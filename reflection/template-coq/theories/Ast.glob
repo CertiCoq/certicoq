@@ -1,0 +1,117 @@
+DIGEST 23b69dd044ec8fd78a227bbaaf79796f
+FTemplate.Ast
+R15:32 Coq.Strings.String <> <> lib
+R50:66 Coq.PArith.BinPos <> <> lib
+def 81:88 <> universe
+R93:100 Coq.Numbers.BinNums <> positive ind
+def 114:118 <> ident
+R123:128 Coq.Strings.String <> string ind
+ind 142:145 <> sort
+constr 159:163 <> sProp
+constr 167:170 <> sSet
+constr 174:178 <> sType
+R164:164 Template.Ast <> sort ind
+R171:171 Template.Ast <> sort ind
+R185:192 Template.Ast <> universe def
+R194:194 Template.Ast <> sort ind
+rec 204:206 <> ind
+ind 234:237 <> name
+constr 251:255 <> nAnon
+constr 259:264 <> nNamed
+R256:256 Template.Ast <> name ind
+R271:275 Template.Ast <> ident def
+R277:277 Template.Ast <> name ind
+ind 290:298 <> cast_kind
+constr 312:317 <> VmCast
+constr 321:330 <> NativeCast
+constr 334:337 <> Cast
+constr 341:350 <> RevertCast
+R318:318 Template.Ast <> cast_kind ind
+R331:331 Template.Ast <> cast_kind ind
+R338:338 Template.Ast <> cast_kind ind
+R351:351 Template.Ast <> cast_kind ind
+ind 364:372 <> inductive
+constr 386:390 <> mkInd
+R411:419 Template.Ast <> inductive ind
+R404:406 Coq.Init.Datatypes <> nat ind
+R394:399 Coq.Strings.String <> string ind
+constr 458:462 <> mkdef
+rec 430:432 <> def
+proj 466:470 <> dname
+proj 481:485 <> dtype
+proj 496:500 <> dbody
+proj 511:514 <> rarg
+R474:477 Template.Ast <> name ind
+R489:492 Template.Ast <> term var
+R504:507 Template.Ast <> term var
+R518:520 Coq.Init.Datatypes <> nat ind
+def 537:545 <> mfixpoint
+R573:576 Coq.Init.Datatypes <> list ind
+R579:581 Template.Ast <> def rec
+R583:586 Template.Ast <> term var
+ind 601:604 <> term
+constr 618:621 <> tRel
+constr 645:648 <> tVar
+constr 674:678 <> tMeta
+constr 701:705 <> tEvar
+constr 728:732 <> tSort
+constr 756:760 <> tCast
+constr 805:809 <> tProd
+constr 866:872 <> tLambda
+constr 927:932 <> tLetIn
+constr 996:999 <> tApp
+constr 1037:1042 <> tConst
+constr 1067:1070 <> tInd
+constr 1100:1109 <> tConstruct
+constr 1140:1144 <> tCase
+constr 1207:1210 <> tFix
+constr 1303:1310 <> tUnknown
+R638:641 Template.Ast <> term ind
+R631:633 Coq.Init.Datatypes <> nat ind
+R667:670 Template.Ast <> term ind
+R658:662 Template.Ast <> ident def
+R694:697 Template.Ast <> term ind
+R687:689 Coq.Init.Datatypes <> nat ind
+R721:724 Template.Ast <> term ind
+R714:716 Coq.Init.Datatypes <> nat ind
+R749:752 Template.Ast <> term ind
+R741:744 Template.Ast <> sort ind
+R798:801 Template.Ast <> term ind
+R790:793 Template.Ast <> term ind
+R777:785 Template.Ast <> cast_kind ind
+R769:772 Template.Ast <> term ind
+R859:862 Template.Ast <> term ind
+R851:854 Template.Ast <> term ind
+R826:829 Template.Ast <> term ind
+R818:821 Template.Ast <> name ind
+R920:923 Template.Ast <> term ind
+R912:915 Template.Ast <> term ind
+R887:890 Template.Ast <> term ind
+R879:882 Template.Ast <> name ind
+R989:992 Template.Ast <> term ind
+R981:984 Template.Ast <> term ind
+R973:976 Template.Ast <> term ind
+R948:951 Template.Ast <> term ind
+R940:943 Template.Ast <> name ind
+R1030:1033 Template.Ast <> term ind
+R1017:1020 Coq.Init.Datatypes <> list ind
+R1022:1025 Template.Ast <> term ind
+R1009:1012 Template.Ast <> term ind
+R1060:1063 Template.Ast <> term ind
+R1050:1055 Coq.Strings.String <> string ind
+R1093:1096 Template.Ast <> term ind
+R1080:1088 Template.Ast <> inductive ind
+R1133:1136 Template.Ast <> term ind
+R1126:1128 Coq.Init.Datatypes <> nat ind
+R1113:1121 Template.Ast <> inductive ind
+R1200:1203 Template.Ast <> term ind
+R1187:1190 Coq.Init.Datatypes <> list ind
+R1192:1195 Template.Ast <> term ind
+R1179:1182 Template.Ast <> term ind
+R1153:1156 Template.Ast <> term ind
+R1245:1248 Template.Ast <> term ind
+R1238:1240 Coq.Init.Datatypes <> nat ind
+R1220:1228 Template.Ast <> mfixpoint def
+R1230:1233 Template.Ast <> term ind
+R1324:1327 Template.Ast <> term ind
+R1314:1319 Coq.Strings.String <> string ind

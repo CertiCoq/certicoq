@@ -1,4 +1,6 @@
+Add LoadPath "../theories" as Template.
 Require Import Template.Template.
+Require Import Ast.
 
 Local Open Scope string_scope.
 
@@ -24,6 +26,7 @@ Defined.
 
 (** Another way **)
 Quote Definition d' := (fun x : nat => x).
+Print d'.
 
 (** To quote existing definitions **)
 Definition id_nat : nat -> nat := fun x => x.

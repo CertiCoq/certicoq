@@ -1,1 +1,0 @@
-module Coercion : Coercion.S

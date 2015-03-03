@@ -36,9 +36,11 @@ Definition mfixpoint (term : Type) : Type :=
 
 Inductive term : Type :=
 | tRel       : nat -> term
+(***
 | tVar       : ident -> term (** this can go away **)
 | tMeta      : nat -> term   (** NOTE: this can go away *)
 | tEvar      : nat -> term
+***)
 | tSort      : sort -> term
 | tCast      : term -> cast_kind -> term -> term
 | tProd      : name -> term (** the type **) -> term -> term
@@ -49,11 +51,11 @@ Inductive term : Type :=
 | tInd       : inductive -> term
 | tConstruct : inductive -> nat -> term
 | tCase      : nat (* # of parameters *) -> term (** type info **) -> term -> list term -> term
-| tFix       : mfixpoint term -> nat -> term
+| tFix       : mfixpoint term -> nat -> term.
 (*
 | CoFix     of ('constr, 'types) pcofixpoint
-*)
 | tUnknown : string -> term.
+*)
 
 Record inductive_body := mkinductive_body
 { ctors : list (ident * term) }.

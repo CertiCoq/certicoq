@@ -58,8 +58,8 @@ module TermReify = struct
   let sType = r_reify "sType"
   let tident = r_reify "ident"
   let tmkInd = r_reify "mkInd"
-  let [tTerm;tRel;tVar;tMeta;tEvar;tSort;tCast;tProd;tLambda;tLetIn;tApp;tCase;tFix;tConstructor;tConst;tInd;tUnknown]
-      = List.map r_reify ["term";"tRel";"tVar";"tMeta";"tEvar";"tSort";"tCast";"tProd";"tLambda";"tLetIn";"tApp";"tCase";"tFix";"tConstruct";"tConst";"tInd";"tUnknown"]
+  let [tTerm;tRel;tSort;tCast;tProd;tLambda;tLetIn;tApp;tCase;tFix;tConstructor;tConst;tInd]
+      = List.map r_reify ["term";"tRel";"tSort";"tCast";"tProd";"tLambda";"tLetIn";"tApp";"tCase";"tFix";"tConstruct";"tConst";"tInd"]
   let [tdef;tmkdef] = List.map r_reify ["def";"mkdef"]
   let [pConstr;pType;pAxiom;pIn]
       = List.map r_reify ["PConstr";"PType";"PAxiom";"PIn"]
@@ -182,7 +182,6 @@ module TermReify = struct
     let rec quote_term (acc : 'a) env trm =
       match Term.kind_of_term trm with
 	Term.Rel i -> (Term.mkApp (tRel, [| int_to_nat (i - 1) |]), acc)
-      | Term.Var v -> (Term.mkApp (tVar, [| quote_ident v |]), acc)
       | Term.Sort s -> (Term.mkApp (tSort, [| quote_sort s |]), acc)
       | Term.Cast (c,k,t) ->
 	let (c',acc) = quote_term acc env c in
@@ -225,7 +224,6 @@ module TermReify = struct
       | Term.Fix fp ->
 	let (t,n,acc) = quote_fixpoint acc env fp in
 	(Term.mkApp (tFix, [| t ; int_to_nat n |]), acc)
-      | _ -> (Term.mkApp (tUnknown, [| quote_string (Format.asprintf "%a" pp_constr trm) |]), acc)
     and quote_fixpoint acc env t =
       let ((a,b),(ns,ts,ds)) = t in
       let rec seq f t =
@@ -471,10 +469,6 @@ module TermReify = struct
 	x :: _ ->
 	  Format.eprintf "Rel\n" ;
 	  Term.mkRel (nat_to_int x + 1)
-      | _ -> raise (Failure "ill-typed")
-    else if Term.eq_constr h tVar then
-      match args with
-	x :: _ -> Format.eprintf "var\n"; Term.mkVar (unquote_ident x)
       | _ -> raise (Failure "ill-typed")
     else if Term.eq_constr h tSort then
       match args with

@@ -97,8 +97,8 @@ let add_coq x =
 	Cmd (S[A (Lazy.force camlpX ^ "o");
 	       T(tags_of_pathname ml4 ++ "p4mod");
 	       T(tags_of_pathname ml4 ++ "p4option");
-	       A"-I";A (coq_dir "parsing");
-	       A"pa_extend.cmo";A"pa_macro.cmo";A"q_MLast.cmo";A"grammar.cma";
+	       A"-I";A (coq_dir "parsing");A"-I";A (coq_dir "grammar");
+	       A"-threads";A"pa_extend.cmo";A"pa_macro.cmo";A"q_MLast.cmo";A"grammar.cma";
 	       A"-loc";A"loc";
 	       A"-o"; Px ml; A"-impl"; P ml4])) ;
     flag ["ocaml";"compile"; "coq"] & (S coq_args) ;

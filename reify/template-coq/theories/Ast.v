@@ -36,17 +36,12 @@ Definition mfixpoint (term : Type) : Type :=
 
 Inductive term : Type :=
 | tRel       : nat -> term
-(***
-| tVar       : ident -> term (** this can go away **)
-| tMeta      : nat -> term   (** NOTE: this can go away *)
-| tEvar      : nat -> term
-***)
 | tSort      : sort -> term
 | tCast      : term -> cast_kind -> term -> term
 | tProd      : name -> term (** the type **) -> term -> term
 | tLambda    : name -> term (** the type **) -> term -> term
 | tLetIn     : name -> term (** the type **) -> term -> term -> term
-| tApp       : term -> list term -> term
+| tApp       : term -> term (* at least one arg *) -> list term -> term
 | tConst     : string -> term
 | tInd       : inductive -> term
 | tConstruct : inductive -> nat -> term

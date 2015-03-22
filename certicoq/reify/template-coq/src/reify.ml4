@@ -206,7 +206,9 @@ module TermReify = struct
 	  List.fold_left (fun (xs,acc) x ->
 	    let (x,acc) = quote_term acc env x in (x :: xs, acc))
 	    ([],acc) (Array.to_list xs) in
-	(Term.mkApp (tApp, [| f' ; to_coq_list tTerm (List.rev xs') |]), acc)
+        let (arg,args) = match (List.rev xs') with
+                        (arg :: args) -> (arg, to_coq_list tTerm args) in
+	(Term.mkApp (tApp, [| f' ; arg ; args |]), acc)
       | Term.Const c ->
 	(Term.mkApp (tConst, [| quote_string (Names.string_of_con c) |]), add_constant c acc)
       | Term.Construct (ind,c) ->

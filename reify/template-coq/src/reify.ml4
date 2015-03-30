@@ -175,6 +175,13 @@ module TermReify = struct
       [] -> []
     | l :: ls -> (st,l) :: pair_with_number (st + 1) ls
 
+  let rec function_arity typ =
+    match typ with
+      Term.Prod (n,t,b) -> (function_arity t) + 1
+    | Term.Rel n -> 0
+    | Term.App (Term.Rel _, _) -> 0
+    | Term.App (Term.Construct _, _) -> 0
+    | x -> raise (Failure "Quoting can't find arity of constructor")
 
   let quote_term_remember
       (add_constant : Names.constant -> 'a -> 'a)
@@ -212,7 +219,8 @@ module TermReify = struct
       | Term.Const c ->
 	(Term.mkApp (tConst, [| quote_string (Names.string_of_con c) |]), add_constant c acc)
       | Term.Construct (ind,c) ->
-	(Term.mkApp (tConstructor, [| quote_inductive env ind ; int_to_nat (c - 1) |]), add_inductive ind acc)
+	(Term.mkApp (tConstructor,
+                     [| quote_inductive env ind ; int_to_nat (c - 1) |]), add_inductive ind acc)
       | Term.Ind i -> (Term.mkApp (tInd, [| quote_inductive env i |]), add_inductive i acc)
       | Term.Case (ci,a,b,e) ->
         let npar = int_to_nat ci.ci_npar in

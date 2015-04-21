@@ -59,9 +59,6 @@ struct
   let pair a b f s =
     Term.mkApp (c_pair, [| a ; b ; f ; s |])
 
-  let cmk_const = r_reify "mk_const"
-  let cconst = r_reify "const"
-
   let nAnon = r_reify "nAnon"
   let nNamed = r_reify "nNamed"
   let kVmCast = r_reify "VmCast"
@@ -159,6 +156,7 @@ struct
     | Term.REVERTcast -> kRevertCast
 
   let quote_universe s =
+    (** TODO: This doesn't work yet **)
     to_positive 1
 
   let quote_sort s =
@@ -168,23 +166,11 @@ struct
 	else
 	  let _ = assert (s = Term.set_sort) in
 	  sSet
-    | Term.Type u ->
-      Term.mkApp (sType, [| Term.mkSort s (* quote_universe u *) |])
-
-  let parse_name s =
-    let ls = Str.split (Str.regexp_string ".") s in
-    match List.rev ls with
-      [] -> assert false
-    | nm :: m -> (List.rev m, nm)
-
-  let mk_const s =
-    let (mm,n) = parse_name s in
-    Term.mkApp (cmk_const, [| to_coq_list tident (List.map quote_string mm)
-			    ; quote_string n |])
+    | Term.Type u -> Term.mkApp (sType, [| quote_universe u |])
 
   let quote_inductive env (t : Names.inductive) =
     let (m,i) = t in
-    Term.mkApp (tmkInd, [| mk_const (Names.string_of_kn (Names.canonical_mind m))
+    Term.mkApp (tmkInd, [| quote_string (Names.string_of_kn (Names.canonical_mind m))
 			 ; int_to_nat i |])
 
   let mk_ctor_list =
@@ -246,7 +232,7 @@ struct
 	    ([],acc) (Array.to_list xs) in
 	(Term.mkApp (tApp, [| f' ; to_coq_list tTerm (List.rev xs') |]), acc)
       | Term.Const c ->
-	(Term.mkApp (tConst, [| mk_const (Names.string_of_con c) |]), add_constant c acc)
+	(Term.mkApp (tConst, [| quote_string (Names.string_of_con c) |]), add_constant c acc)
       | Term.Construct (ind,c) ->
 	(Term.mkApp (tConstructor, [| quote_inductive env ind ; int_to_nat (c - 1) |]), add_inductive ind acc)
       | Term.Ind i -> (Term.mkApp (tInd, [| quote_inductive env i |]), add_inductive i acc)
@@ -441,6 +427,7 @@ struct
     else
       bad_term trm
 
+
   let unquote_name trm =
     let (h,args) = app_full trm [] in
     if Term.eq_constr h nAnon then
@@ -452,20 +439,16 @@ struct
     else
       raise (Failure "non-value")
 
-(*
   let unquote_sort trm =
     let (h,args) = app_full trm [] in
     if Term.eq_constr h sType then
-      match args with
-	[x] -> x
-      | _ -> raise (NotSupported h)
+      raise (NotSupported h)
     else if Term.eq_constr h sProp then
       Term.Prop Term.Pos
     else if Term.eq_constr h sSet then
       Term.Prop Term.Null
     else
       raise (Failure "ill-typed, expected sort")
-*)
 
   let kn_of_canonical_string s =
     let ss = List.rev (Str.split (Str.regexp (Str.quote ".")) s) in
@@ -476,6 +459,20 @@ struct
 	Names.make_kn mp Names.empty_dirpath (Names.mk_label nm)
     | _ -> assert false
 
+  let denote_inductive trm =
+    let (h,args) = app_full trm [] in
+    if Term.eq_constr h tmkInd then
+      match args with
+	nm :: num :: _ ->
+	  let n = unquote_string nm in
+	  let kn = kn_of_canonical_string n in
+	  let mi = Names.mind_of_kn kn in
+	  let i = nat_to_int num in
+	  (mi, i)
+      | _ -> assert false
+    else
+      raise (Failure "non-constructor")
+
   let rec from_coq_list trm =
     let (h,args) = app_full trm [] in
     if Term.eq_constr h c_nil then []
@@ -485,31 +482,6 @@ struct
       | _ -> bad_term trm
     else
       not_supported trm
-
-  let unquote_const trm =
-    let (h,args) = app_full trm [] in
-    if Term.eq_constr h cmk_const then
-      match args with
-	[m;n] ->
-	let m = List.map unquote_string (from_coq_list m) in
-	let n = unquote_string n in
-	resolve_symbol m n
-      | _ -> bad_term trm
-    else
-      not_supported trm
-
-  let denote_inductive trm =
-    let (h,args) = app_full trm [] in
-    if Term.eq_constr h tmkInd then
-      match args with
-	nm :: num :: _ ->
-	  let n = unquote_const nm in
-	  let (mi,_) = Term.destInd n in
-	  let i = nat_to_int num in
-	  (mi, i)
-      | _ -> assert false
-    else
-      raise (Failure "non-constructor")
 
 
   (** NOTE: Because the representation is lossy, I should probably
@@ -531,20 +503,7 @@ struct
       | _ -> raise (Failure "ill-typed")
     else if Term.eq_constr h tSort then
       match args with
-	trm :: _ ->
-	  begin
-	    let (h,args) = app_full trm [] in
-	    if Term.eq_constr h sType then
-	      match args with
-		[x] -> x
-	      | _ -> not_supported h
-	    else if Term.eq_constr h sProp then
-	      Term.mkSort (Term.Prop Term.Pos)
-	    else if Term.eq_constr h sSet then
-	      Term.mkSort (Term.Prop Term.Null)
-	    else
-	      raise (Failure "ill-typed, expected sort")
-	  end
+	x :: _ -> Term.mkSort (unquote_sort x)
       | _ -> raise (Failure "ill-typed")
     else if Term.eq_constr h tCast then
       match args with
@@ -592,10 +551,6 @@ struct
 		      , denote_term ty, denote_term d ,
 			Array.of_list (List.map denote_term (from_coq_list brs)))
       | _ -> raise (Failure "ill-typed (case)")
-    else if Term.eq_constr h tConst then
-      match args with
-	[c] -> unquote_const c
-      | _ -> not_supported trm
     else
       not_supported trm
 
@@ -667,8 +622,7 @@ VERNAC COMMAND EXTEND Make_vernac
 	declare_definition name
 	  (Decl_kinds.Global, false, Decl_kinds.Definition)
 	  [] None result None (fun _ _ -> ()) ]
-    | [ "Quote" "Definition" ident(name) ":="
-		"Eval" red_expr(rd) "in" constr(def) ] ->
+    | [ "Quote" "Definition" ident(name) ":=" "Eval" red_expr(rd) "in" constr(def) ] ->
       [ check_inside_section () ;
 	let (evm,env) = Lemmas.get_current_context () in
 	let def = Constrintern.interp_constr evm env def in
@@ -712,19 +666,6 @@ VERNAC COMMAND EXTEND Unquote_vernac
       [ check_inside_section () ;
 	let (evm,env) = Lemmas.get_current_context () in
 	let def = Constrintern.interp_constr evm env def in
-	let trm = TermReify.denote_term def in
-	let result = Constrextern.extern_constr true env trm in
-	declare_definition name
-	  (Decl_kinds.Global, false, Decl_kinds.Definition)
-	  [] None result None (fun _ _ -> ()) ]
-    | [ "Make" "Definition" ident(name) ":="
-	       "Eval" red_expr(rd) "in" constr(def) ] ->
-      [ check_inside_section () ;
-	let (evm,env) = Lemmas.get_current_context () in
-	let def = Constrintern.interp_constr evm env def in
-	let (evm2,red) = Tacinterp.interp_redexp env evm rd in
-	let red = fst (Redexpr.reduction_of_red_expr red) in
-	let def = red env evm2 def in
 	let trm = TermReify.denote_term def in
 	let result = Constrextern.extern_constr true env trm in
 	declare_definition name

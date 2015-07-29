@@ -1,8 +1,12 @@
 Require Import Coq.Strings.String.
 Require Import Coq.PArith.BinPos.
 
-Definition universe := positive.
+Definition universe := Type (* positive *).
 Definition ident := string.
+Record const := mk_const
+{ constPath : list ident
+; constName : ident
+}.
 
 Inductive sort : Type :=
 | sProp
@@ -22,7 +26,7 @@ Inductive cast_kind : Type :=
 | RevertCast.
 
 Inductive inductive : Type :=
-| mkInd : string -> nat -> inductive.
+| mkInd : const -> nat -> inductive.
 
 Record def (term : Type) : Type := mkdef
 { dname : name (** the name (note, this may mention other definitions **)
@@ -45,7 +49,7 @@ Inductive term : Type :=
 | tLambda    : name -> term (** the type **) -> term -> term
 | tLetIn     : name -> term (** the type **) -> term -> term -> term
 | tApp       : term -> list term -> term
-| tConst     : string -> term
+| tConst     : const -> term
 | tInd       : inductive -> term
 | tConstruct : inductive -> nat -> term
 | tCase      : nat (* # of parameters *) -> term (** type info **) -> term -> list term -> term

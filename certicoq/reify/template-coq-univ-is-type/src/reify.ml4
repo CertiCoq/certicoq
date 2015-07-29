@@ -5,13 +5,25 @@ let contrib_name = "template-coq"
 
 let pp_constr fmt x = Pp.pp_with fmt (Printer.pr_constr x)
 
-module TermReify = struct
+module TermReify =
+struct
   exception NotSupported of Term.constr
 
   module Cmap = Names.Cmap
   module Cset = Names.Cset
   module Mindset = Names.Mindset
 
+  (* flags *)
+  let opt_hnf_ctor_types = ref false
+
+  let with_hnf_ctor_types f =
+    opt_hnf_ctor_types := true ;
+    try
+      let result = f () in
+      opt_hnf_ctor_types := false ;
+      result
+    with
+      e -> let _ = opt_hnf_ctor_types := false in raise e
 
   let not_supported trm =
     Format.eprintf "\nNot Supported: %a\n" pp_constr trm ;
@@ -21,7 +33,8 @@ module TermReify = struct
     raise (NotSupported trm)
 
   let resolve_symbol (path : string list) (tm : string) : Term.constr =
-    Coqlib.gen_constant_in_modules contrib_name [path] tm
+    let re = Coqlib.find_reference contrib_name path tm in
+    Libnames.constr_of_global re
 
   let pkg_bignums = ["Coq";"Numbers";"BinNums"]
   let pkg_datatypes = ["Coq";"Init";"Datatypes"]
@@ -45,6 +58,9 @@ module TermReify = struct
   let c_pair = resolve_symbol pkg_datatypes "pair"
   let pair a b f s =
     Term.mkApp (c_pair, [| a ; b ; f ; s |])
+
+  let cmk_const = r_reify "mk_const"
+  let cconst = r_reify "const"
 
   let nAnon = r_reify "nAnon"
   let nNamed = r_reify "nNamed"
@@ -143,7 +159,6 @@ module TermReify = struct
     | Term.REVERTcast -> kRevertCast
 
   let quote_universe s =
-    (** TODO: This doesn't work yet **)
     to_positive 1
 
   let quote_sort s =
@@ -153,11 +168,23 @@ module TermReify = struct
 	else
 	  let _ = assert (s = Term.set_sort) in
 	  sSet
-    | Term.Type u -> Term.mkApp (sType, [| quote_universe u |])
+    | Term.Type u ->
+      Term.mkApp (sType, [| Term.mkSort s (* quote_universe u *) |])
+
+  let parse_name s =
+    let ls = Str.split (Str.regexp_string ".") s in
+    match List.rev ls with
+      [] -> assert false
+    | nm :: m -> (List.rev m, nm)
+
+  let mk_const s =
+    let (mm,n) = parse_name s in
+    Term.mkApp (cmk_const, [| to_coq_list tident (List.map quote_string mm)
+			    ; quote_string n |])
 
   let quote_inductive env (t : Names.inductive) =
     let (m,i) = t in
-    Term.mkApp (tmkInd, [| quote_string (Names.string_of_kn (Names.canonical_mind m))
+    Term.mkApp (tmkInd, [| mk_const (Names.string_of_kn (Names.canonical_mind m))
 			 ; int_to_nat i |])
 
   let mk_ctor_list =
@@ -174,6 +201,17 @@ module TermReify = struct
       [] -> []
     | l :: ls -> (st,l) :: pair_with_number (st + 1) ls
 
+  let hnf_type env ty =
+    let rec hnf_type continue ty =
+      match Term.kind_of_term ty with
+	Term.Prod (n,t,b) -> Term.mkProd (n,t,hnf_type true b)
+      | Term.LetIn _
+      | Term.Cast _
+      | Term.App _ when continue ->
+	 hnf_type false (Reduction.whd_betadeltaiota env ty)
+      | _ -> ty
+    in
+    hnf_type true ty
 
   let quote_term_remember
       (add_constant : Names.constant -> 'a -> 'a)
@@ -207,12 +245,11 @@ module TermReify = struct
 	    let (x,acc) = quote_term acc env x in (x :: xs, acc))
 	    ([],acc) (Array.to_list xs) in
 	(Term.mkApp (tApp, [| f' ; to_coq_list tTerm (List.rev xs') |]), acc)
-      | Term.Const (c,pu) -> (* FIXME: take universe constraints into account *)
-	(Term.mkApp (tConst, [| quote_string (Names.string_of_con c) |]), add_constant c acc)
-      | Term.Construct ((ind,c),pu) -> (* FIXME: take universe constraints into account *)
+      | Term.Const c ->
+	(Term.mkApp (tConst, [| mk_const (Names.string_of_con c) |]), add_constant c acc)
+      | Term.Construct (ind,c) ->
 	(Term.mkApp (tConstructor, [| quote_inductive env ind ; int_to_nat (c - 1) |]), add_inductive ind acc)
-      | Term.Ind (i,pu) -> (* FIXME: take universe constraints into account *)
-         (Term.mkApp (tInd, [| quote_inductive env i |]), add_inductive i acc)
+      | Term.Ind i -> (Term.mkApp (tInd, [| quote_inductive env i |]), add_inductive i acc)
       | Term.Case (ci,a,b,e) ->
         let npar = int_to_nat ci.ci_npar in
 	let (a',acc) = quote_term acc env a in
@@ -254,6 +291,8 @@ module TermReify = struct
 	  in
 	  let (reified_ctors,acc) =
 	    List.fold_left (fun (ls,acc) (nm,ty) ->
+			    Printf.eprintf "XXXX %b\n" !opt_hnf_ctor_types ;
+	      let ty = if !opt_hnf_ctor_types then hnf_type env ty else ty in
 	      let (ty,acc) = quote_term acc env ty in
 	      ((quote_ident nm, ty) :: ls, acc))
 	      ([],acc) named_ctors
@@ -315,9 +354,9 @@ module TermReify = struct
 		  constants := Term.mkApp (pAxiom,
 					   [| quote_string (Names.string_of_con c) |]) :: !constants
 	      | Def cs ->
-		do_body (Mod_subst.force_constr cs)
+		do_body (force cs)
 	      | OpaqueDef lc ->
-		do_body (Opaqueproof.force_proof (Global.opaque_tables ()) lc))
+		do_body (force_opaque lc))
 	  end
     in
     let (quote_rem,quote_typ) =
@@ -402,7 +441,6 @@ module TermReify = struct
     else
       bad_term trm
 
-
   let unquote_name trm =
     let (h,args) = app_full trm [] in
     if Term.eq_constr h nAnon then
@@ -414,16 +452,20 @@ module TermReify = struct
     else
       raise (Failure "non-value")
 
+(*
   let unquote_sort trm =
     let (h,args) = app_full trm [] in
     if Term.eq_constr h sType then
-      raise (NotSupported h)
+      match args with
+	[x] -> x
+      | _ -> raise (NotSupported h)
     else if Term.eq_constr h sProp then
       Term.Prop Term.Pos
     else if Term.eq_constr h sSet then
       Term.Prop Term.Null
     else
       raise (Failure "ill-typed, expected sort")
+*)
 
   let kn_of_canonical_string s =
     let ss = List.rev (Str.split (Str.regexp (Str.quote ".")) s) in
@@ -434,20 +476,6 @@ module TermReify = struct
 	Names.make_kn mp Names.empty_dirpath (Names.mk_label nm)
     | _ -> assert false
 
-  let denote_inductive trm =
-    let (h,args) = app_full trm [] in
-    if Term.eq_constr h tmkInd then
-      match args with
-	nm :: num :: _ ->
-	  let n = unquote_string nm in
-	  let kn = kn_of_canonical_string n in
-	  let mi = Names.mind_of_kn kn in
-	  let i = nat_to_int num in
-	  (mi, i)
-      | _ -> assert false
-    else
-      raise (Failure "non-constructor")
-
   let rec from_coq_list trm =
     let (h,args) = app_full trm [] in
     if Term.eq_constr h c_nil then []
@@ -457,6 +485,31 @@ module TermReify = struct
       | _ -> bad_term trm
     else
       not_supported trm
+
+  let unquote_const trm =
+    let (h,args) = app_full trm [] in
+    if Term.eq_constr h cmk_const then
+      match args with
+	[m;n] ->
+	let m = List.map unquote_string (from_coq_list m) in
+	let n = unquote_string n in
+	resolve_symbol m n
+      | _ -> bad_term trm
+    else
+      not_supported trm
+
+  let denote_inductive trm =
+    let (h,args) = app_full trm [] in
+    if Term.eq_constr h tmkInd then
+      match args with
+	nm :: num :: _ ->
+	  let n = unquote_const nm in
+	  let (mi,_) = Term.destInd n in
+	  let i = nat_to_int num in
+	  (mi, i)
+      | _ -> assert false
+    else
+      raise (Failure "non-constructor")
 
 
   (** NOTE: Because the representation is lossy, I should probably
@@ -478,7 +531,20 @@ module TermReify = struct
       | _ -> raise (Failure "ill-typed")
     else if Term.eq_constr h tSort then
       match args with
-	x :: _ -> Term.mkSort (unquote_sort x)
+	trm :: _ ->
+	  begin
+	    let (h,args) = app_full trm [] in
+	    if Term.eq_constr h sType then
+	      match args with
+		[x] -> x
+	      | _ -> not_supported h
+	    else if Term.eq_constr h sProp then
+	      Term.mkSort (Term.Prop Term.Pos)
+	    else if Term.eq_constr h sSet then
+	      Term.mkSort (Term.Prop Term.Null)
+	    else
+	      raise (Failure "ill-typed, expected sort")
+	  end
       | _ -> raise (Failure "ill-typed")
     else if Term.eq_constr h tCast then
       match args with
@@ -526,56 +592,62 @@ module TermReify = struct
 		      , denote_term ty, denote_term d ,
 			Array.of_list (List.map denote_term (from_coq_list brs)))
       | _ -> raise (Failure "ill-typed (case)")
+    else if Term.eq_constr h tConst then
+      match args with
+	[c] -> unquote_const c
+      | _ -> not_supported trm
     else
       not_supported trm
 
 end
 
-DECLARE PLUGIN "template_plugin"
-let _= Mltop.add_known_module "template_plugin"
+let _= Mltop.add_known_module "templateCoq"
 
 (** Stolen from CoqPluginUtils **)
 (** Calling Ltac **)
 let ltac_call tac (args:Tacexpr.glob_tactic_arg list) =
-  Tacexpr.TacArg(Loc.ghost,Tacexpr.TacCall(Loc.ghost, Misctypes.ArgArg(Loc.ghost, Lazy.force tac),args))
+  Tacexpr.TacArg(Util.dummy_loc,Tacexpr.TacCall(Util.dummy_loc, Glob_term.ArgArg(Util.dummy_loc, Lazy.force tac),args))
 
 (* Calling a locally bound tactic *)
 let ltac_lcall tac args =
-  Tacexpr.TacArg(Loc.ghost,Tacexpr.TacCall(Loc.ghost, Misctypes.ArgVar(Loc.ghost, Names.id_of_string tac),args))
+  Tacexpr.TacArg(Util.dummy_loc,Tacexpr.TacCall(Util.dummy_loc, Glob_term.ArgVar(Util.dummy_loc, Names.id_of_string tac),args))
 
 let ltac_letin (x, e1) e2 =
-  Tacexpr.TacLetIn(false,[(Loc.ghost,Names.id_of_string x),e1],e2)
+  Tacexpr.TacLetIn(false,[(Util.dummy_loc,Names.id_of_string x),e1],e2)
 
 let ltac_apply (f:Tacexpr.glob_tactic_expr) (args:Tacexpr.glob_tactic_arg list) =
   Tacinterp.eval_tactic
     (ltac_letin ("F", Tacexpr.Tacexp f) (ltac_lcall "F" args))
 
-let to_ltac_val c = Tacexpr.TacDynamic(Loc.ghost,Pretyping.constr_in c)
+let to_ltac_val c = Tacexpr.TacDynamic(Util.dummy_loc,Pretyping.constr_in c)
 
 (** From Containers **)
-
 let declare_definition
     id (loc, boxed_flag, def_obj_kind)
     binder_list red_expr_opt constr_expr
     constr_expr_opt decl_hook =
-  Command.do_definition
-  id (loc, false, def_obj_kind) binder_list red_expr_opt constr_expr
-  constr_expr_opt decl_hook
+  let (def_entry, man_impl) =
+    Command.interp_definition binder_list red_expr_opt constr_expr
+      constr_expr_opt
+  in
+    Command.declare_definition
+      id (loc, def_obj_kind) def_entry man_impl decl_hook
 
 let check_inside_section () =
   if Lib.sections_are_opened () then
     (** In trunk this seems to be moved to Errors **)
-    Errors.errorlabstrm "Quote" (Pp.str "You can not quote within a section.")
+    Util.errorlabstrm "Quote" (Pp.str "You can not quote within a section.")
   else ()
+
+
 
 TACTIC EXTEND get_goal
     | [ "quote_term" constr(c) tactic(tac) ] ->
       [ (** quote the given term, pass the result to t **)
-  Proofview.Goal.nf_enter begin fun gl ->
-          let env = Proofview.Goal.env gl in
+	fun gl ->
+	  let env = Tacmach.pf_env gl in
 	  let c = TermReify.quote_term env c in
-	  ltac_apply tac (List.map to_ltac_val [c])
-  end ]
+	  ltac_apply tac (List.map to_ltac_val [c]) gl ]
 (*
     | [ "quote_goal" ] ->
       [ (** get the representation of the goal **)
@@ -585,55 +657,82 @@ TACTIC EXTEND get_goal
 *)
 END;;
 
-VERNAC COMMAND EXTEND Make_vernac CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND Make_vernac
     | [ "Quote" "Definition" ident(name) ":=" constr(def) ] ->
       [ check_inside_section () ;
 	let (evm,env) = Lemmas.get_current_context () in
-	let def = Constrintern.interp_constr env evm def in
-	let trm = TermReify.quote_term env (fst def) in
-	let result = Constrextern.extern_constr true env evm trm in
+	let def = Constrintern.interp_constr evm env def in
+	let trm = TermReify.quote_term env def in
+	let result = Constrextern.extern_constr true env trm in
 	declare_definition name
 	  (Decl_kinds.Global, false, Decl_kinds.Definition)
-	  [] None result None (Lemmas.mk_hook (fun _ _ -> ())) ]
-    | [ "Quote" "Definition" ident(name) ":=" "Eval" red_expr(rd) "in" constr(def) ] ->
+	  [] None result None (fun _ _ -> ()) ]
+    | [ "Quote" "Definition" ident(name) ":="
+		"Eval" red_expr(rd) "in" constr(def) ] ->
       [ check_inside_section () ;
 	let (evm,env) = Lemmas.get_current_context () in
-	let def = Constrintern.interp_constr env evm def in
+	let def = Constrintern.interp_constr evm env def in
 	let (evm2,red) = Tacinterp.interp_redexp env evm rd in
-	let red = fst (Redexpr.reduction_of_red_expr env red) in
-	let def = red env evm2 (fst def) in
-	let trm = TermReify.quote_term env (snd def) in
-	let result = Constrextern.extern_constr true env (fst def) trm in
+	let red = fst (Redexpr.reduction_of_red_expr red) in
+	let def = red env evm2 def in
+	let trm = TermReify.quote_term env def in
+	let result = Constrextern.extern_constr true env trm in
 	declare_definition name
 	  (Decl_kinds.Global, false, Decl_kinds.Definition)
-	  [] None result None (Lemmas.mk_hook (fun _ _ -> ())) ]
+	  [] None result None (fun _ _ -> ()) ]
 END;;
 
-VERNAC COMMAND EXTEND Make_recursive CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND Make_recursive
     | [ "Quote" "Recursively" "Definition" ident(name) ":=" constr(def) ] ->
       [ check_inside_section () ;
 	let (evm,env) = Lemmas.get_current_context () in
-	let def = Constrintern.interp_constr env evm def in
-	let trm = TermReify.quote_term_rec env (fst def) in
-	let result = Constrextern.extern_constr true env evm trm in
+	let def = Constrintern.interp_constr evm env def in
+	let trm = TermReify.quote_term_rec env def in
+	let result = Constrextern.extern_constr true env trm in
 	declare_definition name
 	  (Decl_kinds.Global, false, Decl_kinds.Definition)
-	  [] None result None (Lemmas.mk_hook (fun _ _ -> ())) ]
+	  [] None result None (fun _ _ -> ()) ]
 END;;
 
-VERNAC COMMAND EXTEND Unquote_vernac CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND Make_recursive_hnf
+    | [ "Quote" "Recursively" "[" "hnf" "ind" "typ" "]" "Definition" ident(name) ":=" constr(def) ] ->
+      [ check_inside_section () ;
+	let (evm,env) = Lemmas.get_current_context () in
+	let def = Constrintern.interp_constr evm env def in
+	let trm = TermReify.with_hnf_ctor_types (fun () -> TermReify.quote_term_rec env def) in
+	let result = Constrextern.extern_constr true env trm in
+	declare_definition name
+	  (Decl_kinds.Global, false, Decl_kinds.Definition)
+	  [] None result None (fun _ _ -> ()) ]
+END;;
+
+
+VERNAC COMMAND EXTEND Unquote_vernac
     | [ "Make" "Definition" ident(name) ":=" constr(def) ] ->
       [ check_inside_section () ;
 	let (evm,env) = Lemmas.get_current_context () in
-	let def = Constrintern.interp_constr env evm def in
-	let trm = TermReify.denote_term (fst def) in
-	let result = Constrextern.extern_constr true env evm trm in
+	let def = Constrintern.interp_constr evm env def in
+	let trm = TermReify.denote_term def in
+	let result = Constrextern.extern_constr true env trm in
 	declare_definition name
 	  (Decl_kinds.Global, false, Decl_kinds.Definition)
-	  [] None result None (Lemmas.mk_hook (fun _ _ -> ())) ]
+	  [] None result None (fun _ _ -> ()) ]
+    | [ "Make" "Definition" ident(name) ":="
+	       "Eval" red_expr(rd) "in" constr(def) ] ->
+      [ check_inside_section () ;
+	let (evm,env) = Lemmas.get_current_context () in
+	let def = Constrintern.interp_constr evm env def in
+	let (evm2,red) = Tacinterp.interp_redexp env evm rd in
+	let red = fst (Redexpr.reduction_of_red_expr red) in
+	let def = red env evm2 def in
+	let trm = TermReify.denote_term def in
+	let result = Constrextern.extern_constr true env trm in
+	declare_definition name
+	  (Decl_kinds.Global, false, Decl_kinds.Definition)
+	  [] None result None (fun _ _ -> ()) ]
 END;;
 
-VERNAC COMMAND EXTEND Make_tests CLASSIFIED AS QUERY
+VERNAC COMMAND EXTEND Make_tests
 (*
     | [ "Make" "Definitions" tactic(t) ] ->
       [ (** [t] returns a [list (string * term)] **)
@@ -642,8 +741,8 @@ VERNAC COMMAND EXTEND Make_tests CLASSIFIED AS QUERY
     | [ "Test" "Quote" constr(c) ] ->
       [ check_inside_section () ;
 	let (evm,env) = Lemmas.get_current_context () in
-	let c = Constrintern.interp_constr env evm c in
-	let result = TermReify.quote_term env (fst c) in
+	let c = Constrintern.interp_constr evm env c in
+	let result = TermReify.quote_term env c in
 (* DEBUGGING
 	let back = TermReify.denote_term result in
 	Format.eprintf "%a\n" pp_constr result ;

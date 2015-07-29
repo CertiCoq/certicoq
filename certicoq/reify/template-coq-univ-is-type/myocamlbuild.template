@@ -1,5 +1,3 @@
-let coq_config_string = "LOCAL=1|COQLIB=/home/mdenes/coq.trunk/|DOCDIR=/|OCAMLDEP=ocamldep|OCAMLC=ocamlc|OCAMLOPT=ocamlopt|OCAMLDOC=ocamldoc|CAMLBIN=/home/mdenes/.opam/4.01.0/bin/|CAMLLIB=/home/mdenes/.opam/4.01.0/lib/ocaml/|CAMLP4=camlp5|CAMLP4O=camlp5o|CAMLP4BIN=/home/mdenes/.opam/4.01.0/bin/|CAMLP4LIB=/home/mdenes/.opam/4.01.0/lib/camlp5|CAMLP4OPTIONS=-loc loc|HASNATDYNLINK=true|";; 
-
 open Ocamlbuild_plugin
 open Unix
 
@@ -99,8 +97,8 @@ let add_coq x =
 	Cmd (S[A (Lazy.force camlpX ^ "o");
 	       T(tags_of_pathname ml4 ++ "p4mod");
 	       T(tags_of_pathname ml4 ++ "p4option");
-	       A"-I";A (coq_dir "parsing");A"-I";A (coq_dir "grammar");
-	       A"-threads";A"pa_extend.cmo";A"pa_macro.cmo";A"q_MLast.cmo";A"grammar.cma";
+	       A"-I";A (coq_dir "parsing");
+	       A"pa_extend.cmo";A"pa_macro.cmo";A"q_MLast.cmo";A"grammar.cma";
 	       A"-loc";A"loc";
 	       A"-o"; Px ml; A"-impl"; P ml4])) ;
     flag ["ocaml";"compile"; "coq"] & (S coq_args) ;

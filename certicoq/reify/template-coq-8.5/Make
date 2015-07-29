@@ -1,5 +1,0 @@
--I src
--R theories Template
-src/template_plugin.ml4
-theories/Ast.v
-theories/Template.v

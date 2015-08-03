@@ -58,7 +58,6 @@ Qed.
 Hint Resolve strip_absorbs_mkApp_nil.
 ****)
 
-
 Definition optStrip (t:option L1Term) : option Term :=
   match t with
     | None => None
@@ -101,6 +100,7 @@ Fixpoint stripEnv (p:L1.program.environ) : environ :=
     | nil => nil
     | cons (nm, ec) q => cons (nm, (stripEc ec)) (stripEnv q)
   end.
+
 
 Definition program_Program (pgm:program) : option Program :=
   match L1.malecha_L1.program_Program pgm (ret nil) with
@@ -204,6 +204,36 @@ Lemma isApp_hom:
   forall t, isApp (strip t) -> L1.term.isApp t.
 destruct t; simpl; intros h; destruct h as [x0 [x1 [x2 h]]]; try discriminate. 
 - exists t1, t2, t3. reflexivity.
+Qed.
+
+Lemma L1WFapp_L2WFapp:
+  (forall t, L1.term.WFapp t -> WFapp (strip t)) /\
+  (forall ts, L1.term.WFapps ts -> WFapps (strips ts)) /\
+  (forall ds, L1.term.WFappDs ds -> WFappDs (stripDs ds)).
+Proof.
+  apply L1.term.WFappTrmsDefs_ind; simpl; constructor; auto.
+  - intros h. elim H. apply isApp_hom. assumption.
+Qed.
+
+Lemma L1WFaEnv_L2WFaEnv:
+  forall p:L1.program.environ, L1.program.WFaEnv p -> WFaEnv (stripEnv p).
+Proof.
+  induction 1; simpl; constructor.
+  - inversion H; destruct ec; simpl; try discriminate.
+    + constructor. apply (proj1 (L1WFapp_L2WFapp)). assumption.
+    + constructor.
+  - assumption.
+Qed.
+
+Lemma WFapp_hom:
+  (forall t, L1.term.WFapp t -> WFapp (strip t)) /\
+  (forall ts, L1.term.WFapps ts -> WFapps (strips ts)) /\
+  (forall ds, L1.term.WFappDs ds -> WFappDs (stripDs ds)).
+Proof.
+  apply L1.term.WFappTrmsDefs_ind; simpl; intros; try (solve [constructor]);
+  try (solve [constructor; intuition]).
+  - constructor; try assumption.
+    + intros h. assert (j:= isApp_hom _ h). contradiction.
 Qed.
 
 Lemma mkApp_tcons_lem1:
@@ -373,7 +403,7 @@ unfold L1.term.whBetaStep, whBetaStep.
 rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
 Qed.
 
-Lemma TConstruct_hom:  (****  WRONG: arity ****)
+Lemma TConstruct_hom:
   forall i n , strip (L1.term.TConstruct i n) = TConstruct i n.
 intros. simpl.  destruct i. reflexivity.
 Qed.
@@ -562,6 +592,327 @@ Qed.
 
 Print Assumptions L1wcbvEval_strip_L2WcbvEval.
 
+Lemma Lam_strip_inv:
+  forall nm bod s, TLambda nm bod = strip s ->
+   exists sty sbod, 
+     (L1.term.TLambda nm sty sbod) = s /\ bod = strip sbod.
+Proof.
+  intros nm bod; destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2. intuition. 
+Qed.
+
+Lemma Prod_strip_inv:
+  forall nm bod s, TProd nm bod = strip s ->
+   exists sty sbod, 
+     (L1.term.TProd nm sty sbod) = s /\ bod = strip sbod.
+Proof.
+  intros nm bod; destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2. intuition. 
+Qed.
+
+Lemma Cast_strip_inv:
+  forall tm s, TCast tm = strip s ->
+   exists stm ck sty, 
+     (L1.term.TCast stm ck sty) = s /\ tm = strip stm.
+Proof.
+  intros tm; destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, c, s2. intuition. 
+Qed.
+
+Lemma Construct_strip_inv:
+  forall i n s, TConstruct i n = strip s -> L1.term.TConstruct i n = s.
+Proof.
+  intros i n. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. reflexivity.
+Qed.
+
+Lemma Sort_strip_inv:
+  forall srt s, TSort srt = strip s -> L1.term.TSort srt = s.
+Proof.
+  intros srt. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. reflexivity.
+Qed.
+
+Lemma Ind_strip_inv:
+  forall i s, TInd i = strip s -> L1.term.TInd i = s.
+Proof.
+  intros i. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. reflexivity.
+Qed.
+
+Lemma Const_strip_inv:
+  forall nm s, TConst nm = strip s -> L1.term.TConst nm = s.
+Proof.
+  intros nm. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. reflexivity.
+Qed.
+
+Lemma Fix_strip_inv:
+  forall ds n s, TFix ds n = strip s ->
+    exists sds, (L1.term.TFix sds n) = s /\ ds = stripDs sds.
+Proof.
+  intros ds n. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists d. intuition.
+Qed.
+
+Lemma App_strip_inv:
+  forall fn arg args s, TApp fn arg args = strip s ->
+    exists sfn sarg sargs,
+      (L1.term.TApp sfn sarg sargs) = s /\
+      fn = strip sfn /\ arg = strip sarg /\ args = strips sargs.
+Proof.
+  intros fn arg args. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2, t. intuition.
+Qed.
+
+Lemma LetIn_strip_inv:
+  forall nm dfn bod s, TLetIn nm dfn bod = strip s ->
+    exists sdfn sty sbod,
+      (L1.term.TLetIn nm sdfn sty sbod = s) /\
+      dfn = strip sdfn /\ bod = strip sbod.
+Proof.
+  intros nm dfn bod s. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2, s3. intuition.
+Qed.
+
+Lemma Case_strip_inv:
+  forall m mch brs s, TCase m mch brs = strip s ->
+    exists sty smch sbrs, (L1.term.TCase m sty smch sbrs = s) /\
+              mch = strip smch /\ brs = strips sbrs.
+Proof.
+  intros m mch brs s. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2, t. intuition.
+Qed.
+
+Lemma tnil_strip_inv:
+  forall ts, tnil = strips ts -> ts = L1.term.tnil.
+Proof.
+  induction ts; intros; try reflexivity.
+  - simpl in H. discriminate.
+Qed.
+
+Lemma tcons_strip_inv:
+  forall t ts us, tcons t ts = strips us ->
+    exists st sts, (L1.term.tcons st sts = us) /\ 
+                   t = strip st /\ ts = strips sts.
+Proof.
+  intros t ts us. destruct us; simpl; intros h; try discriminate.
+  - myInjection h. exists t0, us. intuition.
+Qed.
+
+Theorem L2WcbvEval_L1WcbvEval:
+  forall L2p p, L2p = stripEnv p -> L1.program.WFaEnv p ->
+    (forall L2t L2s, WcbvEval L2p L2t L2s ->
+     forall t, L2t = strip t -> L1.term.WFapp t ->
+               forall s, L1.wcbvEval.WcbvEval p t s -> L2s = strip s) /\
+    (forall L2ts L2ss, WcbvEvals L2p L2ts L2ss ->
+     forall ts, L2ts = strips ts -> L1.term.WFapps ts ->
+                forall ss, L1.wcbvEval.WcbvEvals p ts ss -> L2ss = strips ss).
+Proof.
+  intros L2p p hp1 hp2. apply WcbvEvalEvals_ind; simpl; intros.
+  - destruct (Lam_strip_inv _ H) as [t0 [t1 [jtl jtr]]]. subst.
+    inversion H1. simpl. reflexivity.
+  - destruct (Prod_strip_inv _ H) as [t0 [t1 [jtl jtr]]]. subst.
+    inversion H1. simpl. reflexivity.
+  - destruct (Cast_strip_inv _ H0) as [y0 [y1 [y2 [jt0 jt1]]]].
+    eapply H. 
+    + eassumption.
+    + rewrite <- jt0 in H1. inversion_Clear H1. assumption.
+    + rewrite <- jt0 in H2. inversion H2. assumption.
+  - destruct (Construct_strip_inv _ H). inversion H1. reflexivity.
+  - destruct (Ind_strip_inv _ H). inversion H1. subst. reflexivity.
+  - destruct (Sort_strip_inv _ H). inversion H1. reflexivity.
+  - destruct (Fix_strip_inv _ H) as [x [j1 j2]]. rewrite <- j1 in H1.
+    inversion H1. subst. reflexivity.
+  - destruct (Const_strip_inv _ H0). inversion H2. subst. 
+    refine (H _ _ _ _ H5). 
+    + assert (j:= Lookup_hom H4). simpl in j.
+      apply (LookupDfn_single_valued l j).
+    + assert (j:= L1.program.Lookup_pres_WFapp hp2 H4).
+      inversion j. assumption.
+  - destruct (App_strip_inv _ H2) as [x1 [x2 [x3 [x4 [x5 [x6 x7]]]]]].
+    clear H2. subst. inversion H3. inversion H4; subst; clear H3; clear H4.
+    + refine (H1 (L1.term.whBetaStep bod0 a1'0 x3) _ _ _ _); try assumption.
+      rewrite whBetaStep_hom. erewrite (f_equal2 whBetaStep). reflexivity.
+      * assert (j0:= H _ eq_refl H8 (L1.term.TLambda nm0 ty bod0) H14).
+        simpl in j0. myInjection j0. reflexivity.
+      * assert (j1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H16 H9).
+        apply (WcbvEval_single_valued w0 j1).
+      * { refine (L1.term.whBetaStep_pres_WFapp _ _ _); try assumption.
+          - assert
+              (j:=proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2) _ _ H14 H8).
+            inversion j; assumption. 
+          - refine (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2) _ _ H16 H9). }
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+  - destruct (LetIn_strip_inv _ H1) as [x0 [x1 [x2 [j1 [j2 j3]]]]].
+    clear H1. rewrite <- j1 in H2. inversion_Clear H2.
+    inversion_clear H3.
+    eapply H0.
+    + assert (j0: L1.term.WFapp dfn'0).
+      { eapply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2)); eassumption. }
+      assert (j1: WcbvEval (stripEnv p)
+                           (strip (L1.term.instantiate dfn'0 0 x2))
+                           (strip s0)).
+      { apply(proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H2).
+        apply (L1.term.instantiate_pres_WFapp); assumption. }
+      rewrite (proj1 instantiate_hom) in j1.
+      erewrite (H _ eq_refl H6) in w0; try eapply H1.
+      assert (k:= WcbvEval_single_valued w0 j1).
+      erewrite (H _ eq_refl H6); try eapply H1.
+      rewrite (proj1 instantiate_hom). reflexivity.
+    + assert (j0: L1.term.WFapp dfn'0).
+      { eapply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2)); eassumption. }
+      assert (j1: WcbvEval (stripEnv p)
+                           (strip (L1.term.instantiate dfn'0 0 x2))
+                           (strip s0)).
+      { apply(proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H2).
+        apply (L1.term.instantiate_pres_WFapp); assumption. }
+      rewrite (proj1 instantiate_hom) in j1.
+      erewrite (H _ eq_refl H6) in w0; try eapply H1.
+      apply (proj1 (L1.term.instantiate_pres_WFapp)); assumption.
+    + assert (j0: L1.term.WFapp dfn'0).
+      { eapply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2)); eassumption. }
+      assert (j1: WcbvEval (stripEnv p)
+                           (strip (L1.term.instantiate dfn'0 0 x2))
+                           (strip s0)).
+      { apply(proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H2).
+        apply (L1.term.instantiate_pres_WFapp); assumption. }
+      rewrite (proj1 instantiate_hom) in j1.
+      erewrite (H _ eq_refl H6) in w0; try eapply H1. assumption.
+  - destruct (App_strip_inv _ H1) as [x1 [x2 [x3 [x4 [x5 [x6 x7]]]]]].
+    clear H1. subst. inversion H2; inversion H3; subst; clear H2; clear H3.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H13 H7).
+      simpl in j. assert (k:= WcbvEval_single_valued w j). discriminate.
+    + assert (j1:= proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2) _ _ H13 H7).
+      inversion_Clear j1.
+      assert (j4: L1.term.WFapps (L1.term.tcons x2 x3)).
+      { constructor; assumption. }
+      assert (j3:= L1.term.whFixStep_pres_WFapp _ H2 j4 H15).
+      assert (j2:= H _ eq_refl H7 _ H13). simpl in j2. myInjection j2.
+      clear j2.
+      refine (H0 _ _ _ _ _); try assumption.
+      rewrite <- tcons_hom in e.
+      rewrite <- whFixStep_hom in e.
+      rewrite H15 in e. simpl in e. myInjection e. reflexivity.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H13 H7).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H13 H7).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+  - destruct (App_strip_inv _ H2) as [x1 [x2 [x3 [x4 [x5 [x6 x7]]]]]].
+    clear H2. subst. inversion H3; inversion H4; subst; clear H3; clear H4.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + simpl. apply (f_equal3 TApp).
+      * assert (j0:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+        simpl in j0.
+        refine (WcbvEval_single_valued w j0).
+      * assert (j0:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H16 H9).
+        refine (WcbvEval_single_valued w0 j0).
+      * assert (j0:= proj2 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H17 H10).
+        refine (WcbvEvals_single_valued w1 j0).
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+  - destruct (App_strip_inv _ H2) as [x1 [x2 [x3 [x4 [x5 [x6 x7]]]]]].
+    clear H2. subst. inversion H3; inversion H4; subst; clear H3; clear H4.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+      simpl in j.
+      assert (k:= WcbvEval_single_valued w j). discriminate.
+    + simpl. apply f_equal3.
+      * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+        simpl in j.
+        refine (WcbvEval_single_valued w j).
+      * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H16 H9).
+        refine (WcbvEval_single_valued w0 j).
+      * assert (j:= proj2 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H17 H10).
+        refine (WcbvEvals_single_valued w1 j).
+  - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]]. 
+    clear H1. subst. inversion H2. inversion H3; subst. clear H2. clear H3.
+    + refine (H0 cs0 _ _ _ H16).
+      * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H13 H6).
+        simpl in j.
+        assert (k:= WcbvEval_single_valued j w). myInjection k. clear k.
+        rewrite <- tnil_hom in e.
+        rewrite <- whCaseStep_hom in e. rewrite H15 in e. simpl in e.
+        myInjection e. reflexivity.
+      * refine (L1.term.whCaseStep_pres_WFapp H8 _ _ H15). constructor.
+    + refine (H0 cs0 _ _ _ H18).
+      * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H6).
+        simpl in j.
+        assert (k:= WcbvEval_single_valued j w). discriminate. 
+      * refine (L1.term.whCaseStep_pres_WFapp H8 _ _ H17). 
+        refine (L1.term.tskipn_pres_WFapp _ _ H16).
+        assert (j0:= proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2) _ _ H14 H6).
+        inversion_clear j0. constructor; assumption.
+  - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]]. 
+    clear H1. subst. inversion_Clear H2; inversion_Clear H3.
+    + refine (H0 cs0 _ _ _ H12).
+      * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H10 H6).
+        simpl in j.
+        assert (k:= WcbvEval_single_valued j w). discriminate. 
+      * refine (L1.term.whCaseStep_pres_WFapp H8 _ _ H11). constructor.
+    + refine (H0 cs0 _ _ _ H13);
+      assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H7 H6);
+      simpl in j.
+      * assert (k:= WcbvEval_single_valued j w). myInjection k. clear k.
+        assert (j5: ts = strips ts0).
+        { assert (j6:= tskipn_hom (L1.term.tcons arg0 args0) np).
+          simpl in j6. rewrite H11 in j6. rewrite  e in j6.
+          rewrite (optStrips_hom) in j6. myInjection j6. reflexivity. }
+        rewrite j5 in e0. rewrite <- whCaseStep_hom in e0.
+        rewrite H12 in e0.
+        rewrite optStrip_hom in e0. myInjection e0. reflexivity.
+      * refine (L1.term.whCaseStep_pres_WFapp _ _ _ H12); try assumption.
+        refine (L1.term.tskipn_pres_WFapp _ _ H11).
+        constructor;
+        assert (j0:= proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2) _ _ H7 H6);
+        inversion_Clear j0; assumption.
+  - rewrite (tnil_strip_inv _ H) in H1. inversion H1. reflexivity. 
+  - destruct (tcons_strip_inv _ H1) as [x0 [x1 [j1 [j2 j3]]]]. subst.
+    clear H1. inversion_Clear H2; inversion_Clear H3. simpl.
+    eapply (f_equal2 tcons).
+    + refine (WcbvEval_single_valued w _).
+      refine (proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ _ _); assumption.
+    + refine (H0 _ _ _ _ H8). reflexivity. assumption.
+Qed.
+
+Print Assumptions L2WcbvEval_L1WcbvEval.
+
+(** add w.r.t. L1 wndEval **)
+Lemma L2WcbvEval_sound_for_L1wndEval:
+  forall L2p p, L2p = stripEnv p -> L1.program.WFaEnv p ->
+    (forall L2t L2s, WcbvEval L2p L2t L2s ->
+     forall t, L2t = strip t -> L1.term.WFapp t ->
+           forall s, L1.wcbvEval.WcbvEval p t s ->
+                     L2s = strip s /\ L1.wndEval.wndEvalRTC p t s).
+Proof.
+  intros L2p p hp1 hp2. intros L2t L2s h0 t h1 h2 s h3; split.
+  - apply (proj1 (L2WcbvEval_L1WcbvEval hp1 hp2) L2t L2s h0 t h1 h2 s h3).
+  - apply (proj1 (L1.wcbvEval.WcbvEval_wndEvalRTC hp2) t s h3 h2).
+Qed.
+Print Assumptions L2WcbvEval_sound_for_L1wndEval.
+
+(*** unstrip: replace every missing type field with [prop]  ***)
 Function unstrip (t:Term) : L1Term :=
   match t with
     | TRel n => L1.term.TRel n
@@ -645,25 +996,49 @@ Fixpoint unstripEnv (p:environ) : L1.program.environ :=
     | cons (nm, ec) q => cons (nm, (unstripEc ec)) (unstripEnv q)
   end.
 
-
-Lemma Lam_strip_inv:
-  forall nm bod s, TLambda nm bod = strip s ->
-   exists sty sbod, 
-     (L1.term.TLambda nm sty sbod) = s /\ bod = strip sbod.
+Lemma stripItyCnstrs_leftInv_unstripCnstrs:
+  forall cs, stripCnstrs (unstripCnstrs cs) = cs.
 Proof.
-  intros nm bod s; induction s; simpl; intros h; try discriminate.
-  - myInjection h. exists s1, s2. intuition. 
+  induction cs.
+  - reflexivity.
+  - destruct a. simpl. rewrite IHcs. reflexivity.
 Qed.
 
-Lemma L1WFapp_L2WFapp:
-  (forall t, L1.term.WFapp t -> WFapp (strip t)) /\
-  (forall ts, L1.term.WFapps ts -> WFapps (strips ts)) /\
-  (forall ds, L1.term.WFappDs ds -> WFappDs (stripDs ds)).
+Lemma stripItyPack_leftInv_unstripItyPack:
+  forall its, stripItyPack (unstripItyPack its) = its.
 Proof.
-  apply L1.term.WFappTrmsDefs_ind; simpl; constructor; auto.
-  - intros h. elim H. apply isApp_hom. assumption.
+  induction its.
+  - simpl. reflexivity.
+  - destruct a. simpl. rewrite IHits.
+    rewrite stripItyCnstrs_leftInv_unstripCnstrs.
+    reflexivity.
 Qed.
 
+Lemma stripEc_leftInv_unstripEc:
+  forall ec, stripEc (unstripEc ec) = ec.
+Proof.
+  induction ec.
+  - simpl. rewrite (proj1 strip_leftInv_unstrip). reflexivity.
+  - simpl. destruct i.
+    + reflexivity.
+    + simpl. destruct i. simpl. 
+      rewrite stripItyCnstrs_leftInv_unstripCnstrs.
+      rewrite stripItyPack_leftInv_unstripItyPack.
+      reflexivity.
+Qed.
+
+Lemma stripEnv_leftInv_unstripEnv:
+  forall (p:environ), stripEnv (unstripEnv p) = p.
+Proof.
+  induction p.
+  - reflexivity.
+  - destruct a. simpl. rewrite IHp. destruct e.
+    + simpl. rewrite (proj1 strip_leftInv_unstrip). reflexivity.
+    + simpl; destruct i.
+      * simpl. reflexivity.
+      * rewrite stripItyPack_leftInv_unstripItyPack.
+        reflexivity.
+Qed.
 
 Lemma L2WFapp_L1WFapp:
   (forall t, WFapp t -> L1.term.WFapp (unstrip t)) /\
@@ -677,17 +1052,6 @@ Proof.
       assert (k:= f_equal strip j).
       rewrite (proj1 (strip_leftInv_unstrip)) in k. rewrite k. simpl.
       exists (strip x0), (strip x1), (strips x2). reflexivity.
-Qed.
-
-
-Lemma L1WFaEnv_L2WFaEnv:
-  forall p:L1.program.environ, L1.program.WFaEnv p -> WFaEnv (stripEnv p).
-Proof.
-  induction 1; simpl; constructor.
-  - inversion H; destruct ec; simpl; try discriminate.
-    + constructor. apply (proj1 (L1WFapp_L2WFapp)). assumption.
-    + constructor.
-  - assumption.
 Qed.
 
 Lemma Lookup_unhom:
@@ -739,7 +1103,6 @@ Lemma dcons_unhom:
     L1.term.dcons nm L1.term.prop (unstrip bod) rarg (unstripDs ds).
 reflexivity.
 Qed.
-
 
 Lemma instantiate_unhom: 
   (forall bod tin ni,
@@ -915,8 +1278,8 @@ induction ts; simpl; intros n; case n; try reflexivity; trivial.
 Qed.
 
 
-(** L2 WcbvEval is sound for L1 WcbvEval **)
-Theorem L2WcbvEval_L1WcbvEval:
+(** very weak notion of soundness using ubstrip **)
+Theorem unstrip_L2WcbvEval_L1WcbvEval:
   forall p,
     (forall t s, WcbvEval p t s ->
      L1.wcbvEval.WcbvEval (unstripEnv p) (unstrip t) (unstrip s)) /\
@@ -948,38 +1311,27 @@ Proof.
 Qed.
 
 
-(** NO?? strip throws away info **
-Goal
-  forall L2p p, L2p = stripEnv p ->
-    (forall L2t L2s, WcbvEval L2p L2t L2s ->
-     forall t, L2t = strip t -> forall s, L2s = strip s ->
-                                          L1.wcbvEval.WcbvEval p t s) /\
-    (forall L2ts L2ss, WcbvEvals L2p L2ts L2ss ->
-     forall ts, L2ts = strips ts -> forall ss, L2ss = strips ss ->
-                                          L1.wcbvEval.WcbvEvals p ts ss).
+Lemma use_unstrip:
+ forall p, exists pp, p = stripEnv pp /\
+    (forall t s, WcbvEval p t s ->
+         exists tt ss, L1.wcbvEval.WcbvEval pp tt ss /\
+                    t = strip tt /\ s = strip ss) /\
+    (forall ts ss, WcbvEvals p ts ss ->
+         exists tts sss, L1.wcbvEval.WcbvEvals pp tts sss /\
+                    ts = strips tts /\ ss = strips sss).
 Proof.
-  intros L2p p hp.
-  apply WcbvEvalEvals_ind; simpl; intros.
-  - destruct (Lam_strip_inv _ H) as [t0 [t1 [jtl jtr]]].
-    destruct (Lam_strip_inv _ H0) as [s0 [s1 [jsl jsr]]].
-    subst.
+  intros p. exists (unstripEnv p). split.
+  - rewrite stripEnv_leftInv_unstripEnv. reflexivity.
+  - split.
+    + intros t s hpts. exists (unstrip t), (unstrip s). split.
+      { apply (proj1 (unstrip_L2WcbvEval_L1WcbvEval p)). assumption. }
+      { split; rewrite (proj1 strip_leftInv_unstrip); reflexivity. }
+    + intros ts ss hpts. exists (unstrips ts), (unstrips ss). split.
+      { apply (proj2 (unstrip_L2WcbvEval_L1WcbvEval p)). assumption. }
+      { split; rewrite (proj1 (proj2 strip_leftInv_unstrip)); reflexivity. }
+Qed.
 
-
-WcbvEval (stripEnv p) (strip t) (strip s) -> 
-     L1.wcbvEval.WcbvEval p t s) /\
-    (forall ts ss, WcbvEvals (stripEnv p) (strips ts) (strips ss) ->
-     L1.wcbvEval.WcbvEvals p ts ss).
-Proof.
-
-Theorem L2WcbvEval_L1wndEval:
-  forall (p:L1.program.environ), L1.program.WFaEnv p ->
-    (forall t s, WcbvEval (stripEnv p) (strip t) (strip s) -> 
-                 L1.term.WFapp t -> L1.wndEval.wndEvalRTC p t s) /\
-    (forall ts ss, WcbvEvals (stripEnv p) (strips ts) (strips ss) ->
-                   L1.term.WFapps ts -> L1.wndEval.wndEvalsRTC p ts ss).
-**)
-
-
+Print Assumptions use_unstrip.
 
 
 (**** below here scratch ****

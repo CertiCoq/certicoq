@@ -152,7 +152,6 @@ functional induction (lookupDfn nm p); intros h; try discriminate.
 - injection h. intros. subst. apply lookup_Lookup. assumption.
 Qed.
 
-(**
 Lemma LookupDfn_functional:
   forall (nm:string) (p:environ) (t r:Term),
     LookupDfn nm p t -> LookupDfn nm p r -> t = r.
@@ -161,7 +160,6 @@ assert (j1:= LookupDfn_lookupDfn h1 (te:=t)).
 assert (j2:= LookupDfn_lookupDfn h2 (te:=r)).
 rewrite j1 in j2. injection j2; intros; subst; reflexivity. reflexivity.
 Qed.
-***)
 
 (***
 Lemma not_lookupDfn_not_LookupDfn:

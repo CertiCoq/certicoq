@@ -618,12 +618,13 @@ Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind, wcbvEvals_ind.
 **)
 
 (** wcbvEval and WcbvEval are the same relation **)
-(***
 Lemma wcbvEval_WcbvEval:
   forall p,
   (forall t n s, wcbvEval n p t = Ret s -> WcbvEval p t s) /\
   (forall ts n ss, wcbvEvals n p ts = Ret ss -> WcbvEvals p ts ss) /\
   (forall (ds:Defs) (n:nat), True).
+Admitted.
+(***
 intros p.
 - eapply(TrmTrmsDefs_ind
       (fun t => forall n s, wcbvEval n p t = Ret s -> WcbvEval p t s)
@@ -752,17 +753,18 @@ apply (wcbvEvalEvals_ind
 Qed.
 ***)
 
+
 (* need this strengthening to large-enough fuel to make the induction
 ** go through
 *)
-Lemma WcbvEval_wcbvEval:
+Lemma pre_WcbvEval_wcbvEval:
   forall p,
     (forall t s, WcbvEval p t s ->
              exists n, forall m, m >= n -> wcbvEval (S m) p t = Ret s) /\
     (forall ts ss, WcbvEvals p ts ss ->
              exists n, forall m, m >= n -> wcbvEvals (S m) p ts = Ret ss).
 intros p.
-assert (j:forall m x, m > x -> m = S (m - 1)). induction m; intuition.
+assert (j:forall m x, m > x -> m = S (m - 1)). { induction m; intuition. }
 apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
 - destruct H. exists (S x). intros m hm. simpl. rewrite (j m x); try omega.
   + rewrite (H (m - 1)); try omega. reflexivity. 
@@ -841,19 +843,30 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   simpl. rewrite k. rewrite k0. reflexivity.
 Qed.
 
+Lemma WcbvEval_wcbvEval:
+  forall p t s, WcbvEval p t s ->
+             exists n, forall m, m >= n -> wcbvEval m p t = Ret s.
+Proof.
+  intros p t s h.
+  destruct (proj1 (pre_WcbvEval_wcbvEval p) _ _ h).
+  exists (S x). intros m hm. assert (j:= H (m - 1)). 
+  assert (k: m = S (m - 1)). { omega. }
+  rewrite k. apply j. omega.
+Qed.
+
+
 Lemma WcbvEval_single_valued:
   forall p t s, WcbvEval p t s -> forall u, WcbvEval p t u -> s = u.
 Proof.
   intros p t s h0 u h1.
-  assert (j0:= proj1 (WcbvEval_wcbvEval _) _ _ h0).
-  assert (j1:= proj1 (WcbvEval_wcbvEval _) _ _ h1).
+  assert (j0:= WcbvEval_wcbvEval h0).
+  assert (j1:= WcbvEval_wcbvEval h1).
   destruct j0 as [x0 k0].
   destruct j1 as [x1 k1].
   assert (l0:= k0 (max x0 x1) (max_fst x0 x1)).
   assert (l1:= k1 (max x0 x1) (max_snd x0 x1)).
   rewrite l0 in l1. injection l1. intuition.
 Qed.
-
 
 
 (**** scratch below here ****

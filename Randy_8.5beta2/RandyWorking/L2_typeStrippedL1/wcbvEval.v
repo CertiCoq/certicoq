@@ -682,7 +682,7 @@ Qed.
 (* need this strengthening to large-enough fuel to make the induction
 ** go through
 *)
-Lemma WcbvEval_wcbvEval:
+Lemma pre_WcbvEval_wcbvEval:
   forall p,
     (forall t s, WcbvEval p t s ->
              exists n, forall m, m >= n -> wcbvEval (S m) p t = Some s) /\
@@ -766,13 +766,49 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   simpl. rewrite k. rewrite k0. reflexivity.
 Qed.
 
+Lemma WcbvEval_wcbvEval:
+  forall p t s, WcbvEval p t s ->
+             exists n, forall m, m >= n -> wcbvEval m p t = Some s.
+Proof.
+  intros p t s h.
+  destruct (proj1 (pre_WcbvEval_wcbvEval p) _ _ h).
+  exists (S x). intros m hm. assert (j:= H (m - 1)). 
+  assert (k: m = S (m - 1)). { omega. }
+  rewrite k. apply j. omega.
+Qed.
+
+Lemma WcbvEvals_wcbvEvals:
+  forall p ts ss, WcbvEvals p ts ss ->
+             exists n, forall m, m >= n -> wcbvEvals m p ts = Some ss.
+Proof.
+  intros p ts ss h.
+  destruct (proj2 (pre_WcbvEval_wcbvEval p) _ _ h).
+  exists (S x). intros m hm. assert (j:= H (m - 1)). 
+  assert (k: m = S (m - 1)). { omega. }
+  rewrite k. apply j. omega.
+Qed.
+
+
 (** WcbvEval is single-valued **)
 Lemma WcbvEval_single_valued:
   forall p t s1, WcbvEval p t s1 -> forall s2, WcbvEval p t s2 -> s1 = s2.
 Proof.
   intros p t s1 h1 s2 h2.
-  assert (j1:= proj1 (WcbvEval_wcbvEval p) _ _ h1).
-  assert (j2:= proj1 (WcbvEval_wcbvEval p) _ _ h2).
+  assert (j1:= WcbvEval_wcbvEval h1).
+  assert (j2:= WcbvEval_wcbvEval h2).
+  destruct j1 as [x1 k1]. destruct j2 as [x2 k2].
+  specialize (k1 (max x1 x2)). specialize (k2 (max x1 x2)).
+  rewrite k1 in k2. injection k2. intuition. 
+  apply max_snd. apply max_fst.
+Qed.
+
+Lemma WcbvEvals_single_valued:
+  forall p ts ss1, WcbvEvals p ts ss1 ->
+   forall ss2, WcbvEvals p ts ss2 -> ss1 = ss2.
+Proof.
+  intros p ts ss1 h1 ss2 h2.
+  assert (j1:= WcbvEvals_wcbvEvals h1).
+  assert (j2:= WcbvEvals_wcbvEvals h2).
   destruct j1 as [x1 k1]. destruct j2 as [x2 k2].
   specialize (k1 (max x1 x2)). specialize (k2 (max x1 x2)).
   rewrite k1 in k2. injection k2. intuition. 

@@ -99,12 +99,11 @@ Function lookupDfn (nm:string) (p:environ) : option Term :=
    | _ => None
   end.
 
-Function lookupDTyp (nm:string) (p:environ) : exception itypPack :=
+Function lookupDTyp (nm:string) (p:environ) : option itypPack :=
   match lookup nm p with
-    | Some (ecTyp itps) => ret itps
-    | _ => raise "datatype not in cxt"
+    | Some (ecTyp itps) => Some itps
+    | _ => None
   end.
-
 
 Lemma Lookup_lookup:
   forall nm p t, Lookup nm p t -> lookup nm p = Some t.
@@ -447,14 +446,12 @@ try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
     * assert (j:= proj1 Crct_fresh_Pocc _ _ _ H1 _ H3).
       elim j. constructor.
     * elim (H0 _ H11).
-  + eelim (H0 _ (Lookup_strengthen H4 _ n0)).
+  + refine (H0 _ (Lookup_strengthen H4 eq_refl n0)).
 - elim (H0 nm0). unfold LookupDfn in H4. unfold LookupDfn.
   destruct (string_dec nm0 nm).
   + subst. inversion H4. assumption.
-  + eapply (Lookup_strengthen H4). reflexivity. assumption.
+  + refine (Lookup_strengthen H4 eq_refl _). assumption.
 - elim (H1 _ H2).
-Grab Existential Variables.
-  + reflexivity.
 Qed.
 
 Lemma  Crct_weaken:

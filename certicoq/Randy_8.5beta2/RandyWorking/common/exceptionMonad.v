@@ -58,3 +58,11 @@ Definition epair2
   (A B:Type) (a:A) (b:exception B): exception (A * B) :=
   do bb <- b;
   ret (pair a bb).
+
+Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
+  match xs, n with
+    | nil, _ => raise "exnNth; no hit"
+    | cons x xs, 0 => ret x
+    | cons x xs, S m => exnNth xs m
+  end.
+

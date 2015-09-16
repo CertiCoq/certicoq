@@ -1,6 +1,5 @@
-
-
-
+Require L2.L2.
+Require L1.L1.
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -13,8 +12,6 @@ Require Import L3.program.
 Require Import L3.wndEval.
 Require Import L3.wcbvEval.
 Require Import L3.wNorm.
-Require L2.L2.
-Require L1.L1.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -41,6 +38,13 @@ Function mkEta (cstr:Term) (xtraArity:nat) : Term :=
       | S n => mkEta (TLambda nAnon cstr) n
     end.
 
+Lemma mkEta_under_Lambda:
+  forall n t, mkEta (TLambda nAnon t) n = TLambda nAnon (mkEta t n).
+Proof.
+  induction n; simpl; intros.
+  - reflexivity.
+  - rewrite IHn. reflexivity.
+Qed.
 
 (** Lookup constructor arity in L2 environ (to avoid mutual dependency
 *** between converting L2 terms to L3 and L2 environs to L3
@@ -48,28 +52,33 @@ Function mkEta (cstr:Term) (xtraArity:nat) : Term :=
 Section EtaExpand.
 Variable p:L2.program.environ.
 
-Definition cnstrArity (i:inductive) (n:nat) : exception nat :=
+Function cnstrArity (i:inductive) (n:nat) : option nat :=
   match i with
-    | mkInd str m =>
-        do itp <- L2.program.lookupDTyp str p;
-        do aty <- L2.program.arity_from_dtyp itp m n;
-        ret aty
+    | mkInd str m => 
+      match L2.program.lookupDTyp str p with
+        | Exc _ => None
+        | Ret itp =>
+          match L2.program.arity_from_dtyp itp m n with
+          | Exc _ => None
+          | Ret itp => Some itp
+          end
+      end
   end.
 
 (** compute list of variables for eta expanding a constructor
 *** (which may already be partially applied
 **)
-Fixpoint etaArgs (n:nat) : Terms :=
+Function etaArgs (n:nat) : Terms :=
   match n with
     | 0 => tnil
     | S m => tcons (TRel m) (etaArgs m)
   end.
 
 (** this should really be (exception Term) **)
-Fixpoint etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : option Term :=
+Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : option Term :=
   match cnstrArity i n with
-    | Exc str => None   (** constructor not found in environment **)
-    | Ret arity =>
+    | None => None   (** constructor not found in environment **)
+    | Some arity =>
       match nat_compare (tlength args) arity with
         | Eq => Some (TConstruct i n args)
         | Lt => let k := arity - (tlength args)
@@ -82,11 +91,7 @@ Function strip (t:L2Term) : option Term :=
   match t with
     | L2.term.TRel n => Some (TRel n)
     | L2.term.TSort s => Some (TSort s)
-    | L2.term.TCast s =>   (* finally remove Cast *)
-      match strip s with
-        | None => None
-        | Some t => Some t
-      end
+    | L2.term.TCast s => strip s
     | L2.term.TProd nm bod => 
       match strip bod with
         | None => None
@@ -156,6 +161,7 @@ Combined Scheme stripStripsStripDs_ind
 End EtaExpand.
 
 
+
 Function stripCnstrs (cs:list L2.program.Cnstr) : list Cnstr :=
   match cs with
     | nil => nil
@@ -168,7 +174,7 @@ Function stripItyPack (its:L2.program.itypPack) : itypPack :=
     | (L2.program.mkItyp str itps) :: itpacks =>
                   (mkItyp str (stripCnstrs itps)) :: stripItyPack itpacks
   end.
-Fixpoint stripEnv (p:L2.program.environ) : option environ :=
+Function stripEnv (p:L2.program.environ) : option environ :=
   match p with
     | nil => Some nil
     | cons (nm, L2.program.ecTrm t) q =>
@@ -204,7 +210,7 @@ Definition term_Term (e:L2.program.environ) (t:term) : option Term :=
 
 (***
 Goal
-  forall p bod sbod, strip p bod = Some sbod -> 
+  forall bod sbod, strip bod = Some sbod -> 
   forall t nm, t = L2.term.TLambda nm bod ->
   strip p t = Some (TLambda nm sbod).
 induction p; induction t; simpl; intros; try discriminate. 
@@ -212,6 +218,130 @@ induction p; induction t; simpl; intros; try discriminate.
   change ()
 
 ****)
+
+Lemma strip_Lam_invrt:
+  forall p nm bod tt,
+        strip p (L2.term.TLambda nm bod) = Some tt ->
+        exists sbod, strip p bod = Some sbod /\ tt = TLambda nm sbod.
+Proof.
+  induction tt; simpl; intros. 
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TRel n)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TSort s)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TProd n tt)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TLambda n tt)) in H.
+    destruct (strip p bod). 
+    + myInjection H. exists tt. intuition.
+    + discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TLetIn n tt1 tt2)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TApp tt1 tt2)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TConst s)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TInd i)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TConstruct i n t)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TCase n tt t)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TFix d n)) in H.
+    destruct (strip p bod); discriminate.
+Qed.
+
+Lemma strip_Prod_invrt:
+  forall p nm bod tt,
+        strip p (L2.term.TProd nm bod) = Some tt ->
+        exists sbod, strip p bod = Some sbod /\ tt = TProd nm sbod.
+Proof.
+  induction tt; simpl; intros. 
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TRel n)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TSort s)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TProd n tt)) in H.
+    destruct (strip p bod). 
+    + myInjection H. exists tt. intuition.
+    + discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TLambda n tt)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TLetIn n tt1 tt2)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TApp tt1 tt2)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TConst s)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TInd i)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TConstruct i n t)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TCase n tt t)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TFix d n)) in H.
+    destruct (strip p bod); discriminate.
+Qed.
+
+Lemma strip_Construct_invrt:
+  forall p i r tt,
+        strip p (L2.term.TConstruct i r) = Some tt ->
+        etaExp_cnstr p i r tnil = Some tt.
+Proof.
+  induction tt; unfold strip; simpl; intros; try assumption.
+Qed.
+ 
+Lemma strip_Ind_invrt:
+  forall p i tt,
+        strip p (L2.term.TInd i) = Some tt -> tt = (TInd i).
+Proof.
+  induction tt;  simpl; intros; try discriminate.
+  myInjection H. reflexivity.
+Qed.
 
 
 (**** L2 and L3 agree on cbv evaluation  ****
@@ -225,11 +355,43 @@ Lemma wndEval_types_irrelevant:
      forall tss, strips p ts = Some tss -> 
      forall sss, strips p ss = Some sss ->
           WcbvEvals pp tss sss).
-intros p pp h. apply L2.wcbvEval.WcbvEvalEvals_ind; simpl; intros.
--
+Proof.
+  intros p pp h. apply L2.wcbvEval.WcbvEvalEvals_ind; simpl; intros.
+  - destruct (strip_Lam_invrt _ _ _ H) as [x [j1x j2x]].
+    destruct (strip_Lam_invrt _ _ _ H0) as [y [j1y j2y]].
+    subst. rewrite j1x in j1y. myInjection j1y. constructor.
+  - destruct (strip_Prod_invrt _ _ _ H) as [x [j1x j2x]].
+    destruct (strip_Prod_invrt _ _ _ H0) as [y [j1y j2y]].
+    subst. rewrite j1x in j1y. myInjection j1y. constructor.
+  - change (strip p t = Some tt) in H0. eapply H; assumption.
+  - unfold strip in H. unfold strip in H0. rewrite H in H0.
+    myInjection H0. clear H0. unfold etaExp_cnstr in H.
+    destruct (cnstrArity p i r).
+    + destruct (PeanoNat.Nat.compare (tlength tnil) n).
+      * myInjection H. constructor. constructor.
+      * myInjection H. clear H. rewrite <- minus_n_O.
+        { induction n.
+          - simpl. constructor. constructor.
+          - change 
+              (WcbvEval pp
+                        (mkEta (TLambda nAnon
+                                        (TConstruct i r (etaArgs (S n)))) n)
+                        (mkEta (TLambda nAnon
+                                        (TConstruct i r (etaArgs (S n)))) n)).
+            simpl. rewrite mkEta_under_Lambda. constructor. }
+      * discriminate.
+    + discriminate.
+  - rewrite (strip_Ind_invrt H). rewrite (strip_Ind_invrt H0). constructor.
+  - unfold strip in H. unfold strip in H0. myInjection H. myInjection H0.
+    constructor.
+  -
 
 
-strip p (L2.term.TLambda nm bod) = Some
+
+
+
+Qed.
+
 ***)
 
 

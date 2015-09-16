@@ -68,6 +68,14 @@ induction oa; intros.
 - reflexivity.
 Qed.
 
+Fixpoint optNth (A:Type) (xs:list A) (n:nat) : option A :=
+  match xs, n with
+    | nil, _ => None
+    | cons x xs, 0 => Some x
+    | cons x xs, S m => optNth xs m
+  end.
+
+
 (** well-founded induction on natural number measure **)
 Lemma complete_nat_induct:
   forall (P:nat -> Prop)
@@ -112,13 +120,6 @@ Fixpoint list_to_zero (n:nat) :=
   match n with
     | 0 => nil
     | S n => n :: (list_to_zero n)
-  end.
-
-Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
-  match xs, n with
-    | nil, _ => raise "exnNth; no hit"
-    | cons x xs, 0 => ret x
-    | cons x xs, S m => exnNth xs m
   end.
 
 Lemma bool_not_neq: forall (b1 b2:bool), (~ b1 <> b2) <-> b1 = b2.

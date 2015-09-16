@@ -1,11 +1,12 @@
 Add LoadPath "../common" as Common.
 Add LoadPath "." as L2.
+
+Require Import L2.term.
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Strings.Ascii.
 Require Import Arith.Compare_dec.
 Require Import Omega.
-Require Import L2.term.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -23,11 +24,16 @@ Definition defaultItyp := {| itypNm:=""; itypCnstrs:=nil |}.
 Definition itypPack := list ityp.
 
 (** this function for use in translation from L2 to L3 **)
-Fixpoint arity_from_dtyp
-         (itps:itypPack) (pndx:nat) (cndx:nat) : exception nat :=
-  do ity <- exnNth itps pndx;
-  do itp <- exnNth (itypCnstrs ity) cndx;
-  ret (CnstrArity itp).
+Function arity_from_dtyp
+         (itps:itypPack) (pndx:nat) (cndx:nat) : option nat :=
+  match optNth itps pndx with
+    | None => None
+    | Some ity =>
+      match optNth (itypCnstrs ity) cndx with
+        | None => None
+        | Some itp => Some (CnstrArity itp)
+      end
+  end.
 
 (** environments and programs: Gregory's type [program] is inside out
 *** so we reverse it and make it an ordinary association list
@@ -116,10 +122,10 @@ Function lookupDfn (nm:string) (p:environ) : option Term :=
    | _ => None
   end.
 
-Function lookupDTyp (nm:string) (p:environ) : exception itypPack :=
+Function lookupDTyp (nm:string) (p:environ) : option itypPack :=
   match lookup nm p with
-    | Some (ecTyp itps) => ret itps
-    | _ => raise "datatype not in cxt"
+    | Some (ecTyp itps) => Some itps
+    | _ => None
   end.
 
 

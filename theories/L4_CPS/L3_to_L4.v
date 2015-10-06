@@ -49,15 +49,23 @@ Section TermTranslation.
     | S n' =>
       Let_e (Proj_e (Var_e k) (N.of_nat n')) (fix_subst n' (k + 1) t) 
     end.
+
+  Definition reloc n := Var_e n.
+  Definition reloc_lam (r : N -> exp) :=
+    fun n => match n with N0 => Var_e 0 | Npos n' => shift 1 0 (r (N.pred n)) end.
   
-  Fixpoint translate (k : N) (t : L3t.Term) : exp :=
+  Definition reloc_fix k (r : N -> exp) i :=
+    fun n => if n <? k then Proj_e (Var_e 0) i else Var_e (N.sub n (N.pred k)).
+    
+  Fixpoint trans (k : N) (reloc : N -> exp) (t : L3t.Term) : exp :=
     match t with
-    | L3t.TRel n => Var_e (N.of_nat n)
+    | L3t.TRel n => reloc (N.of_nat n)
     | L3t.TSort s => (* Erase *) dummy
     | L3t.TProd n t => (* Erase *) dummy
-    | L3t.TLambda n t => Lam_e (translate (k+1) t)
-    | L3t.TLetIn n t u => Let_e (translate k t) (translate (k+1) u)
-    | L3t.TApp t u => App_e (translate k t) (translate k u)
+    | L3t.TLambda n t => Lam_e (trans (k+1) (reloc_lam reloc) t)
+    | L3t.TLetIn n t u => Let_e (trans k reloc t)
+                               (trans (k+1) (reloc_lam reloc) u)
+    | L3t.TApp t u => App_e (trans k reloc t) (trans k reloc u)
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
     | L3t.TInd i => (* Erase *) dummy
@@ -65,7 +73,7 @@ Section TermTranslation.
       let fix args' l :=
         match l with
         | L3t.tnil => nil
-        | L3t.tcons t ts => cons (translate k t) (args' ts)
+        | L3t.tcons t ts => cons (trans k reloc t) (args' ts)
         end
       in Con_e (dcon_of_con ind c) (args' args)
     | L3t.TCase n t brs =>
@@ -74,21 +82,20 @@ Section TermTranslation.
           | L3t.tnil => nil
           | L3t.tcons t ts =>
             cons (n, 0 (* Number of args of n, impossible to infer here *),
-                  translate k t) (brs' (n + 1)%N ts)
+                  trans k reloc t) (brs' (n + 1)%N ts)
           end
-      in Match_e (translate k t) (brs' (0%N) brs)
+      in Match_e (trans k reloc t) (brs' (0%N) brs)
     | L3t.TFix d n =>
-      let len := L3t.dlength d in
-      let subst := fix_subst len 0 in
-      let fix defs' l :=
+      let len := N.of_nat (L3t.dlength d) in
+      let fix defs' l i :=
           match l with
           | L3t.dnil => nil
           | L3t.dcons na t _ l' =>
-            let t' := translate (k + N.of_nat len) t in
-              cons (subst t') (defs' l')
+            let t' := trans (k + 1) (reloc_fix len reloc i) t in
+              cons t' (defs' l' (i + 1))
           end
       in      
-      Proj_e (Fix_e (defs' d)) (N.of_nat n)
+      Proj_e (Fix_e (defs' d 0)) (N.of_nat n)
     end.
 
   (** The [TFix d n] block assumes that recursive calls to [di] in [d] are of the 
@@ -99,11 +106,14 @@ Section TermTranslation.
   
 End TermTranslation.
 
+Definition translate (e : env) t :=
+  trans e 0 reloc t.
+
 Definition translate_env (e : environ) : env :=
   fold_right
     (fun x acc => match x with
                | (s, ecTrm t) =>
-                 let t' := translate acc 0%N t in
+                 let t' := translate acc t in
                    (s, t') :: acc
                | (s, ecTyp _) => acc
                end) [] e.
@@ -113,7 +123,7 @@ Definition mkLets (e : env) (t : exp) :=
 
 Definition translate_program (e : environ) (t : L3t.Term) : exp :=
   let e' := translate_env e in
-    mkLets e' (translate e' 0 t).
+    mkLets e' (translate e' t).
               
 Theorem translate_correct (e : environ) (t t' : L3t.Term) :
   L3eval.wndEval e t t' -> (* small step non-deterministic *)

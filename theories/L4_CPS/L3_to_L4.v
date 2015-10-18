@@ -13,12 +13,12 @@ Require L3.
 Module L3eval := L3.wndEval.
 Module L3t := L3.term.
 Module L3U := L3.unaryApplications.
-Require Import simple_cps.
+Require Import CPS.expression.
 
 Definition dcon_of_con (i : inductive) (n : nat) := N.of_nat n.
 
 (** Unit type single constructor *)
-Definition dummy := Con_e 0 [].
+Definition dummy := Con_e 0 enil.
 
 (** Definition environment *)
 Definition env := list (string * exp).
@@ -79,17 +79,17 @@ Section TermTranslation.
     | L3t.TConstruct ind c args =>
       let fix args' l :=
         match l with
-        | L3t.tnil => nil
-        | L3t.tcons t ts => cons (trans k reloc t) (args' ts)
+        | L3t.tnil => enil
+        | L3t.tcons t ts => econs (trans k reloc t) (args' ts)
         end
       in Con_e (dcon_of_con ind c) (args' args)
     | L3t.TCase ann t brs =>
       let fix brs' n l :=
           match l with
-          | L3t.tnil => nil
+          | L3t.tnil => brnil_e
           | L3t.tcons t ts =>
             let nargs := List.nth (N.to_nat n) (snd ann) 0%nat in
-            cons (n, N.of_nat nargs, strip_lam nargs (trans k reloc t))
+            brcons_e n (N.of_nat nargs) (strip_lam nargs (trans k reloc t))
                  (brs' (n + 1)%N ts)
           end
       in Match_e (trans k reloc t) (brs' (0%N) brs)
@@ -98,10 +98,10 @@ Section TermTranslation.
       let len := N.of_nat (L3t.dlength d) in
       let fix defs' l i :=
           match l with
-          | L3t.dnil => nil
+          | L3t.dnil => eflnil
           | L3t.dcons na t _ l' =>
             let t' := trans (k + 1) (reloc_fix len reloc i) t in
-              cons t' (defs' l' (i + 1))
+              eflcons (strip_lam 1 t') (defs' l' (i + 1))
           end
       in      
       Proj_e (Fix_e (defs' d 0)) (N.of_nat n)
@@ -171,6 +171,14 @@ Definition term_exp (e:program.environ) (t:term) : exception exp :=
     end
   end.
 
+From CPS Require Import cpstrans cpseval.
+
+Definition compile (p : program) : exception cps :=
+  do e <- program_exp p; Ret (cps_cvt_prog e).
+
+Definition run (p : program) : exception ans :=
+  do c <- compile p; Ret (ueval_c_n 1000 c).
+
 (** Testing the compiler *)
 
 Require Import Template.Template.
@@ -216,15 +224,10 @@ Quote Recursively Definition p_add01 := (Nat.add 0%nat 1).
 Transparent N.add.
 Eval compute in program_exp p_add.
 
-Definition compile (p : program) : exception cps :=
-  do e <- program_exp p; Ret (cps_cvt_prog e).
-
 Definition paddexp := Eval compute in compile p_add.
 
 Definition padd01 := Eval compute in compile p_add01.
 
-Definition run (p : program) : exception ans :=
-  do c <- compile p; Ret (eval_c_n 1000 c).
 Eval compute in run p_0.
 
 Eval compute in program_exp p_add01.
@@ -233,6 +236,5 @@ Eval compute in program_exp p_matchn.
 Eval compute in run p_matchn.
 
 Eval compute in program_exp p_idn.
-
 Eval compute in program_exp p_idn1.
 Eval compute in run p_idn1.

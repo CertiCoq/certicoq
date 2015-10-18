@@ -42,6 +42,18 @@ try (solve [left; reflexivity]);
 right; intros h; elim n1; injection h; intuition.
 Qed.
 
+Lemma nat_list_dec : forall l1 l2 : list nat, {l1 = l2} + {l1 <> l2}.
+Proof.
+  induction l1; induction l2; try solve [left; reflexivity].
+  right. congruence.
+  right; congruence.
+  destruct (eq_nat_dec a a0); subst.
+  destruct (IHl1 l2); subst.
+  left; reflexivity.
+  right; congruence.
+  right; congruence.
+Qed.
+
 Inductive Srt := SProp | SSet | SType.
 
 Lemma Srt_dec: forall (s1 s2:Srt), {s1 = s2}+{s1 <> s2}.

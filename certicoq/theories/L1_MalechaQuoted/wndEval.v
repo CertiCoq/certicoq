@@ -26,12 +26,12 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
             wndEval p (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| sCase0: forall (n:nat) (ty s:Term) (i:inductive) (brs:Terms),
+| sCase0: forall (n:nat) (ty s:Term) (i:inductive) l (brs:Terms),
             whCaseStep n tnil brs = Some s ->
-            wndEval p (TCase 0 ty (TConstruct i n) brs) s
-| sCasen: forall (np:nat) (ty s arg:Term) (i:inductive)
+            wndEval p (TCase (0,l) ty (TConstruct i n) brs) s
+| sCasen: forall (np:nat * list nat) (ty s arg:Term) (i:inductive)
                  (args brs ts:Terms) (n:nat),
-            tskipn np (tcons arg args) = Some ts ->
+            tskipn (fst np) (tcons arg args) = Some ts ->
             whCaseStep n ts brs = Some s ->
             wndEval p (TCase np ty (TApp (TConstruct i n) arg args) brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg s:Term) (args:Terms),
@@ -62,13 +62,13 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (t d1 d2 bod:Term),
               wndEval p d1 d2 ->
               wndEval p (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
-| sCaseTy:  forall (np:nat) (ty uy mch:Term) (brs:Terms),
+| sCaseTy:  forall (np:nat * list nat) (ty uy mch:Term) (brs:Terms),
               wndEval p ty uy ->
               wndEval p (TCase np ty mch brs) (TCase np uy mch brs)
-| sCaseArg: forall (np:nat) (ty mch can:Term) (brs:Terms),
+| sCaseArg: forall (np:nat * list nat) (ty mch can:Term) (brs:Terms),
               wndEval p mch can ->
               wndEval p (TCase np ty mch brs) (TCase np ty can brs)
-| sCaseBrs: forall (np:nat) (ty mch:Term) (brs brs':Terms),
+| sCaseBrs: forall (np:nat * list nat) (ty mch:Term) (brs brs':Terms),
               wndEvals p brs brs' ->
               wndEval p (TCase np ty mch brs) (TCase np ty mch brs')
 with wndEvals (p:environ) : Terms -> Terms -> Prop :=

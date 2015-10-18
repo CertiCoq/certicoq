@@ -371,10 +371,10 @@ apply L1.term.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
                    (instantiates (strip arg) n (strips t1))))).
   rewrite <- H. rewrite <- H0. rewrite <- H1. 
   rewrite mkApp_hom. rewrite tcons_hom. reflexivity. 
-- change (TCase n (strip (L1.term.instantiate arg n0 t0))
-                (strips (L1.term.instantiates arg n0 t1)) =
-         (TCase n (instantiate (strip arg) n0 (strip t0))
-                (instantiates (strip arg) n0 (strips t1)))).
+- change (TCase p (strip (L1.term.instantiate arg n t0))
+                (strips (L1.term.instantiates arg n t1)) =
+         (TCase p (instantiate (strip arg) n (strip t0))
+                (instantiates (strip arg) n (strips t1)))).
   rewrite H0. rewrite H1. reflexivity.
 - change (TFix (stripDs (L1.term.instantiateDefs arg
                                               (n0 + L1.term.dlength d) d)) n =
@@ -848,14 +848,14 @@ Proof.
         refine (WcbvEvals_single_valued w1 j).
   - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]]. 
     clear H1. subst. inversion H2. inversion H3; subst. clear H2. clear H3.
-    + refine (H0 cs0 _ _ _ H16).
-      * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H13 H6).
+    + refine (H0 cs0 _ _ _ H17).
+      * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H15 H6).
         simpl in j.
         assert (k:= WcbvEval_single_valued j w). myInjection k. clear k.
         rewrite <- tnil_hom in e.
-        rewrite <- whCaseStep_hom in e. rewrite H15 in e. simpl in e.
+        rewrite <- whCaseStep_hom in e. rewrite H16 in e. simpl in e.
         myInjection e. reflexivity.
-      * refine (L1.term.whCaseStep_pres_WFapp H8 _ _ H15). constructor.
+      * refine (L1.term.whCaseStep_pres_WFapp H8 _ _ H16). constructor.
     + refine (H0 cs0 _ _ _ H18).
       * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H6).
         simpl in j.
@@ -876,7 +876,7 @@ Proof.
       simpl in j.
       * assert (k:= WcbvEval_single_valued j w). myInjection k. clear k.
         assert (j5: ts = strips ts0).
-        { assert (j6:= tskipn_hom (L1.term.tcons arg0 args0) np).
+        { assert (j6:= tskipn_hom (L1.term.tcons arg0 args0) (fst np)).
           simpl in j6. rewrite H11 in j6. rewrite  e in j6.
           rewrite (optStrips_hom) in j6. myInjection j6. reflexivity. }
         rewrite j5 in e0. rewrite <- whCaseStep_hom in e0.
@@ -1157,9 +1157,9 @@ Proof.
                                 (unstrip tin) ni (unstrips t1)))).
     rewrite <- H. rewrite <- H0. rewrite <- H1. simpl.
     rewrite mkApp_unhom. reflexivity.
-  - change (unstrip (TCase n (instantiate tin ni t)
+  - change (unstrip (TCase p (instantiate tin ni t)
                            (instantiates tin ni t0)) =
-            L1.term.TCase n L1.term.prop
+            L1.term.TCase p L1.term.prop
                           (L1.term.instantiate (unstrip tin) ni (unstrip t))
                           (L1.term.instantiates (unstrip tin) ni
                                                 (unstrips t0))).

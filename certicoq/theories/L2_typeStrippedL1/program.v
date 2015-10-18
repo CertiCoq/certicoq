@@ -829,7 +829,7 @@ Lemma mkApp_pres_Crct:
   forall fn p n, Crct p n fn ->
   forall args, Crcts p n args -> Crct p n (mkApp fn args).
 Proof.
-  induction fn; unfold mkApp; simpl; intros p nx h0 args h1;
+  induction fn; unfold mkApp; simpl; intros p' nx h0 args h1;
   destruct args; intuition;
   try (solve [inversion_Clear h1; apply CrctApp; try assumption; not_isApp]).
   - destruct (Crct_invrt_App h0 eq_refl) as [j1 [j2 [j3 j4]]].

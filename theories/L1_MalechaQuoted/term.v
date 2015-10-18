@@ -28,8 +28,8 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat -> Term
-| TCase      : nat (* # of parameters *) -> Term (* type info *) ->
-               Term -> Terms -> Term
+| TCase      : (nat * list nat) (* # of parameters, args per branch *) ->
+               Term (* type info *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
 with Terms : Type :=
 | tnil : Terms
@@ -71,7 +71,7 @@ Definition TrmTrmsDefs_Typeind
   (f6 : forall s : string, P (TConst s))
   (f7 : forall i : inductive, P (TInd i))
   (f8 : forall (i : inductive) (n : nat), P (TConstruct i n))
-  (f9 : forall (n : nat) (t : Term),
+  (f9 : forall (n : nat * list nat) (t : Term),
         P t ->
         forall t0 : Term,
         P t0 -> forall t1 : Terms, P0 t1 -> P (TCase n t t0 t1))
@@ -121,7 +121,9 @@ apply TrmTrmsDefs_ind.
 - induction t; cross.
   destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); [lft | rght .. ].
 - induction t2; cross.
-  destruct (eq_nat_dec n n0); destruct (H t2_1); destruct (H0 t2_2);
+  destruct p as [n l], p0 as [n0 l0].
+  destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
+  destruct (H t2_1); destruct (H0 t2_2);
   destruct (H1 t2); [lft | rght .. ].
 - induction t; cross.
   destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
@@ -666,7 +668,7 @@ Proof.
   left. intuition. revert H. not_isApp.
 - exists (TConstruct i n), arg, tnil. split. reflexivity.
   left. intuition. revert H. not_isApp.
-- exists (TCase n fn1 fn2 t), arg, tnil. split. reflexivity.
+- exists (TCase p fn1 fn2 t), arg, tnil. split. reflexivity.
   left. intuition. revert H. not_isApp.
 - exists (TFix d n), arg, tnil. split. reflexivity.
   left. intuition. revert H. not_isApp.

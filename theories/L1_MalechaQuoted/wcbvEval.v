@@ -56,14 +56,14 @@ Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
                WcbvEvals p args args1 ->
                WcbvEval p (TApp fn arg args)
                         (TApp (TInd i) arg1 args1)
-| wCase0: forall mch i n ty brs cs s,
+| wCase0: forall mch i n ty l brs cs s,
            WcbvEval p mch (TConstruct i n) ->
            whCaseStep n tnil brs = Some cs ->
            WcbvEval p cs s ->
-           WcbvEval p (TCase 0 ty mch brs) s
+           WcbvEval p (TCase (0,l) ty mch brs) s
 | wCasen: forall mch i n ty arg args np brs cs s ts,
            WcbvEval p mch (TApp (TConstruct i n) arg args) ->
-           tskipn np (tcons arg args) = Some ts ->
+           tskipn (fst np) (tcons arg args) = Some ts ->
            whCaseStep n ts brs = Some cs ->
            WcbvEval p cs s ->
            WcbvEval p (TCase np ty mch brs) s
@@ -555,14 +555,14 @@ Function wcbvEval
             (match wcbvEval n p mch with
                | Exc str => Exc str
                | Ret emch =>
-                 (match emch, np with 
+                 (match emch, fst np with 
                     | TConstruct _ r, 0 => 
                       match whCaseStep r tnil brs with
                         | None => raise "case step fails"
                         | Some cs => wcbvEval n p cs
                       end
                     | TApp (TConstruct _ r) arg args, _ =>
-                      match tskipn np (tcons arg args) with
+                      match tskipn (fst np) (tcons arg args) with
                         | None => raise "not enough args for constructor"
                         | Some ts => match whCaseStep r ts brs with
                                        | None => raise "case step fails"

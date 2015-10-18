@@ -21,15 +21,16 @@ Set Implicit Arguments.
 ***  (without constructor arity, to be filled in at L2)
 **)
 Section term_Term_sec.
-  Variable term_Term: term -> exception Term.
-  Fixpoint terms_Terms (ts:list term) : exception Terms :=
+  Variable A : Set.
+  Variable term_Term: A -> exception Term.
+  Fixpoint terms_Terms (ts:list A) : exception Terms :=
     match ts with
       | nil => ret tnil
       | cons r rs => do R <- term_Term r;
                      do Rs <- terms_Terms rs;
                      ret (tcons R Rs)
     end.
-  Fixpoint defs_Defs (ds: list (def term)) : exception Defs :=
+  Fixpoint defs_Defs (ds: list (def A)) : exception Defs :=
    match ds with
      | nil => ret dnil
      | cons d ds => 
@@ -77,8 +78,9 @@ Fixpoint term_Term (t:term) : exception Term :=
     | tCase n ty mch brs =>
         do Ty <- term_Term ty;
         do Mch <- term_Term mch;
-        do Brs <- terms_Terms term_Term brs;
-        ret (TCase n Ty Mch Brs)
+        let Ars := List.map fst brs in
+        do Brs <- terms_Terms (fun x => term_Term (snd x)) brs;
+        ret (TCase (n,Ars) Ty Mch Brs)
     | tFix defs m =>
         do Defs <- defs_Defs term_Term defs;
         ret (TFix Defs m)

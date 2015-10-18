@@ -265,7 +265,7 @@ Proof.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TCase n tt t)) in H.
+              | None => None end) = Some (TCase p0 tt t)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Some sbod => Some (TLambda nm sbod)
@@ -319,7 +319,7 @@ Proof.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TCase n tt t)) in H.
+              | None => None end) = Some (TCase p0 tt t)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Some sbod => Some (TProd nm sbod)

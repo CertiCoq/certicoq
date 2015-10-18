@@ -57,6 +57,13 @@ Section TermTranslation.
   Definition reloc_fix k (r : N -> exp) i :=
     fun n => if n <? k then Proj_e (Var_e 0) i else Var_e (N.sub n (N.pred k)).
     
+  Fixpoint strip_lam (k : nat) (e : exp) : exp :=
+    match k, e with
+    | 0%nat, _ => e
+    | S n, Lam_e e => strip_lam n e
+    | S n, _ => e
+    end.
+  
   Fixpoint trans (k : N) (reloc : N -> exp) (t : L3t.Term) : exp :=
     match t with
     | L3t.TRel n => reloc (N.of_nat n)
@@ -76,16 +83,18 @@ Section TermTranslation.
         | L3t.tcons t ts => cons (trans k reloc t) (args' ts)
         end
       in Con_e (dcon_of_con ind c) (args' args)
-    | L3t.TCase n t brs =>
+    | L3t.TCase ann t brs =>
       let fix brs' n l :=
           match l with
           | L3t.tnil => nil
           | L3t.tcons t ts =>
-            cons (n, 0 (* Number of args of n, impossible to infer here *),
-                  trans k reloc t) (brs' (n + 1)%N ts)
+            let nargs := List.nth (N.to_nat n) (snd ann) 0%nat in
+            cons (n, N.of_nat nargs, strip_lam nargs (trans k reloc t))
+                 (brs' (n + 1)%N ts)
           end
       in Match_e (trans k reloc t) (brs' (0%N) brs)
     | L3t.TFix d n =>
+      (** Discuss with Olivier how to change cps for that *)
       let len := N.of_nat (L3t.dlength d) in
       let fix defs' l i :=
           match l with
@@ -103,7 +112,7 @@ Section TermTranslation.
       of a tuple, we hence have to substitute these rels in [t] by the right
       projections. Actually, we have no substitution operation on L3 terms, so
       we have to use let-bindings instead. *)
-  
+
 End TermTranslation.
 
 Definition translate (e : env) t :=
@@ -192,11 +201,15 @@ Eval compute in (slowFib 4).
 Fixpoint idn (n : nat) : nat :=
   match n with 0%nat => 0 | S n => S (idn n) end.
 
+Definition matchn (n : nat) : nat :=
+  match n with 0%nat => 0 | S n => n end.
+
 Quote Recursively Definition p_0 := 0.
 Quote Recursively Definition p_idn := idn.
 Quote Recursively Definition p_idn1 := (idn 1).
 
 Quote Recursively Definition p_slowFib1 := (slowFib 1).
+Quote Recursively Definition p_matchn := (matchn 1).
 
 Quote Recursively Definition p_add := Nat.add.
 Quote Recursively Definition p_add01 := (Nat.add 0%nat 1).
@@ -216,6 +229,8 @@ Eval compute in run p_0.
 
 Eval compute in program_exp p_add01.
 Eval compute in run p_add01.
+Eval compute in program_exp p_matchn.
+Eval compute in run p_matchn.
 
 Eval compute in program_exp p_idn.
 

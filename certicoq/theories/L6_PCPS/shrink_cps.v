@@ -644,9 +644,7 @@ Qed.
           end) 
 
 
-    end.
-
-
+    end. 
   
  Solve Obligations with (program_simpl; unfold term_sub_size; simpl;  rewrite plus_n_Sm; rewrite <- Nat.add_lt_mono_l;  eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; omega)]).
  Next Obligation. Defined. 

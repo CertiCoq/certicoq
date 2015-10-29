@@ -26,8 +26,8 @@ Require Import CpdtTactics.
 
 
 Require Import List.
-Add LoadPath "../L4_Cps".
-Add LoadPath "./L4_Cps".
+Add LoadPath "../L4_CPS".
+Add LoadPath "./L4_CPS".
 Require Import simple_cps. (* using cps for db cps terms *)
 Require Import cps. (* shadows exp from simple_cps for nominal cps terms *)
 

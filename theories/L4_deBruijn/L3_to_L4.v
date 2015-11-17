@@ -13,7 +13,7 @@ Require L3.
 Module L3eval := L3.wndEval.
 Module L3t := L3.term.
 Module L3U := L3.unaryApplications.
-Require Import CPS.expression.
+Require Import L4.expression.
 
 Definition dcon_of_con (i : inductive) (n : nat) := N.of_nat n.
 
@@ -238,3 +238,5 @@ Eval compute in run p_matchn.
 Eval compute in program_exp p_idn.
 Eval compute in program_exp p_idn1.
 Eval compute in run p_idn1.
+
+Eval compute in run p_add01.

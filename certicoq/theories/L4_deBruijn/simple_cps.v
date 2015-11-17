@@ -37,28 +37,22 @@ Inductive exp : Type :=
 | Con_e : dcon -> (list exp) -> exp
 | Match_e : exp -> (list (branch exp)) -> exp
 | Let_e : exp -> exp -> exp
-| Fix_e : (list exp) -> exp  (* implicitly lambdas *)
-| Proj_e : exp -> N -> exp.
+| Fix_e : (list exp) -> N -> exp.  (* implicitly lambdas *)
 
 (* A few notes on the source:  
 
    [Let_e e1 e2] corresponds to (let x0 := e1 in e2)
 
-   [Fix_e [e1;e2;...;en]] produces an n-tuple of functions.  Each expression
-   is treated as binding (a) the n-tuple, and then (b) a function argument.
+   [Fix_e [e1;e2;...;en] i] produces a projection of an n-tuple of
+   functions.  Each expression is treated as binding the n functions.
 
    So this is similar to saying something like:
 
-    let rec f1 = \x1.e1
-        and f2 = \x2.e2
+    let rec f1 = e1
+        and f2 = e2
         ...
-        and fn = \xn.en
-    in
-      (f1,f2,...,fn)
-
-   When [e] evaluates to [Fix_e [e1;e2;...;en]], then [Proj_e e i] evaluates
-   to [ei{0 := Fix_e[e1;e2;...;en]}].  That is, we unwind the recursion when
-   you project something out of the tuple.
+        and fn = en
+    in fi
 
    For [Match_e] each [branch] binds [n] variables, corresponding to the
    arguments to the data constructor.  
@@ -77,8 +71,7 @@ Section EXP_SCHEME.
   Variable con_e : forall d {es}, Pexps es -> Pexp (Con_e d es).
   Variable match_e : forall {e bs}, Pexp e -> Pbranches bs -> Pexp (Match_e e bs).
   Variable let_e : forall {e1 e2}, Pexp e1 -> Pexp e2 -> Pexp (Let_e e1 e2).
-  Variable fix_e : forall {es}, Pexps es -> Pexp (Fix_e es).
-  Variable proj_e : forall e i, Pexp e -> Pexp (Proj_e e i).
+  Variable fix_e : forall {es} i, Pexps es -> Pexp (Fix_e es i).
   Variable nil_es : Pexps nil.
   Variable cons_es : forall {e es}, Pexp e -> Pexps es -> Pexps (e::es).
   Variable nil_bs : Pbranches nil.
@@ -108,8 +101,7 @@ Section EXP_SCHEME.
       | Con_e d es => con_e d _ (my_exps_ind' my_exp_ind' es)
       | Match_e e bs => match_e _ _ (my_exp_ind' e) (my_branches_ind' my_exp_ind' bs)
       | Let_e e1 e2 => let_e _ _ (my_exp_ind' e1) (my_exp_ind' e2)
-      | Fix_e es => fix_e _ (my_exps_ind' my_exp_ind' es)
-      | Proj_e e i => proj_e _ i (my_exp_ind' e)
+      | Fix_e es i => fix_e _ i (my_exps_ind' my_exp_ind' es)
     end.
 
   Definition my_exp_ind :
@@ -125,8 +117,7 @@ Inductive exp_wf : N -> exp -> Prop :=
 | con_e_wf : forall i d es, exps_wf i es -> exp_wf i (Con_e d es)
 | match_e_wf : forall i e bs, exp_wf i e -> branches_wf i bs -> exp_wf i (Match_e e bs)
 | let_e_wf : forall i e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 -> exp_wf i (Let_e e1 e2)
-| fix_e_wf : forall i es, exps_wf (2 + i) es -> exp_wf i (Fix_e es)
-| proj_e_wf : forall i e n, exp_wf i e -> exp_wf i (Proj_e e n)
+| fix_e_wf : forall i es k, exps_wf (2 + i) es -> exp_wf i (Fix_e es k)
 with exps_wf : N -> list exp -> Prop :=
 | nil_wf : forall i, exps_wf i nil
 | cons_wf : forall i e es, exp_wf i e -> exps_wf i es -> exps_wf i (e::es)
@@ -192,8 +183,7 @@ Fixpoint shift n k e :=
     | Con_e d es => Con_e d (shifts' shift n k es)
     | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
     | Match_e e bs => Match_e (shift n k e) (shift_branches' shift n k bs)
-    | Fix_e es => Fix_e (shifts' shift n (2 + k) es)
-    | Proj_e e m => Proj_e (shift n k e) m
+    | Fix_e es i => Fix_e (shifts' shift n (2 + k) es) i
   end.
 Definition shifts := shifts' shift.
 Definition shift_branch := shift_branch' shift.
@@ -217,8 +207,7 @@ Fixpoint subst (v:exp) k (e:exp) : exp :=
     | Con_e d es => Con_e d (substs' subst v k es)
     | Let_e e1 e2 => Let_e (subst v k e1) (subst v (1 + k) e2)
     | Match_e e bs => Match_e (subst v k e) (subst_branches' subst v k bs)
-    | Fix_e es => Fix_e (substs' subst v (2 + k) es)
-    | Proj_e e m => Proj_e (subst v k e) m
+    | Fix_e es i => Fix_e (substs' subst v (2 + k) es) i
   end.
 Definition substs := substs' subst.
 Definition subst_branch := subst_branch' subst.
@@ -382,11 +371,11 @@ Inductive eval : exp -> exp -> Prop :=
                    find_branch d (N.of_nat (List.length vs)) bs = Some e' ->
                    eval (subst_list e' vs) v ->
                    eval (Match_e e bs) v
-| eval_Fix_e : forall es, eval (Fix_e es) (Fix_e es)
-| eval_Proj_e : forall e es n e',
-                  eval e (Fix_e es) ->
+| eval_Fix_e : forall es i, eval (Fix_e es i) (Fix_e es i)
+| eval_Proj_e : forall e es n e' e2 v2,
+                  eval e (Fix_e es n) ->
                   nthopt (N.to_nat n) es = Some e' ->
-                  eval (Proj_e e n) ((Lam_e e'){0 := Fix_e es})
+                  eval (App_e e e2) (e'{0 := Fix_e es})
 with evals : list exp -> list exp -> Prop :=
      | evals_nil : evals nil nil
      | evals_cons : forall e es v vs, eval e v -> evals es vs ->

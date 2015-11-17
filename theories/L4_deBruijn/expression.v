@@ -1,4 +1,5 @@
 Require Import Arith BinNat String List Omega Program Psatz.
+Require Import Common.Common.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
@@ -60,8 +61,7 @@ Inductive exp: Type :=
 | Con_e: dcon -> exps -> exp
 | Match_e: exp -> branches_e -> exp
 | Let_e: exp -> exp -> exp
-| Fix_e: efnlst -> exp  (* implicitly lambdas *)
-| Proj_e: exp -> N -> exp
+| Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
 with exps: Type :=
 | enil: exps
 | econs: exp -> exps -> exps
@@ -130,9 +130,8 @@ Inductive exp_wf: N -> exp -> Prop :=
                               exp_wf i (Match_e e bs)
 | let_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 ->
                              exp_wf i (Let_e e1 e2)
-| fix_e_wf: forall i (es:efnlst), efnlst_wf (2 + i) es ->
-                                     exp_wf i (Fix_e es)
-| proj_e_wf: forall i e n, exp_wf i e -> exp_wf i (Proj_e e n)
+| fix_e_wf: forall i (es:efnlst) k, efnlst_wf (2 + i) es ->
+                                     exp_wf i (Fix_e es k)
 with exps_wf: N -> exps -> Prop :=
 | enil_wf: forall i, exps_wf i enil
 | econs_wf: forall i e es, exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
@@ -216,8 +215,7 @@ Fixpoint shift n k e :=
     | Con_e d es => Con_e d (shift_exps' shift n k es)
     | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
     | Match_e e bs => Match_e (shift n k e) (shift_branches' shift n k bs)
-    | Fix_e es => Fix_e (shift_efnlst shift n (2 + k) es)
-    | Proj_e e m => Proj_e (shift n k e) m
+    | Fix_e es k => Fix_e (shift_efnlst shift n (2 + k) es) k
   end.
 
 Definition shifts := shift_exps' shift.
@@ -299,8 +297,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Con_e d es => Con_e d (sbsts v k es)
     | Let_e e1 e2 => Let_e (sbst v k e1) (sbst v (1 + k) e2)
     | Match_e e bs => Match_e (sbst v k e) (sbst_branches v k bs)
-    | Fix_e es => Fix_e (sbst_efnlst v (2 + k) es)
-    | Proj_e e m => Proj_e (sbst v k e) m
+    | Fix_e es k => Fix_e (sbst_efnlst v (2 + k) es) k
   end
 with sbsts (v:exp) k (es:exps) : exps :=
        match es with
@@ -448,6 +445,19 @@ Fixpoint find_branch (d:dcon) (m:N) (bs:branches_e) : option exp :=
                      else find_branch d m bs
   end.
 
+Fixpoint efnlength (es:efnlst) :=
+  match es with
+  | eflnil => 0%nat
+  | eflcons _ l => S (efnlength l)
+  end.
+
+(** Building a Fixpoint substitution. **)
+Definition sbst_fix (es:efnlst) (e : exp) : exp :=
+  let les := efnlength es in
+    fold_left
+      (fun bod ndx => e{0::= Fix_e es (N.of_nat ndx)})
+      (list_to_zero les) e.
+
 (** Big-step evaluation for [exp]. *)
 Inductive eval: exp -> exp -> Prop :=
 | eval_Lam_e: forall e, eval (Lam_e e) (Lam_e e)
@@ -466,11 +476,13 @@ Inductive eval: exp -> exp -> Prop :=
                    find_branch d (exps_length vs) bs = Some e' ->
                    eval (sbst_list e' vs) v ->
                    eval (Match_e e bs) v
-| eval_Fix_e: forall es, eval (Fix_e es) (Fix_e es)
-| eval_Proj_e: forall e (es:efnlst) n e',
-                  eval e (Fix_e es) ->
-                  enthopt (N.to_nat n) es = Some e' ->
-                  eval (Proj_e e n) ((Lam_e e'){0 ::= Fix_e es})
+| eval_Fix_e: forall es k, eval (Fix_e es k) (Fix_e es k)
+| eval_FixApp_e: forall e (es:efnlst) n e2 v2 e' e'',
+    eval e (Fix_e es n) ->
+    eval e2 v2 ->
+    enthopt (N.to_nat n) es = Some e' ->
+    eval (App_e (sbst_fix es e') v2) e'' ->
+    eval (App_e e e2) e''
 with evals: exps -> exps -> Prop :=
      | evals_nil: evals enil enil
      | evals_cons: forall e es v vs, eval e v -> evals es vs ->
@@ -493,11 +505,12 @@ Lemma eval_single_valued:
 Proof.
   apply my_eval_ind; simpl; intros.
   - inversion H. reflexivity.
-  - inversion H2. subst.
-    assert (j0:Lam_e e1' = Lam_e e1'0). { apply H. assumption. }
-    injection j0; intros h0. subst.
-    assert (j1:v2 = v0). { apply H0. assumption. } subst.
-    apply H1. assumption.
+  - inversion H2; subst.
+    * assert (j0:Lam_e e1' = Lam_e e1'0). { apply H. assumption. }
+                                          injection j0; intros h0. subst.
+      assert (j1:v2 = v0). { apply H0. assumption. } subst.
+      apply H1. assumption.
+    * specialize (H _ H5); discriminate.
   - inversion H0. subst. apply f_equal2. reflexivity.
     apply H. assumption.
   - inversion H1. subst.
@@ -508,14 +521,16 @@ Proof.
     rewrite H5 in e1. injection e1; intros h2. subst. clear e1.
     apply H0. assumption.
   - inversion H. subst. reflexivity.
-  - inversion H0. subst. simpl. inversion H0. subst.
-    specialize (H _ H6). injection H; intros h0. subst.
-    rewrite H7 in e1. injection e1; intros h1. subst. reflexivity.
+  - inversion H2; subst.
+    * specialize (H _ H5); discriminate.
+    * specialize (H _ H5); injection H; intros; subst.
+      specialize (H0 _ H6); subst v0.
+      assert (e' = e'0) by congruence; subst e'0.
+      now apply H1.
   - inversion H. reflexivity.
   - inversion H1. subst. rewrite (H v0); try assumption.
     rewrite (H0 vs0); try assumption. reflexivity.
 Qed.
-
 
 Example x1: exp := Lam_e (Var_e 0).  (* identity *)
 Lemma Lx1: forall (e d:exp), eval e d -> eval (App_e x1 e) d.
@@ -540,7 +555,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
     | 0%nat => None
     | S n => match e with
                | Lam_e d => Some (Lam_e d)
-               | Fix_e es => Some (Fix_e es)
+               | Fix_e es k => Some (Fix_e es k)
                | Con_e d es => 
                  match evals_n n es with
                      | None => None
@@ -552,6 +567,17 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                      match eval_n n e2 with
                        | None => None
                        | Some e2' => eval_n n (e1'{0 ::= e2'})
+                     end
+                   | Some (Fix_e es k) =>
+                     match eval_n n e2 with
+                     | None => None
+                     | Some e2' =>
+                       match enthopt (N.to_nat k) es with
+                       | Some e' =>
+                         let t' := sbst_fix es e' in
+                         eval_n n (App_e t' e2')
+                       | _ => None
+                       end
                      end
                    | _ => None
                   end
@@ -566,15 +592,6 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                      match find_branch d (exps_length vs) bs with
                        | None => None
                        | Some e' => eval_n n (sbst_list e' vs)
-                     end
-                   | _ => None
-                 end
-               | Proj_e e m =>
-                 match eval_n n e with
-                   | Some (Fix_e es) => 
-                     match enthopt (N.to_nat m) es with
-                       | Some e' => Some ((Lam_e e'){0 ::= Fix_e es})
-                       | _ => None
                      end
                    | _ => None
                  end
@@ -757,22 +774,20 @@ Proof.
     * specialize (H _ e4). eapply H.
     * specialize (H0 _ e5). eapply H0.
     * specialize (H1 _ H2). apply H1.
+  + eapply eval_FixApp_e.
+    * specialize (H _ e4). eapply H.
+    * specialize (H0 _ e5). apply H0.
+    * apply e6.
+    * now apply H1.
   + econstructor.
     * specialize (H _ e4). eapply H.
     * specialize (H0 _ H1). apply H0.
-  + econstructor.
-    * specialize (H _ e3). eapply H.
-    * eapply e4. 
-    * specialize (H0 _ H1). apply H0.
-  + injection H0; intros h0. subst. constructor.
-    * apply H. assumption.
-    * assumption.
+  + econstructor; eauto. 
   + injection H; intros h0. subst. constructor.
   + injection H1; intros h0. subst. constructor.
     * apply H. assumption.
     * apply H0. assumption.
 Qed.
-
 
 (** [eval_n] is complete w.r.t. [eval] **)
 Lemma eval_evaln:
@@ -824,12 +839,22 @@ Proof.
     simpl. rewrite k.
     replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
     rewrite e1. rewrite k0. reflexivity.
-  - destruct H as [x h]. exists (x+1)%nat.
+  - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
+    exists (x+x0+x1)%nat.
     assert (j:=eval_n_Some_Succ _ _ _ h).
+    assert (j0:=eval_n_Some_Succ _ _ _ h0).
+    assert (j1:=eval_n_Some_Succ _ _ _ h1).
     assert (k:= eval_n_monotone _ _ _ h).
+    assert (k0:= eval_n_monotone _ _ _ h0).
+    assert (k1:= eval_n_monotone _ _ _ h1).
     rewrite j.
-    replace (S (x - 1) + 1)%nat with (S (x + 0))%nat; try lia.
-    simpl. rewrite k. rewrite e1. reflexivity.
+    replace (S (x - 1) + x0 + x1)%nat
+    with (S (x + (x0 + x1 - 1)))%nat; try lia.
+    simpl. rewrite k.
+    replace (x + (x0 + x1 - 1))%nat with (x0 + (x + x1 - 1))%nat; try lia.
+    rewrite k0.
+    replace (x0 + (x + x1 - 1))%nat with (x1 + (x + x0 - 1))%nat; try lia.
+    rewrite e3, k1. reflexivity.
   - destruct H as [x h]. destruct H0 as [x0 h0].
     assert (j:=eval_n_Some_Succ _ _ _ h).
     assert (j0:=evals_n_Some_Succ _ _ _ h0).
@@ -842,7 +867,6 @@ Proof.
     replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
     rewrite k0. reflexivity.
 Qed.
-
 
 (** some concrete examples **)
 Example Ke: exp := Lam_e (Lam_e (Var_e 1)).
@@ -977,14 +1001,14 @@ repeat econstructor.
 Qed.
 
 (** fixpoints **)
-Definition pre_copy : exp :=
-  (Fix_e [!(Match_e Ve0 (brcons_e ZZ 0 ZZZ 
-            (brcons_e SS 1 (SSS $ ((Proj_e Ve2 0) $ Ve0)) brnil_e)))!]).
-Definition copy :exp := Proj_e pre_copy 0.
+Definition copy : exp :=
+  (Fix_e [!Lam_e (Match_e Ve0 (brcons_e ZZ 0 ZZZ 
+            (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
 
 Goal eval (copy $ ZZZ) ZZZ.
-unfold copy, pre_copy.
-repeat (try econstructor; try vm_compute).
+unfold copy.
+econstructor 7 ; try vm_compute; try constructor. econstructor.
+repeat (try econstructor ; try vm_compute).
 Qed.
 
 Eval vm_compute in eval_n 100 (copy $ six).

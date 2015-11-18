@@ -35,27 +35,6 @@ Definition ienv := list (string * itypPack).
 Section TermTranslation.
   Variable ie : ienv.
   Variable e : env.
-
-  (* Fixpoint fix_subst (n : nat) := *)
-  (*   match n with *)
-  (*   | 0%nat => [Proj_e (Var_e 0%N) 0%N] *)
-  (*   | S n' => *)
-  (*     (Proj_e (Var_e 0%N) (N.of_nat n)) :: fix_subst n' *)
-  (*   end. *)
-
-  Fixpoint fix_subst (n : nat) (k : N) (t : exp) :=
-    match n with
-    | 0%nat => (* Go over the tuple binder *) shift 1 k t
-    | S n' =>
-      Let_e (Proj_e (Var_e k) (N.of_nat n')) (fix_subst n' (k + 1) t) 
-    end.
-
-  Definition reloc n := Var_e n.
-  Definition reloc_lam (r : N -> exp) :=
-    fun n => match n with N0 => Var_e 0 | Npos n' => shift 1 0 (r (N.pred n)) end.
-  
-  Definition reloc_fix k (r : N -> exp) i :=
-    fun n => if n <? k then Proj_e (Var_e 0) i else Var_e (N.sub n (N.pred k)).
     
   Fixpoint strip_lam (k : nat) (e : exp) : exp :=
     match k, e with
@@ -64,15 +43,14 @@ Section TermTranslation.
     | S n, _ => e
     end.
   
-  Fixpoint trans (k : N) (reloc : N -> exp) (t : L3t.Term) : exp :=
+  Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
-    | L3t.TRel n => reloc (N.of_nat n)
+    | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TSort s => (* Erase *) dummy
     | L3t.TProd n t => (* Erase *) dummy
-    | L3t.TLambda n t => Lam_e (trans (k+1) (reloc_lam reloc) t)
-    | L3t.TLetIn n t u => Let_e (trans k reloc t)
-                               (trans (k+1) (reloc_lam reloc) u)
-    | L3t.TApp t u => App_e (trans k reloc t) (trans k reloc u)
+    | L3t.TLambda n t => Lam_e (trans (k+1) t)
+    | L3t.TLetIn n t u => Let_e (trans k t) (trans (k+1) u)
+    | L3t.TApp t u => App_e (trans k t) (trans k u)
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
     | L3t.TInd i => (* Erase *) dummy
@@ -80,7 +58,7 @@ Section TermTranslation.
       let fix args' l :=
         match l with
         | L3t.tnil => enil
-        | L3t.tcons t ts => econs (trans k reloc t) (args' ts)
+        | L3t.tcons t ts => econs (trans k t) (args' ts)
         end
       in Con_e (dcon_of_con ind c) (args' args)
     | L3t.TCase ann t brs =>
@@ -89,34 +67,26 @@ Section TermTranslation.
           | L3t.tnil => brnil_e
           | L3t.tcons t ts =>
             let nargs := List.nth (N.to_nat n) (snd ann) 0%nat in
-            brcons_e n (N.of_nat nargs) (strip_lam nargs (trans k reloc t))
+            brcons_e n (N.of_nat nargs) (strip_lam nargs (trans k t))
                  (brs' (n + 1)%N ts)
           end
-      in Match_e (trans k reloc t) (brs' (0%N) brs)
+      in Match_e (trans k t) (brs' (0%N) brs)
     | L3t.TFix d n =>
-      (** Discuss with Olivier how to change cps for that *)
-      let len := N.of_nat (L3t.dlength d) in
-      let fix defs' l i :=
+      let fix defs' l :=
           match l with
           | L3t.dnil => eflnil
           | L3t.dcons na t _ l' =>
-            let t' := trans (k + 1) (reloc_fix len reloc i) t in
-              eflcons (strip_lam 1 t') (defs' l' (i + 1))
+            let t' := trans (k + 1) t in
+              eflcons (strip_lam 1 t') (defs' l')
           end
       in      
-      Proj_e (Fix_e (defs' d 0)) (N.of_nat n)
+      Fix_e (defs' d) (N.of_nat n)
     end.
-
-  (** The [TFix d n] block assumes that recursive calls to [di] in [d] are of the 
-      form [TRel ki], while in the cps exp encoding, this becomes a projection
-      of a tuple, we hence have to substitute these rels in [t] by the right
-      projections. Actually, we have no substitution operation on L3 terms, so
-      we have to use let-bindings instead. *)
 
 End TermTranslation.
 
 Definition translate (e : env) t :=
-  trans e 0 reloc t.
+  trans e 0 t.
 
 Definition translate_env (e : environ) : env :=
   fold_right
@@ -240,3 +210,4 @@ Eval compute in program_exp p_idn1.
 Eval compute in run p_idn1.
 
 Eval compute in run p_add01.
+

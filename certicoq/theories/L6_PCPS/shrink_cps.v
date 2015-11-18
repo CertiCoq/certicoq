@@ -538,7 +538,14 @@ Qed.
 Qed.  
   
   (* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)
-  Program Fixpoint postcontractfun (oes: exp * ctx_map) (fcon:  r_map -> c_map -> b_map -> forall es:(exp*ctx_map), (term_sub_size es < term_sub_size oes) -> (exp * c_map * b_map))  (sig:r_map) (count:c_map) (inl:b_map) (sub:ctx_map) (fds: fundefs) (pfe:subfds_e fds (fst oes)) (pfsub:sub_size sub <= sub_size (snd oes)) : (fundefs * c_map * b_map) :=
+  Program
+  Fixpoint postcontractfun (oes: exp * ctx_map)
+    (fcon: r_map -> c_map -> b_map ->
+           forall es:(exp*ctx_map), (term_sub_size es < term_sub_size oes) ->
+                                    (exp * c_map * b_map))
+    (sig:r_map) (count:c_map) (inl:b_map) (sub:ctx_map) (fds: fundefs)
+    (pfe:subfds_e fds (fst oes)) (pfsub:sub_size sub <= sub_size (snd oes))
+    : (fundefs * c_map * b_map) :=
     match fds with
       | Fnil => (Fnil, count, inl)
       | Fcons f t ys e fds' =>
@@ -625,7 +632,10 @@ Qed.
       | (Efun fl e, sub) =>
              let '(fl', count', sub') := precontractfun sig count sub fl in
              let '(e', count'', inl') := contract sig count' inl (e, sub') in
-             let '(fl'', count''', inl'') := postcontractfun (Efun fl' e', sub') contract sig count'' inl' sub' fl' _ _ in 
+             let '(fl'', count''', inl'') :=
+                 postcontractfun (Efun fl' e', sub')
+                    (fun rm cm bm es H => contract rm cm bm es) sig count''
+                                 inl' sub' fl' _ _ in 
              (Efun fl'' e', count''', inl'')
         
       | ( Eapp f ys, sub) =>
@@ -650,7 +660,14 @@ Qed.
  Next Obligation. Defined. 
 Solve Obligations with (program_simpl; unfold term_sub_size; simpl; symmetry in Heq_anonymous; apply findtag_not_empty in Heq_anonymous; omega).
 Next Obligation. apply precontractfun_size in Heq_anonymous. unfold term_sub_size. simpl. apply le_lt_n_Sm. omega. Qed.  
-Next Obligation. Show Proof. inversion Heq_es; subst. assert (Ha0 := Heq_anonymous0). apply precontractfun_size in Ha0.  unfold term_sub_size; simpl.  admit. Admitted. (* need...to look more into this *)
+Next Obligation.
+Proof. 
+  inversion Heq_es; subst.
+  assert (Ha0 := Heq_anonymous0).
+  apply precontractfun_size in Ha0.
+  unfold term_sub_size in H |- *. simpl in H |- *.
+  eapply (lt_le_trans _ _ _ H).
+  admit. Admitted. (* need...to look more into this *)
 Next Obligation.  exists fl' e'. split; right; reflexivity. Qed.
 Next Obligation.  unfold term_sub_size; simpl. symmetry in Heq_anonymous. apply sub_remove_size in Heq_anonymous. rewrite <- Heq_anonymous. simpl. omega. Qed. 
 

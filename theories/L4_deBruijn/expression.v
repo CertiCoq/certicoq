@@ -455,7 +455,7 @@ Fixpoint efnlength (es:efnlst) :=
 Definition sbst_fix (es:efnlst) (e : exp) : exp :=
   let les := efnlength es in
     fold_left
-      (fun bod ndx => e{0::= Fix_e es (N.of_nat ndx)})
+      (fun bod ndx => e{1 ::= Fix_e es (N.of_nat ndx)})
       (list_to_zero les) e.
 
 (** Big-step evaluation for [exp]. *)
@@ -481,7 +481,7 @@ Inductive eval: exp -> exp -> Prop :=
     eval e (Fix_e es n) ->
     eval e2 v2 ->
     enthopt (N.to_nat n) es = Some e' ->
-    eval (App_e (sbst_fix es e') v2) e'' ->
+    eval ((sbst_fix es e') {0 ::= v2}) e'' ->
     eval (App_e e e2) e''
 with evals: exps -> exps -> Prop :=
      | evals_nil: evals enil enil
@@ -575,7 +575,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                        match enthopt (N.to_nat k) es with
                        | Some e' =>
                          let t' := sbst_fix es e' in
-                         eval_n n (App_e t' e2')
+                         eval_n n (t'{0 ::= e2'})
                        | _ => None
                        end
                      end
@@ -1002,12 +1002,13 @@ Qed.
 
 (** fixpoints **)
 Definition copy : exp :=
-  (Fix_e [!Lam_e (Match_e Ve0 (brcons_e ZZ 0 ZZZ 
-            (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
+  (Fix_e [!Match_e Ve0 (brcons_e ZZ 0 ZZZ 
+            (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e))!] 0).
 
 Goal eval (copy $ ZZZ) ZZZ.
 unfold copy.
 econstructor 7 ; try vm_compute; try constructor. econstructor.
+unfold sbst_fix.
 repeat (try econstructor ; try vm_compute).
 Qed.
 

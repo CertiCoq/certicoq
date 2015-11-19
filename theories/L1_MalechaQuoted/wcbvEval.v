@@ -407,7 +407,6 @@ intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
      * apply wEsRTCrfl.
 Qed.
 
-
 (************  in progress  ****
 Lemma WcbvEval_strengthen:
   forall pp,
@@ -609,11 +608,11 @@ with wcbvEvals (tmr:nat) (p:environ) (ts:Terms) {struct tmr}
                        end
                    end
         end).
-(**
-Functional Scheme wcbvEval_ind := Induction for wcbvEval Sort Prop
-with wcbvEvals_ind := Induction for wcbvEvals Sort Prop.
-Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind, wcbvEvals_ind.
-**)
+
+(* Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop *)
+(* with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop. *)
+
+(* Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'. *)
 
 (** wcbvEval and WcbvEval are the same relation **)
 Lemma wcbvEval_WcbvEval:
@@ -622,38 +621,36 @@ Lemma wcbvEval_WcbvEval:
   (forall ts n ss, wcbvEvals n p ts = Ret ss -> WcbvEvals p ts ss) /\
   (forall (ds:Defs) (n:nat), True).
 Admitted.
-(***
-intros p.
-- eapply(TrmTrmsDefs_ind
-      (fun t => forall n s, wcbvEval n p t = Ret s -> WcbvEval p t s)
-      (fun ts => forall n ss, wcbvEvals n p ts = Ret ss ->
-                              WcbvEvals p ts ss)
-      (fun (ds:Defs) => forall (n:nat), True)); intros; intuition;
-  try (solve [induction n; simpl in *; discriminate]).
-  + induction n0; simpl in *; try discriminate.
-  + induction n; simpl in *; try discriminate.
-    * myInjection H. constructor.
-  + induction n; simpl in *; try discriminate.
-    * constructor. eapply H.  eassumption. 
-  + induction n0; simpl in *; try discriminate.
-    * { case_eq (wcbvEval n0 p t); intros; rewrite H2 in H1. 
-        - discriminate.
-        - myInjection H1. constructor. eapply H. eassumption. }
-  + induction n0; simpl in *; try discriminate.
-    * { case_eq (wcbvEval n0 p t); intros; rewrite H2 in H1. 
-        - discriminate.
-        - myInjection H1. constructor. eapply H. eassumption. }
-  + induction n0; simpl in *; try discriminate.
-    * { case_eq (wcbvEval n0 p t); intros; rewrite H3 in H2.
-        - discriminate.
-        - eapply wLetIn. 
-          + eapply H. eassumption. 
-          + eassumption.
-          apply IHn0. rewrite <- H2. 
+(* intros p. *)
+(* - eapply(TrmTrmsDefs_ind *)
+(*       (fun t => forall n s, wcbvEval n p t = Ret s -> WcbvEval p t s) *)
+(*       (fun ts => forall n ss, wcbvEvals n p ts = Ret ss -> *)
+(*                               WcbvEvals p ts ss) *)
+(*       (fun (ds:Defs) => forall (n:nat), True)); intros; intuition; *)
+(*   try (solve [induction n; simpl in *; discriminate]). *)
+(*   + induction n0; simpl in *; try discriminate. *)
+(*   + induction n; simpl in *; try discriminate. *)
+(*     * myInjection H. constructor. *)
+(*   + induction n; simpl in *; try discriminate. *)
+(*     * constructor. eapply H.  eassumption.  *)
+(*   + induction n0; simpl in *; try discriminate. *)
+(*     * { case_eq (wcbvEval n0 p t); intros; rewrite H2 in H1.  *)
+(*         - discriminate. *)
+(*         - myInjection H1. constructor. eapply H. eassumption. } *)
+(*   + induction n0; simpl in *; try discriminate. *)
+(*     * { case_eq (wcbvEval n0 p t); intros; rewrite H2 in H1.  *)
+(*         - discriminate. *)
+(*         - myInjection H1. constructor. eapply H. eassumption. } *)
+(*   + induction n0; simpl in *; try discriminate. *)
+(*     * { case_eq (wcbvEval n0 p t); intros; rewrite H3 in H2. *)
+(*         - discriminate. *)
+(*         - eapply wLetIn.  *)
+(*           + eapply H. eassumption.  *)
+(*           + eassumption. *)
+(*           apply IHn0. rewrite <- H2.  *)
 
-assert (j2:= H _ _ Happly IHn. rewrite <- H1.
-  +
-***)
+(* assert (j2:= H _ _ Happly IHn. rewrite <- H1. *)
+(*   + *)
 
 (***
 Lemma wcbvEval_mono:
@@ -702,8 +699,9 @@ rewrite <- H5. unfold wcbvEval.
 
 
 unfold whBetaStep. instantiate. 
-
+*)
 (** wcbvEval and WcbvEval are the same relation **)
+(*
 Lemma wcbvEval_WcbvEval:
   forall n p,
   (forall t s, wcbvEval n p t = Ret s -> WcbvEval p t s) /\
@@ -714,21 +712,10 @@ apply (wcbvEvalEvals_ind
   (fun n p ts os => forall ss, os = Ret ss -> WcbvEvals p ts ss));
   intros; try discriminate;
   try (solve [injection H; intros h; subst; constructor]).
-- apply wCast. intuition.
-- injection H0. intros. subst. eapply wProd. apply H. assumption.
-- injection H0. intros. subst. eapply wLam. apply H. assumption.
-- eapply wLetIn.
+- subst. eapply wConst. apply lookupDfn_LookupDfn. eassumption.
   + apply H. eassumption.
-  + apply H0. assumption.
+- apply wCast. intuition.
 - subst. eapply wAppLam.
-  + eapply H. eassumption.
-  + eapply H0. eassumption.
-  + eapply H1. eassumption.
-- subst. injection H2. intros. rewrite <- H3. eapply wAppInd.
-  + eapply H. eassumption.
-  + eapply H0. eassumption.
-  + eapply H1. eassumption.
-- subst. injection H2. intros. rewrite <- H3. eapply wAppCnstr.
   + eapply H. eassumption.
   + eapply H0. eassumption.
   + eapply H1. eassumption.
@@ -736,22 +723,31 @@ apply (wcbvEvalEvals_ind
   + apply H. eassumption.
   + eassumption.
   + apply H0. eassumption.
-- subst. eapply wConst. apply lookupDfn_LookupDfn. eassumption.
-  + apply H. eassumption.
-- subst. eapply wCasen; try eassumption.
-  + apply H. eassumption.
-  + apply H0. eassumption.
-- subst. eapply wCase0; try assumption.
+- subst. injection H2. intros. rewrite <- H3. eapply wAppCnstr.
+  + eapply H. eassumption.
+  + eapply H0. eassumption.
+  + eapply H1. eassumption.
+- subst. injection H2. intros. rewrite <- H3. eapply wAppInd.
+  + eapply H. eassumption.
+  + eapply H0. eassumption.
+  + eapply H1. eassumption.
+- destruct np; simpl in *; subst. eapply wCase0; try assumption.
   + apply H. eassumption.
   + eassumption.
   + apply H0. eassumption.
+- subst. eapply wCasen; try eassumption.
+  + apply H. eassumption.
+  + apply H0. eassumption.    
+- eapply wLetIn.
+  + apply H. eassumption.
+  + apply H0. assumption.
+- injection H0. intros. subst. eapply wLam. apply H. assumption.
+- injection H0. intros. subst. eapply wProd. apply H. assumption.
 - subst. injection H1. intros. rewrite <- H2. constructor.
   + apply H. assumption.
   + apply H0. assumption.
 Qed.
-***)
-
-
+*)
 (* need this strengthening to large-enough fuel to make the induction
 ** go through
 *)

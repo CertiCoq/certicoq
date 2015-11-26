@@ -528,13 +528,13 @@ Section CONTRACT.
 Qed.
       
   Theorem precontractfun_size: forall fds sig count sub fds' count' sub',
-                                 (fds', count', sub') =  precontractfun sig count sub fds -> sub_size(sub') <= funs_size (fds) + sub_size (sub).
+                                 (fds', count', sub') =  precontractfun sig count sub fds -> sub_size(sub') <= funs_size (fds) + sub_size (sub) /\ funs_size fds' <= funs_size fds.
   Proof.
-    induction fds; intros; simpl in H.
+    induction fds; intros; simpl in H.    
     - destruct (get_c v count) eqn: gcvc.
       + apply IHfds in H. simpl. omega.
-      +  assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds). destruct (precontractfun sig count sub fds). destruct p. eauto. destructAll. assert (H0' := H0). apply IHfds in H0.  rewrite <- H0' in H. inversion H; subst. simpl. eapply le_trans. apply set_value_size.  simpl. omega.        
-    - inversion H; subst. simpl. omega.
+      +  assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds). destruct (precontractfun sig count sub fds). destruct p. eauto. destructAll. assert (H0' := H0). apply IHfds in H0.  rewrite <- H0' in H. inversion H; subst. simpl. split. eapply le_trans. apply set_value_size.  simpl. omega. omega.
+    -  inversion H; subst. simpl. omega.
 Qed.  
   
   (* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)
@@ -633,9 +633,9 @@ Qed.
              let '(fl', count', sub') := precontractfun sig count sub fl in
              let '(e', count'', inl') := contract sig count' inl (e, sub') in
              let '(fl'', count''', inl'') :=
-                 postcontractfun (Efun fl' e', sub')
+                 postcontractfun (Efun fl' e, sub) 
                     (fun rm cm bm es H => contract rm cm bm es) sig count''
-                                 inl' sub' fl' _ _ in 
+                                 inl' sub fl' _ _ in  (* using sub instead of sub' so that we don't inline functions within their mutually inductive set of funs *)
              (Efun fl'' e', count''', inl'')
         
       | ( Eapp f ys, sub) =>
@@ -662,13 +662,12 @@ Solve Obligations with (program_simpl; unfold term_sub_size; simpl; symmetry in 
 Next Obligation. apply precontractfun_size in Heq_anonymous. unfold term_sub_size. simpl. apply le_lt_n_Sm. omega. Qed.  
 Next Obligation.
 Proof. 
-  inversion Heq_es; subst.
+  inversion Heq_es; subst. 
   assert (Ha0 := Heq_anonymous0).
   apply precontractfun_size in Ha0.
   unfold term_sub_size in H |- *. simpl in H |- *.
-  eapply (lt_le_trans _ _ _ H).
-  admit. Admitted. (* need...to look more into this *)
-Next Obligation.  exists fl' e'. split; right; reflexivity. Qed.
+  eapply (lt_le_trans _ _ _ H). omega. Qed.
+Next Obligation.  exists fl' e. split; right; reflexivity. Qed.
 Next Obligation.  unfold term_sub_size; simpl. symmetry in Heq_anonymous. apply sub_remove_size in Heq_anonymous. rewrite <- Heq_anonymous. simpl. omega. Qed. 
 
 

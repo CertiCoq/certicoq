@@ -71,6 +71,11 @@ Fixpoint branches_c_length (vs:branches_c) : N :=
     | brnil_c => N0
     | brcons_c _ _ _ us => 1 + (branches_c_length us)
   end.
+Fixpoint fnlst_length (vs:fnlst) : N :=
+  match vs with
+    | flnil => N0
+    | flcons _ us => 1 + (fnlst_length us)
+  end.
 
 
 (** [cps_kwf j c] (resp. [val_kwf j v]) holds when [c] (resp. [v]) has no 
@@ -136,7 +141,7 @@ with val_uwf: N -> val_c -> Prop :=
 | lam_uwf: forall i c, cps_uwf (1 + i) c -> val_uwf i (Lam_c c)
 | cont_uwf: forall i c, cps_uwf i c -> val_uwf i (Cont_c c)
 | con_uwf: forall i d vs, vals_uwf i vs -> val_uwf i (Con_c d vs)
-| fix_uwf: forall i cs k, fnlst_uwf i cs -> val_uwf i (Fix_c cs k)
+| fix_uwf: forall i cs k, fnlst_uwf (fnlst_length cs + i) cs -> val_uwf i (Fix_c cs k)
 with vals_uwf: N -> vals_c -> Prop :=
 | nil_c_uwf: forall i, vals_uwf i vcnil
 | cons_c_uwf: forall i v vs, val_uwf i v -> vals_uwf i vs ->
@@ -149,7 +154,7 @@ with cpsbranches_uwf: N -> branches_c -> Prop :=
 with fnlst_uwf: N -> fnlst -> Prop :=
 | nil_fn_uwf: forall i, fnlst_uwf i flnil
 | cons_fn_uwf: forall i c cs,
-                 cps_uwf (2 + i) c -> fnlst_uwf i cs ->
+                 cps_uwf (1 + i) c -> fnlst_uwf i cs ->
                  fnlst_uwf i (flcons c cs).
 Hint Constructors cps_uwf val_uwf vals_uwf cpsbranches_uwf fnlst_uwf.
 Scheme cps_uwf_ind2 := Induction for cps_uwf Sort Prop
@@ -181,7 +186,7 @@ with val_wf: N -> N -> val_c -> Prop :=
 | lam_wf: forall i j c, cps_wf (1 + i) (1 + j) c -> val_wf i j (Lam_c c)
 | cont_wf: forall i j c, cps_wf i (1 + j) c -> val_wf i j (Cont_c c)
 | con_wf: forall i j d vs, vals_wf i j vs -> val_wf i j (Con_c d vs)
-| fix_wf: forall i j cs k, fnlst_wf i j cs -> val_wf i j (Fix_c cs k)
+| fix_wf: forall i j cs k, fnlst_wf (fnlst_length cs + i) j cs -> val_wf i j (Fix_c cs k)
 with vals_wf: N -> N -> vals_c -> Prop :=
 | nil_c_wf: forall i j, vals_wf i j vcnil
 | cons_c_wf: forall i j v vs, val_wf i j v -> vals_wf i j vs ->
@@ -194,7 +199,7 @@ with cpsbranches_wf: N -> N -> branches_c -> Prop :=
 with fnlst_wf: N -> N -> fnlst -> Prop :=
 | nil_fn_wf: forall i j, fnlst_wf i j flnil
 | cons_fn_wf: forall i j c cs,
-                 cps_wf (2 + i) (1 + j) c -> fnlst_wf i j cs ->
+                 cps_wf (1 + i) (1 + j) c -> fnlst_wf i j cs ->
                  fnlst_wf i j (flcons c cs).
 Hint Constructors cps_wf val_wf vals_wf cpsbranches_wf fnlst_wf.
 Scheme cps_wf_ind2 := Induction for cps_wf Sort Prop
@@ -252,10 +257,13 @@ Proof.
     replace (1 + (k + i)) with (k + (1 + i)); try lia.
     replace (1 + (l + j)) with (l + (1 + j)); try lia. assumption.
   - specialize (H k l). replace (1 + (l + j)) with (l + (1 + j)); [auto|lia].
+  - specialize (H k0 l).
+    now replace (fnlst_length cs + (k0 + i)) with
+      (k0 + (fnlst_length cs + i)); try lia.
   - specialize (H k l).
     replace (1 + (l + j)) with (l + (1 + j)); try lia.
     replace (n + (k + i)) with (k + (n + i)); [auto | lia].
-  - replace (2 + (k + i)) with (k + (2 + i)); try lia.
+  - replace (1 + (k + i)) with (k + (1 + i)); try lia.
     replace (1 + (l + j)) with (l + (1 + j)); try lia. apply H.
 Qed.
 Definition cps_weaken := proj1 cps_weaken'.
@@ -320,8 +328,9 @@ Lemma cps_uweaken' :
 Proof.
   apply my_uwf_ind; simpl; intros; eauto; constructor; try lia; auto;
   repeat (replace (1 + (l + i)) with (l + (1 + i)); try lia; apply H).
+  - replace (fnlst_length cs + (l + i)) with (l + (fnlst_length cs + i)); try lia.
+    apply H.
   - replace (n + (l + i)) with (l + (n + i)); try lia. apply H.
-  - replace (2 + (l + i)) with (l + (2 + i)); try lia. apply H.
 Qed.
 Definition cps_uweaken := proj1 cps_uweaken'.
 Definition val_uweaken := proj1 (proj2 cps_uweaken').

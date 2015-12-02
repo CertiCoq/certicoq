@@ -111,6 +111,12 @@ Fixpoint exps_length (es:exps) : N :=
     | econs _ es => 1 + (exps_length es)
   end.
 
+Fixpoint efnlst_length (es:efnlst) : N :=
+  match es with
+    | eflnil => N0
+    | eflcons _ es => 1 + (efnlst_length es)
+  end.
+
 (** Find the nth component in exps **)
 Fixpoint enthopt (n:nat) (xs:efnlst): option exp :=
   match n, xs with 
@@ -130,7 +136,7 @@ Inductive exp_wf: N -> exp -> Prop :=
                               exp_wf i (Match_e e bs)
 | let_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 ->
                              exp_wf i (Let_e e1 e2)
-| fix_e_wf: forall i (es:efnlst) k, efnlst_wf (2 + i) es ->
+| fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + 1 + i) es ->
                                      exp_wf i (Fix_e es k)
 with exps_wf: N -> exps -> Prop :=
 | enil_wf: forall i, exps_wf i enil
@@ -164,7 +170,7 @@ Proof.
     | [ H: forall _, _ -> exp_wf _ ?e |- exp_wf _ ?e] => apply H; lia
     | _ => idtac
   end.
-  apply (H (2 + j)). lia.
+  apply H. lia.
 Qed.
 
 Lemma weaken_wf: forall i e, exp_wf i e -> forall j, i < j -> exp_wf j e.
@@ -215,7 +221,7 @@ Fixpoint shift n k e :=
     | Con_e d es => Con_e d (shift_exps' shift n k es)
     | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
     | Match_e e bs => Match_e (shift n k e) (shift_branches' shift n k bs)
-    | Fix_e es k => Fix_e (shift_efnlst shift n (2 + k) es) k
+    | Fix_e es k => Fix_e (shift_efnlst shift n (efnlst_length es + 1 + k) es) k
   end.
 
 Definition shifts := shift_exps' shift.
@@ -297,7 +303,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Con_e d es => Con_e d (sbsts v k es)
     | Let_e e1 e2 => Let_e (sbst v k e1) (sbst v (1 + k) e2)
     | Match_e e bs => Match_e (sbst v k e) (sbst_branches v k bs)
-    | Fix_e es k => Fix_e (sbst_efnlst v (2 + k) es) k
+    | Fix_e es k => Fix_e (sbst_efnlst v (efnlst_length es + 1 + k) es) k
   end
 with sbsts (v:exp) k (es:exps) : exps :=
        match es with

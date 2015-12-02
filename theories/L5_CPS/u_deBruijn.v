@@ -23,7 +23,7 @@ with ushift_val (n:N) (k:N) (v:val_c): val_c :=
     | Lam_c e' => Lam_c (ushift_cps n (1 + k) e')
     | Cont_c e' => Cont_c (ushift_cps n k e')
     | Con_c d vs => Con_c d (ushift_vals n k vs)
-    | Fix_c cs i => Fix_c (ushift_fnlst n k cs) i
+    | Fix_c cs i => Fix_c (ushift_fnlst n (fnlst_length cs + k) cs) i
   end
 with ushift_vals n k (vs:vals_c): vals_c :=
        match vs with
@@ -34,7 +34,7 @@ with ushift_fnlst n k (fls:fnlst): fnlst :=
        match fls with
          | flnil => flnil
          | flcons f fs =>
-           flcons (ushift_cps n (2+k) f) (ushift_fnlst n k fs)
+           flcons (ushift_cps n (1+k) f) (ushift_fnlst n k fs)
        end
 with ushift_branches n k (bs:branches_c): branches_c :=
        match bs with
@@ -60,6 +60,12 @@ Definition vals_ushift_0 := proj1 (proj2 (proj2 ushift_zero)).
 Definition branches_ushift_0 := proj1 (proj2 (proj2 (proj2 ushift_zero))).
 Definition fnlst_ushift_0 := proj2 (proj2 (proj2 (proj2 ushift_zero))).
 
+Lemma ushift_fnlst_length n k l :
+  fnlst_length (ushift_fnlst n k l) = fnlst_length l.
+Proof.
+  induction l as [ |a l IHl]; simpl; rewrite ?IHl; auto.
+Qed.
+
 Lemma ushift_twice :
   (forall c i j m n, i <= j -> j <= i + m ->
      ushift_cps n j (ushift_cps m i c) = ushift_cps (m+n) i c) /\
@@ -79,6 +85,7 @@ Proof.
   - repeat if_split; auto.
     replace (n + (m + n0)) with (n + m + n0); try lia; auto.
   - rewrite H; try lia. reflexivity.
+  - rewrite ushift_fnlst_length, H; try lia. reflexivity.
   - rewrite H, H0; try lia. reflexivity. 
   - rewrite H, H0; try lia. reflexivity.
 Qed.
@@ -107,7 +114,7 @@ with ushft_val (k:N) (v:val_c): val_c :=
     | Lam_c e' => Lam_c (ushft_cps (1 + k) e')
     | Cont_c e' => Cont_c (ushft_cps k e')
     | Con_c d vs => Con_c d (ushft_vals k vs)
-    | Fix_c cs i => Fix_c (ushft_fnlst k cs) i
+    | Fix_c cs i => Fix_c (ushft_fnlst (fnlst_length cs + k) cs) i
   end
 with ushft_vals k (vs:vals_c): vals_c :=
        match vs with
@@ -117,7 +124,7 @@ with ushft_vals k (vs:vals_c): vals_c :=
 with ushft_fnlst k (fls:fnlst): fnlst :=
        match fls with
          | flnil => flnil
-         | flcons f fs => flcons (ushft_cps (2+k) f) (ushft_fnlst k fs)
+         | flcons f fs => flcons (ushft_cps (1+k) f) (ushft_fnlst k fs)
        end
 with ushft_branches k (bs:branches_c): branches_c :=
        match bs with
@@ -145,6 +152,9 @@ Proof.
   - inversion H2; subst; erewrite H, H0, H1; eauto.
   - if_split. inversion H; subst. lia.
   - erewrite H. reflexivity. inversion H0. subst. eassumption. lia.
+  - erewrite H; try eassumption; try reflexivity.
+    + inversion H0; subst. apply H4.
+    + lia.
   - erewrite H, H0; try eassumption; try reflexivity.
     + inversion H1. subst. eassumption.
     + inversion H1. subst. eassumption.
@@ -171,9 +181,7 @@ Lemma uwf_ushft_ushift' :
     forall k n, m <= k -> ushift_fnlst n k cs = ushft_fnlst k cs).
 Proof.
   apply my_uwf_ind; simpl; intros; try reflexivity;
-  try (rewrite H; try lia; reflexivity);
-  try (rewrite H, H0; try lia; reflexivity);
-  try (rewrite H, H0, H1; try lia; reflexivity). 
+  try (rewrite H, ?H0, ?H1; try lia; reflexivity).
   - if_split.
 Qed.
 Definition uwf_cps_ushift_ushft := proj1 uwf_ushft_ushift'.
@@ -201,11 +209,10 @@ Lemma cps_ushift_ushft':
                   ushft_fnlst k (ushift_fnlst n k cs)).
 Proof.
   apply my_cps_ind; simpl; intros; try reflexivity;
-  try (solve [rewrite H; reflexivity]);
-  try (solve [rewrite H, H0; reflexivity]);
-  try (solve [rewrite H, H0, H1; reflexivity]).
+  try (solve [rewrite H, ?H0, ?H1; reflexivity]).
   - repeat if_split. replace (n + (1 + n0)) with (n + n0 + 1); try lia.
     reflexivity.
+  - now rewrite ushift_fnlst_length, H.
 Qed.
 Definition cps_ushift_ushft := proj1 cps_ushift_ushft'.
 Definition val_ushift_ushft := proj1 (proj2 cps_ushift_ushft').
@@ -238,7 +245,7 @@ with usubst_val (v:val_c) (k:N) (v':val_c): val_c :=
     | Lam_c e => Lam_c (usubst_cps v (1 + k) e)
     | Cont_c e => Cont_c (usubst_cps v k e)
     | Con_c d vs => Con_c d (usubst_vals v k vs)
-    | Fix_c cs i => Fix_c (usubst_fnlst v k cs) i
+    | Fix_c cs i => Fix_c (usubst_fnlst v (fnlst_length cs + k) cs) i
   end
 with usubst_vals (u:val_c) (k:N) (vs:vals_c): vals_c :=
        match vs with
@@ -249,7 +256,7 @@ with usubst_fnlst (v:val_c) (k:N) (fls:fnlst): fnlst :=
        match fls with
          | flnil => flnil
          | flcons f fs =>
-           flcons (usubst_cps v (2+k) f) (usubst_fnlst v k fs)
+           flcons (usubst_cps v (1+k) f) (usubst_fnlst v k fs)
        end
 with usubst_branches (v:val_c) (k:N) (bs:branches_c): branches_c :=
        match bs with
@@ -279,7 +286,7 @@ with usbst_val (v:val_c) (k:N) (v':val_c): val_c :=
       Lam_c (usbst_cps (ushft_val 0 v) (1 + k) e)
     | Cont_c e => Cont_c (usbst_cps v k e) 
     | Con_c d vs => Con_c d (usbst_vals v k vs)
-    | Fix_c cs i => Fix_c (usbst_fnlst v k cs) i
+    | Fix_c cs i => Fix_c (usbst_fnlst v (fnlst_length cs + k) cs) i
   end
 with usbst_vals (u:val_c) (k:N) (vs:vals_c): vals_c :=
        match vs with
@@ -290,7 +297,7 @@ with usbst_fnlst (v:val_c) (k:N) (fls:fnlst): fnlst :=
        match fls with
          | flnil => flnil
          | flcons f fs =>
-           flcons (usbst_cps v (2+k) f) (usbst_fnlst v k fs)
+           flcons (usbst_cps v (1+k) f) (usbst_fnlst v k fs)
        end
 with usbst_branches (v:val_c) (k:N) (bs:branches_c): branches_c :=
        match bs with

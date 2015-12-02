@@ -3,7 +3,6 @@
 **)
 
 
-
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Strings.Ascii.
@@ -18,7 +17,7 @@ Set Implicit Arguments.
 
 
 (** translate Gregory Malecha's [term] into my [Term]
-***  (without constructor arity, to be filled in at L2)
+*** (without constructor arity, to be filled in at L2)
 **)
 Section term_Term_sec.
   Variable A : Set.

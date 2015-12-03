@@ -1,0 +1,47 @@
+The CertiCoq project
+
+Installation instructions
+=========================
+
+Installing dependencies:
+------------------------
+
+  To install the compiler, you need Coq.8.5beta2 along with the Template
+and ExtLib packages of G. Malecha.  One way to get it is using opam:
+
+  To add the official Coq repositories, you need:
+
+# opam repo add coq-released https://coq.inria.fr/opam/released
+# opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev
+# opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
+
+  Optionally, you might want to create an opam switch for 8.5beta2 using:
+
+# opam switch -A 4.02.1 coq.8.5beta2
+
+  Using switches one can have multiple versions of Coq and associated
+packages available at the same time. The -A version instructs to use
+that version of the ocaml compiler.
+
+  Then to install coq:
+
+# opam install coq.8.5~beta2 coq-template-coq.1.1.0~beta2 coq-ext-lib
+
+  Then you can pin Coq to this particular version using:
+
+# opam pin add coq.8.5~beta2
+
+  This will ensure opam never tries to update coq in this switch.
+
+Building the compiler:
+----------------------
+
+  Once you have a working Coq in your path, you can go to the theories/
+ directory. There you can run (once):
+
+# coq_makefile -f _CoqProject -o Makefile
+# make -j4
+
+  This will build the compiler and its proofs.
+
+  TODO: Extracted version ?

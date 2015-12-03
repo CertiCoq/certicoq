@@ -106,7 +106,7 @@ Definition translate_program (e : environ) (t : L3t.Term) : exp :=
               
 Theorem translate_correct (e : environ) (t t' : L3t.Term) :
   L3eval.wndEval e t t' -> (* small step non-deterministic *)
-  eval (translate_program e t) (translate_program e t') (* big-step deterministic *).
+  eval (translate_program e t) (translate_program e t'). (* big-step deterministic *)
 Proof.
   induction 1. simpl. red in H.
 Admitted.

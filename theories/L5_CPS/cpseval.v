@@ -1,8 +1,14 @@
-Require Import Arith BinNat String List Omega Program Psatz.
+Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
+Add LoadPath "../common" as Common.
 Require Import Common.Common.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
+(* Add LoadPath "./" as CPS.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+Add LoadPath "../L4_deBruijn" as L4. *)
 From CPS Require Export cpstrans k_deBruijn u_deBruijn.
 
 (** OPTIMISED Big-step evaluation for CPS expressions.
@@ -506,9 +512,14 @@ Fixpoint idn (n : nat) : nat :=
 Definition matchn (n : nat) : nat :=
   match n with 0%nat => 0 | S n => n end.
 
+
+
+
 Quote Recursively Definition p_0 := 0.
 Quote Recursively Definition p_idn := idn.
 Quote Recursively Definition p_idn1 := (idn 1).
+
+
 
 Quote Recursively Definition p_slowFib1 := (slowFib 1).
 Quote Recursively Definition p_matchn := (matchn 1).
@@ -522,6 +533,7 @@ Definition paddexp := Eval compute in compile p_add.
 
 Definition padd01 := Eval compute in compile p_add01.
 
+
 Eval compute in run p_0.
 
 Eval compute in program_exp p_add01.
@@ -534,4 +546,3 @@ Eval compute in program_exp p_idn1.
 Eval compute in run p_idn1.
 
 Eval compute in run p_add01.
-

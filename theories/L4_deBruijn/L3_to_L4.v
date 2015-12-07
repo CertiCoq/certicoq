@@ -1,7 +1,7 @@
 (** Naive conversion to a deBruijn-only expression language for a core calculus including
     mutually recursive functions, data constructors, and pattern matching.
 *)
-Require Import Arith BinNat String List Omega Program Psatz.
+Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.

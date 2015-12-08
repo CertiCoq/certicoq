@@ -93,7 +93,7 @@ Fixpoint ctx_bind_proj' (n:positive) (m:nat): exp_ctx :=
     | O => Hole_c
     | S m' =>
       let ctx_p' := ctx_bind_proj' n m' in
-      Eproj_c (Pos.add n (Pos.of_succ_nat m)) ty (N.of_nat m') n ctx_p'
+      Eproj_c (Pos.add n (Pos.of_nat m)) ty (N.of_nat m') n ctx_p'
   end.
 
 

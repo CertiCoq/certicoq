@@ -497,6 +497,7 @@ Scheme eval_ind2 := Induction for eval Sort Prop
 with evals_ind2 := Induction for evals Sort Prop.
 Combined Scheme my_eval_ind from eval_ind2, evals_ind2.
 
+
 (** some sanity checks of [eval] **)
 Lemma eval_idempotent:
   (forall e d, eval e d -> eval d d) /\

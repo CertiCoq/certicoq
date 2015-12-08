@@ -1,14 +1,15 @@
 Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
-Add LoadPath "../common" as Common.
+(* Add LoadPath "../common" as Common.
+ Add LoadPath "./" as CPS.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+Add LoadPath "../L4_deBruijn" as L4.  *)
+
 Require Import Common.Common.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
-(* Add LoadPath "./" as CPS.
-Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L2_typeStrippedL1" as L2.
-Add LoadPath "../L3_flattenedApp" as L3.
-Add LoadPath "../L4_deBruijn" as L4. *)
 From CPS Require Export cpstrans k_deBruijn u_deBruijn.
 
 (** OPTIMISED Big-step evaluation for CPS expressions.

@@ -40,6 +40,7 @@ Section term_Term_sec.
    end.
 End term_Term_sec.
 
+
 Fixpoint term_Term (t:term) : exception Term :=
   match t with
     | tRel n => ret (TRel n)

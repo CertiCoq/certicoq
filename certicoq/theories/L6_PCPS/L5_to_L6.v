@@ -33,9 +33,9 @@ Require Import List.
 
 
 
-Add LoadPath "../L5_CPS" as CPS.
+(* Add LoadPath "../L5_CPS" as CPS.
 Add LoadPath "../common" as Common.
-Add LoadPath "../L4_deBruijn" as L4.
+Add LoadPath "../L4_deBruijn" as L4. *)
 
 
 Require Import CPS.cpstrans. (* using cps for db cps terms *)
@@ -68,72 +68,14 @@ Variable ty_con : positive. (* continuation in simple_cps *)
 Variable ty : positive.  (* everything else *)
 
 
-
-Theorem lt_pred_l:  forall n : N, n <> 0 -> N.pred n < n.
-Proof.
-exact (
-  fun n : N =>
-N.case_analysis (fun t : N => t <> 0 -> N.pred t < t)
-  (fun (x y : N) (H : x = y) =>
-   Morphisms.trans_co_eq_inv_impl_morphism RelationClasses.iff_Transitive
-     (x <> 0 -> N.pred x < x) (y <> 0 -> N.pred y < y)
-     (Morphisms_Prop.iff_iff_iff_impl_morphism (x <> 0) 
-        (y <> 0)
-        (Morphisms_Prop.not_iff_morphism (x = 0) (y = 0)
-           (Morphisms.PER_morphism
-              (RelationClasses.Equivalence_PER N.eq_equiv) x y H 0 0
-              (Morphisms.reflexive_proper_proxy
-                 RelationClasses.Equivalence_Reflexive 0))) 
-        (N.pred x < x) (N.pred y < y)
-        (N.lt_wd (N.pred x) (N.pred y) (N.pred_wd x y H) x y H))
-     (y <> 0 -> N.pred y < y) (y <> 0 -> N.pred y < y)
-     (Morphisms.eq_proper_proxy (y <> 0 -> N.pred y < y))
-     (RelationClasses.reflexivity (y <> 0 -> N.pred y < y)))
-  (fun H : 0 <> 0 =>
-   False_ind (N.pred 0 < 0) (H (RelationClasses.reflexivity 0)))
-  (fun (n0 : N) (_ : N.succ n0 <> 0) =>
-   (fun lemma : N.pred (N.succ n0) = n0 =>
-    Morphisms.subrelation_proper N.lt_wd tt
-      (Morphisms.subrelation_respectful (Morphisms.subrelation_refl eq)
-         (Morphisms.subrelation_respectful (Morphisms.subrelation_refl eq)
-            Morphisms.iff_flip_impl_subrelation)) (N.pred (N.succ n0)) n0
-      lemma (N.succ n0) (N.succ n0)
-      (Morphisms.reflexive_proper_proxy RelationClasses.Equivalence_Reflexive
-         (N.succ n0))) (N.pred_succ n0) (N.lt_succ_diag_r n0)) n).
-Defined.
-
-Theorem eqb_neq :  forall x y : N, (x =? y) = false <-> x <> y. 
-Proof.
- exact (fun x y : N =>
-    (fun lemma : (x =? y) <> true <-> (x =? y) = false =>
-       Morphisms.trans_co_eq_inv_impl_morphism RelationClasses.iff_Transitive
-  ((x =? y) = false) ((x =? y) <> true) (RelationClasses.symmetry lemma)
-                                               (x <> y) (x <> y) (Morphisms.eq_proper_proxy (x <> y)))
-  (not_true_iff_false (x =? y))
-  ((fun lemma : (x =? y) = true <-> x = y =>
-    Morphisms.trans_co_eq_inv_impl_morphism RelationClasses.iff_Transitive
-      ((x =? y) <> true) (x <> y)
-      (Morphisms_Prop.not_iff_morphism ((x =? y) = true) (x = y) lemma)
-      (x <> y) (x <> y) (Morphisms.eq_proper_proxy (x <> y))) 
-     (N.eqb_eq x y) (RelationClasses.reflexivity (x <> y)))).
-Defined.
-
-
-Set Printing All.
-
-
-
-Theorem lt_wf_0 : well_founded N.lt.
-Proof.
-exact ((fun
-
- (*  
+(*  
   NOTE:  use slower ctx_bind_proj' since this relies on opaque proofs
-
+ 
 create a context binding m projections of var n to var (n+1+m)
  i.e. each binding has form  ({| let var (n + m + 1) := \pi_(m-1) var n in [] |})
    
- *)
+  *)
+           
 Function ctx_bind_proj (n:positive) (m:N) {wf N.lt m}: exp_ctx :=
   if N.eqb m 0%N then
     Hole_c

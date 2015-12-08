@@ -8,7 +8,7 @@ Require Import Bool.
 Require Maps.
 Require Recdef.
 Import Nnat.
-Require Import Arith BinNat String List Omega Program Psatz.
+Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
 Require Import CpdtTactics Permutation.
 Require Import HashMap.
 Require Import cps.
@@ -674,6 +674,12 @@ Next Obligation.  unfold term_sub_size; simpl. symmetry in Heq_anonymous. apply 
 
 End CONTRACT.  
 
+
+Definition shrink_top (e:exp) : exp :=
+  let count := init_census e in
+  match (contract (M.empty var) count (M.empty bool) (e, (M.empty value))) with
+    | (e', _, _) => e'
+  end.
 
 (* 
 invariants for programs:

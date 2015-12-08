@@ -29,10 +29,14 @@ Require Import CpdtTactics.
 
 
 Require Import List.
+
+
+
+(*
 Add LoadPath "../L5_CPS" as CPS.
 Add LoadPath "../common" as Common.
 Add LoadPath "../L4_deBruijn" as L4.
-Add LoadPath "./L5_CPS".
+*)
 Require Import CPS.cpstrans. (* using cps for db cps terms *)
 Require Import cps. (* shadows exp from simple_cps for nominal cps terms *)
 Require Import cps_util.
@@ -201,6 +205,7 @@ with convert_branches (bl: branches_c) (sv: list var) (sk: list var) (n:var) (* 
 
 Definition convert_top (e:cps) : exp :=
   let (er, n) := convert e nil nil (3%positive) in er.
+
 
 (*
  {| Example e1 : expression.exp := Lam_e (Var_e 0).  |}

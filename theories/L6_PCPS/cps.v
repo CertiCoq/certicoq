@@ -20,9 +20,7 @@ Require Import HashMap.
  * For now we'll use Xavier Leroy's efficient polymorphic maps from positive numbers to _.
  * When the MMaps module of the Coq stdlib is created, we'll use that.
  *)
-Print Maps.PTree.
 
-Locate PTree.
 
 
 

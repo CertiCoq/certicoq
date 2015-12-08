@@ -32,11 +32,12 @@ Require Import List.
 
 
 
-(*
+
 Add LoadPath "../L5_CPS" as CPS.
 Add LoadPath "../common" as Common.
 Add LoadPath "../L4_deBruijn" as L4.
-*)
+
+
 Require Import CPS.cpstrans. (* using cps for db cps terms *)
 Require Import cps. (* shadows exp from simple_cps for nominal cps terms *)
 Require Import cps_util.
@@ -66,8 +67,72 @@ Variable ty_fun : positive. (* Regular function (lam) in simple_cps *)
 Variable ty_con : positive. (* continuation in simple_cps *)
 Variable ty : positive.  (* everything else *)
 
-(* create a context binding m projections of var n to var (n+1+m)
+
+
+Theorem lt_pred_l:  forall n : N, n <> 0 -> N.pred n < n.
+Proof.
+exact (
+  fun n : N =>
+N.case_analysis (fun t : N => t <> 0 -> N.pred t < t)
+  (fun (x y : N) (H : x = y) =>
+   Morphisms.trans_co_eq_inv_impl_morphism RelationClasses.iff_Transitive
+     (x <> 0 -> N.pred x < x) (y <> 0 -> N.pred y < y)
+     (Morphisms_Prop.iff_iff_iff_impl_morphism (x <> 0) 
+        (y <> 0)
+        (Morphisms_Prop.not_iff_morphism (x = 0) (y = 0)
+           (Morphisms.PER_morphism
+              (RelationClasses.Equivalence_PER N.eq_equiv) x y H 0 0
+              (Morphisms.reflexive_proper_proxy
+                 RelationClasses.Equivalence_Reflexive 0))) 
+        (N.pred x < x) (N.pred y < y)
+        (N.lt_wd (N.pred x) (N.pred y) (N.pred_wd x y H) x y H))
+     (y <> 0 -> N.pred y < y) (y <> 0 -> N.pred y < y)
+     (Morphisms.eq_proper_proxy (y <> 0 -> N.pred y < y))
+     (RelationClasses.reflexivity (y <> 0 -> N.pred y < y)))
+  (fun H : 0 <> 0 =>
+   False_ind (N.pred 0 < 0) (H (RelationClasses.reflexivity 0)))
+  (fun (n0 : N) (_ : N.succ n0 <> 0) =>
+   (fun lemma : N.pred (N.succ n0) = n0 =>
+    Morphisms.subrelation_proper N.lt_wd tt
+      (Morphisms.subrelation_respectful (Morphisms.subrelation_refl eq)
+         (Morphisms.subrelation_respectful (Morphisms.subrelation_refl eq)
+            Morphisms.iff_flip_impl_subrelation)) (N.pred (N.succ n0)) n0
+      lemma (N.succ n0) (N.succ n0)
+      (Morphisms.reflexive_proper_proxy RelationClasses.Equivalence_Reflexive
+         (N.succ n0))) (N.pred_succ n0) (N.lt_succ_diag_r n0)) n).
+Defined.
+
+Theorem eqb_neq :  forall x y : N, (x =? y) = false <-> x <> y. 
+Proof.
+ exact (fun x y : N =>
+    (fun lemma : (x =? y) <> true <-> (x =? y) = false =>
+       Morphisms.trans_co_eq_inv_impl_morphism RelationClasses.iff_Transitive
+  ((x =? y) = false) ((x =? y) <> true) (RelationClasses.symmetry lemma)
+                                               (x <> y) (x <> y) (Morphisms.eq_proper_proxy (x <> y)))
+  (not_true_iff_false (x =? y))
+  ((fun lemma : (x =? y) = true <-> x = y =>
+    Morphisms.trans_co_eq_inv_impl_morphism RelationClasses.iff_Transitive
+      ((x =? y) <> true) (x <> y)
+      (Morphisms_Prop.not_iff_morphism ((x =? y) = true) (x = y) lemma)
+      (x <> y) (x <> y) (Morphisms.eq_proper_proxy (x <> y))) 
+     (N.eqb_eq x y) (RelationClasses.reflexivity (x <> y)))).
+Defined.
+
+
+Set Printing All.
+
+
+
+Theorem lt_wf_0 : well_founded N.lt.
+Proof.
+exact ((fun
+
+ (*  
+  NOTE:  use slower ctx_bind_proj' since this relies on opaque proofs
+
+create a context binding m projections of var n to var (n+1+m)
  i.e. each binding has form  ({| let var (n + m + 1) := \pi_(m-1) var n in [] |})
+   
  *)
 Function ctx_bind_proj (n:positive) (m:N) {wf N.lt m}: exp_ctx :=
   if N.eqb m 0%N then
@@ -77,7 +142,17 @@ Function ctx_bind_proj (n:positive) (m:N) {wf N.lt m}: exp_ctx :=
     Eproj_c (Pos.add n (N.succ_pos m)) ty (N.pred m ) n ctx_p'.
 Proof.
   intros. apply N.lt_pred_l.  apply N.eqb_neq in teq. assumption. apply N.lt_wf_0. 
-Qed.
+Defined.
+
+
+
+Fixpoint ctx_bind_proj' (n:positive) (m:nat): exp_ctx :=
+  match m with
+    | O => Hole_c
+    | S m' =>
+      let ctx_p' := ctx_bind_proj' n m' in
+      Eproj_c (Pos.add n (Pos.of_succ_nat m)) ty (N.of_nat m') n ctx_p'
+  end.
 
 
 
@@ -197,7 +272,7 @@ with convert_branches (bl: branches_c) (sv: list var) (sk: list var) (n:var) (* 
       | brnil_c => (Fnil, nil, n)
       | brcons_c dcn m e bl' =>
         let '(cfds, cbl, n') := convert_branches bl' sv sk n in
-        let ctx_p := ctx_bind_proj (Pos.succ n') m in 
+        let ctx_p := ctx_bind_proj' (Pos.succ n') (N.to_nat m) in 
         let (xs, nm2) := fromN (Pos.add n' 2) (N.to_nat m) in
         let (ce, n'') :=  convert e (xs++sv) sk nm2 in 
         (Fcons n' ty_con ((Pos.succ n')::nil) (app_ctx_f ctx_p ce) cfds, ((dcon_to_tag dcn), n')::cbl ,   n'')

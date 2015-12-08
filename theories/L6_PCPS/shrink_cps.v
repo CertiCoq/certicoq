@@ -635,8 +635,11 @@ Qed.
              let '(fl'', count''', inl'') :=
                  postcontractfun (Efun fl' e, sub) 
                     (fun rm cm bm es H => contract rm cm bm es) sig count''
-                                 inl' sub fl' _ _ in  (* using sub instead of sub' so that we don't inline functions within their mutually inductive set of funs *)
-             (Efun fl'' e', count''', inl'')
+                    inl' sub fl' _ _ in  (* using sub instead of sub' so that we don't inline functions within their mutually inductive set of funs *)
+             (match fl'' with
+               | Fnil => ( e', count''', inl'')
+               |  _  =>  (Efun fl'' e', count''', inl'')
+              end)
         
       | ( Eapp f ys, sub) =>
         let f' := apply_r sig f in

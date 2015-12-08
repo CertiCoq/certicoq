@@ -304,23 +304,6 @@ End MEASURECONTRACT.
  
 
 
-(* 
-Fixpoint census (e:exp): c_map := 
-  match e with
-  | Econstr x t c ys e => M.combine (f_opt plus) (count_init [] (apply_r_list sigma ys)) (census e)
-  | Eprim x t f ys e =>  M.combine (count_init [] (apply_r_list sigma ys)) (census sigma e)                                    
-  | Ecase v cl => count_init [(apply_r sigma v)] (apply_r_list sigma (snd (split cl)))
-  | Eproj v t n y e => c2_combine (count_init [(apply_r sigma y)] []) (census sigma e) 
-  | Efun fl e => c2_combine (census_f sigma fl) (census sigma e)
-  | Eapp f ys => count_init [(apply_r sigma f)] (apply_r_list sigma ys)
-  end
-  with census_f (sigma:r_map) (fds:fundefs): c2_map :=
-         match fds with
-         | Fcons v t ys e fds' => c2_combine (census sigma e) (census_f sigma fds')
-
-         | Fnil => M.empty (nat * nat)
-         end. *) 
-
   Fixpoint c_combine fun_delta (count:c_map) (ys:list var) :=
     match ys with
       | y::ys => M.set y (fun_delta (get_c y count) 1) count
@@ -561,7 +544,7 @@ Qed.
                   let (e', count') := ec' in
                   
                   let (fc', inl'') := postcontractfun oes fcon sig count' inl' sub fds' _ _ in
-                  let (fds'', count'') := fc' in                     
+                  let (fds'', count'') := fc' in
                   (Fcons f t ys e' fds'', count'', inl'')
               end)
          end)
@@ -575,18 +558,19 @@ Qed.
   Program Fixpoint contract (sig:r_map) (count:c_map) (inl:b_map) (es:exp * ctx_map) {measure (term_sub_size es)} : (exp * c_map * b_map) :=
     match es with
       | ( Econstr x t c ys e , sub) =>
+        let ys' := apply_r_list sig ys in
         match (get_c x count) with
           | 0 =>
-            let count' := dec_census_list sig ys count in 
+            let count' := dec_census_list sig ys' count in 
             contract sig count' inl (e, sub)
           | _ =>
-            let '(e', count', inl') := contract sig count inl (e, (M.set x (Vconstr t c ys) sub)) in
+            let '(e', count', inl') := contract sig count inl (e, (M.set x (Vconstr t c ys') sub)) in
             (match (get_c x count) with
               | 0 =>
-                let count'' := dec_census_list sig ys count'  in
+                let count'' := dec_census_list sig ys' count'  in
                 (e', count'', inl')
-              | _ => 
-                 (Econstr x t c ys e', count', inl')
+              | _ =>
+                 (Econstr x t c ys' e', count', inl')
              end)
         end
       | (Eproj v t n y e, sub)  =>

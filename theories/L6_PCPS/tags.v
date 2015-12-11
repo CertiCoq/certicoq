@@ -34,12 +34,12 @@ Module TagInfo <: Orders.UsualOrderedType.
     match f a a' with Lt => Lt | Eq => g b b' | Gt => Gt end.
 
  Fixpoint compare_list {A} (f: A -> A -> comparison) (al bl: list A) : comparison := 
-  match al, bl with
-  | a::al', b::bl' => lexi f a b (compare_list f) al' bl'
- | nil, _::_ => Lt
- | _::_, nil => Gt
- | nil, nil => Eq
- end.
+   match al, bl with
+     | a::al', b::bl' => lexi f a b (compare_list f) al' bl'
+     | nil, _::_ => Lt
+     | _::_, nil => Gt
+     | nil, nil => Eq
+   end.
 
  Fixpoint compare_pair {A}{B} (f: A -> A -> comparison) (g: B -> B -> comparison)
                      (x: A*B) (y: A*B) : comparison :=

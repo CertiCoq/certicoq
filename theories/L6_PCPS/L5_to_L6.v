@@ -33,9 +33,9 @@ Require Import List.
 
 
 
-(* Add LoadPath "../L5_CPS" as CPS.
-Add LoadPath "../common" as Common.
-Add LoadPath "../L4_deBruijn" as L4. *)
+(* Add LoadPath "../L5_CPS" as CPS. *)
+(* Add LoadPath "../common" as Common. *)
+(* Add LoadPath "../L4_deBruijn" as L4. *)
 
 
 Require Import CPS.cpstrans. (* using cps for db cps terms *)
@@ -54,11 +54,10 @@ Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
 
 
 
-
+Section L5toL6.
 
 (* placeholder *)
 Variable default_tag : M.elt.
-Definition dcon_to_tag: dcon -> tag := N.succ_pos. (* should probably change dcon to positive in simple_cps *)
 Variable var_tag : M.elt.
 Variable kvar_tag : M.elt.
 Variable rec_tag : M.elt.
@@ -66,6 +65,8 @@ Variable rec_tag : M.elt.
 Variable ty_fun : positive. (* Regular function (lam) in simple_cps *)
 Variable ty_con : positive. (* continuation in simple_cps *)
 Variable ty : positive.  (* everything else *)
+
+Definition dcon_to_tag: dcon -> tag := N.succ_pos. (* should probably change dcon to positive in simple_cps *)
 
 
 (*  
@@ -230,3 +231,6 @@ Definition convert_top (e:cps) : exp :=
 {|  Eval vm_compute in cps_cvt_prog e1.  |}
 {|  Eval vm_compute in convert_top (cps_cvt_prog e1).  |}
  *)
+
+End L5toL6.
+

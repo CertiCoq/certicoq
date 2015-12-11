@@ -338,10 +338,10 @@ with fundefs_closure_conv (defs : fundefs) (mapfv : VarInfoMap)
        end.
 
 
-Fixpoint exp_hoist (e : exp) (defs : fundefs ) (c : exp_ctx) : exp :=
+Fixpoint exp_hoist (e : exp) (defs : fundefs ) (f : exp -> exp) : exp :=
   match e with
     | Econstr x typ tag ys e' =>
-      exp_hoist e' defs (fun e => c (Econstr x typ tag ys e))
+      exp_hoist e' defs (fun e => f (Econstr x typ tag ys e))
     | Ecase x xs =>
       Efun defs (f (Ecase x xs))
     | Eproj x typ n y e' =>
@@ -396,7 +396,7 @@ with max_var_fundefs defs z :=
          | Fnil => z
        end.
 
-(* types are still bogus *)
+(* types are bogus *)
 Definition closure_conversion (e : exp) : exp :=
   let map := exp_info e (Maps.PTree.empty FunInfo) in
   let next :=

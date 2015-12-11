@@ -155,7 +155,8 @@ Ltac inv H := inversion H; clear H; subst.
 Inductive typeinfo : Type :=
 | Tdata: list (tag * list type) -> typeinfo
 | Tfun: tag -> list type -> typeinfo
-| Tother: tag -> typeinfo.
+| Tother: tag -> typeinfo
+| Tunknown.
 
 (* [Tdata (c1 ts1 :: c2 ts2 :: ... )] is a sum-of-products type.
    Each disjunct is tagged with a tag ([c1],[c2],...).   No two disjuncts
@@ -205,6 +206,8 @@ Module TypeInfo <: Orders.UsualOrderedType.
  | Tfun c tl, Tfun c' tl' => lexi Pos.compare c c' (compare_list Pos.compare) tl tl'
  | Tfun _ _, _ => Lt
  | _, Tfun _ _ => Gt
+ | Tunknown, _ => Lt
+ | _, Tunknown => Gt
  | Tother c, Tother c' => Pos.compare c c'
  end.
 
@@ -1022,8 +1025,3 @@ Qed.
 
  
 End PRIMS.
-
-
-
-
- 

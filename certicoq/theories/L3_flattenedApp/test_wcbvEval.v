@@ -1,7 +1,4 @@
 
-
-
-
 Require Import Template.Template.
 Require Import Common.RandyPrelude.
 Require L1.L1.         (* whole L1 library is exported by L1.L1 *)
@@ -27,6 +24,22 @@ Definition exc_wcbvEval
            term_Term e2 tm)
       end
   end.
+
+(** Abishek's example **)
+Axiom feq1 : (fun x:nat => x) = (fun x:nat => x+x-x).
+
+Definition zero :nat :=
+  match feq1 with
+    | eq_refl => 0
+  end.
+
+Quote Recursively Definition p_zero := zero.
+Quote Definition q_zero := Eval compute in zero.
+Goal
+  let ew := (exc_wcbvEval 40 p_zero q_zero) in
+  fst ew = snd ew.
+compute. reflexivity.
+Qed.
 
 Definition Nat := nat.
 Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1).

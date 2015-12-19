@@ -1,4 +1,6 @@
 
+Add LoadPath "../common" as Common.
+Add LoadPath "." as L1.
 
 Require Import Template.Template.
 Require Import Common.RandyPrelude.
@@ -82,6 +84,20 @@ Definition vplus0123 := (@vplus 2 v01 v23).
 Quote Recursively Definition p_vplus0123 := vplus0123.
 Quote Definition q_vplus0123 := Eval compute in vplus0123.
 Goal exc_wcbvEval 40 p_vplus0123 = term_Term q_vplus0123.
+compute. reflexivity.
+Qed.
+
+(** Abishek's example **)
+Axiom feq1 : (fun x:nat => x) = (fun x:nat => x+x-x).
+
+Definition zero :nat :=
+  match feq1 with
+    | eq_refl => 0
+  end.
+
+Quote Recursively Definition p_zero := zero.
+Quote Definition q_zero := Eval compute in zero.
+Goal exc_wcbvEval 40 p_zero = term_Term q_zero.
 compute. reflexivity.
 Qed.
 

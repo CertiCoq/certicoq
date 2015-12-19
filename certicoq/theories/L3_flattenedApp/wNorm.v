@@ -1,6 +1,5 @@
 
 
-
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Strings.Ascii.
@@ -22,6 +21,7 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
+| WNAx: forall ty, WNorm (TAx ty)
 | WNCase: forall mch n brs,
             WNorm mch -> WNorms brs -> ~ isConstruct mch ->
             WNorm (TCase n mch brs)

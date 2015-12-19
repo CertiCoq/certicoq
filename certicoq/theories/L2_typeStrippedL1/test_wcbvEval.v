@@ -1,5 +1,6 @@
-
-
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "." as L2.
 
 Require Import Template.Template.
 Require Import Common.RandyPrelude.
@@ -11,16 +12,22 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+(** a tool for testing **)
+Definition exc_wcbvEval (tmr:nat) (pgm:program): option Term :=
+  match program_Program pgm with
+    | None => None
+    | Some pgm => wcbvEval tmr (L2.program.env pgm) (L2.program.main pgm)
+  end.
+
 Inductive foo (A:Set) : Set :=
 | nilf: foo A
 | consf: (fun (Y W:Set) => Y -> foo Y -> foo ((fun X Z => X) A nat)) A bool.
-Quote Recursively [ hnf ind typ ] 
-      Definition foo_nat_cons := (@consf nat 0 (nilf nat)).
+Quote Recursively Definition foo_nat_cons := (@consf nat 0 (nilf nat)).
 Print foo_nat_cons.
 
 Fixpoint foo_list (A:Set) (fs:foo A) : list A :=
   match fs with
-    | nilf => nil
+    | nilf _ => nil
     | consf b bs => cons b (foo_list bs)
   end.
 Fixpoint list_foo (A:Set) (fs:list A) : foo A :=
@@ -36,6 +43,21 @@ Goal forall (A:Set) (fs:foo A), list_foo (foo_list fs) = fs.
 induction fs; try reflexivity.
 - simpl. rewrite IHfs. reflexivity.
 Qed.
+
+(** Abishek's example **)
+Axiom feq1 : (fun x:nat => x) = (fun x:nat => x+x-x).
+
+Definition zero :nat :=
+  match feq1 with
+    | eq_refl => 0
+  end.
+
+Quote Recursively Definition p_zero := zero.
+Quote Definition q_zero := Eval compute in zero.
+Goal (exc_wcbvEval 40 p_zero) = term_Term q_zero.
+compute. reflexivity.
+Qed.
+
 
 (** type casting ? **)
 Check (cons: forall (A:Set), A -> list A -> list A).
@@ -108,12 +130,6 @@ Print AppApp2.
 ***)
 
 Set Implicit Arguments.
-Definition exc_wcbvEval (tmr:nat) (pgm:program): option Term :=
-  match program_Program pgm with
-    | None => None
-    | Some pgm => wcbvEval tmr (L2.program.env pgm) (L2.program.main pgm)
-  end.
-
 Definition Nat := nat.
 Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1).
 Quote Definition q_typedef := Eval compute in typedef.
@@ -125,8 +141,7 @@ Qed.
 Definition II := fun (A:Type) (a:A) => a.
 Quote Definition q_II := Eval compute in II.
 Quote Recursively Definition p_II := II.
-Goal
-  (exc_wcbvEval 10 p_II) = term_Term q_II.
+Goal (exc_wcbvEval 10 p_II) = term_Term q_II.
 reflexivity.
 Qed.
 
@@ -258,7 +273,7 @@ Inductive lst (A:Set) : Set :=
 | cns: A -> lst A -> lst A.
 Definition hd (A:Set) (ls:lst A) (default:A) : A :=
   match ls with
-    | nl => default
+    | nl _ => default
     | cns a _ => a
   end.
 Quote Recursively Definition p_hd :=
@@ -292,7 +307,7 @@ Inductive tm (A:Set) : Set :=
 | cc: A -> tm A.
 Definition occIn (A:Set) (t:tm A) : nat :=
   match t with
-    | vv m => m
+    | vv _ m => m
     | cc _ => 0
 end.
 Quote Recursively Definition p_occIn := (occIn (cc true)).
@@ -313,8 +328,8 @@ Definition vplus01 :=
   (@vplus 1 (cons nat 0 0 (nil nat)) (cons nat 1 0 (nil nat))).
 Quote Recursively Definition p_vplus01 := vplus01.
 Quote Definition q_vplus01 := Eval compute in vplus01.
-Goal (exc_wcbvEval 20 p_vplus01) = term_Term q_vplus01.
-reflexivity.
+Goal (exc_wcbvEval 40 p_vplus01) = term_Term q_vplus01.
+compute. reflexivity.
 Qed.
 
 Definition v01 : Vector.t nat 2 := (cons nat 0 1 (cons nat 1 0 (nil nat))).

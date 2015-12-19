@@ -98,7 +98,6 @@ Definition ibody_ityp (iib:ident * inductive_body) : ityp :=
 Definition ibodies_itypPack (ibs:list (ident * inductive_body)) : itypPack :=
   map ibody_ityp ibs.
 
-(** not dealing with axioms at the moment **)
 Fixpoint program_Program
          (p:program) (e:exception environ): exception Program :=
   match p with
@@ -112,7 +111,9 @@ Fixpoint program_Program
     | PType nm ibs p =>
       let Ibs := ibodies_itypPack ibs
       in program_Program p (econs (epair2 nm (ret (ecTyp Ibs))) e)
-    | PAxiom _ _ _ => raise "not supporting axioms yet"
+    | PAxiom nm ty p =>
+      do Ty <- term_Term ty;
+      program_Program p (econs (epair2 nm (ret (ecTrm (TAx Ty)))) e)
   end.
 
 

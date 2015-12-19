@@ -459,57 +459,6 @@ rewrite H0 in H. simpl in H.
 Qed.
 ***************)
 
-(** now an executable weak-call-by-value evaluation **)
-(** use a timer to make this terminate **)
-(****  Working HERE  ****
-Definition wcbvEv:
-  forall (p:environ) (tmr:nat),
-    (forall (t:Term), exception Term) *
-    (forall (ts:Terms), exception Terms) *
-    (forall (ds:Defs), True).
-Proof.
-  intros p t. induction t; intros.
-  Case "tmr = 0". split; split; intros; apply (Exc "out of time").
-  Case "tmr = S n". apply TrmTrmsDefs_Typeind; intros.
-  - SCase "TRel". apply (Exc "TRel; free index").
-  - SCase "TSort". apply (Ret (TSort s)).
-  - SCase "TCast". apply (fst (fst IHt) t0).
-  - SCase "TProd". apply (Ret (TProd n t0 t1)).
-  - SCase "TLambda". apply (Ret (TLambda n t0 t1)).
-  - SCase "TLetIn". destruct H.
-    + apply (Exc s).
-    + destruct (fst (fst IHt) (instantiate t0 0 t2)).
-      * apply (Exc s).
-      * apply (Ret t4).
-  - SCase "TApp". destruct H.
-    + SSCase "fn doesn't eval". apply (Exc s).
-    + SSCase "fn evals to ..". destruct t3.
-      * SSSCase "TRel". apply (Exc "never result of eval").
-      * SSSCase "TSort". apply (Exc "doesn't have functional type").
-      * SSSCase "TCast". apply (Exc "never result of eval").
-      * SSSCase "TProd". apply (Exc "doesn't have functional type").
-      * SSSCase "TLambda". destruct H0.
-        SSSSCase "arg doesn't eval". apply (Exc s).
-        SSSSCase "arg evals". apply (fst (fst IHt) (whBetaStep t3_2 t3 t2)).
-      * SSSCase "TLetIn". apply (Exc "never result of eval").
-      * SSSCase "TApp: must mkApp". 
-        apply (fst (fst IHt) (mkApp t3_1 (tcons t3_2 t3))).
-      * SSSCase "TConst". apply (Exc "never result of eval").
-      * SSSCase "TInd".
-  -
-apply (Exc "").
-      * SSSCase "TLetIn". apply (Exc "").
-      * SSSCase "TApp". apply (Exc "").
-      * SSSCase "TConst". apply (Exc "").
-      * SSSCase "TInd". apply (Exc "").
-      * SSSCase "TConstruct". apply (Exc "").
-      * SSSCase "TCase". apply (Exc "").
-      * SSSCase "TFix". apply (Exc "").
-  - SCase "TConst". destruct (lookupDfn s p).
-    + SSCase "lookup succeeds". apply (IHtmr p
-    + SSCase "lookup fails". apply (Exc "").
-**************************)
-
 Function wcbvEval
          (tmr:nat) (p:environ) (t:Term) {struct tmr}: exception Term :=
   (match tmr with 
@@ -550,7 +499,7 @@ Function wcbvEval
                      | _ => raise "wcbvEval: application"
                   end)
              end)
-          | TCase np _ mch brs =>
+          | TCase np x mch brs =>
             (match wcbvEval n p mch with
                | Exc str => Exc str
                | Ret emch =>
@@ -568,6 +517,7 @@ Function wcbvEval
                                        | Some cs => wcbvEval n p cs
                                      end
                       end
+                    | TAx _, _ => ret (TCase np x mch brs)
                     | _, _ => raise "case match arg not canonical"
                   end)
              end)
@@ -586,8 +536,9 @@ Function wcbvEval
               | Exc str => Exc str
               | Ret ty' => ret (TProd nn ty' t)
             end
-          | TFix mfp br => ret (TFix mfp br)
           (** already in whnf ***)
+          | TFix mfp br => ret (TFix mfp br)
+          | TAx ty => ret (TAx ty)
           | TConstruct i cn => ret (TConstruct i cn)
           | TInd i => ret (TInd i)
           | TSort srt => ret (TSort srt)

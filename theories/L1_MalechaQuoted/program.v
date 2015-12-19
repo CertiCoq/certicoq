@@ -1,5 +1,4 @@
 
-
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Strings.Ascii.
@@ -30,16 +29,16 @@ Inductive envClass :=
 | ecTrm (_:Term)
 | ecTyp (_:itypPack).
 
-(** An environ is a list of definitions.
-***  Currently ignoring Axioms
-**)
+(** An environ is a list of axioms and
+*** definitions of terms and inductive types
+***)
 Definition environ := list (string * envClass).
 Record Program : Type := mkPgm { main:Term; env:environ }.
 
 Inductive WFaEc: envClass -> Prop :=
 | wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
 | wfaecTyp: forall i, WFaEc (ecTyp i).
-
+    
 Inductive WFaEnv: environ -> Prop :=
 | wfaenil: WFaEnv nil
 | wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
@@ -84,9 +83,7 @@ Qed.
 
 (*** Common functions for evaluation ***)
 
-(** Lookup an entry in the environment
-*** axioms are currently not allowed
-**)
+(** Lookup an entry in the environment **)
 Inductive Lookup: string -> environ -> envClass -> Prop :=
 | LHit: forall s p t, Lookup s ((s,t)::p) t
 | LMiss: forall s1 s2 p t ec,
@@ -316,6 +313,7 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctFix: forall n p ds m,
              Crct p n prop ->    (** convenient for IH *)
              CrctDs p (n + dlength ds) ds -> Crct p n (TFix ds m)
+| CrctAx: forall n p ty, Crct p n ty -> Crct p n (TAx ty)
 | CrctInd: forall n p ind, Crct p n prop -> Crct p n (TInd ind)
 with Crcts: environ -> nat -> Terms -> Prop :=
 | CrctsNil: forall n p, Crct p n prop -> Crcts p n tnil
@@ -348,7 +346,7 @@ Lemma Crct_WFTrm:
   (forall p n ts, Crcts p n ts -> WFTrms ts n) /\
   (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> WFTrmDs ds n) /\
   (forall (p:environ) (n:nat) (itp:itypPack), CrctTyp p n itp -> True).
-apply CrctCrctsCrctDsTyp_ind; intros; try auto; try (solve [constructor]).
+apply CrctCrctsCrctDsTyp_ind; intros; auto.
 Qed.
 
 Lemma Crct_mkApp_ident:
@@ -382,6 +380,7 @@ apply CrctCrctsCrctDsTyp_ind; intros.
 - eapply CrctConstruct; eassumption.
 - apply CrctCase; assumption.
 - apply CrctFix; assumption.
+- apply CrctAx; assumption.
 - apply CrctInd; assumption.
 - apply CrctsNil; assumption.
 - apply CrctsCons; assumption.
@@ -682,6 +681,8 @@ eapply CrctCrctsCrctDsTyp_ind; intros; auto.
 - apply CrctFix.
   + eapply H0. eassumption. intros h. inversion h.
   + eapply H2. eassumption. intros h. elim H4. apply PoFix. assumption.
+- apply CrctAx. apply (H0 _ _ _ H1). intros h. elim H2.
+  apply PoAx. assumption.
 - apply CrctInd. apply (H0 _ _ _ H1). inversion 1. 
 - apply CrctsNil. rewrite H1 in H. inversion H; assumption.
 - apply CrctsCons.
@@ -871,6 +872,15 @@ induction 1; intros; try discriminate.
 - injection H1; intros; subst. assumption.
 Qed.
 
+Lemma Crct_invrt_Ax:
+  forall p n t, Crct p n t ->
+  forall u, t = (TAx u) -> Crct p n u.
+induction 1; intros; try discriminate.
+- apply (proj1 Crct_weaken); intuition.
+- specialize (IHCrct _ H2). apply (proj1 Crct_Typ_weaken); intuition.
+- myInjection H0. assumption.
+Qed.
+  
 Lemma Crct_invrt_Construct:
   forall p n construct, Crct p n construct ->
   forall ipkgNm inum cnum, construct = (TConstruct (mkInd ipkgNm inum) cnum) ->
@@ -964,7 +974,7 @@ Proof.
     + destruct H3 as [x [h1 h2]]. eapply (@CrctConst _ _ x); trivial.
       * eapply Crct_Sort. eassumption.
   - apply CrctInd. eapply Crct_Sort. eassumption.
-  - destruct ind.  edestruct (Crct_invrt_Construct H0).
+  - destruct ind. edestruct (Crct_invrt_Construct H0).
     + reflexivity.
     + destruct H3 as [x [h1 h2]]. eapply CrctConstruct; try eassumption.
       * eapply Crct_Sort. eassumption.
@@ -979,6 +989,8 @@ Proof.
       * simpl in j. generalize (dlength d). induction n0.
         rewrite <- plus_n_O. assumption.
         rewrite <- plus_n_Sm. apply (proj1 Crct_up). assumption.
+  - apply CrctAx. apply H; try assumption.
+    apply (Crct_invrt_Ax H1 eq_refl).
   - apply CrctsNil. eapply Crct_Sort. eassumption.
   - inversion_Clear H2. apply CrctsCons.
     + apply H; trivial.

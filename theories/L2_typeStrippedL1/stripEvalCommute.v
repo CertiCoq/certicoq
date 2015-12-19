@@ -1,7 +1,5 @@
 
 
-
-
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Strings.Ascii.
@@ -37,6 +35,7 @@ Function strip (t:L1Term) : Term :=
     | L1.term.TConstruct i m => TConstruct i m
     | L1.term.TCase n _ mch brs => TCase n (strip mch) (strips brs)
     | L1.term.TFix ds n => TFix (stripDs ds) n
+    | L1.term.TAx ty => TAx (strip ty)
   end
 with strips (ts:L1Terms) : Terms := 
   match ts with
@@ -381,6 +380,9 @@ apply L1.term.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
          (TFix (instantiateDefs (strip arg)
                                 (n0 + dlength (stripDs d)) (stripDs d)) n)).
   rewrite H. rewrite dlength_hom. reflexivity.
+- change (TAx (strip (L1.term.instantiate arg n t)) =
+          TAx (instantiate (strip arg) n (strip t))).
+  rewrite H. reflexivity.      
 - change (tcons (strip (L1.term.instantiate arg n t))
                 (strips (L1.term.instantiates arg n t0)) =
           tcons (instantiate (strip arg) n (strip t))
@@ -930,6 +932,7 @@ Function unstrip (t:Term) : L1Term :=
     | TCase n mch brs =>
            L1.term.TCase n L1.term.prop (unstrip mch) (unstrips brs)
     | TFix ds n => L1.term.TFix (unstripDs ds) n
+    | TAx ty => L1.term.TAx (unstrip ty)
   end
 with unstrips (ts:Terms) : L1Terms := 
   match ts with
@@ -1170,6 +1173,9 @@ Proof.
                                        (ni + L1.term.dlength (unstripDs d))
                                        (unstripDs d)) n).
     rewrite <- H. rewrite dlength_unhom. simpl. reflexivity.
+  - change (unstrip (TAx (instantiate tin ni t)) =
+            L1.term.TAx (L1.term.instantiate (unstrip tin) ni (unstrip t))).
+    rewrite <- H. simpl. reflexivity.
   - change (unstrips (tcons (instantiate tin ni t)
                             (instantiates tin ni t0)) =
             L1.term.tcons (L1.term.instantiate (unstrip tin) ni (unstrip t))

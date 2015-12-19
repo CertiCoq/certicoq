@@ -28,8 +28,9 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* cnstr no *) -> Term
-| TCase      : (nat * list nat) (* # of parameters, # of args per branch *) -> Term -> Terms -> Term
+| TCase      : (nat * list nat) (* # parameters, # args per branch *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
+| TAx        : Term -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -123,6 +124,7 @@ apply TrmTrmsDefs_ind.
   [lft | rght .. ].
 - induction t; cross.
   destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
+- induction t0; cross. destruct (H t0); [lft | rght ..].
 - induction tt; cross. lft.
 - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
 - induction ee; cross. lft.
@@ -628,6 +630,8 @@ Proof.
   left. intuition. revert H. not_isApp.
   - exists (TFix d n), arg, tnil. split. reflexivity.
   left. intuition. revert H. not_isApp.
+- exists (TAx fn), arg, tnil. split. reflexivity.
+  left. intuition. revert H. not_isApp.
 Qed.
 
 (** well-formed terms: TApp well-formed all the way down **)
@@ -648,6 +652,7 @@ Inductive WFapp: Term -> Prop :=
 | wfaCase: forall m mch brs,
             WFapp mch -> WFapps brs -> WFapp (TCase m mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
+| wfaAx: forall ty, WFapp ty -> WFapp (TAx ty)
 with WFapps: Terms -> Prop :=
 | wfanil: WFapps tnil
 | wfacons: forall t ts, WFapp t -> WFapps ts -> WFapps (tcons t ts)
@@ -770,6 +775,7 @@ Inductive WFTrm: Term -> nat -> Prop :=
             WFTrm (TCase m mch brs) n
 | wfFix: forall n defs m,
            WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
+| wfAx: forall n ty, WFTrm ty n -> WFTrm (TAx ty) n
 with WFTrms: Terms -> nat -> Prop :=
 | wfnil: forall n, WFTrms tnil n
 | wfcons: forall n t ts, WFTrm t n -> WFTrms ts n -> WFTrms (tcons t ts) n
@@ -814,6 +820,7 @@ Inductive PoccTrm : Term -> Prop :=
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
 | PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
+| PoAx: forall ty, PoccTrm ty -> PoccTrm (TAx ty)
 | PoCnstr: forall m1 n, PoccTrm (TConstruct (mkInd nm m1) n)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
@@ -1063,6 +1070,9 @@ Proof.
     + apply PoFix. assumption.
     + apply PoAppL. apply PoFix. assumption.
   - destruct args; simpl.
+    + apply PoAx. assumption.
+    + apply PoAppL. apply PoAx. assumption.
+  - destruct args; simpl.
     + apply PoCnstr; assumption.
     + apply PoAppL. apply PoCnstr.
 Qed.
@@ -1109,11 +1119,11 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
              Instantiate (S n) bod ibod -> 
              Instantiate n (TLambda nm bod) (TLambda nm ibod)
 | ILetIn: forall n nm dfn bod idfn ibod,
-               Instantiate n dfn idfn -> Instantiate (S n) bod ibod ->
-               Instantiate n (TLetIn nm dfn bod) (TLetIn nm idfn ibod)
+            Instantiate n dfn idfn -> Instantiate (S n) bod ibod ->
+            Instantiate n (TLetIn nm dfn bod) (TLetIn nm idfn ibod)
 | IApp: forall n t a ts it ia its,
-          Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
-          Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
+       Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
+       Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
 | IInd: forall n ind, Instantiate n (TInd ind) (TInd ind)
 | IConstruct: forall n ind m1,
@@ -1124,6 +1134,8 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
+| IAx: forall n ty ity,
+         Instantiate n ty ity -> Instantiate n (TAx ty) (TAx ity)
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,
@@ -1177,6 +1189,7 @@ intro h. apply InstInstsDefs_ind; intros; auto.
   + apply PoCaseR. intuition.
 - inversion_Clear H0.
   + constructor. apply H. assumption.
+- inversion_Clear H0. constructor. intuition.
 - inversion_Clear H1.
   + constructor. intuition.
   + apply PoTtl. intuition.
@@ -1202,6 +1215,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
+    | TAx ty => TAx (instantiate n ty)
     | TCast t => TCast (instantiate n t)
     | x => x
   end
@@ -1255,6 +1269,7 @@ apply TrmTrmsDefs_ind; intros; simpl; try (solve [constructor]).
 - apply IApp; intuition.
 - apply ICase; intuition.
 - apply IFix; intuition.
+- apply IAx. intuition.  
 - apply Icons; intuition.
 - apply Idcons; intuition.
 Qed.
@@ -1327,6 +1342,8 @@ Proof.
    - change (WFapp (TFix (instantiateDefs t (n + dlength defs) defs) m)).
      constructor.
      + apply H0. assumption.
+   - change (WFapp (TAx (instantiate t n ty))).
+     constructor. apply H0. assumption.
    - change (WFapps (tcons (instantiate t0 n t) (instantiates t0 n ts))).
      constructor.
      + apply H0. assumption.

@@ -595,6 +595,7 @@ Fixpoint wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
                                        | Some cs => wcbvEval n p cs
                                      end
                       end
+                    | TAx _, _ => Some (TCase np mch brs)
                     | _, _ => None
                   end)
              end)
@@ -607,6 +608,7 @@ Fixpoint wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
           | TLambda nn t => Some (TLambda nn t)
           | TProd nn t => Some (TProd nn t)
           | TFix mfp br => Some (TFix mfp br)
+          | TAx ty => Some (TAx ty)
           | TConstruct i cn => Some (TConstruct i cn)
           | TInd i => Some (TInd i)
           | TSort srt => Some (TSort srt)

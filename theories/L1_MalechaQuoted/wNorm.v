@@ -25,6 +25,7 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm ty bod, WNorm ty -> WNorm (TLambda nm ty bod)
 | WNProd: forall nm ty bod, WNorm ty -> WNorm (TProd nm ty bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
+| WNAx: forall ty, WNorm (TAx ty)
 | WNCase: forall mch n ty brs,
             WNorm mch -> WNorm ty -> WNorms brs -> ~ isCanonical mch ->
             WNorm (TCase n ty mch brs)

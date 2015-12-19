@@ -132,6 +132,11 @@ Function strip (t:L2Term) : option Term :=
         | Some sds => Some (TFix sds n)
         | _ => None
       end
+    | L2.term.TAx ty =>
+      match strip ty with
+        | Some sty => Some (TAx sty)
+        | _ => None
+      end
   end
 with strips (ts:L2Terms) : option Terms := 
   match ts with
@@ -271,6 +276,10 @@ Proof.
               | Some sbod => Some (TLambda nm sbod)
               | None => None end) = Some (TFix d n)) in H.
     destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TAx tt)) in H.
+    destruct (strip p bod); discriminate.    
 Qed.
 
 Lemma strip_Prod_invrt:
@@ -324,6 +333,10 @@ Proof.
   - change ((match strip p bod with
               | Some sbod => Some (TProd nm sbod)
               | None => None end) = Some (TFix d n)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TAx tt)) in H.
     destruct (strip p bod); discriminate.
 Qed.
 

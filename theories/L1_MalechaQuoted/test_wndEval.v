@@ -1,4 +1,6 @@
 
+Add LoadPath "../common" as Common.
+Add LoadPath "." as L1.
 
 Require Import Template.Template.
 Require Import Relations.Relation_Operators.

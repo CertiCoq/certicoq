@@ -1,6 +1,5 @@
 
 
-
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Strings.Ascii.
@@ -25,6 +24,7 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
+| WNAx: forall ty, WNorm (TAx ty)
 | WNCase: forall mch n brs,
             WNorm mch -> WNorms brs -> ~ isCanonical mch ->
             WNorm (TCase n mch brs)
@@ -60,7 +60,7 @@ apply TrmTrmsDefs_ind; intros; auto.
   destruct H, H0, H1; try rght.
   + left. apply WNApp; auto.
 - rght.
-- destruct H; destruct H0; try rght.
+- destruct H, H0; try rght.
   + destruct (isCanonical_dec t).
     * right. inversion H1; intros h; inversion h; subst; contradiction.
     * left. constructor; auto.

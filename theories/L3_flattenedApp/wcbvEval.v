@@ -468,7 +468,8 @@ Fixpoint wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
                         | None => None
                       end
                     | None => None
-                      end)
+                  end)
+               | Some (TAx _) => Some (TCase np mch brs)
                | _ => None
              end)
            | TLetIn nm df bod =>
@@ -480,6 +481,7 @@ Fixpoint wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
           | TLambda nn t => Some (TLambda nn t)
           | TProd nn t => Some (TProd nn t)
           | TFix mfp br => Some (TFix mfp br)
+          | TAx ty => Some (TAx ty)
           | TInd i => Some (TInd i)
           | TSort srt => Some (TSort srt)
           (** should never appear **)

@@ -312,18 +312,18 @@ End MEASURECONTRACT.
 
 
        (* could reduce the number of accesses to the c_map by first tallying the number of occ for each var in the list *)
-     Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:nat -> nat -> nat) (count:c_map) :=
+     Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:var -> c_map -> nat) (count:c_map) :=
        match ys with
          | [] => count
          | y::ys' =>
            let y' := apply_r sig y in
-           update_census_list sig ys' fun_delta (M.set y' (fun_delta (get_c y' count) 1) count)
+           update_census_list sig ys' fun_delta (M.set y' (fun_delta y' count) count)
        end.
 
   
 
   
-  Fixpoint update_census (sig:r_map) (e:exp) (fun_delta:nat -> nat -> nat) (count:c_map) : c_map :=    
+  Fixpoint update_census (sig:r_map) (e:exp) (fun_delta:var -> c_map -> nat) (count:c_map) : c_map :=    
   match e with
     | Econstr x t c ys e =>
       let count' := update_census_list sig ys fun_delta count in
@@ -341,7 +341,7 @@ End MEASURECONTRACT.
       update_census sig e fun_delta count' 
     | Eapp f ys => update_census_list sig (f::ys) fun_delta count
   end 
-with update_census_f (sig:r_map) (fds:fundefs) (fun_delta:nat -> nat -> nat) (count:c_map): c_map :=
+with update_census_f (sig:r_map) (fds:fundefs) (fun_delta: var -> c_map -> nat) (count:c_map): c_map :=
        match fds with
          | Fcons v t ys e fds' => let count' := update_census sig e fun_delta count in
                                   update_census_f sig fds' fun_delta count' 
@@ -349,10 +349,21 @@ with update_census_f (sig:r_map) (fds:fundefs) (fun_delta:nat -> nat -> nat) (co
 end.
 
 
-Definition init_census (e:exp) := update_census (M.empty var) e plus (M.empty nat).
- Definition dec_census (sig:r_map) (e:exp) (count:c_map) := update_census sig e minus count.
- Definition dec_census_list (sig:r_map) (ys:list var) (count:c_map) := update_census_list sig ys minus count.
-     
+Definition init_census (e:exp) := update_census (M.empty var) e (fun v c => get_c v c + 1) (M.empty nat).
+ Definition dec_census (sig:r_map) (e:exp) (count:c_map) := update_census sig e (fun v c => get_c v c - 1)  count.
+ Definition dec_census_list (sig:r_map) (ys:list var) (count:c_map) := update_census_list sig ys (fun v c => get_c v c - 1) count.
+
+
+ (* assume NoDup(ys++xs) *)
+ Fixpoint update_count_inlined (ys:list var) (xs:list var) (count:c_map) :=
+   match ys, xs with
+   | y::ys', x::xs' =>
+     let cy := get_c y count in
+     let cx := get_c x count in
+     update_count_inlined ys' xs'  (M.set y (cy + cx - 1) (M.set x 0 count))
+   | _, _ => count
+   end.
+ 
 Section REWRITE.
 
 
@@ -519,6 +530,9 @@ Qed.
       +  assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds). destruct (precontractfun sig count sub fds). destruct p. eauto. destructAll. assert (H0' := H0). apply IHfds in H0.  rewrite <- H0' in H. inversion H; subst. simpl. split. eapply le_trans. apply set_value_size.  simpl. omega. omega.
     -  inversion H; subst. simpl. omega.
 Qed.  
+
+
+
   
   (* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)
   Program
@@ -565,7 +579,7 @@ Qed.
             contract sig count' inl (e, sub)
           | _ =>
             let '(e', count', inl') := contract sig count inl (e, (M.set x (Vconstr t c ys') sub)) in
-            (match (get_c x count) with
+            (match (get_c x count') with
               | 0 =>
                 let count'' := dec_census_list sig ys' count'  in
                 (e', count'', inl')
@@ -633,7 +647,7 @@ Qed.
                    | Some (Vfun t xs m) =>
                      let inl' := M.set f' true inl in
                    (* update counts of ys' and xs *)
-                     let count' := count in
+                     let count' := update_count_inlined ys' xs count in
                      contract (set_list (combine xs ys') sig) count' inl' (m, M.remove f' sub)                   
                    | _ => (Eapp f' ys', count, inl)
                  end)

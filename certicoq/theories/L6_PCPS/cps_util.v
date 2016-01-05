@@ -1,6 +1,6 @@
 Require Maps.
 Import Nnat.
-Require Import Arith BinNat String List Omega Program Psatz.
+Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
 Require Import CpdtTactics.
 Require Import cps.
 

@@ -9,7 +9,7 @@ Opaque N.sub.
 
 Require Import L3.program.
 
-Require L3.
+Require L3.L3.
 Module L3eval := L3.wndEval.
 Module L3t := L3.term.
 Module L3U := L3.unaryApplications.
@@ -45,6 +45,7 @@ Section TermTranslation.
   
   Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
+    | L3t.TAx _ => (* TODO *) dummy
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TSort s => (* Erase *) dummy
     | L3t.TProd n t => (* Erase *) dummy

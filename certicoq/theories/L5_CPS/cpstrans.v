@@ -27,7 +27,7 @@ Require Export L4.expression.
 *)
 Inductive cps: Type :=
 | Halt_c: val_c -> cps
-| Ret_c: val_c (* cont *) -> val_c (* result *) -> cps
+| Ret_c: val_c (* result *) -> val_c (* cont *) -> cps
 | Call_c: val_c (* fn *) -> val_c (* cont *) -> val_c (* arg *) -> cps
 | Match_c: val_c -> branches_c -> cps
 with val_c: Type :=

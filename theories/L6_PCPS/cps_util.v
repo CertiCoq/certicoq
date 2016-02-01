@@ -74,7 +74,7 @@ Admitted.
 Theorem subfds_e_subfds: forall fds e fds', subfds_fds fds' fds -> subfds_e fds e -> subfds_e fds' e.
 Proof.
   destruct fds; intros.
-  - destruct H0; destructAll. exists x x0. split. assumption.  eapply subfds_or_eq_left. apply H. assumption.
+  - destruct H0; destructAll. exists x. exists x0. split. assumption.  eapply subfds_or_eq_left. apply H. assumption.
   - inversion H. 
 Qed.
 

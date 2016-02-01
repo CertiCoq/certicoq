@@ -100,7 +100,6 @@ Fixpoint ctx_bind_proj' (n:positive) (m:nat): exp_ctx :=
 
 
 
-
 Fixpoint fnlst_length (vs:fnlst) : nat :=
   match vs with
     | flnil => 0
@@ -217,12 +216,13 @@ with convert_branches (bl: branches_c) (sv: list var) (sk: list var) (n:var) (* 
         let '(cfds, cbl, n') := convert_branches bl' sv sk n in
         let ctx_p := ctx_bind_proj' (Pos.succ n') (N.to_nat m) in 
         let (xs, nm2) := fromN (Pos.add n' 2) (N.to_nat m) in
-        let (ce, n'') :=  convert e (xs++sv) sk nm2 in 
+        let (ce, n'') :=  convert e ((List.rev xs)++sv) sk nm2 in 
         (Fcons n' ty_con ((Pos.succ n')::nil) (app_ctx_f ctx_p ce) cfds, ((dcon_to_tag dcn), n')::cbl ,   n'')
     end.
 
 Definition convert_top (e:cps) : exp :=
   let (er, n) := convert e nil nil (3%positive) in er.
+
 
 
 (*

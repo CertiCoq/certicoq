@@ -634,7 +634,7 @@ Qed.
                  postcontractfun (Efun fl' e, sub) 
                     (fun rm cm bm es H => contract rm cm bm es) sig count''
                     inl' sub fl' _ _ in  (* using sub instead of sub' so that we don't inline functions within their mutually inductive set of funs *)
-             (match fl'' with
+             (match fl'' with (* eliminate empty function defns. *)
                | Fnil => ( e', count''', inl'')
                |  _  =>  (Efun fl'' e', count''', inl'')
               end)
@@ -668,7 +668,7 @@ Proof.
   apply precontractfun_size in Ha0.
   unfold term_sub_size in H |- *. simpl in H |- *.
   eapply (lt_le_trans _ _ _ H). omega. Qed.
-Next Obligation.  exists fl' e. split; right; reflexivity. Qed.
+Next Obligation.  exists fl'. exists e. split; right; reflexivity. Qed.
 Next Obligation.  unfold term_sub_size; simpl. symmetry in Heq_anonymous. apply sub_remove_size in Heq_anonymous. rewrite <- Heq_anonymous. simpl. omega. Qed. 
 
 

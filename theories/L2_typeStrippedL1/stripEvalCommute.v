@@ -585,7 +585,7 @@ apply L1.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
     refine (L1.term.tskipn_pres_WFapp _ _ e).
     assert (j: L1.term.WFapp (L1.term.TApp (L1.term.TConstruct i n) arg args)).
     { refine (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp) _ _ _ _).
-      apply mch. assumption. assumption. }
+      try apply mch. eassumption. eassumption. }
     inversion_clear j.
     constructor; assumption.
 - inversion_Clear H1. rewrite tcons_hom. rewrite tcons_hom.
@@ -800,7 +800,7 @@ Proof.
       assert (j3:= L1.term.whFixStep_pres_WFapp _ H2 j4 H15).
       assert (j2:= H _ eq_refl H7 _ H13). simpl in j2. myInjection j2.
       clear j2.
-      refine (H0 _ _ _ _ _); try assumption.
+      refine (H0 _ _ _ _ _); try eassumption.
       rewrite <- tcons_hom in e.
       rewrite <- whFixStep_hom in e.
       rewrite H15 in e. simpl in e. myInjection e. reflexivity.

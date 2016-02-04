@@ -1,3 +1,7 @@
+(****)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+(****)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -21,24 +25,73 @@ Definition defaultItyp := {| itypNm:=""; itypCnstrs:=nil |}.
 (* a mutual type package is a list of ityps *)
 Definition itypPack := list ityp.
 
+Lemma Cnstr_dec: forall C1 C2:Cnstr, C1 = C2 \/ C1 <> C2.
+Proof.
+  destruct C1, C2, (string_dec CnstrNm0 CnstrNm1),
+  (eq_nat_dec CnstrArity0 CnstrArity1).
+  - left. subst. reflexivity.
+  - right. intros h. assert (j:= f_equal CnstrArity h).
+    simpl in j. contradiction.
+  - right. intros h. assert (j:= f_equal CnstrNm h).
+    simpl in j. contradiction.
+  - right. intros h. assert (j:= f_equal CnstrNm h).
+    simpl in j. contradiction.
+Qed.
+
+Lemma ityp_dec: forall i j:ityp, i = j \/ i <> j.
+Proof.
+  destruct i, j; destruct (string_dec itypNm0 itypNm1);
+  destruct (list_eq_dec Cnstr_dec itypCnstrs0 itypCnstrs1); subst;
+  try (left; reflexivity);
+  right; intros h.
+  - assert (j:= f_equal itypCnstrs h). simpl in j. contradiction.
+  - assert (j:= f_equal itypNm h). simpl in j. contradiction.
+  - assert (j:= f_equal itypNm h). simpl in j. contradiction.
+Qed.  
+
 
 (** environments and programs: Gregory's type [program] is inside out
 *** so we reverse it and make it an ordinary association list
 **)
 Inductive envClass := 
 | ecTrm (_:Term)
-| ecTyp (_:itypPack).
+| ecTyp (_:itypPack)
+| ecAx.
 
+Lemma isAx_dec:
+  forall (e:envClass), e = ecAx \/ e <> ecAx.
+Proof.
+  destruct e.
+  - right. intros h. discriminate.
+  - right. intros h. discriminate.
+  - left. reflexivity.
+Qed.
+      
+Lemma envClass_dec: forall e f:envClass, e = f \/ e <> f.
+Proof.
+  destruct e, f; try (right; intros h; discriminate).
+  - destruct (proj1 TermTerms_dec t t0).
+    + left. subst. reflexivity.
+    + right. intros h. injection h. intros. contradiction.
+  - destruct (Common.RandyPrelude.list_eq_dec ityp_dec i i0).
+    + subst. left. reflexivity.
+    + right. intros h. injection h. contradiction.
+  - left. reflexivity.
+Qed.
+
+      
 (** An environ is a list of axioms and
-*** definitions of terms and inductive types
+*** definitions of terms, inductive types and axioms
 ***)
 Definition environ := list (string * envClass).
 Record Program : Type := mkPgm { main:Term; env:environ }.
 
+(** all items in an env are application-well-formed **)
 Inductive WFaEc: envClass -> Prop :=
 | wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall i, WFaEc (ecTyp i).
-    
+| wfaecTyp: forall i, WFaEc (ecTyp i)
+| wfaecAx: WFaEc ecAx.
+
 Inductive WFaEnv: environ -> Prop :=
 | wfaenil: WFaEnv nil
 | wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
@@ -92,13 +145,47 @@ Hint Constructors Lookup.
 
 Definition LookupDfn s p t := Lookup s p (ecTrm t).
 Definition LookupTyp s p i := Lookup s p (ecTyp i).
+Definition LookupAx s p := Lookup s p ecAx.
+
+Lemma Lookup_fresh_neq:
+  forall nm2 p t, Lookup nm2 p t -> forall nm1, fresh nm1 p -> nm1 <> nm2.
+induction 1; intros.
+- inversion H. assumption.
+- apply IHLookup. apply (fresh_tl H1).
+Qed.
+
+Lemma Lookup_weaken:
+  forall s p t, Lookup s p t -> 
+      forall nm ec, fresh nm p -> Lookup s ((nm, ec) :: p) t.
+intros s p t h1 nm ec h2.
+assert (j1:= Lookup_fresh_neq h1 h2). apply LMiss. apply neq_sym. assumption.
+assumption.
+Qed.
+
+Lemma Lookup_dec:
+  forall s p, (exists t, Lookup s p t) \/ (forall t, ~ Lookup s p t).
+Proof.
+  induction p; intros.
+  - right. intros t h. inversion h.
+  - destruct IHp; destruct a; destruct (string_dec s s0); subst.
+    + left. destruct H. exists e. apply LHit.
+    + left. destruct H. exists x. apply LMiss; assumption.
+    + destruct e.
+      * left. exists (ecTrm t). apply LHit.
+      * left. exists (ecTyp i). apply LHit. 
+      * left. exists ecAx. apply LHit.
+    + right. intros t h. inversion_Clear h. 
+      * elim n. reflexivity.
+      * elim (H t). assumption.
+Qed.
+
 
 (** equivalent functions **)
 Function lookup (nm:string) (p:environ) : option envClass :=
   match p with
    | nil => None
    | cons (s,ec) p => if (string_eq_bool nm s) then Some ec
-                                 else lookup nm p
+                      else lookup nm p
   end.
 
 Function lookupDfn (nm:string) (p:environ) : option Term :=
@@ -137,9 +224,8 @@ Lemma LookupDfn_lookupDfn:
                  forall te, t = (ecTrm te) -> lookupDfn nm p = Some te.
 induction 1; intros; subst.
 - unfold lookupDfn, lookup. rewrite (string_eq_bool_rfl s). reflexivity.
-- unfold lookupDfn, lookup. rewrite (string_eq_bool_neq H). destruct t.
-  + apply IHLookup. reflexivity.
-  + apply IHLookup. reflexivity.
+- unfold lookupDfn, lookup. rewrite (string_eq_bool_neq H).
+  destruct t; apply IHLookup; reflexivity.
 Qed.
 
 Lemma lookupDfn_LookupDfn:
@@ -149,44 +235,14 @@ functional induction (lookupDfn nm p); intros h; try discriminate.
 - injection h. intros. subst. apply lookup_Lookup. assumption.
 Qed.
 
-Lemma LookupDfn_functional:
-  forall (nm:string) (p:environ) (t r:Term),
-    LookupDfn nm p t -> LookupDfn nm p r -> t = r.
+Lemma Lookup_functional:
+  forall (nm:string) (p:environ) (t r:envClass),
+    Lookup nm p t -> Lookup nm p r -> t = r.
 intros nm p t r h1 h2. 
-assert (j1:= LookupDfn_lookupDfn h1 (te:=t)).
-assert (j2:= LookupDfn_lookupDfn h2 (te:=r)).
-rewrite j1 in j2. injection j2; intros; subst; reflexivity. reflexivity.
+assert (j1:= Lookup_lookup h1).
+assert (j2:= Lookup_lookup h2).
+rewrite j1 in j2. injection j2; intros; subst. reflexivity.
 Qed.
-
-(***
-Lemma not_lookupDfn_not_LookupDfn:
- forall (nm:string) (p:environ) (t:Term),
-   ~(lookupDfn nm p = Some t) <-> ~(LookupDfn nm p t).
-split; eapply deMorgan_impl.
-- apply (proj2 (lookupDfn_LookupDfn _ _ _ )).
-- apply (proj1 (lookupDfn_LookupDfn _ _ _ )).
-Qed.
-
-Lemma lookupDfn_None_not_LookupDfn:
-  forall (nm:string) (p:environ) (t:Term),
-    lookupDfn nm p = None -> ~(LookupDfn nm p t).
-intros nm p te h. apply (proj1 (not_lookupDfn_not_LookupDfn _ _ _)). 
-intuition. rewrite h in H. discriminate.
-Qed.
-
-Lemma lookupDfn_neq:
-  forall n1 n2 p t, n1 <> n2 ->
-     lookupDfn n1 ((n2, ecConstr t) :: p) = lookupDfn n1 p.
-intros n1 n2 p t h.
-unfold lookupDfn. rewrite (string_eq_bool_neq h). reflexivity.
-Qed.
-
-Lemma lookupDfn_eq:
-  forall n t p, lookupDfn n ((n, ecConstr t) :: p) = Some t.
-intros n t p.
-unfold lookupDfn. rewrite string_eq_bool_rfl. reflexivity.
-Qed.
-***)
 
 
 Lemma Lookup_pres_WFapp:
@@ -208,21 +264,6 @@ Lemma Lookup_strengthen:
 intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
 simpl in k. rewrite (string_eq_bool_neq j2) in k.
 apply lookup_Lookup. assumption.
-Qed.
-
-Lemma Lookup_fresh_neq:
-  forall nm2 p t, Lookup nm2 p t -> forall nm1, fresh nm1 p -> nm1 <> nm2.
-induction 1; intros.
-- inversion H. assumption.
-- apply IHLookup. apply (fresh_tl H1).
-Qed.
-
-Lemma Lookup_weaken:
-  forall s p t, Lookup s p t -> 
-      forall nm ec, fresh nm p -> Lookup s ((nm, ec) :: p) t.
-intros s p t h1 nm ec h2.
-assert (j1:= Lookup_fresh_neq h1 h2). apply LMiss. apply neq_sym. assumption.
-assumption.
 Qed.
 
 Lemma fresh_lookup_None: forall nm p, fresh nm p <-> lookup nm p = None.
@@ -313,7 +354,6 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctFix: forall n p ds m,
              Crct p n prop ->    (** convenient for IH *)
              CrctDs p (n + dlength ds) ds -> Crct p n (TFix ds m)
-| CrctAx: forall n p ty, Crct p n ty -> Crct p n (TAx ty)
 | CrctInd: forall n p ind, Crct p n prop -> Crct p n (TInd ind)
 with Crcts: environ -> nat -> Terms -> Prop :=
 | CrctsNil: forall n p, Crct p n prop -> Crcts p n tnil
@@ -380,7 +420,6 @@ apply CrctCrctsCrctDsTyp_ind; intros.
 - eapply CrctConstruct; eassumption.
 - apply CrctCase; assumption.
 - apply CrctFix; assumption.
-- apply CrctAx; assumption.
 - apply CrctInd; assumption.
 - apply CrctsNil; assumption.
 - apply CrctsCons; assumption.
@@ -681,8 +720,6 @@ eapply CrctCrctsCrctDsTyp_ind; intros; auto.
 - apply CrctFix.
   + eapply H0. eassumption. intros h. inversion h.
   + eapply H2. eassumption. intros h. elim H4. apply PoFix. assumption.
-- apply CrctAx. apply (H0 _ _ _ H1). intros h. elim H2.
-  apply PoAx. assumption.
 - apply CrctInd. apply (H0 _ _ _ H1). inversion 1. 
 - apply CrctsNil. rewrite H1 in H. inversion H; assumption.
 - apply CrctsCons.
@@ -871,15 +908,6 @@ induction 1; intros; try discriminate.
     * rewrite <- plus_n_Sm. apply Crct_up. assumption.
 - injection H1; intros; subst. assumption.
 Qed.
-
-Lemma Crct_invrt_Ax:
-  forall p n t, Crct p n t ->
-  forall u, t = (TAx u) -> Crct p n u.
-induction 1; intros; try discriminate.
-- apply (proj1 Crct_weaken); intuition.
-- specialize (IHCrct _ H2). apply (proj1 Crct_Typ_weaken); intuition.
-- myInjection H0. assumption.
-Qed.
   
 Lemma Crct_invrt_Construct:
   forall p n construct, Crct p n construct ->
@@ -989,8 +1017,6 @@ Proof.
       * simpl in j. generalize (dlength d). induction n0.
         rewrite <- plus_n_O. assumption.
         rewrite <- plus_n_Sm. apply (proj1 Crct_up). assumption.
-  - apply CrctAx. apply H; try assumption.
-    apply (Crct_invrt_Ax H1 eq_refl).
   - apply CrctsNil. eapply Crct_Sort. eassumption.
   - inversion_Clear H2. apply CrctsCons.
     + apply H; trivial.
@@ -1247,44 +1273,6 @@ Proof.
     apply (tnth_pres_Crct h2 _ H).
 Qed. 
 
-(**
-Lemma fold_left_pres_Crct:
-  let f := fold_left
-                 (fun bod ndx => instantiate (TFix dts ndx) 0 bod)
-                 (list_to_zero ldts) body in
-
-  forall p n (f:Term -> nat -> Term),
-    (forall t, Crct p n t -> forall m, Crct p n (f t m)) ->
-    forall t, Crct p n t -> forall ns, Crct p n (fold_left f ns t).
-Proof.
-  intros p n f hf t ht. induction ns; simpl. try assumption.
-  - induction ht.
-
-  intros p n f hf. induction 1; intros ns.
-  - induction ns; simpl.
-    + apply CrctSrt.
-    +
-***)
-
-
-(**
-Lemma whFixStep_pres_Crct:
-  forall dts m args s, whFixStep dts m args = Some s -> 
-  forall p i, CrctDs p i dts -> forall n, i = (n + dlength dts) ->
-       Crcts p i args -> Crct p i s.
-Proof.
-  intros dts m args s h1 p i h2 n h3 h4.
-  unfold whFixStep in h1.
-
-  intros dts m args s h1 p i h2 n h3 h4. 
-  functional induction (dnthBody m dts).
-  - unfold whFixStep in h1. simpl in h1. discriminate.
-  - simpl in h3. unfold whFixStep in h1. simpl in h1.
-    injection h1; intros j. rewrite <- j. admit.
-  - unfold whFixStep in h1. simpl in h1.
-
- destruct (dnthBody m dts).
-***)
 
 (***
 Goal

@@ -11,6 +11,11 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 
+Fixpoint Ftest (f:False) : nat := match f with  end.
+Print Ftest.
+Quote Recursively Definition p_Ftest := Ftest.
+Print p_Ftest.
+
 (***  TESTING eval ***)
 Ltac tran_step := eapply rt_trans; [eapply rt_step|].
 Ltac dfn_unfold := unfold lookupDfn; simpl; try reflexivity.

@@ -2,7 +2,10 @@
 *** equivalent for well-formed programs
 **)
 
-
+(****)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+(****)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -33,17 +36,17 @@ Inductive awndEval (p:environ) : Term -> Term -> Prop :=
             awndEval p (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| aCase0: forall (n:nat) (ty s:Term) (i:inductive) l (brs:Terms),
-            whCaseStep n tnil brs = Some s ->
+| aCase0: forall (n:nat) l (ty s:Term) (i:inductive) (brs:Terms),
+            whCaseStep n tnil brs = Some s ->   (* no parameters *)
             awndEval p (TCase (0,l) ty (TConstruct i n) brs) s
-| aCasen: forall (np:nat * list nat) (ty s arg:Term) (i:inductive)
-                 (args brs ts:Terms) (n:nat),
-            tskipn (fst np) (tcons arg args) = Some ts ->
+| aCasen: forall (ml:nat * list nat) (ty s arg:Term) (i:inductive)
+                 (args brs ts:Terms) (n:nat),   (* at least one parameter *)
+            tskipn (fst ml) (tcons arg args) = Some ts ->
             whCaseStep n ts brs = Some s ->
-            awndEval p (TCase np ty (TApp (TConstruct i n) arg args) brs) s
-| aFix: forall (dts:Defs) (m:nat) (arg s:Term) (args:Terms),
-          whFixStep dts m (tcons arg args) = Some s ->
-          awndEval p (TApp (TFix dts m) arg args) s
+            awndEval p (TCase ml ty (TApp (TConstruct i n) arg args) brs) s
+| aFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms),
+          awndEval p (TApp (TFix dts m) arg args)
+                   (whFixStep dts m (tcons arg args))
 | aCast: forall t ck ty, awndEval p (TCast t ck ty) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
@@ -69,26 +72,37 @@ Inductive awndEval (p:environ) : Term -> Term -> Prop :=
 | aLetInDef:forall (nm:name) (t d1 d2 bod:Term),
               awndEval p d1 d2 ->
               awndEval p (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
-| aCaseTy:  forall (np:nat * list nat) (ty uy mch:Term) (brs:Terms),
+| aCaseTy:  forall (ml:nat * list nat) (ty uy mch:Term) (brs:Terms),
               awndEval p ty uy ->
-              awndEval p (TCase np ty mch brs) (TCase np uy mch brs)
-| aCaseArg: forall (np:nat * list nat) (ty mch can:Term) (brs:Terms),
+              awndEval p (TCase ml ty mch brs) (TCase ml uy mch brs)
+| aCaseArg: forall (ml:nat * list nat) (ty mch can:Term) (brs:Terms),
               awndEval p mch can ->
-              awndEval p (TCase np ty mch brs) (TCase np ty can brs)
-| aCaseBrs: forall (np:nat * list nat) (ty mch:Term) (brs brs':Terms),
+              awndEval p (TCase ml ty mch brs) (TCase ml ty can brs)
+| aCaseBrs: forall (ml:nat * list nat) (ty mch:Term) (brs brs':Terms),
               awndEvals p brs brs' ->
-              awndEval p (TCase np ty mch brs) (TCase np ty mch brs')
+              awndEval p (TCase ml ty mch brs) (TCase ml ty mch brs')
+| aFixDefs: forall (ds es:Defs) (i:nat),
+              awndDEvals p ds es -> awndEval p (TFix ds i) (TFix es i)
 with awndEvals (p:environ) : Terms -> Terms -> Prop :=
      | aaHd: forall (t r:Term) (ts:Terms), 
                awndEval p t r ->
                awndEvals p (tcons t ts) (tcons r ts)
      | aaTl: forall (t:Term) (ts ss:Terms),
                awndEvals p ts ss ->
-               awndEvals p (tcons t ts) (tcons t ss).
-Hint Constructors awndEval awndEvals.
+               awndEvals p (tcons t ts) (tcons t ss)
+with awndDEvals  (p:environ) : Defs -> Defs -> Prop :=
+     | adaHd: forall (n:name) (t r s:Term) (i:nat) (ds:Defs), 
+               awndEval p t r ->
+               awndDEvals p (dcons n t s i ds) (dcons n r s i ds)
+     | adaTl: forall (n:name) (t s:Term) (i:nat) (ds es:Defs),
+               awndDEvals p ds es ->
+               awndDEvals p (dcons n t s i ds) (dcons n t s i es).
+Hint Constructors awndEval awndEvals awndDEvals.
 Scheme awndEval1_ind := Induction for awndEval Sort Prop
-  with awndEvals1_ind := Induction for awndEvals Sort Prop.
-Combined Scheme awndEvalEvals_ind from awndEval1_ind, awndEvals1_ind.
+     with awndEvals1_ind := Induction for awndEvals Sort Prop
+     with awndDEvals1_ind := Induction for awndDEvals Sort Prop.
+Combined Scheme awndEvalEvals_ind
+         from awndEval1_ind, awndEvals1_ind, awndDEvals1_ind.
 
 Definition no_awnd_step (p:environ) (t:Term) : Prop :=
   no_step (awndEval p) t.
@@ -145,11 +159,7 @@ Proof.
   - rewrite whBetaStep_absorbs_mkApp. apply aBeta.
   - rewrite <- mkApp_goodFn; try not_isApp. apply aAppFn.
     eapply aCasen; eassumption.
-  - unfold whFixStep in H. case_eq (dnthBody m dts); intros; rewrite H0 in H.
-    + apply aFix. injection H. intros.
-      rewrite <- H1. rewrite pre_whFixStep_absorbs_mkApp. 
-      simpl. unfold whFixStep. rewrite H0. reflexivity. 
-    + discriminate.
+  - rewrite whFixStep_absorbs_mkApp. simpl. constructor.
   - rewrite mkApp_idempotent. simpl. rewrite <- (mkApp_goodFn _ _ H3).
     apply IHawndEval; assumption.
   - apply aAppArgs. apply awndEval_tappendl. assumption.
@@ -174,6 +184,9 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp.
     rewrite <- mkApp_goodFn; try not_isApp. eapply aAppFn. 
     eapply aCaseBrs. assumption.
+  - rewrite <- mkApp_goodFn; try not_isApp.
+    rewrite <- mkApp_goodFn; try not_isApp. eapply aAppFn. 
+    eapply aFixDefs. assumption.
 Qed.
 
 Lemma WFapp_mkApp_WFapp:
@@ -191,7 +204,8 @@ Qed.
 Lemma wndEval_awndEval:
   forall p, WFaEnv p -> 
   (forall t s, wndEval p t s -> WFapp t -> awndEval p t s) /\
-  (forall ts ss, wndEvals p ts ss -> WFapps ts -> awndEvals p ts ss).
+  (forall ts ss, wndEvals p ts ss -> WFapps ts -> awndEvals p ts ss) /\
+  (forall ds es, wndDEvals p ds es -> WFappDs ds -> awndDEvals p ds es).
 Proof. 
   intros p hp. apply wndEvalEvals_ind; intros; try (constructor; assumption);
                try (inversion H0; subst; constructor; apply H; assumption).
@@ -204,7 +218,8 @@ Qed.
 Lemma awndEval_wndEval:
   forall p, WFaEnv p -> 
   (forall t s, awndEval p t s -> WFapp t -> wndEval p t s) /\
-  (forall ts ss, awndEvals p ts ss -> WFapps ts -> wndEvals p ts ss).
+  (forall ts ss, awndEvals p ts ss -> WFapps ts -> wndEvals p ts ss) /\
+  (forall ds es, awndDEvals p ds es -> WFappDs ds -> wndDEvals p ds es).
 Proof. 
   intros p hp. apply awndEvalEvals_ind; intros; try (constructor; assumption);
               try (inversion H0; subst; constructor; apply H; assumption).
@@ -229,7 +244,7 @@ Proof.
   try (rewrite (mkApp_goodFn _ _ H0) in H; try discriminate);
   try (rewrite (mkApp_goodFn _ _ H2) in H1; try discriminate).
   - left. exists nm, ty, bod. injection H. intros. subst. reflexivity.
-  - right. left. exists dts, m. injection H0. intros. subst. reflexivity.
+  - right. left. exists dts, m. injection H. intros. subst. reflexivity.
   - right. right. left. injection H0. intros. subst.
     exists r. inversion H2. apply awndEval_wndEval; assumption.
   - right. right. right. left. injection H0. intros. subst.

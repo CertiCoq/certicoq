@@ -1,4 +1,10 @@
 
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+(******)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -21,7 +27,7 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNAx: forall ty, WNorm (TAx ty)
+| WNAx: forall nm, WNorm (TAx nm)
 | WNCase: forall mch n brs,
             WNorm mch -> WNorms brs -> ~ isConstruct mch ->
             WNorm (TCase n mch brs)
@@ -84,7 +90,6 @@ try (solve [elim (H0 _ H6)]).
 - eelim H0. eassumption.
 Qed.
 
-
 (** If a program is in weak normal form, it WcbvEval to itself **)
 Lemma pre_wNorm_WcbvEval_rfl:
   forall p,
@@ -95,10 +100,12 @@ try (solve [inversion H; reflexivity]).
 - inversion_Clear H1. rewrite (H _ H5) in n0. elim n0. auto.
 - inversion H0.
   + rewrite (H args'). reflexivity. assumption.
-  + rewrite (H args'). reflexivity. assumption.
 - inversion_Clear H1.
   + rewrite (H _ H4) in n. elim n. exists nm, bod. reflexivity.
   + rewrite (H _ H4) in n0. elim n0. exists dts, m. reflexivity.
+  + apply f_equal2.
+    * apply H. assumption.
+    * apply H0. assumption.
 - inversion_Clear H1. rewrite (H _ H4). rewrite (H0 _ H6). reflexivity.
 Qed.
 
@@ -107,9 +114,11 @@ Lemma wNorm_WcbvEval_rfl:
   forall p,
     (forall t, WNorm t -> WcbvEval p t t) /\
     (forall ts, WNorms ts -> WcbvEvals p ts ts).
-intros p.
-assert (j:= pre_wNorm_WcbvEval_rfl p).
+  intros p.
+  destruct (pre_wNorm_WcbvEval_rfl p).
 split; intros.
+- rewrite H.
+
 Check (proj1 j _ H).
 ***)
 

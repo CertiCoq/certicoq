@@ -1,4 +1,7 @@
 
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -25,17 +28,17 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
             wndEval p (TLetIn nm dfn bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| sCase0: forall (n:nat) (s:Term) (i:inductive) l (brs:Terms),
+| sCase0: forall (n:nat) l (s:Term) (i:inductive) (brs:Terms),
             whCaseStep n tnil brs = Some s ->
-            wndEval p (TCase (0, l) (TConstruct i n) brs) s
-| sCasen: forall (np:nat * list nat) (s arg:Term) (i:inductive)
+            wndEval p (TCase (0,l) (TConstruct i n) brs) s
+| sCasen: forall (ml:nat * list nat) (s arg:Term) (i:inductive)
                  (args brs ts:Terms) (n:nat),
-            tskipn (fst np) (tcons arg args) = Some ts ->
+            tskipn (fst ml) (tcons arg args) = Some ts ->
             whCaseStep n ts brs = Some s ->
-            wndEval p (TCase np (TApp (TConstruct i n) arg args) brs) s
-| sFix: forall (dts:Defs) (m:nat) (arg s:Term) (args:Terms),
-          whFixStep dts m (tcons arg args) = Some s ->
-          wndEval p (TApp (TFix dts m) arg args) s
+            wndEval p (TCase ml (TApp (TConstruct i n) arg args) brs) s
+| sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms),
+          wndEval p (TApp (TFix dts m) arg args)
+                  (whFixStep dts m (tcons arg args))
 | sCast: forall t, wndEval p (TCast t) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
@@ -52,12 +55,12 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (d1 d2 bod:Term),
               wndEval p d1 d2 ->
               wndEval p (TLetIn nm d1 bod) (TLetIn nm d2 bod)
-| sCaseArg: forall (np:nat * list nat) (mch can:Term) (brs:Terms),
+| sCaseArg: forall (nl:nat * list nat) (mch can:Term) (brs:Terms),
               wndEval p mch can ->
-              wndEval p (TCase np mch brs) (TCase np can brs)
-| sCaseBrs: forall (np:nat * list nat) (mch:Term) (brs brs':Terms),
+              wndEval p (TCase nl mch brs) (TCase nl can brs)
+| sCaseBrs: forall (nl:nat * list nat) (mch:Term) (brs brs':Terms),
               wndEvals p brs brs' ->
-              wndEval p (TCase np mch brs) (TCase np mch brs')
+              wndEval p (TCase nl mch brs) (TCase nl mch brs')
 with  (** step any term in a list of terms **)
 wndEvals (p:environ) : Terms -> Terms -> Prop :=
     | saHd: forall (t r:Term) (ts:Terms), 
@@ -93,22 +96,14 @@ Proof.
   - inversion_Clear H. apply instantiate_pres_WFapp; assumption.
   - inversion_Clear H. eapply (whCaseStep_pres_WFapp H4). eapply wfanil.
     eassumption.
-  - inversion_Clear H. inversion_Clear H2. unfold whCaseStep in e0.
-    assert (j:= tnth_pres_WFapp H4 n). destruct (tnth n brs).
-    + injection e0. intros. rewrite <- H. apply mkApp_pres_WFapp.
-      * eapply (tskipn_pres_WFapp). apply wfacons. apply H6. apply H7. apply e.
-      * apply j. reflexivity.
-    + discriminate.
-  - inversion_Clear H. inversion_Clear H4. unfold whFixStep in e.
-    assert (j:= dnthBody_pres_WFapp H0 m). destruct (dnthBody m dts).
-    injection e. intros. rewrite <- H. apply mkApp_pres_WFapp.
-    + apply wfacons; assumption.
-    + apply fold_left_pres_WFapp. intros.
-      * { apply instantiate_pres_WFapp. 
-          - assumption.
-          - auto. }
-      * eapply j. reflexivity.
-    + discriminate.
+  - inversion_Clear H.
+    refine (whCaseStep_pres_WFapp _ _ _ e0); try assumption.
+    inversion_Clear H2. refine (tskipn_pres_WFapp _ _ e).
+    constructor; assumption.
+  - inversion_Clear H. inversion_Clear H4. 
+    assert (j:= dnthBody_pres_WFapp H0 m).
+    apply whFixStep_pres_WFapp; try assumption.
+    constructor; assumption.
   - inversion_Clear H. assumption.
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.
@@ -271,22 +266,11 @@ Proof.
     apply sCase0. assumption.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
     eapply sCasen; eassumption.
-  - unfold whFixStep in H. case_eq (dnthBody m dts); intros; rewrite H0 in H.
-    + apply sFix. injection H. intros.
-      rewrite <- H1. rewrite pre_whFixStep_absorbs_mkApp. 
-      simpl. unfold whFixStep. rewrite H0. reflexivity. 
-    + discriminate.
+  - rewrite whFixStep_absorbs_mkApp.
+    simpl. apply sFix.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
     eapply sCast; eassumption.
   - eapply sAppArgs. eapply wndEval_tappendl. assumption.
-(***
-  - rewrite <- mkApp_goodFn; try not_isApp.
-    rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
-    eapply sProdTy. assumption.
-  - rewrite <- mkApp_goodFn; try not_isApp.
-    rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
-    eapply sLamTy. assumption.
-**)
   - rewrite <- mkApp_goodFn; try not_isApp.
     rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
     eapply sLetInDef. assumption.

@@ -53,6 +53,7 @@ Definition zero :nat :=
   end.
 
 Quote Recursively Definition p_zero := zero.
+Print p_zero.
 Quote Definition q_zero := Eval compute in zero.
 Goal (exc_wcbvEval 40 p_zero) = term_Term q_zero.
 compute. reflexivity.

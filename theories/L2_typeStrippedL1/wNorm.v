@@ -1,4 +1,8 @@
-
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+(******)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -19,12 +23,15 @@ Set Implicit Arguments.
 (** Weak typed normal form: normal form of wndEval:
 *** no wndEval steps possible (including no steps in type fields.
 **)
+Section Sec_environ.
+Variable p:environ.
+  
 Inductive WNorm: Term -> Prop :=
 | WNRel: forall n, WNorm (TRel n)
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNAx: forall ty, WNorm (TAx ty)
+| WNAx: forall nm, LookupAx nm p -> WNorm (TConst nm)
 | WNCase: forall mch n brs,
             WNorm mch -> WNorms brs -> ~ isCanonical mch ->
             WNorm (TCase n mch brs)
@@ -49,24 +56,30 @@ Lemma WNorm_dec:
   (forall t, WNorm t \/ ~ WNorm t) /\
   (forall ts, WNorms ts \/ ~ WNorms ts) /\
   (forall (ds:Defs), True).
-Ltac rght := right; intros h; inversion_Clear h; contradiction.
-Ltac lft := solve [left; constructor; assumption].
-apply TrmTrmsDefs_ind; intros; auto.
-- right. intros h. inversion h.
-- destruct H; rght.
-- destruct (isLambda_dec t). rght.
-  destruct (isFix_dec t). rght.
-  destruct (isApp_dec t). rght.
-  destruct H, H0, H1; try rght.
-  + left. apply WNApp; auto.
-- rght.
-- destruct H, H0; try rght.
-  + destruct (isCanonical_dec t).
-    * right. inversion H1; intros h; inversion h; subst; contradiction.
-    * left. constructor; auto.
-- destruct H; destruct H0;
-  try (solve [right; intros h; inversion_Clear h; contradiction]).
-  + left; constructor; auto.
+Proof.
+  Ltac rght := right; intros h; inversion_Clear h; contradiction.
+  Ltac lft := solve [left; constructor; assumption].
+  apply TrmTrmsDefs_ind; intros; auto.
+  - right. intros h. inversion h.
+  - destruct H; rght.
+  - destruct (isLambda_dec t). rght.
+    destruct (isFix_dec t). rght.
+    destruct (isApp_dec t). rght.
+    destruct H, H0, H1; try rght.
+    + left. apply WNApp; auto.
+  - destruct (Lookup_dec s p).
+    + destruct H. destruct (isAx_dec x). 
+      * left. constructor. unfold LookupAx. subst. assumption.
+      * right. intro h. inversion_Clear h. unfold LookupAx in H2.
+        rewrite (Lookup_single_valued H H2) in H0. elim H0. reflexivity.
+    + right. intros h. inversion h. eelim H. apply H1.
+  - destruct H, H0; try rght.
+    + destruct (isCanonical_dec t).
+      * right. inversion H1; intros h; inversion h; subst; contradiction.
+      * left. constructor; auto.
+  - destruct H; destruct H0;
+    try (solve [right; intros h; inversion_Clear h; contradiction]).
+    + left; constructor; auto.
 Qed.
 
 Lemma WNorms_tappendl:
@@ -81,61 +94,51 @@ Qed.
 
 
 Lemma Wcbv_WNorm:
-  forall p, WFaEnv p ->
+  WFaEnv p ->
     (forall t s, WcbvEval p t s -> WFapp t -> WNorm s) /\
     (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss).
 Proof.
-intros p hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
+intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
 - inversion_Clear H0. apply H. assumption.
 - inversion_Clear H0. apply H.
   assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
 - inversion_Clear H2. apply H1. 
-  assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H7). inversion_Clear j.
+  assert (j:= proj1 (WcbvEval_presWFapp hp) _ _ w H7). inversion_Clear j.
   apply whBetaStep_pres_WFapp; try assumption.
-  eapply (proj1 (wcbvEval_pres_WFapp hp)); eassumption. 
+  eapply (proj1 (WcbvEval_presWFapp hp)); eassumption. 
 - inversion_Clear H1. apply H0. apply instantiate_pres_WFapp. assumption. 
-  apply (proj1 (wcbvEval_pres_WFapp hp) _ _ w). assumption.
-- inversion_Clear H1. apply H0. 
-  refine (whFixStep_pres_WFapp _ _ _ e). 
-  + assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H6).
-    inversion j. assumption.
+  apply (proj1 (WcbvEval_presWFapp hp) _ _ w). assumption.
+- inversion_Clear H1. specialize (H H6). apply H0. eapply (whFixStep_pres_WFapp).
+  + assert (j:= proj1 (WcbvEval_presWFapp hp) _ _ w H6).
+    inversion_Clear j. assumption.
   + constructor; assumption.
 - inversion_Clear H2. constructor; intuition.
-  + destruct H2 as [x0 [x1 j]]. discriminate.
-  + destruct H2 as [x0 [x1 j]]. discriminate.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
-- inversion_Clear H2. constructor; intuition.
-  + destruct H2 as [x0 [x1 j]]. discriminate.
-  + destruct H2 as [x0 [x1 j]]. discriminate.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
 - inversion_Clear H1. apply H0.
   refine (whCaseStep_pres_WFapp _ _ _ e); auto.
 - inversion_Clear H1. apply H0.
   refine (whCaseStep_pres_WFapp _ _ _ e0). auto.
   refine (tskipn_pres_WFapp _ _ e).
-  assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H4). inversion j.
+  assert (j:= proj1 (WcbvEval_presWFapp hp) _ _ w H4). inversion j.
   constructor; assumption.
 - inversion_Clear H1. constructor; intuition.
 Qed.
 
-
 Lemma wcbvEval_no_further:
-  forall p, 
-    (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
-    (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss).
+  (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
+  (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss).
 Proof.
-  intros p. apply WcbvEvalEvals_ind; simpl; intros; auto.
+  apply WcbvEvalEvals_ind; simpl; intros; auto.
 Qed.
 
 (** If a program is in weak normal form, it has no wndEval step **)
 Lemma wNorm_no_wndStep_lem:
-  forall (p:environ),
   (forall t s, wndEval p t s -> ~ WNorm t) /\
   (forall ts ss, wndEvals p ts ss -> ~ WNorms ts).
-intros p.
 apply wndEvalEvals_ind; intros; intros h;
 try (solve[inversion h]);
 try (solve[inversion h; subst; contradiction]).
+- unfold LookupDfn in l. inversion_Clear h. unfold LookupAx in H0.
+  discriminate (Lookup_single_valued l H0).
 - inversion h. subst. elim H5. exists nm, bod. reflexivity.
 - inversion h. subst. elim H4. constructor.
 - inversion h. subst. elim H4. constructor.
@@ -152,11 +155,12 @@ try (solve[inversion h; subst; contradiction]).
 Qed.
 
 Lemma wNorm_no_wndStep:
-  forall t, WNorm t -> forall p, no_wnd_step p t.
-unfold no_wnd_step, no_wnds_step, no_step. intros t h0 p b h1.
-elim (proj1 (wNorm_no_wndStep_lem p) _ _ h1). assumption.
+  forall t, WNorm t -> no_wnd_step p t.
+unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
+elim (proj1 wNorm_no_wndStep_lem _ _ h1). assumption.
 Qed.
 
+End Sec_environ.
 
 (***************
 Lemma wNorm_no_wndStep:

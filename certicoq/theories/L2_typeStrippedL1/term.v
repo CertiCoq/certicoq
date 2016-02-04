@@ -1,5 +1,6 @@
 (*** type fields are stripped from term notations ***)
 
+Add LoadPath "../common" as Common.
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -28,9 +29,9 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* cnstr no *) -> Term
-| TCase      : (nat * list nat) (* # parameters, # args per branch *) -> Term -> Terms -> Term
+| TCase      : (nat * list nat) (* # parameters, # args per branch *) ->
+               Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
-| TAx        : Term -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -124,7 +125,6 @@ apply TrmTrmsDefs_ind.
   [lft | rght .. ].
 - induction t; cross.
   destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-- induction t0; cross. destruct (H t0); [lft | rght ..].
 - induction tt; cross. lft.
 - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
 - induction ee; cross. lft.
@@ -393,27 +393,14 @@ Fixpoint dlength (ts:Defs) : nat :=
     | dcons _ _ _ ts => S (dlength ts)
   end.
 
-Function dnthBody (n:nat) (l:Defs) {struct l} : option Term :=
+Function dnthBody (n:nat) (l:Defs) {struct l} : Term :=
   match l with
-    | dnil => None
+    | dnil => prop
     | dcons _ x _ t => match n with
-                           | 0 => Some x
+                           | 0 => x
                            | S m => dnthBody m t
                          end
   end.
-
-Lemma dnthBody_None: forall n ds, n >= dlength ds -> dnthBody n ds = None.
-induction n; induction ds; simpl; intuition. inversion H.
-Qed.
-
-Lemma dnthBody_Some:
-  forall ds n, n < dlength ds -> exists d, dnthBody n ds = Some d.
-induction ds; intros nx h.
-- simpl in h. inversion h.
-- destruct nx.
-  + simpl. exists t. reflexivity.
-  + simpl. apply IHds. simpl in h. omega.
-Qed.
 
 
 (** syntactic control of "TApp": no nested apps, app must have an argument **)
@@ -595,19 +582,19 @@ Lemma mkApp_isApp_lem:
 Proof.
   induction fn; intros arg args; unfold mkApp; simpl.
   - exists (TRel n), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TSort s), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TCast fn), arg, tnil. split. reflexivity.
-  + left. intuition. revert H. not_isApp. 
+    + left. intuition. revert H. not_isApp. 
   - exists (TProd n fn), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TLambda n fn), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TLetIn n fn1 fn2), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - change (exists (fn' arg' : Term) (args' : Terms),
-     TApp fn1 fn2 (tappend t (tcons arg args)) =
+              TApp fn1 fn2 (tappend t (tcons arg args)) =
               TApp fn' arg' (tappend args' args) /\
               (~ isApp (TApp fn1 fn2 t) /\
                fn' = TApp fn1 fn2 t /\ arg = arg' /\ args' = tnil \/
@@ -618,20 +605,18 @@ Proof.
     + rewrite <- tappend_assoc. simpl. reflexivity.
     + right. split; try split.
       * exists fn1, fn2, t. reflexivity.
-  * omega.
-  * apply tIn_tappend1.
+      * omega.
+      * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TInd i), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TConstruct i n), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TCase p fn t), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TFix d n), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
-- exists (TAx fn), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
 Qed.
 
 (** well-formed terms: TApp well-formed all the way down **)
@@ -652,7 +637,6 @@ Inductive WFapp: Term -> Prop :=
 | wfaCase: forall m mch brs,
             WFapp mch -> WFapps brs -> WFapp (TCase m mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
-| wfaAx: forall ty, WFapp ty -> WFapp (TAx ty)
 with WFapps: Terms -> Prop :=
 | wfanil: WFapps tnil
 | wfacons: forall t ts, WFapp t -> WFapps ts -> WFapps (tcons t ts)
@@ -731,13 +715,12 @@ Proof.
 Qed.
 
 Lemma dnthBody_pres_WFapp:
-  forall (ds:Defs), WFappDs ds -> 
-  forall n t, dnthBody n ds = Some t -> WFapp t.
+  forall (ds:Defs), WFappDs ds -> forall n, WFapp (dnthBody n ds).
 Proof.
-  intros ds h n t.
-  functional induction (dnthBody n ds); intros; try discriminate.
-  - injection H; intros; subst. inversion h. assumption.
-  - apply IHo; inversion h; assumption.
+  intros ds h n.
+  functional induction (dnthBody n ds); intros; auto.
+  - inversion h. assumption.
+  - apply IHt; inversion h; assumption.
 Qed.
 
 Lemma tskipn_pres_WFapp:
@@ -775,7 +758,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
             WFTrm (TCase m mch brs) n
 | wfFix: forall n defs m,
            WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
-| wfAx: forall n ty, WFTrm ty n -> WFTrm (TAx ty) n
 with WFTrms: Terms -> nat -> Prop :=
 | wfnil: forall n, WFTrms tnil n
 | wfcons: forall n t ts, WFTrm t n -> WFTrms ts n -> WFTrms (tcons t ts) n
@@ -820,7 +802,6 @@ Inductive PoccTrm : Term -> Prop :=
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
 | PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
-| PoAx: forall ty, PoccTrm ty -> PoccTrm (TAx ty)
 | PoCnstr: forall m1 n, PoccTrm (TConstruct (mkInd nm m1) n)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
@@ -1040,23 +1021,6 @@ Proof.
   - simpl. intros brgs. apply PoAppL. assumption.
   - simpl. intros brgs. apply PoAppA. assumption.
   - simpl. intros brgs. apply PoAppR. apply PoccTrms_tappendl. assumption.
-(**
-  - simpl. intros brgs.
-    destruct (mkApp_isApp_lem fn a (tappend args brgs))
-      as [x0 [x1 [x2 [h1 h2]]]].
-    rewrite h1. destruct h2.
-    + destruct H0 as [j1 [j2 [j3 j4]]]. subst. apply PoAppA. assumption.
-    + destruct H0 as [j1 [j2 j3]]. apply PoAppR.
-      eapply tIn_Pocc_Poccs; eassumption.
-  - simpl. intros brgs.
-    destruct (mkApp_isApp_lem fn a (tappend args brgs))
-      as [x0 [x1 [x2 [h1 h2]]]].
-    rewrite h1. destruct h2.
-    + destruct H0 as [j1 [j2 [j3 j4]]]. subst. simpl.
-      apply PoAppR. apply PoccTrms_tappendl. assumption.
-    + destruct H0. apply PoAppR.
-      apply PoccTrms_tappendr. apply PoccTrms_tappendl. assumption.
-**)
   - destruct args; simpl.
     + apply PoConst.
     + apply PoAppL. apply PoConst.
@@ -1069,9 +1033,6 @@ Proof.
   - destruct args; simpl.
     + apply PoFix. assumption.
     + apply PoAppL. apply PoFix. assumption.
-  - destruct args; simpl.
-    + apply PoAx. assumption.
-    + apply PoAppL. apply PoAx. assumption.
   - destruct args; simpl.
     + apply PoCnstr; assumption.
     + apply PoAppL. apply PoCnstr.
@@ -1134,8 +1095,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
-| IAx: forall n ty ity,
-         Instantiate n ty ity -> Instantiate n (TAx ty) (TAx ity)
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,
@@ -1189,7 +1148,6 @@ intro h. apply InstInstsDefs_ind; intros; auto.
   + apply PoCaseR. intuition.
 - inversion_Clear H0.
   + constructor. apply H. assumption.
-- inversion_Clear H0. constructor. intuition.
 - inversion_Clear H1.
   + constructor. intuition.
   + apply PoTtl. intuition.
@@ -1215,7 +1173,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TAx ty => TAx (instantiate n ty)
     | TCast t => TCast (instantiate n t)
     | x => x
   end
@@ -1269,7 +1226,6 @@ apply TrmTrmsDefs_ind; intros; simpl; try (solve [constructor]).
 - apply IApp; intuition.
 - apply ICase; intuition.
 - apply IFix; intuition.
-- apply IAx. intuition.  
 - apply Icons; intuition.
 - apply Idcons; intuition.
 Qed.
@@ -1342,8 +1298,6 @@ Proof.
    - change (WFapp (TFix (instantiateDefs t (n + dlength defs) defs) m)).
      constructor.
      + apply H0. assumption.
-   - change (WFapp (TAx (instantiate t n ty))).
-     constructor. apply H0. assumption.
    - change (WFapps (tcons (instantiate t0 n t) (instantiates t0 n ts))).
      constructor.
      + apply H0. assumption.
@@ -1441,23 +1395,18 @@ Definition pre_whFixStep body dts args : Term :=
              (list_to_zero (dlength dts)) body in
   (mkApp f args).
 
-Definition whFixStep (dts:Defs) (m:nat) (args:Terms) : option Term :=
-  match dnthBody m dts with
-    | Some body => Some (pre_whFixStep body dts args)
-    | None => None
-  end.
+Definition whFixStep (dts:Defs) (m:nat) (args:Terms) : Term :=
+  pre_whFixStep (dnthBody m dts) dts args.
 
 Lemma whFixStep_mkApp:
-  forall (dts:Defs) (m:nat) (args:Terms) (s:Term),
-    whFixStep dts m args = Some s -> exists f, s = mkApp f args.
+  forall (dts:Defs) (m:nat) (args:Terms),
+    exists f, whFixStep dts m args = mkApp f args.
 Proof.
-  intros dts m args s h. unfold whFixStep in h. destruct (dnthBody m dts).
-  - injection h. intros j. 
+  intros dts m args. unfold whFixStep, pre_whFixStep.
     exists (fold_left
         (fun (bod : Term) (ndx : nat) => instantiate (TFix dts ndx) 0 bod)
-        (list_to_zero (dlength dts)) t).
-    rewrite <- j. unfold pre_whFixStep. reflexivity.
-  - discriminate.
+        (list_to_zero (dlength dts)) (dnthBody m dts)).
+    reflexivity.
 Qed.
 
 Lemma fold_left_pres_WFapp:
@@ -1473,20 +1422,17 @@ Proof.
 Qed.
 
 Lemma whFixStep_pres_WFapp:
-  forall (dts:Defs) (m:nat) (args:Terms) (s:Term),
-    WFappDs dts -> WFapps args -> whFixStep dts m args = Some s -> WFapp s.
+  forall (dts:Defs) (m:nat) (args:Terms),
+    WFappDs dts -> WFapps args -> WFapp (whFixStep dts m args).
 Proof.
-  intros dts m args s hdts hargs h.
-  unfold whFixStep in h.
-  assert (k:= dnthBody_pres_WFapp hdts m). destruct (dnthBody m dts).
-  - injection h. intros j. rewrite <- j. apply mkApp_pres_WFapp. assumption.
-    + apply fold_left_pres_WFapp.
-      * { intros. apply (proj1 instantiate_pres_WFapp). 
-          - assumption. 
-          - auto. }
-      * apply k. reflexivity.
-  - discriminate.
+  intros dts m args hdts hargs.
+  unfold whFixStep, pre_whFixStep.
+  apply mkApp_pres_WFapp. assumption.
+  apply fold_left_pres_WFapp.
+  - intros u wfu n. apply (proj1 instantiate_pres_WFapp); auto.
+  - apply (dnthBody_pres_WFapp hdts m).
 Qed.
+
 
 Lemma pre_whFixStep_absorbs_mkApp:
   forall bod dts args brgs,
@@ -1497,13 +1443,9 @@ Proof.
 Qed.
 
 Lemma whFixStep_absorbs_mkApp:
-  forall dts m args s, whFixStep dts m args = Some s ->
-  forall brgs, exists t, whFixStep dts m (tappend args brgs) = Some t /\
-       (mkApp s brgs) = t.
+  forall dts m args brgs,
+  (mkApp (whFixStep dts m args) brgs) = (whFixStep dts m (tappend args brgs)).
 Proof.
-  unfold whFixStep. intros. destruct (dnthBody m dts); try discriminate.
-  injection H. intros h. 
-  exists (pre_whFixStep t dts (tappend args brgs)). split.
-  + reflexivity.
-  + rewrite <- h. unfold pre_whFixStep. apply mkApp_idempotent.
+  unfold whFixStep. intros.
+  rewrite (pre_whFixStep_absorbs_mkApp). reflexivity.
 Qed.

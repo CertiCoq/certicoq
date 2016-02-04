@@ -1380,7 +1380,6 @@ Proof.
       rewrite <- whCaseStep_unhom. rewrite <- optUnstrip_unhom.
       apply f_equal. assumption.
   - refine (L1.wcbvEval.wCasen _ _ _ H _ _ H0); try eassumption.
-    + apply (unstrips ts).
     + rewrite <- tcons_unhom. rewrite <- tskipn_unhom.
       rewrite e. rewrite <- optUnstrips_unhom. reflexivity.
     + rewrite <- whCaseStep_unhom. rewrite <- optUnstrip_unhom.

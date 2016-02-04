@@ -1,3 +1,9 @@
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+(******)
 
 Require Import Template.Template.
 Require Import Common.RandyPrelude.
@@ -10,7 +16,6 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Check L2.stripEvalCommute.program_Program.
 Definition exc_wcbvEval
            (tmr:nat) (pgm:program) (tm:term): (option Term * option Term) :=
   match L2.stripEvalCommute.program_Program pgm with
@@ -33,13 +38,17 @@ Definition zero :nat :=
     | eq_refl => 0
   end.
 
+(***)
 Quote Recursively Definition p_zero := zero.
 Quote Definition q_zero := Eval compute in zero.
+Print p_zero.
+Print q_zero.
 Goal
   let ew := (exc_wcbvEval 40 p_zero q_zero) in
   fst ew = snd ew.
 compute. reflexivity.
 Qed.
+
 
 Definition Nat := nat.
 Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1).

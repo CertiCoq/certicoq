@@ -1,7 +1,11 @@
-(** Here we give functions to actually convert from Malecha's quoted Coq
+(** Functions to actually convert from Malecha's quoted Coq
 *** to the L1 language that we reason about
 **)
 
+(****)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+(****)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -41,7 +45,7 @@ Section term_Term_sec.
 End term_Term_sec.
 
 
-Fixpoint term_Term (t:term) : exception Term :=
+Function term_Term (t:term) : exception Term :=
   match t with
     | tRel n => ret (TRel n)
     | tSort srt => 
@@ -78,13 +82,13 @@ Fixpoint term_Term (t:term) : exception Term :=
     | tCase n ty mch brs =>
         do Ty <- term_Term ty;
         do Mch <- term_Term mch;
-        let Ars := List.map fst brs in
         do Brs <- terms_Terms (fun x => term_Term (snd x)) brs;
+        let Ars := List.map fst brs in
         ret (TCase (n,Ars) Ty Mch Brs)
     | tFix defs m =>
         do Defs <- defs_Defs term_Term defs;
         ret (TFix Defs m)
-     | _ => raise ""
+    | _ => raise "term_Term"
 end.
 
 (** convert Malecha's inductive type package into L1 **)
@@ -113,7 +117,7 @@ Fixpoint program_Program
       in program_Program p (econs (epair2 nm (ret (ecTyp Ibs))) e)
     | PAxiom nm ty p =>
       do Ty <- term_Term ty;
-      program_Program p (econs (epair2 nm (ret (ecTrm (TAx Ty)))) e)
+      program_Program p (econs (epair2 nm (ret ecAx)) e)
   end.
 
 

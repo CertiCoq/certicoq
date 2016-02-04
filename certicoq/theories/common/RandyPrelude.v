@@ -5,6 +5,10 @@
 ** because of types like Sort, ...
 *)
 
+(****)
+Add LoadPath "../common" as Common.
+(****)
+
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Strings.Ascii.
@@ -68,6 +72,25 @@ induction oa; intros.
 - reflexivity.
 Qed.
 
+
+Section Sec_list_eq_dec.
+  Variable A:Type.
+  Hypothesis eq_dec : forall (x y : A), x = y \/ x <> y.
+  Lemma list_eq_dec : forall l l':list A, l = l' \/ l <> l'.
+  Proof.
+    induction l; destruct l'.
+    - left. reflexivity.
+    - right. intros h. discriminate.
+    - right. intros h. discriminate.
+    - destruct (eq_dec a a0); subst.
+      + destruct (IHl l'). subst.
+        * left. reflexivity.
+        * right. intros h. injection h. contradiction.
+      + right. intros h. injection h. contradiction.
+  Qed.
+End Sec_list_eq_dec.
+
+  
 (** well-founded induction on natural number measure **)
 Lemma complete_nat_induct:
   forall (P:nat -> Prop)
@@ -309,8 +332,33 @@ Lemma max_snd: forall m n, max m n >= n.
 induction m; induction n; simpl; intuition.
 Qed.
 
-(** is an application a value (e.g. a fully applied data constructor)? **)
-Inductive AppIsVal: Set := aivT | aivF | aivM.
+
+Section PP.
+Require Import String Div2 NPeano Program.Wf.
+Local Open Scope string_scope.
+
+Definition digit_to_string (n:nat): string :=
+  match n with
+    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4"
+    | 5 => "5" | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
+  end%nat.
+
+Program Fixpoint nat_to_string (n:nat) {measure n}: string :=
+  (match n <? 10 as x return n <? 10 = x -> string with
+     | true => fun _ => digit_to_string n
+     | false => fun pf =>
+                  let m := NPeano.Nat.div n 10 in
+                  (nat_to_string m) ++ (digit_to_string (n - 10 * m))
+   end eq_refl)%nat.
+Next Obligation.
+  apply (NPeano.Nat.div_lt n 10%nat).
+  destruct n. unfold NPeano.Nat.ltb in *. simpl in *.
+  discriminate. auto with arith.
+  auto with arith.
+Defined.
+
+End PP.
+
 
 (***
 Goal

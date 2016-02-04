@@ -1,4 +1,10 @@
 
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+(******)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -24,10 +30,10 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
             wndEval p (TLetIn nm dfn bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| sCase: forall (n:nat) (np : nat * list nat) (s:Term) (i:inductive) (args brs ts:Terms),
-           tskipn (fst np) args = Some ts ->
+| sCase: forall (n:nat) (ml : nat * list nat) (s:Term) (i:inductive) (args brs ts:Terms),
+           tskipn (fst ml) args = Some ts ->
            whCaseStep n ts brs = Some s ->
-           wndEval p (TCase np (TConstruct i n args) brs) s
+           wndEval p (TCase ml (TConstruct i n args) brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg f:Term),
           whFixStep dts m = Some f ->
           wndEval p (TApp (TFix dts m) arg) (TApp f arg)
@@ -42,12 +48,12 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (d1 d2 bod:Term),
               wndEval p d1 d2 ->
               wndEval p (TLetIn nm d1 bod) (TLetIn nm d2 bod)
-| sCaseArg: forall (np:nat * list nat) (mch can:Term) (brs:Terms),
+| sCaseArg: forall (ml:nat * list nat) (mch can:Term) (brs:Terms),
               wndEval p mch can ->
-              wndEval p (TCase np mch brs) (TCase np can brs)
-| sCaseBrs: forall (np:nat * list nat) (mch:Term) (brs brs':Terms),
+              wndEval p (TCase ml mch brs) (TCase ml can brs)
+| sCaseBrs: forall (ml:nat * list nat) (mch:Term) (brs brs':Terms),
               wndEvals p brs brs' ->
-              wndEval p (TCase np mch brs) (TCase np mch brs')
+              wndEval p (TCase ml mch brs) (TCase ml mch brs')
 with  (** step any term in a list of terms **)
 wndEvals (p:environ) : Terms -> Terms -> Prop :=
     | saHd: forall (t r:Term) (ts:Terms), 

@@ -1,6 +1,15 @@
 (** Naive conversion to a deBruijn-only expression language for a core calculus including
     mutually recursive functions, data constructors, and pattern matching.
-*)
+ *)
+
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+Add LoadPath "../L4_deBruijn" as L4.
+(******)
+
 Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
@@ -552,6 +561,9 @@ Proof.
   + (* Fix *)
     admit.
 
+  + (* Ax *)
+    admit.
+    
   + (* Const *)
     unfold translate.
     simpl.

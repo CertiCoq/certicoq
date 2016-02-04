@@ -1,3 +1,9 @@
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+(******)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -134,9 +140,8 @@ Lemma LookupDfn_lookupDfn:
                  forall te, t = (ecTrm te) -> lookupDfn nm p = Some te.
 induction 1; intros; subst.
 - unfold lookupDfn, lookup. rewrite (string_eq_bool_rfl s). reflexivity.
-- unfold lookupDfn, lookup. rewrite (string_eq_bool_neq H). destruct t.
-  + apply IHLookup. reflexivity.
-  + apply IHLookup. reflexivity.
+- unfold lookupDfn, lookup. rewrite (string_eq_bool_neq H).
+  destruct t; apply IHLookup; reflexivity.
 Qed.
 
 Lemma lookupDfn_LookupDfn:
@@ -145,6 +150,7 @@ intros nm p t.
 functional induction (lookupDfn nm p); intros h; try discriminate.
 - injection h. intros. subst. apply lookup_Lookup. assumption.
 Qed.
+
 
 (**
 Lemma LookupDfn_functional:
@@ -291,7 +297,6 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctFix: forall n p ds m,
              Crct p n prop ->    (** convenient for IH *)
              CrctDs p (n + dlength ds) ds -> Crct p n (TFix ds m)
-| CrctAx: forall n p ty, Crct p n ty -> Crct p n (TAx ty)
 | CrctInd: forall n p ind, Crct p n prop -> Crct p n (TInd ind)
 with Crcts: environ -> nat -> Terms -> Prop :=
 | CrctsNil: forall n p, Crct p n prop -> Crcts p n tnil
@@ -344,7 +349,6 @@ apply CrctCrctsCrctDsTyp_ind; intros.
 - eapply CrctConstruct; eassumption.
 - apply CrctCase; assumption.
 - apply CrctFix; assumption.
-- apply CrctAx; assumption.
 - apply CrctInd; assumption.
 - apply CrctsNil; assumption.
 - apply CrctsCons; assumption.
@@ -553,8 +557,6 @@ apply CrctCrctsCrctDsTyp_ind; intros; auto.
 - apply CrctFix.
   + eapply H0. eassumption. intros h. inversion h.
   + eapply H2. eassumption. intros h. elim H4. apply PoFix. assumption.
-- apply CrctAx. apply (H0 _ _ _ H1). intros h. elim H2.
-  apply PoAx. assumption.        
 - apply CrctInd. apply (H0 _ _ _ H1). inversion 1. 
 - apply CrctsNil. rewrite H1 in H. inversion H; assumption.
 - apply CrctsCons.
@@ -721,15 +723,6 @@ induction 1; intros; try discriminate.
 - injection H1; intros; subst. assumption.
 Qed.
 
-Lemma Crct_invrt_Ax:
-  forall p n t, Crct p n t ->
-  forall u, t = (TAx u) -> Crct p n u.
-induction 1; intros; try discriminate.
-- apply (proj1 Crct_weaken); intuition.
-- specialize (IHCrct _ H2). apply (proj1 Crct_Typ_weaken); intuition.
-- myInjection H0. assumption.
-Qed.
-
 Lemma Crct_invrt_Construct:
   forall p n construct, Crct p n construct ->
   forall ipkgNm inum cnum args,
@@ -806,8 +799,6 @@ Proof.
       * simpl in j. generalize (dlength d). induction n0.
         rewrite <- plus_n_O. assumption.
         rewrite <- plus_n_Sm. apply (proj1 Crct_up). assumption.
-  - apply CrctAx. apply H; try assumption.
-    apply (Crct_invrt_Ax H1 eq_refl).
   - apply CrctsNil. eapply Crct_Sort. eassumption.
   - inversion_Clear H2. apply CrctsCons.
     + apply H; trivial.

@@ -1,3 +1,10 @@
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+(******)
+
 Require L2.L2.
 Require L1.L1.
 
@@ -119,7 +126,13 @@ Function strip (t:L2Term) : option Term :=
           end
         | _, _ => None
       end
-    | L2.term.TConst nm => Some (TConst nm)
+    | L2.term.TConst nm =>
+      match L2.program.lookup nm p with
+        | Some (L2.program.ecTrm _) => Some (TConst nm)
+        | Some L2.program.ecAx => Some (TAx nm)
+        | Some (L2.program.ecTyp _) => None (*** needs work ***)
+        | _ => None
+      end
     | L2.term.TInd i => Some (TInd i)
     | L2.term.TConstruct i n => etaExp_cnstr i n tnil
     | L2.term.TCase n mch brs =>
@@ -132,12 +145,7 @@ Function strip (t:L2Term) : option Term :=
         | Some sds => Some (TFix sds n)
         | _ => None
       end
-    | L2.term.TAx ty =>
-      match strip ty with
-        | Some sty => Some (TAx sty)
-        | _ => None
-      end
-  end
+   end
 with strips (ts:L2Terms) : option Terms := 
   match ts with
     | L2.term.tnil => Some tnil
@@ -192,6 +200,7 @@ Function stripEnv (p:L2.program.environ) : option environ :=
         | Some qs => Some (cons (nm, ecTyp (stripItyPack ityps)) qs)
         | _ => None
       end
+     | cons (nm, L2.program.ecAx) q => stripEnv q
   end.
 
 
@@ -262,6 +271,10 @@ Proof.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Some sbod => Some (TLambda nm sbod)
+              | None => None end) = Some (TAx s)) in H.
+    destruct (strip p bod); discriminate.    
+  - change ((match strip p bod with
+              | Some sbod => Some (TLambda nm sbod)
               | None => None end) = Some (TInd i)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
@@ -276,10 +289,6 @@ Proof.
               | Some sbod => Some (TLambda nm sbod)
               | None => None end) = Some (TFix d n)) in H.
     destruct (strip p bod); discriminate.
-  - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TAx tt)) in H.
-    destruct (strip p bod); discriminate.    
 Qed.
 
 Lemma strip_Prod_invrt:
@@ -320,6 +329,10 @@ Proof.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Some sbod => Some (TProd nm sbod)
+              | None => None end) = Some (TAx s)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Some sbod => Some (TProd nm sbod)
               | None => None end) = Some (TInd i)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
@@ -333,10 +346,6 @@ Proof.
   - change ((match strip p bod with
               | Some sbod => Some (TProd nm sbod)
               | None => None end) = Some (TFix d n)) in H.
-    destruct (strip p bod); discriminate.
-  - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TAx tt)) in H.
     destruct (strip p bod); discriminate.
 Qed.
 

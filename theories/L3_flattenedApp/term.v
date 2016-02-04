@@ -1,5 +1,12 @@
 (*** type fields are stripped from term notations and unary applications ***)
 
+(******)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L3_flattenedApp" as L3.
+(******)
+
 Require Import Lists.List.
 Require Import Strings.String.
 Require Import Arith.Compare_dec.
@@ -24,11 +31,12 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term -> Term
 | TConst     : string -> Term
+| TAx        : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat -> Terms -> Term
-| TCase      : nat * list nat (* #parameters, args per branch *) -> Term -> Terms -> Term
+| TCase      : nat * list nat (* #parameters, args per branch *) ->
+               Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
-| TAx        : Term -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -67,6 +75,7 @@ apply TrmTrmsDefs_ind.
 - induction t1; cross. 
   destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
 - induction t; cross. destruct (string_dec s s0); [lft | rght].
+- induction t; cross. destruct (string_dec s s0); [lft | rght].
 - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
 - induction t0; cross.
   destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); destruct (H t0);
@@ -78,7 +87,6 @@ apply TrmTrmsDefs_ind.
   [lft | rght .. ].
 - induction t; cross.
   destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-- induction t0; cross. destruct (H t0); [lft | rght ..].
 - induction tt; cross. lft.
 - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
 - induction ee; cross. lft.
@@ -340,7 +348,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
             WFTrm (TCase m mch brs) n
 | wfFix: forall n defs m,
            WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
-| wfAx: forall n ty, WFTrm ty n -> WFTrm (TAx ty) n
 with WFTrms: Terms -> nat -> Prop :=
 | wfnil: forall n, WFTrms tnil n
 | wfcons: forall n t ts, WFTrm t n -> WFTrms ts n -> WFTrms (tcons t ts) n
@@ -375,7 +382,6 @@ Inductive PoccTrm : Term -> Prop :=
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
 | PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
-| PoAx: forall ty, PoccTrm ty -> PoccTrm (TAx ty)
 | PoCnstrI: forall m1 m2 args, PoccTrm (TConstruct (mkInd nm m1) m2 args)
 | PoCnstrA: forall i m args,
              PoccTrms args -> PoccTrm (TConstruct i m args)
@@ -561,8 +567,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
-| IAx: forall n ty ity,
-         Instantiate n ty ity -> Instantiate n (TAx ty) (TAx ity)
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,
@@ -628,7 +632,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
          TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TAx ty => TAx (instantiate n ty)
     | TConstruct i m args => TConstruct i m (instantiates n args)
     | x => x
   end

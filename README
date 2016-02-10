@@ -35,8 +35,14 @@ https://github.com/gmalecha/template-coq
 Building the compiler:
 ----------------------
 
-  Once you have a working Coq in your path, you can go to the theories/
- directory. There you can run (once):
+  Once you have a working Coq in your path,
+  you can go to the libraries/ directory, and run
+  
+# coq_makefile -f _CoqProject -o Makefile
+# make -j4
+
+  Then, go to the theories/ directory.
+  There you can run (once):
 
 # coq_makefile -f _CoqProject -o Makefile
 # make -j4

@@ -61,6 +61,8 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
 | sCaseBrs: forall (nl:nat * list nat) (mch:Term) (brs brs':Terms),
               wndEvals p brs brs' ->
               wndEval p (TCase nl mch brs) (TCase nl mch brs')
+| sFixDefs: forall (ds es:Defs) (i:nat),
+              wndDEvals p ds es -> wndEval p (TFix ds i) (TFix es i)
 with  (** step any term in a list of terms **)
 wndEvals (p:environ) : Terms -> Terms -> Prop :=
     | saHd: forall (t r:Term) (ts:Terms), 
@@ -68,11 +70,21 @@ wndEvals (p:environ) : Terms -> Terms -> Prop :=
               wndEvals p (tcons t ts) (tcons r ts)
     | saTl: forall (t:Term) (ts ss:Terms),
               wndEvals p ts ss ->
-              wndEvals p (tcons t ts) (tcons t ss).
-Hint Constructors wndEval wndEvals.
+              wndEvals p (tcons t ts) (tcons t ss)
+with wndDEvals  (p:environ) : Defs -> Defs -> Prop :=
+     | daHd: forall (n:name) (t r:Term) (i:nat) (ds:Defs), 
+               wndEval p t r ->
+               wndDEvals p (dcons n t i ds) (dcons n r i ds)
+     | daTl: forall (n:name) (t:Term) (i:nat) (ds es:Defs),
+               wndDEvals p ds es ->
+               wndDEvals p (dcons n t i ds) (dcons n t i es).
+Hint Constructors wndEval wndDEvals wndEvals.
 Scheme wndEval1_ind := Induction for wndEval Sort Prop
-  with wndEvals1_ind := Induction for wndEvals Sort Prop.
-Combined Scheme wndEvalEvals_ind from wndEval1_ind, wndEvals1_ind.
+     with wndEvals1_ind := Induction for wndEvals Sort Prop
+     with wndDEvals1_ind := Induction for wndDEvals Sort Prop.
+Combined Scheme wndEvalEvals_ind
+         from wndEval1_ind, wndEvals1_ind, wndDEvals1_ind.
+
 
 (** example: evaluate omega = (\x.xx)(\x.xx): nontermination **)
 Definition xx := (TLambda nAnon (TApp (TRel 0) (TRel 0) tnil)).
@@ -85,7 +97,8 @@ Qed.
 Lemma wndEval_pres_WFapp:
   forall p, WFaEnv p -> 
   (forall t s, wndEval p t s -> WFapp t -> WFapp s) /\
-  (forall ts ss, wndEvals p ts ss -> WFapps ts -> WFapps ss).
+  (forall ts ss, wndEvals p ts ss -> WFapps ts -> WFapps ss) /\
+  (forall ds es, wndDEvals p ds es -> WFappDs ds -> WFappDs es).
 Proof.
   intros p hp.
   apply wndEvalEvals_ind; intros;
@@ -152,7 +165,12 @@ Inductive wndEvalsRTC (p:environ): Terms -> Terms -> Prop :=
 | wEsRTCstep: forall ts ss, wndEvals p ts ss -> wndEvalsRTC p ts ss
 | wEsRTCtrn: forall ts ss us, wndEvalsRTC p ts ss -> wndEvalsRTC p ss us ->
                           wndEvalsRTC p ts us.
-Hint Constructors wndEvalRTC wndEvalsRTC.
+Inductive wndDEvalsRTC (p:environ): Defs -> Defs -> Prop :=
+| wDEsRTCrfl: forall ts, wndDEvalsRTC p ts ts
+| wDEsRTCstep: forall ts ss, wndDEvals p ts ss -> wndDEvalsRTC p ts ss
+| wDEsRTCtrn: forall ts ss us, wndDEvalsRTC p ts ss -> wndDEvalsRTC p ss us ->
+                          wndDEvalsRTC p ts us.
+Hint Constructors wndEvalRTC wndEvalsRTC wndDEvalsRTC.
 
 Lemma wndEvalRTC_pres_WFapp:
   forall p t s, wndEvalRTC p t s -> WFaEnv p -> WFapp t -> WFapp s.
@@ -280,6 +298,9 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp.
     rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
     eapply sCaseBrs. assumption.
+  - rewrite <- mkApp_goodFn; try not_isApp.
+    rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
+    eapply sFixDefs. assumption.
 Qed.
 
 (*** We solve the problem using modified wndEval and RTC  ***)
@@ -332,6 +353,16 @@ Lemma wndEvalsTC_App_args:
 induction 1.
 - constructor. apply sAppArgs. assumption.
 - eapply wETCtrn. apply IHwndEvalsTC1. apply IHwndEvalsTC2.
+Qed.
+
+Lemma wndEvalsRTC_Fix_defs:
+  forall p dts dts',
+    wndDEvalsRTC p dts dts' ->
+      forall m, wndEvalRTC p (TFix dts m) (TFix dts' m).
+induction 1; intros h.
+- constructor.
+- constructor. apply sFixDefs; assumption.
+- eapply wERTCtrn. apply IHwndDEvalsRTC1. apply IHwndDEvalsRTC2. 
 Qed.
 
 Lemma wndEvalRTC_LetIn_dfn:
@@ -410,6 +441,23 @@ induction 1.
 - eapply wEsTCtrn. apply IHwndEvalsTC1. apply IHwndEvalsTC2.
 Qed.
 
+Lemma wndDEvalsRTC_dcons_hd:
+  forall p n s s' i ts,
+    wndEvalRTC p s s' -> wndDEvalsRTC p (dcons n s i ts) (dcons n s' i ts).
+induction 1.
+- constructor.
+- constructor. apply daHd. assumption.
+- eapply wDEsRTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+
+Lemma wndDEvalsRTC_dcons_tl:
+  forall p n s i ts ts',
+    wndDEvalsRTC p ts ts' -> wndDEvalsRTC p (dcons n s i ts) (dcons n  s i ts').
+induction 1.
+- constructor.
+- constructor. apply daTl. assumption.
+- eapply wDEsRTCtrn. apply IHwndDEvalsRTC1. apply IHwndDEvalsRTC2.
+Qed.
 
 (*** weakening and strengthening ***)
 Lemma wndEval_weaken:
@@ -417,7 +465,9 @@ Lemma wndEval_weaken:
   (forall t s, wndEval p t s -> forall nm ec, fresh nm p ->
                    wndEval ((nm,ec)::p) t s) /\
   (forall ts ss, wndEvals p ts ss -> forall nm ec, fresh nm p ->
-                    wndEvals ((nm,ec)::p) ts ss).
+                    wndEvals ((nm,ec)::p) ts ss) /\
+    (forall ds es, wndDEvals p ds es ->
+                   forall nm ec, fresh nm p -> wndDEvals ((nm,ec)::p) ds es).
 intros p. apply wndEvalEvals_ind; intros; auto.
 - apply sConst. apply Lookup_weaken; assumption.
 - eapply sCasen; eassumption.
@@ -428,7 +478,9 @@ Lemma wndEval_strengthen:
   (forall t s, wndEval pp t s -> forall nm ec p, pp = (nm,ec)::p ->
         ~ PoccTrm nm t -> wndEval p t s) /\
   (forall ts ss, wndEvals pp ts ss -> forall nm ec p, pp = (nm,ec)::p ->
-        ~ PoccTrms nm ts -> wndEvals p ts ss).
+        ~ PoccTrms nm ts -> wndEvals p ts ss) /\
+  (forall ds es, wndDEvals pp ds es -> forall nm ec p, pp = (nm,ec)::p ->
+         ~ PoccDefs nm ds -> wndDEvals p ds es).
 intros pp. apply wndEvalEvals_ind; intros; auto.
 - apply sConst. 
   assert (j:= neq_sym (inverse_Pocc_TConstL H0)). inversion_Clear l.
@@ -442,8 +494,12 @@ intros pp. apply wndEvalEvals_ind; intros; auto.
 - apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
 - apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
 - apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
+- apply sFixDefs. eapply H. eassumption.
+  intros h. elim H1. constructor. assumption.
 - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
 - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
+- apply daHd. apply (H nm ec). trivial. apply (notPoccDefs H1).
+- apply daTl. apply (H nm ec). trivial. apply (notPoccDefs H1).
 Qed.
 
 Lemma wndEvalTC_weaken:

@@ -30,7 +30,8 @@ Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
                 WcbvEval p (TConstruct i r) (TConstruct i r)
 | wInd: forall i, WcbvEval p (TInd i) (TInd i) 
 | wSort: forall srt, WcbvEval p (TSort srt) (TSort srt)
-| wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
+| wFix: forall dts dts' m,
+          WcbvDEvals p dts dts' -> WcbvEval p (TFix dts m) (TFix dts' m)
 | wAx: forall nm, LookupAx nm p -> WcbvEval p (TConst nm) (TConst nm)
 | wConst: forall nm (t s:Term),
             LookupDfn nm p t -> WcbvEval p t s -> WcbvEval p (TConst nm) s
@@ -69,11 +70,18 @@ with WcbvEvals (p:environ) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
 | wCons: forall t t' ts ts',
            WcbvEval p t t' -> WcbvEvals p ts ts' -> 
-           WcbvEvals p (tcons t ts) (tcons t' ts').
-Hint Constructors WcbvEval WcbvEvals.
+           WcbvEvals p (tcons t ts) (tcons t' ts')
+with WcbvDEvals (p:environ) : Defs -> Defs -> Prop :=
+| wDNil: WcbvDEvals p dnil dnil
+| wDCons: forall n s s' i ds ds',
+           WcbvEval p s s' -> WcbvDEvals p ds ds' -> 
+           WcbvDEvals p (dcons n s i ds) (dcons n s' i ds').
+Hint Constructors WcbvEval WcbvEvals WcbvDEvals.
 Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
-  with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
-Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
+     with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop
+     with WcbvDEvals1_ind := Induction for WcbvDEvals Sort Prop.
+Combined Scheme WcbvEvalEvals_ind
+         from WcbvEval1_ind, WcbvEvals1_ind, WcbvDEvals1_ind.
 
 (** when reduction stops **)
 Definition no_Wcbv_step (p:environ) (t:Term) : Prop :=
@@ -102,12 +110,13 @@ Qed.
 Lemma WcbvEval_presWFapp:
   forall p, WFaEnv p -> 
   (forall t s, WcbvEval p t s -> WFapp t -> WFapp s) /\
-  (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WFapps ss).
+  (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WFapps ss) /\
+  (forall ds es, WcbvDEvals p ds es -> WFappDs ds -> WFappDs es).
 Proof.
   intros p hp. apply WcbvEvalEvals_ind; intros; try assumption.
   - inversion_Clear H0. intuition.
-  - inversion_Clear H0. apply H.
-    assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
+  - inversion_Clear H0. constructor. intuition.
+  - apply H. assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
   - inversion_Clear H2. apply H1.
     apply (whBetaStep_pres_WFapp); try assumption.
     + assert (j:= H H7). inversion_Clear j. assumption.
@@ -125,6 +134,7 @@ Proof.
     assert (j:= H H4). inversion_Clear j.
     refine (tskipn_pres_WFapp _ _ e). intuition.
   - inversion_Clear H1. intuition. 
+  - inversion_Clear H1. constructor; intuition.
 Qed.
 
 Lemma WcbvEval_weaken:
@@ -132,7 +142,9 @@ Lemma WcbvEval_weaken:
     (forall t s, WcbvEval p t s -> forall nm ec, fresh nm p ->
           WcbvEval ((nm,ec)::p) t s) /\
     (forall ts ss, WcbvEvals p ts ss -> forall nm ec, fresh nm p ->
-          WcbvEvals ((nm,ec)::p) ts ss).
+          WcbvEvals ((nm,ec)::p) ts ss) /\
+    (forall ds es, WcbvDEvals p ds es -> forall nm ec, fresh nm p ->
+                   WcbvDEvals ((nm,ec)::p) ds es).
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
   - apply wAx. apply Lookup_weaken; assumption.
@@ -154,11 +166,15 @@ Qed.
 Lemma WcbvEval_wndEvalRTC:
   forall (p:environ), WFaEnv p ->
     (forall t s, WcbvEval p t s -> WFapp t -> wndEvalRTC p t s) /\
-    (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> wndEvalsRTC p ts ss).
+    (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> wndEvalsRTC p ts ss) /\
+    (forall ds es, WcbvDEvals p ds es -> WFappDs ds -> wndDEvalsRTC p ds es).
 Proof.
 intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
 - eapply wERTCtrn. apply wERTCstep. apply sCast. apply H. 
   inversion_Clear H0. assumption.
+- inversion_Clear H0. specialize (H H2). eapply wERTCtrn.
+  + constructor.
+  + eapply wndEvalsRTC_Fix_defs. assumption.
 - eapply wERTCtrn. 
   + apply wERTCstep. apply sConst. eassumption.
   + apply H. assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
@@ -227,6 +243,11 @@ intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
   + eapply (@wEsRTCtrn _ _ (tcons t' ts')).
      * apply wndEvalsRTC_tcons_tl. intuition. 
      * apply wEsRTCrfl.
+- inversion_Clear H1. eapply (@wDEsRTCtrn _ _ (dcons n s' i ds)).
+  + apply wndDEvalsRTC_dcons_hd. apply H. assumption.
+  + eapply (@wDEsRTCtrn _ _ (dcons n s' i ds)).
+    * apply wndDEvalsRTC_dcons_hd. intuition.
+    * apply wndDEvalsRTC_dcons_tl. intuition.
 Qed.
 
 
@@ -546,10 +567,14 @@ Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
               | None => None
               | Some df' => wcbvEval n p (instantiate df' 0 bod)
             end
-           (** already in whnf ***)
+          | TFix mfp br =>
+            match wcbvDEvals n p mfp with
+              | Some mfp' => Some (TFix mfp' br)
+              | None => None
+            end
+            (** already in whnf ***)
           | TLambda nn t => Some (TLambda nn t)
           | TProd nn t => Some (TProd nn t)
-          | TFix mfp br => Some (TFix mfp br)
           | TConstruct i cn => Some (TConstruct i cn)
           | TInd i => Some (TInd i)
           | TSort srt => Some (TSort srt)
@@ -569,6 +594,20 @@ with wcbvEvals (tmr:nat) (p:environ) (ts:Terms) {struct tmr}
                          | _, _ => None
                        end
                    end
+        end)
+with wcbvDEvals (tmr:nat) (p:environ) (ds:Defs) {struct tmr}
+     : option Defs :=
+       (match tmr with 
+          | 0 => None
+          | S n =>
+            match ds with             (** look for a redex **)
+              | dnil => Some dnil
+              | dcons m t i ss =>
+                match wcbvEval n p t, wcbvDEvals n p ss with
+                  | Some et, Some ess => Some (dcons m et i ess)
+                  | _, _ => None
+                end
+            end
         end).
 (***
 Functional Scheme wcbvEval_ind := Induction for wcbvEval Sort Prop
@@ -630,12 +669,17 @@ Lemma pre_WcbvEval_wcbvEval:
     (forall t s, WcbvEval p t s ->
              exists n, forall m, m >= n -> wcbvEval (S m) p t = Some s) /\
     (forall ts ss, WcbvEvals p ts ss ->
-             exists n, forall m, m >= n -> wcbvEvals (S m) p ts = Some ss).
+             exists n, forall m, m >= n -> wcbvEvals (S m) p ts = Some ss) /\
+    (forall ds es, WcbvDEvals p ds es ->
+          exists n, forall m, m >= n -> wcbvDEvals (S m) p ds = Some es).
 intros p.
 assert (j:forall m x, m > x -> m = S (m - 1)). induction m; intuition.
 apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
 - destruct H. exists (S x). intros m hm. simpl. rewrite (j m x).
   + apply H. omega.
+  + omega.
+- destruct H. exists (S x). intros mm hmm. simpl. rewrite (j mm x).
+  + rewrite H. reflexivity. omega.
   + omega.
 - exists 0. intros m hm. simpl. rewrite (LookupAx_lookup l). reflexivity.
 - destruct H. exists (S x). intros m h. unfold LookupDfn in l.
@@ -697,6 +741,14 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   assert (l:= max_snd x x0).
   rewrite (j m (max x x0)). apply H0. omega. omega.
   simpl. rewrite k. rewrite k0. reflexivity.
+- destruct H, H0. exists (S (max x x0)). intros m h.
+  assert (k:wcbvEval m p s = Some s').
+  assert (l:= max_fst x x0).
+  rewrite (j m (max x x0)). apply H. omega. omega.
+  assert (k0:wcbvDEvals m p ds = Some ds').
+  assert (l:= max_snd x x0).
+  rewrite (j m (max x x0)). apply H0. omega. omega.
+  simpl. rewrite k. rewrite k0. reflexivity.
 Qed.
 
 Lemma WcbvEval_wcbvEval:
@@ -715,7 +767,7 @@ Lemma WcbvEvals_wcbvEvals:
              exists n, forall m, m >= n -> wcbvEvals m p ts = Some ss.
 Proof.
   intros p ts ss h.
-  destruct (proj2 (pre_WcbvEval_wcbvEval p) _ _ h).
+  destruct (proj1 (proj2 (pre_WcbvEval_wcbvEval p)) _ _ h).
   exists (S x). intros m hm. assert (j:= H (m - 1)). 
   assert (k: m = S (m - 1)). { omega. }
   rewrite k. apply j. omega.

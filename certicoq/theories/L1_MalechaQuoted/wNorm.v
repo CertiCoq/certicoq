@@ -100,21 +100,18 @@ Proof.
     + eapply IHts. eassumption.
 Qed.
 
-(*******************
+  
 Lemma Wcbv_WNorm:
   WFaEnv p ->
     (forall t s, WcbvEval p t s -> WFapp t -> WNorm s) /\
-    (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss).
+    (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss) /\
+    (forall dts dss, WcbvDEvals p dts dss ->  WFappDs dts -> WDNorms dss).
 Proof.
 intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
 - inversion_Clear H0. intuition. 
 - inversion_Clear H0. intuition. 
 - inversion_Clear H0. apply H. assumption.
-- constructor.
-
-  assert (j:= Lookup_pres_WFapp hp l). inversion j. subst.   constructor.
-  unfold LookupAx in *.
-  simpl.
+- constructor. apply H. inversion H0. assumption.
 - inversion_Clear H0. apply H.
   assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
 - inversion_Clear H2. apply H1. 
@@ -123,33 +120,25 @@ intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
   eapply (proj1 (wcbvEval_pres_WFapp hp)); eassumption. 
 - inversion_Clear H1. apply H0. apply instantiate_pres_WFapp. assumption. 
   apply (proj1 (wcbvEval_pres_WFapp hp) _ _ w). assumption.
-- inversion_Clear H1. apply H0. 
-  refine (whFixStep_pres_WFapp _ _ _ e). 
+- apply H0. inversion_Clear H1.
+  refine (whFixStep_pres_WFapp _ _ _). 
   + assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H6).
     inversion j. assumption.
   + constructor; assumption.
 - inversion_Clear H2. constructor; intuition.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
-  + destruct H2 as [x0 [x1 j]]. discriminate.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
-- inversion_Clear H2. constructor; intuition.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
-  + destruct H2 as [x0 [x1 j]]. discriminate.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
-- inversion_Clear H2. constructor; intuition.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
-  + destruct H2 as [x0 [x1 j]]. discriminate.
-  + destruct H2 as [x0 [x1 [x2 j]]]. discriminate.
-- inversion_Clear H1. apply H0.
-  refine (whCaseStep_pres_WFapp _ _ _ e); auto.
-- inversion_Clear H1. apply H0.
-  refine (whCaseStep_pres_WFapp _ _ _ e0). auto.
-  refine (tskipn_pres_WFapp _ _ e).
-  assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H5). inversion j.
-  constructor; assumption.
+- apply H1. refine (whCaseStep_pres_WFapp _ _ _ e); try constructor.
+  inversion H2. assumption.
+- apply H0. refine (whCaseStep_pres_WFapp _ _ _ e0).
+  + inversion H1. assumption.
+  + refine (tskipn_pres_WFapp _ _ e).
+    inversion_clear H1.
+    assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H2). inversion_Clear j.
+    constructor; assumption.
+- constructor. 
 - inversion_Clear H1. constructor; intuition.
+- inversion_Clear H2. constructor; intuition.
 Qed.
-**********************)
+
 
 Lemma wcbvEval_no_further:
     (forall t s, WcbvEval p t s -> WcbvEval p s s) /\

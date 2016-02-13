@@ -91,6 +91,9 @@ with wndDEvals  (p:environ) : Defs -> Defs -> Prop :=
      | daHd: forall (n:name) (t r s:Term) (i:nat) (ds:Defs), 
                wndEval p t r ->
                wndDEvals p (dcons n t s i ds) (dcons n r s i ds)
+     | daHd2: forall (n:name) (t r s:Term) (i:nat) (ds:Defs), 
+               wndEval p t r ->
+               wndDEvals p (dcons n s t i ds) (dcons n s r i ds)
      | daTl: forall (n:name) (t s:Term) (i:nat) (ds es:Defs),
                wndDEvals p ds es ->
                wndDEvals p (dcons n t s i ds) (dcons n t s i es).
@@ -1065,6 +1068,15 @@ induction 1.
 - eapply wDEsRTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
 Qed.
 
+Lemma wndDEvalsRTC_dcons_hd2:
+  forall p n t s s' i ts,
+    wndEvalRTC p s s' -> wndDEvalsRTC p (dcons n t s i ts) (dcons n t s'  i ts).
+induction 1.
+- constructor.
+- constructor. apply daHd2. assumption.
+- eapply wDEsRTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+
 Lemma wndEvalsTC_tcons_hd:
   forall p t t' ts,
     wndEvalTC p t t' -> wndEvalsTC p (tcons t ts) (tcons t' ts).
@@ -1143,5 +1155,6 @@ intros pp. apply wndEvalEvals_ind; intros; auto.
 - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
 - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
 - apply daHd. apply (H nm ec). trivial. apply (notPoccDefs H1).
+- apply daHd2. apply (H nm ec). trivial. apply (notPoccDefs H1).
 - apply daTl. apply (H nm ec). trivial. apply (notPoccDefs H1).
 Qed.

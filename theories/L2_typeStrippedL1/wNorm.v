@@ -30,7 +30,7 @@ Inductive WNorm: Term -> Prop :=
 | WNRel: forall n, WNorm (TRel n)
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
-| WNFix: forall ds br, WNorm (TFix ds br)
+| WNFix: forall ds br,  WDNorms ds -> WNorm (TFix ds br)
 | WNAx: forall nm, LookupAx nm p -> WNorm (TConst nm)
 | WNCase: forall mch n brs,
             WNorm mch -> WNorms brs -> ~ isCanonical mch ->
@@ -44,18 +44,24 @@ Inductive WNorm: Term -> Prop :=
            WNorm (TApp fn t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
-| WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
-Hint Constructors WNorm WNorms.
+| WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts)
+with WDNorms: Defs -> Prop :=
+| WDNtnil: WDNorms dnil
+| WDNtcons: forall ds n s i,
+              WNorm s -> WDNorms ds -> WDNorms (dcons n s i ds).
+Hint Constructors WNorm WNorm WDNorms.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
-  with WNorms_ind' := Induction for WNorms Sort Prop.
-Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.
+      with WNorms_ind' := Induction for WNorms Sort Prop
+      with WDNorms_ind' := Induction for WDNorms Sort Prop.
+Combined Scheme WNormWNorms_ind
+         from WNorm_ind', WNorms_ind', WDNorms_ind'.
 
 
 (** WNorm is decidable **)
 Lemma WNorm_dec: 
   (forall t, WNorm t \/ ~ WNorm t) /\
   (forall ts, WNorms ts \/ ~ WNorms ts) /\
-  (forall (ds:Defs), True).
+  (forall (ds:Defs), WDNorms ds \/ ~ WDNorms ds).
 Proof.
   Ltac rght := right; intros h; inversion_Clear h; contradiction.
   Ltac lft := solve [left; constructor; assumption].
@@ -77,7 +83,14 @@ Proof.
     + destruct (isCanonical_dec t).
       * right. inversion H1; intros h; inversion h; subst; contradiction.
       * left. constructor; auto.
-  - destruct H; destruct H0;
+  - destruct H.
+    + left. constructor. assumption.
+    + right. intros h. inversion_Clear h. elim H. assumption.
+  - left. constructor.
+  - destruct H, H0;
+    try (solve [right; intros h; inversion_Clear h; contradiction]).
+    + left; constructor; auto.
+  - destruct H, H0;
     try (solve [right; intros h; inversion_Clear h; contradiction]).
     + left; constructor; auto.
 Qed.
@@ -96,10 +109,12 @@ Qed.
 Lemma Wcbv_WNorm:
   WFaEnv p ->
     (forall t s, WcbvEval p t s -> WFapp t -> WNorm s) /\
-    (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss).
+    (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss) /\
+    (forall dts dss, WcbvDEvals p dts dss ->  WFappDs dts -> WDNorms dss).
 Proof.
 intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
 - inversion_Clear H0. apply H. assumption.
+- inversion_Clear H0. constructor. apply H. assumption.
 - inversion_Clear H0. apply H.
   assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
 - inversion_Clear H2. apply H1. 
@@ -108,7 +123,8 @@ intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
   eapply (proj1 (WcbvEval_presWFapp hp)); eassumption. 
 - inversion_Clear H1. apply H0. apply instantiate_pres_WFapp. assumption. 
   apply (proj1 (WcbvEval_presWFapp hp) _ _ w). assumption.
-- inversion_Clear H1. specialize (H H6). apply H0. eapply (whFixStep_pres_WFapp).
+- inversion_Clear H1. specialize (H H6). apply H0.
+  eapply (whFixStep_pres_WFapp).
   + assert (j:= proj1 (WcbvEval_presWFapp hp) _ _ w H6).
     inversion_Clear j. assumption.
   + constructor; assumption.
@@ -120,12 +136,15 @@ intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
   refine (tskipn_pres_WFapp _ _ e).
   assert (j:= proj1 (WcbvEval_presWFapp hp) _ _ w H4). inversion j.
   constructor; assumption.
+- constructor.
+- inversion_Clear H1. constructor; intuition.
 - inversion_Clear H1. constructor; intuition.
 Qed.
 
 Lemma wcbvEval_no_further:
   (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
-  (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss).
+  (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss) /\
+  (forall ds es, WcbvDEvals p ds es -> WcbvDEvals p es es).
 Proof.
   apply WcbvEvalEvals_ind; simpl; intros; auto.
 Qed.
@@ -133,7 +152,8 @@ Qed.
 (** If a program is in weak normal form, it has no wndEval step **)
 Lemma wNorm_no_wndStep_lem:
   (forall t s, wndEval p t s -> ~ WNorm t) /\
-  (forall ts ss, wndEvals p ts ss -> ~ WNorms ts).
+  (forall ts ss, wndEvals p ts ss -> ~ WNorms ts) /\
+  (forall ds es, wndDEvals p ds es -> ~ WDNorms ds).
 apply wndEvalEvals_ind; intros; intros h;
 try (solve[inversion h]);
 try (solve[inversion h; subst; contradiction]).
@@ -143,15 +163,10 @@ try (solve[inversion h; subst; contradiction]).
 - inversion h. subst. elim H4. constructor.
 - inversion h. subst. elim H4. constructor.
 - inversion h. subst. elim H6. exists dts, m. reflexivity.
-- destruct t; simpl in h; try (solve [elim H; constructor]).
-  + inversion w. subst.
-    * inversion h. subst. inversion H3.
-    * inversion h. subst. inversion H6.
-  + inversion h. subst. contradiction.
-  + elim H. inversion h. subst. assert (j:= WNorms_tappendl _ _ H5).
+- destruct t; simpl in h;
+  try (solve [elim H; constructor]); inversion_Clear h; try contradiction.
+    + elim H. assert (j:= WNorms_tappendl _ _ H5).
     constructor; try assumption.
-  + inversion h. subst. contradiction.
-  + inversion h. subst. inversion H3. contradiction.
 Qed.
 
 Lemma wNorm_no_wndStep:

@@ -76,9 +76,9 @@ with WcbvEvals (p:environ) : Terms -> Terms -> Prop :=
            WcbvEvals p (tcons t ts) (tcons t' ts')
 with WcbvDEvals (p:environ) : Defs -> Defs -> Prop :=
 | wDNil: WcbvDEvals p dnil dnil
-| wDCons: forall n t t' s i ds ds',
-           WcbvEval p t t' -> WcbvDEvals p ds ds' -> 
-           WcbvDEvals p (dcons n t s i ds) (dcons n t' s i ds').
+| wDCons: forall n t t' s s' i ds ds',
+           WcbvEval p t t' -> WcbvEval p s s' -> WcbvDEvals p ds ds' -> 
+           WcbvDEvals p (dcons n t s i ds) (dcons n t' s' i ds').
 Hint Constructors WcbvEval WcbvEvals WcbvDEvals.
 Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
      with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop
@@ -140,7 +140,7 @@ Proof.
     assert (j:= H H5). inversion_Clear j.
     refine (tskipn_pres_WFapp _ _ e). intuition.
   - inversion_Clear H1. intuition.
-  - inversion_Clear H1. intuition.
+  - inversion_Clear H2. intuition.
 Qed.
 
 
@@ -391,9 +391,11 @@ intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
 - inversion_Clear H1. eapply (@wEsRTCtrn _ _ (tcons t' ts)).
   + apply wndEvalsRTC_tcons_hd. apply H. assumption.
   + apply wndEvalsRTC_tcons_tl. apply H0. assumption.
-- inversion_Clear H1. eapply (@wDEsRTCtrn _ _ (dcons n t' s i ds)).
+- inversion_Clear H2. eapply (@wDEsRTCtrn _ _ (dcons n t' s i ds)).
   + apply wndDEvalsRTC_dcons_hd. apply H. assumption.
-  + apply wndDEvalsRTC_dcons_tl. apply H0. assumption.
+  + eapply (@wDEsRTCtrn _ _ (dcons n t' s' i ds)).
+    * apply wndDEvalsRTC_dcons_hd2. intuition.
+    * apply wndDEvalsRTC_dcons_tl. intuition.
 Qed.
 
 (************  in progress  ****
@@ -549,15 +551,16 @@ with wcbvDEvals (tmr:nat) (p:environ) (ds:Defs) {struct tmr}
      : exception Defs :=
        (match tmr with 
           | 0 => raise "out of time"
-          | S n => match ds with             (** look for a redex **)
-                     | dnil => ret dnil
-                     | dcons m s t i ss =>
-                       match wcbvEval n p s, wcbvDEvals n p ss with
-                         | Ret es, Ret ess => ret (dcons m es t i ess)
-                         | Exc s, _ => raise ("wcbvDEvals: " ++ s)
-                         | _, _ => raise "wcbvDEvals ??"
-                       end
-                   end
+          | S n =>
+            match ds with             (** look for a redex **)
+              | dnil => ret dnil
+              | dcons m s t i ss =>
+                match wcbvEval n p s, wcbvEval n p t, wcbvDEvals n p ss with
+                  | Ret es, Ret et, Ret ess => ret (dcons m es et i ess)
+                  | Exc s, _, _ => raise ("wcbvDEvals: " ++ s)
+                  | _, _, _ => raise "wcbvDEvals ??"
+                end
+            end
         end).
 
 (***
@@ -807,12 +810,18 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
     * assert (l:= max_snd x x0).
       rewrite (j m (max x x0)). apply H0. omega. omega.
     * simpl. rewrite k. rewrite k0. reflexivity.
-- destruct H, H0. exists (S (max x x0)). intros m h.
-  assert (k:wcbvEval  m p t = Ret t').
-  + assert (l:= max_fst x x0).
-    rewrite (j m (max x x0)). apply H. omega. omega.
-  +  assert (l:= max_snd x x0). simpl. rewrite k.
-     rewrite (j m (max x x0)). rewrite H0. reflexivity. omega. omega.
+- destruct H, H0, H1. exists (S (max x (max x0 x1))). intros mx h.
+  assert (j1:= max_fst x (max x0 x1)). 
+  assert (lx: mx > x). omega.
+  assert (j2:= max_snd x (max x0 x1)).
+  assert (j3:= max_fst x0 x1).
+  assert (lx0: mx > x0). omega.
+  assert (j4:= max_snd x0 x1).
+  assert (j5:= max_fst x0 x1).
+  assert (lx1: mx > x1). omega.
+  simpl. rewrite (j mx x); try omega.
+  rewrite H; try omega. rewrite H0; try omega. rewrite H1; try omega.
+  reflexivity.
 Qed.
 
 

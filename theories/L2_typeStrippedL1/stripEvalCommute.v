@@ -549,14 +549,53 @@ Inductive WcbvEvalsRC: environ -> Terms -> Terms -> Prop :=
 | WcEsRCstep: forall p ts ss, WcbvEvals p ts ss -> WcbvEvalsRC p ts ss.
 Hint Constructors WcbvEvalRC WcbvEvalsRC.
 
-Lemma L1WcbvDEvals_pres_strip:
-  forall p dts dts',
-    wcbvEval.WcbvDEvals p dts dts' -> stripDs dts = stripDs dts'.
+
+Lemma WcbvEval_hom:
+  forall p,
+    (forall t t', L1.wcbvEval.WcbvEval p t t' ->
+                  WcbvEval (stripEnv p) (strip t) (strip t')) /\
+    (forall ts ts', L1.wcbvEval.WcbvEvals p ts ts' ->
+                    WcbvEvals (stripEnv p) (strips ts) (strips ts')) /\  
+    (forall dts dts', L1.wcbvEval.WcbvDEvals p dts dts' ->
+                      WcbvDEvals (stripEnv p) (stripDs dts) (stripDs dts')).
 Proof.
-  induction 1. reflexivity. simpl. rewrite IHWcbvDEvals. reflexivity.
+  intros p.
+  apply L1.wcbvEval.WcbvEvalEvals_ind; intros; simpl; try reflexivity;
+  try (solve[constructor; trivial]).
+  - constructor. unfold LookupAx. unfold L1.program.LookupAx in *.
+    change (Lookup nm (stripEnv p) (stripEc L1.program.ecAx)).
+    apply Lookup_hom. assumption.
+  - refine (wConst _ _); try eassumption.
+    unfold LookupDfn. unfold L1.program.LookupDfn in *.
+    change (Lookup nm (stripEnv p) (stripEc (L1.program.ecTrm t))).
+    apply Lookup_hom. assumption.
+  - refine (wAppLam _ _ _ _).
+    + rewrite TLambda_hom in H. eassumption.
+    + eassumption.
+    + rewrite whBetaStep_hom in H1. eassumption.
+  - refine (wLetIn _ _ _ _). eassumption.
+    rewrite <- (proj1 instantiate_hom). assumption.
+  - refine (wAppFix _ _ _ _ _).
+    + rewrite TFix_hom in H. eassumption.
+    + rewrite <- tcons_hom. rewrite <- whFixStep_hom. rewrite e.
+      reflexivity.
+    + assumption.
+  - refine (wAppCong _ _ _ _ _ _); try assumption.
+    + intros h. elim n. apply isApp_hom. assumption.
+    + intros h. elim n0. apply isLambda_hom. assumption.
+    + intros h. elim n1. apply isFix_hom. assumption.
+  - refine (wCase0 _ _ _ _ _); try eassumption.
+    rewrite <- tnil_hom. rewrite <- whCaseStep_hom. rewrite <- optStrip_hom.
+    apply f_equal. assumption.
+  - refine (wCasen _ _ _ _ _ _); try eassumption.
+    + rewrite <- TConstruct_hom. rewrite <- TApp_hom. eassumption.
+    + rewrite <- tcons_hom. rewrite <- tskipn_hom. rewrite e.
+      eapply optStrips_hom.
+    + rewrite <- whCaseStep_hom. rewrite <- optStrip_hom.
+      apply f_equal. assumption.
 Qed.
 
-  
+ 
 Theorem L1wcbvEval_strip_L2WcbvEval:
   forall p, L1.program.WFaEnv p ->
     (forall t s, L1.wcbvEval.WcbvEval p t s -> L1.term.WFapp t ->
@@ -564,11 +603,11 @@ Theorem L1wcbvEval_strip_L2WcbvEval:
     (forall ts ss, L1.wcbvEval.WcbvEvals p ts ss -> L1.term.WFapps ts ->
                    WcbvEvals (stripEnv p) (strips ts) (strips ss)) /\
     (forall ds es, L1.wcbvEval.WcbvDEvals p ds es -> L1.term.WFappDs ds ->
-                   True).
+                   WcbvDEvals (stripEnv p) (stripDs ds) (stripDs es)).
 intros p hp.
 apply L1.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
 - simpl. eapply wCast. inversion H0. intuition.
-- simpl. erewrite L1WcbvDEvals_pres_strip. eapply wFix. eassumption.
+- simpl. eapply wFix. inversion H0. intuition.
 - simpl. eapply wAx. unfold L1.program.LookupAx in l. unfold LookupAx.
   apply (Lookup_hom l).
 - simpl. eapply wConst.
@@ -622,6 +661,8 @@ apply L1.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
       try apply mch. eassumption. eassumption. }
     inversion_clear j. constructor; assumption.
 - inversion_Clear H1. rewrite tcons_hom. rewrite tcons_hom.
+  constructor; intuition.
+- inversion_Clear H2. rewrite dcons_hom. rewrite dcons_hom.
   constructor; intuition.
 Qed.
 
@@ -735,6 +776,16 @@ Proof.
   - myInjection h. exists t0, us. intuition.
 Qed.
 
+Lemma dcons_strip_inv:
+  forall nm t m ts us, dcons nm t m ts = stripDs us ->
+    exists ty st sts, (L1.term.dcons nm ty st m sts = us) /\ 
+                   t = strip st /\ ts = stripDs sts.
+Proof.
+  intros nm t m ts us. destruct us; simpl; intros h; try discriminate.
+  - myInjection h. exists t0, t1, us. intuition.
+Qed.
+
+(***
 Lemma WcbvDEvals_pres_Defs:
   forall p dts edts,
     wcbvEval.WcbvDEvals p dts edts -> stripDs dts = stripDs edts.
@@ -744,6 +795,7 @@ Proof.
   - simpl. apply f_equal4; try reflexivity.
     apply IHdts. assumption.
 Qed.
+ ***)
 
 Lemma whCaseStep_Hom:
   forall n ts bs t,
@@ -753,7 +805,22 @@ Proof.
   intros n ts bs t h. rewrite <- whCaseStep_hom. rewrite <- optStrip_hom.
   apply f_equal. assumption.
 Qed.
-  
+
+
+
+(***  HERE **
+Lemma L2WndEval_sound_for_L1wndEval:
+  forall L2p p, L2p = stripEnv p -> L1.program.WFaEnv p ->
+    (forall L2t L2s, wndEval L2p L2t L2s ->
+     forall t, L2t = strip t -> L1.term.WFapp t ->
+               forall s, L2s = strip s -> L1.wndEval.wndEval p t s) /\
+    (forall L2t L2s, wndEvals L2p L2t L2s ->
+     forall ts, L2t = strips ts -> L1.term.WFapp ts ->
+               forall s, L2s = strip s -> L1.wndEval.wndEval p t s) /\
+ ***)  
+
+
+
 Theorem L2WcbvEval_L1WcbvEval:
   forall L2p p, L2p = stripEnv p -> L1.program.WFaEnv p ->
     (forall L2t L2s, WcbvEval L2p L2t L2s ->
@@ -761,7 +828,10 @@ Theorem L2WcbvEval_L1WcbvEval:
            forall s, L1.wcbvEval.WcbvEval p t s -> L2s = strip s) /\
     (forall L2ts L2ss, WcbvEvals L2p L2ts L2ss ->
      forall ts, L2ts = strips ts -> L1.term.WFapps ts ->
-           forall ss, L1.wcbvEval.WcbvEvals p ts ss -> L2ss = strips ss).
+           forall ss, L1.wcbvEval.WcbvEvals p ts ss -> L2ss = strips ss) /\
+    (forall L2ts L2ss, WcbvDEvals L2p L2ts L2ss ->
+     forall ts, L2ts = stripDs ts -> L1.term.WFappDs ts ->
+           forall ss, L1.wcbvEval.WcbvDEvals p ts ss -> L2ss = stripDs ss).
 Proof.
   intros L2p p hp1 hp2. apply WcbvEvalEvals_ind; simpl; intros.
   - destruct (Lam_strip_inv _ H) as [t0 [t1 [jtl jtr]]]. subst.
@@ -774,11 +844,11 @@ Proof.
     + rewrite <- jt0 in H1. inversion_Clear H1. assumption.
     + rewrite <- jt0 in H2. inversion H2. assumption.
   - destruct (Construct_strip_inv _ H). inversion H1. reflexivity.
-  - destruct (Ind_strip_inv _ H). inversion H1. subst. reflexivity.
+  - destruct (Ind_strip_inv _ H). inversion_Clear H1. reflexivity.
   - destruct (Sort_strip_inv _ H). inversion H1. reflexivity.
-  - destruct (Fix_strip_inv _ H) as [x [j1 j2]]. rewrite <- j1 in H1.
-    inversion H1. subst. simpl. rewrite H. simpl.
-    apply f_equal2; try reflexivity. eapply WcbvDEvals_pres_Defs. eassumption.
+  - destruct (Fix_strip_inv _ H0) as [x [j1 j2]]. subst. 
+    inversion_Clear H2. simpl. apply f_equal2; try reflexivity.
+    inversion_Clear H1. refine (H _ _ _ _ _ ); trivial.
   - rewrite <- (Const_strip_inv _ H) in H1. inversion_Clear H1.
     + reflexivity.
     + unfold LookupAx in l. unfold L1.program.LookupDfn in H3.
@@ -925,11 +995,18 @@ Proof.
   - rewrite (tnil_strip_inv _ H) in H1. inversion H1. reflexivity. 
   - destruct (tcons_strip_inv _ H1) as [x0 [x1 [j1 [j2 j3]]]]. subst.
     clear H1. inversion_Clear H2; inversion_Clear H3. simpl.
-    eapply (f_equal2 tcons).
+    eapply f_equal2.
     + refine (WcbvEval_single_valued w _).
       refine (proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ _ _); assumption.
     + refine (H0 _ _ _ _ H8). reflexivity. assumption.
-      Qed.
+  - assert (j:= proj2 (proj2 (WcbvEval_hom p)) _ _ H1).
+    rewrite <- H in j. inversion_Clear j. reflexivity.
+  - destruct (dcons_strip_inv _ H1) as [x0 [x1 [x2 [j1 [j2 j3]]]]]. subst.
+    inversion_Clear H2. inversion_Clear H3. simpl.
+    eapply f_equal4; try reflexivity.
+    + refine (H _ _ _ _ _); try reflexivity; try assumption.
+    + refine (H0 _ _ _ _ _); try reflexivity; try assumption.
+Qed.
 
 Print Assumptions L2WcbvEval_L1WcbvEval.
 
@@ -946,6 +1023,7 @@ Proof.
   - apply (proj1 (L1.wcbvEval.WcbvEval_wndEvalRTC hp2) t s h3 h2).
 Qed.
 Print Assumptions L2WcbvEval_sound_for_L1wndEval.
+
 
 (*** unstrip: replace every missing type field with [prop]  ***)
 Function unstrip (t:Term) : L1Term :=
@@ -1347,15 +1425,14 @@ Theorem unstrip_L2WcbvEval_L1WcbvEval:
     (forall t s, WcbvEval p t s ->
      L1.wcbvEval.WcbvEval (unstripEnv p) (unstrip t) (unstrip s)) /\
     (forall ts ss, WcbvEvals p ts ss ->
-     L1.wcbvEval.WcbvEvals (unstripEnv p) (unstrips ts) (unstrips ss)).
+     L1.wcbvEval.WcbvEvals (unstripEnv p) (unstrips ts) (unstrips ss)) /\
+    (forall ts ss, WcbvDEvals p ts ss ->
+     L1.wcbvEval.WcbvDEvals (unstripEnv p) (unstripDs ts) (unstripDs ss)).
 Proof.
   intros p.
   apply WcbvEvalEvals_ind; simpl; intros; try (solve [constructor]);
   try (solve [constructor; constructor]);
   try (solve [constructor; assumption]).
-  - apply L1.wcbvEval.wFix. induction dts.
-    + simpl. constructor.
-    + simpl. constructor. constructor. assumption.
   - eapply L1.wcbvEval.wAx.
     unfold LookupAx in l. unfold L1.program.LookupAx.
     apply (Lookup_unhom l).
@@ -1384,6 +1461,7 @@ Proof.
       rewrite e. rewrite <- optUnstrips_unhom. reflexivity.
     + rewrite <- whCaseStep_unhom. rewrite <- optUnstrip_unhom.
       apply f_equal. assumption.
+  - constructor. constructor. assumption. assumption.
 Qed.    
 
 

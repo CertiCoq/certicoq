@@ -94,6 +94,9 @@ with awndDEvals  (p:environ) : Defs -> Defs -> Prop :=
      | adaHd: forall (n:name) (t r s:Term) (i:nat) (ds:Defs), 
                awndEval p t r ->
                awndDEvals p (dcons n t s i ds) (dcons n r s i ds)
+     | adaHd2: forall (n:name) (t r s:Term) (i:nat) (ds:Defs), 
+               awndEval p t r ->
+               awndDEvals p (dcons n s t i ds) (dcons n s r i ds)
      | adaTl: forall (n:name) (t s:Term) (i:nat) (ds es:Defs),
                awndDEvals p ds es ->
                awndDEvals p (dcons n t s i ds) (dcons n t s i es).

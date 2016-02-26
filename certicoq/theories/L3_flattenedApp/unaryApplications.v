@@ -54,11 +54,23 @@ Proof.
 Qed.
 
 (** Lookup constructor arity in L2 environ (to avoid mutual dependency
-*** between converting L2 terms to L3 and L2 environs to L3
+*** between converting L2 terms to L3 and L2 environs to L3)
 **)
 Section EtaExpand.
 Variable p:L2.program.environ.
 
+(** temp: here we assume the type of constructors is evaluated **)
+(** when removing this; also remove L2.program.arity_from_dtyp **)
+Function cnstrArity (i:inductive) (n:nat) : option nat :=
+  match i with
+    | mkInd str m =>
+      match L2.program.lookupDTyp str p with
+        | Exc _ => None
+        | Ret itp => exception_option (L2.program.arity_from_dtyp itp m n)
+      end
+  end.
+
+(**** for when template-coq computes the true arity of constructors ***
 Function cnstrArity (i:inductive) (n:nat) : option nat :=
   match i with
     | mkInd str m => 
@@ -71,6 +83,7 @@ Function cnstrArity (i:inductive) (n:nat) : option nat :=
           end
       end
   end.
+ *************)
 
 (** compute list of variables for eta expanding a constructor
 *** (which may already be partially applied
@@ -81,87 +94,99 @@ Function etaArgs (n:nat) : Terms :=
     | S m => tcons (TRel m) (etaArgs m)
   end.
 
-(** this should really be (exception Term) **)
-Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : option Term :=
+Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : exception Term :=
   match cnstrArity i n with
-    | None => None   (** constructor not found in environment **)
+    | None => Exc "constructor n not found in environment"
     | Some arity =>
       match nat_compare (tlength args) arity with
-        | Eq => Some (TConstruct i n args)
+        | Eq => Ret (TConstruct i n args)
         | Lt => let k := arity - (tlength args)
-                in Some (mkEta (TConstruct i n (tappend args (etaArgs k))) k)
-        | Gt => None  (** more arguments than constructor arity **)
+                in Ret (mkEta (TConstruct i n (tappend args (etaArgs k))) k)
+        | Gt => Exc ("more arguments than constructor arity: "
+                       ++ (nat_to_string (tlength args)) ++ (" ")
+                       ++ (nat_to_string arity))
       end
   end.
 
-Function strip (t:L2Term) : option Term :=
+Function strip (t:L2Term) : exception Term :=
   match t with
-    | L2.term.TRel n => Some (TRel n)
-    | L2.term.TSort s => Some (TSort s)
+    | L2.term.TRel n => Ret (TRel n)
+    | L2.term.TSort s => Ret (TSort s)
     | L2.term.TCast s => strip s
     | L2.term.TProd nm bod => 
       match strip bod with
-        | None => None
-        | Some sbod => Some (TProd nm sbod)
+        | Ret sbod => Ret (TProd nm sbod)
+        | x => x
       end
     | L2.term.TLambda nm bod =>
       match strip bod with
-        | None => None
-        | Some sbod => Some (TLambda nm sbod)
+        | Ret sbod => Ret (TLambda nm sbod)
+        | x => x
       end
     | L2.term.TLetIn nm dfn bod => 
       match strip dfn, strip bod with
-        | Some sdfn, Some sbod => Some (TLetIn nm sdfn sbod)
-        | _, _ => None
+        | Ret sdfn, Ret sbod => Ret (TLetIn nm sdfn sbod)
+        | Exc s, Ret _ => Exc ("strip dfn fails:" ++ s)
+        | Ret _, Exc s => Exc ("strip bod fails:" ++ s)
+        | Exc s1, Exc s2 => Exc "both strip dfn and strip bod fail"
       end
     | L2.term.TApp fn arg args =>
       match strip arg, strips args with
-        | Some sarg, Some sargs =>
+        | Ret sarg, Ret sargs =>
           match fn with 
             | L2.term.TConstruct i n => etaExp_cnstr i n (tcons sarg sargs)
             | x => match strip x with
-                     | Some sx => Some (mkApp sx (tcons sarg sargs))
-                     | None => None
+                     | Ret sx => Ret (mkApp sx (tcons sarg sargs))
+                     | x => x
                    end
           end
-        | _, _ => None
+        | Exc s, Ret _ => Exc ("strip arg fails:" ++ s)
+        | Ret _, Exc s => Exc ("strips args fails:" ++ s)
+        | Exc s1, Exc s2 => Exc "both strip arg and strips args fail"
       end
     | L2.term.TConst nm =>
       match L2.program.lookup nm p with
-        | Some (L2.program.ecTrm _) => Some (TConst nm)
-        | Some L2.program.ecAx => Some (TAx nm)
-        | Some (L2.program.ecTyp _) => None (*** needs work ***)
-        | _ => None
+        | Some (L2.program.ecTrm _) => Ret (TConst nm)
+        | Some L2.program.ecAx => Ret (TAx nm)
+        | Some (L2.program.ecTyp _) =>
+          Exc "L2.program.lookup nm p returns a type"
+        | None => Exc "L2.program.lookup nm p misses"
       end
-    | L2.term.TInd i => Some (TInd i)
+    | L2.term.TInd i => Ret (TInd i)
     | L2.term.TConstruct i n => etaExp_cnstr i n tnil
     | L2.term.TCase n mch brs =>
       match strip mch, strips brs with
-        | Some smch, Some sbrs => Some (TCase n smch sbrs)
-        | _, _ => None
+        | Ret smch, Ret sbrs => Ret (TCase n smch sbrs)
+        | Exc s, Ret _ => Exc ("strip mch fails:" ++ s)
+        | Ret _, Exc s => Exc ("strips brs fails:" ++ s)
+        | Exc s1, Exc s2 => Exc "both strip mch and strips brs fail"
       end
     | L2.term.TFix ds n =>
       match stripDs ds with
-        | Some sds => Some (TFix sds n)
-        | _ => None
+        | Ret sds => Ret (TFix sds n)
+        | Exc s => Exc "stripDs ds fails"
       end
    end
-with strips (ts:L2Terms) : option Terms := 
+with strips (ts:L2Terms) : exception Terms := 
   match ts with
-    | L2.term.tnil => Some tnil
+    | L2.term.tnil => Ret tnil
     | L2.term.tcons t ts =>
       match strip t, strips ts with
-        | Some st, Some sts => Some (tcons st sts)
-        | _, _ => None
+        | Ret st, Ret sts => Ret (tcons st sts)
+        | Exc s, Ret _ => Exc ("strip t fails:" ++ s)
+        | Ret _, Exc s => Exc ("strips ts fails:" ++ s)
+        | Exc s1, Exc s2 => Exc "both strip t and strips ts fail"
       end
   end
-with stripDs (ts:L2Defs) : option Defs := 
+with stripDs (ts:L2Defs) : exception Defs := 
   match ts with
-    | L2.term.dnil => Some dnil
+    | L2.term.dnil => Ret dnil
     | L2.term.dcons nm t m ds =>
       match strip t, stripDs ds with
-        | Some st, Some sds => Some (dcons nm st m sds)
-        | _, _ => None
+        | Ret st, Ret sds => Ret (dcons nm st m sds)
+        | Exc s, Ret _ => Exc ("strip t fails:" ++ s)
+        | Ret _, Exc s => Exc ("stripDs ds fails:" ++ s)
+        | Exc s1, Exc s2 => Exc "both strip t and stripDs ds fail"
       end
   end.
 (**
@@ -187,179 +212,174 @@ Function stripItyPack (its:L2.program.itypPack) : itypPack :=
     | (L2.program.mkItyp str itps) :: itpacks =>
                   (mkItyp str (stripCnstrs itps)) :: stripItyPack itpacks
   end.
-Function stripEnv (p:L2.program.environ) : option environ :=
+Function stripEnv (p:L2.program.environ) : exception environ :=
   match p with
-    | nil => Some nil
+    | nil => Ret nil
     | cons (nm, L2.program.ecTrm t) q =>
       match strip q t, stripEnv q with
-        | Some ts, Some qs => Some (cons (nm, ecTrm ts) qs)
-        | _, _ => None
+        | Ret ts, Ret qs => Ret (cons (nm, ecTrm ts) qs)
+        | Exc s, Ret _ => Exc ("strip q t fails:" ++ s)
+        | Ret _, Exc s => Exc ("stripEnv q fails:" ++ s)
+        | Exc s1, Exc s2 => Exc "both strip q t and stripEnv q fail"
       end
     | cons (nm, L2.program.ecTyp ityps) q =>
       match stripEnv q with
-        | Some qs => Some (cons (nm, ecTyp (stripItyPack ityps)) qs)
-        | _ => None
+        | Ret qs => Ret (cons (nm, ecTyp (stripItyPack ityps)) qs)
+        | x => x
       end
-     | cons (nm, L2.program.ecAx) q => stripEnv q
+    | cons (nm, L2.program.ecAx) q => stripEnv q
   end.
 
 
 (** start-to-L3 translations **)
 Definition program_Program 
-           (e:L2.program.environ) (pgm:program) : option Program :=
+           (e:L2.program.environ) (pgm:program) : exception Program :=
   match L1.malecha_L1.program_Program pgm (Ret nil) with
-    | Exc str => None
     | Ret pgm => 
       match stripEnv (L2.stripEvalCommute.stripEnv (L1.program.env pgm)),
             strip e (L2.stripEvalCommute.strip (L1.program.main pgm)) with
-        | Some senv, Some smain => Some {| env:= senv; main:= smain |}
-        | _, _ => None
+        | Ret senv, Ret smain => Ret {| env:= senv; main:= smain |}
+        | Exc s, Ret _ => Exc ("program_Program: stripEnv fails:" ++ s)
+        | Ret _, Exc s => Exc ("program_Program: strip fails:" ++ s)
+        | Exc s1, Exc s2 =>
+          Exc "program_Program: both stripEnv and strip fail"
       end
+    | Exc s => Exc s
   end.
-Definition term_Term (e:L2.program.environ) (t:term) : option Term :=
+Definition term_Term (e:L2.program.environ) (t:term) : exception Term :=
   match L1.malecha_L1.term_Term t with
-    | Exc str => None
+    | Exc str => Exc str
     | Ret trm => strip e (L2.stripEvalCommute.strip trm)
   end.
 
-(***
-Goal
-  forall bod sbod, strip bod = Some sbod -> 
-  forall t nm, t = L2.term.TLambda nm bod ->
-  strip p t = Some (TLambda nm sbod).
-induction p; induction t; simpl; intros; try discriminate. 
-- myInjection H0.
-  change ()
-
-****)
 
 Lemma strip_Lam_invrt:
   forall p nm bod tt,
-        strip p (L2.term.TLambda nm bod) = Some tt ->
-        exists sbod, strip p bod = Some sbod /\ tt = TLambda nm sbod.
+        strip p (L2.term.TLambda nm bod) = Ret tt ->
+        exists sbod, strip p bod = Ret sbod /\ tt = TLambda nm sbod.
 Proof.
   induction tt; simpl; intros. 
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TRel n)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TRel n)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TSort s)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TSort s)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TProd n tt)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TProd n tt)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TLambda n tt)) in H.
-    destruct (strip p bod). 
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TLambda n tt)) in H.
+    destruct (strip p bod).
+    + discriminate. 
     + myInjection H. exists tt. intuition.
-    + discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TLetIn n tt1 tt2)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TLetIn n tt1 tt2)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TApp tt1 tt2)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TApp tt1 tt2)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TConst s)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TConst s)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TAx s)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TAx s)) in H.
     destruct (strip p bod); discriminate.    
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TInd i)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TInd i)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TConstruct i n t)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TConstruct i n t)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TCase p0 tt t)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TCase p0 tt t)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TLambda nm sbod)
-              | None => None end) = Some (TFix d n)) in H.
+              | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret (TFix d n)) in H.
     destruct (strip p bod); discriminate.
 Qed.
 
 Lemma strip_Prod_invrt:
   forall p nm bod tt,
-        strip p (L2.term.TProd nm bod) = Some tt ->
-        exists sbod, strip p bod = Some sbod /\ tt = TProd nm sbod.
+        strip p (L2.term.TProd nm bod) = Ret tt ->
+        exists sbod, strip p bod = Ret sbod /\ tt = TProd nm sbod.
 Proof.
   induction tt; simpl; intros. 
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TRel n)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TRel n)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TSort s)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TSort s)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TProd n tt)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TProd n tt)) in H.
     destruct (strip p bod). 
-    + myInjection H. exists tt. intuition.
     + discriminate.
+    + myInjection H. exists tt. intuition.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TLambda n tt)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TLambda n tt)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TLetIn n tt1 tt2)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TLetIn n tt1 tt2)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TApp tt1 tt2)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TApp tt1 tt2)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TConst s)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TConst s)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TAx s)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TAx s)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TInd i)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TInd i)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TConstruct i n t)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TConstruct i n t)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TCase p0 tt t)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TCase p0 tt t)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
-              | Some sbod => Some (TProd nm sbod)
-              | None => None end) = Some (TFix d n)) in H.
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret (TFix d n)) in H.
     destruct (strip p bod); discriminate.
 Qed.
 
 Lemma strip_Construct_invrt:
   forall p i r tt,
-        strip p (L2.term.TConstruct i r) = Some tt ->
-        etaExp_cnstr p i r tnil = Some tt.
+        strip p (L2.term.TConstruct i r) = Ret tt ->
+        etaExp_cnstr p i r tnil = Ret tt.
 Proof.
   induction tt; unfold strip; simpl; intros; try assumption.
 Qed.
  
 Lemma strip_Ind_invrt:
   forall p i tt,
-        strip p (L2.term.TInd i) = Some tt -> tt = (TInd i).
+        strip p (L2.term.TInd i) = Ret tt -> tt = (TInd i).
 Proof.
   induction tt;  simpl; intros; try discriminate.
   myInjection H. reflexivity.

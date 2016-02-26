@@ -58,3 +58,15 @@ Definition epair2
   (A B:Type) (a:A) (b:exception B): exception (A * B) :=
   do bb <- b;
   ret (pair a bb).
+
+Definition option_exception (A:Type) (o:option A) : exception A :=
+  match o with
+    | Some a => Ret a
+    | None => Exc "option_exception: None"
+  end.
+
+Definition exception_option (A:Type) (e:exception A) : option A :=
+  match e with
+    | Ret a => Some a
+    | Exc s => None
+  end.

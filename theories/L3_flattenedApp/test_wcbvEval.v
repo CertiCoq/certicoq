@@ -5,8 +5,9 @@ Add LoadPath "../L2_typeStrippedL1" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
+Require Import String.
 Require Import Template.Template.
-Require Import Common.RandyPrelude.
+Require Import Common.Common.
 Require L1.L1.         (* whole L1 library is exported by L1.L1 *)
 Require L2.L2.         (* whole L2 library is exported by L2.L2 *)
 Require Import L3.L3.  (* whole L3 library is exported by L3.L3 *)
@@ -17,18 +18,39 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 Definition exc_wcbvEval
-           (tmr:nat) (pgm:program) (tm:term): (option Term * option Term) :=
+    (tmr:nat) (pgm:program) (tm:term): (exception Term * exception Term) :=
   match L2.stripEvalCommute.program_Program pgm with
-    | None => (None, None)
+    | None => (Exc "L2.stripEvalCommute.program_Program pgm fails:",
+               Ret prop)
     | Some p =>
       let e2 := L2.program.env p in
-      match program_Program e2 pgm with
-        | None => (None, None)
-        | Some pgm =>
-          (wcbvEval tmr (L3.program.env pgm) (L3.program.main pgm),
-           term_Term e2 tm)
+      match term_Term e2 tm with
+        | Exc s => (Exc ("term_Term e2 tm fails: " ++ s), Ret prop)
+        | Ret tTtm =>
+          match program_Program e2 pgm with
+            | Exc s => (Exc ("program_Program e2 pgm fails: " ++ s), Ret tTtm)
+            | Ret pgm =>
+              (option_exception
+                 (wcbvEval tmr (L3.program.env pgm) (L3.program.main pgm)),
+               Ret tTtm)
+          end
       end
   end.
+
+(** Olivier's example **)
+Definition olivier := (Some 0).
+Quote Recursively Definition p_olivier := olivier.
+Quote Definition q_olivier := Eval cbv in olivier.
+Print p_olivier.
+Print q_olivier.
+Eval cbv in (L2.stripEvalCommute.program_Program p_olivier).
+(**)
+Goal
+  let ew := (exc_wcbvEval 40 p_olivier q_olivier) in
+  fst ew = snd ew.
+compute. reflexivity.
+Qed.
+**)
 
 (** Abishek's example **)
 Axiom feq1 : (fun x:nat => x) = (fun x:nat => x+x-x).

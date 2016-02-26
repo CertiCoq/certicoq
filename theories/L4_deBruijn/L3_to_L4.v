@@ -594,12 +594,12 @@ Definition myprogram_Program (pgm : program) :=
   do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
     let e' := stripEvalCommute.stripEnv (program.env pgm0) in
     match L3U.stripEnv e' with
-    | Some senv => 
+    | Ret senv => 
       match L3U.strip e' (stripEvalCommute.strip (program.main pgm0)) with
-      | Some smain => Ret {| main := smain; L3.program.env := senv |}
-      | None => Exc "Error in stripping"
+      | Ret smain => Ret {| main := smain; L3.program.env := senv |}
+      | Exc s => Exc ("Error in stripping: " ++ s)
       end
-    | None => Exc "Error while stripping environment"
+    | Exc s => Exc ("Error while stripping environment: " ++ s)
     end.
 
 Definition program_exp (pgm:program) : exception exp :=
@@ -610,10 +610,10 @@ Definition program_exp (pgm:program) : exception exp :=
 Definition term_exp (e:program.environ) (t:term) : exception exp :=
   let e' := stripEvalCommute.stripEnv e in
   match L3U.term_Term e' t with
-  | None => Exc "Error while translating term to L3"
-  | Some trm =>
+  | Exc s => Exc ("Error while translating term to L3: " ++ s)
+  | Ret trm =>
     match L3U.stripEnv e' with
-    | None => Exc "Error while stripping environment"
-    | Some e => Ret (translate_program e trm)
+    | Exc s => Exc ("Error while stripping environment: " ++ s)
+    | Ret e => Ret (translate_program e trm)
     end
   end.

@@ -1,10 +1,12 @@
 Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
-(* Add LoadPath "../common" as Common.
- Add LoadPath "./" as CPS.
+(** 
+Add LoadPath "../common" as Common.
+Add LoadPath "./" as CPS.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L2_typeStrippedL1" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
-Add LoadPath "../L4_deBruijn" as L4.  *)
+Add LoadPath "../L4_deBruijn" as L4. 
+**)
 
 Require Import Common.Common.
 Open Scope N_scope.
@@ -487,13 +489,19 @@ Definition run (p : program) : exception ans :=
 
 (** Testing the compiler *)
 
+(**)
+Add LoadPath "../template-coq-coq-8.5/theories" as Template. 
+(**)
 Require Import Template.Template.
 Definition Nat := nat.
 Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1%nat).
 
 Quote Definition q_typedef := Eval compute in typedef.
 Quote Recursively Definition p_typedef := typedef.
-Definition L1_typedef :=
+Eval compute in (malecha_L1.program_Program p_typedef (Ret nil) :
+                   exception program.Program).
+
+Definition L1_typedef : exception program.Program :=
   Eval compute in malecha_L1.program_Program p_typedef (Ret nil).
 
 Definition P_typedef := Eval compute in program_exp p_typedef.

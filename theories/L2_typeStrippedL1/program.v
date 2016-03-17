@@ -27,17 +27,17 @@ Definition itypPack := list ityp.
 
 (** this function for use in translation from L2 to L3 **)
 Fixpoint arity_from_dtyp
-         (itps:itypPack) (pndx:nat) (cndx:nat) : exception nat :=
-  do ity <- exnNth itps pndx;
+        (npars:nat) (itps:itypPack) (tndx:nat) (cndx:nat) : exception nat :=
+  do ity <- exnNth itps tndx;
   do itp <- exnNth (itypCnstrs ity) cndx;
-  ret (CnstrArity itp).
+  ret (npars + (CnstrArity itp)).
 
 (** environments and programs: Gregory's type [program] is inside out
 *** so we reverse it and make it an ordinary association list
 **)
 Inductive envClass := 
 | ecTrm (_:Term)
-| ecTyp (_:itypPack)
+| ecTyp (_:nat) (_:itypPack)
 | ecAx.
 
 Lemma isAx_dec:
@@ -58,7 +58,7 @@ Record Program : Type := mkPgm { main:Term; env:environ }.
 
 Inductive WFaEc: envClass -> Prop :=
 | wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall i, WFaEc (ecTyp i)
+| wfaecTyp: forall n i, WFaEc (ecTyp n i)
 | wfaecAx: WFaEc ecAx.
 
 Inductive WFaEnv: environ -> Prop :=
@@ -115,7 +115,7 @@ Inductive Lookup: string -> environ -> envClass -> Prop :=
 Hint Constructors Lookup.
 
 Definition LookupDfn s p t := Lookup s p (ecTrm t).
-Definition LookupTyp s p i := Lookup s p (ecTyp i).
+Definition LookupTyp s p n i := Lookup s p (ecTyp n i).
 Definition LookupAx s p := Lookup s p ecAx.
 
 (** equivalent functions **)
@@ -132,12 +132,13 @@ Function lookupDfn (nm:string) (p:environ) : option Term :=
    | _ => None
   end.
 
-Function lookupDTyp (nm:string) (p:environ) : exception itypPack :=
-  match lookup nm p with
-    | Some (ecTyp itps) => ret itps
-    | _ => raise "datatype not in cxt"
+Function cnstrArity (itpnm:string) (pndx:nat) (cndx:nat) (p:environ)
+                      : exception nat :=
+  match lookup itpnm p with
+    | Some (ecTyp npars itps) => arity_from_dtyp npars itps pndx cndx
+    | Some _ => raise ("L2.cnstrArity; not a type package: " ++ itpnm)
+    | none => raise ("L2.cnstrArity; datatype package not found: " ++ itpnm)
   end.
-
 
 Lemma Lookup_lookup:
   forall nm p t, Lookup nm p t -> lookup nm p = Some t.
@@ -292,7 +293,7 @@ Proof.
     + left. destruct H. exists x. apply LMiss; assumption.
     + destruct e.
       * left. exists (ecTrm t). apply LHit.
-      * left. exists (ecTyp i). apply LHit. 
+      * left. exists (ecTyp n i). apply LHit.
       * left. exists ecAx. apply LHit.
     + right. intros t h. inversion_Clear h. 
       * elim n. reflexivity.
@@ -361,7 +362,7 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctWkTrmTrm: forall n p t s nm, Crct p n t -> Crct p n s ->
            fresh nm p -> Crct ((nm,ecTrm s)::p) n t
 | CrctWkTrmTyp: forall n p t s nm, Crct p n t -> CrctTyp p n s ->
-           fresh nm p -> Crct ((nm,ecTyp s)::p) n t
+           fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
 | CrctCast: forall n p t, Crct p n t -> Crct p n (TCast t)
 | CrctProd: forall n p nm bod,
@@ -376,8 +377,8 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
              Crct p n (TApp fn a args)
 | CrctConst: forall n p pd nm,
                Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
-| CrctConstruct: forall n p ipkgNm itypk inum cnum,
-                   Crct p n prop -> LookupTyp ipkgNm p itypk ->
+| CrctConstruct: forall n p ipkgNm npars itypk inum cnum,
+                   Crct p n prop -> LookupTyp ipkgNm p npars itypk ->
                    CrctCnstr itypk inum cnum ->
                    Crct p n (TConstruct (mkInd ipkgNm inum) cnum)
 | CrctCase: forall n p m mch brs,
@@ -400,7 +401,7 @@ with CrctTyp: environ -> nat -> itypPack -> Prop :=
 | CrctTypWk1: forall n p t s nm, CrctTyp p n t -> Crct p n s ->
            fresh nm p -> CrctTyp ((nm,ecTrm s)::p) n t
 | CrctTypWk2: forall n p t s nm, CrctTyp p n t -> CrctTyp p n s ->
-           fresh nm p -> CrctTyp ((nm,ecTyp s)::p) n t.
+           fresh nm p -> forall m, CrctTyp ((nm,ecTyp m s)::p) n t.
 Hint Constructors Crct Crcts CrctDs CrctTyp.
 Scheme Crct_ind' := Minimality for Crct Sort Prop
   with Crcts_ind' := Minimality for Crcts Sort Prop
@@ -471,7 +472,7 @@ Qed.
 
 Lemma CrctTypTl:
   forall pp n t, Crct pp n t ->
-             forall nm tp p, pp = ((nm,ecTyp tp)::p) -> CrctTyp p n tp.
+    forall nm npars tp p, pp = ((nm,ecTyp npars  tp)::p) -> CrctTyp p n tp.
 induction 1; intros; try discriminate;
 try (solve [eapply IHCrct2; eassumption]);
 try (solve [eapply IHCrct; eassumption]);
@@ -560,28 +561,28 @@ Lemma  Crct_weaken:
 eapply CrctCrctsCrctDsTyp_ind; intros; intuition.
 - apply CrctWkTrmTrm; try assumption. eapply CrctConst; try eassumption.
 - eapply CrctConstruct; try eassumption.
-  apply H0; try assumption. apply Lookup_weaken; assumption.
+  apply H0; try assumption. apply Lookup_weaken; eassumption.
 Qed.
 
 
 Lemma  Crct_Typ_weaken:
   (forall p n t, Crct p n t -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                   Crct ((nm,ecTyp itp)::p) n t) /\
+                   forall npars, Crct ((nm,ecTyp npars itp)::p) n t) /\
   (forall p n ts, Crcts p n ts -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                 Crcts ((nm,ecTyp itp)::p) n ts) /\
+                 forall npars, Crcts ((nm,ecTyp npars itp)::p) n ts) /\
   (forall p n ds, CrctDs p n ds -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                   CrctDs ((nm,ecTyp itp)::p) n ds) /\
+                   forall npars, CrctDs ((nm,ecTyp npars itp)::p) n ds) /\
   (forall p n jtp, CrctTyp p n jtp -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                   CrctTyp ((nm,ecTyp itp)::p) n jtp).
+                   forall npars, CrctTyp ((nm,ecTyp npars itp)::p) n jtp).
 Proof.
   eapply CrctCrctsCrctDsTyp_ind; intros; auto.
   - apply CrctWkTrmTyp; try assumption. eapply CrctConst; try eassumption.
   - eapply CrctConstruct; try eassumption.
-    apply H0; try assumption. apply Lookup_weaken; assumption.
+    apply H0; try assumption. apply Lookup_weaken; eassumption.
 Qed.
 
 Lemma Crct_strengthen:
@@ -686,7 +687,7 @@ Lemma Crct_invrt_Rel:
 Proof.
   induction 1; intros; try discriminate.
   - assert (j:= IHCrct1 m). intuition.
-  - assert (j:= IHCrct m). intuition.
+  - assert (j:= IHCrct m). specialize (IHCrct _ H2). intuition.
   - assert (j:= IHCrct m). injection H1. intuition.
 Qed.
 
@@ -825,16 +826,17 @@ Lemma Crct_invrt_Construct:
   forall ipkgNm inum cnum,
     construct = (TConstruct (mkInd ipkgNm inum) cnum) ->
     Crct p n prop /\
-    exists itypk, LookupTyp ipkgNm p itypk /\ CrctCnstr itypk inum cnum.
+    exists npars itypk,
+      LookupTyp ipkgNm p npars itypk /\ CrctCnstr itypk inum cnum.
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ H2). intuition.
-  destruct H4 as [itypk [h1 h2]]. exists itypk. intuition.
+  destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
   apply Lookup_weaken; trivial.
 - assert (j:= IHCrct _ _ _ H2). intuition.
-  destruct H4 as [itypk [h1 h2]]. exists itypk. intuition.
+  destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
   apply Lookup_weaken; trivial.
 - injection H2; intros; subst. intuition.
-  exists itypk. intuition.
+  exists npars, itypk. intuition.
 Qed.
 
 Lemma Crct_App_fn_notApp:
@@ -912,9 +914,9 @@ Proof.
     + destruct H3 as [x [h1 h2]]. eapply (@CrctConst _ _ x); trivial.
       eapply Crct_Sort. eassumption.
   - apply CrctInd. eapply Crct_Sort. eassumption.
-  - destruct ind.  edestruct (Crct_invrt_Construct H0).
+  - destruct ind. edestruct (Crct_invrt_Construct H0).
     + reflexivity.
-    + destruct H3 as [x [h1 h2]]. eapply CrctConstruct; try eassumption.
+    + destruct H3 as [npars [x [h1 h2]]]. eapply CrctConstruct; try eassumption.
       * eapply Crct_Sort. eassumption.
   - destruct (Crct_invrt_Case H2 eq_refl) as [h1 h2]. apply CrctCase.
     + apply H; trivial.

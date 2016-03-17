@@ -61,32 +61,13 @@ Variable p:L2.program.environ.
 
 (** temp: here we assume the type of constructors is evaluated **)
 (** when removing this; also remove L2.program.arity_from_dtyp **)
-Function cnstrArity (i:inductive) (n:nat) : option nat :=
+Function cnstrArity (i:inductive) (n:nat) : exception nat :=
   match i with
-    | mkInd str m =>
-      match L2.program.lookupDTyp str p with
-        | Exc _ => None
-        | Ret itp => exception_option (L2.program.arity_from_dtyp itp m n)
-      end
+    | mkInd str m => L2.program.cnstrArity str m n p
   end.
-
-(**** for when template-coq computes the true arity of constructors ***
-Function cnstrArity (i:inductive) (n:nat) : option nat :=
-  match i with
-    | mkInd str m => 
-      match L2.program.lookupDTyp str p with
-        | Exc _ => None
-        | Ret itp =>
-          match L2.program.arity_from_dtyp itp m n with
-          | Exc _ => None
-          | Ret itp => Some itp
-          end
-      end
-  end.
- *************)
 
 (** compute list of variables for eta expanding a constructor
-*** (which may already be partially applied
+*** (which may already be partially applied)
 **)
 Function etaArgs (n:nat) : Terms :=
   match n with
@@ -96,8 +77,7 @@ Function etaArgs (n:nat) : Terms :=
 
 Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : exception Term :=
   match cnstrArity i n with
-    | None => Exc "constructor n not found in environment"
-    | Some arity =>
+    | Ret arity =>
       match nat_compare (tlength args) arity with
         | Eq => Ret (TConstruct i n args)
         | Lt => let k := arity - (tlength args)
@@ -106,6 +86,7 @@ Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : exception Term :=
                        ++ (nat_to_string (tlength args)) ++ (" ")
                        ++ (nat_to_string arity))
       end
+    | Exc x => Exc x
   end.
 
 Function strip (t:L2Term) : exception Term :=
@@ -148,7 +129,7 @@ Function strip (t:L2Term) : exception Term :=
       match L2.program.lookup nm p with
         | Some (L2.program.ecTrm _) => Ret (TConst nm)
         | Some L2.program.ecAx => Ret (TAx nm)
-        | Some (L2.program.ecTyp _) =>
+        | Some (L2.program.ecTyp _ _) =>
           Exc "L2.program.lookup nm p returns a type"
         | None => Exc "L2.program.lookup nm p misses"
       end
@@ -222,9 +203,9 @@ Function stripEnv (p:L2.program.environ) : exception environ :=
         | Ret _, Exc s => Exc ("stripEnv q fails:" ++ s)
         | Exc s1, Exc s2 => Exc "both strip q t and stripEnv q fail"
       end
-    | cons (nm, L2.program.ecTyp ityps) q =>
+    | cons (nm, L2.program.ecTyp m ityps) q =>
       match stripEnv q with
-        | Ret qs => Ret (cons (nm, ecTyp (stripItyPack ityps)) qs)
+        | Ret qs => Ret (cons (nm, ecTyp m (stripItyPack ityps)) qs)
         | x => x
       end
     | cons (nm, L2.program.ecAx) q => stripEnv q

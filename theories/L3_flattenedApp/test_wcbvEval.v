@@ -15,7 +15,6 @@ Require Import L3.L3.  (* whole L3 library is exported by L3.L3 *)
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
-Set Implicit Arguments.
 
 Definition exc_wcbvEval
     (tmr:nat) (pgm:program) (tm:term): (exception Term * exception Term) :=
@@ -37,24 +36,36 @@ Definition exc_wcbvEval
       end
   end.
 
+Inductive List (A:Set) :=
+  Nil: List A | Cons: forall (a:A) (bs:List A), List A.
+Definition tl (A:Set) (ls:List A) : List A :=
+  match ls with Nil _ => Nil A | Cons _ x bs => Cons _ x bs end.
+Quote Recursively Definition p_tl := tl.
+Print p_tl.
+
+
 (** Olivier's example **)
 Definition olivier := (Some 0).
 Quote Recursively Definition p_olivier := olivier.
 Quote Definition q_olivier := Eval cbv in olivier.
 Print p_olivier.
 Print q_olivier.
-Eval cbv in (L2.stripEvalCommute.program_Program p_olivier).
-(**)
 Goal
   let ew := (exc_wcbvEval 40 p_olivier q_olivier) in
   fst ew = snd ew.
 compute. reflexivity.
 Qed.
-**)
+
+Quote Recursively Definition p_0 := 0.
+Quote Definition q_0 := Eval compute in 0.
+Goal
+  let ew := (exc_wcbvEval 40 p_0 q_0) in
+  fst ew = snd ew.
+compute. reflexivity.
+Qed.
 
 (** Abishek's example **)
 Axiom feq1 : (fun x:nat => x) = (fun x:nat => x+x-x).
-
 Definition zero :nat :=
   match feq1 with
     | eq_refl => 0
@@ -71,6 +82,7 @@ Goal
 compute. reflexivity.
 Qed.
 
+Set Implicit Arguments.
 
 Definition Nat := nat.
 Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1).
@@ -127,6 +139,7 @@ Eval compute in taut 1 (fun x => x || negb x).
 (* Pierce *)
 Definition pierce := taut 2 (fun x y => implb (implb (implb x y) x) x).
 Quote Recursively Definition p_pierce := pierce.
+Print p_pierce.
 Quote Definition q_pierce := Eval compute in pierce.
 Goal
   let ew := (exc_wcbvEval 23 p_pierce q_pierce) in
@@ -188,7 +201,8 @@ with forest (A:Set) : Set :=
      | leaf : A -> forest A
      | fcons : tree A -> forest A -> forest A.
 
-Quote Recursively Definition p_fcons := (fcons).
+Quote Recursively Definition p_fcons := fcons.
+Print p_fcons.
 Quote Definition q_fcons := Eval compute in (fcons).
 Goal
   let ew := (exc_wcbvEval 10 p_fcons q_fcons) in

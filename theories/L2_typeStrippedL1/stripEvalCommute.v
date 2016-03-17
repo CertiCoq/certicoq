@@ -3,6 +3,9 @@ Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L2_typeStrippedL1" as L2.
 (******)
+(**)
+Add LoadPath "../../../template-coq-coq-8.5/theories" as Template. 
+(**)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -95,7 +98,7 @@ Function stripItyPack (its:L1.program.itypPack) : L2.program.itypPack :=
 Function stripEc (ec:L1.program.envClass) : L2.program.envClass :=
   match ec with
     | L1.program.ecTrm t => L2.program.ecTrm (strip t)
-    | L1.program.ecTyp itp => L2.program.ecTyp (stripItyPack itp)
+    | L1.program.ecTyp n itp => L2.program.ecTyp n (stripItyPack itp)
     | L1.program.ecAx => L2.program.ecAx
   end.
 
@@ -131,15 +134,15 @@ induction 1; destruct t.
 - change (Lookup s ((s, L2.program.ecTrm (strip t)) :: (stripEnv p))
                     (L2.program.ecTrm (strip t))).
   apply L2.program.LHit.
-- change (Lookup s ((s, L2.program.ecTyp (stripItyPack i)) :: (stripEnv p))
-                    (L2.program.ecTyp (stripItyPack i))).
+- change (Lookup s ((s, L2.program.ecTyp n (stripItyPack i)) :: (stripEnv p))
+                    (L2.program.ecTyp n (stripItyPack i))).
   apply L2.program.LHit.
 - change (Lookup s ((s, L2.program.ecAx) :: (stripEnv p)) ecAx).
   apply L2.program.LHit.
 - change (Lookup s2 ((s1, L2.program.ecTrm (strip t)) :: (stripEnv p))
                      (stripEc ec)).
   apply L2.program.LMiss; assumption.
-- change (Lookup s2 ((s1, L2.program.ecTyp (stripItyPack i)) :: (stripEnv p))
+- change (Lookup s2 ((s1, L2.program.ecTyp n (stripItyPack i)) :: (stripEnv p))
                      (stripEc ec)).
   apply L2.program.LMiss; assumption.
 - change (Lookup s2 ((s1, L2.program.ecAx) :: (stripEnv p))
@@ -1101,7 +1104,7 @@ Function unstripItyPack (its:itypPack) : L1.program.itypPack :=
 Function unstripEc (ec:envClass) : L1.program.envClass :=
   match ec with
     | ecTrm t => L1.program.ecTrm (unstrip t)
-    | ecTyp itp => L1.program.ecTyp (unstripItyPack itp)
+    | ecTyp npars itp => L1.program.ecTyp npars (unstripItyPack itp)
     | ecAx => L1.program.ecAx
   end.
 Fixpoint unstripEnv (p:environ) : L1.program.environ :=

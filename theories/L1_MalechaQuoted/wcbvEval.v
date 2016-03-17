@@ -460,7 +460,8 @@ Function wcbvEval
             match (lookup nm p) with
               | Some (ecTrm t) => wcbvEval n p t
               | Some ecAx => ret (TConst nm)
-              | Some (ecTyp ity) => raise "wcbvEval: lookup defined type"
+              | Some (ecTyp _ _) =>
+                raise ("wcbvEval, TConst names type package " ++ nm)
               | _ => raise "wcbvEval: environment miss"
             end
           | TCast t _ _ =>  wcbvEval n p t

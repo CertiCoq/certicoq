@@ -103,7 +103,7 @@ Definition translate_entry x acc :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
     (s, t') :: acc
-  | (s, ecTyp _) => acc
+  | (s, ecTyp _ _) => acc
   end.
 
 Definition translate_entry_aux x acc : option (string * exp) :=
@@ -111,7 +111,7 @@ Definition translate_entry_aux x acc : option (string * exp) :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
     Some (s, t')
-  | (s, ecTyp _) => None
+  | (s, ecTyp _ _) => None
   end.
 
 Definition translate_env_aux (e : environ) (k : env) : env :=
@@ -128,7 +128,7 @@ Definition let_entry acc (a : string * envClass) e :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
     Let_e t' e
-  | (s, ecTyp _) => e
+  | (s, ecTyp _ _) => e
   end.
 
 Lemma mkLets_translate a e t :
@@ -154,7 +154,7 @@ Definition subst_entry (a : string * envClass) acc (e : exp) :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
       e{0 ::= t'}
-  | (s, ecTyp _) => e
+  | (s, ecTyp _ _) => e
   end.
 
 Lemma subst_env_tr a e k t :

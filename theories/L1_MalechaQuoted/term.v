@@ -1,8 +1,16 @@
 
+(**
+Add LoadPath "../../../template-coq-coq-8.5-coqOpam/theories" as Template. 
+Require Export Template.Template.
+Quote Recursively Definition p_NN := nat.
+Print p_NN.
+**)
+
 (****)
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 (****)
+
 
 Require Import Lists.List.
 Require Import Strings.String.

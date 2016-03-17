@@ -41,6 +41,11 @@ Definition exc_WcbvEval (pgm:program) (ans:term) : Prop :=
     | _, _ => False
   end.
 
+Quote Recursively Definition p_0 := 0.
+Quote Definition q_0 := Eval compute in 0.
+Goal (exc_wcbvEval 50 p_0) = term_Term q_0.
+compute. reflexivity.
+Qed.
 
 Inductive foo (A:Set) : Set :=
 | nilf: foo A

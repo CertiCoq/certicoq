@@ -17,6 +17,7 @@ Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
 
+
 Lemma N_plus_minus:
   forall n:N, n > 0 -> (n - 1 + 1) = (n + 1 - 1).
 Proof.
@@ -60,9 +61,10 @@ Defined.
 (** * Source Expressions. *)
 (**************************)
 
-Require Import SquiggleLazyEq.alphaeq.
 
 Definition dcon := N.
+Require Import SquiggleLazyEq.alphaeq.
+
 Definition branch {s} : Set := (dcon * (@BTerm s))%type.
 
 (** Find a branch in a match expression corresponding to a given constructor
@@ -117,6 +119,9 @@ forall
 Proof.
   repeat(decide equality).
 Defined.
+Require Import SquiggleLazyEq.alphaeq.
+
+
 
 Definition CoqL4GenericTermSig : GenericTermSig :=
 {| 
@@ -289,6 +294,7 @@ Proof.
     rewrite memvar_dmemvar in Hc.
     if_splitH Hc; simpl in Hc; autorewrite with list in *;firstorder.
 
+(* match case *)
   - intros ? Hf. apply_clear IHHe2 in Hf.
     destruct e' as [lv nt].
     unfold apply_bterm in Hf. simpl in Hf.
@@ -425,8 +431,8 @@ Inductive CPSCanonicalOp : Set :=
 Definition CPSOpBindingsCan (c : CPSCanonicalOp) 
     : list nat :=
   match c with
-  | CLambda    => [1]
-  | CKLambda    => [1]
+  | CLambda    => [2] (* user lambda, also binds a continuation *)
+  | CKLambda    => [1] (* continuation lambda  *)
   | CFix nMut => repeat nMut 1
   | CDCon _ nargs    => repeat nargs 0
   end.
@@ -479,8 +485,8 @@ Notation coterm := (@terms.oterm CPSGenericTermSig).
 Notation CCan := (@opid.Can CPSGenericTermSig).
 Notation CNCan := (@opid.NCan CPSGenericTermSig).
 
-Definition Lam_c (v : NVar) (b : CTerm) : CTerm :=
-  coterm (CCan CLambda) [bterm [v] b].
+Definition Lam_c (v vk : NVar) (b : CTerm) : CTerm :=
+  coterm (CCan CLambda) [bterm [v; vk] b].
 
 Definition KLam_c (v : NVar) (b : CTerm) : CTerm :=
   coterm (CCan CKLambda) [bterm [v] b].
@@ -489,7 +495,7 @@ Definition Ret_c (f a : CTerm) :=
   coterm (CNCan CRet) [bterm [] f , bterm [] a].
 
 Definition Halt_c (v : CTerm) :=
-  coterm (CNCan CRet) [bterm [] v].
+  coterm (CNCan CHalt) [bterm [] v].
 
 Definition Call_c (f k a : CTerm) :=
   coterm (CNCan CCall) [bterm [] f , bterm [] k , bterm [] a].
@@ -520,11 +526,11 @@ Inductive eval_c : CTerm -> CTerm -> Prop :=
                  eval_c (c {x := v}) v' -> 
                  eval_c (Ret_c (KLam_c x c) v) v'
 
-(** use simultaneous substitution? *)
+(** apply_bterm is the recommend *)
 
 | eval_Call_c : forall xk x c v1 v2 v',
-                  eval_c (c {x:=v2}{xk:=v1}) v' -> 
-                  eval_c (Call_c (KLam_c xk (Lam_c x c)) v1 v2) v'
+                  eval_c (lsubst c [(x,v2);(xk,v1)]) v' -> 
+                  eval_c (Call_c ((Lam_c x xk c)) v1 v2) v'
 | eval_Match_c : forall d vs bs c v',
                    find_branch d (List.length vs) bs = Some c ->
                    eval_c (apply_bterm c vs) v' -> 
@@ -547,8 +553,8 @@ Qed.
 
 (** Useful for rewriting. *)
 Lemma eval_call : forall xk x c v1 v2 v',
-   eval_c (Call_c (KLam_c xk (Lam_c x c)) v1 v2) v'
-  <-> eval_c (c {x:=v2}{xk:=v1}) v'.
+   eval_c (Call_c (Lam_c x xk c) v1 v2) v'
+  <-> eval_c (lsubst c [(x,v2);(xk,v1)]) v'.
 Proof.
   intros ; split ; intro; inversion H ; subst ; auto.
 Qed.
@@ -645,7 +651,7 @@ Section CPS_CVT.
   Definition cps_cvt_lambda (fve : list NVar) (x : NVar) (b: NTerm) : CTerm :=
           let fvee := (x::fve) in
           let kv := fresh_var fvee in
-             KLam_c kv (Lam_c x (Ret_c (cps_cvt fvee b) (vterm kv))).
+             (Lam_c x kv (Ret_c (cps_cvt fvee b) (vterm kv))).
 
   (** the KLam_c was manually added. unlike now, Fix_c previously implicitly bound a var*)
   Definition cps_cvt_fn_list' (fve : list NVar) (es: list BTerm) : list CBTerm :=
@@ -904,6 +910,27 @@ Proof.
     firstorder.
 Qed.
 
+Lemma substLam_cTrivial2 : forall x xk xx (b t : CTerm),
+  closed t
+  -> closed (Lam_c x xk b)
+  -> lsubst (Lam_c x xk b) [(xx,t)] = Lam_c x xk b.
+Proof.
+  intros ? ? ? ? ? H Hb.
+  change_to_lsubst_aux4;[ |simpl; rewrite H; disjoint_reasoningv; tauto].
+  simpl. rewrite memvar_dmemvar.
+  cases_if.
+  - simpl. rewrite lsubst_aux_nil.
+    reflexivity.
+  - unfold Lam_c. do 3 f_equal.
+    apply lsubst_aux_trivial_cl.
+    intros ? ? Hin. in_reasoning. inverts Hin.
+    split; [assumption|].
+    unfold closed in Hb. simpl in Hb.
+    autorewrite with core list in Hb.
+    rw nil_remove_nvars_iff in Hb.
+    firstorder.
+Qed.
+
 Lemma lsubstCall_c : forall sub a b d, 
   sub_range_sat sub closed
   -> lsubst (Call_c a b d) sub = Call_c (lsubst a sub) (lsubst b sub) (lsubst d sub).
@@ -1009,14 +1036,6 @@ Proof.
   + intros.  apply Hyp; eauto. eapply lt_trans; eauto.
     eapply size_subterm3; eauto.
   + eapply subset_flat_map_lbt; eauto.
-Qed.
-
-Hint Rewrite <- beq_var_refl : SquiggleLazyEq.
-
-Lemma size_pos : forall {gts} t, 
-  0<(@size gts t).
-Proof.
-  intros. destruct t; simpl; omega.
 Qed.
 
 (** will be used for both the [App_e] ane [Let_e] case *)
@@ -1298,15 +1317,137 @@ Proof.
 Qed.
 End CPSFV.
 
+(** unlike [eval_c], this relation supports rewriting with alpha equality.
+    rewritability at the 2nd argument is obvious. the lemma [eval_c_respects_α] below
+    enables rewriting at the 1st argument *)
+Definition eval_cα (a b : CTerm):= exists bα,
+  eval_c a bα /\ alpha_eq b bα.
+  
+
+(*Move*)  
+Hint Rewrite (fun gts => @lsubst_aux_nil gts): SquiggleLazyEq.
+
+Definition defbranch : (@branch CPSGenericTermSig) := (0%N, bterm [] (vterm nvarx)).
+
+Lemma match_c_alpha : forall brs discriminee t2,
+alpha_eq (Match_c discriminee brs) t2
+-> exists discriminee2, exists brs2,
+t2= (Match_c discriminee2 brs2)
+/\ alpha_eq discriminee discriminee2.
+Proof.
+  intros ? ? ? Hal.
+  inverts Hal. simpl in *.
+  dlist_len_name lbt2 lb. 
+  pose proof (H3 0 $(omega)$) as Hd.
+  repeat rewrite selectbt_cons in Hd. simpl in Hd.
+  repeat alphahypsd3.
+  exists nt2.
+  exists (combine (map fst brs) lbt2).
+  split; [| assumption].
+  unfold Match_c. rewrite map_length in *.
+  f_equal; f_equal;
+    [ f_equal
+      |rewrite <- snd_split_as_map, combine_split; try rewrite map_length; auto].
+  apply eq_maps2 with (defa := defbranch) (defc := defbranch);
+    [rewrite length_combine_eq; rewrite map_length; auto|].
+  intros ? ?.
+  specialize (H3 (S n) $(omega)$).
+  repeat rewrite selectbt_cons in H3. simpl in H3.
+  replace (n-0) with n in H3 by omega.
+  apply alphaeqbt_numbvars in H3.
+  unfold defbranch.
+  rewrite combine_nth;[| rewrite map_length; auto].
+  simpl.
+  f_equal.
+-  rewrite <- (map_nth fst). refl.
+-  rewrite <- (map_nth snd). simpl. assumption.
+Qed.
 
 
+Lemma con_c_alpha : forall d vs t2,
+alpha_eq (Con_c d vs) t2
+-> exists vs2, t2 = (Con_c d vs2) /\ bin_rel_nterm alpha_eq vs vs2.
+Proof.
+  intros ? ? ? Hal.
+  apply alpha_eq_bterm_nil in Hal.
+  exrepnd. subst.
+  eexists. split;[| apply Hal0].
+  destruct Hal0.
+  unfold Con_c. rewrite H. reflexivity.
+Qed.
+
+(* this lemma would have been needed anyway when variables are changed after CPS 
+conversion, in order to make them distinct *)
+
+Lemma eval_c_respects_α : 
+  forall a b, 
+    eval_c a b
+    -> forall aα,
+        alpha_eq a aα
+        -> exists bα, eval_c aα bα /\ alpha_eq b bα.
+Proof.
+  intros ? ? He.
+  induction He; intros ? Ha.
+(* eval_Halt_c*)
+- inverts Ha as Hl Hb. simpl in *.  repeat alphahypsd3.
+  eexists. split;[constructor| assumption].
+
+(* eval_Ret_c*)
+- inverts Ha as Hl Hb. simpl in *.  repeat alphahypsd3.
+  clear Hb.
+  inverts Hb0bt0. simpl in *. repeat alphahypsd3. 
+  clear H30bt2 H30bt0. 
+  rename H3 into Hbb.
+  specialize (Hbb 0 $(simpl; omega)$).
+  unfold selectbt in Hbb. simpl in Hbb.
+  eapply apply_bterm_alpha_congr  with (lnt1:=[v]) (lnt2:=[nt2]) in Hbb;
+    auto;[| prove_bin_rel_nterm ].
+  apply IHHe in Hbb. exrepnd.
+  eexists. split; [constructor; apply Hbb1| assumption].
+
+(* eval_Call_c*)
+- inverts Ha. simpl in *. repeat alphahypsd3. clear H3.
+  inverts H30bt0. simpl in *. repeat alphahypsd3.
+  rename H3 into Hbb.
+  specialize (Hbb 0 $(simpl; omega)$).
+  unfold selectbt in Hbb. simpl in Hbb.
+  eapply apply_bterm_alpha_congr  with (lnt1:=[v2, v1]) (lnt2:=[nt2, nt0]) in Hbb;
+    auto;[| prove_bin_rel_nterm ].
+  apply IHHe in Hbb. exrepnd.
+  eexists. split; [constructor; apply Hbb1| assumption].
+
+(* eval_Match_c*)
+- pose proof Ha as Hab.
+  apply match_c_alpha in Ha.
+  exrepnd. subst.
+  apply con_c_alpha in Ha1.
+  exrepnd. subst.
+  eexists. split.
+  eapply eval_Match_c.
+Admitted.
+
+Require Import Coq.Classes.Morphisms.
+
+Global Instance eval_cα_proper :
+  Proper (alpha_eq ==> alpha_eq ==> iff) eval_cα.
+Proof.
+  intros ? ? H1eq ? ? H2eq. unfold eval_cα.
+  split; intro H; exrepnd;
+  apply' eval_c_respects_α  H1;
+  try apply H1 in H1eq; try symmetry in H1eq;
+  try apply H1 in H1eq; exrepnd; clear H1;
+  eexists; split; eauto.
+  - rewrite <- H1eq0, <- H2eq. assumption.
+  - rewrite <- H1eq0, H2eq. assumption.
+Qed.
+  
 Lemma eval_c_subst_commute : forall x v e,
 nt_wf v
 -> is_value v
 -> closed v
 -> forall (lv : list NVar),
-  lsubst (cps_cvt_aux (x::lv) e) [(x, cps_cvt_val' cps_cvt_aux lv v)]
-    = cps_cvt_aux lv (lsubst e [(x, v)]).
+  alpha_eq (lsubst (cps_cvt_aux (x::lv) e) [(x, cps_cvt_val' cps_cvt_aux lv v)])
+     (cps_cvt_aux lv (lsubst e [(x, v)])).
  Proof.
   intros ? ? ?. unfold closed.
   induction e as [xx | o lbt Hind] using NTerm_better_ind3;
@@ -1333,6 +1474,32 @@ nt_wf v
       *)
  Admitted.
 
+(** Useful for rewriting. *)
+Lemma eval_retα :
+  forall x c v v', eval_cα (Ret_c (KLam_c x c) v) v' 
+  <-> eval_cα (c{x := v}) v'.
+Proof.
+  unfold eval_cα; intros; split ; intro; exrepnd; eexists; eauto.
+  inversion H1. subst. eexists; eauto.
+Qed.
+
+(** Useful for rewriting. *)
+Lemma eval_callα : forall xk x c v1 v2 v',
+   eval_cα (Call_c (Lam_c x xk c) v1 v2) v'
+  <-> eval_cα (lsubst c [(x,v2);(xk,v1)]) v'.
+Proof.
+  unfold eval_cα; intros; split ; intro; exrepnd; eexists; eauto.
+  inversion H1. subst. eexists; eauto.
+Qed.
+
+Global Instance proper_retcα : Proper  (alpha_eq ==> alpha_eq ==> alpha_eq) Ret_c.
+Proof.
+  intros ? ? Hal1 ? ? Hal2.
+  constructor; auto. simpl.
+  prove_alpha_eq4; unfold selectbt; simpl;[| | omega];
+  prove_alpha_eq4; assumption.
+Qed.
+
 (** Once we establish that eval and eval_c respect alpha equality, we can get rid of 
 closedness assumptions for e and k and make the proof easier.
 A large part of the current proof is about reistablishing these while involking induction
@@ -1344,8 +1511,8 @@ Theorem cps_cvt_corr : forall e v,
   closed e -> (* implies subset (free_vars e) lv *)
   forall k, closed k ->
     forall v' lv, 
-      eval_c (Ret_c (cps_cvt_aux lv e) k) v' <->
-        eval_c (Ret_c (cps_cvt_aux lv v) k) v'.
+      eval_cα (Ret_c (cps_cvt_aux lv e) k) v' <->
+        eval_cα (Ret_c (cps_cvt_aux lv v) k) v'.
 Proof.
   intros ? ? Hwf He.  induction He; try (simpl ; tauto; fail); [| | | |].
   (* beta reduction case (eval_App_e) *)
@@ -1379,7 +1546,7 @@ Proof.
   specialize (IHHe3 hyp).
   clear hyp.
   rewrite <- IHHe3;[| assumption]. clear IHHe3.
-  rewrite eval_ret.
+  rewrite eval_retα.
   simpl. unfold subst. 
   assert (sub_range_sat [(kv0, k)] closed) as Hcs by
     (intros ? ? ?; in_reasoning; cpx).
@@ -1423,12 +1590,13 @@ Proof.
 
   rewrite IHHe1; [| assumption]. simpl. clear IHHe1.
   unfold cps_cvt_lambda.
-  rewrite eval_ret. simpl.
+  rewrite eval_retα. simpl.
   unfold subst.
   rewrite lsubstRet_c by assumption.
   rewrite lsubst_vterm. simpl.
   rename Hcs into Hcsss.
   simpl. rename Hclk into Hclkk.
+  autorewrite with SquiggleLazyEq.
   match goal with
   [|- context [Ret_c _ (lsubst ?k _)]] => assert (closed k) as Hclk;
     [|  assert (sub_range_sat [(kv1 , k)] closed) as Hcs by
@@ -1437,18 +1605,19 @@ Proof.
     unfold closed. simpl. autorewrite with list core.
     apply null_iff_nil. pose proof Hss as Hssb.
     apply null_iff_nil, null_remove_nvars_subsetv in Hss.
-    rewrite (cons_as_app _ x []).
     rewrite cps_cvt_aux_fvars;
       [| apply' eval_preseves_wf He1; ntwfauto; fail
        | rewrite cons_as_app;
           apply subset_app_r; inauto].
     apply null_iff_nil. simpl.
-    rewrite remove_nvars_app_r, Hssb. simpl.
-    rewrite remove_nvars_comm, remove_nvars_eq. reflexivity.
+    rewrite remove_nvars_app_r.
+    rewrite cons_as_app.
+    repeat rewrite <- remove_nvars_app_l. rewrite remove_nvars_eq.
+    rewrite remove_nvars_comm, Hssb. reflexivity.
 
-  rewrite substKlam_cTrivial2 by  assumption.
+  rewrite substLam_cTrivial2 by  assumption.
   autorewrite with SquiggleLazyEq.
-  rewrite eval_ret. simpl.
+  rewrite eval_retα. simpl.
   unfold subst.
   rewrite lsubstRet_c by assumption.
   rewrite lsubstKlam_c; [| assumption| noRepDis].
@@ -1488,7 +1657,7 @@ Proof.
     [assumption |  assert (sub_range_sat [(fresh_var lv , k)] closed) as Hcs by
         (intros ? ? ?; in_reasoning; cpx)]
   end.
-  rewrite eval_ret. simpl. unfold subst. 
+  rewrite eval_retα. simpl. unfold subst. 
   rewrite lsubstRet_c by assumption.
   rewrite lsubst_vterm. simpl.
   assert (closed (cps_cvt_val' cps_cvt_aux lv v2)) as Hc2v by 
@@ -1505,7 +1674,7 @@ Proof.
   end.
 
   autorewrite with SquiggleLazyEq.
-  rewrite eval_ret.
+  rewrite eval_retα.
   simpl. unfold subst.
   simpl.
   rewrite lsubstCall_c by assumption.
@@ -1514,39 +1683,44 @@ Proof.
   do 2 (rewrite lsubst_trivial2_cl;[| assumption | 
     assumption
       ]).
-  rewrite eval_call. simpl.
+  rewrite eval_callα. simpl.
   unfold subst.
-  do 2 (rewrite lsubstRet_c by 
-        (intros ? ? ?; in_reasoning; cpx)).
-  rewrite lsubst_trivial2_cl;[|
-     (intros ? ? ?; in_reasoning; cpx) | 
-      ].
-  Focus 2 .
-    unfold closed. rewrite fvars_lsubst1; simpl;
-      [| (intros ? ? ?; in_reasoning; cpx)].
-    apply null_iff_nil.
-    rewrite cps_cvt_aux_fvars; 
-       [ apply null_iff_nil; assumption
-        | apply' eval_preseves_wf He1; ntwfauto; fail | ].
-    apply null_remove_nvars_subsetv, null_iff_nil.
-    inauto.
-    intros xx.  specialize (Hss xx). tauto.
+  
+  (rewrite lsubstRet_c by
+        (intros ? ? ?; repeat in_reasoning; cpx) ).
+  SearchAbout (lsubst ?t _ = ?t).
   rewrite lsubst_vterm.
   simpl.
   pose proof (fresh_var_not_in (x::lv)) as Hf.
   simpl in Hf.
   rewrite not_eq_beq_var_false;[| auto].
-  clear Hf.
-  rewrite lsubst_vterm. 
-  simpl. rewrite <- beq_var_refl.
+  autorewrite with SquiggleLazyEq.
+  apply null_iff_nil, null_remove_nvars_subsetv in Hss.
+  rewrite <- lsubst_sub_filter2 with (l:=[fresh_var (x::lv)]);
+    [| |].
+  Focus 3. 
+    rewrite cps_cvt_aux_fvars;
+       [|(apply' eval_preseves_wf He1; 
+                      ntwfauto) 
+        | intros xx Hin;simpl; specialize (Hss xx); simpl in *; tauto].
+      
+      intros xx Hin. specialize (Hss xx). 
+      rewrite in_single_iff in *. intros Hc. subst.
+      apply Hss in Hin. apply not_over_or in Hf. repnd. auto.
+
+  Focus 2. unfold disjoint_bv_sub.
+     intros ? ? Hin.
+     repeat in_reasoning; inverts Hin; try rewrite Hc2v;
+     try rewrite Hcl; auto.
+  simpl.
+  autorewrite with SquiggleLazyEq.
+
   rewrite eval_c_subst_commute; auto;
     [refl
       | ntwfauto ; eauto using eval_preseves_wf
-      |eapply eval_yields_value'; eauto].
+      |eapply eval_yields_value'; eauto]. 
 
 
 (* constructor *)
 - 
 Abort.
-
-

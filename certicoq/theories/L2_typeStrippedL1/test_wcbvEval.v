@@ -25,7 +25,7 @@ Quote Recursively Definition p_olivier := olivier.
 Quote Definition q_olivier := Eval cbv in olivier.
 Print p_olivier.
 Print q_olivier.
-Goal (exc_wcbvEval 10 p_olivier) = term_Term q_olivier.
+Goal (exc_wcbvEval 40 p_olivier) = term_Term q_olivier.
 compute. reflexivity.
 Qed.
 

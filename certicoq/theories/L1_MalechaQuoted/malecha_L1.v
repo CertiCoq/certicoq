@@ -3,6 +3,8 @@
 **)
 
 (****)
+Add LoadPath "../template-coq-coq-8.5/theories" as Template.
+Require Export Template.Ast.
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 (****)
@@ -112,9 +114,9 @@ Fixpoint program_Program
     | PConstr nm t p =>
       do T <- term_Term t;
       program_Program p (econs (epair2 nm (ret (ecTrm T))) e)
-    | PType nm ibs p =>
+    | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs
-      in program_Program p (econs (epair2 nm (ret (ecTyp Ibs))) e)
+      in program_Program p (econs (epair2 nm (ret (ecTyp npar Ibs))) e)
     | PAxiom nm ty p =>
       do Ty <- term_Term ty;
       program_Program p (econs (epair2 nm (ret ecAx)) e)

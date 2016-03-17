@@ -1,5 +1,8 @@
 
-Require Import Template.Ast. 
+Add LoadPath "../../../template-coq-coq-8.5-coqOpam/theories" as Template.
+Add LoadPath "../common" as Common.
+
+Require Export Template.Ast.
 Require Import PArith.BinPos.
 Require Import Strings.String.
 Require Import Arith.Peano_dec.

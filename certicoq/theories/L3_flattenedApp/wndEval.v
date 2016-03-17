@@ -30,7 +30,8 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
             wndEval p (TLetIn nm dfn bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| sCase: forall (n:nat) (ml : nat * list nat) (s:Term) (i:inductive) (args brs ts:Terms),
+| sCase: forall (n:nat) (ml : nat * list nat) (s:Term)
+                (i:inductive) (args brs ts:Terms),
            tskipn (fst ml) args = Some ts ->
            whCaseStep n ts brs = Some s ->
            wndEval p (TCase ml (TConstruct i n args) brs) s

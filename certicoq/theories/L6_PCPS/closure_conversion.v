@@ -1,13 +1,9 @@
-Require Import cps cps_util hoisting.
+Require Import cps cps_util hoisting identifiers.
 Require Import Znumtheory.
 Require Import List MSets MSetRBT BinNums BinNat BinPos.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
 Require Maps.
-
-Module FVSet := MSetRBT.Make POrderedType.Positive_as_OT.
-
-Import FVSet.
 
 Record FunInfo : Type :=
   mkFunInfo
@@ -49,46 +45,6 @@ Definition get_typeinfo (i : type) : ccstate typeinfo :=
     | Some typinfo => ret typinfo
     | None => ret Tunknown (* should not happen *)
   end.
-
-Definition from_list (l : list (Maps.PTree.elt)) : FVSet.t :=
-  List.fold_left (fun set e => add e set) l empty.
-
-(** The set of names of the functions in the same fix definition *)
-Fixpoint fundefs_names (defs : fundefs) : FVSet.t :=
-  match defs with
-    | Fcons f _ _ _ defs' => add f (fundefs_names defs') 
-    | Fnil => empty
-  end.
-
-(** The free variables of an exp *)
-Fixpoint exp_fv (e : exp) : FVSet.t :=
-  match e with
-    | Econstr x tau c ys e =>
-      let set := remove x (exp_fv e) in
-      union set (from_list ys)
-    | Ecase x pats => 
-      let set := from_list (map snd pats) in
-      add x set
-    | Eproj x tau n y e =>
-      let set := remove x (exp_fv e) in
-      add y set
-    | Efun defs e =>
-      let names := fundefs_names defs in
-      union (fundefs_fv defs names)
-            (diff (exp_fv e) names)
-    | Eapp x xs =>
-      add x (from_list xs)
-    | Eprim x tau prim ys e =>
-      let set := remove x (exp_fv e) in
-      union set (from_list ys)
-  end
-with fundefs_fv (defs : fundefs) (names : FVSet.t) : FVSet.t :=
-       match defs with
-         | Fcons f t ys e defs' =>
-           let set := diff (exp_fv e) names in
-           union (diff set (from_list ys)) (fundefs_fv defs' names)
-         | Fnil => empty
-       end.
 
 Fixpoint exp_info (e : exp) (acc : FunInfoMap) : FunInfoMap :=
   match e with
@@ -179,10 +135,10 @@ Section CC.
   Definition make_env (fv : FVSet.t) (mapfv_new : VarInfoMap)
              (mapfv_old : VarInfoMap) (env_new env_old : var) (g : exp -> exp)
   : ccstate (type * VarInfoMap * (exp -> exp)) :=
-    t1 <- get_vars_with_types (elements fv) mapfv_old g env_old ;;
+    t1 <- get_vars_with_types (FVSet.elements fv) mapfv_old g env_old ;;
     let '(vars, g') :=  t1 in
     let (map_new', _) :=
-        fold (fun x arg =>
+        FVSet.fold (fun x arg =>
                 let '(map, n) := arg in
                 let typ :=
                     match Maps.PTree.get x mapfv_old with
@@ -199,7 +155,7 @@ Section CC.
     in
     env_typ <- set_typeinfo (Tdata [(env_tag, List.map snd vars)]) ;;
     ret (env_typ, map_new',
-    fun e => g' (Econstr env_new env_typ utag (List.map fst vars) e)).
+         fun e => g' (Econstr env_new env_typ utag (List.map fst vars) e)).
 
   Fixpoint mapM {M : Type -> Type} {A B : Type} `{Monad M} (f : A -> M B)
            (l : list A)  : M (list B) :=
@@ -296,9 +252,9 @@ Section CC.
               | Fcons f _ _ _ _ =>
                 match Maps.PTree.get f map with
                   | Some entry => fv_set_def entry
-                  | None => empty
+                  | None => FVSet.empty
                 end
-              | Fnil => empty
+              | Fnil => FVSet.empty
             end in
         env' <- get_name ;;
         t1 <- make_env fv (Maps.PTree.empty VarInfo) mapfv env' env id ;;

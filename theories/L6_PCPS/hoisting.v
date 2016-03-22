@@ -1,4 +1,4 @@
-Require Import cps cps_util shrink_cps.
+Require Import cps cps_util shrink_cps identifiers.
 Require Import BinNat Relations.
 
 (* TODO : move dependencies from shrink_cps to common file *)
@@ -48,6 +48,7 @@ Inductive no_fun : exp -> Prop  :=
 | Eprim_no_fun :
     forall x tau p xs e,
       no_fun e ->
+
       no_fun (Eprim x tau p xs e).
 
 (** function definitions without nested function definitions *)
@@ -98,40 +99,6 @@ Qed.
 Lemma split_fds_nil_r fdefs : split_fds Fnil fdefs fdefs.
   induction fdefs; constructor; eauto.
 Qed.
-
-
-(* to do proofs simultaneously. TODO move to exp.v *)
-Lemma exp_def_mutual_ind :
-  forall (P : exp -> Prop) (P0 : fundefs -> Prop),
-    (forall (v : var) (t : type) (t0 : tag) (l : list var) (e : exp),
-       P e -> P (Econstr v t t0 l e)) ->
-    (forall (v : var) (l : list (tag * var)), P (Ecase v l)) ->
-    (forall (v : var) (t : type) (n : N) (v0 : var) (e : exp),
-       P e -> P (Eproj v t n v0 e)) ->
-    (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
-    (forall (v : var) (l : list var), P (Eapp v l)) ->
-    (forall (v : var) (t : type) (p : prim) (l : list var) (e : exp),
-       P e -> P (Eprim v t p l e)) ->
-    (forall (v : var) (t : type) (l : list var) (e : exp),
-       P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
-    P0 Fnil -> (forall e : exp, P e) /\ (forall f : fundefs, P0 f).
-Proof.
-  intros. split.
-  apply (exp_mut P P0); assumption.
-  apply (fundefs_mut P P0); assumption.
-Qed.
-
-(** name the induction hypotheses only *)
-Ltac exp_defs_induction IH1 IH2 :=
-  apply exp_def_mutual_ind;
-  [ intros ? ? ? ? ? IH1 
-  | intros ? ?
-  | intros ? ? ? ? ? IH1
-  | intros ? IH2 ? IH1 
-  | intros ? ?
-  | intros ? ? ? ? ? IH1 
-  | intros ? ? ? ? IH1 ? IH2
-  | ].
 
 
 Definition injective {A B} (f : A -> B) :=
@@ -343,3 +310,13 @@ Proof.
     apply app_ctx_f_correct. simpl. f_equal; eauto.
     apply app_ctx_f_correct. simpl. f_equal; eauto.
 Qed.
+
+
+Lemma hoist_rw_correct (pr : prims) (e1 e2 : exp) (rho : env) (obs : obs_val) :
+  closed_fundefs_in_exp e1 ->
+  unique_bindings e1 ->
+  hoist_rw e1 e2 ->
+  bstep_e pr rho e1 obs ->
+  bstep_e pr rho e2 obs.
+Proof.
+Abort.

@@ -11,6 +11,7 @@ Require Import Arith.Compare_dec.
 Require Import Relations.Relation_Operators.
 Require Import Relations.Operators_Properties.
 Require Import Setoid.
+Require Import Omega.
 Require Import L1.term.
 Require Import L1.program.
 
@@ -165,7 +166,9 @@ Lemma wndEval_pres_Crct:
   forall p,
   (forall t s, wndEval p t s -> forall n, Crct p n t -> Crct p n s) /\
   (forall ts ss, wndEvals p ts ss ->
-                   forall n, Crcts p n ts -> Crcts p n ss).
+                 forall n, Crcts p n ts -> Crcts p n ss) /\
+  (forall ds es, wndDEvals p ds es ->
+                 forall n, CrctDs p n ds -> CrctDs p n es).
 Proof.
   intros p. apply wndEvalEvals_ind; intros.
   - eapply LookupDfn_pres_Crct; try eassumption.
@@ -186,8 +189,10 @@ Proof.
         apply CrctsCons; assumption.
   - destruct (Crct_invrt_App H eq_refl) as [h1 [h2 [h3 h4]]].
     assert (j:= @Crct_invrt_Fix _ _ _ h1 dts m eq_refl).
-    refine (whFixStep_pres_Crct _ _ _ e); try assumption.
+    refine (whFixStep_pres_Crct _ _ _ _ _).
+    + admit.
     + constructor; assumption. 
+    +
   - destruct (Crct_invrt_Cast H eq_refl) as [h1 h2]. assumption.
   - destruct (Crct_invrt_App H0 eq_refl) as [h1 [h2 [h3 h4]]].
     apply mkApp_pres_Crct.
@@ -1038,6 +1043,28 @@ induction 1; intros.
 - constructor.
 - constructor. apply sCaseArg. assumption.
 - eapply wERTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+
+Lemma wndEvalRTC_Case_ty:
+  forall p ty ty',
+    wndEvalRTC p ty ty' -> 
+    forall np mch brs, 
+      wndEvalRTC p (TCase np ty mch brs) (TCase np ty' mch brs).
+induction 1; intros.
+- constructor.
+- constructor. apply sCaseTy. assumption.
+- eapply wERTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+
+Lemma wndEvalRTC_Case_brs:
+  forall p brs brs',
+    wndEvalsRTC p brs brs' -> 
+    forall np mch ty, 
+      wndEvalRTC p (TCase np ty mch brs) (TCase np ty mch brs').
+induction 1; intros.
+- constructor.
+- constructor. apply sCaseBrs. assumption.
+- eapply wERTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
 Qed.
 
 Lemma wndEvalTC_Case_mch:

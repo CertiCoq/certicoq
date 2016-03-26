@@ -128,7 +128,11 @@ intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
   + assert (j:= proj1 (WcbvEval_presWFapp hp) _ _ w H6).
     inversion_Clear j. assumption.
   + constructor; assumption.
-- inversion_Clear H2. constructor; intuition.
+- inversion_Clear H2.
+  constructor; intuition; unfold isLambda, isFix, isApp in *.
+  + destruct H2 as [x1 [x2 j]]. discriminate.
+  + destruct H2 as [x1 [x2 j]]. discriminate.
+  + destruct H2 as [x1 [x2 [x3 j]]]. discriminate.
 - inversion_Clear H1. apply H0.
   refine (whCaseStep_pres_WFapp _ _ _ e); auto.
 - inversion_Clear H1. apply H0.
@@ -136,6 +140,8 @@ intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
   refine (tskipn_pres_WFapp _ _ e).
   assert (j:= proj1 (WcbvEval_presWFapp hp) _ _ w H4). inversion j.
   constructor; assumption.
+- inversion_Clear H1. constructor. intuition. intuition.
+  intros h. inversion h.
 - constructor.
 - inversion_Clear H1. constructor; intuition.
 - inversion_Clear H1. constructor; intuition.

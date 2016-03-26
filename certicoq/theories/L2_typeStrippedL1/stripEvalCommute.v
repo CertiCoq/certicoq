@@ -3,9 +3,6 @@ Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L2_typeStrippedL1" as L2.
 (******)
-(**)
-Add LoadPath "../../../template-coq-coq-8.5/theories" as Template. 
-(**)
 
 Require Import Lists.List.
 Require Import Strings.String.
@@ -583,10 +580,6 @@ Proof.
     + rewrite <- tcons_hom. rewrite <- whFixStep_hom. rewrite e.
       reflexivity.
     + assumption.
-  - refine (wAppCong _ _ _ _ _ _); try assumption.
-    + intros h. elim n. apply isApp_hom. assumption.
-    + intros h. elim n0. apply isLambda_hom. assumption.
-    + intros h. elim n1. apply isFix_hom. assumption.
   - refine (wCase0 _ _ _ _ _); try eassumption.
     rewrite <- tnil_hom. rewrite <- whCaseStep_hom. rewrite <- optStrip_hom.
     apply f_equal. assumption.
@@ -609,7 +602,7 @@ Theorem L1wcbvEval_strip_L2WcbvEval:
                    WcbvDEvals (stripEnv p) (stripDs ds) (stripDs es)).
 intros p hp.
 apply L1.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
-- simpl. eapply wCast. inversion H0. intuition.
+- simpl. eapply wCast. inversion H1. intuition.
 - simpl. eapply wFix. inversion H0. intuition.
 - simpl. eapply wAx. unfold L1.program.LookupAx in l. unfold LookupAx.
   apply (Lookup_hom l).
@@ -625,9 +618,9 @@ apply L1.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
     * assert (j:= proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w H7).
       inversion j. assumption.
     * apply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w0). assumption.
-- simpl. inversion H1. subst. eapply wLetIn.
+- simpl. inversion H2. subst. eapply wLetIn.
   + apply H. assumption.
-  + rewrite (proj1 instantiate_hom) in H0. apply H0.
+  + rewrite (proj1 instantiate_hom) in H1. apply H1.
     apply L1.term.instantiate_pres_WFapp; try assumption.
     * apply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w). assumption.
 - inversion_Clear H1.
@@ -640,29 +633,24 @@ apply L1.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
     apply (L1.term.whFixStep_pres_WFapp _ H2).
     constructor; assumption.
 - inversion_Clear H2. rewrite TApp_hom. rewrite TApp_hom.
-  apply wAppCong.
-  + apply H. assumption.
-  + intros h. elim n. apply isApp_hom. assumption.
-  + intros h. elim n0. apply isLambda_hom. assumption.
-  + intros h. elim n1. apply isFix_hom. assumption.
-  + apply H0. assumption.
-  + apply H1. assumption.
+  apply wAppAx; intuition.
 - inversion_Clear H2. rewrite TCase_hom. eapply wCase0.
-  + simpl in H0. apply H0. assumption.
+  + simpl in H. apply H. assumption.
   + rewrite <- tnil_hom. rewrite <- whCaseStep_hom. rewrite <- optStrip_hom.
     apply f_equal. eassumption.
   + apply H1. refine (L1.term.whCaseStep_pres_WFapp H8 _ _ e). constructor.
-- inversion_Clear H1. rewrite TCase_hom. simpl in H. eapply wCasen.
+- inversion_Clear H2. rewrite TCase_hom. simpl in H. eapply wCasen.
   + apply H. assumption.
   + rewrite <- tcons_hom. rewrite <- tskipn_hom. rewrite e. 
     rewrite optStrips_hom. reflexivity.
   + rewrite <- whCaseStep_hom. rewrite e0. rewrite optStrip_hom. reflexivity.
-  + apply H0. refine (L1.term.whCaseStep_pres_WFapp H7 _ _ e0). 
+  + apply H1. refine (L1.term.whCaseStep_pres_WFapp H8 _ _ e0). 
     refine (L1.term.tskipn_pres_WFapp _ _ e).
     assert (j: L1.term.WFapp (L1.term.TApp (L1.term.TConstruct i n) arg args)).
     { refine (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp) _ _ _ _).
       try apply mch. eassumption. eassumption. }
     inversion_clear j. constructor; assumption.
+- inversion_Clear H2. simpl.  apply wCaseAx; simpl in H; intuition.   
 - inversion_Clear H1. rewrite tcons_hom. rewrite tcons_hom.
   constructor; intuition.
 - inversion_Clear H2. rewrite dcons_hom. rewrite dcons_hom.
@@ -886,43 +874,27 @@ Proof.
       assert (k:= WcbvEval_single_valued w j). discriminate.
     + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
       assert (k:= WcbvEval_single_valued w j).
-      destruct (Lam_strip_inv _ k) as [y1 [y2 [l1 j2]]].
-      rewrite <- l1 in H16. elim H16. exists nm, y1, y2. reflexivity.
+      destruct (Lam_strip_inv _ k) as [y1 [y2 [l1 j2]]]. discriminate.
   - destruct (LetIn_strip_inv _ H1) as [x0 [x1 [x2 [j1 [j2 j3]]]]].
     clear H1. rewrite <- j1 in H2. inversion_Clear H2.
     inversion_clear H3.
     eapply H0.
+    + erewrite H.
+      * rewrite <- (proj1 (instantiate_hom)). apply f_equal. reflexivity.
+      * reflexivity.
+      * assumption.
+      * eassumption.
     + assert (j0: L1.term.WFapp dfn'0).
       { eapply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2)); eassumption. }
       assert (j1: WcbvEval (stripEnv p)
                            (strip (L1.term.instantiate dfn'0 0 x2))
                            (strip s0)).
-      { apply(proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H2).
+      { apply (proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H4).
         apply (L1.term.instantiate_pres_WFapp); assumption. }
       rewrite (proj1 instantiate_hom) in j1.
-      erewrite (H _ eq_refl H6) in w0; try eapply H1.
-      assert (k:= WcbvEval_single_valued w0 j1).
-      erewrite (H _ eq_refl H6); try eapply H1.
-      rewrite (proj1 instantiate_hom). reflexivity.
-    + assert (j0: L1.term.WFapp dfn'0).
-      { eapply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2)); eassumption. }
-      assert (j1: WcbvEval (stripEnv p)
-                           (strip (L1.term.instantiate dfn'0 0 x2))
-                           (strip s0)).
-      { apply(proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H2).
-        apply (L1.term.instantiate_pres_WFapp); assumption. }
-      rewrite (proj1 instantiate_hom) in j1.
-      erewrite (H _ eq_refl H6) in w0; try eapply H1.
-      apply (proj1 (L1.term.instantiate_pres_WFapp)); assumption.
-    + assert (j0: L1.term.WFapp dfn'0).
-      { eapply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2)); eassumption. }
-      assert (j1: WcbvEval (stripEnv p)
-                           (strip (L1.term.instantiate dfn'0 0 x2))
-                           (strip s0)).
-      { apply(proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H2).
-        apply (L1.term.instantiate_pres_WFapp); assumption. }
-      rewrite (proj1 instantiate_hom) in j1.
-      erewrite (H _ eq_refl H6) in w0; try eapply H1. assumption.
+      apply (L1.term.instantiate_pres_WFapp). assumption.
+      eapply (proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2)); eassumption.
+    + assumption.
   - destruct (App_strip_inv _ H1) as [x1 [x2 [x3 [x4 [x5 [x6 x7]]]]]].
     clear H1. subst. inversion H2. inversion H3; subst; clear H2 H3.
     + assert (j1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H13 H7).
@@ -940,29 +912,23 @@ Proof.
             inversion j; assumption.
           - constructor; assumption. }
     + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H13 H7).
-      assert (k:= WcbvEval_single_valued w j).
-      destruct (Fix_strip_inv _ k) as [y1 [l1 j2]].
-      rewrite <- l1 in H16. elim H16. exists y1, m. reflexivity.
+      assert (k:= WcbvEval_single_valued w j). simpl in k. discriminate.
   - destruct (App_strip_inv _ H2) as [x1 [x2 [x3 [x4 [x5 [x6 x7]]]]]].
-    clear H2. subst. inversion H3; inversion H4; subst; clear H3; clear H4.
+    clear H2. subst. inversion H3. inversion H4; subst; clear H3 H4.
+    + assert (j1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+       simpl in j1. assert (k:= WcbvEval_single_valued w j1). discriminate.
     + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
-      simpl in j.
-      assert (k:= WcbvEval_single_valued w j). subst.
-      elim n0. exists nm, (strip bod). reflexivity.
-    + assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
-      simpl in j.
-      assert (k:= WcbvEval_single_valued w j). subst.
-      elim n1. exists (stripDs dts), m. reflexivity.
-    + simpl. apply (f_equal3 TApp).
-      * refine (H _ eq_refl H8 _ _); try assumption.
+      simpl in j. assert (k:= WcbvEval_single_valued w j). discriminate.
+     + simpl. apply (f_equal3 TApp).
+       * assert (j:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H14 H8).
+         simpl in j. apply (WcbvEval_single_valued w). assumption.
       * refine (H0 _ _ _ _ _); try reflexivity; try assumption.
       * refine (H1 _ _ _ _ _); try reflexivity; try assumption.
-  - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]].
+ - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]].
     clear H1. subst. inversion_Clear H2. inversion_Clear H3.
     + assert (k0: n = n0).
-      { assert (j0:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H11 H6).
-        simpl in j0.
-        assert (j1:= WcbvEval_single_valued w j0). myInjection j1.
+      { assert (j0:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H7 H6).
+        simpl in j0. assert (j1:= WcbvEval_single_valued w j0). myInjection j1.
         reflexivity. }
       subst.
       assert (k1:= whCaseStep_Hom  _ _ _ H12). simpl in k1.
@@ -973,10 +939,12 @@ Proof.
     + assert (j0:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H7 H6).
       simpl in j0.
       assert (j1:= WcbvEval_single_valued w j0). discriminate.
-  - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]].
+    + assert (j0:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H10 H6).
+      assert (j1:= WcbvEval_single_valued w j0). discriminate.
+ - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]].
     clear H1. subst. inversion_Clear H2. inversion_Clear H3.
     + simpl in e. myInjection e. clear e.
-      assert (k1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H11 H6).
+      assert (k1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H7 H6).
       simpl in k1.
       assert (k2:= WcbvEval_single_valued w k1). discriminate.
     + assert (k1:= proj1 (L1.wcbvEval.wcbvEval_pres_WFapp hp2) _ _ H7 H6).
@@ -985,16 +953,30 @@ Proof.
       simpl in j0.
       assert (k3:= WcbvEval_single_valued w j0). myInjection k3. clear k3.
       assert (k0: L1.term.WFapp cs0).
-      { refine (L1.term.whCaseStep_pres_WFapp _ _ _ H12); try assumption.
-        refine (L1.term.tskipn_pres_WFapp _ _ H11).
+      { refine (L1.term.whCaseStep_pres_WFapp _ _ _ H13); try assumption.
+        refine (L1.term.tskipn_pres_WFapp _ _ H12).
         constructor; try assumption. }
-      refine (H0 _ _ _ _ H13); try assumption.
+      refine (H0 _ _ _ _ H14); try assumption.
       assert (k1: ts = strips ts0).
       { rewrite <- tcons_hom in e.  rewrite <- tskipn_hom in e.
-        rewrite H11 in e. rewrite optStrips_hom in e. myInjection e.
+        rewrite H12 in e. rewrite optStrips_hom in e. myInjection e.
         reflexivity. } subst.
-      rewrite <- whCaseStep_hom in e0. rewrite H12 in e0.
+      rewrite <- whCaseStep_hom in e0. rewrite H13 in e0.
      rewrite optStrip_hom in e0. myInjection e0. reflexivity.
+    + assert (k1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H10 H6).
+      simpl in k1. assert (k:= WcbvEval_single_valued w k1). discriminate.
+  - destruct (Case_strip_inv _ H1) as [x0 [x1 [x2 [j0 [j1 j2]]]]].
+    clear H1. subst. inversion_Clear H2. inversion_Clear H3.
+    + assert (k1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H7 H6).
+      simpl in k1. assert (k:= WcbvEval_single_valued w k1). discriminate.
+    + assert (k1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H7 H6).
+      simpl in k1. assert (k:= WcbvEval_single_valued w k1). discriminate.
+    + assert (k1:= proj1 (L1wcbvEval_strip_L2WcbvEval hp2) _ _ H10 H6).
+       assert (k2:= proj1 (proj2 (L1wcbvEval_strip_L2WcbvEval hp2)) _ _ H12 H8).
+      simpl in k1.
+      assert (k:= WcbvEval_single_valued w k1). myInjection k. clear k w.
+      assert (k:= WcbvEvals_single_valued w0 k2). 
+      rewrite TCase_hom. simpl. apply f_equal3; try reflexivity. assumption.
   - rewrite (tnil_strip_inv _ H) in H1. inversion H1. reflexivity. 
   - destruct (tcons_strip_inv _ H1) as [x0 [x1 [j1 [j2 j3]]]]. subst.
     clear H1. inversion_Clear H2; inversion_Clear H3. simpl.
@@ -1436,6 +1418,8 @@ Proof.
   apply WcbvEvalEvals_ind; simpl; intros; try (solve [constructor]);
   try (solve [constructor; constructor]);
   try (solve [constructor; assumption]).
+  - eapply L1.wcbvEval.wCast; try assumption.
+    + eapply L1.wcbvEval.wSort.
   - eapply L1.wcbvEval.wAx.
     unfold LookupAx in l. unfold L1.program.LookupAx.
     apply (Lookup_unhom l).
@@ -1444,14 +1428,11 @@ Proof.
   - eapply L1.wcbvEval.wAppLam; try eassumption.
     rewrite <- whBetaStep_unhom. assumption.
   - eapply L1.wcbvEval.wLetIn; try eassumption.
-    rewrite <- (proj1 instantiate_unhom). assumption.
+    + apply L1.wcbvEval.wSort.
+    + rewrite <- (proj1 instantiate_unhom). assumption.
   - eapply L1.wcbvEval.wAppFix; try eassumption.
     rewrite <- tcons_unhom. rewrite <- whFixStep_unhom.
     apply f_equal. assumption.
-  - eapply L1.wcbvEval.wAppCong; try eassumption.
-    + intros h. elim n. apply isApp_unhom. assumption.
-    + intros h. elim n0. apply isLambda_unhom. assumption.
-    + intros h. elim n1. apply isFix_unhom. assumption.
   - eapply L1.wcbvEval.wCase0; try eassumption.
     + constructor.
     + change
@@ -1459,11 +1440,14 @@ Proof.
          Some (unstrip cs)).
       rewrite <- whCaseStep_unhom. rewrite <- optUnstrip_unhom.
       apply f_equal. assumption.
-  - refine (L1.wcbvEval.wCasen _ _ _ H _ _ H0); try eassumption.
+  - refine (L1.wcbvEval.wCasen _ _ _ _ _ _ H0); try eassumption.
+    + apply (L1.wcbvEval.wSort).
     + rewrite <- tcons_unhom. rewrite <- tskipn_unhom.
       rewrite e. rewrite <- optUnstrips_unhom. reflexivity.
     + rewrite <- whCaseStep_unhom. rewrite <- optUnstrip_unhom.
       apply f_equal. assumption.
+  - eapply (L1.wcbvEval.wCaseAx); try assumption.
+    apply (L1.wcbvEval.wSort).
   - constructor. constructor. assumption. assumption.
 Qed.    
 

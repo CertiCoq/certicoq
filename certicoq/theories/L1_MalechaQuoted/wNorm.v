@@ -17,8 +17,14 @@ Require Import L1.wcbvEval.
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
-Local Open Scope program_scope.
 Set Implicit Arguments.
+
+(**
+Require Import Template.Template.
+Quote Definition xx :=
+  fun (n:list nat) => match n with cons m ms => cons m ms | nil => nil  end.
+Print xx.
+**)
 
 (** Weak typed normal form: normal form of wndEval:
 *** no wndEval steps possible (including no steps in type fields.
@@ -110,7 +116,7 @@ Proof.
 intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
 - inversion_Clear H0. intuition. 
 - inversion_Clear H0. intuition. 
-- inversion_Clear H0. apply H. assumption.
+- inversion_Clear H1. apply H. assumption.
 - constructor. apply H. inversion H0. assumption.
 - inversion_Clear H0. apply H.
   assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
@@ -118,22 +124,27 @@ intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
   assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H7). inversion_Clear j.
   apply whBetaStep_pres_WFapp; try assumption.
   eapply (proj1 (wcbvEval_pres_WFapp hp)); eassumption. 
-- inversion_Clear H1. apply H0. apply instantiate_pres_WFapp. assumption. 
+- inversion_Clear H2. apply H1. apply instantiate_pres_WFapp. assumption. 
   apply (proj1 (wcbvEval_pres_WFapp hp) _ _ w). assumption.
 - apply H0. inversion_Clear H1.
   refine (whFixStep_pres_WFapp _ _ _). 
   + assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H6).
     inversion j. assumption.
   + constructor; assumption.
-- inversion_Clear H2. constructor; intuition.
+- inversion_Clear H2.
+  constructor; intuition; unfold isLambda, isFix, isApp in *.
+  + destruct H2 as [x1 [x2 [x3 j]]]. discriminate.
+  + destruct H2 as [x1 [x2 j]]. discriminate.
+  + destruct H2 as [x1 [x2 [x3 j]]]. discriminate.
 - apply H1. refine (whCaseStep_pres_WFapp _ _ _ e); try constructor.
   inversion H2. assumption.
-- apply H0. refine (whCaseStep_pres_WFapp _ _ _ e0).
-  + inversion H1. assumption.
+- inversion_Clear H2. apply H1. refine (whCaseStep_pres_WFapp _ _ _ e0).
+  + assumption.
   + refine (tskipn_pres_WFapp _ _ e).
-    inversion_clear H1.
-    assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H2). inversion_Clear j.
+    assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H6). inversion_Clear j.
     constructor; assumption.
+- inversion_Clear H2. constructor; try (solve[intuition]).
+  intros h. inversion h.
 - constructor. 
 - inversion_Clear H1. constructor; intuition.
 - inversion_Clear H2. constructor; intuition.
@@ -154,19 +165,21 @@ Lemma wNorm_no_wndStep_lem:
   (forall t s, wndEval p t s -> ~ WNorm t) /\
   (forall ts ss, wndEvals p ts ss -> ~ WNorms ts) /\
   (forall ds es, wndDEvals p ds es -> ~ WDNorms ds).
-apply wndEvalEvals_ind; intros; intros h;
-try (solve[inversion h]);
-try (solve[inversion h; subst; contradiction]).
-- inversion h. inversion l; subst;
-  unfold LookupDfn in l; unfold LookupAx in H0;
-    assert (j:=Lookup_functional l H0); discriminate.
-- inversion h. subst. elim H5. exists nm, ty, bod. reflexivity.
-- inversion h. subst. elim H6. constructor.
-- inversion h. subst. elim H6. constructor.
-- inversion h. subst. elim H6. exists dts, m. reflexivity.
-- destruct t; simpl in h; inversion h; try (contradiction).
-  + subst. elim H. constructor; try assumption.
-    apply (WNorms_tappendl _ _ H5).
+Proof.
+  apply wndEvalEvals_ind; intros; intros h;
+  try (solve[inversion h]);
+  try (solve[inversion h; subst; contradiction]).
+  - inversion h.
+    inversion l; subst;
+    unfold LookupDfn in l; unfold LookupAx in H0;
+    assert (j:= Lookup_functional l H0); discriminate.
+  - inversion h. subst. elim H5. exists nm, ty, bod. reflexivity.
+  - inversion h. subst. elim H6. constructor.
+  - inversion h. subst. elim H6. constructor.
+  - inversion h. subst. elim H6. exists dts, m. reflexivity.
+  - destruct t; simpl in h; inversion h; try (contradiction).
+    + subst. elim H. constructor; try assumption.
+      apply (WNorms_tappendl _ _ H5).
 Qed.
 
 Lemma wNorm_no_wndStep:

@@ -1031,137 +1031,6 @@ Proof.
     + apply H1; trivial.
 Qed.
 
-(***
-Lemma Instantiate_pres_Crct:
-  forall tin, 
-  (forall n bod ins, Instantiate tin n bod ins ->
-  forall m p, n < m -> Crct p (S m) bod -> Crct p m tin -> Crct p m ins) /\
-  (forall n bods inss, Instantiates tin n bods inss ->
-  forall m p, n < m -> Crcts p (S m) bods -> Crct p m tin -> Crcts p m inss) /\
-  (forall n ds ids, InstantiateDefs tin n ds ids ->
-  forall m p, n < m -> CrctDs p (S m) ds -> Crct p m tin -> CrctDs p m ids).
-Proof.
-  intros tin. apply InstInstsDefs_ind; intros; trivial.
-  - destruct (Crct_invrt_Rel H0 eq_refl). apply CrctRel.
-    + omega.
-    + eapply Crct_Sort. eassumption.
-  - destruct (Crct_invrt_Rel H0 eq_refl). apply CrctRel.
-    + omega.
-    + eapply Crct_Sort. eassumption.
-  - eapply Crct_Sort; eassumption.
-  - destruct (Crct_invrt_Prod H2 eq_refl). apply CrctProd.
-    + apply H; trivial. omega. apply (proj1 Crct_up). assumption.
-    + apply H0; trivial.
-  - destruct (Crct_invrt_Lam H2 eq_refl). apply CrctLam.
-    + apply H; trivial. omega. apply (proj1 Crct_up). assumption.
-    + apply H0; trivial.
-  - destruct (Crct_invrt_LetIn H3 eq_refl). apply CrctLetIn.
-    + apply H; trivial.
-    + apply H0; intuition. apply (proj1 Crct_up). assumption.
-    + apply H1; intuition.
-  - destruct (Crct_invrt_App H3 eq_refl) as [j1 [j2 [j3 j4]]]. 
-    apply mkApp_pres_Crct.
-    + apply H; trivial.
-    + apply CrctsCons.
-      * apply H0; trivial.
-      * apply H1; trivial.
-  - edestruct (Crct_invrt_Const H0).
-    + reflexivity.
-    + destruct H3 as [x [h1 h2]]. eapply (@CrctConst _ _ x); trivial.
-      * eapply Crct_Sort. eassumption.
-  - apply CrctInd. eapply Crct_Sort. eassumption.
-  - destruct ind.  edestruct (Crct_invrt_Construct H0).
-    + reflexivity.
-    + destruct H3 as [x [h1 h2]]. eapply CrctConstruct; try eassumption.
-      * eapply Crct_Sort. eassumption.
-  - destruct (Crct_invrt_Case H3 eq_refl) as [h1 [h2 h3]]. apply CrctCase.
-    + apply H; trivial.
-    + apply H1; trivial.
-    + apply H0; trivial.
-  - assert (j:= Crct_invrt_Fix H1 eq_refl). apply CrctFix. 
-    + eapply Crct_Sort. eassumption.
-    + rewrite <- (InstantiateDefs_pres_dlength i). apply H. omega.
-      * simpl in j. assumption.
-      * simpl in j. generalize (dlength d). induction n0.
-        rewrite <- plus_n_O. assumption.
-        rewrite <- plus_n_Sm. apply (proj1 Crct_up). assumption.
-  - apply CrctsNil. eapply Crct_Sort. eassumption.
-  - inversion_Clear H2. apply CrctsCons.
-    + apply H; trivial.
-    + apply H0; trivial.
-  - apply CrctDsNil. eapply Crct_Sort. eassumption.
-  - inversion_Clear H3. apply CrctDsCons.
-    + apply H; trivial.
-    + apply H0; trivial.
-    + apply H1; trivial.
-Qed.
-***************)
-
-(**
-Lemma Instantiate_pres_Crct:
-  forall tin, 
-  (forall n bod ins, Instantiate tin n bod ins ->
-  forall p, Crct p (S n) bod -> Crct p n tin -> Crct p n ins) /\
-  (forall n bods inss, Instantiates tin n bods inss ->
-  forall p, Crcts p (S n) bods -> Crct p n tin -> Crcts p n inss) /\
-  (forall n ds ids, InstantiateDefs tin n ds ids ->
-  forall p, CrctDs p (S n) ds -> Crct p n tin -> CrctDs p n ids).
-Proof.
-  intros tin. apply InstInstsDefs_ind; intros; trivial.
-  - destruct (Crct_invrt_Rel H eq_refl). apply CrctRel.
-    + omega.
-    + eapply Crct_Sort. eassumption.
-  - destruct (Crct_invrt_Rel H eq_refl). apply CrctRel.
-    + omega.
-    + eapply Crct_Sort. eassumption.
-  - eapply Crct_Sort; eassumption.
-  - destruct (Crct_invrt_Prod H1 eq_refl). apply CrctProd.
-    + apply H; trivial. apply (proj1 Crct_up). assumption.
-    + apply H0; trivial.
-  - destruct (Crct_invrt_Lam H1 eq_refl). apply CrctLam.
-    + apply H; trivial. apply (proj1 Crct_up). assumption.
-    + apply H0; trivial.
-  - destruct (Crct_invrt_LetIn H2 eq_refl). apply CrctLetIn.
-    + apply H; trivial.
-    + apply H0; intuition. apply (proj1 Crct_up). assumption.
-    + apply H1; intuition.
-  - destruct (Crct_invrt_App H2 eq_refl) as [j1 [j2 [j3 j4]]]. 
-    apply mkApp_pres_Crct.
-    + apply H; trivial.
-    + apply CrctsCons.
-      * apply H0; trivial.
-      * apply H1; trivial.
-  - edestruct (Crct_invrt_Const H).
-    + reflexivity.
-    + destruct H2 as [x [h1 h2]]. eapply (@CrctConst _ _ x); trivial.
-      * eapply Crct_Sort. eassumption.
-  - apply CrctInd. eapply Crct_Sort. eassumption.
-  - destruct ind.  edestruct (Crct_invrt_Construct H).
-    + reflexivity.
-    + destruct H2 as [x [h1 h2]]. eapply CrctConstruct; try eassumption.
-      * eapply Crct_Sort. eassumption.
-  - destruct (Crct_invrt_Case H2 eq_refl) as [h1 [h2 h3]]. apply CrctCase.
-    + apply H; trivial.
-    + apply H1; trivial.
-    + apply H0; trivial.
-  - assert (j:= Crct_invrt_Fix H0 eq_refl). apply CrctFix. 
-    + eapply Crct_Sort. eassumption.
-    + rewrite <- (InstantiateDefs_pres_dlength i). apply H. trivial.
-      * generalize (dlength d). induction n0.
-        rewrite <- plus_n_O. assumption.
-        rewrite <- plus_n_Sm. apply Crct_up. assumption.
-  - apply CrctsNil. eapply Crct_Sort. eassumption.
-  - inversion_Clear H1. apply CrctsCons.
-    + apply H; trivial.
-    + apply H0; trivial.
-  - apply CrctDsNil. eapply Crct_Sort. eassumption.
-  - inversion_Clear H2. apply CrctDsCons.
-    + apply H; trivial.
-    + apply H0; trivial.
-    + apply H1; trivial.
-Qed.
-**)
-
 Lemma instantiate_pres_Crct:
   forall p m bod, Crct p (S m) bod ->
   forall n tin, n <= m -> Crct p m tin -> Crct p m (instantiate tin n bod).
@@ -1169,64 +1038,6 @@ Proof.
   intros. eapply (proj1 (Instantiate_pres_Crct tin)); try eassumption.
   - apply (proj1 (instantiate_Instantiate tin)). 
 Qed.
-
-(***
-Lemma Instantiate_pres_Crct:
-  forall tin, 
-  (forall n bod ins, Instantiate tin n bod ins ->
-  forall p m, Crct p m bod -> Crct p m tin -> Crct p m ins) /\
-  (forall n bods inss, Instantiates tin n bods inss ->
-  forall p m, Crcts p m bods -> Crct p m tin -> Crcts p m inss) /\
-  (forall n ds ids, InstantiateDefs tin n ds ids ->
-  forall p m, CrctDs p m ds -> Crct p m tin -> CrctDs p m ids).
-Proof.
-  intros tin. apply InstInstsDefs_ind; intros; trivial.
-  - destruct (Crct_invrt_Rel H eq_refl). apply CrctRel. omega. assumption.
-  - destruct (Crct_invrt_Prod H1 eq_refl). apply CrctProd.
-    + apply H; trivial. apply (proj1 Crct_up). assumption.
-    + apply H0; trivial.
-  - destruct (Crct_invrt_Lam H1 eq_refl). apply CrctLam.
-    + apply H; trivial. apply (proj1 Crct_up). assumption.
-    + apply H0; trivial.
-  - destruct (Crct_invrt_LetIn H2 eq_refl). apply CrctLetIn.
-    + apply H; trivial.
-    + apply H0; intuition. apply (proj1 Crct_up). assumption.
-    + apply H1; intuition.
-  - destruct (Crct_invrt_App H2 eq_refl) as [j1 [j2 [j3 j4]]]. 
-    apply mkApp_pres_Crct.
-    + apply H; trivial.
-    + apply CrctsCons.
-      * apply H0; trivial.
-      * apply H1; trivial.
-  - destruct (Crct_invrt_Case H2 eq_refl) as [h1 [h2 h3]]. apply CrctCase.
-    + apply H; trivial.
-    + apply H1; trivial.
-    + apply H0; trivial.
-  - assert (j:= Crct_invrt_Fix H0 eq_refl). apply CrctFix. 
-    + eapply Crct_prop. eassumption.
-    + apply H. 
-      * rewrite <- (InstantiateDefs_pres_dlength i). assumption.
-      * generalize (dlength id). induction n0.
-        rewrite <- plus_n_O. assumption.
-        rewrite <- plus_n_Sm. apply Crct_up. assumption.
-  - inversion_Clear H1. apply CrctsCons.
-    + apply H; trivial.
-    + apply H0; trivial.
-  - inversion_Clear H2. apply CrctDsCons.
-    + apply H; trivial.
-    + apply H0; trivial.
-    + apply H1; trivial.
-Qed.
-
-Lemma instantiate_pres_Crct:
-  forall p n bod, Crct p (S n) bod ->
-  forall tin, Crct p n tin -> Crct p n (instantiate tin n bod).
-Proof.
-  intros. eapply (proj1 (Instantiate_pres_Crct tin)); trivial.
-  - apply (proj1 (instantiate_Instantiate tin)); assumption.
-  - assumption.
-Qed.
-***)
 
 Lemma whBetaStep_pres_Crct:
   forall p n bod, Crct p (S n) bod ->
@@ -1276,8 +1087,53 @@ Proof.
     apply (tnth_pres_Crct h2 _ H).
 Qed. 
 
+Lemma fold_left_pres_Crct:
+  forall p m (f:Term -> nat -> Term) (ns:list nat) (t:Term),
+    (forall u, Crct p m u -> forall n, Crct p m (f u n)) ->
+    Crct p m t -> Crct p m (fold_left f ns t).
+Proof.
+  intros p n f. induction ns; simpl; intros.
+  - assumption.
+  - apply IHns.
+    + intros. apply H. assumption.
+    + apply H. assumption.
+Qed.
 
 (***
+Lemma whFixStep_pres_Crct:
+  forall dts m args,
+  forall p i, CrctDs p i dts -> Crcts p i args -> i >= dlength dts ->
+              Crcts p i args -> Crct p i (whFixStep dts m args).
+Proof.
+  Admitted.
+(***)
+  intros dts m args p i h2 h3 h4.
+  unfold whFixStep, pre_whFixStep.
+(*  Check fold_left_pres_mkApp. *)
+  induction dts.
+  - simpl in *. inversion_Clear h2. inversion_Clear h4. assumption.
+    assert (j: n + 0 = n). induction n; auto.
+    rewrite j in *. constructor; try assumption. not_isApp.
+  - simpl in h3. eapply IHdts. simpl in h1. simpl.
+
+    rewrite 
+    constructor.
+  functional induction (fold_left
+            (fun (bod : Term) (ndx : nat) => instantiate (TFix dts ndx) 0 bod)
+            (list_to_zero (dlength dts)) (dnthBody m dts)).
+  - rewrite <- h1. inversion_Clear h4.
+    +
+  - simpl in *. destruct args.
+  - unfold whFixStep in h1. simpl in h1. discriminate.
+  - simpl in h3. unfold whFixStep in h1. simpl in h1.
+    injection h1; intros j. rewrite <- j. admit.
+  - unfold whFixStep in h1. simpl in h1.
+
+ destruct (dnthBody m dts).
+***)
+
+
+ (***
 Goal
   forall dts m args n t s i,
     whFixStep dts m args = whFixStep (dcons n t s i dts) (S m) args.

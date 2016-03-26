@@ -49,12 +49,11 @@ Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
              whFixStep dts m (tcons arg args) = fs ->
              WcbvEval p fs s ->
              WcbvEval p (TApp fn arg args) s
-| wAppCong: forall fn efn arg arg1 args args1,
-              WcbvEval p fn efn ->
-              ~ isApp efn -> ~ isLambda efn -> ~ isFix efn ->
+| wAppAx: forall fn ax arg arg1 args args1,
+              WcbvEval p fn (TConst ax) ->
               WcbvEval p arg arg1 ->
               WcbvEvals p args args1 ->
-              WcbvEval p (TApp fn arg args) (TApp efn arg1 args1)
+              WcbvEval p (TApp fn arg args) (TApp (TConst ax) arg1 args1)
 | wCase0: forall l mch i n brs cs s,
             WcbvEval p mch (TConstruct i n) ->
             whCaseStep n tnil brs = Some cs ->
@@ -66,6 +65,10 @@ Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
            whCaseStep n ts brs = Some cs ->
            WcbvEval p cs s ->
            WcbvEval p (TCase ml mch brs) s
+| wCaseAx: forall mch ax ml brs brs',
+           WcbvEval p mch (TConst ax) ->
+           WcbvEvals p brs brs' ->           
+           WcbvEval p (TCase ml mch brs) (TCase ml (TConst ax) brs')
 with WcbvEvals (p:environ) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
 | wCons: forall t t' ts ts',
@@ -126,7 +129,8 @@ Proof.
     apply whFixStep_pres_WFapp.
     + specialize (H H3). inversion_Clear H. assumption.
     + constructor; assumption.
-  - inversion_Clear H2. apply wfaApp; try intuition.
+  - inversion_Clear H2. constructor; intuition.
+    destruct H2 as [x1 [x2 [x3 j]]]. discriminate.
   - apply H0. inversion_Clear H1.
     refine (whCaseStep_pres_WFapp _ _ _ e); auto.
   - apply H0. inversion_Clear H1.
@@ -135,6 +139,7 @@ Proof.
     refine (tskipn_pres_WFapp _ _ e). intuition.
   - inversion_Clear H1. intuition. 
   - inversion_Clear H1. constructor; intuition.
+  - inversion_Clear H1. intuition.
 Qed.
 
 Lemma WcbvEval_weaken:
@@ -208,36 +213,39 @@ intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
     * apply H0. eapply whFixStep_pres_WFapp. assumption.
       constructor; assumption.
 - inversion_Clear H2.
-  eapply (@wERTCtrn _ _ (TApp efn arg args)).
+  specialize (H1 H9). specialize (H0 H8). specialize (H H7).
+  eapply (@wERTCtrn _ _ (TApp (TConst ax) arg args)).
   + rewrite <- mkApp_goodFn; try assumption.
-    rewrite <- mkApp_goodFn; try assumption. 
-    apply wndEvalRTC_App_fn. apply H; assumption. assumption.
-  + eapply (@wERTCtrn _ _ (TApp efn arg1 args)).
-    * { apply wndEvalRTC_App_arg; try not_isApp.
-        - apply H0. assumption. }
-    * { eapply (@wERTCtrn _ _ (TApp efn arg1 args1)).
-        - apply wndEvalsRTC_App_args; try not_isApp.
-          + apply H1. assumption. 
+    rewrite <- mkApp_goodFn; try not_isApp.
+    apply wndEvalRTC_App_fn. apply H. assumption.
+  + eapply (@wERTCtrn _ _ (TApp (TConst ax) arg1 args)).
+    * { apply wndEvalRTC_App_arg; try not_isApp; try assumption. }
+    * { eapply (@wERTCtrn _ _ (TApp (TConst ax) arg1 args1)).
+        - apply wndEvalsRTC_App_args; try not_isApp; try assumption.
         - apply wERTCrfl. }
-- inversion_Clear H1. eapply wERTCtrn. 
-  + eapply wndEvalRTC_Case_mch. apply H. assumption.
-  + eapply (@wERTCtrn _ _ cs). 
+- inversion_Clear H1. specialize (H H4).
+  specialize (H0 (whCaseStep_pres_WFapp H6 wfanil _ e)).
+  eapply wERTCtrn. 
+  + eapply wndEvalRTC_Case_mch. eassumption.
+  + eapply (@wERTCtrn _ _ cs).
     * apply wERTCstep. apply sCase0. assumption.
-    * { apply H0. eapply whCaseStep_pres_WFapp.
-        - eapply H6.
-        - eapply wfanil.
-        - eassumption. }
+    * assumption.
 - inversion_Clear H1. eapply wERTCtrn. 
   + eapply wndEvalRTC_Case_mch. apply H. assumption.
-  + eapply (@wERTCtrn _ _ cs). 
+  + eapply (@wERTCtrn _ _ cs).
     * apply wERTCstep. eapply sCasen; eassumption.
-    * { apply H0.  refine (whCaseStep_pres_WFapp _ _ _ e0); try assumption.
-        - assert (j: WFapps  (tcons arg args)).
+    * { apply H0. refine (whCaseStep_pres_WFapp _ _ _ e0). assumption.
+        - assert (j: WFapps (tcons arg args)).
           { assert (k:= proj1 (WcbvEval_presWFapp hp) _ _ w H4).
             inversion_clear k. constructor; assumption. }
-          inversion_Clear j.          
+          inversion_Clear j.
           eapply (@tskipn_pres_WFapp (tcons arg args)); try eassumption.
-          constructor; eassumption. }
+          constructor; assumption. }
+- inversion_Clear H1. eapply wERTCtrn.
+  + eapply wndEvalRTC_Case_mch. apply H. assumption.
+  + eapply (@wERTCtrn _ _  (TCase ml (TConst ax) brs')).
+    * apply wndEvalRTC_Case_brs. intuition.
+    * apply wERTCrfl. 
 - inversion_Clear H1. eapply (@wEsRTCtrn _ _ (tcons t' ts)).
   + apply wndEvalsRTC_tcons_hd. apply H. assumption.
   + eapply (@wEsRTCtrn _ _ (tcons t' ts')).
@@ -249,19 +257,6 @@ intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
     * apply wndDEvalsRTC_dcons_hd. intuition.
     * apply wndDEvalsRTC_dcons_tl. intuition.
 Qed.
-
-
-(************  FALSE as stated:
-**** nm might occur hereditarily in delta expansion of t   ****
-Lemma WcbvEval_strengthen:
-  forall pp,
-  (forall t s, WcbvEval pp t s -> forall nm ec p, pp = (nm, ec)::p ->
-        ~ PoccTrm nm t -> WcbvEval p t s) /\
-  (forall ts ss, WcbvEvals pp ts ss -> forall nm ec p, pp = (nm,ec)::p ->
-        ~ PoccTrms nm ts -> WcbvEvals p ts ss).
-Proof.
-*************)
-
 
 
 (** WcbvEval makes progress **
@@ -278,8 +273,6 @@ Proof.
     Check (MkApp_tcons_isApp (tcons arg args)).
 
 ***)
-
-
 
 
 (***************** ***
@@ -536,7 +529,8 @@ Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
                 wcbvEval n p (whFixStep dts m (tcons a1 args))
               | Some (TLambda _ bod), Some ea1, _ =>
                 wcbvEval n p (whBetaStep bod ea1 args)
-              | Some T, Some ea1, Some eargs => Some (TApp T ea1 eargs)
+              | Some  (TConst ax), Some ea1, Some eargs =>
+                Some (TApp (TConst ax) ea1 eargs)
               | _, _, _ => None
             end
           | TCase ml mch brs =>
@@ -558,7 +552,10 @@ Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
                                      end
                       end
                     | TConst nm, _ => (* mch evals to an axiom *)
-                      Some (TCase ml (TConst nm) brs)
+                      match wcbvEvals n p brs with
+                            | Some brs' => Some (TCase ml (TConst nm) brs')
+                            | None => None
+                      end
                     | _, _ => None
                   end)
              end)
@@ -609,57 +606,47 @@ with wcbvDEvals (tmr:nat) (p:environ) (ds:Defs) {struct tmr}
                 end
             end
         end).
-(***
-Functional Scheme wcbvEval_ind := Induction for wcbvEval Sort Prop
-with wcbvEvals_ind := Induction for wcbvEvals Sort Prop.
-Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind, wcbvEvals_ind.
-
+Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
+with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop
+with wcbvDEvals_ind' := Induction for wcbvDEvals Sort Prop.
+Combined Scheme wcbvEvalEvalsDEvals_ind
+         from wcbvEval_ind', wcbvEvals_ind', wcbvDEvals_ind'.
 
 (** wcbvEval and WcbvEval are the same relation **)
 Lemma wcbvEval_WcbvEval:
   forall n p,
-  (forall t s, wcbvEval n p t = Some s -> WcbvEval p t s) /\
-  (forall ts ss, wcbvEvals n p ts = Some ss -> WcbvEvals p ts ss).
-intros n p.
-apply (wcbvEvalEvals_ind 
-  (fun n p t o => forall s, o = Some s -> WcbvEval p t s)
-  (fun n p ts os => forall ss, os = Some ss -> WcbvEvals p ts ss));
-  intros; try discriminate;
-  try (solve [injection H; intros h; subst; constructor]).
-- apply wCast. intuition.
-- eapply wLetIn.
-  + apply H. eassumption.
-  + apply H0. assumption.
-- subst. eapply wAppLam.
-  + apply H. eassumption.
-  + apply H0. eassumption.
-  + apply H1. eassumption.
-- subst. injection H2. intros. rewrite <- H3. eapply wAppInd.
-  + eapply H. eassumption.
-  + eapply H0. eassumption.
-  + eapply H1. eassumption.
-- subst. injection H2. intros. rewrite <- H3. eapply wAppCnstr.
-  + eapply H. eassumption.
-  + eapply H0. eassumption.
-  + eapply H1. eassumption.
-- subst. eapply wAppFix.
-  + apply H. eassumption.
-  + eassumption.
-  + apply H0. eassumption.
-- subst. eapply wConst. apply lookupDfn_LookupDfn. eassumption.
-  + apply H. eassumption.
-- subst. eapply wCasen; try eassumption.
-  + apply H. eassumption.
-  + apply H0. eassumption.
-- subst. eapply wCase0; try assumption.
-  + apply H. eassumption.
-  + eassumption.
-  + apply H0. eassumption.
-- subst. injection H1. intros. rewrite <- H2. constructor.
-  + apply H. assumption.
-  + apply H0. assumption.
+    (forall t s, wcbvEval n p t = Some s -> WcbvEval p t s) /\
+    (forall ts ss, wcbvEvals n p ts = Some ss -> WcbvEvals p ts ss) /\
+    (forall (ds es:Defs), wcbvDEvals n p ds = Some es -> WcbvDEvals p ds es).
+Proof.
+  intros n p.
+  apply (wcbvEvalEvalsDEvals_ind
+           (fun n p t o => forall s, o = Some s -> WcbvEval p t s)
+           (fun n p ts os => forall ss, os = Some ss -> WcbvEvals p ts ss)
+           (fun n p t su => forall u, su = Some u -> WcbvDEvals p t u));
+    intros; try discriminate;
+    try (myInjection H); try (myInjection H0);
+    try (myInjection H1); try (myInjection H2);
+    try(solve[constructor]); intuition.
+  - eapply wConst; intuition.
+    + unfold LookupDfn. apply lookup_Lookup. eassumption.
+  - apply wAx. unfold LookupAx. apply lookup_Lookup. eassumption.
+  - eapply wAppFix; intuition.
+    + apply H. eassumption.
+  - eapply wAppLam; intuition.
+    + apply H. eassumption.
+    + apply H0. eassumption.
+  - destruct ml. simpl in e3. subst. eapply wCase0; intuition.
+    + apply H. eassumption.
+    + assumption.
+  - eapply wCasen; intuition.
+    + eapply H. rewrite e1. apply f_equal. eassumption.
+    + rewrite e3. rewrite e4. reflexivity.
+    + assumption.
+  - eapply wLetIn; intuition.
+    + apply H. assumption.
 Qed.
-***)
+
 
 (* need this strengthening to large-enough fuel to make the induction
 ** go through
@@ -685,7 +672,7 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
 - destruct H. exists (S x). intros m h. unfold LookupDfn in l.
   simpl. rewrite (Lookup_lookup l). rewrite (j m x); try omega.
   apply H. omega.
-- destruct H; destruct H0; destruct H1. exists (S (max x (max x0 x1))).
+- destruct H, H0, H1. exists (S (max x (max x0 x1))).
   intros m h.
   assert (k:wcbvEval m p fn = Some (TLambda nm bod)).
   + rewrite (j m (max x (max x0 x1))). apply H.
@@ -710,21 +697,18 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   simpl. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
   rewrite e. rewrite (H0 (mx - 1)); try omega.
   rewrite <- (H0 mx); try omega. reflexivity.
-- destruct H, H0, H1. exists (S (max x (max x0 x1))). intros mx h.
+- destruct H, H0, H1. exists (S (max x (max x0 x1))). intros m h.
   assert (j1:= max_fst x (max x0 x1)). 
-  assert (lx: mx > x). omega.
+  assert (lx: m > x). omega.
   assert (j2:= max_snd x (max x0 x1)).
   assert (j3:= max_fst x0 x1).
-  assert (lx0: mx > x0). omega.
+  assert (lx0: m > x0). omega.
   assert (j4:= max_snd x0 x1).
   assert (j5:= max_fst x0 x1).
-  assert (lx1: mx > x1). omega.
-  simpl. rewrite (j mx x); try omega.
-  rewrite (H (mx - 1)); try omega.
-  rewrite (H0 (mx - 1)); try omega.
-  rewrite (H1 (mx - 1)); try omega. destruct efn; try reflexivity.
-  + elim n0. auto.
-  + elim n1. auto.
+  assert (lx1: m > x1). omega.
+  simpl. rewrite (j m x); try omega.
+  rewrite H; try omega. rewrite H0; try omega. rewrite H1; try omega.
+  reflexivity.  
 - destruct H, H0. exists (S (max x x0)). intros mx h.
   assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
   simpl. rewrite (j mx x); try rewrite (H (mx - 1)); try omega.
@@ -733,22 +717,22 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
   simpl. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
   rewrite e. rewrite e0. apply H0. omega.
-- destruct H, H0. exists (S (max x x0)). intros m h.
-  assert (k:wcbvEval m p t = Some t').
-  assert (l:= max_fst x x0).
-  rewrite (j m (max x x0)). apply H. omega. omega.
-  assert (k0:wcbvEvals m p ts = Some ts').
-  assert (l:= max_snd x x0).
-  rewrite (j m (max x x0)). apply H0. omega. omega.
-  simpl. rewrite k. rewrite k0. reflexivity.
-- destruct H, H0. exists (S (max x x0)). intros m h.
-  assert (k:wcbvEval m p s = Some s').
-  assert (l:= max_fst x x0).
-  rewrite (j m (max x x0)). apply H. omega. omega.
-  assert (k0:wcbvDEvals m p ds = Some ds').
-  assert (l:= max_snd x x0).
-  rewrite (j m (max x x0)). apply H0. omega. omega.
-  simpl. rewrite k. rewrite k0. reflexivity.
+- destruct H, H0. exists (S (max x x0)). intros mx h.
+  assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+  simpl. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
+  rewrite H0; try omega. reflexivity.
+- destruct H, H0. exists (S (max x x0)). intros mx h.
+  assert (j1:= max_fst x x0). assert (j2:= max_snd x x0).
+  assert (lx: mx > x). omega.  assert (lx0: mx > x0). omega.
+  simpl. rewrite (j mx x); try omega.
+  rewrite (H (mx - 1)); try omega. rewrite (H0 (mx - 1)); try omega.
+  reflexivity.
+- destruct H, H0. exists (S (max x x0)). intros mx h.
+  assert (j1:= max_fst x x0). assert (j2:= max_snd x x0).
+  assert (lx: mx > x). omega.  assert (lx0: mx > x0). omega.
+  simpl. rewrite (j mx x); try omega.
+  rewrite (H (mx - 1)); try omega. rewrite (H0 (mx - 1)); try omega.
+  reflexivity.
 Qed.
 
 Lemma WcbvEval_wcbvEval:

@@ -1484,9 +1484,11 @@ Definition pre_whFixStep body dts args : Term :=
              (fun bod ndx => instantiate (TFix dts ndx) 0 bod)
              (list_to_zero (dlength dts)) body in
   (mkApp f args).
+Functional Scheme pre_whFixStep_ind := Induction for pre_whFixStep Sort Prop.
 
 Definition whFixStep (dts:Defs) (m:nat) (args:Terms) : Term :=
   pre_whFixStep (dnthBody m dts) dts args.
+Functional Scheme whFixStep_ind := Induction for whFixStep Sort Prop.
 
 Lemma whFixStep_mkApp:
   forall (dts:Defs) (m:nat) (args:Terms),

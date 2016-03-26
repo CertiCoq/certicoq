@@ -407,6 +407,17 @@ induction 1; intros.
 - eapply wETCtrn. apply IHwndEvalTC1. apply IHwndEvalTC2.
 Qed.
 
+Lemma wndEvalRTC_Case_brs:
+  forall p brs brs',
+    wndEvalsRTC p brs brs' -> 
+    forall np mch, 
+      wndEvalRTC p (TCase np mch brs) (TCase np mch brs').
+induction 1; intros.
+- constructor.
+- constructor. apply sCaseBrs. assumption.
+- eapply wERTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
+Qed.
+
 Lemma wndEvalsRTC_tcons_hd:
   forall p t t' ts,
     wndEvalRTC p t t' -> wndEvalsRTC p (tcons t ts) (tcons t' ts).

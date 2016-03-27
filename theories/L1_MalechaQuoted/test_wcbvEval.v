@@ -33,7 +33,7 @@ Print p_tst.
 Definition exc_wcbvEval (tmr:nat) (pgm:program): exception Term :=
   match program_Program pgm (ret nil) with
     | Exc str => Exc str
-    | Ret pgm => wcbvEval tmr (env pgm) (main pgm)
+    | Ret pgm => wcbvEval (env pgm) tmr (main pgm)
   end.
 Definition exc_WcbvEval (pgm:program) (ans:term) : Prop :=
   match program_Program pgm (ret nil), term_Term ans with

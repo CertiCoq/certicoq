@@ -16,7 +16,7 @@ Set Implicit Arguments.
 Definition exc_wcbvEval (tmr:nat) (pgm:program): option Term :=
   match program_Program pgm with
     | None => None
-    | Some pgm => wcbvEval tmr (L2.program.env pgm) (L2.program.main pgm)
+    | Some pgm => wcbvEval (L2.program.env pgm) tmr (L2.program.main pgm)
   end.
 
 (** Olivier's example **)

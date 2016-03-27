@@ -133,6 +133,16 @@ intros hp. apply WcbvEvalEvals_ind; simpl; intros; auto.
   + destruct H2 as [x1 [x2 j]]. discriminate.
   + destruct H2 as [x1 [x2 j]]. discriminate.
   + destruct H2 as [x1 [x2 [x3 j]]]. discriminate.
+- inversion_Clear H2.
+  constructor; intuition; unfold isLambda, isFix, isApp in *.
+  + destruct H2 as [x1 [x2 j]]. discriminate.
+  + destruct H2 as [x1 [x2 j]]. discriminate.
+  + destruct H2 as [x1 [x2 [x3 j]]]. discriminate.
+ - inversion_Clear H2.
+  constructor; intuition; unfold isLambda, isFix, isApp in *.
+  + destruct H2 as [x1 [x2 j]]. discriminate.
+  + destruct H2 as [x1 [x2 j]]. discriminate.
+  + destruct H2 as [x1 [x2 [x3 j]]]. discriminate.
 - inversion_Clear H1. apply H0.
   refine (whCaseStep_pres_WFapp _ _ _ e); auto.
 - inversion_Clear H1. apply H0.

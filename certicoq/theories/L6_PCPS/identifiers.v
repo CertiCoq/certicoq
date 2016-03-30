@@ -5,7 +5,7 @@ Module FVSet := MSetRBT.Make POrderedType.Positive_as_OT.
 
 Import FVSet.
 
-(** f is in a function defined in fs *)
+(** f is a function defined in fs *)
 Fixpoint name_in_fundefs f (fs : fundefs) :=
   match fs with
     | Fnil => False

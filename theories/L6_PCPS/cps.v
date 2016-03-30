@@ -17,12 +17,9 @@ Import Nnat.
 Require Import HashMap.
 
 (* We will use several maps from identifiers to types, values, etc.
- * For now we'll use Xavier Leroy's efficient polymorphic maps from positive numbers to _.
- * When the MMaps module of the Coq stdlib is created, we'll use that.
- *)
-
-
-
+ * For now we'll use Xavier Leroy's efficient polymorphic maps from 
+ * positive numbers to _. When the MMaps module of the Coq stdlib is
+ * created, we'll use that. *)
 
 Module M := Maps.PTree.
 Module T := ExtLib.Core.Type.
@@ -38,7 +35,7 @@ Module T := ExtLib.Core.Type.
 
  Fixpoint setlist {A} (xs: list M.elt) (vs: list A) (rho: M.t A) : option (M.t A) :=
  match xs, vs with
- | x::xs', v::vs' => match setlist xs' vs rho with
+ | x::xs', v::vs' => match setlist xs' vs' rho with
                             | Some rho' => Some (M.set x v rho')
                             | None => None
                             end
@@ -134,8 +131,8 @@ Scheme exp_mut := Induction for exp Sort Prop
             the CPS transform of [ts->t], where [ts] are the type of the [ys].
 
    [Fdef f t ys e]   defines a function [f] of type [t] with parameters [ys]
-             and body [e].  We do not syntactically distinguish continuations from
-             other functions, as Andrew Kennedy does [Compiling with 
+             and body [e].  We do not syntactically distinguish continuations 
+             from other functions, as Andrew Kennedy does [Compiling with 
              Continuations, Continued, 2007].  Instead, we rely on the type 
              system to do it; see below.  This mechanism also permits
              classifying functions into different calling conventions, even 
@@ -406,10 +403,8 @@ with welltyped_funbodies (TD: tdict): forall (Gamma: tenv) (fbody: fundefs), Pro
 
 (*********** evaluation ********************)
 
-
-
 Inductive val : Type :=
-| Vconstr: type -> tag -> list val -> val                                        
+| Vconstr: type -> tag -> list val -> val
 | Vfun: M.t val -> fundefs -> var -> val
 (* Vfun env fds f where 
        env is the environment at the function binding site
@@ -417,12 +412,12 @@ Inductive val : Type :=
 | Vint: Z -> val
 | Vother: type -> val
 (* OSB: add constructor for observer functions *)
-| Vobvs: type -> val.
-
-
-
-
-
+| Vobvs: type -> val
+(* Constructor to return values to the environment. 
+ * Correspons to Obs with the difference that the values
+ * in the list need not be observable. The type is the 
+ * type of the observe *)
+| Vobservable : type -> list val -> val.
 
 Definition env := M.t val.  (* An [env]ironment maps [var]s to their [val]ues *)
 
@@ -434,7 +429,6 @@ Inductive type_of_val : val -> type -> Prop :=
 | TVother: type_of_val (Vother t) t
 | TVobvs : type_of_val (Vobs t) t   
 . *)
-
 
 
 

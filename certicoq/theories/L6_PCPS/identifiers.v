@@ -1,5 +1,5 @@
 Require Import cps cps_util shrink_cps.
-Require Import BinNat Relations MSets MSetRBT.
+Require Import BinNat Relations Coq.MSets.MSetRBT List.
 
 Module FVSet := MSetRBT.Make POrderedType.Positive_as_OT.
 

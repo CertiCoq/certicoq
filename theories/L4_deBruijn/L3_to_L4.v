@@ -22,6 +22,8 @@ Require L3.L3.
 Module L3eval := L3.wcbvEval.
 Module L3t := L3.term.
 Module L3U := L3.unaryApplications.
+Module L3N := L3.wNorm.
+
 Require Import L4.expression.
 
 Definition dcon_of_con (i : inductive) (n : nat) := N.of_nat n.
@@ -501,7 +503,8 @@ Proof.
   + simpl. clear IHk0.
     rewrite mkLets_app.
     simpl.
-    econstructor. instantiate (v1 := snd x). admit.
+    econstructor. instantiate (v1 := snd x).
+    (* Value invariant of environment entries *) admit.
     simpl in IHk.
     simpl.
     rewrite sbst_lets.
@@ -529,14 +532,153 @@ Lemma subst_env_aux_var e k nm t :
 Proof.
   revert t; induction e; intros; simpl.
   - inversion H.
+  - 
 Admitted.
 
+Lemma subst_env_application e t u :
+  subst_env e (t $ u) = (subst_env e t $ subst_env e u).
+Proof. revert t u; induction e; intros; simpl; try rewrite IHe; reflexivity. Qed.
+
+
+Lemma subst_env_lambda e t :
+  subst_env (translate_env e) (Lam_e t) =
+  Lam_e (subst_env_aux (translate_env e) 1 t).
+Proof.
+  revert t; induction e; intros; simpl.
+
+  reflexivity.
+  destruct a as [s [trm | ty]]; simpl.
+  rewrite <- IHe. reflexivity.
+
+  apply IHe.
+Qed.
+
+Lemma subst_env_instantiate e a k b :
+  subst_env e (translate e (L3.term.instantiate a k b)) =
+  ((subst_env_aux e 1 (trans e 1 b)) {0 ::= subst_env e (translate e a)}).
+Proof.
+  revert a k b; induction e; intros; simpl.
+
+  induction b; simpl. unfold L3.term.instantiate.
+  rewrite nat_compare_equiv.
+  destruct lt_dec. admit.
+  unfold nat_compare_alt. destruct (lt_eq_lt_dec k n) as [[Hlt|Heq]|Hgt].
+  destruct N.eq_dec.
+  assert(n = 0%nat). admit. subst n. inversion Hlt.
+  unfold translate. simpl. rewrite Nnat.Nat2N.inj_pred.
+  now rewrite N.pred_sub.
+
+  subst k. 
+  destruct N.eq_dec. reflexivity.
+Admitted.
+
+Lemma eval_dummy e : eval (subst_env e dummy) (subst_env e dummy).
+Proof.
+  unfold dummy, subst_env. simpl.
+  induction e; simpl; try apply IHe. constructor. constructor.
+Qed.
+
+Definition map_terms (f : L3t.Term -> exp) :=
+  fix map_terms (l : L3t.Terms) : exps :=
+  match l with
+  | L3t.tnil => enil
+  | L3t.tcons t ts => econs (f t) (map_terms ts)
+  end.
+
+Definition map_exps (f : exp -> exp) :=
+  fix map_exps (l : exps) : exps :=
+  match l with
+  | enil => enil
+  | econs t ts => econs (f t) (map_exps ts)
+  end.
+
+Lemma subst_env_con_e e i r args :
+  subst_env e (Con_e (dcon_of_con i r) args) =
+  Con_e (dcon_of_con i r) (map_exps (subst_env e) args).
+Proof.
+  revert i r args; induction e; simpl; intros.
+  f_equal. induction args; simpl; try rewrite IHargs at 1; reflexivity.
+  
+  rewrite IHe. f_equal.
+  induction args; simpl; try rewrite IHargs at 1; reflexivity.
+Qed.
+
+Lemma subst_env_constructor e i r args :
+  subst_env e (translate e (L3.term.TConstruct i r args)) =
+  Con_e (dcon_of_con i r) (map_terms (fun x => subst_env e (translate e x)) args).
+Proof.
+  revert i r args; induction e; intros; unfold translate.
+  - reflexivity.
+  - simpl trans. rewrite subst_env_con_e. f_equal.
+    induction args; simpl; try rewrite IHargs; try reflexivity.
+Qed.
+
+Lemma subst_env_lete e d b :
+  subst_env e (Let_e d b) = Let_e (subst_env e d) (subst_env_aux e 1 b).
+Proof.
+  revert d b; induction e; intros; simpl; try rewrite IHe; reflexivity.
+Qed.
+
+Lemma subst_env_letin e n d b :
+  subst_env e (translate e (L3.term.TLetIn n d b)) =
+  Let_e (subst_env e (translate e d)) (subst_env_aux e 1 (trans e 1 b)).
+Proof.
+  unfold translate. simpl.
+  now rewrite subst_env_lete.
+Qed.
+
+Inductive wf_environ : environ -> Prop :=
+| wf_nil : wf_environ []
+| wf_cons_trm s t e : L3t.WFTrm t 0 -> wf_environ e -> wf_environ (cons (s, ecTrm t) e)
+| wf_cons_ty s n t e : wf_environ e -> wf_environ (cons (s, ecTyp n t) e).
+
+Lemma wf_environ_lookup (e : environ) (t : L3.term.Term) nm :
+  wf_environ e -> LookupDfn nm e t -> L3t.WFTrm t 0.
+Proof.
+  intros wfe Het. revert wfe. red in Het.
+  dependent induction Het; intros wfe.
+  now inversion_clear wfe.
+  apply IHHet. now inversion_clear wfe.
+Qed.
+
+Lemma wftrm_0_no_redex:
+  forall (e : environ) (efn : L3.term.Term),
+    ~ L3.term.isApp efn ->
+    ~ L3.term.isLambda efn ->
+    ~ L3.term.isFix efn ->
+    ~ L3.term.isConstruct efn ->
+    L3N.WNorm efn ->
+    L3t.WFTrm efn 0 -> translate (translate_env e) efn = dummy.
+Proof.
+  intros e efn H0 H1 H2 H3 H6 H7.
+  revert H0 H1 H2 H3 H6.
+  inversion_clear H7; unfold translate; simpl; intros; try reflexivity.
+
+  inversion H.
+  elim H1. apply L3.term.IsLambda.
+
+  inversion_clear H6.
+  elim H1; apply L3.term.IsApp.
+
+  inversion_clear H6.
+  elim H3. apply L3.term.IsConstruct.
+  
+  inversion_clear H6.
+
+  admit.
+
+  elim H2. apply L3.term.IsFix.
+
+Admitted.
+
+  
 Theorem translate_correct (e : environ) (t t' : L3t.Term) :
+  wf_environ e -> L3t.WFTrm t 0 ->
   L3eval.WcbvEval e t t' -> (* small step non-deterministic *)
   let e' := translate_env e in
   eval (mkLets e' (translate e' t)) (subst_env e' (translate e' t')). (* big-step deterministic *)
 Proof.
-  cbn. intros H. apply eval_lets.
+  cbn. intros wfe wft H. apply eval_lets.
   induction H.
 
   + (* Lambda *)
@@ -544,44 +686,82 @@ Proof.
     rewrite subst_env_lam. constructor.
 
   + (* Prod *)
-    cbn. 
-    admit.
+    cbn. apply eval_dummy.
 
-  + unfold translate. (* mutual *)
-    admit.
+  + (* Constructor *)
+    rewrite !subst_env_constructor.
+    constructor.
+    induction H. constructor.
+    constructor. (* Need mutual statement *) admit.
+    apply IHWcbvEvals.
 
+    - inversion_clear wft. constructor. now inversion_clear H1. 
+    
   + (* Ind *)
     unfold translate.
-    simpl.
-    admit.
+    simpl. apply eval_dummy.
 
   + (* Sort *)
-    admit.
+    apply eval_dummy.
 
   + (* Fix *)
     admit.
 
   + (* Ax *)
-    admit.
+    unfold translate. simpl. apply eval_dummy.
     
   + (* Const *)
     unfold translate.
     simpl.
     (* IH is not strong enough here *)
     unfold subst_env at 1.
-    erewrite subst_env_aux_var.
-    apply IHWcbvEval. assumption.
+    erewrite subst_env_aux_var; try eassumption.
+    apply IHWcbvEval.
 
+    - apply wf_environ_lookup in H; auto.
+    
   + (* App Lam *)
-    admit.
+    unfold translate.
+    simpl.
+    rewrite subst_env_application.
+    inversion_clear wft.
+    econstructor; eauto.
+    unfold translate in IHWcbvEval1. simpl in IHWcbvEval1.
+    rewrite subst_env_lambda in IHWcbvEval1.
+    apply IHWcbvEval1; auto.
+    clear IHWcbvEval1 IHWcbvEval2.
+    unfold L3.term.whBetaStep in IHWcbvEval3.
+    rewrite subst_env_instantiate in IHWcbvEval3.
+    apply IHWcbvEval3.
 
+    - (* WF instantiate + wcbeval preserves WF *)
+      admit.
+      
   + (* LetIn *)
-    admit.
-
+    simpl.
+    rewrite subst_env_letin.
+    inversion_clear wft.
+    econstructor; [eauto| ].
+    rewrite subst_env_instantiate in IHWcbvEval2.
+    apply IHWcbvEval2.
+    
+    - (* WF instantiate *)
+      admit.
+      
   + (* App Fix *)
     admit.
 
-  + (* Construct *)
+  + (* App not lambda *)
+    unfold translate. simpl.
+    rewrite !subst_env_application.
+    inversion_clear wft.
+    assert (L3t.WFTrm efn 0).
+    admit.
+    pose (wftrm_0_no_redex e efn H0 H1 H2).
+    assert (~ L3.term.isConstruct efn). admit.
+    assert (L3N.WNorm efn). admit.
+    specialize (e0 H7 H8 H6). 
+    unfold translate in e0. rewrite !e0.
     admit.
 
   + (* Case *)

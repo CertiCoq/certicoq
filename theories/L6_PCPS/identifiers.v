@@ -1,11 +1,13 @@
-Require Import cps cps_util shrink_cps.
-Require Import BinNat Relations Coq.MSets.MSetRBT List.
+Require Import cps cps_util set_util shrink_cps.
+Require Import List BinNat Relations Coq.MSets.MSetRBT List.
+Import ListNotations.
 
-Module FVSet := MSetRBT.Make POrderedType.Positive_as_OT.
+Import PS.
 
-Import FVSet.
+Definition FVSet := PS.t.
 
-(** f is a function defined in fs *)
+
+(** [f] is a function defined in [fs] *)
 Fixpoint name_in_fundefs f (fs : fundefs) :=
   match fs with
     | Fnil => False
@@ -13,7 +15,7 @@ Fixpoint name_in_fundefs f (fs : fundefs) :=
       f' = f \/ name_in_fundefs f fs
   end.
 
-(** [occurs_free x e] iff x appears free in e *)
+(** [occurs_free x e] iff [x] appears free in [e] *)
 Inductive occurs_free : var -> exp -> Prop :=
 | Free_Econstr1 :
     forall y x tau t ys e,
@@ -28,8 +30,8 @@ Inductive occurs_free : var -> exp -> Prop :=
     forall x ys, 
       occurs_free x (Ecase x ys)
 | Free_Ecase2 :  
-    forall y x t ys,
-      List.In (t, y) ys ->
+    forall y x ys,
+      List.Exists (fun p => occurs_free y (snd p)) ys ->
       occurs_free y (Ecase x ys)
 | Free_Eproj1 :
     forall y x tau n e,
@@ -79,7 +81,7 @@ with occurs_free_fundefs : var -> fundefs -> Prop :=
       occurs_free_fundefs x (Fcons f tau ys e defs).
 
 (** sanity check : The names of the functions cannot appear 
-    free in a fundef block *)
+    free in a fundefs block *)
 Lemma fun_names_not_free_in_fundefs f defs :
   name_in_fundefs f defs ->
   ~ occurs_free_fundefs f defs.
@@ -94,7 +96,7 @@ Definition closed_exp (e : exp) : Prop :=
 Definition closed_fundefs (defs : fundefs) : Prop :=
   forall x, ~ (occurs_free_fundefs x defs).
 
-(** [funs_in_exp defs e] iff defs is a block of functions in e *)
+(** [funs_in_exp B e] iff [B] is a block of functions in [e] *)
 Inductive funs_in_exp : fundefs -> exp -> Prop :=
 | In_Econstr :
     forall fs e x tau t ys,
@@ -213,55 +215,21 @@ with unique_bindings_fundefs : fundefs -> Prop :=
     unique_bindings_fundefs Fnil.
 
 (** The set of names of the functions in the same fix definition *)
-Fixpoint fundefs_names (defs : fundefs) : FVSet.t :=
+Fixpoint fundefs_names (defs : fundefs) : FVSet :=
   match defs with
     | Fcons f _ _ _ defs' => add f (fundefs_names defs') 
     | Fnil => empty
   end.
 
-Definition union_list (s : FVSet.t) (l : list (Maps.PTree.elt)) : FVSet.t :=
-  List.fold_left (fun set e => add e set) l s.
-
-Lemma union_list_spec (s : FVSet.t) (l : list (Maps.PTree.elt)) : 
-  forall (x : elt), In x (union_list s l) <->
-                    In x s \/ List.In x l.
-Proof.
-  revert s; induction l as [| x xs IHxs ]; simpl;
-  intros s e; split; intros H; eauto.
-  - inv H; eauto. contradiction.
-  - eapply IHxs in H. inversion H as [H1 | H2]; eauto.
-    eapply add_spec in H1; inv H1; eauto.
-  - inversion H as [H1 | [ H2 | H3 ]]; subst;
-    eapply IHxs; solve [ left; eapply add_spec; eauto
-                       | right; eauto ].
-Qed.
-
-Definition diff_list (s : FVSet.t) (l : list (Maps.PTree.elt)) : FVSet.t :=
-  List.fold_left (fun set e => remove e set) l s.
-
-Lemma diff_list_spec (s : FVSet.t) (l : list (Maps.PTree.elt)) : 
-  forall (x : elt), In x (diff_list s l) <->
-                    In x s /\ ~ List.In x l.
-Proof.
-  revert s; induction l as [| x xs IHxs ]; simpl;
-  intros s e; split; intros H; eauto.
-  - inv H; eauto.
-  - eapply IHxs in H. inversion H as [H1 H2]; eauto.
-    eapply remove_spec in H1; inv H1; split; eauto.
-    intros [Hc | Hc]; congruence.
-  - eapply IHxs. inversion H as [H1 H2]. split.
-    * eapply remove_spec. split; eauto.
-    * intros Hc. eauto.
-Qed.
-
+  
 (** The set of free variables of an exp *)
-Fixpoint exp_fv (e : exp) : FVSet.t :=
+Fixpoint exp_fv (e : exp) : FVSet :=
   match e with
     | Econstr x tau c ys e =>
       let set := remove x (exp_fv e) in
       union_list set ys
-    | Ecase x pats => 
-      union_list (singleton x) (map snd pats) 
+    | Ecase x pats =>
+      fold_left (fun s p => union (exp_fv (snd p)) s) pats (singleton x)
     | Eproj x tau n y e =>
       let set := remove x (exp_fv e) in
       add y set
@@ -275,7 +243,7 @@ Fixpoint exp_fv (e : exp) : FVSet.t :=
       let set := remove x (exp_fv e) in
       union_list set ys
   end
-with fundefs_fv (defs : fundefs) (names : FVSet.t) : FVSet.t :=
+with fundefs_fv (defs : fundefs) (names : FVSet) : FVSet :=
        match defs with
          | Fcons f t ys e defs' =>
            let fv_e := diff_list (diff (exp_fv e) names) ys in
@@ -283,7 +251,7 @@ with fundefs_fv (defs : fundefs) (names : FVSet.t) : FVSet.t :=
          | Fnil => empty
        end.
 
-(** Equivalence of computational and inductive fv definitions *)
+(** Equivalence of computational and inductive FV definitions *)
 
 (** fundefs_names correct w.r.t name_in_fundefs *)
 Lemma fundefs_names_correct (defs : fundefs) :
@@ -295,39 +263,6 @@ Proof.
   - apply add_spec. inv H; eauto.
     right. eapply IHdefs; eauto.
 Qed.
-
-(* to do proofs simultaneously. TODO move to cps.v *)
-Lemma exp_def_mutual_ind :
-  forall (P : exp -> Prop) (P0 : fundefs -> Prop),
-    (forall (v : var) (t : type) (t0 : tag) (l : list var) (e : exp),
-       P e -> P (Econstr v t t0 l e)) ->
-    (forall (v : var) (l : list (tag * var)), P (Ecase v l)) ->
-    (forall (v : var) (t : type) (n : N) (v0 : var) (e : exp),
-       P e -> P (Eproj v t n v0 e)) ->
-    (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
-    (forall (v : var) (l : list var), P (Eapp v l)) ->
-    (forall (v : var) (t : type) (p : prim) (l : list var) (e : exp),
-       P e -> P (Eprim v t p l e)) ->
-    (forall (v : var) (t : type) (l : list var) (e : exp),
-       P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
-    P0 Fnil -> (forall e : exp, P e) /\ (forall f : fundefs, P0 f).
-Proof.
-  intros. split.
-  apply (exp_mut P P0); assumption.
-  apply (fundefs_mut P P0); assumption.
-Qed.
-
-(** name the induction hypotheses only *)
-Ltac exp_defs_induction IH1 IH2 :=
-  apply exp_def_mutual_ind;
-  [ intros ? ? ? ? ? IH1 
-  | intros ? ?
-  | intros ? ? ? ? ? IH1
-  | intros ? IH2 ? IH1 
-  | intros ? ?
-  | intros ? ? ? ? ? IH1 
-  | intros ? ? ? ? IH1 ? IH2
-  | ].
 
 Ltac apply_set_specs_ctx :=
   match goal with
@@ -388,6 +323,44 @@ Proof.
   - apply_set_specs_ctx; eauto.
 Qed.
 
+
+Lemma In_fold_left_l {A} (f : A -> FVSet) (l : list A)
+      (si : FVSet) x:
+  In x (fold_left (fun s e => union (f e) s) l si) ->
+  In x si \/ List.Exists (fun e => In x (f e)) l.
+Proof.
+  revert si; induction l; intros si H; simpl in H; eauto.
+  eapply IHl in H. inv H.
+  - repeat apply_set_specs_ctx.
+    + right. constructor; eauto.
+    + left; eauto. 
+  - right. constructor 2; eauto.
+Qed.
+
+Lemma In_fold_left_r {A} (f : A -> FVSet) (l : list A)
+      (si : FVSet) x:
+  In x si \/ List.Exists (fun e => In x (f e)) l ->
+  In x (fold_left (fun s e => union (f e) s) l si).
+Proof.
+  revert si; induction l; intros si H; simpl in H; eauto.
+  - simpl. inv H; eauto. inv H0.
+  - inv H; simpl; eapply IHl.
+    + left. apply_set_specs; eauto.
+    + inv H0; eauto. left.  apply_set_specs; eauto.
+Qed.
+
+Lemma In_fold_left_weaken {A} f (l : list A)
+      (si si' : FVSet) x:
+  Subset si si' ->
+  In x (fold_left (fun s e => union (f e) s) l si) ->
+  In x (fold_left (fun s e => union (f e) s) l si').
+Proof.
+  revert si si'; induction l; intros si si' H Hin; simpl in H; eauto.
+  simpl in *. eapply IHl; eauto.
+  eapply Subset_union_l; eauto.
+Qed.
+
+  
 (** correctness of exp_fv and fundefs_fv w.r.t occurs_free
     and occurs_free_def *)
 Lemma exp_fv_fundefs_fv_correct :
@@ -396,21 +369,35 @@ Lemma exp_fv_fundefs_fv_correct :
      In x (fundefs_fv defs (fundefs_names defs)) <->
      occurs_free_fundefs x defs).
 Proof.
-  exp_defs_induction IHe IHdefs; simpl; intros x; split; intros H.
+  exp_defs_induction IHe IHl IHdefs; simpl; intros x; split; intros H.
   - repeat apply_set_specs_ctx.
     + constructor 2; eauto. eapply IHe; eauto.
     + constructor; eauto.
   - inv H; repeat apply_set_specs; eauto.
     left. apply_set_specs; eauto.
     apply IHe; eauto.
+  - repeat apply_set_specs_ctx; constructor.
+  - inv H; eauto; apply_set_specs; eauto.
+    inv H2.
   - repeat apply_set_specs_ctx.
-    + constructor; eauto.
-    + eapply in_map_iff in H0. 
-      destruct H0 as [[t1 t2] [Heq HIn]]. inv Heq.
-      econstructor; eauto.
-  - inv H; repeat apply_set_specs; eauto.
-    + left. apply_set_specs; eauto.
-    + right. eapply in_map_iff. eexists; split; eauto. simpl; eauto.
+    eapply In_fold_left_l in H.
+    inv H.
+    + repeat apply_set_specs_ctx.
+      * constructor; simpl. constructor; eapply IHe; eauto.
+      * constructor.
+    + assert (Hsuf : occurs_free x (Ecase v l))
+        by (eapply IHl; apply In_fold_left_r; eauto).
+      clear H0. inv Hsuf. constructor; eauto.
+      constructor. constructor 2. eauto.
+  - inv H.
+    + eapply In_fold_left_r.
+      left. apply_set_specs; right; apply_set_specs; eauto.
+    + inv H2; simpl in *.
+      * eapply In_fold_left_r.
+        left. apply_set_specs; left. apply IHe; eauto.
+      * eapply In_fold_left_weaken.
+        apply Subset_union_mon_r. apply Subset_refl.
+        eapply IHl. constructor; eauto.
   - repeat apply_set_specs_ctx.
     + constructor; eauto.
     + constructor; eauto. eapply IHe; eauto.

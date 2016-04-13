@@ -1,4 +1,4 @@
-Require Import cps cps_util hoisting identifiers.
+Require Import cps cps_util set_util hoisting identifiers.
 Require Import Znumtheory.
 Require Import List MSets MSetRBT BinNums BinNat BinPos.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
@@ -7,10 +7,10 @@ Require Maps.
 
 Record FunInfo : Type :=
   mkFunInfo
-    { (* free variable set of the fix definition *)
-      fv_set_def : FVSet.t;
-      (* the names of the functions that are mut. recursive *)
-      rec_names  : FVSet.t }.
+    { (* free variables of the function definition block *)
+      fv_set_def : FVSet;
+      (* the names of the functions the block *)
+      rec_names  : FVSet }.
  
 Definition FunInfoMap := Maps.PTree.t FunInfo.
 
@@ -50,7 +50,8 @@ Fixpoint exp_info (e : exp) (acc : FunInfoMap) : FunInfoMap :=
   match e with
     | Econstr x tau c ys e =>
       exp_info e acc
-    | Ecase x pats => acc
+    | Ecase x pats =>
+      fold_left (fun map te => exp_info (snd te) map) pats acc 
     | Eproj x tau n y e =>
       exp_info e acc
     | Efun defs e =>
@@ -61,7 +62,7 @@ Fixpoint exp_info (e : exp) (acc : FunInfoMap) : FunInfoMap :=
     | Eprim x tau prim ys e =>
       exp_info e acc
   end
-with fundefs_info (defs : fundefs) (fv : FVSet.t) (names : FVSet.t)
+with fundefs_info (defs : fundefs) (fv : FVSet) (names : FVSet)
                   (acc : FunInfoMap) : FunInfoMap :=
        match defs with
          | Fcons f tau ys e defs' =>
@@ -79,7 +80,7 @@ Section CC.
           (utag : tag) (* Tag for types with unique constructor *)
           (env_tag : tag) (* Tag for the type of environments *)
           (tag_bij : tag -> tag) (* mapping from function tags to closure 
-                                 records tags *)
+                                    records tags *)
           (unknown_type : type).
   
   Definition get_var (x : var) (map : VarInfoMap) (f : exp -> exp) (env : var)
@@ -119,26 +120,13 @@ Section CC.
                   ret (y :: ys, f'')
                ) (ret ([], f)) xs.
 
-  (* not sure if needed *)
-  Definition get_tvars (xs : list (tag * var)) (map : VarInfoMap)
-             (f : exp -> exp) (cl : var)
-  : ccstate (list (tag * var) * (exp -> exp)) :=
-    fold_right (fun tx t =>
-                  let '(tag, x) := tx in
-                  t1 <- t ;;
-                  let '(ys, f') := t1 in
-                  t2 <- get_var x map f' cl ;;   
-                  let '(y, f'') := t2  in
-                  ret ((tag, fst y) :: ys, f'')
-               ) (ret ([], f)) xs.
-
-  Definition make_env (fv : FVSet.t) (mapfv_new : VarInfoMap)
+  Definition make_env (fv : FVSet) (mapfv_new : VarInfoMap)
              (mapfv_old : VarInfoMap) (env_new env_old : var) (g : exp -> exp)
   : ccstate (type * VarInfoMap * (exp -> exp)) :=
-    t1 <- get_vars_with_types (FVSet.elements fv) mapfv_old g env_old ;;
+    t1 <- get_vars_with_types (PS.elements fv) mapfv_old g env_old ;;
     let '(vars, g') :=  t1 in
     let (map_new', _) :=
-        FVSet.fold (fun x arg =>
+        PS.fold (fun x arg =>
                 let '(map, n) := arg in
                 let typ :=
                     match Maps.PTree.get x mapfv_old with
@@ -157,15 +145,6 @@ Section CC.
     ret (env_typ, map_new',
          fun e => g' (Econstr env_new env_typ utag (List.map fst vars) e)).
 
-  Fixpoint mapM {M : Type -> Type} {A B : Type} `{Monad M} (f : A -> M B)
-           (l : list A)  : M (list B) :=
-    match l with
-      | [] => ret []
-      | x :: xs =>
-        x' <- (f x) ;;
-        xs' <- mapM f xs ;;
-        ret (x' :: xs')
-    end.
 
 (* recursive lookup for types -- needs termination proof *)
 (* Fixpoint closure_type (fun_typ env_type : type) : ccstate type := *)
@@ -226,7 +205,28 @@ Section CC.
                  Maps.PTree.set var (BoundVar typ) map)
               (combine args args_typ) mapfv.
 
-  (* TODO : fix argument types bug *)
+  Fixpoint mapM {M : Type -> Type} {A B : Type} `{Monad M} (f : A -> M B)
+           (l : list A)  : M (list B) :=
+    match l with
+      | [] => ret []
+      | x :: xs =>
+        let sx' := f x in
+        x' <- sx' ;;
+        xs' <- mapM f xs ;;
+        ret (x' :: xs')
+    end.
+
+  Fixpoint sequence {M : Type -> Type} {A : Type} `{Monad M}
+           (l : list (M A))  : M (list A) :=
+    match l with
+      | [] => ret []
+      | x :: xs =>
+        x' <- x ;;
+        xs' <- sequence xs ;;
+        ret (x' :: xs')
+    end.
+  
+  (* Todo : Fix argument type bug *)
   Fixpoint exp_closure_conv (e : exp) (mapfv : VarInfoMap)
            (env : var) : ccstate exp := 
     match e with
@@ -235,12 +235,16 @@ Section CC.
         let '(ys', f) := t1 in
         e'' <- exp_closure_conv e' (Maps.PTree.set x (BoundVar typ) mapfv) env ;;
         ret (f (Econstr x typ c ys' e''))
-      | Ecase x xs =>
+      | Ecase x tes =>
         t1 <- get_var x mapfv id env ;;
-        let '(x', _, f1) := t1 in
-        t2 <- get_tvars xs mapfv f1 env ;;
-        let '(xs', f2) := t2 in
-        ret (f2 (Ecase x' xs'))
+        let stes' := List.map (fun (p : tag * exp) =>
+                                 let (t, e) := p in 
+                                 e' <- exp_closure_conv e mapfv env ;;
+                                 ret (t, e')) tes
+        in
+        tes' <- sequence stes' ;;
+        let '(x', _, f1) := t1 in           
+        ret (f1 (Ecase x' tes'))
       | Eproj x typ n y e' =>
         t1 <- get_var y mapfv id env ;;
         let '(y', _, f) := t1 in
@@ -252,9 +256,9 @@ Section CC.
               | Fcons f _ _ _ _ =>
                 match Maps.PTree.get f map with
                   | Some entry => fv_set_def entry
-                  | None => FVSet.empty
+                  | None => PS.empty
                 end
-              | Fnil => FVSet.empty
+              | Fnil => PS.empty
             end in
         env' <- get_name ;;
         t1 <- make_env fv (Maps.PTree.empty VarInfo) mapfv env' env id ;;
@@ -356,7 +360,9 @@ Definition closure_conversion (e : exp) : exp :=
       if Pos.leb x 3%positive then 3%positive else (x+1)%positive
   in
   let state := (next, TDict.empty) in
-  exp_hoist (fst (runState
-                    (exp_closure_conv map 1%positive 1%positive id 1%positive
-                                      e (Maps.PTree.empty VarInfo) 1%positive)
-                    state)) Fnil id.
+  let (e, defs) :=
+      exp_hoist (fst (runState
+                        (exp_closure_conv map 1%positive 1%positive id 1%positive
+                                          e (Maps.PTree.empty VarInfo) 1%positive)
+                        state)) Fnil id
+  in Efun defs e.

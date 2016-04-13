@@ -1,4 +1,4 @@
-Require Import cps cps_util identifiers env.
+Require Import cps cps_util identifiers env ctx.
 Require Import BinNat Relations MSets MSetRBT List Omega.
 Import ListNotations.
 
@@ -37,11 +37,11 @@ Section EVAL.
         bstep_e (M.set x v rho) e ov c ->
         bstep_e rho (Eproj x t n y e) ov c 
   | BStep_case :
-      forall (y : var) (v : val) (k : var) (t : tag) (cl : list (tag * var))
+      forall (y : var) (v : val) (e : exp) (t : tag) (cl : list (tag * exp))
              (vl : list val) (tau : type) (rho : env) (c : nat),
         M.get y rho = Some (Vconstr tau t vl) ->
-        findtag cl t = Some k ->
-        bstep_e rho (Eapp k (y :: nil)) v c ->
+        findtag cl t = Some e ->
+        bstep_e rho e v c ->
         bstep_e rho (Ecase y cl) v c
   | BStep_app_fun :
       forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
@@ -85,31 +85,20 @@ Section EVAL.
     split; f_equal; eapply IHHeval1; eauto. 
   Qed.
 
-  (** Induction principle for values. TODO: Move this to cps.v *)
-  Lemma val_ind :
-    forall P : val -> Prop,
-      (forall (tau : type) (t : tag), P (Vconstr tau t nil)) ->
-      (forall (tau : type) (t : tag) (v : val) (l : list val),
-         P v -> P (Vconstr tau t l) -> P (Vconstr tau t (v :: l))) ->
-      (forall (t : M.t val) (f0 : fundefs) (v : var), P (Vfun t f0 v)) ->
-      (forall z : Z, P (Vint z)) ->
-      (forall t : type, P (Vother t)) ->
-      (forall t : type, P (Vobvs t)) ->
-      (forall (tau : type), P (Vobservable tau nil)) ->
-      (forall (tau : type) (v : val) (l : list val),
-         P v -> P (Vobservable tau l) -> P (Vobservable tau (v :: l))) ->
-      forall v : val, P v.
+   Open Scope env_scope.
+  
+  Definition bstep_e_strengthen rho1 rho2 e v c:
+    bstep_e rho1 e v c ->
+    env_subset rho2 rho1 ->
+    rho2 ⊢ e ->
+    bstep_e rho2 e v c.
   Proof.
-    intros P H1 H2 H3 H4 H5 H6 H7 H8.
-    fix 1.
-    destruct v; try (now clear val_ind; eauto).
-    - induction l as [ | x xs IHxs].
-      eapply H1. eapply H2. apply val_ind. eauto.
-    - induction l as [ | x xs IHxs].
-      eapply H7. eapply H8. apply val_ind. eauto.
-  Qed.
- 
-
+    intros Hstep. revert rho2.
+    induction Hstep; intros rho2 Hext Hws; inv Hws.
+    - erewrite Hext in H; eauto; inv H.
+      constructor; eauto.
+  Abort All. (* need more lemmas *)
+      
   (** step-indexed preorder on cps terms *)
   (* Expression relation : 
    * ---------------------
@@ -366,7 +355,7 @@ Section EVAL.
         eexists. split; simpl; eauto.
       + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
   Qed.
-
+  
   Lemma nthN_length {A} (l1 l2 : list A) (n : N) (v1 : A) :
     length l1 = length l2 ->
     nthN l1 n = Some v1 ->
@@ -462,7 +451,7 @@ Section EVAL.
     induction k using lt_wf_rec1; destruct k as [| k ];
     try (now intros; replace j with 0 in * by omega; eauto).
     intros v1 v2 h Hpre Hleq. try rewrite preord_val_eq in *.
-    revert v2 Hpre; induction v1 using val_ind; intros v2 Hpre;
+    revert v2 Hpre; induction v1 using val_ind'; intros v2 Hpre;
     destruct v2; try (simpl; contradiction); eauto.
     - destruct l; try now inv Hpre.
     - inv Hpre. inv H1.
@@ -516,78 +505,49 @@ Section EVAL.
       eexists. split; simpl; eauto. rewrite Hget, Heq. eauto.
   Qed.
 
-  Parameter Prim_axiom :
-    forall f f' v1,
-      M.get f pr = Some f' ->
-      forall k vs1 vs2,
-        Forall2 (preord_val k) vs1 vs2 ->
-        f' vs1 = Some v1 ->
-        exists v2,
-          f' vs2 = Some v2 /\                      
-          preord_val k v1 v2.
-  
-  Lemma preord_exp_refl_pre (k : nat) :
-    Reflexive (preord_val k) ->
-    forall rho rho' e,
-      preord_env k rho rho' ->
-      preord_exp k (e, rho) (e, rho').
+  Lemma preord_exp_const_compat k rho1 rho2 x tau t ys e1 e2 :
+    preord_env k rho1 rho2 ->
+    (forall vs1 vs2,
+       Forall2 (preord_val k) vs1 vs2 -> 
+       preord_exp k (e1, M.set x (Vconstr tau t vs1) rho1)
+                  (e2, M.set x (Vconstr tau t vs2) rho2)) ->
+    preord_exp k (Econstr x tau t ys e1, rho1) (Econstr x tau t ys e2, rho2).
   Proof.
-    induction k as [ k IH ] using lt_wf_rec1.
-    intros Hrefl rho rho' e Henv v c Hleq Hstep.
-    revert rho' Henv. induction Hstep; intros rho2 Henv.
+    intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
+    edestruct (preord_var_env_getlist rho1 rho2) as [vs2 [Hget Hpre]]; [| eauto |].
+    eapply Forall2_refl; eauto.
+    edestruct Hexp as [v2 [c2 [Hstep [Hleq Hval]]]]; eauto.
+    repeat eexists; eauto. econstructor; eauto.
+  Qed.
+
+  Lemma preord_exp_proj_compat k rho1 rho2 x tau n y e1 e2 :
+    preord_env k rho1 rho2 ->
+    (forall v1 v2,
+       preord_val k v1 v2 -> 
+       preord_exp k (e1, M.set x v1 rho1)
+                  (e2, M.set x v2 rho2)) ->
+    preord_exp k (Eproj x tau n y e1, rho1) (Eproj x tau n y e2, rho2).
+  Proof.
+    intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
+    edestruct Henv as [v' [Hget Hpre]]; eauto.
+    destruct v'; rewrite preord_val_eq in Hpre; simpl in Hpre; try contradiction.
+    inv Hpre.
+    edestruct (Forall2_nthN (preord_val k) vs l) as [v2 [Hnth Hval]]; eauto.
+    edestruct Hexp as [v2' [c2 [Hstep [Hleq Hval']]]]; eauto.
+    repeat eexists; eauto. econstructor; eauto.
+  Qed.
+
+  Lemma preord_exp_app_compat k rho1 rho2 x ys :
+    preord_env k rho1 rho2 ->
+    preord_exp k (Eapp x ys, rho1) (Eapp x ys, rho2).
+  Proof.
+    intros Henv v1 c1 Hleq1 Hstep1. inv Hstep1.
     - edestruct preord_env_getlist_l as [vs2 [Hget' Hpre']]; eauto.
       edestruct Henv as [v2 [Hget Hpre]]; eauto.
       rewrite preord_val_eq in Hpre.
       destruct v2; try (now simpl in Hpre; contradiction).
       repeat eexists. constructor; eauto. eauto.
       rewrite preord_val_eq. rewrite <- minus_n_O. eauto.
-    - edestruct preord_env_getlist_l as [vs2 [Hget' Hpre']]; eauto.
-      inv H0. edestruct IHHstep as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; eauto.
-      eapply preord_env_extend with (v2 :=  Vconstr t n vs2); eauto.
-      rewrite preord_val_eq; simpl; eauto.
-      repeat eexists; eauto.
-      econstructor. eauto. reflexivity. eauto.
-    - edestruct Henv as [v2' [Hget Hpre]]; eauto.
-      rewrite preord_val_eq in Hpre.
-      destruct v2'; try (now simpl in Hpre; contradiction).
-      destruct Hpre as [? Hpre]; subst.
-      edestruct (Forall2_nthN _ _ _ _ _ Hpre H0) as [v' [Hnth Hpre']].
-      edestruct IHHstep as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; eauto.
-      eapply preord_env_extend; eauto. 
-      repeat eexists; eauto.
-      econstructor; eauto.
-    - inv Hstep.
-      + simpl in H7. destruct (M.get y rho) eqn:Hget; try discriminate.
-        inv H7. inv H.
-        edestruct (Henv k0) as [v2 [Hget2 Hpre]]; eauto.
-        edestruct (Henv y) as [v2' [Hget2' Hpre']]; eauto.
-        rewrite preord_val_eq in Hpre, Hpre'.
-        destruct v2; try (now simpl in Hpre; contradiction).
-        destruct v2'; try (now simpl in Hpre'; contradiction).
-        destruct Hpre' as [? Hpre']; subst.
-        repeat eexists. econstructor; eauto. constructor; eauto.
-        simpl. rewrite Hget2'. eauto. eauto.
-        rewrite preord_val_eq. rewrite <- minus_n_O; simpl; eauto.
-        constructor. rewrite preord_val_eq. simpl; eauto. constructor.
-      + edestruct Henv as [f2 [Hget2 Hpref]]; eauto.
-        rewrite preord_val_eq in Hpref.
-        destruct f2; try (now simpl in Hpref; contradiction).
-        edestruct preord_env_getlist_l as [vs2 [Hget' Hpre']]; eauto.
-        edestruct (Hpref vs vs2 (k-1)) as [t2 [xs2 [e2 [rho2' [Hf [Hset H']]]]]]; eauto.
-        eapply Forall2_length; eauto.
-        edestruct H' with (c1 := c0) as [v2 [c2 [Hstep' [Hc2 Hpre'']]]];
-        eauto; try omega.
-        eapply Forall2_monotonic. intros.
-        eapply (preord_val_monotonic k). eauto. omega. eauto.
-        simpl in Hget'. destruct (M.get y rho2) eqn:Hgety; try discriminate.
-        inv Hget'. simpl in H4.
-        destruct (M.get y rho) eqn:Hgety'; try discriminate. inv H4. inv H.
-        inv Hpre'. rewrite preord_val_eq in H4.
-        destruct v1; try (now simpl in H4; contradiction).
-        destruct H4 as [? Hpre]; subst.
-        repeat eexists. econstructor; eauto. econstructor 5; eauto.
-        simpl. rewrite Hgety; eauto. omega.
-        replace (k - (c0 + 1)) with (k - 1 - c0) by omega. eauto.
     - edestruct Henv as [v2' [Hget Hpre]]; eauto.
       rewrite preord_val_eq in Hpre.
       destruct v2'; try (now simpl in Hpre; contradiction).
@@ -600,38 +560,127 @@ Section EVAL.
       eapply (preord_val_monotonic k). eauto. omega. eauto.
       repeat eexists. econstructor 5; eauto. omega.
       replace (k - (c + 1)) with (k - 1 - c) by omega. eauto.
-    - edestruct IHHstep with (rho' := def_funs fl fl rho2 rho2)
-        as [v2 [c2 [Hstep' [Hleq' Hpre']]]]; eauto.
-      + clear IHHstep Hstep e v c Hleq. generalize fl at 1 3.
-        revert fl rho rho2 Henv Hrefl.
-        induction k as [ k IH' ] using lt_wf_rec1. intros fl rho rho2 Henv Hrefl.
-        induction fl; intros defs; simpl; eauto. 
-        eapply preord_env_extend. eapply IHfl.
-        rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-        edestruct setlist_length as [rho2' Hs']; eauto.
-        exists t1. exists xs1. exists e1. exists rho2'. split; eauto.
-        split. eauto. intros Hleq Hpre. eapply IH; eauto.
-        intros v'. eapply (preord_val_monotonic k). eapply Hrefl. omega.
-        eapply preord_env_setlist_l; eauto.
-        eapply IH'; try omega; eauto.
-        intros. eapply IH; eauto. omega.
-        eapply preord_env_monotonic; [| eauto]. omega.
-        intros v'. eapply (preord_val_monotonic k). eapply Hrefl. omega.
-      + repeat eexists; eauto. constructor; eauto.
-    - edestruct preord_env_getlist_l as [vs2 [Hget' Hpre']]; eauto.
-      edestruct Prim_axiom as [v2 [Heq Hprev2]]; eauto.
-      edestruct (IHHstep Hleq (M.set x v2 rho2))
-        as [v2' [c2 [Hstepv2' [ Hleq2 Hprev2']]]]; eauto.
-      rewrite <- H2. eapply preord_env_extend; eauto. 
-      repeat eexists; eauto. econstructor; eauto.
   Qed.
+
+    Lemma preord_exp_case_nil_compat k rho1 rho2 x :
+      preord_exp k (Ecase x [], rho1) (Ecase x [], rho2).
+    Proof.
+      intros v1 c1 Hleq1 Hstep1. inv Hstep1. inv H3.
+    Qed.
+
+    Lemma preord_exp_case_cons_compat k rho1 rho2 x c e1 e2 tes1 tes2:
+      preord_env k rho1 rho2 ->
+      preord_exp k (e1, rho1) (e2, rho2) ->
+      preord_exp k (Ecase x tes1, rho1)
+                 (Ecase x tes2, rho2) ->
+      preord_exp k (Ecase x ((c, e1) :: tes1), rho1)
+                 (Ecase x ((c, e2) :: tes2), rho2).
+    Proof.
+      intros Henv Hexp_hd Hexp_tl v1 c1 Hleq1 Hstep1. inv Hstep1. inv H3.
+      destruct (M.elt_eq c t) eqn:Heq; subst.
+      - inv H0. edestruct Hexp_hd as [v2 [c2 [Hleq2 [Hstep2 Hpre2]]]]; eauto.
+        edestruct Henv as [v2' [Hget Hpre]]; eauto.
+        rewrite preord_val_eq in Hpre.
+        destruct v2'; try (now simpl in Hpre; contradiction). inv Hpre. 
+        repeat eexists; eauto. econstructor; eauto. simpl; rewrite Heq; eauto.
+      - edestruct Hexp_tl as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; eauto.
+        econstructor; eauto. inv Hstep2.
+        edestruct Henv as [v2' [Hget Hpre]]; eauto.
+        rewrite preord_val_eq in Hpre.
+        destruct v2'; try (now simpl in Hpre; contradiction). inv Hpre.
+        rewrite Hget in H3; inv H3.
+        repeat eexists; eauto. econstructor; eauto. simpl; rewrite Heq; eauto.
+    Qed.
     
+  Parameter Prim_axiom :
+    forall f f' v1,
+      M.get f pr = Some f' ->
+      forall k vs1 vs2,
+        Forall2 (preord_val k) vs1 vs2 ->
+        f' vs1 = Some v1 ->
+        exists v2,
+          f' vs2 = Some v2 /\                      
+          preord_val k v1 v2.
+
+  Lemma preord_exp_prim_compat k rho1 rho2 x tau f ys e1 e2 :
+    preord_env k rho1 rho2 ->
+    (forall v1 v2,
+       preord_val k v1 v2 -> 
+       preord_exp k (e1, M.set x v1 rho1)
+                  (e2, M.set x v2 rho2)) ->
+    preord_exp k (Eprim x tau f ys e1, rho1) (Eprim x tau f ys e2, rho2).
+  Proof.
+    intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
+    edestruct preord_env_getlist_l as [vs2 [Hget' Hpre']]; eauto.
+    edestruct Prim_axiom as [v2 [Heq Hprev2]]; eauto.
+    edestruct Hexp as [v2' [c2 [Hstepv2' [ Hleq2 Hprev2']]]]; eauto.
+    repeat eexists; eauto. econstructor; eauto.
+  Qed.
+
+  Lemma preord_exp_fun_compat k rho1 rho2 defs e1 e2 :
+    preord_env k rho1 rho2 ->
+    preord_exp k (e1, def_funs defs defs rho1 rho1)
+               (e2, def_funs defs defs rho2 rho2) ->
+    preord_exp k (Efun defs e1, rho1) (Efun defs e2, rho2).
+  Proof.
+    intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
+    edestruct Hexp as [v2' [c2 [Hstepv2' [ Hleq2 Hprev2']]]]; eauto.
+    repeat eexists; eauto. econstructor; eauto.
+  Qed.
+
+  Lemma preord_env_def_funs_pre k f rho1 rho2 :
+    preord_env k rho1 rho2 ->
+    (forall m (rho rho' : env) (e : exp),
+       m <  k ->
+       preord_env m rho rho' ->
+       preord_exp m (e, rho) (e, rho')) ->
+    preord_env k (def_funs f f rho1 rho1) (def_funs f f rho2 rho2).
+  Proof.
+    intros Henv Hyp.
+    generalize f at 1 3. revert f rho1 rho2 Henv.
+    induction k as [ k IH' ] using lt_wf_rec1. intros f rho rho2 Henv.
+    induction f; eauto; intros defs. simpl; eauto. 
+    eapply preord_env_extend. simpl. eapply IHf.
+    rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
+    edestruct setlist_length as [rho2' Hs']; eauto.
+    exists t1. exists xs1. exists e1. exists rho2'. split; eauto.
+    split. eauto. intros Hleq Hpre. eapply Hyp. omega.
+    eapply preord_env_setlist_l with (vs1 := vs1) (vs2 := vs2); eauto.
+    eapply IH'; try omega; eauto. intros. eapply Hyp; eauto. omega.
+    eapply preord_env_monotonic; [| eauto]. omega.
+  Qed.
+
+  Lemma preord_exp_refl_pre (k : nat) :
+    Reflexive (preord_val k) ->
+    forall rho rho' e,
+      preord_env k rho rho' ->
+      preord_exp k (e, rho) (e, rho').
+  Proof.
+    induction k as [ k IH ] using lt_wf_rec1.
+    intros Hrefl rho rho' e Henv.
+    revert rho rho' Henv; induction e using exp_ind'; intros rho1 rho2 Henv.
+    - eapply preord_exp_const_compat; eauto; intros. eapply IHe.
+      eapply preord_env_extend with (v2 :=  Vconstr t t0 vs2); eauto.
+      rewrite preord_val_eq; simpl; eauto.
+    - eapply preord_exp_case_nil_compat.
+    - eapply preord_exp_case_cons_compat; eauto.
+    - eapply preord_exp_proj_compat; eauto; intros.
+      eapply IHe. eapply preord_env_extend; eauto.
+    - eapply preord_exp_fun_compat; eauto.
+      eapply IHe. eapply preord_env_def_funs_pre; eauto.
+      intros; eapply IH; eauto. intros v.
+      eapply (preord_val_monotonic k). eapply Hrefl. omega.
+    - eapply preord_exp_app_compat; eauto.
+    - eapply preord_exp_prim_compat; eauto; intros. eapply IHe.
+      eapply preord_env_extend; eauto.
+  Qed.
+  
   Lemma preord_val_refl (k : nat) :
     Reflexive (preord_val k).
   Proof.
     induction k using lt_wf_rec1.
     destruct k as [| k]; unfold Reflexive; intros x; rewrite preord_val_eq;
-    induction x using val_ind; simpl; eauto;
+    induction x using val_ind'; simpl; eauto;
     try (now (try split; eauto); econstructor; eauto; rewrite preord_val_eq; eauto).
     - split; eauto. constructor; eauto. rewrite preord_val_eq; eauto.
       destruct IHx0. eauto.
@@ -653,11 +702,19 @@ Section EVAL.
   Qed.
 
   Corollary preord_exp_refl (k : nat) (rho rho' : env) (e : exp) :
-      preord_env k rho rho' ->
-      preord_exp k (e, rho) (e, rho').
+    preord_env k rho rho' ->
+    preord_exp k (e, rho) (e, rho').
   Proof.
     intros. eapply preord_exp_refl_pre; eauto.
     eapply preord_val_refl.
+  Qed.
+  
+  Corollary preord_env_def_funs k f rho1 rho2 :
+    preord_env k rho1 rho2 ->
+    preord_env k (def_funs f f rho1 rho1) (def_funs f f rho2 rho2).
+  Proof.
+    intros Hevn. eapply preord_env_def_funs_pre; eauto.
+    intros. eapply preord_exp_refl; eauto.
   Qed.
     
   Lemma preord_exp_trans_pre (k : nat) :
@@ -679,14 +736,13 @@ Section EVAL.
     Transitive (preord_val k).
   Proof.
     induction k using lt_wf_rec1.
-    intros x; induction x using val_ind; simpl; eauto;
+    intros x; induction x using val_ind'; simpl; eauto;
     intros v1 v2; rewrite !preord_val_eq;
     try (now intros H1 H2; destruct v1; destruct v2;
          try (now simpl in *; contradiction); inv H1; inv H2; simpl; eauto).
     - intros H1 H2. destruct v1; destruct v2; try (now simpl in *; contradiction).
       destruct H1 as [H1 H1']. destruct H2 as [H2 H2']. subst.
-      destruct l; destruct l0; try inv H1'; try inv H2'.
-      split; eauto.
+      destruct l; destruct l0; try inv H1'; try inv H2'. split; eauto.
     - intros H1 H2. destruct v1; destruct v2; try (now simpl in *; contradiction).
       destruct H1 as [H1 H1']. destruct H2 as [H2 H2']. subst.
       destruct l0; try inv H1'; try inv H2'. split; eauto. constructor; eauto.
@@ -706,6 +762,16 @@ Section EVAL.
       rewrite !preord_val_eq in IHx0. eapply IHx0; eauto.
   Qed.
 
+  Corollary preord_exp_trans (k : nat) :
+    forall rho1 rho2 rho3 e1 e2 e3,
+      preord_exp k (e1, rho1) (e2, rho2) ->
+      preord_exp k (e2, rho2) (e3, rho3) ->
+      preord_exp k (e1, rho1) (e3, rho3).
+  Proof.
+    intros. eapply preord_exp_trans_pre; eauto.
+    intros. eapply preord_val_trans.
+  Qed.
+
   Inductive Forall2_fundefs
             (R : var -> type -> list var -> exp ->
                  var -> type -> list var -> exp -> Prop)
@@ -717,7 +783,7 @@ Section EVAL.
         Forall2_fundefs R (Fcons f t xs e defs) (Fcons f' t' xs' e' defs')
   | Forall2_Fnil : Forall2_fundefs R Fnil Fnil.
   
-
+  
   Lemma find_def_spec f f' xs t e defs t' ys e' :
     find_def f ( Fcons f' t xs e defs) = Some (t', ys, e') ->
     (f = f' /\ t = t' /\ xs = ys /\ e = e') \/
@@ -746,4 +812,3 @@ Section EVAL.
   Qed.
       
 End EVAL.
-

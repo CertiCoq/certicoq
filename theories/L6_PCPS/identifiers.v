@@ -1,4 +1,4 @@
-Require Import cps cps_util set_util shrink_cps.
+Require Import cps cps_util set_util.
 Require Import List BinNat Relations Coq.MSets.MSetRBT List.
 Import ListNotations.
 

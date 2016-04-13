@@ -1,4 +1,4 @@
-Require Import cps cps_util shrink_cps identifiers eval env ctx.
+Require Import cps cps_util identifiers eval env ctx.
 Require Import List BinNat Relations.
 
 Import ListNotations.
@@ -116,16 +116,6 @@ Definition hoist_star (e1 e2: exp) : Prop :=
 (** Hoisting normal form *)
 Definition hoist_nf (e : exp) :=
   ~ exists e', hoist_rw e e'.
-
-(** easy lemmas about split_fds. 
-    TODO move split_fds in common file along with lemmas *)
-Lemma split_fds_nil_l fdefs : split_fds fdefs Fnil fdefs.
-  induction fdefs; constructor; eauto.
-Qed.
-
-Lemma split_fds_nil_r fdefs : split_fds Fnil fdefs fdefs.
-  induction fdefs; constructor; eauto.
-Qed.
 
 
 Definition injective {A B} (f : A -> B) :=

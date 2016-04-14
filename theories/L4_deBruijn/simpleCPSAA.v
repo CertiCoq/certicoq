@@ -1,15 +1,9 @@
 
 (** coqide -R /path/to/SquiggleLazyEq SquiggleLazyEq 
-https://github.com/aa755/SquiggleLazyEq (branch ssubst)
+https://github.com/aa755/SquiggleLazyEq
 
 *)
 
-(** CPS conversion for a language with nominal style variable bindings.
-We use the 
-SquiggleLazyEq library for generically defined substitution, 
-alpha equality (and soon, a contextual computational equivalence)
-and several proofs about them.
-*)
 
 Require Import Arith BinNat String List Omega 
   Program Psatz.
@@ -19,6 +13,7 @@ Opaque N.sub.
 
 
 Require Import Morphisms.
+(*
 Lemma N_plus_minus:
   forall n:N, n > 0 -> (n - 1 + 1) = (n + 1 - 1).
 Proof using.
@@ -41,11 +36,20 @@ Lemma N_i11:
 Proof using.
   induction i using N.peano_ind; intros; lia.
 Qed.
+*)
 
 (* MathClasses or Extlib may habe a much richer theory and implementation *)
 Require Import Coq.Classes.DecidableClass.
-Require Import SquiggleLazyEq.alphaeq.
+Require Import Coq.Lists.List.
+Require Import Coq.Bool.Bool.
+Require Import SquiggleLazyEq.export.
 Require Import SquiggleLazyEq.UsefulTypes.
+Require Import SquiggleLazyEq.list.
+Require Import SquiggleLazyEq.LibTactics.
+Require Import SquiggleLazyEq.tactics.
+Require Import SquiggleLazyEq.lmap.
+
+Open Scope nat_scope.
 
 Instance NEqDec : Deq N.
 Proof using.
@@ -92,88 +96,69 @@ Definition find_branch {s} (d:N) (m:nat) (matcht :list (@branch s)) :
     (fun a : (@branch s) => decide ((d,m) = (fst a, num_bvars (snd a)))) matcht in
   option_map snd obr.
 
-Inductive CoqCanonicalOp : Set :=
+Inductive L4Opid : Set :=
  | NLambda
  | NFix (nMut : nat) (** number of functions that are mutually defined*)
- | NDCon (dc : dcon) (nargs : nat).
-
-Definition CoqOpBindingsCan (c : CoqCanonicalOp) 
-    : list nat :=
-  match c with
-  | NLambda    => [1]
-  | NFix nMut => repeat nMut 1
-  | NDCon _ nargs    => repeat nargs 0
-  end.
-
-Inductive CoqNonCanonicalOp : Set :=
+ | NDCon (dc : dcon) (nargs : nat)
  | NApply
  | NProj (selector :nat) (** which one to project out*)
  | NLet
- | NMatch (dconAndNumArgs : list (dcon * nat))
- (** each member of the list corresponds to a branch. 
-    it says how many variables are bound in that branch*) .
+ | NMatch (dconAndNumArgs : list (dcon * nat)).
 
-Definition CoqOpBindingsNCan (nc : CoqNonCanonicalOp) : list nat :=
+
+Definition OpBindingsL4 (nc : L4Opid) : list nat :=
   match nc with
+  | NLambda    => [1]
+  | NFix nMut => repeat 1 nMut
+  | NDCon _ nargs    => repeat 0 nargs
   | NApply     => [0,0]
   | NProj _ => [0]
   | NLet => [0,1]
   | NMatch numargsInBranches => 0::(List.map snd numargsInBranches)
   end.
 
-Definition decc: forall x y : CoqCanonicalOp,
+Definition decc: forall x y : L4Opid,
 {x = y} + {x <> y}.
 Proof using.
    repeat(decide equality).
 Defined.
 
-Definition decnc:
-forall
-  x y : CoqNonCanonicalOp, {x = y} + {x <> y}.
-Proof using.
-  repeat(decide equality).
-Defined.
 Require Import SquiggleLazyEq.alphaeq.
-
 
 
 Definition CoqL4GenericTermSig : GenericTermSig :=
 {| 
-  CanonicalOp := CoqCanonicalOp;
-  NonCanonicalOp := CoqNonCanonicalOp;
-  OpBindingsCan := CoqOpBindingsCan;
-  OpBindingsNCan := CoqOpBindingsNCan;
-  canonical_dec := decc;
-  ncanonical_dec := decnc
+  Opid := L4Opid;
+  OpBindings := OpBindingsL4;
+  opid_dec := decc;
 |}.
 
 
 Notation BTerm := (@BTerm NVar CoqL4GenericTermSig).
 Notation NTerm := (@NTerm NVar CoqL4GenericTermSig).
 Notation oterm := (@oterm NVar CoqL4GenericTermSig).
-Notation Can := (@Can CoqL4GenericTermSig).
-Notation NCan := (@NCan CoqL4GenericTermSig).
+
 Definition Lam_e (v : NVar) (b : NTerm) : NTerm :=
-  oterm (Can NLambda) [bterm [v] b].
+  oterm NLambda [bterm [v] b].
 
 Definition Let_e (v : NVar) (e1 e2 : NTerm) : NTerm :=
-  oterm (NCan NLet) [(bterm [] e1);(bterm [v] e2)].
+  oterm NLet [(bterm [] e1);(bterm [v] e2)].
 
 Definition App_e (f a : NTerm) :=
-  oterm (NCan NApply) [bterm [] f , bterm [] a].
+  oterm NApply [bterm [] f , bterm [] a].
 
 Definition Con_e (dc : dcon) (args : list NTerm) : NTerm :=
-  oterm (Can (NDCon dc (length args))) (List.map (bterm []) args).
+  oterm (NDCon dc (length args)) (List.map (bterm []) args).
 
 Definition Proj_e (arg : NTerm) (selector : nat)  : NTerm :=
-  oterm (NCan (NProj selector)) [bterm [] arg].
+  oterm (NProj selector) [bterm [] arg].
 
 (** fix (\xf. (\x..,,)) *)
 Definition Fix_e (xf : NVar) (args : list NTerm) : NTerm :=
-  oterm (Can (NFix (length args))) (List.map (bterm [xf]) args).
+  oterm (NFix (length args)) (List.map (bterm [xf]) args).
 
 Definition Match_e (discriminee : NTerm) (brs : list branch) : NTerm :=
-  oterm (NCan (NMatch (List.map (fun b => (fst b, num_bvars (snd b))) brs))) 
+  oterm (NMatch (List.map (fun b => (fst b, num_bvars (snd b))) brs))
         ((bterm [] discriminee)::(List.map snd brs)).
 
 (* A few notes on the source:  
@@ -224,7 +209,7 @@ Instance ExpSubstitute : Substitute NTerm NTerm :=
 
 
 Definition Fix_e' (lbt : list BTerm) : NTerm :=
-  oterm (Can (NFix (length lbt))) lbt.
+  oterm (NFix (length lbt)) lbt.
 
 
 (** Big-step evaluation for [exp]. *)
@@ -284,7 +269,7 @@ Proof using.
   apply Decidable_sound in Heqsnl.
   simpl in Heqsnl.
   inverts Heqsnl. dands; auto.
-  apply in_map_iff. eexists; eauto.
+  apply in_map_iff. eexists; split; eauto;  simpl; auto.
 Qed.
 
 Local Opaque ssubst.
@@ -338,7 +323,7 @@ Proof using.
     dorn Hf;[left|right].
     + apply in_flat_map.
       exists (bterm lv nt). repnd. split;[| assumption].
-      apply in_map_iff. eexists; eauto.
+      apply in_map_iff. eexists; split; eauto; simpl; auto.
     + apply IHHe1. apply in_sub_free_vars in Hf. exrepnd.
       apply in_flat_map. exists (bterm [] t).
       split;[| assumption]. apply in_map.
@@ -417,9 +402,9 @@ Proof using.
     apply in_map_iff in Hin1. exrepnd.
     simpl in *. subst.
     eapply H1;eauto.
-    apply Hntwf. apply in_map_iff; eauto.
-  + rewrite map_map. unfold compose, num_bvars. simpl.
-    apply repeat_map_len.
+    apply Hntwf. apply in_map_iff; eexists; split; eauto; simpl; auto.
+  + simpl in *. rewrite map_map in *. unfold compose, num_bvars in *. simpl in *.
+    rewrite repeat_map_len in *. congruence.
 - ntwfauto. apply IHHe2. ntwfauto.
 - ntwfauto. apply IHHe2. destruct e'. simpl in *.
   ntwfauto.
@@ -527,22 +512,11 @@ Qed.
 (**********************)
 
 
-Inductive CPSCanonicalOp : Set :=
+Inductive L5Opid : Set :=
  | CLambda 
  | CKLambda
  | CFix (nMut : nat) (** number of functions that are mutually defined*)
- | CDCon (dc : dcon) (nargs : nat).
-
-Definition CPSOpBindingsCan (c : CPSCanonicalOp) 
-    : list nat :=
-  match c with
-  | CLambda    => [2] (* user lambda, also binds a continuation *)
-  | CKLambda    => [1] (* continuation lambda  *)
-  | CFix nMut => repeat nMut 1
-  | CDCon _ nargs    => repeat nargs 0
-  end.
-
-Inductive CPSNonCanonicalOp : Set :=
+ | CDCon (dc : dcon) (nargs : nat)
  | CHalt 
  | CRet (** application of a continuation lambda ([CKLambda]) *)
  | CCall (** a bit like apply in source language *)
@@ -551,8 +525,13 @@ Inductive CPSNonCanonicalOp : Set :=
  (** each member of the list corresponds to a branch. 
     it says how many variables are bound in that branch*).
 
-Definition CPSOpBindingsNCan (nc : CPSNonCanonicalOp) : list nat :=
-  match nc with
+Definition CPSOpBindings (c : L5Opid) 
+    : list nat :=
+  match c with
+  | CLambda    => [2] (* user lambda, also binds a continuation *)
+  | CKLambda    => [1] (* continuation lambda  *)
+  | CFix nMut => repeat 1 nMut
+  | CDCon _ nargs    => repeat 0 nargs
   | CHalt => [0]
   | CRet => [0,0]
   | CCall => [0,0,0]
@@ -560,66 +539,56 @@ Definition CPSOpBindingsNCan (nc : CPSNonCanonicalOp) : list nat :=
   | CMatch numargsInBranches => 0::(List.map snd numargsInBranches)
   end.
 
-Definition cdecc: forall x y : CPSCanonicalOp,
+
+Definition cdecc: forall x y : L5Opid,
 {x = y} + {x <> y}.
 Proof using.
   repeat(decide equality).
 Defined.
 
-Definition cdecnc:
-forall
-  x y : CPSNonCanonicalOp, {x = y} + {x <> y}.
-Proof using.
-  repeat(decide equality).
-Defined.
 
 Definition CPSGenericTermSig : GenericTermSig :=
 {| 
-  CanonicalOp := CPSCanonicalOp;
-  NonCanonicalOp := CPSNonCanonicalOp;
-  OpBindingsCan := CPSOpBindingsCan;
-  OpBindingsNCan := CPSOpBindingsNCan;
-  canonical_dec := cdecc;
-  ncanonical_dec := cdecnc
+  Opid := L5Opid;
+  OpBindings := CPSOpBindings;
+  opid_dec := cdecc;
 |}.
 
 
 Notation CBTerm := (@terms.BTerm NVar CPSGenericTermSig).
 Notation CTerm := (@terms.NTerm NVar CPSGenericTermSig).
 Notation coterm := (@terms.oterm NVar CPSGenericTermSig).
-Notation CCan := (@opid.Can CPSGenericTermSig).
-Notation CNCan := (@opid.NCan CPSGenericTermSig).
 
 Definition Lam_c (v vk : NVar) (b : CTerm) : CTerm :=
-  coterm (CCan CLambda) [bterm [v; vk] b].
+  coterm CLambda [bterm [v; vk] b].
 
 Definition KLam_c (v : NVar) (b : CTerm) : CTerm :=
-  coterm (CCan CKLambda) [bterm [v] b].
+  coterm CKLambda [bterm [v] b].
 
 Definition Ret_c (f a : CTerm) :=
-  coterm (CNCan CRet) [bterm [] f , bterm [] a].
+  coterm CRet [bterm [] f , bterm [] a].
 
 Definition Halt_c (v : CTerm) :=
-  coterm (CNCan CHalt) [bterm [] v].
+  coterm CHalt [bterm [] v].
 
 Definition Call_c (f k a : CTerm) :=
-  coterm (CNCan CCall) [bterm [] f , bterm [] k , bterm [] a].
+  coterm CCall [bterm [] f , bterm [] k , bterm [] a].
 
 Definition Con_c (dc : dcon) (args : list CTerm) : CTerm :=
-  coterm (CCan (CDCon dc (length args))) (List.map (bterm []) args).
+  coterm (CDCon dc (length args)) (List.map (bterm []) args).
 
 Definition Proj_c (arg: CTerm) (selector : nat) (cont: CTerm)  : CTerm :=
-  coterm (CNCan (CProj selector)) [bterm [] arg, bterm [] cont].
+  coterm (CProj selector) [bterm [] arg, bterm [] cont].
 
 (** do we need a continuation variable as well? *)
 Definition Fix_c (xf : NVar) (args : list CTerm) : CTerm :=
-  coterm (CCan (CFix (length args))) (List.map (bterm [xf]) args).
+  coterm (CFix (length args)) (List.map (bterm [xf]) args).
 
 Definition Fix_c' (lbt : list CBTerm) : CTerm :=
-  coterm (CCan (CFix (length lbt))) lbt.
+  coterm (CFix (length lbt)) lbt.
 
 Definition Match_c (discriminee : CTerm) (brs : list branch) : CTerm :=
-  coterm (CNCan (CMatch (List.map (fun b => (fst b, num_bvars (snd b))) brs))) 
+  coterm (CMatch (List.map (fun b => (fst b, num_bvars (snd b))) brs))
          ((bterm [] discriminee)::(List.map snd brs)).
 
 Instance CExpSubstitute : Substitute CTerm CTerm :=
@@ -716,13 +685,14 @@ Fixpoint is_valueb (e:NTerm) : bool :=
     | vterm _ => true
     | terms.oterm c lb => 
       match c with
-      | opid.Can c => 
-          match c with
           (* expensive test. need memoization *)
-          | NDCon _ _ => ball (List.map (is_valueb ∘ get_nt) lb)
-          | _ => true
-          end
-      | opid.NCan _ => false
+        | NLambda => true
+        | NFix _ => true
+        | NDCon _ _ => ball (List.map (is_valueb ∘ get_nt) lb)
+        | NApply => false
+        | NProj _ => false
+        | NLet => false
+        | NMatch _ => false
       end
    end.
 
@@ -796,17 +766,17 @@ Section CPS_CVT.
   Fixpoint cps_cvt_val' (e:NTerm) : CTerm :=
     match e with
       | vterm n => vterm n
-      | terms.oterm (opid.Can NLambda) [bterm [x] b] => 
+      |   terms.oterm NLambda [bterm [x] b] => 
           cps_cvt_lambda x b
-      | terms.oterm (opid.Can (NDCon d l)) lb => 
+      | terms.oterm (NDCon d l) lb => 
           let fb := (fun b => 
                       bterm []
                             (cps_cvt_val' (get_nt b))) in
-            coterm (CCan (CDCon d l)) (List.map fb lb)
-      | terms.oterm (opid.Can (NFix nargs)) lb =>
-          terms.oterm (CCan (CFix nargs))
+            coterm (CDCon d l) (List.map fb lb)
+      | terms.oterm (NFix nargs) lb =>
+          coterm (CFix nargs)
              (cps_cvt_fn_list' lb)
-      | _ => coterm (CCan CLambda) (map ((bterm []) ∘ vterm)  (free_vars e))
+      | _ => coterm CLambda (map ((bterm []) ∘ vterm)  (free_vars e))
           (* ill-formed term, which will not arise from the prev. phase.
             This choice, which is also ill-formed,
             is just to ensure that the free variables are same as
@@ -845,36 +815,36 @@ Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
      (*val_outer seems unnecessary eta expansion; not needed when consideing beta equiv?*)
     else
   match e with
-    | terms.oterm (opid.NCan NApply) [bterm [] e1; bterm [] e2] => 
+    | terms.oterm NApply [bterm [] e1; bterm [] e2] => 
         cps_cvt_apply cps_cvt (cps_cvt e1) e2
-    | terms.oterm (opid.Can (NDCon d nargs)) es => 
+    | terms.oterm (NDCon d nargs) es => 
         let kvars := contVars (S (length es)) in
         let k := hd nvarx kvars  in
         let tlkv := tail kvars  in
         KLam_c k (cps_cvts_chain cps_cvt tlkv es (Ret_c (vterm k)
                                                           (Con_c d (map vterm tlkv))))
-    | terms.oterm (opid.NCan (NMatch brl)) ((bterm [] discriminee)::brr) => 
+    | terms.oterm (NMatch brl) ((bterm [] discriminee)::brr) => 
       let kvars := contVars 2 in 
       let k := nth 0 kvars nvarx in
       let kd := nth 1 kvars nvarx in
       let brrc :=  (bterm [] (vterm kd))::(cps_cvt_branches cps_cvt (vterm k) brr) in
       KLam_c k (Ret_c (cps_cvt discriminee)
-                      (KLam_c kd (coterm (CNCan (CMatch brl)) brrc) ))
+                      (KLam_c kd (coterm (CMatch brl) brrc) ))
 
 
       (* translate as if it were App_e (Lam_e x e2) e1. See [cps_cvt_let_as_app_lam] below.
          Unlike the general cas of App, here the function is already a value *)
-    | terms.oterm (opid.NCan NLet) [bterm [] e1, bterm [x] e2] => 
+    | terms.oterm NLet [bterm [] e1, bterm [x] e2] => 
       let cpsLam := (val_outer (cps_cvt_lambda cps_cvt x e2)) in
         cps_cvt_apply cps_cvt cpsLam e1
 
-    | terms.oterm (opid.NCan (NProj i)) [bterm [] e] =>
+    | terms.oterm (NProj i) [bterm [] e] =>
       let kvars := contVars  2 in 
       let k := nth 0 kvars nvarx in  
       let ke := nth 1 kvars nvarx in  
         KLam_c k (Ret_c (cps_cvt e) 
                         (KLam_c ke (Proj_c (vterm ke) i (vterm k))))
-    | _ => coterm (CCan CLambda) (map ((bterm []) ∘ vterm)  (free_vars e))
+    | _ => coterm CLambda (map ((bterm []) ∘ vterm)  (free_vars e))
           (* ill-formed term, which will not arise from the prev. phase.
             This choice, which is also ill-formed,
             is just to ensure that the free variables are same as
@@ -1025,12 +995,11 @@ Proof using.
   - simpl. rewrite ssubst_aux_nil.
     reflexivity.
   - unfold KLam_c. do 3 f_equal.
-    apply ssubst_aux_trivial_cl.
-    intros ? ? Hin. in_reasoning. inverts Hin.
-    split; [assumption|].
+    apply ssubst_aux_trivial_disj.
+    intros ? ? Hin. simpl in *. in_reasoning; inverts Hin.
     unfold closed in Hb. simpl in Hb.
     autorewrite with core list in Hb.
-    rw nil_remove_nvars_iff in Hb.
+    rewrite nil_remove_nvars_iff in Hb.
     firstorder.
 Qed.
 
@@ -1052,7 +1021,7 @@ Proof using.
     split; [assumption|].
     unfold closed in Hb. simpl in Hb.
     autorewrite with core list in Hb.
-    rw nil_remove_nvars_iff in Hb.
+    rewrite nil_remove_nvars_iff in Hb.
     firstorder.
 Qed.
 
@@ -1151,6 +1120,7 @@ illFormedCase :=
  (try reflexivity; try (simpl;rewrite flat_map_vterm; reflexivity)).
 
 
+
 Definition cps_preserves_fvars (e : NTerm) (cps_cvt : NTerm -> CTerm) := 
     nt_wf e 
     -> varsOfClass (all_vars e) USERVAR
@@ -1162,8 +1132,8 @@ Proof using.
   simpl. unfold cps_preserves_fvars. intros ? Hyp.
   nterm_ind e as [v | o lbt Hind] Case;[eauto|].
   intros Hwf Hs. simpl in Hs.
-  destruct o;[| illFormedCase].
-  destruct c;[clear Hind| clear Hind|]; inverts Hwf as Hbt Hnb;
+  destruct o; try illFormedCase;
+    [clear Hind| clear Hind|]; inverts Hwf as Hbt Hnb;
     simpl in Hnb.
 (* lambda case *)
 - simpl.
@@ -1329,7 +1299,7 @@ Local Transparent cps_cvt_val' is_valueb.
 
 (* e is not a value *)
 - pose proof Hwf as Hwfb.
-  destruct o as [c| nc];[destruct c | destruct nc ]; illFormedCase;
+  destruct o; illFormedCase;
   inverts Hwf as Hbt Hnb; simpl in Hnb.
 (** data constructor when not all subterms are values *)
   + 
@@ -1501,7 +1471,6 @@ Proof.
 - simpl. dsub_find sf;[| refl]; symmetry in Heqsf.
   apply is_valueb_corr.  eapply Hsr. apply sub_find_some. eauto.
 - simpl. destruct o; try refl.
-  destruct c; try refl.
   rewrite map_map.
   f_equal.
   apply eq_maps.
@@ -1614,7 +1583,7 @@ Proof using.
   nterm_ind e as [v | o lbt Hind] Case;
   intros Hev ?  Hwf Hisv Hwfs Hcs  Hs;
   applydup userVarsContVar in Hs as Hdisvc; simpl in Hdisvc;
-  [ | destruct o;[destruct c; inverts Hwf as Hbt Hnb; simpl in Hnb | inverts Hev]];
+  [ | destruct o; try (complete (inverts Hev)) ; inverts Hwf as Hbt Hnb; simpl in Hnb];
     [| clear Hind | clear Hind| ].
 - simpl. symmetry.
   dsub_find sf; symmetry in Heqsf; [|erewrite sub_find_none_map; eauto; fail].
@@ -1743,7 +1712,7 @@ Local Opaque is_valueb cps_cvt_val'.
   [ | simpl; 
       setoid_rewrite (isvalueb_ssubst_aux (oterm o lbt) sub);
       [cases_if as Hd;[| destruct o; inverts Hwf as Hbt Hnb;
-        [destruct c; inverts Hd| destruct n]; simpl in Hnb] | assumption] ].
+              try (inverts Hd); simpl in Hnb] | assumption] ].
 (* variable case *)
 Local Opaque   ssubst_aux.
 Local Transparent is_valueb.
@@ -1949,14 +1918,14 @@ forall
 (He1 : eval e2 v2)
 (He2 : eval (ssubst e1' [(x, v2)]) v)
 (IHHe2 : forall k : CTerm,
-        free_vars k = [] -> forall v' : CTerm, eval_c (Ret_c (cps_cvt e2) k) v' <=> eval_c (Ret_c (cps_cvt v2) k) v')
+        free_vars k = [] -> forall v' : CTerm, eval_c (Ret_c (cps_cvt e2) k) v' <-> eval_c (Ret_c (cps_cvt v2) k) v')
 (Hcle : isprogram e2 /\ isprogram_bt (bterm [x] e1') /\ closed k /\ closed v2)
 (Hvcnr : no_repeats [kv, kv0, kv1])
 (Hcvdis : disjoint [contVar, kv, kv0, kv1] (all_vars e2 ++ x :: all_vars e1')) 
 (Hcsss : (closed (KLam_c kv0 (Ret_c (cps_cvt e2) (KLam_c kv1 (Call_c (vterm kv0) k (vterm kv1))))))),
 eval_c
   (Ret_c (val_outer (cps_cvt_lambda cps_cvt x e1'))
-     (KLam_c kv0 (Ret_c (cps_cvt e2) (KLam_c kv1 (Call_c (vterm kv0) k (vterm kv1)))))) v' <=>
+     (KLam_c kv0 (Ret_c (cps_cvt e2) (KLam_c kv1 (Call_c (vterm kv0) k (vterm kv1)))))) v' <->
 eval_c (Ret_c (cps_cvt (ssubst e1' [(x, v2)])) k) v'.
 Proof using.
   intros. unfold isprogram, isprogram_bt, closed, closed_bt in *. repnd.
@@ -1965,7 +1934,7 @@ Proof using.
   rewrite eval_ret. simpl.
   unfold subst.
   rewrite ssubstRet_c by assumption.
-  rewrite ssubst_vterm. simpl.
+  rewrite ssubst_vterm. simpl ssubst_aux.
   progress autorewrite with SquiggleLazyEq.
   match goal with
   [|- context [Ret_c _ (ssubst ?k _)]] => assert (closed k) as Hclk;
@@ -2025,9 +1994,7 @@ Proof using.
   do 2 (rewrite ssubst_trivial2_cl;[|intros; repeat in_reasoning; cpx | 
     assumption
       ]).
-  rewrite eval_call. simpl.
-  unfold subst.
-  autorewrite with SquiggleLazyEq.
+  rewrite eval_call.
   rewrite ssubstRet_c. repnd.
   rewrite <- ssubst_sub_filter2 with (l:=[contVar]).
   Focus 3. 
@@ -2166,8 +2133,8 @@ Lemma eval_matchg :
     find_branch d (length vs) (combine (map fst ld) lbt) = Some c -> 
     map num_bvars lbt = map snd ld -> 
     length vs = len -> 
-    let o :=  (CNCan (CMatch ld)) in
-    let cc :=  coterm (CCan (CDCon d len)) (map (bterm []) vs) in
+    let o :=  (CMatch ld) in
+    let cc :=  coterm (CDCon d len) (map (bterm []) vs) in
     (eval_c (coterm o ((bterm [] cc)::lbt)) v' <-> eval_c (apply_bterm c vs) v').
 Proof using.
   intros ? ? ? ? ? ? ? Hf Hm Hl.
@@ -2194,7 +2161,7 @@ Lemma eval_proj :
   forall (lbt : list CBTerm) (i : nat) (k v' : CTerm) (xf: NVar) (fn : CTerm) len,
     select i lbt = Some (bterm [xf] fn) ->
     len = length lbt ->
-  let Fix := coterm (CCan (CFix len)) lbt in
+  let Fix := coterm (CFix len) lbt in
   eval_c (Proj_c Fix i k) v' <-> eval_c (Ret_c (fn {xf := Fix}) k) v'.
 Proof using.
   intros ?  ? ? ? ? ? ? Hf Hl; simpl; subst; split ; intros;[| econstructor; eauto].
@@ -2313,7 +2280,7 @@ Lemma eval_c_constr_move_in : forall k d v' es vs ws lkv
 (Hind: forall e v : NTerm,
        LIn (e, v) (combine es vs) ->
        forall k : CTerm,
-       closed k -> forall v' : CTerm, eval_c (Ret_c (cps_cvt e) k) v' <=> eval_c (Ret_c (cps_cvt v) k) v')
+       closed k -> forall v' : CTerm, eval_c (Ret_c (cps_cvt e) k) v' <-> eval_c (Ret_c (cps_cvt v) k) v')
 (Hcws : (flat_map free_vars es)++(flat_map free_vars ws) = [])
 (Hclkk : closed k)
 (Hwf :  lforall nt_wf  es)
@@ -2323,7 +2290,7 @@ Lemma eval_c_constr_move_in : forall k d v' es vs ws lkv
 ,
 eval_c
   (cps_cvts_chain cps_cvt lkv (map (bterm []) es)
-            (Ret_c k (Con_c d (ws ++ (map vterm lkv)) ) ) ) v' <=>
+            (Ret_c k (Con_c d (ws ++ (map vterm lkv)) ) ) ) v' <->
 eval_c
   (Ret_c k
      (Con_c d 
@@ -2389,14 +2356,27 @@ Proof using.
   refl.
 Qed.
 
+Ltac apply' H1 H2 :=
+  let H3 := fresh in
+  (pose proof (H1 H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
+  (pose proof (H1 _ _ _ _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3).
 
 
 Ltac unfoldSubst :=
   unfold ssubst; simpl;
-  fold (@ssubst _ _ _ _ CPSGenericTermSig);
-  fold (@ssubst_bterm _ _ _ _ CPSGenericTermSig);
-  fold (@ssubst _ _ _ _ CoqL4GenericTermSig);
-  fold (@ssubst_bterm _ _ _ _ CoqL4GenericTermSig).
+  fold (@ssubst NVar _ _ _ CPSGenericTermSig);
+  fold (@ssubst_bterm NVar _ _ _ CPSGenericTermSig);
+  fold (@ssubst NVar _ _ _ CoqL4GenericTermSig);
+  fold (@ssubst_bterm NVar _ _ _ CoqL4GenericTermSig).
 
 (** What happens when e does not compute further, e.g. eval e e ? 
 Should we prove something more about such cases, e.g. the CPS converted term
@@ -2584,7 +2564,7 @@ Proof using.
   rewrite ssubstRet_c by assumption.
   rewrite ssubstKlam_c; [| assumption| noRepDis].
   rewrite ssubstCall_c by assumption.
-  do 3 rewrite ssubst_vterm. simpl.
+  do 3 rewrite ssubst_vterm. simpl ssubst_aux.
   rewrite <- beq_var_refl.
   do 2 (rewrite not_eq_beq_var_false;[| noRepDis]).
   change (val_outer (cps_cvt_lambda cps_cvt x e1')) with
@@ -2666,11 +2646,12 @@ Proof using.
   rewrite ssubstRet_c.
   rewrite ssubstKlam_c; [| try assumption| noRepDis].
   unfoldSubst.
+  fold (@ssubst NVar _ _ _ CPSGenericTermSig).
+  fold (@ssubst_bterm NVar _ _ _ CPSGenericTermSig).
   rewrite ssubst_trivial2_cl;[|assumption| unfold closed; apply cps_cvt_closed; auto].
   (rewrite not_eq_beq_var_false;[| noRepDis]).
   inverts Hwf as Hwfb Hwfs. simpl in Hwfb. dLin_hyp.
   rewrite cps_cvt_branches_subst; simpl; auto;[| disjoint_reasoningv2].
-  rewrite ssubst_vterm. simpl.
   rewrite <- beq_var_refl.
   clear Hcs.
   match goal with
@@ -2777,7 +2758,7 @@ Proof using.
   match goal with 
   [|- context [cps_cvt ?x]] => assert (is_value x) as Hisv
   end.
-    subst. simpl. rewrite ssubst_ssubst_aux;[| simpl; rwHyps; simpl; auto].
+    subst. rewrite ssubst_ssubst_aux;[| simpl; rwHyps; simpl; auto].
     constructor; fail.
   symmetry.
   do 1 rewrite eval_ret.
@@ -2806,7 +2787,7 @@ Proof using.
   simpl. unfold subst.
   match goal with
   [|- context [ (_,?ft)]  ] => 
-    change ft with (cps_cvt_val (oterm (Can (NFix (Datatypes.length es))) es))
+    change ft with (cps_cvt_val (oterm (NFix (Datatypes.length es)) es))
   end.
   apply eq_subrelation;[auto with typeclass_instances|].
   do 2 f_equal.
@@ -2863,9 +2844,9 @@ Proof using.
   exists (combine (map fst brs) lbt2).
   split; [| assumption].
   unfold Match_c. rewrite map_length in *.
-  f_equal; f_equal;
-    [ f_equal
-      |rewrite <- snd_split_as_map, combine_split; try rewrite map_length; auto].
+  f_equal;
+     [ |rewrite <- snd_split_as_map, combine_split; try rewrite map_length; auto].
+  f_equal.
   apply eq_maps2 with (defa := defbranch) (defc := defbranch);
     [rewrite length_combine_eq; rewrite map_length; auto|].
   intros ? ?.
@@ -3013,48 +2994,22 @@ Proof using.
   end.
   match type of Hbtf with
     alpha_eq ?l ?r=>
-      assert (alpha_eq (Ret_c k l) (Ret_c nt2 r)) as Hal
+      assert (alpha_eq (Ret_c  l k) (Ret_c r nt2)) as Hal
         by (unfold Ret_c; repeat prove_alpha_eq4)
   end.
-(*  apply IHHe in Hal.
+  apply IHHe in Hal. 
   exrepnd.
   eexists. split;[ | apply Hal0].
   pose proof (conj Hn1 Hl) as Hs. rewrite Hlf in Hs.
-  apply select_selectbt in Hs.*)
+  apply select_selectbt in Hs.
+  setoid_rewrite eval_proj; eauto.
+  apply Hal1.
+Qed.
 
-  (* prove a general lemma in certicoq about [Hn0] *)
-  (* nt0 must be a lambda for fix to reduce. because nt0 is alpha equal to a lambda,
-    we can show that nt0 also must be a lamda *)
-(*  Local Opaque ssubst_bterm.
-  simpl in Hn0.
-  inverts Hn0 as Hnt Hnt2 Hnt3.
-  destruct nt0;
-   [apply isvarc_ssubst_ot in Hnt3; auto with SquiggleLazyEq;contradiction|].
-  simpl in Hnt3. inverts Hnt3.
-  specialize (Hnt2 0 ltac:(simpl; omega)).
-  simpl in *.
-  destruct l;[inverts Hnt|].
-  destruct l;[|inverts Hnt].
-  clear Hnt. simpl in Hnt2.
-  do 2 rewrite selectbt_cons in Hnt2.
-  simpl in Hnt2. destruct b0 as [lvl ntl].
-  apply alphaeqbt_numbvars in Hnt2.
-  (* FIX : fold ssubst_bterm. Some tactics seem to be ignoring its opacity *)
-  do 2 rewrite num_bvars_ssubst_bterm in Hnt2.
-  unfold num_bvars in Hnt2.
-  simpl in Hnt2.
-  dlist_len_name lvl lvl.
-  econstructor; eauto. *)
-Abort.
-
-(*
 Print Assumptions eval_c_respects_α.
-Closed under the global context
-*)
 
 Require Import Coq.Classes.Morphisms.
 
-(*
 Global Instance eval_cα_proper :
   Proper (alpha_eq ==> alpha_eq ==> iff) eval_cα.
 Proof using.
@@ -3067,7 +3022,6 @@ Proof using.
   - rewrite <- H1eq0, <- H2eq. assumption.
   - rewrite <- H1eq0, H2eq. assumption.
 Qed.
-*)
 
 
 (** Useful for rewriting. *)

@@ -360,9 +360,7 @@ Definition closure_conversion (e : exp) : exp :=
       if Pos.leb x 3%positive then 3%positive else (x+1)%positive
   in
   let state := (next, TDict.empty) in
-  let (e, defs) :=
-      exp_hoist (fst (runState
-                        (exp_closure_conv map 1%positive 1%positive id 1%positive
-                                          e (Maps.PTree.empty VarInfo) 1%positive)
-                        state)) Fnil id
-  in Efun defs e.
+  exp_hoist (fst (runState
+                    (exp_closure_conv map 1%positive 1%positive id 1%positive
+                                      e (Maps.PTree.empty VarInfo) 1%positive)
+                    state)).

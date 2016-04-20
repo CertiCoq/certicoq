@@ -7,7 +7,7 @@ Inductive exp_ctx : Type :=
 | Hole_c : exp_ctx
 | Econstr_c : var -> type -> tag -> list var -> exp_ctx -> exp_ctx
 | Eproj_c  : var -> type -> N -> var -> exp_ctx -> exp_ctx
-| Eprim_c : var -> type -> prim -> list var -> exp_ctx -> exp_ctx
+| Eprim_c : var -> type -> prim -> list var -> exp_ctx -> exp_ctx   
 | Ecase_c : var -> list (tag * exp) -> tag ->
             exp_ctx -> list (tag * exp) -> exp_ctx  
 | Efun1_c : fundefs -> exp_ctx -> exp_ctx
@@ -156,8 +156,7 @@ Ltac exp_fundefs_ctx_induction IH1 IH2 :=
     | intros ? ? ? ? IH1 ?
     | intros ? ? ? ? ? IH2 ].
 
-(** alternative definition of subterms relation in function of 
-    applicative contexts *)
+(** alternative definition of subterms relation *)
 Definition subterm_e' (e':exp) (e:exp): Prop :=
   exists c, Hole_c <> c /\ app_ctx c e' e.
 

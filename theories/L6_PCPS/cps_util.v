@@ -304,3 +304,48 @@ Qed.
 Lemma split_fds_nil_r fdefs : split_fds Fnil fdefs fdefs.
   induction fdefs; constructor; eauto.
 Qed.
+
+Lemma split_fds_trans B1 B2 B3 B1' B2' :
+  split_fds B1 B1' B2 ->
+  split_fds B2 B2' B3 ->
+  exists B2,
+    split_fds B1' B2' B2 /\ split_fds B1 B2 B3.
+Proof.
+  intros Hs1 Hs2. revert B1 B1' Hs1. induction Hs2; intros B1 B1' Hs1.
+  - inv Hs1. 
+    edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
+    eexists. split; eauto. constructor; eauto.
+    edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
+    eexists. split; constructor; eauto.
+  - edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
+    eexists. split; constructor; eauto.
+  - eexists; split; eauto using split_fds_nil_l.
+Qed.  
+
+Lemma split_fds_sym B1 B2 B3 :
+  split_fds B1 B2 B3 ->
+  split_fds B2 B1 B3.
+Proof.
+  intros Hs1. induction Hs1; now constructor; eauto.
+Qed.
+
+Lemma split_fds_Fnil B1 B2 :
+  split_fds B1 B2 Fnil ->
+  B1 = Fnil /\ B2 = Fnil.
+Proof.
+  intros H. inv H; eauto.
+Qed.
+
+Lemma split_fds_Fcons_l B1 B2 B3 :
+  split_fds B1 B2 B3 ->
+  B1 <> Fnil -> B3 <> Fnil.
+Proof.
+  intros H1 H2. inv H1; eauto; congruence.
+Qed.
+
+Lemma split_fds_Fcons_r B1 B2 B3 :
+  split_fds B1 B2 B3 ->
+  B2 <> Fnil -> B3 <> Fnil.
+Proof.
+  intros H1 H2. inv H1; eauto; congruence.
+Qed.

@@ -7,14 +7,46 @@ Import PS.
 Definition FVSet := PS.t.
 
 
-(** [f] is a function defined in [fs] *)
-Fixpoint name_in_fundefs f (fs : fundefs) :=
-  match fs with
+(** [f] is a function defined in [B] *)
+Fixpoint name_in_fundefs f (B : fundefs) :=
+  match B with
     | Fnil => False
-    | Fcons f' _ _ _ fs =>
-      f' = f \/ name_in_fundefs f fs
+    | Fcons f' _ _ _ B =>
+      f' = f \/ name_in_fundefs f B
   end.
 
+Lemma name_in_fundefs_dec x B :
+  {name_in_fundefs x B} + {~ name_in_fundefs x B}.
+Proof.
+  induction B.
+  - destruct (Coqlib.peq x v); subst.
+    left. left; eauto.
+    inv IHB. left. right; eauto.
+    right. intros Hc. apply H. inv Hc; congruence.
+  - right. intros Hc; inv Hc.
+Qed.
+
+
+(** The function [(f, tau, xs, e)] is defined in [B] *)
+Fixpoint fun_in_fundefs f tau xs e (B : fundefs) :=
+  match B with
+    | Fnil => False
+    | Fcons f' tau' xs' e' B =>
+      (f' = f /\ tau' = tau /\ xs' = xs /\ e = e') \/
+      fun_in_fundefs f tau xs e B
+  end.
+
+(** [find_def] is correct w.r.t. [fun_in_fundefs] *)
+Lemma find_def_correct f B tau xs e :
+  find_def f B = Some (tau, xs, e) ->
+  fun_in_fundefs f tau xs e B.
+Proof.
+  induction B; simpl; intros H; try discriminate.
+  destruct (M.elt_eq f v).
+  - inv H; eauto.
+  - right; eauto.
+Qed.
+    
 (** [occurs_free x e] iff [x] appears free in [e] *)
 Inductive occurs_free : var -> exp -> Prop :=
 | Free_Econstr1 :
@@ -30,9 +62,13 @@ Inductive occurs_free : var -> exp -> Prop :=
     forall x ys, 
       occurs_free x (Ecase x ys)
 | Free_Ecase2 :  
-    forall y x ys,
-      List.Exists (fun p => occurs_free y (snd p)) ys ->
-      occurs_free y (Ecase x ys)
+    forall y x c e ys,
+      occurs_free y e ->
+      occurs_free y (Ecase x ((c, e) :: ys))
+| Free_Ecase3 :  
+    forall y x c e ys,
+      occurs_free y (Ecase x ys) ->
+      occurs_free y (Ecase x ((c, e) :: ys))
 | Free_Eproj1 :
     forall y x tau n e,
       occurs_free y (Eproj x tau n y e)
@@ -90,6 +126,27 @@ Proof.
   induction Hfree; inversion Hname; eauto.
 Qed.
 
+Lemma occurs_free_in_fun f tau xs e B x :
+  fun_in_fundefs f tau xs e B ->
+  occurs_free x e ->
+  List.In x xs \/ name_in_fundefs x B \/ occurs_free_fundefs x B.
+Proof.
+  induction B; intros H Hfree; inv H.
+  - destruct H0 as [H1 [H2 [H3 H4]]]; subst.
+    destruct (Coqlib.peq x f); subst.
+    + right. left. constructor; eauto.
+    + destruct (in_dec var_dec x xs); eauto; subst.
+      destruct (name_in_fundefs_dec x B).
+      * right. left. right; eauto.
+      * right. right. constructor; eauto.
+  - destruct (Coqlib.peq x v); subst.
+    + right; left. left; eauto.
+    + edestruct IHB as [H | [H | H]]; eauto.
+      * right. left. right; eauto.
+      * right. right. constructor 2; eauto.
+Qed.
+      
+   
 Definition closed_exp (e : exp) : Prop :=
   forall x, ~ (occurs_free x e).
 
@@ -264,41 +321,6 @@ Proof.
     right. eapply IHdefs; eauto.
 Qed.
 
-Ltac apply_set_specs_ctx :=
-  match goal with
-    | [ H : In _ (add _ _) |- _ ] =>
-      apply add_spec in H; inv H
-    | [ H : In _ (remove _ _) |- _ ] =>
-      apply remove_spec in H; inv H
-    | [ H : In _  (singleton _ ) |- _ ] =>
-      apply singleton_spec in H; subst
-    | [ H : In _ (union _ _) |- _ ] =>
-      apply union_spec in H; inv H
-    | [ H : In _ (diff _ _) |- _ ] =>
-      apply diff_spec in H; inv H
-    | [ H : In _ (diff_list _ _) |- _ ] =>
-      apply diff_list_spec in H; inv H
-    | [ H : In _ (union_list _ _) |- _ ] =>
-      apply union_list_spec in H; inv H
-  end.
-
-Ltac apply_set_specs :=
-  match goal with
-    | [ |- In _ (add _ _) ] =>
-      apply add_spec
-    | [ |- In _ (remove _ _) ] =>
-      apply remove_spec; split
-    | [ |- In _  (singleton _ ) ] =>
-      apply singleton_spec
-    | [ |- In _ (union _ _) ] =>
-      apply union_spec
-    | [ |- In _ (diff _ _) ] =>
-      apply diff_spec; split
-    | [ |- In _ (diff_list _ _) ] =>
-      apply diff_list_spec; split
-    | [ |- In _ (union_list _ _) ] =>
-      apply union_list_spec
-  end.
 
 Lemma fundefs_fv_add defs :
   forall s x,
@@ -360,7 +382,40 @@ Proof.
   eapply Subset_union_l; eauto.
 Qed.
 
-  
+Lemma In_fold_left {A} f (l : list A)
+      (si : FVSet) x:
+  In x si ->
+  In x (fold_left (fun s e => union (f e) s) l si).
+Proof.
+  revert si; induction l; intros si H; simpl; eauto.
+  eapply In_fold_left_weaken; eauto.
+  apply Subset_union_mon_r. eapply Subset_refl.
+Qed.
+
+
+Lemma Equal_fold_left {A} f (l : list A) (si si' : FVSet): 
+  Equal si si' ->
+  Equal (fold_left (fun s e => union (f e) s) l si)
+        (fold_left (fun s e => union (f e) s) l si').
+Proof.
+  revert si si'; induction l; intros si si' H; eauto.
+  simpl. eapply IHl. apply Subset_Equal; eauto.
+  eapply Subset_union_l; eauto. apply Equal_Subset_l; eauto.
+  eapply Subset_union_l; eauto. apply Equal_Subset_r; eauto.
+Qed.
+
+Lemma In_fold_left_strengthen {A} f (l : list A)
+      (si si' : FVSet) x:
+  In x (fold_left (fun s e => union (f e) s) l (union si si')) ->
+  In x (fold_left (fun s e => union (f e) s) l si') \/ In x si.
+Proof.
+  revert si si'; induction l; intros si si' H; simpl in H; eauto; simpl in *.
+  - apply_set_specs_ctx; eauto.
+  - rewrite Equal_fold_left in H. Focus 2.
+    rewrite union_sym. rewrite union_assoc. rewrite (union_sym si' (f a)). reflexivity.
+    eapply IHl in H. inv H; eauto.
+Qed.
+
 (** correctness of exp_fv and fundefs_fv w.r.t occurs_free
     and occurs_free_def *)
 Lemma exp_fv_fundefs_fv_correct :
@@ -377,27 +432,16 @@ Proof.
     left. apply_set_specs; eauto.
     apply IHe; eauto.
   - repeat apply_set_specs_ctx; constructor.
-  - inv H; eauto; apply_set_specs; eauto.
-    inv H2.
-  - repeat apply_set_specs_ctx.
-    eapply In_fold_left_l in H.
-    inv H.
-    + repeat apply_set_specs_ctx.
-      * constructor; simpl. constructor; eapply IHe; eauto.
-      * constructor.
-    + assert (Hsuf : occurs_free x (Ecase v l))
-        by (eapply IHl; apply In_fold_left_r; eauto).
-      clear H0. inv Hsuf. constructor; eauto.
-      constructor. constructor 2. eauto.
+  - inv H. apply_set_specs; eauto.
+  - eapply In_fold_left_strengthen in H. inv H.
+    + apply Free_Ecase3. apply IHl; eauto.
+    + constructor. eapply IHe; eauto. 
   - inv H.
-    + eapply In_fold_left_r.
-      left. apply_set_specs; right; apply_set_specs; eauto.
-    + inv H2; simpl in *.
-      * eapply In_fold_left_r.
-        left. apply_set_specs; left. apply IHe; eauto.
-      * eapply In_fold_left_weaken.
-        apply Subset_union_mon_r. apply Subset_refl.
-        eapply IHl. constructor; eauto.
+    + eapply In_fold_left. apply_set_specs. right; constructor; eauto.
+    + apply In_fold_left. apply_set_specs; left. apply IHe; eauto.
+    + apply IHl in H2. simpl in H2.
+      eapply In_fold_left_weaken; eauto.
+      apply Subset_union_mon_r. apply Subset_refl.
   - repeat apply_set_specs_ctx.
     + constructor; eauto.
     + constructor; eauto. eapply IHe; eauto.

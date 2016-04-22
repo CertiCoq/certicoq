@@ -192,3 +192,86 @@ Proof.
   eapply elements_spec1; eapply elements_spec1 in H';
   eapply H; eauto.
 Qed.
+
+Ltac apply_set_specs_ctx :=
+  match goal with
+    | [ H : In _ (add _ _) |- _ ] =>
+      apply add_spec in H; inv H
+    | [ H : In _ (remove _ _) |- _ ] =>
+      apply remove_spec in H; inv H
+    | [ H : In _  (singleton _ ) |- _ ] =>
+      apply singleton_spec in H; subst
+    | [ H : In _ (union _ _) |- _ ] =>
+      apply union_spec in H; inv H
+    | [ H : In _ (diff _ _) |- _ ] =>
+      apply diff_spec in H; inv H
+    | [ H : In _ (diff_list _ _) |- _ ] =>
+      apply diff_list_spec in H; inv H
+    | [ H : In _ (union_list _ _) |- _ ] =>
+      apply union_list_spec in H; inv H
+  end.
+
+Ltac apply_set_specs :=
+  match goal with
+    | [ |- In _ (add _ _) ] =>
+      apply add_spec
+    | [ |- In _ (remove _ _) ] =>
+      apply remove_spec; split
+    | [ |- In _  (singleton _ ) ] =>
+      apply singleton_spec
+    | [ |- In _ (union _ _) ] =>
+      apply union_spec
+    | [ |- In _ (diff _ _) ] =>
+      apply diff_spec; split
+    | [ |- In _ (diff_list _ _) ] =>
+      apply diff_list_spec; split
+    | [ |- In _ (union_list _ _) ] =>
+      apply union_list_spec
+  end.
+
+Lemma Subset_Equal s s' :
+  Subset s s' ->
+  Subset s' s ->
+  Equal s s'.
+Proof.
+  intros H1 H2 x. split; eauto.
+Qed.
+
+Lemma Equal_Subset_l s s' :
+  Equal s s' ->
+  Subset s s'.
+Proof.
+  intros H1 x Hin. apply H1; eauto.
+Qed.
+
+Lemma Equal_Subset_r s s' :
+  Equal s s' ->
+  Subset s' s.
+Proof.
+  intros H1 x Hin. apply H1; eauto.
+Qed.
+
+Lemma union_assoc s1 s2 s3 :
+  Equal (union (union s1 s2) s3) (union s1 (union s2 s3)).
+Proof.
+  split; intros HIn; repeat apply_set_specs_ctx; apply_set_specs; eauto;
+  solve [ right; apply_set_specs; eauto | left; apply_set_specs; eauto ].
+Qed.
+
+Lemma union_sym s1 s2 :
+  Equal (union s1 s2) (union s2 s1).
+Proof.
+  split; intros HIn; repeat apply_set_specs_ctx; apply_set_specs; eauto;
+  solve [ right; apply_set_specs; eauto | left; apply_set_specs; eauto ].
+Qed.
+
+Instance In_proper x :  Proper (Equal ==> iff) (In x).
+Proof.
+  constructor; intros Hin; eapply H; eauto.
+Qed.
+
+Instance union_proper_r x :  Proper (Equal ==> Equal) (union x).
+Proof.
+  constructor; intros Hin; apply_set_specs_ctx; apply_set_specs; eauto;
+  right; apply H; eauto.
+Qed.

@@ -3,8 +3,6 @@ Require Import List BinNat Relations Omega.
 
 Import ListNotations.
 
-(* TODO : move dependencies from shrink_cps to common file *)
-
 (** Given an expression [e], [exp_hoist e B f] will return an expression [e']
   * and a block of function definitions [B']. [e'] is the function defintion 
   * erasure of [e] and [B] is exactly the function definitions of [e]. It's 
@@ -764,7 +762,6 @@ Proof.
   - apply Erase_fundefs_Fnil_in_hoist_rw; eauto.
 Qed.
 
-
 (* Is this the expected behavior?
 
 Inductive one_or_many A : Type :=
@@ -776,25 +773,26 @@ Inductive dummy {A : Type} : one_or_many A -> Prop :=
     forall a, dummy (One A a) 
 | Two_dummy :
     forall (p : one_or_many A * one_or_many A),
-      let '(c, e) := p in dummy e ->
+      (let '(c, e) := p in dummy e) ->
       dummy (Many A p).
 
 *)
 
 
 (* TODO : move the following lemmas to the right files *) 
-Lemma preord_env_permut k x y v1 v2 rho1 rho2 :
+
+Lemma preord_env_permut k x y v1 v2 rho1 rho2 P :
   x <> y ->
-  preord_env k (M.set x v1 (M.set y v2 rho1)) (M.set x v1 (M.set y v2 rho2)) ->
-  preord_env k (M.set x v1 (M.set y v2 rho1)) (M.set y v2 (M.set x v1 rho2)).
+  preord_env_P k P (M.set x v1 (M.set y v2 rho1)) (M.set x v1 (M.set y v2 rho2)) ->
+  preord_env_P k P (M.set x v1 (M.set y v2 rho1)) (M.set y v2 (M.set x v1 rho2)).
 Proof.
-  intros Hneq Hpre x' v1' Hget.
+  intros Hneq Hpre x' HP v1' Hget.
   rewrite M.gsspec in Hget.
   destruct (Coqlib.peq x' x). inv Hget. 
-  - edestruct (Hpre x) as [v1'' [Hget'' Hpre'']]. rewrite M.gss; eauto.
+  - edestruct (Hpre x) as [v1'' [Hget'' Hpre'']]; eauto. rewrite M.gss; eauto.
     rewrite M.gss in Hget''; inv Hget''.
     eexists. rewrite M.gso; eauto. rewrite M.gss; eauto.
-  - edestruct (Hpre x') as [v1'' [Hget'' Hpre'']].
+  - edestruct (Hpre x') as [v1'' [Hget'' Hpre'']]; eauto.
     rewrite M.gso; eauto. rewrite M.gsspec in Hget.
     destruct (Coqlib.peq x' y). inv Hget.
     + eexists. rewrite M.gss; eauto. split; eauto.
@@ -836,6 +834,36 @@ Proof.
   exfalso. apply Hin. constructor; eauto. eapply IHdefs.
   intros Hc.  eapply Hin. constructor 2; eauto.
 Qed.
+              
+
+Lemma preord_env_permut_def_funs k x B v1 v2 rho1 rho2 :
+  (forall x' : var, bound_var_fundefs x' B -> x <> x') ->
+  closed_fundefs B ->
+  preord_val k v1 v2 ->
+  preord_env k rho1 rho1 ->
+  preord_env k (def_funs B B (M.set x v1 rho1) (M.set x v1 rho1))
+             (M.set x v1 (def_funs B B rho2 rho2)).
+Proof.
+  induction k using lt_wf_rec1.
+Admitted.
+(*   intros Hneq Hclo Hpre Hpreenv x' v1' Hget. *)
+(*   apply def_funs_spec in Hget. *)
+(*   destruct Hget as [[Hname Heq] | [Hname Heq ]]; subst. *)
+(*   - assert (Hadm : bound_var_fundefs x' B) by admit. *)
+(*     specialize (Hneq _ Hadm). eexists. *)
+(*     rewrite M.gso; eauto. rewrite def_funs_eq; eauto. *)
+(*     split; eauto.  *)
+(*     rewrite preord_val_eq. *)
+(*     intros vs1 vs2 j t xs e1 rho1' Hlen Hdef Heq. *)
+(*     edestruct setlist_length as [rho2' Hset]; eauto. *)
+(*     do 4 eexists. split; eauto. split; eauto. *)
+(*     intros Hlt Hall. *)
+(*     assert (Henv : preord_exp j (e1, rho1') (e1, M.set x v2 rho2')). *)
+(*     apply preord_exp_refl. admit. *)
+(*     eapply preord_exp_strengthen; eauto. *)
+(*     intros ? ?; eauto. *)
+(* Qed. *)
+
 
 
 Lemma preord_env_def_funs_permut (k : nat) (f1 f2 : fundefs)
@@ -845,7 +873,7 @@ Lemma preord_env_def_funs_permut (k : nat) (f1 f2 : fundefs)
   preord_env k (def_funs f1 f1 rho1 (def_funs f2 f2 rho1 rho1))
              (def_funs f2 f2 rho2 (def_funs f1 f1 rho2 rho2)).
 Proof.
-  intros Henv Hname x v Hget.
+  intros Henv Hname x _ v Hget.
   eapply def_funs_spec in Hget. destruct Hget as [[H1 H2] | [H1 H2]].
   - eexists. rewrite def_funs_neq; eauto. rewrite def_funs_eq; eauto.
     split; eauto. inv H2.
@@ -854,8 +882,9 @@ Proof.
                               (def_funs f1 f1 rho2 rho2)) as [rho2'' Hset]; eauto.
     do 4 eexists; repeat split; eauto. intros Hlt Hall.
     eapply preord_exp_refl.
-    eapply preord_env_setlist_l. eapply preord_env_def_funs.
-    eapply preord_env_monotonic; [| eauto]. omega. eauto. eauto. eauto.
+    eapply preord_env_P_setlist_l. eapply preord_env_def_funs.
+    eapply preord_env_monotonic; [| eauto]. omega.
+    intros; simpl; eauto. eauto. eauto. eauto.
   - eapply def_funs_spec in H2.
     destruct H2 as [[H3 H4] | [H3 H4]]; subst.
     + eexists. rewrite def_funs_eq; eauto. split; eauto.
@@ -864,8 +893,19 @@ Proof.
                                 (def_funs f2 f2 rho2 rho2)) as [rho2' Hset]; eauto.
       do 4 eexists; repeat split; eauto. intros Hlt Hall.
       eapply preord_exp_refl.
-      eapply preord_env_setlist_l. eapply preord_env_def_funs.
-      eapply preord_env_monotonic; [| eauto]. omega. eauto. eauto. eauto.
+      eapply preord_env_P_setlist_l. eapply preord_env_def_funs.
+      eapply preord_env_monotonic; [| eauto]. omega.
+      intros; simpl; eauto. eauto. eauto. eauto.
     + edestruct Henv as [v2 [Hget Hpre]]; eauto.
       eexists. rewrite def_funs_neq; eauto. rewrite def_funs_neq; eauto.
 Qed.
+
+Lemma hoist_rw_correct e e' rho rho' k :
+  closed_fundefs_in_exp e ->
+  unique_bindings e ->
+  hoist_rw e e' ->
+  preord_env k rho rho' ->
+  preord_exp k (e, rho) (e', rho').
+Proof.
+  intros Hclo Hun Hrw Henv; inv Hrw; intros v1 c1 Hleq1 Hstep1.
+Abort All.

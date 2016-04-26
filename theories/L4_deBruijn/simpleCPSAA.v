@@ -79,6 +79,7 @@ Definition dcon := N.
 
 Section VarsOf2Class.
 
+(* see the file SquiggleLazyEq.varImplPeano for an instantiation of NVar *)
 Context {NVar} {deqnvar : Deq NVar} {vartype: @VarType NVar bool (* 2 species of vars*) _}.
 
 Notation USERVAR := true (only parsing).
@@ -927,6 +928,7 @@ Proof using.
   intros. reflexivity.
 Qed.
 
+
 Lemma cps_val_outer :
   forall (v:NTerm), 
   is_valueb v = true -> 
@@ -1084,8 +1086,6 @@ Definition cps_cvt_apply_step : Prop := forall e1 e2 :NTerm,
 
 End CPS_CVT_INDUCTION.
 
-(* get rid of it. must not depend on the return value on ill formed cases.
-cps_cvt_val will  never be called for non-values. So add is_value as a hypothesis*)
 Local Lemma cps_cvt_val_aux_fvars_aux : forall o lbt,
   (forall es, 
     (size es) < size (oterm o lbt)
@@ -1115,6 +1115,9 @@ Proof using.
   refl.
 Qed.
 
+
+(* get rid of it. must not depend on the return value on ill formed cases.
+cps_cvt_val will  never be called for non-values. So add is_value as a hypothesis*)
 Local Ltac 
 illFormedCase :=
  (try reflexivity; try (simpl;rewrite flat_map_vterm; reflexivity)).
@@ -2797,8 +2800,6 @@ Proof using.
   rwsimplC. dands; eauto with subset.
 Qed.
 
-Print Assumptions cps_cvt_corr.
-
 (** 
 ** Evaluation of CPS converted terms respects alpha equality. *
 *
@@ -3006,8 +3007,6 @@ Proof using.
   apply Hal1.
 Qed.
 
-Print Assumptions eval_c_respects_α.
-
 Require Import Coq.Classes.Morphisms.
 
 Global Instance eval_cα_proper :
@@ -3050,4 +3049,105 @@ Proof using.
   prove_alpha_eq4; assumption.
 Qed.
 
+
+(** [SquiggleLazyEq.substitution.change_bvars_alpha] 
+   gets the job done, but it was written
+   without any consideration whatsoever to efficiency. Need to
+   rewrite it (in the SquiggleLazyEq library) to be efficient.
+   
+   *)
+Definition cps_cvt_unique_bvars :=
+ (change_bvars_alpha []) ∘ cps_cvt.
+
+Lemma cps_cvt_unique_alpha : forall (t:NTerm),
+  alpha_eq (cps_cvt_unique_bvars t) (cps_cvt t).
+Proof using.
+  intros.
+  symmetry.
+  apply change_bvars_alpha_spec.
+Qed.
+
+Corollary cps_cvt_unique_corr : forall e v,
+  nt_wf e ->
+  varsOfClass (all_vars e) USERVAR -> 
+  eval e v ->
+  closed e ->
+  forall k, closed k ->
+    forall v',
+      eval_cα (Ret_c (cps_cvt_unique_bvars e) k) v' <->
+        eval_cα (Ret_c (cps_cvt_unique_bvars v) k) v'.
+Proof using.
+  intros.
+  do 2 rewrite cps_cvt_unique_alpha.
+  unfold eval_cα.
+  setoid_rewrite cps_cvt_corr at 1; eauto;[].
+  refl.
+Qed.
+
+
+Section TypePreservingCPS.
+(* if [x] has type [A], then [cps_cvt x] has type [forall {F:Type} (contVar: A -> F), F],
+  or, forall {F:Type}, (A -> F)-> F.
+So, cps_cvt is the realizer of Godel's double negation transformation, at least for variables.  
+   *)
+Example cps_cvt_var : forall x,
+  cps_cvt (vterm x)
+  = KLam_c contVar (Ret_c (vterm contVar) (vterm x)).
+Proof using. refl. Qed.
+
+Example cps_cvt_lam : forall x b,
+(* suppose [Lam_e x b] has type [A -> B]
+[b] has type [B]. [cps_cvt b] has type [forall {F}, ((B -> F) -> F)], by the variable case above,
+ and substitution lemma.
+because cv2 is applied to  [cps_cvt b], the type of [cv2] must be [B->F], and the type of application
+must be [F].
+So, the type of [(Lam_c x cv2 (Ret_c (cps_cvt b) (vterm cv2)))] should then be 
+[forall {F}, A-> (B->F) -> F].
+By using the above var case and substitution lemma, the type of the whole thing (which prepends va_outer),
+is [forall {F' F}, ((A-> (B->F) -> F) -> F') -> F']
+
+In the literature in type-preserving CPS translation, they have only one \bot symbol for F.
+How do they manage the need above for an F and an F'. There is no reason they should be the same.
+Also, to be fully explicit, we should add the type lambdas explicitly, and correspondingly add the instances
+in the application case.
+*)
+  let cv1 := contVar in
+  let cv2 := contVar in
+  cps_cvt (Lam_e x b)
+  = KLam_c cv1 (Ret_c (vterm cv1) (Lam_c x cv2 (Ret_c (cps_cvt b) (vterm cv2))) ).
+Proof using. refl. Qed.
+
+(* if [d] is a [bool], and [ct] is of type [A] and [cf] is of type [B], then the result
+ this match expression has type [if d then A esle B]*)
+Definition depMatchExample (ct cf d : NVar): NTerm :=
+  Match_e (vterm d) [(1%N, bterm [] (vterm ct)) ; (2%N, bterm [] (vterm cf))].
+
+Example cps_cvt_depmatch : forall (ct cf d : NVar),
+(*
+they are computationally equivalent. see [val_outer_eval] below/
+*)
+  (forall k v, Ret_c (val_outer v) k=  Ret_c k v)
+  ->
+  cps_cvt (depMatchExample ct cf d) = vterm d.  
+(* replacing the result of simpl at RHS causes type inference issues *)
+Proof using. intros. simpl.
+  set (kv0:= nth 0 (contVars 2) nvarx).
+  set (kv1:= nth 1 (contVars 2) nvarx).
+  unfold num_bvars. simpl. 
+
+(* [kv0] is applied to both [ct] and [cf]. So, it should have type
+  forall {FA FB}, if d then (A -> FA) else (B -> FB)
+  [KLam_c kv _] is being applied to [vterm d]. So, [kv1] should have type [bool].
+  So, the overall type is:
+  forall {FA FB}, 
+  (if d then (A -> FA) else (B -> FB)) -> (if d then FA else FB)
+  
+  *)
+Abort.
+  
+End TypePreservingCPS.
+
+
 End VarsOf2Class.
+
+

@@ -1,8 +1,9 @@
-Require Maps.
-Import Nnat.
-Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
+Require Import Arith BinNat String List Omega Ensembles.
 Require Import CpdtTactics.
-Require Import cps.
+Require Import cps Ensembles_util.
+Import ListNotations.
+(* Require Maps. *)
+(* Import Nnat. *)
 
 (* useful definitions and proof for L6 - cps language *)
 (* 
@@ -295,8 +296,7 @@ Inductive split_fds: fundefs -> fundefs -> fundefs -> Prop :=
       split_fds lfds (Fcons v t ys e rfds) (Fcons v t ys e lrfds)
 | End_f: split_fds Fnil Fnil Fnil.
 
-(** easy lemmas about split_fds. 
-    TODO move split_fds in common file along with lemmas *)
+(** some lemmas about split_fds. *)
 Lemma split_fds_nil_l fdefs : split_fds fdefs Fnil fdefs.
   induction fdefs; constructor; eauto.
 Qed.
@@ -348,4 +348,114 @@ Lemma split_fds_Fcons_r B1 B2 B3 :
   B2 <> Fnil -> B3 <> Fnil.
 Proof.
   intros H1 H2. inv H1; eauto; congruence.
+Qed.
+
+
+Lemma split_fds_Fnil_eq_l B1 B2 :
+  split_fds Fnil B1 B2 -> B1 = B2.
+Proof.
+  revert B1. induction B2; intros B1 H; auto; inv H; f_equal; eauto.
+Qed.
+
+Lemma split_fds_Fnil_eq_r B1 B2 :
+  split_fds B1 Fnil B2 -> B1 = B2.
+Proof.
+  revert B1. induction B2; intros B1 H; auto; inv H; f_equal; eauto.
+Qed.
+
+
+Fixpoint fundefs_append (B1 B2 : fundefs) : fundefs :=
+  match B1 with
+    | Fcons f t xs xe B => Fcons f t xs xe (fundefs_append B B2)
+    | Fnil => B2
+  end.
+    
+Lemma def_funs_append B B1 B2 rho rho' :
+  def_funs B (fundefs_append B1 B2) rho rho' =
+  def_funs B B1 rho (def_funs B B2 rho rho').
+Proof.
+  induction B1; simpl; eauto. now rewrite IHB1.
+Qed.
+
+Lemma find_def_fundefs_append_r f B1 B2 v:
+  find_def f B2 = Some v ->
+  find_def f B1 = None ->
+  find_def f (fundefs_append B1 B2) = find_def f B2.
+Proof.
+  induction B1; simpl; intros H1 H2; eauto.
+  destruct (M.elt_eq f v0); try discriminate; eauto.
+Qed.
+
+Lemma find_def_fundefs_append_l f B1 B2 v:
+  find_def f B1 = Some v ->
+  find_def f (fundefs_append B1 B2) = find_def f B1.
+Proof.
+  induction B1; simpl; intros H2; eauto; try discriminate.
+  destruct (M.elt_eq f v0); try discriminate; eauto.
+Qed.
+
+Lemma fundefs_append_split_fds B1 B2 B3 :
+  fundefs_append B1 B2 = B3 ->
+  split_fds B1 B2 B3.
+Proof.
+  revert B1. induction B3; intros B1 Hdefs.
+  - destruct B1; simpl in Hdefs; subst. inv Hdefs.
+    constructor. eauto.
+    eapply split_fds_nil_r.
+  - destruct B1; simpl in Hdefs; try congruence. subst.
+    constructor.
+Qed.
+
+Lemma find_def_fundefs_append_Fcons_neq f v t ys e B1 B2 :
+  f <> v ->
+  find_def f (fundefs_append B1 (Fcons v t ys e B2)) =
+  find_def f (fundefs_append B1 B2).
+Proof.
+  intros Hneq. revert B2. induction B1; intros B2.
+  - simpl. destruct (M.elt_eq f v0); eauto.
+  - simpl. destruct (M.elt_eq f v); try contradiction; eauto.
+Qed.
+
+Lemma findtag_In_patterns {A} P c (v : A) :
+  findtag P c = Some v ->
+  List.In (c, v) P.
+Proof.
+  induction P as [ | [c' e'] P IHP]; intros H; try discriminate.
+  simpl in H. edestruct (M.elt_eq c' c).
+  - inv H. now left.
+  - right. eauto.
+Qed.
+   
+Lemma findtag_append_spec {A} c P P' (v : A) :
+  findtag (P ++ P') c = Some v ->
+  (findtag P c = Some v) \/
+  (findtag P' c = Some v /\ forall v, ~ List.In (c, v) P).
+Proof.
+  induction P as [| [c' v'] P IHP]; intros H.
+  - simpl in H. right; split; eauto.
+  - simpl in *.
+    destruct (M.elt_eq c' c); eauto.
+    destruct (IHP H) as [H1 | [H1 H2]]; eauto.
+    right; split; eauto. intros v''.
+    intros Hc. inv Hc. inv H0; congruence.
+    eapply H2; eauto.
+Qed.
+
+Lemma findtag_append_not_In {A} c (P P' : list (tag * A)) :
+  (forall v, ~ List.In (c, v) P) ->
+  findtag (P ++ P') c = findtag P' c.
+Proof.
+  induction P as [| [c' v'] P IHP]; simpl; intros H; eauto.
+  destruct (M.elt_eq c' c); eauto.
+  - exfalso. subst. eapply H. left; eauto.
+  - eapply IHP. intros x Hc. eapply H. eauto.
+Qed.
+
+Lemma findtag_append_Some {A} c P P' (v : A) :
+  findtag P c = Some v ->
+  findtag (P ++ P') c = Some v.
+Proof.
+  induction P as [| [c' v'] P IHP]; simpl; intros H; eauto.
+  - inv H.
+  - destruct (M.elt_eq c' c); eauto.
 Qed.

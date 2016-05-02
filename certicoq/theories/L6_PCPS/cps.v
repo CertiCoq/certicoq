@@ -102,9 +102,9 @@ with fundefs : Type :=
      | Fcons: var -> type -> list var -> exp -> fundefs -> fundefs
      | Fnil: fundefs.
 
-(** Induction principle for exp *)
+(** Induction principles for exp *)
 Lemma exp_ind' :
-  forall P : exp -> Prop,
+  forall P : exp -> Type,
     (forall (v : var) (t : type) (t0 : tag) (l : list var) (e : exp),
        P e -> P (Econstr v t t0 l e)) ->
     (forall (v : var), P (Ecase v nil)) ->
@@ -130,7 +130,7 @@ Qed.
 
 (** Mutual induction scheme for exp and fundefs *)
 Lemma exp_mut :
-  forall (P : exp -> Prop) (P0 : fundefs -> Prop),
+  forall (P : exp -> Type) (P0 : fundefs -> Type),
     (forall (v : var) (t : type) (t0 : tag) (l : list var) (e : exp),
        P e -> P (Econstr v t t0 l e)) ->
     (forall (v : var), P (Ecase v nil)) ->
@@ -146,7 +146,7 @@ Lemma exp_mut :
        P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
     P0 Fnil -> forall e : exp, P e                                 
 with fundefs_mut :
-  forall (P : exp -> Prop) (P0 : fundefs -> Prop),
+  forall (P : exp -> Type) (P0 : fundefs -> Type),
     (forall (v : var) (t : type) (t0 : tag) (l : list var) (e : exp),
        P e -> P (Econstr v t t0 l e)) ->
     (forall (v : var), P (Ecase v nil)) ->

@@ -1,5 +1,5 @@
-Require Import cps cps_util identifiers env ctx.
-Require Import BinNat Relations MSets MSetRBT List Omega.
+Require Import BinNat Relations MSets MSetRBT List Omega Ensembles.
+Require Import cps cps_util identifiers env ctx Ensembles_util.
 Import ListNotations.
 
 Section EVAL.
@@ -89,7 +89,7 @@ Section EVAL.
 
   Lemma env_subset_getlist_2 rho1 rho2 ys:
     env_subset rho1 rho2 ->
-    (forall x, In x ys -> M.get x rho2 = M.get x rho1) ->
+    (forall x, List.In x ys -> M.get x rho2 = M.get x rho1) ->
     getlist ys rho2 = getlist ys rho1.
   Proof.
     intros Hsub. induction ys as [| y ys IHys]; eauto; intros Hget.
@@ -99,7 +99,7 @@ Section EVAL.
 
   Lemma getlist_In (rho : env) ys x vs :
     getlist ys rho = Some vs ->
-    In x ys ->
+    List.In x ys ->
     exists v, M.get x rho = Some v.
   Proof.
     revert x vs. induction ys; intros x vs Hget H. inv H.
@@ -303,13 +303,13 @@ Section EVAL.
       M.get x rho1 = Some v1 -> 
       exists v2, M.get y rho2 = Some v2 /\ preord_val k v1 v2.
 
-  Definition preord_env_P (P : var -> Prop) k rho1 rho2 :=
+  Definition preord_env_P (P : Ensemble var) k rho1 rho2 :=
     forall (x : var), P x -> preord_var_env k rho1 rho2 x x.
   
   (** ρ1 ~_k ρ2 iff ρ1(x) = v => ρ2(x) = v' /\ v ~_k v' *)
   Definition preord_env (k : nat) (rho1 rho2 : env) : Prop :=
     preord_env_P (fun _ => True) k rho1 rho2.
-
+  
   Open Scope ctx_scope.
 
   (** Context relation. *)
@@ -434,15 +434,53 @@ Section EVAL.
 
   Lemma preord_env_P_antimon (P1 P2 : var -> Prop) k rho1 rho2 :
     preord_env_P P2 k rho1 rho2 ->
-    (forall x, P1 x -> P2 x) ->
+    (Included var P1 P2) ->
     preord_env_P P1 k rho1 rho2.
   Proof.
-    intros Hpre Hin x HP2. eapply Hpre; eauto.
+    intros Hpre Hin x HP2. eapply Hpre; eapply Hin; eauto.
+  Qed.
+
+  Global Instance preord_env_proper  :
+    Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+           preord_env_P.
+  Proof.
+    intros s1 s2 [H1 H2]; split; intros Hpre; eapply preord_env_P_antimon; subst; eauto.
+  Qed.
+  
+  Lemma preord_env_Empty_set k (rho1 rho2 : env) :
+    preord_env_P (Empty_set var) k rho1 rho2.
+  Proof.
+    intros x H. inv H.
+  Qed.
+  
+  Lemma preord_env_P_union (P1 P2 : var -> Prop) k rho1 rho2 :
+    preord_env_P P1 k rho1 rho2 ->
+    preord_env_P P2 k rho1 rho2 ->
+    preord_env_P (Union var P1 P2) k rho1 rho2.
+  Proof.
+    intros Hpre1 Hpre2 x HP2.
+    inv HP2; eauto.
+  Qed.
+
+  Lemma preord_env_P_inter_l (P1 P2 : var -> Prop) k rho1 rho2 :
+    preord_env_P P1 k rho1 rho2 ->
+    preord_env_P (Intersection var P1 P2) k rho1 rho2.
+  Proof.
+    intros Hpre x HP2.
+    inv HP2; eauto.
+  Qed.
+
+  Lemma preord_env_P_inter_r (P1 P2 : var -> Prop) k rho1 rho2 :
+    preord_env_P P2 k rho1 rho2 ->
+    preord_env_P (Intersection var P1 P2) k rho1 rho2.
+  Proof.
+    intros Hpre x HP2.
+    inv HP2; eauto.
   Qed.
   
   Lemma preord_env_P_extend :
     forall P (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
-      preord_env_P (fun y => P y /\ y <> x) k rho1 rho2 ->
+      preord_env_P (Setminus var P (Singleton var x)) k rho1 rho2 ->
       preord_val k v1 v2 ->
       preord_env_P P k (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
@@ -450,7 +488,8 @@ Section EVAL.
     rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x); subst.
     - inv Hget. eexists. rewrite M.gss. split; eauto.
     - apply Henv in Hget; eauto. destruct Hget as [v2' [Heq Hpre]].
-      eexists; split; eauto. rewrite M.gso; eauto.
+      eexists; split; eauto. rewrite M.gso; eauto. constructor; eauto.
+      intros Hin. inv Hin. congruence.
   Qed.
 
   Lemma setlist_Forall2_get (P : val -> val -> Prop)
@@ -458,7 +497,7 @@ Section EVAL.
     Forall2 P vs1 vs2 ->
     setlist xs vs1 rho1 = Some rho1' ->
     setlist xs vs2 rho2 = Some rho2' ->
-    In x xs ->
+    List.In x xs ->
     exists v1 v2,
       M.get x rho1' = Some v1 /\
       M.get x rho2' = Some v2 /\ P v1 v2.
@@ -482,7 +521,7 @@ Section EVAL.
 
   Lemma setlist_not_In (xs : list var) (vs : list val) (rho rho' : env) (x : var) : 
     setlist xs vs rho = Some rho' ->
-    ~ In x xs ->
+    ~ List.In x xs ->
     M.get x rho = M.get x rho'.
   Proof.
     revert vs rho'.
@@ -497,7 +536,7 @@ Section EVAL.
     forall (P1 P2 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
            (k : nat) (xs : list var) (vs1 vs2 : list val),
       preord_env_P P1 k rho1 rho2 ->
-      (forall x, ~ In x xs -> P2 x -> P1 x) ->
+      (forall x, ~ List.In x xs -> P2 x -> P1 x) ->
       Forall2 (preord_val k) vs1 vs2 ->
       setlist xs vs1 rho1 = Some rho1' ->
       setlist xs vs2 rho2 = Some rho2' ->
@@ -513,6 +552,26 @@ Section EVAL.
       repeat eexists; eauto. erewrite <- setlist_not_In; eauto.
   Qed.
 
+    Lemma preord_env_P_getlist_l (P : var -> Prop) (rho1 rho2 : env) (k : nat)
+        (xs : list var) (vs1 : list val) :
+      preord_env_P P k rho1 rho2 ->
+      (forall x, List.In x xs -> P x) ->
+    getlist xs rho1 = Some vs1 ->
+    exists vs2,
+      getlist xs rho2 = Some vs2 /\ Forall2 (preord_val k) vs1 vs2.
+  Proof.
+    intros Henv. revert vs1.
+    induction xs as [| x xs IHxs]; intros vs1 Hp Hget.
+    - inv Hget. eexists. split; simpl; eauto.
+    - simpl in Hget. destruct (M.get x rho1) eqn:Heq1; try discriminate.
+      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      edestruct (IHxs l) as  [vs2 [Hget HAll]]; eauto.
+      + intros x' Hin. eapply Hp. constructor 2; eauto.
+      + eapply Henv in Heq1. destruct Heq1 as [v2 [H1 H2]].
+        eexists. split; simpl; eauto. rewrite H1. rewrite Hget.
+        constructor. apply Hp. now constructor.
+  Qed.
+
   
   Lemma preord_env_getlist_l (rho1 rho2 : env) (k : nat)
         (xs : list var) (vs1 : list val) :
@@ -521,15 +580,8 @@ Section EVAL.
     exists vs2,
       getlist xs rho2 = Some vs2 /\ Forall2 (preord_val k) vs1 vs2.
   Proof.
-    intros Henv. revert vs1.
-    induction xs as [| x xs IHxs]; intros vs1 Hget.
-    - inv Hget. eexists. split; simpl; eauto.
-    - simpl in Hget. destruct (M.get x rho1) eqn:Heq1; try discriminate.
-      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
-      destruct (IHxs l eq_refl) as  [vs2 [Hget HAll]].
-      eapply Henv in Heq1. destruct Heq1 as [v2 [H1 H2]].
-      eexists. split; simpl; eauto. rewrite H1. rewrite Hget.
-      constructor. eauto.
+    intros. eapply preord_env_P_getlist_l; eauto.
+    intros; simpl; eauto.
   Qed.
 
   Lemma preord_env_extend (rho1 rho2 : env) (k : nat)
@@ -539,7 +591,7 @@ Section EVAL.
     preord_env k (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
     intros H1 Hval. apply preord_env_P_extend; eauto.
-    eapply preord_env_P_antimon; eauto. intros; simpl; eauto.
+    eapply preord_env_P_antimon; eauto. intros x' H; simpl; eauto.
   Qed.
 
   Lemma preord_env_refl k :
@@ -574,16 +626,7 @@ Section EVAL.
     setlist xs vs2 rho2 = Some rho2' ->
     preord_env k rho1' rho2'.
   Proof.
-    revert vs1 vs2 rho1 rho2 rho1' rho2'.
-    induction xs as [| x xs IHxs ];
-      intros vs1 vs2 rho1 rho2 rho1' rho2' Hr Hall Hset1 Hset2.
-    - inv Hall; try discriminate. simpl in *.
-      inv Hset1; inv Hset2. eauto.
-    - destruct vs1; try discriminate.
-      inv Hall; try discriminate. simpl in Hset1, Hset2.
-      destruct (setlist xs vs1 rho1) eqn:Heq2; try discriminate.
-      destruct (setlist xs l' rho2) eqn:Heq3; try discriminate. 
-      inv Hset1; inv Hset2. eapply preord_env_extend; eauto.
+    intros. eapply preord_env_P_setlist_l; eauto.
   Qed.
   
   Lemma preord_val_monotonic (k : nat) :
@@ -777,42 +820,42 @@ Section EVAL.
     repeat eexists; eauto. econstructor; eauto.
   Qed.
 
-  Lemma preord_env_P_def_funs k B rho rho' e B' :
-    (forall m (rho rho' : env) (e : exp),
-       m <  k ->
-       preord_env_P (fun x => occurs_free x e) m rho rho' ->
-       preord_exp m (e, rho) (e, rho')) ->
-    preord_env_P (fun x => occurs_free_fundefs x B' \/
-                           (~ name_in_fundefs x B' /\ occurs_free x e))
+  Lemma preord_env_P_def_funs_pre k B rho rho' B' e :
+    (forall m e (rho rho' : env),
+        m <  k ->
+       preord_env_P (fun x => occurs_free e x) m rho rho' ->
+        preord_exp m (e, rho) (e, rho')) ->
+    preord_env_P (fun x => occurs_free_fundefs B' x \/
+                           (~ name_in_fundefs B' x /\ occurs_free e x))
                  k rho rho' ->
-    preord_env_P (fun x => occurs_free x (Efun B' e) \/ name_in_fundefs x B)
+    preord_env_P (fun x => occurs_free (Efun B' e) x \/ name_in_fundefs B x)
                  k (def_funs B' B rho rho) (def_funs B' B rho' rho').
-  Proof.
+   Proof.
     revert B rho rho' e B'.
     induction k as [ k IH' ] using lt_wf_rec1. intros B rho rho' e B'.
     induction B; intros Hyp Hpre.
     - simpl. apply preord_env_P_extend.
       + intros x H. inv H. eapply IHB; eauto.
-        inv H0; eauto. inv H; try congruence. eauto.
+        inv H0; eauto. inv H; try contradiction. eauto.
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
         edestruct setlist_length as [rho2' Hs']; eauto.
         exists t1. exists xs1. exists e1. exists rho2'. split; eauto.
         split. eauto. intros Hleq Hpre'. 
         eapply Hyp. omega.
-        eapply preord_env_P_setlist_l; [| | | eauto | eauto]; eauto. 
+        eapply preord_env_P_setlist_l; [| | eauto | eauto | eauto]. 
         apply IH'; eauto. intros. apply Hyp. omega. eauto.
         eapply (preord_env_P_monotonic _ k); eauto. omega.
         intros x Hin Hfr. simpl.
-        apply find_def_correct in Hf.
-        edestruct occurs_free_in_fun as [H1 | [H1 | H1]]; eauto; try contradiction.
-        left. apply Free_Efun2; eauto.
+        apply find_def_correct in Hf; eauto.
+        specialize (occurs_free_in_fun _ _ _ _ _ Hf x Hfr); intros H1.
+        inv H1; eauto; try contradiction. inv H; eauto.
     - simpl. intros x HP. inv HP. inv H. apply Hpre; eauto.
       apply Hpre; eauto. inv H.
-  Qed.
-
+   Qed.
+  
   Lemma preord_exp_refl k e rho rho' :
-    preord_env_P (fun x => occurs_free x e) k rho rho' ->
+    preord_env_P (occurs_free e) k rho rho' ->
     preord_exp k (e, rho) (e, rho').
   Proof.
     (* intros Hvalrefl. *)
@@ -822,42 +865,121 @@ Section EVAL.
     - eapply preord_exp_const_compat; eauto; intros.
       eapply Forall2_same. intros x HIn. apply Henv. now constructor.
       eapply IHe. eapply preord_env_P_extend.
-      eapply preord_env_P_antimon; eauto. intros x [H1 H2]. constructor 2; eauto.
+      eapply preord_env_P_antimon; eauto. intros x [H1 H2].
+      constructor 2; eauto. intros Hc. subst. eauto.
       rewrite preord_val_eq. constructor; eauto.
     - eapply preord_exp_case_nil_compat.
     - eapply preord_exp_case_cons_compat; eauto.
-      apply Henv. constructor.
       apply IHe. intros x P. apply Henv. constructor; eauto.
       apply IHe0. intros x P. apply Henv. apply Free_Ecase3; eauto.
     - eapply preord_exp_proj_compat; eauto.
-      apply Henv. now constructor.
       intros v1 v2 Hval. eapply IHe. eapply preord_env_P_extend; eauto.
       eapply preord_env_P_antimon; eauto.
-      intros x [H1 H2]; eauto. constructor; eauto.
+      intros x [H1 H2]. constructor; eauto. intros Hc; subst; eauto.
     - eapply preord_exp_fun_compat; eauto.
       eapply IHe. eapply preord_env_P_antimon. 
-      eapply preord_env_P_def_funs; eauto.
+      eapply preord_env_P_def_funs_pre; eauto.
       eapply preord_env_P_antimon. eauto.
       intros x H. destruct H as [H | [H1 H2]]; try now (constructor; eauto).
-      intros x H. destruct (name_in_fundefs_dec x f2); eauto.
-      left. constructor; eauto.
+      intros x H. destruct (@Dec _ _ (Decidable_name_in_fundefs f2) x); eauto.
     - eapply preord_exp_app_compat.
-      intros x HP. apply Henv; eauto. now constructor.
+      intros x HP. apply Henv; eauto.
       apply Forall2_same. intros. apply Henv. now constructor.
     - eapply preord_exp_prim_compat; eauto; intros.
       eapply Forall2_same. intros. apply Henv. now constructor.
       eapply IHe. eapply preord_env_P_extend; eauto.
       eapply preord_env_P_antimon; eauto. intros x [H1 H2].
-      apply Free_Eprim2; eauto. 
+      apply Free_Eprim2; eauto. intros Hc; subst; eauto.
   Qed.
 
-  Lemma preord_exp_refl_weak (k : nat) rho rho' e :
+  Lemma preord_env_P_def_funs k B rho rho' B' S1 :
+    preord_env_P (fun x => (~ name_in_fundefs B' x /\ S1 x) \/
+                           occurs_free_fundefs B' x) k rho rho' ->
+    preord_env_P (fun x => (~ name_in_fundefs B' x /\ S1 x) \/
+                           occurs_free_fundefs B' x \/ name_in_fundefs B x)
+                 k (def_funs B' B rho rho) (def_funs B' B rho' rho').
+  Proof.
+    intros Hpre.
+    revert B rho rho' B' Hpre.
+    induction k as [ k IH' ] using lt_wf_rec1. intros B rho rho' B' Hpre.
+    induction B.
+    - simpl. apply preord_env_P_extend.
+      + intros x H. inv H. eapply IHB; eauto.
+        inv H0; eauto. inv H; eauto. inv H0; try contradiction; eauto.
+      + rewrite preord_val_eq.
+        intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
+        edestruct setlist_length as [rho2' Hs']; eauto.
+        exists t1. exists xs1. exists e1. exists rho2'. split; eauto.
+        split. eauto. intros Hleq Hpre'.
+        eapply preord_exp_refl. 
+        eapply preord_env_P_setlist_l; [| | eauto | eauto | eauto].
+        apply IH'; eauto. 
+        eapply (preord_env_P_monotonic _ k); eauto. omega.
+        intros x Hin Hfr. 
+        apply find_def_correct in Hf.
+        edestruct (occurs_free_in_fun _ _ _ _ _ Hf x Hfr); eauto; try contradiction.
+        inv H; eauto.
+    - simpl. intros x HP. inv HP. apply Hpre; eauto. inv H.
+      apply Hpre; eauto. inv H0.
+  Qed.
+
+
+  (* Lemma preord_env_P_def_funs_strong k rho rho' B1 B2 B1' B2' S1 : *)
+  (*   (forall x, In var (Intersection var (name_in_fundefs B1) (name_in_fundefs B2)) x -> *)
+  (*              find_def x B1 = find_def x B2) -> *)
+  (*   (forall x, In var (Intersection var (name_in_fundefs B1') (name_in_fundefs B2')) x -> *)
+  (*              find_def x B1' = find_def x B2') -> *)
+  (*   preord_env_P (Union var (Setminus var S1 (Union var (name_in_fundefs B1) (name_in_fundefs B2))) *)
+  (*                       (Union var (occurs_free_fundefs B1') (occurs_free_fundefs B2'))) k rho rho' -> *)
+  (*   preord_env_P (Union var (Setminus var S1 (Union var (name_in_fundefs B1) (name_in_fundefs B2))) *)
+  (*                       (Union var (Union var (occurs_free_fundefs B1') (occurs_free_fundefs B2')) *)
+  (*                              (Intersection var (name_in_fundefs B1) (name_in_fundefs B2)))) *)
+  (*                k (def_funs B1' B1 rho rho) (def_funs B2' B2 rho' rho'). *)
+  (* Proof. *)
+  (*   intros Hpre. *)
+  (*   revert B1 B2  rho rho' B1' B2' Hpre. *)
+  (*   induction k as [ k IH' ] using lt_wf_rec1. intros B1 B2 rho rho' B1' B2' Hyp1 Hyp2 Hpre. *)
+  (*   induction B1. *)
+  (*   - simpl. apply preord_env_P_extend. *)
+  (*     + intros x H. inv H. eapply IHB; eauto. *)
+  (*       inv H0; eauto. inv H; eauto. inv H0; try contradiction; eauto. *)
+  (*       inv H; try contradiction. eauto. *)
+  (*     + rewrite preord_val_eq. *)
+  (*       intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs. *)
+  (*       edestruct setlist_length as [rho2' Hs']; eauto. *)
+  (*       exists t1. exists xs1. exists e1. exists rho2'. split; eauto. *)
+  (*       admit. split. eauto. intros Hleq Hpre'. *)
+  (*       eapply preord_exp_refl.  *)
+  (*       eapply preord_env_P_setlist_l; [| | eauto | eauto | eauto]. *)
+  (*       eapply IH'; eauto.  *)
+  (*       eapply (preord_env_P_monotonic _ k); eauto. omega. *)
+  (*       intros x Hin Hfr.  *)
+  (*       apply find_def_correct in Hf. *)
+  (*       edestruct occurs_free_in_fun as [H1 | [H1 | H1]]; eauto; try contradiction. *)
+  (*   - simpl. intros x HP. inv HP. apply Hpre; eauto. inv H. *)
+  (*     apply Hpre; eauto. inv H0. *)
+  (* Qed. *)
+
+  Corollary preord_env_P_def_funs_col k B rho rho' S1 :
+    preord_env_P (Union var (Setminus var S1 (name_in_fundefs B))
+                        (occurs_free_fundefs B)) k rho rho' ->
+    preord_env_P S1 k (def_funs B B rho rho) (def_funs B B rho' rho').
+  Proof.
+    intros Hpre. eapply preord_env_P_antimon. eapply preord_env_P_def_funs; eauto.
+    eapply preord_env_P_antimon; eauto.
+    intros x HS. inv HS. inv H. left. constructor; eauto.
+    right; eauto.
+    intros x HS.
+    destruct (@Dec _ _ (Decidable_name_in_fundefs B) x); eauto.
+  Qed.
+  
+  Lemma preord_exp_refl_weak (k : nat) e rho rho' :
       preord_env k rho rho' ->
       preord_exp k (e, rho) (e, rho').
   Proof.
     intros Henv. eapply preord_exp_refl.
     eapply preord_env_P_antimon; eauto.
-    intros; simpl; eauto.
+    intros x H; simpl; eauto.
   Qed.
   
   Lemma preord_val_refl (k : nat) :
@@ -886,22 +1008,19 @@ Section EVAL.
       eapply preord_env_refl; eauto.
   Qed.
 
+  Lemma preord_env_P_refl S k rho :
+    preord_env_P S k rho rho.
+  Proof.
+    intros x Px v Hget.
+    eexists; split; eauto. eapply preord_val_refl; eauto.
+  Qed.
+
   Lemma preord_env_def_funs k f rho1 rho2 :
     preord_env k rho1 rho2 ->
     preord_env k (def_funs f f rho1 rho1) (def_funs f f rho2 rho2).
   Proof.
-    intros Henv. 
-    generalize f at 1 3. revert f rho1 rho2 Henv.
-    induction k as [ k IH' ] using lt_wf_rec1. intros f rho rho2 Henv.
-    induction f; eauto; intros defs. simpl; eauto. 
-    eapply preord_env_extend. simpl. eapply IHf.
-    rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-    edestruct setlist_length as [rho2' Hs']; eauto.
-    exists t1. exists xs1. exists e1. exists rho2'. split; eauto.
-    split. eauto. intros Hleq Hpre. eapply preord_exp_refl_weak.
-    eapply preord_env_setlist_l with (vs1 := vs1) (vs2 := vs2); eauto.
-    eapply IH'; try omega; eauto.
-    eapply preord_env_monotonic; [| eauto]. omega.
+    intros Henv. eapply preord_env_P_def_funs_col.
+    eapply preord_env_P_antimon; eauto. intros x H; simpl; eauto.
   Qed.
     
   Lemma preord_exp_trans_pre (k : nat) :
@@ -949,6 +1068,17 @@ Section EVAL.
       rewrite !preord_val_eq in IHx0. eapply IHx0; eauto.
   Qed.
 
+  Lemma preord_env_P_trans (k : nat) P rho1 rho2 rho3 :
+    preord_env_P P k rho1 rho2 ->
+    preord_env_P P k rho2 rho3 ->
+    preord_env_P P k rho1 rho3.
+  Proof.
+    intros H1 H2 x Px v Hget.
+    edestruct H1 as [v' [Hget' Hpre']]; eauto.
+    edestruct H2 as [v'' [Hget'' Hpre'']]; eauto.
+    eexists; split; eauto. eapply preord_val_trans; eauto.
+  Qed.
+  
   Corollary preord_exp_trans (k : nat) :
     forall rho1 rho2 rho3 e1 e2 e3,
       preord_exp k (e1, rho1) (e2, rho2) ->
@@ -970,7 +1100,7 @@ Section EVAL.
         Forall2_fundefs R (Fcons f t xs e defs) (Fcons f' t' xs' e' defs')
   | Forall2_Fnil : Forall2_fundefs R Fnil Fnil.  
 
-  Lemma preord_env_P_def_funs_pre k (P1 P2 : var -> Prop) B rho1 rho2 :
+  Lemma preord_env_P_def_funs_pre' k (P1 P2 : var -> Prop) B rho1 rho2 :
     preord_env_P P1 k rho1 rho2 ->
     (forall x, P2 x -> P1 x) -> 
     (forall m (rho rho' : env) (e : exp),
@@ -997,4 +1127,655 @@ Section EVAL.
     - simpl. eauto.
   Qed.
 
+  Lemma preord_env_permut k x y v1 v2 rho1 rho2 P :
+    x <> y ->
+    preord_env_P k P (M.set x v1 (M.set y v2 rho1)) (M.set x v1 (M.set y v2 rho2)) ->
+    preord_env_P k P (M.set x v1 (M.set y v2 rho1)) (M.set y v2 (M.set x v1 rho2)).
+  Proof.
+    intros Hneq Hpre x' HP v1' Hget.
+    rewrite M.gsspec in Hget.
+    destruct (Coqlib.peq x' x). inv Hget. 
+    - edestruct (Hpre x) as [v1'' [Hget'' Hpre'']]; eauto. rewrite M.gss; eauto.
+      rewrite M.gss in Hget''; inv Hget''.
+      eexists. rewrite M.gso; eauto. rewrite M.gss; eauto.
+    - edestruct (Hpre x') as [v1'' [Hget'' Hpre'']]; eauto.
+      rewrite M.gso; eauto. rewrite M.gsspec in Hget.
+      destruct (Coqlib.peq x' y). inv Hget.
+      + eexists. rewrite M.gss; eauto. split; eauto.
+        eapply preord_val_refl.
+      + do 2 (rewrite M.gso in Hget''; eauto).
+        eexists. split; eauto.
+        do 2 (rewrite M.gso; eauto).
+  Qed.
+
+  Lemma preord_env_P_set_not_in_P_l x v P k rho1 rho2 :
+    preord_env_P P k rho1 rho2 ->
+    Disjoint var P (Singleton var x) ->
+    preord_env_P P k (M.set x v rho1) rho2.
+  Proof.
+    intros Hpre HP x' HP' v' Hget.
+    rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x).
+    - inv Hget. exfalso. inv HP. eapply H; eauto.
+    - edestruct Hpre; eauto.
+  Qed.
+
+  Lemma preord_env_P_set_not_in_P_r x v P k rho1 rho2 :
+    preord_env_P P k rho1 rho2 ->
+    Disjoint var P (Singleton var x) ->
+    preord_env_P P k rho1 (M.set x v rho2).
+  Proof.
+    intros Hpre HP x' HP' v' Hget.
+    rewrite M.gsspec. destruct (Coqlib.peq x' x); subst.
+    - exfalso; eauto. inv HP. eapply H; eauto.
+    - edestruct Hpre; eauto.
+  Qed.
+
+  Lemma preord_env_P_def_funs_not_in_P_l B B' P k rho rho1 rho2 :
+    preord_env_P P k rho1 rho2 ->
+    Disjoint var P (name_in_fundefs B) ->
+    preord_env_P P k (def_funs B' B rho rho1) rho2.
+  Proof.
+    intros Hpre HP x' HP' v' Hget.
+    eapply def_funs_spec in Hget.
+    destruct Hget as [[Hname Heq] | [Hname Heq ]]; subst.
+    - exfalso. eapply HP; eauto.
+    - edestruct Hpre; eauto.
+  Qed.
+
+  Lemma preord_env_P_def_funs_not_in_P_r B B' P k rho rho1 rho2 :
+    preord_env_P P k rho1 rho2 ->
+    Disjoint var P (name_in_fundefs B) ->
+    preord_env_P P k rho1 (def_funs B' B rho rho2).
+  Proof.
+    intros Hpre HP x' HP' v' Hget.
+    edestruct (@Dec _ _ (Decidable_name_in_fundefs B) x').
+    - exfalso. eapply HP; eauto.
+    - edestruct Hpre as [v'' [Hget' Hpre']]; eauto.
+      eexists. rewrite def_funs_neq; eauto.
+  Qed.
+
+  Lemma preord_env_singleton_extend (rho1 rho2 : env) (k : nat) (x : var)
+        (v1 v2 : val) :
+    preord_val k v1 v2 ->
+    preord_env_P (Singleton var x) k (M.set x v1 rho1) (M.set x v2 rho2).
+  Proof.
+    intros Hpre. eapply preord_env_P_extend; eauto.
+    eapply preord_env_P_antimon. apply preord_env_Empty_set.
+    intros x' H. inv H. inv H0. exfalso. eauto.
+  Qed.
+
+  Lemma preord_env_set_def_funs_permut k x S1 B v1 v2 rho1 rho2 :
+    ~ bound_var_fundefs B x ->
+    closed_fundefs B ->
+    preord_val k v1 v2 ->
+    preord_env_P S1 k rho1 rho2 ->
+    preord_env_P (Union var S1 (Union var (Singleton var x) (name_in_fundefs B))) k
+                 (def_funs B B (M.set x v1 rho1) (M.set x v1 rho1)) 
+                 (M.set x v2 (def_funs B B rho2 rho2)).
+  Proof.
+    intros Hb Hclo Hval Hpre. rewrite (@Union_Setminus _ _ _ _).
+    apply preord_env_P_union.
+    - apply preord_env_P_def_funs_not_in_P_l;
+      eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l.
+      apply preord_env_P_set_not_in_P_l;
+        eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l.
+      apply preord_env_P_set_not_in_P_r;
+        eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l.
+      apply preord_env_P_def_funs_not_in_P_r;
+        eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l.
+      eapply preord_env_P_antimon. eauto.
+      apply Subset_Setminus.
+    - apply preord_env_P_union.
+      + apply preord_env_P_def_funs_not_in_P_l.
+        eapply preord_env_singleton_extend; eauto.
+        apply Disjoint_sym.
+        apply Disjoint_Singleton. intros Hc; apply Hb.
+        now apply name_in_fundefs_bound_var_fundefs.
+      + apply preord_env_P_set_not_in_P_r.
+        eapply preord_env_P_def_funs_col.
+        eapply preord_env_P_antimon. apply preord_env_Empty_set.
+        intros x' HIn. inv HIn. exfalso. inv H. contradiction.
+        unfold closed_fundefs in Hclo. rewrite <- Hclo; eauto.
+        apply Disjoint_Singleton. intros Hc; apply Hb.
+        now apply name_in_fundefs_bound_var_fundefs.
+  Qed. 
+
+  Lemma preord_env_def_funs_permut (k : nat) S1 (B1 B2 : fundefs) (rho1 rho2 : env) :
+    closed_fundefs B1 -> closed_fundefs B2 ->
+    Disjoint var (name_in_fundefs B1) (name_in_fundefs B2) ->
+    preord_env_P S1 k rho1 rho2 ->
+    preord_env_P (Union var S1 (Union var (name_in_fundefs B1) (name_in_fundefs B2)))
+                 k (def_funs B1 B1 (def_funs B2 B2 rho1 rho1) (def_funs B2 B2 rho1 rho1))
+                 (def_funs B2 B2 (def_funs B1 B1 rho2 rho2) (def_funs B1 B1 rho2 rho2)).
+  Proof.
+    intros Hclo1 Hclo2 HD Hpre. rewrite (@Union_Setminus _ _ _ _).
+    apply preord_env_P_union.
+    - eapply preord_env_P_def_funs_not_in_P_r;
+      eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l.
+      eapply preord_env_P_def_funs_not_in_P_l;
+        eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l. 
+      eapply preord_env_P_def_funs_not_in_P_r;
+        eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l.
+      eapply preord_env_P_def_funs_not_in_P_l;
+        eauto using Disjoint_Setminus, Included_Union_r, Included_Union_l.
+      eapply preord_env_P_antimon. eauto.
+      apply Subset_Setminus.
+    - apply preord_env_P_union.
+      + apply preord_env_P_def_funs_not_in_P_r; eauto.
+        eapply preord_env_P_def_funs_col.
+        eapply preord_env_P_antimon. apply preord_env_Empty_set.
+        intros x' HIn. inv HIn. exfalso. inv H. contradiction.
+        eapply Hclo1; eauto.
+      + apply preord_env_P_def_funs_not_in_P_l; eauto using Disjoint_sym.
+        eapply preord_env_P_def_funs_col.
+        eapply preord_env_P_antimon. apply preord_env_Empty_set.
+        intros x' HIn. inv HIn. exfalso. inv H. contradiction.
+        eapply Hclo2; eauto.
+  Qed.
+
+  Lemma preord_env_P_def_funs_strengthen_l (k : nat) rho rho' B1 B1' B2 :
+    Disjoint var (occurs_free_fundefs B1') (name_in_fundefs B2) ->
+    Disjoint var (name_in_fundefs B1') (name_in_fundefs B2) ->
+    closed_fundefs B1' ->
+    preord_env_P (name_in_fundefs B1) k
+                 (def_funs B1' B1 rho rho')
+                 (def_funs (fundefs_append B2 B1') B1 rho rho').
+  Proof.
+    revert rho rho' B1 B1' B2.
+    induction k as [ k IH' ] using lt_wf_rec1. intros rho rho' B1 B1' B2 HD1 HD2 Hclo.
+    induction B1.
+    - simpl. apply preord_env_P_extend.
+      + eapply preord_env_P_antimon. eapply IHB1; eauto.
+        rewrite Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_r.
+        eapply Setminus_Included. eapply Included_refl.
+      + rewrite preord_val_eq.
+        intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
+        edestruct setlist_length as [rho2' Hs']; eauto.
+        exists t1. exists xs1. exists e1. exists rho2'. split; eauto.
+        specialize (find_def_name_in_fundefs _ _ _ Hf); intros Hname.
+        destruct (@Dec _ _  (Decidable_name_in_fundefs B2) v).
+        exfalso. inv HD2. eapply H0; eauto.
+        eapply name_in_fundefs_find_def_None in H.
+        erewrite find_def_fundefs_append_r; eauto.
+        split. eauto. intros Hleq Hpre'.
+        eapply preord_exp_refl. 
+        eapply preord_env_P_setlist_l; [| | eauto | eauto | eauto].
+        rewrite def_funs_append.
+        apply preord_env_P_def_funs_not_in_P_r; eauto. 
+        intros x Hin Hfr.
+        apply find_def_correct in Hf.  
+        edestruct (occurs_free_in_fun _ _ _ _ _ Hf x Hfr); try contradiction.
+        inv H; eauto. unfold closed_fundefs in Hclo. rewrite Hclo in H0. inv H0.
+    - simpl. intros x HP. inv HP.
+  Qed.
+  
+  Lemma preord_env_P_setlist_not_in_P_r xs vs P k rho1 rho2 rho2' :
+    preord_env_P P k rho1 rho2 ->
+    Some rho2' = setlist xs vs rho2 -> 
+    Disjoint var P (FromList xs) ->
+    preord_env_P P k rho1 rho2'.
+  Proof.
+    revert vs rho2'. induction xs; intros vs rho2' Hpre Hset HD.
+    - destruct vs; try discriminate. inv Hset; eauto.
+    - destruct vs; try discriminate. simpl in Hset.
+      destruct (setlist xs vs rho2) eqn:Heq ; try discriminate. inv Hset.
+      rewrite FromList_cons in HD. eapply Disjoint_sym in HD.
+      apply preord_env_P_set_not_in_P_r. eapply IHxs; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_r; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
+  Qed.
+
+  Lemma preord_env_P_setlist_not_in_P_l xs vs P k rho1 rho2 rho1' :
+    preord_env_P P k rho1 rho2 ->
+    Some rho1' = setlist xs vs rho1 -> 
+    Disjoint var P (FromList xs) ->
+    preord_env_P P k rho1' rho2.
+  Proof.
+    revert vs rho1'. induction xs; intros vs rho1' Hpre Hset HD.
+    - destruct vs; try discriminate. inv Hset; eauto.
+    - destruct vs; try discriminate. simpl in Hset.
+      destruct (setlist xs vs rho1) eqn:Heq ; try discriminate. inv Hset.
+      rewrite FromList_cons in HD. eapply Disjoint_sym in HD.
+      apply preord_env_P_set_not_in_P_l. eapply IHxs; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_r; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
+  Qed.
+
+  
+  Lemma preord_val_def_funs_append_pre (k : nat) f tau xs e (B1 B2 : fundefs)
+        (rho1 rho2  : env) :
+    closed_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
+    closed_fundefs B2 ->
+    unique_bindings_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
+    Disjoint var (name_in_fundefs (Fcons f tau xs e B1)) (name_in_fundefs B2) ->
+    (forall j S1 rho1 rho2 rho1' rho2',
+       j < k ->
+       preord_env_P S1 j rho1 rho2 ->
+       preord_env_P (Union var S1 (name_in_fundefs B1))
+                    j (def_funs (Fcons f tau xs (Efun B2 e) B1) B1 rho1' rho1)
+                    (def_funs (fundefs_append (Fcons f tau xs e B1) B2) B1 rho2' rho2)) ->
+    preord_val k (Vfun rho1 (Fcons f tau xs (Efun B2 e) B1) f)
+               (Vfun rho2 (fundefs_append (Fcons f tau xs e B1) B2) f).
+  Proof.
+    revert f tau xs e B1 B2 rho1 rho2. induction k using lt_wf_rec1.
+    intros f tau xs e B1 B2 rho1 rho2 Hcl1 Hcl2 Hun HD Hyp. rewrite preord_val_eq.
+    intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
+    edestruct setlist_length as [rho2' Hs']; eauto. simpl in Hf.
+    destruct (M.elt_eq f f); try congruence. inv Hf. do 4 eexists. split. simpl.
+    destruct (M.elt_eq f f); try congruence. eauto. split; eauto.
+    intros Hleq Hpre'. simpl in Hs, Hs'. rewrite def_funs_append in Hs'.
+    intros v1 c1 Hleq1 Hstep1. inv Hstep1. edestruct preord_exp_refl; eauto.
+    apply preord_env_P_antimon with
+    (P2 := Union var (FromList xs1)
+                 (Union var (name_in_fundefs B2)
+                        (Union var (Singleton var f) (name_in_fundefs B1)))).
+    - repeat apply preord_env_P_union.
+      + apply preord_env_P_def_funs_not_in_P_l.
+        * eapply preord_env_P_setlist_l with (P1 := Empty_set var); eauto.
+          eapply preord_env_Empty_set. intros x Hc1 Hc2. exfalso; eauto.
+        * inv Hun. eapply Disjoint_Included_r.
+          eapply name_in_fundefs_bound_var_Efun. eauto using Disjoint_sym.
+      + eapply preord_env_P_setlist_not_in_P_r; eauto.
+        * eapply preord_env_P_set_not_in_P_r; eauto.
+          eapply preord_env_P_def_funs_not_in_P_r; eauto.
+          eapply preord_env_P_trans;
+            [| eapply preord_env_P_def_funs_strengthen_l
+               with (B2 := Fcons f t1 xs1 e B1); eauto ].
+          eapply preord_env_P_def_funs_col; eauto.
+          eapply preord_env_P_antimon. eapply preord_env_Empty_set.
+          rewrite Setminus_Empty_set. rewrite Union_Empty_set_r. apply Hcl2.
+          unfold closed_fundefs in Hcl2. rewrite Hcl2.
+          eapply Disjoint_Empty_set_l.
+          apply Disjoint_sym; eauto.
+          apply Disjoint_sym. eapply Disjoint_Union_r; eauto.
+          apply Disjoint_sym. eapply Disjoint_Union_l; eauto.
+        * inv Hun. eapply Disjoint_Included_l ; [| apply H8 ].
+          eapply name_in_fundefs_bound_var_Efun.
+      + eapply preord_env_P_setlist_not_in_P_r; eauto.
+        * eapply preord_env_P_def_funs_not_in_P_l; eauto.
+          eapply preord_env_P_setlist_not_in_P_l; eauto.
+          eapply preord_env_P_extend. rewrite Setminus_Empty_set.
+          eapply preord_env_Empty_set. 
+          eapply H; eauto. intros. eapply Hyp; eauto. omega.
+          inv Hun. constructor. intros x Hin. inv Hin. inv H0. contradiction.
+          inv Hun. eapply Disjoint_sym. eapply Disjoint_Singleton.
+          intros Hc. apply H6. apply name_in_fundefs_bound_var_Efun; eauto.
+        * inv Hun. apply Disjoint_sym. eapply Disjoint_Singleton; eauto.
+      + eapply preord_env_P_setlist_not_in_P_r; eauto.
+        * eapply preord_env_P_set_not_in_P_r; eauto.
+          eapply preord_env_P_def_funs_not_in_P_l; eauto.
+          eapply preord_env_P_setlist_not_in_P_l; eauto.
+          eapply preord_env_P_set_not_in_P_l; eauto.
+          eapply preord_env_P_antimon. eapply Hyp. omega.
+          eapply preord_env_Empty_set. rewrite Union_Empty_set_r.
+          eapply Included_refl.
+          inv Hun. eapply Disjoint_Singleton. intros Hc. apply H7.
+          apply name_in_fundefs_bound_var_fundefs; eauto.
+          inv Hun. eapply Disjoint_Included_l; [| apply H9 ].
+          apply name_in_fundefs_bound_var_fundefs; eauto.
+          eapply Disjoint_Union_r; eauto.
+          inv Hun. eapply Disjoint_Singleton. intros Hc. apply H7.
+          apply name_in_fundefs_bound_var_fundefs; eauto.
+        * inv Hun. eapply Disjoint_Included_l; [| apply H9 ]. intros x Hx. 
+          eapply name_in_fundefs_bound_var_fundefs; eauto.
+    - eapply Included_trans. eapply occurs_free_Efun_Included with (B := B2).
+      intros x Hfr. inv Hfr; eauto.
+      assert (Hin : fun_in_fundefs (Fcons f t1 xs1 (Efun B2 e) B1)
+                                   (f, t1, xs1, (Efun B2 e)))
+        by (constructor; eauto).
+      edestruct (occurs_free_in_fun _ _ _ _ _ Hin x H0); eauto.  inv H1; eauto.
+      unfold closed_fundefs in Hcl1. rewrite Hcl1 in H2. inv H2.
+  Qed.
+
+  Lemma preord_env_P_def_funs_append (k : nat) S1 f tau xs e (B1 B1' B2 : fundefs)
+        (rho1 rho2 rho1' rho2' : env) :
+    closed_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
+    closed_fundefs B2 ->
+    unique_bindings_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
+    Disjoint var (name_in_fundefs (Fcons f tau xs e B1)) (name_in_fundefs B2) ->
+    preord_env_P S1 k rho1 rho2 ->
+    preord_env_P (Union var S1 (name_in_fundefs B1'))
+                 k (def_funs (Fcons f tau xs (Efun B2 e) B1) B1' rho1' rho1)
+                 (def_funs (fundefs_append (Fcons f tau xs e B1) B2) B1' rho2' rho2).
+  Proof.
+    revert S1 f tau xs e B1 B1' B2 rho1 rho2 rho1' rho2'. induction k using lt_wf_rec1.
+    intros S1 f tau xs e B1 B1' B2 rho1 rho2 rho1' rho2' Hcl1 Hcl2 Hun HD Hpre1. simpl.
+    induction B1'.
+    - simpl. apply preord_env_P_extend.
+      + eapply preord_env_P_antimon. eauto.
+        rewrite !Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_r.
+        apply Included_Union_compat; eapply Setminus_Included; eapply Included_refl.
+      + destruct (M.elt_eq v f); subst.
+        * eapply preord_val_def_funs_append_pre; eauto.
+        * rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs.
+          edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+          exists t1, xs1, e1, rho2''. repeat split; eauto.
+          simpl in *. destruct (M.elt_eq v f); try congruence.
+          specialize (find_def_name_in_fundefs _ _ _ Hf); intros Hname.
+          erewrite <- find_def_fundefs_append_l in Hf; eauto.
+          intros Hleq Hpre'. eapply preord_exp_refl; eauto.
+          eapply preord_env_P_setlist_l with
+          (P1 := Union var (name_in_fundefs B1) (Singleton var f)); [| | eauto | eauto | eauto].
+          simpl. eapply preord_env_P_extend. eapply preord_env_P_antimon.
+          rewrite def_funs_append. eapply H; eauto. eapply preord_env_Empty_set.
+          rewrite Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_l, Union_Empty_set_r.
+          apply Setminus_Included. eapply Included_refl.
+          eapply preord_val_def_funs_append_pre; eauto. intros; eauto.
+          eapply H; eauto. omega.
+          destruct (M.elt_eq v f); try congruence. 
+          apply find_def_correct in Hf.
+          intros x Hin Hfr. specialize (occurs_free_in_fun _ _ _ _ _ Hf x Hfr).
+          intros H1. inv H1; try contradiction.
+          inv H0; eauto. simpl in H1. inv H1; eauto. right; eauto. left; eauto.
+          destruct (var_dec f x); subst. right; eauto.  
+          exfalso. eapply not_In_Empty_set. eapply Hcl1; eauto.
+    - simpl. now rewrite Union_Empty_set_l.
+  Qed.
+
+  Lemma preord_env_P_def_funs_hoist (k : nat) S1 f tau xs e (B1 B2 : fundefs)
+        (rho1 rho2 : env) :
+    closed_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
+    closed_fundefs B2 ->
+    unique_bindings_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
+    Disjoint var S1 (name_in_fundefs B2) ->
+    Disjoint var (name_in_fundefs (Fcons f tau xs e B1)) (name_in_fundefs B2) ->
+    preord_env_P S1 k rho1 rho2 ->
+    preord_env_P (Union var S1 (Union var (name_in_fundefs B1) (Singleton var f)))
+                 k (def_funs (Fcons f tau xs (Efun B2 e) B1)
+                             (Fcons f tau xs (Efun B2 e) B1)
+                             rho1 rho1)
+                 (def_funs (fundefs_append (Fcons f tau xs e B1) B2)
+                           (fundefs_append (Fcons f tau xs e B1) B2)
+                           rho2 rho2).
+  Proof.
+    intros Hcl1 Hcl2 Hun HD1 HD2 Hpre. simpl.
+    eapply preord_env_P_extend.
+    - eapply preord_env_P_antimon. 
+      rewrite def_funs_append. eapply preord_env_P_def_funs_append with (S1 := S1); eauto.
+      eapply preord_env_P_def_funs_not_in_P_r; eauto.
+      rewrite !Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_l.
+      eapply Included_Union_compat; apply Setminus_Included; apply Included_refl.
+    - eapply preord_val_def_funs_append_pre; eauto.
+      intros. eapply preord_env_P_def_funs_append; eauto.
+  Qed.
+
+  Lemma proerd_env_P_def_funs_weakening k S1 B B1 B2 f tau xs e rho rho':
+    ~ In var S1 f ->
+    preord_env_P S1 k (def_funs B (fundefs_append B1 B2) rho rho')
+                 (def_funs B (fundefs_append B1 (Fcons f tau xs e B2)) rho rho').
+  Proof.
+    revert S1 rho'. induction B1; intros S1 rho' Hin; simpl.
+    - destruct (var_dec f v); subst.
+      + apply preord_env_P_set_not_in_P_l; eauto using Disjoint_Singleton.
+        apply preord_env_P_set_not_in_P_r; eauto using Disjoint_Singleton.
+      + apply preord_env_P_extend. 
+        * eapply IHB1. intros Hc. inv Hc. eauto.
+        * eapply preord_val_refl.
+    - apply preord_env_P_set_not_in_P_r; eauto using Disjoint_Singleton.
+      apply preord_env_P_refl.
+  Qed.
+
+  (* TODO : make this a corollary of a following proof *)
+  Lemma preord_env_P_split_fds k S1 B1 B1' B2 B2' B11 B12 B11' B12' rho1 rho1' :
+    split_fds B11 B12 B1 ->
+    split_fds B11' B12' B1' ->
+    split_fds B11 B12 B2 ->
+    split_fds B11' B12' B2' ->
+    unique_bindings_fundefs B1' ->
+    unique_bindings_fundefs B1 ->  
+    preord_env_P S1 k (def_funs B1' B1 rho1 rho1') (def_funs B2' B2 rho1 rho1').
+  Proof.
+    intros Hspl.
+    revert B1 B11 B12 Hspl S1 B1' B2 B2' B11' B12' rho1 rho1'. induction k using lt_wf_rec1.
+    induction B1; intros B11 B12 Hspl1 S1 B1' B2 B2' B11' B12' rho1 rho1'
+                         Hspl1' Hspl2 Hspl2' Hun1 Hun2.
+    - edestruct split_fds_unique_bindings_fundefs_l as [H1 [H2 H3]]; [| |]; eauto.
+      specialize (split_fds_unique_bindings_fundefs_r _ _ _ H1 H2 H3 Hspl2); intros H4.
+      inv Hspl1.
+      + edestruct split_fds_cons_l_append_fundefs as [B3 [B4 [Heq Hspl3]]]; eauto.
+        eapply preord_env_P_antimon;
+          [| apply (@Included_Union_Setminus _ _ (name_in_fundefs B2) _)].
+        eapply preord_env_P_union.
+        * eapply preord_env_P_def_funs_not_in_P_r;
+          eauto using Disjoint_Setminus, Included_refl.
+          eapply preord_env_P_def_funs_not_in_P_l. eapply preord_env_P_refl.
+          rewrite split_fds_name_in_fundefs; eauto. simpl.
+          rewrite split_fds_name_in_fundefs with (B3 := B1); eauto.
+          rewrite Union_assoc. apply Disjoint_Setminus. apply Included_refl.
+        * rewrite split_fds_name_in_fundefs; eauto. simpl (Union _ _ _).
+          rewrite <- Union_assoc.
+          eapply preord_env_P_union.
+          rewrite Heq. rewrite def_funs_append; eauto.
+          eapply preord_env_P_def_funs_not_in_P_r.
+          simpl. apply preord_env_P_extend.
+          rewrite Setminus_Empty_set. apply preord_env_Empty_set.
+          { rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs.
+            edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+            exists t1, xs1, e1, rho2''. repeat split; eauto.
+            erewrite <- find_def_split_fds; eauto.
+            intros Hleq Hpre'. eapply preord_exp_refl; eauto.
+            eapply preord_env_P_setlist_l; [| | | eauto | eauto ]; eauto. }
+          symmetry in Heq. eapply fundefs_append_split_fds in Heq.
+          edestruct split_fds_unique_bindings_fundefs_l as [H5 [H6 H8]]. apply H4.  eauto.
+          rewrite bound_var_fundefs_Fcons in H8. apply Disjoint_sym in H8.
+          eapply Disjoint_Union_l. eapply Disjoint_Included_r; eauto.
+          eapply name_in_fundefs_bound_var_fundefs.
+          simpl. eapply preord_env_P_set_not_in_P_l.
+          rewrite Heq. eapply preord_env_P_trans;
+            [| apply proerd_env_P_def_funs_weakening ].
+          eapply IHB1; eauto. inv Hun2; eauto.
+          edestruct split_fds_unique_bindings_fundefs_l as [H5 [H6 H8]]; [apply H4| |]; eauto.
+          intros Hc. inv H5. inv Hc; eauto. apply H14.
+          apply name_in_fundefs_bound_var_fundefs; eauto.
+          eapply H8. constructor. rewrite bound_var_fundefs_Fcons. left; eauto.
+          apply name_in_fundefs_bound_var_fundefs; eauto.
+          inv H1. apply Disjoint_Singleton. intros Hc. inv Hc.
+          eapply H11. apply name_in_fundefs_bound_var_fundefs; eauto.
+          eapply H3. constructor. rewrite bound_var_fundefs_Fcons. left; eauto.
+          apply name_in_fundefs_bound_var_fundefs; eauto.
+      + edestruct split_fds_cons_r_append_fundefs as [B3 [B4 [Heq Hspl3]]]; eauto.
+        eapply preord_env_P_antimon;
+          [| apply (@Included_Union_Setminus _ _ (name_in_fundefs B2) _)].
+        eapply preord_env_P_union.
+        * eapply preord_env_P_def_funs_not_in_P_r;
+          eauto using Disjoint_Setminus, Included_refl.
+          eapply preord_env_P_def_funs_not_in_P_l. eapply preord_env_P_refl.
+          rewrite split_fds_name_in_fundefs; eauto. simpl.
+          rewrite split_fds_name_in_fundefs with (B3 := B1); eauto.
+          rewrite !Union_assoc. rewrite (Union_sym (Singleton var v)).
+          apply Disjoint_Setminus. apply Included_refl.
+        * rewrite split_fds_name_in_fundefs; eauto. simpl (Union _ _ _).
+          rewrite Union_assoc, (Union_sym _ (Singleton var v)), <- Union_assoc.
+          eapply preord_env_P_union.
+          rewrite Heq. rewrite def_funs_append; eauto.
+          eapply preord_env_P_def_funs_not_in_P_r.
+          simpl. apply preord_env_P_extend.
+          rewrite Setminus_Empty_set. apply preord_env_Empty_set.
+          { rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs.
+            edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+            exists t1, xs1, e1, rho2''. repeat split; eauto.
+            erewrite <- find_def_split_fds; eauto.
+            intros Hleq Hpre'. eapply preord_exp_refl; eauto.
+            eapply preord_env_P_setlist_l; [| | | eauto | eauto ]; eauto. }
+          symmetry in Heq. eapply fundefs_append_split_fds in Heq.
+          edestruct split_fds_unique_bindings_fundefs_l as [H5 [H6 H8]].
+          apply H4. eauto.
+          rewrite bound_var_fundefs_Fcons in H8. apply Disjoint_sym in H8.
+          eapply Disjoint_Union_l. eapply Disjoint_Included_r; eauto.
+          eapply name_in_fundefs_bound_var_fundefs.
+          simpl. eapply preord_env_P_set_not_in_P_l.
+          rewrite Heq. eapply preord_env_P_trans;
+            [| apply proerd_env_P_def_funs_weakening ].
+          eapply IHB1; eauto. inv Hun2; eauto.
+          edestruct split_fds_unique_bindings_fundefs_l as [H5 [H6 H8]]; [apply H4| |]; eauto.
+          intros Hc. inv H6. inv Hc; eauto. eapply H8. constructor; eauto.
+          apply name_in_fundefs_bound_var_fundefs; eauto. constructor. left; eauto.
+          eapply H14. apply name_in_fundefs_bound_var_fundefs; eauto.
+          inv H2. apply Disjoint_Singleton. intros Hc. inv Hc.
+          eapply H3. constructor. apply name_in_fundefs_bound_var_fundefs; eauto.
+          rewrite bound_var_fundefs_Fcons. left; eauto.
+          eapply H11. apply name_in_fundefs_bound_var_fundefs; eauto.
+    - inv Hspl1. simpl. inv Hspl2. eapply preord_env_P_refl.
+  Qed.
+
+  Lemma preord_env_P_Included_fun_in_fundefs k B1 B1' B2 B2' rho1 rho1' :
+    Included _ (fun_in_fundefs B1) (fun_in_fundefs B2) ->
+    Included _ (fun_in_fundefs B1') (fun_in_fundefs B2') ->
+    closed_fundefs B1' ->
+    unique_bindings_fundefs B1'->
+    unique_bindings_fundefs B1 ->
+    unique_bindings_fundefs B2'->
+    unique_bindings_fundefs B2 ->
+    preord_env_P (name_in_fundefs B1) k (def_funs B1' B1 rho1 rho1')
+                 (def_funs B2' B2 rho1 rho1').
+  Proof.
+    revert B1 B1' B2 B2' rho1 rho1'. induction k using lt_wf_rec1.
+    induction B1; intros B1' B2 B2' rho1 rho1' HS1 HS2 Hcl Hun1' Hun1 Hun2' Hun2.
+    - edestruct fun_in_fundefs_unique_bindings_split
+      with (B := B2) as [B [B' [Heq [Hn [HS Hun']]]]]; eauto.
+      eapply HS1. left. eauto.
+      edestruct fundefs_append_unique_bindings_l as [H1 [H2 H3]]; eauto.
+      rewrite Heq.
+      eapply preord_env_P_antimon;
+        [| apply (@Included_Union_Setminus _ _ (Singleton var v) _)].
+      eapply preord_env_P_union.
+      + simpl. eapply preord_env_P_set_not_in_P_l;
+          eauto using Disjoint_Setminus,  Included_refl.
+        eapply preord_env_P_trans;
+          [| apply proerd_env_P_def_funs_weakening; intros Hc; inv Hc; eauto ].
+        rewrite Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_r.
+        eapply preord_env_P_antimon; [ eapply IHB1; eauto |].
+        rewrite (fundefs_append_fun_in_fundefs B B' (fundefs_append B B')); eauto.
+        rewrite HS. simpl in HS1.
+        rewrite <- (Setminus_Disjoint (fun_in_fundefs B1) (Singleton _ (v, t, l, e))).
+        rewrite <- Setminus_Union_Inlcluded; eauto using Included_refl.
+        eapply Included_Setminus_compat; eauto using Included_refl.
+        now rewrite Union_sym.  
+        eapply Disjoint_Singleton. inv Hun1; eauto. intros Hc. apply H9.
+        apply name_in_fundefs_bound_var_fundefs.
+        now eapply fun_in_fundefs_name_in_fundefs; eauto.
+        now inv Hun1; eauto.
+        apply Setminus_Disjoint. eapply Disjoint_Singleton. inv Hun1; eauto.
+        intros Hc. apply H9. now apply name_in_fundefs_bound_var_fundefs; eauto.
+      + rewrite def_funs_append;
+        eapply preord_env_P_def_funs_not_in_P_r.
+        * simpl. eapply preord_env_P_extend.
+          rewrite Setminus_Empty_set. apply preord_env_Empty_set.
+          rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs. 
+          edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+          exists t1, xs1, e1, rho2''. repeat split; eauto.
+          erewrite <- find_def_Included_fun_in_fundefs; eauto.
+          eapply fun_in_fundefs_name_in_fundefs. now eapply find_def_correct; eauto.
+          intros Hleq Hpre'. eapply preord_exp_refl; eauto. 
+          eapply preord_env_P_setlist_l; [| | | eauto | eauto ]; eauto.
+          intros c Hnin Hf'. apply find_def_correct in Hf.
+          eapply occurs_free_in_fun in Hf'; eauto. inv Hf'.
+          exfalso; eauto. inv H0; eauto.
+          exfalso. eapply not_In_Empty_set. eapply Hcl; eauto.
+        * apply Disjoint_sym. apply Disjoint_Singleton. eauto.
+    - simpl. eapply preord_env_Empty_set.
+  Qed.
+
+  Lemma preord_env_P_def_funs_merge k S1 B B' B'' rho rho' :
+    unique_bindings_fundefs B ->
+    split_fds B' B'' B ->
+    closed_fundefs B' ->
+    closed_fundefs B'' ->
+    preord_env_P S1 k rho rho' ->
+    preord_env_P (Union var S1 (name_in_fundefs B)) k
+                 (def_funs B' B' (def_funs B'' B'' rho rho)
+                           (def_funs B'' B'' rho rho))
+                 (def_funs B B rho' rho').
+  Proof.
+    intros Hun HS Hcl Hcl' Hpre.
+    assert (Hcl'' := split_fds_closed_fundefs B' B'' B HS Hcl Hcl').
+    rewrite (@Union_Setminus _ _ _ _ ).
+    eapply preord_env_P_union.
+    - eapply preord_env_P_def_funs_not_in_P_l.
+      eapply preord_env_P_def_funs_not_in_P_l.
+      eapply preord_env_P_def_funs_not_in_P_r.
+      eapply preord_env_P_antimon; eauto.
+      apply Subset_Setminus.
+      apply Disjoint_Setminus; eauto using Included_refl.
+      eapply Disjoint_Setminus. 
+      rewrite !name_in_fundefs_big_cup_fun_in_fundefs.
+      eapply Included_big_cup. intros x; eauto using Same_set_refl.
+      rewrite (split_fds_fun_in_fundefs B' B'' B); eauto. now apply Included_Union_r.
+      edestruct split_fds_unique_bindings_fundefs_l as [H1 [H2 H3]]; eauto.
+      rewrite split_fds_name_in_fundefs; eauto.
+      eapply Disjoint_Setminus. eapply Included_Union_l.
+    - edestruct split_fds_unique_bindings_fundefs_l as [H1 [H2 H3]]; eauto.
+      rewrite split_fds_name_in_fundefs; eauto. eapply preord_env_P_union.
+      + eapply preord_env_P_trans.
+        eapply preord_env_P_Included_fun_in_fundefs with (B2 := B) (B2' := B);
+          eauto using Included_refl;
+          try (now rewrite (split_fds_fun_in_fundefs B' B'' B); eauto;
+               apply Included_Union_l).
+        eapply preord_env_P_def_funs_col.
+        rewrite (split_fds_name_in_fundefs B' B'' B); eauto.
+        unfold closed_fundefs in *. rewrite Hcl'', Union_Empty_set_l.
+        rewrite Setminus_Included_Empty_set. eapply preord_env_Empty_set.
+        eapply Included_Union_l.
+      + eapply preord_env_P_def_funs_not_in_P_l.
+        eapply preord_env_P_trans.
+        eapply preord_env_P_Included_fun_in_fundefs with (B2 := B) (B2' := B);
+          eauto using Included_refl;
+          try (now rewrite (split_fds_fun_in_fundefs B' B'' B); eauto;
+               apply Included_Union_r).
+        eapply preord_env_P_def_funs_col.
+        rewrite (split_fds_name_in_fundefs B' B'' B); eauto.
+        unfold closed_fundefs in *. rewrite Hcl'', Union_Empty_set_l.
+        rewrite Setminus_Included_Empty_set. eapply preord_env_Empty_set.
+        eapply Included_Union_r.
+        eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs.
+        eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.
+        now apply Disjoint_sym.
+  Qed.
+
+  Lemma preord_env_P_Same_set_fun_in_fundefs k S1 B1 B1' B2 B2' rho1 rho1' :
+    Same_set _ (fun_in_fundefs B1) (fun_in_fundefs B2) ->
+    Same_set _ (fun_in_fundefs B1') (fun_in_fundefs B2') ->
+    unique_bindings_fundefs B1'->
+    unique_bindings_fundefs B1 ->
+    unique_bindings_fundefs B2'->
+    unique_bindings_fundefs B2 ->
+    preord_env_P S1 k (def_funs B1' B1 rho1 rho1') (def_funs B2' B2 rho1 rho1').
+  Proof. 
+    revert B1 S1 B1' B2 B2' rho1 rho1'. induction k using lt_wf_rec1.
+    induction B1; intros S1 B1' B2 B2' rho1 rho1' HS1 HS2 Hun1' Hun1 Hun2' Hun2.
+    - edestruct fun_in_fundefs_unique_bindings_split
+      with (B := B2) as [B [B' [Heq [Hn [HS Hun']]]]]; eauto.
+      eapply HS1. left. eauto.
+      edestruct fundefs_append_unique_bindings_l as [H1 [H2 H3]]; eauto.
+      rewrite Heq. 
+      eapply preord_env_P_antimon;
+        [| apply (@Included_Union_Setminus _ _ (Singleton var v) _)].
+      eapply preord_env_P_union.
+      + simpl. eapply preord_env_P_set_not_in_P_l;
+          eauto using Disjoint_Setminus, Included_refl.
+        eapply preord_env_P_trans;
+          [| apply proerd_env_P_def_funs_weakening; intros Hc; inv Hc; eauto ].
+        eapply IHB1; eauto ; try (now inv Hun1; eauto).
+        rewrite (fundefs_append_fun_in_fundefs B B' (fundefs_append B B')); eauto.
+        rewrite HS, <- HS1. simpl.
+        rewrite Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_r.
+        apply Same_set_sym. eapply Setminus_Disjoint. eapply Disjoint_Singleton.
+        inv Hun1; eauto. intros Hc. apply H9. apply name_in_fundefs_bound_var_fundefs.
+        eapply fun_in_fundefs_name_in_fundefs; eauto.
+      + rewrite def_funs_append;
+        eapply preord_env_P_def_funs_not_in_P_r.
+        * simpl. eapply preord_env_P_extend.
+          rewrite Setminus_Empty_set. apply preord_env_Empty_set.
+          rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs. 
+          edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+          exists t1, xs1, e1, rho2''. repeat split; eauto.
+          erewrite <- find_def_Same_set_fun_in_fundefs; eauto.
+          intros Hleq Hpre'. eapply preord_exp_refl; eauto.
+          eapply preord_env_P_setlist_l; [| | | eauto | eauto ]; eauto.
+        * apply Disjoint_sym. apply Disjoint_Singleton. eauto.
+    - simpl. destruct B2; eauto using preord_env_P_refl.
+      destruct HS1 as [_ H1]. exfalso. eapply not_In_Empty_set. eapply H1.
+      simpl. eauto.
+  Qed.
+  
 End EVAL.

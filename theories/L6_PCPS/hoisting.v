@@ -256,6 +256,8 @@ Inductive hoist_rw : relation exp :=
       split_fds B3 B4 B ->
       hoist_rw (Efun B2 e) (Efun B e).
 
+(** The reflexivite transitive closure of the compatible 
+  * closure of [hoist_rw] *)
 Definition hoist_star (e1 e2: exp) : Prop :=
   exists n, refl_trans_closure_n (compat_closure hoist_rw) n e1 e2.
 
@@ -283,8 +285,8 @@ Proof.
 Qed.
 
 (** The number of functions definitions is invariant w.r.t hoist_rw *)
-Lemma exp_fun_count_invariant n :
-  invariant hoist_rw (fun e => exp_fun_count e = n).
+Lemma exp_fun_count_Invariant n :
+  Invariant hoist_rw (fun e => exp_fun_count e = n).
 Proof.
   intros e1 e2 Heq Hrw; inv Hrw; simpl; eauto.
   - rewrite <- !fold_left_rev_right, !rev_app_distr.
@@ -297,7 +299,7 @@ Proof.
     apply split_fds_fundefs_fundefs_count in H1. simpl in *.
     omega.
 Qed.
-
+      
 Lemma fun_count_ctx_compat :
   (forall c e e', exp_fun_count e = exp_fun_count e' ->
                   exp_fun_count (c |[ e ]|) = exp_fun_count (c |[ e' ]|)) /\
@@ -317,7 +319,7 @@ Qed.
 (** The number of functions definitions is invariant w.r.t hoist_star *)
 (* TODO : refactor this proof so that it uses the generic lemmas in relations.v *)
 Lemma exp_fun_cnt_refl_trans_clo_invariant m n :
-  invariant (refl_trans_closure_n (compat_closure hoist_rw) m)
+  Invariant (refl_trans_closure_n (compat_closure hoist_rw) m)
             (fun e => exp_fun_count e = n).
 Proof.
   intros e1 e2 H1 Hstar.
@@ -325,7 +327,7 @@ Proof.
   - inv Hstar. eauto. 
   - inv Hstar. inv H0. eapply IHm; [| eauto ].
     apply fun_count_ctx_compat.
-    eapply exp_fun_count_invariant; eauto.
+    eapply exp_fun_count_Invariant; eauto.
 Qed.
 
 Lemma hoist_rw_Ecase_cons x c e tes tes' :
@@ -342,7 +344,7 @@ Proof.
 Qed.
   
 Lemma invariant_no_fun :
-  invariant hoist_rw no_fun.
+  Invariant hoist_rw no_fun.
 Proof.
   intros e1 e2 Hnf Hrw. inv Hnf; inv Hrw; try now inv H.
   - apply app_eq_nil in H1. inv H1. inv H0.
@@ -351,24 +353,28 @@ Proof.
     + inv H3. exfalso. eapply no_fun_Ecase_Efun; eauto.
 Qed.
 
-Lemma ctx_compat_no_fun :
-  ctx_compat no_fun.
+Lemma no_fun_SubtermInvariant :
+  SubtermInvariant no_fun.
 Proof.
-  split.
-  - induction c; simpl; intros e1 e2 Hnf1 Hnf2; inv Hnf1; eauto.
-    + symmetry in H1. apply app_eq_nil in H1. inv H1. inv H0.
-    + revert c0 e tes l0 H1 H2 H0. induction l; intros c0 e tes l0 H1 H2 H0.
-      * simpl in *. inv H0. constructor; eauto.
-      * inv H1.
-        inv H0. symmetry in H3. apply app_eq_nil in H3. inv H3. inv H0.
-        inv H0. simpl. constructor; eauto. 
-  - induction c; simpl; intros e1 Hnf; eauto; try inv Hnf; eauto.
+  - intros c. induction c; simpl; intros e1 Hnf; eauto; try inv Hnf; eauto.
     + symmetry in H1. apply app_eq_nil in H1. inv H1. inv H0.
     + revert c0 e tes l0 H1 H2 H0. induction l; intros c0 e tes l0 H1 H2 H0.
       * inv H0; eauto.
       * simpl in H0; inv H0. inv H1.
         symmetry in H3. apply app_eq_nil in H3. inv H3. inv H0.
         eapply IHl; eauto.
+Qed.
+
+Lemma no_fun_SubtermSubstInvariant :
+  SubtermSubstInvariant (fun _ e => no_fun e) no_fun.
+Proof.
+  intros c. induction c; simpl; intros e1 e2 Hnf1 Hnf2; inv Hnf1; eauto.
+  - symmetry in H1. apply app_eq_nil in H1. inv H1. inv H0.
+  - revert c0 e tes l0 H1 H2 H0. induction l; intros c0 e tes l0 H1 H2 H0.
+    + simpl in *. inv H0. constructor; eauto.
+    + inv H1.
+      inv H0. symmetry in H3. apply app_eq_nil in H3. inv H3. inv H0.
+      inv H0. simpl. constructor; eauto. 
 Qed.
 
 Ltac exp_to_ctx e c :=
@@ -456,7 +462,7 @@ Proof.
 Qed.
 
 
-(* This lemma should not be used. Insted we should find a way to use 
+(* This lemma should not be used. Instead we should find a way to use 
  * the more general lemma compat_closure_g_compat in relations.v *)
 Lemma compat_closure_g_compat (R : relation exp) e1 e2 e1' x tau xs e' :
   (forall e1 e2 e1', R e1 e2 -> g x tau xs e' e1 e1' ->
@@ -514,7 +520,7 @@ Lemma hoist_star_Efun_cons
 Proof.
   intros [n Hrwstar]. exists n.
   edestruct
-    (refl_trans_closure_R_compat (compat_closure hoist_rw) n (g f tau xs e')
+    (refl_trans_closure_commut (compat_closure hoist_rw) n (g f tau xs e')
                                  (Efun (Fcons f1 tau1 xs1 e1' B1) e)
                                  (Efun (Fcons f2 tau2 xs2 e2' B2) e)); simpl; eauto.
   intros e1 e2 e1'' Hr Hrw.
@@ -765,7 +771,706 @@ Inductive dummy {A : Type} : one_or_many A -> Prop :=
       dummy (Many A p).
 
 *)
+Lemma unique_bindings_SubtermInvariant' :
+  SubtermInvariant unique_bindings /\
+  (forall f e, unique_bindings_fundefs (f <[ e ]>) -> unique_bindings e).
+Proof.
+  exp_fundefs_ctx_induction IHe IHf;
+  try (now intros e' H; simpl; eauto; inv H; eauto).
+  simpl. intros l' e' H. 
+  induction l; inv H; eauto.
+Qed.
 
+Corollary unique_bindings_SubtermInvariant :
+  SubtermInvariant unique_bindings.
+Proof.
+  eapply unique_bindings_SubtermInvariant'.
+Qed.
+
+Lemma unique_bindings_Invariant :
+  Invariant hoist_rw (fun e => unique_bindings e).
+Proof.
+  intros e1 e2 Hun Hrw; inv Hrw; simpl.
+  - inv Hun. inv H5. constructor; eauto. constructor; eauto.
+    rewrite bound_var_Econstr.  eapply Disjoint_Union; eauto.
+    eapply Disjoint_sym. eapply Disjoint_Singleton. intros HB; eauto.
+  - inv Hun. exfalso. eapply app_cons_not_nil; eauto.
+    destruct tes.
+    + inv H0. simpl. inv H2. rewrite bound_var_Efun in H3.
+      constructor; eauto. constructor; eauto.
+      eapply Disjoint_Union_r; eauto.
+      rewrite bound_var_Ecase_cons. eapply Disjoint_Union; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
+    + inv H0.
+      edestruct unique_bindings_Ecase_l as [H1' [H2' [H3' [H4' [H5' H6']]]]]; eauto.
+      inv H1'. constructor; eauto. 
+      * rewrite !bound_var_Ecase_append, !bound_var_Ecase_cons, !bound_var_Efun in *.
+        eapply unique_bindings_Ecase_r; [ assumption | | assumption | | | ].
+        constructor. assumption. assumption.
+        eapply Disjoint_sym. eapply Disjoint_Union_l.
+        eapply Disjoint_sym. eassumption.
+        rewrite !bound_var_Ecase_cons. eapply Disjoint_Union.
+        eapply Disjoint_Included_r ; [| eassumption ].
+        rewrite <- Union_assoc.
+        do 2 eapply Included_Union_mon_r. now apply Included_Union_l.
+        apply Disjoint_sym. eapply Disjoint_Union_r.
+        eapply Disjoint_sym. eassumption.
+        apply Disjoint_sym. eapply Disjoint_Union_r.
+        eapply Disjoint_sym. eassumption.
+        rewrite !bound_var_Ecase_cons. eapply Disjoint_Union.
+        eapply Disjoint_Included_r; [| eassumption ].
+        do 2 eapply Included_Union_mon_r. now apply Included_refl.
+        assumption.
+      * rewrite !bound_var_Ecase_append, !bound_var_Ecase_cons, !bound_var_Efun in *.
+        eapply Disjoint_Union. eapply Disjoint_Union.
+        eapply Disjoint_Included_r; [| now apply H3 ].
+        eapply Included_Union_mon_r. eapply Included_Union_mon_l.
+        now apply Included_Union_l.
+        eapply Disjoint_sym. eapply Disjoint_Union_l.
+        eapply Disjoint_sym. eassumption.
+        eapply Disjoint_Union. eassumption.
+        eapply Disjoint_sym. eapply Disjoint_Union_l.
+        eapply Disjoint_sym. eassumption.
+  - inv Hun. inv H5. constructor; eauto. constructor; eauto.
+    rewrite bound_var_Eproj.  eapply Disjoint_Union; eauto.
+    eapply Disjoint_sym. eapply Disjoint_Singleton. intros HB; eauto.
+  - inv Hun. inv H2. rewrite bound_var_Efun in H4. constructor; eauto.
+    eapply (split_fds_unique_bindings_fundefs_r B B' B''); eauto.
+    eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
+    rewrite split_fds_bound_vars; eauto.
+    eapply Disjoint_sym. eapply Disjoint_sym in H7.
+    eapply Disjoint_Union; eauto.
+    eapply Disjoint_sym. eapply Disjoint_Union_r; eauto.
+  - inv Hun. inv H5. constructor; eauto. constructor; eauto.
+    rewrite bound_var_Eprim. eapply Disjoint_Union; eauto.
+    eapply Disjoint_sym. eapply Disjoint_Singleton. intros HB; eauto.
+  - inv Hun; eauto.
+  - inv Hun. 
+    edestruct split_fds_unique_bindings_fundefs_l as [H1' [H2' H3']];
+      [| apply H |]; eauto. inv H2'. inv H16.
+    rewrite bound_var_Efun in *. rewrite bound_var_fundefs_Fcons in *.
+    constructor; eauto.
+    + eapply (split_fds_unique_bindings_fundefs_r B3 B4); eauto.
+      eapply (split_fds_unique_bindings_fundefs_r B1 (Fcons f0 tau xs e' Fnil)); eauto.
+      constructor; eauto. eapply Disjoint_Union_r; eauto.
+      eapply Disjoint_Union_r; eauto. rewrite bound_var_fundefs_Fcons.
+      eapply Disjoint_Included_r; [| now apply H3' ].
+      do 2 (eapply Included_Union_compat; eauto using Included_refl).
+      rewrite bound_var_Efun, <- Union_assoc.
+      now eapply Included_Union_r.
+      rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs e' Fnil) B4); eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union.
+      eapply Disjoint_Included_r; [| now apply H3' ].
+      do 2 eapply Included_Union_mon_r. rewrite bound_var_Efun.
+      rewrite <- Union_assoc. eapply Included_Union_l.
+      rewrite bound_var_fundefs_Fcons. eapply Disjoint_Union; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Singleton; eauto.
+      eapply Disjoint_Union; eauto.
+      eapply Disjoint_sym. now eapply Disjoint_Union_l; eauto.
+      now rewrite bound_var_fundefs_Fnil, Union_Empty_set_l; eauto.
+    + rewrite (split_fds_bound_vars B3 B4 B); eauto.
+      rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs (Efun B3 e') Fnil) B2)
+        in *; eauto.
+      rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs e' Fnil) B4); eauto.
+      rewrite bound_var_fundefs_Fcons in H6.
+      eapply Disjoint_sym. eapply Disjoint_Union.
+      eapply Disjoint_sym; eapply Disjoint_Included_r; [| now apply H6 ].
+      do 3 eapply Included_Union_mon_r. rewrite bound_var_Efun.
+      rewrite <- Union_assoc. eapply Included_Union_l.
+      rewrite bound_var_fundefs_Fcons. eapply Disjoint_sym.
+      eapply Disjoint_Included_r; [| now apply H6 ].
+      do 3 (eapply Included_Union_compat; eauto using Included_refl).
+      rewrite bound_var_Efun. rewrite <- Union_assoc. now eapply Included_Union_r.
+Qed.
+
+Lemma closed_fundefs_in_exp_SubtermInvariant' :
+  SubtermInvariant closed_fundefs_in_exp /\
+  (forall f e, closed_fundefs_in_fundefs (f <[ e ]>) ->
+               closed_fundefs_in_exp e).
+Proof.
+  exp_fundefs_ctx_induction IHc IHf; eauto;
+  try (now intros e2 H; eapply IHc; intros B H'; eapply H; simpl; constructor).
+  - intros l' e' H.
+    eapply IHc; intros B H'; eapply H.
+    simpl. econstructor; [ eassumption |].
+    eapply in_or_app. right. left. reflexivity.
+  - intros e2 H.  eapply IHf. 
+    intros B H'. eapply H.
+    simpl. now eapply In_Fun3.
+  - intros e' H. simpl in H.
+    eapply IHf. intros B H'. eapply H.
+    now constructor 2.
+Qed.
+  
+Lemma closed_fundefs_in_exp_SubtermInvariant :
+  SubtermInvariant closed_fundefs_in_exp.
+Proof.
+  apply closed_fundefs_in_exp_SubtermInvariant'.
+Qed.
+
+Lemma split_fds_closed_fundefs_strong B1 B2 B3 :
+  split_fds B1 B2 B3 ->
+  Included var (occurs_free_fundefs B1) (name_in_fundefs B2) ->
+  Included var (occurs_free_fundefs B2) (name_in_fundefs B1) ->
+  closed_fundefs B3.
+Proof.
+  intros Hs HI1 HI2. unfold closed_fundefs.
+  rewrite occurs_free_fundefs_big_cup in *.
+  rewrite Same_Set_big_cup_l; [| eapply split_fds_fun_in_fundefs; eassumption ].
+  rewrite Setminus_big_cup in *. rewrite Setminus_big_cup in HI1, HI2.
+  rewrite Union_big_cup.
+  rewrite split_fds_name_in_fundefs; [| eassumption ].
+  rewrite Setminus_Union_distr.
+  rewrite (Union_sym (name_in_fundefs B1) (name_in_fundefs B2)) at 2.
+  rewrite <- !Setminus_Union.
+  split; [| intros x Hc; now inv Hc ].
+  eapply Included_trans.
+  eapply Included_Union_compat.
+  eapply Included_Setminus_compat. eassumption. now eapply Included_refl.
+  eapply Included_Setminus_compat. eassumption. now eapply Included_refl.
+  rewrite !Setminus_Empty_set, Union_Empty_set_l. now eapply Included_refl.
+Qed.
+
+Lemma closed_fundefs_in_exp_Invariant :
+  Invariant hoist_rw closed_fundefs_in_exp.
+Proof.
+  intros e1 e2 Hun Hrw; inv Hrw; simpl;
+  try now intros B' H'; inv H'; [ eapply Hun; eauto | inv H1; eapply Hun; eauto | eapply Hun; eauto ].
+  - intros B' H'. inv H'.
+    + eapply Hun.
+      econstructor; [| apply in_or_app; right; left; reflexivity].
+      constructor.
+    + inv H1. eapply Hun. eapply in_app_or in H4. inv H4.
+      econstructor; [ eassumption |]. now eapply in_or_app; eauto.
+      inv H. inv H0.
+      econstructor; [ | eapply in_or_app; right; left; reflexivity ].
+      now constructor.
+      econstructor; [ eassumption |].
+      eapply in_or_app; right; right. eassumption.     
+    + eapply Hun.
+      econstructor; [ | eapply in_or_app; right; left; reflexivity ].
+      now constructor.
+  - intros B1 H'.
+    inv H'. 
+    eapply (split_fds_closed_fundefs B B' B''); [eassumption | | ]; now eauto.
+    now eauto. eapply funs_in_fundef_split_fds in H2; [| eassumption ].
+    inv H2; now eauto.
+  - intros B1 H'. eapply Hun. eauto.
+  - intros B' H'.
+    assert (HB2 : closed_fundefs_in_fundefs B2).
+    { intros x' H''. eapply Hun. now constructor. }
+    inv H'; [| now eauto |].
+    + eapply split_fds_closed_fundefs_strong; [ eassumption | |].
+      * eapply Included_trans with (s2 := Empty_set _); [| intros x Hc; now inv Hc].
+        eapply Hun. eapply In_Fun3. eapply split_fds_funs_in_fundef_r.
+        eassumption. now eauto.
+      * eapply same_split_fds_closed_fundefs with (B3' := Fcons f0 tau xs (Efun B3 e') B1) in H.
+        unfold closed_fundefs in H. rewrite occurs_free_fundefs_Fcons in H.
+        assert (H2 := Union_Same_set_Empty_set_l _ _  H).
+        assert (H3 := Union_Same_set_Empty_set_r _ _  H).
+        rewrite split_fds_occurs_free_fundefs; [| eassumption ].
+        rewrite occurs_free_fundefs_Fcons in *.
+        simpl in *. rewrite !Union_Empty_set_l, H3, !Union_Empty_set_r.
+        rewrite occurs_free_fundefs_Fnil in *.
+        rewrite (Setminus_Included_Empty_set (Empty_set var)), Union_Empty_set_l;
+          [| intros c Hc; now inv Hc ]. rewrite Setminus_Union.
+        eapply Included_Setminus_l; [| now eapply occurs_free_Efun_Included ].
+        rewrite Setminus_Union_distr, <- Union_assoc at 1.
+        rewrite H2, Union_Empty_set_r. eapply Subset_Setminus.
+        constructor. now apply split_fds_nil_l.
+        eapply Hun. now constructor.
+    + eapply funs_in_fundef_split_fds in H4; [| eassumption ].
+      inv H4.
+      * eapply HB2. eapply split_fds_funs_in_fundef_r. eassumption.
+        now eauto.
+      * eapply funs_in_fundef_split_fds in H2; [| eassumption].
+        inv H2.
+        eapply HB2. eapply split_fds_funs_in_fundef_l. eassumption. eassumption.
+        inv H3. eapply HB2.
+        eapply split_fds_funs_in_fundef_r. eassumption. now eauto.
+        inv H5.
+Qed.
+
+
+Lemma disjoint_ident_SubtermInvariant' :
+  SubtermInvariant (fun e => Disjoint _ (bound_var e) (occurs_free e) /\
+                             unique_bindings e) /\
+  (forall B e, Disjoint _ (bound_var_fundefs (B <[ e ]>)) (occurs_free_fundefs (B <[ e ]>))
+               /\ unique_bindings_fundefs (B <[ e ]>) ->
+               Disjoint _ (bound_var e) (occurs_free e) /\ unique_bindings e).
+Proof.
+  exp_fundefs_ctx_induction IHc IHf; eauto;
+  try (intros e' [H1 H2];
+       assert (H3 : unique_bindings e')
+         by (eapply unique_bindings_SubtermInvariant; eauto);
+      split; [| assumption ]); simpl in *.
+  - inv H2. apply IHc. split; [| assumption ].
+    rewrite bound_var_Econstr, occurs_free_Econstr in *.
+    eapply Disjoint_Included;
+      [ now apply occurs_free_Econstr_Included with (tau := t) (t := t0)
+      | now apply Included_refl |].
+    rewrite occurs_free_Econstr.
+    eapply Disjoint_sym. eapply Disjoint_Union; eapply Disjoint_sym.
+    eapply Disjoint_Union_l. eassumption.
+    eapply Disjoint_Singleton; eauto.
+  - inv H2. apply IHc; split; [| assumption ].
+    rewrite bound_var_Eproj, occurs_free_Eproj in *.
+    eapply Disjoint_Included;
+      [ now apply occurs_free_Eproj_Included with (tau := t) (t := n)
+      | now apply Included_refl |]. 
+    rewrite occurs_free_Eproj.
+    eapply Disjoint_sym. eapply Disjoint_Union; eapply Disjoint_sym.
+    eapply Disjoint_Union_l. eassumption.
+    eapply Disjoint_Singleton; eauto.
+  - inv H2. apply IHc; split; [| assumption ].
+    rewrite bound_var_Eprim, occurs_free_Eprim in *.
+    eapply Disjoint_Included;
+      [ now apply occurs_free_Eprim_Included with (tau := t) (f := p)
+      | now apply Included_refl |]. 
+    rewrite occurs_free_Eprim.
+    eapply Disjoint_sym. eapply Disjoint_Union; eapply Disjoint_sym.
+    eapply Disjoint_Union_l. eassumption.
+    eapply Disjoint_Singleton; eauto.
+  - intros l' e' [H1 H2].
+    assert (H3 : unique_bindings e') 
+      by (eapply unique_bindings_SubtermInvariant
+          with (c := Ecase_c v l t e l'); eauto).
+    split; [| assumption ].
+    rewrite occurs_free_Ecase_app, bound_var_Ecase_append,
+    bound_var_Ecase_cons in *. 
+    edestruct unique_bindings_Ecase_l as [H1' [H2' [H3' [H4' [H5' H6']]]]].
+    eassumption. 
+    eapply IHc; split; [| eassumption ].
+    eapply Disjoint_Included; [| | now eapply H1 ].
+    now eapply Included_Union_l.
+    eapply Included_Union_mon_r. now eapply Included_Union_l.
+  - inv H2. eapply IHc; split; [| eassumption ].
+    rewrite bound_var_Efun, occurs_free_Efun in *.
+    eapply Disjoint_Included; [| now apply Included_refl |].
+    now apply occurs_free_Efun_Included. 
+    rewrite occurs_free_Efun.
+    eapply Disjoint_sym. eapply Disjoint_Union; eapply Disjoint_sym.
+    eapply Disjoint_Union_l. rewrite Union_sym. eassumption.
+    eapply Disjoint_Included; [| now apply Included_refl | eassumption].
+    eapply name_in_fundefs_bound_var_fundefs.
+  - inv H2. eapply IHf. split; [| eassumption ].
+    rewrite bound_var_Efun, occurs_free_Efun in *.
+    eapply Disjoint_Included; [| | now apply H1 ];
+    now eapply Included_Union_l.
+  - intros e' [H1 H2].
+    assert (H3 : unique_bindings e')
+      by (eapply unique_bindings_SubtermInvariant'
+          with (f := Fcons1_c v t l e f6); eauto).
+    split; [| eassumption ].
+    inv H2. eapply IHc; split; [| eassumption ].
+    rewrite bound_var_fundefs_Fcons, occurs_free_fundefs_Fcons in *.
+    eapply Disjoint_Included; [| now apply Included_refl |].
+    eapply occurs_free_in_fun with (B := Fcons v t l (e |[ e' ]|) f6).
+    left. now constructor. simpl.
+    rewrite occurs_free_fundefs_Fcons.
+    eapply Disjoint_sym. eapply Disjoint_Union.
+    eapply Disjoint_sym. assumption.
+    eapply Disjoint_Union.
+    eapply Disjoint_Union. eapply Disjoint_sym.
+    eapply Disjoint_Singleton. assumption.
+    eapply Disjoint_sym.
+    eapply Disjoint_Included; [| eapply Included_refl| eassumption ].
+    now eapply name_in_fundefs_bound_var_fundefs.
+    eapply Disjoint_Included; [ | eapply Included_refl | eapply Disjoint_sym; eassumption ].
+    do 2 eapply Included_Union_mon_r. now apply Included_Union_l.
+  - intros e' [H1 H2].
+    assert (H3 : unique_bindings e')
+      by (eapply unique_bindings_SubtermInvariant'
+          with (f := Fcons2_c v t l e f7); eauto).
+    split; [| eassumption ].
+    inv H2. eapply IHf; split; [| eassumption ].
+    rewrite bound_var_fundefs_Fcons, occurs_free_fundefs_Fcons in *. 
+    eapply Disjoint_Included; [| now apply Included_refl |].
+    eapply (occurs_free_fundefs_Fcons_Included v t l e (f7 <[ e' ]>)).
+    rewrite occurs_free_fundefs_Fcons.
+    eapply Disjoint_sym. eapply Disjoint_Union.
+    eapply Disjoint_sym. eapply Disjoint_Included; [| | now apply H1 ].
+    eapply Included_Union_compat; now eapply Included_refl.
+    do 3 eapply Included_Union_mon_r. now apply Included_refl.
+   eapply Disjoint_sym. now eapply Disjoint_Singleton.
+Qed.
+
+Corollary disjoint_ident_SubtermInvariant :
+  SubtermInvariant (fun e => Disjoint _ (bound_var e) (occurs_free e) /\
+                             unique_bindings e).
+Proof.
+  apply disjoint_ident_SubtermInvariant'.
+Qed.
+
+Lemma disjoint_ident_Invariant :
+  Invariant hoist_rw (fun e => Disjoint _ (bound_var e) (occurs_free e) /\
+                               closed_fundefs_in_exp e /\
+                               unique_bindings e).
+Proof.
+  intros e1 e2 [HD [Hclo Hun]] Hrw.
+  assert (Hun' : unique_bindings e2)
+    by (eapply unique_bindings_Invariant; eauto).
+  assert (Hclo'' : closed_fundefs_in_exp e2)
+    by (eapply closed_fundefs_in_exp_Invariant; eauto).
+  split; [| split; eassumption ].
+  inv Hrw; simpl; clear Hun Hun'.
+  - rewrite !bound_var_Econstr, !occurs_free_Econstr, !bound_var_Efun, !occurs_free_Efun,
+    !bound_var_Econstr, !occurs_free_Econstr in *.
+    assert (Hclo' : closed_fundefs B) by (eapply Hclo; eauto).
+    unfold closed_fundefs in Hclo'. rewrite Hclo', !Union_Empty_set_r in *.
+    rewrite Union_assoc.
+    eapply Disjoint_Included; [| now apply Included_refl | now apply HD].
+    rewrite Setminus_Union_distr.
+    apply Included_Union_compat.
+    + apply Subset_Setminus.
+    + rewrite !Setminus_Union, Union_sym. apply Included_refl.
+  - rewrite !bound_var_Ecase_append, !occurs_free_Ecase_app, !bound_var_Efun, !occurs_free_Efun,
+    !bound_var_Ecase_append, !occurs_free_Ecase_app, !bound_var_Ecase_cons,
+    !bound_var_Efun in *.
+    assert (Hclo' : closed_fundefs B) by (eapply Hclo''; eauto).
+    unfold closed_fundefs in Hclo'. rewrite Hclo', !Union_Empty_set_r in *.
+    rewrite Union_assoc. rewrite (Union_sym (bound_var_fundefs B) (bound_var (Ecase x tes))).
+    rewrite <- Union_assoc in HD. rewrite <- !Union_assoc. 
+    eapply Disjoint_Included; [| eapply Included_refl | now apply HD].
+    rewrite Setminus_Union_distr.
+    eapply Included_Union_compat. now apply Included_refl.
+    now apply Subset_Setminus.
+  - rewrite !bound_var_Eproj, !occurs_free_Eproj, !bound_var_Efun, !occurs_free_Efun,
+    !bound_var_Eproj, !occurs_free_Eproj in *.
+    assert (Hclo' : closed_fundefs B) by (eapply Hclo; eauto).
+    unfold closed_fundefs in Hclo'. rewrite Hclo', !Union_Empty_set_r in *.
+    rewrite Union_assoc.
+    eapply Disjoint_Included; [| now apply Included_refl | now apply HD].
+    rewrite Setminus_Union_distr.
+    apply Included_Union_compat.
+    + apply Subset_Setminus.
+    + rewrite !Setminus_Union, Union_sym. apply Included_refl.
+  - rewrite !bound_var_Efun, !occurs_free_Efun in *.
+    rewrite split_fds_bound_vars; [| eassumption ].
+    rewrite split_fds_name_in_fundefs; [| eassumption ].
+    rewrite split_fds_occurs_free_fundefs; [| eassumption ].
+    assert (Hclo1 : closed_fundefs B') by (eapply Hclo; eauto).
+    assert (Hclo2 : closed_fundefs B) by (eapply Hclo; eauto).
+    unfold closed_fundefs in Hclo1, Hclo2.
+    rewrite Hclo1, Hclo2.
+    rewrite !(Setminus_Included_Empty_set (Empty_set _));
+      try (now intros x Hc; inv Hc).
+    rewrite !Union_Empty_set_r, <- Union_assoc.
+    eapply Disjoint_Included; [| now apply Included_refl  | now apply HD].
+    rewrite Setminus_Union_distr.
+    do 2 eapply Included_Union_mon_r.
+    rewrite Setminus_Union, Union_sym. now apply Included_refl.
+  - rewrite !bound_var_Eprim, !occurs_free_Eprim, !bound_var_Efun, !occurs_free_Efun,
+    !bound_var_Eprim, !occurs_free_Eprim in *.
+    assert (Hclo' : closed_fundefs B) by (eapply Hclo; eauto).
+    unfold closed_fundefs in Hclo'. rewrite Hclo', !Union_Empty_set_r in *.
+    rewrite Union_assoc.
+    eapply Disjoint_Included; [| now apply Included_refl | now apply HD].
+    rewrite Setminus_Union_distr.
+    apply Included_Union_compat.
+    + apply Subset_Setminus.
+    + rewrite !Setminus_Union, Union_sym. apply Included_refl.
+  - rewrite !bound_var_Efun, !occurs_free_Efun, !bound_var_fundefs_Fnil,
+    !occurs_free_fundefs_Fnil, !Union_Empty_set_r in *. simpl in *.
+    rewrite Setminus_Empty_set_Same_set in HD. assumption.
+  - rewrite !bound_var_Efun, !occurs_free_Efun in *.
+    assert (Hclo2 : closed_fundefs B) by (eapply Hclo''; eauto).
+    unfold closed_fundefs in Hclo2. rewrite Hclo2, !Union_Empty_set_r in *.
+    clear Hclo2.
+    rewrite split_fds_bound_vars in *; try eassumption. 
+    rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs e' Fnil) B4) in *; try eassumption.
+    rewrite split_fds_occurs_free_fundefs in *; try eassumption.
+    rewrite split_fds_name_in_fundefs with (B3 := B)  in *; try eassumption.
+    rewrite split_fds_name_in_fundefs with (B3 := B2)  in *; try eassumption.
+    rewrite split_fds_name_in_fundefs with (B3 := B4) at 1; try eassumption.
+    rewrite !bound_var_fundefs_Fcons, !occurs_free_fundefs_Fcons in *.
+    simpl in *.
+    rewrite !bound_var_fundefs_Fnil, !occurs_free_fundefs_Fnil in *.
+    rewrite !(Setminus_Included_Empty_set (Empty_set _)) in HD ;
+      try (now intros x Hc; inv Hc).
+    (* rewrite !(Setminus_Included_Empty_set (Empty_set _)) ; *)
+    (*   try (now intros x Hc; inv Hc). *)
+    rewrite !bound_var_Efun, !occurs_free_Efun in *.
+    rewrite !Union_Empty_set_l.
+    repeat rewrite !Union_Empty_set_l in HD at 1.
+    eapply Disjoint_Included; [|  | now apply HD].
+    + eapply Included_Union_mon_r. 
+      eapply Included_Setminus_compat.
+      now apply Included_refl.
+      now apply Included_Union_r.
+    + rewrite Union_assoc, (Union_sym (bound_var_fundefs B3)).
+      rewrite <- (Union_assoc (bound_var_fundefs B1)).
+      eapply Included_Union_compat; [| now apply Included_refl ].
+      eapply Included_Union_compat; [ now apply Included_refl |].
+      rewrite !Union_assoc.
+      eapply Included_Union_compat; [| now apply Included_refl ].
+      rewrite (Union_sym _ (bound_var_fundefs B3)), <- Union_assoc.
+      apply Included_refl.
+Qed.
+
+
+Lemma bound_var_Invariant S :
+  Invariant hoist_rw (fun e => Same_set _ (bound_var e) S).
+Proof.
+  intros e1 e2 HS Hrw; inv Hrw.
+  - rewrite !bound_var_Efun, !bound_var_Econstr, !bound_var_Efun in *.
+    rewrite <- HS. apply Union_assoc.
+  - rewrite !bound_var_Efun, !bound_var_Ecase_append,
+    !bound_var_Ecase_cons, !bound_var_Efun in *.
+    rewrite <- HS. rewrite Union_assoc, (Union_sym (bound_var_fundefs B)), <- Union_assoc.
+    rewrite !Union_assoc. apply Same_set_refl.
+  - rewrite !bound_var_Efun, !bound_var_Eproj, !bound_var_Efun in *.
+    rewrite <- HS. apply Union_assoc.
+  - rewrite !bound_var_Efun in *. rewrite split_fds_bound_vars; [| eassumption ].
+    rewrite <- HS. rewrite Union_assoc. apply Same_set_refl.
+  - rewrite !bound_var_Efun, !bound_var_Eprim, !bound_var_Efun in *.
+    rewrite <- HS. apply Union_assoc.
+  - now rewrite bound_var_Efun, bound_var_fundefs_Fnil, Union_Empty_set_r in HS.
+  - rewrite bound_var_Efun in *.
+    rewrite split_fds_bound_vars; [| eassumption ].
+    rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs e' Fnil) B4); [| eassumption ].
+    rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs (Efun B3 e') Fnil) B2) in HS
+    ; [| eassumption ].
+    rewrite <- HS.
+    rewrite !bound_var_fundefs_Fcons, !bound_var_Efun.
+    do 2 rewrite bound_var_fundefs_Fnil at 1.
+    rewrite !Union_Empty_set_l.
+    eapply Same_set_Union_compat; [| apply Same_set_refl ].
+    rewrite Union_assoc, (Union_sym (bound_var_fundefs B3) (bound_var_fundefs B1)),
+    <- Union_assoc.
+    eapply Same_set_Union_compat; [ apply Same_set_refl |].
+    rewrite Union_assoc, (Union_sym (bound_var_fundefs B3) (Singleton var f0)),
+    <- Union_assoc.
+    eapply Same_set_Union_compat; [ apply Same_set_refl |].
+    rewrite Union_assoc, (Union_sym (bound_var_fundefs B3) (FromList xs)),
+    <- Union_assoc. apply Same_set_refl.
+Qed.
+
+Lemma occurs_free_disjoint_ident_Invariant S :
+  Invariant hoist_rw (fun e => Same_set _(occurs_free e) S /\
+                               Disjoint _ (bound_var e) (occurs_free e)  /\
+                               closed_fundefs_in_exp e /\
+                               unique_bindings e).
+Proof.
+  intros e1 e2 [HS [HD [Hcl Hun]]] Hrw.
+  assert ( H : Disjoint var (bound_var e2) (occurs_free e2) /\
+               closed_fundefs_in_exp e2 /\ unique_bindings e2)
+    by (eapply disjoint_ident_Invariant; eauto).
+  split; [| eassumption ]. destruct H as [HD' [Hcl' _]].
+  unfold closed_fundefs_in_exp, closed_fundefs in *.
+  rewrite <- HS; clear HS. inv Hrw.
+  - inv Hun.
+    rewrite !occurs_free_Econstr, !occurs_free_Efun, !occurs_free_Econstr,
+    !bound_var_Econstr, !bound_var_Efun in *.
+    rewrite !Setminus_Union_distr.
+    rewrite (Union_assoc (FromList _) _), (Union_sym (FromList _)), <- Union_assoc.
+    apply Same_set_Union_compat; [| apply Same_set_Union_compat ].
+    + apply Same_set_sym. apply Setminus_Disjoint. rewrite Hcl.
+      now apply Disjoint_Empty_set_l. now constructor.
+    + apply Setminus_Disjoint. eapply Disjoint_sym.
+      eapply Disjoint_Included; [| | now apply HD ].
+      now apply Included_Union_l.
+      rewrite <- Union_assoc. apply Included_Union_mon_l.
+      now apply name_in_fundefs_bound_var_fundefs.
+    + rewrite !Setminus_Union. rewrite Union_sym.
+      now apply Same_set_refl.
+  - rewrite !bound_var_Ecase_append, !bound_var_Ecase_cons, !bound_var_Efun,
+    !occurs_free_Ecase_app, !occurs_free_Efun, !occurs_free_Ecase_app in *.
+    rewrite  <- !Union_assoc .
+    apply Same_set_Union_compat; [ now apply Same_set_refl |].
+    rewrite !Setminus_Union_distr.
+    apply Same_set_Union_compat; [ now apply Same_set_refl |].
+    apply Same_set_Union_compat; [| apply Same_set_Union_compat ].
+    + apply Setminus_Disjoint. eapply Disjoint_sym.
+      eapply Disjoint_Included; [| | now apply HD ].
+      apply Included_Union_mon_r; now apply Included_Union_l.
+      apply Included_Union_mon_r. rewrite <- Union_assoc.
+      apply Included_Union_mon_l. now apply name_in_fundefs_bound_var_fundefs.
+    + apply Setminus_Disjoint. eapply Disjoint_sym.
+      eapply Disjoint_Included; [| | now apply HD ].
+      do 2 apply Included_Union_mon_r; now apply Included_Union_l.
+      apply Included_Union_mon_r. rewrite <- Union_assoc.
+      apply Included_Union_mon_l. now apply name_in_fundefs_bound_var_fundefs.
+    + apply Setminus_Disjoint. eapply Disjoint_sym.
+      eapply Disjoint_Included; [| | now apply HD ].
+      do 3 apply Included_Union_mon_r; now apply Included_refl.
+      apply Included_Union_mon_r. rewrite <- Union_assoc.
+      apply Included_Union_mon_l. now apply name_in_fundefs_bound_var_fundefs.
+  - rewrite !occurs_free_Eproj, !occurs_free_Efun, !occurs_free_Eproj,
+    !bound_var_Eproj, !bound_var_Efun in *.
+    rewrite !Setminus_Union_distr.
+    rewrite (Union_assoc (Singleton _ _) _), (Union_sym (Singleton _ _)), <- Union_assoc.
+    apply Same_set_Union_compat; [| apply Same_set_Union_compat ].
+    + apply Same_set_sym. apply Setminus_Disjoint. rewrite Hcl.
+      now apply Disjoint_Empty_set_l. now constructor.
+    + apply Setminus_Disjoint. eapply Disjoint_sym.
+      eapply Disjoint_Included; [| | now apply HD ].
+      now apply Included_Union_l.
+      rewrite <- Union_assoc. apply Included_Union_mon_l.
+      now apply name_in_fundefs_bound_var_fundefs.
+    + rewrite !Setminus_Union. rewrite Union_sym.
+      now apply Same_set_refl.
+  - rewrite !bound_var_Efun, !occurs_free_Efun in *.
+    rewrite split_fds_occurs_free_fundefs; [| eassumption ].
+    rewrite (split_fds_name_in_fundefs B B' B''); [| eassumption ].
+    rewrite !Setminus_Union_distr, <- Union_assoc, Setminus_Union,
+    (Union_sym (name_in_fundefs B)).
+    apply Same_set_Union_compat; try now apply Same_set_Union_compat.
+    apply Setminus_Disjoint. eapply Disjoint_sym.
+    eapply Disjoint_Included; [| | now apply HD ].
+    now apply Included_Union_l.
+    apply Included_Union_mon_r. apply Included_Union_mon_l.
+    now apply name_in_fundefs_bound_var_fundefs.
+  - rewrite !occurs_free_Eprim, !occurs_free_Efun, !occurs_free_Eprim,
+    !bound_var_Eprim, !bound_var_Efun in *.
+    rewrite !Setminus_Union_distr.
+    rewrite (Union_assoc (FromList _) _), (Union_sym (FromList _)), <- Union_assoc.
+    apply Same_set_Union_compat; [| apply Same_set_Union_compat ].
+    + apply Same_set_sym. apply Setminus_Disjoint. rewrite Hcl.
+      now apply Disjoint_Empty_set_l. now constructor.
+    + apply Setminus_Disjoint. eapply Disjoint_sym.
+      eapply Disjoint_Included; [| | now apply HD ].
+      now apply Included_Union_l.
+      rewrite <- Union_assoc. apply Included_Union_mon_l.
+      now apply name_in_fundefs_bound_var_fundefs.
+    + rewrite !Setminus_Union. rewrite Union_sym.
+      now apply Same_set_refl.
+  - rewrite !occurs_free_Efun, !occurs_free_fundefs_Fnil, !Union_Empty_set_r.
+    simpl. rewrite Setminus_Empty_set_Same_set.  apply Same_set_refl.
+  - rewrite !bound_var_Efun, !occurs_free_Efun in *.
+    rewrite Hcl'; [| now constructor ]. rewrite Hcl; [| now constructor ].
+    rewrite !Union_Empty_set_r.  
+    rewrite split_fds_name_in_fundefs with (B3 := B)  in *; try eassumption.
+    rewrite split_fds_name_in_fundefs with (B3 := B2); try eassumption.
+    rewrite split_fds_name_in_fundefs with (B3 := B4) in *; try eassumption.
+    simpl in *. do 2 rewrite Union_Empty_set_l at 1. 
+    rewrite <- Setminus_Union.
+    eapply Same_set_Setminus_compat; [| now apply Same_set_refl ].
+    apply Setminus_Disjoint. eapply Disjoint_sym.
+    eapply Disjoint_Included;
+      [ now eapply occurs_free_Efun_Included with (B := B2)
+      |  now apply Included_refl |].
+    apply Disjoint_sym. eapply Disjoint_Union.
+    + apply Disjoint_sym. eapply Disjoint_Included; [| | now apply HD ].
+      * apply occurs_free_Efun.
+      * apply Included_Union_mon_l.
+        rewrite split_fds_bound_vars with (B3 := B2); try eassumption.
+        rewrite bound_var_fundefs_Fcons, bound_var_Efun.
+        do 3 apply Included_Union_mon_r.
+        do 2 apply Included_Union_mon_l.
+        now apply name_in_fundefs_bound_var_fundefs.
+    + inv Hun.
+      eapply split_fds_unique_bindings_fundefs_l in H5;
+        [| eassumption ].
+      edestruct H5 as [_ [H1' H2']].
+      inv H1'. 
+      rewrite split_fds_name_in_fundefs with (B3 := B2); try eassumption.
+      simpl. rewrite Union_Empty_set_l. eapply Disjoint_Union.
+      eapply Disjoint_Included; [| | now apply H2' ].
+      rewrite bound_var_fundefs_Fcons, bound_var_Efun.
+      do 2 apply Included_Union_mon_r. do 2 apply Included_Union_mon_l.
+      now apply name_in_fundefs_bound_var_fundefs.
+      now apply name_in_fundefs_bound_var_fundefs.
+      eapply Disjoint_sym. eapply Disjoint_Singleton.
+      intros Hc. apply H10. constructor.
+      now apply name_in_fundefs_bound_var_fundefs; eauto.
+Qed.
+
+ 
+Lemma closed_fundefs_in_exp_subterm_subst :
+  (forall c e e', closed_fundefs_in_exp (c |[ e ]|) ->
+                  Same_set _ (occurs_free e) (occurs_free e') ->
+                  closed_fundefs_in_exp e' ->
+                  closed_fundefs_in_exp (c |[ e' ]|)) /\
+  (forall B e e', closed_fundefs_in_fundefs (B <[ e ]>) ->
+                  Same_set _ (occurs_free e) (occurs_free e') ->
+                  closed_fundefs_in_exp e' ->
+                  closed_fundefs_in_fundefs (B <[ e' ]>)).
+Proof.
+  exp_fundefs_ctx_induction IHc IHf; eauto; simpl. 
+  - intros e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn.
+    eapply IHc ; [ | eassumption | eassumption | eassumption].
+    intros B' Hin'. eapply H1. eauto.
+  - intros e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn.
+    eapply IHc ; [ | eassumption | eassumption | eassumption].
+    intros B' Hin'. eapply H1. eauto.
+  - intros e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn.
+    eapply IHc ; [ | eassumption | eassumption | eassumption].
+    intros B' Hin'. eapply H1. eauto.
+  - intros l' e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn. eapply in_app_or in H6.
+    inv H6.
+    + eapply H1. econstructor. eassumption.
+      eapply in_or_app. left; eauto.
+    + inv H.
+      * inv H0. 
+        eapply IHc; [| | | eassumption]; [ | eassumption | eassumption ].
+        intros B' HIn'. eapply H1.
+        econstructor. eassumption.
+        eapply in_or_app. right. left. reflexivity.
+      * eapply H1. econstructor. eassumption.
+        eapply in_or_app. right; right; eauto.
+  - intros e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn.
+    + eapply H1. eauto.
+    + eapply IHc ; [ | eassumption | eassumption | eassumption].
+      intros B' Hin'. eapply H1. eauto.
+    + eapply H1. eauto.
+  - intros e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn.
+    + unfold closed_fundefs. rewrite occurs_free_fundefs_comp.
+      eapply H1. now eauto.
+      apply Same_set_sym. eassumption.
+    + eapply H1. eauto.
+    + eapply IHf; [ | eassumption | eassumption | eassumption].
+      intros B' HB'. eapply H1. eauto.
+  - intros e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn.
+    + eapply IHc; [ | eassumption | eassumption | eassumption].
+      intros B' HB'. eapply H1. eauto.
+    + eapply H1. eauto.
+  - intros e1 e2 H1 H2 H3.
+    intros B HIn. inv HIn.
+    + eapply H1. eauto.
+    + eapply IHf; [ | eassumption | eassumption | eassumption].
+      intros B' HB'. eapply H1. eauto.
+Qed.
+  
+Lemma hoist_correct_pre_compat_closure_Invariant :
+  Invariant (compat_closure hoist_rw)
+            (fun e => closed_fundefs_in_exp e /\
+                      unique_bindings e /\
+                      Disjoint _ (bound_var e) (occurs_free e)).
+Proof.
+  eapply invariant_compat_closure
+  with (R' := fun e e' => Same_set _ (bound_var e) (bound_var e') /\
+                          Same_set _ (occurs_free e) (occurs_free e')).
+  - intros e1 e2 [H1 [H2 H3]] Hrw.
+    split; [| split]; try now eapply disjoint_ident_Invariant; eauto.
+  - intros e1 e2 [H1 [H2 H3]].
+    split; [| split ].
+    + eapply closed_fundefs_in_exp_SubtermInvariant; eauto.
+    + eapply unique_bindings_SubtermInvariant; eauto.
+    + eapply disjoint_ident_SubtermInvariant; eauto .
+  - intros c e1 e2 [Hcl [Hun HD]] [[HS1 HS2] [Hcl' [Hun' HD']]].
+    split; [| split].
+    + eapply closed_fundefs_in_exp_subterm_subst; eassumption.
+    + eapply unique_bindings_ctx; eassumption.
+    + rewrite occurs_free_comp.
+      rewrite bound_var_comp. eassumption.
+      apply Same_set_sym. eassumption.
+      apply Same_set_sym. eassumption.
+  - intros e1 e2 [Hrw [HI1 [HI2 HI3]]]. split.
+    + eapply Same_set_sym. eapply bound_var_Invariant; eauto.
+      eapply Same_set_refl.
+    + eapply Same_set_sym. eapply occurs_free_disjoint_ident_Invariant; eauto.
+      split. now eapply Same_set_refl.
+      split. eassumption.
+      split; now eauto.
+Qed.
 
 Lemma hoist_rw_correct e e' rho rho' k :
   closed_fundefs_in_exp e ->
@@ -778,11 +1483,11 @@ Proof.
   intros Hclo Hun HD Hrw Henv; inv Hrw; intros v1 c1 Hleq1 Hstep1.
   { inv Hstep1. inv H9; eauto.
     edestruct preord_env_P_getlist_l as [vs' [Hgetl Hpre]]; eauto.
+    rewrite occurs_free_Econstr. now apply Included_Union_l.
     edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; [| eauto | eauto |].
     eapply preord_env_P_antimon.
     eapply preord_env_set_def_funs_permut with (v2 := Vconstr tau t vs'); eauto.
     - inv Hun. intros Hb. eapply H1. constructor; eauto.
-    - eapply Hclo. constructor. constructor.
     - rewrite preord_val_eq. split; eauto.
     - eapply Included_trans. eapply occurs_free_Efun_Included with (B := B).
       rewrite Union_assoc. apply Included_Union_compat; eauto using Included_refl.
@@ -790,8 +1495,9 @@ Proof.
     - repeat eexists; eauto. constructor. econstructor; eauto.
       eapply getlist_fundefs; eauto. 
       intros y Hin Hc. eapply HD.
-      constructor; eauto. constructor. constructor.
-      now apply name_in_fundefs_bound_var_fundefs. }
+      constructor. constructor 2. constructor.
+      now apply name_in_fundefs_bound_var_fundefs; eauto.
+      now constructor. }
   { inv Hstep1.
     edestruct Henv as [v' [Hget Hpre]]; eauto.
     rewrite preord_val_eq in Hpre.
@@ -829,8 +1535,8 @@ Proof.
         rewrite def_funs_neq; eauto. intros Hn.
         eapply HD. econstructor.
         simpl. econstructor; [| eapply in_or_app; right; constructor; eauto ].
-        constructor. now apply name_in_fundefs_bound_var_fundefs.
-        constructor.
+        constructor. now apply name_in_fundefs_bound_var_fundefs; eauto.
+        now constructor.
         erewrite findtag_append_not_In; eauto. simpl.
         destruct (M.elt_eq t2 t2); try congruence.
       + edestruct (preord_exp_refl k e) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
@@ -848,7 +1554,7 @@ Proof.
           rewrite def_funs_neq; eauto. intros Hn.
           eapply HD. econstructor.
           simpl. econstructor; [| eapply in_or_app; right; constructor; eauto ].
-          constructor. now apply name_in_fundefs_bound_var_fundefs.
+          constructor. now apply name_in_fundefs_bound_var_fundefs; eauto.
           constructor.
           erewrite findtag_append_not_In; eauto. simpl.
           destruct (M.elt_eq t t2); try congruence. }
@@ -861,25 +1567,22 @@ Proof.
     eapply preord_env_P_antimon.
     eapply preord_env_set_def_funs_permut; eauto.
     - inv Hun. intros Hb. eapply H2. constructor; eauto.
-    - eapply Hclo. constructor. constructor.
     - eapply Included_trans. eapply occurs_free_Efun_Included with (B := B).
       rewrite Union_assoc. apply Included_Union_compat; eauto using Included_refl.
       eapply occurs_free_Eproj_Included.
     - repeat eexists; eauto. constructor. econstructor; eauto.
       eapply get_fundefs; eauto. 
       intros Hc. eapply HD.
-      constructor; eauto. constructor. constructor.
+      constructor; [| constructor; now constructor ].
+      constructor. constructor.
       now apply name_in_fundefs_bound_var_fundefs. }
   { inv Hstep1. inv H5; eauto.
     edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; [| eauto | eauto |].
     eapply preord_env_P_antimon. 
     - eapply preord_env_P_def_funs_merge with (B := B''); eauto using split_fds_sym.
-      + inv Hun. inv H2.
-        eapply split_fds_unique_bindings_fundefs_r with (B1 := B); eauto.
-        constructor. intros x HI. inv HI. eapply H4. split; eauto.
-        constructor; eauto.
-      + eapply Hclo. constructor. constructor.
-      + eapply Hclo. constructor.
+      inv Hun. inv H2.
+      eapply split_fds_unique_bindings_fundefs_r with (B1 := B); eauto.
+      constructor. intros x HI. inv HI. eapply H4. split; now eauto.
     - eapply Included_trans. eapply occurs_free_Efun_Included with (B := B').
       rewrite (split_fds_name_in_fundefs B B' B''), Union_assoc; eauto.
       eapply Included_Union_compat; eauto using Included_refl.
@@ -888,20 +1591,21 @@ Proof.
     - repeat eexists; eauto. constructor. eauto. }
   { inv Hstep1. inv H11; eauto.
     edestruct preord_env_P_getlist_l as [vs' [Hgetl Hpre]]; eauto.
+    rewrite occurs_free_Eprim. now apply Included_Union_l.
     edestruct Prim_axiom as [v' [Heq Hpre']]; eauto.
     edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
       [| eauto | eauto |].
     eapply preord_env_P_antimon.
     eapply preord_env_set_def_funs_permut; eauto.
     - inv Hun. intros Hb. eapply H1. constructor; eauto.
-    - eapply Hclo. constructor. constructor.
     - eapply Included_trans. eapply occurs_free_Efun_Included with (B := B).
       rewrite Union_assoc. apply Included_Union_compat; eauto using Included_refl.
       eapply occurs_free_Eprim_Included.
     - repeat eexists; eauto. constructor. econstructor; eauto.
       eapply getlist_fundefs; eauto. 
       intros y Hin Hc. eapply HD.
-      constructor; eauto. constructor. constructor.
+      constructor; [| now constructor; eauto ].
+      constructor. constructor.
       now apply name_in_fundefs_bound_var_fundefs. }
   { inv Hstep1. simpl in H4.
     edestruct (preord_exp_refl k e') as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
@@ -929,10 +1633,9 @@ Proof.
          eapply preord_env_P_def_funs_hoist; eauto.
          specialize (Hclo B2 (In_Fun1 _ _)). 
          eapply same_split_fds_closed_fundefs; [ | | eauto]; eauto.
-         constructor. apply split_fds_nil_l.
-         eapply Hclo. apply In_Fun3. eapply split_fds_funs_in_fundef_r; eauto.
-         constructor. constructor.
-         eapply unique_bindings_split_fds_fundfes_append
+         constructor. now apply split_fds_nil_l.
+         eapply Hclo. apply In_Fun3. now eapply split_fds_funs_in_fundef_r; eauto.
+         now eapply unique_bindings_split_fds_fundfes_append
          with (B1 := Fcons f0 tau xs (Efun B3 e'0) Fnil); eauto using split_fds_sym.
          apply Disjoint_sym.
          eapply Disjoint_Included; [ apply Included_refl | | apply HD ].
@@ -941,16 +1644,16 @@ Proof.
          (split_fds_bound_vars B1 (Fcons f0 tau xs (Efun B3 e'0) Fnil) B2),
          bound_var_fundefs_Fcons, bound_var_Efun, <- !Union_assoc; eauto.
          do 3 apply Included_Union_mon_r.
-         apply Included_Union_mon_l. apply Included_refl.
+         apply Included_Union_mon_l. now apply Included_refl.
          edestruct split_fds_unique_bindings_fundefs_l as [H1' [H2' H3']];
            [| apply H1 |]; eauto.
          rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs e'0 Fnil) B4) in H3' ; eauto.
          rewrite bound_var_fundefs_Fcons in H3'.
          apply Disjoint_sym. eapply Disjoint_Included; [ | | apply H3' ]; eauto.
          simpl. rewrite Union_sym.
-         apply Included_Union_compat; eauto using Included_Union_l.
-         apply name_in_fundefs_bound_var_fundefs.  
-         apply name_in_fundefs_bound_var_fundefs.
+         apply Included_Union_compat; eauto using Included_Union_l;
+         now apply name_in_fundefs_bound_var_fundefs.
+         now apply name_in_fundefs_bound_var_fundefs.
          eapply Included_trans. apply occurs_free_Efun_Included.
          eapply Included_Union_compat. apply Included_refl.
          rewrite split_fds_name_in_fundefs; eauto. simpl. rewrite Union_Empty_set_l.
@@ -959,4 +1662,93 @@ Proof.
          eauto using unique_bindings_split_fds_Fcons_fundefs_append;
          now (eapply split_fds_fundefs_append_fun_in_fundefs
               with (B2 := Fcons f0 tau xs e'0 Fnil); eauto). }
+Qed.
+
+
+
+Lemma hoist_star_preserves_fv e e' :
+  closed_fundefs_in_exp e ->
+  unique_bindings e ->
+  (Disjoint var (bound_var e) (occurs_free e)) ->
+  hoist_star e e' ->
+  Same_set _ (occurs_free e) (occurs_free e').
+Proof.
+  intros Hclo Hun HD [n Hrw].
+  eapply (relation_inclusion_refl_trans_strong (compat_closure hoist_rw)) with
+  (Pre := fun e => closed_fundefs_in_exp e /\
+                   unique_bindings e /\
+                   (Disjoint var (bound_var e) (occurs_free e)))
+    (R' := fun e e' : exp =>
+             Same_set var (occurs_free e) (occurs_free e')); eauto.
+  - intros e1 e2 Hpre HR.
+    eapply (relation_inclusion_compat_strong hoist_rw) with
+    (Pre := fun e => closed_fundefs_in_exp e /\
+                     unique_bindings e /\
+                     Disjoint var (bound_var e) (occurs_free e))
+    (R' := fun e e' : exp =>
+             Same_set var (occurs_free e) (occurs_free e')); eauto.
+    + intros e1' e2' [H1 [H2 H4]] Hclo'. eapply Same_set_sym.
+      eapply occurs_free_disjoint_ident_Invariant; [| eassumption ].
+      split. now apply Same_set_refl.
+      eauto.
+    + intros e1' e2' [H1 [H2 H3]]. split.
+      eapply closed_fundefs_in_exp_SubtermInvariant; eauto.
+      split; eapply disjoint_ident_SubtermInvariant; eauto.
+    + intros e1' e2' c H. eapply occurs_free_comp. eauto.
+  - intros e1' e2' [H1 [H2 H3]] Hrw'.
+    eapply hoist_correct_pre_compat_closure_Invariant; eauto.
+  - intros e1 H. eapply Same_set_refl.
+  - intros e1 e2 e3 _ _ HS1 HS2. rewrite HS1. eassumption.
+Qed. 
+
+Lemma hoist_star_correct e e' rho rho' k :
+  closed_fundefs_in_exp e ->
+  unique_bindings e ->
+  (Disjoint var (bound_var e) (occurs_free e)) ->
+  hoist_star e e' ->
+  preord_env_P (occurs_free e) k rho rho' ->
+  preord_exp k (e, rho) (e', rho').
+Proof.
+  intros Hclo Hun HD [n Hrw].
+  revert k rho rho'. 
+  eapply (relation_inclusion_refl_trans_strong (compat_closure hoist_rw)) with
+  (Pre := fun e => closed_fundefs_in_exp e /\
+                   unique_bindings e /\
+                   (Disjoint var (bound_var e) (occurs_free e)))
+    (R' := fun e e' : exp =>
+            forall k rho rho',
+              preord_env_P (occurs_free e) k rho rho' ->
+              preord_exp k (e, rho) (e', rho')); eauto.
+  - intros e1 e2 Hpre HR.
+    eapply (relation_inclusion_compat_strong hoist_rw) with
+    (Pre := fun e => closed_fundefs_in_exp e /\
+                     unique_bindings e /\
+                     Disjoint var (bound_var e) (occurs_free e))
+    (R' := fun e e' : exp =>
+             forall k rho rho',
+               preord_env_P (occurs_free e) k rho rho' ->
+               preord_exp k (e, rho) (e', rho')); eauto.
+    + intros e1' e2' [H1 [H2 H4]] Hclo' k rho rho' Hpre'.
+      eapply hoist_rw_correct; eauto.
+    + intros e1' e2' [H1 [H2 H3]]. split.
+      eapply closed_fundefs_in_exp_SubtermInvariant; eauto.
+      split; eapply disjoint_ident_SubtermInvariant; eauto.
+    + intros e1' e2' c H rho1 rho2 Hpre'. eapply preord_exp_compat. eauto.
+  - intros e1' e2' [H1 [H2 H3]] Hrw'. 
+    eapply hoist_correct_pre_compat_closure_Invariant; eauto.
+  - intros e1 e2 rho1 rho2 H. eapply preord_exp_refl; eauto.
+  - intros e1 e2 e3 [H1 [H2 H3]] H4 Ht1 Ht2 k rho1 rho2 Hpre. eapply preord_exp_trans.
+    eapply Ht1; eauto. eapply Ht2; eauto. eapply preord_env_P_refl.
+Qed.
+
+Corollary hoist_exp_correct e rho rho' k :
+  closed_fundefs_in_exp e ->
+  unique_bindings e ->
+  (Disjoint var (bound_var e) (occurs_free e)) ->
+  preord_env_P (occurs_free e) k rho rho' ->
+  preord_exp k (e, rho) (exp_hoist e, rho').
+Proof.
+  intros.
+  eapply hoist_star_correct; try eassumption.
+  now eapply exp_hoist_in_hoist_star.
 Qed.

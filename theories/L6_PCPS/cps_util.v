@@ -459,3 +459,113 @@ Proof.
   - inv H.
   - destruct (M.elt_eq c' c); eauto.
 Qed.
+
+Lemma getlist_In (rho : env) ys x vs :
+  getlist ys rho = Some vs ->
+  List.In x ys ->
+  exists v, M.get x rho = Some v.
+Proof.
+  revert x vs. induction ys; intros x vs Hget H. inv H.
+  inv H; simpl in Hget.
+  - destruct (M.get x rho) eqn:Heq; try discriminate; eauto.
+  - destruct (M.get a rho) eqn:Heq; try discriminate; eauto.
+    destruct (getlist ys rho) eqn:Heq'; try discriminate; eauto.
+Qed.
+
+Lemma findtag_In {A} (P : list (tag * A)) c e :
+  findtag P c = Some e -> List.In (c, e) P.
+Proof.
+  revert e. induction P as [| [c' e'] P IHp]; intros x H; try now inv H.
+  simpl in H. inv H.
+  destruct (M.elt_eq c' c); inv H1; try now constructor.
+  constructor 2. apply IHp; eauto.
+Qed.
+
+Lemma Forall2_nthN {A} (R : A -> A -> Prop) (l1 l2 : list A)
+      (n : N) (v1 : A):
+  Forall2 R l1 l2 ->
+  nthN l1 n = Some v1 ->
+  exists v2,
+    nthN l2 n = Some v2 /\
+    R v1 v2.
+Proof.
+  revert l2 n.
+  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
+  - inv H. discriminate.
+  - inv H. destruct n as [| n].
+    + simpl in Hnth. inv Hnth.
+      eexists. split; simpl; eauto.
+    + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
+Qed.
+
+Lemma nthN_length {A} (l1 l2 : list A) (n : N) (v1 : A) :
+  length l1 = length l2 ->
+  nthN l1 n = Some v1 ->
+  exists v2,
+    nthN l2 n = Some v2.
+Proof.
+  revert l2 n.
+  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
+  - inv H. discriminate.
+  - inv H. destruct n as [| n]; destruct l2; try discriminate.
+    + simpl in Hnth. inv Hnth.
+      eexists. split; simpl; eauto.
+    + inv H1. edestruct IHxs as [v2 Hnth2]; eauto.
+Qed.
+
+Lemma setlist_Forall2_get (P : val -> val -> Prop)
+      xs vs1 vs2 rho1 rho2 rho1' rho2' x : 
+  Forall2 P vs1 vs2 ->
+  setlist xs vs1 rho1 = Some rho1' ->
+  setlist xs vs2 rho2 = Some rho2' ->
+  List.In x xs ->
+  exists v1 v2,
+    M.get x rho1' = Some v1 /\
+    M.get x rho2' = Some v2 /\ P v1 v2.
+Proof.
+  revert rho1' rho2' vs1 vs2.
+  induction xs; simpl; intros rho1' rho2' vs1 vs2 Hall Hset1 Hset2 Hin.
+  - inv Hin.
+  - destruct (Coqlib.peq a x); subst.
+    + destruct vs1; destruct vs2; try discriminate.
+      destruct (setlist xs vs1 rho1) eqn:Heq1;
+        destruct (setlist xs vs2 rho2) eqn:Heq2; try discriminate.
+      inv Hset1; inv Hset2. inv Hall.
+      repeat eexists; try rewrite M.gss; eauto.
+    + destruct vs1; destruct vs2; try discriminate.
+      destruct (setlist xs vs1 rho1) eqn:Heq1;
+        destruct (setlist xs vs2 rho2) eqn:Heq2; try discriminate.
+      inv Hset1; inv Hset2. inv Hall. inv Hin; try congruence.
+      edestruct IHxs as [v1 [v2 [Hget1 [Hget2 HP]]]]; eauto.
+      repeat eexists; eauto; rewrite M.gso; eauto.
+Qed.
+
+Lemma setlist_not_In (xs : list var) (vs : list val) (rho rho' : env) (x : var) : 
+  setlist xs vs rho = Some rho' ->
+  ~ List.In x xs ->
+  M.get x rho = M.get x rho'.
+Proof.
+  revert vs rho'.
+  induction xs; simpl; intros vs rho' Hset Hin.
+  - destruct vs; congruence.
+  - destruct vs; try discriminate.
+    destruct (setlist xs vs rho) eqn:Heq1; try discriminate. inv Hset.
+    rewrite M.gso; eauto.
+Qed.
+
+Lemma setlist_length (rho rho' rho1 : env)
+      (xs : list var) (vs1 vs2 : list val) :
+  length vs1 = length vs2 -> 
+  setlist xs vs1 rho = Some rho1 ->
+  exists rho2, setlist xs vs2 rho' = Some rho2.
+Proof.
+  revert vs1 vs2 rho1.
+  induction xs as [| x xs IHxs ]; intros vs1 vs2 rho1 Hlen Hset.
+  - inv Hset. destruct vs1; try discriminate. inv H0.
+    destruct vs2; try discriminate. eexists; simpl; eauto. 
+  - destruct vs1; try discriminate. destruct vs2; try discriminate.
+    inv Hlen. simpl in Hset. 
+    destruct (setlist xs vs1 rho) eqn:Heq2; try discriminate.
+    edestruct (IHxs _ _ _ H0 Heq2) as  [vs2' Hset2].
+    eexists. simpl; rewrite Hset2; eauto.
+Qed.

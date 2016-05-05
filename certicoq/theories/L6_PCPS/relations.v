@@ -1,18 +1,22 @@
-Require Import Relations.
+Require Import Relations RelationClasses.
 Require Import cps ctx.
 
 Section Relations.
 
   Variable (R : relation exp).
-
+  (* TODO : abstract over exp ? *)
+  
   Open Scope ctx_scope.
   
+  (** The compatible closure of R *) 
   Inductive compat_closure : relation exp :=
   | Compat :
-      forall c e e',
+      forall e e' c,
         R e e' ->
         compat_closure (c |[ e ]|) (c |[ e' ]|).
-      
+
+  (** The reflexive transitive closure of R, 
+    * parametrized by the numbers of steps *) 
   Inductive refl_trans_closure_n : nat -> relation exp :=
   | Trans :
       forall n e1 e2 e3,
@@ -22,13 +26,32 @@ Section Relations.
   | Refl :
       forall e, refl_trans_closure_n 0 e e.
 
-  Definition invariant (R : relation exp) (I : exp -> Prop)  : Prop :=
+  (** Compatible relation w.r.t to [f] *)
+  Definition Compatible (R' : relation exp) :=
+    forall e1 e2 c,
+      R' e1 e2 -> R' (c |[ e1 ]|) (c |[ e2 ]|).
+   
+  (** Invariant w.r.t. a relation R *)
+  Definition Invariant (R : relation exp) (I : exp -> Prop)  : Prop :=
     forall (e1 e2 : exp),
       I e1 -> R e1 e2 -> I e2.
 
+  (* Better names for these two? *)
+
+  (** If a property if true for [e] then it's true for it's subterms  *)
+  Definition SubtermInvariant (I : exp -> Prop) :=
+    forall c e,  I (c |[ e ]|) ->  I e.
+
+  (** If a property if true for a term and we substitute a subterm [e] with a 
+    * term [e'] such that [R e e'], then it's true for the resulting term  *)
+  Definition SubtermSubstInvariant (R : relation exp) (I : exp -> Prop) :=
+    forall c e e', I (c |[ e ]|) -> R e e' ->  I (c |[ e' ]|).
+
+  (** Lifting of an invariant w.r.t to a relation to the 
+    * reflexive transitive closure of the relation *)
   Lemma invariant_refl_trans_closure (I : exp -> Prop) n :
-    invariant R I ->
-    invariant (refl_trans_closure_n n) I.
+    Invariant R I ->
+    Invariant (refl_trans_closure_n n) I.
   Proof.
     induction n.
     - intros HInv e1 e2 HI Hrw. inv Hrw; eauto.
@@ -36,32 +59,21 @@ Section Relations.
       apply (IHn HInv e3 e2); eauto.
   Qed.
 
-  Definition ctx_compat (I : exp -> Prop) : Prop :=
-    (forall c e e', I (c |[ e ]|) -> I e' ->  I (c |[ e' ]|)) /\
-    (forall c e,  I (c |[ e ]|) ->  I e).
-  
-
-  Lemma invariant_compat_closure (I : exp -> Prop) :
-    invariant R I ->
-    ctx_compat I ->
-    invariant compat_closure I.
+  (** Lifting of an invariant w.r.t to a relation to the 
+    * compatible closure of the relation *)
+  Lemma invariant_compat_closure (R' : relation exp) (I : exp -> Prop) :
+    Invariant R I ->
+    SubtermInvariant I ->
+    SubtermSubstInvariant (fun e e' => R' e e' /\ I e') I ->
+    inclusion _ (fun e e' => R e e' /\ I e) R' -> 
+    Invariant compat_closure I.
   Proof.
-    intros HInv [HS1 HS2] e1 e2 HI Hrw. inv Hrw.
-    eapply HS1; eauto.
+    intros HInv HS1 HS2 HIn e1 e2 HI Hrw. inv Hrw.
+    eapply HS2; eauto. split; eauto.
   Qed.
 
-  Lemma refl_trans_closure_f_compat n e1 e2 f :
-    (forall e1 e2, R e1 e2 -> R (f e1) (f e2)) ->
-    refl_trans_closure_n n e1 e2 ->
-    refl_trans_closure_n n (f e1) (f e2).
-  Proof.
-    revert e1 e2 f. induction n; intros e1 e2 f Hyp H.
-    - inv H. constructor.
-    - inv H. econstructor. apply Hyp. eauto. eauto. 
-  Qed.
-
-  Lemma refl_trans_closure_f_compat_inv n I e1 e2 f :
-    invariant R I ->
+  Lemma refl_trans_closure_f_compat_strong n I e1 e2 f :
+    Invariant R I ->
     (forall e1 e2, I e1 -> R e1 e2 -> R (f e1) (f e2)) ->
     I e1 ->
     refl_trans_closure_n n e1 e2 ->
@@ -74,25 +86,19 @@ Section Relations.
       apply IHn; eauto.
   Qed.
 
-  Lemma refl_trans_closure_R_compat n (R' : relation exp) e1 e2 e1' :
-    (forall e1 e2 e1',
-       R' e1 e1' -> R e1 e2 ->
-       exists e2', R e1' e2' /\ R' e2 e2') ->
-    R' e1 e1' -> 
+
+  Lemma refl_trans_closure_f_compat n e1 e2 f :
+    (forall e1 e2, R e1 e2 -> R (f e1) (f e2)) ->
     refl_trans_closure_n n e1 e2 ->
-    exists e2',
-      R' e2 e2' /\
-      refl_trans_closure_n n e1' e2'.
+    refl_trans_closure_n n (f e1) (f e2).
   Proof.
-    revert e1 e2 e1'. induction n; intros e1 e2 e1' Hyp Hr1 H.
-    - inv H. exists e1'. constructor; eauto. constructor.
-    - inv H. edestruct Hyp as [e3' [Hrw' Hr3]]; eauto.
-      edestruct IHn as [e2' [Hrw Hr2]]; [ | | eauto |]; eauto.
-      eexists. split; eauto. econstructor; eauto.
+    intros. 
+    eapply refl_trans_closure_f_compat_strong with (I := fun _ => True); eauto.
+    intros e1' e2'; eauto. 
   Qed.
 
-  Lemma refl_trans_closure_R_compat_inv n I (R' : relation exp) e1 e2 e1' :
-    invariant R I ->
+  Lemma refl_trans_closure_commut_strong n I (R' : relation exp) e1 e2 e1' :
+    Invariant R I ->
     (forall e1 e2 e1',
        I e1 -> R' e1 e1' -> R e1 e2 ->
        exists e2', R e1' e2' /\ R' e2 e2') ->
@@ -112,6 +118,20 @@ Section Relations.
       eexists. split; eauto. econstructor; eauto.
   Qed.
 
+  Lemma refl_trans_closure_commut n (R' : relation exp) e1 e2 e1' :
+    (forall e1 e2 e1',
+       R' e1 e1' -> R e1 e2 ->
+       exists e2', R e1' e2' /\ R' e2 e2') ->
+    R' e1 e1' -> 
+    refl_trans_closure_n n e1 e2 ->
+    exists e2',
+      R' e2 e2' /\ refl_trans_closure_n n e1' e2'.
+  Proof.
+    intros. 
+    eapply refl_trans_closure_commut_strong with (I := fun _ => True); eauto.
+    intros e1'' e2''; eauto.
+  Qed.
+
 
   Lemma compat_closure_f_compat e1 e2 f :
     (forall e1 e2, R e1 e2 -> R (f e1) (f e2)) ->
@@ -124,16 +144,17 @@ Section Relations.
     destruct (Hyp2 c) as [[c' Heq] | [c' Heq]]; rewrite !Heq; econstructor; eauto.
   Qed.
 
-  Lemma compat_closure_f_compat_inv I e1 e2 f :
-    invariant R I -> ctx_compat I ->
+  Lemma compat_closure_f_compat_inv I (R' : relation exp) e1 e2 f :
+    Invariant R I -> SubtermInvariant I -> SubtermSubstInvariant R' I ->
     (forall e1 e2, I e1 -> R e1 e2 -> R (f e1) (f e2)) ->
     (forall c,  (exists c1, forall e, f (c |[ e ]|) = c1 |[ f e ]|) \/
                 (exists c1, forall e, f (c |[ e ]|) = c1 |[ e ]|)) ->
     I e1 ->
+    inclusion _ R R' ->
     compat_closure e1 e2 ->
     compat_closure (f e1) (f e2).
   Proof.
-    intros Inv [HC1 HC2] Hyp1 Hyp2 HI H. inv H.
+    intros Inv HC1 HC2 Hyp1 Hyp2 HI Hinc H. inv H.
     destruct (Hyp2 c) as [[c' Heq] | [c' Heq]]; rewrite !Heq; econstructor; eauto.
   Qed.
 
@@ -190,5 +211,57 @@ Abort. *)
     intros H. inv H. rewrite !app_ctx_f_fuse.
     constructor; eauto.
   Qed.
+
+  (** If R is included R', and R' is compatible then the 
+      compatible closure of R is in R' *)
+  Lemma relation_inclusion_compat (R' : relation exp) :
+    inclusion _ R R' ->
+    Compatible R' ->
+    inclusion _ compat_closure R'.
+  Proof.
+    intros Hyp1 Hyp2 e1 e2 Hcomp. inv Hcomp. eauto.
+  Qed.
   
+  (** If R is included R', and R' is reflexive and transitive then the 
+      reflexive transitive closure of R is in R' *)
+  Lemma relation_inclusion_refl_trans (R' : relation exp) n :
+    (forall e1 e2, R e1 e2 -> R' e1 e2) ->
+    Reflexive R' ->
+    Transitive R' ->
+    inclusion _ (refl_trans_closure_n n) R'.  
+  Proof.
+    intros Hyp1 Hrefl Htrans e1 e2 Hstar. induction Hstar; eauto.
+  Qed.
+
+  (** If R is included R', and R' is compatible then the 
+      compatible closure of R is in R' *)
+  Lemma relation_inclusion_compat_strong (Pre : exp -> Prop)
+        (R' : relation exp) e1 e2 :
+    (forall e1 e2, Pre e1 -> R e1 e2 -> R' e1 e2) ->
+    Pre e1 ->
+    SubtermInvariant Pre ->
+    Compatible R' ->
+    compat_closure e1 e2 ->
+    R' e1 e2.
+  Proof.
+    intros H1 H2 H3 H4 Hcomp. inv Hcomp. eauto.
+  Qed.
+  
+  (** If R is included R', and R' is reflexive and transitive then the 
+      reflexive transitive closure of R is in R' *)  
+  Lemma relation_inclusion_refl_trans_strong (Pre : exp -> Prop)
+        (R' : relation exp) e1 e2 n :
+    (forall e1 e2, Pre e1 -> R e1 e2 -> R' e1 e2) ->
+    Pre e1 ->
+    Invariant R Pre ->
+    (forall e, Pre e -> R' e e) ->
+    (forall e1 e2 e3, Pre e1 -> Pre e2 -> R' e1 e2 -> R' e2 e3 -> R' e1 e3) ->
+    refl_trans_closure_n n e1 e2 ->
+    R' e1 e2.
+  Proof.
+    intros H1 H2 H3 Hrefl Htrans Hstar. induction Hstar; eauto.
+    eapply Htrans. eauto. eapply H3. eassumption. eassumption.
+    now eauto. eapply IHHstar. eauto.
+  Qed.
+
 End Relations.

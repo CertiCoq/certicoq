@@ -650,3 +650,19 @@ Proof.
   intros H1 H2 HD. inv HD. constructor. intros x H'.
   inv H'. eapply H; constructor; eauto.
 Qed.
+
+Lemma Included_Setminus_l {A} (s1 s1' s2 s3 : Ensemble A) :
+  Included A (Setminus A s1 s2) s3 ->
+  Included A s1' s1 ->
+  Included A (Setminus A s1' s2) s3.
+Proof.
+  intros H H1 x H2.
+  eapply H. inv H2. constructor; eauto.
+Qed.
+
+Lemma Union_idempotent {A} s :
+  Same_set A (Union _ s s) s.
+Proof.
+  split; intros x H; eauto.
+  inv H; eauto.
+Qed.

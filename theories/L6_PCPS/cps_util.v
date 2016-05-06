@@ -569,3 +569,33 @@ Proof.
     edestruct (IHxs _ _ _ H0 Heq2) as  [vs2' Hset2].
     eexists. simpl; rewrite Hset2; eauto.
 Qed.
+
+Lemma split_fds_cons_l_append_fundefs f tau xs e B1 B2 B3 : 
+  split_fds (Fcons f tau xs e B1) B2 B3 ->
+  exists B1' B2',
+    B3 = fundefs_append B1' (Fcons f tau xs e B2') /\
+    split_fds B1 B2 (fundefs_append B1' B2').
+Proof.
+  revert B1 B2. induction B3; intros B1 B2 Hspl.
+  - inv Hspl.
+    + exists Fnil, B3; eauto.
+    + edestruct IHB3 as [B1' [B2' [Heq Hspl]]]; eauto.
+      exists (Fcons v t l e0 B1'), B2'. rewrite Heq; split; eauto.
+      simpl; constructor; eauto.
+  - inv Hspl.
+Qed.
+
+Lemma split_fds_cons_r_append_fundefs f tau xs e B1 B2 B3 : 
+  split_fds B1 (Fcons f tau xs e B2) B3 ->
+  exists B1' B2',
+    B3 = fundefs_append B1' (Fcons f tau xs e B2') /\
+    split_fds B1 B2 (fundefs_append B1' B2').
+Proof.
+  revert B1 B2. induction B3; intros B1 B2 Hspl.
+  - inv Hspl.
+    + edestruct IHB3 as [B1' [B2' [Heq Hspl]]]; eauto.
+      exists (Fcons v t l e0 B1'), B2'. rewrite Heq; eauto. split; eauto.
+      simpl. constructor; eauto.
+    + exists Fnil, B3; eauto.
+  - inv Hspl.
+Qed.

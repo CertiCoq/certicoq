@@ -503,7 +503,7 @@ Proof.
   + simpl. clear IHk0.
     rewrite mkLets_app.
     simpl.
-    econstructor. instantiate (v1 := snd x).
+    apply eval_Let_e with (v1 := snd x).
     (* Value invariant of environment entries *) admit.
     simpl in IHk.
     simpl.
@@ -671,6 +671,24 @@ Proof.
 
 Admitted.
 
+(** Questions:
+
+  - Is this the right kind of preservation theorem?
+  
+   Small to big step seems wrong. But a small step in the source language
+   needs big steps in the target because we add the lets which need to
+   be reduced before we come to the original source reduction. 
+
+   The target "t'" needs a substitution of the environment definitions
+   that might appear under lambda abstractions. We have to ensure 
+   that t' is a normal form, i.e. not of the form (App (Const c) u) 
+   otherwise the big step could go further.
+
+  - In the neutral app case, one can have a match in function position,
+   how to disallow it -> same idea that the scrutinee should then be a 
+   neutral, and there are none in the empty environment might not work.
+   It could be a lambda, i.e. ill-formed term.
+ *)
   
 Theorem translate_correct (e : environ) (t t' : L3t.Term) :
   wf_environ e -> L3t.WFTrm t 0 ->

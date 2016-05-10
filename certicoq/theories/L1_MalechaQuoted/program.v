@@ -327,6 +327,7 @@ Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=
 (** correctness specification for programs (including local closure) **)
 Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctSrt: forall n srt, Crct nil n (TSort srt)
+| CrctPrf: forall n, Crct nil n TProof
 | CrctWkTrmTrm: forall n p t s nm, Crct p n t -> Crct p n s ->
            fresh nm p -> Crct ((nm,ecTrm s)::p) n t
 | CrctWkTrmTyp: forall n p t s nm, Crct p n t -> CrctTyp p n s ->
@@ -408,28 +409,30 @@ Lemma Crct_up:
   (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> CrctDs p (S n) ds) /\
   (forall (p:environ) (n:nat) (itp:itypPack), CrctTyp p n itp ->
                                               CrctTyp p (S n) itp).
-apply CrctCrctsCrctDsTyp_ind; intros.
-- constructor.
-- apply CrctWkTrmTrm; assumption.
-- apply CrctWkTrmTyp; try assumption.
-- apply CrctRel; try assumption. omega.
-- apply CrctCast; try assumption.
-- apply CrctProd; assumption.
-- apply CrctLam; assumption.
-- apply CrctLetIn; assumption.
-- apply CrctApp; assumption.
-- eapply CrctConst; eassumption.
-- eapply CrctConstruct; eassumption.
-- apply CrctCase; assumption.
-- apply CrctFix; assumption.
-- apply CrctInd; assumption.
-- apply CrctsNil; assumption.
-- apply CrctsCons; assumption.
-- apply CrctDsNil; assumption.
-- apply CrctDsCons; assumption.
-- apply CrctTypStart; assumption.
-- apply CrctTypWk1; assumption.
-- apply CrctTypWk2; assumption.
+Proof.
+  apply CrctCrctsCrctDsTyp_ind; intros.
+  - constructor.
+  - constructor.
+  - apply CrctWkTrmTrm; assumption.
+  - apply CrctWkTrmTyp; try assumption.
+  - apply CrctRel; try assumption. omega.
+  - apply CrctCast; try assumption.
+  - apply CrctProd; assumption.
+  - apply CrctLam; assumption.
+  - apply CrctLetIn; assumption.
+  - apply CrctApp; assumption.
+  - eapply CrctConst; eassumption.
+  - eapply CrctConstruct; eassumption.
+  - apply CrctCase; assumption.
+  - apply CrctFix; assumption.
+  - apply CrctInd; assumption.
+  - apply CrctsNil; assumption.
+  - apply CrctsCons; assumption.
+  - apply CrctDsNil; assumption.
+  - apply CrctDsCons; assumption.
+  - apply CrctTypStart; assumption.
+  - apply CrctTypWk1; assumption.
+  - apply CrctTypWk2; assumption.
 Qed.
 
 Lemma Crct_Sort:
@@ -437,10 +440,17 @@ Lemma Crct_Sort:
 induction 1; intuition.
 Qed.
 
+Lemma Crct_Prf:
+  forall p n t, Crct p n t -> Crct p n TProof.
+induction 1; intuition.
+Qed.
+
+
 Lemma Crcts_tnil:
   forall p n t, Crct p n t -> Crcts p n tnil.
 induction 1; apply CrctsNil; try assumption;
 try (solve [eapply Crct_Sort; eassumption]).
+- constructor.
 - constructor.
 - apply CrctWkTrmTrm; try assumption. eapply Crct_Sort; eassumption.
 - apply CrctWkTrmTyp; try assumption. eapply Crct_Sort; eassumption.
@@ -568,6 +578,7 @@ apply CrctCrctsCrctDsTyp_ind; intros; auto;
 try (solve [elim (H0 _ H3)]); try (solve [elim (H0 _ H5)]);
 try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
 - inversion H.
+- inversion H.
 - destruct (string_dec nm0 nm).
   + subst. inversion_Clear H4.
     * assert (j:= proj1 Crct_fresh_Pocc _ _ _ H1 _ H3).
@@ -584,40 +595,6 @@ Grab Existential Variables.
   + reflexivity.
 Qed.
 
-
-(***
-Lemma Crct_Not_Bad_Lookup:
-  forall p n s, Crct p n s ->
-                 forall nm t, LookupDfn nm p t -> ~ PoccTrm nm t.
-intros. eapply (proj1 Crct_fresh_Pocc).
-
-
-induction 1; intros.
-- inversion H.
-- destruct (string_dec nm0 nm). 
-  + subst. inversion_clear H2.
-    * assert (j:= proj1 Crct_fresh_Pocc p n _ H nm H1).  apply IHCrct1. elim j.
-      elim j. constructor. 
-    * elim (H0 _ H11).
-
-inversion H2; subst.
-  + apply IHCrct1. intros h.
-
-apply IHCrct1. eapply (Lookup_strengthen H2). reflexivity. 
-
-eapply Lookup_strengthen.
-
-
-Lemma Crct_Not_Bad_Lookup:
-  (forall p n s, Crct p n s ->
-                 forall nm t, LookupDfn nm p t -> ~ PoccTrm nm t) /\
-  (forall p n ss, Crcts p n ss ->
-                 forall nm t , LookupDfn nm p t -> ~ PoccTrm nm t) /\
-  (forall p n ds, CrctDs p n ds ->
-                 forall nm t, LookupDfn nm p t -> ~ PoccTrm nm t) /\
-  (forall p n itp, CrctTyp p n itp -> True).
-apply CrctCrctsCrctDsTyp_ind; intros; auto.
-****)
 
 Lemma  Crct_weaken:
   (forall p n t, Crct p n t -> 
@@ -663,6 +640,7 @@ Lemma Crct_strengthen:
        forall nm ec p, pp = (nm,ec)::p -> ~ PoccDefs nm ds -> CrctDs p n ds) /\
   (forall p n itp, CrctTyp p n itp -> True).
 eapply CrctCrctsCrctDsTyp_ind; intros; auto.
+- inversion H.
 - inversion H.
 - injection H4; intros. subst. assumption.
 - injection H4; intros. subst. assumption.
@@ -749,6 +727,7 @@ assert (lem: (forall p n t, Crct p n t ->
     try (solve [eapply H1; eassumption]);
     try (solve [eapply H2; eassumption]);
     try (solve [eapply H0; eassumption]).
+    - inversion H.
     - inversion H.
     - apply CrctWkTrmTrm; try assumption. inversion H4; subst.
       + assumption.
@@ -981,6 +960,7 @@ Proof.
     + omega.
     + eapply Crct_Sort. eassumption.
   - eapply Crct_Sort; eassumption.
+  - eapply Crct_Prf; eassumption.
   - destruct (Crct_invrt_Cast H2 eq_refl). apply CrctCast.
     + apply H; trivial.
     + apply H0; trivial.

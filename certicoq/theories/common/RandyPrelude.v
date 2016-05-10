@@ -131,7 +131,7 @@ Lemma neq_sym: forall (A:Type) (a b:A), a <> b -> b <> a.
 intuition.
 Qed.
 
-Fixpoint list_to_zero (n:nat) :=
+Fixpoint list_to_zero (n:nat) : list nat :=
   match n with
     | 0 => nil
     | S n => n :: (list_to_zero n)

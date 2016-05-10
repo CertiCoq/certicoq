@@ -221,7 +221,7 @@ Fixpoint shift n k e :=
     | Con_e d es => Con_e d (shift_exps' shift n k es)
     | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
     | Match_e e bs => Match_e (shift n k e) (shift_branches' shift n k bs)
-    | Fix_e es k => Fix_e (shift_efnlst shift n (efnlst_length es + 1 + k) es) k
+    | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + 1 + k) es) k'
   end.
 
 Definition shifts := shift_exps' shift.
@@ -239,6 +239,7 @@ Proof.
   try (solve[apply f_equal2; try rewrite H; try rewrite H0; reflexivity]).
   - if_split. replace (n+0) with n. reflexivity. lia.
 Qed.
+
 (*
 (* unoptimised *)
 (** Shift all variables [i] equal or above [k] by [1]. *)
@@ -264,33 +265,38 @@ Fixpoint shft k e :=
 Definition shfts := shfts' shft.
 Definition shft_branch := shft_branch' shft.
 Definition shft_branches := shft_branches' shft.
-
+*)
 (* optimised *)
-(** Substitute [v] for variable [k] in [e]. *)
-Section SUBST.
-  Variable subst: exp -> N -> exp -> exp.
-  Definition substs' v k es := List.map (subst v k) es.
-  Definition subst_branch' v k b := br (fun d n e => (d,n,subst v (n+k) e)) b.
-  Definition subst_branches' v k bs := List.map (subst_branch' v k) bs.
-End SUBST.
-  
-Fixpoint subst (v:exp) k (e:exp): exp :=
+
+(** Substitute [v] for variable [k] in [e];
+*** with shifting *)
+Function subst (v:exp) k (e:exp): exp :=
   match e with
     | Var_e i => if lt_dec i k then Var_e i
-                 else if eq_dec i k then shift k 0 v
-                      else Var_e (i - 1)
+                 else if eq_dec i k then shift k 0 v else Var_e (i - 1)
     | App_e e1 e2 => App_e (subst v k e1) (subst v k e2)
     | Lam_e e' => Lam_e (subst v (1 + k) e')
-    | Con_e d es => Con_e d (substs' subst v k es)
+    | Con_e d es => Con_e d (substs v k es)
     | Let_e e1 e2 => Let_e (subst v k e1) (subst v (1 + k) e2)
-    | Match_e e bs => Match_e (subst v k e) (subst_branches' subst v k bs)
-    | Fix_e es => Fix_e (substs' subst v (2 + k) es)
-    | Proj_e e m => Proj_e (subst v k e) m
-  end.
-Definition substs := substs' subst.
-Definition subst_branch := subst_branch' subst.
-Definition subst_branches := subst_branches' subst.
-***)
+    | Match_e e bs => Match_e (subst v k e) (subst_branches v k bs)
+    | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + 1 + k) es) k'
+  end
+with substs (v:exp) k (es:exps) : exps :=
+       match es with
+         | enil => enil
+         | econs f fs => econs (subst v k f) (substs v k fs)
+       end
+with subst_efnlst (v:exp) k (es:efnlst) : efnlst :=
+       match es with
+         | eflnil => eflnil
+         | eflcons f fs => eflcons (subst v k f) (subst_efnlst v k fs)
+       end
+with subst_branches (v:exp) k (bs:branches_e) : branches_e :=
+       match bs with
+         | brnil_e => brnil_e
+         | brcons_e d n e bs =>
+           brcons_e d n (subst v (n+k) e) (subst_branches v k bs)
+       end.
 
 (** Substitute [v] for variable [k] in [e];
 *** no shifting, only for evaluation of closed expressions. *)
@@ -303,7 +309,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Con_e d es => Con_e d (sbsts v k es)
     | Let_e e1 e2 => Let_e (sbst v k e1) (sbst v (1 + k) e2)
     | Match_e e bs => Match_e (sbst v k e) (sbst_branches v k bs)
-    | Fix_e es k => Fix_e (sbst_efnlst v (efnlst_length es + 1 + k) es) k
+    | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + 1 + k) es) k'
   end
 with sbsts (v:exp) k (es:exps) : exps :=
        match es with
@@ -322,19 +328,18 @@ with sbst_branches (v:exp) k (bs:branches_e) : branches_e :=
            brcons_e d n (sbst v (n+k) e) (sbst_branches v k bs)
        end.
 
-(** Notation for optimised substitution. **
+(** Notation for optimised substitution. **)
 Class Substitute (v:Type) (t:Type) := { substitute: v -> N -> t -> t }.
 Notation "M { j := N }" := (substitute N j M)
                       (at level 10, right associativity).
 Instance ExpSubstitute: Substitute exp exp :=
   { substitute := subst}.
-Instance ExpsSubstitute: Substitute exp (list exp) :=
+Instance ExpsSubstitute: Substitute exp exps :=
   { substitute := substs}.
-Instance BranchSubstitute: Substitute exp (dcon * N * exp) :=
-  { substitute := subst_branch}.
-Instance BranchesSubstitute: Substitute exp (list (dcon * N * exp)) := 
+Instance BranchSubstitute: Substitute exp _ :=
+  { substitute := subst_efnlst}.
+Instance BranchesSubstitute: Substitute exp _ := 
   { substitute := subst_branches}.
-**)
 
 (** Notation for unoptimised substitution. *)
 Class Sbstitute (v:Type) (t:Type) := { sbstitute: v -> N -> t -> t }.
@@ -1197,13 +1202,14 @@ Proof.
 Qed.
 Definition eval_preserves_wf := proj1 eval_preserves_wf'.
 Definition evals_preserves_wf := proj2 eval_preserves_wf'.
+ *)
 
 (** Characterize values **)
 Inductive is_value: exp -> Prop :=
 | var_is_value: forall i, is_value (Var_e i)
 | lam_is_value: forall e, is_value (Lam_e e)
 | con_is_value: forall d es, are_values es -> is_value (Con_e d es)
-| fix_is_value: forall es, is_value (Fix_e es)
+| fix_is_value: forall es k, is_value (Fix_e es k)
 with are_values: exps -> Prop :=
 | enil_are_values: are_values enil
 | econs_are_values: forall e es, is_value e -> are_values es ->
@@ -1234,8 +1240,7 @@ Fixpoint is_valueb (e:exp): bool :=
     | Con_e _ es => are_valuesb es
     | Match_e _ _ => false
     | Let_e _ _ => false
-    | Fix_e _ => true
-    | Proj_e _ _ => false
+    | Fix_e _ _ => true
   end
 with are_valuesb (es:exps): bool :=
        match es with
@@ -1253,7 +1258,6 @@ Proof.
   try discriminate; try inversion H1.
   - constructor. rewrite <- H. auto.
   - inversion H0; subst. rewrite H. auto.
-  - inversion H0; try discriminate.
   - destruct (is_valueb e); try discriminate. constructor.
     + apply H; auto.
     + apply H0; auto. 
@@ -1290,5 +1294,3 @@ Proof.
   - inversion H ; subst. rewrite <- IHes1 in H3. destruct H3. split ; auto.
 Qed.
 Hint Resolve are_values_append.
-
-***************)

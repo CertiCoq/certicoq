@@ -21,6 +21,7 @@ Set Implicit Arguments.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
+| TProof     : Term
 | TCast      : Term -> Term
 | TProd      : name -> Term -> Term
 | TLambda    : name -> Term -> Term
@@ -103,6 +104,7 @@ Lemma TermTerms_dec:
 apply TrmTrmsDefs_ind.
 - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
 - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
+- induction t; cross. intuition.
 - induction t0; cross.
   destruct (H t0); [lft | rght ..]. 
 - induction t0; cross.
@@ -585,6 +587,8 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TSort s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
+  - exists TProof, arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
   - exists (TCast fn), arg, tnil. split. reflexivity.
     + left. intuition. revert H. not_isApp. 
   - exists (TProd n fn), arg, tnil. split. reflexivity.
@@ -623,6 +627,7 @@ Qed.
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
 | wfaSort: forall srt, WFapp (TSort srt)
+| wfaPrf: WFapp TProof
 | wfaCast: forall tm, WFapp tm -> WFapp (TCast tm)
 | wfaProd: forall nm bod, WFapp bod -> WFapp (TProd nm bod)
 | wfaLambda: forall nm bod, WFapp bod -> WFapp (TLambda nm bod)
@@ -689,6 +694,7 @@ Proof.
   try (destruct tx, args; simpl in h; try discriminate;
               try (solve [constructor]);
               try (solve [injection h; intros; subst; intuition]);
+              intuition;
               injection h; intros; subst; intuition).
   - constructor; try assumption. rewrite tappend_tnil in H2; assumption.
   - constructor; try assumption. eapply WFapps_tappendl. eassumption.
@@ -739,6 +745,7 @@ Qed.
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
 | wfSort: forall n s, WFTrm (TSort s) n
+| wfPrf: forall n, WFTrm TProof n
 | wfCast: forall n t, WFTrm t n -> WFTrm (TCast t) n
 | wfProd: forall n nm bod,
             WFTrm bod (S n) -> WFTrm (TProd nm bod) n
@@ -1071,6 +1078,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
 | ISort: forall n srt, Instantiate n (TSort srt) (TSort srt)
+| IProof: forall n, Instantiate n TProof TProof
 | ICast: forall n t it,
            Instantiate n t it -> Instantiate n (TCast t) (TCast it)
 | IProd: forall n nm bod ibod,

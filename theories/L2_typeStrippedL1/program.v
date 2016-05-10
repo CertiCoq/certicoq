@@ -359,6 +359,7 @@ Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=
 (** correctness specification for programs (including local closure) **)
 Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctSrt: forall n srt, Crct nil n (TSort srt)
+| CrctPrf: forall n, Crct nil n TProof
 | CrctWkTrmTrm: forall n p t s nm, Crct p n t -> Crct p n s ->
            fresh nm p -> Crct ((nm,ecTrm s)::p) n t
 | CrctWkTrmTyp: forall n p t s nm, Crct p n t -> CrctTyp p n s ->
@@ -449,10 +450,16 @@ Lemma Crct_Sort:
 induction 1; intuition.
 Qed.
 
+Lemma Crct_Prf:
+  forall p n t, Crct p n t -> Crct p n TProof.
+induction 1; intuition.
+Qed.
+
 Lemma Crcts_tnil:
   forall p n t, Crct p n t -> Crcts p n tnil.
 induction 1; apply CrctsNil; try assumption;
 try (solve [eapply Crct_Sort; eassumption]).
+- constructor.
 - constructor.
 - apply CrctWkTrmTrm; try assumption. eapply Crct_Sort; eassumption.
 - apply CrctWkTrmTyp; try assumption. eapply Crct_Sort; eassumption.
@@ -533,6 +540,7 @@ apply CrctCrctsCrctDsTyp_ind; intros; auto;
 try (solve [elim (H0 _ H3)]); try (solve [elim (H0 _ H5)]);
 try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
 - inversion H.
+- inversion H.
 - destruct (string_dec nm0 nm).
   + subst. inversion_Clear H4.
     * assert (j:= proj1 Crct_fresh_Pocc _ _ _ H1 _ H3).
@@ -594,6 +602,7 @@ Lemma Crct_strengthen:
                  ~ PoccDefs nm ds -> CrctDs p n ds) /\
   (forall (pp:environ) (n:nat) (itp:itypPack), CrctTyp pp n itp -> True).
 apply CrctCrctsCrctDsTyp_ind; intros; auto.
+- discriminate.
 - discriminate.
 - injection H4; intros. subst. assumption.
 - injection H4; intros. subst. assumption.
@@ -670,6 +679,7 @@ assert (lem: (forall p n t, Crct p n t ->
     try (solve [eapply H1; eassumption]);
     try (solve [eapply H2; eassumption]);
     try (solve [eapply H0; eassumption]).
+    - inversion H.
     - inversion H.
     - apply CrctWkTrmTrm; try assumption. inversion H4; subst.
       + assumption.
@@ -892,6 +902,7 @@ Proof.
     + omega.
     + eapply Crct_Sort. eassumption.
   - eapply Crct_Sort; eassumption.
+  - eapply Crct_Prf; eassumption.
   - assert (j:= Crct_invrt_Cast H1 eq_refl). apply CrctCast.
     apply H; trivial.
   - apply CrctProd. eapply Crct_Sort; eassumption.

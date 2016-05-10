@@ -28,6 +28,7 @@ Definition L1Defs := L1.term.Defs.
 
 Function strip (t:L1Term) : Term :=
   match t with
+    | L1.term.TProof => TProof
     | L1.term.TRel n => TRel n
     | L1.term.TSort s => TSort s
     | L1.term.TCast t _ _ => TCast (strip t)
@@ -663,6 +664,12 @@ Qed.
 
 Print Assumptions L1wcbvEval_strip_L2WcbvEval.
 
+Lemma Prf_strip_inv:
+  forall s, TProof = strip s -> s = L1.term.TProof.
+Proof.
+  destruct s; simpl; intros h; try discriminate. reflexivity.
+Qed.
+  
 Lemma Lam_strip_inv:
   forall nm bod s, TLambda nm bod = strip s ->
    exists sty sbod, 
@@ -829,6 +836,7 @@ Theorem L2WcbvEval_L1WcbvEval:
            forall ss, L1.wcbvEval.WcbvDEvals p ts ss -> L2ss = stripDs ss).
 Proof.
   intros L2p p hp1 hp2. apply WcbvEvalEvals_ind; simpl; intros.
+  - rewrite (Prf_strip_inv _ H) in H1. inversion H1. reflexivity.
   - destruct (Lam_strip_inv _ H) as [t0 [t1 [jtl jtr]]]. subst.
     inversion H1. simpl. reflexivity.
   - destruct (Prod_strip_inv _ H) as [t0 [t1 [jtl jtr]]]. subst.
@@ -1076,6 +1084,7 @@ Print Assumptions L2WcbvEval_sound_for_L1wndEval.
 (*** unstrip: replace every missing type field with [prop]  ***)
 Function unstrip (t:Term) : L1Term :=
   match t with
+    | TProof => L1.term.TProof
     | TRel n => L1.term.TRel n
     | TSort s => L1.term.TSort s
     | TCast t => L1.term.TCast (unstrip t) Cast L1.term.prop

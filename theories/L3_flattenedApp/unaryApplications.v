@@ -91,6 +91,7 @@ Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : exception Term :=
 
 Function strip (t:L2Term) : exception Term :=
   match t with
+    | L2.term.TProof => Ret TProof
     | L2.term.TRel n => Ret (TRel n)
     | L2.term.TSort s => Ret (TSort s)
     | L2.term.TCast s => strip s
@@ -250,6 +251,10 @@ Proof.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Ret sbod => Ret (TLambda nm sbod)
+              | Exc s => Exc s end) = Ret TProof) in H.
+     destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Ret sbod => Ret (TLambda nm sbod)
               | Exc s => Exc s end) = Ret (TProd n tt)) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
@@ -305,6 +310,10 @@ Proof.
   - change ((match strip p bod with
               | Ret sbod => Ret (TProd nm sbod)
               | Exc s => Exc s end) = Ret (TSort s)) in H.
+    destruct (strip p bod); discriminate.
+  - change ((match strip p bod with
+              | Ret sbod => Ret (TProd nm sbod)
+              | Exc s => Exc s end) = Ret TProof) in H.
     destruct (strip p bod); discriminate.
   - change ((match strip p bod with
               | Ret sbod => Ret (TProd nm sbod)

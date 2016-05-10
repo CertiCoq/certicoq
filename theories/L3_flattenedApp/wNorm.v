@@ -24,6 +24,7 @@ Set Implicit Arguments.
 
 (** Weak typed normal form of wndEval: no wndEval steps possible. **)
 Inductive WNorm: Term -> Prop :=
+| WNPrf: WNorm TProof
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)

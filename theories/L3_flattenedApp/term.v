@@ -26,6 +26,7 @@ Set Implicit Arguments.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
+| TProof     : Term
 | TProd      : name -> Term -> Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
@@ -65,6 +66,7 @@ Lemma TermTerms_dec:
 apply TrmTrmsDefs_ind.
 - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
 - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
+- induction t; cross. intuition.
 - induction t0; cross.
   destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
 - induction t0; cross.

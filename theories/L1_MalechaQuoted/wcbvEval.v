@@ -22,6 +22,7 @@ Set Implicit Arguments.
 (** Big step relation of weak cbv evaluation  **)
 (** every field must evaluate **)
 Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
+| wPrf: WcbvEval p TProof TProof
 | wLam: forall nm ty ty' bod,
           WcbvEval p ty ty' ->
           WcbvEval p (TLambda nm ty bod) (TLambda nm ty' bod)
@@ -589,6 +590,7 @@ Function wcbvEval
           | TConstruct i cn => ret (TConstruct i cn)
           | TInd i => ret (TInd i)
           | TSort srt => ret (TSort srt)
+          | TProof => ret TProof
           (** should never appear **)
           | TRel _ => raise "wcbvEval: unbound Rel"
         end)

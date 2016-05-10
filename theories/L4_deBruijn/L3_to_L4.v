@@ -57,6 +57,7 @@ Section TermTranslation.
   Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
     | L3t.TAx _ => (* TODO *) dummy
+    | L3t.TProof => (* TODO *) dummy                                  
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TSort s => (* Erase *) dummy
     | L3t.TProd n t => (* Erase *) dummy
@@ -728,8 +729,8 @@ Proof.
   - destruct a as [s v].
     case_eq (string_eq_bool nm s); intros Heq; simpl.
     + rewrite N.add_0_l. case (lt_dec k k).
-      ++ now intros H'%N.lt_irrefl.
-      ++ intros _. destruct (N.eq_dec k k) as [_|H'].
+      * now intros H'%N.lt_irrefl.
+      * intros _. destruct (N.eq_dec k k) as [_|H'].
         simpl in H. rewrite Heq in H.
         inversion H. subst.
 Admitted.
@@ -945,6 +946,9 @@ Proof.
   cbn. intros wfe wft H. apply eval_lets.
   now apply wf_environ_tr.
   induction H.
+
+  + (* Proof *)
+    admit.
 
   + (* Lambda *)
     cbn.

@@ -9,12 +9,8 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
+Set Template Cast Propositions.
 
-Definition NN := nat.
-Quote Definition q_NN := NN.
-Print  q_NN.
-Quote Definition q_eNN := Eval cbv in NN.
-Print  q_eNN.
 
 Definition LL := list.
 Quote Definition q_LL := LL.
@@ -41,11 +37,6 @@ Definition exc_WcbvEval (pgm:program) (ans:term) : Prop :=
     | _, _ => False
   end.
 
-Quote Recursively Definition p_0 := 0.
-Quote Definition q_0 := Eval compute in 0.
-Goal (exc_wcbvEval 50 p_0) = term_Term q_0.
-compute. reflexivity.
-Qed.
 
 Inductive foo (A:Set) : Set :=
 | nilf: foo A
@@ -111,6 +102,8 @@ Definition vplus01 :=
           (Vector.cons nat 1 0 (Vector.nil nat))).
 Quote Recursively Definition p_vplus01 := vplus01.
 Quote Definition q_vplus01 := Eval cbv in vplus01.
+Set Printing Width 150.
+Set Printing Depth 75.
 Print p_vplus01.
 Goal (exc_wcbvEval 50 p_vplus01) = term_Term q_vplus01.
 compute. reflexivity.
@@ -123,7 +116,6 @@ Goal (exc_wcbvEval 50 p_vec1) = term_Term q_vec1.
 compute. reflexivity.
 Qed.
 
-(***  HERE **********
 Definition v01 : Vector.t nat 2 :=
   (Vector.cons nat 0 1 (Vector.cons nat 1 0 (Vector.nil nat))).
 Definition v23 : Vector.t nat 2 :=
@@ -131,13 +123,11 @@ Definition v23 : Vector.t nat 2 :=
 Definition vplus0123 := (@vplus 2 v01 v23).
 Quote Recursively Definition p_vplus0123 := vplus0123.
 Quote Definition q_vplus0123 := Eval cbv in vplus0123.
-Goal exc_wcbvEval 90 p_vplus0123 = Ret prop.
-unfold p_vplus0123.
- 
 Goal exc_wcbvEval 90 p_vplus0123 = term_Term q_vplus0123.
 compute. reflexivity.
 Qed.
-***********)
+Unset Printing Width.
+Unset Printing Depth.
 
 (** match with no branches **)
 Definition Fdemo (f:False) : False := match f with end.
@@ -173,16 +163,85 @@ Quote Definition qcbv_demo1 := Eval cbv in demo1.
 Print qcbv_demo1.
 
 
-(** Abishek's example **)
+(** Abhishek's example **)
 Definition xx := (fun x:nat => x) = (fun x:nat => x+x-x).
 Print xx.
 Eval cbv in xx.
 
-Axiom feq1 : (fun x:nat => x) = (fun x:nat => x+2).
+Print eq.
+
+Inductive mleq (A:Type) : A -> A-> Prop := mleqrfl:forall x:A, mleq x x.
+Print mleq.
+
+Axiom mlfeq : mleq 0 0.
+Print mlfeq.
+Quote Definition q_mlfeq := mlfeq.
+Print q_mlfeq.
+Eval cbv in (malecha_L1.term_Term q_mlfeq).
+Quote Recursively Definition p_mlfeq := mlfeq.
+Print p_mlfeq.
+
+(*** not accepted because mleqrfl has a non-Prop argument
+Definition mlzero : nat :=
+  match mlfeq with
+    | mleqrfl x => 0
+  end.
+****)
+
+Inductive NN : Prop := ZZ:NN | SS:NN->NN.
+Inductive BB : Prop := tt:BB | ff:BB.
+
+Definition mlbb : BB :=
+  match mlfeq with
+    | mleqrfl x => match x with O => tt | S _ => ff  end
+  end.
+Quote Definition q_mlbb := mlbb.
+Print q_mlbb.
+
+Axiom feq : 0 = 0.
+Definition zero : nat :=
+  match feq with
+    | eq_refl => 0
+  end.
+Quote Definition q_0 := Eval cbv in 0.
+Quote Recursively Definition p_zero := zero.
+Print p_zero.
+Eval cbv in program_Program p_zero (ret nil).
+Goal exc_wcbvEval 40 p_zero = term_Term q_0.
+compute. reflexivity.
+Qed.
+
+(* HERE *)
+Print and.
+Inductive pack (A:Prop) : Prop := Pack: A -> A -> A -> A -> pack A.
+Axiom packax: forall A, pack A -> pack A.
+Definition pack_nat (A:Prop) (a:pack A) : nat :=
+  match packax a with
+    | Pack b1 b2 b3 b4 => 0
+  end.
+Quote Recursively Definition p_pack_nat := (pack_nat (Pack I I I I)).
+Goal exc_wcbvEval 40 p_pack_nat = term_Term q_0.
+compute. reflexivity.
+Qed.
+  
+Axiom andax: forall A, A /\ A -> A /\ A.
+Definition and_nat (A:Prop) (a:A /\ A) : nat :=
+  match andax a with
+    | conj b1 b2 => 0
+  end.
+Quote Recursively Definition p_and_nat := (and_nat (conj I I)).
+Print p_and_nat.
+Eval cbv in (program_Program p_and_nat (ret nil)).
+Goal exc_wcbvEval 40 p_and_nat = term_Term q_0.
+compute. reflexivity.
+Qed.
+
+
+Axiom feq1 : forall (y:bool), (fun x:nat => x) = (fun x:nat => x+2).
 Print feq1.
 Eval cbv in feq1.
 Definition zero1 : nat :=
-  match feq1 with
+  match feq1 true with
     | eq_refl => 0
   end.
 Eval cbv in zero1.
@@ -259,7 +318,6 @@ Definition main :=
   end.
 Eval compute in main.
 
-(*** HERE ***)
 Goal exc_wcbvEval 40 p_testAx = term_Term q_testAx.
 compute. reflexivity.
 Qed.
@@ -374,6 +432,7 @@ Quote Definition q_ack35 := Eval cbv in ack35.
 Goal (exc_wcbvEval 3000 p_ack35) = term_Term q_ack35.
 vm_compute. reflexivity.
 Qed.
+
 
 (** SASL tautology function: variable arity **)
 Fixpoint tautArg (n:nat) : Type :=

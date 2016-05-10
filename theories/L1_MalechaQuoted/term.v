@@ -38,6 +38,7 @@ Set Implicit Arguments.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
+| TProof     : Term
 | TCast      : Term -> cast_kind -> Term -> Term
 | TProd      : name -> Term (* type *) -> Term -> Term
 | TLambda    : name -> Term (* type *) -> Term -> Term
@@ -74,6 +75,7 @@ Fixpoint print_term (t:Term) : string :=
   match t with
     | TRel n => " (" ++ (nat_to_string n) ++ ") "
     | TSort _ => " SRT "
+    | TProof => " PRF "
     | TCast _ _ _ => " CAST "
     | TProd _ _ _ => " PROD "
     | TLambda _ _ _ => " LAM "
@@ -89,7 +91,7 @@ Fixpoint print_term (t:Term) : string :=
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
   end.
 
-    
+
 Section TermTerms_dec. (** to make Ltac definitions local **)
 Local Ltac rght := right; injection; intuition.
 Local Ltac lft := left; subst; reflexivity.
@@ -98,40 +100,42 @@ Lemma TermTerms_dec:
   (forall (s t:Term), s = t \/ s <> t) /\
   (forall (ss tt:Terms), ss = tt \/ ss <> tt) /\
   (forall (dd ee:Defs), dd = ee \/ dd <> ee).
-apply TrmTrmsDefs_ind.
-- Case "TRel". induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-- Case "TSort". induction t; cross. destruct (Srt_dec s s0); [lft | rght].
-- induction t1; cross.
-  destruct (cast_kind_dec c c0); destruct (H t1_1); destruct (H0 t1_2);
-  [lft | rght ..]. 
-- induction t1; cross.
-  destruct (name_dec n n0);
-    destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
-- induction t1; cross.
-  destruct (name_dec n n0);
-    destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
-- induction t2; cross.
-  destruct (name_dec n n0);
-    destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2_3); 
+Proof.
+  apply TrmTrmsDefs_ind.
+  - Case "TRel". induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
+  - Case "TSort". induction t; cross. destruct (Srt_dec s s0); [lft | rght].
+  - Case "TProof". induction t; cross. intuition.
+  - induction t1; cross.
+    destruct (cast_kind_dec c c0); destruct (H t1_1); destruct (H0 t1_2);
     [lft | rght ..]. 
-- induction t2; cross.
-  destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
-- induction t; cross. destruct (string_dec s s0); [lft | rght].
-- induction t; cross. destruct (inductive_dec i i0); [lft | rght].
-- induction t; cross.
-  destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); [lft | rght .. ].
-- induction t2; cross. destruct p as [n l], p0 as [n0 l0].
-  + destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
-    destruct (H t2_1); destruct (H0 t2_2);
-    destruct (H1 t2); [lft | rght .. ].
-- induction t; cross.
-  destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-- induction tt; cross. lft.
-- induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
-- induction ee; cross. lft.
-- induction ee; cross.
-  destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
-  destruct (H t1); destruct (H0 t2); destruct (H1 ee); [lft | rght .. ].
+  - induction t1; cross.
+    destruct (name_dec n n0);
+      destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
+  - induction t1; cross.
+    destruct (name_dec n n0);
+      destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
+  - induction t2; cross.
+    destruct (name_dec n n0);
+      destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2_3); 
+      [lft | rght ..]. 
+  - induction t2; cross.
+    destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
+  - induction t; cross. destruct (string_dec s s0); [lft | rght].
+  - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
+  - induction t; cross.
+    destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); [lft | rght .. ].
+  - induction t2; cross. destruct p as [n l], p0 as [n0 l0].
+    + destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
+      destruct (H t2_1); destruct (H0 t2_2);
+      destruct (H1 t2); [lft | rght .. ].
+  - induction t; cross.
+    destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
+  - induction tt; cross. lft.
+  - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
+  - induction ee; cross. lft.
+  - induction ee; cross.
+    destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
+    destruct (H t1); destruct (H0 t2); destruct (H1 ee); [lft | rght .. ].
 Qed.
 End TermTerms_dec.
 
@@ -623,9 +627,11 @@ Lemma mkApp_isApp_lem:
 Proof.
   induction fn; intros arg args; unfold mkApp; simpl.
   - exists (TRel n), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TSort s), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
+  - exists TProof, arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
   - exists (TCast fn1 c fn2), arg, tnil. split. reflexivity.
   + left. intuition. revert H. not_isApp. 
   - exists (TProd n fn1 fn2), arg, tnil. split. reflexivity.
@@ -664,6 +670,7 @@ Qed.
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
 | wfaSort: forall srt, WFapp (TSort srt)
+| wfaPrf: WFapp TProof
 | wfaCast: forall tm ck ty, WFapp tm -> WFapp ty -> WFapp (TCast tm ck ty)
 | wfaProd: forall nm ty bod,
             WFapp bod -> WFapp ty -> WFapp (TProd nm ty bod)
@@ -734,6 +741,7 @@ Proof.
   try (destruct tx, args; simpl in h; try discriminate;
               try (solve [constructor]);
               try (solve [injection h; intros; subst; intuition]);
+              intuition;
               injection h; intros; subst; intuition).
   - constructor; try assumption. rewrite tappend_tnil in H2; assumption.
   - constructor; try assumption. eapply WFapps_tappendl. eassumption.
@@ -784,6 +792,7 @@ Qed.
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
 | wfSort: forall n srt, WFTrm (TSort srt) n
+| wfPrf: forall n, WFTrm TProof n
 | wfCast: forall n t ck ty, WFTrm t n -> WFTrm ty n -> WFTrm (TCast t ck ty) n
 | wfProd: forall n nm ty bod,
             WFTrm bod (S n) -> WFTrm ty n -> WFTrm (TProd nm ty bod) n
@@ -1141,6 +1150,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
 | ISort: forall n srt, Instantiate n (TSort srt) (TSort srt)
+| IProof: forall n, Instantiate n TProof TProof
 | ICast: forall n t ck ty it ity,
            Instantiate n t it -> Instantiate n ty ity ->
            Instantiate n (TCast t ck ty) (TCast it ck ity)

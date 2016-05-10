@@ -46,20 +46,25 @@ Section term_Term_sec.
    end.
 End term_Term_sec.
 
+Fixpoint applyBranchToTProof (br:Term) :=
+  match br with
+    | TLambda _ _ body => instantiate TProof 0 (applyBranchToTProof body)
+    | x => x
+  end.
 
 Function term_Term (t:term) : exception Term :=
   match t with
     | tRel n => ret (TRel n)
-    | tSort srt => 
-      let srt' := match srt with 
+    | tSort srt =>
+      ret (TSort (match srt with 
                     | sProp => SProp
                     | sSet => SSet
                     | sType _ => SType  (* throwing away some sort info *)
-                  end
-      in ret (TSort srt')
+                  end))
+    | tCast _ _ (tCast _ _ (tSort sProp)) => ret TProof
     | tCast tm ck ty =>
-        do Tm <- term_Term tm;
         do Ty <- term_Term ty;
+        do Tm <- term_Term tm;
         ret (TCast Tm ck Ty)
     | tProd nm ty bod =>
         do Ty <- term_Term ty;
@@ -81,17 +86,22 @@ Function term_Term (t:term) : exception Term :=
     | tConst pth => ret (TConst pth)
     | tInd ind => ret (TInd ind)
     | tConstruct ind m => ret (TConstruct ind m)
-    | tCase n ty mch brs =>
-        do Ty <- term_Term ty;
+    | tCase npars ty mch brs => 
         do Mch <- term_Term mch;
         do Brs <- terms_Terms (fun x => term_Term (snd x)) brs;
-        let Ars := List.map fst brs in
-        ret (TCase (n,Ars) Ty Mch Brs)
+        let Ars := map fst brs in
+        match Mch, Brs, Ars with
+          | TProof, tunit Br, (cons nargs nil) =>  (* remove case on axiom *)
+            ret (applyBranchToTProof Br)
+          | _, _, _ =>  do Ty <- term_Term ty;
+                        ret (TCase (npars,Ars) Ty Mch Brs)
+        end
     | tFix defs m =>
         do Defs <- defs_Defs term_Term defs;
         ret (TFix Defs m)
     | _ => raise "term_Term"
-end.
+  end.
+
 
 (** convert Malecha's inductive type package into L1 **)
 Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=

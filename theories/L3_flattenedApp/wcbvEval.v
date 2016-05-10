@@ -24,6 +24,7 @@ Set Implicit Arguments.
 
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
+| wPrf: WcbvEval p TProof TProof
 | wLam: forall nm bod,
           WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProd: forall nm bod,
@@ -491,6 +492,7 @@ Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
            | TFix mfp br => Some (TFix mfp br)
            | TInd i => Some (TInd i)
            | TSort srt => Some (TSort srt)
+           | TProof => Some TProof
            (** should never appear **)
            | TRel _ => None
         end)

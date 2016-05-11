@@ -4,10 +4,10 @@ Require Import List BinNat Relations Omega Ensembles Morphisms.
 Import ListNotations.
 
 (** Given an expression [e], [exp_hoist e B f] will return an expression [e']
-  * and a block of function definitions [B']. [e'] is the function defintion 
+  * and a block of function definitions [B']. [e'] is the function definition 
   * erasure of [e] and [B] is exactly the function definitions of [e]. It's 
-  * writen in a CPS fashion and [f] is the continuation. [B] is an accumulator
-  * of function defitnions. 
+  * written in a CPS fashion and [f] is the continuation. [B] is an accumulator
+  * of function definitions. 
   *)
 Fixpoint erase_fundefs (e : exp) (defs : fundefs)
          (f : exp * fundefs -> exp * fundefs) {struct e} : exp * fundefs :=
@@ -69,7 +69,7 @@ Definition exp_hoist (e : exp) :=
   end.
 
 (** [erase_fundefs e e' B] iff [e'] is [e] after erasing all the function 
-  *  defintion blocks and [B] is exactly the function definitions of [e] 
+  *  definition blocks and [B] is exactly the function definitions of [e] 
   *) 
 Inductive Erase_fundefs : exp -> exp -> fundefs -> Prop :=
 | Efun_erase :
@@ -115,7 +115,7 @@ with Erase_nested_fundefs : fundefs -> fundefs -> Prop :=
 | Fnil_erase :
     Erase_nested_fundefs Fnil Fnil.
 
-(** Correspondence between the inductive and the computational defintions
+(** Correspondence between the inductive and the computational definitions
   * of function definition erasure 
   *)
 Lemma erase_fundefs_in_Erase_fundefs :
@@ -200,7 +200,7 @@ Proof.
 Qed.
 
 
-(** If [Erase_fundefs e e' B] then there are no function defintions 
+(** If [Erase_fundefs e e' B] then there are no function definitions 
     in [e'] and [B] *)
 Lemma erase_fundefs_no_fun :
   (forall e e' B,

@@ -170,7 +170,7 @@ Section EVAL.
       exists v2 c2, bstep_e rho2 e2 v2 c2 /\ c2 <= c1 /\
                     preord_val (k - c1) v1 v2.
 
-  (** more compact defintion of preorder on values *)
+  (** more compact definition of preorder on values *)
   Definition preord_val' (k : nat) (v1 v2 : val) : Prop :=
     match v1, v2 with
       | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
@@ -194,7 +194,7 @@ Section EVAL.
       | _, _ => False
     end.
 
-  (** correspondance of the two definitions *)
+  (** correspondence of the two definitions *)
   Lemma preord_val_eq (k : nat) (v1 v2 : val) :
     preord_val k v1 v2 <-> preord_val' k v1 v2.
   Proof.

@@ -157,7 +157,7 @@ Lemma fold_left_bool_mono:
   forall (ds:list bool),
        fold_left (fun (b c:bool) => b || c) ds false = true ->
        fold_left (fun (b c:bool) => b || c) ds true = true.
-induction ds; intro h; intuition. induction a. 
+induction ds; intro h; intuition. induction a.
 - exact h.
 - simpl. simpl in h. apply (IHds h).
 Qed.

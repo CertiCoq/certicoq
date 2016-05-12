@@ -729,8 +729,8 @@ Proof.
   - destruct a as [s v].
     case_eq (string_eq_bool nm s); intros Heq; simpl.
     + rewrite N.add_0_l. case (lt_dec k k).
-      * now intros H'%N.lt_irrefl.
-      * intros _. destruct (N.eq_dec k k) as [_|H'].
+      ++ now intros H'%N.lt_irrefl.
+      ++ intros _. destruct (N.eq_dec k k) as [_|H'].
         simpl in H. rewrite Heq in H.
         inversion H. subst.
 Admitted.

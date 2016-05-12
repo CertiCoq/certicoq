@@ -4,11 +4,11 @@ Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L2_typeStrippedL1" as L2.
 (******)
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Strings.Ascii.
-Require Import Arith.EqNat.
-Require Import Arith.Compare_dec.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Arith.EqNat.
+Require Import Coq.Arith.Compare_dec.
 Require Import L2.term.
 Require Import L2.program.
 Require Import L2.wndEval.

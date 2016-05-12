@@ -1,4 +1,4 @@
-Require Import List BinNat Coq.MSets.MSetRBT List Ensembles.
+Require Import Coq.Lists.List Coq.NArith.BinNat Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles.
 Require Import cps cps_util ctx set_util Ensembles_util.
 Import ListNotations.
 

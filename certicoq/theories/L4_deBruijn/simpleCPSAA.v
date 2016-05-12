@@ -5,14 +5,14 @@ https://github.com/aa755/SquiggleLazyEq
 *)
 
 
-Require Import Arith BinNat String List Omega 
-  Program Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
+  Coq.Program.Program Coq.micromega.Psatz.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
 
 
-Require Import Morphisms.
+Require Import Coq.Classes.Morphisms.
 (*
 Lemma N_plus_minus:
   forall n:N, n > 0 -> (n - 1 + 1) = (n + 1 - 1).

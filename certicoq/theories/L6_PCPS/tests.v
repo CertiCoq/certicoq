@@ -1,9 +1,9 @@
-Require Import ZArith.
-Require Import Znumtheory.
-Require Import List.
-Require Import Bool.
+Require Import Coq.ZArith.ZArith.
+Require Import Coq.ZArith.Znumtheory.
+Require Import ExtLib.Data.List.
+Require Import ExtLib.Data.Bool.
 Require Maps.
-Require Recdef.
+Require Coq.funind.Recdef.
 Import Nnat.
 
 
@@ -19,7 +19,7 @@ Add LoadPath "../L2_typeStrippedL1" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 Add LoadPath "../L4_deBruijn" as L4.
 Add LoadPath "../L5_CPS" as CPS.
-From CPS Require Export cpseval. 
+Require Export CPS.cpseval. 
 
 Require Import cps.
 Require Import cps_util.

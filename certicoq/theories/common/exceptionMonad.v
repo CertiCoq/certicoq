@@ -1,4 +1,4 @@
-Require Import String.
+Require Import Coq.Strings.String.
 Set Implicit Arguments.
 
 Inductive exception (A:Type) := Exc (_:string) | Ret (_:A).

@@ -1,4 +1,4 @@
-Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 (** 
 Add LoadPath "../common" as Common.
 Add LoadPath "./" as CPS.
@@ -12,7 +12,7 @@ Require Import Common.Common.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
-From CPS Require Export cpstrans k_deBruijn u_deBruijn.
+Require Export CPS.cpstrans CPS.k_deBruijn CPS.u_deBruijn.
 
 (** OPTIMISED Big-step evaluation for CPS expressions.
     Notice that only computations
@@ -479,7 +479,7 @@ Eval vm_compute in ueval_ce_n 100 (cdr $ (Cons $ FFF $ (Cons $ TTT $ Nil))).
 Eval vm_compute in ueval_ce_n 100 (copy $ ZZZ).
 Eval vm_compute in ueval_ce_n 100 (copy $ one).
 
-From L4 Require Import L3_to_L4.
+Require Import L4.L3_to_L4.
 
 Definition compile (p : program) : exception cps :=
   do e <- program_exp p; Ret (cps_cvt_prog e).

@@ -1,4 +1,4 @@
-Require Import List Relations RelationClasses.
+Require Import Coq.Lists.List Coq.Relations.Relations Coq.Classes.RelationClasses.
 Import ListNotations.
 
 Ltac inv H := inversion H; clear H; subst.

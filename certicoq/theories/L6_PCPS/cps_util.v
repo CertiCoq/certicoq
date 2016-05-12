@@ -1,4 +1,4 @@
-Require Import Arith BinNat String List Omega Ensembles.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import CpdtTactics.
 Require Import cps Ensembles_util.
 Import ListNotations.

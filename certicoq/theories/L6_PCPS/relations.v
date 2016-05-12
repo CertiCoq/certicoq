@@ -1,4 +1,4 @@
-Require Import Relations RelationClasses.
+Require Import Coq.Relations.Relations Coq.Classes.RelationClasses.
 Require Import cps ctx.
 
 Section Relations.

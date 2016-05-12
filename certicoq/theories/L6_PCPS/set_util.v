@@ -1,4 +1,4 @@
-Require Import PArith Coq.MSets.MSetRBT Morphisms.
+Require Import Coq.PArith.PArith Coq.MSets.MSetRBT Coq.Classes.Morphisms.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 

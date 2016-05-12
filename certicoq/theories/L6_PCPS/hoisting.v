@@ -1,5 +1,5 @@
 Require Import cps cps_util identifiers eval env ctx relations Ensembles_util.
-Require Import List BinNat Relations Omega Ensembles Morphisms.
+Require Import Coq.Lists.List Coq.NArith.BinNat Coq.Relations.Relations Coq.omega.Omega Coq.Sets.Ensembles Coq.Classes.Morphisms.
 
 Import ListNotations.
 

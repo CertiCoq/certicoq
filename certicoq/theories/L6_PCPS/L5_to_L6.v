@@ -18,17 +18,17 @@
 new
 
 *)     
-Require Import ZArith.
-Require Import Znumtheory.
-Require Import List.
-Require Import Bool.
+Require Import Coq.ZArith.ZArith.
+Require Import Coq.ZArith.Znumtheory.
+Require Import ExtLib.Data.List.
+Require Import ExtLib.Data.Bool.
 Require Maps.
-Require Recdef.
+Require Coq.funind.Recdef.
 Import Nnat.
 Require Import CpdtTactics.
 
 
-Require Import List.
+Require Import ExtLib.Data.List.
 
 
 

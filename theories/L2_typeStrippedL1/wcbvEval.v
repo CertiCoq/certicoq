@@ -4,12 +4,12 @@ Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L2_typeStrippedL1" as L2.
 (****)
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Arith.Compare_dec.
-Require Import Program.Basics.
-Require Import Omega.
-Require Import JMeq.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Program.Basics.
+Require Import Coq.omega.Omega.
+Require Import Coq.Logic.JMeq.
 Require Import L2.term.
 Require Import L2.program.
 Require Import L2.wndEval.

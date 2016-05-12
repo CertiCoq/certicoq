@@ -1,4 +1,4 @@
-Require Import Arith BinNat List Omega.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega.
 Require Import cps.
 
 Import ListNotations.

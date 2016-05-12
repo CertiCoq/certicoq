@@ -12,11 +12,11 @@ Add LoadPath "../L1_MalechaQuoted" as L1.
 (****)
 
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Arith.Compare_dec.
-Require Import Arith.Peano_dec.
-Require Import Omega.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Arith.Peano_dec.
+Require Import Coq.omega.Omega.
 Require Export Common.Common.  (* shared namespace *)
 
 Local Open Scope string_scope.

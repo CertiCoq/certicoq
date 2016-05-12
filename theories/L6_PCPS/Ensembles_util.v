@@ -1,4 +1,4 @@
-Require Import Morphisms List Ensembles.
+Require Import Coq.Classes.Morphisms Coq.Lists.List Coq.Sets.Ensembles.
 Import ListNotations.
 
 Ltac inv H := inversion H; clear H; subst.

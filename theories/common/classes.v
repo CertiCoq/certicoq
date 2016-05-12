@@ -1,10 +1,10 @@
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Strings.Ascii.
-Require Import Bool.Bool.
-Require Import Bool.DecBool.
-Require Import Omega.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Bool.Bool.
+Require Import Coq.Bool.DecBool.
+Require Import Coq.omega.Omega.
 
 
 Class Eq (A:Type) :=

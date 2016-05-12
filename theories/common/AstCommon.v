@@ -2,10 +2,10 @@
 Add LoadPath "../common" as Common.
 
 Require Export Template.Ast.
-Require Import PArith.BinPos.
-Require Import Strings.String.
-Require Import Arith.Peano_dec.
-Require Import Logic.Eqdep_dec.
+Require Import Coq.PArith.BinPos.
+Require Import Coq.Strings.String.
+Require Import Coq.Arith.Peano_dec.
+Require Import Coq.Logic.Eqdep_dec.
 
 Require Import Common.RandyPrelude.
 

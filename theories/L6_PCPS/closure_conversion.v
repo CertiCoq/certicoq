@@ -1,6 +1,6 @@
 Require Import cps cps_util set_util hoisting identifiers.
-Require Import Znumtheory.
-Require Import List MSets MSetRBT BinNums BinNat BinPos.
+Require Import Coq.ZArith.Znumtheory.
+Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
 Require Maps.

@@ -7,13 +7,13 @@ Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 (****)
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Strings.Ascii.
-Require Import Arith.Compare_dec.
-Require Import Relations.Relation_Operators.
-Require Import Relations.Operators_Properties.
-Require Import Setoid.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Relations.Relation_Operators.
+Require Import Coq.Relations.Operators_Properties.
+Require Import Coq.Setoids.Setoid.
 Require Import L1.term.
 Require Import L1.program.
 Require Import L1.wndEval.

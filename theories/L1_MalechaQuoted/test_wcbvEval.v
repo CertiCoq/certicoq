@@ -89,7 +89,7 @@ Quote Recursively Definition qcons :=
   (@cons (list bool): (list bool) -> xlist -> xlist).
 Print qcons.
 
-Require Vectors.Vector.
+Require Coq.Vectors.Vector.
 Print Fin.t.
 Print Vector.t.
 

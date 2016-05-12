@@ -1,4 +1,4 @@
-Require Import BinNat Relations MSets MSetRBT List Omega Ensembles.
+Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import cps cps_util identifiers env ctx Ensembles_util List_util.
 Import ListNotations.
 

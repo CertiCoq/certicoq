@@ -1,9 +1,9 @@
-Require Import ZArith.
-Require Import Znumtheory.
-Require Import List.
-Require Import Bool.
+Require Import Coq.ZArith.ZArith.
+Require Import Coq.ZArith.Znumtheory.
+Require Import Coq.Lists.List.
+Require Import Coq.Bool.Bool.
 Require Maps.
-Require Recdef.
+Require Coq.funind.Recdef.
 Import Nnat.
 Require Coq.Structures.Orders.
 Import RelationClasses.

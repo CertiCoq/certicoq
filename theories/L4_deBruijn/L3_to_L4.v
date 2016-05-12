@@ -10,7 +10,7 @@ Add LoadPath "../L3_flattenedApp" as L3.
 Add LoadPath "../L4_deBruijn" as L4.
 (******)
 
-Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.

@@ -6,10 +6,10 @@ Add LoadPath "../L2_typeStrippedL1" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Strings.Ascii.
-Require Import Arith.Compare_dec.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Arith.Compare_dec.
 Require Import L3.term.
 Require Import L3.program.
 

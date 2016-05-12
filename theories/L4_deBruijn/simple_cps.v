@@ -1,7 +1,7 @@
 (** Naive conversion to continuation-passing style for a core language including
     mutually recursive functions, data constructors, and pattern matching.
 *)
-Require Import Arith BinNat String List Omega Program Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.

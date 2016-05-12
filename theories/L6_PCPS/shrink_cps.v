@@ -1,15 +1,15 @@
 Require Import Coq.Relations.Relations.
-Require Import Relations.
-Require Import Setoid.
-Require Import Morphisms.
+Require Import Coq.Relations.Relations.
+Require Import Coq.Setoids.Setoid.
+Require Import Coq.Classes.Morphisms.
 Import RelationClasses.
 
-Require Import Bool.
+Require Import ExtLib.Data.Bool.
 Require Maps.
-Require Recdef.
+Require Coq.funind.Recdef.
 Import Nnat.
-Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
-Require Import CpdtTactics Permutation.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import CpdtTactics Coq.Sorting.Permutation.
 Require Import HashMap.
 Require Import cps.
 Require Import cps_util.

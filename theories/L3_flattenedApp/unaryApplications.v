@@ -8,11 +8,11 @@ Add LoadPath "../L3_flattenedApp" as L3.
 Require L2.L2.
 Require L1.L1.
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Strings.Ascii.
-Require Import Arith.Compare_dec.
-Require Import Arith.Minus.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Arith.Minus.
 Require Import Coq.Logic.JMeq.
 Require Import L3.term.
 Require Import L3.program.

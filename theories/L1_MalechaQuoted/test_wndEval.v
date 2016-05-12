@@ -3,7 +3,7 @@ Add LoadPath "../common" as Common.
 Add LoadPath "." as L1.
 
 Require Import Template.Template.
-Require Import Relations.Relation_Operators.
+Require Import Coq.Relations.Relation_Operators.
 Require Import Common.RandyPrelude.
 Require Import L1.L1.  (* whole L1 library is exported by L1.L1 *)
 

@@ -1,4 +1,4 @@
-Require Import Arith BinNat String List Omega Coq.Program.Program Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.

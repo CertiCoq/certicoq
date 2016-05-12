@@ -5,7 +5,7 @@ Add LoadPath "../L2_typeStrippedL1" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
-Require Import String.
+Require Import ExtLib.Data.String.
 Require Import Template.Template.
 Require Import Common.Common.
 Require L1.L1.         (* whole L1 library is exported by L1.L1 *)

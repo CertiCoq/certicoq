@@ -9,12 +9,12 @@
 Add LoadPath "../common" as Common.
 (****)
 
-Require Import Lists.List.
-Require Import Strings.String.
-Require Import Strings.Ascii.
-Require Import Bool.Bool.
-Require Import Bool.DecBool.
-Require Import Omega.
+Require Import Coq.Lists.List.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Bool.Bool.
+Require Import Coq.Bool.DecBool.
+Require Import Coq.omega.Omega.
 Require Import Common.exceptionMonad.
 
 Local Open Scope string_scope.
@@ -23,7 +23,7 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (** named cases from Software Foundations **)
-Require String. 
+Require Coq.Strings.String. 
 Open Scope string_scope.
 
 Ltac move_to_top x :=
@@ -334,7 +334,7 @@ Qed.
 
 
 Section PP.
-Require Import String Div2 NPeano Program.Wf.
+Require Import Coq.Strings.String Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
 Local Open Scope string_scope.
 
 Definition digit_to_string (n:nat): string :=

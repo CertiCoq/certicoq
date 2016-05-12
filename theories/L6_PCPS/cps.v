@@ -4,12 +4,12 @@
 Require Import Coq.Relations.Relations.
 Require Import ExtLib.Structures.Monad.
 Require ExtLib.Core.Type.
-Require Import ZArith.
-Require Import Znumtheory.
-Require Import Bool.
-Require Import List.
+Require Import Coq.ZArith.ZArith.
+Require Import Coq.ZArith.Znumtheory.
+Require Import Coq.Bool.Bool.
+Require Import Coq.Lists.List.
 Require Maps.
-Require Recdef.
+Require Coq.funind.Recdef.
 Import Nnat.
 
 

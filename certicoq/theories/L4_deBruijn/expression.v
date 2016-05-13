@@ -62,6 +62,8 @@ Inductive exp: Type :=
 | Match_e: exp -> branches_e -> exp
 | Let_e: exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
+| Ax_e: string -> exp
+(* | Prf_e : exp *)
 with exps: Type :=
 | enil: exps
 | econs: exp -> exps -> exps
@@ -138,6 +140,7 @@ Inductive exp_wf: N -> exp -> Prop :=
                              exp_wf i (Let_e e1 e2)
 | fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + 1 + i) es ->
                                      exp_wf i (Fix_e es k)
+| ax_e_wf : forall i s, exp_wf i (Ax_e s)
 with exps_wf: N -> exps -> Prop :=
 | enil_wf: forall i, exps_wf i enil
 | econs_wf: forall i e es, exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
@@ -222,6 +225,7 @@ Fixpoint shift n k e :=
     | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
     | Match_e e bs => Match_e (shift n k e) (shift_branches' shift n k bs)
     | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + 1 + k) es) k'
+    | Ax_e s => Ax_e s
   end.
 
 Definition shifts := shift_exps' shift.
@@ -280,6 +284,7 @@ Function subst (v:exp) k (e:exp): exp :=
     | Let_e e1 e2 => Let_e (subst v k e1) (subst v (1 + k) e2)
     | Match_e e bs => Match_e (subst v k e) (subst_branches v k bs)
     | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + 1 + k) es) k'
+    | Ax_e s => Ax_e s
   end
 with substs (v:exp) k (es:exps) : exps :=
        match es with
@@ -310,6 +315,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Let_e e1 e2 => Let_e (sbst v k e1) (sbst v (1 + k) e2)
     | Match_e e bs => Match_e (sbst v k e) (sbst_branches v k bs)
     | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + 1 + k) es) k'
+    | Ax_e s => Ax_e s
   end
 with sbsts (v:exp) k (es:exps) : exps :=
        match es with
@@ -494,6 +500,7 @@ Inductive eval: exp -> exp -> Prop :=
     enthopt (N.to_nat n) es = Some e' ->
     eval ((sbst_fix es e') {0 ::= v2}) e'' ->
     eval (App_e e e2) e''
+| eval_Ax_e s : eval (Ax_e s) (Ax_e s)
 with evals: exps -> exps -> Prop :=
      | evals_nil: evals enil enil
      | evals_cons: forall e es v vs, eval e v -> evals es vs ->
@@ -539,6 +546,7 @@ Proof.
       specialize (H0 _ H6); subst v0.
       assert (e' = e'0) by congruence; subst e'0.
       now apply H1.
+  - inversion H. reflexivity.
   - inversion H. reflexivity.
   - inversion H1. subst. rewrite (H v0); try assumption.
     rewrite (H0 vs0); try assumption. reflexivity.
@@ -607,7 +615,8 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                      end
                    | _ => None
                  end
-               | _ => None
+               | Ax_e s => Some (Ax_e s)
+               | Var_e e => None
              end
   end
 with evals_n n (es:exps) : option exps :=
@@ -795,6 +804,7 @@ Proof.
     * specialize (H _ e4). eapply H.
     * specialize (H0 _ H1). apply H0.
   + econstructor; eauto. 
+  + injection H; intros h0. subst. constructor.
   + injection H; intros h0. subst. constructor.
   + injection H1; intros h0. subst. constructor.
     * apply H. assumption.
@@ -1210,6 +1220,7 @@ Inductive is_value: exp -> Prop :=
 | lam_is_value: forall e, is_value (Lam_e e)
 | con_is_value: forall d es, are_values es -> is_value (Con_e d es)
 | fix_is_value: forall es k, is_value (Fix_e es k)
+| ax_is_value : forall s, is_value (Ax_e s)
 with are_values: exps -> Prop :=
 | enil_are_values: are_values enil
 | econs_are_values: forall e es, is_value e -> are_values es ->
@@ -1241,6 +1252,7 @@ Fixpoint is_valueb (e:exp): bool :=
     | Match_e _ _ => false
     | Let_e _ _ => false
     | Fix_e _ _ => true
+    | Ax_e _ => true
   end
 with are_valuesb (es:exps): bool :=
        match es with
@@ -1294,3 +1306,144 @@ Proof.
   - inversion H ; subst. rewrite <- IHes1 in H3. destruct H3. split ; auto.
 Qed.
 Hint Resolve are_values_append.
+
+Ltac inv H := inversion H; clear H; subst.
+Ltac rewrite_hyps :=
+  repeat match goal with
+    | [ H : _ |- _ ] => rewrite !H
+  end.
+
+Lemma efnlst_length_sbst v k es :
+  efnlst_length (sbst_efnlst v k es) = efnlst_length es.
+Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
+
+Lemma efnlst_length_subst v k es :
+  efnlst_length (subst_efnlst v k es) = efnlst_length es.
+Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
+
+Lemma exp_wf_shift :
+  (forall i e, exp_wf i e -> forall j, shift j i e = e) /\
+  (forall i es, exps_wf i es -> forall j, shifts j i es = es) /\
+  (forall i es, efnlst_wf i es -> forall j, shift_fns j i es = es) /\
+  (forall i bs, branches_wf i bs -> forall j, shift_branches j i bs = bs).
+Proof.
+  apply my_exp_wf_ind; simpl; intros; try rewrite_hyps; trivial.
+  destruct lt_dec. reflexivity. contradiction.
+  f_equal. now rewrite N.add_comm.
+Qed.
+
+Lemma closed_subst_sbst v :
+  exp_wf 0 v ->
+  (forall t k, sbst v k t = subst v k t) /\
+  (forall es k, sbsts v k es = es{k := v}) /\
+  (forall es k, sbst_efnlst v k es = es{k:=v}) /\
+  (forall bs k, sbst_branches v k bs = bs{k:=v}).
+Proof.
+  intros Hv.
+  apply my_exp_ind; simpl; intros; try rewrite_hyps; trivial.
+  destruct lt_dec. reflexivity.
+  destruct N.eq_dec. subst n.
+  symmetry; now apply exp_wf_shift.
+  reflexivity.
+Qed.
+
+Lemma sbst_preserves_wf' :
+  (forall i' e, exp_wf i' e ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> exp_wf i (e{k::=v})) /\
+  (forall i' es, exps_wf i' es ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> exps_wf i (es{k::=v})) /\
+  (forall i' es, efnlst_wf i' es ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> efnlst_wf i (es{k::=v})) /\
+  (forall i' bs, branches_wf i' bs ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> branches_wf i (bs{k::=v})).
+Proof.
+  apply my_exp_wf_ind; simpl; intros; subst; eauto.
+  - repeat if_split; try (constructor; auto; lia).
+  - constructor. apply H; try lia; auto.
+  - constructor; auto. apply H0; try lia; auto.
+  - constructor; auto. rewrite efnlst_length_sbst; apply H; try lia; auto.
+  - constructor; auto. 
+  - constructor; auto. 
+  - constructor; auto. apply H; try lia; auto.
+Qed.
+
+(** Weakening with respect to [exp_wf]. *)
+Lemma weaken_wf_le :
+  (forall i e, exp_wf i e -> forall j, i <= j -> exp_wf j e) /\
+  (forall i es, exps_wf i es -> forall j, i <= j -> exps_wf j es) /\
+  (forall i es, efnlst_wf i es -> forall j, i <= j -> efnlst_wf j es) /\
+  (forall i bs, branches_wf i bs -> forall j, i <= j -> branches_wf j bs).
+Proof.  
+  apply my_exp_wf_ind; intros; econstructor; auto; try lia; 
+  match goal with
+    | [ H: forall _, _ -> exp_wf _ ?e |- exp_wf _ ?e] => apply H; lia
+    | _ => idtac
+  end.
+  apply H. lia.
+Qed.
+
+Lemma subst_preserves_wf' :
+  (forall i' e, exp_wf i' e ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> exp_wf i (e{k:=v})) /\
+  (forall i' es, exps_wf i' es ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> exps_wf i (es{k:=v})) /\
+  (forall i' es, efnlst_wf i' es ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> efnlst_wf i (es{k:=v})) /\
+  (forall i' bs, branches_wf i' bs ->
+     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
+       forall k, k <= i -> branches_wf i (bs{k:=v})).
+Proof.
+  apply my_exp_wf_ind; simpl; intros; subst; eauto.
+  - repeat if_split; try (constructor; auto; lia).
+    rewrite (proj1 exp_wf_shift _ _ H0).
+    eapply (proj1 weaken_wf_le); eauto; lia.
+  - constructor. apply H; try lia; auto.
+  - constructor; auto. apply H0; try lia; auto.
+  - constructor; auto. rewrite efnlst_length_subst; apply H; try lia; auto.
+  - constructor; auto. 
+  - constructor; auto. 
+  - constructor; auto. apply H; try lia; auto.
+Qed.
+
+Lemma value_value_subst n v :
+  is_value v -> exp_wf 0 v ->
+  (forall e, is_value e -> is_value (subst v n e)) /\
+  (forall es, are_values es -> are_values (substs v n es)).
+Proof.
+  intros vv wfv.
+  apply my_is_value_ind; simpl; intros; try constructor; trivial.
+  intros.
+  destruct lt_dec. constructor.
+  destruct N.eq_dec. now rewrite (proj1 exp_wf_shift).
+  constructor.
+Qed.  
+
+Lemma wf_value_self_eval :
+  (forall v, is_value v -> exp_wf 0 v -> eval v v) /\
+  (forall vs, are_values vs -> exps_wf 0 vs -> evals vs vs).
+Proof.
+  apply my_is_value_ind; simpl; intros; auto; try constructor; auto.
+  inv H. lia.
+  inv H0. auto.
+  inv H1. intuition.
+  inv H1. intuition.
+Qed.
+
+
+Lemma subst_closed_id v :
+  (forall k t, exp_wf k t -> forall j, k <= j -> subst v j t = t) /\
+  (forall k es, exps_wf k es -> forall j, k <= j -> es{j:=v} = es) /\
+  (forall k es, efnlst_wf k es -> forall j, k <= j -> es{j:=v} = es) /\
+  (forall k bs, branches_wf k bs -> forall j, k <= j -> bs{j:=v} = bs).
+Proof.
+  apply my_exp_wf_ind; simpl; intros; try solve [rewrite_hyps; auto; lia]; trivial.
+  destruct (lt_dec j j0). reflexivity.
+  destruct (N.eq_dec j j0). lia. lia.
+Qed.

@@ -395,6 +395,9 @@ Function cps_cvt (e:exp) {struct e} : val_c :=
     | Lam_e e => Cont_c (Ret_c (KVar_c 0)
                                (Lam_c (Ret_c (cps_cvt e) (KVar_c 0))))
     | Fix_e es k => Cont_c (Ret_c (KVar_c 0) (Fix_c (cps_cvt_fnlst es) k))
+    | Ax_e s =>
+      (* Translate as a dummy *)
+      Cont_c (Ret_c (KVar_c 0) (Con_c 0 vcnil))
   end
 with cps_cvts (es:exps) (c:cps) : cps :=
     match es with

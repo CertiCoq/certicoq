@@ -512,7 +512,6 @@ Qed.
 (** * CPS expressions *)
 (**********************)
 
-
 Inductive L5Opid : Set :=
  | CLambda 
  | CKLambda
@@ -522,6 +521,8 @@ Inductive L5Opid : Set :=
  | CRet (** application of a continuation lambda ([CKLambda]) *)
  | CCall (** a bit like apply in source language *)
  | CProj (selector :nat) (** which one to project out*)
+ (* nat may be ineffiecient in general, 
+    but here it is only used to iterate over the list ONE BY ONE and pick one out *)
  | CMatch (dconAndNumArgs : list (dcon * nat))
  (** each member of the list corresponds to a branch. 
     it says how many variables are bound in that branch*).
@@ -592,8 +593,10 @@ Definition Match_c (discriminee : CTerm) (brs : list branch) : CTerm :=
   coterm (CMatch (List.map (fun b => (fst b, num_bvars (snd b))) brs))
          ((bterm [] discriminee)::(List.map snd brs)).
 
+
 Instance CExpSubstitute : Substitute CTerm CTerm :=
   { substitute := fun rep x t => subst t x rep}.
+
 
 (** OPTIMISED Big-step evaluation for CPS expressions.
     Notice that only computations
@@ -1824,6 +1827,44 @@ Local Transparent is_valueb.
     unfold range, dom_sub, dom_lmap; eauto with subset].
 Qed.
 
+(* this failed proof is just to illustrate why we need the 
+  range of the substitution to be values. *)
+Lemma cps_cvt_ssubst_commute_why_subrange_val_needed : forall (e : NTerm) (sub : Substitution),
+nt_wf e
+-> sub_range_sat sub nt_wf
+-> sub_range_sat sub closed
+-> varsOfClass (all_vars e ++ dom_sub sub ++ flat_map all_vars (range sub)) USERVAR
+->  let sub_c := (map_sub_range (cps_cvt_val' cps_cvt)) sub in
+      (ssubst_aux (cps_cvt e) sub_c)= (cps_cvt (ssubst_aux e sub)).
+Proof using.
+  intros.
+  destruct e as [x | o lbt].
+- (*just the value case is interesting *)
+  Local Opaque val_outer.
+  simpl.
+  Local Transparent cps_cvt_val'.
+   simpl. 
+  Local Opaque cps_cvt_val'.
+  apply userVarsContVar in H2.
+  rwsimpl H2. subst sub_c. 
+  (* [val_outer] commutes with [ssubst_aux] under some disjointness conditions *)
+  rewrite val_outer_ssubst_aux;[| rwsimplC; disjoint_reasoningv2].
+  simpl. symmetry.
+  dsub_find sf; symmetry in Heqsf; [|erewrite sub_find_none_map; eauto; fail].
+  erewrite sub_find_some_map; eauto.
+  (* this holds only if the value test in [cps_cvt] says yes for [sfs], 
+    which is in [range sub].
+    From the aplication, we only have that big-step evaluation terminates at [sfs],
+    So, we should ensure that  eval e v -> value test in cps_cvt says yes for [v],
+     of at least this equation holds in some way.
+    So we cannot say false for an all value constructor.
+    
+    We can weaken the syntactic equation. in application, we had eval_c iff of application of the result
+   
+     *)
+  Local Transparent val_outer.
+Abort.
+  
 
 Lemma eval_c_ssubst_commute : forall (e : NTerm) (sub : Substitution) ,
 nt_wf e
@@ -3085,6 +3126,7 @@ Proof using.
 Qed.
 
 
+
 Section TypePreservingCPS.
 (* if [x] has type [A], then [cps_cvt x] has type [forall {F:Type} (contVar: A -> F), F],
   or, forall {F:Type}, (A -> F)-> F.
@@ -3149,5 +3191,4 @@ End TypePreservingCPS.
 
 
 End VarsOf2Class.
-
 

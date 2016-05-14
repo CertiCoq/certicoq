@@ -1484,7 +1484,7 @@ Proof.
   { inv Hstep1. inv H9; eauto.
     edestruct preord_env_P_getlist_l as [vs' [Hgetl Hpre]]; eauto.
     rewrite occurs_free_Econstr. now apply Included_Union_l.
-    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; [| eauto | eauto |].
+    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 Hpre2]]]; [| eauto | eauto |].
     eapply preord_env_P_antimon.
     eapply preord_env_set_def_funs_permut with (v2 := Vconstr tau t vs'); eauto.
     - inv Hun. intros Hb. eapply H1. constructor; eauto.
@@ -1503,7 +1503,7 @@ Proof.
     rewrite preord_val_eq in Hpre.
     destruct v'; try (now simpl in Hpre; contradiction). inv Hpre.
     edestruct (@findtag_append_spec exp) as [H4 | [H4 H5]]; eauto.
-    - edestruct (preord_exp_refl k e) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
+    - edestruct (preord_exp_refl k e) as [v2 [c2 [Hstep2 Hpre2]]];
       [| eauto | eauto |].
       + eapply preord_env_P_def_funs_not_in_P_r with (B := B).
         * eapply preord_env_P_antimon; eauto.
@@ -1523,7 +1523,7 @@ Proof.
         erewrite findtag_append_Some; eauto.
     - simpl in H4. destruct (M.elt_eq t t2); subst.
       + inv H4. inv H6.
-        edestruct (preord_exp_refl k e'0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
+        edestruct (preord_exp_refl k e'0) as [v2 [c2 [Hstep2 Hpre2]]];
           [| eauto | eauto |]. 
         eapply preord_env_P_def_funs_col; eauto.
         eapply preord_env_P_antimon; eauto.
@@ -1539,7 +1539,7 @@ Proof.
         now constructor.
         erewrite findtag_append_not_In; eauto. simpl.
         destruct (M.elt_eq t2 t2); try congruence.
-      + edestruct (preord_exp_refl k e) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
+      + edestruct (preord_exp_refl k e) as [v2 [c2 [Hstep2 Hpre2]]];
         [| eauto | eauto |].
         * eapply preord_env_P_def_funs_not_in_P_r with (B := B).
           eapply preord_env_P_antimon; eauto.
@@ -1562,7 +1562,7 @@ Proof.
     edestruct Henv as [vs' [Hgetl Hpre]]; eauto. rewrite preord_val_eq in Hpre.
     destruct vs'; try (simpl in Hpre; contradiction). inv Hpre.
     edestruct (@Forall2_nthN val) as [v' [Hnth Hpre']] ; eauto. 
-    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
+    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 Hpre2]]];
       [| eauto | eauto |].
     eapply preord_env_P_antimon.
     eapply preord_env_set_def_funs_permut; eauto.
@@ -1577,7 +1577,7 @@ Proof.
       constructor. constructor.
       now apply name_in_fundefs_bound_var_fundefs. }
   { inv Hstep1. inv H5; eauto.
-    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; [| eauto | eauto |].
+    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 Hpre2]]]; [| eauto | eauto |].
     eapply preord_env_P_antimon. 
     - eapply preord_env_P_def_funs_merge with (B := B''); eauto using split_fds_sym.
       inv Hun. inv H2.
@@ -1593,7 +1593,7 @@ Proof.
     edestruct preord_env_P_getlist_l as [vs' [Hgetl Hpre]]; eauto.
     rewrite occurs_free_Eprim. now apply Included_Union_l.
     edestruct Prim_axiom as [v' [Heq Hpre']]; eauto.
-    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
+    edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 Hpre2]]];
       [| eauto | eauto |].
     eapply preord_env_P_antimon.
     eapply preord_env_set_def_funs_permut; eauto.
@@ -1608,62 +1608,68 @@ Proof.
       constructor. constructor.
       now apply name_in_fundefs_bound_var_fundefs. }
   { inv Hstep1. simpl in H4.
-    edestruct (preord_exp_refl k e') as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]];
+    edestruct (preord_exp_refl k e') as [v2 [c2 [Hstep2 Hpre2]]];
       [| eauto | eauto |].
     eapply preord_env_P_antimon; eauto.
     eapply Included_trans. eapply occurs_free_Efun_Included with (B := Fnil).
     simpl. rewrite Union_Empty_set_l. apply Included_refl.
     repeat eexists; eauto. }
-  {  inv Hun. inv Hstep1.
-     edestruct preord_exp_refl with (e := e0) as [v2 [c2 [Hstep2 [Hleq2 Hpre2]]]]; eauto;
-     [| exists v2, c2; repeat split; try constructor; eauto ].
-     specialize (unique_bindings_hoist _ _ _ _ _ _ _ _ _ H H0 H1 H5); intros Hun.
-     eapply preord_env_P_trans.
-     + eapply preord_env_P_Same_set_fun_in_fundefs
-       with (B2 := Fcons f0 tau xs (Efun B3 e'0) B1)
-              (B2' := Fcons f0 tau xs (Efun B3 e'0) B1); eauto;
-       solve
-         [ rewrite split_fds_fun_in_fundefs; eauto;
-           simpl; rewrite Union_Empty_set_l, Union_sym; apply Same_set_refl
-         | eapply unique_bindings_split_fds_fundfes_append
-           with (B1 := (Fcons f0 tau xs (Efun B3 e'0) Fnil));
-           eauto using split_fds_sym ].
-     + eapply preord_env_P_trans.
-       * eapply preord_env_P_antimon.
-         eapply preord_env_P_def_funs_hoist; eauto.
-         specialize (Hclo B2 (In_Fun1 _ _)). 
-         eapply same_split_fds_closed_fundefs; [ | | eauto]; eauto.
-         constructor. now apply split_fds_nil_l.
-         eapply Hclo. apply In_Fun3. now eapply split_fds_funs_in_fundef_r; eauto.
-         now eapply unique_bindings_split_fds_fundfes_append
-         with (B1 := Fcons f0 tau xs (Efun B3 e'0) Fnil); eauto using split_fds_sym.
-         apply Disjoint_sym.
-         eapply Disjoint_Included; [ apply Included_refl | | apply HD ].
-         eapply Included_trans. now apply name_in_fundefs_bound_var_fundefs.
-         rewrite bound_var_Efun,
-         (split_fds_bound_vars B1 (Fcons f0 tau xs (Efun B3 e'0) Fnil) B2),
-         bound_var_fundefs_Fcons, bound_var_Efun, <- !Union_assoc; eauto.
-         do 3 apply Included_Union_mon_r.
-         apply Included_Union_mon_l. now apply Included_refl.
-         edestruct split_fds_unique_bindings_fundefs_l as [H1' [H2' H3']];
-           [| apply H1 |]; eauto.
-         rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs e'0 Fnil) B4) in H3' ; eauto.
-         rewrite bound_var_fundefs_Fcons in H3'.
-         apply Disjoint_sym. eapply Disjoint_Included; [ | | apply H3' ]; eauto.
-         simpl. rewrite Union_sym.
-         apply Included_Union_compat; eauto using Included_Union_l;
-         now apply name_in_fundefs_bound_var_fundefs.
-         now apply name_in_fundefs_bound_var_fundefs.
-         eapply Included_trans. apply occurs_free_Efun_Included.
-         eapply Included_Union_compat. apply Included_refl.
-         rewrite split_fds_name_in_fundefs; eauto. simpl. rewrite Union_Empty_set_l.
-         eapply Included_Union_compat; apply Included_refl.
-       * eapply preord_env_P_Same_set_fun_in_fundefs;
-         eauto using unique_bindings_split_fds_Fcons_fundefs_append;
-         now (eapply split_fds_fundefs_append_fun_in_fundefs
-              with (B2 := Fcons f0 tau xs e'0 Fnil); eauto). }
+  { inv Hun. inv Hstep1. 
+    edestruct preord_exp_refl with (e := e0) as [v2 [c2 [Hstep2 Hpre2]]]; eauto;
+    [| exists v2, c2; repeat split; try constructor; eauto ].
+    specialize (unique_bindings_hoist _ _ _ _ _ _ _ _ _ H H0 H1 H5); intros Hun.
+    eapply preord_env_P_trans with (rho2 := def_funs B2 B2 rho' rho').
+    + eapply preord_env_P_def_funs_col.
+      rewrite occurs_free_Efun in Henv. unfold closed_fundefs_in_exp, closed_fundefs in Hclo.
+      now rewrite Union_sym.
+    + clear Henv. intros m.
+      eapply preord_env_P_trans.
+      * eapply preord_env_P_Same_set_fun_in_fundefs
+        with (B2 := Fcons f0 tau xs (Efun B3 e'0) B1)
+               (B2' := Fcons f0 tau xs (Efun B3 e'0) B1); eauto;
+        solve
+          [ rewrite split_fds_fun_in_fundefs; eauto;
+            simpl; rewrite Union_Empty_set_l, Union_sym; apply Same_set_refl
+          | eapply unique_bindings_split_fds_fundfes_append
+            with (B1 := (Fcons f0 tau xs (Efun B3 e'0) Fnil));
+            eauto using split_fds_sym ].
+      * intros m'. eapply preord_env_P_trans.
+        { eapply preord_env_P_antimon.
+          eapply preord_env_P_def_funs_hoist; eauto.
+          specialize (Hclo B2 (In_Fun1 _ _)). 
+          eapply same_split_fds_closed_fundefs; [ | | eauto]; eauto.
+          constructor. now apply split_fds_nil_l.
+          eapply Hclo. apply In_Fun3. now eapply split_fds_funs_in_fundef_r; eauto.
+          now eapply unique_bindings_split_fds_fundfes_append
+          with (B1 := Fcons f0 tau xs (Efun B3 e'0) Fnil); eauto using split_fds_sym.
+          apply Disjoint_sym.
+          eapply Disjoint_Included; [ apply Included_refl | | apply HD ].
+          eapply Included_trans. now apply name_in_fundefs_bound_var_fundefs.
+          rewrite bound_var_Efun,
+          (split_fds_bound_vars B1 (Fcons f0 tau xs (Efun B3 e'0) Fnil) B2),
+          bound_var_fundefs_Fcons, bound_var_Efun, <- !Union_assoc; eauto.
+          do 3 apply Included_Union_mon_r.
+          apply Included_Union_mon_l. now apply Included_refl.
+        edestruct split_fds_unique_bindings_fundefs_l as [H1' [H2' H3']];
+          [| apply H1 |]; eauto.
+        rewrite (split_fds_bound_vars B1 (Fcons f0 tau xs e'0 Fnil) B4) in H3' ; eauto.
+        rewrite bound_var_fundefs_Fcons in H3'.
+        apply Disjoint_sym. eapply Disjoint_Included; [ | | apply H3' ]; eauto.
+        simpl. rewrite Union_sym.
+        apply Included_Union_compat; eauto using Included_Union_l;
+        now apply name_in_fundefs_bound_var_fundefs.
+        now apply name_in_fundefs_bound_var_fundefs.
+        eapply preord_env_P_refl.
+        eapply Included_trans. apply occurs_free_Efun_Included.
+        eapply Included_Union_compat. apply Included_refl.
+        rewrite split_fds_name_in_fundefs; eauto. simpl. rewrite Union_Empty_set_l.
+        eapply Included_Union_compat; apply Included_refl. }
+        { intros m''.  
+          eapply preord_env_P_Same_set_fun_in_fundefs;
+            eauto using unique_bindings_split_fds_Fcons_fundefs_append;
+            now (eapply split_fds_fundefs_append_fun_in_fundefs
+                 with (B2 := Fcons f0 tau xs e'0 Fnil); eauto). } }
 Qed.
-
 
 
 Lemma hoist_star_preserves_fv e e' :
@@ -1738,7 +1744,7 @@ Proof.
     eapply hoist_correct_pre_compat_closure_Invariant; eauto.
   - intros e1 e2 rho1 rho2 H. eapply preord_exp_refl; eauto.
   - intros e1 e2 e3 [H1 [H2 H3]] H4 Ht1 Ht2 k rho1 rho2 Hpre. eapply preord_exp_trans.
-    eapply Ht1; eauto. eapply Ht2; eauto. eapply preord_env_P_refl.
+    eapply Ht1; eauto. intros m. eapply Ht2; eauto. eapply preord_env_P_refl.
 Qed.
 
 Corollary hoist_exp_correct e rho rho' k :
@@ -1752,3 +1758,4 @@ Proof.
   eapply hoist_star_correct; try eassumption.
   now eapply exp_hoist_in_hoist_star.
 Qed.
+

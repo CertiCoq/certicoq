@@ -30,8 +30,12 @@ with val_c : Type :=
 (** In Fix_c [(v1,c1); (v2,c2) ...],
     in ci, vi can occur, and refers to Fix_c [(v1,c1); (v2,c2) ...]
     See [simpleCPSAA.eval_Proj_c] for more details
+    
+    Unlike previously, when a lambda was implicit in a fix, the ci must now explicitly be a value.
+    Currently, [simpleCPSAA.eval_Proj_e] only reduces if cis are lambdas.
+    We may allow arbitrary values.
   *)
-| Fix_c : list (NVar * cps) -> val_c.
+| Fix_c : list (NVar * val_c) -> val_c.
 
 Require Import ExtLib.Data.Monads.OptionMonad.
 
@@ -114,7 +118,7 @@ match c with
 end
 with translateVal (c:CTerm) : option val_c :=
 match c with
- | vterm v => if ((varClass v):bool (*== USERVAR*)) then ret (Var_c v) else (ret (KVar_c v))
+ | vterm v => ret (if ((varClass v):bool (*== USERVAR*)) then  (Var_c v) else ((KVar_c v)))
  | terms.oterm CLambda [bterm [x; xk] b] =>
       b <- translateCPS b ;; 
       ret (Lam_c x xk b)
@@ -131,7 +135,7 @@ match c with
       let l:= map (fun b: CBTerm => 
                           match b with
                           bterm vars nt => 
-                            c <- translateCPS nt ;;
+                            c <- translateVal nt ;;
                             ret (hd nvarx vars, c)
                           end)
                   lbt in
@@ -139,4 +143,258 @@ match c with
       ret (Fix_c l)
  | _ => None
 end.
+
+(* Move *)
+Definition isSome {A:Type} (sop : option A) : Prop  := 
+match sop with
+| Some s => True
+| None => False
+end.
+
+Require Import SquiggleLazyEq.tactics.
+Require Import SquiggleLazyEq.LibTactics.
+Require Import SquiggleLazyEq.list.
+
+Lemma translateVal_val_outer : forall (t:CTerm),
+  isSome (translateVal t)
+  -> isSome (translateVal (val_outer t)).
+Proof using.
+  intros ? Hs.
+  simpl. cases_ifn v; destruct (translateVal t); auto.
+Qed.
+  
+Lemma translateVal_cps_cvt_val : forall (t:NTerm),
+  is_valueb t = true
+  -> isSome (translateVal (cps_cvt_val t))
+  -> isSome (translateVal (cps_cvt t)).
+Proof using.
+  intros ? Heq.
+  simpl. rewrite cps_val_outer by assumption.
+  unfold cps_cvt_val. apply translateVal_val_outer.
+Qed.
+
+Lemma translateVal_cps_cvt_val2 : forall (t:NTerm),
+(if (is_valueb t) 
+      then (isSome (translateVal (cps_cvt_val t)))
+      else (isSome (translateVal (cps_cvt t))))
+-> isSome (translateVal (cps_cvt t)).
+Proof using.
+  intros ?.
+  cases_if; auto.
+  apply translateVal_cps_cvt_val.
+  assumption.
+Qed.
+
+(* delete *)
+Ltac rwsimpl He1 :=
+  repeat progress (autorewrite with list core SquiggleLazyEq in He1; simpl in He1).
+
+Ltac rwsimplAll :=
+  repeat progress (autorewrite with list core SquiggleLazyEq in *; simpl in *).
+
+Ltac rwsimplC :=
+  repeat progress (autorewrite with list core SquiggleLazyEq; simpl).
+  
+(* delete *)
+Ltac dLin_hyp :=
+  repeat
+   match goal with
+   | H:forall x : ?T, ?L = x \/ ?R -> ?C
+     |- _ =>
+         let Hyp := fresh "Hyp" in
+         pose proof (H L (or_introl eq_refl)) as Hyp; specialize (fun x y => H x (or_intror y))
+   | H:forall x y, _ = _ \/ ?R -> ?C
+     |- _ =>
+         let Hyp := fresh "Hyp" in
+         pose proof (H _ _ (or_introl eq_refl)) as Hyp; specialize
+          (fun x z y => H x z (or_intror y))
+   | H:forall x : ?T, False -> _ |- _ => clear H
+   end.
+
+Ltac dimpn H :=
+  match type of H with
+  | ?T1 -> ?T2 => let name := fresh "hyp" in
+                  assert (name : T1);[auto| specialize (H name)]
+  end.
+
+(* Move  *)
+Lemma isSomeBindRet {A B:Type}: forall (v:option A) (f:A->B),
+  isSome v 
+  -> isSome (x <- v ;; (ret (f x))).
+Proof using.
+  intros ? ? His.
+  simpl. destruct v; auto.
+Qed.
+
+Lemma isSomeFlatten {A} : forall (lo : list (option A)),
+  (forall a, In a lo -> isSome a)
+  -> isSome (flatten lo).
+Proof using.
+  unfold flatten. intros ? Hin.
+  generalize (@nil A).
+  induction lo; simpl in *; auto.
+  dLin_hyp.
+  destruct a; simpl in *; try tauto; auto.
+Qed.
+
+(* Move *)
+Lemma varClassContVar : varClass contVar = false.
+Proof using.
+  intros.
+  unfold contVar.
+  pose proof (freshCorrect 1 (Some false) [] []) as Hf.
+  simpl in Hf. repnd.
+  remember (freshVars 1 (Some false) [] []) as lv.
+  dlist_len_name lv v. simpl.
+  specialize (Hf _ eq_refl v). simpl in *. auto.
+Qed.
+
+(* Delete *)
+Ltac addContVarsSpec  m H vn:=
+  let Hfr := fresh H "nr" in
+  pose proof H as Hfr;
+  apply userVarsContVars with (n:=m) in Hfr;
+  let vf := fresh "lvcvf" in
+  remember (contVars m) as vf;
+  let Hdis := fresh "Hcvdis" in
+  let Hlen := fresh "Hcvlen" in
+  pose proof Hfr as  Hdis;
+  pose proof Hfr as  Hlen;
+  apply proj2, proj2 in Hlen;
+  apply proj2, proj1 in Hdis;
+  apply proj1 in Hfr;
+  simpl in Hlen;
+  dlist_len_name vf vn.
+  
+Lemma translateVal_cps_cvt_Some : forall (t:NTerm),
+  nt_wf t
+  -> if (is_valueb t) 
+      then (isSome (translateVal (cps_cvt_val t))) 
+      else (isSome (translateVal (cps_cvt t))).
+Proof using.
+  induction t as [x | o lbt Hind]  using NTerm_better_ind ; intros Hwf;
+    [(* var *) simpl; tauto|].
+  inverts Hwf as Hbt Hnb.
+  destruct o; simpl in *; auto.
+(* lambda *)
+- dnumvbars  Hnb bt.
+  simpl in *. rewrite varClassContVar.
+  apply isSomeBindRet. 
+  apply isSomeBindRet.
+  apply translateVal_cps_cvt_val2.
+  dLin_hyp.
+  apply Hyp0; auto. ntwfauto.
+
+(* fix *)
+- setoid_rewrite map_map. unfold compose.
+  apply isSomeBindRet.
+  apply isSomeFlatten.
+  intros p Hin.
+  apply in_map_iff in Hin. exrepnd.
+  destruct a as [lv nt].
+  subst.
+  apply isSomeBindRet. simpl. apply translateVal_cps_cvt_val2.
+  eapply Hind; eauto.
+  ntwfauto.
+
+(* constructor *)
+- cases_if; rename H into Hb.
+(* constructor : all values*)
+  + apply isSomeBindRet.
+    rewrite map_map. unfold compose.
+    apply isSomeFlatten.
+    intros p Hin.
+    apply in_map_iff in Hin. exrepnd.
+    destruct a as [lv nt].
+    subst. simpl.
+    rewrite ball_map_true in Hb.
+    specialize (Hb _ Hin1). unfold compose in Hb. simpl in Hb.
+    specialize (Hind _ _ Hin1). rewrite Hb in Hind.
+    apply Hind; eauto with subset. ntwfauto.
+(* constructor : not all values*)
+  + generalize  ((tl (contVars (S (Datatypes.length lbt))))) at 2.
+    intros lkvv. simpl.
+    pose proof (varsOfClassNil true) as Hvc.
+    addContVarsSpec ((S (Datatypes.length lbt))) Hvc kv.
+    apply isSomeBindRet. simpl.
+    clear Heqlvcvf Hvcnr Hcvdis Hnb Hvc Hb.
+    rename H0 into Hlen.
+    revert Hlen. revert lvcvf.
+    induction lbt; simpl; intros; auto.
+    * rewrite map_map. unfold compose.
+      clear. simpl. cases_if;
+      apply isSomeBindRet;
+      apply isSomeBindRet;
+      rewrite map_map; unfold compose; simpl;
+      apply isSomeFlatten;
+      intros ? Hin; apply in_map_iff in Hin;
+      exrepnd; subst;
+      cases_if; simpl; auto.
+    * simpl in *. dlist_len_name lvcvf lvc. 
+      simpl.
+      destruct a. simpl.
+      dLin_hyp.
+      dimpn Hyp0;[ntwfauto|]; clear hyp.
+      apply translateVal_cps_cvt_val2 in Hyp0.
+      destruct (translateVal (cps_cvt n)); auto.
+      clear Hyp0.
+      apply isSomeBindRet.
+      apply isSomeBindRet.
+      apply_clear IHlbt; auto.
+  
+(* apply *)
+- dnumvbars  Hnb bt. simpl. ntwfauto.
+  simpl in *. dLin_hyp. ntwfauto.
+  dLin_hyp.
+  (dimpn Hyp1; clear hyp).
+  (dimpn Hyp2; clear hyp).
+  apply translateVal_cps_cvt_val2 in Hyp1.
+  apply translateVal_cps_cvt_val2 in Hyp2.
+  destruct (translateVal (cps_cvt btnt)); auto.
+  destruct (translateVal (cps_cvt btnt0)); auto.
+
+(* proj *)
+- dnumvbars  Hnb bt. simpl. ntwfauto.
+  simpl in *. dLin_hyp. ntwfauto.
+  apply isSomeBindRet.
+  apply isSomeBindRet.
+  dLin_hyp.
+  apply Hyp0 in Hyp. clear Hyp0.
+  apply translateVal_cps_cvt_val2. auto.
+
+(* let *)
+- dnumvbars  Hnb bt. simpl. ntwfauto.
+  simpl in *. dLin_hyp. ntwfauto.
+  dLin_hyp.
+  (dimpn Hyp1; clear hyp).
+  (dimpn Hyp2; clear hyp).
+  apply translateVal_cps_cvt_val2 in Hyp1.
+  apply translateVal_cps_cvt_val2 in Hyp2.
+  apply isSomeBindRet.
+  destruct (translateVal (cps_cvt btnt0)); auto.
+  apply isSomeBindRet.
+  apply isSomeBindRet.
+  destruct (translateVal (cps_cvt btnt)); auto.
+
+(* match *)
+- dnumvbars  Hnb bt. simpl.
+  apply isSomeBindRet.
+  simpl in *. dLin_hyp. ntwfauto.
+  apply Hyp0 in Hyp. clear Hyp0.
+  apply translateVal_cps_cvt_val2 in Hyp.
+  destruct (translateVal (cps_cvt btnt)); auto.
+  apply isSomeBindRet.
+  apply isSomeBindRet.
+  apply isSomeBindRet.
+  setoid_rewrite map_map. unfold compose.
+  apply isSomeFlatten.
+  intros ? Hin. apply in_map_iff in Hin.
+  exrepnd. subst.
+  destruct a0. simpl.
+  apply isSomeBindRet.
+  apply isSomeBindRet.
+  apply translateVal_cps_cvt_val2.
+  eapply Hind; eauto. ntwfauto.
+Qed.
+    
 End VarsOf2Class.

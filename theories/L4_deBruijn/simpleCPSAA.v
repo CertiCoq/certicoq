@@ -51,6 +51,33 @@ Require Import SquiggleLazyEq.lmap.
 
 Open Scope nat_scope.
 
+(* MOVE to [SquiggleLazyEq] *)
+Ltac rwsimpl He1 :=
+  repeat progress (autorewrite with list core SquiggleLazyEq in He1; simpl in He1).
+
+Ltac rwsimplAll :=
+  repeat progress (autorewrite with list core SquiggleLazyEq in *; simpl in *).
+
+Ltac rwsimplC :=
+  repeat progress (autorewrite with list core SquiggleLazyEq; simpl).
+
+
+Ltac dLin_hyp :=
+  repeat
+   match goal with
+   | H:forall x : ?T, ?L = x \/ ?R -> ?C
+     |- _ =>
+         let Hyp := fresh "Hyp" in
+         pose proof (H L (or_introl eq_refl)) as Hyp; specialize (fun x y => H x (or_intror y))
+   | H:forall x y, _ = _ \/ ?R -> ?C
+     |- _ =>
+         let Hyp := fresh "Hyp" in
+         pose proof (H _ _ (or_introl eq_refl)) as Hyp; specialize
+          (fun x z y => H x z (or_intror y))
+   | H:forall x : ?T, False -> _ |- _ => clear H
+   end.
+
+
 Instance NEqDec : Deq N.
 Proof using.
   intros x y. exists (N.eqb x y). apply N.eqb_eq.
@@ -420,15 +447,6 @@ Proof using.
   apply Hntwf in H.
   ntwfauto.
 Qed.
-
-Ltac rwsimpl He1 :=
-  repeat progress (autorewrite with list core SquiggleLazyEq in He1; simpl in He1).
-
-Ltac rwsimplAll :=
-  repeat progress (autorewrite with list core SquiggleLazyEq in *; simpl in *).
-
-Ltac rwsimplC :=
-  repeat progress (autorewrite with list core SquiggleLazyEq; simpl).
 
 Hint Rewrite @flat_map_bterm_nil_allvars : SquiggleLazyEq.
 
@@ -2400,20 +2418,6 @@ Proof using.
   refl.
 Qed.
 
-Ltac apply' H1 H2 :=
-  let H3 := fresh in
-  (pose proof (H1 H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3) ||
-  (pose proof (H1 _ _ _ _ _ _ _ _ _ _ H2) as H3; clear H2; pose proof H3 as H2; clear H3).
-
 
 Ltac unfoldSubst :=
   unfold ssubst; simpl;
@@ -3192,3 +3196,18 @@ End TypePreservingCPS.
 
 End VarsOf2Class.
 
+Ltac addContVarsSpec  m H vn:=
+  let Hfr := fresh H "nr" in
+  pose proof H as Hfr;
+  apply userVarsContVars with (n:=m) in Hfr;
+  let vf := fresh "lvcvf" in
+  remember (contVars m) as vf;
+  let Hdis := fresh "Hcvdis" in
+  let Hlen := fresh "Hcvlen" in
+  pose proof Hfr as  Hdis;
+  pose proof Hfr as  Hlen;
+  apply proj2, proj2 in Hlen;
+  apply proj2, proj1 in Hdis;
+  apply proj1 in Hfr;
+  simpl in Hlen;
+  dlist_len_name vf vn.

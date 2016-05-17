@@ -1,11 +1,15 @@
-Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
+Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
+        Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import cps cps_util identifiers env ctx Ensembles_util List_util.
 Import ListNotations.
 
 Section EVAL.
   
   Parameter pr : prims.
-  
+
+  (** The tag of the constructor that is returned to the top-level *)
+  Parameter obs_tag : tag.
+
   (** Big step evaluation relation with step counting *)
   (* This is almost a copy of the big step relation in cps.v.
    * There are two differences:
@@ -20,7 +24,7 @@ Section EVAL.
              (vs : list val) (f : var),
         M.get f rho = Some (Vobvs t) ->
         getlist ys rho = Some vs ->
-        bstep_e rho (Eapp f ys) (Vobservable t vs) 0
+        bstep_e rho (Eapp f ys) (Vconstr t obs_tag vs) 0
   | BStep_constr :
       forall (x : var) (t : type) (n : tag) (ys :list var) (e : exp)
              (rho rho' : env) (vs : list val) (v : val) (c : nat),
@@ -95,13 +99,11 @@ Section EVAL.
    *    forall c1 <= k, 
    *      ρ1 |- e1 ->^c1 v1 -> 
    *      exists v2, p2 |- e2 -> v2 /\ v1 ~_(k-c1) v2 
-   * Note that restrict the number of applications in the evaluation
-   * of the second argument so that the relation is transitive.
    * Value relation :
    * ----------------
    * Integers: (n1 ~_k n2) iff n1 = n2
-   * Constructors: [v_1, .., v_n] ~_k [v_1', .., v_n'] iff 
-   *                 v_1 ~_k v_1' /\ ... /\ v_n ~_k v_n'
+   * Constructors: [v_1, .., v_n] ~_k [v'_1, .., v'_m] iff
+                     n <= m /\ v_1 ~_k v'_1 /\ ... /\ v_n ~_k v'_n'
    * Closures: (\f1 x1. e1, ρ1) ~_k (\f2 x2. e2, ρ2) iff 
    *              \forall v1 v2 i < k, v1 ~_j v2 => 
    *                (e1, ρ1[x1 -> v1, f1 -> (\f1 x1. e1, ρ1)]) ~_j 
@@ -116,51 +118,43 @@ Section EVAL.
            exists v2 c2, bstep_e rho2 e2 v2 c2 /\ 
                     preord_val (k - c1) v1 v2
     in
-    let fix Forall2 R vs1 vs2 :=
-        match vs1, vs2 with
-          | [], [] => True
-          | v1 :: vs1, v2 :: vs2 =>
-            R v1 v2 /\ Forall2 R vs1 vs2
+    let fix preord_val_aux (v1 v2 : val) {struct v1} : Prop :=
+        let fix Forall2_aux vs1 vs2 :=
+            match vs1, vs2 with
+              | [], _ => True
+              | v1 :: vs1, v2 :: vs2 =>
+                preord_val_aux v1 v2 /\ Forall2_aux vs1 vs2
+              | _, _ => False
+            end
+        in
+        match v1, v2 with
+          | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
+            forall (vs1 vs2 : list val) (j : nat) (t1 : type) 
+              (xs1 : list var) (e1 : exp) (rho1' : env),
+              length vs1 = length vs2 ->
+              find_def f1 defs1 = Some (t1, xs1, e1) ->
+              Some rho1' = setlist xs1 vs1 (def_funs defs1 defs1 rho1 rho1) ->
+              exists (t2 : type) (xs2 : list var) (e2 : exp) (rho2' : env),
+                find_def f2 defs2 = Some (t2, xs2, e2) /\
+                Some rho2' = setlist xs2 vs2 (def_funs defs2 defs2 rho2 rho2) /\
+                match k with
+                  | 0 => True
+                  | S k =>
+                    let R := preord_val (k - (k-j)) in
+                    j < S k ->
+                    Forall2 R vs1 vs2 ->
+                    preord_exp (k - (k-j)) (e1, rho1') (e2, rho2')
+                end
+          | Vconstr tau1 t1 vs1, Vconstr tau2 t2 vs2 =>
+            t1 = t2 /\ Forall2_aux vs1 vs2
+          | Vint n1, Vint n2 => n1 = n2
+          | Vother t1, Vother t2 => True
+          | Vobvs t1, Vobvs t2 => True
+          | Vobservable t1 vs1, Vobservable t2 vs2 =>
+            Forall2_aux vs1 vs2
           | _, _ => False
         end
-    in
-    let fix preord_val_aux1 (v1 v2 : val) {struct v1} : Prop :=
-        let fix Forall2_aux vs1 vs2 :=
-               match vs1, vs2 with
-                 | [], [] => True
-                 | v1 :: vs1, v2 :: vs2 =>
-                   preord_val_aux1 v1 v2 /\ Forall2_aux vs1 vs2
-                 | _, _ => False
-               end
-           in
-           match v1, v2 with
-             | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
-               forall (vs1 vs2 : list val) (j : nat) (t1 : type) 
-                      (xs1 : list var) (e1 : exp) (rho1' : env),
-                 length vs1 = length vs2 ->
-                 find_def f1 defs1 = Some (t1, xs1, e1) ->
-                 Some rho1' = setlist xs1 vs1 (def_funs defs1 defs1 rho1 rho1) ->
-                 exists (t2 : type) (xs2 : list var) (e2 : exp) (rho2' : env),
-                   find_def f2 defs2 = Some (t2, xs2, e2) /\
-                   Some rho2' = setlist xs2 vs2 (def_funs defs2 defs2 rho2 rho2) /\
-                   match k with
-                     | 0 => True
-                     | S k =>
-                       let R := preord_val (k - (k-j)) in
-                       j < S k ->
-                       Forall2 R vs1 vs2 ->
-                       preord_exp (k - (k-j)) (e1, rho1') (e2, rho2')
-                   end
-           | Vconstr tau1 t1 vs1, Vconstr tau2 t2 vs2 =>
-             t1 = t2 /\ Forall2_aux vs1 vs2
-           | Vint n1, Vint n2 => n1 = n2
-           | Vother t1, Vother t2 => True
-           | Vobvs t1, Vobvs t2 => True
-           | Vobservable t1 vs1, Vobservable t2 vs2 =>
-             Forall2_aux vs1 vs2
-           | _, _ => False
-           end
-    in preord_val_aux1 v1 v2.
+    in preord_val_aux v1 v2.
            
   Definition preord_exp (k : nat) (p1 p2 : exp * env) : Prop :=
     let '(e1, rho1) := p1 in
@@ -168,9 +162,9 @@ Section EVAL.
     forall v1 c1,
       c1 <= k -> bstep_e rho1 e1 v1 c1 ->
       exists v2 c2, bstep_e rho2 e2 v2 c2 /\
-                    preord_val (k - c1) v1 v2.
+               preord_val (k - c1) v1 v2.
 
-  (** more compact definition of preorder on values *)
+  (** more compact definition of the value preorder *)
   Definition preord_val' (k : nat) (v1 v2 : val) : Prop :=
     match v1, v2 with
       | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
@@ -185,12 +179,12 @@ Section EVAL.
             (j < k -> Forall2 (preord_val j) vs1 vs2 ->
              preord_exp j (e1, rho1') (e2, rho2'))
       | Vconstr tau1 t1 vs1, Vconstr tau2 t2 vs2 =>
-        t1 = t2 /\ Forall2 (preord_val k) vs1 vs2
+        t1 = t2 /\ Forall2_asym (preord_val k) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
       | Vother t1, Vother t2 => True
       | Vobvs t1, Vobvs t2 => True
       | Vobservable t1 vs1, Vobservable t2 vs2 =>
-        Forall2 (preord_val k) vs1 vs2
+        Forall2_asym (preord_val k) vs1 vs2
       | _, _ => False
     end.
 
@@ -217,10 +211,10 @@ Section EVAL.
       eauto; do 4 eexists; split; eauto; split; eauto; intros Hc; exfalso; omega.
     - revert l0; induction l as [| x xs IHxs];
       intros l2; destruct l2 as [| y ys ];
-      split; intros H; try (now simpl in H; inv H). constructor. 
-      destruct H as [H1 H2]; eauto.
-      constructor; eauto. eapply IHxs. eauto.
-      inv H. split; eauto. eapply IHxs; eauto. 
+      split; intros H; try (now simpl in H; inv H); try now (simpl; eauto).
+      + destruct H as [H1 H2]; eauto.
+        constructor; eauto. eapply IHxs. eauto.
+      + inv H. split; eauto. eapply IHxs; eauto. 
     - split.
       * revert l0; induction l as [| x xs IHxs];
         intros l2; destruct l2 as [| y ys ];
@@ -236,18 +230,13 @@ Section EVAL.
       + edestruct Hpre as [t2 [xs2 [e2 [rho' [H1' [H2' H3']]]]]]; eauto.
         do 4 eexists. split; eauto. split; eauto. intros Hleq Hf v1 c1 Hleq' Hstep. 
         assert (Heq : k - (k - j) = j) by omega. rewrite Heq in H3'.
-        simpl in H3'. eapply H3'; eauto. clear H0 H1 H1' H2' H3' H Hleq'.
-        induction Hf; eauto.
+        simpl in H3'. eapply H3'; eauto.
       + edestruct Hpre as [t2 [xs2 [e2 [rho' [H1' [H2' H3']]]]]]; eauto.
         do 4 eexists. split; eauto. split; eauto.
         intros Hleq Hf v1 Hstep.
         assert (Heq : k - (k - j) = j) by omega. rewrite Heq in *.
-        eapply H3'; eauto. clear H0 H1 H2' H3' H.
-        revert vs2 Hf; induction vs1 as [| v1' vs1 IHvs1];
-        intros [| v2 vs2 ]; intros Hall; try now inv Hall; eauto.
-        constructor. destruct Hall. constructor; eauto.
-    - simpl. 
-      revert l0; induction l as [| x xs IHxs];
+        eapply H3'; eauto.
+    - simpl. revert l0; induction l as [| x xs IHxs];
       intros l2; destruct l2 as [| y ys ];
       split; intros H; try (now simpl in H; inv H).
       destruct H as [H1 H2]; eauto.
@@ -286,8 +275,6 @@ Section EVAL.
                   preord_exp k (c1 |[ e1 ]|, rho1')
                              (c2 |[ e2 ]|, rho2').
 
-  
-
   Lemma preord_var_env_extend_eq :
     forall (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
       preord_val k v1 v2 ->
@@ -296,8 +283,8 @@ Section EVAL.
     intros rho1 rho2 k x v1 v2 Hval x' Hget.
     rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss. split; eauto.
   Qed.
-
-    Lemma preord_var_env_extend_neq :
+  
+  Lemma preord_var_env_extend_neq :
     forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
       preord_var_env k rho1 rho2 y y ->
       y <> x ->
@@ -384,7 +371,7 @@ Section EVAL.
   (** extend the related environments with a list *)
   Lemma preord_env_P_setlist_l:
     forall (P1 P2 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
-           (k : nat) (xs : list var) (vs1 vs2 : list val),
+      (k : nat) (xs : list var) (vs1 vs2 : list val),
       preord_env_P P1 k rho1 rho2 ->
       (forall x, ~ List.In x xs -> P2 x -> P1 x) ->
       Forall2 (preord_val k) vs1 vs2 ->
@@ -419,7 +406,7 @@ Section EVAL.
       destruct (H2 _ Heq1) as [v2 [Heq Hpre]].
       eexists. split; simpl; eauto. rewrite Hget, Heq. eauto.
   Qed.
-  
+
   Lemma preord_env_P_getlist_l (P : var -> Prop) (rho1 rho2 : env) (k : nat)
         (xs : list var) (vs1 : list val) :
     preord_env_P P k rho1 rho2 ->
@@ -499,11 +486,11 @@ Section EVAL.
       edestruct Hpre as [t2 [xs2 [e2 [rho2' [H1 [H2 H3]]]]]]; eauto.
       do 4 eexists; split; eauto. split; eauto. intros Hleq' Hall. 
       eapply H3; eauto. omega. 
-    - destruct l; try now inv Hpre. constructor.
+    - constructor.
     - inv Hpre. constructor; rewrite preord_val_eq in *. eapply IHv1; eauto.
         eapply (IHv0 (Vobservable tau l')) in H4. eauto.
   Qed.
-
+  
   (** The expression relation is monotonic in the step index *)
   Lemma preord_exp_monotonic (k : nat) :
     (forall rho1 e1 rho2 e2 j,
@@ -526,7 +513,6 @@ Section EVAL.
     eexists; split; eauto. eapply preord_val_monotonic; eauto.
   Qed.
 
-  
   Lemma preord_env_monotonic k j rho1 rho2 :
     j <= k -> preord_env k rho1 rho2 -> preord_env j rho1 rho2.
   Proof.
@@ -561,10 +547,17 @@ Section EVAL.
     edestruct Henv as [v' [Hget Hpre]]; eauto.
     destruct v'; rewrite preord_val_eq in Hpre; simpl in Hpre; try contradiction.
     inv Hpre.
-    edestruct (Forall2_nthN (preord_val k) vs l) as [v2 [Hnth Hval]]; eauto.
+    edestruct (Forall2_asym_nthN (preord_val k) vs l) as [v2 [Hnth Hval]]; eauto.
     edestruct Hexp as [v2' [c2 [Hstep Hval']]]; eauto.
     repeat eexists; eauto. econstructor; eauto.
   Qed.
+
+  Lemma Forall2_Forall2_asym_included {A} R (l1 l2 : list A) :
+    Forall2 R l1 l2 ->
+    Forall2_asym R l1 l2.
+  Proof.
+    intros H. induction H; eauto.
+  Qed.    
 
   Lemma preord_exp_app_compat k rho1 rho2 x1 x2 ys1 ys2 :
     preord_var_env k rho1 rho2 x1 x2 ->
@@ -577,7 +570,8 @@ Section EVAL.
       rewrite preord_val_eq in Hpre.
       destruct v2; try (now simpl in Hpre; contradiction).
       repeat eexists. constructor; eauto. eauto.
-      rewrite preord_val_eq. rewrite <- minus_n_O. eauto.
+      rewrite preord_val_eq. rewrite <- minus_n_O.
+      simpl. split; eauto. eauto using Forall2_Forall2_asym_included.
     - edestruct Hvar as [v2' [Hget Hpre]]; eauto.
       rewrite preord_val_eq in Hpre.
       destruct v2'; try (now simpl in Hpre; contradiction).
@@ -647,7 +641,6 @@ Section EVAL.
     repeat eexists; eauto. econstructor; eauto.
   Qed.
 
-
   Lemma preord_exp_fun_compat k rho1 rho2 B e1 e2 :
     preord_exp k (e1, def_funs B B rho1 rho1)
                (e2, def_funs B B rho2 rho2) ->
@@ -705,7 +698,7 @@ Section EVAL.
       eapply IHe. eapply preord_env_P_extend.
       eapply preord_env_P_antimon; eauto. intros x [H1 H2].
       constructor 2; eauto. intros Hc. subst. eauto.
-      rewrite preord_val_eq. constructor; eauto.
+      rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
     - eapply preord_exp_case_nil_compat.
     - eapply preord_exp_case_cons_compat; eauto.
       apply IHe. intros x P. apply Henv. constructor; eauto.
@@ -927,12 +920,12 @@ Section EVAL.
                                (name_in_fundefs (B <[ e1 ]>))))
                  k (def_funs (B' <[ e1 ]>) (B <[ e1 ]>) rho1 rho1)
                  (def_funs (B' <[ e2 ]>) (B <[ e2 ]>) rho2 rho2).
-   Proof.
+  Proof.
     revert B rho1 rho2 B' e1 e2 S1.
     induction k as [ k IH' ] using lt_wf_rec1.
     intros B rho1 rho2 B' e1 e2 S1 Hpre Henv.
     assert (Hval : forall f, preord_val k (Vfun rho1 (B' <[ e1 ]>) f)
-                                       (Vfun rho2 (B' <[ e2 ]>) f)).
+                                   (Vfun rho2 (B' <[ e2 ]>) f)).
     { intros f. rewrite preord_val_eq.
       intros vs1 vs2 j t1 xs1 e' rho1' Hlen Hf Hs.
       edestruct find_def_def_funs_ctx as [H1 | [c [H1 H2]]]; eauto.
@@ -971,10 +964,10 @@ Section EVAL.
             rewrite Union_Empty_set_r.
             rewrite (Setminus_Included_Empty_set (Setminus var (Singleton var v0) (Singleton var v)));
               [| eapply Setminus_Included; now apply Included_refl ].
-             rewrite Union_Empty_set_r.
-             rewrite <- Setminus_Union_distr.
-             eapply Included_Union_compat;
-             eapply Setminus_Included; now apply Included_refl.
+            rewrite Union_Empty_set_r.
+            rewrite <- Setminus_Union_distr.
+            eapply Included_Union_compat;
+              eapply Setminus_Included; now apply Included_refl.
           - eapply Hval. }
         { simpl. eapply preord_env_P_antimon ; [ eassumption |].
           rewrite Setminus_Union_distr, Union_Empty_set_l.
@@ -988,11 +981,11 @@ Section EVAL.
         rewrite <- !Setminus_Union_distr.  
         apply Setminus_Included; eauto using Included_refl.
       + apply Hval.
-   Qed.
+  Qed.
   
   Lemma preord_exp_compat k rho1 rho2 c e1 e2 :
     (forall k rho1 rho2, preord_env_P (occurs_free e1) k rho1 rho2 ->
-                         preord_exp k (e1, rho1) (e2, rho2)) ->
+                    preord_exp k (e1, rho1) (e2, rho2)) ->
     preord_env_P (occurs_free (c |[ e1 ]|)) k rho1 rho2 ->
     preord_exp k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
@@ -1005,7 +998,7 @@ Section EVAL.
         * eapply preord_env_P_antimon; eauto.
           simpl. intros x H. inv H. constructor 2; eauto.
           intros H. subst; eauto.
-        * rewrite preord_val_eq. simpl; eauto.
+        * rewrite preord_val_eq. simpl; split; eauto using Forall2_Forall2_asym_included.
     - simpl. eapply preord_exp_proj_compat; eauto.
       + eapply Hpre. constructor; eauto.
       + intros vs1 vs2 Hall. eapply IHc; eauto.
@@ -1068,7 +1061,6 @@ Section EVAL.
     eapply preord_val_monotonic; eauto. omega.
   Qed.
 
-
   Lemma preord_val_trans (k : nat) v1 v2 v3 :
     preord_val k v1 v2 ->
     (forall m, preord_val m v2 v3) ->
@@ -1081,10 +1073,6 @@ Section EVAL.
     try (now  intros H1 H2; specialize (H2 k); rewrite !preord_val_eq in *;
            destruct v1; destruct v2; 
          try (now simpl in *; contradiction); inv H1; inv H2; simpl; eauto).
-    - intros H1 H2. specialize (H2 k); rewrite !preord_val_eq in *.
-      destruct v1; destruct v2; try (now simpl in *; contradiction).
-      destruct H1 as [H1 H1']. destruct H2 as [H2 H2']. subst.
-      destruct l; destruct l0; try inv H1'; try inv H2'. split; eauto.
     - intros H1 H2. assert (H2' := H2 k); rewrite !preord_val_eq in *.
       destruct v1; destruct v2; try (now simpl in *; contradiction).
       destruct H1 as [H1 H1']. destruct H2' as [H3 H3']. subst.

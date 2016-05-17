@@ -1,6 +1,7 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
+        Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import CpdtTactics.
-Require Import cps Ensembles_util.
+Require Import cps Ensembles_util List_util.
 Import ListNotations.
 (* Require Maps. *)
 (* Import Nnat. *)
@@ -498,19 +499,39 @@ Proof.
     + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
 Qed.
 
+Lemma Forall2_asym_nthN {A} (R : A -> A -> Prop) (l1 l2 : list A)
+      (n : N) (v1 : A):
+  Forall2_asym R l1 l2 ->
+  nthN l1 n = Some v1 ->
+  exists v2,
+    nthN l2 n = Some v2 /\
+    R v1 v2.
+Proof.
+  revert l2 n.
+  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
+  - inv H. discriminate.
+  - inv H. destruct n as [| n].
+    + simpl in Hnth. inv Hnth.
+      eexists. split; simpl; eauto.
+    + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
+Qed.
+
 Lemma nthN_length {A} (l1 l2 : list A) (n : N) (v1 : A) :
-  length l1 = length l2 ->
+  length l1 <= length l2 ->
   nthN l1 n = Some v1 ->
   exists v2,
     nthN l2 n = Some v2.
 Proof.
   revert l2 n.
   induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
-  - inv H. discriminate.
-  - inv H. destruct n as [| n]; destruct l2; try discriminate.
+  - inv Hnth.
+  - destruct n as [| n]; destruct l2; try discriminate.
+    + simpl in H. omega.
     + simpl in Hnth. inv Hnth.
       eexists. split; simpl; eauto.
-    + inv H1. edestruct IHxs as [v2 Hnth2]; eauto.
+    + simpl in H. omega.
+    + edestruct IHxs with (l2 := l2) as [v2 Hnth2]; eauto.
+      simpl in H. omega.
 Qed.
 
 Lemma setlist_Forall2_get (P : val -> val -> Prop)

@@ -479,12 +479,13 @@ Proof with crush.
       rewrite <- IHe... f_equal. f_equal. lia.
 Qed.
 
-
 Lemma eval_wf n t t' : exp_wf n t -> eval t t' -> exp_wf n t'.
 Proof. (* should be easy *) Admitted.
 
-Lemma exp_wf_subst e n t  : exp_wf (n + N.of_nat (List.length e)) t ->
-                            exp_wf n (subst_env e t).
+Lemma exp_wf_subst e n t :
+  wf_tr_environ e ->
+  exp_wf (n + N.of_nat (List.length e)) t ->
+  exp_wf n (subst_env e t).
 Proof. (* just as well *) Admitted.
 
 Lemma sbst_closed_id v :
@@ -813,12 +814,11 @@ Proof.
     pose (WFTerm_exp_wf _ _ Hwf H4 IHHwf _ _ H).
     simpl in e0.
     rewrite (translate_env_eval _ _ _ H4) in H5.
-    apply (exp_wf_subst e'0 0) in e0.
+    apply (exp_wf_subst e'0 0) in e0; auto.
     apply (eval_wf _ _ _ e0 H5).
     eapply eval_yields_value; now eauto.
   - intros. simpl in H. eauto.
 Qed.
-
 
 Lemma wf_tr_environ_sbst t n e :
   wf_tr_environ e -> e = snd (sbst_env t n e).
@@ -1048,7 +1048,7 @@ Proof with eauto.
     simpl. simpl in IHWcbvEval3.
     rewrite subst_env_aux_subst in IHWcbvEval3; auto.
     assert(exp_wf 0 (subst_env e'' (translate e'' a1'))).
-    apply exp_wf_subst.
+    apply exp_wf_subst; eauto.
     apply (WFTerm_exp_wf e e'' wfe evenv wfe'' _ _ H1).
     rewrite (proj1 (closed_subst_sbst _ H3)). 
     apply IHWcbvEval3; eauto.
@@ -1072,7 +1072,7 @@ Proof with eauto.
     rewrite subst_env_aux_subst in IHWcbvEval2; auto.
     simpl.
     assert(exp_wf 0 (subst_env e'' (translate e'' dfn'))).
-    apply exp_wf_subst.
+    apply exp_wf_subst; eauto.
     apply (WFTerm_exp_wf e e'' wfe evenv wfe'' _ _ H).
     rewrite (proj1 (closed_subst_sbst _ H2)).
     apply IHWcbvEval2.

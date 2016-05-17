@@ -11,6 +11,15 @@ Ltac if_split :=
       destruct e; simpl; try lia; auto; try subst
   end.
 
+(** Inversion tactic *)
+Ltac inv H := inversion H; clear H; subst.
+
+(** Try rewriting (with inductive hyps usually) *)
+Ltac rewrite_hyps :=
+  repeat match goal with
+    | [ H : _ |- _ ] => rewrite !H
+  end.
+
 Class Eq (A:Type) :=
   {
     eq_dec: forall (x y:A), {x = y} + {x<>y}
@@ -367,14 +376,29 @@ Proof.
   - exists n. reflexivity.
 Qed.
 
+
+
 (* These lemmas come from "A Head-to-Head Comparison of deBruijn
    Indices and Names" by Stefan Berghofer and Christian Urban. It's
    notable that they and others remark that coming up with these on
    your own is quite difficult...
 
-   I don't actually need these yet, so they are not quite up to date
-   with the rest of the development.  *)
-(*
+   They are used to formalize the L3 to L4 translation. *)
+
+Lemma efnlst_length_shift v k es :
+  efnlst_length (shift_fns v k es) = efnlst_length es.
+Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
+
+Lemma efnlst_length_sbst v k es :
+  efnlst_length (sbst_efnlst v k es) = efnlst_length es.
+Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
+
+Lemma efnlst_length_subst v k es :
+  efnlst_length (subst_efnlst v k es) = efnlst_length es.
+Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
+
+Hint Rewrite efnlst_length_shift efnlst_length_subst efnlst_length_sbst.
+
 Lemma shift_twice:
   forall N i j m n, i <= j -> j <= i + m ->
  shift n j (shift m i N) = shift (m + n) i N.
@@ -382,10 +406,18 @@ Proof.
   assert ((forall N i j m n, i <= j -> j <= i + m ->
  shift n j (shift m i N) = shift (m + n) i N) /\
           (forall Ns i j m n, i <= j -> j <= i + m ->
- shifts n j (shifts m i Ns) = shifts (m + n) i Ns)).
+                              shifts n j (shifts m i Ns) = shifts (m + n) i Ns) /\
+          (forall Ns i j m n, i <= j -> j <= i + m ->
+                                    shift_fns n j (shift_fns m i Ns) =
+                                    shift_fns (m + n) i Ns) /\
+          (forall Ns i j m n, i <= j -> j <= i + m ->
+                           shift_branches n j (shift_branches m i Ns) =
+                           shift_branches (m + n) i Ns)).
   apply my_exp_ind; intros; simpl; auto ;
-  try (rewrite H; auto; try lia; rewrite H0; auto; try lia; auto).
+  try (rewrite H; auto; try lia; rewrite H0; auto; autorewrite with core; try lia; auto).
   repeat if_split. apply f_equal. lia.
+  f_equal.
+  rewrite H; auto; autorewrite with core; try lia. 
   tauto.
 Qed.
 
@@ -396,14 +428,25 @@ Proof.
   assert ((forall N i k j L, k <= j ->
  shift i k (N{j := L}) = (shift i k N){j+i := L}) /\
           (forall Ns i k j L, k <= j ->
- shifts i k (Ns{j := L}) = (shifts i k Ns){j+i := L})).
+                              shifts i k (Ns{j := L}) = (shifts i k Ns){j+i := L}) /\
+          (forall Ns i k j L, k <= j ->
+                         shift_fns i k (Ns{j := L}) = (shift_fns i k Ns){j+i := L}) /\
+          (forall Ns i k j L, k <= j ->
+                         shift_branches i k (Ns{j := L}) =
+                         (shift_branches i k Ns){j+i := L})).
   apply my_exp_ind; intros; simpl; auto ;
-  try (rewrite H; auto; rewrite H0; auto).
+  try (rewrite H; auto; autorewrite with core; rewrite H0; auto; try lia).
   repeat if_split. destruct (lt_dec j k); try lia.
   rewrite shift_twice; auto; lia.
   destruct (lt_dec n k); try lia; auto. apply f_equal. lia.
-  apply f_equal. rewrite H; try lia. simpl.
-  replace (1 + j + i) with (1 + (j + i)); auto; lia. 
+  apply f_equal. rewrite H; simpl; f_equal; try lia.
+  simpl; repeat (f_equal; try lia). 
+  repeat (f_equal; try lia).
+  simpl in H. unfold shift_fns in H. rewrite H.
+  repeat (f_equal; autorewrite with core; try lia; auto).
+  repeat (f_equal; autorewrite with core; try lia; auto).
+  repeat (f_equal; autorewrite with core; simpl; try lia; auto).
+  rewrite H. simpl. f_equal; lia. lia.
   tauto.
 Qed.
 
@@ -414,37 +457,43 @@ Proof.
   assert ((forall (L:exp) k i j (P:exp), k <= i -> i < k + (j + 1) ->
                                          (shift (1 + j) k L){i := P} = shift j k L) /\
           (forall (Ls:exps) k i j (P:exp), k <= i -> i < k + (j + 1) ->
-                                         (shifts (1 + j) k Ls){i := P} = shifts j k Ls)).
+                                           (shifts (1 + j) k Ls){i := P} = shifts j k Ls) /\
+  (forall Ls k i j (P:exp), k <= i -> i < k + (j + 1) ->
+                       (shift_fns (1 + j) k Ls){i := P} = shift_fns j k Ls) /\
+  (forall Ls k i j (P:exp), k <= i -> i < k + (j + 1) ->
+                       (shift_branches (1 + j) k Ls){i := P} = shift_branches j k Ls)).
   apply my_exp_ind; simpl; intros; auto ;
-  try (rewrite H; auto; try lia; rewrite H0; auto).
+  try (rewrite H; auto; try lia; try rewrite H0; autorewrite with core; auto); try lia.
   repeat if_split. replace (n + (1 + j) - 1) with (n + j); auto; lia.
   tauto.
 Qed.
 
-(** According to Berghofer and Urban, this is a critical property of substitution,
-    though we don't use it here. *)
+(** According to Berghofer and Urban, this is a critical property of substitution, *)
+(*     though we don't use it here. *)
 Lemma substitution :
   forall (M N L:exp) i j, i <= j ->
     M{i := N}{j := L} = M{1+j := L}{i := N{ j-i := L}}.
 Proof.
-  assert ((forall (M:exp) N L i j, i <= j -> M{i := N}{j := L} = M{1+j := L}{i := N{ j-i := L}}) /\
-          (forall (Ms:exps) N L i j, i <= j -> Ms{i := N}{j := L} = Ms{1+j := L}{i := N{ j-i := L}})).
+  assert ((forall (M:exp) N L i j, i <= j -> M{i := N}{j := L} = M{1+j := L}{i := N{ j-i := L}}) /\ (forall (Ms:exps) N L i j, i <= j -> Ms{i := N}{j := L} = Ms{1+j := L}{i := N{ j-i := L}}) /\
+   (forall (Ms:efnlst) N L i j, i <= j -> Ms{i := N}{j := L} = Ms{1+j := L}{i := N{ j-i := L}}) /\
+   (forall (Ms:branches_e) N L i j, i <= j -> Ms{i := N}{j := L} = Ms{1+j := L}{i := N{ j-i := L}})).
   apply my_exp_ind; intros; simpl in *; auto ;
-  try (rewrite H; auto; rewrite H0; auto).
+  try (rewrite H; auto; try rewrite H0; autorewrite with core; auto; try lia).
   repeat if_split.
-  assert (0 <= j - i). lia.
+  assert (0 <= j - i) by lia.
   generalize (shift_subst N i 0 (j - i) L H0). intros.
   unfold substitute in H1. simpl in H1.
   rewrite H1. replace (j - i + i) with j; auto. lia.
   destruct (eq_dec n 0). lia.
-  generalize  (shift_away_subst L 0 i (n - 1)). intro.
+  generalize (shift_away_subst L 0 i (n - 1)). intro.
   unfold substitute in H0. simpl in H0.
   specialize (H0 (subst L (n - 1 - i) N)). rewrite H0; auto. lia. lia.
-  apply f_equal.
-  rewrite H. replace (1 + j - (1 + i)) with (j - i). auto. lia. lia.
+  apply f_equal. replace (1 + j - (1 + i)) with (j - i). auto. lia. 
+  apply f_equal. replace (1 + j - (1 + i)) with (j - i). auto. lia.
+  f_equal. repeat (f_equal; try lia).
+  repeat (f_equal; try lia).
   tauto.
 Qed.
-*)
 
 Fixpoint sbst_list (e:exp) (vs:exps): exp :=
   match vs with
@@ -1307,20 +1356,6 @@ Proof.
 Qed.
 Hint Resolve are_values_append.
 
-Ltac inv H := inversion H; clear H; subst.
-Ltac rewrite_hyps :=
-  repeat match goal with
-    | [ H : _ |- _ ] => rewrite !H
-  end.
-
-Lemma efnlst_length_sbst v k es :
-  efnlst_length (sbst_efnlst v k es) = efnlst_length es.
-Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
-
-Lemma efnlst_length_subst v k es :
-  efnlst_length (subst_efnlst v k es) = efnlst_length es.
-Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
-
 Lemma exp_wf_shift :
   (forall i e, exp_wf i e -> forall j, shift j i e = e) /\
   (forall i es, exps_wf i es -> forall j, shifts j i es = es) /\
@@ -1446,4 +1481,15 @@ Proof.
   apply my_exp_wf_ind; simpl; intros; try solve [rewrite_hyps; auto; lia]; trivial.
   destruct (lt_dec j j0). reflexivity.
   destruct (N.eq_dec j j0). lia. lia.
+Qed.
+
+
+Lemma shift0 :
+  (forall e, forall i, shift 0 i e = e) /\
+  (forall es, forall i, shifts 0 i es = es) /\
+  (forall es, forall i, shift_fns 0 i es = es) /\
+  (forall bs, forall i, shift_branches 0 i bs = bs).
+Proof.
+  apply my_exp_ind; intros; try rewrite_hyps; simpl; try rewrite_hyps; trivial.
+  destruct lt_dec. reflexivity. now rewrite N.add_0_r.
 Qed.

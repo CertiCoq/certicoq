@@ -6,11 +6,11 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.Li
   Coq.Program.Program Coq.micromega.Psatz.
 
 Set Implicit Arguments.
-Section VarsOf2Class.
 
-(* see the file SquiggleLazyEq.varImplPeano for an instantiation of NVar *)
-Context {NVar} {deqnvar : Deq NVar} {vartype: @VarType NVar bool (* 2 species of vars*) _}.
+Require Import L4.VarInstance.
 
+Require Import cps.
+Notation NVar := var.
 
 (**********************)
 (** * CPS expressions *)
@@ -155,11 +155,14 @@ Require Import SquiggleLazyEq.tactics.
 Require Import SquiggleLazyEq.LibTactics.
 Require Import SquiggleLazyEq.list.
 
+Local Opaque varClassP.
+
 Lemma translateVal_val_outer : forall (t:CTerm),
   isSome (translateVal t)
   -> isSome (translateVal (val_outer t)).
 Proof using.
   intros ? Hs.
+  unfold val_outer.
   simpl. cases_ifn v; destruct (translateVal t); auto.
 Qed.
   
@@ -237,7 +240,15 @@ Proof using.
   destruct a; simpl in *; try tauto; auto.
 Qed.
 
-(* Move *)
+Local Opaque freshVars.
+Local Opaque varClass.
+Local Opaque freshVarsPos.
+Local Opaque freshVarsPosAux.
+Local Opaque varClass.
+Local Opaque varClassP.
+Local Opaque contVars.
+
+(* delete *)
 Lemma varClassContVar : varClass contVar = false.
 Proof using.
   intros.
@@ -247,7 +258,8 @@ Proof using.
   remember (freshVars 1 (Some false) [] []) as lv.
   dlist_len_name lv v. simpl.
   specialize (Hf _ eq_refl v). simpl in *. auto.
-Qed.
+Qed.  
+
 
 (* Delete *)
 Ltac addContVarsSpec  m H vn:=
@@ -265,7 +277,7 @@ Ltac addContVarsSpec  m H vn:=
   apply proj1 in Hfr;
   simpl in Hlen;
   dlist_len_name vf vn.
-  
+
 Lemma translateVal_cps_cvt_Some : forall (t:NTerm),
   nt_wf t
   -> if (is_valueb t) 
@@ -278,7 +290,9 @@ Proof using.
   destruct o; simpl in *; auto.
 (* lambda *)
 - dnumvbars  Hnb bt.
-  simpl in *. rewrite varClassContVar.
+  simpl in *.
+  unfold var, M.elt in *.
+  rewrite @varClassContVar.
   apply isSomeBindRet. 
   apply isSomeBindRet.
   apply translateVal_cps_cvt_val2.
@@ -312,7 +326,9 @@ Proof using.
     specialize (Hind _ _ Hin1). rewrite Hb in Hind.
     apply Hind; eauto with subset. ntwfauto.
 (* constructor : not all values*)
-  + generalize  ((tl (contVars (S (Datatypes.length lbt))))) at 2.
+  + 
+    unfold var, M.elt in *.
+    generalize  ((tl (contVars (S (Datatypes.length lbt))))) at 2.
     intros lkvv. simpl.
     pose proof (varsOfClassNil true) as Hvc.
     addContVarsSpec ((S (Datatypes.length lbt))) Hvc kv.
@@ -320,7 +336,7 @@ Proof using.
     clear Heqlvcvf Hvcnr Hcvdis Hnb Hvc Hb.
     rename H0 into Hlen.
     revert Hlen. revert lvcvf.
-    induction lbt; simpl; intros; auto.
+    induction lbt; simpl; intros; auto;[|].
     * rewrite map_map. unfold compose.
       clear. simpl. cases_if;
       apply isSomeBindRet;
@@ -336,6 +352,7 @@ Proof using.
       dLin_hyp.
       dimpn Hyp0;[ntwfauto|]; clear hyp.
       apply translateVal_cps_cvt_val2 in Hyp0.
+      unfold var, M.elt in *.
       destruct (translateVal (cps_cvt n)); auto.
       clear Hyp0.
       apply isSomeBindRet.
@@ -396,5 +413,3 @@ Proof using.
   apply translateVal_cps_cvt_val2.
   eapply Hind; eauto. ntwfauto.
 Qed.
-    
-End VarsOf2Class.

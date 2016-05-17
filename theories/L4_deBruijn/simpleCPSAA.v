@@ -448,6 +448,7 @@ Proof using.
   ntwfauto.
 Qed.
 
+
 Hint Rewrite @flat_map_bterm_nil_allvars : SquiggleLazyEq.
 
 (* c := USERVAR in the intended use case. But this property holds more generally *)
@@ -757,7 +758,17 @@ Definition contVar : NVar :=
     This ensures a substitution property 
     [cps_cvt(e{x:=v}) = (cps_cvt e){x:=(cps_vt_val v)}].
  *)
- 
+ Lemma varClassContVar : varClass contVar = false.
+Proof using.
+  intros.
+  unfold contVar.
+  pose proof (freshCorrect 1 (Some false) [] []) as Hf.
+  simpl in Hf. repnd.
+  remember (freshVars 1 (Some false) [] []) as lv.
+  dlist_len_name lv v. simpl.
+  specialize (Hf _ eq_refl v). simpl in *. auto.
+Qed.
+
 Section CPS_CVT.
 (** recursive call *)
   Variable cps_cvt : NTerm -> CTerm (*val_c *).

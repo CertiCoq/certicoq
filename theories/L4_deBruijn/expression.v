@@ -521,7 +521,7 @@ Fixpoint efnlength (es:efnlst) :=
 Definition sbst_fix (es:efnlst) (e : exp) : exp :=
   let les := efnlength es in
     fold_left
-      (fun bod ndx => e{1 ::= Fix_e es (N.of_nat ndx)})
+      (fun e ndx => e{1 ::= Fix_e es (N.of_nat ndx)})
       (list_to_zero les) e.
 
 (** Big-step evaluation for [exp]. *)
@@ -1145,8 +1145,7 @@ Example Three := Eval vm_compute in (unsome (eval_n 100 three)).
 Example Four := Eval vm_compute in (unsome (eval_n 100 four)).
 Example Five := Eval vm_compute in (unsome (eval_n 100 five)).
 Example Six := Eval vm_compute in (unsome (eval_n 100 six)).
-
-
+*)
 
 (** If [e] is an [i+1] expression, and [v] is a closed expression, then 
     for any [k <= i], substituting [v] for [k] in e yields an [i] expression.
@@ -1173,7 +1172,8 @@ Proof.
   - repeat if_split; try (constructor; auto; lia).
   - constructor. apply H; try lia; auto.
   - constructor; auto. apply H0; try lia; auto.
-  - constructor; auto. apply H; try lia; auto.
+  - constructor; auto. rewrite efnlst_length_sbst.
+    apply H; try lia; auto.
   - constructor; auto. 
   - constructor; auto. 
   - constructor; auto. apply H; try lia; auto.
@@ -1227,6 +1227,21 @@ Proof.
       apply IHes. auto.
 Qed.
 
+(** TODO: depends on the representation of fixes *)
+Lemma sbst_fix_preserves_wf :
+  forall es, efnlst_wf (efnlst_length es + 1) es ->
+          forall e, exp_wf (efnlst_length es + 1) e ->
+               exp_wf 1 (sbst_fix es e).
+Proof.
+  intros.
+  unfold sbst_fix.
+  revert e H0.
+  remember (Fix_e es) as fixe.
+  remember (efnlst_length es) as n.
+  rewrite Heqn in H. revert Heqn. 
+  revert n. refine (N.induction _ _ _ _).
+Admitted.
+
 Lemma find_branch_preserves_wf :
   forall i bs, branches_wf i bs ->
                forall d m e, find_branch d m bs = Some e -> exp_wf (m+i) e.
@@ -1253,15 +1268,19 @@ Proof.
   - inversion H1; clear H1; subst. apply H0; auto.
     apply subst_list_preserves_exp_wf. specialize (H H5). inversion H; subst.
     auto. eapply find_branch_preserves_wf; eauto.
-  - inversion H0; subst. clear H0.
-    specialize (H H3). inversion H; subst.
-    apply (fun H' => sbst_preserves_exp_wf 0 (Lam_e e') H' (Fix_e es) H).
-    constructor.  eapply nthopt_preserves_wf; eassumption.
+  - inversion H2; subst. 
+    specialize (H0 H7). specialize (H H6).
+    inversion H. subst.
+    apply H1.
+    assert (wfe':=nthopt_preserves_wf _ _ H5 _ _ e3).
+    rewrite N.add_0_r in *.
+    eapply sbst_preserves_wf'.
+    apply sbst_fix_preserves_wf.
+    all:(eauto || lia).
   - inversion H1; subst. constructor; auto.
 Qed.
 Definition eval_preserves_wf := proj1 eval_preserves_wf'.
 Definition evals_preserves_wf := proj2 eval_preserves_wf'.
- *)
 
 (** Characterize values **)
 Inductive is_value: exp -> Prop :=
@@ -1382,30 +1401,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma sbst_preserves_wf' :
-  (forall i' e, exp_wf i' e ->
-     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
-       forall k, k <= i -> exp_wf i (e{k::=v})) /\
-  (forall i' es, exps_wf i' es ->
-     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
-       forall k, k <= i -> exps_wf i (es{k::=v})) /\
-  (forall i' es, efnlst_wf i' es ->
-     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
-       forall k, k <= i -> efnlst_wf i (es{k::=v})) /\
-  (forall i' bs, branches_wf i' bs ->
-     forall i, i' = 1 + i -> forall v, exp_wf 0 v ->
-       forall k, k <= i -> branches_wf i (bs{k::=v})).
-Proof.
-  apply my_exp_wf_ind; simpl; intros; subst; eauto.
-  - repeat if_split; try (constructor; auto; lia).
-  - constructor. apply H; try lia; auto.
-  - constructor; auto. apply H0; try lia; auto.
-  - constructor; auto. rewrite efnlst_length_sbst; apply H; try lia; auto.
-  - constructor; auto. 
-  - constructor; auto. 
-  - constructor; auto. apply H; try lia; auto.
-Qed.
-
 (** Weakening with respect to [exp_wf]. *)
 Lemma weaken_wf_le :
   (forall i e, exp_wf i e -> forall j, i <= j -> exp_wf j e) /\
@@ -1471,6 +1466,16 @@ Proof.
   inv H1. intuition.
 Qed.
 
+Lemma sbst_closed_id v :
+  (forall k t, exp_wf k t -> forall j, k <= j -> sbst v j t = t) /\
+  (forall k es, exps_wf k es -> forall j, k <= j -> es{j::=v} = es) /\
+  (forall k es, efnlst_wf k es -> forall j, k <= j -> es{j::=v} = es) /\
+  (forall k bs, branches_wf k bs -> forall j, k <= j -> bs{j::=v} = bs).
+Proof.
+  apply my_exp_wf_ind; simpl; intros; try solve [rewrite_hyps; auto; lia]; trivial.
+  destruct (lt_dec j j0). reflexivity.
+  destruct (N.eq_dec j j0). lia. lia.
+Qed.
 
 Lemma subst_closed_id v :
   (forall k t, exp_wf k t -> forall j, k <= j -> subst v j t = t) /\
@@ -1493,3 +1498,4 @@ Proof.
   apply my_exp_ind; intros; try rewrite_hyps; simpl; try rewrite_hyps; trivial.
   destruct lt_dec. reflexivity. now rewrite N.add_0_r.
 Qed.
+

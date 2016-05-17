@@ -103,8 +103,8 @@ Section TermTranslation.
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TSort s => (* Erase *) erased_exp
     | L3t.TProd n t => (* Erase *) erased_exp
-    | L3t.TLambda n t => Lam_e (trans (k+1) t)
-    | L3t.TLetIn n t u => Let_e (trans k t) (trans (k+1) u)
+    | L3t.TLambda n t => Lam_e (trans (1+k) t)
+    | L3t.TLetIn n t u => Let_e (trans k t) (trans (1+k) u)
     | L3t.TApp t u => App_e (trans k t) (trans k u)
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
@@ -184,4 +184,3 @@ Definition term_exp (e:program.environ) (t:term) : exception exp :=
     | Ret e => Ret (translate_program e trm)
     end
   end.
-

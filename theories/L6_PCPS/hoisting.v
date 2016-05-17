@@ -1488,7 +1488,7 @@ Proof.
     eapply preord_env_P_antimon.
     eapply preord_env_set_def_funs_permut with (v2 := Vconstr tau t vs'); eauto.
     - inv Hun. intros Hb. eapply H1. constructor; eauto.
-    - rewrite preord_val_eq. split; eauto.
+    - rewrite preord_val_eq. split; eauto using Forall2_Forall2_asym_included.
     - eapply Included_trans. eapply occurs_free_Efun_Included with (B := B).
       rewrite Union_assoc. apply Included_Union_compat; eauto using Included_refl.
       eapply occurs_free_Econstr_Included.
@@ -1561,7 +1561,7 @@ Proof.
   { inv Hstep1. inv H9; eauto.
     edestruct Henv as [vs' [Hgetl Hpre]]; eauto. rewrite preord_val_eq in Hpre.
     destruct vs'; try (simpl in Hpre; contradiction). inv Hpre.
-    edestruct (@Forall2_nthN val) as [v' [Hnth Hpre']] ; eauto. 
+    edestruct (@Forall2_asym_nthN val) as [v' [Hnth Hpre']]; eauto.
     edestruct (preord_exp_refl k e0) as [v2 [c2 [Hstep2 Hpre2]]];
       [| eauto | eauto |].
     eapply preord_env_P_antimon.
@@ -1671,7 +1671,6 @@ Proof.
                  with (B2 := Fcons f0 tau xs e'0 Fnil); eauto). } }
 Qed.
 
-
 Lemma hoist_star_preserves_fv e e' :
   closed_fundefs_in_exp e ->
   unique_bindings e ->
@@ -1719,21 +1718,21 @@ Proof.
   revert k rho rho'. 
   eapply (relation_inclusion_refl_trans_strong (compat_closure hoist_rw)) with
   (Pre := fun e => closed_fundefs_in_exp e /\
-                   unique_bindings e /\
-                   (Disjoint var (bound_var e) (occurs_free e)))
-    (R' := fun e e' : exp =>
-            forall k rho rho',
-              preord_env_P (occurs_free e) k rho rho' ->
-              preord_exp k (e, rho) (e', rho')); eauto.
-  - intros e1 e2 Hpre HR.
-    eapply (relation_inclusion_compat_strong hoist_rw) with
-    (Pre := fun e => closed_fundefs_in_exp e /\
-                     unique_bindings e /\
-                     Disjoint var (bound_var e) (occurs_free e))
+                unique_bindings e /\
+                (Disjoint var (bound_var e) (occurs_free e)))
     (R' := fun e e' : exp =>
              forall k rho rho',
                preord_env_P (occurs_free e) k rho rho' ->
                preord_exp k (e, rho) (e', rho')); eauto.
+  - intros e1 e2 Hpre HR.
+    eapply (relation_inclusion_compat_strong hoist_rw) with
+    (Pre := fun e => closed_fundefs_in_exp e /\
+                  unique_bindings e /\
+                  Disjoint var (bound_var e) (occurs_free e))
+      (R' := fun e e' : exp =>
+               forall k rho rho',
+                 preord_env_P (occurs_free e) k rho rho' ->
+                 preord_exp k (e, rho) (e', rho')); eauto.
     + intros e1' e2' [H1 [H2 H4]] Hclo' k rho rho' Hpre'.
       eapply hoist_rw_correct; eauto.
     + intros e1' e2' [H1 [H2 H3]]. split.
@@ -1758,4 +1757,3 @@ Proof.
   eapply hoist_star_correct; try eassumption.
   now eapply exp_hoist_in_hoist_star.
 Qed.
-

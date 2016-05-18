@@ -1178,7 +1178,6 @@ Proof with eauto.
     rewrite H in Hcasestep.
     econstructor.
     rewrite subst_env_aux_con_e in IHmch. apply IHmch.
-    instantiate (e':= subst_env_aux e'' 0 (trans e'' 0 t)).
     (** Lookup is the same *)
     admit.
     (** Substitution of arguments *)

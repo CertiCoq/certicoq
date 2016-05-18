@@ -62,7 +62,6 @@ Definition map_exps (f : exp -> exp) :=
   | econs t ts => econs (f t) (map_exps ts)
   end.
 
-
 Section TermTranslation.
   Variable ie : ienv.
   Variable e : env.

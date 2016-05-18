@@ -146,144 +146,10 @@ Proof. induction d; simpl; try rewrite_hyps; auto; lia. Qed.
     relation to substitution.
  *)
 
-Definition let_entry acc (a : string * envClass) e :=
-  match a with
-  | (s, ecTrm t) =>
-    let t' := translate acc t in
-    Let_e t' e
-  | (s, ecTyp _ _) => e
-  end.
-
-Lemma mkLets_translate a e t :
-  mkLets (translate_env (a :: e)) t =
-  mkLets (translate_env e) (let_entry (translate_env e) a t).
-Proof.
-  now destruct a as [s [trm|ty]].
-Qed.
-
-Definition subst_entry (a : string * envClass) acc (e : exp) :=
-  match a with
-  | (s, ecTrm t) =>
-    let t' := translate acc t in
-      e{0 := t'}
-  | (s, ecTyp _ _) => e
-  end.
-
-Lemma subst_env_tr a e k t :
-  subst_env (translate_entry a (translate_env_aux e k)) t =
-  subst_env (translate_env_aux e k)
-            (subst_entry a (translate_env_aux e k) t).
-Proof.
-  destruct a as [s [trm|ty]]; cbn; reflexivity.
-Qed.
-
-Lemma translate_env_aux_snoc e a acc :
-  translate_env_aux (e ++ [a]) acc =
-  translate_env_aux e (translate_entry a acc). 
-Proof.
-  unfold translate_env_aux.
-  rewrite fold_right_app; simpl. reflexivity.
-Qed.
-
-Definition build_subst_fn :=
-  (fun (x : string * envClass) acc =>
-                let '(acc, k) := acc in
-                match translate_entry_aux x k with
-                | Some r => (r :: acc, r :: k)
-                | None => (acc, k)
-                end).
-
-Lemma snd_build_subst_fn a k :
-  snd (build_subst_fn a k) = translate_entry a (snd k).
-Proof.
-  destruct k as [acc k].
-  destruct a as [s [trm|ty]]; reflexivity.
-Qed.
-
-Definition build_subst_aux e acc :=
-  fold_right build_subst_fn acc e.
-
-Definition build_subst e k :=
-  build_subst_aux e ([], k).
-
-Definition substl l (e : exp) :=
-  fold_left (fun t e => t{0 := e}) l e.
-
-Lemma substl_app l l' e : substl l (substl l' e) = substl (l' ++ l) e.
-Proof.
-  revert l e; induction l'; intros l e; simpl.
-  - reflexivity.
-  - rewrite IHl'.
-    reflexivity.
-Qed.
-
-Lemma build_subst_lemma a e' e :
-  build_subst (a :: e') e =
-  build_subst_fn a (build_subst e' e).
-Proof. reflexivity. Qed.
-
 Ltac case_call f :=
   let call := fresh "call" in
   remember f as call; destruct call.
 
-Lemma build_subst_aux_lemma e' e'' acc :
-  build_subst_aux (e'' ++ e') acc =
-  build_subst_aux e'' (build_subst_aux e' acc).
-Proof.
-  revert e'' acc; induction e' as [ |x e'] using rev_ind; intros e'' acc.
-  simpl.
-  - now rewrite !app_nil_r. 
-  - specialize (IHe' e'').
-    unfold build_subst_aux.
-    now rewrite fold_right_app.
-Qed.
-
-Definition build_subst_app e e' e'' :=
-  let '(s, k) := build_subst e' e in
-  let '(s', k') := build_subst e'' k in
-  (s' ++ s, k').
-
-Lemma build_subst_lemma' e' e'' e :
-  build_subst (e'' ++ e') e = build_subst_app e e' e''.
-Proof.
-  unfold build_subst, build_subst_app in *.
-  case_call (build_subst e' e).
-  case_call (build_subst e'' e0).
-  unfold build_subst, build_subst_app in *.
-  rewrite build_subst_aux_lemma.
-  rewrite <- Heqcall.
-  clear Heqcall.
-  revert l0 e1 e0 Heqcall0. clear.
-  induction e''; simpl; intros.
-  + injection Heqcall0; intros; subst. 
-    reflexivity.
-  + case_call (build_subst_aux e'' ([], e0)).
-    specialize (IHe'' _ _ _ Heqcall).
-    rewrite IHe''.
-    simpl in *.
-    case_call (translate_entry_aux a e);
-    injection Heqcall0; intros; subst;
-    reflexivity.
-Qed.
-
-Lemma translate_env_aux_build_subst e k :
-  translate_env_aux e k = snd (build_subst e k).
-Proof.
-  revert k; induction e using rev_ind; intros; try reflexivity.
-  unfold translate_env_aux, build_subst, build_subst_aux in *.
-  simpl.
-  rewrite !fold_right_app.
-  rewrite IHe.
-  simpl.
-  unfold translate_entry, translate_entry_aux.
-  destruct x as [s [trm|ty]]; simpl; try reflexivity.
-  generalize ((s, translate k trm) :: k).
-  clear. induction e; simpl; intros.
-  + reflexivity.
-  + rewrite !snd_build_subst_fn.
-    f_equal. apply IHe.
-Qed.
-  
 Lemma mkLets_app e e' t : mkLets (e ++ e') t =
                           mkLets e' (mkLets e t).
 Proof.
@@ -294,7 +160,8 @@ Proof.
 Qed.
 
 (** This version of substitution implements the one used 
-   by lets: folding from right to left. *)
+   by lets: folding from right to left, incrementally 
+   substituting into the environment. *)
 
 Definition sbst_env_aux (u : exp) (e : env) acc : N * env :=
   fold_right (fun s acc =>
@@ -312,17 +179,6 @@ Proof.
 Qed.
 
 Lemma fst_sbst_env_aux e k acc :
-  fst (sbst_env_aux e k acc) = fst (sbst_env_aux e k (fst acc, [])).
-Proof.
-  induction k; simpl.
-  - reflexivity.
-  - case_call (sbst_env_aux e k acc).
-    simpl in *. 
-    case_call (sbst_env_aux e k (fst acc, [])).
-    subst n; simpl. reflexivity.
-Qed.
-
-Lemma fst_sbst_env_aux' e k acc :
   fst (sbst_env_aux e k acc) = fst acc + N.of_nat (List.length k).
 Proof.
   induction k; simpl.
@@ -333,6 +189,12 @@ Proof.
     subst n; simpl. lia.
 Qed.
 
+Lemma fst_sbst_env_aux_acc e k acc :
+  fst (sbst_env_aux e k acc) = fst (sbst_env_aux e k (fst acc, [])).
+Proof.
+  now rewrite !fst_sbst_env_aux.
+Qed.
+
 Lemma snd_sbst_env_aux e k acc :
   snd (sbst_env_aux e k acc) =
   snd (sbst_env_aux e k (fst acc, [])) ++ snd acc.
@@ -340,7 +202,7 @@ Proof.
   induction k; simpl.
 
   - reflexivity.
-  - generalize (fst_sbst_env_aux e k acc).
+  - generalize (fst_sbst_env_aux_acc e k acc).
     case_call (sbst_env_aux e k acc).
     simpl in *. 
     case_call (sbst_env_aux e k (fst acc, [])).
@@ -350,6 +212,12 @@ Proof.
     now intros ->.
 Qed.
 
+Lemma sbst_env_length t k e :
+  Datatypes.length (snd (sbst_env t k e)) = Datatypes.length e.
+Proof.
+  induction e; simpl in *; try rewrite_hyps; try reflexivity.
+  destruct sbst_env. simpl in *. lia.
+Qed.
 
 Lemma sbst_lets (e : exp) (n : N) k t :
   let k' := (sbst_env e n k) in
@@ -371,21 +239,10 @@ Proof.
     f_equal. f_equal.
     + unfold sbst_env. now rewrite N.add_1_r, N.add_1_l.
     + unfold sbst_env. rewrite N.add_1_r, N.add_1_l.
-      now setoid_rewrite fst_sbst_env_aux at 2.
+      now setoid_rewrite fst_sbst_env_aux_acc at 2.
 Qed.
     
-Lemma length_sbst_env e n k : length (snd (sbst_env e n k)) = length k.
-Proof.
-  revert e n; induction k using rev_ind; intros.
-  simpl. reflexivity.
-  unfold sbst_env.
-  rewrite sbst_env_app.
-  simpl.
-  rewrite snd_sbst_env_aux.
-  rewrite !app_length. simpl.
-  unfold sbst_env in IHk. rewrite IHk.
-  reflexivity.
-Qed.
+(** Relation of subst_env (folding left to right) and sbst_env *)
 
 Lemma subst_env_app k x t : exp_wf 0 (snd x) ->
   let k' := sbst_env (snd x) 0 k in
@@ -987,13 +844,6 @@ Qed.
 
 Lemma eval_env_length e e' : eval_env e e' -> Datatypes.length e = Datatypes.length e'.
 Proof. induction 1; simpl; try rewrite_hyps; reflexivity. Qed.
-
-Lemma sbst_env_length t k e :
-  Datatypes.length (snd (sbst_env t k e)) = Datatypes.length e.
-Proof.
-  induction e; simpl in *; try rewrite_hyps; try reflexivity.
-  destruct sbst_env. simpl in *. lia.
-Qed.
   
 (** Inversion principle for evaluated environments. *)
 
@@ -1021,9 +871,9 @@ Proof.
   rewrite <- wf_tr_environ_sbst in H4; eauto.
   pose (eval_env_length _ _ evee''). simpl in *.
   assert(fst (sbst_env t'' 0 e) = fst (sbst_env t'' 0 e'')).
-  unfold sbst_env. rewrite !fst_sbst_env_aux'.
+  unfold sbst_env. rewrite !fst_sbst_env_aux.
   rewrite <- (eval_env_length _ _ evee'').
-  pose (length_sbst_env t'' 0 e). rewrite H in e2.
+  pose (sbst_env_length t'' 0 e). rewrite H in e2.
   simpl in e2. now rewrite <- e2.
   rewrite <- H0, H in H4. apply H4.
   apply wf_tr_environ_inv in H3. intuition.
@@ -1055,17 +905,67 @@ Proof.
     rewrite (proj1 (closed_subst_sbst _ H0)).
     rewrite sbst_lets.
     eapply IHk; eauto.
-    rewrite length_sbst_env, app_length; simpl; lia.
+    rewrite sbst_env_length, app_length; simpl; lia.
     rewrite subst_env_app in H1. simpl in H1.
     rewrite <- wf_tr_environ_sbst in H1; auto.
     unfold sbst_env in H1 |- *.
-    rewrite fst_sbst_env_aux' in H1 |- *; simpl in *.
+    rewrite fst_sbst_env_aux in H1 |- *; simpl in *.
     assert (Datatypes.length e'' = Datatypes.length k).
     rewrite <- (eval_env_length _ _ H).
     now rewrite sbst_env_length. rewrite H4 in H1.
     apply H1. apply H0. auto.
 Qed.
-    
+
+Import L3t.
+
+(** Weak typed normal form of wndEval: no wndEval steps possible. **)
+Inductive WNorm: Term -> Prop :=
+| WNPrf: WNorm TProof
+| WNLam: forall nm bod, WNorm (TLambda nm bod)
+| WNProd: forall nm bod, WNorm (TProd nm bod)
+| WNFix: forall ds br, WNorm (TFix ds br)
+| WNAx: forall nm, WNorm (TAx nm)
+| WNConstruct: forall i n args, WNorms args -> WNorm (TConstruct i n args)
+| WNInd: forall i, WNorm (TInd i)
+| WNSort: forall s, WNorm (TSort s)
+| WNNeutral: forall e, WNeutral e -> WNorm e
+with WNorms: Terms -> Prop :=
+| WNtnil: WNorms tnil
+| WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts)
+
+with WNeutral : Term -> Prop :=
+| WNVar n : WNeutral (L3t.TRel n)
+| WNApp f a : WNeutral f -> WNorm a -> WNeutral (L3t.TApp f a)
+| WNCase mch n brs : WNeutral mch -> WNorms brs -> WNeutral (TCase n mch brs).
+
+Hint Constructors WNorm WNeutral WNorms.
+Scheme WNorm_ind' := Induction for WNorm Sort Prop
+  with WNeutral_ind' := Induction for WNeutral Sort Prop
+  with WNorms_ind' := Induction for WNorms Sort Prop.
+Combined Scheme WNormWNeutralWNorms_ind from WNorm_ind', WNeutral_ind', WNorms_ind'.
+
+Lemma wnorm_closed t : WFTrm t 0 -> WNorm t -> ~ WNeutral t.
+Proof.
+  remember 0%nat as n. intros wf. revert Heqn.
+  induction wf; intros; intro HN; try solve [inv HN]. subst. lia.
+  inv HN. inv H.
+  specialize (IHwf1 eq_refl (WNNeutral _ H2)). contradiction.
+  inv HN.
+  specialize (IHwf eq_refl (WNNeutral _ H3)). contradiction.
+Qed.
+
+Lemma dnthbody m dts f e k g : L3.term.dnthBody m dts = Some f ->
+                             enthopt m (map_efnlst g (trans_fixes (trans e) k dts)) =
+                             Some (g (strip_lam 1 (trans e k f))).
+Proof.
+  revert dts f e k. induction m; simpl; intros.
+  destruct dts; simpl in H; try injection H. discriminate.
+  intros ->. simpl. reflexivity.
+
+  destruct dts; simpl in H; try injection H. discriminate.
+  simpl. erewrite IHm. reflexivity. apply H.
+Qed.
+
 (** Questions:
 
   - In the neutral app case, one can have a match in function position,
@@ -1221,20 +1121,49 @@ Proof with eauto.
     unfold subst_env, translate in Hfn. simpl in Hfn.
     rewrite subst_env_aux_fix_e in Hfn.
     (* Treat fixstep *)
-    admit.
-    (* eapply eval_FixApp_e. apply Hfn. *)
+    unfold translate, subst_env in IHevfix.
+    simpl in IHevfix.
+    rewrite subst_env_application in IHevfix.
+    unfold L3.term.whFixStep in fixstep.
+    case_eq (L3.term.dnthBody m dts); intros t'.
 
+    - intros eqt'.
+      rewrite eqt' in fixstep. injection fixstep.
+      inv IHevfix. intros eqfs.
+      -- (* Originally a wAppLam transition *)
+         eapply eval_FixApp_e; eauto. 
+         rewrite Nnat.Nat2N.id.
+         rewrite (dnthbody _ _ _ _ _ _ eqt').
+         rewrite efnlst_length_trans. reflexivity.
+         rewrite efnlst_length_trans.
+         rewrite <- eqfs in H4.
+         assert (e1' = (sbst_fix
+         (map_efnlst (subst_env_aux e'' (N.of_nat (dlength dts) + 1 + 0))
+            (trans_fixes (trans e'') (N.of_nat (dlength dts) + 0) dts))
+         (subst_env_aux e'' (N.of_nat (dlength dts) + 1 + 0)
+                        (strip_lam 1 (trans e'' (N.of_nat (dlength dts) + 0) t'))))).
+         admit.
+         rewrite <- H0. apply H7.
+      -- intros.
+         eapply eval_FixApp_e. eauto. eauto.
+         rewrite efnlst_length_trans.
+         rewrite Nnat.Nat2N.id.
+         rewrite (dnthbody _ _ _ _ _ _ eqt'). reflexivity.
+         rewrite efnlst_length_trans.
+         rewrite <- H0 in H4.
+         (* Impossible, as t' must be a lambda, so cannot evaluate to a fix *)
+         admit.
+
+    - rewrite t' in fixstep. discriminate.
+    
   + (* App no redex: this cannot produce a well-formed value *)
-    intros * evfn Hfn napp nlam nfix evarg Harg wft. inv wft.
-    unfold translate. simpl.
-    unfold subst_env.
-    rewrite !subst_env_application.
-    assert (L3t.WFTrm efn 0).
-    (* Wcbeval preserves wf *)
-    admit.
-    specialize (Hfn H1).
-    specialize (Harg H3).
-    admit.
+    intros * evfn Hfn napp nlam nfix evarg Harg wft.
+    cut (WNorm (L3t.TApp efn arg1)). intros wnorm.
+    cut (WFTrm (L3t.TApp efn arg1) 0). intros wft'.
+    pose proof (wnorm_closed _ wft' wnorm).
+    inv wft'. inv wnorm. contradiction.
+    (* Eval preserves wf *) admit.
+    (* Application in normal form *) admit.
     
   + (* Case *)
     unfold translate; simpl.

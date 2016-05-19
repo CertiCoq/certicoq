@@ -523,7 +523,7 @@ Function wcbvEval
               | Ret (TFix dts m), _, _ =>
                 wcbvEval n (whFixStep dts m (tcons a1 args))
               | Ret _, Exc s, _ => 
-               raise ("wcbvEval TApp: arg1 doesn't eval: " ++ s)
+                raise ("wcbvEval TApp: arg1 doesn't eval: " ++ s)
               | Ret (TLambda _ _ bod), Ret ea1, _ =>
                 wcbvEval n (whBetaStep bod ea1 args)
               | Ret _, Ret _, Exc s =>

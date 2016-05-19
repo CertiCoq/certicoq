@@ -46,9 +46,9 @@ Section term_Term_sec.
    end.
 End term_Term_sec.
 
-Fixpoint applyBranchToTProof (br:Term) :=
+Fixpoint applyBranchToProof (br:Term) :=
   match br with
-    | TLambda _ _ body => instantiate TProof 0 (applyBranchToTProof body)
+    | TLambda _ _ body => instantiate TProof 0 (applyBranchToProof body)
     | x => x
   end.
 
@@ -92,7 +92,7 @@ Function term_Term (t:term) : exception Term :=
         let Ars := map fst brs in
         match Mch, Brs, Ars with
           | TProof, tunit Br, (cons nargs nil) =>  (* remove case on axiom *)
-            ret (applyBranchToTProof Br)
+            ret (applyBranchToProof Br)
           | _, _, _ =>  do Ty <- term_Term ty;
                         ret (TCase (npars,Ars) Ty Mch Brs)
         end

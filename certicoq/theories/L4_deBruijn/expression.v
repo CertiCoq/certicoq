@@ -96,21 +96,8 @@ Combined Scheme my_exp_ind from
    [Let_e e1 e2] corresponds to (let x0 := e1 in e2)
 
    [Fix_e [e1;e2;...;en]] produces an n-tuple of functions.  Each expression
-   is treated as binding (a) the n-tuple, and then (b) a function argument.
-   (Thus going under Fix_e increases index by 2).
-
-   So this is similar to saying something like:
-
-    let rec f1 = \x1.e1
-        and f2 = \x2.e2
-        ...
-        and fn = \xn.en
-    in
-      (f1,f2,...,fn)
-
-   When [e] evaluates to [Fix_e [e1;e2;...;en]], then [Proj_e e i] evaluates
-   to [ei{0 := Fix_e[e1;e2;...;en]}].  That is, we unwind the recursion when
-   you project something out of the tuple.
+   is treated as binding n functions.
+   (Thus going under Fix_e increases index by n).
 
    For [Match_e] each [branch], (d, n, e), binds [n] variables,
    corresponding to the arguments to the data constructor d.  
@@ -147,7 +134,7 @@ Inductive exp_wf: N -> exp -> Prop :=
                               exp_wf i (Match_e e bs)
 | let_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 ->
                              exp_wf i (Let_e e1 e2)
-| fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + 1 + i) es ->
+| fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + i) es ->
                                      exp_wf i (Fix_e es k)
 | ax_e_wf : forall i s, exp_wf i (Ax_e s)
 with exps_wf: N -> exps -> Prop :=
@@ -233,7 +220,7 @@ Fixpoint shift n k e :=
     | Con_e d es => Con_e d (shift_exps' shift n k es)
     | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
     | Match_e e bs => Match_e (shift n k e) (shift_branches' shift n k bs)
-    | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + 1 + k) es) k'
+    | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
   end.
 
@@ -292,7 +279,7 @@ Function subst (v:exp) k (e:exp): exp :=
     | Con_e d es => Con_e d (substs v k es)
     | Let_e e1 e2 => Let_e (subst v k e1) (subst v (1 + k) e2)
     | Match_e e bs => Match_e (subst v k e) (subst_branches v k bs)
-    | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + 1 + k) es) k'
+    | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
   end
 with substs (v:exp) k (es:exps) : exps :=
@@ -323,7 +310,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Con_e d es => Con_e d (sbsts v k es)
     | Let_e e1 e2 => Let_e (sbst v k e1) (sbst v (1 + k) e2)
     | Match_e e bs => Match_e (sbst v k e) (sbst_branches v k bs)
-    | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + 1 + k) es) k'
+    | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
   end
 with sbsts (v:exp) k (es:exps) : exps :=
@@ -521,7 +508,7 @@ Fixpoint efnlength (es:efnlst) :=
 Definition sbst_fix (es:efnlst) (e : exp) : exp :=
   let les := efnlength es in
     fold_left
-      (fun e ndx => e{1 ::= Fix_e es (N.of_nat ndx)})
+      (fun e ndx => e{0 ::= Fix_e es (N.of_nat ndx)})
       (list_to_zero les) e.
 
 (** Big-step evaluation for [exp]. *)
@@ -547,7 +534,7 @@ Inductive eval: exp -> exp -> Prop :=
     eval e (Fix_e es n) ->
     eval e2 v2 ->
     enthopt (N.to_nat n) es = Some e' ->
-    eval ((sbst_fix es e') {0 ::= v2}) e'' ->
+    eval (App_e (sbst_fix es e') v2) e'' ->
     eval (App_e e e2) e''
 | eval_Ax_e s : eval (Ax_e s) (Ax_e s)
 with evals: exps -> exps -> Prop :=
@@ -644,7 +631,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                        match enthopt (N.to_nat k) es with
                        | Some e' =>
                          let t' := sbst_fix es e' in
-                         eval_n n (t'{0 ::= e2'})
+                         eval_n n (App_e t' e2')
                        | _ => None
                        end
                      end
@@ -1073,8 +1060,8 @@ Qed.
 
 (** fixpoints **)
 Definition copy : exp :=
-  (Fix_e [!Match_e Ve0 (brcons_e ZZ 0 ZZZ 
-            (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e))!] 0).
+  (Fix_e [!Lam_e (Match_e Ve0 (brcons_e ZZ 0 ZZZ 
+            (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
 
 Goal eval (copy $ ZZZ) ZZZ.
 unfold copy.
@@ -1227,20 +1214,27 @@ Proof.
       apply IHes. auto.
 Qed.
 
-(** TODO: depends on the representation of fixes *)
 Lemma sbst_fix_preserves_wf :
-  forall es, efnlst_wf (efnlst_length es + 1) es ->
-          forall e, exp_wf (efnlst_length es + 1) e ->
-               exp_wf 1 (sbst_fix es e).
+  forall es, efnlst_wf (efnlst_length es) es ->
+        forall e, exp_wf (efnlst_length es) e ->
+             exp_wf 0 (sbst_fix es e).
 Proof.
   intros.
   unfold sbst_fix.
   revert e H0.
   remember (Fix_e es) as fixe.
-  remember (efnlst_length es) as n.
-  rewrite Heqn in H. revert Heqn. 
-  revert n. refine (N.induction _ _ _ _).
-Admitted.
+  intros.
+  revert H0. generalize es as es'. intros es'.
+  remember (list_to_zero (efnlength es')).
+  revert es' Heql e.
+  induction l. simpl; intros.
+  destruct es'; simpl in *; auto; discriminate.
+  intros.
+  destruct es'; simpl in *; auto; try discriminate.
+  injection Heql. intros. specialize (IHl _ H1).
+  apply IHl. eapply sbst_preserves_exp_wf. eauto.
+  subst fixe. constructor. now rewrite N.add_0_r.
+Qed.
 
 Lemma find_branch_preserves_wf :
   forall i bs, branches_wf i bs ->
@@ -1274,9 +1268,9 @@ Proof.
     apply H1.
     assert (wfe':=nthopt_preserves_wf _ _ H5 _ _ e3).
     rewrite N.add_0_r in *.
-    eapply sbst_preserves_wf'.
-    apply sbst_fix_preserves_wf.
-    all:(eauto || lia).
+    constructor.
+    now eapply sbst_fix_preserves_wf.
+    eauto.
   - inversion H1; subst. constructor; auto.
 Qed.
 Definition eval_preserves_wf := proj1 eval_preserves_wf'.
@@ -1498,4 +1492,3 @@ Proof.
   apply my_exp_ind; intros; try rewrite_hyps; simpl; try rewrite_hyps; trivial.
   destruct lt_dec. reflexivity. now rewrite N.add_0_r.
 Qed.
-

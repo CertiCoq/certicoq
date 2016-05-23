@@ -89,8 +89,7 @@ Section TermTranslation.
       match l with
       | L3t.dnil => eflnil
       | L3t.dcons na t _ l' =>
-        let t' := strip_lam 1 (trans k t) in
-        eflcons t' (trans_fixes k l')
+        eflcons (trans k t) (trans_fixes k l')
       end.
 
   End fixes.

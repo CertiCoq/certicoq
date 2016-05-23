@@ -1,9 +1,4 @@
 
-(** coqide -R /path/to/SquiggleLazyEq SquiggleLazyEq 
-https://github.com/aa755/SquiggleLazyEq
-
-*)
-
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
   Coq.Program.Program Coq.micromega.Psatz.
@@ -42,40 +37,16 @@ Qed.
 Require Import Coq.Classes.DecidableClass.
 Require Import Coq.Lists.List.
 Require Import Coq.Bool.Bool.
-Require Import SquiggleLazyEq.export.
-Require Import SquiggleLazyEq.UsefulTypes.
-Require Import SquiggleLazyEq.list.
-Require Import SquiggleLazyEq.LibTactics.
-Require Import SquiggleLazyEq.tactics.
-Require Import SquiggleLazyEq.lmap.
+Require Import SquiggleEq.export.
+Require Import SquiggleEq.UsefulTypes.
+Require Import SquiggleEq.list.
+Require Import SquiggleEq.LibTactics.
+Require Import SquiggleEq.tactics.
+Require Import SquiggleEq.lmap.
 
 Open Scope nat_scope.
 
-(* MOVE to [SquiggleLazyEq] *)
-Ltac rwsimpl He1 :=
-  repeat progress (autorewrite with list core SquiggleLazyEq in He1; simpl in He1).
-
-Ltac rwsimplAll :=
-  repeat progress (autorewrite with list core SquiggleLazyEq in *; simpl in *).
-
-Ltac rwsimplC :=
-  repeat progress (autorewrite with list core SquiggleLazyEq; simpl).
-
-
-Ltac dLin_hyp :=
-  repeat
-   match goal with
-   | H:forall x : ?T, ?L = x \/ ?R -> ?C
-     |- _ =>
-         let Hyp := fresh "Hyp" in
-         pose proof (H L (or_introl eq_refl)) as Hyp; specialize (fun x y => H x (or_intror y))
-   | H:forall x y, _ = _ \/ ?R -> ?C
-     |- _ =>
-         let Hyp := fresh "Hyp" in
-         pose proof (H _ _ (or_introl eq_refl)) as Hyp; specialize
-          (fun x z y => H x z (or_intror y))
-   | H:forall x : ?T, False -> _ |- _ => clear H
-   end.
+(* MOVE to [SquiggleEq] *)
 
 
 Instance NEqDec : Deq N.
@@ -106,7 +77,7 @@ Definition dcon := N.
 
 Section VarsOf2Class.
 
-(* see the file SquiggleLazyEq.varImplPeano for an instantiation of NVar *)
+(* see the file SquiggleEq.varImplPeano for an instantiation of NVar *)
 Context {NVar} {deqnvar : Deq NVar} {vartype: @VarType NVar bool (* 2 species of vars*) _}.
 
 Notation USERVAR := true (only parsing).
@@ -151,7 +122,7 @@ Proof using.
    repeat(decide equality).
 Defined.
 
-Require Import SquiggleLazyEq.alphaeq.
+Require Import SquiggleEq.alphaeq.
 
 
 Definition CoqL4GenericTermSig : GenericTermSig :=
@@ -449,7 +420,7 @@ Proof using.
 Qed.
 
 
-Hint Rewrite @flat_map_bterm_nil_allvars : SquiggleLazyEq.
+Hint Rewrite @flat_map_bterm_nil_allvars : SquiggleEq.
 
 (* c := USERVAR in the intended use case. But this property holds more generally *)
 Lemma eval_preseves_varclass :
@@ -1009,7 +980,7 @@ Lemma substKlam_cTrivial : forall x (b t : CTerm),
 Proof using.
   intros ? ? ? H.
   change_to_ssubst_aux8;[ |simpl; rewrite H; disjoint_reasoningv; tauto].
-  simpl. autorewrite with SquiggleLazyEq.
+  simpl. autorewrite with SquiggleEq.
   simpl.
   reflexivity.
 Qed.
@@ -1135,7 +1106,7 @@ Proof using.
   intros bt Hin.
   destruct bt as [lvb nt]. unfold compose.
   simpl.
-  autorewrite with list SquiggleLazyEq.
+  autorewrite with list SquiggleEq.
   autorewrite with list in *.
   varsOfClassSimpl.
   rewrite Hyp; [
@@ -1174,10 +1145,10 @@ Proof using.
 - simpl.
   dnumvbars Hnb bt.
   erewrite <- cps_cvt_val_aux_fvars_aux; eauto.
-  simpl. autorewrite with list SquiggleLazyEq.
+  simpl. autorewrite with list SquiggleEq.
   rewrite cons_as_app.
   rewrite <- remove_nvars_app_l, remove_nvars_app_r.
-  autorewrite with list SquiggleLazyEq.
+  autorewrite with list SquiggleEq.
   setoid_rewrite remove_nvars_nop at 2; auto.
   rwsimpl Hs. pose proof Hs as Hsb. unfold all_vars in Hs. rwsimpl Hs.
   apply disjoint_sym. apply userVarsContVar. repnd.
@@ -1227,20 +1198,20 @@ Lemma cps_cvt_apply_fvars :
 cps_cvt_apply_step cps_preserves_fvars.
 Proof using.
   intros ? ? Hind Hwf Hs.
-  simpl. autorewrite with  SquiggleLazyEq list.
+  simpl. autorewrite with  SquiggleEq list.
   unfold App_e in Hs.
   repeat progress (autorewrite with list allvarsSimpl in Hs; 
     simpl in Hs).
   addContVarsSpec 3 Hs kv.
   simpl.
   remove_nvars_r_simpl.
-  autorewrite with SquiggleLazyEq list. 
+  autorewrite with SquiggleEq list. 
   repeat (rewrite remove_nvars_nops;[| noRepDis]).
   repeat rewrite remove_nvars_app_r.
-  autorewrite with SquiggleLazyEq list.
+  autorewrite with SquiggleEq list.
   simpl. 
   setoid_rewrite remove_nvars_comm at 2.
-  autorewrite with SquiggleLazyEq list. 
+  autorewrite with SquiggleEq list. 
   repeat rewrite remove_nvars_app_l.
   pose proof (size_pos e2).
   pose proof (size_pos e1).
@@ -1272,16 +1243,16 @@ Proof using.
   simpl in *.
   destruct b as [blv bnt].
   simpl.
-  autorewrite with list SquiggleLazyEq.
-  repeat progress (autorewrite with SquiggleLazyEq list in *; 
+  autorewrite with list SquiggleEq.
+  repeat progress (autorewrite with SquiggleEq list in *; 
     simpl in * ).
   repnd.
   rewrite IHlbt; simpl;
-    autorewrite with SquiggleLazyEq list; eauto;
+    autorewrite with SquiggleEq list; eauto;
      [| intros; apply Hyp; eauto; omega | disjoint_reasoningv ].
   clear IHlbt.
   dLin_hyp. simpl in *. repnd. subst.
-  autorewrite with SquiggleLazyEq in *.
+  autorewrite with SquiggleEq in *.
   rewrite remove_nvars_app_r.
   rewrite remove_nvars_app_l.
   setoid_rewrite flat_map_fapp in Hdis.
@@ -1311,20 +1282,20 @@ Proof using.
   intros  Hwf Hs;
   [    unfold all_vars in Hs;
     simpl in *;
-    autorewrite with core list SquiggleLazyEq SquiggleLazyEq2;
+    autorewrite with core list SquiggleEq SquiggleEq2;
     simpl; rewrite remove_nvars_nops; auto;apply disjoint_sym; eauto using
                @userVarsContVar |].
 Local Opaque cps_cvt_val' is_valueb. 
   simpl. 
   cases_if.
 (* e is a value; use the lemma above *)
-- simpl. autorewrite with list SquiggleLazyEq SquiggleLazyEq2. simpl.
+- simpl. autorewrite with list SquiggleEq SquiggleEq2. simpl.
 Local Transparent cps_cvt_val' is_valueb.
   pose proof cps_cvt_val_aux_fvars as Hccc.
   unfold cps_preserves_fvars, cps_cvt_val_step in Hccc.
   rewrite Hccc; clear Hccc; [simpl; autorewrite with list| | ntwfauto | assumption].
   + rewrite remove_nvars_nop;[auto|].
-    autorewrite with list SquiggleLazyEq in *.
+    autorewrite with list SquiggleEq in *.
     setoid_rewrite flat_map_fapp in Hs.
     apply varsOfClassApp in Hs. repnd.
     apply disjoint_sym.
@@ -1346,13 +1317,13 @@ Local Transparent cps_cvt_val' is_valueb.
     simpl in *.
     rewrite  cps_cvt_constr_fvars_aux; 
       autorewrite with list allvarsSimpl; auto;[| | disjoint_reasoningv; fail].
-    * simpl. autorewrite with list SquiggleLazyEq SquiggleLazyEq2.
+    * simpl. autorewrite with list SquiggleEq SquiggleEq2.
       setoid_rewrite flat_map_fapp in Hcvdis.
       rewrite remove_nvars_nop;[| disjoint_reasoningv].
       rewrite (remove_nvars_nop lkv);[| noRepDis]. simpl.
-      autorewrite with list SquiggleLazyEq.
+      autorewrite with list SquiggleEq.
        simpl.
-      autorewrite with list SquiggleLazyEq.
+      autorewrite with list SquiggleEq.
       refl.
     * intros ? Hin.
       pose proof Hin as Hinb.
@@ -1371,12 +1342,12 @@ Local Transparent cps_cvt_val' is_valueb.
   + dnumvbars Hnb bt. unfold num_bvars. simpl.
     addContVarsSpec 2 Hs kv. repnd.
     simpl in *. dlist_len_name lkv kv; simpl in *.
-    repeat progress (autorewrite with list SquiggleLazyEq SquiggleLazyEq2 in *; simpl in * ).
+    repeat progress (autorewrite with list SquiggleEq SquiggleEq2 in *; simpl in * ).
     rewrite remove_nvars_nops;[|noRepDis].
-    autorewrite with list SquiggleLazyEq.
-    autorewrite with  SquiggleLazyEq in Hs.
+    autorewrite with list SquiggleEq.
+    autorewrite with  SquiggleEq in Hs.
     rewrite Hind;[| omega | ntwfauto | tauto].
-    autorewrite with list SquiggleLazyEq.
+    autorewrite with list SquiggleEq.
     rewrite remove_nvars_nop;[auto| inauto; eauto].
 
 (** Let_e *)
@@ -1385,7 +1356,7 @@ Local Transparent cps_cvt_val' is_valueb.
     unsimpl (cps_cvt (Let_e blv1 bnt bnt0)).
     rewrite cps_cvt_let_as_app_lam.
     remember (Lam_e blv1 bnt0) as lam.
-    repeat progress (autorewrite with list SquiggleLazyEq in Hs; simpl in Hs).
+    repeat progress (autorewrite with list SquiggleEq in Hs; simpl in Hs).
     pose cps_cvt_apply_fvars as Hccc. unfold cps_cvt_apply_step, cps_preserves_fvars in Hccc.
     rewrite Hccc; clear Hccc;
       [
@@ -1393,10 +1364,10 @@ Local Transparent cps_cvt_val' is_valueb.
           intros;  simpl in *; apply Hind;[omega | ntwfauto |assumption]
         | subst lam; ntwfauto;in_reasoning; subst; ntwfauto
         | subst lam; simpl in *; unfold App_e, Lam_e;
-              repeat progress (autorewrite with list SquiggleLazyEq; simpl); tauto
+              repeat progress (autorewrite with list SquiggleEq; simpl); tauto
               ].
     subst lam. clear.
-    simpl. autorewrite with list SquiggleLazyEq.
+    simpl. autorewrite with list SquiggleEq.
     apply eqsetv_prop. intros. repeat rewrite in_app_iff.
     tauto. 
 
@@ -1408,7 +1379,7 @@ Local Transparent cps_cvt_val' is_valueb.
     Local Opaque size.
     simpl in *.
     Local Transparent size. simpl in Hs.
-    repeat progress (autorewrite with list SquiggleLazyEq SquiggleLazyEq2 in *; simpl in * ).
+    repeat progress (autorewrite with list SquiggleEq SquiggleEq2 in *; simpl in * ).
     unfold cps_cvt_branches.
     rewrite flat_map_map.
     unfold compose. simpl.
@@ -1427,17 +1398,17 @@ Local Transparent cps_cvt_val' is_valueb.
       rewrite eq_flat_maps with (g:=fun b => (free_vars_bterm b));[auto;fail|].
       intros.
       rewrite remove_nvars_cons_r, memvar_singleton.
-      autorewrite with SquiggleLazyEq. 
+      autorewrite with SquiggleEq. 
       rewrite remove_nvars_nop;[refl|terms2.disjoint_flat2].
 
     * intros ? Hin. destruct x as [xlv xnt]. simpl.
-      autorewrite with SquiggleLazyEq.
+      autorewrite with SquiggleEq.
       repnd.
       rewrite Hind;
         [|eapply (size_subterm4 ((bterm [] bnt)::lbt)); right; eauto 
          | ntwfauto 
          | eauto using varsOfClassSubset, subsetAllVarsLbt2 ].
-      autorewrite with list SquiggleLazyEq SquiggleLazyEq2.
+      autorewrite with list SquiggleEq SquiggleEq2.
       rewrite (remove_nvars_nop xlv [kv]);[|terms2.disjoint_flat2].
       rewrite eqset_app_comm. refl.
 Qed.
@@ -1591,7 +1562,7 @@ disjoint [contVar] (dom_sub sub)
 Proof.
   intros ? ? Hdis. unfold val_outer.
   simpl. unfold KLam_c, Ret_c.
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   rewrite sub_filter_disjoint1; [|disjoint_reasoningv2].
   repeat f_equal.
  rewrite sub_find_none_if;
@@ -1599,7 +1570,7 @@ Proof.
 Qed.
 
 (*
-Hint Resolve sub_filter_subset flat_map_monotone varsOfClassSubset map_monotone : SquiggleLazyEq. 
+Hint Resolve sub_filter_subset flat_map_monotone varsOfClassSubset map_monotone : SquiggleEq. 
 *)
 
 Lemma contVars1 : contVars 1 = [contVar].
@@ -1627,7 +1598,7 @@ Proof using.
 - dnumvbars Hnb bt. simpl.
   unfold cps_cvt_lambda, Lam_c, Ret_c.
   do 4 f_equal.
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   rewrite sub_find_sub_filter;[| cpx].
   do 2 f_equal.
   rewrite sub_filter_map_range_comm.
@@ -1646,7 +1617,7 @@ Proof using.
   destruct bt as [lv nt].
   simpl. f_equal. unfold KLam_c, Ret_c.
   do 4 f_equal.
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   rewrite sub_filter_map_range_comm.
   rwsimpl Hs.
   apply Hyp; auto; simpl;[eapply size_subterm4; eauto | ntwfauto|].
@@ -1660,7 +1631,7 @@ Proof using.
   apply map_eq_repeat_implies with (v:= (bterm lv nt)) in Hnb;[| assumption].
   unfold num_bvars in Hnb. simpl in Hnb.
   dlist_len_name lv vv.
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   simpl in Hev.
   rewrite ball_map_true in Hev. unfold compose in Hev.
   applydup_clear Hev in Hin.
@@ -1718,12 +1689,12 @@ Proof using.
   induction lbt as [| b lbt IHlbt]; intros ? ? Hyp Hl Hf Hvc Hd;
     simpl in Hl; dlist_len_name lkv kv;
       [ apply ssubst_aux_trivial_disj;
-        autorewrite with SquiggleLazyEq;auto|].
+        autorewrite with SquiggleEq;auto|].
   destruct b as [blv bnt].
   simpl in *.
   dLin_hyp. simpl in *. repnd. subst.
 - rwsimplC.
-  repeat progress (autorewrite with SquiggleLazyEq list in *; 
+  repeat progress (autorewrite with SquiggleEq list in *; 
     simpl in * ).
   unfold Ret_c, KLam_c.
   do 3 f_equal;[|do 4 f_equal].
@@ -1731,7 +1702,7 @@ Proof using.
 + rewrite sub_filter_map_range_comm.
   rewrite (sub_filter_disjoint1 sub); [|disjoint_reasoningv2].
   rewrite IHlbt; simpl;
-    autorewrite with SquiggleLazyEq list; eauto;
+    autorewrite with SquiggleEq list; eauto;
      [intros; apply Hyp; omega | tauto | disjoint_reasoningv ].
 Qed.
 
@@ -1753,7 +1724,7 @@ Local Opaque   ssubst_aux.
 Local Transparent is_valueb.
 - simpl. rewrite cps_val_outer;[| rewrite isvalueb_ssubst_aux; auto; fail].
   rewrite val_outer_ssubst_aux;
-    [| autorewrite with SquiggleLazyEq; disjoint_reasoningv2].
+    [| autorewrite with SquiggleEq; disjoint_reasoningv2].
   f_equal. apply cps_cvt_val_ssubst_commutes_aux; auto. simpl.
   intros es ?. pose proof (size_pos es). omega.
 (* value oterm *)
@@ -1761,12 +1732,12 @@ Local Transparent is_valueb.
 Local Opaque is_valueb.
 Local Transparent ssubst_aux.
   rewrite val_outer_ssubst_aux;
-    [| autorewrite with SquiggleLazyEq; disjoint_reasoningv2].
+    [| autorewrite with SquiggleEq; disjoint_reasoningv2].
   f_equal. apply cps_cvt_val_ssubst_commutes_aux; auto.
 (* constructor*)
-- simpl. unfold KLam_c. autorewrite with list SquiggleLazyEq. 
+- simpl. unfold KLam_c. autorewrite with list SquiggleEq. 
   do 3 f_equal. clear H0. clear Hdisvc.
-  autorewrite with SquiggleLazyEq in *.
+  autorewrite with SquiggleEq in *.
   simpl in *.
   repnd.
   apply' map_eq_repeat_implies Hnb.
@@ -1818,7 +1789,7 @@ Local Transparent is_valueb.
     [ | intros; apply Hind; auto; omega 
       | ntwfauto 
       | rwsimplC; dands; try tauto].
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   refl.
 - 
   dnumvbars Hnb bt. unfold num_bvars. simpl.
@@ -1909,7 +1880,7 @@ Proof using.
   subst sub_c.
   rewrite disjoint_flat_map_r.
   setoid_rewrite map_map.
-  autorewrite with SquiggleLazyEq in H3. repnd.
+  autorewrite with SquiggleEq in H3. repnd.
   intros t Hin.
   apply in_map_iff in Hin.
   exrepnd.
@@ -2008,13 +1979,13 @@ Proof using.
   unfold subst.
   rewrite ssubstRet_c by assumption.
   rewrite ssubst_vterm. simpl ssubst_aux.
-  progress autorewrite with SquiggleLazyEq.
+  progress autorewrite with SquiggleEq.
   match goal with
   [|- context [Ret_c _ (ssubst ?k _)]] => assert (closed k) as Hclk;
     [|  assert (sub_range_sat [(kv0 , k)] closed) as Hcs by
         (intros ? ? ?; in_reasoning; cpx)]
   end.
-    unfold closed. simpl. autorewrite with list core SquiggleLazyEq.
+    unfold closed. simpl. autorewrite with list core SquiggleEq.
     symmetry.
     rewrite cps_cvt_aux_fvars;
       [| apply' eval_preseves_wf He1; ntwfauto; fail
@@ -2022,7 +1993,7 @@ Proof using.
     rewrite remove_nvars_app_r.
     rewrite cons_as_app.
     repeat rewrite <- remove_nvars_app_l.
-    autorewrite with SquiggleLazyEq.
+    autorewrite with SquiggleEq.
     rewrite remove_nvars_comm. rwHyps. refl.
 
   rewrite substLam_cTrivial2 by assumption.
@@ -2050,8 +2021,8 @@ Proof using.
     end.
     
     simpl.
-    autorewrite with list core SquiggleLazyEq using rwHyps. refl.
-    rwHyps. rwsimplC. autorewrite with list core SquiggleLazyEq.
+    autorewrite with list core SquiggleEq using rwHyps. refl.
+    rwHyps. rwsimplC. autorewrite with list core SquiggleEq.
   clear Hcs.
   rewrite IHHe2 by assumption. clear IHHe2.
   rewrite cps_val_ret_flip; auto;[|eauto using eval_yields_value'| tauto | split; auto; 
@@ -2083,7 +2054,7 @@ Proof using.
      rwHyps; auto.
      
   rewrite ssubst_vterm. simpl.
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   rewrite not_eq_beq_var_false;[| apply disjoint_neq; disjoint_reasoningv2].
   rewrite <- (eval_c_ssubst_commute);[refl
      | apply' eval_preseves_wf He1; 
@@ -2167,11 +2138,11 @@ Proof using.
   simpl. destruct b as [lb nt].
   destruct lkv; simpl in *; inverts Hl.
   unfold Ret_c, KLam_c.
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   unfold lforall in Hwf. simpl in *.
   dLin_hyp. ntwfauto.
   rwsimpl Hvc.
-  autorewrite with SquiggleLazyEq in Hd.
+  autorewrite with SquiggleEq in Hd.
   rwsimpl Hd.
   rewrite ssubst_aux_trivial_disj;
       [auto 
@@ -2401,23 +2372,23 @@ Proof using.
     eval_preseves_varclass, eval_preseves_wf,eval_preserves_closed).
   unfold closed in *.
   change_to_ssubst_aux8;[ |simpl; rwHyps; simpl; auto].
-  Hint Rewrite @list_nil_btwf : SquiggleLazyEq.
+  Hint Rewrite @list_nil_btwf : SquiggleEq.
   rewrite ssubst_aux_cps_cvts'; simpl; autorewrite with list; auto; unfold lforall; rwsimplC; auto;
     [| noRepDis2].
-  autorewrite with SquiggleLazyEq. simpl.
+  autorewrite with SquiggleEq. simpl.
   rewrite map_map.
   unfold compose. simpl.
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   do 2 rewrite <- snoc_append_r.
   do 2 rewrite snoc_as_append.
   do 2 rewrite map_app.
   rewrite map_ssubst_aux; simpl; rwHyps; auto.
   rewrite map_ssubst_aux;[| rwsimplC; noRepDis2].
   rewrite ssubst_aux_trivial_disj;[|rwHyps; auto].
-  autorewrite with SquiggleLazyEq.
+  autorewrite with SquiggleEq.
   change ([bterm [] (cps_cvt_val v)]) with (map (bterm []) [cps_cvt_val v]).
   rewrite <- map_app.
-  Hint Rewrite @flat_map_app : SquiggleLazyEq.
+  Hint Rewrite @flat_map_app : SquiggleEq.
   rewrite <- IHes with (lkv:=lkv); simpl; rwsimplC; rwHyps; try noRepDis2.
   unfold Con_c.
   rewrite length_app.
@@ -2465,7 +2436,7 @@ Proof using.
   unfold closed in Hcle. simpl in Hcle.
   autorewrite with core list in Hcle.
   apply app_eq_nil in Hcle.
-  autorewrite with SquiggleLazyEq in *. repnd.
+  autorewrite with SquiggleEq in *. repnd.
   pose proof He1 as He1wf.
   apply' eval_preseves_wf He1wf.
   dimp He1wf;clear He1wf;[ ntwfauto|]. rename hyp into He1wf.
@@ -2510,12 +2481,12 @@ Proof using.
   match goal with
   [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk
   end.
-    unfold closed. simpl. autorewrite with list core SquiggleLazyEq SquiggleLazyEq2.
+    unfold closed. simpl. autorewrite with list core SquiggleEq SquiggleEq2.
     symmetry.
     rewrite cps_cvt_aux_fvars;[| ntwfauto|]; try rewrite Hcle; [  | eauto ].
     simpl. rewrite Hcl.
     rewrite remove_nvars_nops;[| noRepDis].
-    autorewrite with SquiggleLazyEq. refl.
+    autorewrite with SquiggleEq. refl.
 
   rewrite IHHe1; [| assumption]. 
   simpl. clear IHHe1.
@@ -2595,7 +2566,7 @@ Proof using.
   autorewrite with core list in Hcle.
   apply app_eq_nil in Hcle.
   applydup userVarsContVar in Hvc as Hvcdiss.
-  autorewrite with SquiggleLazyEq in *. repnd.
+  autorewrite with SquiggleEq in *. repnd.
   specialize (IHHe1 ltac:(ntwfauto) Hvc0  Hcle0).
   specialize (IHHe2 ltac:(apply' eval_preseves_wf He1; 
                       ntwfauto; eauto using eval_preseves_wf)).
@@ -2638,10 +2609,10 @@ Proof using.
     rwsimplC; try tauto; try ntwfauto;
     [rewrite cons_as_app; rewrite disjoint_app_l; split;tauto|].
   
-  unfold closed. simpl. autorewrite with core list SquiggleLazyEq using rwHyps.
+  unfold closed. simpl. autorewrite with core list SquiggleEq using rwHyps.
   symmetry. rewrite cps_cvt_aux_fvars; simpl; auto.
   rwHyps. simpl. rewrite remove_nvars_app_l. 
-  simpl. autorewrite with SquiggleLazyEq. refl.
+  simpl. autorewrite with SquiggleEq. refl.
 
 (* eval_Match_e *)
 
@@ -2682,7 +2653,7 @@ Proof using.
     apply ssubst_wf_iff;[| auto].
     apply sub_range_sat_range.
     rewrite dom_range_combine by assumption.
-    ntwfauto. autorewrite with SquiggleLazyEq in Hntwf. assumption.
+    ntwfauto. autorewrite with SquiggleEq in Hntwf. assumption.
   rename hyp into Hwfs. specialize (IHHe2 Hwfs).
   
   dimp IHHe2.
@@ -2719,7 +2690,7 @@ Proof using.
         (intros ? ? ?; in_reasoning; cpx)]
   end.
   
-    unfold closed. simpl. autorewrite with list core SquiggleLazyEq SquiggleLazyEq2.
+    unfold closed. simpl. autorewrite with list core SquiggleEq SquiggleEq2.
     simpl. symmetry.
     rewrite cps_cvt_branches_fvars; simpl; rwHyps; auto.
     rewrite repeat_nil. refl.
@@ -2783,7 +2754,7 @@ Proof using.
   rewrite <- map_sub_range_combine.
   apply eval_c_ssubst_commute; 
     try (rewrite sub_range_sat_range);try (rewrite dom_range_combine;[| rwsimplC; auto]); auto.
-  + inverts Hcwf as Hcwf _. autorewrite with SquiggleLazyEq in Hcwf. auto.
+  + inverts Hcwf as Hcwf _. autorewrite with SquiggleEq in Hcwf. auto.
   + setoid_rewrite <- flat_map_empty. auto.
   + rewrite dom_sub_combine ;[| rwsimplC; auto]. rwsimplC. dands; eauto with subset.
 
@@ -3106,10 +3077,10 @@ Proof using.
 Qed.
 
 
-(** [SquiggleLazyEq.substitution.change_bvars_alpha] 
+(** [SquiggleEq.substitution.change_bvars_alpha] 
    gets the job done, but it was written
    without any consideration whatsoever to efficiency. Need to
-   rewrite it (in the SquiggleLazyEq library) to be efficient.
+   rewrite it (in the SquiggleEq library) to be efficient.
    
    *)
 Definition cps_cvt_unique_bvars :=

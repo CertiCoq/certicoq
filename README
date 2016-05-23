@@ -31,12 +31,6 @@ https://github.com/coq-ext-lib/coq-ext-lib
 https://github.com/gmalecha/template-coq
 
 
-Also, the library SquiggleLazyEq needs to be insalled as follows:
-
-git clone https://github.com/aa755/SquiggleLazyEq.git
-cd SquiggleLazyEq
-make -j6
-sudo make install (Alternatively, add "-R `pwd` SquiggleLazyEq" to the coq flags in certicoq/theories/_CoqProject)
 
 
 Building the compiler:
@@ -46,6 +40,8 @@ Building the compiler:
   you can go to the libraries/ directory, and run
   
 # coq_makefile -f _CoqProject -o Makefile
+# make -j4
+# cd SquiggleEq
 # make -j4
 
   Then, go to the theories/ directory.

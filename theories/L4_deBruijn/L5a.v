@@ -1,13 +1,13 @@
 
-Require Import SquiggleLazyEq.export.
-Require Import SquiggleLazyEq.UsefulTypes.
+Require Import SquiggleEq.export.
+Require Import SquiggleEq.UsefulTypes.
 Require Import L4.simpleCPSAA.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
   Coq.Program.Program Coq.micromega.Psatz.
 
 Set Implicit Arguments.
 
-Require Import L4.VarInstance.
+Require Import SquiggleEq.varImplZ.
 
 Require Import cps.
 Notation NVar := var.
@@ -151,9 +151,9 @@ match sop with
 | None => False
 end.
 
-Require Import SquiggleLazyEq.tactics.
-Require Import SquiggleLazyEq.LibTactics.
-Require Import SquiggleLazyEq.list.
+Require Import SquiggleEq.tactics.
+Require Import SquiggleEq.LibTactics.
+Require Import SquiggleEq.list.
 
 Local Opaque varClassP.
 
@@ -188,31 +188,6 @@ Proof using.
   assumption.
 Qed.
 
-(* delete *)
-Ltac rwsimpl He1 :=
-  repeat progress (autorewrite with list core SquiggleLazyEq in He1; simpl in He1).
-
-Ltac rwsimplAll :=
-  repeat progress (autorewrite with list core SquiggleLazyEq in *; simpl in *).
-
-Ltac rwsimplC :=
-  repeat progress (autorewrite with list core SquiggleLazyEq; simpl).
-  
-(* delete *)
-Ltac dLin_hyp :=
-  repeat
-   match goal with
-   | H:forall x : ?T, ?L = x \/ ?R -> ?C
-     |- _ =>
-         let Hyp := fresh "Hyp" in
-         pose proof (H L (or_introl eq_refl)) as Hyp; specialize (fun x y => H x (or_intror y))
-   | H:forall x y, _ = _ \/ ?R -> ?C
-     |- _ =>
-         let Hyp := fresh "Hyp" in
-         pose proof (H _ _ (or_introl eq_refl)) as Hyp; specialize
-          (fun x z y => H x z (or_intror y))
-   | H:forall x : ?T, False -> _ |- _ => clear H
-   end.
 
 Ltac dimpn H :=
   match type of H with
@@ -260,23 +235,6 @@ Proof using.
   specialize (Hf _ eq_refl v). simpl in *. auto.
 Qed.  
 
-
-(* Delete *)
-Ltac addContVarsSpec  m H vn:=
-  let Hfr := fresh H "nr" in
-  pose proof H as Hfr;
-  apply userVarsContVars with (n:=m) in Hfr;
-  let vf := fresh "lvcvf" in
-  remember (contVars m) as vf;
-  let Hdis := fresh "Hcvdis" in
-  let Hlen := fresh "Hcvlen" in
-  pose proof Hfr as  Hdis;
-  pose proof Hfr as  Hlen;
-  apply proj2, proj2 in Hlen;
-  apply proj2, proj1 in Hdis;
-  apply proj1 in Hfr;
-  simpl in Hlen;
-  dlist_len_name vf vn.
 
 Lemma translateVal_cps_cvt_Some : forall (t:NTerm),
   nt_wf t

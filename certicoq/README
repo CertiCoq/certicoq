@@ -35,20 +35,8 @@ https://github.com/gmalecha/template-coq
 
 Building the compiler:
 ----------------------
-
-  Once you have a working Coq in your path,
-  you can go to the libraries/ directory, and run
-  
-# coq_makefile -f _CoqProject -o Makefile
-# make -j4
-# cd SquiggleEq
-# make -j4
-
-  Then, go to the theories/ directory.
-  There you can run (once):
-
-# coq_makefile -f _CoqProject -o Makefile
-# make -j4
+  at certicoq/, run
+# make -j4 -k
 
   This will build the compiler and its proofs.
 

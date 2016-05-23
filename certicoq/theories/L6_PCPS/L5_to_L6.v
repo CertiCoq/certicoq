@@ -25,6 +25,7 @@ Require Import CpdtTactics.
 
 Require Import ExtLib.Data.List.
 Require Import L4.simpleCPSAA.
+Require Import SquiggleEq.varImplZ.
 Require Import L4.L5a.
 
 Require Import cps.

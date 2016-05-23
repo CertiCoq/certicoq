@@ -1,5 +1,5 @@
-Require Import SquiggleLazyEq.export.
-Require Import SquiggleLazyEq.UsefulTypes.
+Require Import export.
+Require Import UsefulTypes.
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
   Coq.Program.Program Coq.micromega.Psatz.
@@ -57,5 +57,3 @@ Global Instance vartypePos : @VarType positive bool deqpos.
   apply Build_VarType with (varClass:=varClassP) (freshVars := freshVarsPos).
   exact freshVarsPosCorrect.
 Defined.
-
-(* Move all of this file to SquiggleLazyEq *)

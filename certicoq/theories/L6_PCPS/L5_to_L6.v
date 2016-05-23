@@ -24,7 +24,6 @@ Require Import CpdtTactics.
 
 
 Require Import ExtLib.Data.List.
-Require Import L4.VarInstance.
 Require Import L4.simpleCPSAA.
 Require Import L4.L5a.
 

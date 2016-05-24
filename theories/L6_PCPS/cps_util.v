@@ -1,11 +1,12 @@
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
-        Coq.omega.Omega Coq.Sets.Ensembles.
+        Coq.omega.Omega Coq.Sets.Ensembles Coq.Relations.Relation_Operators.
+
 Require Import CpdtTactics.
 Require Import cps Ensembles_util List_util.
 Import ListNotations.
 (* Require Maps. *)
 (* Import Nnat. *)
-
+Require Import ctx.
 (* useful definitions and proof for L6 - cps language *)
 (* 
  SUBTERM - proper subterm relation
@@ -28,29 +29,28 @@ Ltac destructAll :=
 
 Definition var_dec := M.elt_eq.
 
-Inductive subterm_e: exp -> exp -> Prop :=
-(* immediate *)
-| subterm_constr: forall x t c ys e, subterm_e e (Econstr x t c ys e)
-| subterm_proj: forall v t n y e, subterm_e e (Eproj v t n y e)
-| subterm_prim: forall x t f ys e, subterm_e e (Eprim x t f ys e)
-(* remote *)
-| subterm_constr':
-    forall x t c ys e e', subterm_e e' e -> subterm_e e' (Econstr x t c ys e)
-| subterm_proj':
-    forall v t n y e e', subterm_e e' e -> subterm_e e' (Eproj v t n y e)
-| subterm_prim':
-    forall x t f ys e e', subterm_e e' e -> subterm_e e' (Eprim x t f ys e)
-(* in fdefs *)
-| subterm_fds:
+Inductive dsubterm_e:exp -> exp -> Prop :=
+| dsubterm_constr: forall x t c ys e, dsubterm_e e (Econstr x t c ys e)
+| dsubterm_proj: forall v t n y e, dsubterm_e e (Eproj v t n y e)
+| dsubterm_prim: forall x t f ys e, dsubterm_e e (Eprim x t f ys e)
+| dsubterm_fds:
     forall e' fds e,
-      subterm_fds_e e' fds -> subterm_e e' (Efun fds e)
-with subterm_fds_e: exp -> fundefs -> Prop :=
-     | subterm_cons:
-         forall e f t ys fds', subterm_fds_e e (Fcons f t ys e fds')
-     | subterm_cons':
-         forall e' e f t ys fds', subterm_e e' e -> subterm_fds_e e' (Fcons f t ys e fds')
-     | subterm_cons_fds:
+      dsubterm_fds_e e' fds -> dsubterm_e e' (Efun fds e)
+with dsubterm_fds_e: exp -> fundefs -> Prop :=
+     | dsubterm_cons:
+         forall e f t ys fds', dsubterm_fds_e e (Fcons f t ys e fds')
+     | dsubterm_cons_fds:
+         forall e' fds' f t ys e , dsubterm_fds_e e' fds' -> dsubterm_fds_e e' (Fcons f t ys e fds').
+
+Definition subterm_e := clos_trans _ dsubterm_e.
+Definition subterm_or_eq := clos_refl_trans _ dsubterm_e.
+
+Inductive subterm_fds_e: exp -> fundefs -> Prop :=
+| subterm_cons:
+    forall e e' f t ys fds', subterm_e e' e -> subterm_fds_e e' (Fcons f t ys e fds')
+| subterm_cons_fds:
          forall e' fds' f t ys e , subterm_fds_e e' fds' -> subterm_fds_e e' (Fcons f t ys e fds').
+
 
 Inductive subfds_fds: fundefs -> fundefs -> Prop :=
 | subfds_cons':
@@ -61,8 +61,6 @@ Inductive subfds_fds: fundefs -> fundefs -> Prop :=
     forall fds f t ys e, subfds_fds fds (Fcons f t ys e fds).
 
 
-Definition subterm_or_eq: exp -> exp -> Prop :=
-  fun e' e => subterm_e e' e \/ e' = e.
 
 Definition subfds_or_eq: fundefs -> fundefs -> Prop :=
   fun fds' fds => subfds_fds fds' fds \/ fds' = fds.
@@ -93,138 +91,210 @@ Definition num_occur_list (lv:list var) (v:var) : nat :=
   fold_right (fun v' n => if (var_dec v v') then 1 + n
                           else n) 0 lv.
 
-(* number of time var occurs in exp (free or not) *)
-(* Inductive num_occur: exp -> var -> nat -> Prop := *)
-(* | Num_occ_constr: *)
-(*   forall x t c ys e v n, *)
-(*     num_occur e v n -> *)
-(*     num_occur (Econstr x t c ys e) v (n + (num_occur_list ys v)) *)
-(* | Num_occ_prim: *)
-(*     forall x t f ys e v n, *)
-(*       num_occur e v n -> *)
-(*       num_occur (Eprim x t f ys e) v (n + (num_occur_list ys v)) *)
-(* | Num_occ_case: *)
-(*     forall v' cl v, *)
-(*       num_occur (Ecase v' cl) v (num_occur_list (v'::(snd (split cl))) v) *)
-(* | Num_occ_proj: *)
-(*     forall e v n  y v' t n', *)
-(*       num_occur  e v n ->  *)
-(*       num_occur (Eproj v' t n' y e) v (num_occur_list [y] v + n) *)
-(* | Num_occ_app: *)
-(*     forall f ys v, *)
-(*                  num_occur (Eapp f ys) v (num_occur_list (f::ys) v) *)
-(* | Num_occ_fun: *)
-(*     forall e v n m fl, *)
-(*       num_occur e v n -> *)
-(*       num_occur_fds fl v m -> *)
-(*       num_occur (Efun fl e) v (n + m ) *)
-(* with num_occur_fds: fundefs -> var -> nat -> Prop := *)
-(*      | Num_occ_nil : *)
-(*          forall v, *)
-(*            num_occur_fds Fnil v 0 *)
-(*      | Num_occ_cons : *)
-(*          forall v t n v' ys e fds' m, *)
-(*            num_occur e v n -> *)
-(*            num_occur_fds fds' v m -> *)
-(*            num_occur_fds (Fcons v' t ys e fds') v (n + m). *)
+(* number of time var occurs in exp (free or not)*)
+Inductive num_occur: exp -> var -> nat -> Prop :=
+| Num_occ_constr:
+  forall x t c ys e v n,
+    num_occur e v n ->
+    num_occur (Econstr x t c ys e) v (n + (num_occur_list ys v))
+| Num_occ_prim:
+    forall x t f ys e v n,
+      num_occur e v n ->
+      num_occur (Eprim x t f ys e) v (n + (num_occur_list ys v))
+| Num_occ_case:
+    forall v' cl v n,
+      num_occur_case cl v n -> 
+      num_occur (Ecase v' cl) v (num_occur_list [v'] v + n)
+| Num_occ_proj:
+    forall e v n  y v' t n',
+      num_occur  e v n ->
+      num_occur (Eproj v' t n' y e) v (num_occur_list [y] v + n)
+| Num_occ_app:
+    forall f ys v,
+                 num_occur (Eapp f ys) v (num_occur_list (f::ys) v)
+| Num_occ_fun:
+    forall e v n m fl,
+      num_occur e v n ->
+      num_occur_fds fl v m ->
+      num_occur (Efun fl e) v (n + m )
+with num_occur_fds: fundefs -> var -> nat -> Prop :=
+     | Num_occ_nil :
+         forall v,
+           num_occur_fds Fnil v 0
+     | Num_occ_cons :
+         forall v t n v' ys e fds' m,
+           num_occur e v n ->
+           num_occur_fds fds' v m ->
+           num_occur_fds (Fcons v' t ys e fds') v (n + m)
+with num_occur_case: list (var * exp) -> var -> nat -> Prop :=
+     | Num_occ_cnil:
+         forall v,
+           num_occur_case [] v 0
+     | Num_occur_ccons:
+         forall v k cl e n m,
+           num_occur e v n ->
+           num_occur_case cl v m ->
+           num_occur_case ((k,e)::cl) v (n+m).
 
 
-(* (* number of times var occurs in a context *) *)
-(* Inductive num_occur_ec: exp_ctx -> var -> nat -> Prop := *)
-(* | Noec_hole: forall v, num_occur_ec Hole_c v 0 *)
-(* | Noec_constr: forall c v n x t ys g, *)
-(*                  num_occur_ec c v n ->  *)
-(*                  num_occur_ec (Econstr_c x t g ys c) v (num_occur_list ys v + n) *)
-(* | Noec_prim: forall c v n x t f ys,  *)
-(*                num_occur_ec c v n ->  *)
-(*                num_occur_ec (Eprim_c x t f ys c) v (num_occur_list ys v + n ) *)
-(* | Noec_proj: forall  v n y v' t n' c, *)
-(*                num_occur_ec c v n -> *)
-(*                num_occur_ec (Eproj_c v' t n' y c) v (num_occur_list [y] v + n) *)
-(* | Noec_fun1: forall n m fds c v, *)
-(*                num_occur_ec c v n -> *)
-(*                num_occur_fds fds v m -> *)
-(*                num_occur_ec (Efun1_c fds c) v (n+m) *)
-(* | Noec_fun2: forall n m fdc e v , *)
-(*                num_occur e v n -> *)
-(*                num_occur_fdc fdc v m -> *)
-(*                num_occur_ec (Efun2_c fdc e) v (n + m) *)
-(* with num_occur_fdc : fundefs_ctx -> var -> nat -> Prop := *)
-(*      | Nofc_fcons1 : forall v n m fds t ys c f, *)
-(*                        num_occur_ec c v n -> *)
-(*                        num_occur_fds fds v m ->  *)
-(*                        num_occur_fdc (Fcons1_c f t ys c fds) v  (n + m) *)
-(*      | Nofc_fcons2 : forall e v n m fdc f t ys, *)
-(*                        num_occur e v n -> *)
-(*                        num_occur_fdc fdc v m -> *)
-(*                        num_occur_fdc (Fcons2_c f t ys e fdc) v (n + m). *)
+
+ (* number of times var occurs in a context *) 
+Inductive num_occur_ec: exp_ctx -> var -> nat -> Prop :=
+| Noec_hole: forall v, num_occur_ec Hole_c v 0
+| Noec_constr: forall c v n x t ys g,
+                 num_occur_ec c v n ->
+                 num_occur_ec (Econstr_c x t g ys c) v (num_occur_list ys v + n)
+| Noec_prim: forall c v n x t f ys,
+               num_occur_ec c v n ->
+               num_occur_ec (Eprim_c x t f ys c) v (num_occur_list ys v + n )
+| Noec_proj: forall  v n y v' t n' c,
+               num_occur_ec c v n ->
+               num_occur_ec (Eproj_c v' t n' y c) v (num_occur_list [y] v + n)
+| Noec_case: forall cl cl' c v n m tg y p,
+            num_occur_case cl v n ->
+            num_occur_ec c v m ->
+            num_occur_case cl' v p ->
+            num_occur_ec (Ecase_c y cl tg c cl') v (num_occur_list [y] v + n+m+p)
+| Noec_fun1: forall n m fds c v,
+               num_occur_ec c v n ->
+               num_occur_fds fds v m ->
+               num_occur_ec (Efun1_c fds c) v (n+m)
+| Noec_fun2: forall n m fdc e v ,
+               num_occur e v n ->
+               num_occur_fdc fdc v m ->
+               num_occur_ec (Efun2_c fdc e) v (n + m)
+with num_occur_fdc : fundefs_ctx -> var -> nat -> Prop :=
+     | Nofc_fcons1 : forall v n m fds t ys c f,
+                       num_occur_ec c v n ->
+                       num_occur_fds fds v m ->
+                       num_occur_fdc (Fcons1_c f t ys c fds) v  (n + m)
+     | Nofc_fcons2 : forall e v n m fdc f t ys,
+                       num_occur e v n ->
+                       num_occur_fdc fdc v m ->
+                       num_occur_fdc (Fcons2_c f t ys e fdc) v (n + m).
 
 
-(* (* number of times var occurs in exp in an applied position *) *)
-(* Inductive num_occur_app: exp -> var -> nat -> Prop := *)
-(* | Num_oa_constr: *)
-(*   forall x t c ys e v n, *)
-(*     num_occur_app e v n -> num_occur_app (Econstr x t c ys e) v n *)
-(* | Num_oa_prim: *)
-(*     forall x t f ys e v n, *)
-(*       num_occur_app e v n -> num_occur_app (Eprim x t f ys e) v n *)
-(* | Num_oa_case: *)
-(*     forall v' cl v, *)
-(*       num_occur_app (Ecase v' cl) v (num_occur_list [v'] v) *)
-(* | Num_oa_proj: *)
-(*     forall e v n  y v' t n', (* TODO: A&J counts y here *) *)
-(*       num_occur_app e v n ->  *)
-(*       num_occur_app (Eproj v' t n' y e) v (num_occur_list [y] v + n) *)
-(* | Num_oa_app: *)
-(*     forall f ys v, *)
-(*       num_occur_app (Eapp f ys) v (num_occur_list [f] v) *)
-(* | Num_oa_fun: *)
-(*     forall e v n m fl, *)
-(*       num_occur_app e v n -> *)
-(*       num_occur_app_fds fl v m -> *)
-(*       num_occur_app (Efun fl e) v (n + m ) *)
-(* with num_occur_app_fds: fundefs -> var -> nat -> Prop := *)
-(*      | Num_oa_nil : forall v, *)
-(*                       num_occur_app_fds Fnil v 0 *)
-(*      | Num_oa_cons : forall v t n v' ys e fds' m, *)
-(*                        num_occur_app e v n -> *)
-(*                        num_occur_app_fds fds' v m -> *)
-(*                        num_occur_app_fds (Fcons v' t ys e fds') v (n + m). *)
+Inductive num_binding_e: exp -> var -> nat -> Prop :=
+| Ub_constr: forall v t0 t ys e v' m,
+               num_binding_e e v m -> 
+               num_binding_e (Econstr v' t0 t ys e) v (num_occur_list [v'] v + m)
+| Ub_proj: forall v' t n' y e v n, 
+    num_binding_e e v n ->
+    num_binding_e (Eproj v' t n' y e) v (num_occur_list [v'] v + n)
+| Ub_prim: forall e v n x t f ys,
+    num_binding_e e v n ->
+    num_binding_e (Eprim x t f ys e) v (num_occur_list [x] v + n)
+| Ub_app: forall f ys v,
+    num_binding_e (Eapp f ys) v 0
+| Ub_case: forall l v n y,
+    num_binding_l l v n ->
+    num_binding_e (Ecase y l ) v n
+| Ub_fun: forall fds v n m e,
+    num_binding_f fds v n ->
+    num_binding_e e v m ->
+    num_binding_e (Efun fds e) v (n+m)
 
-(* (* number of times var occurs in exp in an escaping position *) *)
-(* Inductive num_occur_esc: exp -> var -> nat -> Prop := *)
-(* | Num_oe_constr: *)
-(*   forall x t c ys e v n, *)
-(*     num_occur_esc e v n -> *)
-(*     num_occur_esc (Econstr x t c ys e) v (n + (num_occur_list ys v)) *)
-(* | Num_oe_prim: *)
-(*     forall x t f ys e v n, *)
-(*       num_occur_esc e v n -> *)
-(*       num_occur_esc (Eprim x t f ys e) v (n + (num_occur_list ys v)) *)
-(* | Num_oe_case: *)
-(*     forall v' cl v, *)
-(*       num_occur_esc (Ecase v' cl) v (num_occur_list (snd (split cl)) v) *)
-(* | Num_oe_proj: *)
-(*     forall e v n  y v' t n', *)
-(*       num_occur_esc  e v n ->  *)
-(*       num_occur_esc (Eproj v' t n' y e) v n *)
-(* | Num_oe_app: *)
-(*     forall f ys v, *)
-(*       num_occur_esc (Eapp f ys) v (num_occur_list ys v) *)
-(* | Num_oe_fun: *)
-(*     forall e v n m fl, *)
-(*       num_occur_esc e v n -> *)
-(*       num_occur_esc_fds fl v m -> *)
-(*       num_occur_esc (Efun fl e) v (n + m ) *)
-(* with num_occur_esc_fds: fundefs -> var -> nat -> Prop := *)
-(*      | Num_oe_nil : *)
-(*          forall v, *)
-(*            num_occur_esc_fds Fnil v 0 *)
-(*      | Num_oe_cons : *)
-(*          forall v t n v' ys e fds' m, *)
-(*            num_occur_esc e v n -> *)
-(*            num_occur_esc_fds fds' v m -> *)
-(*            num_occur_esc_fds (Fcons v' t ys e fds') v (n + m).   *)
+with num_binding_l: list (tag*exp) -> var -> nat -> Prop :=
+      | Ub_cons: forall e l v n m k,
+          num_binding_e e v n ->
+          num_binding_l l v m ->
+             num_binding_l ((k,e)::l) v (n+m)
+        | Ub_nil: forall v,
+            num_binding_l [] v 0 
+with num_binding_f: fundefs -> var -> nat -> Prop :=
+     | Ub_fcons: forall e v n fds v' t ys m,
+         num_binding_e e v n ->
+         num_binding_f fds v m ->                        
+         num_binding_f (Fcons v' t ys e fds) v (num_occur_list (v'::ys) v+n+m)
+     | Ub_fnil: forall v,
+         num_binding_f Fnil v 0.
+
+
+Scheme nbe_ind := Induction for num_binding_e Sort Prop
+                  with nbl_ind := Induction for num_binding_l Sort Prop
+                  with nbf_ind:= Induction for num_binding_f Sort Prop.
+
+
+
+
+Theorem e_num_binding: forall v e,
+                       exists n, num_binding_e e v n
+                                 with e_num_binding_f: forall v fds,
+                                                       exists n, num_binding_f fds v n.                                                                 
+Proof.  
+  - induction e; destructAll.
+     + exists (num_occur_list [v0] v  + x); constructor; auto.
+             + assert (exists n, num_binding_l l v n).
+               { induction l.
+                 exists 0; constructor.
+                 destruct a.
+                 specialize (e_num_binding v e).
+                 destructAll. eexists; constructor; eauto.
+               }
+               destruct H. exists x; constructor; auto.
+             + exists (num_occur_list [v0] v + x); constructor; auto.
+    + specialize (e_num_binding_f v f).
+      destructAll.
+      eexists; constructor; eauto.
+    + exists 0; constructor.
+    + exists (num_occur_list [v0] v + x); constructor; auto.
+  - induction fds.
+    + specialize (e_num_binding v e). destructAll.
+      eexists; constructor; eauto.
+    + exists 0; constructor.
+Qed.
+
+(*
+
+Theorem num_binding_det: forall v e n m,
+                           num_binding_e e v n ->
+                           num_binding_e e v m ->
+                           n = m 
+with num_binding_f_det: forall v fds n m,
+                          num_binding_f fds v n ->
+                          num_binding_f fds v m ->
+                          n = m.
+- induction e; intros; inversion H; inversion H0; subst.
+  + specialize (IHe _ _ H8 H16).
+    auto.
+  +    clear H H0 num_binding_f_det.
+    revert n m H5 H10.
+    induction l; intros.
+    * inversion H5; inversion H10; subst; auto.
+    * inversion H5; inversion H10; subst.
+      inversion H6; subst.
+      specialize (num_binding_det _ _ _ _ H1 H8). 
+      specialize (IHl _ _ H4 H12). auto.
+  + specialize (IHe _ _ H8 H16).
+    auto.
+  + specialize (IHe _ _ H6 H12).
+    specialize (num_binding_f_det _ _ _ _ H3 H9).
+    auto.
+  + auto.
+  + specialize (IHe _ _ H8 H16).
+    auto.
+-  induction fds; intros; inversion H; inversion H0; subst.
+  + specialize (num_binding_det _ _ _ _ H8 H17).
+    specialize (IHfds _ _ H9 H18).
+    auto.
+  + auto.
+Qed.
+
+ *)
+
+
+
+    
+Definition unique_bindings' e: Prop :=
+  forall v,
+    exists n,
+    num_binding_e e v n /\ n <= 1.
+
+Definition unique_binding_f' fds:Prop :=
+  forall v, exists n,
+    num_binding_f fds v n /\ n <= 1.
+
+
 
 Inductive bv_e: exp -> list var -> Prop :=
 | Constr_bv :

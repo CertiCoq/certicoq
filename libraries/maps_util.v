@@ -179,6 +179,25 @@ Section GETD.
   Proof.
     unfold getd; intros; destruct (M.get v sub); subst; assumption. 
   Qed.
+
+  Theorem gdss: forall A (d:A) x c v,                  
+         getd d x (M.set x v c) = v.
+  Proof.
+    intros. unfold getd. rewrite M.gss. reflexivity.
+  Qed.
+
+  Theorem gdso: forall A (d:A) x x' c v,
+                  x <> x' -> getd d x (M.set x' v c) = getd d x c.
+  Proof.
+    unfold getd. intros. rewrite M.gso. reflexivity. assumption.
+  Qed.
+
+  Theorem gdempty: forall A (d:A) x,
+             getd d x (M.empty A) = d.        
+  Proof.
+    unfold getd. symmetry. rewrite M.gempty. reflexivity.
+  Qed.
+
   
 End GETD.
   
@@ -295,3 +314,17 @@ Section EQDMAP.
 
 
 End EQDMAP.
+
+Theorem gr_some : forall A x y s (a:A), M.get x (M.remove y s) = Some a -> M.get x s = Some a.
+Proof.
+  intros. destruct (var_dec x y).
+  subst; rewrite M.grs in H; inversion H.
+  rewrite M.gro in H; assumption.
+Qed.
+
+Theorem gr_none: forall A x y (s:M.t A), M.get x s = None -> M.get x (M.remove y s) = None.
+Proof.
+  intros. destruct (var_dec x y).
+  subst; apply M.grs.
+  rewrite M.gro; assumption.
+Qed.

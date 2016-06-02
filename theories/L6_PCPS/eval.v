@@ -17,7 +17,7 @@ Section EVAL.
    *    needed to define the relations (see below). 
    * b. This definition can return arbitrary values as opposed to 
    *    only observable values which is the case with the old definition 
-   * Eventually, we should move everything related to evaluation in this file. *)
+   * Eventually, we should move this to a file dedicated to the semantics. *)
   Inductive bstep_e : env -> exp -> val -> nat -> Prop :=
   | BStep_app_obs :
       forall (rho : env) (t : type) (ys : list var)
@@ -78,7 +78,7 @@ Section EVAL.
         rewrite H1 in H2; inv H2
     end.
 
-  (** The evalutation semantics are derministic *)
+  (** The evalutation semantics is derministic *)
   Lemma bstep_e_deterministic e rho v1 v2 c1 c2 :
     bstep_e rho e v1 c1 ->
     bstep_e rho e v2 c2 ->
@@ -199,16 +199,16 @@ Section EVAL.
       * revert l0; induction l as [| x xs IHxs];
         intros l2; destruct l2 as [| y ys ];
         try (now intros [H1 H2]; split; eauto; inv H2).
-        intros H; split; destruct H as [H1 [H2 H3]]; eauto. constructor. eauto.
-        eapply IHxs. simpl. eauto.
+        intros H; split; destruct H as [H1 [H2 H3]]; eauto.
+        constructor; [ now eauto | now eapply IHxs ].
       * revert l0; induction l as [| x xs IHxs];
         intros l2; destruct l2 as [| y ys ];
         try (now intros [H1 H2]; split; eauto; inv H2).
-        intros H; split; inv H; eauto. inv H1. split; eauto.
-        eapply IHxs. simpl. eauto.
+        intros H; split; inv H; eauto. inv H1.
+        split; [ now eauto | now eapply IHxs ].
     - split; intros Hpre; simpl; intros; 
       edestruct (Hpre vs1 vs2 0) as [t2 [xs2 [e2 [rho' [H1' [H2' H3']]]]]];
-      eauto; do 4 eexists; split; eauto; split; eauto; intros Hc; exfalso; omega.
+      eauto; do 4 eexists; repeat split; eauto; intros Hc; exfalso; omega.
     - revert l0; induction l as [| x xs IHxs];
       intros l2; destruct l2 as [| y ys ];
       split; intros H; try (now simpl in H; inv H); try now (simpl; eauto).
@@ -224,24 +224,19 @@ Section EVAL.
       * revert l0; induction l as [| x xs IHxs];
         intros l2; destruct l2 as [| y ys ];
         try (now intros [H1 H2]; split; eauto; inv H2).
-        intros H; split; inv H; eauto. inv H1. split; eauto.
-        eapply IHxs. simpl. eauto.
-    - split; intros Hpre; simpl; intros. 
-      + edestruct Hpre as [t2 [xs2 [e2 [rho' [H1' [H2' H3']]]]]]; eauto.
-        do 4 eexists. split; eauto. split; eauto. intros Hleq Hf v1 c1 Hleq' Hstep. 
-        assert (Heq : k - (k - j) = j) by omega. rewrite Heq in H3'.
-        simpl in H3'. eapply H3'; eauto.
-      + edestruct Hpre as [t2 [xs2 [e2 [rho' [H1' [H2' H3']]]]]]; eauto.
-        do 4 eexists. split; eauto. split; eauto.
-        intros Hleq Hf v1 Hstep.
-        assert (Heq : k - (k - j) = j) by omega. rewrite Heq in *.
-        eapply H3'; eauto.
+        intros H; split; inv H; eauto. inv H1.
+        split; [now eauto | now apply IHxs].
+    - split; intros Hpre; simpl; intros; 
+      now (edestruct Hpre as [t2 [xs2 [e2 [rho' [H1' [H2' H3']]]]]]; eauto;
+           do 4 eexists; do 2 (split; eauto); intros Hleq Hf v1 c1 Hleq' Hstep;
+           (assert (Heq : k - (k - j) = j) by omega); rewrite Heq in *;
+           eapply H3'; eauto).
     - simpl. revert l0; induction l as [| x xs IHxs];
       intros l2; destruct l2 as [| y ys ];
       split; intros H; try (now simpl in H; inv H).
       destruct H as [H1 H2]; eauto.
-      constructor; eauto. eapply IHxs. eauto.
-      inv H. split; eauto. eapply IHxs; eauto.
+      constructor; eauto. now eapply IHxs.
+      inv H. split; [now eauto | now apply IHxs].
   Qed.
 
   Opaque preord_val.
@@ -275,6 +270,7 @@ Section EVAL.
                   preord_exp k (c1 |[ e1 ]|, rho1')
                              (c2 |[ e2 ]|, rho2').
 
+  (** Lemmas about extending the environment *)
   Lemma preord_var_env_extend_eq :
     forall (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
       preord_val k v1 v2 ->
@@ -306,7 +302,8 @@ Section EVAL.
     - apply preord_var_env_extend_neq; eauto.
   Qed.
 
-
+  (** The environment relation is antimonotonic in the set
+    * of free variables *) 
   Lemma preord_env_P_antimon (P1 P2 : var -> Prop) k rho1 rho2 :
     preord_env_P P2 k rho1 rho2 ->
     (Included var P1 P2) ->
@@ -319,9 +316,11 @@ Section EVAL.
     Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            preord_env_P.
   Proof.
-    intros s1 s2 [H1 H2]; split; intros Hpre; eapply preord_env_P_antimon; subst; eauto.
+    intros s1 s2 [H1 H2]; split; intros Hpre;
+    eapply preord_env_P_antimon; subst; eauto.
   Qed.
-  
+
+  (** Lemmas about the sets that index the environment relation *)
   Lemma preord_env_Empty_set k (rho1 rho2 : env) :
     preord_env_P (Empty_set var) k rho1 rho2.
   Proof.
@@ -333,16 +332,14 @@ Section EVAL.
     preord_env_P P2 k rho1 rho2 ->
     preord_env_P (Union var P1 P2) k rho1 rho2.
   Proof.
-    intros Hpre1 Hpre2 x HP2.
-    inv HP2; eauto.
+    intros Hpre1 Hpre2 x HP2. inv HP2; eauto.
   Qed.
 
   Lemma preord_env_P_inter_l (P1 P2 : var -> Prop) k rho1 rho2 :
     preord_env_P P1 k rho1 rho2 ->
     preord_env_P (Intersection var P1 P2) k rho1 rho2.
   Proof.
-    intros Hpre x HP2.
-    inv HP2; eauto.
+    intros Hpre x HP2. inv HP2; eauto.
   Qed.
 
   Lemma preord_env_P_inter_r (P1 P2 : var -> Prop) k rho1 rho2 :
@@ -353,7 +350,7 @@ Section EVAL.
     inv HP2; eauto.
   Qed.
 
-  (** extend the related environments with a single point *)
+  (** Extend the related environments with a single point *)
   Lemma preord_env_P_extend :
     forall P (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
       preord_env_P (Setminus var P (Singleton var x)) k rho1 rho2 ->
@@ -368,7 +365,7 @@ Section EVAL.
       intros Hin. inv Hin. congruence.
   Qed.
 
-  (** extend the related environments with a list *)
+  (** Extend the related environments with a list *)
   Lemma preord_env_P_setlist_l:
     forall (P1 P2 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
       (k : nat) (xs : list var) (vs1 vs2 : list val),
@@ -389,6 +386,7 @@ Section EVAL.
       repeat eexists; eauto. erewrite <- setlist_not_In; eauto.
   Qed.
 
+  
   Lemma preord_var_env_getlist (rho1 rho2 : env) (k : nat)
         (xs ys : list var) (vs1 : list val) :
     Forall2 (preord_var_env k rho1 rho2) xs ys ->
@@ -466,18 +464,18 @@ Section EVAL.
     intros. eapply preord_env_P_setlist_l; eauto.
   Qed.
 
+  (** * Index Monotonicity Properties *)
+
   (** The value relation is monotonic in the step index *)
   Lemma preord_val_monotonic (k : nat) :
     (forall v1 v2 j,
        preord_val k v1 v2 -> j <= k -> preord_val j v1 v2).
   Proof.
-    induction k using lt_wf_rec1; destruct k as [| k ];
-    try (now intros; replace j with 0 in * by omega; eauto).
     intros v1 v2 h Hpre Hleq. try rewrite preord_val_eq in *.
     revert v2 Hpre; induction v1 using val_ind'; intros v2 Hpre;
     destruct v2; try (simpl; contradiction); eauto.
     - destruct l; try now inv Hpre.
-    - inv Hpre. inv H1.
+    - inv Hpre. inv H0.
       split; auto. constructor; eauto; rewrite preord_val_eq in *.
       eapply IHv1; eauto.
       destruct (IHv0 ((Vconstr tau t1 l'))) as [Heq Hpre']; eauto.
@@ -488,7 +486,7 @@ Section EVAL.
       eapply H3; eauto. omega. 
     - constructor.
     - inv Hpre. constructor; rewrite preord_val_eq in *. eapply IHv1; eauto.
-        eapply (IHv0 (Vobservable tau l')) in H4. eauto.
+      eapply (IHv0 (Vobservable tau l')) in H3. eauto.
   Qed.
   
   (** The expression relation is monotonic in the step index *)
@@ -512,15 +510,15 @@ Section EVAL.
     edestruct Hpre as [v2 [Heq Hpre2]]; eauto.
     eexists; split; eauto. eapply preord_val_monotonic; eauto.
   Qed.
-
+  
   Lemma preord_env_monotonic k j rho1 rho2 :
     j <= k -> preord_env k rho1 rho2 -> preord_env j rho1 rho2.
   Proof.
     intros Hleq H. eapply preord_env_P_monotonic; eauto.
   Qed.
   
+  (** * Compatibility Properties *)
 
-  (** Compatibility lemmas for the expression relation *)
   Lemma preord_exp_const_compat k rho1 rho2 x tau t ys1 ys2 e1 e2 :
     Forall2 (preord_var_env k rho1 rho2) ys1 ys2 ->
     (forall vs1 vs2 : list val,
@@ -530,7 +528,8 @@ Section EVAL.
     preord_exp k (Econstr x tau t ys1 e1, rho1) (Econstr x tau t ys2 e2, rho2).
   Proof.
     intros Hall Hpre v1 c1 Hleq1 Hstep1. inv Hstep1.
-    edestruct (preord_var_env_getlist rho1 rho2) as [vs2' [Hget' Hpre']]; [| eauto |]; eauto.
+    edestruct (preord_var_env_getlist rho1 rho2) as [vs2' [Hget' Hpre']];
+      [| eauto |]; eauto.
     edestruct Hpre as [v2 [c2 [Hstep Hval]]]; eauto.
     repeat eexists; eauto. econstructor; eauto.
   Qed.
@@ -569,7 +568,7 @@ Section EVAL.
       edestruct Hvar as [v2 [Hget Hpre]]; eauto.
       rewrite preord_val_eq in Hpre.
       destruct v2; try (now simpl in Hpre; contradiction).
-      repeat eexists. constructor; eauto. eauto.
+      repeat eexists. now constructor; eauto.
       rewrite preord_val_eq. rewrite <- minus_n_O.
       simpl. split; eauto. eauto using Forall2_Forall2_asym_included.
     - edestruct Hvar as [v2' [Hget Hpre]]; eauto.
@@ -577,13 +576,13 @@ Section EVAL.
       destruct v2'; try (now simpl in Hpre; contradiction).
       edestruct preord_var_env_getlist as [vs2 [Hget' Hpre']]; eauto.
       edestruct (Hpre vs vs2 (k-1)) as [t2 [xs2 [e2 [rho2' [Hf [Hset H']]]]]]; eauto.
-      eapply Forall2_length; eauto.
+      now eapply Forall2_length; eauto.
       edestruct H' with (c1 := c) as [v2 [c2 [Hstep' Hpre'']]];
         eauto; try omega.
-      eapply Forall2_monotonic. intros.
-      eapply (preord_val_monotonic k). eauto. omega. eauto.
-      repeat eexists. econstructor 5; eauto.
-      replace (k - (c + 1)) with (k - 1 - c) by omega. eauto.
+      + eapply Forall2_monotonic; [| now eauto ].
+        intros. eapply (preord_val_monotonic k); [ now eauto | omega ].
+      + repeat eexists. econstructor 5; eauto.
+        replace (k - (c + 1)) with (k - 1 - c) by omega. eauto.
   Qed.
 
   Lemma preord_exp_case_nil_compat k rho1 rho2 x1 x2 :
@@ -651,36 +650,44 @@ Section EVAL.
     repeat eexists; eauto. econstructor; eauto.
   Qed.
 
+
+  (** * Reflexivity Properties *)
+
+  (** Un-nesting the function case of the reflexivity proof *)
   Lemma preord_env_P_def_funs_pre k B rho rho' B' e :
+    (* The inductive hypothesis on expressions *)
     (forall m e (rho rho' : env),
-        m <  k ->
+       m <  k ->
        preord_env_P (fun x => occurs_free e x) m rho rho' ->
-        preord_exp m (e, rho) (e, rho')) ->
-    preord_env_P (fun x => occurs_free_fundefs B' x \/
-                           (~ name_in_fundefs B' x /\ occurs_free e x))
-                 k rho rho' ->
-    preord_env_P (fun x => occurs_free (Efun B' e) x \/ name_in_fundefs B x)
+       preord_exp m (e, rho) (e, rho')) ->
+    (* Environments are related at FV(Efun B' e) *) 
+    preord_env_P (occurs_free (Efun B' e)) k rho rho' ->
+    preord_env_P (Union _ (occurs_free (Efun B' e)) (name_in_fundefs B))
                  k (def_funs B' B rho rho) (def_funs B' B rho' rho').
    Proof.
     revert B rho rho' e B'.
     induction k as [ k IH' ] using lt_wf_rec1. intros B rho rho' e B'.
     induction B; intros Hyp Hpre.
     - simpl. apply preord_env_P_extend.
-      + intros x H. inv H. eapply IHB; eauto.
-        inv H0; eauto. inv H; try contradiction. eauto.
+      + eapply preord_env_P_antimon; [ now eapply IHB; eauto | ].
+        rewrite !Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_r.
+        eapply Included_Union_compat.
+        * eapply Setminus_Included. now apply Included_refl.
+        * eapply Subset_Setminus.
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
         edestruct setlist_length as [rho2' Hs']; eauto.
         exists t1. exists xs1. exists e1. exists rho2'. split; eauto.
-        split. eauto. intros Hleq Hpre'. 
+        split; [ now eauto |]. intros Hleq Hpre'. 
         eapply Hyp. omega.
         eapply preord_env_P_setlist_l; [| | eauto | eauto | eauto]. 
-        apply IH'; eauto. intros. apply Hyp. omega. eauto.
-        eapply (preord_env_P_monotonic _ k); eauto. omega.
-        intros x Hin Hfr. simpl.
-        apply find_def_correct in Hf; eauto.
-        specialize (occurs_free_in_fun _ _ _ _ _ Hf x Hfr); intros H1.
-        inv H1; eauto; try contradiction. inv H; eauto.
+        * apply IH'; eauto. intros. apply Hyp. omega. eauto.
+          eapply (preord_env_P_monotonic _ k); eauto. omega.
+        * intros x Hin Hfr. simpl.
+          apply find_def_correct in Hf; eauto.
+          specialize (occurs_free_in_fun _ _ _ _ _ Hf x Hfr); intros H1.
+          inv H1; eauto; try contradiction. inv H.
+          now right; eauto. now left; eauto.
     - simpl. intros x HP. inv HP. inv H. apply Hpre; eauto.
       apply Hpre; eauto. inv H.
    Qed.
@@ -689,16 +696,18 @@ Section EVAL.
     preord_env_P (occurs_free e) k rho rho' ->
     preord_exp k (e, rho) (e, rho').
   Proof.
-    (* intros Hvalrefl. *)
     revert e rho rho'.
+    (* Well founded induction on the step-index *)
     induction k as [ k IH ] using lt_wf_rec1.
+    (* Induction on e *)
     induction e using exp_ind'; intros rho rho' Henv.
+    (* Each case follows from the corresponding compat lemma *)
     - eapply preord_exp_const_compat; eauto; intros.
-      eapply Forall2_same. intros x HIn. apply Henv. now constructor.
-      eapply IHe. eapply preord_env_P_extend.
-      eapply preord_env_P_antimon; eauto. intros x [H1 H2].
-      constructor 2; eauto. intros Hc. subst. eauto.
-      rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
+      * eapply Forall2_same. intros x HIn. apply Henv. now constructor.
+      * eapply IHe. eapply preord_env_P_extend.
+        eapply preord_env_P_antimon; eauto. intros x [H1 H2].
+        constructor 2; eauto. intros Hc. subst. now eauto.
+        rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
     - eapply preord_exp_case_nil_compat.
     - eapply preord_exp_case_cons_compat; eauto.
       apply IHe. intros x P. apply Henv. constructor; eauto.
@@ -709,10 +718,8 @@ Section EVAL.
       intros x [H1 H2]. constructor; eauto. intros Hc; subst; eauto.
     - eapply preord_exp_fun_compat; eauto.
       eapply IHe. eapply preord_env_P_antimon. 
-      eapply preord_env_P_def_funs_pre; eauto.
-      eapply preord_env_P_antimon. eauto.
-      intros x H. destruct H as [H | [H1 H2]]; try now (constructor; eauto).
-      intros x H. destruct (@Dec _ _ (Decidable_name_in_fundefs f2) x); eauto.
+      now eapply preord_env_P_def_funs_pre; eauto.
+      now eapply occurs_free_Efun_Included.
     - eapply preord_exp_app_compat.
       intros x HP. apply Henv; eauto.
       apply Forall2_same. intros. apply Henv. now constructor.
@@ -722,10 +729,13 @@ Section EVAL.
       eapply preord_env_P_antimon; eauto. intros x [H1 H2].
       apply Free_Eprim2; eauto. intros Hc; subst; eauto.
   Qed.
+  (* Note: I think that the above proof could go through also by mutual
+     induction on expressions and function definitions and then nested induction
+     at the step-index only for the function case *)
 
   Lemma preord_env_P_def_funs k B rho rho' B' S1 :
     preord_env_P (fun x => (~ name_in_fundefs B' x /\ S1 x) \/
-                           occurs_free_fundefs B' x) k rho rho' ->
+                        occurs_free_fundefs B' x) k rho rho' ->
     preord_env_P (fun x => (~ name_in_fundefs B' x /\ S1 x) \/
                            occurs_free_fundefs B' x \/ name_in_fundefs B x)
                  k (def_funs B' B rho rho) (def_funs B' B rho' rho').
@@ -754,54 +764,18 @@ Section EVAL.
       apply Hpre; eauto. inv H0.
   Qed.
 
-
-  (* Lemma preord_env_P_def_funs_strong k rho rho' B1 B2 B1' B2' S1 : *)
-  (*   (forall x, In var (Intersection var (name_in_fundefs B1) (name_in_fundefs B2)) x -> *)
-  (*              find_def x B1 = find_def x B2) -> *)
-  (*   (forall x, In var (Intersection var (name_in_fundefs B1') (name_in_fundefs B2')) x -> *)
-  (*              find_def x B1' = find_def x B2') -> *)
-  (*   preord_env_P (Union var (Setminus var S1 (Union var (name_in_fundefs B1) (name_in_fundefs B2))) *)
-  (*                       (Union var (occurs_free_fundefs B1') (occurs_free_fundefs B2'))) k rho rho' -> *)
-  (*   preord_env_P (Union var (Setminus var S1 (Union var (name_in_fundefs B1) (name_in_fundefs B2))) *)
-  (*                       (Union var (Union var (occurs_free_fundefs B1') (occurs_free_fundefs B2')) *)
-  (*                              (Intersection var (name_in_fundefs B1) (name_in_fundefs B2)))) *)
-  (*                k (def_funs B1' B1 rho rho) (def_funs B2' B2 rho' rho'). *)
-  (* Proof. *)
-  (*   intros Hpre. *)
-  (*   revert B1 B2  rho rho' B1' B2' Hpre. *)
-  (*   induction k as [ k IH' ] using lt_wf_rec1. intros B1 B2 rho rho' B1' B2' Hyp1 Hyp2 Hpre. *)
-  (*   induction B1. *)
-  (*   - simpl. apply preord_env_P_extend. *)
-  (*     + intros x H. inv H. eapply IHB; eauto. *)
-  (*       inv H0; eauto. inv H; eauto. inv H0; try contradiction; eauto. *)
-  (*       inv H; try contradiction. eauto. *)
-  (*     + rewrite preord_val_eq. *)
-  (*       intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs. *)
-  (*       edestruct setlist_length as [rho2' Hs']; eauto. *)
-  (*       exists t1. exists xs1. exists e1. exists rho2'. split; eauto. *)
-  (*       admit. split. eauto. intros Hleq Hpre'. *)
-  (*       eapply preord_exp_refl.  *)
-  (*       eapply preord_env_P_setlist_l; [| | eauto | eauto | eauto]. *)
-  (*       eapply IH'; eauto.  *)
-  (*       eapply (preord_env_P_monotonic _ k); eauto. omega. *)
-  (*       intros x Hin Hfr.  *)
-  (*       apply find_def_correct in Hf. *)
-  (*       edestruct occurs_free_in_fun as [H1 | [H1 | H1]]; eauto; try contradiction. *)
-  (*   - simpl. intros x HP. inv HP. apply Hpre; eauto. inv H. *)
-  (*     apply Hpre; eauto. inv H0. *)
-  (* Qed. *)
-
   Corollary preord_env_P_def_funs_col k B rho rho' S1 :
     preord_env_P (Union var (Setminus var S1 (name_in_fundefs B))
                         (occurs_free_fundefs B)) k rho rho' ->
     preord_env_P S1 k (def_funs B B rho rho) (def_funs B B rho' rho').
   Proof.
-    intros Hpre. eapply preord_env_P_antimon. eapply preord_env_P_def_funs; eauto.
-    eapply preord_env_P_antimon; eauto.
-    intros x HS. inv HS. inv H. left. constructor; eauto.
-    right; eauto.
-    intros x HS.
-    destruct (@Dec _ _ (Decidable_name_in_fundefs B) x); eauto.
+    intros Hpre. eapply preord_env_P_antimon.
+    - eapply preord_env_P_def_funs; eauto.
+      eapply preord_env_P_antimon; eauto.
+      intros x HS. inv HS. inv H. left. constructor; eauto.
+      right; eauto.
+    - intros x HS.
+      destruct (@Dec _ _ (Decidable_name_in_fundefs B) x); eauto.
   Qed.
   
   Lemma preord_exp_refl_weak (k : nat) e rho rho' :
@@ -891,6 +865,7 @@ Section EVAL.
           repeat eexists; eauto. econstructor; eauto. simpl. rewrite Heq; eauto.
   Qed.
 
+  (* TODO : move *)
   Lemma find_def_def_funs_ctx B f e1 e2 tau xs e' :
     find_def f (B <[ e1 ]>) = Some (tau, xs, e') ->
     (find_def f (B <[ e2 ]>) = Some (tau, xs, e')) \/
@@ -906,7 +881,9 @@ Section EVAL.
       + inv Heq. left; eauto.
       + eauto.
   Qed.
-  
+
+  (** * Compatibility with context application *)
+
   Lemma preord_env_P_def_funs_compat_pre k B rho1 rho2 B' e1 e2 S1 :
     (forall m c (rho1 rho2 : env),
        m <  k ->
@@ -1039,8 +1016,13 @@ Section EVAL.
           right. right; eauto.
       + repeat eexists; eauto. simpl. constructor; eauto.
   Qed.
-    
+
+  (** * Transitivity Properties *)
+
+  (** Expression relation is transitive *)
   Lemma preord_exp_trans_pre (k : nat) :
+    (* The induction hypothesis for transitivity of
+       the value relation. They need to be proved simultaneously *)
     (forall k' v1 v2 v3,
        k' <= k ->
        preord_val k' v1 v2 ->
@@ -1098,7 +1080,8 @@ Section EVAL.
       eapply preord_exp_trans_pre. intros. eapply H; eauto. omega.
       eapply Hpre2; eauto.
       intros m. specialize (H2 (m + 1)). rewrite !preord_val_eq in H2.
-      edestruct (H2 vs3 vs3) with (j := m) as [t3'' [xs3' [e3' [rho3' [Hf3' [Hs3' Hpre3']]]]]]; eauto.
+      edestruct (H2 vs3 vs3) with (j := m)
+        as [t3'' [xs3' [e3' [rho3' [Hf3' [Hs3' Hpre3']]]]]]; eauto.
       rewrite Hf3 in Hf3'. inv Hf3'. rewrite <- Hs3 in Hs3'. inv Hs3'.
       eapply Hpre3'; eauto. omega. eapply Forall2_refl. now eapply preord_val_refl.
     - intros H1 H2. assert (H2' := H2 k); rewrite !preord_val_eq in *.
@@ -1188,6 +1171,7 @@ Section EVAL.
         do 2 (rewrite M.gso; eauto).
   Qed.
 
+  (** Left weakening *)
   Lemma preord_env_P_set_not_in_P_l x v P k rho1 rho2 :
     preord_env_P P k rho1 rho2 ->
     Disjoint var P (Singleton var x) ->
@@ -1199,6 +1183,7 @@ Section EVAL.
     - edestruct Hpre; eauto.
   Qed.
 
+  (** Right weakening *)
   Lemma preord_env_P_set_not_in_P_r x v P k rho1 rho2 :
     preord_env_P P k rho1 rho2 ->
     Disjoint var P (Singleton var x) ->
@@ -1210,6 +1195,7 @@ Section EVAL.
     - edestruct Hpre; eauto.
   Qed.
 
+  (** Left weakening for function definitions *)
   Lemma preord_env_P_def_funs_not_in_P_l B B' P k rho rho1 rho2 :
     preord_env_P P k rho1 rho2 ->
     Disjoint var P (name_in_fundefs B) ->
@@ -1222,6 +1208,7 @@ Section EVAL.
     - edestruct Hpre; eauto.
   Qed.
 
+  (** Right weakening for function definitions *)
   Lemma preord_env_P_def_funs_not_in_P_r B B' P k rho rho1 rho2 :
     preord_env_P P k rho1 rho2 ->
     Disjoint var P (name_in_fundefs B) ->
@@ -1234,6 +1221,40 @@ Section EVAL.
       eexists. rewrite def_funs_neq; eauto.
   Qed.
 
+  (** Left weakening for setlist *)
+  Lemma preord_env_P_setlist_not_in_P_r xs vs P k rho1 rho2 rho2' :
+    preord_env_P P k rho1 rho2 ->
+    Some rho2' = setlist xs vs rho2 -> 
+    Disjoint var P (FromList xs) ->
+    preord_env_P P k rho1 rho2'.
+  Proof.
+    revert vs rho2'. induction xs; intros vs rho2' Hpre Hset HD.
+    - destruct vs; try discriminate. inv Hset; eauto.
+    - destruct vs; try discriminate. simpl in Hset.
+      destruct (setlist xs vs rho2) eqn:Heq ; try discriminate. inv Hset.
+      rewrite FromList_cons in HD. eapply Disjoint_sym in HD.
+      apply preord_env_P_set_not_in_P_r. eapply IHxs; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_r; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
+  Qed.
+
+  (** Right weakening for setlist *)
+  Lemma preord_env_P_setlist_not_in_P_l xs vs P k rho1 rho2 rho1' :
+    preord_env_P P k rho1 rho2 ->
+    Some rho1' = setlist xs vs rho1 -> 
+    Disjoint var P (FromList xs) ->
+    preord_env_P P k rho1' rho2.
+  Proof.
+    revert vs rho1'. induction xs; intros vs rho1' Hpre Hset HD.
+    - destruct vs; try discriminate. inv Hset; eauto.
+    - destruct vs; try discriminate. simpl in Hset.
+      destruct (setlist xs vs rho1) eqn:Heq ; try discriminate. inv Hset.
+      rewrite FromList_cons in HD. eapply Disjoint_sym in HD.
+      apply preord_env_P_set_not_in_P_l. eapply IHxs; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_r; eauto.
+      eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
+  Qed.
+
   Lemma preord_env_P_singleton_extend (rho1 rho2 : env) (k : nat) (x : var)
         (v1 v2 : val) :
     preord_val k v1 v2 ->
@@ -1243,6 +1264,8 @@ Section EVAL.
     eapply preord_env_P_antimon. apply preord_env_Empty_set.
     intros x' H. inv H. inv H0. exfalso. eauto.
   Qed.
+
+  (** * Technical lemmas about mutually recursive function definitions *)
 
   Lemma preord_env_set_def_funs_permut k x S1 B v1 v2 rho1 rho2 :
     ~ bound_var_fundefs B x ->
@@ -1347,38 +1370,6 @@ Section EVAL.
         edestruct (occurs_free_in_fun _ _ _ _ _ Hf x Hfr); try contradiction.
         inv H; eauto. unfold closed_fundefs in Hclo. rewrite Hclo in H0. inv H0.
     - simpl. intros x HP. inv HP.
-  Qed.
-  
-  Lemma preord_env_P_setlist_not_in_P_r xs vs P k rho1 rho2 rho2' :
-    preord_env_P P k rho1 rho2 ->
-    Some rho2' = setlist xs vs rho2 -> 
-    Disjoint var P (FromList xs) ->
-    preord_env_P P k rho1 rho2'.
-  Proof.
-    revert vs rho2'. induction xs; intros vs rho2' Hpre Hset HD.
-    - destruct vs; try discriminate. inv Hset; eauto.
-    - destruct vs; try discriminate. simpl in Hset.
-      destruct (setlist xs vs rho2) eqn:Heq ; try discriminate. inv Hset.
-      rewrite FromList_cons in HD. eapply Disjoint_sym in HD.
-      apply preord_env_P_set_not_in_P_r. eapply IHxs; eauto.
-      eapply Disjoint_sym. eapply Disjoint_Union_r; eauto.
-      eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
-  Qed.
-
-  Lemma preord_env_P_setlist_not_in_P_l xs vs P k rho1 rho2 rho1' :
-    preord_env_P P k rho1 rho2 ->
-    Some rho1' = setlist xs vs rho1 -> 
-    Disjoint var P (FromList xs) ->
-    preord_env_P P k rho1' rho2.
-  Proof.
-    revert vs rho1'. induction xs; intros vs rho1' Hpre Hset HD.
-    - destruct vs; try discriminate. inv Hset; eauto.
-    - destruct vs; try discriminate. simpl in Hset.
-      destruct (setlist xs vs rho1) eqn:Heq ; try discriminate. inv Hset.
-      rewrite FromList_cons in HD. eapply Disjoint_sym in HD.
-      apply preord_env_P_set_not_in_P_l. eapply IHxs; eauto.
-      eapply Disjoint_sym. eapply Disjoint_Union_r; eauto.
-      eapply Disjoint_sym. eapply Disjoint_Union_l; eauto.
   Qed.
 
   

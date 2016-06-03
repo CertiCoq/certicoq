@@ -4,7 +4,9 @@ Require Import cps cps_util identifiers env ctx Ensembles_util List_util.
 Import ListNotations.
 
 Section EVAL.
-  
+
+  (* TODO : find out how these will be discharged. Probably turn them
+   * to variables at some point *)
   Parameter pr : prims.
 
   (** The tag of the constructor that is returned to the top-level *)
@@ -615,7 +617,7 @@ Section EVAL.
       repeat eexists; eauto. econstructor; eauto. simpl; rewrite Heq; eauto.
   Qed.
   
-  Parameter Prim_axiom :
+  Axiom Prim_axiom :
     forall f f' v1,
       M.get f pr = Some f' ->
       forall k vs1 vs2,

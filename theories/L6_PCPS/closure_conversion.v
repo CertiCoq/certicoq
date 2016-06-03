@@ -1,9 +1,148 @@
-Require Import cps cps_util set_util hoisting identifiers.
+Require Import cps cps_util set_util hoisting identifiers ctx Ensembles_util.
 Require Import Coq.ZArith.Znumtheory.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos.
+Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
 Require Maps.
+
+Open Scope ctx_scope.
+
+(** * Closure conversion as a relation  *)
+
+Inductive project_var :
+  list var -> (* Variables in the current scope *)
+  var -> (* The environment argument *)
+  list var -> (* The environment *)
+  Ensemble var -> (* The free set *)
+  var -> (* Before projection *)
+  var -> (* After projection *)
+  exp_ctx -> (* Context that will perform the projection *)
+  Ensemble var -> (* The new free set *)
+  Prop :=
+  (* The current scope and the environment should be disjoint *)
+| Var_in_args :
+    forall xs env fvs S x,
+      List.In x xs ->
+      project_var xs env fvs S x x Hole_c S
+| Var_in_envs :
+    forall xs env fvs x y S N tau,
+      nthN fvs N = Some x ->
+      In _ S y ->
+      project_var xs env fvs S x y (Eproj_c y tau N env Hole_c) (Setminus _ S (Singleton _ y)).
+
+Inductive project_vars :
+  list var -> (* Variables in the current scope *)
+  var -> (* The environment argument *)
+  list var -> (* The environment *)
+  Ensemble var -> (* The free set *)
+  list var -> (* Before projection *)
+  list var -> (* After projection *)
+  exp_ctx -> (* Context that will perform the projection *)
+  Ensemble var -> (* The new free set *)
+  Prop :=
+| VarsNil :
+    forall xs env fvs S,
+      project_vars xs env fvs S [] [] Hole_c S
+| VarsCons :
+    forall xs env fvs y y' ys ys' C1 C2 S1 S2 S3,
+      project_var xs env fvs S1 y y' C1 S2 ->
+      project_vars xs env fvs S2 ys ys' C1 S3 ->
+      project_vars xs env fvs S1 (y :: ys) (y' :: ys') (comp_ctx_f C1 C2) S3.
+
+
+Inductive Closure_conversion :
+  list var -> (* Variables in the current scope *)
+  var -> (* The environment argument *)
+  list var -> (* The environment *)
+  exp -> (* Before cc *)
+  exp -> (* After cc *)
+  Prop :=
+| CC_Econstr :
+    forall args env Γ S x ys ys' C tau tau' t e e',
+      (* Variables for projected vars should not shadow variables in the
+         current scope, i.e. args U { env } *)
+      project_vars args env Γ
+                   (Complement _ (Union _ (FromList args) (Singleton _ env)))
+                   ys ys' C S ->
+      (* We do not care about ys'. Should never be accessed again so do not
+         add them at the current scope *)
+      Closure_conversion (x :: args) env Γ e e' ->
+      Closure_conversion args env Γ (Econstr x tau t ys e)
+                        (C |[ Econstr x tau' t ys' e' ]|)
+| CC_Ecase :
+    forall args env Γ x x' C S pats pats',
+      project_var args env Γ
+                   (Complement _ (Union _ (FromList args) (Singleton _ env)))
+                   x x' C S ->
+      Forall2 (fun (pat pat' : tag * exp) =>
+                 (fst pat) = (fst pat') /\
+                 Closure_conversion args env Γ (snd pat) (snd pat')) pats pats' ->
+      Closure_conversion args env Γ (Ecase x pats) (C |[ Ecase x' pats']|)
+| CC_Eproj :
+    forall args env Γ S x y y' C tau tau' N e e',
+      project_var args env Γ
+                   (Complement _ (Union _ (FromList args) (Singleton _ env)))
+                   y y' C S ->
+      Closure_conversion (x :: args) env Γ e e' ->
+      Closure_conversion args env Γ (Eproj x tau N y e)
+                         (C |[ Eproj x tau' N y' e' ]|)
+| CC_Efun :
+    forall args env names Γ Γ' B B' e e' C,
+      (* The current scope of the body of the function includes their names *)
+      Same_set _ (name_in_fundefs B) (FromList names) ->
+      (* The environment contains all the variables that are free in B *)
+      Same_set _ (occurs_free_fundefs B) (FromList Γ') ->
+      Closure_conversion_fundefs names Γ' B B' C ->
+      Closure_conversion (names ++ args) env Γ e e' ->
+      Closure_conversion args env Γ (Efun B e) (Efun B' (C |[ e' ]|))
+| CC_Eapp :
+    forall args env Γ f f' f'' env' ys ys' C1 C2 S1 S2 tau tau',
+      (* Project the function name *)
+      project_var args env Γ
+                  (Complement _ (Union _ (FromList args) (Singleton _ env)))
+                  f f' C1 S1 ->
+      (* Project the actual parameters *)
+      project_vars args env Γ S1 ys ys' C2 S2 ->
+      (* The name of the function pointer and the name of the environment
+         should not shadow the variables in the current scope and the
+         variables that where used in the projections *)
+      ~ In _ S2 f' -> ~ In _ S2 env' ->
+      Closure_conversion args env Γ (Eapp f ys)
+                         (C1 |[ C2
+                               |[ Eproj f'' tau 0%N f'
+                                        (Eproj env' tau' 1%N f'
+                                               (Eapp f'' (env' :: ys'))) ]| ]| )
+| CC_Eprim :
+    forall args env Γ S x ys ys' C tau tau' f e e',
+      project_vars args env Γ
+                   (Complement _ (Union _ (FromList args) (Singleton _ env)))
+                   ys ys' C S ->
+      Closure_conversion (x :: args) env Γ e e' ->
+      Closure_conversion args env Γ (Eprim x tau f ys e)
+                        (C |[ Eprim x tau' f ys' e' ]|)
+with Closure_conversion_fundefs :
+  list var -> (* Variables in the current scope *)
+  list var -> (* The environment *)
+  fundefs -> (* Before cc *)
+  fundefs -> (* After cc *)
+  exp_ctx -> (* The contexts that constructs the closures *)
+  Prop :=
+| CC_Fcons :
+    forall args Γ env f tau tau' tau'' t ys e e' defs defs' C,
+      (* The environment binding should not shadow the current scope
+         (i.e. the names of the mut. rec. functions and the other arguments *)
+      ~ In _ (Union _ (FromList args) (FromList ys)) env ->
+      Closure_conversion_fundefs args Γ defs defs' C ->
+      Closure_conversion (ys ++ args) env Γ e e' ->
+      Closure_conversion_fundefs args Γ (Fcons f tau ys e defs )
+                                 (Fcons f tau' (env :: ys) e' defs')
+                                 (Econstr_c f tau'' t [f; env] C)
+| CC_Fnil :
+    forall args Γ,
+      Closure_conversion_fundefs args Γ Fnil Fnil Hole_c.
+
+(** * Computational defintion of closure conversion *)
 
 Record FunInfo : Type :=
   mkFunInfo

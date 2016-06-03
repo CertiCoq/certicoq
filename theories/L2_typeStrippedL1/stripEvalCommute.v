@@ -808,22 +808,20 @@ Proof.
   apply f_equal. assumption.
 Qed.
 
-
-
-(***  HERE **
-Lemma L2WndEval_sound_for_L1wndEval:
-  forall L2p p, L2p = stripEnv p -> L1.program.WFaEnv p ->
-    (forall L2t L2s, wndEval L2p L2t L2s ->
-     forall t, L2t = strip t -> L1.term.WFapp t ->
-               forall s, L2s = strip s -> L1.wndEval.wndEval p t s) /\
-    (forall L2t L2s, wndEvals L2p L2t L2s ->
-     forall ts, L2t = strips ts -> L1.term.WFapp ts ->
-               forall s, L2s = strip s -> L1.wndEval.wndEval p t s) /\
- ***)  
-
-
-
+(** Proof suggested by Zoe. **)
 Theorem L2WcbvEval_L1WcbvEval:
+  forall L2p p, L2p = stripEnv p -> L1.program.WFaEnv p ->
+    (forall L2t L2s, WcbvEval L2p L2t L2s ->
+     forall t, L2t = strip t -> L1.term.WFapp t ->
+           forall s, L1.wcbvEval.WcbvEval p t s -> L2s = strip s).
+Proof.
+  intros L2p p hp1 hp2 L2t L2s h1 t h2 ht s hs.
+  apply (WcbvEval_single_valued h1).
+  rewrite hp1. rewrite h2.
+  apply (proj1 (L1wcbvEval_strip_L2WcbvEval hp2)). apply hs. apply ht.
+Qed.
+    
+Theorem L2WcbvEval_L1WcbvEval':  (** old proof **)
   forall L2p p, L2p = stripEnv p -> L1.program.WFaEnv p ->
     (forall L2t L2s, WcbvEval L2p L2t L2s ->
      forall t, L2t = strip t -> L1.term.WFapp t ->
@@ -1074,8 +1072,8 @@ Lemma L2WcbvEval_sound_for_L1wndEval:
            forall s, L1.wcbvEval.WcbvEval p t s ->
                      L2s = strip s /\ L1.wndEval.wndEvalRTC p t s).
 Proof.
-  intros L2p p hp1 hp2. intros L2t L2s h0 t h1 h2 s h3; split.
-  - apply (proj1 (L2WcbvEval_L1WcbvEval hp1 hp2) L2t L2s h0 t h1 h2 s h3).
+  intros L2p p hp1 hp2 L2t L2s h0 t h1 h2 s h3; split.
+  - refine (L2WcbvEval_L1WcbvEval hp1 hp2 h0 h1 h2 h3).
   - apply (proj1 (L1.wcbvEval.WcbvEval_wndEvalRTC hp2) t s h3 h2).
 Qed.
 Print Assumptions L2WcbvEval_sound_for_L1wndEval.

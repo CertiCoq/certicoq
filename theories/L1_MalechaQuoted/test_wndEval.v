@@ -28,10 +28,10 @@ Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
   match n with
     | _ => loop (S n) (Acc_inv _ a (S n) (lt_n n))
   end.
-Axiom false : Acc 0.
+Axiom Acc0Ax : Acc 0.
 Definition loop0 := Eval cbv in (loop 0).
 Print loop0.
-Definition loop0f := Eval vm_compute in (loop 0 false).
+Definition loop0f := Eval vm_compute in (loop 0 Acc0Ax).
 Print loop0f.
 Quote Recursively Definition p_loop0f := loop0f.
 Print p_loop0f.
@@ -71,9 +71,9 @@ end.
 Check Acc.
 Check (Acc gt).
 Print gt_Sn_n.
-Axiom false : Acc gt 0.
+Axiom Acc0Ax : Acc gt 0.
 Check (Acc gt 0).
-Definition loop0f := Eval vm_compute in (loop O) false.
+Definition loop0f := Eval vm_compute in (loop O) Acc0Ax.
 Quote Definition q_loop0f := loop0f.
 Quote Recursively Definition p_loop0f := loop0f.
 Print p_loop0f.

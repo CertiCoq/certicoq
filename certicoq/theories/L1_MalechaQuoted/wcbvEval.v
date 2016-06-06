@@ -501,7 +501,7 @@ Variable p:environ.
 Function wcbvEval
          (tmr:nat) (t:Term) {struct tmr}: exception Term :=
   (match tmr with 
-     | 0 => raise "out of time"
+     | 0 => raise ("out of time: " ++ print_term t)
      | S n =>
        (match t with      (** look for a redex **)
           | TConst nm =>
@@ -604,7 +604,10 @@ with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
                      | tcons s ss =>
                        match wcbvEval n s, wcbvEvals n ss with
                          | Ret es, Ret ess => ret (tcons es ess)
-                         | _, _ => raise "wcbvEvals fails"
+                         | Exc str, _ =>
+                           raise ("wcbvEvals fails (left): " ++ str)
+                         | _, Exc str =>
+                           raise ("wcbvEvals fails (rght): " ++ str)
                        end
                    end
         end)

@@ -33,9 +33,9 @@ Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
   match n with
     | _ => loop (S n) (Acc_inv _ a (S n) (lt_n n))
   end.
-Axiom false : Acc 0.
-Eval vm_compute in (loop O) false.
-Quote Recursively Definition p_loop0 := (loop 0 false).
+Axiom Acc0Ax : Acc 0.
+Eval vm_compute in (loop O Acc0Ax) .
+Quote Recursively Definition p_loop0 := (loop 0 Acc0Ax).
 Print p_loop0.
 Eval vm_compute in (exc_wcbvEval 12 p_loop0).
 (***)

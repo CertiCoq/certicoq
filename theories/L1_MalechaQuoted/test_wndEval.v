@@ -16,6 +16,81 @@ Print Ftest.
 Quote Recursively Definition p_Ftest := Ftest.
 Print p_Ftest.
 
+
+(****)
+Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
+Inductive Acc (y: nat) : Prop :=
+  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
+Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
+  intros. destruct H. apply H. apply H0.
+  Defined.
+Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
+  match n with
+    | _ => loop (S n) (Acc_inv _ a (S n) (lt_n n))
+  end.
+Axiom false : Acc 0.
+Definition loop0 := Eval cbv in (loop 0).
+Print loop0.
+Definition loop0f := Eval vm_compute in (loop 0 false).
+Print loop0f.
+Quote Recursively Definition p_loop0f := loop0f.
+Print p_loop0f.
+
+Definition pp := Eval cbv in program_Program p_loop0f (Ret nil).
+Goal
+  match pp with
+    | Ret p => wndEvalRTC (env p) (main p) TProof
+    | _ => True
+  end.
+unfold pp. econstructor 2. eapply sAppFn. refine (@sAppFn _ _ _ _ _).
+
+
+(**
+Lemma lt_n_Sn: forall (n:nat), lt n (S n).
+  induction n; constructor 1. 
+Defined.
+Check gt_Sn_n.
+
+ **)
+Print Acc.
+Eval cbv in Acc_inv.
+Print le_n.
+Variables  (n:nat) (a:Acc gt n).
+Eval cbv in (Acc_inv a (S n) (lt_n n)).
+(**
+Lemma Acc_inv : forall (x:nat), Acc gt x -> forall y:nat, gt y x -> Acc gt y.
+  induction x; intros.
+  Defined.
+**)
+Eval cbv in Acc_inv.
+Unset Implicit Arguments.
+Fixpoint  loop (n:nat) (a:Acc gt n) {struct a} : nat :=
+match n with
+| _ => loop (S n) (Acc_inv a (S n) (gt_Sn_n n))
+end.
+Check Acc.
+Check (Acc gt).
+Print gt_Sn_n.
+Axiom false : Acc gt 0.
+Check (Acc gt 0).
+Definition loop0f := Eval vm_compute in (loop O) false.
+Quote Definition q_loop0f := loop0f.
+Quote Recursively Definition p_loop0f := loop0f.
+Print p_loop0f.
+Definition pp := Eval cbv in program_Program p_loop0 (Ret nil).
+Goal
+  match pp with
+    | Ret p => wndEvalRTC (env p) (main p) TProof
+    | _ => True
+  end.
+unfold pp. econstructor 2. refine (@sAppFn _ _ _ _ _).
+
+let p := program_Program p_loop0 (Ret nil)
+in clos_refl_trans _ (wndEval (env p)) (main p) (term_Term q_loop0).
+Eval vm_compute in (exc_wcbvEval 8 p_loop0).
+Set Implicit Arguments.
+****)
+
 (***  TESTING eval ***)
 Ltac tran_step := eapply rt_trans; [eapply rt_step|].
 Ltac dfn_unfold := unfold lookupDfn; simpl; try reflexivity.

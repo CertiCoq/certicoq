@@ -8,8 +8,39 @@ Require Import L1.L1.  (* whole L1 library is exported by L1.L1 *)
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
-Set Implicit Arguments.
 Set Template Cast Propositions.
+
+(** tool to set up examples for testing **)
+Definition exc_wcbvEval (tmr:nat) (pgm:program): exception Term :=
+  match program_Program pgm (ret nil) with
+    | Exc str => Exc str
+    | Ret pgm => wcbvEval (env pgm) tmr (main pgm)
+  end.
+Definition exc_WcbvEval (pgm:program) (ans:term) : Prop :=
+  match program_Program pgm (ret nil), term_Term ans with
+    | Ret pgm, Ret trm => WcbvEval (env pgm) (main pgm) trm
+    | _, _ => False
+  end.
+
+(** Abhishek's example of looping in L1 **)
+Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
+Inductive Acc (y: nat) : Prop :=
+  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
+Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
+  intros. destruct H. apply H. apply H0.
+  Defined.
+Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
+  match n with
+    | _ => loop (S n) (Acc_inv _ a (S n) (lt_n n))
+  end.
+Axiom false : Acc 0.
+Eval vm_compute in (loop O) false.
+Quote Recursively Definition p_loop0 := (loop 0 false).
+Print p_loop0.
+Eval vm_compute in (exc_wcbvEval 12 p_loop0).
+(***)
+
+Set Implicit Arguments.
 
 
 Definition LL := list.
@@ -25,17 +56,6 @@ Print tst.
 Quote Recursively Definition p_tst := tst.
 Print p_tst.
 
-(** tool to set up examples for testing **)
-Definition exc_wcbvEval (tmr:nat) (pgm:program): exception Term :=
-  match program_Program pgm (ret nil) with
-    | Exc str => Exc str
-    | Ret pgm => wcbvEval (env pgm) tmr (main pgm)
-  end.
-Definition exc_WcbvEval (pgm:program) (ans:term) : Prop :=
-  match program_Program pgm (ret nil), term_Term ans with
-    | Ret pgm, Ret trm => WcbvEval (env pgm) (main pgm) trm
-    | _, _ => False
-  end.
 
 
 Inductive foo (A:Set) : Set :=

@@ -43,7 +43,7 @@ Fixpoint cc_approx_val (k : nat) (v1 v2 : val) {struct k} : Prop :=
           end
       in
       match v1, v2 with
-        | Vfun rho1 defs1 f1, Vconstr tau t [Vfun rho2 defs2 f2; Vconstr tau' t' fvs]  =>
+        | Vfun rho1 defs1 f1, Vconstr tau t ((Vfun rho2 defs2 f2) ::  (Vconstr tau' t' fvs) :: l)  =>
           forall (vs1 vs2 : list val) (j : nat) (t1 : type) 
             (xs1 : list var) (e1 : exp) (rho1' : env),
             length vs1 = length vs2 ->
@@ -83,7 +83,8 @@ Definition cc_approx_exp (k : nat) (p1 p2 : exp * env) : Prop :=
 (** more compact definition of the value relation *)
 Definition cc_approx_val' (k : nat) (v1 v2 : val) : Prop :=
   match v1, v2 with
-    | Vfun rho1 defs1 f1, Vconstr tau t [Vfun rho2 defs2 f2; Vconstr tau' t' fvs]  =>
+    | Vfun rho1 defs1 f1,
+      Vconstr tau t ((Vfun rho2 defs2 f2) ::  (Vconstr tau' t' fvs) :: l) =>
       forall (vs1 vs2 : list val) (j : nat) (t1 : type) 
         (xs1 : list var) (e1 : exp) (rho1' : env),
         length vs1 = length vs2 ->
@@ -385,11 +386,10 @@ Proof.
     now split; eauto.
   - destruct l; try contradiction. destruct v0; try contradiction. 
     destruct l; try contradiction. destruct v1; try contradiction. 
-    destruct l; try contradiction. 
     intros vs1 vs2 j t1' xs e1 rho1' Hlen Hf Heq.
     edestruct Hpre as [t2' [Γ [xs2 [e2 [rho2' [H1 [H2 H3]]]]]]]; eauto.
     do 5 eexists; split; eauto. split; eauto. intros Hleq' Hall. 
-    eapply H3; eauto. omega. 
+    eapply H3; eauto. omega.
   - constructor.
   - inv Hpre. constructor; rewrite cc_approx_val_eq in *. now eapply IHv1; eauto.
     now eapply (IHv0 (Vobservable tau l')) in H3.
@@ -512,3 +512,110 @@ Proof.
   edestruct Hexp as [v2' [c2 [Hstepv2' Hprev2']]]; eauto.
   repeat eexists; eauto. econstructor; eauto.
 Qed.
+
+Lemma cc_approx_exp_respects_preord_exp_r_pre (k : nat)
+      (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
+  (forall j v1 v2 v3,
+     j <= k ->
+     cc_approx_val j v1 v2 ->
+     (forall k, preord_val k v2 v3) ->
+     cc_approx_val j v1 v3) ->
+  cc_approx_exp k (e1, rho1) (e2, rho2) ->
+  (forall k', preord_exp k' (e2, rho2) (e3, rho3)) ->
+  cc_approx_exp k (e1, rho1) (e3, rho3).
+Proof.
+  intros IH Hexp1 Hexp2 v1 c Hleq1 Hstep1. 
+  edestruct Hexp1 as [v2 [c2 [Hstep2 Hpre2]]]; eauto. 
+  edestruct (Hexp2 c2) as [v3 [c3 [Hstep3 Hpre3]]]; [| eauto | ]. omega.
+  exists v3, c3. split; eauto.
+  eapply IH. omega. eauto. intros m.
+  edestruct (Hexp2 (m + c2)) as [v3' [c3' [Hstep3' Hpre3']]]; [| eauto |]. omega.
+  eapply bstep_e_deterministic in Hstep3; eauto. inv Hstep3.
+  eapply preord_val_monotonic; eauto. omega.
+Qed.
+
+Lemma cc_approx_val_respects_preord_val_r (k : nat) (v1 v2 v3 : val) :
+  cc_approx_val k v1 v2 ->
+  (forall k, preord_val k v2 v3) ->
+  cc_approx_val k v1 v3.
+Proof.
+  revert v1 v2 v3. induction k using lt_wf_rec.
+  induction v1 using val_ind'; intros v2 v3 Happrox Hpre;
+  assert (Hpre' := Hpre k);
+  rewrite cc_approx_val_eq, preord_val_eq in *.
+  - destruct v2; try contradiction.
+    destruct v3; try contradiction.
+    inv Hpre'; inv Happrox. split; eauto.
+  - destruct v2; try contradiction.
+    destruct v3; try contradiction.
+    destruct l0; [now inv Happrox; inv H1 |].
+    destruct l1; [now inv Hpre'; inv H1 |].
+    inv Hpre'; inv Happrox. inv H1; inv H2; split; eauto.
+    constructor; eauto.
+    + eapply IHv1; eauto. intros k'. specialize (Hpre k').
+      rewrite preord_val_eq in Hpre. inv Hpre. now inv H1.
+    + assert (Hsuf : cc_approx_val' k (Vconstr tau t3 l)  (Vconstr tau t3 l1)).
+      { rewrite <- cc_approx_val_eq.
+        eapply IHv0 with (v2 := Vconstr tau t3 l0); eauto.
+        rewrite cc_approx_val_eq. now split; eauto.
+        intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre.
+        inv Hpre. inv H1. rewrite preord_val_eq. now split; eauto. }
+      now inv Hsuf.
+  - destruct v2, v3; try contradiction.
+    destruct l; try contradiction.
+    destruct v0, l; try contradiction.
+    destruct v1; try contradiction.
+    inversion  Hpre' as [Hleq Hall]. clear Hpre'. inv Hall.
+    rewrite preord_val_eq in H2. inv H4.
+    rewrite preord_val_eq in H3.
+    destruct y, y0; try contradiction.
+    intros vs1 vs2 j t1' xs1 e1 rho1 Heq1 Hfind1 Hset1.
+    edestruct (Happrox vs1 vs2) as [t2' [Γ [xs [e2 [rho2 [Hfind2 [Hset2 Heval2]]]]]]]; eauto.
+    edestruct (H2 (Vconstr t5 t6 l1 :: vs2) (Vconstr t5 t6 l1 :: vs2)) as 
+        [t3' [vs3' [e3 [rho3 [Hfind3 [Hset3 Heval3]]]]]]; eauto. admit.
+    edestruct vs3'; try discriminate. 
+    do 5 eexists. repeat split; eauto. admit.
+    intros Hlt Hall.
+    eapply cc_approx_exp_respects_preord_exp_r_pre.
+    + intros. eapply H; eauto. omega.
+    + eapply Heval2; eauto.
+    + intros k'. specialize (Hpre (k' + 1)). rewrite preord_val_eq in Hpre.
+      inversion Hpre as [Hleq' Hall']. inv Hall'. 
+      rewrite preord_val_eq in H5.
+      edestruct (H5 (Vconstr t5 t6 l1 :: vs2) (Vconstr t5 t6 l1 :: vs2)) as
+          [t3'' [vs3'' [e3' [rho3' [Hfind3' [Hset3' Heval3']]]]]]; eauto. admit.
+      rewrite Hfind3 in Hfind3'. inv Hfind3'.
+      rewrite <- Hset3 in Hset3'. inv Hset3'.
+      eapply preord_exp_trans.
+      * eapply Heval3'. omega. eapply Forall2_refl.
+        eapply preord_val_refl.
+      * (* need lemmas about the admitted environments *)
+        admit.
+  - destruct v2; try contradiction.
+    destruct v3; try contradiction. inv Happrox.
+    inv Hpre'. reflexivity.
+  - destruct v2; try contradiction.
+    destruct v3; try contradiction. inv Happrox.
+    inv Hpre'. reflexivity.
+  - destruct v2; try contradiction.
+    destruct v3; try contradiction. inv Happrox.
+    inv Hpre'. reflexivity.
+  - destruct v2; try contradiction.
+    destruct v3; try contradiction.
+    constructor.
+  - destruct v2; try contradiction.
+    destruct v3; try contradiction.
+    destruct l0; [now inv Happrox; inv H1 |].
+    destruct l1; [now inv Hpre'; inv H1 |].
+    inv Hpre'; inv Happrox.
+    constructor.
+    + eapply IHv1; eauto. intros k'. specialize (Hpre k').
+      rewrite preord_val_eq in Hpre. now inv Hpre.
+    + assert (Hsuf : cc_approx_val' k (Vobservable tau l)  (Vobservable tau l1)).
+      { rewrite <- cc_approx_val_eq.
+        eapply IHv0 with (v2 := Vobservable tau l0); eauto.
+        rewrite cc_approx_val_eq. now eauto.
+        intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre.
+        inv Hpre. now rewrite preord_val_eq.  }
+      now eauto.
+Abort.

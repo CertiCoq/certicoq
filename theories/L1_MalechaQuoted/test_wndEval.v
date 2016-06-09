@@ -6,6 +6,7 @@ Require Import Template.Template.
 Require Import Coq.Relations.Relation_Operators.
 Require Import Common.RandyPrelude.
 Require Import L1.L1.  (* whole L1 library is exported by L1.L1 *)
+Require Import Omega.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -16,22 +17,46 @@ Print Ftest.
 Quote Recursively Definition p_Ftest := Ftest.
 Print p_Ftest.
 
-
 (****)
-Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
-Inductive Acc (y: nat) : Prop :=
-  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
-Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
+Inductive lt (n:nat): nat -> Prop := lt_n: lt n (S n).
+Definition gt (m n:nat ): Prop := lt n m.
+Inductive Acc (R:nat->nat->Prop) (y: nat) : Prop :=
+  Acc_intro : (forall x: nat, R y x -> Acc R x) -> Acc R y.
+Definition Acc_inv: forall (R:nat->nat->Prop) (x:nat) (H:Acc R x) (y:nat),
+                      R x y -> Acc R y.
   intros. destruct H. apply H. apply H0.
-  Defined.
-Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
+Defined.
+Definition Acclt := Acc lt.
+Definition Accgt := Acc gt.
+
+Lemma Acc_gt_n: forall (n:nat), Acc gt n.
+  induction n.
+  - constructor. intros. inversion H.
+  - constructor. intros. inversion H. subst. assumption.
+Qed.
+
+Fixpoint looplt (n:nat) (a:Acclt n) {struct a} : nat :=
   match n with
-    | _ => loop (S n) (Acc_inv _ a (S n) (lt_n n))
+    | _ => looplt (S n) (Acc_inv lt _ a (S n) (lt_n n))
   end.
-Axiom Acc0Ax : Acc 0.
-Definition loop0 := Eval cbv in (loop 0).
+(***
+Axiom gt_n_Sn: forall n, gt n (S n).
+Fixpoint loopgt (n:nat) (a:Accgt n) {struct a} : nat :=
+  match n with
+    | _ => loopgt (S n) (Acc_inv gt n (Acc_gt_n n) _ (gt_n_Sn n))
+  end.
+***)
+(**
+Inductive Acc (y : nat) : Prop :=
+    Acc_intro : (forall x : nat, lt y x -> Acc x) -> Acc y
+
+Acc_inv: forall x : nat, Acc x -> forall y : nat, lt x y -> Acc y
+**)
+
+Axiom Acc0Ax : Acclt 0.
+Definition loop0 := Eval cbv in (looplt 0).
 Print loop0.
-Definition loop0f := Eval vm_compute in (loop 0 Acc0Ax).
+Definition loop0f := Eval vm_compute in (loop0 Acc0Ax).
 Print loop0f.
 Quote Recursively Definition p_loop0f := loop0f.
 Print p_loop0f.
@@ -42,7 +67,34 @@ Goal
     | Ret p => wndEvalRTC (env p) (main p) TProof
     | _ => True
   end.
-unfold pp. econstructor 2. eapply sAppFn. refine (@sAppFn _ _ _ _ _).
+  unfold pp. simpl.
+  econstructor 3. econstructor 2. eapply sConst. unfold LookupDfn. eapply LHit.
+  econstructor 3. econstructor 2. eapply sFix. unfold whFixStep, pre_whFixStep, mkApp.
+  simpl. unfold instantiate, PeanoNat.Nat.compare, mkApp.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sFix. unfold whFixStep, pre_whFixStep, mkApp.
+  simpl. unfold instantiate, PeanoNat.Nat.compare, mkApp.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sFix. unfold whFixStep, pre_whFixStep, mkApp.
+  simpl. unfold instantiate, PeanoNat.Nat.compare, mkApp.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sFix. unfold whFixStep, pre_whFixStep, mkApp.
+  simpl. unfold instantiate, PeanoNat.Nat.compare, mkApp.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sFix. unfold whFixStep, pre_whFixStep, mkApp.
+  simpl. unfold instantiate, PeanoNat.Nat.compare, mkApp.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sBeta. unfold whBetaStep, instantiate. simpl.
+  econstructor 3. econstructor 2. eapply sFix. unfold whFixStep, pre_whFixStep, mkApp.
+  simpl. unfold instantiate, PeanoNat.Nat.compare, mkApp.
+
+
+
+  
 
 
 (**

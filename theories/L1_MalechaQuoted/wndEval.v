@@ -21,83 +21,85 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (*** non-deterministic small step evaluation relation ***)
-Inductive wndEval (p:environ) : Term -> Term -> Prop :=
+Section Env.
+Variable p:environ.
+Inductive wndEval : Term -> Term -> Prop :=
 (*** contraction steps ***)
 | sConst: forall (s:string) (t:Term),
-            LookupDfn s p t -> wndEval p (TConst s) t
+            LookupDfn s p t -> wndEval (TConst s) t
 | sBeta: forall (nm:name) (ty bod arg:Term) (args:Terms),
-           wndEval p (TApp (TLambda nm ty bod) arg args)
+           wndEval (TApp (TLambda nm ty bod) arg args)
                    (whBetaStep bod arg args)
      (* note: [instantiate] is total *)
 | sLetIn: forall (nm:name) (dfn ty bod:Term),
-            wndEval p (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
+            wndEval (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* n is the number of parameters of the datatype *)
 | sCase0: forall (n:nat) l (ty s:Term) (i:inductive) (brs:Terms),
             whCaseStep n tnil brs = Some s ->   (* no parameters *)
-            wndEval p (TCase (0,l) ty (TConstruct i n) brs) s
+            wndEval (TCase (0,l) ty (TConstruct i n) brs) s
 | sCasen: forall (ml:nat * list nat) (ty s arg:Term) (i:inductive)
                  (args brs ts:Terms) (n:nat),  (* at least one parameter *)
             tskipn (fst ml) (tcons arg args) = Some ts ->
             whCaseStep n ts brs = Some s ->
-            wndEval p (TCase ml ty (TApp (TConstruct i n) arg args) brs) s
+            wndEval (TCase ml ty (TApp (TConstruct i n) arg args) brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms),
-          wndEval p (TApp (TFix dts m) arg args)
+          wndEval (TApp (TFix dts m) arg args)
                   (whFixStep dts m (tcons arg args))
-| sCast: forall t ck ty, wndEval p (TCast t ck ty) t
+| sCast: forall t ck ty, wndEval (TCast t ck ty) t
 (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches 
 *** congruence on type of Fix ***)
 | sAppFn:  forall (t r arg:Term) (args:Terms),
-              wndEval p t r ->
-              wndEval p (mkApp t (tcons arg args)) (mkApp r (tcons arg args))
+              wndEval t r ->
+              wndEval (mkApp t (tcons arg args)) (mkApp r (tcons arg args))
 | sAppArg: forall (t arg brg:Term) (args:Terms),
-              wndEval p arg brg ->
-              wndEval p (TApp t arg args) (TApp t brg args)
+              wndEval arg brg ->
+              wndEval (TApp t arg args) (TApp t brg args)
 | sAppArgs: forall (t arg:Term) (args brgs:Terms),
-              wndEvals p args brgs ->
-              wndEval p (TApp t arg args) (TApp t arg brgs)
+              wndEvals args brgs ->
+              wndEval (TApp t arg args) (TApp t arg brgs)
 | sProdTy:  forall (nm:name) (t1 t2 bod:Term),
-              wndEval p t1 t2 ->
-              wndEval p (TProd nm t1 bod) (TProd nm t2 bod)
+              wndEval t1 t2 ->
+              wndEval (TProd nm t1 bod) (TProd nm t2 bod)
 | sLamTy:   forall (nm:name) (t1 t2 bod:Term),
-              wndEval p t1 t2 ->
-              wndEval p (TLambda nm t1 bod) (TLambda nm t2 bod)
+              wndEval t1 t2 ->
+              wndEval (TLambda nm t1 bod) (TLambda nm t2 bod)
 | sLetInTy: forall (nm:name) (t1 t2 d bod:Term),
-              wndEval p t1 t2 ->
-              wndEval p (TLetIn nm d t1 bod) (TLetIn nm d t2 bod)
+              wndEval t1 t2 ->
+              wndEval (TLetIn nm d t1 bod) (TLetIn nm d t2 bod)
 | sLetInDef:forall (nm:name) (t d1 d2 bod:Term),
-              wndEval p d1 d2 ->
-              wndEval p (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
+              wndEval d1 d2 ->
+              wndEval (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
 | sCaseTy:  forall (nl:nat * list nat) (ty uy mch:Term) (brs:Terms),
-              wndEval p ty uy ->
-              wndEval p (TCase nl ty mch brs) (TCase nl uy mch brs)
+              wndEval ty uy ->
+              wndEval (TCase nl ty mch brs) (TCase nl uy mch brs)
 | sCaseArg: forall (nl:nat * list nat) (ty mch can:Term) (brs:Terms),
-              wndEval p mch can ->
-              wndEval p (TCase nl ty mch brs) (TCase nl ty can brs)
+              wndEval mch can ->
+              wndEval (TCase nl ty mch brs) (TCase nl ty can brs)
 | sCaseBrs: forall (nl:nat * list nat) (ty mch:Term) (brs brs':Terms),
-              wndEvals p brs brs' ->
-              wndEval p (TCase nl ty mch brs) (TCase nl ty mch brs')
+              wndEvals brs brs' ->
+              wndEval (TCase nl ty mch brs) (TCase nl ty mch brs')
 | sFixDefs: forall (ds es:Defs) (i:nat),
-              wndDEvals p ds es -> wndEval p (TFix ds i) (TFix es i)
-with wndEvals (p:environ) : Terms -> Terms -> Prop :=
+              wndDEvals ds es -> wndEval (TFix ds i) (TFix es i)
+with wndEvals : Terms -> Terms -> Prop :=
      | saHd: forall (t r:Term) (ts:Terms), 
-               wndEval p t r ->
-               wndEvals p (tcons t ts) (tcons r ts)
+               wndEval t r ->
+               wndEvals (tcons t ts) (tcons r ts)
      | saTl: forall (t:Term) (ts ss:Terms),
-               wndEvals p ts ss ->
-               wndEvals p (tcons t ts) (tcons t ss)
-with wndDEvals  (p:environ) : Defs -> Defs -> Prop :=
+               wndEvals ts ss ->
+               wndEvals (tcons t ts) (tcons t ss)
+with wndDEvals : Defs -> Defs -> Prop :=
      | daHd: forall (n:name) (t r s:Term) (i:nat) (ds:Defs), 
-               wndEval p t r ->
-               wndDEvals p (dcons n t s i ds) (dcons n r s i ds)
+               wndEval t r ->
+               wndDEvals (dcons n t s i ds) (dcons n r s i ds)
      | daHd2: forall (n:name) (t r s:Term) (i:nat) (ds:Defs), 
-               wndEval p t r ->
-               wndDEvals p (dcons n s t i ds) (dcons n s r i ds)
+               wndEval t r ->
+               wndDEvals (dcons n s t i ds) (dcons n s r i ds)
      | daTl: forall (n:name) (t s:Term) (i:nat) (ds es:Defs),
-               wndDEvals p ds es ->
-               wndDEvals p (dcons n t s i ds) (dcons n t s i es).
+               wndDEvals ds es ->
+               wndDEvals (dcons n t s i ds) (dcons n t s i es).
 Hint Constructors wndEval wndDEvals wndEvals.
 Scheme wndEval1_ind := Induction for wndEval Sort Prop
      with wndEvals1_ind := Induction for wndEvals Sort Prop
@@ -108,18 +110,18 @@ Combined Scheme wndEvalEvals_ind
 (** example: evaluate omega = (\x.xx)(\x.xx): nontermination **)
 Definition xx := (TLambda nAnon prop (TApp (TRel 0) (TRel 0) tnil)).
 Definition xxxx := (TApp xx xx tnil).
-Goal wndEval nil xxxx xxxx.
+Goal wndEval xxxx xxxx.
 unfold xxxx, xx. eapply sBeta. 
 Qed.
 
 
 Lemma wndEval_pres_WFapp:
-  forall p, WFaEnv p -> 
-  (forall t s, wndEval p t s -> WFapp t -> WFapp s) /\
-  (forall ts ss, wndEvals p ts ss -> WFapps ts -> WFapps ss) /\
-  (forall ds es, wndDEvals p ds es -> WFappDs ds -> WFappDs es) .
+  WFaEnv p -> 
+  (forall t s, wndEval t s -> WFapp t -> WFapp s) /\
+  (forall ts ss, wndEvals ts ss -> WFapps ts -> WFapps ss) /\
+  (forall ds es, wndDEvals ds es -> WFappDs ds -> WFappDs es) .
 Proof.
-  intros p hp.
+  intros hp.
   apply wndEvalEvals_ind; intros;
   try (solve [inversion_Clear H0; constructor; intuition]).
   - assert (j:= Lookup_pres_WFapp hp l). inversion j. intuition.
@@ -144,8 +146,8 @@ Proof.
 Qed.
 
 Lemma wndEval_tappendl:
-  forall p bs cs, wndEvals p bs cs ->
-  forall ds, wndEvals p (tappend bs ds) (tappend cs ds).
+  forall bs cs, wndEvals bs cs ->
+  forall ds, wndEvals (tappend bs ds) (tappend cs ds).
 Proof.
   induction 1; intros.
   - constructor. assumption.
@@ -153,10 +155,10 @@ Proof.
 Qed.
 
 Lemma wndEval_tappendr:
-  forall p bs cs, wndEvals p bs cs ->
-  forall ds, wndEvals p (tappend ds bs) (tappend ds cs).
+  forall bs cs, wndEvals bs cs ->
+  forall ds, wndEvals (tappend ds bs) (tappend ds cs).
 Proof.
-  intros p bs cs h ds. induction ds; simpl.
+  intros bs cs h ds. induction ds; simpl.
   - assumption.
   - apply saTl. apply IHds.
 Qed.
@@ -243,28 +245,27 @@ Qed.
 **)
 
 Lemma wndEval_Lam_inv:
-  forall p nm tp bod s,
-    wndEval p (TLambda nm tp bod) s ->
-    exists tp', wndEval p tp tp' /\ s = (TLambda nm tp' bod).
-intros p nm tp bod s h. inversion_Clear h.
+  forall nm tp bod s,
+    wndEval (TLambda nm tp bod) s ->
+    exists tp', wndEval tp tp' /\ s = (TLambda nm tp' bod).
+intros nm tp bod s h. inversion_Clear h.
 - assert (j:= mkApp_isApp t arg args).
   destruct j as [x0 [x1 [x2 k]]]. rewrite k in H. discriminate.
 - exists t2. split; [assumption | reflexivity].
 Qed.
 
 Lemma wndEval_Prod_inv:
-  forall p nm tp bod s,
-    wndEval p (TProd nm tp bod) s ->
-    exists tp', wndEval p tp tp' /\ s = (TProd nm tp' bod).
-intros p nm tp bod s h. inversion_Clear h.
+  forall nm tp bod s,
+    wndEval (TProd nm tp bod) s ->
+    exists tp', wndEval tp tp' /\ s = (TProd nm tp' bod).
+intros nm tp bod s h. inversion_Clear h.
 - assert (j:= mkApp_isApp t arg args).
   destruct j as [x0 [x1 [x2 k]]]. rewrite k in H. discriminate.
 - exists t2. split; [assumption | reflexivity].
 Qed.
 
 Lemma wndEval_Cast_inv:
-  forall p tm ck ty s,
-    wndEval p (TCast tm ck ty) s -> tm = s.
+  forall tm ck ty s, wndEval (TCast tm ck ty) s -> tm = s.
 inversion 1.
 - reflexivity.
 - destruct (mkApp_isApp t arg args) as [x0 [x1 [x2 j]]].
@@ -272,34 +273,34 @@ inversion 1.
 Qed.
 
 (** when reduction stops **)
-Definition no_wnd_step (p:environ) (t:Term) : Prop :=
-  no_step (wndEval p) t.
-Definition no_wnds_step (p:environ) (ts:Terms) : Prop :=
-  no_step (wndEvals p) ts.
+Definition no_wnd_step (t:Term) : Prop :=
+  no_step wndEval t.
+Definition no_wnds_step (ts:Terms) : Prop :=
+  no_step wndEvals ts.
 
 
 (** reflexive-transitive closure of wndEval **)
-Inductive wndEvalRTC (p:environ): Term -> Term -> Prop :=
-(** | wERTCrfl: forall t, WNorm t -> wndEvalRTC p t t ??? **)
-| wERTCrfl: forall t, wndEvalRTC p t t
-| wERTCstep: forall t s, wndEval p t s -> wndEvalRTC p t s
-| wERTCtrn: forall t s u, wndEvalRTC p t s -> wndEvalRTC p s u ->
-                          wndEvalRTC p t u.
-Inductive wndEvalsRTC (p:environ): Terms -> Terms -> Prop :=
+Inductive wndEvalRTC: Term -> Term -> Prop :=
+(** | wERTCrfl: forall t, WNorm t -> wndEvalRTC t t ??? **)
+| wERTCrfl: forall t, wndEvalRTC t t
+| wERTCstep: forall t s, wndEval t s -> wndEvalRTC t s
+| wERTCtrn: forall t s u, wndEvalRTC t s -> wndEvalRTC s u ->
+                          wndEvalRTC t u.
+Inductive wndEvalsRTC: Terms -> Terms -> Prop :=
 (** | wEsRTCrfl: forall ts, WNorms ts -> wndEvalsRTC p ts ts ??? **)
-| wEsRTCrfl: forall ts, wndEvalsRTC p ts ts
-| wEsRTCstep: forall ts ss, wndEvals p ts ss -> wndEvalsRTC p ts ss
-| wEsRTCtrn: forall ts ss us, wndEvalsRTC p ts ss -> wndEvalsRTC p ss us ->
-                          wndEvalsRTC p ts us.
-Inductive wndDEvalsRTC (p:environ): Defs -> Defs -> Prop :=
-| wDEsRTCrfl: forall ts, wndDEvalsRTC p ts ts
-| wDEsRTCstep: forall ts ss, wndDEvals p ts ss -> wndDEvalsRTC p ts ss
-| wDEsRTCtrn: forall ts ss us, wndDEvalsRTC p ts ss -> wndDEvalsRTC p ss us ->
-                          wndDEvalsRTC p ts us.
+| wEsRTCrfl: forall ts, wndEvalsRTC ts ts
+| wEsRTCstep: forall ts ss, wndEvals ts ss -> wndEvalsRTC ts ss
+| wEsRTCtrn: forall ts ss us, wndEvalsRTC ts ss -> wndEvalsRTC ss us ->
+                          wndEvalsRTC ts us.
+Inductive wndDEvalsRTC: Defs -> Defs -> Prop :=
+| wDEsRTCrfl: forall ts, wndDEvalsRTC ts ts
+| wDEsRTCstep: forall ts ss, wndDEvals ts ss -> wndDEvalsRTC ts ss
+| wDEsRTCtrn: forall ts ss us, wndDEvalsRTC ts ss -> wndDEvalsRTC ss us ->
+                          wndDEvalsRTC ts us.
 Hint Constructors wndEvalRTC wndEvalsRTC wndDEvalsRTC.
 
 Lemma wndEvalRTC_pres_WFapp:
-  forall p t s, wndEvalRTC p t s -> WFaEnv p -> WFapp t -> WFapp s.
+  forall t s, wndEvalRTC t s -> WFaEnv p -> WFapp t -> WFapp s.
 Proof.
   induction 1; intros; try assumption.
   - eapply (proj1 (wndEval_pres_WFapp H0)); eassumption.
@@ -317,18 +318,18 @@ Hint Constructors clos_trans clos_trans_1n clos_trans_n1.
 Notation wETCstep := (t_step).
 Notation wETCtrn := (t_trans).
 ****)
-Inductive wndEvalTC (p:environ): Term -> Term -> Prop :=
-| wETCstep: forall t s, wndEval p t s -> wndEvalTC p t s
-| wETCtrn: forall t s, wndEvalTC p t s -> forall u, wndEvalTC p s u ->
-                          wndEvalTC p t u.
-Inductive wndEvalsTC (p:environ): Terms -> Terms -> Prop :=
-| wEsTCstep: forall ts ss, wndEvals p ts ss -> wndEvalsTC p ts ss
-| wEsTCtrn: forall ts ss, wndEvalsTC p ts ss -> forall us, wndEvalsTC p ss us ->
-                          wndEvalsTC p ts us.
+Inductive wndEvalTC: Term -> Term -> Prop :=
+| wETCstep: forall t s, wndEval t s -> wndEvalTC t s
+| wETCtrn: forall t s, wndEvalTC t s -> forall u, wndEvalTC s u ->
+                          wndEvalTC t u.
+Inductive wndEvalsTC: Terms -> Terms -> Prop :=
+| wEsTCstep: forall ts ss, wndEvals ts ss -> wndEvalsTC ts ss
+| wEsTCtrn: forall ts ss, wndEvalsTC ts ss -> forall us, wndEvalsTC ss us ->
+                          wndEvalsTC ts us.
 Hint Constructors wndEvalTC wndEvalsTC.
 
 Lemma wndEvalTC_pres_WFapp:
-  forall p t s, wndEvalTC p t s -> WFaEnv p -> WFapp t -> WFapp s.
+  forall t s, wndEvalTC t s -> WFaEnv p -> WFapp t -> WFapp s.
 Proof.
   induction 1; intros.
   - eapply (proj1 (wndEval_pres_WFapp H0)); eassumption.
@@ -336,21 +337,21 @@ Proof.
     + apply IHwndEvalTC1; assumption.
 Qed.
 
-Inductive wndEvalTCl (p:environ): Term -> Term -> Prop :=
-| wETClstep: forall t s, wndEval p t s -> wndEvalTCl p t s
-| wETCltrn: forall t s, wndEvalTCl p t s -> forall u, wndEval p s u ->
-                          wndEvalTCl p t u.
-Inductive wndEvalsTCl (p:environ): Terms -> Terms -> Prop :=
-| wEsTClstep: forall ts ss, wndEvals p ts ss -> wndEvalsTCl p ts ss
-| wEsTCltrn: forall ts ss, wndEvalsTCl p ts ss -> 
-                           forall us, wndEvals p ss us ->
-                          wndEvalsTCl p ts us.
+Inductive wndEvalTCl: Term -> Term -> Prop :=
+| wETClstep: forall t s, wndEval t s -> wndEvalTCl t s
+| wETCltrn: forall t s, wndEvalTCl t s -> forall u, wndEval s u ->
+                          wndEvalTCl t u.
+Inductive wndEvalsTCl: Terms -> Terms -> Prop :=
+| wEsTClstep: forall ts ss, wndEvals ts ss -> wndEvalsTCl ts ss
+| wEsTCltrn: forall ts ss, wndEvalsTCl ts ss -> 
+                           forall us, wndEvals ss us ->
+                          wndEvalsTCl ts us.
 Hint Constructors wndEvalTCl wndEvalsTCl.
 
 Axiom wndEvalTC_wndEvalTCl:
-  forall p t s, wndEvalTC p t s -> wndEvalTCl p t s.
+  forall t s, wndEvalTC t s -> wndEvalTCl t s.
 Axiom wndEvalTl_wndEvalTC:
-  forall p t s, wndEvalTCl p t s -> wndEvalTC p t s.
+  forall t s, wndEvalTCl t s -> wndEvalTC t s.
 
 
 (** transitive congruence rules **)
@@ -462,9 +463,9 @@ Qed.
 ***)
 
 Lemma wndEval_mkApp_mkApp:
-  forall p s u, wndEval p s u ->
+  forall s u, wndEval s u ->
   forall a1 args,
-     wndEval p (mkApp s (tcons a1 args)) (mkApp u (tcons a1 args)).
+     wndEval (mkApp s (tcons a1 args)) (mkApp u (tcons a1 args)).
 Proof.
   induction 1; simpl; intros; auto; try discriminate.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
@@ -927,9 +928,9 @@ Proof.
 
 (*** HERE is another version of the problem  ***)
 Lemma wndEvalRTC_App_fn:
-  forall p fn fn', wndEvalRTC p fn fn' -> WFaEnv p ->
+  forall fn fn', wndEvalRTC fn fn' -> WFaEnv p ->
     forall  a1 args, 
-      wndEvalRTC p (mkApp fn (tcons a1 args)) (mkApp fn' (tcons a1 args)).
+      wndEvalRTC (mkApp fn (tcons a1 args)) (mkApp fn' (tcons a1 args)).
 induction 1; intros.
 - apply wERTCrfl. 
 - apply wERTCstep. eapply wndEval_mkApp_mkApp. assumption.
@@ -939,10 +940,10 @@ Qed.
 
 
 Lemma wndEvalRTC_App_arg:
-  forall p fn arg arg',
-    wndEvalRTC p arg arg' -> ~ isApp fn ->
+  forall fn arg arg',
+    wndEvalRTC arg arg' -> ~ isApp fn ->
     forall args, 
-      wndEvalRTC p (TApp fn arg args) (TApp fn arg' args).
+      wndEvalRTC (TApp fn arg args) (TApp fn arg' args).
 induction 1; intros h args.
 - constructor.
 - constructor. apply sAppArg; assumption.
@@ -951,19 +952,19 @@ induction 1; intros h args.
 Qed.
 
 Lemma wndEvalTC_App_arg:
-  forall p fn arg arg',
-    wndEvalTC p arg arg' ->
+  forall fn arg arg',
+    wndEvalTC arg arg' ->
     forall args, 
-      wndEvalTC p (TApp fn arg args) (TApp fn arg' args).
+      wndEvalTC (TApp fn arg args) (TApp fn arg' args).
 induction 1; intros args.
 - constructor. apply sAppArg. assumption.
 - eapply wETCtrn. apply IHwndEvalTC1. apply IHwndEvalTC2.
 Qed.
 
 Lemma wndEvalsRTC_App_args:
-  forall p fn arg args args',
-    wndEvalsRTC p args args' -> ~ isApp fn ->
-      wndEvalRTC p (TApp fn arg args) (TApp fn arg args').
+  forall fn arg args args',
+    wndEvalsRTC args args' -> ~ isApp fn ->
+      wndEvalRTC (TApp fn arg args) (TApp fn arg args').
 induction 1; intros h.
 - constructor.
 - constructor. apply sAppArgs; assumption.
@@ -972,9 +973,9 @@ induction 1; intros h.
 Qed.
 
 Lemma wndEvalsTC_App_args:
-  forall p fn arg args args',
-    wndEvalsTC p args args' -> ~ isApp fn ->
-      wndEvalTC p (TApp fn arg args) (TApp fn arg args').
+  forall fn arg args args',
+    wndEvalsTC args args' -> ~ isApp fn ->
+      wndEvalTC (TApp fn arg args) (TApp fn arg args').
 induction 1; intros h.
 - constructor. apply sAppArgs; assumption.
 - eapply wETCtrn. apply IHwndEvalsTC1. assumption. 
@@ -982,9 +983,9 @@ induction 1; intros h.
 Qed.
 
 Lemma wndEvalsRTC_Fix_defs:
-  forall p dts dts',
-    wndDEvalsRTC p dts dts' ->
-      forall m, wndEvalRTC p (TFix dts m) (TFix dts' m).
+  forall dts dts',
+    wndDEvalsRTC dts dts' ->
+      forall m, wndEvalRTC (TFix dts m) (TFix dts' m).
 induction 1; intros h.
 - constructor.
 - constructor. apply sFixDefs; assumption.
@@ -992,10 +993,10 @@ induction 1; intros h.
 Qed.
 
 Lemma wndEvalRTC_Lam_typ:
-  forall p ty ty',
-    wndEvalRTC p ty ty' ->
+  forall ty ty',
+    wndEvalRTC ty ty' ->
     forall nm bod, 
-      wndEvalRTC p (TLambda nm ty bod) (TLambda nm ty' bod).
+      wndEvalRTC (TLambda nm ty bod) (TLambda nm ty' bod).
 induction 1; intros nm bod.
 - constructor.
 - constructor. apply sLamTy. assumption.
@@ -1003,10 +1004,10 @@ induction 1; intros nm bod.
 Qed.
 
 Lemma wndEvalRTC_Prod_typ:
-  forall p ty ty',
-    wndEvalRTC p ty ty' ->
+  forall ty ty',
+    wndEvalRTC ty ty' ->
     forall nm bod, 
-      wndEvalRTC p (TProd nm ty bod) (TProd nm ty' bod).
+      wndEvalRTC (TProd nm ty bod) (TProd nm ty' bod).
 induction 1; intros nm bod.
 - constructor.
 - constructor. apply sProdTy. assumption.
@@ -1014,10 +1015,10 @@ induction 1; intros nm bod.
 Qed.
 
 Lemma wndEvalRTC_LetIn_dfn:
-  forall p nm dfn dfn',
-    wndEvalRTC p dfn dfn' ->
+  forall nm dfn dfn',
+    wndEvalRTC dfn dfn' ->
     forall ty bod, 
-      wndEvalRTC p (TLetIn nm dfn ty bod) (TLetIn nm dfn' ty bod).
+      wndEvalRTC (TLetIn nm dfn ty bod) (TLetIn nm dfn' ty bod).
 induction 1; intros ty bod.
 - constructor.
 - constructor. apply sLetInDef. assumption.
@@ -1025,20 +1026,20 @@ induction 1; intros ty bod.
 Qed.
 
 Lemma wndEvalTC_LetIn_dfn:
-  forall p nm dfn dfn',
-    wndEvalTC p dfn dfn' ->
+  forall nm dfn dfn',
+    wndEvalTC dfn dfn' ->
     forall ty bod, 
-      wndEvalTC p (TLetIn nm dfn ty bod) (TLetIn nm dfn' ty bod).
+      wndEvalTC (TLetIn nm dfn ty bod) (TLetIn nm dfn' ty bod).
 induction 1; intros ty bod.
 - constructor. apply sLetInDef. assumption.
 - eapply wETCtrn. apply IHwndEvalTC1. apply IHwndEvalTC2.
 Qed.
 
 Lemma wndEvalRTC_Case_mch:
-  forall p mch mch',
-    wndEvalRTC p mch mch' -> 
+  forall mch mch',
+    wndEvalRTC mch mch' -> 
     forall np ty brs, 
-      wndEvalRTC p (TCase np ty mch brs) (TCase np ty mch' brs).
+      wndEvalRTC (TCase np ty mch brs) (TCase np ty mch' brs).
 induction 1; intros.
 - constructor.
 - constructor. apply sCaseArg. assumption.
@@ -1046,10 +1047,10 @@ induction 1; intros.
 Qed.
 
 Lemma wndEvalRTC_Case_ty:
-  forall p ty ty',
-    wndEvalRTC p ty ty' -> 
+  forall ty ty',
+    wndEvalRTC ty ty' -> 
     forall np mch brs, 
-      wndEvalRTC p (TCase np ty mch brs) (TCase np ty' mch brs).
+      wndEvalRTC (TCase np ty mch brs) (TCase np ty' mch brs).
 induction 1; intros.
 - constructor.
 - constructor. apply sCaseTy. assumption.
@@ -1057,10 +1058,10 @@ induction 1; intros.
 Qed.
 
 Lemma wndEvalRTC_Case_brs:
-  forall p brs brs',
-    wndEvalsRTC p brs brs' -> 
+  forall brs brs',
+    wndEvalsRTC brs brs' -> 
     forall np mch ty, 
-      wndEvalRTC p (TCase np ty mch brs) (TCase np ty mch brs').
+      wndEvalRTC (TCase np ty mch brs) (TCase np ty mch brs').
 induction 1; intros.
 - constructor.
 - constructor. apply sCaseBrs. assumption.
@@ -1068,18 +1069,18 @@ induction 1; intros.
 Qed.
 
 Lemma wndEvalTC_Case_mch:
-  forall p mch mch',
-    wndEvalTC p mch mch' -> 
+  forall mch mch',
+    wndEvalTC mch mch' -> 
     forall np ty brs, 
-      wndEvalTC p (TCase np ty mch brs) (TCase np ty mch' brs).
+      wndEvalTC (TCase np ty mch brs) (TCase np ty mch' brs).
 induction 1; intros.
 - constructor. apply sCaseArg. assumption.
 - eapply wETCtrn. apply IHwndEvalTC1. apply IHwndEvalTC2.
 Qed.
 
 Lemma wndEvalsRTC_tcons_hd:
-  forall p t t' ts,
-    wndEvalRTC p t t' -> wndEvalsRTC p (tcons t ts) (tcons t' ts).
+  forall t t' ts,
+    wndEvalRTC t t' -> wndEvalsRTC (tcons t ts) (tcons t' ts).
 induction 1.
 - constructor.
 - constructor. apply saHd. assumption.
@@ -1087,8 +1088,8 @@ induction 1.
 Qed.
 
 Lemma wndDEvalsRTC_dcons_hd:
-  forall p n t t' s i ts,
-    wndEvalRTC p t t' -> wndDEvalsRTC p (dcons n t s i ts) (dcons n t' s  i ts).
+  forall n t t' s i ts,
+    wndEvalRTC t t' -> wndDEvalsRTC (dcons n t s i ts) (dcons n t' s  i ts).
 induction 1.
 - constructor.
 - constructor. apply daHd. assumption.
@@ -1096,8 +1097,8 @@ induction 1.
 Qed.
 
 Lemma wndDEvalsRTC_dcons_hd2:
-  forall p n t s s' i ts,
-    wndEvalRTC p s s' -> wndDEvalsRTC p (dcons n t s i ts) (dcons n t s'  i ts).
+  forall n t s s' i ts,
+    wndEvalRTC s s' -> wndDEvalsRTC (dcons n t s i ts) (dcons n t s'  i ts).
 induction 1.
 - constructor.
 - constructor. apply daHd2. assumption.
@@ -1105,16 +1106,16 @@ induction 1.
 Qed.
 
 Lemma wndEvalsTC_tcons_hd:
-  forall p t t' ts,
-    wndEvalTC p t t' -> wndEvalsTC p (tcons t ts) (tcons t' ts).
+  forall t t' ts,
+    wndEvalTC t t' -> wndEvalsTC (tcons t ts) (tcons t' ts).
 induction 1.
 - constructor. apply saHd. assumption.
 - eapply wEsTCtrn. apply IHwndEvalTC1. apply IHwndEvalTC2.
 Qed.
 
 Lemma wndEvalsRTC_tcons_tl:
-  forall p t ts ts',
-    wndEvalsRTC p ts ts' -> wndEvalsRTC p (tcons t ts) (tcons t ts').
+  forall t ts ts',
+    wndEvalsRTC ts ts' -> wndEvalsRTC (tcons t ts) (tcons t ts').
 induction 1.
 - constructor.
 - constructor. apply saTl. assumption.
@@ -1122,8 +1123,8 @@ induction 1.
 Qed.
 
 Lemma wndDEvalsRTC_dcons_tl:
-  forall p n t s i ts ts',
-    wndDEvalsRTC p ts ts' -> wndDEvalsRTC p (dcons n t s i ts) (dcons n  t s i ts').
+  forall n t s i ts ts',
+    wndDEvalsRTC ts ts' -> wndDEvalsRTC (dcons n t s i ts) (dcons n  t s i ts').
 induction 1.
 - constructor.
 - constructor. apply daTl. assumption.
@@ -1131,13 +1132,18 @@ induction 1.
 Qed.
 
 Lemma wndEvalsTC_tcons_tl:
-  forall p t ts ts',
-    wndEvalsTC p ts ts' -> wndEvalsTC p (tcons t ts) (tcons t ts').
+  forall t ts ts',
+    wndEvalsTC ts ts' -> wndEvalsTC (tcons t ts) (tcons t ts').
 induction 1.
 - constructor. apply saTl. assumption.
 - eapply wEsTCtrn. apply IHwndEvalsTC1. apply IHwndEvalsTC2.
 Qed.
 
+End Env.
+Hint Constructors wndEval wndDEvals wndEvals.
+Hint Constructors wndEvalRTC wndEvalsRTC wndDEvalsRTC.
+Hint Constructors wndEvalTC wndEvalsTC.
+Hint Constructors wndEvalTCl wndEvalsTCl.
 
 Lemma wndEval_weaken:
   forall p,

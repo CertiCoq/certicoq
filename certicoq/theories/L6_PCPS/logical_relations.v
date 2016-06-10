@@ -513,34 +513,113 @@ Proof.
   repeat eexists; eauto. econstructor; eauto.
 Qed.
 
+
+(** Lift a value predicate to a subset of an environment *)
+Definition lift_P_env (S : Ensemble var) (P : val -> Prop) (rho : env) :=
+  forall x v, S x -> M.get x rho = Some v -> P v.
+
+(* TODO: move to identifiers.v *)
+Inductive closed_fundefs_in_val : val -> Prop :=
+| Vconstr_closed :
+    forall tau t vs,
+      Forall closed_fundefs_in_val vs ->
+      closed_fundefs_in_val (Vconstr tau t vs)
+| Vfun_closed :
+    forall rho B f,
+      closed_fundefs B ->
+      closed_fundefs_in_fundefs B ->
+      (* fun_in_fundefs B (f, tau, xs, e) -> *)
+      (* Included _ (occurs_free e) (Union _ (FromList xs) (name_in_fundefs B)) -> *)
+      closed_fundefs_in_val (Vfun rho B f)
+| Vint_closed :
+    forall z, closed_fundefs_in_val (Vint z)
+| Vother_closed :
+    forall tau, closed_fundefs_in_val (Vother tau)
+| Vobs :
+    forall tau, closed_fundefs_in_val (Vobvs tau)
+| Vobservable_closed :
+    forall tau vs,
+      Forall closed_fundefs_in_val vs ->
+      closed_fundefs_in_val (Vobservable tau vs).
+
+Definition closed_fundefs_in_env (S : Ensemble var) rho : Prop :=
+  lift_P_env S closed_fundefs_in_val rho.
+
+Lemma bstep_e_preserves_closed_fundefs rho e v c :
+  bstep_e rho e v c ->
+  closed_fundefs_in_env (occurs_free e) rho ->
+  closed_fundefs_in_exp e ->
+  closed_fundefs_in_val v.
+Proof.
+  intros Hstep Hcl1 Hcl2. induction Hstep.
+  - constructor. admit. (* easy *)
+  - eapply IHHstep.
+    + admit. (* easy *)
+    + intros B Hin. eauto.
+  - eapply IHHstep.
+    + admit. (* easy *)
+    + intros B Hin. eauto.
+  - eapply IHHstep.
+    + (* antimonotonicity lemma *)
+      admit.
+    + intros B Hin. eapply Hcl2.
+      econstructor; eauto.
+      apply findtag_In_patterns.
+      eassumption.
+  - eapply IHHstep.
+    + (* FV(e) \subseteq names(B) \cup xs *)
+      admit.
+    + intros B Hin.
+      eapply Hcl1 in H; [| now eauto ].
+      eapply find_def_correct in H1.
+      inv H. eapply H7. admit.
+  - eapply IHHstep.
+    + admit.
+    + intros B Hin. eauto. 
+  - eapply IHHstep.
+    + admit. 
+    + intros B Hin. eauto.
+Admitted. 
+
 Lemma cc_approx_exp_respects_preord_exp_r_pre (k : nat)
       (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
   (forall j v1 v2 v3,
+     closed_fundefs_in_val v2 ->
+     closed_fundefs_in_val v3 ->
      j <= k ->
      cc_approx_val j v1 v2 ->
      (forall k, preord_val k v2 v3) ->
      cc_approx_val j v1 v3) ->
+  closed_fundefs_in_env (occurs_free e2) rho2 ->
+  closed_fundefs_in_exp e2 ->
+  closed_fundefs_in_env (occurs_free e3) rho3 ->
+  closed_fundefs_in_exp e3 ->
   cc_approx_exp k (e1, rho1) (e2, rho2) ->
   (forall k', preord_exp k' (e2, rho2) (e3, rho3)) ->
   cc_approx_exp k (e1, rho1) (e3, rho3).
 Proof.
-  intros IH Hexp1 Hexp2 v1 c Hleq1 Hstep1. 
+  intros IH Hclo_rho2 Hclo_e2 Hclo_rho3 Hclo_e3 Hexp1 Hexp2 v1 c Hleq1 Hstep1. 
   edestruct Hexp1 as [v2 [c2 [Hstep2 Hpre2]]]; eauto. 
   edestruct (Hexp2 c2) as [v3 [c3 [Hstep3 Hpre3]]]; [| eauto | ]. omega.
   exists v3, c3. split; eauto.
-  eapply IH. omega. eauto. intros m.
-  edestruct (Hexp2 (m + c2)) as [v3' [c3' [Hstep3' Hpre3']]]; [| eauto |]. omega.
-  eapply bstep_e_deterministic in Hstep3; eauto. inv Hstep3.
-  eapply preord_val_monotonic; eauto. omega.
+  eapply IH; [ | |  omega | now eauto | ].
+  - eapply bstep_e_preserves_closed_fundefs; [ now apply Hstep2 | | ]; now eauto.
+  - eapply bstep_e_preserves_closed_fundefs; now eauto.
+  - intros m.
+    edestruct (Hexp2 (m + c2)) as [v3' [c3' [Hstep3' Hpre3']]]; [| eauto |]. omega.
+    eapply bstep_e_deterministic in Hstep3; eauto. inv Hstep3.
+    eapply preord_val_monotonic; eauto. omega.
 Qed.
 
 Lemma cc_approx_val_respects_preord_val_r (k : nat) (v1 v2 v3 : val) :
+  closed_fundefs_in_val v2 ->
+  closed_fundefs_in_val v3 ->
   cc_approx_val k v1 v2 ->
   (forall k, preord_val k v2 v3) ->
   cc_approx_val k v1 v3.
 Proof.
   revert v1 v2 v3. induction k using lt_wf_rec.
-  induction v1 using val_ind'; intros v2 v3 Happrox Hpre;
+  induction v1 using val_ind'; intros v2 v3 Hcl2 Hcl3 Happrox Hpre;
   assert (Hpre' := Hpre k);
   rewrite cc_approx_val_eq, preord_val_eq in *.
   - destruct v2; try contradiction.
@@ -552,14 +631,19 @@ Proof.
     destruct l1; [now inv Hpre'; inv H1 |].
     inv Hpre'; inv Happrox. inv H1; inv H2; split; eauto.
     constructor; eauto.
-    + eapply IHv1; eauto. intros k'. specialize (Hpre k').
-      rewrite preord_val_eq in Hpre. inv Hpre. now inv H1.
+    + eapply IHv1; [| | eauto |].
+      * inv Hcl2. now inv H1.
+      * inv Hcl3. now inv H1.
+      * intros k'. specialize (Hpre k').
+        rewrite preord_val_eq in Hpre. inv Hpre. now inv H1.
     + assert (Hsuf : cc_approx_val' k (Vconstr tau t3 l)  (Vconstr tau t3 l1)).
       { rewrite <- cc_approx_val_eq.
-        eapply IHv0 with (v2 := Vconstr tau t3 l0); eauto.
-        rewrite cc_approx_val_eq. now split; eauto.
-        intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre.
-        inv Hpre. inv H1. rewrite preord_val_eq. now split; eauto. }
+        eapply IHv0 with (v2 := Vconstr tau t3 l0).
+        - inv Hcl2. inv H1. now constructor.
+        - inv Hcl3. inv H1. now constructor.
+        - rewrite cc_approx_val_eq. now split; eauto.
+        - intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre.
+          inv Hpre. inv H1. rewrite preord_val_eq. now split; eauto. }
       now inv Hsuf.
   - destruct v2, v3; try contradiction.
     destruct l; try contradiction.
@@ -575,22 +659,24 @@ Proof.
         [t3' [vs3' [e3 [rho3 [Hfind3 [Hset3 Heval3]]]]]]; eauto. admit.
     edestruct vs3'; try discriminate. 
     do 5 eexists. repeat split; eauto. admit.
-    intros Hlt Hall.
-    eapply cc_approx_exp_respects_preord_exp_r_pre.
-    + intros. eapply H; eauto. omega.
-    + eapply Heval2; eauto.
-    + intros k'. specialize (Hpre (k' + 1)). rewrite preord_val_eq in Hpre.
-      inversion Hpre as [Hleq' Hall']. inv Hall'. 
-      rewrite preord_val_eq in H5.
-      edestruct (H5 (Vconstr t5 t6 l1 :: vs2) (Vconstr t5 t6 l1 :: vs2)) as
-          [t3'' [vs3'' [e3' [rho3' [Hfind3' [Hset3' Heval3']]]]]]; eauto. admit.
-      rewrite Hfind3 in Hfind3'. inv Hfind3'.
-      rewrite <- Hset3 in Hset3'. inv Hset3'.
-      eapply preord_exp_trans.
-      * eapply Heval3'. omega. eapply Forall2_refl.
-        eapply preord_val_refl.
-      * (* need lemmas about the admitted environments *)
-        admit.
+    intros Hlt Hall. admit.
+    (* eapply cc_approx_exp_respects_preord_exp_r_pre. *)
+    (* Focus 6. eapply Heval2; eauto. *)
+    (* + intros. eapply H; [| | | now eauto | now eauto ]; eauto. omega.  *)
+    (* + admit. *)
+    (* + eapply Heval2; eauto. *)
+    (* + intros k'. specialize (Hpre (k' + 1)). rewrite preord_val_eq in Hpre. *)
+    (*   inversion Hpre as [Hleq' Hall']. inv Hall'.  *)
+    (*   rewrite preord_val_eq in H5. *)
+    (*   edestruct (H5 (Vconstr t5 t6 l1 :: vs2) (Vconstr t5 t6 l1 :: vs2)) as *)
+    (*       [t3'' [vs3'' [e3' [rho3' [Hfind3' [Hset3' Heval3']]]]]]; eauto. admit. *)
+    (*   rewrite Hfind3 in Hfind3'. inv Hfind3'. *)
+    (*   rewrite <- Hset3 in Hset3'. inv Hset3'. *)
+    (*   eapply preord_exp_trans. *)
+    (*   * eapply Heval3'. omega. eapply Forall2_refl. *)
+    (*     eapply preord_val_refl. *)
+    (*   * (* need lemmas about the admitted environments *) *)
+    (*     admit. *)
   - destruct v2; try contradiction.
     destruct v3; try contradiction. inv Happrox.
     inv Hpre'. reflexivity.
@@ -609,13 +695,18 @@ Proof.
     destruct l1; [now inv Hpre'; inv H1 |].
     inv Hpre'; inv Happrox.
     constructor.
-    + eapply IHv1; eauto. intros k'. specialize (Hpre k').
-      rewrite preord_val_eq in Hpre. now inv Hpre.
+    + eapply IHv1; [| | eauto |].
+      * inv Hcl2. now inv H1.
+      * inv Hcl3. now inv H1.
+      * intros k'. specialize (Hpre k').
+        rewrite preord_val_eq in Hpre. now inv Hpre.
     + assert (Hsuf : cc_approx_val' k (Vobservable tau l)  (Vobservable tau l1)).
       { rewrite <- cc_approx_val_eq.
         eapply IHv0 with (v2 := Vobservable tau l0); eauto.
-        rewrite cc_approx_val_eq. now eauto.
-        intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre.
-        inv Hpre. now rewrite preord_val_eq.  }
+        - inv Hcl2. inv H1. now constructor.
+        - inv Hcl3. inv H1. now constructor.
+        - rewrite cc_approx_val_eq. now eauto.
+        - intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre.
+          inv Hpre. now rewrite preord_val_eq.  }
       now eauto.
 Abort.

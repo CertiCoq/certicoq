@@ -194,7 +194,6 @@ Section EVAL.
   Lemma preord_val_eq (k : nat) (v1 v2 : val) :
     preord_val k v1 v2 <-> preord_val' k v1 v2.
   Proof.
-    (* TODO : refactor this proof *)
     destruct k as [ | k ]; destruct v1; destruct v2;
     eauto; try (split; intros H; (now simpl in H; inv H)).
     - split.
@@ -941,7 +940,8 @@ Section EVAL.
             rewrite (Setminus_Included_Empty_set (Empty_set var) (Singleton var v0));
               [| intros x' H'; now inv H' ].
             rewrite Union_Empty_set_r.
-            rewrite (Setminus_Included_Empty_set (Setminus var (Singleton var v0) (Singleton var v)));
+            rewrite (Setminus_Included_Empty_set
+                       (Setminus var (Singleton var v0) (Singleton var v)));
               [| eapply Setminus_Included; now apply Included_refl ].
             rewrite Union_Empty_set_r.
             rewrite <- Setminus_Union_distr.
@@ -1150,6 +1150,19 @@ Section EVAL.
         eapply preord_env_P_monotonic; [| eauto]. omega.
         intros. eapply Hyp2; eauto. omega.
     - simpl. eauto.
+  Qed.
+  
+  Lemma preord_exp_proord_env_com rho1 rho2 rho1' rho2' e1 e2 :
+    (forall k, preord_exp k (e1, rho1) (e2, rho2)) ->
+    (forall k, preord_env_P (occurs_free e1) k rho1' rho1) ->
+    (forall k, preord_env_P (occurs_free e2) k rho2 rho2') ->
+    (forall k, preord_exp k (e1, rho1') (e2, rho2')).
+  Proof.
+    intros Hexp1 Henv1 Henv2 k.
+    eapply preord_exp_trans.
+    - now eapply preord_exp_refl.
+    - intros m. eapply preord_exp_trans; [ now eauto | ].
+      intros m'. now eapply preord_exp_refl.
   Qed.
 
   Lemma preord_env_permut k x y v1 v2 rho1 rho2 P :

@@ -1151,7 +1151,8 @@ Section EVAL.
         intros. eapply Hyp2; eauto. omega.
     - simpl. eauto.
   Qed.
-  
+
+  (* TODO fix typo *)
   Lemma preord_exp_proord_env_com rho1 rho2 rho1' rho2' e1 e2 :
     (forall k, preord_exp k (e1, rho1) (e2, rho2)) ->
     (forall k, preord_env_P (occurs_free e1) k rho1' rho1) ->

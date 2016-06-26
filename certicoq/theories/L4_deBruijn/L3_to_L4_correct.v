@@ -834,120 +834,122 @@ Lemma trans_instantiate' e a k (k' : nat) :
   (* wf_tr_environ e -> *) L3t.WFTrm a 0 ->
   forall b, L3t.WFTrm b (S k) -> (k' <= k)%nat ->
   trans e (N.of_nat k) (L3.term.instantiate a k' b) =
-  (trans e (1 + N.of_nat k) b) {N.of_nat k' := trans e (N.of_nat (k - k')) a}.
+  (trans e (1 + N.of_nat k) b) {N.of_nat k' := trans e 0(* (N.of_nat (k - k')) *) a}.
 Proof.
-  intros wfa b. revert b k k'.
-  assert (
-    (forall b k k', L3t.WFTrm b (S k) -> (k' <= k)%nat ->
-            (trans e (N.of_nat k) (L3.term.instantiate a k' b)) =
-            (trans e (1 + N.of_nat k) b)
-              {N.of_nat k' := (trans e (N.of_nat (k - k')) a)}) /\
-    (forall b k k', L3t.WFTrms b (S k) -> (k' <= k)%nat ->
-         (trans_args (trans e) (N.of_nat k) (L3.term.instantiates a k' b) =
-          (trans_args (trans e) (1 + N.of_nat k) b)
-            {N.of_nat k' := trans e (N.of_nat (k - k')) a}) /\
-    (forall ann l,
-        trans_brs (trans e) ann (N.of_nat k) l (L3.term.instantiates a k' b) =
-        (trans_brs (trans e) ann (1 + N.of_nat k) l b)
-          {N.of_nat k' := trans e (N.of_nat (k - k')) a})) /\
-    (forall b k k', L3t.WFTrmDs b (S k) -> (k' <= k)%nat ->
-        trans_fixes (trans e) (N.of_nat k) (L3.term.instantiateDefs a k' b) =
-        (trans_fixes (trans e) (1 + N.of_nat k) b)
-          {N.of_nat k' := trans e (N.of_nat (k - k')) a})).
-  apply L3t.TrmTrmsDefs_ind; try reflexivity.
-
-  (* Var *)
-  - intros n k k' wfn kk'. inv wfn. 
-    rewrite L3.term.instantiate_equation.
-    rewrite nat_compare_equiv.
-    unfold nat_compare_alt.
-    destruct (lt_eq_lt_dec k' n) as [[Hlt|Heq]|Hgt]; try lia.
-    simpl. destruct lt_dec. lia. destruct N.eq_dec. lia.
-    f_equal; lia.
-    subst n. simpl.
-    destruct lt_dec. lia.
-    destruct N.eq_dec.
-    + erewrite (trans_shift' e a). f_equal. f_equal. lia. admit. lia.
-    + lia.
-    + simpl.
-      destruct lt_dec. reflexivity.
-      destruct N.eq_dec. lia. lia.
-
-  - (* Lambda *)
-    intros n t Ht k k' wft kk'. 
-    assert ((1 + N.of_nat k) = N.of_nat (S k)) by lia.
-    rewrite L3.term.instantiate_equation. simpl.
-    rewrite H, Ht. simpl. f_equal. repeat (f_equal; try lia).
-    inv wft. auto. lia.
-    
-  - (* LetIn *)
-    intros s dfn IHdfn bod IHbod k k' wfbod kk'.
-    inv wfbod.
-    rewrite L3.term.instantiate_equation; simpl.
-    f_equal. rewrite IHdfn; auto. 
-    assert(N.of_nat (S k) = 1 + N.of_nat k) by lia.
-    specialize (IHbod (S k)).
-    rewrite H in IHbod. 
-    rewrite IHbod; auto. simpl. equaln. lia.
-
-  - (* Application *)
-    intros t IHt fn IHfn k k' wft kk'. inv wft. 
-    rewrite L3.term.instantiate_equation; simpl.
-    repeat (f_equal; rewrite_hyps; try lia; eauto).
-
-  - (* Const *)
-    intros nm k k' wft kk'. inv wft.
-    rewrite L3.term.instantiate_equation; simpl.
-    destruct lt_dec. lia.
-    simpl. assert(exists t, LookupEnv nm e t). admit. (*WFtrm environment *)
-    destruct H as [t Ht].
-    destruct N.eq_dec. lia.
-    repeat (f_equal; try lia).
-
-  - (* Constructor *)
-    intros i m args IHargs k k' wft kk'. inv wft.
-    rewrite L3.term.instantiate_equation; simpl.
-    f_equal. destruct (IHargs k k' H3 kk'); auto.
-    
-  - (* Match *)
-    intros. inv H1. destruct (H0 k k' H8 H2). 
-    rewrite L3.term.instantiate_equation; simpl; intuition.
-    rewrite_hyps; f_equal; simpl; eauto. 
-
-  - (* Fix *)
-    intros defs IHdefs n k k' wft kk'. inv wft.
-    specialize (IHdefs (k + L3t.dlength defs)%nat).
-    rewrite L3.term.instantiate_equation; simpl; intuition.
-    assert (k' + L3t.dlength defs <= k + L3t.dlength defs)%nat by lia.
-    specialize (IHdefs (k' + L3t.dlength defs)%nat H2 H).
-    f_equal; simpl; eauto.
-    rewrite efnlst_length_trans.
-    rewrite <- L3t.instantiateDefs_pres_dlength.
-    assert ((N.of_nat (k + L3t.dlength defs)) =
-            (N.of_nat (L3t.dlength defs) + N.of_nat k)) by lia.
-    rewrite <- H0. rewrite IHdefs. 
-    simpl. repeat (f_equal; try lia).
-
-  - simpl. intuition trivial.
-  - intros t IHt ts IHts k k' wft kk'. inv wft.
-    destruct (IHts k k' H3 kk').
-    specialize (IHt k k' H1 kk').
-    rewrite L3.term.instantiates_equation. simpl trans_args.
-    rewrite IHt.
-    rewrite H. split; intuition.
-    simpl.
-    f_equal. rewrite IHt.
-    rewrite strip_lam_subst. reflexivity.
-    (* Well-formedness of matches *)
-    admit.
-    intuition.
-
-  - intros n t IHt ann ts IHts k k' wft kk'. inv wft.
-    specialize (IHt k k' H4 kk'). specialize (IHts k k' H5 kk').
-    rewrite L3.term.instantiateDefs_equation.
-    simpl. now rewrite IHt, IHts. 
-  - tauto.
 Admitted.
+(*   intros wfa b. revert b k k'.  *)
+(*   assert ( *)
+(*     (forall b k k', L3t.WFTrm b (S k) -> (k' <= k)%nat -> *)
+(*             (trans e (N.of_nat k) (L3.term.instantiate a k' b)) = *)
+(*             (trans e (1 + N.of_nat k) b) *)
+(*               {N.of_nat k' := (trans e (N.of_nat (k - k')) a)}) /\ *)
+(*     (forall b k k', L3t.WFTrms b (S k) -> (k' <= k)%nat -> *)
+(*          (trans_args (trans e) (N.of_nat k) (L3.term.instantiates a k' b) = *)
+(*           (trans_args (trans e) (1 + N.of_nat k) b) *)
+(*             {N.of_nat k' := trans e (N.of_nat (k - k')) a}) /\ *)
+(*     (forall ann l, *)
+(*         trans_brs (trans e) ann (N.of_nat k) l (L3.term.instantiates a k' b) = *)
+(*         (trans_brs (trans e) ann (1 + N.of_nat k) l b) *)
+(*           {N.of_nat k' := trans e (N.of_nat (k - k')) a})) /\ *)
+(*     (forall b k k', L3t.WFTrmDs b (S k) -> (k' <= k)%nat -> *)
+(*         trans_fixes (trans e) (N.of_nat k) (L3.term.instantiateDefs a k' b) = *)
+(*         (trans_fixes (trans e) (1 + N.of_nat k) b) *)
+(*           {N.of_nat k' := trans e (N.of_nat (k - k')) a})). *)
+(*   apply L3t.TrmTrmsDefs_ind; try reflexivity. *)
+
+(*   (* Var *) *)
+(*   - intros n k k' wfn kk'. inv wfn.  *)
+(*     rewrite L3.term.instantiate_equation. *)
+(*     rewrite nat_compare_equiv. *)
+(*     unfold nat_compare_alt. *)
+(*     destruct (lt_eq_lt_dec k' n) as [[Hlt|Heq]|Hgt]; try lia. *)
+(*     simpl. destruct lt_dec. lia. destruct N.eq_dec. lia. *)
+(*     f_equal; lia. *)
+(*     subst n. simpl. *)
+(*     destruct lt_dec. lia. *)
+(*     destruct N.eq_dec. *)
+(*     + erewrite (trans_shift' e a). f_equal. f_equal. lia. *)
+(*       (* WFtrm lift *) admit. lia. *)
+(*     + lia. *)
+(*     + simpl. *)
+(*       destruct lt_dec. reflexivity. *)
+(*       destruct N.eq_dec. lia. lia. *)
+
+(*   - (* Lambda *) *)
+(*     intros n t Ht k k' wft kk'.  *)
+(*     assert ((1 + N.of_nat k) = N.of_nat (S k)) by lia. *)
+(*     rewrite L3.term.instantiate_equation. simpl. *)
+(*     rewrite H, Ht. simpl. f_equal. repeat (f_equal; try lia). *)
+(*     inv wft. auto. lia. *)
+    
+(*   - (* LetIn *) *)
+(*     intros s dfn IHdfn bod IHbod k k' wfbod kk'. *)
+(*     inv wfbod. *)
+(*     rewrite L3.term.instantiate_equation; simpl. *)
+(*     f_equal. rewrite IHdfn; auto.  *)
+(*     assert(N.of_nat (S k) = 1 + N.of_nat k) by lia. *)
+(*     specialize (IHbod (S k)). *)
+(*     rewrite H in IHbod.  *)
+(*     rewrite IHbod; auto. simpl. equaln. lia. *)
+
+(*   - (* Application *) *)
+(*     intros t IHt fn IHfn k k' wft kk'. inv wft.  *)
+(*     rewrite L3.term.instantiate_equation; simpl. *)
+(*     repeat (f_equal; rewrite_hyps; try lia; eauto). *)
+
+(*   - (* Const *) *)
+(*     intros nm k k' wft kk'. inv wft. *)
+(*     rewrite L3.term.instantiate_equation; simpl. *)
+(*     destruct lt_dec. lia. *)
+(*     simpl. assert(exists t, LookupEnv nm e t). admit. (*WFtrm environment *) *)
+(*     destruct H as [t Ht]. *)
+(*     destruct N.eq_dec. lia. *)
+(*     repeat (f_equal; try lia). *)
+
+(*   - (* Constructor *) *)
+(*     intros i m args IHargs k k' wft kk'. inv wft. *)
+(*     rewrite L3.term.instantiate_equation; simpl. *)
+(*     f_equal. destruct (IHargs k k' H3 kk'); auto. *)
+    
+(*   - (* Match *) *)
+(*     intros. inv H1. destruct (H0 k k' H8 H2).  *)
+(*     rewrite L3.term.instantiate_equation; simpl; intuition. *)
+(*     rewrite_hyps; f_equal; simpl; eauto.  *)
+
+(*   - (* Fix *) *)
+(*     intros defs IHdefs n k k' wft kk'. inv wft. *)
+(*     specialize (IHdefs (k + L3t.dlength defs)%nat). *)
+(*     rewrite L3.term.instantiate_equation; simpl; intuition. *)
+(*     assert (k' + L3t.dlength defs <= k + L3t.dlength defs)%nat by lia. *)
+(*     specialize (IHdefs (k' + L3t.dlength defs)%nat H2 H). *)
+(*     f_equal; simpl; eauto. *)
+(*     rewrite efnlst_length_trans. *)
+(*     rewrite <- L3t.instantiateDefs_pres_dlength. *)
+(*     assert ((N.of_nat (k + L3t.dlength defs)) = *)
+(*             (N.of_nat (L3t.dlength defs) + N.of_nat k)) by lia. *)
+(*     rewrite <- H0. rewrite IHdefs.  *)
+(*     simpl. repeat (f_equal; try lia). *)
+
+(*   - simpl. intuition trivial. *)
+(*   - intros t IHt ts IHts k k' wft kk'. inv wft. *)
+(*     destruct (IHts k k' H3 kk'). *)
+(*     specialize (IHt k k' H1 kk'). *)
+(*     rewrite L3.term.instantiates_equation. simpl trans_args. *)
+(*     rewrite IHt. *)
+(*     rewrite H. split; intuition. *)
+(*     simpl. *)
+(*     f_equal. rewrite IHt. *)
+(*     rewrite strip_lam_subst. reflexivity. *)
+(*     (* Well-formedness of matches *) *)
+(*     admit. *)
+(*     intuition. *)
+
+(*   - intros n t IHt ann ts IHts k k' wft kk'. inv wft. *)
+(*     specialize (IHt k k' H4 kk'). specialize (IHts k k' H5 kk'). *)
+(*     rewrite L3.term.instantiateDefs_equation. *)
+(*     simpl. now rewrite IHt, IHts.  *)
+(*   - tauto. *)
+(* Admitted. *)
 
 (** Evaluation in the target language *)
 
@@ -1151,6 +1153,12 @@ Proof. intros. inv H. Admitted.
 Lemma wcbeval_preserves_wf e t t' :
   WFTrm t 0 -> L3eval.WcbvEval e t t' -> WFTrm t' 0.
 Admitted.
+
+Lemma instantiate_preserves_wf t k k' a : (k' <= k)%nat ->
+  WFTrm a 0 ->
+  WFTrm t (S k) ->
+  WFTrm (L3.term.instantiate a k' t) k.
+Admitted.
   
 Lemma L3sbst_fix_preserves_lam dts nm bod :
   fold_left
@@ -1171,17 +1179,38 @@ Qed.
 Definition sbst_fix_aux (es:efnlst) (e : exp) (k : N) : exp :=
   let les := efnlength es in
     fold_left
-      (fun e ndx => e{k ::= Fix_e es (N.of_nat ndx)})
+      (fun e ndx => e{k := Fix_e es (N.of_nat ndx)})
       (list_to_zero les) e.
 
+Lemma list_to_zero_spec n :
+  forall x, In x (list_to_zero n) -> (x < n)%nat.
+Proof.
+  induction n; simpl; intros.
+  elim H.
+  destruct H. subst x. auto with arith.
+  specialize (IHn _ H). lia.
+Qed.
+  
 Lemma sbst_fix_preserves_lam es bod :
+  (forall i, (i < efnlength es)%nat -> exp_wf 0 (Fix_e es (N.of_nat i))) ->
   sbst_fix es (Lam_e bod) =
   Lam_e (sbst_fix_aux es bod 1).
 Proof.
-  revert bod; unfold sbst_fix, sbst_fix_aux;
+  revert bod; unfold sbst_fix, sbst_fix_aux.
+  generalize (eq_refl (efnlength es)).
+  generalize (efnlength es) at 1 3.
+  generalize (le_refl (efnlength es)).
+  generalize es at 1 4 5 7.
+  generalize (list_to_zero_spec (efnlength es)).
   induction (list_to_zero (efnlength es)); simpl; intros.
   - reflexivity.
-  - simpl. rewrite IHl. reflexivity.
+  - simpl. erewrite IHl; auto.
+    f_equal.
+    f_equal.
+    rewrite N.add_0_r.
+    refine (proj1 (closed_subst_sbst _ _) _ _).
+    apply H2. subst n. apply H. left; auto.
+    rewrite <- H1. auto.
 Qed.
 
 Lemma efnlength_map g l : efnlength (map_efnlst g l) = efnlength l.
@@ -1195,21 +1224,42 @@ Definition L3sbst_fix_aux dts body k :=
      (fun bod ndx => instantiate (TFix dts ndx) k bod)
      (list_to_zero ldts) body).
 
-Lemma L3sbst_fix_sbst_fix e k dts body : (forall i, WFTrm (TFix dts i) 0) ->
-  trans e k (L3sbst_fix_aux dts body 1) =
-  sbst_fix (trans_fixes (trans e) k dts) (trans e k body).
+Lemma L3sbst_fix_sbst_fix env e dts body :
+  wf_environ env -> eval_env (translate_env env) e -> wf_tr_environ e ->
+  WFTrm body (S (dlength dts)) ->
+                                       
+  (forall i, (i < dlength dts)%nat -> WFTrm (TFix dts i) 0) ->
+  trans e (1 + 0) (L3sbst_fix_aux dts body 1) =
+  sbst_fix_aux (trans_fixes (trans e) (N.of_nat (dlength dts)) dts)
+               (trans e (N.of_nat (dlength dts) + 1) body) 1.
 Proof.
-  revert body k.
-  unfold L3sbst_fix_aux, sbst_fix. simpl.
-  generalize dts at 1 2 4.
-  induction dts; simpl; intros; trivial.
-  rewrite (IHdts _ _ _ H).
+  revert body.
+  unfold L3sbst_fix_aux, sbst_fix_aux. simpl.
+  generalize (le_refl (dlength dts)).
+  generalize dts at 2 4 5 6 8 9 10.
+  induction dts; simpl; try solve [intros; trivial].
+  intros dts0 Hdts body wfenv evenv wfe wfbod wffix.
+  assert (dtsle:(dlength dts <= dlength dts0)%nat) by lia.
+  assert (dtslt:(dlength dts < dlength dts0)%nat) by lia.
+  specialize (IHdts dts0 dtsle (instantiate (TFix dts0 (dlength dts)) 1 body)
+                    wfenv evenv wfe).
+  rewrite IHdts; eauto.
   f_equal.
-  pose (trans_instantiate' e (TFix dts0 (dlength dts)) (N.to_nat k) 0 (H _)
-       body). forward e0. forward e0; try lia.
-  simpl in e0. rewrite Nnat.N2Nat.id in e0. 
-Admitted.  
-  
+  rewrite !efnlength_trans. 
+  pose (e0:=trans_instantiate' e (TFix dts0 (dlength dts)) (S (dlength dts)) 1
+                           (wffix _ dtslt)
+                           body). forward e0. forward e0; try lia.
+  rewrite Nnat.Nat2N.inj_succ in e0.
+  rewrite N.add_1_r, e0.
+  - simpl.
+    (* The fixes are not actually closed as translation inserts binders !*)
+    equaln; eauto.
+    (* pose (wffix (dlength dts) dtslt). *)
+    (* pose (Hwf:=WFTerm_exp_wf env e wfenv evenv wfe _ _ w). *)
+  - eauto.
+  - eapply instantiate_preserves_wf; eauto. lia.
+Qed.
+
 Lemma subst_env_aux_subst' e a k k' b : exp_wf 0 a -> k' <= k ->
   subst_env_aux e k (subst a k' b) =
   subst (subst_env_aux e k (shift k' 0 a)) k' (subst_env_aux e (1 + k) b).
@@ -1222,25 +1272,140 @@ Proof.
   simpl. equaln. erewrite (proj1 (subst_closed_id (snd a))); eauto. lia. lia.
 Qed.
 
-Definition sbst_fix_aux' (es:efnlst) (e : exp) (k : N) les : exp :=
+Lemma map_efnlst_id es : map_efnlst (fun x => x) es = es.
+Proof. induction es; simpl; intros; now rewrite_hyps. Qed.
+
+Lemma map_efnlst_comp f g es : map_efnlst g (map_efnlst f es) = map_efnlst (fun x => g (f x)) es.
+Proof. induction es; simpl; intros; now rewrite_hyps. Qed.
+
+Lemma efnlst_length_map f es : efnlst_length (map_efnlst f es) = efnlst_length es.
+Proof. induction es; simpl; intros; now rewrite_hyps. Qed.
+  
+Definition sbst_fix_aux' (es:efnlst) (acc : efnlst) (e : exp) (k : N) : exp :=
+  let les := efnlength acc in
     fold_left
-      (fun e ndx => e{k ::= Fix_e es (N.of_nat ndx)})
-      les e.
+      (fun e ndx => e{k := Fix_e es (N.of_nat ndx)})
+      (list_to_zero les) e.
 
-Lemma sbst_fix_aux_eq es e k n ns :
-  sbst_fix_aux' es e k (n :: ns) =
-  sbst_fix_aux' es (e{k::=Fix_e es (N.of_nat n)}) k ns.
-Proof. unfold sbst_fix_aux'. simpl. reflexivity. Qed.
+(* Lemma sbst_fix_aux_eq e dts e1 k : *)
+(*   sbst_fix_aux (eflcons e dts) e1 k' = *)
+(*   sbst_fix_aux' (eflcons e dts) dts (subst (Fix_e (eflcons e dts) (efnlst_length (eflconst e dts))) k e1). *)
 
-Lemma subst_env_aux_sbst_fix e dts bod : subst_env_aux e (1 + 0)
-     (sbst_fix (trans_fixes (trans e) (1 + 0) dts) (trans e (1 + 0) bod)) =
-   sbst_fix_aux
-     (map_efnlst (subst_env_aux e (N.of_nat (dlength dts) + 0))
-        (trans_fixes (trans e) (N.of_nat (dlength dts) + 0) dts))
-     (subst_env_aux e (1 + (N.of_nat (dlength dts) + 0))
-                    (trans e (1 + (N.of_nat (dlength dts) + 0)) bod)) 1.
+Lemma subst_efnlst_map x k v :
+  subst_efnlst x k v = map_efnlst (subst x k) v.
+Proof. induction v; simpl; intros; now try rewrite_hyps. Qed.
+
+Lemma substitution :
+  forall (M N L:exp) i j, i <= j ->
+    M{i := N}{j := L} = M{1+j := L}{i := N{ j-i := L}}.
 Proof.
+  assert ((forall (M:exp) N L i j, i <= j -> M{i := N}{j := L} = M{1+j := L}{i := N{ j-i := L}}) /\ (forall (Ms:exps) N L i j, i <= j -> Ms{i := N}{j := L} = Ms{1+j := L}{i := N{ j-i := L}}) /\
+   (forall (Ms:efnlst) N L i j, i <= j -> Ms{i := N}{j := L} = Ms{1+j := L}{i := N{ j-i := L}}) /\
+   (forall (Ms:branches_e) N L i j, i <= j -> Ms{i := N}{j := L} = Ms{1+j := L}{i := N{ j-i := L}})).
+  apply my_exp_ind; intros; simpl in *; auto ;
+  try (rewrite H; auto; try rewrite H0; autorewrite with core; auto; try lia).
+  repeat if_split.
+  assert (0 <= j - i) by lia.
+  generalize (shift_subst N i 0 (j - i) L H0). intros.
+  unfold substitute in H1. simpl in H1.
+  rewrite H1. replace (j - i + i) with j; auto. lia.
+  destruct (eq_dec n 0). lia.
+  generalize (shift_away_subst L 0 i (n - 1)). intro.
+  unfold substitute in H0. simpl in H0.
+  specialize (H0 (subst L (n - 1 - i) N)). rewrite H0; auto. lia. lia.
+  apply f_equal. replace (1 + j - (1 + i)) with (j - i). auto. lia. 
+  apply f_equal. replace (1 + j - (1 + i)) with (j - i). auto. lia.
+  f_equal. repeat (f_equal; try lia).
+  repeat (f_equal; try lia).
+  tauto.
+Qed.
+
+(** 
+  Assuming each dts_i has one freevar for x.
+  (e1[1..n:=dts_n])[1:=x] = (e1[1+n:=x])[1..n:=dts_n[n:=x]] *)
+Lemma subst_subst_fix_aux x dts e1 : 
+  subst x 1 (sbst_fix_aux dts e1 1) =
+  sbst_fix_aux (map_efnlst (subst x (efnlst_length dts)) dts)
+               (subst x (efnlst_length dts + 1) e1) 1.
+Proof.
+  unfold sbst_fix_aux.
+  set (fn := (fun (e : exp) (ndx : nat) => e {1 := Fix_e dts (N.of_nat ndx)})).
+  set (fn' := (fun (e : exp) (ndx : nat) =>
+      e {1
+      := Fix_e (map_efnlst (subst x (efnlst_length dts)) dts) (N.of_nat ndx)})).
+  rewrite efnlength_map.
+  (* replace (efnlst_length dts + 1) with (efnlst_length dts - (efnlst_length dts - efnlst_length dts) + 1). *)
+  generalize dts at 1 2 3. intros dts0.
+  remember (efnlength dts0) as len.
+  revert len Heqlen e1.
+  induction dts0; simpl; intros.
+  - simpl in *. subst len. simpl. equaln. 
+  - simpl in *; try discriminate. subst len.
+    simpl. specialize (IHdts0 _ eq_refl).
+
+    (* (e1[1+n:=x])[1:=fix_n[_:=x]] *)
+    rewrite IHdts0. f_equal.
+    subst fn fn'. simpl.
+    rewrite substitution.
+    simpl.
+    f_equal. f_equal. admit. (* f_equal. rewrite subst_efnlst_map. equaln. *)
+    equaln. lia.
 Admitted.
+    
+Lemma subst_env_aux_sbst_fix e dts e1 :
+  subst_env_aux e 1 (sbst_fix_aux dts e1 1) =
+  sbst_fix_aux
+     (map_efnlst (subst_env_aux e (efnlst_length dts + 0)) dts)
+     (subst_env_aux e (1 + efnlst_length dts) e1) 1.
+Proof.
+  revert dts e1.
+  pattern e. refine (wf_ind (@length _) _ _ e). clear. intros.
+  destruct t.
+  - simpl. intros.
+    unfold subst_env_aux. simpl.
+    now rewrite map_efnlst_id.
+  - simpl; intros.
+    rewrite subst_subst_fix_aux.
+    rewrite H.
+    rewrite efnlst_length_map.
+    f_equal.
+    rewrite map_efnlst_comp.
+    f_equal.
+    extensionality x.
+    simpl. equaln.
+    f_equal. equaln. equaln.
+Qed.
+
+(* Lemma subst_env_aux_sbst_fix e dts bod k : *)
+(*   subst_env_aux e (1 + k) *)
+(*      (sbst_fix_aux (trans_fixes (trans e) (N.of_nat (dlength dts) + k) dts) *)
+(*                    (trans e (1 + (N.of_nat (dlength dts) + k)) bod) 1) = *)
+(*    sbst_fix_aux *)
+(*      (map_efnlst (subst_env_aux e (N.of_nat (dlength dts) + k)) *)
+(*         (trans_fixes (trans e) (N.of_nat (dlength dts) + k) dts)) *)
+(*      (subst_env_aux e (1 + (N.of_nat (dlength dts) + k)) *)
+(*                     (trans e (1 + (N.of_nat (dlength dts) + k)) bod)) 1. *)
+(* Proof. *)
+(*   generalize (trans e (1 + (N.of_nat (dlength dts) + k)) bod). intros. *)
+(*   clear bod. *)
+(*   revert dts e0 k. *)
+
+(*   generalize e at 2 4. *)
+(*   induction e using rev_ind; simpl; intros. *)
+(*   unfold subst_env_aux. simpl. *)
+(*   rewrite map_efnlst_id. reflexivity.  *)
+(*   rewrite subst_env_aux_subst'. *)
+(*   specialize (IHe e0 dts e1 (1 + k)). *)
+
+  
+  
+(*   induction dts. simpl. unfold sbst_fix_aux. simpl. reflexivity. *)
+
+  
+  
+(*   simpl. unfold sbst_fix_aux. simpl. *)
+  
+(* Admitted. *)
   
 (** Questions:
 
@@ -1411,7 +1576,7 @@ Proof with eauto.
          rewrite Nnat.Nat2N.id.
          rewrite (dnthbody _ _ _ _ _ _ eqt').
          rewrite efnlst_length_trans. reflexivity.
-         rewrite efnlst_length_trans.
+         (* rewrite efnlst_length_trans. *)
          rewrite <- eqfs in H4.
          apply wcbeval_preserves_wf in evfn; auto.
          destruct (wftrm_fix _ _ _ _ evfn eqt') as [nm [bod ->]].
@@ -1433,19 +1598,29 @@ Proof with eauto.
                    (fun (bod : L3.term.Term) (ndx : nat) =>
                     L3.term.instantiate (L3.term.TFix dts ndx) 1 bod)
                    (list_to_zero (L3.term.dlength dts)) bod))))
-                 with (subst_env_aux e'' (1 + 0)
+         with
+         (subst_env_aux e'' (1 + 0)
                                      (trans e'' (1 + 0) (L3sbst_fix_aux dts bod 1))) in *.         
          assert ((subst_env_aux e'' (1 + 0)
              (trans e'' (1 + 0) (L3sbst_fix_aux dts bod 1))) =
-                 (sbst_fix_aux
-         (map_efnlst (subst_env_aux e'' (N.of_nat (dlength dts) + 0))
+           (sbst_fix_aux
+         (map_efnlst (subst_env_aux e'' ((efnlst_length
+                  (trans_fixes (trans e'') (N.of_nat (dlength dts) + 0) dts) +
+                0)))
             (trans_fixes (trans e'') (N.of_nat (dlength dts) + 0) dts))
          (subst_env_aux e'' (1 + (N.of_nat (dlength dts) + 0))
                         (trans e'' (1 + (N.of_nat (dlength dts) + 0)) bod)) 1)).
-         rewrite L3sbst_fix_sbst_fix.
-         rewrite subst_env_aux_sbst_fix. reflexivity.
-         admit. 
+         rewrite (L3sbst_fix_sbst_fix e e''); auto.
+         rewrite N.add_0_r.
+         
+         simpl.
+         rewrite subst_env_aux_sbst_fix; auto.
+         rewrite !efnlst_length_trans. equaln.
+         admit. (* wf of fix *)
+         admit. (* wf of fix *)
          rewrite H0 in H7. apply H7.
+         rewrite efnlength_map, efnlength_trans.
+         admit. (* wf of fix *)
 
       -- (* Impossible, as t' must be a lambda, so cannot evaluate to a fix *)
          intros Hfs.

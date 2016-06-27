@@ -552,7 +552,7 @@ Proof.
   constructor 2. apply IHp; eauto.
 Qed.
 
-Lemma Forall2_nthN {A} (R : A -> A -> Prop) (l1 l2 : list A)
+Lemma Forall2_nthN {A B} (R : A -> B -> Prop) l1 l2
       (n : N) (v1 : A):
   Forall2 R l1 l2 ->
   nthN l1 n = Some v1 ->
@@ -586,7 +586,7 @@ Proof.
     + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
 Qed.
 
-Lemma nthN_length {A} (l1 l2 : list A) (n : N) (v1 : A) :
+Lemma nthN_length {A B} (l1 : list A) (l2 : list B) (n : N) (v1 : A) :
   length l1 <= length l2 ->
   nthN l1 n = Some v1 ->
   exists v2,

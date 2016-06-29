@@ -70,7 +70,7 @@ Inductive make_closures : fundefs -> var -> exp_ctx -> Prop :=
     forall f xs tau e B Γ C tau' t',
       make_closures B Γ C ->
       make_closures (Fcons f tau xs e B) Γ
-                    (comp_ctx_f C (Econstr_c f tau' t' [f; Γ] Hole_c)).
+                    (Econstr_c f tau' t' [f; Γ] C).
 
 Inductive Closure_conversion :
   Ensemble var -> (* Variables in the current scope *)
@@ -154,7 +154,7 @@ Inductive Closure_conversion :
       (* The name of the function pointer and the name of the environment
          should not shadow the variables in the current scope and the
          variables that where used in the projections *)
-      ~ In _ S f'' -> ~ In _ S env' ->
+      In _ S f'' -> In _ S env' -> f'' <> env' ->
       Closure_conversion Scope Funs Γ FVs (Eapp f ys)
                          (C |[ Eproj f'' tau 0%N f'
                                      (Eproj env' tau' 1%N f'

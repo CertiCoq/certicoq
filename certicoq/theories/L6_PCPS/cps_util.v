@@ -440,7 +440,7 @@ Fixpoint fundefs_append (B1 B2 : fundefs) : fundefs :=
     | Fcons f t xs xe B => Fcons f t xs xe (fundefs_append B B2)
     | Fnil => B2
   end.
-    
+
 Lemma def_funs_append B B1 B2 rho rho' :
   def_funs B (fundefs_append B1 B2) rho rho' =
   def_funs B B1 rho (def_funs B B2 rho rho').
@@ -543,6 +543,48 @@ Proof.
     destruct (getlist ys rho) eqn:Heq'; try discriminate; eauto.
 Qed.
 
+Lemma In_getlist (xs : list var) (rho : env) :
+  (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
+  exists vs, getlist xs rho = Some vs. 
+Proof.                                            
+  intros H. induction xs. 
+  - eexists; simpl; eauto.
+  - edestruct IHxs. 
+    + intros x Hin. eapply H. now constructor 2. 
+    + edestruct H. now constructor. 
+      eexists. simpl. erewrite H1, H0. 
+      reflexivity. 
+Qed.
+
+Lemma getlist_nth_get (xs : list var) (vs : list val) rho (x : var) N :
+  getlist xs rho = Some vs ->
+  nthN xs N = Some x ->
+  exists v, nthN vs N = Some v /\ M.get x rho = Some v. 
+Proof.
+  revert vs N; induction xs; intros vs N Hget Hnth.
+  - inv Hnth. 
+  - simpl in Hget.
+    destruct (M.get a rho) eqn:Hget'; try discriminate.
+    destruct (getlist xs rho) eqn:Hgetlist'; try discriminate.
+    inv Hget. destruct N. 
+    + inv Hnth. eexists; simpl; eauto.
+    + edestruct IHxs as [v' [Hnth1 Hget1]]; eauto. 
+Qed.
+
+
+Lemma getlist_set_neq {A} xs x (v : A) rho :
+  ~ List.In x xs ->
+  getlist xs (M.set x v rho) = getlist xs rho. 
+Proof.
+  intros Hin.
+  revert rho. induction xs; intros rho.
+  - reflexivity.
+  - simpl. rewrite M.gso.
+    + rewrite IHxs. reflexivity.
+      intros Hin'. eapply Hin. now constructor 2.
+    + intros Heq; subst. eapply Hin. now constructor.
+Qed.
+
 Lemma findtag_In {A} (P : list (tag * A)) c e :
   findtag P c = Some e -> List.In (c, e) P.
 Proof.
@@ -551,6 +593,17 @@ Proof.
   destruct (M.elt_eq c' c); inv H1; try now constructor.
   constructor 2. apply IHp; eauto.
 Qed.
+
+Lemma nthN_In {A} (l : list A) n v :
+  nthN l n = Some v ->
+  List.In v l.
+Proof. 
+  revert n v. induction l; intros n v Hnth.
+  - inv Hnth.
+  - destruct n. inv Hnth.
+    now constructor.
+    constructor 2. eapply IHl. eauto. 
+Qed. 
 
 Lemma Forall2_nthN {A B} (R : A -> B -> Prop) l1 l2
       (n : N) (v1 : A):
@@ -629,6 +682,25 @@ Proof.
       inv Hset1; inv Hset2. inv Hall. inv Hin; try congruence.
       edestruct IHxs as [v1 [v2 [Hget1 [Hget2 HP]]]]; eauto.
       repeat eexists; eauto; rewrite M.gso; eauto.
+Qed.
+
+Lemma get_setlist_In_xs x xs vs rho rho' :
+  In var (FromList xs) x ->
+  setlist xs vs rho = Some rho' ->
+  exists v : val, M.get x rho' = Some v.
+Proof.
+  revert rho rho' vs. induction xs; intros rho rho' vs Hin Hset.
+  - rewrite FromList_nil in Hin. exfalso.
+    eapply not_In_Empty_set. eassumption. 
+  - rewrite FromList_cons in Hin.
+    destruct vs; try discriminate.    
+    simpl in Hset. destruct (setlist xs vs rho) eqn:Hsetlist; try discriminate.
+    inv Hset. inv Hin.
+    + inv H. eexists. rewrite M.gss. reflexivity.
+    + destruct (Coqlib.peq x a); subst.
+      * eexists. now rewrite M.gss.
+      * edestruct IHxs; eauto.
+        eexists. simpl. rewrite M.gso; eauto. 
 Qed.
 
 Lemma setlist_not_In (xs : list var) (vs : list val) (rho rho' : env) (x : var) : 

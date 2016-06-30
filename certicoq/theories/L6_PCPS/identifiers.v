@@ -16,6 +16,17 @@ Proof.
   right. intros Hc. inv Hc; eauto.
 Qed.
 
+Instance Decidable_FromList (l : list var) : Decidable (FromList l). 
+Proof. 
+  constructor. intros x. induction l. 
+  - right. intros H. inv H. 
+  - destruct (Coqlib.peq a x).
+    + subst. left. constructor. eauto.
+    + destruct IHl. left. now constructor 2.
+      right. intros Hc. eapply H. inv Hc; eauto.
+      congruence.
+Qed.
+
 (** * Function definitions *) 
 
 (** [name_in_fundefs B] is the set of the names of the functions in [B] *)
@@ -1038,6 +1049,22 @@ with unique_bindings_fundefs : fundefs -> Prop :=
       unique_bindings_fundefs (Fcons f tau ys e defs)
 | UBound_Fnil :
     unique_bindings_fundefs Fnil.
+
+(** Uniqueness of names in a block of functions *)
+Inductive unique_functions : fundefs -> Prop :=
+| Fnil_un :
+    unique_functions Fnil
+| Fcons_un :
+    forall f tau xs e B,
+      unique_functions B ->
+      ~ Ensembles.In _ (name_in_fundefs B) f ->
+      unique_functions (Fcons f tau xs e B).
+
+Definition fundefs_names_unique (e : exp) : Prop :=
+  forall B, funs_in_exp B e -> unique_functions B.
+
+Definition fundefs_names_unique_fundefs (B : fundefs) : Prop :=
+  forall B', funs_in_fundef B' B \/ B' = B -> unique_functions B'.
 
 Lemma unique_bindings_Ecase_l x P1 c e P2 :
   unique_bindings (Ecase x (P1 ++ ((c, e) :: P2))) ->

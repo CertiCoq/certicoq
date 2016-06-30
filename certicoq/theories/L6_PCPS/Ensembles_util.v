@@ -666,3 +666,26 @@ Proof.
   split; intros x H; eauto.
   inv H; eauto.
 Qed.
+
+Lemma Union_Included {A} S1 S2 S :
+  Included A S1 S ->
+  Included A S2 S ->
+  Included A (Union A S1 S2) S.
+Proof. 
+  intros H1 H2 x Hin; inv Hin; eauto.
+Qed.
+
+Lemma Singleton_Included {A} x S :
+  In A S x ->
+  Included A (Singleton A x) S.
+Proof. 
+  intros H x' Hin; inv Hin; eauto.
+Qed.
+
+Lemma Complement_Disjoint {A} S1 S2 :
+  Included A S1 S2 ->
+  Disjoint A (Complement _ S2) S1.
+Proof.   
+  intros Hin. constructor. intros x Hin'.
+  inv Hin'. eauto.
+Qed.

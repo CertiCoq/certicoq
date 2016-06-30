@@ -64,6 +64,7 @@ Fixpoint cc_approx_val (k : nat) (v1 v2 : val) {struct k} : Prop :=
           t1 = t2 /\ Forall2_aux vs1 vs2
         | Vint n1, Vint n2 => n1 = n2
         | Vother t1, Vother t2 => True
+        (* XXX : Question.  *)
         | Vobvs t1, Vobvs t2 => True
         | Vobservable t1 vs1, Vobservable t2 vs2 =>
           Forall2_aux vs1 vs2
@@ -365,6 +366,41 @@ Corollary cc_approx_env_setlist_l (rho1 rho2 rho1' rho2' : env) (k : nat)
   cc_approx_env k rho1' rho2'.
 Proof.
   intros. eapply cc_approx_env_P_setlist_l; eauto.
+Qed.
+
+Lemma cc_approx_env_P_set_not_in_P_r P k rho rho' x v :
+  cc_approx_env_P P k rho rho' ->
+  ~ In _ P x ->
+  cc_approx_env_P P k rho (M.set x v rho').
+Proof. 
+  intros Hcc Hnin y Py v' Hget.
+  edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
+  exists v''. rewrite M.gsspec.
+  destruct (Coqlib.peq y x); subst.
+  - contradiction.
+  - eauto.
+Qed.
+
+Lemma cc_approx_env_P_def_funs_not_In_P_l k rho1 rho2 S B B' :
+  Disjoint _ S (name_in_fundefs B') ->
+  cc_approx_env_P S k rho1 rho2 ->
+  cc_approx_env_P S k (def_funs B B' rho1 rho1) rho2.
+Proof.
+  intros Hd Hcc x HS v Hget. eapply Hcc; eauto. 
+  erewrite <- def_funs_neq. eassumption.  
+  intros Hc. eapply Hd; constructor; eauto.
+Qed.
+
+Lemma cc_approx_env_P_def_funs_not_In_P_r k rho1 rho2 S B B' :
+  Disjoint _ S (name_in_fundefs B') ->
+  cc_approx_env_P S k rho1 rho2 ->
+  cc_approx_env_P S k rho1 (def_funs B B' rho2 rho2).
+Proof.
+  intros Hd Hcc x HS v Hget.
+  edestruct Hcc as [v' [Hget' Hcc']]; eauto.
+  eexists; split; eauto.
+  rewrite def_funs_neq. eassumption.
+  intros Hc. eapply Hd; constructor; eauto.
 Qed.
 
 (** * Index Monotonicity Properties *)

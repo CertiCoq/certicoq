@@ -371,3 +371,16 @@ Proof using.
   apply translateVal_cps_cvt_val2.
   eapply Hind; eauto. ntwfauto.
 Qed.
+
+Require Import L4.expression.
+Require Import L4.L4_to_L4a.
+
+Definition L4_to_L5a (e:L4.expression.exp) : option cps :=
+  let l4a := L4.L4_to_L4a.L4_to_L4a e in
+  let l5 := simpleCPSAA.cps_cvt l4a in
+  translateCPS l5.
+  
+
+
+
+

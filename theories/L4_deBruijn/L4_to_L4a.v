@@ -3,11 +3,12 @@ Require Import L4.simpleCPSAA.
 
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
+(*
 Require Import SquiggleEq.list.
 Require Import SquiggleEq.LibTactics.
 Require Import SquiggleEq.tactics.
 Require Import SquiggleEq.lmap.
-
+*)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 
@@ -77,3 +78,21 @@ end.
 
 
 End VarsOf2Class.
+
+Require Import SquiggleEq.varImplZ.
+
+Require Import cps.
+
+Definition L4_to_L4a (e:expression.exp) : (@NTerm cps.var CoqL4GenericTermSig) :=
+  translate nil e.
+
+(* faster than [L4_to_L4a]. This one exploits the fact that variables are numbers 
+Fixpoint L4_to_L4a_fast (depth : positive (*1 => outside any binder *))
+(e:expression.exp) : NTerm :=
+match e with
+| Var_e n => vterm ((Npos depth) - (n+1))%N
+| _ => vterm xH
+end.
+*)
+
+

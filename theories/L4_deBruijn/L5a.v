@@ -37,6 +37,7 @@ with val_c : Type :=
   *)
 | Fix_c : list (NVar * val_c) -> val_c.
 
+Section Notations.
 Require Import ExtLib.Data.Monads.OptionMonad.
 
 (*
@@ -375,10 +376,57 @@ Qed.
 Require Import L4.expression.
 Require Import L4.L4_to_L4a.
 
-Definition L4_to_L5a (e:L4.expression.exp) : option cps :=
+Definition L4_to_L5a (e:L4.expression.exp) : option val_c :=
   let l4a := L4.L4_to_L4a.L4_to_L4a e in
   let l5 := simpleCPSAA.cps_cvt l4a in
-  translateCPS l5.
+  translateVal l5.
+
+
+End Notations.
+
+
+Require Import L4.L3_to_L4.
+Require Import Template.Template.
+Require Import Template.Ast.
+
+Section L1_to_L5a.
+(* definitions from Greg's email dated July 5th 3:56PM EST *)
+
+Let compile_L1_to_L4 := L3_to_L4.program_exp.
+Require Import L4.L4_to_L4a.
+Let compile_L1_to_L4a (e : Ast.program) :=
+    match compile_L1_to_L4 e with
+    | exceptionMonad.Exc s => exceptionMonad.Exc s
+    | exceptionMonad.Ret e => exceptionMonad.Ret (L4.L4_to_L4a.translate nil e)
+    end.
+
+Let compile_L1_to_cps (e : Ast.program)  :=
+    match compile_L1_to_L4a e with
+    | exceptionMonad.Exc s => exceptionMonad.Exc s
+    | exceptionMonad.Ret e => exceptionMonad.Ret (simpleCPSAA.cps_cvt e)
+    end.
+
+
+Definition compile_L1_to_L5a (e:Ast.program) : exception val_c:=
+    match compile_L1_to_cps e with
+    | exceptionMonad.Exc s => exceptionMonad.Exc s
+    | exceptionMonad.Ret e =>
+      match translateVal e with
+      | None => exceptionMonad.Exc "error in L5a.translateVal"
+      | Some e => exceptionMonad.Ret e
+      end
+    end.
+End L1_to_L5a.
+
+(*
+Quote Recursively Definition p0L1 := 0.
+Eval compute in compile_L1_to_L5a p0L1.
+(*
+     = Ret (Cont_c 5%positive (Ret_c (KVar_c 5%positive) (Con_c 0 [])))
+     : exception val_c
+*)
+*)
+
   
 
 

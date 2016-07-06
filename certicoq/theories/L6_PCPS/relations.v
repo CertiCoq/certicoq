@@ -7,6 +7,9 @@ Section Relations.
   (* TODO : abstract over exp ? *)
   
   Open Scope ctx_scope.
+
+  Definition compose {A} (R1 : relation A) (R2 : relation A) : relation A :=
+    fun x y => exists z, R1 x z /\ R2 z y.
   
   (** The compatible closure of R *) 
   Inductive compat_closure : relation exp :=

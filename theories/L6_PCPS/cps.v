@@ -11,7 +11,7 @@ Require Import Coq.Lists.List.
 Require Maps.
 Require Coq.funind.Recdef.
 Import Nnat.
-
+Require Import List_util.
 
 
 Require Import HashMap.
@@ -63,13 +63,6 @@ Definition prim := M.elt. (* primitive operators *)
    which is a consideration for programs that process large
    abstract syntax trees.
  *)
-
-Function nthN {A: Type} (al: list A) (n: N) : option A :=
-  match al, n with
-    | a::al', 0%N => Some a
-    | a::al', _ => nthN al' (n-1)%N
-    | _, _ => None
-  end.
 
 
 Fixpoint mapopt {A} (al: list (option A)) : option (list A) :=

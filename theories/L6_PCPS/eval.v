@@ -520,13 +520,13 @@ Section EVAL.
   
   (** * Compatibility Properties *)
 
-  Lemma preord_exp_const_compat k rho1 rho2 x tau t ys1 ys2 e1 e2 :
+  Lemma preord_exp_const_compat k rho1 rho2 x x' tau t ys1 ys2 e1 e2 :
     Forall2 (preord_var_env k rho1 rho2) ys1 ys2 ->
     (forall vs1 vs2 : list val,
        Forall2 (preord_val k) vs1 vs2 ->
        preord_exp k (e1, M.set x (Vconstr tau t vs1) rho1)
-                  (e2, M.set x (Vconstr tau t vs2) rho2)) ->
-    preord_exp k (Econstr x tau t ys1 e1, rho1) (Econstr x tau t ys2 e2, rho2).
+                  (e2, M.set x' (Vconstr tau t vs2) rho2)) ->
+    preord_exp k (Econstr x tau t ys1 e1, rho1) (Econstr x' tau t ys2 e2, rho2).
   Proof.
     intros Hall Hpre v1 c1 Hleq1 Hstep1. inv Hstep1.
     edestruct (preord_var_env_getlist rho1 rho2) as [vs2' [Hget' Hpre']];
@@ -535,13 +535,13 @@ Section EVAL.
     repeat eexists; eauto. econstructor; eauto.
   Qed.
 
-  Lemma preord_exp_proj_compat k rho1 rho2 x tau n y1 y2 e1 e2 :
+  Lemma preord_exp_proj_compat k rho1 rho2 x x' tau n y1 y2 e1 e2 :
     preord_var_env k rho1 rho2 y1 y2 ->
     (forall v1 v2,
        preord_val k v1 v2 -> 
        preord_exp k (e1, M.set x v1 rho1)
-                  (e2, M.set x v2 rho2)) ->
-    preord_exp k (Eproj x tau n y1 e1, rho1) (Eproj x tau n y2 e2, rho2).
+                  (e2, M.set x' v2 rho2)) ->
+    preord_exp k (Eproj x tau n y1 e1, rho1) (Eproj x' tau n y2 e2, rho2).
   Proof.
     intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
     edestruct Henv as [v' [Hget Hpre]]; eauto.
@@ -558,7 +558,7 @@ Section EVAL.
   Proof.
     intros H. induction H; eauto.
   Qed.    
-
+  
   Lemma preord_exp_app_compat k rho1 rho2 x1 x2 ys1 ys2 :
     preord_var_env k rho1 rho2 x1 x2 ->
     Forall2 (preord_var_env k rho1 rho2) ys1 ys2 ->
@@ -641,10 +641,10 @@ Section EVAL.
     repeat eexists; eauto. econstructor; eauto.
   Qed.
 
-  Lemma preord_exp_fun_compat k rho1 rho2 B e1 e2 :
+  Lemma preord_exp_fun_compat k rho1 rho2 B B' e1 e2 :
     preord_exp k (e1, def_funs B B rho1 rho1)
-               (e2, def_funs B B rho2 rho2) ->
-    preord_exp k (Efun B e1, rho1) (Efun B e2, rho2).
+               (e2, def_funs B' B' rho2 rho2) ->
+    preord_exp k (Efun B e1, rho1) (Efun B' e2, rho2).
   Proof.
     intros Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
     edestruct Hexp as [v2' [c2 [Hstepv2' Hprev2']]]; eauto.

@@ -1,8 +1,16 @@
 Require Import Coq.Lists.List Coq.Relations.Relations Coq.Classes.RelationClasses
-        Coq.omega.Omega.
+        Coq.omega.Omega Coq.Numbers.BinNums Coq.Structures.OrdersEx.
+
 Import ListNotations.
 
 Ltac inv H := inversion H; clear H; subst.
+
+Function nthN {A: Type} (al: list A) (n: N) : option A :=
+  match al, n with
+    | a::al', 0%N => Some a
+    | a::al', _ => nthN al' (n-1)%N
+    | _, _ => None
+  end.
 
 (** Asymmetric version of Forall2 *) 
 Inductive Forall2_asym {A} (R : relation A) : list A -> list A -> Prop :=
@@ -125,4 +133,19 @@ Proof.
   induction l; intros H; constructor.
   - apply H. constructor; eauto.
   - apply IHl. intros. apply H. constructor 2; eauto.
+Qed.
+
+Lemma In_nthN (A : Type) (l : list A) (v : A) :
+  List.In v l -> exists n, nthN l n = Some v .
+Proof.
+  intros Hin. induction l.
+  - inv Hin.
+  - inv Hin.
+    + exists 0%N. eauto.
+    + destruct IHl as [n Hnth].
+      eassumption. 
+      exists (n+1)%N. simpl. destruct (n + 1)%N eqn:Heq; eauto. 
+      zify. omega. 
+      rewrite <- Heq. rewrite N_as_OT.add_sub.
+      eassumption.
 Qed.

@@ -689,3 +689,13 @@ Proof.
   intros Hin. constructor. intros x Hin'.
   inv Hin'. eauto.
 Qed.
+
+Lemma Decidable_Same_set {A} (s1 s2 : Ensemble A) :
+  Same_set _ s1 s2 ->
+  Decidable s1 ->
+  Decidable s2.
+Proof.
+  intros Heq Hd. constructor. intros x. destruct Hd. destruct (Dec0 x).
+  left; now apply Heq.
+  right. intros Hc. apply H. now apply Heq.
+Qed.

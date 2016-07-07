@@ -71,56 +71,39 @@ Print P1L6su.
 Quote Recursively Definition P2L1 := (fun (x y:nat) => x).
 Definition P2L6 := Eval compute in compile_L1_to_L6 P2L1.
 Print P2L6.
-Require Import L4.L5a.
-Require Import L4.L4_to_L4a.
-Let compile_L1_to_L4a (e : Ast.program) :=
-    match compile_L1_to_L4 e with
-    | exceptionMonad.Exc s => exceptionMonad.Exc s
-    | exceptionMonad.Ret e => exceptionMonad.Ret (L4.L4_to_L4a.translate nil e)
-    end.
+Definition P2L6s := Eval compute in shrink_once_L6 P2L6.
+Print P2L6s.
+Definition P2L6su := Eval compute in uncurry_L6 P2L6s.
+Print P2L6su.
+Definition P2L6u := Eval compute in uncurry_L6 P2L6.
+Print P2L6u.
 
-Let compile_L1_to_cps (e : Ast.program)  :=
-    match compile_L1_to_L4a e with
-    | exceptionMonad.Exc s => exceptionMonad.Exc s
-    | exceptionMonad.Ret e => exceptionMonad.Ret (simpleCPSAA.cps_cvt e)
-    end.
+(* This example doesn't shrink correctly -- it produces unbound variables *)
+Definition P3 :=
+  (fun f => f 0%nat) (fun (x:nat) => x).
+Quote Recursively Definition P3L1 := P3.
+Definition P3L6 := Eval compute in compile_L1_to_L6 P3L1.
+Print P3L6.
+Definition P3L6s := Eval compute in shrink_once_L6 P3L6.
+Print P3L6s.
 
+Let ty_con := L5_to_L6.ty_con.
 
-Definition P2L4 := Eval compute in compile_L1_to_L4a P2L1.
-Print P2L4.
-Definition P2L5 := Eval compute in emap Halt_c (compile_L1_to_L5a P2L1).
-Print P2L5.
-Definition P2L6' := Eval compute in emap convert_top P2L5.
-Print P2L6'.
+Definition P4L6 :=
+  (Efun (Fcons 10 ty_con (3::nil)
+               (Efun (Fcons 5 ty_con (6::7::nil)
+                            (Eapp 6 nil) Fnil)
+                     (Eapp 3 (5::nil))) Fnil)
+        (Eapp 2 (10::nil)))%positive.
 
-Definition P2L5' :=
-(Halt_c
-     (Cont_c 5%positive
-        (Ret_c (KVar_c 5%positive)
-           (Lam_c 4%positive 5%positive
-              (Ret_c
-                 (Cont_c 5%positive
-                    (Ret_c (KVar_c 5%positive)
-                       (Lam_c 10%positive 5%positive
-                          (Ret_c
-                             (Cont_c 5%positive
-                                (Ret_c (KVar_c 5%positive) (Var_c 4%positive)))
-                             (KVar_c 5%positive))))) 
-                 (KVar_c 5%positive)))))).
-Eval compute in convert_top P2L5'.
-Eval compute in convert P2L5' s_empty s_empty 3%positive.
-Eval compute in convert_v (Cont_c 5%positive
-        (Ret_c (KVar_c 5%positive)
-           (Lam_c 4%positive 5%positive
-              (Ret_c
-                 (Cont_c 5%positive
-                    (Ret_c (KVar_c 5%positive)
-                       (Lam_c 10%positive 5%positive
-                          (Ret_c
-                             (Cont_c 5%positive
-                                (Ret_c (KVar_c 5%positive) (Var_c 4%positive)))
-                             (KVar_c 5%positive))))) 
-                 (KVar_c 5%positive))))) s_empty s_empty 3%positive.
+Definition P4L6u := Eval compute in uncurry P4L6.
+Print P4L6u.
+
+Definition P5 :=
+  (fun x => match x with | 0 => 0 | S n => n end)%nat.
+Quote Recursively Definition P5L1 := P5.
+Definition P5L6 := Eval compute in compile_L1_to_L6 P5L1.
+Print P5L6.
 
 (*
 Definition p0L5 := Eval compute in compile p0L1.

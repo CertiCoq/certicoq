@@ -2,6 +2,7 @@ Require Import Coq.ZArith.ZArith.
 Require Import Coq.ZArith.Znumtheory.
 Require Import ExtLib.Data.List.
 Require Import ExtLib.Data.Bool.
+Require Import String.
 Require Maps.
 Require Coq.funind.Recdef.
 Import Nnat.
@@ -24,6 +25,7 @@ Require Export CPS.cpseval.
 Require Import cps.
 Require Import cps_util.
 Require Import shrink_cps.
+Require Import cps_show.
 
 Require Import L5_to_L6 closure_conversion uncurry.
 
@@ -36,6 +38,12 @@ Definition emap {A B} (f:A->B) (en: exceptionMonad.exception A) :
   match en with
   | exceptionMonad.Exc s => exceptionMonad.Exc s
   | exceptionMonad.Ret e => exceptionMonad.Ret (f e)
+  end.
+
+Definition show_exn (x : exceptionMonad.exception exp) : string :=
+  match x with
+  | exceptionMonad.Exc s => s
+  | exceptionMonad.Ret e => show_exp e
   end.
 
 Definition compile_L1_to_L6 (e:Ast.program) :=
@@ -61,12 +69,12 @@ Eval compute in compile_uncurry p0L1.
 Quote Recursively Definition P1L1 := (fun x:nat => x).
 Definition P1L6 := Eval compute in compile_L1_to_L6 P1L1.
 Definition P1L6s := Eval compute in shrink_once_L6 P1L6.
-Print P1L6.
-Print P1L6s.
+Eval compute in show_exn P1L6.
+Eval compute in show_exn P1L6s.
 Definition P1L6u := Eval compute in uncurry_L6 P1L6.
-Print P1L6u.
+Eval compute in show_exn P1L6u.
 Definition P1L6su := Eval compute in uncurry_L6 P1L6s.
-Print P1L6su.
+Eval compute in show_exn P1L6su.
 
 Quote Recursively Definition P2L1 := (fun (x y:nat) => x).
 Definition P2L6 := Eval compute in compile_L1_to_L6 P2L1.

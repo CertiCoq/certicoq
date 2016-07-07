@@ -1,3 +1,14 @@
+(** Implements an uncurrying pass for the L6 CPS language, based on the same
+    approach used in SML/NJ.  The following issues need to be addressed:
+
+    * This doesn't do all of the uncurrying at once -- you have to iterate until
+      there's no change.  But...
+
+    * We need to tag the eta-expansions so that they don't get uncurried again, and
+
+    * We need to tag the uncurried function so that it doesn't get inlined into
+      the eta expansion (thereby undoing the uncurrying.)
+*)
 Require Import CpdtTactics.
 Require Import cps.
 Require Import ExtLib.Structures.Monad.
@@ -13,49 +24,47 @@ Require Import closure_conversion.  (* for max_var *)
 Section UNCURRY.
   Import MonadNotation.
 
+  Definition eq_var := Pos.eqb.
+
+  (** We need to determine whether variables occur free in some terms.  We
+      over-approximate by determining whether the variable occurs at all. *)
+  
   (* Returns true iff [k] is in [xs]. *)
-  Fixpoint free_in_vars (k:var) (xs:list var) : bool :=
+  Fixpoint occurs_in_vars (k:var) (xs:list var) : bool :=
     match xs with
     | nil => false
-    | x::xs1 => rel_dec k x || free_in_vars k xs1
+    | x::xs1 => eq_var k x || occurs_in_vars k xs1
     end.
 
-  (* Returns true iff [k] occurs free within the expression [e] *)
-  Fixpoint free_in_exp (k:var) (e:exp) : bool :=
+  (* Returns true iff [k] occurs (at all) within the expression [e] *)
+  Fixpoint occurs_in_exp (k:var) (e:exp) : bool :=
     match e with
     | Econstr z _ _ xs e1 =>
-      (negb (rel_dec z k)) && (free_in_vars k xs || free_in_exp k e1)
+      eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     | Ecase x arms =>
-      rel_dec k x ||
-              (fix free_in_arms (arms: list (tag * exp)) : bool :=
+      eq_var k x ||
+              (fix occurs_in_arms (arms: list (tag * exp)) : bool :=
                  match arms with
                  | nil => false
                  | p::arms1 => match p with
-                               | (_,e) => free_in_exp k e || free_in_arms arms1
+                               | (_,e) => occurs_in_exp k e || occurs_in_arms arms1
                                end
                  end) arms
     | Eproj z _ _ x e1 =>
-      (negb (rel_dec z k)) && (rel_dec k x || free_in_exp k e1)
+      eq_var z k || eq_var k x || occurs_in_exp k e1
     | Efun fds e =>
-      (negb (bound_in_fundefs k fds)) &&
-      (free_in_fundefs k fds || free_in_exp k e)
-    | Eapp x xs => rel_dec k x || free_in_vars k xs
+      occurs_in_fundefs k fds || occurs_in_exp k e
+    | Eapp x xs => eq_var k x || occurs_in_vars k xs
     | Eprim z _ _ xs e1 =>
-      (negb (rel_dec z k)) && (free_in_vars k xs || free_in_exp k e1)
+      eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     end
   (* Returns true iff [k] occurs within the function definitions [fds] *)
-  with free_in_fundefs (k:var) (fds:fundefs) : bool :=
+  with occurs_in_fundefs (k:var) (fds:fundefs) : bool :=
          match fds with
          | Fnil => false
          | Fcons z _ zs e fds1 =>
-           (negb (rel_dec z k || free_in_vars k zs)) &&
-           (free_in_exp k e || free_in_fundefs k fds1)
-         end
-  (* Returns true iff [k] is one of the function names in a list of functions *)
-  with bound_in_fundefs (k:var) (fds:fundefs) : bool :=
-         match fds with
-         | Fnil => false
-         | Fcons z _ _ _ fds1 => rel_dec z k || bound_in_fundefs k fds1
+           eq_var z k || occurs_in_vars k zs || occurs_in_exp k e ||
+                   occurs_in_fundefs k fds1
          end.
 
   (* The state for this includes a "next" var for gensyming a fresh variable
@@ -106,7 +115,11 @@ Section UNCURRY.
      One difference with SML/NJ is that this won't get all of the uncurrying
      done in a single pass.  In particular, if f gets uncurried, but the 
      resulting function can be further uncurried, we won't pick this up.  So
-     really, we should iterate this until there's no change.  
+     really, we should iterate this until there's no change.  But, doing so
+     will try to uncurry f yet again.  So we need to either fix this so that
+     we tag f as something that should no longer be uncurried, or else 
+     do all of the uncurrying in one pass.  The latter would be preferable
+     but makes a structural termination argument harder.  
   *)
   Fixpoint uncurry_exp (e:exp) : uncurryM exp :=
     match e with
@@ -149,9 +162,9 @@ Section UNCURRY.
            | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
                            (Eapp fk' (g'::nil)) =>
              ge' <- uncurry_exp ge ;;
-             if rel_dec fk fk' && rel_dec g g' &&
-                        negb (free_in_exp fk ge) &&
-                        negb (free_in_exp g ge) then
+             if eq_var fk fk' && eq_var g g' &&
+                        negb (occurs_in_exp fk ge) &&
+                        negb (occurs_in_exp g ge) then
                gvs' <- copyVars gvs ;;
                fvs' <- copyVars fvs ;;
                fk'' <- copyVar fk ;;

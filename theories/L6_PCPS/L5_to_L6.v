@@ -109,7 +109,8 @@ Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (n:var) (*  {struct e } *): exp 
                       let '(ctx_v, vn, n'') := convert_v v sv sk n' in
                        (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp kn (vn::nil)), n'')
        | Call_c f k v =>
-         (Eapp (get_s f sv) ((get_s v sv)::(get_s k sk)::nil) , n)
+         (* flipping around so the continuation comes first *)
+         (Eapp (get_s f sv) ((get_s k sk)::(get_s v sv)::nil) , n)
          
        | Match_c v bl =>
          let fix convert_branches (bl:list  ((dcon * nat) * ((list NVar)* cps))) (sv: s_map) (sk:s_map) (r:var) (n:var)  (* { struct bl } *): (list (tag * exp) * var)  :=
@@ -145,7 +146,8 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (n:var) (* { struct v }  *): (e
          | Var_c m => (Hole_c, get_s m sv , n)   (* {| ( Econstr_c n ty var_tag ((nth (N.to_nat m) sv (1%positive))::nil)  Hole_c, Pos.succ n  ) |} *)
          | KVar_c m => (Hole_c, get_s m sk, n) (* {| ( Econstr_c n ty kvar_tag ((nth (N.to_nat m) sk (1%positive))::nil) Hole_c, Pos.succ n) |} *)
          | Lam_c x k e => let (e', n') := convert e (M.set x n sv) (M.set k (Pos.succ n) sk) (Pos.add n (2%positive)) in
-                          let fds := Fcons n' ty_fun (n::(Pos.succ n)::nil) e' Fnil in
+                          (* flipping around so the continuation comes first *)
+                          let fds := Fcons n' ty_fun ((Pos.succ n)::n::nil) e' Fnil in
                           (Efun1_c fds Hole_c, n' , (Pos.succ n'))
          | Cont_c k e => let (e', n') := convert e sv (M.set k n sk) (Pos.succ n) in
                          let fds := Fcons n' ty_con (n::nil) e' Fnil in

@@ -144,7 +144,7 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (n:var) (* { struct v }  *): (e
        match v with
          | Var_c m => (Hole_c, get_s m sv , n)   (* {| ( Econstr_c n ty var_tag ((nth (N.to_nat m) sv (1%positive))::nil)  Hole_c, Pos.succ n  ) |} *)
          | KVar_c m => (Hole_c, get_s m sk, n) (* {| ( Econstr_c n ty kvar_tag ((nth (N.to_nat m) sk (1%positive))::nil) Hole_c, Pos.succ n) |} *)
-         | Lam_c x k e => let (e', n') := convert e (M.set x n sk) (M.set k (Pos.succ n) sk) (Pos.add n (2%positive)) in
+         | Lam_c x k e => let (e', n') := convert e (M.set x n sv) (M.set k (Pos.succ n) sk) (Pos.add n (2%positive)) in
                           let fds := Fcons n' ty_fun (n::(Pos.succ n)::nil) e' Fnil in
                           (Efun1_c fds Hole_c, n' , (Pos.succ n'))
          | Cont_c k e => let (e', n') := convert e sv (M.set k n sk) (Pos.succ n) in

@@ -19,48 +19,131 @@ Add LoadPath "../L2_typeStrippedL1" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 Add LoadPath "../L4_deBruijn" as L4.
 Add LoadPath "../L5_CPS" as CPS.
-Require Export CPS.cpseval. 
+Require Export CPS.cpseval.
 
 Require Import cps.
 Require Import cps_util.
 Require Import shrink_cps.
 
-Require Import L5_to_L6 closure_conversion.
+Require Import L5_to_L6 closure_conversion uncurry.
 
+Definition compile_L1_to_L4 := L3_to_L4.program_exp.
 
-Definition compile_to_L6 (ee: exceptionMonad.exception cps) : option exp :=
-  match ee with
-    | exceptionMonad.Ret e =>
-      Some (convert_top 1%positive 1%positive 1%positive e)
-    | _ => None
+Check L5a.compile_L1_to_L5a.
+
+Definition emap {A B} (f:A->B) (en: exceptionMonad.exception A) :
+  exceptionMonad.exception B :=
+  match en with
+  | exceptionMonad.Exc s => exceptionMonad.Exc s
+  | exceptionMonad.Ret e => exceptionMonad.Ret (f e)
   end.
 
-Print exceptionMonad.
-
-Definition shrink_once_L6 (oe: option exp): option exp :=
-  match oe with
-    | Some e => Some (shrink_top e)
-    | None => None
-  end.
-
-Definition closure_convert_L6 (oe: option exp): option exp :=
-  match oe with
-    | Some e => Some (closure_conversion e)
-    | None => None
-  end.
-
+Definition compile_L1_to_L6 (e:Ast.program) :=
+    match L5a.compile_L1_to_L5a e with
+    | exceptionMonad.Exc s => exceptionMonad.Exc s
+    | exceptionMonad.Ret e => exceptionMonad.Ret (convert_top (L5a.Halt_c e))
+    end.
 
 Quote Recursively Definition p0L1 := 0%nat.
+Eval compute in compile_L1_to_L6 p0L1.
+
+Definition uncurry_L6 := emap (fun x => match uncurry x with
+                                        | None => x
+                                        | Some y => y
+                                        end).
+Definition shrink_once_L6 := emap shrink_top.
+Definition closure_convert_L6 := emap closure_conversion.
+Definition compile_uncurry (e:Ast.program) :=
+  uncurry_L6 (compile_L1_to_L6 e).
+
+Eval compute in compile_uncurry p0L1.
+
+Quote Recursively Definition P1L1 := (fun x:nat => x).
+Definition P1L6 := Eval compute in compile_L1_to_L6 P1L1.
+Definition P1L6s := Eval compute in shrink_once_L6 P1L6.
+Print P1L6.
+Print P1L6s.
+Definition P1L6u := Eval compute in uncurry_L6 P1L6.
+Print P1L6u.
+Definition P1L6su := Eval compute in uncurry_L6 P1L6s.
+Print P1L6su.
+
+Quote Recursively Definition P2L1 := (fun (x y:nat) => x).
+Definition P2L6 := Eval compute in compile_L1_to_L6 P2L1.
+Print P2L6.
+Require Import L4.L5a.
+Require Import L4.L4_to_L4a.
+Let compile_L1_to_L4a (e : Ast.program) :=
+    match compile_L1_to_L4 e with
+    | exceptionMonad.Exc s => exceptionMonad.Exc s
+    | exceptionMonad.Ret e => exceptionMonad.Ret (L4.L4_to_L4a.translate nil e)
+    end.
+
+Let compile_L1_to_cps (e : Ast.program)  :=
+    match compile_L1_to_L4a e with
+    | exceptionMonad.Exc s => exceptionMonad.Exc s
+    | exceptionMonad.Ret e => exceptionMonad.Ret (simpleCPSAA.cps_cvt e)
+    end.
+
+
+Definition P2L4 := Eval compute in compile_L1_to_L4a P2L1.
+Print P2L4.
+Definition P2L5 := Eval compute in emap Halt_c (compile_L1_to_L5a P2L1).
+Print P2L5.
+Definition P2L6' := Eval compute in emap convert_top P2L5.
+Print P2L6'.
+
+Definition P2L5' :=
+(Halt_c
+     (Cont_c 5%positive
+        (Ret_c (KVar_c 5%positive)
+           (Lam_c 4%positive 5%positive
+              (Ret_c
+                 (Cont_c 5%positive
+                    (Ret_c (KVar_c 5%positive)
+                       (Lam_c 10%positive 5%positive
+                          (Ret_c
+                             (Cont_c 5%positive
+                                (Ret_c (KVar_c 5%positive) (Var_c 4%positive)))
+                             (KVar_c 5%positive))))) 
+                 (KVar_c 5%positive)))))).
+Eval compute in convert_top P2L5'.
+Eval compute in convert P2L5' s_empty s_empty 3%positive.
+Eval compute in convert_v (Cont_c 5%positive
+        (Ret_c (KVar_c 5%positive)
+           (Lam_c 4%positive 5%positive
+              (Ret_c
+                 (Cont_c 5%positive
+                    (Ret_c (KVar_c 5%positive)
+                       (Lam_c 10%positive 5%positive
+                          (Ret_c
+                             (Cont_c 5%positive
+                                (Ret_c (KVar_c 5%positive) (Var_c 4%positive)))
+                             (KVar_c 5%positive))))) 
+                 (KVar_c 5%positive))))) s_empty s_empty 3%positive.
+
+(*
 Definition p0L5 := Eval compute in compile p0L1.
+Print p0L5.
+Check compile.
+Check (compile : Ast.program -> exceptionMonad.exception cps).
 Definition p0L6 := compile_to_L6 p0L5.
 Definition p0L6s := Eval compute in shrink_once_L6 p0L6.
 Definition p0L6scc := Eval compute in closure_convert_L6 p0L6.
 Print p0L6s.
+*)
 (* Print p0L6scc. *)
 
 Definition sabry (x:nat): (nat -> nat) :=
   fun (y:nat) => x.
 
+Quote Recursively Definition pSabryL1 := sabry.
+Definition pSabryL6 := Eval compute in compile_L1_to_L6 pSabryL1.
+Print pSabryL6.
+Definition pSabryL6u := Eval compute in compile_uncurry pSabryL1.
+Print pSabryL6u.
+Definition pSabryL6s := Eval compute in shrink_once_L6 pSabryL6u.
+Print pSabryL6s.
 Definition feil:nat := sabry (0%nat) (1%nat).
 
 Quote Recursively Definition pFeilL1 := feil.

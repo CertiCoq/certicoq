@@ -1,4 +1,5 @@
-Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
+Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad
+        Coq.Classes.Morphisms.
 Import MonadNotation.
 
 Definition triple {A S} (pre : S -> Prop) (e : state S A)
@@ -9,6 +10,69 @@ Definition triple {A S} (pre : S -> Prop) (e : state S A)
 
 Notation "{{ p }} e {{ q }}" :=
   (triple p e q) (at level 90, e at next level).
+
+Require Import alpha_conv.
+
+(** Extensional equality for computations in the state monad *) 
+Definition st_eq {A S} (s1 s2 : state S A) := f_eq (runState s1) (runState s2).
+
+Instance triple_Proper {A S} : Proper (Logic.eq ==> st_eq ==> Logic.eq ==> iff) (@triple A S).
+Proof.
+  intros P1 P2 Heq1 m1 m2 Hfeq P3 P4 Heq2; subst; split; intros H.
+  - intros s HP2. rewrite <- Hfeq. eapply H. eauto.
+  - intros s HP2. rewrite  Hfeq. eapply H. eauto.
+Qed.
+
+Instance bind_Proper_l {A B S} : Proper (st_eq ==> Logic.eq ==> st_eq)
+                                        (@bind (state S) (Monad_state S) A B).
+Proof. 
+  intros m1 m2 Hfeq f1 f2 Heq m; subst.
+  unfold bind, Monad_state. simpl. rewrite Hfeq. reflexivity.
+Qed.
+
+Instance bind_Proper_r {A B S} : Proper (Logic.eq ==> (fun f1 f2 => forall x, st_eq (f1 x) (f2 x)) ==> st_eq)
+                                        (@bind (state S) (Monad_state S) A B).
+Proof. 
+  intros m1 m2 Hfeq f1 f2 Heq m; subst.
+  unfold bind, Monad_state. simpl.
+  destruct (runState m2 m). rewrite Heq. reflexivity.
+Qed.
+
+Instance st_eq_Proper_l {A S} : Proper (st_eq ==> Logic.eq ==> iff) (@st_eq A S).
+Proof. 
+  intros m1 m2 Heq1 m3 m4 Heq2; subst.
+  split; intros Heq s. now rewrite <- Heq1, Heq. now rewrite Heq1, Heq. 
+Qed.
+
+Instance st_eq_Proper_r {A S} : Proper (Logic.eq ==> st_eq ==> iff) (@st_eq A S).
+Proof. 
+  intros m1 m2 Heq1 m3 m4 Heq2; subst.
+  split; intros Heq s. now rewrite <- Heq2, Heq. now rewrite Heq2, Heq. 
+Qed.
+
+(** * Monad Laws *)
+
+Lemma left_id {A B S} (x : A) (f : A -> state S B) :
+  st_eq (bind (ret x) f) (f x).
+Proof.
+  intros m1. reflexivity.
+Qed.
+
+Lemma right_id {A S} (m : state S A) :
+  st_eq (bind m ret) m.
+Proof.
+  intros m1. unfold bind, ret, Monad_state. simpl.
+  destruct (runState m m1). reflexivity.
+Qed.
+
+Lemma assoc {A B C S} (m : state S A) (f : A -> state S B)  (g : B -> state S C) :
+  st_eq (bind (bind m f) g) (bind m (fun x => bind (f x) g)).
+Proof.
+  intros m1. unfold bind, ret, Monad_state. simpl.
+  destruct (runState m m1). reflexivity.
+Qed.
+
+(** * Lemmas about monadic combinators *)
 
 Lemma return_triple {A S} (x : A) (Pre : S -> Prop) (Post : S -> A -> S -> Prop) :
   (forall i, Pre i -> Post i x i) ->
@@ -29,6 +93,26 @@ Proof.
   destruct (runState m i) eqn:Heq. eapply H2.
   specialize (H1 i). rewrite Heq in H1. eapply H1; eauto.
 Qed.
+
+Lemma get_triple {S} :
+  {{ fun (i : S) => True }}
+    get
+  {{ fun (i : S) (x : S) (i' : S) =>
+       x = i /\ i = i' }}.
+Proof.
+  unfold triple; intros. simpl. eauto.
+Qed.
+
+Lemma put_triple {S} x :
+  {{ fun (i : S) => True }}
+    put x
+  {{ fun (_ : S) (_ : unit) (i' : S) =>
+       x = i' }}.
+Proof.
+  unfold triple; intros. simpl. eauto.
+Qed.
+
+(** * Usefull lemmas about triples *)
 
 Lemma pre_strenghtening {A S} (P P' : S -> Prop) (Q : S -> A -> S -> Prop) e :  
   (forall i, P' i -> P i) ->
@@ -118,22 +202,5 @@ Proof.
   intros; eauto.
 Qed.
 
-Lemma get_triple {S} :
-  {{ fun (i : S) => True }}
-    get
-  {{ fun (i : S) (x : S) (i' : S) =>
-       x = i /\ i = i' }}.
-Proof.
-  unfold triple; intros. simpl. eauto.
-Qed.
-
-Lemma put_triple {S} x :
-  {{ fun (i : S) => True }}
-    put x
-  {{ fun (_ : S) (_ : unit) (i' : S) =>
-       x = i' }}.
-Proof.
-  unfold triple; intros. simpl. eauto.
-Qed.
 
 Opaque triple bind ret.

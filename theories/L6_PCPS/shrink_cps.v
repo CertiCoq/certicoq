@@ -720,7 +720,7 @@ Qed.
                | Some yn =>
                  let yn' := apply_r sig yn in
                  let count' := M.set y' ((get_c y' count) - 1)%nat count in
-                 let count'' := M.set v 0%nat (M.set yn' (get_c v count + get_c yn' count)%nat count) in
+                 let count'' := M.set v 0%nat (M.set yn' (get_c v count + get_c yn' count)%nat count') in
                  contract (M.set v yn' sig) count'' (e, sub, im )
                | None =>
                  match contract sig count (e, sub, im ) with
@@ -748,7 +748,7 @@ Qed.
                 | Some k =>
                   (* decrease count of each (sig e') other than k *)
                   let count' := dec_census_case sig cl g count in
-                  (* recursive call to contract (will most likely) imine the definition of (sig k) *)
+                  (* recursive call to contract (will most likely) inline the definition of (sig k) *)
                   contract sig count' (k, sub, im)
                 | None =>
                   (* fold over case body *)

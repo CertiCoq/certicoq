@@ -79,9 +79,10 @@ Inductive Closure_conversion :
   list var -> (* The free variables - needs to be ordered *)
   exp -> (* Before cc *)
   exp -> (* After cc *)
+  exp_ctx -> (* The context that the output expression should be put in *)
   Prop :=
 | CC_Econstr :
-    forall Scope Funs Γ FVs S' S x ys ys' C tau tau' t e e',
+    forall Scope Funs Γ FVs S' S x ys ys' C C' tau tau' t e e',
       (* Variables for projected vars should not shadow the variables in
          scope, i.e. Scope U FV U { Γ } *)
       Disjoint _ S (Union _ Scope
@@ -90,9 +91,9 @@ Inductive Closure_conversion :
       project_vars Scope Funs Γ FVs S ys ys' C S' ->
       (* We do not care about ys'. Should never be accessed again so do not
          add them aτ the current scope *)
-      Closure_conversion (Union _ (Singleton _ x) Scope) Funs Γ FVs e e' ->
+      Closure_conversion (Union _ (Singleton _ x) Scope) Funs Γ FVs e e' C' ->
       Closure_conversion Scope Funs Γ FVs (Econstr x tau t ys e)
-                         (C |[ Econstr x tau' t ys' e' ]|)
+                         (Econstr x tau' t ys' (C' |[ e' ]|)) C
 | CC_Ecase :
     forall Scope Funs Γ FVs x x' C S S' pats pats',
       Disjoint _ S (Union _ Scope
@@ -101,20 +102,22 @@ Inductive Closure_conversion :
       project_var Scope Funs Γ FVs S x x' C S' ->
       Forall2 (fun (pat pat' : tag * exp) =>
                  (fst pat) = (fst pat') /\
-                 Closure_conversion Scope Funs Γ FVs (snd pat) (snd pat'))
+                 exists C' e',
+                   snd pat' = C' |[ e' ]| /\
+                   Closure_conversion Scope Funs Γ FVs (snd pat) e' C')
               pats pats' ->
-      Closure_conversion Scope Funs Γ FVs (Ecase x pats) (C |[ Ecase x' pats']|)
+      Closure_conversion Scope Funs Γ FVs (Ecase x pats) (Ecase x' pats') C
 | CC_Eproj :
-    forall Scope Funs Γ FVs S S' x y y' C tau tau' N e e',
+    forall Scope Funs Γ FVs S S' x y y' C C' tau tau' N e e',
       Disjoint _ S (Union _ Scope
                           (Union _ Funs
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_var Scope Funs Γ FVs S y y' C S' ->
-      Closure_conversion (Union _ (Singleton _ x) Scope) Funs Γ FVs e e' ->
+      Closure_conversion (Union _ (Singleton _ x) Scope) Funs Γ FVs e e' C' ->
       Closure_conversion Scope Funs Γ FVs (Eproj x tau N y e)
-                         (C |[ Eproj x tau' N y' e' ]|)
+                         (Eproj x tau' N y' (C' |[ e' ]|)) C
 | CC_Efun :
-    forall Scope Funs Γ Γ' FVs FVs' FVs'' B B' e e' C C' S S' tau t,
+    forall Scope Funs Γ Γ' FVs FVs' FVs'' B B' e e' C C' Ce S S' tau t,
       (* The environment contains all the variables that are free in B *)
       Same_set _ (occurs_free_fundefs B) (FromList FVs') ->
       (* Γ' is the variable that will hold the record of the environment *)
@@ -123,14 +126,14 @@ Inductive Closure_conversion :
                            (Union _ Funs
                                   (Union _ (FromList FVs) (Singleton _ Γ))))) Γ' ->
       Closure_conversion_fundefs (name_in_fundefs B) FVs' B B' ->
-      Closure_conversion (Union _ (name_in_fundefs B) Scope) Funs Γ FVs e e' ->
+      Closure_conversion (Union _ (name_in_fundefs B) Scope) Funs Γ FVs e e' Ce  ->
       make_closures B Γ' C ->
       Disjoint _ S (Union _ Scope
                           (Union _ Funs
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_vars Scope Funs Γ FVs S FVs' FVs'' C' S' ->
       Closure_conversion Scope Funs Γ FVs (Efun B e)
-                         (C' |[ Econstr Γ' tau t FVs'' (Efun B' (C |[ e' ]|)) ]|)
+                         (Econstr Γ' tau t FVs'' (Efun B' (C |[ Ce |[ e' ]| ]|))) C'
 | CC_Eapp :
     forall Scope Funs Γ FVs f f' f'' env' ys ys' C S S' tau tau',
       Disjoint _ S (Union _ Scope
@@ -145,18 +148,18 @@ Inductive Closure_conversion :
          variables that where used in the projections *)
       In _ S' f'' -> In _ S' env' -> f'' <> env' ->
       Closure_conversion Scope Funs Γ FVs (Eapp f ys)
-                         (C |[ Eproj f'' tau 0%N f'
-                                     (Eproj env' tau' 1%N f'
-                                            (Eapp f'' (env' :: ys'))) ]| )
+                         (Eproj f'' tau 0%N f'
+                                (Eproj env' tau' 1%N f'
+                                       (Eapp f'' (env' :: ys')))) C
 | CC_Eprim :
-    forall Scope Funs Γ FVs S S' x ys ys' C tau tau' f e e',
+    forall Scope Funs Γ FVs S S' x ys ys' C C' tau tau' f e e',
       Disjoint _ S (Union _ Scope
                           (Union _ Funs
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_vars Scope Funs Γ FVs S ys ys' C S' ->
-      Closure_conversion (Union _ (Singleton _ x) Scope) Funs Γ FVs e e' ->
+      Closure_conversion (Union _ (Singleton _ x) Scope) Funs Γ FVs e e' C' ->
       Closure_conversion Scope Funs Γ FVs (Eprim x tau f ys e)
-                         (C |[ Eprim x tau' f ys' e' ]|)
+                         (Eprim x tau' f ys' (C' |[ e' ]|)) C
 with Closure_conversion_fundefs :
   Ensemble var -> (* The function names in the current block *)
   list var -> (* The environment *)
@@ -164,23 +167,31 @@ with Closure_conversion_fundefs :
   fundefs -> (* After cc *)
   Prop :=
 | CC_Fcons :
-    forall Funs Γ' FVs f tau tau' ys e e' defs defs',
+    forall Funs Γ' FVs f tau tau' ys e e' C defs defs',
       (* The environment binding should not shadow the current scope
          (i.e. the names of the mut. rec. functions and the other arguments) *)
       ~ In _ (Union _ Funs (Union _ (FromList ys) (bound_var e))) Γ' ->
       Closure_conversion_fundefs Funs FVs defs defs' ->
-      Closure_conversion (FromList ys) Funs Γ' FVs e e' ->
+      Closure_conversion (FromList ys) Funs Γ' FVs e e' C ->
       Closure_conversion_fundefs Funs FVs (Fcons f tau ys e defs )
-                                 (Fcons f tau' (Γ' :: ys) e' defs')
+                                 (Fcons f tau' (Γ' :: ys) (C |[ e' ]|) defs')
 | CC_Fnil :
     forall Funs FVs,
       Closure_conversion_fundefs Funs FVs Fnil Fnil.
 
 
+(** Pair of contexts that preserves α-equivalence *)
+Definition Alpha_conv_ctx C C' f :=
+  forall e e',
+    Alpha_conv e e' f ->
+    Alpha_conv (C |[ e]|) (C' |[ e']|) f.
+
 Definition Closure_conversion_alpha (Scope Funs : Ensemble var) (Γ : var)
-           (FVs : list var) sbst
+           (FVs : list var) (C : exp_ctx) sbst
 : relation exp  :=
-  relations.compose (Closure_conversion Scope Funs Γ FVs) (fun e e' => Alpha_conv e e' sbst).
+  fun e e' =>
+    exists e'' C'', Closure_conversion Scope Funs Γ FVs e e'' C'' /\
+               Alpha_conv_ctx C'' C sbst /\ Alpha_conv e'' e' sbst.
 
 Definition Closure_conversion_fundefs_alpha (Funs : Ensemble var) (FVs : list var) sbst
 : relation fundefs  :=
@@ -430,20 +441,29 @@ Section CC.
 
   (* Todo : Fix argument type bug *)
   Fixpoint exp_closure_conv (e : exp) (mapfv : VarInfoMap)
-           (Γ : var) : ccstate exp := 
+           (Γ : var) : ccstate (exp * (exp -> exp)) := 
     match e with
       | Econstr x typ c ys e' =>
         t1 <- get_vars ys mapfv Γ ;;
         let '(ys', f) := t1 in
-        e'' <- exp_closure_conv e' (Maps.PTree.set x (BoundVar typ) mapfv) Γ ;;
-        ret (f (Econstr x typ c ys' e''))
+        ef <- exp_closure_conv e' (Maps.PTree.set x (BoundVar typ) mapfv) Γ ;;
+        ret (Econstr x typ c ys' ((snd ef) (fst ef)), f)
       | Ecase x pats =>
+        pats' <-
+        (fix mapM_cc l :=
+         match l with
+           | [] => ret []
+           | (y, e) :: xs =>
+             ef <- exp_closure_conv e mapfv Γ ;;
+             xs' <- mapM_cc xs ;;
+             ret ((y, ((snd ef) (fst ef))) :: xs')
+         end) pats;;
         t1 <- get_var x mapfv Γ ;;
-        let pats_st := List.map (fun (p : tag * exp) =>
-                                  let (t, e) := p in
-                                  e' <- exp_closure_conv e mapfv Γ ;;
-                                     ret (t, e')) pats in
-        pats' <- sequence pats_st ;;
+        (* let pats_st := List.map (fun (p : tag * exp) => *)
+        (*                           let (t, e) := p in *)
+        (*                           e' <- exp_closure_conv e mapfv Γ ;; *)
+        (*                           ret (t, e')) pats in *)
+        (* pats' <- sequence pats_st ;; *)
         (* could do [mapM] here but it stops guessing the decreasing arg :( *) 
         (* pats' <- mapM (fun (p : tag * exp) => *)
         (*                 let (t, e) := p in *)
@@ -451,13 +471,13 @@ Section CC.
         (*                 e' <-  e_st ;; *)
         (*                 ret (t, e')) pats ;; *)
         let '(x', _, f1) := t1 in           
-        ret (f1 (Ecase x' pats'))
+        ret (Ecase x' pats', f1)
       | Eproj x typ n y e' =>
         t1 <- get_var y mapfv
            Γ ;;
         let '(y', _, f) := t1 in
-        e'' <- exp_closure_conv e' (Maps.PTree.set x (BoundVar typ) mapfv) Γ ;;
-        ret (f (Eproj x typ n y' e''))
+        ef <- exp_closure_conv e' (Maps.PTree.set x (BoundVar typ) mapfv) Γ ;;
+        ret (Eproj x typ n y' ((snd ef) (fst ef)), f)
       | Efun defs e =>
         let names := fundefs_names defs in
         let fv := fundefs_fv defs names in
@@ -466,9 +486,9 @@ Section CC.
         let '(env_type, mapfv_new, g1) := t1 in
         t2 <- make_full_closure defs mapfv_new mapfv Γ' env_type ;;
         let '(mapfv_new', mapfv_old', g2) := t2 in
-        e' <- exp_closure_conv e mapfv_old' Γ ;;
+        ef <- exp_closure_conv e mapfv_old' Γ ;;
         defs' <- fundefs_closure_conv defs mapfv_new' ;;
-        ret (g1 (Efun defs' (g2 e')))
+        ret (Efun defs' (g2 ((snd ef) (fst ef))), g1)
       | Eapp f xs =>
         t1 <- get_var f mapfv Γ ;;
         let '(f', typ, g1) := t1 in     
@@ -483,14 +503,14 @@ Section CC.
               | _ => 1%positive (* should not happen *) 
             end
         in
-        ret (g1 (g2 (Eproj ptr ftyp 0 f'
-                           (Eproj Γ unknown_type 1 f'
-                                  (Eapp ptr (Γ :: xs'))))))
+        ret (Eproj ptr ftyp 0 f'
+                   (Eproj Γ unknown_type 1 f'
+                          (Eapp ptr (Γ :: xs'))), fun e => g1 (g2 e))
     | Eprim x typ prim ys e' =>
       t1 <- get_vars ys mapfv Γ ;;
       let '(ys', f) := t1 in
-      e'' <- exp_closure_conv e' (Maps.PTree.set x (BoundVar typ) mapfv) Γ ;;
-      ret (f (Eprim x typ prim ys' e''))
+      ef <- exp_closure_conv e' (Maps.PTree.set x (BoundVar typ) mapfv) Γ ;;
+      ret (Eprim x typ prim ys' ((snd ef) (fst ef)), f)
     end
   with fundefs_closure_conv (defs : fundefs) (mapfv : VarInfoMap)
        : ccstate fundefs  :=
@@ -508,7 +528,7 @@ Section CC.
              let mapfv' := add_params ys args_typ mapfv in
              (* formal parameter for the environment pointer *)
              Γ <- get_name ;;
-             e' <- exp_closure_conv e mapfv' Γ ;;
+             ef <- exp_closure_conv e mapfv' Γ ;;
              defs'' <- fundefs_closure_conv defs' mapfv ;;
              (* find the new name of the function *)
              let (code_ptr, typ') :=
@@ -521,7 +541,7 @@ Section CC.
                    | None => (f, 1%positive) (* should never reach here *)
                  end
              in
-             ret (Fcons code_ptr typ' (Γ::ys) e' defs'')
+             ret (Fcons code_ptr typ' (Γ::ys) ((snd ef) (fst ef)) defs'')
            | Fnil => ret Fnil
          end.
 
@@ -557,15 +577,15 @@ with max_var_fundefs defs z :=
        end.
 
 
-(* XXX closure conversion does not currently handles the types right. *)
-(* types are bogus because they rely on parameters instantiated with dummies *)
+(* XXX closure conversion does not currently handles types right. *)
 Definition closure_conversion (e : exp) : exp :=
   let next :=
       let x := max_var e 1%positive in
       if Pos.leb x 3%positive then 3%positive else (x+1)%positive
   in
   let state := (next, TDict.empty) in
-  exp_hoist (fst (runState
-                    (exp_closure_conv 1%positive 1%positive id 1%positive
-                                      e (Maps.PTree.empty VarInfo) 1%positive)
-                    state)).
+  let '(e, f, s) := runState
+                  (exp_closure_conv 1%positive 1%positive id 1%positive
+                                    e (Maps.PTree.empty VarInfo) 1%positive)
+                  state in
+  exp_hoist (f e).

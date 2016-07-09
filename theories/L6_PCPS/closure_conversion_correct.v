@@ -1887,24 +1887,35 @@ Section CC_correct.
 
   Import MonadNotation.
 
+  Transparent bind ret.
+
+  (** This identity is very useful to make the computation of the IH to appear
+      as a subcomputation in the goal *)
   Lemma st_eq_Ecase {S} m1 (m2 : state S (var * type * (exp -> exp))) y :
     st_eq
-      (bind m1 (fun ys => 
-       bind (ret (y :: ys)) (fun ys' =>
-       bind m2 (fun t1 => 
+      (ys <- m1 ;; 
+       ys' <- ret (y :: ys) ;;
+       t1 <- m2 ;;
        let '(x, _ , f) := t1 in
-       ret (Ecase x ys', f)))))
-      (fe <- (pats' <- m1 ;;
+       ret (Ecase x ys', f))
+      (fe <- (ys <- m1 ;;
              t1 <- m2 ;;
-             let '(x', _, f1) := t1 in    
-             ret (Ecase x' pats', f1)) ;;
+             let '(x, _, f1) := t1 in    
+             ret (Ecase x ys, f1)) ;;
        match fe with
          | (Ecase x ys, f) =>
            ret (Ecase x (y :: ys), f)
          | _ => ret fe
-      end).
-    Admitted.
-    
+       end).
+  Proof.
+    unfold pbind, ret.
+    intros s. simpl. destruct (runState m1 s).
+    destruct (runState m2 s0). destruct p as [[x tau] f].
+    reflexivity.
+  Qed.
+
+  Opaque bind ret.
+
   Lemma exp_closure_conv_Closure_conv_sound :
     (forall e Scope Funs Γ FVs FVmap S
        (* The invariant the relates [FVmap] and [Scope], [Funs], [FV] *)
@@ -2000,7 +2011,8 @@ Section CC_correct.
           eapply not_In_new_function_names_injective.
           intros Hc. eapply HD3; eauto. eassumption.
           rewrite subst_BoundVar_f_eq. rewrite HC''. now eauto.
-          admit.
+          eapply fresh_monotonic. now eapply project_vars_free_set_Included; eauto.
+          eassumption.
     - eapply pre_post_mp_r. eapply bind_triple with (post' := fun _ l i => l = [] /\ fresh S (fst i)).
       + eapply return_triple; eauto. 
       + intros pats' s2.
@@ -2016,29 +2028,63 @@ Section CC_correct.
           eapply Disjoint_Included_r; [| eassumption ]. do 2 apply Included_Union_mon_r.
           now apply Included_refl.
           eassumption. now constructor.
-          split. eassumption. now constructor. admit.
+          split. eassumption. now constructor.
+          eapply fresh_monotonic. now eapply project_var_free_set_Included; eauto.
+          eassumption.
     - unfold exp_closure_conv. setoid_rewrite assoc.
       eapply bind_triple.
-      + eapply H.
-        eassumption. eassumption. admit. eassumption. admit. admit. admit.
+      + eapply H; [ eassumption | eassumption | | eassumption | | | ].
+        * eapply binding_in_map_antimon; [| eassumption ].
+          eapply occurs_free_Ecase_Included. now constructor.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          apply Included_Union_compat.
+          rewrite bound_var_Ecase_cons. now apply Included_Union_l.
+          rewrite occurs_free_Ecase_cons.
+          apply Included_Union_compat. now apply Included_Union_l.
+          now apply Included_refl.
+        * intros Hc. apply HD2.
+          rewrite bound_var_Ecase_cons, occurs_free_Ecase_cons.
+          inv Hc; eauto.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          apply Included_Union_compat.
+          rewrite occurs_free_Ecase_cons. now apply Included_Union_l.
+          rewrite bound_var_Ecase_cons. now apply Included_Union_l.
       + intros [e' f'] s'.  simpl. setoid_rewrite assoc. simpl.
         setoid_rewrite st_eq_Ecase. 
         eapply pre_post_mp_l. eapply bind_triple. 
-        eapply H0 with (FVmap := FVmap) (Γ := Γ).
-        eassumption. eassumption. admit. eassumption. admit. admit. admit.
-        intros [e'' f s''].   
-        edestruct e''; eapply return_triple; intros s''' Hcc1 Hcc2 Hf;
-        edestruct (Hcc2 Hf) as [C2 [Hctx1 [[e2 [C2' [Hc2' [Ha2 Ha2']]]] Hf'']]];
-        edestruct (Hcc1 Hf'') as [C1 [Hctx2 [[e1 [C1' [Hcc1' [Ha1 Ha1']]]] Hf''']]];
-        inv Hcc1'; inv Ha1'.
-        eexists. repeat split.
-        * eassumption.
-        * repeat eexists. eapply CC_Ecase with (pats' := (c, C2' |[ e2 ]|) :: pats'); eauto.
+        eapply H0 with (FVmap := FVmap) (Γ := Γ);
+          [ eassumption | eassumption | | eassumption | | | ].
+        * eapply binding_in_map_antimon; [| eassumption ].
+          rewrite occurs_free_Ecase_cons. apply Included_Union_mon_r.
+          now apply Included_Union_r.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          apply Included_Union_compat.
+          rewrite bound_var_Ecase_cons. now apply Included_Union_r.
+          rewrite occurs_free_Ecase_cons.
+          apply Included_Union_compat. apply Included_Union_mon_r.
+          now apply Included_Union_r.
+          now apply Included_refl.
+        * intros Hc. apply HD2.
+          rewrite bound_var_Ecase_cons, occurs_free_Ecase_cons.
+          inv Hc; eauto.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          apply Included_Union_compat.
+          rewrite occurs_free_Ecase_cons. apply Included_Union_mon_r.
+          now apply Included_Union_r.
+          rewrite bound_var_Ecase_cons. now apply Included_Union_r.
+        * intros [e'' f s''].   
+          edestruct e''; eapply return_triple; intros s''' Hcc1 Hcc2 Hf;
+          edestruct (Hcc2 Hf) as [C2 [Hctx1 [[e2 [C2' [Hc2' [Ha2 Ha2']]]] Hf'']]];
+          edestruct (Hcc1 Hf'') as [C1 [Hctx2 [[e1 [C1' [Hcc1' [Ha1 Ha1']]]] Hf''']]];
+          inv Hcc1'; inv Ha1'.
+          eexists. repeat split.
+          eassumption.
+          repeat eexists. eapply CC_Ecase with (pats' := (c, C2' |[ e2 ]|) :: pats'); eauto.
           econstructor; [| eassumption ]. split; eauto. repeat eexists; eauto.
           eassumption. econstructor; eauto.
           econstructor; [| eassumption ]. split; eauto.
           rewrite Hctx1. now eauto.
-        * admit. 
+          eassumption.
   Abort.
 
 End CC_correct.

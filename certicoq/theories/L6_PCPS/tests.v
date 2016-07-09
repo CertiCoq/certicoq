@@ -78,41 +78,39 @@ Eval compute in show_exn P1L6su.
 
 Quote Recursively Definition P2L1 := (fun (x y:nat) => x).
 Definition P2L6 := Eval compute in compile_L1_to_L6 P2L1.
-Print P2L6.
+Eval compute in show_exn P2L6.
 Definition P2L6s := Eval compute in shrink_once_L6 P2L6.
-Print P2L6s.
+Eval compute in show_exn P2L6s.
 Definition P2L6su := Eval compute in uncurry_L6 P2L6s.
-Print P2L6su.
+Eval compute in show_exn P2L6su.
 Definition P2L6u := Eval compute in uncurry_L6 P2L6.
 Print P2L6u.
 
-(* This example doesn't shrink correctly -- it produces unbound variables *)
-Definition P3 :=
-  (fun f => f 0%nat) (fun (x:nat) => x).
+Definition P3 := (fun f:nat => 0%nat).
 Quote Recursively Definition P3L1 := P3.
 Definition P3L6 := Eval compute in compile_L1_to_L6 P3L1.
-Print P3L6.
+Eval compute in show_exn P3L6.
 Definition P3L6s := Eval compute in shrink_once_L6 P3L6.
-Print P3L6s.
+Eval compute in show_exn P3L6s.
 
-Let ty_con := L5_to_L6.ty_con.
-
-Definition P4L6 :=
-  (Efun (Fcons 10 ty_con (3::nil)
-               (Efun (Fcons 5 ty_con (6::7::nil)
-                            (Eapp 6 nil) Fnil)
-                     (Eapp 3 (5::nil))) Fnil)
-        (Eapp 2 (10::nil)))%positive.
-
-Definition P4L6u := Eval compute in uncurry P4L6.
-Print P4L6u.
+Definition P4 := (0,1)%nat.
+Quote Recursively Definition P4L1 := P4.
+Definition P4L4 := Eval compute in compile_L1_to_L4 P4L1.
+Print P4L4.
+Definition P4L6 := Eval compute in compile_L1_to_L6 P4L1.
+Eval compute in show_exn P4L6.
+(* This doesn't shrink correctly. *)
+Definition P4L6s := Eval compute in shrink_once_L6 P3L6.
+Eval compute in show_exn P4L6s.
 
 Definition P5 :=
   (fun x => match x with | 0 => 0 | S n => n end)%nat.
 Quote Recursively Definition P5L1 := P5.
 Definition P5L6 := Eval compute in compile_L1_to_L6 P5L1.
-Print P5L6.
-
+Eval compute in show_exn P5L6.
+(* This doesn't shrink correctly. *)
+Definition P5L6s := Eval compute in shrink_once_L6 P5L6.
+Eval compute in show_exn P5L6s.
 (*
 Definition p0L5 := Eval compute in compile p0L1.
 Print p0L5.

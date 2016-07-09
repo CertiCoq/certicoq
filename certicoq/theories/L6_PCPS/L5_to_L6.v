@@ -109,8 +109,11 @@ Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (n:var) (*  {struct e } *): exp 
                       let '(ctx_v, vn, n'') := convert_v v sv sk n' in
                        (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp kn (vn::nil)), n'')
        | Call_c f k v =>
+         let fv := if (varInterface.varClass f):bool then sv else sk in
+         let kv := if (varInterface.varClass k):bool then sv else sk in
+         let vv := if (varInterface.varClass v):bool then sv else sk in
          (* flipping around so the continuation comes first *)
-         (Eapp (get_s f sv) ((get_s k sk)::(get_s v sv)::nil) , n)
+         (Eapp (get_s f fv) ((get_s k kv)::(get_s v vv)::nil) , n)
          
        | Match_c v bl =>
          let fix convert_branches (bl:list  ((dcon * nat) * ((list NVar)* cps))) (sv: s_map) (sk:s_map) (r:var) (n:var)  (* { struct bl } *): (list (tag * exp) * var)  :=
@@ -163,7 +166,7 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (n:var) (* { struct v }  *): (e
                      
                end in
            let '(lv_ctx, nl, n') := convert_v_list lv sv sk n in
-             (comp_ctx_f lv_ctx (Econstr_c n' ty (dcon_to_tag dcn) nl Hole_c), n', Pos.succ n') 
+             (comp_ctx_f lv_ctx (Econstr_c n' ty (dcon_to_tag dcn) (List.rev nl) Hole_c), n', Pos.succ n') 
          | Fix_c lbt =>
            (*  convert a list of simple_cps cps functions into 
                (1) a set of cps.exp functions (fundefs), each referring to a local variable (n+1), a local continuation variable (n+2) and the functions name (pushed to sv before calling convert_fds

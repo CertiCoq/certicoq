@@ -54,7 +54,7 @@ match e with
 | expression.Match_e d brl => 
     Match_e (translate fvars d) (translateb fvars brl)
 
-| Ax_e _ => vterm nvarx (* FIX! *) 
+| Ax_e _ => Con_e N.zero nil (* FIX! *) 
 end
 with translatel (fvars : list NVar)(e:exps) : list NTerm :=
 match e with

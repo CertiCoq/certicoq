@@ -85,12 +85,12 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
     emit_exp indent e
   | Eproj x ty n y e =>
     emit "let " ;; emit (show_var x) ;;
-    emit ":= proj_" ;; emit (show_binnat n) ;; emit " " ;;
+    emit " := proj_" ;; emit (show_binnat n) ;; emit " " ;;
     emit (show_var y) ;; emit" in " ;; newline ;; 
     emit_exp indent e
   | Eprim x ty p ys e =>
     emit "let " ;; emit (show_var x) ;;
-    emit ":= prim_" ;; emit (show_pos p) ;; emit (show_vars ys) ;;
+    emit " := prim_" ;; emit (show_pos p) ;; emit (show_vars ys) ;;
     emit " in " ;; newline ;; 
     emit_exp indent e
   | Ecase x arms =>

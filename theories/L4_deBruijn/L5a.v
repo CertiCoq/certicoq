@@ -96,7 +96,7 @@ match c with
  | terms.oterm CCall [bterm [] fn; bterm [] cont; bterm [] arg] => 
  (** we know that the CPS translation only produces Call_c terms that are variables. see 
     [simpleCPSAA.cps_cvt] and [simpleCPSAA.cps_cvt_apply]. *)
-      fn <- getVar fn ;;
+      fn <- getVar fn ;; 
       cont <- getVar cont ;;
       arg <- getVar arg ;;
       ret (Call_c fn cont arg)

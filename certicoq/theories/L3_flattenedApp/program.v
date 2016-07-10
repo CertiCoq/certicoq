@@ -1,7 +1,8 @@
 (******)
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L1_5_box" as L1_5.
+Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
@@ -11,33 +12,12 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
 Require Import L3.term.
+Require Import L3.compile.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
-
-(** Inductive types representation **)
-(* a constructor; the string only for human readability *)
-Record Cnstr := mkCnstr { CnstrNm:string; CnstrArity:nat }.
-Definition defCnstr := {| CnstrNm:=""; CnstrArity:= 0 |}.
-(* a type is a list of Cnstrs; string only for human readability *)
-Record ityp := mkItyp { itypNm:string; itypCnstrs:list Cnstr }.
-Definition defItyp := {| itypNm:=""; itypCnstrs:=nil |}.
-(* a mutual type package is a list of ityps *)
-Definition itypPack := list ityp.
-
-(** environments and programs: Gregory's type [program] is inside out
-*** so we reverse it and make it an ordinary association list
-**)
-Inductive envClass := 
-| ecTrm (_:Term)
-| ecTyp (_:nat) (_:itypPack).
-
-(** An environ is a list of definitions.
-***  Currently ignoring Types and Axioms **)
-Definition environ := list (string * envClass).
-Record Program : Type := mkPgm { main:Term; env:environ }.
 
 
 Inductive fresh (nm:string) : environ -> Prop :=
@@ -78,9 +58,8 @@ Qed.
 
 (*** Common functions for evaluation ***)
 
-(** Lookup an entry in the environment
-*** axioms are currently not allowed; not looking for Types
-**)
+(** Lookup an entry in the environment **)
+Print environ.
 Inductive Lookup: string -> environ -> envClass -> Prop :=
 | LHit: forall s p t, Lookup s ((s,t)::p) t
 | LMiss: forall s1 s2 p t ec,
@@ -256,8 +235,8 @@ Qed.
 
 (** Check that a named datatype and constructor exist in the environment **)
 Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=
-  if (nth_ok inum ipkg defItyp)
-  then (if nth_ok cnum (itypCnstrs (nth inum ipkg defItyp)) defCnstr
+  if (nth_ok inum ipkg defaultItyp)
+  then (if nth_ok cnum (itypCnstrs (nth inum ipkg defaultItyp)) defaultCnstr
         then True else False)
   else False.
 

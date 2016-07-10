@@ -4,7 +4,7 @@
 
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1_5_box" as L1_5.
 (****)
 
 Require Import Coq.Lists.List.
@@ -14,10 +14,8 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Operators_Properties.
 Require Import Coq.Setoids.Setoid.
-Require Import Common.Common.
-Require Import L1.compile.
-Require Import L1.term.
-Require Import L1.program.
+Require Import L1_5.term.
+Require Import L1_5.program.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -41,17 +39,16 @@ Inductive awndEval : Term -> Term -> Prop :=
      (* np is the number of parameters of the datatype *)
 | aCase: forall (ml:nat * list nat) (ty s mch:Term)
                  (args brs ts:Terms) (n:nat),
-            canonicalP mch = Ret (n, args) ->
+            canonicalP mch = Some (n, args) ->
             tskipn (fst ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             awndEval (TCase ml ty mch brs) s
 | aFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
-               (x:Term) (ix:nat) (t:Term) z,
+               (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          tnth ix (tcons arg args) = Some t -> canonicalP t = Ret z ->
           awndEval (TApp (TFix dts m) arg args)
-                  (pre_whFixStep x dts (tcons arg args))
+                   (pre_whFixStep x dts (tcons arg args))
 | aCast: forall t ck ty, awndEval (TCast t ck ty) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,

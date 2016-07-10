@@ -3,7 +3,7 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.Li
 Add LoadPath "../common" as Common.
 Add LoadPath "./" as CPS.
 Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 Add LoadPath "../L4_deBruijn" as L4. 
 **)

@@ -5,7 +5,7 @@
 (******)
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 Add LoadPath "../L4_deBruijn" as L4.
 (******)
@@ -16,13 +16,20 @@ Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
 
-Require Import L3.program.
+(***
+Require L3.term.
+Require L3.wcbvEval.
+Require L3.wNorm.
+Require L3.unaryApplications.
+***)
+Require Import L3.compile.
 
-Require L3.L3.
+(***
 Module L3eval := L3.wcbvEval.
-Module L3t := L3.term.
 Module L3U := L3.unaryApplications.
 Module L3N := L3.wNorm.
+***)
+Module L3t := L3.compile.
 
 Require Import L4.expression.
 
@@ -96,7 +103,7 @@ Section TermTranslation.
   
   Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
-    | L3t.TAx s => Ax_e s
+    | L3t.TAx => Ax_e ""
     | L3t.TProof => (* TODO: Ax_e for now *) Ax_e "proof"
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TSort s => (* Erase *) erased_exp

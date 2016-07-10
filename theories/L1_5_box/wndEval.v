@@ -1,7 +1,7 @@
 
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1_5_box" as L1_5.
 (****)
 
 Require Import Coq.Lists.List.
@@ -12,11 +12,9 @@ Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Operators_Properties.
 Require Import Coq.Setoids.Setoid.
 Require Import Coq.omega.Omega.
-Require Import Common.Common.
-Require Import L1.compile.
-Require Import L1.term.
-Require Import L1.program.
-Require Import L1.awndEval.
+Require Import L1_5.term.
+Require Import L1_5.program.
+Require Import L1_5.awndEval.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -40,16 +38,14 @@ Inductive wndEval : Term -> Term -> Prop :=
      (* n is the number of parameters of the datatype *)
 | sCase: forall (ml:nat * list nat) (ty s mch:Term)
                  (args brs ts:Terms) (n:nat),
-            canonicalP mch = Ret (n, args) ->
+            canonicalP mch = Some (n, args) ->
             tskipn (fst ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml ty mch brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
-               (x:Term) (ix:nat) (t:Term) z,
+               (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          tnth ix (tcons arg args) = Some t ->
-          canonicalP t = Ret z ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t ck ty, wndEval (TCast t ck ty) t
@@ -224,8 +220,6 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
     eapply sCase; eassumption.
   - rewrite pre_whFixStep_absorbs_mkApp. simpl. eapply sFix; try eassumption.
-    change (tnth ix (tappend (tcons arg args) (tcons a1 args0)) = Some t).
-    apply tnth_append. assumption.
   - rewrite mkApp_idempotent. simpl. rewrite <- (mkApp_goodFn _ _ H3).
     apply IHwndEval; assumption.
   - inversion_Clear H; eapply sAppArgs. 

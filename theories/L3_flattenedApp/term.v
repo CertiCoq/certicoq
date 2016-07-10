@@ -3,7 +3,8 @@
 (******)
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L1_5_box" as L1_5.
+Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
@@ -13,47 +14,12 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.omega.Omega.
 Require Export Common.Common.  (* shared namespace *)
+Require Import L3.compile.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
-
-(** A cleaned up notion of object term, which we use uniformly:
-*** the simultaneous definitions of [Terms] and [Defs] make inductions
-*** proof over this type long-winded but straightforward
-**)
-Inductive Term : Type :=
-| TRel       : nat -> Term
-| TSort      : Srt -> Term
-| TProof     : Term
-| TProd      : name -> Term -> Term
-| TLambda    : name -> Term -> Term
-| TLetIn     : name -> Term -> Term -> Term
-| TApp       : Term -> Term -> Term
-| TConst     : string -> Term
-| TAx        : string -> Term
-| TInd       : inductive -> Term
-| TConstruct : inductive -> nat -> Terms -> Term
-| TCase      : nat * list nat (* #parameters, args per branch *) ->
-               Term -> Terms -> Term
-| TFix       : Defs -> nat -> Term
-with Terms : Type :=
-| tnil : Terms
-| tcons : Term -> Terms -> Terms
-with Defs : Type :=
-| dnil : Defs
-| dcons : name -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Defs.
-Scheme Trm_ind' := Induction for Term Sort Prop
-  with Trms_ind' := Induction for Terms Sort Prop
-  with Defs_ind' := Induction for Defs Sort Prop.
-Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
-Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
-Notation prop := (TSort SProp).
-Notation set_ := (TSort SSet).
-Notation type_ := (TSort SType).
-Notation tunit t := (tcons t tnil).
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
 Local Ltac rght := right; injection; intuition.
@@ -63,6 +29,7 @@ Lemma TermTerms_dec:
   (forall (s t:Term), s = t \/ s <> t) /\
   (forall (ss tt:Terms), ss = tt \/ ss <> tt) /\
   (forall (dd ee:Defs), dd = ee \/ dd <> ee).
+Proof.
 apply TrmTrmsDefs_ind.
 - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
 - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
@@ -77,7 +44,7 @@ apply TrmTrmsDefs_ind.
 - induction t1; cross. 
   destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
 - induction t; cross. destruct (string_dec s s0); [lft | rght].
-- induction t; cross. destruct (string_dec s s0); [lft | rght].
+- induction t; cross. left. reflexivity.
 - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
 - induction t0; cross.
   destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); destruct (H t0);
@@ -198,18 +165,6 @@ Qed.
 
 
 (** some utility operations on [Terms] ("lists" of Term) **)
-Fixpoint tlength (ts:Terms) : nat :=
-  match ts with 
-    | tnil => 0
-    | tcons _ ts => S (tlength ts)
-  end.
-
-Fixpoint tappend (ts1 ts2:Terms) : Terms :=
-  match ts1 with
-    | tnil => ts2
-    | tcons t ts => tcons t (tappend ts ts2)
-  end.
-
 Lemma tappend_tnil: forall ts:Terms, tappend ts tnil = ts.
 induction ts; simpl; try reflexivity.
 rewrite IHts. reflexivity.
@@ -296,12 +251,6 @@ Fixpoint tnth (n:nat) (l:Terms) {struct l} : option Term :=
                         | S m => tnth m xs
                       end
     end.
-
-Fixpoint dlength (ts:Defs) : nat :=
-  match ts with 
-    | dnil => 0
-    | dcons _ _ _ ts => S (dlength ts)
-  end.
 
 Fixpoint dnthBody (n:nat) (l:Defs) {struct l} : option Term :=
   match l with

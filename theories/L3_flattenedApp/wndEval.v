@@ -2,7 +2,8 @@
 (******)
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L1_5_box" as L1_5.
+Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
@@ -12,6 +13,7 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import L3.term.
 Require Import L3.program.
+Require Import L3.compile.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

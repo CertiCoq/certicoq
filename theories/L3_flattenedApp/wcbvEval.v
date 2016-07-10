@@ -2,7 +2,8 @@
 (******)
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L2_typeStrippedL1" as L2.
+Add LoadPath "../L1_5_box" as L1_5.
+Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
@@ -16,6 +17,7 @@ Require Import Coq.Logic.JMeq.
 Require Import L3.term.
 Require Import L3.program.
 Require Import L3.wndEval.
+Require Import L3.compile.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -35,7 +37,7 @@ Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
 | wInd: forall i, WcbvEval p (TInd i) (TInd i) 
 | wSort: forall s, WcbvEval p (TSort s) (TSort s)
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
-| wAx: forall nm, WcbvEval p (TAx nm) (TAx nm)
+| wAx: WcbvEval p TAx TAx
 | wConst: forall nm (t s:Term),
             LookupDfn nm p t -> WcbvEval p t s -> WcbvEval p (TConst nm) s
 | wAppLam: forall (fn bod a1 a1' s:Term) (nm:name),
@@ -476,7 +478,7 @@ Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
                                        | Some cs => wcbvEval n p cs
                                      end
                       end
-                    | TAx nm => Some (TCase ml (TAx nm) brs)
+                    | TAx => Some (TCase ml TAx brs)
                     | _=> None
                   end)
              end)
@@ -486,7 +488,7 @@ Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
               | Some df' => wcbvEval n p (instantiate df' 0 bod)
             end
            (** already in whnf ***)
-           | TAx nm => Some (TAx nm)
+           | TAx => Some TAx
            | TLambda nn t => Some (TLambda nn t)
            | TProd nn t => Some (TProd nn t)
            | TFix mfp br => Some (TFix mfp br)

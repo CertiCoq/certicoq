@@ -104,9 +104,9 @@ Definition Program := AstCommon.Program Term.
 
 Function stripEC (ec:L1_5EC) : envClass :=
   match ec with
-    | ecTrm _ t => ecTrm Term (strip t)
-    | ecTyp _ n itp => ecTyp Term n itp
-    | ecAx _ => ecAx Term
+    | AstCommon.ecTrm _ t => AstCommon.ecTrm Term (strip t)
+    | AstCommon.ecTyp _ n itp => AstCommon.ecTyp Term n itp
+    | AstCommon.ecAx _ => AstCommon.ecAx Term
   end.
 
 Definition  stripEnv : L1_5Env -> environ :=
@@ -127,3 +127,4 @@ Definition term_Term (t:term) : option Term :=
     | Exc str => None
     | Ret trm => Some (strip trm)
   end.
+

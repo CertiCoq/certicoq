@@ -203,3 +203,7 @@ Definition term_Term (t:term) : exception Term :=
     | Exc s => raise s
     | Ret q => Ret (L1Term_Term q)
   end.
+
+Definition ecTrm := AstCommon.ecTrm Term.
+Definition ecTyp := AstCommon.ecTyp Term.
+Definition ecAx := AstCommon.ecAx Term.

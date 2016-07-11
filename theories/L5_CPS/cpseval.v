@@ -498,11 +498,11 @@ Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1%nat).
 
 Quote Definition q_typedef := Eval compute in typedef.
 Quote Recursively Definition p_typedef := typedef.
-Eval compute in (malecha_L1.program_Program p_typedef (Ret nil) :
-                   exception program.Program).
+Eval compute in (compile.program_Program p_typedef :
+                   exception compile.Program).
 
-Definition L1_typedef : exception program.Program :=
-  Eval compute in malecha_L1.program_Program p_typedef (Ret nil).
+Definition L1_typedef : exception compile.Program :=
+  Eval compute in compile.program_Program p_typedef.
 
 Definition P_typedef := Eval compute in program_exp p_typedef.
 

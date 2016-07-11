@@ -19,6 +19,8 @@ Opaque N.add.
 Opaque N.sub.
 
 Require Import L3.program.
+Require Import L3.term.
+Require Import L3.compile.
 
 Require L3.L3.
 Module L3eval := L3.wcbvEval.
@@ -29,10 +31,9 @@ Module L3N := L3.wNorm.
 Require Import L4.expression.
 Require Import L4.L3_to_L4.
 
-Import L3t.
 (** Should be true in L3 *)
 Lemma wftrm_fix dts m t n :
-  L3t.WFTrm (L3.term.TFix dts m) n ->
+  L3t.WFTrm (TFix dts m) n ->
   L3.term.dnthBody m dts = Some t -> isLambda t.
 Proof. intros. inv H. Admitted.
 
@@ -61,7 +62,7 @@ Inductive wf_environ : environ -> Prop :=
 | wf_cons_trm s t e : WFTrm t 0 -> wf_environ e -> wf_environ (cons (s, ecTrm t) e)
 | wf_cons_ty s n t e : wf_environ e -> wf_environ (cons (s, ecTyp n t) e).
 
-Lemma wf_environ_lookup (e : environ) (t : L3.term.Term) nm :
+Lemma wf_environ_lookup (e : environ) (t : Term) nm :
   wf_environ e -> LookupDfn nm e t -> WFTrm t 0.
 Proof.
   intros wfe Het. revert wfe. red in Het.
@@ -402,7 +403,7 @@ Proof.
 Qed.
 
 Lemma subst_env_aux_constructor e k i r args :
-  subst_env_aux e k (trans e k (L3.term.TConstruct i r args)) =
+  subst_env_aux e k (trans e k (TConstruct i r args)) =
   Con_e (dcon_of_con i r) (map_terms (fun x => subst_env_aux e k (trans e k x)) args).
 Proof.
   revert k i r args; induction e; intros; unfold translate.
@@ -440,7 +441,7 @@ Lemma subst_env_lete e d b :
 Proof. apply subst_env_aux_let. Qed.
 
 Lemma subst_env_letin e n d b :
-  subst_env e (translate e (L3.term.TLetIn n d b)) =
+  subst_env e (translate e (TLetIn n d b)) =
   Let_e (subst_env e (translate e d)) (subst_env_aux e 1 (trans e 1 b)).
 Proof.
   unfold translate. simpl.
@@ -972,7 +973,7 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNAx: forall nm, WNorm (TAx nm)
+| WNAx: WNorm TAx
 | WNConstruct: forall i n args, WNorms args -> WNorm (TConstruct i n args)
 | WNInd: forall i, WNorm (TInd i)
 | WNSort: forall s, WNorm (TSort s)
@@ -1018,15 +1019,15 @@ Qed.
 (** Translation of fixpoints and fixpoint reduction *)
 Lemma L3sbst_fix_preserves_lam dts nm bod :
   fold_left
-    (fun (bod : L3.term.Term) (ndx : nat) =>
-       L3.term.instantiate (L3.term.TFix dts ndx) 0 bod)
-    (list_to_zero (L3.term.dlength dts)) (TLambda nm bod) =
+    (fun (bod : Term) (ndx : nat) =>
+       L3.term.instantiate (TFix dts ndx) 0 bod)
+    (list_to_zero (dlength dts)) (TLambda nm bod) =
   TLambda nm (fold_left
-                (fun (bod : L3.term.Term) (ndx : nat) =>
-                   L3.term.instantiate (L3.term.TFix dts ndx) 1 bod)
-                (list_to_zero (L3.term.dlength dts)) bod).
+                (fun (bod : Term) (ndx : nat) =>
+                   L3.term.instantiate (TFix dts ndx) 1 bod)
+                (list_to_zero (dlength dts)) bod).
 Proof.
-  revert nm bod; induction (list_to_zero (L3.term.dlength dts)); simpl; intros.
+  revert nm bod; induction (list_to_zero (dlength dts)); simpl; intros.
   reflexivity.
   simpl. setoid_rewrite L3.term.instantiate_equation at 2.
   simpl. rewrite IHl. reflexivity.
@@ -1236,7 +1237,7 @@ Proof with eauto.
     unfold subst_env. rewrite subst_env_aux_fix_e. constructor.
 
   + (* Ax *)
-    intros nm wft.
+    intros wft.
     unfold translate, subst_env. simpl.
     apply eval_axiom.
     
@@ -1255,10 +1256,10 @@ Proof with eauto.
       apply wf_value_self_eval; eauto.
     - cut (subst_env e'' (translate e'' t) =
            subst_env bef' (translate bef t)).
-      -- intros. unfold translate in H1. rewrite H1 in IHt.
-         pose proof (proj1 eval_single_valued _ _ IHt _ evt).
-         now rewrite <- H2.
-      -- admit. (* Weakening of environmanent *) 
+      * intros. unfold translate in H1. rewrite H1 in IHt.
+        pose proof (proj1 eval_single_valued _ _ IHt _ evt).
+        now rewrite <- H2.
+      * admit. (* Weakening of environmanent *) 
     
   + (* App Lam *)
     unfold translate. simpl.
@@ -1333,7 +1334,7 @@ Proof with eauto.
     - intros eqt'.
       rewrite eqt' in fixstep. injection fixstep.
       inv IHevfix. intros eqfs.
-      -- (* Originally a wAppLam transition *)
+      * (* Originally a wAppLam transition *)
          eapply eval_FixApp_e; eauto. 
          rewrite Nnat.Nat2N.id.
          rewrite (dnthbody _ _ _ _ _ _ eqt').
@@ -1358,9 +1359,9 @@ Proof with eauto.
          change ((subst_env_aux e'' (1 + 0)
              (trans e'' (1 + 0)
                 (fold_left
-                   (fun (bod : L3.term.Term) (ndx : nat) =>
-                    L3.term.instantiate (L3.term.TFix dts ndx) 1 bod)
-                   (list_to_zero (L3.term.dlength dts)) bod))))
+                   (fun (bod : Term) (ndx : nat) =>
+                    L3.term.instantiate (TFix dts ndx) 1 bod)
+                   (list_to_zero (dlength dts)) bod))))
          with
          (subst_env_aux e'' (1 + 0)
                         (trans e'' (1 + 0) (L3sbst_fix_aux dts bod 1))) in *.
@@ -1379,7 +1380,7 @@ Proof with eauto.
          pose proof (proj2 (proj2 (WFTerm_exp_wf_ind e e'' wfe evenv wfe''))).
          admit. (* wf of fix *)
 
-      -- (* Impossible, as t' must be a lambda, so cannot evaluate to a fix *)
+      * (* Impossible, as t' must be a lambda, so cannot evaluate to a fix *)
          intros Hfs.
          apply wcbeval_preserves_wf in evfn; auto.
          destruct (wftrm_fix _ _ _ _ evfn eqt') as [nm [bod ->]].

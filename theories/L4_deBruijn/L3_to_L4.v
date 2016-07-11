@@ -157,8 +157,9 @@ Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : string * exp) => Let_e (snd x) acc) e t.
 
 (** start-to-L4 translations **)
-
-Definition myprogram_Program (pgm : program) :=
+Definition myprogram_Program : program -> exception L3t.Program :=
+  L3t.program_Program.
+(*************
   do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
     let e' := stripEvalCommute.stripEnv (program.env pgm0) in
     match L3U.stripEnv e' with
@@ -169,6 +170,7 @@ Definition myprogram_Program (pgm : program) :=
       end
     | Exc s => Exc ("Error while stripping environment: " ++ s)
     end.
+ *************)
 
 Definition translate_program (e : environ) (t : L3t.Term) : exp :=
   let e' := translate_env e in
@@ -179,7 +181,8 @@ Definition program_exp (pgm:program) : exception exp :=
       let (main, env) := prg in
       Ret (translate_program env main).
 
-Definition term_exp (e:program.environ) (t:term) : exception exp :=
+(**************  never used ???  *******************
+Definition term_exp (e:L3t.environ) (t:term) : exception exp :=
   let e' := stripEvalCommute.stripEnv e in
   match L3U.term_Term e' t with
   | Exc s => Exc ("Error while translating term to L3: " ++ s)
@@ -189,3 +192,4 @@ Definition term_exp (e:program.environ) (t:term) : exception exp :=
     | Ret e => Ret (translate_program e trm)
     end
   end.
+***************************************************)

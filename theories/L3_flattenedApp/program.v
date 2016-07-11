@@ -59,7 +59,6 @@ Qed.
 (*** Common functions for evaluation ***)
 
 (** Lookup an entry in the environment **)
-Print environ.
 Inductive Lookup: string -> environ -> envClass -> Prop :=
 | LHit: forall s p t, Lookup s ((s,t)::p) t
 | LMiss: forall s1 s2 p t ec,

@@ -299,52 +299,6 @@ intros p. apply WcbvEvalEvals_ind; intros; try (nreflexivity H).
 Qed.
 **)
 
-(****************  old version of theorem above  ***
-Lemma WcbvEval_wndEvalRTC:
-  forall (p:environ),
-    (forall t s, WcbvEval p t s -> wndEvalRTC p t s) /\
-    (forall ts ss, WcbvEvals p ts ss -> wndEvalsRTC p ts ss).
-intros p. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
-- eapply wERTCtrn. apply wERTCstep. apply sConst; eassumption.
-  assumption.
-- eapply (@wERTCtrn _ _ (TApp (TLambda nm bod) a1 args)).
-  + apply wndEvalRTC_App_fn. assumption.
-  + eapply (@wERTCtrn _ _ (TApp (TLambda nm bod) a1' args)).
-    * apply wndEvalRTC_App_arg. assumption.
-    * apply (@wERTCtrn _ _ (whBetaStep bod a1' args)).
-      apply wERTCstep. apply sBeta. assumption.
-- eapply (@wERTCtrn _ _ (TLetIn nm dfn' bod)).
-  + apply wndEvalRTC_LetIn_dfn. assumption.
-  + eapply wERTCtrn. apply wERTCstep. apply sLetIn. assumption.
-- eapply (@wERTCtrn _ _ (TApp (TFix dts m) arg args)).
-  + apply wndEvalRTC_App_fn. assumption.
-  + eapply (@wERTCtrn _ _ fs).
-    * apply wERTCstep. apply sFix. assumption.
-    * assumption.
-- eapply (@wERTCtrn _ _ (TApp (TConstruct i r) arg args)).
-  + apply wndEvalRTC_App_fn. assumption.
-  + eapply (@wERTCtrn _ _ (TApp (TConstruct i r) arg' args)).
-    * apply wndEvalRTC_App_arg. assumption.
-    * eapply (@wERTCtrn _ _ (TApp (TConstruct i r) arg' args')).
-      apply wndEvalsRTC_App_args. assumption.
-      constructor.
-- eapply (@wERTCtrn _ _ (TCase 0 (TConstruct i n) brs)).
-  + apply wndEvalRTC_Case_mch. assumption.
-  + eapply (@wERTCtrn _ _ cs).
-    * apply wERTCstep. apply sCase0. assumption.
-    * assumption.
-- eapply (@wERTCtrn _ _ (TCase np (TApp (TConstruct i n) arg args) brs)).
-  + apply wndEvalRTC_Case_mch. assumption.
-  + eapply (@wERTCtrn _ _ cs).
-    * apply wERTCstep. eapply sCasen; eassumption.
-    * assumption.
-- eapply (@wEsRTCtrn _ _ (tcons t' ts)).
-  + apply wndEvalsRTC_tcons_hd. assumption.
-  +  eapply (@wEsRTCtrn _ _ (tcons t' ts')).
-     * apply wndEvalsRTC_tcons_tl. assumption.
-     * constructor.
-Qed.
-*************)
 (************  in progress  ****
 Lemma WcbvEval_strengthen:
   forall pp,

@@ -17,11 +17,6 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition envClass := AstCommon.envClass Term.
-Definition ecTrm := ecTrm Term.
-Definition ecTyp := ecTyp Term.
-Definition ecAx := ecAx Term.
-
 
 (** all items in an env are application-well-formed **)
 Inductive WFaEc: envClass-> Prop :=

@@ -1,10 +1,12 @@
-Require Import cps cps_util set_util identifiers Ensembles_util List_util
+Require Import cps ctx cps_util set_util identifiers Ensembles_util List_util
         eval logical_relations.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
 
 Import ListNotations.
+
+Open Scope ctx_scope.
 
 Definition extend (f: var -> var) (x x' : var) : (var -> var) :=
   fun z => if Coqlib.peq z x then x' else f z.
@@ -36,11 +38,11 @@ Fixpoint extend_fundefs (f: var -> var) (B B' : fundefs) : (var -> var) :=
       end
   end.
 
-Notation " f '{[' xs '~>' ys ']}' " := (extend_lst f xs ys) (at level 10, no associativity)
-                                       : alpha_scope.
+(* Notation " f '{[' xs '~>' ys ']}' " := (extend_lst f xs ys) (at level 10, no associativity) *)
+(*                                        : alpha_scope. *)
 
-Notation " f '<{' B '~>' B' '}>' " := (extend_fundefs f B B') (at level 10, no associativity)
-                                       : alpha_scope.
+(* Notation " f '<{' B '~>' B' '}>' " := (extend_fundefs f B B') (at level 10, no associativity) *)
+(*                                        : alpha_scope. *)
 
 Definition codomain {A B} (f : A -> B) : Ensemble B := 
   fun y => exists x, f x = y.
@@ -149,6 +151,19 @@ Proof.
     unfold extend. destruct (Coqlib.peq x' x); eauto.
     congruence. 
 Qed.    
+
+Lemma extend_same f x y :
+  f x = x ->
+  f {y ~> y} x = x. 
+Proof.
+  unfold extend. destruct (Coqlib.peq x y); eauto.
+Qed.
+
+Instance extend_Proper : Proper (f_eq ==> Logic.eq ==> Logic.eq ==> f_eq) extend.
+Proof. 
+  intros f1 f2 Hfeq x1 x2 Heq1 x3 x4 Hfeq2; subst.
+  intros x. unfold extend. destruct (Coqlib.peq x x2); eauto.
+Qed.
 
 Instance injective_proper {A B} : Proper (f_eq ==> iff) (@injective A B).
 Proof. 
@@ -276,6 +291,21 @@ Instance Alpha_conv_fundfes_proper :
   Proper (Logic.eq ==> Logic.eq ==> f_eq ==> iff) Alpha_conv_fundefs.
 Proof.
   now apply Alpha_conv_proper_mut.
+Qed.
+
+
+
+(** Pair of contexts that preserves α-equivalence *)
+Definition Alpha_conv_ctx C C' f :=
+  forall e e',
+    Alpha_conv e e' f ->
+    Alpha_conv (C |[ e ]|) (C' |[ e']|) f.
+
+Instance alpha_conv_ctx_Proper : Proper (eq ==> eq ==> f_eq ==> iff) Alpha_conv_ctx.
+Proof. 
+  intros c1 c2 Heq1 c3 c4 Heq2 f1 f2 Hfeq; subst; split; intros H1 e1 e2 H2.
+  rewrite <- Hfeq. rewrite <- Hfeq in H2. now eauto.
+  rewrite Hfeq. rewrite Hfeq in H2. now eauto. 
 Qed.
   
 Definition preord_env_P_inj P k f rho1 rho2 :=
@@ -547,3 +577,4 @@ Proof.
 Qed.
 
 Close Scope alpha_scope.
+Close Scope ctx_scope.

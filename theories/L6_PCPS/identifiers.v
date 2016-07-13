@@ -1683,8 +1683,8 @@ Proof.
     eapply IHl in H. inv H; eauto.
 Qed.
 
-(** correctness of exp_fv and fundefs_fv w.r.t occurs_free and 
-  * occurs_free_fundefs *)
+(** correctness of exp_fv and fundefs_fv w.r.t occurs_free and
+    occurs_free_fundefs *)
 Lemma exp_fv_fundefs_fv_correct :
   (forall e x, In x (exp_fv e) <-> occurs_free e x) /\
   (forall defs x,

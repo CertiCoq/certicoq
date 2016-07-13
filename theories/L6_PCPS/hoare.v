@@ -1,6 +1,10 @@
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad
-        Coq.Classes.Morphisms.
-Import MonadNotation.
+        Coq.Classes.Morphisms Coq.Lists.List.
+Import MonadNotation ListNotations.
+
+Open Scope monad_scope.
+
+Ltac inv H := inversion H; clear H; subst.
 
 Definition triple {A S} (pre : S -> Prop) (e : state S A)
            (post : S -> A -> S -> Prop) : Prop :=
@@ -11,6 +15,28 @@ Definition triple {A S} (pre : S -> Prop) (e : state S A)
 Notation "{{ p }} e {{ q }}" :=
   (triple p e q) (at level 90, e at next level).
 
+Fixpoint mapM {M : Type -> Type} {A B : Type} `{Monad M} (f : A -> M B)
+         (l : list A)  : M (list B) :=
+  match l with
+    | [] => ret []
+    | x :: xs =>
+      let sx' := f x in
+      x' <- sx';;
+      xs' <- mapM f xs ;;
+      ret (x' :: xs')
+  end.
+
+Fixpoint sequence {M : Type -> Type} {A : Type} `{Monad M}
+         (l : list (M A))  : M (list A) :=
+  match l with
+    | [] => ret []
+    | x :: xs =>
+      x' <- x ;;
+         xs' <- sequence xs ;;
+         ret (x' :: xs')
+  end.
+
+(* just to import the extensional equality definition, probably move it to an other file *)
 Require Import alpha_conv.
 
 (** Extensional equality for computations in the state monad *) 
@@ -202,5 +228,56 @@ Proof.
   intros; eauto.
 Qed.
 
+Lemma sequence_triple {A S} (Pre : S -> Prop) (P : A -> Prop) (l : list (state S A)) :
+  Forall (fun e => {{ Pre }} e {{ fun _ e' s' => P e' /\ Pre s' }}) l ->  
+  {{ Pre }} sequence l {{fun _ l' s' => Forall P l' /\ Pre s' }}.
+Proof.     
+  induction l; intros Hall.
+  - inv Hall. apply return_triple.     
+    intros i Hp. split; eauto.
+  - inv Hall. eapply bind_triple.
+    eassumption. 
+    intros x s. eapply bind_triple.
+    eapply frame_rule. eapply IHl; eassumption.
+    intros x' s'. eapply return_triple.
+    intros s'' [HP [Hall Hpre]]. split; eauto.
+Qed.
+
+
+Lemma map_sequence_triple {A S} (Pre : S -> Prop) (P : A -> A -> Prop) (f : A -> state S A) (l : list A) :
+  Forall (fun e => {{ Pre }} f e {{ fun _ e' s' => P e e' /\ Pre s' }}) l ->  
+  {{ Pre }} sequence (map f l) {{fun _ l' s' => Forall2 P l l' /\ Pre s' }}.
+Proof.     
+  induction l; intros Hall.
+  - inv Hall. apply return_triple.     
+    intros i Hp. split; eauto.
+  - inv Hall. eapply bind_triple.
+    eassumption. 
+    intros x s. eapply bind_triple.
+    eapply frame_rule. eapply IHl; eassumption.
+    intros x' s'. eapply return_triple.
+    intros s'' [HP [Hall Hpre]]. split; eauto.
+Qed.
+
+Lemma pre_existential {A B S} (Pre : B -> S -> Prop) (Post : S -> A -> S -> Prop) e :
+  (forall b, {{ Pre b }} e {{ Post }}) ->
+  ({{ fun s => exists b, Pre b s }} e {{ Post }}).
+Proof.
+  intros Hb s [b' Hre]. eapply Hb. eassumption.
+Qed.    
+
+Lemma pre_uncurry_r {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
+  (P -> {{ Pre }} e {{ Post }}) ->
+  {{ fun s => Pre s /\ P }} e {{ Post }}.
+Proof.
+  intros Hyp s [Hpre HP]. eapply Hyp; eauto.
+Qed.
+
+Lemma pre_uncurry_l {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
+  (P -> {{ Pre }} e {{ Post }}) ->
+  {{ fun s => P /\ Pre s }} e {{ Post }}.
+Proof.
+  intros Hyp s [Hpre HP]. eapply Hyp; eauto.
+Qed.
 
 Opaque triple bind ret.

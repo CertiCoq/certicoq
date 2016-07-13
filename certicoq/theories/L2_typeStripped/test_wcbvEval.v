@@ -3,8 +3,8 @@ Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "." as L2.
 
 Require Import Template.Template.
-Require Import Common.RandyPrelude.
-Require Import L1.L1.  (* whole L1 library is exported by L1.L1 *)
+Require Import Common.Common.
+Require Import L1_5.L1_5.
 Require Import L2.L2.  (* whole L2 library is exported by L2.L2 *)
 
 Local Open Scope string_scope.
@@ -13,10 +13,10 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (** a tool for testing **)
-Definition exc_wcbvEval (tmr:nat) (pgm:program): option Term :=
-  match program_Program pgm with
-    | None => None
-    | Some pgm => wcbvEval (L2.program.env pgm) tmr (L2.program.main pgm)
+Definition exc_wcbvEval (tmr:nat) (pgm:program): exception Term :=
+  match L2.compile.program_Program pgm with
+    | Exc str => raise str
+    | Ret pgm => L2.wcbvEval.wcbvEval (env _ pgm) tmr (main _ pgm)
   end.
 
 (** Olivier's example **)
@@ -175,8 +175,8 @@ Eval compute in taut 1 (fun x => x || negb x).
 Definition pierce := taut 2 (fun x y => implb (implb (implb x y) x) x).
 Quote Recursively Definition p_pierce := pierce.
 Quote Definition q_pierce := Eval compute in pierce.
-Goal (exc_wcbvEval 23 p_pierce) = term_Term q_pierce.
-reflexivity.
+Goal (exc_wcbvEval 40 p_pierce) = term_Term q_pierce.
+compute. reflexivity.
 Qed.
 (* S combinator *)
 Definition Scomb := taut 3
@@ -348,7 +348,7 @@ Definition v23 : Vector.t nat 2 := (cons nat 2 1 (cons nat 3 0 (nil nat))).
 Definition vplus0123 := (@vplus 2 v01 v23).
 Quote Recursively Definition p_vplus0123 := vplus0123.
 Quote Definition q_vplus0123 := Eval compute in vplus0123.
-Goal exc_wcbvEval 40 p_vplus0123 = term_Term q_vplus0123.
+Goal exc_wcbvEval 50 p_vplus0123 = term_Term q_vplus0123.
 reflexivity.
 Qed.
 
@@ -404,7 +404,7 @@ Qed.
 
 Quote Recursively Definition p_fib10 := (fib 10).
 Quote Definition q_fib10 := Eval compute in (fib 10).
-Goal exc_wcbvEval 300 p_fib10 = term_Term q_fib10.
+Goal exc_wcbvEval 500 p_fib10 = term_Term q_fib10.
 vm_compute; reflexivity.
 Qed.
 
@@ -425,7 +425,7 @@ End S1.
 
 Quote Recursively Definition p_forest_size1 := (forest_size1 1 sherwood).
 Quote Definition q_forest_size1 := Eval compute in (forest_size1 1 sherwood).
-Goal (exc_wcbvEval 40 p_forest_size1) = term_Term q_forest_size1.
+Goal (exc_wcbvEval 50 p_forest_size1) = term_Term q_forest_size1.
 vm_compute; reflexivity.
 Qed.
 

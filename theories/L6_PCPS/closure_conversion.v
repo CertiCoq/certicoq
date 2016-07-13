@@ -180,12 +180,6 @@ with Closure_conversion_fundefs :
       Closure_conversion_fundefs Funs FVs Fnil Fnil.
 
 
-(** Pair of contexts that preserves α-equivalence *)
-Definition Alpha_conv_ctx C C' f :=
-  forall e e',
-    Alpha_conv e e' f ->
-    Alpha_conv (C |[ e]|) (C' |[ e']|) f.
-
 Definition Closure_conversion_alpha (Scope Funs : Ensemble var) (Γ : var)
            (FVs : list var) (C : exp_ctx) sbst
 : relation exp  :=
@@ -323,42 +317,47 @@ Section CC.
         ret (fst y :: ys, fun e => f (f' e))
     end.
 
-  Definition get_vars_with_types (xs : list var) (map : VarInfoMap) (cl : var)
-  : ccstate (list (var * type) * (exp -> exp)) :=
-    fold_right (fun x t =>
-                  t1 <- get_var x map cl ;;
-                  let '(y, f) := t1 in
-                  t2 <- t ;; 
-                  let '(ys, f') := t2 in
-                  ret (y :: ys, fun e => (f (f' e)))
-               ) (ret ([], id)) xs.
+  Fixpoint get_vars_with_types (xs : list var) (map : VarInfoMap) (cl : var)
+  : ccstate (list var * list type * (exp -> exp)) :=
+    match xs with
+      | [] => ret ([], [], id)
+      | x :: xs =>
+        t1 <- get_var x map cl ;;
+        let '(y, f) := t1 in
+        t2 <- get_vars_with_types xs map cl ;; 
+        let '(ys, ts, f') := t2 in
+        ret (fst y :: ys, snd y :: ts, fun e => f (f' e))
+    end.
 
   (** Construct the closure environment and the new variable map *)
   Definition make_env (fv : FVSet) (mapfv_new : VarInfoMap)
              (mapfv_old : VarInfoMap) (Γ_new Γ_old : var)
   : ccstate (type * VarInfoMap * (exp -> exp)) :=
     (* put the free variables in a new map *)
-    let (map_new', _) :=
-        PS.fold (fun x arg =>
-                   let '(map, n) := arg in
-                   let typ :=
-                       match Maps.PTree.get x mapfv_old with
-                         | Some entry  =>
-                           match entry with
-                             | FVar _ t | BoundVar t
-                             | MRFun _ _ t => t
-                           end
-                         | None => 1%positive (* should not happen *)
+    let fvs := PS.elements fv in
+    let map_new' :=
+        (fix add_fvs l n map :=
+           match l with
+             | [] => map
+             | x :: xs =>
+               let typ :=
+                   match Maps.PTree.get x mapfv_old with
+                     | Some entry  =>
+                       match entry with
+                         | FVar _ t | BoundVar t
+                         | MRFun _ _ t => t
                        end
-                   in
-                   (Maps.PTree.set x (FVar n typ) map, (n + 1)%N))
-                fv (mapfv_new, 0%N)
+                     | None => 1%positive (* should not happen *)
+                   end
+               in
+               add_fvs xs (n + 1)%N (Maps.PTree.set x (FVar n typ) map)
+           end) fvs 0%N (Maps.PTree.empty VarInfo)
     in
-    t1 <- get_vars_with_types (PS.elements fv) mapfv_old Γ_old ;;
-    let '(fv', g') :=  t1 in
-    env_typ <- set_typeinfo (Tdata [(env_tag, List.map snd fv')]) ;;
+    t1 <- get_vars_with_types fvs mapfv_old Γ_old ;;
+    let '(fv', ts, g') :=  t1 in
+    env_typ <- set_typeinfo (Tdata [(env_tag, ts)]) ;;
     ret (env_typ, map_new',
-         fun e => g' (Econstr Γ_new env_typ utag (List.map fst fv') e)).
+         fun e => g' (Econstr Γ_new env_typ utag fv' e)).
 
 (* recursive lookup for types -- needs termination proof *)
 (* Fixpoint closure_type (fun_typ env_type : type) : ccstate type := *)
@@ -412,33 +411,19 @@ Section CC.
     end.
 
   (** Add some bound variables in the map *)
-  Definition add_params args args_typ (mapfv : VarInfoMap) : VarInfoMap :=
-    fold_left (fun map p =>
-                 let '(var, typ) := p in
-                 Maps.PTree.set var (BoundVar typ) map)
-              (combine args args_typ) mapfv.
+  Fixpoint add_params args args_typ (mapfv : VarInfoMap) : VarInfoMap :=
+    match args with
+      | [] => mapfv
+      | x :: xs =>
+        let (typ, typs) :=
+            match args_typ with
+              | [] => (1%positive, [])
+              | t :: ts => (t, ts) 
+            end
+        in
+        M.set x (BoundVar typ) (add_params xs typs mapfv)
+    end.
   
-  Fixpoint mapM {M : Type -> Type} {A B : Type} `{Monad M} (f : A -> M B)
-           (l : list A)  : M (list B) :=
-    match l with
-      | [] => ret []
-      | x :: xs =>
-        let sx' := f x in
-        x' <- sx';;
-        xs' <- mapM f xs ;;
-        ret (x' :: xs')
-    end.
-
-  Fixpoint sequence {M : Type -> Type} {A : Type} `{Monad M}
-           (l : list (M A))  : M (list A) :=
-    match l with
-      | [] => ret []
-      | x :: xs =>
-        x' <- x ;;
-        xs' <- sequence xs ;;
-        ret (x' :: xs')
-    end.
-
   (* Todo : Fix argument type bug *)
   Fixpoint exp_closure_conv (e : exp) (mapfv : VarInfoMap)
            (Γ : var) : ccstate (exp * (exp -> exp)) := 
@@ -524,7 +509,6 @@ Section CC.
                  end
              in
              (* Add arguments to the map *)
-             (* TODO pad args_typ so that it has always the same length with ys *)
              let mapfv' := add_params ys args_typ mapfv in
              (* formal parameter for the environment pointer *)
              Γ <- get_name ;;

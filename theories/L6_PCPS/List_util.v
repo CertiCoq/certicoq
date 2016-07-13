@@ -72,6 +72,22 @@ Proof.
   intros H. induction l as [| x l IHl]; eauto.
 Qed.
 
+Lemma Forall2_Forall {A} (P : A -> A -> Prop) l :
+  Forall2 P l l ->
+  Forall (fun x => P x x) l.
+Proof.
+  intros H. induction l; eauto.
+  inv H. constructor; eauto.
+Qed.
+
+Lemma Forall_Forall2 {A} (P : A -> A -> Prop) l :
+  Forall (fun x => P x x) l  ->
+  Forall2 P l l.
+Proof.
+  intros H. induction l; eauto.
+  inv H. constructor; eauto.
+Qed.
+  
 Lemma Forall2_trans {A} (R : A -> A -> Prop) (l1 l2 l3 : list A) :
   Transitive R ->
   Forall2 R l1 l2 ->

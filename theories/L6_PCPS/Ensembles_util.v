@@ -699,3 +699,11 @@ Proof.
   left; now apply Heq.
   right. intros Hc. apply H. now apply Heq.
 Qed.
+
+Lemma Union_Included_Same_set {A} (s1 s2 : Ensemble A) :
+  Included _ s1 s2 ->
+  Same_set _ (Union _ s2 s1) s2.
+Proof. 
+  intros Hinc; split; intros x Hi; eauto.
+  inv Hi; eauto.
+Qed.

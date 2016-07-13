@@ -1,11 +1,11 @@
 
 Add LoadPath "../common" as Common.
-Add LoadPath "." as L1.
+Add LoadPath "." as L1_5.
 
 Require Import Template.Template.
-Require Import Common.RandyPrelude.
-Require Import L1.compile.
-Require Import L1.wcbvEval.
+Require Import Common.Common.
+Require Import L1_5.compile.
+Require Import L1_5.wcbvEval.
 (***
 Require Import L1.L1.  (* whole L1 library is exported by L1.L1 *)
 ***)
@@ -18,13 +18,13 @@ Set Printing Depth 100.
 
 (** tool to set up examples for testing **)
 Definition exc_wcbvEval (tmr:nat) (pgm:program): exception Term :=
-  match program_Program pgm (ret nil) with
+  match program_Program pgm with
     | Exc str => Exc str
-    | Ret pgm => wcbvEval (env pgm) tmr (main pgm)
+    | Ret pgm => wcbvEval (env _ pgm) tmr (main _ pgm)
   end.
 Definition exc_WcbvEval (pgm:program) (ans:term) : Prop :=
-  match program_Program pgm (ret nil), term_Term ans with
-    | Ret pgm, Ret trm => WcbvEval (env pgm) (main pgm) trm
+  match program_Program pgm, term_Term ans with
+    | Ret pgm, Ret trm => WcbvEval (env _ pgm) (main _ pgm) trm
     | _, _ => False
   end.
 
@@ -233,7 +233,7 @@ Definition zero : nat :=
 Quote Definition q_0 := Eval cbv in 0.
 Quote Recursively Definition p_zero := zero.
 Print p_zero.
-Eval cbv in program_Program p_zero (ret nil).
+Eval cbv in program_Program p_zero.
 Goal exc_wcbvEval 40 p_zero = term_Term q_0.
 compute. 
 Abort.  (* axiom feq doesn't expand: blocks eval *)
@@ -257,7 +257,7 @@ Definition and_nat (A:Prop) (a:A /\ A) : nat :=
   end.
 Quote Recursively Definition p_and_nat := (and_nat (conj I I)).
 Print p_and_nat.
-Eval cbv in (program_Program p_and_nat (ret nil)).
+Eval cbv in (program_Program p_and_nat).
 Goal exc_wcbvEval 40 p_and_nat = term_Term q_0.
 compute. 
 Abort.
@@ -330,16 +330,16 @@ Print q_testAx.
 Quote Recursively Definition p_testAx := testAx.
 Print p_testAx.
 
-Eval cbv in (program_Program p_testAx (Ret nil)).
+Eval cbv in (program_Program p_testAx).
 Definition pgm :=
-  match  (program_Program p_testAx (Ret nil)) with
-    | Ret pgm => env pgm
+  match  (program_Program p_testAx) with
+    | Ret pgm => env _ pgm
     | x => nil
   end.
 Eval compute in pgm.
 Definition main :=
-  match  (program_Program p_testAx (Ret nil)) with
-    | Ret pgm => main pgm
+  match  (program_Program p_testAx) with
+    | Ret pgm => main _ pgm
     | x => prop
   end.
 Eval compute in main.
@@ -453,7 +453,7 @@ Fixpoint ack (n m:nat) {struct n} : nat :=
 Eval cbv in ack 3 5.
 Definition ack35 := (ack 3 5).
 Quote Recursively Definition p_ack35 := ack35.
-Eval cbv in (program_Program p_ack35 (Ret nil)).
+Eval cbv in (program_Program p_ack35).
 Quote Definition q_ack35 := Eval cbv in ack35.
 Goal (exc_wcbvEval 3000 p_ack35) = term_Term q_ack35.
 vm_compute. reflexivity.
@@ -477,7 +477,7 @@ Eval cbv in taut 1 (fun x => x || negb x).
 (* Pierce *)
 Definition pierce := taut 2 (fun x y => implb (implb (implb x y) x) x).
 Quote Recursively Definition p_pierce := pierce.
-Eval cbv in (program_Program p_pierce (Ret nil)).
+Eval cbv in (program_Program p_pierce).
 Quote Definition q_pierce := Eval cbv in pierce.
 Goal (exc_wcbvEval 100 p_pierce) = term_Term q_pierce.
  unfold exc_wcbvEval, program_Program, p_pierce.
@@ -552,7 +552,7 @@ Definition sherwood: forest bool :=
   fcons (node true (fcons (node true (leaf false)) (leaf true)))
         (leaf false).
 Quote Recursively Definition p_sherwood_size := (forest_size sherwood).
-Eval cbv in (program_Program p_sherwood_size (Ret nil)).
+Eval cbv in (program_Program p_sherwood_size).
 Quote Definition q_sherwood_size := Eval cbv in (forest_size sherwood).
 Goal (exc_wcbvEval 40 p_sherwood_size) = term_Term q_sherwood_size.
 reflexivity.

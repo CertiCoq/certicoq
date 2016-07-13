@@ -18,9 +18,9 @@ Set Implicit Arguments.
 Definition L1_5Term := L1_5.compile.Term.
 Definition L1_5Terms := L1_5.compile.Terms.
 Definition L1_5Defs := L1_5.compile.Defs.
-Definition L1_5EC := L1_5.compile.envClass.
-Definition L1_5Env := L1_5.compile.environ.
 Definition L1_5Pgm := L1_5.compile.Program.
+Definition L1_5EC := @AstCommon.envClass L1_5Term.
+Definition L1_5Env := AstCommon.environ L1_5Term.
 
 
 Inductive Term : Type :=
@@ -90,13 +90,6 @@ with stripDs (ts:L1_5Defs) : Defs :=
   end.
 
 
-(** this function for use in translation from L2 to L3 **)
-Fixpoint arity_from_dtyp
-        (npars:nat) (itps:itypPack) (tndx:nat) (cndx:nat) : exception nat :=
-  do ity <- exnNth itps tndx;
-  do itp <- exnNth (itypCnstrs ity) cndx;
-  ret (npars + (CnstrArity itp)).
-
 (** environments and programs **)
 Definition envClass := AstCommon.envClass Term.
 Definition environ := AstCommon.environ Term.
@@ -104,7 +97,7 @@ Definition Program := AstCommon.Program Term.
 
 Function stripEC (ec:L1_5EC) : envClass :=
   match ec with
-    | AstCommon.ecTrm _ t => AstCommon.ecTrm Term (strip t)
+    | AstCommon.ecTrm t => AstCommon.ecTrm (strip t)
     | AstCommon.ecTyp _ n itp => AstCommon.ecTyp Term n itp
     | AstCommon.ecAx _ => AstCommon.ecAx Term
   end.
@@ -113,18 +106,18 @@ Definition  stripEnv : L1_5Env -> environ :=
   List.map (fun nmec : string * L1_5EC => (fst nmec, stripEC (snd nmec))).
 
 Definition stripProgram (p:L1_5Pgm) : Program :=
-  {| env:= stripEnv (env _ p);
-     main:= strip (main _ p) |}.
+  {| env:= stripEnv (env p);
+     main:= strip (main p) |}.
 
 (*** from L0 to L2 ***)
-Definition program_Program (pgm:program) : option Program :=
+Definition program_Program (pgm:program) : exception Program :=
   match L1_5.compile.program_Program pgm with
-    | Exc str => None
-    | Ret pgm => Some (stripProgram pgm)
+    | Exc str => raise str
+    | Ret pgm => ret (stripProgram pgm)
   end.
-Definition term_Term (t:term) : option Term :=
+Definition term_Term (t:term) : exception Term :=
   match L1_5.compile.term_Term t with
-    | Exc str => None
-    | Ret trm => Some (strip trm)
+    | Exc str => raise str
+    | Ret trm => ret (strip trm)
   end.
 

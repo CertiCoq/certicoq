@@ -3,7 +3,7 @@ Add LoadPath "../common" as Common.
 Add LoadPath "." as L1.
 
 Require Import Template.Template.
-Require Import Common.RandyPrelude.
+Require Import Common.Common.
 Require Import L1.compile.
 Require Import L1.wcbvEval.
 (***
@@ -551,6 +551,8 @@ with forest_size (f:forest bool) : nat :=
 Definition sherwood: forest bool :=
   fcons (node true (fcons (node true (leaf false)) (leaf true)))
         (leaf false).
+Quote Recursively Definition n_sherwood := sherwood.
+Print n_sherwood.
 Quote Recursively Definition p_sherwood_size := (forest_size sherwood).
 Eval cbv in (program_Program p_sherwood_size (Ret nil)).
 Quote Definition q_sherwood_size := Eval cbv in (forest_size sherwood).

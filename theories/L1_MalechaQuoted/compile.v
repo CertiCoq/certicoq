@@ -172,7 +172,7 @@ Fixpoint program_Program
       ret {| main:= T; env:= E |}
     | PConstr nm t p =>
       do T <- term_Term t;
-      program_Program p (econs (epair2 nm (ret (ecTrm Term T))) e)
+      program_Program p (econs (epair2 nm (ret (ecTrm T))) e)
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs
       in program_Program p (econs (epair2 nm (ret (ecTyp Term npar Ibs))) e)

@@ -21,8 +21,8 @@ Set Implicit Arguments.
 (** all items in an env are application-well-formed **)
 Inductive WFaEc: envClass-> Prop :=
 | wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall n i, WFaEc (ecTyp n i)
-| wfaecAx: WFaEc (ecAx).
+| wfaecTyp: forall n (i:itypPack), WFaEc (ecTyp _ n i)
+| wfaecAx: WFaEc (ecAx Term).
 
 Inductive WFaEnv: environ -> Prop :=
 | wfaenil: WFaEnv nil
@@ -30,152 +30,19 @@ Inductive WFaEnv: environ -> Prop :=
                    forall nm, WFaEnv ((nm, ec) :: p).
 
 
-Inductive fresh (nm:string) : environ -> Prop :=
-| fcons: forall s p ec,
-         fresh nm p -> nm <> s -> fresh nm ((s,ec)::p)
-| fnil: fresh nm nil.
-Hint Constructors fresh.
-
-Lemma fresh_dec: forall nm p, (fresh nm p) \/ ~(fresh nm p).
-induction p.
-- left. auto.
-- destruct a. destruct IHp. destruct (string_dec nm s).
- + subst. right. intros h. inversion_Clear h. nreflexivity H4.
- + left. constructor; auto.
- + right. intros h. elim H. inversion_Clear h. assumption.
-Qed.
-
-Lemma fresh_tl: forall nm p, fresh nm p -> fresh nm (tl p).
-induction 1.
-- simpl. assumption.
-- auto.
-Qed.
-
-Lemma fresh_strengthen:
-  forall rs qs nm, fresh nm (rs++qs) -> fresh nm qs.
-induction rs; intros qs nm h.
-- assumption.
-- inversion h. subst. auto.
-Qed.
-
-Lemma fresh_not_head:
-  forall nm t p nmtp, fresh nm nmtp -> nmtp = ((nm,t)::p) -> False.
-induction 1; intros h.
-- inversion h. subst. auto.
-- discriminate h.
-Qed.
-
-
 (*** Common functions for evaluation ***)
 
 (** Lookup an entry in the environment **)
-Inductive Lookup: string -> environ -> envClass -> Prop :=
-| LHit: forall s p t, Lookup s ((s,t)::p) t
-| LMiss: forall s1 s2 p t ec,
-           s2 <> s1 -> Lookup s2 p ec -> Lookup s2 ((s1,t)::p) ec.
-Hint Constructors Lookup.
+Definition Lookup := AstCommon.Lookup.
+Hint Constructors AstCommon.Lookup.
 
-Definition LookupDfn s p t := Lookup s p (ecTrm t).
-Definition LookupTyp s p n i := Lookup s p (ecTyp  n i).
-Definition LookupAx s p := Lookup s p (ecAx).
-
-Lemma Lookup_fresh_neq:
-  forall nm2 p t, Lookup nm2 p t -> forall nm1, fresh nm1 p -> nm1 <> nm2.
-induction 1; intros.
-- inversion H. assumption.
-- apply IHLookup. apply (fresh_tl H1).
-Qed.
-
-Lemma Lookup_weaken:
-  forall s p t, Lookup s p t -> 
-      forall nm ec, fresh nm p -> Lookup s ((nm, ec) :: p) t.
-intros s p t h1 nm ec h2.
-assert (j1:= Lookup_fresh_neq h1 h2). apply LMiss. apply neq_sym. assumption.
-assumption.
-Qed.
-
-Lemma Lookup_dec:
-  forall s p, (exists t, Lookup s p t) \/ (forall t, ~ Lookup s p t).
-Proof.
-  induction p; intros.
-  - right. intros t h. inversion h.
-  - destruct IHp; destruct a; destruct (string_dec s s0); subst.
-    + left. destruct H. exists e. apply LHit.
-    + left. destruct H. exists x. apply LMiss; assumption.
-    + destruct e.
-      * left. exists (ecTrm t). apply LHit.
-      * left. exists (ecTyp n i). apply LHit. 
-      * left. exists ecAx. apply LHit.
-    + right. intros t h. inversion_Clear h. 
-      * elim n. reflexivity.
-      * elim (H t). assumption.
-Qed.
-
+Definition LookupDfn s p (t:Term) := Lookup s p (ecTrm t).
+Definition LookupTyp s p n i := Lookup s p (ecTyp Term n i).
+Definition LookupAx s p := Lookup s p (ecAx Term).
 
 (** equivalent functions **)
-Function lookup (nm:string) (p:environ) : option envClass :=
-  match p with
-   | nil => None
-   | cons (s,ec) p => if (string_eq_bool nm s) then Some ec
-                      else lookup nm p
-  end.
-
-Function lookupDfn (nm:string) (p:environ) : option Term :=
-  match lookup nm p with
-   | Some (AstCommon.ecTrm _ t) => Some t
-   | _ => None
-  end.
-
-Lemma Lookup_lookup:
-  forall nm p t, Lookup nm p t -> lookup nm p = Some t.
-induction 1; intros; subst.
-- simpl. rewrite (string_eq_bool_rfl s). reflexivity.
-- simpl. rewrite (string_eq_bool_neq H). destruct t; assumption.
-Qed.
-
-Lemma lookup_Lookup:
-  forall nm p t, lookup nm p = Some t -> Lookup nm p t.
-induction p; intros t h. inversion h.
-destruct a. destruct (string_dec nm s); simpl in h.
-- subst. rewrite (string_eq_bool_rfl s) in h. 
-  injection h. intros; subst. apply LHit.
-- apply LMiss. assumption. apply IHp. 
-  rewrite (string_eq_bool_neq n) in h. assumption.
-Qed.
-
-Lemma not_lookup_not_Lookup:
- forall (nm:string) (p:environ) (ec:envClass),
-   ~(lookup nm p = Some ec) <-> ~(Lookup nm p ec).
-split; eapply deMorgan_impl.
-- apply (Lookup_lookup).
-- apply (lookup_Lookup).
-Qed.
-
-Lemma LookupDfn_lookupDfn:
-  forall nm p t, Lookup nm p t ->
-                 forall te, t = (ecTrm te) -> lookupDfn nm p = Some te.
-induction 1; intros; subst.
-- unfold lookupDfn, lookup. rewrite (string_eq_bool_rfl s). reflexivity.
-- unfold lookupDfn, lookup. rewrite (string_eq_bool_neq H).
-  destruct t; apply IHLookup; reflexivity.
-Qed.
-
-Lemma lookupDfn_LookupDfn:
-  forall nm p t, lookupDfn nm p = Some t -> Lookup nm p (ecTrm t).
-intros nm p t. 
-functional induction (lookupDfn nm p); intros h; try discriminate.
-- injection h. intros. subst. apply lookup_Lookup. assumption.
-Qed.
-
-Lemma Lookup_functional:
-  forall (nm:string) (p:environ) (t r:envClass),
-    Lookup nm p t -> Lookup nm p r -> t = r.
-intros nm p t r h1 h2. 
-assert (j1:= Lookup_lookup h1).
-assert (j2:= Lookup_lookup h2).
-rewrite j1 in j2. injection j2; intros; subst. reflexivity.
-Qed.
-
+Definition lookup := AstCommon.lookup.
+Definition lookupDfn := AstCommon.lookupDfn.
 
 Lemma Lookup_pres_WFapp:
   forall p, WFaEnv p -> forall nm ec, Lookup nm p ec -> WFaEc ec.
@@ -183,30 +50,6 @@ Proof.
   induction 1; intros nn ed h; inversion_Clear h.
   - assumption.
   - eapply IHWFaEnv. eassumption.
-Qed.
-
-Lemma fresh_Lookup_fails:
-  forall nm p ec, fresh nm p -> ~(Lookup nm p ec).
-induction 1; intro h; inversion h; subst; auto.
-Qed.
-
-Lemma Lookup_strengthen:
-  forall (nm1:string) pp t, Lookup nm1 pp t -> 
-       forall nm2 ec p, pp = (nm2,ec)::p -> nm1 <> nm2 -> Lookup nm1 p t.
-intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
-simpl in k. rewrite (string_eq_bool_neq j2) in k.
-apply lookup_Lookup. assumption.
-Qed.
-
-Lemma fresh_lookup_None: forall nm p, fresh nm p <-> lookup nm p = None.
-split. 
-- induction 1; simpl; try reflexivity.
-  + rewrite string_eq_bool_neq; assumption.
-- induction p; auto.
-  + destruct a. destruct (string_dec nm s). 
-    * subst. simpl. rewrite string_eq_bool_rfl. discriminate.
-    * simpl. rewrite string_eq_bool_neq; try assumption. intros h.
-      apply fcons; intuition.
 Qed.
 
 
@@ -261,7 +104,7 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctWkTrmTrm: forall n p t s nm, Crct p n t -> Crct p n s ->
            fresh nm p -> Crct ((nm,ecTrm s)::p) n t
 | CrctWkTrmTyp: forall n p t s nm, Crct p n t -> CrctTyp p n s ->
-           fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
+           fresh nm p -> forall m, Crct ((nm,ecTyp _ m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
 | CrctCast: forall n p t ck ty, Crct p n t -> Crct p n ty ->
                                 Crct p n (TCast t ck ty)
@@ -302,7 +145,7 @@ with CrctTyp: environ -> nat -> itypPack -> Prop :=
 | CrctTypWk1: forall n p t s nm, CrctTyp p n t -> Crct p n s ->
            fresh nm p -> CrctTyp ((nm,ecTrm s)::p) n t
 | CrctTypWk2: forall n p t s nm, CrctTyp p n t -> CrctTyp p n s ->
-           fresh nm p -> forall m, CrctTyp ((nm,ecTyp m s)::p) n t.
+           fresh nm p -> forall m, CrctTyp ((nm,ecTyp _ m s)::p) n t.
 Hint Constructors Crct Crcts CrctDs CrctTyp.
 Scheme Crct_ind' := Minimality for Crct Sort Prop
   with Crcts_ind' := Minimality for Crcts Sort Prop
@@ -379,7 +222,7 @@ Qed.
 
 Lemma CrctTypTl:
   forall pp n t, Crct pp n t ->
-   forall nm npars tp p, pp = ((nm,ecTyp npars tp)::p) -> CrctTyp p n tp.
+   forall nm npars tp p, pp = ((nm,ecTyp _ npars tp)::p) -> CrctTyp p n tp.
 induction 1; intros; try discriminate;
 try (solve [eapply IHCrct2; eassumption]);
 try (solve [eapply IHCrct; eassumption]).
@@ -467,7 +310,8 @@ try (solve [inversion_clear H4; elim (H0 nm0); trivial]).
   elim (H4 nm0); trivial.
 - inversion_clear j. elim (H1 nm); trivial. elim (H3 nm); trivial.
   induction args. inversion H7. elim (H5 nm); trivial.
-- inversion j. subst. elim (@fresh_Lookup_fails _ _ (ecTrm pd) H2). assumption.
+- inversion j. subst. elim (@fresh_Lookup_fails _ _ _ (ecTrm pd) H2).
+  unfold LookupDfn in H1. assumption.
 - inversion_Clear j. eelim (fresh_Lookup_fails H3). eassumption.
 - inversion_Clear j. elim (H0 nm); trivial. elim (H2 nm); trivial.
   elim (H4 nm); trivial.
@@ -523,16 +367,16 @@ Qed.
 Lemma  Crct_Typ_weaken:
   (forall p n t, Crct p n t -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                   forall npars, Crct ((nm,ecTyp npars itp)::p) n t) /\
+                   forall npars, Crct ((nm,ecTyp _ npars itp)::p) n t) /\
   (forall p n ts, Crcts p n ts -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                 forall npars, Crcts ((nm,ecTyp npars itp)::p) n ts) /\
+                 forall npars, Crcts ((nm,ecTyp _ npars itp)::p) n ts) /\
   (forall p n ds, CrctDs p n ds -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                   forall npars, CrctDs ((nm,ecTyp npars itp)::p) n ds) /\
+                   forall npars, CrctDs ((nm,ecTyp _ npars itp)::p) n ds) /\
   (forall p n jtp, CrctTyp p n jtp -> 
     forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                  forall npars,  CrctTyp ((nm,ecTyp npars itp)::p) n jtp).
+                  forall npars,  CrctTyp ((nm,ecTyp _ npars itp)::p) n jtp).
 Proof.
   eapply CrctCrctsCrctDsTyp_ind; intros; auto.
   - apply CrctWkTrmTyp; try assumption. eapply CrctConst; try eassumption.

@@ -8,29 +8,27 @@ Add LoadPath "../L3_flattenedApp" as L3.
 Require Import ExtLib.Data.String.
 Require Import Template.Template.
 Require Import Common.Common.
-Require L1.L1.         (* whole L1 library is exported by L1.L1 *)
 Require L2.L2.         (* whole L2 library is exported by L2.L2 *)
 Require Import L3.L3.  (* whole L3 library is exported by L3.L3 *)
 
-Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
+Local Open Scope string_scope.
 
 Definition exc_wcbvEval
-    (tmr:nat) (pgm:program) (tm:term): (exception Term * exception Term) :=
-  match L2.stripEvalCommute.program_Program pgm with
-    | None => (Exc "L2.stripEvalCommute.program_Program pgm fails:",
-               Ret prop)
-    | Some p =>
-      let e2 := L2.program.env p in
+  (tmr:nat) (pgm:program) (tm:term) : (exception Term * exception Term) :=
+  match L2.compile.program_Program pgm with
+    | Exc str => (Exc str, Ret prop)
+    | Ret p =>
+      let e2 := AstCommon.env p in
       match term_Term e2 tm with
-        | Exc s => (Exc ("term_Term e2 tm fails: " ++ s), Ret prop)
+        | Exc _ => (Exc ("term_Term e2 tm fails"), Ret prop)
         | Ret tTtm =>
-          match program_Program e2 pgm with
-            | Exc s => (Exc ("program_Program e2 pgm fails: " ++ s), Ret tTtm)
+          match program_Program pgm with
+            | Exc _ => (Exc ("program_Program e2 pgm fails"), Ret tTtm)
             | Ret pgm =>
               (option_exception
-                 (wcbvEval tmr (L3.program.env pgm) (L3.program.main pgm)),
+                 (wcbvEval tmr (env pgm) (main pgm)),
                Ret tTtm)
           end
       end
@@ -88,23 +86,14 @@ Definition Nat := nat.
 Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1).
 Quote Definition q_typedef := Eval compute in typedef.
 Quote Recursively Definition p_typedef := typedef.
-Eval compute in (L2.stripEvalCommute.program_Program p_typedef).
+Eval compute in (L2.compile.program_Program p_typedef).
 Definition e2 :=
-  match (L2.stripEvalCommute.program_Program p_typedef) with
-    | None => nil
-    | Some p => L2.program.env p 
+  match (L2.compile.program_Program p_typedef) with
+    | Exc _ => nil
+    | Ret p => AstCommon.env p 
   end.
 Eval compute in e2.
 Eval compute in (term_Term e2 q_typedef).
-Eval compute in (L1.malecha_L1.term_Term q_typedef).
-Eval compute in (match L1.malecha_L1.term_Term q_typedef with
-                   | Exc str => None
-                   | Ret tm => Some (strip e2 (L2.stripEvalCommute.strip tm))
-                 end).
-Eval compute in (match L1.malecha_L1.term_Term q_typedef with
-                   | Exc str => None
-                   | Ret tm => Some ( (L2.stripEvalCommute.strip tm))
-                 end).
 Eval compute in (exc_wcbvEval 20 p_typedef q_typedef).
 Goal 
   let ew := (exc_wcbvEval 20 p_typedef q_typedef) in
@@ -211,14 +200,13 @@ compute. reflexivity.
 Qed.
 
 Definition e3 :=
-  match (L2.stripEvalCommute.program_Program p_fcons) with
-    | None => nil
-    | Some p => L2.program.env p 
+  match (L2.compile.program_Program p_fcons) with
+    | Exc _ => nil
+    | Ret p => AstCommon.env p 
   end.
 Eval compute in e3.
 Eval compute in (term_Term e3 q_fcons).
-Eval compute in (L1.malecha_L1.term_Term q_fcons).
-Eval compute in (L2.stripEvalCommute.term_Term q_fcons).
+Eval compute in (L2.compile.term_Term q_fcons).
 Eval compute in (cnstrArity e3 (mkInd "Top.tree" 1) 1).
 Eval compute in (etaExp_cnstr e3 (mkInd "Top.tree" 1) 1 tnil).
 

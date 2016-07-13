@@ -8,6 +8,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.EqNat.
 Require Import Coq.Arith.Compare_dec.
+Require Import Common.AstCommon.
 Require Import L1.term.
 Require Import L1.program.
 Require Import L1.wndEval.
@@ -87,10 +88,10 @@ Proof.
     destruct H, H0, H1; try rght.
     + left. apply WNApp; auto.
   - destruct (Lookup_dec s p).
-    + destruct H. destruct (AstCommon.isAx_dec Term x).
+    + destruct H. destruct (isAx_dec x).
       * left. constructor. subst. assumption.
       * right. intros j. inversion j. elim H0.
-        unfold LookupAx in H2. apply (Lookup_functional H H2).
+        unfold LookupAx in H2. apply (Lookup_single_valued H H2).
     + right. intros h. inversion h. eelim H. apply H1.
   - destruct H, H0, H1; try rght.
     + destruct (isCanonical_dec t0); try rght.
@@ -194,7 +195,7 @@ Proof.
   - inversion h.
     inversion l; subst;
     unfold LookupDfn in l; unfold LookupAx in H0;
-    assert (j:= Lookup_functional l H0); discriminate.
+    assert (j:= Lookup_single_valued l H0); discriminate.
   - inversion h. subst. elim H5. exists nm, ty, bod. reflexivity.
   - inversion h. subst. elim H6.
     eapply canonicalP_isCanonical. eassumption.

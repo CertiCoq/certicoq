@@ -105,14 +105,7 @@ Qed.
 *** between converting L2 terms to L3 and L2 environs to L3)
 **)
 Section EtaExpand.
-Variable p:L2.compile.environ.
-
-(** temp: here we assume the type of constructors is evaluated **)
-(** when removing this; also remove L2.program.arity_from_dtyp **)
-Function cnstrArity (i:inductive) (n:nat) : exception nat :=
-  match i with
-    | mkInd str m => L2.program.cnstrArity str m n p
-  end.
+Variable p: AstCommon.environ L2.compile.Term.
 
 (** compute list of variables for eta expanding a constructor
 *** (which may already be partially applied)
@@ -124,7 +117,7 @@ Function etaArgs (n:nat) : Terms :=
   end.
 
 Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : exception Term :=
-  match cnstrArity i n with
+  match cnstrArity p i n with
     | Ret arity =>
       match nat_compare (tlength args) arity with
         | Eq => Ret (TConstruct i n args)
@@ -176,7 +169,7 @@ Function strip (t:L2Term) : exception Term :=
       end
     | L2.compile.TConst nm =>
       match L2.program.lookup nm p with
-        | Some (AstCommon.ecTrm _ _) => Ret (TConst nm)
+        | Some (AstCommon.ecTrm _) => Ret (TConst nm)
         | Some (AstCommon.ecAx _) => Ret (TAx)
         | Some (AstCommon.ecTyp _ _ _) =>
           Exc "L2.compile.lookup nm p returns a type"
@@ -241,7 +234,7 @@ Record Program : Type := mkPgm { main:Term; env:environ }.
 
 Function stripEC (ec:L2EC) : exception envClass :=
   match ec with
-    | AstCommon.ecTrm _ t =>
+    | AstCommon.ecTrm t =>
       match strip t with
         | Ret u => ret (ecTrm u)
         | Exc s => raise ("L3.compile, stripEC: " ++ s)
@@ -267,8 +260,8 @@ Function stripEnv (p:L2Env) : exception environ :=
   end.
 
 Definition stripProgram (p:L2Pgm) : exception Program :=
-  match stripEnv (AstCommon.env _ p),
-        strip (AstCommon.env _ p) (AstCommon.main _ p) with
+  match stripEnv (AstCommon.env p),
+        strip (AstCommon.env p) (AstCommon.main p) with
     | Ret q, Ret t => ret {| env:= q; main:= t |}
     | _, _ => raise ("L3 stripProgram; fails")
   end.
@@ -277,11 +270,11 @@ Definition stripProgram (p:L2Pgm) : exception Program :=
 (** L0-to-L3 translations **)
 Definition program_Program (p:program) : exception Program :=
   match L2.compile.program_Program p with
-    | Some q => stripProgram q
-    | None => raise ("L3 program_Program")
+    | Ret q => stripProgram q
+    | Exc str => raise ("L3 program_Program: " ++ str)
   end.
 Definition term_Term (e:L2.compile.environ) (t:term) : exception Term :=
   match L2.compile.term_Term t with
-    | None => raise "L2.compile.term_Term failed"
-    | Some trm => strip e trm
+    | Exc str => raise ("L2.compile.term_Term failed: " ++ str)
+    | Ret trm => strip e trm
   end.

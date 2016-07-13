@@ -483,7 +483,7 @@ Function wcbvEval
       match t with      (** look for a redex **)
         | TConst nm =>
           match (lookup nm p) with
-            | Some (AstCommon.ecTrm _ t) => wcbvEval n t
+            | Some (AstCommon.ecTrm t) => wcbvEval n t
             | Some (AstCommon.ecAx _) => ret (TConst nm)
             | Some (AstCommon.ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
             | _ => raise "wcbvEval: TConst environment miss"
@@ -654,10 +654,10 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
 - destruct H. exists (S x). intros m0 h. simpl.
   rewrite (j m0 x); try omega. rewrite H; try omega. reflexivity.
 - exists 0. intros m h. simpl.
-  unfold LookupAx in l. rewrite (Lookup_lookup l). reflexivity.
+  unfold LookupAx in l. unfold lookup. rewrite (Lookup_lookup l). reflexivity.
 - destruct H. exists (S x). intros mm h. simpl.
   rewrite (j mm x); try omega.
-  unfold LookupDfn in l. rewrite (Lookup_lookup l).
+  unfold LookupDfn in l. unfold lookup. rewrite (Lookup_lookup l).
   apply H. omega.
 - destruct H, H0, H1. exists (S (max x (max x0 x1))). intros m h.
   assert (j1:= max_fst x (max x0 x1)). 

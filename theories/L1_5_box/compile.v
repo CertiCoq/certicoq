@@ -179,7 +179,7 @@ Definition Program := AstCommon.Program Term.
 
 Function L1EC_EC (ec:L1EC) : envClass :=
   match ec with
-    | ecTrm _ t => ecTrm Term (L1Term_Term t)
+    | ecTrm t => ecTrm (L1Term_Term t)
     | ecTyp _ n itp => ecTyp Term n itp
     | ecAx _ => ecAx Term
   end.
@@ -188,8 +188,8 @@ Definition L1Env_Env: L1Env -> environ :=
   List.map (fun (nmec: string * L1EC) => (fst nmec, L1EC_EC (snd nmec))).
 
 Definition L1Pgm_Program (p:L1Pgm) : Program :=
-  {| env:= L1Env_Env (env _ p);
-     main:= L1Term_Term (main _ p) |}.
+  {| env:= L1Env_Env (env p);
+     main:= L1Term_Term (main p) |}.
 
 
 (*** from L0 to L1_5 ***)
@@ -204,6 +204,3 @@ Definition term_Term (t:term) : exception Term :=
     | Ret q => Ret (L1Term_Term q)
   end.
 
-Definition ecTrm := AstCommon.ecTrm Term.
-Definition ecTyp := AstCommon.ecTyp Term.
-Definition ecAx := AstCommon.ecAx Term.

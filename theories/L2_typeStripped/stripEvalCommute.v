@@ -28,7 +28,7 @@ Set Implicit Arguments.
 Definition L1_5Term := L1_5.compile.Term.
 Definition L1_5Terms := L1_5.compile.Terms.
 Definition L1_5Defs := L1_5.compile.Defs.
-Definition ecTrm := AstCommon.ecTrm Term.
+Definition ecTrm := AstCommon.ecTrm.
 Definition ecTyp := AstCommon.ecTyp Term.
 Definition ecAx := AstCommon.ecAx Term.
 
@@ -79,14 +79,14 @@ Lemma Lookup_hom:
  forall p s ec, L1_5.program.Lookup s p ec -> 
                Lookup s (stripEnv p) (stripEC ec).
 induction 1; destruct t.
-- change (Lookup s ((s, ecTrm (strip t)) :: (stripEnv p))
-                    (ecTrm (strip t))).
+- change (Lookup s ((s, ecTrm (strip l)) :: (stripEnv p))
+                    (ecTrm (strip l))).
   apply LHit.
 - change (Lookup s ((s, ecTyp n i) :: (stripEnv p)) (ecTyp n i)).
   apply LHit.
 - change (Lookup s ((s, ecAx) :: (stripEnv p)) ecAx).
   apply LHit.
-- change (Lookup s2 ((s1, ecTrm (strip t)) :: (stripEnv p))
+- change (Lookup s2 ((s1, ecTrm (strip l)) :: (stripEnv p))
                      (stripEC ec)).
   apply LMiss; assumption.
 - change (Lookup s2 ((s1, ecTyp n i) :: (stripEnv p)) (stripEC ec)).
@@ -514,11 +514,11 @@ Proof.
   apply L1_5.wcbvEval.WcbvEvalEvals_ind; intros; simpl; try reflexivity;
   try (solve[constructor; trivial]).
   - constructor. unfold LookupAx. unfold L1_5.program.LookupAx in *.
-    change (Lookup nm (stripEnv p) (stripEC L1_5.compile.ecAx)).
+    change (Lookup nm (stripEnv p) (stripEC (AstCommon.ecAx (L1_5.compile.Term)))).
     apply Lookup_hom. assumption.
   - refine (wConst _ _); try eassumption.
     unfold LookupDfn. unfold L1_5.program.LookupDfn in *.
-    change (Lookup nm (stripEnv p) (stripEC (L1_5.compile.ecTrm t))).
+    change (Lookup nm (stripEnv p) (stripEC (AstCommon.ecTrm t))).
     apply Lookup_hom. assumption.
   - refine (wAppLam _ _ _).
     + rewrite TLambda_hom in H. eassumption.

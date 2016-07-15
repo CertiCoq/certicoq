@@ -47,6 +47,13 @@ Fixpoint extend_fundefs (f: var -> var) (B B' : fundefs) : (var -> var) :=
 Definition codomain {A B} (f : A -> B) : Ensemble B := 
   fun y => exists x, f x = y.
 
+Definition image {A B} (f : A -> B) (S : Ensemble A) :=
+  fun y => exists x, In _ S x /\ f x = y.
+
+(** A function is injective in a subdomain *)
+Definition injectiveP {A B} (f : A -> B) P :=
+  forall x x', In _ P x -> In _ P x' -> f x = f x' -> x = x'.
+
 Definition injective {A B} (f : A -> B) :=
   forall x x', f x = f x' -> x = x'.
 

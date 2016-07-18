@@ -68,22 +68,22 @@ Inductive project_vars :
 Inductive make_closures :
   fundefs -> (* The function block *)
   Ensemble var -> (* The free set *)
-  (var -> var) -> (* The renaming *)
   var -> (* The environment variable *)
   exp_ctx -> (* The context that constructs the closures *)
+  (var -> var) -> (* The renaming *)
   Ensemble var -> (* The new free set *)
-  (var -> var) -> (* The new renaming *)
   Prop :=
 | closures_Fnil :
     forall Γ f S,
-      make_closures Fnil S f Γ Hole_c S f
+      make_closures Fnil S Γ Hole_c f S
 | closures_Fcons :
     forall f f' xs tau e B Γ C tau' t' g g' S S',
-      make_closures B (Setminus _ S (Singleton _ f')) g Γ C S' g' ->
+      make_closures B (Setminus _ S (Singleton _ f')) Γ C g S' ->
       In _ S f' ->
-      make_closures (Fcons f tau xs e B) S g Γ
-                    (Econstr_c f tau' t' [f'; Γ] C)
-                    S' (g' {f ~> f'}).
+      f_eq (g {f ~> f'}) g' ->
+      make_closures (Fcons f tau xs e B) S Γ
+                    (Econstr_c f tau' t' [f' ; Γ] C)
+                    g' S'.
 
 Inductive Closure_conversion :
   Ensemble var -> (* Variables in the current scope *)
@@ -100,7 +100,7 @@ Inductive Closure_conversion :
       (* Variables for projected vars should not shadow the variables in
          scope, i.e. Scope U FV U { Γ } *)
       Disjoint _ S (Union _ Scope
-                          (Union _ (image f Funs)
+                          (Union _ (image f (Setminus _ Funs Scope))
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_vars Scope Funs f Γ FVs S ys ys' C S' ->
       (* We do not care about ys'. Should never be accessed again so do not
@@ -111,7 +111,7 @@ Inductive Closure_conversion :
 | CC_Ecase :
     forall Scope Funs f Γ FVs x x' C S S' pats pats',
       Disjoint _ S (Union _ Scope
-                          (Union _ (image f Funs)
+                          (Union _ (image f (Setminus _ Funs Scope))
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_var Scope Funs f Γ FVs S x x' C S' ->
       Forall2 (fun (pat pat' : tag * exp) =>
@@ -124,7 +124,7 @@ Inductive Closure_conversion :
 | CC_Eproj :
     forall Scope Funs f Γ FVs S S' x y y' C C' tau tau' N e e',
       Disjoint _ S (Union _ Scope
-                          (Union _ (image f Funs)
+                          (Union _ (image f (Setminus _ Funs Scope))
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_var Scope Funs f Γ FVs S y y' C S' ->
       Closure_conversion (Union _ (Singleton _ x) Scope) Funs f Γ FVs e e' C' ->
@@ -136,29 +136,29 @@ Inductive Closure_conversion :
       Same_set _ (occurs_free_fundefs B) (FromList FVs') ->
       (* Project the FVs to construct the environment *)
       Disjoint _ S1 (Union _ Scope
-                          (Union _ (image f Funs)
+                          (Union _ (image f (Setminus _ Funs Scope))
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_vars Scope Funs f Γ FVs S1 FVs' FVs'' C' S1' ->
       (* Γ' is the variable that will hold the record of the environment *)
       Disjoint _ S3 (Union _ (name_in_fundefs B)
                            (Union _ Scope
-                                  (Union _ (image f Funs)
+                                  (Union _ (image f (Setminus _ Funs Scope))
                                          (Union _ (FromList FVs) (Singleton _ Γ))))) ->
       In _ S3 Γ' ->
       Disjoint _ S2 (Union _ (bound_var_fundefs B)
                            (Union _ (Singleton _ Γ')
                                   (Union _ Scope
-                                         (Union _ (image f Funs)
+                                         (Union _ (image f (Setminus _ Funs Scope))
                                                 (Union _ (FromList FVs) (Singleton _ Γ)))))) ->
-      make_closures B S2 id Γ' C S2' f' ->
+      make_closures B S2  Γ' C f' S2' ->
       Closure_conversion_fundefs (name_in_fundefs B) f' FVs' B B' ->
       Closure_conversion (Union _ (name_in_fundefs B) Scope) Funs f Γ FVs e e' Ce  ->
       Closure_conversion Scope Funs f Γ FVs (Efun B e)
-                         (Econstr Γ' tau t FVs'' (Efun B' (C |[ Ce |[ e' ]| ]|))) C'
+                         (Efun B' (C |[ Ce |[ e' ]| ]|)) (comp_ctx_f C' (Econstr_c Γ' tau t FVs'' Hole_c))
 | CC_Eapp :
     forall Scope Funs g Γ FVs f f' f'' env' ys ys' C S S' tau tau',
       Disjoint _ S (Union _ Scope
-                          (Union _ (image g Funs)
+                          (Union _ (image g (Setminus _ Funs Scope))
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       (* Project the function name and the actual parameter *)
       project_vars Scope Funs g Γ FVs S (f :: ys) (f' :: ys') C S' ->
@@ -175,7 +175,7 @@ Inductive Closure_conversion :
 | CC_Eprim :
     forall Scope Funs g Γ FVs S S' x ys ys' C C' tau tau' f e e',
       Disjoint _ S (Union _ Scope
-                          (Union _ (image g Funs)
+                          (Union _ (image g (Setminus _ Funs Scope))
                                  (Union _ (FromList FVs) (Singleton _ Γ)))) ->
       project_vars Scope Funs g Γ FVs S ys ys' C S' ->
       Closure_conversion (Union _ (Singleton _ x) Scope) Funs g Γ FVs e e' C' ->
@@ -189,10 +189,11 @@ with Closure_conversion_fundefs :
   fundefs -> (* After cc *)
   Prop :=
 | CC_Fcons :
-    forall Funs g Γ' FVs f tau tau' ys e e' C defs defs',
+    forall Funs g Γ' FVs S f tau tau' ys e e' C defs defs',
       (* The environment binding should not shadow the current scope
          (i.e. the names of the mut. rec. functions and the other arguments) *)
-      ~ In _ (Union _ (image g Funs) (Union _ (FromList ys) (bound_var e))) Γ' ->
+      Disjoint _ S (Union _ (image g Funs) (Union _ (FromList ys) (bound_var e))) ->
+      In _ S  Γ' ->
       Closure_conversion_fundefs Funs g FVs defs defs' ->
       Closure_conversion (FromList ys) Funs g Γ' FVs e e' C ->
       Closure_conversion_fundefs Funs g FVs (Fcons f tau ys e defs )

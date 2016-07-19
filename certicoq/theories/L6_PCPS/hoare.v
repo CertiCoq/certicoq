@@ -1,5 +1,6 @@
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad
         Coq.Classes.Morphisms Coq.Lists.List.
+Require Import functions.
 Import MonadNotation ListNotations.
 
 Open Scope monad_scope.
@@ -15,6 +16,8 @@ Definition triple {A S} (pre : S -> Prop) (e : state S A)
 Notation "{{ p }} e {{ q }}" :=
   (triple p e q) (at level 90, e at next level).
 
+
+(** Some extra combinators *)
 Fixpoint mapM {M : Type -> Type} {A B : Type} `{Monad M} (f : A -> M B)
          (l : list A)  : M (list B) :=
   match l with
@@ -35,9 +38,6 @@ Fixpoint sequence {M : Type -> Type} {A : Type} `{Monad M}
          xs' <- sequence xs ;;
          ret (x' :: xs')
   end.
-
-(* just to import the extensional equality definition, probably move it to an other file *)
-Require Import alpha_conv.
 
 (** Extensional equality for computations in the state monad *) 
 Definition st_eq {A S} (s1 s2 : state S A) := f_eq (runState s1) (runState s2).
@@ -98,45 +98,6 @@ Proof.
   destruct (runState m m1). reflexivity.
 Qed.
 
-(** * Lemmas about monadic combinators *)
-
-Lemma return_triple {A S} (x : A) (Pre : S -> Prop) (Post : S -> A -> S -> Prop) :
-  (forall i, Pre i -> Post i x i) ->
-  {{ Pre }} (ret x) {{ Post }}.
-Proof.
-  unfold triple. auto.
-Qed.
-
-Lemma bind_triple {A B S} (m : state S A) (f : A -> state S B)
-      (pre : S -> Prop) (post : S -> B -> S -> Prop)
-      (post' : S -> A -> S -> Prop):
-  {{ pre }} m {{ post' }} ->
-  (forall (x : A) i, {{ post' i x }} f x {{ fun i' => post i }}) -> 
-  {{ pre }} bind m f {{ post }}.
-Proof.
-  simpl. unfold triple; simpl. 
-  intros H1 H2 i Pre.
-  destruct (runState m i) eqn:Heq. eapply H2.
-  specialize (H1 i). rewrite Heq in H1. eapply H1; eauto.
-Qed.
-
-Lemma get_triple {S} :
-  {{ fun (i : S) => True }}
-    get
-  {{ fun (i : S) (x : S) (i' : S) =>
-       x = i /\ i = i' }}.
-Proof.
-  unfold triple; intros. simpl. eauto.
-Qed.
-
-Lemma put_triple {S} x :
-  {{ fun (i : S) => True }}
-    put x
-  {{ fun (_ : S) (_ : unit) (i' : S) =>
-       x = i' }}.
-Proof.
-  unfold triple; intros. simpl. eauto.
-Qed.
 
 (** * Usefull lemmas about triples *)
 
@@ -228,6 +189,67 @@ Proof.
   intros; eauto.
 Qed.
 
+Lemma pre_existential {A B S} (Pre : B -> S -> Prop) (Post : S -> A -> S -> Prop) e :
+  (forall b, {{ Pre b }} e {{ Post }}) ->
+  ({{ fun s => exists b, Pre b s }} e {{ Post }}).
+Proof.
+  intros Hb s [b' Hre]. eapply Hb. eassumption.
+Qed.    
+
+Lemma pre_uncurry_r {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
+  (P -> {{ Pre }} e {{ Post }}) ->
+  {{ fun s => Pre s /\ P }} e {{ Post }}.
+Proof.
+  intros Hyp s [Hpre HP]. eapply Hyp; eauto.
+Qed.
+
+Lemma pre_uncurry_l {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
+  (P -> {{ Pre }} e {{ Post }}) ->
+  {{ fun s => P /\ Pre s }} e {{ Post }}.
+Proof.
+  intros Hyp s [Hpre HP]. eapply Hyp; eauto.
+Qed.
+
+(** * Lemmas about monadic combinators *)
+
+Lemma return_triple {A S} (x : A) (Pre : S -> Prop) (Post : S -> A -> S -> Prop) :
+  (forall i, Pre i -> Post i x i) ->
+  {{ Pre }} (ret x) {{ Post }}.
+Proof.
+  unfold triple. auto.
+Qed.
+
+Lemma bind_triple {A B S} (m : state S A) (f : A -> state S B)
+      (pre : S -> Prop) (post : S -> B -> S -> Prop)
+      (post' : S -> A -> S -> Prop):
+  {{ pre }} m {{ post' }} ->
+  (forall (x : A) i, {{ post' i x }} f x {{ fun i' => post i }}) -> 
+  {{ pre }} bind m f {{ post }}.
+Proof.
+  simpl. unfold triple; simpl. 
+  intros H1 H2 i Pre.
+  destruct (runState m i) eqn:Heq. eapply H2.
+  specialize (H1 i). rewrite Heq in H1. eapply H1; eauto.
+Qed.
+
+Lemma get_triple {S} :
+  {{ fun (i : S) => True }}
+    get
+  {{ fun (i : S) (x : S) (i' : S) =>
+       x = i /\ i = i' }}.
+Proof.
+  unfold triple; intros. simpl. eauto.
+Qed.
+
+Lemma put_triple {S} x :
+  {{ fun (i : S) => True }}
+    put x
+  {{ fun (_ : S) (_ : unit) (i' : S) =>
+       x = i' }}.
+Proof.
+  unfold triple; intros. simpl. eauto.
+Qed.
+
 Lemma sequence_triple {A S} (Pre : S -> Prop) (P : A -> Prop) (l : list (state S A)) :
   Forall (fun e => {{ Pre }} e {{ fun _ e' s' => P e' /\ Pre s' }}) l ->  
   {{ Pre }} sequence l {{fun _ l' s' => Forall P l' /\ Pre s' }}.
@@ -257,27 +279,6 @@ Proof.
     eapply frame_rule. eapply IHl; eassumption.
     intros x' s'. eapply return_triple.
     intros s'' [HP [Hall Hpre]]. split; eauto.
-Qed.
-
-Lemma pre_existential {A B S} (Pre : B -> S -> Prop) (Post : S -> A -> S -> Prop) e :
-  (forall b, {{ Pre b }} e {{ Post }}) ->
-  ({{ fun s => exists b, Pre b s }} e {{ Post }}).
-Proof.
-  intros Hb s [b' Hre]. eapply Hb. eassumption.
-Qed.    
-
-Lemma pre_uncurry_r {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
-  (P -> {{ Pre }} e {{ Post }}) ->
-  {{ fun s => Pre s /\ P }} e {{ Post }}.
-Proof.
-  intros Hyp s [Hpre HP]. eapply Hyp; eauto.
-Qed.
-
-Lemma pre_uncurry_l {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
-  (P -> {{ Pre }} e {{ Post }}) ->
-  {{ fun s => P /\ Pre s }} e {{ Post }}.
-Proof.
-  intros Hyp s [Hpre HP]. eapply Hyp; eauto.
 Qed.
 
 Opaque triple bind ret.

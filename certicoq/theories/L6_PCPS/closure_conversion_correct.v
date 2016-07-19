@@ -1,5 +1,5 @@
-Require Import cps cps_util set_util hoisting identifiers ctx
-        Ensembles_util List_util closure_conversion eval logical_relations alpha_conv.
+Require Import cps cps_util set_util hoisting identifiers ctx Ensembles_util
+        List_util functions closure_conversion eval logical_relations alpha_conv.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -7,7 +7,7 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
 Import ListNotations.
 
 Open Scope ctx_scope.
-Open Scope alpha_scope.
+Open Scope fun_scope.
 
 (** For closure conversion, the free variables of an expression are divided in
     three categories :
@@ -598,34 +598,6 @@ Qed.
 
 (** * Various lemmas about [Closure_conversion_fundefs] *)
 
-Lemma image_Union {A B} S1 S2 (g : A -> B) :
-  Same_set _ (image g (Union _ S1 S2)) (Union _ (image g S1) (image g S2)).
-Proof. 
-  split; intros x Hi.
-  - destruct Hi as [x' [Hin Heq]]; subst. inv Hin.
-    left. eexists; eauto.
-    right. eexists; eauto.
-  - inv Hi; destruct H as [x' [Hin Heq]]; subst;
-    eexists; split; eauto.
-Qed.
-
-Lemma image_Singleton {A B} x (g : A -> B) :
-  Same_set _ (image g (Singleton _ x)) (Singleton _ (g x)).
-Proof. 
-  split; intros y Hi.
-  - destruct Hi as [x' [Hin Heq]]; subst. inv Hin.
-    eauto.
-  - destruct Hi as [x' [Hin Heq]]; subst. eexists; eauto.
-Qed.
-
-Lemma image_Empty_set {A B} (g : A -> B) :
-  Same_set _ (image g (Empty_set _)) ((Empty_set _)).
-Proof. 
-  split; intros y Hi.
-  - destruct Hi as [x' [Hin Heq]]; subst. inv Hin.
-  - inv Hi.
-Qed.
-
 Lemma closure_conversion_fundefs_Same_set_image σ Funs FVs B1 B2  :
   Closure_conversion_fundefs Funs σ FVs B1 B2 ->
   Same_set _ (image σ (name_in_fundefs B1)) (name_in_fundefs B2).
@@ -636,16 +608,8 @@ Proof.
   - simpl. rewrite image_Empty_set. apply Same_set_refl.
 Qed.
 
-Lemma injectiveP_antimon {A B} (σ : A -> B) S S' :
-  injectiveP σ S ->
-  Included _ S' S ->
-  injectiveP σ S'.
-Proof. 
-  intros Hinj Hinc x y Hin Hin' Heq. eauto.
-Qed.
-
 Lemma closure_conversion_fundefs_find_def σ Funs FVs B1 B2 f t1 xs e1 :
-  injectiveP σ (name_in_fundefs B1) ->
+  injective_subdomain (name_in_fundefs B1) σ ->
   Closure_conversion_fundefs Funs σ FVs B1 B2 ->
   find_def f B1 = Some (t1, xs, e1) ->
   exists t2 Γ' C e2,
@@ -660,7 +624,7 @@ Proof.
       intros Hc. eapply H. now eauto.
       simpl. rewrite Coqlib.peq_true. reflexivity.
     + edestruct IHHcc as [t2 [Γ'' [C' [e2 [Hnin [Hfind Hcc']]]]]]; eauto.
-      eapply injectiveP_antimon. eassumption.
+      eapply injective_subdomain_antimon. eassumption.
       now apply Included_Union_r.
       repeat eexists; eauto. simpl. rewrite Coqlib.peq_false. eassumption.
       intros Hc. eapply n. eapply Hinj; eauto.
@@ -671,46 +635,6 @@ Proof.
 Qed.
 
 (** * Lemmas about [make_closures] *)
-
-Lemma extend_gss f x x' :
-  f {x ~> x'} x = x'.
-Proof. 
-  unfold extend. rewrite Coqlib.peq_true. reflexivity.
-Qed.
-
-Lemma extend_gso f x x' y :
-  y <> x ->
-  f {x ~> x'} y = f y.
-Proof. 
-  intros Heq. unfold extend. rewrite Coqlib.peq_false; eauto.
-Qed.
-
-Lemma image_extend_Included f x x' S :
-  Included _ (image (f {x ~> x'}) S) (Union _ (image f S) (Singleton _ x')).
-Proof.  
-  intros y [y' [Hin Heq]]. unfold extend in Heq.
-  destruct (Coqlib.peq y' x); subst; [ now eauto |] .
-  left. eexists; eauto.
-Qed.
-
-Lemma image_monotonic {A B} (f : A -> B) S S' :
-  Included _ S S' ->
-  Included _ (image f S) (image f S').
-Proof.
-  intros Hin x [y [Hin' Heq]]; subst. eexists; eauto.
-Qed.
-
-Instance image_Proper_Same_set {A B} : Proper (eq ==> Same_set A ==> Same_set B) image.
-Proof.
-  intros x1 x2 Heq1 s1 s2 Hseq; subst; split; intros x [y [Hin Heq]]; subst;
-  eexists; split; eauto; apply Hseq; eauto.
-Qed.
-
-Instance image_Proper_f_eq {A B} : Proper (f_eq ==> eq ==> Same_set B) (@image A B).
-Proof.
-  intros x1 x2 Heq1 s1 s2 Hseq; subst; split; intros x [y [Hin Heq]]; subst;
-  eexists; split; eauto; apply Hseq; eauto.
-Qed.
 
 Lemma make_closures_image_Included B S Γ C σ S' :
   make_closures B S Γ C σ S' ->
@@ -739,33 +663,6 @@ Proof.
     now apply Subset_Setminus.
 Qed.
 
-Lemma injectiveP_extend f x x' S :
-  injectiveP f S ->
-  ~ In _ (image f (Setminus _ S (Singleton _ x))) x' ->
-  injectiveP (f {x~>x'}) (Union _ (Singleton _ x) S).
-Proof.
-  intros Hinj Hnin.
-  intros y y' Hin1 Hin2.
-  destruct (Coqlib.peq x y); subst.
-  - rewrite extend_gss. intros Heq.
-    destruct (Coqlib.peq y y'); [ now eauto | ].
-    rewrite extend_gso in Heq; [| now eauto ]. 
-    exfalso. eapply Hnin. eexists; split; [| now eauto ].
-    inv Hin2. inv H. congruence.
-    constructor; eauto. intros Hc; inv Hc; congruence.
-  - rewrite extend_gso; [| now eauto ].
-    destruct (Coqlib.peq x y'); subst.
-    + rewrite extend_gss. intros Heq. subst.
-      exfalso. apply Hnin. eexists.
-      split; [| reflexivity ].
-      inv Hin1. inv H; congruence. 
-      constructor; eauto. intros Hc; inv Hc; congruence.
-    + rewrite extend_gso; [| now eauto ].
-      intros Heq. eapply Hinj; eauto.
-      inv Hin1. inv H; congruence. eassumption.
-      inv Hin2. inv H; congruence. eassumption.
-Qed.
-
 Lemma make_closures_image_Disjoint B S Γ C σ S' :
   make_closures B S Γ C σ S' ->
   Disjoint _ (image σ (name_in_fundefs B)) S'.
@@ -784,21 +681,15 @@ Proof.
       apply Disjoint_sym. eapply Disjoint_Setminus. now apply Included_refl.
 Qed.
 
-Instance injectiveP_Proper {A B} : Proper (f_eq ==> eq ==> iff) (@injectiveP A B).
-Proof.
-  intros f1 f2 Hfeq s1 s2 Hseq; split; intros Hinj x y Hin1 Hin2 Heq; subst;
-  eapply Hinj; eauto. now rewrite !Hfeq. now rewrite <- !Hfeq. 
-Qed.
-
 Lemma make_closures_injective B S Γ C σ S' :
   Disjoint _ S (name_in_fundefs B) ->
   make_closures B S Γ C  σ S' ->
-  injectiveP σ (name_in_fundefs B).
+  injective_subdomain (name_in_fundefs B) σ.
 Proof. 
   intros Hd Hmc. induction Hmc.
   - intros x y Hc. inv Hc. 
   - simpl. rewrite <- H0.
-    eapply injectiveP_extend.
+    eapply injective_subdomain_extend.
     + eapply IHHmc.
       eapply Disjoint_Included_r; [| eapply Disjoint_Included_l; [| eassumption ] ].
       now apply Included_Union_r.
@@ -1122,16 +1013,6 @@ Qed.
 
 (** * Correctness lemmas *)
 
-Lemma injectiveP_Union_Disjoint {A B} (f : A -> B) S1 S2 :
-  injectiveP f (Union _ S1 S2) ->
-  Disjoint _ S1 S2 ->
-  Disjoint _ (image f S1) (image f S2).
-Proof. 
-  intros Hinj. constructor; intros x Hin. inv Hin. 
-  destruct H0 as [y [Hin Heq]]. destruct H1 as [y' [Hin' Heq']].
-  subst. eapply Hinj in Heq'; eauto. eapply H. subst; eauto.
-Qed.
-
 Lemma fun_in_fundefs_bound_var_fundefs B f tau xs e :
   fun_in_fundefs B (f, tau, xs, e) ->
   Included _ (Union _ (Singleton _ f) (Union _ (FromList xs) (bound_var e))) (bound_var_fundefs B).
@@ -1160,7 +1041,7 @@ Lemma Closure_conversion_fundefs_correct k rho rho' B1 B2 B1' B2'
         ~ In var (bound_var e) Γ ->
         binding_in_map (occurs_free e) rho ->
         fundefs_names_unique e ->
-        injectiveP σ Funs ->
+        injective_subdomain Funs σ ->
         Disjoint var (image σ (Setminus _ Funs Scope)) (bound_var e) ->
         Fun_inv m rho rho' Scope Funs σ Γ ->
         FV_inv m rho rho' Scope Funs Γ FVs ->
@@ -1175,8 +1056,8 @@ Lemma Closure_conversion_fundefs_correct k rho rho' B1 B2 B1' B2'
   Disjoint _ (image σ (name_in_fundefs B1)) (bound_var_fundefs B1) ->
   Disjoint _ (image σ (name_in_fundefs B1')) Scope ->
   Same_set _ (image σ (name_in_fundefs B1)) (name_in_fundefs B2) ->
-  injectiveP σ (name_in_fundefs B1) ->
-  injectiveP σ (name_in_fundefs B1') ->
+  injective_subdomain (name_in_fundefs B1) σ ->
+  injective_subdomain (name_in_fundefs B1') σ ->
   ~ In _ (name_in_fundefs B1) Γ ->
   ~ In _ (name_in_fundefs B1') Γ ->
   ~ In _ (name_in_fundefs B2) Γ ->
@@ -1198,13 +1079,13 @@ Proof.
         inv Hun'; eauto.
       * eapply Disjoint_Included_l; [| eassumption ].
         eapply image_monotonic.  now apply Included_Union_r.
-      * eapply injectiveP_antimon. eassumption. now apply Included_Union_r.
+      * eapply injective_subdomain_antimon. eassumption. now apply Included_Union_r.
       * intros Hc. apply Hnin1'. simpl; eauto.
       * intros Hc. apply Hnin2'. simpl; eauto.
     + intros Hc. eapply Hnin2'. subst. left. eauto.
     + intros Hc. eapply Hd''. constructor; eauto. eexists. split; eauto.
       left. eauto.
-    + simpl in Hinj'. eapply injectiveP_Union_Disjoint in Hinj'.
+    + simpl in Hinj'. eapply injective_subdomain_Union_not_In_image in Hinj'.
       intros Hc. eapply Hinj'. constructor; eauto. eexists; eauto.
       eapply image_monotonic; [| eassumption ]. now apply Subset_Setminus.
       eapply Disjoint_sym. eapply Disjoint_Singleton.
@@ -1480,16 +1361,6 @@ Proof.
     + eauto.
 Qed.
 
-Lemma injectiveP_Union_not_In_image {A B} (f : A -> B) S1 S2 :
-  injectiveP f (Union _ S1 S2) ->
-  Disjoint _ S1 S2 ->
-  Disjoint _ (image f S1) (image f S2).
-Proof. 
-  intros Hinj. constructor; intros x Hin. inv Hin. 
-  destruct H0 as [y [Hin Heq]]. destruct H1 as [y' [Hin' Heq']].
-  subst. eapply Hinj in Heq'; eauto. eapply H. subst; eauto.
-Qed.
-
 (** Correctness of [Closure_conversion] *)
 Lemma Closure_conversion_correct k rho rho' e e' Scope Funs σ Γ FVs C :
   (* [Scope] invariant *)
@@ -1501,7 +1372,7 @@ Lemma Closure_conversion_correct k rho rho' e e' Scope Funs σ Γ FVs C :
   (* The blocks of functions have unique function names *)
   fundefs_names_unique e ->
   (* function renaming is injective in the [Funs] subdomain *)
-  injectiveP σ Funs ->
+  injective_subdomain Funs σ ->
   (* function renaming codomain is not shadowed by other vars *)
   Disjoint _ (image σ (Setminus _ Funs Scope)) (bound_var e) ->
   (* [Fun] invariant *)

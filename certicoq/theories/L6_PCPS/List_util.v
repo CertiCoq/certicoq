@@ -5,6 +5,8 @@ Import ListNotations.
 
 Ltac inv H := inversion H; clear H; subst.
 
+(** Definition of [nthN]. Same as [nth_error] but the argument is
+  * of type [N] instead of [nat] *)
 Function nthN {A: Type} (al: list A) (n: N) : option A :=
   match al, n with
     | a::al', 0%N => Some a
@@ -20,6 +22,8 @@ Inductive Forall2_asym {A} (R : relation A) : list A -> list A -> Prop :=
 
 Hint Constructors Forall2_asym.
 
+
+(** Lemmas about [Forall2] and [Forall2_asym] *)
 Lemma Forall2_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
   Forall2 R l1 l2 -> length l1 = length l2. 
 Proof.
@@ -151,6 +155,8 @@ Proof.
   - apply IHl. intros. apply H. constructor 2; eauto.
 Qed.
 
+(** Lemmas about [nthN] *)
+
 Lemma In_nthN (A : Type) (l : list A) (v : A) :
   List.In v l -> exists n, nthN l n = Some v .
 Proof.
@@ -164,4 +170,123 @@ Proof.
       zify. omega. 
       rewrite <- Heq. rewrite N_as_OT.add_sub.
       eassumption.
+Qed.
+
+Lemma nthN_In {A} (l : list A) n v :
+  nthN l n = Some v ->
+  List.In v l.
+Proof. 
+  revert n v. induction l; intros n v Hnth.
+  - inv Hnth.
+  - destruct n. inv Hnth.
+    now constructor.
+    constructor 2. eapply IHl. eauto. 
+Qed.
+
+Lemma nthN_app {A} (l1 l2 : list A) N :
+  (nthN (l1 ++ l2) N = nthN l1 N) \/
+  (nthN (l1 ++ l2) N = nthN l2 (N - N.of_nat (length l1))%N /\ (N.of_nat (length l1) <= N)%N).
+Proof. 
+  revert N; induction l1; intros N.
+  - right. rewrite app_nil_l, N.sub_0_r. split; eauto. simpl. zify; omega.
+  - destruct N; [now eauto |].
+    destruct (IHl1 ((N.pos p)-1)%N) as [H1 | [H2 H3]].
+    now eauto.
+    replace (N.of_nat (length (a :: l1))) with (1 + N.of_nat (length l1))%N.
+    replace (N.pos p - (1 + N.of_nat (length l1)))%N with
+    (N.pos p - 1 - N.of_nat (length l1))%N.
+    right. split. now eauto. zify. omega. 
+    zify; omega. 
+    simpl (length _). rewrite Nnat.Nat2N.inj_succ.
+    zify. omega. 
+Qed.
+
+Lemma nthN_app_geq {A} (l1 l2 : list A) N :
+  (N.of_nat (length l1) <= N)%N ->
+  nthN (l1 ++ l2) N = nthN l2 (N - N.of_nat (length l1))%N.
+Proof.
+  revert N. induction l1; intros N Heq.
+  - simpl. rewrite N.sub_0_r. reflexivity.
+  - simpl length in *. 
+    destruct N. 
+    zify. omega.
+    rewrite Nnat.Nat2N.inj_succ.
+    rewrite <- N.add_1_l, N_as_DT.sub_add_distr. 
+    rewrite <- IHl1.
+    reflexivity. zify. omega. 
+Qed.
+
+Lemma nthN_is_Some_app {A} (l1 l2 : list A) N x :
+  nthN l1 N = Some x ->
+  nthN (l1 ++ l2) N = Some x.
+Proof.
+  revert N. induction l1; intros N Heq.
+  - inv Heq.
+  - destruct N. inv Heq. reflexivity.
+    simpl. eauto.
+Qed.
+
+Lemma nthN_length {A B} (l1 : list A) (l2 : list B) (n : N) (v1 : A) :
+  length l1 <= length l2 ->
+  nthN l1 n = Some v1 ->
+  exists v2,
+    nthN l2 n = Some v2.
+Proof.
+  revert l2 n.
+  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
+  - inv Hnth.
+  - destruct n as [| n]; destruct l2; try discriminate.
+    + simpl in H. omega.
+    + simpl in Hnth. inv Hnth.
+      eexists. split; simpl; eauto.
+    + simpl in H. omega.
+    + edestruct IHxs with (l2 := l2) as [v2 Hnth2]; eauto.
+      simpl in H. omega.
+Qed.
+
+Lemma nthN_is_Some_length {A} (l : list A) N x :
+  nthN l N = Some x ->
+  (N < N.of_nat (length l))%N.
+Proof. 
+  revert N. induction l; intros N Heq.
+  - inv Heq. 
+  - destruct N. inv Heq.
+    unfold length. rewrite Nnat.Nat2N.inj_succ. zify. omega. 
+    assert (Hlt : ((N.pos p)-1 < N.of_nat (length l))%N) by eauto.
+    simpl (length _). rewrite Nnat.Nat2N.inj_succ.
+    zify. omega. 
+Qed.
+
+Lemma Forall2_nthN {A B} (R : A -> B -> Prop) l1 l2
+      (n : N) (v1 : A):
+  Forall2 R l1 l2 ->
+  nthN l1 n = Some v1 ->
+  exists v2,
+    nthN l2 n = Some v2 /\
+    R v1 v2.
+Proof.
+  revert l2 n.
+  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
+  - inv H. discriminate.
+  - inv H. destruct n as [| n].
+    + simpl in Hnth. inv Hnth.
+      eexists. split; simpl; eauto.
+    + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
+Qed.
+
+Lemma Forall2_asym_nthN {A} (R : A -> A -> Prop) (l1 l2 : list A)
+      (n : N) (v1 : A):
+  Forall2_asym R l1 l2 ->
+  nthN l1 n = Some v1 ->
+  exists v2,
+    nthN l2 n = Some v2 /\
+    R v1 v2.
+Proof.
+  revert l2 n.
+  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
+  - inv H. discriminate.
+  - inv H. destruct n as [| n].
+    + simpl in Hnth. inv Hnth.
+      eexists. split; simpl; eauto.
+    + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
 Qed.

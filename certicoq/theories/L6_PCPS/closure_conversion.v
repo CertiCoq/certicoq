@@ -1,5 +1,5 @@
 Require Import cps cps_util set_util relations hoisting identifiers ctx
-        Ensembles_util List_util alpha_conv.
+        Ensembles_util List_util alpha_conv functions.
 Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
@@ -8,7 +8,7 @@ Import ListNotations Nnat MonadNotation.
 Require Maps.
 
 Open Scope ctx_scope.
-Open Scope alpha_scope.
+Open Scope fun_scope.
 
 (** * Closure conversion as a relation  *)
 

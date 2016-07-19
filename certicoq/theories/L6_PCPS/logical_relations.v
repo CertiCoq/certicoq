@@ -17,11 +17,11 @@ Import ListNotations.
  * Integers: (n1 ~_k n2) iff n1 = n2
  * Constructors: C[v_1, .., v_n] ~_k C[v'_1, .., v'_m] iff
                      n <= m /\ v_1 ~_k v'_1 /\ ... /\ v_n ~_k v'_n'
-   * Closures: (\f1 x1. e1, ρ1) ~_k C[(\f2 Γ x2. e2, ρ2), ρ] iff 
-   *              \forall v1 v2 i < k, v1 ~_j v2 => 
-   *                (e1, ρ1[x1 -> v1, f1 -> (\f1 x1. e1, ρ1)]) ~_j 
-   *                (e2, [x2 -> v2, f2 -> (\f2 x2. e2, ρ2), Γ -> ρ])
-   *)
+ * Closures: (\f1 x1. e1, ρ1) ~_k {(\f2 Γ x2. e2, ρ2); ρ} iff 
+ *              \forall v1 v2 i < k, v1 ~_j v2 => 
+ *                (e1, ρ1[x1 -> v1, f1 -> (\f1 x1. e1, ρ1)]) ~_j 
+ *                (e2, [x2 -> v2, f2 -> (\f2 x2. e2, ρ2), Γ -> ρ])
+ *)
 Fixpoint cc_approx_val (k : nat) (v1 v2 : val) {struct k} : Prop :=
   let cc_approx_exp (k : nat) (p1 p2 : exp * env) : Prop :=
       let '(e1, rho1) := p1 in

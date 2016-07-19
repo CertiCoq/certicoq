@@ -1,5 +1,5 @@
 Require Import cps ctx cps_util set_util identifiers Ensembles_util List_util
-        eval logical_relations.
+        eval logical_relations functions.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -7,14 +7,8 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
 Import ListNotations.
 
 Open Scope ctx_scope.
+Open Scope fun_scope.
 
-Definition extend (f: var -> var) (x x' : var) : (var -> var) :=
-  fun z => if Coqlib.peq z x then x' else f z.
-
-Notation " f '{' x '~>' y '}' " := (extend f x y) (at level 10, no associativity)
-                                   : alpha_scope.
-
-Open Scope alpha_scope.
 
 Fixpoint extend_lst (f: var -> var) (xs xs' : list var) : (var -> var) :=
   match xs with
@@ -44,19 +38,6 @@ Fixpoint extend_fundefs (f: var -> var) (B B' : fundefs) : (var -> var) :=
 (* Notation " f '<{' B '~>' B' '}>' " := (extend_fundefs f B B') (at level 10, no associativity) *)
 (*                                        : alpha_scope. *)
 
-Definition codomain {A B} (f : A -> B) : Ensemble B := 
-  fun y => exists x, f x = y.
-
-Definition image {A B} (f : A -> B) (S : Ensemble A) :=
-  fun y => exists x, In _ S x /\ f x = y.
-
-(** A function is injective in a subdomain *)
-Definition injectiveP {A B} (f : A -> B) P :=
-  forall x x', In _ P x -> In _ P x' -> f x = f x' -> x = x'.
-
-Definition injective {A B} (f : A -> B) :=
-  forall x x', f x = f x' -> x = x'.
-
 Inductive construct_lst_injection : (var -> var) -> list var -> list var -> (var -> var) -> Prop :=
 | Inj_nil :
     forall f, construct_lst_injection f [] [] f
@@ -75,6 +56,7 @@ Inductive construct_fundefs_injection : (var -> var) -> fundefs -> fundefs -> (v
       injective (f' {g1 ~> g2}) ->
       construct_fundefs_injection f (Fcons g1 t1 xs1 e1 B1) (Fcons g2 t2 xs2 e2 B2) (f' {g1 ~> g2}).
 
+(** α-equivalent terms *)
 Inductive Alpha_conv : exp -> exp -> (var -> var) -> Prop :=
 | Alpha_Econstr :
     forall x x' tau t ys ys' e e' f,
@@ -122,66 +104,6 @@ with Alpha_conv_fundefs : fundefs -> fundefs -> (var -> var) -> Prop :=
       Alpha_conv e e' f' ->
       Alpha_conv_fundefs (Fcons g tau xs e B) (Fcons g' tau xs' e' B') f.
 
-Lemma extend_injective (f : var -> var) x y :
-  injective f ->
-  ~ In _ (codomain f) y ->
-  injective (f{x ~> y}).
-Proof.
-  intros Hinj Hin x1 x2 Heq.
-  unfold extend in *.
-  edestruct (Coqlib.peq x1 x).
-  - rewrite <- e in Heq.
-    edestruct (Coqlib.peq x2 x1); [ now eauto |].
-    exfalso. eapply Hin. eexists; eauto.
-  - edestruct (Coqlib.peq x2 x).
-    + exfalso. eapply Hin. eexists; eauto.
-    + eauto.
-Qed.
-
-Definition f_eq  {A B} (f f' : A -> B) : Prop :=
-    forall x, f x = f' x.
-
-Lemma f_eq_extend (f f' : var -> var) x y :
-  f_eq f f' ->
-  f_eq (f{x ~> y}) (f'{x ~> y}).
-Proof. 
-  intros Heq. 
-  unfold extend. intros z. 
-  destruct (Coqlib.peq z x); eauto.
-Qed.
-
-Lemma f_eq_extend_same (f : var -> var) x y :
-  f x = y ->
-  f_eq (f{x ~> y}) f.
-Proof. 
-  intros Heq x'.
-    unfold extend. destruct (Coqlib.peq x' x); eauto.
-    congruence. 
-Qed.    
-
-Lemma extend_same f x y :
-  f x = x ->
-  f {y ~> y} x = x. 
-Proof.
-  unfold extend. destruct (Coqlib.peq x y); eauto.
-Qed.
-
-Instance extend_Proper : Proper (f_eq ==> Logic.eq ==> Logic.eq ==> f_eq) extend.
-Proof. 
-  intros f1 f2 Hfeq x1 x2 Heq1 x3 x4 Hfeq2; subst.
-  intros x. unfold extend. destruct (Coqlib.peq x x2); eauto.
-Qed.
-
-Instance injective_proper {A B} : Proper (f_eq ==> iff) (@injective A B).
-Proof. 
-  intros f f' Heq. split; intros Hinj x y Heq'; eapply Hinj; congruence.
-Qed.
-
-Instance equivalence_f_eq {A B} : Equivalence (@f_eq A B). 
-Proof. 
-  constructor; congruence. 
-Qed.      
-
 Lemma construct_fundefs_injection_f_eq f f' B B' g :
   construct_fundefs_injection f B B' f' ->
   f_eq f g ->
@@ -219,18 +141,19 @@ Proof.
   eapply exp_def_mutual_ind; intros; split; intros H'; subst.
   - inv H'; constructor; eauto.
     + eapply Forall2_monotonic; [| eassumption ].
-      intros x1 x2 Heq. rewrite <- H2. eassumption. 
+      intros x1 x2 Heq. rewrite <- H2. eassumption.
     + rewrite f_eq_extend. eassumption. symmetry. eassumption.
     + eapply H; eauto. symmetry.
       eapply f_eq_extend. eassumption. 
   - inv H'; constructor; eauto.
     + eapply Forall2_monotonic; [| eassumption ].
-      intros x1 x2 Heq. rewrite H2. eassumption. 
+      intros x1 x2 Heq. rewrite H2. eassumption.
     + rewrite f_eq_extend. eassumption. eassumption.
     + eapply H; eauto.
       eapply f_eq_extend. eassumption. 
-  - inv H'. inv H2. constructor; eauto.
-  - inv H'. inv H2. constructor; eauto.
+  - inv H'. inv H2. constructor. constructor.
+    rewrite H1. reflexivity.
+  - inv H'. inv H2. constructor;  eauto.
   - inv H'; constructor; eauto. inv H4. destruct y as [c' e'].
     inv H5. simpl in H1; subst. constructor.
     split; eauto. eapply H; eauto. symmetry; eassumption.      
@@ -300,8 +223,6 @@ Proof.
   now apply Alpha_conv_proper_mut.
 Qed.
 
-
-
 (** Pair of contexts that preserves α-equivalence *)
 Definition Alpha_conv_ctx C C' f :=
   forall e e',
@@ -362,8 +283,9 @@ Proof.
     rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
   - intros z' Hget. rewrite M.gso in Hget; eauto.
     destruct (Coqlib.peq (f z) y).
-    + exfalso. eapply Hneq. eapply Hinj.
-      unfold extend. now rewrite Heq', Coqlib.peq_true.
+    + exfalso. eapply Hneq. eapply Hinj. now constructor.
+      now constructor. rewrite extend_gso; eauto.
+      rewrite extend_gss. eassumption.
     + edestruct (Henv z); eauto.
       constructor; eauto. intros Hc. inv Hc. congruence. 
       eexists. rewrite M.gso; eauto. 
@@ -410,7 +332,8 @@ Proof.
       simpl. rewrite Coqlib.peq_true. eauto.
     + edestruct IHHa as [xs2 [ e2 Ha' ] ]; eauto.
       edestruct (Coqlib.peq (f g) (f g0)). 
-      * eapply Hinj in e0. subst. congruence.
+      * eapply Hinj in e0. subst. congruence. now constructor.
+        now constructor.
       * do 2 eexists. simpl. rewrite Coqlib.peq_false; eauto.
 Qed.
 
@@ -464,8 +387,8 @@ Proof.
       * eexists. unfold extend. rewrite Coqlib.peq_false; [| now eauto ].
         rewrite M.gso; [ now eauto |].
         intros Heq. eapply n. 
-        eapply H7. unfold extend. rewrite Coqlib.peq_false; [| eassumption ].
-        rewrite Coqlib.peq_true. eassumption. 
+        eapply H7; try now constructor.
+        rewrite extend_gss. rewrite extend_gso; eassumption. 
 Qed.
  
 Lemma preord_env_P_inj_def_funs_pre k rho1 rho2 B1 B1' B2 B2' f h h' e :
@@ -525,6 +448,7 @@ Proof.
     rewrite Union_Empty_set_l. now apply Included_refl.
 Qed.
 
+(** α-equivalence preserves semantics *)
 Lemma Alpha_conv_correct k rho1 rho2 e1 e2 f :
   injective f ->
   Alpha_conv e1 e2 f ->
@@ -583,5 +507,5 @@ Proof.
       eauto. 
 Qed.
 
-Close Scope alpha_scope.
+Close Scope fun_scope.
 Close Scope ctx_scope.

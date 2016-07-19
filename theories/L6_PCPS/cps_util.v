@@ -594,68 +594,6 @@ Proof.
   constructor 2. apply IHp; eauto.
 Qed.
 
-Lemma nthN_In {A} (l : list A) n v :
-  nthN l n = Some v ->
-  List.In v l.
-Proof. 
-  revert n v. induction l; intros n v Hnth.
-  - inv Hnth.
-  - destruct n. inv Hnth.
-    now constructor.
-    constructor 2. eapply IHl. eauto. 
-Qed. 
-
-Lemma Forall2_nthN {A B} (R : A -> B -> Prop) l1 l2
-      (n : N) (v1 : A):
-  Forall2 R l1 l2 ->
-  nthN l1 n = Some v1 ->
-  exists v2,
-    nthN l2 n = Some v2 /\
-    R v1 v2.
-Proof.
-  revert l2 n.
-  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
-  - inv H. discriminate.
-  - inv H. destruct n as [| n].
-    + simpl in Hnth. inv Hnth.
-      eexists. split; simpl; eauto.
-    + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
-Qed.
-
-Lemma Forall2_asym_nthN {A} (R : A -> A -> Prop) (l1 l2 : list A)
-      (n : N) (v1 : A):
-  Forall2_asym R l1 l2 ->
-  nthN l1 n = Some v1 ->
-  exists v2,
-    nthN l2 n = Some v2 /\
-    R v1 v2.
-Proof.
-  revert l2 n.
-  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
-  - inv H. discriminate.
-  - inv H. destruct n as [| n].
-    + simpl in Hnth. inv Hnth.
-      eexists. split; simpl; eauto.
-    + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
-Qed.
-
-Lemma nthN_length {A B} (l1 : list A) (l2 : list B) (n : N) (v1 : A) :
-  length l1 <= length l2 ->
-  nthN l1 n = Some v1 ->
-  exists v2,
-    nthN l2 n = Some v2.
-Proof.
-  revert l2 n.
-  induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
-  - inv Hnth.
-  - destruct n as [| n]; destruct l2; try discriminate.
-    + simpl in H. omega.
-    + simpl in Hnth. inv Hnth.
-      eexists. split; simpl; eauto.
-    + simpl in H. omega.
-    + edestruct IHxs with (l2 := l2) as [v2 Hnth2]; eauto.
-      simpl in H. omega.
-Qed.
 
 Lemma setlist_Forall2_get (P : val -> val -> Prop)
       xs vs1 vs2 rho1 rho2 rho1' rho2' x : 

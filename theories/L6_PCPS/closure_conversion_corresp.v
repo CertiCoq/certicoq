@@ -1,5 +1,5 @@
-Require Import cps cps_util set_util identifiers ctx alpha_conv hoare
-        Ensembles_util List_util closure_conversion closure_conversion_correct.
+Require Import cps cps_util set_util identifiers ctx hoare Ensembles_util
+        List_util closure_conversion closure_conversion_correct functions.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -8,7 +8,7 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations.
 
 Open Scope ctx_scope.
-Open Scope alpha_scope.
+Open Scope fun_scope.
 
 
 (** * Correspondance of the relational and the computational definitions of  closure conversion *)
@@ -41,8 +41,6 @@ Section CC_correct.
       | Some (MRFun x' _ _) => x'
       | _ => x
     end.
-
-  Opaque bind ret.
 
   (** A function that corresponds to an evaluation context *)
   Definition is_exp_ctx (f : exp -> exp) C : Prop := 
@@ -77,12 +75,8 @@ Section CC_correct.
     fresh S' x.
   Proof.
     intros Hinc Hf x' Hleq. eapply Hinc. eapply Hf. eassumption.
-  Qed.
-
-  Definition f_eq_subdomain {A B} S (f1 f2 : A -> B) :=
-    forall x, In _ S x -> f1 x = f2 x.
+  Qed.  
   
-
   Lemma FVmap_inv_set_bound FVmap Scope Funs FVs x t :
     FVmap_inv FVmap Scope Funs FVs ->
     FVmap_inv (M.set x (BoundVar t) FVmap) (Union _ (Singleton _ x) Scope) Funs FVs.
@@ -331,32 +325,6 @@ Section CC_correct.
     reflexivity. 
   Qed.
 
-
-  Definition new_function_names FVmap : Ensemble var :=
-    fun x => exists y t1 t2, M.get y FVmap = Some (MRFun x t1 t2).
-
-  Lemma not_In_new_function_names_injective FVmap f:
-    ~ In _ (new_function_names FVmap) f ->
-    injective (subst FVmap) ->
-    injective ((subst FVmap) {f ~> f}).
-  Proof.
-    intros Hc Hinj x x' Heq. unfold extend in *.
-    destruct (Coqlib.peq x x'); eauto.
-    destruct (Coqlib.peq x f); eauto.
-    - destruct (Coqlib.peq x' f); try congruence.
-      exfalso. eapply Hc. 
-      eexists x'. unfold subst in Heq.
-      destruct (M.get x' FVmap) eqn:Heq'; eauto; try congruence.
-      subst. destruct v; try congruence.
-      eauto.
-    - destruct (Coqlib.peq x' f); [| now eauto ].
-      exfalso. eapply Hc. 
-      eexists x. unfold subst in Heq.
-      destruct (M.get x FVmap) eqn:Heq'; eauto; try congruence.
-      subst. destruct v; try congruence.
-      eauto.
-  Qed.
-
   Lemma Disjoint_free_set FVmap Scope Funs FVs S :
     binding_not_in_map S FVmap ->
     FVmap_inv FVmap Scope Funs FVs ->
@@ -409,14 +377,6 @@ Section CC_correct.
     intros HB Hnin x' Hin.
     rewrite M.gsspec. destruct (Coqlib.peq x' x); subst; try contradiction. 
     eauto. 
-  Qed.
-
-  Lemma new_function_names_set_BoundVar FVmap x t :
-    Included _ (new_function_names (M.set x (BoundVar t) FVmap)) (new_function_names FVmap).
-  Proof.
-    unfold new_function_names. intros x' [y [t' [t'' Hin]]].
-    rewrite M.gsspec in Hin. destruct (Coqlib.peq y x); try congruence.  
-    eauto.
   Qed.
 
   Import MonadNotation.
@@ -536,73 +496,7 @@ Section CC_correct.
         constructor. intros x Hc. inv Hc. eapply Hd. now constructor; eauto.
       + intros Hc. eapply Hd. eauto.
   Qed.
-
-  Lemma new_function_names_add_params FVmap xs ts :
-    Included  _ (new_function_names (add_params xs ts FVmap)) (new_function_names FVmap).
-  Proof.
-    revert FVmap ts. induction xs; intros FVmap ts; simpl. 
-    - apply Included_refl.
-    - destruct ts;
-      (eapply Included_trans;
-       [ eapply new_function_names_set_BoundVar | eapply IHxs ]).
-  Qed.
-
-  (* Lemma injective_add_params FVmap xs ts : *)
-  (*   Disjoint _ (new_function_names FVmap) (FromList xs) ->  *)
-  (*   injective (subst FVmap) -> *)
-  (*   injective (subst (add_params xs ts FVmap)). *)
-  (* Proof.  *)
-  (*   revert FVmap ts. induction xs; intros FVmap ts Hd Hinj. *)
-  (*   - eassumption.  *)
-  (*   - simpl. destruct ts; rewrite <- subst_BoundVar_f_eq; *)
-  (*     eapply not_In_new_function_names_injective. *)
-  (*     + intros Hc. eapply Hd. constructor. *)
-  (*       eapply new_function_names_add_params. eassumption.  *)
-  (*       rewrite FromList_cons. eauto. *)
-  (*     + eapply IHxs. constructor. intros x Hin.  *)
-  (*       inv Hin. eapply Hd. constructor; eauto. *)
-  (*       rewrite FromList_cons. eauto. *)
-  (*       eassumption. *)
-  (*     + intros Hc. eapply Hd. constructor. *)
-  (*       eapply new_function_names_add_params. eassumption.  *)
-  (*       rewrite FromList_cons. eauto. *)
-  (*     + eapply IHxs. constructor. intros x Hin.  *)
-  (*       inv Hin. eapply Hd. constructor; eauto. *)
-  (*       rewrite FromList_cons. eauto. *)
-  (*       eassumption. *)
-  (* Qed. *)
-
-  (* Lemma construct_lst_injection_add_params FVmap xs ts : *)
-  (*   Disjoint _ (new_function_names FVmap) (FromList xs) -> *)
-  (*   injective (subst FVmap) -> *)
-  (*   exists f, *)
-  (*     f_eq f (subst (add_params xs ts FVmap)) /\ *)
-  (*     construct_lst_injection (subst FVmap) xs xs f. *)
-  (* Proof. *)
-  (*   revert FVmap ts. induction xs; intros FVmap ts Hd Hinj.   *)
-  (*   - eexists. split. simpl. reflexivity. constructor. *)
-  (*   - assert (Hinj' : injective (subst (add_params (a :: xs) ts FVmap))). *)
-  (*     { apply injective_add_params; eauto. } *)
-  (*     rewrite FromList_cons in Hd. *)
-  (*     destruct ts; edestruct IHxs as [f [Heq Hinj'']].  *)
-  (*     + eapply Disjoint_Included_r; [ | eassumption ]. *)
-  (*       now apply Included_Union_r.  *)
-  (*     + eassumption. *)
-  (*     + eexists (f {a ~> a}). split.  *)
-  (*       simpl. rewrite Heq. eapply subst_BoundVar_f_eq. *)
-  (*       constructor. eassumption.  *)
-  (*       rewrite Heq. simpl in Hinj'. rewrite subst_BoundVar_f_eq. *)
-  (*       eassumption. *)
-  (*     + eapply Disjoint_Included_r; [ | eassumption ]. *)
-  (*       now apply Included_Union_r.  *)
-  (*     + eassumption. *)
-  (*     + eexists (f {a ~> a}). split.  *)
-  (*       simpl. rewrite Heq. eapply subst_BoundVar_f_eq. *)
-  (*       constructor. eassumption.  *)
-  (*       rewrite Heq. simpl in Hinj'. rewrite subst_BoundVar_f_eq. *)
-  (*       eassumption. *)
-  (* Qed. *)
-          
+  
   Lemma FVmap_inv_empty :
     FVmap_inv (Maps.PTree.empty VarInfo) (Empty_set M.elt) (Empty_set M.elt) [].
   Proof.
@@ -611,63 +505,7 @@ Section CC_correct.
     destruct H as [x' [t [t' Hget]]]. rewrite M.gempty in Hget. now inv Hget.
     destruct H as [t Hget]. rewrite M.gempty in Hget. now inv Hget.
   Qed.
-  
-  Lemma nthN_app {A} (l1 l2 : list A) N :
-    (nthN (l1 ++ l2) N = nthN l1 N) \/
-    (nthN (l1 ++ l2) N = nthN l2 (N - N.of_nat (length l1))%N /\ (N.of_nat (length l1) <= N)%N).
-  Proof. 
-    revert N; induction l1; intros N.
-    - right. rewrite app_nil_l, N.sub_0_r. split; eauto. simpl. zify; omega.
-    - destruct N; [now eauto |].
-      destruct (IHl1 ((N.pos p)-1)%N) as [H1 | [H2 H3]].
-      now eauto.
-      replace (N.of_nat (length (a :: l1))) with (1 + N.of_nat (length l1))%N.
-      replace (N.pos p - (1 + N.of_nat (length l1)))%N with
-      (N.pos p - 1 - N.of_nat (length l1))%N.
-      right. split. now eauto. zify. omega. 
-      zify; omega. 
-      simpl (length _). rewrite Nnat.Nat2N.inj_succ.
-      zify. omega. 
-  Qed.
-  
-  Lemma nthN_is_Some_length {A} (l : list A) N x :
-    nthN l N = Some x ->
-    (N < N.of_nat (length l))%N.
-  Proof. 
-    revert N. induction l; intros N Heq.
-    - inv Heq. 
-    - destruct N. inv Heq.
-      unfold length. rewrite Nnat.Nat2N.inj_succ. zify. omega. 
-      assert (Hlt : ((N.pos p)-1 < N.of_nat (length l))%N) by eauto.
-      simpl (length _). rewrite Nnat.Nat2N.inj_succ.
-      zify. omega. 
-  Qed.
-  
-  Lemma nthN_app_geq {A} (l1 l2 : list A) N :
-    (N.of_nat (length l1) <= N)%N ->
-    nthN (l1 ++ l2) N = nthN l2 (N - N.of_nat (length l1))%N.
-  Proof.
-    revert N. induction l1; intros N Heq.
-    - simpl. rewrite N.sub_0_r. reflexivity.
-    - simpl length in *. 
-      destruct N. 
-      zify. omega.
-      rewrite Nnat.Nat2N.inj_succ.
-      rewrite <- N.add_1_l, N_as_DT.sub_add_distr. 
-      rewrite <- IHl1.
-      reflexivity. zify. omega. 
-  Qed.
-  
-  Lemma nthN_is_Some_app {A} (l1 l2 : list A) N x :
-    nthN l1 N = Some x ->
-    nthN (l1 ++ l2) N = Some x.
-  Proof.
-    revert N. induction l1; intros N Heq.
-    - inv Heq.
-    - destruct N. inv Heq. reflexivity.
-      simpl. eauto.
-  Qed.
-  
+    
   Lemma FVmap_inv_set_free_var FVmap Scope Funs FVs x n t:
     FVmap_inv FVmap Scope Funs FVs ->
     N.of_nat (length FVs) = n ->
@@ -717,22 +555,6 @@ Section CC_correct.
         * edestruct H3 as [_ [H1' [H2' H3']]].
           now eexists; eauto.
           repeat split; eauto. apply nthN_is_Some_app. eassumption.
-  Qed.
-
-  Lemma FromList_app {A} (l1 l2 : list A) :
-    Same_set _ (FromList (l1 ++ l2)) (Union _ (FromList l1) (FromList l2)). 
-  Proof.
-    induction l1. 
-    - rewrite FromList_nil, Union_Empty_set_r. now apply Same_set_refl.
-    - rewrite FromList_cons, <- Union_assoc, <- IHl1, <- FromList_cons, app_comm_cons. 
-      now apply Same_set_refl.
-  Qed.
-
-  Lemma Complement_antimon {A} S1 S2 :
-    Included A S1 S2 ->
-    Included A (Complement _ S2) (Complement _ S1).
-  Proof.
-    intros Hin x Hin' y. eauto.
   Qed.
   
   Lemma make_env_spec fv FVmap_o Γ_n Γ_o Scope Funs FVs S :
@@ -806,72 +628,6 @@ Section CC_correct.
   Proof.
     unfold subst. intros y. unfold extend.
     rewrite M.gsspec. destruct (Coqlib.peq y x); eauto.
-  Qed.
-
-  Instance image_Proper {A B} : Proper (f_eq ==> Logic.eq ==> Same_set _) (@image A B).
-  Proof.
-    intros x1 x2 Heq s1 s2 Heq'; subst.
-    split; intros x [y1 [Hin Heq']]; subst;
-    eexists; eauto.
-  Qed.
-
-  Instance f_eq_subdomain_Proper_Same_set {A B} :
-    Proper (Same_set A ==> eq ==> eq ==> iff) (@f_eq_subdomain A B).
-  Proof.
-    intros S1 S2 Hseq f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq x HS;
-    apply Hfeq; eapply Hseq; eassumption.
-  Qed.
-
-  Instance f_eq_subdomain_Proper_f_eq_l {A B} :
-    Proper (eq ==> f_eq ==> eq ==> iff) (@f_eq_subdomain A B).
-  Proof.
-    intros S1 S2 Heq f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq x HS.
-    now rewrite <- Heq1; eauto. now rewrite Heq1; eauto.
-  Qed.
-
-  Instance f_eq_subdomain_Proper_f_eq_r {A B} :
-    Proper (eq ==> eq ==> f_eq ==> iff) (@f_eq_subdomain A B).
-  Proof.
-    intros S1 S2 Heq f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq x HS.
-    now rewrite <- Heq2; eauto. now rewrite Heq2; eauto.
-  Qed.
-
-  Lemma f_eq_subdomain_extend S (f f' : var -> var) x y :
-    f_eq_subdomain S f f' ->
-    f_eq_subdomain (Union _ (Singleton _ x) S) (f{x ~> y}) (f'{x ~> y}).
-  Proof. 
-    intros Heq. 
-    unfold extend. intros z Hin. 
-    destruct (Coqlib.peq z x). now eauto.
-    apply Heq. inv Hin; [| now eauto ]. inv H; congruence. 
-  Qed.
-  
-  Lemma f_eq_subdomain_antimon {A B} S S' (f f' : A -> B) :
-    Included _ S' S ->
-    f_eq_subdomain S f f' ->
-    f_eq_subdomain S' f f'.
-  Proof.
-    intros Hinc Hfeq x Hin; eauto.
-  Qed.
-
-  Lemma f_eq_subdomain_extend_not_In_S_l f1 S f2 x x'  : 
-    ~ In _ S x ->
-    f_eq_subdomain S f1 f2 ->
-    f_eq_subdomain S (f1{x~>x'}) f2.
-  Proof.
-    intros Hin Hfeq y HIn.
-    rewrite extend_gso. now eauto.
-    intros Hc. subst. contradiction.
-  Qed.
-
-  Lemma f_eq_subdomain_extend_not_In_S_r f1 S f2 x x'  : 
-    ~ In _ S x ->
-    f_eq_subdomain S f1 f2 ->
-    f_eq_subdomain S f1 (f2{x~>x'}).
-  Proof.
-    intros Hin Hfeq y HIn.
-    rewrite extend_gso. now eauto.
-    intros Hc. subst. contradiction.
   Qed.
 
 
@@ -963,35 +719,6 @@ Section CC_correct.
       eassumption. 
   Qed.
 
-  Lemma image_extend_not_In f x x' S :
-    ~ In _ S x ->
-    Same_set _ (image (f {x ~> x'} ) S) (image f S).
-  Proof.    
-    intros Hnin.
-    split; intros y [y' [Hin Heq]]. rewrite extend_gso in Heq.
-    now eexists; eauto. intros Hc. subst. contradiction.
-    eexists; split; eauto. rewrite extend_gso. now eauto.
-    intros Hc. subst. contradiction.
-  Qed.
-
-  Instance equivalence_f_eq_subdomain {A B} S : Equivalence (@f_eq_subdomain A B S). 
-  Proof. 
-    constructor; try now constructor.
-    intros f1 f2 Heq x HS; rewrite Heq. reflexivity. eassumption.
-    intros f1 f2 f3 Heq1 Heq2 x HS; rewrite Heq1. now eauto. eassumption.
-  Qed.      
-
-  Lemma image_Setminus_extend f v v' S :
-    Included _ (image (f {v ~> v'}) (Setminus M.elt S  (Singleton var v)))
-             (image f S).
-  Proof.
-    intros x [y [Hin Heq]]; subst.
-    destruct (Coqlib.peq v y); subst.
-    - inv Hin. exfalso. eauto.
-    - rewrite extend_gso; [| now eauto ].
-      eexists; esplit; auto. inv Hin. now eauto.
-  Qed.
-
   Instance project_var_Proper Scope Funs :
     Proper
       (f_eq_subdomain (Setminus _ Funs Scope) ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff)
@@ -1011,14 +738,6 @@ Section CC_correct.
       - econstructor. eapply project_var_Proper; eauto.
         now symmetry. now eauto.
       - econstructor. now eapply project_var_Proper; eauto. now eauto.
-  Qed.
-
-  Lemma image_f_eq_subdomain {A B} (f1 f2 : A -> B) S :
-    f_eq_subdomain S f1 f2 ->
-    Same_set _ (image f1 S) (image f2 S).
-  Proof.
-    intros Heq; split; intros x [y [Hin Heq']]; subst; 
-    (eexists; split; [ now eauto |]); now rewrite Heq.
   Qed.
 
   Lemma Closure_conversion_f_eq_subdomain_mut :
@@ -1116,107 +835,6 @@ Section CC_correct.
     now apply Closure_conversion_f_eq_subdomain_mut.
   Qed.
 
-
-  Lemma bound_var_occurs_free_Econstr_Included x tau t ys e :
-    Included _ (Union _ (bound_var e) (occurs_free e))
-             (Union _ (bound_var (Econstr x tau t ys e))
-                    (occurs_free (Econstr x tau t ys e))).
-  Proof.
-    rewrite bound_var_Econstr, <- Union_assoc.
-    apply Included_Union_compat. now apply Included_refl. 
-    eapply Included_trans. now apply occurs_free_Econstr_Included.
-    rewrite Union_sym. now apply Included_refl.
-  Qed.
-
-  Lemma bound_var_occurs_free_Ecase_Included c e x P:
-    List.In (c, e) P ->
-    Included _ (Union _ (bound_var e) (occurs_free e))
-             (Union _ (bound_var (Ecase x P))
-                    (occurs_free (Ecase x P))).
-  Proof.
-    intros Hin x' Hin'. inv Hin'.
-    now left; eauto.
-    right. eapply occurs_free_Ecase_Included; now eauto.
-  Qed.
-
-  Lemma bound_var_occurs_free_Ecase_cons_Included c e x P:
-    Included _ (Union _ (bound_var (Ecase x P))
-                      (occurs_free (Ecase x P)))
-             (Union _ (bound_var (Ecase x ((c, e) :: P)))
-                    (occurs_free (Ecase x ((c, e) :: P)))).
-  Proof.
-    rewrite bound_var_Ecase_cons, <- Union_assoc.
-    eapply Included_Union_mon_r.
-    apply Included_Union_compat. now apply Included_refl.
-    eapply Included_trans with (s2 := occurs_free (Ecase x ((c, e) :: P))).
-    intros y Hin. now apply Free_Ecase3. now apply Included_refl.
-  Qed.
-
-  Lemma bound_var_occurs_free_Eproj_Included x tau N y e :
-    Included _ (Union _ (bound_var e) (occurs_free e))
-             (Union _ (bound_var (Eproj x tau N y e))
-                    (occurs_free (Eproj x tau N y e))).
-  Proof.
-    rewrite bound_var_Eproj, <- Union_assoc.
-    apply Included_Union_compat. now apply Included_refl. 
-    eapply Included_trans. now apply occurs_free_Eproj_Included.
-    rewrite Union_sym. now apply Included_refl.
-  Qed.
-
-
-  Lemma bound_var_occurs_free_Efun_Included B e :
-    Included _ (Union _ (bound_var e) (occurs_free e))
-             (Union _ (bound_var (Efun B e))
-                    (occurs_free (Efun B e))).
-  Proof.
-    rewrite bound_var_Efun, (Union_sym _ (bound_var e)), <- Union_assoc.
-    apply Included_Union_compat. now apply Included_refl. 
-    eapply Included_trans. now apply occurs_free_Efun_Included.
-    rewrite Union_sym. apply Included_Union_compat.
-    now apply name_in_fundefs_bound_var_fundefs. now apply Included_refl.
-  Qed.
-
-  Lemma bound_var_occurs_free_fundefs_Efun_Included B e :
-    Included _ (Union _ (bound_var_fundefs B) (occurs_free_fundefs B))
-             (Union _ (bound_var (Efun B e))
-                    (occurs_free (Efun B e))).
-  Proof.
-    rewrite bound_var_Efun, (Union_sym _ (bound_var e)), <- Union_assoc.
-    apply Included_Union_mon_r.
-    apply Included_Union_compat. now apply Included_refl. 
-    rewrite occurs_free_Efun. now apply Included_Union_mon_l.
-  Qed.
-
-  Lemma bound_var_occurs_free_Eprim_Included x tau f ys e :
-    Included _ (Union _ (bound_var e) (occurs_free e))
-             (Union _ (bound_var (Eprim x tau f ys e))
-                    (occurs_free (Eprim x tau f ys e))).
-  Proof.
-    rewrite bound_var_Eprim, <- Union_assoc.
-    apply Included_Union_compat. now apply Included_refl. 
-    eapply Included_trans. now apply occurs_free_Eprim_Included.
-    rewrite Union_sym. now apply Included_refl.
-  Qed.
-
-  Lemma Included_Setminus_Disjoint {A} s1 s2 :
-    Disjoint _ s1 s2 ->
-    Same_set A s1 (Setminus _ s1 s2).
-  Proof.
-    intros Hd.
-    split; intros x H. constructor; eauto. intros Hc; eapply Hd; eauto. 
-    inv H; eauto.
-  Qed.
-
-  Corollary fundefs_fv_correct B :
-    Same_set var (occurs_free_fundefs B)
-             (FromList (PS.elements (fundefs_fv B (fundefs_names B)))).
-  Proof.
-    split; intros x H.
-    eapply exp_fv_fundefs_fv_correct in H. eapply PS.elements_spec1 in H.
-    eapply InA_alt in H. edestruct H as [y [Heq Hin]]. subst. eauto. 
-    eapply exp_fv_fundefs_fv_correct. eapply PS.elements_spec1.
-    eapply In_InA. now eapply PS.E.eq_equiv. eassumption.
-  Qed.
 
   Lemma subst_add_params_f_eq_subdomain S l ts FVmap :
     Disjoint _ (FromList l) S ->

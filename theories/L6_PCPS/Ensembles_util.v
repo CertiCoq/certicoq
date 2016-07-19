@@ -707,3 +707,28 @@ Proof.
   intros Hinc; split; intros x Hi; eauto.
   inv Hi; eauto.
 Qed.
+
+Lemma Included_Setminus_Disjoint {A} s1 s2 :
+  Disjoint _ s1 s2 ->
+  Same_set A s1 (Setminus _ s1 s2).
+Proof.
+  intros Hd.
+  split; intros x H. constructor; eauto. intros Hc; eapply Hd; eauto. 
+  inv H; eauto.
+Qed.
+
+Lemma FromList_app {A} (l1 l2 : list A) :
+  Same_set _ (FromList (l1 ++ l2)) (Union _ (FromList l1) (FromList l2)). 
+Proof.
+  induction l1. 
+  - rewrite FromList_nil, Union_Empty_set_r. now apply Same_set_refl.
+  - rewrite FromList_cons, <- Union_assoc, <- IHl1, <- FromList_cons, app_comm_cons. 
+    now apply Same_set_refl.
+Qed.
+
+Lemma Complement_antimon {A} S1 S2 :
+  Included A S1 S2 ->
+  Included A (Complement _ S2) (Complement _ S1).
+Proof.
+  intros Hin x Hin' y. eauto.
+Qed.

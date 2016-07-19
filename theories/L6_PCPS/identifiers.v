@@ -1,4 +1,5 @@
-Require Import Coq.Lists.List Coq.NArith.BinNat Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles.
+Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat
+        Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles.
 Require Import cps cps_util ctx set_util Ensembles_util.
 Import ListNotations.
 
@@ -1003,6 +1004,89 @@ Proof.
   apply bound_var_comp_mut.
 Qed.
 
+(** Lemmas about the union of free and bound variables *)
+Lemma bound_var_occurs_free_Econstr_Included x tau t ys e :
+  Included _ (Union _ (bound_var e) (occurs_free e))
+           (Union _ (bound_var (Econstr x tau t ys e))
+                  (occurs_free (Econstr x tau t ys e))).
+Proof.
+  rewrite bound_var_Econstr, <- Union_assoc.
+  apply Included_Union_compat. now apply Included_refl. 
+  eapply Included_trans. now apply occurs_free_Econstr_Included.
+  rewrite Union_sym. now apply Included_refl.
+Qed.
+
+Lemma bound_var_occurs_free_Ecase_Included c e x P:
+  List.In (c, e) P ->
+  Included _ (Union _ (bound_var e) (occurs_free e))
+           (Union _ (bound_var (Ecase x P))
+                  (occurs_free (Ecase x P))).
+Proof.
+  intros Hin x' Hin'. inv Hin'.
+  now left; eauto.
+  right. eapply occurs_free_Ecase_Included; now eauto.
+Qed.
+
+Lemma bound_var_occurs_free_Ecase_cons_Included c e x P:
+  Included _ (Union _ (bound_var (Ecase x P))
+                    (occurs_free (Ecase x P)))
+           (Union _ (bound_var (Ecase x ((c, e) :: P)))
+                  (occurs_free (Ecase x ((c, e) :: P)))).
+Proof.
+  rewrite bound_var_Ecase_cons, <- Union_assoc.
+  eapply Included_Union_mon_r.
+  apply Included_Union_compat. now apply Included_refl.
+  eapply Included_trans with (s2 := occurs_free (Ecase x ((c, e) :: P))).
+  intros y Hin. now apply Free_Ecase3. now apply Included_refl.
+Qed.
+
+Lemma bound_var_occurs_free_Eproj_Included x tau N y e :
+  Included _ (Union _ (bound_var e) (occurs_free e))
+           (Union _ (bound_var (Eproj x tau N y e))
+                  (occurs_free (Eproj x tau N y e))).
+Proof.
+  rewrite bound_var_Eproj, <- Union_assoc.
+  apply Included_Union_compat. now apply Included_refl. 
+  eapply Included_trans. now apply occurs_free_Eproj_Included.
+  rewrite Union_sym. now apply Included_refl.
+Qed.
+
+
+Lemma bound_var_occurs_free_Efun_Included B e :
+  Included _ (Union _ (bound_var e) (occurs_free e))
+           (Union _ (bound_var (Efun B e))
+                  (occurs_free (Efun B e))).
+Proof.
+  rewrite bound_var_Efun, (Union_sym _ (bound_var e)), <- Union_assoc.
+  apply Included_Union_compat. now apply Included_refl. 
+  eapply Included_trans. now apply occurs_free_Efun_Included.
+  rewrite Union_sym. apply Included_Union_compat.
+  now apply name_in_fundefs_bound_var_fundefs. now apply Included_refl.
+Qed.
+
+Lemma bound_var_occurs_free_fundefs_Efun_Included B e :
+  Included _ (Union _ (bound_var_fundefs B) (occurs_free_fundefs B))
+           (Union _ (bound_var (Efun B e))
+                  (occurs_free (Efun B e))).
+Proof.
+  rewrite bound_var_Efun, (Union_sym _ (bound_var e)), <- Union_assoc.
+  apply Included_Union_mon_r.
+  apply Included_Union_compat. now apply Included_refl. 
+  rewrite occurs_free_Efun. now apply Included_Union_mon_l.
+Qed.
+
+Lemma bound_var_occurs_free_Eprim_Included x tau f ys e :
+  Included _ (Union _ (bound_var e) (occurs_free e))
+           (Union _ (bound_var (Eprim x tau f ys e))
+                  (occurs_free (Eprim x tau f ys e))).
+Proof.
+  rewrite bound_var_Eprim, <- Union_assoc.
+  apply Included_Union_compat. now apply Included_refl. 
+  eapply Included_trans. now apply occurs_free_Eprim_Included.
+  rewrite Union_sym. now apply Included_refl.
+Qed.
+
+
 (** unique bindings - alternative definition without lists *)
 Inductive unique_bindings : exp -> Prop :=
 | UBound_Econstr :
@@ -1746,4 +1830,15 @@ Proof.
       apply IHdefs. eauto.
   - inv H.
   - inv H.
+Qed.
+
+Corollary fundefs_fv_correct B :
+  Same_set var (occurs_free_fundefs B)
+           (FromList (PS.elements (fundefs_fv B (fundefs_names B)))).
+Proof.
+  split; intros x H.
+  eapply exp_fv_fundefs_fv_correct in H. eapply PS.elements_spec1 in H.
+  eapply InA_alt in H. edestruct H as [y [Heq Hin]]. subst. eauto. 
+  eapply exp_fv_fundefs_fv_correct. eapply PS.elements_spec1.
+  eapply In_InA. now eapply PS.E.eq_equiv. eassumption.
 Qed.

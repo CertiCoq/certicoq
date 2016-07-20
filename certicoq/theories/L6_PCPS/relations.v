@@ -1,13 +1,15 @@
 Require Import Coq.Relations.Relations Coq.Classes.RelationClasses.
 Require Import cps ctx.
 
+Ltac inv H := inversion H; clear H; subst.
+
 Section Relations.
 
   Variable (R : relation exp).
   (* TODO : abstract over exp ? *)
   
   Open Scope ctx_scope.
-
+  
   Definition compose {A} (R1 : relation A) (R2 : relation A) : relation A :=
     fun x y => exists z, R1 x z /\ R2 z y.
   

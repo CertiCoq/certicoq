@@ -6,7 +6,8 @@ Require Import cps Ensembles_util List_util.
 Import ListNotations.
 (* Require Maps. *)
 (* Import Nnat. *)
-Require Import ctx.
+Require Import ctx eval.
+
 (* useful definitions and proof for L6 - cps language *)
 (* 
  SUBTERM - proper subterm relation
@@ -25,7 +26,6 @@ Ltac destructAll :=
     | [ H : exists E, _ |- _ ] => destruct H; destructAll
     | _ => subst
   end.
-
 
 Definition var_dec := M.elt_eq.
 

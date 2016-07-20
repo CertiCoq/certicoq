@@ -14,6 +14,17 @@ Function nthN {A: Type} (al: list A) (n: N) : option A :=
     | _, _ => None
   end.
 
+(** map a function to a list of option type *)
+Fixpoint mapopt {A} (al: list (option A)) : option (list A) :=
+  match al with 
+    | Some a :: al' => match mapopt al' with
+                         | Some bl' => Some (a::bl')
+                         | None => None
+                       end
+    | None :: _ => None
+    | nil => Some nil
+  end.
+
 (** Asymmetric version of Forall2 *) 
 Inductive Forall2_asym {A} (R : relation A) : list A -> list A -> Prop :=
 | Forall2_asym_nil : forall l, Forall2_asym R [] l
@@ -153,6 +164,22 @@ Proof.
   induction l; intros H; constructor.
   - apply H. constructor; eauto.
   - apply IHl. intros. apply H. constructor 2; eauto.
+Qed.
+
+Theorem Forall2_Equiv:
+  forall (X:Type) (R:relation X), Equivalence R -> Equivalence (Forall2 R).
+Proof.
+  intros. inversion H. constructor.
+  + red. intros. induction x. constructor. constructor.
+    apply Equivalence_Reflexive. assumption.
+  + red. intro x. induction x; intros. inversion H0. constructor.
+    inversion H0; subst.   apply IHx in H5. constructor.
+    apply (Equivalence_Symmetric _ _ H3). assumption.
+  + red. induction x; intros.
+    * inversion H0; subst; inversion H1. constructor.
+    * inversion H0; subst; inversion H1; subst. constructor.
+      eapply Equivalence_Transitive. apply H4. assumption.
+      apply (IHx _ _ H6) in H8. assumption.
 Qed.
 
 (** Lemmas about [nthN] *)

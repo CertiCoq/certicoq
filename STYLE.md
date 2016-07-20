@@ -5,39 +5,53 @@ Adapted  from https://raw.githubusercontent.com/HoTT/HoTT/master/STYLE.md
 ## Organization ##
 
 ### theories/
-This directory hosts all the intermediate/terminal languages, and the translations between them.
-There should be one directory named Lxxx for each intermediate/terminal language, where xxx is a natural number.
-Such directories can be nested. For example, the intermediate language L2.22.45 should reside in theories/L2/L22/L45
 
-Because we are using version control, it is desirable to remove files and directories that are not in use.
-(Should we switch from the current vanilla SVN service to [Cornell's Github service][cisgithub]?)
+This directory hosts all the intermediate/terminal languages, and the
+translations between them. There should be one directory named Lxxx for each
+intermediate/terminal language, where xxx is a natural number. Such directories
+can be nested. For example, the intermediate language L2.22.45 should reside in
+theories/L2/L22/L45
+
+Because we are using version control, it is desirable to remove files and
+directories that are not in use. (Should we switch from the current vanilla SVN
+service to [Cornell's Github service][cisgithub]?)
 
 [cisgithub]: https://github.coecis.cornell.edu/
 
 ### theories/....../Lppp/Lxxx/
-- There should be a file named term.v containing a `Definition`/`Inductive`/`Let`/`Notation` named `Term`, which is the type of terms in Lxxx. If this file is missing, it means that Lxxx shares the type of terms with Lppp. All directories of the form theories/Lxxx must have a term.v
 
-- The translation from Lxxx to Lyyy should be defined in Lyyy/Lxxx_to_Lyyy.v . Ideally, this file should NOT contain the correctness proof of the translation. That should be in Lyyy/Lxxx_to_Lyyy_correctness.v
+- There should be a file named term.v containing a
+  `Definition`/`Inductive`/`Let`/`Notation` named `Term`, which is the type of
+  terms in Lxxx. If this file is missing, it means that Lxxx shares the type of
+  terms with Lppp. All directories of the form theories/Lxxx must have a term.v
+
+- The translation from Lxxx to Lyyy should be defined in Lyyy/Lxxx_to_Lyyy.v .
+  Ideally, this file should NOT contain the correctness proof of the
+  translation. That should be in Lyyy/Lxxx_to_Lyyy_correctness.v
 
 
 ### reports/2016April
 
-For each intermediate language, add an entry in reports/2016April explaining its purpose.
-If needed, it can refer to a README file for additional details about a language. Such README files should be placed at the root of the directory of the corresponding language.
+For each intermediate language, add an entry in reports/2016April explaining its
+purpose. If needed, it can refer to a README file for additional details about a
+language. Such README files should be placed at the root of the directory of the
+corresponding language.
 
 ### theories/_CoqProject
 The first line should be:
 
 -R . Certicoq
 
-This means that a definition, say d, in theories/Lxxx/Lyyy/f.v will be accessed in .v files as `Certicoq.Lxxx.Lyyy.f.d`
-All imports (`Require Import/Export`) in .v files should be fully qualified, to avoid ambiguities.
-For each .v file, there should be an entry in theories/_CoqProject.
+This means that a definition, say d, in theories/Lxxx/Lyyy/f.v will be accessed
+in .v files as `Certicoq.Lxxx.Lyyy.f.d` All imports (`Require Import/Export`) in
+.v files should be fully qualified, to avoid ambiguities. For each .v file,
+there should be an entry in theories/_CoqProject.
 
 ### theories/common
 
 ### libraries/
-move to theories/common? Currently, it is compiled in the namespace "", which is problematic if someone wishes to use our development.
+move to theories/common? Currently, it is compiled in the namespace "", which is
+problematic if someone wishes to use our development.
 
 
 ## Naming Conventions ##
@@ -173,13 +187,20 @@ names `H`, your name will result in a conflict.  Conversely, we
 sometimes give a hypothesis a name that won't be used, to pre-empt
 such conflicts, such as `{ua : Univalence}` or `{fs : Funext}`.
 
-One gotcha about typeclass arguments is that they cannot be inferred automatically when preceeded by non-implicit arguments.  So for instance if we write
+One gotcha about typeclass arguments is that they cannot be inferred
+automatically when preceeded by non-implicit arguments. So for instance if we
+write
 
 ```coq
 Definition foo (A : Type) `{Funext}
 ```
 
-then the `Funext` argument will not generally be inferrable.  Thus, typeclass arguments should generally come first if possible.  In addition, note that when section variables are generalized at the close of a section, they appear first.  Thus, if anything in a section requires `Funext` or `Univalence`, those hypotheses should go in the `Context` at the top of the section in order that they'll come first in the eventual argument lists.
+then the `Funext` argument will not generally be inferrable. Thus, typeclass
+arguments should generally come first if possible. In addition, note that when
+section variables are generalized at the close of a section, they appear first.
+Thus, if anything in a section requires `Funext` or `Univalence`, those
+hypotheses should go in the `Context` at the top of the section in order that
+they'll come first in the eventual argument lists.
 
 
 ### Coercions and Existing Instances ###

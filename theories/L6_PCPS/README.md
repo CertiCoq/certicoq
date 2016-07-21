@@ -3,8 +3,18 @@
 ### cps.v
 The syntax of the L6 language.
 
+### cps_NEW.v
+The syntax of the L6 language updated with new tag system that will be used when compiling to CompCert.
+
+(TODO: Merge this with cps.v once all of the proofs are updated)
+
 ### eval.v
 The evaluation semantics of the L6 language. 
+
+### eval_NEW.v
+The evaluation semantics of the L6 language updated with new tag system that will be used when compiling to CompCert.
+
+(TODO: Merge this with eval.v once all of the proofs are updated). 
   
 ### cps_util.v
 Useful lemmas and definitions about the L6 language.

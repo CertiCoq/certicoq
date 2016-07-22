@@ -30,7 +30,7 @@ Qed.
 
 (** * Function definitions *) 
 
-(** [name_in_fundefs B] is the set of the names of the functions in [B] *)
+(** [name_in_fundefs B] is the set of the function names in [B] *)
 Fixpoint name_in_fundefs (B : fundefs) : Ensemble var :=
   match B with
     | Fnil => Empty_set var
@@ -39,7 +39,7 @@ Fixpoint name_in_fundefs (B : fundefs) : Ensemble var :=
   end.
 
 (** [fun_in_fundefs B] is the set of functions defined in [B] *)
-Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * type * list var * exp) :=
+Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * fTag * list var * exp) :=
   match B with
     | Fnil => Empty_set _
     | Fcons f tau xs e B =>
@@ -47,6 +47,7 @@ Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * type * list var * exp) 
             (fun_in_fundefs B)
   end.
 
+(** The set of function names is decidable *)
 Instance Decidable_name_in_fundefs (B : fundefs) :
   Decidable (name_in_fundefs B).
 Proof.
@@ -60,26 +61,7 @@ Proof.
   - right. intros Hc; inv Hc.
 Qed.
 
-Lemma find_def_name_in_fundefs f B v:
-  find_def f B = Some v ->
-  name_in_fundefs B f.
-Proof.
-  induction B; simpl; intros H; try now inv H.
-  destruct (M.elt_eq f v0); inv H.
-  left; eauto. right; eauto.
-Qed.
-
-
-Lemma name_not_in_fundefs_find_def_None f B:
-  ~ name_in_fundefs B f ->
-  find_def f B = None.
-Proof.
-  induction B; simpl; intros H; eauto.
-  destruct (M.elt_eq f v); subst.
-  - exfalso. apply H. now left.
-  - eapply IHB. intros Hc. apply H. now right.
-Qed.
-
+(** Lemmas about [split_fds] and [name_in_fundefs] *)
 Lemma split_fds_name_in_fundefs B1 B2 B3 :
   split_fds B1 B2 B3 ->
   Same_set var (name_in_fundefs B3)
@@ -107,15 +89,6 @@ Proof.
     apply Same_set_refl.
 Qed.
 
-Lemma name_in_fundefs_ctx B e1 e2 :
-  Same_set _ (name_in_fundefs (B <[ e1 ]>)) (name_in_fundefs (B <[ e2 ]>)).
-Proof.
-  induction B; simpl;
-  (apply Same_set_Union_compat; [ now apply Same_set_refl |]).
-  now apply Same_set_refl.
-  eassumption.
-Qed.
-
 Lemma split_fds_fun_in_fundefs B1 B2 B3 :
   split_fds B1 B2 B3 ->
   Same_set _ (fun_in_fundefs B3)
@@ -138,7 +111,19 @@ Proof.
   eapply fundefs_append_split_fds; eauto.
 Qed.
 
-(** names(B) = $\{ f ~|~ \exists ~xs ~tau ~e,~(f, ~xs, ~tau, ~e) \in B \}$ *)
+(** Names of function in a function definition evaluation context *)
+Lemma name_in_fundefs_ctx B e1 e2 :
+  Same_set _ (name_in_fundefs (B <[ e1 ]>)) (name_in_fundefs (B <[ e2 ]>)).
+Proof.
+  induction B; simpl;
+  (apply Same_set_Union_compat; [ now apply Same_set_refl |]).
+  now apply Same_set_refl.
+  eassumption.
+Qed.
+
+
+(** Alternative definition of [name_in_fundefs] using set comprehension:  
+   [names_in_fundefs b] = $\{ f ~|~ \exists ~xs ~tau ~e,~(f, ~xs, ~tau, ~e) \in B \}$ *)
 Lemma name_in_fundefs_big_cup_fun_in_fundefs B :
   Same_set var (name_in_fundefs B) (big_cup (fun_in_fundefs B)
                                             (fun p =>
@@ -161,7 +146,26 @@ Qed.
 
 (** ** Lemmas about [find_def] and [def_funs] *)
 
-(** [find_def] is correct w.r.t. [fun_in_fundefs] *)
+Lemma find_def_name_in_fundefs f B v:
+  find_def f B = Some v ->
+  name_in_fundefs B f.
+Proof.
+  induction B; simpl; intros H; try now inv H.
+  destruct (M.elt_eq f v0); inv H.
+  left; eauto. right; eauto.
+Qed.
+
+Lemma name_not_in_fundefs_find_def_None f B:
+  ~ name_in_fundefs B f ->
+  find_def f B = None.
+Proof.
+  induction B; simpl; intros H; eauto.
+  destruct (M.elt_eq f v); subst.
+  - exfalso. apply H. now left.
+  - eapply IHB. intros Hc. apply H. now right.
+Qed.
+
+(** [find_def] is sound w.r.t. [fun_in_fundefs] *)
 Lemma find_def_correct f B tau xs e :
   find_def f B = Some (tau, xs, e) ->
   fun_in_fundefs B (f, tau, xs, e).
@@ -171,7 +175,6 @@ Proof.
   - inv H. left; eauto.
   - right; eauto.
 Qed.
-
 
 Lemma def_funs_spec x v B B' rho rho' :
   M.get x (def_funs B' B rho rho') = Some v ->
@@ -234,14 +237,14 @@ Qed.
 (** [occurs_free e] is the set of free variables of [e] *)
 Inductive occurs_free : exp -> Ensemble var :=
 | Free_Econstr1 :
-    forall y x tau t ys e,
+    forall y x t ys e,
       List.In y ys ->
-      occurs_free (Econstr x tau t ys e) y
+      occurs_free (Econstr x t ys e) y
 | Free_Econstr2 :
-    forall y x tau t ys e,
+    forall y x t ys e,
       ~ x = y ->
       occurs_free e y ->
-      occurs_free (Econstr x tau t ys e) y
+      occurs_free (Econstr x t ys e) y
 | Free_Ecase1 :
     forall x ys, 
       occurs_free (Ecase x ys) x
@@ -271,21 +274,21 @@ Inductive occurs_free : exp -> Ensemble var :=
       occurs_free_fundefs defs y ->
       occurs_free (Efun defs e) y
 | Free_Eapp1 :
-    forall x ys,
-      occurs_free (Eapp x ys) x
+    forall x ys f,
+      occurs_free (Eapp x f ys) x
 | Free_Eapp2 :
-    forall y x ys,
+    forall y x f ys,
       List.In y ys ->
-      occurs_free (Eapp x ys) y
+      occurs_free (Eapp x f ys) y
 | Free_Eprim1 :
-    forall y x tau p ys e,
+    forall y x p ys e,
       List.In y ys ->
-      occurs_free (Eprim x tau p ys e) y
+      occurs_free (Eprim x p ys e) y
 | Free_Eprim2 :
-    forall y x tau p ys e,
+    forall y x p ys e,
       x <> y ->
       occurs_free e y ->
-      occurs_free (Eprim x tau p ys e) y
+      occurs_free (Eprim x p ys e) y
 with occurs_free_fundefs : fundefs -> Ensemble var :=
 | Free_Fcons1 :
     forall x f tau ys e defs,  
@@ -303,8 +306,7 @@ with occurs_free_fundefs : fundefs -> Ensemble var :=
 Hint Constructors occurs_free.
 Hint Constructors occurs_free_fundefs.
 
-(** sanity check : The names of the functions cannot appear 
-  * free in a fundefs block *)
+(** sanity check : The names of the functions cannot appear free in a fundefs block *)
 Lemma fun_names_not_free_in_fundefs f defs :
   name_in_fundefs defs f ->
   ~ occurs_free_fundefs defs f.
@@ -314,8 +316,10 @@ Proof.
   inv H3. eauto. inv H0; eauto.
 Qed.
 
-Lemma occurs_free_Econstr x tau t ys e :
-  Same_set var (occurs_free (Econstr x tau t ys e))
+(** ** Useful set equalities *)
+
+Lemma occurs_free_Econstr x t ys e :
+  Same_set var (occurs_free (Econstr x t ys e))
            (Union _ (FromList ys) (Setminus var (occurs_free e) (Singleton var x))).
 Proof.
   split; intros x' H; inv H; eauto.
@@ -323,8 +327,8 @@ Proof.
   inv H0. constructor 2; eauto. intros Hc. subst. eauto.
 Qed.
 
-Lemma occurs_free_Eprim x tau f ys e :
-  Same_set var (occurs_free (Eprim x tau f ys e))
+Lemma occurs_free_Eprim x f ys e :
+  Same_set var (occurs_free (Eprim x f ys e))
            (Union _ (FromList ys) (Setminus var (occurs_free e) (Singleton var x))).
 Proof.
   split; intros x' H; inv H; eauto.
@@ -332,8 +336,8 @@ Proof.
   inv H0. eapply Free_Eprim2; eauto. intros Hc. subst. eauto.
 Qed.
 
-Lemma occurs_free_Eproj x tau t y e :
-  Same_set var (occurs_free (Eproj x tau t y e))
+Lemma occurs_free_Eproj x tag n y e :
+  Same_set var (occurs_free (Eproj x tag n y e))
            (Union _ (Singleton var y) (Setminus var (occurs_free e) (Singleton var x))).
 Proof.
   split; intros x' H; inv H; eauto. 
@@ -343,8 +347,8 @@ Proof.
   intros Hc. subst. eauto.
 Qed.
 
-Lemma occurs_free_Eapp f ys :
-  Same_set var (occurs_free (Eapp f ys))
+Lemma occurs_free_Eapp f ft ys :
+  Same_set var (occurs_free (Eapp f ft ys))
            (Union _ (FromList ys) (Singleton var f)).
 Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
@@ -417,6 +421,8 @@ Proof.
   split; intros x H; inv H.
 Qed.
 
+(** ** Useful set inclusions *)
+
 Lemma occurs_free_fundefs_Fcons_Included f tau xs e B :
   Included var (occurs_free_fundefs B)
            (Union _ (occurs_free_fundefs (Fcons f tau xs e B)) (Singleton var f)).
@@ -424,9 +430,9 @@ Proof.
   intros x H. destruct (var_dec f x); subst; now eauto.
 Qed.
 
-Lemma occurs_free_Econstr_Included x tau t ys e :
+Lemma occurs_free_Econstr_Included x t ys e :
   Included var (occurs_free e)
-           (Union var (occurs_free (Econstr x tau t ys e)) (Singleton var x)).
+           (Union var (occurs_free (Econstr x t ys e)) (Singleton var x)).
 Proof.
   intros x' Hin.
   destruct (var_dec x x'); subst; eauto.
@@ -440,9 +446,9 @@ Proof.
   destruct (var_dec x x'); subst; eauto.
 Qed.
 
-Lemma occurs_free_Eprim_Included x tau f ys e :
+Lemma occurs_free_Eprim_Included x f ys e :
   Included var (occurs_free e)
-           (Union var (occurs_free (Eprim x tau f ys e)) (Singleton var x)).
+           (Union var (occurs_free (Eprim x f ys e)) (Singleton var x)).
 Proof.
   intros x' Hin.
   destruct (var_dec x x'); subst; eauto.
@@ -500,7 +506,7 @@ Proof.
     rewrite (Union_assoc (FromList l)), (Union_sym _ (Singleton var v)),
             <- Union_assoc. apply Same_set_refl.
     rewrite <- Setminus_big_cup.
-    apply Same_Set_big_cup_r. intros [[[f tau] xs] e'].
+    apply Same_Set_big_cup_r. intros [[[f' tau] xs] e'].
     rewrite Setminus_Union, (Union_sym (Singleton var v)).
     apply Same_set_refl.
   - rewrite occurs_free_fundefs_Fnil, big_cup_Empty_set. apply Same_set_refl.
@@ -593,10 +599,10 @@ Qed.
 Instance Decidable_occurs_free_fundefs e : Decidable (occurs_free_fundefs e).
 Proof.
   now apply occurs_free_dec.
-Qed.
-      
+Qed.   
 
-Lemma same_split_fds_occurs_free_fundefs B1 B2 B3 B3' :
+
+Lemma split_fds_same_occurs_free_fundefs_Same_set B1 B2 B3 B3' :
   split_fds B1 B2 B3 ->
   split_fds B1 B2 B3' ->
   Same_set _ (occurs_free_fundefs B3) (occurs_free_fundefs B3').
@@ -611,7 +617,8 @@ Proof.
     rewrite (split_fds_fun_in_fundefs B1 B2 B3'); eauto. apply Same_set_refl.
 Qed.
 
-Lemma occurs_free_comp_mut :
+(** Compatibility with contex application *)
+Lemma occurs_free_ctx_mut :
   (forall c e e', Same_set _ (occurs_free e) (occurs_free e') ->
                   Same_set _ (occurs_free (c |[ e ]|))
                            (occurs_free (c |[ e' ]|))) /\
@@ -638,20 +645,20 @@ Proof.
     rewrite name_in_fundefs_ctx. apply Same_set_refl.
 Qed.
 
-Corollary occurs_free_comp :
+Corollary occurs_free_exp_ctx :
   forall c e e', Same_set _ (occurs_free e) (occurs_free e') ->
                  Same_set _ (occurs_free (c |[ e ]|))
                           (occurs_free (c |[ e' ]|)).
 Proof.
-  apply occurs_free_comp_mut.
+  apply occurs_free_ctx_mut.
 Qed.
 
-Corollary occurs_free_fundefs_comp :
+Corollary occurs_free_fundefs_ctx :
   forall B e e', Same_set _ (occurs_free e) (occurs_free e') ->
                  Same_set _ (occurs_free_fundefs (B <[ e ]>))
                           (occurs_free_fundefs (B <[ e' ]>)).
 Proof.
-  apply occurs_free_comp_mut.
+  apply occurs_free_ctx_mut.
 Qed.
 
 (** ** Closed expressions *)
@@ -669,7 +676,7 @@ Lemma same_split_fds_closed_fundefs B1 B2 B3 B3' :
   closed_fundefs B3 -> closed_fundefs B3'.
 Proof.
   intros Hspl1 Hspl2 Hcl. unfold closed_fundefs in *.
-  rewrite same_split_fds_occurs_free_fundefs; eauto.
+  rewrite split_fds_same_occurs_free_fundefs_Same_set; eauto.
 Qed.
 
 Lemma split_fds_closed_fundefs B1 B2 B3 :
@@ -685,14 +692,14 @@ Proof.
   intros x Hc; inv Hc. intros x Hc; inv Hc.
 Qed.
 
-(** * Function blocks in expressions and function blocks *)
+(** * Function blocks defined inside in expressions and function blocks *)
 
 (** [funs_in_exp B e] iff [B] is a block of functions in [e] *)
 Inductive funs_in_exp : fundefs -> exp -> Prop :=
 | In_Econstr :
-    forall fs e x tau t ys,
+    forall fs e x t ys,
       funs_in_exp fs e ->
-      funs_in_exp fs (Econstr x tau t ys e)
+      funs_in_exp fs (Econstr x t ys e)
 | In_Case :
     forall fs x c e P,
       funs_in_exp fs e ->
@@ -714,9 +721,9 @@ Inductive funs_in_exp : fundefs -> exp -> Prop :=
       funs_in_fundef fs fs' ->
       funs_in_exp fs (Efun fs' e)
 | In_Eprim :
-    forall fs e x tau p ys,
+    forall fs e x p ys,
       funs_in_exp fs e ->
-      funs_in_exp fs (Eprim x tau p ys e)
+      funs_in_exp fs (Eprim x p ys e)
 with funs_in_fundef : fundefs -> fundefs -> Prop :=
 | In_Fcons1 :
     forall fs fs' x tau ys e,
@@ -781,16 +788,15 @@ Definition closed_fundefs_in_fundefs (B : fundefs) :=
 
 (** * Bound variables *)
 
-(** bound variables - alternative definition without lists or 
-  * number of occurences *)
+(** bound variables - alternative definition without lists or number of occurences *)
 Inductive bound_var : exp -> Ensemble var :=
 | Bound_Econstr1 :
-    forall x tau t ys e,
-      bound_var (Econstr x tau t ys e) x
+    forall x t ys e,
+      bound_var (Econstr x t ys e) x
 | Bound_Econstr2 :
-    forall y x tau t ys e,
+    forall y x t ys e,
       bound_var e y ->
-      bound_var (Econstr x tau t ys e) y
+      bound_var (Econstr x t ys e) y
 | Bound_Eproj1 :
     forall x y tau n e,
       bound_var (Eproj x tau n y e) x
@@ -812,12 +818,12 @@ Inductive bound_var : exp -> Ensemble var :=
       bound_var e y ->
       bound_var (Efun defs e) y
 | Bound_Eprim1 :
-    forall x tau p ys e,
-      bound_var (Eprim x tau p ys e) x
+    forall x p ys e,
+      bound_var (Eprim x p ys e) x
 | Bound_Eprim2 :
-    forall y x tau p ys e,
+    forall y x p ys e,
       bound_var e y ->
-      bound_var (Eprim x tau p ys e) y
+      bound_var (Eprim x p ys e) y
 with bound_var_fundefs : fundefs -> Ensemble var :=
 | Bound_Fcons1 :
     forall x f tau ys e defs,
@@ -835,8 +841,10 @@ with bound_var_fundefs : fundefs -> Ensemble var :=
 Hint Constructors bound_var.
 Hint Constructors bound_var_fundefs.
 
-Lemma bound_var_Econstr x tau t ys e :
-  Same_set _ (bound_var (Econstr x tau t ys e))
+(** ** Useful set equalities *)
+
+Lemma bound_var_Econstr x t ys e :
+  Same_set _ (bound_var (Econstr x t ys e))
            (Union var (bound_var e) (Singleton _ x)).
 Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
@@ -849,15 +857,15 @@ Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
 Qed.
 
-Lemma bound_var_Eprim x tau f y e :
-  Same_set _ (bound_var (Eprim x tau f y e))
+Lemma bound_var_Eprim x f y e :
+  Same_set _ (bound_var (Eprim x f y e))
            (Union var (bound_var e) (Singleton _ x)).
 Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
 Qed.
 
-Lemma bound_var_Eapp f ys :
-  Same_set _ (bound_var (Eapp f ys))
+Lemma bound_var_Eapp f ft ys :
+  Same_set _ (bound_var (Eapp f ft ys))
            (Empty_set var).
 Proof.
   split; intros x' H; inv H; eauto.
@@ -1004,11 +1012,12 @@ Proof.
   apply bound_var_comp_mut.
 Qed.
 
-(** Lemmas about the union of free and bound variables *)
-Lemma bound_var_occurs_free_Econstr_Included x tau t ys e :
+(** ** Lemmas about the union of free and bound variables *)
+
+Lemma bound_var_occurs_free_Econstr_Included x t ys e :
   Included _ (Union _ (bound_var e) (occurs_free e))
-           (Union _ (bound_var (Econstr x tau t ys e))
-                  (occurs_free (Econstr x tau t ys e))).
+           (Union _ (bound_var (Econstr x t ys e))
+                  (occurs_free (Econstr x t ys e))).
 Proof.
   rewrite bound_var_Econstr, <- Union_assoc.
   apply Included_Union_compat. now apply Included_refl. 
@@ -1075,10 +1084,10 @@ Proof.
   rewrite occurs_free_Efun. now apply Included_Union_mon_l.
 Qed.
 
-Lemma bound_var_occurs_free_Eprim_Included x tau f ys e :
+Lemma bound_var_occurs_free_Eprim_Included x f ys e :
   Included _ (Union _ (bound_var e) (occurs_free e))
-           (Union _ (bound_var (Eprim x tau f ys e))
-                  (occurs_free (Eprim x tau f ys e))).
+           (Union _ (bound_var (Eprim x f ys e))
+                  (occurs_free (Eprim x f ys e))).
 Proof.
   rewrite bound_var_Eprim, <- Union_assoc.
   apply Included_Union_compat. now apply Included_refl. 
@@ -1086,14 +1095,13 @@ Proof.
   rewrite Union_sym. now apply Included_refl.
 Qed.
 
-
-(** unique bindings - alternative definition without lists *)
+(** Unique bindings - alternative definition without lists *)
 Inductive unique_bindings : exp -> Prop :=
 | UBound_Econstr :
-    forall x tau t ys e,
+    forall x t ys e,
       ~ (bound_var e) x ->
       unique_bindings e ->
-      unique_bindings (Econstr x tau t ys e)
+      unique_bindings (Econstr x t ys e)
 | UBound_Eproj :
     forall x tau n y e,
       ~ (bound_var e) x ->
@@ -1115,10 +1123,10 @@ Inductive unique_bindings : exp -> Prop :=
       Disjoint var (bound_var e) (bound_var_fundefs defs) ->
       unique_bindings (Efun defs e)
 | UBound_Eprim :
-    forall x tau p ys e,
+    forall x p ys e,
       ~ (bound_var e) x ->
       unique_bindings e ->
-      unique_bindings (Eprim x tau p ys e)
+      unique_bindings (Eprim x p ys e)
 with unique_bindings_fundefs : fundefs -> Prop :=
 | UBound_Fcons :
     forall f tau ys e defs,
@@ -1345,7 +1353,7 @@ Proof.
       edestruct IHB as [B1 [B2 [Heq [Hn [Hs Hun']]]]]; eauto.
       edestruct fundefs_append_unique_bindings_l as [H1 [H2 H3]];
         [ apply H12 | | ]; eauto.
-      exists (Fcons v t0 l e0 B1), B2. rewrite Heq. split; eauto.
+      exists (Fcons v f0 l e0 B1), B2. rewrite Heq. split; eauto.
       split; [| split ].
       * intros H. apply Hn. inv H; eauto. inv H4. congruence.
       * simpl. rewrite Setminus_Union_distr, <- Union_assoc.
@@ -1405,7 +1413,7 @@ Proof.
       inv Hun; eauto.
       rewrite (fundefs_append_fun_in_fundefs B1 B1' (fundefs_append B1 B1')); eauto.
       eapply Included_trans; [| inv HS'; eauto].
-      rewrite <- (Setminus_Disjoint (fun_in_fundefs B) (Singleton _ (v, t0, l, e))).
+      rewrite <- (Setminus_Disjoint (fun_in_fundefs B) (Singleton _ (v, f0, l, e))).
       rewrite <- Setminus_Union_Inlcluded; eauto using Included_refl.
       eapply Included_Setminus_compat; eauto using Included_refl.
       now rewrite Union_sym.  
@@ -1634,7 +1642,7 @@ Fixpoint fundefs_names (defs : fundefs) : FVSet :=
 (** The set of free variables of an [exp], computational definition *)
 Fixpoint exp_fv (e : exp) : FVSet :=
   match e with
-    | Econstr x tau c ys e =>
+    | Econstr x c ys e =>
       let set := remove x (exp_fv e) in
       union_list set ys
     | Ecase x pats =>
@@ -1646,9 +1654,9 @@ Fixpoint exp_fv (e : exp) : FVSet :=
       let names := fundefs_names defs in
       union (fundefs_fv defs names)
             (diff (exp_fv e) names)
-    | Eapp x xs =>
+    | Eapp x ft xs =>
       union_list (singleton x) xs
-    | Eprim x tau prim ys e =>
+    | Eprim x prim ys e =>
       let set := remove x (exp_fv e) in
       union_list set ys
   end
@@ -1666,7 +1674,7 @@ with fundefs_fv (defs : fundefs) (names : FVSet) : FVSet :=
 Lemma fundefs_names_correct (defs : fundefs) :
   forall f, In f (fundefs_names defs) <-> name_in_fundefs defs f.
 Proof.
-  induction defs; simpl; intros f; split; intros H; try now inv H.
+  induction defs; simpl; intros f0; split; intros H; try now inv H.
   - apply add_spec in H. inv H; eauto. left; eauto.
     right. eapply IHdefs; eauto.
   - apply add_spec. inv H; eauto. inv H0; eauto.

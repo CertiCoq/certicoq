@@ -2,23 +2,9 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.Li
         Coq.omega.Omega Coq.Sets.Ensembles Coq.Relations.Relation_Operators.
 
 Require Import CpdtTactics.
-Require Import cps Ensembles_util List_util.
+Require Import cps ctx eval Ensembles_util List_util.
+
 Import ListNotations.
-(* Require Maps. *)
-(* Import Nnat. *)
-Require Import ctx eval.
-
-(* useful definitions and proof for L6 - cps language *)
-(* 
- SUBTERM - proper subterm relation
-
- OCCUR   - number of occurence of variables
-
- BINDING - list of variable bindings, unique binding property
- 
- OTHER  - unclassified fact about cps/cps.v
-
- *)
 
 Ltac destructAll :=
   match goal with
@@ -28,6 +14,382 @@ Ltac destructAll :=
   end.
 
 Definition var_dec := M.elt_eq.
+
+(** Lemmas about [findtag] *)
+Lemma findtag_not_empty:
+  forall A cl (k : A) (v : cTag), findtag cl v = Some k -> 0 < (length cl).
+Proof.
+  induction cl; intros.
+  - inversion H.
+  - simpl in H. destruct a. destruct (M.elt_eq c v).
+    + inversion H. simpl. omega.
+    + simpl. apply IHcl in H. omega.
+Qed.
+
+Lemma findtag_In_patterns {A} P c (v : A) :
+  findtag P c = Some v ->
+  List.In (c, v) P.
+Proof.
+  induction P as [ | [c' e'] P IHP]; intros H; try discriminate.
+  simpl in H. edestruct (M.elt_eq c' c).
+  - inv H. now left.
+  - right. eauto.
+Qed.
+   
+Lemma findtag_append_spec {A} c P P' (v : A) :
+  findtag (P ++ P') c = Some v ->
+  (findtag P c = Some v) \/
+  (findtag P' c = Some v /\ forall v, ~ List.In (c, v) P).
+Proof.
+  induction P as [| [c' v'] P IHP]; intros H.
+  - simpl in H. right; split; eauto.
+  - simpl in *.
+    destruct (M.elt_eq c' c); eauto.
+    destruct (IHP H) as [H1 | [H1 H2]]; eauto.
+    right; split; eauto. intros v''.
+    intros Hc. inv Hc. inv H0; congruence.
+    eapply H2; eauto.
+Qed.
+
+Lemma findtag_append_is_Some {A} c P P' (v : A) :
+  findtag P c = Some v ->
+  findtag (P ++ P') c = Some v.
+Proof.
+  induction P as [| [c' v'] P IHP]; simpl; intros H; eauto.
+  - inv H.
+  - destruct (M.elt_eq c' c); eauto.
+Qed.
+
+Lemma findtag_append_not_In {A} c (P P' : list (cTag * A)) :
+  (forall v, ~ List.In (c, v) P) ->
+  findtag (P ++ P') c = findtag P' c.
+Proof.
+  induction P as [| [c' v'] P IHP]; simpl; intros H; eauto.
+  destruct (M.elt_eq c' c); eauto.
+  - exfalso. subst. eapply H. left; eauto.
+  - eapply IHP. intros x Hc. eapply H. eauto.
+Qed.
+
+Lemma findtag_In {A} (P : list (cTag * A)) c e :
+  findtag P c = Some e -> List.In (c, e) P.
+Proof.
+  revert e. induction P as [| [c' e'] P IHp]; intros x H; try now inv H.
+  simpl in H. inv H.
+  destruct (M.elt_eq c' c); inv H1; try now constructor.
+  constructor 2. apply IHp; eauto.
+Qed.
+
+(** [split_fds B1 B2 B] iff B is an interleaving of the definitions in B1 and B2 *)
+Inductive split_fds: fundefs -> fundefs -> fundefs -> Prop :=
+| Left_f:
+    forall lfds rfds lrfds v t ys e,
+      split_fds lfds rfds lrfds ->
+      split_fds (Fcons v t ys e lfds) rfds (Fcons v t ys e lrfds)
+| Right_f:
+    forall lfds rfds lrfds v t ys e,
+      split_fds lfds rfds lrfds ->
+      split_fds lfds (Fcons v t ys e rfds) (Fcons v t ys e lrfds)
+| End_f: split_fds Fnil Fnil Fnil.
+
+(** Lemmas about [split_fds]. *)
+Lemma split_fds_nil_l fdefs : split_fds fdefs Fnil fdefs.
+  induction fdefs; constructor; eauto.
+Qed.
+
+Lemma split_fds_nil_r fdefs : split_fds Fnil fdefs fdefs.
+  induction fdefs; constructor; eauto.
+Qed.
+
+Lemma split_fds_trans B1 B2 B3 B1' B2' :
+  split_fds B1 B1' B2 ->
+  split_fds B2 B2' B3 ->
+  exists B2,
+    split_fds B1' B2' B2 /\ split_fds B1 B2 B3.
+Proof.
+  intros Hs1 Hs2. revert B1 B1' Hs1. induction Hs2; intros B1 B1' Hs1.
+  - inv Hs1. 
+    edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
+    eexists. split; eauto. constructor; eauto.
+    edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
+    eexists. split; constructor; eauto.
+  - edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
+    eexists. split; constructor; eauto.
+  - eexists; split; eauto using split_fds_nil_l.
+Qed.  
+
+Lemma split_fds_sym B1 B2 B3 :
+  split_fds B1 B2 B3 ->
+  split_fds B2 B1 B3.
+Proof.
+  intros Hs1. induction Hs1; now constructor; eauto.
+Qed.
+
+Lemma split_fds_Fnil B1 B2 :
+  split_fds B1 B2 Fnil ->
+  B1 = Fnil /\ B2 = Fnil.
+Proof.
+  intros H. inv H; eauto.
+Qed.
+
+Lemma split_fds_Fcons_l B1 B2 B3 :
+  split_fds B1 B2 B3 ->
+  B1 <> Fnil -> B3 <> Fnil.
+Proof.
+  intros H1 H2. inv H1; eauto; congruence.
+Qed.
+
+Lemma split_fds_Fcons_r B1 B2 B3 :
+  split_fds B1 B2 B3 ->
+  B2 <> Fnil -> B3 <> Fnil.
+Proof.
+  intros H1 H2. inv H1; eauto; congruence.
+Qed.
+
+
+Lemma split_fds_Fnil_eq_l B1 B2 :
+  split_fds Fnil B1 B2 -> B1 = B2.
+Proof.
+  revert B1. induction B2; intros B1 H; auto; inv H; f_equal; eauto.
+Qed.
+
+Lemma split_fds_Fnil_eq_r B1 B2 :
+  split_fds B1 Fnil B2 -> B1 = B2.
+Proof.
+  revert B1. induction B2; intros B1 H; auto; inv H; f_equal; eauto.
+Qed.
+
+(** Append function definitions *)
+Fixpoint fundefs_append (B1 B2 : fundefs) : fundefs :=
+  match B1 with
+    | Fcons f t xs xe B => Fcons f t xs xe (fundefs_append B B2)
+    | Fnil => B2
+  end.
+
+(** Lemmas about [fundefs_append] *)
+Lemma def_funs_append B B1 B2 rho rho' :
+  def_funs B (fundefs_append B1 B2) rho rho' =
+  def_funs B B1 rho (def_funs B B2 rho rho').
+Proof.
+  induction B1; simpl; eauto. now rewrite IHB1.
+Qed.
+
+Lemma find_def_fundefs_append_r f B1 B2 v:
+  find_def f B2 = Some v ->
+  find_def f B1 = None ->
+  find_def f (fundefs_append B1 B2) = find_def f B2.
+Proof.
+  induction B1; simpl; intros H1 H2; eauto.
+  destruct (M.elt_eq f v0); try discriminate; eauto.
+Qed.
+
+Lemma find_def_fundefs_append_l f B1 B2 v:
+  find_def f B1 = Some v ->
+  find_def f (fundefs_append B1 B2) = find_def f B1.
+Proof.
+  induction B1; simpl; intros H2; eauto; try discriminate.
+  destruct (M.elt_eq f v0); try discriminate; eauto.
+Qed.
+
+Lemma fundefs_append_split_fds B1 B2 B3 :
+  fundefs_append B1 B2 = B3 ->
+  split_fds B1 B2 B3.
+Proof.
+  revert B1. induction B3; intros B1 Hdefs.
+  - destruct B1; simpl in Hdefs; subst. inv Hdefs.
+    constructor. eauto.
+    eapply split_fds_nil_r.
+  - destruct B1; simpl in Hdefs; try congruence. subst.
+    constructor.
+Qed.
+
+Lemma find_def_fundefs_append_Fcons_neq f v t ys e B1 B2 :
+  f <> v ->
+  find_def f (fundefs_append B1 (Fcons v t ys e B2)) =
+  find_def f (fundefs_append B1 B2).
+Proof.
+  intros Hneq. revert B2. induction B1; intros B2.
+  - simpl. destruct (M.elt_eq f v0); eauto.
+  - simpl. destruct (M.elt_eq f v); try contradiction; eauto.
+Qed.
+
+Lemma split_fds_cons_l_append_fundefs f tau xs e B1 B2 B3 : 
+  split_fds (Fcons f tau xs e B1) B2 B3 ->
+  exists B1' B2',
+    B3 = fundefs_append B1' (Fcons f tau xs e B2') /\
+    split_fds B1 B2 (fundefs_append B1' B2').
+Proof.
+  revert B1 B2. induction B3; intros B1 B2 Hspl.
+  - inv Hspl.
+    + exists Fnil, B3; eauto.
+    + edestruct IHB3 as [B1' [B2' [Heq Hspl]]]; eauto.
+      exists (Fcons v f0 l e0 B1'), B2'. rewrite Heq; split; eauto.
+      simpl; constructor; eauto.
+  - inv Hspl.
+Qed.
+
+Lemma split_fds_cons_r_append_fundefs f tau xs e B1 B2 B3 : 
+  split_fds B1 (Fcons f tau xs e B2) B3 ->
+  exists B1' B2',
+    B3 = fundefs_append B1' (Fcons f tau xs e B2') /\
+    split_fds B1 B2 (fundefs_append B1' B2').
+Proof.
+  revert B1 B2. induction B3; intros B1 B2 Hspl.
+  - inv Hspl.
+    + edestruct IHB3 as [B1' [B2' [Heq Hspl]]]; eauto.
+      exists (Fcons v f0 l e0 B1'), B2'. rewrite Heq; eauto. split; eauto.
+      simpl. constructor; eauto.
+    + exists Fnil, B3; eauto.
+  - inv Hspl.
+Qed.
+
+
+(** Lemmas about [getlist] *)
+Lemma getlist_In (rho : env) ys x vs :
+  getlist ys rho = Some vs ->
+  List.In x ys ->
+  exists v, M.get x rho = Some v.
+Proof.
+  revert x vs. induction ys; intros x vs Hget H. inv H.
+  inv H; simpl in Hget.
+  - destruct (M.get x rho) eqn:Heq; try discriminate; eauto.
+  - destruct (M.get a rho) eqn:Heq; try discriminate; eauto.
+    destruct (getlist ys rho) eqn:Heq'; try discriminate; eauto.
+Qed.
+
+Lemma In_getlist (xs : list var) (rho : env) :
+  (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
+  exists vs, getlist xs rho = Some vs. 
+Proof.                                            
+  intros H. induction xs. 
+  - eexists; simpl; eauto.
+  - edestruct IHxs. 
+    + intros x Hin. eapply H. now constructor 2. 
+    + edestruct H. now constructor. 
+      eexists. simpl. erewrite H1, H0. 
+      reflexivity. 
+Qed.
+
+Lemma getlist_nth_get (xs : list var) (vs : list val) rho (x : var) N :
+  getlist xs rho = Some vs ->
+  nthN xs N = Some x ->
+  exists v, nthN vs N = Some v /\ M.get x rho = Some v. 
+Proof.
+  revert vs N; induction xs; intros vs N Hget Hnth.
+  - inv Hnth. 
+  - simpl in Hget.
+    destruct (M.get a rho) eqn:Hget'; try discriminate.
+    destruct (getlist xs rho) eqn:Hgetlist'; try discriminate.
+    inv Hget. destruct N. 
+    + inv Hnth. eexists; simpl; eauto.
+    + edestruct IHxs as [v' [Hnth1 Hget1]]; eauto. 
+Qed.
+
+Lemma getlist_set_neq {A} xs x (v : A) rho :
+  ~ List.In x xs ->
+  getlist xs (M.set x v rho) = getlist xs rho. 
+Proof.
+  intros Hin.
+  revert rho. induction xs; intros rho.
+  - reflexivity.
+  - simpl. rewrite M.gso.
+    + rewrite IHxs. reflexivity.
+      intros Hin'. eapply Hin. now constructor 2.
+    + intros Heq; subst. eapply Hin. now constructor.
+Qed.
+
+(** Lemmas about [setlist]  *)
+Lemma setlist_Forall2_get (P : val -> val -> Prop)
+      xs vs1 vs2 rho1 rho2 rho1' rho2' x : 
+  Forall2 P vs1 vs2 ->
+  setlist xs vs1 rho1 = Some rho1' ->
+  setlist xs vs2 rho2 = Some rho2' ->
+  List.In x xs ->
+  exists v1 v2,
+    M.get x rho1' = Some v1 /\
+    M.get x rho2' = Some v2 /\ P v1 v2.
+Proof.
+  revert rho1' rho2' vs1 vs2.
+  induction xs; simpl; intros rho1' rho2' vs1 vs2 Hall Hset1 Hset2 Hin.
+  - inv Hin.
+  - destruct (Coqlib.peq a x); subst.
+    + destruct vs1; destruct vs2; try discriminate.
+      destruct (setlist xs vs1 rho1) eqn:Heq1;
+        destruct (setlist xs vs2 rho2) eqn:Heq2; try discriminate.
+      inv Hset1; inv Hset2. inv Hall.
+      repeat eexists; try rewrite M.gss; eauto.
+    + destruct vs1; destruct vs2; try discriminate.
+      destruct (setlist xs vs1 rho1) eqn:Heq1;
+        destruct (setlist xs vs2 rho2) eqn:Heq2; try discriminate.
+      inv Hset1; inv Hset2. inv Hall. inv Hin; try congruence.
+      edestruct IHxs as [v1 [v2 [Hget1 [Hget2 HP]]]]; eauto.
+      repeat eexists; eauto; rewrite M.gso; eauto.
+Qed.
+
+Lemma get_setlist_In_xs x xs vs rho rho' :
+  In var (FromList xs) x ->
+  setlist xs vs rho = Some rho' ->
+  exists v : val, M.get x rho' = Some v.
+Proof.
+  revert rho rho' vs. induction xs; intros rho rho' vs Hin Hset.
+  - rewrite FromList_nil in Hin. exfalso.
+    eapply not_In_Empty_set. eassumption. 
+  - rewrite FromList_cons in Hin.
+    destruct vs; try discriminate.    
+    simpl in Hset. destruct (setlist xs vs rho) eqn:Hsetlist; try discriminate.
+    inv Hset. inv Hin.
+    + inv H. eexists. rewrite M.gss. reflexivity.
+    + destruct (Coqlib.peq x a); subst.
+      * eexists. now rewrite M.gss.
+      * edestruct IHxs; eauto.
+        eexists. simpl. rewrite M.gso; eauto. 
+Qed.
+
+Lemma setlist_not_In (xs : list var) (vs : list val) (rho rho' : env) (x : var) : 
+  setlist xs vs rho = Some rho' ->
+  ~ List.In x xs ->
+  M.get x rho = M.get x rho'.
+Proof.
+  revert vs rho'.
+  induction xs; simpl; intros vs rho' Hset Hin.
+  - destruct vs; congruence.
+  - destruct vs; try discriminate.
+    destruct (setlist xs vs rho) eqn:Heq1; try discriminate. inv Hset.
+    rewrite M.gso; eauto.
+Qed.
+
+Lemma setlist_length (rho rho' rho1 : env)
+      (xs : list var) (vs1 vs2 : list val) :
+  length vs1 = length vs2 -> 
+  setlist xs vs1 rho = Some rho1 ->
+  exists rho2, setlist xs vs2 rho' = Some rho2.
+Proof.
+  revert vs1 vs2 rho1.
+  induction xs as [| x xs IHxs ]; intros vs1 vs2 rho1 Hlen Hset.
+  - inv Hset. destruct vs1; try discriminate. inv H0.
+    destruct vs2; try discriminate. eexists; simpl; eauto. 
+  - destruct vs1; try discriminate. destruct vs2; try discriminate.
+    inv Hlen. simpl in Hset. 
+    destruct (setlist xs vs1 rho) eqn:Heq2; try discriminate.
+    edestruct (IHxs _ _ _ H0 Heq2) as  [vs2' Hset2].
+    eexists. simpl; rewrite Hset2; eauto.
+Qed.
+
+(** Lemmas about case consistent *)
+
+Lemma caseConsistent_same_cTags cenv P1 P2 t :
+  Forall2 (fun pat pat' => fst pat = fst pat') P1 P2 ->
+  caseConsistent cenv P1 t ->
+  caseConsistent cenv P2 t.
+Proof.
+  intros H Hc; induction H.
+  - now constructor. 
+  - inv Hc. destruct y as [t'' e'']. simpl in *. subst.
+    econstructor; now eauto.
+Qed.
+
+(* XXX: These definitions need to be updated to work with the new syntax of L6.
+        Whoever needs them has to update them. Otherwise, they will
+        self-destruct in an arbitrary amount of time.
 
 Inductive dsubterm_e:exp -> exp -> Prop :=
 | dsubterm_constr: forall x t c ys e, dsubterm_e e (Econstr x t c ys e)
@@ -59,8 +421,6 @@ Inductive subfds_fds: fundefs -> fundefs -> Prop :=
       subfds_fds fds' (Fcons f t ys e fds)
 | subfds_cons:
     forall fds f t ys e, subfds_fds fds (Fcons f t ys e fds).
-
-
 
 Definition subfds_or_eq: fundefs -> fundefs -> Prop :=
   fun fds' fds => subfds_fds fds' fds \/ fds' = fds.
@@ -244,45 +604,6 @@ Proof.
     + exists 0; constructor.
 Qed.
 
-(*
-
-Theorem num_binding_det: forall v e n m,
-                           num_binding_e e v n ->
-                           num_binding_e e v m ->
-                           n = m 
-with num_binding_f_det: forall v fds n m,
-                          num_binding_f fds v n ->
-                          num_binding_f fds v m ->
-                          n = m.
-- induction e; intros; inversion H; inversion H0; subst.
-  + specialize (IHe _ _ H8 H16).
-    auto.
-  +    clear H H0 num_binding_f_det.
-    revert n m H5 H10.
-    induction l; intros.
-    * inversion H5; inversion H10; subst; auto.
-    * inversion H5; inversion H10; subst.
-      inversion H6; subst.
-      specialize (num_binding_det _ _ _ _ H1 H8). 
-      specialize (IHl _ _ H4 H12). auto.
-  + specialize (IHe _ _ H8 H16).
-    auto.
-  + specialize (IHe _ _ H6 H12).
-    specialize (num_binding_f_det _ _ _ _ H3 H9).
-    auto.
-  + auto.
-  + specialize (IHe _ _ H8 H16).
-    auto.
--  induction fds; intros; inversion H; inversion H0; subst.
-  + specialize (num_binding_det _ _ _ _ H8 H17).
-    specialize (IHfds _ _ H9 H18).
-    auto.
-  + auto.
-Qed.
-
- *)
-
-
 
     
 Definition unique_bindings' e: Prop :=
@@ -329,374 +650,16 @@ Proof.
   specialize (e_bv_e e); destruct e_bv_e. eauto.
 Qed.
 
-
-
-(*   
-  Theorem bv_e_det: forall e l1 l2, bv_e e l1 -> bv_e e l2 -> l1 = l2
-   with bv_f_det: forall f l1 l2, bv_f f l1 -> bv_f f l2 -> l1 = l2.                     
-  Proof.
-    - induction e; clear bv_e_det; intros; auto; inversion H; inversion H0; subst; auto.  
-      + specialize (IHe _ _ H7 H14); subst; reflexivity.
-      + specialize (IHe _ _ H7 H14); subst; reflexivity.
-      + specialize (bv_f_det f _ _ H3 H8); specialize (IHe _ _ H5 H10); subst; reflexivity.
-      + specialize (IHe _ _ H7 H14); subst; reflexivity.
-    - induction f; clear bv_f_det; intros; auto; inversion H; inversion H0; subst.
-      + specialize (bv_e_det e _ _ H7 H15); specialize (IHf _ _ H8 H16); subst; reflexivity.
-      + reflexivity.
-  Qed.
- *)
-
-Theorem findtag_not_empty:
-  forall A cl (k:A) (v:tag), findtag cl v = Some k -> 0 < (length cl).
+Theorem bv_e_det: forall e l1 l2, bv_e e l1 -> bv_e e l2 -> l1 = l2
+                             with bv_f_det: forall f l1 l2, bv_f f l1 -> bv_f f l2 -> l1 = l2.                     
 Proof.
-  induction cl; intros.
-  - inversion H.
-  - simpl in H. destruct a. destruct (M.elt_eq t v).
-    + inversion H. simpl. omega.
-    + simpl. apply IHcl in H. omega.
-Qed.
+  - induction e; clear bv_e_det; intros; auto; inversion H; inversion H0; subst; auto.  
+    + specialize (IHe _ _ H7 H14); subst; reflexivity.
+    + specialize (IHe _ _ H7 H14); subst; reflexivity.
+    + specialize (bv_f_det f _ _ H3 H8); specialize (IHe _ _ H5 H10); subst; reflexivity.
+    + specialize (IHe _ _ H7 H14); subst; reflexivity.
+  - induction f; clear bv_f_det; intros; auto; inversion H; inversion H0; subst.
+    + specialize (bv_e_det e _ _ H7 H15); specialize (IHf _ _ H8 H16); subst; reflexivity.
+    + reflexivity.
+Qed. *)
 
-Inductive split_fds: fundefs -> fundefs -> fundefs -> Prop :=
-| Left_f:
-    forall lfds rfds lrfds v t ys e,
-      split_fds lfds rfds lrfds ->
-      split_fds (Fcons v t ys e lfds) rfds (Fcons v t ys e lrfds)
-| Right_f:
-    forall lfds rfds lrfds v t ys e,
-      split_fds lfds rfds lrfds ->
-      split_fds lfds (Fcons v t ys e rfds) (Fcons v t ys e lrfds)
-| End_f: split_fds Fnil Fnil Fnil.
-
-(** some lemmas about split_fds. *)
-Lemma split_fds_nil_l fdefs : split_fds fdefs Fnil fdefs.
-  induction fdefs; constructor; eauto.
-Qed.
-
-Lemma split_fds_nil_r fdefs : split_fds Fnil fdefs fdefs.
-  induction fdefs; constructor; eauto.
-Qed.
-
-Lemma split_fds_trans B1 B2 B3 B1' B2' :
-  split_fds B1 B1' B2 ->
-  split_fds B2 B2' B3 ->
-  exists B2,
-    split_fds B1' B2' B2 /\ split_fds B1 B2 B3.
-Proof.
-  intros Hs1 Hs2. revert B1 B1' Hs1. induction Hs2; intros B1 B1' Hs1.
-  - inv Hs1. 
-    edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
-    eexists. split; eauto. constructor; eauto.
-    edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
-    eexists. split; constructor; eauto.
-  - edestruct IHHs2 as [B2'' [Hs3 Hs4]]; eauto.
-    eexists. split; constructor; eauto.
-  - eexists; split; eauto using split_fds_nil_l.
-Qed.  
-
-Lemma split_fds_sym B1 B2 B3 :
-  split_fds B1 B2 B3 ->
-  split_fds B2 B1 B3.
-Proof.
-  intros Hs1. induction Hs1; now constructor; eauto.
-Qed.
-
-Lemma split_fds_Fnil B1 B2 :
-  split_fds B1 B2 Fnil ->
-  B1 = Fnil /\ B2 = Fnil.
-Proof.
-  intros H. inv H; eauto.
-Qed.
-
-Lemma split_fds_Fcons_l B1 B2 B3 :
-  split_fds B1 B2 B3 ->
-  B1 <> Fnil -> B3 <> Fnil.
-Proof.
-  intros H1 H2. inv H1; eauto; congruence.
-Qed.
-
-Lemma split_fds_Fcons_r B1 B2 B3 :
-  split_fds B1 B2 B3 ->
-  B2 <> Fnil -> B3 <> Fnil.
-Proof.
-  intros H1 H2. inv H1; eauto; congruence.
-Qed.
-
-
-Lemma split_fds_Fnil_eq_l B1 B2 :
-  split_fds Fnil B1 B2 -> B1 = B2.
-Proof.
-  revert B1. induction B2; intros B1 H; auto; inv H; f_equal; eauto.
-Qed.
-
-Lemma split_fds_Fnil_eq_r B1 B2 :
-  split_fds B1 Fnil B2 -> B1 = B2.
-Proof.
-  revert B1. induction B2; intros B1 H; auto; inv H; f_equal; eauto.
-Qed.
-
-
-Fixpoint fundefs_append (B1 B2 : fundefs) : fundefs :=
-  match B1 with
-    | Fcons f t xs xe B => Fcons f t xs xe (fundefs_append B B2)
-    | Fnil => B2
-  end.
-
-Lemma def_funs_append B B1 B2 rho rho' :
-  def_funs B (fundefs_append B1 B2) rho rho' =
-  def_funs B B1 rho (def_funs B B2 rho rho').
-Proof.
-  induction B1; simpl; eauto. now rewrite IHB1.
-Qed.
-
-Lemma find_def_fundefs_append_r f B1 B2 v:
-  find_def f B2 = Some v ->
-  find_def f B1 = None ->
-  find_def f (fundefs_append B1 B2) = find_def f B2.
-Proof.
-  induction B1; simpl; intros H1 H2; eauto.
-  destruct (M.elt_eq f v0); try discriminate; eauto.
-Qed.
-
-Lemma find_def_fundefs_append_l f B1 B2 v:
-  find_def f B1 = Some v ->
-  find_def f (fundefs_append B1 B2) = find_def f B1.
-Proof.
-  induction B1; simpl; intros H2; eauto; try discriminate.
-  destruct (M.elt_eq f v0); try discriminate; eauto.
-Qed.
-
-Lemma fundefs_append_split_fds B1 B2 B3 :
-  fundefs_append B1 B2 = B3 ->
-  split_fds B1 B2 B3.
-Proof.
-  revert B1. induction B3; intros B1 Hdefs.
-  - destruct B1; simpl in Hdefs; subst. inv Hdefs.
-    constructor. eauto.
-    eapply split_fds_nil_r.
-  - destruct B1; simpl in Hdefs; try congruence. subst.
-    constructor.
-Qed.
-
-Lemma find_def_fundefs_append_Fcons_neq f v t ys e B1 B2 :
-  f <> v ->
-  find_def f (fundefs_append B1 (Fcons v t ys e B2)) =
-  find_def f (fundefs_append B1 B2).
-Proof.
-  intros Hneq. revert B2. induction B1; intros B2.
-  - simpl. destruct (M.elt_eq f v0); eauto.
-  - simpl. destruct (M.elt_eq f v); try contradiction; eauto.
-Qed.
-
-Lemma findtag_In_patterns {A} P c (v : A) :
-  findtag P c = Some v ->
-  List.In (c, v) P.
-Proof.
-  induction P as [ | [c' e'] P IHP]; intros H; try discriminate.
-  simpl in H. edestruct (M.elt_eq c' c).
-  - inv H. now left.
-  - right. eauto.
-Qed.
-   
-Lemma findtag_append_spec {A} c P P' (v : A) :
-  findtag (P ++ P') c = Some v ->
-  (findtag P c = Some v) \/
-  (findtag P' c = Some v /\ forall v, ~ List.In (c, v) P).
-Proof.
-  induction P as [| [c' v'] P IHP]; intros H.
-  - simpl in H. right; split; eauto.
-  - simpl in *.
-    destruct (M.elt_eq c' c); eauto.
-    destruct (IHP H) as [H1 | [H1 H2]]; eauto.
-    right; split; eauto. intros v''.
-    intros Hc. inv Hc. inv H0; congruence.
-    eapply H2; eauto.
-Qed.
-
-Lemma findtag_append_not_In {A} c (P P' : list (tag * A)) :
-  (forall v, ~ List.In (c, v) P) ->
-  findtag (P ++ P') c = findtag P' c.
-Proof.
-  induction P as [| [c' v'] P IHP]; simpl; intros H; eauto.
-  destruct (M.elt_eq c' c); eauto.
-  - exfalso. subst. eapply H. left; eauto.
-  - eapply IHP. intros x Hc. eapply H. eauto.
-Qed.
-
-Lemma findtag_append_Some {A} c P P' (v : A) :
-  findtag P c = Some v ->
-  findtag (P ++ P') c = Some v.
-Proof.
-  induction P as [| [c' v'] P IHP]; simpl; intros H; eauto.
-  - inv H.
-  - destruct (M.elt_eq c' c); eauto.
-Qed.
-
-Lemma getlist_In (rho : env) ys x vs :
-  getlist ys rho = Some vs ->
-  List.In x ys ->
-  exists v, M.get x rho = Some v.
-Proof.
-  revert x vs. induction ys; intros x vs Hget H. inv H.
-  inv H; simpl in Hget.
-  - destruct (M.get x rho) eqn:Heq; try discriminate; eauto.
-  - destruct (M.get a rho) eqn:Heq; try discriminate; eauto.
-    destruct (getlist ys rho) eqn:Heq'; try discriminate; eauto.
-Qed.
-
-Lemma In_getlist (xs : list var) (rho : env) :
-  (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
-  exists vs, getlist xs rho = Some vs. 
-Proof.                                            
-  intros H. induction xs. 
-  - eexists; simpl; eauto.
-  - edestruct IHxs. 
-    + intros x Hin. eapply H. now constructor 2. 
-    + edestruct H. now constructor. 
-      eexists. simpl. erewrite H1, H0. 
-      reflexivity. 
-Qed.
-
-Lemma getlist_nth_get (xs : list var) (vs : list val) rho (x : var) N :
-  getlist xs rho = Some vs ->
-  nthN xs N = Some x ->
-  exists v, nthN vs N = Some v /\ M.get x rho = Some v. 
-Proof.
-  revert vs N; induction xs; intros vs N Hget Hnth.
-  - inv Hnth. 
-  - simpl in Hget.
-    destruct (M.get a rho) eqn:Hget'; try discriminate.
-    destruct (getlist xs rho) eqn:Hgetlist'; try discriminate.
-    inv Hget. destruct N. 
-    + inv Hnth. eexists; simpl; eauto.
-    + edestruct IHxs as [v' [Hnth1 Hget1]]; eauto. 
-Qed.
-
-
-Lemma getlist_set_neq {A} xs x (v : A) rho :
-  ~ List.In x xs ->
-  getlist xs (M.set x v rho) = getlist xs rho. 
-Proof.
-  intros Hin.
-  revert rho. induction xs; intros rho.
-  - reflexivity.
-  - simpl. rewrite M.gso.
-    + rewrite IHxs. reflexivity.
-      intros Hin'. eapply Hin. now constructor 2.
-    + intros Heq; subst. eapply Hin. now constructor.
-Qed.
-
-Lemma findtag_In {A} (P : list (tag * A)) c e :
-  findtag P c = Some e -> List.In (c, e) P.
-Proof.
-  revert e. induction P as [| [c' e'] P IHp]; intros x H; try now inv H.
-  simpl in H. inv H.
-  destruct (M.elt_eq c' c); inv H1; try now constructor.
-  constructor 2. apply IHp; eauto.
-Qed.
-
-
-Lemma setlist_Forall2_get (P : val -> val -> Prop)
-      xs vs1 vs2 rho1 rho2 rho1' rho2' x : 
-  Forall2 P vs1 vs2 ->
-  setlist xs vs1 rho1 = Some rho1' ->
-  setlist xs vs2 rho2 = Some rho2' ->
-  List.In x xs ->
-  exists v1 v2,
-    M.get x rho1' = Some v1 /\
-    M.get x rho2' = Some v2 /\ P v1 v2.
-Proof.
-  revert rho1' rho2' vs1 vs2.
-  induction xs; simpl; intros rho1' rho2' vs1 vs2 Hall Hset1 Hset2 Hin.
-  - inv Hin.
-  - destruct (Coqlib.peq a x); subst.
-    + destruct vs1; destruct vs2; try discriminate.
-      destruct (setlist xs vs1 rho1) eqn:Heq1;
-        destruct (setlist xs vs2 rho2) eqn:Heq2; try discriminate.
-      inv Hset1; inv Hset2. inv Hall.
-      repeat eexists; try rewrite M.gss; eauto.
-    + destruct vs1; destruct vs2; try discriminate.
-      destruct (setlist xs vs1 rho1) eqn:Heq1;
-        destruct (setlist xs vs2 rho2) eqn:Heq2; try discriminate.
-      inv Hset1; inv Hset2. inv Hall. inv Hin; try congruence.
-      edestruct IHxs as [v1 [v2 [Hget1 [Hget2 HP]]]]; eauto.
-      repeat eexists; eauto; rewrite M.gso; eauto.
-Qed.
-
-Lemma get_setlist_In_xs x xs vs rho rho' :
-  In var (FromList xs) x ->
-  setlist xs vs rho = Some rho' ->
-  exists v : val, M.get x rho' = Some v.
-Proof.
-  revert rho rho' vs. induction xs; intros rho rho' vs Hin Hset.
-  - rewrite FromList_nil in Hin. exfalso.
-    eapply not_In_Empty_set. eassumption. 
-  - rewrite FromList_cons in Hin.
-    destruct vs; try discriminate.    
-    simpl in Hset. destruct (setlist xs vs rho) eqn:Hsetlist; try discriminate.
-    inv Hset. inv Hin.
-    + inv H. eexists. rewrite M.gss. reflexivity.
-    + destruct (Coqlib.peq x a); subst.
-      * eexists. now rewrite M.gss.
-      * edestruct IHxs; eauto.
-        eexists. simpl. rewrite M.gso; eauto. 
-Qed.
-
-Lemma setlist_not_In (xs : list var) (vs : list val) (rho rho' : env) (x : var) : 
-  setlist xs vs rho = Some rho' ->
-  ~ List.In x xs ->
-  M.get x rho = M.get x rho'.
-Proof.
-  revert vs rho'.
-  induction xs; simpl; intros vs rho' Hset Hin.
-  - destruct vs; congruence.
-  - destruct vs; try discriminate.
-    destruct (setlist xs vs rho) eqn:Heq1; try discriminate. inv Hset.
-    rewrite M.gso; eauto.
-Qed.
-
-Lemma setlist_length (rho rho' rho1 : env)
-      (xs : list var) (vs1 vs2 : list val) :
-  length vs1 = length vs2 -> 
-  setlist xs vs1 rho = Some rho1 ->
-  exists rho2, setlist xs vs2 rho' = Some rho2.
-Proof.
-  revert vs1 vs2 rho1.
-  induction xs as [| x xs IHxs ]; intros vs1 vs2 rho1 Hlen Hset.
-  - inv Hset. destruct vs1; try discriminate. inv H0.
-    destruct vs2; try discriminate. eexists; simpl; eauto. 
-  - destruct vs1; try discriminate. destruct vs2; try discriminate.
-    inv Hlen. simpl in Hset. 
-    destruct (setlist xs vs1 rho) eqn:Heq2; try discriminate.
-    edestruct (IHxs _ _ _ H0 Heq2) as  [vs2' Hset2].
-    eexists. simpl; rewrite Hset2; eauto.
-Qed.
-
-Lemma split_fds_cons_l_append_fundefs f tau xs e B1 B2 B3 : 
-  split_fds (Fcons f tau xs e B1) B2 B3 ->
-  exists B1' B2',
-    B3 = fundefs_append B1' (Fcons f tau xs e B2') /\
-    split_fds B1 B2 (fundefs_append B1' B2').
-Proof.
-  revert B1 B2. induction B3; intros B1 B2 Hspl.
-  - inv Hspl.
-    + exists Fnil, B3; eauto.
-    + edestruct IHB3 as [B1' [B2' [Heq Hspl]]]; eauto.
-      exists (Fcons v t l e0 B1'), B2'. rewrite Heq; split; eauto.
-      simpl; constructor; eauto.
-  - inv Hspl.
-Qed.
-
-Lemma split_fds_cons_r_append_fundefs f tau xs e B1 B2 B3 : 
-  split_fds B1 (Fcons f tau xs e B2) B3 ->
-  exists B1' B2',
-    B3 = fundefs_append B1' (Fcons f tau xs e B2') /\
-    split_fds B1 B2 (fundefs_append B1' B2').
-Proof.
-  revert B1 B2. induction B3; intros B1 B2 Hspl.
-  - inv Hspl.
-    + edestruct IHB3 as [B1' [B2' [Heq Hspl]]]; eauto.
-      exists (Fcons v t l e0 B1'), B2'. rewrite Heq; eauto. split; eauto.
-      simpl. constructor; eauto.
-    + exists Fnil, B3; eauto.
-  - inv Hspl.
-Qed.

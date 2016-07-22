@@ -1,84 +1,106 @@
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets
         Coq.MSets.MSetRBT Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles
         Coq.Relations.Relations.
-Require Import ExtLib.Structures.Monad ExtLib.Core.Type.
+Require Import ExtLib.Structures.Monad  ExtLib.Data.Monads.OptionMonad ExtLib.Core.Type.
 Require Import cps List_util.
 
 Import ListNotations MonadNotation.
 
-Definition env := M.t val. (* An [env]ironment maps [var]s to their [val]ues *)
+(** An [env]ironment maps [var]s to their [val]ues *)
+Definition env := M.t val. 
 
-Definition state := (env*exp)%type.
+(** A pair of an environment and an expression. The small step semantics is a transition system between this state *)
+Definition state := (env * exp)%type. 
 
+(** Primitive functions map. *)
 Definition prims := M.t (list val -> option val).
 
 Section EVAL.
 
   Variable (pr : prims).
+  
+  Variable (cenv : cEnv).
 
+  (** A case statement only pattern matches constructors from the same inductive type *)
+  Inductive caseConsistent : list (cTag * exp) -> cTag -> Prop :=
+  | CCnil  :
+      forall (t : cTag),
+        caseConsistent nil t
+  | CCcons :
+      forall (l : list (cTag * exp)) (t t' : cTag) (ty ty' : iTag)
+        (n n' : N) (i i' : N) (e : exp),
+        M.get t cenv  = Some (ty, n, i) ->
+        M.get t' cenv = Some (ty', n', i') ->
+        ty = ty' ->
+        caseConsistent l t ->
+        caseConsistent ((t', e) :: l) t.
+  
   (** Big step semantics with cost counting *)
-  Inductive bstep_e : env -> exp -> val -> nat -> Prop :=
+  Inductive bstep_e :  env -> exp -> val -> nat -> Prop :=
   | BStep_constr :
-      forall (x : var) (t : type) (n : tag) (ys :list var) (e : exp)
-             (rho rho' : env) (vs : list val) (v : val) (c : nat),
+      forall (x : var) (t : cTag) (ys :list var) (e : exp)
+        (rho rho' : env) (vs : list val) (v : val) (c : nat),
         getlist ys rho = Some vs ->
-        M.set x (Vconstr t n vs) rho = rho' ->
+        M.set x (Vconstr t vs) rho = rho' ->
         bstep_e rho' e v c ->
-        bstep_e rho (Econstr x t n ys e) v c
+        bstep_e rho (Econstr x t ys e) v c
   | BStep_proj :
-      forall (t' : type) (n' : tag) (vs : list val) (v : val)
-             (rho : env) (x : var) (t : type) (n : N) (y : var)
-             (e : exp) (ov : val) (c : nat),
-        M.get y rho = Some (Vconstr t' n' vs) ->
-        nthN vs n = Some v ->
+      forall (t : cTag) (vs : list val) (v : val)
+        (rho : env) (x : var) (n : N) (y : var)
+        (e : exp) (ov : val) (c : nat),
+        M.get y rho = Some (Vconstr t vs) ->
+        nthN vs n = Some v -> 
         bstep_e (M.set x v rho) e ov c ->
-        bstep_e rho (Eproj x t n y e) ov c 
+        bstep_e rho (Eproj x t n y e) ov c (* force equality on [t] *)
   | BStep_case :
-      forall (y : var) (v : val) (e : exp) (t : tag) (cl : list (tag * exp))
-             (vl : list val) (tau : type) (rho : env) (c : nat),
-        M.get y rho = Some (Vconstr tau t vl) ->
+      forall (y : var) (v : val) (e : exp) (t : cTag) (cl : list (cTag * exp))
+        (vl : list val) (rho : env) (c : nat),
+        M.get y rho = Some (Vconstr t vl) ->
+        caseConsistent cl t -> (* NEW *)
         findtag cl t = Some e ->
         bstep_e rho e v c ->
         bstep_e rho (Ecase y cl) v c
-  | BStep_app_fun :
+  | BStep_app :
       forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
-             (xs : list var) (e : exp) (rho'' rho : env) (f : var)
-             (t : type) (ys : list var) (v : val) (c : nat),
+        (xs : list var) (e : exp) (rho'' rho : env) (f : var)
+        (t : cTag) (ys : list var) (v : val) (c : nat),
         M.get f rho = Some (Vfun rho' fl f') ->
         getlist ys rho = Some vs ->
         find_def f' fl = Some (t,xs,e) ->
         setlist xs vs (def_funs fl fl rho' rho') = Some rho'' ->
         bstep_e rho'' e v c ->
-        bstep_e rho (Eapp f ys) v (c+1)
+        bstep_e rho (Eapp f t ys) v (c+1)  (* force equality on [t] *)
   | BStep_fun :
       forall (rho : env) (fl : fundefs) (e : exp) (v : val) (c : nat),
         bstep_e (def_funs fl fl rho rho) e v c ->
         bstep_e rho (Efun fl e) v c
   | BStep_prim :
-      forall (vs : list val) (rho' rho : env) (x : var) (t : type) (f : prim) 
-             (f' : list val -> option val) (ys : list var) (e : exp)
-             (v v' : val) (c : nat),
+      forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
+        (f' : list val -> option val) (ys : list var) (e : exp)
+        (v v' : val) (c : nat),
         getlist ys rho = Some vs ->
         M.get f pr = Some f' ->
         f' vs = Some v ->
         M.set x v rho = rho' ->
         bstep_e rho' e v' c ->
-        bstep_e rho (Eprim x t f ys e) v' c.
+        bstep_e rho (Eprim x f ys e) v' c.
+
     
   (** Small step semantics -- Relational definition *)
   (* TODO : this semantics currently does not match the big step semantic.
    * We need them to match and a proof that they indeed match. *)
   Inductive step: state -> state -> Prop := 
-  | Step_constr: forall vs rho x t n ys e,
+  | Step_constr: forall vs rho x t ys e,
                    getlist ys rho = Some vs ->
-                   step (rho, Econstr x t n ys e) (M.set x (Vconstr t n vs) rho, e)
-  | Step_proj: forall t' n' vs v rho x t n y e,
-                 M.get y rho = Some (Vconstr t' n' vs) ->
+                   step (rho, Econstr x t ys e) (M.set x (Vconstr t vs) rho, e)
+  | Step_proj: forall vs v rho x t n y e,
+                 M.get y rho = Some (Vconstr t vs) ->
                  nthN vs n = Some v ->
                  step (rho, Eproj x t n y e) (M.set x v rho, e)
-  | Step_case: forall t c vl e' rho y cl,
-                 M.get y rho = Some (Vconstr t c vl) ->
-                 findtag cl c = Some e' -> 
+  | Step_case: forall t vl e' rho y cl,
+                 M.get y rho = Some (Vconstr t vl) ->
+                 caseConsistent cl t ->
+                 findtag cl t = Some e' -> 
                  step (rho, Ecase y cl) (rho, e')
   | Step_fun: forall rho fl e,
                 step (rho, Efun fl e) (def_funs fl fl rho rho, e)
@@ -87,55 +109,60 @@ Section EVAL.
                 getlist ys rho = Some vs ->
                 find_def f' fl = Some (t,xs,e) ->
                 setlist xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-                step (rho, Eapp f ys) (rho'', e)
-  | Step_prim: forall vs v rho' rho x t f f' ys e,
+                step (rho, Eapp f t ys) (rho'', e)
+  | Step_prim: forall vs v rho' rho x f f' ys e,
                  getlist ys rho = Some vs ->
                  M.get f pr = Some f' ->
                  f' vs = Some v ->
                  M.set x v rho = rho' ->
-                 step (rho, Eprim x t f ys e) (rho', e).
-
+                 step (rho, Eprim x f ys e) (rho', e).
+  
   (** Small step semantics -- Computational definition *)
-  Definition stepf (s: env * exp) : option (env * exp) := 
+  (* TODO : this is inconsistent with [step].  we need computational case_consistent *)
+  Definition stepf (s: env * exp) : option (env * exp) :=
     let (rho,e) := s in
     match e with
-      | Econstr x t n ys e => 
+      | Econstr x t ys e => 
         vs <- getlist ys rho ;; 
-        ret (M.set x (Vconstr t n vs) rho, e)
+        ret (M.set x (Vconstr t vs) rho, e)
       | Eproj x t n y e =>
         match M.get y rho with
-          | Some (Vconstr t' n' vs) =>
+          | Some (Vconstr t' vs) =>
             v <- nthN vs n ;; ret (M.set x v rho, e)
           | _ => None
         end
       | Ecase y cl =>
         match M.get y rho with
-          | Some (Vconstr t c vl) =>
-            e' <- findtag cl c ;; ret (rho, e')
+          | Some (Vconstr t vl) =>
+            e' <- findtag cl t ;; ret (rho, e')
           | _ => None
         end
       | Efun fl e => 
         ret (def_funs fl fl rho rho, e)
-      | Eapp f ys =>
+      | Eapp f t ys =>
         match M.get f rho with
             | Some (Vfun rho' fl f') =>
               vs <- getlist ys rho ;;
                  match find_def f' fl with
                    | Some (t',xs,e) =>
-                     rho'' <- setlist xs vs (def_funs fl fl rho' rho') ;;
-                     ret (rho'', e)
+                     (* if (Coqlib.peq t t') then *)
+                       rho'' <- setlist xs vs (def_funs fl fl rho' rho') ;;
+                       ret (rho'', e)
+                     (* else None *)
                    | _ => None
                  end
             | _ => None
         end
-      | Eprim x t f ys e =>
+      | Eprim x f ys e =>
         vs <- getlist ys rho ;;
         f' <- M.get f pr ;;
         v <- f' vs ;;
         ret (M.set x v rho, e)
     end.
 
-  (** Correspondence of the two small step semantics definitions *)
+
+(* TODO : to update the following we need computational definition of case_consistent *)
+(*  (** Correspondence of the two small step semantics definitions *)
   Lemma step_stepf:
     forall s s',
       step s s' ->
@@ -162,7 +189,8 @@ Section EVAL.
         | H: Some _ = Some _ |- _ => inv H
       end;
     try solve [econstructor; eauto].
-  Qed.
+    
+  Qed. *)
 
   
   (** Reflexive transitive closure of the small-step relation *)
@@ -200,7 +228,7 @@ Section EVAL.
              | [H: ((?rho0, _) = (?rho, _)) |- _ ] => inversion H; subst
            end.
     + rewrite H6 in H2.  inversion H2; subst. reflexivity.
-    + rewrite H6 in H2; inversion H2; subst. reflexivity.
+    + inv H6. rewrite H8 in H3; inv H3. reflexivity.
     + rewrite H9 in H3; inversion H3; subst.
       rewrite H2 in H8; inversion H8; subst.
       rewrite H10 in H4; inversion H4. reflexivity.

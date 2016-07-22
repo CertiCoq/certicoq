@@ -59,11 +59,11 @@ Inductive construct_fundefs_injection : (var -> var) -> fundefs -> fundefs -> (v
 (** α-equivalent terms *)
 Inductive Alpha_conv : exp -> exp -> (var -> var) -> Prop :=
 | Alpha_Econstr :
-    forall x x' tau t ys ys' e e' f,
+    forall x x' t ys ys' e e' f,
       Forall2 (fun y y' => f y = y') ys ys' ->
       injective (f {x ~> x'}) -> 
       Alpha_conv e e' (f {x ~> x'}) ->
-      Alpha_conv (Econstr x tau t ys e) (Econstr x' tau t ys' e') f
+      Alpha_conv (Econstr x t ys e) (Econstr x' t ys' e') f
 | Alpha_Eproj :
     forall x x' tau N y y' e e' f, 
       f y = y' ->
@@ -76,16 +76,16 @@ Inductive Alpha_conv : exp -> exp -> (var -> var) -> Prop :=
       f x = x' ->
       Alpha_conv (Ecase x pats) (Ecase x' pats') f
 | Alpha_Eapp :
-    forall g g' xs xs' f,
+    forall g g' xs xs' f ft,
       Forall2 (fun y y' => f y = y') xs xs' ->
       f g = g' ->
-      Alpha_conv (Eapp g xs) (Eapp g' xs') f
+      Alpha_conv (Eapp g ft xs) (Eapp g' ft xs') f
 | Alpha_Eprim :
-    forall x x' tau p ys ys' e e' f, 
+    forall x x' p ys ys' e e' f, 
       Forall2 (fun y y' => f y = y') ys ys' ->      
       injective (f {x ~> x'}) ->
       Alpha_conv e e' (f {x ~> x'}) ->
-      Alpha_conv (Eprim x tau p ys e) (Eprim x' tau p ys' e') f
+      Alpha_conv (Eprim x p ys e) (Eprim x' p ys' e') f
 | Alpha_Efun :
     forall B B' e e' f f',
       construct_fundefs_injection f B B' f' ->
@@ -96,13 +96,13 @@ with Alpha_conv_fundefs : fundefs -> fundefs -> (var -> var) -> Prop :=
 | Alpha_Fnil :
     forall f, Alpha_conv_fundefs Fnil Fnil f
 | Alpha_Fcons :
-    forall g g' tau xs xs' e e' B B' f f',
+    forall g g' t xs xs' e e' B B' f f',
       f g = g' ->
       length xs = length xs' ->
       Alpha_conv_fundefs B B' f ->
       construct_lst_injection f xs xs' f' ->
       Alpha_conv e e' f' ->
-      Alpha_conv_fundefs (Fcons g tau xs e B) (Fcons g' tau xs' e' B') f.
+      Alpha_conv_fundefs (Fcons g t xs e B) (Fcons g' t xs' e' B') f.
 
 Lemma construct_fundefs_injection_f_eq f f' B B' g :
   construct_fundefs_injection f B B' f' ->
@@ -239,10 +239,11 @@ Qed.
 Section Alpha_conv_correct.
 
   Variable pr : prims.
+  Variable cenv : cEnv.
 
   Definition preord_env_P_inj P k f rho1 rho2 :=
     forall x : var,
-      P x -> preord_var_env pr k rho1 rho2 x (f x).
+      P x -> preord_var_env pr cenv k rho1 rho2 x (f x).
 
   Lemma Forall2_app {A B} (P : A -> B -> Prop) xs ys f :
     Forall2 (fun x y => f x = y) xs ys ->
@@ -277,7 +278,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set (P : Ensemble var) (rho1 rho2 : env) 
         (k : nat)  f(x y : var) (v1 v2 : val) : 
     preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
-    preord_val pr k v1 v2 ->
+    preord_val pr cenv k v1 v2 ->
     injective (f {x ~> y}) ->
     preord_env_P_inj P k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof. 
@@ -363,7 +364,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_setlist (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f f':
     preord_env_P_inj P1 k f rho1 rho2 ->
-    Forall2 (preord_val pr k) vs1 vs2 ->
+    Forall2 (preord_val pr cenv k) vs1 vs2 ->
     construct_lst_injection f xs1 xs2 f' ->
     setlist xs1 vs1 rho1 = Some rho1' ->
     setlist xs2 vs2 rho2 = Some rho2' ->
@@ -403,7 +404,7 @@ Section Alpha_conv_correct.
          injective f ->
          Alpha_conv e1 e2 f ->
          preord_env_P_inj (occurs_free e1) m f rho1 rho2 ->
-         preord_exp pr m (e1, rho1) (e2, rho2)) ->
+         preord_exp pr cenv m (e1, rho1) (e2, rho2)) ->
     construct_fundefs_injection f B1 B2 h ->
     construct_fundefs_injection f B1' B2' h' ->
     injective f ->
@@ -415,7 +416,7 @@ Section Alpha_conv_correct.
   Proof.
     revert B1 rho1 rho2 B1' B2 B2' f h h' e.
     induction k as [ k IH' ] using lt_wf_rec1.
-    induction B1; intros rho1 rho2 B1' B2 B2' f h h' e' IHe Hinj Hinj' Hinj'' Ha Ha' Hpre.
+    induction B1; intros rho1 rho2 B1' B2 B2' g h h' e' IHe Hinj Hinj' Hinj'' Ha Ha' Hpre.
     - inv Ha. simpl. subst. inv Hinj. eapply preord_env_P_inj_set. 
       + eapply preord_env_P_inj_antimon. now eapply IHB1; eauto.
         rewrite !Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_r.
@@ -428,7 +429,7 @@ Section Alpha_conv_correct.
           as [xs2 [e2 [f'' [Hf' [Hlen' [Hinj''' Ha'' ] ] ] ] ] ]; [ apply Ha' | | | ]; eauto.
         now eapply construct_fundefs_injection_injective; eauto.
         edestruct setlist_length2 as [rho2' Hs']; eauto.
-        exists t1. exists xs2. exists e2. exists rho2'. split; eauto.
+        exists xs2. exists e2. exists rho2'. split; eauto.
         split; [ now eauto |]. intros Hleq Hpre'.
         eapply IHe; [| | eassumption |]. omega.
         eapply construct_lst_injection_injective; eauto.
@@ -457,7 +458,7 @@ Section Alpha_conv_correct.
     injective f ->
     Alpha_conv e1 e2 f ->
     preord_env_P_inj (occurs_free e1) k f rho1 rho2 ->
-    preord_exp pr k (e1, rho1) (e2, rho2).
+    preord_exp pr cenv k (e1, rho1) (e2, rho2).
   Proof. 
     revert e1 e2 rho1 rho2 f.
     induction k as [ k IH ] using lt_wf_rec1.
@@ -475,6 +476,7 @@ Section Alpha_conv_correct.
     - inv H1. eapply preord_exp_case_nil_compat.
     - inv H1. destruct H2 as [Heq Ha]. destruct y as [c' e2]. simpl in Heq; subst.
       eapply preord_exp_case_cons_compat; eauto.
+      eapply Forall2_monotonic; [| eassumption ]. intros x1 x2 H; now inv H. 
       eapply IHe1. eassumption. eassumption.
       eapply preord_env_P_inj_antimon.
       eassumption. rewrite occurs_free_Ecase_cons. now apply Included_Union_l.

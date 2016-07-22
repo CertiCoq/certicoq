@@ -9,10 +9,10 @@ Definition env_subset (rho1 rho2 : env) :=
 (** An expression is well scoped in an environment: [Γ |- e] *) 
 Inductive well_scoped_exp : env -> exp -> Prop :=
 | WS_constr :
-    forall x tau t ys vs e Γ,
+    forall x t ys vs e Γ,
       getlist ys Γ = Some vs ->
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
-      well_scoped_exp Γ (Econstr x tau t ys e)
+      well_scoped_exp Γ (Econstr x t ys e)
 | WS_case :
     forall x v te Γ,
       M.get x Γ = Some v ->
@@ -24,15 +24,15 @@ Inductive well_scoped_exp : env -> exp -> Prop :=
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
       well_scoped_exp Γ (Eproj x tau N y e)
 | WS_app :
-    forall x v ys vs Γ,
+    forall x v ys vs ft Γ,
       getlist ys Γ = Some vs ->
       M.get x Γ = Some v ->
-      well_scoped_exp Γ (Eapp x ys)
+      well_scoped_exp Γ (Eapp x ft ys)
 | WS_prim :
-    forall x tau f ys vs e Γ,
+    forall x f ys vs e Γ,
       getlist ys Γ = Some vs ->
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
-      well_scoped_exp Γ (Eprim x tau f ys e)
+      well_scoped_exp Γ (Eprim x f ys e)
 | WS_fun :
     forall defs e Γ,
       well_scoped_fundefs Γ defs ->
@@ -67,20 +67,20 @@ Inductive well_scoped_exp_ctx : env -> exp_ctx -> env -> Prop :=
       env_subset Γ' Γ ->
       well_scoped_exp_ctx Γ Hole_c Γ'
 | WSCtx_constr :
-    forall x tau t ys vs c Γ Γ',
+    forall x t ys vs c Γ Γ',
       getlist ys Γ = Some vs ->
       (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
-      well_scoped_exp_ctx Γ (Econstr_c x tau t ys c) Γ'
+      well_scoped_exp_ctx Γ (Econstr_c x t ys c) Γ'
 | WSCtx_proj :
     forall x tau N y v c Γ Γ',
       M.get y Γ = Some v ->
       (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
       well_scoped_exp_ctx Γ (Eproj_c x tau N y c) Γ'
 | WSCtx_prim :
-    forall x tau f ys vs c Γ Γ',
+    forall x f ys vs c Γ Γ',
       getlist ys Γ = Some vs ->
       (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
-      well_scoped_exp_ctx Γ (Eprim_c x tau f ys c) Γ'
+      well_scoped_exp_ctx Γ (Eprim_c x f ys c) Γ'
 | WSCtx_fun1 :
     forall defs c Γ Γ',
       well_scoped_fundefs Γ defs ->

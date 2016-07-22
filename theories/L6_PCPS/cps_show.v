@@ -78,24 +78,25 @@ Definition newline : M unit := emit (String chr_newline EmptyString).
 Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
   tab indent ;; 
   match e with
-  | Econstr x ty tg xs e =>
+  | Econstr x tg xs e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := con_" ;; emit (show_pos tg) ;;
     emit (show_vars xs) ;; emit " in " ;; newline ;; 
     emit_exp indent e
-  | Eproj x ty n y e =>
+  | Eproj x tg n y e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := proj_" ;; emit (show_binnat n) ;; emit " " ;;
-    emit (show_var y) ;; emit" in " ;; newline ;; 
+    emit (show_pos tg) ;; emit " " ;;
+    emit (show_var y) ;; emit " in " ;; newline ;; 
     emit_exp indent e
-  | Eprim x ty p ys e =>
+  | Eprim x p ys e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := prim_" ;; emit (show_pos p) ;; emit (show_vars ys) ;;
     emit " in " ;; newline ;; 
     emit_exp indent e
   | Ecase x arms =>
     emit "case " ;; emit (show_var x) ;; emit " of {" ;; newline ;;
-         (fix iter (xs : list (tag*exp)) : M unit :=
+         (fix iter (xs : list (cTag*exp)) : M unit :=
             match xs with
             | nil => ret tt
             | p::tail =>
@@ -111,7 +112,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
          (fix iter (fds : fundefs) : M unit :=
             match fds with
             | Fnil => ret tt
-            | Fcons x _ xs e fds' =>
+            | Fcons x tg xs e fds' =>
               tab (2 + indent) ;;
               emit "fun " ;; emit (show_var x) ;;
                    emit (show_vars xs) ;; emit " := " ;; newline ;;
@@ -119,7 +120,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
                    iter fds'
             end) fds ;;
          tab indent ;; emit "] in" ;; newline ;; emit_exp indent e
-  | Eapp x ys => emit (show_var x) ;; emit (show_vars ys) ;; newline
+  | Eapp x ft ys => emit (show_var x) ;; emit (show_vars ys) ;; newline
   end%string.
 
 (* We add an extra newline at the front so that Coq will display the

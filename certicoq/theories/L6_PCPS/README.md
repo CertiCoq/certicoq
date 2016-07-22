@@ -3,16 +3,9 @@
 ### cps.v
 The syntax of the L6 language.
 
-### cps_NEW.v
-The syntax of the L6 language updated with new tag system that will be used when compiling to CompCert.
-
 (TODO: Merge this with cps.v once all of the proofs are updated)
 
 ### eval.v
-The evaluation semantics of the L6 language. 
-
-### eval_NEW.v
-The evaluation semantics of the L6 language updated with new tag system that will be used when compiling to CompCert.
 
 (TODO: Merge this with eval.v once all of the proofs are updated). 
   
@@ -23,8 +16,8 @@ Useful lemmas and definitions about the L6 language.
 
 ### identifiers.v
 Definitions and lemmas about identifiers in L6. Among others, it contains
-formalizations of free variables, bound variables, unique bindings, and useful
-lemmas about them.
+formalizations of free variables, bound variables, unique bindings, closed
+expressions, and useful lemmas about them.
 
 ### logical_relations.v
 Step-indexed logical relations. They are used in the correctness proofs of

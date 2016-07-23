@@ -450,6 +450,8 @@ Fixpoint ack (n m:nat) {struct n} : nat :=
                  end
              in ackn m
   end.
+Quote Recursively Definition a_ack := ack.
+Print a_ack.
 Eval cbv in ack 3 5.
 Definition ack35 := (ack 3 5).
 Quote Recursively Definition p_ack35 := ack35.
@@ -466,6 +468,8 @@ Fixpoint tautArg (n:nat) : Type :=
     | 0 => bool
     | S n => bool -> tautArg n
   end.
+Quote Recursively Definition a_tautArg := tautArg.
+Print a_tautArg.
 Fixpoint taut (n:nat) : tautArg n -> bool :=
   match n with
     | 0 => (fun x => x)

@@ -1,14 +1,17 @@
 (****)
 Add LoadPath "../common" as Common.
+Add LoadPath "../L0_QuotedCoq" as L0.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 (****)
 
+Require Import Coq.Bool.Bool.
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
 Require Import Common.Common.
+Require Import L0.term.
 Require Import L1.compile.
 Require Import L1.term.
 
@@ -17,24 +20,40 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+
+(** all items in an env are application-well-formed **)
+Inductive WFaEc: envClass -> Prop :=
+| wfaecTrm: forall (t:Term), WFapp t -> WFaEc (ecTrm t)
+| wfaecTyp: forall n i, WFaEc (ecTyp Term n i)
+| wfaecAx: WFaEc (ecAx Term).
+
+Inductive WFaEnv: environ -> Prop :=
+| wfaenil: WFaEnv nil
+| wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
+                   forall nm, WFaEnv ((nm, ec) :: p).
+(***************
+Definition WFaEc (ec: AstCommon.envClass term) : bool :=
+  match ec with
+    | ecTrm t => WF_term (termSize t) t
+    | _ => true
+  end.
+
+Function WFaEnv (e: AstCommon.environ term) : bool :=
+  match e with
+    | (_, ec) :: p => WFaEc ec && WFaEnv p
+    | _ => true
+  end.
+ **********************)
+
+
+
+
 Definition ecTrm := ecTrm.
 Definition ecTyp := ecTyp Term.
 Definition ecAx := ecAx Term.
 Definition envClass_dec := envClass_dec.
 Definition fresh := fresh.
 Hint Constructors AstCommon.fresh.
-
-(** all items in an env are application-well-formed **)
-Inductive WFaEc: envClass -> Prop :=
-| wfaecTrm: forall (t:Term), WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall n i, WFaEc (ecTyp n i)
-| wfaecAx: WFaEc ecAx.
-
-Inductive WFaEnv: environ -> Prop :=
-| wfaenil: WFaEnv nil
-| wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
-                   forall nm, WFaEnv ((nm, ec) :: p).
-
 
 (** Lookup an entry in the environment **)
 Definition Lookup := AstCommon.Lookup.
@@ -56,7 +75,20 @@ Proof.
   - assumption.
   - eapply IHWFaEnv. eassumption.
 Qed.
-
+(*****************
+Lemma Lookup_pres_WFapp:
+  forall p, WFaEnv p = true ->
+            forall nm ec, Lookup nm p ec -> WFaEc ec = true.
+Proof.
+  intros p. functional induction (WFaEnv p); intros.
+  - inversion_Clear H0.
+    + destruct (andb_true_true _ _ H). assumption.
+    + refine (IHb _ _ _ H7). inversion_Clear H7.
+      * destruct (andb_true_true _ _ H). assumption.
+      * destruct (andb_true_true _ _ H). assumption.
+  - inversion_Clear H0; contradiction.
+Qed.
+********************************)
 
 (** Check that a named datatype and constructor exist in the environment **)
 Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=

@@ -1,17 +1,20 @@
 
 (****)
 Add LoadPath "../common" as Common.
+Add LoadPath "../L0_quotedCoq" as L0.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 (****)
 
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
+Require Import Coq.Bool.Bool.
 Require Import Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.omega.Omega.
 Require Export Common.Common.
+Require Export L0.term.
 Require Export L1.compile.
 
 Local Open Scope string_scope.
@@ -808,6 +811,97 @@ Lemma tskipn_pres_WFapp:
   - inversion_Clear hargs. apply IHo; try assumption.
   - discriminate.
 Qed.
+
+(** compiling well formed terms to Term produces well formed Terms **)
+Lemma terms_Terms_map_lem:
+  forall (brs:list (nat * term)),
+    terms_Terms term_Term (map snd brs) =
+    terms_Terms (fun x : nat * term => term_Term (snd x)) brs.
+Proof.
+  induction brs; cbn. reflexivity.
+  rewrite IHbrs. reflexivity.
+Qed.
+
+Lemma term_Term_pres_WFapp:
+  forall n,
+  (forall (t:term), WF_term n t = true -> exists T, term_Term t = Ret T) /\
+  (forall (ts:list term),
+    WF_terms n ts = true -> exists Ts, terms_Terms term_Term ts = Ret Ts) /\
+  (forall (ds:list (def term)),
+    WF_defs n ds = true -> exists Ds, defs_Defs term_Term ds = Ret Ds).
+Proof.
+  apply (WF_term_terms_defs_ind
+    (fun (m:nat) (t:term) (q:bool) =>
+       WF_term m t = true -> exists T, term_Term t = Ret T)
+    (fun (m:nat) (ts:list term) (q:bool) =>
+       WF_terms m ts = true -> exists Ts, terms_Terms term_Term ts = Ret Ts)
+    (fun (m:nat) (ds:list (def term)) (q:bool) =>
+       WF_defs m ds = true -> exists Ds, defs_Defs term_Term ds = Ret Ds));
+  intros; cbn in H; try discriminate.
+  - exists (TRel n1). reflexivity.
+  - exists (TSort (match srt with 
+                    | sProp => SProp
+                    | sSet => SSet
+                    | sType _ => SType  (* throwing away sort info *)
+                   end)). reflexivity.
+  - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
+    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
+    exists (TCast x1 ck x0). cbn. rewrite k1. rewrite k0. reflexivity.
+  - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
+    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
+    exists (TProd nm x0 x1). cbn. rewrite k0. rewrite k1. reflexivity.
+  - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
+    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
+    exists (TLambda nm x0 x1). cbn. rewrite k0. rewrite k1. reflexivity.
+  - cbn in H2.
+    destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
+    destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
+    destruct (H j3) as [x0 k0].
+    destruct (H0 j4) as [x1 k1].
+    destruct (H1 j2) as [x2 k2].
+    exists (TLetIn nm x0 x1 x2). cbn.
+    rewrite k0. rewrite k1. rewrite k2. reflexivity.
+  - cbn in H2.
+    destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
+    destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
+    destruct (proj1 (andb_true_iff _ _) j3) as [j5 j6].
+    destruct (H j6) as [x0 k0].
+    destruct (H0 j4) as [x1 k1].
+    destruct (H1 j2) as [x2 k2].
+    exists (TApp x0 x1 x2). cbn.
+    rewrite k0. rewrite k1. rewrite k2. reflexivity.
+  - exists (TConst pth). reflexivity.
+  - exists (TInd ind). reflexivity.
+  - exists (TConstruct ind m). reflexivity.
+  - cbn in H2.
+    destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
+    destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
+    destruct (H j3) as [x0 k0].
+    destruct (H0 j4) as [x1 k1].
+    destruct (H1 j2) as [x2 k2].
+    exists (TCase (npars, map fst brs) x0 x1 x2).
+    cbn. rewrite k1.
+    rewrite terms_Terms_map_lem in k2. rewrite k2. rewrite k0. reflexivity.
+  - cbn in H0. destruct (H H0) as [x0 k0].
+    exists (TFix x0 m). cbn. rewrite k0. reflexivity.
+  - subst. destruct _x; try contradiction; cbn in H; try discriminate.
+    destruct l. discriminate. contradiction.
+  - subst. exists tnil. reflexivity.
+  - subst. cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
+    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
+    exists (tcons x0 x1). cbn. rewrite k0. rewrite k1. reflexivity.
+  - subst. exists dnil. reflexivity.
+  - subst. cbn in H2.
+    destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
+    destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
+    destruct (H j3) as [x0 k0].
+    destruct (H0 j4) as [x1 k1].
+    destruct (H1 j2) as [x2 k2].
+    exists (dcons (dname term c) x0 x1 (rarg term c) x2). cbn.
+    rewrite k0. rewrite k1. rewrite k2. reflexivity.
+Qed.
+
+
 
 
 (** well-formed terms: TApp well-formed all the way down **)

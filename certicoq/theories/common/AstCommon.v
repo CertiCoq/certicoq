@@ -1,18 +1,17 @@
-
 Add LoadPath "../common" as Common.
 
 Require Export Template.Ast.
-Require Import Coq.PArith.BinPos.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
 
-Require Import Common.RandyPrelude.
 Require Import Common.exceptionMonad.
+Require Import Common.RandyPrelude.
 
 Open Scope list_scope.
 Set Implicit Arguments.
+
 
 Lemma name_dec: forall (s1 s2:name), {s1 = s2}+{s1 <> s2}.
 induction s1; induction s2; try (solve [right; intros h; discriminate]).
@@ -69,6 +68,7 @@ try (solve [right; intros h; discriminate]);
 try (solve [left; reflexivity]).
 Qed.
 
+
 (** certiCoq representation of inductive types **)
 (* a constructor; the string only for human readability *)
 Record Cnstr := mkCnstr { CnstrNm:string; CnstrArity:nat }.
@@ -121,6 +121,7 @@ Proof.
   - right. intros h. discriminate.
   - left. reflexivity.
 Qed.
+
 
 Lemma envClass_dec: forall e f:envClass, e = f \/ e <> f.
 Proof.
@@ -318,16 +319,6 @@ simpl in k. rewrite (string_eq_bool_neq j2) in k.
 apply lookup_Lookup. assumption.
 Qed.
 
-
-(***
-Definition cnstrArity (itpnm:string) (pndx:nat) (cndx:nat) (p:environ)
-                      : exception nat :=
-  match lookup itpnm p with
-    | Some (ecTyp npars itps) => arity_from_dtyp npars itps pndx cndx
-    | Some _ => raise ("cnstrArity; not a type package: " ++ itpnm)
-    | none => raise ("cnstrArity; datatype package not found: " ++ itpnm)
-  end.
- ****)
 
 (** this function for use in translation from L2 to L3 **)
 Fixpoint arity_from_dtyp

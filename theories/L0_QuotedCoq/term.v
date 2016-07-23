@@ -18,6 +18,14 @@ Open Scope bool_scope.
 Set Implicit Arguments.
 
 
+Ltac not_isApp :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y" in
+  intros hh; destruct hh as [xx [yy jj]]; discriminate.
+
+
 (** Check applications are (hereditarily) well-formed,
 *** and omit unused term forms (tVar, ...) **)
 Definition isNotApp (t:term) : bool :=
@@ -26,19 +34,40 @@ Definition isNotApp (t:term) : bool :=
     | _ => true
   end.
 
+Definition isApp (t:term) : Prop :=
+  exists fn args, t = tApp fn args.
+Lemma IsApp: forall fn args, isApp (tApp fn args).
+intros. exists fn, args. reflexivity.
+Qed.
+
+Lemma not_isApp_isNotApp:
+  forall t, ~ isApp t -> isNotApp t = true.
+Proof.
+  destruct t; intros h; cbn; try reflexivity.
+  destruct h. exists t, l. reflexivity.
+Qed.
+
+Lemma isNotApp_not_isApp:
+  forall t, isNotApp t = true -> ~ isApp t.
+Proof.
+  destruct t; intros h0; not_isApp.
+Qed.
+
+  
 Section termSize_sec.
   Variable A : Set.
   Variable termSize: A -> nat.
   Fixpoint termsSize (ts:list A) : nat :=
     match ts with
-      | nil => 0
+      | nil => 1
       | cons r rs => S (termSize r + termsSize rs)
     end.
+  Definition defSize (d:def A) : nat :=
+    termSize (dtype _ d) + termSize (dbody _ d).
   Fixpoint defsSize (ds: list (def A)) : nat :=
    match ds with
-     | nil => 0
-     | cons d ds =>
-        2 + (termSize (dtype _ d) + termSize (dbody _ d) + defsSize ds)
+     | nil => 1
+     | cons d ds => 2 + (defSize d + defsSize ds)
    end.
 End termSize_sec.
 
@@ -312,6 +341,44 @@ Proof.
 Defined.
  *************************)
 
+(****************  a Prop-valued wf_term  ******)
+Inductive wf_term : term -> Prop :=
+| wftRel: forall n, wf_term (tRel n)
+| wftSort: forall srt, wf_term (tSort srt)
+| wftCast: forall tm ck ty,
+             wf_term ty -> wf_term tm -> wf_term (tCast tm ck ty)
+| wftProd: forall nm ty bod,
+            wf_term ty -> wf_term bod -> wf_term (tProd nm ty bod)
+| wftLambda: forall nm ty bod,
+            wf_term ty -> wf_term bod -> wf_term (tLambda nm ty bod)
+| wftLetIn: forall nm dfn ty bod,
+              wf_term dfn -> wf_term ty -> wf_term bod ->
+              wf_term (tLetIn nm dfn ty bod)
+| wftApp: forall fn u us, 
+            ~ isApp fn -> wf_term fn -> wf_term u -> wf_terms us ->
+            wf_term (tApp fn (cons u us) )
+| wftConst: forall nm, wf_term (tConst nm)
+| wftInf: forall ind, wf_term (tInd ind)
+| wftInd: forall ind m, wf_term (tConstruct ind m)
+| wftCase: forall npars ty mch brs,
+             wf_term ty -> wf_term mch -> wf_terms (map snd brs) ->
+             wf_term (tCase npars ty mch brs)
+| wftFix: forall defs m, wf_defs defs -> wf_term (tFix defs m)
+with wf_terms: list term -> Prop :=
+| wfts_nil: wf_terms nil
+| wfts_cons: forall b bs, wf_term b -> wf_terms bs -> wf_terms (cons b bs)
+with wf_defs: list (def term) -> Prop :=
+| wfds_nil: wf_defs nil
+| wfds_cons: forall c cs,
+               wf_term (dtype _ c) -> wf_term (dbody _ c) -> wf_defs cs ->
+               wf_defs (cons c cs).
+Scheme wf_term_ind' := Induction for wf_term Sort Prop
+with wf_terms_ind' := Induction for wf_terms Sort Prop
+with wf_defs_ind' := Induction for wf_defs Sort Prop.
+Combined Scheme wf_term_terms_defs_ind
+         from wf_term_ind', wf_terms_ind', wf_defs_ind'.
+
+(**** boolean valued well-formedness ****)
 Function WF_term (n:nat) (t:term) : bool :=
   match n with
     | 0 => false
@@ -436,6 +503,64 @@ Proof.
 Qed.
 
 
+Lemma wf_WF_term:
+  (forall t, wf_term t -> exists n, WF_term n t = true) /\
+  (forall ts, wf_terms ts -> exists n, WF_terms n ts = true) /\
+  (forall ds, wf_defs ds -> exists n, WF_defs n ds = true).
+Proof.
+  apply wf_term_terms_defs_ind; intros; try (exists 1; reflexivity);
+  destruct H as [x0 j0];
+  try (destruct H0 as [x1 j1]); try (destruct H1 as [x2 j2]);
+  try (exists (S (x0 + x1)); cbn; eapply true_true_andb;
+              eapply WF_term_up; try eassumption; try omega);
+  try (exists (S (x0 + x1 + x2)); cbn;
+    eapply true_true_andb; try eapply true_true_andb;
+    try eapply WF_term_up; try eapply WF_terms_up;
+    try eassumption; try omega).
+  - rewrite not_isApp_isNotApp; try assumption.
+    eapply true_true_andb; try reflexivity.
+    eapply WF_term_up; try eapply WF_terms_up. eassumption. omega.
+  - exists (S x0). cbn. assumption.
+  - exists (S (x0 + x1)). cbn. eapply true_true_andb;
+      first [eapply WF_term_up | eapply WF_terms_up];
+      try eassumption; try omega.
+  - eapply WF_defs_up. eassumption. omega.
+Qed.
+
+Lemma WF_wf_term:
+  forall m,
+    (forall t, WF_term m t = true -> wf_term t) /\
+    (forall ts, WF_terms m ts = true -> wf_terms ts) /\
+    (forall ds, WF_defs m ds = true -> wf_defs ds).
+Proof.
+  intros m.
+  apply (WF_term_terms_defs_ind
+           (fun (m:nat) (t:term) (q:bool) =>
+              WF_term m t = true -> wf_term t)
+           (fun (m:nat) (ts:list term) (q:bool) =>
+              WF_terms m ts = true -> wf_terms ts)
+           (fun (m:nat) (ds:list (def term)) (q:bool) =>
+              WF_defs m ds = true -> wf_defs ds));
+    intros; cbn in *; try discriminate; subst; try (solve[constructor]);
+    try (solve[constructor; intuition]);
+    try (solve[destruct (andb_true_true _ _ H1); constructor; intuition]);
+    try (solve
+           [destruct (andb_true_true _ _ H2) as [j0 j1];
+             destruct (andb_true_true _ _ j0) as [j2 j3];
+             constructor; intuition]).
+  - destruct (andb_true_true _ _ H2) as [j0 j1].
+    destruct (andb_true_true _ _ j0) as [j2 j3].
+    destruct (andb_true_true _ _ j2) as [j4 j5].
+    constructor; try (solve[intuition]).
+    apply isNotApp_not_isApp. assumption.
+  - destruct _x; try discriminate; try (solve [constructor]);
+    try (solve[constructor; intuition]);
+    try (solve[destruct (andb_true_true _ _ H) as [j0 j1];
+                constructor; intuition]).
+    + destruct l. discriminate. constructor; intuition.
+Qed.
+
+      
 (********************************
 Lemma termSize_enough:
   forall n,
@@ -468,11 +593,40 @@ Proof.
     apply (true_true_andb). 
     + eapply WF_term_up. eapply H. eassumption. omega.
     + eapply WF_term_up. eapply H0. eassumption. omega.
-  - cbn in *. destruct (andb_true_true _ _ H2).
-    apply (true_true_andb). apply (true_true_andb). 
-    + eapply WF_term_up. eapply H. eassumption. omega.
-    + eapply WF_term_up. eapply H0. eassumption. omega.     
-  - destruct H1. split.
+  - destruct (andb_true_true _ _ H2). destruct (andb_true_true _ _ H3).
+    repeat (apply (true_true_andb)); eapply WF_term_up.
+    eapply H. assumption. omega.
+    eapply H0. assumption. omega.
+    eapply H1. assumption. omega.
+  - subst. cbn in *.
+    destruct (andb_true_true _ _ H2).
+    destruct (andb_true_true _ _ H3).
+    destruct (andb_true_true _ _ H5).
+    repeat (apply (true_true_andb));
+      try (eapply WF_term_up); try (eapply WF_terms_up).
+    assumption.
+    eapply H. assumption. omega.
+    eapply H0. assumption. omega.
+    eapply H1. assumption. omega.
+  - subst. cbn in *.
+    destruct (andb_true_true _ _ H2).
+    destruct (andb_true_true _ _ H3).
+    repeat (apply (true_true_andb));
+      try (eapply WF_term_up); try (eapply WF_terms_up).
+    eapply H. assumption. omega.
+    eapply H0. assumption. omega.
+    eapply H1. assumption. rewrite termsSize_map_lem. omega.
+  - subst. cbn in *.
+    destruct _x; try discriminate; try (solve [constructor]).
+    try (solve[constructor; intuition]);
+    try (solve[destruct (andb_true_true _ _ H) as [j0 j1];
+                constructor; intuition]).
+    destruct _x; try discriminate; cbn; try reflexivity.
+
+
+
+
+    - destruct H1. split.
     * refine (WF_term_up _ _ _). eapply H. assumption. omega.
     * refine (WF_term_up _ _ _). eapply H0. assumption. omega.
   - destruct H1. split.
@@ -502,4 +656,4 @@ Proof.
     + refine (WF_term_up _ _ _). apply H0. eassumption. omega.
     + refine (WF_defs_up _ _ _). apply H1. eassumption. omega.
 Qed.
-*******************************)
+ *******************************)

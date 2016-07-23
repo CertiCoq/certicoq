@@ -46,8 +46,6 @@ Function WFaEnv (e: AstCommon.environ term) : bool :=
  **********************)
 
 
-
-
 Definition ecTrm := ecTrm.
 Definition ecTyp := ecTyp Term.
 Definition ecAx := ecAx Term.

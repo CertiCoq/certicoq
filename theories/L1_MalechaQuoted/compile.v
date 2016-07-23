@@ -1,18 +1,23 @@
 
 (****)
 Add LoadPath "../common" as Common.
+Add LoadPath "../L0_QuotedCoq" as L0.
 (****)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
+Require Import Coq.omega.Omega.
+Require Import Coq.Bool.Bool.
 Require Import Template.Ast.
-Require Import Common.Common.  (* shared namespace *)
+Require Import Common.Common.
+Require Import L0.term.
+Require Import L0.program.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
-
+  
 (** A slightly cleaned up notion of object term.
 *** The simultaneous definitions of [Terms] and [Defs] make
 *** inductions over this type long-winded but straightforward.
@@ -59,10 +64,60 @@ Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
 
+Definition pre_checked_term_Term:
+  forall n,
+  (forall (t:term), WF_term n t = true -> Term) *
+  (forall (ts:list term), WF_terms n ts = true -> Terms) *
+  (forall (ds:list (def term)), WF_defs n ds = true -> Defs).
+Proof.
+  induction n; repeat split; try (solve[cbn; intros; discriminate]).
+  destruct IHn as [[j1 j2] j3]; intros x hx; destruct x; cbn in hx;
+  try discriminate.
+  - exact (TRel n0).
+  - apply TSort. destruct s; [ exact SProp | exact SSet | exact SType].
+  - destruct (andb_true_true _ _ hx) as [k2 k1].
+    refine (TCast (j1 _ k2) c (j1 _ k1)).
+  - destruct (andb_true_true _ _ hx) as [k1 k2].
+    refine (TProd n0 (j1 _ k1) (j1 _ k2)).
+  - destruct (andb_true_true _ _ hx) as [k1 k2].
+    refine (TLambda n0 (j1 _ k1) (j1 _ k2)).
+  - destruct (andb_true_true _ _ hx) as [z1 k3].
+    destruct (andb_true_true _ _ z1) as [k1 k2].
+    refine (TLetIn n0 (j1 _ k1) (j1 _ k2) (j1 _ k3)).
+  - destruct l. discriminate.
+    destruct (andb_true_true _ _ hx) as [z1 k4].
+    destruct (andb_true_true _ _ z1) as [z2 k3].
+    destruct (andb_true_true _ _ z2) as [k1 k2].
+    refine (TApp (j1 _ k2) (j1 _ k3) (j2 _ k4)).
+  - exact (TConst s).
+  - exact (TInd i).
+  - exact (TConstruct i n0).
+  - destruct (andb_true_true _ _ hx) as [z1 k3].
+    destruct (andb_true_true _ _ z1) as [k1 k2].
+    refine (TCase (n0, map fst l) (j1 _ k1) (j1 _ k2) (j2 _ k3)).
+  - refine (TFix (j3 _ hx) n).
+  - destruct IHn as [[j1 j2] j3]. destruct ts; intros.
+    + exact tnil.
+    + cbn in H. destruct (andb_true_true _ _ H) as [k2 k1].
+      refine (tcons (j1 _ k2) (j2 _ k1)).
+  - destruct IHn as [[j1 j2] j3]. destruct ds; intros.   
+    + exact dnil.
+    + cbn in H.
+      destruct (andb_true_true _ _ H) as [z1 k3].
+      destruct (andb_true_true _ _ z1) as [k1 k2].
+      refine (dcons (dname _ d) (j1 _ k1) (j1 _ k2) (rarg _ d) (j3 _ k3)).
+Defined.
+
+(** following definition only works for _ground_ terms t **)
+Definition
+  checked_term_Term (t:term) : WF_term (termSize t) t = true -> Term :=
+  (fst (fst (pre_checked_term_Term (termSize t)))) t.
+
+
+
 (** translate Gregory Malecha's [term] into my [Term]
 *** (without constructor arity, to be filled in at L2)
 **)
-  
 Section term_Term_sec.
   Variable A : Set.
   Variable term_Term: A -> exception Term.
@@ -83,8 +138,8 @@ Section term_Term_sec.
          ret (dcons (dname _ d) Dt Db (rarg _ d) Ds)
    end.
 End term_Term_sec.
-
-Function term_Term (t:term) : exception Term :=
+   
+Fixpoint term_Term (t:term) : exception Term :=
   match t with
     | tRel n => ret (TRel n)
     | tSort srt =>
@@ -137,14 +192,9 @@ Function term_Term (t:term) : exception Term :=
       end
     | _ => raise "term_Term"
   end.
-(****
-Functional Scheme term_Term_ind' := Induction for term_Term Sort Prop
-with terms_Terms_ind' := Induction for terms_Terms Sort Prop
-with wcbvDEvals_ind' := Induction for defs_Defs Sort Prop.
-Combined Scheme term_TermEvalsDEvals_ind
-         from term_Term_ind', terms_Terms_ind', wcbvDEvals_ind'.
-***)
 
+
+    
 (** environments and programsn **)
 Definition envClass := Common.AstCommon.envClass Term.
 Definition environ := Common.AstCommon.environ Term.
@@ -161,7 +211,6 @@ Definition ibody_ityp (iib:ident * inductive_body) : ityp :=
 
 Definition ibodies_itypPack (ibs:list (ident * inductive_body)) : itypPack :=
   map ibody_ityp ibs.
-
 
 Fixpoint program_Program
          (p:program) (e:exception environ): exception Program :=
@@ -180,3 +229,46 @@ Fixpoint program_Program
       do Ty <- term_Term ty;
       program_Program p (econs (epair2 nm (ret (ecAx Term))) e)
   end.
+
+(*********************
+Fixpoint checked_program_Program (p:program) (e:environ): Program :=
+  match p with
+    | PIn t => {| main:= checked_term_Term t; env:= e |}
+    | PConstr nm t p =>
+      checked_program_Program
+        p (cons (nm, ecTrm (checked_term_Term t eq_refl)) e)
+    | PType nm npar ibs p =>
+      let Ibs := ibodies_itypPack ibs
+      in checked_program_Program p (cons (nm, ecTyp Term npar Ibs) e)
+    | PAxiom nm ty p =>
+      let Ty := checked_term_Term ty in
+      checked_program_Program p (cons (nm, ecAx Term) e)
+  end.
+**************************)
+
+(******************************
+Goal
+  (forall (n:nat) (menv:AstCommon.environ term) (mmain:term),
+         Crct n menv mmain -> n = 0 ->
+         forall p:program, menv = env (wf_program.program_mypgm p nil) ->
+                           mmain = main (wf_program.program_mypgm p nil) ->
+                           exists mp, program_Program p (Ret nil) = Ret mp) /\
+(forall (n:nat) (menv:AstCommon.environ term) (ip:itypPack),
+   CrctTyp n menv ip -> True).
+Proof.
+  apply (wf_program.CrctCrctTyp_ind'
+        (fun (n:nat) menv (mmain:term) => n = 0 ->
+         forall p:program, menv = env (wf_program.program_mypgm p nil) ->
+                           mmain = main (wf_program.program_mypgm p nil) ->
+                           exists mp, program_Program p (Ret nil) = Ret mp)
+        (fun (n:nat) menv (ip:itypPack) => True));
+  intros.
+  - symmetry in H0. destruct (nil_hom _ H0).
+    Check (mkPgm (term_Term x) nil).
+  - subst. specialize (H0 eq_refl _ H5). apply H2. reflexivity.
+
+
+  ; intros; subst.
+  - destruct p; cbn.
+    + inversion_Clear H. discriminate.
+***********************************************)

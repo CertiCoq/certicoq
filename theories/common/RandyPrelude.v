@@ -26,6 +26,27 @@ Set Implicit Arguments.
 Require Coq.Strings.String. 
 Open Scope string_scope.
 
+Definition
+  andb_true_true (b1 b2:bool) (q:b1 && b2 = true) : b1 = true /\ b2 = true.
+Proof.
+  destruct b1; destruct b2; cbn in q.
+  + split; reflexivity.
+  + split. reflexivity. assumption.
+  + split. assumption. reflexivity.
+  + split. assumption. assumption.
+Defined.
+
+Definition
+  true_true_andb (b1 b2:bool) (q1:b1 = true) (q2:b2 = true) : b1 && b2 = true.
+Proof.
+  destruct b1; destruct b2; [reflexivity | discriminate ..].
+Qed.
+
+(** snoc lists *)
+Definition unit (A:Type) (a:A) : list A := cons a nil.
+Definition snoc (A:Type) (l:list A) (a:A) : list A := l ++ unit a.
+Notation "b ::: bs" := (snoc bs b)  (at level 100).
+
 Ltac move_to_top x :=
   match reverse goal with
   | H : _ |- _ => try move x after H
@@ -91,7 +112,7 @@ Section Sec_list_eq_dec.
 End Sec_list_eq_dec.
 
   
-(** well-founded induction on natural number measure **)
+(** well-founded induction and recursion on natural number measure **)
 Lemma complete_nat_induct:
   forall (P:nat -> Prop)
          (ih:forall (n:nat), (forall (x:nat), x < n -> P x) -> P n),
@@ -112,6 +133,18 @@ Lemma wf_ind:
   - intros. apply wfih. intros. eapply H. rewrite H0. apply H1. reflexivity.
   - reflexivity.
 Qed.  
+
+Definition wf_rec:
+  forall (A:Type) (f:A -> nat) (P:A -> Type)
+         (wfih:forall (t:A), (forall (x:A), f x < f t -> P x) -> P t),
+  forall k, P k.
+  intros A f P wfih k.
+  eapply ((well_founded_induction_type lt_wf)
+            (fun n:nat => forall (y:A), n = f y -> P y)).
+  - intros. apply wfih. intros. eapply X. instantiate (1:= f x0). subst.
+    assumption. reflexivity.
+  - reflexivity.
+Defined.
 
 
 (** Want to unfold all occurrances of nm in context and goal

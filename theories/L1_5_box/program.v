@@ -19,9 +19,9 @@ Set Implicit Arguments.
 
 
 (** all items in an env are application-well-formed **)
-Inductive WFaEc: envClass-> Prop :=
-| wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall n (i:itypPack), WFaEc (ecTyp _ n i)
+Inductive WFaEc: envClass -> Prop :=
+| wfaecTrm: forall (t:Term), WFapp t -> WFaEc (ecTrm t)
+| wfaecTyp: forall n i, WFaEc (ecTyp Term n i)
 | wfaecAx: WFaEc (ecAx Term).
 
 Inductive WFaEnv: environ -> Prop :=
@@ -90,13 +90,6 @@ try discriminate; try (inversion h); try reflexivity.
 Qed.
 ***)
 
-(** Check that a named datatype and constructor exist in the environment **)
-Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=
-  if (nth_ok inum ipkg defaultItyp)
-  then (if nth_ok cnum (itypCnstrs (nth inum ipkg defaultItyp)) defaultCnstr
-        then True else False)
-  else False.
-
 (** correctness specification for programs (including local closure) **)
 Inductive Crct: environ -> nat -> Term -> Prop :=
 | CrctSrt: forall n srt, Crct nil n (TSort srt)
@@ -120,9 +113,11 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
              Crct p n (TApp fn a args)
 | CrctConst: forall n p pd nm,
                Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
-| CrctConstruct: forall n p ipkgNm npars itypk inum cnum,
-                   Crct p n prop -> LookupTyp ipkgNm p npars itypk ->
-                   CrctCnstr itypk inum cnum ->
+| CrctConstruct: forall n p ipkgNm inum cnum ipkg itp cstr m,
+                   Crct p n prop ->
+                   LookupTyp ipkgNm p m ipkg ->
+                   getInd ipkg inum = Ret itp ->
+                   getCnstr itp cnum = Ret cstr ->
                    Crct p n (TConstruct (mkInd ipkgNm inum) cnum)
 | CrctCase: forall n p m ty mch brs,
               Crct p n mch -> Crcts p n brs -> Crct p n ty -> 
@@ -310,9 +305,8 @@ try (solve [inversion_clear H4; elim (H0 nm0); trivial]).
   elim (H4 nm0); trivial.
 - inversion_clear j. elim (H1 nm); trivial. elim (H3 nm); trivial.
   induction args. inversion H7. elim (H5 nm); trivial.
-- inversion j. subst. elim (@fresh_Lookup_fails _ _ _ (ecTrm pd) H2).
-  unfold LookupDfn in H1. assumption.
-- inversion_Clear j. eelim (fresh_Lookup_fails H3). eassumption.
+- inversion_Clear j. eelim (fresh_Lookup_fails H2). eassumption.
+- inversion_Clear j. eelim (fresh_Lookup_fails H4). eassumption.
 - inversion_Clear j. elim (H0 nm); trivial. elim (H2 nm); trivial.
   elim (H4 nm); trivial.
 - inversion_clear j. elim (H0 nm); trivial. elim (H2 nm); trivial.
@@ -344,6 +338,7 @@ try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
   + eapply (Lookup_strengthen H4). reflexivity. assumption.
 - elim (H1 _ H2).
 - elim (H1 _ H6).
+- eapply H0. eassumption. 
 Grab Existential Variables.
   + reflexivity.
 Qed.
@@ -436,12 +431,12 @@ eapply CrctCrctsCrctDsTyp_ind; intros; auto.
   + rewrite H6 in j. nreflexivity j.
   + eassumption.
 - eapply CrctConstruct; try eassumption.
-  + eapply H0. eapply H3. intros h. inversion h.
-  + rewrite H3 in H1.
+  + eapply H0. eapply H4. intros h. inversion h.
+  + rewrite H4 in H1.
     assert (j: nm <> ipkgNm).
     { eapply notPocc_TCnstr. eassumption. }
     inversion H1.
-    * rewrite H7 in j. nreflexivity j.
+    * rewrite H8 in j. nreflexivity j.
     * eassumption.
 - apply CrctCase.
   + eapply H0. eassumption.
@@ -639,7 +634,9 @@ Lemma Crct_invrt_Construct:
   forall ipkgNm inum cnum, construct = (TConstruct (mkInd ipkgNm inum) cnum) ->
     Crct p n prop /\
     exists npars itypk,
-      LookupTyp ipkgNm p npars itypk /\ CrctCnstr itypk inum cnum.
+      LookupTyp ipkgNm p npars itypk /\
+      exists (ip:ityp), getInd itypk inum = Ret ip /\
+      exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ H2). intuition.
   destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
@@ -647,8 +644,10 @@ induction 1; intros; try discriminate.
 - assert (j:= IHCrct _ _ _ H2). intuition.
   destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
   apply Lookup_weaken; trivial.
-- injection H2; intros; subst. intuition.
-  exists npars, itypk. intuition.
+- myInjection H3. intuition.
+  exists m, ipkg. intuition.
+  exists itp. intuition.
+  exists cstr. assumption.
 Qed.
 
 Lemma Crct_invrt_any:
@@ -735,8 +734,9 @@ Proof.
   - apply CrctInd. eapply Crct_Sort. eassumption.
   - destruct ind. edestruct (Crct_invrt_Construct H0).
     + reflexivity.
-    + destruct H3 as [npars [x [h1 h2]]]. eapply CrctConstruct; try eassumption.
-      * eapply Crct_Sort. eassumption.
+    + destruct H3 as [npars [ip [h1 [it [h2 [ctr h3]]]]]].
+      eapply CrctConstruct; try eassumption.
+      * eapply Crct_Sort. eassumption.        
   - destruct (Crct_invrt_Case H3 eq_refl) as [h1 [h2 h3]]. apply CrctCase.
     + apply H; trivial.
     + apply H1; trivial.

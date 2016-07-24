@@ -1139,24 +1139,6 @@ Lemma PoccTrms_append:
       * right. assumption.
 Qed.
 
-(***
-(** Pocc and mkApp: what a mess! **)
-Lemma Pocc_mkApp_inv_lem:
-  forall fn args res, MkApp fn args res ->
-                  PoccTrm res -> PoccTrm fn \/ PoccTrms args.
-Proof.
-  induction 1; intros h; intuition.
-  - inversion_Clear H1.
-    + left. apply PoAppA. assumption.
-    + destruct (PoccTrms_append_invrt _ _ H2).
-      * left. apply PoAppR. assumption.
-      * right. assumption.
-  - inversion_clear h. 
-    + left. assumption.
-    + right. apply PoThd. assumption.
-    + right. apply PoTtl. assumption.
-Qed.
-***)
 
 Lemma Pocc_mkApp_inv:
   forall fn args, PoccTrm (mkApp fn args) -> PoccTrm fn \/ PoccTrms args.

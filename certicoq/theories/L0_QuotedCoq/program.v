@@ -7,8 +7,7 @@ Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
 
-Require Import Common.RandyPrelude.
-Require Import Common.AstCommon.
+Require Import Common.Common.
 Require Import L0.term.
 
 Open Scope list_scope.
@@ -52,41 +51,41 @@ Proof.
   - exists t. reflexivity.
 Qed.
 
-    
-(** Check that a named datatype and constructor exist in the environment **)
-Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=
-  if (nth_ok inum ipkg defaultItyp)
-  then (if nth_ok cnum (itypCnstrs (nth inum ipkg defaultItyp)) defaultCnstr
-        then True else False)
-  else False.
 
 Notation prop := (tSort sProp).
 Inductive Crct : nat -> environ term -> term -> Prop :=
 | CrctSrt: forall n srt, Crct n nil (tSort srt)
 | CrctWkTrmTrm: forall n p t s nm, Crct n p t -> Crct n p s ->
-           fresh nm p -> Crct n ((nm,ecTrm s):::p) t
-| CrctWkTrmTyp: forall n p t (s:itypPack) nm, Crct n p t -> CrctTyp n p s ->
-           fresh nm p -> forall (m:nat), Crct n ((nm,ecTyp term m s):::p) t
+     fresh nm p -> Crct n ((nm,ecTrm s):::p) t
+| CrctWkTrmTyp: forall n p t (s:itypPack) nm,
+     Crct n p t -> CrctTyp n p s ->
+     fresh nm p -> forall (m:nat), Crct n ((nm,ecTyp term m s):::p) t
 | CrctRel: forall n m p, m < n -> Crct n p prop -> Crct n p (tRel m)
-| CrctCast: forall n p t ck ty, Crct n p t -> Crct n p ty ->
-                                Crct n p (tCast t ck ty)
+| CrctCast: forall n p t ck ty,
+              wf_term t -> Crct n p t -> wf_term ty -> Crct n p ty ->
+              Crct n p (tCast t ck ty)
 | CrctProd: forall n p nm ty bod,
-              Crct (S n) p bod -> Crct n p ty -> Crct n p (tProd nm ty bod)
+              wf_term bod -> Crct (S n) p bod ->
+              wf_term ty -> Crct n p ty -> Crct n p (tProd nm ty bod)
 | CrctLam: forall n p nm ty bod,
-             Crct (S n) p bod -> Crct n p ty -> Crct n p (tLambda nm ty bod)
+             wf_term bod -> Crct (S n) p bod ->
+             wf_term ty -> Crct n p ty -> Crct n p (tLambda nm ty bod)
 | CrctLetIn: forall n p nm dfn ty bod,
-         Crct n p dfn -> Crct (S n) p bod -> Crct n p ty -> 
-         Crct n p (tLetIn nm dfn ty bod)
-              (***
-| CrctApp: forall n p fn a args,
-             ~ (isApp fn) -> Crct n p fn -> Crct n p a -> Crcts p args ->
-             Crct n p (TApp fn a args)
-***)
+               wf_term dfn -> Crct n p dfn ->
+               wf_term bod -> Crct (S n) p bod ->
+               wf_term ty -> Crct n p ty -> 
+               Crct n p (tLetIn nm dfn ty bod)
+| CrctApp: forall n p fn args,
+             ~ (isApp fn) -> wf_term fn -> Crct n p fn ->
+             wf_terms args -> Crcts n p args ->
+             Crct n p (tApp fn args)
 | CrctConst: forall n p pd nm,
                Crct n p prop -> LookupDfn nm (rev p) pd -> Crct n p (tConst nm)
-| CrctConstruct: forall n p ipkgNm npars itypk inum cnum,
-                   Crct n p prop -> LookupTyp ipkgNm (rev p) npars itypk ->
-                   CrctCnstr itypk inum cnum ->
+| CrctConstruct: forall n p ipkgNm inum cnum ipkg itp cstr m,
+                   Crct n p prop ->
+                   LookupTyp ipkgNm p m ipkg ->
+                   getInd ipkg inum = Ret itp ->
+                   getCnstr itp cnum = Ret cstr ->
                    Crct n p (tConstruct (mkInd ipkgNm inum) cnum)
                         (****
 | CrctCase: forall n p m ty mch brs,
@@ -97,7 +96,11 @@ Inductive Crct : nat -> environ term -> term -> Prop :=
              CrctDs p (n + dlength ds) ds -> Crct n p (TFix ds m)
 ***)
 | CrctInd: forall n p ind, Crct n p prop -> Crct n p (tInd ind)
-with CrctTyp: nat -> environ term ->  itypPack -> Prop := 
+with Crcts: nat -> environ term -> list term -> Prop :=
+| Crcts_nil: forall n p, Crct n p prop -> Crcts n p nil
+| Crcts_cons: forall n p t ts,
+                Crct n p t -> Crcts n p ts -> Crcts n p (t :: ts)
+with CrctTyp: nat -> environ term -> itypPack -> Prop := 
 | CrctTypStart: forall n itp, CrctTyp n nil itp
 | CrctTypWk1: forall n p t s nm, CrctTyp n p t -> Crct n p s ->
            fresh nm p -> CrctTyp n ((nm,ecTrm s):::p) t

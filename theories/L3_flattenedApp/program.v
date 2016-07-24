@@ -233,6 +233,8 @@ Qed.
 
 
 (** Check that a named datatype and constructor exist in the environment **)
+Definition defaultCnstr := {| CnstrNm:=""; CnstrArity:= 0 |}.
+Definition defaultItyp := {| itypNm:=""; itypCnstrs:=nil |}.
 Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=
   if (nth_ok inum ipkg defaultItyp)
   then (if nth_ok cnum (itypCnstrs (nth inum ipkg defaultItyp)) defaultCnstr

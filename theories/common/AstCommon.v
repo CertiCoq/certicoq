@@ -72,10 +72,10 @@ Qed.
 (** certiCoq representation of inductive types **)
 (* a constructor; the string only for human readability *)
 Record Cnstr := mkCnstr { CnstrNm:string; CnstrArity:nat }.
-Definition defaultCnstr := {| CnstrNm:=""; CnstrArity:= 0 |}.
+
 (* a type is a list of Cnstrs; string only for human readability *)
 Record ityp := mkItyp { itypNm:string; itypCnstrs:list Cnstr }.
-Definition defaultItyp := {| itypNm:=""; itypCnstrs:=nil |}.
+
 (* a mutual type package is a list of ityps *)
 Definition itypPack := list ityp.
 
@@ -201,6 +201,12 @@ Definition lookupDfn (nm:string) (p:environ) : option trm :=
    | _ => None
   end.
 
+Definition lookupTyp (nm:string) (p:environ) : option (nat * itypPack) :=
+  match lookup nm p with
+   | Some (ecTyp n t) => Some (n, t)
+   | _ => None
+  end.
+
 Lemma Lookup_lookup:
   forall nm p t, Lookup nm p t -> lookup nm p = Some t.
 induction 1; intros; subst.
@@ -319,22 +325,27 @@ simpl in k. rewrite (string_eq_bool_neq j2) in k.
 apply lookup_Lookup. assumption.
 Qed.
 
+(** find an ityp in an itypPack **)
+Definition getInd (ipkg:itypPack) (inum:nat) : exception ityp :=
+  exnNth ipkg inum.
 
-(** this function for use in translation from L2 to L3 **)
-Fixpoint arity_from_dtyp
-        (npars:nat) (itps:itypPack) (tndx:nat) (cndx:nat) : exception nat :=
-  do ity <- exnNth itps tndx;
-  do itp <- exnNth (itypCnstrs ity) cndx;
-  ret (npars + (CnstrArity itp)).
+(** find a Cnstr in an ityp **)
+Definition getCnstr (ip:ityp) (cnum:nat) : exception Cnstr :=
+  exnNth (itypCnstrs ip) cnum.
 
-(** constructor arity is only computed on the fly **)
-Definition cnstrArity (p:environ) (i:inductive) (n:nat) : exception nat :=
+
+(** constructor arity is only computed on the fly during
+***  translation from L2 to L3 **)
+Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) : exception nat :=
   match i with
-    | mkInd str m =>
-      match lookup str p with
-        | Some (ecTyp npars itps) => arity_from_dtyp npars itps m n
-        | Some _ => raise ("cnstrArity; not a type package: " ++ str)
-        | none => raise ("cnstrArity; datatype package not found: " ++ str)
+    | mkInd nm tndx =>
+      match lookup nm p with
+        | Some (ecTyp npars itypkg) =>
+          do ity <- getInd itypkg tndx;
+          do itp <- getCnstr ity cndx;
+          ret (npars + (CnstrArity itp))
+        | Some _ => raise ("cnstrArity; not a type package: " ++ nm)
+        | None => raise ("cnstrArity; not found: " ++ nm)
       end
   end.
 

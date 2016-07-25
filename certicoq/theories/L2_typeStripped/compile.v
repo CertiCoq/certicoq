@@ -99,7 +99,6 @@ Function stripEC (ec:L1_5EC) : envClass :=
   match ec with
     | AstCommon.ecTrm t => AstCommon.ecTrm (strip t)
     | AstCommon.ecTyp _ n itp => AstCommon.ecTyp Term n itp
-    | AstCommon.ecAx _ => AstCommon.ecAx Term
   end.
 
 Definition  stripEnv : L1_5Env -> environ :=

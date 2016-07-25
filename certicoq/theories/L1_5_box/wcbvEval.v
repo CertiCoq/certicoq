@@ -484,8 +484,10 @@ Function wcbvEval
         | TConst nm =>
           match (lookup nm p) with
             | Some (AstCommon.ecTrm t) => wcbvEval n t
-            | Some (AstCommon.ecAx _) => ret (TConst nm)
-            | Some (AstCommon.ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
+                  (** note hack coding of axioms in environment **)
+            | Some (AstCommon.ecTyp _ 0 nil) => ret (TConst nm)
+            | Some (AstCommon.ecTyp _ _ _) =>
+              raise ("wcbvEval, TConst ecTyp " ++ nm)
             | _ => raise "wcbvEval: TConst environment miss"
           end
         | TCast t ck _ =>

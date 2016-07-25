@@ -107,21 +107,13 @@ Qed.
 Section trm_Sec.
 Variable trm: Set.
 Variable trm_dec: forall (s t:trm), s = t \/ s <> t.
-  
+
+(** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
 Inductive envClass := 
 | ecTrm (_:trm)
-| ecTyp (_:nat) (_:itypPack)
-| ecAx.
+| ecTyp (_:nat) (_:itypPack).
 
-Lemma isAx_dec:
-  forall (e:envClass), e = ecAx \/ e <> ecAx.
-Proof.
-  destruct e.
-  - right. intros h. discriminate.
-  - right. intros h. discriminate.
-  - left. reflexivity.
-Qed.
-
+Definition ecAx : envClass := ecTyp 0 nil.
 
 Lemma envClass_dec: forall e f:envClass, e = f \/ e <> f.
 Proof.
@@ -134,11 +126,16 @@ Proof.
     + right. intros h. injection h. contradiction.
     + right. intros h. injection h. contradiction.
     + right. intros h. injection h. contradiction.
-  - left. reflexivity.
 Qed.
 
-(** An environ is a list of definitions.
-***  Currently ignoring Types and Axioms **)
+Lemma isAx_dec:
+  forall (e:envClass), e = ecAx \/ e <> ecAx.
+Proof.
+  unfold ecAx. intros.
+  apply envClass_dec.
+Qed.
+
+(** An environ is a list of definitions. **)
 Definition environ := list (string * envClass).
 Record Program : Type := mkPgm { main:trm; env:environ }.
 
@@ -180,6 +177,7 @@ Qed.
 
 
 (** looking a name up in an environment **)
+(** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
 Inductive Lookup: string -> environ -> envClass -> Prop :=
 | LHit: forall s p t, Lookup s ((s,t)::p) t
 | LMiss: forall s1 s2 p t ec,
@@ -187,7 +185,9 @@ Inductive Lookup: string -> environ -> envClass -> Prop :=
 Hint Constructors Lookup.
 Definition LookupDfn s p t := Lookup s p (ecTrm t).
 Definition LookupTyp s p n i := Lookup s p (ecTyp n i).
+Definition LookupAx s p := Lookup s p ecAx.
 
+(** equivalent lookup functions **)
 Function lookup (nm:string) (p:environ) : option envClass :=
   match p with
    | nil => None
@@ -262,7 +262,6 @@ Proof.
     + destruct e.
       * left. exists (ecTrm t). apply LHit.
       * left. exists (ecTyp n i). apply LHit. 
-      * left. exists ecAx. apply LHit.
     + right. intros t h. inversion_Clear h. 
       * elim n. reflexivity.
       * elim (H t). assumption.

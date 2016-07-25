@@ -21,7 +21,7 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (*** non-deterministic small step evaluation relation ***)
-Inductive wndEval (p:environ) : Term -> Term -> Prop :=
+Inductive wndEval (p:environ Term) : Term -> Term -> Prop :=
 (** contraction steps **)
 | sConst: forall (s:string) (t:Term),
             LookupDfn s p t -> wndEval p (TConst s) t
@@ -58,7 +58,7 @@ Inductive wndEval (p:environ) : Term -> Term -> Prop :=
               wndEvals p brs brs' ->
               wndEval p (TCase ml mch brs) (TCase ml mch brs')
 with  (** step any term in a list of terms **)
-wndEvals (p:environ) : Terms -> Terms -> Prop :=
+wndEvals (p:environ Term) : Terms -> Terms -> Prop :=
     | saHd: forall (t r:Term) (ts:Terms), 
               wndEval p t r ->
               wndEvals p (tcons t ts) (tcons r ts)
@@ -81,19 +81,19 @@ Qed.
 (** when reduction stops **)
 Definition no_step {A:Set} (R:A -> A -> Prop) (a:A) :=
   forall (b:A), ~ R a b.
-Definition no_wnd_step (p:environ) (t:Term) : Prop :=
+Definition no_wnd_step (p:environ Term) (t:Term) : Prop :=
   no_step (wndEval p) t.
-Definition no_wnds_step (p:environ) (ts:Terms) : Prop :=
+Definition no_wnds_step (p:environ Term) (ts:Terms) : Prop :=
   no_step (wndEvals p) ts.
 
 
 (** reflexive-transitive closure of wndEval **)
-Inductive wndEvalRTC (p:environ): Term -> Term -> Prop :=
+Inductive wndEvalRTC (p:environ Term): Term -> Term -> Prop :=
 | wERTCrfl: forall t, wndEvalRTC p t t
 | wERTCstep: forall t s, wndEval p t s -> wndEvalRTC p t s
 | wERTCtrn: forall t s u, wndEvalRTC p t s -> wndEvalRTC p s u ->
                           wndEvalRTC p t u.
-Inductive wndEvalsRTC (p:environ): Terms -> Terms -> Prop :=
+Inductive wndEvalsRTC (p:environ Term): Terms -> Terms -> Prop :=
 (** | wEsRTCrfl: forall ts, WNorms ts -> wndEvalsRTC p ts ts ??? **)
 | wEsRTCrfl: forall ts, wndEvalsRTC p ts ts
 | wEsRTCstep: forall ts ss, wndEvals p ts ss -> wndEvalsRTC p ts ss
@@ -101,11 +101,11 @@ Inductive wndEvalsRTC (p:environ): Terms -> Terms -> Prop :=
                           wndEvalsRTC p ts us.
 Hint Constructors wndEvalRTC wndEvalsRTC.
 
-Inductive wndEvalTC (p:environ): Term -> Term -> Prop :=
+Inductive wndEvalTC (p:environ Term): Term -> Term -> Prop :=
 | wETCstep: forall t s, wndEval p t s -> wndEvalTC p t s
 | wETCtrn: forall t s u, wndEvalTC p t s -> wndEvalTC p s u ->
                           wndEvalTC p t u.
-Inductive wndEvalsTC (p:environ): Terms -> Terms -> Prop :=
+Inductive wndEvalsTC (p:environ Term): Terms -> Terms -> Prop :=
 | wEsTCstep: forall ts ss, wndEvals p ts ss -> wndEvalsTC p ts ss
 | wEsTCtrn: forall ts ss us, wndEvalsTC p ts ss -> wndEvalsTC p ss us ->
                           wndEvalsTC p ts us.
@@ -241,7 +241,7 @@ intros p. apply wndEvalEvals_ind; intros; auto.
 Qed.
 
 Lemma wndEval_strengthen:
-  forall (pp:environ),
+  forall (pp:environ Term),
   (forall t s, wndEval pp t s -> forall nm ec p, pp = (nm,ec)::p ->
         ~ PoccTrm nm t -> wndEval p t s) /\
   (forall ts ss, wndEvals pp ts ss -> forall nm ec p, pp = (nm,ec)::p ->
@@ -286,7 +286,7 @@ Lemma wndEval_pres_Crct:
   (forall p n t, Crct p n t -> forall s, wndEval p t s -> Crct p n s) /\
   (forall p n ts, Crcts p n ts -> forall ss, wndEvals p ts ss ->
                                              Crcts p n ss) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> True).
+  (forall (p:environ Term) (n:nat) (ds:Defs), CrctDs p n ds -> True).
 apply CrctCrctsCrctDs_ind; intros; auto.
 - inversion H.
 - constructor; auto. apply H0.
@@ -331,7 +331,7 @@ Lemma wndEval_Pocc:
       forall nm, PoccTrm nm s -> PoccTrm nm t) /\
   (forall p n ts, Crcts p n ts -> forall ss, wndEvals p ts ss ->
       forall nm, PoccTrms nm ss -> PoccTrms nm ts) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> True).
+  (forall (p:environ Term) (n:nat) (ds:Defs), CrctDs p n ds -> True).
 apply CrctCrctsCrctDs_ind; intros; auto.
 - inversion H.
 - 
@@ -341,7 +341,7 @@ Lemma wndEval_pres_Crct:
   (forall p n t, Crct p n t -> forall s, wndEval p t s -> Crct p n s) /\
   (forall p n ts, Crcts p n ts -> forall ss, wndEvals p ts ss ->
                                              Crcts p n ss) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> True).
+  (forall (p:environ Term) (n:nat) (ds:Defs), CrctDs p n ds -> True).
 apply CrctCrctsCrctDs_ind; intros; auto; try (solve [constructor]).
 - inversion H.
 - constructor; auto. apply H2.

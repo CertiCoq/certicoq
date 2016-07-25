@@ -87,7 +87,7 @@ Proof.
     destruct H, H0, H1; try rght.
     + left. apply WNApp; auto.
   - destruct (Lookup_dec s p).
-    + destruct H. destruct (isAx_dec x).
+    + destruct H. destruct (isAx_dec Term_dec x).
       * left. constructor. subst. assumption.
       * right. intros j. inversion j. elim H0.
         unfold LookupAx in H2. apply (Lookup_single_valued H H2).

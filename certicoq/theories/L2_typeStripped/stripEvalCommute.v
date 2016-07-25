@@ -84,14 +84,10 @@ induction 1; destruct t.
   apply LHit.
 - change (Lookup s ((s, ecTyp n i) :: (stripEnv p)) (ecTyp n i)).
   apply LHit.
-- change (Lookup s ((s, ecAx) :: (stripEnv p)) ecAx).
-  apply LHit.
 - change (Lookup s2 ((s1, ecTrm (strip l)) :: (stripEnv p))
                      (stripEC ec)).
   apply LMiss; assumption.
 - change (Lookup s2 ((s1, ecTyp n i) :: (stripEnv p)) (stripEC ec)).
-  apply LMiss; assumption.
-- change (Lookup s2 ((s1, ecAx) :: (stripEnv p)) (stripEC ec)).
   apply LMiss; assumption.
 Qed.
 
@@ -514,7 +510,8 @@ Proof.
   apply L1_5.wcbvEval.WcbvEvalEvals_ind; intros; simpl; try reflexivity;
   try (solve[constructor; trivial]).
   - constructor. unfold LookupAx. unfold L1_5.program.LookupAx in *.
-    change (Lookup nm (stripEnv p) (stripEC (AstCommon.ecAx (L1_5.compile.Term)))).
+    change (Lookup nm (stripEnv p)
+                   (stripEC (AstCommon.ecAx (L1_5.compile.Term)))).
     apply Lookup_hom. assumption.
   - refine (wConst _ _); try eassumption.
     unfold LookupDfn. unfold L1_5.program.LookupDfn in *.
@@ -553,72 +550,73 @@ Theorem L1wcbvEval_strip_L2WcbvEval:
                    WcbvEvals (stripEnv p) (strips ts) (strips ss)) /\
     (forall ds es, L1_5.wcbvEval.WcbvDEvals p ds es -> L1_5.term.WFappDs ds ->
                    WcbvDEvals (stripEnv p) (stripDs ds) (stripDs es)).
-intros p hp.
-apply L1_5.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
-- simpl. eapply wCast. inversion H0. intuition.
-- simpl. eapply wFix. inversion H0. intuition.
-- simpl. eapply wAx. unfold L1_5.program.LookupAx in l. unfold LookupAx.
-  apply (Lookup_hom l).
-- simpl. eapply wConst.
-  + apply LookupDfn_hom. eassumption.
-  + apply H.
-    assert (j:= L1_5.program.Lookup_pres_WFapp hp l). inversion_Clear j.
-    assumption.
-- rewrite TApp_hom. inversion H2. subst. eapply wAppLam.
-  + rewrite TLambda_hom in H. apply H. assumption.
-  + apply H0. constructor; assumption.
-  + rewrite whBetaStep_hom in H1. apply H1.
-    destruct (L1_5.wcbvEval.WcbvEvals_tcons_tcons' w0).
-    apply L1_5.term.whBetaStep_pres_WFapp. 
-    * assert (j:= proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w H7).
-      inversion j. assumption.
-    * eapply (proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp)); eassumption.
-    * eapply (proj1 (proj2 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp)));
-      eassumption.
-- simpl. inversion H1. subst. eapply wLetIn.
-  + apply H. assumption.
-  + rewrite (proj1 instantiate_hom) in H0. apply H0.
-    apply L1_5.term.instantiate_pres_WFapp; try assumption.
-    * apply (proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w). assumption.
-- inversion_Clear H2.
-  assert (j:= proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w H7). 
-  inversion_Clear j.
-  rewrite TApp_hom. eapply wAppFix.
-  + rewrite TFix_hom in H. apply H. assumption.
-  + rewrite <- dnthBody_hom. rewrite e. cbn. reflexivity. 
-  + rewrite <- tcons_hom. rewrite <- tcons_hom. apply H0.
-    constructor; assumption.
-  + rewrite <- tcons_hom. rewrite pre_whFixStep_hom. apply H1.
-    assert (j: L1_5.term.WFapps (L1_5.compile.tcons arg' args')).
-    { refine (proj1 (proj2 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp)) _ _ w0 _).
-      constructor; assumption. }
+Proof.
+  intros p hp.
+  apply L1_5.wcbvEval.WcbvEvalEvals_ind; intros; try (solve [constructor]).
+  - simpl. eapply wCast. inversion H0. intuition.
+  - simpl. eapply wFix. inversion H0. intuition.
+  - simpl. eapply wAx. unfold L1_5.program.LookupAx in l. unfold LookupAx.
+    apply (Lookup_hom l).
+  - simpl. eapply wConst.
+    + apply LookupDfn_hom. eassumption.
+    + apply H.
+      assert (j:= L1_5.program.Lookup_pres_WFapp hp l). inversion_Clear j.
+      assumption.
+  - rewrite TApp_hom. inversion H2. subst. eapply wAppLam.
+    + rewrite TLambda_hom in H. apply H. assumption.
+    + apply H0. constructor; assumption.
+    + rewrite whBetaStep_hom in H1. apply H1.
+      destruct (L1_5.wcbvEval.WcbvEvals_tcons_tcons' w0).
+      apply L1_5.term.whBetaStep_pres_WFapp. 
+      * assert (j:= proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w H7).
+        inversion j. assumption.
+      * eapply (proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp)); eassumption.
+      * eapply (proj1 (proj2 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp)));
+        eassumption.
+  - simpl. inversion H1. subst. eapply wLetIn.
+    + apply H. assumption.
+    + rewrite (proj1 instantiate_hom) in H0. apply H0.
+      apply L1_5.term.instantiate_pres_WFapp; try assumption.
+      * apply (proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w). assumption.
+  - inversion_Clear H2.
+    assert (j:= proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w H7). 
     inversion_Clear j.
-    refine (L1_5.term.pre_whFixStep_pres_WFapp _ _ _); try eassumption.
-    * refine (L1_5.term.dnthBody_pres_WFapp _ _ _); eassumption.
-    * constructor; assumption.
-- inversion_Clear H1. rewrite TApp_hom. rewrite TApp_hom.
-  apply wAppAx; intuition.
-- inversion_Clear H1. rewrite TApp_hom. rewrite TApp_hom.
-  apply wAppCnstr; intuition.
-- inversion_Clear H1. rewrite TApp_hom. rewrite TApp_hom.
-  apply wAppInd; intuition.  
-- inversion_Clear H1. rewrite TCase_hom. refine (wCase _ _ _ _ _ _ _).
-  + apply H. assumption.
-  + rewrite <- canonicalP_hom. rewrite e. simpl. reflexivity.
-  + rewrite <- tskipn_hom. rewrite e0. simpl. reflexivity.
-  + rewrite <- whCaseStep_hom. rewrite e1. simpl. reflexivity.
-  + apply H0. refine (L1_5.term.whCaseStep_pres_WFapp H7 _ _ e1).
-    refine (L1_5.term.tskipn_pres_WFapp _ _ e0).
-    refine (L1_5.term.canonicalP_pres_WFapp _ e).
-    refine (proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w _).
-    assumption.
-- inversion_Clear H2.
-  rewrite TCase_hom. refine (wCaseAx _ _ _ _); intuition.
-  rewrite <- e. rewrite appliedAxiomP_hom.  reflexivity.
-- inversion_Clear H1. rewrite tcons_hom. rewrite tcons_hom.
-  constructor; intuition.
-- inversion_Clear H2. rewrite dcons_hom. rewrite dcons_hom.
-  constructor; intuition.
+    rewrite TApp_hom. eapply wAppFix.
+    + rewrite TFix_hom in H. apply H. assumption.
+    + rewrite <- dnthBody_hom. rewrite e. cbn. reflexivity. 
+    + rewrite <- tcons_hom. rewrite <- tcons_hom. apply H0.
+      constructor; assumption.
+    + rewrite <- tcons_hom. rewrite pre_whFixStep_hom. apply H1.
+      assert (j: L1_5.term.WFapps (L1_5.compile.tcons arg' args')).
+      { refine (proj1 (proj2 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp)) _ _ w0 _).
+        constructor; assumption. }
+      inversion_Clear j.
+      refine (L1_5.term.pre_whFixStep_pres_WFapp _ _ _); try eassumption.
+      * refine (L1_5.term.dnthBody_pres_WFapp _ _ _); eassumption.
+      * constructor; assumption.
+  - inversion_Clear H1. rewrite TApp_hom. rewrite TApp_hom.
+    apply wAppAx; intuition.
+  - inversion_Clear H1. rewrite TApp_hom. rewrite TApp_hom.
+    apply wAppCnstr; intuition.
+  - inversion_Clear H1. rewrite TApp_hom. rewrite TApp_hom.
+    apply wAppInd; intuition.  
+  - inversion_Clear H1. rewrite TCase_hom. refine (wCase _ _ _ _ _ _ _).
+    + apply H. assumption.
+    + rewrite <- canonicalP_hom. rewrite e. simpl. reflexivity.
+    + rewrite <- tskipn_hom. rewrite e0. simpl. reflexivity.
+    + rewrite <- whCaseStep_hom. rewrite e1. simpl. reflexivity.
+    + apply H0. refine (L1_5.term.whCaseStep_pres_WFapp H7 _ _ e1).
+      refine (L1_5.term.tskipn_pres_WFapp _ _ e0).
+      refine (L1_5.term.canonicalP_pres_WFapp _ e).
+      refine (proj1 (L1_5.wcbvEval.wcbvEval_pres_WFapp hp) _ _ w _).
+      assumption.
+  - inversion_Clear H2.
+    rewrite TCase_hom. refine (wCaseAx _ _ _ _); intuition.
+    rewrite <- e. rewrite appliedAxiomP_hom.  reflexivity.
+  - inversion_Clear H1. rewrite tcons_hom. rewrite tcons_hom.
+    constructor; intuition.
+  - inversion_Clear H2. rewrite dcons_hom. rewrite dcons_hom.
+    constructor; intuition.
 Qed.
 
 Print Assumptions L1wcbvEval_strip_L2WcbvEval.

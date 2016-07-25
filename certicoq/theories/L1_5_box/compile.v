@@ -181,7 +181,6 @@ Function L1EC_EC (ec:L1EC) : envClass :=
   match ec with
     | ecTrm t => ecTrm (L1Term_Term t)
     | ecTyp _ n itp => ecTyp Term n itp
-    | ecAx _ => ecAx Term
   end.
 
 Definition L1Env_Env: L1Env -> environ :=

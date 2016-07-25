@@ -170,7 +170,7 @@ Function strip (t:L2Term) : exception Term :=
     | L2.compile.TConst nm =>
       match L2.program.lookup nm p with
         | Some (AstCommon.ecTrm _) => Ret (TConst nm)
-        | Some (AstCommon.ecAx _) => Ret (TAx)
+        | Some (AstCommon.ecTyp _ 0 nil) => Ret (TAx)
         | Some (AstCommon.ecTyp _ _ _) =>
           Exc "L2.compile.lookup nm p returns a type"
         | None => Exc "L2.compile.lookup nm p misses"
@@ -212,43 +212,31 @@ with stripDs (ts:L2Defs) : exception Defs :=
         | Exc s1, Exc s2 => Exc "both strip t and stripDs ds fail"
       end
   end.
-(**
 Functional Scheme strip_ind' := Induction for strip Sort Prop
 with strips_ind' := Induction for strips Sort Prop
 with stripDs_ind' := Induction for stripDs Sort Prop.
+(*** Anomaly: Uncaught exception Term.DestKO. Please report.
 Combined Scheme stripStripsStripDs_ind
          from strip_ind', strips_ind', stripDs_ind'.
 ***)
 
 
-(** environments and programs: no axioms in L3 environments **)
-Inductive envClass := 
-| ecTrm (_:Term)
-| ecTyp (_:nat) (_:itypPack).
-
-(** An environ is a list of definitions.
-***  Currently ignoring Types and Axioms **)
-Definition environ := list (string * envClass).
-Record Program : Type := mkPgm { main:Term; env:environ }.
-
-
-Function stripEC (ec:L2EC) : exception envClass :=
+Function stripEC (ec:L2EC) : exception (AstCommon.envClass Term) :=
   match ec with
     | AstCommon.ecTrm t =>
       match strip t with
         | Ret u => ret (ecTrm u)
         | Exc s => raise ("L3.compile, stripEC: " ++ s)
       end
-    | AstCommon.ecTyp _ n itp => ret (ecTyp n itp)
-    | AstCommon.ecAx _ => raise "stripEC, Anomaly"
+    | AstCommon.ecTyp _ n itp => ret (ecTyp _ n itp)
   end.
 
 End EtaExpand.
 
-Function stripEnv (p:L2Env) : exception environ :=
+Function stripEnv (p:L2Env) : exception (AstCommon.environ Term) :=
   match p with
     | nil => Ret nil
-    | cons (nm, AstCommon.ecAx _) q =>   (** remove axioms from env **)
+    | cons (nm, AstCommon.ecTyp _ 0 nil) q =>   (** remove axioms from env **)
       stripEnv q
     | cons (nm, ec) q =>
       match stripEC q ec, stripEnv q with
@@ -259,7 +247,7 @@ Function stripEnv (p:L2Env) : exception environ :=
       end
   end.
 
-Definition stripProgram (p:L2Pgm) : exception Program :=
+Definition stripProgram (p:L2Pgm) : exception (AstCommon.Program Term) :=
   match stripEnv (AstCommon.env p),
         strip (AstCommon.env p) (AstCommon.main p) with
     | Ret q, Ret t => ret {| env:= q; main:= t |}
@@ -268,7 +256,7 @@ Definition stripProgram (p:L2Pgm) : exception Program :=
 
 
 (** L0-to-L3 translations **)
-Definition program_Program (p:program) : exception Program :=
+Definition program_Program (p:program) : exception  (AstCommon.Program Term) :=
   match L2.compile.program_Program p with
     | Ret q => stripProgram q
     | Exc str => raise ("L3 program_Program: " ++ str)

@@ -25,7 +25,7 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (** Relational version of weak cbv evaluation  **)
-Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
+Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wPrf: WcbvEval p TProof TProof
 | wLam: forall nm bod,
           WcbvEval p (TLambda nm bod) (TLambda nm bod)
@@ -65,7 +65,7 @@ Inductive WcbvEval (p:environ) : Term -> Term -> Prop :=
            whCaseStep n args' brs = Some cs ->
            WcbvEval p cs s ->
            WcbvEval p (TCase ml mch brs) s
-with WcbvEvals (p:environ) : Terms -> Terms -> Prop :=
+with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
 | wCons: forall t t' ts ts',
            WcbvEval p t t' -> WcbvEvals p ts ts' -> 
@@ -76,9 +76,9 @@ Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
 Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
 
 (** when reduction stops **)
-Definition no_Wcbv_step (p:environ) (t:Term) : Prop :=
+Definition no_Wcbv_step (p:environ Term) (t:Term) : Prop :=
   no_step (WcbvEval p) t.
-Definition no_Wcbvs_step (p:environ) (ts:Terms) : Prop :=
+Definition no_Wcbvs_step (p:environ Term) (ts:Terms) : Prop :=
   no_step (WcbvEvals p) ts.
 
 (** evaluate omega = (\x.xx)(\x.xx): nontermination **)
@@ -158,7 +158,7 @@ eapply wConst. subst. eassumption.  (@wConst p nm t s pp).
 (** WcbvEval makes progress **)
 (******************  HERE  ***
 Goal
-  forall (p:environ),
+  forall (p:environ Term),
   (forall t, (no_wnd_step p t /\ (no_Wcbv_step p t \/ WcbvEval p t t)) \/
                  (exists u, wndEvalTC p t u /\ WcbvEval p t u)) /\
   (forall ts, (no_wnds_step p ts /\ WcbvEvals p ts ts) \/
@@ -175,7 +175,7 @@ Goal
   (forall p n ts, Crcts p n ts -> n = 0 ->
                   (no_wnds_step p ts /\ WcbvEvals p ts ts) \/
                   (exists us, wndEvalsTC p ts us /\ WcbvEvals p ts us)) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> True).
+  (forall (p:environ Term) (n:nat) (ds:Defs), CrctDs p n ds -> True).
 apply CrctCrctsCrctDs_ind; intros; try auto; subst.
 - left. split.
   + intros x h. inversion h.
@@ -210,7 +210,7 @@ apply CrctCrctsCrctDs_ind; intros; try auto; subst.
 (** WcbvEval is in the transitive closure of wndEval **)
 (**
 Lemma WcbvEval_wndEvalTC:
-  forall (p:environ),
+  forall (p:environ Term),
     (forall t s, WcbvEval p t s -> t <> s -> wndEvalTC p t s) /\
     (forall ts ss, WcbvEvals p ts ss -> ts <> ss -> wndEvalsTC p ts ss).
 intros p. apply WcbvEvalEvals_ind; intros; try (nreflexivity H).
@@ -393,7 +393,7 @@ Qed.
 
 (** now an executable weak-call-by-value evaluation **)
 (** use a timer to make this terminate **)
-Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
+Function wcbvEval (tmr:nat) (p:environ Term) (t:Term) {struct tmr} : option Term :=
   (match tmr with 
      | 0 => None          (** out of time  **)
      | S n =>
@@ -453,7 +453,7 @@ Function wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : option Term :=
            | TRel _ => None
         end)
    end)
-with wcbvEvals (tmr:nat) (p:environ) (ts:Terms) {struct tmr}
+with wcbvEvals (tmr:nat) (p:environ Term) (ts:Terms) {struct tmr}
      : option Terms :=
        (match tmr with 
           | 0 => None                        (** out of time  **)
@@ -594,7 +594,7 @@ unfold wcbvEval in H. simpl.
          (forall ts ss, WcbvEvals p ts ss ->
              exists n, ss = tmap (wcbvEval n p) ts).
 Goal
-  forall (p:environ),
+  forall (p:environ Term),
          (forall (t s:Term), wcbvEval p t s ->
              exists n, s = wcbvEval n p t) /\
          (forall ts ss, WcbvEvals p ts ss ->
@@ -602,7 +602,7 @@ Goal
 
 (** WcbvEval and wcbvEval are the same relation **)
 Goal
-  forall (p:environ),
+  forall (p:environ Term),
          (forall (t s:Term), WcbvEval p t s ->
              exists n, s = wcbvEval n p t) /\
          (forall ts ss, WcbvEvals p ts ss ->
@@ -623,7 +623,7 @@ apply WcbvEvalEvals_ind; intros; try (exists 1; reflexivity).
 Qed.
 
 (** use a timer to make this Terminate **)
-Fixpoint wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : nat * Term :=
+Fixpoint wcbvEval (tmr:nat) (p:environ Term) (t:Term) {struct tmr} : nat * Term :=
   match tmr with 
     | 0 => (0, TUnknown "time")          (** out of time  **)
     | S n => match t with  (** look for a redex **)
@@ -676,12 +676,12 @@ Fixpoint wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : nat * Term :=
 (** If wcbvEval has fuel left, then it has reached a weak normal form **)
 (**
 Goal
-  forall (p:environ) t s n m, (wcbvEval n p t) = (S m, s) -> WNorm s.
+  forall (p:environ Term) t s n m, (wcbvEval n p t) = (S m, s) -> WNorm s.
 ***)
 
 (** WcbvEval and wcbvEval are the same relation **)
 Goal
-  forall (p:environ),
+  forall (p:environ Term),
          (forall (t s:Term), WcbvEval p t s ->
              exists n, s = snd (wcbvEval n p t)) /\
          (forall ts ss, WcbvEvals p ts ss ->
@@ -700,7 +700,7 @@ apply WcbvEvalEvals_ind; intros; try (exists 1; reflexivity).
 (***** scratch below here ****************
 
 
-Goal forall (p:environ) t s, WcbvEval p t s -> crct p t -> wNorm s = true.
+Goal forall (p:environ Term) t s, WcbvEval p t s -> crct p t -> wNorm s = true.
 induction 1; destruct 1. 
 - apply IHWcbvEval. split. assumption. unfold weaklyClosed. intros nmx j.
   unfold weaklyClosed in H2. apply H2. inversion H1. subst.
@@ -724,7 +724,7 @@ HERE
 
 
 
-Goal forall (p:environ), 
+Goal forall (p:environ Term), 
   (forall t s, WcbvEval p t s -> crct p t -> wNorm s = true) /\
   (forall ts ss, WcbvEvals p ts ss ->
         Forall (crct p) ts -> Forall (fun s => wNorm s = true) ss).
@@ -792,7 +792,7 @@ induction 1; intros bodx ax a2 heq h.
 - symmetry in heq. case (instantiate_is_Const _ _ _ _ heq); intro j.
 
 Lemma WcbvEval_unique:
-  forall (p:environ) (t s1:Term),
+  forall (p:environ Term) (t s1:Term),
     WcbvEval p t s1 -> forall (s2:Term), WcbvEval p t s2 -> s1 = s2.
 induction 1.
 - inversion_clear 1. eapply IHWcbvEval.
@@ -924,7 +924,7 @@ Check (rt_refl Term (wndEval p)). _ (wndEval p) _ IHWcbvEval1).
 **)
 
 (** use a timer to make this Terminate **)
-Fixpoint wcbvEval (tmr:nat) (p:environ) (t:Term) {struct tmr} : nat * Term :=
+Fixpoint wcbvEval (tmr:nat) (p:environ Term) (t:Term) {struct tmr} : nat * Term :=
   match tmr with 
     | 0 => (0, t)          (** out of time  **)
     | S n => match t with  (** look for a redex **)
@@ -1168,7 +1168,7 @@ Eval hnf in  3 : ((fun n:Type => nat) Prop).
 Eval vm_compute in  3 : ((fun n:Type => nat) Prop).
 
 Goal 
-  forall (t s:Term) (n m:nat) (e:environ),
+  forall (t s:Term) (n m:nat) (e:environ Term),
   wcbvEval (S n) e t = (S m,s) -> wNorm s = true.
 intros t; induction t; intros; try discriminate;
 try (injection H; intros h1 h2; rewrite <- h1; auto; subst).

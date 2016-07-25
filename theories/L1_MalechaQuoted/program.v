@@ -24,8 +24,7 @@ Set Implicit Arguments.
 (** all items in an env are application-well-formed **)
 Inductive WFaEc: envClass -> Prop :=
 | wfaecTrm: forall (t:Term), WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall n i, WFaEc (ecTyp Term n i)
-| wfaecAx: WFaEc (ecAx Term).
+| wfaecTyp: forall n i, WFaEc (ecTyp Term n i).
 
 Inductive WFaEnv: environ -> Prop :=
 | wfaenil: WFaEnv nil
@@ -48,18 +47,10 @@ Function WFaEnv (e: AstCommon.environ term) : bool :=
 
 Definition ecTrm := ecTrm.
 Definition ecTyp := ecTyp Term.
-Definition ecAx := ecAx Term.
-Definition envClass_dec := envClass_dec.
-Definition fresh := fresh.
 Hint Constructors AstCommon.fresh.
 
 (** Lookup an entry in the environment **)
-Definition Lookup := AstCommon.Lookup.
 Hint Constructors AstCommon.Lookup.
-
-Definition LookupDfn s p (t:Term) := Lookup s p (ecTrm t).
-Definition LookupTyp s p n i := Lookup s p (ecTyp n i).
-Definition LookupAx s p := Lookup s p ecAx.
 
 (** equivalent functions **)
 Definition lookup := @AstCommon.lookup Term.

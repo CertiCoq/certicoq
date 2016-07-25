@@ -136,7 +136,7 @@ Definition translate_entry x acc :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
     (s, t') :: acc
-  | (s, ecTyp _ _) => acc
+  | (s, ecTyp _ _ _) => acc
   end.
 
 Definition translate_entry_aux x acc : option (string * exp) :=
@@ -144,20 +144,20 @@ Definition translate_entry_aux x acc : option (string * exp) :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
     Some (s, t')
-  | (s, ecTyp _ _) => None
+  | (s, ecTyp _ _ _) => None
   end.
 
-Definition translate_env_aux (e : environ) (k : env) : env :=
+Definition translate_env_aux (e : environ L3.compile.Term) (k : env) : env :=
   fold_right translate_entry k e.
 
-Definition translate_env (e : environ) : env :=
+Definition translate_env (e : environ L3.compile.Term) : env :=
   translate_env_aux e [].
 
 Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : string * exp) => Let_e (snd x) acc) e t.
 
 (** start-to-L4 translations **)
-Definition myprogram_Program : program -> exception L3t.Program :=
+Definition myprogram_Program : program -> exception (Program Term) :=
   L3t.program_Program.
 (*************
   do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
@@ -168,11 +168,11 @@ Definition myprogram_Program : program -> exception L3t.Program :=
       | Ret smain => Ret {| main := smain; L3.program.env := senv |}
       | Exc s => Exc ("Error in stripping: " ++ s)
       end
-    | Exc s => Exc ("Error while stripping environment: " ++ s)
+    | Exc s => Exc ("Error while stripping environ L3.compile.Termment: " ++ s)
     end.
  *************)
 
-Definition translate_program (e : environ) (t : L3t.Term) : exp :=
+Definition translate_program (e : environ L3.compile.Term) (t : L3t.Term) : exp :=
   let e' := translate_env e in
     mkLets e' (translate e' t).
 
@@ -182,13 +182,13 @@ Definition program_exp (pgm:program) : exception exp :=
       Ret (translate_program env main).
 
 (**************  never used ???  *******************
-Definition term_exp (e:L3t.environ) (t:term) : exception exp :=
+Definition term_exp (e:L3t.environ L3.compile.Term) (t:term) : exception exp :=
   let e' := stripEvalCommute.stripEnv e in
   match L3U.term_Term e' t with
   | Exc s => Exc ("Error while translating term to L3: " ++ s)
   | Ret trm =>
     match L3U.stripEnv e' with
-    | Exc s => Exc ("Error while stripping environment: " ++ s)
+    | Exc s => Exc ("Error while stripping environ L3.compile.Termment: " ++ s)
     | Ret e => Ret (translate_program e trm)
     end
   end.

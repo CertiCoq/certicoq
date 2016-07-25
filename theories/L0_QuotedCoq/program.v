@@ -32,7 +32,7 @@ Fixpoint program_mypgm (p:program) (e:environ term) : AstCommon.Program term :=
     | PType nm npar ibs p => 
       let Ibs := ibodies_itypPack ibs
       in program_mypgm p (snoc e (nm, ecTyp term npar Ibs))
-    | PAxiom nm ty p => program_mypgm p (snoc e (nm, ecAx term))
+    | PAxiom nm _ p => program_mypgm p (snoc e (nm, ecAx term))
   end.
 
 Lemma env_hom:

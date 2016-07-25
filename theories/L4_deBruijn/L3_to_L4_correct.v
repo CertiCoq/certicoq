@@ -4,11 +4,11 @@
  *)
 
 (******)
-(*Add LoadPath "../common" as Common.
+Add LoadPath "../common" as Common.
 Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
-Add LoadPath "../L4_deBruijn" as L4.*)
+Add LoadPath "../L4_deBruijn" as L4.
 (******)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
@@ -18,6 +18,7 @@ Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
 
+Require Import Common.AstCommon.
 Require Import L3.program.
 Require Import L3.term.
 Require Import L3.compile.
@@ -57,12 +58,14 @@ Ltac case_call f :=
 
 Ltac equaln := repeat (f_equal; try lia); auto.
 
-Inductive wf_environ : environ -> Prop :=
+Inductive wf_environ : environ Term -> Prop :=
 | wf_nil : wf_environ []
-| wf_cons_trm s t e : WFTrm t 0 -> wf_environ e -> wf_environ (cons (s, ecTrm t) e)
-| wf_cons_ty s n t e : wf_environ e -> wf_environ (cons (s, ecTyp n t) e).
+| wf_cons_trm s t e :
+    WFTrm t 0 -> wf_environ e -> wf_environ (cons (s, ecTrm t) e)
+| wf_cons_ty s n t e :
+    wf_environ e -> wf_environ (cons (s, ecTyp Term n t) e).
 
-Lemma wf_environ_lookup (e : environ) (t : Term) nm :
+Lemma wf_environ_lookup (e : environ Term) (t : Term) nm :
   wf_environ e -> LookupDfn nm e t -> WFTrm t 0.
 Proof.
   intros wfe Het. revert wfe. red in Het.
@@ -125,7 +128,7 @@ Qed.
 
 (** Looking up in the evaluated environment *)
 Lemma lookup_eval_env:
-  forall e : environ,
+  forall e : environ L3.compile.Term,
     wf_environ e ->
     forall (nm : string) t, LookupDfn nm e t ->
     forall (e'' : env),
@@ -1178,7 +1181,7 @@ Qed.
    It could be a lambda, i.e. ill-formed term.
  *)
 
-Theorem translate_correct (e : environ) (t t' : Term) :
+Theorem translate_correct (e : environ Term) (t t' : Term) :
   wf_environ e -> WFTrm t 0 ->
   L3eval.WcbvEval e t t' -> (* big step non-deterministic *)
   let e' := translate_env e in

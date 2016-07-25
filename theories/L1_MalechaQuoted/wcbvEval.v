@@ -488,7 +488,8 @@ Function wcbvEval
         | TConst nm =>
           match (lookup nm p) with
             | Some (AstCommon.ecTrm t) => wcbvEval n t
-            | Some (AstCommon.ecAx _) => ret (TConst nm)
+                  (** note hack coding of axioms in environment **)
+            | Some (AstCommon.ecTyp _ 0 nil) => ret (TConst nm)
             | Some (AstCommon.ecTyp _ _ _) =>
               raise ("wcbvEval, TConst ecTyp " ++ nm)
             | _ => raise "wcbvEval: TConst environment miss"
@@ -635,8 +636,7 @@ Proof.
     try(solve[constructor]); intuition.
   - eapply wConst; intuition.
     + unfold LookupDfn. apply lookup_Lookup. eassumption.
-  - apply wAx. unfold LookupAx, ecAx. apply lookup_Lookup. 
-    assumption.
+  - apply wAx. unfold LookupAx, LookupTyp. apply lookup_Lookup. assumption.
   - specialize (H1 _ p1). specialize (H _ e1). specialize (H0 _ e2).
     refine (wAppFix _ _ _ _ _ _); eassumption.
   - specialize (H1 _ p1). specialize (H _ e1). specialize (H0 _ e2).

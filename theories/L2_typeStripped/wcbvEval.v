@@ -198,7 +198,118 @@ Proof.
   inversion 1. intuition.
 Qed.
 
-
+(******is this better than revious version below?? ****************
+Lemma WcbvEval_wndEvalRTC:
+  forall (p:environ),
+    (forall t s, WcbvEval p t s -> wndEvalRTC p t s) /\
+    (forall ts ss, WcbvEvals p ts ss -> wndEvalsRTC p ts ss) /\
+    (forall ds es, WcbvDEvals p ds es -> wndDEvalsRTC p ds es).
+Proof.
+  intros p. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
+  - eapply wERTCtrn. apply wERTCstep. apply sCast. apply H. 
+  - apply wndEvalsRTC_Fix_defs. assumption. 
+  - eapply wERTCtrn.
+    + apply wERTCstep. apply sConst. eassumption.
+    + apply H. assert (k:= Lookup_pres_WFapp hp l). inversion k. assumption.
+  - inversion_Clear H2.
+    assert (k0: WFapps (tcons a1' args')).
+    { eapply (proj1 (proj2 (WcbvEval_pres_WFapp hp)) _ _ w0).
+      constructor; assumption. }
+    inversion_Clear k0.
+    eapply (@wERTCtrn _ _ (TApp (TLambda nm bod) a1 args)).
+    + rewrite <- mkApp_goodFn; try assumption.
+      rewrite <- mkApp_goodFn; try not_isApp.
+      apply wndEvalRTC_App_fn; try assumption. intuition.
+    + eapply (@wERTCtrn _ _ (TApp (TLambda nm bod) a1' args')).
+      * eapply wndEvalsRTC_App_args; try reflexivity.
+        apply H0. constructor; assumption. not_isApp.
+      * { apply (@wERTCtrn _ _ (whBetaStep bod a1' args')).
+          - apply wERTCstep. apply sBeta. 
+          - apply H1. apply whBetaStep_pres_WFapp; try eassumption.
+            + assert (j:= proj1 (WcbvEval_pres_WFapp hp) _ _ w H7).
+              inversion_Clear j. assumption. }
+  - inversion_Clear H1. eapply (@wERTCtrn _ _ (TLetIn nm dfn' bod)).
+    + apply wndEvalRTC_LetIn_dfn. intuition.
+    + eapply wERTCtrn. apply wERTCstep. apply sLetIn. apply H0.
+      apply instantiate_pres_WFapp; try assumption.
+      * eapply (proj1 (WcbvEval_pres_WFapp hp)); try eassumption.
+  - inversion_clear H2. specialize (H H4).
+    assert (j0: WFapps (tcons arg' args')).
+    { refine (proj1 (proj2 (WcbvEval_pres_WFapp hp)) _ _ _ _). eassumption.
+      constructor; eassumption. }
+    assert (j2: WFapp (TFix dts m)).
+    { refine (proj1 (WcbvEval_pres_WFapp hp) _ _ w _). assumption. }
+    inversion_clear j2.
+    assert (j3: WFapp x).
+    { refine (dnthBody_pres_WFapp _ _ e). assumption. }
+    assert (j4: WFapp (pre_whFixStep x dts (tcons arg' args'))).
+    { refine (pre_whFixStep_pres_WFapp _ _ _); assumption. }
+    specialize (H1 j4).
+    refine (@wERTCtrn _ _ (TApp (TFix dts m) arg args) _ _ _).
+    + rewrite <- mkApp_goodFn; try assumption.
+      rewrite <- mkApp_goodFn; try not_isApp.
+      apply wndEvalRTC_App_fn; assumption.
+    + destruct (WcbvEvals_tcons_tcons w0) as [x0 [x1 j]]. subst.
+      eapply wERTCtrn.
+      refine (wndEvalsRTC_App_args _ eq_refl eq_refl _);
+        try not_isApp. try intuition.
+      refine (wERTCtrn _ H1).
+      apply wERTCstep. eapply sFix; try eassumption.
+  - inversion_Clear H1.
+    assert (j: WFapps (tcons arg args)). constructor; assumption.
+    specialize (H0 j). specialize (H H6).
+    eapply (@wERTCtrn _ _ (TApp (TConst ax) arg args)).
+    + rewrite <- mkApp_goodFn; try assumption.
+      rewrite <- mkApp_goodFn; try not_isApp.
+      apply wndEvalRTC_App_fn; try assumption.
+    + eapply (@wERTCtrn _ _ (TApp (TConst ax) arg' args')).
+      * { eapply wndEvalsRTC_App_args; try not_isApp;
+          try reflexivity. assumption. }
+      * { apply wERTCrfl. }
+  - inversion_Clear H1.
+    assert (j: WFapps (tcons arg args)). constructor; assumption.
+    specialize (H0 j). specialize (H H6).
+    eapply (@wERTCtrn _ _ (TApp (TConstruct i n) arg args)).
+    + rewrite <- mkApp_goodFn; try assumption.
+      rewrite <- mkApp_goodFn; try not_isApp.
+      apply wndEvalRTC_App_fn; try assumption.
+    + eapply (@wERTCtrn _ _ (TApp (TConstruct i n) arg' args')).
+      * { eapply wndEvalsRTC_App_args; try not_isApp;
+          try reflexivity. assumption. }
+      * { apply wERTCrfl. }
+  - inversion_Clear H1.
+    assert (j: WFapps (tcons arg args)). constructor; assumption.
+    specialize (H0 j). specialize (H H6).
+    eapply (@wERTCtrn _ _ (TApp (TInd i) arg args)).
+    + rewrite <- mkApp_goodFn; try assumption.
+      rewrite <- mkApp_goodFn; try not_isApp.
+      apply wndEvalRTC_App_fn; try assumption.
+    + eapply (@wERTCtrn _ _ (TApp (TInd i) arg' args')).
+      * { eapply wndEvalsRTC_App_args; try not_isApp;
+          try reflexivity. assumption. }
+      * { apply wERTCrfl. }
+  - inversion_Clear H1. eapply wERTCtrn. 
+    + eapply wndEvalRTC_Case_mch. apply H. assumption.
+    + eapply (@wERTCtrn _ _ cs). 
+      * apply wERTCstep. eapply sCase; eassumption.
+      * { apply H0. refine (whCaseStep_pres_WFapp _ _ _ e1). assumption.
+          refine (tskipn_pres_WFapp _ _ e0).
+          refine (canonicalP_pres_WFapp _ e).
+          specialize (H H4).
+          refine (wndEvalRTC_pres_WFapp H _). assumption. }
+  - inversion_Clear H1. eapply wERTCtrn.
+    + eapply wndEvalRTC_Case_mch. apply H. intuition.
+    + eapply (@wERTCtrn _ _  (TCase ml Mch brs')).
+      apply wndEvalRTC_Case_brs. intuition.
+      constructor.
+  - inversion_Clear H1. eapply (@wEsRTCtrn _ _ (tcons t' ts)).
+    + apply wndEvalsRTC_tcons_hd. apply H. assumption.
+    + apply wndEvalsRTC_tcons_tl. apply H0. assumption.
+  - inversion_Clear H1. eapply (@wDEsRTCtrn _ _ (dcons n s' i ds)).
+    + apply wndDEvalsRTC_dcons_hd. apply H. intuition.
+    + apply wndDEvalsRTC_dcons_tl. intuition.
+Qed.
+***********************************************)
 Lemma WcbvEval_wndEvalRTC:
   forall (p:environ), WFaEnv p ->
     (forall t s, WcbvEval p t s -> WFapp t -> wndEvalRTC p t s) /\
@@ -316,7 +427,6 @@ Proof.
     + apply wndDEvalsRTC_dcons_hd. apply H. intuition.
     + apply wndDEvalsRTC_dcons_tl. intuition.
 Qed.
-
 
 (** WcbvEval is in the transitive closure of wndEval **)
 (**

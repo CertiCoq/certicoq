@@ -29,7 +29,7 @@ Variable p:environ.
 Inductive awndEval : Term -> Term -> Prop :=
 (** contraction steps **)
 | aConst: forall (s:string) (t:Term),
-         WFapp t -> LookupDfn s p t -> awndEval (TConst s) t
+          LookupDfn s p t -> awndEval (TConst s) t
 | aBeta: forall (nm:name) (bod arg:Term) (args:Terms),
            awndEval (TApp (TLambda nm bod) arg args)
                    (whBetaStep bod arg args)
@@ -140,12 +140,15 @@ Lemma awndEval_Cast_inv:
 Qed.
 
 Lemma awndEval_pres_WFapp:
+  WFaEnv p ->
   (forall t s, awndEval t s -> WFapp t -> WFapp s) /\
   (forall ts ss, awndEvals ts ss -> WFapps ts -> WFapps ss) /\
   (forall ds es, awndDEvals ds es -> WFappDs ds -> WFappDs es) .
 Proof.
-  apply awndEvalEvals_ind; intros; try assumption;
-  try (solve [inversion_Clear H0; constructor; intuition]).
+  intros hp. apply awndEvalEvals_ind; intros; try assumption;
+             try (solve [inversion_Clear H0; constructor; intuition]).
+  - unfold LookupDfn in l. assert (j:= Lookup_pres_WFapp hp l).
+    inversion j. assumption.
   - inversion_Clear H. inversion_Clear H4.
     apply whBetaStep_pres_WFapp; assumption.
   - inversion_Clear H. apply instantiate_pres_WFapp; assumption.
@@ -192,10 +195,12 @@ Hint Constructors awndEvalRTC awndEvalsRTC awndDEvalsRTC.
 
 
 Lemma awndEvalRTC_pres_WFapp:
+  WFaEnv p ->
   forall t s, awndEvalRTC t s -> WFapp t -> WFapp s.
 Proof.
+  intros hp.
   induction 1; intros; try assumption.
-  - eapply (proj1 (awndEval_pres_WFapp)); eassumption.
+  - eapply (proj1 (awndEval_pres_WFapp hp)); eassumption.
   - apply IHawndEvalRTC2; try assumption.
     + apply IHawndEvalRTC1; assumption.
 Qed.

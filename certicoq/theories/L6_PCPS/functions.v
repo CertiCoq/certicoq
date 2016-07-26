@@ -241,7 +241,8 @@ Lemma image_Setminus_extend f v v' S :
            (image f S).
 Proof.
   rewrite image_extend_not_In_S.
-  apply image_monotonic. now apply Subset_Setminus.
+  apply image_monotonic.
+  now apply Setminus_Included.
   intros Hc. inv Hc. eapply H0; eauto.
 Qed.
 

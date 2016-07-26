@@ -387,6 +387,73 @@ Proof.
     econstructor; now eauto.
 Qed.
 
+(** ** Existance (or not) of a binding in a map -- TODO : maybe move the a map_util.v? *)
+
+(** The variables in S are defined in the map. *)
+Definition binding_in_map {A} (S : Ensemble M.elt) (map : M.t A) : Prop :=
+  forall x, In _ S x -> exists v, M.get x map = Some v. 
+
+(** The variables in S are not defined in the map. *)
+Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) := 
+  forall x : M.elt, In M.elt S x -> M.get x map = None.
+
+
+(** * Lemmas about [binding_in_map] *)
+
+(** [binding_in_map] is anti-monotonic on its first argument *)
+Lemma binding_in_map_antimon {A} S S' (rho : M.t A) :
+  Included _ S' S ->
+  binding_in_map S rho ->
+  binding_in_map S' rho.
+Proof.
+  intros Hin Hv x Hs. eauto.
+Qed.
+
+(** Extend the environment with a variable and put it in the set *)
+Lemma binding_in_map_set {A} x (v : A) S rho :
+  binding_in_map S rho ->
+  binding_in_map (Union _ S (Singleton _ x)) (M.set x v rho).
+Proof. 
+  intros H x' Hs. inv Hs.
+  - edestruct H; eauto.
+    destruct (Coqlib.peq x' x) eqn:Heq'.
+    + eexists. simpl. now rewrite M.gsspec, Heq'.
+    + eexists. simpl. rewrite M.gsspec, Heq'.
+      eassumption.
+  - inv H0. eexists. rewrite M.gss. eauto.
+Qed.
+
+(** Extend the environment with a list of variables and put them in the set *)
+Lemma binding_in_map_setlist xs vs S (rho rho' : env) :
+  binding_in_map S rho ->
+  setlist xs vs rho = Some rho' ->
+  binding_in_map (Union _ (FromList xs) S) rho'.
+Proof.
+  intros H Hset x' Hs.
+  destruct (Decidable_FromList xs). destruct (Dec x').
+  - eapply get_setlist_In_xs; eauto.
+  - destruct Hs; try contradiction. 
+    edestruct H; eauto.
+    eexists. erewrite <- setlist_not_In; eauto.
+Qed.
+
+Lemma binding_not_in_map_antimon (A : Type) (S S' : Ensemble M.elt) (rho : M.t A):
+  Included M.elt S' S -> binding_not_in_map S rho -> binding_not_in_map S' rho.
+Proof. 
+  intros Hin Hb x Hin'. eauto.
+Qed.
+
+Lemma binding_not_in_map_set_not_In_S {A} S map x (v : A) :
+  binding_not_in_map S map ->
+  ~ In _ S x ->
+  binding_not_in_map S (M.set x v map). 
+Proof. 
+  intros HB Hnin x' Hin.
+  rewrite M.gsspec. destruct (Coqlib.peq x' x); subst; try contradiction. 
+  eauto. 
+Qed.
+
+
 (* XXX: These definitions need to be updated to work with the new syntax of L6.
         Whoever needs them has to update them. Otherwise, they will
         self-destruct in an arbitrary amount of time.

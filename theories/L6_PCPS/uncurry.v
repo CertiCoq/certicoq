@@ -39,11 +39,11 @@ Section UNCURRY.
   (* Returns true iff [k] occurs (at all) within the expression [e] *)
   Fixpoint occurs_in_exp (k:var) (e:exp) : bool :=
     match e with
-    | Econstr z _ _ xs e1 =>
+    | Econstr z _ xs e1 =>
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     | Ecase x arms =>
       eq_var k x ||
-              (fix occurs_in_arms (arms: list (tag * exp)) : bool :=
+              (fix occurs_in_arms (arms: list (cTag * exp)) : bool :=
                  match arms with
                  | nil => false
                  | p::arms1 => match p with
@@ -54,8 +54,8 @@ Section UNCURRY.
       eq_var z k || eq_var k x || occurs_in_exp k e1
     | Efun fds e =>
       occurs_in_fundefs k fds || occurs_in_exp k e
-    | Eapp x xs => eq_var k x || occurs_in_vars k xs
-    | Eprim z _ _ xs e1 =>
+    | Eapp x _ xs => eq_var k x || occurs_in_vars k xs
+    | Eprim z _ xs e1 =>
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     end
   (* Returns true iff [k] occurs within the function definitions [fds] *)
@@ -123,14 +123,14 @@ Section UNCURRY.
   *)
   Fixpoint uncurry_exp (e:exp) : uncurryM exp :=
     match e with
-    | Econstr x ty tg vs e1 =>
+    | Econstr x ct vs e1 =>
       e1' <- uncurry_exp e1 ;; 
-      ret (Econstr x ty tg vs e1')
+      ret (Econstr x ct vs e1')
     | Ecase x arms =>
       (* annoyingly, I can't seem to use a separate mapM definition here, but
          if I inline the definition, and specialize it, it seems to work. *)
-      arms' <- (fix uncurry_list (arms: list (tag*exp)) :
-                  uncurryM (list (tag*exp)) :=
+      arms' <- (fix uncurry_list (arms: list (cTag*exp)) :
+                  uncurryM (list (cTag*exp)) :=
                   match arms with
                   | nil => ret nil
                   | h::t =>
@@ -141,13 +141,13 @@ Section UNCURRY.
                     end
                   end) arms ;;
       ret (Ecase x arms')
-    | Eproj x t n y e1 =>
+    | Eproj x ct n y e1 =>
       e1' <- uncurry_exp e1 ;;
-      ret (Eproj x t n y e1')
-    | Eapp x xs => ret (Eapp x xs)
-    | Eprim x t p xs e1 =>
+      ret (Eproj x ct n y e1')
+    | Eapp x ft xs => ret (Eapp x ft xs)
+    | Eprim x p xs e1 =>
       e1' <- uncurry_exp e1 ;;
-      ret (Eprim x t p xs e1')
+      ret (Eprim x p xs e1')
     | Efun fds e1 =>
       fds' <- uncurry_fundefs fds ;;
       e1' <- uncurry_exp e1 ;;
@@ -160,7 +160,7 @@ Section UNCURRY.
            fds1' <- uncurry_fundefs fds1 ;;
            match fvs, fe with
            | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
-                           (Eapp fk' (g'::nil)) =>
+                           (Eapp fk' ft (g'::nil)) =>
              ge' <- uncurry_exp ge ;;
              if eq_var fk fk' && eq_var g g' &&
                         negb (occurs_in_exp fk ge) &&
@@ -172,12 +172,15 @@ Section UNCURRY.
                f' <- copyVar f ;;
                _ <- click ;; 
                ret (Fcons f ft (fk''::fvs')
-                          (Efun (Fcons g' gt gvs' (Eapp f' (gvs' ++ fvs')) Fnil)
-                                (Eapp fk'' (g''::nil)))
+                          (* Note:  not sure what fTag to put on this application *)
+                          (Efun (Fcons g' gt gvs' (Eapp f' ft (gvs' ++ fvs')) Fnil)
+                                (Eapp fk'' ft (g''::nil)))
+                          (* Note:  not sure what fTag to put on this function, but
+                             it needs to match the Eapp noted above. *)
                           (Fcons f' ft (gvs ++ fvs) ge' fds1'))
              else
                ret (Fcons f ft (fk::fvs) (Efun (Fcons g gt gvs ge' Fnil)
-                                               (Eapp fk' (g'::nil))) fds1')
+                                               (Eapp fk' ft (g'::nil))) fds1')
            | _, _ => 
              fe' <- uncurry_exp fe ;;
                  ret (Fcons f ft fvs fe' fds1')

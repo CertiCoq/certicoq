@@ -653,19 +653,97 @@ Proof.
   apply f_equal. assumption.
 Qed.
 
-(** Proof suggested by Zoe. **)
-Theorem L2WcbvEval_sound_for_L1WcbvEval:
-  forall L2p L2t L2s, WcbvEval L2p L2t L2s ->
-  forall p, L2p = stripEnv p ->
-  forall t, L2t = strip t ->       
-  forall s, L1_5.wcbvEval.WcbvEval p t s ->
-     L1_5.program.WFaEnv p -> L1_5.term.WFapp t ->       
-     L2s = strip s /\ L1_5.wndEval.wndEvalRTC p t s.
+Theorem L2WcbvEval_L1_5WcbvEval:
+  forall L2p p, L2p = stripEnv p -> L1_5.program.WFaEnv p ->
+  forall L2t t, L2t = strip t -> L1_5.term.WFapp t ->
+  forall L2s, WcbvEval L2p L2t L2s ->
+  forall s, L1_5.wcbvEval.WcbvEval p t s -> L2s = strip s.
 Proof.
-  intros. split.
+  intros.
+  refine (WcbvEval_single_valued _ _). eassumption.
+  subst. apply WcbvEval_hom. assumption.
+Qed.
+Print Assumptions L2WcbvEval_L1_5WcbvEval.
+
+Theorem L2WcbvEval_sound_for_L1_5wndEval:
+  forall L2p L2t L2s, WcbvEval L2p L2t L2s ->
+  forall p, L2p = stripEnv p -> L1_5.program.WFaEnv p -> 
+  forall t, L2t = strip t -> L1_5.term.WFapp t ->       
+  forall s, L1_5.wcbvEval.WcbvEval p t s ->      
+            L2s = strip s /\ L1_5.wndEval.wndEvalRTC p t s.
+Proof.
+  intros. repeat split.
   - refine (WcbvEval_single_valued _ _). eassumption.
     subst. apply WcbvEval_hom. assumption.
   - refine (proj1 (L1_5.wcbvEval.WcbvEval_wndEvalRTC _) _ _ _ _); assumption.
 Qed.
-Print Assumptions L2WcbvEval_sound_for_L1WcbvEval.
+Print Assumptions L2WcbvEval_sound_for_L1_5wndEval.
 
+
+(*** unstrip: replace every missing type field with [prop]  ***)
+Function unstrip (t:Term) : L1_5Term :=
+  match t with
+    | TProof => L1_5.compile.TProof
+    | TRel n => L1_5.compile.TRel n
+    | TSort s => L1_5.compile.TSort s
+    | TCast t => L1_5.compile.TCast (unstrip t) Cast L1_5.compile.prop
+    | TProd nm bod => L1_5.compile.TProd nm L1_5.compile.prop (unstrip bod)
+    | TLambda nm bod => L1_5.compile.TLambda nm L1_5.compile.prop (unstrip bod)
+    | TLetIn nm dfn bod =>
+           L1_5.compile.TLetIn nm (unstrip dfn) L1_5.compile.prop (unstrip bod)
+    | TApp fn arg args =>
+           L1_5.compile.TApp (unstrip fn) (unstrip arg) (unstrips args)
+    | TConst nm => L1_5.compile.TConst nm
+    | TInd i => L1_5.compile.TInd i
+    | TConstruct i m => L1_5.compile.TConstruct i m
+    | TCase n mch brs =>
+           L1_5.compile.TCase n L1_5.compile.prop (unstrip mch) (unstrips brs)
+    | TFix ds n => L1_5.compile.TFix (unstripDs ds) n
+  end
+with unstrips (ts:Terms) : L1_5Terms := 
+  match ts with
+    | tnil => L1_5.compile.tnil
+    | tcons t ts => L1_5.compile.tcons (unstrip t) (unstrips ts)
+  end
+with unstripDs (ts:Defs) : L1_5Defs := 
+  match ts with
+    | dnil => L1_5.compile.dnil
+    | dcons nm t m ds =>
+           L1_5.compile.dcons nm L1_5.compile.prop (unstrip t) m (unstripDs ds)
+  end.
+
+Lemma strip_leftInv_unstrip:
+  (forall (t:Term), strip (unstrip t) = t) /\
+  (forall ts:Terms, strips (unstrips ts) = ts) /\
+  (forall ds:Defs, stripDs (unstripDs ds) = ds).
+Proof.
+  apply TrmTrmsDefs_ind; simpl; intros;
+  try reflexivity; try (rewrite H; reflexivity);
+  try (rewrite H; rewrite H0; reflexivity);
+  try (rewrite H; rewrite H0; rewrite H1; reflexivity).
+Qed.
+
+Function unstripCnstrs (cs:list Cnstr) : list AstCommon.Cnstr :=
+  match cs with
+    | nil => nil
+    | cons (mkCnstr str arity) cs =>
+        cons (AstCommon.mkCnstr str arity) (unstripCnstrs cs)
+  end.
+Function unstripItyPack (its:itypPack) : AstCommon.itypPack :=
+  match its with
+    | nil => nil
+    | (mkItyp str itps) :: itpacks =>
+         (AstCommon.mkItyp str (unstripCnstrs itps)) ::
+                           unstripItyPack itpacks
+  end.
+Function unstripEC (ec:envClass) : AstCommon.envClass L1_5.compile.Term :=
+  match ec with
+    | AstCommon.ecTrm t => ecTrm (unstrip t)
+    | AstCommon.ecTyp _ npars itp =>
+       AstCommon.ecTyp _ npars (unstripItyPack itp)
+  end.
+Fixpoint unstripEnv (p:environ) : AstCommon.environ L1_5.compile.Term :=
+  match p with
+    | nil => nil
+    | cons (nm, ec) q => cons (nm, (unstripEC ec)) (unstripEnv q)
+  end.

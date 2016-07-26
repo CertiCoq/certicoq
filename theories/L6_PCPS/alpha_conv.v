@@ -419,10 +419,7 @@ Section Alpha_conv_correct.
     induction B1; intros rho1 rho2 B1' B2 B2' g h h' e' IHe Hinj Hinj' Hinj'' Ha Ha' Hpre.
     - inv Ha. simpl. subst. inv Hinj. eapply preord_env_P_inj_set. 
       + eapply preord_env_P_inj_antimon. now eapply IHB1; eauto.
-        rewrite !Setminus_Union_distr, Setminus_Empty_set, Union_Empty_set_r.
-        eapply Included_Union_compat.
-        * eapply Setminus_Included. now apply Included_refl.
-        * eapply Subset_Setminus.
+        eauto 6 with Ensembles_DB.
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
         edestruct Alpha_conv_fundefs_find_def
@@ -445,12 +442,10 @@ Section Alpha_conv_correct.
           rewrite occurs_free_Efun.
           eapply Included_trans.
           eapply occurs_free_in_fun. eassumption. 
-          rewrite Union_sym. eapply Included_Union_compat; [| now apply Included_refl ].
-          rewrite Union_sym. eapply Included_Union_compat; [| now apply Included_refl ].
-          now apply Included_Union_l.
+          eauto with Ensembles_DB.
       + eassumption.
     - inv Ha. simpl. inv Hinj. eapply preord_env_P_inj_antimon. eassumption.
-      rewrite Union_Empty_set_l. now apply Included_refl.
+      eauto with Ensembles_DB.
   Qed.
 
   (** α-equivalence preserves semantics *)
@@ -459,7 +454,7 @@ Section Alpha_conv_correct.
     Alpha_conv e1 e2 f ->
     preord_env_P_inj (occurs_free e1) k f rho1 rho2 ->
     preord_exp pr cenv k (e1, rho1) (e2, rho2).
-  Proof. 
+  Proof with now eauto with Ensembles_DB. 
     revert e1 e2 rho1 rho2 f.
     induction k as [ k IH ] using lt_wf_rec1.
     induction e1 using exp_ind'; intros e2 rho1 rho2 f Hinj Ha Henv; inv Ha.
@@ -471,7 +466,7 @@ Section Alpha_conv_correct.
       + eapply IHe1. eassumption. eassumption.
         eapply preord_env_P_inj_set; [| | eassumption ]. 
         eapply preord_env_P_inj_antimon; eauto.
-        rewrite occurs_free_Econstr. now apply Included_Union_r.
+        normalize_occurs_free...
         rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
     - inv H1. eapply preord_exp_case_nil_compat.
     - inv H1. destruct H2 as [Heq Ha]. destruct y as [c' e2]. simpl in Heq; subst.
@@ -479,16 +474,15 @@ Section Alpha_conv_correct.
       eapply Forall2_monotonic; [| eassumption ]. intros x1 x2 H; now inv H. 
       eapply IHe1. eassumption. eassumption.
       eapply preord_env_P_inj_antimon.
-      eassumption. rewrite occurs_free_Ecase_cons. now apply Included_Union_l.
+      eassumption. normalize_occurs_free...
       eapply IHe0. eassumption. now constructor; eauto.
       eapply preord_env_P_inj_antimon.
-      eassumption. rewrite occurs_free_Ecase_cons.
-      rewrite Union_assoc. now apply Included_Union_r.
+      eassumption. normalize_occurs_free...
     - eapply preord_exp_proj_compat; eauto; intros.
       eapply IHe1. eassumption. eassumption.
       eapply preord_env_P_inj_set; [| | eassumption ]. 
       eapply preord_env_P_inj_antimon; eauto.
-      rewrite occurs_free_Eproj. now apply Included_Union_r. eassumption.
+      normalize_occurs_free... eassumption.
     - eapply preord_exp_fun_compat; eauto.
       eapply IHe1; [| eassumption |].
       eapply construct_fundefs_injection_injective. eassumption. eassumption.
@@ -509,10 +503,10 @@ Section Alpha_conv_correct.
       + eapply IHe1. eassumption. eassumption.
         eapply preord_env_P_inj_set; [| | eassumption ]. 
         eapply preord_env_P_inj_antimon; eauto.
-        rewrite occurs_free_Eprim. now apply Included_Union_r.
-        eauto. 
+        normalize_occurs_free...
+        eassumption.
   Qed.
-
+  
 End Alpha_conv_correct.
 
 Close Scope fun_scope.

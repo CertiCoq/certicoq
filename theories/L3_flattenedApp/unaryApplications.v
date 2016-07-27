@@ -14,6 +14,7 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Minus.
 Require Import Coq.Logic.JMeq.
+Require Import L2.L2.
 Require Import L3.term.
 Require Import L3.program.
 Require Import L3.wndEval.
@@ -171,7 +172,41 @@ Proof.
   myInjection H. reflexivity.
 Qed.
 
+(********
+Lemma WcbvEval_hom:
+  forall (p:AstCommon.environ L2Term) L3p, stripEnv p = Ret L3p ->
+  (forall t t': L2Term, L2.wcbvEval.WcbvEval p t t' ->
+    forall L3t, strip p t = Ret L3t ->
+    forall L3t', strip p t' = Ret L3t' ->
+        WcbvEval L3p L3t L3t') /\
+  (forall ts ts', L2.wcbvEval.WcbvEvals p ts ts' ->
+    forall L3ts, strips p ts = Ret L3ts ->
+    forall L3ts', strips p ts' = Ret L3ts' ->
+                  WcbvEvals L3p L3ts L3ts') /\
+  (forall ds ds', L2.wcbvEval.WcbvDEvals p ds ds' -> True).
+(*************
+    forall L3ds, stripDs p ds = Ret L3ds ->
+    forall L3ds', stripDs p ds' = Ret L3ds' ->
+                     WcbvDEvals L3p L3ds L3ds').
+****************)
+Proof.
+  intros p L3p hp.
+  apply L2.wcbvEval.WcbvEvalEvals_ind; cbn; intros; try reflexivity.
+  - myInjection H. myInjection H0. constructor.
+  - case_eq (strip p bod); intros x hx; rewrite hx in *.
+    + discriminate.
+    + myInjection H. myInjection H0. constructor.
+  - case_eq (strip p bod); intros x hx; rewrite hx in *.
+    + discriminate.
+    + myInjection H. myInjection H0. constructor.
+  - intuition.
+  - case_eq (etaExp_cnstr p i r tnil); intros x hx; rewrite hx in *.
+    + discriminate.
+    + myInjection H. myInjection H0. constructor.
+*******)
 
+
+      
 (**** L2 and L3 agree on cbv evaluation  ****
 Lemma wndEval_types_irrelevant:
   forall p pp, stripEnv p = Some pp -> 

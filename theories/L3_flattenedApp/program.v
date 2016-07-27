@@ -99,28 +99,11 @@ Lemma Crct_up:
      CrctDs p n ds -> CrctDs p (S n) ds) /\
   (forall (p:environ Term) (n:nat) (itp:itypPack),
      CrctTyp p n itp -> CrctTyp p (S n) itp).
-apply CrctCrctsCrctDsTyp_ind; intros.
-- constructor.
-- apply CrctWkTrmTrm; assumption.
-- apply CrctWkTrmTyp; try assumption.
-- apply CrctRel; try assumption. omega.
-- apply CrctProd; assumption.
-- apply CrctLam; assumption.
-- apply CrctLetIn; assumption.
-- apply CrctApp; assumption.
-- eapply CrctConst; eassumption.
-- eapply CrctConstruct; eassumption.
-- apply CrctCase; assumption.
-- apply CrctFix; assumption.
-- apply CrctInd; assumption.
-- apply CrctsNil; assumption.
-- apply CrctsCons; assumption.
-- apply CrctDsNil; assumption.
-- apply CrctDsCons; assumption.
-- apply CrctTypStart; assumption.
-- apply CrctTypWk1; assumption.
-- apply CrctTypWk2; assumption.
+Proof.
+  apply CrctCrctsCrctDsTyp_ind; intros;
+  try (solve[econstructor; try eassumption; try omega]).
 Qed.
+
 
 Lemma Crct_Sort:
   forall p n t, Crct p n t -> forall srt, Crct p n (TSort srt).

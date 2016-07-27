@@ -283,56 +283,109 @@ Fixpoint find_def (f: var) (fl:  fundefs) :=
     | Fnil => None
   end.
 
-(*********** type info ********************)
-(* Will probably be updated to be a HashMap to get fresh tags instead of state *)
+(*********** type info ***************)
+(* Need to wrap in module with proofs of freshness etc...for various functions *)
 
 (* info of a constructor. Includes: iTag of corresponding inductive type
                                     the constructor's arity
                                     the cTags ordinal in inductive defn starting at zero *)
-
 Definition cTyInfo : Type := iTag * N * N.
 
-Definition unkownTyInfo : cTyInfo := (1%positive, 0%N, 0%N).
+Definition iTyInfo : Type := list (cTag * N). 
+
+Definition unkown_cTyInfo : cTyInfo := (1%positive, 0%N, 0%N).
+
+Definition unkown_iTyInfo : iTyInfo := nil.
 
 Definition cEnv := M.t cTyInfo.  (* An constructor enironment maps [cTag]s to their information *)
 
+Definition iEnv := M.t iTyInfo. (* An inductive type environment maps [iTag]s to their constructors with their arities *) 
+
 (* state of next fresh [cTag], [iTag], and the current environment *)
-Definition cState := state (cTag * iTag * cEnv).
+Definition cState := state (cTag * iTag * cEnv * iEnv).
 
 (** Get a new cTag *)
 Definition get_cTag : cState cTag :=
   p <- get ;;
-  let '(n, m, e) := p in
-  put ((n+1)%positive, m, e) ;;
-  ret n.
+  let '(n, m, ce, ie) := p in
+  put ((n+1)%positive, m, ce, ie) ;;
+      ret n.
 
 (** Get a new iTag *)
 Definition get_iTag : cState iTag :=
   p <- get ;;
-  let '(n, m, e) := p in
-  put (n,(m+1)%positive, e) ;;
+  let '(n, m, ce, ie) := p in
+  put (n,(m+1)%positive, ce, ie) ;;
   ret m.
 
 (** set the cTyInfo for a given cTag *)
 Definition set_cTyInfo (x : cTag) (t : cTyInfo) : cState cTag :=
   p <- get ;;
-  let '(n, m, e) := p in
-  put (n, m, M.set x t e) ;;
+  let '(n, m, ce, ie) := p in
+  put (n, m, M.set x t ce, ie) ;;
+  ret x.
+
+(** set the iTyInfo for a given iTag *)
+Definition set_iTyInfo (x : iTag) (t : iTyInfo) : cState iTag :=
+  p <- get ;;
+  let '(n, m, ce, ie) := p in
+  put (n, m, ce, M.set x t ie) ;;
   ret x.
 
 (** retrieve the cTyInfo for a given cTag *)
 Definition get_cTyInfo (c : cTag) : cState cTyInfo :=
   p <- get ;;
-  let '(n, m, e) := p in
-  match M.get c e with
-    | Some t => ret t
-    | None => ret unkownTyInfo (* Should never get here *)
+  let '(n, m, ce, ie) := p in
+  match M.get c ce with
+  | Some t => ret t
+  | None => ret unkown_cTyInfo (* Should never get here *)
+  end.
+
+(** retrieve the iTyInfo for a given iTag *)
+Definition get_iTyInfo (i : cTag) : cState iTyInfo :=
+  p <- get ;;
+  let '(n, m, ce, ie) := p in
+  match M.get i ie with
+  | Some t => ret t
+  | None => ret unkown_iTyInfo (* Should never get here *)
   end.
 
 (** add a record type of a given arity to the state and get back relevant tag info
     (helpful for closure conversion) *)
-Definition makeRecord (n : nat) : cState (cTag * iTag) :=
+Definition makeRecord (n : nat) : cState (iTag * cTag) :=
   ct <- get_cTag ;;
   it <- get_iTag ;;
   _ <- set_cTyInfo ct (it, N.of_nat n, 0%N) ;;
-  ret (ct , it).
+  _ <- set_iTyInfo it ((ct, N.of_nat n) :: nil) ;;
+  ret (it, ct).
+
+
+(** add a datatype from a list of arities for each constructor *)
+Fixpoint makeDataType (l : list nat) : cState (iTag * list cTag) :=
+  match l with
+  | nil =>
+    it <- get_iTag ;;
+    _ <- set_iTyInfo it nil ;;
+    ret (it, nil)
+  | cons n l' =>
+    x <- makeDataType l' ;;
+    let it := fst x in
+    let cl := snd x in   
+    ct <- get_cTag ;;
+    iinf <- get_iTyInfo it ;;
+    _ <- set_cTyInfo ct (it, N.of_nat n, N.of_nat (length iinf)) ;;
+    _ <- set_iTyInfo it ((ct , N.of_nat n) :: iinf) ;;
+    ret (it, ct :: cl)
+  end.
+
+
+(********** generator for fTags *************)
+(* state of next fresh [fTag] with a function environment *)
+Definition fState := state fTag.
+
+(** Get a new cTag *)
+Definition get_fTag : fState fTag :=
+  t <- get ;;
+  put (t+1)%positive ;;
+  ret t.
+

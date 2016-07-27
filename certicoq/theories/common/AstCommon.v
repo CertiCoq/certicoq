@@ -333,8 +333,8 @@ Definition getCnstr (ip:ityp) (cnum:nat) : exception Cnstr :=
   exnNth (itypCnstrs ip) cnum.
 
 
-(** constructor arity is only computed on the fly during
-***  translation from L2 to L3 **)
+(** total constructor arity (including parameters) is only computed
+***  n the fly during translation from L2 to L3 **)
 Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) : exception nat :=
   match i with
     | mkInd nm tndx =>

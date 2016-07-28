@@ -11,8 +11,8 @@ Require Import Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.omega.Omega.
-Require Export Common.Common.
-Require Import L1.L1.
+Require Import Common.Common.
+Require Import L1g.L1g.
 Require Export L1_5.compile.
 
 Local Open Scope string_scope.
@@ -414,14 +414,16 @@ Proof.
   induction n; intros.
   - destruct l. simpl in H. omega. exists t. reflexivity.
   - destruct l. inversion H. simpl in H.
-    specialize (IHn _ (lt_S_n _ _ H)). destruct IHn. exists x. simpl. assumption.
+    specialize (IHn _ (lt_S_n _ _ H)). destruct IHn.
+    exists x. simpl. assumption.
 Qed.
 
 Lemma tnth_append:
   forall n args t, tnth n args = Some t ->
             forall brgs, tnth n (tappend args brgs) = Some t.
 Proof.
-  induction n; induction args; simpl; intros; try discriminate; try assumption.
+  induction n; induction args; simpl; intros;
+  try discriminate; try assumption.
   - apply IHn. assumption.
 Qed.
 
@@ -535,32 +537,6 @@ Proof.
   - rewrite <- tappend_assoc. simpl. reflexivity.
 Qed.
 
-(*******
-Lemma mkApp_character:
-  forall fn args, ~ isApp (mkApp fn args) \/
-   (exists fn' arg' args', mkApp fn args = TApp fn' arg' args' /\ ~ isApp fn').
-Proof.
-  intros fn args.
-  functional induction (mkApp fn args).
-  - destruct IHt.
-    + left. assumption.
-    + right. assumption.
-  - destruct t; try (left; not_isApp). elim y.
-  - destruct t. 
-    + right. exists (TRel n), c, cs. intuition. isApp_inv H.
-    + right. exists (TSort s), c, cs. intuition. isApp_inv H.
-    + right. exists (TCast t1 c0 t2), c, cs. intuition. isApp_inv H.
-    + right. exists (TProd n t1 t2), c, cs. intuition. isApp_inv H.
-    + right. exists (TLambda n t1 t2), c, cs. intuition. isApp_inv H.
-    + right. exists (TLetIn n t1 t2 t3), c, cs. intuition. isApp_inv H.
-    + left. elim y.
-    + right. exists (TConst s), c, cs. intuition. isApp_inv H.
-    + right. exists (TInd i), c, cs. intuition. isApp_inv H.
-    + right. exists (TConstruct i n), c, cs. intuition. isApp_inv H.
-    + right. exists (TCase n t1 t2 t3), c, cs. intuition. isApp_inv H.
-    + right. exists (TFix d n), c, cs. intuition. isApp_inv H.
-Qed.
-***)
 
 Lemma isApp_mkApp_isApp:
   forall t, isApp (mkApp t tnil) -> isApp t.
@@ -777,11 +753,11 @@ Qed.
 (** compiling well formed terms to Term produces well formed Terms **
 Lemma L1Term_Term_pres_WFapp:
   forall n,
-  (forall (t:L1.compile.Term), L1.term.WFapp t-> WFapp (L1Term_Term t)) /\
-  (forall (ts:L1.compile.termTerms),
-    L1.term.WFapps ts -> WFapps (L1terms_Terms ts)) /\
-  (forall (ds:L1compile.Defs),
-    L1.term.WF_defs ds -> WFappDs (L1defs_Defs ds)).
+  (forall (t:L1g.compile.Term), L1g.term.WFapp t-> WFapp (L1Term_Term t)) /\
+  (forall (ts:L1g.compile.Terms),
+    L1g.term.WFapps ts -> WFapps (L1g.compile.terms_Terms ts)) /\
+  (forall (ds:L1g.compile.Defs),
+    L1.term.WF_defs ds -> WFappDs (L1g.compile.defs_Defs ds)).
 Proof.
   apply (L1.WFapp_terms_defs_ind
     (fun (m:nat) (t:term) (q:bool) =>

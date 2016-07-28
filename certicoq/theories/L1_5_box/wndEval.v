@@ -12,6 +12,7 @@ Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Operators_Properties.
 Require Import Coq.Setoids.Setoid.
 Require Import Coq.omega.Omega.
+Require Import Common.Common.
 Require Import L1_5.term.
 Require Import L1_5.program.
 Require Import L1_5.awndEval.

@@ -9,6 +9,7 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.omega.Omega.
 Require Import Coq.Logic.JMeq.
+Require Import Common.Common.
 Require Import L1_5.term.
 Require Import L1_5.program.
 Require Import L1_5.wndEval.

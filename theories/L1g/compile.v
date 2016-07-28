@@ -112,7 +112,10 @@ Definition
   checked_term_Term (t:term) : WF_term (termSize t) t = true -> Term :=
   (fst (fst (pre_checked_term_Term (termSize t)))) t.
 
+(**** term_Term guarded by Prop valued wf_term *****
+Definition wf_term_Term (t:term) (w:wf_term t): Term.
 
+***)
 
 (** translate Gregory Malecha's [term] into my [Term]
 *** (without constructor arity, to be filled in at L2)

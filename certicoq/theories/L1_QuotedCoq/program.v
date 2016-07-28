@@ -1,5 +1,5 @@
 Add LoadPath "../common" as Common.
-Add LoadPath "../L0_Quoted_Coq" as L0.
+Add LoadPath "../L1_QuotedCoq" as L1.
 
 Require Export Template.Ast.
 Require Import Coq.Strings.String.
@@ -8,7 +8,7 @@ Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
 
 Require Import Common.Common.
-Require Import L0.term.
+Require Import L1.term.
 
 Open Scope list_scope.
 Set Implicit Arguments.

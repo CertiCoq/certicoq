@@ -1,6 +1,6 @@
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1g" as L1g.
 (****)
 
 Require Import Coq.Lists.List.
@@ -9,10 +9,10 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.omega.Omega.
 Require Import Coq.Logic.JMeq.
-Require Import L1.term.
-Require Import L1.program.
-Require Import L1.wndEval.
-Require Import L1.awndEval.
+Require Import L1g.term.
+Require Import L1g.program.
+Require Import L1g.wndEval.
+Require Import L1g.awndEval.
 
 Delimit Scope string_scope with string.
 Open Scope string_scope.

@@ -40,7 +40,7 @@ Inductive Term : Type :=
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat -> Term
+| TConstruct : inductive -> nat (* index of constructor in type *) -> Term
 | TCase      : (nat * list nat) (* # of parameters, args per branch *) ->
                Term (* type info *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term

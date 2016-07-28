@@ -822,85 +822,128 @@ Proof.
   rewrite IHbrs. reflexivity.
 Qed.
 
+Lemma wf_notisApp_notisApp:
+  forall fn, wf_term fn -> ~ L0.term.isApp fn ->
+               forall x, term_Term fn = Ret x -> ~ isApp x.
+Proof.
+  destruct fn; cbn; intros h0 h1 y hy; intros;
+  try discriminate; try (myInjection hy; not_isApp);
+  inversion_Clear h0;
+  try destruct (term_Term fn3); try destruct (term_Term fn2);
+  try destruct (term_Term fn1); try destruct (term_Term fn); try discriminate;
+  try myInjection hy; try not_isApp.
+  - elim h1. exists fn, (u :: us). reflexivity.
+  - destruct (terms_Terms (fun x : nat * term => term_Term (snd x)) l);
+    discriminate.
+  - destruct (terms_Terms (fun x : nat * term => term_Term (snd x)) l);
+    try discriminate.
+    myInjection hy. not_isApp.
+  - destruct (defs_Defs term_Term m); try discriminate.
+    myInjection hy. not_isApp.
+Qed.
+       
+
 Lemma term_Term_pres_WFapp:
   forall n,
-  (forall (t:term), WF_term n t = true -> exists T, term_Term t = Ret T) /\
+    (forall (t:term),
+       WF_term n t = true ->
+       exists T, term_Term t = Ret T /\ WFapp T) /\
   (forall (ts:list term),
-    WF_terms n ts = true -> exists Ts, terms_Terms term_Term ts = Ret Ts) /\
+     WF_terms n ts = true ->
+     exists Ts, terms_Terms term_Term ts = Ret Ts /\ WFapps Ts) /\
   (forall (ds:list (def term)),
-    WF_defs n ds = true -> exists Ds, defs_Defs term_Term ds = Ret Ds).
+     WF_defs n ds = true ->
+     exists Ds, defs_Defs term_Term ds = Ret Ds /\ WFappDs Ds).
 Proof.
   apply (WF_term_terms_defs_ind
     (fun (m:nat) (t:term) (q:bool) =>
-       WF_term m t = true -> exists T, term_Term t = Ret T)
+       WF_term m t = true -> exists T, term_Term t = Ret T /\ WFapp T)
     (fun (m:nat) (ts:list term) (q:bool) =>
-       WF_terms m ts = true -> exists Ts, terms_Terms term_Term ts = Ret Ts)
+       WF_terms m ts = true ->
+       exists Ts, terms_Terms term_Term ts = Ret Ts /\ WFapps Ts)
     (fun (m:nat) (ds:list (def term)) (q:bool) =>
-       WF_defs m ds = true -> exists Ds, defs_Defs term_Term ds = Ret Ds));
+       WF_defs m ds = true ->
+       exists Ds, defs_Defs term_Term ds = Ret Ds /\ WFappDs Ds));
   intros; cbn in H; try discriminate.
-  - exists (TRel n1). reflexivity.
+  - exists (TRel n1). split. reflexivity. constructor.
   - exists (TSort (match srt with 
                     | sProp => SProp
                     | sSet => SSet
                     | sType _ => SType  (* throwing away sort info *)
-                   end)). reflexivity.
+                   end)). split. reflexivity. constructor.
   - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
-    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
-    exists (TCast x1 ck x0). cbn. rewrite k1. rewrite k0. reflexivity.
+    destruct (H j1) as [x0 [k0 k2]]. destruct (H0 j2) as [x1 [k1 k3]].
+    exists (TCast x1 ck x0). cbn. split.
+    + rewrite k1. rewrite k0. reflexivity.
+    + constructor; assumption.
   - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
-    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
-    exists (TProd nm x0 x1). cbn. rewrite k0. rewrite k1. reflexivity.
+    destruct (H j1) as [x0 [k0 k2]]. destruct (H0 j2) as [x1 [k1 k3]].
+    exists (TProd nm x0 x1). cbn. split.
+    + rewrite k0. rewrite k1. reflexivity.
+    + constructor; assumption.
   - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
-    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
-    exists (TLambda nm x0 x1). cbn. rewrite k0. rewrite k1. reflexivity.
+    destruct (H j1) as [x0 [k0 k2]]. destruct (H0 j2) as [x1 [k1 k3]].
+    exists (TLambda nm x0 x1). cbn. split.
+    + rewrite k0. rewrite k1. reflexivity.
+    + constructor; assumption.     
   - cbn in H2.
     destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
     destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
-    destruct (H j3) as [x0 k0].
-    destruct (H0 j4) as [x1 k1].
-    destruct (H1 j2) as [x2 k2].
-    exists (TLetIn nm x0 x1 x2). cbn.
-    rewrite k0. rewrite k1. rewrite k2. reflexivity.
+    destruct (H j3) as [x0 [k0 p0]].
+    destruct (H0 j4) as [x1 [k1 p1]].
+    destruct (H1 j2) as [x2 [k2 p2]].
+    exists (TLetIn nm x0 x1 x2). cbn. split.
+    + rewrite k0. rewrite k1. rewrite k2. reflexivity.
+    + constructor; assumption.
   - cbn in H2.
     destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
     destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
     destruct (proj1 (andb_true_iff _ _) j3) as [j5 j6].
-    destruct (H j6) as [x0 k0].
-    destruct (H0 j4) as [x1 k1].
-    destruct (H1 j2) as [x2 k2].
-    exists (TApp x0 x1 x2). cbn.
-    rewrite k0. rewrite k1. rewrite k2. reflexivity.
-  - exists (TConst pth). reflexivity.
-  - exists (TInd ind). reflexivity.
-  - exists (TConstruct ind m). reflexivity.
+    destruct (H j6) as [x0 [k0 p0]].
+    destruct (H0 j4) as [x1 [k1 p1]].
+    destruct (H1 j2) as [x2 [k2 p2]].
+    exists (TApp x0 x1 x2). cbn. split.
+    + rewrite k0. rewrite k1. rewrite k2. reflexivity.
+    + constructor; try assumption. 
+     inversion p0; subst; unfold isNotApp in j5; try not_isApp.
+     refine (wf_notisApp_notisApp _ _ _); try eassumption.
+      * refine (proj1 (WF_wf_term n0) _ _). assumption.
+      * intros k. destruct k as [y0 [y1 j]]. subst. discriminate.
+  - exists (TConst pth). split. reflexivity. constructor.
+  - exists (TInd ind). split. reflexivity. constructor.
+  - exists (TConstruct ind m). split. reflexivity. constructor.
   - cbn in H2.
     destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
     destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
-    destruct (H j3) as [x0 k0].
-    destruct (H0 j4) as [x1 k1].
-    destruct (H1 j2) as [x2 k2].
-    exists (TCase (npars, map fst brs) x0 x1 x2).
-    cbn. rewrite k1.
-    rewrite terms_Terms_map_lem in k2. rewrite k2. rewrite k0. reflexivity.
-  - cbn in H0. destruct (H H0) as [x0 k0].
-    exists (TFix x0 m). cbn. rewrite k0. reflexivity.
+    destruct (H j3) as [x0 [k0 k0a]].
+    destruct (H0 j4) as [x1 [k1 k1a]].
+    destruct (H1 j2) as [x2 [k2 k2a]].
+    exists (TCase (npars, map fst brs) x0 x1 x2). split.
+    + cbn. rewrite k1.
+      rewrite terms_Terms_map_lem in k2. rewrite k2.
+      rewrite k0. reflexivity.
+    + constructor; assumption.
+  - cbn in H0. destruct (H H0) as [x0 [k0 k0a]].
+    exists (TFix x0 m). cbn. rewrite k0. split. reflexivity.
+    constructor. assumption.
   - subst. destruct _x; try contradiction; cbn in H; try discriminate.
     destruct l. discriminate. contradiction.
-  - subst. exists tnil. reflexivity.
+  - subst. exists tnil. split. reflexivity. constructor.
   - subst. cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
-    destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
-    exists (tcons x0 x1). cbn. rewrite k0. rewrite k1. reflexivity.
-  - subst. exists dnil. reflexivity.
+    destruct (H j1) as [x0 [k0 k0a]]. destruct (H0 j2) as [x1 [k1 k1a]].
+    exists (tcons x0 x1). split. cbn. rewrite k0. rewrite k1. reflexivity.
+    constructor; assumption.
+  - subst. exists dnil. split. reflexivity. constructor.
   - subst. cbn in H2.
     destruct (proj1 (andb_true_iff _ _) H2) as [j1 j2].
     destruct (proj1 (andb_true_iff _ _) j1) as [j3 j4].
-    destruct (H j3) as [x0 k0].
-    destruct (H0 j4) as [x1 k1].
-    destruct (H1 j2) as [x2 k2].
-    exists (dcons (dname term c) x0 x1 (rarg term c) x2). cbn.
+    destruct (H j3) as [x0 [k0 k0a]].
+    destruct (H0 j4) as [x1 [k1 k1a]].
+    destruct (H1 j2) as [x2 [k2 k2a]].
+    exists (dcons (dname term c) x0 x1 (rarg term c) x2). cbn. split.
     rewrite k0. rewrite k1. rewrite k2. reflexivity.
+    constructor; assumption.
 Qed.
-
 
 
 

@@ -1,7 +1,7 @@
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L0_QuotedCoq" as L0.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1_QuotedCoq" as L1.
+Add LoadPath "../L1g" as L1g.
 (****)
 
 Require Import Coq.Bool.Bool.
@@ -11,9 +11,9 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
 Require Import Common.Common.
-Require Import L0.term.
-Require Import L1.compile.
 Require Import L1.term.
+Require Import L1g.compile.
+Require Import L1g.term.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

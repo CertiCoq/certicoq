@@ -1,8 +1,8 @@
 
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L0_quotedCoq" as L0.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1_QuotedCoq" as L1.
+Add LoadPath "../L1g" as L1g.
 (****)
 
 
@@ -14,8 +14,8 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.omega.Omega.
 Require Export Common.Common.
-Require Export L0.term.
-Require Export L1.compile.
+Require Export L1.term.
+Require Export L1g.compile.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -823,7 +823,7 @@ Proof.
 Qed.
 
 Lemma wf_notisApp_notisApp:
-  forall fn, wf_term fn -> ~ L0.term.isApp fn ->
+  forall fn, wf_term fn -> ~ L1.term.isApp fn ->
                forall x, term_Term fn = Ret x -> ~ isApp x.
 Proof.
   destruct fn; cbn; intros h0 h1 y hy; intros;

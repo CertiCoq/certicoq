@@ -1,7 +1,7 @@
 
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1g" as L1g.
 (****)
 
 Require Import Coq.Lists.List.
@@ -9,7 +9,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Export Template.Ast.
 Require Import Common.Common.
-Require Import L1.compile.
+Require Import L1g.compile.
 
 
 Local Open Scope string_scope.
@@ -17,12 +17,12 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition L1Term := L1.compile.Term.
-Definition L1Terms := L1.compile.Terms.
-Definition L1Defs := L1.compile.Defs.
-Definition L1EC := L1.compile.envClass.
-Definition L1Env := L1.compile.environ.
-Definition L1Pgm := L1.compile.Program.
+Definition L1Term := L1g.compile.Term.
+Definition L1Terms := L1g.compile.Terms.
+Definition L1Defs := L1g.compile.Defs.
+Definition L1EC := L1g.compile.envClass.
+Definition L1Env := L1g.compile.environ.
+Definition L1Pgm := L1g.compile.Program.
 
 
 Inductive Term : Type :=
@@ -129,39 +129,39 @@ Fixpoint applyBranchToProof (br:Term) :=
 
 Function L1Term_Term (t:L1Term) : Term :=
   match t with
-    | L1.compile.TRel n => TRel n
-    | L1.compile.TSort srt => TSort srt
-    | L1.compile.TCast _ _ (L1.compile.TCast _ _ (L1.compile.TSort SProp)) =>
+    | L1g.compile.TRel n => TRel n
+    | L1g.compile.TSort srt => TSort srt
+    | L1g.compile.TCast _ _ (L1g.compile.TCast _ _ (L1g.compile.TSort SProp)) =>
       TProof
-    | L1.compile.TCast tm ck ty =>
+    | L1g.compile.TCast tm ck ty =>
       TCast (L1Term_Term ty) ck (L1Term_Term tm)
-    | L1.compile.TProd nm ty bod =>
+    | L1g.compile.TProd nm ty bod =>
       TProd nm (L1Term_Term ty) (L1Term_Term bod)
-    | L1.compile.TLambda nm ty bod =>
+    | L1g.compile.TLambda nm ty bod =>
       TLambda nm (L1Term_Term ty) (L1Term_Term bod)
-    | L1.compile.TLetIn nm dfn ty bod =>
+    | L1g.compile.TLetIn nm dfn ty bod =>
       TLetIn nm (L1Term_Term dfn) (L1Term_Term ty) (L1Term_Term bod)
-    | L1.compile.TApp fn arg args =>
+    | L1g.compile.TApp fn arg args =>
       TApp (L1Term_Term fn) (L1Term_Term arg) (L1Terms_Terms args)
-    | L1.compile.TConst pth => TConst pth
-    | L1.compile.TInd ind => TInd ind
-    | L1.compile.TConstruct ind m => TConstruct ind m
-    | L1.compile.TCase m ty mch brs =>
+    | L1g.compile.TConst pth => TConst pth
+    | L1g.compile.TInd ind => TInd ind
+    | L1g.compile.TConstruct ind m => TConstruct ind m
+    | L1g.compile.TCase m ty mch brs =>
       match L1Term_Term mch, L1Terms_Terms brs with
         | TProof, tunit br => applyBranchToProof br
         | Mch, Brs => TCase m (L1Term_Term ty) Mch Brs
       end
-    | L1.compile.TFix defs m => TFix (L1Defs_Defs defs) m
+    | L1g.compile.TFix defs m => TFix (L1Defs_Defs defs) m
   end
 with L1Terms_Terms (ts:L1Terms) : Terms :=
        match ts with
-         | L1.compile.tnil => tnil
-         | L1.compile.tcons u us => tcons (L1Term_Term u) (L1Terms_Terms us)
+         | L1g.compile.tnil => tnil
+         | L1g.compile.tcons u us => tcons (L1Term_Term u) (L1Terms_Terms us)
        end
 with L1Defs_Defs (ds:L1Defs) : Defs :=
        match ds with
-         | L1.compile.dnil => dnil
-         | L1.compile.dcons nm ty tm m ds =>
+         | L1g.compile.dnil => dnil
+         | L1g.compile.dcons nm ty tm m ds =>
            dcons nm (L1Term_Term ty) (L1Term_Term tm) m (L1Defs_Defs ds)
        end.
 (****
@@ -191,14 +191,14 @@ Definition L1Pgm_Program (p:L1Pgm) : Program :=
      main:= L1Term_Term (main p) |}.
 
 
-(*** from L0 to L1_5 ***)
+(*** from L1 to L1_5 ***)
 Definition program_Program (p:program) : exception Program :=
-  match L1.compile.program_Program p (Ret nil) with
+  match L1g.compile.program_Program p (Ret nil) with
     | Exc s => raise s
     | Ret q => Ret (L1Pgm_Program q)
   end.
 Definition term_Term (t:term) : exception Term :=
-  match L1.compile.term_Term t with
+  match L1g.compile.term_Term t with
     | Exc s => raise s
     | Ret q => Ret (L1Term_Term q)
   end.

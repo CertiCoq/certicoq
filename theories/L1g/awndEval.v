@@ -4,7 +4,7 @@
 
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1g" as L1g.
 (****)
 
 Require Import Coq.Lists.List.
@@ -15,9 +15,9 @@ Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Operators_Properties.
 Require Import Coq.Setoids.Setoid.
 Require Import Common.Common.
-Require Import L1.compile.
-Require Import L1.term.
-Require Import L1.program.
+Require Import L1g.compile.
+Require Import L1g.term.
+Require Import L1g.program.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

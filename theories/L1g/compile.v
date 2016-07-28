@@ -1,7 +1,7 @@
 
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L0_QuotedCoq" as L0.
+Add LoadPath "../L1_QuotedCoq" as L1.
 (****)
 
 Require Import Coq.Lists.List.
@@ -10,8 +10,7 @@ Require Import Coq.omega.Omega.
 Require Import Coq.Bool.Bool.
 Require Import Template.Ast.
 Require Import Common.Common.
-Require Import L0.term.
-Require Import L0.program.
+Require Import L1.L1.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

@@ -32,7 +32,10 @@ Require Import ctx.
 
 
 
-  
+Parameter halt: prim.
+Parameter halt_tag: fTag.
+
+                   
 (* placeholder *)
 Definition tag := positive.
 Variable default_tag : tag.
@@ -116,7 +119,7 @@ note : var "2" is taken as an external function standing for "halt"
 Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:t_map) (n:var) (*  {struct e } *): exp * var * t_map :=
        match e with
        | Halt_c v => let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
-                         (app_ctx_f ctx_v (Eapp (2%positive) default_tag (vn::nil) ), n', tgm)
+                         (app_ctx_f ctx_v (Eprim n' halt (vn::nil) (Eapp n' halt_tag nil)), (Pos.succ n'), tgm)
        | Ret_c k v => let '(ctx_k, kn, n', tgm) := convert_v k sv sk tgm n in
                       let '(ctx_v, vn, n'', tgm) := convert_v v sv sk tgm n' in
                        (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp  kn (get_t kn tgm) (vn::nil)), n'', tgm)

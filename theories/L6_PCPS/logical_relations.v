@@ -85,7 +85,7 @@ Section Log_rel.
     match v1, v2 with
       | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
         forall (vs1 vs2 : list val) j (t : fTag) (xs1 : list var)
-               (e1 : exp) (rho1' : env),
+          (e1 : exp) (rho1' : env),
           length vs1 = length vs2 -> 
           find_def f1 defs1 = Some (t, xs1, e1) ->
           Some rho1' = setlist xs1 vs1 (def_funs defs1 defs1 rho1 rho1) ->
@@ -132,10 +132,10 @@ Section Log_rel.
       now (edestruct Hpre as [xs2 [e2 [rho' [H1' [H2' H3']]]]]; eauto;
            do 3 eexists; do 2 (split; eauto); intros Hleq Hf v1 c1 Hleq' Hstep;
            (assert (Heq : k - (k - j) = j) by omega); rewrite Heq in *;
-           eapply H3'; eauto).
+             eapply H3'; eauto).
   Qed.
 
-  Opaque preord_val.
+  Global Opaque preord_val.
   
   (** Environment relation for a single point (i.e. variable) : 
     * ρ1 ~_k^x ρ2 iff ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)
@@ -1802,7 +1802,7 @@ Section Log_rel.
       rewrite Heq' in *;  eapply H3'; eauto.
   Qed.
 
-  Opaque cc_approx_val.
+  Global Opaque cc_approx_val.
 
   (** Environment relation for a single point (i.e. variable) : 
    * ρ1 ~_k^x ρ2 iff ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)

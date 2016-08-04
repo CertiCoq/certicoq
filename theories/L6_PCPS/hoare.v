@@ -136,12 +136,40 @@ Proof.
   eauto.
 Qed.
 
-Lemma pre_eq_state {A S} (P : S -> Prop) (Q : S -> A -> S -> Prop) e :
+Lemma pre_eq_state_l {A S} (P : S -> Prop) (Q : S -> A -> S -> Prop) e :
   (forall i, P i -> {{ fun i' => i = i' }} e {{ Q }}) ->
   {{ P }} e {{ Q }}.
 Proof.
   intros H i HP. specialize (H i HP). 
   unfold triple in H. eapply H. eauto. 
+Qed.
+
+Lemma pre_eq_state_r {A S} (P : S -> Prop) (Q : S -> A -> S -> Prop) e :
+  {{ P }} e {{ Q }} ->
+  (forall i, P i -> {{ fun i' => i = i' }} e {{ Q }}).
+Proof.
+  intros H i HP.  intros i' Heq; subst. now eapply H.
+Qed.
+
+Lemma post_eq_l {A S} (P : S -> Prop) (Q : S -> A -> S -> Prop) e i1 x i2 :
+  {{ P }} e {{ fun i1' x' i2' => i1 = i1' /\ x = x' /\ i2 = i2'  }} ->
+  Q i1 x i2 ->
+  {{ P }} e {{ Q }}.
+Proof.
+  intros H HQ i HP. specialize (H i HP). 
+  unfold triple in H. destruct runState.
+  inv H. inv H1. eauto.
+Qed.
+
+Lemma post_eq_r {A S} (P : S -> Prop) (Q : S -> A -> S -> Prop) e i1 x i2 :
+  {{ P }} e {{ Q }} ->
+  {{ P }} e {{ fun i1' x' i2' => i1 = i1' /\ x = x' /\ i2 = i2' }} ->
+  P i1 ->
+  Q i1 x i2.
+Proof.
+  intros H H' HP. specialize (H i1 HP). specialize (H' i1 HP). 
+  destruct runState.
+  inv H'. inv H1. eauto.
 Qed.
 
 Lemma post_conj {A S} (P : S -> Prop) (Q1 Q2 : S -> A -> S -> Prop) e :
@@ -196,14 +224,14 @@ Proof.
   intros Hb s [b' Hre]. eapply Hb. eassumption.
 Qed.    
 
-Lemma pre_uncurry_r {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
+Lemma pre_curry_r {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
   (P -> {{ Pre }} e {{ Post }}) ->
   {{ fun s => Pre s /\ P }} e {{ Post }}.
 Proof.
   intros Hyp s [Hpre HP]. eapply Hyp; eauto.
 Qed.
 
-Lemma pre_uncurry_l {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
+Lemma pre_curry_l {A S} (Pre : S -> Prop) (Post : S -> A -> S -> Prop) (P : Prop) e :
   (P -> {{ Pre }} e {{ Post }}) ->
   {{ fun s => P /\ Pre s }} e {{ Post }}.
 Proof.

@@ -350,7 +350,7 @@ Section CC_correct.
     reflexivity.
   Qed.
 
-  Opaque bind ret.
+  Global Opaque bind ret.
 
   Global Instance FVmap_inv_Scope_Proper :
     Proper (Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> iff) FVmap_inv.
@@ -1882,7 +1882,8 @@ Section CC_correct.
             Disjoint _ (bound_var e) (bound_var_fundefs B) ->
             unique_bindings e ->
             unique_bindings (f e)) /\
-         fresh S (next_var s')
+         fresh (Setminus _ S (image (subst m1') (name_in_fundefs B)))
+               (next_var s')
      }}.
   Proof with now eauto with Ensembles_DB.
     revert S; induction B; intros S Hun. 
@@ -1900,9 +1901,15 @@ Section CC_correct.
         rewrite bound_var_fundefs_Fcons in Hun1. 
         eauto with Ensembles_DB.
       + eapply fresh_monotonic; [| eassumption ].
-        now apply Setminus_Included.
+        rewrite <- subst_MRFun_f_eq. simpl.
+        rewrite image_extend_In_S.  rewrite Setminus_Union.
+        apply Included_Setminus_compat. reflexivity.
+        rewrite Union_commut. eapply Included_Union_compat.
+        reflexivity. apply image_monotonic...
+        now eauto.
     - apply return_triple. intros s Hf.
-      simpl. split; now eauto.
+      simpl. split. now eauto.
+      rewrite image_Empty_set, Setminus_Empty_set_neut_r. eassumption.
   Qed.
 
   Lemma unique_bindings_ctx_app_Ecase_cons_mut :
@@ -1978,7 +1985,23 @@ Section CC_correct.
     now eapply Hf1. intros Hc. inv Hc. eapply Hf1 in H; eauto.
     eapply Hf2 in H; eauto.
   Qed.
-  
+
+  Lemma fundefs_closure_conv_in_image_subst_map B map c :
+    {{ fun _ => True }}
+      fundefs_closure_conv clo_tag B map c
+    {{ fun _ B' _ =>
+         Same_set _ (name_in_fundefs B') (image (subst map) (name_in_fundefs B)) }}.
+  Proof with now eauto with Ensembles_DB.
+    induction B.
+    - eapply bind_triple. now apply post_trivial.
+      intros x s1. eapply bind_triple. now apply post_trivial.
+      intros e' s2. eapply bind_triple. now apply IHB.
+      intros B' s3. apply return_triple. intros _ Hseq.
+      simpl. rewrite image_Union, image_Singleton...
+    - apply return_triple. simpl. intros. 
+      rewrite image_Empty_set...
+  Qed.
+
   Lemma exp_closure_conv_unique_bindings_mut :
     (forall e c Γ FVmap S
        (HD: Disjoint _ S (Union _ (bound_var e) (occurs_free e)))
@@ -1995,7 +2018,7 @@ Section CC_correct.
        {{ fun s => fresh S (next_var s) }}
          fundefs_closure_conv clo_tag B FVmap c
        {{ fun s B' s' =>
-          unique_bindings_fundefs B /\
+          unique_bindings_fundefs B' /\
           fresh (Setminus _ S (bound_var_fundefs B')) (next_var s')
         }}).
   Proof with now eauto with Ensembles_DB.
@@ -2123,27 +2146,110 @@ Section CC_correct.
         eapply Setminus_Disjoint_preserv... 
     - eapply bind_triple. now apply get_name_fresh.
       intros Γ' s1. eapply pre_uncurry_l. intros Hf1.
+      unfold make_env.
+      destruct
+        ((fix
+            add_fvs (l : list Maps.PTree.elt) (n : N) (map : Maps.PTree.t VarInfo)
+            {struct l} : Maps.PTree.t VarInfo * N :=
+            match l with
+              | [] => (map, n)
+              | x :: xs => add_fvs xs (n + 1)%N (Maps.PTree.set x (FVar n) map)
+            end) _ _ _ ) as [m1' n].
+      setoid_rewrite assoc.
       eapply bind_triple.
-      + unfold make_env.
-        destruct
-          ((fix
-              add_fvs (l : list Maps.PTree.elt) (n : N) (map : Maps.PTree.t VarInfo)
-              {struct l} : Maps.PTree.t VarInfo * N :=
-              match l with
-                | [] => (map, n)
-                | x :: xs => add_fvs xs (n + 1)%N (Maps.PTree.set x (FVar n) map)
-              end) _ _ _ ) as [m1' n].
-        eapply bind_triple.
-        eapply post_conj;
-          [ eapply get_vars_unique_bindings | eapply get_vars_bound_var_Included' ];
+      eapply post_conj;
+        [ eapply get_vars_unique_bindings | eapply get_vars_bound_var_Included' ];
         eapply Setminus_Disjoint_preserv;
         (eapply Disjoint_Included_r; [| eassumption ]);
-          rewrite <- fundefs_fv_correct; rewrite occurs_free_Efun...
-        intros [xs f1] s2. eapply pre_strenghtening. intros ? [[Hun' _] [Hin Hf]].
-        exact (conj (conj Hun' Hin) Hf).
-        apply pre_uncurry_l; intros [Hun' Hin']. inv Hun.
-        eapply bind_triple. now apply make_record_cTag_preserves_prop.
-        intros c1 s3. eapply return_triple. intros s4 Hf. 
+        rewrite <- fundefs_fv_correct; rewrite occurs_free_Efun...
+      intros [xs f1] s2. eapply pre_strenghtening. intros ? [[Hun1 _] [Hin Hf]].
+      exact (conj (conj Hun1 Hin) Hf).
+      apply pre_uncurry_l; intros [Hun1 Hin1]. inv Hun.
+      setoid_rewrite assoc.
+      eapply bind_triple. now apply make_record_cTag_preserves_prop.
+      intros c1 s3.  eapply bind_triple.
+      now eapply return_triple with
+      (Post := fun s r s' =>
+                 fresh (Setminus var (Setminus var S (Singleton var Γ')) (FromList xs))
+                       (next_var s') /\
+                 r = (c1, m1', fun e0 : exp => f1 (Econstr Γ' c1 xs e0))).
+      intros [[c' m] f] s4. eapply pre_uncurry_r; intros Heq; inv Heq.
+      eapply bind_triple.
+      eapply post_conj;
+        [ eapply make_full_closure_unique_bindings |
+          eapply make_full_closure_bound_var_Included ]. admit.
+      intros [[m m'] f'] s5. eapply pre_strenghtening.
+      intros ? [[Hun2 Hf] [Hseq [Hin2 _]]]. exact (conj (conj Hun2 (conj Hin2 Hseq)) Hf).
+      apply pre_uncurry_l; intros [Hun2 [Hin2 Hseq]].
+      eapply bind_triple.
+      + eapply post_conj.
+         eapply IHe. rewrite Setminus_Union.
+         rewrite Setminus_Union.
+         eapply Disjoint_Included_l; [ now apply Setminus_Included | ].         
+         eapply Disjoint_Included_r; [| eassumption ].
+         now eapply bound_var_occurs_free_Efun_Included. eassumption. 
+         eapply exp_closure_conv_bound_var_Included_mut. rewrite Setminus_Union.
+         rewrite Setminus_Union.
+         eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
+         eapply Disjoint_Included_r; [| eassumption ].
+         now eapply bound_var_occurs_free_Efun_Included.
+      + intros [e' f''] s6. eapply pre_strenghtening. intros ? [[Hun3 _] [Hin3 Hf]]. 
+        exact (conj (conj Hun3 Hin3) Hf). eapply pre_uncurry_l. intros [Hun3 Hin3].
+        eapply bind_triple.
+        * eapply post_conj.
+          eapply IHB. rewrite Setminus_Union.
+          rewrite Setminus_Union.
+          eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
+          eapply Disjoint_Included_r; [| eassumption ].
+          now eapply bound_var_occurs_free_fundefs_Efun_Included. eassumption.
+          eapply post_conj.
+          eapply exp_closure_conv_bound_var_Included_mut. rewrite Setminus_Union.
+          rewrite Setminus_Union.
+          eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
+          eapply Disjoint_Included_r; [| eassumption ].
+          now eapply bound_var_occurs_free_fundefs_Efun_Included.
+          eapply pre_strenghtening; [| eapply fundefs_closure_conv_in_image_subst_map ].
+          now intros; simpl; eauto. 
+        * intros B' s7. apply return_triple.
+          intros s8 [[Hun4 Hf'] [[Hinc4 Hf] Hin5]]. simpl in *.
+          split. eapply Hun1. repeat normalize_bound_var.
+          rewrite Hseq. repeat apply Union_Included.
+          eapply Included_trans. eassumption.
+          repeat apply Union_Included. eapply Included_Union_preserv_l.
+          now eapply (Included_Union_l _ (Union _ (bound_var e) (Singleton _ Γ'))).
+          eapply Included_Union_preserv_r... rewrite <- Hin5.
+          eapply Included_trans. now eapply name_in_fundefs_bound_var_fundefs.
+          eapply Included_trans. eassumption.
+          now eauto with Ensembles_DB.
+          eapply Included_trans. eassumption.
+          now eauto with Ensembles_DB.
+          do 2 eapply Included_Union_preserv_l.
+          now apply name_in_fundefs_bound_var_fundefs.
+          now eauto with Ensembles_DB.
+          rewrite Union_assoc. eapply Union_Disjoint_l.
+          repeat normalize_bound_var_in_ctx.
+          eapply Disjoint_Included_r. now apply Setminus_Included.
+          eapply Disjoint_Included_l_sym; [| eassumption ]...
+          eapply Disjoint_Setminus_r...
+          constructor. intros Hc. eapply bound_var_Efun in Hc. 
+          inv Hc. eapply Hinc4 in H. inv H.
+          eapply HD with (x := Γ'). constructor. eapply Hf1. zify; omega.
+          now repeat normalize_bound_var; eauto. inv H0.
+          inv H. inv H0. inv H. now eauto.
+          eapply Hin2 in H. inv H. inv H0. now eauto.
+          rewrite Hseq in H. inv H. eapply Hin3 in H0.
+          inv H0. eapply HD with (x := Γ'). constructor. eapply Hf1. zify; omega.
+          now repeat normalize_bound_var; eauto. inv H.
+          inv H0. inv H. now eauto.
+          eapply HD with (x := Γ'). constructor. eapply Hf1. zify; omega.
+          left. rewrite bound_var_Efun. left. now eapply name_in_fundefs_bound_var_fundefs.
+          constructor. eapply Hun2. eapply Disjoint_Included_l. eassumption.
+          eapply Union_Disjoint_l. eassumption.
+          eapply (Disjoint_Included_l _ _ S). now eauto with Ensembles_DB.
+          repeat normalize_bound_var_in_ctx...
+          eassumption. eassumption.
+          rewrite Hseq.
+          eapply Disjoint_Included_r.
   Abort.
 
 End CC_correct.

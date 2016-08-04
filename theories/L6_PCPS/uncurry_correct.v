@@ -82,7 +82,7 @@ Section Uncurry_correct.
       + apply IHB2; [ eassumption | | eassumption ].
         eapply Disjoint_Included_r; [| eassumption ].
         now eapply bound_var_occurs_free_fundefs_Fcons_Included.
-      + intros B2' s1. eapply pre_uncurry_l. intros HB2.
+      + intros B2' s1. eapply pre_curry_l. intros HB2.
         destruct k as [| k].
         * (* should be straightforward for index 0 -- holds vacuously *) 
           admit.
@@ -110,7 +110,7 @@ Section Uncurry_correct.
                         eapply IHe with (m := k). omega.
                         eapply Disjoint_Included_r; [| eassumption ].
                         admit.
-                        intros ge' s2. apply pre_uncurry_l. intros He'.
+                        intros ge' s2. apply pre_curry_l. intros He'.
                         destruct (eq_var v0 v1 && eq_var g v2 &&
                                          negb (occurs_in_exp v0 ge) &&
                                          negb (occurs_in_exp g ge)) eqn:Heq.
@@ -164,15 +164,15 @@ Section Uncurry_correct.
         eapply bound_var_occurs_free_Ecase_Included.
         now constructor.
       + intros e' s1. rewrite st_eq_Ecase.
-        eapply pre_uncurry_l. intros He.
+        eapply pre_curry_l. intros He.
         eapply bind_triple. eapply post_conj.
         * eapply IHe0.
           eapply Disjoint_Included_r; [| eassumption ].
           eapply bound_var_occurs_free_Ecase_cons_Included.
         * eapply pre_strenghtening; [| now apply uncurry_exp_Ecase ].
           now intros; simpl; eauto.
-        * intros e'' s2. simpl. apply pre_uncurry_r. intros [l' Heq].
-          subst. apply pre_uncurry_l. intros Hl. apply return_triple.
+        * intros e'' s2. simpl. apply pre_curry_r. intros [l' Heq].
+          subst. apply pre_curry_l. intros Hl. apply return_triple.
           intros s3 Hf. split; [| eassumption ]. intros rho rho' Henv. 
           (* now we can apply the compatibility lemma *)
           eapply preord_exp_case_cons_compat.

@@ -4,7 +4,7 @@
 
 (******)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1g" as L1g.
 Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 Add LoadPath "../L4_deBruijn" as L4.
@@ -38,7 +38,7 @@ Ltac forward H :=
   | ?T -> _ => let H' := fresh in cut T;[intros H'; specialize (H H') | ]
   end.
 
-Definition dcon_of_con (i : inductive) (n : nat) := N.of_nat n.
+Definition dcon_of_con (i : inductive) (n : nat) := (i, N.of_nat n).
 
 (** Erased terms are turned into axioms *)
 Definition erased_exp := Ax_e "erased".
@@ -84,13 +84,13 @@ Section TermTranslation.
     Variable trans : N -> L3t.Term -> exp.
     Definition trans_args (k : N) (t : L3t.Terms) : exps :=
       map_terms (trans k) t.
-    Fixpoint trans_brs ann k n l :=
+    Fixpoint trans_brs ind ann k n l :=
       match l with
       | L3t.tnil => brnil_e
       | L3t.tcons t ts =>
         let nargs := List.nth (N.to_nat n) ann 0%nat in
-        brcons_e n (N.of_nat nargs) (strip_lam nargs (trans k t))
-                 (trans_brs ann k (n + 1)%N ts)
+        brcons_e (ind,n) (N.of_nat nargs) (strip_lam nargs (trans k t))
+                 (trans_brs ind ann k (n + 1)%N ts)
       end.
     Fixpoint trans_fixes k l :=
       match l with
@@ -118,8 +118,9 @@ Section TermTranslation.
       let args' := trans_args trans k args in
         Con_e (dcon_of_con ind c) args'
     | L3t.TCase ann t brs =>
-      let brs' := trans_brs trans (snd ann) k 0%N brs in
-      Match_e (trans k t) brs'
+      let '(ind, pars, args) := ann in
+      let brs' := trans_brs trans ind args k 0%N brs in
+      Match_e (trans k t) (* pars *)brs'
     | L3t.TFix d n =>
       let len := L3t.dlength d in
       let defs' := trans_fixes trans (N.of_nat len + k) d in

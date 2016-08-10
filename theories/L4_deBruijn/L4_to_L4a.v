@@ -28,6 +28,8 @@ Notation push := cons (only parsing).
 Definition freshVar (lv : list NVar) : NVar :=
 hd nvarx (freshVars 1 (Some true) lv []).
 
+Definition dummyind := Ast.mkInd "" 0%nat.
+
 (* N.to_nat efficiency? *)
 Fixpoint translate (fvars : list NVar)(e:exp) : NTerm :=
 match e with
@@ -54,7 +56,7 @@ match e with
 | expression.Match_e d brl => 
     Match_e (translate fvars d) (translateb fvars brl)
 
-| Ax_e _ => Con_e N.zero nil (* FIX! *) 
+| Ax_e _ => Con_e (dummyind, N.zero) nil (* FIX! *) 
 end
 with translatel (fvars : list NVar)(e:exps) : list NTerm :=
 match e with

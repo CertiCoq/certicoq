@@ -61,7 +61,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               WcbvEval p (TApp fn arg) (TApp efn arg1)
 | wCase: forall mch i n ml args args' brs cs s,
            WcbvEval p mch (TConstruct i n args) ->
-           tskipn (fst ml) args = Some args' ->  (* drop parameters *)
+           tskipn (snd (fst ml)) args = Some args' ->  (* drop parameters *)
            whCaseStep n args' brs = Some cs ->
            WcbvEval p cs s ->
            WcbvEval p (TCase ml mch brs) s
@@ -342,7 +342,7 @@ Function wcbvEval (tmr:nat) (p:environ Term) (t:Term) {struct tmr} : option Term
                | Some emch =>
                  (match emch with 
                     | TConstruct _ r args =>
-                      match tskipn (fst ml) args with
+                      match tskipn (snd (fst ml)) args with
                         | None => None
                         | Some ts => match whCaseStep r ts brs with
                                        | None => None

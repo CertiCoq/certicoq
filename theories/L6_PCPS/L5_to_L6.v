@@ -45,7 +45,8 @@ Variable rec_tag : tag.
 Variable fun_tag: tag.
 Variable kon_tag: tag.
                     
-Definition dcon_to_tag:dcon -> cTag := N.succ_pos. (* should probably change dcon to positive in simple_cps *)
+Definition dcon_to_tag:dcon -> cTag :=
+  fun x => N.succ_pos (snd x). (* should probably change dcon to positive in simple_cps *)
 
 
 (* returns list of numbers [n, n+m[  and the positive n+m (next available pos) *)

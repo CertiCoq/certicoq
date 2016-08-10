@@ -37,7 +37,7 @@ Inductive Term : Type :=
 | TAx        : Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat -> Terms -> Term
-| TCase      : nat * list nat (* #parameters, args per branch *) ->
+| TCase      : inductive * nat * list nat (* #parameters, args per branch *) ->
                Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
 with Terms : Type :=
@@ -120,7 +120,7 @@ Function etaExp_cnstr (i:inductive) (n:nat) (args:Terms) : exception Term :=
   match cnstrArity p i n with
     | Ret arity =>
       match nat_compare (tlength args) arity with
-        | Eq => Ret (TConstruct i n args)
+        | Datatypes.Eq => Ret (TConstruct i n args)
         | Lt => let k := arity - (tlength args)
                 in Ret (mkEta (TConstruct i n (tappend args (etaArgs k))) k)
         | Gt => Exc ("more arguments than constructor arity: "

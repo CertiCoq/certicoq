@@ -20,15 +20,6 @@ Ltac rewrite_hyps :=
     | [ H : _ |- _ ] => rewrite !H
   end.
 
-Class Eq (A:Type) :=
-  {
-    eq_dec: forall (x y:A), {x = y} + {x<>y}
-  }.
-
-(** using [N] instead of [nat] **)
-Instance NEq: Eq N := { eq_dec := N.eq_dec }.
-Instance NatEq: Eq nat := { eq_dec := eq_nat_dec }.
-
 Definition lt_dec (x y:N): {x < y} + { x >= y}.
   refine (match x <? y as z return (x <? y) = z -> {x < y} + {x >= y} with
             | true => fun H => left _ (proj1 (N.ltb_lt x y) H)
@@ -59,8 +50,8 @@ Qed.
 (**************************)
 
 (* data constructors *)
-Definition dcon := N.
-Definition dcon0 := N0.
+Definition dcon : Set := inductive * N.
+Instance DconEq : Eq dcon := _.
 
 (** Source expressions, represented using deBruijn notation *)
 Inductive exp: Type :=
@@ -931,8 +922,11 @@ Example Ke: exp := Lam_e (Lam_e (Var_e 1)).
 Example Se: exp := Lam_e (Lam_e (Lam_e
             (App_e (App_e (Var_e 2) (Var_e 0)) (App_e (Var_e 1) (Var_e 0))))).
 Example SKKe: exp := App_e (App_e Se Ke) Ke.
-Eval vm_compute in (eval_n 1000 (App_e SKKe (Con_e 10 enil))).
-Goal eval (App_e SKKe (Con_e 10 enil)) (Con_e 10 enil).
+Definition index := mkInd "someind" 0.
+Definition conex := (index, 10).
+
+Eval vm_compute in (eval_n 1000 (App_e SKKe (Con_e conex enil))).
+Goal eval (App_e SKKe (Con_e conex enil)) (Con_e conex enil).
 Proof.
   unfold SKKe, Se, Ke. repeat econstructor.
 Qed.
@@ -984,23 +978,26 @@ End ChurchNaturals.
 Reset ChurchNaturals.
 
 (** booleans using native data constructors (with no arguments) **)
-Notation TT := (0:dcon).
+Notation boolind := (mkInd "bool" 0).
+
+Notation TT := ((boolind, 0):dcon).
 Notation TTT := (Con_e TT enil).
-Notation FF := (1:dcon).
+Notation FF := ((boolind, 1):dcon).
 Notation FFF := (Con_e FF enil).
 (* if b then e1 else e2 *)
 Notation ite :=
   (Lam_e (Lam_e (Lam_e
              (Match_e Ve2 (brcons_e TT 0 Ve1 (brcons_e FF 0 Ve0 brnil_e)))))).
 Goal eval (ite $ TTT $ FFF $ TTT) FFF.
-repeat econstructor. Qed.
+  repeat econstructor. Qed.
 Goal eval (ite $ FFF $ FFF $ TTT) TTT.
 repeat econstructor. Qed.
 
 (** lists using native data constructors: Cons takes 2 arguments **)
-Notation dNil := (2:dcon).
+Notation listind := (mkInd "list" 0).
+Notation dNil := ((listind,0):dcon).
 Notation Nil := (Con_e dNil enil).
-Notation dCons := (3:dcon).
+Notation dCons := ((listind,1):dcon).
 Notation Cons := (Lam_e (Lam_e (Con_e dCons (econs Ve1 [|Ve0|])))).
 Notation cdr :=
   (Lam_e (Match_e Ve0 (brcons_e dNil 0 Nil (brcons_e dCons 2 Ve1 brnil_e)))).
@@ -1031,9 +1028,10 @@ Qed.
 
 
 (** Natural numbers using native data constructors **)
-Notation ZZ := (0:dcon).
+Notation natind := (mkInd "nat" 0).
+Notation ZZ := ((natind,0):dcon).
 Notation ZZZ := (Con_e ZZ enil).
-Notation SS := (1:dcon).
+Notation SS := ((natind,1):dcon).
 Notation SSS := (Lam_e (Con_e SS [|Ve0|])).
 Notation one := (SSS $ ZZZ).
 Notation two := (SSS $ one).

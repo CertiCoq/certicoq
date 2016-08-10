@@ -9,14 +9,11 @@ Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
 Require Import Coq.omega.Omega.
 
-Require Import Common.RandyPrelude.
-Require Import Common.exceptionMonad.
-Require Import Common.AstCommon.
+Require Import Common.Common.
 
 Open Scope list_scope.
 Open Scope bool_scope.
 Set Implicit Arguments.
-
 
 Ltac not_isApp :=
   let hh := fresh "h"

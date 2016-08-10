@@ -33,7 +33,7 @@ Fixpoint print_term (t:Term) : string :=
     | TInd _ => " TIND "
     | TConstruct _ n => " (CSTR " ++ (nat_to_string n) ++ ") "
     | TCase n mch _ =>
-      " (CASE " ++ (nat_to_string (fst n)) ++ " _ " ++ (print_term mch) ++
+      " (CASE " ++ (nat_to_string (snd (fst n))) ++ " _ " ++ (print_term mch) ++
                  " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
   end.
@@ -68,7 +68,7 @@ apply TrmTrmsDefs_ind.
   destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); [lft | rght .. ].
 - induction t1; cross.
   destruct p as [n l], p0 as [n0 l0].
-  destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
+  destruct (eq_dec n n0); destruct (nat_list_dec l l0);
   destruct (H t1); destruct (H0 t2);
   [lft | rght .. ].
 - induction t; cross.
@@ -1168,7 +1168,7 @@ Qed.
 Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
   match tbod with
     | TRel m => match nat_compare n m with
-                  | Eq => mkApp tin tnil
+                  | Datatypes.Eq => mkApp tin tnil
                   | Gt => TRel m
                   | Lt => TRel (pred m)
                 end

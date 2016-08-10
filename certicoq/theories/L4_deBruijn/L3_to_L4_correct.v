@@ -5,7 +5,7 @@
 
 (******)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+Add LoadPath "../L1_QuotedCoq" as L1.
 Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 Add LoadPath "../L4_deBruijn" as L4.
@@ -25,6 +25,7 @@ Require Import L3.compile.
 
 Require L3.L3.
 Module L3eval := L3.wcbvEval.
+Module L3C := L3.compile.
 Module L3t := L3.term.
 Module L3U := L3.unaryApplications.
 Module L3N := L3.wNorm.
@@ -36,6 +37,32 @@ Require Import L4.L3_to_L4.
 Lemma wftrm_fix dts m t n :
   L3t.WFTrm (TFix dts m) n ->
   L3.term.dnthBody m dts = Some t -> isLambda t.
+Proof. intros. inv H. Admitted.
+
+Fixpoint is_n_lambda (n : nat) (t : L3t.Term) :=
+  match n with
+  | 0%nat => true
+  | S n => 
+    match t with
+    | L3t.TLambda _ t => is_n_lambda n t
+    | _ => false
+    end
+  end.
+
+Fixpoint is_n_lam n t :=
+  match n with
+  | 0%nat => true
+  | S n => match t with
+          | Lam_e b => is_n_lam n b
+          | _ => false
+          end
+  end.
+
+Lemma wftrm_case ann mch brs n :
+  L3t.WFTrm (L3C.TCase ann mch brs) n ->
+  tlength brs = List.length (snd ann) /\
+  (forall n t, tnth n brs = Some t ->
+          is_n_lambda (List.nth n (snd ann) 0%nat) t = true).
 Proof. intros. inv H. Admitted.
 
 Lemma wcbeval_preserves_wf e t t' :
@@ -482,24 +509,6 @@ Qed.
 (** Needed in well-formedness of cases and fixes,
   for strip_lam *)
 
-Fixpoint is_n_lambda n t :=
-  match n with
-  | 0%nat => true
-  | S n => match t with
-          | TLambda _ b => is_n_lambda n b
-          | _ => false
-          end
-  end.
-
-Fixpoint is_n_lam n t :=
-  match n with
-  | 0%nat => true
-  | S n => match t with
-          | Lam_e b => is_n_lam n b
-          | _ => false
-          end
-  end.
-
 Lemma strip_lam_sbst n a k t :
   is_n_lam n t = true ->
   strip_lam n (sbst a (N.of_nat k) t) =
@@ -579,8 +588,9 @@ Lemma WFTerm_exp_wf_ind e e' :
           exp_wf (N.of_nat (n + List.length e')) (trans e' (N.of_nat n) t)) /\
   (forall t n, WFTrms t n ->
           exps_wf (N.of_nat (n + List.length e')) (trans_args (trans e') (N.of_nat n) t) /\
-          forall l k,
-            branches_wf (N.of_nat (n + List.length e')) (trans_brs (trans e') l (N.of_nat n) k t)) /\
+          forall i l k,
+            branches_wf (N.of_nat (n + List.length e'))
+                        (trans_brs (trans e') i l (N.of_nat n) k t)) /\
   (forall t n, WFTrmDs t n ->
           efnlst_wf (N.of_nat (n + List.length e'))
                     (trans_fixes (trans e') (N.of_nat n) t))
@@ -601,7 +611,8 @@ Proof.
     (* Needs well-formedness condition of terms: well scoped definitions *)
     admit.
   - now destruct H0. 
-  - now destruct H2.
+  - destruct m as [[i pars] l]. simpl. destruct H2.
+    constructor. apply H0. apply H3.
   - rewrite efnlst_length_trans.
     assert (N.of_nat (n + dlength defs + Datatypes.length e') =
             N.of_nat (dlength defs + n + Datatypes.length e')) by lia.
@@ -634,9 +645,9 @@ Proof.
      (forall a k, WFTrms a (N.to_nat k) ->
              (trans_args (trans e) (k + N.of_nat n) a =
               shifts (N.of_nat n) k (trans_args (trans e) k a)) /\
-             (forall n' ann,
-                 (trans_brs (trans e) ann (k + N.of_nat n) n' a =
-                  shift_branches (N.of_nat n) k (trans_brs (trans e) ann k n' a)))) /\
+             (forall n' i ann,
+                 (trans_brs (trans e) i ann (k + N.of_nat n) n' a =
+                  shift_branches (N.of_nat n) k (trans_brs (trans e) i ann k n' a))))/\
      (forall a k, WFTrmDs a (N.to_nat k) ->
              trans_fixes (trans e) (k + N.of_nat n) a =
              shift_fns (N.of_nat n) k (trans_fixes (trans e) k a))); [ |tauto].
@@ -666,7 +677,9 @@ Proof.
     now rewrite H.
 
   - intros IH ts IH2 k Hwf. inv Hwf. simpl.
-    rewrite (IH k); auto. f_equal.
+    rewrite (IH k); auto.
+    destruct p as [[ind pars] args]. simpl.
+    f_equal.
     destruct (IH2 k); auto.
 
   - intros IH n' k Hwf. inv Hwf. simpl.
@@ -711,9 +724,9 @@ Proof.
          (trans_args (trans e) (N.of_nat k) (L3.term.instantiates a k' b) =
           (trans_args (trans e) (1 + N.of_nat k) b)
             {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)}) /\
-    (forall ann l,
-        trans_brs (trans e) ann (N.of_nat k) l (L3.term.instantiates a k' b) =
-        (trans_brs (trans e) ann (1 + N.of_nat k) l b)
+    (forall i ann l,
+        trans_brs (trans e) i ann (N.of_nat k) l (L3.term.instantiates a k' b) =
+        (trans_brs (trans e) i ann (1 + N.of_nat k) l b)
           {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)})) /\
     (forall b k k', WFTrmDs b (S k) -> (k' <= k)%nat ->
         trans_fixes (trans e) (N.of_nat k) (L3.term.instantiateDefs a k' b) =
@@ -853,12 +866,14 @@ Proof.
   apply TrmTrmsDefs_ind; simpl; intros; try rewrite_hyps; trivial.
 
   erewrite eval_env_offset; eauto.
+  destruct p as [[ind pars] args].
   f_equal.
   generalize 0.
   induction t0.
   reflexivity.
   simpl. intros. f_equal.
-  injection (H0 n). intros. now rewrite H2.
+  injection (H0 n). intros.
+  now rewrite H2.
   apply IHt0. intros.
   now injection (H0 n1).
 Qed.
@@ -1172,6 +1187,39 @@ Proof.
   - eauto.
   - eapply instantiate_preserves_wf; eauto. lia.
 Qed.
+
+(** Lookup is the same *)
+Lemma L3_tnth_find_branch n e ann brs t i f :
+  let nargs := nth n ann 0%nat in
+  tnth n brs = Some t ->
+  find_branch (dcon_of_con i n) (N.of_nat nargs)
+              (map_branches f (trans_brs (trans e) i ann 0 0 brs)) =
+  Some (f (N.of_nat nargs) (strip_lam nargs (trans e 0 t))).
+Proof.
+  revert brs t i; induction n; simpl; intros brs t i. 
+  - intros H. destruct brs; simpl in H.
+    + discriminate.
+    + injection H. intros ->.
+      simpl. destruct inductive_dec; try contradiction.
+      destruct N.eq_dec; try contradiction.
+      reflexivity. elim n. reflexivity.
+      now elim n.
+      
+  - destruct brs.
+    + discriminate. 
+    + intros H. specialize (IHn _ _ i H).
+      simpl trans_brs. simpl map_branches.
+      simpl find_branch.
+      unfold dcon_of_con in IHn.
+      destruct inductive_dec. simpl.
+      simpl.
+Admitted.
+
+Lemma exps_length_map f l :
+  exps_length (map_exps f l) = exps_length l.
+Proof.
+  induction l; crush.
+Qed.
   
 (** Questions:
 
@@ -1407,17 +1455,17 @@ Proof with eauto.
   + (* Case *)
     unfold translate; simpl.
     (* Reduction case *)
-    intros *.
-    intros evmch IHmch Hskip Hcasestep evalcss IHcs Hwf.
+    intros * evmch IHmch Hskip Hcasestep evalcss IHcs Hwf.
     inv Hwf.
     specialize (IHmch H3).
+    destruct ml as [[ind pars] largs].
     unfold subst_env in *; rewrite subst_env_aux_match.
     unfold L3.term.whCaseStep in Hcasestep.
     case_eq (L3.term.tnth n brs). intros.
     rewrite H in Hcasestep.
     econstructor.
     rewrite subst_env_aux_con_e in IHmch. apply IHmch.
-    (** Lookup is the same *)
+    rewrite exps_length_map.
     admit.
     (** Substitution of arguments *)
     admit.

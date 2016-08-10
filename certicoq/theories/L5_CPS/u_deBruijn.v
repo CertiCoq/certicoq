@@ -3,6 +3,7 @@ Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
 Require Export CPS.cpstrans.
+Require Import Common.classes.
 
 (*** deBruijn operations for Var: shifting and substitution ***)
 

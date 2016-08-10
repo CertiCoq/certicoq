@@ -37,10 +37,10 @@ Inductive wndEval : Term -> Term -> Prop :=
             wndEval (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* n is the number of parameters of the datatype *)
-| sCase: forall (ml:nat * list nat) (ty s mch:Term)
+| sCase: forall (ml:inductive * nat * list nat) (ty s mch:Term)
                  (args brs ts:Terms) (n:nat),
             canonicalP mch = Some (n, args) ->
-            tskipn (fst ml) args = Some ts ->
+            tskipn (snd (fst ml)) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml ty mch brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
@@ -72,13 +72,13 @@ Inductive wndEval : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (t d1 d2 bod:Term),
               wndEval d1 d2 ->
               wndEval (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
-| sCaseTy:  forall (nl:nat * list nat) (ty uy mch:Term) (brs:Terms),
+| sCaseTy:  forall (nl:inductive * nat * list nat) (ty uy mch:Term) (brs:Terms),
               wndEval ty uy ->
               wndEval (TCase nl ty mch brs) (TCase nl uy mch brs)
-| sCaseArg: forall (nl:nat * list nat) (ty mch can:Term) (brs:Terms),
+| sCaseArg: forall (nl:inductive * nat * list nat) (ty mch can:Term) (brs:Terms),
               wndEval mch can ->
               wndEval (TCase nl ty mch brs) (TCase nl ty can brs)
-| sCaseBrs: forall (nl:nat * list nat) (ty mch:Term) (brs brs':Terms),
+| sCaseBrs: forall (nl:inductive * nat * list nat) (ty mch:Term) (brs brs':Terms),
               wndEvals brs brs' ->
               wndEval (TCase nl ty mch brs) (TCase nl ty mch brs')
 | sFixDefs: forall (ds es:Defs) (i:nat),

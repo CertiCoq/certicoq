@@ -35,7 +35,7 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* cnstr no *) -> Term
-| TCase      : (nat * list nat) (* # parameters, # args per branch *) ->
+| TCase      : (inductive * nat * list nat) (* # parameters, # args per branch *) ->
                Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
 with Terms : Type :=

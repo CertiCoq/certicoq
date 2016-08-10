@@ -54,6 +54,14 @@ Proof using.
   intros x y. exists (N.eqb x y). apply N.eqb_eq.
 Defined.
 
+Require Import Common.classes Common.AstCommon.
+
+Instance IndEqDec : Deq (inductive * N).
+Proof using.
+intros x y.
+destruct (eq_dec x y). exists true. tauto.
+exists false. split; congruence. 
+Defined.
 
 (*
 Instance NatEq : Eq nat := { eq_dec := eq_nat_dec }.
@@ -71,8 +79,7 @@ Defined.
 (** * Source Expressions. *)
 (**************************)
 
-
-Definition dcon := N.
+Definition dcon : Set := inductive * N.
 
 
 Section VarsOf2Class.
@@ -87,7 +94,7 @@ Definition branch {s} : Type := (dcon * (@BTerm NVar s))%type.
 
 (** Find a branch in a match expression corresponding to a given constructor
     and arity. *)
-Definition find_branch {s} (d:N) (m:nat) (matcht :list (@branch s)) : 
+Definition find_branch {s} (d:dcon) (m:nat) (matcht :list (@branch s)) : 
     option BTerm 
   := 
   let obr :=
@@ -254,11 +261,10 @@ Proof using.
   if_splitH Hc; simpl in Hc; autorewrite with list in *;firstorder.
 Qed.
 
-
-Lemma find_branch_some: forall  {s} (d:N) (m:nat) (bs :list (@branch s)) b,
+Lemma find_branch_some: forall  {s} (d:dcon) (m:nat) (bs :list (@branch s)) b,
   find_branch d m bs = Some b
   -> LIn (d,b) bs /\ LIn b (map snd bs) /\ num_bvars b = m
-  /\ find (fun a : branch => (d =? fst a)%N && (m =? num_bvars (snd a))) bs = Some (d, b).
+  /\ find (fun a : branch => decide (d = fst a) && (m =? num_bvars (snd a))) bs = Some (d, b).
 Proof using.
   unfold find_branch. intros ? ? ? ? ? .
   destFind; intros Hdf; [| inverts Hdf].
@@ -2111,12 +2117,12 @@ Lemma eval_vals_l:   forall es vs
 ball (map (is_valueb ∘ get_nt) (map (bterm []) es)) = true
 -> es=vs.
 Proof using.
-  intros ? ? ? ? Hb.
-  eapply eval_Con_e with (d:=0%N) in H0; eauto.
-  apply eval_valueb_noop in H0;[| assumption].
-  inverts H0.
-  apply map_eq_injective in H3; auto.
-  intros ? ? ?. congruence.
+intros ? ? ? ? Hb.
+eapply eval_Con_e with (d:=((mkInd "" 0), 0%N)) in H0; eauto.
+apply eval_valueb_noop in H0;[| assumption].
+inverts H0.
+apply map_eq_injective in H3; auto.
+intros ? ? ?. congruence.
 Qed.
 
 
@@ -2854,7 +2860,7 @@ Definition eval_cα (a b : CTerm):= exists bα,
   eval_c a bα /\ alpha_eq b bα.
 
 
-Definition defbranch : (@branch CPSGenericTermSig) := (0%N, bterm [] (vterm nvarx)).
+Definition defbranch : (@branch CPSGenericTermSig) := ((mkInd "" 0, 0%N), bterm [] (vterm nvarx)).
 
 Lemma match_c_alpha : forall brs discriminee t2,
 alpha_eq (Match_c discriminee brs) t2
@@ -3148,7 +3154,8 @@ Proof using. refl. Qed.
 (* if [d] is a [bool], and [ct] is of type [A] and [cf] is of type [B], then the result
  this match expression has type [if d then A esle B]*)
 Definition depMatchExample (ct cf d : NVar): NTerm :=
-  Match_e (vterm d) [(1%N, bterm [] (vterm ct)) ; (2%N, bterm [] (vterm cf))].
+  Match_e (vterm d) [((mkInd "" 0, 1%N), bterm [] (vterm ct)) ;
+                      ((mkInd "" 0, 2%N), bterm [] (vterm cf))].
 
 Example cps_cvt_depmatch : forall (ct cf d : NVar),
 (*

@@ -39,10 +39,10 @@ Inductive awndEval : Term -> Term -> Prop :=
             awndEval (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| aCase: forall (ml:nat * list nat) (ty s mch:Term)
+| aCase: forall (ml: inductive * nat * list nat) (ty s mch:Term)
                  (args brs ts:Terms) (n:nat),
             canonicalP mch = Ret (n, args) ->
-            tskipn (fst ml) args = Some ts ->
+            tskipn (snd (fst ml)) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             awndEval (TCase ml ty mch brs) s
 | aFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
@@ -74,13 +74,13 @@ Inductive awndEval : Term -> Term -> Prop :=
 | aLetInDef:forall (nm:name) (t d1 d2 bod:Term),
               awndEval d1 d2 ->
               awndEval (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
-| aCaseTy:  forall (ml:nat * list nat) (ty uy mch:Term) (brs:Terms),
+| aCaseTy:  forall (ml: inductive * nat * list nat) (ty uy mch:Term) (brs:Terms),
               awndEval ty uy ->
               awndEval (TCase ml ty mch brs) (TCase ml uy mch brs)
-| aCaseArg: forall (ml:nat * list nat) (ty mch can:Term) (brs:Terms),
+| aCaseArg: forall (ml: inductive * nat * list nat) (ty mch can:Term) (brs:Terms),
               awndEval mch can ->
               awndEval (TCase ml ty mch brs) (TCase ml ty can brs)
-| aCaseBrs: forall (ml:nat * list nat) (ty mch:Term) (brs brs':Terms),
+| aCaseBrs: forall (ml: inductive * nat * list nat) (ty mch:Term) (brs brs':Terms),
               awndEvals brs brs' ->
               awndEval (TCase ml ty mch brs) (TCase ml ty mch brs')
 | aFixDefs: forall (ds es:Defs) (i:nat),

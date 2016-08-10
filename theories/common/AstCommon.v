@@ -8,6 +8,7 @@ Require Import Coq.Lists.List.
 
 Require Import Common.exceptionMonad.
 Require Import Common.RandyPrelude.
+Require Import Common.classes.
 
 Open Scope list_scope.
 Set Implicit Arguments.
@@ -19,11 +20,11 @@ induction s1; induction s2; try (solve [right; intros h; discriminate]).
 - destruct (string_dec i i0).
   + subst. left. reflexivity.
   + right. injection. intuition.
-Qed.
+Defined.
 
 Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
 exact Coq.PArith.BinPos.Pos.eq_dec.
-Qed.
+Defined.
 
 Lemma sort_dec: forall (s1 s2:sort), {s1 = s2}+{s1 <> s2}.
 induction s1; induction s2;
@@ -32,20 +33,20 @@ try (solve [left; reflexivity]).
 destruct (universe_dec u u0).
 - subst. left. reflexivity.
 - right. intros h. injection h. intuition.
-Qed.
+Defined.
 
 Lemma cast_kind_dec: forall (c1 c2:cast_kind), {c1 = c2}+{c1 <> c2}.
 induction c1; induction c2;
 try (solve [right; intros; discriminate]);
 try (solve [left; reflexivity]).
-Qed.
+Defined.
 
 Lemma inductive_dec: forall (s1 s2:inductive), {s1 = s2}+{s1 <> s2}.
 induction s1; induction s2.
 destruct (string_dec s s0); destruct (eq_nat_dec n n0); subst;
 try (solve [left; reflexivity]); 
 right; intros h; elim n1; injection h; intuition.
-Qed.
+Defined.
 
 Lemma nat_list_dec : forall l1 l2 : list nat, {l1 = l2} + {l1 <> l2}.
 Proof.
@@ -57,7 +58,20 @@ Proof.
   left; reflexivity.
   right; congruence.
   right; congruence.
-Qed.
+Defined.
+
+Require Import NArith.NArith.
+Instance NEq: Eq N := { eq_dec := N.eq_dec }.
+Instance EqPair A B `(Eq A) `(Eq B) : Eq (A * B).
+Proof.
+  constructor; intros [x y] [x' y'].
+  destruct (eq_dec x x'). destruct (eq_dec y y').
+  left; congruence.
+  right; congruence.
+  right; congruence.
+Defined.
+
+Instance InductiveEq: Eq inductive := { eq_dec := inductive_dec }.
 
 (** certiCoq representation of sorts **)
 Inductive Srt := SProp | SSet | SType.
@@ -66,7 +80,7 @@ Lemma Srt_dec: forall (s1 s2:Srt), {s1 = s2}+{s1 <> s2}.
 induction s1; induction s2;
 try (solve [right; intros h; discriminate]);
 try (solve [left; reflexivity]).
-Qed.
+Defined.
 
 
 (** certiCoq representation of inductive types **)

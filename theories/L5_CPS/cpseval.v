@@ -308,9 +308,9 @@ Definition ueval_ce (e f:exp) :=
 Definition eval_ce (e f:exp) :=
   eval_c (cps_cvt_prog e) (unvalue (ueval_ce_n 5000 f)).
 
-
+Definition index := (mkInd "" 0).
 Eval compute in
-    ueval_c_n 10 (Ret_c (Cont_c (Halt_c (Var_c 0))) (Con_c 9 vcnil)).
+    ueval_c_n 10 (Ret_c (Cont_c (Halt_c (Var_c 0))) (Con_c (index,9) vcnil)).
 
 Eval cbv in (Var_c 0){0::= Var_c 9}.
 Eval cbv in (Halt_c (Var_c 0)){0::= Var_c 9}.
@@ -318,22 +318,22 @@ Eval cbv in (Halt_c (Var_c 0)){0::= Var_c 9}.
 Eval vm_compute in (cps_cvt_prog (App_e (Var_e 0) (Var_e 9))).
 Eval vm_compute in ueval_c_n 10 (cps_cvt_prog (App_e (Var_e 0) (Var_e 9))).
 
-Example d1: exp := App_e (Lam_e (Con_e 5 enil)) (Con_e 10 enil).
+Example d1: exp := App_e (Lam_e (Con_e (index,5) enil)) (Con_e (index,10) enil).
 Eval vm_compute in ueval_c_n 10 (cps_cvt_prog d1).
 
-Example d2: exp := App_e (Lam_e (Var_e 0)) (Con_e 10 enil).
+Example d2: exp := App_e (Lam_e (Var_e 0)) (Con_e (index,10) enil).
 Eval vm_compute in ueval_c_n 10 (cps_cvt_prog d2).
 
 Example e1: exp := Lam_e (Var_e 0).  (* identity *)
-Example e1': exp := App_e e1 (Con_e 10 enil).
+Example e1': exp := App_e e1 (Con_e (index,10) enil).
 Eval vm_compute in (ueval_c_n 100 (cps_cvt_prog e1')).
 
 Example e2: exp := App_e e1 e1.  (* (fun x => x) (fun x => x) *)
-Example e2': exp := App_e e2 (Con_e 9 enil).
+Example e2': exp := App_e e2 (Con_e (index,9) enil).
 Eval vm_compute in ueval_c_n 100 (cps_cvt_prog e2').
 
 Eval vm_compute in   (** SKKe defined above **)
-       ueval_c_n 100 (cps_cvt_prog (App_e SKKe (Con_e 9 enil))).
+       ueval_c_n 100 (cps_cvt_prog (App_e SKKe (Con_e (index,9) enil))).
 
 
 (** natural numbers in Church representation **)
@@ -410,9 +410,9 @@ Goal ueval_ce (ite $ TTT $ FFF $ TTT) FFF.
 repeat (try vm_compute; try econstructor). Qed.
 
 (** Natural numbers using native data constructors **)
-Notation ZZ := (0:dcon).
+Notation ZZ := ((index,0):dcon).
 Notation ZZZ := (Con_e ZZ enil).
-Notation SS := (1:dcon).
+Notation SS := ((index,1):dcon).
 Notation SSS := (Lam_e (Con_e SS [|Ve0|])).
 Notation one := (SSS $ ZZZ).
 Notation two := (SSS $ one).

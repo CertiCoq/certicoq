@@ -40,7 +40,7 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* index of constructor in type *) -> Term
-| TCase      : (nat * list nat) (* # of parameters, args per branch *) ->
+| TCase      : (inductive * nat * list nat) (* # of parameters, args per branch *) ->
                Term (* type info *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
 with Terms : Type :=
@@ -93,7 +93,7 @@ Proof.
   - exact (TConstruct i n0).
   - destruct (andb_true_true _ _ hx) as [z1 k3].
     destruct (andb_true_true _ _ z1) as [k1 k2].
-    refine (TCase (n0, map fst l) (j1 _ k1) (j1 _ k2) (j2 _ k3)).
+    refine (TCase (p, map fst l) (j1 _ k1) (j1 _ k2) (j2 _ k3)).
   - refine (TFix (j3 _ hx) n).
   - destruct IHn as [[j1 j2] j3]. destruct ts; intros.
     + exact tnil.

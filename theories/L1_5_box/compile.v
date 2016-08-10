@@ -38,7 +38,7 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat -> Term
-| TCase      : (nat * list nat) (* # of parameters, args per branch *) ->
+| TCase      : (inductive * nat * list nat) (* # of parameters, args per branch *) ->
                Term (* type info *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
 with Terms : Type :=
@@ -87,7 +87,7 @@ Variable (tin:Term).
 Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
   match tbod with
     | TRel m => match nat_compare n m with
-                  | Eq => tin
+                  | Datatypes.Eq => tin
                   | Gt => TRel m
                   | Lt => TRel (pred m)
                 end

@@ -359,6 +359,10 @@ Proof.
     auto; lia.
 Qed.
 
+(** Globally unique, all inductives from source programs are qualified *)
+Definition dummy_ind := Template.Ast.mkInd "dummy" 1.
+Definition dummy_dcon := (dummy_ind, 0).
+
 (** The inner, naive CBV CPS translation.  This introduces a lot of 
     administrative reductions, but simple things first.  Importantly,
     things that are already values are treated a little specially.  
@@ -397,7 +401,7 @@ Function cps_cvt (e:exp) {struct e} : val_c :=
     | Fix_e es k => Cont_c (Ret_c (KVar_c 0) (Fix_c (cps_cvt_fnlst es) k))
     | Ax_e s =>
       (* Translate as a dummy *)
-      Cont_c (Ret_c (KVar_c 0) (Con_c 0 vcnil))
+      Cont_c (Ret_c (KVar_c 0) (Con_c dummy_dcon vcnil))
   end
 with cps_cvts (es:exps) (c:cps) : cps :=
     match es with

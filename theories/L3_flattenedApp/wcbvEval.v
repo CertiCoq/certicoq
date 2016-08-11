@@ -1,10 +1,10 @@
 
 (******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L1_5_box" as L1_5.
-Add LoadPath "../L2_typeStripped" as L2.
-Add LoadPath "../L3_flattenedApp" as L3.
+(* Add LoadPath "../common" as Common. *)
+(* Add LoadPath "../L1_MalechaQuoted" as L1. *)
+(* Add LoadPath "../L1_5_box" as L1_5. *)
+(* Add LoadPath "../L2_typeStripped" as L2. *)
+(* Add LoadPath "../L3_flattenedApp" as L3. *)
 (******)
 
 Require Import Coq.Lists.List.
@@ -60,11 +60,12 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               WcbvEval p arg arg1 ->
               WcbvEval p (TApp fn arg) (TApp efn arg1)
 | wCase: forall mch i n ml args args' brs cs s,
-           WcbvEval p mch (TConstruct i n args) ->
-           tskipn (snd (fst ml)) args = Some args' ->  (* drop parameters *)
-           whCaseStep n args' brs = Some cs ->
-           WcbvEval p cs s ->
-           WcbvEval p (TCase ml mch brs) s
+    WcbvEval p mch (TConstruct i n args) ->
+    i = fst (fst ml) ->
+    tskipn (snd (fst ml)) args = Some args' ->  (* drop parameters *)
+    whCaseStep n args' brs = Some cs ->
+    WcbvEval p cs s ->
+    WcbvEval p (TCase ml mch brs) s
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
 | wCons: forall t t' ts ts',
@@ -114,6 +115,7 @@ Proof.
     + apply H. assumption.
     + apply e.
     + apply e0.
+    + apply e1.
     + apply H0. assumption.
 Qed.
 
@@ -479,7 +481,7 @@ apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   intros mx h.
   assert (l1:= max_fst x y). assert (l2:= max_snd x y).
   simpl. rewrite (j mx x); try omega. rewrite (hx (mx - 1)); try omega.
-  rewrite e. rewrite e0. apply hy. omega.
+  rewrite e0. rewrite e1. apply hy. omega.
  - destruct H; destruct H0. exists (S (max x x0)). intros m h.
   assert (k:wcbvEval m p t = Some t').
   assert (l:= max_fst x x0).

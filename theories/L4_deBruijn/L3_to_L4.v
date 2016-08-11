@@ -84,13 +84,14 @@ Section TermTranslation.
     Variable trans : N -> L3t.Term -> exp.
     Definition trans_args (k : N) (t : L3t.Terms) : exps :=
       map_terms (trans k) t.
-    Fixpoint trans_brs ind ann k n l :=
+    Fixpoint trans_brs ind pars ann k n l :=
       match l with
       | L3t.tnil => brnil_e
       | L3t.tcons t ts =>
-        let nargs := List.nth (N.to_nat n) ann 0%nat in
-        brcons_e (ind,n) (N.of_nat nargs) (strip_lam nargs (trans k t))
-                 (trans_brs ind ann k (n + 1)%N ts)
+        let nargs := (List.nth (N.to_nat n) ann 0%nat - pars)%nat in
+        brcons_e (ind,n) (N.of_nat nargs)
+                 (strip_lam nargs (trans k t))
+                 (trans_brs ind pars ann k (n + 1)%N ts)
       end.
     Fixpoint trans_fixes k l :=
       match l with
@@ -119,8 +120,8 @@ Section TermTranslation.
         Con_e (dcon_of_con ind c) args'
     | L3t.TCase ann t brs =>
       let '(ind, pars, args) := ann in
-      let brs' := trans_brs trans ind args k 0%N brs in
-      Match_e (trans k t) (* pars *)brs'
+      let brs' := trans_brs trans ind pars args k 0%N brs in
+      Match_e (trans k t) (N.of_nat pars) brs'
     | L3t.TFix d n =>
       let len := L3t.dlength d in
       let defs' := trans_fixes trans (N.of_nat len + k) d in

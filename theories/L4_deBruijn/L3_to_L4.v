@@ -52,8 +52,9 @@ Fixpoint cst_offset (e : env) (s : string) : N :=
   | (c, e) :: tl => if string_eq_bool s c then 0 else 1 + cst_offset tl s
   end.
 
-(** Inductive environment: disappears at this stage *)
-Definition ienv := list (string * itypPack).
+(** Inductive environment, kept to record parameters of inductives 
+    and arities of constructors *)
+Definition ienv := list (string * nat * itypPack).
 
 Definition map_terms (f : L3t.Term -> exp) :=
   fix map_terms (l : L3t.Terms) : exps :=
@@ -70,7 +71,6 @@ Definition map_exps (f : exp -> exp) :=
   end.
 
 Section TermTranslation.
-  Variable ie : ienv.
   Variable e : env.
     
   Fixpoint strip_lam (k : nat) (e : exp) : exp :=
@@ -154,6 +154,15 @@ Definition translate_env_aux (e : environ L3.compile.Term) (k : env) : env :=
 
 Definition translate_env (e : environ L3.compile.Term) : env :=
   translate_env_aux e [].
+
+Definition inductive_entry_aux {A} (x : string * envClass A) acc : ienv :=
+  match x with
+  | (s, ecTrm t) => acc
+  | (s, ecTyp _ pars pack) => (s, pars, pack) :: acc
+  end.
+
+Definition inductive_env (e : environ L3.compile.Term) : ienv :=
+  fold_right inductive_entry_aux [] e.
 
 Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : string * exp) => Let_e (snd x) acc) e t.

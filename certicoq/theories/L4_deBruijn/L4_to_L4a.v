@@ -53,7 +53,7 @@ match e with
     let xf := freshVar fvars in
     Proj_e (Fix_e xf (translatef (xf::fvars) el)) (N.to_nat pn)
 
-| expression.Match_e d brl => 
+| expression.Match_e d _ brl => 
     Match_e (translate fvars d) (translateb fvars brl)
 
 | Ax_e _ => Con_e (dummyind, N.zero) nil (* FIX! *) 

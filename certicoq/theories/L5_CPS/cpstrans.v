@@ -387,7 +387,7 @@ Function cps_cvt (e:exp) {struct e} : val_c :=
         | true => Cont_c (Ret_c (KVar_c 0) (Con_c d (cps_cvt_vals es)))
       end
 ***)
-    | Match_e e bs => 
+    | Match_e e _ bs => 
       Cont_c (Ret_c (cps_cvt e)
                     (Cont_c (Match_c (KVar_c 0) (cps_cvt_branches bs))))
     | Let_e e2 e1 =>

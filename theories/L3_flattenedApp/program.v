@@ -1,9 +1,9 @@
 (******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L1_5_box" as L1_5.
-Add LoadPath "../L2_typeStripped" as L2.
-Add LoadPath "../L3_flattenedApp" as L3.
+(* Add LoadPath "../common" as Common. *)
+(* Add LoadPath "../L1_MalechaQuoted" as L1. *)
+(* Add LoadPath "../L1_5_box" as L1_5. *)
+(* Add LoadPath "../L2_typeStripped" as L2. *)
+(* Add LoadPath "../L3_flattenedApp" as L3. *)
 (******)
 
 Require Import Coq.Lists.List.
@@ -23,11 +23,28 @@ Set Implicit Arguments.
 (** Check that a named datatype and constructor exist in the environment **)
 Definition defaultCnstr := {| CnstrNm:=""; CnstrArity:= 0 |}.
 Definition defaultItyp := {| itypNm:=""; itypCnstrs:=nil |}.
-Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) : Prop :=
-  if (nth_ok inum ipkg defaultItyp)
-  then (if nth_ok cnum (itypCnstrs (nth inum ipkg defaultItyp)) defaultCnstr
-        then True else False)
-  else False.
+Definition CrctCnstr (ipkg:itypPack) (inum cnum:nat) (args:nat): Prop :=
+  match
+    (do ity <- getInd ipkg inum;
+     do itp <- getCnstr ity cnum;
+        ret (CnstrArity itp))
+  with
+  | Exc s => False
+  | Ret n => n = args
+  end.
+
+Definition getIndArities pack n :=
+  do ity <- getInd pack n;
+     ret (List.map CnstrArity ity.(itypCnstrs)).
+
+Definition CrctAnnot {A} (e : environ A) (ann : inductive * nat * list nat) : Prop :=
+  let '(ind, pars, args) := ann in
+  let 'mkInd mind n := ind in
+  match lookup mind e with
+  | Some (ecTyp _ pars' pack) =>
+    pars' = pars /\ getIndArities pack n = Ret args
+  | _ => False
+  end.
 
 (** correctness specification for programs (including local closure) **)
 Inductive Crct: (environ Term) -> nat -> Term -> Prop :=
@@ -50,10 +67,11 @@ Inductive Crct: (environ Term) -> nat -> Term -> Prop :=
                Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
 | CrctConstruct: forall n p ipkgNm npars itypk inum cnum args,
                    Crct p n prop -> LookupTyp ipkgNm p npars itypk ->
-                   CrctCnstr itypk inum cnum ->
+                   CrctCnstr itypk inum cnum (tlength args) ->
                    Crcts p n args ->
                    Crct p n (TConstruct (mkInd ipkgNm inum) cnum args)
 | CrctCase: forall n p m mch brs,
+    CrctAnnot p m ->
               Crct p n mch -> Crcts p n brs ->
               Crct p n (TCase m mch brs)
 | CrctFix: forall n p ds m,
@@ -82,8 +100,7 @@ Scheme Crct_ind' := Minimality for Crct Sort Prop
 Combined Scheme CrctCrctsCrctDsTyp_ind from
          Crct_ind', Crcts_ind', CrctDs_ind', CrctTyp_ind'.
 Combined Scheme CrctCrctsCrctDs_ind from Crct_ind', Crcts_ind', CrctDs_ind'.
-
-
+ 
 Lemma Crct_WFTrm:
   (forall p n t, Crct p n t -> WFTrm t n) /\
   (forall p n ts, Crcts p n ts -> WFTrms ts n) /\
@@ -172,6 +189,7 @@ try (solve [inversion j]);
 try (solve [inversion_clear j; elim (H0 nm); trivial]);
 try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
 try (solve [inversion_clear j; elim (H0 nm0); trivial; elim (H2 nm0); trivial]);
+try (solve [inversion_clear j; elim (H1 nm); trivial; elim (H3 nm); trivial]);
 try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
 try (solve [inversion_clear H4; elim (H0 nm0); trivial]).
 - inversion j. subst.
@@ -179,6 +197,10 @@ try (solve [inversion_clear H4; elim (H0 nm0); trivial]).
 - inversion_Clear j. 
   + eelim (fresh_Lookup_fails H5). eassumption.
   + eelim H4; eassumption.
+- inversion j; subst.
+  + red in H. apply fresh_lookup_None in H4. rewrite H4 in H. auto.
+  + inversion_clear j; elim (H1 nm); trivial; elim (H3 nm); trivial.
+  + inversion_clear j; elim (H1 nm); trivial; elim (H3 nm); trivial.
 Qed.
 
 Lemma Crct_not_bad_Lookup:
@@ -191,6 +213,7 @@ Lemma Crct_not_bad_Lookup:
   (forall (p:environ Term) (n:nat) (itp:itypPack), CrctTyp p n itp -> True).
 apply CrctCrctsCrctDsTyp_ind; intros; auto;
 try (solve [elim (H0 _ H3)]); try (solve [elim (H0 _ H5)]);
+try (solve [elim (H1 _ H2)]); try (solve [elim (H1 _ H3)]);
 try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
 - inversion H.
 - destruct (string_dec nm0 nm).
@@ -203,7 +226,7 @@ try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
   destruct (string_dec nm0 nm).
   + subst. inversion H4. assumption.
   + refine (Lookup_strengthen H4 eq_refl _). assumption.
-- elim (H1 _ H2).
+- elim (H1 _ H4).
 Qed.
 
 Lemma  Crct_weaken:
@@ -297,10 +320,15 @@ apply CrctCrctsCrctDsTyp_ind; intros; auto.
     * eassumption.
   + eapply H4. exact H5. intros h. elim H6. apply PoCnstrA. assumption.
 - apply CrctCase.
-  + eapply H0. eassumption.
-    intros h. elim H4. apply PoCaseL. assumption.
-  + eapply H2. eassumption.
-    intros h. elim H4. apply PoCaseR. assumption.
+  + red. destruct m as [[[mind n0] pars] args].
+    simpl in H. rewrite H4 in H. simpl in H.
+    revert H; case_eq (string_eq_bool mind nm); auto.
+    intros. elim H5. apply string_eq_bool_eq in H. subst mind.
+    constructor.
+  + eapply H1. eassumption.
+    intros h. elim H5. apply PoCaseL. assumption.
+  + eapply H3. eassumption.
+    intros h. elim H5. apply PoCaseR. assumption.
 - apply CrctFix.
   + eapply H0. eassumption. intros h. inversion h.
   + eapply H2. eassumption. intros h. elim H4. apply PoFix. assumption.
@@ -442,16 +470,31 @@ induction 1; intros; try discriminate.
 - injection H1; intros; subst. intuition.
 Qed.
 
+Lemma CrctAnnot_weaken nm (p : environ Term) m d :
+  CrctAnnot p m -> fresh nm p ->
+  CrctAnnot ((nm, d) :: p) m.
+Proof.
+  intros HC Hf.
+  red.
+  destruct m as [[[mind n0] pars] args]. simpl.
+  simpl in HC.
+  case_eq (string_eq_bool mind nm); auto.
+  intros Heq%string_eq_bool_eq. subst mind.
+  apply fresh_lookup_None in Hf. now rewrite Hf in HC.
+Qed.
+
 Lemma Crct_invrt_Case:
   forall p n case,
     Crct p n case -> forall m s us, case = (TCase m s us) ->
-    Crct p n s /\ Crcts p n us.
+    CrctAnnot p m /\ Crct p n s /\ Crcts p n us.
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ H2). intuition.
+  apply CrctAnnot_weaken; auto.
   apply (proj2 Crct_weaken); auto.
 - assert (j:= IHCrct _ _ _ H2). intuition.
+  apply CrctAnnot_weaken; auto.
   apply (proj1 (proj2 Crct_Typ_weaken)); auto.
-- injection H1; intros; subst. auto.
+- injection H2; intros; subst. auto.
 Qed.
 
 Lemma Crct_invrt_Fix:
@@ -477,7 +520,7 @@ Lemma Crct_invrt_Construct:
     construct = (TConstruct (mkInd ipkgNm inum) cnum args) ->
     Crct p n prop /\ Crcts p n args /\
     exists npars itypk,
-      LookupTyp ipkgNm p npars itypk /\ CrctCnstr itypk inum cnum.
+      LookupTyp ipkgNm p npars itypk /\ CrctCnstr itypk inum cnum (tlength args).
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ _ H2).
   intuition; destruct H6 as [npars [itypk [h1 h2]]].
@@ -540,8 +583,10 @@ Proof.
     + destruct H4 as [npars [x [h1 [h2 h3]]]].
       eapply CrctConstruct; try eassumption.
       * eapply Crct_Sort. eassumption.
-      * apply H; trivial.
-  - destruct (Crct_invrt_Case H2 eq_refl) as [h1 h2]. apply CrctCase.
+      * rewrite <- (Instantiates_pres_tlength i). apply h3; trivial.
+      * apply H; auto.
+  - destruct (Crct_invrt_Case H2 eq_refl) as [h1 [h2 h3]]. apply CrctCase.
+    + apply h1.
     + apply H; trivial.
     + apply H0; trivial.
   - assert (j:= Crct_invrt_Fix H1 eq_refl). apply CrctFix. 

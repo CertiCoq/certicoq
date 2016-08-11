@@ -59,7 +59,7 @@ Inductive exp: Type :=
 | Lam_e: exp -> exp
 | App_e: exp -> exp -> exp
 | Con_e: dcon -> exps -> exp
-| Match_e: exp -> branches_e -> exp
+| Match_e: exp -> forall (pars:N) (* # of parameters *), branches_e -> exp
 | Let_e: exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
 | Ax_e: string -> exp
@@ -121,8 +121,8 @@ Inductive exp_wf: N -> exp -> Prop :=
 | app_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf i e2 ->
                              exp_wf i (App_e e1 e2)
 | con_e_wf: forall i d es, exps_wf i es -> exp_wf i (Con_e d es)
-| match_e_wf: forall i e bs, exp_wf i e -> branches_wf i bs ->
-                              exp_wf i (Match_e e bs)
+| match_e_wf: forall i e n bs, exp_wf i e -> branches_wf i bs ->
+                              exp_wf i (Match_e e n bs)
 | let_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 ->
                              exp_wf i (Let_e e1 e2)
 | fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + i) es ->
@@ -210,7 +210,7 @@ Fixpoint shift n k e :=
     | Lam_e e' => Lam_e (shift n (1 + k) e')
     | Con_e d es => Con_e d (shift_exps' shift n k es)
     | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
-    | Match_e e bs => Match_e (shift n k e) (shift_branches' shift n k bs)
+    | Match_e e p bs => Match_e (shift n k e) p (shift_branches' shift n k bs)
     | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
   end.
@@ -227,7 +227,9 @@ Lemma shift_0:
 Proof.
   apply my_exp_ind; simpl; intros; try reflexivity;
   try (solve[apply f_equal; rewrite H; reflexivity]);
-  try (solve[apply f_equal2; try rewrite H; try rewrite H0; reflexivity]).
+  try (solve[apply f_equal2; try rewrite H; try rewrite H0; reflexivity]);
+  try (solve[apply f_equal3; try rewrite H; try rewrite H0; try rewrite H1;
+             reflexivity]).
   - if_split. replace (n+0) with n. reflexivity. lia.
 Qed.
 
@@ -269,7 +271,7 @@ Function subst (v:exp) k (e:exp): exp :=
     | Lam_e e' => Lam_e (subst v (1 + k) e')
     | Con_e d es => Con_e d (substs v k es)
     | Let_e e1 e2 => Let_e (subst v k e1) (subst v (1 + k) e2)
-    | Match_e e bs => Match_e (subst v k e) (subst_branches v k bs)
+    | Match_e e p bs => Match_e (subst v k e) p (subst_branches v k bs)
     | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
   end
@@ -300,7 +302,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Lam_e e' => Lam_e (sbst v (1 + k) e')
     | Con_e d es => Con_e d (sbsts v k es)
     | Let_e e1 e2 => Let_e (sbst v k e1) (sbst v (1 + k) e2)
-    | Match_e e bs => Match_e (sbst v k e) (sbst_branches v k bs)
+    | Match_e e p bs => Match_e (sbst v k e) p (sbst_branches v k bs)
     | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
   end
@@ -476,7 +478,7 @@ Qed.
 Fixpoint sbst_list (e:exp) (vs:exps): exp :=
   match vs with
     | enil => e
-    | econs v vs => sbst_list (e{0::=v}) vs
+    | econs v vs => (sbst_list e vs){0::=v}
   end.
 
 (** Find a branch in a match expression corresponding to a given constructor
@@ -493,6 +495,17 @@ Fixpoint efnlength (es:efnlst) :=
   match es with
   | eflnil => 0%nat
   | eflcons _ l => S (efnlength l)
+  end.
+
+(** Skipping parameters *)
+Fixpoint exps_skipn (n : N) (e : exps) : exps :=
+  match n with
+  | 0%N => e
+  | _ =>
+    match e with
+    | enil => e
+    | econs _ e' => exps_skipn (N.pred n) e'
+    end
   end.
 
 (** Building a Fixpoint substitution. **)
@@ -515,11 +528,12 @@ Inductive eval: exp -> exp -> Prop :=
                  eval e1 v1 ->
                  eval (e2{0::=v1}) v2 ->
                  eval (Let_e e1 e2) v2
-| eval_Match_e: forall e bs d vs e' v,
-                   eval e (Con_e d vs) ->
-                   find_branch d (exps_length vs) bs = Some e' ->
-                   eval (sbst_list e' vs) v ->
-                   eval (Match_e e bs) v
+| eval_Match_e: forall e p bs d vs e' v,
+    eval e (Con_e d vs) ->
+    let vs' := exps_skipn p vs in
+    find_branch d (exps_length vs') bs = Some e' ->
+    eval (sbst_list e' vs') v ->
+    eval (Match_e e p bs) v
 | eval_Fix_e: forall es k, eval (Fix_e es k) (Fix_e es k)
 | eval_FixApp_e: forall e (es:efnlst) n e2 v2 e' e'',
     eval e (Fix_e es n) ->
@@ -562,9 +576,9 @@ Proof.
   - inversion H1. subst.
     assert (j0:v1 = v0). { apply H. assumption. }
     subst. apply H0. assumption.
-  - inversion H1. subst.
-    specialize (H _ H4). injection H; intros h0 h1. subst. clear H.
-    rewrite H5 in e1. injection e1; intros h2. subst. clear e1.
+  - inversion H1. subst. subst vs'.
+    specialize (H _ H5). injection H; intros h0 h1. subst. clear H.
+    rewrite H7 in e1. injection e1; intros h2. subst. clear e1.
     apply H0. assumption.
   - inversion H. subst. reflexivity.
   - inversion H2; subst.
@@ -633,13 +647,14 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                    | None => None
                    | Some v1 => eval_n n (e2{0::=v1})
                  end
-               | Match_e e bs =>
+               | Match_e e p bs =>
                  match eval_n n e with
-                   | Some (Con_e d vs) =>
-                     match find_branch d (exps_length vs) bs with
-                       | None => None
-                       | Some e' => eval_n n (sbst_list e' vs)
-                     end
+                 | Some (Con_e d vs) =>
+                   let vs' := exps_skipn p vs in
+                   match find_branch d (exps_length vs') bs with
+                     | None => None
+                     | Some e' => eval_n n (sbst_list e' vs')
+                   end
                    | _ => None
                  end
                | Ax_e s => Some (Ax_e s)
@@ -885,7 +900,7 @@ Proof.
     exists (x+x0)%nat.
     rewrite j.
     replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
-    simpl. rewrite k.
+    simpl. rewrite k. subst vs'.
     replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
     rewrite e1. rewrite k0. reflexivity.
   - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
@@ -987,7 +1002,7 @@ Notation FFF := (Con_e FF enil).
 (* if b then e1 else e2 *)
 Notation ite :=
   (Lam_e (Lam_e (Lam_e
-             (Match_e Ve2 (brcons_e TT 0 Ve1 (brcons_e FF 0 Ve0 brnil_e)))))).
+             (Match_e Ve2 0 (brcons_e TT 0 Ve1 (brcons_e FF 0 Ve0 brnil_e)))))).
 Goal eval (ite $ TTT $ FFF $ TTT) FFF.
   repeat econstructor. Qed.
 Goal eval (ite $ FFF $ FFF $ TTT) TTT.
@@ -1000,7 +1015,7 @@ Notation Nil := (Con_e dNil enil).
 Notation dCons := ((listind,1):dcon).
 Notation Cons := (Lam_e (Lam_e (Con_e dCons (econs Ve1 [|Ve0|])))).
 Notation cdr :=
-  (Lam_e (Match_e Ve0 (brcons_e dNil 0 Nil (brcons_e dCons 2 Ve1 brnil_e)))).
+  (Lam_e (Match_e Ve0 0 (brcons_e dNil 0 Nil (brcons_e dCons 2 Ve0 brnil_e)))).
 
 Goal eval (cdr $ Nil) Nil.
 eapply eval_App_e.
@@ -1058,7 +1073,7 @@ Qed.
 
 (** fixpoints **)
 Definition copy : exp :=
-  (Fix_e [!Lam_e (Match_e Ve0 (brcons_e ZZ 0 ZZZ 
+  (Fix_e [!Lam_e (Match_e Ve0 0 (brcons_e ZZ 0 ZZZ 
             (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
 
 Goal eval (copy $ ZZZ) ZZZ.
@@ -1180,9 +1195,9 @@ Lemma subst_list_preserves_exp_wf :
 Proof.
   induction vs; simpl; intros; subst; auto. 
   inversion H; clear H; subst.
-  replace (1 + exps_length vs + i) with (1 + (exps_length vs + i)) in H0;
+  replace (1 + exps_length vs + i) with (exps_length vs + (1 + i)) in H0;
     try lia.
-  apply IHvs; auto. apply sbst_preserves_exp_wf; auto.
+  apply sbst_preserves_exp_wf; auto.
 Qed.
   
 Lemma sbst_preserves_exps_wf :
@@ -1244,6 +1259,16 @@ Proof.
   - eapply IHbranches_wf; eauto.
 Qed.
 Hint Resolve find_branch_preserves_wf.
+
+Lemma exps_skipn_preserves_wf k p vs :
+  exps_wf k vs -> exps_wf k (exps_skipn p vs).
+Proof.
+  revert p; induction vs; intros; simpl.
+  - now destruct p.
+  - destruct p; trivial.
+    apply IHvs. now inv H.
+Qed.
+Hint Resolve exps_skipn_preserves_wf.
 
 (** Evaluation preserves closed expressions.  I wish I could generalize this
    to evaluation preserves [i] expressions. *)
@@ -1309,7 +1334,7 @@ Fixpoint is_valueb (e:exp): bool :=
     | Lam_e _ => true
     | App_e _ _  => false
     | Con_e _ es => are_valuesb es
-    | Match_e _ _ => false
+    | Match_e _ _ _ => false
     | Let_e _ _ => false
     | Fix_e _ _ => true
     | Ax_e _ => true

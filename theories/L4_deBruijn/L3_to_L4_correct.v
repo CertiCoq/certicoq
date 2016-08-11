@@ -478,9 +478,9 @@ Proof.
   now rewrite subst_env_lete.
 Qed.
 
-Lemma subst_env_aux_match e k mch brs :
-  subst_env_aux e k (Match_e mch brs) =
-  Match_e (subst_env_aux e k mch)
+Lemma subst_env_aux_match e k mch pars brs :
+  subst_env_aux e k (Match_e mch pars brs) =
+  Match_e (subst_env_aux e k mch) pars
           (map_branches (fun n => subst_env_aux e (n + k)) brs). 
 Proof.
   revert k mch brs; induction e; simpl; intros; auto.
@@ -587,10 +587,10 @@ Lemma WFTerm_exp_wf_ind e e' :
   (forall t n, WFTrm t n ->
           exp_wf (N.of_nat (n + List.length e')) (trans e' (N.of_nat n) t)) /\
   (forall t n, WFTrms t n ->
-          exps_wf (N.of_nat (n + List.length e')) (trans_args (trans e') (N.of_nat n) t) /\
-          forall i l k,
-            branches_wf (N.of_nat (n + List.length e'))
-                        (trans_brs (trans e') i l (N.of_nat n) k t)) /\
+    exps_wf (N.of_nat (n + List.length e')) (trans_args (trans e') (N.of_nat n) t) /\
+   forall i p l k,
+     branches_wf (N.of_nat (n + List.length e'))
+                 (trans_brs (trans e') i p l (N.of_nat n) k t)) /\
   (forall t n, WFTrmDs t n ->
           efnlst_wf (N.of_nat (n + List.length e'))
                     (trans_fixes (trans e') (N.of_nat n) t))
@@ -645,9 +645,9 @@ Proof.
      (forall a k, WFTrms a (N.to_nat k) ->
              (trans_args (trans e) (k + N.of_nat n) a =
               shifts (N.of_nat n) k (trans_args (trans e) k a)) /\
-             (forall n' i ann,
-                 (trans_brs (trans e) i ann (k + N.of_nat n) n' a =
-                  shift_branches (N.of_nat n) k (trans_brs (trans e) i ann k n' a))))/\
+             (forall n' i p ann,
+                 (trans_brs (trans e) i p ann (k + N.of_nat n) n' a =
+             shift_branches (N.of_nat n) k (trans_brs (trans e) i p ann k n' a)))) /\
      (forall a k, WFTrmDs a (N.to_nat k) ->
              trans_fixes (trans e) (k + N.of_nat n) a =
              shift_fns (N.of_nat n) k (trans_fixes (trans e) k a))); [ |tauto].
@@ -724,9 +724,9 @@ Proof.
          (trans_args (trans e) (N.of_nat k) (L3.term.instantiates a k' b) =
           (trans_args (trans e) (1 + N.of_nat k) b)
             {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)}) /\
-    (forall i ann l,
-        trans_brs (trans e) i ann (N.of_nat k) l (L3.term.instantiates a k' b) =
-        (trans_brs (trans e) i ann (1 + N.of_nat k) l b)
+    (forall i p ann l,
+        trans_brs (trans e) i p ann (N.of_nat k) l (L3.term.instantiates a k' b) =
+        (trans_brs (trans e) i p ann (1 + N.of_nat k) l b)
           {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)})) /\
     (forall b k k', WFTrmDs b (S k) -> (k' <= k)%nat ->
         trans_fixes (trans e) (N.of_nat k) (L3.term.instantiateDefs a k' b) =
@@ -1189,11 +1189,11 @@ Proof.
 Qed.
 
 (** Lookup is the same *)
-Lemma L3_tnth_find_branch n e ann brs t i f :
-  let nargs := nth n ann 0%nat in
+Lemma L3_tnth_find_branch n e ann brs t i p f :
+  let nargs := (nth n ann 0%nat - p)%nat in
   tnth n brs = Some t ->
   find_branch (dcon_of_con i n) (N.of_nat nargs)
-              (map_branches f (trans_brs (trans e) i ann 0 0 brs)) =
+              (map_branches f (trans_brs (trans e) i p ann 0 0 brs)) =
   Some (f (N.of_nat nargs) (strip_lam nargs (trans e 0 t))).
 Proof.
   revert brs t i; induction n; simpl; intros brs t i. 
@@ -1215,12 +1215,30 @@ Proof.
       simpl.
 Admitted.
 
+(* TODO move *)
 Lemma exps_length_map f l :
   exps_length (map_exps f l) = exps_length l.
 Proof.
   induction l; crush.
 Qed.
   
+Lemma exps_skip_tskipn pars args args' e f :
+  tskipn pars args = Some args' ->
+  exps_skipn (N.of_nat pars) (map_exps f (trans_args (trans e) 0 args)) =
+  map_exps f (trans_args (trans e) 0 args').
+Proof.
+  revert pars args'; induction args; intros pars args'.
+  - destruct pars; simpl; intros [=]. now subst args'.
+  - destruct pars; simpl; intros [=]. now subst args'.
+    rewrite <- (IHargs _ _ H0). equaln.
+    destruct pars; simpl. auto. now rewrite Pos.pred_N_succ.
+Qed.
+
+Lemma wftrm_construct {e : environ Term} {i n args} : wf_environ e ->
+  L3t.WFTrm (TConstruct i n args) 0 ->
+  cnstrArity e i n = Ret (tlength args).
+Proof. intros. inv H. Admitted.
+    
 (** Questions:
 
   - In the neutral app case, one can have a match in function position,
@@ -1449,27 +1467,78 @@ Proof with eauto.
     cut (WFTrm (TApp efn arg1) 0). intros wft'.
     pose proof (wnorm_closed _ wft' wnorm).
     inv wft'. inv wnorm. contradiction.
-    (* Eval preserves wf *) admit.
+    (* Eval preserves wf *) eapply wcbeval_preserves_wf. eauto. eauto.
     (* Application in normal form *) admit.
     
   + (* Case *)
     unfold translate; simpl.
     (* Reduction case *)
-    intros * evmch IHmch Hskip Hcasestep evalcss IHcs Hwf.
-    inv Hwf.
-    specialize (IHmch H3).
+    intros * evmch IHmch Hi Hskip Hcasestep evalcss IHcs Hwf.
     destruct ml as [[ind pars] largs].
+    assert (Hwf':=wftrm_case _ _ _ _ Hwf).
+    inv Hwf.
+    assert (Har:WFTrm (TConstruct ind n args) 0).
+    eapply wcbeval_preserves_wf; eauto.
+    apply (wftrm_construct wfe) in Har.
+    specialize (IHmch H3).
     unfold subst_env in *; rewrite subst_env_aux_match.
     unfold L3.term.whCaseStep in Hcasestep.
-    case_eq (L3.term.tnth n brs). intros.
-    rewrite H in Hcasestep.
+    case_eq (L3.term.tnth n brs); [intros t H | intros H];
+      rewrite H in Hcasestep; try easy.
     econstructor.
     rewrite subst_env_aux_con_e in IHmch. apply IHmch.
+    simpl in Hskip.
+    erewrite exps_skip_tskipn; eauto.
     rewrite exps_length_map.
+    assert(exps_length (trans_args (trans e'') 0 args') =
+           N.of_nat (tlength args - pars)).
+    admit. (* wf of case + construct *)
+    rewrite H0.
+    assert (nth n largs 0%nat = tlength args).
     admit.
+    rewrite <- H1.
+    apply L3_tnth_find_branch. eauto.
+    simpl in *.
     (** Substitution of arguments *)
+    erewrite exps_skip_tskipn; eauto.
+
+    Lemma eval_app_lam e fn b b' s : is_n_lambda 1 fn = true ->
+      eval (subst_env e (trans e 0 b)) b' ->
+      eval (sbst b' 0 (subst_env_aux e (1 + 0)
+                                     (strip_lam 1 (trans e 0 fn)))) s ->
+      eval (subst_env e (trans e 0 (TApp fn b))) s.
+      simpl. unfold subst_env. rewrite subst_env_application.
+      simpl. destruct fn; try discriminate.
+      intros _. econstructor.
+      simpl. rewrite subst_env_aux_lam.
+      constructor.
+      eauto.
+      simpl. 
+      auto.
+    Qed.
+
+    injection (Hcasestep). intros <-.
+    forward IHcs.
+    destruct Hwf'.
+    specialize (H2 _ _ H).
     admit.
-    intros. now rewrite H in Hcasestep.
+    admit.
+    (* assert((subst_env_aux e'' 0 (trans e'' 0 (tfold_left args' t))) = *)
+    (*        (sbst_list *)
+    (*     (subst_env_aux e'' (N.of_nat (nth n largs 0%nat - pars) + 0) *)
+    (*        (strip_lam (nth n largs 0%nat - pars) (trans e'' 0 t))) *)
+    (*     (map_exps (subst_env_aux e'' 0) (trans_args (trans e'') 0 args')))). *)
+    (* induction args'. simpl. *)
+    (* assert (nth n largs 0%nat = pars). *)
+    
+    (* Lemma subst_args args t cs s : *)
+    (*   tfold_left args t = Some cs -> *)
+    (*   L3eval.WcbvEval e cs s -> *)
+    (*   (sbst_list *)
+    (*     (subst_env_aux e'' (N.of_nat (nth n largs 0%nat - pars) + 0) *)
+    (*        (strip_lam (nth n largs 0%nat - pars) (trans e'' 0 t))) *)
+    (*     (map_exps (subst_env_aux e'' 0) (trans_args (trans e'') 0 args'))) *)
+    (* admit. *)
 
   (** Terms *)
   + intros; constructor.

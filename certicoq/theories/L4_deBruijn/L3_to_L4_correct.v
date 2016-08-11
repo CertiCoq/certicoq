@@ -58,6 +58,10 @@ Fixpoint is_n_lam n t :=
           end
   end.
 
+(* Now move to Crct predicate which implies WF 
+  + closure w.r.t environment and correcness of annotations
+  of cases.
+*)
 Lemma wftrm_case ann mch brs n :
   L3t.WFTrm (L3C.TCase ann mch brs) n ->
   tlength brs = List.length (snd ann) /\

@@ -1,11 +1,11 @@
 (*** type fields are stripped from term notations and unary applications ***)
 
 (******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
-Add LoadPath "../L1_5_box" as L1_5.
-Add LoadPath "../L2_typeStripped" as L2.
-Add LoadPath "../L3_flattenedApp" as L3.
+(* Add LoadPath "../common" as Common. *)
+(* Add LoadPath "../L1_MalechaQuoted" as L1. *)
+(* Add LoadPath "../L1_5_box" as L1_5. *)
+(* Add LoadPath "../L2_typeStripped" as L2. *)
+(* Add LoadPath "../L3_flattenedApp" as L3. *)
 (******)
 
 Require Import Coq.Lists.List.
@@ -330,6 +330,7 @@ Inductive PoccTrm : Term -> Prop :=
 | PoAppL: forall fn a, PoccTrm fn -> PoccTrm (TApp fn a)
 | PoAppA: forall fn a, PoccTrm a -> PoccTrm (TApp fn a)
 | PoConst: PoccTrm (TConst nm)
+| PoCaseA: forall n p l mch brs, PoccTrm (TCase ((mkInd nm n), p, l) mch brs)
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
 | PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
@@ -545,6 +546,14 @@ Proof.
   + simpl. intuition.
 Qed.
 
+Lemma Instantiates_pres_tlength:
+  forall n ds ids, Instantiates n ds ids -> tlength ds = tlength ids.
+Proof.
+  induction 1.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
 Lemma Instantiates_no_gen:
   (~ PoccTrm tin) ->
   (forall n t s, Instantiate n t s -> PoccTrm s -> PoccTrm t) /\
@@ -559,6 +568,7 @@ intro h. apply InstInstsDefs_ind; intros; auto;
   + apply PoLetInBod. intuition.
 - destruct (Pocc_TApp H1) as [hit | hiats]; intuition.
 - inversion_Clear H1.
+  + constructor.
   + constructor. intuition.
   + apply PoCaseR. intuition.
 - inversion_Clear H1.

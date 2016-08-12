@@ -224,18 +224,6 @@ Local Opaque varClass.
 Local Opaque varClassP.
 Local Opaque contVars.
 
-(* delete *)
-Lemma varClassContVar : varClass contVar = false.
-Proof using.
-  intros.
-  unfold contVar.
-  pose proof (freshCorrect 1 (Some false) [] []) as Hf.
-  simpl in Hf. repnd.
-  remember (freshVars 1 (Some false) [] []) as lv.
-  dlist_len_name lv v. simpl.
-  specialize (Hf _ eq_refl v). simpl in *. auto.
-Qed.  
-
 
 Lemma translateVal_cps_cvt_Some : forall (t:NTerm),
   nt_wf t
@@ -381,8 +369,22 @@ Definition L4_to_L5a (e:L4.expression.exp) : option val_c :=
   let l5 := simpleCPSAA.cps_cvt l4a in
   translateVal l5.
 
-
 End Notations.
+
+(* Ending the dummy section clears the notation imports which conflict later,
+and also the Opacity directives *)
+ 
+Eval compute in (L4_to_L5a (Lam_e (Var_e 0))).
+(*
+     = Some
+         (Cont_c 5%positive
+            (Ret_c (KVar_c 5%positive)
+               (Lam_c 4%positive 5%positive
+                  (Ret_c (Cont_c 5%positive (Ret_c (KVar_c 5%positive) (Var_c 4%positive)))
+                     (KVar_c 5%positive)))))
+     : option val_c
+*)
+Eval compute in (L4_to_L5a (Lam_e (Lam_e (Lam_e (App_e (Var_e 1) (Var_e 0)))))).
 
 
 Require Import L4.L3_to_L4.
@@ -408,6 +410,9 @@ Definition compile_L1_to_L5a (e:Ast.program) : exception val_c:=
   end.
 End L1_to_L5a.
 
+Print Instances VarType.
+Print vartypePos.
+Print freshVarsPos.
 (*
 Quote Recursively Definition p0L1 := 0.
 Eval compute in compile_L1_to_L5a p0L1.

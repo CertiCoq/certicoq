@@ -84,11 +84,11 @@ Inductive Crct: (environ Term) -> nat -> Term -> Prop :=
              Crct p n fn -> Crct p n a -> Crct p n (TApp fn a)
 | CrctConst: forall n p pd nm,
                Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
-| CrctConstruct: forall n p ipkgNm npars itypk inum cnum arty args,
+| CrctConstruct: forall n p ipkgNm npars itypk inum cnum args,
                    Crct p n prop -> LookupTyp ipkgNm p npars itypk ->
                    CrctCnstr itypk inum cnum (tlength args) ->
                    Crcts p n args ->
-                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum arty args)
+                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum args)
 | CrctCase: forall n p m mch brs,
     CrctAnnot p m brs ->
               Crct p n mch -> Crcts p n brs ->
@@ -537,18 +537,19 @@ Qed.
 
 Lemma Crct_invrt_Construct:
   forall p n construct, Crct p n construct ->
-  forall ipkgNm inum cnum arty args,
-    construct = (TConstruct (mkInd ipkgNm inum) cnum arty args) ->
+  forall ipkgNm inum cnum args,
+    construct = (TConstruct (mkInd ipkgNm inum) cnum args) ->
     Crct p n prop /\ Crcts p n args /\
     exists npars itypk,
-      LookupTyp ipkgNm p npars itypk /\ CrctCnstr itypk inum cnum (tlength args).
+      LookupTyp ipkgNm p npars itypk /\
+      CrctCnstr itypk inum cnum (tlength args).
 induction 1; intros; try discriminate.
-- assert (j:= IHCrct1 _ _ _ _ _ H2).
+- assert (j:= IHCrct1 _ _ _ _ H2).
   intuition; destruct H6 as [npars [itypk [h1 h2]]].
   + apply (proj1 (proj2 Crct_weaken)); trivial.
   + destruct h1. exists npars, itypk. repeat split; try assumption.
     apply Lookup_weaken; trivial.
-- assert (j:= IHCrct _ _ _ _ _ H2).
+- assert (j:= IHCrct _ _ _ _ H2).
   intuition; destruct H6 as [npars [itypk [h1 h2]]].
   + apply (proj1 (proj2 Crct_Typ_weaken)); trivial.
   + exists npars, itypk. destruct h1. repeat split; try assumption.

@@ -30,10 +30,9 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
           WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProd: forall nm bod,
           WcbvEval p (TProd nm bod) (TProd nm bod)
-| wConstruct: forall i r arty args args',
+| wConstruct: forall i r args args',
                 WcbvEvals p args args' ->
-                WcbvEval p (TConstruct i r arty args)
-                         (TConstruct i r arty args')
+                WcbvEval p (TConstruct i r args) (TConstruct i r args')
 | wInd: forall i, WcbvEval p (TInd i) (TInd i) 
 | wSort: forall s, WcbvEval p (TSort s) (TSort s)
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
@@ -59,14 +58,14 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               ~ isLambda efn -> ~ isFix efn ->
               WcbvEval p arg arg1 ->
               WcbvEval p (TApp fn arg) (TApp efn arg1)
-| wCase: forall mch i n arty ml args args' brs ebrs cs s,
-    WcbvEval p mch (TConstruct i n arty args) ->
-    i = (fst (fst ml)) ->
-    tskipn (snd (fst ml)) args = Some args' ->  (* drop parameters *)
-    WcbvEvals p brs ebrs ->
-    whCaseStep n args' ebrs = Some cs ->
-    WcbvEval p cs s ->
-    WcbvEval p (TCase ml mch brs) s
+| wCase: forall mch i n ml args args' brs ebrs cs s,
+           WcbvEval p mch (TConstruct i n args) ->
+           i = (fst (fst ml)) ->
+           tskipn (snd (fst ml)) args = Some args' ->  (* drop parameters *)
+           WcbvEvals p brs ebrs ->
+           whCaseStep n args' ebrs = Some cs ->
+           WcbvEval p cs s ->
+           WcbvEval p (TCase ml mch brs) s
 | wCaseCong: forall ml mch emch brs ebrs,
            WcbvEval p mch emch ->
            ~ isConstruct emch ->
@@ -324,9 +323,9 @@ Function wcbvEval
                            | Some (ecTrm t) => wcbvEval n p t
                            | _ => None
                          end
-          | TConstruct i cn arty args => 
+          | TConstruct i cn args => 
             (match wcbvEvals n p args with
-               | Some args' => Some (TConstruct i cn arty args')
+               | Some args' => Some (TConstruct i cn args')
                | None => None
              end)
           | TApp fn a1 =>
@@ -346,7 +345,7 @@ Function wcbvEval
                 | None => None
                 | Some ebrs => 
                   match wcbvEval n p mch with
-                  | Some (TConstruct i r _ args) =>
+                    | Some (TConstruct i r args) =>
                       if eq_dec i (fst (fst ml)) then
                         match tskipn (snd (fst ml)) args with
                         | None => None
@@ -424,8 +423,8 @@ Proof.
     clear e3.
     refine (wCase _ _ _ _ _ _ _); eassumption || reflexivity.
   - subst. specialize (H _ e1). specialize (H0 _ e2). myInjection H1.
-    eapply wCaseCong; try assumption.
-    destruct T; try contradiction; try not_isConstruct.
+    eapply wCaseCong; try assumption. 
+    destruct T; try not_isConstruct. contradiction. 
   - eapply wLetIn.
     + apply H. eassumption.
     + apply H0. assumption.
@@ -486,7 +485,7 @@ Proof.
     + elim n0. auto.
   - destruct H as [x hx]. destruct H0 as [y hy]. destruct H1 as [z hz].
     exists (S (max x (max y z))). intros m h.
-    assert (k:wcbvEval m p mch = Some (TConstruct i n arty args)).
+    assert (k:wcbvEval m p mch = Some (TConstruct i n args)).
     { rewrite (j m (max x (max y z))).
       apply hx. assert (l:= max_fst x (max y z)); omega. omega. }
     assert (k0:wcbvEvals m p brs = Some ebrs).

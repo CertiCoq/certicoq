@@ -129,6 +129,14 @@ Inductive envClass :=
 
 Definition ecAx : envClass := ecTyp 0 nil.
 
+(** for debugging **)
+Definition print_ec (ec:envClass) : string :=
+  match ec with
+    | ecTrm _ => "(ecTrm)"
+    | ecTyp _ (cons _ _) => "(ecTyp)"
+    | ecTyp _ nil => "(ecAx)"
+  end.
+
 Lemma envClass_dec: forall e f:envClass, e = f \/ e <> f.
 Proof.
   destruct e, f; try (right; intros h; discriminate).
@@ -152,6 +160,14 @@ Qed.
 (** An environ is a list of definitions. **)
 Definition environ := list (string * envClass).
 Record Program : Type := mkPgm { main:trm; env:environ }.
+
+(** for debugging **)
+Fixpoint print_environ (e:environ) : string :=
+  match e with
+    | nil => "(envnil)"
+    | cons (str, ec) ecs => "(envcons " ++ str ++ (print_ec ec) ++ ")" ++
+                                        (print_environ ecs)
+  end.
 
 (** environments are finite functions **)
 Inductive fresh (nm:string) : environ -> Prop :=
@@ -198,7 +214,7 @@ Inductive Lookup: string -> environ -> envClass -> Prop :=
            s2 <> s1 -> Lookup s2 p ec -> Lookup s2 ((s1,t)::p) ec.
 Hint Constructors Lookup.
 Definition LookupDfn s p t := Lookup s p (ecTrm t).
-Definition LookupTyp s p n i := Lookup s p (ecTyp n i).
+Definition LookupTyp s p n i := Lookup s p (ecTyp n i) /\ i <> nil.
 Definition LookupAx s p := Lookup s p ecAx.
 
 (** equivalent lookup functions **)
@@ -209,16 +225,16 @@ Function lookup (nm:string) (p:environ) : option envClass :=
                       else lookup nm p
   end.
 
-Definition lookupDfn (nm:string) (p:environ) : option trm :=
+Definition lookupDfn (nm:string) (p:environ) : exception trm :=
   match lookup nm p with
-   | Some (ecTrm t) => Some t
-   | _ => None
+    | Some (ecTrm t) => ret t
+    | _ => raise ("lookupDfn; fails on " ++ nm)
   end.
 
-Definition lookupTyp (nm:string) (p:environ) : option (nat * itypPack) :=
+Definition lookupTyp (nm:string) (p:environ) : exception (nat * itypPack) :=
   match lookup nm p with
-   | Some (ecTyp n t) => Some (n, t)
-   | _ => None
+    | Some (ecTyp n ((cons _ _) as t)) => Ret (n, t)
+    | _ => raise ("lookupTyp; fails on " ++ nm)
   end.
 
 Lemma Lookup_lookup:
@@ -248,7 +264,7 @@ Qed.
 
 Lemma LookupDfn_lookupDfn:
   forall nm p t, Lookup nm p t ->
-                 forall te, t = (ecTrm te) -> lookupDfn nm p = Some te.
+                 forall te, t = (ecTrm te) -> lookupDfn nm p = Ret te.
   induction 1; intros; subst; unfold lookupDfn, lookup.
 - rewrite (string_eq_bool_rfl s). reflexivity.
 - rewrite (string_eq_bool_neq H). 
@@ -256,12 +272,14 @@ Lemma LookupDfn_lookupDfn:
 Qed.
 
 Lemma lookupDfn_LookupDfn:
-  forall nm p t, lookupDfn nm p = Some t -> Lookup nm p (ecTrm t).
+  forall nm p t, lookupDfn nm p = Ret t -> Lookup nm p (ecTrm t).
 Proof.
   intros nm p t. intros. apply lookup_Lookup.
   unfold lookupDfn in H. 
   case_eq (lookup nm p); intros; rewrite H0 in H.
-  - rewrite <- H0. destruct e; try discriminate. myInjection H. assumption.
+  - destruct e.
+    + myInjection H. reflexivity.
+    + discriminate.
   - discriminate.
 Qed.
 
@@ -348,18 +366,22 @@ Definition getCnstr (ip:ityp) (cnum:nat) : exception Cnstr :=
 
 
 (** total constructor arity (including parameters) is only computed
-*** on the fly during translation from L2 to L3 **)
+ ***  n the fly during translation from L2 to L3 **)
 Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) : exception nat :=
   match i with
     | mkInd nm tndx =>
-      match lookup nm p with
-        | Some (ecTyp npars itypkg) =>
-          do ity <- getInd itypkg tndx;
-          do itp <- getCnstr ity cndx;
-          ret (npars + (CnstrArity itp))
-        | Some _ => raise ("cnstrArity; not a type package: " ++ nm)
-        | None => raise ("cnstrArity; not found: " ++ nm)
-      end
+      match lookupTyp nm p with
+        | Exc str => raise ("cnstrArity; lookupTyp fails: " ++ str)
+        | Ret (npars, itypkg) =>
+          match getInd itypkg tndx with
+            | Exc str => raise ("cnstrArity; getInd fails: " ++ str)
+            | Ret ity => match getCnstr ity cndx with
+                           | Exc str =>
+                             raise ("cnstrArity; getCnstr fails: " ++ str)
+                           | Ret itp => ret (npars + (CnstrArity itp))
+                         end
+          end
+       end
   end.
 
 End trm_Sec.

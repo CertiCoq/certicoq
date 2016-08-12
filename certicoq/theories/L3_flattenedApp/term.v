@@ -30,38 +30,41 @@ Lemma TermTerms_dec:
   (forall (ss tt:Terms), ss = tt \/ ss <> tt) /\
   (forall (dd ee:Defs), dd = ee \/ dd <> ee).
 Proof.
-apply TrmTrmsDefs_ind.
-- induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-- induction t; cross. destruct (Srt_dec s s0); [lft | rght].
-- induction t; cross. intuition.
-- induction t0; cross.
-  destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
-- induction t0; cross.
-  destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
-- induction t1; cross.
-  destruct (name_dec n n0); destruct (H t1_1); destruct (H0 t1_2); 
-  [lft | rght ..]. 
-- induction t1; cross. 
-  destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
-- induction t; cross. destruct (string_dec s s0); [lft | rght].
-- induction t; cross. left. reflexivity.
-- induction t; cross. destruct (inductive_dec i i0); [lft | rght].
-- induction t0; cross.
-  destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); destruct (H t0);
-  [lft | rght .. ].
-- induction t1; cross.
-  destruct p as [n l], p0 as [n0 l0].
-  destruct (eq_dec n n0); destruct (nat_list_dec l l0);
-  destruct (H t1); destruct (H0 t2);
-  [lft | rght .. ].
-- induction t; cross.
-  destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-- induction tt; cross. lft.
-- induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
-- induction ee; cross. lft.
-- induction ee; cross.
-  destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
-  destruct (H t0); destruct (H0 ee); [lft | rght .. ].
+  apply TrmTrmsDefs_ind.
+  - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
+  - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
+  - induction t; cross. intuition.
+  - induction t0; cross.
+    destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
+  - induction t0; cross.
+    destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
+  - induction t1; cross.
+    destruct (name_dec n n0); destruct (H t1_1); destruct (H0 t1_2); 
+    [lft | rght ..]. 
+  - induction t1; cross. 
+    destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
+  - induction t; cross. destruct (string_dec s s0); [lft | rght].
+  - induction t; cross. left. reflexivity.
+  - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
+  - induction t0; cross.
+    destruct (inductive_dec i i0); destruct (eq_nat_dec n n1);
+    destruct (eq_nat_dec n0 n2); destruct (H t0);
+    [lft | rght .. ].
+  - induction t1; cross.
+    destruct p as [[i n] l], p0 as [[i0 n0] l0].
+    destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
+    destruct (inductive_dec i i0);
+    destruct (H t1); destruct (H0 t2);
+    [lft | rght .. ].
+  - induction t; cross.
+    destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
+  - destruct t; cross. lft.
+  - induction tt; cross. lft.
+  - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
+  - induction ee; cross. lft.
+  - induction ee; cross.
+    destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
+    destruct (H t0); destruct (H0 ee); [lft | rght .. ].
 Qed.
 End TermTerms_dec.
 
@@ -129,7 +132,15 @@ Ltac isApp :=
   with zz := fresh "z"
   with ll := fresh "l" in
   intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
-  destruct kk as [zz ll].
+             destruct kk as [zz ll].
+Ltac not_isConstruct :=
+  let hh := fresh "h"
+  with xx0 := fresh "x"
+  with xx1 := fresh "x1"
+  with xx2 := fresh "x2"
+  with xx3 := fresh "x3"
+  with ll := fresh "l" in
+  intros hh; destruct hh as [xx0 [xx1 [xx2 [xx3 l]]]]; discriminate.
 
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 induction t;
@@ -151,15 +162,17 @@ induction t;
 left. auto.
 Qed.
 
-Definition isConstruct (t:Term) : Prop := exists i n ts, t = TConstruct i n ts.
-Lemma IsConstruct: forall i n ts, isConstruct (TConstruct i n ts).
-intros. exists i, n, ts. reflexivity.
+Definition isConstruct (t:Term) : Prop :=
+  exists i n arty ts, t = TConstruct i n arty ts.
+Lemma IsConstruct: forall i n arty ts, isConstruct (TConstruct i n arty ts).
+intros. exists i, n, arty, ts. reflexivity.
 Qed.
 Hint Resolve IsConstruct.
 
 Lemma isConstruct_dec: forall t, isConstruct t \/ ~ isConstruct t.
 induction t;
-try (solve [right; intros h; destruct h as [x [nx [ts j]]]; discriminate]).
+  try (solve [right; intros h;
+              destruct h as [x [nx [arty [ts j]]]]; discriminate]).
 - left. auto.
 Qed.
 
@@ -207,6 +220,26 @@ Lemma tlength_tappend:
 Proof.
   induction ts; simpl; intros; try reflexivity.
   - rewrite IHts. reflexivity.
+Qed.
+
+Lemma tappend_tcons_tunit:
+  forall bs ds cs x,
+    tappend bs (tcons x cs) = tappend ds cs -> tappend bs (tunit x) = ds.
+Proof.
+  induction bs; destruct ds; cbn; intros.
+  - assert (j:= f_equal tlength H). cbn in j. omega.
+  - injection H. intros. subst x. destruct ds.
+    + reflexivity.
+    + injection H; intros.
+      assert (j:= f_equal tlength H). cbn in j.
+      rewrite tlength_tappend in j. omega.
+  - destruct cs.
+    + discriminate.
+    + injection H; intros. assert (j:= f_equal tlength H0).
+      rewrite tlength_tappend in j. cbn in j. omega.
+  - injection H; intros.  assert (j:= f_equal tlength H0).
+    rewrite tlength_tappend in j. cbn in j.
+    specialize (IHbs _ _ _ H0). rewrite IHbs. rewrite H1. reflexivity.
 Qed.
 
 Fixpoint tmap (fn:Term -> Term) (ts:Terms) : Terms :=
@@ -292,8 +325,8 @@ Inductive WFTrm: Term -> nat -> Prop :=
            WFTrm fn n -> WFTrm t n -> WFTrm (TApp fn t) n
 | wfConst: forall n nm, WFTrm (TConst nm) n
 | wfInd: forall n i, WFTrm (TInd i) n
-| wfConstruct: forall n i m1 args,
-                 WFTrms args n -> WFTrm (TConstruct i m1 args) n
+| wfConstruct: forall n i m1 arty args,
+                 WFTrms args n -> WFTrm (TConstruct i m1 arty args) n
 | wfCase: forall n m mch brs,
             WFTrm mch n -> WFTrms brs n ->
             WFTrm (TCase m mch brs) n
@@ -334,9 +367,10 @@ Inductive PoccTrm : Term -> Prop :=
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
 | PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
-| PoCnstrI: forall m1 m2 args, PoccTrm (TConstruct (mkInd nm m1) m2 args)
-| PoCnstrA: forall i m args,
-             PoccTrms args -> PoccTrm (TConstruct i m args)
+| PoCnstrI: forall m1 m2 arty args,
+              PoccTrm (TConstruct (mkInd nm m1) m2 arty args)
+| PoCnstrA: forall i m arty args,
+             PoccTrms args -> PoccTrm (TConstruct i m arty args)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
 | PoTtl: forall t ts, PoccTrms ts -> PoccTrms (tcons t ts)
@@ -360,17 +394,17 @@ intros s2 h j. elim h. rewrite <- j. auto.
 Qed.
 
 Lemma Pocc_TCnstr:
-  forall ipkgNm inum cnum args,
-    PoccTrm (TConstruct ((mkInd ipkgNm inum)) cnum args) ->
+  forall ipkgNm inum cnum arty args,
+    PoccTrm (TConstruct ((mkInd ipkgNm inum)) cnum arty args) ->
     nm = ipkgNm \/ PoccTrms args.
-intros ipkgNm inum cnum args h. inversion h; intuition. 
+intros ipkgNm inum cnum arty args h. inversion h; intuition. 
 Qed.
 
 Lemma notPocc_TCnstr:
-  forall ipkgNm inum cnum args,
-    ~ PoccTrm (TConstruct ((mkInd ipkgNm inum)) cnum args) ->
+  forall ipkgNm inum cnum arty args,
+    ~ PoccTrm (TConstruct ((mkInd ipkgNm inum)) cnum arty args) ->
     nm <> ipkgNm /\ ~ PoccTrms args.
-intros ipkgNm inum cnum args h. intuition. elim h. rewrite <- H. 
+intros ipkgNm inum cnum arty args h. intuition. elim h. rewrite <- H. 
 apply PoCnstrI.
 Qed.
 
@@ -510,9 +544,10 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
           Instantiate n (TApp t a) (TApp it ia)
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
 | IInd: forall n ind, Instantiate n (TInd ind) (TInd ind)
-| IConstruct: forall n ind m1 args iargs,
+| IConstruct: forall n ind m1 arty args iargs,
               Instantiates n args iargs ->
-              Instantiate n (TConstruct ind m1 args) (TConstruct ind m1 iargs)
+              Instantiate n (TConstruct ind m1 arty args)
+                          (TConstruct ind m1 arty iargs)
 | ICase: forall n np s ts is its,
            Instantiate n s is -> Instantiates n ts its ->
            Instantiate n (TCase np s ts) (TCase np is its)
@@ -593,7 +628,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
          TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TConstruct i m args => TConstruct i m (instantiates n args)
+    | TConstruct i m arty args => TConstruct i m arty (instantiates n args)
     | x => x
   end
 with instantiates (n:nat) (args:Terms) {struct args} : Terms :=

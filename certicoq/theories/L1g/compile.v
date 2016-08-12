@@ -16,6 +16,7 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
+
   
 (** A slightly cleaned up notion of object term.
 *** The simultaneous definitions of [Terms] and [Defs] make
@@ -38,11 +39,14 @@ Inductive Term : Type :=
                Term (* dfn *) -> Term (* type *) -> Term (* body *) -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
+| TAx        : Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat (* index of constructor in type *) -> Term
+| TConstruct : inductive -> nat (* index of constructor in type *) ->
+               nat (* arity *) -> Term
 | TCase      : (inductive * nat * list nat) (* # of parameters, args per branch *) ->
                Term (* type info *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
+| TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -63,6 +67,24 @@ Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
 
+(** needed for compiling L1 to L1g **)
+Function tappend (ts1 ts2:Terms) : Terms :=
+  match ts1 with
+    | tnil => ts2
+    | tcons t ts => tcons t (tappend ts ts2)
+  end.
+
+Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
+  match t with
+    | TApp fn b bs => TApp fn b (tappend bs args)
+    | fn => match args with
+              | tnil => fn
+              | tcons c cs => TApp fn c cs
+            end
+  end.
+
+
+(************************
 Definition pre_checked_term_Term:
   forall n,
   (forall (t:term), WF_term n t = true -> Term) *
@@ -111,126 +133,122 @@ Defined.
 Definition
   checked_term_Term (t:term) : WF_term (termSize t) t = true -> Term :=
   (fst (fst (pre_checked_term_Term (termSize t)))) t.
+****************************)
 
-(**** term_Term guarded by Prop valued wf_term *****
-Definition wf_term_Term (t:term) (w:wf_term t): Term.
 
-***)
-
-(** translate Gregory Malecha's [term] into my [Term]
-*** (without constructor arity, to be filled in at L2)
-**)
+(** translate Gregory Malecha's [term] into my [Term] **)
+Section datatypeEnv_sec.
+  Variable e : environ Term.
 Section term_Term_sec.
   Variable A : Set.
-  Variable term_Term: A -> exception Term.
-  Fixpoint terms_Terms (ts:list A) : exception Terms :=
+  Variable term_Term: A -> Term.
+  Fixpoint terms_Terms (ts:list A) : Terms :=
     match ts with
-      | nil => ret tnil
-      | cons r rs => do R <- term_Term r;
-                     do Rs <- terms_Terms rs;
-                     ret (tcons R Rs)
+      | nil => tnil
+      | cons r rs => tcons (term_Term r) (terms_Terms rs)
     end.
-  Fixpoint defs_Defs (ds: list (def A)) : exception Defs :=
+  Fixpoint defs_Defs (ds: list (def A)) : Defs :=
    match ds with
-     | nil => ret dnil
-     | cons d ds => 
-         do Dt <- term_Term (dtype _ d);
-         do Db <- term_Term (dbody _ d);
-         do Ds <- defs_Defs ds;
-         ret (dcons (dname _ d) Dt Db (rarg _ d) Ds)
+     | nil => dnil
+     | cons d ds =>
+       dcons (dname _ d) (term_Term (dtype _ d))
+             (term_Term (dbody _ d))  (rarg _ d) (defs_Defs ds )
    end.
 End term_Term_sec.
    
-Fixpoint term_Term (t:term) : exception Term :=
+Function term_Term (t:term) : Term :=
   match t with
-    | tRel n => ret (TRel n)
+    | tRel n => (TRel n)
     | tSort srt =>
-      ret (TSort (match srt with 
+      TSort (match srt with 
                     | sProp => SProp
                     | sSet => SSet
                     | sType _ => SType  (* throwing away sort info *)
-                  end))
-    | tCast tm ck ty =>
-      match term_Term ty, term_Term tm with
-        | Ret Ty, Ret Tm => ret (TCast Tm ck Ty)
-        | _, _ => Exc "term_Term; tCast"
-      end
-    | tProd nm ty bod =>
-      match term_Term ty, term_Term bod with
-        | Ret Ty, Ret Bod => ret (TProd nm Ty Bod)
-        | _, _ => Exc "term_Term; tProd"
-      end
-    | tLambda nm ty bod =>
-      match term_Term ty, term_Term bod with
-        | Ret Ty, Ret Bod => ret (TLambda nm Ty Bod)
-        | _, _ => Exc "term_Term; tLambda"
-      end
+                  end)
+    | tCast tm ck ty => (TCast (term_Term tm) ck (term_Term ty))
+    | tProd nm ty bod => (TProd nm (term_Term ty) (term_Term bod))
+    | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))
     | tLetIn nm dfn ty bod =>
-      match term_Term dfn, term_Term ty, term_Term bod with
-        | Ret Dfn, Ret Ty, Ret Bod => ret (TLetIn nm Dfn Ty Bod)
-        | _, _, _ => Exc "term_Term; tLetIn"
+      (TLetIn nm (term_Term dfn) (term_Term ty) (term_Term bod))
+    | tApp (tApp _ _) us => TWrong "term_Term: nested App"
+    | tApp fn nil => TWrong "term_Term: App with no arg"
+    | tApp fn (cons u us) => TApp (term_Term fn) (term_Term u)
+                                  (terms_Terms term_Term us)
+    | tConst pth =>   (* replace constants with no value by [TAx] *)
+      match lookupTyp pth e with
+        | Ret (0, nil) => TAx  (* note funny coding of axion in environ *)
+        | _ => TConst pth
       end
-    | tApp fn us =>
-      match term_Term fn, terms_Terms term_Term us with
-        | Ret Fn, Ret (tcons arg args) => ret (TApp Fn arg args)
-        | _, _ => Exc "term_Term; tApp"
+    | tInd ind => (TInd ind)
+    | tConstruct ind m =>
+      match cnstrArity e ind m with
+        | Ret arty => (TConstruct ind m arty)
+        | Exc str => TWrong ("term_Term: Cnstr arity not found: " ++ str)
       end
-    | tConst pth => ret (TConst pth)
-    | tInd ind => ret (TInd ind)
-    | tConstruct ind m => ret (TConstruct ind m)
-    | tCase npars ty mch brs => 
-      match term_Term mch,
-            terms_Terms (fun x => term_Term (snd x)) brs,
-            term_Term ty
-      with
-        | Ret Mch, Ret Brs, Ret Ty =>
-          let Ars := map fst brs in ret (TCase (npars, Ars) Ty Mch Brs)
-        | _, _, _ => Exc "term_Term; tCase"
-      end
-    | tFix defs m =>
-      match defs_Defs term_Term defs with
-        | Ret Defs => ret (TFix Defs m)
-        | Exc s => Exc ("term_Term; tFix " ++ s)
-      end
-    | _ => raise "term_Term"
+    | tCase npars ty mch brs =>
+      let Ars := map fst brs in
+      (TCase (npars, Ars) (term_Term ty) (term_Term mch)
+             (terms_Terms (fun x => term_Term (snd x)) brs))
+    | tFix defs m => (TFix (defs_Defs term_Term defs) m)
+    | _ => TWrong "term_Term: Unknown term"
   end.
 
-
+End datatypeEnv_sec.
     
-(** environments and programsn **)
-Definition envClass := Common.AstCommon.envClass Term.
-Definition environ := Common.AstCommon.environ Term.
-Definition Program := Common.AstCommon.Program Term.
-
-
-(** convert Malecha's inductive type package into L1 **)
-Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
-  mkCnstr (fst (fst c)) (snd c).
-
-Definition ibody_ityp (iib:ident * inductive_body) : ityp :=
-  let Ctors := map cnstr_Cnstr (ctors (snd iib))
-  in mkItyp (fst iib) Ctors.
-
-Definition ibodies_itypPack (ibs:list (ident * inductive_body)) : itypPack :=
-  map ibody_ityp ibs.
-
-Fixpoint program_Program
-         (p:program) (e:exception environ): exception Program :=
+(** environments and programs **)
+(** given an L0 program, return an L1 environment containing the
+*** datatypes of the program: this can be done without a term 
+*** translation function
+**)
+Fixpoint program_datatypeEnv (p:program) (e:environ Term) : environ Term :=
   match p with
-    | PIn t =>
-      do T <- term_Term t;
-      do E <- e;
-      ret {| main:= T; env:= E |}
-    | PConstr nm t p =>
-      do T <- term_Term t;
-      program_Program p (econs (epair2 nm (ret (ecTrm T))) e)
+    | PIn _ => e
+    | PConstr _ _ p => program_datatypeEnv p e
     | PType nm npar ibs p =>
-      let Ibs := ibodies_itypPack ibs
-      in program_Program p (econs (epair2 nm (ret (ecTyp Term npar Ibs))) e)
-    | PAxiom nm ty p =>
-      do Ty <- term_Term ty;
-      program_Program p (econs (epair2 nm (ret (ecAx Term))) e)
+      let Ibs := ibodies_itypPack ibs in
+      program_datatypeEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
+    | PAxiom _ _ p => program_datatypeEnv p e
   end.
+
+Fixpoint program_Pgm
+         (dtEnv: environ Term) (p:program) (e:environ Term) : Program Term :=
+  match p with
+    | PIn t => {| main:= (term_Term dtEnv t); env:= e |}
+    | PConstr nm t p =>
+      program_Pgm dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv t))) e)
+    | PType nm npar ibs p =>
+      let Ibs := ibodies_itypPack ibs in
+      program_Pgm dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
+    | PAxiom nm ty p =>
+      program_Pgm dtEnv p (cons (pair nm (ecAx Term)) e)
+  end.
+
+Definition program_Program (p:program) : Program Term :=
+  let dtEnv := program_datatypeEnv p (nil (A:= (string * envClass Term))) in
+  program_Pgm dtEnv p nil.
+
+
+(*********************
+
+  Fixpoint program_Pgm (p:program) (e:environ Term): Program Term :=
+                                 (* e is an accumulator *)
+  let dtEnv := program_datatypeEnv p (nil (A:= (string * envClass Term))) in
+  match p with
+    | PIn t => {| main:= (term_Term dtEnv t); env:= e |}
+    | PConstr nm t p =>
+      program_Pgm p (cons (pair nm (ecTrm (term_Term dtEnv t))) e)
+    | PType nm npar ibs p =>
+      let Ibs := ibodies_itypPack ibs in
+      program_Pgm p (cons (pair nm (ecTyp Term npar Ibs)) e)
+    | PAxiom nm ty p =>
+      program_Pgm p (cons (pair nm (ecAx Term)) e)
+  end.
+
+
+(*** toplevel compilation ***)
+Definition program_Program (p:program) := program_Pgm p nil.
+********************)
+
 
 (*********************
 Fixpoint checked_program_Program (p:program) (e:environ): Program :=
@@ -247,30 +265,3 @@ Fixpoint checked_program_Program (p:program) (e:environ): Program :=
       checked_program_Program p (cons (nm, ecAx Term) e)
   end.
 **************************)
-
-(******************************
-Goal
-  (forall (n:nat) (menv:AstCommon.environ term) (mmain:term),
-         Crct n menv mmain -> n = 0 ->
-         forall p:program, menv = env (wf_program.program_mypgm p nil) ->
-                           mmain = main (wf_program.program_mypgm p nil) ->
-                           exists mp, program_Program p (Ret nil) = Ret mp) /\
-(forall (n:nat) (menv:AstCommon.environ term) (ip:itypPack),
-   CrctTyp n menv ip -> True).
-Proof.
-  apply (wf_program.CrctCrctTyp_ind'
-        (fun (n:nat) menv (mmain:term) => n = 0 ->
-         forall p:program, menv = env (wf_program.program_mypgm p nil) ->
-                           mmain = main (wf_program.program_mypgm p nil) ->
-                           exists mp, program_Program p (Ret nil) = Ret mp)
-        (fun (n:nat) menv (ip:itypPack) => True));
-  intros.
-  - symmetry in H0. destruct (nil_hom _ H0).
-    Check (mkPgm (term_Term x) nil).
-  - subst. specialize (H0 eq_refl _ H5). apply H2. reflexivity.
-
-
-  ; intros; subst.
-  - destruct p; cbn.
-    + inversion_Clear H. discriminate.
-***********************************************)

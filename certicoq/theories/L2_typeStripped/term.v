@@ -17,6 +17,42 @@ Open Scope bool.
 Open Scope list.
 Set Implicit Arguments.
 
+
+Ltac not_is2 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y" in
+  intros hh; destruct hh as [xx [yy jj]]; discriminate.
+ Ltac not_is3 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y"
+  with zz := fresh "z" in
+  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
+Ltac not_isApp := not_is3.
+Ltac not_isLambda := not_is2.
+            
+Ltac isApp_inv h :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with jj := fresh "j"
+  in destruct h as [xx [yy [zz jj]]]; discriminate.
+Ltac isApp :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y"
+  with kk := fresh "k"
+  with zz := fresh "z"
+  with ll := fresh "l" in
+  intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
+  destruct kk as [zz ll].
+
+
 (** Printing terms in exceptions for debugging purposes **)
 Fixpoint print_term (t:Term) : string :=
   match t with
@@ -30,12 +66,14 @@ Fixpoint print_term (t:Term) : string :=
     | TApp fn arg args =>
       " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
     | TConst s => "[" ++ s ++ "]"
+    | TAx => " TAx "
     | TInd _ => " TIND "
-    | TConstruct _ n => " (CSTR " ++ (nat_to_string n) ++ ") "
+    | TConstruct _ n _ => " (CSTR " ++ (nat_to_string n) ++ ") "
     | TCase n mch _ =>
       " (CASE " ++ (nat_to_string (snd (fst n))) ++ " _ " ++ (print_term mch) ++
                  " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+    | TWrong => "TWrong"
   end.
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
@@ -47,38 +85,42 @@ Lemma TermTerms_dec:
   (forall (ss tt:Terms), ss = tt \/ ss <> tt) /\
   (forall (dd ee:Defs), dd = ee \/ dd <> ee).
 Proof.
-apply TrmTrmsDefs_ind.
-- induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-- induction t; cross. destruct (Srt_dec s s0); [lft | rght].
-- induction t; cross. intuition.
-- induction t0; cross.
-  destruct (H t0); [lft | rght ..]. 
-- induction t0; cross.
-  destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
-- induction t0; cross.
-  destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
-- induction t1; cross.
-  destruct (name_dec n n0); destruct (H t1_1); destruct (H0 t1_2); 
-  [lft | rght ..]. 
-- induction t2; cross.
-  destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
-- induction t; cross. destruct (string_dec s s0); [lft | rght].
-- induction t; cross. destruct (inductive_dec i i0); [lft | rght].
-- induction t; cross.
-  destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); [lft | rght .. ].
-- induction t1; cross.
-  destruct p as [n l], p0 as [n0 l0].
-  destruct (eq_dec n n0); destruct (nat_list_dec l l0);
-  destruct (H t1); destruct (H0 t2);
-  [lft | rght .. ].
-- induction t; cross.
-  destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-- induction tt; cross. lft.
-- induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
-- induction ee; cross. lft.
-- induction ee; cross.
-  destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
-  destruct (H t0); destruct (H0 ee); [lft | rght .. ].
+  apply TrmTrmsDefs_ind.
+  - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
+  - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
+  - induction t; cross. intuition.
+  - induction t0; cross.
+    destruct (H t0); [lft | rght ..]. 
+  - induction t0; cross.
+    destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
+  - induction t0; cross.
+    destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
+  - induction t1; cross.
+    destruct (name_dec n n0); destruct (H t1_1); destruct (H0 t1_2); 
+    [lft | rght ..]. 
+  - induction t2; cross.
+    destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
+  - induction t; cross. destruct (string_dec s s0); [lft | rght].
+  - destruct t; cross. lft.
+  - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
+  - induction t; cross.
+    destruct (inductive_dec i i0); destruct (eq_nat_dec n n1);
+    destruct (eq_nat_dec n0 n2); [lft | rght .. ].
+  - induction t1; cross.
+    destruct p as [[i n] l], p0 as [[i0 n0] l0].
+    destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
+    destruct (inductive_dec i i0);
+    destruct (H t1); destruct (H0 t2);
+    [lft | rght .. ].
+  - induction t; cross.
+    destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
+  - destruct t; cross. lft.
+  - induction tt; cross. lft.
+  - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
+  - induction ee; cross. lft.
+  - induction ee; cross.
+    destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
+    destruct (H t0); destruct (H0 ee); [lft | rght .. ].
 Qed.
 End TermTerms_dec.
 
@@ -109,14 +151,6 @@ intros. exists nm, bod. reflexivity.
 Qed.
 Hint Resolve IsLambda.
 
-Ltac not_isLambda :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with zz := fresh "z" in
-  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
-
 Lemma isLambda_dec: forall t, {isLambda t}+{~ isLambda t}.
 induction t;
   try (solve [right; intros h; unfold isLambda in h;
@@ -144,31 +178,6 @@ intros. exists fn, arg, args. reflexivity.
 Qed.
 Hint Resolve IsApp.
 
-Ltac not_isApp :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with kk := fresh "k" in
-  intros hh; destruct hh as [xx jj]; destruct jj as [yy kk]; destruct kk;
-  discriminate.
-Ltac isApp_inv h :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with yy := fresh "y"
-  with zz := fresh "z"
-  with jj := fresh "j"
-  in destruct h as [xx [yy [zz jj]]]; discriminate.
-Ltac isApp :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with kk := fresh "k"
-  with zz := fresh "z"
-  with ll := fresh "l" in
-  intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
-  destruct kk as [zz ll].
 
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 destruct t; try (right; not_isApp). 
@@ -197,47 +206,48 @@ left. auto.
 Qed.
 
 Definition isConstruct (t:Term) : Prop :=
-  exists i n, t = TConstruct i n.
-Lemma IsConstruct: forall i n, isConstruct (TConstruct i n).
-intros. exists i, n. reflexivity.
+  exists i n arty, t = TConstruct i n arty.
+Lemma IsConstruct: forall i n arty, isConstruct (TConstruct i n arty).
+intros. exists i, n, arty. reflexivity.
 Qed.
 Hint Resolve IsConstruct.
 
 Lemma isConstruct_dec: forall t, isConstruct t \/ ~ isConstruct t.
-induction t;
-try (solve [right; unfold isConstruct; intros h;
-            destruct h as [x0 [x1 j]]; discriminate]).
-- left. auto.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate).
+  - left. auto.
 Qed.
 
 Inductive isCanonical : Term -> Prop :=
-| canC: forall (i:inductive) (n:nat), isCanonical (TConstruct i n)
-| canA: forall (arg:Term) (args:Terms) (i:inductive) (n:nat), 
-          isCanonical (TApp (TConstruct i n) arg args).
+| canC: forall (i:inductive) (n m:nat), isCanonical (TConstruct i n m)
+| canA: forall (arg:Term) (args:Terms) (i:inductive) (n m:nat), 
+          isCanonical (TApp (TConstruct i n m) arg args).
 Hint Constructors isCanonical.
 
 Lemma IsCanonical:
-  (forall i n, isCanonical (TConstruct i n)) /\
-  (forall i n t ts, isCanonical (TApp (TConstruct i n) t ts)).
+  (forall i n m, isCanonical (TConstruct i n m)) /\
+  (forall i n m t ts, isCanonical (TApp (TConstruct i n m) t ts)).
 split; intros; auto.
 Qed.
 Hint Resolve IsCanonical.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
-induction t; try (solve [right; intros h; inversion h]).
-- destruct IHt1. 
-  + inversion H. 
-    * left. constructor.
-    * right. intros h. inversion_Clear h.
+induction t;
+  try (solve [right; intros h; inversion h; inversion H;
+              destruct H1; discriminate]).
+- destruct (isConstruct_dec t1).
+  + left. unfold isConstruct in H. destruct H as [x0 [x1 [x2 j]]]. subst.
+    constructor.
   + right. intros h. inversion_Clear h. elim H. auto.
 - left. constructor.
 Qed.
 
 Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
-    | TConstruct _ r => Some (r, tnil)
-    | TApp (TConstruct _ r) arg args => Some (r, tcons arg args)
-    | _ => None
+    | TConstruct _ r _ => Some (r, tnil)
+    | TApp (TConstruct _ r _) arg args => Some (r, tcons arg args)
+    | x => None
   end.
 
 Lemma canonicalP_isCanonical:
@@ -254,22 +264,6 @@ Proof.
   induction 1; simpl.
   - exists (n, tnil). reflexivity.
   - exists (n, tcons arg args). reflexivity.
-Qed.
-
-Function appliedAxiomP (t:Term) : bool :=
-  match t with
-    | TConst _ => true
-    | TApp (TConst _) arg args => true
-    | _ => false
-  end.
-
-Open Scope string_scope.
-Lemma appliedAxiomP_canonicalP:
-  forall mch, appliedAxiomP mch = true -> canonicalP mch = None.
-Proof.
-  intros mch.
-  functional induction (appliedAxiomP mch); intros; cbn; try reflexivity.
-  discriminate.
 Qed.
 
 
@@ -329,6 +323,26 @@ Lemma tlength_tappend:
 Proof.
   induction ts; simpl; intros; try reflexivity.
   - rewrite IHts. reflexivity.
+Qed.
+
+Lemma tappend_tcons_tunit:
+  forall bs ds cs x,
+    tappend bs (tcons x cs) = tappend ds cs -> tappend bs (tunit x) = ds.
+Proof.
+  induction bs; destruct ds; cbn; intros.
+  - assert (j:= f_equal tlength H). cbn in j. omega.
+  - injection H. intros. subst x. destruct ds.
+    + reflexivity.
+    + injection H; intros.
+      assert (j:= f_equal tlength H). cbn in j.
+      rewrite tlength_tappend in j. omega.
+  - destruct cs.
+    + discriminate.
+    + injection H; intros. assert (j:= f_equal tlength H0).
+      rewrite tlength_tappend in j. cbn in j. omega.
+  - injection H; intros.  assert (j:= f_equal tlength H0).
+    rewrite tlength_tappend in j. cbn in j.
+    specialize (IHbs _ _ _ H0). rewrite IHbs. rewrite H1. reflexivity.
 Qed.
 
 Fixpoint tmap (fn:Term -> Term) (ts:Terms) : Terms :=
@@ -602,14 +616,18 @@ Proof.
       * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
+  - exists TAx, arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
   - exists (TInd i), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TConstruct i n), arg, tnil. split. reflexivity.
+  - exists (TConstruct i n n0), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TCase p fn t), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TFix d n), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
+  - exists TWrong, arg, tnil. cbn.  split. reflexivity.
+  left. repeat split. not_isApp.
 Qed.
 
 (** well-formed terms: TApp well-formed all the way down **)
@@ -626,8 +644,9 @@ Inductive WFapp: Term -> Prop :=
            ~ (isApp fn) -> WFapp fn -> WFapp t -> WFapps ts ->
            WFapp (TApp fn t ts)
 | wfaConst: forall nm, WFapp (TConst nm)
+| wfaAx: WFapp TAx
 | wfaInd: forall i, WFapp (TInd i)
-| wfaConstruct: forall i m1, WFapp (TConstruct i m1)
+| wfaConstruct: forall i m1 m2, WFapp (TConstruct i m1 m2)
 | wfaCase: forall m mch brs,
             WFapp mch -> WFapps brs -> WFapp (TCase m mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
@@ -759,8 +778,9 @@ Inductive WFTrm: Term -> nat -> Prop :=
            ~ (isApp fn) -> WFTrm fn n -> WFTrm t n -> WFTrms ts n ->
            WFTrm (TApp fn t ts) n
 | wfConst: forall n nm, WFTrm (TConst nm) n
+| wfAx: forall n, WFTrm TAx n
 | wfInd: forall n i, WFTrm (TInd i) n
-| wfConstruct: forall n i m, WFTrm (TConstruct i m) n
+| wfConstruct: forall n i m arty, WFTrm (TConstruct i m arty) n
 | wfCase: forall n m mch brs,
             WFTrm mch n -> WFTrms brs n ->
             WFTrm (TCase m mch brs) n
@@ -810,7 +830,7 @@ Inductive PoccTrm : Term -> Prop :=
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
 | PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
-| PoCnstr: forall m1 n, PoccTrm (TConstruct (mkInd nm m1) n)
+| PoCnstr: forall m1 n arty, PoccTrm (TConstruct (mkInd nm m1) n arty)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
 | PoTtl: forall t ts, PoccTrms ts -> PoccTrms (tcons t ts)
@@ -834,13 +854,15 @@ intros s2 h j. elim h. rewrite <- j. auto.
 Qed.
 
 Lemma Pocc_TCnstr:
-  forall s2 m1 m2, PoccTrm (TConstruct (mkInd s2 m1) m2) -> nm = s2.
-intros s2 m1 m2 h. inversion h. reflexivity.
+  forall s2 m1 m2 arty,
+    PoccTrm (TConstruct (mkInd s2 m1) m2 arty) -> nm = s2.
+intros s2 m1 m2 arty h. inversion h. reflexivity.
 Qed.
 
 Lemma notPocc_TCnstr:
-  forall s2 m1 m2, ~ PoccTrm (TConstruct (mkInd s2 m1) m2) -> nm <> s2.
-intros s2 m1 m2 h j. elim h. rewrite <- j. auto. 
+  forall s2 m1 m2 arty,
+    ~ PoccTrm (TConstruct (mkInd s2 m1) m2 arty) -> nm <> s2.
+intros s2 m1 m2 arty h j. elim h. rewrite <- j. auto. 
 Qed.
 
 Lemma PoccTrms_tappendl:
@@ -1095,15 +1117,18 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
        Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
        Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
+| IAx: forall n, Instantiate n TAx TAx
 | IInd: forall n ind, Instantiate n (TInd ind) (TInd ind)
-| IConstruct: forall n ind m1,
-                Instantiate n (TConstruct ind m1) (TConstruct ind m1)
+| IConstruct: forall n ind m1 arty,
+                Instantiate n (TConstruct ind m1 arty)
+                            (TConstruct ind m1 arty)
 | ICase: forall n np s ts is its,
            Instantiate n s is -> Instantiates n ts its ->
            Instantiate n (TCase np s ts) (TCase np is its)
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
+| IWrong: forall n, Instantiate n TWrong TWrong
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,

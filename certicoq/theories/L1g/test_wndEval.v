@@ -1,21 +1,63 @@
 
 Add LoadPath "../common" as Common.
-Add LoadPath "." as L1.
+Add LoadPath "../L1_QuotedCoq" as L1.
+Add LoadPath "." as L1g.
 
 Require Import Template.Template.
 Require Import Coq.Relations.Relation_Operators.
-Require Import Common.RandyPrelude.
-Require Import L1.term L1.program L1.wndEval.
-(**
-Require Import L1.L1.  (* whole L1 library is exported by L1.L1 *)
-**)
+Require Import Common.Common.
+Require Import L1.L1.
+Require Import L1g.term L1g.program L1g.wndEval.
 Require Import Omega.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 
-Fixpoint fooFix (n:nat) := match n with 0 => 0 | S n => S (fooFix n) end.
+Set Printing Width 150.
+Set Printing Depth 100.
+
+(** simple example **)
+Definition plus01 := (plus 1 0).
+Definition cbv_plus01 := Eval cbv in plus01.  (* evaluated by Coq *)
+Print cbv_plus01.
+(* program of Coq's result *)
+Quote Recursively Definition p_plus01 := (plus 1 0).
+Quote Definition q_plus01 := Eval cbv in (plus 1 0).
+Print q_plus01.
+Definition pP := Eval cbv in program_Program p_plus01.
+Print pP.
+Definition cbv_env_pP := Eval cbv in (env pP).
+Print cbv_env_pP.
+Definition cbv_main_pP := Eval cbv in (main pP).
+Print cbv_main_pP.
+Definition cbv_q_plus01 := Eval cbv in (term_Term (env pP) q_plus01).
+Print cbv_q_plus01.
+Goal (wndEvalRTC cbv_env_pP cbv_main_pP cbv_q_plus01).
+  unfold cbv_env_pP, cbv_main_pP, cbv_q_plus01.
+  eapply wERTCtrn. eapply wERTCstep. eapply sAppFn. eapply sConst.
+  unfold LookupDfn. apply LHit. cbn.
+  eapply wERTCtrn. eapply wERTCstep. eapply sFix. cbn. reflexivity.
+  cbn. reflexivity. cbn. reflexivity. cbn.
+  eapply wERTCtrn. eapply wERTCstep. eapply sBeta. cbn.
+  eapply wERTCtrn. eapply wERTCstep. eapply sBeta. cbn.
+  eapply wERTCtrn. eapply wERTCstep. eapply sCase.
+  cbn. reflexivity. cbn. reflexivity. cbn. reflexivity.
+  eapply wERTCtrn. eapply wERTCstep. eapply sBeta. cbn.
+  eapply wERTCtrn. eapply wERTCstep. eapply sAppArgs.
+  eapply saHd. eapply sFix. cbn. reflexivity. cbn. reflexivity. reflexivity.
+  cbn. eapply wERTCtrn. eapply wERTCstep. eapply sAppArgs.
+  eapply saHd. eapply sBeta. cbn.
+  eapply wERTCtrn. eapply wERTCstep. eapply sAppArgs.
+  eapply saHd. eapply sBeta. cbn.
+  eapply wERTCtrn. eapply wERTCstep. eapply sAppArgs.
+  eapply saHd. eapply sCase. cbn. reflexivity. cbn. reflexivity. cbn. reflexivity.
+  eapply wERTCrfl.
+  Qed.
+
+(***********************)
+  
+  Fixpoint fooFix (n:nat) := match n with 0 => 0 | S n => S (fooFix n) end.
 Quote Recursively Definition p_fooFix := fooFix.
 Print p_fooFix.
 

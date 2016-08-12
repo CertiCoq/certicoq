@@ -9,30 +9,14 @@ Require Import ExtLib.Data.String.
 Require Import Template.Template.
 Require Import Common.Common.
 Require L2.L2.         (* whole L2 library is exported by L2.L2 *)
-Require Import L3.L3.  (* whole L3 library is exported by L3.L3 *)
+Require Import L3.compile. 
+Require Import L3.term.
+Require Import L3.program.
+Require Import L3.wcbvEval.
 
 Local Open Scope bool.
 Local Open Scope list.
 Local Open Scope string_scope.
-
-Definition exc_wcbvEval
-  (tmr:nat) (pgm:program) (tm:term) : (exception Term * exception Term) :=
-  match L2.compile.program_Program pgm with
-    | Exc str => (Exc str, Ret prop)
-    | Ret p =>
-      let e2 := AstCommon.env p in
-      match term_Term e2 tm with
-        | Exc _ => (Exc ("term_Term e2 tm fails"), Ret prop)
-        | Ret tTtm =>
-          match program_Program pgm with
-            | Exc _ => (Exc ("program_Program e2 pgm fails"), Ret tTtm)
-            | Ret pgm =>
-              (option_exception
-                 (wcbvEval tmr (env pgm) (main pgm)),
-               Ret tTtm)
-          end
-      end
-  end.
 
 Inductive List (A:Set) :=
   Nil: List A | Cons: forall (a:A) (bs:List A), List A.
@@ -40,6 +24,31 @@ Definition tl (A:Set) (ls:List A) : List A :=
   match ls with Nil _ => Nil A | Cons _ x bs => Cons _ x bs end.
 Quote Recursively Definition p_tl := tl.
 Print p_tl.
+
+
+Require Coq.Vectors.Vector.
+Print Fin.t.
+Print Vector.t.
+
+Definition vplus (n:nat) :
+  Vector.t nat n -> Vector.t nat n -> Vector.t nat n :=
+  Eval cbv in (Vector.map2 plus).
+
+Definition vplus01 :=
+  (@vplus 1 (Vector.cons nat 0 0 (Vector.nil nat))
+          (Vector.cons nat 1 0 (Vector.nil nat))).
+Definition cbv_vplus01 := Eval cbv in vplus01.
+Print cbv_vplus01.
+Quote Recursively Definition q_vplus01 := vplus01.
+Print q_vplus01.
+Quote Recursively Definition q_cbv_vplus01 := cbv_vplus01.
+Print q_cbv_vplus01.
+Definition p_vplus01 := Eval cbv in program_Program q_vplus01.
+Print p_vplus01.
+Definition ans_vplus01 := Eval cbv in main (program_Program q_vplus01).
+Print ans_vplus01.
+Print p_vplus01.
+
 
 
 (** Olivier's example **)

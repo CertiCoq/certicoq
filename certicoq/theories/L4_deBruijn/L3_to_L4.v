@@ -105,6 +105,7 @@ Section TermTranslation.
   Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
     | L3t.TAx => Ax_e ""
+    | L3t.TWrong => Ax_e "wrong"
     | L3t.TProof => (* TODO: Ax_e for now *) Ax_e "proof"
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TSort s => (* Erase *) erased_exp
@@ -115,7 +116,7 @@ Section TermTranslation.
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
     | L3t.TInd i => (* Erase *) erased_exp
-    | L3t.TConstruct ind c args =>
+    | L3t.TConstruct ind c _ args =>
       let args' := trans_args trans k args in
         Con_e (dcon_of_con ind c) args'
     | L3t.TCase ann t brs =>
@@ -168,7 +169,7 @@ Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : string * exp) => Let_e (snd x) acc) e t.
 
 (** start-to-L4 translations **)
-Definition myprogram_Program : program -> exception (Program Term) :=
+Definition myprogram_Program : program -> Program Term :=
   L3t.program_Program.
 (*************
   do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
@@ -187,10 +188,9 @@ Definition translate_program (e : environ L3.compile.Term) (t : L3t.Term) : exp 
   let e' := translate_env e in
     mkLets e' (translate e' t).
 
-Definition program_exp (pgm:program) : exception exp :=
-  do prg <- myprogram_Program pgm;
-      let (main, env) := prg in
-      Ret (translate_program env main).
+Definition program_exp (pgm:program) : exp :=
+  let (main, env) := myprogram_Program pgm in
+  translate_program env main.
 
 (**************  never used ???  *******************
 Definition term_exp (e:L3t.environ L3.compile.Term) (t:term) : exception exp :=

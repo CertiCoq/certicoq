@@ -482,7 +482,7 @@ Eval vm_compute in ueval_ce_n 100 (copy $ one).
 Require Import L4.L3_to_L4.
 
 Definition compile (p : program) : exception cps :=
-  do e <- program_exp p; Ret (cps_cvt_prog e).
+  Ret (cps_cvt_prog (program_exp p)).
 
 Definition run (p : program) : exception ans :=
   do c <- compile p; Ret (ueval_c_n 1000 c).
@@ -499,7 +499,7 @@ Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1%nat).
 Quote Definition q_typedef := Eval compute in typedef.
 Quote Recursively Definition p_typedef := typedef.
 Eval compute in (compile.program_Program p_typedef :
-                   exception (Program compile.Term)).
+                   Program compile.Term).
 
 Definition L1_typedef  :=
   Eval compute in compile.program_Program p_typedef.

@@ -395,27 +395,17 @@ Section L1_to_L5a.
 Let compile_L1_to_L4 := L3_to_L4.program_exp.
 Require Import L4.L4_to_L4a.
 Let compile_L1_to_L4a (e : Ast.program) :=
-    match compile_L1_to_L4 e with
-    | exceptionMonad.Exc s => exceptionMonad.Exc s
-    | exceptionMonad.Ret e => exceptionMonad.Ret (L4.L4_to_L4a.translate nil e)
-    end.
+  L4.L4_to_L4a.translate nil (compile_L1_to_L4 e).
 
 Let compile_L1_to_cps (e : Ast.program)  :=
-    match compile_L1_to_L4a e with
-    | exceptionMonad.Exc s => exceptionMonad.Exc s
-    | exceptionMonad.Ret e => exceptionMonad.Ret (simpleCPSAA.cps_cvt e)
-    end.
-
+  simpleCPSAA.cps_cvt (compile_L1_to_L4a e).
 
 Definition compile_L1_to_L5a (e:Ast.program) : exception val_c:=
-    match compile_L1_to_cps e with
-    | exceptionMonad.Exc s => exceptionMonad.Exc s
-    | exceptionMonad.Ret e =>
-      match translateVal e with
-      | None => exceptionMonad.Exc "error in L5a.translateVal"
-      | Some e => exceptionMonad.Ret e
-      end
-    end.
+  let e := compile_L1_to_cps e in
+  match translateVal e with
+  | None => exceptionMonad.Exc "error in L5a.translateVal"
+  | Some e => exceptionMonad.Ret e
+  end.
 End L1_to_L5a.
 
 (*

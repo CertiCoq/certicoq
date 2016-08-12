@@ -38,12 +38,30 @@ Definition getIndArities pack n :=
   do ity <- getInd pack n;
      ret (List.map CnstrArity ity.(itypCnstrs)).
 
-Definition CrctAnnot {A} (e : environ A) (ann : inductive * nat * list nat) : Prop :=
+Fixpoint is_n_lambda (n : nat) (t : Term) :=
+  match n with
+  | 0%nat => true
+  | S n => 
+    match t with
+    | TLambda _ t => is_n_lambda n t
+    | _ => false
+    end
+  end.
+
+Definition CrctBranches (e : environ Term) (arities : list nat) (brs : Terms) : Prop :=
+  List.length arities = tlength brs /\
+  forall i, match List.nth_error arities i, tnth i brs with
+       | Some ar, Some t => is_n_lambda ar t = true
+       | _, _ => False
+       end.
+
+Definition CrctAnnot (e : environ Term) (ann : inductive * nat * list nat) (brs : Terms) : Prop :=
   let '(ind, pars, args) := ann in
   let 'mkInd mind n := ind in
   match lookup mind e with
   | Some (ecTyp _ pars' pack) =>
-    pars' = pars /\ getIndArities pack n = Ret args
+    pars' = pars /\ getIndArities pack n = Ret args /\
+    CrctBranches e args brs
   | _ => False
   end.
 
@@ -72,7 +90,7 @@ Inductive Crct: (environ Term) -> nat -> Term -> Prop :=
                    Crcts p n args ->
                    Crct p n (TConstruct (mkInd ipkgNm inum) cnum arty args)
 | CrctCase: forall n p m mch brs,
-    CrctAnnot p m ->
+    CrctAnnot p m brs ->
               Crct p n mch -> Crcts p n brs ->
               Crct p n (TCase m mch brs)
 | CrctFix: forall n p ds m,
@@ -473,9 +491,9 @@ induction 1; intros; try discriminate.
 - injection H1; intros; subst. intuition.
 Qed.
 
-Lemma CrctAnnot_weaken nm (p : environ Term) m d :
-  CrctAnnot p m -> fresh nm p ->
-  CrctAnnot ((nm, d) :: p) m.
+Lemma CrctAnnot_weaken nm (p : environ Term) m brs d :
+  CrctAnnot p m brs -> fresh nm p ->
+  CrctAnnot ((nm, d) :: p) m brs.
 Proof.
   intros HC Hf.
   red.
@@ -489,7 +507,7 @@ Qed.
 Lemma Crct_invrt_Case:
   forall p n case,
     Crct p n case -> forall m s us, case = (TCase m s us) ->
-    CrctAnnot p m /\ Crct p n s /\ Crcts p n us.
+    CrctAnnot p m us /\ Crct p n s /\ Crcts p n us.
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ H2). intuition.
   apply CrctAnnot_weaken; auto.
@@ -548,7 +566,48 @@ Proof.
   - apply CrctsCons; intuition.
 Qed.
 
+Lemma Instantiate_pres_is_n_lambda tin n t it k :
+  Instantiate tin n t it ->
+  is_n_lambda k t = true -> is_n_lambda k it = true.
+Proof.
+  intros H; revert k; induction H;
+  simpl; intros; destruct k; 
+  try (simpl in *; reflexivity || discriminate).
+  simpl in H0. apply (IHInstantiate _ H0). 
+Qed.
 
+Lemma Instantiates_pres_is_n_lambda tin n ts its k :
+  Instantiates tin n ts its ->
+  forall i t, tnth i ts = Some t ->
+         exists t', tnth i its = Some t' /\
+               (is_n_lambda k t = true ->
+                is_n_lambda k t' = true).
+Proof.
+  induction 1. simpl. intros. discriminate.
+  intros.
+  simpl in H1. destruct i.
+  - injection H1. intros <-.
+    exists it. intuition.
+    eapply Instantiate_pres_is_n_lambda in H. apply H. apply H2.
+  - destruct (IHInstantiates _ _ H1) as [t' [Hnth Hlam]].
+    exists t'. intuition.
+Qed.
+
+Lemma Instantiates_pres_CrctAnnot tin n ts its p np :
+  Instantiates tin n ts its ->
+  CrctAnnot p np ts -> CrctAnnot p np its.
+Proof.
+  destruct np as [[[mind ind] pars] args]; intros i h1. simpl in *.
+  destruct (lookup mind p); trivial. destruct e; trivial.
+  destruct h1 as [h1 [h1' h1'']].
+  intuition. red in h1'' |- *. intuition.
+  now rewrite <- (Instantiates_pres_tlength i).
+  specialize (H0 i1). destruct (nth_error args i1); trivial.
+  revert H0; case_eq (tnth i1 ts). intros t Ht Hnt.
+  destruct (Instantiates_pres_is_n_lambda n1 i _ Ht) as [t' [Hnt' Hnlam]].
+  rewrite Hnt'. intuition. now intros _ Hf.
+Qed.
+      
 Lemma Instantiate_pres_Crct:
   forall tin, 
   (forall n bod ins, Instantiate tin n bod ins ->
@@ -591,7 +650,7 @@ Proof.
       * rewrite <- (Instantiates_pres_tlength i). apply h3; trivial.
       * apply H; auto.
   - destruct (Crct_invrt_Case H2 eq_refl) as [h1 [h2 h3]]. apply CrctCase.
-    + apply h1.
+    + eapply Instantiates_pres_CrctAnnot; eauto.
     + apply H; trivial.
     + apply H0; trivial.
   - assert (j:= Crct_invrt_Fix H1 eq_refl). apply CrctFix. 

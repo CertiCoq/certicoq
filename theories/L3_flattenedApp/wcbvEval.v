@@ -60,12 +60,13 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               WcbvEval p arg arg1 ->
               WcbvEval p (TApp fn arg) (TApp efn arg1)
 | wCase: forall mch i n arty ml args args' brs ebrs cs s,
-           WcbvEval p mch (TConstruct i n arty args) ->
-           tskipn (snd (fst ml)) args = Some args' ->  (* drop parameters *)
-           WcbvEvals p brs ebrs ->
-           whCaseStep n args' ebrs = Some cs ->
-           WcbvEval p cs s ->
-           WcbvEval p (TCase ml mch brs) s
+    WcbvEval p mch (TConstruct i n arty args) ->
+    i = (fst (fst ml)) ->
+    tskipn (snd (fst ml)) args = Some args' ->  (* drop parameters *)
+    WcbvEvals p brs ebrs ->
+    whCaseStep n args' ebrs = Some cs ->
+    WcbvEval p cs s ->
+    WcbvEval p (TCase ml mch brs) s
 | wCaseCong: forall ml mch emch brs ebrs,
            WcbvEval p mch emch ->
            ~ isConstruct emch ->
@@ -345,14 +346,16 @@ Function wcbvEval
                 | None => None
                 | Some ebrs => 
                   match wcbvEval n p mch with
-                    | Some (TConstruct _ r _ args) =>
-                      match tskipn (snd (fst ml)) args with
+                  | Some (TConstruct i r _ args) =>
+                      if eq_dec i (fst (fst ml)) then
+                        match tskipn (snd (fst ml)) args with
                         | None => None
                         | Some ts => match whCaseStep r ts ebrs with
-                                       | None => None
-                                       | Some cs => wcbvEval n p cs
-                                     end
-                      end
+                                    | None => None
+                                    | Some cs => wcbvEval n p cs
+                                    end
+                        end
+                      else None
                     | Some T => Some (TCase ml T ebrs)
                     | None => None
                   end
@@ -418,7 +421,8 @@ Proof.
     try (myInjection H1); try (apply wAppCong); try assumption;
     try (solve[not_isApp]).
   - subst. specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ H2).
-    refine (wCase _ _ _ _ _ _); eassumption.  
+    clear e3.
+    refine (wCase _ _ _ _ _ _ _); eassumption || reflexivity.
   - subst. specialize (H _ e1). specialize (H0 _ e2). myInjection H1.
     eapply wCaseCong; try assumption.
     destruct T; try contradiction; try not_isConstruct.
@@ -489,10 +493,12 @@ Proof.
     { rewrite (j m (max x (max y z))). apply hy.
       assert (l:= max_snd x (max y z)). assert (l':= max_fst y z).
       omega. omega. }
-    cbn. rewrite k0. rewrite k. rewrite e. rewrite e0.
+    cbn. rewrite k0. rewrite k.
+    destruct inductive_dec.
+    rewrite e0. rewrite e1.
     rewrite (j m (max x (max y z))). apply hz.
     assert (l:= max_snd x (max y z)). assert (l':= max_snd y z).
-    omega. omega.
+    omega. omega. contradiction.
   - destruct H as [x hx]. destruct H0 as [x0 hx0].
     exists (S (max x x0)). intros m hm. cbn.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).

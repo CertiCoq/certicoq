@@ -36,8 +36,7 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TAx        : Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat (* index *) ->
-               nat (* arity *) -> Terms -> Term
+| TConstruct : inductive -> nat (* index *) -> Terms -> Term
 | TCase      : inductive * nat * list nat (* # pars, args per branch *) ->
                Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
@@ -114,9 +113,9 @@ Function etaArgs (n:nat) : Terms :=
 
 Function etaExp_cnstr (i:inductive) (n arity:nat) (args:Terms) : Term :=
   match nat_compare (tlength args) arity with
-    | Datatypes.Eq => (TConstruct i n arity args)
+    | Datatypes.Eq => (TConstruct i n args)
     | Lt => let k := arity - (tlength args)
-            in (mkEta (TConstruct i n arity (tappend args (etaArgs k))) k)
+            in (mkEta (TConstruct i n (tappend args (etaArgs k))) k)
     | Gt => TWrong
   end.
 

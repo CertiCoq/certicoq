@@ -34,8 +34,8 @@ Inductive WNorm: Term -> Prop :=
             WNorm mch -> ~ isConstruct mch ->
             WNorms brs ->
             WNorm (TCase n mch brs)
-| WNConstruct: forall i n arty args,
-                 WNorms args -> WNorm (TConstruct i n arty args)
+| WNConstruct: forall i n args,
+                 WNorms args -> WNorm (TConstruct i n args)
 | WNInd: forall i, WNorm (TInd i)
 | WNSort: forall s, WNorm (TSort s)
 | WNApp: forall fn t,
@@ -70,7 +70,7 @@ Proof.
     + right. intros h. elim H. inversion h. assumption.
   - destruct H; try rght.
     + destruct (isConstruct_dec t).
-      * right. destruct H1 as [x0 [x1 [x2 [x3 j]]]]. subst. intros h.
+      * right. destruct H1 as [x0 [x1 [x2 j]]]. subst. intros h.
         inversion_Clear h. elim H5. auto.
       * destruct H0.
         { left. constructor; assumption. }

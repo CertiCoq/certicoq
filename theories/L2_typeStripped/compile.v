@@ -18,9 +18,9 @@ Set Implicit Arguments.
 Definition L1_5Term := L1_5.compile.Term.
 Definition L1_5Terms := L1_5.compile.Terms.
 Definition L1_5Defs := L1_5.compile.Defs.
-Definition L1_5Pgm := L1_5.compile.Program.
-Definition L1_5EC := @AstCommon.envClass L1_5Term.
-Definition L1_5Env := AstCommon.environ L1_5Term.
+Definition L1_5Pgm := Program L1_5Term.
+Definition L1_5EC := envClass L1_5Term.
+Definition L1_5Env := environ L1_5Term.
 
 
 Inductive Term : Type :=
@@ -33,11 +33,13 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
+| TAx        : Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat (* cnstr no *) -> Term
+| TConstruct : inductive -> nat (* cnstr no *) -> nat (* arity *) -> Term
 | TCase      : (inductive * nat * list nat) (* # parameters, # args per branch *) ->
                Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
+| TWrong     : Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -48,16 +50,12 @@ Hint Constructors Term Terms Defs.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
-Scheme Trm_ind2 := Induction for Term Sort Type
-  with Trms_ind2 := Induction for Terms Sort Type
-  with Defs_ind2 := Induction for Defs Sort Type.
 Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
 Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
-Definition tunit (t:Term) : Terms := (tcons t tnil).
 Notation prop := (TSort SProp).
 Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
-Notation x_ := (nAnon).
+Notation tunit t := (tcons t tnil).
 
 
 Function strip (t:L1_5Term) : Term :=
@@ -73,10 +71,12 @@ Function strip (t:L1_5Term) : Term :=
     | L1_5.compile.TApp fn arg args =>
       TApp (strip fn) (strip arg) (strips args)
     | L1_5.compile.TConst nm => TConst nm
+    | L1_5.compile.TAx => TAx
     | L1_5.compile.TInd i => TInd i
-    | L1_5.compile.TConstruct i m => TConstruct i m
+    | L1_5.compile.TConstruct i m arty => TConstruct i m arty
     | L1_5.compile.TCase n _ mch brs => TCase n (strip mch) (strips brs)
     | L1_5.compile.TFix ds n => TFix (stripDs ds) n
+    | L1_5.compile.TWrong => TWrong
   end
 with strips (ts:L1_5Terms) : Terms := 
   match ts with
@@ -91,32 +91,22 @@ with stripDs (ts:L1_5Defs) : Defs :=
 
 
 (** environments and programs **)
-Definition envClass := AstCommon.envClass Term.
-Definition environ := AstCommon.environ Term.
-Definition Program := AstCommon.Program Term.
-
-Function stripEC (ec:L1_5EC) : envClass :=
+Function stripEC (ec:L1_5EC) : AstCommon.envClass Term :=
   match ec with
-    | AstCommon.ecTrm t => AstCommon.ecTrm (strip t)
-    | AstCommon.ecTyp _ n itp => AstCommon.ecTyp Term n itp
+    | ecTrm t => ecTrm (strip t)
+    | ecTyp _ n itp => ecTyp Term n itp
   end.
 
-Definition  stripEnv : L1_5Env -> environ :=
+Definition  stripEnv : L1_5Env -> AstCommon.environ Term :=
   List.map (fun nmec : string * L1_5EC => (fst nmec, stripEC (snd nmec))).
 
-Definition stripProgram (p:L1_5Pgm) : Program :=
+Definition stripProgram (p:L1_5Pgm) : Program Term :=
   {| env:= stripEnv (env p);
      main:= strip (main p) |}.
 
-(*** from L0 to L2 ***)
-Definition program_Program (pgm:program) : exception Program :=
-  match L1_5.compile.program_Program pgm with
-    | Exc str => raise str
-    | Ret pgm => ret (stripProgram pgm)
-  end.
-Definition term_Term (t:term) : exception Term :=
-  match L1_5.compile.term_Term t with
-    | Exc str => raise str
-    | Ret trm => ret (strip trm)
-  end.
+(*** from L1 to L2 ***) 
+Definition program_Program (p:program) : Program Term :=
+  stripProgram (L1_5.compile.program_Program p).
 
+Definition term_Term (e:AstCommon.environ L1gTerm) (t:term) : Term :=
+  strip (L1_5.compile.term_Term e t).

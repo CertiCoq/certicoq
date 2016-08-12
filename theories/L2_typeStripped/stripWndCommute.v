@@ -22,10 +22,6 @@ Require Import L2.compile.
 Definition L1_5Term := L1_5.compile.Term.
 Definition L1_5Terms := L1_5.compile.Terms.
 Definition L1_5Defs := L1_5.compile.Defs.
-Definition ecTrm := AstCommon.ecTrm.
-Definition ecTyp := AstCommon.ecTyp Term.
-Definition ecAx := AstCommon.ecAx Term.
-
 
 
 Lemma not_isApp_strip_hom:
@@ -67,11 +63,7 @@ Lemma Wnd_hom:
   (forall (ss ts:L1_5Terms),
      L1_5.wndEval.wndEvals p ss ts ->
      L1_5.term.WFapps ss -> strips ss <> strips ts ->
-     wndEvals (stripEnv p) (strips ss) (strips ts)) /\
-  (forall (ds es:L1_5Defs),
-     L1_5.wndEval.wndDEvals p ds es ->
-     L1_5.term.WFappDs ds -> stripDs ds <> stripDs es ->
-     wndDEvals (stripEnv p) (stripDs ds) (stripDs es)).
+     wndEvals (stripEnv p) (strips ss) (strips ts)).
 Proof.
   intros p hp.
   apply L1_5.wndEval.wndEvalEvals_ind; intros; try (solve [constructor]);

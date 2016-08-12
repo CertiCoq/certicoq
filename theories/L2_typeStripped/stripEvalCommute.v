@@ -28,9 +28,6 @@ Set Implicit Arguments.
 Definition L1_5Term := L1_5.compile.Term.
 Definition L1_5Terms := L1_5.compile.Terms.
 Definition L1_5Defs := L1_5.compile.Defs.
-Definition ecTrm := AstCommon.ecTrm.
-Definition ecTyp := AstCommon.ecTyp Term.
-Definition ecAx := AstCommon.ecAx Term.
 
 Definition optStrip (t:option L1_5Term) : option Term :=
   match t with
@@ -69,32 +66,26 @@ induction y; simpl; reflexivity.
 Qed.
                               
 
-Lemma stripEnv_hom:
-  forall str (ec:L1_5.compile.envClass) p,
-    stripEnv ((str, ec) :: p) = (str, (stripEC ec))::(stripEnv p).
-induction p; destruct ec; try reflexivity.
-Qed.
-
 Lemma Lookup_hom:
- forall p s ec, L1_5.program.Lookup s p ec -> 
-               Lookup s (stripEnv p) (stripEC ec).
-induction 1; destruct t.
-- change (Lookup s ((s, ecTrm (strip l)) :: (stripEnv p))
-                    (ecTrm (strip l))).
-  apply LHit.
-- change (Lookup s ((s, ecTyp n i) :: (stripEnv p)) (ecTyp n i)).
-  apply LHit.
-- change (Lookup s2 ((s1, ecTrm (strip l)) :: (stripEnv p))
-                     (stripEC ec)).
-  apply LMiss; assumption.
-- change (Lookup s2 ((s1, ecTyp n i) :: (stripEnv p)) (stripEC ec)).
-  apply LMiss; assumption.
+  forall p s ec, Lookup s p ec -> Lookup s (stripEnv p) (stripEC ec).
+Proof.
+  induction 1; destruct t.
+  - change (Lookup s ((s, ecTrm (strip l)) :: (stripEnv p))
+                   (ecTrm (strip l))).
+    apply LHit.
+  - change (Lookup s ((s, ecTyp _ n i) :: (stripEnv p)) (ecTyp _ n i)).
+    apply LHit.
+  - change (Lookup s2 ((s1, ecTrm (strip l)) :: (stripEnv p))
+                   (stripEC ec)).
+    apply LMiss; assumption.
+  - change (Lookup s2 ((s1, ecTyp _ n i) :: (stripEnv p)) (stripEC ec)).
+    apply LMiss; assumption.
 Qed.
 
 Lemma LookupDfn_hom:
  forall p s t, L1_5.program.LookupDfn s p t -> 
                LookupDfn s (stripEnv p) (strip t).
-unfold L1_5.program.LookupDfn, L2.program.LookupDfn. intros.
+unfold LookupDfn. intros.
 assert (j:= Lookup_hom H). exact j.
 Qed.
 
@@ -189,7 +180,7 @@ Proof.
 Qed.
 
 Lemma L1WFaEnv_L2WFaEnv:
-  forall p:L1_5.compile.environ, L1_5.program.WFaEnv p -> WFaEnv (stripEnv p).
+  forall p:environ L1_5Term, L1_5.program.WFaEnv p -> WFaEnv (stripEnv p).
 Proof.
   induction 1; simpl; constructor.
   - inversion H; destruct ec; simpl; try discriminate; constructor.
@@ -376,7 +367,8 @@ rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
 Qed.
 
 Lemma TConstruct_hom:
-  forall i n , strip (L1_5.compile.TConstruct i n) = TConstruct i n.
+  forall i n arty,
+    strip (L1_5.compile.TConstruct i n arty) = TConstruct i n arty.
 intros. simpl.  destruct i. reflexivity.
 Qed.
 
@@ -409,24 +401,28 @@ reflexivity.
 Qed.
 
 Lemma TProd_hom:
-  forall nm ty bod, strip (L1_5.compile.TProd nm ty bod) = TProd nm (strip bod).
+  forall nm ty bod,
+    strip (L1_5.compile.TProd nm ty bod) = TProd nm (strip bod).
 reflexivity.
 Qed.
 
 Lemma TLambda_hom:
-  forall nm ty bod, strip (L1_5.compile.TLambda nm ty bod) = TLambda nm (strip bod).
+  forall nm ty bod,
+    strip (L1_5.compile.TLambda nm ty bod) = TLambda nm (strip bod).
 reflexivity.
 Qed.
 
 Lemma TLetIn_hom:
   forall nm dfn ty bod,
-    strip (L1_5.compile.TLetIn nm dfn ty bod) = TLetIn nm (strip dfn) (strip bod).
+    strip (L1_5.compile.TLetIn nm dfn ty bod) =
+    TLetIn nm (strip dfn) (strip bod).
 reflexivity.
 Qed.
 
 Lemma TCase_hom:
   forall n ty mch brs,
-    strip (L1_5.compile.TCase n ty mch brs) = TCase n (strip mch) (strips brs).
+    strip (L1_5.compile.TCase n ty mch brs) =
+    TCase n (strip mch) (strips brs).
 reflexivity.
 Qed.
 
@@ -468,41 +464,26 @@ Proof.
 Qed.
 
 
-Lemma appliedAxiomP_hom:
-  forall Mch, L1_5.term.appliedAxiomP Mch = appliedAxiomP (strip Mch).
-Proof.
-  destruct Mch; cbn; try reflexivity.
-  destruct Mch1; cbn; try reflexivity.
-Qed.
-
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L1_5.wcbvEval.WcbvEval p t t' ->
                   WcbvEval (stripEnv p) (strip t) (strip t')) /\
     (forall ts ts', L1_5.wcbvEval.WcbvEvals p ts ts' ->
-                    WcbvEvals (stripEnv p) (strips ts) (strips ts')) /\  
-    (forall dts dts', L1_5.wcbvEval.WcbvDEvals p dts dts' ->
-                      WcbvDEvals (stripEnv p) (stripDs dts) (stripDs dts')).
+                    WcbvEvals (stripEnv p) (strips ts) (strips ts')).
 Proof.
   intros p.
-  apply L1_5.wcbvEval.WcbvEvalEvals_ind; intros; simpl; try reflexivity;
+  apply L1_5.wcbvEval.WcbvEvalEvals_ind; cbn; intros; try reflexivity;
   try (solve[constructor; trivial]).
-  - constructor. unfold LookupAx. unfold L1_5.program.LookupAx in *.
-    change (Lookup nm (stripEnv p)
-                   (stripEC (AstCommon.ecAx (L1_5.compile.Term)))).
-    apply Lookup_hom. assumption.
   - refine (wConst _ _); try eassumption.
     unfold LookupDfn. unfold L1_5.program.LookupDfn in *.
     change (Lookup nm (stripEnv p) (stripEC (AstCommon.ecTrm t))).
     apply Lookup_hom. assumption.
-  - refine (wAppLam _ _ _).
-    + rewrite TLambda_hom in H. eassumption.
-    + eassumption.
+  - refine (wAppLam _ _ _); try eassumption.
     + rewrite whBetaStep_hom in H1. eassumption.
   - refine (wLetIn _ _ _ _). eassumption.
     rewrite <- (proj1 instantiate_hom). assumption.
   - refine (wAppFix _ _ _ _).
-    + rewrite TFix_hom in H. eassumption.
+    + eassumption.
     + rewrite <- dnthBody_hom. destruct (L1_5.term.dnthBody m dts).
       * rewrite e. cbn. reflexivity.
       * discriminate.
@@ -511,12 +492,15 @@ Proof.
       constructor; eassumption.
     + rewrite <- tcons_hom. rewrite pre_whFixStep_hom.
       assumption.
+  - rewrite mkApp_hom. refine (wAppCong _ _ _ _); try eassumption.
+    + intros h. elim n. apply isLambda_hom. assumption.
+    + intros h. elim n0. apply isFix_hom. assumption.      
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.
     * rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
-  - refine (wCaseAx _ _ _ _); try eassumption.
-    + rewrite <- appliedAxiomP_hom. assumption.
+  - refine (wCaseCong _ _ _ _); try eassumption.
+    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
 Qed.
 Print Assumptions WcbvEval_hom.
 
@@ -555,7 +539,8 @@ Proof.
 Qed.
 
 Lemma Construct_strip_inv:
-  forall i n s, TConstruct i n = strip s -> L1_5.compile.TConstruct i n = s.
+  forall i n arty s,
+    TConstruct i n arty = strip s -> L1_5.compile.TConstruct i n arty = s.
 Proof.
   intros i n. destruct s; simpl; intros h; try discriminate.
   - myInjection h. reflexivity.
@@ -692,13 +677,15 @@ Function unstrip (t:Term) : L1_5Term :=
     | TLetIn nm dfn bod =>
            L1_5.compile.TLetIn nm (unstrip dfn) L1_5.compile.prop (unstrip bod)
     | TApp fn arg args =>
-           L1_5.compile.TApp (unstrip fn) (unstrip arg) (unstrips args)
+      L1_5.compile.TApp (unstrip fn) (unstrip arg) (unstrips args)
+    | TAx => L1_5.compile.TAx
     | TConst nm => L1_5.compile.TConst nm
     | TInd i => L1_5.compile.TInd i
-    | TConstruct i m => L1_5.compile.TConstruct i m
+    | TConstruct i m arty => L1_5.compile.TConstruct i m arty
     | TCase n mch brs =>
            L1_5.compile.TCase n L1_5.compile.prop (unstrip mch) (unstrips brs)
     | TFix ds n => L1_5.compile.TFix (unstripDs ds) n
+    | TWrong => L1_5.compile.TWrong
   end
 with unstrips (ts:Terms) : L1_5Terms := 
   match ts with
@@ -736,13 +723,13 @@ Function unstripItyPack (its:itypPack) : AstCommon.itypPack :=
          (AstCommon.mkItyp str (unstripCnstrs itps)) ::
                            unstripItyPack itpacks
   end.
-Function unstripEC (ec:envClass) : AstCommon.envClass L1_5.compile.Term :=
+Function unstripEC (ec:envClass Term) : envClass L1_5.compile.Term :=
   match ec with
     | AstCommon.ecTrm t => ecTrm (unstrip t)
     | AstCommon.ecTyp _ npars itp =>
        AstCommon.ecTyp _ npars (unstripItyPack itp)
   end.
-Fixpoint unstripEnv (p:environ) : AstCommon.environ L1_5.compile.Term :=
+Fixpoint unstripEnv (p:environ Term) : environ L1_5.compile.Term :=
   match p with
     | nil => nil
     | cons (nm, ec) q => cons (nm, (unstripEC ec)) (unstripEnv q)

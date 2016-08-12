@@ -11,5 +11,8 @@ theories/Makefile:
 libraries/Makefile:
 	cd libraries;coq_makefile -f _CoqProject -o Makefile
 
-
+clean:
+	$(MAKE) clean -C libraries
+	$(MAKE) clean -C libraries/SquiggleEq
+	$(MAKE) clean -C theories
 	

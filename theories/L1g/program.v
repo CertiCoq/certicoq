@@ -22,11 +22,11 @@ Set Implicit Arguments.
 
 
 (** all items in an env are application-well-formed **)
-Inductive WFaEc: envClass -> Prop :=
+Inductive WFaEc: envClass Term -> Prop :=
 | wfaecTrm: forall (t:Term), WFapp t -> WFaEc (ecTrm t)
 | wfaecTyp: forall n i, WFaEc (ecTyp Term n i).
 
-Inductive WFaEnv: environ -> Prop :=
+Inductive WFaEnv: environ Term -> Prop :=
 | wfaenil: WFaEnv nil
 | wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
                    forall nm, WFaEnv ((nm, ec) :: p).
@@ -52,11 +52,6 @@ Hint Constructors AstCommon.fresh.
 (** Lookup an entry in the environment **)
 Hint Constructors AstCommon.Lookup.
 
-(** equivalent functions **)
-Definition lookup := @AstCommon.lookup Term.
-Definition lookupDfn := @AstCommon.lookupDfn Term.
-
-
 Lemma Lookup_pres_WFapp:
   forall p, WFaEnv p -> forall nm ec, Lookup nm p ec -> WFaEc ec.
 Proof.
@@ -81,11 +76,11 @@ Qed.
 
 
 (** correctness specification for programs (including local closure) **)
-Inductive Crct: environ -> nat -> Term -> Prop :=
+Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctSrt: forall n srt, Crct nil n (TSort srt)
 | CrctWkTrmTrm: forall n p t s nm, Crct p n t -> Crct p n s ->
            fresh nm p -> Crct ((nm,ecTrm s)::p) n t
-| CrctWkTrmTyp: forall n p t s nm, Crct p n t -> CrctTyp p n s ->
+| CrctWkTrmTyp: forall n p t s nm, Crct p n t ->
            fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
 | CrctCast: forall n p t ck ty, Crct p n t -> Crct p n ty ->
@@ -102,12 +97,13 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
              Crct p n (TApp fn a args)
 | CrctConst: forall n p pd nm,
                Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
-| CrctConstruct: forall n p ipkgNm inum cnum ipkg itp cstr m,
+| CrctAx: forall n p, Crct p n prop -> Crct p n TAx
+| CrctConstruct: forall n p ipkgNm inum cnum arty ipkg itp cstr m,
                    Crct p n prop ->
                    LookupTyp ipkgNm p m ipkg ->
                    getInd ipkg inum = Ret itp ->
                    getCnstr itp cnum = Ret cstr ->
-                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum)
+                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum arty)
 | CrctCase: forall n p m ty mch brs,
               Crct p n mch -> Crcts p n brs -> Crct p n ty -> 
               Crct p n (TCase m ty mch brs)
@@ -115,38 +111,28 @@ Inductive Crct: environ -> nat -> Term -> Prop :=
              Crct p n prop ->    (** convenient for IH *)
              CrctDs p (n + dlength ds) ds -> Crct p n (TFix ds m)
 | CrctInd: forall n p ind, Crct p n prop -> Crct p n (TInd ind)
-with Crcts: environ -> nat -> Terms -> Prop :=
+with Crcts: environ Term -> nat -> Terms -> Prop :=
 | CrctsNil: forall n p, Crct p n prop -> Crcts p n tnil
 | CrctsCons: forall n p t ts,
                Crct p n t -> Crcts p n ts -> Crcts p n (tcons t ts)
-with CrctDs: environ -> nat -> Defs -> Prop :=
+with CrctDs: environ Term -> nat -> Defs -> Prop :=
 | CrctDsNil: forall n p, Crct p n prop -> CrctDs p n dnil
 | CrctDsCons: forall n p dn dty db dra ds,
           Crct p n dty -> Crct p n db -> CrctDs p n ds ->
-          CrctDs p n (dcons dn dty db dra ds)
-with CrctTyp: environ -> nat -> itypPack -> Prop := 
-| CrctTypStart: forall n itp, CrctTyp nil n itp
-| CrctTypWk1: forall n p t s nm, CrctTyp p n t -> Crct p n s ->
-           fresh nm p -> CrctTyp ((nm,ecTrm s)::p) n t
-| CrctTypWk2: forall n p t s nm, CrctTyp p n t -> CrctTyp p n s ->
-           fresh nm p -> forall m, CrctTyp ((nm,ecTyp m s)::p) n t.
-Hint Constructors Crct Crcts CrctDs CrctTyp.
+          CrctDs p n (dcons dn dty db dra ds).
+Hint Constructors Crct Crcts CrctDs.
 Scheme Crct_ind' := Minimality for Crct Sort Prop
   with Crcts_ind' := Minimality for Crcts Sort Prop
-  with CrctDs_ind' := Minimality for CrctDs Sort Prop
-  with CrctTyp_ind' := Minimality for CrctTyp Sort Prop.
+  with CrctDs_ind' := Minimality for CrctDs Sort Prop.
 Combined Scheme CrctCrctsCrctDs_ind from
          Crct_ind', Crcts_ind', CrctDs_ind'.
-Combined Scheme CrctCrctsCrctDsTyp_ind from
-         Crct_ind', Crcts_ind', CrctDs_ind', CrctTyp_ind'.
 
 
 Lemma Crct_WFTrm:
   (forall p n t, Crct p n t -> WFTrm t n) /\
   (forall p n ts, Crcts p n ts -> WFTrms ts n) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> WFTrmDs ds n) /\
-  (forall (p:environ) (n:nat) (itp:itypPack), CrctTyp p n itp -> True).
-apply CrctCrctsCrctDsTyp_ind; intros; auto.
+  (forall p (n:nat) (ds:Defs), CrctDs p n ds -> WFTrmDs ds n).
+apply CrctCrctsCrctDs_ind; intros; auto.
 Qed.
 
 Lemma Crct_mkApp_ident:
@@ -160,25 +146,40 @@ Lemma Crct_WFApp:
   intros p n t h. eapply WFTrm_WFapp. eapply (proj1 Crct_WFTrm). eassumption.
 Qed.
 
+ 
 Lemma Crct_up:
   (forall p n t, Crct p n t -> Crct p (S n) t) /\
   (forall p n ts, Crcts p n ts -> Crcts p (S n) ts) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> CrctDs p (S n) ds) /\
-  (forall (p:environ) (n:nat) (itp:itypPack), CrctTyp p n itp ->
-                                              CrctTyp p (S n) itp).
+  (forall p (n:nat) (ds:Defs), CrctDs p n ds -> CrctDs p (S n) ds).
 Proof.
-  apply CrctCrctsCrctDsTyp_ind; intros;
+  apply CrctCrctsCrctDs_ind; intros;
   try (econstructor; try omega; eassumption).
 Qed.
 
 Lemma Crct_Sort:
   forall p n t, Crct p n t -> forall srt, Crct p n (TSort srt).
+  induction 1; intuition.  
+Qed.
+
+(*** ???
+Lemma Crct_Typ_Sort:
+  forall p n t, Crct ((nm, ecTyp m s)::p) n t -> forall srt, Crct p n (TSort srt).
 induction 1; intuition.
 Qed.
+****)
 
 Lemma Crcts_tnil:
   forall p n t, Crct p n t -> Crcts p n tnil.
 induction 1; apply CrctsNil; try assumption;
+try (solve [eapply Crct_Sort; eassumption]).
+- constructor.
+- apply CrctWkTrmTrm; try assumption. eapply Crct_Sort; eassumption.
+- apply CrctWkTrmTyp; try assumption. eapply Crct_Sort; eassumption.
+Qed.
+
+Lemma CrctDs_dnil:
+  forall p n t, Crct p n t -> CrctDs p n dnil.
+induction 1; apply CrctDsNil; try assumption;
 try (solve [eapply Crct_Sort; eassumption]).
 - constructor.
 - apply CrctWkTrmTrm; try assumption. eapply Crct_Sort; eassumption.
@@ -195,16 +196,6 @@ try (solve [eapply IHCrct; eassumption]);
 try (solve [eapply IHCrct1; eassumption]);
 try discriminate.
 - injection H2; intros. subst. assumption.
-Qed.
-
-Lemma CrctTypTl:
-  forall pp n t, Crct pp n t ->
-   forall nm npars tp p, pp = ((nm,ecTyp npars tp)::p) -> CrctTyp p n tp.
-induction 1; intros; try discriminate;
-try (solve [eapply IHCrct2; eassumption]);
-try (solve [eapply IHCrct; eassumption]).
-- injection H2; intros. subst. assumption.
-- eapply IHCrct1. eassumption.
 Qed.
 
 
@@ -274,21 +265,22 @@ Lemma Crct_fresh_Pocc:
   (forall p n t, Crct p n t -> forall nm, fresh nm p -> ~ PoccTrm nm t) /\
   (forall p n ts, Crcts p n ts -> forall nm, fresh nm p -> ~ PoccTrms nm ts) /\
   (forall p n (ds:Defs), CrctDs p n ds -> forall nm, fresh nm p ->
-                                                     ~ PoccDefs nm ds) /\
-  (forall (p:environ) (n:nat) (itp:itypPack), CrctTyp p n itp -> True).
-apply CrctCrctsCrctDsTyp_ind; intros; try intros j; auto;
+                                                     ~ PoccDefs nm ds).
+apply CrctCrctsCrctDs_ind; intros; intros j; auto;
 try (solve [inversion j]);
 try (solve [inversion_clear j; elim (H0 nm); trivial]);
 try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
 try (solve [inversion_clear j; elim (H0 nm0); trivial; elim (H2 nm0); trivial]);
 try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
 try (solve [inversion_clear H4; elim (H0 nm0); trivial]).
-- inversion_clear j; elim (H0 nm0); trivial. elim (H2 nm0); trivial.
-  elim (H4 nm0); trivial.
+- elim (H0 nm0); trivial. inversion H2. assumption.
+- inversion_clear j. elim (H0 nm0); assumption. elim (H2 nm0); assumption.
+  elim (H4 nm0); assumption.
 - inversion_clear j. elim (H1 nm); trivial. elim (H3 nm); trivial.
   induction args. inversion H7. elim (H5 nm); trivial.
 - inversion_Clear j. eelim (fresh_Lookup_fails H2). eassumption.
-- inversion_Clear j. eelim (fresh_Lookup_fails H4). eassumption.
+- inversion_Clear j. eelim (fresh_Lookup_fails H4).
+  destruct H1. eassumption.
 - inversion_Clear j. elim (H0 nm); trivial. elim (H2 nm); trivial.
   elim (H4 nm); trivial.
 - inversion_clear j. elim (H0 nm); trivial. elim (H2 nm); trivial.
@@ -301,9 +293,8 @@ Lemma Crct_not_bad_Lookup:
   (forall p n ss, Crcts p n ss ->
                  forall nm, LookupDfn nm p (TConst nm) -> False) /\
   (forall p n ds, CrctDs p n ds ->
-                 forall nm, LookupDfn nm p (TConst nm) -> False) /\
-  (forall p n itp, CrctTyp p n itp -> True).
-apply CrctCrctsCrctDsTyp_ind; intros; auto;
+                 forall nm, LookupDfn nm p (TConst nm) -> False).
+apply CrctCrctsCrctDs_ind; intros; auto;
 try (solve [elim (H0 _ H3)]); try (solve [elim (H0 _ H5)]);
 try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
 - inversion H.
@@ -313,10 +304,10 @@ try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
       elim j. constructor. 
     * elim (H0 _ H11).
   + eelim (H0 _ (Lookup_strengthen H4 _ n0)).
-- elim (H0 nm0). unfold LookupDfn in H4. unfold LookupDfn.
+- elim (H0 nm0). unfold LookupDfn in H2. unfold LookupDfn.
   destruct (string_dec nm0 nm).
-  + subst. inversion H4. assumption.
-  + eapply (Lookup_strengthen H4). reflexivity. assumption.
+  + subst. inversion H2. assumption.
+  + eapply (Lookup_strengthen H2). reflexivity. assumption.
 - elim (H1 _ H2).
 - elim (H1 _ H6).
 - eapply H0. eassumption. 
@@ -331,33 +322,32 @@ Lemma  Crct_weaken:
   (forall p n ts, Crcts p n ts -> 
     forall nm s, fresh nm p -> Crct p n s -> Crcts ((nm,ecTrm s)::p) n ts) /\
   (forall p n ds, CrctDs p n ds -> 
-    forall nm s, fresh nm p -> Crct p n s -> CrctDs ((nm,ecTrm s)::p) n ds) /\
-  (forall p n itp, CrctTyp p n itp -> 
-    forall nm s, fresh nm p -> Crct p n s -> CrctTyp ((nm,ecTrm s)::p) n itp).
-eapply CrctCrctsCrctDsTyp_ind; intros; intuition.
+    forall nm s, fresh nm p -> Crct p n s -> CrctDs ((nm,ecTrm s)::p) n ds).
+eapply CrctCrctsCrctDs_ind; intros; intuition.
 - apply CrctWkTrmTrm; try assumption. eapply CrctConst; try eassumption.
 - eapply CrctConstruct; try eassumption.
-  apply H0; try assumption. apply Lookup_weaken; eassumption.
+  apply H0; try assumption. destruct H1. split.
+  + apply Lookup_weaken; eassumption.
+  + assumption.
 Qed.
 
 Lemma  Crct_Typ_weaken:
   (forall p n t, Crct p n t -> 
-    forall nm itp, fresh nm p -> CrctTyp p n itp ->
+    forall nm itp, fresh nm p -> 
                    forall npars, Crct ((nm,ecTyp npars itp)::p) n t) /\
   (forall p n ts, Crcts p n ts -> 
-    forall nm itp, fresh nm p -> CrctTyp p n itp ->
+    forall nm itp, fresh nm p ->
                  forall npars, Crcts ((nm,ecTyp npars itp)::p) n ts) /\
   (forall p n ds, CrctDs p n ds -> 
-    forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                   forall npars, CrctDs ((nm,ecTyp npars itp)::p) n ds) /\
-  (forall p n jtp, CrctTyp p n jtp -> 
-    forall nm itp, fresh nm p -> CrctTyp p n itp ->
-                  forall npars,  CrctTyp ((nm,ecTyp npars itp)::p) n jtp).
+    forall nm itp, fresh nm p ->
+                   forall npars, CrctDs ((nm,ecTyp npars itp)::p) n ds).
 Proof.
-  eapply CrctCrctsCrctDsTyp_ind; intros; auto.
+  eapply CrctCrctsCrctDs_ind; intros; auto.
   - apply CrctWkTrmTyp; try assumption. eapply CrctConst; try eassumption.
   - eapply CrctConstruct; try eassumption.
-    apply H0; try assumption. apply Lookup_weaken; eassumption.
+    apply H0; try assumption. destruct H1. split.
+    + apply Lookup_weaken; eassumption.
+    + assumption.
 Qed.
 
 Lemma Crct_strengthen:
@@ -366,92 +356,103 @@ Lemma Crct_strengthen:
   (forall pp n ts, Crcts pp n ts -> 
        forall nm ec p, pp = (nm,ec)::p -> ~ PoccTrms nm ts -> Crcts p n ts) /\
   (forall pp n ds, CrctDs pp n ds -> 
-       forall nm ec p, pp = (nm,ec)::p -> ~ PoccDefs nm ds -> CrctDs p n ds) /\
-  (forall p n itp, CrctTyp p n itp -> True).
-eapply CrctCrctsCrctDsTyp_ind; intros; auto.
-- inversion H.
-- injection H4; intros. subst. assumption.
-- injection H4; intros. subst. assumption.
-- apply CrctRel; try assumption. eapply H1. eapply H2.
-  intros h. inversion h.
-- apply CrctCast.
-  + eapply H0. eassumption.
-    intros h. elim H4. apply PoCastTm. assumption.
-  + eapply H2. eassumption.
-    intros h. elim H4. apply PoCastTy. assumption.
-- apply CrctProd.
-  + eapply H0. eassumption.
-    intros h. elim H4. apply PoProdBod. assumption.
-  + eapply H2. eassumption.
-    intros h. elim H4. apply PoProdTy. assumption.
-- apply CrctLam.
-  + eapply H0. eassumption.
-    intros h. elim H4. apply PoLambdaBod. assumption.
-  + eapply H2. eassumption.
-    intros h. elim H4. apply PoLambdaTy. assumption.
-- apply CrctLetIn.
-  + eapply H0. eassumption.
-    intros h. elim H6. apply PoLetInDfn. assumption.
-  + eapply H2. eassumption.
-    intros h. elim H6. apply PoLetInBod. assumption.
-  + eapply H4. eassumption.
-    intros h. elim H6. apply PoLetInTy. assumption.
-- apply CrctApp. assumption.
-  + eapply H1. eassumption.
-    intros h. elim H7. apply PoAppL. assumption.
-  + eapply H3. eassumption.
-    intros h. elim H7. apply PoAppA. assumption.
-  + eapply H5. eassumption.
-    intros h. elim H7. apply PoAppR. assumption.
-- eapply CrctConst. eapply H0. eapply H2.
+       forall nm ec p, pp = (nm,ec)::p -> ~ PoccDefs nm ds -> CrctDs p n ds).
+Proof.
+  eapply CrctCrctsCrctDs_ind; intros; auto.
+  - inversion H.
+  - injection H4; intros. subst. assumption.
+  - injection H2; intros. subst. assumption.
+  - apply CrctRel; try assumption. eapply H1. eapply H2.
+    intros h. inversion h.
+  - apply CrctCast.
+    + eapply H0. eassumption.
+      intros h. elim H4. apply PoCastTm. assumption.
+    + eapply H2. eassumption.
+      intros h. elim H4. apply PoCastTy. assumption.
+  - apply CrctProd.
+    + eapply H0. eassumption.
+      intros h. elim H4. apply PoProdBod. assumption.
+    + eapply H2. eassumption.
+      intros h. elim H4. apply PoProdTy. assumption.
+  - apply CrctLam.
+    + eapply H0. eassumption.
+      intros h. elim H4. apply PoLambdaBod. assumption.
+    + eapply H2. eassumption.
+      intros h. elim H4. apply PoLambdaTy. assumption.
+  - apply CrctLetIn.
+    + eapply H0. eassumption.
+      intros h. elim H6. apply PoLetInDfn. assumption.
+    + eapply H2. eassumption.
+      intros h. elim H6. apply PoLetInBod. assumption.
+    + eapply H4. eassumption.
+      intros h. elim H6. apply PoLetInTy. assumption.
+  - apply CrctApp. assumption.
+    + eapply H1. eassumption.
+      intros h. elim H7. apply PoAppL. assumption.
+    + eapply H3. eassumption.
+      intros h. elim H7. apply PoAppA. assumption.
+    + eapply H5. eassumption.
+      intros h. elim H7. apply PoAppR. assumption.
+  - eapply CrctConst. eapply H0. eapply H2.
     intros h. inversion h. rewrite H2 in H1.
     assert (j: nm0 <> nm).
     { apply notPocc_TConst. assumption. }
     inversion H1.
-  + rewrite H6 in j. nreflexivity j.
-  + eassumption.
-- eapply CrctConstruct; try eassumption.
-  + eapply H0. eapply H4. intros h. inversion h.
-  + rewrite H4 in H1.
-    assert (j: nm <> ipkgNm).
-    { eapply notPocc_TCnstr. eassumption. }
-    inversion H1.
-    * rewrite H8 in j. nreflexivity j.
-    * eassumption.
-- apply CrctCase.
-  + eapply H0. eassumption.
-    intros h. elim H6. apply PoCaseL. assumption.
-  + eapply H2. eassumption.
-    intros h. elim H6. apply PoCaseR. assumption.
-  + eapply H4. eassumption.
-    intros h. elim H6. apply PoCaseTy. assumption.
-- apply CrctFix.
-  + eapply H0. eassumption. intros h. inversion h.
-  + eapply H2. eassumption. intros h. elim H4. apply PoFix. assumption.
-- apply CrctInd. apply (H0 _ _ _ H1). inversion 1. 
-- apply CrctsNil. rewrite H1 in H. inversion H; assumption.
-- apply CrctsCons.
-  + eapply H0. eassumption. intros h. elim H4. apply PoThd. assumption.
-  + eapply H2. eassumption.
-    intros h. elim H4. apply PoTtl. assumption.
-- apply CrctDsNil. eapply H0. eassumption. intros h. inversion h.
-- apply CrctDsCons.
-  + eapply H0. eassumption. intros h. elim H6. apply PoDhd_ty. assumption.
-  + eapply H2. eassumption. intros h. elim H6. apply PoDhd_bod. assumption.
-  + eapply H4. eassumption. intros h. elim H6. apply PoDtl. assumption.
+    + rewrite H6 in j. nreflexivity j.
+    + eassumption.
+  - eapply CrctAx. eapply H0; try eassumption. intros h. inversion h. 
+  - eapply CrctConstruct; try eassumption.
+    + eapply H0. eapply H4. intros h. inversion h.
+    + rewrite H4 in H1.
+      assert (j: nm <> ipkgNm).
+      { eapply notPocc_TCnstr. eassumption. }
+      destruct H1. subst. split; try assumption.
+      inversion_Clear H1.
+      * elim j. reflexivity.
+      * eassumption.
+  - apply CrctCase.
+    + eapply H0. eassumption.
+      intros h. elim H6. apply PoCaseL. assumption.
+    + eapply H2. eassumption.
+      intros h. elim H6. apply PoCaseR. assumption.
+    + eapply H4. eassumption.
+      intros h. elim H6. apply PoCaseTy. assumption.
+  - apply CrctFix.
+    + eapply H0. eassumption. intros h. inversion h.
+    + eapply H2. eassumption. intros h. elim H4. apply PoFix. assumption.
+  - apply CrctInd. apply (H0 _ _ _ H1). inversion 1. 
+  - apply CrctsNil. rewrite H1 in H. inversion H; assumption.
+  - apply CrctsCons.
+    + eapply H0. eassumption. intros h. elim H4. apply PoThd. assumption.
+    + eapply H2. eassumption.
+      intros h. elim H4. apply PoTtl. assumption.
+  - apply CrctDsNil. eapply H0. eassumption. intros h. inversion h.
+  - apply CrctDsCons.
+    + eapply H0. eassumption. intros h. elim H6. apply PoDhd_ty. assumption.
+    + eapply H2. eassumption. intros h. elim H6. apply PoDhd_bod. assumption.
+    + eapply H4. eassumption. intros h. elim H6. apply PoDtl. assumption.
 Qed.
 
-(** Crct inversions **)
+Lemma TWrong_not_Crct:
+  forall p n s, ~ Crct p n (TWrong s).
+Proof.
+  induction p; intros; intros h.
+  - inversion h.
+  - eelim IHp. destruct a. eapply (proj1 Crct_strengthen _ _ _ h).
+    + reflexivity.
+    + intros j. inversion j.
+Qed.
+
+ (** Crct inversions **)
 Lemma LookupDfn_pres_Crct:
   forall p n t, Crct p n t -> forall nm u, LookupDfn nm p u -> Crct p n u.
 Proof.
 assert (lem: (forall p n t, Crct p n t -> 
                             forall nm u, LookupDfn nm p u -> Crct p n u) /\
              (forall p n ts, Crcts p n ts -> True) /\
-             (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> True) /\
-             (forall (p:environ) (n:nat) (itp:itypPack),
-                CrctTyp p n itp -> True)).
-  { apply CrctCrctsCrctDsTyp_ind; intros; auto;
+             (forall (p:environ Term) (n:nat) (ds:Defs),
+                CrctDs p n ds -> True)).
+  { apply CrctCrctsCrctDs_ind; intros; auto;
     try (solve [eapply H1; eassumption]);
     try (solve [eapply H2; eassumption]);
     try (solve [eapply H0; eassumption]).
@@ -459,8 +460,8 @@ assert (lem: (forall p n t, Crct p n t ->
      - apply CrctWkTrmTrm; try assumption. inversion H4; subst.
       + assumption.
       + eapply H0. apply H11.
-    - apply CrctWkTrmTyp; try assumption. inversion H4; subst.
-      eapply H0. eassumption.
+     - apply CrctWkTrmTyp; try assumption. eapply H0.
+       inversion H2. eassumption.
   }
   apply (proj1 lem).
 Qed.
@@ -471,12 +472,12 @@ Lemma Crct_invrt_Rel:
 Proof.
   induction 1; intros; try discriminate.
   - assert (j:= IHCrct1 m). intuition.
-  - assert (j:= IHCrct m). specialize (IHCrct _ H2). intuition.
+  - assert (j:= IHCrct m). specialize (IHCrct _ H1). intuition.
   - assert (j:= IHCrct m). injection H1. intuition.
 Qed.
 
 Lemma Crct_invrt_WkTrm:
-  forall (ev:environ) n t, Crct ev n t ->
+  forall (ev:environ Term) n t, Crct ev n t ->
   forall nm s p, ev = (nm, ecTrm s)::p -> Crct p n s.
 Proof.
   induction 1; intros; try discriminate;
@@ -500,11 +501,11 @@ Proof.
         - assumption. }
       apply (LMiss _ j). trivial.
     + apply CrctWkTrmTrm; trivial.
-  - assert (j:= IHCrct _ H2). intuition.
-    destruct H4 as [x [h2 h3]]. exists x. split.
+  - assert (j:= IHCrct _ H1). intuition.
+    destruct H3 as [x [h2 h3]]. exists x. split.
     + assert (j: nm0 <> nm).
       { destruct (string_dec nm0 nm). 
-        - subst. elim (fresh_Lookup_fails H1 h2).
+        - subst. elim (fresh_Lookup_fails H0 h2).
         - assumption. }
       apply (LMiss _ j). trivial.
     + apply CrctWkTrmTyp; trivial.
@@ -521,9 +522,7 @@ Proof.
   - assert (j:= IHCrct1 _ _ _ H2). intuition.
     apply CrctWkTrmTrm; trivial.
     apply (proj1 (Crct_up)). assumption.
-  - assert (j:= IHCrct _ _ _ H2). intuition.
-    apply (CrctWkTrmTyp);trivial.
-    apply (proj2 (proj2 (Crct_up))). assumption.    
+  - assert (j:= IHCrct _ _ _ H1). intuition.
   - injection H1. intros. subst. intuition.
 Qed.
 
@@ -536,9 +535,7 @@ Proof.
   - assert (j:= IHCrct1 _ _ _ H2). intuition.
     apply CrctWkTrmTrm; trivial.
     apply (proj1 (Crct_up)). assumption.
-  - assert (j:= IHCrct _ _ _ H2). intuition.
-    apply (CrctWkTrmTyp);trivial.
-    apply (proj2 (proj2 (Crct_up))). assumption.    
+  - assert (j:= IHCrct _ _ _ H1). intuition.
   - injection H1. intros. subst. intuition.
 Qed.
 
@@ -551,9 +548,7 @@ Proof.
   - assert (j:= IHCrct1 _ _ _ _ H2). intuition.
     apply CrctWkTrmTrm; trivial.
     apply (proj1 (Crct_up)). assumption.
-  - assert (j:= IHCrct _ _ _ _ H2). intuition.
-    apply (CrctWkTrmTyp); trivial.
-    apply (proj2 (proj2 Crct_up)). assumption.
+  - assert (j:= IHCrct _ _ _ _ H1). intuition.
   - injection H2. intros. subst. intuition.
 Qed.
 
@@ -564,8 +559,10 @@ Lemma Crct_invrt_App:
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ H2). intuition.
   apply (proj2 Crct_weaken); auto.
-- assert (j:= IHCrct _ _ _ H2). intuition.
-  apply (proj1 (proj2 Crct_Typ_weaken)); auto.
+- assert (j:= IHCrct _ _ _ H1); destruct j as [j0 [j1 [j2 j3]]]. intuition.
+  inversion_clear j2. intuition. constructor.
+  apply (proj1 Crct_Typ_weaken); assumption.
+  apply (proj1 (proj2 Crct_Typ_weaken)); assumption.
 - injection H3; intros; subst. auto.
 Qed.
 
@@ -576,7 +573,7 @@ Lemma Crct_invrt_Case:
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ _ H2). intuition.
   apply (proj2 Crct_weaken); auto.
-- assert (j:= IHCrct _ _ _ _ H2). intuition.
+- assert (j:= IHCrct _ _ _ _ H1). intuition.
   apply (proj1 (proj2 Crct_Typ_weaken)); auto.
 - injection H2; intros; subst. auto.
 Qed.
@@ -587,7 +584,7 @@ Lemma Crct_invrt_Cast:
     Crct p n t /\ Crct p n ty.
 induction 1; intros; try discriminate.
 - assert (j:= IHCrct1 _ _ _ H2). intuition.
-- assert (j:= IHCrct _ _ _ H2). intuition.
+- assert (j:= IHCrct _ _ _ H1). intuition.
 - injection H1; intros; subst. auto.
 Qed.
 
@@ -600,28 +597,30 @@ induction 1; intros; try discriminate.
   + generalize (dlength ds). induction n0.
     * rewrite <- plus_n_O. assumption.
     * rewrite <- plus_n_Sm. apply Crct_up. assumption.
-- assert (j:= IHCrct _ _ H2). 
-  apply (proj1 (proj2 (proj2 Crct_Typ_weaken))); auto.
-  + generalize (dlength ds). induction n0.
-    * rewrite <- plus_n_O. assumption.
-    * rewrite <- plus_n_Sm. apply Crct_up. assumption.
+- assert (j:= IHCrct _ _ H1). inversion_Clear j. intuition. constructor.
+  + apply (proj1 Crct_Typ_weaken); assumption.
+  + apply (proj1 Crct_Typ_weaken); assumption.
+  + apply (proj2 (proj2 Crct_Typ_weaken)); assumption.
 - injection H1; intros; subst. assumption.
 Qed.
 
 Lemma Crct_invrt_Construct:
   forall p n construct, Crct p n construct ->
-  forall ipkgNm inum cnum, construct = (TConstruct (mkInd ipkgNm inum) cnum) ->
+  forall ipkgNm inum cnum arty,
+    construct = (TConstruct (mkInd ipkgNm inum) cnum arty) ->
     Crct p n prop /\
     exists npars itypk,
       LookupTyp ipkgNm p npars itypk /\
       exists (ip:ityp), getInd itypk inum = Ret ip /\
       exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
 induction 1; intros; try discriminate.
-- assert (j:= IHCrct1 _ _ _ H2). intuition.
+- assert (j:= IHCrct1 _ _ _ _ H2). intuition.
   destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
+  destruct h1; split; try assumption.
   apply Lookup_weaken; trivial.
-- assert (j:= IHCrct _ _ _ H2). intuition.
-  destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
+- assert (j:= IHCrct _ _ _ _ H1). intuition.
+  destruct H3 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
+  destruct h1; split; trivial. 
   apply Lookup_weaken; trivial.
 - myInjection H3. intuition.
   exists m, ipkg. intuition.
@@ -670,16 +669,54 @@ Proof.
       apply Crcts_append; assumption.
 Qed.
 
-Lemma Instantiate_pres_Crct:
+(***
+Lemma instantiate_pres_Crct:
   forall tin, 
-  (forall n bod ins, Instantiate tin n bod ins ->
-  forall m p, n <= m -> Crct p (S m) bod -> Crct p m tin -> Crct p m ins) /\
-  (forall n bods inss, Instantiates tin n bods inss ->
-  forall m p, n <= m -> Crcts p (S m) bods -> Crct p m tin -> Crcts p m inss) /\
-  (forall n ds ids, InstantiateDefs tin n ds ids ->
-  forall m p, n <= m -> CrctDs p (S m) ds -> Crct p m tin -> CrctDs p m ids).
+    (forall p Sm bod, Crct p (Sm) bod -> forall m, Sm = S m -> Crct p m tin ->
+                     forall n, n <= m -> Crct p m (instantiate tin n bod)) /\
+    (forall p Sm bods, Crcts p (Sm) bods -> forall m, Sm = S m  -> Crct p m tin ->
+                     forall n, n <= m -> Crcts p m (instantiates tin n bods)) /\
+    (forall p Sm ds, CrctDs p (Sm) ds -> forall m, Sm = S m  -> Crct p m tin ->
+                      forall n, n <= m -> CrctDs p m (instantiateDefs tin n ds)) /\
+    (forall p Sm (itp:itypPack), CrctTyp p (Sm) itp -> True).
 Proof.
-  intros tin. apply InstInstsDefs_ind; intros.
+  intros tin.
+  apply CrctCrctsCrctDsTyp_ind; intros; subst; intuition; try (solve[constructor]);
+  try (solve[cbn; constructor; intuition]).
+  - (* weak *) admit.
+               (************
+    assert (j: Crct p m prop).
+    { induction p. constructor.
+      destruct a; destruct e; constructor; try assumption.
+      apply IHp.
+
+      inversion_Clear H5; try assumption.
+    refine (proj1 Crct_weaken _ _ _ _ _ _ _ _); intuition.
+    refine (H7 _ _ _); try eassumption.
+    constructor; try assumption.
+
+    Check (H7 H10 n0 H6). Check (proj1 Crct_weaken).
+*****************)
+  - admit.
+  - subst. cbn. admit.
+  - cbn. constructor; intuition. apply H0. reflexivity.
+    apply Crct_up. assumption. omega.
+  - cbn. constructor; intuition. apply H0. reflexivity.
+    apply Crct_up. assumption. omega.
+  - cbn. constructor; intuition. apply H2. reflexivity.
+    apply Crct_up. assumption. omega.
+  -  (*** do we need [CrctTyp] ???  ***)
+    
+HERE
+
+    (instantiateAll_ind tin
+        (fun n _ bod => Crct p (S m) bod -> Crct p m tin ->
+                     forall n, n <= m -> Crct p m bod)).
+
+
+
+
+  apply InstInstsDefs_ind; intros.
   - assumption.
   - constructor. omega. eapply Crct_invrt_any. eassumption.
   - destruct (Crct_invrt_Rel H0 eq_refl). apply CrctRel.
@@ -726,6 +763,76 @@ Proof.
       * simpl in j. generalize (dlength d). induction n0.
         rewrite <- plus_n_O. assumption.
         rewrite <- plus_n_Sm. apply (proj1 Crct_up). assumption.
+  - apply CrctsNil. eapply Crct_Sort. eassumption.
+  - inversion_Clear H2. apply CrctsCons.
+    + apply H; trivial.
+    + apply H0; trivial.
+  - apply CrctDsNil. eapply Crct_Sort. eassumption.
+  - inversion_Clear H3. apply CrctDsCons.
+    + apply H; trivial.
+    + apply H0; trivial.
+    + apply H1; trivial.
+Qed.
+ ***)
+
+Lemma Instantiate_pres_Crct:
+  forall tin, 
+  (forall n bod ins, Instantiate tin n bod ins ->
+  forall m p, n <= m -> Crct p (S m) bod -> Crct p m tin -> Crct p m ins) /\
+  (forall n bods inss, Instantiates tin n bods inss ->
+  forall m p, n <= m -> Crcts p (S m) bods -> Crct p m tin -> Crcts p m inss) /\
+  (forall n ds ids, InstantiateDefs tin n ds ids ->
+  forall m p, n <= m -> CrctDs p (S m) ds -> Crct p m tin -> CrctDs p m ids).
+Proof.
+  intros tin. apply InstInstsDefs_ind; intros.
+  - assumption.
+  - constructor. omega. eapply Crct_invrt_any. eassumption.
+  - destruct (Crct_invrt_Rel H0 eq_refl). apply CrctRel.
+    + omega.
+    + eapply Crct_Sort. eassumption.
+  - eapply Crct_Sort; eassumption.
+  - destruct (Crct_invrt_Cast H2 eq_refl). apply CrctCast.
+    + apply H; trivial.
+    + apply H0; trivial.
+  - destruct (Crct_invrt_Prod H2 eq_refl). apply CrctProd.
+    + apply H; trivial. omega. apply (proj1 Crct_up). assumption.
+    + apply H0; trivial.
+  - destruct (Crct_invrt_Lam H2 eq_refl). apply CrctLam.
+    + apply H; trivial. omega. apply (proj1 Crct_up). assumption.
+    + apply H0; trivial.
+  - destruct (Crct_invrt_LetIn H3 eq_refl). apply CrctLetIn.
+    + apply H; trivial.
+    + apply H0; intuition. apply (proj1 Crct_up). assumption.
+    + apply H1; intuition.
+  - destruct (Crct_invrt_App H3 eq_refl) as [j1 [j2 [j3 j4]]]. 
+    apply mkApp_pres_Crct.
+    + apply H; trivial.
+    + apply CrctsCons.
+      * apply H0; trivial.
+      * apply H1; trivial.
+  - edestruct (Crct_invrt_Const H0).
+    + reflexivity.
+    + destruct H3 as [x [h1 h2]]. eapply (@CrctConst _ _ x); trivial.
+      * eapply Crct_Sort. eassumption.
+  - constructor. eapply Crct_Sort. eassumption.
+  - apply CrctInd. eapply Crct_Sort. eassumption.
+  - destruct ind. edestruct (Crct_invrt_Construct H0).
+    + reflexivity.
+    + destruct H3 as [npars [ip [h1 [it [h2 [ctr h3]]]]]].
+      eapply CrctConstruct; try eassumption.
+      * eapply Crct_Sort. eassumption.
+  - destruct (Crct_invrt_Case H3 eq_refl) as [h1 [h2 h3]]. apply CrctCase.
+    + apply H; trivial.
+    + apply H1; trivial.
+    + apply H0; trivial.
+  - assert (j:= Crct_invrt_Fix H1 eq_refl). apply CrctFix. 
+    + eapply Crct_Sort. eassumption.
+    + rewrite <- (InstantiateDefs_pres_dlength i). apply H. omega.
+      * simpl in j. assumption.
+      * simpl in j. generalize (dlength d). induction n0.
+        rewrite <- plus_n_O. assumption.
+        rewrite <- plus_n_Sm. apply (proj1 Crct_up). assumption.
+  - eelim TWrong_not_Crct. eassumption.
   - apply CrctsNil. eapply Crct_Sort. eassumption.
   - inversion_Clear H2. apply CrctsCons.
     + apply H; trivial.

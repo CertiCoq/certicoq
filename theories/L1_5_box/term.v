@@ -20,6 +20,42 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+
+Ltac not_is2 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y" in
+  intros hh; destruct hh as [xx [yy jj]]; discriminate.
+ Ltac not_is3 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y"
+  with zz := fresh "z" in
+  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
+            Ltac not_isApp := not_is3.
+            Ltac not_isLambda := not_is3.
+            
+Ltac isApp_inv h :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with jj := fresh "j"
+  in destruct h as [xx [yy [zz jj]]]; discriminate.
+Ltac isApp :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y"
+  with kk := fresh "k"
+  with zz := fresh "z"
+  with ll := fresh "l" in
+  intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
+  destruct kk as [zz ll].
+
+
 (** Printing terms in exceptions for debugging purposes **)
 Fixpoint print_term (t:Term) : string :=
   match t with
@@ -33,12 +69,14 @@ Fixpoint print_term (t:Term) : string :=
     | TApp fn arg args =>
       " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
     | TConst s => "[" ++ s ++ "]"
+    | TAx => " TAx "
     | TInd _ => " TIND "
-    | TConstruct _ n => " (CSTR " ++ (nat_to_string n) ++ ") "
+    | TConstruct _ n _ => " (CSTR " ++ (nat_to_string n) ++ ") "
     | TCase n _ mch _ =>
       " (CASE " ++ (nat_to_string (snd (fst n))) ++ " _ " ++ (print_term mch) ++
                  " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+    | TWrong => "TWrong"
   end.
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
@@ -70,15 +108,18 @@ Proof.
   - destruct t2; cross.
     destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
   - destruct t; cross. destruct (string_dec s s0); [lft | rght].
+  - destruct t; cross. lft.
   - destruct t; cross. destruct (inductive_dec i i0); [lft | rght].
   - destruct t; cross.
-    destruct (inductive_dec i i0); destruct (eq_nat_dec n n0); [lft | rght .. ].
+    destruct (inductive_dec i i0); destruct (eq_nat_dec n n1);
+    destruct (eq_nat_dec n0 n2); [lft | rght .. ].
   - destruct t2; cross. destruct p as [n l], p0 as [n0 l0].
     + destruct (eq_dec n n0); destruct (nat_list_dec l l0);
       destruct (H t2_1); destruct (H0 t2_2);
       destruct (H1 t2); [lft | rght .. ].
   - destruct t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
+  - destruct t; cross. lft. 
   - destruct tt; cross. lft.
   - destruct tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
   - destruct ee; cross. lft.
@@ -121,14 +162,6 @@ intros. exists nm, ty, bod. reflexivity.
 Qed.
 Hint Resolve IsLambda.
 
-Ltac not_isLambda :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with zz := fresh "z" in
-  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
-
 Lemma isLambda_dec: forall t, {isLambda t}+{~ isLambda t}.
 induction t;
   try (solve [right; intros h; unfold isLambda in h;
@@ -158,30 +191,6 @@ intros. exists fn, arg, args. reflexivity.
 Qed.
 Hint Resolve IsApp.
 
-Ltac not_isApp :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with zz := fresh "z" in
-  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
-Ltac isApp_inv h :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with yy := fresh "y"
-  with zz := fresh "z"
-  with jj := fresh "j"
-  in destruct h as [xx [yy [zz jj]]]; discriminate.
-Ltac isApp :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with kk := fresh "k"
-  with zz := fresh "z"
-  with ll := fresh "l" in
-  intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
-  destruct kk as [zz ll].
 
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 destruct t; try (right; not_isApp). 
@@ -229,28 +238,28 @@ left. auto.
 Qed.
 
 Definition isConstruct (t:Term) : Prop :=
-  exists i n, t = TConstruct i n.
-Lemma IsConstruct: forall i n, isConstruct (TConstruct i n).
-intros. exists i, n. reflexivity.
+  exists i n arty, t = TConstruct i n arty.
+Lemma IsConstruct: forall i n arty, isConstruct (TConstruct i n arty).
+intros. exists i, n, arty. reflexivity.
 Qed.
 Hint Resolve IsConstruct.
 
 Lemma isConstruct_dec: forall t, isConstruct t \/ ~ isConstruct t.
-induction t;
-try (solve [right; unfold isConstruct; intros h; elim h;
-            intros x1 h1; elim h1; intros x2 h2; discriminate]).
-- left. auto.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate).
+  - left. auto.
 Qed.
 
 Inductive isCanonical : Term -> Prop :=
-| canC: forall (i:inductive) (n:nat), isCanonical (TConstruct i n)
-| canA: forall (arg:Term) (args:Terms) (i:inductive) (n:nat), 
-          isCanonical (TApp (TConstruct i n) arg args).
+| canC: forall (i:inductive) (n m:nat), isCanonical (TConstruct i n m)
+| canA: forall (arg:Term) (args:Terms) (i:inductive) (n m:nat), 
+          isCanonical (TApp (TConstruct i n m) arg args).
 Hint Constructors isCanonical.
 
 Lemma IsCanonical:
-  (forall i n, isCanonical (TConstruct i n)) /\
-  (forall i n t ts, isCanonical (TApp (TConstruct i n) t ts)).
+  (forall i n m, isCanonical (TConstruct i n m)) /\
+  (forall i n m t ts, isCanonical (TApp (TConstruct i n m) t ts)).
 split; intros; auto.
 Qed.
 Hint Resolve IsCanonical.
@@ -260,7 +269,7 @@ induction t;
   try (solve [right; intros h; inversion h; inversion H;
               destruct H1; discriminate]).
 - destruct (isConstruct_dec t1).
-  + left. unfold isConstruct in H. destruct H as [x0 [x1 j]]. subst.
+  + left. unfold isConstruct in H. destruct H as [x0 [x1 [x2 j]]]. subst.
     constructor.
   + right. intros h. inversion_Clear h. elim H. auto.
 - left. constructor.
@@ -268,9 +277,9 @@ Qed.
 
 Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
-    | TConstruct _ r => Some (r, tnil)
-    | TApp (TConstruct _ r) arg args => Some (r, tcons arg args)
-    | _ => None
+    | TConstruct _ r _ => Some (r, tnil)
+    | TApp (TConstruct _ r _) arg args => Some (r, tcons arg args)
+    | x => None
   end.
 
 Lemma canonicalP_isCanonical:
@@ -287,22 +296,6 @@ Proof.
   induction 1; simpl.
   - exists (n, tnil). reflexivity.
   - exists (n, tcons arg args). reflexivity.
-Qed.
-
-Function appliedAxiomP (t:Term) : bool :=
-  match t with
-    | TConst _ => true
-    | TApp (TConst _) arg args => true
-    | _ => false
-  end.
-    
-Open Scope string_scope.
-Lemma appliedAxiomP_canonicalP:
-  forall mch, appliedAxiomP mch = true -> canonicalP mch = None.
-Proof.
-  intros mch.
-  functional induction (appliedAxiomP mch); intros;
-  try discriminate; reflexivity.
 Qed.
 
 
@@ -356,6 +349,26 @@ Lemma tlength_tappend:
 Proof.
   induction ts; simpl; intros; try reflexivity.
   - rewrite IHts. reflexivity.
+Qed.
+
+Lemma tappend_tcons_tunit:
+  forall bs ds cs x,
+    tappend bs (tcons x cs) = tappend ds cs -> tappend bs (tunit x) = ds.
+Proof.
+  induction bs; destruct ds; cbn; intros.
+  - assert (j:= f_equal tlength H). cbn in j. omega.
+  - injection H. intros. subst x. destruct ds.
+    + reflexivity.
+    + injection H; intros.
+      assert (j:= f_equal tlength H). cbn in j.
+      rewrite tlength_tappend in j. omega.
+  - destruct cs.
+    + discriminate.
+    + injection H; intros. assert (j:= f_equal tlength H0).
+      rewrite tlength_tappend in j. cbn in j. omega.
+  - injection H; intros.  assert (j:= f_equal tlength H0).
+    rewrite tlength_tappend in j. cbn in j.
+    specialize (IHbs _ _ _ H0). rewrite IHbs. rewrite H1. reflexivity.
 Qed.
 
 Fixpoint tmap (fn:Term -> Term) (ts:Terms) : Terms :=
@@ -490,12 +503,6 @@ intros. rewrite <- (MkApp_mkApp H). rewrite <- (MkApp_mkApp H0).
 reflexivity.
 Qed.
 
-Lemma mkApp_nil_ident:
-  forall fn, ~ isApp fn -> mkApp fn tnil = fn.
-intros fn h.
-apply MkApp_mkApp. apply MkApp_nil_ident. assumption.
-Qed.
-
 Lemma mkApp_cons_App:
   forall fn, ~ isApp fn ->
     forall arg args, mkApp fn (tcons arg args) = TApp fn arg args.
@@ -588,39 +595,60 @@ Proof.
   - exists TProof, arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TCast fn1 c fn2), arg, tnil. split. reflexivity.
-  + left. intuition. revert H. not_isApp. 
+    + left. intuition. revert H. not_isApp. 
   - exists (TProd n fn1 fn2), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TLambda n fn1 fn2), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - exists (TLetIn n fn1 fn2 fn3), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    left. intuition. revert H. not_isApp.
   - change (exists (fn' arg' : Term) (args' : Terms),
-     TApp fn1 fn2 (tappend t (tcons arg args)) =
-     TApp fn' arg' (tappend args' args) /\
-     (~ isApp (TApp fn1 fn2 t) /\
-      fn' = TApp fn1 fn2 t /\ arg = arg' /\ args' = tnil \/
-      isApp (TApp fn1 fn2 t) /\ 
-      TrmSize fn' < S (TrmSize fn1 + TrmSize fn2 + TrmsSize t) /\
-      tIn arg args')).
+              TApp fn1 fn2 (tappend t (tcons arg args)) =
+              TApp fn' arg' (tappend args' args) /\
+              (~ isApp (TApp fn1 fn2 t) /\
+               fn' = TApp fn1 fn2 t /\ arg = arg' /\ args' = tnil \/
+                                                     isApp (TApp fn1 fn2 t) /\ 
+               TrmSize fn' < S (TrmSize fn1 + TrmSize fn2 + TrmsSize t) /\
+               tIn arg args')).
     exists fn1, fn2, (tappend t (tunit arg)). split.
-  + rewrite <- tappend_assoc. simpl. reflexivity.
-  + right. split; try split.
-    * exists fn1, fn2, t. reflexivity.
-  * omega.
-  * apply tIn_tappend1.
-- exists (TConst s), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
-- exists (TInd i), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
-- exists (TConstruct i n), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
-- exists (TCase p fn1 fn2 t), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
-- exists (TFix d n), arg, tnil. split. reflexivity.
-  left. intuition. revert H. not_isApp.
+    + rewrite <- tappend_assoc. simpl. reflexivity.
+    + right. split; try split.
+      * exists fn1, fn2, t. reflexivity.
+      * omega.
+      * apply tIn_tappend1.
+  - exists (TConst s), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists TAx, arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TInd i), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TConstruct i n n0), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TCase p fn1 fn2 t), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TFix d n), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists TWrong, arg, tnil. cbn.  split. reflexivity.
+    left. repeat split. not_isApp.
 Qed.
 
+Lemma mkApp_mkApp_fn:
+  forall fn, exists fn',
+    (forall arg args, exists arg' args',
+    mkApp fn (tcons arg args) = TApp fn' arg' (tappend args' args)) /\
+    (forall brg brgs, exists brg' brgs',
+      mkApp fn (tcons brg brgs) = TApp fn' brg' (tappend brgs' brgs)).
+Proof.
+  intros fn.
+  case_eq fn; intros;
+  try (solve [exists fn; subst; split; intros carg cargs;
+                     exists carg, tnil; reflexivity]).
+  - exists t. split; intros crg crgs; exists t0; cbn;
+    exists (tappend t1 (tunit crg));
+    rewrite <- tappend_assoc; reflexivity.
+Qed.
+
+   
 (** well-formed terms: TApp well-formed all the way down **)
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
@@ -638,8 +666,9 @@ Inductive WFapp: Term -> Prop :=
            ~ (isApp fn) -> WFapp fn -> WFapp t -> WFapps ts ->
            WFapp (TApp fn t ts)
 | wfaConst: forall nm, WFapp (TConst nm)
+| wfaAx: WFapp TAx
 | wfaInd: forall i, WFapp (TInd i)
-| wfaConstruct: forall i m1, WFapp (TConstruct i m1)
+| wfaConstruct: forall i m1 m2, WFapp (TConstruct i m1 m2)
 | wfaCase: forall m ty mch brs,
             WFapp mch -> WFapps brs -> WFapp ty ->
             WFapp (TCase m ty mch brs)
@@ -751,29 +780,75 @@ Lemma tskipn_pres_WFapp:
 Qed.
 
 (** compiling well formed terms to Term produces well formed Terms **
-Lemma L1Term_Term_pres_WFapp:
-  forall n,
-  (forall (t:L1g.compile.Term), L1g.term.WFapp t-> WFapp (L1Term_Term t)) /\
-  (forall (ts:L1g.compile.Terms),
-    L1g.term.WFapps ts -> WFapps (L1g.compile.terms_Terms ts)) /\
-  (forall (ds:L1g.compile.Defs),
-    L1.term.WF_defs ds -> WFappDs (L1g.compile.defs_Defs ds)).
+*** not used ****
+Lemma L1gTerm_Term_pres_isApp:
+  forall t:L1g.compile.Term, isApp (L1gTerm_Term t) -> L1g.term.isApp t.
 Proof.
-  apply (L1.WFapp_terms_defs_ind
-    (fun (m:nat) (t:term) (q:bool) =>
-       L1.WFapp m t = true -> exists T, L1Term_Term t = Ret T)
-    (fun (m:nat) (ts:list term) (q:bool) =>
-       L1.WFapps m ts = true -> exists Ts, terms_Terms L1Term_Term ts = Ret Ts)
-    (fun (m:nat) (ds:list (def term)) (q:bool) =>
-       WF_defs m ds = true -> exists Ds, defs_Defs L1Term_Term ds = Ret Ds));
-  intros; cbn in H; try discriminate.
-  - exists (TRel n1). reflexivity.
-  - exists (TSort (match srt with 
-                    | sProp => SProp
-                    | sSet => SSet
-                    | sType _ => SType  (* throwing away sort info *)
-                   end)). reflexivity.
-  - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
+  induction t; intros; destruct H as [x0 [x1 [x2 j]]]; try discriminate.
+  - destruct t1, t2; try discriminate;
+    destruct t2_2; try discriminate; 
+    try (destruct s; discriminate);
+    destruct s0; discriminate.
+  - exists t1, t2, t3. reflexivity.
+  - cbn in j. destruct (L1gTerm_Term t2); try discriminate.
+    destruct (L1gTerms_Terms t3); try discriminate.
+    destruct t0; try discriminate. 
+    destruct t; try discriminate.
+    + destruct (isApp_dec (L1gTerm_Term t1)); try discriminate.
+      * cbn in j.
+    
+    + specialize (IHt1 i).
+      
+    t2; try discriminate.
+
+  
+  destruct t;
+  try (cbn; intros; destruct H as [x0 [x1 [x2 j]]]; discriminate); intros;
+  destruct H as [x0 [x1 [x2 j]]].
+  - destruct t1, t2; try discriminate;
+    destruct t2_2; try discriminate; 
+    try (destruct s; discriminate);
+    destruct s0; discriminate.
+  - exists t1, t2, t3. reflexivity.
+  - destruct (L1g.compile.TCase p t1 t2 t3); try discriminate.
+
+    destruct (L1gTerm_Term t2), (L1gTerms_Terms t3);
+      try discriminate.
+    destruct t0; try discriminate.
+    destruct (isLambda_dec t).
+    + destruct i as [y0 [y1 [y2 k]]]. rewrite k in j. cbn in j.
+      destruct y2; cbn in j; try discriminate.
+      * destruct (match n with 0 => Eq | S _ => Lt end); discriminate.
+      * unfold instantiate in j.  cbn in j.
+    destruct t; cbn in j; try discriminate.
+
+    destruct H as [x0 [x1 [x2 j]]];
+      destruct t2; try discriminate.
+    destruct t2_2; cbn in j; try discriminate.
+
+    destruct t2_2; cbn in j; try discriminate.
+    destruct s. discriminate.    
+    cbn in j.
+     destruct t1; try constructor; try assumption.
+     destruct t2_2; try discriminate; try constructor; try assumption.
+
+  
+Lemma L1gTerm_Term_pres_WFapp:
+    (forall (t:L1g.compile.Term),
+       L1g.term.WFapp t-> WFapp (L1gTerm_Term t)) /\
+    (forall (ts:L1g.compile.Terms),
+       L1g.term.WFapps ts -> WFapps (L1gTerms_Terms ts)) /\
+    (forall (ds:L1g.compile.Defs),
+       L1g.term.WFappDs ds -> WFappDs (L1gDefs_Defs ds)).
+Proof.
+  apply (L1g.term.WFappTrmsDefs_ind); intros;
+  try (cbn; constructor); try assumption.
+  - cbn. destruct ty; try constructor; try assumption.
+    destruct ty2; try constructor; try assumption.
+    destruct s; try constructor; try assumption.
+  - destruct fn; cbn; cbn in H.   intros h. elim H. destruct fn; cbn in h.
+
+      in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
     destruct (H j1) as [x0 k0]. destruct (H0 j2) as [x1 k1].
     exists (TCast x1 ck x0). cbn. rewrite k1. rewrite k0. reflexivity.
   - cbn in H1. destruct (proj1 (andb_true_iff _ _) H1) as [j1 j2].
@@ -829,9 +904,7 @@ Proof.
     exists (dcons (dname term c) x0 x1 (rarg term c) x2). cbn.
     rewrite k0. rewrite k1. rewrite k2. reflexivity.
 Qed.
-********)
-
-
+****************)
 
     
 (** well-formed terms: TApp well-formed all the way down **)
@@ -852,8 +925,9 @@ Inductive WFTrm: Term -> nat -> Prop :=
            ~ (isApp fn) -> WFTrm fn n -> WFTrm t n -> WFTrms ts n ->
            WFTrm (TApp fn t ts) n
 | wfConst: forall n nm, WFTrm (TConst nm) n
+| wfAx: forall n, WFTrm TAx n
 | wfInd: forall n i, WFTrm (TInd i) n
-| wfConstruct: forall n i m1, WFTrm (TConstruct i m1) n
+| wfConstruct: forall n i m1 m2, WFTrm (TConstruct i m1 m2) n
 | wfCase: forall n m ty mch brs,
             WFTrm mch n -> WFTrms brs n -> WFTrm ty n ->
             WFTrm (TCase m ty mch brs) n
@@ -909,7 +983,7 @@ Inductive PoccTrm : Term -> Prop :=
 | PoCaseR: forall n ty mch brs, PoccTrms brs -> PoccTrm (TCase n ty mch brs)
 | PoCaseTy: forall n ty mch brs, PoccTrm ty -> PoccTrm (TCase n ty mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
-| PoCnstr: forall m1 m2, PoccTrm (TConstruct (mkInd nm m1) m2)
+| PoCnstr: forall m1 m2 m3, PoccTrm (TConstruct (mkInd nm m1) m2 m3)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
 | PoTtl: forall t ts, PoccTrms ts -> PoccTrms (tcons t ts)
@@ -935,13 +1009,13 @@ intros s2 h j. elim h. rewrite <- j. auto.
 Qed.
 
 Lemma Pocc_TCnstr:
-  forall s2 m1 m2, PoccTrm (TConstruct (mkInd s2 m1) m2) -> nm = s2.
-intros s2 m1 m2 h. inversion h. reflexivity.
+  forall s2 m1 m2 m3, PoccTrm (TConstruct (mkInd s2 m1) m2 m3) -> nm = s2.
+intros s2 m1 m2 m3 h. inversion h. reflexivity.
 Qed.
 
 Lemma notPocc_TCnstr:
-  forall s2 m1 m2, ~ PoccTrm (TConstruct (mkInd s2 m1) m2) -> nm <> s2.
-intros s2 m1 m2 h j. elim h. rewrite <- j. auto. 
+  forall s2 m1 m2 m3, ~ PoccTrm (TConstruct (mkInd s2 m1) m2 m3) -> nm <> s2.
+intros s2 m1 m2 m3 h j. elim h. rewrite <- j. auto. 
 Qed.
 
 Lemma PoccTrms_tappendl:
@@ -1070,24 +1144,6 @@ Lemma PoccTrms_append:
       * right. assumption.
 Qed.
 
-(***
-(** Pocc and mkApp: what a mess! **)
-Lemma Pocc_mkApp_inv_lem:
-  forall fn args res, MkApp fn args res ->
-                  PoccTrm res -> PoccTrm fn \/ PoccTrms args.
-Proof.
-  induction 1; intros h; intuition.
-  - inversion_Clear H1.
-    + left. apply PoAppA. assumption.
-    + destruct (PoccTrms_append_invrt _ _ H2).
-      * left. apply PoAppR. assumption.
-      * right. assumption.
-  - inversion_clear h. 
-    + left. assumption.
-    + right. apply PoThd. assumption.
-    + right. apply PoTtl. assumption.
-Qed.
-***)
 
 Lemma Pocc_mkApp_inv:
   forall fn args, PoccTrm (mkApp fn args) -> PoccTrm fn \/ PoccTrms args.
@@ -1219,9 +1275,10 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
           Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
           Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
+| IAx: forall n, Instantiate n TAx TAx
 | IInd: forall n ind, Instantiate n (TInd ind) (TInd ind)
-| IConstruct: forall n ind m1,
-                Instantiate n (TConstruct ind m1) (TConstruct ind m1)
+| IConstruct: forall n ind m1 m2,
+                Instantiate n (TConstruct ind m1 m2) (TConstruct ind m1 m2)
 | ICase: forall n np ty s ts is its ity,
            Instantiate n s is -> Instantiate n ty ity ->
            Instantiates n ts its ->
@@ -1229,6 +1286,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
+| IWrong: forall n, Instantiate n TWrong TWrong
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,

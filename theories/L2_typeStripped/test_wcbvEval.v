@@ -13,11 +13,13 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (** a tool for testing **)
-Definition exc_wcbvEval (tmr:nat) (pgm:program): exception Term :=
-  match L2.compile.program_Program pgm with
-    | Exc str => raise str
-    | Ret pgm => L2.wcbvEval.wcbvEval (env _ pgm) tmr (main _ pgm)
+Definition exc_wcbvEval (tmr:nat) (pgm:program): Term :=
+  let pgm := L2.compile.program_Program pgm in
+  match L2.wcbvEval.wcbvEval (env pgm) tmr (main pgm) with
+    | Exc _ => TWrong
+    | Ret x => x
   end.
+                             
 
 (** Olivier's example **)
 Definition olivier := (Some 0).
@@ -40,6 +42,7 @@ Fixpoint foo_list (A:Set) (fs:foo A) : list A :=
     | nilf _ => nil
     | consf b bs => cons b (foo_list bs)
   end.
+Print foo_list.
 Fixpoint list_foo (A:Set) (fs:list A) : foo A :=
   match fs with
     | nil => nilf A

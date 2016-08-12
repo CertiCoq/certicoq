@@ -17,12 +17,12 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition L1Term := L1g.compile.Term.
-Definition L1Terms := L1g.compile.Terms.
-Definition L1Defs := L1g.compile.Defs.
-Definition L1EC := L1g.compile.envClass.
-Definition L1Env := L1g.compile.environ.
-Definition L1Pgm := L1g.compile.Program.
+Definition L1gTerm := L1g.compile.Term.
+Definition L1gTerms := L1g.compile.Terms.
+Definition L1gDefs := L1g.compile.Defs.
+Definition L1gEC := envClass L1gTerm.
+Definition L1gEnv := environ L1gTerm.
+Definition L1gPgm := Program L1gTerm.
 
 
 Inductive Term : Type :=
@@ -36,11 +36,14 @@ Inductive Term : Type :=
                Term (* dfn *) -> Term (* type *) -> Term (* body *) -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
+| TAx        : Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat -> Term
+| TConstruct : inductive -> nat (* index in datatype *) ->
+               nat (* arity *) -> Term
 | TCase      : (inductive * nat * list nat) (* # of parameters, args per branch *) ->
                Term (* type info *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
+| TWrong     : Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -53,9 +56,6 @@ Scheme Trm_ind' := Induction for Term Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
 Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
 Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
-Scheme Trm_ind2 := Induction for Term Sort Type
-  with Trms_ind2 := Induction for Terms Sort Type
-  with Defs_ind2 := Induction for Defs Sort Type.
 Notation prop := (TSort SProp).
 Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
@@ -127,79 +127,71 @@ Fixpoint applyBranchToProof (br:Term) :=
     | x => x
   end.
 
-Function L1Term_Term (t:L1Term) : Term :=
+Function L1gTerm_Term (t:L1gTerm) : Term :=
   match t with
     | L1g.compile.TRel n => TRel n
     | L1g.compile.TSort srt => TSort srt
     | L1g.compile.TCast _ _ (L1g.compile.TCast _ _ (L1g.compile.TSort SProp)) =>
       TProof
     | L1g.compile.TCast tm ck ty =>
-      TCast (L1Term_Term ty) ck (L1Term_Term tm)
+      TCast (L1gTerm_Term ty) ck (L1gTerm_Term tm)
     | L1g.compile.TProd nm ty bod =>
-      TProd nm (L1Term_Term ty) (L1Term_Term bod)
+      TProd nm (L1gTerm_Term ty) (L1gTerm_Term bod)
     | L1g.compile.TLambda nm ty bod =>
-      TLambda nm (L1Term_Term ty) (L1Term_Term bod)
+      TLambda nm (L1gTerm_Term ty) (L1gTerm_Term bod)
     | L1g.compile.TLetIn nm dfn ty bod =>
-      TLetIn nm (L1Term_Term dfn) (L1Term_Term ty) (L1Term_Term bod)
+      TLetIn nm (L1gTerm_Term dfn) (L1gTerm_Term ty) (L1gTerm_Term bod)
     | L1g.compile.TApp fn arg args =>
-      TApp (L1Term_Term fn) (L1Term_Term arg) (L1Terms_Terms args)
+      TApp (L1gTerm_Term fn) (L1gTerm_Term arg) (L1gTerms_Terms args)
     | L1g.compile.TConst pth => TConst pth
+    | L1g.compile.TAx => TAx
     | L1g.compile.TInd ind => TInd ind
-    | L1g.compile.TConstruct ind m => TConstruct ind m
+    | L1g.compile.TConstruct ind m arty => TConstruct ind m arty
     | L1g.compile.TCase m ty mch brs =>
-      match L1Term_Term mch, L1Terms_Terms brs with
+      match L1gTerm_Term mch, L1gTerms_Terms brs with
         | TProof, tunit br => applyBranchToProof br
-        | Mch, Brs => TCase m (L1Term_Term ty) Mch Brs
+        | Mch, Brs => TCase m (L1gTerm_Term ty) Mch Brs
       end
-    | L1g.compile.TFix defs m => TFix (L1Defs_Defs defs) m
+    | L1g.compile.TFix defs m => TFix (L1gDefs_Defs defs) m
+    | L1g.compile.TWrong _ => TWrong
   end
-with L1Terms_Terms (ts:L1Terms) : Terms :=
+with L1gTerms_Terms (ts:L1gTerms) : Terms :=
        match ts with
          | L1g.compile.tnil => tnil
-         | L1g.compile.tcons u us => tcons (L1Term_Term u) (L1Terms_Terms us)
+         | L1g.compile.tcons u us => tcons (L1gTerm_Term u) (L1gTerms_Terms us)
        end
-with L1Defs_Defs (ds:L1Defs) : Defs :=
+with L1gDefs_Defs (ds:L1gDefs) : Defs :=
        match ds with
          | L1g.compile.dnil => dnil
          | L1g.compile.dcons nm ty tm m ds =>
-           dcons nm (L1Term_Term ty) (L1Term_Term tm) m (L1Defs_Defs ds)
+           dcons nm (L1gTerm_Term ty) (L1gTerm_Term tm) m (L1gDefs_Defs ds)
        end.
 (****
-Functional Scheme L1Term_Term_ind' := Induction for L1Term_Term Sort Prop
+Functional Scheme L1gTerm_Term_ind' := Induction for L1gTerm_Term Sort Prop
 with terms_Terms_ind' := Induction for terms_Terms Sort Prop
 with wcbvDEvals_ind' := Induction for defs_Defs Sort Prop.
-Combined Scheme L1Term_TermEvalsDEvals_ind
-         from L1Term_Term_ind', terms_Terms_ind', wcbvDEvals_ind'.
+Combined Scheme L1gTerm_TermEvalsDEvals_ind
+         from L1gTerm_Term_ind', terms_Terms_ind', wcbvDEvals_ind'.
 ***)
 
 (** environments and programs **)
-Definition envClass := AstCommon.envClass Term.
-Definition environ := AstCommon.environ Term.
-Definition Program := AstCommon.Program Term.
-
-Function L1EC_EC (ec:L1EC) : envClass :=
+Function L1gEC_EC (ec:L1gEC) : envClass Term :=
   match ec with
-    | ecTrm t => ecTrm (L1Term_Term t)
+    | ecTrm t => ecTrm (L1gTerm_Term t)
     | ecTyp _ n itp => ecTyp Term n itp
   end.
 
-Definition L1Env_Env: L1Env -> environ :=
-  List.map (fun (nmec: string * L1EC) => (fst nmec, L1EC_EC (snd nmec))).
+Definition L1gEnv_Env: L1gEnv -> environ Term :=
+  List.map (fun (nmec: string * L1gEC) => (fst nmec, L1gEC_EC (snd nmec))).
 
-Definition L1Pgm_Program (p:L1Pgm) : Program :=
-  {| env:= L1Env_Env (env p);
-     main:= L1Term_Term (main p) |}.
+Definition L1gPgm_Program (p:L1gPgm) : Program Term:=
+  {| env:= L1gEnv_Env (env p);
+     main:= L1gTerm_Term (main p) |}.
 
 
 (*** from L1 to L1_5 ***)
-Definition program_Program (p:program) : exception Program :=
-  match L1g.compile.program_Program p (Ret nil) with
-    | Exc s => raise s
-    | Ret q => Ret (L1Pgm_Program q)
-  end.
-Definition term_Term (t:term) : exception Term :=
-  match L1g.compile.term_Term t with
-    | Exc s => raise s
-    | Ret q => Ret (L1Term_Term q)
-  end.
+Definition program_Program (p:program) : Program Term :=
+  L1gPgm_Program (L1g.compile.program_Program p).
 
+Definition term_Term (e:AstCommon.environ L1gTerm) (t:term) : Term :=
+  L1gTerm_Term (L1g.compile.term_Term e t).

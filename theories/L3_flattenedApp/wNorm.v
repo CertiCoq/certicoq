@@ -1,7 +1,6 @@
 
 (******)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L1_5_box" as L1_5.
 Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
@@ -32,9 +31,11 @@ Inductive WNorm: Term -> Prop :=
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNAx: WNorm TAx
 | WNCase: forall mch n brs,
-            WNorm mch -> WNorms brs -> ~ isConstruct mch ->
+            WNorm mch -> ~ isConstruct mch ->
+            WNorms brs ->
             WNorm (TCase n mch brs)
-| WNConstruct: forall i n args, WNorms args -> WNorm (TConstruct i n args)
+| WNConstruct: forall i n arty args,
+                 WNorms args -> WNorm (TConstruct i n arty args)
 | WNInd: forall i, WNorm (TInd i)
 | WNSort: forall s, WNorm (TSort s)
 | WNApp: forall fn t,
@@ -43,9 +44,9 @@ Inductive WNorm: Term -> Prop :=
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
-Hint Constructors WNorm WNorms.
+Hint Constructors WNorm WNorm.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
-  with WNorms_ind' := Induction for WNorms Sort Prop.
+      with WNorms_ind' := Induction for WNorms Sort Prop.
 Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.
 
 
@@ -54,25 +55,29 @@ Lemma WNorm_dec:
   (forall t, WNorm t \/ ~ WNorm t) /\
   (forall ts, WNorms ts \/ ~ WNorms ts) /\
   (forall (ds:Defs), True).
-Ltac rght := right; intros h; inversion_Clear h; contradiction.
-apply TrmTrmsDefs_ind; intros; auto.
-- right. intros h. inversion h.
-- destruct H; destruct H0; try (solve [rght]).
-- destruct (isLambda_dec t). rght.
-  destruct (isFix_dec t). rght.
-  destruct H; destruct H0; try rght.
-  + left. apply WNApp; auto.
-- rght.
-- destruct H.
-  + left. constructor. assumption.
-  + right. intros h. elim H. inversion h. assumption.
-- destruct H; destruct H0; try rght.
-  + destruct (isConstruct_dec t).
-    * right. inversion H1; intros h; inversion h; subst; contradiction.
-    * left. constructor; auto.
-- destruct H; destruct H0;
-  try (solve [right; intros h; inversion_Clear h; contradiction]).
-  + left; constructor; auto.
+Proof.
+  Ltac rght := solve [right; intros h; inversion_Clear h; contradiction].
+  Ltac lft := solve [left; constructor; assumption].
+  apply TrmTrmsDefs_ind; intros; auto;
+  try (solve[right; intros h; inversion h]);
+  try (solve[left; constructor]).
+  - destruct (isLambda_dec t). rght.
+    destruct (isFix_dec t). rght.
+    destruct H; destruct H0; try rght.
+    + left. apply WNApp; auto.
+  - destruct H.
+    + left. constructor. assumption.
+    + right. intros h. elim H. inversion h. assumption.
+  - destruct H; try rght.
+    + destruct (isConstruct_dec t).
+      * right. destruct H1 as [x0 [x1 [x2 [x3 j]]]]. subst. intros h.
+        inversion_Clear h. elim H5. auto.
+      * destruct H0.
+        { left. constructor; assumption. }
+        { right. intros h. destruct H0. inversion_Clear h. assumption. }
+  - destruct H, H0;
+    try (solve [right; intros h; inversion_Clear h; contradiction]).
+    + left; constructor; auto.
 Qed.
 
 
@@ -81,16 +86,17 @@ Lemma wNorm_no_wndStep:
   forall p,
     (forall t, WNorm t -> no_wnd_step p t) /\
     (forall ts, WNorms ts -> no_wnds_step p ts).
-intros p; apply WNormWNorms_ind; intros;
-unfold no_wnd_step, no_wnds_step;
-intros x h; inversion_Clear h; auto;
-try (solve [elim (H _ H4)]);
-try (solve [elim (H _ H6)]);
-try (solve [elim (H0 _ H6)]).
-- eelim H. eassumption.
-- eelim H0. eassumption.
-- eelim H0. eassumption. 
-- eelim H0. eassumption.
+Proof.
+  intros p; apply WNormWNorms_ind; intros;
+  unfold no_wnd_step, no_wnds_step;
+  intros x h; inversion_Clear h; auto;
+  try (solve [elim (H _ H4)]);
+  try (solve [elim (H _ H6)]);
+  try (solve [elim (H0 _ H6)]).
+  - unfold no_wnd_step, no_step in H. eelim H. eassumption.
+  - eelim H0. eassumption.
+  - eelim H0. eassumption. 
+  - eelim H0. eassumption.
 Qed.
 
 (** If a program is in weak normal form, it WcbvEval to itself **)
@@ -98,18 +104,21 @@ Lemma pre_wNorm_WcbvEval_rfl:
   forall p,
     (forall t, WNorm t -> forall s, WcbvEval p t s -> t = s) /\
     (forall ts, WNorms ts -> forall ss, WcbvEvals p ts ss -> ts = ss).
-intros p; apply WNormWNorms_ind; intros; auto; 
-try (solve [inversion H; reflexivity]).
-- inversion_Clear H1. rewrite (H _ H5) in n0. elim n0. auto.
-- inversion H0.
-  + rewrite (H args'). reflexivity. assumption.
-- inversion_Clear H1.
-  + rewrite (H _ H4) in n. elim n. exists nm, bod. reflexivity.
-  + rewrite (H _ H4) in n0. elim n0. exists dts, m. reflexivity.
-  + apply f_equal2.
-    * apply H. assumption.
-    * apply H0. assumption.
-- inversion_Clear H1. rewrite (H _ H4). rewrite (H0 _ H6). reflexivity.
+Proof.
+  intros p; apply WNormWNorms_ind; intros; auto; 
+  try (solve [inversion H; reflexivity]).
+  - inversion_Clear H1.
+    + rewrite (H _ H5) in n0. elim n0. auto.
+    + rewrite (H0 _ H8). rewrite (H _ H5). reflexivity.
+  - inversion H0.
+    + rewrite (H args'). reflexivity. assumption.
+  - inversion_Clear H1.
+    + rewrite (H _ H4) in n. elim n. exists nm, bod. reflexivity.
+    + rewrite (H _ H4) in n0. elim n0. exists dts, m. reflexivity.
+    + apply f_equal2.
+      * apply H. assumption.
+      * apply H0. assumption.
+  - inversion_Clear H1. rewrite (H _ H4). rewrite (H0 _ H6). reflexivity.
 Qed.
 
 (***

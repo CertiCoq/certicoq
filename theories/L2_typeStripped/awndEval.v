@@ -25,7 +25,7 @@ Set Implicit Arguments.
 
 (*** alrernative non-deterministic small step evaluation relation ***)
 Section Env.
-Variable p:environ.
+Variable p:environ Term.
 Inductive awndEval : Term -> Term -> Prop :=
 (** contraction steps **)
 | aConst: forall (s:string) (t:Term),
@@ -69,28 +69,17 @@ Inductive awndEval : Term -> Term -> Prop :=
 | aCaseBrs: forall (ml:inductive * nat * list nat) (mch:Term) (brs brs':Terms),
               awndEvals brs brs' ->
               awndEval (TCase ml mch brs) (TCase ml mch brs')
-| aFixDefs: forall (ds es:Defs) (i:nat),
-              awndDEvals ds es -> awndEval (TFix ds i) (TFix es i)
 with awndEvals : Terms -> Terms -> Prop :=
      | aaHd: forall (t r:Term) (ts:Terms), 
                awndEval t r ->
                awndEvals (tcons t ts) (tcons r ts)
      | aaTl: forall (t:Term) (ts ss:Terms),
                awndEvals ts ss ->
-               awndEvals (tcons t ts) (tcons t ss)
-with awndDEvals : Defs -> Defs -> Prop :=
-     | adaHd: forall (n:name) (t r:Term) (i:nat) (ds:Defs), 
-               awndEval t r ->
-               awndDEvals (dcons n t i ds) (dcons n r i ds)
-     | adaTl: forall (n:name) (t:Term) (i:nat) (ds es:Defs),
-               awndDEvals ds es ->
-               awndDEvals (dcons n t i ds) (dcons n t i es).
-Hint Constructors awndEval awndEvals awndDEvals.
+               awndEvals (tcons t ts) (tcons t ss).
+Hint Constructors awndEval awndEvals.
 Scheme awndEval1_ind := Induction for awndEval Sort Prop
-     with awndEvals1_ind := Induction for awndEvals Sort Prop
-     with awndDEvals1_ind := Induction for awndDEvals Sort Prop.
-Combined Scheme awndEvalEvals_ind
-         from awndEval1_ind, awndEvals1_ind, awndDEvals1_ind.
+     with awndEvals1_ind := Induction for awndEvals Sort Prop.
+Combined Scheme awndEvalEvals_ind from awndEval1_ind, awndEvals1_ind.
 
 Definition no_awnd_step (t:Term) : Prop :=
   no_step awndEval t.
@@ -142,8 +131,7 @@ Qed.
 Lemma awndEval_pres_WFapp:
   WFaEnv p ->
   (forall t s, awndEval t s -> WFapp t -> WFapp s) /\
-  (forall ts ss, awndEvals ts ss -> WFapps ts -> WFapps ss) /\
-  (forall ds es, awndDEvals ds es -> WFappDs ds -> WFappDs es) .
+  (forall ts ss, awndEvals ts ss -> WFapps ts -> WFapps ss).
 Proof.
   intros hp. apply awndEvalEvals_ind; intros; try assumption;
              try (solve [inversion_Clear H0; constructor; intuition]).
@@ -186,12 +174,7 @@ Inductive awndEvalsRTC : Terms -> Terms -> Prop :=
 | awEsRTCstep: forall ts ss, awndEvals ts ss -> awndEvalsRTC ts ss
 | awEsRTCtrn: forall ts ss us,
        awndEvalsRTC ts ss -> awndEvalsRTC ss us -> awndEvalsRTC ts us.
-Inductive awndDEvalsRTC: Defs -> Defs -> Prop :=
-| awDEsRTCrfl: forall ts, awndDEvalsRTC ts ts
-| awDEsRTCstep: forall ts ss, awndDEvals ts ss -> awndDEvalsRTC ts ss
-| awDEsRTCtrn: forall ts ss us, awndDEvalsRTC ts ss -> awndDEvalsRTC ss us ->
-                          awndDEvalsRTC ts us.
-Hint Constructors awndEvalRTC awndEvalsRTC awndDEvalsRTC.
+Hint Constructors awndEvalRTC awndEvalsRTC.
 
 
 Lemma awndEvalRTC_pres_WFapp:
@@ -220,6 +203,6 @@ Qed.
 
 
 End Env.
-Hint Constructors awndEval awndDEvals awndEvals.
-Hint Constructors awndEvalRTC awndEvalsRTC awndDEvalsRTC.
+Hint Constructors awndEval awndEvals.
+Hint Constructors awndEvalRTC awndEvalsRTC.
 

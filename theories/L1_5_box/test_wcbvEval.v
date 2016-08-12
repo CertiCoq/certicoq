@@ -1,14 +1,13 @@
 
 Add LoadPath "../common" as Common.
+Add LoadPath "../L1g" as L1g.
 Add LoadPath "." as L1_5.
 
 Require Import Template.Template.
 Require Import Common.Common.
+Require Import L1g.compile.
 Require Import L1_5.compile.
 Require Import L1_5.wcbvEval.
-(***
-Require Import L1.L1.  (* whole L1 library is exported by L1.L1 *)
-***)
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
@@ -16,17 +15,6 @@ Unset Template Cast Propositions.  (** L1 doesn't strip proofs **)
 Set Printing Width 90.
 Set Printing Depth 100.
 
-(** tool to set up examples for testing **)
-Definition exc_wcbvEval (tmr:nat) (pgm:program): exception Term :=
-  match program_Program pgm with
-    | Exc str => Exc str
-    | Ret pgm => wcbvEval (env _ pgm) tmr (main _ pgm)
-  end.
-Definition exc_WcbvEval (pgm:program) (ans:term) : Prop :=
-  match program_Program pgm, term_Term ans with
-    | Ret pgm, Ret trm => WcbvEval (env _ pgm) (main _ pgm) trm
-    | _, _ => False
-  end.
 
 (** Abhishek's example of looping in L1 **)
 Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
@@ -43,7 +31,6 @@ Axiom Acc0Ax : Acc 0.
 Eval vm_compute in (loop O Acc0Ax) .
 Quote Recursively Definition p_loop0 := (loop 0 Acc0Ax).
 Print p_loop0.
-Eval vm_compute in (exc_wcbvEval 12 p_loop0).
 (***)
 
 Set Implicit Arguments.
@@ -115,6 +102,7 @@ Quote Recursively Definition qcons :=
   (@cons (list bool): (list bool) -> xlist -> xlist).
 Print qcons.
 
+(** vector addition **)
 Require Coq.Vectors.Vector.
 Print Fin.t.
 Print Vector.t.
@@ -122,45 +110,114 @@ Print Vector.t.
 Definition vplus (n:nat) :
   Vector.t nat n -> Vector.t nat n -> Vector.t nat n :=
   Eval cbv in (Vector.map2 plus).
-
-Definition vplus01 :=
-  (@vplus 1 (Vector.cons nat 0 0 (Vector.nil nat))
-          (Vector.cons nat 1 0 (Vector.nil nat))).
-Eval cbv in vplus01.
-Quote Recursively Definition p_vplus01 := vplus01.
-Quote Definition q_vplus01 := Eval cbv in vplus01.
-Print p_vplus01.
-Goal (exc_wcbvEval 50 p_vplus01) = term_Term q_vplus01.
-compute. reflexivity.
-Qed.
-
-Definition vec1 := Vector.t Set 1.
-Eval cbv in vec1.
-Quote Recursively Definition p_vec1 := vec1.
-Quote Definition q_vec1 := Eval cbv in vec1.
-Goal (exc_wcbvEval 50 p_vec1) = term_Term q_vec1.
-compute. reflexivity.
-Qed.
-
 Definition v01 : Vector.t nat 2 :=
   (Vector.cons nat 0 1 (Vector.cons nat 1 0 (Vector.nil nat))).
 Definition v23 : Vector.t nat 2 :=
   (Vector.cons nat 2 1 (Vector.cons nat 3 0 (Vector.nil nat))).
 Definition vplus0123 := (@vplus 2 v01 v23).
-Eval cbv in vplus0123.
-Quote Recursively Definition p_vplus0123 := vplus0123.
-Print p_vplus0123.
-Quote Definition q_vplus0123 := Eval cbv in vplus0123.
-Print q_vplus0123.
-Goal exc_wcbvEval 90 p_vplus0123 = term_Term q_vplus0123.
-compute. reflexivity.
+Definition cbv_vplus0123 := Eval cbv in vplus0123.  (* evaluated by Coq *)
+Print cbv_vplus0123.
+(* program of Coq's result *)
+Quote Recursively Definition p_vplus0123 := (@vplus 2 v01 v23).
+Quote Definition q_vplus0123 := Eval cbv in (@vplus 2 v01 v23).
+Goal
+  let pP : Program := program_Program p_vplus0123 in
+  let qP : AstCommon.environ L1g.compile.Term :=
+      program_datatypeEnv p_vplus0123 nil in.
+  wcbvEval (env pP) 100 (main pP) = Ret (term_Term (env qP) q_vplus0123).
+  vm_compute. reflexivity.
 Qed.
 
+
+(** mutual recursion **)
+Set Implicit Arguments.
+Inductive tree (A:Set) : Set :=
+  node : A -> forest A -> tree A
+with forest (A:Set) : Set :=
+     | leaf : A -> forest A
+     | fcons : tree A -> forest A -> forest A.
+
+Fixpoint tree_size (t:tree bool) : nat :=
+  match t with
+    | node a f => S (forest_size f)
+  end
+with forest_size (f:forest bool) : nat :=
+       match f with
+         | leaf b => 1
+         | fcons t f1 => (tree_size t + forest_size f1)
+       end.
+
+Definition arden: forest bool :=
+  fcons (node true (fcons (node true (leaf false)) (leaf true)))
+        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
+               (leaf false)).
+Quote Recursively Definition p_arden_size := (forest_size arden).
+Quote Definition q_arden_size := Eval cbv in (forest_size arden).
+Goal
+  let pP := program_Program p_arden_size in
+  wcbvEval (env pP) 100 (main pP) = Ret (term_Term (env pP) q_arden_size).
+vm_compute; reflexivity.
+Qed.
+
+(** Ackermann **)
+Fixpoint ack (n m:nat) {struct n} : nat :=
+  match n with
+    | 0 => S m
+    | S p => let fix ackn (m:nat) {struct m} :=
+                 match m with
+                   | 0 => ack p 1
+                   | S q => ack p (ackn q)
+                 end
+             in ackn m
+  end.
+Definition ack35 := (ack 3 5).
+Quote Recursively Definition p_ack35 := ack35.
+Quote Definition q_ack35 := Eval cbv in ack35.
+Goal
+  let pP := program_Program p_ack35 in
+  wcbvEval (env pP) 15000 (main pP) = Ret (term_Term (env pP) q_ack35).
+vm_compute. reflexivity.
+Qed.
+
+
+(** SASL tautology function: variable arity **)
+Fixpoint tautArg (n:nat) : Type :=
+  match n with
+    | 0 => bool
+    | S n => bool -> tautArg n
+  end.
+Fixpoint taut (n:nat) : tautArg n -> bool :=
+  match n with
+    | 0 => (fun x => x)
+    | S n => fun x => taut n (x true) && taut n (x false)
+  end.
+(* Pierce *)
+Definition pierce := taut 2 (fun x y => implb (implb (implb x y) x) x).
+Quote Recursively Definition p_pierce := pierce.
+Quote Definition q_pierce := Eval cbv in pierce.
+Goal
+  let pP := program_Program p_pierce in
+  wcbvEval (env pP) 15000 (main pP) = Ret (term_Term (env pP) q_pierce).
+vm_compute. reflexivity.
+(* S combinator *)
+Definition Scomb := taut 3
+         (fun x y z => implb (implb x (implb y z))
+                             (implb (implb x y) (implb x z))).
+Quote Recursively Definition p_Scomb := Scomb.
+Quote Definition q_Scomb := Eval cbv in Scomb.
+Goal
+  let pP := program_Program p_pierce in
+  wcbvEval (env pP) 15000 (main pP) = Ret (term_Term (env pP) q_Scomb).
+vm_compute. reflexivity.
+Qed.
+
+(********
 (** match with no branches **)
 Definition Fdemo (f:False) : False := match f with end.
 Print Fdemo.
 Quote Recursively Definition p_Fdemo := Fdemo.
 Print p_Fdemo.
+
 Axiom FF : False.
 Eval compute in (Fdemo FF).
 
@@ -233,7 +290,7 @@ Definition zero : nat :=
 Quote Definition q_0 := Eval cbv in 0.
 Quote Recursively Definition p_zero := zero.
 Print p_zero.
-Eval cbv in program_Program p_zero.
+Eval cbv in program_Program p_zero (ret nil).
 Goal exc_wcbvEval 40 p_zero = term_Term q_0.
 compute. 
 Abort.  (* axiom feq doesn't expand: blocks eval *)
@@ -257,7 +314,7 @@ Definition and_nat (A:Prop) (a:A /\ A) : nat :=
   end.
 Quote Recursively Definition p_and_nat := (and_nat (conj I I)).
 Print p_and_nat.
-Eval cbv in (program_Program p_and_nat).
+Eval cbv in (program_Program p_and_nat (ret nil)).
 Goal exc_wcbvEval 40 p_and_nat = term_Term q_0.
 compute. 
 Abort.
@@ -330,16 +387,16 @@ Print q_testAx.
 Quote Recursively Definition p_testAx := testAx.
 Print p_testAx.
 
-Eval cbv in (program_Program p_testAx).
+Eval cbv in (program_Program p_testAx (Ret nil)).
 Definition pgm :=
-  match  (program_Program p_testAx) with
-    | Ret pgm => env _ pgm
+  match  (program_Program p_testAx (Ret nil)) with
+    | Ret pgm => env pgm
     | x => nil
   end.
 Eval compute in pgm.
 Definition main :=
-  match  (program_Program p_testAx) with
-    | Ret pgm => main _ pgm
+  match  (program_Program p_testAx (Ret nil)) with
+    | Ret pgm => main pgm
     | x => prop
   end.
 Eval compute in main.
@@ -439,60 +496,6 @@ Goal
 reflexivity.
 Qed.
 
-(** Ackermann **)
-Fixpoint ack (n m:nat) {struct n} : nat :=
-  match n with
-    | 0 => S m
-    | S p => let fix ackn (m:nat) {struct m} :=
-                 match m with
-                   | 0 => ack p 1
-                   | S q => ack p (ackn q)
-                 end
-             in ackn m
-  end.
-Eval cbv in ack 3 5.
-Definition ack35 := (ack 3 5).
-Quote Recursively Definition p_ack35 := ack35.
-Eval cbv in (program_Program p_ack35).
-Quote Definition q_ack35 := Eval cbv in ack35.
-Goal (exc_wcbvEval 3000 p_ack35) = term_Term q_ack35.
-vm_compute. reflexivity.
-Qed.
-
-
-(** SASL tautology function: variable arity **)
-Fixpoint tautArg (n:nat) : Type :=
-  match n with
-    | 0 => bool
-    | S n => bool -> tautArg n
-  end.
-Fixpoint taut (n:nat) : tautArg n -> bool :=
-  match n with
-    | 0 => (fun x => x)
-    | S n => fun x => taut n (x true) && taut n (x false)
-  end.
-Eval cbv in taut 0 true.
-Eval cbv in taut 1 (fun x => x).
-Eval cbv in taut 1 (fun x => x || negb x).
-(* Pierce *)
-Definition pierce := taut 2 (fun x y => implb (implb (implb x y) x) x).
-Quote Recursively Definition p_pierce := pierce.
-Eval cbv in (program_Program p_pierce).
-Quote Definition q_pierce := Eval cbv in pierce.
-Goal (exc_wcbvEval 100 p_pierce) = term_Term q_pierce.
- unfold exc_wcbvEval, program_Program, p_pierce.
-compute. reflexivity.
-Qed.
-
-(* S combinator *)
-Definition Scomb := taut 3
-         (fun x y z => implb (implb x (implb y z))
-                             (implb (implb x y) (implb x z))).
-Quote Recursively Definition p_Scomb := Scomb.
-Quote Definition q_Scomb := Eval cbv in Scomb.
-Goal  (exc_wcbvEval 50 p_Scomb) = term_Term q_Scomb.
-vm_compute. reflexivity.
-Qed.
 
 (* Must data constructors have fixed arity? It seems the answer is yes. *)
 Fixpoint arity (n:nat) (A:Type) : Type :=
@@ -531,42 +534,6 @@ Inductive vec2 A (n:nat) : Type :=
   |v2cons : forall (h:A), vec2 A (n + n) -> vec2 A n.
 ***)
 
-Set Implicit Arguments.
-Inductive tree (A:Set) : Set :=
-  node : A -> forest A -> tree A
-with forest (A:Set) : Set :=
-     | leaf : A -> forest A
-     | fcons : tree A -> forest A -> forest A.
-
-Fixpoint tree_size (t:tree bool) : nat :=
-  match t with
-    | node a f => S (forest_size f)
-  end
-with forest_size (f:forest bool) : nat :=
-       match f with
-         | leaf b => 1
-         | fcons t f1 => (tree_size t + forest_size f1)
-       end.
-
-Definition sherwood: forest bool :=
-  fcons (node true (fcons (node true (leaf false)) (leaf true)))
-        (leaf false).
-Quote Recursively Definition p_sherwood_size := (forest_size sherwood).
-Eval cbv in (program_Program p_sherwood_size).
-Quote Definition q_sherwood_size := Eval cbv in (forest_size sherwood).
-Goal (exc_wcbvEval 40 p_sherwood_size) = term_Term q_sherwood_size.
-reflexivity.
-Qed.
-
-Definition arden: forest bool :=
-  fcons (node true (fcons (node true (leaf false)) (leaf true)))
-        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
-               (leaf false)).
-Quote Recursively Definition p_arden_size := (forest_size arden).
-Quote Definition q_arden_size := Eval cbv in (forest_size arden).
-Goal (exc_wcbvEval 100 p_arden_size) = term_Term q_arden_size.
-vm_compute; reflexivity.
-Qed.
 
 
 Inductive uuyy: Set := uu | yy.
@@ -717,3 +684,4 @@ Quote Definition q_arden_size1 := Eval cbv in (forest_size arden).
 Goal (exc_wcbvEval 100 p_arden_size1) = term_Term q_arden_size1.
 vm_compute; reflexivity.
 Qed.
+ ************)

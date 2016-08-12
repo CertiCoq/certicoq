@@ -26,17 +26,17 @@ Set Implicit Arguments.
 *** may occur under a binder in a weak typed normal form
 **)
 Section Sec_environ.
-Variable p:environ.
+Variable p:environ Term.
   
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm ty bod, WNorm ty -> WNorm (TLambda nm ty bod)
 | WNProd: forall nm ty bod, WNorm ty -> WNorm (TProd nm ty bod)
-| WNFix: forall ds br, WDNorms ds -> WNorm (TFix ds br)
-| WNAx: forall nm, LookupAx nm p -> WNorm (TConst nm)
+| WNFix: forall ds br, WNorm (TFix ds br)
+| WNAx: WNorm TAx
 | WNCase: forall mch n ty brs,
             WNorm mch -> WNorm ty -> WNorms brs -> ~ isCanonical mch ->
             WNorm (TCase n ty mch brs)
-| WNConstruct: forall i n, WNorm (TConstruct i n)
+| WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
 | WNInd: forall i, WNorm (TInd i)
 | WNSort: forall srt, WNorm (TSort srt)
 | WNApp: forall fn t ts,
@@ -45,17 +45,11 @@ Inductive WNorm: Term -> Prop :=
            WNorm (TApp fn t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
-| WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts)
-with WDNorms: Defs -> Prop :=
-| WDNtnil: WDNorms dnil
-| WDNtcons: forall t ds n s i,
-              WNorm t -> WNorm s -> WDNorms ds -> WDNorms (dcons n t s i ds).
-Hint Constructors WNorm WNorm WDNorms.
+| WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
+Hint Constructors WNorm WNorm.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
-      with WNorms_ind' := Induction for WNorms Sort Prop
-      with WDNorms_ind' := Induction for WDNorms Sort Prop.
-Combined Scheme WNormWNorms_ind
-         from WNorm_ind', WNorms_ind', WDNorms_ind' .
+      with WNorms_ind' := Induction for WNorms Sort Prop.
+Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.
 
 Ltac rght := solve [right; intros h; inversion_Clear h; contradiction].
 Ltac lft := solve [left; constructor; assumption].
@@ -63,18 +57,18 @@ Ltac lft := solve [left; constructor; assumption].
 (*** Is this desirable ??? ***
 Lemma WNorm_WFapp:
   (forall s, WNorm s -> WFapp s) /\
-  (forall ss, WNorms ss -> WFapps ss) /\
-  (forall dts, WDNorms dts -> WFappDs dts).
+  (forall ss, WNorms ss -> WFapps ss).
 Proof.
   apply WNormWNorms_ind; intros; constructor; try assumption.
 Qed.
  ****)
 
+(*****
 (** WNorm is decidable **)
 Lemma WNorm_dec:
   (forall t, WNorm t \/ ~ WNorm t) /\
   (forall ts, WNorms ts \/ ~ WNorms ts) /\
-  (forall (ds:Defs), WDNorms ds \/ ~ WDNorms ds).
+  (forall ds:Defs, True).
 Proof.
   apply TrmTrmsDefs_ind; intros; auto;
   try (solve[right; intros h; inversion h]);
@@ -83,24 +77,15 @@ Proof.
   - destruct H; [lft|rght].
   - destruct (isLambda_dec t). rght.
     destruct (isFix_dec t). rght.
-    destruct (isApp_dec t). rght.
     destruct H, H0, H1; try rght.
     + left. apply WNApp; auto.
-  - destruct (Lookup_dec s p).
-    + destruct H. destruct (isAx_dec Term_dec x).
-      * left. constructor. subst. assumption.
-      * right. intros j. inversion j. elim H0.
-        unfold LookupAx in H2. apply (Lookup_single_valued H H2).
-    + right. intros h. inversion h. eelim H. apply H1.
   - destruct H, H0, H1; try rght.
     + destruct (isCanonical_dec t0); try rght.
       * left. constructor; auto.
-  - destruct H; [lft|rght]. 
   - destruct H, H0; try rght.
     + left. constructor; assumption.
-  - destruct H, H0, H1; try rght.
-    + left. constructor; assumption.
 Qed.
+*****)
 
 Lemma WNorms_tappendl:
   forall ts us, WNorms (tappend ts us) -> WNorms ts.
@@ -111,12 +96,11 @@ Proof.
     + eapply IHts. eassumption.
 Qed.
 
-  
+ (*********** 
 Lemma Wcbv_WNorm:
   WFaEnv p ->
   (forall t s, WcbvEval p t s -> WFapp t -> WNorm s) /\
-  (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss) /\
-  (forall dts dss, WcbvDEvals p dts dss ->  WFappDs dts -> WDNorms dss).
+  (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss).
 Proof.
   intros hp.
   apply WcbvEvalEvals_ind; simpl; intros; try (solve[constructor]);
@@ -125,7 +109,7 @@ Proof.
   - inversion_Clear H2. apply H1. 
     assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H7). inversion_Clear j.
     assert (j: WFapps (tcons a1' args')).
-    { apply (proj1 (proj2 (wcbvEval_pres_WFapp hp)) _ _ w0).
+    { apply (proj2 (wcbvEval_pres_WFapp hp) _ _ w0).
       constructor; assumption. }
     inversion_Clear j.
     apply whBetaStep_pres_WFapp; try assumption.
@@ -137,29 +121,16 @@ Proof.
     apply H1.
     refine (pre_whFixStep_pres_WFapp _ _ _); try eassumption.
     eapply (dnthBody_pres_WFapp H2 _ e).
-    eapply (proj1 (proj2 (wcbvEval_pres_WFapp hp))). eassumption.
+    eapply (proj2 (wcbvEval_pres_WFapp hp)). eassumption.
     constructor; assumption.
-  - inversion_Clear H1. 
+  - inversion_Clear H2. 
     assert (j0: WFapps (tcons arg args)). constructor; assumption.
     specialize (H0 j0). inversion_Clear H0.
-    constructor; try eassumption; intuition.
-    + destruct H0 as [x1 [x2 [x3 j]]]. discriminate.
-    + destruct H0 as [x1 [x2 j]]. discriminate.
-    + destruct H0 as [x1 [x2 [x3 j]]]. discriminate.
-  - inversion_Clear H1. 
-    assert (j0: WFapps (tcons arg args)). constructor; assumption.
-    specialize (H0 j0). inversion_Clear H0.
-    constructor; try eassumption; intuition.
-    + destruct H0 as [x1 [x2 [x3 j]]]. discriminate.
-    + destruct H0 as [x1 [x2 j]]. discriminate.
-    + destruct H0 as [x1 [x2 [x3 j]]]. discriminate.
-  - inversion_Clear H1. 
-    assert (j0: WFapps (tcons arg args)). constructor; assumption.
-    specialize (H0 j0). inversion_Clear H0.
-    constructor; try eassumption; intuition.
-    + destruct H0 as [x1 [x2 [x3 j]]]. discriminate.
-    + destruct H0 as [x1 [x2 j]]. discriminate.
-    + destruct H0 as [x1 [x2 [x3 j]]]. discriminate.
+    specialize (H H7).
+    apply H1.
+    assert (k:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H7).
+    assert (k0:= proj2 (wcbvEval_pres_WFapp hp) _ _ w0 j0).
+    apply mkApp_pres_WFapp; assumption.
   - inversion_Clear H1. apply H0. refine (whCaseStep_pres_WFapp _ _ _ e1).
     + assumption.
     + refine (tskipn_pres_WFapp _ _ e0).
@@ -169,32 +140,19 @@ Proof.
     intros h. inversion h.
     + rewrite <- H2 in e. simpl in e. discriminate.
     + rewrite <- H2 in e. simpl in e. discriminate.
+  - inversion H.
   - inversion_Clear H1. constructor; intuition.
-  - inversion_Clear H2. constructor; intuition.
 Qed.
-
-Lemma wcbvEval_no_further:
-    (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
-    (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss) /\
-    (forall ds es, WcbvDEvals p ds es -> WcbvDEvals p es es).
-Proof.
-  apply WcbvEvalEvals_ind; simpl; intros; auto.
-Qed.
-
+**********************)
 
 (** If a program is in weak normal form, it has no wndEval step **)
 Lemma wNorm_no_wndStep_lem:
   (forall t s, wndEval p t s -> ~ WNorm t) /\
-  (forall ts ss, wndEvals p ts ss -> ~ WNorms ts) /\
-  (forall ds es, wndDEvals p ds es -> ~ WDNorms ds).
+  (forall ts ss, wndEvals p ts ss -> ~ WNorms ts).
 Proof.
   apply wndEvalEvals_ind; intros; intros h;
   try (solve[inversion h]);
   try (solve[inversion h; subst; contradiction]).
-  - inversion h.
-    inversion l; subst;
-    unfold LookupDfn in l; unfold LookupAx in H0;
-    assert (j:= Lookup_single_valued l H0); discriminate.
   - inversion h. subst. elim H5. exists nm, ty, bod. reflexivity.
   - inversion h. subst. elim H6.
     eapply canonicalP_isCanonical. eassumption.

@@ -23,6 +23,29 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 
+(** Printing terms in exceptions for debugging purposes **)
+Fixpoint print_term (t:Term) : string :=
+  match t with
+    | TRel n => " (" ++ (nat_to_string n) ++ ") "
+    | TSort _ => " SRT "
+    | TCast _ _ _ => " CAST "
+    | TProd _ _ _ => " PROD "
+    | TLambda _ _ _ => " LAM "
+    | TLetIn _ _ _ _ => " LET "
+    | TApp fn arg args =>
+      " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
+    | TConst s => "[" ++ s ++ "]"
+    | TInd _ => " TIND "
+    | TConstruct _ _ n => " (CSTR " ++ (nat_to_string n) ++ ") "
+    | TCase n _ mch _ =>
+      " (CASE " ++ (nat_to_string (snd (fst n))) ++ " _ " ++ (print_term mch) ++
+                 " _ " ++") "
+    | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+    | TAx => " Ax "
+    | TWrong str => (" Wrong " ++ str )
+  end.
+
+
 Ltac not_is2 :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -56,29 +79,6 @@ Ltac isApp :=
   with ll := fresh "l" in
   intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
   destruct kk as [zz ll].
-
-
-(** Printing terms in exceptions for debugging purposes **)
-Fixpoint print_term (t:Term) : string :=
-  match t with
-    | TRel n => " (" ++ (nat_to_string n) ++ ") "
-    | TSort _ => " SRT "
-    | TCast _ _ _ => " CAST "
-    | TProd _ _ _ => " PROD "
-    | TLambda _ _ _ => " LAM "
-    | TLetIn _ _ _ _ => " LET "
-    | TApp fn arg args =>
-      " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
-    | TConst s => "[" ++ s ++ "]"
-    | TInd _ => " TIND "
-    | TConstruct _ n _ => " (CSTR " ++ (nat_to_string n) ++ ") "
-    | TCase n _ mch _ =>
-      " (CASE " ++ (nat_to_string (snd (fst n))) ++ " _ " ++ (print_term mch) ++
-                 " _ " ++") "
-    | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
-    | TAx => " TAx "
-    | TWrong str => "TWrong: " ++ str
-  end.
 
 
 Section TermTerms_dec. (** to make Ltac definitions local **)

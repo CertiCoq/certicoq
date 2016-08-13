@@ -43,7 +43,7 @@ Inductive Term : Type :=
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* index of constructor in type *) ->
                nat (* arity *) -> Term
-| TCase      : (inductive * nat * list nat) (* # of parameters, args per branch *) ->
+| TCase      : (inductive * nat * list nat) (* # of pars, args per branch *) ->
                Term (* type info *) -> Term -> Terms -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : string -> Term
@@ -66,6 +66,27 @@ Notation prop := (TSort SProp).
 Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
+
+(** Printing terms in exceptions for debugging purposes **)
+Fixpoint print_template_term (t:term) : string :=
+  match t with
+    | tRel n => " (" ++ (nat_to_string n) ++ ") "
+    | tSort _ => " SRT "
+    | tCast _ _ _ => " CAST "
+    | tProd _ _ _ => " PROD "
+    | tLambda _ _ _ => " LAM "
+    | tLetIn _ _ _ _ => " LET "
+    | tApp fn args =>
+      " (APP" ++ (print_template_term fn) ++ " _ " ++ ") "
+    | tConst s => "[" ++ s ++ "]"
+    | tInd _ => " IND "
+    | tConstruct _ n => " (CSTR " ++ (nat_to_string n) ++ ") "
+    | tCase n _ mch _ =>
+      " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++
+                (print_template_term mch) ++ " _ " ++") "
+    | tFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+    | _ =>  " Wrong "
+  end.
 
 (** needed for compiling L1 to L1g **)
 Function tappend (ts1 ts2:Terms) : Terms :=
@@ -175,9 +196,12 @@ Function term_Term (t:term) : Term :=
     | tApp fn (cons u us) => TApp (term_Term fn) (term_Term u)
                                   (terms_Terms term_Term us)
     | tConst pth =>   (* replace constants with no value by [TAx] *)
-      match lookupTyp pth e with
-        | Ret (0, nil) => TAx  (* note funny coding of axion in environ *)
-        | _ => TConst pth
+      match lookup pth e with
+        | Some (ecTrm _) => TConst pth
+        | Some (ecTyp _ 0 nil) => TAx  (* note coding of axion in environ *)
+        | Some (ecTyp _ _ _) =>
+          TWrong ("Const refers to inductive: " ++ pth)
+        | None => TWrong ("Const not found in environ: " ++ pth)
       end
     | tInd ind => (TInd ind)
     | tConstruct ind m =>
@@ -207,7 +231,8 @@ Fixpoint program_datatypeEnv (p:program) (e:environ Term) : environ Term :=
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
       program_datatypeEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
-    | PAxiom _ _ p => program_datatypeEnv p e
+    | PAxiom nm _ p =>
+      program_datatypeEnv p (cons (pair nm (ecTyp Term 0 nil)) e)
   end.
 
 Fixpoint program_Pgm

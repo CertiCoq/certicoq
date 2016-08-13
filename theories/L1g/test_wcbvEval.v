@@ -14,7 +14,26 @@ Unset Template Cast Propositions.  (** L1 doesn't strip proofs **)
 Set Printing Width 90.
 Set Printing Depth 100.
 
+(** does Coq eval match branches ? **)
+Variable (y:nat).
+Definition mbt :=
+  match y with
+    | 0 => (fun x:nat => x) 1
+    | S n => (fun x:nat => x) 0
+  end.
+Eval cbv in mbt.
 
+Quote Recursively Definition p_mbt := 
+  match y with
+    | 0 => (fun x:nat => x) 1
+    | S n => (fun x:nat => x) 0
+  end.
+Definition L1g_mbt := Eval cbv in (program_Program p_mbt).
+Definition mbt_env := env L1g_mbt.  (* L1g environ *)
+Definition mbt_main := main L1g_mbt. (* L1g main function *)
+Eval cbv in (wcbvEval mbt_env 10 mbt_main).
+
+  
 (** Abhishek's example of looping in L1 **)
 Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
 Inductive Acc (y: nat) : Prop :=

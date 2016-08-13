@@ -118,16 +118,69 @@ induction ts; intros us; simpl. reflexivity.
 rewrite IHts. reflexivity.
 Qed.
 
+Lemma mkApp_idempotent:
+ forall args fn brgs,
+   mkApp (mkApp fn args) brgs = mkApp fn (tappend args brgs).
+Proof.
+  induction args; cbn; intros. reflexivity.
+  rewrite IHargs. reflexivity.
+Qed.
 
+(**********************
+Goal
+  forall args i n m b,
+    etaExp_cnstr i n m (tcons b args) =
+    mkApp (etaExp_cnstr i n m (tunit b)) args.
+Proof.
+  induction args; intros. reflexivity.
+  - cbn. unfold etaExp_cnstr at 1.
+    case_eq (tlength (tcons b (tcons t args)) ?= m); intros.
+    +  unfold etaExp_cnstr at 1. cbn.
+       assert (j0: m = 2 + tlength args). admit.
+       rewrite j0. cbn.
+
+Qed.
+
+Goal
+  forall bs args i b n m, etaExp_cnstr i n m (tcons b (tappend bs args)) =
+                          mkApp (etaExp_cnstr i n m (tcons b bs)) args.
+Proof.
+  induction bs; intros; cbn.
+  
+  induction args; intros.
+  - rewrite tappend_tnil. reflexivity.
+  - destruct (tappend_mk_canonical bs t args) as [x0 [x1 jx]].
+    rewrite jx. Check (IHargs i b (tcons x0 x1)).
+
+
+  
+  intros i b bs args n m.
+  functional induction (etaExp_cnstr i n m (tcons b (tappend bs args))).
+  - 
+ 
 Lemma mkApp_hom:
 forall fn args,
   strip (L2.term.mkApp fn args) = mkApp (strip fn) (strips args).
 Proof.
-  induction fn; induction args; cbn; try reflexivity.
+  intros fn args.
+  functional induction (L2.term.mkApp fn args);
+    try (destruct fn; cbn;
+         try (rewrite mkApp_idempotent; rewrite tappend_hom);
+         try reflexivity).
+  - rewrite tappend_hom.
+  - reflexivity.
+  - cbn. destruct t; try reflexivity.
+
+
+    destruct fn; cbn; try (rewrite mkApp_idempotent; rewrite tappend_hom); try reflexivity.
+
+     
+     induction fn; induction args; cbn; try reflexivity.
   - rewrite L2.term.tappend_tnil. reflexivity.
   - rewrite tappend_hom. rewrite tcons_hom.
     admit.
 Admitted.
+**********************)
 
 Lemma instantiate_hom:
     (forall bod arg n, strip (L2.term.instantiate arg n bod) =

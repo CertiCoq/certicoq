@@ -18,6 +18,18 @@ Local Open Scope bool.
 Local Open Scope list.
 Local Open Scope string_scope.
 
+Variable (y:nat).
+Quote Recursively Definition p_mbt := 
+  match y with
+    | 0 => (fun x:nat => x) 1
+    | S n => (fun x:nat => x) 0
+  end.
+Definition L1g_mbt := Eval cbv in (program_Program p_mbt).
+Definition mbt_env := env L1g_mbt.  (* L1g environ *)
+Definition mbt_main := main L1g_mbt. (* L1g main function *)
+Eval cbv in (wcbvEval 10 mbt_env mbt_main).
+
+
 Inductive List (A:Set) :=
   Nil: List A | Cons: forall (a:A) (bs:List A), List A.
 Definition tl (A:Set) (ls:List A) : List A :=

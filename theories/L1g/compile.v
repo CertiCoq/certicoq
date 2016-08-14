@@ -195,13 +195,12 @@ Function term_Term (t:term) : Term :=
     | tApp fn nil => TWrong "term_Term: App with no arg"
     | tApp fn (cons u us) => TApp (term_Term fn) (term_Term u)
                                   (terms_Terms term_Term us)
-    | tConst pth =>   (* replace constants with no value by [TAx] *)
-      match lookup pth e with
-        | Some (ecTrm _) => TConst pth
+    | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
+      match lookup pth e with  (* only lookup ecTyp at this point! *)
         | Some (ecTyp _ 0 nil) => TAx  (* note coding of axion in environ *)
         | Some (ecTyp _ _ _) =>
           TWrong ("Const refers to inductive: " ++ pth)
-        | None => TWrong ("Const not found in environ: " ++ pth)
+        | _  => TConst pth
       end
     | tInd ind => (TInd ind)
     | tConstruct ind m =>

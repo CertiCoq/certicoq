@@ -32,7 +32,6 @@ Definition L1g_mbt := Eval cbv in (program_Program p_mbt).
 Definition mbt_env := env L1g_mbt.  (* L1g environ *)
 Definition mbt_main := main L1g_mbt. (* L1g main function *)
 Eval cbv in (wcbvEval mbt_env 10 mbt_main).
-
   
 (** Abhishek's example of looping in L1 **)
 Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
@@ -124,7 +123,7 @@ Quote Recursively Definition qcons :=
 Print qcons.
 
 
-(** simple example **)
+(** simple example **
 Definition plus01 := (plus 1 0).
 Definition cbv_plus01 := Eval cbv in plus01.  (* evaluated by Coq *)
 Print cbv_plus01.
@@ -139,57 +138,8 @@ Definition cbv_env_pP := Eval cbv in (env pP).
 Print cbv_env_pP.
 Definition cbv_main_pP := Eval cbv in (main pP).
 Print cbv_main_pP.
-Check (WcbvE cbv_env_pP).
-
-Goal WcbvE cbv_env_pP cbv_main_pP cbv_q_plus01.
-  unfold cbv_env_pP, cbv_main_pP, cbv_q_plus01.
-eapply w_AppFix. eapply w_Const. eapply LHit.
-econstructor. cbn. reflexivity. eapply w_Cons. eapply w_AppCong.
-econstructor. not_isLambda.
-intros h. destruct h as [x0 [x1 h0]]. discriminate.
-eapply w_Cons. eapply w_Construct. eapply w_Nil. reflexivity.
-cbn. reflexivity. eapply w_Cons. eapply w_Construct. eapply w_Nil. reflexivity. reflexivity. cbn. reflexivity.
-reflexivity. cbn. eapply w_AppLam. eapply w_Lam. eapply w_Ind. reflexivity.
-eapply w_Cons. eapply w_AppCong. eapply w_Construct.
-not_isLambda. intros h. destruct h as [x0 [x1 h0]]. discriminate.
-eapply w_Cons. eapply w_Construct. eapply w_Nil. reflexivity. reflexivity.
-eapply w_Cons. eapply w_Construct. eapply w_Nil. reflexivity.
-reflexivity. cbn. eapply w_AppLam. eapply w_Lam. eapply w_Ind. reflexivity.
-eapply w_Cons. eapply w_Construct. eapply w_Nil. reflexivity. cbn.
-eapply w_Case.
-
-eapply w_Cons. eapply w_Construct. eapply w_Nil. reflexivity. reflexivity.
-
-not_isLambda. intros h. destruct h as [x0 [x1 h0]]. discriminate.
-
-
-eapply w_AppCong.  eapply w_Construct. not_isLambda.
-intros h. destruct h as [x0 [x1 h0]]. discriminate.
-eapply w_Cons.  eapply w_Construct.  eapply w_Nil. reflexivity.
-cbn. eapply w_AppCong.  eapply w_Construct. not_isLambda.
-intros h. destruct h as [x0 [x1 h0]]. discriminate.
-eapply w_Cons.  eapply w_Construct.  eapply w_Nil. reflexivity.
-cbn. eapply w_AppCong.  eapply w_Construct. not_isLambda.
-intros h. destruct h as [x0 [x1 h0]]. discriminate.
-eapply w_Cons.  eapply w_Construct.  eapply w_Nil. reflexivity.
-cbn. eapply w_AppCong.  eapply w_Construct. not_isLambda.
-intros h. destruct h as [x0 [x1 h0]]. discriminate.
-eapply w_Cons.  eapply w_Construct.  eapply w_Nil. reflexivity.
-cbn. eapply w_AppCong.  eapply w_Construct. not_isLambda.
-intros h. destruct h as [x0 [x1 h0]]. discriminate.
-
-(**** non-terminating!!!  ****)
-
-
 Eval cbv in (wcbvEval cbv_env_pP 5000 cbv_main_pP).
-
-
-
-Definition plus01 := 0 + 1.
-Quote Recursively Definition p_plus01 := plus01.
-Print p_plus01.
-Quote Definition cbv_plus01 := Eval cbv in plus01.
-Print cbv_plus01.
+******************)
 
 (** vector addition **)
 Require Coq.Vectors.Vector.
@@ -208,7 +158,9 @@ Definition cbv_vplus0123 := Eval cbv in vplus0123.  (* evaluated by Coq *)
 Print cbv_vplus0123.
 (* program of Coq's result *)
 Quote Recursively Definition p_vplus0123 := (@vplus 2 v01 v23).
+Print p_vplus0123.
 Quote Definition q_vplus0123 := Eval cbv in (@vplus 2 v01 v23).
+Print q_vplus0123.
 Definition pP := Eval cbv in program_Program p_vplus0123.
 Print pP.
 Definition cbv_q_vplus0123 := Eval cbv in (term_Term (env pP) q_vplus0123).

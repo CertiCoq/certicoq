@@ -147,31 +147,26 @@ Print Fin.t.
 Print Vector.t.
 
 Definition vplus (n:nat) :
-  Vector.t nat n -> Vector.t nat n -> Vector.t nat n :=
-  Eval cbv in (Vector.map2 plus).
+  Vector.t nat n -> Vector.t nat n -> Vector.t nat n := (Vector.map2 plus).
 Definition v01 : Vector.t nat 2 :=
   (Vector.cons nat 0 1 (Vector.cons nat 1 0 (Vector.nil nat))).
 Definition v23 : Vector.t nat 2 :=
   (Vector.cons nat 2 1 (Vector.cons nat 3 0 (Vector.nil nat))).
-Definition vplus0123 := (@vplus 2 v01 v23).
-Definition cbv_vplus0123 := Eval cbv in vplus0123.  (* evaluated by Coq *)
+Definition vplus0123 := (vplus v01 v23).
+Quote Recursively Definition cbv_vplus0123 := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (vplus0123)) in exact t).
 Print cbv_vplus0123.
-(* program of Coq's result *)
-Quote Recursively Definition p_vplus0123 := (@vplus 2 v01 v23).
+(* [Term] of Coq's answer *)
+Definition ans_vplus0123 := Eval cbv in (main (program_Program cbv_vplus0123)).
+(* [program] of the program *)
+Quote Recursively Definition p_vplus0123 := vplus0123.
 Print p_vplus0123.
-Quote Definition q_vplus0123 := Eval cbv in (@vplus 2 v01 v23).
-Print q_vplus0123.
-Definition pP := Eval cbv in program_Program p_vplus0123.
-Print pP.
-Definition cbv_q_vplus0123 := Eval cbv in (term_Term (env pP) q_vplus0123).
-Print cbv_q_vplus0123.
-Definition cbv_env_pP := Eval cbv in (env pP).
-Print cbv_env_pP.
-Definition cbv_main_pP := Eval cbv in (main pP).
-Print cbv_main_pP.
-Eval cbv in (wcbvEval cbv_env_pP 1000 cbv_main_pP).
+Definition P_vplus0123 := Eval cbv in (program_Program p_vplus0123).
+Print P_vplus0123.
 Goal
-  wcbvEval (env pP) 1000 (main pP) = Ret cbv_q_vplus0123.
+  let env := (env P_vplus0123) in
+  let main := (main P_vplus0123) in
+  wcbvEval (env) 100 (main) = Ret ans_vplus0123.
   vm_compute. reflexivity.
 Qed.
 

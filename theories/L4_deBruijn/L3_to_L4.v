@@ -116,7 +116,7 @@ Section TermTranslation.
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
     | L3t.TInd i => (* Erase *) erased_exp
-    | L3t.TConstruct ind c _ args =>
+    | L3t.TConstruct ind c (* _ *) args =>
       let args' := trans_args trans k args in
         Con_e (dcon_of_con ind c) args'
     | L3t.TCase ann t brs =>

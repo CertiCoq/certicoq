@@ -451,8 +451,8 @@ Proof.
   induction args; simpl; try rewrite IHargs at 1; reflexivity.
 Qed.
 
-Lemma subst_env_aux_constructor e k i r arty args :
-  subst_env_aux e k (trans e k (TConstruct i r arty args)) =
+Lemma subst_env_aux_constructor e k i r (* arty *) args :
+  subst_env_aux e k (trans e k (TConstruct i r (* arty *) args)) =
   Con_e (dcon_of_con i r) (map_terms (fun x => subst_env_aux e k (trans e k x)) args).
 Proof.
   revert k i r args; induction e; intros; unfold translate.
@@ -804,9 +804,9 @@ Proof.
     repeat (f_equal; try lia).
 
   - (* Constructor *)
-    intros i m arty args IHargs k k' wft kk'. inv wft.
+    intros i m (* arty *) args IHargs k k' wft kk'. inv wft.
     rewrite L3.term.instantiate_equation; simpl.
-    f_equal. destruct (IHargs k k' H4 kk'); auto.
+    f_equal. destruct (IHargs k k'  H3  kk'); auto.
     
   - (* Match *)
     intros. inv H1. destruct (H0 k k' H8 H2).
@@ -1011,7 +1011,7 @@ Inductive WNorm: Term -> Prop :=
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNAx: WNorm TAx
-| WNConstruct: forall i n arty args, WNorms args -> WNorm (TConstruct i n arty args)
+| WNConstruct: forall i n (* arty *) args, WNorms args -> WNorm (TConstruct i n (* arty *) args)
 | WNInd: forall i, WNorm (TInd i)
 | WNSort: forall s, WNorm (TSort s)
 | WNNeutral: forall e, WNeutral e -> WNorm e
@@ -1253,8 +1253,8 @@ Proof.
     destruct pars; simpl. auto. now rewrite Pos.pred_N_succ.
 Qed.
 
-Lemma wftrm_construct {e : environ Term} {i n arty args} : wf_environ e ->
-  L3t.WFTrm (TConstruct i n arty args) 0 ->
+Lemma wftrm_construct {e : environ Term} {i n (* arty *) args} : wf_environ e ->
+  L3t.WFTrm (TConstruct i n (* arty *) args) 0 ->
   cnstrArity e i n = Ret (tlength args).
 Proof. intros. inv H. Admitted.
     
@@ -1397,7 +1397,7 @@ Proof with eauto.
     cbn. apply eval_erased_exp.
 
   + (* Constructor *)
-    intros i r arty args args' Hargs Hargs' wft.
+    intros i r (*arty *) args args' Hargs Hargs' wft.
     destruct i.
     eapply Crct_invrt_Construct in wft; eauto. intuition. 
     unfold translate, subst_env.
@@ -1605,7 +1605,7 @@ Proof with eauto.
     assert (Hwf':=wftrm_case _ _ _ _ _ Hcrct).
     eapply Crct_invrt_Case in Hcrct; [ |reflexivity].
     destruct Hcrct as [Hann [Hmch Hbrs]].
-    assert (Har:WFTrm (TConstruct ind n arty args) 0).
+    assert (Har:WFTrm (TConstruct ind n (* arty *) args) 0).
     inv Hwf.
     eapply wcbeval_preserves_wf; eauto.
     apply (wftrm_construct wfe) in Har.

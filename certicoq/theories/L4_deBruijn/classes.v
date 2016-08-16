@@ -14,7 +14,7 @@ Program Instance : WellFormed L4.expression.exp :=
 
 Instance certiL4: CerticoqLanguage L4.expression.exp := {}.
 
-Program Instance : 
+Instance certiL3_to_L4: 
   CerticoqTranslation (Program L3.compile.Term) L4.expression.exp  :=
 fun p => Ret (L3_to_L4.translate_program (AstCommon.env p) (main p)).
 
@@ -26,7 +26,7 @@ constructor.
   intros ? ? Hwf He.
   destruct Hwf.
   unfold certiClasses.translate,
-    CerticoqTranslation_instance_0, liftBigStepException, bigStepEval, BigStepOpSem_instance_0.
+    certiL3_to_L4, liftBigStepException, bigStepEval, BigStepOpSem_instance_0.
   unfold translate_program.
   Fail eapply L3_to_L4_correct.translate_correct. 
 (* not applicable!! do we need to change the end to end correctness property?, 
@@ -49,7 +49,7 @@ Program Instance : WellFormed L4aTerm :=
 Instance certiL4a: CerticoqLanguage L4aTerm := {}.
 
 
-Program Instance : 
+Instance certiL4_to_L4a: 
   CerticoqTranslation L4.expression.exp L4aTerm :=
   fun x => Ret (L4_to_L4a x).
 
@@ -62,7 +62,7 @@ Program Instance : WellFormed L5Term := isprogram.
 
 Instance certiL5: CerticoqLanguage L5Term := {}.
 
-Program Instance : 
+Instance certiL4a_to_L5:
   CerticoqTranslation L4aTerm L5Term:=
   fun x => Ret (cps_cvt x).
 
@@ -77,7 +77,7 @@ Program Instance : WellFormed L4.L5a.val_c := fun x => False.
 
 Instance certiL5a: CerticoqLanguage L5Term := {}.
 
-Program Instance : 
+Instance certiL5_to_L5a: 
   CerticoqTranslation  L5Term L4.L5a.val_c :=
   fun e =>
    match L4.L5a.translateVal e with
@@ -92,7 +92,8 @@ Require Import L2.classes.
 
 Open Scope Z_scope.
 Require Import ZArith.
-Print Instances CerticoqLanguage.
+(* Print Instances CerticoqLanguage. *)
+
 Eval compute in (translateTo L5a.val_c p0L1).
 (*
      = Ret

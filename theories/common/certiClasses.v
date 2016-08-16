@@ -48,6 +48,15 @@ Definition bigStepPreserving `{CerticoqTranslation Src Dst}
     -> s ⇓ sv
     -> (translate Src Dst s) ⇓ (translate Src Dst sv).
 
+Definition bigStepPreservingWeaker `{CerticoqTranslation Src Dst}
+   `{BigStepOpSem Src} `{BigStepOpSem Dst} `{WellFormed Src}
+  :=
+   ∀ (s sv:Src) (tv : Dst), 
+    wf s 
+    -> s ⇓ sv
+    -> ((translate Src Dst s) ⇓ (Ret tv) <-> (translate Src Dst sv) ⇓ (Ret tv)).
+
+
 Arguments bigStepPreserving Src Dst {H} {H0} {H1} {H2}.
 
 (** A Certicoq language must have an associated bigstep operational semantics and 
@@ -69,7 +78,7 @@ Class CerticoqTranslationCorrect
   `{CerticoqTranslation Src Dst} := 
 {
   certiWfPres : wfPreserving Src Dst;
-  certiBigStepPres : bigStepPreserving Src Dst;
+  certiBigStepPres : bigStepPreserving Src Dst; (* consider [bigStepPreservingWeaker] *)
 }.
 
 Arguments CerticoqTranslationCorrect Src {H} {H0} {H1} Dst {H2} {H3} {H4} {H5}.
@@ -99,6 +108,10 @@ Proof.
   unfold translate in *.
   assumption.
 Qed.
+
+Instance  BigStepOpWEnv (Term:Set) (ev: (environ Term) -> Term -> Term -> Prop) :
+  BigStepOpSem (Program Term) :=
+fun p1 p2 => ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
 
 
 

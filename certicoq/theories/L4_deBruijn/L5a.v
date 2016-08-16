@@ -1,7 +1,7 @@
 
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
-Require Import L4.simpleCPSAA.
+Require Import L4.L4a_to_L5.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
   Coq.Program.Program Coq.micromega.Psatz.
 
@@ -29,10 +29,10 @@ with val_c : Type :=
 | Con_c : dcon -> list val_c -> val_c
 (** In Fix_c [(v1,c1); (v2,c2) ...],
     in ci, vi can occur, and refers to Fix_c [(v1,c1); (v2,c2) ...]
-    See [simpleCPSAA.eval_Proj_c] for more details
+    See [L4a_to_L5.eval_Proj_c] for more details
     
     Unlike previously, when a lambda was implicit in a fix, the ci must now explicitly be a value.
-    Currently, [simpleCPSAA.eval_Proj_e] only reduces if cis are lambdas.
+    Currently, [L4a_to_L5.eval_Proj_e] only reduces if cis are lambdas.
     We may allow arbitrary values.
   *)
 | Fix_c : list (NVar * val_c) -> val_c.
@@ -95,7 +95,7 @@ match c with
       ret (Ret_c f a)
  | terms.oterm CCall [bterm [] fn; bterm [] cont; bterm [] arg] => 
  (** we know that the CPS translation only produces Call_c terms that are variables. see 
-    [simpleCPSAA.cps_cvt] and [simpleCPSAA.cps_cvt_apply]. *)
+    [L4a_to_L5.cps_cvt] and [L4a_to_L5.cps_cvt_apply]. *)
       fn <- getVar fn ;; 
       cont <- getVar cont ;;
       arg <- getVar arg ;;
@@ -366,7 +366,7 @@ Require Import L4.L4_to_L4a.
 
 Definition L4_to_L5a (e:L4.expression.exp) : option val_c :=
   let l4a := L4.L4_to_L4a.L4_to_L4a e in
-  let l5 := simpleCPSAA.cps_cvt l4a in
+  let l5 := L4a_to_L5.cps_cvt l4a in
   translateVal l5.
 
 End Notations.
@@ -400,7 +400,7 @@ Let compile_L1_to_L4a (e : Ast.program) :=
   L4.L4_to_L4a.translate nil (compile_L1_to_L4 e).
 
 Let compile_L1_to_cps (e : Ast.program)  :=
-  simpleCPSAA.cps_cvt (compile_L1_to_L4a e).
+  L4a_to_L5.cps_cvt (compile_L1_to_L4a e).
 
 Definition compile_L1_to_L5a (e:Ast.program) : exception val_c:=
   let e := compile_L1_to_cps e in

@@ -48,6 +48,15 @@ Definition bigStepPreserving `{CerticoqTranslation Src Dst}
     -> s ⇓ sv
     -> (translate Src Dst s) ⇓ (translate Src Dst sv).
 
+Arguments bigStepPreserving Src Dst {H} {H0} {H1} {H2}.
+
+(* Sometimes, the translation of a value may not be a value. 
+For example, in L3 to L4, the environment is translated as let bindings.
+Thus, a value with a non-empty environment will be translated to a term
+whose outermost operator is a let binding and is hence not a value.
+This definition, which is inspired by CPS correct seems weaker, is not strong enough
+to be sensible. For example it is possible that the translation of [s] and [sv] both
+diverge. *)
 Definition bigStepPreservingWeaker `{CerticoqTranslation Src Dst}
    `{BigStepOpSem Src} `{BigStepOpSem Dst} `{WellFormed Src}
   :=
@@ -56,8 +65,8 @@ Definition bigStepPreservingWeaker `{CerticoqTranslation Src Dst}
     -> s ⇓ sv
     -> ((translate Src Dst s) ⇓ (Ret tv) <-> (translate Src Dst sv) ⇓ (Ret tv)).
 
+Arguments bigStepPreservingWeaker Src Dst {H} {H0} {H1} {H2}.
 
-Arguments bigStepPreserving Src Dst {H} {H0} {H1} {H2}.
 
 (** A Certicoq language must have an associated bigstep operational semantics and 
   a well formedness predicate (possibly \_.True) *)
@@ -109,11 +118,6 @@ Proof.
   assumption.
 Qed.
 
-Instance  BigStepOpWEnv (Term:Set) (ev: (environ Term) -> Term -> Term -> Prop) :
-  BigStepOpSem (Program Term) :=
-fun p1 p2 => ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
-
-
 
 Instance composeCerticoqTranslationCorrect (Src Inter Dst: Type)
   `{CerticoqLanguage Src}
@@ -136,6 +140,40 @@ Proof.
   exact Hev.
 Qed.
 
+
+Instance  BigStepOpWEnv (Term:Set) (ev: (environ Term) -> Term -> Term -> Prop) :
+  BigStepOpSem (Program Term) :=
+fun p1 p2 => ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
+
+
+(* A possible replacement for [CerticoqTranslationCorrect] 
+Class CerticoqTranslationCorrect2 
+  `{CerticoqLanguage Src} `{CerticoqLanguage Dst}
+  `{CerticoqTranslation Src Dst} := 
+{
+  certiWfPres2 : wfPreserving Src Dst;
+  certiBigStepPres2 : bigStepPreservingWeaker Src Dst;
+}.
+
+Arguments CerticoqTranslationCorrect2 Src {H} {H0} {H1} Dst {H2} {H3} {H4} {H5}.
+
+
+Instance composeCerticoqTranslationCorrect2 (Src Inter Dst: Type)
+  `{CerticoqLanguage Src}
+  `{CerticoqLanguage Inter}
+  `{CerticoqLanguage Dst}
+  {t1 : CerticoqTranslation Src Inter}
+  {t2 : CerticoqTranslation Inter Dst}
+  {Ht1: CerticoqTranslationCorrect2 Src Inter}
+  {Ht2: CerticoqTranslationCorrect2 Inter Dst}
+    : CerticoqTranslationCorrect2 Src Dst.
+Proof.
+  destruct Ht1, Ht2.
+  constructor;[eapply composePreservesWf; eauto|].
+  intros ? ? ? Hwf Hev.
+  specialize (fun ti => certiBigStepPres3 _ _ ti Hwf Hev).
+
+*)
 
 
 (* ( * ) in Randy's email dated Tue, May 31, 2016 at 10:35 PM EST 

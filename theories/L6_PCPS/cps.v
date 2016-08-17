@@ -79,6 +79,7 @@ Inductive exp : Type :=
 | Efun: fundefs -> exp -> exp
 | Eapp: var -> fTag -> list var -> exp
 | Eprim: var -> prim -> list var -> exp -> exp (* where prim is id *)
+| Ehalt : var -> exp
 with fundefs : Type :=
      | Fcons: var -> fTag -> list var -> exp -> fundefs -> fundefs
      | Fnil: fundefs.
@@ -142,9 +143,11 @@ Lemma exp_ind' :
     (forall (f2 : fundefs) (e : exp), P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
     (forall (v : var)  (p : prim) (l : list var) (e : exp),
-       P e -> P (Eprim v p l e)) -> forall e : exp, P e.
+       P e -> P (Eprim v p l e)) ->
+    (forall (v : var), P (Ehalt v)) ->
+    forall e : exp, P e.
 Proof.
-  intros P H1 H2 H3 H4 H5 H6 H7. fix 1.
+  intros P H1 H2 H3 H4 H5 H6 H7 H8. fix 1.
   destruct e; try (now clear exp_ind'; eauto).
   - eapply H1. eapply exp_ind'; eauto.
   - induction l as [ | [c e] xs IHxs].
@@ -169,6 +172,7 @@ Lemma exp_mut :
     (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
        P e -> P (Eprim v p l e)) ->
+    (forall (v : var), P (Ehalt v)) ->
     (forall (v : var) (t : fTag) (l : list var) (e : exp),
        P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
     P0 Fnil -> forall e : exp, P e                                 
@@ -185,11 +189,12 @@ with fundefs_mut :
     (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
        P e -> P (Eprim v p l e)) ->
+    (forall (v : var), P (Ehalt v)) ->
     (forall (v : var) (t : fTag) (l : list var) (e : exp),
        P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
     P0 Fnil -> forall f7 : fundefs, P0 f7.
 Proof.
-  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9. 
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10. 
     destruct e; eauto.
     + eapply H1. eapply exp_mut; eauto.
     + induction l as [ | [c e] xs IHxs].
@@ -199,9 +204,9 @@ Proof.
     + eapply H5. eapply fundefs_mut; eauto.
       eapply exp_mut; eauto.
     + eapply H7. eapply exp_mut; eauto.
-  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 defs. 
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 defs. 
     destruct defs; eauto.
-    eapply H8. eapply exp_mut; eauto.
+    eapply H9. eapply exp_mut; eauto.
     eapply fundefs_mut; eauto.
 Qed.
 
@@ -219,6 +224,7 @@ Lemma exp_def_mutual_ind :
     (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
        P e -> P (Eprim v p l e)) ->
+    (forall (v : var), P (Ehalt v)) ->
     (forall (v : var) (t : fTag) (l : list var) (e : exp),
        P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
     P0 Fnil -> (forall e : exp, P e) /\ (forall f : fundefs, P0 f).
@@ -238,7 +244,8 @@ Ltac exp_defs_induction IH1 IHl IH2 :=
   | intros ? ? ? ? ? IH1
   | intros ? IH2 ? IH1 
   | intros ? ? ?
-  | intros ? ? ? ? IH1 
+  | intros ? ? ? ? IH1
+  | intros ?
   | intros ? ? ? ? IH1 ? IH2
   | ].
 
@@ -388,4 +395,3 @@ Definition get_fTag : fState fTag :=
   t <- get ;;
   put (t+1)%positive ;;
   ret t.
-

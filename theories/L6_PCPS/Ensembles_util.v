@@ -190,6 +190,11 @@ Proof.
   constructor; eauto; eapply Included_trans; eauto.
 Qed.
 
+Instance Complement_Proper {A : Type} : Proper (Same_set A ==> Same_set A) (Complement A). 
+Proof.
+  intros s1 s2 [Hin1 Hin2]; split; intros x Hc Hc'; eapply Hc; eauto.
+Qed.
+
 (** * Useful definitions and lemmas *)
 
 (** ** Commutativity properties *)
@@ -641,7 +646,7 @@ Proof.
   eapply H2; eauto.
 Qed.
 
-Lemma Setminus_Disjoint_preserv {A} s1 s2 s3:
+Lemma Setminus_Disjoint_preserv_l {A} s1 s2 s3:
   Disjoint A s1 s3 ->
   Disjoint A (Setminus A s1 s2) s3.
 Proof.
@@ -649,9 +654,18 @@ Proof.
   inv H0. eapply Hd; eauto.
 Qed.
 
+Lemma Setminus_Disjoint_preserv_r {A} s1 s2 s3:
+  Disjoint A s1 s2 ->
+  Disjoint A s1 (Setminus A s2 s3).
+Proof.
+  intros Hd. constructor; intros x H. inv H. 
+  inv H1. eapply Hd; eauto.
+Qed.
 
-Hint Resolve Disjoint_Setminus_l Disjoint_Setminus_r Union_Disjoint_l Union_Disjoint_r
-     Disjoint_Singleton_l Disjoint_Singleton_r Setminus_Disjoint_preserv  : Ensembles_DB.
+
+Hint Resolve Disjoint_Setminus_l Disjoint_Setminus_r Union_Disjoint_l
+     Union_Disjoint_r Disjoint_Singleton_l Disjoint_Singleton_r
+     Setminus_Disjoint_preserv_l Setminus_Disjoint_preserv_r  : Ensembles_DB.
 
 Hint Immediate Disjoint_Empty_set_l Disjoint_Empty_set_r : Ensembles_DB.
 
@@ -1061,7 +1075,7 @@ Proof.
     now apply Same_set_refl.
 Qed.
 
-Lemma FromList_singleton {A} x (l : list A) :
+Lemma FromList_singleton {A} x :
   Same_set A (FromList [x]) (Singleton A x).
 Proof.
   rewrite FromList_cons, FromList_nil, Union_Empty_set_neut_r.

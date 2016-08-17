@@ -19,7 +19,7 @@ Require Import ExtLib.Structures.Traversable.
 Require Import ExtLib.Core.RelDec.
 Require Import ExtLib.Data.Positive.
 Require Import Coq.Bool.Bool.
-Require Import closure_conversion.  (* for max_var *)
+Require Import identifiers.  (* for max_var *)
 
 Section UNCURRY.
   Import MonadNotation.
@@ -57,6 +57,7 @@ Section UNCURRY.
     | Eapp x _ xs => eq_var k x || occurs_in_vars k xs
     | Eprim z _ xs e1 =>
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
+    | Ehalt x => eq_var x k
     end
   (* Returns true iff [k] occurs within the function definitions [fds] *)
   with occurs_in_fundefs (k:var) (fds:fundefs) : bool :=
@@ -66,7 +67,7 @@ Section UNCURRY.
            eq_var z k || occurs_in_vars k zs || occurs_in_exp k e ||
                    occurs_in_fundefs k fds1
          end.
-
+  
   (* The state for this includes a "next" var for gensyming a fresh variable
      and a boolean for tracking whether or not a reduction happens. *)
   Definition uncurryM := state (var * bool).
@@ -152,6 +153,7 @@ Section UNCURRY.
       fds' <- uncurry_fundefs fds ;;
       e1' <- uncurry_exp e1 ;;
       ret (Efun fds' e1')
+    | Ehalt x => ret (Ehalt x)
     end
   with uncurry_fundefs (fds : fundefs) : uncurryM fundefs :=
          match fds with

@@ -107,8 +107,7 @@ returns pair of converted expression e', the next available variable name n' and
 
         The names bound in e' are exactly [n, n'[
 
-note : var "2" is taken as an external function standing for "halt"
-       var "1" is taken as error and will be proven not to appear when input is well-scoped                           
+note : var "1" is taken as error and will be proven not to appear when input is well-scoped                           
 
       Mutually recursive function are bound as a single (explicit) record
       Continuation for pattern matching take a single argument whose m projections are bound to unique variables 
@@ -120,7 +119,7 @@ note : var "2" is taken as an external function standing for "halt"
 Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:t_map) (n:var) (*  {struct e } *): exp * var * t_map :=
        match e with
        | Halt_c v => let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
-                         (app_ctx_f ctx_v (Eprim n' halt (vn::nil) (Eapp n' halt_tag nil)), (Pos.succ n'), tgm)
+                         (app_ctx_f ctx_v (Ehalt vn), (Pos.succ n'), tgm)
        | Ret_c k v => let '(ctx_k, kn, n', tgm) := convert_v k sv sk tgm n in
                       let '(ctx_v, vn, n'', tgm) := convert_v v sv sk tgm n' in
                        (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp  kn (get_t kn tgm) (vn::nil)), n'', tgm)

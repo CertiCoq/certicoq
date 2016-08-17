@@ -23,7 +23,6 @@ Definition f_eq_subdomain {A B} S (f1 f2 : A -> B) :=
 (** Extensional equality *)
 Definition f_eq  {A B} (f1 f2 : A -> B) : Prop :=  forall x, f1 x = f2 x.
 
-
 (** Extend a function. Only works for positives to avoid parameterizing the definition with
   * the decidable equality proof. TODO: fix this *)
 Definition extend (f: positive -> positive) (x x' : positive) : (positive -> positive) :=
@@ -236,6 +235,29 @@ Proof.
   intros Hc. subst. contradiction.
 Qed.
 
+Lemma image_extend_In_S f x x' S :
+  In _ S x ->
+  Same_set _ (image (f {x ~> x'}) S)
+           (Union _ (image f (Setminus _ S (Singleton _ x)))
+                  (Singleton _ x')).
+Proof.
+  intros HinS. split. 
+  - intros y [y' [Hin Heq]]; subst. 
+    destruct (Coqlib.peq x y').
+    + subst. rewrite extend_gss. eauto.
+    + rewrite extend_gso; eauto. left.
+      eexists; split; eauto. constructor; eauto.
+      intros Hc; inv Hc; congruence.
+  - intros y Hin.
+    destruct (Coqlib.peq x' y); subst.
+    + eexists; split; eauto. rewrite extend_gss; eauto.
+    + inv Hin. 
+      * destruct H as [y' [Hin Heq]]; subst. inv Hin.
+        eexists; split. now eauto. rewrite extend_gso; eauto.
+        intros Heq; subst. eauto.
+      * inv H. congruence. 
+Qed.
+
 Lemma image_Setminus_extend f v v' S :
   Included _ (image (f {v ~> v'}) (Setminus _ S  (Singleton positive v)))
            (image f S).
@@ -253,6 +275,27 @@ Proof.
   destruct (Coqlib.peq y' x); subst; [ now eauto |] .
   left. eexists; eauto.
 Qed.
+
+Lemma In_image {A B} S f x: 
+  In A S x ->
+  In B (image f S) (f x).
+Proof. 
+  intros; repeat eexists; eauto.
+Qed.
+
+Lemma Included_image_extend g S x x':
+  ~ In _ S x ->
+  Included _ (image g S)
+           (image (g {x ~> x'}) (Union _ (Singleton _ x) S)).
+Proof.
+  intros H.
+  eapply Included_trans.
+  eapply image_extend_not_In_S. eassumption. eapply image_monotonic.
+  now apply Included_Union_r.
+Qed.
+
+Hint Resolve In_image Included_image_extend : functions_BD.
+
 
 (** * Lemmas about [injective_subdomain] and [injective] *)
 
@@ -285,7 +328,33 @@ Proof.
   intros Hinj Hinc x y Hin Hin' Heq. eauto.
 Qed.
 
-    
+Lemma injective_subdomain_Union {A B} (f : A -> B) S1 S2 :
+  injective_subdomain S1 f ->
+  injective_subdomain S2 f ->
+  Disjoint  _ (image f S1) (image f S2) ->
+  injective_subdomain (Union A S1 S2) f.
+Proof.
+  intros Hinj1 Hinj2 HD x1 x2 Hin1 Hin2 Heq.
+  inv Hin1; inv Hin2.
+  - eauto.
+  - exfalso. eapply HD. constructor; eexists; eauto.
+  - exfalso. eapply HD. constructor; eexists; eauto.
+  - eauto.
+Qed.
+
+Lemma injective_subdomain_Singleton {A B} (f : A -> B) x :
+  injective_subdomain (Singleton _ x) f.
+Proof.
+  intros x1 x2 Hin1 Hin2 Heq. inv Hin1. inv Hin2.
+  reflexivity.
+Qed.
+
+Lemma injective_subdomain_Empty_set {A B} (f : A -> B) :
+  injective_subdomain (Empty_set _) f.
+Proof.
+  intros x1 x2 Hin1 Hin2 Heq. inv Hin1.
+Qed.
+
 Lemma injective_subdomain_extend f x x' S :
   injective_subdomain S f ->
   ~ In _ (image f (Setminus _ S (Singleton _ x))) x' ->
@@ -311,6 +380,29 @@ Proof.
       intros Heq. eapply Hinj; eauto.
       inv Hin1. inv H; congruence. eassumption.
       inv Hin2. inv H; congruence. eassumption.
+Qed.
+
+Lemma injective_subdomain_extend' f x x' S :
+  injective_subdomain S f ->
+  ~ In _ (image f (Setminus _ S (Singleton _ x))) x' ->
+  injective_subdomain S (f {x~>x'}).
+Proof.
+  intros Hinj Hnin.
+  intros y y' Hin1 Hin2.
+  destruct (Coqlib.peq x y); subst.
+  - rewrite extend_gss. intros Heq.
+    destruct (Coqlib.peq y y'); [ now eauto | ].
+    rewrite extend_gso in Heq; [| now eauto ]. 
+    exfalso. eapply Hnin. eexists; split; [| now eauto ].
+    constructor; eauto. intros Hc; eapply n. now inv Hc.
+  - rewrite extend_gso; [| now eauto ].
+    destruct (Coqlib.peq x y'); subst.
+    + rewrite extend_gss. intros Heq. subst.
+      exfalso. apply Hnin. eexists.
+      split; [| reflexivity ].
+      constructor; eauto. intros Hc; eapply n. now inv Hc.
+    + rewrite extend_gso; [| now eauto ].
+      intros Heq. eapply Hinj; eauto.
 Qed.
 
 Lemma injective_extend (f : positive -> positive) x y :

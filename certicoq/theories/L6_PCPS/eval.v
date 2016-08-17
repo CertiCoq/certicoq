@@ -83,11 +83,15 @@ Section EVAL.
         f' vs = Some v ->
         M.set x v rho = rho' ->
         bstep_e rho' e v' c ->
-        bstep_e rho (Eprim x f ys e) v' c.
+        bstep_e rho (Eprim x f ys e) v' c
+  | BStep_halt :
+      forall x v rho,
+        M.get x rho = Some v ->
+        bstep_e rho (Ehalt x) v 0.
 
     
   (** Small step semantics -- Relational definition *)
-  (* TODO : this semantics currently does not match the big step semantic.
+  (* TODO : this semantics currently does not match the big step semantics.
    * We need them to match and a proof that they indeed match. *)
   Inductive step: state -> state -> Prop := 
   | Step_constr: forall vs rho x t ys e,
@@ -115,7 +119,11 @@ Section EVAL.
                  M.get f pr = Some f' ->
                  f' vs = Some v ->
                  M.set x v rho = rho' ->
-                 step (rho, Eprim x f ys e) (rho', e).
+                 step (rho, Eprim x f ys e) (rho', e)
+  (* need to go from value to exp somehow ... *)
+  (* | Step_halt : forall x v rho, *)
+  (*                 M.get x rho = Some v -> *)
+  (*                 step (rho, Ehalt x) (rho, v) *).
   
   (** Small step semantics -- Computational definition *)
   (* TODO : this is inconsistent with [step].  we need computational case_consistent *)
@@ -158,10 +166,12 @@ Section EVAL.
         f' <- M.get f pr ;;
         v <- f' vs ;;
         ret (M.set x v rho, e)
+      | Ehalt x =>
+        (* need to go from value to exp somehow ... *)
+        None
     end.
 
-
-(* TODO : to update the following we need computational definition of case_consistent *)
+(* TODO : to update the following we need a computational definition of case_consistent *)
 (*  (** Correspondence of the two small step semantics definitions *)
   Lemma step_stepf:
     forall s s',

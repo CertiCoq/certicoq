@@ -317,3 +317,39 @@ Proof.
       eexists. split; simpl; eauto.
     + edestruct IHxs as [v2 [Hnth2 Hr]]; eauto.
 Qed.
+
+(** Compute the maximum of a list with positives *)
+Fixpoint max_list ls acc : positive :=
+  match ls with
+    | nil => acc
+    | cons x xs => max_list xs (Pos.max x acc)
+  end.
+
+Lemma max_list_spec1 l z :
+  (z <= max_list l z)%positive.
+Proof.
+  revert z. induction l; intros z.
+  - simpl. zify; omega.
+  - simpl. eapply Pos.le_trans; [| now eapply IHl ].
+    zify; omega. 
+Qed.
+
+Lemma max_list_spec2 l z x :
+  List.In x l -> (x <= max_list l z)%positive.
+Proof.
+  revert z. induction l; intros z Hin.
+  - inv Hin.
+  - inv Hin; simpl. 
+    + eapply Pos.le_trans; [| now eapply max_list_spec1 ].
+      zify; omega.
+    + now apply IHl.
+Qed.
+
+Lemma max_list_acc_mon z1 z2 l :
+  (z1 <= z2)%positive ->
+  (max_list l z1 <= max_list l z2)%positive.
+Proof.
+  revert z1 z2; induction l; intros z1 z2 Hleq.
+  - eassumption.
+  - simpl. eapply IHl. zify; omega.
+Qed.

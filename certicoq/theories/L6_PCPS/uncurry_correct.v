@@ -122,8 +122,10 @@ Section Uncurry_correct.
                         
                         admit.
                      * admit.
+                  - admit.
                   - admit. } 
               + admit. 
+            - admit.
             - admit.
             - admit. }
     - apply return_triple. intros s1 Hf.
@@ -189,6 +191,8 @@ Section Uncurry_correct.
     - (* Case Eproj -- directly from compatibility lemma *)
       admit.
     - (* Case Eproj -- directly from compatibility lemma *)
+      admit.
+    - (* Case Ehalt -- directly from compatibility lemma *)
       admit. 
   Admitted.
 

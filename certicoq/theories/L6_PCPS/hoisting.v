@@ -46,6 +46,7 @@ Fixpoint erase_fundefs (e : exp) (defs : fundefs)
       erase_fundefs e' defs (fun p =>
                            let (e', defs') := p in
                            f (Eprim x prim ys e', defs'))
+    | Ehalt x => f (Ehalt x, defs) 
   end
 with erase_nested_fundefs (defs : fundefs) (e : exp) (hdefs : fundefs)
                           (f : exp * fundefs -> exp * fundefs) {struct defs}
@@ -107,6 +108,8 @@ Inductive Erase_fundefs : exp -> exp -> fundefs -> Prop :=
       Erase_fundefs e e' B ->
       Erase_fundefs (Eprim x f ys e)
                     (Eprim x f ys e') B
+| Ehalt_erase :
+    forall x, Erase_fundefs (Ehalt x) (Ehalt x) Fnil
 with Erase_nested_fundefs : fundefs -> fundefs -> Prop :=
 | Fcons_erase :
     forall f tau xs e e' defs B B' B'',
@@ -144,6 +147,7 @@ Proof.
     edestruct split_fds_trans as [B3 [H1 H2]] ; [ | apply Hspl1 |]; eauto.
     repeat eexists. rewrite Heq2, Heq1; eauto. eauto. econstructor; eauto.
   - repeat eexists; eauto using split_fds_nil_l; repeat econstructor.
+  - repeat eexists; eauto using split_fds_nil_l; econstructor.
   - edestruct IHf as [B1 [B1' [Heq1 [Hspl1 Her1]]]]; subst.
     edestruct IHe as [e2 [B2 [B2' [Heq2 [Hspl2 Her2]]]]].
     edestruct split_fds_trans as [B3 [H1 H2]] ; [ apply Hspl1 | |]; eauto.
@@ -175,7 +179,9 @@ Inductive no_fun : exp -> Prop  :=
 | Eprim_no_fun :
     forall x p xs e,
       no_fun e ->
-      no_fun (Eprim x p xs e).
+      no_fun (Eprim x p xs e)
+| Ehalt_no_fun :
+    forall x, no_fun (Ehalt x).
 
 (** Function definitions without nested function definitions *)
 Inductive no_fun_defs : fundefs -> Prop  :=
@@ -270,6 +276,7 @@ Fixpoint exp_fun_count (e : exp) : nat :=
       fold_left (fun n p => n + (exp_fun_count (snd p))) P 0
     | Efun B e => exp_fun_count e + fundefs_fun_count B
     | Eapp _ _ _ => 0
+    | Ehalt _ => 0
   end
 with fundefs_fun_count (B : fundefs) : nat :=
        match B with
@@ -397,6 +404,7 @@ Fixpoint f c e' e : exp :=
     | Eapp x ft x0 => e
     | Eprim x f' ys e =>
       Eprim x f' ys (f c e' e)
+    | Ehalt x => e
   end.
 
 Inductive g (f' : var) (t : cTag) (xs' : list var) (e' : exp)
@@ -428,7 +436,9 @@ Inductive g (f' : var) (t : cTag) (xs' : list var) (e' : exp)
 | g_app :
     forall f ft xs,
       g f' t xs' e' (Eapp f ft xs) (Eapp f ft xs)
- | g_case :
+| g_halt :
+    forall x, g f' t xs' e' (Ehalt x) (Ehalt x)
+| g_case :
      forall x P,
        g f' t xs' e' (Ecase x P) (Ecase x P).
 
@@ -623,6 +633,7 @@ Proof.
     apply IHdefs; eauto.
   - exists 0; constructor; eauto.
   - eapply hoist_star_compat with (c := Eprim_c v p l Hole_c); eauto.
+  - econstructor. constructor.
   - inv H8.
   - exists 1. econstructor.
     apply Compat with (c := Hole_c). constructor.
@@ -654,7 +665,7 @@ Lemma Erase_fundefs_in_hoist_rw :
      hoist_star (Efun B e) (Efun B' e)).
 Proof.
   exp_defs_induction IHe IHl IHdefs;
-  [| | | | | | | intros B' e1 Hnil H |intros B' e1 Hnil H ];
+  [| | | | | | | | intros B' e1 Hnil H |intros B' e1 Hnil H ];
   try intros e1 B' Hnil H; inv H.
   - eapply hoist_star_trans.
     eapply hoist_star_compat with (c := Econstr_c v t l Hole_c); eauto.
@@ -711,6 +722,7 @@ Proof.
   - eapply hoist_star_trans.
     eapply hoist_star_compat with (c := Eprim_c v p l Hole_c); eauto.
     apply hoist_rw_hoist_star. constructor.
+  - congruence.
   - destruct (Fnil_eq_dec B'0) as [Heq1 | Heq1]; subst;
     destruct (Fnil_eq_dec B) as [Heq2 | Heq2]; subst.
     + eapply hoist_star_trans.
@@ -800,7 +812,6 @@ Proof with now eauto 6 with Ensembles_DB.
       constructor; eauto. constructor; eauto.
       eauto with Ensembles_DB.
       normalize_bound_var...
-      
     + inv H0.
       edestruct unique_bindings_Ecase_l as [H1' [H2' [H3' [H4' [H5' H6']]]]]; eauto.
       inv H1'. repeat normalize_bound_var_in_ctx.

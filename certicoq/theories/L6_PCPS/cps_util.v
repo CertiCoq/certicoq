@@ -453,6 +453,16 @@ Proof.
   eauto. 
 Qed.
 
+Lemma binding_in_map_Included {A} S (rho : M.t A) :
+  binding_in_map S rho ->
+  Included _ S (FromList (List.map fst (M.elements rho))).
+Proof.
+  intros Hin x Hx. unfold FromList, In.
+  eapply in_map_iff. edestruct Hin as [v Hget]; eauto.
+  eexists (x, v). split; eauto.
+  eapply M.elements_correct. eassumption.
+Qed.    
+
 
 (* XXX: These definitions need to be updated to work with the new syntax of L6.
         Whoever needs them has to update them. Otherwise, they will

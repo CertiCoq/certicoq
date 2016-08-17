@@ -33,6 +33,10 @@ Inductive well_scoped_exp : env -> exp -> Prop :=
       getlist ys Γ = Some vs ->
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
       well_scoped_exp Γ (Eprim x f ys e)
+| WS_halt :
+    forall x v Γ,
+      M.get x Γ = Some v ->
+      well_scoped_exp Γ (Ehalt x)
 | WS_fun :
     forall defs e Γ,
       well_scoped_fundefs Γ defs ->

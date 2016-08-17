@@ -121,6 +121,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
             end) fds ;;
          tab indent ;; emit "] in" ;; newline ;; emit_exp indent e
   | Eapp x ft ys => emit (show_var x) ;; emit (show_vars ys) ;; newline
+  | Ehalt x  => emit "halt " ;; emit (show_var x) ;; newline
   end%string.
 
 (* We add an extra newline at the front so that Coq will display the

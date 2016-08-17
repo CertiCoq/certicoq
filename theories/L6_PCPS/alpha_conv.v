@@ -92,6 +92,10 @@ Inductive Alpha_conv : exp -> exp -> (var -> var) -> Prop :=
       Alpha_conv_fundefs B B' f' ->
       Alpha_conv e e' f' ->
       Alpha_conv (Efun B e) (Efun B' e') f
+| Alpha_Ehalt :
+    forall f x x',
+      f x = x' ->
+      Alpha_conv (Ehalt x) (Ehalt x') f
 with Alpha_conv_fundefs : fundefs -> fundefs -> (var -> var) -> Prop :=
 | Alpha_Fnil :
     forall f, Alpha_conv_fundefs Fnil Fnil f
@@ -200,6 +204,8 @@ Proof.
       intros x1 x2 Heq. rewrite H2. eassumption. 
     + rewrite f_eq_extend. eassumption. eassumption.
     + eapply H; eauto. eapply f_eq_extend. eassumption. 
+  - inv H'; constructor; eauto.
+  - inv H'; constructor; eauto.
   - inv H'. edestruct construct_lst_injection_f_eq as [g' [Heq Hinj]].
     eassumption. eassumption. econstructor; eauto.
     eapply H0; eauto. now symmetry.
@@ -505,6 +511,8 @@ Section Alpha_conv_correct.
         eapply preord_env_P_inj_antimon; eauto.
         normalize_occurs_free...
         eassumption.
+    - eapply preord_exp_halt_compat.
+      eapply Henv. now constructor.
   Qed.
   
 End Alpha_conv_correct.

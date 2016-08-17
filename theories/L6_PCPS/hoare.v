@@ -238,6 +238,17 @@ Proof.
   intros Hyp s [Hpre HP]. eapply Hyp; eauto.
 Qed.
 
+Lemma post_mp  (A S : Type) (Pre : S -> Prop) (Post Post' : S -> A -> S -> Prop) (e : state S A) :
+  {{ Pre }} e {{ Post' }} ->
+  {{ Pre }} e {{ fun s r s' => Post' s r s' -> Post s r s' }} ->
+  {{ Pre }} e {{ Post }}.
+Proof.
+  unfold triple. 
+  intros Ht1 Ht2 s HPre. specialize (Ht1 s HPre); specialize (Ht2 s HPre).
+  destruct (runState e s). eauto.
+Qed.
+
+
 (** * Lemmas about monadic combinators *)
 
 Lemma return_triple {A S} (x : A) (Pre : S -> Prop) (Post : S -> A -> S -> Prop) :

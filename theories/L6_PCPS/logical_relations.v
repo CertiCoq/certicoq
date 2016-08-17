@@ -80,7 +80,7 @@ Section Log_rel.
       exists v2 c2, bstep_e pr cenv rho2 e2 v2 c2 /\
                preord_val (k - c1) v1 v2.
   
-  (** more compact definition of the value preorder *)
+  (** a more compact definition of the value preorder *)
   Definition preord_val' (k : nat) (v1 v2 : val) : Prop :=
     match v1, v2 with
       | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
@@ -360,9 +360,9 @@ Section Log_rel.
     intros. eapply preord_env_P_setlist_l; eauto.
   Qed.
 
-  (** * Index Monotonicity Properties *)
+  (** * Index Anti-Monotonicity Properties *)
 
-  (** The value relation is monotonic in the step index *)
+  (** The value relation is anti-monotonic in the step index *)
   Lemma preord_val_monotonic (k : nat) :
     (forall v1 v2 j,
        preord_val k v1 v2 -> j <= k -> preord_val j v1 v2).
@@ -382,7 +382,7 @@ Section Log_rel.
       eapply H3; eauto. omega. 
   Qed.
   
-  (** The expression relation is monotonic in the step index *)
+  (** The expression relation is anti-monotonic in the step index *)
   Lemma preord_exp_monotonic (k : nat) :
     (forall rho1 e1 rho2 e2 j,
        preord_exp k (rho1, e1) (rho2, e2) ->
@@ -470,6 +470,16 @@ Section Log_rel.
     - repeat eexists. econstructor 4; eauto.
       replace (k - (c + 1)) with (k - 1 - c) by omega. eauto.
   Qed.
+
+  Lemma preord_exp_halt_compat k rho1 rho2 x1 x2  :
+    preord_var_env k rho1 rho2 x1 x2 ->
+    preord_exp k (Ehalt x1, rho1) (Ehalt x2, rho2).
+  Proof.
+    intros Hvar v1 c1 Hleq1 Hstep1. inv Hstep1.
+    edestruct Hvar as [v2' [Hget Hpre]]; eauto.
+    repeat eexists; eauto. now econstructor; eauto.
+    eapply preord_val_monotonic. eassumption. omega.
+  Qed.    
 
   Lemma preord_exp_case_nil_compat k rho1 rho2 x1 x2 :
     preord_exp k (Ecase x1 [], rho1) (Ecase x2 [], rho2).
@@ -615,6 +625,8 @@ Section Log_rel.
       eapply IHe. eapply preord_env_P_extend; eauto.
       eapply preord_env_P_antimon. eassumption.
       now (normalize_occurs_free; eauto with Ensembles_DB).
+    - eapply preord_exp_halt_compat.
+      intros x HP. apply Henv; eauto.
    Qed.
   (* Note: I think that the above proof could go through also by mutual
      induction on expressions and function definitions and then nested induction
@@ -1252,7 +1264,6 @@ Section Log_rel.
         inv H; eauto. unfold closed_fundefs in Hclo. rewrite Hclo in H0. inv H0.
     - simpl. intros x HP. inv HP.
   Qed.
-
   
   Lemma preord_val_def_funs_append_pre (k : nat) f tau xs e (B1 B2 : fundefs)
         (rho1 rho2  : env) :
@@ -2163,7 +2174,17 @@ Section Log_rel.
       repeat eexists; eauto. econstructor; eauto; [| now simpl; rewrite Heq; eauto ].
       inv H2. econstructor; eauto.
   Qed.
-
+  
+  Lemma cc_approx_exp_halt_compat k rho1 rho2 x1 x2 :
+    cc_approx_var_env k rho1 rho2 x1 x2 ->
+    cc_approx_exp k (Ehalt x1, rho1) (Ehalt x2, rho2).
+  Proof.
+    intros Henv v1 c1 Hleq1 Hstep1. inv Hstep1.
+    edestruct Henv as [v' [Hget Hpre]]; eauto.
+    repeat eexists; eauto. now econstructor; eauto.
+    eapply cc_approx_val_monotonic. eassumption. omega.
+  Qed.
+    
   Axiom Prim_axiom_cc :
     forall f f' v1,
       M.get f pr = Some f' ->
@@ -2230,7 +2251,6 @@ Section Log_rel.
   Proof.
     intros x v H. inv H.
   Qed.
-
 
   Lemma lift_P_env_extend S P rho x v :
     lift_P_env (Setminus _ S (Singleton _ x)) P rho ->
@@ -2415,6 +2435,16 @@ Section Log_rel.
       inv Hpre'. reflexivity.
   Qed.
 
+  Corollary cc_approx_exp_respects_preord_exp_r (k : nat)
+        (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
+    cc_approx_exp k (e1, rho1) (e2, rho2) ->
+    (forall k', preord_exp k' (e2, rho2) (e3, rho3)) ->
+    cc_approx_exp k (e1, rho1) (e3, rho3).
+  Proof.
+    eapply cc_approx_exp_respects_preord_exp_r_pre.
+    now intros; eapply cc_approx_val_respects_preord_val_r; eauto.
+  Qed.
+
   (* The following are obsolete *)
   (* TODO: move to identifiers.v *)
   Inductive closed_fundefs_in_val : val -> Prop :=
@@ -2518,6 +2548,7 @@ Section Log_rel.
           eapply lift_P_env_getlist; [ eassumption | | eassumption ].
           rewrite occurs_free_Eprim. eapply Included_Union_l.
       + intros B Hin. eauto.
+    - eapply Hcl1. now constructor. eassumption.
   Qed.
 
 End Log_rel.

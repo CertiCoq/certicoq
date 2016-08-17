@@ -47,26 +47,6 @@ Section Closure_conversion_correct.
 
   (** ** Proof that after closure conversion all functions are closed *)
 
-  Lemma In_image {A B} S f x: 
-    In A S x ->
-    In B (image f S) (f x).
-  Proof. 
-    intros; repeat eexists; eauto.
-  Qed.
-
-  Lemma Included_image_extend g S x x':
-    ~ In _ S x ->
-    Included var (image g S)
-             (image (g {x ~> x'}) (Union var (Singleton var x) S)).
-  Proof.
-    intros H.
-    eapply Included_trans.
-    eapply image_extend_not_In_S. eassumption. eapply image_monotonic.
-    now apply Included_Union_r.
-  Qed.
-
-  Hint Resolve In_image Included_image_extend : functions_BD.
-
   Lemma project_var_occurs_free_ctx_Included Scope Funs σ c Γ FVs S x x' C S' F e:
     project_var clo_tag Scope Funs σ c Γ FVs S x x' C S' ->
     Included _ (occurs_free e) (Union _ F (Singleton _ x')) ->
@@ -91,6 +71,7 @@ Section Closure_conversion_correct.
       + eauto with Ensembles_DB.
   Qed.
 
+  (* TODO : do this with autorewrites *)
   Ltac normalize_sets :=
     match goal with
       | [|- context[FromList []]] => rewrite FromList_nil
@@ -275,6 +256,9 @@ Section Closure_conversion_correct.
       eapply Included_trans. eapply IHe. eassumption.
       intros f Hunf. eapply Hun. now constructor.
       eauto 7 with Ensembles_DB.
+    - eapply project_var_occurs_free_ctx_Included;
+      [ eassumption | | now apply Included_refl ].
+      rewrite occurs_free_Ehalt...
     - rewrite occurs_free_fundefs_Fcons.
       apply Union_Included.
       + apply Setminus_Included_Included_Union.
@@ -343,7 +327,9 @@ Section Closure_conversion_correct.
       inv HB. inv H1. inv H4.
     - intros B HB. rewrite project_vars_free_funs_in_exp in HB; [| eassumption ].
       inv HB. eapply IHe; [ eassumption | | eassumption ]. 
-      intros B' H. eapply Hun. now constructor. 
+      intros B' H. eapply Hun. now constructor.
+    - intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ].
+      inv HB.
     - intros B HB. inv HB.
       + eapply IHe; [ eassumption | | eassumption ].  
         intros B' H. eapply Hun. left. now constructor. 
@@ -367,24 +353,29 @@ Section Closure_conversion_correct.
   
   (** Invariant about the free variables *) 
   Definition FV_inv k rho rho' Scope Funs c Γ FVs : Prop :=
-    exists vs,
-      M.get Γ rho' = Some (Vconstr c vs) /\
-      closure_env k rho Scope Funs vs FVs.
+    forall (x : var) N (v : val),
+      ~ In _ Scope x ->
+      ~ In _ Funs x -> 
+      nthN FVs N = Some x ->
+      M.get x rho = Some v ->
+      exists (vs : list val) (v' : val),
+        M.get Γ rho' = Some (Vconstr c vs) /\
+        nthN vs N = Some v' /\
+        cc_approx_val pr cenv clo_tag k v v'.
   
   (** Invariant about the functions in the current function definition *)
   Definition Fun_inv k (rho rho' : env) Scope Funs σ c Γ : Prop :=
-    exists vs,
-      M.get Γ rho' = Some (Vconstr c vs) /\
-      forall f v,
-        ~ In _ Scope f ->
-        In var Funs f ->
-        M.get f rho = Some v  ->
-        exists  rho1 B1 f1 rho2 B2 f2,
-          v = (Vfun rho1 B1 f1) /\
-          ~ In _ Scope (σ f) /\
-          M.get (σ f) rho' = Some (Vfun rho2 B2 f2) /\
-          cc_approx_val pr cenv clo_tag k (Vfun rho1 B1 f1)
-                        (Vconstr clo_tag [(Vfun rho2 B2 f2) ; (Vconstr c vs)]).
+    forall f v,
+      ~ In _ Scope f ->
+      In var Funs f ->
+      M.get f rho = Some v  ->
+      exists vs rho1 B1 f1 rho2 B2 f2,
+        M.get Γ rho' = Some (Vconstr c vs) /\
+        v = (Vfun rho1 B1 f1) /\
+        ~ In _ Scope (σ f) /\
+        M.get (σ f) rho' = Some (Vfun rho2 B2 f2) /\
+        cc_approx_val pr cenv clo_tag k (Vfun rho1 B1 f1)
+                      (Vconstr clo_tag [(Vfun rho2 B2 f2) ; (Vconstr c vs)]).
   
 
   (** * Lemmas about Fun_inv *)
@@ -403,19 +394,19 @@ Section Closure_conversion_correct.
             (M.set (σ f) (Vfun rho2 B2 f2) rho')
             Scope (Union _ (Singleton _ f) Funs) σ c Γ.
   Proof.
-    intros Hinv Hneq Heq Hinj Hget Hv. edestruct Hinv as [vs' [Hget' Hyp]]. 
-    eexists. rewrite M.gso; eauto. split; [ eassumption |].
-    intros f'' v Hnin' Hin Hget''. rewrite Hget in Hget'. inv Hget'.
-    rewrite M.gsspec in Hget''. destruct (Coqlib.peq f'' f); subst.
-    - inv Hget''. 
-      repeat eexists; eauto. unfold extend. rewrite M.gss; eauto.
-    - edestruct Hyp with (f := f'') as
-          [rho3 [B3 [f3 [rho4 [B4 [f4 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]];
-      subst; eauto.
-      + inv Hin; eauto. inv H. congruence.
-      + subst. repeat eexists; eauto. rewrite M.gso. now eauto. 
-        intros Hc. inv Hin. inv H. congruence. eapply Hinj. 
-        rewrite <- Hc. eexists; split; [| now eauto]. now constructor; eauto.
+    intros Hinv Hneq Hnin Hnin' Hget Hv f'' v Hnin'' Hin Hget'.
+    destruct (Coqlib.peq f'' f); subst.
+    - repeat eexists; eauto. rewrite M.gso; eauto.
+      now rewrite M.gss in Hget'; inv Hget'; eauto.
+      now rewrite M.gss.
+    - inv Hin. inv H; congruence. rewrite M.gso in Hget'; eauto.
+      edestruct Hinv with (f := f'') as
+          [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]];
+        subst; eauto.
+      repeat eexists; eauto. rewrite M.gso; now eauto. 
+      rewrite M.gso. now eauto.
+      intros Hc. eapply Hnin'. eexists; eauto. split; [| eassumption ].
+      now constructor; eauto.
   Qed.
 
   (** Rename the environment parameter *)
@@ -424,35 +415,29 @@ Section Closure_conversion_correct.
     Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ c Γ ->
     Fun_inv k rho1 (M.set Γ' v rho2) Scope Funs σ c Γ'.
   Proof.
-    intros Hnin Hnin' [vs [Hget H]].
-    rewrite M.gss in Hget. inv Hget.
-    eexists. rewrite M.gss; split; [ now eauto |].
-    intros f v Hninf Hin Hget.
-    edestruct H as
-        [rhof1 [B1 [f1 [rhof2 [B2 [f2  [Heq [Hnin'' [Hget' Happrox']]]]]]]]]; eauto.
-    rewrite M.gsspec in Hget'.
-    destruct (Coqlib.peq (σ f) Γ); subst.
-    - exfalso. eapply Hnin. eexists. split; [| now eauto ].
-      constructor; eauto.
-    - destruct (Coqlib.peq (σ f) Γ'); subst.
-      + exfalso. eapply Hnin'. eexists. eauto.
-      + repeat eexists; eauto. rewrite M.gso; eauto.
+    intros Hnin Hnin' Hinv f v1 Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    rewrite M.gss in Hget1. inv Hget1.
+    repeat eexists; eauto. now rewrite M.gss; eauto.
+    rewrite M.gso in Hget2. rewrite M.gso; eauto.
+    intros Hc. eapply Hnin'. now eexists; split; eauto.
+    intros Hc. eapply Hnin. now eexists; split; eauto.
   Qed.
-
+  
   (** Extend [Scope] with a set that does not shadow the new function names *)
   Lemma Fun_inv_mon k rho1 rho2 Scope Scope' Funs σ c Γ :
     Disjoint _ (image σ (Setminus _ Funs Scope)) Scope' ->
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
     Fun_inv k rho1 rho2 (Union _ Scope' Scope) Funs σ c Γ.
   Proof.
-    intros Hd [vs [Hget H]].
-    eexists. split; [ now eauto |].
-    intros f c' Hnin Hin Hget'.
-    edestruct H as
-        [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin'' [Hget'' Happrox']]]]]]]]]; eauto.
+    intros Hd Hinv f v Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
     repeat eexists; eauto.
-    intros Hc; inv Hc; eauto. eapply Hd. constructor; eauto.
-    eexists; eauto. split; [| now eauto ]. constructor; eauto.
+    intros Hc; inv Hc. eapply Hd. constructor; eauto. 
+    eexists; eauto. split; [| now eauto ]. now constructor; eauto.
+    now eauto.
   Qed.
 
   (** Extend the first environment with a variable in [Scope] *)
@@ -461,12 +446,9 @@ Section Closure_conversion_correct.
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
     Fun_inv k (M.set x v rho1) rho2 Scope Funs σ c Γ.
   Proof.
-    intros Hin [t [Hget H]].
-    eexists. split; [ now eauto |].
-    intros f v' Hninf Hin' Hget'.
-    rewrite M.gsspec in Hget'.
-    destruct (Coqlib.peq f x); subst; [ contradiction |].
-    now eauto.
+    intros Hin Hinv f v' Hninf Hinf Hget.
+    eapply Hinv; eauto. rewrite M.gso in Hget.
+    now eauto. intros Hc; subst. now eauto.
   Qed.
   
   (** Extend the second environment with a variable in [Scope] *)
@@ -475,18 +457,16 @@ Section Closure_conversion_correct.
     Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ c Γ ->
     Fun_inv k rho1 (M.set Γ v (M.set x v' rho2)) Scope Funs σ c Γ.
   Proof.
-    intros Hin Hnin [vs [Hget H]].
-    rewrite M.gss in Hget. inversion Hget. subst v.
-    eexists. rewrite M.gss; split; [ now eauto |].
-    intros f v1 Hninf Hin' Hget'.
-    edestruct H as
-        [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq' [Hnin' [Hget'' Happrox']]]]]]]]]; eauto.
-    rewrite M.gsspec in Hget''.
+    intros Hin Hnin Hinv f v1 Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    rewrite M.gss in Hget1; inv Hget1. 
+    repeat eexists; eauto. now rewrite M.gss.
     destruct (Coqlib.peq (σ f) Γ).
-    - congruence.
-    - repeat eexists; try eassumption.
-      rewrite M.gso; eauto. rewrite M.gso. eassumption. 
-      intros Heq''; subst. eapply Hnin. eexists; eauto.
+    - subst. now rewrite M.gss in *.
+    - rewrite M.gso; eauto. rewrite M.gso in Hget2; eauto.
+      rewrite M.gso; eauto.
+      intros Hc; subst. eapply Hnin. eexists; eauto.
       split; [| now eauto]. constructor; eauto.
   Qed.
 
@@ -496,17 +476,15 @@ Section Closure_conversion_correct.
     In _ Scope x -> Γ <> x ->
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
     Fun_inv k rho1 (M.set x v rho2) Scope Funs σ c Γ.
-  Proof. 
-    intros Hin Hneq [vs [Hget H]].
-    eexists. rewrite M.gso; [| now eauto ].
-    split; [ now eauto |].
-    intros f v' Hninf Hin' Hget'. 
-    edestruct H
-      as [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin'' [Hget'' Happrox']]]]]]]]]; eauto.
-    destruct (Coqlib.peq (σ f) x); subst. contradiction. 
-    do 8 eexists; eauto. rewrite M.gso; eauto.
-  Qed.
-  
+  Proof.
+    intros Hin Hnin Hinv f v1 Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    repeat eexists; eauto.
+    now rewrite M.gso.
+    rewrite M.gso. now eauto.
+    intros Hc. subst. contradiction.
+  Qed.  
 
   (** Extend the second environment with a variable not in [Funs] that is different
     from Γ *)
@@ -515,16 +493,16 @@ Section Closure_conversion_correct.
     x <> Γ -> 
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
     Fun_inv k rho1 (M.set x v rho2) Scope Funs σ c Γ.
-  Proof. 
-    intros Hnin Hneq [vs [Hget H]].
-    eexists. rewrite M.gso; [| now eauto ].
-    split; [ now eauto |].
-    intros f v' Hninf Hin' Hget'.
-    edestruct H
-      as [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin' [Hget'' Happrox']]]]]]]]]; eauto.
-    destruct (Coqlib.peq (σ f) x); subst.
-    exfalso. eapply Hnin. now eexists; eauto.
-    do 8 eexists; eauto. rewrite M.gso; eauto.
+  Proof.
+    intros Hnin Hneq Hinv f v1 Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    repeat eexists; eauto.
+    rewrite M.gso. now eauto.
+    intros Hc. subst. congruence.
+    rewrite M.gso. now eauto.
+    intros Hc. subst. eapply Hnin.
+    now eexists; eauto.
   Qed.
 
   (** Extend the first environment with a list of variables in [Scope] *)
@@ -536,7 +514,7 @@ Section Closure_conversion_correct.
   Proof.
     revert rho1 rho1' vs. induction xs; intros rho1 rho1' vs.
     - intros Hinc Hfun Hset. inv Hset.
-      destruct vs; [ congruence | discriminate ].
+      destruct vs; [ | discriminate ]. now inv H0.
     - intros Hinc Hfun Hset.
       simpl in Hset.
       destruct vs; [ discriminate | ].
@@ -560,7 +538,7 @@ Section Closure_conversion_correct.
   Proof.
     revert rho2 rho2' vs. induction xs; intros rho2 rho2' vs.
     - intros Hinc Hd Hfun Hset. inv Hset.
-      destruct vs; [ congruence | discriminate ].
+      destruct vs; [ | discriminate ]. now inv H0.
     - intros Hinc Hd Hfun Hset.
       simpl in Hset.
       destruct vs; [ discriminate | ].
@@ -586,15 +564,15 @@ Section Closure_conversion_correct.
             (M.set Γ v (def_funs B B  (M.set Γ v rho') (M.set Γ v rho')))
             Scope Funs σ c Γ.
   Proof. 
-    intros Hin [vs [Hget Hfun]]. 
-    rewrite def_funs_neq in Hget; eauto. rewrite M.gss in Hget.
-    inv Hget.
-    eexists. rewrite M.gss. split; eauto.
-    intros f v Hnin Hin' Hget.
-    edestruct Hfun as
-        [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin' [Hget' Hcc]]]]]]]]]; eauto.
-    subst. eapply def_funs_spec in Hget'.
-    destruct Hget' as [[Hname Heq] | [Hname Hget']].
+    intros Hnin Hinv f v1 Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    rewrite def_funs_neq in Hget1; eauto. rewrite M.gss in Hget1.
+    inv Hget1.
+    repeat eexists; eauto.
+    now rewrite M.gss.
+    eapply def_funs_spec in Hget2.
+    destruct Hget2 as [[Hname Heq] | [Hname Hget']].
     - inv Heq. repeat eexists; eauto.
       rewrite M.gso.
       rewrite def_funs_eq. reflexivity. eassumption.
@@ -614,15 +592,14 @@ Section Closure_conversion_correct.
                      Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            (Fun_inv).
   Proof.
-    constructor; subst; intros [vs [Hget Hfun]];
-    eexists; split; eauto; intros;
-    edestruct Hfun as
-        [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin' [Hget' Hcc]]]]]]]]];
-    try rewrite H2; eauto;
+    constructor; intros Hinv; subst;
+    intros f v1 Hninf Hinf Hget;
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto;
     repeat eexists; try (now rewrite <- H2; eauto); try rewrite H2; eauto.
   Qed.
-
-  (** Define a block of functions in the first environment and put the in the
+  
+  (** Define a block of functions in the first environment and put them in the
     current scope *)
   Lemma Fun_inv_def_funs_l k rho rho' B1 B1' Scope Funs σ c Γ:
     Disjoint _ (image σ (Setminus _ Funs Scope)) (name_in_fundefs B1') -> 
@@ -630,15 +607,12 @@ Section Closure_conversion_correct.
     Fun_inv k (def_funs B1 B1' rho rho) rho'
             (Union _ (name_in_fundefs B1')  Scope) Funs σ c Γ.
   Proof.
-    intros Hd [v [Hget Hfun]].
-    eexists. split; eauto.
-    intros f v' Hnin Hin Hget'.
-    rewrite def_funs_neq in Hget'; eauto.
-    edestruct Hfun as
-        [rhof1 [B1'' [f1 [rhof2 [B2 [f2 [Heq [Hnin' [Hget'' Hcc]]]]]]]]];
-      eauto.
-    repeat eexists; eauto. intros Hc; inv Hc; eauto.
-    eapply Hd. econstructor; eauto.
+    intros HD Hinv f v1 Hninf Hinf Hget. rewrite def_funs_neq in Hget; eauto.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    subst. repeat eexists; eauto.
+    intros Hc; inv Hc; eauto.
+    eapply HD. econstructor; eauto.
     eexists; split; [| now eauto ]. constructor; eauto.
   Qed.
 
@@ -651,18 +625,16 @@ Section Closure_conversion_correct.
     Fun_inv k rho (def_funs B1 B1' rho' rho')
             (Union _ (name_in_fundefs B1') Scope) Funs σ c Γ.
   Proof.
-    intros Hin Hd [v [Hget Hfun]].
-    eexists. split; eauto. 
-    rewrite def_funs_neq; eauto.
-    intros f v' Hnin Hin' Hget'.
-    edestruct Hfun as
-        [rho1' [B2 [f1 [rho2' [B2' [f2 [Heq' [Hnin' [Hget2 Happrox2]]]]]]]]]; eauto.
-    repeat eexists; eauto.
-    intros Hc; inv Hc; eauto.
-    eapply Hd. econstructor; eauto. eexists;  split; [| now eauto ].
+    intros Hnin HD Hinv f v1 Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    subst. repeat eexists; eauto.
+    now rewrite def_funs_neq; eauto.
+    intros Hc; inv Hc; eauto. 
+    eapply HD. econstructor; eauto. eexists;  split; [| now eauto ].
     now constructor; eauto.
     rewrite def_funs_neq; eauto. 
-    intros Hc. eapply Hd. constructor; eauto. eexists; split; [| now eauto ].
+    intros Hc. eapply HD. constructor; eauto. eexists; split; [| now eauto ].
     now constructor; eauto.
   Qed.
 
@@ -672,25 +644,21 @@ Section Closure_conversion_correct.
     ~ In _ (name_in_fundefs B2') Γ -> ~ In _ (name_in_fundefs B1') Γ ->
     Disjoint _ (image σ (Setminus _ Funs Scope)) (name_in_fundefs B1') ->
     Disjoint _ (image σ (Setminus _ Funs Scope)) (name_in_fundefs B2') ->
-    (* Same_set _ (name_in_fundefs B1') (name_in_fundefs B2') -> *)
     Fun_inv k rho rho' Scope Funs σ c Γ ->
     Fun_inv k  (def_funs B1 B1' rho rho) (def_funs B2 B2' rho' rho')
             (Union _ (name_in_fundefs B1') Scope) Funs σ c Γ.
   Proof.
-    intros Hnin Hnin' Hd Hd' [v [Hget Hfun]].
-    eexists. split; eauto. 
-    rewrite def_funs_neq; eauto.
-    (* intros Hc. eapply Hnin. now eapply HS. *)
-    intros f v' Hnin'' Hin' Hget'.
-    rewrite def_funs_neq in Hget'; eauto.
-    edestruct Hfun as
-        [rho1' [B3 [f1 [rho2' [B3' [f2 [Heq' [Hnin2 [Hget2 Happrox2]]]]]]]]]; eauto.
-    repeat eexists; eauto.
+    intros Hnin1 Hnin2 HD1 HD2 Hinv f v1 Hninf Hinf Hget.
+    rewrite def_funs_neq in Hget; eauto.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    subst. repeat eexists; eauto.
+    now rewrite def_funs_neq; eauto.
     intros Hc; inv Hc; eauto.
-    eapply Hd. econstructor; eauto. eexists; split; [| now eauto ].
+    eapply HD1. econstructor; eauto. eexists; split; [| now eauto ].
     now constructor; eauto.
     rewrite def_funs_neq; eauto.
-    intros Hc. eapply Hd'. econstructor; eauto. eexists; split; [| now eauto ].
+    intros Hc. eapply HD2. econstructor; eauto. eexists; split; [| now eauto ].
     now constructor; eauto.
   Qed.
   
@@ -702,11 +670,10 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs c Γ FVs ->
     FV_inv k (M.set x v rho) rho' Scope Funs c Γ FVs.
   Proof.
-    intros Hin HInv. destruct HInv as [vs [Hget H]].
-    eexists; split; eauto. intros y n v' Hnin Hnin' Hnth Hget'.
-    rewrite M.gsspec in Hget'. destruct (Coqlib.peq y x); subst.
-    - contradiction. 
-    - eauto. 
+    intros Hin HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
+    rewrite M.gso in Hget. now eauto.
+    intros Hc; subst. now eauto.
   Qed.
   
   (** Extend the second environment with a variable in [Scope] that is not [Γ].
@@ -717,8 +684,10 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs c Γ FVs ->
     FV_inv k rho (M.set x v rho') Scope Funs c Γ FVs.
   Proof.
-    intros Hin Hneq HInv. destruct HInv as [vs [Hget H]].
-    eexists; split; eauto. rewrite M.gso; eauto.
+    intros Hin Hneq HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
+    repeat eexists; eauto.
+    now rewrite M.gso; eauto.
   Qed.
 
   (** Extend the first environment with a variable not in [FVs] *)
@@ -727,13 +696,11 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs c Γ FVs ->
     FV_inv k (M.set x v rho) rho' Scope Funs c Γ FVs.
   Proof.
-    intros Hin HInv. destruct HInv as [vs [Hget H]].
-    eexists; split; eauto. intros y n v' Hnin Hnin' Hnth Hget'.
-    rewrite M.gsspec in Hget'. destruct (Coqlib.peq y x); subst.
-    - inv Hget. eapply H; eauto.
-      eapply nthN_In in Hnth.
-      contradiction.
-    - eauto.
+    intros Hnin HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
+    rewrite M.gso in Hget. now eauto. intros Hc. subst.
+    eapply nthN_In in Hnth.
+    contradiction.
   Qed.
 
   (** Extend the second environment with a variable that is not [Γ] *)
@@ -742,21 +709,20 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs c Γ FVs ->
     FV_inv k rho (M.set x v rho') Scope Funs c Γ FVs.
   Proof.
-    intros Hin HInv. destruct HInv as [vs [Hget H]].
-    eexists; split; eauto. 
-    rewrite M.gso; eauto. 
+    intros Hneq HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
+    repeat eexists; eauto. 
+    rewrite M.gso. now eauto. congruence.
   Qed.
-
+  
   (** Extend the [Scope]. TODO : replace with monotonicity property? *)
   Lemma FV_inv_extend_Scope k rho rho' Scope Funs c Γ FVs x :
     FV_inv k rho rho' Scope Funs c Γ FVs ->
     FV_inv k rho rho' (Union _ (Singleton _ x) Scope) Funs c Γ FVs.
   Proof.
-    intros [vs [Hget H]].
-    eexists; split; eauto. 
-    intros y N v Hnin Hnin' Hnth Hget'. eapply H; eauto.
+    intros HInv x' N v' Hnin1 Hnin2 Hnth Hget. eapply HInv; eauto.
   Qed.
-
+  
   (** Define a block of functions in both environments and put the in the
     current scope *)
   Lemma FV_inv_def_funs k rho rho' B1 B1' B2 B2' Scope Funs c Γ FVs:
@@ -766,11 +732,10 @@ Section Closure_conversion_correct.
     FV_inv k  (def_funs B1 B1' rho rho) (def_funs B2 B2' rho' rho')
            (Union _ (name_in_fundefs B1') Scope) Funs c Γ FVs.
   Proof.
-    intros Hnin Hnin' [v [Hget Henv]].
-    eexists. split; eauto. 
-    rewrite def_funs_neq; eauto.
-    intros f N v' Hnin1 Hnin1' Hnth Hget'.
-    rewrite def_funs_neq in Hget'; eauto.
+    intros Hnin Hnin' HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
+    now rewrite def_funs_neq in Hget; eauto.
+    repeat eexists; eauto. now rewrite def_funs_neq.
   Qed.
 
 
@@ -1144,16 +1109,14 @@ Section Closure_conversion_correct.
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
     M.get x rho1 = Some v1 ->
     exists rho2', ctx_to_rho C rho2 rho2'.
-  Proof. 
-    intros Hproj [vs' [Hget3' Henv]]
-           [vs [Hget3 Hfun]] Hget1; inv Hproj.
+  Proof.
+    intros Hproj HFV HFun Hget. inv Hproj.
     - eexists; econstructor; eauto.
-    - edestruct Hfun as
-          [rho1' [B1 [f1 [rho2' [B2 [f2 [Heq' [Hnin [Hget2 Happrox2]]]]]]]]]; eauto.
+    - edestruct HFun as
+          [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
       eexists; econstructor; eauto.
       constructor.
-    - rewrite Hget3 in Hget3'; inv Hget3'.
-      edestruct Henv as [y [Hnth Hcc]]; eauto.
+    - edestruct HFV as [vs [v [Hget' [Hnth' Hcc]]]]; eauto.
       eexists. econstructor; eauto. constructor. 
   Qed.
 
@@ -1166,13 +1129,12 @@ Section Closure_conversion_correct.
     (forall f, In _ (name_in_fundefs B) f -> exists v, M.get f rho1 = Some v) ->
     exists rho2', ctx_to_rho C rho2 rho2'.
   Proof.
-    intros Hclo. revert rho1 rho2. induction Hclo; intros rho1 rho2 Hun Hd Hnin Hfun Hyp. 
+    intros Hclo. revert rho1 rho2. induction Hclo; intros rho1 rho2 Hun Hd Hnin HFun Hyp. 
     - eexists; constructor. 
     - destruct (Hyp f) as [v' Hget'].
       now left; eauto.
-      edestruct Hfun as [vs1 [Hget1 Hfun']].
-      edestruct Hfun' as
-          [rho1f' [B1 [f1 [rho2f' [B2 [f2 [Heq' [Hnin' [Hget2 Happrox2]]]]]]]]]; eauto.
+      edestruct HFun as
+          [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
       now apply not_In_Empty_set.
       now left; eauto. inv Hun.
       edestruct IHHclo as [rho2' Hctx]; [ eassumption | | | | | ]. 
@@ -1184,18 +1146,18 @@ Section Closure_conversion_correct.
         eapply Hd.  constructor; [| now left; eauto ].
         eapply Hclo. eassumption.
         intros Hc; subst. eapply Hnin. now left; eauto.
-        eexists. split; eauto. intros. 
-        edestruct Hfun' as
-            [rho1'' [B1' [f1' [rho2'' [B2' [f2' [Heq'' [Hnin'' [Hget2' Happrox2']]]]]]]]]; eauto.
-        right; eauto.
-        subst. repeat eexists; eauto. intros Hc; inv Hc.
-        rewrite <- H0 in Hget2'. unfold extend in Hget2'.
-        rewrite Coqlib.peq_false in Hget2'. eassumption.
+        intros x v Hninx Hinx Hget.
+        edestruct HFun  with (f0 := x) as
+            [vs'' [rho3' [B3' [f3' [rho4' [B4' [f4' [Hget1' [Heq2' [Ηnin2' [Hget2' Happrox']]]]]]]]]]]; eauto.
+        now right.
+        repeat eexists; eauto.
+        now apply not_In_Empty_set. 
+        rewrite <-  H0, extend_gso in Hget2'.
+        now eauto.
         intros Hc; subst; contradiction.
       + intros. eapply Hyp. right; eauto.
-      + eexists. econstructor; eauto. rewrite <- H0 in Hget2. 
-        unfold extend in Hget2. rewrite Coqlib.peq_true in Hget2.
-        eassumption.
+      + eexists. econstructor; eauto.
+        now rewrite <-  H0, extend_gss in Hget2; eauto.
   Qed.
   
   Lemma project_vars_ctx_to_rho Scope Funs σ c Γ FVs xs xs' C S S' vs1 k rho1 rho2 :
@@ -1208,38 +1170,36 @@ Section Closure_conversion_correct.
     getlist xs rho1 = Some vs1 ->
     exists rho2', ctx_to_rho C rho2 rho2'.
   Proof. 
-    intros HD Hvars Hfun [vs [Hget Henv]].
-    assert (HD' := Hvars).
-    revert Scope Funs Γ FVs xs' C S S' vs1 c vs k
-           rho1 rho2  HD HD' Hvars Hfun Hget Henv. 
+    intros HD Hvars HFun HFV.
+    (* assert (HD' := Hvars). *)
+    revert Scope Funs Γ FVs xs' C S S' vs1 k
+           rho1 rho2  HD  Hvars HFun HFV.
     induction xs;
-      intros Scope Funs Γ FVs xs' C S S' vs1 c vs k
-             rho1 rho2 HD  HD' Hvars Hfun Hget Hclo Hgetlist.
+      intros Scope Funs Γ FVs xs' C S S' vs1 k
+             rho1 rho2 HD Hvars HFun HFV Hgetlist.
     - inv Hvars. eexists; econstructor; eauto.
     - inv Hvars. simpl in Hgetlist.
       destruct (M.get a rho1) eqn:Hgeta1; try discriminate. 
       destruct (getlist xs rho1) eqn:Hgetlist1; try discriminate.
       edestruct project_var_ctx_to_rho with (rho1 := rho1) as [rho2' Hctx1]; eauto.
-      now eexists; split; eauto. 
-      edestruct IHxs with (rho2 := rho2') as [rho2'' Hctx2];
-        [| eassumption  | eassumption | | | eassumption | eassumption | ].
+      edestruct IHxs with (rho2 := rho2') as [rho2'' Hctx2].
       + eapply Disjoint_Included_l; [| eassumption ].
         eapply project_var_free_set_Included. eassumption.
-      + eexists; split.
+      + eassumption.
+      +inv Hgetlist. intros f v' Hnin Hin Hget.
+       edestruct HFun as
+          [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+       repeat eexists; eauto.
+       erewrite <- project_var_get; eauto.  intros Hc. eapply HD. now eauto.
+       erewrite <- project_var_get; eauto. 
+       intros Hin'. eapply HD. constructor. now eauto.
+       right. left. eexists. now eauto.
+      + intros x N v' Hnin1 Hnin2 Hnth Hget.
+        edestruct HFV as [vs [v'' [Hget' [Hnth' Hcc]]]]; eauto.
+        repeat eexists; eauto.
         erewrite <- project_var_get; eauto.
-        intros Hin. eapply HD. eauto.
-        intros f v' Hnin Hin Hgetv'.
-        edestruct Hfun as [vs' [Hget1 Hfun']].
-        rewrite Hget1 in Hget. inv Hget.
-        edestruct Hfun' as
-            [rho1f' [B1 [f1 [rho2f' [B2 [f2 [Heq' [Hnin2 [Hget2 Happrox2]]]]]]]]];
-          eauto.
-        subst. repeat eexists; eauto.
-        erewrite <- project_var_get; eauto. 
-        intros Hin'. eapply HD. constructor. now eauto.
-        right. left. eexists. now eauto.
-      + erewrite <- project_var_get; eauto.
-        intros Hin. eapply HD. eauto.
+        intros Hin. eapply HD. now eauto.
+      + eassumption.
       + exists rho2''. eapply ctx_to_rho_comp_ctx_f_r; eassumption.
   Qed.
 
@@ -1387,23 +1347,19 @@ Section Closure_conversion_correct.
             [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
           right; eauto.
           eapply Fun_inv_reset; [| eassumption ]. eassumption. now eauto.
-        * eexists. split.
-          rewrite M.gss. reflexivity.
-          intros x N v1 Hnin3 Hnin4 Hnth Hget'. 
+        * intros x N v1 Hnin3 Hnin4 Hnth Hget'. 
           edestruct Henv as [v' [Hnth'' Hcc'']]; eauto.
-          intros Hc. now inv Hc.
-          intros Hc. now inv Hc.
+          now apply not_In_Empty_set. now apply not_In_Empty_set.
           erewrite <- def_funs_neq.
-          erewrite setlist_not_In. eassumption.
-          now eauto. now eauto. now eauto.
-          eexists; eauto. split. eassumption.
+          erewrite setlist_not_In. eassumption. now eauto.
+          intros Hc. now eapply Hnin3; eauto. eassumption.
+          repeat eexists; eauto.
+          rewrite M.gss. reflexivity.
           eapply cc_approx_val_monotonic. eassumption. omega.
         * eassumption.
-    - eexists.
-      rewrite def_funs_neq. rewrite M.gss. split; eauto.
-      intros. inv H0. inv Hcc'. simpl. eauto.
+    - intros f v Hnin Hin Hget. now inv Hin.
   Qed.
-
+  
   (** Correctness of [project_var] *)
   Lemma project_var_correct k rho1 rho2 rho2'
         Scope Funs σ c Γ FVs x x' C S S'  :
@@ -1430,46 +1386,39 @@ Section Closure_conversion_correct.
       + eapply cc_approx_env_P_set_not_in_P_r. eassumption.
         intros Hc. eapply Hd. eauto.
       + (* TODO : make lemma *)
-        edestruct Hfun as [vs' [Hget Hfun']].
-        rewrite Hget in H9; inv H9.
-        eexists. rewrite M.gso; [ | now intros Heq; subst; eapply Hd; eauto ].
-        split; eauto. intros f v Hnin Hin Hget''.
-        edestruct Hfun' as
-            [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin' [Hget' Hcc']]]]]]]]]; eauto.
+        intros f v Hnin Hin Hget.
+        edestruct Hfun as
+            [vs [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
         subst. repeat eexists; eauto.
+        rewrite M.gso; [ eassumption | now intros Heq; subst; eapply Hd; eauto ].
         rewrite M.gso. eassumption. 
         intros Hc. subst; eapply Hd; constructor; eauto. right; left.
         eexists. split; [| now eauto ]. constructor; eauto.
       + eapply FV_inv_set_r. now intros Heq; subst; eapply Hd; eauto.
         eassumption.
       + intros v Hget. eexists. rewrite M.gss. split; eauto.
-        edestruct Hfun as [vs' [Hget' Hfun']].
-        rewrite Hget' in H9; inv H9.
-        edestruct Hfun' as
-            [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin' [Hget'' Hcc']]]]]]]]]; eauto.
-        subst. rewrite Hget'' in H10. inv H10.
-        now rewrite cc_approx_val_eq in *.
+        edestruct Hfun as
+            [vs [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+        rewrite Hget2 in H10; inv H10.
+        rewrite Hget1 in H9; inv H9. eassumption.
     - inv Hctx. inv H12.
       repeat split; eauto.
       + intros Hc. inv Hc. eauto.
       + eapply cc_approx_env_P_set_not_in_P_r. eassumption.
         intros Hc. eapply Hd. eauto.
-      + edestruct Hfun as [vs' [Hget Hfun']].
-        rewrite Hget in H10; inv H10.
-        eexists. rewrite M.gso; [ | now intros Heq; subst; eapply Hd; eauto ].
-        split; eauto. intros f v' Hnin Hin Hget''.
-        edestruct Hfun' as
-            [rhof1 [B1 [f1 [rhof2 [B2 [f2 [Heq [Hnin' [Hget' Hcc']]]]]]]]]; eauto.
+      + intros f' v' Hnin Hin Hget.
+        edestruct Hfun as
+            [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
         subst. repeat eexists; eauto.
+        rewrite M.gso; [ eassumption | now intros Heq; subst; eapply Hd; eauto ].
         rewrite M.gso. eassumption. 
-        intros Hc. subst; eapply Hd; eauto. constructor; eauto. right; left.
-        eexists. split; [| now eauto ]. constructor; eauto.      
+        intros Hc. subst; eapply Hd; constructor; eauto. right; left.
+        eexists. split; [| now eauto ]. constructor; eauto.
       + eapply FV_inv_set_r. now intros Heq; subst; eapply Hd; eauto.
         eassumption.
       + intros v' Hget. eexists. rewrite M.gss. split; eauto.
-        edestruct Henv as [vs' [Hget' Henv']].
+        edestruct Henv as [vs' [v'' [Hget' [Hnth Hcc']]]]; eauto.
         rewrite Hget' in H10; inv H10.
-        edestruct Henv' as [v'' [Hnth Hcc']]; eauto.
         rewrite H11 in Hnth. now inv Hnth.
   Qed.
 
@@ -1555,33 +1504,29 @@ Section Closure_conversion_correct.
         eapply cc_approx_env_P_union.
         eapply cc_approx_env_P_set_not_in_P_r. eassumption.
         intros Hc. inv Hc. now eauto.
-        intros f'' Hs v Hget'. inv Hs.
-        edestruct Hfun' as [vs2 [Hget2 Hfun2]]. 
-        edestruct Hfun2
-          as [rho1f' [B1 [f1 [rho2f' [B2 [f2 [Heq' [Hnin2' [Hget2' Happrox2]]]]]]]]];
-          [| | eassumption |]. now eapply not_In_Empty_set. now left; eauto.
-        rewrite <- H0 in Hget2'. unfold extend in Hget2'. rewrite Coqlib.peq_true in Hget2'.
-        subst. eexists; split.
-        rewrite M.gss. reflexivity.
-        rewrite H8 in Hget2. inv Hget2. rewrite H9 in Hget2'. inv Hget2'.
-        rewrite cc_approx_val_eq in *. simpl. now eauto.
+        intros x Hin v Hget. inv Hin.
+        edestruct Hfun' as
+            [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]];
+        [| | eassumption |]. now apply not_In_Empty_set. now left. 
+        eexists. split. now rewrite M.gss.
+        subst. rewrite H8 in Hget1. inv Hget1.
+        rewrite <- H0, extend_gss in Hget2. rewrite H9 in Hget2. inv Hget2.
+        eassumption.
       + eapply Fun_inv_set_In_Scope_r_not_Γ ; [| | eassumption ].
         * eapply Hsub. now left. 
         * intros Hc; subst. eapply Hnin1. left; eauto.
       + eapply FV_inv_set_r; [| eassumption ].
         intros Hc; subst. eapply Hnin1. left; eauto.
-      + edestruct Hfun' as [vs2 [Hget2 Hfun2]].
-        eexists; split; eauto.
+      + intros f'' v Hnin Hin Hget.
+        edestruct Hfun' as
+            [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]];
+          [| | eassumption |]. now apply not_In_Empty_set. now right. 
+        subst. repeat eexists; eauto. 
         rewrite M.gso. eassumption.
-        intros Hc; subst. eapply Hnin2. left; eauto.
-        intros f'' v' _ Hnin Hgetf. 
-        edestruct Hfun2
-          as [rho1f' [B1 [f1 [rho2f' [B2 [f2 [Heq' [Hnin2' [Hget2' Happrox2]]]]]]]]];
-          [| | eassumption |].
-        now eapply not_In_Empty_set. now right; eauto.
-        repeat eexists; eauto. intros Hc; now inv Hc. 
-        rewrite <- H0 in Hget2'. rewrite M.gso. unfold extend in Hget2'.  
-        rewrite Coqlib.peq_false in Hget2'. eassumption.
+        intros Hc; subst. eapply Hnin2. now left; eauto.
+        now eapply not_In_Empty_set.
+        rewrite <- H0 in Hget2. rewrite M.gso. rewrite extend_gso in Hget2.
+        eassumption.
         intros Hc; subst. contradiction.
         eapply make_closures_image_Included in Hmake. intros Hc; subst.
         eapply Hd. constructor; [| now left; eauto ].
@@ -1673,12 +1618,10 @@ Section Closure_conversion_correct.
             econstructor; eauto. inv H11. eapply caseConsistent_same_cTags.
             eapply Forall2_monotonic; [| eassumption ].
             intros x x2 H'. now inv H'. eassumption.
-        - edestruct Hfun as [vs1 [Hget1 Hfun']].
-          edestruct Hfun' as
-              [rho1' [B1 [f1 [rho2' [B2 [f2 [Heq' [Hget2 Happrox2]]]]]]]];
-            [| | now apply H2 | ]; eauto. congruence.
-        - edestruct Henv as [vs1 [Hget Henv']]; eauto.
-          edestruct Henv' as [v' [Hnth' Happrox2]]; eauto.
+        - edestruct Hfun as
+              [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox']]]]]]]]]]]; eauto.
+          congruence.
+        - edestruct Henv as [vs2 [v' [Hget [Hnth' Happrox2]]]]; eauto.
           rewrite cc_approx_val_eq in Happrox2.
           destruct v'; try contradiction. inv Happrox2.
           edestruct IHe as [v2 [c2 [Hstep2 Happrox2]]];
@@ -1723,12 +1666,10 @@ Section Closure_conversion_correct.
             econstructor; eauto. simpl. rewrite Hget' in H7. inv H7.
             econstructor; eauto.
             simpl. rewrite Hget' in H7. inv H7. now rewrite Heq.
-        - edestruct Hfun as [vs1 [Hget1 Hfun']].
-          edestruct Hfun' as
-              [rho1' [B1 [f1 [rho2' [B2 [f2 [Heq' [Hget2 Happrox2]]]]]]]];
-            [| | now apply H2 | ]; eauto. congruence.
-        - edestruct Henv as [vs1 [Hget Henv']]; eauto.
-          edestruct Henv' as [v' [Hnth' Happrox2]]; eauto.
+        -  edestruct Hfun as
+              [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox']]]]]]]]]]]; eauto.
+          congruence.
+        - edestruct Henv as [vs2 [v' [Hget [Hnth' Happrox2]]]]; eauto.
           rewrite cc_approx_val_eq in Happrox2.
           destruct v'; try contradiction. inv Happrox2. inv H3.
           edestruct IHe0 as [v2 [c2' [Hstep2 Happrox2]]];
@@ -1990,6 +1931,13 @@ Section Closure_conversion_correct.
         eapply FV_inv_set_r. intros Hc. eapply Hnin.
         subst. now eauto. now eapply FV_inv_extend_Scope.
       + repeat eexists; [| eassumption ]. econstructor; eauto.
+    - inv Hcc.
+      intros v1 c1 Hleq Hstep. inv Hstep.
+      edestruct project_var_ctx_to_rho as [rho2' Hto_rho]; eauto.
+      edestruct project_var_correct as [Hnin' [Happ [Hfun' [Henv' Hvar]]]]; eauto.
+      edestruct Hvar as [v' [Hget' Happ']]; eauto.
+      eapply ctx_to_rho_cc_approx_exp; eauto.
+      eapply cc_approx_exp_halt_compat. eassumption. now econstructor; eauto.
   Qed.
 
 End Closure_conversion_correct. 

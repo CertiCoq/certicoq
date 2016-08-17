@@ -187,6 +187,14 @@ Section CC.
         Closure_conversion (Union _ (Singleton _ x) Scope) Funs g c Γ FVs e e' C' ->
         Closure_conversion Scope Funs g c Γ FVs (Eprim x f ys e)
                            (Eprim x f ys' (C' |[ e' ]|)) C
+  | CC_Ehalt :
+      forall Scope Funs g c Γ FVs x x' C S S',
+        Disjoint _ S (Union _ Scope
+                            (Union _ (image g (Setminus _ Funs Scope))
+                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        (* Project the function name and the actual parameter *)
+        project_var Scope Funs g c Γ FVs S x x' C S' ->
+        Closure_conversion Scope Funs g c Γ FVs (Ehalt x) (Ehalt x') C
   with Closure_conversion_fundefs :
          Ensemble var -> (* The function names in the current block *)
          (var -> var) -> (* renaming of function names *)
@@ -391,7 +399,11 @@ Section CC.
       t1 <- get_vars ys mapfv c Γ ;;
       let '(ys', f) := t1 in
       ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) c Γ ;;
-      ret (Eprim x prim ys' ((snd ef) (fst ef)), f)
+         ret (Eprim x prim ys' ((snd ef) (fst ef)), f)
+    | Ehalt x =>
+      t1 <- get_var x mapfv c Γ ;;
+      let '(x', f) := t1 in
+      ret (Ehalt x', f)
     end
   with fundefs_closure_conv (defs : fundefs) (mapfv : VarInfoMap) (c : cTag)
        : ccstate fundefs  :=
@@ -418,44 +430,26 @@ Section CC.
            | Fnil => ret Fnil
          end.
 
-
-  Fixpoint max_list ls : positive :=
-    let fix aux ls (n : positive) :=
-        match ls with
-          | nil => n
-          | cons x xs => aux xs (Pos.max x n)
-        end
-    in
-    aux ls 1%positive.
-
-  Fixpoint max_var e z :=
-    match e with
-      | Econstr x _ ys e => max_var e (max_list (z::x::ys)) 
-      | Ecase x ys => max_list (z::x::(List.map fst ys))
-      | Eproj x _ _ y e => max_var e (max_list (z::x::y::nil))
-      | Efun defs e =>
-        let z' := max_var_fundefs defs z in
-        max_var e z'
-      | Eapp f _ xs => max_list (z::f::xs)
-      | Eprim x _ ys e => max_var e (max_list (z::x::ys))
-    end
-  with max_var_fundefs defs z :=
-         match defs with
-           | Fcons f _ ys e defs =>
-             let z' := max_var e z in
-             max_var_fundefs defs (max_list (z::f::ys))
-           | Fnil => z
-         end.
-
-  Definition closure_conversion (e : exp) ctag itag cenv : exp :=
-    let next :=
-        let x := max_var e 1%positive in
-        if Pos.leb x 3%positive then 3%positive else (x+1)%positive
-    in
+  Definition closure_conversion_hoist (e : exp) ctag itag cenv : exp :=
+    let Γ := ((max_var e 1%positive) + 1)%positive in
+    let next := (Γ + 1)%positive in
     let state := mkCont next ctag itag cenv in
     let '(e, f, s) := runState
-                        (exp_closure_conv e (Maps.PTree.empty VarInfo) 1%positive 1%positive)
+                        (exp_closure_conv e (Maps.PTree.empty VarInfo) 1%positive Γ)
                         state in
     exp_hoist (f e).
 
+  Definition populate_map (l : list (var * val)) map  :=
+    fold_left (fun map x => M.set (fst x) BoundVar map) l map.
+
+  Definition closure_conversion_hoist_open (rho : eval.env) (e : exp) ctag itag cenv : exp :=
+    let Γ := ((max_list (map fst (M.elements rho)) (max_var e 1%positive)) + 1)%positive in
+    let map := populate_map (M.elements rho) (Maps.PTree.empty VarInfo) in
+    let next := (Γ + 1)%positive in
+    let state := mkCont next ctag itag cenv in
+    let '(e, f, s) := runState
+                        (exp_closure_conv e map 1%positive Γ)
+                        state in
+    exp_hoist (f e).
+  
 End CC.

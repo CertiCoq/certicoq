@@ -1,6 +1,6 @@
-Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat
-        Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles.
-Require Import cps cps_util ctx set_util Ensembles_util.
+Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
+        Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles Omega.
+Require Import cps cps_util ctx set_util Ensembles_util List_util.
 Import ListNotations.
 
 Import PS.
@@ -269,6 +269,8 @@ Inductive occurs_free : exp -> Ensemble var :=
       x <> y ->
       occurs_free e y ->
       occurs_free (Eprim x p ys e) y
+| Free_Ehalt :
+    forall x, occurs_free (Ehalt x) x
 with occurs_free_fundefs : fundefs -> Ensemble var :=
 | Free_Fcons1 :
     forall x f tau ys e defs,  
@@ -325,6 +327,12 @@ Proof.
   inv H0. eauto.
   inv H0. constructor; eauto.
   intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Ehalt x :
+  Same_set var (occurs_free (Ehalt x)) (Singleton _ x).
+Proof.
+  split; intros x' H; inv H; eauto.
 Qed.
 
 Lemma occurs_free_Eapp f ft ys :
@@ -593,6 +601,8 @@ Proof.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
     destruct (Dec x); eauto.
     right. intros Hc. inv Hc; eauto.
+  - destruct (var_dec x v); subst; eauto.
+    right. intros Hc; inv Hc. congruence.
   - destruct (Decidable_name_in_fundefs f5). destruct (Dec1 x).
     right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
@@ -705,6 +715,47 @@ Proof.
   now apply occurs_free_Ecase_ctx_app_mut.
 Qed.
 
+Lemma occurs_free_Ecase_ctx_app_mut' :
+  (forall C x c e P,
+     Included _ (occurs_free (C |[ Ecase x ((c, e) :: P)]|))
+              (Union _ (occurs_free e) (occurs_free (C |[ Ecase x P ]|)))) /\
+  (forall Cf x c e P,
+     Included _ (occurs_free_fundefs (Cf <[ Ecase x ((c, e) :: P)]>))
+              (Union _ (occurs_free e) (occurs_free_fundefs (Cf <[ Ecase x P ]>)))).
+Proof with eauto with Ensembles_DB. 
+  exp_fundefs_ctx_induction IHC IHCf; simpl; intros;
+  repeat normalize_occurs_free; try now eauto with Ensembles_DB;
+  try (now eapply Included_trans;
+       [ apply Included_Union_compat;
+         [ now apply Included_refl |
+           apply Included_Setminus_compat; [ now eapply IHC | now apply Included_refl ] ] |
+         rewrite Setminus_Union_distr; eauto with Ensembles_DB]).
+  - eapply Included_trans.
+    apply Included_Union_compat. now apply Included_refl.
+    apply Included_Union_compat. now apply Included_refl.
+    apply Included_Union_compat. now eauto. now apply Included_refl.
+    do 4 (apply Union_Included; eauto with Ensembles_DB). 
+  - rewrite Union_assoc.
+    apply Included_Union_compat.
+    eapply Included_trans. now eauto.
+    now apply Union_Included; eauto with Ensembles_DB.
+    rewrite name_in_fundefs_ctx...
+  - eapply Included_trans.
+    apply Included_Union_compat; [| now apply Included_refl ].
+    apply Included_Setminus_compat. now eauto. now apply Included_refl.
+    rewrite Setminus_Union_distr...
+  - eapply Included_trans.
+    apply Included_Union_compat; [ now apply Included_refl |].
+    apply Included_Setminus_compat. now eauto. now apply Included_refl.
+    rewrite name_in_fundefs_ctx, !Setminus_Union_distr...
+Qed.
+
+Corollary occurs_free_Ecase_ctx_app' C x c e P :
+  Included _ (occurs_free (C |[ Ecase x ((c, e) :: P)]|))
+           (Union _ (occurs_free  e) (occurs_free (C |[ Ecase x P ]|))).
+Proof. 
+  now apply occurs_free_Ecase_ctx_app_mut'.
+Qed.
 
 (** ** Closed expressions *)
 
@@ -960,6 +1011,12 @@ Proof with eauto with Ensembles_DB.
     inv H; now eauto.
 Qed.
 
+Lemma bound_var_Ehalt x :
+  Same_set _ (bound_var (Ehalt x)) (Empty_set _).
+Proof.
+  split; intros x' H; inv H.
+Qed.
+
 Lemma bound_var_fundefs_Fnil  :
   Same_set var (bound_var_fundefs Fnil) (Empty_set var).
 Proof.
@@ -984,6 +1041,8 @@ Ltac normalize_bound_var :=
       rewrite bound_var_Eapp
     | [|- context[bound_var (Eprim _ _ _ _)]] =>
       rewrite bound_var_Eprim
+    | [|- context[bound_var (Ehalt _)]] =>
+      rewrite bound_var_Ehalt
     | [|- context[bound_var_fundefs (Fcons _ _ _ _ _)]] =>
        rewrite bound_var_fundefs_Fcons
     | [|- context[bound_var_fundefs Fnil]] =>
@@ -1008,6 +1067,8 @@ Ltac normalize_bound_var_in_ctx :=
       rewrite bound_var_Eapp in H
     | [ H : context[bound_var (Eprim _ _ _ _)] |- _ ] =>
       rewrite bound_var_Eprim in H
+    | [ H : context[bound_var (Ehalt _)] |- _ ] =>
+      rewrite bound_var_Ehalt
     | [ H : context[bound_var_fundefs (Fcons _ _ _ _ _)] |- _ ] =>
        rewrite bound_var_fundefs_Fcons in H
     | [ H : context[bound_var_fundefs Fnil] |- _ ] =>
@@ -1074,6 +1135,33 @@ Corollary bound_var_fundefs_comp B e e' :
             (bound_var_fundefs (B <[ e' ]>)).
 Proof.
   apply bound_var_comp_mut.
+Qed.
+
+Lemma bound_var_ctx_app_Ecase_cons_mut :
+  (forall C x c e P,
+     Same_set _ (bound_var (C |[ Ecase x ((c, e) :: P) ]|))
+              (Union _ (bound_var e) (bound_var (C |[ Ecase x P ]|)))) /\
+  (forall Cf x c e P,
+     Same_set _ (bound_var_fundefs (Cf <[ Ecase x ((c, e) :: P) ]>))
+              (Union _ (bound_var e) (bound_var_fundefs (Cf <[ Ecase x P ]>)))).
+Proof. 
+  exp_fundefs_ctx_induction IHe IHB; intros;
+  simpl; repeat normalize_bound_var;
+  try now (try rewrite IHe; try rewrite IHB; eauto 6 with Ensembles_DB).
+Qed.
+
+Corollary bound_var_ctx_app_Ecase_cons C x c e P :
+  Same_set _ (bound_var (C |[ Ecase x ((c, e) :: P) ]|))
+           (Union _ (bound_var e) (bound_var (C |[ Ecase x P ]|))).
+Proof.     
+  now apply bound_var_ctx_app_Ecase_cons_mut.
+Qed.
+
+Corollary bound_var_fundefs_ctx_app_Ecase_cons Cf x c e P :
+  Same_set _ (bound_var_fundefs (Cf <[ Ecase x ((c, e) :: P) ]>))
+           (Union _ (bound_var e) (bound_var_fundefs (Cf <[ Ecase x P ]>))).
+Proof.     
+  now apply bound_var_ctx_app_Ecase_cons_mut.
 Qed.
 
 (** ** Lemmas about the union of free and bound variables *)
@@ -1158,6 +1246,34 @@ Proof with eauto with Ensembles_DB.
   normalize_occurs_free...
 Qed.
 
+Lemma bound_var_occurs_free_Fcons_Included v t l e B :
+  Included var (Union var (bound_var e) (occurs_free e))
+           (Union var (bound_var_fundefs (Fcons v t l e B))
+                  (occurs_free_fundefs (Fcons v t l e B))).
+Proof.
+  rewrite bound_var_fundefs_Fcons.
+  rewrite !Union_assoc,
+  Union_commut with (s2 := FromList l), Union_commut with (s2 := bound_var e), <- !Union_assoc.
+  apply Included_Union_compat. now apply Included_refl.
+  eapply Included_trans. eapply occurs_free_in_fun with (B := Fcons v t l e B).
+  econstructor. now eauto. apply Included_Union_compat. now apply Included_refl. 
+  simpl. rewrite <- Union_assoc. apply Included_Union_compat. now apply Included_refl. 
+  apply Included_Union_compat; [| now apply Included_refl ].
+  now eapply name_in_fundefs_bound_var_fundefs.
+Qed.
+
+Lemma bound_var_occurs_free_fundefs_Fcons_Included v t l e B :
+  Included var (Union var (bound_var_fundefs B) (occurs_free_fundefs B))
+           (Union var (bound_var_fundefs (Fcons v t l e B))
+                  (occurs_free_fundefs (Fcons v t l e B))).
+Proof.
+  normalize_bound_var. normalize_occurs_free.
+  rewrite !Union_assoc, Union_commut with (s2 := bound_var_fundefs B), <- !Union_assoc. 
+  apply Included_Union_compat. now apply Included_refl.
+  rewrite Union_commut with (s1 := Singleton _ _) , <- !Union_assoc.
+  rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances.
+Qed.  
+
 (** Unique bindings - alternative definition without lists *)
 Inductive unique_bindings : exp -> Prop :=
 | UBound_Econstr :
@@ -1185,11 +1301,16 @@ Inductive unique_bindings : exp -> Prop :=
       unique_bindings_fundefs defs ->
       Disjoint var (bound_var e) (bound_var_fundefs defs) ->
       unique_bindings (Efun defs e)
+| UBound_Eapp :
+    forall f t xs,
+      unique_bindings (Eapp f t xs)
 | UBound_Eprim :
     forall x p ys e,
       ~ (bound_var e) x ->
       unique_bindings e ->
       unique_bindings (Eprim x p ys e)
+| UBound_Ehalt :
+    forall x, unique_bindings (Ehalt x)
 with unique_bindings_fundefs : fundefs -> Prop :=
 | UBound_Fcons :
     forall f tau ys e defs,
@@ -1220,6 +1341,14 @@ Definition fundefs_names_unique (e : exp) : Prop :=
 
 Definition fundefs_names_unique_fundefs (B : fundefs) : Prop :=
   forall B', funs_in_fundef B' B \/ B' = B -> unique_functions B'.
+
+Lemma unique_bindings_fundefs_unique_functions B :
+  unique_bindings_fundefs B ->
+  unique_functions B.
+Proof.
+  intros H; induction H; constructor; eauto.
+  intros Hin. eapply H0. now apply name_in_fundefs_bound_var_fundefs.
+Qed.
 
 Lemma unique_bindings_Ecase_l x P1 c e P2 :
   unique_bindings (Ecase x (P1 ++ ((c, e) :: P2))) ->
@@ -1264,6 +1393,62 @@ Proof with eauto with Ensembles_DB.
     * now eauto with Ensembles_DB.
     * repeat normalize_bound_var... 
 Qed.
+
+Lemma unique_bindings_ctx_app_Ecase_cons_mut :
+  (forall C x c e P
+     (Hun1 : unique_bindings e)
+     (Hun2 : unique_bindings (C |[ Ecase x P ]|))
+     (Hd : Disjoint _ (bound_var e) (bound_var (C |[ Ecase x P ]|))),
+     unique_bindings (C |[ Ecase x ((c, e) :: P) ]|)) /\
+  (forall Cf x c e P
+     (Hun1 : unique_bindings e)
+     (Hun2 : unique_bindings_fundefs (Cf <[ Ecase x P ]>))
+     (Hd : Disjoint _ (bound_var e) (bound_var_fundefs (Cf <[ Ecase x P ]>))),
+     unique_bindings_fundefs (Cf <[ Ecase x ((c, e) :: P) ]>)).
+Proof with now eauto with Ensembles_DB. 
+  exp_fundefs_ctx_induction IHe IHB; intros; simpl in *;
+  try now (inv Hun2; repeat normalize_bound_var_in_ctx;
+           constructor; [| now eauto with Ensembles_DB ];
+           intros Hc; eapply bound_var_ctx_app_Ecase_cons in Hc;
+           (inv Hc; [ | now  eauto ]); eapply Hd; eauto).
+  - constructor; eassumption.
+  - eapply unique_bindings_Ecase_l in Hun2.
+    repeat normalize_bound_var_in_ctx.      
+    destruct Hun2 as [Hun1' [Hun2' [Hun3' [Hd1 [Hd2 Hd3]]]]].
+    eapply unique_bindings_Ecase_r; try eassumption.
+    eapply IHe; eauto with Ensembles_DB.
+    rewrite bound_var_ctx_app_Ecase_cons...
+    rewrite bound_var_ctx_app_Ecase_cons...
+  - inv Hun2; repeat normalize_bound_var_in_ctx.
+    constructor. now eauto with Ensembles_DB.
+    eassumption. rewrite bound_var_ctx_app_Ecase_cons...
+  - inv Hun2; repeat normalize_bound_var_in_ctx.
+    constructor. eassumption.
+    now eauto with Ensembles_DB.
+    rewrite bound_var_fundefs_ctx_app_Ecase_cons...
+  - inv Hun2; repeat normalize_bound_var_in_ctx.
+    constructor;
+      try rewrite bound_var_ctx_app_Ecase_cons; try now eauto with Ensembles_DB.
+    intros Hc. eapply bound_var_ctx_app_Ecase_cons in Hc.
+    inv Hc; [ | now  eauto ]; eapply Hd; eauto.
+  - inv Hun2; repeat normalize_bound_var_in_ctx.
+    constructor;
+      try rewrite bound_var_fundefs_ctx_app_Ecase_cons; try now eauto with Ensembles_DB.
+    intros Hc. eapply bound_var_fundefs_ctx_app_Ecase_cons in Hc.
+    inv Hc; [ | now  eauto ]; eapply Hd; eauto.
+Qed.
+
+
+Lemma unique_bindings_ctx_app_Ecase_cons :
+  (forall C x c e P
+     (Hun1 : unique_bindings e)
+     (Hun2 : unique_bindings (C |[ Ecase x P ]|))
+     (Hd : Disjoint _ (bound_var e) (bound_var (C |[ Ecase x P ]|))),
+     unique_bindings (C |[ Ecase x ((c, e) :: P) ]|)).
+Proof.
+  now apply unique_bindings_ctx_app_Ecase_cons_mut.
+Qed.
+
 
 Lemma split_fds_unique_bindings_fundefs_l B1 B2 B3 :
   unique_bindings_fundefs B3 ->
@@ -1342,6 +1527,36 @@ Proof.
   eapply split_fds_unique_bindings_fundefs_r;
     [ apply H0 | | | ]; eauto.
   apply fundefs_append_split_fds; eauto.
+Qed.
+
+Lemma unique_bindings_funs_in_exp_mut :
+  (forall e B, unique_bindings e ->
+          funs_in_exp B e ->
+          unique_bindings_fundefs B) /\
+  (forall B B', unique_bindings_fundefs B ->
+           funs_in_fundef B' B ->
+           unique_bindings_fundefs B').
+Proof.
+  exp_defs_induction IHe IHl IHb; intros B Hun Hin; inv Hun; inv Hin; eauto.
+  - inv H3. 
+  - inv H6. inv H. now eauto.
+    now eauto.
+Qed.
+
+Corollary unique_bindings_funs_in_exp e B :
+  unique_bindings e ->
+  funs_in_exp B e ->
+  unique_bindings_fundefs B.
+Proof.
+  now eapply unique_bindings_funs_in_exp_mut.
+Qed.
+
+Corollary unique_bindings_fundefs_funs_in_fundefs B B':
+  unique_bindings_fundefs B ->
+  funs_in_fundef B' B ->
+  unique_bindings_fundefs B'.
+Proof.
+  now apply unique_bindings_funs_in_exp_mut.
 Qed.
 
 Lemma fun_in_fundefs_Fcons_Disjoint f tau xs e B :
@@ -1671,6 +1886,8 @@ Fixpoint exp_fv (e : exp) : FVSet :=
     | Eprim x prim ys e =>
       let set := remove x (exp_fv e) in
       union_list set ys
+    | Ehalt x =>
+      (singleton x)
   end
 with fundefs_fv (defs : fundefs) (names : FVSet) : FVSet :=
        match defs with
@@ -1833,6 +2050,8 @@ Proof.
     + constructor; eauto.
   - inv H; apply_set_specs; eauto. left.
     apply_set_specs; eauto; apply IHe; eauto.
+  - repeat apply_set_specs_ctx. constructor.
+  - inv H; apply_set_specs. reflexivity.
   - repeat apply_set_specs_ctx.
     + constructor; eauto.
       intros Hc; apply H2; apply_set_specs; eauto.
@@ -1861,4 +2080,211 @@ Proof.
   eapply InA_alt in H. edestruct H as [y [Heq Hin]]. subst. eauto. 
   eapply exp_fv_fundefs_fv_correct. eapply PS.elements_spec1.
   eapply In_InA. now eapply PS.E.eq_equiv. eassumption.
+Qed.
+
+(** * Compute the maximum identifier (free or bound) that occurs in an expression *)
+
+Fixpoint max_var e z :=
+  match e with
+    | Econstr x _ ys e => max_var e (max_list (x::ys) z) 
+    | Ecase x P =>
+      (fix aux P z :=
+         match P with
+           | (_, e) :: P => aux P (max_var e z)
+           | [] => (Pos.max z x)
+         end) P z
+    | Eproj x _ _ y e => max_var e (max_list (x::y::nil) z)
+    | Efun defs e =>
+      let z' := max_var_fundefs defs z in
+      max_var e z'
+    | Eapp f _ xs => max_list (f::xs) z
+    | Eprim x _ ys e => max_var e (max_list (x::ys) z)
+    | Ehalt x => Pos.max z x
+  end
+with max_var_fundefs defs z :=
+       match defs with
+         | Fcons f _ ys e defs =>
+           let z' := max_var e z in
+           max_var_fundefs defs (max_list (f::ys) z')
+         | Fnil => z
+       end.
+
+Lemma acc_leq_max_var_mut :
+  (forall e y,
+     (y <= max_var e y)%positive) /\
+  (forall B y,
+     (y <= max_var_fundefs B y)%positive).
+Proof.
+  exp_defs_induction IHe IHl IHb; intros y;
+  try now (eapply Pos.le_trans; [| now eapply IHe ];
+           eapply Pos.le_trans; [| now eapply max_list_spec1 ];
+           zify; omega).
+  - simpl; zify; omega.
+  - simpl. eapply Pos.le_trans. now apply IHe. 
+    now apply IHl.
+  - simpl. eapply Pos.le_trans. now apply IHb.
+    now apply IHe.
+  - simpl. eapply Pos.le_trans; [| eapply max_list_spec1 ].
+    zify; omega.
+  - simpl. zify; omega.
+  - simpl. eapply Pos.le_trans. now apply IHe.
+    eapply Pos.le_trans. now apply max_list_spec1.
+    eapply Pos.le_trans; [| now apply IHb ].
+    eapply max_list_acc_mon. zify; omega. 
+  - simpl. zify; omega. 
+Qed.
+
+Corollary acc_leq_max_var e y :
+  (y <= max_var e y)%positive.
+Proof.
+  now apply acc_leq_max_var_mut. 
+Qed.
+
+Corollary acc_leq_max_var_fundefs B y :
+  (y <= max_var_fundefs B y)%positive.
+Proof.
+  now apply acc_leq_max_var_mut. 
+Qed.
+
+Lemma bound_var_leq_max_var_mut :
+  (forall e x y,
+     Ensembles.In _ (bound_var e) x ->
+     (x <= max_var e y)%positive) /\
+  (forall B x y,
+     Ensembles.In _ (bound_var_fundefs B) x ->
+     (x <= max_var_fundefs B y)%positive).
+Proof.
+  exp_defs_induction IHe IHl IHb; intros x y HIn;
+  try (simpl; inv HIn; [| now eauto ];
+       (eapply Pos.le_trans; [| now eapply acc_leq_max_var ];
+        eapply Pos.le_trans; [| now eapply max_list_spec1 ];
+        zify; omega)).
+  - inv HIn. inv H3.
+  - inv HIn. inv H3; [| now  eauto]. inv H.
+    eapply Pos.le_trans; [| eapply acc_leq_max_var with (e := Ecase v l) ].
+    now eauto.
+  - simpl. inv HIn; [| now eauto ].
+    eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
+    zify; omega.
+  - inv HIn; [| now eauto ].
+    simpl. eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
+    now eauto.
+  - inv HIn.
+  - inv HIn.
+  - simpl; inv HIn; [| now eauto |].
+    + inv H5.
+      * inv H.
+        eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
+        eapply Pos.le_trans; [| now eapply max_list_spec1 ].
+        zify; omega.
+      * eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
+        now eapply max_list_spec2.
+    + eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
+      eapply Pos.le_trans; [| now eapply max_list_spec1 ].
+      eapply Pos.le_trans. now apply IHe with (y := y); eauto.
+      zify; omega.
+  - inv HIn.
+Qed.
+
+Corollary bound_var_leq_max_var e x y :
+  Ensembles.In _ (bound_var e) x ->
+  (x <= max_var e y)%positive.
+Proof.
+  now apply bound_var_leq_max_var_mut.
+Qed.
+
+Corollary bound_var_leq_max_fundefs B x y :
+  Ensembles.In _ (bound_var_fundefs B) x ->
+  (x <= max_var_fundefs B y)%positive.
+Proof.
+  now apply bound_var_leq_max_var_mut.
+Qed.
+
+Lemma occurs_free_leq_max_var_mut :
+  (forall e x y,
+     Ensembles.In _ (occurs_free e) x ->
+     (x <= max_var e y)%positive) /\
+  (forall B x y,
+     Ensembles.In _ (occurs_free_fundefs B) x ->
+     (x <= max_var_fundefs B y)%positive).
+Proof.
+  exp_defs_induction IHe IHl IHb; intros x y HIn.
+  try (inv HIn; [| now eauto ];
+       simpl; eapply Pos.le_trans; [| now eapply acc_leq_max_var ];
+       now eapply max_list_spec2).
+  - inv HIn. simpl; zify; omega.
+  - inv HIn; [ now eauto | | now eauto ].
+    simpl. eapply Pos.le_trans; [| eapply acc_leq_max_var with (e := Ecase v l) ].
+    now eauto.
+  - simpl. inv HIn; [| now eauto ].
+    eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
+    zify; omega.
+  - inv HIn; [ now eauto |].
+    simpl. eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
+    now eauto.
+  - inv HIn; simpl.
+    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; omega.
+    now eapply max_list_spec2.
+  - simpl; inv HIn; [| now eauto ].
+    eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
+    now apply max_list_spec2.
+  - inv HIn. simpl. zify; omega.
+  - inv HIn; [| now eauto ].
+    simpl. eapply Pos.le_trans. eapply IHe with (y := y). eassumption.
+    eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
+    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; omega.
+  - inv HIn. 
+Qed. 
+
+Corollary occurs_free_leq_max_var e x y :
+  Ensembles.In _ (occurs_free e) x ->
+  (x <= max_var e y)%positive.
+Proof.
+  now apply occurs_free_leq_max_var_mut.
+Qed.
+
+Corollary occurs_free_leq_max_fundefs B x y :
+  Ensembles.In _ (occurs_free_fundefs B) x ->
+  (x <= max_var_fundefs B y)%positive.
+Proof.
+  now apply occurs_free_leq_max_var_mut.
+Qed.
+
+(** * A set that contains all the identifiers above a certain value *)
+
+(** All the variables that are greater or equal to x are in S (i.e. the "fresh" set) *)
+Definition fresh (S : Ensemble var) (x : var) :=
+  forall y, (x <= y)%positive -> Ensembles.In _ S y.
+
+Lemma fresh_monotonic S S' x :
+  Included _ S S' ->
+  fresh S x ->
+  fresh S' x.
+Proof.
+  intros Hinc Hf x' Hleq. eapply Hinc. eapply Hf. eassumption.
+Qed.
+
+Lemma fresh_Instersection S1 S2 x :
+  fresh S1 x ->
+  fresh S2 x ->
+  fresh (Intersection _ S1 S2) x.
+Proof.
+  intros Hf1 Hf2 x' Hleq. eauto.
+Qed.
+
+Lemma fresh_Setminus S1 S2 S3 x :
+  fresh (Setminus _ S1 S2) x ->
+  fresh (Setminus _ S1 S3) x ->
+  fresh (Setminus _ S1 (Union _ S2 S3)) x.
+Proof.
+  intros Hf1 Hf2 x' Hleq. constructor.
+  now eapply Hf1. intros Hc. inv Hc. eapply Hf1 in H; eauto.
+  eapply Hf2 in H; eauto.
+Qed.
+
+Instance fresh_Proper : Proper (Same_set _ ==> Logic.eq ==> iff) fresh.
+Proof.
+  intros s1 s2 Hseq x1 x2 Heq; subst; split; intros x H.
+  now rewrite <- Hseq; eauto.
+  now rewrite Hseq; eauto.
 Qed.

@@ -16,3 +16,5 @@ clean:
 	$(MAKE) clean -C libraries/SquiggleEq
 	$(MAKE) clean -C theories
 	
+superclean:
+	git clean -xf

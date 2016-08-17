@@ -21,7 +21,7 @@ Instance WfL3Term : WellFormed cps.exp :=
 
 Instance certiL6 : CerticoqLanguage cps.exp := {}.
 
-Require Import L4.classes.
+Require Import L4.instances.
 Require Import L5_to_L6.
 
 Instance certiL5a_t0_L6: 

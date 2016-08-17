@@ -80,6 +80,13 @@ Class CerticoqLanguage (Term : Type) `{BigStepOpSem Term} `{WellFormed Term} :=
   *)
 }.
 
+(* can be used to get the term type from an instance *)
+Definition cTerm `{CerticoqLanguage Term} : Type := Term.
+
+Arguments cTerm {Term} {H} {H0} _.
+
+
+
 Arguments CerticoqLanguage Term {H} {H0}.
 
 Class CerticoqTranslationCorrect 

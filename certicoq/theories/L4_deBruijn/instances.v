@@ -3,7 +3,7 @@ Require Import certiClasses.
 Require Import Common.Common.
 Require Import L3.compile.
 Require Import L4.L3_to_L4.
-Require Import L3.classes.
+Require Import L3.instances.
 
 
 Program Instance : BigStepOpSem L4.expression.exp := eval.
@@ -88,13 +88,13 @@ Instance certiL5_to_L5a:
 
 Quote Recursively Definition p0L1 := 0.
 
-Require Import L2.classes.
+Require Import L2.instances.
 
 Open Scope Z_scope.
 Require Import ZArith.
 (* Print Instances CerticoqLanguage. *)
 
-Eval compute in (translateTo L5a.val_c p0L1).
+Eval compute in (translateTo (cTerm certiL5a) p0L1).
 (*
      = Ret
          (Cont_c 5%positive

@@ -5,29 +5,45 @@ Require Import Common.AstCommon.
 
 Class WellFormed (Term: Type) := wf : Term  -> Prop. 
 
-Generalizable Variables Src Dst Inter Term.
+Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
-(** A [Term] can contain an environment embedded in it. *)
-Class BigStepOpSem (Term:Type) := bigStepEval: Term -> Term -> Prop.
+(** A [Term] can contain an environment embedded in it. 
+Use this class when there is a separate type (and translation?) for values *)
+Class BigStepHetero (Term Value:Type) := bigStepEval: Term -> Value -> Prop.
 
+(** Use this class when values are just a subcollection of terms. *)
+Class BigStepOpSem (Term:Type) := bigStepEvalSame:> BigStepHetero Term Term.
+
+(* In either case, one can use ⇓ to refer to the big step eval relation *)
 
 Notation "s ⇓ t" := (bigStepEval s t) (at level 70).
+
+
 
 Require Import Coq.Unicode.Utf8.
 
 
-Instance liftBigStepException `{BigStepOpSem Term} : BigStepOpSem (exception Term):=
-λ (s sv: exception Term),
+Instance liftBigStepException `{BigStepHetero Term Value} 
+  : BigStepHetero (exception Term) (exception Value) :=
+λ (s : exception Term) (sv : exception Value),
 match (s, sv) with
 | (Ret s, Ret sv) => s ⇓ sv
 | (_,_) => False
 end.
 
 
-Class CerticoqTranslation (Src Dst : Type)
+Class CerticoqTranslation (Src Dst : Type) : Type
   := translate : Src -> exception Dst.
 
+Class CerticoqTotalTranslation (Src Dst : Type) : Type
+  := translateT : Src -> Dst.
+
 Arguments translate  Src Dst {CerticoqTranslation} s.
+Arguments translateT  Src Dst {CerticoqTotalTranslation} s.
+
+Instance liftTotal `{CerticoqTotalTranslation Src Dst} : CerticoqTranslation Src Dst :=
+  fun (x:Src) => Ret (translateT Src Dst x). 
+
 
 Definition wfPreserving `{CerticoqTranslation Src Dst}
     `{WellFormed Src} `{WellFormed Dst} : Prop := 
@@ -40,37 +56,9 @@ Definition wfPreserving `{CerticoqTranslation Src Dst}
 
 Arguments wfPreserving Src Dst {H} {H0} {H1}.
 
-Definition bigStepPreserving `{CerticoqTranslation Src Dst}
-   `{BigStepOpSem Src} `{BigStepOpSem Dst} `{WellFormed Src}
-  :=
-   ∀ (s sv:Src), 
-    wf s 
-    -> s ⇓ sv
-    -> (translate Src Dst s) ⇓ (translate Src Dst sv).
-
-Arguments bigStepPreserving Src Dst {H} {H0} {H1} {H2}.
-
-(* Sometimes, the translation of a value may not be a value. 
-For example, in L3 to L4, the environment is translated as let bindings.
-Thus, a value with a non-empty environment will be translated to a term
-whose outermost operator is a let binding and is hence not a value.
-This definition, which is inspired by CPS correct seems weaker, is not strong enough
-to be sensible. For example it is possible that the translation of [s] and [sv] both
-diverge. *)
-Definition bigStepPreservingWeaker `{CerticoqTranslation Src Dst}
-   `{BigStepOpSem Src} `{BigStepOpSem Dst} `{WellFormed Src}
-  :=
-   ∀ (s sv:Src) (tv : Dst), 
-    wf s 
-    -> s ⇓ sv
-    -> ((translate Src Dst s) ⇓ (Ret tv) <-> (translate Src Dst sv) ⇓ (Ret tv)).
-
-Arguments bigStepPreservingWeaker Src Dst {H} {H0} {H1} {H2}.
-
-
 (** A Certicoq language must have an associated bigstep operational semantics and 
   a well formedness predicate (possibly \_.True) *)
-Class CerticoqLanguage (Term : Type) `{BigStepOpSem Term} `{WellFormed Term} := 
+Class CerticoqLanguage `{BigStepHetero Term Value} `{WellFormed Term} := 
 {
   (* Sensible, but not needed yet.
   wfPreserved : forall (s v : Term), 
@@ -81,23 +69,55 @@ Class CerticoqLanguage (Term : Type) `{BigStepOpSem Term} `{WellFormed Term} :=
 }.
 
 (* can be used to get the term type from an instance *)
-Definition cTerm `{CerticoqLanguage Term} : Type := Term.
+Definition cTerm `{CerticoqLanguage Term Value} : Type := Term.
+(* can be used to get the Value type from an instance *)
+Definition cValue `{CerticoqLanguage Term Value} : Type := Term.
 
-Arguments cTerm {Term} {H} {H0} _.
+Arguments cTerm {Term} {Value} {H} {H0} _.
+Arguments cValue {Term} {Value} {H} {H0} _.
 
+Arguments CerticoqLanguage Term {Value} {H} {H0}.
 
+Definition bigStepPreserving `{CerticoqTranslation Src Dst} 
+  `{CerticoqTranslation SrcValue DstValue}
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{WellFormed Src}
+  :=
+   ∀ (s:Src) (sv: SrcValue), 
+    wf s 
+    -> s ⇓ sv
+    -> (translate Src Dst s) ⇓ (translate SrcValue DstValue sv).
 
-Arguments CerticoqLanguage Term {H} {H0}.
+Arguments bigStepPreserving Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} {H3}.
+
+(* Sometimes, the translation of a value may not be a value. 
+For example, in L3 to L4, the environment is translated as let bindings.
+Thus, a value with a non-empty environment will be translated to a term
+whose outermost operator is a let binding and is hence not a value.
+This definition, which is inspired by CPS correct seems weaker, is not strong enough
+to be sensible. For example it is possible that the translation of [s] and [sv] both
+diverge. 
+Definition bigStepPreservingWeaker `{CerticoqTranslation Src Dst}
+   `{BigStepOpSem Src} `{BigStepOpSem Dst} `{WellFormed Src}
+  :=
+   ∀ (s sv:Src) (tv : Dst), 
+    wf s 
+    -> s ⇓ sv
+    -> ((translate Src Dst s) ⇓ (Ret tv) <-> (translate Src Dst sv) ⇓ (Ret tv)).
+
+Arguments bigStepPreservingWeaker Src Dst {H} {H0} {H1} {H2}.
+*)
+
 
 Class CerticoqTranslationCorrect 
-  `{CerticoqLanguage Src} `{CerticoqLanguage Dst}
-  `{CerticoqTranslation Src Dst} := 
+  `{CerticoqLanguage Src SrcValue} `{CerticoqLanguage Dst DstValue}
+  `{CerticoqTranslation Src Dst} `{CerticoqTranslation SrcValue DstValue} := 
 {
   certiWfPres : wfPreserving Src Dst;
-  certiBigStepPres : bigStepPreserving Src Dst; (* consider [bigStepPreservingWeaker] *)
+  certiBigStepPres : bigStepPreserving Src Dst;
 }.
 
-Arguments CerticoqTranslationCorrect Src {H} {H0} {H1} Dst {H2} {H3} {H4} {H5}.
+Arguments CerticoqTranslationCorrect 
+  Src {SrcValue} {H} {H0} {H1} Dst {DstValue} {H2} {H3} {H4} {H5} {H6}.
 
 Global Instance composeTranslation `{CerticoqTranslation Src Inter} 
   `{CerticoqTranslation Inter Dst} :
@@ -126,12 +146,14 @@ Proof.
 Qed.
 
 
-Instance composeCerticoqTranslationCorrect (Src Inter Dst: Type)
-  `{CerticoqLanguage Src}
-  `{CerticoqLanguage Inter}
-  `{CerticoqLanguage Dst}
+Instance composeCerticoqTranslationCorrect
+  `{CerticoqLanguage Src SrcValue}
+  `{CerticoqLanguage Inter InterValue}
+  `{CerticoqLanguage Dst DstValue}
   {t1 : CerticoqTranslation Src Inter}
   {t2 : CerticoqTranslation Inter Dst}
+  {t1v : CerticoqTranslation SrcValue InterValue}
+  {t2v : CerticoqTranslation InterValue DstValue}
   {Ht1: CerticoqTranslationCorrect Src Inter}
   {Ht2: CerticoqTranslationCorrect Inter Dst}
     : CerticoqTranslationCorrect Src Dst.
@@ -142,7 +164,7 @@ Proof.
   apply certiBigStepPres0 in Hev;[| assumption].
   apply certiWfPres0 in Hwf.
   unfold composeTranslation, translate in *.
-  destruct (t1 s), (t1 sv); compute in Hev; try contradiction.
+  destruct (t1 s), (t1v sv); compute in Hev; try contradiction.
   apply certiBigStepPres1 in Hev;[| assumption].
   exact Hev.
 Qed.
@@ -151,6 +173,35 @@ Qed.
 Instance  BigStepOpWEnv (Term:Set) (ev: (environ Term) -> Term -> Term -> Prop) :
   BigStepOpSem (Program Term) :=
 fun p1 p2 => ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
+
+Definition normalizes `{BigStepHetero Term Value} (s:Term): Prop :=
+∃ (sv : Value) , s ⇓ sv.
+
+
+(* Todo : generalize over Coq.Init.Logic.eq. *)
+Definition deterministicBigStep `{BigStepHetero Term Value} :=
+∀ (s :Term) (v1 v2 : Value), s ⇓ v1 -> s ⇓ v2 -> v1 = v2.
+
+Arguments deterministicBigStep Term {Value} {H}.
+
+Definition totalTranslation `{CerticoqTranslation Src Dst} : Prop :=
+  ∀ (s:Src), 
+match translate Src Dst s with
+| Ret _ => True
+| Exc _ => False
+end.
+
+
+Lemma deterministicBigStepLiftExc `{BigStepHetero Term Value}:
+  deterministicBigStep Term
+  -> deterministicBigStep (exception Term).
+Proof.
+  intros Hd ? ? ? He1 He2.
+  destruct s, v1, v2; compute in He1; compute in He2; try contradiction.
+  f_equal.
+  unfold deterministicBigStep in Hd.
+  eapply Hd; eauto.
+Qed.
 
 
 (* A possible replacement for [CerticoqTranslationCorrect] 
@@ -186,51 +237,23 @@ Proof.
 (* ( * ) in Randy's email dated Tue, May 31, 2016 at 10:35 PM EST 
 *) 
 
-Definition bigStepReflecting `{CerticoqTranslation Src Dst}  
-   `{BigStepOpSem Src} `{BigStepOpSem Dst} (s:Src) : Prop :=
- ∀ (td: exception Dst), 
+Definition bigStepReflecting `{CerticoqTranslation Src Dst}
+  `{CerticoqTranslation SrcValue DstValue}  
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} (s:Src) : Prop :=
+ ∀ (td: exception DstValue), 
     (translate Src Dst s) ⇓ td
-    -> ∃ (d:Src), s ⇓ d ∧ td = translate Src Dst d.
+    -> ∃ (d:SrcValue), s ⇓ d ∧ td = translate SrcValue DstValue d.
 
 
-Arguments bigStepReflecting Src Dst {H} {H0} {H1} s.
+Arguments bigStepReflecting Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} s.
 
-
-
-Definition normalizes `{BigStepOpSem Term} (s:Term): Prop :=
-∃ sv, s ⇓ sv.
-
-
-(* Todo : generalize over Coq.Init.Logic.eq. *)
-Definition deterministicBigStep `{BigStepOpSem Term} :=
-∀ (s v1 v2:Term), s ⇓ v1 -> s ⇓ v2 -> v1 = v2.
-
-Arguments deterministicBigStep Term {H}.
-
-Definition totalTranslation `{CerticoqTranslation Src Dst} : Prop :=
-  ∀ (s:Src), 
-match translate Src Dst s with
-| Ret _ => True
-| Exc _ => False
-end.
-
-
-Lemma deterministicBigStepLiftExc `{BigStepOpSem Term}:
-  deterministicBigStep Term
-  -> deterministicBigStep (exception Term).
-Proof.
-  intros Hd ? ? ? He1 He2.
-  destruct s, v1, v2; compute in He1; compute in He2; try contradiction.
-  f_equal.
-  unfold deterministicBigStep in Hd.
-  eapply Hd; eauto.
-Qed.
 
 Lemma bigStepPreservingReflecting 
   `{CerticoqTranslation Src Dst}
-  `{CerticoqLanguage Src}
-  `{BigStepOpSem Dst}
-  `{@bigStepPreserving Src Dst _ _ _ _ } :
+  `{CerticoqTranslation SrcValue DstValue}
+  `{CerticoqLanguage Src SrcValue}
+  `{CerticoqLanguage Dst DstValue}
+  {_:bigStepPreserving Src Dst} :
   (deterministicBigStep Dst)
   -> ∀ (s:Src), 
     wf s

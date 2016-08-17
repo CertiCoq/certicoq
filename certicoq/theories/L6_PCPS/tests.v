@@ -20,8 +20,13 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 (* Add LoadPath "../L3_flattenedApp" as L3. *)
 (* Add LoadPath "../L4_deBruijn" as L4. *)
 (* Add LoadPath "../L5_CPS" as CPS. *)
-Require Export CPS.cpseval.
 
+(* 
+This file has been moved to certicoq/oldL5. was it needed? If so, please
+revert the commit 7625.
+
+Require Export CPS.cpseval
+*)
 Require Import cps.
 Require Import cps_util.
 Require Import shrink_cps.

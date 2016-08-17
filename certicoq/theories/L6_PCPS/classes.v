@@ -1,4 +1,3 @@
-Require Export CPS.cpseval.
 
 Require Import cps.
 Require Import cps_util.

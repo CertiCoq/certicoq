@@ -68,7 +68,7 @@ Class CerticoqLanguage `{BigStepHetero Term Value} `{WellFormed Term} :=
   *)
 }.
 
-(* can be used to get the term type from an instance *)
+(* can be used to get the Term type from an instance *)
 Definition cTerm `{CerticoqLanguage Term Value} : Type := Term.
 (* can be used to get the Value type from an instance *)
 Definition cValue `{CerticoqLanguage Term Value} : Type := Term.
@@ -76,7 +76,9 @@ Definition cValue `{CerticoqLanguage Term Value} : Type := Term.
 Arguments cTerm {Term} {Value} {H} {H0} _.
 Arguments cValue {Term} {Value} {H} {H0} _.
 
+
 Arguments CerticoqLanguage Term {Value} {H} {H0}.
+
 
 Definition bigStepPreserving `{CerticoqTranslation Src Dst} 
   `{CerticoqTranslation SrcValue DstValue}
@@ -89,24 +91,44 @@ Definition bigStepPreserving `{CerticoqTranslation Src Dst}
 
 Arguments bigStepPreserving Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} {H3}.
 
-(* Sometimes, the translation of a value may not be a value. 
-For example, in L3 to L4, the environment is translated as let bindings.
-Thus, a value with a non-empty environment will be translated to a term
-whose outermost operator is a let binding and is hence not a value.
-This definition, which is inspired by CPS correct seems weaker, is not strong enough
-to be sensible. For example it is possible that the translation of [s] and [sv] both
-diverge. 
-Definition bigStepPreservingWeaker `{CerticoqTranslation Src Dst}
-   `{BigStepOpSem Src} `{BigStepOpSem Dst} `{WellFormed Src}
+(* We fix one type of observations of the head of a value. Typically,
+these would be the tags of constructors of (co-) inductive types.
+If a value is not a constructor applied to some args, e.g. a lambda,
+the observation should be None*)
+
+Definition Observation :Set := option (inductive * nat).
+
+Class ObserveHead (Value:Type) := observeHead: Value -> Observation.
+
+(* observe subterms for a constructor. return [] if the value is not a constructor. *)
+Class ObserveSubterms (Value:Type) := observeSubterms: Value -> list Value.
+
+Require Import List.
+(* Coinductive, in case we add support for Coq's coinductive types lateron *)
+CoInductive obsEqual
+   `{ObserveHead SrcValue} `{ObserveSubterms SrcValue} 
+   `{ObserveHead DstValue} `{ObserveSubterms DstValue} : SrcValue -> DstValue -> Prop :=
+| sameObs : forall (s : SrcValue) (d : DstValue),
+    observeHead s = observeHead d
+    -> (let ls := (observeSubterms s) in
+       let ld := (observeSubterms d) in
+       length ls = length ld /\
+       forall n:nat, obsEqual (nth n ls s)  (nth n ld d))
+    -> obsEqual s d.
+
+Notation "s ~ t" := (obsEqual s t) (at level 65).
+
+(* Similar to what Zoe suggested on 	Wed, Aug 17, 2016 at 8:57 AM *)
+Definition obsPreserving 
+  `{CerticoqTranslation Src Dst} 
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{WellFormed Src}
+   `{ObserveHead SrcValue} `{ObserveSubterms SrcValue} 
+   `{ObserveHead DstValue} `{ObserveSubterms DstValue}
   :=
-   ∀ (s sv:Src) (tv : Dst), 
+   ∀ (s:Src) (sv: SrcValue), 
     wf s 
-    -> s ⇓ sv
-    -> ((translate Src Dst s) ⇓ (Ret tv) <-> (translate Src Dst sv) ⇓ (Ret tv)).
-
-Arguments bigStepPreservingWeaker Src Dst {H} {H0} {H1} {H2}.
-*)
-
+    -> (s ⇓ sv)
+    -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ~ dv.
 
 Class CerticoqTranslationCorrect 
   `{CerticoqLanguage Src SrcValue} `{CerticoqLanguage Dst DstValue}

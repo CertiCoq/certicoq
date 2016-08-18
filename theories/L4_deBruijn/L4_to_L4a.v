@@ -83,7 +83,7 @@ End VarsOf2Class.
 
 Require Import SquiggleEq.varImplZ.
 
-Require Import cps.
+Require Import L6.cps.
 
 Definition L4_to_L4a (e:expression.exp) : (@NTerm cps.var CoqL4GenericTermSig) :=
   translate nil e.

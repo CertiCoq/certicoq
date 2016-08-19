@@ -40,7 +40,7 @@ Inductive wndEval : Term -> Term -> Prop :=
      (* n is the number of parameters of the datatype *)
 | sCase: forall (ml:inductive * nat * list nat) (ty s mch:Term)
                  (args brs ts:Terms) (n:nat),
-            canonicalP mch = Ret (n, args) ->
+            canonicalP mch = Some (n, args) ->
             tskipn (snd (fst ml)) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml ty mch brs) s
@@ -49,7 +49,7 @@ Inductive wndEval : Term -> Term -> Prop :=
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
           tnth ix (tcons arg args) = Some t ->
-          canonicalP t = Ret z ->
+          canonicalP t = Some z ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t ck ty, wndEval (TCast t ck ty) t

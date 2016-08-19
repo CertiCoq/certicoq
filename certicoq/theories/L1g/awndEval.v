@@ -41,7 +41,7 @@ Inductive awndEval : Term -> Term -> Prop :=
      (* np is the number of parameters of the datatype *)
 | aCase: forall (ml: inductive * nat * list nat) (ty s mch:Term)
                  (args brs ts:Terms) (n:nat),
-            canonicalP mch = Ret (n, args) ->
+            canonicalP mch = Some (n, args) ->
             tskipn (snd (fst ml)) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             awndEval (TCase ml ty mch brs) s
@@ -49,7 +49,7 @@ Inductive awndEval : Term -> Term -> Prop :=
                (x:Term) (ix:nat) (t:Term) z,
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          tnth ix (tcons arg args) = Some t -> canonicalP t = Ret z ->
+          tnth ix (tcons arg args) = Some t -> canonicalP t = Some z ->
           awndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | aCast: forall t ck ty, awndEval (TCast t ck ty) t

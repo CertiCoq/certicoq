@@ -277,15 +277,15 @@ induction t;
 - left. constructor.
 Qed.
 
-Function canonicalP (t:Term) : exception (nat * Terms) :=
+Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
-    | TConstruct _ r _ => ret (r, tnil)
-    | TApp (TConstruct _ r _) arg args => ret (r, tcons arg args)
-    | x => raise ("canonicalP: " ++ (print_term x))
+    | TConstruct _ r _ => Some (r, tnil)
+    | TApp (TConstruct _ r _) arg args => Some (r, tcons arg args)
+    | x => None
   end.
 
 Lemma canonicalP_isCanonical:
-  forall t x, canonicalP t = Ret x -> isCanonical t.
+  forall t x, canonicalP t = Some x -> isCanonical t.
 Proof.
   induction t; simpl; intros; try discriminate.
   - destruct t1; try discriminate. constructor.
@@ -293,13 +293,12 @@ Proof.
 Qed.
 
 Lemma isCanonical_canonicalP:
-  forall t, isCanonical t -> exists x, canonicalP t = Ret x.
+  forall t, isCanonical t -> exists x, canonicalP t = Some x.
 Proof.
   induction 1; simpl.
   - exists (n, tnil). reflexivity.
   - exists (n, tcons arg args). reflexivity.
 Qed.
-
 
 (** some utility operations on [Terms] ("lists" of Term) **)
 Fixpoint tlength (ts:Terms) : nat :=
@@ -741,7 +740,7 @@ Qed.
 
 Lemma canonicalP_pres_WFapp:
   forall t, WFapp t ->
-        forall r args, canonicalP t = Ret (r, args) -> WFapps args.
+        forall r args, canonicalP t = Some (r, args) -> WFapps args.
 Proof.
   induction t; simpl; intros; try discriminate.
   - destruct t1; try discriminate. myInjection H0. inversion_Clear H.

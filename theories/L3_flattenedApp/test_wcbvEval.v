@@ -18,6 +18,11 @@ Local Open Scope bool.
 Local Open Scope list.
 Local Open Scope string_scope.
 
+Set Template Cast Propositions.  (** L1 doesn't strip proofs **)
+Set Printing Width 90.
+Set Printing Depth 100.
+Set Implicit Arguments.
+
 Variable (y:nat).
 Quote Recursively Definition p_mbt := 
   match y with
@@ -27,8 +32,7 @@ Quote Recursively Definition p_mbt :=
 Definition L1g_mbt := Eval cbv in (program_Program p_mbt).
 Definition mbt_env := env L1g_mbt.  (* L1g environ *)
 Definition mbt_main := main L1g_mbt. (* L1g main function *)
-Eval cbv in (wcbvEval 10 mbt_env mbt_main).
-
+Eval cbv in (wcbvEval mbt_env 10 mbt_main).
 
 (** vector addition **)
 Require Coq.Vectors.Vector.
@@ -41,7 +45,7 @@ Definition v01 : Vector.t nat 2 :=
   (Vector.cons nat 0 1 (Vector.cons nat 1 0 (Vector.nil nat))).
 Definition v23 : Vector.t nat 2 :=
   (Vector.cons nat 2 1 (Vector.cons nat 3 0 (Vector.nil nat))).
-Definition vplus0123 := (vplus _ v01 v23).
+Definition vplus0123 := (vplus v01 v23).
 Quote Recursively Definition cbv_vplus0123 := (* [program] of Coq's answer *)
   ltac:(let t:=(eval cbv in (vplus0123)) in exact t).
 Print cbv_vplus0123.
@@ -55,144 +59,115 @@ Print P_vplus0123.
 Goal
   let env := (env P_vplus0123) in
   let main := (main P_vplus0123) in
-  wcbvEval 100 (env) (main) = Some ans_vplus0123.
+  wcbvEval (env) 100 (main) = Ret ans_vplus0123.
   vm_compute. reflexivity.
 Qed.
 
-
-
-Inductive List (A:Set) :=
-  Nil: List A | Cons: forall (a:A) (bs:List A), List A.
-Definition tl (A:Set) (ls:List A) : List A :=
-  match ls with Nil _ => Nil A | Cons _ x bs => Cons _ x bs end.
-Quote Recursively Definition p_tl := tl.
-Print p_tl.
-
-
-Require Coq.Vectors.Vector.
-Print Fin.t.
-Print Vector.t.
-
-Definition vplus (n:nat) :
-  Vector.t nat n -> Vector.t nat n -> Vector.t nat n :=
-  Eval cbv in (Vector.map2 plus).
-Definition v01 : Vector.t nat 2 :=
-  (Vector.cons nat 0 1 (Vector.cons nat 1 0 (Vector.nil nat))).
-Definition v23 : Vector.t nat 2 :=
-  (Vector.cons nat 2 1 (Vector.cons nat 3 0 (Vector.nil nat))).
-Definition vplus0123 := (@vplus 2 v01 v23).
-Definition cbv_vplus0123 := Eval cbv in vplus0123.  (* evaluated by Coq *)
-Print cbv_vplus0123.
-(* program of Coq's result *)
-Quote Recursively Definition p_vplus0123 := (@vplus 2 v01 v23).
-Print p_vplus0123.
-Quote Definition q_vplus0123 := Eval cbv in (@vplus 2 v01 v23).
-Print q_vplus0123.
-Definition pP := Eval cbv in program_Program p_vplus0123.
-Print pP.
-(**
-Definition cbv_q_vplus0123 := Eval cbv in (term_Term (env pP) q_vplus0123).
-Print cbv_q_vplus0123.
-**)
-Definition cbv_env_pP := Eval cbv in (env pP).
-Print cbv_env_pP.
-Definition cbv_main_pP := Eval cbv in (main pP).
-Print cbv_main_pP.
-Eval cbv in (wcbvEval 100 cbv_env_pP cbv_main_pP).
-Goal
-  wcbvEval (env pP) 1000 (main pP) = Ret cbv_q_vplus0123.
-  vm_compute. reflexivity.
-Qed.
-
-
-
-Definition vplus (n:nat) :
-  Vector.t nat n -> Vector.t nat n -> Vector.t nat n :=
-  Eval cbv in (Vector.map2 plus).
-
-Definition vplus01 :=
-  (@vplus 1 (Vector.cons nat 0 0 (Vector.nil nat))
-          (Vector.cons nat 1 0 (Vector.nil nat))).
-Definition cbv_vplus01 := Eval cbv in vplus01.
-Print cbv_vplus01.
-Quote Recursively Definition q_vplus01 := vplus01.
-Print q_vplus01.
-Quote Recursively Definition q_cbv_vplus01 := cbv_vplus01.
-Print q_cbv_vplus01.
-Definition p_vplus01 := Eval cbv in program_Program q_vplus01.
-Print p_vplus01.
-Definition ans_vplus01 := Eval cbv in main (program_Program q_vplus01).
-Print ans_vplus01.
-Print p_vplus01.
-
-
-
-(** Olivier's example **)
-Definition olivier := (Some 0).
-Quote Recursively Definition p_olivier := olivier.
-Quote Definition q_olivier := Eval cbv in olivier.
-Print p_olivier.
-Print q_olivier.
-Goal
-  let ew := (exc_wcbvEval 40 p_olivier q_olivier) in
-  fst ew = snd ew.
-compute. reflexivity.
-Qed.
-
-Quote Recursively Definition p_0 := 0.
-Quote Definition q_0 := Eval compute in 0.
-Goal
-  let ew := (exc_wcbvEval 40 p_0 q_0) in
-  fst ew = snd ew.
-compute. reflexivity.
-Qed.
-
-(** Abishek's example **)
-Axiom feq1 : (fun x:nat => x) = (fun x:nat => x+x-x).
-Definition zero :nat :=
-  match feq1 with
-    | eq_refl => 0
+Inductive pack (A:Prop) : Prop := Pack: A -> A -> A -> A -> pack A.
+Axiom packax: forall A, pack A -> pack A.
+Definition pack_nat (A:Prop) (a:pack A) : nat :=
+  match packax a with
+    | Pack b1 b2 b3 b4 => 0
   end.
+Quote Recursively Definition p_pack_nat := (pack_nat (Pack I I I I)).
+Check p_pack_nat.
+Definition P_pack_nat := Eval cbv in (program_Program p_pack_nat).
+Print P_pack_nat.
 
-(***)
-Quote Recursively Definition p_zero := zero.
-Quote Definition q_zero := Eval compute in zero.
-Print p_zero.
-Print q_zero.
+Inductive xxxx : Set :=
+| xxxxl: forall n:nat, n = 0 -> xxxx
+| xxxxr: forall n:nat, n = 1 -> xxxx.
+Print xxxx.
+Axiom Xxxx : xxxx.
+Definition yyyy (f:xxxx) :=
+  match f with xxxxl q => f | xxxxr q => f end.
+Definition yyyyX := (yyyy Xxxx).
+Print yyyyX.
+Quote Recursively Definition cbv_yyyyX := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (yyyyX)) in exact t).
+Print cbv_yyyyX.
+(* [Term] of Coq's answer *)
+Definition ans_yyyyX := Eval cbv in (main (program_Program cbv_yyyyX)).
+(* [program] of the program *)
+Quote Recursively Definition p_yyyyX := yyyyX.
+Print p_yyyyX.
+Definition P_yyyyX := Eval cbv in (program_Program p_yyyyX).
+Print P_yyyyX.
 Goal
-  let ew := (exc_wcbvEval 40 p_zero q_zero) in
-  fst ew = snd ew.
-compute. reflexivity.
+    let env := (env P_yyyyX) in
+    let main := (main P_yyyyX) in
+    wcbvEval (env) 100 (main) = Ret ans_yyyyX.
+  vm_compute. reflexivity.
 Qed.
 
+
+(** mutual recursion **)
 Set Implicit Arguments.
+Inductive tree (A:Set) : Set :=
+  node : A -> forest A -> tree A
+with forest (A:Set) : Set :=
+     | leaf : A -> forest A
+     | fcons : tree A -> forest A -> forest A.
 
-Definition Nat := nat.
-Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1).
-Quote Definition q_typedef := Eval compute in typedef.
-Quote Recursively Definition p_typedef := typedef.
-Eval compute in (L2.compile.program_Program p_typedef).
-Definition e2 :=
-  match (L2.compile.program_Program p_typedef) with
-    | Exc _ => nil
-    | Ret p => AstCommon.env p 
-  end.
-Eval compute in e2.
-Eval compute in (term_Term e2 q_typedef).
-Eval compute in (exc_wcbvEval 20 p_typedef q_typedef).
-Goal 
-  let ew := (exc_wcbvEval 20 p_typedef q_typedef) in
-  fst ew = snd ew.
-reflexivity.
+Fixpoint tree_size (t:tree bool) : nat :=
+  match t with
+    | node a f => S (forest_size f)
+  end
+with forest_size (f:forest bool) : nat :=
+       match f with
+         | leaf b => 1
+         | fcons t f1 => (tree_size t + forest_size f1)
+       end.
+
+Definition arden: forest bool :=
+  fcons (node true (fcons (node true (leaf false)) (leaf true)))
+        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
+               (leaf false)).
+Definition arden_size := (forest_size arden).
+Quote Recursively Definition cbv_arden_size :=
+  ltac:(let t:=(eval cbv in arden_size) in exact t).
+Definition ans_arden_size :=
+  Eval cbv in (main (program_Program cbv_arden_size)).
+(* [program] of the program *)
+Quote Recursively Definition p_arden_size := arden_size.
+Print p_arden_size.
+Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
+Print P_arden_size.
+Goal
+  let env := (env P_arden_size) in
+  let main := (main P_arden_size) in
+  wcbvEval (env) 100 (main) = Ret ans_arden_size.
+  vm_compute. reflexivity.
 Qed.
 
-Definition II := fun (A:Type) (a:A) => a.
-Quote Definition q_II := Eval compute in II.
-Quote Recursively Definition p_II := II.
+(** Ackermann **)
+Fixpoint ack (n m:nat) {struct n} : nat :=
+  match n with
+    | 0 => S m
+    | S p => let fix ackn (m:nat) {struct m} :=
+                 match m with
+                   | 0 => ack p 1
+                   | S q => ack p (ackn q)
+                 end
+             in ackn m
+  end.
+Definition ack35 := (ack 3 5).
+Quote Recursively Definition cbv_ack35 :=
+  ltac:(let t:=(eval cbv in ack35) in exact t).
+Print cbv_ack35.
+Definition ans_ack35 :=
+  Eval cbv in (main (program_Program cbv_ack35)).
+Print ans_ack35.
+(* [program] of the program *)
+Quote Recursively Definition p_ack35 := ack35.
+Print p_ack35.
+Definition P_ack35 := Eval cbv in (program_Program p_ack35).
+Print P_ack35.
 Goal
-  let ew := (exc_wcbvEval 10 p_II q_II) in
-  fst ew = snd ew.
-reflexivity.
+  let env := (env P_ack35) in
+  let main := (main P_ack35) in
+  wcbvEval (env) 2000 (main) = Ret ans_ack35.
+  vm_compute. reflexivity.
 Qed.
 
 
@@ -207,145 +182,47 @@ Fixpoint taut (n:nat) : tautArg n -> bool :=
     | 0 => (fun x => x)
     | S n => fun x => taut n (x true) && taut n (x false)
   end.
-Eval compute in taut 0 true.
-Eval compute in taut 1 (fun x => x).
-Eval compute in taut 1 (fun x => x || negb x).
 (* Pierce *)
 Definition pierce := taut 2 (fun x y => implb (implb (implb x y) x) x).
+Quote Recursively Definition cbv_pierce :=
+  ltac:(let t:=(eval cbv in pierce) in exact t).
+Print cbv_pierce.
+Definition ans_pierce :=
+  Eval cbv in (main (program_Program cbv_pierce)).
+Print ans_pierce.
+(* [program] of the program *)
 Quote Recursively Definition p_pierce := pierce.
 Print p_pierce.
-Quote Definition q_pierce := Eval compute in pierce.
+Definition P_pierce := Eval cbv in (program_Program p_pierce).
+Print P_pierce.
 Goal
-  let ew := (exc_wcbvEval 23 p_pierce q_pierce) in
-  fst ew = snd ew.
-reflexivity.
+  let env := (env P_pierce) in
+  let main := (main P_pierce) in
+  wcbvEval (env) 2000 (main) = Ret ans_pierce.
+  vm_compute. reflexivity.
 Qed.
 (* S combinator *)
 Definition Scomb := taut 3
          (fun x y z => implb (implb x (implb y z))
                              (implb (implb x y) (implb x z))).
+Quote Recursively Definition cbv_Scomb :=
+  ltac:(let t:=(eval cbv in Scomb) in exact t).
+Print cbv_Scomb.
+Definition ans_Scomb :=
+  Eval cbv in (main (program_Program cbv_Scomb)).
+Print ans_Scomb.
+(* [program] of the program *)
 Quote Recursively Definition p_Scomb := Scomb.
-Quote Definition q_Scomb := Eval compute in Scomb.
+Print p_Scomb.
+Definition P_Scomb := Eval cbv in (program_Program p_Scomb).
+Print P_Scomb.
 Goal
-  let ew := (exc_wcbvEval 50 p_Scomb q_Scomb) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
+  let env := (env P_Scomb) in
+  let main := (main P_Scomb) in
+  wcbvEval (env) 2000 (main) = Ret ans_pierce.
+  vm_compute. reflexivity.
 Qed.
 
-(* Must data constructors have fixed arity? It seems the answer is yes. *)
-Fixpoint arity (n:nat) (A:Type) : Type :=
-  match n with
-    | 0 => A
-    | S n => A -> arity n A
-  end.
-Eval compute in arity 2 bool.
-Inductive bar : Type :=
-| b0: arity 0 bar
-| b1: arity 1 bar.
-(** this constructor is not accepted:
-| bn: forall n:nat, arity n bar.
-***)
-
-Inductive baz : Type :=
-| baz1: baz
-| baz2: arity 5 bool -> baz.
-
-
-(** playing with arity of constructors **
-Fixpoint Arity (n:nat) (A:Prop) : Prop :=
-  match n with
-    | 0 => A
-    | S n => A -> Arity n A
-  end.
-Definition aaa : Prop := forall (X:Prop) (n:nat), X -> (Arity n X) -> X.
-Definition ZZ: aaa := fun (X:Prop) (n:nat) (z:X) (s:Arity n X) => z.
-
-Variable arb:nat.
-Inductive vec1 A : nat -> Type :=
-  |v1nil : vec1 A 0
-  |v1cons : forall (h:A) (n:nat), vec1 A (n + n) -> vec1 A arb.
-Inductive vec2 A (n:nat) : Type :=
-  |v2nil : vec2 A n
-  |v2cons : forall (h:A), vec2 A (n + n) -> vec2 A n.
-***)
-
-Inductive tree (A:Set) : Set :=
-  node : A -> forest A -> tree A
-with forest (A:Set) : Set :=
-     | leaf : A -> forest A
-     | fcons : tree A -> forest A -> forest A.
-
-Quote Recursively Definition p_fcons := fcons.
-Print p_fcons.
-Quote Definition q_fcons := Eval compute in (fcons).
-Goal
-  let ew := (exc_wcbvEval 10 p_fcons q_fcons) in
-  fst ew = snd ew.
-compute. reflexivity.
-Qed.
-
-Definition e3 :=
-  match (L2.compile.program_Program p_fcons) with
-    | Exc _ => nil
-    | Ret p => AstCommon.env p 
-  end.
-Eval compute in e3.
-Eval compute in (term_Term e3 q_fcons).
-Eval compute in (L2.compile.term_Term q_fcons).
-Eval compute in (cnstrArity e3 (mkInd "Top.tree" 1) 1).
-Eval compute in (etaExp_cnstr e3 (mkInd "Top.tree" 1) 1 tnil).
-
-
-Quote Recursively Definition p_fconsBool := (@fcons bool).
-Quote Definition q_fconsBool := Eval compute in (@fcons bool).
-Goal
-  let ew := (exc_wcbvEval 10 p_fconsBool q_fconsBool) in
-  fst ew = snd ew.
-compute. reflexivity.
-Qed.
-
-Quote Recursively Definition p_fconsTrue := (fcons (node true (leaf false))).
-Quote Definition q_fconsTrue :=
-  Eval compute in (fcons (node true (leaf false))).
-Goal
-  let ew := (exc_wcbvEval 10 p_fconsTrue q_fconsTrue) in
-  fst ew = snd ew.
-compute. reflexivity.
-Qed.
-
-
-Fixpoint tree_size (t:tree bool) : nat :=
-  match t with
-    | node a f => S (forest_size f)
-  end
-with forest_size (f:forest bool) : nat :=
-       match f with
-         | leaf b => 1
-         | fcons t f1 => (tree_size t + forest_size f1)
-       end.
-
-Definition sherwood: forest bool :=
-  fcons (node true (fcons (node true (leaf false)) (leaf true)))
-        (leaf false).
-Quote Recursively Definition p_sherwood_size := (forest_size sherwood).
-Quote Definition q_sherwood_size := Eval compute in (forest_size sherwood).
-Goal
-  let ew := (exc_wcbvEval 40 p_sherwood_size q_sherwood_size) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
-Qed.
-
-Definition arden: forest bool :=
-  fcons (node true (fcons (node true (leaf false)) (leaf true)))
-        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
-               (leaf false)).
-Quote Recursively Definition p_arden_size := (forest_size arden).
-Quote Definition q_arden_size := Eval compute in (forest_size arden).
-Goal
-  let ew := (exc_wcbvEval 100 p_arden_size q_arden_size) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
-Qed.
 
 
 Inductive uuyy: Set := uu | yy.
@@ -359,98 +236,19 @@ Definition Foo : nat -> bool -> wwzz -> wwzz :=
       | S m, zz n x c, b => zz m x b
     end.
 Definition Foo0ty := (Foo 0 true (ww uu)).
+Quote Recursively Definition cbv_Foo0ty :=
+  ltac:(let t:=(eval cbv in Foo0ty) in exact t).
+Definition ans_Foo0ty :=
+  Eval cbv in (main (program_Program cbv_Foo0ty)).
+(* [program] of the program *)
 Quote Recursively Definition p_Foo0ty := Foo0ty.
-Quote Definition q_Foo0ty := Eval compute in Foo0ty.
+Definition P_Foo0ty := Eval cbv in (program_Program p_Foo0ty).
 Goal
-  let ew := (exc_wcbvEval 23 p_Foo0ty q_Foo0ty) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
+  let env := (env P_Foo0ty) in
+  let main := (main P_Foo0ty) in
+  wcbvEval (env) 30 (main) = Ret ans_Foo0ty.
+  vm_compute. reflexivity.
 Qed.
-
-(** destructing a parameterised datatype **)
-Inductive lst (A:Set) : Set := 
-| nl: lst A
-| cns: A -> lst A -> lst A.
-Definition hd (A:Set) (ls:lst A) (default:A) : A :=
-  match ls with
-    | nl _ => default
-    | cns a _ => a
-  end.
-Quote Recursively Definition p_hd :=
- (@hd bool (@cns bool true (nl bool)) false).
-Quote Definition q_hd :=
-  Eval compute in (@hd bool (@cns bool true (nl bool)) false).
-Goal
-  let ew := (exc_wcbvEval 100 p_hd q_hd) in
-  fst ew = snd ew.
-reflexivity.
-Qed.
-
-(** destructing a parameterised datatype **)
-Inductive nelst (A:Set) : Set := 
-| nenl: A -> nelst A
-| necns: A -> nelst A -> nelst A.
-Definition nehd (A:Set) (ls:nelst A) : A :=
-  match ls with
-    | nenl a => a
-    | necns a _ => a
-  end.
-Quote Recursively Definition p_nehd :=
-  (@nehd bool (@necns bool true (@nenl bool false))).
-Quote Definition q_nehd :=
-  Eval compute in (@nehd bool (@necns bool true (@nenl bool false))).
-Goal
-  let ew := (exc_wcbvEval 100 p_nehd q_nehd) in
-  fst ew = snd ew.
-reflexivity.
-Qed.
-
-
-Inductive tm (A:Set) : Set := 
-| vv: nat -> tm A 
-| cc: A -> tm A.
-Definition occIn (A:Set) (t:tm A) : nat :=
-  match t with
-    | vv _ m => m
-    | cc _ => 0
-end.
-Quote Recursively Definition p_occIn := (occIn (cc true)).
-Quote Definition q_occIn := Eval compute in (occIn (cc true)).
-Goal
-  let ew := (exc_wcbvEval 20 p_occIn q_occIn) in
-  fst ew = snd ew.
-reflexivity.
-Qed.
-
-
-Require Import Vectors.Vector.
-Open Scope vector_scope.
-
-Definition vplus (n:nat) :
-  Vector.t nat n -> Vector.t nat n -> Vector.t nat n :=
-  Eval cbv delta beta in (map2 plus).
-
-Definition vplus01 :=
-  (@vplus 1 (cons nat 0 0 (nil nat)) (cons nat 1 0 (nil nat))).
-Quote Recursively Definition p_vplus01 := vplus01.
-Quote Definition q_vplus01 := Eval compute in vplus01.
-Goal
-  let ew := (exc_wcbvEval 20 p_vplus01 q_vplus01) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
-Qed.
-
-Definition v01 : Vector.t nat 2 := (cons nat 0 1 (cons nat 1 0 (nil nat))).
-Definition v23 : Vector.t nat 2 := (cons nat 2 1 (cons nat 3 0 (nil nat))).
-Definition vplus0123 := (@vplus 2 v01 v23).
-Quote Recursively Definition p_vplus0123 := vplus0123.
-Quote Definition q_vplus0123 := Eval compute in vplus0123.
-Goal
-  let ew := (exc_wcbvEval 40 p_vplus0123 q_vplus0123) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
-Qed.
-
 
 (** Fibonacci **)
 Fixpoint slowFib (n:nat) : nat :=
@@ -461,81 +259,116 @@ Fixpoint slowFib (n:nat) : nat :=
                | S p => slowFib p + slowFib m
              end
   end.
-
-Quote Recursively Definition p_slowFib1 := (slowFib 1).
-Quote Definition q_slowFib1 := Eval compute in (slowFib 1).
+Definition slowFib3 := (slowFib 3).
+Quote Recursively Definition cbv_slowFib3 :=
+  ltac:(let t:=(eval cbv in slowFib3) in exact t).
+Definition ans_slowFib3 :=
+  Eval cbv in (main (program_Program cbv_slowFib3)).
+(* [program] of the program *)
+Quote Recursively Definition p_slowFib3 := slowFib3.
+Definition P_slowFib3 := Eval cbv in (program_Program p_slowFib3).
 Goal
-  let ew := (exc_wcbvEval 10 p_slowFib1 q_slowFib1) in
-  fst ew = snd ew.
-reflexivity.
+  let env := (env P_slowFib3) in
+  let main := (main P_slowFib3) in
+  wcbvEval (env) 30 (main) = Ret ans_slowFib3.
+  vm_compute. reflexivity.
 Qed.
 
-Quote Recursively Definition p_slowFib4 := (slowFib 4).
-Quote Definition q_slowFib4 := Eval compute in (slowFib 4).
-Goal
-  let ew := (exc_wcbvEval 100 p_slowFib4 q_slowFib4) in
-  fst ew = snd ew.
-compute. reflexivity.
-Qed.
-
+(* fast Fib *)
 Fixpoint fibrec (n:nat) (fs:nat * nat) {struct n} : nat :=
   match n with
     | 0 => fst fs
     | (S n) => fibrec n (pair ((fst fs) + (snd fs)) (fst fs))
   end.
 Definition fib : nat -> nat := fun n => fibrec n (pair 0 1).
-
-(*** fails due to wcbv not matching Coq reduction ***
-Quote Recursively Definition p_fibrec0 := (fibrec 0).
-Quote Definition q_fibrec0 := Eval hnf in (fibrec 0).
-Goal exc_wcbvEval 3 p_fibrec0 = term_Term q_fibrec0. simpl. 
-reflexivity.
-Qed.
-***)
-
-Quote Recursively Definition p_fib3 := (fib 3).
-Quote Definition q_fib3 := Eval compute in (fib 3).
+Definition fib9 := fib 9.
+Quote Recursively Definition cbv_fib9 :=
+  ltac:(let t:=(eval cbv in fib9) in exact t).
+Definition ans_fib9 :=
+  Eval cbv in (main (program_Program cbv_fib9)).
+(* [program] of the program *)
+Quote Recursively Definition p_fib9 := fib9.
+Definition P_fib9 := Eval cbv in (program_Program p_fib9).
 Goal
-  let ew := (exc_wcbvEval 100 p_fib3 q_fib3) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
+  let env := (env P_fib9) in
+  let main := (main P_fib9) in
+  wcbvEval (env) 1000 (main) = Ret ans_fib9.
+  vm_compute. reflexivity.
 Qed.
 
-Quote Recursively Definition p_fib10 := (fib 10).
-Quote Definition q_fib10 := Eval compute in (fib 10).
+(** Heterogenous datatypes, a la Matthes **)
+Inductive PList : Set->Type:=  (* powerlists *)
+| zero : forall A:Set, A -> PList A
+| succ : forall A:Set, PList (A * A)%type -> PList A.
+
+Definition myPList : PList nat :=
+  succ (succ (succ (zero (((1,2),(3,4)),((5,6),(7,8)))))).
+
+Fixpoint unzip (A:Set) (l:list (A*A)) {struct l} : list A :=
+  match l return list A with
+    | nil => nil
+    | cons (a1,a2) l' => cons a1 (cons a2 (unzip l'))
+  end.
+Fixpoint PListToList (A:Set) (l:PList A) {struct l} : list A :=
+  match l in PList A return list A with
+    | zero a => cons a (nil )
+    | succ l' => unzip (PListToList l')
+  end.
+
+Eval compute in PListToList myPList.
+
+Fixpoint gen_sumPList (A:Set) (l:PList A) {struct l} : (A->nat)->nat :=
+  match l in PList A return (A->nat)->nat with
+    | zero a => fun f => f a
+    | succ l' =>
+      fun f => gen_sumPList l' (fun a => let (a1,a2) := a in f a1 + f a2)
+  end.
+Definition sumPList l := gen_sumPList l (fun x => x).
+Definition sumPL_myPL := (sumPList myPList).
+Quote Recursively Definition cbv_sumPL_myPL :=
+  ltac:(let t:=(eval cbv in sumPL_myPL) in exact t).
+Definition ans_sumPL_myPL :=
+  Eval cbv in (main (program_Program cbv_sumPL_myPL)).
+(* [program] of the program *)
+Quote Recursively Definition p_sumPL_myPL := sumPL_myPL.
+Definition P_sumPL_myPL := Eval cbv in (program_Program p_sumPL_myPL).
 Goal
-  let ew := (exc_wcbvEval 300 p_fib10 q_fib10) in
-  fst ew = snd ew.
-vm_compute. reflexivity.
+  let env := (env P_sumPL_myPL) in
+  let main := (main P_sumPL_myPL) in
+  wcbvEval (env) 1000 (main) = Ret ans_sumPL_myPL.
+  vm_compute. reflexivity.
 Qed.
 
 
-(*** instantiate in a branch of a mutual fixpoint ***)
-Section S1.
-Variable nn:nat.
-Fixpoint tree_size1 (t:tree bool) : nat :=
+Set Implicit Arguments.
+Section List.
+Variables X Y : Type.
+Variable f : X -> Y -> Y.
+Fixpoint fold (y : Y) (xs : list X) : Y :=
+  match xs with
+    | nil => y
+    | cons x xr => fold (f x y) xr
+  end.
+End List.
+Inductive Tree := T : list Tree -> Tree.
+Fixpoint size (t : Tree) : nat :=
   match t with
-    | node a f => S (forest_size1 f)
-  end
-with forest_size1 (f:forest bool) : nat :=
-       match f with
-         | leaf b => nn
-         | fcons t f1 => (tree_size1 t + forest_size1 f1)
-       end.
-End S1.
-
-Quote Recursively Definition p_forest_size1 := (forest_size1 1 sherwood).
-Quote Definition q_forest_size1 := Eval compute in (forest_size1 1 sherwood).
+    | T ts => S (fold (fun t a => size t + a) 0 ts)
+  end.
+Definition myTree := (T (cons (T (unit (T nil))) (cons (T (unit (T nil))) nil))).
+Eval cbv in size myTree.
+Definition size_myTree := size myTree.
+Quote Recursively Definition cbv_size_myTree :=
+  ltac:(let t:=(eval cbv in size_myTree) in exact t).
+Definition ans_size_myTree :=
+  Eval cbv in (main (program_Program cbv_size_myTree)).
+(* [program] of the program *)
+Quote Recursively Definition p_size_myTree := size_myTree.
+Definition P_size_myTree := Eval cbv in (program_Program p_size_myTree).
 Goal
-  let ew := (exc_wcbvEval 40 p_forest_size1 q_forest_size1) in
-  fst ew = snd ew.
-vm_compute; reflexivity.
+  let env := (env P_size_myTree) in
+  let main := (main P_size_myTree) in
+  wcbvEval (env) 1000 (main) = Ret ans_size_myTree.
+  vm_compute. reflexivity.
 Qed.
 
-Quote Recursively Definition p_arden_size1 := (forest_size arden).
-Quote Definition q_arden_size1 := Eval compute in (forest_size arden).
-Goal
-  let ew := (exc_wcbvEval 100 p_arden_size1 q_arden_size1) in
-  fst ew = snd ew.
-vm_compute; reflexivity.
-Qed.

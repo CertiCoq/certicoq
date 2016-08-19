@@ -478,18 +478,14 @@ Proof.
     unfold LookupDfn. unfold L1_5.program.LookupDfn in *.
     change (Lookup nm (stripEnv p) (stripEC (AstCommon.ecTrm t))).
     apply Lookup_hom. assumption.
-  - refine (wAppLam _ _ _); try eassumption.
+  - refine (wAppLam _ _ _ _); try eassumption.
     + rewrite whBetaStep_hom in H1. eassumption.
   - refine (wLetIn _ _ _ _). eassumption.
     rewrite <- (proj1 instantiate_hom). assumption.
-  - refine (wAppFix _ _ _ _).
-    + eassumption.
+  - refine (wAppFix _ _ _ _ _); try eassumption.
     + rewrite <- dnthBody_hom. destruct (L1_5.term.dnthBody m dts).
-      * rewrite e. cbn. reflexivity.
+      * rewrite e. reflexivity.
       * discriminate.
-    + rewrite <- tcons_hom. cbn.
-      destruct (WcbvEvals_tcons_tcons' H0) as [j0 j1].
-      constructor; eassumption.
     + rewrite <- tcons_hom. rewrite pre_whFixStep_hom.
       assumption.
   - rewrite mkApp_hom. refine (wAppCong _ _ _ _); try eassumption.

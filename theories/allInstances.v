@@ -17,14 +17,14 @@ Print Instances CerticoqLanguage.
 Require Import Common.Common.
 Eval compute in (translateTo (cTerm certiL4) p).
 
-(* slow! Fix! The above is fast. The translation from L4 to L4a is a bottleneck -- it is
-quadratic because of naive fresh name generation and can be made linear.
+Time Eval compute in (translateTo (cTerm certiL4a) p).
 
-Eval compute in (translateTo (cTerm certiL4a) p).
-
+(* Fix the type of [certiL5a_t0_L6]. It should return (cTerm certiL6) which 
+also contains an environment. 
+To debug typeclass resolution problems, try:
+Typeclasses eauto := 5. (* or a small number to limit the search depth *)
+Typeclasses eauto := debug. (* if your ide doesn't show debug messages, use coqc *)
 *)
-
-
-Eval vm_compute in (translateTo (cTerm certiL6) p).
+Eval vm_compute in (translateTo (* (cTerm certiL6) *) cps.exp p).
 
 

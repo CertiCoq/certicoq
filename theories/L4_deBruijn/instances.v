@@ -28,7 +28,7 @@ constructor.
   unfold certiClasses.translate,
     certiL3_to_L4, liftBigStepException, bigStepEval, BigStepOpSem_instance_0.
   unfold translate_program.
-  Fail eapply L3_to_L4_correct.translate_correct. 
+(*  Fail eapply L3_to_L4_correct.translate_correct.  *)
 (* not applicable!! do we need to change the end to end correctness property?, 
   or can the L3_to_L4 translation syntactically preserve big step eval? *)
 Abort.
@@ -38,7 +38,7 @@ Require Import L4a_to_L5.
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
 
-Definition L4aTerm :Type := (@NTerm cps.var CoqL4GenericTermSig).
+Definition L4aTerm :Type := (@NTerm cps.var L4Opid).
 
 Program Instance : BigStepOpSem L4aTerm := eval.
 
@@ -54,7 +54,7 @@ Instance certiL4_to_L4a:
   fun x => Ret (L4_to_L4a x).
 
 
-Definition L5Term :Type := (@NTerm cps.var CPSGenericTermSig).
+Definition L5Term :Type := (@NTerm cps.var L5Opid).
 
 Program Instance : BigStepOpSem L5Term := eval_c.
 

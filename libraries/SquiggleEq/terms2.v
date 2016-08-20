@@ -30,12 +30,14 @@ Require Import terms.
     reduce the verbosity of some of our later definitions
 *)
 
+Generalizable Variable Opid.
 
 Section terms2Generic.
 
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} {gts : GenericTermSig}.
-Notation NTerm := (@NTerm NVar).
-Notation BTerm := (@BTerm NVar).
+Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+`{hdeq: Deq Opid} {gts : GenericTermSig Opid}.
+Notation NTerm := (@NTerm NVar Opid).
+Notation BTerm := (@BTerm NVar Opid).
 
 Definition nobnd (f:NTerm) : BTerm := bterm [] f.
 
@@ -65,7 +67,7 @@ Definition mk_esquash (R : NTerm) :=
 Definition newvar (t : NTerm) := fresh_var (free_vars t).
 
 (* Delete. use flat_map instead *)
-Fixpoint free_vars_list terms :=
+Fixpoint free_vars_list (terms : list NTerm) :=
   match terms with
     | [] => []
     | t :: ts => free_vars t ++ free_vars_list ts
@@ -91,33 +93,34 @@ Fixpoint depth (t : NTerm) : nat :=
 End terms2Generic.
 
 
-Fixpoint size {NVar:Type} {gts : GenericTermSig} (t : @NTerm NVar gts) : nat :=
+Fixpoint size {NVar:Type} {Opid:Type} (t : @NTerm NVar Opid) : nat :=
   match t with
   | vterm _ => 1
   | oterm op bterms => S (addl (map (@size_bterm NVar _) bterms))
   end
- with size_bterm {NVar:Type} {gts : GenericTermSig} (bt: @BTerm NVar gts) :=
+ with size_bterm {NVar:Type} {Opid:Type} (bt: @BTerm NVar Opid) :nat :=
   match bt with
-  | bterm lv nt => @size NVar _ nt
+  | bterm lv nt => @size NVar Opid nt
   end.
 
-Fixpoint wft {NVar:Type}  {gts : GenericTermSig} (t : @NTerm NVar gts) : bool :=
+Fixpoint wft {NVar:Type} {Opid:Type} {gts : GenericTermSig Opid} (t : @NTerm NVar Opid) : bool :=
   match t with
     | vterm _ => true
     | oterm o bts =>
       andb (beq_list deq_nat (map (@num_bvars NVar _) bts) (OpBindings o))
            (ball (map wftb bts))
   end
-with wftb {NVar:Type}  {gts : GenericTermSig} (bt : @BTerm NVar gts) : bool :=
+with wftb {NVar:Type} {Opid:Type} {gts : GenericTermSig Opid} (bt : @BTerm NVar Opid) : bool :=
   match bt with
     | bterm vars t => wft t
   end.
 
 Section terms3Generic.
 
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} {gts : GenericTermSig}.
-Notation NTerm := (@NTerm NVar).
-Notation BTerm := (@BTerm NVar).
+Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+  `{hdeq: Deq Opid} {gts : GenericTermSig Opid}.
+Notation NTerm := (@NTerm NVar Opid).
+Notation BTerm := (@BTerm NVar Opid).
 
 (* ------ INDUCTION ON TERMS ------ *)
 
@@ -253,8 +256,8 @@ Tactic Notation "nterm_ind1s" ident(h) "as" simple_intropattern(I)  ident(c) :=
 
 
 Lemma num_bvars_on_bterm :
-  forall l (n : NTerm),
-    num_bvars (bterm l n) = length l.
+  forall (l:list NVar) (n : NTerm),
+    num_bvars (@bterm NVar Opid l n) = length l.
 Proof using.
   unfold num_bvars; simpl; sp.
 Qed.
@@ -423,14 +426,14 @@ Proof using.
   sp; unfold closed, closed_bt; simpl; trw flat_map_empty; split; sp.
 Qed.
 
-Lemma closed_nt0 : forall o nt, closed (oterm o [bterm [] nt]) -> closed nt.
+Lemma closed_nt0 : forall o (nt:NTerm), closed (oterm o [bterm [] nt]) -> closed nt.
 Proof using.
   intros. unfold closed in H. simpl in H. apply app_eq_nil in H. repnd.
   clears_last. unfold closed. assumption.
 Qed.
 
 Lemma closed_null_free_vars :
-  forall t,
+  forall (t:NTerm),
     closed t <=> null (free_vars t).
 Proof using.
   unfold closed; sp.
@@ -467,8 +470,7 @@ Proof using.
   nterm_ind t Case; simpl; intros.
 
   - Case "vterm".
-    split; sp. allunfold closed; allsimpl; sp.
-    compute in *. sp.
+    split; sp. unfold closed in *; allsimpl; sp.
 
   - Case "oterm".
     split_iff SCase.
@@ -560,7 +562,7 @@ Proof using.
   rw isprog_vars_eq.
   rw isprog_eq in ip.
   destruct ip; sp.
-  allunfold closed; allrw; sp.
+  unfold closed in *; allrw; sp.
 Qed.
 
 Lemma isprog_vars_app_l :
@@ -660,7 +662,7 @@ Qed.
 
 
 Lemma newvar_prop :
-  forall t, ! LIn (newvar t) (free_vars t).
+  forall (t: NTerm), ! LIn (newvar t) (free_vars t).
 Proof using.
   unfold newvar; sp.
   allapply fresh_var_not_in; sp.
@@ -784,6 +786,7 @@ Definition get_wterm (t : WTerm) := let (a,_) := t in a.
 Definition get_cvterm (vs : list NVar) (t : CVTerm vs) := let (a,_) := t in a.
 Definition get_bcterm (bt : BCTerm) := let (a,_) := bt in a.
 
+Print BTerm.
 Definition selectbt (bts: list BTerm) (n:nat) : BTerm :=
   nth n bts (bterm [] (vterm nvarx)).
 
@@ -963,9 +966,10 @@ Ltac d_isnoncan H :=
 
 Section terms4Generic.
 
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} {gts : GenericTermSig}.
-Notation NTerm := (@NTerm NVar).
-Notation BTerm := (@BTerm NVar).
+Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+  `{hdeq : Deq Opid} {gts : GenericTermSig Opid}.
+Notation NTerm := (@NTerm NVar Opid).
+Notation BTerm := (@BTerm NVar Opid).
 
 Lemma cterm_eq :
   forall t u,
@@ -1007,7 +1011,7 @@ Definition mk_cterm (t : NTerm) (p : isprogram t) :=
 
 Definition mk_ct (t : NTerm) (p : isprog t) := exist isprog t p.
 
-Definition mk_wterm (t : NTerm) (p : wf_term t) := exist (@wf_term NVar _) t p.
+Definition mk_wterm (t : NTerm) (p : wf_term t) := exist (@wf_term NVar _ _) t p.
 
 Definition mk_wterm' (t : NTerm) (p : nt_wf t) :=
   exist wf_term t (nt_wf_implies t p).
@@ -1017,20 +1021,20 @@ Definition mk_wterm' (t : NTerm) (p : nt_wf t) :=
  *)
  
 Lemma mk_cv_pf :
-  forall vs t,
-    isprog_vars vs (get_cterm t).
+  forall (vs : list NVar) (t:CTerm),
+    @isprog_vars NVar _ Opid _ vs (@get_cterm NVar _ Opid _ t).
 Proof using.
   destruct t; simpl.
-  rw isprog_eq in i; destruct i.
-  rw isprog_vars_eq; simpl; sp.
-  allunfold closed.
+  rw @isprog_eq in i; destruct i.
+  rw @isprog_vars_eq; simpl; sp.
+  unfold closed in *.
   allrw; sp.
 Qed.
 
 (** From a closed term, we can always make a term whose variables
  * are contained in vs: *)
-Definition mk_cv (vs : list NVar) (t : CTerm) : CVTerm vs :=
-  exist (isprog_vars vs) (get_cterm t) (mk_cv_pf vs t).
+Definition mk_cv (vs : list NVar) (t : @CTerm NVar _ Opid _) : @CVTerm NVar _ Opid _ vs :=
+  exist (isprog_vars vs) (@get_cterm NVar _ Opid _ t) (mk_cv_pf vs t).
 
 
 Lemma programs_bt_to_program :
@@ -1040,17 +1044,17 @@ Lemma programs_bt_to_program :
     -> isprogram (oterm op (map get_bcterm bts)).
 Proof using.
   sp; unfold isprogram; sp.
-  allrw closed_nt; sp.
+  rewrite closed_nt in *; sp.
   allrw in_map_iff; sp; subst.
   destruct a; destruct x; allsimpl.
   clear_deps i.
-  rw <- isprogram_bt_eq in i.
+  rw <- @isprogram_bt_eq in i.
   inversion i; sp.
   constructor; sp.
   allrw in_map_iff; sp; subst.
   destruct a; destruct x; allsimpl.
   clear_deps i.
-  rw <- isprogram_bt_eq in i.
+  rw <- @isprogram_bt_eq in i.
   inversion i; sp.
   rewrite <- H.
   rewrite map_map; unfold compose; sp.
@@ -1093,7 +1097,7 @@ Proof using.
 Qed.
 
 Theorem selectbt_in :
-  forall n bts,
+  forall n (bts : list BTerm),
     n < length bts -> LIn (selectbt bts n) bts.
 Proof using.
   intros. unfold selectbt.
@@ -1101,7 +1105,7 @@ Proof using.
 Qed.
 
 Lemma selectbt_cons :
-  forall bt bts n,
+  forall bt (bts : list BTerm) n,
     selectbt (bt :: bts) n = if beq_nat n 0 then bt else selectbt bts (n - 1).
 Proof using.
   unfold selectbt; simpl; sp.
@@ -1131,6 +1135,7 @@ Proof using. intros ? ?  Hval. apply isvalue_wf in Hval.
 Qed.
  *)
 
+Notation bterm := (@bterm NVar Opid).
 Lemma isprogram_wf3: forall o bts,
   (isprogram (oterm o bts))
   -> forall n, (n<length bts) -> (num_bvars (selectbt bts n))= nth n (OpBindings o) 0.
@@ -1248,7 +1253,7 @@ Theorem is_program_ot_subst2 :
 Proof using. intros ? ? ? ?  ? Hisp Hispst. unfold isprogram.
     unfold closed. simpl.
     inverts Hisp as Hclos Hisp. inverts Hispst as Hclosst Hwfst.
-    allunfold closed. simpl.
+    unfold closed in *. simpl.
     unfold closed in Hclos. allsimpl.
    simpl_vlist. rewrite Hclosst. rewrite Hclos0.
    simpl. split;auto.
@@ -1272,7 +1277,7 @@ Qed.
 
 Lemma combine_vars_map_sp :
   forall vars,
-    combine vars (map (@vterm NVar gts) vars) = map (fun v => (v, vterm v)) vars.
+    combine vars (map (@vterm NVar Opid) vars) = map (fun v => (v, vterm v)) vars.
 Proof using.
   induction vars; simpl; sp.
   rewrite IHvars; sp.
@@ -1289,7 +1294,7 @@ Proof using.
 Qed.
 
 
-Theorem in_selectbt: forall bt bts,  LIn bt bts ->
+Theorem in_selectbt: forall bt (bts : list BTerm),  LIn bt bts ->
     {n : nat $ n < length bts # selectbt bts n = bt}.
 Proof using.
   intros ? ? Hin. induction bts. inverts Hin.
@@ -1335,14 +1340,13 @@ Lemma oterm_eq :
   forall o1 o2 l1 l2,
     o1 = o2
     -> l1 = l2
-    -> (@oterm NVar gts) o1 l1 = oterm o2 l2.
+    -> (@oterm NVar Opid) o1 l1 = oterm o2 l2.
 Proof using.
   sp; allrw; sp.
 Qed.
 
-Notation oterm := (@oterm NVar gts).
-Notation bterm := (@bterm NVar gts).
-Notation vterm := (@vterm NVar gts).
+Notation oterm := (@oterm NVar Opid).
+Notation vterm := (@vterm NVar Opid).
 
 
 Lemma bterm_eq :
@@ -1354,7 +1358,8 @@ Proof using.
   sp; allrw; sp.
 Qed.
 
-Theorem selectbt_map {gtsi gtso}: forall lbt n (f: (@BTerm gtsi) -> (@BTerm gtso)) ,
+Theorem selectbt_map {gtsi gtso}: forall lbt n 
+  (f: (@terms.BTerm NVar gtsi) -> (@terms.BTerm NVar gtso)) ,
   n<length lbt
   -> selectbt (map f lbt) n = f (selectbt lbt n).
 Proof using.
@@ -1389,7 +1394,7 @@ Proof using.
 Qed.
 
 Global Instance deq_nterm : DeqSumbool NTerm.
-Proof using deqnvar.
+Proof using deqnvar hdeq.
   intros x.
   nterm_ind1 x as [v1 | o1 lbt1 Hind] Case; intros y.
 
@@ -1402,7 +1407,8 @@ Proof using deqnvar.
 
   - Case "oterm".
     destruct y as [v2 | o2 lbt2]; [ right; intro Hc; inverts Hc | ].
-    destruct (opid_dec o1 o2); subst; [  | right; intro Hc; inverts Hc;sp].
+  SearchAbout Deq.
+    destruct (decideP (o1=o2)); subst; [  | right; intro Hc; inverts Hc;sp].
     assert ((lbt1=lbt2) + (lbt1 <> lbt2)) as Hbt.
     Focus 2.
     dorn Hbt; subst; [left; auto | right; intro Hc; inverts Hc;sp ]; fail.
@@ -1436,11 +1442,12 @@ forall lvi lvr,
   map vterm (remove_nvars lvi lvr)
   = @lremove _ _ (map vterm lvi) (map vterm lvr).
 Proof using.
+  clear gts.
   intros. apply map_diff_commute.
   introv Hc. inverts Hc. auto.
 Qed.
 
-Definition all_vars_bt bt := free_vars_bterm bt ++ bound_vars_bterm bt.
+Definition all_vars_bt (bt : BTerm) := free_vars_bterm bt ++ bound_vars_bterm bt.
 
 Lemma all_vars_ot : forall o lbt, 
   eq_set
@@ -1477,7 +1484,7 @@ Proof using.
 Qed.
 
 Lemma flat_map_closed_terms:
-  forall lnt, lforall closed lnt
+  forall (lnt : list NTerm), lforall closed lnt
     -> flat_map free_vars lnt = [].
 Proof using.
   unfold lforall, closed. introv Hfr.
@@ -1512,14 +1519,14 @@ Definition selectnt (n:nat) (lnt : list NTerm): NTerm :=
   nth n lnt (vterm nvarx).
 
 Lemma deq_bterm : DeqSumbool BTerm.
-Proof using deqnvar.
+Proof using deqnvar hdeq.
   intros btx bty. destruct btx as [lvx ntx].
   destruct bty as [lvy nty].
   destruct (deq_nterm ntx nty);
   destruct (decideP (lvx=lvy)); subst;sp;
   right; introv Heq;
   inverts Heq; cpx.
-Qed.
+Qed. (*FIX *)
 
 
 Inductive nt_wf2 : NTerm -> [univ] :=
@@ -1599,7 +1606,7 @@ Qed.
 
 
 Lemma free_vars_list_app :
-  forall ts1 ts2,
+  forall (ts1 ts2 : list NTerm),
     free_vars_list (ts1 ++ ts2)
     = free_vars_list ts1 ++ free_vars_list ts2.
 Proof using.
@@ -1671,7 +1678,7 @@ Qed.
 
 
 Lemma closed_implies:
-  forall t,
+  forall (t : NTerm),
     closed t -> (forall x, !LIn x (free_vars t)).
 Proof using.
   introv cl.
@@ -1679,63 +1686,7 @@ Proof using.
   allrw; simpl; try (complete sp).
 Qed.
 
-(** newvar on closed terms *)
-Definition cnewvar (t : CTerm) := newvar (proj1_sig t).
 
-Lemma cnewvar_eq :
-  forall t, cnewvar t = nvarx.
-Proof using.
-  destruct t; unfold cnewvar, newvar; simpl.
-  rw isprog_eq in i.
-  inversion i.
-  unfold closed in H.
-  rewrite H.
-  unfold fresh_var; sp.
-Qed.
-
-Lemma isprog_vars_cvterm_var :
-  forall v : NVar,
-  forall t : CTerm,
-    isprog_vars [v] (proj1_sig t).
-Proof using.
-  destruct t; unfold cnewvar.
-  rw isprog_vars_eq; simpl.
-  rw isprog_eq in i.
-  inversion i; sp.
-  unfold closed in H.
-  rewrite H; sp.
-Qed.
-
-Lemma isprog_vars_cvterm_newvar :
-  forall t : CTerm,
-    isprog_vars [cnewvar t] (proj1_sig t).
-Proof using.
-  sp; apply isprog_vars_cvterm_var.
-Qed.
-
-(** Builds, from a closed term t, a term that has at most one free variable,
- * namely v, which we know not to be in t.
- * The term is the same.  Only the proof of closeness changes. *)
-Definition cvterm_var (v : NVar) (t : CTerm) : CVTerm [v] :=
-  exist (isprog_vars [v])
-        (proj1_sig t)
-        (isprog_vars_cvterm_var v t).
-
-Definition cvterm_newvar (t : CTerm) : CVTerm [cnewvar t] :=
-  cvterm_var (cnewvar t) t.
-
-Lemma mk_cv_as_cvterm_var :
-  forall v t, mk_cv [v] t = cvterm_var v t.
-Proof using.
-  intros.
-  destruct_cterms.
-  unfold mk_cv, cvterm_var, get_cterm; simpl.
-  rewrite dep_pair_eq
-    with (eq0 := eq_refl)
-           (pb := isprog_vars_cvterm_var v (exist (fun t : NTerm => isprog t) x i)); auto.
-  apply UIP_dec.
-  apply bool_dec.
-Qed.
 
 
 Lemma list_nil_btwf: forall es,
@@ -1790,7 +1741,7 @@ Proof using.
   rewrite in_app_iff; destruct (dmemvar x l); cpx.
 Qed.
 
-Lemma select_selectbt : forall n lbt b,
+Lemma select_selectbt : forall n lbt (b:BTerm),
 select n lbt = Some b
 <-> (selectbt lbt n = b /\ n < length lbt).
 Proof using.
@@ -1836,7 +1787,7 @@ Qed.
 Lemma varsOfClassOT : forall o lbt c,
   varsOfClass (all_vars (oterm o lbt)) c
   -> forall bt, LIn bt lbt -> varsOfClass (all_vars_bt bt) c.
-Proof.
+Proof using.
   intros ? ? ? Hv ? Hin ? Hinn.
   apply Hv. revert Hinn.
   apply subsetAllVarsLbt.
@@ -1847,7 +1798,8 @@ Definition allvars_bterm : forall lv nt,
   eq_set 
     (all_vars_bt (bterm lv nt))
     (lv ++ all_vars nt).
-Proof.
+Proof using.
+  clear.
   intros ? ?. apply eqsetv_prop.
   intro. unfold all_vars, all_vars_bt.
   simpl.
@@ -1882,6 +1834,7 @@ Qed.
 Lemma subsetAllVarsLbt2 : forall lbt lv (nt : NTerm), 
   LIn (bterm lv nt) lbt -> subset (all_vars nt) (flat_map all_vars_bt lbt).
 Proof using.
+  clear.
   intros.
   eapply subset_trans;
     [|eapply subset_flat_map_r; eauto].

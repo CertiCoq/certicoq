@@ -58,8 +58,8 @@ match c with
 end.
 *)
 
-Notation CBTerm := (@terms.BTerm NVar CPSGenericTermSig).
-Notation CTerm := (@terms.NTerm NVar CPSGenericTermSig).
+Notation CBTerm := (@terms.BTerm NVar L5Opid).
+Notation CTerm := (@terms.NTerm NVar L5Opid).
 
 Require Import ExtLib.Structures.Monads.
 
@@ -223,6 +223,8 @@ Local Opaque freshVarsPosAux.
 Local Opaque varClass.
 Local Opaque varClassP.
 Local Opaque contVars.
+
+Require Import L4.L4a_to_L5.
 
 
 Lemma translateVal_cps_cvt_Some : forall (t:NTerm),
@@ -397,7 +399,7 @@ Section L1_to_L5a.
 Let compile_L1_to_L4 := L3_to_L4.program_exp.
 Require Import L4.L4_to_L4a.
 Let compile_L1_to_L4a (e : Ast.program) :=
-  L4.L4_to_L4a.translate nil (compile_L1_to_L4 e).
+  L4.L4_to_L4a.L4_to_L4a (compile_L1_to_L4 e).
 
 Let compile_L1_to_cps (e : Ast.program)  :=
   L4a_to_L5.cps_cvt (compile_L1_to_L4a e).
@@ -410,10 +412,10 @@ Definition compile_L1_to_L5a (e:Ast.program) : exception val_c:=
   end.
 End L1_to_L5a.
 
+(*
 Print Instances VarType.
 Print vartypePos.
 Print freshVarsPos.
-(*
 Quote Recursively Definition p0L1 := 0.
 Eval compute in compile_L1_to_L5a p0L1.
 (*

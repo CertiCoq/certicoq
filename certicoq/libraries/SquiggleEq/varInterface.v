@@ -1494,6 +1494,15 @@ Proof using.
   discriminate.
 Qed.
 
+Lemma beq_deq : forall T (v1 v2 : NVar) (ct cf:T) ,
+  (if (beq_var v1 v2)  then ct else cf) = (if (decideP (v1=v2))  then ct else cf).
+Proof.
+  intros.
+  Local Transparent beq_var.
+   apply decide_decideP.
+  Local Opaque beq_var.
+   
+Qed.
 
 End Vars2Class.
 

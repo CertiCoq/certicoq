@@ -18,10 +18,9 @@ Require Import Recdef.
 Require Import Eqdep_dec.
 Require Import varInterface.
 
-Class GenericTermSig : Type :=
+Class GenericTermSig (Opid : Type) : Type :=
 {
 (** the collection of operators in the language. For example, in lambda calculus, App and Lam are operators *)
-  Opid : Set;
 (** Arities for each operator. An [Opid] [o] takes 
   [length (OpBindings o)] arguments. The number of bound variables in the ith argument is 
   specified by the ith member of [(OpBindings o)].
@@ -29,12 +28,13 @@ Class GenericTermSig : Type :=
   A lambda takes one argument and that argument binds 1 variable. An application takes 2 arguments,
   each of which bind 0 variables.*)
   OpBindings : Opid -> list nat;
-  opid_dec : forall x y : Opid, {x = y} + {x <> y};
 }.
 
+Generalizable Variable Opid.
 
 Section terms.
-Context {NVar VarClass} `{VarType NVar VarClass} {gts : GenericTermSig}.
+
+Context {NVar VarClass} `{VarType NVar VarClass} `{Deq Opid} {gts : GenericTermSig Opid}.
 
 Inductive NTerm : Type :=
 | vterm: NVar -> NTerm
@@ -216,36 +216,37 @@ https://coq.inria.fr/bugs/show_bug.cgi?id=3343
 
 (** Just decidability of equality on variables suffices for these definitions.
   The full [VarType] may not be needed until [ssubst]*)
-Fixpoint free_vars {NVar} `{Deq NVar} {gts : GenericTermSig}  
+Fixpoint free_vars {NVar} `{Deq NVar} {Opid:Type}
   (t:NTerm) {struct t}: list NVar :=
   match t with
   | vterm v => [v]
-  | oterm op bts => flat_map (@free_vars_bterm NVar _ _)  bts
+  | oterm op bts => flat_map (@free_vars_bterm NVar _ Opid )  bts
   end
- with free_vars_bterm {NVar} `{Deq NVar} {gts : GenericTermSig}  (bt : BTerm)
+ with free_vars_bterm {NVar} `{Deq NVar} {Opid:Type}
+    (bt : @BTerm NVar Opid)
   {struct bt} : list NVar :=
   match bt with
-  | bterm  lv nt => remove_nvars lv (free_vars nt)
+  | bterm  lv nt => remove_nvars lv (@free_vars NVar _  Opid nt)
   end.
 
-Fixpoint bound_vars {NVar} `{Deq NVar} {gts : GenericTermSig} (t : NTerm) : list NVar :=
+Fixpoint bound_vars {NVar} `{Deq NVar} {Opid:Type} (t : NTerm) : list NVar :=
   match t with
   | vterm v => []
-  | oterm op bts => flat_map (@bound_vars_bterm NVar _ _)  bts
+  | oterm op bts => flat_map (@bound_vars_bterm NVar _ Opid)  bts
   end
- with bound_vars_bterm {NVar} `{Deq NVar} {gts : GenericTermSig} (bt : BTerm ) 
+ with bound_vars_bterm {NVar} `{Deq NVar} {Opid:Type} (bt : @BTerm NVar Opid) 
   :list NVar :=
   match bt with
   | bterm lv nt => lv ++ bound_vars nt
   end.
 
 Section termsCont.
-Context {NVar VarClass} `{VarType NVar VarClass} {gts : GenericTermSig}.
-Definition all_vars t := free_vars t ++ bound_vars t.
+Context {NVar VarClass} `{VarType NVar VarClass} `{Deq Opid} {gts : GenericTermSig Opid}.
+Definition all_vars (t:@NTerm NVar Opid) : list NVar := free_vars t ++ bound_vars t.
 
 
-Definition closed (t : NTerm) := free_vars t = [].
+Definition closed (t : @NTerm NVar Opid) := free_vars t = [].
 (* Howe's T_0(L) *)
-Definition isprogram (t : NTerm) := closed t # nt_wf t.
+Definition isprogram (t : @NTerm NVar Opid) := closed t # nt_wf t.
 
 End termsCont.

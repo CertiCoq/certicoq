@@ -81,27 +81,6 @@ Defined.
 
 Definition dcon : Set := inductive * N.
 
-
-Section VarsOf2Class.
-
-(* see the file SquiggleEq.varImplPeano for an instantiation of NVar *)
-Context {NVar} {deqnvar : Deq NVar} {vartype: @VarType NVar bool (* 2 species of vars*) _}.
-
-Notation USERVAR := true (only parsing).
-Notation CPSVAR := false (only parsing).
-
-Definition branch {s} : Type := (dcon * (@BTerm NVar s))%type.
-
-(** Find a branch in a match expression corresponding to a given constructor
-    and arity. *)
-Definition find_branch {s} (d:dcon) (m:nat) (matcht :list (@branch s)) : 
-    option BTerm 
-  := 
-  let obr :=
-  find 
-    (fun a : (@branch s) => decide ((d,m) = (fst a, num_bvars (snd a)))) matcht in
-  option_map snd obr.
-
 Inductive L4Opid : Set :=
  | NLambda
  | NFix (nMut : nat) (** number of functions that are mutually defined*)
@@ -123,26 +102,95 @@ Definition OpBindingsL4 (nc : L4Opid) : list nat :=
   | NMatch numargsInBranches => 0::(List.map snd numargsInBranches)
   end.
 
-Definition decc: forall x y : L4Opid,
-{x = y} + {x <> y}.
+Instance decc: DeqSumbool L4Opid.
 Proof using.
+  intros ? ?. unfold DecidableSumbool.
    repeat(decide equality).
 Defined.
 
 Require Import SquiggleEq.alphaeq.
 
 
-Definition CoqL4GenericTermSig : GenericTermSig :=
+Instance CoqL4GenericTermSig : GenericTermSig L4Opid:=
 {| 
-  Opid := L4Opid;
   OpBindings := OpBindingsL4;
-  opid_dec := decc;
 |}.
 
 
-Notation BTerm := (@BTerm NVar CoqL4GenericTermSig).
-Notation NTerm := (@NTerm NVar CoqL4GenericTermSig).
-Notation oterm := (@oterm NVar CoqL4GenericTermSig).
+(**********************)
+(** * CPS expressions *)
+(**********************)
+
+Inductive L5Opid : Set :=
+ | CLambda 
+ | CKLambda
+ | CFix (nMut : nat) (** number of functions that are mutually defined*)
+ | CDCon (dc : dcon) (nargs : nat)
+ | CHalt 
+ | CRet (** application of a continuation lambda ([CKLambda]) *)
+ | CCall (** a bit like apply in source language *)
+ | CProj (selector :nat) (** which one to project out*)
+ (* nat may be ineffiecient in general, 
+    but here it is only used to iterate over the list ONE BY ONE and pick one out *)
+ | CMatch (dconAndNumArgs : list (dcon * nat))
+ (** each member of the list corresponds to a branch. 
+    it says how many variables are bound in that branch*).
+
+Definition CPSOpBindings (c : L5Opid) 
+    : list nat :=
+  match c with
+  | CLambda    => [2] (* user lambda, also binds a continuation *)
+  | CKLambda    => [1] (* continuation lambda  *)
+  | CFix nMut => repeat 1 nMut
+  | CDCon _ nargs    => repeat 0 nargs
+  | CHalt => [0]
+  | CRet => [0,0]
+  | CCall => [0,0,0]
+  | CProj _ => [0,0]
+  | CMatch numargsInBranches => 0::(List.map snd numargsInBranches)
+  end.
+
+
+Definition cdecc: DeqSumbool L5Opid.
+Proof using.
+  intros ? ?. unfold DecidableSumbool.
+  repeat(decide equality).
+Defined.
+
+
+Instance CPSGenericTermSig : GenericTermSig L5Opid:=
+{| 
+  OpBindings := CPSOpBindings;
+|}.
+
+
+
+Section VarsOf2Class.
+
+(* see the file SquiggleEq.varImplPeano for an instantiation of NVar *)
+Context {NVar} {deqnvar : Deq NVar} {vartype: @VarType NVar bool (* 2 species of vars*) _}.
+
+Notation USERVAR := true (only parsing).
+Notation CPSVAR := false (only parsing).
+
+Definition branch {s} : Type := (dcon * (@BTerm NVar s))%type.
+
+(** Find a branch in a match expression corresponding to a given constructor
+    and arity. *)
+Definition find_branch {s} (d:dcon) (m:nat) (matcht :list (@branch s)) : 
+    option BTerm 
+  := 
+  let obr :=
+  find 
+    (fun a : (@branch s) => decide ((d,m) = (fst a, num_bvars (snd a)))) matcht in
+  option_map snd obr.
+
+
+
+
+Notation BTerm := (@BTerm NVar L4Opid).
+Notation NTerm := (@NTerm NVar L4Opid).
+Notation oterm := (@oterm NVar L4Opid).
 
 Definition Lam_e (v : NVar) (b : NTerm) : NTerm :=
   oterm NLambda [bterm [v] b].
@@ -504,58 +552,10 @@ Proof using.
   apply in_app_iff. tauto.
 Qed.
 
-(**********************)
-(** * CPS expressions *)
-(**********************)
 
-Inductive L5Opid : Set :=
- | CLambda 
- | CKLambda
- | CFix (nMut : nat) (** number of functions that are mutually defined*)
- | CDCon (dc : dcon) (nargs : nat)
- | CHalt 
- | CRet (** application of a continuation lambda ([CKLambda]) *)
- | CCall (** a bit like apply in source language *)
- | CProj (selector :nat) (** which one to project out*)
- (* nat may be ineffiecient in general, 
-    but here it is only used to iterate over the list ONE BY ONE and pick one out *)
- | CMatch (dconAndNumArgs : list (dcon * nat))
- (** each member of the list corresponds to a branch. 
-    it says how many variables are bound in that branch*).
-
-Definition CPSOpBindings (c : L5Opid) 
-    : list nat :=
-  match c with
-  | CLambda    => [2] (* user lambda, also binds a continuation *)
-  | CKLambda    => [1] (* continuation lambda  *)
-  | CFix nMut => repeat 1 nMut
-  | CDCon _ nargs    => repeat 0 nargs
-  | CHalt => [0]
-  | CRet => [0,0]
-  | CCall => [0,0,0]
-  | CProj _ => [0,0]
-  | CMatch numargsInBranches => 0::(List.map snd numargsInBranches)
-  end.
-
-
-Definition cdecc: forall x y : L5Opid,
-{x = y} + {x <> y}.
-Proof using.
-  repeat(decide equality).
-Defined.
-
-
-Definition CPSGenericTermSig : GenericTermSig :=
-{| 
-  Opid := L5Opid;
-  OpBindings := CPSOpBindings;
-  opid_dec := cdecc;
-|}.
-
-
-Notation CBTerm := (@terms.BTerm NVar CPSGenericTermSig).
-Notation CTerm := (@terms.NTerm NVar CPSGenericTermSig).
-Notation coterm := (@terms.oterm NVar CPSGenericTermSig).
+Notation CBTerm := (@terms.BTerm NVar L5Opid).
+Notation CTerm := (@terms.NTerm NVar L5Opid).
+Notation coterm := (@terms.oterm NVar L5Opid).
 
 Definition Lam_c (v vk : NVar) (b : CTerm) : CTerm :=
   coterm CLambda [bterm [v; vk] b].
@@ -2409,10 +2409,10 @@ Qed.
 
 Ltac unfoldSubst :=
   unfold ssubst; simpl;
-  fold (@ssubst NVar _ _ _ CPSGenericTermSig);
-  fold (@ssubst_bterm NVar _ _ _ CPSGenericTermSig);
-  fold (@ssubst NVar _ _ _ CoqL4GenericTermSig);
-  fold (@ssubst_bterm NVar _ _ _ CoqL4GenericTermSig).
+  fold (@ssubst NVar _ _ _ L5Opid);
+  fold (@ssubst_bterm NVar _ _ _ L5Opid);
+  fold (@ssubst NVar _ _ _ L4Opid);
+  fold (@ssubst_bterm NVar _ _ _ L4Opid).
 
 (** What happens when e does not compute further, e.g. eval e e ? 
 Should we prove something more about such cases, e.g. the CPS converted term
@@ -2682,8 +2682,8 @@ Proof using.
   rewrite ssubstRet_c.
   rewrite ssubstKlam_c; [| try assumption| noRepDis].
   unfoldSubst.
-  fold (@ssubst NVar _ _ _ CPSGenericTermSig).
-  fold (@ssubst_bterm NVar _ _ _ CPSGenericTermSig).
+  fold (@ssubst NVar _ _ _ L5Opid).
+  fold (@ssubst_bterm NVar _ _ _ L5Opid).
   rewrite ssubst_trivial2_cl;[|assumption| unfold closed; apply cps_cvt_closed; auto].
   (rewrite not_eq_beq_var_false;[| noRepDis]).
   inverts Hwf as Hwfb Hwfs. simpl in Hwfb. dLin_hyp.
@@ -2734,7 +2734,7 @@ Proof using.
     
   unfold apply_bterm. simpl.
   unfold ssubst at 1. simpl.
-  fold (@ssubst _ _ _ _ CPSGenericTermSig).
+  fold (@ssubst _ _ _ _ L5Opid).
   apply eq_subrelation;[auto with typeclass_instances|].
   repeat rewrite map_map.
   unfold Ret_c.
@@ -2860,7 +2860,7 @@ Definition eval_cα (a b : CTerm):= exists bα,
   eval_c a bα /\ alpha_eq b bα.
 
 
-Definition defbranch : (@branch CPSGenericTermSig) := ((mkInd "" 0, 0%N), bterm [] (vterm nvarx)).
+Definition defbranch : (@branch L5Opid) := ((mkInd "" 0, 0%N), bterm [] (vterm nvarx)).
 
 Lemma match_c_alpha : forall brs discriminee t2,
 alpha_eq (Match_c discriminee brs) t2

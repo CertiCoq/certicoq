@@ -5,12 +5,12 @@ Require Import L3.compile.
 Require Import L4.L3_to_L4.
 Require Import L3.instances.
 
+Require Import BinNat.
 
 Program Instance : BigStepOpSem L4.expression.exp := eval.
 
-(** FIX!! *)
 Program Instance : WellFormed L4.expression.exp :=
-  fun _  => True.
+ L4.expression.exp_wf (0%N).
 
 Instance certiL4: CerticoqLanguage L4.expression.exp := {}.
 
@@ -21,9 +21,8 @@ fun p => Ret (L3_to_L4.translate_program (AstCommon.env p) (main p)).
 Instance failed: 
   CerticoqTranslationCorrect (Program L3.compile.Term) L4.expression.exp.
 constructor.
-  compute. auto. 
-
-  intros ? ? Hwf He.
+- admit.
+- intros ? ? Hwf He.
   destruct Hwf.
   unfold certiClasses.translate,
     certiL3_to_L4, liftBigStepException, bigStepEval, BigStepOpSem_instance_0.
@@ -50,8 +49,8 @@ Instance certiL4a: CerticoqLanguage L4aTerm := {}.
 
 
 Instance certiL4_to_L4a: 
-  CerticoqTranslation L4.expression.exp L4aTerm :=
-  fun x => Ret (L4_to_L4a x).
+  CerticoqTotalTranslation L4.expression.exp L4aTerm :=
+  (L4_to_L4a (0)%N).
 
 
 Definition L5Term :Type := (@NTerm cps.var L5Opid).
@@ -85,7 +84,7 @@ Instance certiL5_to_L5a:
   | Some e => exceptionMonad.Ret e
   end.
 
-
+Require Import Template.Template.
 Quote Recursively Definition p0L1 := 0.
 
 Require Import L2.instances.

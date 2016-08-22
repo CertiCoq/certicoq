@@ -366,12 +366,15 @@ Qed.
 Require Import L4.expression.
 Require Import L4.L4_to_L4a.
 
+(*
 Definition L4_to_L5a (e:L4.expression.exp) : option val_c :=
   let l4a := L4.L4_to_L4a.L4_to_L4a e in
   let l5 := L4a_to_L5.cps_cvt l4a in
   translateVal l5.
+*)
 
 End Notations.
+(*
 
 (* Ending the dummy section clears the notation imports which conflict later,
 and also the Opacity directives *)
@@ -411,6 +414,7 @@ Definition compile_L1_to_L5a (e:Ast.program) : exception val_c:=
   | Some e => exceptionMonad.Ret e
   end.
 End L1_to_L5a.
+*)
 
 (*
 Print Instances VarType.

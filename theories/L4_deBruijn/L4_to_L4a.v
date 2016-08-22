@@ -23,7 +23,7 @@ end.
 
 (* make a section so that the notations get cleared *)
 Section Dummy.
-Variable NVar:Type.
+Context {NVar : Type} `{Deq NVar}.
 Variable mkVar : N -> NVar.
 
 Notation BTerm := (@BTerm NVar L4Opid).
@@ -35,7 +35,7 @@ Notation push := cons (only parsing).
 
 Definition dummyind := Ast.mkInd "" 0%nat.
 
-
+Require Import Common.RandyPrelude.
 
 (* N.to_nat efficiency? *)
 Fixpoint translate (max : N)(e:exp) : NTerm :=
@@ -57,8 +57,16 @@ match e with
     Con_e d (translatel max el)
 
 | expression.Fix_e el pn => 
-    let xf := mkVar max in
-    Proj_e (Fix_e xf (translatef (N.succ max) el)) (N.to_nat pn)
+    let len := efnlength el in 
+    let bvars := map mkVar (seq N.succ max len) in (* variables for the untupled rep. *)
+    let xf := mkVar max in (* final variable for the tuple representation *)
+    (* untupled representation obrained from raw translation *)
+    let bds := (translatef (max+ N.of_nat len) el) in
+    (* convert untupled to tupled *)
+    let pinds := (seq S 0 len) in
+    let sub := combine bvars (map (fun n=> Proj_e (vterm xf) n) pinds) in
+    let bds := map (fun t => ssubst_aux t sub) bds in
+    Proj_e (Fix_e xf bds) (N.to_nat pn)
 
 | expression.Match_e d _ brl => 
     Match_e (translate max d) (translateb max brl)
@@ -88,11 +96,12 @@ end.
 
 End Dummy.
 
+Definition mkVar (n:N):=  xO (N.succ_pos n).
 Require Import L6.cps.
 
 (* uservars are supposed to be even, so multiply by 2 x0*)
-Definition L4_to_L4a (e:expression.exp) : (@NTerm cps.var L4Opid) :=
-  translate cps.var (fun n => xO (N.succ_pos n)) (0%N) e.
+Definition L4_to_L4a (n:N) (e:expression.exp) : (@NTerm cps.var L4Opid) :=
+  translate mkVar  n e.
 
 (*
 (* Delete this module and everything inside it *)

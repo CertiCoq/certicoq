@@ -5,7 +5,7 @@
 *)
 Require Import List.
 Require Import String.
-Require Import cps.
+Require Import L6.cps.
 Require Import ExtLib.Data.String.
 Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.

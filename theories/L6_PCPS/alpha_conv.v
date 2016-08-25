@@ -1,5 +1,6 @@
-Require Import cps ctx cps_util set_util identifiers Ensembles_util List_util
-        eval logical_relations functions.
+Require Import L6.cps L6.ctx L6.cps_util L6.set_util L6.identifiers L6.Ensembles_util L6.List_util
+        L6.eval L6.logical_relations L6.functions.
+Require Import Libraries.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -8,7 +9,7 @@ Import ListNotations.
 
 Open Scope ctx_scope.
 Open Scope fun_scope.
-
+Close Scope Z_scope.
 
 Fixpoint extend_lst (f: var -> var) (xs xs' : list var) : (var -> var) :=
   match xs with
@@ -289,11 +290,11 @@ Section Alpha_conv_correct.
     preord_env_P_inj P k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof. 
     intros Henv Hv Hinj z HP. unfold extend. 
-    destruct (Coqlib.peq z x) as [| Hneq] eqn:Heq'.
+    destruct (peq z x) as [| Hneq] eqn:Heq'.
     - subst. intros z Hget.
       rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
     - intros z' Hget. rewrite M.gso in Hget; eauto.
-      destruct (Coqlib.peq (f z) y).
+      destruct (peq (f z) y).
       + exfalso. eapply Hneq. eapply Hinj. now constructor.
         now constructor. rewrite extend_gso; eauto.
         rewrite extend_gss. eassumption.
@@ -340,12 +341,12 @@ Section Alpha_conv_correct.
     - inv Hdef. 
     - simpl in Hdef. subst. destruct (M.elt_eq g g0).
       + subst. inv Hdef. exists xs', e'.
-        simpl. rewrite Coqlib.peq_true. eauto.
+        simpl. rewrite peq_true. eauto.
       + edestruct IHHa as [xs2 [ e2 Ha' ] ]; eauto.
-        edestruct (Coqlib.peq (f g) (f g0)). 
+        edestruct (peq (f g) (f g0)). 
         * eapply Hinj in e0. subst. congruence. now constructor.
           now constructor.
-        * do 2 eexists. simpl. rewrite Coqlib.peq_false; eauto.
+        * do 2 eexists. simpl. rewrite peq_false; eauto.
   Qed.
 
   Lemma setlist_length2 (rho rho' rho1 : env) (xs1 xs2 : list var) (vs1 vs2 : list val) :
@@ -387,15 +388,15 @@ Section Alpha_conv_correct.
       destruct (setlist xs1 vs1 rho1) eqn:Heq1;
         destruct (setlist ys l' rho2) eqn:Heq2; try discriminate.
       inv Hset1; inv Hset2. rewrite M.gsspec in Hget.
-      destruct (Coqlib.peq x a); subst.
+      destruct (peq x a); subst.
       + inv Hget. eexists. 
-        simpl. unfold extend. rewrite Coqlib.peq_true.
+        simpl. unfold extend. rewrite peq_true.
         rewrite M.gss. eauto.
       + edestruct IHxs1 as [v2 [Het' Hpre'] ]; eauto.
         * inv HP; [ now left; eauto |].
           rewrite FromList_cons in H. inv H.
           inv H0. congruence. right; eauto.
-        * eexists. unfold extend. rewrite Coqlib.peq_false; [| now eauto ].
+        * eexists. unfold extend. rewrite peq_false; [| now eauto ].
           rewrite M.gso; [ now eauto |].
           intros Heq. eapply n. 
           eapply H7; try now constructor.

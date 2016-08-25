@@ -1,6 +1,7 @@
-Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos Coqlib Coq.Sets.Ensembles
+Require Import L6.Ensembles_util.
+Require Import Libraries.Coqlib.
+Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles
         Coq.Relations.Relations Coq.Classes.Morphisms.
-Require Import Ensembles_util.
 
 (** ** Usefull definitions and lemmas about functions. *)
 
@@ -26,7 +27,7 @@ Definition f_eq  {A B} (f1 f2 : A -> B) : Prop :=  forall x, f1 x = f2 x.
 (** Extend a function. Only works for positives to avoid parameterizing the definition with
   * the decidable equality proof. TODO: fix this *)
 Definition extend (f: positive -> positive) (x x' : positive) : (positive -> positive) :=
-  fun z => if Coqlib.peq z x then x' else f z.
+  fun z => if peq z x then x' else f z.
 
 Notation " f '{' x '~>' y '}' " := (extend f x y) (at level 10, no associativity)
                                    : fun_scope.
@@ -153,27 +154,27 @@ Qed.
 Instance extend_Proper : Proper (f_eq ==> Logic.eq ==> Logic.eq ==> f_eq) extend.
 Proof. 
   intros f1 f2 Hfeq x1 x2 Heq1 x3 x4 Hfeq2; subst.
-  intros x. unfold extend. destruct (Coqlib.peq x x2); eauto.
+  intros x. unfold extend. destruct (peq x x2); eauto.
 Qed.
 
 Lemma extend_gss f x x' :
   f {x ~> x'} x = x'.
 Proof. 
-  unfold extend. rewrite Coqlib.peq_true. reflexivity.
+  unfold extend. rewrite peq_true. reflexivity.
 Qed.
 
 Lemma extend_gso f x x' y :
   y <> x ->
   f {x ~> x'} y = f y.
 Proof. 
-  intros Heq. unfold extend. rewrite Coqlib.peq_false; eauto.
+  intros Heq. unfold extend. rewrite peq_false; eauto.
 Qed.
 
 Lemma extend_same f x y :
   f x = x ->
   f {y ~> y} x = x. 
 Proof.
-  unfold extend. destruct (Coqlib.peq x y); eauto.
+  unfold extend. destruct (peq x y); eauto.
 Qed.
 
 Lemma f_eq_extend (f f' : positive -> positive) x y :
@@ -182,7 +183,7 @@ Lemma f_eq_extend (f f' : positive -> positive) x y :
 Proof. 
   intros Heq. 
   unfold extend. intros z. 
-  destruct (Coqlib.peq z x); eauto.
+  destruct (peq z x); eauto.
 Qed.
 
 Lemma f_eq_extend_same (f : positive -> positive) x y :
@@ -190,7 +191,7 @@ Lemma f_eq_extend_same (f : positive -> positive) x y :
   f_eq (f{x ~> y}) f.
 Proof. 
   intros Heq x'.
-    unfold extend. destruct (Coqlib.peq x' x); eauto.
+    unfold extend. destruct (peq x' x); eauto.
     congruence. 
 Qed.    
 
@@ -200,7 +201,7 @@ Lemma f_eq_subdomain_extend S (f f' : positive -> positive) x y :
 Proof. 
   intros Heq. 
   unfold extend. intros z Hin. 
-  destruct (Coqlib.peq z x). now eauto.
+  destruct (peq z x). now eauto.
   apply Heq. inv Hin; [| now eauto ]. inv H; congruence. 
 Qed.
 
@@ -243,13 +244,13 @@ Lemma image_extend_In_S f x x' S :
 Proof.
   intros HinS. split. 
   - intros y [y' [Hin Heq]]; subst. 
-    destruct (Coqlib.peq x y').
+    destruct (peq x y').
     + subst. rewrite extend_gss. eauto.
     + rewrite extend_gso; eauto. left.
       eexists; split; eauto. constructor; eauto.
       intros Hc; inv Hc; congruence.
   - intros y Hin.
-    destruct (Coqlib.peq x' y); subst.
+    destruct (peq x' y); subst.
     + eexists; split; eauto. rewrite extend_gss; eauto.
     + inv Hin. 
       * destruct H as [y' [Hin Heq]]; subst. inv Hin.
@@ -272,7 +273,7 @@ Lemma image_extend_Included f x x' S :
   Included _ (image (f {x ~> x'}) S) (Union _ (image f S) (Singleton _ x')).
 Proof.  
   intros y [y' [Hin Heq]]. unfold extend in Heq.
-  destruct (Coqlib.peq y' x); subst; [ now eauto |] .
+  destruct (peq y' x); subst; [ now eauto |] .
   left. eexists; eauto.
 Qed.
 
@@ -362,15 +363,15 @@ Lemma injective_subdomain_extend f x x' S :
 Proof.
   intros Hinj Hnin.
   intros y y' Hin1 Hin2.
-  destruct (Coqlib.peq x y); subst.
+  destruct (peq x y); subst.
   - rewrite extend_gss. intros Heq.
-    destruct (Coqlib.peq y y'); [ now eauto | ].
+    destruct (peq y y'); [ now eauto | ].
     rewrite extend_gso in Heq; [| now eauto ]. 
     exfalso. eapply Hnin. eexists; split; [| now eauto ].
     inv Hin2. inv H. congruence.
     constructor; eauto. intros Hc; inv Hc; congruence.
   - rewrite extend_gso; [| now eauto ].
-    destruct (Coqlib.peq x y'); subst.
+    destruct (peq x y'); subst.
     + rewrite extend_gss. intros Heq. subst.
       exfalso. apply Hnin. eexists.
       split; [| reflexivity ].
@@ -389,14 +390,14 @@ Lemma injective_subdomain_extend' f x x' S :
 Proof.
   intros Hinj Hnin.
   intros y y' Hin1 Hin2.
-  destruct (Coqlib.peq x y); subst.
+  destruct (peq x y); subst.
   - rewrite extend_gss. intros Heq.
-    destruct (Coqlib.peq y y'); [ now eauto | ].
+    destruct (peq y y'); [ now eauto | ].
     rewrite extend_gso in Heq; [| now eauto ]. 
     exfalso. eapply Hnin. eexists; split; [| now eauto ].
     constructor; eauto. intros Hc; eapply n. now inv Hc.
   - rewrite extend_gso; [| now eauto ].
-    destruct (Coqlib.peq x y'); subst.
+    destruct (peq x y'); subst.
     + rewrite extend_gss. intros Heq. subst.
       exfalso. apply Hnin. eexists.
       split; [| reflexivity ].
@@ -412,11 +413,11 @@ Lemma injective_extend (f : positive -> positive) x y :
 Proof.
   intros Hinj Hin x1 x2 __ _ Heq.
   unfold extend in *.
-  edestruct (Coqlib.peq x1 x).
+  edestruct (peq x1 x).
   - rewrite <- e in Heq.
-    edestruct (Coqlib.peq x2 x1); [ now eauto |].
+    edestruct (peq x2 x1); [ now eauto |].
     exfalso. eapply Hin. eexists; eauto.
-  - edestruct (Coqlib.peq x2 x).
+  - edestruct (peq x2 x).
     + exfalso. eapply Hin. eexists; eauto.
     + eapply Hinj; try now constructor; eauto.
       assumption.

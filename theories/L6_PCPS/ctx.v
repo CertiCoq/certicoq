@@ -1,5 +1,5 @@
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega.
-Require Import cps.
+Require Import L6.cps.
 
 Import ListNotations.
 

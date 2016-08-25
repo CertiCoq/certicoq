@@ -1,5 +1,6 @@
-Require Import set_util cps eval cps_util ctx identifiers.
+Require Import L6.set_util L6.cps L6.eval L6.cps_util L6.ctx L6.identifiers.
 Require Import Coq.MSets.MSetRBT Coq.Lists.List.
+Require Import Libraries.Coqlib.
 
 Import PS.
 
@@ -140,7 +141,7 @@ Lemma env_subset_set Γ Γ' x v :
   env_subset (M.set x v Γ) (M.set x v Γ').
 Proof.
   intros Hsub x' v' Hget. rewrite M.gsspec in *.
-  destruct (Coqlib.peq x' x); eauto.
+  destruct (peq x' x); eauto.
 Qed.
 
 Lemma env_subset_setlist Γ1 Γ2 Γ1' xs vs :

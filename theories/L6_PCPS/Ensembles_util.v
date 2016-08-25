@@ -1,7 +1,8 @@
-Require Import Coq.Classes.Morphisms Coq.NArith.BinNat Coq.Lists.List Coqlib Coq.Sets.Ensembles.
+Require Import Coq.Classes.Morphisms Coq.NArith.BinNat Coq.Lists.List Coq.Sets.Ensembles.
+Require Import Libraries.Coqlib.
 Import ListNotations.
 
-Ltac inv H := inversion H; clear H; subst.
+Ltac inv H := inversion H; clear H;  subst.
 
 Hint Constructors Singleton.
 Hint Constructors Union.
@@ -17,6 +18,7 @@ Lemma Included_refl {A} s1 :
 Proof.
   intros x Hin; eauto.
 Qed.
+
 
 Lemma Included_trans {A} s1 s2 s3 :
   Included A s1 s2 ->
@@ -100,7 +102,7 @@ Qed.
 Instance DecidableSingleton_positive x : Decidable (Singleton positive x).
 Proof.
   constructor. intros x'.
-  destruct (Coqlib.peq x x'); subst. left; constructor.
+  destruct (peq x x'); subst. left; constructor.
   right. intros Hc. inv Hc; eauto.
 Qed.
 
@@ -1043,7 +1045,7 @@ Instance Decidable_FromList (l : list positive) : Decidable (FromList l).
 Proof. 
   constructor. intros x. induction l. 
   - right. intros H. inv H. 
-  - destruct (Coqlib.peq a x).
+  - destruct (peq a x).
     + subst. left. constructor. eauto.
     + destruct IHl. left. now constructor 2.
       right. intros Hc. eapply H. inv Hc; eauto.

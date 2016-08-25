@@ -5,7 +5,7 @@ Require Import Coq.ZArith.ZArith Coq.Lists.List.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Require Import List_util.
 
-Require Maps.
+Require Import Libraries.Maps.
 
 Import MonadNotation.
 
@@ -309,6 +309,9 @@ Definition cEnv := M.t cTyInfo.  (* An constructor enironment maps [cTag]s to th
 
 Definition iEnv := M.t iTyInfo. (* An inductive type environment maps [iTag]s to their constructors with their arities *) 
 
+(* TODO : this state and the getters and setters will be used by a particular
+   translation so move them to the appropriate file? *)
+
 (* state of next fresh [cTag], [iTag], and the current environment *)
 Definition cState := state (cTag * iTag * cEnv * iEnv).
 
@@ -386,6 +389,8 @@ Fixpoint makeDataType (l : list nat) : cState (iTag * list cTag) :=
   end.
 
 
+(* TODO : this state and the getters and setters will be used by a particular
+   translation so move them to the appropriate file? *)
 (********** generator for fTags *************)
 (* state of next fresh [fTag] with a function environment *)
 Definition fState := state fTag.

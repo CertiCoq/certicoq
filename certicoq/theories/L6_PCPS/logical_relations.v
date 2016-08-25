@@ -1,8 +1,11 @@
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
-Require Import cps eval cps_util identifiers ctx Ensembles_util List_util.
+Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.Ensembles_util L6.List_util.
+Require Import Libraries.Coqlib.
+
 Import ListNotations.
 
+Close Scope Z_scope.
 
 Section Log_rel.
 
@@ -193,7 +196,7 @@ Section Log_rel.
       preord_var_env k (M.set x v1 rho1) (M.set x v2 rho2) y y.
   Proof.
     intros rho1 rho2 k x y v1 v2 Henv Hval.
-    destruct (Coqlib.peq y x); subst.
+    destruct (peq y x); subst.
     - apply preord_var_env_extend_eq; eauto.
     - apply preord_var_env_extend_neq; eauto.
   Qed.
@@ -254,7 +257,7 @@ Section Log_rel.
       preord_env_P P k (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
     intros P rho1 rho2 k x v1 v2 Henv Hval x' HP v1' Hget.
-    rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x); subst.
+    rewrite M.gsspec in Hget. destruct (peq x' x); subst.
     - inv Hget. eexists. rewrite M.gss. split; eauto.
     - apply Henv in Hget; eauto. destruct Hget as [v2' [Heq Hpre]].
       eexists; split; eauto. rewrite M.gso; eauto. constructor; eauto.
@@ -1066,13 +1069,13 @@ Section Log_rel.
   Proof.
     intros Hneq Hpre x' HP v1' Hget.
     rewrite M.gsspec in Hget.
-    destruct (Coqlib.peq x' x). inv Hget. 
+    destruct (peq x' x). inv Hget. 
     - edestruct (Hpre x) as [v1'' [Hget'' Hpre'']]; eauto. rewrite M.gss; eauto.
       rewrite M.gss in Hget''; inv Hget''.
       eexists. rewrite M.gso; eauto. rewrite M.gss; eauto.
     - edestruct (Hpre x') as [v1'' [Hget'' Hpre'']]; eauto.
       rewrite M.gso; eauto. rewrite M.gsspec in Hget.
-      destruct (Coqlib.peq x' y). inv Hget.
+      destruct (peq x' y). inv Hget.
       + eexists. rewrite M.gss; eauto. split; eauto.
         eapply preord_val_refl.
       + do 2 (rewrite M.gso in Hget''; eauto).
@@ -1087,7 +1090,7 @@ Section Log_rel.
     preord_env_P P k (M.set x v rho1) rho2.
   Proof.
     intros Hpre HP x' HP' v' Hget.
-    rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x).
+    rewrite M.gsspec in Hget. destruct (peq x' x).
     - inv Hget. exfalso. inv HP. eapply H; eauto.
     - edestruct Hpre; eauto.
   Qed.
@@ -1099,7 +1102,7 @@ Section Log_rel.
     preord_env_P P k rho1 (M.set x v rho2).
   Proof.
     intros Hpre HP x' HP' v' Hget.
-    rewrite M.gsspec. destruct (Coqlib.peq x' x); subst.
+    rewrite M.gsspec. destruct (peq x' x); subst.
     - exfalso; eauto. inv HP. eapply H; eauto.
     - edestruct Hpre; eauto.
   Qed.
@@ -1860,7 +1863,7 @@ Section Log_rel.
       cc_approx_var_env k (M.set x v1 rho1) (M.set x v2 rho2) y y.
   Proof.
     intros rho1 rho2 k x y v1 v2 Henv Hval.
-    destruct (Coqlib.peq y x); subst.
+    destruct (peq y x); subst.
     - apply cc_approx_var_env_extend_eq; eauto.
     - apply cc_approx_var_env_extend_neq; eauto.
   Qed.
@@ -1921,7 +1924,7 @@ Section Log_rel.
       cc_approx_env_P P k (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
     intros P rho1 rho2 k x v1 v2 Henv Hval x' HP v1' Hget.
-    rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x); subst.
+    rewrite M.gsspec in Hget. destruct (peq x' x); subst.
     - inv Hget. eexists. rewrite M.gss. split; eauto.
     - apply Henv in Hget; eauto. destruct Hget as [v2' [Heq Hpre]].
       eexists; split; eauto. rewrite M.gso; eauto. constructor; eauto.
@@ -2028,7 +2031,7 @@ Section Log_rel.
     intros Hcc Hnin y Py v' Hget.
     edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
     exists v''. rewrite M.gsspec.
-    destruct (Coqlib.peq y x); subst.
+    destruct (peq y x); subst.
     - contradiction.
     - eauto.
   Qed.
@@ -2259,7 +2262,7 @@ Section Log_rel.
   Proof.
     intros H Hp x' v' HS Hget.
     rewrite M.gsspec in Hget.
-    destruct (Coqlib.peq x' x); subst.
+    destruct (peq x' x); subst.
     - now inv Hget.
     - eapply H; [| eassumption ].
       constructor; eauto. intros Hc. inv Hc. congruence.

@@ -1,6 +1,7 @@
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega
         Coq.Relations.Relations Coq.Classes.RelationClasses.
-Require Import cps ctx eval logical_relations identifiers.
+Require Import L6.cps L6.ctx L6.eval L6.logical_relations L6.identifiers.
+
 Import ListNotations.
 
 

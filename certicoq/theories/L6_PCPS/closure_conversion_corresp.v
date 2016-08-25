@@ -1,6 +1,7 @@
-Require Import cps cps_util set_util identifiers ctx hoare Ensembles_util
-        List_util closure_conversion closure_conversion_correct functions
-        logical_relations eval.
+Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.hoare L6.Ensembles_util
+        L6.List_util L6.closure_conversion L6.closure_conversion_correct L6.functions
+        L6.logical_relations L6.eval.
+Require Import Libraries.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -68,47 +69,47 @@ Section CC_correct.
     FVmap_inv (M.set x BoundVar FVmap) (Union _ (Singleton _ x) Scope) Funs FVs.
   Proof. 
     intros [H1 [H2 H3]]. repeat split.
-    - intros y Hin. destruct (Coqlib.peq y x); subst.
+    - intros y Hin. destruct (peq y x); subst.
       + unfold In. now rewrite M.gss.
       + inv Hin. inv H; congruence.
         eapply H1 in H. edestruct H as [t' Heq].
         unfold In. rewrite M.gso; now eauto.
-    - intros y Hin. destruct (Coqlib.peq y x); subst.
+    - intros y Hin. destruct (peq y x); subst.
       + eauto.
       + unfold In in Hin. rewrite M.gso in Hin; [| now eauto ].
         right. eapply H1. eauto.
-    - intros y Hin. inv Hin. destruct (Coqlib.peq y x); subst.
+    - intros y Hin. inv Hin. destruct (peq y x); subst.
       + exfalso. eauto.
       + edestruct H2 as [H2' _].
         edestruct H2' as [x' Heq].
         * constructor; eauto.
         * eexists. rewrite M.gso; eauto.
     - eapply H2. destruct H as [x' Heq].
-      destruct (Coqlib.peq x x0); subst.
+      destruct (peq x x0); subst.
       + rewrite M.gss in Heq. congruence.
       + repeat eexists. rewrite M.gso in Heq; eauto.
     - intros Hc. destruct H as [x' Heq].
-      destruct (Coqlib.peq x0 x); subst.
+      destruct (peq x0 x); subst.
       + rewrite M.gss in Heq. congruence.
       + inv Hc. inv H; congruence.
         eapply H2; eauto. repeat eexists.
         rewrite M.gso in Heq; eauto.
     - intros [Hnth [Hnin Hnin']].
-      destruct (Coqlib.peq x0 x); subst.
+      destruct (peq x0 x); subst.
       + exfalso. eauto. 
       + edestruct H3 as [Heq _].
         rewrite M.gso; eauto. eapply Heq; repeat split; eauto.
-    - destruct (Coqlib.peq x0 x); subst.
+    - destruct (peq x0 x); subst.
       + rewrite M.gss in H. congruence.
       + eapply H3; eauto.
         rewrite M.gso in H; eauto.
-    - destruct (Coqlib.peq x0 x); subst.
+    - destruct (peq x0 x); subst.
       + rewrite M.gss in H. congruence.
       + intros Hc. inv Hc. inv H0; congruence.
         rewrite M.gso in H; eauto.
         edestruct H3 as [_ [_ [Hc _]]].
         eapply H3 in H0; eauto. contradiction.
-    - destruct (Coqlib.peq x0 x); subst.
+    - destruct (peq x0 x); subst.
       + rewrite M.gss in H. congruence.
       + intros Hc.
         rewrite M.gso in H; eauto.
@@ -122,41 +123,41 @@ Section CC_correct.
     FVmap_inv (M.set x (MRFun x') FVmap) Scope (Union _ (Singleton _ x) Funs) FVs.
   Proof. 
     intros Hnin [H1 [H2 H3]]. repeat split.
-    - intros y Hin. destruct (Coqlib.peq y x); subst.
+    - intros y Hin. destruct (peq y x); subst.
       + contradiction.
       + eapply H1 in Hin. edestruct Hin as [t'' Heq].
         unfold In. rewrite M.gso; eauto.
-    - intros y Hin. destruct (Coqlib.peq y x); subst.
+    - intros y Hin. destruct (peq y x); subst.
       + unfold In in Hin. rewrite M.gss in Hin; congruence.
       + unfold In in Hin. rewrite M.gso in Hin; [| now eauto ].
         now eapply H1.
-    - intros y Hin. inv Hin. destruct (Coqlib.peq y x); subst.
+    - intros y Hin. inv Hin. destruct (peq y x); subst.
       + repeat eexists. rewrite M.gss. reflexivity.
       + edestruct H2 as [H2' _].
         edestruct H2' as [x'' Heq].
         inv H. inv H4; congruence. constructor; eassumption.
         repeat eexists. rewrite M.gso; eassumption.
-    - destruct (Coqlib.peq x0 x); subst; eauto. right.
+    - destruct (peq x0 x); subst; eauto. right.
       eapply H2. edestruct H as [x'' Hget].
       rewrite M.gso in Hget; [| now eauto ].
       repeat eexists; eauto. 
     - destruct H as [x'' Hget].
-      destruct (Coqlib.peq x0 x); subst; eauto.
+      destruct (peq x0 x); subst; eauto.
       rewrite M.gso in Hget; [| now eauto ].
       intros Hc. apply H1 in Hc. congruence.
     - intros [Hnth [Hnin1 Hnin2]].
-      destruct (Coqlib.peq x0 x); subst.
+      destruct (peq x0 x); subst.
       + exfalso. eauto.
       + edestruct H3 as [Heq _].
         rewrite M.gso; eauto. eapply Heq; repeat split; eauto.
-    - destruct (Coqlib.peq x0 x); subst.
+    - destruct (peq x0 x); subst.
       + rewrite M.gss in H. congruence.
       + eapply H3; eauto. rewrite M.gso in H; eauto.
-    - destruct (Coqlib.peq x0 x); subst.
+    - destruct (peq x0 x); subst.
       + rewrite M.gss in H. congruence.
       + intros Hc. rewrite M.gso in H; eauto.
         eapply H1 in Hc. congruence.
-    - destruct (Coqlib.peq x0 x); subst.
+    - destruct (peq x0 x); subst.
       + rewrite M.gss in H. congruence.
       + intros Hc. rewrite M.gso in H; eauto.
         inv Hc. inv H0; congruence.
@@ -249,14 +250,14 @@ Section CC_correct.
     f_eq_subdomain S ((subst FVmap) {x ~> x}) (subst (M.set x BoundVar FVmap)).
   Proof.  
     intros x'. unfold subst, extend. rewrite M.gsspec.
-    destruct (Coqlib.peq x' x). now eauto. reflexivity. 
+    destruct (peq x' x). now eauto. reflexivity. 
   Qed.
 
   Lemma subst_BoundVar_f_eq FVmap x :
     f_eq ((subst FVmap) {x ~> x}) (subst (M.set x BoundVar FVmap)).
   Proof.  
     intros x'. unfold subst, extend. rewrite M.gsspec.
-    destruct (Coqlib.peq x' x). now eauto. reflexivity. 
+    destruct (peq x' x). now eauto. reflexivity. 
   Qed.
 
   Lemma Disjoint_free_set FVmap Scope Funs FVs S :
@@ -306,7 +307,7 @@ Section CC_correct.
     binding_not_in_map S (M.set x v map). 
   Proof. 
     intros HB Hnin x' Hin.
-    rewrite M.gsspec. destruct (Coqlib.peq x' x); subst; try contradiction. 
+    rewrite M.gsspec. destruct (peq x' x); subst; try contradiction. 
     eauto. 
   Qed.
 
@@ -424,26 +425,26 @@ Section CC_correct.
     split; [| split ]. 
     - split.
       + intros x' Hin. assert (Hin' := Hin). eapply H1 in Hin.
-        destruct (Coqlib.peq x' x).
+        destruct (peq x' x).
         subst; contradiction.
         unfold In. now rewrite M.gso; eauto.
       + intros x' Hget. eapply H1. 
-        unfold In in Hget. rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x).
+        unfold In in Hget. rewrite M.gsspec in Hget. destruct (peq x' x).
         subst; congruence. now eauto.
     - split.
       + intros x' Hin. assert (Hin' := Hin). inv Hin'. 
         eapply H2 in Hin. edestruct Hin as [y Heq].
-        destruct (Coqlib.peq x' x).
+        destruct (peq x' x).
         subst; contradiction.
         eexists. rewrite M.gso; eauto.
       + intros x' [y Hget]. eapply H2. 
-        rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x).
+        rewrite M.gsspec in Hget. destruct (peq x' x).
         subst; congruence.
         now eauto.
     - intros N x'. split.
       + intros [Hnth [Hnin1' Hnin2']].
         destruct (nthN_app FVs [x] N) as [Hn | [Hn Hlen']].
-        * destruct (Coqlib.peq x' x); subst.
+        * destruct (peq x' x); subst.
           exfalso. eapply H. eapply nthN_In. rewrite <- Hnth. now eauto.
           edestruct H3 as [Hget _].
           rewrite M.gso; eauto. eapply Hget. repeat split; eauto.
@@ -454,7 +455,7 @@ Section CC_correct.
           inv Hn. rewrite M.gss; eauto.
           repeat f_equal. zify. omega. 
       + subst. intros Hget.
-        rewrite M.gsspec in Hget. destruct (Coqlib.peq x' x).
+        rewrite M.gsspec in Hget. destruct (peq x' x).
         * subst. inv Hget. repeat split; eauto.
           rewrite nthN_app_geq. rewrite N.sub_diag. reflexivity. 
           zify; omega. 
@@ -562,7 +563,7 @@ Section CC_correct.
     f_eq ((subst FVmap) {x ~> x'}) (subst (M.set x (MRFun x') FVmap)).
   Proof.
     unfold subst. intros y. unfold extend.
-    rewrite M.gsspec. destruct (Coqlib.peq y x); eauto.
+    rewrite M.gsspec. destruct (peq y x); eauto.
   Qed.
 
 
@@ -823,7 +824,7 @@ Section CC_correct.
           now apply bound_var_occurs_free_Econstr_Included.
         * intros Hc. inv Hc; eapply HD2; eauto.
           rewrite bound_var_Econstr, occurs_free_Econstr. 
-          destruct (Coqlib.peq Γ v); subst. now eauto.
+          destruct (peq Γ v); subst. now eauto.
           right. right. constructor; eauto. intros Hc; inv Hc. congruence.
         * intros e' s'.
           eapply return_triple. intros s'' [C' [Hctx' [Hcc Hf'']]]; eauto.
@@ -914,7 +915,7 @@ Section CC_correct.
           now apply bound_var_occurs_free_Eproj_Included.
         * intros Hc. inv Hc; eapply HD2; eauto.
           rewrite bound_var_Eproj, occurs_free_Eproj. 
-          destruct (Coqlib.peq Γ v); subst. now eauto.
+          destruct (peq Γ v); subst. now eauto.
           right. right. constructor; eauto. intros Hc; inv Hc. congruence.
         * intros e' s'. eapply return_triple. intros s'' [C' [Hctx' [Hcc Hf'']]].
           eexists. split. now eapply Hctx. split.
@@ -1097,7 +1098,7 @@ Section CC_correct.
           now apply bound_var_occurs_free_Eprim_Included.
         * intros Hc. inv Hc; eapply HD2; eauto.
           rewrite bound_var_Eprim, occurs_free_Eprim. 
-          destruct (Coqlib.peq Γ v); subst. now eauto.
+          destruct (peq Γ v); subst. now eauto.
           right. right. constructor; eauto. intros Hc; inv Hc. congruence.
         * intros e' s'. eapply return_triple.
           intros s'' [C' [Hctx' [Hcc Hf'']]]; eauto.

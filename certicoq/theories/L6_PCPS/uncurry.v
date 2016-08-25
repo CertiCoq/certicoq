@@ -9,8 +9,8 @@
     * We need to tag the uncurried function so that it doesn't get inlined into
       the eta expansion (thereby undoing the uncurrying.)
 *)
-Require Import CpdtTactics.
-Require Import cps.
+Require Import Libraries.CpdtTactics.
+Require Import L6.cps.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.

@@ -1,5 +1,6 @@
-Require Import cps cps_util set_util hoisting identifiers ctx Ensembles_util
-        List_util functions closure_conversion eval logical_relations alpha_conv.
+Require Import L6.cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx L6.Ensembles_util
+        L6.List_util L6.functions L6.closure_conversion L6.eval L6.logical_relations.
+Require Import Libraries.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -8,6 +9,7 @@ Import ListNotations.
 
 Open Scope ctx_scope.
 Open Scope fun_scope.
+Close Scope Z_scope.
 
 (** For closure conversion, the free variables of an expression are divided in
     three categories :
@@ -395,7 +397,7 @@ Section Closure_conversion_correct.
             Scope (Union _ (Singleton _ f) Funs) σ c Γ.
   Proof.
     intros Hinv Hneq Hnin Hnin' Hget Hv f'' v Hnin'' Hin Hget'.
-    destruct (Coqlib.peq f'' f); subst.
+    destruct (peq f'' f); subst.
     - repeat eexists; eauto. rewrite M.gso; eauto.
       now rewrite M.gss in Hget'; inv Hget'; eauto.
       now rewrite M.gss.
@@ -462,7 +464,7 @@ Section Closure_conversion_correct.
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
     rewrite M.gss in Hget1; inv Hget1. 
     repeat eexists; eauto. now rewrite M.gss.
-    destruct (Coqlib.peq (σ f) Γ).
+    destruct (peq (σ f) Γ).
     - subst. now rewrite M.gss in *.
     - rewrite M.gso; eauto. rewrite M.gso in Hget2; eauto.
       rewrite M.gso; eauto.
@@ -578,7 +580,7 @@ Section Closure_conversion_correct.
       rewrite def_funs_eq. reflexivity. eassumption.
       intros Hc; subst; eauto.
     - rewrite M.gsspec in Hget'.
-      destruct (Coqlib.peq (σ f) Γ).
+      destruct (peq (σ f) Γ).
       + subst. inv Hget'.
       + repeat eexists; eauto. rewrite M.gso. 
         rewrite def_funs_neq; eauto. 
@@ -837,11 +839,11 @@ Section Closure_conversion_correct.
       + inv Hdef. repeat eexists; eauto. 
         simpl.
         intros Hc. eapply H. now eauto.
-        simpl. rewrite Coqlib.peq_true. reflexivity.
+        simpl. rewrite peq_true. reflexivity.
       + edestruct IHHcc as [Γ'' [C' [e2 [Hnin [Hfind Hcc']]]]]; eauto.
         eapply injective_subdomain_antimon. eassumption.
         now apply Included_Union_r.
-        repeat eexists; eauto. simpl. rewrite Coqlib.peq_false. eassumption.
+        repeat eexists; eauto. simpl. rewrite peq_false. eassumption.
         intros Hc. eapply n. eapply Hinj; eauto.
         right. eapply fun_in_fundefs_name_in_fundefs.
         eapply find_def_correct. now eauto.
@@ -980,11 +982,11 @@ Section Closure_conversion_correct.
     intros Hvar Hctx Hin. inv Hvar.
     - inv Hctx. reflexivity.
     - inv Hctx. inv H11.
-      destruct (Coqlib.peq y x'); subst.
+      destruct (peq y x'); subst.
       contradiction.
       now rewrite M.gso.
     - inv Hctx. inv H12.
-      destruct (Coqlib.peq y x'); subst.
+      destruct (peq y x'); subst.
       contradiction.
       now rewrite M.gso.
   Qed.    

@@ -1,6 +1,7 @@
 Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
         Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles Omega.
-Require Import cps cps_util ctx set_util Ensembles_util List_util.
+Require Import L6.cps L6.cps_util L6.ctx L6.set_util L6.Ensembles_util L6.List_util.
+Require Import Libraries.Coqlib.
 Import ListNotations.
 
 Import PS.
@@ -34,7 +35,7 @@ Instance Decidable_name_in_fundefs (B : fundefs) :
 Proof.
   constructor.
   induction B; intros x.
-  - destruct (Coqlib.peq x v); subst.
+  - destruct (peq x v); subst.
     left. left. eauto.
     destruct (IHB x). left. right; eauto.
     right. intros Hc. inv Hc. inv H0; congruence. 
@@ -149,7 +150,7 @@ Lemma def_funs_spec x v B B' rho rho' :
   (~ name_in_fundefs B x /\ M.get x rho' = Some v).
 Proof.
   induction B; intros Hget.
-  - simpl in Hget. rewrite M.gsspec in Hget. destruct (Coqlib.peq x v0).
+  - simpl in Hget. rewrite M.gsspec in Hget. destruct (peq x v0).
     + inv Hget. left. split; eauto. constructor; eauto.
     + destruct (IHB Hget) as [[H1 H2] | [H1 H2]]; eauto.
       * left. split; eauto. constructor 2; eauto.
@@ -163,7 +164,7 @@ Lemma def_funs_eq x B B' rho rho' :
 Proof.
   induction B; intros Hin; inv Hin.
   - simpl. inv H; rewrite M.gss. eauto.
-  - simpl. rewrite M.gsspec. destruct (Coqlib.peq x v); subst; eauto.
+  - simpl. rewrite M.gsspec. destruct (peq x v); subst; eauto.
 Qed.
 
 Lemma def_funs_neq x B B' rho rho' :
@@ -171,7 +172,7 @@ Lemma def_funs_neq x B B' rho rho' :
   M.get x (def_funs B' B rho rho') = M.get x rho'.
 Proof.
   induction B; intros Hin; simpl; eauto.
-  rewrite M.gsspec. destruct (Coqlib.peq x v); subst; eauto.
+  rewrite M.gsspec. destruct (peq x v); subst; eauto.
   exfalso. apply Hin. constructor; eauto. eapply IHB.
   intros Hc.  eapply Hin. constructor 2; eauto.
 Qed.
@@ -513,10 +514,10 @@ Lemma occurs_free_in_fun f tau xs e B :
 Proof with eauto with Ensembles_DB.
   induction B; intros H; inv H.
   - inv H0. intros x H.
-    destruct (Coqlib.peq x f); simpl; subst; eauto.
+    destruct (peq x f); simpl; subst; eauto.
     destruct (in_dec var_dec x xs); eauto; subst.
     destruct (@Dec _ _ (Decidable_name_in_fundefs B) x); eauto.
-  - intros x H. destruct (Coqlib.peq x v); subst; simpl...
+  - intros x H. destruct (peq x v); subst; simpl...
     edestruct (IHB H0 x) as [H'| H']; eauto.
     inv H1...
 Qed.

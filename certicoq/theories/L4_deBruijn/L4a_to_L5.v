@@ -48,10 +48,51 @@ Open Scope nat_scope.
 
 (* MOVE to [SquiggleEq] *)
 
+Section GetOpid.
+Context {NVar Opid : Type}.
+
+Definition getOpid (n: @NTerm NVar Opid) : option Opid :=
+match n with
+| vterm _ => None
+| oterm o _ => Some o
+end. 
+Context {VarClass:Type} `{Deq NVar} `{VarType NVar VarClass}.
+
+Global Instance alphaGetOpid : Proper ((@alpha_eq NVar _ _ _ Opid) ==> eq) getOpid.
+Proof.
+  intros ? ? Hal.
+  inverts Hal; refl.
+Qed.
+
+End GetOpid.
 
 Instance NEqDec : Deq N.
 Proof using.
   intros x y. exists (N.eqb x y). apply N.eqb_eq.
+Defined.
+
+Definition deqOption {A:Type} `{Deq A} (oa ob : option A) : bool :=
+match (oa,ob) with
+| (Some a, Some b) => decide (a=b)
+| (None, None) => true
+| _ => false 
+end.
+
+Lemma deqOptionCorr {A:Type} `{Deq A} :
+  forall x y, deqOption x y = true <-> x = y.
+Proof.
+  destruct x, y; unfold deqOption; simpl; auto; 
+  unfold decide; try rewrite  Decidable_spec;
+  split; intro;
+  subst; try discriminate; auto.
+  inverts H0. refl.
+Qed.
+
+
+
+Instance optionEqDec {A:Type} `{Deq A}: Deq (option A).
+Proof using.
+  intros x y. exists (deqOption x y). apply deqOptionCorr.
 Defined.
 
 Require Import Common.classes Common.AstCommon.
@@ -83,10 +124,13 @@ Definition dcon : Set := inductive * N.
 
 Inductive L4Opid : Set :=
  | NLambda
- | NFix (nMut : nat) (** number of functions that are mutually defined*)
+(** number of functions that are mutually defined, index of the one which
+is referred to here.*)
+ | NFix (nMut index: nat) 
  | NDCon (dc : dcon) (nargs : nat)
  | NApply
- | NProj (selector :nat) (** which one to project out*)
+(* Not longer using projection based semantics for mutual fixpoints 
+| NProj (selector :nat) (** which one to project out*) *)
  | NLet
  | NMatch (dconAndNumArgs : list (dcon * nat)).
 
@@ -94,10 +138,10 @@ Inductive L4Opid : Set :=
 Definition OpBindingsL4 (nc : L4Opid) : list nat :=
   match nc with
   | NLambda    => [1]
-  | NFix nMut => repeat 1 nMut
+  | NFix nMut _ => repeat nMut nMut
   | NDCon _ nargs    => repeat 0 nargs
   | NApply     => [0,0]
-  | NProj _ => [0]
+(*  | NProj _ => [0] *)
   | NLet => [0,1]
   | NMatch numargsInBranches => 0::(List.map snd numargsInBranches)
   end.
@@ -124,12 +168,14 @@ Instance CoqL4GenericTermSig : GenericTermSig L4Opid:=
 Inductive L5Opid : Set :=
  | CLambda 
  | CKLambda
- | CFix (nMut : nat) (** number of functions that are mutually defined*)
+(** number of functions that are mutually defined, index of the one which
+is referred to here.*)
+ | CFix (nMut index : nat)
  | CDCon (dc : dcon) (nargs : nat)
  | CHalt 
  | CRet (** application of a continuation lambda ([CKLambda]) *)
  | CCall (** a bit like apply in source language *)
- | CProj (selector :nat) (** which one to project out*)
+(* | CProj (selector :nat) (** which one to project out*) *)
  (* nat may be ineffiecient in general, 
     but here it is only used to iterate over the list ONE BY ONE and pick one out *)
  | CMatch (dconAndNumArgs : list (dcon * nat))
@@ -141,12 +187,12 @@ Definition CPSOpBindings (c : L5Opid)
   match c with
   | CLambda    => [2] (* user lambda, also binds a continuation *)
   | CKLambda    => [1] (* continuation lambda  *)
-  | CFix nMut => repeat 1 nMut
+  | CFix nMut _ => repeat nMut nMut
   | CDCon _ nargs    => repeat 0 nargs
   | CHalt => [0]
   | CRet => [0,0]
   | CCall => [0,0,0]
-  | CProj _ => [0,0]
+(*  | CProj _ => [0,0] *)
   | CMatch numargsInBranches => 0::(List.map snd numargsInBranches)
   end.
 
@@ -204,12 +250,17 @@ Definition App_e (f a : NTerm) :=
 Definition Con_e (dc : dcon) (args : list NTerm) : NTerm :=
   oterm (NDCon dc (length args)) (List.map (bterm []) args).
 
+(*
 Definition Proj_e (arg : NTerm) (selector : nat)  : NTerm :=
   oterm (NProj selector) [bterm [] arg].
+*)
+
+Definition Fix_e' (lbt : list BTerm) (n:nat) : NTerm :=
+  oterm (NFix (length lbt) n) lbt.
 
 (** fix (\xf. (\x..,,)) *)
-Definition Fix_e (xf : NVar) (args : list NTerm) : NTerm :=
-  oterm (NFix (length args)) (List.map (bterm [xf]) args).
+Definition Fix_e (xf : list NVar) (args : list NTerm)  (n:nat) : NTerm :=
+  Fix_e' (List.map (bterm xf) args) n.
 
 Definition Match_e (discriminee : NTerm) (brs : list branch) : NTerm :=
   oterm (NMatch (List.map (fun b => (fst b, num_bvars (snd b))) brs))
@@ -262,9 +313,13 @@ Instance ExpSubstitute : Substitute NTerm NTerm :=
   { substitute := fun rep x t => subst t x rep}.
 
 
-Definition Fix_e' (lbt : list BTerm) : NTerm :=
-  oterm (NFix (length lbt)) lbt.
 
+Inductive is_value : NTerm -> Prop :=
+| var_is_value : forall i, is_value (vterm i)
+| lam_is_value : forall x e, is_value (Lam_e x e)
+| con_is_value : forall d es, (forall s, In s es -> is_value s) -> is_value (Con_e d es)
+(** Unlike in Nuprl, fix is a value.*)
+| fix_is_value : forall es n, is_value (Fix_e' es n).
 
 (** Big-step evaluation for [exp]. *)
 Inductive eval : NTerm -> NTerm -> Prop :=
@@ -275,7 +330,8 @@ Inductive eval : NTerm -> NTerm -> Prop :=
                  eval e2 v2 ->
                  eval (e1'{x := v2}) v -> 
                  eval (App_e e1 e2) v
-(**AA: do we need to go inside constructors for weak-head evaluation? *)
+(**AA: do we need to go inside constructors for weak-head evaluation? 
+What if we add coinductives? *)
 | eval_Con_e : forall d es vs, 
     length es = length vs
     -> (forall e v, (LIn (e,v) (combine es vs)) -> eval e v)
@@ -289,11 +345,33 @@ Inductive eval : NTerm -> NTerm -> Prop :=
                    find_branch d ((List.length vs)) bs = Some e' ->
                    eval (apply_bterm e' vs) v ->
                    eval (Match_e e bs) v
-| eval_Fix_e : forall es, eval (Fix_e' es) (Fix_e' es)
+| eval_Fix_e : forall es n, eval (Fix_e' es n) (Fix_e' es n)
+| eval_FixApp_e : forall e lbt n e2 v2 bt ev2,
+    let len := length lbt in
+    let pinds := (seq 0 len) in
+    let sub :=  (map (Fix_e' lbt) pinds) in
+    eval e (Fix_e' lbt n) ->
+    eval e2 v2 ->
+    select n lbt = Some bt ->
+    eval (App_e (apply_bterm bt sub) v2) ev2 ->
+    num_bvars bt = len ->
+    eval (App_e e e2) ev2.
+(* | eval_Ax_e s : eval (Ax_e s) (Ax_e s) 
+
 | eval_Proj_e : forall xf e es n xl bl,
                   eval e (Fix_e' es) ->
                   select n es = Some (bterm [xf] (Lam_e xl bl)) ->
                   eval (Proj_e e n) ((Lam_e xl bl){xf:=Fix_e' es}).
+
+*)
+
+Require Import Common.certiClasses.
+(* Enables the ⇓ notation.
+Local Instances are cleared at the end of a section.
+A more specific instance
+is redeclared in L4.instances using "Existing Instance" *)
+Local Instance L4aEval : BigStepOpSem NTerm := eval.
+
 
 (** will be used in [eval_reduces_fvars] and cps_cvt_corr *)
 Lemma subset_step_app: forall x e1' v2,
@@ -327,15 +405,42 @@ Qed.
 
 Local Opaque ssubst.
 
+(* will be used in eval_reduces_fvars and cps_cvt_corr *)
+Lemma subset_fvars_fix : forall bt lbt,
+LIn bt lbt ->
+Datatypes.length (get_vars bt) = Datatypes.length lbt ->
+let len := Datatypes.length lbt in
+let pinds := seq 0 len in
+let sub := map (Fix_e' lbt) pinds in
+subset (free_vars (apply_bterm bt sub)) (flat_map free_vars_bterm lbt).
+Proof using.
+  intros ? ? Hin Hl. simpl.  
+  unfold apply_bterm.
+  rewrite eqsetv_free_vars_disjoint.
+  intros v Hc.
+  rewrite in_app_iff in Hc.
+  rewrite dom_sub_combine in Hc;
+    [ | rewrite map_length, seq_length; assumption].
+  dorn Hc; [rewrite  in_flat_map; simpl; exists bt; destruct bt; eauto | ].
+  apply in_sub_free_vars in Hc.
+  exrepnd.
+  apply in_sub_keep_first in Hc0.
+  repnd.
+  apply sub_find_some in Hc2.
+  apply in_combine in Hc2.
+  apply proj2 in Hc2.
+  apply in_map_iff in Hc2.
+  exrepnd. subst. clear Hc2.
+  assumption.
+Qed.
+
 Lemma eval_reduces_fvars :
-  forall e v, eval e v ->  subset (free_vars v) (free_vars e).
+  forall (e v : NTerm) , e ⇓ v -> subset (free_vars v) (free_vars e).
 Proof using.
   intros ? ? He. unfold closed. induction He; try auto;
   simpl in *;autorewrite with core list in *.
   (**Apply case*)
-  -
-    unfold subset.
-    pose proof (subset_step_app x e1' v2) as H.
+  - pose proof (subset_step_app x e1' v2) as H.
     pose proof (subset_trans _ _ _ _ IHHe3 H).
     clear H IHHe3. eapply subset_trans; eauto.
     simpl. autorewrite with list core.
@@ -384,22 +489,18 @@ Proof using.
       apply sub_find_some in Hf0. apply in_combine_r in Hf0.
       assumption.
 
-- intros ? Hf. unfold subst.
-  apply_clear IHHe. unfold subst in Hf.
-  rewrite eqsetv_free_vars_disjoint in Hf.
-   simpl in Hf.
-  rewrite in_app_iff in *.
-  dorn Hf. 
-  + unfold compose. repnd.
-    apply select_in in H. apply in_flat_map. eexists; split; eauto.
-  + rewrite memvar_dmemvar in Hf. 
-    if_splitH Hf; simpl in Hf; autorewrite with list in *;[|firstorder].
-    assumption.
+(* fix application *)
+- eapply subset_trans; eauto.
+  apply subsetvAppLR; auto.
+  eapply subset_trans; [| apply IHHe1].
+  clear He3 IHHe3.
+  apply select_in in H.
+  apply subset_fvars_fix; auto.
 Qed.
 
 (** Evaluation preserves closedness.*)
 Corollary eval_preserves_closed :
-  forall e v, eval e v ->  closed e -> closed v.
+  forall (e v : NTerm),  e ⇓ v ->  closed e -> closed v.
 Proof using.
   intros ? ?  He. unfold closed. intro Hc.
   apply eval_reduces_fvars  in He.
@@ -408,20 +509,15 @@ Proof using.
 Qed.
 
 (** Characterize values *)
-Inductive is_value : NTerm -> Prop :=
-| var_is_value : forall i, is_value (vterm i)
-| lam_is_value : forall x e, is_value (Lam_e x e)
-| con_is_value : forall d es, (forall s, In s es -> is_value s) -> is_value (Con_e d es)
-(** Unlike in Nuprl, fix is a value.*)
-| fix_is_value : forall es, is_value (Fix_e' es).
+
 
 (** Show that evaluation always yields a value. *)
 Lemma eval_yields_value' :
   (forall e v, eval e v -> is_value v).
 Proof using.
   intros ? ? He ; induction He ; simpl ; intros;
-  auto ; try constructor ; auto;[|].
-  - change vs  with (snd (es, vs)).
+  auto ; try constructor ; auto.
+  change vs  with (snd (es, vs)).
     rename H into Hl.
     apply combine_split in Hl.
     rewrite <- Hl.
@@ -430,16 +526,26 @@ Proof using.
     apply in_map_iff in Hin.
     exrepnd. simpl in *. subst.
     eauto.
-  - unfold subst.
-    Local Transparent ssubst. unfold Lam_e. unfold ssubst. simpl.
-    cases_ifd Hd; simpl;[constructor|].
-    unfold freshReplacements. simpl in *.
-    addFreshVarsSpec2 lvn Hfr.
-    repnd. simpl in *. dlist_len_name lvn a. simpl. constructor. 
 Qed.
 
 Ltac ntwfauto := 
 simpl substitute in *;alphaeq.ntwfauto.
+
+
+
+Lemma fVarsFix' : forall lbt,
+eq_set
+  (flat_map all_vars (map (Fix_e' lbt) (seq 0 (Datatypes.length lbt))))
+  (flat_map all_vars_bt lbt).
+Proof using.
+  intros. rewrite flat_map_map.
+  unfold compose.
+  unfold Fix_e'.
+  rewrite eqset_flat_maps with (g:= fun x => (flat_map all_vars_bt lbt));
+    [| intros ? ?; rewrite all_vars_ot at 1; refl].
+  destruct lbt;[refl | ].
+  apply eqset_repeat. simpl. discriminate.
+Qed.
 
 Lemma eval_preseves_wf :
   forall e v, eval e v ->  nt_wf e -> nt_wf v.
@@ -466,11 +572,14 @@ Proof using.
   + apply find_branch_some in H. repnd.
     repnd. rewrite <- (bt_wf_iff l).
     apply Hntwf. auto.
-- ntwfauto. 
-  subst.
-  apply select_in in H.
-  apply Hntwf in H.
+- unfold len, sub, pinds in *.
   ntwfauto.
+  apply IHHe3.
+  ntwfauto.
+  + apply in_combine in Hsub. repnd. apply in_map_iff in Hsub.
+    exrepnd. subst. ntwfauto.
+  + apply select_in in H. destruct bt. ntwfauto.
+  + rewrite or_false_r in HntwfIn. subst. ntwfauto.  
 Qed.
 
 
@@ -535,21 +644,22 @@ Proof using.
   rewrite allvars_bterm.
   apply in_app_iff. tauto.
 
-- remember (Lam_e xl bl) as r. clear Heqr.
-  unfold Fix_e', Proj_e in *.
-  apply ssubst_allvars_varclass_nb.
-  apply select_in in H.
-  rwsimplAll.
-  split;[| tauto].
+- unfold Fix_e, Fix_e', App_e,  sub, pinds, len in *.
+  apply_clear IHHe3.
+  rwsimplC.
+  rwsimpl Hn.
+  rwsimpl IHHe1.
   repnd.
-  eapply varsOfClassSubset;[| apply IHHe; auto].
-  intros ? Hin.
-  apply in_flat_map. eexists.
-  split;[apply H|].
-  unfold compose.
-  simpl.
-  rewrite allvars_bterm.
-  apply in_app_iff. tauto.
+  dands; eauto with SquiggleEq;[].
+  repnd.
+  apply ssubst_allvars_varclass_nb.
+  rewrite dom_range_combine;[| destruct bt; autorewrite with list; auto ].
+  apply select_in in H.
+  rwsimpl IHHe1.
+  apply varsOfClassApp.
+  dands;[destruct bt; simpl in *;eauto with subset | ].
+  rewrite fVarsFix'.
+  auto 2.
 Qed.
 
 
@@ -575,15 +685,20 @@ Definition Call_c (f k a : CTerm) :=
 Definition Con_c (dc : dcon) (args : list CTerm) : CTerm :=
   coterm (CDCon dc (length args)) (List.map (bterm []) args).
 
+(*
 Definition Proj_c (arg: CTerm) (selector : nat) (cont: CTerm)  : CTerm :=
   coterm (CProj selector) [bterm [] arg, bterm [] cont].
+*)
 
-(** do we need a continuation variable as well? *)
-Definition Fix_c (xf : NVar) (args : list CTerm) : CTerm :=
-  coterm (CFix (length args)) (List.map (bterm [xf]) args).
+Definition Fix_c' (lbt : list CBTerm) (n:nat) : CTerm :=
+  coterm (CFix (length lbt) n) lbt.
 
-Definition Fix_c' (lbt : list CBTerm) : CTerm :=
-  coterm (CFix (length lbt)) lbt.
+(** do we need a continuation variable as well? 
+A continuation variable is only needed for elim forms. a Fix is eliminated using an App.
+*)
+Definition Fix_c (xf : list NVar) (args : list CTerm) (n:nat) : CTerm :=
+  Fix_c' (List.map (bterm xf) args) n.
+
 
 Definition Match_c (discriminee : CTerm) (brs : list branch) : CTerm :=
   coterm (CMatch (List.map (fun b => (fst b, num_bvars (snd b))) brs))
@@ -593,7 +708,7 @@ Definition Match_c (discriminee : CTerm) (brs : list branch) : CTerm :=
 Instance CExpSubstitute : Substitute CTerm CTerm :=
   { substitute := fun rep x t => subst t x rep}.
 
-
+Print eval.
 (** OPTIMISED Big-step evaluation for CPS expressions.
     Notice that only computations
     are evaluated -- values are inert so to speak. *)
@@ -606,7 +721,8 @@ Inductive eval_c : CTerm -> CTerm -> Prop :=
 | eval_Call_c : forall xk x c v1 v2 v',
                   eval_c (ssubst c [(x,v2);(xk,v1)]) v' -> 
                   eval_c (Call_c ((Lam_c x xk c)) v1 v2) v'
-| eval_Match_c : forall d vs bs c v',
+
+| eval_Match_c :  forall d vs bs c v',
                    find_branch d (List.length vs) bs = Some c ->
                    eval_c (apply_bterm c vs) v' -> 
                    eval_c (Match_c (Con_c d vs) bs) v'
@@ -617,11 +733,15 @@ Inductive eval_c : CTerm -> CTerm -> Prop :=
                   eval_c (Ret_c k (fn{xf:=Fix_c' lbt})) v' ->  
                   eval_c (Proj_c (Fix_c' lbt) i k) v'. *)
 
-| eval_Proj_c : forall lbt i k v' xf fn, 
-(* fn is a value, which will have a val_outer (defined below) in the intended usecase*)
-                  select i lbt = Some (bterm [xf] fn) -> 
-                  eval_c (Ret_c (fn{xf:=Fix_c' lbt}) k) v' ->
-                  eval_c (Proj_c (Fix_c' lbt) i k) v'.
+(* fn is a lambda *)
+| eval_FixApp_c : forall lbt i k arg v bt, 
+    let len := Datatypes.length lbt in
+    let pinds := seq 0 len in
+    let sub := map (Fix_c' lbt) pinds in
+    select i lbt = Some bt -> 
+    eval_c (Call_c (apply_bterm bt sub) k arg) v ->
+    eval_c (Call_c (Fix_c' lbt i) k arg) v.
+
 Hint Constructors eval_c.
 
 (** Useful for rewriting. *)
@@ -687,10 +807,10 @@ Fixpoint is_valueb (e:NTerm) : bool :=
       match c with
           (* expensive test. need memoization *)
         | NLambda => true
-        | NFix _ => true
+        | NFix _ _ => true
         | NDCon _ _ => ball (List.map (is_valueb ∘ get_nt) lb)
         | NApply => false
-        | NProj _ => false
+(*        | NProj _ => false *)
         | NLet => false
         | NMatch _ => false
       end
@@ -767,11 +887,11 @@ Section CPS_CVT.
              (Lam_c x kv (Ret_c (cps_cvt b) (vterm kv))).
 
   (** the KLam_c was manually added. unlike now, Fix_c previously implicitly bound a var*)
-  Definition cps_cvt_fn_list'  (es: list BTerm) : list CBTerm :=
+  Definition cps_cvt_fn_list' f (es: list BTerm) : list CBTerm :=
     map (fun b => 
             let e := get_nt b in
             let vars := get_vars b in
-                    bterm vars (cps_cvt e)) es.
+                    bterm vars (f e)) es.
 
   Fixpoint cps_cvt_val' (e:NTerm) : CTerm :=
     match e with
@@ -783,9 +903,9 @@ Section CPS_CVT.
                       bterm []
                             (cps_cvt_val' (get_nt b))) in
             coterm (CDCon d l) (List.map fb lb)
-      | terms.oterm (NFix nargs) lb =>
-          coterm (CFix nargs)
-             (cps_cvt_fn_list' lb)
+      | terms.oterm (NFix nargs i) lb =>
+          coterm (CFix nargs i)
+             (cps_cvt_fn_list' cps_cvt_val' lb)
       | _ => coterm CLambda (map ((bterm []) ∘ vterm)  (free_vars e))
           (* ill-formed term, which will not arise from the prev. phase.
             This choice, which is also ill-formed,
@@ -848,12 +968,12 @@ Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
       let cpsLam := (val_outer (cps_cvt_lambda cps_cvt x e2)) in
         cps_cvt_apply cps_cvt cpsLam e1
 
-    | terms.oterm (NProj i) [bterm [] e] =>
+(*    | terms.oterm (NProj i) [bterm [] e] =>
       let kvars := contVars  2 in 
       let k := nth 0 kvars nvarx in  
       let ke := nth 1 kvars nvarx in  
         KLam_c k (Ret_c (cps_cvt e) 
-                        (KLam_c ke (Proj_c (vterm ke) i (vterm k))))
+                        (KLam_c ke (Proj_c (vterm ke) i (vterm k)))) *)
     | _ => coterm CLambda (map ((bterm []) ∘ vterm)  (free_vars e))
           (* ill-formed term, which will not arise from the prev. phase.
             This choice, which is also ill-formed,
@@ -1095,6 +1215,7 @@ Definition cps_cvt_apply_step : Prop := forall e1 e2 :NTerm,
 
 End CPS_CVT_INDUCTION.
 
+(* TODO : pick an appropriate name *)
 Local Lemma cps_cvt_val_aux_fvars_aux : forall o lbt,
   (forall es, 
     (size es) < size (oterm o lbt)
@@ -1104,6 +1225,37 @@ Local Lemma cps_cvt_val_aux_fvars_aux : forall o lbt,
 -> nt_wf (oterm o lbt)
 -> varsOfClass (all_vars (oterm o lbt)) USERVAR
 -> eq_set (flat_map free_vars_bterm (cps_cvt_fn_list' cps_cvt lbt))
+          (flat_map free_vars_bterm lbt).
+Proof using.
+  intros ? ? Hyp  Hwf Hvc.
+  unfold cps_cvt_fn_list'. rewrite flat_map_map.
+  apply eqset_flat_maps.
+  intros bt Hin.
+  destruct bt as [lvb nt]. unfold compose.
+  simpl.
+  autorewrite with list SquiggleEq.
+  autorewrite with list in *.
+  varsOfClassSimpl.
+  rewrite Hyp; [
+    | eapply size_subterm3; eauto
+    | ntwfauto
+    | tauto
+      ].
+  apply proj2, userVarsContVar in Hin.
+  refl.
+Qed.
+
+(* TODO : pick an appropriate name *)
+
+Local Lemma cps_cvt_val_aux_fvars_aux2 : forall o lbt,
+  (forall es, 
+    (size es) < size (oterm o lbt)
+    -> nt_wf es 
+    -> varsOfClass (all_vars es) USERVAR
+    -> eq_set (free_vars (cps_cvt_val  es)) (free_vars es))
+-> nt_wf (oterm o lbt)
+-> varsOfClass (all_vars (oterm o lbt)) USERVAR
+-> eq_set (flat_map free_vars_bterm (cps_cvt_fn_list' cps_cvt_val lbt))
           (flat_map free_vars_bterm lbt).
 Proof using.
   intros ? ? Hyp  Hwf Hvc.
@@ -1142,10 +1294,10 @@ Lemma cps_cvt_val_aux_fvars :
   cps_cvt_val_step cps_preserves_fvars.
 Proof using.
   simpl. unfold cps_preserves_fvars. intros ? Hyp.
-  nterm_ind e as [v | o lbt Hind] Case;[eauto|].
+  induction e as [v | o lbt Hind] using NTerm_better_ind3;[eauto|].
   intros Hwf Hs. simpl in Hs.
   destruct o; try illFormedCase;
-    [clear Hind| clear Hind|]; inverts Hwf as Hbt Hnb;
+    [clear Hind| |]; inverts Hwf as Hbt Hnb;
     simpl in Hnb.
 (* lambda case *)
 - simpl.
@@ -1164,7 +1316,9 @@ Proof using.
   auto.
 (* Fix_e case *)
 - simpl.
-  eapply cps_cvt_val_aux_fvars_aux; eauto.
+  eapply cps_cvt_val_aux_fvars_aux2; eauto;[| ntwfauto].
+  intros. eapply Hind; eauto.
+  intros. eapply Hyp; eauto. omega.
   
 (* Con_e case *)
 - simpl.
@@ -1176,8 +1330,8 @@ Proof using.
   unfold num_bvars in Hnb. simpl in Hnb.
   dlist_len_name l vv.
   apply properEqsetvRemove; eauto.
-  rewrite Hind; eauto; [|ntwfauto; fail|].
-  + intros.  apply Hyp; eauto. eapply lt_trans; eauto.
+  rewrite Hind; eauto;[eauto using size_subterm3 | | ntwfauto |].
+  + intros.  apply Hyp; eauto.  eapply lt_trans; eauto.
     eapply size_subterm3; eauto.
   + varsOfClassSimpl. tauto.
 Qed.
@@ -1344,17 +1498,6 @@ Local Transparent cps_cvt_val' is_valueb.
     unfold cps_preserves_fvars.
     intros; apply Hind; auto;[]. simpl in *. omega.
 
-(** Proj_e *)
-  + dnumvbars Hnb bt. unfold num_bvars. simpl.
-    addContVarsSpec 2 Hs kv. repnd.
-    simpl in *. dlist_len_name lkv kv; simpl in *.
-    repeat progress (autorewrite with list SquiggleEq SquiggleEq2 in *; simpl in * ).
-    rewrite remove_nvars_nops;[|noRepDis].
-    autorewrite with list SquiggleEq.
-    autorewrite with  SquiggleEq in Hs.
-    rewrite Hind;[| omega | ntwfauto | tauto].
-    autorewrite with list SquiggleEq.
-    rewrite remove_nvars_nop;[auto| inauto; eauto].
 
 (** Let_e *)
   + dnumvbars Hnb b.
@@ -1478,19 +1621,19 @@ Qed.
 Lemma isvalueb_ssubst_aux : forall t sub,
 sub_range_sat sub is_value 
 -> (is_valueb (ssubst_aux t sub)) = is_valueb t.
-Proof.
+Proof using.
   intro t. induction t as [v | o lbt Hind] using NTerm_better_ind; intros ? Hsr.
 - simpl. dsub_find sf;[| refl]; symmetry in Heqsf.
   apply is_valueb_corr.  eapply Hsr. apply sub_find_some. eauto.
 - simpl. destruct o; try refl.
-  rewrite map_map.
-  f_equal.
-  apply eq_maps.
-  intros bt Hin.
-  destruct bt as [lv nt].
-  unfold compose.
-  simpl.
-  eapply Hind; eauto.
+   rewrite map_map.
+    f_equal.
+    apply eq_maps.
+    intros bt Hin.
+    destruct bt as [lv nt].
+    unfold compose.
+    simpl.
+    eapply Hind; eauto.
 Qed.
 
 
@@ -1514,7 +1657,7 @@ Hint Constructors is_value : CerticoqCPS.
 Lemma isvalue_ssubst_aux : forall t sub,
 sub_range_sat sub is_value 
 -> (is_value (ssubst_aux t sub)) <-> is_value t.
-Proof.
+Proof using.
   intro t. induction t as [v | o lbt Hind] using NTerm_better_ind; intros ? Hsr.
 - simpl. dsub_find sf;[| refl]; symmetry in Heqsf.
   apply sub_find_some in Heqsf. apply Hsr in Heqsf.
@@ -1552,9 +1695,35 @@ Qed.
 *)
 Hint Rewrite isvalueb_ssubst_aux : CerticoqCPS.
 
+Definition is_lambdab (n: NTerm) :=
+decide (getOpid n = Some NLambda).
+
+
+Fixpoint fixwf (e:NTerm) : bool :=
+match e with
+| terms.vterm _ => true (* closedness is a the concern of this predicate *) 
+| terms.oterm o lb => 
+    (match o with
+    | NFix _ _ => ball (map (is_lambdab ∘ get_nt) lb) 
+    | _ => true
+    end) && ball (map (fixwf ∘ get_nt) lb)
+end.
+
+
+Lemma is_lambdab_is_valueb : forall t,
+  is_lambdab t = true -> is_valueb t = true.
+Proof using.
+  intros ? H. destruct t as [? | o ? ]; auto.
+  destruct o; inverts H.
+  refl.
+Qed.
+
+
+
 Definition cps_ssubst_commutes (e : NTerm) (cps_cvt' : NTerm -> CTerm) := 
   forall (sub : Substitution),
 nt_wf e
+-> (fixwf e = true)
 -> sub_range_sat sub is_value (* can we get rid of this ?*)
 -> sub_range_sat sub nt_wf
 -> sub_range_sat sub closed
@@ -1565,13 +1734,13 @@ nt_wf e
 Lemma val_outer_ssubst_aux : forall t sub,
 disjoint [contVar] (dom_sub sub)
 ->ssubst_aux (val_outer t) sub = val_outer (ssubst_aux t sub).
-Proof.
+Proof using.
   intros ? ? Hdis. unfold val_outer.
   simpl. unfold KLam_c, Ret_c.
   autorewrite with SquiggleEq.
   rewrite sub_filter_disjoint1; [|disjoint_reasoningv2].
   repeat f_equal.
- rewrite sub_find_none_if;
+  rewrite sub_find_none_if;
      [refl|disjoint_reasoningv2].
 Qed.
 
@@ -1580,7 +1749,7 @@ Hint Resolve sub_filter_subset flat_map_monotone varsOfClassSubset map_monotone 
 *)
 
 Lemma contVars1 : contVars 1 = [contVar].
-Proof.
+Proof using.
   unfold contVar, contVars.
   addFreshVarsSpec2 lvn Hfr.
   simpl in *. repnd.
@@ -1593,10 +1762,10 @@ Lemma cps_cvt_val_ssubst_commutes_aux :
 Proof using.
   simpl. unfold cps_ssubst_commutes. intros ? Hyp.
   nterm_ind e as [v | o lbt Hind] Case;
-  intros Hev ?  Hwf Hisv Hwfs Hcs  Hs;
+  intros Hev ?  Hwf Hfwf Hisv Hwfs Hcs  Hs;
   applydup userVarsContVar in Hs as Hdisvc; simpl in Hdisvc;
   [ | destruct o; try (complete (inverts Hev)) ; inverts Hwf as Hbt Hnb; simpl in Hnb];
-    [| clear Hind | clear Hind| ].
+    [| clear Hind  | | ].
 - simpl. symmetry.
   dsub_find sf; symmetry in Heqsf; [|erewrite sub_find_none_map; eauto; fail].
   erewrite sub_find_some_map; eauto.
@@ -1614,9 +1783,12 @@ Proof using.
   rewrite (sub_filter_disjoint1 sub); [|disjoint_reasoningv2].
   rwsimpl Hs.
   simpl in Hbt. dLin_hyp.
+  simpl in Hfwf. apply andb_true_iff, proj1 in Hfwf.
+  unfold compose in Hfwf. simpl in Hfwf.
   apply Hyp; auto; simpl; try omega; try ntwfauto.
   repnd.
   rwsimplC. dands; unfold range, dom_sub, dom_lmap; eauto with subset.
+(* Fix case *)
 - simpl. f_equal. setoid_rewrite map_map.
   apply eq_maps.
   intros bt Hin.
@@ -1626,9 +1798,20 @@ Proof using.
   autorewrite with SquiggleEq.
   rewrite sub_filter_map_range_comm.
   rwsimpl Hs.
-  apply Hyp; auto; simpl;[eapply size_subterm4; eauto | ntwfauto|].
+  simpl in Hfwf.  apply andb_true_iff in Hfwf.
+  repeat rewrite ball_map_true in Hfwf.
   repnd.
-  rwsimplC. dands; unfold range, dom_sub, dom_lmap; eauto with subset.
+  specialize (Hfwf0 _ Hin).
+  specialize (Hfwf _ Hin).
+  unfold compose in *. simpl in *.
+  apply is_lambdab_is_valueb in Hfwf0.
+  apply Hind with (lv:=lv); auto; simpl;
+    [ |  ntwfauto |  ].
+  + intros.  apply Hyp; eauto. eapply lt_trans; eauto.
+    eapply size_subterm4; eauto.
+  + repnd. repeat rewrite varsOfClassApp.
+    unfold dom_sub, dom_lmap, range. (* unfolding makes the lemmas in hintdb applicable *)
+    dands; eauto with subset.
 - simpl. f_equal. setoid_rewrite map_map.
   apply eq_maps.
   intros bt Hin.
@@ -1642,6 +1825,10 @@ Proof using.
   rewrite ball_map_true in Hev. unfold compose in Hev.
   applydup_clear Hev in Hin.
   simpl in *.
+  simpl in Hfwf.
+  repeat rewrite ball_map_true in Hfwf.
+  specialize (Hfwf _ Hin).
+
   apply Hind with (lv:=[]); auto;[| ntwfauto|].
   + intros.  apply Hyp; eauto. eapply lt_trans; eauto.
     eapply size_subterm4; eauto.
@@ -1654,7 +1841,7 @@ Qed.
 Lemma cps_cvt_apply_ssubst_commutes_aux : 
   cps_cvt_apply_step cps_ssubst_commutes.
 Proof using.
-  intros ? ? Hind ? Hwf H1s H2s H3s Hs. 
+  intros ? ? Hind ? Hwf Hfwf H1s H2s H3s Hs. 
   simpl. unfold cps_cvt_apply. simpl.
   addContVarsSpec 3 Hs kv. repnd. clear Heqlvcvf.
   simpl in *.
@@ -1670,6 +1857,8 @@ Proof using.
   rwsimpl  Hs.
   pose proof (size_pos e1).
   pose proof (size_pos e2).
+  unfold compose in Hfwf. simpl in Hfwf.
+  repeat rewrite andb_true_iff in Hfwf. repnd.
   do 4 f_equal;[| do 5 f_equal];
     (apply Hind; auto; [try omega| ntwfauto | rwsimplC; try tauto]).
 Qed.
@@ -1684,7 +1873,7 @@ sub_range_sat sub is_value (* can we get rid of this ?*)
      (size es <  S (addl (map size_bterm lbt)))
       -> cps_ssubst_commutes es cps_cvt)
   -> length lbt = length lkv
-  -> (forall b, LIn b lbt -> (bt_wf b /\ get_vars b = []))
+  -> (forall b, LIn b lbt -> (bt_wf b /\ get_vars b = [] /\ fixwf (get_nt b)=true))
     -> varsOfClass (flat_map all_vars_bt lbt) USERVAR 
     -> disjoint (lkv++free_vars c) (dom_sub sub)
    -> let sf := (map_sub_range (cps_cvt_val' cps_cvt) sub) in
@@ -1704,7 +1893,7 @@ Proof using.
     simpl in * ).
   unfold Ret_c, KLam_c.
   do 3 f_equal;[|do 4 f_equal].
-+ apply Hyp; auto;[ omega | ntwfauto | rwsimplC; tauto].
++ apply Hyp; auto;[ omega | ntwfauto  | rwsimplC; tauto].
 + rewrite sub_filter_map_range_comm.
   rewrite (sub_filter_disjoint1 sub); [|disjoint_reasoningv2].
   rewrite IHlbt; simpl;
@@ -1713,13 +1902,14 @@ Proof using.
 Qed.
 
 
+(* TODO : rename [cps_cvt/eval_c] *)
 Lemma eval_c_ssubst_aux_commute : forall (e : NTerm),
-  cps_ssubst_commutes e cps_cvt.
+cps_ssubst_commutes e cps_cvt.
 Proof using.
 Local Opaque is_valueb cps_cvt_val'.
   intros ?. unfold closed.
   induction e as [xx | o lbt Hind] using NTerm_better_ind3;
-  intros ?  Hwf Hisv Hwfs Hcs  Hs;
+  intros ?  Hwf Hfwf Hisv Hwfs Hcs  Hs;
   applydup userVarsContVar in Hs as Hdisvc; simpl in Hdisvc;
   [ | simpl; 
       setoid_rewrite (isvalueb_ssubst_aux (oterm o lbt) sub);
@@ -1733,13 +1923,14 @@ Local Transparent is_valueb.
     [| autorewrite with SquiggleEq; disjoint_reasoningv2].
   f_equal. apply cps_cvt_val_ssubst_commutes_aux; auto. simpl.
   intros es ?. pose proof (size_pos es). omega.
-(* value oterm *)
+(*legal value oterm *)
 - 
 Local Opaque is_valueb.
 Local Transparent ssubst_aux.
   rewrite val_outer_ssubst_aux;
     [| autorewrite with SquiggleEq; disjoint_reasoningv2].
   f_equal. apply cps_cvt_val_ssubst_commutes_aux; auto.
+
 (* constructor*)
 - simpl. unfold KLam_c. autorewrite with list SquiggleEq. 
   do 3 f_equal. clear H0. clear Hdisvc.
@@ -1753,10 +1944,10 @@ Local Transparent ssubst_aux.
   rewrite (sub_filter_disjoint1 sub); [|disjoint_reasoningv2].
   unfold num_bvars in Hnb.
   setoid_rewrite length_zero_iff_nil in Hnb.
+  rewrite ball_map_true in Hfwf. unfold compose in Hfwf.
   rewrite cps_cvt_constr_subst_aux; auto;
     [ rwsimplC; try tauto
-      | simpl; rwsimplC; disjoint_reasoningv2].
-
+      |  simpl; rwsimplC; disjoint_reasoningv2].
 Local Transparent is_valueb.
 
 (* App_e *)
@@ -1766,22 +1957,6 @@ Local Transparent is_valueb.
   rewrite cps_cvt_apply_ssubst_commutes_aux; auto; [|ntwfauto].
   simpl in *.
   intros. apply Hind. omega.
-(* Proj_e *)
-- dnumvbars Hnb bt. unfold num_bvars. simpl.
-  addContVarsSpec 2 Hs kv. repnd. clear Heqlvcvf.
-  simpl.
-  rwsimplC.
-  unfold KLam_c, Ret_c.
-  do 4 f_equal.
-  do 2 (rewrite sub_filter_map_range_comm;
-        rewrite (sub_filter_disjoint1 sub); [|disjoint_reasoningv2]).
-  do 2 (rewrite (sub_find_none_if); 
-          [| rwsimplC ; apply disjoint_singleton_l; disjoint_reasoningv2]).
-  do 2 f_equal.
-  simpl in *.
-  dLin_hyp.
-  rwsimpl Hs.
-  apply Hind; auto;[omega| ntwfauto | rwsimplC; tauto].
 
 (* Let_e *)
 - 
@@ -1790,15 +1965,19 @@ Local Transparent is_valueb.
     with (cps_cvt ((Let_e btlv0 btnt btnt0))).
   rewrite cps_cvt_let_as_app_lam.
   rwsimpl Hs.
+  simpl in Hfwf. repeat rewrite andb_true_iff in Hfwf.
+  unfold compose in Hfwf. simpl in Hfwf. dands.
   rewrite cps_cvt_apply_ssubst_commutes_aux; unfold Lam_e, App_e in *;
-    simpl in *;auto;
+    simpl in *;auto; unfold compose; simpl; unfold compose; simpl;
     [ | intros; apply Hind; auto; omega 
       | ntwfauto 
+      | repnd; rwHyps; refl
       | rwsimplC; dands; try tauto].
   autorewrite with SquiggleEq.
   refl.
-- 
-  dnumvbars Hnb bt. unfold num_bvars. simpl.
+
+(* match *)
+- dnumvbars Hnb bt. unfold num_bvars. simpl.
   addContVarsSpec 2 Hs kv. repnd. clear Heqlvcvf.
   simpl. unfold KLam_c, Ret_c.
   do 4 f_equal.
@@ -1810,6 +1989,8 @@ Local Transparent is_valueb.
   simpl in *.
   dLin_hyp.
   rwsimpl Hs.
+  unfold compose in Hfwf.
+  repeat rewrite andb_true_iff in Hfwf. simpl in Hfwf. repnd.
   do 2 f_equal;[| do 6 f_equal];
     [ apply Hind; auto;[omega| ntwfauto | rwsimplC; tauto] |].
   setoid_rewrite map_map.
@@ -1829,6 +2010,8 @@ Local Transparent is_valueb.
   repnd.
   pose proof Hin as Hins.
   apply size_subterm4 in Hins.
+  rewrite ball_map_true in Hfwf.
+  specialize (Hfwf _ Hin).
   apply Hind; auto;[omega| ntwfauto | rwsimplC; dands; 
     unfold range, dom_sub, dom_lmap; eauto with subset].
 Qed.
@@ -1874,6 +2057,7 @@ Abort.
 
 Lemma eval_c_ssubst_commute : forall (e : NTerm) (sub : Substitution) ,
 nt_wf e
+-> fixwf e = true
 -> sub_range_sat sub is_value (* can we get rid of this ?*)
 -> sub_range_sat sub nt_wf
 -> sub_range_sat sub closed
@@ -1881,7 +2065,7 @@ nt_wf e
 ->  let sub_c := (map_sub_range (cps_cvt_val' cps_cvt)) sub in
       (ssubst (cps_cvt e) sub_c)= (cps_cvt (ssubst e sub)).
 Proof using.
-  intros.
+  intros ? ? Hfwf. intros.
   change_to_ssubst_aux8;[apply eval_c_ssubst_aux_commute; assumption|].
   subst sub_c.
   rewrite disjoint_flat_map_r.
@@ -1945,7 +2129,7 @@ Lemma val_outer_ssubst : forall t sub,
 (flat_map free_vars (range sub)) = []
 -> disjoint [contVar] (dom_sub sub)
 -> ssubst (val_outer t) sub = val_outer (ssubst t sub).
-Proof.
+Proof using.
   intros ? ? H1dis H2dis.
   change_to_ssubst_aux8; try rewrite H1dis; auto.
   apply val_outer_ssubst_aux. auto.
@@ -1959,118 +2143,96 @@ Ltac prepareForEvalRet Hc Hs :=
         (intros ? ? ?; in_reasoning; cpx)]
   end.
 
-Lemma cps_cvt_corr_app_let_common_part:
-forall 
-(x kv kv0 kv1 : NVar)
-(e2 e1' v2 v : NTerm)
-(k v' : CTerm)
-(Hvc : varsOfClass (all_vars e2 ++ [x] ++ all_vars e1' ++ all_vars v2) USERVAR)
-(He1 : eval e2 v2)
-(He2 : eval (ssubst e1' [(x, v2)]) v)
-(IHHe2 : forall k : CTerm,
-        free_vars k = [] -> forall v' : CTerm, eval_c (Ret_c (cps_cvt e2) k) v' <-> eval_c (Ret_c (cps_cvt v2) k) v')
-(Hcle : isprogram e2 /\ isprogram_bt (bterm [x] e1') /\ closed k /\ closed v2)
-(Hvcnr : no_repeats [kv, kv0, kv1])
-(Hcvdis : disjoint [contVar, kv, kv0, kv1] (all_vars e2 ++ x :: all_vars e1')) 
-(Hcsss : (closed (KLam_c kv0 (Ret_c (cps_cvt e2) (KLam_c kv1 (Call_c (vterm kv0) k (vterm kv1))))))),
-eval_c
-  (Ret_c (val_outer (cps_cvt_lambda cps_cvt x e1'))
-     (KLam_c kv0 (Ret_c (cps_cvt e2) (KLam_c kv1 (Call_c (vterm kv0) k (vterm kv1)))))) v' <->
-eval_c (Ret_c (cps_cvt (ssubst e1' [(x, v2)])) k) v'.
-Proof using.
-  intros. unfold isprogram, isprogram_bt, closed, closed_bt in *. repnd.
-  rwsimpl Hvc. simpl in *.
-  unfold  val_outer, cps_cvt_lambda.
-  rewrite eval_ret. simpl.
-  unfold subst.
-  rewrite ssubstRet_c by assumption.
-  rewrite ssubst_vterm. simpl ssubst_aux.
-  progress autorewrite with SquiggleEq.
-  match goal with
-  [|- context [Ret_c _ (ssubst ?k _)]] => assert (closed k) as Hclk;
-    [|  assert (sub_range_sat [(kv0 , k)] closed) as Hcs by
-        (intros ? ? ?; in_reasoning; cpx)]
-  end.
-    unfold closed. simpl. autorewrite with list core SquiggleEq.
-    symmetry.
-    rewrite cps_cvt_aux_fvars;
-      [| apply' eval_preseves_wf He1; ntwfauto; fail
-       | try tauto].
-    rewrite remove_nvars_app_r.
-    rewrite cons_as_app.
-    repeat rewrite <- remove_nvars_app_l.
-    autorewrite with SquiggleEq.
-    rewrite remove_nvars_comm. rwHyps. refl.
+Let  evalt := fun e v =>
+(forall k, closed k ->
+    forall v',
+      eval_c (Ret_c (cps_cvt e) k) v' <->
+        eval_c (Ret_c (cps_cvt v) k) v') /\ eval e v.
 
-  rewrite substLam_cTrivial2 by assumption.
-  rewrite eval_ret. simpl.
-  unfold subst.
+Hint Unfold isprogram : eval.
+Hint Resolve eval_yields_value' eval_preseves_varclass 
+  eval_preseves_wf eval_preserves_closed conj
+  cps_cvt_val_closed cps_cvt_closed : eval.
+
+Lemma cps_cvt_apply_eval : forall e e2 ev2 ev k v
+(Hp : isprogram e /\ isprogram e2)
+(Hclk : closed k)
+(Hvc : varsOfClass (all_vars e ++ all_vars e2) USERVAR)
+(H1e : evalt e ev)
+(H2e : evalt e2 ev2),
+(eval_c (Ret_c (cps_cvt_apply cps_cvt (cps_cvt e) e2) k) v
+<->
+eval_c (Call_c (cps_cvt_val ev) k (cps_cvt_val ev2)) v).
+Proof using.
+  intros ? ? ? ? ? ? ? ? ? ? ?.
+  subst evalt.
+  unfold cps_cvt_apply.
+  addContVarsSpec 3 Hvc kv.
+  rewrite eval_ret.
+  simpl. unfold subst. 
+  assert (sub_range_sat [(kv, k)] closed) as Hcs by
+    (intros ? ? ?; in_reasoning; cpx).
   rewrite ssubstRet_c by assumption.
   rewrite ssubstKlam_c; [| try assumption| noRepDis].
+  rewrite ssubstRet_c by assumption.
+  rewrite ssubstKlam_c; [| assumption| noRepDis].
+  rewrite ssubstCall_c by assumption.
+  do 3 rewrite ssubst_vterm. simpl.
+  rewrite <- beq_var_refl.
+  do 2 (rewrite not_eq_beq_var_false;[| noRepDis]).
+  unfold isprogram in Hp.
+  rwsimpl Hvc.
+  repnd. unfold closed in *.
+  do 2 (rewrite ssubst_trivial2_cl;[|assumption|];
+          [| unfold closed; symmetry;rewrite cps_cvt_aux_fvars; [| ntwfauto|]; 
+           try rewrite Hp1 ; try rewrite Hp2 ; [ tauto | eauto ] ] ).
+  clear Hcs. rename Hclk into Hclkb.
+  match goal with
+  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk
+  end.
+    unfold closed. simpl. autorewrite with list core SquiggleEq SquiggleEq2.
+    symmetry.
+    rewrite cps_cvt_aux_fvars;[| ntwfauto|]; try rewrite Hclkb; [  | eauto ].
+    simpl. rewrite Hp1.
+    rewrite remove_nvars_nops;[| noRepDis].
+    autorewrite with SquiggleEq. refl.
+
+  rewrite H1e0; [| assumption]. 
+  simpl. clear H1e0.
+  rewrite cps_val_ret_flip; autounfold with eval; eauto with eval;[].
+  rewrite eval_ret. simpl.
+  unfold subst.
+  rewrite ssubstRet_c by assumption.
+  clear Hclk.
+  rewrite ssubst_trivial2_cl; auto;
+    [ |  (intros ? ? ?; in_reasoning; cpx)| ]; try eauto with eval;[].
+  unfold cps_cvt_val, closed.
+  rewrite ssubstKlam_c; [| (intros ? ? ?; in_reasoning; cpx);
+    apply cps_cvt_val_closed; eauto with eval | noRepDis].
   rewrite ssubstCall_c by assumption.
   do 2 rewrite ssubst_vterm. simpl.
   rewrite <- beq_var_refl.
   rewrite not_eq_beq_var_false;[| noRepDis].
-  rewrite ssubst_trivial2_cl;[| assumption | 
-      symmetry; rewrite cps_cvt_aux_fvars; [ rwHyps; refl | ntwfauto| tauto]].
-  rewrite ssubst_trivial2_cl;[| assumption | assumption].
-  clear Hcs.
-  rename Hclk into Hclkb.
+  rewrite ssubst_trivial2_cl;
+    [| (intros ? ? ?; in_reasoning; cpx); eauto with eval | assumption].
   match goal with
-  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk;
-    [|  assert (sub_range_sat [(fresh_var [] , k)] closed) as Hcs by
-        (intros ? ? ?; in_reasoning; cpx)]
+  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk
   end.
-    unfold closed.
-    match type of Hclkb with
-    closed ?k => remember k as kr
-    end.
-    
-    simpl.
-    autorewrite with list core SquiggleEq using rwHyps. refl.
-    rwHyps. rwsimplC. autorewrite with list core SquiggleEq.
-  clear Hcs.
-  rewrite IHHe2 by assumption. clear IHHe2.
-  rewrite cps_val_ret_flip; auto;[|eauto using eval_yields_value'| tauto | split; auto; 
-      eauto using eval_preseves_wf].
+    unfold closed. symmetry.
+    simpl. rewrite Hclkb. rwsimplC.
+    rewrite cps_cvt_val_fvars; eauto with eval.
+    rewrite eval_preserves_closed; eauto. simpl. rwsimplC. refl.
+  rewrite H2e0 by assumption. clear H2e0.
+  rewrite cps_val_ret_flip; eauto with eval.
   rewrite eval_ret.
   simpl. unfold subst.
   rewrite ssubstCall_c by assumption.
   rewrite ssubst_vterm. simpl ssubst_aux.
   rewrite <- beq_var_refl.
-  pose proof Hcle as Hcleb.
-  apply cps_cvt_val_closed in Hcle; eauto using eval_preseves_wf; try tauto.
-  unfold closed in Hcle.
-  do 2 (rewrite ssubst_trivial2_cl;[|intros; repeat in_reasoning; cpx | 
-    assumption
-      ]).
-  rewrite eval_call.
-  rewrite ssubstRet_c. repnd.
-  rewrite <- ssubst_sub_filter2 with (l:=[contVar]).
-  Focus 3. 
-    rewrite cps_cvt_aux_fvars;
-       [disjoint_reasoningv2
-         |(apply' eval_preseves_wf He1; 
-                      ntwfauto) 
-        | assumption]; fail.
-
-  Focus 2. unfold disjoint_bv_sub. unfold cps_cvt_val.
-     intros ? ? Hin. 
-     repeat in_reasoning; inverts Hin;
-     rwHyps; auto.
-     
-  rewrite ssubst_vterm. simpl.
-  autorewrite with SquiggleEq.
-  rewrite not_eq_beq_var_false;[| apply disjoint_neq; disjoint_reasoningv2].
-  rewrite <- (eval_c_ssubst_commute);[refl
-     | apply' eval_preseves_wf He1; 
-                      ntwfauto; eauto using eval_preseves_wf
-     | | | | rwsimplC; try tauto ]; 
-    intros ? ? Hin; rewrite in_single_iff in Hin;
-    inverts Hin; subst;auto;
-        [eapply eval_yields_value'; eauto
-        | ntwfauto; eauto using eval_preseves_wf].
+  do 2 (rewrite ssubst_trivial2_cl;[|intros; repeat in_reasoning; cpx |]; eauto with eval).
+  refl.
 Qed.
+
 
 
 Lemma eval_vals_r:   forall es vs
@@ -2205,17 +2367,6 @@ Proof using.
     autorewrite with list; auto.
 - rewrite <- combine_map_snd;
   autorewrite with list in *; auto.
-Qed.
-
-Lemma eval_proj :
-  forall (lbt : list CBTerm) (i : nat) (k v' : CTerm) (xf: NVar) (fn : CTerm) len,
-    select i lbt = Some (bterm [xf] fn) ->
-    len = length lbt ->
-  let Fix := coterm (CFix len) lbt in
-  eval_c (Proj_c Fix i k) v' <-> eval_c (Ret_c (fn {xf := Fix}) k) v'.
-Proof using.
-  intros ?  ? ? ? ? ? ? Hf Hl; simpl; subst; split ; intros;[| econstructor; eauto].
-  inverts H. simpl in *. unfold Fix_c', subst in *. congruence. 
 Qed.
 
 
@@ -2407,6 +2558,30 @@ Proof using.
 Qed.
 
 
+Lemma eval_FixApp :
+forall (lbt : list CBTerm) (i : nat) (k arg v : CTerm) (bt : CBTerm) l,
+  let len := Datatypes.length lbt in
+  let pinds := seq 0 len in
+  let sub := map (Fix_c' lbt) pinds in
+  select i lbt = Some bt ->
+  l = length lbt ->
+  let Fix := coterm (CFix l i) lbt in
+  eval_c (Call_c Fix k arg) v <->
+  eval_c (Call_c (apply_bterm bt sub) k arg) v.
+Proof using.
+  intros ?  ? ? ? ? ? ? ? ? ? ? ?; simpl; subst; split ; intros;[| econstructor; eauto].
+  inversion H0. subst. clear H0.
+  rewrite H7 in H. inverts H.
+  exact H8.
+Qed.
+
+
+
+
+
+
+
+Local Transparent ssubst.
 Ltac unfoldSubst :=
   unfold ssubst; simpl;
   fold (@ssubst NVar _ _ _ L5Opid);
@@ -2414,12 +2589,397 @@ Ltac unfoldSubst :=
   fold (@ssubst NVar _ _ _ L4Opid);
   fold (@ssubst_bterm NVar _ _ _ L4Opid).
 
-(** What happens when e does not compute further, e.g. eval e e ? 
-Should we prove something more about such cases, e.g. the CPS converted term
-does not admit any evaluations in the user space?*)
+Lemma cps_cvt_corr_app_let_common_part:
+forall x el v2 k v
+(Hp :  isprogram v2)
+(Hv :  is_value v2)
+(Hwf : nt_wf  el)
+(Hfwf : fixwf el = true)
+(Hclk : closed k)
+(Hvc : varsOfClass (all_vars el++ all_vars v2 ++ [x]) USERVAR),
+eval_c (Call_c (cps_cvt_lambda cps_cvt x el) k (cps_cvt_val v2)) v <->
+eval_c (Ret_c (cps_cvt (ssubst el [(x, v2)])) k) v.
+Proof using.
+  intros. unfold isprogram,  closed, closed_bt in *. repnd.
+  pose proof Hvc as Hdis.
+  apply userVarsContVar in Hdis.
+  rwsimpl Hvc. simpl in *.
+  unfold  val_outer, cps_cvt_lambda.
+  rewrite eval_call.
+  rewrite ssubstRet_c. repnd.
+  rewrite <- ssubst_sub_filter2 with (l:=[contVar]).
+  Focus 3. 
+    rewrite cps_cvt_aux_fvars;
+       [disjoint_reasoningv2
+         | ntwfauto
+         | assumption]; fail.
+
+  Focus 2. unfold disjoint_bv_sub. unfold cps_cvt_val.
+     intros ? ? Hin. 
+     repeat in_reasoning; inverts Hin;
+     rwHyps; auto.
+     rewrite cps_cvt_val_fvars; eauto.
+     rwHyps. disjoint_reasoningv.
+     
+  rewrite ssubst_vterm. simpl.
+  autorewrite with SquiggleEq.
+  rewrite not_eq_beq_var_false;[| apply disjoint_neq; disjoint_reasoningv2].
+  rewrite <- (eval_c_ssubst_commute); auto; [
+    
+                      ntwfauto; eauto using eval_preseves_wf
+     | | |  | rwsimplC; try tauto ]; 
+    intros ? ? Hin; rewrite in_single_iff in Hin;
+    inverts Hin; subst;eauto.
+Qed.
+
+Lemma cps_cvt_val_ssubst_commute :
+      forall (e : NTerm) (sub : Substitution),
+       nt_wf e ->
+       fixwf e = true ->
+       is_valueb e = true ->
+       sub_range_sat sub is_value ->
+       sub_range_sat sub nt_wf ->
+       sub_range_sat sub closed ->
+       varsOfClass (all_vars e ++ dom_sub sub ++ flat_map all_vars (range sub)) true ->
+       let sub_c := map_sub_range (cps_cvt_val' cps_cvt) sub in
+       ssubst (cps_cvt_val e) sub_c = cps_cvt_val (ssubst e sub).
+Proof using.
+  intros ? ? Hfwf Hval. intros.
+  change_to_ssubst_aux8.
+-  apply cps_cvt_val_ssubst_commutes_aux; auto. intros.
+  apply eval_c_ssubst_aux_commute; auto.
+(* the rest of this proof was copied exactly from [eval_c_ssubst_commute] *)
+- subst sub_c.
+  rewrite disjoint_flat_map_r.
+  setoid_rewrite map_map.
+  autorewrite with SquiggleEq in H3. repnd.
+  intros t Hin.
+  apply in_map_iff in Hin.
+  exrepnd.
+  specialize (H0 _ _ Hin0).
+  specialize (H1 _ _ Hin0).
+  specialize (H2 _ _ Hin0).
+  simpl in *.
+  apply (f_equal free_vars) in Hin1.
+  rewrite <- Hin1.
+  apply in_sub_eta in Hin0. repnd.
+  eapply varsOfClassSubset in H3;[| eapply subset_flat_map_r; eauto].
+  rewrite cps_cvt_val_fvars; auto.
+  rewrite H2.
+  auto.
+Qed.
+
+Lemma evalt_eval_refl : forall v,
+  eval v v-> evalt v v.
+Proof using.
+  intros. unfold evalt. tauto.
+Qed.
+
+
+
+Lemma eq_iff : forall A B:Prop,
+  A=B -> A <-> B.
+Proof using. intros. subst. refl.
+Qed.
+
+
+Lemma is_lambdab_ssubst_aux : forall nt s,
+  is_lambdab nt = true -> is_lambdab (ssubst_aux nt s) = true.
+Proof using.
+  intros ? ? Hl.
+  destruct nt as [? | o ? ]; inverts Hl as Hl.
+  destruct o; inverts Hl.
+  refl.
+Qed.
+
+Lemma fixwf_ssubst_aux : forall  a sub,
+  sub_range_sat sub (fun x => fixwf x = true)
+  -> fixwf a= true -> fixwf (ssubst_aux a sub) = true.
+Proof using.
+  intros t. induction t as [v | o lbt Hind] using NTerm_better_ind; intros ? Hsr Hwf.
+- simpl. dsub_find sf;[| refl]; symmetry in Heqsf.
+  apply sub_find_some in Heqsf. apply Hsr in Heqsf. auto.
+- rewrite <- Hwf. simpl. f_equal;[ destruct o; try refl;[] | ];
+   rewrite map_map;
+   f_equal;
+   apply eq_maps;
+   intros bt Hin;
+   destruct bt as [lv nt];
+   unfold compose in *;
+   simpl in Hwf;
+    (try (apply andb_true_iff in Hwf; repnd));
+  try(
+   rewrite ball_map_true in Hwf; unfold compose in *;
+   specialize (Hwf _ Hin);
+   simpl in *;
+   rewrite Hwf;
+   eapply Hind; eauto
+   ).
+   rewrite ball_map_true in Hwf0; unfold compose in *;
+   specialize (Hwf0 _ Hin);
+   simpl in *;
+   rewrite Hwf0.
+   apply is_lambdab_ssubst_aux; auto.
+Qed.
+
+(* Move to [SquiggleEq] *)
+Lemma getopid_ssubst_aux_var_ren : forall (a : NTerm) sub,
+   allvars_sub sub
+  -> getOpid (ssubst_aux a sub) = getOpid a.
+Proof using vartype.
+  intros nt sub H.
+  destruct nt; auto.
+   apply isvarc_ssubst_vterm with (v:=n) in H.
+    simpl in *. unfold isvarc in H. dsub_find sc; auto.
+    destruct scs; auto. contradiction.
+Qed.
+
+Lemma fixwf_ssubst_aux_var_ren : forall  a sub,
+   allvars_sub sub
+  -> fixwf (ssubst_aux a sub) = fixwf a.
+Proof using vartype.
+  intros t. induction t as [v | o lbt Hind] using NTerm_better_ind; intros ? ?.
+- apply isvarc_ssubst_vterm with (v0:=v) in H.
+  simpl in *. unfold isvarc in H. dsub_find sc; auto.
+  destruct scs; auto.
+-  simpl. f_equal;[ destruct o; try refl;[] | ];
+   rewrite map_map;
+   f_equal;
+   apply eq_maps;
+   intros bt Hin;
+   destruct bt as [lv nt];
+   unfold compose in *; simpl in *;
+   try (eapply Hind; eauto using sub_filter_allvars);[].
+    unfold is_lambdab. rewrite getopid_ssubst_aux_var_ren.
+   refl.
+   apply sub_filter_allvars. auto.
+Qed.
+
+
+(* Move to [SquiggleEq] 
+Lemma ssubst_aux_var_ren_impl_alpha {A:Type} : 
+  forall (f: NTerm -> A),
+   (forall a sub, allvars_sub sub -> f (ssubst_aux a sub) = f a)
+ -> forall (a b: NTerm), alpha_eq a b -> f a = f b.
+Proof using.
+  intros  ?  H ?.
+  nterm_ind1s a as [? | o lbt Hind] Case; intros ? Hal; inverts Hal; auto.
+  simpl.
+
+
+ f_equal; [
+    destruct o; auto |].
+*)
+  
+
+Global Instance fixwf_alpha :
+  Proper (alpha_eq  ==> eq) fixwf.
+Proof using.
+  intros a b H. apply alpha_eq3_if with (lv:=[]) in H.
+  revert H. revert b. revert  a.
+  nterm_ind1s a as [? | o lbt Hind] Case; intros ? Hal;
+   inverts Hal; auto.
+  simpl. f_equal; [
+    destruct o; auto |]; f_equal;
+  unfold compose;
+  apply eq_maps_bt; auto;
+  intros ? Hlt;
+  specialize (H3 _ Hlt);
+  pose proof Hlt as Hlt1;
+  pose proof Hlt as Hlt2;
+  rewrite H1 in Hlt2;
+  pose proof (selectbt_in _ _ Hlt1);
+  pose proof (selectbt_in _ _ Hlt2);
+  destruct (selectbt lbt n) as [lv1 nt1];
+  destruct (selectbt lbt2 n) as [lv2 nt2]; simpl;
+  inverts H3 as ? ? ? ? Hal.
++ unfold is_lambdab. apply alpha_eq_if3 in Hal.
+  apply alphaGetOpid in Hal.
+  do 2 rewrite getopid_ssubst_aux_var_ren in Hal 
+    by (eauto 1 using allvars_combine).
+  rewrite Hal. refl.
++ eapply Hind in Hal; eauto;
+  try rewrite ssubst_aux_allvars_preserves_size2; try omega.
+  do 2 (rewrite  fixwf_ssubst_aux_var_ren in Hal 
+    by (eauto 1 using allvars_combine)).
+  assumption.
+Qed.
+
+(* this lemma is the crux of [eval_preserves_fixwf] below *)
+Lemma fixwf_ssubst : forall  a sub,
+  sub_range_sat sub (fun x => fixwf x = true)
+  -> fixwf a= true -> fixwf (ssubst a sub) = true.
+Proof using.
+  intros ? ? ? Hwf.
+  rewrite ssubst_ssubst_aux_alpha.
+  add_changebvar_spec nt' XX.
+  repnd. rewrite XX in Hwf.
+  eapply fixwf_ssubst_aux; auto.
+Qed.
+
+Lemma eval_preserves_fixwf :
+  forall e v, eval e v ->  fixwf e = true -> fixwf v = true.
+Proof using.
+  intros ? ? He. induction He; intro Hfwf; try auto.
+- apply_clear IHHe3. 
+  simpl in *. repeat rewrite andb_true_iff in *.
+  unfold compose in *. simpl in *. repnd.
+  apply fixwf_ssubst; [| tauto].
+  prove_sub_range_sat.
+
+- revert Hfwf.
+  simpl.
+  repeat rewrite map_map.
+  unfold compose.
+  rewrite (combine_map_snd es vs) by assumption.
+  setoid_rewrite (combine_map_fst es vs) at 1;[|assumption].
+  repeat rewrite map_map.
+  repeat rewrite ball_map_true in *. simpl.
+  intro Hfwf. firstorder.
+
+- apply_clear IHHe2. (* this is same as the app(1st) case with IHHe2 instead of IHHe3 *)
+  simpl in *. repeat rewrite andb_true_iff in *.
+  unfold compose in *. simpl in *. repnd.
+  apply fixwf_ssubst; [| tauto].
+  prove_sub_range_sat.
+
+- apply_clear IHHe2. destruct e'.
+  simpl in *. repeat rewrite andb_true_iff in *.
+  unfold compose in *. simpl in *. repnd.
+  repeat rewrite map_map in *.
+  repeat rewrite ball_map_true in *. simpl in *.
+  unfold apply_bterm. simpl.
+  apply find_branch_some in H. repnd.
+  specialize (Hfwf _ H0). simpl in *.
+  apply fixwf_ssubst; auto.
+  intros ? ? Hin. apply IHHe1; auto.
+  apply in_combine_r in Hin. assumption.
+
+- apply_clear IHHe3. destruct bt. 
+  simpl in *. repeat rewrite andb_true_iff in *.
+  unfold compose in *. simpl in *. repnd.
+  dands; eauto 2. GC.
+  apply fixwf_ssubst; auto 1.
+  + unfold sub. intros ? ? Hin.
+    apply in_combine in Hin. repnd.
+    apply in_map_iff in Hin.
+    exrepnd. subst. simpl. auto.
+    repeat rewrite andb_true_iff. auto.
+  + apply select_in in H.
+    repeat rewrite ball_map_true in *.
+    specialize (IHHe1 Hfwf0). repnd.
+    specialize (IHHe1 _ H). simpl in *.
+    auto.
+Qed.
+
+
+Hint Resolve eval_preserves_fixwf : eval.
+Ltac ntwfautoFast :=
+unfold apply_bterm in *;
+unfold subst in *;
+(repeat match goal with
+| [ H: nt_wf ?x |- _ ] => 
+  let H1 := fresh "Hntwf" in
+  let H2 := fresh "HntwfSig" in
+    inverts H as H1 H2;[]; simpl in H1; dLin_hyp
+| [ H: _ -> (nt_wf _) , H1:_ |- _ ] => apply H in H1; clear H
+| [ H: forall (_:_),  _ -> (nt_wf _) , H1:_ |- _ ] => apply H in H1
+| [ H: forall (_:_),  _ -> (bt_wf _) , H1:_ |- _ ] => apply H in H1
+| [ H: bt_wf (bterm _ _) |- _ ] => apply bt_wf_iff in H
+| [ |- nt_wf (vterm _)] => constructor
+| [ |- bt_wf _] => constructor
+| [ H: _ \/ False |- _] => rewrite or_false_r in H; subst
+| [ |- nt_wf _] => 
+  let Hin := fresh "HntwfIn" in
+    constructor; [try (intros ? Hin; simpl in Hin; in_reasoning; subst;  cpx)|]
+end); cpx.
+
+
+(* Move to SquiggleEq *)
+Lemma map0lbt : forall (lbt: list BTerm),
+map num_bvars lbt = repeat 0 (Datatypes.length lbt)
+->  lbt = map (bterm []) (map get_nt lbt).
+Proof using.
+  induction lbt; simpl; auto.
+  intro Hn.
+  destruct a. inverts Hn as Hn Hnn. unfold num_bvars in Hn.
+  simpl in Hn. dlist_len_name l Hh.
+  simpl. f_equal. eauto.
+Qed.
+
+Lemma is_valueb_sound :
+  (forall e,  is_valueb e = true -> nt_wf e-> is_value e).
+Proof using.
+  intros ? Hisv Hnt.
+  nterm_ind e as [? | o lbt Hind] Case; [constructor|].
+  inverts Hnt as Hbt Hnb.
+  destruct o ; simpl in Hnb; try inverts Hisv.
+- dnumvbars Hnb l. constructor. 
+- apply (f_equal (@length _ )) in Hnb. 
+  rewrite map_length, repeat_length in Hnb. subst.
+  constructor.
+- pose proof Hnb as Hnbb. 
+  apply (f_equal (@length _ )) in Hnb. 
+  rewrite map_length, repeat_length in Hnb. subst.
+  apply map0lbt in Hnbb.
+  rewrite Hnbb. do 1 rewrite map_length.
+  apply con_is_value.
+  rewrite ball_map_true in H0.
+  intros ? Hin.
+  apply in_map with (f:=(bterm [])) in Hin.
+  pose proof Hin as Hinb.
+  rewrite <- Hnbb in Hin.
+  apply H0 in Hin. unfold compose in Hin. simpl in Hin.
+  rewrite <- Hnbb in Hinb.
+  apply Hind with (lv:=[]); eauto.
+  ntwfauto.
+Qed.
+
+Lemma is_value_eval_end : forall v,
+  is_value v 
+  -> closed v
+  -> eval v v.
+Proof using.
+  intros ? Hv.
+  induction Hv; try econstructor; auto.
+- intro c. inverts c.
+- intros ? ? Hin.
+  rewrite <- (map_id es) in Hin.
+  rewrite combine_map in Hin.
+  apply in_map_iff in Hin.
+  exrepnd. inverts Hin1.
+  apply H0; auto.
+  unfold closed in *.
+  simpl in H1.
+  rewrite flat_map_map in H1.
+  rewrite flat_map_empty in H1.
+  apply H1 in Hin0.
+  auto.
+Qed.
+
+
+Lemma eval_end : forall e v,
+  eval e v -> eval v v.
+Proof using.
+  intros ? ? Hev.
+  induction Hev; auto; try constructor; try auto.
+  intros ? ? Hin.
+  rewrite <- (map_id vs) in Hin.
+  rewrite combine_map in Hin.
+  apply in_map_iff in Hin.
+  exrepnd.
+  inverts Hin1.
+  apply combine_in_right with (l1:=es) in Hin0;[| omega].
+  exrepnd.
+  eapply H1; eauto.
+Qed.
+
+Hint Resolve eval_end : eval.
+
 
 Theorem cps_cvt_corr : forall e v,
   nt_wf e ->
+  fixwf e = true ->
   varsOfClass (all_vars e) USERVAR -> 
   eval e v ->
   closed e ->
@@ -2428,86 +2988,43 @@ Theorem cps_cvt_corr : forall e v,
       eval_c (Ret_c (cps_cvt e) k) v' <->
         eval_c (Ret_c (cps_cvt v) k) v'.
 Proof using.
-  intros ? ? Hwf Hvc He.  induction He; try (simpl ; tauto; fail); [ | | | |]. 
+  intros ? ? Hwf Hfwf Hvc He.  induction He; try (simpl ; tauto; fail); [ | | | |].
   (* beta reduction case (eval_App_e) *)
-- intros Hcle ? Hcl ?.
-   unfold App_e in *. simpl.
-   unfold cps_cvt_apply.
+- intros Hcle ? Hcl ?. simpl.
+  unfold App_e in *. simpl.
   repeat progress (autorewrite with list allvarsSimpl in Hvc; 
     simpl in Hvc).
-  addContVarsSpec 3 Hvc kv.
-  simpl.
-  repnd.
-  (* now lets fulfil the assumptions in the induction hypotheses *)
   unfold closed in Hcle. simpl in Hcle.
-  autorewrite with core list in Hcle.
+  rwsimpl Hcle.
   apply app_eq_nil in Hcle.
-  autorewrite with SquiggleEq in *. repnd.
-  pose proof He1 as He1wf.
+  progress autorewrite with SquiggleEq in *. repnd.
+  ntwfauto.
+  simpl in Hfwf. repeat rewrite andb_true_iff in Hfwf. unfold compose in Hfwf.
+  simpl in Hfwf. repnd.
+  rewrite cps_cvt_apply_eval; unfold evalt; unfold isprogram; dands; eauto;
+    [| rwsimplC; tauto ].
+  clear IHHe1 IHHe2.
+  pose proof He1 as He1wf.  
   apply' eval_preseves_wf He1wf.
-  dimp He1wf;clear He1wf;[ ntwfauto|]. rename hyp into He1wf.
-  specialize (IHHe1 ltac:(ntwfauto) Hvc0  Hcle0).
-  specialize (IHHe2 ltac:(ntwfauto) Hvc Hcle).
-  specialize (IHHe3 ltac:(ntwfauto; eauto using eval_preseves_wf)).
-  (* IHHe3 needs more work : 2 more hyps *)
   applydup (eval_preseves_varclass USERVAR) in He1 as Hvs1;[| assumption].
-  applydup (eval_preseves_varclass USERVAR) in He2 as Hvs2;[| assumption].
   unfold Lam_e in Hvs1.
   rwsimpl Hvs1. repnd.
-  dest_imp IHHe3 HH;[apply ssubst_allvars_varclass_nb;  rwsimplC; try tauto|].
-
-  (* IHHe3 has 1 more hyp *)
   applydup eval_preserves_closed in He1 as Hss;[| assumption].
   applydup eval_preserves_closed in He2 as Hss2;[| assumption].
   unfold subst, closed in *. simpl in *. autorewrite with list in *.
-  setoid_rewrite fvars_ssubst1 in IHHe3;[| intros; repeat in_reasoning; cpx].
-  dest_imp IHHe3 HH.
-
-  rewrite <- IHHe3;[| assumption]. clear IHHe3.
-
-  (* now, work on simplifying LHS slowly until it becomes equal to rhs *)
-  (* first, e1 will be evaluated to a lambda *) 
-  rewrite eval_ret.
-  simpl. unfold subst. 
-  assert (sub_range_sat [(kv, k)] closed) as Hcs by
-    (intros ? ? ?; in_reasoning; cpx).
-  rewrite ssubstRet_c by assumption.
-  rewrite ssubstKlam_c; [| try assumption| noRepDis].
-  rewrite ssubstRet_c by assumption.
-  rewrite ssubstKlam_c; [| assumption| noRepDis].
-  rewrite ssubstCall_c by assumption.
-  do 3 rewrite ssubst_vterm. simpl.
-  rewrite <- beq_var_refl.
-  do 2 (rewrite not_eq_beq_var_false;[| noRepDis]).
-  do 2 (rewrite ssubst_trivial2_cl;[|assumption|];
-          [| unfold closed; symmetry;rewrite cps_cvt_aux_fvars; [| ntwfauto|]; 
-           try rewrite Hcle0 ; try rewrite Hcle ; [ tauto | eauto ] ] ).
-
-  clear Hcs.
-  match goal with
-  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk
-  end.
-    unfold closed. simpl. autorewrite with list core SquiggleEq SquiggleEq2.
-    symmetry.
-    rewrite cps_cvt_aux_fvars;[| ntwfauto|]; try rewrite Hcle; [  | eauto ].
-    simpl. rewrite Hcl.
-    rewrite remove_nvars_nops;[| noRepDis].
-    autorewrite with SquiggleEq. refl.
-
-  rewrite IHHe1; [| assumption]. 
-  simpl. clear IHHe1.
-  eapply cps_cvt_corr_app_let_common_part; unfold isprogram, isprogram_bt; dands; eauto;
-    rwsimplC; try tauto; try ntwfauto.
-
-  apply userVarsContVar in Hvc.
-  applydup userVarsContVar in Hvs1.
-  applydup userVarsContVar in Hvs0.
-  apply userVarsContVars with (n:=3) in Hvs1.
-  apply userVarsContVars with (n:=3) in Hvs0.
-  rewrite <- Heqlvcvf in Hvs0, Hvs1.
-  rewrite cons_as_app.
-  remember ([kv, kv0, kv1]) as cv. clear Heqcv Heqlvcvf.
-  noRepDis.
+  pose proof (eval_preserves_fixwf _ _ He1 Hfwf0) as Hfwflam.
+  pose proof (eval_preserves_fixwf _ _ He2 Hfwf1) as Hfwfarg.
+  simpl in Hfwflam. unfold compose in Hfwflam. simpl in Hfwflam.
+  rewrite andb_true_r in Hfwflam.
+  rewrite <- IHHe3; eauto with eval;
+    [ | ntwfauto; eauto with eval 
+      | apply fixwf_ssubst; auto; prove_sub_range_sat; auto
+      | apply ssubst_allvars_varclass_nb; rwsimplC; dands; eauto with eval
+      | setoid_rewrite fvars_ssubst1;[assumption | intros; repeat in_reasoning; cpx]].
+  clear IHHe3.
+  rewrite cps_cvt_corr_app_let_common_part; eauto with eval; 
+    [refl | ntwfauto   |].
+  rwsimplC; dands; eauto with eval.
 
 (* reduction inside constructor : eval_Con_e *)
 - intros Hcle ? Hcl ?. rename H0 into Hev. rename H1 into Hind.
@@ -2554,74 +3071,52 @@ Proof using.
   intros ? ? Hinn.
   applydup in_combine_l in Hinn.
   rewrite flat_map_empty in Hcle.
-  apply Hind; auto;[].
-  eapply varsOfClassSubset;[| apply Hvc].
-  apply subset_flat_map_r. auto.
+  rewrite map_map in Hfwf. rewrite ball_map_true in Hfwf.
+  unfold compose in Hfwf.
+  specialize (Hfwf _ Hinn0). simpl in Hfwf.
+  apply Hind; auto;[ ].
+  eauto with subset.
 
 (* eval_Let_e *)
-- intros Hcle ? Hcl ?.
-   unfold Let_e in *. simpl.
-   unfold cps_cvt_apply.
+- intros Hcle ? Hcl ?. simpl.
+  unfold Let_e in *. simpl.
+  change
+    (val_outer (cps_cvt_lambda cps_cvt x e2))
+    with (cps_cvt (Lam_e x e2)).
+  unfold Lam_e in *.
   repeat progress (autorewrite with list allvarsSimpl in Hvc; 
     simpl in Hvc).
-  addContVarsSpec 3 Hvc kv.
-  simpl.
-  repnd.
-  (* now lets fulfil the assumptions in the induction hypotheses *)
   unfold closed in Hcle. simpl in Hcle.
-  autorewrite with core list in Hcle.
+  rwsimpl Hcle.
   apply app_eq_nil in Hcle.
-  applydup userVarsContVar in Hvc as Hvcdiss.
-  autorewrite with SquiggleEq in *. repnd.
-  specialize (IHHe1 ltac:(ntwfauto) Hvc0  Hcle0).
-  specialize (IHHe2 ltac:(apply' eval_preseves_wf He1; 
-                      ntwfauto; eauto using eval_preseves_wf)).
-  (* IHHe3 needs more work : 2 more hyps *)
-  applydup (eval_preseves_varclass USERVAR) in He1 as Hvs1;[| assumption].
-  rewrite cons_as_app in Hvc.
-  rwsimpl Hvc.
-  dest_imp IHHe2 HH;[apply ssubst_allvars_varclass_nb;  rwsimplC; tauto|].
+  progress autorewrite with SquiggleEq in *. repnd.
+  ntwfauto. rewrite cons_as_app in Hvc. rwsimpl Hvc. repnd.
+  simpl in Hfwf.
+  unfold compose in Hfwf. simpl in Hfwf.
+  rewrite andb_true_r in Hfwf.
+  repeat rewrite andb_true_iff in Hfwf. repnd.
+  pose proof (eval_preserves_fixwf _ _ He1 Hfwf0) as Hfwflam.
 
-  rename e2 into e1'.
-  rename IHHe2 into IHHe3.
-  applydup eval_preserves_closed in He1 as Hss;[| assumption].
-  unfold subst, closed in *. simpl in *. autorewrite with list in *.
-  setoid_rewrite fvars_ssubst1 in IHHe3;[| intros; repeat in_reasoning; cpx].
-  dest_imp IHHe3 HH.
+  rewrite cps_cvt_apply_eval; unfold evalt; unfold isprogram, closed; dands;
+    eauto using eval_Lam_e; eauto with eval; try tauto;
+    [| rwsimplC; auto | ntwfauto | rwsimplC; tauto];[].
 
-  rewrite <- IHHe3;[| assumption]. clear IHHe3.
-  
-  rewrite eval_ret.
-  simpl. unfold subst. 
-  assert (sub_range_sat [(kv, k)] closed) as Hcs by
-    (intros ? ? ?; in_reasoning; cpx).
-  rewrite ssubstRet_c by assumption.
-  rewrite ssubstKlam_c; [| try assumption| noRepDis].
-  rewrite ssubstRet_c by assumption.
-  rewrite ssubstKlam_c; [| assumption| noRepDis].
-  rewrite ssubstCall_c by assumption.
-  do 3 rewrite ssubst_vterm. simpl ssubst_aux.
-  rewrite <- beq_var_refl.
-  do 2 (rewrite not_eq_beq_var_false;[| noRepDis]).
-  change (val_outer (cps_cvt_lambda cps_cvt x e1')) with
-            (cps_cvt (Lam_e x e1')).
-  (rewrite ssubst_trivial2_cl;[|assumption|];
-          [| unfold closed, Lam_e in * ; symmetry;
-               rewrite cps_cvt_aux_fvars; simpl; [lcongruence | ntwfauto| rwsimplAll; tauto] ] ).
-  (rewrite ssubst_trivial2_cl;[|assumption|];
-          [| unfold closed in *; symmetry;rewrite cps_cvt_aux_fvars; [congruence | ntwfauto| tauto]] ).
+  clear IHHe1.
+  rewrite <- IHHe2; eauto with eval; unfold closed;
+    [ | ntwfauto; eauto with eval
+      | apply fixwf_ssubst; auto; prove_sub_range_sat; auto
+      | apply ssubst_allvars_varclass_nb; rwsimplC; dands; eauto with eval
+      | setoid_rewrite fvars_ssubst1;
+          [assumption | intros; repeat in_reasoning; cpx]; eauto with eval ].
 
-  eapply cps_cvt_corr_app_let_common_part; unfold isprogram, isprogram_bt; dands; eauto;
-    rwsimplC; try tauto; try ntwfauto;
-    [rewrite cons_as_app; rewrite disjoint_app_l; split;tauto|].
-  
-  unfold closed. simpl. autorewrite with core list SquiggleEq using rwHyps.
-  symmetry. rewrite cps_cvt_aux_fvars; simpl; auto.
-  rwHyps. simpl. rewrite remove_nvars_app_l. 
-  simpl. autorewrite with SquiggleEq. refl.
+  clear IHHe2.
+  simpl.
+  rewrite cps_cvt_corr_app_let_common_part; eauto with eval;
+    [refl | ].
+  rwsimplC; dands; eauto with eval.
+
 
 (* eval_Match_e *)
-
 - intros Hcle ? Hcl ?.
   unfold Match_e in *.
   remember (Con_e d vs) as con.
@@ -2636,7 +3131,9 @@ Proof using.
   unfold closed in *.
   rwsimpl Hcle.
   apply app_eq_nil in Hcle. repnd.
-  specialize (IHHe1 ltac:(ntwfauto) Hvc0  Hcle0).
+  unfold compose in Hfwf. simpl in Hfwf.
+  apply andb_true_iff in Hfwf. repnd.
+  specialize (IHHe1 ltac:(ntwfauto) ltac:(auto) Hvc0  Hcle0).
   apply find_branch_some in H as H. rename H into Hfr.
 
   unfold num_bvars in Hfr.
@@ -2655,18 +3152,28 @@ Proof using.
   rwsimpl Hcvc.
   unfold Con_e, closed in Hc. simpl in Hc.
   rwsimpl Hc.
+  pose proof (eval_preserves_fixwf _ _ He1 Hfwf0) as Hfwflam.
+  simpl in Hfwflam. 
+  repeat rewrite map_map, ball_map_true in *.
+  specialize (Hfwf _ Hfr0).
   dimp IHHe2.
     apply ssubst_wf_iff;[| auto].
     apply sub_range_sat_range.
     rewrite dom_range_combine by assumption.
     ntwfauto. autorewrite with SquiggleEq in Hntwf. assumption.
-  rename hyp into Hwfs. specialize (IHHe2 Hwfs).
+    rename hyp into Hwfs. specialize (IHHe2 Hwfs).
+
+  dimp IHHe2.
+    apply fixwf_ssubst; auto.
+    simpl. prove_sub_range_sat. apply in_combine_r in Hin.
+    apply Hfwflam. auto.
+    specialize (IHHe2 hyp). clear hyp.
   
   dimp IHHe2.
     apply ssubst_allvars_varclass_nb. simpl.
     rewrite dom_range_combine by assumption.
     rwsimplC. split; eauto with subset.
-  rename hyp into Hvcs. specialize (IHHe2 Hvcs).
+    rename hyp into Hvcs. specialize (IHHe2 Hvcs).
 
   dimp IHHe2.
     apply closed_bt_implies; [ apply Hcleb; assumption 
@@ -2764,74 +3271,134 @@ Proof using.
   + setoid_rewrite <- flat_map_empty. auto.
   + rewrite dom_sub_combine ;[| rwsimplC; auto]. rwsimplC. dands; eauto with subset.
 
-(* eval_Proj_e *)
-- intros Hcle ? Hcl ?. rename He into Hev.
-  ntwfauto. clear HntwfSig.  remember (Lam_e xl bl) as lam.
-  simpl. 
-  Local Opaque cps_cvt cps_cvt_val'.
-  unfold Proj_e, Fix_e', closed in *.
-  simpl in *.
+(* eval_FixApp_e *)
+- intros Hcle ? Hcl ?. simpl.
+  unfold App_e, Fix_e' in *. simpl.
+  repeat progress (autorewrite with list allvarsSimpl in Hvc; 
+    simpl in Hvc).
+  unfold closed in Hcle. simpl in Hcle.
   rwsimpl Hcle.
-  rwsimpl Hvc.
-  applydup eval_preserves_closed in Hev as Hevvc;[| assumption].
-  applydup eval_preseves_wf in Hev as Hevvw;[| assumption].
-  applydup (eval_preseves_varclass USERVAR) in Hev as Hevvvc;[| tauto].
-  applydup cps_cvt_val_closed in Hevvc as Hevcc; [| try assumption |try assumption].
-  apply proj2 in Hvc.
-  addContVarsSpec 2 Hvc kv.
-  unfold closed in *. simpl in *.
-  pose proof Hevvc as Hevvcl.
-  rewrite flat_map_empty in Hevvcl.
+  apply app_eq_nil in Hcle.
+  progress autorewrite with SquiggleEq in *. repnd.
+  ntwfauto.
+  simpl in Hfwf. unfold compose in Hfwf. simpl in Hfwf.
+  rewrite andb_true_r in Hfwf.
+  rewrite andb_true_iff in Hfwf. repnd.
+  rewrite cps_cvt_apply_eval; unfold evalt; unfold isprogram; dands; eauto;
+    [|  rwsimplC; try tauto ].
+  clear IHHe1 IHHe2.
+  pose proof He1 as He1wf.  
+  apply' eval_preseves_wf He1wf.
+  pose proof He2 as He2wf.  
+  apply' eval_preseves_wf He2wf.
+  applydup (eval_preseves_varclass USERVAR) in He1 as Hvs1;[| assumption].
+  unfold Lam_e in Hvs1.
+  rwsimpl Hvs1. repnd.
+  applydup eval_preserves_closed in He1 as Hss;[| assumption].
+  applydup eval_preserves_closed in He2 as Hss2;[| assumption].
+  unfold subst, closed in *. simpl in *. autorewrite with list in *.
+  destruct bt as [lv nt]. simpl in IHHe3.
   pose proof H as Hsel.
   apply select_in in H.
-  specialize (Hevvcl _ H).
-  pose proof Hevvw as  Hevvwb.
-  inverts Hevvw as Hwfes _.
-  specialize (Hwfes _ H). inverts Hwfes.
-  rwsimpl Hevvvc.
+  pose proof (eval_preserves_fixwf _ _ He1 Hfwf0) as Hfwflam.
+  simpl in Hfwflam.
+  specialize (He1wf Hyp).
+
+  pose proof (subset_fvars_fix (bterm lv nt) lbt) as Hssn.
+  simpl in Hssn. rewrite Hss in Hssn.
+  dimp Hssn; auto.
+  clear Hssn. rename hyp into Hssn.
+  apply subsetv_nil_r in Hssn. unfold apply_bterm in Hssn.
+  simpl in Hssn. fold len pinds in Hssn. 
+  unfold Fix_e' in Hssn. fold sub in Hssn.
+
+  clear HntwfSig.
+  let tac t :=
+    prove_sub_range_sat; apply in_combine_r in Hin;
+    unfold sub in Hin;
+    rewrite in_map_iff in Hin;
+    exrepnd; subst; t in
+  assert (sub_range_sat (combine lv sub) (fun x => fixwf x = true))
+    by (tac assumption);
+  assert (sub_range_sat (combine lv sub) is_value)
+    by (tac constructor);
+  assert (sub_range_sat (combine lv sub) nt_wf)
+    by (tac ntwfauto);
+  assert (sub_range_sat (combine lv sub) closed)
+    by (tac auto).
+
+  assert ((varsOfClass (flat_map all_vars (range (combine lv sub)))) true)
+    as Hvcccc.
+    rewrite dom_range_combine; 
+      [| unfold sub, pinds; rewrite map_length, seq_length; auto].
+    pose proof (fVarsFix' lbt) as xxx.
+    unfold Fix_e' in xxx.
+    unfold sub, pinds, len.
+    rewrite xxx. clear xxx. assumption.
   
-  symmetry.
-  match goal with 
-  [|- context [cps_cvt ?x]] => assert (is_value x) as Hisv
-  end.
-    subst. rewrite ssubst_ssubst_aux;[| simpl; rwHyps; simpl; auto].
-    constructor; fail.
-  symmetry.
-  do 1 rewrite eval_ret.
-  simpl. unfold subst.  
-  do 1 rewrite ssubstRet_c.
-  assert (forall x, sub_range_sat [(x, k)] closed) as Hcs by
-    (intros ? ? ? ?; in_reasoning; cpx).
-  rewrite ssubstKlam_c; simpl; auto; [| noRepDis2].
+  assert (varsOfClass (all_vars (ssubst nt (combine lv sub))) true).
+    apply ssubst_allvars_varclass_nb.
+    rwsimplC; dands; eauto with subset.
+
+
+  apply andb_true_iff in Hfwflam.
+  do 2 rewrite ball_map_true in Hfwflam. repnd.
+  specialize (Hfwflam _ H).
+  specialize (Hfwflam0 _ H). 
+  unfold compose in Hfwflam, Hfwflam0. simpl in Hfwflam, Hfwflam0.
+  remember (combine lv sub) as subb.
+
+  assert (varsOfClass (dom_sub subb) true).
+    subst subb. rewrite dom_sub_combine; 
+    [ |unfold sub, pinds; rewrite map_length, seq_length; auto].
+    eauto with subset.
+
+  assert (nt_wf v2) by auto.
+  assert (nt_wf nt) by ntwfauto.
+  assert (nt_wf (ssubst nt subb)) by (apply ssubst_wf_iff; auto).
+  clear Hyp Hyp0 He1wf He2wf.
+  assert (fixwf v2 = true) by (eauto with eval).
+  assert (fixwf (ssubst nt subb) = true) by (apply fixwf_ssubst; auto).
+  unfold sub, pinds in Heqsubb.
+  clear He3. clear sub. clear pinds.
+
+  assert (is_value (ssubst nt subb)).
+    apply is_valueb_sound; auto.
+    change_to_ssubst_aux8.
+    rewrite isvalueb_ssubst_aux; auto.
+    apply is_lambdab_is_valueb; auto.
+
+  rewrite <- IHHe3; rwsimplC; dands; eauto 3 with eval; try eauto 1 with SquiggleEq;
+    [| ntwfautoFast 
+      | unfold compose; simpl; rwHyps; refl | rwHyps; refl ].
+  clear IHHe3.
+
+  unfold cps_cvt_fn_list'.
+  rewrite cps_cvt_apply_eval; try apply evalt_eval_refl; 
+    dands; rwsimplC; eauto with eval;
+    [ | apply is_value_eval_end; auto].
+  
+  rewrite eval_FixApp; rwsimplC; eauto;
+    [ | apply select_map; apply Hsel].
+  apply eq_iff.
+  f_equal.
+  f_equal.
   simpl.
-  rewrite ssubst_trivial2_cl;[ | apply Hcs | apply cps_cvt_closed; auto].
-  unfold Proj_c.
-  unfold ssubst at 1. simpl. 
-  do 1 rewrite <- beq_var_refl.
-  do 1 (rewrite not_eq_beq_var_false;[| noRepDis]).
-  rewrite IHHe; auto;[| rwsimplC; rwHyps; auto].
-  let tac :=auto;unfold Con_e; unfold isprogram, closed; rwsimplC; rwHyps; auto in
-    rewrite cps_val_ret_flip; [|  eauto using eval_yields_value'| tac | tac | tac].
-  prepareForEvalRet Hclkk Hcsss;
-    [apply cps_cvt_val_closed; auto; rwsimplC; auto|].
-  rewrite eval_ret. simpl. unfold subst.
-  unfoldSubst. rewrite <- beq_var_refl.
-  rewrite ssubst_trivial2_cl by assumption.
-  setoid_rewrite eval_proj; try setoid_rewrite map_length; auto;[|].
-  Focus 2.
-    unfold cps_cvt_fn_list'. erewrite select_map;[| apply Hsel]. simpl. refl.
-  simpl. unfold subst.
-  match goal with
-  [|- context [ (_,?ft)]  ] => 
-    change ft with (cps_cvt_val (oterm (NFix (Datatypes.length es)) es))
-  end.
-  apply eq_subrelation;[auto with typeclass_instances|].
-  do 2 f_equal.
-  apply select_in in Hsel.
-  rewrite <- eval_c_ssubst_commute; auto;
-  try complete (prove_sub_range_sat; auto; constructor).
-  rwsimplC. dands; eauto with subset.
+  unfold apply_bterm. simpl.
+  fold len.
+
+  rewrite <- cps_cvt_val_ssubst_commute; eauto using is_lambdab_is_valueb;
+    [| rwsimplC; dands; eauto with subset].
+  f_equal. subst subb.
+  rewrite map_sub_range_combine.
+  f_equal.
+  rewrite map_map.
+  apply eq_maps.
+  intros. simpl.
+  unfold Fix_c'.
+  rewrite map_length. refl.
 Qed.
+(*
 
 (** 
 ** Evaluation of CPS converted terms respects alpha equality. *
@@ -3182,7 +3749,7 @@ Abort.
   
 End TypePreservingCPS.
 
-
+*)
 End VarsOf2Class.
 
 Ltac addContVarsSpec  m H vn:=

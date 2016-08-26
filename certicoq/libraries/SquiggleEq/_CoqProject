@@ -1,0 +1,17 @@
+-R . Libraries.SquiggleEq
+./eq_rel.v
+./tactics.v
+./bin_rels.v
+./export.v
+./alphaeq.v
+./substitution.v
+./terms.v
+./terms2.v
+./varImplZ.v
+./varInterface.v
+./lmap.v
+./varImplPeano.v
+./universe.v
+./LibTactics.v
+./UsefulTypes.v
+./list.v

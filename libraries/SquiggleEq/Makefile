@@ -12,5 +12,5 @@ clean:
 	rm Makefile.coq
 
 _CoqProject:
-	echo "-R . SquiggleEq" > _CoqProject
+	echo "-R . Libraries.SquiggleEq" > _CoqProject
 	find . -name "*.v" >> _CoqProject

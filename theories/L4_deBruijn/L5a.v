@@ -9,7 +9,7 @@ Set Implicit Arguments.
 
 Require Import SquiggleEq.varImplZ.
 
-Require Import cps.
+Require Import L6.cps.
 Notation NVar := var.
 
 (**********************)
@@ -20,22 +20,25 @@ Inductive cps : Type :=
 | Ret_c : val_c (* cont *) -> val_c (* result *) -> cps
 | Call_c : NVar (* fn *) -> NVar (* cont *) -> NVar (* arg *) -> cps
 | Match_c : val_c -> list  ((dcon * nat) * ((list NVar)* cps)) -> cps
-| Proj_c : val_c (*arg *) -> nat -> val_c (*cont*) -> cps
+(* | Proj_c : val_c (*arg *) -> nat -> val_c (*cont*) -> cps *)
 with val_c : Type :=
 | Var_c : NVar -> val_c
 | KVar_c : NVar -> val_c
 | Lam_c : NVar (* arg *) -> NVar (*cont *) -> cps -> val_c
 | Cont_c : NVar (* cont *) -> cps -> val_c
 | Con_c : dcon -> list val_c -> val_c
-(** In Fix_c [(v1,c1); (v2,c2) ...],
-    in ci, vi can occur, and refers to Fix_c [(v1,c1); (v2,c2) ...]
-    See [L4a_to_L5.eval_Proj_c] for more details
+(** In Fix_c [(lv1,c1); (lv2,c2) ...],
+    lvi are lists of variables where the nth one in lvi will get substituted with the nth
+    "projection" of the mutual fixpoint.
+    As of now, one can assume that lv1 = lv2 = ...
+    If needed, we can formally prove it and then change the type of Fix_c.
+    to be (list NVar) -> list (val_c) -> val_c.
     
     Unlike previously, when a lambda was implicit in a fix, the ci must now explicitly be a value.
     Currently, [L4a_to_L5.eval_Proj_e] only reduces if cis are lambdas.
     We may allow arbitrary values.
   *)
-| Fix_c : list (NVar * val_c) -> val_c.
+| Fix_c : list ((list NVar) * val_c) -> nat ->  val_c.
 
 Section Notations.
 Require Import ExtLib.Data.Monads.OptionMonad.
@@ -111,10 +114,10 @@ match c with
       l <- flatten l;;
       discriminee <- translateVal discriminee ;;
       ret (Match_c discriminee (combine ls l))
- | terms.oterm (CProj n) [bterm [] arg, bterm [] cont] => 
+(* | terms.oterm (CProj n) [bterm [] arg, bterm [] cont] => 
       cont <- translateVal cont ;;
       arg <- translateVal arg ;;
-      ret (Proj_c arg n cont)
+      ret (Proj_c arg n cont) *)
  | _ => None
 end
 with translateVal (c:CTerm) : option val_c :=
@@ -132,16 +135,16 @@ match c with
                          end) lbt in
       l <- flatten l ;;
       ret (Con_c dc l)
- | terms.oterm (CFix _) lbt =>
+ | terms.oterm (CFix _ n) lbt =>
       let l:= map (fun b: CBTerm => 
                           match b with
                           bterm vars nt => 
                             c <- translateVal nt ;;
-                            ret (hd nvarx vars, c)
+                            ret (vars, c)
                           end)
                   lbt in
       l <- flatten l;;
-      ret (Fix_c l)
+      ret (Fix_c l n)
  | _ => None
 end.
 
@@ -256,9 +259,11 @@ Proof using.
   apply in_map_iff in Hin. exrepnd.
   destruct a as [lv nt].
   subst.
-  apply isSomeBindRet. simpl. apply translateVal_cps_cvt_val2.
+  apply isSomeBindRet. simpl. 
+(*  apply translateVal_cps_cvt_val.
   eapply Hind; eauto.
-  ntwfauto.
+  ntwfauto. *)
+  admit. (* need to add the fixwf assumption *)
 
 (* constructor *)
 - cases_if; rename H into Hb.
@@ -319,14 +324,6 @@ Proof using.
   destruct (translateVal (cps_cvt btnt)); auto.
   destruct (translateVal (cps_cvt btnt0)); auto.
 
-(* proj *)
-- dnumvbars  Hnb bt. simpl. ntwfauto.
-  simpl in *. dLin_hyp. ntwfauto.
-  apply isSomeBindRet.
-  apply isSomeBindRet.
-  dLin_hyp.
-  apply Hyp0 in Hyp. clear Hyp0.
-  apply translateVal_cps_cvt_val2. auto.
 
 (* let *)
 - dnumvbars  Hnb bt. simpl. ntwfauto.
@@ -361,7 +358,7 @@ Proof using.
   apply isSomeBindRet.
   apply translateVal_cps_cvt_val2.
   eapply Hind; eauto. ntwfauto.
-Qed.
+Admitted.
 
 Require Import L4.expression.
 Require Import L4.L4_to_L4a.

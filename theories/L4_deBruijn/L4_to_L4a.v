@@ -58,15 +58,9 @@ match e with
 
 | expression.Fix_e el pn => 
     let len := efnlength el in 
-    let bvars := map mkVar (seq N.succ max len) in (* variables for the untupled rep. *)
-    let xf := mkVar max in (* final variable for the tuple representation *)
-    (* untupled representation obrained from raw translation *)
+    let bvars := map mkVar (seq N.succ max len) in 
     let bds := (translatef (max+ N.of_nat len) el) in
-    (* convert untupled to tupled *)
-    let pinds := (seq S 0 len) in
-    let sub := combine bvars (map (fun n=> Proj_e (vterm xf) n) pinds) in
-    let bds := map (fun t => ssubst_aux t sub) bds in
-    Proj_e (Fix_e xf bds) (N.to_nat pn)
+    Fix_e bvars bds (N.to_nat pn)
 
 | expression.Match_e d _ brl => 
     Match_e (translate max d) (translateb max brl)

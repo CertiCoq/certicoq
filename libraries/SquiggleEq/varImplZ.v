@@ -6,10 +6,14 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.Li
 
 Global Instance deqpos : Deq positive.
 Proof.
-  apply @deqAsSumbool.
-  intros ? ?. unfold DecidableSumbool.
-  decide equality.
-Qed.
+  unfold Deq.
+  intros ? ?.
+  exists (Pos.eqb a b).
+  split.
+  - intros. apply Peqb_true_eq. assumption.
+  - intros. subst. apply Pos.eqb_refl.
+Defined.
+
 
 Definition varClassP (p:positive) : bool :=
 match p with

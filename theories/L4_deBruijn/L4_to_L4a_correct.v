@@ -183,6 +183,8 @@ match n with
 end.
 
 Quote Recursively Definition isEven3 := (isEven 3).
+Require Import Arith.
+Quote Recursively Definition even3 := (Nat.even 3).
 
 (* Move to an earlier file because it is more generally useful *)
 Ltac cexact x := let t := eval compute in x in exact t.
@@ -195,7 +197,6 @@ Print isEven3.
 
 Local Opaque Match_e.
 Local Opaque Fix_e.
-Local Opaque Proj_e.
 Local Opaque Con_e.
 Local Opaque Lam_e.
 Local Opaque Let_e.
@@ -204,11 +205,13 @@ Local Opaque App_e.
 Local Transparent ssubst_aux.
 Local Transparent ssubst_bterm_aux.
 Definition isEven3L4a := ltac:(cexact (translateTo (cTerm certiL4a) isEven3)).
+Definition even3L4a := ltac:(cexact (translateTo (cTerm certiL4a) even3)).
 
 Print isEven3L4.
 Print isEven3L4a.
 
 Eval vm_compute in isEven3L4a.
+Eval vm_compute in even3L4a.
 
 Eval compute in (DecidableClass.decide (2=3))%positive.
 

@@ -28,7 +28,8 @@ https://coq.inria.fr/coq-85
 and install the packages from source:
 
 https://github.com/coq-ext-lib/coq-ext-lib
-https://github.com/gmalecha/template-coq
+https://github.com/gmalecha/template-coq/commit/2540cb532b1c4e773dff0381fe77f03cc83b77fd (branch : coq-8.5)
+
 
 
 
@@ -36,8 +37,35 @@ https://github.com/gmalecha/template-coq
 Building the compiler:
 ----------------------
   at certicoq/, run
+
 # make -j4 -k
 
   This will build the compiler and its proofs.
 
   TODO: Extracted version ?
+
+Troubleshooting:
+----------------------
+
+If the above fails, try the following
+
+1) "make clean" at certicoq/ and then try to build again
+
+2) Ensure that your working copy is EXACTLY the same as the contents of SVN repo. Unversioned files and directories should also be removed because they can 
+interfere with how Coq resolves imports and how Makefile tracks dependences (via coqdep).
+
+If you are using a git client to access the SVN repo, "git reset HEAD --hard; git clean -xf" ensures that the working copy exactly matches the state of the repository.
+
+If you use the SVN client, there should be something similar:
+http://stackoverflow.com/questions/239340/automatically-remove-subversion-unversioned-files
+http://stackoverflow.com/questions/6204572/is-there-a-subversion-command-to-reset-the-working-copy
+
+3) Is your file system case-insensitive? Please consider using a linux VM. Or,  try making all Require Imports/Exports fully qualified,
+so that Coq doesn't import the wrong file because its name differes only in capitalization.
+There is tool to help with that:
+https://github.com/JasonGross/coq-tools/
+
+
+If errors remain AFTER step 2, please send an email to the certicoq mailing list.
+Until step 2, others may have no idea about the state of the working copy of your machine, so their help may not be applicable.
+

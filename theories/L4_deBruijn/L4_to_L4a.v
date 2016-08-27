@@ -57,9 +57,9 @@ match e with
     Con_e d (translatel max el)
 
 | expression.Fix_e el pn => 
-    let len := efnlength el in 
-    let bvars := map mkVar (seq N.succ max len) in 
-    let bds := (translatef (max+ N.of_nat len) el) in
+    let len := efnlst_length el in 
+    let bvars := map mkVar (seq N.succ max (N.to_nat len)) in 
+    let bds := (translatef (max+ len) el) in
     Fix_e bvars bds (N.to_nat pn)
 
 | expression.Match_e d _ brl => 

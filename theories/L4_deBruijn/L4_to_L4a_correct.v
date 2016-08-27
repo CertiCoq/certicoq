@@ -1,16 +1,3 @@
-Require Import L4.expression.
-Require Import L4.L4a_to_L5.
-Require Import L4.L4_to_L4a.
-
-Require Import SquiggleEq.export.
-Require Import SquiggleEq.UsefulTypes.
-Require Import SquiggleEq.varImplZ.
-
-(* circularity watch: this correctness property cannot go to L4.instances. Should we have
-L4.correctnessInstances for such instances? *)
-Require Import L4.instances.
-Require Import Common.certiClasses.
-
 Require Import BinNat.
 Require Import BinPos.
 Require Import Omega.
@@ -18,6 +5,95 @@ Require Import Psatz.
 Require Import Arith.
 Require Import PArith.
 Require Import NArith.
+  SearchAbout N.lt not iff.
+SearchAbout N.lt N.add ex.
+
+Require Import L4.expression.
+Require Import Basics.
+
+
+Fixpoint fn {A:Type} (f: A->A) (n:nat) : A -> A :=
+match n with
+| O => id
+| S n' => compose (fn f n') f
+end.
+
+Lemma fn_shift {A:Type} (f: A->A) : forall x start,
+fn f x (f start) = f (fn f x start).
+Proof using.
+  induction x; auto.
+  simpl. unfold compose. auto.
+Qed.
+
+
+Require Import L4.L4a_to_L5.
+Require Import L4.L4_to_L4a.
+Require Import SquiggleEq.export.
+Require Import SquiggleEq.UsefulTypes.
+Require Import SquiggleEq.varImplZ.
+Require Import SquiggleEq.list.
+
+Require Import SquiggleEq.tactics.
+Print my_exp_wf_ind.
+Require Import Coq.Unicode.Utf8.
+Require Import List.
+Require Import SquiggleEq.list.
+
+Open Scope program_scope.
+
+Lemma seq_spec {A:Type} (f: A->A)  :
+  forall (len:nat) (start:A), 
+    (L4_to_L4a.seq f start len) = map (fun n => (fn f n) start) (seq 0 len).
+Proof using Type.
+  induction len; intros ?; auto.
+  simpl. f_equal. rewrite <- seq_shift.
+  rewrite map_map. unfold compose. simpl.
+  eauto.
+Qed.
+
+Lemma seq_shift {A:Type} (f: A->A)  :
+  forall (len:nat) (start:A), 
+    (L4_to_L4a.seq f (f start) len) = map f (L4_to_L4a.seq f start len).
+Proof using Type.
+  intros.
+  do 2 rewrite seq_spec.
+  rewrite map_map. unfold compose.
+  apply eq_maps.
+  intros ? _.
+  apply fn_shift.
+Qed.
+
+Lemma fn_plusN : forall (n:nat) (m:N), (fn N.succ n) m = ((N.of_nat n) + m)%N.
+Proof using Type.
+  induction n; auto.
+  intros. rewrite Nat2N.inj_succ. simpl.
+  unfold compose. simpl.
+  rewrite IHn.
+  lia.
+Qed.
+
+Open Scope N_scope.
+
+Lemma in_seq_Nplus :   ∀ len (start n : N),
+   LIn n (L4_to_L4a.seq N.succ start len) ↔ (start <= n ∧ n < start + N.of_nat len)%N.
+Proof using.
+  intros.
+  rewrite seq_spec.
+  rewrite in_map_iff.
+  setoid_rewrite fn_plusN.
+  setoid_rewrite in_seq.
+  split; intro H.
+- exrepnd. lia.
+- repnd. exists (N.to_nat (n-start)).
+  lia.
+Qed.
+
+
+(* circularity watch: this correctness property cannot go to L4.instances. Should we have
+L4.correctnessInstances for such instances? *)
+Require Import L4.instances.
+Require Import Common.certiClasses.
+
 
 
 (*
@@ -33,17 +109,36 @@ Proof.
 Admitted.
 *)
 
+
+
+Lemma mkVarDiv : forall i, 
+  N.pos (Pos.div2 (mkVar i)) = N.succ i.
+Proof using Type.
+  intros. simpl.
+  rewrite N.succ_pos_spec. refl.
+Qed.
+
 Require Import SquiggleEq.tactics.
-Print my_exp_wf_ind.
-Require Import Basics.
-SearchAbout Basics.compose. 
-Require Import Coq.Unicode.Utf8.
-Require Import List.
-Require Import SquiggleEq.list.
+Require Import SquiggleEq.LibTactics.
+
+Lemma in_seq_mkvar_map : forall v l,
+varClass v = true
+->
+(In v (map mkVar l)
+<-> In (N.pos (Pos.div2 v)) (map N.succ l)).
+Proof using.
+  intros ? ? Hvc. do 2 rewrite in_map_iff.
+  split; intro H; exrepnd; subst.
+- rewrite mkVarDiv. eexists; eauto.
+- exists a. split; auto.
+  unfold mkVar.
+  clear H1. destruct v; inverts H0; inverts Hvc.
+  f_equal. rewrite <- N.succ_pos_spec in H1.
+  inverts H1. refl.
+Qed.
 
 
-Open Scope program_scope.
-Print exp_wf.
+
 Lemma L4_to_L4a_fvars: 
   (forall n (s : exp),
     L4.expression.exp_wf n s 
@@ -57,7 +152,8 @@ Lemma L4_to_L4a_fvars:
  ∧
   (forall n (s : efnlst),
     L4.expression.efnlst_wf n s 
-    -> forall v, List.In v (flat_map free_vars (translatef mkVar n s)) -> 
+    -> forall v, List.In v 
+                 (flat_map free_vars (translatef mkVar n s)) -> 
         (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
  ∧
   (forall n (s : branches_e),
@@ -65,16 +161,17 @@ Lemma L4_to_L4a_fvars:
     -> forall v, List.In v (flat_map (free_vars_bterm ∘ snd)  (translateb mkVar n s)) -> 
         (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
 .
-Proof.
-  apply my_exp_wf_ind;
+Proof using.
+  apply my_exp_wf_ind; try (simpl; tauto);
   intros ? ?.
+(* Var_e *)
 - intros Hwf ? Hin. simpl in Hin. rewrite or_false_r in Hin.
   subst. split; [ | refl].
-  simpl.
-  rewrite N.succ_pos_spec.
+  rewrite mkVarDiv.
   rewrite N.sub_1_r.
   rewrite N.lt_succ_pred with (z:=0%N); lia.
 
+(* Lam_e *)
 - intros Hwf Hind ? Hin.
   simpl in Hin. fold (L4_to_L4a.translate mkVar (N.succ i)) in Hin.
   rewrite list.in_app_iff in Hin.
@@ -97,18 +194,21 @@ Proof.
   rewrite <- N.succ_pos_spec in Hind0.
   injection Hind0. trivial.
 
+(* App_e *)
 - intros ? ? H1ind H1wf H2ind ? Hin. simpl in Hin.
   fold (L4_to_L4a.translate mkVar i) in Hin.
   repeat (rewrite list.in_app_iff in Hin).
   rewrite or_false_r in Hin.
   dorn Hin; eauto.
 
+(* Con_e *)
 - intros ? Hwf Hind ? Hin.
   simpl in Hin.
   fold (L4_to_L4a.translatel mkVar i) in Hin.
   rewrite flat_map_bterm_nil in Hin.
   eauto.
 
+(* Match_e *)
 - intros ? ? Hwf Hind ? Hindb ? Hin.
   simpl in Hin.
   fold (L4_to_L4a.translateb mkVar i) in Hin.
@@ -116,7 +216,9 @@ Proof.
   apply list.in_app_iff in Hin.
   rewrite list.flat_map_map in Hin.
   dorn Hin; eauto.
+  (* the crux of this proof comes later, in the translateb case *)
 
+(* Let_e *)
 - intros ? Hwf Hind H2wf H2ind ? Hin.
   simpl in Hin.
   fold (L4_to_L4a.translate mkVar (N.succ i)) in Hin.
@@ -148,18 +250,48 @@ Proof.
 
 - intros ? Hwf Hind ? Hin.
   simpl in Hin.
-  fold (L4_to_L4a.translatef  mkVar (N.succ i)) in Hin.
+  fold (L4_to_L4a.translatef mkVar (i + (efnlst_length es))%N) in Hin.
+  rewrite N.add_comm in Hin.
+  rewrite flat_map_map in Hin.
+  unfold compose in Hin.
+  simpl in Hin.
+  apply in_flat_map in Hin. exrepnd.
+  apply in_remove_nvars in Hin0. repnd.
+  specialize (Hind v).
+  rewrite in_flat_map in Hind.
+  destruct Hind as [Hyy Hvc]; [eexists; dands; eauto | ].
+  clear Hin1 Hin2.
+  split; [ | assumption ].
+  rewrite in_seq_mkvar_map in Hin0 by assumption.
+  rewrite <- seq_shift in Hin0.
+  setoid_rewrite in_seq_Nplus in Hin0.
+  clear Hvc. lia.
 
-Print exp_wf.
-Print sbst_fix. 
-
-Print exp_wf.
-(*  rewrite flat_map_bterm_nil in Hin.
-  rwsimpl Hin.
-   
-  eauto.
-compute in Hin. *)
-Abort.
+- intros ? Hwf Hind H2wf H2ind ? Hin. simpl in Hin.
+  fold (L4_to_L4a.translate mkVar i) in Hin.
+  fold (L4_to_L4a.translatel mkVar i) in Hin.
+  apply in_app_iff in Hin.
+  dorn Hin; eauto.
+- intros ? Hwf Hind H2wf H2ind ? Hin. simpl in Hin.
+  fold (L4_to_L4a.translate mkVar i) in Hin.
+  fold (L4_to_L4a.translatef mkVar i) in Hin.
+  apply in_app_iff in Hin.
+  dorn Hin; eauto.
+- intros ? ? ? Hwf Hind  H2wf H2ind ? Hin. simpl in Hin.
+  fold (L4_to_L4a.translate mkVar (i+n)) in Hin.
+  fold (L4_to_L4a.translateb mkVar i) in Hin.
+  apply in_app_iff in Hin. 
+  dorn Hin; [ clear H2ind | ]; eauto. unfold compose in Hin.
+  simpl in Hin.
+  rewrite N.add_comm in Hin.
+  apply in_remove_nvars in Hin. repnd.
+  specialize (Hind v).
+  apply Hind in Hin0. clear Hind. rename Hin0 into Hind. repnd.
+  split;[ | assumption].
+  rewrite in_seq_mkvar_map in Hin by assumption.
+  rewrite <- seq_shift in Hin.
+  setoid_rewrite in_seq_Nplus in Hin. lia.
+Qed.
 
 
 Lemma L4_to_L4a_preserves_wf : 

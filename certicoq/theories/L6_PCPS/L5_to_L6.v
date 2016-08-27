@@ -14,7 +14,7 @@ Require Import Coq.ZArith.ZArith.
 Require Import Coq.ZArith.Znumtheory.
 Require Import ExtLib.Data.List.
 Require Import ExtLib.Data.Bool.
-Require Maps.
+Require Libraries.Maps.
 Require Coq.funind.Recdef.
 Import Nnat.
 Require Import CpdtTactics.
@@ -25,9 +25,9 @@ Require Import L4.L4a_to_L5.
 Require Import SquiggleEq.varImplZ.
 Require Import L4.L5a.
 
-Require Import cps.
-Require Import cps_util.
-Require Import ctx.
+Require Import L6.cps.
+Require Import L6.cps_util.
+Require Import L6.ctx.
 
 
 
@@ -147,10 +147,10 @@ Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:t_map) (n:var) (*  {struct 
          let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
          let '(cbls, n'', tgm) := convert_branches bl sv sk tgm vn n' in
          (app_ctx_f ctx_v (Ecase vn cbls), n'', tgm)
-       | Proj_c v m k =>
+(*       | Proj_c v m k =>
          let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
          let '(ctx_k, vk, n'', tgm) := convert_v k sv sk tgm n' in
-         (app_ctx_f (comp_ctx_f ctx_v ctx_k) (Eproj n'' rec_tag (N.of_nat m) vn  (Eapp vk kon_tag (n''::nil))), Pos.succ n'', tgm)
+         (app_ctx_f (comp_ctx_f ctx_v ctx_k) (Eproj n'' rec_tag (N.of_nat m) vn  (Eapp vk kon_tag (n''::nil))), Pos.succ n'', tgm) *)
        end
 (* returns converted context * new binding (usually n'-1 except for var and kvar) * next fresh 
 
@@ -184,11 +184,18 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (tgm:t_map) (n:var) (* { struct
            let '(lv_ctx, nl, n', tgm) := convert_v_list lv sv sk tgm n in
            
              (comp_ctx_f lv_ctx (Econstr_c n' (dcon_to_tag dcn) (List.rev nl) Hole_c), n', Pos.succ n', (M.set n' (dcon_to_tag dcn) tgm)) 
-         | Fix_c lbt =>
-           (*  convert a list of simple_cps cps functions into 
+         | Fix_c lbt i =>
+           (match lbt with
+             | nil => (Hole_c, (1%positive), n, tgm) (* malformed input, should not happen *) 
+             | (fvars, _)::_ =>          
+           (*  convert_fds:
+               convert a list of simple_cps cps functions into 
                (1) a set of cps.exp functions (fundefs), each referring to a local variable (n+1), a local continuation variable (n+2) and the functions name (pushed to sv before calling convert_fds
- (2) the next fresh name
+               (2) the next fresh name
+            assumes that lv1 = lv2 = ... (see comment in L5a.v for about Fix_c)  
+            returns the name of the *i*th function as bound variable
 
+            
 arguments are: 
  - fds : the l ist of functions to convert
  - sv : the stack of names for local variables, including the names for the set of functions being converted
@@ -197,10 +204,12 @@ arguments are:
  - fnames : names given to each of the function left to convert in fds
  - n     : next available name 
 
+
+ 08/27/2016 - updated for directly-named functions in L5a instead of building a record
  *)
-           let fix convert_fds (fds : list (var * val_c))  (sv: s_map) (sk : s_map) (tgm:t_map) (fnames : list var) (n : var) (*{struct fds} *): (fundefs * var * t_map)  :=
+           let fix convert_fds (fds : list (list var * val_c))  (sv: s_map) (sk : s_map) (tgm:t_map) (fnames : list var) (n : var) (*{struct fds} *): (fundefs * var * t_map)  :=
                match (fds, fnames) with
-                 | ((f,v)::fds', currn::fnames') =>
+                 | ((_,v)::fds', currn::fnames') =>
                    (match v with
                       | Lam_c x k e =>            
                         let '(ce, n', tgm) := convert e (M.set x n sv) (M.set k (Pos.succ n) sk) tgm (Pos.add n 2%positive) in
@@ -210,12 +219,11 @@ arguments are:
                     end) 
                  | (_, _) => (Fnil, n, tgm)
                end in
-           let (fnames, fbodys) := List.split lbt in (* length of the mutually recursive block *)
-           let (nfds, newn) := fromN n (length lbt) in
-           let sv' := set_s_list fnames nfds sv in
+           let (nfds, newn) := fromN n (length fvars) in
+           let sv' := set_s_list fvars nfds sv in
            let '(fds, n', tgm) := convert_fds lbt sv' sk tgm nfds newn in
-           (* the record should disappear during shrink reduction *) 
-           (Efun1_c fds (Econstr_c n' rec_tag nfds Hole_c), n',  (Pos.succ n'), tgm )
+           (Efun1_c fds Hole_c, nth i nfds (1%positive), n', tgm )
+             end)
        end.
 
 Definition convert_top (e:cps) : exp :=

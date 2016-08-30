@@ -3020,6 +3020,9 @@ Section CC_correct.
           unfold subst. rewrite Heq. right. eapply Hfx. zify; omega.
           eapply HD'. constructor. now eexists; eauto.
           unfold subst. rewrite Heq. now left; eauto.
+          constructor; eauto. intros Hinl.
+          eapply HD with (x := x). constructor. eapply Hfx. zify; omega.
+          left. normalize_bound_var...
         * split. normalize_bound_var.
           apply Union_Disjoint_r. apply Disjoint_Singleton_r.
           intros Hc. 

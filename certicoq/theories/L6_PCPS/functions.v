@@ -1,7 +1,10 @@
 Require Import L6.Ensembles_util.
 Require Import Libraries.Coqlib.
-Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles
-        Coq.Relations.Relations Coq.Classes.Morphisms.
+Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos
+        Coq.Relations.Relations Coq.Classes.Morphisms Coq.Lists.List
+        Coq.Sets.Ensembles.
+
+Import ListNotations.
 
 (** ** Usefull definitions and lemmas about functions. *)
 
@@ -26,13 +29,29 @@ Definition f_eq  {A B} (f1 f2 : A -> B) : Prop :=  forall x, f1 x = f2 x.
 
 (** Extend a function. Only works for positives to avoid parameterizing the definition with
   * the decidable equality proof. TODO: fix this *)
-Definition extend (f: positive -> positive) (x x' : positive) : (positive -> positive) :=
+Definition extend {A} (f: positive -> A) (x : positive) (x' : A) : (positive -> A) :=
   fun z => if peq z x then x' else f z.
 
 Notation " f '{' x '~>' y '}' " := (extend f x y) (at level 10, no associativity)
                                    : fun_scope.
 
-Open Scope fun_scope.
+Open Scope fun_scope. 
+
+Fixpoint extend_lst {A} (f: positive -> A) (xs : list positive) (xs' : list A)
+: positive -> A :=
+  match xs with
+    | [] => f
+    | x :: xs =>
+      match xs' with
+        | [] => f
+        | x' :: xs' =>
+          (extend_lst f xs xs') {x ~> x'}
+      end
+  end.
+
+
+Notation " f '<{' xs '~>' xs' '}>' " := (extend_lst f xs xs') (at level 10, no associativity)
+                                        : fun_scope.
 
 
 (** * Lemmas about [f_eq_subdomain] and [f_eq] *)
@@ -151,19 +170,19 @@ Qed.
 
 (** * Lemmas about [extend] *)
 
-Instance extend_Proper : Proper (f_eq ==> Logic.eq ==> Logic.eq ==> f_eq) extend.
+Instance extend_Proper {A} : Proper (f_eq ==> Logic.eq ==> Logic.eq ==> f_eq) (@extend A).
 Proof. 
   intros f1 f2 Hfeq x1 x2 Heq1 x3 x4 Hfeq2; subst.
   intros x. unfold extend. destruct (peq x x2); eauto.
 Qed.
 
-Lemma extend_gss f x x' :
+Lemma extend_gss {A} f x (x' : A) :
   f {x ~> x'} x = x'.
 Proof. 
   unfold extend. rewrite peq_true. reflexivity.
 Qed.
 
-Lemma extend_gso f x x' y :
+Lemma extend_gso {A} f x (x' : A) y :
   y <> x ->
   f {x ~> x'} y = f y.
 Proof. 
@@ -177,7 +196,7 @@ Proof.
   unfold extend. destruct (peq x y); eauto.
 Qed.
 
-Lemma f_eq_extend (f f' : positive -> positive) x y :
+Lemma f_eq_extend {A} (f f' : positive -> A) x y :
   f_eq f f' ->
   f_eq (f{x ~> y}) (f'{x ~> y}).
 Proof. 
@@ -186,7 +205,7 @@ Proof.
   destruct (peq z x); eauto.
 Qed.
 
-Lemma f_eq_extend_same (f : positive -> positive) x y :
+Lemma f_eq_extend_same {A} (f : positive -> A) x y :
   f x = y ->
   f_eq (f{x ~> y}) f.
 Proof. 
@@ -195,7 +214,7 @@ Proof.
     congruence. 
 Qed.    
 
-Lemma f_eq_subdomain_extend S (f f' : positive -> positive) x y :
+Lemma f_eq_subdomain_extend {A} S (f f' : positive -> A) x y :
   f_eq_subdomain S f f' ->
   f_eq_subdomain (Union _ (Singleton _ x) S) (f{x ~> y}) (f'{x ~> y}).
 Proof. 
@@ -205,7 +224,7 @@ Proof.
   apply Heq. inv Hin; [| now eauto ]. inv H; congruence. 
 Qed.
 
-Lemma f_eq_subdomain_extend_not_In_S_l f1 S f2 x x'  : 
+Lemma f_eq_subdomain_extend_not_In_S_l {A} f1 S f2 x (x' : A)  : 
   ~ In _ S x ->
   f_eq_subdomain S f1 f2 ->
   f_eq_subdomain S (f1{x~>x'}) f2.
@@ -215,7 +234,7 @@ Proof.
   intros Hc. subst. contradiction.
 Qed.
 
-Lemma f_eq_subdomain_extend_not_In_S_r f1 S f2 x x'  : 
+Lemma f_eq_subdomain_extend_not_In_S_r {A} f1 S f2 x (x' : A) : 
   ~ In _ S x ->
   f_eq_subdomain S f1 f2 ->
   f_eq_subdomain S f1 (f2{x~>x'}).
@@ -225,7 +244,7 @@ Proof.
   intros Hc. subst. contradiction.
 Qed.
 
-Lemma image_extend_not_In_S f x x' S :
+Lemma image_extend_not_In_S {A} f x (x' : A) S :
   ~ In _ S x ->
   Same_set _ (image (f {x ~> x'} ) S) (image f S).
 Proof.    
@@ -236,7 +255,7 @@ Proof.
   intros Hc. subst. contradiction.
 Qed.
 
-Lemma image_extend_In_S f x x' S :
+Lemma image_extend_In_S f x (x' : positive) S :
   In _ S x ->
   Same_set _ (image (f {x ~> x'}) S)
            (Union _ (image f (Setminus _ S (Singleton _ x)))
@@ -259,7 +278,7 @@ Proof.
       * inv H. congruence. 
 Qed.
 
-Lemma image_Setminus_extend f v v' S :
+Lemma image_Setminus_extend f v (v' : positive) S :
   Included _ (image (f {v ~> v'}) (Setminus _ S  (Singleton positive v)))
            (image f S).
 Proof.
@@ -269,7 +288,7 @@ Proof.
   intros Hc. inv Hc. eapply H0; eauto.
 Qed.
 
-Lemma image_extend_Included f x x' S :
+Lemma image_extend_Included {A} f x (x' : A) S :
   Included _ (image (f {x ~> x'}) S) (Union _ (image f S) (Singleton _ x')).
 Proof.  
   intros y [y' [Hin Heq]]. unfold extend in Heq.
@@ -280,11 +299,11 @@ Qed.
 Lemma In_image {A B} S f x: 
   In A S x ->
   In B (image f S) (f x).
-Proof. 
+Proof.
   intros; repeat eexists; eauto.
 Qed.
 
-Lemma Included_image_extend g S x x':
+Lemma Included_image_extend g S x (x' : positive) :
   ~ In _ S x ->
   Included _ (image g S)
            (image (g {x ~> x'}) (Union _ (Singleton _ x) S)).
@@ -356,7 +375,7 @@ Proof.
   intros x1 x2 Hin1 Hin2 Heq. inv Hin1.
 Qed.
 
-Lemma injective_subdomain_extend f x x' S :
+Lemma injective_subdomain_extend f x (x' : positive) S :
   injective_subdomain S f ->
   ~ In _ (image f (Setminus _ S (Singleton _ x))) x' ->
   injective_subdomain (Union _ (Singleton _ x) S) (f {x~>x'}).
@@ -383,7 +402,7 @@ Proof.
       inv Hin2. inv H; congruence. eassumption.
 Qed.
 
-Lemma injective_subdomain_extend' f x x' S :
+Lemma injective_subdomain_extend' f x (x' : positive) S :
   injective_subdomain S f ->
   ~ In _ (image f (Setminus _ S (Singleton _ x))) x' ->
   injective_subdomain S (f {x~>x'}).

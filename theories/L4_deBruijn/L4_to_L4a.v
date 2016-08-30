@@ -21,74 +21,69 @@ match len with
 end.
 
 
-(* make a section so that the notations get cleared *)
-Section Dummy.
-Context {NVar : Type} `{Deq NVar}.
-Variable mkVar : N -> NVar.
-
-Notation BTerm := (@BTerm NVar L4Opid).
-Notation NTerm := (@NTerm NVar L4Opid).
-Notation oterm := (@oterm NVar L4Opid).
-
-Notation push := cons (only parsing).
-
-
 Definition dummyind := Ast.mkInd "" 0%nat.
 
 Require Import Common.RandyPrelude.
+Open Scope N_scope.
+
+Definition translateb {NVar : Type} (mkVar : N -> NVar) max
+translate
+ d n (e:exp)  :  (@branch NVar L4Opid) :=
+    let bvars := map mkVar (seq N.succ max (N.to_nat n)) in 
+    (d, bterm bvars (translate mkVar (max+n) e)).
+
 
 (* N.to_nat efficiency? *)
-Fixpoint translate (max : N)(e:exp) : NTerm :=
+Fixpoint translate {NVar : Type} (mkVar : N -> NVar) 
+  (max : N)(e:exp) {struct e}: NTerm :=
 match e with
 | Var_e n => vterm (mkVar (max-n-1))
 
 | expression.Lam_e e => 
     let vn := mkVar max in
-    Lam_e vn (translate (N.succ max) e)
+    Lam_e vn (translate mkVar (N.succ max) e)
 
 | expression.App_e f a => 
-    App_e (translate max f) (translate max a)
+    App_e (translate mkVar max f) (translate mkVar max a)
 
 | expression.Let_e e1 e2 => 
     let vn := mkVar max in
-    Let_e vn (translate max e1) (translate (N.succ max) e2)
+    Let_e vn (translate mkVar max e1) (translate mkVar (N.succ max) e2)
 
 | expression.Con_e d el => 
-    Con_e d (translatel max el)
+    Con_e d (translatel mkVar max el)
 
 | expression.Fix_e el pn => 
     let len := efnlst_length el in 
     let bvars := map mkVar (seq N.succ max (N.to_nat len)) in 
-    let bds := (translatef (max+ len) el) in
+    let bds := (translatef mkVar (max+ len) el) in
     Fix_e bvars bds (N.to_nat pn)
 
 | expression.Match_e d _ brl => 
-    Match_e (translate max d) (translateb max brl)
+    Match_e (translate mkVar max d) (translatelb mkVar max brl)
 
 | Ax_e _ => Con_e (dummyind, N.zero) nil (* FIX! *) 
 end
-with translatel (max : N)(e:exps) : list NTerm :=
+with translatel {NVar : Type} (mkVar : N -> NVar) 
+  (max : N)(e:exps) {struct e}: list NTerm :=
 match e with
 | enil => []
-| econs h tl => (translate max h)::(translatel max tl)
+| econs h tl => (translate mkVar max h)::(translatel mkVar max tl)
 end
-with translatef (max:N)(e:efnlst) : list NTerm :=
+with translatef {NVar : Type} (mkVar : N -> NVar)
+  (max:N) (e:efnlst) {struct e}: list NTerm :=
 match e with
 | eflnil => []
-| eflcons h tl => (translate max h)::(translatef max tl)
+| eflcons h tl => (translate mkVar max h)::(translatef mkVar max tl)
 end
-with translateb (max:N)(lb:branches_e) 
+with translatelb {NVar : Type} (mkVar : N -> NVar)
+(max:N)(lb:branches_e) {struct lb}
   : list (@branch NVar L4Opid):=
 match lb with
 | brnil_e => []
-| brcons_e d n e tl => 
-    let bvars := map mkVar (seq N.succ max (N.to_nat n)) in 
-    let h := (d, bterm bvars (translate (max+n) e)) in
-    h::(translateb max tl)
+| brcons_e d n e tl => (translateb mkVar max translate d n e)::(translatelb mkVar max tl)
 end.
 
-
-End Dummy.
 
 Definition mkVar (n:N):=  xO (N.succ_pos n).
 Require Import L6.cps.

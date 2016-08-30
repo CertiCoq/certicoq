@@ -58,28 +58,30 @@ Section Uncurry_correct.
              (forall rho rho',
                 preord_env_P pr cenv (occurs_free e) m rho rho' ->
                 preord_exp pr cenv m (e, rho) (e', rho')) /\ fresh S (fst s') }}) ->
-    (* Assumption about the set [S] we  *)
+    (* Assumption about the set [S]  *)
     Disjoint _ S (Union _ (bound_var_fundefs B2) (occurs_free_fundefs B2)) ->
-    (* We need to generalize the first argument of [def_funs] for the proof
-       to work, although in practice it will always be the same with the
-       second one. This may or may not be a sufficient and convenient
-       assumption for B1 and B1' *)
-    {{ fun _ => True }} uncurry_fundefs B1 {{ fun _ B1'' _ => B1' = B1'' }} ->
     {{ fun s =>  fresh S (fst s) }}
       uncurry_fundefs B2
     {{ fun s B2' s' =>
          (forall rho rho',
             preord_env_P pr cenv (occurs_free (Efun B1 e)) k rho rho' ->
+            (* We need to generalize the first argument of [def_funs] for the
+               proof to work, although in practice it will always be the same
+               with the second one. To be able to instantiate the IH we need to
+               have some hypotheses for B1 B1'. However, I do not have a way to
+               do this directly for the stateful program. When the proof is done
+               using a relational definition for the transformation (say R) we
+               can assume that B1 R B1' and the proof goes through.*)
             preord_env_P pr cenv (Union _ (occurs_free (Efun B1 e)) (name_in_fundefs B2)) k
-                      (def_funs B1 B2 rho rho) (def_funs B1' B2' rho' rho')) /\
+                         (def_funs B1 B2 rho rho) (def_funs B1' B2' rho' rho')) /\
          fresh S (fst s')
     }}.
   Proof.
     revert B2 B1 B1' e S. induction k as [k IHk] using lt_wf_rec1.
-    induction B2; intros B1 B1' e' S IHe HD Hunc; simpl.
+    induction B2; intros B1 B1' e' S IHe HD; simpl.
     Opaque uncurry_exp uncurry_fundefs.
     - eapply bind_triple.
-      + apply IHB2; [ eassumption | | eassumption ].
+      + apply IHB2; [ eassumption |  ].
         eapply Disjoint_Included_r; [| eassumption ].
         now eapply bound_var_occurs_free_fundefs_Fcons_Included.
       + intros B2' s1. eapply pre_curry_l. intros HB2.

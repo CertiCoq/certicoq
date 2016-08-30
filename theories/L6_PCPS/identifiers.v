@@ -1321,6 +1321,7 @@ with unique_bindings_fundefs : fundefs -> Prop :=
       Disjoint var (bound_var_fundefs defs) (FromList ys) ->
       Disjoint var (bound_var e) (bound_var_fundefs defs) ->
       ~ FromList ys f ->
+      NoDup ys ->
       unique_bindings e ->
       unique_bindings_fundefs defs ->
       unique_bindings_fundefs (Fcons f tau ys e defs)
@@ -1596,7 +1597,7 @@ Proof with eauto with Ensembles_DB.
     + inv H. inv H0. congruence. inv Hun; eauto.
       edestruct IHB as [B1 [B2 [Heq [Hn [Hs Hun']]]]]; eauto.
       edestruct fundefs_append_unique_bindings_l as [H1 [H2 H3]];
-        [ apply H12 | | ]; eauto.
+        [ apply H13 | | ]; eauto.
       exists (Fcons v f0 l e0 B1), B2. rewrite Heq. split; eauto.
       split; [| split ].
       * intros H. apply Hn. inv H; eauto. inv H4. congruence.
@@ -1613,7 +1614,7 @@ Proof with eauto with Ensembles_DB.
         constructor. eapply name_in_fundefs_bound_var_fundefs.
         eapply fun_in_fundefs_name_in_fundefs; eauto.
         rewrite bound_var_fundefs_Fcons; left. eauto.
-        eapply Disjoint_Singleton_r. intros Hc. inv H2. eapply H17.
+        eapply Disjoint_Singleton_r. intros Hc. inv H2. eapply H18.
         eapply name_in_fundefs_bound_var_fundefs.
         eapply fun_in_fundefs_name_in_fundefs; eauto.
       * simpl. constructor; eauto.
@@ -1688,22 +1689,23 @@ Lemma unique_bindings_hoist B1 B2 B3 f tau xs e B B' :
   split_fds B3 B2 B' ->
   unique_bindings_fundefs B ->
   unique_bindings_fundefs B'.
-Proof with eauto with Ensembles_DB.
+Proof with now eauto with Ensembles_DB.
   intros Hsp1 Hsp2 Hsp3 Hun.
   edestruct split_fds_unique_bindings_fundefs_l as [H1 [H2 H3]]; eauto.
   assert (Hun2 : unique_bindings_fundefs B2).
   { eapply split_fds_unique_bindings_fundefs_r; [ | | | now apply Hsp2 ];
     eauto; repeat normalize_bound_var_in_ctx.
-    - inv H2. inv H13. clear H10. repeat normalize_bound_var_in_ctx.
+    - inv H2. inv H14. clear H10. repeat normalize_bound_var_in_ctx.
       constructor; eauto; repeat normalize_bound_var...
     - repeat normalize_bound_var... }
   edestruct split_fds_unique_bindings_fundefs_l as [H1' [H2' H3']]; eauto.
   eapply split_fds_unique_bindings_fundefs_r; [ | | | eauto]; eauto.
-  inv H2. inv H13; eauto. inv H2.
+  inv H2. inv H14; eauto.
   rewrite (split_fds_bound_vars B1 (Fcons f tau xs e Fnil) B2); eauto.
-  clear H10. clear H3'. inv H13. 
+  inv H2. inv H14. 
   repeat normalize_bound_var_in_ctx. repeat normalize_bound_var.
-  apply Union_Disjoint_r...
+  clear H3' H11 H10.
+  apply Union_Disjoint_r. eapply Disjoint_Included_l_sym; [| eassumption ]...
   apply Union_Disjoint_r...
 Qed.
 

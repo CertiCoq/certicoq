@@ -1,9 +1,12 @@
 Require Import L6.cps L6.cps_util L6.identifiers L6.eval L6.env L6.ctx L6.relations
         L6.logical_relations L6.Ensembles_util L6.List_util.
+Require Import Libraries.Coqlib.
 Require Import Coq.Lists.List Coq.NArith.BinNat Coq.Relations.Relations
         Coq.omega.Omega Coq.Sets.Ensembles Coq.Classes.Morphisms.
 
 Import ListNotations.
+
+Close Scope Z_scope.
 
 (** Given an expression [e], [exp_hoist e B f] will return an expression [e']
   * and a block of function definitions [B']. [e'] is the function definition 
@@ -833,7 +836,7 @@ Proof with now eauto 6 with Ensembles_DB.
   - inv Hun; eauto.
   - inv Hun. 
     edestruct split_fds_unique_bindings_fundefs_l as [H1' [H2' H3']];
-      [| apply H |]; eauto. inv H2'. inv H16.
+      [| apply H |]; eauto. inv H2'. inv H17.
     rewrite bound_var_Efun in *. rewrite bound_var_fundefs_Fcons in *.
     repeat normalize_bound_var_in_ctx.
     constructor; eauto.
@@ -1426,7 +1429,7 @@ Section hoisting_correct.
           now eapply Forall2_same. constructor. reflexivity.
           now eapply Forall2_same.
           erewrite findtag_append_not_In; eauto. simpl.
-          rewrite Coqlib.peq_true. reflexivity.
+          rewrite peq_true. reflexivity.
         + edestruct (preord_exp_refl pr cenv k e) as [v2 [c2 [Hstep2 Hpre2]]];
           [| eauto | eauto |].
           * eapply preord_env_P_def_funs_not_in_P_r with (B := B).

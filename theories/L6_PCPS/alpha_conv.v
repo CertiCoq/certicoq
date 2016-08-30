@@ -11,16 +11,6 @@ Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
 
-Fixpoint extend_lst (f: var -> var) (xs xs' : list var) : (var -> var) :=
-  match xs with
-    | [] => f
-    | x :: xs =>
-      match xs' with
-        | [] => f
-        | x' :: xs' =>
-          extend_lst (f{x ~> x'}) xs xs'
-      end
-  end.
 
 Fixpoint extend_fundefs (f: var -> var) (B B' : fundefs) : (var -> var) :=
   match B with
@@ -32,12 +22,6 @@ Fixpoint extend_fundefs (f: var -> var) (B B' : fundefs) : (var -> var) :=
           (extend_fundefs f B B'){g ~> g'}
       end
   end.
-
-(* Notation " f '{[' xs '~>' ys ']}' " := (extend_lst f xs ys) (at level 10, no associativity) *)
-(*                                        : alpha_scope. *)
-
-(* Notation " f '<{' B '~>' B' '}>' " := (extend_fundefs f B B') (at level 10, no associativity) *)
-(*                                        : alpha_scope. *)
 
 Inductive construct_lst_injection : (var -> var) -> list var -> list var -> (var -> var) -> Prop :=
 | Inj_nil :
@@ -248,7 +232,7 @@ Section Alpha_conv_correct.
   Variable pr : prims.
   Variable cenv : cEnv.
 
-  Definition preord_env_P_inj P k f rho1 rho2 :=
+  Definition preord_env_P_inj (P : Ensemble var) k f rho1 rho2 :=
     forall x : var,
       P x -> preord_var_env pr cenv k rho1 rho2 x (f x).
 
@@ -286,17 +270,18 @@ Section Alpha_conv_correct.
         (k : nat)  f(x y : var) (v1 v2 : val) : 
     preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
     preord_val pr cenv k v1 v2 ->
-    injective (f {x ~> y}) ->
+    injective_subdomain (Union _ P (Singleton _ x)) (f {x ~> y}) ->
     preord_env_P_inj P k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
-  Proof. 
+  Proof.
     intros Henv Hv Hinj z HP. unfold extend. 
-    destruct (peq z x) as [| Hneq] eqn:Heq'.
+    destruct (peq z x) as [| Hneq].
     - subst. intros z Hget.
       rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
     - intros z' Hget. rewrite M.gso in Hget; eauto.
       destruct (peq (f z) y).
-      + exfalso. eapply Hneq. eapply Hinj. now constructor.
-        now constructor. rewrite extend_gso; eauto.
+      + exfalso. eapply Hneq. eapply Hinj. left. eassumption.
+        now eauto.
+        rewrite extend_gso; eauto.
         rewrite extend_gss. eassumption.
       + edestruct (Henv z); eauto.
         constructor; eauto. intros Hc. inv Hc. congruence. 
@@ -319,7 +304,7 @@ Section Alpha_conv_correct.
     eexists; split; eauto. eapply preord_val_monotonic; eauto.
   Qed.
 
-  Instance preord_env_P_inj_proper  :
+  Global Instance preord_env_P_inj_proper  :
     Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            preord_env_P_inj.
   Proof.
@@ -370,19 +355,18 @@ Section Alpha_conv_correct.
 
   Lemma preord_env_P_inj_setlist (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f f':
-    preord_env_P_inj P1 k f rho1 rho2 ->
+    preord_env_P_inj (Setminus _ P1 (FromList xs1)) k f rho1 rho2 ->
     Forall2 (preord_val pr cenv k) vs1 vs2 ->
     construct_lst_injection f xs1 xs2 f' ->
     setlist xs1 vs1 rho1 = Some rho1' ->
     setlist xs2 vs2 rho2 = Some rho2' ->
-    preord_env_P_inj (Union _ P1 (FromList xs1)) k f' rho1' rho2'.
+    preord_env_P_inj P1 k f' rho1' rho2'.
   Proof.
     revert P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f f'. induction xs1;
       intros P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2  f f' Hpre Hall Hinj Hset1 Hset2 x HP v Hget.
     - inv Hinj. destruct vs1; try discriminate.
-      inv Hall. 
-      inv Hset1; inv Hset2. eapply Hpre; eauto.
-      inv HP; [ now eauto | now inv H ]. 
+      inv Hall. inv Hset1; inv Hset2. eapply Hpre; eauto.
+      constructor; eauto.
     - destruct vs1; try discriminate. inv Hall. inv Hinj.
       simpl in Hset1, Hset2. 
       destruct (setlist xs1 vs1 rho1) eqn:Heq1;
@@ -392,11 +376,11 @@ Section Alpha_conv_correct.
       + inv Hget. eexists. 
         simpl. unfold extend. rewrite peq_true.
         rewrite M.gss. eauto.
-      + edestruct IHxs1 as [v2 [Het' Hpre'] ]; eauto.
-        * inv HP; [ now left; eauto |].
-          rewrite FromList_cons in H. inv H.
-          inv H0. congruence. right; eauto.
-        * eexists. unfold extend. rewrite peq_false; [| now eauto ].
+      + edestruct IHxs1 with (P1 := Setminus var P1 (Singleton _ a)) as [v2 [Het' Hpre']]; eauto.
+        * rewrite Setminus_Union.
+          rewrite FromList_cons in Hpre. eassumption.
+        * constructor; eauto. intros Hc.  inv Hc; eauto.
+        * eexists. rewrite extend_gso; eauto.
           rewrite M.gso; [ now eauto |].
           intros Heq. eapply n. 
           eapply H7; try now constructor.
@@ -420,7 +404,7 @@ Section Alpha_conv_correct.
     preord_env_P_inj (occurs_free (Efun B1' e)) k f rho1 rho2 ->
     preord_env_P_inj (Union _ (occurs_free (Efun B1' e)) (name_in_fundefs B1)) k h
                      (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2).
-  Proof.
+  Proof with now eauto with Ensembles_DB.
     revert B1 rho1 rho2 B1' B2 B2' f h h' e.
     induction k as [ k IH' ] using lt_wf_rec1.
     induction B1; intros rho1 rho2 B1' B2 B2' g h h' e' IHe Hinj Hinj' Hinj'' Ha Ha' Hpre.
@@ -438,19 +422,19 @@ Section Alpha_conv_correct.
         eapply IHe; [| | eassumption |]. omega.
         eapply construct_lst_injection_injective; eauto.
         now eapply construct_fundefs_injection_injective; eauto.
-        eapply preord_env_P_inj_antimon.
+        apply find_def_correct in Hf; eauto.
+        eapply preord_env_P_inj_antimon; [| eapply occurs_free_in_fun; eassumption ]. 
         * eapply preord_env_P_inj_setlist;
           [ | eassumption | eassumption | now eauto | now eauto  ].
+          eapply preord_env_P_inj_antimon.
           eapply IH'; eauto. intros. eapply IHe. omega. now eauto. now eauto.
           eassumption.
           eapply (preord_env_P_inj_monotonic _ k). omega.
-          now eauto.
-        * apply find_def_correct in Hf; eauto.
-          rewrite occurs_free_Efun.
-          eapply Included_trans.
-          eapply occurs_free_in_fun. eassumption. 
-          eauto with Ensembles_DB.
-      + eassumption.
+          now eauto. rewrite Setminus_Union_distr.
+          rewrite Setminus_Same_set_Empty_set.
+          normalize_occurs_free...
+      + eapply injective_subdomain_antimon. eassumption.
+        constructor.
     - inv Ha. simpl. inv Hinj. eapply preord_env_P_inj_antimon. eassumption.
       eauto with Ensembles_DB.
   Qed.
@@ -471,10 +455,11 @@ Section Alpha_conv_correct.
         rewrite Heq in Henv. eapply Henv.
         now constructor.
       + eapply IHe1. eassumption. eassumption.
-        eapply preord_env_P_inj_set; [| | eassumption ]. 
+        eapply preord_env_P_inj_set. 
         eapply preord_env_P_inj_antimon; eauto.
         normalize_occurs_free...
         rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
+        eapply injective_subdomain_antimon. eassumption. now constructor.
     - inv H1. eapply preord_exp_case_nil_compat.
     - inv H1. destruct H2 as [Heq Ha]. destruct y as [c' e2]. simpl in Heq; subst.
       eapply preord_exp_case_cons_compat; eauto.
@@ -487,9 +472,10 @@ Section Alpha_conv_correct.
       eassumption. normalize_occurs_free...
     - eapply preord_exp_proj_compat; eauto; intros.
       eapply IHe1. eassumption. eassumption.
-      eapply preord_env_P_inj_set; [| | eassumption ]. 
+      eapply preord_env_P_inj_set. 
       eapply preord_env_P_inj_antimon; eauto.
       normalize_occurs_free... eassumption.
+      eapply injective_subdomain_antimon. eassumption. now constructor.
     - eapply preord_exp_fun_compat; eauto.
       eapply IHe1; [| eassumption |].
       eapply construct_fundefs_injection_injective. eassumption. eassumption.
@@ -508,10 +494,11 @@ Section Alpha_conv_correct.
         rewrite Heq in Henv. eapply Henv.
         now constructor.
       + eapply IHe1. eassumption. eassumption.
-        eapply preord_env_P_inj_set; [| | eassumption ]. 
+        eapply preord_env_P_inj_set. 
         eapply preord_env_P_inj_antimon; eauto.
         normalize_occurs_free...
         eassumption.
+        eapply injective_subdomain_antimon. eassumption. now constructor.
     - eapply preord_exp_halt_compat.
       eapply Henv. now constructor.
   Qed.

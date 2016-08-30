@@ -1,4 +1,5 @@
-Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.List_util.
+Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.List_util
+        L6.functions L6.Ensembles_util.
 Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
@@ -6,6 +7,7 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
 Require Import Libraries.Maps.
 
+Close Scope Z_scope.
 
 (** * Lambda lifting *)
 
@@ -31,7 +33,7 @@ Require Import Libraries.Maps.
     where fvs are the free variables of the mutually recursive function
     definition.
 
-    In [·] each occurrence of f_i in escaping position is left as it as, while
+    In [·] each occurrence of f_i in escaping position is left as it is, while
     each occurrence in applied position, for instance f_i z, for some z, is
     replaced with f_i' z fvs.
 
@@ -44,6 +46,8 @@ Require Import Libraries.Maps.
 
 **)
 
+
+(** * Computational Defintion *)
 
 Inductive VarInfo : Type :=
 (* A variable bound in the current scope *)
@@ -73,6 +77,16 @@ Definition get_name : state var :=
   put (mkCont ((n+1)%positive) f) ;;
   ret n.
 
+(** Get a list of fresh names *)
+Fixpoint get_names (n : nat) : state (list var) :=
+  match n with
+    | 0 => ret []
+    | S n =>
+      x <- get_name ;;
+      xs <- get_names n ;;
+      ret (x :: xs)
+  end.
+
 (** Get a fresh function tag *)
 Definition get_tag : state fTag :=
   p <- get ;;
@@ -80,21 +94,19 @@ Definition get_tag : state fTag :=
   put (mkCont n ((f+1)%positive)) ;;
   ret f.
 
-Definition rename (map : VarInfoMap) (esc : bool) (x : var) : var :=
+Definition rename (map : VarInfoMap) (x : var) : var :=
   match M.get x map with
     | Some inf =>
       match inf with
-        | BoundVar => x
+        | BoundVar | Fun _ _ _ => x
         | FreeVar y => y
-        | Fun f _ _ =>
-          if esc then x else f
       end
     | None => x
   end.
 
 Definition rename_lst (map : VarInfoMap) (xs : list var) : list var :=
   (* all list of variables in the AST are in an escaping positions *)
-  List.map (rename map true) xs.
+  List.map (rename map) xs.
 
 Fixpoint add_functions (B : fundefs) (fvs : list var) (m : VarInfoMap)
 : state VarInfoMap :=
@@ -144,10 +156,10 @@ Fixpoint exp_lambda_lift (e : exp) (m : VarInfoMap) : state exp :=
            P' <- mapM_ll P ;;
            ret ((c, e') :: P')
        end) P ;;
-    ret (Ecase (rename m false x) P')
+    ret (Ecase (rename m x) P')
   | Eproj x t N y e =>
     e' <- exp_lambda_lift e (M.set x BoundVar m) ;;
-    ret (Eproj x t N (rename m false y) e')
+    ret (Eproj x t N (rename m y) e')
   | Efun B e =>
     let fvs := PS.elements (fundefs_fv B (fundefs_names B)) in
     m' <- add_functions B fvs m ;;
@@ -171,7 +183,7 @@ Fixpoint exp_lambda_lift (e : exp) (m : VarInfoMap) : state exp :=
   | Eprim x f ys e =>
     e' <- exp_lambda_lift e (M.set x BoundVar m) ;;
        ret (Eprim x f (rename_lst m ys) e')
-  | Ehalt x => ret (Ehalt (rename m true x))
+  | Ehalt x => ret (Ehalt (rename m x))
   end
 with fundefs_lambda_lift B m :=
        match B with
@@ -182,11 +194,12 @@ with fundefs_lambda_lift B m :=
                  | Fun f' ft' fvs =>
                    p <- add_free_vars fvs (add_params xs m) ;;
                    let (ys, m') := p in
+                   xs' <- get_names (length xs) ;;
                    e' <- exp_lambda_lift e m' ;;
                    B' <- fundefs_lambda_lift B m ;;
                    ret (Fcons f' ft' (xs ++ ys) e
-                              (Fcons f ft xs
-                                     (Eapp f' ft' (xs ++ (rename_lst m fvs)))
+                              (Fcons f ft xs'
+                                     (Eapp f' ft' (xs' ++ (rename_lst m fvs)))
                                      B'))
                  | _ => ret (Fcons f ft xs e B) (* should never match *)
                end
@@ -211,3 +224,101 @@ with fundefs_lambda_lift B m :=
    and f x = f' x z
 
  *)
+
+
+(** * Relational Defintion *)
+
+Inductive Add_functions :
+  fundefs ->
+  list var ->
+  (var -> var) ->
+  (var -> option (var * fTag * list var)) ->
+  Ensemble var ->
+  (var -> var) ->
+  (var -> option (var * fTag * list var)) ->
+  Ensemble var ->
+  Prop :=
+| Add_Fcons :
+    forall f ft xs e B fvs σ σ' ζ ζ' S S' f' ft',
+      In _ S' f' ->
+      Add_functions B fvs σ ζ S σ' ζ' S' ->
+      Add_functions (Fcons f ft xs e B) fvs σ ζ S
+                    (σ' {f ~> f}) (ζ' {f ~> Some (f', ft', fvs)}) (Setminus _ S' (Singleton _ f'))
+| Add_Fnil :
+    forall fvs σ ζ S,
+      Add_functions Fnil fvs σ ζ S σ ζ S.
+
+Inductive Exp_lambda_lift :
+  (var -> option (var * fTag * list var)) ->
+  (var -> var) ->
+  exp ->
+  Ensemble var ->
+  exp ->
+  Ensemble var ->
+  Prop :=
+| LL_Econstr :
+    forall ζ σ x t ys e e' S S',
+      Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->
+      Exp_lambda_lift ζ σ (Econstr x t ys e) S (Econstr x t (map σ ys) e') S'
+| LL_Ecase_nil :
+    forall ζ σ x S,
+      Exp_lambda_lift ζ σ (Ecase x []) S (Ecase (σ x) []) S
+| LL_Ecase_cons :
+    forall ζ σ x y c e e' P P' S S' S'',
+      Exp_lambda_lift ζ σ e S e' S' ->
+      Exp_lambda_lift ζ σ (Ecase x P) S' (Ecase y P') S'' ->
+      Exp_lambda_lift ζ σ (Ecase x ((c, e) :: P)) S (Ecase (σ x) ((c, e') :: P')) S''
+| LL_Eproj :
+    forall ζ σ x t N y e e' S S',
+      Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->
+      Exp_lambda_lift ζ σ (Eproj x t N y e) S (Eproj x t N (σ y) e') S'
+| LL_Efun :
+    forall B B' e e' σ σ' ζ ζ' fvs S S' S'' S''',
+      Included _ (FromList fvs) (occurs_free_fundefs B) -> 
+      Add_functions B fvs σ ζ S σ' ζ' S' ->
+      Fundefs_lambda_lift ζ' σ' B S' B' S'' ->
+      Exp_lambda_lift ζ' σ' e S'' e' S''' ->
+      Exp_lambda_lift ζ σ (Efun B e) S (Efun B' e') S'''
+| LL_Eapp_known :
+    forall ζ σ f ft xs f' ft' fvs S,
+      ζ f = Some (f', ft', fvs) -> 
+      Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp f' ft' (map σ (xs ++ fvs))) S
+| LL_Eapp_unknown :
+    forall ζ σ f ft xs S,
+      ζ f = None -> 
+      Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp (σ f) ft (map σ xs)) S
+| LL_Eprim :
+    forall ζ σ x f ys e e' S S',
+      Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->
+      Exp_lambda_lift ζ σ (Eprim x f ys e) S (Eprim x f (map σ ys) e') S'
+| LL_Ehalt :
+    forall ζ σ x S,
+      Exp_lambda_lift ζ σ (Ehalt x) S (Ehalt (σ x)) S
+with Fundefs_lambda_lift :
+  (var -> option (var * fTag * list var)) ->
+  (var -> var) ->
+  fundefs ->
+  Ensemble var ->
+  fundefs ->
+  Ensemble var ->
+  Prop :=
+     | LL_Fcons :
+         forall ζ σ f ft xs xs' e e' B B' S S' S'' f' ft' fvs ys,
+           ζ f = Some (f', ft', fvs) ->
+           length xs' = length xs ->
+           Included _ (FromList ys) S ->
+           Included _ (FromList xs') (Setminus _ S (FromList ys)) ->
+           Exp_lambda_lift ζ (σ <{ (xs ++ fvs) ~> (xs ++ ys) }>)
+                           e (Setminus _ (Setminus _ S (FromList ys)) (FromList xs'))
+                           e' S' ->
+           Fundefs_lambda_lift ζ σ B S' B' S'' ->
+           Fundefs_lambda_lift ζ σ (Fcons f ft xs e B) S
+                               (Fcons f' ft' (xs ++ ys) e'
+                                      (Fcons f ft xs'
+                                             (Eapp f' ft' (xs' ++ (map σ fvs))) B')) S''
+     | LL_Fnil :
+         forall ζ σ S,
+           Fundefs_lambda_lift ζ σ Fnil S Fnil S.
+
+
+

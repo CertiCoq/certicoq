@@ -316,7 +316,36 @@ Qed.
 
 Hint Resolve In_image Included_image_extend : functions_BD.
 
+(** * Lemmas about [extend_lst]  *) 
 
+Lemma extend_lst_gso {A} f l (l' : list A) x :
+  ~ In _ (FromList l) x ->
+  f <{l ~> l' }> x = f x.
+Proof.
+  revert l'; induction l; intros l' Hnin; simpl; eauto.
+  destruct l'; eauto. rewrite FromList_cons in Hnin.
+  rewrite extend_gso. eapply IHl.
+  intros Hc. eapply Hnin; eauto.
+  intros Hc. subst; eapply Hnin; eauto.
+Qed.
+
+Lemma extend_lst_gss {A} f l (l' : list A) x :
+  In _ (FromList l) x ->
+  length l = length l' ->    
+  exists x', f <{ l ~> l' }> x = x' /\ List.In x' l'.
+Proof.
+  revert l'; induction l; intros l' Hnin Hlen; simpl; eauto.
+  - inv Hnin.
+  -  destruct l'; try discriminate. rewrite FromList_cons in Hnin.
+     destruct (peq x a); subst.
+     + rewrite extend_gss.
+       eexists; split; eauto. now constructor.
+     + rewrite extend_gso; eauto. edestruct IHl as [x' [Heq HIn]].
+       inv Hnin; eauto. inv H; congruence.
+       inv Hlen. eassumption.
+       eexists; split; eauto. now constructor 2.
+Qed.
+  
 (** * Lemmas about [injective_subdomain] and [injective] *)
 
 Instance injective_subdomain_Proper_f_eq {A B} : Proper (eq ==> f_eq ==> iff)
@@ -375,7 +404,7 @@ Proof.
   intros x1 x2 Hin1 Hin2 Heq. inv Hin1.
 Qed.
 
-Lemma injective_subdomain_extend f x (x' : positive) S :
+Lemma injective_subdomain_extend {A} f x (x' : A) S :
   injective_subdomain S f ->
   ~ In _ (image f (Setminus _ S (Singleton _ x))) x' ->
   injective_subdomain (Union _ (Singleton _ x) S) (f {x~>x'}).
@@ -402,7 +431,7 @@ Proof.
       inv Hin2. inv H; congruence. eassumption.
 Qed.
 
-Lemma injective_subdomain_extend' f x (x' : positive) S :
+Lemma injective_subdomain_extend' {A} f x (x' : A) S :
   injective_subdomain S f ->
   ~ In _ (image f (Setminus _ S (Singleton _ x))) x' ->
   injective_subdomain S (f {x~>x'}).

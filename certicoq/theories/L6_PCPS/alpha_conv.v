@@ -265,7 +265,7 @@ Section Alpha_conv_correct.
   Proof.
     intros H1 H2. induction H1; eauto. 
   Qed.
-
+  
   Lemma preord_env_P_inj_set (P : Ensemble var) (rho1 rho2 : env) 
         (k : nat)  f(x y : var) (v1 v2 : val) : 
     preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
@@ -283,6 +283,27 @@ Section Alpha_conv_correct.
         now eauto.
         rewrite extend_gso; eauto.
         rewrite extend_gss. eassumption.
+      + edestruct (Henv z); eauto.
+        constructor; eauto. intros Hc. inv Hc. congruence. 
+        eexists. rewrite M.gso; eauto. 
+  Qed.
+  
+  Lemma preord_env_P_inj_set_alt (P : Ensemble var) (rho1 rho2 : env) 
+        (k : nat)  f(x y : var) (v1 v2 : val) : 
+    preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
+    preord_val pr cenv k v1 v2 ->
+    ~ In _ (image f (Setminus _ P (Singleton _ x))) y ->
+    preord_env_P_inj P k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
+  Proof.
+    intros Henv Hv Hnin z HP. unfold extend. 
+    destruct (peq z x) as [| Hneq].
+    - subst. intros z Hget.
+      rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
+    - intros z' Hget. rewrite M.gso in Hget; eauto.
+      destruct (peq (f z) y).
+      + exfalso. eapply Hnin. eexists; eauto.
+        split; eauto. constructor; eauto.
+        intros Hc; inv Hc; congruence.
       + edestruct (Henv z); eauto.
         constructor; eauto. intros Hc. inv Hc. congruence. 
         eexists. rewrite M.gso; eauto. 
@@ -385,6 +406,59 @@ Section Alpha_conv_correct.
           intros Heq. eapply n. 
           eapply H7; try now constructor.
           rewrite extend_gss. rewrite extend_gso; eassumption. 
+  Qed.
+  
+  Lemma preord_env_P_inj_setlist_alt (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
+        (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f :
+    preord_env_P_inj (Setminus _ P1 (FromList xs1)) k f rho1 rho2 ->
+    Forall2 (preord_val pr cenv k) vs1 vs2 ->
+    NoDup xs1 -> NoDup xs2 ->
+    length xs1 = length xs2 ->
+    Disjoint _ (image f (Setminus _ P1 (FromList xs1))) (FromList xs2) ->
+    setlist xs1 vs1 rho1 = Some rho1' ->
+    setlist xs2 vs2 rho2 = Some rho2' ->
+    preord_env_P_inj P1 k (f <{ xs1 ~> xs2 }>)  rho1' rho2'.
+  Proof with now eauto with Ensembles_DB.
+    revert P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f.
+    induction xs1;
+      intros P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f Hpre Hall
+             Hnd1 Hnd2 Hlen HD Hset1 Hset2 x HP v Hget;
+      destruct xs2; try discriminate;
+      destruct vs1; try discriminate;
+      destruct vs2; try discriminate.
+    - rewrite FromList_nil in Hpre.
+      inv Hset1. inv Hset2. eapply Hpre; eauto.
+      constructor; eauto. eapply not_In_Empty_set.
+    - inv Hall. inv Hlen. inv Hnd1. inv Hnd2. simpl in *.
+      destruct (setlist xs1 vs1 rho1) eqn:Heq1;
+        destruct (setlist xs2 vs2 rho2) eqn:Heq2; try discriminate.
+      inv Hset1; inv Hset2. rewrite M.gsspec in Hget.
+      destruct (peq x a); subst.
+      + inv Hget. eexists. 
+        simpl. rewrite extend_gss.
+        rewrite M.gss. eauto.
+      + edestruct IHxs1 with (P1 := Setminus var P1 (Singleton _ a))
+          as [v2' [Hget' Hpre']]; eauto.
+        * rewrite Setminus_Union.
+          rewrite FromList_cons in Hpre. eassumption.
+        * eapply Disjoint_Included; [| | eassumption ].
+          rewrite FromList_cons...
+          rewrite FromList_cons, Setminus_Union. reflexivity.
+        * constructor; eauto. intros Hc; inv Hc.
+          congruence.
+        * eexists. rewrite extend_gso; eauto.
+          rewrite M.gso; [ now eauto |].
+          rewrite !FromList_cons in HD. intros Heq.
+          eapply HD.
+          assert (Hnin : ~ List.In x xs1).
+          { destruct (in_dec peq x xs1); eauto.
+            edestruct (@extend_lst_gss var) as [y' [Heq' Hin]]; eauto.
+            rewrite Heq' in Heq. subst v0. exfalso; eauto. }
+          rewrite extend_lst_gso in Heq, Hget'; eauto.
+          constructor; eauto.
+          eexists. split; eauto. constructor; eauto.
+          intros Hc; inv Hc. inv H; congruence.
+          eauto.
   Qed.
   
   Lemma preord_env_P_inj_def_funs_pre k rho1 rho2 B1 B1' B2 B2' f h h' e :

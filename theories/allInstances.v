@@ -31,3 +31,74 @@ Eval vm_compute in (translateTo (* (cTerm certiL6) *) cps.exp p).
 *)
 
 
+Quote Recursively Definition swap := 
+(fun  (p: nat  * bool) =>
+match p with
+(x,y) => (y,x)
+end).
+
+Open Scope string_scope.
+Print swap.
+
+Ltac computeExtract certiL4 f:=
+(let t:= eval compute in (translateTo (cTerm certiL4) f) in 
+match t with
+|Ret ?xx => exact xx
+end).
+
+
+Definition swap4 : L4.expression.exp.
+computeExtract certiL4 swap.
+Defined.
+
+Definition swap4a : cTerm certiL4a.
+computeExtract certiL4a swap.
+Defined.
+
+Print swap4.
+
+Quote Recursively Definition prev := (fun x => 
+ match x with
+ | 0 => 0
+| S n => n
+end).
+
+(*
+Local Opaque L4a_to_L5.Match_e.
+Local Opaque L4a_to_L5.Fix_e.
+Local Opaque L4a_to_L5.Con_e.
+Local Opaque L4a_to_L5.Lam_e.
+Local Opaque L4a_to_L5.Let_e.
+Local Opaque L4a_to_L5.App_e.
+*)
+
+Definition prev4 : L4.expression.exp.
+computeExtract certiL4 prev.
+Defined.
+
+Definition prev4a : cTerm certiL4a.
+computeExtract certiL4a prev.
+Defined.
+
+Definition prev5 : cTerm certiL5.
+(let t:= eval vm_compute in (translateTo (cTerm certiL5) prev) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
+Definition prev5a : cTerm certiL5a.
+(let t:= eval vm_compute in (translateTo (cTerm certiL5a) prev) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
+
+Print prev4.
+Print prev4a.
+Print prev5.
+Print prev5a.
+
+
+

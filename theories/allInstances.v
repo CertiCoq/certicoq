@@ -100,5 +100,18 @@ Print prev4a.
 Print prev5.
 Print prev5a.
 
+Print prev.
+
+Require Import L3.instances.
+Eval compute in (cTerm certiL3).
+
+Definition prev3 := ltac:(computeExtract certiL3 prev).
+
+Require Import L3_to_L4.
+Definition prev3Ienv := L4.L3_to_L4.inductive_env (AstCommon.env prev3).
+Eval vm_compute in prev3Ienv.
+
+
+
 
 

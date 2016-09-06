@@ -305,9 +305,11 @@ with Fundefs_lambda_lift :
      | LL_Fcons :
          forall ζ σ f ft xs xs' e e' B B' S S' S'' f' ft' fvs ys,
            ζ f = Some (f', ft', fvs) ->
-           length xs' = length xs ->
            Included _ (FromList ys) S ->
            Included _ (FromList xs') (Setminus _ S (FromList ys)) ->
+           NoDup ys -> NoDup xs' ->
+           length ys = length fvs ->
+           length xs' = length xs -> 
            Exp_lambda_lift ζ (σ <{ (xs ++ fvs) ~> (xs ++ ys) }>)
                            e (Setminus _ (Setminus _ S (FromList ys)) (FromList xs'))
                            e' S' ->

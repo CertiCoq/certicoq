@@ -69,14 +69,30 @@ Require Import ExtLib.Structures.Monads.
 Import Monad.MonadNotation.
 Open Scope monad_scope.
 
-
 (* Move *)
+
 Definition flatten {m} {A: Type} `{Monad m} (lm:list (m A)) : m (list A) :=
-fold_left (fun l a => l <- l;; 
-                      a <- a;; 
+fold_right (fun a l => l <- l;; 
+                       a <- a;; 
                       ret (a :: l))
-          lm 
-          (ret []).
+          (ret []) 
+          lm.
+
+
+
+(*
+
+Eval vm_compute in flatten ([Some 1; Some 2]).
+Some [1; 2]
+
+Eval vm_compute in flatten ([Some 1; Some 2]).
+
+fold_left gives
+   = Some [2; 1]
+     : option (list nat)
+*)
+
+
 
 
 (* Move *)
@@ -213,10 +229,20 @@ Lemma isSomeFlatten {A} : forall (lo : list (option A)),
   -> isSome (flatten lo).
 Proof using.
   unfold flatten. intros ? Hin.
-  generalize (@nil A).
   induction lo; simpl in *; auto.
   dLin_hyp.
   destruct a; simpl in *; try tauto; auto.
+  intros.
+  specialize (IHlo Hin). clear Hin.
+  destruct ((fold_right
+            (fun (a : option A) (l0 : option (list A)) =>
+             match l0 with
+             | Some v => match a with
+                         | Some v0 => Some (v0 :: v)
+                         | None => None
+                         end
+             | None => None
+             end) (Some []) lo)); auto.
 Qed.
 
 Local Opaque freshVars.

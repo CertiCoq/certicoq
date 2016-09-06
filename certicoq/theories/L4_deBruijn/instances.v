@@ -74,7 +74,7 @@ Program Instance : BigStepOpSem L4.L5a.val_c := fun _ _ => True.
 (** Fix *)
 Program Instance : WellFormed L4.L5a.val_c := fun x => False.
 
-Instance certiL5a: CerticoqLanguage L5Term := {}.
+Instance certiL5a: CerticoqLanguage L4.L5a.val_c := {}.
 
 Instance certiL5_to_L5a: 
   CerticoqTranslation  L5Term L4.L5a.val_c :=

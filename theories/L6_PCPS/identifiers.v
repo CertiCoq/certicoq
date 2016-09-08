@@ -1,7 +1,7 @@
 Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
         Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles Omega.
-Require Import L6.cps L6.cps_util L6.ctx L6.set_util L6.Ensembles_util L6.List_util.
 Require Import Libraries.Coqlib.
+Require Import L6.cps L6.cps_util L6.ctx L6.set_util L6.Ensembles_util L6.List_util.
 Import ListNotations.
 
 Import PS.
@@ -80,6 +80,18 @@ Proof.
   eapply fundefs_append_split_fds; eauto.
 Qed.
 
+Lemma getlist_def_funs_Disjoint xs B B' rho  :
+  Disjoint _ (FromList xs) (name_in_fundefs B) ->
+  getlist xs (def_funs B' B rho rho) = getlist xs rho.
+Proof with now eauto with Ensembles_DB.
+  induction B; intros Hd.
+  - simpl.
+    rewrite getlist_set_neq.
+    erewrite IHB...
+    intros Hc; eapply Hd. constructor; eauto. now left.
+  - reflexivity.
+Qed.
+
 (** Names of function in a function definition evaluation context *)
 Lemma name_in_fundefs_ctx B e1 e2 :
   Same_set _ (name_in_fundefs (B <[ e1 ]>)) (name_in_fundefs (B <[ e2 ]>)).
@@ -131,6 +143,19 @@ Proof.
   destruct (M.elt_eq f v); subst.
   - exfalso. apply H. now left.
   - eapply IHB. intros Hc. apply H. now right.
+Qed.
+
+Lemma name_in_fundefs_find_def_is_Some f B :
+  Ensembles.In _ (name_in_fundefs B) f ->
+  exists ft xs e, find_def f B = Some (ft, xs, e).
+Proof.
+  intros Hin. induction B.
+  - destruct (peq v f); simpl; subst.
+    + repeat eexists; eauto.
+      rewrite peq_true. reflexivity.
+    + inv Hin. inv H; congruence.
+      rewrite peq_false; eauto.
+  - inv Hin.
 Qed.
 
 (** [find_def] is sound w.r.t. [fun_in_fundefs] *)
@@ -1090,7 +1115,6 @@ Proof.
   now eapply name_in_fundefs_bound_var_fundefs.
 Qed.
 
-
 Lemma split_fds_bound_vars B1 B2 B3 :
   split_fds B1 B2 B3 ->
   Same_set var (bound_var_fundefs B3)
@@ -1163,6 +1187,16 @@ Corollary bound_var_fundefs_ctx_app_Ecase_cons Cf x c e P :
            (Union _ (bound_var e) (bound_var_fundefs (Cf <[ Ecase x P ]>))).
 Proof.     
   now apply bound_var_ctx_app_Ecase_cons_mut.
+Qed.
+
+Lemma bound_var_fun_in_fundefs B f ft xs e :
+  Ensembles.In _ (fun_in_fundefs B) (f, ft, xs, e) ->
+  Included _ (Union _ (Singleton _ f) (Union _ (FromList xs) (bound_var e)))
+           (bound_var_fundefs B).
+Proof with now eauto with Ensembles_DB.
+  intros Hin; induction B; inv Hin.
+  - inv H. normalize_bound_var...
+  - normalize_bound_var...
 Qed.
 
 (** ** Lemmas about the union of free and bound variables *)
@@ -1273,7 +1307,21 @@ Proof.
   apply Included_Union_compat. now apply Included_refl.
   rewrite Union_commut with (s1 := Singleton _ _) , <- !Union_assoc.
   rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances.
-Qed.  
+Qed.
+
+Lemma bound_var_occurs_free_in_fun_Included f t xs e B :
+  Ensembles.In _ (fun_in_fundefs B) (f, t, xs, e) ->
+  Included var (Union var (bound_var e) (occurs_free e))
+           (Union var (bound_var_fundefs B) (occurs_free_fundefs B)).
+Proof with now eauto with Ensembles_DB.
+  induction B; intros Hin; inv Hin.
+  - inv H. now eapply bound_var_occurs_free_Fcons_Included.
+  - normalize_bound_var. normalize_occurs_free.
+    eapply Included_trans. eapply IHB. eassumption.
+    eapply Union_Included. now eauto with Ensembles_DB.
+    rewrite Union_assoc.
+    rewrite Union_Setminus_Included; eauto with Ensembles_DB typeclass_instances.
+Qed.
 
 (** Unique bindings - alternative definition without lists *)
 Inductive unique_bindings : exp -> Prop :=
@@ -1440,6 +1488,74 @@ Proof with now eauto with Ensembles_DB.
     inv Hc; [ | now  eauto ]; eapply Hd; eauto.
 Qed.
 
+Lemma fun_in_fundefs_Disjoint_bound_Var_occurs_free B f t xs e :
+  fun_in_fundefs B (f, t, xs, e) ->
+  unique_bindings_fundefs B ->
+  Disjoint _ (bound_var_fundefs B) (occurs_free_fundefs B) ->
+  Disjoint _ (bound_var e) (occurs_free e).
+Proof.    
+  intros Hin Hun HD; induction B; inv Hun.
+  - assert (Hin' := Hin). inv Hin.
+    + inv H.
+      eapply Disjoint_Included_r.
+      eapply occurs_free_in_fun. eassumption.
+      repeat normalize_bound_var_in_ctx.
+      repeat normalize_occurs_free_in_ctx.
+      normalize_occurs_free.
+      eapply Union_Disjoint_r. eassumption.
+      eapply Union_Disjoint_r. simpl. 
+      eapply Union_Disjoint_r.
+      apply Disjoint_Singleton_r. eassumption.
+      eapply Disjoint_Included_r; [| now eapply H8 ].
+      now apply name_in_fundefs_bound_var_fundefs.
+      now eauto with Ensembles_DB.
+    + eapply IHB; try eassumption.
+      repeat normalize_bound_var_in_ctx.
+      eapply Disjoint_Included_r.
+      eapply occurs_free_fundefs_Fcons_Included. 
+      eapply Union_Disjoint_r.
+      eapply Disjoint_Included_l; [| now apply HD ].
+      now eauto with Ensembles_DB.
+      apply Disjoint_Singleton_r. eassumption.
+  - inv Hin.
+Qed.       
+
+Lemma unique_bindings_fun_in_fundefs B f ft xs e :
+  Ensembles.In _ (fun_in_fundefs B) (f, ft, xs, e) ->
+  unique_bindings_fundefs B ->
+  unique_bindings e /\
+  ~ Ensembles.In _ (bound_var e) f /\
+  ~ Ensembles.In _ (FromList xs) f /\
+  Disjoint _ (bound_var e) (name_in_fundefs B) /\
+  Disjoint _ (FromList xs) (name_in_fundefs B) /\    
+  Disjoint _ (bound_var e) (FromList xs) /\
+  NoDup xs.
+Proof with now eauto with Ensembles_DB.
+  intros Hin Hun; induction Hun.
+  -inv Hin.
+   + inv H7. split; [| split; [| split; [| split; [| split]]]]; eauto; simpl.
+     eapply Union_Disjoint_r.
+     eapply Disjoint_Singleton_r; eassumption.
+     eapply Disjoint_Included_r; [| now apply H3 ].
+     now apply name_in_fundefs_bound_var_fundefs.
+     eapply Union_Disjoint_r.
+     eapply Disjoint_Singleton_r; eassumption.
+     eapply Disjoint_Included_r_sym; [| now apply H2 ].
+     now apply name_in_fundefs_bound_var_fundefs.
+   + edestruct IHHun as [Hun' [Hnin1 [Hnin2 [HD1 [HD2 [HD3 Hnd]]]]]].
+     eassumption.
+     split; [| split; [| split; [| split; [| split; [| split ]]]]]; eauto; simpl;
+     eapply bound_var_fun_in_fundefs in H7.
+     eapply Union_Disjoint_r; [| eassumption ].
+     eapply Disjoint_Singleton_r.
+     intros Hc. eapply H0.
+     eapply H7. now eauto.
+     eapply Union_Disjoint_r; [| eassumption ].
+     eapply Disjoint_Singleton_r.
+     intros Hc. eapply H0.
+     eapply H7. now eauto.
+  - inv Hin.
+Qed.
 
 Lemma unique_bindings_ctx_app_Ecase_cons :
   (forall C x c e P

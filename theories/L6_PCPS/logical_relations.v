@@ -667,7 +667,7 @@ Section Log_rel.
       apply Hpre; eauto. inv H0.
   Qed.
 
-  Corollary preord_env_P_def_funs_col k B rho rho' S1 :
+  Corollary preord_env_P_def_funs_cor k B rho rho' S1 :
     preord_env_P (Union var (Setminus var S1 (name_in_fundefs B))
                         (occurs_free_fundefs B)) k rho rho' ->
     preord_env_P S1 k (def_funs B B rho rho) (def_funs B B rho' rho').
@@ -728,7 +728,7 @@ Section Log_rel.
     preord_env k rho1 rho2 ->
     preord_env k (def_funs f f rho1 rho1) (def_funs f f rho2 rho2).
   Proof.
-    intros Henv. eapply preord_env_P_def_funs_col.
+    intros Henv. eapply preord_env_P_def_funs_cor.
     eapply preord_env_P_antimon; eauto. intros x H; simpl; eauto.
   Qed.
 
@@ -909,7 +909,7 @@ Section Log_rel.
       eapply in_or_app. right. left; eauto.
     - simpl. eapply preord_exp_fun_compat; eauto.
       eapply IHc; auto.
-      eapply preord_env_P_def_funs_col.
+      eapply preord_env_P_def_funs_cor.
       eapply preord_env_P_antimon; [ eassumption |].
       intros x' H'. inv H'.
       + inv H. simpl. constructor; eauto.
@@ -1199,7 +1199,7 @@ Section Log_rel.
         apply Disjoint_Singleton_l. intros Hc; apply Hb.
         now apply name_in_fundefs_bound_var_fundefs.
       + apply preord_env_P_set_not_in_P_r.
-        eapply preord_env_P_def_funs_col.
+        eapply preord_env_P_def_funs_cor.
         eapply preord_env_P_antimon. apply preord_env_Empty_set.
         eauto with Ensembles_DB.
         unfold closed_fundefs in Hclo. rewrite <- Hclo; eauto with Ensembles_DB.
@@ -1224,11 +1224,11 @@ Section Log_rel.
       eapply preord_env_P_antimon; now eauto with Ensembles_DB.
     - apply preord_env_P_union.
       + apply preord_env_P_def_funs_not_in_P_r; eauto.
-        eapply preord_env_P_def_funs_col.
+        eapply preord_env_P_def_funs_cor.
         eapply preord_env_P_antimon. apply preord_env_Empty_set.
         unfold closed_fundefs in Hclo1. rewrite <- Hclo1; eauto with Ensembles_DB.
       + apply preord_env_P_def_funs_not_in_P_l; eauto using Disjoint_sym.
-        eapply preord_env_P_def_funs_col.
+        eapply preord_env_P_def_funs_cor.
         eapply preord_env_P_antimon. apply preord_env_Empty_set.
         unfold closed_fundefs in Hclo2. rewrite <- Hclo2; eauto with Ensembles_DB.
   Qed.
@@ -1307,7 +1307,7 @@ Section Log_rel.
           eapply preord_env_P_trans;
             [| intros m; eapply preord_env_P_def_funs_strengthen_l
                with (B2 := Fcons f t1 xs1 e B1) ]; eauto with Ensembles_DB. 
-          eapply preord_env_P_def_funs_col; eauto.
+          eapply preord_env_P_def_funs_cor; eauto.
           eapply preord_env_P_antimon. eapply preord_env_Empty_set.
           unfold closed_fundefs in Hcl2. rewrite Hcl2. eauto with Ensembles_DB.
           unfold closed_fundefs in Hcl2. rewrite Hcl2. eauto with Ensembles_DB.
@@ -1609,7 +1609,7 @@ Section Log_rel.
           eauto using Included_refl;
           try (now rewrite (split_fds_fun_in_fundefs B' B'' B); eauto;
                apply Included_Union_l).
-        intros m. eapply preord_env_P_def_funs_col.
+        intros m. eapply preord_env_P_def_funs_cor.
         rewrite (split_fds_name_in_fundefs B' B'' B); eauto.
         unfold closed_fundefs in *. rewrite Hcl'', Union_Empty_set_neut_r.
         rewrite Setminus_Included_Empty_set. eapply preord_env_Empty_set.
@@ -1620,7 +1620,7 @@ Section Log_rel.
           eauto using Included_refl;
           try (now rewrite (split_fds_fun_in_fundefs B' B'' B); eauto;
                apply Included_Union_r).
-        intros m. eapply preord_env_P_def_funs_col.
+        intros m. eapply preord_env_P_def_funs_cor.
         rewrite (split_fds_name_in_fundefs B' B'' B); eauto.
         unfold closed_fundefs in *. rewrite Hcl'', Union_Empty_set_neut_r.
         rewrite Setminus_Included_Empty_set. eapply preord_env_Empty_set.

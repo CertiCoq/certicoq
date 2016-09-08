@@ -44,6 +44,31 @@ Close Scope Z_scope.
     empty. If a function is escaping, f_i will be closure converted in
     subsequent passes.
 
+    A better idea would be  to turn it into
+
+    let f_1' x_1 fvs = [e_1]
+    and f_1 x_1 = [e1]
+        ....
+    and f_n' x_n fvs = [e_n]
+    and f_n x_n = [e_n]
+    in [e]
+
+    or even
+
+    let f_1 x_1 = [e1]
+        ....
+    and f_n x_n = [e_n]
+    in 
+    let f_1' x_1 fvs = [e_1]
+        ....
+    and f_n' x_n fvs = [e_n]
+    in [e]
+
+
+    and then use f_i and f_i' as above. This way we will avoid an extra
+    function call an more importantly after closure conversion we will
+    not have to project all the values from the record (even those that
+    will not be needed).
 **)
 
 
@@ -112,11 +137,12 @@ Fixpoint add_functions (B : fundefs) (fvs : list var) (m : VarInfoMap)
 : state VarInfoMap :=
   match B with
     | Fcons f ft xs _ B =>
+      m' <- add_functions B fvs m ;;
       (* new name for lambda lifted definition - this function will always be known *)
       f' <- get_name ;;
       (* new fTag for lambda listed definition *)
       ft' <- get_tag ;;
-      add_functions B fvs (M.set f (Fun f' ft' fvs) m)
+      ret (M.set f (Fun f' ft' fvs) m')
     | Fnil => ret m
   end.
 
@@ -240,10 +266,11 @@ Inductive Add_functions :
   Prop :=
 | Add_Fcons :
     forall f ft xs e B fvs σ σ' ζ ζ' S S' f' ft',
-      In _ S' f' ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
+      In _ S' f' ->
       Add_functions (Fcons f ft xs e B) fvs σ ζ S
-                    (σ' {f ~> f}) (ζ' {f ~> Some (f', ft', fvs)}) (Setminus _ S' (Singleton _ f'))
+                    (σ' {f ~> f}) (ζ' {f ~> Some (f', ft', fvs)})
+                    (Setminus _ S' (Singleton _ f'))
 | Add_Fnil :
     forall fvs σ ζ S,
       Add_functions Fnil fvs σ ζ S σ ζ S.
@@ -274,7 +301,8 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Eproj x t N y e) S (Eproj x t N (σ y) e') S'
 | LL_Efun :
     forall B B' e e' σ σ' ζ ζ' fvs S S' S'' S''',
-      Included _ (FromList fvs) (occurs_free_fundefs B) -> 
+      Included _ (FromList fvs) (occurs_free_fundefs B) ->
+      NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift ζ' σ' B S' B' S'' ->
       Exp_lambda_lift ζ' σ' e S'' e' S''' ->
@@ -321,6 +349,4 @@ with Fundefs_lambda_lift :
      | LL_Fnil :
          forall ζ σ S,
            Fundefs_lambda_lift ζ σ Fnil S Fnil S.
-
-
 

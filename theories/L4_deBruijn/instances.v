@@ -7,25 +7,43 @@ Require Import L3.instances.
 
 Require Import BinNat.
 
-Program Instance : BigStepOpSem L4.expression.exp := eval.
+Definition dummyEnvBigStep {E T: Type}  (bt : BigStepOpSem T)
+: BigStepOpSem (E * T) :=
+  (fun e v => (fst e) = (fst v) /\ (snd e) ⇓ (snd v)).
 
-Program Instance : WellFormed L4.expression.exp :=
+Definition dummyEnvWf {E T: Type}  (bt : WellFormed T)
+: WellFormed (E * T) :=
+  (fun e => wf (snd e)).
+
+(* very low priority *)
+Existing Instance dummyEnvBigStep | 1000000.
+(* very low priority *)
+Existing Instance dummyEnvWf | 1000000.
+
+Let L4Term := prod ienv  L4.expression.exp.
+
+Instance certiL4eval : BigStepOpSem L4.expression.exp := eval.
+
+
+Instance certiL4wf: WellFormed L4.expression.exp :=
  L4.expression.exp_wf (0%N).
 
-Instance certiL4: CerticoqLanguage L4.expression.exp := {}.
 
-Instance certiL3_to_L4: 
-  CerticoqTranslation (Program L3.compile.Term) L4.expression.exp  :=
-fun p => Ret (L3_to_L4.translate_program (AstCommon.env p) (main p)).
+Global Instance certiL4: CerticoqLanguage (ienv * L4.expression.exp) := {}.
 
-Instance failed: 
-  CerticoqTranslationCorrect (Program L3.compile.Term) L4.expression.exp.
+Global  Instance certiL3_to_L4: 
+  CerticoqTranslation (cTerm certiL3) (cTerm certiL4)  :=
+fun p => Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
+   (L3_to_L4.translate_program (AstCommon.env p) (main p))).
+
+Global  Instance failed: 
+  CerticoqTranslationCorrect (Program L3.compile.Term) L4Term.
 constructor.
 - admit.
 - intros ? ? Hwf He.
   destruct Hwf.
   unfold certiClasses.translate,
-    certiL3_to_L4, liftBigStepException, bigStepEval, BigStepOpSem_instance_0.
+    certiL3_to_L4, liftBigStepException, bigStepEval.
   unfold translate_program.
 (*  Fail eapply L3_to_L4_correct.translate_correct.  *)
 (* not applicable!! do we need to change the end to end correctness property?, 
@@ -39,66 +57,73 @@ Require Import SquiggleEq.UsefulTypes.
 
 Definition L4aTerm :Type := (@NTerm cps.var L4Opid).
 
-Program Instance : BigStepOpSem L4aTerm := eval.
+Global  Program Instance : BigStepOpSem L4aTerm := eval.
 
 (** all variables must be user variables *)
-Program Instance : WellFormed L4aTerm :=
+Global Program Instance : WellFormed L4aTerm :=
   fun e  => varsOfClass (all_vars e) true /\ isprogram e.
 
-Instance certiL4a: CerticoqLanguage L4aTerm := {}.
+Global Instance certiL4a: CerticoqLanguage (prod ienv L4aTerm) := {}.
 
 
-Instance certiL4_to_L4a: 
-  CerticoqTotalTranslation L4.expression.exp L4aTerm :=
-  (L4_to_L4a (0)%N).
+Global Instance certiL4_to_L4a: 
+  CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4a) :=
+  (fun p => (fst p, (L4_to_L4a (0)%N (snd p)))).
 
 
 Definition L5Term :Type := (@NTerm cps.var L5Opid).
 
-Program Instance : BigStepOpSem L5Term := eval_c.
+Global Program Instance : BigStepOpSem L5Term := eval_c.
 
-Program Instance : WellFormed L5Term := isprogram.
+Global Program Instance : WellFormed L5Term := isprogram.
 
-Instance certiL5: CerticoqLanguage L5Term := {}.
+Global Instance certiL5: CerticoqLanguage (ienv * L5Term) := {}.
 
-Instance certiL4a_to_L5:
-  CerticoqTranslation L4aTerm L5Term:=
-  fun x => Ret (cps_cvt x).
+Global Instance certiL4a_to_L5:
+  CerticoqTotalTranslation (cTerm certiL4a) (cTerm certiL5):=
+  (fun x => (fst x,  (cps_cvt (snd x)))).
 
 
 Require Import L4.L5a.
 
 (* Fix. Define subst and evaluation on L5a by going to L5 via a bijection? *)
-Program Instance : BigStepOpSem L4.L5a.val_c := fun _ _ => True.
+Global Program Instance : BigStepOpSem L4.L5a.val_c := fun _ _ => True.
 
 (** Fix *)
-Program Instance : WellFormed L4.L5a.val_c := fun x => False.
+Global Program Instance : WellFormed L4.L5a.val_c := fun x => False.
 
-Instance certiL5a: CerticoqLanguage L4.L5a.val_c := {}.
+Global Instance certiL5a: CerticoqLanguage (ienv * L4.L5a.val_c) := {}.
 
-Instance certiL5_to_L5a: 
-  CerticoqTranslation  L5Term L4.L5a.val_c :=
+Global Instance certiL5_to_L5a: 
+  CerticoqTranslation (cTerm certiL5) (cTerm certiL5a)  :=
   fun e =>
-   match L4.L5a.translateVal e with
+   match L4.L5a.translateVal (snd e) with
   | None => exceptionMonad.Exc "error in L5a.translateVal"
-  | Some e => exceptionMonad.Ret e
+  | Some e5a => exceptionMonad.Ret (fst e, e5a)
   end.
 
+
 Require Import Template.Template.
-Quote Recursively Definition p0L1 := 0.
+Quote Recursively Definition p0L1 := 0. 
 
 Require Import L2.instances.
 
 Open Scope Z_scope.
 Require Import ZArith.
 (* Print Instances CerticoqLanguage. *)
+Open Scope string_scope.
 
-Eval compute in (translateTo (cTerm certiL5a) p0L1).
+Eval vm_compute in (translateTo (cTerm certiL5a) p0L1).
 (*
      = Ret
-         (Cont_c 5%positive
-            (Ret_c (KVar_c 5%positive) (Con_c (mkInd "Coq.Init.Datatypes.nat" 0, 0%N) nil)))
-     : exception val_c
+         ([("Coq.Init.Datatypes.nat", 0,
+           [{|
+            itypNm := "nat";
+            itypCnstrs := [{| CnstrNm := "O"; CnstrArity := 0 |},
+                          {| CnstrNm := "S"; CnstrArity := 1 |}] |}])],
+         Cont_c 5%positive
+           (Ret_c (KVar_c 5%positive) (Con_c (mkInd "Coq.Init.Datatypes.nat" 0, 0%N) nil)))
+     : exception (cTerm certiL5a)
 *)
 
 

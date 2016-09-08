@@ -47,7 +47,7 @@ match t with
 end).
 
 
-Definition swap4 : L4.expression.exp.
+Definition swap4 : (cTerm certiL4).
 computeExtract certiL4 swap.
 Defined.
 
@@ -72,7 +72,7 @@ Local Opaque L4a_to_L5.Let_e.
 Local Opaque L4a_to_L5.App_e.
 *)
 
-Definition prev4 : L4.expression.exp.
+Definition prev4 : cTerm certiL4.
 computeExtract certiL4 prev.
 Defined.
 

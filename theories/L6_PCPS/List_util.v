@@ -1,5 +1,7 @@
 Require Import Coq.Lists.List Coq.Relations.Relations Coq.Classes.RelationClasses
-        Coq.omega.Omega Coq.Numbers.BinNums Coq.Structures.OrdersEx.
+        Coq.omega.Omega Coq.Numbers.BinNums Coq.Structures.OrdersEx Coq.Sets.Ensembles.
+
+Require Import Ensembles_util.
 
 Import ListNotations.
 
@@ -352,4 +354,16 @@ Proof.
   revert z1 z2; induction l; intros z1 z2 Hleq.
   - eassumption.
   - simpl. eapply IHl. zify; omega.
+Qed.
+
+Lemma NoDup_app {A} xs ys :
+  NoDup xs -> NoDup ys ->
+  Disjoint A (FromList xs) (FromList ys) ->
+  NoDup (xs ++ ys).
+Proof with now eauto with Ensembles_DB.
+  revert ys; induction xs; intros ys Hnd1 Hnd2 HD; simpl; eauto.
+  inv Hnd1. rewrite FromList_cons in HD.
+  constructor. intros Hc. eapply in_app_or in Hc. inv Hc; eauto.
+  now eapply HD; constructor; eauto.
+  eapply IHxs; eauto...
 Qed.

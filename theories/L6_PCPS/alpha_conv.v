@@ -460,7 +460,133 @@ Section Alpha_conv_correct.
           intros Hc; inv Hc. inv H; congruence.
           eauto.
   Qed.
+
+  Lemma Forall2_preord_var_env_map k P σ rho rho' l :
+    preord_env_P_inj P k σ rho rho' ->
+    Included _ (FromList l) P ->
+    Forall2 (preord_var_env pr cenv k rho rho') l (map σ l).
+  Proof with now eauto with Ensembles_DB.
+    induction l; intros Henv Hin; simpl; constructor.
+    - eapply Henv. eapply Hin. rewrite FromList_cons...
+    - eapply IHl; eauto.
+      eapply Included_trans; [| eassumption ].
+      rewrite FromList_cons...
+  Qed.
+
+  Lemma preord_env_P_inj_getlist_l (P : var -> Prop) k f rho1 rho2 xs vs1 :
+    preord_env_P_inj P k f rho1 rho2 ->
+    Included var (FromList xs) P ->
+    getlist xs rho1 = Some vs1 ->
+    exists vs2 : list val,
+      getlist (map f xs) rho2 = Some vs2 /\ Forall2 (preord_val pr cenv k) vs1 vs2.
+  Proof with now eauto with Ensembles_DB.
+    revert vs1. induction xs; intros vs1 Henv Hinc Hget.
+    - eexists; split; eauto. inv Hget. constructor.
+    - simpl in *.
+      destruct (M.get a rho1) eqn:Hgeta; try discriminate.
+      destruct (getlist xs rho1) eqn:Hgetl; try discriminate.
+      inv Hget.
+      edestruct Henv with (x := a) as [x' [Hgetx' Hprex']]. eapply Hinc. rewrite FromList_cons...
+      eassumption.
+      edestruct IHxs as [l' [Hgetl' Hprel']]. eassumption.
+      eapply Included_trans; [| eassumption ]. rewrite FromList_cons...
+      reflexivity.
+      eexists. rewrite Hgetx', Hgetl'. split.
+      reflexivity.
+      now constructor; eauto.
+  Qed.
+
+  Global Instance preord_env_P_inj_f_proper : Proper (eq ==> eq ==> f_eq ==> eq ==> eq ==> iff)
+                                                preord_env_P_inj.
+  Proof.
+    constructor; subst; intros Hp.
+    intros z Hz. rewrite <- H1. eauto.
+    intros z Hz. rewrite H1. eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_not_In_P_l P k f rho1 rho2 x v :
+    preord_env_P_inj P k f rho1 rho2 ->
+    ~ In _ P x ->
+    preord_env_P_inj P k f (M.set x v rho1) rho2.
+  Proof.
+    intros Henv Hnin y Hy v' Hget. eapply Henv. eassumption.
+    rewrite M.gso in Hget. eassumption. intros Hc; subst.
+    eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_not_In_P_r P k f rho1 rho2 x v :
+    preord_env_P_inj P k f rho1 rho2 ->
+    ~ In _ (image f P) x ->    
+    preord_env_P_inj P k f rho1 (M.set x v rho2).
+  Proof.
+    intros Henv Hnin y Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto.
+    eexists; split; eauto.
+    rewrite M.gso. eassumption. intros Hc; subst.
+    eapply Hnin. eexists; eauto.
+  Qed.
   
+  Lemma preord_env_P_inj_reset P k f rho rho' x y v :
+    M.get (f x) rho' = Some v ->
+    ~ In _ (image f P) y ->
+    preord_env_P_inj P k f rho rho' ->
+    preord_env_P_inj P k (f {x ~> y}) rho (M.set y v rho').
+  Proof.
+    intros Hget Hnin Hpre z Hz v' Hget'.
+    destruct (peq z x); subst.
+    - rewrite extend_gss, M.gss.
+      edestruct Hpre as [v2 [Hget'' Hpre2]]; eauto.
+      rewrite Hget'' in Hget; inv Hget.
+      eexists; eauto.
+    - rewrite extend_gso, M.gso; eauto.
+      eapply Hpre; eauto.
+      intros Hc; subst. eapply Hnin; eexists; eauto.
+  Qed.
+
+
+  Lemma preord_env_P_inj_resetlist P k f rho rho' rho'' xs ys vs :
+    getlist (map f xs) rho' = Some vs ->
+    Disjoint _ (image f P) (FromList ys) ->
+    setlist ys vs rho' = Some rho'' ->
+    NoDup ys ->
+    length xs = length ys ->
+    preord_env_P_inj P k f rho rho' ->
+    preord_env_P_inj P k (f <{xs ~> ys}>) rho rho''.
+  Proof.
+    revert rho'' ys vs; induction xs; intros rho'' ys vs Hget HD Hset Hdup Hlen Hpre.
+    - simpl. destruct vs; try discriminate.
+      destruct ys; try discriminate. inv Hset. eassumption.
+    - simpl in *.
+      destruct (M.get (f a) rho') eqn:Heqa; try discriminate.
+      destruct (getlist (map f xs) rho') eqn:Hgetl; try discriminate.
+      inv Hget.
+      destruct ys; try discriminate. simpl in Hset.
+      destruct (setlist ys l rho') eqn:Hsetl; try discriminate.
+      rewrite FromList_cons in HD. inv Hset.
+      assert (Hpre' : preord_env_P_inj P k (f <{ xs ~> ys }>) rho t).
+      { eapply IHxs. reflexivity.
+        now eauto with Ensembles_DB.
+        eassumption. now inv Hdup. now inv Hlen. eassumption. }
+      intros z Hz v' Hget'.
+      destruct (peq z a); subst.
+      + rewrite extend_gss, M.gss.
+        edestruct Hpre as [v2 [Hget'' Hpre2]]; eauto.
+        rewrite Hget'' in Heqa; inv Heqa.
+        eexists; eauto.
+      + rewrite extend_gso, M.gso; eauto.
+        eapply Hpre'; eauto.
+        inv Hdup. intros Hc; subst.
+        edestruct in_dec with (a := z) (l := xs) as [Hin | Hnin ].
+        now apply peq.
+        edestruct (@extend_lst_gss var f xs ys z) as [x' [Heq Hin']].
+        eassumption. now inv Hlen. eapply H1.
+        rewrite <- Heq in Hin'. eassumption.
+        rewrite extend_lst_gso in H1; [| eassumption ].
+        eapply HD. constructor; eauto.
+        eexists; split; eauto. rewrite extend_lst_gso; [| eassumption ].
+        reflexivity.
+  Qed.
+
   Lemma preord_env_P_inj_def_funs_pre k rho1 rho2 B1 B1' B2 B2' f h h' e :
     (* The IH *)
     (forall m : nat,

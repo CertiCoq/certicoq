@@ -23,5 +23,15 @@ Definition translateTo `{CerticoqTranslation (Program L2.compile.Term) Lj}
 
 Arguments translateTo Lj {H} p.
 
+Definition ctranslateTo {Term Value BigStep WF} 
+  (Lj : @CerticoqLanguage Term Value BigStep WF)
+   `{CerticoqTranslation (Program L2.compile.Term) (cTerm Lj)}
+   : program -> exception (cTerm Lj) :=
+  translateTo (cTerm Lj).
+
+Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} Lj {H} p.
+
+
+
 
 

@@ -677,7 +677,9 @@ Eval compute in
 
 Hint Constructors expression.eval.
 Hint Constructors expression.evals.
-Lemma isEven3Eval : exists v, isEven3L4 ⇓ v.
+Print Instances BigStepOpSem.
+(*
+Lemma isEven3Eval : exists (v : exception exp), (isEven3L4) ⇓ v.
 Proof.
   compute.
   evar (v: (cTerm certiL4)).
@@ -728,6 +730,6 @@ see isEven3
   compute.
   compute.
 Abort.
-
+*)
 
 

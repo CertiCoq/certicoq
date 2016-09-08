@@ -13,7 +13,7 @@ Open Scope ctx_scope.
 Open Scope fun_scope.
 
 
-(** * Correspondance of the relational and the computational definitions of  closure conversion *)
+(** * Correspondence of the relational and the computational definitions of closure conversion *)
 
 Section CC_correct.
 
@@ -2481,7 +2481,7 @@ Section CC_correct.
          injective_subdomain (name_in_fundefs B) (subst m1') /\
          fresh S (next_var s')
      }}.
-  Proof.
+  Proof with now eauto with Ensembles_DB.
     revert S. induction B; intros S HD Hun.
     - eapply bind_triple. now apply get_name_fresh.
       intros v' s1. apply pre_curry_l. intros Hfv'.
@@ -2497,8 +2497,8 @@ Section CC_correct.
         * simpl. apply injective_subdomain_Union.
           now apply injective_subdomain_Singleton.
           rewrite <- subst_MRFun_f_eq. eapply injective_subdomain_extend'.
-          eassumption. intros Hc.
-          eapply Hinc. eapply image_monotonic; [| eassumption ].
+          eapply injective_subdomain_antimon; [ eassumption |]...
+          intros Hc. eapply Hinc. eapply image_monotonic; [| eassumption ].
           now eapply Setminus_Included. now eauto.
           rewrite image_Singleton. 
           unfold subst at 1. rewrite M.gss, <- subst_MRFun_f_eq.

@@ -1411,7 +1411,7 @@ Section hoisting_correct.
         + inv H5. inv H7.
           edestruct (preord_exp_refl pr cenv k e'0) as [v2 [c2 [Hstep2 Hpre2]]];
             [| now eauto | now eauto |]. 
-          eapply preord_env_P_def_funs_col; eauto.
+          eapply preord_env_P_def_funs_cor; eauto.
           eapply preord_env_P_antimon; eauto.
           eapply Included_trans; 
             [| eapply occurs_free_Ecase_Included; eapply findtag_In_patterns; eauto ].
@@ -1514,7 +1514,7 @@ Section hoisting_correct.
       [| exists v2, c2; repeat split; try constructor; eauto ].
       specialize (unique_bindings_hoist _ _ _ _ _ _ _ _ _ H H0 H1 H5); intros Hun.
       eapply preord_env_P_trans with (rho2 := def_funs B2 B2 rho' rho').
-      + eapply preord_env_P_def_funs_col.
+      + eapply preord_env_P_def_funs_cor.
         rewrite occurs_free_Efun in Henv. unfold closed_fundefs_in_exp, closed_fundefs in Hclo.
         now rewrite Union_commut.
       + clear Henv. intros m.

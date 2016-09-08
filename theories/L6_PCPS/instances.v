@@ -29,13 +29,31 @@ Instance WfL3Term : WellFormed (L6env * cps.exp) :=
 
 Instance certiL6 : CerticoqLanguage (L6env * cps.exp) := {}.
 
-Require Import L4.instances.
-Require Import L5_to_L6.
+(* 
+Add LoadPath "../" as Top.
+ Add LoadPath "../common" as Common. 
+ Add LoadPath "../L1_QuotedCoq" as L1.
+ Add LoadPath "../L1g" as L1g.
+ Add LoadPath "../L1_5_box" as L1_5.
+ Add LoadPath "../L2_typeStripped" as L2. 
+ Add LoadPath "../L3_flattenedApp" as L3. 
+ Add LoadPath "../L4_deBruijn" as L4. 
+ Add LoadPath "../L5_CPS" as CPS. 
+ Add LoadPath "./" as L6. 
+ *)
+Require Import L4.instances. 
+Require Import L6.L5_to_L6.
+
+
 
 Instance certiL5a_t0_L6: 
-  CerticoqTotalTranslation L5a.val_c cps.exp := 
-  fun v => convert_top (L5a.Halt_c v).
-
+  CerticoqTotalTranslation (cTerm certiL5a) (cTerm certiL6) := 
+  fun v =>
+    match v with
+        | pair venv vt => 
+          let (cenv, t) := convert_top (venv, L5a.Halt_c vt) in
+          ((M.empty _ , cenv, M.empty _), t)
+    end.
 
 
 

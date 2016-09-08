@@ -1,7 +1,7 @@
 Require Export Common.certiClasses.
 Require Export L2.instances.
 Require Export L4.instances.
-(*Require Export L6.instances.*)
+Require Export L6.instances.
 
 
 Quote Recursively Definition p := (3 + 4).
@@ -15,22 +15,24 @@ Print Instances CerticoqTotalTranslation.
 Print Instances CerticoqLanguage.
 
 Require Import Common.Common.
-Eval compute in (translateTo (cTerm certiL4) p).
+Eval compute in (ctranslateTo certiL4 p).
 
-Time Eval compute in (translateTo (cTerm certiL5a) p).
+Time Eval compute in (ctranslateTo certiL5a p).
 
-(* Fix the type of [certiL5a_t0_L6]. It should return (cTerm certiL6) which 
-also contains an environment. 
+Open Scope string_scope.
+Eval compute in (cTerm certiL6).
+Eval compute in (ctranslateTo certiL6 p).
+
+(* 
 To debug typeclass resolution problems, try:
 Typeclasses eauto := 5. (* or a small number to limit the search depth *)
 Typeclasses eauto := debug. (* if your ide doesn't show debug messages, use coqc *)
-
-Eval vm_compute in (translateTo (* (cTerm certiL6) *) cps.exp p).
-
-
+Print Instances CerticoqTranslation.
+Print Instances CerticoqTotalTranslation.
+Print Instances CerticoqLanguage.
 *)
 
-
+(*
 Quote Recursively Definition swap := 
 (fun  (p: nat  * bool) =>
 match p with
@@ -111,7 +113,7 @@ Require Import L3_to_L4.
 Definition prev3Ienv := L4.L3_to_L4.inductive_env (AstCommon.env prev3).
 Eval vm_compute in prev3Ienv.
 
-
+*)
 
 
 

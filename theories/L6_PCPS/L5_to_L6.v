@@ -44,16 +44,11 @@ Require Import L6.ctx.
 
 
 
-Parameter halt: prim.
-Parameter halt_tag: fTag.
 
                    
 (* placeholder *)
 Definition tag := positive.
 Variable default_tag : tag.
-Variable var_tag : tag.
-Variable kvar_tag : tag.
-Variable rec_tag : tag.
 Variable fun_tag: tag.
 Variable kon_tag: tag.
 
@@ -69,21 +64,21 @@ Proof.
     + subst. left. auto.
     + right. intro. apply n1. inversion H. auto.
   - right; intro; apply n1. inversion H; auto.
-Qed.
+Defined.
     
 Definition L6_conId := cTag.
-Definition d_L6_conId := 1%positive.
+
 
 Definition conId_map:= list (L5_conId * L6_conId).
 
 
 
 
-Print sumbool.
+
 
 Fixpoint dcon_to_tag (a:L5_conId) (sig:conId_map) :=
   match sig with
-    | nil => d_L6_conId
+    | nil => default_tag
     | ((cId, tag)::sig') => match L5_conId_dec a cId with
                               | left _ => tag
                               | right _ => dcon_to_tag a sig'
@@ -104,12 +99,12 @@ Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
 
 
 (* Bind the m first projections of var r to variables [n, n+m[ *)
-Fixpoint ctx_bind_proj (r:positive) (m:nat) (n:var) : (exp_ctx * var) :=
+Fixpoint ctx_bind_proj (tg:cTag) (r:positive) (m:nat) (n:var) : (exp_ctx * var) :=
   match m with
     | O => (Hole_c, n)
     | S m' =>
-      let (ctx_p', n') := ctx_bind_proj r m' n in
-      (Eproj_c  n' rec_tag (N.of_nat m') r ctx_p', Pos.succ n')
+      let (ctx_p', n') := ctx_bind_proj tg r m' n in
+      (Eproj_c  n' tg (N.of_nat m') r ctx_p', Pos.succ n')
   end.
 
 
@@ -190,19 +185,16 @@ Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:conv_env) (n:var) (*  {stru
                | ((dcn, m),(xs, e))::bl' =>
                  let lxs := List.length xs in 
                  let '(cbl, n', tgm) := convert_branches bl' sv sk tgm r n in
-                 let (ctx_p, n'') := ctx_bind_proj r lxs n' in 
+                 let tg := dcon_to_tag dcn (fst tgm) in
+                 let (ctx_p, n'') := ctx_bind_proj tg r lxs n' in 
                  let (names, _) := fromN n' lxs in
                  let sv' := set_s_list xs names sv in
                  let '(ce, n''', tgm) :=  convert e sv' sk tgm n'' in
-                 (((dcon_to_tag dcn (fst tgm)), (app_ctx_f ctx_p ce))::cbl , n''', tgm) 
+                 ((tg, (app_ctx_f ctx_p ce))::cbl , n''', tgm)
              end in
          let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
          let '(cbls, n'', tgm) := convert_branches bl sv sk tgm vn n' in
          (app_ctx_f ctx_v (Ecase vn cbls), n'', tgm)
-(*       | Proj_c v m k =>
-         let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
-         let '(ctx_k, vk, n'', tgm) := convert_v k sv sk tgm n' in
-         (app_ctx_f (comp_ctx_f ctx_v ctx_k) (Eproj n'' rec_tag (N.of_nat m) vn  (Eapp vk kon_tag (n''::nil))), Pos.succ n'', tgm) *)
        end
 (* returns converted context * new binding (usually n'-1 except for var and kvar) * next fresh 
 

@@ -4,7 +4,7 @@ Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
-Import ListNotations Nnat MonadNotation.
+Import ListNotations Nnat MonadNotation PS.
 Require Import Libraries.Maps.
 
 Close Scope Z_scope.
@@ -44,31 +44,6 @@ Close Scope Z_scope.
     empty. If a function is escaping, f_i will be closure converted in
     subsequent passes.
 
-    A better idea would be  to turn it into
-
-    let f_1' x_1 fvs = [e_1]
-    and f_1 x_1 = [e1]
-        ....
-    and f_n' x_n fvs = [e_n]
-    and f_n x_n = [e_n]
-    in [e]
-
-    or even
-
-    let f_1 x_1 = [e1]
-        ....
-    and f_n x_n = [e_n]
-    in 
-    let f_1' x_1 fvs = [e_1]
-        ....
-    and f_n' x_n fvs = [e_n]
-    in [e]
-
-
-    and then use f_i and f_i' as above. This way we will avoid an extra
-    function call an more importantly after closure conversion we will
-    not have to project all the values from the record (even those that
-    will not be needed).
 **)
 
 
@@ -81,7 +56,7 @@ Inductive VarInfo : Type :=
    The first argument is the name of the parameter of the lambda
    lifted function that corresponds to this free variable *)
 | FreeVar : var -> VarInfo
-(* A function. The first argument is the name of the lambda lifted version,
+(* A known function. The first argument is the name of the lambda lifted version,
    the second the new fTag and the third the list of free variables of the
    function *)
 | Fun : var -> fTag -> list var -> VarInfo.
@@ -165,6 +140,50 @@ Fixpoint add_params (ys : list var) (m : VarInfoMap) : VarInfoMap :=
   end.
 
 
+(** The set of the *true* free variables of an [exp]. The true free variables
+    are the variables that appear free plus the free variables of the known
+    functions that are called inside the expression. Relies on the unique
+    identifiers assumption and the assumptions the free and bound variables
+    are disjoint. *)
+Fixpoint exp_true_fvs (e : exp) (m : VarInfoMap) : FVSet :=
+  match e with
+    | Econstr x c ys e =>
+      let set := exp_true_fvs e m in
+      union_list set ys
+    | Ecase x pats =>
+      fold_left (fun s p => union (exp_true_fvs (snd p) m) s) pats (singleton x)
+    | Eproj x tau n y e =>
+      let set := exp_true_fvs e m in
+      add y set
+    | Efun defs e =>
+      let names := fundefs_names defs in
+      union (fundefs_true_fvs defs names m)
+            (diff (exp_true_fvs e m) names)
+    | Eapp x ft xs =>
+      match M.get x m with
+        | Some inf =>
+          match inf with
+            | Fun f' ft' fvs =>
+              union_list (singleton f') fvs
+            | _ => union_list (singleton x) xs
+          end
+        | None => union_list (singleton x) xs
+      end
+    | Eprim x prim ys e =>
+      let set := exp_true_fvs e m in
+      union_list set ys
+    | Ehalt x =>
+      (singleton x)
+  end
+with fundefs_true_fvs (defs : fundefs) (names : FVSet) m : FVSet :=
+       match defs with
+         | Fcons f t ys e defs' =>
+           let fv_e := diff_list (diff (exp_true_fvs e m) names) ys in
+           union fv_e (fundefs_true_fvs defs' names m)
+         | Fnil => empty
+       end.
+
+
 Fixpoint exp_lambda_lift (e : exp) (m : VarInfoMap) : state exp :=
   match e with
   (* We are (too) conservative here and we assume that all variables that are
@@ -187,7 +206,7 @@ Fixpoint exp_lambda_lift (e : exp) (m : VarInfoMap) : state exp :=
     e' <- exp_lambda_lift e (M.set x BoundVar m) ;;
     ret (Eproj x t N (rename m y) e')
   | Efun B e =>
-    let fvs := PS.elements (fundefs_fv B (fundefs_names B)) in
+    let fvs := PS.elements (fundefs_true_fvs B (fundefs_names B) m) in
     m' <- add_functions B fvs m ;;
     B' <- fundefs_lambda_lift B m' ;;
     e' <- exp_lambda_lift e m' ;;
@@ -267,13 +286,22 @@ Inductive Add_functions :
 | Add_Fcons :
     forall f ft xs e B fvs σ σ' ζ ζ' S S' f' ft',
       Add_functions B fvs σ ζ S σ' ζ' S' ->
-      In _ S' f' ->
+      Ensembles.In _ S' f' ->
       Add_functions (Fcons f ft xs e B) fvs σ ζ S
                     (σ' {f ~> f}) (ζ' {f ~> Some (f', ft', fvs)})
                     (Setminus _ S' (Singleton _ f'))
 | Add_Fnil :
     forall fvs σ ζ S,
       Add_functions Fnil fvs σ ζ S σ ζ S.
+
+(* (* Map from the original name to the list of free vars *) *)
+(* Definition free_vars (ζ : var -> option (var * fTag * list var)) : var -> option (list var) := *)
+(*   fun f => (liftM (fun x => snd x)) (ζ f). *)
+
+(**  The free variables of functions in ζ *)
+Definition FunsFVs (ζ : var -> option (var * fTag * list var)) : Ensemble var :=
+  fun v => exists f f' ft' fvs, ζ f = Some (f', ft', fvs) /\
+                        Ensembles.In _ (FromList fvs) v.
 
 Inductive Exp_lambda_lift :
   (var -> option (var * fTag * list var)) ->
@@ -301,7 +329,7 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Eproj x t N y e) S (Eproj x t N (σ y) e') S'
 | LL_Efun :
     forall B B' e e' σ σ' ζ ζ' fvs S S' S'' S''',
-      Included _ (FromList fvs) (occurs_free_fundefs B) ->
+      Included _ (FromList fvs) (Union _ (occurs_free_fundefs B) (FunsFVs ζ)) ->
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift ζ' σ' B S' B' S'' ->
@@ -349,4 +377,3 @@ with Fundefs_lambda_lift :
      | LL_Fnil :
          forall ζ σ S,
            Fundefs_lambda_lift ζ σ Fnil S Fnil S.
-

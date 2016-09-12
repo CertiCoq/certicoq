@@ -314,6 +314,58 @@ with occurs_free_fundefs : fundefs -> Ensemble var :=
 Hint Constructors occurs_free.
 Hint Constructors occurs_free_fundefs.
 
+(** [occurs_free_applied e] is the set of free variables of [e] that appear in applied position *)
+Inductive occurs_free_applied : exp -> Ensemble var :=
+| FreeApp_Econstr :
+    forall y x t ys e,
+      ~ x = y ->
+      occurs_free_applied e y ->
+      occurs_free_applied (Econstr x t ys e) y
+| FreeApp_Ecase1 :  
+    forall y x c e ys,
+      occurs_free_applied e y ->
+      occurs_free_applied (Ecase x ((c, e) :: ys)) y
+| FreeApp_Ecase2 :  
+    forall y x c e ys,
+      occurs_free_applied (Ecase x ys) y ->
+      occurs_free_applied (Ecase x ((c, e) :: ys)) y
+| FreeApp_Eproj :
+    forall y x tau n y' e,
+      x <> y ->
+      occurs_free_applied e y ->
+      occurs_free_applied (Eproj x tau n y' e) y
+| FreeApp_Efun1 :
+    forall y defs e,
+      ~ (name_in_fundefs defs y) -> 
+      occurs_free_applied e y ->
+      occurs_free_applied (Efun defs e) y
+| FreeApp_Efun2 :
+    forall y defs e, 
+      occurs_free_applied_fundefs defs y ->
+      occurs_free_applied (Efun defs e) y
+| FreeApp_Eapp :
+    forall x ys f,
+      occurs_free_applied (Eapp x f ys) x
+| FreeApp_Eprim :
+    forall y x p ys e,
+      x <> y ->
+      occurs_free_applied e y ->
+      occurs_free_applied (Eprim x p ys e) y
+with occurs_free_applied_fundefs : fundefs -> Ensemble var :=
+| FreeApp_Fcons1 :
+    forall x f tau ys e defs,  
+      x <> f ->
+      ~ (List.In x ys) ->
+      ~ (name_in_fundefs defs x) ->
+      occurs_free_applied e x ->
+      occurs_free_applied_fundefs (Fcons f tau ys e defs) x
+| FreeApp_Fcons2 :
+    forall x f tau ys e defs,
+      occurs_free_applied_fundefs defs x ->
+      x <> f ->
+      occurs_free_applied_fundefs (Fcons f tau ys e defs) x.
+
+
 (** sanity check : The names of the functions cannot appear free in a fundefs block *)
 Lemma fun_names_not_free_in_fundefs f defs :
   name_in_fundefs defs f ->

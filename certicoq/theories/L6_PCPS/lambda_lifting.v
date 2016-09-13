@@ -142,14 +142,13 @@ Fixpoint add_params (ys : list var) (m : VarInfoMap) : VarInfoMap :=
 
 (** The set of the *true* free variables of an [exp]. The true free variables
     are the variables that appear free plus the free variables of the known
-    functions that are called inside the expression. Relies on the unique
-    identifiers assumption and the assumptions the free and bound variables
-    are disjoint. *)
+    functions that are called inside the expression. Relies on the the
+    assumption that the free and bound variables are disjoint. *)
 Fixpoint exp_true_fvs (e : exp) (m : VarInfoMap) : FVSet :=
   match e with
     | Econstr x c ys e =>
-      let set := exp_true_fvs e m in
-      union_list set ys
+      let set := exp_true_fvs e m in 
+      union_list set ys 
     | Ecase x pats =>
       fold_left (fun s p => union (exp_true_fvs (snd p) m) s) pats (singleton x)
     | Eproj x tau n y e =>
@@ -237,12 +236,13 @@ with fundefs_lambda_lift B m :=
              | Some inf =>
                match inf with
                  | Fun f' ft' fvs =>
-                   p <- add_free_vars fvs (add_params xs m) ;;
+                   p <- add_free_vars fvs m ;;
                    let (ys, m') := p in
+                   let m'' := add_params xs m' in
                    xs' <- get_names (length xs) ;;
-                   e' <- exp_lambda_lift e m' ;;
+                   e' <- exp_lambda_lift e m'' ;;
                    B' <- fundefs_lambda_lift B m ;;
-                   ret (Fcons f' ft' (xs ++ ys) e
+                   ret (Fcons f' ft' (xs ++ ys) e'
                               (Fcons f ft xs'
                                      (Eapp f' ft' (xs' ++ (rename_lst m fvs)))
                                      B'))

@@ -39,7 +39,6 @@ Section Lambda_lifting_correct.
   (* Map from the original name to the list of free vars *)
   Definition free_vars (ζ : var -> option (var * fTag * list var)) : var -> option (list var) :=
     fun f => (liftM (fun x => snd x)) (ζ f).
-
   
   (** The domain of ζ *)
   Definition Funs (ζ : var -> option (var * fTag * list var)) : Ensemble var :=

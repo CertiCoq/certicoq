@@ -724,19 +724,19 @@ Proof.
 Qed.
 
 
-  Lemma binding_in_map_getlist {A} S m  xs :
-    binding_in_map S m ->
-    Included _  (FromList xs) S ->
-    exists (vs : list A), getlist xs m = Some vs.
-  Proof with now eauto with Ensembles_DB.
-    intros Hin Hinc. induction xs.
-    - eexists; simpl; eauto.
-    - rewrite FromList_cons in Hinc. edestruct Hin with (x := a) as [v' Hget].
-      now eapply Hinc; eauto.
-      edestruct IHxs as [vs' Hgetl].
-      eapply Included_trans...
-      eexists; simpl. rewrite Hget, Hgetl. reflexivity.
-  Qed.
+Lemma binding_in_map_getlist {A} S m  xs :
+  binding_in_map S m ->
+  Included _  (FromList xs) S ->
+  exists (vs : list A), getlist xs m = Some vs.
+Proof with now eauto with Ensembles_DB.
+  intros Hin Hinc. induction xs.
+  - eexists; simpl; eauto.
+  - rewrite FromList_cons in Hinc. edestruct Hin with (x := a) as [v' Hget].
+    now eapply Hinc; eauto.
+    edestruct IHxs as [vs' Hgetl].
+    eapply Included_trans...
+    eexists; simpl. rewrite Hget, Hgetl. reflexivity.
+Qed.
 
 
 

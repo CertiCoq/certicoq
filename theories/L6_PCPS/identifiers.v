@@ -2037,36 +2037,43 @@ Fixpoint fundefs_names (defs : fundefs) : FVSet :=
     | Fnil => empty
   end.
 
+Definition add_list (scope fvset : FVSet) ys : FVSet :=
+  fold_left (fun fvs y => if mem y scope then fvs else add y fvs) ys fvset.
+
+
 (** The set of free variables of an [exp], computational definition *)
-Fixpoint exp_fv (e : exp) : FVSet :=
+Fixpoint exp_fv_aux (e : exp) (scope fvset : FVSet) : FVSet :=
   match e with
     | Econstr x c ys e =>
-      let set := remove x (exp_fv e) in
-      union_list set ys
+      let fvset' := add_list scope fvset ys in 
+      exp_fv_aux e (add x scope) fvset'
     | Ecase x pats =>
-      fold_left (fun s p => union (exp_fv (snd p)) s) pats (singleton x)
+      let fvset' := fold_left (fun fvs p => exp_fv_aux (snd p) scope fvs) pats fvset in
+      if mem x scope then fvset' else add x fvset'
     | Eproj x tau n y e =>
-      let set := remove x (exp_fv e) in
-      add y set
+      let fvset' := if mem y scope then fvset else add y fvset in
+      exp_fv_aux e (add x scope) fvset'
     | Efun defs e =>
-      let names := fundefs_names defs in
-      union (fundefs_fv defs names)
-            (diff (exp_fv e) names)
+      let '(scope', fvset') := fundefs_fv_aux defs scope fvset in 
+      exp_fv_aux e scope' fvset'
     | Eapp x ft xs =>
-      union_list (singleton x) xs
+      let fvset' := add_list scope fvset xs in 
+      if mem x scope then fvset' else add x fvset'
     | Eprim x prim ys e =>
-      let set := remove x (exp_fv e) in
-      union_list set ys
-    | Ehalt x =>
-      (singleton x)
+      let fvset' := add_list scope fvset ys in 
+      exp_fv_aux e (add x scope) fvset'
+    | Ehalt x => if mem x scope then fvset else add x fvset
   end
-with fundefs_fv (defs : fundefs) (names : FVSet) : FVSet :=
+with fundefs_fv_aux (defs : fundefs) (scope fvset : FVSet) : FVSet * FVSet :=
        match defs with
          | Fcons f t ys e defs' =>
-           let fv_e := diff_list (diff (exp_fv e) names) ys in
-           union fv_e (fundefs_fv defs' names)
-         | Fnil => empty
+           let (scope', fvset') := fundefs_fv_aux defs' (add f scope) fvset in
+           (scope', exp_fv_aux e (union_list scope' ys) fvset')
+         | Fnil => (scope, fvset)
        end.
+
+Definition exp_fv e := exp_fv_aux e empty empty.
+Definition fundefs_fv B := snd (fundefs_fv_aux B empty empty).
 
 (** * * Equivalence of computational and inductive FV definitions *)
 
@@ -2082,28 +2089,188 @@ Proof.
 Qed.
 
 
-Lemma fundefs_fv_add defs :
-  forall s x,
-    Equal (fundefs_fv defs (add x s))
-          (remove x (fundefs_fv defs s)).
+Lemma add_list_spec Scope FVset l x :
+  In x (add_list Scope FVset l) <-> (In x FVset \/ (~ In x Scope /\ List.In x l)).
 Proof.
-  induction defs; intros s x x'; simpl; split; intros HIn.
-  - repeat apply_set_specs_ctx.
-    + repeat apply_set_specs;
-      (try left; repeat apply_set_specs; auto);
-      intros Hc; apply H2; apply_set_specs; eauto.
-    + repeat apply_set_specs;
-      try right; eapply IHdefs in H; repeat apply_set_specs_ctx; auto.
-  - repeat apply_set_specs_ctx.
-    + repeat apply_set_specs.
-      left. repeat apply_set_specs; auto. 
-      intros Hc; apply H3. apply_set_specs_ctx; eauto.
-      congruence.
-    + repeat apply_set_specs. right.
-      eapply IHdefs. apply_set_specs; auto.
-  - inv HIn.
-  - apply_set_specs_ctx; eauto.
+  revert FVset. induction l; intros FVset; simpl; split; eauto.
+  - intros [H1 | H2 ]; eauto. inv H2. inv H0.
+  - intros H. destruct (mem a Scope) eqn:Heq.
+    + eapply IHl in H. inv H; eauto. inv H0; eauto.
+    + eapply IHl in H. inv H; eauto.
+      repeat apply_set_specs_ctx; eauto.
+      * right. split; eauto. intros Hc.
+        eapply mem_spec in Hc. congruence.
+      * inv H0; eauto.
+  - destruct (mem a Scope) eqn:Heq.
+    + intros [H1 | [H2 H3]].
+      * eapply IHl; eauto.
+      * inv H3; subst. eapply IHl; eauto.
+        exfalso. apply H2. now apply mem_spec; eauto.
+        eapply IHl; eauto.
+    + intros [H1 | [H2 H3]].
+      * eapply IHl. left. apply_set_specs; eauto.
+      * inv H3; subst. eapply IHl; eauto.
+        left. now apply_set_specs; eauto.
+        eapply IHl; eauto.
+Qed. 
+
+(** correctness of exp_fv and fundefs_fv w.r.t occurs_free and
+    occurs_free_fundefs *)
+Lemma exp_fv_fundefs_fv_correct :
+  (forall e Scope FVset x,
+     In x (exp_fv_aux e Scope FVset) <-> ((Ensembles.In _ (occurs_free e) x /\ ~ In x Scope) \/ In x FVset)) /\
+  (forall B Scope FVset,
+     let '(Scope', FVset') := fundefs_fv_aux B Scope FVset in
+     (forall x, In x Scope' <-> (In x Scope \/ Ensembles.In _ (name_in_fundefs B) x)) /\
+     (forall x, In x FVset' <-> ((Ensembles.In _ (occurs_free_fundefs B) x /\ ~ In x Scope) \/ In x FVset))).
+Proof.
+  exp_defs_induction IHe IHl IHdefs; simpl; intros.
+  - split; intros H.
+    + eapply IHe in H. inv H.
+      * inv H0. left. split. constructor 2; eauto.
+        intros Hc. subst. apply H1. now apply_set_specs; eauto.
+        intros Hc. apply H1. now apply_set_specs; eauto.
+      * eapply add_list_spec in H0. inv H0; eauto.
+        inv H; left; eauto.
+    + inv H.
+      * inv H0. eapply IHe. inv H.
+        right. now apply add_list_spec; eauto.
+        left; split; eauto.
+        intros Hc. apply_set_specs_ctx; eauto.
+      * eapply IHe. right. now apply add_list_spec; eauto.
+  - split; intros H.
+    + destruct (mem v Scope) eqn:Heq; eauto.
+      repeat apply_set_specs_ctx; eauto. left; split; eauto.
+      intros Hc. eapply mem_spec in Hc. congruence.
+    + destruct (mem v Scope) eqn:Heq.
+      * inv H; eauto. inv H0. inv H.
+        exfalso. apply H1. now apply mem_spec; eauto.
+      * inv H. inv H0. inv H. now apply_set_specs; eauto.
+         now apply_set_specs; eauto.
+  - split; intros H.
+    + eapply IHl in H. inv H.
+      * inv H0. left; eauto.
+      * eapply IHe in H0. inv H0; eauto. inv H; eauto.
+    + eapply IHl. inv H; eauto.
+      * inv H0. inv H; eauto. right. eapply IHe; eauto.
+      * right. eapply IHe; eauto.
+  - split; intros H.
+    + eapply IHe in H. inv H.
+      * inv H0. left. split. constructor; eauto.
+        intros Hc. subst. apply H1. now apply_set_specs; eauto.
+        intros Hc. apply H1. now apply_set_specs; eauto.
+      * destruct (mem v0 Scope) eqn:Heq; eauto.
+        apply_set_specs_ctx; eauto. left; split; eauto.
+        intros Hc.  apply mem_spec in Hc. congruence.
+    + inv H.
+      * inv H0. eapply IHe. inv H.
+        destruct (mem x Scope) eqn:Heq; eauto.
+        exfalso. apply H1. now eapply mem_spec; eauto.
+        right. now apply_set_specs; eauto. left; split; eauto.
+        intros Hc. apply_set_specs_ctx; eauto.
+      * eapply IHe. right.
+        destruct (mem v0 Scope) eqn:Heq; eauto.
+        now apply_set_specs; eauto.
+  - destruct (fundefs_fv_aux f2 Scope FVset) as [Scope' FVset'] eqn:Heq.
+    specialize (IHdefs Scope FVset). rewrite Heq in IHdefs.
+    destruct IHdefs as [H1 H2].
+    split; intros H. 
+    + eapply IHe in H. inv H.
+      * inv H0. left; split. constructor; eauto.
+        intros Hc. eapply H3. eapply H1; eauto.
+        intros Hc. eapply H3. eapply H1; eauto.
+      * eapply H2 in H0. inv H0; eauto. inv H; eauto.
+    + eapply IHe. inv H.
+      * inv H0. inv H. left; split; eauto. intros Hc.
+        eapply H1 in Hc. now inv Hc; eauto.
+        right. eapply H2; eauto.
+      * right. eapply H2; eauto.
+  - split; intros H.
+    + destruct (mem v Scope) eqn:Heq; eauto.
+      * eapply add_list_spec in H. inv H; eauto. inv H0; eauto.
+      * repeat apply_set_specs_ctx; eauto. left; split; eauto.
+        intros Hc. eapply mem_spec in Hc. congruence.
+        eapply add_list_spec in H0. inv H0; eauto. inv H; eauto.
+    + destruct (mem v Scope) eqn:Heq; eauto.
+      * eapply add_list_spec. inv H; eauto. inv H0. inv H; eauto.
+        exfalso. apply H1. now apply mem_spec; eauto.
+      * repeat apply_set_specs; eauto. inv H. inv H0. inv H; eauto.
+        right. eapply add_list_spec; eauto.
+        right. eapply add_list_spec; eauto.
+  - split; intros H.
+    + eapply IHe in H. inv H.
+      * inv H0. left. split. eapply Free_Eprim2 ; eauto.
+        intros Hc. subst. apply H1. now apply_set_specs; eauto.
+        intros Hc. apply H1. now apply_set_specs; eauto.
+      * eapply add_list_spec in H0. inv H0; eauto.
+        inv H; left; eauto.
+    + inv H.
+      * inv H0. eapply IHe. inv H.
+        right. now apply add_list_spec; eauto.
+        left; split; eauto.
+        intros Hc. apply_set_specs_ctx; eauto.
+      * eapply IHe. right. now apply add_list_spec; eauto.
+  - split; intros H.
+    + destruct (mem v Scope) eqn:Heq; eauto.
+      repeat apply_set_specs_ctx; eauto. left; split; eauto.
+      intros Hc. eapply mem_spec in Hc. congruence.
+    + destruct (mem v Scope) eqn:Heq; eauto.
+      * inv H; eauto. inv H0. inv H; eauto.
+        exfalso. apply H1. now apply mem_spec; eauto.
+      * repeat apply_set_specs; eauto. inv H. inv H0. inv H; eauto.
+        eauto.
+  - destruct (fundefs_fv_aux f5 (add v Scope) FVset) as [Scope' FVset'] eqn:Heq.
+    specialize (IHdefs (add v Scope) FVset). rewrite Heq in IHdefs.
+    destruct IHdefs as [H1 H2]. split. 
+    + split; intros H.
+      eapply H1 in H; inv H; eauto. repeat apply_set_specs_ctx; eauto.
+      eapply H1. inv H; eauto. left. now apply_set_specs; eauto.
+      inv H0; eauto. inv H. left. now apply_set_specs; eauto.
+    + split; intros H.
+      * eapply IHe in H. inv H. inv H0. left. split; eauto.
+        eapply Free_Fcons1; eauto.
+        intros Hc; subst. eapply H3. eapply union_list_spec.
+        left. eapply H1; left. now repeat apply_set_specs; eauto.
+        intros Hc. eapply H3. eapply union_list_spec. now right; eauto.
+        intros Hc. eapply H3. eapply union_list_spec.
+        left. now eapply H1; right; eauto.
+        intros Hc; subst. eapply H3. eapply union_list_spec.
+        left. eapply H1; left. now repeat apply_set_specs; eauto.
+        eapply H2 in H0. inv H0; eauto. inv H; eauto. left; split; eauto.
+        constructor 2; eauto.
+        intros Hc; subst. eapply H3. now repeat apply_set_specs; eauto.
+        intros Hc; subst. eapply H3. now repeat apply_set_specs; eauto.
+      * eapply IHe. inv H. inv H0.
+        inv H. left; split; eauto. intros Hc. eapply union_list_spec in Hc.
+        inv Hc; eauto. eapply H3. eapply H1 in H. inv H; eauto.
+        repeat apply_set_specs_ctx; eauto. congruence.
+        contradiction. right. eapply H2; left; split; eauto.
+        intros Hc. now repeat apply_set_specs_ctx; eauto.
+        right. eapply H2; eauto.
+  - split. intros x. split; eauto. intros [H1 | H1]; eauto. inv H1.
+    intros x. split; eauto. intros H; inv H; eauto.
+    inv H0. inv H.
 Qed.
+
+Corollary fundefs_fv_correct B :
+  Same_set var (occurs_free_fundefs B)
+           (FromList (PS.elements (fundefs_fv B))).
+Proof.
+  destruct exp_fv_fundefs_fv_correct as [_ H2].
+  unfold fundefs_fv. specialize (H2 B empty empty).
+  destruct (fundefs_fv_aux B empty empty) as [scope fvs].
+  split; intros x H.
+  - inv H2.
+    assert (Hin : In x fvs).
+    { eapply H1. left; split; eauto. intros Hc. inv Hc. }
+    eapply PS.elements_spec1 in Hin. eapply InA_alt in Hin.
+    edestruct Hin as [y [Heq Hin']]. subst. eauto. 
+  - inv H2. simpl in H. unfold FromList, Ensembles.In in H.
+    eapply In_InA in H. eapply PS.elements_spec1 in H.
+    eapply H1 in H. inv H. inv H2; eauto. inv H2.
+    now eapply PS.E.eq_equiv.
+Qed.
+
 
 Lemma In_fold_left_l {A} (f : A -> FVSet) (l : list A)
       (si : FVSet) x:
@@ -2175,83 +2342,6 @@ Proof.
     eapply IHl in H. inv H; eauto.
 Qed.
 
-(** correctness of exp_fv and fundefs_fv w.r.t occurs_free and
-    occurs_free_fundefs *)
-Lemma exp_fv_fundefs_fv_correct :
-  (forall e x, In x (exp_fv e) <-> occurs_free e x) /\
-  (forall defs x,
-     In x (fundefs_fv defs (fundefs_names defs)) <->
-     occurs_free_fundefs defs x).
-Proof.
-  exp_defs_induction IHe IHl IHdefs; simpl; intros x; split; intros H.
-  - repeat apply_set_specs_ctx.
-    + constructor 2; eauto. eapply IHe; eauto.
-    + constructor; eauto.
-  - inv H; repeat apply_set_specs; eauto.
-    left. apply_set_specs; eauto.
-    apply IHe; eauto.
-  - repeat apply_set_specs_ctx; constructor.
-  - inv H. apply_set_specs; eauto.
-  - eapply In_fold_left_strengthen in H. inv H.
-    + apply Free_Ecase3. apply IHl; eauto.
-    + constructor. eapply IHe; eauto. 
-  - inv H.
-    + eapply In_fold_left. apply_set_specs. right; constructor; eauto.
-    + apply In_fold_left. apply_set_specs; left. apply IHe; eauto.
-    + apply IHl in H5. simpl in H5.
-      eapply In_fold_left_weaken; eauto.
-      apply Subset_union_mon_r. apply Subset_refl.
-  - repeat apply_set_specs_ctx.
-    + constructor; eauto.
-    + constructor; eauto. eapply IHe; eauto.
-  - inv H; repeat apply_set_specs; eauto.
-    right. apply_set_specs; eauto. apply IHe; eauto.
-  - repeat apply_set_specs_ctx.
-    + eapply Free_Efun2. eapply IHdefs; eauto.
-    + econstructor. intros Hc; apply H1; apply fundefs_names_correct; eauto.
-      eapply IHe; eauto.
-  - inv H; repeat apply_set_specs; eauto.
-    + right. apply_set_specs; eauto. apply IHe; eauto.
-      intros Hc; apply H2; apply fundefs_names_correct; eauto.
-    + left. eapply IHdefs; eauto.
-  - repeat apply_set_specs_ctx; constructor; eauto.
-  - inv H; apply_set_specs; eauto. left. apply_set_specs; eauto.
-  - repeat apply_set_specs_ctx.
-    + eapply Free_Eprim2; eauto. eapply IHe; eauto.
-    + constructor; eauto.
-  - inv H; apply_set_specs; eauto. left.
-    apply_set_specs; eauto; apply IHe; eauto.
-  - repeat apply_set_specs_ctx. constructor.
-  - inv H; apply_set_specs. reflexivity.
-  - repeat apply_set_specs_ctx.
-    + constructor; eauto.
-      intros Hc; apply H2; apply_set_specs; eauto.
-      intros Hc. apply H2. apply_set_specs; eauto;
-      right. apply fundefs_names_correct; eauto. 
-      apply IHe; eauto.
-    + apply fundefs_fv_add in H0. apply_set_specs_ctx.
-      constructor 2; eauto. apply IHdefs; eauto.
-  - inv H; repeat apply_set_specs.
-    + left; repeat apply_set_specs; eauto.
-      apply IHe; eauto.
-      intros Hc. apply H8. repeat apply_set_specs_ctx.
-      congruence. apply fundefs_names_correct; auto.
-    + right. apply fundefs_fv_add. repeat apply_set_specs; auto.
-      apply IHdefs. eauto.
-  - inv H.
-  - inv H.
-Qed.
-
-Corollary fundefs_fv_correct B :
-  Same_set var (occurs_free_fundefs B)
-           (FromList (PS.elements (fundefs_fv B (fundefs_names B)))).
-Proof.
-  split; intros x H.
-  eapply exp_fv_fundefs_fv_correct in H. eapply PS.elements_spec1 in H.
-  eapply InA_alt in H. edestruct H as [y [Heq Hin]]. subst. eauto. 
-  eapply exp_fv_fundefs_fv_correct. eapply PS.elements_spec1.
-  eapply In_InA. now eapply PS.E.eq_equiv. eassumption.
-Qed.
 
 (** * Compute the maximum identifier (free or bound) that occurs in an expression *)
 

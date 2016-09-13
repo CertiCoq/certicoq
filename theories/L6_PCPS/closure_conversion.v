@@ -96,7 +96,7 @@ Section CC.
     (var -> var) -> (* renaming of function names *)
     cTag -> (* tag of the current environment constructor *)
     var -> (* The environment argument *)
-    list var -> (* The free variables - needs to be ordered *)
+    list var -> (* The free variables - need to be ordered *)
     exp -> (* Before cc *)
     exp -> (* After cc *)
     exp_ctx -> (* The context that the output expression should be put in *)
@@ -219,7 +219,7 @@ Section CC.
 
 
   (** * Computational defintion of closure conversion *)
-
+  
   Inductive VarInfo : Type :=
   (* A free variable, i.e. a variable outside the scope of the current function.
    The argument is position of a free variable in the env record *)
@@ -356,17 +356,6 @@ Section CC.
              ret ((y, ((snd ef) (fst ef))) :: xs')
          end) pats;;
         t1 <- get_var x mapfv c Γ ;;
-        (* let pats_st := List.map (fun (p : tag * exp) => *)
-        (*                           let (t, e) := p in *)
-        (*                           e' <- exp_closure_conv e mapfv Γ ;; *)
-        (*                           ret (t, e')) pats in *)
-        (* pats' <- sequence pats_st ;; *)
-        (* could do [mapM] here but it stops guessing the decreasing arg :( *) 
-        (* pats' <- mapM (fun (p : tag * exp) => *)
-        (*                 let (t, e) := p in *)
-        (*                 let e_st := exp_closure_conv e mapfv Γ in *)
-        (*                 e' <-  e_st ;; *)
-        (*                 ret (t, e')) pats ;; *)
         let '(x', f1) := t1 in           
         ret (Ecase x' pats', f1)
       | Eproj x tag n y e' =>
@@ -375,8 +364,8 @@ Section CC.
         ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) c Γ ;;
         ret (Eproj x tag n y' ((snd ef) (fst ef)), f)
       | Efun defs e =>
-        let names := fundefs_names defs in
-        let fv := fundefs_fv defs names in
+        (* precompute free vars so this computation does not mess up the complexity *)
+        let fv := fundefs_fv defs in
         Γ' <- get_name ;;
         t1 <- make_env fv (Maps.PTree.empty VarInfo) mapfv c Γ' Γ ;;
         let '(c', mapfv_new, g1) := t1 in

@@ -15,12 +15,143 @@ Open Scope fun_scope.
 (** * Composition of L6 transformations and their correctness proofs *)
 
 
+
 Section L6_trans.
    
     Variable (clo_tag : cTag).
     Variable (pr : prims).
     Variable (cenv : cEnv).
-        
+
+    (** Observation relation for phases other than closure conversion *)
+    Inductive obs_rel : val -> val -> Prop :=
+    | Obs_constr :
+        forall ct vs1 vs2,
+          (* This can be potentially changed to [Forall2]. The reason for using
+             [Forall2_asym] is for the logical relation to be complete w.r.t. to
+             contextual equivalence but this is something we necessarily need  *)
+          Forall2_asym obs_rel vs1 vs2 ->
+          obs_rel (Vconstr ct vs1) (Vconstr ct vs2)
+    | Obs_fun :
+        forall rho1 B1 f1 rho2 B2 f2,
+          obs_rel (Vfun rho1 B1 f1) (Vfun rho2 B2 f2)
+    | Obs_int :
+        forall z1 z2,
+          obs_rel (Vint z1) (Vint z2).
+    
+    (** Observation relation for closure conversion *)
+    Inductive obs_rel_cc : val -> val -> Prop :=
+    | Obscc_constr :
+        forall ct vs1 vs2,
+          Forall2_asym obs_rel_cc vs1 vs2 ->
+          obs_rel_cc (Vconstr ct vs1) (Vconstr ct vs2)
+    | Obscc_fun :
+        forall rho1 B1 f1 rho2 B2 f2 c1 c2 vs l,
+          (* This can be potentially changed to [Vconstr c1 [(Vfun rho2 B2 f2) ; (Vconstr c2 vs)]].
+             The only reason it's not written this way is the use of [Forall2_asym]
+             above *)
+          obs_rel_cc (Vfun rho1 B1 f1)
+                     (Vconstr c1 ((Vfun rho2 B2 f2) :: (Vconstr c2 vs) :: l))
+    | Obscc_int :
+        forall z1 z2,
+          obs_rel_cc (Vint z1) (Vint z2).
+    
+
+    (** [obs_rel] is reflexive *)
+    Global Instance Reflexive_obs_rel : Reflexive obs_rel.
+    Proof. 
+      intros x; induction x using val_ind'; constructor; eauto.
+      constructor; eauto. now inv IHx0.
+    Qed.
+
+    (** [obs_rel] is transitive *)
+    Global Instance Transitive_obs_rel : Transitive obs_rel.
+    Proof. 
+      intros x y. revert x. induction y using val_ind'; intros x w H1 H2.
+      + inv H1. inv H2. inv H3. inv H4.  constructor; eauto.
+      + inv H1. inv H2. inv H3.
+        * constructor; eauto.
+        * inv H4. constructor; eauto.
+          constructor; eauto.
+          assert (H : obs_rel (Vconstr t l0) (Vconstr t l')).
+          { eapply IHy0; constructor; eauto. }
+          inv H; eauto.
+      + inv H1. inv H2. constructor.
+      + inv H1. inv H2. constructor.
+    Qed.
+    
+    (** [obs_rel_cc] respects [obs_rel]. Required to compose closure conversion with phases before and after *)
+
+    Lemma obs_rel_cc_respects_obs_rel_l (v1 v2 v3 : val) :
+      obs_rel v1 v2 -> obs_rel_cc v2 v3 -> obs_rel_cc v1 v3.
+    Proof.
+      revert v1 v3; induction v2 using val_ind'; intros v1 v3 H1 H2.
+      - inv H1; inv H2. inv H3; inv H4. constructor. constructor.
+      - inv H1; inv H2. inv H3; inv H4.
+        + constructor. constructor; eauto.
+        + constructor. constructor; eauto.
+          assert (H : obs_rel_cc (Vconstr t l0) (Vconstr t l')).
+          { eapply IHv0; constructor; eauto. }
+        inv H; eauto.
+      - inv H1. inv H2. constructor.
+      - inv H1. inv H2. constructor.
+    Qed.
+
+
+    Lemma obs_rel_cc_respects_obs_rel_r (v1 v2 v3 : val) :
+      obs_rel_cc v1 v2 -> obs_rel v2 v3 -> obs_rel_cc v1 v3.
+    Proof.
+      revert v1 v3; induction v2 using val_ind'; intros v1 v3 H1 H2.
+      - inv H1; inv H2. inv H3; inv H4. constructor. constructor.
+      - inversion H1.
+        + subst. inv H2. inv H3; inv H5.
+          * constructor. constructor; eauto.
+          * constructor. constructor; eauto.
+            assert (H : obs_rel_cc (Vconstr t l0) (Vconstr t l')).
+            { eapply IHv0; constructor; eauto. }
+            inv H; eauto.
+        + subst v1 v2 l t. inv H2. inv H4. inv H2. inv H5.
+          inv H2. inv H4. constructor. constructor.
+      - inv H1.
+      - inv H1. inv H2. constructor.
+    Qed.
+
+    (** The logical relation implies [obs_rel] *)
+    Lemma preord_val_implies_obs_rel k v1 v2 :
+      preord_val pr cenv k v1 v2 -> obs_rel v1 v2.
+    Proof.
+      revert v2; induction v1 using val_ind'; intros v2 Hpre; rewrite preord_val_eq in Hpre.
+      - destruct v2; simpl in *; try contradiction. inv Hpre. inv H0; eauto.
+        constructor; eauto.
+      - destruct v2; simpl in *; try contradiction. inv Hpre. inv H0; eauto.
+        constructor; eauto. constructor; eauto.
+        assert (H : obs_rel (Vconstr c l) (Vconstr c l')).
+        { eapply IHv0. rewrite preord_val_eq. constructor; eauto. }
+        inv H; eauto.
+      - destruct v2; simpl in *; try contradiction. constructor.
+      - destruct v2; simpl in *; try contradiction. constructor.
+    Qed.
+
+    (** The closure conversion logical relation implies [obs_rel_cc] *)
+    Lemma  cc_approx_val_implies_obs_rel_cc k v1 v2 :
+      cc_approx_val pr cenv clo_tag k v1 v2 -> obs_rel_cc v1 v2.
+    Proof.
+      revert v2; induction v1 using val_ind'; intros v2 Hpre; rewrite cc_approx_val_eq in Hpre.
+      - destruct v2; simpl in *; try contradiction. inv Hpre. inv H0; eauto.
+        constructor; eauto.
+      - destruct v2; simpl in *; try contradiction. inv Hpre. inv H0; eauto.
+        constructor; eauto. constructor; eauto.
+        assert (H : obs_rel_cc (Vconstr c l) (Vconstr c l')).
+        { eapply IHv0. rewrite cc_approx_val_eq. constructor; eauto. }
+        inv H; eauto.
+      - destruct v2; simpl in *; try contradiction.
+        destruct l; simpl in *; try contradiction.
+        destruct v0; simpl in *; try contradiction.
+        destruct l; simpl in *; try contradiction.
+        destruct v1; simpl in *; try contradiction.        
+        constructor.
+      - destruct v2; simpl in *; try contradiction. constructor.
+    Qed.    
+
     (** Top level correctness property of closure conversion and hoisting for closed terms *)
     Corollary closure_conversion_hoist_correct k e ctag itag :
       (* [e] is closed *)

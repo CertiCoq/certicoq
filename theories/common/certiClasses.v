@@ -179,18 +179,22 @@ Class ObserveSubterms (Value:Type) := observeSubterms: Value -> list Value.
 
 Require Import List.
 (* Coinductive, in case we add support for Coq's coinductive types lateron *)
-CoInductive obsEqual
+CoInductive obsLe
    `{ObserveHead SrcValue} `{ObserveSubterms SrcValue} 
    `{ObserveHead DstValue} `{ObserveSubterms DstValue} : SrcValue -> DstValue -> Prop :=
 | sameObs : forall (s : SrcValue) (d : DstValue),
-    observeHead s = observeHead d
+    (match observeHead s with
+      | Some constr => observeHead d = Some constr
+      | None => True
+      end)
     -> (let ls := (observeSubterms s) in
        let ld := (observeSubterms d) in
        length ls = length ld /\
-       forall n:nat, obsEqual (nth n ls s)  (nth n ld d))
-    -> obsEqual s d.
+       forall n:nat, (n < length ld) -> obsLe (nth n ls s)  (nth n ld d))
+    -> obsLe s d.
 
-Notation "s ~ t" := (obsEqual s t) (at level 65).
+
+Notation "s ⊑ t" := (obsLe s t) (at level 65).
 
 (* Similar to what Zoe suggested on 	Wed, Aug 17, 2016 at 8:57 AM *)
 Definition obsPreserving 
@@ -202,7 +206,7 @@ Definition obsPreserving
    ∀ (s:Src) (sv: SrcValue), 
     wf s 
     -> (s ⇓ sv)
-    -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ~ dv.
+    -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ⊑ dv.
 
 Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
 
@@ -256,29 +260,33 @@ Require Import Coq.Classes.RelationClasses.
 *)
 
 
-Lemma obsEqualTrns
+Lemma obsLeTrns
    `{ObserveHead SrcValue} `{ObserveSubterms SrcValue} 
    `{ObserveHead InterValue} `{ObserveSubterms InterValue} 
    `{ObserveHead DstValue} `{ObserveSubterms DstValue} :
    forall   (s : SrcValue) (i : InterValue) (d : DstValue),
-  s ~ i
-  -> i ~ d 
-  -> s ~ d.
+  s ⊑ i
+  -> i ⊑ d 
+  -> s ⊑ d.
 Proof.
   cofix.
   intros ? ? ? Ha Hb.
   inversion Ha as [ss is Hah Has]. subst. clear Ha.
   inversion Hb as [is ds Hbh Hbs]. subst. clear Hb.
-  constructor;[congruence|].
-  simpl in *. destruct Has as [Hasl Has].
+  constructor; auto.
+- destruct (observeHead s); [| auto]. rewrite Hah in Hbh. auto.
+- clear Hah Hbh. simpl in *. destruct Has as [Hasl Has].
   destruct Hbs as [Hbsl Hbs].
   split; [congruence|].
-  eauto.
+  rewrite Hbsl in Has. eauto.
 (* info eauto : 
 intro.
-eapply obsEqualTrns.
+intro.
+eapply obsLeTrns.
  apply Has.
- apply Hbs.
+  exact H5.
+  apply Hbs.
+   exact H5.
 *)
 Qed.
 
@@ -308,7 +316,7 @@ Proof.
   compute in Hc. split;[tauto|].
   apply proj2 in Hc. revert Hc Hoeq. clear.
   intros ? ?.
-  eapply obsEqualTrns with (i:=iv); eauto.
+  eapply obsLeTrns with (i:=iv); eauto.
 Qed.
 
 

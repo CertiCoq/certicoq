@@ -242,7 +242,6 @@ Definition subst_assertion (i: var) (e: expr) (a: assertion) :=
  end.
 
 (* compare.v *)
-Load loadpath.
 Require Import ZArith.
 Require Import Coq.Lists.List.
 Require Import Sorted.
@@ -1017,7 +1016,58 @@ inversion H1; clear H1; subst; simpl; auto.
 Qed.
 
 Require Import Finite_sets_facts.
-Require Import msl.Axioms.
+
+(* from msl/Axioms.v: *)
+
+(** This file collects some axioms used throughout the Mechanized Semantic Library development.
+  This file was developed in 2010 by Andrew W. Appel and Xavier Leroy, and harmonizes
+  the axioms used by MSL and by the CompCert project.
+ *)
+
+Require Coq.Logic.ClassicalFacts.
+
+(** * Extensionality axioms *)
+
+(** The following [Require Export] gives us functional extensionality for dependent function types:
+<<
+Axiom functional_extensionality_dep : forall {A} {B : A -> Type}, 
+  forall (f g : forall x : A, B x), 
+  (forall x, f x = g x) -> f = g.
+>> 
+and, as a corollary, functional extensionality for non-dependent functions:
+<<
+Lemma functional_extensionality {A B} (f g : A -> B) : 
+  (forall x, f x = g x) -> f = g.
+>>
+*)
+Require Export Coq.Logic.FunctionalExtensionality.
+
+(** For compatibility with earlier developments, [extensionality]
+  is an alias for [functional_extensionality]. *)
+
+Lemma extensionality:
+  forall (A B: Type) (f g : A -> B),  (forall x, f x = g x) -> f = g.
+Proof. intros; apply functional_extensionality. auto. Qed.
+
+Implicit Arguments extensionality.
+
+(** We also assert propositional extensionality. *)
+
+Axiom prop_ext: ClassicalFacts.prop_extensionality.
+Implicit Arguments prop_ext.
+
+(** * Proof irrelevance *)
+
+(** We also use proof irrelevance, which is a consequence of propositional
+    extensionality. *)
+
+Lemma proof_irr: ClassicalFacts.proof_irrelevance.
+Proof.
+  exact (ClassicalFacts.ext_prop_dep_proof_irrel_cic prop_ext).
+Qed.
+Implicit Arguments proof_irr.
+
+(* end msl/Axioms.v *)
 
 Lemma Mcardinal_spec': forall s,   cardinal _ (Basics.flip M.In s) (M.cardinal s).
 Proof.
@@ -1042,7 +1092,7 @@ subst; auto.
  induction H.
  replace (Basics.flip (@List.In M.elt) (@nil clause)) with (@Empty_set M.elt).
  constructor 1.
- apply Axioms.extensionality; intro; apply Axioms.prop_ext; intuition; inversion H.
+ apply extensionality; intro; apply prop_ext; intuition; inversion H.
  simpl.
  replace (Basics.flip (@List.In M.elt) (@cons clause x l)) 
    with (Add M.elt (Basics.flip (@List.In _) l) x).
@@ -1052,7 +1102,7 @@ subst; auto.
  apply SetoidList.In_InA; auto.
  apply eq_equivalence.
  clear.
- apply Axioms.extensionality; intro; apply Axioms.prop_ext; intuition.
+ apply extensionality; intro; apply prop_ext; intuition.
  unfold Basics.flip; simpl.
  unfold Add in H. destruct H; auto.
  apply Singleton_inv in H. auto.
@@ -1079,9 +1129,9 @@ Proof.
  omega.
  omega.
  clear - H.
- apply Axioms.extensionality;  intro x.
+ apply extensionality;  intro x.
  unfold Basics.flip at 1.
- apply Axioms.prop_ext; intuition.
+ apply prop_ext; intuition.
 rewrite M.remove_spec in H0.
 destruct H0.
 split.
@@ -2134,10 +2184,113 @@ Definition example_ent := Entailment
   (Assertion [Nequ c e] [Lseg a b ; Lseg a c ; Next c d ; Lseg d e])
   (Assertion nil [Lseg b c ; Lseg c e]).
 
-Compute cnf example_ent.
-(* Compute check_entailment example_ent.*)
+Local Open Scope positive_scope.
 
-Definition main := check_entailment example_ent.
+Definition x (p : positive) := Var p.
+
+(*           
+          ex868(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13)
+  [x9 |-> x3 * lseg(x7, x8) * lseg(x1, x6) * x10 |-> x2 * x3 |-> x7 * lseg(x5, x10) * x4 |-> x9 * x13 |-> x5 * lseg(x8, x5) * x11 |-> x12 * x12 |-> x11 * x2 |-> x4 * lseg(x6, x3)] { } [lseg(x2, x10) * lseg(x12, x11) * lseg(x11, x12) * lseg(x6, x3) * lseg(x1, x6) * lseg(x13, x5) * lseg(x10, x2)]*)
+
+
+Definition harder_ent :=
+  Entailment 
+    (Assertion
+       []
+       [Next (x 9) (x 3);
+         Lseg (x 7) (x 8);
+         Lseg (x 1) (x 6);
+         Next (x 10) (x 2);
+         Next (x 3) (x 7);
+         Lseg (x 5) (x 10);    
+         Next (x 4) (x 9);
+         Next (x 13) (x 5);
+         Lseg (x 8) (x 5); 
+         Next (x 11) (x 12);   
+         Next (x 12) (x 11);   
+         Next (x 2) (x 4); 
+         Lseg (x 6) (x 3)])   
+    (Assertion 
+       []
+       [Lseg (x 2) (x 10);
+         Lseg (x 12) (x 11);
+         Lseg (x 11) (x 12);
+         Lseg (x 6) (x 3);
+         Lseg (x 1) (x 6);
+         Lseg (x 13) (x 5);
+         Lseg (x 10) (x 2)]).
+
+
+(*ex971(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20)
+
+     [x2 |-> x13 * lseg(x3, x6) * lseg(x10, x5) * x4 |-> x20 * x16 |-> x11 *
+      lseg(x6, x14) * x20 |-> x11 * lseg(x17, x6) * lseg(x19, x13) * lseg(x11, x1) *
+      x15 |-> x13 * x1 |-> x17 * x5 |-> x18 * lseg(x8, x5) * x7 |-> x13 * x14 |-> x2 *
+      x18 |-> x6 * x12 |-> x17 * lseg(x13, x8) * x9 |-> x10]
+
+     
+     { }
+
+
+     [lseg(x15, x2) * lseg(x4, x6) * lseg(x19, x13) * lseg(x10, x5) * lseg(x7, x13) *
+      lseg(x2, x13) * lseg(x16, x11) * lseg(x3, x6) * lseg(x12, x17) * lseg(x9, x10)]
+ *)
+
+Definition harder_ent2 :=
+  Entailment 
+    (Assertion
+       []
+       [Next (x 2) (x 13); Lseg (x 3) (x 6); Lseg (x 10) (x 5); Next (x 4) (x 20); Next (x 16) (x 11);
+        Lseg (x 6) (x 14); Next (x 20) (x 11); Lseg (x 17) (x 6); Lseg (x 19) (x 13); Lseg (x 11) (x 1);
+        Next (x 15) (x 13); Next (x 1) (x 17); Next (x 5) (x 18); Lseg (x 8) (x 5); Next (x 7) (x 13); Next (x 14) (x 2);
+        Next (x 18) (x 6); Next (x 12) (x 17); Lseg (x 13) (x 8); Next (x 9) (x 10)])
+    (Assertion
+       []
+       [Lseg (x 15) (x 2); Lseg (x 4) (x 6); Lseg (x 19) (x 13); Lseg (x 10) (x 5); Lseg (x 7) (x 13);
+        Lseg (x 2) (x 13); Lseg (x 16) (x 11); Lseg (x 3) (x 6); Lseg (x 12) (x 17); Lseg (x 9) (x 10)]).
+
+(* ex948(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19, x20) 
+
+[x1 |-> x14 * x14 |-> x19 * x5 |-> x8 * x13 |-> x18 * lseg(x18, x13) * lseg(x15, x2) * 
+ x17 |-> x15 * x20 |-> x6 * x6 |-> x13 * lseg(x11, x19) * x7 |-> x12 * x10 |-> x17 * 
+ lseg(x16, x20) * x2 |-> x20 * x19 |-> x4 * lseg(x9, x3) * lseg(x8, x12) * lseg(x12, x20) * 
+ x4 |-> x6 * x3 |-> x20] 
+
+{ } 
+
+[lseg(x6, x18) * lseg(x4, x6) * lseg(x7, x6) * lseg(x1, x4) * 
+ lseg(x11, x19) * lseg(x18, x13) * lseg(x16, x20) * lseg(x10, x20) * lseg(x5, x12) * 
+ lseg(x3, x20) * lseg(x9, x3)] *)
+
+
+Definition harder_ent3 :=
+  Entailment 
+    (Assertion
+       []
+       [Next (x 1) (x 14); Next (x 14) (x 19); Next (x 5) (x 8); Next (x 13) (x 18); Lseg (x 18) (x 13); Lseg (x 15) (x 2);
+        Next (x 17) (x 15); Next (x 20) (x 6); Next (x 6) (x 13); Lseg (x 11) (x 19); Next (x 7) (x 12); Next (x 10) (x 17);
+        Lseg (x 16) (x 20); Next (x 2) (x 20); Next (x 19) (x 4); Lseg (x 9) (x 3); Lseg (x 8) (x 12); Lseg (x 12) (x 20); 
+       Next (x 4) (x 6); Next (x 3) (x 20)])
+    (Assertion
+       []
+       [Lseg (x 6) (x 18); Lseg (x 4) (x 6); Lseg (x 7) (x 6); Lseg (x 1) (x 4);
+        Lseg (x 11) (x 19); Lseg (x 18) (x 13); Lseg (x 16) (x 20); Lseg (x 10) (x 20); Lseg (x 5) (x 12);
+        Lseg (x 3) (x 20); Lseg (x 9) (x 3)]).
+
+Compute cnf example_ent.
+Compute cnf harder_ent.
+Compute cnf harder_ent2.
+Compute cnf harder_ent3.
+(* Compute check_entailment example_ent.
+    ... doesn't work, because of opaque termination proofs ... 
+*)
+
+Definition main :=
+  map check_entailment
+      [example_ent;
+        harder_ent;
+        harder_ent2;
+        harder_ent3].        
 
 Extraction "vs" main.
 

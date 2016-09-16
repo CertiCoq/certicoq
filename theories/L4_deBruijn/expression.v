@@ -56,11 +56,11 @@ Instance DconEq : Eq dcon := _.
 (** Source expressions, represented using deBruijn notation *)
 Inductive exp: Type :=
 | Var_e: N -> exp
-| Lam_e: exp -> exp
+| Lam_e: name -> exp -> exp
 | App_e: exp -> exp -> exp
 | Con_e: dcon -> exps -> exp
 | Match_e: exp -> forall (pars:N) (* # of parameters *), branches_e -> exp
-| Let_e: exp -> exp -> exp
+| Let_e: name -> exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
 | Ax_e: string -> exp
 (* | Prf_e : exp *)
@@ -117,14 +117,14 @@ Fixpoint enthopt (n:nat) (xs:efnlst): option exp :=
 (** [exp_wf i e] ensures there is no free variable above [i]. *)
 Inductive exp_wf: N -> exp -> Prop :=
 | var_e_wf: forall i j, j < i -> exp_wf i (Var_e j)
-| lam_e_wf: forall i e, exp_wf (1 + i) e -> exp_wf i (Lam_e e)
+| lam_e_wf: forall i n e, exp_wf (1 + i) e -> exp_wf i (Lam_e n e)
 | app_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf i e2 ->
                              exp_wf i (App_e e1 e2)
 | con_e_wf: forall i d es, exps_wf i es -> exp_wf i (Con_e d es)
 | match_e_wf: forall i e n bs, exp_wf i e -> branches_wf i bs ->
                               exp_wf i (Match_e e n bs)
-| let_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 ->
-                             exp_wf i (Let_e e1 e2)
+| let_e_wf: forall i n e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 ->
+                             exp_wf i (Let_e n e1 e2)
 | fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + i) es ->
                                      exp_wf i (Fix_e es k)
 | ax_e_wf : forall i s, exp_wf i (Ax_e s)
@@ -207,9 +207,9 @@ Fixpoint shift n k e :=
   match e with
     | Var_e i => Var_e (if lt_dec i k then i else i + n)
     | App_e e1 e2 => App_e (shift n k e1) (shift n k e2)
-    | Lam_e e' => Lam_e (shift n (1 + k) e')
+    | Lam_e na e' => Lam_e na (shift n (1 + k) e')
     | Con_e d es => Con_e d (shift_exps' shift n k es)
-    | Let_e e1 e2 => Let_e (shift n k e1) (shift n (1 + k) e2)
+    | Let_e na e1 e2 => Let_e na (shift n k e1) (shift n (1 + k) e2)
     | Match_e e p bs => Match_e (shift n k e) p (shift_branches' shift n k bs)
     | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
@@ -268,9 +268,9 @@ Function subst (v:exp) k (e:exp): exp :=
     | Var_e i => if lt_dec i k then Var_e i
                  else if eq_dec i k then shift k 0 v else Var_e (i - 1)
     | App_e e1 e2 => App_e (subst v k e1) (subst v k e2)
-    | Lam_e e' => Lam_e (subst v (1 + k) e')
+    | Lam_e na e' => Lam_e na (subst v (1 + k) e')
     | Con_e d es => Con_e d (substs v k es)
-    | Let_e e1 e2 => Let_e (subst v k e1) (subst v (1 + k) e2)
+    | Let_e na e1 e2 => Let_e na (subst v k e1) (subst v (1 + k) e2)
     | Match_e e p bs => Match_e (subst v k e) p (subst_branches v k bs)
     | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
@@ -299,9 +299,9 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Var_e i => if lt_dec i k then Var_e i
                  else if eq_dec i k then v else Var_e (i - 1)
     | App_e e1 e2 => App_e (sbst v k e1) (sbst v k e2)
-    | Lam_e e' => Lam_e (sbst v (1 + k) e')
+    | Lam_e na e' => Lam_e na (sbst v (1 + k) e')
     | Con_e d es => Con_e d (sbsts v k es)
-    | Let_e e1 e2 => Let_e (sbst v k e1) (sbst v (1 + k) e2)
+    | Let_e na e1 e2 => Let_e na (sbst v k e1) (sbst v (1 + k) e2)
     | Match_e e p bs => Match_e (sbst v k e) p (sbst_branches v k bs)
     | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + k) es) k'
     | Ax_e s => Ax_e s
@@ -517,17 +517,17 @@ Definition sbst_fix (es:efnlst) (e : exp) : exp :=
 
 (** Big-step evaluation for [exp]. *)
 Inductive eval: exp -> exp -> Prop :=
-| eval_Lam_e: forall e, eval (Lam_e e) (Lam_e e)
-| eval_App_e: forall e1 e1' e2 v2 v,
-                 eval e1 (Lam_e e1') ->
+| eval_Lam_e: forall na e, eval (Lam_e na e) (Lam_e na e)
+| eval_App_e: forall e1 na e1' e2 v2 v,
+                 eval e1 (Lam_e na e1') ->
                  eval e2 v2 ->
                  eval (e1'{0 ::= v2}) v -> 
                  eval (App_e e1 e2) v
 | eval_Con_e: forall d es vs, evals es vs -> eval (Con_e d es) (Con_e d vs)
-| eval_Let_e: forall e1 v1 e2 v2,
+| eval_Let_e: forall na e1 v1 e2 v2,
                  eval e1 v1 ->
                  eval (e2{0::=v1}) v2 ->
-                 eval (Let_e e1 e2) v2
+                 eval (Let_e na e1 e2) v2
 | eval_Match_e: forall e p bs d vs e' v,
     eval e (Con_e d vs) ->
     let vs' := exps_skipn p vs in
@@ -566,8 +566,8 @@ Proof.
   apply my_eval_ind; simpl; intros.
   - inversion H. reflexivity.
   - inversion H2; subst.
-    * assert (j0:Lam_e e1' = Lam_e e1'0). { apply H. assumption. }
-                                          injection j0; intros h0. subst.
+    * assert (j0:Lam_e na e1' = Lam_e na0 e1'0). { apply H. assumption. }
+                                          injection j0; intros h0 h1. subst.
       assert (j1:v2 = v0). { apply H0. assumption. } subst.
       apply H1. assumption.
     * specialize (H _ H5); discriminate.
@@ -593,7 +593,12 @@ Proof.
     rewrite (H0 vs0); try assumption. reflexivity.
 Qed.
 
-Example x1: exp := Lam_e (Var_e 0).  (* identity *)
+Arguments nNamed i%string.
+Definition nNameds (s : string) : name := nNamed s.
+Coercion nNameds : string >-> name.
+Arguments Lam_e n%string e.
+
+Example x1: exp := Lam_e "x" (Var_e 0).  (* identity *)
 Lemma Lx1: forall (e d:exp), eval e d -> eval (App_e x1 e) d.
 Proof.
   intros e d h. unfold x1. eapply eval_App_e. apply eval_Lam_e.
@@ -615,7 +620,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
   match n with
     | 0%nat => None
     | S n => match e with
-               | Lam_e d => Some (Lam_e d)
+               | Lam_e na d => Some (Lam_e na d)
                | Fix_e es k => Some (Fix_e es k)
                | Con_e d es => 
                  match evals_n n es with
@@ -624,7 +629,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                  end
                | App_e e1 e2 =>
                  match eval_n n e1 with
-                   | Some (Lam_e e1') => 
+                   | Some (Lam_e _ e1') => 
                      match eval_n n e2 with
                        | None => None
                        | Some e2' => eval_n n (e1'{0 ::= e2'})
@@ -642,7 +647,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                      end
                    | _ => None
                   end
-               | Let_e e1 e2 =>
+               | Let_e _ e1 e2 =>
                  match eval_n n e1 with
                    | None => None
                    | Some v1 => eval_n n (e2{0::=v1})
@@ -933,8 +938,8 @@ Proof.
 Qed.
 
 (** some concrete examples **)
-Example Ke: exp := Lam_e (Lam_e (Var_e 1)).
-Example Se: exp := Lam_e (Lam_e (Lam_e
+Example Ke: exp := Lam_e "x" (Lam_e "y" (Var_e 1)).
+Example Se: exp := Lam_e "x" (Lam_e "y" (Lam_e "z"
             (App_e (App_e (Var_e 2) (Var_e 0)) (App_e (Var_e 1) (Var_e 0))))).
 Example SKKe: exp := App_e (App_e Se Ke) Ke.
 Definition index := mkInd "someind" 0.
@@ -962,16 +967,16 @@ Definition unsome (x:option exp) : exp :=
 
 (** natural numbers in Church representation **)
 Section ChurchNaturals.
-Notation ZZ := (Lam_e (Lam_e Ve1)).
-Notation SS := (Lam_e (Lam_e (Lam_e (Ve0 $ (Ve2 $ Ve1 $ Ve0))))).
+Notation ZZ := (Lam_e "x" (Lam_e "y" Ve1)).
+Notation SS := (Lam_e "x" (Lam_e "y" (Lam_e "z" (Ve0 $ (Ve2 $ Ve1 $ Ve0))))).
 Notation one := (SS $ ZZ).
 Notation two := (SS $ one).
 Notation three := (SS $ two).
 Notation four := (SS $ three).
 Notation five := (SS $ four).
 Notation six := (SS $ five).
-Notation add := (Lam_e (Lam_e (Ve1 $ Ve0 $ SS))).
-Notation mul := (Lam_e (Lam_e (Ve1 $ ZZ $ (add $ Ve0)))).
+Notation add := (Lam_e "x" (Lam_e "y" (Ve1 $ Ve0 $ SS))).
+Notation mul := (Lam_e "x" (Lam_e "y" (Ve1 $ ZZ $ (add $ Ve0)))).
 
 Example One := Eval compute in (unsome (eval_n 100 one)).
 Example Two := Eval compute in (unsome (eval_n 100 two)).
@@ -1001,7 +1006,7 @@ Notation FF := ((boolind, 1):dcon).
 Notation FFF := (Con_e FF enil).
 (* if b then e1 else e2 *)
 Notation ite :=
-  (Lam_e (Lam_e (Lam_e
+  (Lam_e "x" (Lam_e "y" (Lam_e "z"
              (Match_e Ve2 0 (brcons_e TT 0 Ve1 (brcons_e FF 0 Ve0 brnil_e)))))).
 Goal eval (ite $ TTT $ FFF $ TTT) FFF.
   repeat econstructor. Qed.
@@ -1013,9 +1018,9 @@ Notation listind := (mkInd "list" 0).
 Notation dNil := ((listind,0):dcon).
 Notation Nil := (Con_e dNil enil).
 Notation dCons := ((listind,1):dcon).
-Notation Cons := (Lam_e (Lam_e (Con_e dCons (econs Ve1 [|Ve0|])))).
+Notation Cons := (Lam_e "x" (Lam_e "y" (Con_e dCons (econs Ve1 [|Ve0|])))).
 Notation cdr :=
-  (Lam_e (Match_e Ve0 0 (brcons_e dNil 0 Nil (brcons_e dCons 2 Ve0 brnil_e)))).
+  (Lam_e "x" (Match_e Ve0 0 (brcons_e dNil 0 Nil (brcons_e dCons 2 Ve0 brnil_e)))).
 
 Goal eval (cdr $ Nil) Nil.
 eapply eval_App_e.
@@ -1047,7 +1052,7 @@ Notation natind := (mkInd "nat" 0).
 Notation ZZ := ((natind,0):dcon).
 Notation ZZZ := (Con_e ZZ enil).
 Notation SS := ((natind,1):dcon).
-Notation SSS := (Lam_e (Con_e SS [|Ve0|])).
+Notation SSS := (Lam_e "x" (Con_e SS [|Ve0|])).
 Notation one := (SSS $ ZZZ).
 Notation two := (SSS $ one).
 Notation three := (SSS $ two).
@@ -1073,7 +1078,7 @@ Qed.
 
 (** fixpoints **)
 Definition copy : exp :=
-  (Fix_e [!Lam_e (Match_e Ve0 0 (brcons_e ZZ 0 ZZZ 
+  (Fix_e [!Lam_e "x" (Match_e Ve0 0 (brcons_e ZZ 0 ZZZ 
             (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
 
 Goal eval (copy $ ZZZ) ZZZ.
@@ -1302,7 +1307,7 @@ Definition evals_preserves_wf := proj2 eval_preserves_wf'.
 (** Characterize values **)
 Inductive is_value: exp -> Prop :=
 | var_is_value: forall i, is_value (Var_e i)
-| lam_is_value: forall e, is_value (Lam_e e)
+| lam_is_value: forall na e, is_value (Lam_e na e)
 | con_is_value: forall d es, are_values es -> is_value (Con_e d es)
 | fix_is_value: forall es k, is_value (Fix_e es k)
 | ax_is_value : forall s, is_value (Ax_e s)
@@ -1331,11 +1336,11 @@ Hint Resolve eval_yields_value evals_yields_values.
 Fixpoint is_valueb (e:exp): bool :=
   match e with
     | Var_e _ => true
-    | Lam_e _ => true
+    | Lam_e _ _ => true
     | App_e _ _  => false
     | Con_e _ es => are_valuesb es
     | Match_e _ _ _ => false
-    | Let_e _ _ => false
+    | Let_e _ _ _ => false
     | Fix_e _ _ => true
     | Ax_e _ => true
   end

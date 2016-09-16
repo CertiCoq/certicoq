@@ -170,7 +170,7 @@ Proof using.
   rewrite N.lt_succ_pred with (z:=0%N); lia.
 
 (* Lam_e *)
-- intros Hwf Hind ? Hin.
+- intros e Hwf Hind ? Hin.
   simpl in Hin.
   rewrite list.in_app_iff in Hin.
   rewrite or_false_r in Hin.
@@ -213,7 +213,7 @@ Proof using.
   (* the crux of this proof comes later, in the translateb case *)
 
 (* Let_e *)
-- intros ? Hwf Hind H2wf H2ind ? Hin.
+- intros ? ? Hwf Hind H2wf H2ind ? Hin.
   simpl in Hin.
   repeat rewrite list.in_app_iff in Hin.
   simpl in Hin.
@@ -513,9 +513,9 @@ Lemma preserves_eval :
        -> eval e v).
 Proof using.
   apply my_eval_ind; [ | | | | | | | | | ]; unfold L4_to_L4a.
-- intros? _. simpl. constructor.
+- intros ? ? _. simpl. constructor.
 (* beta *)
-- intros ? ? ? ? ? H1s H1t H2s H2t H3s H3t Hwf.
+- intros ? ? ? ? ? ? H1s H1t H2s H2t H3s H3t Hwf.
   simpl in *.
   inverts Hwf.
   econstructor; eauto.
@@ -536,7 +536,7 @@ Proof using.
   apply evals_length; auto.
 
 (* zeta *)
-- intros ? ? ? ? H1s H1t H2s H2t Hwf.
+- intros ? ? ? ? ? H1s H1t H2s H2t Hwf.
   inverts Hwf. simpl.
   econstructor; eauto.
   clear H1t.

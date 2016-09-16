@@ -39,14 +39,14 @@ Fixpoint translate {NVar : Type} (mkVar : N -> NVar)
 match e with
 | Var_e n => vterm (mkVar (max-n-1))
 
-| expression.Lam_e e => 
+| expression.Lam_e na e => 
     let vn := mkVar max in
     Lam_e vn (translate mkVar (N.succ max) e)
 
 | expression.App_e f a => 
     App_e (translate mkVar max f) (translate mkVar max a)
 
-| expression.Let_e e1 e2 => 
+| expression.Let_e na e1 e2 => 
     let vn := mkVar max in
     Let_e vn (translate mkVar max e1) (translate mkVar (N.succ max) e2)
 

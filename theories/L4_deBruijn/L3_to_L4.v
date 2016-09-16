@@ -76,7 +76,7 @@ Section TermTranslation.
   Fixpoint strip_lam (k : nat) (e : exp) : exp :=
     match k, e with
     | 0%nat, _ => e
-    | S n, Lam_e e => strip_lam n e
+    | S n, Lam_e _ e => strip_lam n e
     | S n, _ => e
     end.
 
@@ -110,8 +110,8 @@ Section TermTranslation.
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TSort s => (* Erase *) erased_exp
     | L3t.TProd n t => (* Erase *) erased_exp
-    | L3t.TLambda n t => Lam_e (trans (1+k) t)
-    | L3t.TLetIn n t u => Let_e (trans k t) (trans (1+k) u)
+    | L3t.TLambda n t => Lam_e n (trans (1+k) t)
+    | L3t.TLetIn n t u => Let_e n (trans k t) (trans (1+k) u)
     | L3t.TApp t u => App_e (trans k t) (trans k u)
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
@@ -166,7 +166,7 @@ Definition inductive_env (e : environ L3.compile.Term) : ienv :=
   fold_right inductive_entry_aux [] e.
 
 Definition mkLets (e : env) (t : exp) :=
-  fold_left (fun acc (x : string * exp) => Let_e (snd x) acc) e t.
+  fold_left (fun acc (x : string * exp) => Let_e (fst x) (snd x) acc) e t.
 
 (** start-to-L4 translations **)
 Definition myprogram_Program : program -> Program Term :=

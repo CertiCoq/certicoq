@@ -53,6 +53,7 @@ Variable fun_tag: tag.
 Variable kon_tag: tag.
 
 
+
 Definition L5_conId := dcon.
 
 Theorem L5_conId_dec: forall x y:L5_conId, {x = y} + {x <> y}.
@@ -109,12 +110,21 @@ Fixpoint ctx_bind_proj (tg:cTag) (r:positive) (m:nat) (n:var) : (exp_ctx * var) 
 
 
 
-Definition t_map := M.t iTag.
+Definition t_map := M.t fTag.
 Definition t_empty:t_map := M.empty _.
-  
+
+(* get the iTag of a variable, i_tag if not found *)
+(*
 Fixpoint get_t (n:var) (sig:t_map): iTag :=
   match M.get n sig with
-    | None => (1%positive)
+    | None => i_tag
+    | Some v => v
+  end. *)
+
+(* get the fTag of a variable, fun_tag if not found *)
+Fixpoint get_f (n:var) (sig:t_map): fTag :=
+  match M.get n sig with
+    | None => fun_tag
     | Some v => v
   end.
 
@@ -168,14 +178,14 @@ Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:conv_env) (n:var) (*  {stru
                          (app_ctx_f ctx_v (Ehalt vn), (Pos.succ n'), tgm)
        | Ret_c k v => let '(ctx_k, kn, n', tgm) := convert_v k sv sk tgm n in
                       let '(ctx_v, vn, n'', tgm) := convert_v v sv sk tgm n' in
-                       (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp  kn (get_t kn (snd tgm)) (vn::nil)), n'', tgm)
+                       (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp  kn kon_tag (vn::nil)), n'', tgm)
        | Call_c f k v =>
          let fv := if (varInterface.varClass f):bool then sv else sk in
          let kv := if (varInterface.varClass k):bool then sv else sk in
          let vv := if (varInterface.varClass v):bool then sv else sk in
          (* flipping around so the continuation comes first *)
          let f' := get_s f fv in
-         (Eapp f' (get_t f' (snd tgm)) ((get_s k kv)::(get_s v vv)::nil) , n, tgm)
+         (Eapp f' (get_f f' (snd tgm)) ((get_s k kv)::(get_s v vv)::nil) , n, tgm)
          
        | Match_c v bl =>
          let fix convert_branches (bl:list  ((dcon * nat) * ((list NVar)* cps))) (sv: s_map) (sk:s_map) (tgm:conv_env) (r:var)  (n:var)  (* { struct bl } *): (list (cTag * exp) * var * conv_env)  :=

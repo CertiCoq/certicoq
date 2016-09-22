@@ -36,9 +36,9 @@ void forward (value *from_start, value *from_limit, value **next,
       } else {
         sz = Wosize_hd(hd);
 	new = (value)(*next+1);
-	*next += new+sz; 
+	*next = new+sz; 
 	for(int i = -1; i < sz; i++) {
-	  Field(new, i + 1) = Field(v, i);
+	  Field(new, i) = Field(v, i);
 	}
 	Hd_val(v) = 0;
 	Field(v, 0) = new;
@@ -92,19 +92,10 @@ void do_generation (struct space *from,
   from->next=from->start;
 }  
 
-void resume(struct fun_info *fi, struct thread_info *ti) {
-  void (*f)(void);
-  struct heap *h = ti->heap;
-  assert (h);
-  f = fi->fun;
-  *ti->alloc = h->spaces[0].start;
-  *ti->limit = h->spaces[0].limit;
-  (*f)();
-}  
-
 void create_space(struct space *s, uintnat words) {
   value *p; uintnat n;
   unintnat maxint = 0u-1u;
+  /* minor bug:  this assumes sizeof(uintnat)==sizeof(void*)==sizeof(value) */
   if (words > maxint/(2*sizeof(value))) {
     fprintf(stderr,"Next generation would be too big for address space\n");
     exit(1);
@@ -112,7 +103,12 @@ void create_space(struct space *s, uintnat words) {
   d = maxint/RATIO;
   if (words<d) d=words;
   n = d*RATIO;
+  assert (n >= 2*words);
   p = (value *)malloc(n * sizeof(value););
+  if (p==NULL) {
+    n = 2*words;
+    p = (value *)malloc(n * sizeof(value););
+  }
   if (p==NULL) {
     fprintf(stderr,"Could not create the next generation\n");
     exit(1);
@@ -138,6 +134,16 @@ struct heap *create_heap() {
   return h;
 }
 
+void resume(struct fun_info *fi, struct thread_info *ti) {
+  void (*f)(void);
+  struct heap *h = ti->heap;
+  assert (h);
+  f = fi->fun;
+  *ti->alloc = h->spaces[0].start;
+  *ti->limit = h->spaces[0].limit;
+  (*f)();
+}  
+
 void garbage_collect(struct fun_info *fi, struct thread_info *ti) {
   struct heap *h = ti->heap;
   if (h==NULL) {
@@ -153,7 +159,7 @@ void garbage_collect(struct fun_info *fi, struct thread_info *ti) {
 	create_space(h->spaces+(i+1), h->spaces[i].limit-h->spaces[i].start);
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
       if (h->spaces[i].limit - h->spaces[i].start
-	  <= h->spaces[i+1].limit - h->spaces[i].next)
+	  <= h->spaces[i+1].limit - h->spaces[i+1].next)
 	resume(fi,ti);
     }
     fprintf(stderr, "Ran out of generations\n");

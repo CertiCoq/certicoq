@@ -6,51 +6,79 @@
 #include "values.h"
 #include "gc.h"
 
+/* A "space" describes one generation of the generational collector. */
 struct space {
   value *start, *next, *limit;
 };
+/* Either start==NULL (meaning that this generation has not yet been created),
+   or start <= next <= limit.  The words in start..next  are allocated
+   and initialized, and the words from next..limit are available to allocate. */
 
 #define MAX_SPACES 10  /* how many generations */
 #define RATIO 8   /* size of generation i+1 / size of generation i */
+
 #define NURSERY_SIZE ((1<<19)/sizeof(value))  /* half a megabyte */
+/* The size of generation 0 (the "nursery") should approximately match the 
+   size of the level-2 cache of the machine, according to:
+      Cache Performance of Fast-Allocating Programs, 
+      by Marcelo J. R. Goncalves and Andrew W. Appel. 
+      7th Int'l Conf. on Functional Programming and Computer Architecture,
+      pp. 293-305, ACM Press, June 1995.
+   We estimate this as half a megabyte.
+*/
 
 struct heap {
+  /* A heap is an array of generations; generation 0 must be already-created */
   struct space spaces[MAX_SPACES];
 };
 
 
 #define Is_from(from_start, from_limit, v)			\
    (from_start <= (value*)(v) && (value*)(v) < from_limit)
+/* Assuming v is a pointer (Is_block(v)), tests whether v points
+   somewhere into the "from-space" defined by from_start and from_limit */
 
-void forward (value *from_start, value *from_limit, value **next,
-	       value *p) {
-  mlsize_t sz;
-  value new;
+void forward (value *from_start,  /* beginning of from-space */
+	      value *from_limit,  /* end of from-space */
+	      value **next,       /* next available spot in to-space */
+	      value *p)           /* location of word to forward */
+/* What it does:  If *p is a pointer, AND it points into from-space,
+   then make *p point at the corresponding object in to-space.
+   If such an object did not already exist, create it at address *next
+    (and increment *next by the size of the object).
+   If *p is not a pointer into from-space, then leave it alone. 
+*/
+ {
   value v = *p;
   if(Is_block(v)) {
     if(Is_from(from_start, from_limit, v)) {
       header_t hd = Hd_val(v); 
       if(hd == 0) { /* already forwarded */
-	new = Field(v,0);
-	*p = new;
+	*p = Field(v,0);
       } else {
+	mlsize_t sz;
+	value *new;
         sz = Wosize_hd(hd);
-	new = (value)(*next+1);
+	new = *next+1;
 	*next = new+sz; 
 	for(int i = -1; i < sz; i++) {
 	  Field(new, i) = Field(v, i);
 	}
 	Hd_val(v) = 0;
-	Field(v, 0) = new;
-	*p = new;
+	Field(v, 0) = (value)new;
+	*p = (value)new;
       }
     }
   }
 }
 
-void forward_roots (value *from_start, value *from_limit,
-		    value **next,
-		    struct fun_info *fi, struct thread_info *ti) {
+void forward_roots (value *from_start,  /* beginning of from-space */
+		    value *from_limit,  /* end of from-space */
+		    value **next,       /* next available spot in to-space */
+		    struct fun_info *fi,/* which args contain live roots? */
+		    struct thread_info *ti) /* where's the args array? */
+/* Forward each live root in the args array */
+ {
   value *args; int n; uintnat *roots;
   roots = fi -> indices;
   n = fi -> num_args;
@@ -63,9 +91,15 @@ void forward_roots (value *from_start, value *from_limit,
 #define No_scan_tag 251
 #define No_scan(t) ((t) >= No_scan_tag)
 
-void do_scan(value *from_start, value *from_limit,
-	     value *scan,
- 	     value **next) {
+void do_scan(value *from_start,  /* beginning of from-space */
+	     value *from_limit,  /* end of from-space */
+	     value *scan,        /* start of unforwarded part of to-space */
+ 	     value **next)       /* next available spot in to-space */
+/* Forward each word in the to-space between scan and *next.
+  In the process, next may increase, so keep doing it until scan catches up.
+  Leave alone:  header words, and "no_scan" (nonpointer) data. 
+*/
+{
   value *s;
   s = scan;
   while(s < *next) {
@@ -82,19 +116,33 @@ void do_scan(value *from_start, value *from_limit,
   }
 }
 	     
-void do_generation (struct space *from,
-		    struct space *to, 
-		    struct fun_info *fi,
-		    struct thread_info *ti) {
+void do_generation (struct space *from,  /* descriptor of from-space */
+		    struct space *to,    /* descriptor of to-space */
+		    struct fun_info *fi, /* which args contain live roots? */
+		    struct thread_info *ti)  /* where's the args array? */
+/* Copy the live objects out of the "from" space, into the "to" space,
+   using fi and ti to determine the roots of liveness. */
+{
   assert(from->next-from->start <= to->limit-to->next);
   forward_roots(from->start, from->limit, &to->next, fi, ti);
   do_scan(from->start, from->limit, to->start, &to->next);
   from->next=from->start;
 }  
 
-void create_space(struct space *s, uintnat words) {
-  value *p; uintnat n;
-  unintnat maxint = 0u-1u;
+void create_space(struct space *s,  /* which generation to collect */
+		  uintnat words)    /* size of the next-smaller generation */
+  /* malloc an array of words for generation "s", and
+     set s->start and s->next to the beginning, and s->limit to the end.
+     The size must be at least words*2, at most words*RATIO,
+     preferably words*RATIO.
+  */
+
+ {
+  value *p; uintnat n,d;
+  uintnat maxint = 0u-1u;
+  /* The next few lines calculate a value "n" that's at least words*2,
+     preferably words*RATIO, and without overflowing the size of an
+     unsigned integer. */
   /* minor bug:  this assumes sizeof(uintnat)==sizeof(void*)==sizeof(value) */
   if (words > maxint/(2*sizeof(value))) {
     fprintf(stderr,"Next generation would be too big for address space\n");
@@ -104,10 +152,13 @@ void create_space(struct space *s, uintnat words) {
   if (words<d) d=words;
   n = d*RATIO;
   assert (n >= 2*words);
-  p = (value *)malloc(n * sizeof(value););
+
+  /* Now, try to malloc an array of n values.  If that's not possible,
+   * then set n=2*words, and try again. */
+  p = (value *)malloc(n * sizeof(value));
   if (p==NULL) {
     n = 2*words;
-    p = (value *)malloc(n * sizeof(value););
+    p = (value *)malloc(n * sizeof(value));
   }
   if (p==NULL) {
     fprintf(stderr,"Could not create the next generation\n");
@@ -118,7 +169,10 @@ void create_space(struct space *s, uintnat words) {
   s->limit = p+n;
 }
 
-struct heap *create_heap() {
+struct heap *create_heap()
+/* To create a heap, first malloc the array of space-descriptors,
+   then create only generation 0.  */
+{
   int i;
   struct heap *h = (struct heap *)malloc(sizeof (struct heap));
   if (h==NULL) {
@@ -134,36 +188,76 @@ struct heap *create_heap() {
   return h;
 }
 
-void resume(struct fun_info *fi, struct thread_info *ti) {
+void resume(struct fun_info *fi, struct thread_info *ti)
+/* When the garbage collector is all done, it does not "return"
+   to the mutator; instead, it uses this function (which does not return)
+   to resume the mutator by invoking the continuation, fi->fun.  
+   But first, "resume" informs the mutator
+   of the new values for the alloc and limit pointers.
+*/
+ {
   void (*f)(void);
   struct heap *h = ti->heap;
+  value *lo, *hi;
   assert (h);
+  lo = h->spaces[0].start;
+  hi = h->spaces[0].limit;
+  if (hi-lo < fi->num_allocs) {
+    fprintf(stderr, "Nursery is too small for function's num_allocs\n");
+    exit(1);
+  }
   f = fi->fun;
-  *ti->alloc = h->spaces[0].start;
-  *ti->limit = h->spaces[0].limit;
+  *ti->alloc = lo;
+  *ti->limit = hi;
   (*f)();
 }  
 
-void garbage_collect(struct fun_info *fi, struct thread_info *ti) {
+void garbage_collect(struct fun_info *fi, struct thread_info *ti)
+/* See the header file for the interface-spec of this function. */
+{
   struct heap *h = ti->heap;
   if (h==NULL) {
+    /* If the heap has not yet been initialized, create it and resume */
     h = create_heap();
     ti->heap = h;
     resume(fi,ti);
   } else {
-    assert (h->spaces[0].limit == *ti->limit);
-    h->spaces[0].next = *ti->alloc;
     int i;
+    assert (h->spaces[0].limit == *ti->limit);
+    h->spaces[0].next = *ti->alloc; /* this line is probably unecessary */
     for (i=0; i<MAX_SPACES-1; i++) {
+      /* Starting with the youngest generation, collect each generation
+         into the next-older generation.  Usually, when doing that,
+         there will be enough space left in the next-older generation
+         so that we can break the loop by resuming the mutator. */
+
+      /* If the next generation does not yet exist, create it */
       if (h->spaces[i+1].start==NULL)
 	create_space(h->spaces+(i+1), h->spaces[i].limit-h->spaces[i].start);
+
+      /* Copy all the objects in generation i, into generation i+1 */
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+
+      /* If there's enough space in gen i+1 to guarantee that the
+         NEXT collection into i+1 will succeed, we can stop here */
       if (h->spaces[i].limit - h->spaces[i].start
 	  <= h->spaces[i+1].limit - h->spaces[i+1].next)
 	resume(fi,ti);
     }
+    /* If we get to i==MAX_SPACES, that's bad news */
     fprintf(stderr, "Ran out of generations\n");
     exit(1);
   }
+  /* Can't reach this point */
   assert(0);
 } 
+
+void free_heap(struct heap *h) {
+  int i;
+  for (i=0; i<MAX_SPACES; i++) {
+    value *p = h->spaces[i].start;
+    if (p!=NULL)
+      free(p);
+  }
+  free (h);
+}

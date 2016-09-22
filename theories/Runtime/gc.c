@@ -10,8 +10,8 @@ struct space {
   value *start, *next, *limit;
 };
 
-#define MAX_SPACES 10
-#define RATIO 8
+#define MAX_SPACES 10  /* how many generations */
+#define RATIO 8   /* size of generation i+1 / size of generation i */
 #define NURSERY_SIZE ((1<<19)/sizeof(value))  /* half a megabyte */
 
 struct heap {
@@ -102,15 +102,24 @@ void resume(struct fun_info *fi, struct thread_info *ti) {
   (*f)();
 }  
 
-void create_space(struct space *s, int nwords) {
-  value *p = (value *)malloc(nwords * sizeof(value));
+void create_space(struct space *s, uintnat words) {
+  value *p; uintnat n;
+  unintnat maxint = 0u-1u;
+  if (words > maxint/(2*sizeof(value))) {
+    fprintf(stderr,"Next generation would be too big for address space\n");
+    exit(1);
+  }
+  d = maxint/RATIO;
+  if (words<d) d=words;
+  n = d*RATIO;
+  p = (value *)malloc(n * sizeof(value););
   if (p==NULL) {
     fprintf(stderr,"Could not create the next generation\n");
     exit(1);
   }
   s->start=p;
   s->next=p;
-  s->limit = p+nwords;
+  s->limit = p+n;
 }
 
 struct heap *create_heap() {
@@ -141,8 +150,7 @@ void garbage_collect(struct fun_info *fi, struct thread_info *ti) {
     int i;
     for (i=0; i<MAX_SPACES-1; i++) {
       if (h->spaces[i+1].start==NULL)
-	create_space(h->spaces+(i+1),
-		     RATIO*(h->spaces[i].limit-h->spaces[i].start));
+	create_space(h->spaces+(i+1), h->spaces[i].limit-h->spaces[i].start);
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
       if (h->spaces[i].limit - h->spaces[i].start
 	  <= h->spaces[i+1].limit - h->spaces[i].next)

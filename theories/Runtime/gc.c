@@ -15,17 +15,22 @@ struct space {
    and initialized, and the words from next..limit are available to allocate. */
 
 #define MAX_SPACES 10  /* how many generations */
-#define RATIO 8   /* size of generation i+1 / size of generation i */
+#define RATIO 4   /* size of generation i+1 / size of generation i */
 
-#define NURSERY_SIZE ((1<<19)/sizeof(value))  /* half a megabyte */
+#define NURSERY_SIZE ((1<<18)/sizeof(value))  /* half a megabyte */
 /* The size of generation 0 (the "nursery") should approximately match the 
    size of the level-2 cache of the machine, according to:
       Cache Performance of Fast-Allocating Programs, 
       by Marcelo J. R. Goncalves and Andrew W. Appel. 
       7th Int'l Conf. on Functional Programming and Computer Architecture,
       pp. 293-305, ACM Press, June 1995.
-   We estimate this as half a megabyte.
+   We estimate this as 256 kilobytes 
+     (which is the size of the Intel Core i7 per-core L2 cache).
+    http://www.tomshardware.com/reviews/Intel-i7-nehalem-cpu,2041-10.html
+    https://en.wikipedia.org/wiki/Nehalem_(microarchitecture)
 */
+
+#define DEPTH 10  /* how much depth-first search to do */
 
 struct heap {
   /* A heap is an array of generations; generation 0 must be already-created */
@@ -41,12 +46,17 @@ struct heap {
 void forward (value *from_start,  /* beginning of from-space */
 	      value *from_limit,  /* end of from-space */
 	      value **next,       /* next available spot in to-space */
-	      value *p)           /* location of word to forward */
+	      value *p,           /* location of word to forward */
+	      int depth)          /* how much depth-first search to do */
 /* What it does:  If *p is a pointer, AND it points into from-space,
    then make *p point at the corresponding object in to-space.
    If such an object did not already exist, create it at address *next
     (and increment *next by the size of the object).
    If *p is not a pointer into from-space, then leave it alone. 
+
+   The depth parameter may be set to 0 for ordinary breadth-first
+   collection.  Setting depth to a small integer (perhaps 10)
+   may improve the cache locality of the copied graph.
 */
  {
   value v = *p;
@@ -56,17 +66,21 @@ void forward (value *from_start,  /* beginning of from-space */
       if(hd == 0) { /* already forwarded */
 	*p = Field(v,0);
       } else {
+	int i;
 	mlsize_t sz;
 	value *new;
         sz = Wosize_hd(hd);
 	new = *next+1;
 	*next = new+sz; 
-	for(int i = -1; i < sz; i++) {
+	for(i = -1; i < sz; i++) {
 	  Field(new, i) = Field(v, i);
 	}
 	Hd_val(v) = 0;
 	Field(v, 0) = (value)new;
 	*p = (value)new;
+	if (depth>0)
+	  for (i=0; i<sz; i++)
+	    forward(from_start, from_limit, next, &Field(new,i), depth-1);
       }
     }
   }
@@ -85,7 +99,7 @@ void forward_roots (value *from_start,  /* beginning of from-space */
   args = ti->args;
   
   for(uintnat i = 0; i < n; i++)
-    forward(from_start, from_limit, next, args+roots[i]);
+    forward(from_start, from_limit, next, args+roots[i], DEPTH);
 }  
 
 #define No_scan_tag 251
@@ -109,7 +123,7 @@ void do_scan(value *from_start,  /* beginning of from-space */
     if (!No_scan(tag)) {
       intnat j;
       for(j = 1; j <= sz; j++) {
-	forward (from_start, from_limit, next, &Field(s, j));
+	forward (from_start, from_limit, next, &Field(s, j), DEPTH);
       }
     }
     s += 1+sz;
@@ -252,7 +266,23 @@ void garbage_collect(struct fun_info *fi, struct thread_info *ti)
   assert(0);
 } 
 
-void free_heap(struct heap *h) {
+/* REMARK.  The generation-management policy in the garbage_collect function
+   has a potential flaw.  Whenever a record is copied, it is promoted to
+   a higher generation.  This is generally a good idea.  But there is
+   a bounded number of generations.  A useful improvement would be:
+   when it's time to collect the oldest generation (and we can tell
+   it's the oldest, at least because create_space() fails), do some
+   reorganization instead of failing.
+ */
+
+void reset_heap (struct heap *h) {
+  int i;
+  for (i=0; i<MAX_SPACES; i++)
+    h->spaces[i].next = h->spaces[i].start;
+}
+  
+
+void free_heap (struct heap *h) {
   int i;
   for (i=0; i<MAX_SPACES; i++) {
     value *p = h->spaces[i].start;

@@ -17,7 +17,7 @@ struct space {
 #define MAX_SPACES 10  /* how many generations */
 #define RATIO 4   /* size of generation i+1 / size of generation i */
 
-#define NURSERY_SIZE ((1<<18)/sizeof(value))  /* half a megabyte */
+#define NURSERY_SIZE ((1<<18)/sizeof(value))  /* 256 kilobytes */
 /* The size of generation 0 (the "nursery") should approximately match the 
    size of the level-2 cache of the machine, according to:
       Cache Performance of Fast-Allocating Programs, 

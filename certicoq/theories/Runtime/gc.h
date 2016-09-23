@@ -134,9 +134,20 @@ void garbage_collect(struct fun_info *fi, struct thread_info *ti);
   (where N>=num_allocs), such that limit-alloc=N.
 */
 
-void destroy_heap(struct heap *h);
-/* Deallocates all heap data associated with h.
+void free_heap(struct heap *h);
+/* Deallocates all heap data associated with h, and returns the
+ * memory to the operating system (via the malloc/free system).
  * After calling this function, h is a dangling pointer and should not be used.
+ */
+
+void reset_heap(struct heap *h);
+/* Empties the heap without freeing its storage.
+ * After a complete execution of the mutator,
+ * and after whoever invoked the mutator copies whatever result they want
+ * out of the heap, one can call this function before starting 
+ * another mutator execution.  This saves the operating-system overhead of 
+ * free_heap() followed by the implicit create_heap that would have been
+ * done in the first garbage_collect() call of the next execution.
  */
 
 

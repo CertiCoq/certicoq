@@ -81,7 +81,7 @@ void build(void);
 void done(void);
 
 uintnat roots_insert[] = {1,2,3,4};
-const struct fun_info fi_insert = {insert, 4, 4, roots_insert};
+const struct fun_info fi_insert = {insert, 5, 4, roots_insert};
 
 void insert() {
   value t, key, contf, conte;
@@ -114,8 +114,9 @@ void insert() {
       args[4]=e;
       jump(insert);
     } else {
+      value u = cons3(0,k,left,right);
       args[4]=conte;
-      args[5]=t;
+      args[5]=u;
       jump(contf);
     }
   }

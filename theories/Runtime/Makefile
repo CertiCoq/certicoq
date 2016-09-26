@@ -9,8 +9,6 @@ gctest: gctest.o gc.o
 
 
 gc.o: gc.c config.h values.h
-	${CC} -m32 -c -g gc.c
-
 nogc.o: nogc.c config.h values.h
 gctest.o: gctest.c config.h values.h
 

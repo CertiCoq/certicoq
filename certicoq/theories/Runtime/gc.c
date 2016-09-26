@@ -40,6 +40,8 @@ struct heap {
   struct space spaces[MAX_SPACES];
 };
 
+#ifdef DEBUG
+
 int in_heap(struct heap *h, value v) {
   int i;
   for (i=0; i<MAX_SPACES; i++)
@@ -88,7 +90,7 @@ void printroots (FILE *f, struct heap *h,
   fprintf(f,"\n");
 }  
 
-
+#endif
 
 #define Is_from(from_start, from_limit, v)			\
    (from_start <= (value*)(v) && (value*)(v) < from_limit)
@@ -310,7 +312,7 @@ void garbage_collect(const struct fun_info *fi, struct thread_info *ti)
 	int w = h->spaces[i].limit-h->spaces[i].start;
 	create_space(h->spaces+(i+1), gensize(w), 2*w);
       }
-      fprintf(stderr, "At %8x collecting gen. %d; %8x\n", fi->fun, i,h->spaces[i+1].next);
+      /*      fprintf(stderr, "At %8x collecting gen. %d; %8x\n", fi->fun, i,h->spaces[i+1].next); */
       /*      fprintf(stderr,"BEFORE\n"); printroots(stderr,h,fi,ti); */
       /* Copy all the objects in generation i, into generation i+1 */
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);

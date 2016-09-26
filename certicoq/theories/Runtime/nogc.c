@@ -18,7 +18,7 @@ struct heap {
 };
 
 
-void resume(struct fun_info *fi, struct thread_info *ti)
+void resume(const struct fun_info *fi, struct thread_info *ti)
 /* When the garbage collector is all done, it does not "return"
    to the mutator; instead, it uses this function (which does not return)
    to resume the mutator by invoking the continuation, fi->fun.  
@@ -39,10 +39,10 @@ void resume(struct fun_info *fi, struct thread_info *ti)
   f = fi->fun;
   *ti->alloc = lo;
   *ti->limit = hi;
-  (*f)();
+  /*  (*f)(); */
 }  
 
-void garbage_collect(struct fun_info *fi, struct thread_info *ti) {
+void garbage_collect(const struct fun_info *fi, struct thread_info *ti) {
   struct heap *h = ti->heap;
   if (h==NULL) {
     /* If the heap has not yet been initialized, create it and resume */
@@ -52,6 +52,7 @@ void garbage_collect(struct fun_info *fi, struct thread_info *ti) {
     h->limit = h->space+SIZE;
     ti->heap = h;
     resume(fi,ti);
+    return;
   } else {
     fprintf(stderr, "Ran out of heap, and no garbage collector present!\n");
     exit(1);

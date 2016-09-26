@@ -1,4 +1,3 @@
-#include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -17,7 +16,11 @@ struct space {
 #define MAX_SPACES 10  /* how many generations */
 #define RATIO 4   /* size of generation i+1 / size of generation i */
 
+#ifdef TINY_NURSERY
+#define NURSERY_SIZE (12)
+#else
 #define NURSERY_SIZE ((1<<18)/sizeof(value))  /* 256 kilobytes */
+#endif
 /* The size of generation 0 (the "nursery") should approximately match the 
    size of the level-2 cache of the machine, according to:
       Cache Performance of Fast-Allocating Programs, 
@@ -30,12 +33,61 @@ struct space {
     https://en.wikipedia.org/wiki/Nehalem_(microarchitecture)
 */
 
-#define DEPTH 10  /* how much depth-first search to do */
+#define DEPTH 0  /* how much depth-first search to do */
 
 struct heap {
   /* A heap is an array of generations; generation 0 must be already-created */
   struct space spaces[MAX_SPACES];
 };
+
+int in_heap(struct heap *h, value v) {
+  int i;
+  for (i=0; i<MAX_SPACES; i++)
+    if (h->spaces[i].start != NULL)
+      if (h->spaces[i].start <= (value*)v &&
+	  (value *)v <= h->spaces[i].limit)
+	return 1;
+  return 0;
+}
+
+void printtree(FILE *f, struct heap *h, value v) {
+  if(Is_block(v))
+    if (in_heap(h,v)) {
+      header_t hd = Field(v,-1);
+      int sz = Wosize_hd(hd);
+      int i;
+      fprintf(f,"%d(", Tag_hd(hd));
+      for(i=0; i<sz-1; i++) {
+	printtree(f,h,Field(v,i));
+	fprintf(f,",");
+      }
+      if (i<sz)
+	printtree(f,h,Field(v,i));
+      fprintf(f,")");
+    }
+    else {
+      fprintf(f,"%8x",v);
+    }
+  else fprintf(f,"%d",v>>1);
+}
+
+void printroots (FILE *f, struct heap *h,
+		  const struct fun_info *fi,/* which args contain live roots? */
+		  struct thread_info *ti) /* where's the args array? */
+ {
+   value *args; int n; uintnat i, *roots;
+  roots = fi -> indices;
+  n = fi -> num_args;
+  args = ti->args;
+  
+  for(i = 0; i < n; i++) {
+    fprintf(f,"%d[%8x]:",roots[i],args[roots[i]]);
+    printtree(f, h, args[roots[i]]);
+    fprintf(f,"\n");
+  }
+  fprintf(f,"\n");
+}  
+
 
 
 #define Is_from(from_start, from_limit, v)			\
@@ -67,7 +119,7 @@ void forward (value *from_start,  /* beginning of from-space */
 	*p = Field(v,0);
       } else {
 	int i;
-	mlsize_t sz;
+	int sz;
 	value *new;
         sz = Wosize_hd(hd);
 	new = *next+1;
@@ -89,16 +141,16 @@ void forward (value *from_start,  /* beginning of from-space */
 void forward_roots (value *from_start,  /* beginning of from-space */
 		    value *from_limit,  /* end of from-space */
 		    value **next,       /* next available spot in to-space */
-		    struct fun_info *fi,/* which args contain live roots? */
+		    const struct fun_info *fi,/* which args contain live roots? */
 		    struct thread_info *ti) /* where's the args array? */
 /* Forward each live root in the args array */
  {
-  value *args; int n; uintnat *roots;
+   value *args; int n; uintnat i, *roots;
   roots = fi -> indices;
   n = fi -> num_args;
   args = ti->args;
   
-  for(uintnat i = 0; i < n; i++)
+  for(i = 0; i < n; i++)
     forward(from_start, from_limit, next, args+roots[i], DEPTH);
 }  
 
@@ -132,7 +184,7 @@ void do_scan(value *from_start,  /* beginning of from-space */
 	     
 void do_generation (struct space *from,  /* descriptor of from-space */
 		    struct space *to,    /* descriptor of to-space */
-		    struct fun_info *fi, /* which args contain live roots? */
+		    const struct fun_info *fi, /* which args contain live roots? */
 		    struct thread_info *ti)  /* where's the args array? */
 /* Copy the live objects out of the "from" space, into the "to" space,
    using fi and ti to determine the roots of liveness. */
@@ -143,17 +195,11 @@ void do_generation (struct space *from,  /* descriptor of from-space */
   from->next=from->start;
 }  
 
-void create_space(struct space *s,  /* which generation to collect */
-		  uintnat words)    /* size of the next-smaller generation */
-  /* malloc an array of words for generation "s", and
-     set s->start and s->next to the beginning, and s->limit to the end.
-     The size must be at least words*2, at most words*RATIO,
-     preferably words*RATIO.
-  */
-
- {
-  value *p; uintnat n,d;
+uintnat gensize(uintnat words)
+/* words is size of one generation; calculate size of the next generation */
+{
   uintnat maxint = 0u-1u;
+  uintnat n,d;
   /* The next few lines calculate a value "n" that's at least words*2,
      preferably words*RATIO, and without overflowing the size of an
      unsigned integer. */
@@ -166,18 +212,31 @@ void create_space(struct space *s,  /* which generation to collect */
   if (words<d) d=words;
   n = d*RATIO;
   assert (n >= 2*words);
+  return n;
+}  
+
+void create_space(struct space *s,  /* which generation to create */
+		  uintnat n,  /* desired size of the generation */
+		  uintnat min_n) /* min size of the generation */
+  /* malloc an array of words for generation "s", and
+     set s->start and s->next to the beginning, and s->limit to the end.
+  */
+
+ {
+  value *p;
 
   /* Now, try to malloc an array of n values.  If that's not possible,
    * then set n=2*words, and try again. */
   p = (value *)malloc(n * sizeof(value));
   if (p==NULL) {
-    n = 2*words;
-    p = (value *)malloc(n * sizeof(value));
+    n=min_n;
+    p = (value *)malloc(min_n * sizeof(value));
   }
   if (p==NULL) {
     fprintf(stderr,"Could not create the next generation\n");
     exit(1);
   }
+  fprintf(stderr, "Created a generation of %d words\n", n);
   s->start=p;
   s->next=p;
   s->limit = p+n;
@@ -193,7 +252,7 @@ struct heap *create_heap()
     fprintf(stderr,"Could not create the heap\n");
     exit(1);
   }
-  create_space(h->spaces+0, NURSERY_SIZE);
+  create_space(h->spaces+0, NURSERY_SIZE, NURSERY_SIZE);
   for(i=1; i<MAX_SPACES; i++) {
     h->spaces[i].start = NULL;
     h->spaces[i].next = NULL;
@@ -202,7 +261,7 @@ struct heap *create_heap()
   return h;
 }
 
-void resume(struct fun_info *fi, struct thread_info *ti)
+void resume(const struct fun_info *fi, struct thread_info *ti)
 /* When the garbage collector is all done, it does not "return"
    to the mutator; instead, it uses this function (which does not return)
    to resume the mutator by invoking the continuation, fi->fun.  
@@ -223,10 +282,10 @@ void resume(struct fun_info *fi, struct thread_info *ti)
   f = fi->fun;
   *ti->alloc = lo;
   *ti->limit = hi;
-  (*f)();
+  /*  (*f)(); */
 }  
 
-void garbage_collect(struct fun_info *fi, struct thread_info *ti)
+void garbage_collect(const struct fun_info *fi, struct thread_info *ti)
 /* See the header file for the interface-spec of this function. */
 {
   struct heap *h = ti->heap;
@@ -235,10 +294,11 @@ void garbage_collect(struct fun_info *fi, struct thread_info *ti)
     h = create_heap();
     ti->heap = h;
     resume(fi,ti);
+    return;
   } else {
     int i;
     assert (h->spaces[0].limit == *ti->limit);
-    h->spaces[0].next = *ti->alloc; /* this line is probably unecessary */
+    h->spaces[0].next = *ti->alloc; /* this line is probably unnecessary */
     for (i=0; i<MAX_SPACES-1; i++) {
       /* Starting with the youngest generation, collect each generation
          into the next-older generation.  Usually, when doing that,
@@ -246,17 +306,29 @@ void garbage_collect(struct fun_info *fi, struct thread_info *ti)
          so that we can break the loop by resuming the mutator. */
 
       /* If the next generation does not yet exist, create it */
-      if (h->spaces[i+1].start==NULL)
-	create_space(h->spaces+(i+1), h->spaces[i].limit-h->spaces[i].start);
-
+      if (h->spaces[i+1].start==NULL) {
+	int w = h->spaces[i].limit-h->spaces[i].start;
+	create_space(h->spaces+(i+1), gensize(w), 2*w);
+      }
+      fprintf(stderr, "At %8x collecting gen. %d; %8x\n", fi->fun, i,h->spaces[i+1].next);
+      /*      fprintf(stderr,"BEFORE\n"); printroots(stderr,h,fi,ti); */
       /* Copy all the objects in generation i, into generation i+1 */
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
-
+      /*      printroots(stderr,h,fi,ti); */
+      /*      fprintf(stderr, " %8x %8x %8x %8x %8x\n",
+	      h->spaces[i].start,
+	      h->spaces[i].limit,
+	      h->spaces[i+1].start,
+	      h->spaces[i+1].next,
+	      h->spaces[i+1].limit);
+      */
       /* If there's enough space in gen i+1 to guarantee that the
          NEXT collection into i+1 will succeed, we can stop here */
       if (h->spaces[i].limit - h->spaces[i].start
-	  <= h->spaces[i+1].limit - h->spaces[i+1].next)
-	resume(fi,ti);
+	  <= h->spaces[i+1].limit - h->spaces[i+1].next) {
+	 resume(fi,ti);
+	 return;
+      }
     }
     /* If we get to i==MAX_SPACES, that's bad news */
     fprintf(stderr, "Ran out of generations\n");

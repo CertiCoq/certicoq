@@ -123,7 +123,7 @@ struct thread_info my_thread_info =
     {my_args, 987, &my_start, &my_limit, NULL};
 */
 
-void garbage_collect(struct fun_info *fi, struct thread_info *ti);
+void garbage_collect(const struct fun_info *fi, struct thread_info *ti);
 /* Performs one garbage collection; 
    or if ti->heap==NULL, initializes the heap. 
 

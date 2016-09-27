@@ -10,7 +10,7 @@
    that does no garbage collection.  Useful for debugging 
    both programs and proofs. */
 
-#define SIZE (1<<21)  /* 2 million words */
+#define SIZE (1<<24)  /* 16 million words */
 
 struct heap {
   value *start, *next, *limit;

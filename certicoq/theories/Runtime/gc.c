@@ -14,12 +14,14 @@ struct space {
    and initialized, and the words from next..limit are available to allocate. */
 
 #define MAX_SPACES 10  /* how many generations */
-#define RATIO 4   /* size of generation i+1 / size of generation i */
 
-#ifdef TINY_NURSERY
-#define NURSERY_SIZE (12)
-#else
-#define NURSERY_SIZE ((1<<18)/sizeof(value))  /* 256 kilobytes */
+#ifndef RATIO
+#define RATIO 2   /* size of generation i+1 / size of generation i */
+/*  Using RATIO=2 is faster than larger ratios, empirically */
+#endif
+
+#ifndef NURSERY_SIZE
+#define NURSERY_SIZE ((1<<21)/sizeof(value))  /* 2 megabytes */
 #endif
 /* The size of generation 0 (the "nursery") should approximately match the 
    size of the level-2 cache of the machine, according to:
@@ -31,9 +33,13 @@ struct space {
      (which is the size of the Intel Core i7 per-core L2 cache).
     http://www.tomshardware.com/reviews/Intel-i7-nehalem-cpu,2041-10.html
     https://en.wikipedia.org/wiki/Nehalem_(microarchitecture)
+  Notwithstanding those results, empirical measurements show that 
+   2 megabytes works fastest.
 */
 
+#ifndef DEPTH
 #define DEPTH 0  /* how much depth-first search to do */
+#endif
 
 struct heap {
   /* A heap is an array of generations; generation 0 must be already-created */
@@ -91,6 +97,11 @@ void printroots (FILE *f, struct heap *h,
 }  
 
 #endif
+
+void abort_with(char *s) {
+  fprintf(stderr, s);
+  exit(1);
+}
 
 #define Is_from(from_start, from_limit, v)			\
    (from_start <= (value*)(v) && (value*)(v) < from_limit)
@@ -197,6 +208,9 @@ void do_generation (struct space *from,  /* descriptor of from-space */
   from->next=from->start;
 }  
 
+#if 0
+/* This "gensize" function is only useful if the desired ratio is >2,
+   but empirical measurements show that ratio=2 is better than ratio>2. */
 uintnat gensize(uintnat words)
 /* words is size of one generation; calculate size of the next generation */
 {
@@ -206,39 +220,28 @@ uintnat gensize(uintnat words)
      preferably words*RATIO, and without overflowing the size of an
      unsigned integer. */
   /* minor bug:  this assumes sizeof(uintnat)==sizeof(void*)==sizeof(value) */
-  if (words > maxint/(2*sizeof(value))) {
-    fprintf(stderr,"Next generation would be too big for address space\n");
-    exit(1);
-  }
+  if (words > maxint/(2*sizeof(value)))
+    abort_with("Next generation would be too big for address space\n");
   d = maxint/RATIO;
   if (words<d) d=words;
   n = d*RATIO;
   assert (n >= 2*words);
   return n;
 }  
+#endif
 
 void create_space(struct space *s,  /* which generation to create */
-		  uintnat n,  /* desired size of the generation */
-		  uintnat min_n) /* min size of the generation */
+		  uintnat n) /* size of the generation */
   /* malloc an array of words for generation "s", and
      set s->start and s->next to the beginning, and s->limit to the end.
   */
 
  {
   value *p;
-
-  /* Now, try to malloc an array of n values.  If that's not possible,
-   * then set n=2*words, and try again. */
   p = (value *)malloc(n * sizeof(value));
-  if (p==NULL) {
-    n=min_n;
-    p = (value *)malloc(min_n * sizeof(value));
-  }
-  if (p==NULL) {
-    fprintf(stderr,"Could not create the next generation\n");
-    exit(1);
-  }
-  fprintf(stderr, "Created a generation of %d words\n", n);
+  if (p==NULL)
+    abort_with ("Could not create the next generation\n");
+  /*  fprintf(stderr, "Created a generation of %d words\n", n); */
   s->start=p;
   s->next=p;
   s->limit = p+n;
@@ -250,11 +253,9 @@ struct heap *create_heap()
 {
   int i;
   struct heap *h = (struct heap *)malloc(sizeof (struct heap));
-  if (h==NULL) {
-    fprintf(stderr,"Could not create the heap\n");
-    exit(1);
-  }
-  create_space(h->spaces+0, NURSERY_SIZE, NURSERY_SIZE);
+  if (h==NULL)
+    abort_with("Could not create the heap\n");
+  create_space(h->spaces+0, NURSERY_SIZE);
   for(i=1; i<MAX_SPACES; i++) {
     h->spaces[i].start = NULL;
     h->spaces[i].next = NULL;
@@ -277,10 +278,8 @@ void resume(const struct fun_info *fi, struct thread_info *ti)
   assert (h);
   lo = h->spaces[0].start;
   hi = h->spaces[0].limit;
-  if (hi-lo < fi->num_allocs) {
-    fprintf(stderr, "Nursery is too small for function's num_allocs\n");
-    exit(1);
-  }
+  if (hi-lo < fi->num_allocs)
+    abort_with ("Nursery is too small for function's num_allocs\n");
   f = fi->fun;
   *ti->alloc = lo;
   *ti->limit = hi;
@@ -310,20 +309,10 @@ void garbage_collect(const struct fun_info *fi, struct thread_info *ti)
       /* If the next generation does not yet exist, create it */
       if (h->spaces[i+1].start==NULL) {
 	int w = h->spaces[i].limit-h->spaces[i].start;
-	create_space(h->spaces+(i+1), gensize(w), 2*w);
+	create_space(h->spaces+(i+1), RATIO*w);
       }
-      /*      fprintf(stderr, "At %8x collecting gen. %d; %8x\n", fi->fun, i,h->spaces[i+1].next); */
-      /*      fprintf(stderr,"BEFORE\n"); printroots(stderr,h,fi,ti); */
       /* Copy all the objects in generation i, into generation i+1 */
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
-      /*      printroots(stderr,h,fi,ti); */
-      /*      fprintf(stderr, " %8x %8x %8x %8x %8x\n",
-	      h->spaces[i].start,
-	      h->spaces[i].limit,
-	      h->spaces[i+1].start,
-	      h->spaces[i+1].next,
-	      h->spaces[i+1].limit);
-      */
       /* If there's enough space in gen i+1 to guarantee that the
          NEXT collection into i+1 will succeed, we can stop here */
       if (h->spaces[i].limit - h->spaces[i].start
@@ -333,8 +322,7 @@ void garbage_collect(const struct fun_info *fi, struct thread_info *ti)
       }
     }
     /* If we get to i==MAX_SPACES, that's bad news */
-    fprintf(stderr, "Ran out of generations\n");
-    exit(1);
+    abort_with("Ran out of generations\n");
   }
   /* Can't reach this point */
   assert(0);

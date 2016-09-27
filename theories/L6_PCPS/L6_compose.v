@@ -35,8 +35,7 @@ Section L6_trans.
         forall rho1 B1 f1 rho2 B2 f2,
           obs_rel (Vfun rho1 B1 f1) (Vfun rho2 B2 f2)
     | Obs_int :
-        forall z1 z2,
-          obs_rel (Vint z1) (Vint z2).
+        forall z, obs_rel (Vint z) (Vint z).
     
     (** Observation relation for closure conversion *)
     Inductive obs_rel_cc : val -> val -> Prop :=
@@ -52,8 +51,7 @@ Section L6_trans.
           obs_rel_cc (Vfun rho1 B1 f1)
                      (Vconstr c1 ((Vfun rho2 B2 f2) :: (Vconstr c2 vs) :: l))
     | Obscc_int :
-        forall z1 z2,
-          obs_rel_cc (Vint z1) (Vint z2).
+        forall z, obs_rel_cc (Vint z) (Vint z).
     
 
     (** [obs_rel] is reflexive *)
@@ -128,7 +126,7 @@ Section L6_trans.
         { eapply IHv0. rewrite preord_val_eq. constructor; eauto. }
         inv H; eauto.
       - destruct v2; simpl in *; try contradiction. constructor.
-      - destruct v2; simpl in *; try contradiction. constructor.
+      - destruct v2; simpl in *; try contradiction. subst. constructor.
     Qed.
 
     (** The closure conversion logical relation implies [obs_rel_cc] *)
@@ -149,7 +147,7 @@ Section L6_trans.
         destruct l; simpl in *; try contradiction.
         destruct v1; simpl in *; try contradiction.        
         constructor.
-      - destruct v2; simpl in *; try contradiction. constructor.
+      - destruct v2; simpl in *; try contradiction. subst. constructor.
     Qed.    
 
     (** Top level correctness property of closure conversion and hoisting for closed terms *)

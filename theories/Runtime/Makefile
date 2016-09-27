@@ -1,6 +1,8 @@
-# CC= /cygdrive/d/compcert/ccomp
 CC=gcc
-CFLAGS=  -m32 -O2
+CFLAGS=  -g -O3
+
+# CFLAGS=  -m32 -g -O3   ///use this for 32-bit x86 mode
+
 
 all: gc.o nogc.o gctest
 

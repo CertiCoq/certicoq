@@ -168,18 +168,17 @@ Section TrueFV.
         let '(scope', fvset') := fundefs_true_fv_aux defs scope fvset in 
         exp_true_fv_aux e scope' fvset'
       | Eapp x ft xs =>
-        let tfvs := match fvmap ! x with
+        let fvs := match fvmap ! x with
                       | Some inf =>
                         match inf with
-                          | Fun f' ft' fvs => fvs
-                          | _ => []
+                          | Fun f' ft' fvs => f' :: fvs
+                          | _ => [x]
                         end
-                      | None => []
+                      | None => [x]
                     end
         in
-        let fvset' := add_list scope fvset tfvs in 
-        let fvset'' := add_list scope fvset' xs in 
-        if mem x scope then fvset'' else x :: fvset''
+        let fvset' := add_list scope fvset fvs in 
+        add_list scope fvset' xs
       | Eprim x prim ys e =>
         let fvset' := add_list scope fvset ys in 
         exp_true_fv_aux e (add x scope) fvset'
@@ -304,15 +303,31 @@ Inductive Add_functions :
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Ensembles.In _ S' f' ->
       Add_functions (Fcons f ft xs e B) fvs σ ζ S
-                    (σ' {f ~> f}) (ζ' {f ~> Some (f', ft', fvs)})
+                    (σ' {f ~> f} {f' ~> f'}) (ζ' {f ~> Some (f', ft', fvs)})
                     (Setminus _ S' (Singleton _ f'))
 | Add_Fnil :
     forall fvs σ ζ S,
       Add_functions Fnil fvs σ ζ S σ ζ S.
 
-(* (* Map from the original name to the list of free vars *) *)
-(* Definition free_vars (ζ : var -> option (var * fTag * list var)) : var -> option (list var) := *)
-(*   fun f => (liftM (fun x => snd x)) (ζ f). *)
+(* Map from the original name to the name of the lifted function *)
+Definition lifted_name (ζ : var -> option (var * fTag * list var)) : var -> option var :=
+  fun f => (liftM (fun x => (fst (fst x)))) (ζ f).
+
+(* Map from the original name to the list of free vars *)
+Definition free_vars (ζ : var -> option (var * fTag * list var)) : var -> option (list var) :=
+  fun f => (liftM (fun x => snd x)) (ζ f).
+
+(** The domain of ζ *)
+Definition Funs (ζ : var -> option (var * fTag * list var)) : Ensemble var :=
+  domain (lifted_name ζ).
+
+(** The image of ζ on its domain - i.e. the names of the lifted functions *)
+Definition LiftedFuns (ζ : var -> option (var * fTag * list var)) : Ensemble var :=
+  image' (lifted_name ζ) (Funs ζ).
+
+(**  The free variables of functions in ζ, alternative definition *)
+Definition FunsFVsLst (ζ : var -> option (var * fTag * list var)) : Ensemble (list var) :=
+  fun fvs => exists f f' ft', ζ f = Some (f', ft', fvs).
 
 (**  The free variables of functions in ζ *)
 Definition FunsFVs (ζ : var -> option (var * fTag * list var)) : Ensemble var :=
@@ -345,7 +360,8 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Eproj x t N y e) S (Eproj x t N (σ y) e') S'
 | LL_Efun :
     forall B B' e e' σ σ' ζ ζ' fvs S S' S'' S''',
-      Included _ (FromList fvs) (Union _ (occurs_free_fundefs B) (FunsFVs ζ)) ->
+      Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
+                                       (Union _ (FunsFVs ζ) (LiftedFuns ζ))) ->
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift ζ' σ' B S' B' S'' ->
@@ -354,7 +370,7 @@ Inductive Exp_lambda_lift :
 | LL_Eapp_known :
     forall ζ σ f ft xs f' ft' fvs S,
       ζ f = Some (f', ft', fvs) -> 
-      Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp f' ft' (map σ (xs ++ fvs))) S
+      Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp (σ f') ft' (map σ (xs ++ fvs))) S
 | LL_Eapp_unknown :
     forall ζ σ f ft xs S,
       ζ f = None -> 

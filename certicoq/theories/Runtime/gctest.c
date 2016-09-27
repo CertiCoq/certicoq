@@ -122,7 +122,7 @@ void insert() {
 }
 
 uintnat roots_insert_left[] = {4,5};
-const struct fun_info fi_insert_left = {insert, 4, 2, roots_insert_left};
+const struct fun_info fi_insert_left = {insert_left, 4, 2, roots_insert_left};
 
 void insert_left(void) {
   value k, e, t, u, right, contf, conte;
@@ -140,7 +140,7 @@ void insert_left(void) {
 }
 
 uintnat roots_insert_right[] = {4,5};
-const struct fun_info fi_insert_right = {insert, 4, 2, roots_insert_right};
+const struct fun_info fi_insert_right = {insert_left, 4, 2, roots_insert_right};
 
 void insert_right(void) {
   value k, e, u, t, left, contf, conte;

@@ -1,0 +1,57 @@
+Notes on the speed of CertiCoq generated code.
+
+Experiment:
+Write some C code similar to what we expect from the CertiCoq code generator,
+compile it with gcc, measure performance.  (Expect similar results
+using CompCert instead of gcc, except as noted below.)
+
+Program to be measured: as illustrated by this Ocaml program (ocamltest.ml):
+
+type tree = Leaf | Node of int * tree * tree
+
+let rec insert (key: int) (t: tree) : tree =
+ match t with
+  Leaf -> Node(key,Leaf,Leaf)
+ | Node(k,left,right) ->
+    if (key<k) then Node(k, insert key left, right)
+    else if (k<key) then Node (k, left, insert key right)
+    else t
+
+let rec build (n: int) (t: tree) : tree =
+ if n>0 then build (n-1) (insert (Random.int 1000) t)
+ else t
+
+let rec measure (t: tree) : int =
+ match t with Leaf -> 0 
+            | Node (_,left,right) -> 1 + measure left + measure right
+
+let () =
+  let n = int_of_string (Sys.argv.(1)) in
+  let t = build n Leaf in
+  let s = measure t in
+  (print_string "Tree has "; print_int s; print_string "nodes\n")
+
+The C program is in gctest.c.  
+A modified version, passing up to 6 arguments in registers, is in gctest2.c.
+The modified version works in x86-64 mode with Linux calling conventions
+(less efficient in the x86-64 Windows calling conventions that cygwin uses).
+This modified version will be compatible with a near-future 64-bit release
+of CompCert.
+
+The garbage collector is in gc.c.
+
+PERFORMANCE is measured by "make time", which
+runs the program (above) with n=10^7.
+
+Results:
+Predicted 0-argument Certicoq->C performance: 3.12 sec
+Predicted 6-argument Certicoq->C performance: 3.00 sec
+Native-code compiled Ocaml performance:       1.38 sec
+Byte-code compiled Ocaml performance:         4.96 sec
+
+Garbage collector:
+In that run of the 0-argument Certicoq->C model,
+35% of the time is spent in the garbage collector,
+as measured by the "oprofile" tool.
+
+

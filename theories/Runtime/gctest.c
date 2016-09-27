@@ -114,9 +114,8 @@ void insert() {
       args[4]=e;
       jump(insert);
     } else {
-      value u = cons3(0,k,left,right);
       args[4]=conte;
-      args[5]=u;
+      args[5]=t;
       jump(contf);
     }
   }

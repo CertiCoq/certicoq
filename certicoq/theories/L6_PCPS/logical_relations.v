@@ -2340,7 +2340,6 @@ Section Log_rel.
     - inv Hnth; eauto.
     - eapply IHl; eauto.  
   Qed. 
-
   
   Lemma cc_approx_exp_respects_preord_exp_r_pre (k : nat)
         (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :

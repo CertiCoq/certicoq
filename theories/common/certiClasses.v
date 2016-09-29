@@ -3,7 +3,7 @@ Require Import Common.exceptionMonad.
 Require Import Common.AstCommon.
 
 
-Class WellFormed (Term: Type) := wf : Term  -> Prop. 
+Class WellFormed (Term: Type) := wf : Term  -> Prop.
 
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
@@ -170,12 +170,17 @@ Should we allow some computation when making observation, especially on subterms
 When we add cofix/coinductives/effects, this may become necessary.
 *)
 
-Definition Observation :Set := option (inductive * nat).
-
-Class ObserveHead (Value:Type) := observeHead: Value -> Observation.
 
 (* observe subterms for a constructor. return [] if the value is not a constructor. *)
 Class ObserveSubterms (Value:Type) := observeSubterms: Value -> list Value.
+
+Section Observation.
+
+Variable NonTrivObservation:Type.
+
+Let Observation :Type := option NonTrivObservation.
+
+Class ObserveHead (Value:Type) := observeHead: Value -> Observation.
 
 Require Import List.
 (* Coinductive, in case we add support for Coq's coinductive types lateron *)
@@ -208,7 +213,7 @@ Definition obsPreserving
     -> (s ⇓ sv)
     -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ⊑ dv.
 
-Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
+Global Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
 
 Class CerticoqLanguage2 `{BigStepHetero Term Value} `{WellFormed Term} 
    `{ObserveHead Value} `{ObserveSubterms Value} 
@@ -240,7 +245,7 @@ Class CerticoqTranslationCorrect2 Src SrcValue Dst DstValue S1 S2 S3 S4 D1 D2 D3
   here cuts down a lot of verbosity (by using `, which doesn't work with @) 
   in some definitions below.
  *)
-Arguments CerticoqLanguage2 Term Value {H} {H0} {H1} {H2}.
+Global Arguments CerticoqLanguage2 Term Value {H} {H0} {H1} {H2}.
 
 Class CerticoqTranslationCorrect2
   `{CerticoqLanguage2 Src SrcValue} 
@@ -251,11 +256,12 @@ Class CerticoqTranslationCorrect2
   obsePres : obsPreserving Src Dst;
 }.
 
-Arguments CerticoqTranslationCorrect2
-  Src {SrcValue} {H} {H0} {H1} {H2} {H3} Dst {DstValue} {H4} {H5} {H6} {H7} {H8} {H9}.
+Global Arguments CerticoqTranslationCorrect2
+  {Src} {SrcValue} {H} {H0} {H1} {H2} H3 {Dst} {DstValue} {H4} {H5} {H6} {H7} H8 {H9}.
 
 (*
-Does not have a any theory of heterigeneous relations. Niether does MathClasses.
+Coq.Classes.RelationClasses does not have a any theory of heterigeneous relations.
+Niether does MathClasses.
 Require Import Coq.Classes.RelationClasses.
 *)
 
@@ -290,16 +296,19 @@ eapply obsLeTrns.
 *)
 Qed.
 
-Instance composeCerticoqTranslationCorrect2
-  `{CerticoqLanguage2 Src SrcValue}
-  `{CerticoqLanguage2 Inter InterValue}
-  `{CerticoqLanguage2 Dst DstValue}
+(* making it global can cause ambiguities – see below *)
+(* The proof of [obsPreserving] needs the proof of [wfPreserving]. So the former
+cannot be done in isolation *)
+Local Instance composeCerticoqTranslationCorrect2
+  `{Ls: CerticoqLanguage2 Src SrcValue}
+  `{Li: CerticoqLanguage2 Inter InterValue}
+  `{Ld: CerticoqLanguage2 Dst DstValue}
   {t1 : CerticoqTranslation Src Inter}
   {t2 : CerticoqTranslation Inter Dst}
 (* we don't anymore need a translation for the value type, although typically Src=SrcValue*)
-  {Ht1: CerticoqTranslationCorrect2 Src Inter}
-  {Ht2: CerticoqTranslationCorrect2 Inter Dst}
-    : CerticoqTranslationCorrect2 Src Dst.
+  {Ht1: CerticoqTranslationCorrect2 Ls Li}
+  {Ht2: CerticoqTranslationCorrect2 Li Ld}
+    : CerticoqTranslationCorrect2 Ls Ld.
 Proof.
   destruct Ht1, Ht2.
   constructor;[eapply composePreservesWf; eauto; fail|].
@@ -319,11 +328,137 @@ Proof.
   eapply obsLeTrns with (i:=iv); eauto.
 Qed.
 
+End Observation.
+
+Require Import Program.Basics.
+
+Open Scope program_scope.
+
+
+Section WeakenObservation.
+(* f weakens observations *)
+Context {Obs1 Obs2 : Type} (f : Obs1 -> Obs2).
+
+Local Instance weakenObserveHead {Value} 
+  {_ :ObserveHead Obs1 Value} : ObserveHead Obs2 Value :=
+  (option_map f)  ∘ (observeHead Obs1).
+
+(* post composing the observeHead function preserves [obsLe] (⊑) *)
+Lemma obsLeWeakenObs
+   `{os: ObserveHead Obs1 SrcValue} `{ObserveSubterms SrcValue} 
+   `{od : ObserveHead Obs1 DstValue} `{ObserveSubterms DstValue}
+    (s : SrcValue) (d : DstValue) :
+    obsLe Obs1 s d
+    -> obsLe Obs2 s d.
+Proof.
+  revert d. revert s.
+  cofix. intros ? ? Ha.
+  inversion Ha as [ss is Hah Has]. subst. clear Ha.
+  simpl in *. 
+  constructor; simpl;[| split; try tauto].
+- clear Has. unfold observeHead, weakenObserveHead, observeHead, compose in *.
+  destruct (os s); [| auto]. simpl. rewrite Hah. reflexivity.
+- clear Hah. destruct Has as [Hasl Has].
+  info_eauto.
+(* info eauto : 
+intro.
+intro.
+apply certicoqTranslationCorrectWeakenObs.
+ apply Has.
+  exact H1.
+*)
+Qed.
+
+Lemma obsPreservingWeakenObs
+  `{CerticoqTranslation Src Dst} 
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{WellFormed Src}
+   `{os: ObserveHead Obs1 SrcValue} `{ObserveSubterms SrcValue} 
+   `{od: ObserveHead Obs1 DstValue} `{ObserveSubterms DstValue}:
+    obsPreserving Obs1 Src Dst
+    -> obsPreserving Obs2 Src Dst.
+Proof.
+  intros Ho ? ? Hwf He.
+  specialize (Ho _ _ Hwf He). clear Hwf He.
+  destruct Ho as [dv Hev].
+  exists dv.
+  split;[tauto|]. apply proj2 in Hev.
+  apply obsLeWeakenObs. assumption.
+Qed.
+
+Local Instance CerticoqLanguage2WeakenObs 
+  `(CerticoqLanguage2 Obs1 Term Value)
+  : `{CerticoqLanguage2 Obs2 Term Value} := {}.
+
+Local Instance certicoqTranslationCorrectWeakenObs
+  `{Ls: CerticoqLanguage2 Obs1 Src SrcValue}
+  `{Ld: CerticoqLanguage2 Obs1 Dst DstValue}
+  {t1 : CerticoqTranslation Src Dst}
+  {Ht1: CerticoqTranslationCorrect2 Obs1 Ls Ld}
+   : CerticoqTranslationCorrect2 
+      Obs2 
+      (CerticoqLanguage2WeakenObs Ls) 
+      (CerticoqLanguage2WeakenObs Ld).
+Proof using.
+  destruct Ht1.
+  constructor;[assumption|]. (* wf is independent of observations *)
+  apply obsPreservingWeakenObs. assumption.
+Qed.
+
+End WeakenObservation.
+
+(*Here are 2 specializations of interest: *)
+Definition StrongObservation :Set 
+    := inductive * nat. (* nth constructor of a known inductive type*)
+Definition Observation :Set := nat. (* nth constructor of an unknown inductive type*)
+
+Notation "s ⊑ t" := (obsLe Observation s t) (at level 65).
+
+(*
+Fail Global Existing Instance
+  @weakenObserveHead StrongObservation Observation snd) *)
+
+(* To declare the application as a typeclass instances, 
+    Coq forces us to give it a name *)
+Let weakenObserveHeadInst := 
+  (@weakenObserveHead StrongObservation Observation snd).
+
+Let CerticoqLanguage2WeakenObsInst := 
+  (@CerticoqLanguage2WeakenObs StrongObservation Observation snd).
+
+Let certicoqTranslationCorrectWeakenObsInst := 
+  (@certicoqTranslationCorrectWeakenObs StrongObservation Observation snd).
+
+Global Existing Instances
+ weakenObserveHeadInst
+ CerticoqLanguage2WeakenObsInst
+ certicoqTranslationCorrectWeakenObsInst.
+
+Let composeCerticoqTranslationCorrect2Inst := 
+  (@composeCerticoqTranslationCorrect2 Observation).
+
+(* To avoid ambiguities in typeclass resolution, we only add
+@composeCerticoqTranslationCorrect2 Observation to the resolution DB,
+not @composeCerticoqTranslationCorrect2 StrongObservation,
+or @composeCerticoqTranslationCorrect2 *)
+
+Global Existing Instance composeCerticoqTranslationCorrect2Inst.
+
+
+(* 
+Notation "s =⊏  t" := (obsLe StrongObservation s t) (at level 65). 
+*)
+
+(*
+Arguments CerticoqTranslationCorrect2 NonTrivObservation
+  Src {SrcValue} {H} {H0} {H1} {H2} {H3} Dst {DstValue} {H4} {H5} {H6} {H7} {H8} {H9}.
+Arguments CerticoqLanguage2 Term Value {H} {H0} {H1} {H2}.
+Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
+*)
 
 
 Instance  BigStepOpWEnv (Term:Set) (ev: (environ Term) -> Term -> Term -> Prop) :
   BigStepOpSem (Program Term) :=
-fun p1 p2 => ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
+λ p1 p2, ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
 
 Definition normalizes `{BigStepHetero Term Value} (s:Term): Prop :=
 ∃ (sv : Value) , s ⇓ sv.

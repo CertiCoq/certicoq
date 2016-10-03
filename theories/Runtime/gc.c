@@ -80,13 +80,13 @@ void printtree(FILE *f, struct heap *h, value v) {
 }
 
 void printroots (FILE *f, struct heap *h,
-		  const struct fun_info *fi,/* which args contain live roots? */
+		  fun_info fi,   /* which args contain live roots? */
 		  struct thread_info *ti) /* where's the args array? */
  {
    value *args; int n; uintnat i, *roots;
-  roots = fi -> indices;
-  n = fi -> num_args;
-  args = ti->args;
+   roots = fi+2;
+   n = fi[1];
+   args = ti->args;
   
   for(i = 0; i < n; i++) {
     fprintf(f,"%d[%8x]:",roots[i],args[roots[i]]);
@@ -154,14 +154,14 @@ void forward (value *from_start,  /* beginning of from-space */
 void forward_roots (value *from_start,  /* beginning of from-space */
 		    value *from_limit,  /* end of from-space */
 		    value **next,       /* next available spot in to-space */
-		    const struct fun_info *fi,/* which args contain live roots? */
+		    fun_info fi,        /* which args contain live roots? */
 		    struct thread_info *ti) /* where's the args array? */
 /* Forward each live root in the args array */
  {
-   value *args; int n; uintnat i, *roots;
-  roots = fi -> indices;
-  n = fi -> num_args;
-  args = ti->args;
+   value *args; int n; uintnat i;
+   const uintnat *roots = fi+2;
+   n = fi[1];
+   args = ti->args;
   
   for(i = 0; i < n; i++)
     forward(from_start, from_limit, next, args+roots[i], DEPTH);
@@ -197,7 +197,7 @@ void do_scan(value *from_start,  /* beginning of from-space */
 	     
 void do_generation (struct space *from,  /* descriptor of from-space */
 		    struct space *to,    /* descriptor of to-space */
-		    const struct fun_info *fi, /* which args contain live roots? */
+		    fun_info fi,         /* which args contain live roots? */
 		    struct thread_info *ti)  /* where's the args array? */
 /* Copy the live objects out of the "from" space, into the "to" space,
    using fi and ti to determine the roots of liveness. */
@@ -264,7 +264,7 @@ struct heap *create_heap()
   return h;
 }
 
-void resume(const struct fun_info *fi, struct thread_info *ti)
+void resume(fun_info fi, struct thread_info *ti)
 /* When the garbage collector is all done, it does not "return"
    to the mutator; instead, it uses this function (which does not return)
    to resume the mutator by invoking the continuation, fi->fun.  
@@ -272,21 +272,19 @@ void resume(const struct fun_info *fi, struct thread_info *ti)
    of the new values for the alloc and limit pointers.
 */
  {
-  void (*f)(void);
   struct heap *h = ti->heap;
   value *lo, *hi;
+  uintnat num_allocs = fi[0];
   assert (h);
   lo = h->spaces[0].start;
   hi = h->spaces[0].limit;
-  if (hi-lo < fi->num_allocs)
+  if (hi-lo < num_allocs)
     abort_with ("Nursery is too small for function's num_allocs\n");
-  f = fi->fun;
   *ti->alloc = lo;
   *ti->limit = hi;
-  /*  (*f)(); */
 }  
 
-void garbage_collect(const struct fun_info *fi, struct thread_info *ti)
+void garbage_collect(fun_info fi, struct thread_info *ti)
 /* See the header file for the interface-spec of this function. */
 {
   struct heap *h = ti->heap;

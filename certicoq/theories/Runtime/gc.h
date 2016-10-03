@@ -88,12 +88,11 @@ recent collection.
 To call the garbage collector, the mutator passes a fun_info and
 a thread_info, as follows. */
 
-struct fun_info {
-  void (*fun)(void);  /* What function to run after collecting */
-  uintnat num_allocs; /* How many words that function might allocate */
-  uintnat num_args;   /* How many slots of the args array contain live roots */
-  uintnat *indices;   /* Exactly which slots contain live roots */
-};
+typedef const uintnat *fun_info;
+/* fi[0]: How many words the function might allocate
+   fi[1]: How many slots of the args array contain live roots
+   fi[2..(fi[1]-2)]: Indices of the live roots in the args array
+*/
 
 struct heap;     /* abstract, opaque */
 
@@ -123,7 +122,7 @@ struct thread_info my_thread_info =
     {my_args, 987, &my_start, &my_limit, NULL};
 */
 
-void garbage_collect(const struct fun_info *fi, struct thread_info *ti);
+void garbage_collect(fun_info fi, struct thread_info *ti);
 /* Performs one garbage collection; 
    or if ti->heap==NULL, initializes the heap. 
 

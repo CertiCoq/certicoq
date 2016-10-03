@@ -5,14 +5,15 @@
 #include "values.h"
 #include "gc.h"
 
-value *alloc, *limit;
-
 #define Null ((value)1)
 
+value *alloc, *limit;
 #define NARGS 100
 value args[NARGS];
+struct thread_info tinfo = {args,NARGS,&alloc, &limit, NULL};
 
-value cons1(unsigned char c, value a1) {
+
+inline static value cons1(unsigned char c, value a1) {
   value *p;
   p=alloc;
   alloc+=2;
@@ -21,7 +22,7 @@ value cons1(unsigned char c, value a1) {
   return (value) (p+1);
 }
 
-value cons2(unsigned char c, value a1, value a2) {
+inline static value cons2(unsigned char c, value a1, value a2) {
   value *p;
   p=alloc;
   alloc+=3;
@@ -31,7 +32,7 @@ value cons2(unsigned char c, value a1, value a2) {
   return (value) (p+1);
 }
 
-value cons3(unsigned char c, value a1, value a2, value a3) {
+inline static value cons3(unsigned char c, value a1, value a2, value a3) {
   value *p;
   p=alloc;
   alloc+=4;
@@ -42,7 +43,7 @@ value cons3(unsigned char c, value a1, value a2, value a3) {
   return (value) (p+1);
 }
 
-value cons4(unsigned char c, value a1, value a2, value a3, value a4) {
+inline static value cons4(unsigned char c, value a1, value a2, value a3, value a4) {
   value *p;
   p=alloc;
   alloc+=5;
@@ -54,7 +55,7 @@ value cons4(unsigned char c, value a1, value a2, value a3, value a4) {
   return (value) (p+1);
 }
 
-value cons5(unsigned char c, value a1, value a2, value a3, value a4, value a5) {
+inline static value cons5(unsigned char c, value a1, value a2, value a3, value a4, value a5) {
   value *p;
   p=alloc;
   alloc+=6;
@@ -69,21 +70,18 @@ value cons5(unsigned char c, value a1, value a2, value a3, value a4, value a5) {
 
 #define jump(f) (((void (*)(void))f)())
 
-struct thread_info tinfo = {args,NARGS,&alloc, &limit, NULL};
-
 #define check(fi) \
-  {if (limit-alloc < fi.num_allocs) garbage_collect(&fi,&tinfo);} 
+  {if (limit-alloc < fi[0]) garbage_collect(fi,&tinfo);} 
 
 void insert(void);
 void insert_left(void);
 void insert_right(void);
 void build(void);
-void done(void);
+extern void done(void);
 
-uintnat roots_insert[] = {1,2,3,4};
-const struct fun_info fi_insert = {insert, 5, 4, roots_insert};
+const uintnat fi_insert [] = {5, 4, 1,2,3,4};
 
-void insert() {
+void insert (void) {
   value t, key, contf, conte;
   check(fi_insert);
   t=args[1];
@@ -93,7 +91,7 @@ void insert() {
   if (t==Null) {
     value u = cons3(0,key,Null,Null);
     args[4]=conte;
-    args[5]=u;
+    args[1]=u;
     jump(contf);
   } else {
     value k = Field(t,0);
@@ -115,62 +113,57 @@ void insert() {
       jump(insert);
     } else {
       args[4]=conte;
-      args[5]=t;
+      args[1]=t;
       jump(contf);
     }
   }
 }
 
-uintnat roots_insert_left[] = {4,5};
-const struct fun_info fi_insert_left = {insert_left, 4, 2, roots_insert_left};
+const uintnat fi_insert_left [] = {4,2, 4,1};
 
-void insert_left(void) {
+void insert_left(void)
+{
   value k, e, t, u, right, contf, conte;
   check (fi_insert_left);
   e=args[4];
-  u=args[5];
+  u=args[1];
   k=Field(e,0);
   right=Field(e,1);
   contf=Field(e,2);
   conte=Field(e,3);
   t = cons3(0,k,u,right);
   args[4]=conte;
-  args[5]=t;
+  args[1]=t;
   jump(contf);
 }
 
-uintnat roots_insert_right[] = {4,5};
-const struct fun_info fi_insert_right = {insert_left, 4, 2, roots_insert_right};
+const uintnat fi_insert_right [] = {4,2, 4,1};
 
-void insert_right(void) {
+void insert_right(void)
+{
   value k, e, u, t, left, contf, conte;
   check (fi_insert_right);
   e=args[4];
-  u=args[5];
+  u=args[1];
   k=Field(e,0);
   left=Field(e,1);
   contf=Field(e,2);
   conte=Field(e,3);
   t = cons3(0,k,left,u);
   args[4]=conte;
-  args[5]=t;
+  args[1]=t;
   jump(contf);
 }
 
-void show_stackptr(void) {
-  int x;
-  fprintf (stderr, "stack: %8x\n", &x);
-}  
 
-uintnat roots_build[] = {4,5};
-const struct fun_info fi_build = {build, 0, 2, roots_build};
+const uintnat fi_build [] = {0,2, 4,1};
 
-void build() {
+void build(void) {
   value n,t;
   /*  show_stackptr(); */
   check(fi_build);  
   n=args[4];
-  t=args[5];
+  t=args[1];
   {value n1 = Long_val(n);
   if (n1>0) {
     value k = Val_long (random() % 1000);
@@ -181,39 +174,7 @@ void build() {
     args[4]=n1;
     jump(insert);
   } else {
-    args[5]=t;
+    args[1]=t;
     jump(done);
   }
 }}
-
-int measure (value t) {
-  if (t==Null) 
-    return 0;
-  else {
-    int i;
-    i= 1 + measure(Field(t,1)) + measure (Field(t,2));
-    return i;
-  }
-}
-
-int *stack;
-
-void done(void) {
-  value t = args[5];
-  int n = measure(t);
-  int x; printf ("Stack growth: %d words\n", stack - &x);
-  printf("Tree has %d nodes\n", n);
-  exit(0);
-}
-
-int main(int argc, char *argv[]) {
-  value n, t;
-  int x; stack = &x;
-  assert (argc==2);
-  n = Val_long (atoi(argv[1]));
-  t = Null;
-  args[4]=n;
-  args[5]=t;
-  jump(build);
-}
-

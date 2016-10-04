@@ -9,7 +9,7 @@ https://realworldocaml.org/v1/en/html/memory-representation-of-values.html
 
 That is:
 
- 31   10 9       8 7        0
+       31   10 9       8 7        0
       +-------+---------+----------+
       | size  |  color  | tag byte |
       +-------+---------+----------+

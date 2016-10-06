@@ -278,7 +278,7 @@ let print_program p prog =
   List.iter (print_globdef p) prog.prog_defs;
   fprintf p "@]@."
 
-let destination : string option ref = ref None
+let destination : string option ref = ref (Some "program.c") (* NOTE: currently outputing to fixed file *)
 
 let print_if prog =
   match !destination with

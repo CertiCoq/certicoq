@@ -55,9 +55,21 @@ module P = struct
 
   let one = Coq_xH
   let succ = Pos.succ
-  let pred = Pos.pred
+
+  let rec pred_helper n = 
+  match n with 
+  | Coq_xI n' -> Coq_xI (Coq_xO n')
+  | Coq_xO n' -> Coq_xI (pred_helper n')
+  | Coq_xH -> Coq_xH
+
+  let pred n =
+  match n with
+  | Coq_xI n' -> Coq_xO n'
+  | Coq_xO n' -> pred_helper n'
+  | Coq_xH -> Coq_xH
+
   let add = Pos.add
-  let sub = Pos.sub
+  let sub = Pos.sub_mask
   let eq x y = (Pos.compare x y = Eq)
   let lt x y = (Pos.compare x y = Lt)
   let gt x y = (Pos.compare x y = Gt)
@@ -124,11 +136,30 @@ module N = struct
 
   let zero = N0
   let one = Npos Coq_xH
-  let succ = N.succ
-  let pred = N.pred
-  let add = N.add
+  let succ = N.succ_pos
+  let pred = N.sub one
+
+  let add n m =
+    match n with
+    | N0 -> m
+    | Npos n' ->
+      (match m with
+       | N0 -> n
+       | Npos m' ->
+         (Npos (Pos.add n' m')))
+
   let sub = N.sub
-  let mul = N.mul
+
+  let mul n m =
+    match n with
+    | N0 -> N0
+    | Npos n' ->
+      (match m with
+       | N0 -> N0
+       | Npos m' ->
+         (Npos (Pos.mul n' m')))
+
+
   let eq x y = (N.compare x y = Eq)
   let lt x y = (N.compare x y = Lt)
   let gt x y = (N.compare x y = Gt)
@@ -176,7 +207,17 @@ module Z = struct
   let zero = Z0
   let one = Zpos Coq_xH
   let mone = Zneg Coq_xH
-  let succ = Z.succ
+
+  let succ x = 
+    match x with 
+    | Z0 -> one
+    | Zneg n ->
+      (match n with 
+       | Coq_xH -> zero
+       | Coq_xI n' -> Zneg (P.pred n)
+       | Coq_xO n' -> Zneg (P.pred n))
+    | Zpos n -> Zpos (P.succ n)
+
   let pred = Z.pred
   let neg = Z.opp
   let add = Z.add
@@ -379,3 +420,8 @@ let compare (x:int) (y:int) =
   end
 
 end
+
+let rec implode = function
+    []       -> ""
+  | charlist -> (Char.escaped (List.hd charlist)) ^
+                (implode (List.tl charlist))

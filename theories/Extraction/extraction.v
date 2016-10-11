@@ -29,17 +29,18 @@ Extract Constant L5_to_L6.kon_tag => "Camlcoq.P.of_int 2".
 Extract Constant L5_to_L6.default_tag => "Camlcoq.P.of_int 3000".
 (* L6_to_Clight *)
 Extract Constant L6_to_Clight.print_Clight => "PrintClight.print_if".
+Extract Constant L6_to_Clight.print_Clight_dest => "PrintClight.print_dest".
 Extract Constant L6_to_Clight.print => "print_string".
 (* TEMP STUFF *)
-Extract Constant L6_to_Clight.allocIdent => "Camlcoq.P.of_int 56".
-Extract Constant L6_to_Clight.limitIdent => "Camlcoq.P.of_int 57".
-Extract Constant L6_to_Clight.argsIdent => "Camlcoq.P.of_int 58".
-Extract Constant L6_to_Clight.gcIdent => "Camlcoq.P.of_int 78".
-Extract Constant L6_to_Clight.mainIdent => "Camlcoq.P.of_int 79".
-Extract Constant L6_to_Clight.bodyIdent => "Camlcoq.P.of_int 99".
-Extract Constant L6_to_Clight.threadInfIdent => "Camlcoq.P.of_int 5".
-Extract Constant L6_to_Clight.tinfIdent => "Camlcoq.P.of_int 6".
-Extract Constant L6_to_Clight.heapInfIdent => "Camlcoq.P.of_int 7".
+Extract Constant L6_to_Clight.allocIdent => "Camlcoq.P.of_int 28".
+Extract Constant L6_to_Clight.limitIdent => "Camlcoq.P.of_int 29".
+Extract Constant L6_to_Clight.argsIdent => "Camlcoq.P.of_int 26".
+Extract Constant L6_to_Clight.gcIdent => "Camlcoq.P.of_int 105".
+Extract Constant L6_to_Clight.mainIdent => "Camlcoq.P.of_int 106".
+Extract Constant L6_to_Clight.bodyIdent => "Camlcoq.P.of_int 121".
+Extract Constant L6_to_Clight.threadInfIdent => "Camlcoq.P.of_int 31".
+Extract Constant L6_to_Clight.tinfIdent => "Camlcoq.P.of_int 120".
+Extract Constant L6_to_Clight.heapInfIdent => "Camlcoq.P.of_int 30".
 (* Int31 *)
 Extract Inductive Int31.digits => "bool" [ "false" "true" ].
 Extract Inductive Int31.int31 => "int" [ "Camlcoq.Int31.constr" ] "Camlcoq.Int31.destr".
@@ -72,4 +73,4 @@ Separate Extraction
    Globalenvs.Senv.invert_symbol
    L6_to_Clight.print_test
    allInstances.test
-   (*L6_to_Clight.print_test'*).
+   allInstances.test2.

@@ -428,6 +428,15 @@ Section CC.
                         state in
     exp_hoist (f e).
 
+    Definition closure_conversion_hoist' (e : exp) ctag itag cenv' : cEnv * exp :=
+    let Γ := ((max_var e 1%positive) + 1)%positive in
+    let next := (Γ + 1)%positive in
+    let state := mkCont next ctag itag cenv' in
+    let '(e, f, s) := runState
+                        (exp_closure_conv e (Maps.PTree.empty VarInfo) 1%positive Γ)
+                        state in
+    (s.(cenv), exp_hoist (f e)).
+
   Definition populate_map (l : list (var * val)) map  :=
     fold_left (fun map x => M.set (fst x) BoundVar map) l map.
 

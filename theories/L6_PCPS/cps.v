@@ -307,7 +307,12 @@ Definition unkown_iTyInfo : iTyInfo := nil.
 
 Definition cEnv := M.t cTyInfo.  (* An constructor enironment maps [cTag]s to their information *)
 
-Definition iEnv := M.t iTyInfo. (* An inductive type environment maps [iTag]s to their constructors with their arities *) 
+Definition iEnv := M.t iTyInfo. (* An inductive type environment maps [iTag]s to their constructors with their arities *)
+
+
+(****** TEMPORARY JUNK: MUST DELETE *****)
+Definition add_cloTag (c i : positive) (cenv : cEnv) : cEnv :=
+  M.set c (i, 2%N, 0%N) cenv.
 
 (* TODO : this state and the getters and setters will be used by a particular
    translation so move them to the appropriate file? *)

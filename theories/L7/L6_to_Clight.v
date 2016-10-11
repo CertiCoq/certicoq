@@ -290,7 +290,7 @@ Definition reserve (funInf : positive) (l : Z) : statement :=
   let arr := (Evar funInf (Tarray intTy l noattr)) in
   Sifthenelse
     (!(Ebinop Ole (allocPtr +' (Ederef arr intTy)) limitPtr type_bool))
-    (Scall None gc (arr :: tinf :: nil))
+    (Scall None gc (arr :: (Eaddrof tinf (Tpointer threadInf noattr)) :: nil))
     Sskip.
      
 Fixpoint makeTagZ (cenv : cEnv) (ct : cTag) : option Z :=
@@ -438,19 +438,34 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.
   match fnd with
   | Fnil => ret nil
   | Fcons f t vs e fnd' =>
-    rest <- translate_fundefs fnd' fenv cenv map ;;
-         body <- translate_body e fenv cenv map ;;
+    match translate_fundefs fnd' fenv cenv map with
+    | None => None
+    | Some rest =>
+      match translate_body e fenv cenv map with
+      | None => None
+      | Some body =>
          let localVars := vs ++ (get_allocs e) in
-         inf <- M.get t fenv ;;
+         match M.get t fenv with
+         | None => None
+         | Some inf =>
              let '(l, locs) := inf in
-             asgn <- asgnFunVars vs locs;;
-                  gcArrIdent <- M.get f map ;;
-                  ret ((f , Gfun (Internal
-                                    (mkFun localVars
-                                           ((reserve gcArrIdent
-                                                     (Z.of_nat ((length l) + 2))) ;
-                                              asgn ;
-                                              body)))) :: rest)
+             match asgnFunVars vs locs with
+             | None => None
+             | Some asgn =>
+                  match M.get f map with
+                  | None => None
+                  | Some gcArrIdent =>
+                         ret ((f , Gfun (Internal
+                                           (mkFun localVars
+                                                  ((reserve gcArrIdent
+                                                            (Z.of_N (l + 2))) ;
+                                                     asgn ;
+                                                     body)))) :: rest)
+                  end
+             end
+         end
+      end
+    end
   end.
 
 Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.tree positive) :
@@ -463,7 +478,7 @@ Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.tree posi
               gcArrIdent <- M.get mainIdent map ;;
               ret ((bodyIdent , Gfun (Internal
                                         (mkFun localVars
-                                               (reserve gcArrIdent 2%Z) ;
+                                               (reserve gcArrIdent 2%Z ;
                                                   body))))
                      :: funs)
   | _ => None
@@ -515,9 +530,9 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv)
 Fixpoint make_funinfo (e : exp) (fenv : fEnv) : nState (option ((list (positive * globdef Clight.fundef type)) * M.tree positive)) :=
   match e with
   | Efun fnd e' =>
-    p <- make_fundef_info fnd fenv
+    p <- make_fundef_info fnd fenv ;;
       match p with
-      | None => None
+      | None => ret None
       | Some p' =>
         let '(defs, map) := p' in 
         info_name <- getName ;;
@@ -526,9 +541,10 @@ Fixpoint make_funinfo (e : exp) (fenv : fEnv) : nState (option ((list (positive 
                         (Tarray intTy
                                 2%Z
                                 noattr)
-                        ((Init_int32 (Int.repr (Z.of_N (maxAllocs e')))) :: (Init_int32 Int.zero) :: nil) false false in
+                        ((Init_int32 (Int.repr (Z.of_nat (max_allocs e')))) :: (Init_int32 Int.zero) :: nil) false false in
                   ret (Some (((info_name , Gvar ind) :: defs) ,
                              M.set mainIdent info_name map))
+      end
   | _ => ret None
   end.
 
@@ -542,11 +558,13 @@ Definition global_defs (e : exp)
                                     false false))
     :: (gcIdent , Gfun (External (EF_external "gc"
                                               (mksignature (Tany32 :: nil) None cc_default))
-                                 (Tcons threadInf (Tcons heapInf Tnil))
+                                 (Tcons valPtr (Tcons (Tpointer threadInf noattr) Tnil))
                                  Tvoid
                                  cc_default
        ))
     :: nil.
+
+
 
 Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) :
   nState (option ((list (positive * globdef Clight.fundef type)))) :=
@@ -556,7 +574,8 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) :
              let '(fun_inf, map) := p in
              match translate_funs e fenv cenv map with
              | None => ret None
-             | Some fun_defs =>
+             | Some fun_defs' =>
+               let fun_defs := rev fun_defs' in
                ret (Some ((((global_defs e)
                               ++ ((tinfIdent , Gvar (
                                                    mkglobvar
@@ -566,9 +585,9 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) :
                                                         :: (Init_addrof allocIdent Int.zero)
                                                         :: (Init_addrof limitIdent Int.zero) :: nil)
                                                      false false
-                                  )) :: nil) ++ fun_inf ++ fun_defs))))
-             | None => ret None 
+                                  )) :: nil) ++ fun_inf ++ fun_defs)))) 
              end
+           | None => ret None
            end.
 
 (*
@@ -665,10 +684,12 @@ Definition stripNameState {A : Type} (p : nState A) : A :=
 
 Definition test_result := stripNameState (stripOption (compile test (M.empty _))).
 
+Require Import String.
+
 Variable (print_Clight : Clight.program -> unit).
+Variable (print_Clight_dest : Clight.program -> String.string -> unit).
 Variable (print : String.string -> unit).
 
-Require Import String.
 
 Fixpoint print_err (errs : errmsg) : unit :=
   match errs with

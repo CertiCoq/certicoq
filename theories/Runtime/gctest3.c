@@ -60,11 +60,18 @@ typedef void (*function0)();
 
 struct thread_info tinfo = {args,NARGS,&alloc, &limit, NULL};
 
+#define HEADROOM 100
+
 #define check(fi) \
-  {if (limit-allocx < fi[0]) { \
+  {if ( __builtin_expect( \
+     (fi[0]<HEADROOM ? (limit <= allocx) : (limit-allocx < fi[0]-HEADROOM)), \
+     0)) \
+    { \
       alloc=allocx; \
       args[1]=a1; args[2]=a2; args[3]=a3; args[4]=a4; \
+      limit+=HEADROOM; \
       garbage_collect(fi,&tinfo); \
+      limit-=HEADROOM; \
       allocx=alloc; \
       a1=args[1]; a2=args[2]; a3=args[3]; a4=args[4]; \
     }} 
@@ -179,5 +186,6 @@ void buildx(value *allocx, value a1, value a2, value a3, value a4) {
 }}
 
 void build(void) {
+  limit=alloc;
   buildx(alloc, args[1], args[2], args[3], args[4]);
 }

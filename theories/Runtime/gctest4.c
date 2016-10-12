@@ -53,33 +53,39 @@ value args[NARGS];
     p=(value)(allocx+1), \
     allocx+=(5+1))
 
-typedef void (*function)(value*,value,value,value,value);
+typedef void (*function)(value*,value*,value,value,value,value);
 typedef void (*function0)();
 
-#define jump(f) (((function)f)(allocx,a1,a2,a3,a4))
+#define jump(f) (((function)f)(allocx,limitx,a1,a2,a3,a4))
 
 struct thread_info tinfo = {args,NARGS,&alloc, &limit, NULL};
 
+#define HEADROOM 100
+
 #define check(fi) \
-  {if (limit-allocx < fi[0]) { \
+  {if ( __builtin_expect( \
+     (fi[0]<HEADROOM ? (limitx <= allocx) : (limitx-allocx < fi[0]-HEADROOM)), \
+     0)) \
+    { \
       alloc=allocx; \
       args[1]=a1; args[2]=a2; args[3]=a3; args[4]=a4; \
       garbage_collect(fi,&tinfo); \
+      limitx=limit-HEADROOM; \
       allocx=alloc; \
       a1=args[1]; a2=args[2]; a3=args[3]; a4=args[4]; \
     }} 
 
 void build(void);
 
-void insert      (value *allocx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
-void insert_left (value *allocx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
-void insert_right(value *allocx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
-void buildx      (value *allocx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
+void insert      (value *allocx, value *limitx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
+void insert_left (value *allocx, value *limitx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
+void insert_right(value *allocx, value *limitx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
+void buildx      (value *allocx, value *limitx, value a1, value a2, value a3, value a4) __attribute__ ((noinline));
 void done        (void) __attribute__ ((noinline));
 
 const uintnat fi_insert [] = {5, 4, 1,2,3,4};
 
-void insert(value *allocx, value a1, value a2, value a3, value a4) {
+void insert(value *allocx, value *limitx, value a1, value a2, value a3, value a4) {
   value t, key, contf, conte;
   check(fi_insert);
   t=a1;
@@ -122,7 +128,7 @@ void insert(value *allocx, value a1, value a2, value a3, value a4) {
 
 const uintnat fi_insert_left [] = {4,2, 4,1};
 
-void insert_left(value *allocx, value a1, value a2, value a3, value a4) {
+void insert_left(value *allocx, value *limitx, value a1, value a2, value a3, value a4) {
   value k, e, t, u, right, contf, conte;
   check (fi_insert_left);
   e=a4;
@@ -139,7 +145,7 @@ void insert_left(value *allocx, value a1, value a2, value a3, value a4) {
 
 const uintnat fi_insert_right [] = {4,2, 4,1};
 
-void insert_right(value *allocx, value a1, value a2, value a3, value a4) {
+void insert_right(value *allocx, value *limitx, value a1, value a2, value a3, value a4) {
   value k, e, u, t, left, contf, conte;
   check (fi_insert_right);
   e=a4;
@@ -156,7 +162,7 @@ void insert_right(value *allocx, value a1, value a2, value a3, value a4) {
 
 const uintnat fi_buildx [] = {0,2, 4,1};
 
-void buildx(value *allocx, value a1, value a2, value a3, value a4) {
+void buildx(value *allocx, value *limitx, value a1, value a2, value a3, value a4) {
   value n,t;
   check(fi_buildx);  
   n=a4;
@@ -179,5 +185,6 @@ void buildx(value *allocx, value a1, value a2, value a3, value a4) {
 }}
 
 void build(void) {
-  buildx(alloc, args[1], args[2], args[3], args[4]);
+  limit=alloc;
+  buildx(alloc, limit, args[1], args[2], args[3], args[4]);
 }

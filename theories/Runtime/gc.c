@@ -21,7 +21,7 @@ struct space {
 #endif
 
 #ifndef NURSERY_SIZE
-#define NURSERY_SIZE ((1<<21)/sizeof(value))  /* 2 megabytes */
+#define NURSERY_SIZE ((1<<20)/sizeof(value))  /* 1 megabyte */
 #endif
 /* The size of generation 0 (the "nursery") should approximately match the 
    size of the level-2 cache of the machine, according to:
@@ -34,7 +34,7 @@ struct space {
     http://www.tomshardware.com/reviews/Intel-i7-nehalem-cpu,2041-10.html
     https://en.wikipedia.org/wiki/Nehalem_(microarchitecture)
   Notwithstanding those results, empirical measurements show that 
-   2 megabytes works fastest.
+   1 or 2 megabytes works fastest.
 */
 
 #ifndef DEPTH
@@ -201,10 +201,12 @@ void do_generation (struct space *from,  /* descriptor of from-space */
 		    struct thread_info *ti)  /* where's the args array? */
 /* Copy the live objects out of the "from" space, into the "to" space,
    using fi and ti to determine the roots of liveness. */
-{
+{  value *p = to->next;
   assert(from->next-from->start <= to->limit-to->next);
   forward_roots(from->start, from->limit, &to->next, fi, ti);
   do_scan(from->start, from->limit, to->start, &to->next);
+  if(0)  fprintf(stderr,"%5.3f%% occupancy\n",
+	  (to->next-p)/(double)(from->next-from->start));
   from->next=from->start;
 }  
 
@@ -310,6 +312,8 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
 	create_space(h->spaces+(i+1), RATIO*w);
       }
       /* Copy all the objects in generation i, into generation i+1 */
+  if(0)
+      fprintf(stderr, "Generation %d:  ", i);
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
       /* If there's enough space in gen i+1 to guarantee that the
          NEXT collection into i+1 will succeed, we can stop here */

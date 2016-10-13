@@ -497,6 +497,13 @@ Proof.
     rewrite map_extend_not_In; eauto.
 Qed.
 
+Instance extend_lst_Proper {A} : Proper (f_eq ==> eq ==> eq ==> f_eq) (@extend_lst A).
+Proof.
+  intros f1 f2 f_eq l1 l2 Heq1 l1' l2' Heq2; subst.
+  revert l2'. induction l2; simpl; intros l2'; eauto.
+  destruct l2'; eauto. rewrite IHl2. reflexivity.
+Qed.
+
 (** * Lemmas about [injective_subdomain] and [injective] *)
 
 Instance injective_subdomain_Proper_f_eq {A B} : Proper (eq ==> f_eq ==> iff)
@@ -689,14 +696,36 @@ Proof.
   rewrite <- H in H'. repeat eexists; eauto.
 Qed.
 
+Lemma domain_extend_None {A} (f : positive -> option A) x :
+  Included _ (domain f) (Union _ (Singleton _ x) (domain (f {x ~> None}))).
+Proof.
+  intros y [z Hin].
+  destruct (peq x y); subst; eauto.
+  right. eexists. rewrite extend_gso; eauto.
+Qed.
+
+Lemma domain_extend_Some (A : Type) (f : positive -> option A) (x : positive) y :
+  Same_set positive 
+           (Union positive (Singleton positive x) (domain f))
+           (domain (f {x ~> Some y})).
+Proof.
+  split.
+  - intros z Hin. destruct (peq x z); subst.
+    repeat eexists; eauto. rewrite extend_gss. reflexivity.
+    inv Hin. inv H. congruence.
+    edestruct H. 
+    repeat eexists; eauto. rewrite extend_gso; eauto.
+  - intros z Hin. destruct (peq x z); subst; eauto.
+    right. destruct Hin as [w H1]. rewrite extend_gso in H1; eauto.
+    repeat eexists; eauto.
+Qed.
+
+
 (** * Lemmas about [image'] *)
 
-
-  Instance Proper_image' {A B} : Proper (f_eq ==> Same_set _ ==> Same_set B) (@image' A B).
-  Proof.
-    constructor; intros x' [y' [H1 H2]]; inv H0.
-    rewrite H in H2. repeat eexists; eauto.
-    rewrite <- H in H2. repeat eexists; eauto.
-  Qed.
-
-
+Instance Proper_image' {A B} : Proper (f_eq ==> Same_set _ ==> Same_set B) (@image' A B).
+Proof.
+  constructor; intros x' [y' [H1 H2]]; inv H0.
+  rewrite H in H2. repeat eexists; eauto.
+  rewrite <- H in H2. repeat eexists; eauto.
+Qed.

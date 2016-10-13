@@ -50,19 +50,23 @@ Close Scope Z_scope.
 (** * Computational Defintion *)
 
 Inductive VarInfo : Type :=
-(* A variable bound in the current scope *)
-| BoundVar : VarInfo
 (* A variable that is free in the current function definition.
    The first argument is the name of the parameter of the lambda
    lifted function that corresponds to this free variable *)
-| FreeVar : var -> VarInfo
+| FreeVar : var -> VarInfo.
+
+Inductive FunInfo : Type := 
 (* A known function. The first argument is the name of the lambda lifted version,
    the second the new fTag and the third the list of free variables of the
    function *)
-| Fun : var -> fTag -> list var -> VarInfo.
+| Fun : var -> fTag -> list var -> FunInfo.
 
 (* Maps variables to [VarInfo] *)
 Definition VarInfoMap := Maps.PTree.t VarInfo.
+
+(* Maps variables to [FunInfo] *)
+Definition FunInfoMap := Maps.PTree.t FunInfo.
+
 
 Record state_contents :=
     mkCont { next_var : var ; next_fTag : fTag }.
@@ -98,7 +102,6 @@ Definition rename (map : VarInfoMap) (x : var) : var :=
   match M.get x map with
     | Some inf =>
       match inf with
-        | BoundVar | Fun _ _ _ => x
         | FreeVar y => y
       end
     | None => x
@@ -108,8 +111,8 @@ Definition rename_lst (map : VarInfoMap) (xs : list var) : list var :=
   (* all list of variables in the AST are in an escaping positions *)
   List.map (rename map) xs.
 
-Fixpoint add_functions (B : fundefs) (fvs : list var) (m : VarInfoMap)
-: state VarInfoMap :=
+Fixpoint add_functions (B : fundefs) (fvs : list var) (m : FunInfoMap)
+: state FunInfoMap :=
   match B with
     | Fcons f ft xs _ B =>
       m' <- add_functions B fvs m ;;
@@ -132,142 +135,129 @@ Fixpoint add_free_vars (fvs : list var) (m : VarInfoMap)
       ret (y' :: ys', M.set y (FreeVar y') m')
   end.
 
-Fixpoint add_params (ys : list var) (m : VarInfoMap) : VarInfoMap :=
-  match ys with
-    | [] => m
-    | y :: ys =>
-      M.set y BoundVar (add_params ys m)
-  end.
-
+(* Fixpoint add_params (ys : list var) (m : VarInfoMap) : VarInfoMap := *)
+(*   match ys with *)
+(*     | [] => m *)
+(*     | y :: ys => *)
+(*       M.set y BoundVar (add_params ys m) *)
+(*   end. *)
 
 Definition FVMap := Maps.PTree.t PS.t.
 
 Section TrueFV.
 
-  Variable (fvmap : VarInfoMap).
-
-  Definition add_list (scope : FVSet) fvset ys : list var :=
-    fold_left (fun fvs y => if mem y scope then fvs else y :: fvs) ys fvset.  
+  Variable (funmap : FunInfoMap).
   
   (** The set of the *true* free variables of an [exp]. The true free variables
     are the variables that appear free plus the free variables of the known
     functions that are called inside the expression. Relies on the the
     assumption that the free and bound variables are disjoint. *)
-  Fixpoint exp_true_fv_aux (e : exp) (scope  : FVSet) (fvset : list var) : list var :=
+  Fixpoint exp_true_fv_aux (e : exp) (scope  : FVSet) (fvset : PS.t) : PS.t :=
     match e with
       | Econstr x c ys e =>
         let fvset' := add_list scope fvset ys in 
         exp_true_fv_aux e (add x scope) fvset'
       | Ecase x pats =>
         let fvset' := fold_left (fun fvs p => exp_true_fv_aux (snd p) scope fvs) pats fvset in
-        if mem x scope then fvset' else x :: fvset'
+        if mem x scope then fvset' else PS.add x fvset'
       | Eproj x tau n y e =>
-        let fvset' := if mem y scope then fvset else y :: fvset in
+        let fvset' := if mem y scope then fvset else PS.add y fvset in
         exp_true_fv_aux e (add x scope) fvset'
       | Efun defs e =>
         let '(scope', fvset') := fundefs_true_fv_aux defs scope fvset in 
         exp_true_fv_aux e scope' fvset'
       | Eapp x ft xs =>
-        let fvs := match fvmap ! x with
-                      | Some inf =>
+        let fvset' := match funmap ! x with
+                     | Some inf =>
                         match inf with
-                          | Fun f' ft' fvs => f' :: fvs
-                          | _ => [x]
+                          | Fun f' ft' fvs => union_list fvset (f' :: fvs)
                         end
-                      | None => [x]
-                    end
+                     | None => if mem x scope then fvset else PS.add x fvset
+                   end
         in
-        let fvset' := add_list scope fvset fvs in 
         add_list scope fvset' xs
       | Eprim x prim ys e =>
         let fvset' := add_list scope fvset ys in 
         exp_true_fv_aux e (add x scope) fvset'
-      | Ehalt x => if mem x scope then fvset else x :: fvset
+      | Ehalt x => if mem x scope then fvset else PS.add x fvset
     end
-  with fundefs_true_fv_aux (defs : fundefs) (scope : FVSet) (fvset : list var) : FVSet * list var :=
+  with fundefs_true_fv_aux (defs : fundefs) (scope : FVSet) (fvset : PS.t) : FVSet * PS.t :=
          match defs with
            | Fcons f t ys e defs' =>
              let (scope', fvset') := fundefs_true_fv_aux defs' (add f scope) fvset in
              (scope', exp_true_fv_aux e (union_list scope' ys) fvset')
            | Fnil => (scope, fvset)
          end.
-
-  Definition exp_true_fv e := exp_true_fv_aux e empty [].
   
-  Definition fundefs_true_fv B := snd (fundefs_true_fv_aux B empty []). 
+  Definition exp_true_fv e := exp_true_fv_aux e empty PS.empty.
+  
+  Definition fundefs_true_fv B := snd (fundefs_true_fv_aux B empty PS.empty). 
 
 End TrueFV.
 
-Fixpoint exp_lambda_lift (e : exp) (m : VarInfoMap) : state exp :=
+Fixpoint exp_lambda_lift (e : exp) (fvm : VarInfoMap) (fm : FunInfoMap) : state exp :=
   match e with
   (* We are (too) conservative here and we assume that all variables that are
      being wrapped in a constructor are escaping. *)  
-  | Econstr x t ys e =>
-    e' <- exp_lambda_lift e (M.set x BoundVar m) ;;
-    ret (Econstr x t (rename_lst m ys) e')
+  | Econstr x t ys e => 
+    e' <- exp_lambda_lift e fvm fm ;;
+    ret (Econstr x t (rename_lst fvm ys) e')
   | Ecase x P =>
     P' <-
     (fix mapM_ll l :=
        match l with
          | [] => ret []
          | (c, e) :: P =>
-           e' <- exp_lambda_lift e m ;;
+           e' <- exp_lambda_lift e fvm fm ;;
            P' <- mapM_ll P ;;
            ret ((c, e') :: P')
        end) P ;;
-    ret (Ecase (rename m x) P')
+    ret (Ecase (rename fvm x) P')
   | Eproj x t N y e =>
-    e' <- exp_lambda_lift e (M.set x BoundVar m) ;;
-    ret (Eproj x t N (rename m y) e')
+    e' <- exp_lambda_lift e fvm fm ;;
+    ret (Eproj x t N (rename fvm y) e')
   | Efun B e =>
-    let fvs := fundefs_true_fv m B in
-    m' <- add_functions B fvs m ;;
-    B' <- fundefs_lambda_lift B m' ;;
-    e' <- exp_lambda_lift e m' ;;
+    let fvs := PS.elements (fundefs_true_fv fm B) in
+    fm' <- add_functions B fvs fm ;;
+    B' <- fundefs_lambda_lift B fvm fm' ;;
+    e' <- exp_lambda_lift e fvm fm' ;;
     ret (Efun B' e')
-  | Eapp f ft xs =>
-    match M.get f m with
+  | Eapp f ft xs => 
+    match fm ! f with
       | Some inf =>
         match inf with
-          | BoundVar =>
-            ret (Eapp f ft (rename_lst m xs))
-          | FreeVar f' =>
-            ret (Eapp f' ft (rename_lst m xs))
           | Fun f' ft' fvs =>
-            ret (Eapp f' ft' (rename_lst m (xs ++ fvs)))
+            ret (Eapp (rename fvm f') ft' (rename_lst fvm (xs ++ fvs)))
         end
       | None =>
-        ret (Eapp f ft (rename_lst m xs))
+        ret (Eapp (rename fvm f) ft (rename_lst fvm xs))
     end
   | Eprim x f ys e =>
-    e' <- exp_lambda_lift e (M.set x BoundVar m) ;;
-       ret (Eprim x f (rename_lst m ys) e')
-  | Ehalt x => ret (Ehalt (rename m x))
+    e' <- exp_lambda_lift e fvm fm ;;
+    ret (Eprim x f (rename_lst fvm ys) e')
+  | Ehalt x => ret (Ehalt (rename fvm x))
   end
-with fundefs_lambda_lift B m :=
+with fundefs_lambda_lift B fvm fm :=
        match B with
-         | Fcons f ft xs e B =>
-           match M.get f m with
+         | Fcons f ft xs e B => 
+           match M.get f fm with
              | Some inf =>
                match inf with
                  | Fun f' ft' fvs =>
-                   p <- add_free_vars fvs m ;;
-                   let (ys, m') := p in
-                   let m'' := add_params xs m' in
+                   p <- add_free_vars fvs fvm ;;
+                   let (ys, fvm') := p in
                    xs' <- get_names (length xs) ;;
-                   e' <- exp_lambda_lift e m'' ;;
-                   B' <- fundefs_lambda_lift B m ;;
+                   e' <- exp_lambda_lift e fvm' fm ;;
+                   B' <- fundefs_lambda_lift B fvm fm ;;
                    ret (Fcons f' ft' (xs ++ ys) e'
                               (Fcons f ft xs'
-                                     (Eapp f' ft' (xs' ++ (rename_lst m fvs)))
+                                     (Eapp f' ft' (xs' ++ (rename_lst fvm fvs)))
                                      B'))
-                 | _ => ret (Fcons f ft xs e B) (* should never match *)
                end
              | None => ret (Fcons f ft xs e B) (* should never match *)
            end
          | Fnil => ret Fnil
        end.
-
 
 (* Example :
 

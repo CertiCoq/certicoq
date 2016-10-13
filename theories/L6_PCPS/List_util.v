@@ -1,5 +1,6 @@
 Require Import Coq.Lists.List Coq.Relations.Relations Coq.Classes.RelationClasses
-        Coq.omega.Omega Coq.Numbers.BinNums Coq.Structures.OrdersEx Coq.Sets.Ensembles.
+        Coq.omega.Omega Coq.Numbers.BinNums Coq.Structures.OrdersEx Coq.Sets.Ensembles
+        Coq.Lists.SetoidList.
 
 Require Import Ensembles_util.
 
@@ -356,6 +357,8 @@ Proof.
   - simpl. eapply IHl. zify; omega.
 Qed.
 
+(** * Lemmas about [NoDup] *)
+
 Lemma NoDup_app {A} xs ys :
   NoDup xs -> NoDup ys ->
   Disjoint A (FromList xs) (FromList ys) ->
@@ -366,4 +369,13 @@ Proof with now eauto with Ensembles_DB.
   constructor. intros Hc. eapply in_app_or in Hc. inv Hc; eauto.
   now eapply HD; constructor; eauto.
   eapply IHxs; eauto...
+Qed.
+
+Lemma NoDupA_NoDup {A} l :
+  NoDupA (@eq A) l -> NoDup l.
+Proof.
+  intros H. induction H; constructor; eauto.
+  intros Hc. eapply H. eapply In_InA.
+  now eauto with typeclass_instances.
+  eassumption.
 Qed.

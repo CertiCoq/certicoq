@@ -141,7 +141,7 @@ Section Log_rel.
   Global Opaque preord_val.
   
   (** Environment relation for a single point (i.e. variable) : 
-    * ρ1 ~_k^x ρ2 iff ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)
+    * ρ1 ~_k^(x, y) ρ2 iff ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)
   Definition preord_var_env (k : nat) (rho1 rho2 : env) (x y : var) : Prop :=
     forall v1, 
       M.get x rho1 = Some v1 -> 

@@ -62,9 +62,9 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               ~ isLambda fn' -> ~ isFix fn' ->
               WcbvEvals p (tcons arg args) (tcons arg' args') ->
               WcbvEval p (TApp fn arg args) (mkApp fn' (tcons arg' args'))
-| wCase: forall mch Mch n args ml ts brs cs s ty,
+| wCase: forall mch Mch n args ml ts brs cs s ty arty,
                 WcbvEval p mch Mch ->
-                canonicalP Mch = Some (n, args) ->
+                canonicalP Mch = Some (n, args, arty) ->
                 tskipn (snd (fst ml)) args = Some ts ->
                 whCaseStep n ts brs = Some cs ->
                 WcbvEval p cs s ->
@@ -355,7 +355,7 @@ Function wcbvEval
                         | Ret ebrs => Ret (TCase ml etp emch ebrs)
                       end
                   end
-                | Some (r, args) =>
+                | Some (r, args, _) =>
                   match tskipn (snd (fst ml)) args with
                     | None => raise "wcbvEval: Case, tskipn"
                     | Some ts =>

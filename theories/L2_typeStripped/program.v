@@ -597,12 +597,22 @@ induction 1; intros; try discriminate.
 Qed.
 
 Lemma Crct_App_fn_notApp:
-  forall p n fn arg args, Crct p n (TApp fn arg args) -> ~(isApp fn).
+  forall p n fn arg args, Crct p n (TApp fn arg args) -> ~ isApp fn.
 intros p n fn arg args h1.
 assert (j:= @Crct_invrt_App p n (TApp fn arg args) h1 fn arg args eq_refl).
 intuition.
 Qed.
 
+Lemma CrctDs_invrt:
+  forall n p dts, CrctDs p n dts -> 
+    forall m x ix, dnthBody m dts = Some (x, ix) -> Crct p n x.
+Proof.
+  induction 1; intros.
+  - cbn in H0. discriminate.
+  - destruct m.
+    + cbn in H1. myInjection H1. assumption.
+    + eapply IHCrctDs. cbn in H1. eassumption.
+Qed.
 
 Lemma Crcts_append:
   forall p n ts, Crcts p n ts ->
@@ -650,7 +660,7 @@ Proof.
     + eapply Crct_Sort. eassumption.
   - eapply Crct_Sort; eassumption.
   - eapply Crct_Prf; eassumption.
-  - assert (j:= Crct_invrt_Cast H1 eq_refl). apply CrctCast.
+  - assert (j:= Crct_invrt_Cast H1 eq_refl). 
     apply H; trivial.
   - apply CrctProd. eapply Crct_Sort; eassumption.
     assert (j:= Crct_invrt_Prod H1 eq_refl).
@@ -697,6 +707,37 @@ Proof.
   - inversion_Clear H2. apply CrctDsCons.
     + apply H; trivial.
     + apply H0; trivial.
+Qed.
+
+Lemma instantiate_pres_Crct:
+  forall p m bod, Crct p (S m) bod -> forall tin, Crct p m tin -> 
+                  forall n, n <= m ->  Crct p m (instantiate tin n bod).
+Proof.
+  intros.
+  apply (proj1 (Instantiate_pres_Crct tin) _ _ _
+               (proj1 (instantiate_Instantiate tin) _ _));
+    try assumption.
+Qed.
+
+Lemma whBetaStep_pres_Crct:
+  forall p n bod, Crct p (S n) bod ->
+                  forall a1 args, Crct p n a1 -> Crcts p n args ->
+                                  Crct p n (whBetaStep bod a1 args).
+Proof.
+  intros. unfold whBetaStep. apply mkApp_pres_Crct; try assumption.
+  apply instantiate_pres_Crct; try assumption.  omega.
+Qed.
+
+Lemma fold_left_pres_Crct:
+  forall p m (f:Term -> nat -> Term) (ns:list nat) (t:Term),
+    (forall u, Crct p m u -> forall n, Crct p m (f u n)) ->
+    Crct p m t -> Crct p m (fold_left f ns t).
+Proof.
+  intros p n f. induction ns; simpl; intros.
+  - assumption.
+  - apply IHns.
+    + intros. apply H. assumption.
+    + apply H. assumption.
 Qed.
 
 (***

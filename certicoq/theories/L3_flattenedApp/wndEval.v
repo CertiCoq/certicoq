@@ -272,16 +272,6 @@ Qed.
 
 
 (***
-Lemma Instantiate_pres_Crct:
-  forall p tin bod n,
-    Crct p n tin -> Crct p (S n) bod -> Crct p n (instantiate tin n bod).
-induction bod; intros; unfold instantiate.
-- destruct (lt_eq_lt_dec n0 n). destruct s.
-  + rewrite (proj1 (nat_compare_lt _ _) l). apply (IRelLt l).
-
-
-Admitted.
-
 Lemma wndEval_pres_Crct:
   (forall p n t, Crct p n t -> forall s, wndEval p t s -> Crct p n s) /\
   (forall p n ts, Crcts p n ts -> forall ss, wndEvals p ts ss ->

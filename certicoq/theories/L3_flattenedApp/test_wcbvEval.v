@@ -1,6 +1,5 @@
 (******)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
 Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
@@ -23,6 +22,19 @@ Set Printing Width 90.
 Set Printing Depth 100.
 Set Implicit Arguments.
 
+(** Check eta expansion of constructors **)
+Quote Recursively Definition pcons := (@cons bool).
+Definition Pcons := Eval cbv in (program_Program pcons).
+Print Pcons.
+Inductive fyy : Set := Fyy: bool -> bool -> bool -> fyy.
+Quote Recursively Definition pFyy := Fyy.
+Definition PFyy := Eval cbv in (program_Program pFyy).
+Print PFyy.
+Quote Recursively Definition pFzz := (fun x => Fyy x).
+Definition PFzz := Eval cbv in (program_Program pFzz).
+Print PFzz.
+
+                             
 Variable (y:nat).
 Quote Recursively Definition p_mbt := 
   match y with
@@ -355,7 +367,8 @@ Fixpoint size (t : Tree) : nat :=
   match t with
     | T ts => S (fold (fun t a => size t + a) 0 ts)
   end.
-Definition myTree := (T (cons (T (unit (T nil))) (cons (T (unit (T nil))) nil))).
+Definition myTree :=
+  (T (cons (T (unit (T nil))) (cons (T (unit (T nil))) nil))).
 Eval cbv in size myTree.
 Definition size_myTree := size myTree.
 Quote Recursively Definition cbv_size_myTree :=

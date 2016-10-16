@@ -275,10 +275,10 @@ induction t;
 - left. constructor.
 Qed.
 
-Function canonicalP (t:Term) : option (nat * Terms) :=
+Function canonicalP (t:Term) : option (nat * Terms * nat) :=
   match t with
-    | TConstruct _ r _ => Some (r, tnil)
-    | TApp (TConstruct _ r _) arg args => Some (r, tcons arg args)
+    | TConstruct _ r arty => Some (r, tnil, arty)
+    | TApp (TConstruct _ r arty) arg args => Some (r, tcons arg args, arty)
     | x => None
   end.
 
@@ -294,8 +294,8 @@ Lemma isCanonical_canonicalP:
   forall t, isCanonical t -> exists x, canonicalP t = Some x.
 Proof.
   induction 1; simpl.
-  - exists (n, tnil). reflexivity.
-  - exists (n, tcons arg args). reflexivity.
+  - exists (n, tnil, m). reflexivity.
+  - exists (n, tcons arg args, m). reflexivity.
 Qed.
 
 
@@ -697,7 +697,7 @@ Qed.
 
 Lemma canonicalP_pres_WFapp:
   forall t, WFapp t ->
-        forall r args, canonicalP t = Some (r, args) -> WFapps args.
+        forall r args arty, canonicalP t = Some (r, args, arty) -> WFapps args.
 Proof.
   induction t; simpl; intros; try discriminate.
   - destruct t1; try discriminate. myInjection H0. inversion_Clear H.
@@ -1258,9 +1258,9 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
 | ISort: forall n srt, Instantiate n (TSort srt) (TSort srt)
 | IProof: forall n, Instantiate n TProof TProof
-| ICast: forall n t ck ty it ity,
-           Instantiate n t it -> Instantiate n ty ity ->
-           Instantiate n (TCast t ck ty) (TCast it ck ity)
+| ICast: forall n t ck ty it,
+           Instantiate n t it ->
+           Instantiate n (TCast t ck ty) it
 | IProd: forall n nm ty bod ibod ity,
              Instantiate (S n) bod ibod -> Instantiate n ty ity ->
              Instantiate n (TProd nm ty bod) (TProd nm ity ibod)
@@ -1324,9 +1324,6 @@ intro h. apply InstInstsDefs_ind; intros; auto.
 - inversion H.
 - inversion_Clear H1.
   + constructor. intuition.
-  + apply PoCastTy. intuition.
-- inversion_Clear H1.
-  + constructor. intuition.
   + apply PoProdTy. intuition.
 - inversion_Clear H1.
   + constructor. apply H. assumption.
@@ -1364,32 +1361,36 @@ Lemma Instantiate_instantiate:
   (forall n t it, Instantiate n t it -> instantiate n t = it) /\
   (forall n ts its, Instantiates n ts its -> instantiates n ts = its) /\
   (forall n ds ids, InstantiateDefs n ds ids -> instantiateDefs n ds = ids).
-  apply InstInstsDefs_ind; intros; cbn; intuition;
-  try (subst; reflexivity).
-- rewrite nat_compare_EQ. reflexivity.
-- rewrite (proj1 (nat_compare_gt n m) g). reflexivity.
-- rewrite (proj1 (nat_compare_lt n m) l). reflexivity.
+Proof.
+  apply InstInstsDefs_ind; intros; cbn; intuition; try (subst; reflexivity).
+  - rewrite nat_compare_EQ. reflexivity.
+  - rewrite (proj1 (nat_compare_gt n m) g). reflexivity.
+  - rewrite (proj1 (nat_compare_lt n m) l). reflexivity.
 Qed.
 
 Lemma instantiate_Instantiate:
   (forall t n, Instantiate n t (instantiate n t)) /\
   (forall ts n, Instantiates n ts (instantiates n ts)) /\
   (forall (ds:Defs) n, InstantiateDefs n ds (instantiateDefs n ds)).
+Proof.
   apply TrmTrmsDefs_ind; intros; cbn; try (solve [constructor]);
   try (solve[constructor; intuition]).
-- unfold instantiate. destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
-  + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
-  + rewrite (proj2 (nat_compare_eq_iff _ _) h). subst. apply IRelEq.
-  + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
-    assumption. assumption.
+  - unfold instantiate. destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
+    + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
+    + rewrite (proj2 (nat_compare_eq_iff _ _) h). subst. apply IRelEq.
+    + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
+      assumption. assumption.
 Qed.
 
+(****  false if instantiate can strip Casts ******
 Lemma instant_pres_PoccTrm:
   (forall tbod, PoccTrm tbod -> forall n, PoccTrm (instantiate n tbod)) /\
   (forall ts, PoccTrms ts -> forall n, PoccTrms (instantiates n ts)) /\
   (forall (Ds:Defs),
      PoccDefs Ds -> forall n, PoccDefs (instantiateDefs n Ds)).
-apply poTrmTrmsDefs_ind; intros; cbn; try solve [constructor; trivial].
+  apply poTrmTrmsDefs_ind; intros; cbn; try solve [constructor; trivial].
+  - apply H0.
+    - apply H0.
 - eapply Pocc_TApp_mkApp. apply PoAppL. auto.
 - eapply Pocc_TApp_mkApp. apply PoAppA. auto. 
 - eapply Pocc_TApp_mkApp. apply PoAppR. auto. 
@@ -1413,6 +1414,7 @@ induction tbod; intros h; cbn; intuition; try discriminate.
                           (instantiate n tbod2) (instantiates n t)).
   destruct j as [x0 [x1 [x2 k]]]. rewrite k in h. discriminate.
 Qed.
+ *******************)
 
 End Instantiate_sec.
 End PoccTrm_sec.
@@ -1432,10 +1434,7 @@ Proof.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
-  - change (WFapp (TCast (instantiate t n tm) ck (instantiate t n ty))).
-    constructor.
-    + apply H0. assumption.
-    + apply H2. assumption.
+  - cbn. apply H0. assumption.
   - change (WFapp (TProd nm (instantiate t n ty) (instantiate t (S n) bod))).
     constructor.
     + apply H0. assumption.

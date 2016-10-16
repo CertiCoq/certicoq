@@ -78,13 +78,102 @@ Ltac inversion_Clear h := inversion h; subst; clear h.
 
 Ltac SomeSubst :=
   repeat match goal with
-        | [ H:(_ = Some _) |- _ ] => rewrite H
-        | [ H:(Some _ = _) |- _ ] => rewrite H
-      end.
+           | [ H:(_ = Some _) |- _ ] => rewrite H
+           | [ H:(Some _ = _) |- _ ] => rewrite H
+         end.
+
+(** turn decidable comparisons into Prop comparisons **)
+Ltac Compare_Prop := 
+  match goal with
+    | [ H:(_ ?= _) = Eq |- _ ] =>
+      let j := fresh "j" in
+      assert (j := proj1 (Nat.compare_eq_iff _ _) H); clear H
+    | [ H:(_ ?= _) = Lt |- _ ] =>
+      let j := fresh "j" in
+      assert (j := proj1 (Nat.compare_lt_iff _ _) H); clear H
+    | [ H:(_ ?= _) = Gt |- _ ] =>
+      let j := fresh "j" in
+      assert (j := proj1 (Nat.compare_gt_iff _ _) H); clear H
+    | [ H:(_ =? _) = true |- _ ] =>
+      let j := fresh "j" in
+      assert (j:= proj1 (Nat.eqb_eq _ _) H); clear H
+    | [ H:(_ <=? _) = true |- _ ] =>
+      let j := fresh "j" in
+      assert (j:= proj1 (Nat.leb_le _ _) H); clear H
+    | [ H:(_ <? _) = true |- _ ] =>
+      let j := fresh "j" in
+      assert (j:= proj1 (Nat.ltb_lt _ _) H); clear H
+  end.
+
+Ltac compare_Prop H := first [
+      let j := fresh "j" in
+      assert (j := proj1 (Nat.compare_eq_iff _ _) H)
+    | let j := fresh "j" in
+      assert (j := proj1 (Nat.compare_lt_iff _ _) H)
+    | let j := fresh "j" in
+      assert (j := proj1 (Nat.compare_gt_iff _ _) H)
+    | let j := fresh "j" in
+      assert (j:= proj1 (Nat.eqb_eq _ _) H)
+    | let j := fresh "j" in
+      assert (j:= proj1 (Nat.leb_le _ _) H)
+    | let j := fresh "j" in
+      assert (j:= proj1 (Nat.ltb_lt _ _) H) ].
+
+  
+Lemma match_cn_Eq:
+  forall m n, m = n ->
+              forall (A:Type) (a b c: A),
+                match m ?= n with
+                  | Datatypes.Eq => a
+                  | Lt => b
+                  | Gt => c
+                end = a.
+Proof.
+  intros m n h A a b c.
+  rewrite (proj2 (Nat.compare_eq_iff _ _) h). reflexivity.
+Qed.
+
+Lemma match_cn_Lt:
+  forall m n, m < n ->
+              forall  (A:Type) (a b c: A),
+                match m ?= n with
+                  | Datatypes.Eq => a
+                  | Lt => b
+                  | Gt => c
+                end = b.
+Proof.
+  intros m n h A a b c.
+  rewrite (proj2 (Nat.compare_lt_iff _ _) h). reflexivity.
+Qed.
+
+Lemma match_cn_Gt:
+  forall m n, m > n ->
+              forall (A:Type) (a b c: A),
+                match m ?= n with
+                  | Datatypes.Eq => a
+                  | Lt => b
+                  | Gt => c
+                end = c.
+Proof.
+  intros m n h A a b c.
+  rewrite (proj2 (Nat.compare_gt_iff _ _) h). reflexivity.
+Qed.
+
+Lemma compare_match_eq:
+  forall n m, n = m ->
+              forall {A} (x y z:A),
+                match n ?= m with
+                   | Datatypes.Eq => x
+                   | Lt => y
+                   | Gt => z end = x.
+Proof.
+  intros. rewrite H. rewrite (proj2 (Nat.compare_eq_iff _ _)); reflexivity.
+Qed.
+
 
 Ltac nreflexivity h := elim h; reflexivity.
 
-Ltac myInjection h := injection h; intros; subst.
+Ltac myInjection h := injection h; intros; subst; clear h.
 
 Lemma opt_notSome_None:
   forall (A:Type) (oa:option A), (forall a:A, oa <> Some a) -> oa = None.

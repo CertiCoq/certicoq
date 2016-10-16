@@ -44,10 +44,11 @@ Definition optStripDnth (b: option (L1_5Term * nat)) : option (Term * nat) :=
                              | None => None
                              | Some (t, n) => Some (strip t, n)
                            end.
-Definition optStripCanP (b: option (nat * L1_5Terms)) : option (nat * Terms) :=
+Definition optStripCanP
+           (b: option (nat * L1_5Terms * nat)): option (nat * Terms * nat) :=
                            match b with
                              | None => None
-                             | Some (n, t) => Some (n, strips t)
+                             | Some (n, t, m) => Some (n, strips t, m)
                            end.
 
 Lemma optStrip_hom: forall y, optStrip (Some y) = Some (strip y).
@@ -61,7 +62,7 @@ Lemma optStripDnth_hom:
 induction y; simpl; reflexivity.
 Qed.
 Lemma optStripCanP_hom:
-  forall y n, optStripCanP (Some (n, y)) = Some (n, strips y).
+  forall y n m, optStripCanP (Some (n, y, m)) = Some (n, strips y, m).
 induction y; simpl; reflexivity.
 Qed.
                               
@@ -252,6 +253,24 @@ Lemma instantiates_tcons_commute:
 intros tin n t ts. reflexivity.
 Qed.
 
+Lemma instantiates_dcons_commute:
+  forall tin n nm t m ds,
+         (instantiateDefs tin n (dcons nm t m ds)) = 
+         (dcons nm (instantiate tin n t) m (instantiateDefs tin n ds)).
+reflexivity.
+Qed.
+
+(*****  to remove in favor of term.v  ***
+Lemma instantiate_TApp_mkApp:
+  forall fn tin n arg args,
+      instantiate tin n (TApp fn arg args) =
+      mkApp (instantiate tin n fn)
+           (tcons (instantiate tin n arg) (instantiates tin n args)).
+Proof.
+  intros; destruct fn; try reflexivity. 
+Qed.
+****)
+    
 Lemma instantiate_mkApp_commute:
 forall tin n bod arg args,
   instantiate tin n (mkApp bod (tcons arg args)) =
@@ -274,22 +293,24 @@ Qed.
 Lemma instantiate_mkApp_nil_commute:
 forall tin n bod,
   instantiate tin n (mkApp bod tnil) = mkApp (instantiate tin n bod) tnil.
-induction bod; simpl; intros; try reflexivity.
-- destruct (lt_eq_lt_dec n n0) as [[h1 | h2 ] | h3].
-  + unfold instantiate. rewrite (proj1 (nat_compare_lt _ _) h1). 
-    simpl. reflexivity.
-  + subst. unfold instantiate. rewrite (proj2 (nat_compare_eq_iff n0 n0)).
-    * rewrite mkApp_idempotent. simpl. reflexivity.
-    * reflexivity.
-  + unfold instantiate. rewrite (proj1 (nat_compare_gt _ _) h3).
-    simpl. reflexivity.
-- rewrite tappend_tnil.
-  change (instantiate tin n (TApp bod1 bod2 t) =
-         mkApp (mkApp (instantiate tin n bod1)
-                      (tcons (instantiate tin n bod2)
-                             (instantiates tin n t)))
-                      tnil).
-  rewrite mkApp_idempotent. simpl. rewrite tappend_tnil. reflexivity. 
+Proof.
+  induction bod; simpl; intros; try reflexivity.
+  - destruct (lt_eq_lt_dec n n0) as [[h1 | h2 ] | h3].
+    + unfold instantiate. rewrite (proj1 (nat_compare_lt _ _) h1). 
+      simpl. reflexivity.
+    + subst. unfold instantiate. rewrite (proj2 (nat_compare_eq_iff n0 n0)).
+      * rewrite mkApp_idempotent. simpl. reflexivity.
+      * reflexivity.
+    + unfold instantiate. rewrite (proj1 (nat_compare_gt _ _) h3).
+      simpl. reflexivity.
+  - cbn. rewrite<- IHbod. rewrite mkApp_tnil_ident. reflexivity.
+    - rewrite tappend_tnil.
+    change (instantiate tin n (TApp bod1 bod2 t) =
+            mkApp (mkApp (instantiate tin n bod1)
+                         (tcons (instantiate tin n bod2)
+                                (instantiates tin n t)))
+                  tnil).
+    rewrite mkApp_idempotent. simpl. rewrite tappend_tnil. reflexivity. 
 Qed.
 
 Lemma instantiate_hom:
@@ -298,63 +319,62 @@ Lemma instantiate_hom:
     (forall bods arg n, strips (L1_5.term.instantiates arg n bods) =
                     instantiates (strip arg) n (strips bods)) /\
     (forall ds arg n, stripDs (L1_5.term.instantiateDefs arg n ds) =
-                    instantiateDefs (strip arg) n (stripDs ds)).
-apply L1_5.compile.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
-- simpl. destruct (lt_eq_lt_dec n n0); cbn.
-  + destruct s.
-    * rewrite (proj1 (nat_compare_gt n0 n)); try omega. cbn. reflexivity.
-    * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
-      rewrite mkApp_tnil_ident. reflexivity.
-  + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
-- change (TCast (strip (L1_5.term.instantiate arg n t)) =
-         (TCast (instantiate (strip arg) n (strip t)))).
-  rewrite H. reflexivity.
-- change (TProd n (strip (L1_5.term.instantiate arg (S n0) t0)) =
-         (TProd n (instantiate (strip arg) (S n0) (strip t0)))).
-  rewrite H0. reflexivity.
-- change (TLambda n (strip (L1_5.term.instantiate arg (S n0) t0)) =
-         (TLambda n (instantiate (strip arg) (S n0) (strip t0)))).
-  rewrite H0. reflexivity.
-- change (TLetIn n (strip (L1_5.term.instantiate arg n0 t))
+                      instantiateDefs (strip arg) n (stripDs ds)).
+Proof.
+  apply L1_5.compile.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
+  - simpl. destruct (lt_eq_lt_dec n n0); cbn.
+    + destruct s.
+      * rewrite (proj1 (nat_compare_gt n0 n)); try omega. cbn. reflexivity.
+      * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
+        rewrite mkApp_tnil_ident. reflexivity.
+    + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
+  - cbn. rewrite H. reflexivity.
+  - change (TProd n (strip (L1_5.term.instantiate arg (S n0) t0)) =
+            (TProd n (instantiate (strip arg) (S n0) (strip t0)))).
+    rewrite H0. reflexivity.
+  - change (TLambda n (strip (L1_5.term.instantiate arg (S n0) t0)) =
+            (TLambda n (instantiate (strip arg) (S n0) (strip t0)))).
+    rewrite H0. reflexivity.
+  - change (TLetIn n (strip (L1_5.term.instantiate arg n0 t))
                    (strip (L1_5.term.instantiate arg (S n0) t1)) =
-         (TLetIn n (instantiate (strip arg) n0 (strip t))
-                   (instantiate (strip arg) (S n0) (strip t1)))).
-  rewrite H. rewrite H1. reflexivity.
-- change (strip (L1_5.compile.mkApp
-                   (L1_5.term.instantiate arg n t)
-                   (L1_5.compile.tcons (L1_5.term.instantiate arg n t0)
-                                       (L1_5.term.instantiates arg n t1))) =
-          instantiate (strip arg) n (strip (L1_5.compile.TApp t t0 t1))). 
-  rewrite TApp_hom. 
-  change
-    (strip (L1_5.compile.mkApp (L1_5.term.instantiate arg n t)
-                          (L1_5.compile.tcons (L1_5.term.instantiate arg n t0)
+            (TLetIn n (instantiate (strip arg) n0 (strip t))
+                    (instantiate (strip arg) (S n0) (strip t1)))).
+    rewrite H. rewrite H1. reflexivity.
+  - change (strip (L1_5.compile.mkApp
+                     (L1_5.term.instantiate arg n t)
+                     (L1_5.compile.tcons (L1_5.term.instantiate arg n t0)
                                          (L1_5.term.instantiates arg n t1))) =
-     (mkApp (instantiate (strip arg) n (strip t))
-            (tcons (instantiate (strip arg) n (strip t0))
-                   (instantiates (strip arg) n (strips t1))))).
-  rewrite <- H. rewrite <- H0. rewrite <- H1. 
-  rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
-- change (TCase p (strip (L1_5.term.instantiate arg n t0))
-                (strips (L1_5.term.instantiates arg n t1)) =
-         (TCase p (instantiate (strip arg) n (strip t0))
-                (instantiates (strip arg) n (strips t1)))).
-  rewrite H0. rewrite H1. reflexivity.
-- change (TFix (stripDs (L1_5.term.instantiateDefs
-                           arg (n0 + L1_5.compile.dlength d) d)) n =
-         (TFix (instantiateDefs (strip arg)
-                                (n0 + dlength (stripDs d)) (stripDs d)) n)).
-  rewrite H. rewrite dlength_hom. reflexivity.
-- change (tcons (strip (L1_5.term.instantiate arg n t))
-                (strips (L1_5.term.instantiates arg n t0)) =
-          tcons (instantiate (strip arg) n (strip t))
-                (instantiates (strip arg) n (strips t0))).
-  rewrite H. rewrite H0. reflexivity.
-- change (dcons n (strip (L1_5.term.instantiate arg n1 t0)) n0
+            instantiate (strip arg) n (strip (L1_5.compile.TApp t t0 t1))). 
+    rewrite TApp_hom. 
+    change
+      (strip (L1_5.compile.mkApp (L1_5.term.instantiate arg n t)
+                                 (L1_5.compile.tcons (L1_5.term.instantiate arg n t0)
+                                                     (L1_5.term.instantiates arg n t1))) =
+       (mkApp (instantiate (strip arg) n (strip t))
+              (tcons (instantiate (strip arg) n (strip t0))
+                     (instantiates (strip arg) n (strips t1))))).
+    rewrite <- H. rewrite <- H0. rewrite <- H1. 
+    rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
+  - change (TCase p (strip (L1_5.term.instantiate arg n t0))
+                  (strips (L1_5.term.instantiates arg n t1)) =
+            (TCase p (instantiate (strip arg) n (strip t0))
+                   (instantiates (strip arg) n (strips t1)))).
+    rewrite H0. rewrite H1. reflexivity.
+  - change (TFix (stripDs (L1_5.term.instantiateDefs
+                             arg (n0 + L1_5.compile.dlength d) d)) n =
+            (TFix (instantiateDefs (strip arg)
+                                   (n0 + dlength (stripDs d)) (stripDs d)) n)).
+    rewrite H. rewrite dlength_hom. reflexivity.
+  - change (tcons (strip (L1_5.term.instantiate arg n t))
+                  (strips (L1_5.term.instantiates arg n t0)) =
+            tcons (instantiate (strip arg) n (strip t))
+                  (instantiates (strip arg) n (strips t0))).
+    rewrite H. rewrite H0. reflexivity.
+  - change (dcons n (strip (L1_5.term.instantiate arg n1 t0)) n0
                   (stripDs (L1_5.term.instantiateDefs arg n1 d)) =
-          dcons n (instantiate (strip arg) n1 (strip t0)) n0
-                (instantiateDefs (strip arg) n1 (stripDs d))).
-  rewrite H0. rewrite H1. reflexivity.
+            dcons n (instantiate (strip arg) n1 (strip t0)) n0
+                  (instantiateDefs (strip arg) n1 (stripDs d))).
+    rewrite H0. rewrite H1. reflexivity.
 Qed.
 
 Lemma whBetaStep_hom:

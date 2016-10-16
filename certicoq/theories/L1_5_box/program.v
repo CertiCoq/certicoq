@@ -714,9 +714,8 @@ Proof.
     + eapply Crct_Sort. eassumption.
   - eapply Crct_Sort; eassumption.
   - eapply Crct_Prf; eassumption.
-  - destruct (Crct_invrt_Cast H2 eq_refl). apply CrctCast.
+  - destruct (Crct_invrt_Cast H1 eq_refl). 
     + apply H; trivial.
-    + apply H0; trivial.
   - destruct (Crct_invrt_Prod H2 eq_refl). apply CrctProd.
     + apply H; trivial. omega. apply (proj1 Crct_up). assumption.
     + apply H0; trivial.

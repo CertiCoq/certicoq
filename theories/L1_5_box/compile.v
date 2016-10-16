@@ -101,7 +101,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef ty bod =>
       TLetIn nm (instantiate n tdef) (instantiate n ty) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TCast t ck ty => TCast (instantiate n t) ck (instantiate n ty)
+    | TCast t ck ty => instantiate n t
     | x => x
   end
 with instantiates (n:nat) (args:Terms) {struct args} : Terms :=

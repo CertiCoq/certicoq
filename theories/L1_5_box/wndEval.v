@@ -38,8 +38,8 @@ Inductive wndEval : Term -> Term -> Prop :=
      (* Case argument must be in Canonical form *)
      (* n is the number of parameters of the datatype *)
 | sCase: forall (ml:inductive * nat * list nat) (ty s mch:Term)
-                 (args brs ts:Terms) (n:nat),
-            canonicalP mch = Some (n, args) ->
+                 (args brs ts:Terms) (n arty:nat),
+            canonicalP mch = Some (n, args, arty) ->
             tskipn (snd (fst ml)) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml ty mch brs) s
@@ -295,14 +295,12 @@ Qed.
 
 (***
 Lemma wndEval_pres_Crct:
-  forall p,
-  (forall t s, wndEval p t s -> forall n, Crct p n t -> Crct p n s) /\
-  (forall ts ss, wndEvals p ts ss ->
-                 forall n, Crcts p n ts -> Crcts p n ss) /\
-  (forall ds es, wndDEvals p ds es ->
-                 forall n, CrctDs p n ds -> CrctDs p n es).
+  WFaEnv p -> 
+  (forall t s, wndEval t s -> forall n, Crct p n t -> Crct p n s) /\
+  (forall ts ss, wndEvals ts ss ->
+                 forall n, Crcts p n ts -> Crcts p n ss).
 Proof.
-  intros p. apply wndEvalEvals_ind; intros.
+  intros hp. apply wndEvalEvals_ind; intros.
   - eapply LookupDfn_pres_Crct; try eassumption.
   - destruct (Crct_invrt_App H eq_refl) as [h1 [h2 [h3 h4]]].
     destruct (Crct_invrt_Lam h1 eq_refl). 

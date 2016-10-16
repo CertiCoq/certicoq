@@ -144,6 +144,8 @@ with TrmsSize (ts:Terms) {struct ts} : nat :=
     | tcons s ss => S (TrmSize s + TrmsSize ss)
   end.
 
+Definition isRel (t:Term) : Prop := exists n, t = TRel n.
+
 Definition isLambda (t:Term) : Prop :=
   exists nm bod, t = TLambda nm bod.
 Lemma IsLambda: forall nm bod, isLambda (TLambda nm bod).
@@ -219,6 +221,33 @@ Proof.
   - left. auto.
 Qed.
 
+Function isL2Cnstr (t:Term) : option (inductive * nat * nat) :=
+  match t with
+    | TConstruct i cn arty => Some (i, cn, arty)
+    | TCast u => isL2Cnstr u
+    | _ => None
+  end.
+
+Lemma isL2Cnstr_spec:
+  forall t i cn arty,
+    isL2Cnstr t = Some (i, cn, arty) ->
+    (t = TConstruct i cn arty) \/
+    exists u, (t = TCast u /\ isL2Cnstr u = Some (i, cn, arty)).
+Proof.
+  induction t; intros; cbn in H; try discriminate.
+  - destruct (IHt _ _ _ H).
+    + right. exists t. intuition.
+    + right. exists t. intuition.
+  - myInjection H. left. reflexivity.
+Qed.
+
+Function isL2Rel (t:Term) : option nat :=
+  match t with
+    | TRel n => Some n
+    | TCast u => isL2Rel u
+    | _ => None
+  end.
+
 Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n m:nat), isCanonical (TConstruct i n m)
 | canA: forall (arg:Term) (args:Terms) (i:inductive) (n m:nat), 
@@ -243,10 +272,10 @@ induction t;
 - left. constructor.
 Qed.
 
-Function canonicalP (t:Term) : option (nat * Terms) :=
+Function canonicalP (t:Term) : option (nat * Terms * nat) :=
   match t with
-    | TConstruct _ r _ => Some (r, tnil)
-    | TApp (TConstruct _ r _) arg args => Some (r, tcons arg args)
+    | TConstruct _ r arty => Some (r, tnil, arty)
+    | TApp (TConstruct _ r arty) arg args => Some (r, tcons arg args, arty)
     | x => None
   end.
 
@@ -262,8 +291,8 @@ Lemma isCanonical_canonicalP:
   forall t, isCanonical t -> exists x, canonicalP t = Some x.
 Proof.
   induction 1; simpl.
-  - exists (n, tnil). reflexivity.
-  - exists (n, tcons arg args). reflexivity.
+  - exists (n, tnil, m). reflexivity.
+  - exists (n, tcons arg args, m). reflexivity.
 Qed.
 
 
@@ -578,6 +607,27 @@ induction t; intros arg args h; simpl; try reflexivity.
 - elim h. exists t1, t2, t3. reflexivity.
 Qed.
 
+Lemma isL2Cnstr_mkApp_Some:
+  forall t ts i x arty,
+    isL2Cnstr (mkApp t ts) = Some (i, x, arty) ->
+    ts = tnil \/ isL2Cnstr t = Some (i, x, arty).
+Proof.
+  intros. functional induction (mkApp t ts).
+  - cbn in H. discriminate.
+  - right. assumption.
+  - cbn in H. discriminate.
+Qed.
+
+Lemma isL2Cnstr_mkApp_None:
+    forall t u us,
+    isL2Cnstr t = None -> isL2Cnstr (mkApp t (tcons u us)) = None.
+Proof.
+  intros. case_eq (isL2Cnstr (mkApp t (tcons u us))); intros.
+  - assert (j:= mkApp_isApp t u us).
+    destruct j as [x0 [x1 [x2 k]]]. rewrite k in H0. cbn in H0. discriminate.
+  - reflexivity.
+Qed.  
+
 (** main lemma for dealing with mkApp **)
 Lemma mkApp_isApp_lem:
   forall fn arg args, exists fn' arg' args',
@@ -674,7 +724,7 @@ Qed.
 
 Lemma canonicalP_pres_WFapp:
   forall t, WFapp t ->
-        forall r args, canonicalP t = Some (r, args) -> WFapps args.
+        forall r args arty, canonicalP t = Some (r, args, arty) -> WFapps args.
 Proof.
   induction t; simpl; intros; try discriminate.
   - destruct t1; try discriminate. myInjection H0. inversion_Clear H.
@@ -1103,7 +1153,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | ISort: forall n srt, Instantiate n (TSort srt) (TSort srt)
 | IProof: forall n, Instantiate n TProof TProof
 | ICast: forall n t it,
-           Instantiate n t it -> Instantiate n (TCast t) (TCast it)
+           Instantiate n t it -> Instantiate n (TCast t) it
 | IProd: forall n nm bod ibod,
              Instantiate (S n) bod ibod -> 
              Instantiate n (TProd nm bod) (TProd nm ibod)
@@ -1170,8 +1220,6 @@ intro h. apply InstInstsDefs_ind; intros; auto.
   + constructor. intuition. 
 - inversion_Clear H0.
   + constructor. intuition. 
-- inversion_Clear H0.
-  + constructor. intuition. 
 - inversion_Clear H1.
   + constructor. intuition. 
   + apply PoLetInBod. intuition.
@@ -1207,7 +1255,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TCast t => TCast (instantiate n t)
+    | TCast t => instantiate n t
     | x => x
   end
 with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
@@ -1225,12 +1273,37 @@ Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop
 with instantiates_ind' := Induction for instantiates Sort Prop
 with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop.
 
+Lemma instantiates_pres_tlength:
+  forall n ds, tlength (instantiates n ds) = tlength ds.
+Proof.
+  induction ds.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
 Lemma instantiateDefs_pres_dlength:
   forall n ds, dlength ds = dlength (instantiateDefs n ds).
 Proof.
   induction ds.
   + reflexivity.
   + simpl. intuition.
+Qed.
+
+Lemma instantiate_AppConstruct:
+   forall nin i n arty arg args,
+     instantiate nin (TApp (TConstruct i n arty) arg args) =
+     TApp (TConstruct i n arty)
+          (instantiate nin arg) (instantiates nin args).
+Proof.
+   reflexivity.
+Qed.
+
+Lemma instantiate_mkAppConstruct:
+   forall nin i n arty arg args,
+     instantiate nin (TApp (TConstruct i n arty) arg args) =
+     mkApp (TConstruct i n arty) (instantiates nin (tcons arg args)).
+Proof.
+   reflexivity.
 Qed.
 
 Lemma Instantiate_instantiate:
@@ -1268,27 +1341,42 @@ Lemma instant_pres_PoccTrm:
   (forall tbod, PoccTrm tbod -> forall n, PoccTrm (instantiate n tbod)) /\
   (forall ts, PoccTrms ts -> forall n, PoccTrms (instantiates n ts)) /\
   (forall (Ds:Defs), PoccDefs Ds -> forall n, PoccDefs (instantiateDefs n Ds)).
-apply poTrmTrmsDefs_ind; intros; simpl; try solve [constructor; trivial].
-- eapply Pocc_TApp_mkApp. apply PoAppL. auto.
-- eapply Pocc_TApp_mkApp. apply PoAppA. auto.
-- eapply Pocc_TApp_mkApp. apply PoAppR. auto.
+Proof.
+  apply poTrmTrmsDefs_ind; intros; cbn; try solve [constructor; trivial].
+  - apply H0.
+  - eapply Pocc_TApp_mkApp. apply PoAppL. auto.
+  - eapply Pocc_TApp_mkApp. apply PoAppA. auto.
+  - eapply Pocc_TApp_mkApp. apply PoAppR. auto.
 Qed.
 
+(****
 Lemma instantiate_is_Const:
   forall n tbod,
     instantiate n tbod = TConst nm -> 
     (tbod = TRel n /\ tin = TConst nm) \/ (tbod = TConst nm).
-induction tbod; intros h; simpl; intuition; try discriminate.
-- unfold instantiate in h.
-  case_eq (nat_compare n n0); intros; rewrite H in h.
-  + left. split. rewrite (nat_compare_eq _ _ H). reflexivity.
-    * destruct tin; simpl in h; try discriminate. assumption.
-  + discriminate.
-  + discriminate.
-- simpl in h.
-  assert (j:= mkApp_isApp (instantiate n tbod1)
-                              (instantiate n tbod2) (instantiates n t)).
-  destruct j as [x0 [x1 [x2 k]]]. rewrite k in h. discriminate.
+Proof.
+  induction tbod; intros h; simpl; intuition; try discriminate.
+  - unfold instantiate in h.
+    case_eq (nat_compare n n0); intros; rewrite H in h.
+    + left. split. rewrite (nat_compare_eq _ _ H). reflexivity.
+      * destruct tin; simpl in h; try discriminate. assumption.
+    + discriminate.
+    + discriminate.
+  - subst. cbn in h. rewrite match_cn_Eq in h; try reflexivity.
+    rewrite mkApp_tnil_ident in h. subst.
+    - simpl in h.
+    assert (j:= mkApp_isApp (instantiate n tbod1)
+                            (instantiate n tbod2) (instantiates n t)).
+    destruct j as [x0 [x1 [x2 k]]]. rewrite k in h. discriminate.
+Qed.
+ ****)
+
+Lemma instantiate_TApp_mkApp:
+  forall n fn arg args,
+  instantiate n (TApp fn arg args) =
+   mkApp (instantiate n fn) (instantiates n (tcons arg args)).
+Proof.
+  intros. cbn. reflexivity.
 Qed.
 
 End Instantiate_sec.
@@ -1308,7 +1396,7 @@ Proof.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). apply mkApp_pres_WFapp; auto.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
-  - change (WFapp (TCast (instantiate t n tm))). constructor.
+  - change (WFapp (instantiate t n tm)). 
     + apply H0. assumption.
   - change (WFapp (TProd nm (instantiate t (S n) bod))).
     constructor.

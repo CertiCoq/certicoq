@@ -7,9 +7,13 @@ Add LoadPath "../L2_typeStripped" as L2.
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Arith.PeanoNat.
 Require Import Coq.Arith.Peano_dec.
+Require Import omega.Omega.
+Require Import Recdef.
 Require Import Common.Common.
-Require Import L2.compile.
+Require L2.compile.
+Require L2.term.
 Require L2.program.
 
 Local Open Scope string_scope.
@@ -58,17 +62,191 @@ Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
 
-Fixpoint tlength (ts:Terms) : nat :=
+
+Definition isConstruct (t:Term) : Prop :=
+  exists i n ts, t = TConstruct i n ts.
+Lemma IsConstruct: forall i n ts, isConstruct (TConstruct i n ts).
+intros. exists i, n, ts. reflexivity.
+Qed.
+Hint Resolve IsConstruct.
+
+Function tlength (ts:Terms) : nat :=
   match ts with 
     | tnil => 0
     | tcons _ ts => S (tlength ts)
   end.
 
+Lemma tlength_S:
+  forall ts p,
+    tlength ts > p ->
+    exists u us, ts = tcons u us /\ tlength us >= p.
+Proof.
+  induction ts; intros.
+  - cbn in H. omega.
+  - cbn in H. case_eq ts; intros; subst.
+    + exists t, tnil. auto. cbn in H. assert (j:p = 0). omega. subst.
+      intuition.
+    + exists t, (tcons t0 t1). intuition.
+Qed.
+    
 Fixpoint tappend (ts1 ts2:Terms) : Terms :=
   match ts1 with
     | tnil => ts2
     | tcons t ts => tcons t (tappend ts ts2)
   end.
+
+Lemma tappend_tnil: forall ts:Terms, tappend ts tnil = ts.
+Proof.
+  induction ts; simpl; try reflexivity.
+  rewrite IHts. reflexivity.
+Qed.
+
+Lemma tappend_assoc:
+  forall xts yts zts,
+       (tappend xts (tappend yts zts)) = (tappend (tappend xts yts) zts).
+  induction xts; intros yts zts; simpl.
+  - reflexivity.
+  - rewrite IHxts. reflexivity.
+Qed.
+
+Lemma tappend_pres_tlength:
+  forall ts us, tlength (tappend ts us) = (tlength ts) + (tlength us).
+Proof.
+  induction ts; intros.
+  - reflexivity.
+  - cbn. rewrite IHts. reflexivity.
+Qed.
+
+(** return n (or as many as possible) from front of ts **)
+Fixpoint ttake (ts:Terms) (n:nat) : Terms :=
+  match ts with
+    | tnil => tnil
+    | (tcons u us) as uus =>
+      match n with
+        | 0 => uus
+        | S n => ttake us n
+      end
+  end.
+
+Fixpoint treverse (ts: Terms) : Terms :=
+  match ts with
+    | tnil => tnil
+    | tcons b bs => tappend (treverse bs) (tunit b)
+  end.
+
+Lemma treverse_tappend_distr:
+  forall x y:Terms,
+    treverse (tappend x y) = tappend (treverse y) (treverse x).
+Proof.
+  induction x as [| a l IHl]; cbn; intros.
+  - destruct y as [| a l]; cbn. reflexivity.
+    rewrite tappend_tnil. reflexivity.
+  - rewrite (IHl y). rewrite tappend_assoc. reflexivity.
+Qed.
+
+Remark treverse_tunit:
+  forall (l:Terms) (a:Term),
+    treverse (tappend l (tunit a)) = tcons a (treverse l).
+Proof.
+  intros.
+  apply (treverse_tappend_distr l (tunit a)); simpl; auto.
+Qed.
+
+Lemma treverse_involutive:
+  forall ts:Terms, treverse (treverse ts) = ts.
+Proof.
+  induction ts as [| a l IHl]; cbn; intros. reflexivity.
+  - rewrite treverse_tunit. rewrite IHl. reflexivity.
+Qed.
+   
+Remark tunit_treverse:
+    forall (l:Terms) (a:Term),
+    tappend (treverse l) (tunit a) = treverse (tcons a l).
+Proof.
+  intros. cbn. reflexivity.
+Qed.
+
+Lemma treverse_pres_tlength:
+  forall ts, tlength ts = tlength (treverse ts).
+Proof.
+  induction ts; intros. reflexivity.
+  - cbn. rewrite IHts. rewrite tappend_pres_tlength. cbn. omega.
+Qed.
+  
+Function tfirsts_tlast (t:Term) (ts:Terms) : Terms * Term :=
+  match ts with
+    | tnil => (tnil, t)
+    | tcons u tnil => (tunit t, u)
+    | tcons v (tcons u us) =>
+      let xsx := tfirsts_tlast u us in
+      (tcons t (tcons v (fst xsx)), (snd xsx))
+  end.
+
+Lemma tfirsts_tlast_pres_tlength:  
+  forall t ts, tlength (fst (tfirsts_tlast t ts)) = tlength ts.
+Proof.
+  intros t ts. functional induction (tfirsts_tlast t ts); try reflexivity.
+  - cbn. rewrite <- IHp. reflexivity.
+Qed.
+
+Lemma tfirsts_tlast_spec:
+  forall t ts,
+    tcons t ts = let xsx := tfirsts_tlast t ts in
+                 tappend (fst xsx) (tunit (snd xsx)).
+Proof.
+  intros t ts. functional induction (tfirsts_tlast t ts); try reflexivity.
+  - rewrite IHp. reflexivity.
+Qed.
+  
+Lemma tfirsts_tlast_tnil_tnil:
+  forall ys y, fst (tfirsts_tlast y ys) = tnil -> ys = tnil.
+Proof.
+  induction ys; intros. reflexivity.
+  - destruct ys; discriminate.
+Qed.
+
+Lemma tfirsts_tlast_tnil_y:
+  forall ys y, fst (tfirsts_tlast y ys) = tnil ->
+               snd (tfirsts_tlast y ys) = y.
+Proof.
+  induction ys; intros. reflexivity.
+  - destruct ys; discriminate.
+Qed.
+
+Lemma tfirsts_tlast_tcons_last:
+  forall t t' u us, snd (tfirsts_tlast t (tcons u us)) =
+                    snd (tfirsts_tlast t' (tcons u us)).
+Proof.
+  induction us; intros; cbn; reflexivity.
+Qed.
+
+Lemma tfirsts_tlast_tcons:
+  forall t u us,
+  exists v vs z, tfirsts_tlast t (tcons u us) = (tcons v vs, z).
+Proof.
+  induction us; intros.
+  - exists t, tnil, u. reflexivity.
+  - destruct IHus as [x0 [x1 [x2 j]]].
+    exists t,
+    (tcons u (fst (tfirsts_tlast t0 us))), (snd (tfirsts_tlast t0 us)).
+    reflexivity.
+Qed.
+
+Inductive Tfirsts_tlast : Term -> Terms -> Terms -> Term -> Prop :=
+| Tflnil: forall t, Tfirsts_tlast t tnil tnil t
+| Tflc1: forall t u, Tfirsts_tlast t (tcons u tnil) (tunit t) u
+| Tflc2: forall t v u us xs x,
+           Tfirsts_tlast u us xs x ->
+           Tfirsts_tlast t (tcons v (tcons u us)) (tcons t (tcons v xs)) x.
+
+Goal
+  forall t ts xs x,
+    Tfirsts_tlast t ts xs x -> tlength ts = tlength xs.
+Proof.
+  induction 1; try reflexivity.
+  - cbn. rewrite IHTfirsts_tlast. reflexivity.
+Qed.
+
 
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
@@ -77,48 +255,205 @@ Fixpoint dlength (ts:Defs) : nat :=
   end.
 
 
-(** turn (App fn [x1;...;xn]) into (App (... (App fn x1) x2 ...) xn) **)
-Function mkApp (fn:Term) (xs:Terms) : Term :=
-    match xs with
-      | tnil => fn
-      | tcons b ys => mkApp (TApp fn b) ys
-    end.
+(** lift a Term over a new binding **)
+Fixpoint lift (n:nat) (t:Term) : Term :=
+  match t with
+    | TRel m => TRel (match m ?= n with
+                        | Lt => m
+                        | _ => S m
+                      end)
+    | TProd nm bod => TProd nm (lift (S n) bod)
+    | TLambda nm bod => TLambda nm (lift (S n) bod)
+    | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
+    | TApp fn arg => TApp (lift n fn) (lift n arg)
+    | TConstruct i x args => TConstruct i x (lifts n args)
+    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (lifts n brs)
+    | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
+    | _ => t
+  end
+with lifts (n:nat) (ts:Terms) : Terms :=
+       match ts with
+         | tnil => tnil
+         | tcons u us => tcons (lift n u) (lifts n us)
+       end
+with liftDs n (ds:Defs) : Defs :=
+       match ds with
+         | dnil => dnil
+         | dcons nm u j es => dcons nm (lift n u) j (liftDs n es)
+       end.
 
-(** turn (Constructor [x1;...;xn; 0;...k]])  with arity n+k into
-*** (Lam ... (Lam (Const [x1;...;xn; 0;...k])...))
-**)
-Function mkEta (cstr:Term) (xtraArity:nat) : Term :=
-    match xtraArity with
-      | 0 => cstr
-      | S n => mkEta (TLambda nAnon cstr) n
-    end.
-
-Lemma mkEta_under_Lambda:
-  forall n t, mkEta (TLambda nAnon t) n = TLambda nAnon (mkEta t n).
+Lemma lifts_pres_tlength:
+  forall n ts, tlength (lifts n ts) = tlength ts.
 Proof.
-  induction n; simpl; intros.
+  induction ts.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
+Lemma liftDs_pres_dlength:
+  forall n ds, dlength (liftDs n ds) = dlength ds.
+Proof.
+  induction ds.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
+Lemma tappend_pres_lifts:
+  forall ts ss n, lifts n (tappend ts ss) = tappend (lifts n ts) (lifts n ss).
+Proof.
+  induction ts; intros.
   - reflexivity.
-  - rewrite IHn. reflexivity.
+  - cbn. rewrite IHts. reflexivity.
+Qed.
+  
+Lemma treverse_pres_lifts:
+  forall ts n, lifts n (treverse ts) = treverse (lifts n ts).
+Proof.
+  induction ts; intros.
+  - reflexivity.
+  - cbn. rewrite <- IHts. rewrite tappend_pres_lifts.
+    reflexivity.
+Qed.
+  
+
+(** turn (Construct [x1;...;xn; 0;...k-1]])  with arity n+k into
+*** (Lam ... (Lam (Construct [x1;...;xn; 0;...k-1])...))
+*** lift [x1;...;xn] k times,
+*** then append the k fresh variables and surround with k lambdas
+**)
+Fixpoint mkEtaLams (xtraArity:nat) i x args : Term :=
+  match xtraArity with
+    | 0 => TConstruct i x args
+    | S n => TLambda nAnon (mkEtaLams n i x args)
+  end.
+
+Fixpoint mkEtaArgs k args: Terms :=
+  match k with
+    | 0 => treverse args
+    | S n => mkEtaArgs n (tcons (TRel 0) (lifts 0 args))
+  end.
+  
+(** If there are extra args (more than arity, which cannot happen in
+*** a program checked by Coq) we just truncate them,
+*** and no eta expansion is required 
+**)
+Definition etaExp_cnstr (i:inductive) (x xtra:nat) (args:Terms) : Term :=
+   mkEtaLams xtra i x (mkEtaArgs xtra (treverse args)).
+
+Lemma etaExp_cnstr_0:
+  forall (args:Terms) (i:inductive) (n:nat),
+    etaExp_cnstr i n 0 args = TConstruct i n args.
+Proof. 
+  intros. cbn. rewrite treverse_involutive. reflexivity.
+Qed.
+
+Lemma etaExp_cnstr_S:
+  forall (xtra:nat) (args:Terms) (i:inductive) (x:nat),
+    etaExp_cnstr i x (S xtra) args =
+    TLambda nAnon
+            (mkEtaLams
+               xtra i x (mkEtaArgs xtra (tcons (TRel 0)
+                                               (lifts 0 (treverse args))))).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma etaExp_cnstr_S':
+  forall (xtra:nat) (args:Terms) (i:inductive) (x:nat),
+    mkEtaLams (S xtra) i x (mkEtaArgs (S xtra) args) =
+    TLambda nAnon
+            (mkEtaLams
+               xtra i x (mkEtaArgs xtra (tcons (TRel 0) (lifts 0 args)))).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma etaExp_cnstr_tnil:
+  forall (i:inductive) (n xtra:nat),
+    etaExp_cnstr i n xtra tnil =
+    mkEtaLams xtra i n (mkEtaArgs xtra tnil).
+Proof.
+  reflexivity. 
+Qed.
+
+Lemma etaExp_cnstr_tcons:
+  forall (xtra:nat) (i:inductive) (n:nat) t ts,
+    etaExp_cnstr i n xtra (tcons t ts) =
+    mkEtaLams xtra i n (mkEtaArgs xtra (tappend (treverse ts) (tunit t))).
+Proof.
+  induction xtra; intros.
+  - rewrite etaExp_cnstr_0. unfold mkEtaLams, mkEtaArgs.
+    rewrite treverse_tunit. rewrite treverse_involutive. reflexivity.
+  - rewrite tunit_treverse. reflexivity.
+Qed.
+
+Lemma etaExp_cnstr_Lam_or_Cnstr':
+  forall i n xtra ts,
+    (exists ytra, xtra = S ytra /\
+                     etaExp_cnstr i n xtra ts =
+                     TLambda nAnon (mkEtaLams ytra i n
+                      (mkEtaArgs ytra
+                        (tcons (TRel 0) (lifts 0 (treverse ts)))))) \/
+    (exists us, xtra = 0 /\ etaExp_cnstr i n xtra ts = TConstruct i n us).
+Proof.
+  destruct xtra; intros; unfold etaExp_cnstr; cbn.
+  - right. exists ts. rewrite treverse_involutive. intuition. 
+  - left. exists xtra. intuition.
+Qed.
+
+Lemma etaExp_cnstr_Lam_or_Cnstr:
+  forall i n xtra ts,
+    (exists bod, etaExp_cnstr i n xtra ts = TLambda nAnon bod) \/
+    (exists us, etaExp_cnstr i n xtra ts = TConstruct i n us).
+Proof.
+    destruct xtra; intros; unfold etaExp_cnstr; cbn.
+  - right. exists ts. rewrite treverse_involutive. reflexivity.
+  - left.
+    exists
+    (mkEtaLams xtra i n
+               (mkEtaArgs xtra (tcons (TRel 0) (lifts 0 (treverse ts))))).
+    reflexivity.
 Qed.
 
 
-(** compute list of variables for eta expanding a constructor
-*** (which may already be partially applied)
-**)
-Function etaArgs (n:nat) : Terms :=
-  match n with
-    | 0 => tnil
-    | S m => tcons (TRel m) (etaArgs m)
+(** turn (App fn [x1;...;xn]) into (App (... (App fn x1) x2 ...) xn) **)
+Function mkApp (fn:Term) (ts:Terms) : Term :=
+  match ts with
+    | tnil => fn
+    | tcons y ys => mkApp (TApp fn y) ys
   end.
 
-Function etaExp_cnstr (i:inductive) (n arity:nat) (args:Terms) : Term :=
-  match nat_compare (tlength args) arity with
-    | Datatypes.Eq => (TConstruct i n args)
-    | Lt => let k := arity - (tlength args)
-            in (mkEta (TConstruct i n (tappend args (etaArgs k))) k)
-    | Gt => TWrong
-  end.
+Lemma mkApp_idempotent:
+  forall ts (fn:Term) (ss:Terms),
+    mkApp (mkApp fn ts) ss = mkApp fn (tappend ts ss).
+Proof.
+  induction ts; destruct fn; intros; cbn; try reflexivity;
+  try rewrite <- IHts; try reflexivity.
+Qed.                                                       
+  
+Lemma mkApp_tnil: forall fn, mkApp fn tnil = fn.
+  intros. reflexivity.
+Qed.
 
+Lemma mkApp_cons:
+  forall fn u us, mkApp fn (tcons u us) = mkApp (TApp fn u) us.
+Proof.
+  intros. reflexivity.
+Qed.
+
+Lemma mkApp_out:
+  forall ts fn u,
+    mkApp fn (tappend ts (tunit u)) = TApp (mkApp fn ts) u.
+Proof.
+  induction ts; intros. reflexivity.
+  - cbn. rewrite IHts. reflexivity.
+Qed.
+
+  
+(** Auxiliary function to avoid case blowup when expanding [strip] in L3 **)
+Definition isL2Cnstr: L2Term -> option (inductive * nat * nat) :=
+  L2.term.isL2Cnstr.
+  
 Function strip (t:L2Term) : Term :=
   match t with
     | L2.compile.TProof => TProof
@@ -129,12 +464,10 @@ Function strip (t:L2Term) : Term :=
     | L2.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
     | L2.compile.TApp fn arg args =>
-      let sarg := strip arg in
-      let sargs := strips args in
-      match fn with 
-        | L2.compile.TConstruct i n arty =>
-          etaExp_cnstr i n arty (tcons sarg sargs)
-        | x => mkApp (strip x) (tcons sarg sargs)
+      let sargs := tcons (strip arg) (strips args) in
+      match isL2Cnstr fn with 
+        | Some (i, n, arty) => etaExp_cnstr i n (arty - (tlength sargs)) sargs
+        | None => mkApp (strip fn) sargs
        end
     | L2.compile.TConst nm => TConst nm
     | L2.compile.TAx => TAx
@@ -162,6 +495,177 @@ Combined Scheme stripStripsStripDs_ind
          from strip_ind', strips_ind', stripDs_ind'.
 ***)
 
+Lemma strips_pres_tlength:
+  forall ts:L2Terms,
+  tlength (strips ts) = L2.term.tlength ts.
+Proof.
+  induction ts. reflexivity.
+  cbn. rewrite IHts. reflexivity.
+Qed.
+  
+Lemma stripDs_pres_dlength:
+  forall ds:L2Defs,
+  dlength (stripDs ds) = L2.term.dlength ds.
+Proof.
+  induction ds. reflexivity.
+  cbn. rewrite IHds. reflexivity.
+Qed.
+  
+Lemma isL2Cnstr_TApp_None:
+  forall fn t ts, isL2Cnstr (L2.compile.TApp fn t ts) = None.
+Proof.
+  intros. reflexivity.
+Qed.
+
+Lemma strip_TAppTConstruct:
+  forall i n arty arg args,
+    strip (L2.compile.TApp (L2.compile.TConstruct i n arty) arg args) =
+    etaExp_cnstr i n (arty - S (tlength (strips args)))
+                 (tcons (strip arg) (strips args)).
+Proof.
+  intros. reflexivity.
+Qed.
+
+Lemma isL2Cnstr_Some:
+  forall t i cn arty,
+    isL2Cnstr t = Some (i, cn, arty) -> strip t = etaExp_cnstr i cn arty tnil.
+Proof.
+  induction t; intros; subst; cbn in H; try discriminate.
+  - rewrite <- IHt. reflexivity. assumption.
+  - myInjection H. reflexivity.
+Qed.
+
+Lemma stripApp_notCnstr:
+  forall t fn s, strip t = TApp fn s -> isL2Cnstr t = None.
+Proof.
+  induction t; intros; cbn; try reflexivity.
+  - eapply IHt. cbn in H. eassumption.
+  - cbn in H. destruct (@etaExp_cnstr_Lam_or_Cnstr i n n0 tnil).
+    + destruct H0 as [x0 j]. rewrite j in H. discriminate.
+    + destruct H0 as [x0 j]. rewrite j in H. discriminate.
+Qed.
+  
+Lemma stripAppApp_notCnstr:
+  forall y0 y1 y2 fn s,
+    strip (L2.compile.TApp y0 y1 y2) = TApp fn s -> isL2Cnstr y0 = None.
+Proof.
+  induction y0; intros; cbn; try reflexivity.
+  - cbn in H. case_eq (isL2Cnstr y0); intros; try reflexivity.
+    destruct p, p. rewrite H0 in H.
+    destruct (@etaExp_cnstr_Lam_or_Cnstr
+                i n0 (n - S (tlength (strips y2)))
+                (tcons (strip y1) (strips y2))).
+    + destruct H1 as [x0 j]. rewrite j in H. discriminate.
+    + destruct H1 as [x0 j]. rewrite j in H. discriminate.
+  - cbn in H.
+    destruct (@etaExp_cnstr_Lam_or_Cnstr
+                i n (n0 - S (tlength (strips y2)))
+                (tcons (strip y1) (strips y2))).
+    + destruct H0 as [x0 j]. rewrite j in H. discriminate.
+    + destruct H0 as [x0 j]. rewrite j in H. discriminate.
+Qed.
+
+Lemma isL2Cnstr_None:
+  forall t, isL2Cnstr t = None -> ~ L2.term.isConstruct t.
+Proof.
+  intros.
+  destruct t; intros h; destruct h as [x0 [x1 [x2 j]]]; try discriminate.
+Qed.
+
+Lemma isL2Cnstr_Some_strip:
+  forall u i x arty,
+    isL2Cnstr u = Some (i, x, arty) ->
+    strip u = strip (L2.compile.TConstruct i x arty).
+Proof.
+  induction u; cbn; intros; try discriminate.
+  - rewrite (IHu _ _ _ H). reflexivity.
+  - myInjection H. reflexivity.
+Qed.
+
+                                         
+Lemma TFix_hom:
+  forall defs n,
+    strip (L2.compile.TFix defs n) = TFix (stripDs defs) n.
+reflexivity.
+Qed.
+
+Lemma TProd_hom:
+  forall nm bod,
+    strip (L2.compile.TProd nm bod) = TProd nm (strip bod).
+reflexivity.
+Qed.
+
+Lemma TLambda_hom:
+  forall nm bod,
+    strip (L2.compile.TLambda nm bod)  = TLambda nm (strip bod).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma TLetIn_hom:
+  forall nm dfn bod,
+    strip (L2.compile.TLetIn nm dfn bod) =
+    TLetIn nm (strip dfn) (strip bod).
+reflexivity.
+Qed.
+
+Lemma TCase_hom:
+  forall n mch brs,
+    strip (L2.compile.TCase n mch brs) =
+    TCase n (strip mch) (strips brs).
+reflexivity.
+Qed.
+
+Lemma TConstruct_hom:
+  forall i n arty,
+    strip (L2.compile.TConstruct i n arty) = etaExp_cnstr i n arty tnil.
+Proof.
+  reflexivity.  
+Qed.
+
+Lemma TInd_hom:
+  forall i,
+        strip (L2.compile.TInd i) = (TInd i).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma dlength_hom:
+  forall ds, L2.term.dlength ds = dlength (stripDs ds).
+induction ds. intuition. cbn. rewrite IHds. reflexivity.
+Qed.
+
+Lemma tcons_hom:
+  forall t ts, strips (L2.compile.tcons t ts) = tcons (strip t) (strips ts).
+reflexivity.
+Qed.
+
+Lemma dcons_hom:
+  forall nm t m ds,
+    stripDs (L2.compile.dcons nm t m ds) = dcons nm (strip t) m (stripDs ds).
+reflexivity.
+Qed.
+
+Lemma tappend_hom:
+  forall ts us,
+    strips (L2.term.tappend ts us) = tappend (strips ts) (strips us).
+induction ts; intros us; simpl. reflexivity.
+rewrite IHts. reflexivity.
+Qed.
+
+Lemma TApp_hom:
+  forall fn arg args,
+    strip (L2.compile.TApp fn arg args) =
+    match isL2Cnstr fn with
+      | Some (i, n, arty) =>
+        etaExp_cnstr i n (arty - S (tlength (strips args)))
+                     (tcons (strip arg) (strips args))
+      | None => mkApp (strip fn) (tcons (strip arg) (strips args))
+    end.
+Proof.
+  intros. case_eq fn; intros; try reflexivity.
+Qed.
+
 
 Function stripEC (ec:L2EC) : envClass Term :=
   match ec with
@@ -173,9 +677,6 @@ Function stripEC (ec:L2EC) : envClass Term :=
 Function stripEnv (p:L2Env) : environ Term :=
   match p with
     | nil => nil
-               (****************
-    | cons (nm, ecTyp _ _ nil) q =>  stripEnv q  (** remove axioms from env **)
-***********************)
     | cons (nm, ec) q => cons (nm, stripEC ec) (stripEnv q)
   end.
 

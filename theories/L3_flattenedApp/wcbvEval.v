@@ -119,6 +119,7 @@ Proof.
   - eapply wCase; intuition; try eassumption.
 Qed.
 
+
 (************  in progress  ****
 Lemma WcbvEval_strengthen:
   forall pp,
@@ -411,7 +412,7 @@ Lemma wcbvEval_WcbvEval:
   (forall t s, wcbvEval n t = Ret s -> WcbvEval p t s) /\
   (forall ts ss, wcbvEvals n ts = Ret ss -> WcbvEvals p ts ss).
 Proof.
-  intros n. Check wcbvEvalEvals_ind.
+  intros n.
   apply (wcbvEvalEvals_ind 
            (fun n t (o:exception Term) =>
               forall (s:Term) (p1:o = Ret s), WcbvEval p t s)
@@ -488,23 +489,6 @@ Proof.
     destruct efn; try reflexivity.
     + elim n. auto.
     + elim n0. auto.
-      (***************
-  - destruct H as [x hx]. destruct H0 as [y hy]. destruct H1 as [z hz].
-    exists (S (max x (max y z))). intros m h.
-    assert (k:wcbvEval m mch = Ret (TConstruct i n args)).
-    { rewrite (j m (max x (max y z))).
-      apply hx. assert (l:= max_fst x (max y z)); omega. omega. }
-    assert (k0:wcbvEvals m p brs = Some ebrs).
-    { rewrite (j m (max x (max y z))). apply hy.
-      assert (l:= max_snd x (max y z)). assert (l':= max_fst y z).
-      omega. omega. }
-    cbn. rewrite k0. rewrite k.
-    destruct inductive_dec.
-    rewrite e0. rewrite e1.
-    rewrite (j m (max x (max y z))). apply hz.
-    assert (l:= max_snd x (max y z)). assert (l':= max_snd y z).
-    omega. omega. contradiction.
-****************)
   - destruct H as [x hx]. destruct H0 as [x0 hx0].
     exists (S (max x x0)). intros m hm. cbn.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
@@ -875,69 +859,6 @@ induction 1.
 - tran_step. eapply sAppFun.
 Check (rt_refl Term (wndEval p)). _ (wndEval p) _ IHWcbvEval1).
 **)
-
-(** use a timer to make this Terminate **)
-Fixpoint wcbvEval (tmr:nat) (p:environ Term) (t:Term) {struct tmr} : nat * Term :=
-  match tmr with 
-    | 0 => (0, t)          (** out of time  **)
-    | S n => match t with  (** look for a redex **)
-               | TConst nm => match (lookupDfn nm p) with
-                                | Some t => wcbvEval n t
-                                | None =>  (0, TUnknown nm)
-                              end
-               | TApp fn (cons a1 args) =>
-                 let efn := snd (wcbvEval n fn) in
-                 match efn with
-                   | TLambda _ _ bod =>
-                     let wharg := snd (wcbvEval n a1) in
-                     wcbvEval n (whBetaStep bod wharg args)
-                   | TFix dts m => wcbvEval n (whFixStep dts m args)
-                   | TConstruct _ r =>
-                     let eargs := map (compose (@snd nat Term) (wcbvEval n p))
-                                      (cons a1 args) in
-                     (n, mkApp efn eargs)
-                   | _ => (n, TUnknown"App")
-                 end
-               | TCase np _ mch brs =>
-                 match evCanon n p mch with
-                   | Some (cstr, args) =>
-                     wcbvEval n (whCaseStep cstr (skipn np args) brs)
-                   | None => (n, mch)
-                 end
-               | TLetIn nm df ty bod =>
-                 wcbvEval n (TApp (TLambda nm ty bod) (df::nil))
-               | TCast t1 ck t2 => (n, TCast (snd (wcbvEval n t1)) ck t2)
-               (** already in whnf ***)
-               | TLambda nn ty t => (n, TLambda nn ty t)
-               | TProd nn ty t => (n, TProd nn ty t)
-               | TFix mfp br => (n, TFix mfp br)
-               | TConstruct i cn => (n, TConstruct i cn)
-               | TInd i => (n, TInd i)
-               | TSort srt => (n, TSort srt)
-               (** should never appear **)
-               | TApp _ nil => (0, TUnknown "App no args")
-               | TRel _ => (0, TUnknown "TRel")
-               | TUnknown s => (0, TUnknown s)
-             end
-  end
-(***
-with
-wcbvEvalArgs tmr p (ts:Terms) {struct ts} : Terms :=
-  match ts with
-    | nil => nil
-    | cons t ts => cons (snd (wcbvEval tmr p t)) (wcbvEvalArgs tmr p ts)
-  end
-***)
-with evCanon tmr p (t:Term) {struct tmr} : option (nat * Terms) :=
-  match tmr with
-    | 0 => None              (** out of time  **)
-    | S n => match (wcbvEval n t) with
-               | (_, TConstruct _ cstr) => Some (cstr, nil)
-               | (_, TApp (TConstruct _ cstr) ts) => Some (cstr, ts)
-               | x => None
-             end
-  end.
-
 
 Definition Nat := nat.
 Definition typedef := ((fun (A:Type) (a:A) => a) Nat 1).

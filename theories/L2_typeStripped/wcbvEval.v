@@ -54,9 +54,9 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               ~ isLambda fn' -> ~ isFix fn' ->
               WcbvEvals p (tcons arg args) (tcons arg' args') ->
               WcbvEval p (TApp fn arg args) (mkApp fn' (tcons arg' args'))
-| wCase: forall mch Mch n args ml ts brs cs s,
+| wCase: forall mch Mch n args ml ts brs cs s arty,
                 WcbvEval p mch Mch ->
-                canonicalP Mch = Some (n, args) ->
+                canonicalP Mch = Some (n, args, arty) ->
                 tskipn (snd (fst ml)) args = Some ts ->
                 whCaseStep n ts brs = Some cs ->
                 WcbvEval p cs s ->
@@ -93,6 +93,42 @@ eapply wLam.
 change (WcbvEval nil xxxx xxxx).
 Abort.
 
+Lemma isL2Cnstr_WcbvEval_TCnstr:
+  forall t i x arty, isL2Cnstr t = Some (i, x, arty) ->
+                     forall p u, WcbvEval p t u -> u = TConstruct i x arty.
+Proof.
+  intros t.
+  functional induction (isL2Cnstr t); intros; try discriminate.
+  - myInjection H. inversion_Clear H0. reflexivity.
+  - eapply IHo. assumption. inversion_Clear H0. eassumption.
+Qed.
+
+Lemma isL2Cnstr_WcbvEval_TApp:
+  forall t i x arty, isL2Cnstr t = Some (i, x, arty) ->
+                     forall p et, WcbvEval p t et ->
+  forall arg args earg eargs,
+    WcbvEval p arg earg -> WcbvEvals p args eargs ->
+    WcbvEval p (TApp t arg args) (TApp (TConstruct i x arty) earg eargs).
+Proof.
+  intros t.
+  functional induction (isL2Cnstr t); intros; try discriminate.
+  - myInjection H. rewrite <- (mkApp_goodFn _  eargs). constructor.
+    + constructor.
+    + not_isLambda.
+    + not_isFix.
+    + intuition.
+    + not_isApp.
+  - rewrite <- (mkApp_goodFn _  eargs). constructor.
+    + inversion_Clear H0. erewrite <- (isL2Cnstr_WcbvEval_TCnstr). 
+      * constructor. apply H4. 
+      * eassumption.
+      * eassumption.
+    + not_isLambda.
+    + not_isFix.
+    + intuition.
+    + not_isApp.
+Qed.
+                         
 
 Lemma WcbvEval_mkApp_nil:
   forall t, WFapp t -> forall p s, WcbvEval p t s ->
@@ -179,6 +215,110 @@ Lemma WcbvEvals_tcons_tcons':
 Proof.
   inversion 1. intuition.
 Qed.
+
+Lemma WcbvEval_strengthen:
+  forall pp,
+  (forall t s, WcbvEval pp t s -> forall nm ec p, pp = (nm,ec)::p ->
+       Crct p 0 t -> WcbvEval p t s) /\
+  (forall ts ss, WcbvEvals pp ts ss -> forall nm ec p, pp = (nm,ec)::p ->
+       Crcts p 0 ts -> WcbvEvals p ts ss).
+Proof.
+  Admitted.
+(***
+  intros pp. apply WcbvEvalEvals_ind; intros; auto; subst.
+  - constructor. eapply H. reflexivity.
+    destruct ec.
+    + econstructor. try econstructor; try assumption.
+    intros h. destruct H1. constructor. assumption.
+  - assert (j:= not_eq_sym (notPocc_TConst H1)).
+    assert (j1:= Lookup_strengthen l eq_refl j).
+    econstructor.
+    + unfold LookupDfn. eassumption.
+    + eapply H. reflexivity. eapply (proj1 Crct_fresh_Pocc). eapply
+       
+      intros h. destruct H1. constructor. assumption.
+
+Lemma WcbvEval_strengthen:
+  forall pp, Crct pp 0 prop ->
+  (forall t s, WcbvEval pp t s -> forall nm ec p, pp = (nm,ec)::p ->
+       ~ PoccTrm nm t -> WcbvEval p t s) /\
+  (forall ts ss, WcbvEvals pp ts ss -> forall nm ec p, pp = (nm,ec)::p ->
+       ~ PoccTrms nm ts -> WcbvEvals p ts ss).
+Proof.
+  intros pp hpp. apply WcbvEvalEvals_ind; intros; auto; subst.
+  - constructor. eapply H. reflexivity.
+    intros h. destruct H1. constructor. assumption.
+  - assert (j:= not_eq_sym (notPocc_TConst H1)).
+    assert (j1:= Lookup_strengthen l eq_refl j).
+    econstructor.
+    + unfold LookupDfn. eassumption.
+    + eapply H. reflexivity. eapply (proj1 Crct_fresh_Pocc). eapply
+       
+      intros h. destruct H1. constructor. assumption.
+ **************)
+
+(***
+Lemma WcbvEval_pres_Crct:
+  (forall p n t, Crct p n t ->
+                 forall t', WcbvEval p t t' -> Crct p n t') /\
+  (forall p n ts, Crcts p n ts ->
+                  forall ts', WcbvEvals p ts ts' -> Crcts p n ts') /\
+  (forall p n ds, CrctDs p n ds -> True) /\
+  (forall p n itp, CrctTyp p n itp -> True).
+Proof.
+  apply CrctCrctsCrctDsTyp_ind; intros; try (solve[constructor; trivial]).
+  - inversion_Clear H; constructor.
+  - inversion_Clear H; constructor.
+  - apply CrctWkTrmTrm; try assumption. apply H0.
+    eapply (proj1 (WcbvEval_strengthen p)).
+
+
+Goal    
+  forall p, Crct p 0 prop ->
+    (forall t t', WcbvEval p t t' -> Crct p 0 t) /\
+    (forall ts ts', WcbvEvals p ts ts' -> Crcts p 0 ts).
+Proof.
+  intros p hp.
+  apply WcbvEvalEvals_ind; intros; try (solve[constructor; trivial]).
+  - eapply Crct_Prf. eassumption.
+  - constructor.
+    
+Lemma WcbvEval_pres_Crct:
+  forall p,
+    (forall t t', WcbvEval p t t' -> Crct p 0 t -> Crct p 0 t') /\
+    (forall ts ts', WcbvEvals p ts ts' -> Crcts p 0 ts -> Crcts p 0 ts').
+Proof.
+  intros p.
+  apply WcbvEvalEvals_ind; intros; try reflexivity; try assumption;
+  try (solve[constructor; trivial]).
+  - apply H. inversion_Clear H0; try assumption.
+    + apply (proj1 Crct_weaken); try assumption. apply (Crct_invrt_Cast H1).
+      reflexivity.
+    + apply (proj1 Crct_Typ_weaken); try assumption.
+      apply (Crct_invrt_Cast H1). reflexivity.
+  - apply H. destruct (Crct_invrt_Const H0 eq_refl) as [j0 [pd [j1 j2]]].
+    unfold LookupDfn in *. assert (k:= Lookup_single_valued l j1).
+    myInjection k. assumption.
+  - apply H1. destruct (Crct_invrt_App H2 eq_refl) as [j0 [j1 [j2 j3]]].
+    specialize (H j0).
+    assert (j4:= Crct_invrt_Lam H eq_refl).
+    apply whBetaStep_pres_Crct; try assumption.
+    apply H0. assumption.
+  - destruct (Crct_invrt_LetIn H1 eq_refl). apply H0.
+    apply instantiate_pres_Crct; try assumption. apply H. assumption.
+    omega.
+  - destruct (Crct_invrt_App H1 eq_refl) as [j0 [j1 [j2 j3]]]. clear H1.
+    specialize (H j0). assert (k:= Crct_invrt_Fix H eq_refl). clear H.    
+    apply H0. unfold pre_whFixStep. apply mkApp_pres_Crct.
+    apply fold_left_pres_Crct. intros. apply instantiate_pres_Crct; try omega.
+    apply Crct_up; assumption.
+    constructor; try assumption. eapply Crct_Sort; eassumption.
+    refine (CrctDs_invrt _ _ e). cbn in k. admit.
+    constructor; assumption.
+  -
+
+Qed.
+****)
 
 Lemma WcbvEval_wndEvalRTC:
   forall (p:environ Term), WFaEnv p ->
@@ -336,7 +476,7 @@ Function wcbvEval
                     | Exc _ => Exc ("wcbvEval; TCase, brs don't eval")
                     | Ret ebrs => Ret (TCase ml emch ebrs)
                   end
-                | Some (r, args) =>
+                | Some (r, args, arty) =>
                   match tskipn (snd (fst ml)) args with
                     | None => raise "wcbvEval: Case, tskipn"
                     | Some ts =>

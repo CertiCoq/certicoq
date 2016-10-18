@@ -244,6 +244,8 @@ Print comp_fEnv6'.
 Definition comp_fEnv7 := compile_L6 comp_fEnv6.
 
 
+
+
 Quote Recursively Definition make_args := L6_to_Clight.compute_fEnv.
 Definition comp_fEnv6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) comp_fEnv) in 
@@ -263,3 +265,53 @@ Require Import runtime.runtime.
 Definition test := L6_to_Clight.print_Clight_dest p7 "threePlusFour.c".
 
 Definition test2 := L6_to_Clight.print_Clight_dest runtime.runtime.prog "gc.c".
+
+
+Require Import NPeano.
+Require Import Recdef.
+Set Implicit Arguments.
+Require Import Omega.
+
+Function Gcd (a b : nat) {wf lt a} : nat :=
+match a with
+ | O => b 
+ | S k =>  Gcd (b mod S k)  (S k)
+end
+.
+Proof.
+- intros m n k Heq. subst. apply Nat.mod_upper_bound.
+  omega.
+- exact lt_wf.
+Defined.
+
+
+Quote Recursively Definition pgcd :=
+Gcd.
+
+(*
+Ltac vmcomputeExtract certiL2 f:=
+(let t:= eval vm_compute in (translateTo (cTerm certiL2) f) in 
+match t with
+|Ret ?xx => exact xx
+end).
+*)
+
+Let pcgd2 : cTerm certiL2.
+let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
+Defined.
+
+Let pcgd3 : cTerm certiL3.
+(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL3) pcgd2) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
+(* the Gcd_terminate function is in the environment. Below,
+we project that part of the environment.
+The environment is too big, because it contains even the
+definitions that were used in the erased proof. *)
+Eval vm_compute in (nth_error (AstCommon.env pcgd2) 1).
+Eval vm_compute in (nth_error (AstCommon.env pcgd3) 1).
+
+

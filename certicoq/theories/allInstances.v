@@ -3,6 +3,7 @@ Require Export L2.instances.
 Require Export L4.instances.
 Require Export L6.instances.
 
+Set Template Cast Propositions.
 Quote Recursively Definition p := (3 + 4).
 
 Open Scope Z_scope.
@@ -284,6 +285,7 @@ Proof.
 - exact lt_wf.
 Defined.
 
+Set Template Cast Propositions.
 
 Quote Recursively Definition pgcd :=
 Gcd.
@@ -313,5 +315,4 @@ The environment is too big, because it contains even the
 definitions that were used in the erased proof. *)
 Eval vm_compute in (nth_error (AstCommon.env pcgd2) 1).
 Eval vm_compute in (nth_error (AstCommon.env pcgd3) 1).
-
 

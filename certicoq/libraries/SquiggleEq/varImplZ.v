@@ -15,7 +15,8 @@ Proof.
 Defined.
 
 
-Definition varClassP (p:positive) : bool :=
+Global Instance varClassP : VarClass positive bool :=
+fun p =>
 match p with
 | xO _ => true (* p is even *)
 | _  => false
@@ -70,8 +71,10 @@ let maxn := maxl xH avoid in
 let f := (if c then xO else xI) in
 List.map f (seq (Pos.succ maxn) n).
 
-Definition freshVarsPos (n:nat) 
-  (c : option bool) (avoid original : list positive) : list positive :=
+Global Instance freshVarsPos : FreshVars positive bool:=
+fun (n:nat) 
+  (c : option bool) (avoid original : list positive)
+=>
 let c : bool :=
   match c with
   |Some c => c
@@ -117,7 +120,7 @@ Proof.
   destruct c; refl.
 Admitted.
 
-Global Instance vartypePos : @VarType positive bool deqpos.
-  apply Build_VarType with (varClass:=varClassP) (freshVars := freshVarsPos).
+Global Instance vartypePos : VarType positive bool.
+  apply Build_VarType.
   exact freshVarsPosCorrect.
 Defined.

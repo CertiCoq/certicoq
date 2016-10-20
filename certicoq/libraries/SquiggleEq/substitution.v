@@ -85,7 +85,8 @@ Generalizable Variable Opid.
 
 Section SubstGeneric.
 
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar}
+Context {NVar VarClass} {deqnvar : Deq NVar} {varcl freshv} 
+{varclass: @VarType NVar VarClass deqnvar varcl freshv}
   `{hdeq: Deq Opid} {gts : GenericTermSig Opid}.
 Notation NTerm := (@NTerm NVar Opid).
 Notation BTerm := (@BTerm NVar Opid).
@@ -1062,20 +1063,25 @@ Fixpoint ssubst_aux {NVar} `{Deq NVar} {Opid} (nt : @NTerm NVar Opid) (sub : Sub
 *)
 
 
-Fixpoint change_bvars_alpha {NVar VarClass : Type} `{VarType NVar VarClass} 
+Fixpoint change_bvars_alpha {NVar VarCl : Type}
+`{Deq NVar}
+    {fv : FreshVars NVar VarCl}
+    {vc : VarClass NVar VarCl}
 {Opid} (lv : list NVar ) (t : (@NTerm NVar Opid)) 
 : (@NTerm NVar Opid) :=
 match t with
 | vterm v => vterm v
-| oterm o lbt => oterm o (map (@change_bvars_alphabt NVar _ _ _ _ lv) lbt)
+| oterm o lbt => oterm o (map (@change_bvars_alphabt NVar _  _ fv vc Opid lv) lbt)
 end
-with change_bvars_alphabt {NVar VarClass : Type} `{VarType NVar VarClass}  
+with change_bvars_alphabt {NVar VarCl : Type} 
+`{Deq NVar}    {fv: FreshVars NVar VarCl}
+    {vc : VarClass NVar VarCl}
   {Opid} lv 
 (bt: @BTerm NVar Opid) 
 : (@BTerm NVar Opid):=
 match bt with
 | bterm blv bnt => 
-    let bnt' := @change_bvars_alpha NVar _ _ _ _  lv bnt in
+    let bnt' := change_bvars_alpha lv bnt in
   (* All boundvars are produced by the [freshReplacements] function,
     which produces unique (no_repeats) variables.
     Also, these variables are disjoint from the bound variables of
@@ -1087,6 +1093,7 @@ match bt with
 end.
 
 
+
 (** % \noindent \\* %
   When we define alpha equality in the next section, we prove that
 [change_bvars_alpha] returns a term which is alpha equal to the input.
@@ -1095,7 +1102,7 @@ Finally, here is the function that safely perfoms
 
 *)
 (*
-Fixpoint makeBvarsUnique1 {NVar VarClass : Type} `{VarType NVar VarClass} 
+Fixpoint makeBvarsUnique1 {NVar VarClass : Type}
 {gts : GenericTermSig} (lv : list NVar ) (t : (@NTerm NVar gts)) 
 : (@NTerm NVar gts * list NVar) :=
 match t with
@@ -1118,7 +1125,9 @@ end.
 *)
 Class FreeVars (T V:Type) := freevars : T -> list V.
 
-Fixpoint ssubst {NVar VarClass} {d : Deq NVar} {vc : @VarType NVar VarClass d} 
+Fixpoint ssubst {NVar VarCl} {d : Deq NVar}
+    {fv : FreshVars NVar VarCl}
+    {vc : VarClass NVar VarCl}
 {Opid}
   (t : @NTerm NVar Opid) (sub : @Substitution NVar Opid) : @NTerm NVar Opid:=
 match t with
@@ -1127,9 +1136,11 @@ match t with
     | Some st => st
     | None => t
     end
-| oterm op bts => oterm op (map (fun t => @ssubst_bterm NVar VarClass d vc Opid t sub) bts)
+| oterm op bts => oterm op (map (fun t => @ssubst_bterm NVar VarCl d _ _ Opid t sub) bts)
 end
-with ssubst_bterm  {NVar VarClass}  {d : Deq NVar} {vc : @VarType NVar VarClass d}
+with ssubst_bterm  {NVar VarCl}  {d : Deq NVar}
+    {fv : FreshVars NVar VarCl}
+    {vc : VarClass NVar VarCl}
    {Opid}
   (bt : @BTerm NVar Opid) (sub : Substitution) : @BTerm  NVar Opid :=
   match bt with
@@ -1148,7 +1159,8 @@ with ssubst_bterm  {NVar VarClass}  {d : Deq NVar} {vc : @VarType NVar VarClass 
 
 Section SubstGeneric2.
 Typeclasses eauto :=10.
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+Context {NVar VarClass} {deqnvar : Deq NVar} {varcl freshv} 
+{varclass: @VarType NVar VarClass deqnvar varcl freshv} 
  `{hdeq : Deq Opid} {gts : GenericTermSig Opid}.
 Notation NTerm := (@NTerm NVar Opid).
 Notation BTerm := (@BTerm NVar Opid).
@@ -1354,11 +1366,15 @@ Lemma ssubst_aux_trivial :
     (forall v u, LIn (v, u) sub -> isprogram u # ! LIn v (free_vars t))
     -> ssubst_aux t sub = t.
 Proof using.
+  clear varclass varcl freshv.
   intros.
   apply ssubst_aux_trivial_cl.
   unfold isprogram in *. 
   firstorder.
 Qed.
+
+
+
 
 Lemma prog_sub_flatmap_range : forall (sub : @Substitution Opid), prog_sub sub
     -> flat_map free_vars (range sub) =[].
@@ -1609,6 +1625,7 @@ Lemma ssubst_aux_trivial2 :
     -> isprogram t
     -> ssubst_aux t sub = t.
 Proof using.
+  clear varclass varcl freshv.
   intros. apply @ssubst_aux_trivial2_cl;  unfold isprogram in *;
   firstorder.
 Qed.
@@ -1628,7 +1645,7 @@ Lemma ssubst_trivial2 :
     (forall v u, LIn (v, u) sub -> isprogram u)
     -> isprogram t
     -> ssubst t sub = t.
-Proof using.
+Proof using varclass.
   intros. apply ssubst_trivial2_cl;  unfold isprogram in *;
   firstorder.
 Qed.
@@ -2696,7 +2713,7 @@ Lemma apply_bterm_append_program_id:
     (forall nt, LIn nt lnt -> isprogram nt) ->
     (forall nt, LIn nt lnta -> isprogram nt) ->
     (apply_bterm bt lnt = apply_bterm bt (lnt++lnta)).
-Proof using.
+Proof using varclass.
  intros ?  ? ? Hisp Hnt Hnta. destruct bt as [lv nt].
   unfold apply_bterm. simpl.
   assert(length lv <= length lnt \/ length lnt < length lv ) as Hdi by omega.
@@ -3101,6 +3118,7 @@ Proof using.
   change_to_ssubst_aux4.
 Qed.
 
+(*
 Lemma sub_mk_renames_disjoint :
   forall l1 l2,
     disjoint l1 l2
@@ -3125,7 +3143,7 @@ Proof using.
   apply IHl1 with (lva:=lva) in d0.
   allrw; boolvar; sp.
 Qed.
-
+*)
 
 
 Ltac dsub_find sn :=
@@ -4360,7 +4378,7 @@ Proof using.
 Qed.
 
 Lemma lmap_apply_var2: forall (lvi lvo : list NVar) v,
- (fun t=> @ssubst _ _ _ _ Opid t (var_ren lvi lvo)) (vterm v)
+ (fun t=> @ssubst _ _ _ _ _ Opid t (var_ren lvi lvo)) (vterm v)
   = vterm (lmap_apply deq_nvar (combine lvi lvo) v).
 Proof using.
  intros. simpl. unfold ssubst. simpl. rewrite sub_lmap_find.
@@ -4514,7 +4532,7 @@ Theorem freevars_ssubst_allvars9:
        -> free_vars (ssubst_aux t (var_ren lvi lvo)) 
           = lvmap_lapply (combine lvi lvo) (free_vars t).
 Proof using.
-  clear varclass VarClass.
+  clear varclass varcl freshv VarClass.
   nterm_ind1 t as [v | o lbt Hind] Case;
   introv Hnr Hdis.
   - Case "vterm".
@@ -4713,7 +4731,7 @@ Qed.
 
 Section TempTemp.
 
-Notation ssubst := (@ssubst NVar _ _ _ Opid).
+Notation ssubst := (@ssubst NVar _ _ _ _ Opid).
 
 Lemma ssubst_trivial4 :
   forall t sub, disjoint (dom_sub sub) (free_vars t) 
@@ -6265,7 +6283,7 @@ Lemma in_range_iff :
   forall (t : NTerm) (sub : Substitution),
     LIn t (range sub) <=> {v : NVar $ LIn (v, t) sub}.
 Proof using.
-  clear gts.
+  clear gts varclass varcl freshv deqnvar VarClass.
   induction sub; simpl; split; intro k; sp; allsimpl; subst; discover; sp; cpx;
      eauto.
   apply IHsub in H. sp. exists v; sp. firstorder.
@@ -6371,6 +6389,7 @@ Lemma prog_sub_snoc :
   forall s v t,
     prog_sub (snoc s (v,t)) <=> (prog_sub s # isprogram t).
 Proof using.
+  clear  varclass varcl freshv deqnvar VarClass.
   introv.
   unfold prog_sub, sub_range_sat; split; intro k.
 
@@ -6480,7 +6499,20 @@ Proof using.
   rewrite disjoint_flat_map_l in Hf.
   auto.
 Qed.
+
 End TempTemp.
+
+Lemma getopid_ssubst_aux_var_ren : forall (a : NTerm) sub,
+   allvars_sub sub
+  -> getOpid (ssubst_aux a sub) = getOpid a.
+Proof using varcl freshv.
+  intros nt sub H.
+  destruct nt; auto.
+   apply isvarc_ssubst_vterm with (v:=n) in H.
+    simpl in *. unfold isvarc in H. dsub_find sc; auto.
+    destruct scs; auto. contradiction.
+Qed.
+
 End SubstGeneric2.
 
 Lemma dom_sub_map_range {NVar} {gtsi} {gtso} : forall (f : @NTerm NVar gtsi -> @NTerm NVar gtso) sub,

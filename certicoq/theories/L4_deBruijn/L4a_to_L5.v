@@ -46,26 +46,6 @@ Require Import SquiggleEq.lmap.
 
 Open Scope nat_scope.
 
-(* MOVE to [SquiggleEq] *)
-
-Section GetOpid.
-Context {NVar Opid : Type}.
-
-Definition getOpid (n: @NTerm NVar Opid) : option Opid :=
-match n with
-| vterm _ => None
-| oterm o _ => Some o
-end. 
-Context {VarClass:Type} `{Deq NVar} `{VarType NVar VarClass}.
-
-Global Instance alphaGetOpid : Proper ((@alpha_eq NVar _ _ _ Opid) ==> eq) getOpid.
-Proof.
-  intros ? ? Hal.
-  inverts Hal; refl.
-Qed.
-
-End GetOpid.
-
 Instance NEqDec : Deq N.
 Proof using.
   intros x y. exists (N.eqb x y). apply N.eqb_eq.
@@ -133,6 +113,32 @@ is referred to here.*)
 | NProj (selector :nat) (** which one to project out*) *)
  | NLet
  | NMatch (dconAndNumArgs : list (dcon * nat)).
+
+Require Import Coq.Strings.Ascii.
+
+Require Import  ExtLib.Data.String.
+
+Definition sconString (d: dcon) : string :=
+match fst d with
+| mkInd s n => terms.flatten [nat2string10 (N.to_nat (snd d))
+    ; ":"; nat2string10 n; ":"; s]
+end.
+
+
+Open Scope string_scope.
+
+Definition L4OpidString (l : L4Opid) : string :=
+  match l with
+  | NLambda    => "λ"
+  | NFix nMut _ => "fix"
+  | NDCon d nargs => sconString d
+  | NApply     => "ap"
+(*  | NProj _ => [0] *)
+  | NLet => "let"
+  | NMatch numargsInBranches => 
+      let ld := map fst numargsInBranches in
+      terms.flatten ["match |";terms.flattenDelim " " (map sconString ld);"|"]
+  end.
 
 
 Definition OpBindingsL4 (nc : L4Opid) : list nat :=
@@ -214,7 +220,10 @@ Instance CPSGenericTermSig : GenericTermSig L5Opid:=
 Section VarsOf2Class.
 
 (* see the file SquiggleEq.varImplPeano for an instantiation of NVar *)
-Context {NVar} {deqnvar : Deq NVar} {vartype: @VarType NVar bool (* 2 species of vars*) _}.
+Context {NVar} {deqnvar : Deq NVar} 
+{varcl freshv} 
+  {varclass: @VarType NVar bool(* 2 species of vars*) deqnvar varcl freshv}.
+
 
 Notation USERVAR := true (only parsing).
 Notation CPSVAR := false (only parsing).
@@ -376,7 +385,7 @@ Local Instance L4aEval : BigStepOpSem NTerm := eval.
 (** will be used in [eval_reduces_fvars] and cps_cvt_corr *)
 Lemma subset_step_app: forall x e1' v2,
   subset (free_vars (e1' {x := v2})) (free_vars (App_e (Lam_e x e1') v2)).
-Proof using.
+Proof using varclass.
   intros. simpl. autorewrite with list core. unfold subst.
   rewrite eqsetv_free_vars_disjoint.
   intros ? Hc.
@@ -413,7 +422,7 @@ let len := Datatypes.length lbt in
 let pinds := seq 0 len in
 let sub := map (Fix_e' lbt) pinds in
 subset (free_vars (apply_bterm bt sub)) (flat_map free_vars_bterm lbt).
-Proof using.
+Proof using varclass.
   intros ? ? Hin Hl. simpl.  
   unfold apply_bterm.
   rewrite eqsetv_free_vars_disjoint.
@@ -436,7 +445,7 @@ Qed.
 
 Lemma eval_reduces_fvars :
   forall (e v : NTerm) , e ⇓ v -> subset (free_vars v) (free_vars e).
-Proof using.
+Proof using varclass.
   intros ? ? He. unfold closed. induction He; try auto;
   simpl in *;autorewrite with core list in *.
   (**Apply case*)
@@ -501,7 +510,7 @@ Qed.
 (** Evaluation preserves closedness.*)
 Corollary eval_preserves_closed :
   forall (e v : NTerm),  e ⇓ v ->  closed e -> closed v.
-Proof using.
+Proof using varclass.
   intros ? ?  He. unfold closed. intro Hc.
   apply eval_reduces_fvars  in He.
   rewrite Hc in He.
@@ -549,7 +558,7 @@ Qed.
 
 Lemma eval_preseves_wf :
   forall e v, eval e v ->  nt_wf e -> nt_wf v.
-Proof using.
+Proof using varclass.
   intros ? ? He. induction He; intro Hn; try auto.
 - ntwfauto. apply IHHe3. ntwfauto.
 - ntwfauto;[|simpl].
@@ -583,7 +592,7 @@ Proof using.
 Qed.
 
 
-Hint Rewrite @flat_map_bterm_nil_allvars : SquiggleEq.
+Hint Rewrite @flat_map_bterm_nil_allvars: SquiggleEq.
 
 (* c := USERVAR in the intended use case. But this property holds more generally *)
 Lemma eval_preseves_varclass :
@@ -591,7 +600,7 @@ Lemma eval_preseves_varclass :
     eval e v 
     ->  varsOfClass (all_vars e) c 
     -> varsOfClass (all_vars v) c.
-Proof using.
+Proof using varclass.
   intros ? ? ? He. induction He; intro Hn; try auto.
 (* beta reduction *)
 - apply_clear IHHe3.
@@ -1119,6 +1128,7 @@ Lemma substKlam_cTrivial2 : forall x xx (b t : CTerm),
   -> closed (KLam_c x b)
   -> ssubst (KLam_c x b) [(xx,t)] = KLam_c x b.
 Proof using.
+  clear varclass.
   intros ? ? ? ? H Hb.
   change_to_ssubst_aux8;[ |simpl; rewrite H; disjoint_reasoningv; tauto].
   simpl. rewrite decide_decideP.
@@ -1131,6 +1141,7 @@ Proof using.
     unfold closed in Hb. simpl in Hb.
     autorewrite with core list in Hb.
     rewrite nil_remove_nvars_iff in Hb.
+    eauto.
     firstorder.
 Qed.
 
@@ -1153,7 +1164,7 @@ Proof using.
     unfold closed in Hb. simpl in Hb.
     autorewrite with core list in Hb.
     rewrite nil_remove_nvars_iff in Hb.
-    firstorder.
+    unfold notT in n. eauto.
 Qed.
 
 Lemma ssubstCall_c : forall sub a b d, 
@@ -1166,7 +1177,7 @@ Definition onlyUserVars (t: NTerm) : Prop :=
 Lemma userVarsContVars : forall lv,
 varsOfClass lv USERVAR
 -> forall n, no_repeats (contVars n) /\ disjoint (contVars n) lv /\ Datatypes.length (contVars n) = n.
-Proof using.
+Proof using varclass.
   intros. unfold contVars.
   addFreshVarsSpec.
   dands; try tauto.
@@ -2584,10 +2595,11 @@ Qed.
 Local Transparent ssubst.
 Ltac unfoldSubst :=
   unfold ssubst; simpl;
-  fold (@ssubst NVar _ _ _ L5Opid);
-  fold (@ssubst_bterm NVar _ _ _ L5Opid);
-  fold (@ssubst NVar _ _ _ L4Opid);
-  fold (@ssubst_bterm NVar _ _ _ L4Opid).
+  fold (@ssubst NVar _ _ _ _ L5Opid);
+  fold (@ssubst_bterm NVar _ _ _ _ L5Opid);
+  fold (@ssubst NVar _ _ _ _ L4Opid);
+  fold (@ssubst_bterm NVar _ _ _ _ L4Opid).
+
 
 Lemma cps_cvt_corr_app_let_common_part:
 forall x el v2 k v
@@ -2722,22 +2734,12 @@ Proof using.
    apply is_lambdab_ssubst_aux; auto.
 Qed.
 
-(* Move to [SquiggleEq] *)
-Lemma getopid_ssubst_aux_var_ren : forall (a : NTerm) sub,
-   allvars_sub sub
-  -> getOpid (ssubst_aux a sub) = getOpid a.
-Proof using vartype.
-  intros nt sub H.
-  destruct nt; auto.
-   apply isvarc_ssubst_vterm with (v:=n) in H.
-    simpl in *. unfold isvarc in H. dsub_find sc; auto.
-    destruct scs; auto. contradiction.
-Qed.
+
 
 Lemma fixwf_ssubst_aux_var_ren : forall  a sub,
    allvars_sub sub
   -> fixwf (ssubst_aux a sub) = fixwf a.
-Proof using vartype.
+Proof using varclass.
   intros t. induction t as [v | o lbt Hind] using NTerm_better_ind; intros ? ?.
 - apply isvarc_ssubst_vterm with (v0:=v) in H.
   simpl in *. unfold isvarc in H. dsub_find sc; auto.
@@ -2809,7 +2811,7 @@ Qed.
 Lemma fixwf_ssubst : forall  a sub,
   sub_range_sat sub (fun x => fixwf x = true)
   -> fixwf a= true -> fixwf (ssubst a sub) = true.
-Proof using.
+Proof using varclass.
   intros ? ? ? Hwf.
   rewrite ssubst_ssubst_aux_alpha.
   add_changebvar_spec nt' XX.
@@ -2819,7 +2821,7 @@ Qed.
 
 Lemma eval_preserves_fixwf :
   forall e v, eval e v ->  fixwf e = true -> fixwf v = true.
-Proof using.
+Proof using varclass.
   intros ? ? He. induction He; intro Hfwf; try auto.
 - apply_clear IHHe3. 
   simpl in *. repeat rewrite andb_true_iff in *.
@@ -2894,18 +2896,6 @@ unfold subst in *;
     constructor; [try (intros ? Hin; simpl in Hin; in_reasoning; subst;  cpx)|]
 end); cpx.
 
-
-(* Move to SquiggleEq *)
-Lemma map0lbt : forall (lbt: list BTerm),
-map num_bvars lbt = repeat 0 (Datatypes.length lbt)
-->  lbt = map (bterm []) (map get_nt lbt).
-Proof using.
-  induction lbt; simpl; auto.
-  intro Hn.
-  destruct a. inverts Hn as Hn Hnn. unfold num_bvars in Hn.
-  simpl in Hn. dlist_len_name l Hh.
-  simpl. f_equal. eauto.
-Qed.
 
 Lemma is_valueb_sound :
   (forall e,  is_valueb e = true -> nt_wf e-> is_value e).
@@ -3188,11 +3178,12 @@ Proof using.
     (intros ? ? ?; in_reasoning; cpx).
   rewrite ssubstRet_c.
   rewrite ssubstKlam_c; [| try assumption| noRepDis].
-  unfoldSubst.
-  fold (@ssubst NVar _ _ _ L5Opid).
-  fold (@ssubst_bterm NVar _ _ _ L5Opid).
+
+
+  fold (@ssubst NVar _ _ _ _ L5Opid).
+  fold (@ssubst_bterm NVar _ _ _ _ L5Opid).
   rewrite ssubst_trivial2_cl;[|assumption| unfold closed; apply cps_cvt_closed; auto].
-  (rewrite not_eq_beq_var_false;[| noRepDis]).
+  simpl. (rewrite not_eq_beq_var_false;[| noRepDis]).
   inverts Hwf as Hwfb Hwfs. simpl in Hwfb. dLin_hyp.
   rewrite cps_cvt_branches_subst; simpl; auto;[| disjoint_reasoningv2].
   rewrite <- beq_var_refl.
@@ -3241,7 +3232,7 @@ Proof using.
     
   unfold apply_bterm. simpl.
   unfold ssubst at 1. simpl.
-  fold (@ssubst _ _ _ _ L5Opid).
+  fold (@ssubst _ _ _ _ _ L5Opid).
   apply eq_subrelation;[auto with typeclass_instances|].
   repeat rewrite map_map.
   unfold Ret_c.

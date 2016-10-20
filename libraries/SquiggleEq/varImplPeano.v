@@ -31,9 +31,9 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 Section PeanoVarInstance.
-Context (VarClass :Type) {Hd : Deq VarClass}.
+Context (VarCl :Type) {Hd : Deq VarCl}.
 
-Notation VType := ((nat * VarClass)%type).
+Notation VType := ((nat * VarCl)%type).
 
 (*Instance DeqVType : Deq VType.
   unfold VType. eauto with typeclass_instances.
@@ -44,26 +44,31 @@ Require Import Omega.
 Require Import Coq.Sorting.Sorting.
 Print VarType.
 
-Variable defClass : VarClass.
+Variable defClass : VarCl.
 
-Definition freshVarsPeano (n:nat) (oc : option VarClass) (avoid original : list VType) : list VType :=  
+Global Instance freshVarsPeano : FreshVars VType VarCl :=
+fun (n:nat) (oc : option VarCl) (avoid original : list VType) =>
 let c := match oc with | Some x => x | None => defClass end in
 let maxn := maxl (map fst avoid) in
 List.map (fun x => (x,c)) (seq (S maxn) n).
 
+Global Instance varClassPeano : VarClass VType VarCl := snd.
+
+
 Require Import LibTactics.
 Require Import tactics.
 
-Global Instance VarTypePeano : VarType VType VarClass.
-  apply Build_VarType with (varClass:=snd) (freshVars := freshVarsPeano).
+Global Instance VarTypePeano : VarType VType VarCl.
+  apply Build_VarType.
   intros.
   subst lf. unfold freshVarsPeano.
   autorewrite with list.
   split;[split|].
-- apply NoDup_map_inv with (f:=fst). rewrite map_map.
+- apply NoDup_map_inv with (f:=fst). setoid_rewrite map_map.
   simpl. rewrite map_id. apply seq_NoDup.
-- split; [| refl].
-  intros ? Hin.
+- setoid_rewrite map_length. rewrite seq_length.
+  split; [| refl].
+  intros ? Hin. unfold freshVars in Hin.
   rewrite in_map_iff in Hin.
   setoid_rewrite in_seq in Hin.
   exrepnd. inverts Hin1.
@@ -72,7 +77,7 @@ Global Instance VarTypePeano : VarType VType VarClass.
   simpl in Hinc.
   apply maxl_prop in Hinc.
   omega.
-- introv ? Hin. subst.
+- introv ? Hin. subst. unfold freshVars in Hin.
   apply in_map_iff in Hin.
   exrepnd. cpx.
 Defined.

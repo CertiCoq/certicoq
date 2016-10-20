@@ -34,7 +34,7 @@ Generalizable Variable Opid.
 
 Section terms2Generic.
 
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+Context {NVar VarClass} {deqnvar : Deq NVar} {varcl freshv} {varclass: @VarType NVar VarClass deqnvar varcl freshv} 
 `{hdeq: Deq Opid} {gts : GenericTermSig Opid}.
 Notation NTerm := (@NTerm NVar Opid).
 Notation BTerm := (@BTerm NVar Opid).
@@ -117,7 +117,8 @@ with wftb {NVar:Type} {Opid:Type} {gts : GenericTermSig Opid} (bt : @BTerm NVar 
 
 Section terms3Generic.
 
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+Context {NVar VarClass} {deqnvar : Deq NVar} 
+  {varcl freshv} {varclass: @VarType NVar VarClass deqnvar varcl freshv} 
   `{hdeq: Deq Opid} {gts : GenericTermSig Opid}.
 Notation NTerm := (@NTerm NVar Opid).
 Notation BTerm := (@BTerm NVar Opid).
@@ -310,6 +311,7 @@ Lemma nt_wf_eq :
   forall t,
     nt_wf t <=> wf_term t.
 Proof using.
+  clear varclass varcl freshv deqnvar VarClass.
   unfold wf_term.
   nterm_ind t as [|o lbt ind] Case; simpl; intros.
 
@@ -547,7 +549,7 @@ Qed.
 Lemma isprog_vars_eq :
   forall t vs,
     isprog_vars vs t <=> subsetv (free_vars t) vs # nt_wf t.
-Proof using.
+Proof.
   unfold isprog_vars; sp.
   rw andb_eq_true.
   rewrite fold_assert.
@@ -802,7 +804,7 @@ end.
 *)
 Lemma wf_cterm :
   forall t, wf_term (get_cterm t).
-Proof using.
+Proof.
   introv; (  repeat match goal with
            | [ H : CTerm |- _ ] => destruct H
            | [ H : CVTerm _ |- _ ] => destruct H
@@ -966,7 +968,8 @@ Ltac d_isnoncan H :=
 
 Section terms4Generic.
 
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+Context {NVar VarClass} {deqnvar : Deq NVar} {varcl freshv} 
+{varclass: @VarType NVar VarClass deqnvar varcl freshv} 
   `{hdeq : Deq Opid} {gts : GenericTermSig Opid}.
 Notation NTerm := (@NTerm NVar Opid).
 Notation BTerm := (@BTerm NVar Opid).
@@ -1023,7 +1026,7 @@ Definition mk_wterm' (t : NTerm) (p : nt_wf t) :=
 Lemma mk_cv_pf :
   forall (vs : list NVar) (t:CTerm),
     @isprog_vars NVar _ Opid _ vs (@get_cterm NVar _ Opid _ t).
-Proof using.
+Proof.
   destruct t; simpl.
   rw @isprog_eq in i; destruct i.
   rw @isprog_vars_eq; simpl; sp.
@@ -1793,6 +1796,18 @@ Proof using.
   apply subsetAllVarsLbt.
   assumption.
 Qed.
+
+Lemma map0lbt : forall (lbt: list BTerm),
+map num_bvars lbt = repeat 0 (Datatypes.length lbt)
+->  lbt = map (bterm []) (map get_nt lbt).
+Proof using.
+  induction lbt; simpl; auto.
+  intro Hn.
+  destruct a. inverts Hn as Hn Hnn. unfold num_bvars in Hn.
+  simpl in Hn. dlist_len_name l Hh.
+  simpl. f_equal. eauto.
+Qed.
+
 
 Definition allvars_bterm : forall lv nt,
   eq_set 

@@ -66,7 +66,8 @@ Qed.
 Generalizable Variable Opid.
 
 Section AlphaGeneric.
-Context {NVar VarClass} {deqnvar : Deq NVar} {varclass: @VarType NVar VarClass deqnvar} 
+Context {NVar VarClass} {deqnvar : Deq NVar} {varcl freshv} 
+  {varclass: @VarType NVar VarClass deqnvar varcl freshv} 
  `{hdeq : Deq Opid} {gts : GenericTermSig Opid}.
 Notation NTerm := (@NTerm NVar Opid).
 Notation BTerm := (@BTerm NVar Opid).
@@ -136,6 +137,7 @@ with alpha_eq_bterm3 (lva: list NVar) : BTerm -> BTerm -> [univ] :=
 (* Scheme alpha_eq_mut := Induction for alpha_eq Sort Type
   with alpha_eq_bterm_mut := Induction for alpha_eq_bterm Sort Type.
 *)
+
 
 
  (* Definition alphaeq  (t1 t2 :NTerm) := alpha_eq t1 t2. *)
@@ -776,7 +778,7 @@ Lemma change_bvars_alpha_spec_varclass: forall lv vc,
   * 
   (forall (bt:BTerm), varsOfClass (bound_vars_bterm bt) vc 
       -> varsOfClass (bound_vars_bterm (change_bvars_alphabt lv bt)) vc).
-Proof using.
+Proof using varclass.
   intros. apply NTerm_BTerm_ind;
     [intro v; simpl; unfold preservesVarclass; tauto| |].
   - intros ? ? Hind. simpl.
@@ -789,7 +791,7 @@ Proof using.
   split;[apply freshReplacementsSameClass; assumption|].
   eapply lforall_subset;[apply boundvars_ssubst_aux_subset|].
   rewrite flat_map_bound_var_vars_range;
-      [| autorewrite with SquiggleEq; refl].
+      [| autorewrite with SquiggleEq; setoid_rewrite freshVarsLen; refl].
   autorewrite with list.
   unfold varsOfClass in *.
   eauto.
@@ -1357,6 +1359,12 @@ Proof using.
   constructor; eauto with core slow.
 Qed.
 
+Global Instance alphaGetOpid : Proper (alpha_eq ==> eq) getOpid.
+Proof.
+  intros ? ? Hal.
+  inverts Hal; refl.
+Qed.
+
 Global Instance equivAlphaEqBterm : Equivalence alpha_eq_bterm.
 Proof using.
   constructor; eauto with core slow.
@@ -1381,7 +1389,7 @@ Qed.
 Lemma ssubst_allvars_preserves_size : forall (nt : NTerm) sub,
     allvars_sub sub
    -> size (ssubst nt sub) = size nt.
-Proof using.
+Proof using varclass.
 
   introv Hav. rewrite ssubst_ssubst_aux_alpha.
   add_changebvar_spec nt' Hs.
@@ -1391,7 +1399,7 @@ Qed.
 
 Lemma ssubst_allvars_preserves_size2 : forall (nt : NTerm) lvo lvn,
    size (ssubst nt (var_ren lvo lvn)) = size nt.
-Proof using.
+Proof using varclass.
   intros. apply ssubst_allvars_preserves_size.
   apply allvars_combine.
 Qed.
@@ -1399,7 +1407,7 @@ Qed.
 Theorem alphaeq_preserves_free_vars: 
   forall t1 t2, alpha_eq  t1 t2 ->
      (free_vars t1) = (free_vars t2). 
-Proof using. 
+Proof using.
 nterm_ind1s t1 as [v1 | o lbt1 Hind] Case; introv Hal. 
   Case "vterm". inverts Hal as . reflexivity. 
   Case "oterm". inverts Hal as Hmap Hal. 
@@ -1862,7 +1870,7 @@ Lemma ssubst_nt_wf :
   forall t sub,
     nt_wf (ssubst t sub)
     -> nt_wf t.
-Proof using.
+Proof using varclass.
   introv. rewrite ssubst_ssubst_aux_alpha.
   add_changebvar_spec t' Hs. repnd. rw <- (alphaeq_preserves_wf _ _ Hs).
   apply ssubst_aux_nt_wf.
@@ -1873,7 +1881,7 @@ Lemma ssubst_wf_iff:
   forall sub, 
   wf_sub sub
   -> forall nt, (nt_wf nt <=> nt_wf (ssubst nt sub)).
-Proof using.
+Proof using varclass.
  introv sr. intro. rewrite ssubst_ssubst_aux_alpha.
  add_changebvar_spec nt' Hs.
  rw <- (ssubst_aux_wf_iff _ sr).
@@ -1885,7 +1893,7 @@ Theorem ssubst_wf_if_eauto:
   forall sub, 
   wf_sub sub
   -> forall nt, (nt_wf nt -> nt_wf (ssubst nt sub)).
-Proof using.
+Proof using varclass.
    apply ssubst_wf_iff.
 Qed.
 
@@ -1895,12 +1903,12 @@ Hint Resolve  ssubst_wf_iff: slow.
 
 Theorem ssubst_wf_iff_vars: 
   forall lvi lvo nt, (nt_wf nt <=> nt_wf (ssubst nt (var_ren lvi lvo))).
-Proof using. intros. eauto with slow.
+Proof using varclass. intros. eauto with slow.
 Qed.
 
 Theorem ssubst_wf_if_vars_eauto: 
   forall lvi lvo nt, (nt_wf nt -> nt_wf (ssubst nt (var_ren lvi lvo))).
-Proof using. apply ssubst_wf_iff_vars; sp.
+Proof using varclass. apply ssubst_wf_iff_vars; sp.
 Qed.
 
 
@@ -1910,7 +1918,7 @@ Lemma ssubst_preserves_wf_term :
     wf_sub sub
     -> wf_term t
     -> wf_term (ssubst t sub).
-Proof using.
+Proof using varclass.
   introv ws wt.
   generalize (ssubst_wf_iff sub ws t); intro i.
   repeat (rewrite nt_wf_eq in i).
@@ -1921,7 +1929,7 @@ Lemma ssubst_wf_term :
   forall sub t,
     wf_term (ssubst t sub)
     -> wf_term t.
-Proof using.
+Proof using varclass.
   introv wf; allrw <- (@nt_wf_eq NVar Opid).
   apply ssubst_nt_wf in wf; sp.
 Qed.
@@ -1963,7 +1971,7 @@ Lemma ssubst_sub_wf:
     -> wf_sub sub2
     -> wf_sub (ssubst_sub sub1 sub2).
 
-Proof using.
+Proof using varclass.
   induction sub1 as [|(v,t) sub Hind]; introv H1wf H2wf; allsimpl;sp;[].
   rw cons_as_app. apply sub_app_sat;rw cons_as_app in H1wf; apply sub_app_sat_if in H1wf;sp.
   - unfold sub_range_sat in *. introv Hin. apply in_single in Hin. inverts Hin.
@@ -1986,7 +1994,7 @@ Theorem free_vars_ssubst2:
                 [+] {v' : NVar
                      $ {t : NTerm
                      $ LIn (v',t) sub # LIn v' (free_vars nt) # LIn v (free_vars t)}}.
-Proof using.
+Proof using varclass.
   introns XX. revert XX.
   rewrite ssubst_ssubst_aux_alpha.
   add_changebvar_spec2 nt' XX. alpharw XXr. 
@@ -1998,7 +2006,7 @@ Lemma disjoint_free_vars_ssubst2:
   forall (nt : NTerm) (sub : Substitution) lvdr,
    disjoint (free_vars nt ++ (flat_map free_vars (range sub))) lvdr
   -> disjoint (free_vars (ssubst nt sub)) lvdr.
-Proof using.
+Proof using varclass.
   introv H2dis.
   introv Hin Hc.
   apply free_vars_ssubst2 in Hin.
@@ -2015,7 +2023,7 @@ Lemma ssubst_sub_disjoint_bv2:
     disjoint_bv_sub nt sub1
     -> disjoint_bv_sub nt sub2
     -> disjoint_bv_sub nt (ssubst_sub sub1 sub2).
-Proof using.
+Proof using varclass.
   induction sub1 as [|(v,t) sub Hind]; introv H1wf H2wf; allsimpl;sp;[].
   rw cons_as_app. apply sub_app_sat;rw cons_as_app in H1wf; apply sub_app_sat_if in H1wf;sp.
   - unfold sub_range_sat in *. introv Hin. apply in_single in Hin. inverts Hin.
@@ -2104,7 +2112,7 @@ Lemma eqsetv_free_vars_disjoint :
     eq_set (free_vars (ssubst t sub))
               (remove_nvars (dom_sub sub) (free_vars t)
                ++ sub_free_vars (sub_keep_first sub (free_vars t))).
-Proof using.
+Proof using varclass.
   introv. 
   pose proof (change_bvars_alpha_wspec 
       (flat_map free_vars (range sub)) t) as Hfr.
@@ -2175,7 +2183,7 @@ Lemma ssubst_trim2_alpha2:
   -> isprogram (ssubst a sub)
   -> isprogram (ssubst b sub)
   -> prog_sub (sub_keep_first sub (free_vars a ++ free_vars b)).
-Proof using.
+Proof using varclass.
   introv Hwfs Hapr Hbpr.
   inverts Hapr as Hacl X99. clear X99.
   inverts Hbpr as Hbcl X99. clear X99.
@@ -2212,7 +2220,7 @@ Lemma ssubst_boundvars_varclass_nb: forall (vc : VarClass) (sub: Substitution),
  (forall nt : NTerm, varsOfClass (bound_vars nt) vc -> varsOfClass (bound_vars (ssubst nt sub)) vc) *
  (forall bt : BTerm,
    varsOfClass (bound_vars_bterm bt) vc -> varsOfClass (bound_vars_bterm (ssubst_bterm bt sub)) vc).
-Proof using.
+Proof using varclass.
   simpl. intros ? ? Hvc. apply NTerm_BTerm_ind.
 - intro. rewrite ssubst_vterm. intros Hv.
   eapply lforall_subset;
@@ -2249,7 +2257,7 @@ Lemma ssubst_allvars_varclass_nb: forall
  (vc : VarClass) (sub: Substitution) nt,
  (varsOfClass (all_vars nt ++ (flat_map all_vars (range sub))) vc)
  -> varsOfClass (all_vars (ssubst nt sub)) vc.
-Proof using.
+Proof using varclass.
   intros ? ? ?.
   unfold all_vars.
   repeat rewrite varsOfClassApp.
@@ -2968,7 +2976,7 @@ Lemma eq_vars_progsub :
   forall (t : NTerm) (sub : Substitution),
   prog_sub sub
   -> eq_set (free_vars (ssubst t sub)) (remove_nvars (dom_sub sub) (free_vars t)).
-Proof using.
+Proof using varclass.
   introv Hpr.
   pose proof (eqsetv_free_vars_disjoint t sub) as XX.
   assert ( (sub_free_vars (sub_keep_first sub (free_vars t))) = [] ) as Hn;
@@ -2989,7 +2997,7 @@ Qed.
 Lemma ssubst_program_implies : forall t sub,
   isprogram (ssubst t sub)
   -> subset (free_vars t) (dom_sub sub).
-Proof using.
+Proof using varclass.
   introv Hpr.
   repnud Hpr.
   pose proof (eqsetv_free_vars_disjoint t sub) as XX.
@@ -3007,7 +3015,7 @@ Lemma eq_vars_prog_sub_same_dom: forall ta tb suba subb,
   -> (dom_sub suba = dom_sub subb)
   -> eq_set (free_vars ta) (free_vars tb)
   -> eq_set (free_vars (ssubst ta suba)) (free_vars (ssubst tb subb)).
-Proof using.
+Proof using varclass.
   introv Hap Hbp Hds Heq.
   pose proof (eq_vars_progsub ta _ Hap).
   pose proof (eq_vars_progsub tb _ Hbp).
@@ -3023,7 +3031,7 @@ Qed.
 Lemma eq_vars_same_sub: forall (ta tb : NTerm) sub,
   eq_set (free_vars ta) (free_vars tb)
   -> eq_set (free_vars (ssubst ta sub)) (free_vars (ssubst tb sub)).
-Proof using.
+Proof using varclass.
   introv Heq.
   pose proof (eqsetv_free_vars_disjoint ta sub).
   pose proof (eqsetv_free_vars_disjoint tb sub).
@@ -3045,7 +3053,7 @@ Hint Resolve ssubst_nt_wf ssubst_wf_if_eauto : slow.
 Lemma isprogram_ssubst_implies_ispbt : forall t sub, 
     isprogram (ssubst t sub)
     -> isprogram_bt (bterm (dom_sub sub) t).
-Proof using.
+Proof using varclass.
   introv Hpr.
   unfolds_base.
   duplicate Hpr.
@@ -3066,7 +3074,7 @@ Lemma subst_change_prog : forall t ts td v,
   isprogram td
   -> isprogram (subst t v ts)
   -> isprogram (subst t v td).
-Proof using.
+Proof using varclass.
   introv  Hpd Hpl.
   applydup ssubst_program_implies in Hpl.
   unfold subst in *. apply isprogram_ssubst;sp. 
@@ -3095,7 +3103,7 @@ Lemma subst_aux_change_prog : forall t ts td v,
   -> isprogram td
   -> isprogram (subst_aux t v ts)
   -> isprogram (subst t v td).
-Proof using.
+Proof using varclass.
   introns XX. unfold subst_aux in *.
   rewrite <- ssubst_ssubst_aux_prog_sub in XX1 ;[| prove_sub_range_sat; fail].
   apply subst_change_prog with (ts:=ts); auto.
@@ -3212,7 +3220,7 @@ Lemma prog_sub_change : forall sub1 sub2 t,
   -> prog_sub sub2
   -> dom_sub sub1 =dom_sub sub2
   -> isprogram (ssubst t sub2).
-Proof using hdeq.
+Proof using hdeq varclass.
   introv Hp H1p H2p Hd.
   apply isprogram_ssubst_implies_ispbt in Hp.
   apply isprogram_bt_implies with (lnt := range sub2) in Hp;
@@ -3548,7 +3556,7 @@ Qed.
 Lemma ssubst_oterm : forall (lbt : list BTerm) (o : Opid) (sub: Substitution),
   {lbts : list BTerm | ssubst (oterm o lbt) sub = oterm o lbts
     /\ map num_bvars lbt = map num_bvars lbts}.
-Proof using.
+Proof using varclass.
   intros ? ? ?.
   simpl.
   eexists. split;[reflexivity|]. rewrite map_map.
@@ -3565,7 +3573,7 @@ Qed.
 Lemma num_bvars_ssubst_bterm:
   forall  (bt : BTerm) (sub : Substitution),
   num_bvars (ssubst_bterm bt sub) = num_bvars bt.
-Proof using.
+Proof using varclass.
   intros. rewrite ssubst_ssubst_bterm_aux_alpha.
   rewrite num_bvars_bterm.
   apply alphaeqbt_numbvars.

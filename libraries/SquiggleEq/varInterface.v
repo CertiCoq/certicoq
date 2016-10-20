@@ -21,23 +21,25 @@ Require Import list.
 (* get rid of it eventually *)
 Notation subsetv := subset (only parsing).
 
-
-Class VarType (T:Type) (ClassType : Type)  `{Deq T} := {
-
 (** There can be different classes of variables, e.g. one for types, and one for terms.
 As another example, during CPS conversion, it is handy to have a different class for continuation variables.
 Substitution may need to rename bound variables,
 and we prove that variable class is preserved by substitution. See
 [alphaeq.ssubst_allvars_varclass_nb]
 *)
+Class VarClass (T ClassType : Type) :=
+  varClass : T -> ClassType.
 
-  varClass : T -> ClassType;
+Class FreshVars (T ClassType : Type) := 
+  freshVars : forall (n:nat)  (c : option ClassType) 
+    (avoid : list T) (original : list T), list T.
 
+Class VarType (T:Type) (ClassType : Type)  `{Deq T} 
+  `{VarClass T ClassType} `{FreshVars T ClassType}:= {
 (** We can generate fresh variables w.r.t. variables of any class. 
    [original] is a mechanism to pass extra information to [freshVars]. 
   For example, we often want the fresh replacement names to be close to original names.
   In such cases, [length original=n]. The correctness properties of [freshVars] ignore this input *)
-  freshVars : forall (n:nat)  (c : option ClassType) (avoid : list T) (original : list T), list T;
 
 (* Is it important to pick a more efficient variant of [nat]? This not a concern after extraction.
 Even inside Coq the output is a list which will be built one element at a time. So [nat] should not
@@ -1184,15 +1186,15 @@ Lemma beq_var_false :
   forall (i1 i2 : NVar),
     false = beq_var i1 i2 -> i1 <> i2.
 Proof using.
-  sp. symmetry in H1. 
-  apply DecidableClass.Decidable_complete_alt in H1.
+  sp. symmetry in H3. 
+  apply DecidableClass.Decidable_complete_alt in H3.
   auto.
 Qed.
 
 Theorem beq_var_false_not_eq : forall i1 i2,
   beq_var i1 i2 = false -> i1 <> i2.
 Proof using.
- intros. symmetry in H1.
+ intros. symmetry in H3.
  apply beq_var_false. auto.
 Qed.
 
@@ -1204,7 +1206,7 @@ vca <> vcb
 -> forall lv, 
     varsOfClass lv vca
    -> forall n lva lvs, disjoint (freshVars n (Some vcb) lva lvs) lv.
-Proof using.
+Proof.
   intros ? ? Hn ? Hvc ? ? ?.
   addFreshVarsSpec.
   repnd.
@@ -1220,7 +1222,7 @@ Definition freshReplacements (blv lva : list NVar) :=
   (freshVars (length blv) (option_map varClass (head blv)) lva blv).
 
 Lemma freshVars0 : forall vc lva lvs, freshVars 0 vc lva lvs = [].
-Proof using.
+Proof.
   intros.
   addFreshVarsSpec.
   repnd.
@@ -1230,14 +1232,14 @@ Qed.
 
 (* for auto rewriting *)
 Lemma freshVarsLen : forall n vc lva lvs, length (freshVars n vc lva lvs) = n.
-Proof using.
+Proof.
   intros.
   addFreshVarsSpec.
   tauto.
 Qed.
 
 Lemma freshRepsLen : forall lva lvs, length (freshReplacements lvs lva) = length lvs.
-Proof using.
+Proof.
   intros.
   apply freshVarsLen.
 Qed.
@@ -1247,6 +1249,7 @@ Lemma  varsOfClassApp : forall (lv1 lv2 :list NVar) (vc : VClass),
 varsOfClass (lv1++lv2) vc
 <-> ((varsOfClass lv1 vc) # (varsOfClass lv2 vc)).
 Proof using.
+  clear H1 H2.
   unfold varsOfClass, lforall.
   setoid_rewrite in_app_iff.
   firstorder.
@@ -1260,7 +1263,7 @@ Qed.
 
 Lemma freshReplacementsSameClass : forall (blv lva : list NVar) vc, 
   varsOfClass blv vc -> varsOfClass (freshReplacements blv lva) vc.
-Proof using.
+Proof using H H2.
   intros ? ? ? Hvc.
   unfold freshReplacements.
   addFreshVarsSpec.
@@ -1327,6 +1330,14 @@ Proof.
   apply assert_memvar_false.
   auto.
 Qed.
+
+Definition freshVar  (o : VClass) (lx : list NVar) : NVar.
+Proof.
+  pose proof (freshCorrect 1 (Some o) lx nil) as Hfr. simpl in Hfr.
+  apply  proj1, proj2, proj2 in Hfr.
+  apply (listHead (freshVars 1 (Some o) lx nil)).
+  rewrite Hfr. constructor.
+Defined.
 
 
 End Vars.
@@ -1489,7 +1500,7 @@ Context {NVar : Type} `{VarType NVar bool}.
 Lemma varsOfClassFreshDisjointBool : forall n lva lvs lv, 
     varsOfClass lv true
     -> disjoint (freshVars n (Some false) lva lvs) lv.
-Proof using.
+Proof.
   intros. eapply varsOfClassFreshDisjoint; eauto.
   discriminate.
 Qed.
@@ -1501,7 +1512,6 @@ Proof.
   Local Transparent beq_var.
    apply decide_decideP.
   Local Opaque beq_var.
-   
 Qed.
 
 End Vars2Class.

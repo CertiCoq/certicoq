@@ -19,7 +19,9 @@ Eval compute in (ctranslateTo certiL4 p).
 
 Time Eval compute in (ctranslateTo certiL5a p).
 
+Require Import String.
 Open Scope string_scope.
+
 Eval compute in (cTerm certiL6).
 Eval compute in (ctranslateTo certiL6 p).
 
@@ -40,13 +42,13 @@ match p with
 end).
 
 Open Scope string_scope.
-Print swap.
 
 Ltac computeExtract certiL4 f:=
 (let t:= eval compute in (translateTo (cTerm certiL4) f) in 
 match t with
 |Ret ?xx => exact xx
 end).
+
 
 
 Definition swap4 : (cTerm certiL4).
@@ -113,6 +115,69 @@ Require Import L3_to_L4.
 Definition prev3Ienv := L4.L3_to_L4.inductive_env (AstCommon.env prev3).
 Eval vm_compute in prev3Ienv.
 
+Require Import NPeano.
+Require Import Recdef.
+Set Implicit Arguments.
+Require Import Omega.
+
+Function Gcd (a b : nat) {wf lt a} : nat :=
+match a with
+ | O => b 
+ | S k =>  Gcd (b mod S k)  (S k)
+end
+.
+Proof.
+- intros m n k Heq. subst. apply Nat.mod_upper_bound.
+  omega.
+- exact lt_wf.
+Defined.
+
+Set Template Cast Propositions.
+
+Quote Recursively Definition pgcd :=
+Gcd.
+
+
+Let pcgd2 : cTerm certiL2.
+let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
+Defined.
+
+Let pcgd4a : cTerm certiL4a.
+(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL4a) pcgd2) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
+Require Import List.
+Import ListNotations.
+
+(* the Gcd_terminate function is in the environment. Below,
+we project that part of the environment.
+The environment is too big, because it contains even the
+definitions that were used in the erased proof. *)
+Eval vm_compute in (nth_error (AstCommon.env pcgd2) 1).
+(* Eval vm_compute in (nth_error (AstCommon.env pcgd3) 1). *)
+
+Require Import SquiggleEq.terms.
+
+Require Import  ExtLib.Data.String.
+
+Definition print4 (t: cTerm certiL4a) : string :=
+(tprint ""
+    (fun v => flatten ["v";String.nat2string10 (Pos.to_nat v)])
+L4a_to_L5.L4OpidString 
+ (snd t)).
+
+(*
+Definition pgcd4astr : string.
+let t:= eval vm_compute in (print4 pcgd4a) in exact t.
+Defined.
+Eval compute in pgcd4astr.
+*)
+
+
+
 
 Require Import uncurry shrink_cps closure_conversion hoisting L6_to_Clight.
 
@@ -127,6 +192,7 @@ match t with
 |Ret ?xx => exact xx
 end).
 Defined.
+
 
 Definition bogus_cTag := 1000%positive.
 Definition bogus_iTag := 2000%positive.
@@ -268,51 +334,8 @@ Definition test := L6_to_Clight.print_Clight_dest p7 "threePlusFour.c".
 Definition test2 := L6_to_Clight.print_Clight_dest runtime.runtime.prog "gc.c".
 
 
-Require Import NPeano.
-Require Import Recdef.
-Set Implicit Arguments.
-Require Import Omega.
 
-Function Gcd (a b : nat) {wf lt a} : nat :=
-match a with
- | O => b 
- | S k =>  Gcd (b mod S k)  (S k)
-end
-.
-Proof.
-- intros m n k Heq. subst. apply Nat.mod_upper_bound.
-  omega.
-- exact lt_wf.
-Defined.
 
-Set Template Cast Propositions.
 
-Quote Recursively Definition pgcd :=
-Gcd.
 
-(*
-Ltac vmcomputeExtract certiL2 f:=
-(let t:= eval vm_compute in (translateTo (cTerm certiL2) f) in 
-match t with
-|Ret ?xx => exact xx
-end).
-*)
-
-Let pcgd2 : cTerm certiL2.
-let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
-Defined.
-
-Let pcgd3 : cTerm certiL3.
-(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL3) pcgd2) in 
-match t with
-|Ret ?xx => exact xx
-end).
-Defined.
-
-(* the Gcd_terminate function is in the environment. Below,
-we project that part of the environment.
-The environment is too big, because it contains even the
-definitions that were used in the erased proof. *)
-Eval vm_compute in (nth_error (AstCommon.env pcgd2) 1).
-Eval vm_compute in (nth_error (AstCommon.env pcgd3) 1).
 

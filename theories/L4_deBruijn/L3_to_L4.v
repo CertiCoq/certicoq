@@ -2,13 +2,13 @@
     mutually recursive functions, data constructors, and pattern matching.
  *)
 
-(******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1g" as L1g.
-Add LoadPath "../L2_typeStripped" as L2.
-Add LoadPath "../L3_flattenedApp" as L3.
-Add LoadPath "../L4_deBruijn" as L4.
-(******)
+(* (******) *)
+(* Add LoadPath "../common" as Common. *)
+(* Add LoadPath "../L1g" as L1g. *)
+(* Add LoadPath "../L2_typeStripped" as L2. *)
+(* Add LoadPath "../L3_flattenedApp" as L3. *)
+(* Add LoadPath "../L4_deBruijn" as L4. *)
+(* (******) *)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
@@ -73,11 +73,12 @@ Definition map_exps (f : exp -> exp) :=
 Section TermTranslation.
   Variable e : env.
     
-  Fixpoint strip_lam (k : nat) (e : exp) : exp :=
+  Fixpoint strip_lam (k : nat) (e : exp) : list name * exp :=
     match k, e with
-    | 0%nat, _ => e
-    | S n, Lam_e _ e => strip_lam n e
-    | S n, _ => e
+    | 0%nat, _ => ([], e)
+    | S n, Lam_e na e => let '(names, e) := strip_lam n e in
+                       (na :: names, e)
+    | S n, _ => ([],e)
     end.
 
   Section fixes.
@@ -89,15 +90,15 @@ Section TermTranslation.
       | L3t.tnil => brnil_e
       | L3t.tcons t ts =>
         let nargs := (List.nth (N.to_nat n) ann 0%nat - pars)%nat in
-        brcons_e (ind,n) (N.of_nat nargs)
-                 (strip_lam nargs (trans k t))
+        let '(names, t') := (strip_lam nargs (trans k t)) in
+        brcons_e (ind,n) (N.of_nat nargs, names) t'
                  (trans_brs ind pars ann k (n + 1)%N ts)
       end.
     Fixpoint trans_fixes k l :=
       match l with
       | L3t.dnil => eflnil
       | L3t.dcons na t _ l' =>
-        eflcons (trans k t) (trans_fixes k l')
+        eflcons na (trans k t) (trans_fixes k l')
       end.
 
   End fixes.
@@ -116,7 +117,7 @@ Section TermTranslation.
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
     | L3t.TInd i => (* Erase *) erased_exp
-    | L3t.TConstruct ind c (* _ *) args =>
+    | L3t.TConstruct ind c args =>
       let args' := trans_args trans k args in
         Con_e (dcon_of_con ind c) args'
     | L3t.TCase ann t brs =>

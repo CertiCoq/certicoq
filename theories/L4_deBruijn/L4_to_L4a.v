@@ -103,7 +103,7 @@ with translatef {NVar : Type} (mkVar : N -> Ast.name -> NVar)
   (max:N) (names: pmap Ast.name) (e:efnlst) {struct e}: list (@NTerm NVar L4Opid) :=
 match e with
 | eflnil => []
-| eflcons h tl => 
+| eflcons f h tl => 
     (translate mkVar max names h)
     ::(translatef mkVar max names tl)
 end
@@ -113,7 +113,9 @@ with translatelb {NVar : Type} (mkVar : N -> Ast.name -> NVar)
 match lb with
 | brnil_e => []
 | brcons_e d n e tl => 
-    (translateb mkVar max names translate d n e)
+  (translateb mkVar max names translate d
+              (nargs n) (* Second projection contains the names *)
+              e)
     ::(translatelb mkVar max names tl)
 end.
 

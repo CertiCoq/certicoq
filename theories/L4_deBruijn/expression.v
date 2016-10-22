@@ -69,12 +69,13 @@ with exps: Type :=
 | econs: exp -> exps -> exps
 with efnlst: Type :=
 | eflnil: efnlst
-| eflcons: exp -> efnlst -> efnlst
+| eflcons: name -> exp -> efnlst -> efnlst
 with branches_e: Type :=
 | brnil_e: branches_e
-| brcons_e: dcon -> N -> exp -> branches_e -> branches_e.
+| brcons_e: dcon -> (N * (* # args *) list name (* arg names *)) -> exp ->
+            branches_e -> branches_e.
 Notation "[| e |]" := (econs e enil).
-Notation "[! f !]" := (eflcons f eflnil).
+Notation "[! fn := f !]" := (eflcons fn%string f eflnil).
 Hint Constructors exp exps branches_e.
 Scheme exp_ind' := Induction for exp Sort Prop
 with exps_ind'  := Induction for exps Sort Prop
@@ -103,16 +104,19 @@ Fixpoint exps_length (es:exps) : N :=
 Fixpoint efnlst_length (es:efnlst) : N :=
   match es with
     | eflnil => N0
-    | eflcons _ es => 1 + (efnlst_length es)
+    | eflcons _ _ es => 1 + (efnlst_length es)
   end.
 
 (** Find the nth component in exps **)
 Fixpoint enthopt (n:nat) (xs:efnlst): option exp :=
   match n, xs with 
-    | 0%nat, eflcons h _ => Some h
-    | S n, eflcons _ t => enthopt n t
+    | 0%nat, eflcons _ h _ => Some h
+    | S n, eflcons _ _ t => enthopt n t
     | _, _ => None
   end.
+
+Definition nargs (n : N * list name) : N := fst n.
+Definition arg_names (n : N * list name) : list name := snd n.
 
 (** [exp_wf i e] ensures there is no free variable above [i]. *)
 Inductive exp_wf: N -> exp -> Prop :=
@@ -133,11 +137,11 @@ with exps_wf: N -> exps -> Prop :=
 | econs_wf: forall i e es, exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
 with efnlst_wf: N -> efnlst -> Prop :=
 | flnil_wf_e: forall i, efnlst_wf i eflnil
-| flcons_wf_e: forall i e es, exp_wf i e -> efnlst_wf i es ->
-                           efnlst_wf i (eflcons e es)
+| flcons_wf_e: forall i f e es, exp_wf i e -> efnlst_wf i es ->
+                           efnlst_wf i (eflcons f e es)
 with branches_wf: N -> branches_e -> Prop :=
 | brnil_wf: forall i, branches_wf i brnil_e
-| brcons_wf: forall i d n e bs, exp_wf (n + i) e -> branches_wf i bs ->
+| brcons_wf: forall i d n e bs, exp_wf (nargs n + i) e -> branches_wf i bs ->
                                 branches_wf i (brcons_e d n e bs).
 Hint Constructors exp_wf exps_wf branches_wf.
 Scheme exp_wf_ind2 := Induction for exp_wf Sort Prop
@@ -194,12 +198,13 @@ Section SHIFT.
   Fixpoint shift_efnlst n k bs :=
     match bs with
     | eflnil => eflnil
-    | eflcons e es => eflcons (shift n k e) (shift_efnlst n k es)
+    | eflcons f e es => eflcons f (shift n k e) (shift_efnlst n k es)
     end.
   Fixpoint shift_branches' n k bs :=
     match bs with
     | brnil_e => brnil_e
-    | brcons_e d na e brs => brcons_e d na (shift n (k+na) e) (shift_branches' n k brs)
+    | brcons_e d na e brs => brcons_e d na (shift n (k+nargs na) e)
+                                     (shift_branches' n k brs)
     end.
 End SHIFT.
 
@@ -283,13 +288,13 @@ with substs (v:exp) k (es:exps) : exps :=
 with subst_efnlst (v:exp) k (es:efnlst) : efnlst :=
        match es with
          | eflnil => eflnil
-         | eflcons f fs => eflcons (subst v k f) (subst_efnlst v k fs)
+         | eflcons fna f fs => eflcons fna (subst v k f) (subst_efnlst v k fs)
        end
 with subst_branches (v:exp) k (bs:branches_e) : branches_e :=
        match bs with
          | brnil_e => brnil_e
          | brcons_e d n e bs =>
-           brcons_e d n (subst v (n+k) e) (subst_branches v k bs)
+           brcons_e d n (subst v (nargs n+k) e) (subst_branches v k bs)
        end.
 
 (** Substitute [v] for variable [k] in [e];
@@ -314,13 +319,13 @@ with sbsts (v:exp) k (es:exps) : exps :=
 with sbst_efnlst (v:exp) k (es:efnlst) : efnlst :=
        match es with
          | eflnil => eflnil
-         | eflcons f fs => eflcons (sbst v k f) (sbst_efnlst v k fs)
+         | eflcons fna f fs => eflcons fna (sbst v k f) (sbst_efnlst v k fs)
        end
 with sbst_branches (v:exp) k (bs:branches_e) : branches_e :=
        match bs with
          | brnil_e => brnil_e
          | brcons_e d n e bs =>
-           brcons_e d n (sbst v (n+k) e) (sbst_branches v k bs)
+           brcons_e d n (sbst v (nargs n+k) e) (sbst_branches v k bs)
        end.
 
 (** Notation for optimised substitution. **)
@@ -487,14 +492,14 @@ Fixpoint find_branch (d:dcon) (m:N) (bs:branches_e) : option exp :=
   match bs with
     | brnil_e => None
     | brcons_e d' n e bs =>
-      if eq_dec d d' then (if eq_dec n m then Some e else None)
+      if eq_dec d d' then (if eq_dec (nargs n) m then Some e else None)
                      else find_branch d m bs
   end.
 
 Fixpoint efnlength (es:efnlst) :=
   match es with
   | eflnil => 0%nat
-  | eflcons _ l => S (efnlength l)
+  | eflcons _ _ l => S (efnlength l)
   end.
 
 (** Skipping parameters *)
@@ -593,10 +598,19 @@ Proof.
     rewrite (H0 vs0); try assumption. reflexivity.
 Qed.
 
+Bind Scope name with name.
+Delimit Scope name with name.
 Arguments nNamed i%string.
 Definition nNameds (s : string) : name := nNamed s.
+
+Notation " [: x ] " := (cons (nNameds x) nil) : name.
+Notation " '[:' x , y , .. , z ] " :=
+  (cons (nNameds x) (cons (nNameds y) .. (cons (nNameds z) nil) ..)) : name.
+Local Open Scope name.
+
 Coercion nNameds : string >-> name.
-Arguments Lam_e n%string e.
+Arguments Lam_e n%string _.
+Arguments eflcons n%string _ _.
 
 Example x1: exp := Lam_e "x" (Var_e 0).  (* identity *)
 Lemma Lx1: forall (e d:exp), eval e d -> eval (App_e x1 e) d.
@@ -1007,11 +1021,12 @@ Notation FFF := (Con_e FF enil).
 (* if b then e1 else e2 *)
 Notation ite :=
   (Lam_e "x" (Lam_e "y" (Lam_e "z"
-             (Match_e Ve2 0 (brcons_e TT 0 Ve1 (brcons_e FF 0 Ve0 brnil_e)))))).
+             (Match_e Ve2 0 (brcons_e TT (0,[]) Ve1 (brcons_e FF (0,[]) Ve0 brnil_e)))))).
 Goal eval (ite $ TTT $ FFF $ TTT) FFF.
   repeat econstructor. Qed.
 Goal eval (ite $ FFF $ FFF $ TTT) TTT.
 repeat econstructor. Qed.
+
 
 (** lists using native data constructors: Cons takes 2 arguments **)
 Notation listind := (mkInd "list" 0).
@@ -1020,7 +1035,8 @@ Notation Nil := (Con_e dNil enil).
 Notation dCons := ((listind,1):dcon).
 Notation Cons := (Lam_e "x" (Lam_e "y" (Con_e dCons (econs Ve1 [|Ve0|])))).
 Notation cdr :=
-  (Lam_e "x" (Match_e Ve0 0 (brcons_e dNil 0 Nil (brcons_e dCons 2 Ve0 brnil_e)))).
+  (Lam_e "x" (Match_e Ve0 0 (brcons_e dNil (0,[]) Nil
+   (brcons_e dCons (2,[: "x", "xs" ]) Ve0 brnil_e)))).
 
 Goal eval (cdr $ Nil) Nil.
 eapply eval_App_e.
@@ -1078,8 +1094,8 @@ Qed.
 
 (** fixpoints **)
 Definition copy : exp :=
-  (Fix_e [!Lam_e "x" (Match_e Ve0 0 (brcons_e ZZ 0 ZZZ 
-            (brcons_e SS 1 (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
+  (Fix_e [!"copy" := Lam_e "x" (Match_e Ve0 0 (brcons_e ZZ (0,[]) ZZZ 
+            (brcons_e SS (1, [: "n"]) (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
 
 Goal eval (copy $ ZZZ) ZZZ.
 unfold copy.
@@ -1226,9 +1242,9 @@ Lemma nthopt_preserves_wf :
 Proof.
   induction es; simpl; intros. 
   - destruct n; discriminate.
-  - inversion H; subst. destruct n; simpl in *.
+  - inversion H; subst. destruct n0; simpl in *.
     + injection H0; intros; subst; auto. 
-    + specialize (IHes H5 n e0).
+    + specialize (IHes H6 n0 e0).
       apply IHes. auto.
 Qed.
 

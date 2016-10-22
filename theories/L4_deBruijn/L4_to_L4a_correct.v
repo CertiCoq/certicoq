@@ -111,8 +111,8 @@ Admitted.
 
 
 
-Lemma mkVarDiv : forall i, 
-  N.pos (Pos.div2 (mkVar i)) = N.succ i.
+Lemma mkVarDiv : forall i s, 
+  N.pos (Pos.div2 (fst (mkVar i s))) = N.succ i.
 Proof using Type.
   intros. simpl.
   rewrite N.succ_pos_spec. refl.

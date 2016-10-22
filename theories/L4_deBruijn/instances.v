@@ -55,7 +55,6 @@ Require Import L4a_to_L5.
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
 
-Definition L4aTerm :Type := (@NTerm cps.var L4Opid).
 
 Global  Program Instance : BigStepOpSem L4aTerm := eval.
 
@@ -70,8 +69,9 @@ Global Instance certiL4_to_L4a:
   CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4a) :=
   (fun p => (fst p, (L4_to_L4a (0)%N (snd p)))).
 
+Require Import L4.variables.
 
-Definition L5Term :Type := (@NTerm cps.var L5Opid).
+Definition L5Term :Type := (@NTerm NVar L5Opid).
 
 Global Program Instance : BigStepOpSem L5Term := eval_c.
 

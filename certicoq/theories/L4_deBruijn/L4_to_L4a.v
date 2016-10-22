@@ -1,4 +1,5 @@
 Require Import L4.expression.
+Require Import L4.variables.
 Require Import L4.L4a_to_L5.
 
 Require Import SquiggleEq.export.
@@ -11,7 +12,10 @@ Require Import SquiggleEq.tactics.
 Require Import SquiggleEq.lmap.
 *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith 
+Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program 
+Coq.micromega.Psatz.
+
 
 (*replace in to SquiggleEq and delete here *)
 Fixpoint seq {T:Type} (next: T->T) (start : T) (len : nat) {struct len} : list T :=
@@ -26,71 +30,105 @@ Definition dummyind := Ast.mkInd "" 0%nat.
 Require Import Common.RandyPrelude.
 Open Scope N_scope.
 
-Definition translateb {NVar : Type} (mkVar : N -> NVar) max
+Require Import ExtLib.Data.Map.FMapPositive.
+
+Definition translateb {NVar : Type} (mkVar : N -> Ast.name -> NVar) max
+(names: pmap Ast.name) 
 translate
- d n (e:exp)  :  (@branch NVar L4Opid) :=
-    let bvars := map mkVar (seq N.succ max (N.to_nat n)) in 
-    (d, bterm bvars (translate mkVar (max+n) e)).
+ d n (e:exp)  :  (@L4a_to_L5.branch NVar L4Opid) :=
+    let vars := (seq N.succ max (N.to_nat n)) in
+(* fix when the info from L3 becomes available *)
+    let bvars := map (fun n => mkVar n Ast.nAnon) vars in 
+    (d, bterm bvars (translate mkVar (max+n) names e)).
 
 
-(* N.to_nat efficiency? *)
-Fixpoint translate {NVar : Type} (mkVar : N -> NVar) 
-  (max : N)(e:exp) {struct e}: NTerm :=
+Locate branch.
+
+Print N.succ_pos.
+
+Definition lookupName (names : pmap Ast.name) (var:N) : Ast.name :=
+match pmap_lookup (N.succ_pos var) names with
+| Some name => name
+| None  => Ast.nAnon
+end.
+
+Definition insertName (names : pmap Ast.name) (var:N) (name: Ast.name): pmap Ast.name :=
+pmap_insert (N.succ_pos var) name names.
+
+
+Fixpoint translate {NVar : Type} (mkVar : N -> Ast.name -> NVar) 
+  (max : N) (names: pmap Ast.name)(e:exp) {struct e}: (@NTerm NVar L4Opid):=
 match e with
-| Var_e n => vterm (mkVar (max-n-1))
+| Var_e n => vterm (mkVar (max-n-1) (lookupName names (max-n-1)))
 
-| expression.Lam_e na e => 
-    let vn := mkVar max in
-    Lam_e vn (translate mkVar (N.succ max) e)
+| expression.Lam_e name e => 
+    let vn := mkVar max name in
+    let names := insertName names max name in
+    Lam_e vn (translate mkVar (N.succ max) names e)
 
 | expression.App_e f a => 
-    App_e (translate mkVar max f) (translate mkVar max a)
+    App_e (translate mkVar max names f) (translate mkVar max names a)
 
-| expression.Let_e na e1 e2 => 
-    let vn := mkVar max in
-    Let_e vn (translate mkVar max e1) (translate mkVar (N.succ max) e2)
+| expression.Let_e name e1 e2 => 
+    let vn := mkVar max name in
+    let names := insertName names max name in
+    Let_e vn (translate mkVar max names e1) (translate mkVar (N.succ max) names e2)
 
 | expression.Con_e d el => 
-    Con_e d (translatel mkVar max el)
+    Con_e d (translatel mkVar max names el)
 
 | expression.Fix_e el pn => 
     let len := efnlst_length el in 
-    let bvars := map mkVar (seq N.succ max (N.to_nat len)) in 
-    let bds := (translatef mkVar (max+ len) el) in
+    let vars := (seq N.succ max (N.to_nat len)) in
+(* fix when the info from L3 becomes available *)
+    let bvars := map (fun n => mkVar n Ast.nAnon) vars in 
+    let bds := (translatef mkVar (max+ len) names el) in
     Fix_e bvars bds (N.to_nat pn)
 
 | expression.Match_e d _ brl => 
-    Match_e (translate mkVar max d) (translatelb mkVar max brl)
+    Match_e (translate mkVar max names d) 
+            (translatelb mkVar max names brl)
 
 | Ax_e _ => Con_e (dummyind, N.zero) nil (* FIX! *) 
 end
-with translatel {NVar : Type} (mkVar : N -> NVar) 
-  (max : N)(e:exps) {struct e}: list NTerm :=
+with translatel {NVar : Type} (mkVar : N -> Ast.name -> NVar) 
+  (max : N) (names: pmap Ast.name) (e:exps) {struct e}: list (@NTerm NVar L4Opid) :=
 match e with
 | enil => []
-| econs h tl => (translate mkVar max h)::(translatel mkVar max tl)
+| econs h tl => 
+    (translate mkVar max names h)
+     ::(translatel mkVar max names tl)
 end
-with translatef {NVar : Type} (mkVar : N -> NVar)
-  (max:N) (e:efnlst) {struct e}: list NTerm :=
+with translatef {NVar : Type} (mkVar : N -> Ast.name -> NVar)
+  (max:N) (names: pmap Ast.name) (e:efnlst) {struct e}: list (@NTerm NVar L4Opid) :=
 match e with
 | eflnil => []
-| eflcons h tl => (translate mkVar max h)::(translatef mkVar max tl)
+| eflcons h tl => 
+    (translate mkVar max names h)
+    ::(translatef mkVar max names tl)
 end
-with translatelb {NVar : Type} (mkVar : N -> NVar)
-(max:N)(lb:branches_e) {struct lb}
-  : list (@branch NVar L4Opid):=
+with translatelb {NVar : Type} (mkVar : N -> Ast.name -> NVar)
+(max:N) (names: pmap Ast.name) (lb:branches_e) {struct lb}
+  : list (@L4a_to_L5.branch NVar L4Opid):=
 match lb with
 | brnil_e => []
-| brcons_e d n e tl => (translateb mkVar max translate d n e)::(translatelb mkVar max tl)
+| brcons_e d n e tl => 
+    (translateb mkVar max names translate d n e)
+    ::(translatelb mkVar max names tl)
 end.
 
 
-Definition mkVar (n:N):=  xO (N.succ_pos n).
+Definition mkVar (n:N) (name : Ast.name) :=  (xO (N.succ_pos n), name).
 Require Import L6.cps.
 
+
+
+Definition L4aTerm :Type := (@NTerm NVar L4Opid).
+
+
 (* uservars are supposed to be even, so multiply by 2 x0*)
-Definition L4_to_L4a (n:N) (e:expression.exp) : (@NTerm cps.var L4Opid) :=
-  translate mkVar  n e.
+Definition L4_to_L4a (n:N) (e:expression.exp) : L4aTerm :=
+  translate mkVar n Empty e.
 
 (*
 (* Delete this module and everything inside it *)

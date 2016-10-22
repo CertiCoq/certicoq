@@ -10,7 +10,7 @@ Set Implicit Arguments.
 Require Import SquiggleEq.varImplZ.
 
 Require Import L6.cps.
-Notation NVar := var.
+Require Import L4.variables.
 
 (**********************)
 (** * CPS expressions *)

@@ -36,6 +36,7 @@ Require Import ExtLib.Data.List.
 Require Import L4.L4a_to_L5.
 Require Import SquiggleEq.varImplZ.
 Require Import L4.L5a.
+Require Import L4.variables.
 
 Require Import L6.cps.
 Require Import L6.cps_util.

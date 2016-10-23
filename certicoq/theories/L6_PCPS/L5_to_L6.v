@@ -111,8 +111,11 @@ Fixpoint ctx_bind_proj (tg:cTag) (r:positive) (m:nat) (n:var) : (exp_ctx * var) 
 
 
 
-Definition t_map := M.t fTag.
+Let t_info:Type := (option Ast.name) * fTag.
+Definition t_map := M.t t_info.
 Definition t_empty:t_map := M.empty _.
+
+
 
 (* get the iTag of a variable, i_tag if not found *)
 (*
@@ -126,7 +129,7 @@ Fixpoint get_t (n:var) (sig:t_map): iTag :=
 Fixpoint get_f (n:var) (sig:t_map): fTag :=
   match M.get n sig with
     | None => fun_tag
-    | Some v => v
+    | Some v => snd v
   end.
 
   
@@ -135,23 +138,23 @@ Fixpoint get_f (n:var) (sig:t_map): fTag :=
 Definition s_map := M.t var.
 Definition s_empty := M.empty var.
 
-Definition get_s (a:M.elt) (sig:s_map):=
-  match M.get a sig with
+Definition get_s (a:NVar) (sig:s_map):=
+  match M.get (fst a) sig with
     | None => (1%positive)
     | Some v => v
   end.
 
-Fixpoint set_s_list (lx ly:list var) (sig:s_map) :=
+Fixpoint set_s_list (lx:list NVar) (ly:list var) (sig:s_map) :=
   match (lx, ly) with
     | (x::lx', y::ly') =>
-      set_s_list lx' ly' (M.set x y sig)
+      set_s_list lx' ly' (M.set (fst x) y sig)
     | _ => sig
   end.
 
 (* 
   sv is a map used to convert variable indices to name
 sk is a map from continuation indices to name
-tgm is a map from name to its tag
+tgm is a map from id (positive) to its original name (if any) and tag
 n is the next available name.
 
 returns pair of converted expression e', the next available variable name n' and the updated tag environment
@@ -170,8 +173,18 @@ note : var "1" is taken as error and will be proven not to appear when input is 
 (* environment threaded for conversion 
  conId_map maps the dcon to the right tag pointing to the constructor info (cEnv not passed around)
  t_map maps var name to their tag, allowing to index applications with the right function tag  
+ note:want might to add f and k to t_map on way down 
 *)
 Definition conv_env:Type := conId_map *  t_map.
+Definition set_t (n:var) (ti:t_info) (tgm:conv_env):conv_env := ((fst tgm), M.set n ti (snd tgm)).
+
+(* Add a list of function to the tag environment *)
+Fixpoint set_t_f_list (ns:list var) (ts:list NVar) (tgm:conv_env) :=
+  match ns, ts with
+    | n::ns', t::ts' => set_t_f_list ns' ts' (set_t n (Some (snd t), fun_tag) tgm) 
+    | _, _ => tgm
+  end.
+  
 
 Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:conv_env) (n:var) (*  {struct e } *): exp * var * conv_env :=
        match e with
@@ -219,13 +232,16 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (tgm:conv_env) (n:var) (* { str
        match v with
          | Var_c m => (Hole_c, get_s m sv , n, tgm)   (* {| ( Econstr_c n ty var_tag ((nth (N.to_nat m) sv (1%positive))::nil)  Hole_c, Pos.succ n  ) |} *)
          | KVar_c m => (Hole_c, get_s m sk, n, tgm) (* {| ( Econstr_c n ty kvar_tag ((nth (N.to_nat m) sk (1%positive))::nil) Hole_c, Pos.succ n) |} *)
-         | Lam_c x k e => let '(e', n', tgm) := convert e (M.set x n sv) (M.set k (Pos.succ n) sk) tgm (Pos.add n (2%positive)) in
-                          (* flipping around so the continuation comes first *)
-                          let fds := Fcons n' fun_tag ((Pos.succ n)::n::nil) e' Fnil in
-                          (Efun1_c fds Hole_c, n' , (Pos.succ n'), tgm)
-         | Cont_c k e => let '(e', n', tgm) := convert e sv (M.set k n sk) tgm (Pos.succ n) in
+         | Lam_c x k e =>
+           let tgm := set_t (Pos.succ n) (None, kon_tag) tgm in
+           let '(e', n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) tgm (Pos.add n (2%positive)) in
+           let tgm := set_t n' (None, fun_tag) tgm in  (* what about the tag of x? *)     
+           (* flipping around so the continuation comes first *)
+           let fds := Fcons n' fun_tag ((Pos.succ n)::n::nil) e' Fnil in                         
+           (Efun1_c fds Hole_c, n' , (Pos.succ n'), tgm) 
+         | Cont_c k e => let '(e', n', tgm) := convert e sv (M.set (fst k) n sk) tgm (Pos.succ n) in
                          let fds := Fcons n' kon_tag (n::nil) e' Fnil in
-                         (Efun1_c fds Hole_c, n',  Pos.succ n', tgm)
+                         (Efun1_c fds Hole_c, n',  Pos.succ n', set_t n' (None, kon_tag) tgm)
          | Con_c dcn lv =>
            let fix convert_v_list (lv :list val_c) (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): (exp_ctx * list var * var * conv_env) :=
                match lv with
@@ -237,8 +253,9 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (tgm:conv_env) (n:var) (* { str
                      
                end in
            let '(lv_ctx, nl, n', tgm) := convert_v_list lv sv sk tgm n in
-           
-             (comp_ctx_f lv_ctx (Econstr_c n' (dcon_to_tag dcn (fst tgm)) (List.rev nl) Hole_c), n', Pos.succ n', tgm) 
+           let ctag := (dcon_to_tag dcn (fst tgm)) in
+
+             (comp_ctx_f lv_ctx (Econstr_c n' ctag (List.rev nl) Hole_c), n', Pos.succ n', set_t n' (None, ctag) tgm)
          | Fix_c lbt i =>
            (match lbt with
              | nil => (Hole_c, (1%positive), n, tgm) (* malformed input, should not happen *) 
@@ -263,21 +280,21 @@ arguments are:
  08/27/2016 - updated for directly-named functions in L5a instead of building a record
  09/08/2016 - now passing conv_env, containing a reverse cEnv to populate Econstr with the right cTag
  *)
-           let fix convert_fds (fds : list (list var * val_c))  (sv: s_map) (sk : s_map) (tgm:conv_env) (fnames : list var) (n : var) (*{struct fds} *): (fundefs * var * conv_env)  :=
+           let fix convert_fds (fds : list (list NVar * val_c))  (sv: s_map) (sk : s_map) (tgm:conv_env) (fnames : list var) (n : var) (*{struct fds} *): (fundefs * var * conv_env)  :=
                match (fds, fnames) with
                  | ((_,v)::fds', currn::fnames') =>
                    (match v with
                       | Lam_c x k e =>            
-                        let '(ce, n', tgm) := convert e (M.set x n sv) (M.set k (Pos.succ n) sk) tgm (Pos.add n 2%positive) in
+                        let '(ce, n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) (set_t (Pos.succ n) (None, kon_tag) tgm) (Pos.add n 2%positive) in
                         let '(cfds, n'', tgm) := convert_fds fds' sv sk tgm fnames' n' in
-                        let (tgm1, tgm2) := tgm in 
-                        (Fcons currn fun_tag (n::(Pos.succ n)::nil) ce cfds, n'', (tgm1, M.set currn fun_tag tgm2))
+                        (Fcons currn fun_tag (n::(Pos.succ n)::nil) ce cfds, n'', tgm) (* todo: add the tag for x *)
                       | _ => (Fnil, n, tgm) (* this should not happen *)
                     end) 
                  | (_, _) => (Fnil, n, tgm)
                end in
            let (nfds, newn) := fromN n (length fvars) in
            let sv' := set_s_list fvars nfds sv in
+           let tgm := set_t_f_list nfds fvars tgm in
            let '(fds, n', tgm) := convert_fds lbt sv' sk tgm nfds newn in
            (Efun1_c fds Hole_c, nth i nfds (1%positive), n', tgm )
              end)
@@ -326,4 +343,4 @@ Definition convert_top (ee:ienv*cps) : (cEnv*exp) :=
 
 
 
-
+Print cTyInfo.

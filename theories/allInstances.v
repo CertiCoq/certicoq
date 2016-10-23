@@ -163,12 +163,6 @@ Require Import SquiggleEq.terms.
 
 Require Import  ExtLib.Data.String.
 
-Definition print4 (t: cTerm certiL4a) : string :=
-(tprint ""
-    (fun v => flatten ["v";String.nat2string10 (Pos.to_nat v)])
-L4a_to_L5.L4OpidString 
- (snd t)).
-
 (*
 Definition pgcd4astr : string.
 let t:= eval vm_compute in (print4 pcgd4a) in exact t.

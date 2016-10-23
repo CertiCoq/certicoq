@@ -113,7 +113,47 @@ Require Import ZArith.
 (* Print Instances CerticoqLanguage. *)
 Open Scope string_scope.
 
-Eval vm_compute in (translateTo (cTerm certiL4a) p0L1).
+
+Fixpoint even (n:nat) : bool :=
+  match n with
+    | O => true
+    | (S n') => odd n'
+  end
+with odd n : bool :=
+  match n with
+    | O => false
+    | (S n') => even n'
+  end.
+
+Require Import String.
+Require Import List.
+Import ListNotations.
+
+Definition name2string (n:Ast.name): string :=
+match n with
+| nAnon => "_"
+| nNamed s => s
+end.
+
+Require Import Program.
+
+
+Definition print4 (t: cTerm certiL4a) : string :=
+(tprint "" (name2string ∘ snd)  L4a_to_L5.L4OpidString  (snd t)).
+
+Definition exception_map {A B:Type} (f: A->B) (e: exception A) : exception B:=
+match e with
+| Ret a => Ret (f a)
+| Exc s => Exc s
+end.
+
+
+
+Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a p0L1)).
+
+Quote Recursively Definition evo := (andb (even 0) (odd 1)).
+Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a evo)).
+
 (*
      = Ret
          ([("Coq.Init.Datatypes.nat", 0,

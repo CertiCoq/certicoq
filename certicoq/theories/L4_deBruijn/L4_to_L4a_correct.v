@@ -111,8 +111,8 @@ Admitted.
 
 
 
-Lemma mkVarDiv : forall i s, 
-  N.pos (Pos.div2 (fst (mkVar i s))) = N.succ i.
+Lemma mkVarDiv : forall i,
+  N.pos (Pos.div2 (mkVar i)) = N.succ i.
 Proof using Type.
   intros. simpl.
   rewrite N.succ_pos_spec. refl.
@@ -137,58 +137,81 @@ Proof using.
   inverts H1. refl.
 Qed.
 
+Let fvars : L4aTerm -> list positive := (map fst) ∘ free_vars.
+
+Let fvarsb : (@BTerm variables.NVar L4Opid) -> list positive 
+  := (map fst) ∘ free_vars_bterm.
+
+Let fvarsBounded (vars : list L4.variables.NVar) n := 
+(forall v, List.In v (map fst vars) -> 
+        (Npos (Pos.div2 v) < N.succ n)%N)
+/\
+forall v1 v2, varClass v1 = true
+  /\
+  (List.In v1 vars -> 
+  List.In v2 vars -> 
+  fst v1= fst v2 ->
+  v1=v2).
+
+
+
 
 Lemma L4_to_L4a_fvars: 
   (forall n (s : exp),
     L4.expression.exp_wf n s 
-    -> forall v, List.In v (free_vars (L4_to_L4a n s)) -> 
+    -> forall names v, List.In v (fvars (L4_to_L4a.translate mkNVar n names s)) -> 
         (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
  ∧
   (forall n (s : exps),
-    L4.expression.exps_wf n s 
-    -> forall v, List.In v (flat_map free_vars (translatel mkVar n s)) -> 
+    L4.expression.exps_wf n s
+    -> forall names v, List.In v (flat_map fvars (translatel mkNVar n names s)) -> 
         (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
  ∧
   (forall n (s : efnlst),
     L4.expression.efnlst_wf n s 
-    -> forall v, List.In v 
-                 (flat_map free_vars (translatef mkVar n s)) -> 
+    -> forall names v, List.In v 
+                 (flat_map fvars (translatef mkNVar n names s)) -> 
         (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
  ∧
   (forall n (s : branches_e),
     L4.expression.branches_wf n s 
-    -> forall v, List.In v (flat_map (free_vars_bterm ∘ snd)  (translatelb mkVar n s)) -> 
+    -> forall names v, List.In v (flat_map (fvarsb ∘ snd) 
+          (translatelb mkNVar n names s)) -> 
         (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *)).
 Proof using.
   apply my_exp_wf_ind; try (simpl; tauto); [ | | | | | | | | | ];
   intros ? ?.
 (* Var_e *)
-- intros Hwf ? Hin. simpl in Hin. rewrite or_false_r in Hin.
-  subst. split; [ | refl].
-  rewrite mkVarDiv.
+- intros Hwf ? ? Hin. simpl in Hin. rewrite or_false_r in Hin.
+  subst. split; [ | refl]. simpl.
+  setoid_rewrite mkVarDiv.
   rewrite N.sub_1_r.
   rewrite N.lt_succ_pred with (z:=0%N); lia.
 
 (* Lam_e *)
-- intros e Hwf Hind ? Hin.
-  simpl in Hin.
+- intros e Hwf Hind ? ? Hin.
+  simpl in Hin. unfold fvars, compose in *. simpl in Hin.
+  apply in_map_iff in Hin. exrepnd.
+  simpl in Hin0. subst. rename a0 into v.
+  rename Hin1 into Hin.
   rewrite list.in_app_iff in Hin.
   rewrite or_false_r in Hin.
   apply list.in_remove in Hin.
-  repnd. rewrite  N.add_1_l in Hind.
+  repnd. rewrite N.add_1_l in Hind.
+  apply (in_map fst) in Hin. 
   apply Hind in Hin.
   clear Hind. rename Hin into Hind.
   repnd.
   split; [ | assumption].
   apply N.lt_succ_r in Hind0.
   apply N.lt_eq_cases in Hind0.
-  dorn Hind0; [assumption | subst; provefalse ].
+  dorn Hind0; [auto | subst; provefalse ].
   apply Hin0.
-  clear Hin0.
+  clear Hin0. simpl in Hind0.
   destruct v; inversion Hind. clear Hind.
   simpl in Hind0.
   unfold mkVar. 
-  f_equal.
+  f_equal. f_equal.
   rewrite <- N.succ_pos_spec in Hind0.
   injection Hind0. trivial.
 

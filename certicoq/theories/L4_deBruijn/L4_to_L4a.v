@@ -32,19 +32,6 @@ Open Scope N_scope.
 
 Require Import ExtLib.Data.Map.FMapPositive.
 
-Definition translateb {NVar : Type} (mkVar : N -> Ast.name -> NVar) max
-(names: pmap Ast.name) 
-translate
- d n (e:exp)  :  (@L4a_to_L5.branch NVar L4Opid) :=
-    let vars := (seq N.succ max (N.to_nat n)) in
-(* fix when the info from L3 becomes available *)
-    let bvars := map (fun n => mkVar n Ast.nAnon) vars in 
-    (d, bterm bvars (translate mkVar (max+n) names e)).
-
-
-Locate branch.
-
-Print N.succ_pos.
 
 Definition lookupName (names : pmap Ast.name) (var:N) : Ast.name :=
 match pmap_lookup (N.succ_pos var) names with
@@ -52,26 +39,47 @@ match pmap_lookup (N.succ_pos var) names with
 | None  => Ast.nAnon
 end.
 
-Definition insertName (names : pmap Ast.name) (var:N) (name: Ast.name): pmap Ast.name :=
+Definition insertName (names : pmap Ast.name) (nvar:N*Ast.name): pmap Ast.name :=
+let (var,name) := nvar in
 pmap_insert (N.succ_pos var) name names.
 
+Definition insertNames (names : pmap Ast.name) (nvars: list (N*Ast.name)): pmap Ast.name :=
+fold_left insertName nvars names.
 
-Fixpoint translate {NVar : Type} (mkVar : N -> Ast.name -> NVar) 
+Definition translateb {NVar : Type} (mkVar : (N * Ast.name) -> NVar) max
+(names: pmap Ast.name) 
+translate
+ d (nn: (N * list Ast.name)) (e:exp)  :  (@L4a_to_L5.branch NVar L4Opid) :=
+    let (n,vnames) := nn in
+    let vars := (seq N.succ max (N.to_nat n)) in
+    let nvars := (combine vars vnames) in
+    let names := insertNames names nvars in
+    let bvars := map mkVar nvars in 
+    (d, bterm bvars (translate mkVar (max+n) names e)).
+
+Fixpoint fnames (e:efnlst) {struct e}: list (Ast.name) :=
+match e with
+| eflnil => []
+| eflcons f h tl => 
+    f::(fnames tl)
+end.
+
+Fixpoint translate {NVar : Type} (mkVar : (N * Ast.name) -> NVar) 
   (max : N) (names: pmap Ast.name)(e:exp) {struct e}: (@NTerm NVar L4Opid):=
 match e with
-| Var_e n => vterm (mkVar (max-n-1) (lookupName names (max-n-1)))
+| Var_e n => vterm (mkVar (max-n-1,lookupName names (max-n-1)))
 
 | expression.Lam_e name e => 
-    let vn := mkVar max name in
-    let names := insertName names max name in
+    let vn := mkVar (max,name) in
+    let names := insertName names (max,name) in
     Lam_e vn (translate mkVar (N.succ max) names e)
 
 | expression.App_e f a => 
     App_e (translate mkVar max names f) (translate mkVar max names a)
 
 | expression.Let_e name e1 e2 => 
-    let vn := mkVar max name in
-    let names := insertName names max name in
+    let vn := mkVar (max,name) in
+    let names := insertName names (max,name) in
     Let_e vn (translate mkVar max names e1) (translate mkVar (N.succ max) names e2)
 
 | expression.Con_e d el => 
@@ -80,8 +88,10 @@ match e with
 | expression.Fix_e el pn => 
     let len := efnlst_length el in 
     let vars := (seq N.succ max (N.to_nat len)) in
-(* fix when the info from L3 becomes available *)
-    let bvars := map (fun n => mkVar n Ast.nAnon) vars in 
+    let fnames := fnames el in
+    let nvars := (combine vars fnames) in
+    let names := insertNames names nvars in
+    let bvars := map mkVar nvars in 
     let bds := (translatef mkVar (max+ len) names el) in
     Fix_e bvars bds (N.to_nat pn)
 
@@ -91,7 +101,7 @@ match e with
 
 | Ax_e _ => Con_e (dummyind, N.zero) nil (* FIX! *) 
 end
-with translatel {NVar : Type} (mkVar : N -> Ast.name -> NVar) 
+with translatel {NVar : Type} (mkVar : (N * Ast.name) -> NVar) 
   (max : N) (names: pmap Ast.name) (e:exps) {struct e}: list (@NTerm NVar L4Opid) :=
 match e with
 | enil => []
@@ -99,7 +109,7 @@ match e with
     (translate mkVar max names h)
      ::(translatel mkVar max names tl)
 end
-with translatef {NVar : Type} (mkVar : N -> Ast.name -> NVar)
+with translatef {NVar : Type} (mkVar : (N * Ast.name) -> NVar)
   (max:N) (names: pmap Ast.name) (e:efnlst) {struct e}: list (@NTerm NVar L4Opid) :=
 match e with
 | eflnil => []
@@ -107,20 +117,23 @@ match e with
     (translate mkVar max names h)
     ::(translatef mkVar max names tl)
 end
-with translatelb {NVar : Type} (mkVar : N -> Ast.name -> NVar)
+with translatelb {NVar : Type} (mkVar : (N * Ast.name) -> NVar)
 (max:N) (names: pmap Ast.name) (lb:branches_e) {struct lb}
   : list (@L4a_to_L5.branch NVar L4Opid):=
 match lb with
 | brnil_e => []
 | brcons_e d n e tl => 
   (translateb mkVar max names translate d
-              (nargs n) (* Second projection contains the names *)
+              n
               e)
     ::(translatelb mkVar max names tl)
 end.
 
+Definition mkVar (n:N) :=  (xO (N.succ_pos n)).
 
-Definition mkVar (n:N) (name : Ast.name) :=  (xO (N.succ_pos n), name).
+Definition mkNVar (p: N*Ast.name) := 
+  let (n, name) := p in (mkVar n, name).
+
 Require Import L6.cps.
 
 
@@ -128,9 +141,9 @@ Require Import L6.cps.
 Definition L4aTerm :Type := (@NTerm NVar L4Opid).
 
 
-(* uservars are supposed to be even, so multiply by 2 x0*)
+(* uservars are supposed to be even, so multiply by 2 x0 *)
 Definition L4_to_L4a (n:N) (e:expression.exp) : L4aTerm :=
-  translate mkVar n Empty e.
+  translate mkNVar n Empty e.
 
 (*
 (* Delete this module and everything inside it *)

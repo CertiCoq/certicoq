@@ -104,7 +104,7 @@ Global Instance certiL5_to_L5a:
 
 
 Require Import Template.Template.
-Quote Recursively Definition p0L1 := 0. 
+Quote Recursively Definition p0L1 := (fun vl vr:nat => vl + vr). 
 
 Require Import L2.instances.
 
@@ -113,7 +113,7 @@ Require Import ZArith.
 (* Print Instances CerticoqLanguage. *)
 Open Scope string_scope.
 
-Eval vm_compute in (translateTo (cTerm certiL5a) p0L1).
+Eval vm_compute in (translateTo (cTerm certiL4a) p0L1).
 (*
      = Ret
          ([("Coq.Init.Datatypes.nat", 0,

@@ -12,6 +12,13 @@ Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
 
+Require Import Common.AstCommon. 
+Definition nEnv := M.t Ast.name.
+
+Section PP.
+
+  Variable (nenv:nEnv).
+
 (* Convert various numbers to strings *)
 Definition show_nat := nat2string10.
 Definition show_pos x := nat2string10 (Pos.to_nat x).
@@ -46,8 +53,15 @@ Fixpoint show_tree_c (t : string_tree) (acc : string) : string :=
 
 Definition show_tree t := (show_tree_c t "")%string.
 
-(* Variables are shown using "x" as a prefix *)
-Definition show_var (x:positive) := ("x" +++ (show_pos x))%string.
+(* Variables are shown using "x" as a prefix if their original name is not known*)
+Definition show_var (x:positive) :=
+  match M.get x nenv with
+    | Some (nNamed s) => s%string
+    | _ => ("x" +++ (show_pos x))%string
+  end.
+
+
+
 
 (* Show a list of variables as comma separated and wrapped in parens. *)
 Definition show_vars (xs:list positive) :=
@@ -56,7 +70,7 @@ Definition show_vars (xs:list positive) :=
 
 (* We accumulate a string_tree as we convert the expressions to strings. *)
 Definition M := state string_tree.
-Import MonadNotation.
+Import MonadNotation.  
 
 Definition emit (s:string_tree) : M unit :=
   st <- get ;;
@@ -219,4 +233,5 @@ Let P2 :=
      (Eapp 2 (32 :: nil)))%positive.
 
 Eval vm_compute in show_exp P2.
-*)
+ *)
+End PP.

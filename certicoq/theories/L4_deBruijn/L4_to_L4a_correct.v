@@ -137,83 +137,117 @@ Proof using.
   inverts H1. refl.
 Qed.
 
+
+Require Import ExtLib.Data.Map.FMapPositive.
+
+(*
 Let fvars : L4aTerm -> list positive := (map fst) ∘ free_vars.
 
 Let fvarsb : (@BTerm variables.NVar L4Opid) -> list positive 
   := (map fst) ∘ free_vars_bterm.
-
-Let fvarsBounded (vars : list L4.variables.NVar) n := 
-(forall v, List.In v (map fst vars) -> 
-        (Npos (Pos.div2 v) < N.succ n)%N)
-/\
-forall v1 v2, varClass v1 = true
-  /\
-  (List.In v1 vars -> 
-  List.In v2 vars -> 
-  fst v1= fst v2 ->
-  v1=v2).
+*)
 
 
+Section VarType.
+Require Import L4.varInterface.
+Context (NVar :Type) {mkv gti} {cvt : @CertiVarType NVar mkv gti} {deqn : Deq NVar}.
+
+
+Let fvarsProp (n:N) names (vars : list NVar)  := 
+lforall
+(fun v => 
+let id := (getId v) in
+varClass id = true 
+  /\ (Npos (Pos.div2 id) < N.succ n)%N 
+  /\ v = mkNVar id (opExtract Ast.nAnon (pmap_lookup  (Pos.div2 id) names))
+) vars.
+
+(* the version in Coq-ext-lib is weaker *)
+  Lemma pmap_lookup_insert_neq {T}
+  : ∀ (m : pmap T) (k : positive) (v : T) (k' : positive),
+      k ≠ k' →
+        pmap_lookup k' (pmap_insert k v m) = pmap_lookup k' m.
+  Proof.
+    intros.
+    remember (pmap_lookup k' m).
+    destruct o; [
+      apply pmap_lookup_insert_Some_neq; intuition |
+      apply pmap_lookup_insert_None_neq; intuition].
+  Qed.
+
+Print injective_fun.
+
+Lemma injectiveNsuccpos:  injective_fun N.succ_pos.
+Proof.
+  intros a b Heq.
+  apply (f_equal Npos) in Heq.
+  do 2 rewrite N.succ_pos_spec in Heq.
+  apply N.succ_inj in Heq.
+  assumption.
+Qed.
+
+Definition mkNVarN (p : N * Ast.name) : NVar := 
+let (n, name) := p in mkNVar (mkVar n) name.
 
 
 Lemma L4_to_L4a_fvars: 
   (forall n (s : exp),
     L4.expression.exp_wf n s 
-    -> forall names v, List.In v (fvars (L4_to_L4a.translate mkNVar n names s)) -> 
-        (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
+    -> forall names, fvarsProp n names (free_vars (L4_to_L4a.translate mkNVarN n names s)))
  ∧
   (forall n (s : exps),
     L4.expression.exps_wf n s
-    -> forall names v, List.In v (flat_map fvars (translatel mkNVar n names s)) -> 
-        (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
+    -> forall names,fvarsProp n names  (flat_map free_vars (translatel mkNVarN n names s)))
  ∧
   (forall n (s : efnlst),
     L4.expression.efnlst_wf n s 
-    -> forall names v, List.In v 
-                 (flat_map fvars (translatef mkNVar n names s)) -> 
-        (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *))
+    -> forall names, fvarsProp n names 
+                 (flat_map free_vars (translatef mkNVarN n names s)))
  ∧
   (forall n (s : branches_e),
     L4.expression.branches_wf n s 
-    -> forall names v, List.In v (flat_map (fvarsb ∘ snd) 
-          (translatelb mkNVar n names s)) -> 
-        (Npos (Pos.div2 v) < N.succ n)%N /\ varClass v = true (* user variable *)).
+    -> forall names, fvarsProp n names (flat_map (free_vars_bterm∘snd)
+          (translatelb mkNVarN n names s))).
 Proof using.
-  apply my_exp_wf_ind; try (simpl; tauto); [ | | | | | | | | | ];
+  apply my_exp_wf_ind; unfold fvarsProp, lforall; try (simpl; tauto); [ | | | | | | | | | ];
   intros ? ?.
 (* Var_e *)
-- intros Hwf ? ? Hin. simpl in Hin. rewrite or_false_r in Hin.
-  subst. split; [ | refl]. simpl.
+- intros Hwf ? v Hin. simpl in Hin. rewrite or_false_r in Hin.
+  subst. repeat rewrite getIdCorr in *. split; [refl | ]. simpl.
+  split; [ | refl].
   setoid_rewrite mkVarDiv.
   rewrite N.sub_1_r.
   rewrite N.lt_succ_pred with (z:=0%N); lia.
 
 (* Lam_e *)
-- intros e Hwf Hind ? ? Hin.
-  simpl in Hin. unfold fvars, compose in *. simpl in Hin.
-  apply in_map_iff in Hin. exrepnd.
-  simpl in Hin0. subst. rename a0 into v.
-  rename Hin1 into Hin.
-  rewrite list.in_app_iff in Hin.
-  rewrite or_false_r in Hin.
+- intros e Hwf Hind ? v Hin.
+  simpl in Hin. rewrite app_nil_r in Hin.
   apply list.in_remove in Hin.
   repnd. rewrite N.add_1_l in Hind.
-  apply (in_map fst) in Hin. 
   apply Hind in Hin.
+  simpl.
   clear Hind. rename Hin into Hind.
-  repnd.
-  split; [ | assumption].
-  apply N.lt_succ_r in Hind0.
-  apply N.lt_eq_cases in Hind0.
-  dorn Hind0; [auto | subst; provefalse ].
-  apply Hin0.
-  clear Hin0. simpl in Hind0.
-  destruct v; inversion Hind. clear Hind.
-  simpl in Hind0.
-  unfold mkVar. 
-  f_equal. f_equal.
-  rewrite <- N.succ_pos_spec in Hind0.
-  injection Hind0. trivial.
+  simpl in Hind. repnd.
+  split;[ assumption | ].
+  apply N.lt_succ_r in Hind1.
+  apply N.lt_eq_cases in Hind1.
+  dorn Hind1; [split; auto | provefalse ].
+  + rewrite pmap_lookup_insert_neq in Hind; auto. intros Hc.
+    rewrite Hind in Hc. repeat rewrite getIdCorr in Hc.
+    apply (f_equal N.pos) in Hc.
+    rewrite N.succ_pos_spec in Hc. lia.
+  + rewrite Hind in Hind1, Hind0, Hin0. clear Hind.
+    repeat rewrite getIdCorr in Hind1.
+    repeat rewrite getIdCorr in Hind0.
+    apply Hin0.
+    clear Hin0. simpl in Hind1.
+    remember ((getId v)) as vid. clear Heqvid.
+    destruct vid; inversion Hind0.
+    unfold mkVar.
+    rewrite <- N.succ_pos_spec in Hind1. simpl in Hind1.
+    inverts Hind1.
+    f_equal. simpl.
+    rewrite pmap_lookup_insert_eq. refl.
 
 (* App_e *)
 - intros ? ? H1ind H1wf H2ind ? Hin. simpl in Hin.

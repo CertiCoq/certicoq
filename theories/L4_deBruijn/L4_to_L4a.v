@@ -32,12 +32,15 @@ Open Scope N_scope.
 
 Require Import ExtLib.Data.Map.FMapPositive.
 
+Definition opExtract {A:Type} (def:A) (oa: option A) : A :=
+match oa with
+| Some name => name
+| None  => def
+end.
+ 
 
 Definition lookupName (names : pmap Ast.name) (var:N) : Ast.name :=
-match pmap_lookup (N.succ_pos var) names with
-| Some name => name
-| None  => Ast.nAnon
-end.
+opExtract Ast.nAnon (pmap_lookup (N.succ_pos var) names).
 
 Definition insertName (names : pmap Ast.name) (nvar:N*Ast.name): pmap Ast.name :=
 let (var,name) := nvar in

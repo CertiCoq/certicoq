@@ -195,7 +195,7 @@ Definition bogus_cloiTag := 1501%positive.
 
 Definition L6_translation' (t : cTerm certiL6) : cps.cEnv * cps.exp :=
   let '(env, prog) := t in
-  let '(x, cenv, y) := env in
+  let '(x, cenv, y, nenv) := env in
   closure_conversion_hoist'
     bogus_cloTag
     (shrink_top prog)

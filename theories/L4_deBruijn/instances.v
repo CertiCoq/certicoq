@@ -129,20 +129,16 @@ Require Import String.
 Require Import List.
 Import ListNotations.
 
-Definition name2string (n:Ast.name): string :=
-match n with
-| nAnon => "_"
-| nNamed s => s
-end.
+
 
 Require Import Program.
 
 
 Definition print4 (t: cTerm certiL4a) : string :=
-(tprint "" (name2string ∘ snd)  L4a_to_L5.L4OpidString  (snd t)).
+(tprint "" NVar2string  L4a_to_L5.L4OpidString  (snd t)).
 
 Definition print5 (t: cTerm certiL5) : string :=
-(tprint "" (name2string ∘ snd)  L4a_to_L5.L5OpidString  (snd t)).
+(tprint "" NVar2string  L4a_to_L5.L5OpidString  (snd t)).
 
 Definition exception_map {A B:Type} (f: A->B) (e: exception A) : exception B:=
 match e with
@@ -154,6 +150,7 @@ end.
 
 Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a p0L1)).
 Eval vm_compute in (exception_map print5 (ctranslateTo certiL5 p0L1)).
+Eval vm_compute in ( (ctranslateTo certiL5 p0L1)).
 
 Quote Recursively Definition evo := (andb (even 0) (odd 1)).
 Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a evo)).

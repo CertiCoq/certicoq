@@ -308,7 +308,10 @@ Proof using.
 (* constructor : not all values*)
   + 
     unfold var, M.elt in *.
-    generalize  ((tl (contVars (S (Datatypes.length lbt))))) at 2.
+  match goal with
+  | [|- context [(contVars (S (Datatypes.length lbt)) ?s)] ] =>
+      generalize  ((tl (contVars (S (Datatypes.length lbt)) s))) at 2
+  end.
     intros lkvv. simpl.
     pose proof (varsOfClassNil true) as Hvc.
     addContVarsSpec ((S (Datatypes.length lbt))) Hvc kv.

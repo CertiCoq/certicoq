@@ -201,7 +201,7 @@ Definition L6_translation' (t : cTerm certiL6) : cps.cEnv * cps.exp :=
     (shrink_top prog)
     bogus_cTag
     bogus_iTag
-    cenv.
+    cenv nenv.
 
 Definition add_clo := L6.cps.add_cloTag bogus_cloTag bogus_cloiTag.
 

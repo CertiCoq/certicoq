@@ -44,26 +44,88 @@ Section CC_correct.
   Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) := 
     forall x : M.elt, In M.elt S x -> M.get x map = None.
 
-  (** Spec for [get_name] *)
-  Lemma get_name_fresh S :
-    {{ fun s => fresh S (next_var s) }}
-      get_name
-    {{ fun _ x s' => fresh S x /\ fresh (Setminus var S (Singleton var x)) (next_var s') }}.  
-  Proof.   
-    eapply pre_post_mp_l.
-    eapply bind_triple. eapply get_triple.
-    intros[x c i e] [x' c' i' e'].
-    eapply pre_post_mp_l. eapply bind_triple.
-    eapply put_triple. intros u [x'' c'' i'' e'']. eapply return_triple. 
-    intros [x''' c''' i''' e'''] Heq1 [Heq2 Heq3] H; subst. inv Heq1. inv Heq2. inv Heq3. 
-    split; eauto. intros y Hleq.
-    constructor.
-    - eapply H. simpl in *. zify. omega.
-    - intros Hin. inv Hin. simpl in *. eapply Pos.le_nlt in Hleq.
-      eapply Hleq. zify. omega.
+
+  (** Spec for [get_name_entry] *)
+  Lemma get_name_entry_preserves_prop x P :
+    {{ fun s => P (next_var s) }} get_name_entry x {{ fun _ _ s => P (next_var s) }}.
+  Proof.
+    eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
+    intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
+    destruct (Maps.PTree.get x m1);
+      eapply return_triple; intros ? H ?; inv H; eauto.
+  Qed.
+
+  (** Spec for [set_name_entry] *)
+  Lemma set_name_entry_preserves_prop x s P :
+    {{ fun s => P (next_var s) }} set_name_entry x s {{ fun _ _ s => P (next_var s) }}.
+  Proof.
+    eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
+    intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
+    eapply pre_post_mp_l. eapply bind_triple. 
+    eapply put_triple. intros.
+    eapply return_triple. intros ? ? [H1 H2]. inv H1; eauto.
   Qed.
   
-  
+  (** Specs for adding names *)
+  Lemma add_name_preserves_prop x y P :
+    {{ fun s => P (next_var s) }} add_name x y {{ fun _ _ s => P (next_var s) }}.
+  Proof.
+    eapply set_name_entry_preserves_prop.
+  Qed.
+
+  Lemma add_name_suff_preserves_prop x y s P :
+    {{ fun s => P (next_var s) }} add_name_suff x y s {{ fun _ _ s => P (next_var s) }}.
+  Proof.
+    eapply bind_triple. now apply get_name_entry_preserves_prop.
+    intros n s1. destruct n; now apply set_name_entry_preserves_prop.
+  Qed.
+
+  (** Spec for [get_name] *)
+  Lemma get_name_fresh S y str :
+    {{ fun s => fresh S (next_var s) }}
+      get_name y str
+    {{ fun _ x s' => fresh S x /\ fresh (Setminus var S (Singleton var x)) (next_var s') }}.  
+  Proof.
+    eapply pre_strenghtening with (P := fun s => fresh S (next_var s) /\ True); intros; eauto.
+    eapply bind_triple.
+    eapply frame_rule with (Pre := fun _ => True). now eapply get_triple.
+    intros [x c i e m] [x' c' i' e' m'].
+    eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros H. inv H.
+    eapply bind_triple
+    with (post' :=  fun _ _ s' => fresh (Setminus var S (Singleton var x')) (next_var s')).
+    eapply pre_post_mp_l. eapply post_weakening; [| now eapply put_triple ].
+    intros; subst; simpl in *. subst; simpl.
+    constructor.
+    - eapply Hf. simpl in *. zify. omega.
+    - intros Hin. inv Hin. simpl in *. zify. omega.
+    - intros _ _. eapply bind_triple. 
+      now eapply add_name_suff_preserves_prop.
+      intros. eapply return_triple. intros; eauto.
+  Qed.
+
+  (** Spec for [get_name_no_suff] *)
+  Lemma get_name_no_suff_fresh S str :
+    {{ fun s => fresh S (next_var s) }}
+      get_name_no_suff str
+    {{ fun _ x s' => fresh S x /\ fresh (Setminus var S (Singleton var x)) (next_var s') }}.  
+  Proof.
+    eapply pre_strenghtening with (P := fun s => fresh S (next_var s) /\ True); intros; eauto.
+    eapply bind_triple.
+    eapply frame_rule with (Pre := fun _ => True). now eapply get_triple.
+    intros [x c i e m] [x' c' i' e' m'].
+    eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros H. inv H.
+    eapply bind_triple
+    with (post' :=  fun _ _ s' => fresh (Setminus var S (Singleton var x')) (next_var s')).
+    eapply pre_post_mp_l. eapply post_weakening; [| now eapply put_triple ].
+    intros; subst; simpl in *. subst; simpl.
+    constructor.
+    - eapply Hf. simpl in *. zify. omega.
+    - intros Hin. inv Hin. simpl in *. zify. omega.
+    - intros _ _. eapply bind_triple. 
+      now eapply add_name_preserves_prop.
+      intros. eapply return_triple. intros; eauto.
+  Qed.
+
   Lemma FVmap_inv_set_bound FVmap Scope Funs FVs x :
     FVmap_inv FVmap Scope Funs FVs ->
     FVmap_inv (M.set x BoundVar FVmap) (Union _ (Singleton _ x) Scope) Funs FVs.
@@ -231,14 +293,14 @@ Section CC_correct.
       + eapply get_var_project_var_sound; eauto.
         intros x Hin. eapply Hb. 
         inv Hin. constructor. eauto.
-      + intros [x f] [x1 c1 f1 e1].
+      + intros [x f] s1.
         eapply pre_existential. intros C.
         eapply pre_existential. intros S'.
         eapply pre_curry_r. intros [Hproj Hctx].
         eapply bind_triple.
         eapply (IHxs S'); eauto.
         intros y Hin. eapply Hb. constructor 2. eassumption.
-        intros [xs' f'] [x4 c4 f4 e4]. eapply return_triple.  
+        intros [xs' f'] s2. eapply return_triple.  
         intros s [C' [S'' [Hf' [Hproj' Hctx']]]].
         exists (comp_ctx_f C C'), S''.
         split; [ eassumption |].
@@ -468,12 +530,12 @@ Section CC_correct.
     {{ fun s => P (next_var s) }} make_record_cTag n {{ fun _ _ s => P (next_var s) }}.
   Proof.
     eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
-    intros [x1 c1 f1 e1] [x2 c2 f2 e2].
+    intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
     apply pre_post_mp_l. eapply bind_triple. now apply put_triple.
     intros x s. eapply return_triple. intros s' [[H1 H3] H2]; subst. inv H1.
     eassumption.
   Qed.
-  
+
   Lemma make_env_spec fv FVmap_o c Γ_n Γ_o Scope Funs FVs S :
     binding_in_map (FromList (PS.elements fv)) FVmap_o ->
     binding_not_in_map (Union M.elt S (Singleton M.elt Γ_o)) FVmap_o ->
@@ -930,7 +992,7 @@ Section CC_correct.
           eapply fresh_monotonic.
           now eapply project_var_free_set_Included; eauto.
           eassumption.
-    - eapply bind_triple; [ now eapply get_name_fresh |].
+    - eapply bind_triple; [ now eapply get_name_no_suff_fresh |].
       intros Γ' s1. eapply pre_curry_l. intros Hf1.
       eapply bind_triple.
       + eapply make_env_spec. eapply binding_in_map_antimon; [| eassumption ].
@@ -1556,7 +1618,7 @@ Section CC_correct.
         simpl in *. eapply Hf. rewrite !bound_var_Eproj.
         rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc... 
         eapply fresh_monotonic; [| eassumption ]...
-    - eapply bind_triple. now apply get_name_fresh.
+    - eapply bind_triple. now apply get_name_no_suff_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1.
       eapply bind_triple with
       (post' :=
@@ -2186,7 +2248,7 @@ Section CC_correct.
         eapply fresh_monotonic; [| eassumption ]...
     - eapply post_mp. 
       eapply exp_closure_conv_closed_fundefs with (e := Efun f2 e); eassumption.
-      eapply bind_triple. now eapply get_name_fresh.
+      eapply bind_triple. now eapply get_name_no_suff_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1.
       eapply bind_triple.
       + eapply post_conj.
@@ -2659,7 +2721,7 @@ Section CC_correct.
         apply Included_Setminus_compat. now eauto with Ensembles_DB.
         eapply Included_trans. eapply Hin'. rewrite bound_var_Eproj...
         eapply Setminus_Disjoint_preserv_l... 
-    - eapply bind_triple. now apply get_name_fresh.
+    - eapply bind_triple. now apply get_name_no_suff_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1. unfold make_env.
       destruct
         ((fix

@@ -1,7 +1,12 @@
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_MalechaQuoted" as L1.
+(* Add LoadPath "../L1_QuotedCoq" as L1. *)
 Add LoadPath "." as L2.
 
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Arith.PeanoNat.
+Require Import Coq.Arith.Peano_dec.
+Require Import Recdef.
+Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
 Require Import L1_5.L1_5.
@@ -11,6 +16,285 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
+
+Set Template Cast Propositions.  (** L1 doesn't strip proofs **)
+Set Printing Width 80.
+Set Printing Depth 2000.
+
+(** Fibonacci **)
+Fixpoint slowFib (n:nat) : nat :=
+  match n with
+    | 0 => 0
+    | S m => match m with
+               | 0 => 1
+               | S p => slowFib p + slowFib m
+             end
+  end.
+Definition slowFib3 := (slowFib 3).
+Quote Recursively Definition cbv_slowFib3 :=
+  ltac:(let t:=(eval cbv in slowFib3) in exact t).
+Definition ans_slowFib3 :=
+  Eval cbv in (main (program_Program cbv_slowFib3)).
+(* [program] of the program *)
+Quote Recursively Definition p_slowFib3 := slowFib3.
+Definition P_slowFib3 := Eval cbv in (program_Program p_slowFib3).
+Print P_slowFib3.
+Goal
+  let env := (env P_slowFib3) in
+  let main := (main P_slowFib3) in
+  wcbvEval (env) 30 (main) = Ret ans_slowFib3.
+  vm_compute. reflexivity.
+Qed.
+
+Function Plus1 (n : nat) {wf lt n} : nat :=
+  match n with
+    | 0 => 1
+    | S p => S (Plus1 p)
+  end.
+- intros. omega.
+- apply lt_wf.
+Defined.
+Definition x := 1.
+Definition Plus1x := Plus1 x.
+Eval vm_compute in Plus1x.
+
+(** evaluation of [Function]s defined with measure or wf **)
+Time Quote Recursively Definition p_Plus1x := Plus1x.
+Time Definition P_Plus1x : Program Term :=
+  Eval vm_compute in program_Program p_Plus1x.
+Print P_Plus1x.
+Definition P_env := Eval vm_compute in (env P_Plus1x).
+Print P_env.
+Definition P_main := Eval vm_compute in (main P_Plus1x).
+Print P_main. 
+Definition P_ans := Eval vm_compute in (wcbvEval P_env 17 P_main).
+Print P_ans.
+
+Goal  (** Plus1x doesn't normalize in L2 **)
+  WcbvEval P_env P_main prop.
+Proof.
+  unfold P_main. eapply wConst. cbn. reflexivity.
+  eapply wAppLam. eapply wConst. cbn.  reflexivity.  (* good here **)
+  apply wLam. admit.
+  eapply wConst. cbn.  reflexivity.
+  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
+  eapply wCons. eapply wConstruct. eapply wNil. admit.
+
+  cbn.
+  eapply wCase. eapply wAppLam.
+  eapply wConst. cbn.  reflexivity.
+  eapply wAppLam. eapply wLam. admit. apply wPrf. admit.
+  cbn. eapply wAppLam. eapply wLam. admit.  apply wPrf. admit.
+
+  cbn.
+  eapply wAppLam. eapply wLam. admit.  apply wPrf. admit.
+
+  cbn.
+  eapply wAppLam. eapply wConst. cbn.  reflexivity.
+  eapply wLam. admit. eapply wProd. admit.
+
+  cbn.
+  eapply wAppLam. eapply wLam. admit.
+  eapply wAppLam. eapply wConst.
+  cbn. reflexivity.  eapply wLam. admit. eapply wInd. admit.
+
+  cbn.
+  eapply wAppLam.  eapply wLam. admit.
+  eapply wConst. cbn. reflexivity.
+  eapply wLam. admit.
+
+  cbn. eapply wProd. admit.
+
+  cbn.
+  eapply wAppLam.  eapply wLam. admit. eapply wProd. admit.
+
+  cbn.
+  eapply wAppLam. eapply wConst. cbn. reflexivity. eapply wLam. admit.
+  eapply wProd. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit.
+  eapply wProd. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit.
+  eapply wProd. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit.
+  eapply wLam. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit. admit.
+  cbn. eapply wLam. admit.
+  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
+  eapply wCons. eapply wConstruct. eapply wNil. admit. cbn.
+  eapply wLam. admit. cbn.
+  
+
+
+
+
+  
+
+  (******************)
+Quote Recursively Definition p_X := 1.
+Definition P_X := Eval vm_compute in (program_Program p_X).
+Print P_X.
+Definition T_X := Eval vm_compute in (main P_X).
+Print T_X.
+
+Quote Recursively Definition p_Plus1 := Plus1.
+Definition P_Plus1 := Eval vm_compute in (program_Program p_Plus1).
+Definition cbv_env := Eval vm_compute in (env P_Plus1).
+Definition cbv_main := Eval vm_compute in (main P_Plus1).
+Definition Plus1_main := Eval vm_compute in
+      (match wcbvEval cbv_env 5000 cbv_main with
+         | Ret y => y
+         | Exc _ => prop
+       end).
+Definition Plus1x_main := (TApp Plus1_main T_X tnil).
+Eval vm_compute in (wcbvEval cbv_env 1000 Plus1x_main).
+
+Eval vm_compute in 
+Goal
+  WcbvEval cbv_env Plus1x_main prop.
+Proof.
+  unfold Plus1x_main, Plus1_main. refine (wAppLam _ _ _ _). apply wLam.
+  admit. unfold T_X. apply wAppCong. apply wConstruct. not_isLambda.
+  not_isFix. apply wCons. apply wConstruct. apply wNil. admit.
+  cbn. eapply wCase. apply wAppCong. eapply wConst.
+  constructor. intros h. discriminate.
+  constructor.
+  eapply wAppLam. apply wLam. admit. apply wPrf. admit. cbn.
+  eapply wAppLam. apply wLam. admit. apply wPrf. admit. cbn.
+  eapply wAppLam. apply wLam. admit. apply wPrf. admit. cbn.
+  eapply wAppLam. eapply wConst.
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 20 (apply LMiss; try (intros h; discriminate)).
+  do 10 (apply LMiss; try (intros h; discriminate)).
+  do 9 (apply LMiss; try (intros h; discriminate)).
+  apply LHit. apply wLam. admit. apply wProd. admit.
+  cbn.
+  eapply wAppLam. apply wLam. admit.
+  eapply wAppLam. eapply wConst.
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  apply LMiss; try (intros h; discriminate).
+  apply LHit. apply wLam. admit. apply wInd. admit.
+  cbn. eapply wAppLam. apply wLam. admit.
+  eapply wConst.
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  Do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+  do 40 (apply LMiss; try (intros h; discriminate)).
+
+  
+  
+    
+Definition x:nat := 1.
+Definition Plus1x := Plus1 x.
+Quote Recursively Definition cbv_Plus1x :=  (* [program] of Coq's answer *)
+  ltac:(let t:=(eval native_compute in Plus1x) in exact t).
+Definition ans_Plus1x :=  (* L2 Term of Coq's answer *)
+  Eval vm_compute in (main (program_Program cbv_Plus1x)).
+Print ans_Plus1x.
+(* [program] of the program *)
+Quote Recursively Definition p_Plus1x := Plus1x.
+(* L2 [program] of the program *)
+Definition P_Plus1x := Eval vm_compute in (program_Program p_Plus1x).
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation Lam := (TLambda).
+Notation Pi := (TProd).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Notation "# x" := (TConst x) (at level 85).
+Infix "@" := TApp  (at level 90, left associativity).
+Infix ":t:" := tcons  (at level 87, right associativity).
+Notation "c :t|" := (c :t: tnil) (at level 90).
+Goal
+  let env := (env P_Plus1x) in
+  let main := (main P_Plus1x) in
+  wcbvEval env 200 main = Ret ans_Plus1x.
+  vm_compute. reflexivity.
+Qed.
+
+
+Function Plus (m n : nat) {wf lt n} : nat :=
+match n with
+| 0 => m
+| S p => S (Plus m p)
+end.
+- intros. omega.
+- apply lt_wf.
+Defined.
+Quote Recursively Definition pPlus := Plus.
+Definition PPlus := Eval cbv in (program_Program pPlus).
+Set Printing Width 100.
+Set Printing Depth 500.
+Print PPlus.
+
+
+Function Gcd (a b : nat) {wf lt a} : nat :=
+match a with
+ | O => b 
+ | S k =>  Gcd (b mod S k)  (S k)
+end.
+Proof.
+  - intros m n k Heq. subst. apply Nat.mod_upper_bound.
+    omega.
+  - exact lt_wf.
+Defined.
+
+Quote Recursively Definition pGcd := Gcd.
+Definition PGcd := Eval cbv in (program_Program pGcd).
+Set Printing Width 200.
+Set Printing Depth 100.
+Print PGcd.
+
+
+(** Andrew's example **)
+Function sqrt' (n x0 x diff: Z) {measure Z.to_nat diff} : Z :=
+(if diff =? 0
+then x
+else let y := Z.div2 (x + Z.div n x)
+in if y =? x0 then Z.min x0 x
+else sqrt' n x y (y-x0))%Z.
+Proof.
+Admitted.
+
+Quote Recursively Definition psqrt := sqrt'.
+Definition Psqrt := Eval cbv in (program_Program psqrt).
+Set Printing Width 200.
+Set Printing Depth 100.
+Print Psqrt.
+***********************)
 
 
 (** vector addition **)
@@ -225,29 +509,6 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
-(** Fibonacci **)
-Fixpoint slowFib (n:nat) : nat :=
-  match n with
-    | 0 => 0
-    | S m => match m with
-               | 0 => 1
-               | S p => slowFib p + slowFib m
-             end
-  end.
-Definition slowFib3 := (slowFib 3).
-Quote Recursively Definition cbv_slowFib3 :=
-  ltac:(let t:=(eval cbv in slowFib3) in exact t).
-Definition ans_slowFib3 :=
-  Eval cbv in (main (program_Program cbv_slowFib3)).
-(* [program] of the program *)
-Quote Recursively Definition p_slowFib3 := slowFib3.
-Definition P_slowFib3 := Eval cbv in (program_Program p_slowFib3).
-Goal
-  let env := (env P_slowFib3) in
-  let main := (main P_slowFib3) in
-  wcbvEval (env) 30 (main) = Ret ans_slowFib3.
-  vm_compute. reflexivity.
-Qed.
 
 (* fast Fib *)
 Fixpoint fibrec (n:nat) (fs:nat * nat) {struct n} : nat :=

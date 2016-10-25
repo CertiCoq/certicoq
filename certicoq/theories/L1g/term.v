@@ -17,9 +17,9 @@ Require Export Common.Common.
 Require Export L1.term.
 Require Export L1g.compile.
 
-Local Open Scope string_scope.
-Local Open Scope bool.
-Local Open Scope list.
+Open Scope string_scope.
+Open Scope bool.
+Open Scope list.
 Set Implicit Arguments.
 
 
@@ -1225,6 +1225,48 @@ Proof.
     + destruct H. apply PoAppR. apply PoccTrms_tappendr. assumption.
 Qed.
 
+Function fPocc (n:nat) (t:Term): bool :=
+  match n with
+    | 0 => false
+    | S n =>
+      match t with
+        | TCast t _ ty => fPocc n t || fPocc n ty
+        | TProd _ ty t => fPocc n t || fPocc n ty
+        | TLambda _ ty t => fPocc n t || fPocc n ty
+        | TLetIn _ dfn ty t => fPocc n dfn || fPocc n t || fPocc n ty
+        | TApp fn arg args => fPocc n fn || fPocc n arg || fPoccs n args
+        | TConst str => string_eq_bool str nm
+        | TCase _ ty mch brs =>  fPocc n ty || fPocc n mch || fPoccs n brs
+        | TFix ds _ => fPoccDs n ds
+        | _ => false
+      end
+  end
+with fPoccs (n:nat) (ts:Terms): bool :=
+       match n with
+         | 0 => false
+         | S n =>
+           match ts with
+             | tnil => false
+             | tcons u us => fPocc n u || fPoccs n us
+           end
+       end
+with fPoccDs (n:nat) (ds:Defs): bool :=
+       match n with
+         | 0 => false
+         | S n =>
+           match ds with
+             | dnil => false
+             | dcons _ u1 u2 _ us => fPocc n u1 || fPocc n u2 || fPoccDs n us
+           end
+       end.
+
+Function fPocc_env (p:environ Term) : bool :=
+  match p with
+    | cons (_, ecTrm t) ps => fPocc 1000 t || fPocc_env ps
+    | cons (_, ecTyp _ _ _) ps => fPocc_env ps
+    | nil => false
+  end.
+
 
 (** Instantiate index n of a term with a _locally_closed_ term, so
 *** we do not lift.  But we do increment n when going under a binder 
@@ -1232,7 +1274,6 @@ Qed.
 Section Instantiate_sec.
 Variable (tin:Term).
 
-(******************)
 Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelEq: forall n, Instantiate n (TRel n) tin
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
@@ -1331,7 +1372,6 @@ intro h. apply InstInstsDefs_ind; intros; auto.
   + apply PoDhd_bod. intuition. 
   + apply PoDtl. intuition. 
 Qed.
-(*************************)
 
 Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
   match tbod with

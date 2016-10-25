@@ -59,6 +59,30 @@ Proof.
   - assumption.
   - eapply IHWFaEnv. eassumption.
 Qed.
+
+Lemma lookup_pres_WFapp:
+    forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
+Proof.
+  induction 1; intros nn ed h.
+  - inversion_Clear h.
+  - case_eq (string_eq_bool nn nm); intros j.
+    + cbn in h. rewrite j in h. myInjection h. assumption.
+    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
+Qed.
+
+Lemma lookupDfn_pres_WFapp:
+    forall p, WFaEnv p -> forall nm t, lookupDfn nm p = Ret t -> WFapp t.
+Proof.
+  intros p hp nm t ht. unfold lookupDfn in ht.
+  case_eq (lookup nm p); intros.
+  - rewrite H in ht. destruct e.
+    + assert (j:= lookup_pres_WFapp hp _ H). myInjection ht.
+      inversion_Clear j. assumption.
+    + discriminate.
+  - rewrite H in ht. discriminate.
+Qed.
+
+
 (*****************
 Lemma Lookup_pres_WFapp:
   forall p, WFaEnv p = true ->

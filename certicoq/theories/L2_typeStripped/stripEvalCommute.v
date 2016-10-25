@@ -483,6 +483,18 @@ Proof.
       rewrite <- (dcons_hom _ L1_5.compile.prop). simpl. reflexivity.
 Qed.
 
+(******************  fix later *******************
+Lemma lookup_hom:
+  forall p nm ec,
+    lookup nm p = Some ec -> lookup nm (stripEnv p) = Some (stripEC ec).
+Proof.
+  induction p; intros.
+  - discriminate.
+  - cbn. unfold string_eq_bool in *. destruct (string_dec nm (fst a)).
+    + rewrite e. cbn.
+
+      case_eq (string_eq_bool nm (fst a)); intros.
+    + rewrite H0.
 
 Lemma WcbvEval_hom:
   forall p,
@@ -494,9 +506,15 @@ Proof.
   intros p.
   apply L1_5.wcbvEval.WcbvEvalEvals_ind; cbn; intros; try reflexivity;
   try (solve[constructor; trivial]).
-  - refine (wConst _ _); try eassumption.
-    unfold LookupDfn. unfold L1_5.program.LookupDfn in *.
-    change (Lookup nm (stripEnv p) (stripEC (AstCommon.ecTrm t))).
+  - refine (wConst _ _ _); try eassumption.
+    unfold lookupDfn. unfold lookupDfn in e.
+    case_eq (lookup nm p); intros.
+    + rewrite H0 in e. destruct e0.
+      * myInjection e. rewrite lookup_hom.
+
+
+        
+      change (lookup nm (stripEnv p) = Some (stripEC (AstCommon.ecTrm t))).
     apply Lookup_hom. assumption.
   - refine (wAppLam _ _ _ _); try eassumption.
     + rewrite whBetaStep_hom in H1. eassumption.
@@ -750,3 +768,4 @@ Fixpoint unstripEnv (p:environ Term) : environ L1_5.compile.Term :=
     | nil => nil
     | cons (nm, ec) q => cons (nm, (unstripEC ec)) (unstripEnv q)
   end.
+**********************************)

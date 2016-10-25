@@ -42,7 +42,8 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
 | wAx: WcbvEval p TAx TAx
 | wConst: forall nm (t s:Term),
-            LookupDfn nm p t -> WcbvEval p t s -> WcbvEval p (TConst nm) s
+            lookupDfn nm p = Ret t -> WcbvEval p t s ->
+            WcbvEval p (TConst nm) s
 | wAppLam: forall (fn ty bod a1 a1' s:Term) (args:Terms) (nm:name),
                WcbvEval p fn (TLambda nm ty bod) ->
                WcbvEval p a1 a1' ->
@@ -105,6 +106,18 @@ Proof.
   - rewrite tappend_tnil. assumption.
 Qed.
 
+(*******  move to somewhere  ********)
+Lemma lookup_pres_WFapp:
+    forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
+Proof.
+  induction 1; intros nn ed h.
+  - inversion_Clear h.
+  - case_eq (string_eq_bool nn nm); intros j.
+    + cbn in h. rewrite j in h. myInjection h. assumption.
+    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
+Qed.
+  
+(**************************************************)
 
 (** wcbvEval preserves WFapp **)
 Lemma wcbvEval_pres_WFapp:
@@ -116,8 +129,12 @@ Proof.
   apply WcbvEvalEvals_ind; intros; try assumption;
   try (solve[inversion_Clear H0; intuition]);
   try (solve[inversion_Clear H1; intuition]).
-  - apply H.
-    assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
+  - apply H. unfold lookupDfn in e. case_eq (lookup nm p); intros xc.
+    + intros k. assert (j:= lookup_pres_WFapp hp _ k)
+      . rewrite k in e. destruct xc. 
+      * myInjection e. inversion j. assumption.
+      * discriminate.
+    + rewrite xc in e. discriminate.
   - inversion_clear H2. apply H1.
     specialize (H H4). inversion_Clear H.
     apply (whBetaStep_pres_WFapp); intuition. 
@@ -157,9 +174,14 @@ Lemma WcbvEval_weaken:
                    WcbvEvals ((nm,ec)::p) ts ss).
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
-  - eapply wConst. 
-    + apply Lookup_weaken; eassumption.
-    + apply H. assumption.
+  - destruct (string_dec nm nm0).
+    + subst. 
+      * unfold lookupDfn in e.
+        rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _) H0) in e.
+        discriminate.
+    + eapply wConst.
+      * rewrite <- (lookupDfn_weaken' n). eassumption. 
+      * apply H. assumption. 
   - eapply wAppLam.
     + apply H. assumption.
     + apply H0. assumption.
@@ -215,13 +237,10 @@ Proof.
     + apply wERTCstep. apply sCast.
     + apply H. assumption.
   - eapply wERTCtrn; intuition.
-    assert (j: WFapp t).
-    { unfold LookupDfn in l.
-      assert (k:= Lookup_pres_WFapp hp l). inversion k. assumption. }
     eapply wERTCtrn.
-    + apply wERTCstep. apply sConst; eassumption.
-    + apply H. assert (k:= Lookup_pres_WFapp hp l). inversion k. assumption.
-  - inversion_Clear H2.
+    + apply wERTCstep. apply sConst. apply lookupDfn_LookupDfn. eassumption.
+    + apply H. eapply (lookupDfn_pres_WFapp hp).  eassumption.
+   - inversion_Clear H2.
     eapply (@wERTCtrn _ _ (TApp (TLambda nm ty bod) a1 args)).
     + rewrite <- mkApp_goodFn; try assumption.
       rewrite <- mkApp_goodFn; try not_isApp.
@@ -425,7 +444,7 @@ Proof.
     intros; try discriminate; try (myInjection p1);
     try(solve[constructor]); intuition.
   - eapply wConst; intuition.
-    + unfold LookupDfn. apply lookup_Lookup. eassumption.
+    + unfold lookupDfn. rewrite e1. reflexivity.
   - specialize (H1 _ p1). specialize (H _ e1). specialize (H0 _ e2).
     eapply wAppLam; eassumption.
   - specialize (H0 _ p1). specialize (H _ e1). subst.
@@ -460,10 +479,12 @@ Proof.
     + rewrite (H (m - 1)); try omega. reflexivity.
   - destruct H. exists (S x). intros m h. simpl.
     rewrite (j m x); try omega. rewrite H; try omega. reflexivity.    
-  - destruct H. exists (S x). intros mm h. simpl.
+  - destruct H. exists (S x). intros mm h. cbn.
     rewrite (j mm x); try omega.
-    unfold LookupDfn in l. rewrite (Lookup_lookup l).
-    apply H. omega.
+    unfold lookupDfn in e. destruct (lookup nm p). destruct e0.
+    + myInjection e. apply H. omega.
+    + discriminate.
+    + discriminate.
   - destruct H, H0, H1. exists (S (max x (max x0 x1))). intros m h.
     assert (j1:= max_fst x (max x0 x1)). 
     assert (lx: m > x). omega.

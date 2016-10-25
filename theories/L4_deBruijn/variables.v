@@ -31,12 +31,18 @@ Require Import SquiggleEq.varInterface.
 Global Instance varClassNVar : VarClass NVar bool :=
 fun p => varClass (fst p).
 
+(* Move *)
+Definition listPad {T} (def:T) (l: list T) (n: nat) : list T :=
+l++(repeat def (n-length l)).
+
 Global Instance freshVarsNVar : FreshVars NVar bool:=
 fun (n:nat) 
-  (c : option bool) (avoid original : list NVar)
+  (c : option bool) (avoid suggested : list NVar)
 =>
-  let vars := freshVars n c (map fst avoid) (map fst original) in
-  map (fun p => (p, nAnon)) vars.
+  let vars := freshVars n c (map fst avoid) (map fst suggested) in
+  let names := listPad nAnon (map snd suggested) n in
+  combine vars names.
+
 
 
 Lemma freshVarsPosCorrect:
@@ -45,6 +51,7 @@ let lf := freshVarsNVar n oc avoid original in
 (NoDup lf /\ list.disjoint lf avoid /\ Datatypes.length lf = n) /\
 (forall c : bool, oc = Some c -> forall v : NVar, In v lf -> varClassNVar v = c).
 Proof.
+  simpl. intros ? ? ? ?.
 Admitted.
 
 Global Instance vartypePos : VarType NVar bool.

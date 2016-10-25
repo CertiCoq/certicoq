@@ -130,8 +130,8 @@ Open Scope string_scope.
 Definition L4OpidString (l : L4Opid) : string :=
   match l with
   | NLambda    => "λ"
-  | NFix nMut _ => "fix"
-  | NDCon d nargs => sconString d
+  | NFix _ _ => "fix"
+  | NDCon d _ => sconString d
   | NApply     => "ap"
 (*  | NProj _ => [0] *)
   | NLet => "let"
@@ -200,6 +200,21 @@ Definition CPSOpBindings (c : L5Opid)
   | CCall => [0,0,0]
 (*  | CProj _ => [0,0] *)
   | CMatch numargsInBranches => 0::(List.map snd numargsInBranches)
+  end.
+
+Definition L5OpidString (l : L5Opid) : string :=
+  match l with
+  | CLambda    => "λ"
+  | CKLambda    => "λ→" 
+  | CFix _ _ => "fix"
+  | CDCon d _ => sconString d
+  | CRet     => "ret"
+(*  | NProj _ => [0] *)
+  | CCall => "call"
+  | CHalt => "halt"
+  | CMatch numargsInBranches => 
+      let ld := map fst numargsInBranches in
+      terms.flatten ["match |";terms.flattenDelim " " (map sconString ld);"|"]
   end.
 
 
@@ -852,6 +867,7 @@ Proof using.
   rewrite ball_map_true. auto.
 Qed.
 *)
+
 Definition contVars (n:nat) : list NVar :=
   freshVars n (Some CPSVAR) [] [].
 
@@ -1759,6 +1775,7 @@ Qed.
 Hint Resolve sub_filter_subset flat_map_monotone varsOfClassSubset map_monotone : SquiggleEq. 
 *)
 
+(*
 Lemma contVars1 : contVars 1 = [contVar].
 Proof using.
   unfold contVar, contVars.
@@ -1767,6 +1784,7 @@ Proof using.
   dlist_len_name lvn v.
   refl.
 Qed.
+*)
 
 Lemma cps_cvt_val_ssubst_commutes_aux : 
   cps_cvt_val_step2 cps_ssubst_commutes.

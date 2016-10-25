@@ -118,7 +118,7 @@ Require Import Coq.Strings.Ascii.
 
 Require Import  ExtLib.Data.String.
 
-Definition sconString (d: dcon) : string :=
+Definition dconString (d: dcon) : string :=
 match fst d with
 | mkInd s n => terms.flatten [nat2string10 (N.to_nat (snd d))
     ; ":"; nat2string10 n; ":"; s]
@@ -131,13 +131,13 @@ Definition L4OpidString (l : L4Opid) : string :=
   match l with
   | NLambda    => "λ"
   | NFix _ _ => "fix"
-  | NDCon d _ => sconString d
+  | NDCon d _ => dconString d
   | NApply     => "ap"
 (*  | NProj _ => [0] *)
   | NLet => "let"
   | NMatch numargsInBranches => 
       let ld := map fst numargsInBranches in
-      terms.flatten ["match |";terms.flattenDelim " " (map sconString ld);"|"]
+      terms.flatten ["match |";terms.flattenDelim " " (map dconString ld);"|"]
   end.
 
 
@@ -207,14 +207,14 @@ Definition L5OpidString (l : L5Opid) : string :=
   | CLambda    => "λ"
   | CKLambda    => "λ→" 
   | CFix _ _ => "fix"
-  | CDCon d _ => sconString d
+  | CDCon d _ => dconString d
   | CRet     => "ret"
 (*  | NProj _ => [0] *)
   | CCall => "call"
   | CHalt => "halt"
   | CMatch numargsInBranches => 
       let ld := map fst numargsInBranches in
-      terms.flatten ["match |";terms.flattenDelim " " (map sconString ld);"|"]
+      terms.flatten ["match |";terms.flattenDelim " " (map dconString ld);"|"]
   end.
 
 
@@ -231,13 +231,16 @@ Instance CPSGenericTermSig : GenericTermSig L5Opid:=
 |}.
 
 
+Require Import L4.varInterface.
 
 Section VarsOf2Class.
+
 
 (* see the file SquiggleEq.varImplPeano for an instantiation of NVar *)
 Context {NVar} {deqnvar : Deq NVar} 
 {varcl freshv} 
-  {varclass: @VarType NVar bool(* 2 species of vars*) deqnvar varcl freshv}.
+  {varclass: @VarType NVar bool(* 2 species of vars*) deqnvar varcl freshv}
+  {upnm : UpdateName NVar}.
 
 
 Notation USERVAR := true (only parsing).
@@ -461,6 +464,7 @@ Qed.
 Lemma eval_reduces_fvars :
   forall (e v : NTerm) , e ⇓ v -> subset (free_vars v) (free_vars e).
 Proof using varclass.
+  clear upnm.
   intros ? ? He. unfold closed. induction He; try auto;
   simpl in *;autorewrite with core list in *.
   (**Apply case*)
@@ -868,28 +872,70 @@ Proof using.
 Qed.
 *)
 
-Definition contVars (n:nat) : list NVar :=
-  freshVars n (Some CPSVAR) [] [].
+Definition contVars (n:nat) (suggestions : list NVar): list NVar :=
+  freshVars n (Some CPSVAR) [] suggestions.
+
+Definition mkSuggestion (s : string) : NVar :=
+updateName (nvarx, nNamed s).
+
 
 Definition contVar : NVar :=
-  nth 0 (freshVars 1 (Some CPSVAR) [] []) nvarx.
+  nth 0 (freshVars 1 (Some CPSVAR) [] [mkSuggestion "k"] ) nvarx.
    
+Lemma userVarsContVars : forall lv sugg,
+varsOfClass lv USERVAR
+-> forall n, no_repeats (contVars n sugg) /\ 
+  disjoint (contVars n sugg) lv /\ Datatypes.length (contVars n sugg) = n.
+Proof using varclass.
+  intros. unfold contVars.
+  addFreshVarsSpec.
+  dands; try tauto.
+  apply varsOfClassFreshDisjointBool.
+  assumption.
+Qed.
+
+Ltac addContVarsSpecOld  m sug H vn:=
+  let Hfr := fresh H "nr" in
+  pose proof H as Hfr;
+  apply userVarsContVars with (n:=m) (sugg:=sug) in Hfr;
+  let vf := fresh "lvcvf" in
+  remember (contVars m sug) as vf;
+  let Hdis := fresh "Hcvdis" in
+  let Hlen := fresh "Hcvlen" in
+  pose proof Hfr as  Hdis;
+  pose proof Hfr as  Hlen;
+  apply proj2, proj2 in Hlen;
+  apply proj2, proj1 in Hdis;
+  apply proj1 in Hfr;
+  simpl in Hlen;
+  dlist_len_name vf vn.
+
+Ltac addContVarsSpec  m H vn:=
+match goal with
+[H : context [contVars m ?s] |- _ ] => addContVarsSpecOld  m s H vn
+| [ |- context [contVars m ?s] ] => addContVarsSpecOld  m s H vn
+end.
+
+
+ Lemma varClassContVar : varClass contVar = false.
+Proof using.
+  intros. unfold contVar.
+  match goal with
+  [|- context [mkSuggestion ?k]] =>
+  pose proof (freshCorrect 1 (Some false) [] [mkSuggestion k]) as Hf;
+  simpl in Hf; repnd;
+  remember (freshVars 1 (Some false) [] [mkSuggestion k]) as lv
+  end.
+  dlist_len_name lv v. simpl.
+  specialize (Hf _ eq_refl v). simpl in *. auto.
+Qed.
+
 (** The inner, naive CBV CPS translation.  This introduces a lot of 
     administrative reductions, but simple things first.  Importantly,
     things that are already values are treated a little specially.  
     This ensures a substitution property 
     [cps_cvt(e{x:=v}) = (cps_cvt e){x:=(cps_vt_val v)}].
  *)
- Lemma varClassContVar : varClass contVar = false.
-Proof using.
-  intros.
-  unfold contVar.
-  pose proof (freshCorrect 1 (Some false) [] []) as Hf.
-  simpl in Hf. repnd.
-  remember (freshVars 1 (Some false) [] []) as lv.
-  dlist_len_name lv v. simpl.
-  specialize (Hf _ eq_refl v). simpl in *. auto.
-Qed.
 
 Section CPS_CVT.
 (** recursive call *)
@@ -897,7 +943,8 @@ Section CPS_CVT.
   
       (* cont \k.(ret [e1] (cont \v1.(ret [e2] (cont \v2.call v1 k v2)))) *)
   Definition cps_cvt_apply  (ce1 : CTerm) (e2: NTerm) : CTerm :=
-      let kvars := contVars 3 in 
+      let knames := ["k";"kapf";"kapArg"] in
+      let kvars := contVars 3 (map mkSuggestion knames)in 
       let k := nth 0 kvars nvarx in  
       let k1 := nth 1 kvars nvarx in  
       let k2 := nth 2 kvars nvarx in  
@@ -964,6 +1011,7 @@ End CPS_CVT.
     let kv := contVar in 
       KLam_c kv (Ret_c (vterm kv) ce).
 
+SearchAbout compose.
 Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
   if is_valueb e 
   then val_outer (cps_cvt_val' cps_cvt e) 
@@ -973,13 +1021,16 @@ Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
     | terms.oterm NApply [bterm [] e1; bterm [] e2] => 
         cps_cvt_apply cps_cvt (cps_cvt e1) e2
     | terms.oterm (NDCon d nargs) es => 
-        let kvars := contVars (S (length es)) in
+        let knames := 
+          map (mkSuggestion ∘ (fun x => append x "kdcon") ∘ nat2string10) (seq 0 (length es)) in
+        let kvars := contVars (S (length es)) ((mkSuggestion "k")::knames)in
         let k := hd nvarx kvars  in
         let tlkv := tail kvars  in
         KLam_c k (cps_cvts_chain cps_cvt tlkv es (Ret_c (vterm k)
                                                           (Con_c d (map vterm tlkv))))
     | terms.oterm (NMatch brl) ((bterm [] discriminee)::brr) => 
-      let kvars := contVars 2 in 
+      let knames := ["k";"kmd"] in
+      let kvars := contVars 2 (map mkSuggestion knames )in 
       let k := nth 0 kvars nvarx in
       let kd := nth 1 kvars nvarx in
       let brrc :=  (bterm [] (vterm kd))::(cps_cvt_branches cps_cvt (vterm k) brr) in
@@ -1144,7 +1195,7 @@ Lemma substKlam_cTrivial2 : forall x xx (b t : CTerm),
   -> closed (KLam_c x b)
   -> ssubst (KLam_c x b) [(xx,t)] = KLam_c x b.
 Proof using.
-  clear varclass.
+  clear varclass upnm.
   intros ? ? ? ? H Hb.
   change_to_ssubst_aux8;[ |simpl; rewrite H; disjoint_reasoningv; tauto].
   simpl. rewrite decide_decideP.
@@ -1190,16 +1241,7 @@ Proof using. refl. Qed.
 Definition onlyUserVars (t: NTerm) : Prop :=
   varsOfClass (all_vars t) USERVAR.
 
-Lemma userVarsContVars : forall lv,
-varsOfClass lv USERVAR
--> forall n, no_repeats (contVars n) /\ disjoint (contVars n) lv /\ Datatypes.length (contVars n) = n.
-Proof using varclass.
-  intros. unfold contVars.
-  addFreshVarsSpec.
-  dands; try tauto.
-  apply varsOfClassFreshDisjointBool.
-  assumption.
-Qed.
+
 
 Lemma userVarsContVar : forall lv,
 varsOfClass lv USERVAR
@@ -1363,21 +1405,6 @@ Proof using.
   + varsOfClassSimpl. tauto.
 Qed.
 
-Ltac addContVarsSpec  m H vn:=
-  let Hfr := fresh H "nr" in
-  pose proof H as Hfr;
-  apply userVarsContVars with (n:=m) in Hfr;
-  let vf := fresh "lvcvf" in
-  remember (contVars m) as vf;
-  let Hdis := fresh "Hcvdis" in
-  let Hlen := fresh "Hcvlen" in
-  pose proof Hfr as  Hdis;
-  pose proof Hfr as  Hlen;
-  apply proj2, proj2 in Hlen;
-  apply proj2, proj1 in Hdis;
-  apply proj1 in Hfr;
-  simpl in Hlen;
-  dlist_len_name vf vn.
 
 
 (** will be used for both the [App_e] ane [Let_e] case *)
@@ -2840,6 +2867,7 @@ Qed.
 Lemma eval_preserves_fixwf :
   forall e v, eval e v ->  fixwf e = true -> fixwf v = true.
 Proof using varclass.
+  clear evalt. clear upnm.
   intros ? ? He. induction He; intro Hfwf; try auto.
 - apply_clear IHHe3. 
   simpl in *. repeat rewrite andb_true_iff in *.
@@ -3761,12 +3789,12 @@ End TypePreservingCPS.
 *)
 End VarsOf2Class.
 
-Ltac addContVarsSpec  m H vn:=
+Ltac addContVarsSpecOld  m sug H vn:=
   let Hfr := fresh H "nr" in
   pose proof H as Hfr;
-  apply userVarsContVars with (n:=m) in Hfr;
+  apply userVarsContVars with (n:=m) (sugg:=sug) in Hfr;
   let vf := fresh "lvcvf" in
-  remember (contVars m) as vf;
+  remember (contVars m sug) as vf;
   let Hdis := fresh "Hcvdis" in
   let Hlen := fresh "Hcvlen" in
   pose proof Hfr as  Hdis;
@@ -3776,3 +3804,9 @@ Ltac addContVarsSpec  m H vn:=
   apply proj1 in Hfr;
   simpl in Hlen;
   dlist_len_name vf vn.
+
+Ltac addContVarsSpec  m H vn:=
+match goal with
+[H : context [contVars m ?s] |- _ ] => addContVarsSpecOld  m s H vn
+| [ |- context [contVars m ?s] ] => addContVarsSpecOld  m s H vn
+end.

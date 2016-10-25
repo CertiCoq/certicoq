@@ -151,7 +151,7 @@ Section L6_trans.
     Qed.    
 
     (** Top level correctness property of closure conversion and hoisting for closed terms *)
-    Corollary closure_conversion_hoist_correct k e ctag itag :
+    Corollary closure_conversion_hoist_correct k e ctag itag nmap :
       (* [e] is closed *)
       closed_exp e ->
       (* [e] has unique bindings *)
@@ -159,7 +159,7 @@ Section L6_trans.
       (* Then [e] and its translation are related by the logical relation *)
       cc_approx_exp pr cenv clo_tag k
                     (e, M.empty val)
-                    (closure_conversion_hoist clo_tag e ctag itag cenv, M.empty val).
+                    (closure_conversion_hoist clo_tag e ctag itag cenv nmap, M.empty val).
     Proof with now eauto with Ensembles_DB.
       intros Hclo Hun.
       unfold closure_conversion_hoist. 
@@ -217,7 +217,7 @@ Section L6_trans.
     Qed.
     
     (** Top level correctness property of closure conversion and hoisting for open terms *)
-    Corollary closure_conversion_hoist_open_correct k rho rho' e ctag itag :
+    Corollary closure_conversion_hoist_open_correct k rho rho' e ctag itag nmap :
       (* [e] has unique bindings *)
       unique_bindings e ->
       (* the free variables of [e] are disjoint from the bound variables of [e] *)
@@ -229,7 +229,7 @@ Section L6_trans.
       (* Then [e] and its translation are related by the closure conversion log. relation *)
       cc_approx_exp pr cenv clo_tag k
                     (e, rho)
-                    (closure_conversion_hoist_open clo_tag rho e ctag itag cenv, rho').
+                    (closure_conversion_hoist_open clo_tag rho e ctag itag cenv nmap, rho').
     Proof with now eauto with Ensembles_DB.
       intros Hun HD Hbin Hcc.
       unfold closure_conversion_hoist_open.

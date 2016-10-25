@@ -2,7 +2,15 @@
 Add LoadPath "../common" as Common.
 Add LoadPath "." as L1g.
 
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Arith.PeanoNat.
+Require Import Coq.Arith.Peano_dec.
+Require Import Recdef.
 Require Import Coq.Lists.List.
+Require Import Coq.Lists.ListSet.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Bool.Bool.
 Require Import Coq.omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
@@ -12,9 +20,154 @@ Require Import L1g.wcbvEval.
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
+Set Implicit Arguments.
+
 Unset Template Cast Propositions.  (** L1 doesn't strip proofs **)
-Set Printing Width 90.
-Set Printing Depth 100.
+Set Printing Width 80.
+Set Printing Depth 500.
+
+Function Plus1 (n : nat) {wf lt n} : nat :=
+  match n with
+    | 0 => 1
+    | S p => S (Plus1 p)
+  end.
+- intros. omega.
+- apply lt_wf.
+Defined.
+Definition x := 1.
+Definition Plus1x := Plus1 x.
+Eval vm_compute in Plus1x.
+
+(** evaluation of [Function]s defined with measure or wf **)
+Time Quote Recursively Definition p_Plus1x := Plus1x.
+Time Definition P_Plus1x : Program Term :=
+  Eval vm_compute in program_Program p_Plus1x.
+Time Definition P_env := Eval vm_compute in (env P_Plus1x).
+Time Definition P_main := Eval vm_compute in (main P_Plus1x).
+(***
+ Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
+Print P_ans.
+ ***)
+
+Goal  (** Plus1x does normalize in L1g **)
+  WcbvEval P_env P_main prop.
+Proof.
+  unfold P_main. eapply wConst. cbn. reflexivity.
+  refine (wAppLam _ _ _ _). eapply wConst. cbn.  reflexivity.
+  apply wLam. admit. 
+  eapply wConst. cbn.  reflexivity.
+  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
+  eapply wCons. eapply wConstruct. eapply wNil.
+
+  cbn.
+  eapply wCase. eapply wAppLam.
+  eapply wConst. cbn.  reflexivity.
+  eapply wAppLam. eapply wLam. (* apply wPrf. *) admit. admit.
+   
+  cbn. eapply wAppLam. eapply wLam.   (* apply wPrf. *) admit. admit.
+
+  cbn.
+  eapply wAppLam. eapply wLam.   (* apply wPrf. *) admit. admit.
+  
+  cbn.
+  eapply wAppLam. eapply wConst. cbn.  reflexivity.
+  eapply wLam. admit. (* ? *) eapply wProd. eapply wInd.
+
+  cbn.
+  eapply wAppLam. eapply wLam.  admit. (* ? *)
+  eapply wAppLam. eapply wConst.
+  cbn. reflexivity.  eapply wLam.   admit. (* ? *) eapply wInd.
+
+  cbn.
+  eapply wAppLam.  eapply wLam.  admit.
+  eapply wConst. cbn. reflexivity.
+  eapply wLam.  admit.
+
+  cbn. eapply wProd. admit.
+
+  cbn.
+  eapply wAppLam.  eapply wLam.  admit. eapply wProd.  admit.
+
+  cbn.
+  eapply wAppLam. eapply wConst. cbn. reflexivity. eapply wLam. admit.
+  eapply wProd. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit.
+  eapply wProd. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit.
+  eapply wProd. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit.
+  eapply wLam. admit.
+
+  cbn. eapply wAppLam. eapply wLam. admit. admit.
+  cbn. eapply wCase. 
+  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
+  eapply wCons. eapply wConstruct. eapply wNil.  cbn.
+  eapply wLam.  cbn.
+  
+
+
+
+(*********
+Definition x:nat := 2.
+Definition Plus1x := Plus1 x.
+(* [program] of the program *)
+Quote Recursively Definition p_Plus1x := Plus1x.
+(* L2 [Program] of the program *)
+Definition P_Plus1x := Eval native_compute in (program_Program p_Plus1x).
+Quote Recursively Definition cbv_Plus1x :=  (* [program] of Coq's answer *)
+  ltac:(let t:=(eval vm_compute in Plus1x) in exact t).
+Definition ans_Plus1x :=  (* L2 [Term] of Coq's answer *)
+  Eval vm_compute in (main (program_Program cbv_Plus1x)).
+
+Goal
+  let env := (env P_Plus1x) in
+  let main := (main P_Plus1x) in
+  wcbvEval env 500 main = Ret ans_Plus1x.
+  vm_compute. reflexivity.
+Qed.
+
+Definition sublist (l1 l2:list string) : bool :=
+  forallb (fun x1 => existsb (fun x2 => string_eq_bool x1 x2) l2) l1.
+Definition eqlist (l1 l2:list string) : bool := sublist l1 l2 && sublist l2 l1.
+*****************)
+
+(**********
+Function Plus1 (n : nat) {wf lt n} : nat :=
+match n with
+| 0 => 1
+| S p => S (Plus1 p)
+end.
+- intros. omega.
+- apply lt_wf.
+Defined.
+Print Plus1.
+Notation "↾ x" := (exist _ x _) (at level 100).
+Notation SIGTYPE := (sig _).
+Notation EXTYPE := (ex _).
+Notation "↾ x" := (exist _ x _) (at level 100).
+Notation SIGTYPE := (sig _).
+Notation EXTYPE := (ex _).
+ ********************)
+Definition x:nat := 2.
+Definition Plus1x := Plus1 x.
+
+(***
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation Lam := (TLambda).
+Notation Pi := (TProd).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Notation "# x" := (TConst x) (at level 85).
+Infix "@" := TApp  (at level 90, left associativity).
+Infix ":t:" := tcons  (at level 87, right associativity).
+Notation "c :t|" := (c :t: tnil) (at level 90).
+ *********)
+
 
 (** does Coq eval match branches ? **)
 Variable (y:nat).
@@ -35,7 +188,7 @@ Definition mbt_env := env L1g_mbt.  (* L1g environ *)
 Definition mbt_main := main L1g_mbt. (* L1g main function *)
 Eval cbv in (wcbvEval mbt_env 10 mbt_main).
   
-(** Abhishek's example of looping in L1 **)
+(** Abhishek's example of looping in L1 **
 Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
 Inductive Acc (y: nat) : Prop :=
   Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
@@ -50,7 +203,7 @@ Axiom Acc0Ax : Acc 0.
 Eval vm_compute in (loop O Acc0Ax) .
 Quote Recursively Definition p_loop0 := (loop 0 Acc0Ax).
 Print p_loop0.
-(***)
+***)
 
 Set Implicit Arguments.
 

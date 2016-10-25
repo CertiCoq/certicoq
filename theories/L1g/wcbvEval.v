@@ -40,7 +40,8 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
 | wAx: WcbvEval p TAx TAx
 | wConst: forall nm (t s:Term),
-            LookupDfn nm p t -> WcbvEval p t s -> WcbvEval p (TConst nm) s
+            lookupDfn nm p = Ret t -> WcbvEval p t s ->
+            WcbvEval p (TConst nm) s
 | wAppLam: forall (fn ty bod a1 a1' s:Term) (args:Terms) (nm:name),
                WcbvEval p fn (TLambda nm ty bod) ->
                WcbvEval p a1 a1' ->
@@ -112,6 +113,19 @@ Proof.
 Qed.
 
 
+(*******  move to somewhere  ********)
+Lemma lookup_pres_WFapp:
+    forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
+Proof.
+  induction 1; intros nn ed h.
+  - inversion_Clear h.
+  - case_eq (string_eq_bool nn nm); intros j.
+    + cbn in h. rewrite j in h. myInjection h. assumption.
+    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
+Qed.
+
+(**************************************************)
+
 (** wcbvEval preserves WFapp **)
 Lemma wcbvEval_pres_WFapp:
   forall p, WFaEnv p -> 
@@ -123,8 +137,12 @@ Proof.
   try (solve[inversion_Clear H0; intuition]);
   try (solve[inversion_Clear H1; intuition]);
   try (solve[inversion_Clear H2; intuition]).
-  - apply H.
-    assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
+  - apply H. unfold lookupDfn in e. case_eq (lookup nm p); intros xc.
+    + intros k. assert (j:= lookup_pres_WFapp hp _ k)
+      . rewrite k in e. destruct xc. 
+      * myInjection e. inversion j. assumption.
+      * discriminate.
+    + rewrite xc in e. discriminate.
   - inversion_clear H2. apply H1.
     specialize (H H4). inversion_Clear H.
     apply (whBetaStep_pres_WFapp); intuition. 
@@ -163,10 +181,19 @@ Lemma WcbvEval_weaken:
                    WcbvEvals ((nm,ec)::p) ts ss).
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
-  - eapply wConst. 
-    + apply Lookup_weaken; eassumption.
-    + apply H. assumption.
-  - eapply wAppLam.
+   - destruct (string_dec nm nm0).
+    + subst. inversion_Clear H0.
+      * unfold lookupDfn in e.
+        rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _)) in e.
+        discriminate.
+        constructor; assumption.
+      * unfold lookupDfn in e.
+        rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _)) in e.
+        discriminate.  constructor.
+    + eapply wConst.
+      * rewrite <- (lookupDfn_weaken' n). eassumption. 
+      * apply H. assumption. 
+   - eapply wAppLam.
     + apply H. assumption.
     + apply H0. assumption.
     + apply H1. assumption.
@@ -189,18 +216,7 @@ Lemma WcbvEvals_tcons_tcons':
 Proof.
   inversion 1. intuition.
 Qed.
- 
-(****  Could probably finish this, bus see WcbvEval_wndEvalRTC below ***
-(** WcbvEval is in the transitive closure of wndEval **)
-Lemma WcbvEval_wndEvalTC:
-  forall (p:environ), WFaEnv p ->
-    (forall t s, WcbvEval p t s -> t <> s ->
-        WFapp t -> wndEvalTC p t s) /\
-    (forall ts ss, WcbvEvals p ts ss -> ts <> ss ->
-        WFapps ts -> wndEvalsTC p ts ss).
-Proof.
 
-*******)
 
 Lemma WcbvEval_wndEvalRTC:
   forall (p:environ Term), WFaEnv p ->
@@ -219,13 +235,10 @@ Proof.
   - eapply wERTCtrn; inversion_Clear H0.
     + apply wERTCstep. apply sCast.
     + apply H. assumption.
-  - eapply wERTCtrn; intuition.
-    assert (j: WFapp t).
-    { unfold LookupDfn in l.
-      assert (k:= Lookup_pres_WFapp hp l). inversion k. assumption. }
+   - eapply wERTCtrn; intuition.
     eapply wERTCtrn.
-    + apply wERTCstep. apply sConst; eassumption.
-    + apply H. assert (k:= Lookup_pres_WFapp hp l). inversion k. assumption.
+    + apply wERTCstep. apply sConst. apply lookupDfn_LookupDfn. eassumption.
+    + apply H. eapply (lookupDfn_pres_WFapp hp).  eassumption. 
   - inversion_Clear H2.
     eapply (@wERTCtrn _ _ (TApp (TLambda nm ty bod) a1 args)).
     + rewrite <- mkApp_goodFn; try assumption.
@@ -364,7 +377,7 @@ Function wcbvEval
                   (** note hack coding of axioms in environment **)
             | Some (AstCommon.ecTyp _ _ _) =>
               raise ("wcbvEval, TConst ecTyp " ++ nm)
-            | _ => raise "wcbvEval: TConst environment miss"
+            | _ => raise ("wcbvEval: TConst environment miss:  " ++ nm)
           end
         | TCast t ck _ =>
           match wcbvEval n t with
@@ -506,7 +519,7 @@ Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
 with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.
 Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'.
 
-
+(**************  fix ******************
 (** wcbvEval and WcbvEval are the same relation **)
 Lemma wcbvEval_WcbvEval:
   forall tmr,
@@ -652,5 +665,5 @@ Proof.
   specialize (k1 (max x0 x1) (max_snd x0 x1)).
   rewrite k0 in k1. injection k1. intuition.
 Qed.
-
+******************************************)
 End wcbvEval_sec.

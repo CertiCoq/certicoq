@@ -340,12 +340,45 @@ Proof.
   injection (Lookup_single_valued h1 h2). intuition.
 Qed.
 
+Lemma lookup_fresh_neq:
+  forall nm2 p (ec:envClass),
+    lookup nm2 p = Some ec -> forall nm1, fresh nm1 p -> nm1 <> nm2.
+Proof.
+  intros nm2 p ec. functional induction (lookup nm2 p); intros.
+  - discriminate.
+  - inversion_Clear H0. rewrite (string_eq_bool_eq _ _ e0). assumption.
+  - inversion_Clear H0. specialize (IHo H _ H3). assumption.
+Qed.
+
 Lemma Lookup_weaken:
   forall s p t, Lookup s p t -> 
       forall nm ec, fresh nm p -> Lookup s ((nm, ec) :: p) t.
 intros s p t h1 nm ec h2.
 assert (j1:= Lookup_fresh_neq h1 h2). apply LMiss. apply neq_sym. assumption.
 assumption.
+Qed.
+
+Lemma Lookup_weaken':
+  forall s p t, Lookup s p t -> 
+      forall nm ec, s <> nm -> Lookup s ((nm, ec) :: p) t.
+intros s p t h1 nm ec h2. apply LMiss; assumption.
+Qed.
+
+Lemma lookup_weaken':
+  forall s nm, s <> nm -> forall p ec, lookup s p = lookup s ((nm, ec) :: p).
+Proof.
+  intros s nm h1 p ec.
+  change (lookup s p = if (string_eq_bool s nm) then Some ec
+                       else lookup s p).
+  rewrite string_eq_bool_neq. reflexivity. assumption.
+Qed.
+
+Lemma lookupDfn_weaken':
+  forall s nm, s <> nm ->
+               forall p ec, lookupDfn s p = lookupDfn s ((nm, ec) :: p).
+Proof.
+  intros s nm h1 p ec. unfold lookupDfn. erewrite lookup_weaken'.
+  reflexivity. assumption.
 Qed.
 
 Lemma Lookup_strengthen:
@@ -355,6 +388,7 @@ intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
 simpl in k. rewrite (string_eq_bool_neq j2) in k.
 apply lookup_Lookup. assumption.
 Qed.
+
 
 (** find an ityp in an itypPack **)
 Definition getInd (ipkg:itypPack) (inum:nat) : exception ityp :=

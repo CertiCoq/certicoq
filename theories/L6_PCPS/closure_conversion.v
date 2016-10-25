@@ -301,7 +301,7 @@ Section CC.
   Definition make_record_cTag (n : N) : ccstate cTag :=
     p <- get ;;
     let '(mkCont x c i e names) := p  in
-    let inf := (i, n, 0%N) : cTyInfo in
+    let inf := (nAnon, i, n, 0%N) : cTyInfo in
     let e' := ((M.set c inf e) : cEnv) in
     put (mkCont x (c+1)%positive (i+1)%positive e' names) ;;
     ret c.

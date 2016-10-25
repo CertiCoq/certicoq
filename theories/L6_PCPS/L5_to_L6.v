@@ -45,7 +45,6 @@ Require Import L6.ctx.
 
 
 
-
                    
 (* placeholder *)
 Definition tag := positive.
@@ -164,14 +163,24 @@ Fixpoint set_s_list (lx:list NVar) (ly:list var) (sig:s_map) :=
  note:want might to add f and k to t_map on way down 
  *)
 Definition conv_env:Type := conId_map *  t_map * nEnv.
-Definition set_t (x:var) (ti: Ast.name* t_info)  (tgm:conv_env):conv_env :=
+
+Definition set_nt (x:var) (tn: (Ast.name * t_info))  (tgm:conv_env):conv_env :=
   let '(t1, t2, t3) := tgm in
-  (t1, M.set x (snd ti) t2, M.set x (fst ti) t3).
+  (t1, M.set x (snd tn) t2, M.set x (fst tn) t3).
+
+
+Definition set_t (x:var) (ti: t_info)  (tgm:conv_env):conv_env :=
+  let '(t1, t2, t3) := tgm in
+  (t1, M.set x ti t2, t3).
+
+Definition set_n (x:var) (n:Ast.name) (tgm:conv_env):conv_env :=
+  let '(t1,t2,t3) := tgm in
+  (t1, t2, M.set x n t3).
 
 (* Add a list of function to the tag environment *)
 Fixpoint set_t_f_list (ns:list var) (ts:list NVar) (tgm:conv_env) :=
   match ns, ts with
-    | n::ns', t::ts' => set_t_f_list ns' ts' (set_t n (snd t, fun_tag) tgm)
+    | n::ns', t::ts' => set_t_f_list ns' ts' (set_nt n (snd t, fun_tag) tgm)
     | _, _ => tgm
   end.
   
@@ -194,6 +203,7 @@ note : var "1" is taken as error and will be proven not to appear when input is 
 
 
  *)
+Print NVar.
 Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:conv_env) (n:var) (*  {struct e } *): exp * var * conv_env :=
        match e with
        | Halt_c v => let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
@@ -241,15 +251,18 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (tgm:conv_env) (n:var) (* { str
          | Var_c m => (Hole_c, get_s m sv , n, tgm)   (* {| ( Econstr_c n ty var_tag ((nth (N.to_nat m) sv (1%positive))::nil)  Hole_c, Pos.succ n  ) |} *)
          | KVar_c m => (Hole_c, get_s m sk, n, tgm) (* {| ( Econstr_c n ty kvar_tag ((nth (N.to_nat m) sk (1%positive))::nil) Hole_c, Pos.succ n) |} *)
          | Lam_c x k e =>
-           let tgm := set_t (Pos.succ n) (nAnon, kon_tag) tgm in
+           let tgm := set_nt (Pos.succ n) (snd k, kon_tag) tgm in
+           let tgm := set_n n (snd x) tgm in (* what about the tag of x? *)     
            let '(e', n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) tgm (Pos.add n (2%positive)) in
-           let tgm := set_t n' (nAnon, fun_tag) tgm in  (* what about the tag of x? *)     
+           let tgm := set_t n' fun_tag tgm in  
            (* flipping around so the continuation comes first *)
            let fds := Fcons n' fun_tag ((Pos.succ n)::n::nil) e' Fnil in                         
            (Efun1_c fds Hole_c, n' , (Pos.succ n'), tgm) 
-         | Cont_c k e => let '(e', n', tgm) := convert e sv (M.set (fst k) n sk) tgm (Pos.succ n) in
+         | Cont_c k e =>
+                         let tgm := set_n n (snd k) tgm in (* maybe set the tag? *)
+                         let '(e', n', tgm) := convert e sv (M.set (fst k) n sk) tgm (Pos.succ n) in
                          let fds := Fcons n' kon_tag (n::nil) e' Fnil in
-                         (Efun1_c fds Hole_c, n',  Pos.succ n', set_t n' (nAnon, kon_tag) tgm)
+                         (Efun1_c fds Hole_c, n',  Pos.succ n', set_t n' kon_tag tgm )
          | Con_c dcn lv =>
            let fix convert_v_list (lv :list val_c) (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): (exp_ctx * list var * var * conv_env) :=
                match lv with
@@ -263,7 +276,7 @@ with convert_v (v:val_c) (sv: s_map) (sk: s_map) (tgm:conv_env) (n:var) (* { str
            let '(lv_ctx, nl, n', tgm) := convert_v_list lv sv sk tgm n in
            let ctag := (dcon_to_tag dcn (fst (fst tgm))) in
 
-             (comp_ctx_f lv_ctx (Econstr_c n' ctag (List.rev nl) Hole_c), n', Pos.succ n', set_t n' (nAnon, ctag) tgm)
+             (comp_ctx_f lv_ctx (Econstr_c n' ctag (List.rev nl) Hole_c), n', Pos.succ n', set_t n' ctag tgm)
          | Fix_c lbt i =>
            (match lbt with
              | nil => (Hole_c, (1%positive), n, tgm) (* malformed input, should not happen *) 
@@ -292,8 +305,8 @@ arguments are:
                match (fds, fnames) with
                  | ((_,v)::fds', currn::fnames') =>
                    (match v with
-                      | Lam_c x k e =>            
-                        let '(ce, n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) (set_t (Pos.succ n) (nAnon, kon_tag) tgm) (Pos.add n 2%positive) in
+                      | Lam_c x k e =>                        
+                        let '(ce, n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) (set_nt (Pos.succ n) (snd k, kon_tag) (set_n n (snd x)  tgm)) (Pos.add n 2%positive) in
                         let '(cfds, n'', tgm) := convert_fds fds' sv sk tgm fnames' n' in
                         (Fcons currn fun_tag (n::(Pos.succ n)::nil) ce cfds, n'', tgm) (* todo: add the tag for x *)
                       | _ => (Fnil, n, tgm) (* this should not happen *)
@@ -311,14 +324,19 @@ arguments are:
 
 Definition ienv := list (string * nat * itypPack).  
 
-Fixpoint convert_cnstrs (cct:list positive) (itC:list Cnstr) (ind:inductive) (nCon:N) (niT:iTag) ce (dcm:conId_map) :=
+Print Cnstr.
+Print conId_map.
+Print inductive.
+
+Fixpoint convert_cnstrs (cct:list positive) (itC:list Cnstr) (ind:inductive) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
  match (cct, itC) with  
    | (cn::cct', cst::icT') =>
-     let (_, ccn) := cst in
-         convert_cnstrs cct' icT' ind (nCon+1)%N niT (M.set cn (niT, N.of_nat ccn, nCon) ce) (((ind,nCon), cn)::dcm)
+     let (cname, ccn) := cst in
+         convert_cnstrs cct' icT' ind (nCon+1)%N niT (M.set cn (nNamed cname, niT, N.of_nat ccn, nCon) ce) (((ind,nCon), cn)::dcm)
    | (_, _) => (ce, dcm)
  end.
-               
+
+
 Fixpoint convert_typack typ (idBundle:string) (n:nat) (ice:(iEnv * cEnv* iTag * cTag * conId_map)) : (iEnv * cEnv * cTag * iTag * conId_map) :=
   let '(ie, ce, niT, ncT, dcm) := ice in 
   match typ with

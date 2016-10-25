@@ -2,6 +2,7 @@ Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets
         Coq.MSets.MSetRBT Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles
         Coq.Relations.Relations.
 Require Import ExtLib.Structures.Monad  ExtLib.Data.Monads.OptionMonad ExtLib.Core.Type.
+Require Import Common.AstCommon.
 Require Import cps List_util.
 
 Import ListNotations MonadNotation.
@@ -27,10 +28,10 @@ Section EVAL.
       forall (t : cTag),
         caseConsistent nil t
   | CCcons :
-      forall (l : list (cTag * exp)) (t t' : cTag) (ty ty' : iTag)
+      forall (a a':name) (l : list (cTag * exp)) (t t' : cTag) (ty ty' : iTag)
         (n n' : N) (i i' : N) (e : exp),
-        M.get t cenv  = Some (ty, n, i) ->
-        M.get t' cenv = Some (ty', n', i') ->
+        M.get t cenv  = Some (a, ty, n, i) ->
+        M.get t' cenv = Some (a', ty', n', i') ->
         ty = ty' ->
         caseConsistent l t ->
         caseConsistent ((t', e) :: l) t.

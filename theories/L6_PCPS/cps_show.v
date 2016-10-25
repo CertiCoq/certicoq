@@ -12,13 +12,15 @@ Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
 
+
 Require Import Common.AstCommon. 
 Definition nEnv := M.t Ast.name.
 
 Section PP.
 
   Variable (nenv:nEnv).
-
+  Variable (cenv:cEnv).
+  
 (* Convert various numbers to strings *)
 Definition show_nat := nat2string10.
 Definition show_pos x := nat2string10 (Pos.to_nat x).
@@ -61,7 +63,11 @@ Definition show_var (x:positive) :=
   end.
 
 
-
+Definition show_con (tg:cTag) :=
+  match M.get tg cenv with
+    | Some (nNamed s, i, t, n) => s
+    | _ => ("con_"+++(show_pos tg))%string
+  end.
 
 (* Show a list of variables as comma separated and wrapped in parens. *)
 Definition show_vars (xs:list positive) :=
@@ -94,7 +100,8 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
   match e with
   | Econstr x tg xs e =>
     emit "let " ;; emit (show_var x) ;;
-    emit " := con_" ;; emit (show_pos tg) ;;
+         (* emit " := con_" ;; emit (show_pos tg) ;; *)
+    emit " := ";;emit (show_con tg);;     
     emit (show_vars xs) ;; emit " in " ;; newline ;; 
     emit_exp indent e
   | Eproj x tg n y e =>
@@ -115,7 +122,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
             | nil => ret tt
             | p::tail =>
               let (tg,e) := p in
-              tab indent ;; emit "| con_" ;; emit (show_pos tg) ;;
+              tab indent ;; emit "| " ;; emit (show_con tg) ;;
                   emit " => " ;; newline ;; 
                   emit_exp (2 + indent) e ;; 
                   iter tail

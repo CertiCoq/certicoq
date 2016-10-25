@@ -58,3 +58,25 @@ Global Instance vartypePos : VarType NVar bool.
   apply Build_VarType.
   exact freshVarsPosCorrect.
 Defined.
+
+Require Import L4.varInterface.
+Global Instance NVUpdateName : UpdateName NVar :=
+  fun p => let (v,name) := p in (fst v, name).
+
+
+Definition name2string (n:Ast.name): string :=
+match n with
+| nAnon => "_"
+| nNamed s => s
+end.
+
+Require Import  ExtLib.Data.String.
+
+
+
+Definition NVar2string (v: NVar): string :=
+let name := (name2string (snd v)) in
+if ((varClass v):bool)
+  then name
+  else (name++(nat2string10 (Pos.to_nat (fst v)))).
+

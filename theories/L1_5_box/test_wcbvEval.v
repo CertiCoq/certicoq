@@ -3,6 +3,8 @@ Add LoadPath "../common" as Common.
 Add LoadPath "../L1g" as L1g.
 Add LoadPath "." as L1_5.
 
+Require Import Recdef.
+Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
 Require Import L1g.compile.
@@ -11,9 +13,52 @@ Require Import L1_5.wcbvEval.
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
-Set Template Cast Propositions.  (** L1 doesn't strip proofs **)
+
+Set Template Cast Propositions. 
 Set Printing Width 90.
 Set Printing Depth 100.
+
+Function Plus1 (n : nat) {wf lt n} : nat :=
+  match n with
+    | 0 => 1
+    | S p => S (Plus1 p)
+  end.
+- intros. omega.
+- apply lt_wf.
+Defined.
+
+(**************
+Definition x:nat := 1.
+Definition Plus1x := Plus1 x.
+Quote Recursively Definition cbv_Plus1x :=  (* [program] of Coq's answer *)
+  ltac:(let t:=(eval native_compute in Plus1x) in exact t).
+Print cbv_Plus1x.
+Definition ans_Plus1x :=  (* L2 Term of Coq's answer *)
+  Eval vm_compute in (main (program_Program cbv_Plus1x)).
+Print ans_Plus1x.
+(* [program] of the program *)
+Quote Recursively Definition p_Plus1x := Plus1x.
+(* L2 [program] of the program *)
+Definition P_Plus1x := Eval vm_compute in (program_Program p_Plus1x).
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation Lam := (TLambda).
+Notation Pi := (TProd).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Notation "# x" := (TConst x) (at level 85).
+Infix "@" := TApp  (at level 90, left associativity).
+Infix ":t:" := tcons  (at level 87, right associativity).
+Notation "c :t|" := (c :t: tnil) (at level 90).
+Goal
+  let env := (env P_Plus1x) in
+  let main := (main P_Plus1x) in
+  wcbvEval env 200 main = Ret ans_Plus1x.
+  vm_compute. reflexivity.
+Qed.
+***************)
+
 
 
 (** Abhishek's example of looping in L1 **)
@@ -185,11 +230,12 @@ with forest_size (f:forest bool) : nat :=
          | leaf b => 1
          | fcons t f1 => (tree_size t + forest_size f1)
        end.
-
+Quote Recursively Definition p_tree_size := tree_size.
+Print p_tree_size.
+Definition atree: tree bool := (node true (fcons (node true (leaf false)) (leaf true))).
 Definition arden: forest bool :=
-  fcons (node true (fcons (node true (leaf false)) (leaf true)))
-        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
-               (leaf false)).
+  fcons atree (fcons (node true (fcons (node true (leaf false)) (leaf true)))
+                     (leaf false)).
 Definition arden_size := (forest_size arden).
 Quote Recursively Definition cbv_arden_size :=
   ltac:(let t:=(eval cbv in arden_size) in exact t).
@@ -198,6 +244,8 @@ Definition ans_arden_size :=
 (* [program] of the program *)
 Quote Recursively Definition p_arden_size := arden_size.
 Print p_arden_size.
+Quote Recursively Definition p_arden_tree_size := (tree_size atree).
+Print p_arden_tree_size.
 Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
 Print P_arden_size.
 Goal

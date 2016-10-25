@@ -82,6 +82,35 @@ Ltac SomeSubst :=
            | [ H:(Some _ = _) |- _ ] => rewrite H
          end.
 
+Definition xor (b1 b2:bool) : bool :=
+  match b1, b2 with
+    | true, true => true
+    | false, false => true
+    | _, _ => false
+  end.
+Definition ascii_dec_bool (a b:ascii): bool :=
+  match a, b with
+    | Ascii a0 a1 a2 a3 a4 a5 a6 a7, Ascii b0 b1 b2 b3 b4 b5 b6 b7 =>
+      andb (andb (andb (xor a0 b0) (xor a1 b1)) (andb (xor a2 b2) (xor a3 b3)))
+           (andb (andb (xor a4 b4) (xor a5 b5)) (andb (xor a6 b6) (xor a7 b7)))
+  end.
+
+Definition ascii_eq_bool (a1 a2:ascii) : bool :=
+  ifdec (ascii_dec a1 a2) true false.
+
+Lemma ascii_dec_ascii_eq_bool:
+  forall a b:ascii, ascii_dec_bool a b = ascii_eq_bool a b.
+Proof.
+  intros a b. destruct a, b, b0, b; cbn; try reflexivity;
+              destruct b1, b8; cbn; try reflexivity;
+              destruct b2, b9; cbn; try reflexivity;
+              destruct b3, b10; cbn; try reflexivity;
+              destruct b4, b11; cbn; try reflexivity;
+              destruct b5, b12; cbn; try reflexivity;
+              destruct b6, b13; cbn; try reflexivity;
+              destruct b7, b14; cbn; try reflexivity.
+Qed.  
+
 (** turn decidable comparisons into Prop comparisons **)
 Ltac Compare_Prop := 
   match goal with
@@ -106,20 +135,20 @@ Ltac Compare_Prop :=
   end.
 
 Ltac compare_Prop H := first [
-      let j := fresh "j" in
-      assert (j := proj1 (Nat.compare_eq_iff _ _) H)
-    | let j := fresh "j" in
-      assert (j := proj1 (Nat.compare_lt_iff _ _) H)
-    | let j := fresh "j" in
-      assert (j := proj1 (Nat.compare_gt_iff _ _) H)
-    | let j := fresh "j" in
-      assert (j:= proj1 (Nat.eqb_eq _ _) H)
-    | let j := fresh "j" in
-      assert (j:= proj1 (Nat.leb_le _ _) H)
-    | let j := fresh "j" in
-      assert (j:= proj1 (Nat.ltb_lt _ _) H) ].
+                           let j := fresh "j" in
+                           assert (j := proj1 (Nat.compare_eq_iff _ _) H)
+                         | let j := fresh "j" in
+                           assert (j := proj1 (Nat.compare_lt_iff _ _) H)
+                         | let j := fresh "j" in
+                           assert (j := proj1 (Nat.compare_gt_iff _ _) H)
+                         | let j := fresh "j" in
+                           assert (j:= proj1 (Nat.eqb_eq _ _) H)
+                         | let j := fresh "j" in
+                           assert (j:= proj1 (Nat.leb_le _ _) H)
+                         | let j := fresh "j" in
+                           assert (j:= proj1 (Nat.ltb_lt _ _) H) ].
 
-  
+
 Lemma match_cn_Eq:
   forall m n, m = n ->
               forall (A:Type) (a b c: A),
@@ -163,9 +192,9 @@ Lemma compare_match_eq:
   forall n m, n = m ->
               forall {A} (x y z:A),
                 match n ?= m with
-                   | Datatypes.Eq => x
-                   | Lt => y
-                   | Gt => z end = x.
+                  | Datatypes.Eq => x
+                  | Lt => y
+                  | Gt => z end = x.
 Proof.
   intros. rewrite H. rewrite (proj2 (Nat.compare_eq_iff _ _)); reflexivity.
 Qed.
@@ -177,9 +206,9 @@ Ltac myInjection h := injection h; intros; subst; clear h.
 
 Lemma opt_notSome_None:
   forall (A:Type) (oa:option A), (forall a:A, oa <> Some a) -> oa = None.
-induction oa; intros.
-- assert (j:= H a). nreflexivity j.
-- reflexivity.
+  induction oa; intros.
+  - assert (j:= H a). nreflexivity j.
+  - reflexivity.
 Qed.
 
 
@@ -200,7 +229,7 @@ Section Sec_list_eq_dec.
   Qed.
 End Sec_list_eq_dec.
 
-  
+
 (** well-founded induction and recursion on natural number measure **)
 Lemma complete_nat_induct:
   forall (P:nat -> Prop)
@@ -212,7 +241,7 @@ Lemma complete_nat_induct:
     * apply ih. assumption.
     * assert (k: x < m). omega. apply IHm. assumption.
 Qed.
-  
+
 Lemma wf_ind:
   forall (A:Type) (f:A -> nat) (P:A -> Prop)
          (wfih:forall (t:A), (forall (x:A), f x < f t -> P x) -> P t),
@@ -237,20 +266,20 @@ Defined.
 
 
 (** Want to unfold all occurrances of nm in context and goal
-*** don't know how  
+ *** don't know how  
 Ltac Unfold nm :=
   repeat match goal with
         | [ H:(_ nm _) |- _ ] => unfold nm in H
         | [ |- _ nm _ ] => unfold nm
       end.
-***)
+ ***)
 
 (* when reduction stops *)
 Definition no_step {A:Set} (R:A -> A -> Prop) (a:A) :=
   forall (b:A), ~ R a b.
 
 Lemma neq_sym: forall (A:Type) (a b:A), a <> b -> b <> a.
-intuition.
+  intuition.
 Qed.
 
 Fixpoint list_to_zero (n:nat) : list nat :=
@@ -267,154 +296,193 @@ Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
   end.
 
 Lemma bool_not_neq: forall (b1 b2:bool), (~ b1 <> b2) <-> b1 = b2.
-split; induction b1; induction b2; intuition.
+  split; induction b1; induction b2; intuition.
 Qed.
 
 Lemma bool_neq_false: forall (b:bool), (b <> false) <-> b = true.
-split; induction b; intuition.
+  split; induction b; intuition.
 Qed.
 
 Lemma bs_not_cons_bs:
   forall (B:Type) (b:B) (bs:list B), bs <> (b::bs).
-intros B b bs h.
-assert (j: List.length bs = List.length (b :: bs)). rewrite <- h; reflexivity.
-simpl in j. intuition.
+  intros B b bs h.
+  assert (j: List.length bs = List.length (b :: bs)). rewrite <- h; reflexivity.
+  simpl in j. intuition.
 Qed.
 
 Lemma deMorgan_impl: forall (A B:Prop), (A -> B) -> (~B -> ~A).
-intuition.
+  intuition.
 Qed.
 
 Lemma orb3_true_elim:
   forall b1 b2 b3, b1 || b2 || b3 = true ->
                    {b1 = true} + {b2 = true} + {b3 = true}.
-intros b1 b2 b3 h.
-assert (j1: {b1 = true} + {b2 || b3 = true}).
-{ apply orb_true_elim. rewrite orb_assoc. assumption. }
-destruct j1.
-- intuition.
-- assert (j2: {b2 = true} + {b3 = true}). apply (orb_true_elim _ _ e).
-  destruct j2; intuition.
+  intros b1 b2 b3 h.
+  assert (j1: {b1 = true} + {b2 || b3 = true}).
+  { apply orb_true_elim. rewrite orb_assoc. assumption. }
+  destruct j1.
+  - intuition.
+  - assert (j2: {b2 = true} + {b3 = true}). apply (orb_true_elim _ _ e).
+    destruct j2; intuition.
 Qed.  
 
 Lemma fold_left_bool_mono:
   forall (ds:list bool),
-       fold_left (fun (b c:bool) => b || c) ds false = true ->
-       fold_left (fun (b c:bool) => b || c) ds true = true.
-induction ds; intro h; intuition. induction a. 
-- exact h.
-- simpl. simpl in h. apply (IHds h).
+    fold_left (fun (b c:bool) => b || c) ds false = true ->
+    fold_left (fun (b c:bool) => b || c) ds true = true.
+  induction ds; intro h; intuition. induction a. 
+  - exact h.
+  - simpl. simpl in h. apply (IHds h).
 Qed.
 
 Lemma fold_left_bool_head:
   forall (A:Type) (P:A -> bool) (d:A) (ds:list A),
-       fold_left (fun (b:bool) (t:A) => b || P t) (d::ds) false =
-       fold_left (fun (b:bool) (t:A) => b || P t) ds (P d).
-simpl. intros. reflexivity.
+    fold_left (fun (b:bool) (t:A) => b || P t) (d::ds) false =
+    fold_left (fun (b:bool) (t:A) => b || P t) ds (P d).
+  simpl. intros. reflexivity.
 Qed.
 
 Lemma A_fold_left_bool_mono:
   forall (A:Type) (P:A -> bool) (ds:list A),
-       fold_left (fun (b:bool) (t:A) => b || P t) (ds) false = true ->
-       fold_left (fun (b:bool) (t:A) => b || P t) (ds) true = true.
-induction ds. simpl. reflexivity.
-simpl. intros h. case_eq (P a); intro j; rewrite j in h.
-- assumption.
-- apply (IHds h).
+    fold_left (fun (b:bool) (t:A) => b || P t) (ds) false = true ->
+    fold_left (fun (b:bool) (t:A) => b || P t) (ds) true = true.
+  induction ds. simpl. reflexivity.
+  simpl. intros h. case_eq (P a); intro j; rewrite j in h.
+  - assumption.
+  - apply (IHds h).
 Qed.
 
 Lemma append_nil_1:
   forall (A:Type) (ls ms:list A), (ls++ms) = nil -> ms = nil.
-induction ms; induction ls; intros h.
-- reflexivity.
-- reflexivity.
-- simpl in h. discriminate h.
-- simpl in h. discriminate h.
+  induction ms; induction ls; intros h.
+  - reflexivity.
+  - reflexivity.
+  - simpl in h. discriminate h.
+  - simpl in h. discriminate h.
 Qed.
 
 Lemma nat_compare_EQ: forall n, nat_compare n n = Eq.
-intro n. apply (proj2 (nat_compare_eq_iff n n)). reflexivity.
+  intro n. apply (proj2 (nat_compare_eq_iff n n)). reflexivity.
 Qed.
 Hint Rewrite nat_compare_EQ.
 
 Lemma notNone_Some:
   forall (A:Type) (o:option A), o <> None -> exists a, o = Some a.
-destruct o.
-- intros h. exists a. reflexivity.
-- intros h. destruct h. reflexivity.
+  destruct o.
+  - intros h. exists a. reflexivity.
+  - intros h. destruct h. reflexivity.
 Qed.
 
 
 Lemma string_eq_character:
-     forall (b c:ascii) (bs cs:string),
-       (String b bs) = (String c cs) -> b = c /\ bs = cs.
-intros b c bs cs h.
-destruct (ascii_dec b c); injection h; intuition.
+  forall (b c:ascii) (bs cs:string),
+    (String b bs) = (String c cs) -> b = c /\ bs = cs.
+  intros b c bs cs h.
+  destruct (ascii_dec b c); injection h; intuition.
 Qed.
 
 Lemma string_neq_character:
-     forall (b c:ascii) (bs cs:string),
-       (String b bs) <> (String c cs) -> b <> c \/ bs <> cs.
-intros b c bs cs.
-destruct (ascii_dec b c).
-- rewrite e. destruct (string_dec bs cs).
-  + rewrite e0. intuition.
-  + intuition.
-- intuition.
+  forall (b c:ascii) (bs cs:string),
+    (String b bs) <> (String c cs) -> b <> c \/ bs <> cs.
+  intros b c bs cs.
+  destruct (ascii_dec b c).
+  - rewrite e. destruct (string_dec bs cs).
+    + rewrite e0. intuition.
+    + intuition.
+  - intuition.
 Qed.
 
-Definition ascii_eq_bool (a1 a2:ascii) : bool :=
-  ifdec (ascii_dec a1 a2) true false.
 
 Lemma ascii_eq_bool_eq:
-  forall (a1 a2:ascii),
-    ascii_eq_bool a1 a2 = true -> a1 = a2.
-intros a1 a2 h. case (ascii_dec a1 a2). intuition.
-intro ha.
-assert (j:ascii_eq_bool a1 a2 = false).
-apply (ifdec_right (ascii_dec a1 a2) ha true false).
-rewrite h in j. discriminate.
+  forall (a1 a2:ascii), ascii_eq_bool a1 a2 = true -> a1 = a2.
+  intros a1 a2 h. case (ascii_dec a1 a2). intuition.
+  intro ha.
+  assert (j:ascii_eq_bool a1 a2 = false).
+  apply (ifdec_right (ascii_dec a1 a2) ha true false).
+  rewrite h in j. discriminate.
+Qed.
+
+Lemma ascii_dec_bool_eq:
+  forall (a1 a2:ascii), ascii_dec_bool a1 a2 = true -> a1 = a2.
+Proof.
+  intros a1 a2 h.
+  apply ascii_eq_bool_eq.
+  rewrite <- ascii_dec_ascii_eq_bool. assumption.
 Qed.
 
 Lemma ascii_eq_bool_rfl:
   forall (a:ascii), ascii_eq_bool a a = true.
-intro a. case (ascii_dec a a); intuition.
-unfold ascii_eq_bool. rewrite ifdec_left; intuition.
+  intro a. case (ascii_dec a a); intuition.
+  unfold ascii_eq_bool. rewrite ifdec_left; intuition.
+Qed.
+
+Lemma ascii_dec_bool_rfl:
+  forall (a:ascii), ascii_dec_bool a a = true.
+  intro a. destruct a, b, b0, b1, b2, b3, b4, b5, b6; try reflexivity. 
 Qed.
 
 Lemma ascii_neq_bool_neq:
-  forall (a1 a2:ascii),
-    ascii_eq_bool a1 a2 = false -> a1 <> a2.
-intros a1 a2 h j. subst. rewrite ascii_eq_bool_rfl in h. discriminate.
+  forall (a1 a2:ascii), ascii_eq_bool a1 a2 = false -> a1 <> a2.
+  intros a1 a2 h j. subst. rewrite ascii_eq_bool_rfl in h. discriminate.
+Qed.
+
+Lemma ascii_dec_bool_neq:
+  forall (a1 a2:ascii), ascii_dec_bool a1 a2 = false -> a1 <> a2.
+Proof.
+  intros. apply ascii_neq_bool_neq.
+  rewrite <- ascii_dec_ascii_eq_bool. assumption.
 Qed.
 
 Lemma ascii_eq_bool_neq:
   forall (a1 a2:ascii), a1 <> a2 -> ascii_eq_bool a1 a2 = false.
-intros a1 a2 h. unfold ascii_eq_bool. rewrite ifdec_right; intuition.
+  intros a1 a2 h. unfold ascii_eq_bool. rewrite ifdec_right; intuition.
 Qed.
 
-Definition string_eq_bool (a1 a2:string) : bool :=
+Lemma neq_ascii_dec_bool_neq:
+  forall (a1 a2:ascii), a1 <> a2 -> ascii_dec_bool a1 a2 = false.
+Proof.
+  intros. rewrite ascii_dec_ascii_eq_bool. apply ascii_eq_bool_neq.
+  assumption.
+Qed.
+
+Fixpoint string_eq_bool (a1 a2:string) : bool :=
+  match a1, a2 with
+    | String b bs, String c cs =>
+      (ascii_dec_bool b c) && (string_eq_bool bs cs)
+    | EmptyString, EmptyString => true
+    | _, _ => false
+  end.
+(*** old ***
   ifdec (string_dec a1 a2) true false.
+ *********)
 
 Lemma string_eq_bool_rfl:
   forall (s:string), string_eq_bool s s = true.
-induction s. reflexivity. unfold string_eq_bool. eapply ifdec_left.
-intuition.
+Proof.
+  induction s. reflexivity. cbn. 
+  rewrite ascii_dec_bool_rfl. rewrite IHs. reflexivity.
 Qed.
 Hint Resolve string_eq_bool_rfl.
 
 Lemma string_eq_bool_eq:
   forall (s1 s2:string), string_eq_bool s1 s2 = true -> s1 = s2.
-intros s1 s2 h. case (string_dec s1 s2). intuition.
-intro hs.
-assert (j:string_eq_bool s1 s2 = false).
-apply (ifdec_right (string_dec s1 s2) hs true false).
-rewrite h in j. discriminate.
+Proof.
+  induction s1; destruct s2; intros; try reflexivity; try discriminate.
+  cbn in H.
+  destruct (proj1 (andb_true_iff _ _) H) as [j1 j2].
+  rewrite (IHs1 _ j2).
+  rewrite (ascii_dec_bool_eq _ _ j1). reflexivity.
 Qed.
 
 Lemma string_eq_bool_neq:
   forall (s1 s2:string), s1 <> s2 -> string_eq_bool s1 s2 = false.
-intros s1 s2 h. unfold string_eq_bool. rewrite  ifdec_right; intuition.
+Proof.
+  induction s1; destruct s2; intros; try reflexivity.
+  - elim H. reflexivity.
+  - cbn. apply (proj2 (andb_false_iff _ _)).
+    destruct (string_neq_character H).
+    + left. apply neq_ascii_dec_bool_neq. assumption.
+    + right. apply IHs1. assumption.
 Qed.
 
 Lemma string_neq_bool_neq:
@@ -481,12 +549,3 @@ Defined.
 
 End PP.
 
-
-(***
-Goal
-  forall (A B:Type) (x:option A) (f:A -> B) (b:B),
-    match x with
-      | Some y => Some (f y)
-      | None => None
-    end = Some b -> b = f y.
-***)

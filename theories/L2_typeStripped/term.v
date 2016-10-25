@@ -54,23 +54,33 @@ Ltac isApp :=
 
 
 (** Printing terms in exceptions for debugging purposes **)
+Definition print_name (nm:name) : string :=
+  match nm with
+    | nAnon => "_"
+    | nNamed s => s
+  end.
+Definition print_ind (i:inductive) : string :=
+  match i with
+    | mkInd str n => "[ind " ++ str ++ (nat_to_string n) ++ "]"
+  end.
 Fixpoint print_term (t:Term) : string :=
   match t with
-    | TRel n => " (" ++ (nat_to_string n) ++ ") "
+    | TRel n => "(Rel " ++ (nat_to_string n) ++ ")"
     | TSort _ => " SRT "
     | TProof => " PRF "
-    | TCast _  => " CAST "
-    | TProd _ _ => " PROD "
-    | TLambda _ _ => " LAM "
-    | TLetIn _ _ _ => " LET "
+    | TCast t  => "(CAST " ++ print_term t ++ ")"
+    | TProd nm t => "(PROD "++ (print_name nm) ++ " [" ++ print_term t ++ "])"
+    | TLambda nm t => "(LAM "++ (print_name nm) ++ " [" ++ print_term t ++ "])"
+    | TLetIn nm _ _ => "(LET " ++ (print_name nm) ++ ")"
     | TApp fn arg args =>
-      " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
+      "(" ++ (print_term fn) ++ " @ " ++ (print_term arg) ++ " _ " ++ ")"
     | TConst s => "[" ++ s ++ "]"
     | TAx => " TAx "
-    | TInd _ => " TIND "
-    | TConstruct _ n _ => " (CSTR " ++ (nat_to_string n) ++ ") "
-    | TCase n mch _ =>
-      " (CASE " ++ (nat_to_string (snd (fst n))) ++ " _ " ++ (print_term mch) ++
+    | TInd i => "(TIND " ++ (print_ind i) ++ ")"
+    | TConstruct i n _ =>
+      "(CSTR " ++ (print_ind i) ++ " " ++ (nat_to_string n) ++ ")"
+    | TCase (i, _, _) mch _ =>
+      "(CASE " ++ (print_ind i) ++ " " ++ (print_term mch) ++
                  " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
     | TWrong => "TWrong"

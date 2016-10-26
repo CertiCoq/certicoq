@@ -10,7 +10,7 @@ Require Import Common.RandyPrelude.
 
 Require Import Common.Common.
 
-Definition NVar : Type := @varImplDummyPair.NVar positive Ast.name.
+Definition NVar : Set := (positive * Ast.name).
 
 Global Instance deqnname : Deq name.
 Proof.

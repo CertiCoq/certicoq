@@ -3,14 +3,6 @@
     mutually recursive functions, data constructors, and pattern matching.
  *)
 
-(******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_QuotedCoq" as L1.
-Add LoadPath "../L2_typeStripped" as L2.
-Add LoadPath "../L3_flattenedApp" as L3.
-Add LoadPath "../L4_deBruijn" as L4.
-(******)
-
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
   Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)

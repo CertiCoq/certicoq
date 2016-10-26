@@ -62,73 +62,68 @@ Eval vm_compute in Plus1x.
 Time Quote Recursively Definition p_Plus1x := Plus1x.
 Time Definition P_Plus1x : Program Term :=
   Eval vm_compute in program_Program p_Plus1x.
-Print P_Plus1x.
-Definition P_env := Eval vm_compute in (env P_Plus1x).
-Print P_env.
-Definition P_main := Eval vm_compute in (main P_Plus1x).
-Print P_main. 
-Definition P_ans := Eval vm_compute in (wcbvEval P_env 17 P_main).
+Time Definition P_env := Eval vm_compute in (env P_Plus1x).
+Time Definition P_main := Eval vm_compute in (main P_Plus1x).
+Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
 Print P_ans.
 
 Goal  (** Plus1x doesn't normalize in L2 **)
   WcbvEval P_env P_main prop.
 Proof.
   unfold P_main. eapply wConst. cbn. reflexivity.
-  eapply wAppLam. eapply wConst. cbn.  reflexivity.  (* good here **)
-  apply wLam. admit.
-  eapply wConst. cbn.  reflexivity.
-  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
-  eapply wCons. eapply wConstruct. eapply wNil. admit.
-
-  cbn.
-  eapply wCase. eapply wAppLam.
-  eapply wConst. cbn.  reflexivity.
-  eapply wAppLam. eapply wLam. admit. apply wPrf. admit.
-  cbn. eapply wAppLam. eapply wLam. admit.  apply wPrf. admit.
-
-  cbn.
-  eapply wAppLam. eapply wLam. admit.  apply wPrf. admit.
-
-  cbn.
-  eapply wAppLam. eapply wConst. cbn.  reflexivity.
-  eapply wLam. admit. eapply wProd. admit.
-
-  cbn.
-  eapply wAppLam. eapply wLam. admit.
-  eapply wAppLam. eapply wConst.
-  cbn. reflexivity.  eapply wLam. admit. eapply wInd. admit.
-
-  cbn.
-  eapply wAppLam.  eapply wLam. admit.
-  eapply wConst. cbn. reflexivity.
-  eapply wLam. admit.
-
-  cbn. eapply wProd. admit.
-
-  cbn.
-  eapply wAppLam.  eapply wLam. admit. eapply wProd. admit.
-
-  cbn.
-  eapply wAppLam. eapply wConst. cbn. reflexivity. eapply wLam. admit.
-  eapply wProd. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit.
-  eapply wProd. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit.
-  eapply wProd. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit.
-  eapply wLam. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit. admit.
-  cbn. eapply wLam. admit.
-  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
-  eapply wCons. eapply wConstruct. eapply wNil. admit. cbn.
-  eapply wLam. admit. cbn.
-  
-
-
+  - eapply wAppLam.
+    + eapply wConst. cbn. reflexivity. apply wLam.
+    + eapply wConst. cbn. reflexivity. eapply wAppCong.
+      * eapply wConstruct.
+      * not_isLambda.
+      * not_isFix.
+      * eapply wCons. eapply wConstruct. eapply wNil.
+    + cbn. eapply wCase.
+      * { eapply wAppLam.   (** evaluating the match argument **)
+          - eapply wConst. cbn. reflexivity.
+            + eapply wAppLam.
+              * eapply wLam.
+              * apply wPrf.
+              * { cbn. eapply wAppLam.
+                  - eapply wLam.
+                  - apply wPrf.
+                  - cbn. eapply wAppLam.
+                    + eapply wLam.
+                    + eapply wPrf.
+                    + cbn. eapply wAppLam.
+                      * eapply wConst. cbn. reflexivity. eapply wLam.
+                      * eapply wProd.
+                      * { cbn. eapply wAppLam.
+                          - eapply wLam.
+                          - eapply wAppLam.
+                            + eapply wConst. cbn. reflexivity. eapply wLam.
+                            + eapply wInd.
+                            + cbn. eapply wAppLam.
+                              * eapply wLam.
+                              * eapply wConst. cbn. reflexivity. eapply wLam.
+                              * cbn. eapply wProd.
+                          - cbn. eapply wAppLam.
+                            + eapply wLam.
+                            + eapply wProd.
+                            + cbn. eapply wAppLam.
+                              * eapply wConst. cbn. reflexivity. eapply wLam.
+                              * eapply wProd.
+                              * { cbn. eapply wAppLam. eapply wLam.
+                                  - eapply wProd.
+                                  - cbn. eapply wAppLam. eapply wLam.
+                                    + eapply wProd.
+                                    + cbn. eapply wAppLam. eapply wLam.
+                                      * eapply wLam.
+                                      * { cbn. eapply wAppLam. eapply wLam.
+                                          - eapply wPrf.
+                                          - cbn. eapply wLam. } } } }
+          - eapply wAppCong.
+            + eapply wConstruct.
+            + not_isLambda.
+            + not_isFix.
+            + eapply wCons. eapply wConstruct. eapply wNil.
+          - cbn. eapply wLam. }
+      * cbn.  (** stuck **)
 
 
   

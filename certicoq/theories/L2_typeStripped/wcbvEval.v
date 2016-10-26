@@ -72,7 +72,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
              WcbvEval p (TCase ml mch brs) (TCase ml Mch brs')
 | wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
-| wNil: Crct p 0 prop -> WcbvEvals p tnil tnil
+| wNil: (* Crct p 0 prop -> *) WcbvEvals p tnil tnil
 | wCons: forall t t' ts ts',
            WcbvEval p t t' -> WcbvEvals p ts ts' -> 
            WcbvEvals p (tcons t ts) (tcons t' ts').

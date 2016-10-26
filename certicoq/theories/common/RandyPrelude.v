@@ -445,44 +445,59 @@ Proof.
   assumption.
 Qed.
 
-Fixpoint string_eq_bool (a1 a2:string) : bool :=
+Function string_eq_bool (a1 a2:string) : bool :=
   match a1, a2 with
+    | String b1 (String b2 bs), String c1 (String c2 cs) =>
+      (ascii_dec_bool b1 c1) && (ascii_dec_bool b2 c2) &&
+                             (string_eq_bool bs cs)
     | String b bs, String c cs =>
       (ascii_dec_bool b c) && (string_eq_bool bs cs)
     | EmptyString, EmptyString => true
     | _, _ => false
   end.
-(*** old ***
-  ifdec (string_dec a1 a2) true false.
- *********)
 
 Lemma string_eq_bool_rfl:
   forall (s:string), string_eq_bool s s = true.
 Proof.
-  induction s. reflexivity. cbn. 
-  rewrite ascii_dec_bool_rfl. rewrite IHs. reflexivity.
+  assert (j: forall (s t:string), s = t -> string_eq_bool s t = true). 
+  { intros s t h. 
+    functional induction (string_eq_bool s t); try reflexivity.
+    - myInjection h. rewrite ascii_dec_bool_rfl. rewrite ascii_dec_bool_rfl.
+      rewrite IHb; reflexivity.
+    - myInjection h. rewrite ascii_dec_bool_rfl. rewrite IHb; reflexivity.
+    - destruct _x. elim y. destruct _x; elim y. }
+  intros. apply j. reflexivity.  
 Qed.
 Hint Resolve string_eq_bool_rfl.
 
 Lemma string_eq_bool_eq:
   forall (s1 s2:string), string_eq_bool s1 s2 = true -> s1 = s2.
 Proof.
-  induction s1; destruct s2; intros; try reflexivity; try discriminate.
-  cbn in H.
-  destruct (proj1 (andb_true_iff _ _) H) as [j1 j2].
-  rewrite (IHs1 _ j2).
-  rewrite (ascii_dec_bool_eq _ _ j1). reflexivity.
+  intros s1 s2. functional induction (string_eq_bool s1 s2); intros; auto.
+  - destruct (proj1 (andb_true_iff _ _) H).
+    destruct (proj1 (andb_true_iff _ _) H0).
+    eapply f_equal2. apply (ascii_dec_bool_eq). assumption.
+    eapply f_equal2. apply (ascii_dec_bool_eq). assumption.
+    rewrite IHb. reflexivity. assumption.
+  - destruct (proj1 (andb_true_iff _ _) H).
+    eapply f_equal2. apply (ascii_dec_bool_eq). assumption.
+    rewrite IHb. reflexivity. assumption.
+  - discriminate.
 Qed.
 
 Lemma string_eq_bool_neq:
   forall (s1 s2:string), s1 <> s2 -> string_eq_bool s1 s2 = false.
 Proof.
-  induction s1; destruct s2; intros; try reflexivity.
+  intros s1 s2. functional induction (string_eq_bool s1 s2); intros; auto.
+  - destruct (string_neq_character H).
+    rewrite (neq_ascii_dec_bool_neq H0). reflexivity.
+    destruct (string_neq_character H0).
+    rewrite (neq_ascii_dec_bool_neq H1). rewrite andb_false_r. reflexivity.
+    rewrite IHb. rewrite andb_false_r. reflexivity. assumption.
+  - destruct (string_neq_character H).
+    rewrite (neq_ascii_dec_bool_neq H0). reflexivity.
+    rewrite IHb.  rewrite andb_false_r. reflexivity. assumption.
   - elim H. reflexivity.
-  - cbn. apply (proj2 (andb_false_iff _ _)).
-    destruct (string_neq_character H).
-    + left. apply neq_ascii_dec_bool_neq. assumption.
-    + right. apply IHs1. assumption.
 Qed.
 
 Lemma string_neq_bool_neq:

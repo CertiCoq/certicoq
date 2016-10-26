@@ -134,7 +134,7 @@ Function L1gTerm_Term (t:L1gTerm) : Term :=
     | L1g.compile.TCast _ _ (L1g.compile.TCast _ _ (L1g.compile.TSort SProp)) =>
       TProof
     | L1g.compile.TCast tm ck ty =>
-      TCast (L1gTerm_Term ty) ck (L1gTerm_Term tm)
+      TCast (L1gTerm_Term tm) ck (L1gTerm_Term ty)
     | L1g.compile.TProd nm ty bod =>
       TProd nm (L1gTerm_Term ty) (L1gTerm_Term bod)
     | L1g.compile.TLambda nm ty bod =>

@@ -16,15 +16,6 @@ Require Import Coq.Arith.Arith
 Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program 
 Coq.micromega.Psatz.
 
-
-(*replace in to SquiggleEq and delete here *)
-Fixpoint seq {T:Type} (next: T->T) (start : T) (len : nat) {struct len} : list T :=
-match len with
-| 0 => []
-| S len0 => start :: seq next (next start) len0
-end.
-
-
 Definition dummyind := Ast.mkInd "" 0%nat.
 
 Require Import Common.RandyPrelude.
@@ -32,11 +23,6 @@ Open Scope N_scope.
 
 Require Import ExtLib.Data.Map.FMapPositive.
 
-Definition opExtract {A:Type} (def:A) (oa: option A) : A :=
-match oa with
-| Some name => name
-| None  => def
-end.
  
 
 Definition lookupName (names : pmap Ast.name) (var:N) : Ast.name :=
@@ -48,6 +34,9 @@ pmap_insert (N.succ_pos var) name names.
 
 Definition insertNames (names : pmap Ast.name) (nvars: list (N*Ast.name)): pmap Ast.name :=
 fold_left insertName nvars names.
+
+Require Import SquiggleEq.list.
+Open Scope N_scope.
 
 Definition translateb {NVar : Type} (mkVar : (N * Ast.name) -> NVar) max
 (names: pmap Ast.name) 

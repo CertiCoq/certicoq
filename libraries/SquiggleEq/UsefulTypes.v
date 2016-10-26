@@ -549,4 +549,17 @@ Lemma and_true_r :
   forall t, t # True <=> t.
 Proof. sp; split; sp. Qed.
 
+Definition opExtract {A:Type} (def:A) (oa: option A) : A :=
+match oa with
+| Some name => name
+| None  => def
+end.
+
+Definition isSome {A:Type} (sop : option A) : Prop  := 
+match sop with
+| Some s => True
+| None => False
+end.
+
+
 

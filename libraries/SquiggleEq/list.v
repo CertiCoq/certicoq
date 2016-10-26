@@ -55,6 +55,19 @@ Definition In := 9.
 *)
 
 
+(* Move *)
+Definition listPad {T} (def:T) (l: list T) (n: nat) : list T :=
+l++(repeat def (n-length l)).
+
+Lemma listPad_length  {T} (def:T) (l: list T) (n: nat):
+n <= length (listPad  def l n).
+Proof using.
+  setoid_rewrite app_length.
+  rewrite repeat_length.
+  omega.
+Qed.
+
+SearchAbout NoDup.
 
 Fixpoint ball (l : list bool) : bool :=
   match l with
@@ -2949,32 +2962,186 @@ Qed.
 
 
   Hint Resolve @subset_flat_map_r : subset.
-  
-  (* Move *)
+
+Lemma combine_map_fst2 {A B}: forall la lb,
+  length la <= length lb
+  -> la = map fst (@combine A B la lb).
+Proof.
+  induction la; auto;[].
+  simpl. intros lb Hle.
+  destruct lb;[ inverts Hle |].
+  simpl in *. apply le_S_n in Hle.
+  f_equal; auto.
+Qed.
+
 Lemma combine_map_fst {A B}: forall la lb,
   length la = length lb
   -> la = map fst (@combine A B la lb).
 Proof.
   intros ? ? Hl.
-  change la  with (fst (la, lb)) at 1.
-  apply combine_split in Hl.
-  rewrite <- Hl.
-  rewrite fst_split_as_map.
-  refl.
+  apply combine_map_fst2. rewrite Hl. reflexivity. 
 Qed.
 
+Lemma combine_map_snd2 {A B}: forall lb la,
+  length lb <= length la
+  -> lb = map snd (@combine A B la lb).
+Proof.
+  induction lb; auto;
+  simpl; intros la Hle; try rewrite combine_nil; auto.
+  destruct la;[ inverts Hle |].
+  simpl in *. apply le_S_n in Hle.
+  f_equal; auto.
+Qed.
 
 Lemma combine_map_snd {A B}: forall la lb,
   length la = length lb
   -> lb = map snd (@combine A B la lb).
 Proof.
   intros ? ? Hl.
-  change lb  with (snd (la, lb)) at 1.
-  apply combine_split in Hl.
-  rewrite <- Hl.
-  rewrite snd_split_as_map.
-  refl.
+  apply combine_map_snd2. rewrite Hl. reflexivity. 
 Qed.
+
+
+Fixpoint seq {T:Type} (next: T->T) (start : T) (len : nat) {struct len} : list T :=
+match len with
+| 0 => []
+| S len0 => start :: seq next (next start) len0
+end.
+
+Fixpoint fn {A:Type} (f: A->A) (n:nat) : A -> A :=
+match n with
+| O => id
+| S n' => compose (fn f n') f
+end.
+
+Lemma fn_shift2 {A B:Type} (fa: A->A) (fb : B -> B) (ab : A -> B) :
+(forall a, ab (fa a) = fb (ab a))
+->  forall x start,
+fn fb x (ab start) = ab (fn fa x start).
+Proof using.
+  induction x; auto.
+  simpl. unfold compose. intros.
+  congruence.
+Qed.
+
+
+Lemma fn_shift {A:Type} (f: A->A) : forall x start,
+fn f x (f start) = f (fn f x start).
+Proof using.
+  induction x; auto.
+  simpl. unfold compose. auto.
+Qed.
+
+
+Lemma seq_spec {A:Type} (f: A->A)  :
+  forall (len:nat) (start:A), 
+    (seq f start len) = map (fun n => (fn f n) start) (List.seq 0 len).
+Proof using Type.
+  induction len; intros ?; auto.
+  simpl. f_equal. rewrite <- seq_shift.
+  rewrite map_map. unfold compose. simpl.
+  eauto.
+Qed.
+
+
+Lemma seq_map {A B:Type} (fa: A->A) (fb : B -> B) (ab : A -> B)  :
+(forall a, ab (fa a) = fb (ab a))
+->
+  forall (len:nat) (start:A), 
+    (seq fb (ab start) len) = map ab (seq fa start len).
+Proof using Type.
+  intros.
+  do 2 rewrite seq_spec.
+  rewrite map_map. unfold compose.
+  apply eq_maps.
+  intros ? _.
+  apply fn_shift2. assumption.
+Qed.
+
+Lemma seq_shift {A:Type} (f: A->A)  :
+  forall (len:nat) (start:A), 
+    (seq f (f start) len) = map f (seq f start len).
+Proof using Type.
+  intros.
+  do 2 rewrite seq_spec.
+  rewrite map_map. unfold compose.
+  apply eq_maps.
+  intros ? _.
+  apply fn_shift.
+Qed.
+
+Lemma seq_length A (f:A->A) n x : length (seq f x n) = n.
+Proof using.
+  intros.
+  rewrite seq_spec, map_length, seq_length. refl.
+Qed.
+
+
+Require Import Psatz.
+
+Lemma NoDupInjectiveMap {A B : Type} (f:A->B) :
+injective_fun f
+-> forall l, NoDup l -> NoDup (map f l).
+Proof.
+  intros Hin. induction l; [simpl; constructor |].
+  intros Hnd. inversion Hnd.
+  simpl. constructor; auto.
+  intros Hl.
+  apply in_map_iff in Hl. subst.
+  exrepnd.
+  apply Hin in Hl0.
+  subst. contradiction.
+Qed.
+  
+
+Lemma fn_plusN : forall (n:nat) (m:N), (fn N.succ n) m = ((N.of_nat n) + m)%N.
+Proof using Type.
+  induction n; auto.
+  intros.
+  rewrite Nnat.Nat2N.inj_succ. simpl.
+  unfold compose. simpl.
+  rewrite IHn.
+  lia.
+Qed.
+
+Lemma in_seq_Nplus :   forall len (start n : N),
+   LIn n (seq N.succ start len) <-> (start <= n /\ n < start + N.of_nat len)%N.
+Proof using.
+  intros.
+  rewrite seq_spec.
+  rewrite in_map_iff.
+  setoid_rewrite fn_plusN.
+  setoid_rewrite in_seq.
+  split; intro H.
+- exrepnd. lia.
+- repnd. exists (N.to_nat (n-start)).
+  lia.
+Qed.
+
+Definition maxlp :  (list positive) -> positive  -> positive :=
+  fold_left Pos.max.
+
+Lemma maxlp_le2 : forall  lp p1 p2, 
+  (p1 <= p2 -> maxlp lp p1 <= maxlp lp p2)%positive.
+Proof using.
+  induction lp; auto.
+  intros ? ? Hle. simpl.
+  apply IHlp.
+  apply Pos.max_le_compat_r. assumption.
+Qed.
+
+
+(* using MathClasses, this lemma can be stated more generally *)
+Lemma maxlp_le : forall  x lp p, 
+  (In x (p::lp) -> x <= maxlp lp p)%positive.
+Proof.
+  induction lp; intros ? Hin.
+- apply in_single_iff in Hin. subst. reflexivity.
+- simpl in *. dorn Hin;[| dorn Hin]; subst; auto.
+  + eapply transitivity;[apply IHlp; left; refl | apply maxlp_le2, Pos.le_max_l].
+  + eapply transitivity;[apply IHlp; left; refl | apply maxlp_le2, Pos.le_max_r].
+Qed.
+
 
 Lemma select_map {A B}: forall (f: A->B)  la n a,
   select n la = Some a
@@ -3043,6 +3210,27 @@ Ltac rwsimplAll :=
 Ltac rwsimplC :=
   repeat progress (autorewrite with list core SquiggleEq; simpl).
 
+Lemma disjoint_map {A B} (f:A->B) (l1 l2: list A):
+  disjoint (map f l1) (map f l2)
+  -> disjoint l1 l2.
+Proof using.
+  intros Hd.
+  intros ? Hin.
+  apply (in_map f) in Hin.
+  apply Hd in Hin.
+  intros Hc. apply Hin. apply in_map. assumption.
+Qed.
+
+
+Lemma nodup_map {A B} (f:A->B) (l: list A):
+  NoDup (map f l)
+  -> NoDup l.
+Proof using.
+  induction l;
+  intros Hd;  [ constructor |].
+  inverts Hd as Hin Hinb. constructor; auto.
+  clear Hinb IHl. intros Hc. apply Hin. apply in_map. assumption.
+Qed.
 
 
 

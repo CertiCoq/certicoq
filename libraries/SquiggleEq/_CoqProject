@@ -1,5 +1,6 @@
 -R . Libraries.SquiggleEq
 ./eq_rel.v
+./varImplDummyPair.v
 ./tactics.v
 ./bin_rels.v
 ./export.v

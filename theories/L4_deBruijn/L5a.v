@@ -95,12 +95,6 @@ fold_left gives
 
 
 
-(* Move *)
-Definition getVar (t:CTerm) : option NVar :=
-match t with
-| vterm v => Some v
-| _ => None
-end.
 
 
 Fixpoint translateCPS (c : CTerm) : option cps :=
@@ -164,12 +158,6 @@ match c with
  | _ => None
 end.
 
-(* Move *)
-Definition isSome {A:Type} (sop : option A) : Prop  := 
-match sop with
-| Some s => True
-| None => False
-end.
 
 Require Import SquiggleEq.tactics.
 Require Import SquiggleEq.LibTactics.

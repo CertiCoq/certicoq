@@ -39,7 +39,7 @@ fun p => Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
 Global  Instance failed: 
   CerticoqTranslationCorrect (Program L3.compile.Term) L4Term.
 constructor.
-- admit.
+Focus 2.
 - intros ? ? Hwf He.
   destruct Hwf.
   unfold certiClasses.translate,
@@ -155,6 +155,8 @@ Eval vm_compute in ( (ctranslateTo certiL5 p0L1)).
 Quote Recursively Definition evo := (andb (even 0) (odd 1)).
 Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a evo)).
 Eval vm_compute in (exception_map print5 (ctranslateTo certiL5 evo)).
+
+Check  @cps_cvt_corr.
 
 (*
      = Ret

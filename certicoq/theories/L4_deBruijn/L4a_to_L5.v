@@ -375,7 +375,7 @@ What if we add coinductives? *)
 | eval_Fix_e : forall es n, eval (Fix_e' es n) (Fix_e' es n)
 | eval_FixApp_e : forall e lbt n e2 v2 bt ev2,
     let len := length lbt in
-    let pinds := (seq 0 len) in
+    let pinds := (List.seq 0 len) in
     let sub :=  (map (Fix_e' lbt) pinds) in
     eval e (Fix_e' lbt n) ->
     eval e2 v2 ->
@@ -431,13 +431,14 @@ Proof using.
 Qed.
 
 Local Opaque ssubst.
+Require Import List.
 
 (* will be used in eval_reduces_fvars and cps_cvt_corr *)
 Lemma subset_fvars_fix : forall bt lbt,
 LIn bt lbt ->
 Datatypes.length (get_vars bt) = Datatypes.length lbt ->
 let len := Datatypes.length lbt in
-let pinds := seq 0 len in
+let pinds := List.seq 0 len in
 let sub := map (Fix_e' lbt) pinds in
 subset (free_vars (apply_bterm bt sub)) (flat_map free_vars_bterm lbt).
 Proof using varclass.
@@ -457,7 +458,7 @@ Proof using varclass.
   apply in_combine in Hc2.
   apply proj2 in Hc2.
   apply in_map_iff in Hc2.
-  exrepnd. subst. clear Hc2.
+  exrepnd. subst.
   assumption.
 Qed.
 
@@ -2803,7 +2804,7 @@ Proof using varclass.
 Qed.
 
 
-(* Move to [SquiggleEq] 
+(* 
 Lemma ssubst_aux_var_ren_impl_alpha {A:Type} : 
   forall (f: NTerm -> A),
    (forall a sub, allvars_sub sub -> f (ssubst_aux a sub) = f a)

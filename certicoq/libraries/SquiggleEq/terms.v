@@ -256,6 +256,12 @@ Definition closed (t : @NTerm NVar Opid) := free_vars t = [].
 (* Howe's T_0(L) *)
 Definition isprogram (t : @NTerm NVar Opid) := closed t # nt_wf t.
 
+Definition getVar (t: @NTerm NVar Opid) : option NVar :=
+match t with
+| vterm v => Some v
+| _ => None
+end.
+
 End termsCont.
 
 Fixpoint tmap {V1 V2 O1 O2  :Type} (fv: V1 -> V2) (fo : O1 -> O2) (t : @NTerm V1 O1) 
@@ -317,4 +323,6 @@ match t with
   let pt := tprint spaces fv fo nt in
     flatten [spaces; pv; "." ; pt]
 end.
+
+
 

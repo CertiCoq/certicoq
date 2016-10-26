@@ -12,20 +12,6 @@ Require Import L4.expression.
 Require Import Basics.
 
 
-Fixpoint fn {A:Type} (f: A->A) (n:nat) : A -> A :=
-match n with
-| O => id
-| S n' => compose (fn f n') f
-end.
-
-Lemma fn_shift {A:Type} (f: A->A) : forall x start,
-fn f x (f start) = f (fn f x start).
-Proof using.
-  induction x; auto.
-  simpl. unfold compose. auto.
-Qed.
-
-
 Require Import L4.L4a_to_L5.
 Require Import L4.L4_to_L4a.
 Require Import SquiggleEq.export.
@@ -41,53 +27,8 @@ Require Import SquiggleEq.list.
 
 Open Scope program_scope.
 
-Lemma seq_spec {A:Type} (f: A->A)  :
-  forall (len:nat) (start:A), 
-    (L4_to_L4a.seq f start len) = map (fun n => (fn f n) start) (seq 0 len).
-Proof using Type.
-  induction len; intros ?; auto.
-  simpl. f_equal. rewrite <- seq_shift.
-  rewrite map_map. unfold compose. simpl.
-  eauto.
-Qed.
-
-Lemma seq_shift {A:Type} (f: A->A)  :
-  forall (len:nat) (start:A), 
-    (L4_to_L4a.seq f (f start) len) = map f (L4_to_L4a.seq f start len).
-Proof using Type.
-  intros.
-  do 2 rewrite seq_spec.
-  rewrite map_map. unfold compose.
-  apply eq_maps.
-  intros ? _.
-  apply fn_shift.
-Qed.
-
-Lemma fn_plusN : forall (n:nat) (m:N), (fn N.succ n) m = ((N.of_nat n) + m)%N.
-Proof using Type.
-  induction n; auto.
-  intros. rewrite Nat2N.inj_succ. simpl.
-  unfold compose. simpl.
-  rewrite IHn.
-  lia.
-Qed.
 
 Open Scope N_scope.
-
-Lemma in_seq_Nplus :   ∀ len (start n : N),
-   LIn n (L4_to_L4a.seq N.succ start len) ↔ (start <= n ∧ n < start + N.of_nat len)%N.
-Proof using.
-  intros.
-  rewrite seq_spec.
-  rewrite in_map_iff.
-  setoid_rewrite fn_plusN.
-  setoid_rewrite in_seq.
-  split; intro H.
-- exrepnd. lia.
-- repnd. exists (N.to_nat (n-start)).
-  lia.
-Qed.
-
 
 (* circularity watch: this correctness property cannot go to L4.instances. Should we have
 L4.correctnessInstances for such instances? *)
@@ -456,13 +397,6 @@ Proof using.
   rewrite <- N2Nat.inj_succ.
   rewrite <- N.add_1_l.
   refl.
-Qed.
-
-
-Lemma gseq_length A (f:A->A) n x : length (L4_to_L4a.seq f x n) = n.
-Proof using.
-  intros.
-  rewrite seq_spec, map_length, seq_length. refl.
 Qed.
 
 Hint Rewrite translatef_len translatel_len gseq_length: list.

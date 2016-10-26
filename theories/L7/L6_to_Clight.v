@@ -158,7 +158,7 @@ with max_args_fundefs (fnd : fundefs) :=
        end.
 
 Definition update_iEnv (ienv : iEnv) (p : positive) (cInf : cTyInfo) : iEnv :=
-  let '(t, arity, ord) := cInf in
+  let '(name, t, arity, ord) := cInf in
   match (M.get t ienv) with
   | None => M.set t ((p, arity) :: nil) ienv
   | Some iInf => M.set t ((p, arity) :: iInf) ienv
@@ -213,7 +213,7 @@ Inductive cRep : Type :=
 
 Definition make_cRep (cenv : cEnv) (ct : cTag) : option cRep :=
   p <- M.get ct cenv ;;
-    let '(it , n , r) := p in
+    let '(name, it , n , r) := p in
     let ienv := compute_iEnv cenv in
     l <- M.get it ienv ;;
       match (n =? 0)%N with

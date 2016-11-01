@@ -10,7 +10,7 @@ Require Import ExtLib.Data.Bool.
 Require Libraries.Maps.
 Require Coq.funind.Recdef.
 Import Nnat.
-Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles .
 Require Import Libraries.CpdtTactics Coq.Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
@@ -24,19 +24,19 @@ Require Import Libraries.maps_util.
 Add LoadPath "../L6_PCPS" as L6.
 Require Import L6.cps.
 Require Import L6.ctx.
-Require Import L6.cps_util L6.List_util.
+Require Import L6.cps_util L6.List_util L6.identifiers.
 
 
 Definition var_dec := M.elt_eq.
 
 (* Shallow val for constr and function *)
-Inductive value : Type :=
-| Vconstr: cTag -> list var -> value (* instead of list val *)
-| Vfun :  fTag -> list var -> exp -> value. (* instead of env and full fds *)
+Inductive svalue : Type :=
+| SVconstr: cTag -> list var -> svalue (* instead of list val *)
+| SVfun :  fTag -> list var -> exp -> svalue. (* instead of env and full fds *)
 
 
 (* substitution maps f |-> v where v can stand for a function or a datatype (for projections) *)
-Definition ctx_map := M.t value.
+Definition ctx_map := M.t svalue.
 
 (* renamer maps x |-> a *)
 Definition r_map := M.t var.
@@ -62,7 +62,7 @@ Definition seto {A:Type} (x:var)(oa:option A) (map:M.t A):=
 Notation get_c := (getd 0%nat).
 Notation get_b := (getd false).
 
-
+(* todo: replace with equivalent find_def *)
   Fixpoint get_fun (f:var) (fds:fundefs): option (fTag * list var * exp) :=
     match fds with
       | Fnil => None
@@ -80,7 +80,7 @@ Section MEASURECONTRACT.
   Fixpoint term_size (e: exp) : nat :=
     match e with
       | Econstr _ _ _ e => 1 + term_size e
-      | Ecase _ cl => 1 + (List.fold_right (fun (p:(var * exp)) => fun  (n:nat)  => let (k, e) := p in
+      | Ecase _ cl => 1 + (List.fold_right (fun (p:(cTag * exp)) => fun  (n:nat)  => let (k, e) := p in
                                                                                (n + (term_size e))%nat) 0%nat cl)
       | Eproj _ _ _ _ e => 1 + term_size e
       | Eapp _ _ _ => 1
@@ -95,17 +95,18 @@ Section MEASURECONTRACT.
          end.
 
 
-    Definition value_size (v: value) : nat :=
+
+    Definition svalue_size (v: svalue) : nat :=
     match v with
-    | Vconstr t lv => 0 
-    | Vfun t lv e => term_size e 
+    | SVconstr t lv => 0 
+    | SVfun t lv e => term_size e 
     end.
 
   
   Definition sub_inl_size (sub:ctx_map) (inl:b_map) : nat :=
     M.fold  (fun n => fun f => fun v => 
                                              (if (get_b f inl) then
-                                             0 else value_size v) + n
+                                             0 else svalue_size v) + n
             ) sub 0. 
 
   
@@ -131,7 +132,7 @@ Section MEASURECONTRACT.
 
 
   Definition sub_size (sub: ctx_map) : nat :=
-   (fold1r _ _ (fun v => fun n => (value_size v) + n) sub 0)%nat.
+   (fold1r _ _ (fun v => fun n => (svalue_size v) + n) sub 0)%nat.
 *)
 
 
@@ -157,8 +158,8 @@ Admitted.
       Admitted.
 
    
-    Definition equiv_size : (var * value) -> (var * value) -> Prop :=
-      fun es => fun es' => value_size (snd es) = value_size (snd es').
+    Definition equiv_size : (var * svalue) -> (var * svalue) -> Prop :=
+      fun es => fun es' => svalue_size (snd es) = svalue_size (snd es').
 
     
     Theorem equiv_size_eq: Equivalence equiv_size.
@@ -168,7 +169,7 @@ Admitted.
 
     
     
-    Theorem sub_remove_size: forall x t xs e im sub, M.get x sub = Some (Vfun t xs e) ->
+    Theorem sub_remove_size: forall x t xs e im sub, M.get x sub = Some (SVfun t xs e) ->
                                                      (sub_inl_size sub im  = sub_inl_size sub (M.set x true im) + term_size e )%nat.
       Admitted.
 (*    intros. unfold sub_size. unfold fold1r.  apply elements_remove in H. do 3 destruct H.  rewrite H0. rewrite H.   rewrite SetoidList.fold_right_commutes. apply plus_comm. apply equiv_size_eq. crush. intro. intros. intro. intros. unfold equiv_size in H1. subst. rewrite OrdersEx.Nat_as_OT.add_cancel_r.   assumption.  crush. *)
@@ -185,13 +186,13 @@ Admitted.
 
 
   
-    Theorem sub_set_size: forall v x sub im, (sub_inl_size (M.set x v sub) im  <= value_size v + sub_inl_size sub im)%nat.
+    Theorem sub_set_size: forall v x sub im, (sub_inl_size (M.set x v sub) im  <= svalue_size v + sub_inl_size sub im)%nat.
       Admitted.
       
    
-    Theorem constr_sub_size: forall e v t lv sub im,                                 (term_sub_inl_size (e, M.set v (Vconstr t lv) sub, im) < term_sub_inl_size (Econstr v t lv e, sub, im))%nat.
+    Theorem constr_sub_size: forall e v t lv sub im,                                 (term_sub_inl_size (e, M.set v (SVconstr t lv) sub, im) < term_sub_inl_size (Econstr v t lv e, sub, im))%nat.
     Proof.
-      intros. unfold term_sub_inl_size. simpl. assert ((sub_inl_size (M.set v (Vconstr t lv) sub) im <= value_size (Vconstr t lv)  + sub_inl_size sub im))%nat. apply sub_set_size. simpl in H. omega.
+      intros. unfold term_sub_inl_size. simpl. assert ((sub_inl_size (M.set v (SVconstr t lv) sub) im <= svalue_size (SVconstr t lv)  + sub_inl_size sub im))%nat. apply sub_set_size. simpl in H. omega.
     Qed.      
 
     
@@ -345,7 +346,7 @@ End MEASURECONTRACT.
 
 
   Definition apply_r sigma y :=
-    match (M.get y sigma) with
+    match (Maps.PTree.get y sigma) with
     | Some v => v
     | None => y
     end.
@@ -358,7 +359,47 @@ End MEASURECONTRACT.
   Definition apply_r_case (sigma:r_map) (cl: list (tag*var)) :=
     map (fun k => (fst k, apply_r sigma (snd k))) cl.
  
+  Theorem prop_apply_r: (forall v, forall sub sub', map_get_r _ sub sub' -> apply_r sub v = apply_r sub' v).
+  Proof.
+    intros.
+    unfold apply_r.
+    destruct (M.get v sub) eqn:gvs.
+    rewrite H in gvs. rewrite gvs. auto.
+    rewrite H in gvs. rewrite gvs; auto.
+  Qed.
+  
+  Theorem prop_apply_r_list: (forall l, forall sub sub', map_get_r _ sub sub' -> apply_r_list sub l = apply_r_list sub' l).
+  Proof.
+  induction l; intros.
+  reflexivity.
+  simpl. erewrite IHl; eauto.
+  erewrite prop_apply_r; eauto.
+  Qed.
 
+  
+Theorem apply_r_empty: forall v, apply_r (M.empty var) v = v.
+Proof.
+  intro. unfold apply_r.
+  rewrite M.gempty. auto.
+Qed.
+
+Theorem apply_r_list_empty: forall l, apply_r_list (M.empty var) l = l.
+Proof.
+  induction l; auto.
+  simpl. rewrite IHl. rewrite apply_r_empty. reflexivity.
+Qed.
+
+Fixpoint all_fun_name (fds:fundefs) : list var :=
+  match fds with
+    | Fcons f t ys e fds' => f::(all_fun_name fds')
+    | Fnil => []
+  end.
+
+Fixpoint remove_all (sigma:r_map) (vs:list var) :=
+  match vs with
+    | v::vs' => remove_all (M.remove v sigma) vs'
+    | [] => sigma
+  end.
 
 
        (* could reduce the number of accesses to the c_map by first tallying the number of occ for each var in the list *)
@@ -372,40 +413,42 @@ End MEASURECONTRACT.
 
   
 
-  
+  (* eventually, prove that update_census w/o remove works the same with unique_binding *)
   Fixpoint update_census (sig:r_map) (e:exp) (fun_delta:var -> c_map -> nat) (count:c_map) : c_map :=    
   match e with
     | Econstr x t ys e =>
       let count' := update_census_list sig ys fun_delta count in
-      update_census sig e fun_delta count' 
+      update_census (M.remove x sig) e fun_delta count' 
     | Eprim x f ys e =>
       let count' := update_census_list sig ys fun_delta count in
-      update_census sig e fun_delta count' 
+      update_census (M.remove x sig) e fun_delta count' 
     | Ecase v cl =>
+      let count' := update_census_list sig [v] fun_delta count in
       fold_right (fun (p:(var*exp)) c =>
                     let (k, e) := p in
-                    update_census sig e fun_delta c) count cl
+                    update_census sig e fun_delta c) count' cl
     
     | Eproj v t n y e =>
        let count' := update_census_list sig [y] fun_delta count in
-      update_census sig e fun_delta count' 
+      update_census (M.remove v sig) e fun_delta count' 
     | Efun fl e =>
-      let count' := update_census_f sig fl fun_delta count in
-      update_census sig e fun_delta count' 
+      let fname := all_fun_name fl in
+      let sig' := remove_all sig fname in
+      let count' := update_census_f sig' fl fun_delta count in
+      update_census sig' e fun_delta count' 
     | Eapp f t ys => update_census_list sig (f::ys) fun_delta count
     | Ehalt v => update_census_list sig [v] fun_delta count                                    
   end 
 with update_census_f (sig:r_map) (fds:fundefs) (fun_delta: var -> c_map -> nat) (count:c_map): c_map :=
        match fds with
-         | Fcons v t ys e fds' => let count' := update_census sig e fun_delta count in
+         | Fcons v t ys e fds' => let count' := update_census (remove_all sig ys) e fun_delta count in
                                   update_census_f sig fds' fun_delta count' 
          | Fnil => count
        end
   .
 
   Print c_map.
-  Definition init_census (e:exp) := update_census (M.empty var) e (fun v c =>
-                                                                      get_c v c + 1)%nat (M.empty nat).
+  Definition init_census (e:exp) := update_census (M.empty var) e (fun v c => get_c v c + 1)%nat (M.empty nat).
  Definition dec_census (sig:r_map) (e:exp) (count:c_map) := update_census sig e (fun v c => get_c v c - 1)%nat  count.
  Definition dec_census_list (sig:r_map) (ys:list var) (count:c_map) := update_census_list sig ys (fun v c => get_c v c - 1)%nat count.
 
@@ -431,127 +474,196 @@ with update_census_f (sig:r_map) (fds:fundefs) (fun_delta: var -> c_map -> nat) 
    | _, _ => count
    end.
  
-Section REWRITE.
+
+ Section RENAME.
 
 
 
-  Fixpoint remove_all (sigma:r_map) (vs:list var) :=
-    match vs with
-    | v::vs' => remove_all (M.remove v sigma) vs'
-    | [] => sigma
-    end.
-  
-  Fixpoint all_fun_name (fds:fundefs) : list var :=
-    match fds with
-    | Fcons f t ys e fds' => f::(all_fun_name fds')
-    | Fnil => []
-    end.
-
-  Definition rename_init (vp: list (var * var)): r_map :=
-    fold_right (fun xv sigma => M.set (fst xv) (snd xv) sigma ) (M.empty var) vp.
+Definition rename_init (vp: list (var * var)): r_map :=
+  fold_right (fun xv sigma => M.set (fst xv) (snd xv) sigma ) (M.empty var) vp.
 
 
-  
-  Fixpoint rename_all (sigma:r_map) (e:exp) : exp :=
-    match e with
+   
+
+   Fixpoint rename_all (sigma:r_map) (e:exp) : exp :=
+  match e with
     | Econstr x t ys e' => Econstr x t (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
     | Eprim x f ys e' => Eprim x f (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
     | Eproj v t n y e' => Eproj v t n (apply_r sigma y) (rename_all (M.remove v sigma) e')
     | Ecase v cl =>
       Ecase (apply_r sigma v) (List.map (fun (p:var*exp) => let (k, e) := p in
-                                               (k, rename_all sigma e)) cl)
+                                                            (k, rename_all sigma e)) cl)
     | Efun fl e' =>
       let fs := all_fun_name fl in
       let fl' := rename_all_fun (remove_all sigma fs) fl in
-
+      
       Efun fl' (rename_all (remove_all sigma fs) e')
     | Eapp f t ys =>
       Eapp (apply_r sigma f) t (apply_r_list sigma ys)
     | Ehalt v => Ehalt (apply_r sigma v)       
     end
-  with rename_all_fun (sigma:r_map) (fds:fundefs): fundefs :=
-         match fds with
+with rename_all_fun (sigma:r_map) (fds:fundefs): fundefs :=
+       match fds with
          | Fnil => Fnil
          | Fcons v' t ys e fds' => Fcons v' t ys (rename_all (remove_all sigma ys) e) (rename_all_fun sigma fds')
-         end.
+       end.
 
-  Definition rename (y x:var) (e:exp) : exp :=
-    rename_all (M.set x y (M.empty (var))) e.
+   Theorem rename_all_fun_name: forall rho fds,
+                            Same_set _ (name_in_fundefs (rename_all_fun rho fds)) (name_in_fundefs fds).
+Proof.
+  induction fds.
+  - simpl. eauto with Ensembles_DB.
+  - reflexivity.
+Qed.
 
-  
-  Inductive split_fds: fundefs -> fundefs -> fundefs -> Prop :=
-  | Left_f: forall lfds rfds lrfds v t ys e,  split_fds lfds rfds lrfds -> split_fds (Fcons v t ys e lfds) rfds (Fcons v t ys e lrfds)
-  | Right_f: forall lfds rfds lrfds v t ys e, split_fds lfds rfds lrfds -> split_fds lfds (Fcons v t ys e rfds) (Fcons v t ys e lrfds)
-  | End_f: split_fds Fnil Fnil Fnil.
+
+ Theorem prop_remove_all: forall l, forall sub sub', map_get_r _ sub sub' -> map_get_r _ (remove_all sub l) (remove_all sub' l). 
+ Proof.
+   induction l; intros.
+   auto.
+   simpl. apply IHl. apply proper_remove. auto.
+ Qed.
+ 
 
 
-  (* rewrite rules that 
-    (1) produces a smaller exp
-    (2) preserves the unique binding invariant 
+Theorem prop_rename_all: (forall e, forall sub sub', map_get_r _ sub sub' -> rename_all sub e = rename_all sub' e) /\
+                                                                    (forall fds, forall sub sub', map_get_r _ sub sub' -> rename_all_fun sub fds = rename_all_fun sub' fds) .
+Proof.
+  apply exp_def_mutual_ind; intros; simpl.
+  - erewrite prop_apply_r_list; eauto. erewrite H; eauto. apply proper_remove; auto.
+  - erewrite prop_apply_r; eauto.
+  - erewrite H; eauto.
+    erewrite prop_apply_r; eauto.
+    apply H0 in H1. simpl in H1. inversion H1; subst. reflexivity.
+  - erewrite prop_apply_r; eauto. erewrite H; eauto. apply proper_remove; auto.
+  - erewrite H0; eauto. erewrite H; eauto.
+    apply prop_remove_all; auto.
+    apply prop_remove_all; auto.
+  - erewrite prop_apply_r; eauto. erewrite prop_apply_r_list; eauto.
+  - erewrite prop_apply_r_list; eauto. erewrite H; eauto. apply proper_remove; auto.
+  - erewrite prop_apply_r; eauto.
+  - erewrite H; eauto. erewrite H0; eauto. apply prop_remove_all; auto.
+  - reflexivity.
+Qed.
 
-  Fun_split separates a group of mutually recursive functions lrf into two (lf and rf) where the functions bound in rf do not appear in lf 
-     Fun_inline replaces one occurence on f by its definition
-     Fun_dead removes the definition of a set of functions if none of them occur in the rest of the program
-     Constr_dead removes the binding of a datatype when it doesn't appear in the rest of the program 
-     Constr_proj replaces a binding by the nth projection of a datatype when the datatype is known (in ctx) 
-     Constr_case reduces a pattern match into an application of the right continuation on the datatype when the datatype is know (in ctx)
 
-   
 
-  Inductive rw: relation exp :=
-  | Fun_split: forall lf rf lrf e,
-      split_fds lf rf lrf ->    
-      Forall (fun v => num_occur_fds rf v 0) (all_fun_name lf) ->
-      rw (Efun lrf e) (Efun lf (Efun rf e))
-  | Fun_dead: forall e fds,
-                Forall (fun v => num_occur e v 0) (all_fun_name fds) ->
-                rw (Efun fds e) e
-  | Constr_dead: forall x t c ys e, 
-      num_occur e x 0 ->
-      rw (Econstr x t c ys e) e
-  | Constr_proj: forall v  t t' n x e k ys c c' c'e c'e', 
-      app_ctx c' (Eproj v t' n x e) c'e ->
-      nthN ys n = Some k -> 
-      app_ctx c' (rename k x e) c'e' -> 
-      rw (Econstr x t c ys c'e) (Econstr x t c ys c'e')
-  | Constr_case: forall x c' c'e cl co e y c'e' ys t,
-      app_ctx c' (Ecase y cl) c'e ->
-      findtag cl co = Some e ->
-      app_ctx c' e c'e' -> 
-      rw (Econstr x t co ys c'e) (Econstr x t co ys c'e')
-  | Fun_inline: forall c'  vs c'e f  t xs fb c'e' fds,
-                  app_ctx c' (Eapp f t vs) c'e ->
-                  num_occur_ec c' f 0 -> 
-      get_fun f fds = Some (t, xs, fb) ->
-      app_ctx c' (rename_all (set_list (combine xs vs) (M.empty var)) fb) c'e' ->
-      rw (Efun fds c'e) (Efun fds c'e')        
-  .
-         
+
+SearchAbout apply_r M.empty.
+
+
+
+Theorem remove_all_empty: forall l, map_get_r _ (remove_all (M.empty var) l)  (M.empty var).
+Proof.
+  induction l; intros; simpl; auto.
+  apply smg_refl.
+  assert (map_get_r _ (remove_all (M.remove a (M.empty var)) l) (remove_all (M.empty var) l)).
+  apply prop_remove_all.
+  apply remove_empty.
+  eapply smg_trans.
+  apply H. auto.
+Qed.
+
+Theorem remove_all_in: forall x z l rho,
+                         List.In x l ->
+                         map_get_r _ (remove_all (M.set x z rho) l) (remove_all rho l).
+Proof.
+  induction l; intros; simpl; auto.
+  inversion H.
+  simpl in H.
+  destruct (var_dec x a).
+  subst.
+  assert (map_get_r _  (remove_all (M.remove a rho) l) (remove_all (M.remove a (M.set a z rho)) l)).
+  apply smg_sym.
+  apply prop_remove_all.
+  apply remove_set_1.
+  eapply smg_trans; eauto.
+  apply smg_sym.
+  eauto.
+  apply smg_refl.
+  destruct H.
+  exfalso; auto.
+  eapply IHl with (rho := M.remove a rho) in H.
+  eapply smg_trans; eauto.
+  apply prop_remove_all.
+  apply remove_set_2; auto.
+Qed.
+
+
+Theorem remove_all_not_in: forall x z l rho,
+                         ~ (List.In x l) ->
+                         map_get_r _ (remove_all (M.set x z rho) l) (M.set x z (remove_all rho l)).
+Proof.
+  induction l; intros; simpl.
+  apply smg_refl.
+  eapply smg_trans.
+  Focus 2.
+  eapply IHl.
+  intro.
+  apply H. constructor 2; auto.
+  apply prop_remove_all.
+  apply remove_set_2.
+  intro.
+  apply H.
+  constructor 1. auto.
+ Qed. 
+
+Theorem rename_all_empty: (forall e,
+                             e = rename_all (M.empty var) e) /\
+                          (forall fds, fds = rename_all_fun (M.empty var) fds).
+Proof.
+  apply exp_def_mutual_ind; intros; simpl.
+  - rewrite apply_r_list_empty.
+    replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
+    rewrite H at 1.    
+    apply prop_rename_all.
+    apply smg_sym.
+    apply remove_empty.
+  - rewrite apply_r_empty.  reflexivity.
+  - rewrite apply_r_empty. rewrite <- H. simpl in H0. inversion H0.
+    rewrite <- H3. rewrite <- H3. reflexivity.
+  - rewrite apply_r_empty.    
+    replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
+    rewrite H at 1.
+    apply prop_rename_all.
+    apply smg_sym.
+    apply remove_empty.
+  - replace (rename_all (remove_all (M.empty var) (all_fun_name f2)) e) with e.
+    replace (rename_all_fun (remove_all (M.empty var) (all_fun_name f2)) f2) with f2; auto.
+    rewrite H at 1.
+    eapply prop_rename_all.
+    apply smg_sym.
+    apply remove_all_empty.
+    rewrite H0 at 1.
+    eapply prop_rename_all.
+    apply smg_sym.
+    apply remove_all_empty.
+  - rewrite apply_r_empty.
+    rewrite apply_r_list_empty. auto.
+  - rewrite apply_r_list_empty. 
+    replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
+    rewrite H at 1.
+    apply prop_rename_all.
+    apply smg_sym.
+    apply remove_empty.
+  -     rewrite apply_r_empty. auto.
+  - rewrite <- H0.
+    replace (rename_all (remove_all (M.empty var) l) e) with e.
+    reflexivity.
+    rewrite H at 1.
+    eapply prop_rename_all.
+    apply smg_sym.
+    apply remove_all_empty.
+  - auto.
+Qed.
     
-  Fixpoint collect_funvals (fds:fundefs)  : list (var * value) :=
-    match fds with
-    | Fnil => []
-    | Fcons v t ys e fds' => ( v, (Vfun t ys e))::(collect_funvals fds')
-    end.
-         
-  
-  Inductive gen_rw : relation exp :=
-  | Ctx_rw : forall c e e' ce ce',
-     rw e e' ->
-     app_ctx c e ce ->
-     app_ctx c e' ce' ->
-     gen_rw ce ce'
-  .
+Definition rename y x e := 
+  rename_all (M.set x y (M.empty var)) e.
 
 
-  Definition gr_clos := clos_refl_trans exp gen_rw.
-
-
-
-*) 
- End REWRITE.
-
-
+Transparent rename.
+End RENAME.         
+ 
 Section CONTRACT.
 
 
@@ -565,7 +677,7 @@ Section CONTRACT.
           | _ =>
             let (fc', sub') := precontractfun sig count sub fds' in
             let (fds'', count') := fc' in
-            (Fcons f t ys e fds'', count', (M.set f (Vfun t ys e) sub'))
+            (Fcons f t ys e fds'', count', (M.set f (SVfun t ys e) sub'))
         end            
       | Fnil => (Fnil, count, sub)
     end.
@@ -573,17 +685,17 @@ Section CONTRACT.
 
   Theorem set_none_size: forall x sub im val, 
     M.get x sub = None ->
-    (sub_inl_size (M.set x val sub) im =  value_size val + sub_inl_size sub im)%nat.
+    (sub_inl_size (M.set x val sub) im =  svalue_size val + sub_inl_size sub im)%nat.
     Admitted.
 
   Theorem set_some_size: forall x sub im val val',
                            M.get x sub = Some val' ->
-                           (sub_inl_size (M.set x val sub) im + value_size val' = sub_inl_size sub im + value_size val)%nat.
+                           (sub_inl_size (M.set x val sub) im + svalue_size val' = sub_inl_size sub im + svalue_size val)%nat.
   Admitted.
 
   
-  Theorem set_value_size : forall x val sub im,
-                             (sub_inl_size (M.set x val sub) im <= sub_inl_size sub im + value_size val)%nat.
+  Theorem set_svalue_size : forall x val sub im,
+                             (sub_inl_size (M.set x val sub) im <= sub_inl_size sub im + svalue_size val)%nat.
   Proof.    
     intros; destruct (M.get x sub) eqn:gxs.
     - apply set_some_size with (val := val) (im:=im) in gxs. omega. 
@@ -596,12 +708,12 @@ Qed.
     induction fds; intros; simpl in H.    
     - destruct (get_c v count) eqn: gcvc.
       + specialize (IHfds _ _ _ _ _ _ H im). simpl. omega.
-      +  assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds). destruct (precontractfun sig count sub fds). destruct p. eauto. destructAll. assert (H0' := H0). specialize (IHfds _ _ _ _ _ _ H0 im).  rewrite <- H0' in H. inversion H; subst. simpl. split. eapply le_trans. apply set_value_size.  simpl. omega. omega.
+      +  assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds). destruct (precontractfun sig count sub fds). destruct p. eauto. destructAll. assert (H0' := H0). specialize (IHfds _ _ _ _ _ _ H0 im).  rewrite <- H0' in H. inversion H; subst. simpl. split. eapply le_trans. apply set_svalue_size.  simpl. omega. omega.
     -  inversion H; subst. simpl. omega.
 Qed.  
 
   Definition sublist {A:Type} (l:list A) (l':list A): Prop :=
-    forall x, In x l -> In x l'.
+    forall x, List.In x l -> List.In x l'.
   
   Definition subcl_e: list (var*exp) -> exp -> Prop :=
     fun cl' e =>
@@ -711,7 +823,7 @@ Qed.
             let count' := dec_census_list sig ys count in 
             contract sig count' (e, sub, im )   
           | _ =>
-            match contract sig count (e, (M.set x (Vconstr t ys) sub), im ) with
+            match contract sig count (e, (M.set x (SVconstr t ys) sub), im ) with
               | existT _  (e', count', im') bp =>
                 (match (get_c x count') with
                    | 0%nat =>
@@ -726,7 +838,7 @@ Qed.
       | (Eproj v t n y e, sub, im)  =>
         let y' := apply_r sig y in
         match (M.get y' sub) with
-          | Some (Vconstr t ys) =>
+          | Some (SVconstr t ys) =>
             (match (nthN ys n) with
                | Some yn =>
                  let yn' := apply_r sig yn in
@@ -754,7 +866,7 @@ Qed.
       | (Ecase v cl, sub, im) =>
         let v' := apply_r sig v in
         (match (M.get v' sub) with
-           | Some (Vconstr t lv) =>
+           | Some (SVconstr t lv) =>
              (match findtag cl t with
                 | Some k =>
                   (* decrease count of each (sig e') other than k *)
@@ -800,7 +912,7 @@ Qed.
         let ys' := apply_r_list sig ys in
         (match get_c f' count with
         | 1%nat => (match (M.get f' sub) with
-                      | Some (Vfun t xs m)  =>
+                      | Some (SVfun t xs m)  =>
                             let im' := M.set f' true im in
                             (* update counts of ys' and xs after setting f' to 0 *)
                             let count' := update_count_inlined ys' xs (M.set f' 0 count) in
@@ -850,7 +962,7 @@ End CONTRACT.
 
 Definition shrink_top (e:exp) : exp :=
   let count := init_census e in
-  match (contract (M.empty var) count (e, (M.empty value), (M.empty bool))) with
+  match (contract (M.empty var) count (e, (M.empty svalue), (M.empty bool))) with
     | existT _ (e', _, _) _ => e'
   end.
 

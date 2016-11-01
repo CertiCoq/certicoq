@@ -12,6 +12,8 @@ Require Import Common.Common.
 
 Require Import Coq.Unicode.Utf8.
 
+Require Import ZArith.
+Require Import uncurry shrink_cps closure_conversion hoisting L6_to_Clight.
 
 
 
@@ -57,6 +59,12 @@ Add LoadPath "../" as Top.
 
  *)
 
+Open Scope positive_scope.
+
+Definition bogus_cTag := 1000%positive.
+Definition bogus_iTag := 2000%positive.
+Definition bogus_cloTag := 1500%positive.
+Definition bogus_cloiTag := 1501%positive.
 
 Instance certiL5a_t0_L6: 
   CerticoqTotalTranslation (cTerm certiL5a) (cTerm certiL6) := 
@@ -64,7 +72,13 @@ Instance certiL5a_t0_L6:
     match v with
         | pair venv vt => 
           let '(cenv, nenv, t) := convert_top (venv, L5a.Halt_c vt) in
-          ((M.empty _ , cenv, M.empty _, nenv), shrink_top  t)
+          let '(cenv',nenv', t') := closure_conversion_hoist
+                                   bogus_cloTag
+                                   (shrink_top t)
+                                   bogus_cTag
+                                   bogus_iTag
+                                   cenv nenv in
+          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), M.empty _, nenv'), shrink_top  t')
     end.
 
 

@@ -6,21 +6,19 @@ Require Export L6.instances.
 Set Template Cast Propositions.
 Quote Recursively Definition p := (3 + 4).
 
+
 Open Scope Z_scope.
 Require Import ZArith.
 (* Print Instances CerticoqLanguage. *)
 
-Print Instances CerticoqTranslation.
-Print Instances CerticoqTotalTranslation.
-Print Instances CerticoqLanguage.
-
 Require Import Common.Common.
+Require Import String.
+Open Scope string_scope.
+
 Eval compute in (ctranslateTo certiL4 p).
 
 Time Eval compute in (ctranslateTo certiL5a p).
 
-Require Import String.
-Open Scope string_scope.
 
 Eval compute in (cTerm certiL6).
 Eval compute in (ctranslateTo certiL6 p).
@@ -41,7 +39,7 @@ match p with
 (x,y) => (y,x)
 end).
 
-Open Scope string_scope.
+
 
 Ltac computeExtract certiL4 f:=
 (let t:= eval compute in (translateTo (cTerm certiL4) f) in 
@@ -65,7 +63,7 @@ Quote Recursively Definition prev := (fun x =>
  match x with
  | 0 => 0
 | S n => n
-end).
+end)%nat.
 
 (*
 Local Opaque L4a_to_L5.Match_e.
@@ -148,7 +146,6 @@ match t with
 |Ret ?xx => exact xx
 end).
 Defined.
-
 Require Import List.
 Import ListNotations.
 
@@ -172,14 +169,6 @@ Eval compute in pgcd4astr.
 
 
 
-
-Require Import uncurry shrink_cps closure_conversion hoisting L6_to_Clight.
-
-Definition uncurry_L6 := (fun x => match uncurry x with
-                                        | None => x
-                                        | Some y => y
-                                        end).
-
 Definition p6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) p) in 
 match t with
@@ -187,30 +176,11 @@ match t with
 end).
 Defined.
 
+Require Import L6_to_Clight.
 
-Definition bogus_cTag := 1000%positive.
-Definition bogus_iTag := 2000%positive.
-Definition bogus_cloTag := 1500%positive.
-Definition bogus_cloiTag := 1501%positive.
-
-Definition L6_translation' (t : cTerm certiL6) : cps.cEnv * cps.exp :=
-  let '(env, prog) := t in
-  let '(x, cenv, y, nenv) := env in
-  closure_conversion_hoist'
-    bogus_cloTag
-    (shrink_top prog)
-    bogus_cTag
-    bogus_iTag
-    cenv nenv.
-
-Definition add_clo := L6.cps.add_cloTag bogus_cloTag bogus_cloiTag.
-
-Definition L6_translation (t : cTerm certiL6) : cps.cEnv * cps.exp :=
-  let '(cenv, prog) := L6_translation' t in
-  (add_clo cenv, prog).
 
 Definition compile_L6 (t : cTerm certiL6) : Clight.program :=
-  let '(cenv, prog) := (L6_translation t) in
+  let '((_, cenv, _, _), prog) := t in
   stripNameState (stripOption (compile prog cenv)).
 
 
@@ -218,10 +188,27 @@ Require Import Maps.
 
 Open Scope positive_scope.
 
-Definition p6' := Eval vm_compute in (L6_translation p6).
 Definition p7 := compile_L6 p6.
 
+Require Import L6.cps_show.
 
+Definition show_exn {A:Type} (x : exceptionMonad.exception (cTerm certiL6)) : string :=
+  match x with
+  | exceptionMonad.Exc s => s
+  | exceptionMonad.Ret ((p,cenv,g, nenv), e) => show_exp nenv cenv e
+  end.
+
+Eval compute in (show_exn (Ret p6)).
+
+Quote Recursively Definition test_fun := (fun x : nat => (x + 4)%nat).
+Definition test_fun6 : cTerm certiL6.
+(let t:= eval vm_compute in (translateTo (cTerm certiL6) test_fun) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
+(*
 Definition swap6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) swap) in 
 match t with
@@ -230,6 +217,7 @@ end).
 Defined.
 
 Definition swap7 := compile_L6 swap6.
+*)
 
 Quote Recursively Definition three := 3.
 
@@ -240,7 +228,6 @@ match t with
 end).
 Defined.
 
-Definition three6' := Eval vm_compute in (L6_translation three6).
 Definition three7 := compile_L6 three6.
 
 
@@ -261,8 +248,6 @@ match t with
 |Ret ?xx => exact xx
 end).
 Defined.
-
-Definition cpsTerm6' := Eval vm_compute in (L6_translation cpsTerm6).
 Definition cpsTerm7 := compile_L6 cpsTerm6.
 
 (*
@@ -323,7 +308,7 @@ Definition comp_fEnv7 := compile_L6 comp_fEnv6.
 
 Require Import runtime.runtime.
 
-Definition test := L6_to_Clight.print_Clight_dest p7 "threePlusFour.c".
+Definition test := L6_to_Clight.print_Clight_dest p7 "output/threePlusFour.c".
 
 Definition test2 := L6_to_Clight.print_Clight_dest runtime.runtime.prog "gc.c".
 

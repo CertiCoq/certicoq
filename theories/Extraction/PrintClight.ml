@@ -126,11 +126,11 @@ let rec print_stmt p s =
   | Sset(id, e2) ->
       fprintf p "@[<hv 2>%s =@ %a;@]" (temp_name id) print_expr e2
   | Scall(None, e1, el) ->
-      fprintf p "@[<hv 2>%a@,(@[<hov 0>%a@]);@]"
+      fprintf p "@[<hv 2>(%a@,)(@[<hov 0>%a@]);@]"
                 print_expr e1
                 print_expr_list (true, el)
   | Scall(Some id, e1, el) ->
-      fprintf p "@[<hv 2>%s =@ %a@,(@[<hov 0>%a@]);@]"
+      fprintf p "@[<hv 2>%s =@ (%a@,)(@[<hov 0>%a@]);@]"
                 (temp_name id)
                 print_expr e1
                 print_expr_list (true, el)

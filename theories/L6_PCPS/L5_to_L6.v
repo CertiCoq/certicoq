@@ -365,7 +365,7 @@ Definition convert_env (g:ienv): (iEnv*cEnv * conId_map) := convert_env' g (M.em
 
 Definition convert_top (ee:ienv*cps) : (cEnv*nEnv*exp) :=
   let '(_, cG, dcm) := convert_env (fst ee) in 
-  let '(er, n, tgm) := convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (3%positive) in
+  let '(er, n, tgm) := convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (4000%positive) in
   let '(_, _, nM) := tgm in
   (cG, nM, er).
 

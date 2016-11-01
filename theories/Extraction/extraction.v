@@ -1,5 +1,6 @@
 Require compcert.common.AST
         compcert.common.Errors
+        compcert.common.Values
         compcert.lib.Integers
         compcert.lib.Maps
         compcert.cfrontend.Cop
@@ -11,8 +12,8 @@ Require compcert.common.AST
         compcert.common.Globalenvs
         Int31.
 
-Require L5_to_L6
-        L6_to_Clight
+Require L6.L5_to_L6
+        L7.L6_to_Clight
         allInstances.
 
 (* Standard lib *)
@@ -41,6 +42,7 @@ Extract Constant L6_to_Clight.bodyIdent => "Camlcoq.P.of_int 121".
 Extract Constant L6_to_Clight.threadInfIdent => "Camlcoq.P.of_int 31".
 Extract Constant L6_to_Clight.tinfIdent => "Camlcoq.P.of_int 120".
 Extract Constant L6_to_Clight.heapInfIdent => "Camlcoq.P.of_int 30".
+Extract Constant L6_to_Clight.numArgsIdent => "Camlcoq.P.of_int 1300".
 (* Int31 *)
 Extract Inductive Int31.digits => "bool" [ "false" "true" ].
 Extract Inductive Int31.int31 => "int" [ "Camlcoq.Int31.constr" ] "Camlcoq.Int31.destr".
@@ -51,7 +53,7 @@ Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1".
 
 (* Avoid name clashes *)
-Extraction Blacklist List String Int.
+Extraction Blacklist List String Int Ast.
 
 (* Cutting the dependency to R. *)
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
@@ -63,14 +65,11 @@ Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 Cd "Extraction".
 
 Separate Extraction
-   Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
-   Csyntax.Eindex Csyntax.Epreincr Csyntax.type_of_function
-   Ctypes.make_program
-   AST.signature_main
-   Floats.Float32.from_parsed Floats.Float.from_parsed
-   Floats.Float32.of_bits Floats.Float.of_bits
-   Floats.Float32.to_bits Floats.Float.to_bits
-   Globalenvs.Senv.invert_symbol
-   L6_to_Clight.print_test
-   allInstances.test
-   allInstances.test2.
+         Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
+         Csyntax
+         Ctypes.make_program
+         AST.signature_main
+         Floats.Float32.from_parsed Floats.Float.from_parsed
+         Floats.Float32.of_bits Floats.Float.of_bits
+         Floats.Float32.to_bits Floats.Float.to_bits
+         allInstances.test.

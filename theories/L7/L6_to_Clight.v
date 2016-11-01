@@ -34,6 +34,8 @@ Variable (threadInfIdent : ident).
 Variable (tinfIdent : ident).
 Variable (heapInfIdent : ident).
 
+Variable (numArgsIdent : ident).
+
 (* temporary function to get something working *)
 Fixpoint makeArgList (vs : list positive) : list N :=
   match vs with
@@ -422,7 +424,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.tree posi
         ret (asgn ; 
                call ([funTy] (var x)))
   | Eprim x p vs e => None
-  | Ehalt x => Some (Sreturn (Some (var x)))
+  | Ehalt x => ret Sskip
   end.
 
 Definition mkFun (vs : list positive) (body : statement) : function :=
@@ -590,20 +592,20 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) :
            | None => ret None
            end.
 
-(*
+
 Require Import Clightdefs.
 
 Definition composites : list composite_definition :=
 (Composite threadInfIdent Struct
    ((argsIdent, (tptr tint)) :: (numArgsIdent, tint) :: (allocIdent, (tptr (tptr tint))) ::
-    (limitIdent, (tptr (tptr tint))) :: (heapIdent, (tptr (Tstruct heapInfIdent noattr))) ::
+    (limitIdent, (tptr (tptr tint))) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
     nil)
    noattr :: nil).
-*)
+
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
            (main : ident) : option Clight.program :=
-  let res := Ctypes.make_program nil defs (bodyIdent :: nil) main in
+  let res := Ctypes.make_program composites defs (bodyIdent :: nil) main in
   match res with
   | Error e => None
   | OK p => Some p

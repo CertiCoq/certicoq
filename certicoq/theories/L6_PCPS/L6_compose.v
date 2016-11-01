@@ -148,8 +148,10 @@ Section L6_trans.
         destruct v1; simpl in *; try contradiction.        
         constructor.
       - destruct v2; simpl in *; try contradiction. subst. constructor.
-    Qed.    
+    Qed.
 
+    Check closure_conversion_hoist.
+    
     (** Top level correctness property of closure conversion and hoisting for closed terms *)
     Corollary closure_conversion_hoist_correct k e ctag itag nmap :
       (* [e] is closed *)
@@ -159,7 +161,8 @@ Section L6_trans.
       (* Then [e] and its translation are related by the logical relation *)
       cc_approx_exp pr cenv clo_tag k
                     (e, M.empty val)
-                    (closure_conversion_hoist clo_tag e ctag itag cenv nmap, M.empty val).
+                    (snd (fst (closure_conversion_hoist clo_tag e ctag itag cenv nmap, M.empty val)),
+                     snd (closure_conversion_hoist clo_tag e ctag itag cenv nmap, M.empty val)).
     Proof with now eauto with Ensembles_DB.
       intros Hclo Hun.
       unfold closure_conversion_hoist. 

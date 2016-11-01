@@ -475,23 +475,14 @@ Section CC.
            | Fnil => ret Fnil
          end.
 
-  Definition closure_conversion_hoist (e : exp) ctag itag cenv nmap : exp :=
-    let Γ := ((max_var e 1%positive) + 1)%positive in
-    let next := (Γ + 1)%positive in
-    let state := mkCont next ctag itag cenv nmap in
-    let '(e, f, s) := runState
-                        (exp_closure_conv e (Maps.PTree.empty VarInfo) 1%positive Γ)
-                        state in
-    exp_hoist (f e).
-  
-    Definition closure_conversion_hoist' (e : exp) ctag itag cenv' nmap : cEnv * exp :=
+  Definition closure_conversion_hoist (e : exp) ctag itag cenv' nmap : cEnv * M.t Ast.name * exp :=
     let Γ := ((max_var e 1%positive) + 1)%positive in
     let next := (Γ + 1)%positive in
     let state := mkCont next ctag itag cenv' nmap in
     let '(e, f, s) := runState
                         (exp_closure_conv e (Maps.PTree.empty VarInfo) 1%positive Γ)
                         state in
-    (s.(cenv), exp_hoist (f e)).
+    (s.(cenv), s.(name_env), exp_hoist (f e)).
 
   Definition populate_map (l : list (var * val)) map  :=
     fold_left (fun map x => M.set (fst x) BoundVar map) l map.

@@ -27,7 +27,6 @@ Section Sec_environ.
 Variable p:environ Term.
   
 Inductive WNorm: Term -> Prop :=
-| WNPrf: WNorm TProof
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)

@@ -437,9 +437,9 @@ Qed.
   
   
 Lemma strip_presWFTrm:
-  (forall t n, L2.term.WFTrm t n -> WFTrm (strip t) n) /\
-  (forall ts n, L2.term.WFTrms ts n -> WFTrms (strips ts) n) /\
-  (forall ds n, L2.term.WFTrmDs ds n -> WFTrmDs (stripDs ds) n).
+  (forall t n, L2_5.term.WFTrm t n -> WFTrm (strip t) n) /\
+  (forall ts n, L2_5.term.WFTrms ts n -> WFTrms (strips ts) n) /\
+  (forall ds n, L2_5.term.WFTrmDs ds n -> WFTrmDs (stripDs ds) n).
 Proof.
 Admitted.
 (********************

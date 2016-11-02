@@ -51,6 +51,7 @@ Inductive awndEval : Term -> Term -> Prop :=
           awndEval (TApp (TFix dts m) arg args)
                    (pre_whFixStep x dts (tcons arg args))
 | aCast: forall t, awndEval (TCast t) t
+| aProof: forall t, awndEval (TProof t) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches or Fix ***)
@@ -149,6 +150,7 @@ Proof.
     apply pre_whFixStep_pres_WFapp; try assumption.
     + eapply j. eassumption.
     + constructor; assumption.
+  - inversion_Clear H. assumption.
   - inversion_Clear H. assumption.
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.

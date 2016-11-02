@@ -22,9 +22,110 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Set Template Cast Propositions.  (** L1 doesn't strip proofs **)
+Unset Template Cast Propositions. 
+Quote Recursively Definition p_and_rect := and_rect.
+Print p_and_rect.
+Definition and_rect_x :=
+  (and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+Quote Recursively Definition p_and_rect_x := and_rect_x.
+Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).
+Print P_and_rect_x.
+Quote Recursively Definition cbv_and_rect_x :=
+  ltac:(let t:=(eval cbv in and_rect_x) in exact t).
+Definition ans_and_rect_x :=
+  Eval cbv in (main (program_Program cbv_and_rect_x)).
+Definition envx := env P_and_rect_x.
+Definition mainx := main P_and_rect_x.
+Goal
+  wcbvEval envx 30 mainx = Ret ans_and_rect_x.
+  vm_compute. reflexivity.
+Qed.
+Goal WcbvEval envx mainx prop.
+Proof.
+  change (WcbvEval envx (TConst "and_rect_x") prop).
+  eapply wConst. cbn. reflexivity.
+  eapply wAppLam.
+  - eapply wConst. cbn. reflexivity. eapply wLam. eapply wSort.
+  - eapply wAppCong.
+    + eapply wInd.
+    + not_isLambda.
+    + not_isFix.
+    + eapply wCons. eapply wInd. eapply wCons.
+      * { eapply wAppCong.
+          - eapply wConstruct.
+          - not_isLambda.
+          - not_isFix.
+          - eapply wCons. eapply wAppCong.
+            + eapply wConstruct.
+            + not_isLambda.
+            + not_isFix.
+            + eapply wCons. eapply wConstruct. eapply wNil.
+            + eapply wNil. }
+      * { eapply wCons.
+          - eapply wAppCong.
+            + eapply wConstruct.
+            + not_isLambda.
+            + not_isFix.
+            + eapply wCons. eapply wAppCong.
+              * eapply wConstruct.
+              * not_isLambda.
+              * not_isFix.
+              * eapply wCons. eapply wConstruct. eapply wNil.
+              * eapply wNil.
+          - eapply wNil. }
+  - unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
+    + eapply wLam. eapply wSort.
+    + eapply wInd.
+    + unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
+      * eapply wLam. eapply wSort.
+      * { eapply wAppCong.
+          - eapply wInd.
+          - not_isLambda.
+          - not_isFix.
+          - eapply wCons. eapply wInd. eapply wCons.
+            + eapply wAppCong. eapply wInd. not_isLambda. not_isFix.
+              eapply wCons. eapply wInd. eapply wCons. eapply wAppCong.
+              eapply wConstruct. not_isLambda. not_isFix. eapply wCons.
+              eapply wAppCong. eapply wConstruct. not_isLambda.
+              not_isFix. eapply wCons. eapply wConstruct. eapply wNil.
+              eapply wNil. eapply wCons. eapply wAppCong. eapply wConstruct.
+              not_isLambda. not_isFix. eapply wCons. eapply wAppCong.
+              eapply wConstruct. not_isLambda. not_isFix. eapply wCons.
+              eapply wConstruct. eapply wNil. eapply wNil. eapply wNil.
+            + eapply wNil. }
+      * { unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
+          - eapply wLam. eapply wProd. cbn. eapply wAppCong.
+            + eapply wInd.
+            + not_isLambda.
+            + not_isFix.
+            + 
+        
+Set Template Cast Propositions. 
+Definition my_and_rect := 
+  fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
+    match a with conj x x0 => f x x0 end.
+Quote Recursively Definition p_my_and_rect := my_and_rect.
+Print p_my_and_rect.
+Definition my_and_rect_x :=
+  (my_and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+Quote Recursively Definition p_my_and_rect_x := my_and_rect_x.
+Definition P_my_and_rect_x := Eval cbv in (program_Program p_my_and_rect_x).
+Quote Recursively Definition cbv_my_and_rect_x :=
+  ltac:(let t:=(eval cbv in my_and_rect_x) in exact t).
+Definition ans_my_and_rect_x :=
+  Eval cbv in (main (program_Program cbv_my_and_rect_x)).
+Definition my_envx := env P_my_and_rect_x.
+Definition my_mainx := main P_my_and_rect_x.
+Eval cbv in (wcbvEval my_envx 30 my_mainx).
+Goal
+  wcbvEval envx 30 mainx = Ret ans_my_and_rect_x.
+  cbv. reflexivity.
+Qed.
+
+
+Set Template Cast Propositions. 
 Set Printing Width 80.
-Set Printing Depth 500.
+Set Printing Depth 1000.
 
 Function Plus1 (n : nat) {wf lt n} : nat :=
   match n with
@@ -38,6 +139,27 @@ Definition x := 1.
 Definition Plus1x := Plus1 x.
 Eval vm_compute in Plus1x.
 
+Notation NN := (mkInd "Init.Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation Lam := (TLambda).
+Notation tLam := (tLambda).
+Notation Pi := (TProd).
+Notation tPi := (tProd).
+Notation PROP := (TSort sProp).
+Notation tPROP := (tSort sProp).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+
+
+Unset Template Cast Propositions. 
+Print and_rect.
+Quote Recursively Definition p_and_rect := and_rect.
+Print p_and_rect.
+Definition P_and_rect : Program Term :=
+  Eval vm_compute in program_Program p_and_rect.
+Print P_and_rect.
+
 (** evaluation of [Function]s defined with measure or wf **)
 Time Quote Recursively Definition p_Plus1x := Plus1x.
 Time Definition P_Plus1x : Program Term :=
@@ -46,7 +168,6 @@ Time Definition P_env := Eval vm_compute in (env P_Plus1x).
 Time Definition P_main := Eval vm_compute in (main P_Plus1x).
 Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
 Print P_ans.
-(***)
 
 Print Plus1_terminate.
 Eval vm_compute in Plus1_terminate.

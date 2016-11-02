@@ -22,11 +22,5 @@ Instance WfL3Term : WellFormed (Program L3.compile.Term) :=
 Instance certiL3 : CerticoqLanguage (Program L3.compile.Term) := {}.
 
 Instance certiL2_to_L3: 
-  CerticoqTranslation (Program L2.compile.Term) (Program L3.compile.Term) :=
+  CerticoqTranslation (Program L2_5.compile.Term) (Program L3.compile.Term) :=
 fun x => Ret (L3.compile.stripProgram x).
-
-
-
-
-
-

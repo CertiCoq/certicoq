@@ -1,7 +1,6 @@
 (******)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_5_box" as L1_5.
-Add LoadPath "../L2_typeStripped" as L2.
+Add LoadPath "../L2_5_box" as L2_5.
 (******)
 
 Require Import Coq.Lists.List.
@@ -12,27 +11,27 @@ Require Import Coq.Arith.Peano_dec.
 Require Import omega.Omega.
 Require Import Recdef.
 Require Import Common.Common.
-Require L2.compile.
-Require L2.term.
-Require L2.program.
+Require L2_5.compile.
+Require L2_5.term.
+Require L2_5.program.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition L2Term := L2.compile.Term.
-Definition L2Terms := L2.compile.Terms.
-Definition L2Defs := L2.compile.Defs.
-Definition L2EC := envClass L2Term.
-Definition L2Env := environ L2Term.
-Definition L2Pgm := Program L2Term.
+Definition L2_5Term := L2_5.compile.Term.
+Definition L2_5Terms := L2_5.compile.Terms.
+Definition L2_5Defs := L2_5.compile.Defs.
+Definition L2_5EC := envClass L2_5Term.
+Definition L2_5Env := environ L2_5Term.
+Definition L2_5Pgm := Program L2_5Term.
 
 
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
-| TProof     : Term
+| TProof     : Term 
 | TProd      : name -> Term -> Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
@@ -451,41 +450,41 @@ Qed.
 
   
 (** Auxiliary function to avoid case blowup when expanding [strip] in L3 **)
-Definition isL2Cnstr: L2Term -> option (inductive * nat * nat) :=
-  L2.term.isL2Cnstr.
+Definition isL2_5Cnstr: L2_5Term -> option (inductive * nat * nat) :=
+  L2_5.term.isL2_5Cnstr.
   
-Function strip (t:L2Term) : Term :=
+Function strip (t:L2_5Term) : Term :=
   match t with
-    | L2.compile.TProof => TProof
-    | L2.compile.TRel n => (TRel n)
-    | L2.compile.TSort s => (TSort s)
-    | L2.compile.TCast s => strip s
-    | L2.compile.TProd nm bod => TProd nm (strip bod)
-    | L2.compile.TLambda nm bod => TLambda nm (strip bod)
-    | L2.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
-    | L2.compile.TApp fn arg args =>
+    | L2_5.compile.TProof => TProof
+    | L2_5.compile.TRel n => (TRel n)
+    | L2_5.compile.TSort s => (TSort s)
+    | L2_5.compile.TCast s => strip s
+    | L2_5.compile.TProd nm bod => TProd nm (strip bod)
+    | L2_5.compile.TLambda nm bod => TLambda nm (strip bod)
+    | L2_5.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
+    | L2_5.compile.TApp fn arg args =>
       let sargs := tcons (strip arg) (strips args) in
-      match isL2Cnstr fn with 
+      match isL2_5Cnstr fn with 
         | Some (i, n, arty) => etaExp_cnstr i n (arty - (tlength sargs)) sargs
         | None => mkApp (strip fn) sargs
        end
-    | L2.compile.TConst nm => TConst nm
-    | L2.compile.TAx => TAx
-    | L2.compile.TInd i => (TInd i)
-    | L2.compile.TConstruct i n arity => etaExp_cnstr i n arity tnil
-    | L2.compile.TCase n mch brs => TCase n (strip mch) (strips brs)
-    | L2.compile.TFix ds n => TFix (stripDs ds) n
-    | L2.compile.TWrong => TWrong
+    | L2_5.compile.TConst nm => TConst nm
+    | L2_5.compile.TAx => TAx
+    | L2_5.compile.TInd i => (TInd i)
+    | L2_5.compile.TConstruct i n arity => etaExp_cnstr i n arity tnil
+    | L2_5.compile.TCase n mch brs => TCase n (strip mch) (strips brs)
+    | L2_5.compile.TFix ds n => TFix (stripDs ds) n
+    | L2_5.compile.TWrong => TWrong
    end
-with strips (ts:L2Terms) : Terms := 
+with strips (ts:L2_5Terms) : Terms := 
   match ts with
-    | L2.compile.tnil => tnil
-    | L2.compile.tcons t ts => tcons (strip t) (strips ts)
+    | L2_5.compile.tnil => tnil
+    | L2_5.compile.tcons t ts => tcons (strip t) (strips ts)
   end
-with stripDs (ts:L2Defs) : Defs := 
+with stripDs (ts:L2_5Defs) : Defs := 
   match ts with
-    | L2.compile.dnil => dnil
-    | L2.compile.dcons nm t m ds => dcons nm (strip t) m (stripDs ds)
+    | L2_5.compile.dnil => dnil
+    | L2_5.compile.dcons nm t m ds => dcons nm (strip t) m (stripDs ds)
   end.
 Functional Scheme strip_ind' := Induction for strip Sort Prop
 with strips_ind' := Induction for strips Sort Prop
@@ -496,39 +495,39 @@ Combined Scheme stripStripsStripDs_ind
 ***)
 
 Lemma strips_pres_tlength:
-  forall ts:L2Terms,
-  tlength (strips ts) = L2.term.tlength ts.
+  forall ts:L2_5Terms,
+  tlength (strips ts) = L2_5.term.tlength ts.
 Proof.
   induction ts. reflexivity.
   cbn. rewrite IHts. reflexivity.
 Qed.
   
 Lemma stripDs_pres_dlength:
-  forall ds:L2Defs,
-  dlength (stripDs ds) = L2.term.dlength ds.
+  forall ds:L2_5Defs,
+  dlength (stripDs ds) = L2_5.compile.dlength ds.
 Proof.
   induction ds. reflexivity.
   cbn. rewrite IHds. reflexivity.
 Qed.
   
-Lemma isL2Cnstr_TApp_None:
-  forall fn t ts, isL2Cnstr (L2.compile.TApp fn t ts) = None.
+Lemma isL2_5Cnstr_TApp_None:
+  forall fn t ts, isL2_5Cnstr (L2_5.compile.TApp fn t ts) = None.
 Proof.
   intros. reflexivity.
 Qed.
 
 Lemma strip_TAppTConstruct:
   forall i n arty arg args,
-    strip (L2.compile.TApp (L2.compile.TConstruct i n arty) arg args) =
+    strip (L2_5.compile.TApp (L2_5.compile.TConstruct i n arty) arg args) =
     etaExp_cnstr i n (arty - S (tlength (strips args)))
                  (tcons (strip arg) (strips args)).
 Proof.
   intros. reflexivity.
 Qed.
 
-Lemma isL2Cnstr_Some:
+Lemma isL2_5Cnstr_Some:
   forall t i cn arty,
-    isL2Cnstr t = Some (i, cn, arty) -> strip t = etaExp_cnstr i cn arty tnil.
+    isL2_5Cnstr t = Some (i, cn, arty) -> strip t = etaExp_cnstr i cn arty tnil.
 Proof.
   induction t; intros; subst; cbn in H; try discriminate.
   - rewrite <- IHt. reflexivity. assumption.
@@ -536,7 +535,7 @@ Proof.
 Qed.
 
 Lemma stripApp_notCnstr:
-  forall t fn s, strip t = TApp fn s -> isL2Cnstr t = None.
+  forall t fn s, strip t = TApp fn s -> isL2_5Cnstr t = None.
 Proof.
   induction t; intros; cbn; try reflexivity.
   - eapply IHt. cbn in H. eassumption.
@@ -547,10 +546,10 @@ Qed.
   
 Lemma stripAppApp_notCnstr:
   forall y0 y1 y2 fn s,
-    strip (L2.compile.TApp y0 y1 y2) = TApp fn s -> isL2Cnstr y0 = None.
+    strip (L2_5.compile.TApp y0 y1 y2) = TApp fn s -> isL2_5Cnstr y0 = None.
 Proof.
   induction y0; intros; cbn; try reflexivity.
-  - cbn in H. case_eq (isL2Cnstr y0); intros; try reflexivity.
+  - cbn in H. case_eq (isL2_5Cnstr y0); intros; try reflexivity.
     destruct p, p. rewrite H0 in H.
     destruct (@etaExp_cnstr_Lam_or_Cnstr
                 i n0 (n - S (tlength (strips y2)))
@@ -565,17 +564,17 @@ Proof.
     + destruct H0 as [x0 j]. rewrite j in H. discriminate.
 Qed.
 
-Lemma isL2Cnstr_None:
-  forall t, isL2Cnstr t = None -> ~ L2.term.isConstruct t.
+Lemma isL2_5Cnstr_None:
+  forall t, isL2_5Cnstr t = None -> ~ L2_5.term.isConstruct t.
 Proof.
   intros.
   destruct t; intros h; destruct h as [x0 [x1 [x2 j]]]; try discriminate.
 Qed.
 
-Lemma isL2Cnstr_Some_strip:
+Lemma isL2_5Cnstr_Some_strip:
   forall u i x arty,
-    isL2Cnstr u = Some (i, x, arty) ->
-    strip u = strip (L2.compile.TConstruct i x arty).
+    isL2_5Cnstr u = Some (i, x, arty) ->
+    strip u = strip (L2_5.compile.TConstruct i x arty).
 Proof.
   induction u; cbn; intros; try discriminate.
   - rewrite (IHu _ _ _ H). reflexivity.
@@ -585,78 +584,78 @@ Qed.
                                          
 Lemma TFix_hom:
   forall defs n,
-    strip (L2.compile.TFix defs n) = TFix (stripDs defs) n.
+    strip (L2_5.compile.TFix defs n) = TFix (stripDs defs) n.
 reflexivity.
 Qed.
 
 Lemma TProd_hom:
   forall nm bod,
-    strip (L2.compile.TProd nm bod) = TProd nm (strip bod).
+    strip (L2_5.compile.TProd nm bod) = TProd nm (strip bod).
 reflexivity.
 Qed.
 
 Lemma TLambda_hom:
   forall nm bod,
-    strip (L2.compile.TLambda nm bod)  = TLambda nm (strip bod).
+    strip (L2_5.compile.TLambda nm bod)  = TLambda nm (strip bod).
 Proof.
   reflexivity.
 Qed.
 
 Lemma TLetIn_hom:
   forall nm dfn bod,
-    strip (L2.compile.TLetIn nm dfn bod) =
+    strip (L2_5.compile.TLetIn nm dfn bod) =
     TLetIn nm (strip dfn) (strip bod).
 reflexivity.
 Qed.
 
 Lemma TCase_hom:
   forall n mch brs,
-    strip (L2.compile.TCase n mch brs) =
+    strip (L2_5.compile.TCase n mch brs) =
     TCase n (strip mch) (strips brs).
 reflexivity.
 Qed.
 
 Lemma TConstruct_hom:
   forall i n arty,
-    strip (L2.compile.TConstruct i n arty) = etaExp_cnstr i n arty tnil.
+    strip (L2_5.compile.TConstruct i n arty) = etaExp_cnstr i n arty tnil.
 Proof.
   reflexivity.  
 Qed.
 
 Lemma TInd_hom:
   forall i,
-        strip (L2.compile.TInd i) = (TInd i).
+        strip (L2_5.compile.TInd i) = (TInd i).
 Proof.
   reflexivity.
 Qed.
 
 Lemma dlength_hom:
-  forall ds, L2.term.dlength ds = dlength (stripDs ds).
+  forall ds, L2_5.compile.dlength ds = dlength (stripDs ds).
 induction ds. intuition. cbn. rewrite IHds. reflexivity.
 Qed.
 
 Lemma tcons_hom:
-  forall t ts, strips (L2.compile.tcons t ts) = tcons (strip t) (strips ts).
+  forall t ts, strips (L2_5.compile.tcons t ts) = tcons (strip t) (strips ts).
 reflexivity.
 Qed.
 
 Lemma dcons_hom:
   forall nm t m ds,
-    stripDs (L2.compile.dcons nm t m ds) = dcons nm (strip t) m (stripDs ds).
+    stripDs (L2_5.compile.dcons nm t m ds) = dcons nm (strip t) m (stripDs ds).
 reflexivity.
 Qed.
 
 Lemma tappend_hom:
   forall ts us,
-    strips (L2.term.tappend ts us) = tappend (strips ts) (strips us).
+    strips (L2_5.compile.tappend ts us) = tappend (strips ts) (strips us).
 induction ts; intros us; simpl. reflexivity.
 rewrite IHts. reflexivity.
 Qed.
 
 Lemma TApp_hom:
   forall fn arg args,
-    strip (L2.compile.TApp fn arg args) =
-    match isL2Cnstr fn with
+    strip (L2_5.compile.TApp fn arg args) =
+    match isL2_5Cnstr fn with
       | Some (i, n, arty) =>
         etaExp_cnstr i n (arty - S (tlength (strips args)))
                      (tcons (strip arg) (strips args))
@@ -667,28 +666,28 @@ Proof.
 Qed.
 
 
-Function stripEC (ec:L2EC) : envClass Term :=
+Function stripEC (ec:L2_5EC) : envClass Term :=
   match ec with
     | ecTrm t => ecTrm (strip t)
     | ecTyp _ n itp => ecTyp _ n itp
   end.
 
 
-Function stripEnv (p:L2Env) : environ Term :=
+Function stripEnv (p:L2_5Env) : environ Term :=
   match p with
     | nil => nil
     | cons (nm, ec) q => cons (nm, stripEC ec) (stripEnv q)
   end.
 
-Definition stripProgram (p:L2Pgm) : AstCommon.Program Term :=
+Definition stripProgram (p:L2_5Pgm) : AstCommon.Program Term :=
   {| env:= stripEnv (env p); main:= strip (AstCommon.main p) |}.
 
 
 (** L1-to-L3 translations **)
 Definition program_Program (p:program) : Program Term :=
-  stripProgram (L2.compile.program_Program p).
+  stripProgram (L2_5.compile.program_Program p).
 
 (*******************
-Definition term_Term' (e:L2.compile.environ) (t:term) : Term  :=
-  strip e (L2.compile.term_Term t).
+Definition term_Term' (e:L2_5.compile.environ) (t:term) : Term  :=
+  strip e (L2_5.compile.term_Term t).
 ************************)

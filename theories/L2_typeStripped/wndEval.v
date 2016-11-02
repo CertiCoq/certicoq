@@ -50,6 +50,7 @@ Inductive wndEval : Term -> Term -> Prop :=
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t, wndEval (TCast t) t
+| sProof: forall t, wndEval (TProof t) t
 (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches 

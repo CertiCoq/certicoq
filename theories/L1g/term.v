@@ -253,6 +253,15 @@ Proof.
   - left. auto.
 Qed.
 
+Definition isProp (t:Term) : Prop := t = prop.
+
+Lemma isProp_dec: forall t, isProp t \/ ~ isProp t.
+Proof.
+  destruct t; try (right; intros h; discriminate).
+  destruct s; try (right; intros h; discriminate).
+  - left; reflexivity.
+Qed.
+
 Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n m:nat), isCanonical (TConstruct i n m)
 | canA: forall (arg:Term) (args:Terms) (i:inductive) (n m:nat), 
@@ -277,10 +286,10 @@ induction t;
 - left. constructor.
 Qed.
 
-Function canonicalP (t:Term) : option (nat * Terms) :=
+Function canonicalP (t:Term) : option (nat * Terms * nat) :=
   match t with
-    | TConstruct _ r _ => Some (r, tnil)
-    | TApp (TConstruct _ r _) arg args => Some (r, tcons arg args)
+    | TConstruct _ r m => Some (r, tnil, m)
+    | TApp (TConstruct _ r m) arg args => Some (r, tcons arg args, m)
     | x => None
   end.
 
@@ -296,8 +305,8 @@ Lemma isCanonical_canonicalP:
   forall t, isCanonical t -> exists x, canonicalP t = Some x.
 Proof.
   induction 1; simpl.
-  - exists (n, tnil). reflexivity.
-  - exists (n, tcons arg args). reflexivity.
+  - exists (n, tnil, m). reflexivity.
+  - exists (n, tcons arg args, m). reflexivity.
 Qed.
 
 (** some utility operations on [Terms] ("lists" of Term) **)
@@ -740,7 +749,7 @@ Qed.
 
 Lemma canonicalP_pres_WFapp:
   forall t, WFapp t ->
-        forall r args, canonicalP t = Some (r, args) -> WFapps args.
+        forall r args arty, canonicalP t = Some (r, args, arty) -> WFapps args.
 Proof.
   induction t; simpl; intros; try discriminate.
   - destruct t1; try discriminate. myInjection H0. inversion_Clear H.

@@ -65,9 +65,9 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               ~ isLambda fn' -> ~ isFix fn' ->
               WcbvEvals p (tcons arg args) (tcons arg' args') ->
               WcbvEval p (TApp fn arg args) (mkApp fn' (tcons arg' args'))
-| wCase: forall mch Mch n args ml ts brs cs s ty,
+| wCase: forall mch Mch n args ml ts brs cs s ty arty,
                 WcbvEval p mch Mch ->
-                canonicalP Mch = Some (n, args) ->
+                canonicalP Mch = Some (n, args, arty) ->
                 tskipn (snd (fst ml)) args = Some ts ->
                 whCaseStep n ts brs = Some cs ->
                 WcbvEval p cs s ->
@@ -416,38 +416,6 @@ Function wcbvEval
                   end
               end
           end
-            (****************
-        | TApp fn a1 args =>
-          match wcbvEval n fn with
-            | Exc s => raise ("wcbvEval TApp: fn doesn't eval: " ++ s)
-            | Ret (TLambda _ _ bod) =>
-              match wcbvEval n a1 with
-                | Exc s =>  raise ("wcbvEval TApp: arg doesn't eval: " ++ s)
-                | Ret b1 => wcbvEval n (whBetaStep bod b1 args)
-              end
-            | Ret (TFix dts m) =>
-              match dnthBody m dts with
-                | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
-                | Some (x, ix) =>
-                  match tnth ix (tcons a1 args) with
-                    | None => raise ("wcbvEval TApp: tnth not defined")
-                    | Some t =>
-                      match wcbvEval n t with
-                        | Ret t' =>
-                          match canonicalP t' with
-                            | Some _ => wcbvEval n (pre_whFixStep x dts args)
-                            | None => raise ("wcbvEval TFix: rec arg")
-                          end
-                      end
-                  end
-              end
-            | Ret Fn =>
-              match wcbvEvals n (tcons a1 args) with
-                | Exc s => raise ("wcbvEval TApp: args don't eval: " ++ s)
-                | Ret ergs => ret (mkApp Fn ergs)
-              end
-          end
-*********************)
         | TCase ml tp mch brs =>
           match wcbvEval n mch with
             | Exc str => Exc str
@@ -462,7 +430,7 @@ Function wcbvEval
                         | Ret ebrs => Ret (TCase ml etp emch ebrs)
                       end
                   end
-                | Some (r, args) =>
+                | Some (r, args, _) =>
                   match tskipn (snd (fst ml)) args with
                     | None => raise "wcbvEval: Case, tskipn"
                     | Some ts =>

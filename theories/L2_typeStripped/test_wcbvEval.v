@@ -9,17 +9,250 @@ Require Import Recdef.
 Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
-Require Import L1_5.L1_5.
-Require Import L2.L2.  (* whole L2 library is exported by L2.L2 *)
+Require Import L1g.L1g.
+Require Import L2.compile.
+Require Import L2.term.
+Require Import L2.wcbvEval.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Set Template Cast Propositions.  (** L1 doesn't strip proofs **)
-Set Printing Width 80.
-Set Printing Depth 2000.
+Set Template Cast Propositions.
+Set Printing Width 110.
+Set Printing Depth 1000.
+
+Ltac terms := repeat (eapply wCons; try eapply wAppCong; try eapply wInd;
+                      try eapply wConstruct; try eapply wInd;
+                      try not_isLambda; try not_isFix; try eapply wNil).
+
+Notation NN := (mkInd "Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation Lam := (TLambda).
+Notation tLam := (tLambda).
+Notation Pi := (TProd).
+Notation tPi := (tProd).
+Notation PROP := (TSort sProp).
+Notation tPROP := (tSort sProp).
+Notation AND := (mkInd "Logic.and" 0).
+Notation CONJ := (TConstruct AND 0 4).
+Notation TRUE := (mkInd "Logic.True" 0).
+Notation II := (TConstruct TRUE 0 0).
+Notation EQ := (mkInd "Logic.eq" 0).
+Notation RFL := (TConstruct EQ 0 2).
+Notation PROD := (mkInd "Datatypes.prod" 0).
+Notation PAIR := (TConstruct PROD 0 4).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Infix ":t:" := tcons  (at level 87, right associativity).
+
+
+Inductive P0: Prop := p0.
+Inductive P1: Prop := p1.
+Notation PP0 := (mkInd "P0" 0).
+Notation pp0 := (TConstruct PP0 0 0).
+Notation PP1 := (mkInd "P1" 0).
+Notation pp1 := (TConstruct PP1 0 0).
+
+Definition my_and_rect := 
+  fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
+    match a with conj x x0 => f x x0 end.
+Quote Recursively Definition p_my_and_rect := my_and_rect.
+Print p_my_and_rect.
+Eval cbv in (program_Program p_my_and_rect).
+
+
+Quote Recursively Definition p_and_rect := and_rect.
+Print p_and_rect.
+Eval cbv in (program_Program p_and_rect).
+Definition and_rectx :=
+  and_rect (fun (x0:P0) (x1:P1) => pair (conj x1 x0) 0) (conj p0 p1).
+Eval cbv in and_rectx.
+Quote Recursively Definition ans_and_rectx := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in and_rectx) in exact t).
+Definition Ans_and_rectx :=
+  Eval cbv in (wcbvEval (env (program_Program ans_and_rectx)) 1000
+                        (main (program_Program ans_and_rectx))).
+Print Ans_and_rectx.
+Quote Recursively Definition p_and_rectx := and_rectx.
+Print p_and_rectx.
+Definition P_and_rectx := Eval cbv in (program_Program p_and_rectx).
+Print P_and_rectx.
+Definition P_envx := env P_and_rectx.
+Definition P_mainx := main P_and_rectx.
+Goal wcbvEval P_envx 1000 P_mainx = Ans_and_rectx.
+vm_compute. reflexivity.
+
+Goal WcbvEval P_envx P_mainx prop. 
+  change (WcbvEval P_envx (TConst "and_rectx") prop).
+  eapply wConst. cbn. reflexivity. eapply wAppLam.
+  - eapply wConst. cbn. reflexivity. eapply wLam.
+  - eapply wInd.
+  - cbn. eapply wAppLam.
+    + eapply wLam.
+    + eapply wInd.
+    + cbn. eapply wAppLam.
+      * eapply wLam.
+      * { eapply wAppCong.
+          - eapply wInd.
+          - not_isLambda.
+          - not_isFix.
+          - terms. rewrite mkApp_goodFn. reflexivity. not_isApp.
+          - rewrite mkApp_goodFn. reflexivity. not_isApp. }
+      * { cbn. eapply wAppLam.
+          - eapply wLam.
+          - eapply wLam.
+          - cbn. eapply wAppLam.
+            + eapply wLam.
+            + eapply wProof. eapply wAppCong.
+              * eapply wConstruct.
+              * not_isLambda.
+              * not_isFix.
+              * terms.
+              * rewrite mkApp_goodFn. reflexivity. not_isApp.
+            + cbn. eapply wCase.
+              * { eapply wProof. eapply wAppCong.
+                  - eapply wConstruct.
+                  - not_isLambda.
+                  - not_isFix.
+                  - terms.
+                  - rewrite mkApp_goodFn. reflexivity. not_isApp. }
+              * cbn. reflexivity.
+              * cbn. reflexivity.
+              * cbn. reflexivity.
+              * { eapply wAppLam.
+                  - eapply wLam.
+                  - eapply wConstruct.
+                  - cbn. eapply wAppLam.
+                    + eapply wLam.
+                    + eapply wConstruct.
+                    + cbn. eapply wAppCong.
+                      * eapply wConstruct.
+                      * not_isLambda.
+                      * not_isFix.
+                      * { terms. rewrite mkApp_goodFn. reflexivity. not_isApp. 
+                          eapply wProof. eapply wAppCong.
+                          - eapply wConstruct.
+                          - not_isLambda.
+                          - not_isFix.
+                          - terms.
+                          - rewrite mkApp_goodFn. reflexivity. not_isApp. }
+                      * rewrite mkApp_goodFn. unfold Ans_and_rectx.
+                        repeat (apply f_equal).
+                
+Definition my_and_rect := 
+  fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
+    match a with conj x x0 => f x x0 end.
+Quote Recursively Definition p_my_and_rect := my_and_rect.
+Print p_my_and_rect.
+Eval cbv in (program_Program p_my_and_rect).
+Quote Recursively Definition p_my_and_rectx :=
+  (and_rect (fun (x0:P0) (x1:P1) => pair (conj x1 x0) 0) (conj p0 p1)).
+Definition P_my_and_rectx := Eval cbv in (program_Program p_and_rectx).
+Definition P_my_envx := env P_my_and_rectx.
+Definition P_my_mainx := main P_my_and_rectx.
+Eval cbv in (wcbvEval P_my_envx 100 P_my_mainx).
+
+
+Definition my_and_rect := 
+  fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
+    match a with conj x x0 => f x x0 end.
+Quote Recursively Definition p_my_and_rect := my_and_rect.
+Print p_my_and_rect.
+Eval cbv in (program_Program p_my_and_rect).
+Definition my_and_rect_x :=
+  (my_and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+Quote Recursively Definition p_my_and_rect_x := my_and_rect_x.
+Definition P_my_and_rect_x := Eval cbv in (program_Program p_my_and_rect_x).
+Quote Recursively Definition cbv_my_and_rect_x :=
+  ltac:(let t:=(eval cbv in my_and_rect_x) in exact t).
+Definition ans_my_and_rect_x :=
+  Eval cbv in (main (program_Program cbv_my_and_rect_x)).
+Definition my_envx := env P_my_and_rect_x.
+Definition my_mainx := main P_my_and_rect_x.
+Eval cbv in (wcbvEval my_envx 30 my_mainx).
+Goal
+  wcbvEval envx 30 mainx = Ret ans_my_and_rect_x.
+  cbv. reflexivity.
+Qed.
+
+(*****************
+Quote Recursively Definition p_and_rect := and_rect.
+Eval cbv in (program_Program p_and_rect).
+Definition and_rect_x :=
+  (and_rect (fun (a:0=0) (b:True) => conj b a) (conj (eq_refl 0) I)).
+Quote Recursively Definition p_and_rect_x := and_rect_x.
+Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).
+Print P_and_rect_x.
+Quote Recursively Definition cbv_and_rect_x :=
+  ltac:(let t:=(eval cbv in and_rect_x) in exact t).
+Definition ans_and_rect_x :=
+  Eval cbv in (main (program_Program cbv_and_rect_x)).
+Definition envx := env P_and_rect_x.
+Definition mainx := Eval cbv in main P_and_rect_x.
+Print mainx.
+
+Goal
+  wcbvEval envx 30 mainx = Ret ans_and_rect_x.
+  vm_compute. reflexivity.
+Qed.
+
+Goal WcbvEval envx mainx prop.
+Proof.
+  change (WcbvEval envx (TConst "and_rect_x") prop).
+  eapply wConst. cbn. reflexivity.
+  eapply wAppLam.
+  - eapply wConst. cbn. reflexivity. eapply wLam.
+  - eapply wAppCong.
+    + eapply wInd.
+    + not_isLambda.
+    + not_isFix.
+    + eapply wCons. eapply wInd. eapply wCons.
+      * eapply wConstruct.
+      * terms.
+  - unfold whBetaStep, mkApp, instantiate. cbn. eapply wAppLam.
+    + eapply wLam.
+    + eapply wInd.
+    + unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
+      * eapply wLam. 
+      * { eapply wAppCong.
+          - eapply wInd.
+          - not_isLambda.
+          - not_isFix.
+          - terms. }
+      * { cbn. eapply wAppLam.
+          - eapply wLam.
+          - eapply wLam.
+          - unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
+            + eapply wLam.
+            + eapply wAppCong.
+              * eapply wConstruct.
+              * not_isLambda.
+              * not_isFix.
+              * terms.
+            + cbn. eapply wCase.
+              * { eapply wAppCong.
+                  - eapply wConstruct.
+                  - not_isLambda.
+                  - not_isFix.
+                  - terms. }
+              * cbn. reflexivity.
+              * cbn. reflexivity.
+              * cbn. reflexivity.
+              * { eapply wAppLam.
+                  - eapply wLam.
+                  - eapply wAppCong.
+                    + eapply wConstruct.
+                    + not_isLambda.
+                    + not_isFix.
+                    + terms.
+                  - unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
+                    + eapply wLam.
+                    + eapply wConstruct.
+                    + cbn.
+Abort.  (** correct answer **)
 
 (** Fibonacci **)
 Fixpoint slowFib (n:nat) : nat :=
@@ -37,6 +270,7 @@ Definition ans_slowFib3 :=
   Eval cbv in (main (program_Program cbv_slowFib3)).
 (* [program] of the program *)
 Quote Recursively Definition p_slowFib3 := slowFib3.
+Print p_slowFib3.
 Definition P_slowFib3 := Eval cbv in (program_Program p_slowFib3).
 Print P_slowFib3.
 Goal
@@ -45,6 +279,7 @@ Goal
   wcbvEval (env) 30 (main) = Ret ans_slowFib3.
   vm_compute. reflexivity.
 Qed.
+ *******************************)
 
 Function Plus1 (n : nat) {wf lt n} : nat :=
   match n with
@@ -54,9 +289,10 @@ Function Plus1 (n : nat) {wf lt n} : nat :=
 - intros. omega.
 - apply lt_wf.
 Defined.
-Definition x := 1.
+Definition x := 0.
 Definition Plus1x := Plus1 x.
 Eval vm_compute in Plus1x.
+
 
 (** evaluation of [Function]s defined with measure or wf **)
 Time Quote Recursively Definition p_Plus1x := Plus1x.
@@ -64,27 +300,184 @@ Time Definition P_Plus1x : Program Term :=
   Eval vm_compute in program_Program p_Plus1x.
 Time Definition P_env := Eval vm_compute in (env P_Plus1x).
 Time Definition P_main := Eval vm_compute in (main P_Plus1x).
+(****************
 Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
 Print P_ans.
 
-Goal  (** Plus1x doesn't normalize in L2 **)
+(** match argument is canonical **)
+Time Definition P_Mch :=
+  Eval vm_compute in
+    (wcbvEval P_env 1000 (TApp (TConst "Plus1_terminate") ZZ tnil)).
+Print P_Mch.
+ **********************)
+
+Goal
+  WcbvEval P_env (TApp (TConst "Plus1_terminate") ZZ tnil) prop.
+Proof.
+  eapply wAppLam.   (** evaluating the match argument **)
+  - eapply wConst. cbn. reflexivity.
+    + eapply wAppLam.
+      * eapply wLam.
+      * { apply wProof. eapply wConst. cbn. reflexivity.    (* 1 *)
+          apply wProof. eapply wAppCong.
+          - eapply wConstruct.
+          - not_isLambda.
+          - not_isFix.
+          - eapply wCons.
+            + eapply wProd.
+            + eapply wCons.
+              * { eapply wAppLam.
+                  - eapply wConst. cbn. reflexivity. eapply wLam.
+                  - eapply wInd.
+                  - cbn. eapply wAppLam.
+                    + eapply wLam.
+                    + eapply wConst. cbn. reflexivity. eapply wLam.
+                    + cbn. eapply wProd. }
+              * { eapply wCons.
+                  - eapply wLam.
+                  - eapply wCons.
+                    + eapply wConst. cbn. reflexivity. eapply wProof.
+                      eapply wAppLam.
+                      * eapply wConst. cbn. reflexivity. eapply wProof.
+                        eapply wLam.
+                      * eapply wInd.
+                      * { cbn. eapply wAppLam.
+                          - eapply wLam.
+                          - eapply wLam.
+                          - cbn. eapply wAppLam.
+                            + eapply wLam.
+                            + eapply wLam.
+                            + cbn. eapply wCast. eapply wLam. }
+                    + eapply wNil. } }                     (* end 1 *)
+      * { cbn. eapply wAppLam.
+          - eapply wLam.
+          - { eapply wProof. eapply wAppCong.              (* 2 *)
+              + eapply wConstruct.
+              + not_isLambda.
+              + not_isFix.
+              + eapply wCons.
+                * eapply wProd.
+                * { eapply wCons.
+                    - eapply wProd.
+                    - eapply wCons.
+                      + eapply wLam.
+                      + eapply wCons.
+                        * eapply wLam.
+                        * eapply wNil. } }                  (* end 2 *)
+              - cbn. eapply wAppLam.
+                + eapply wLam.
+                + {eapply wProof. eapply wAppCong.          (* 3 **)
+                   * eapply wConstruct.
+                   * not_isLambda.
+                   * not_isFix.
+                   * { eapply wCons.
+                       - eapply wProd.
+                       - eapply wCons.
+                         + eapply wProd.
+                         + eapply wCons.
+                           * eapply wLam.
+                           * eapply wCons. eapply wLam. eapply wNil. } }   (* end 3 *)
+                + cbn. eapply wAppLam.
+                  * eapply wConst. cbn. reflexivity. eapply wLam.
+                  * eapply wProd.
+                  * {cbn. eapply wAppLam.
+                     - eapply wLam.
+                     - eapply wAppLam.
+                       + eapply wConst. cbn. reflexivity. eapply wLam.
+                       + eapply wInd.
+                       + cbn. eapply wAppLam.
+                         * eapply wLam.
+                         * eapply wConst. cbn. reflexivity. eapply wLam.
+                         * cbn. eapply wProd.
+                     - cbn. eapply wAppLam.
+                       + eapply wLam.
+                       + eapply wProd.
+                       + cbn. eapply wAppLam.
+                         * eapply wConst. cbn. reflexivity. eapply wLam.
+                         * eapply wProd.
+                         * {cbn. eapply wAppLam.
+                            - eapply wLam.
+                            - eapply wProd.
+                            - cbn. eapply wAppLam.
+                              + eapply wLam.
+                              + eapply wProd.
+                              + cbn. eapply wAppLam.
+                                * eapply wLam.
+                                * eapply wLam.
+                                * {cbn. eapply wAppLam.
+                                   - eapply wLam.
+                                   - { eapply wProof. eapply wAppCong.   (* 4 *)
+                                       - eapply wConstruct.
+                                       - not_isLambda.
+                                       - not_isFix.
+                                       - eapply wCons.
+                                         + eapply wProd.
+                                         + eapply wCons.
+                                           * eapply wProd.
+                                           * eapply wCons. eapply wLam. eapply wCons.
+                                             eapply wLam. eapply wNil. }  (* end 4 *)
+                                   - cbn. eapply wCase.
+                                     { eapply wProof. eapply wAppCong.   (* 5 *)
+                                       - eapply wConstruct.
+                                       - not_isLambda.
+                                       - not_isFix.
+                                       - eapply wCons.
+                                         + eapply wProd.
+                                         + eapply wCons. eapply wProd. eapply wCons.
+                                           eapply wLam. eapply wCons. eapply wLam.
+                                           eapply wNil. }             (* end 5 *)
+
+
+
+
+
+                                     
+
+Goal  (** Plus1x does normalize in L2 **)
   WcbvEval P_env P_main prop.
 Proof.
   unfold P_main. eapply wConst. cbn. reflexivity.
   - eapply wAppLam.
     + eapply wConst. cbn. reflexivity. apply wLam.
-    + eapply wConst. cbn. reflexivity. eapply wAppCong.
-      * eapply wConstruct.
-      * not_isLambda.
-      * not_isFix.
-      * eapply wCons. eapply wConstruct. eapply wNil.
+    + eapply wConst. cbn. reflexivity. eapply wConstruct.
     + cbn. eapply wCase.
+      * { apply (proj1 (wcbvEval_WcbvEval P_env 1000)). cbn.
       * { eapply wAppLam.   (** evaluating the match argument **)
           - eapply wConst. cbn. reflexivity.
             + eapply wAppLam.
               * eapply wLam.
-              * apply wPrf.
-              * { cbn. eapply wAppLam.
+              * { apply wProof. eapply wConst. cbn. reflexivity.
+                  apply wProof. eapply wAppCong.
+                  - eapply wConstruct.
+                  - not_isLambda.
+                  - not_isFix.
+                  - eapply wCons.
+                    + eapply wProd.
+                    + eapply wCons.
+                      * { eapply wAppLam.
+                          - eapply wConst. cbn. reflexivity. eapply wLam.
+                          - eapply wInd.
+                          - cbn. eapply wAppLam.
+                            + eapply wLam.
+                            + eapply wConst. cbn. reflexivity. eapply wLam.
+                            + cbn. eapply wProd. }
+                      * { eapply wCons.
+                          - eapply wLam.
+                          - eapply wCons.
+                            + eapply wConst. cbn. reflexivity. eapply wProof.
+                              eapply wAppLam.
+                              * eapply wConst. cbn. reflexivity. eapply wProof.
+                                eapply wLam.
+                              * eapply wInd.
+                              * { cbn. eapply wAppLam.
+                                  - eapply wLam.
+                                  - eapply wLam.
+                                  - cbn.
+
+
+
+                                    
+               * { cbn. eapply wAppLam.
                   - eapply wLam.
                   - apply wPrf.
                   - cbn. eapply wAppLam.

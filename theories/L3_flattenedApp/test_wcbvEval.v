@@ -1,13 +1,14 @@
 (******)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L2_typeStripped" as L2.
+Add LoadPath "../L2_5_box" as L2_5.
 Add LoadPath "../L3_flattenedApp" as L3.
 (******)
 
 Require Import ExtLib.Data.String.
+Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
-Require L2.L2.         (* whole L2 library is exported by L2.L2 *)
+Require L2_5.L2_5.         (* whole L2 library is exported by L2.L2 *)
 Require Import L3.compile. 
 Require Import L3.term.
 Require Import L3.program.
@@ -18,9 +19,35 @@ Local Open Scope list.
 Local Open Scope string_scope.
 
 Set Template Cast Propositions.  (** L1 doesn't strip proofs **)
-Set Printing Width 90.
-Set Printing Depth 100.
+Set Printing Width 80.
+Set Printing Depth 1000.
 Set Implicit Arguments.
+
+
+Notation NN := (mkInd "Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1).
+Notation ZZ := (TConstruct NN 0).
+Notation Lam := (TLambda).
+Notation tLam := (tLambda).
+Notation Pi := (TProd).
+Notation tPi := (tProd).
+Notation PROP := (TSort sProp).
+Notation tPROP := (tSort sProp).
+Notation AND := (mkInd "Logic.and" 0).
+Notation CONJ := (TConstruct AND 0).
+Notation TRUE := (mkInd "Logic.True" 0).
+Notation II := (TConstruct TRUE 0).
+Notation EQ := (mkInd "Logic.eq" 0).
+Notation RFL := (TConstruct EQ 0).
+Notation PROD := (mkInd "Datatypes.prod" 0).
+Notation PAIR := (TConstruct PROD 0).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Infix ":t:" := tcons  (at level 87, right associativity).
+Notation "fn [| arg @ args |]" :=
+  (TApp fn arg args)  (at level 90, left associativity).
+
+
 
 (** Check eta expansion of constructors **)
 Quote Recursively Definition pcons := (@cons bool).
@@ -34,6 +61,26 @@ Quote Recursively Definition pFzz := (fun x => Fyy x).
 Definition PFzz := Eval cbv in (program_Program pFzz).
 Print PFzz.
 
+Function Plus1 (n : nat) {wf lt n} : nat :=
+  match n with
+    | 0 => 1
+    | S p => S (Plus1 p)
+  end.
+- intros. omega.
+- apply lt_wf.
+Defined.
+Definition x:nat := 0.
+Definition Plus1x := Plus1 x.
+Eval vm_compute in Plus1x.
+
+(** evaluation of [Function]s defined with measure or wf **)
+Time Quote Recursively Definition p_Plus1x := Plus1x.
+Time Definition P_Plus1x : Program Term :=
+  Eval vm_compute in program_Program p_Plus1x.
+Time Definition P_env := Eval vm_compute in (env P_Plus1x).
+Time Definition P_main := Eval vm_compute in (main P_Plus1x).
+Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
+Print P_ans.
                              
 Variable (y:nat).
 Quote Recursively Definition p_mbt := 
@@ -385,3 +432,23 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+(** well founded definition **)
+Function Gcd (a b : nat) {wf lt a} : nat :=
+match a with
+ | O => b 
+ | S k =>  Gcd (b mod S k)  (S k)
+end.
+Proof.
+  - intros m n k Heq. subst. apply Nat.mod_upper_bound.
+    omega.
+  - exact lt_wf.
+Defined.
+
+Definition Gcdx := (Gcd 4 2).
+Eval cbv in Gcdx.
+Time Quote Recursively Definition pGcdx := Gcdx.
+Time Definition PGcdx := Eval cbv in (program_Program pGcdx).
+Time Definition Penv_Gcdx := env PGcdx.
+Time Definition Pmain_Gcdx := main PGcdx.
+Time Definition ans_Gcdx := Eval cbv in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
+Print ans_Gcdx.

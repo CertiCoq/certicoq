@@ -1,6 +1,5 @@
 (****)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_5_box" as L1_5.
 Add LoadPath "../L2_typeStripped" as L2.
 (****)
 
@@ -23,12 +22,12 @@ Set Implicit Arguments.
 
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
-| wPrf: (* Crct p 0 prop -> *) WcbvEval p TProof TProof
 | wLam: forall nm bod, (* Crct p 1 bod -> *)
           WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProd: forall nm bod, (* Crct p 1 bod -> *)
           WcbvEval p (TProd nm bod) (TProd nm bod)
 | wCast: forall t s, WcbvEval p t s -> WcbvEval p (TCast t) s
+| wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) s
 | wConstruct: forall i r arty,
                 WcbvEval p (TConstruct i r arty) (TConstruct i r arty)
 | wInd: forall i, (* Crct p 0 prop -> *) WcbvEval p (TInd i) (TInd i) 
@@ -53,11 +52,12 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
              dnthBody m dts = Some (x, ix) ->
              WcbvEval p (pre_whFixStep x dts (tcons arg args)) s ->
              WcbvEval p (TApp fn arg args) s
-| wAppCong: forall fn fn' arg args arg' args',
+| wAppCong: forall fn fn' arg args arg' args' s,
               WcbvEval p fn fn' ->
               ~ isLambda fn' -> ~ isFix fn' ->
               WcbvEvals p (tcons arg args) (tcons arg' args') ->
-              WcbvEval p (TApp fn arg args) (mkApp fn' (tcons arg' args'))
+              (mkApp fn' (tcons arg' args')) = s ->
+              WcbvEval p (TApp fn arg args) s
 | wCase: forall mch Mch n args ml ts brs cs s arty,
                 WcbvEval p mch Mch ->
                 canonicalP Mch = Some (n, args, arty) ->
@@ -95,64 +95,7 @@ unfold xxxx, xx.
 eapply wAppLam; repeat (try constructor; try omega; try not_isApp).
 change (WcbvEval nil xxxx xxxx).
 Abort.
-
-(*****
-Lemma WcbvEval_Crct:
-  forall p,
-  (forall t et, WcbvEval p t et -> Crct p 0 t) /\
-  (forall ts ets, WcbvEvals p ts ets -> Crcts p 0 ts).
-Proof.
-  intros p.
-  apply WcbvEvalEvals_ind; intros;
-  try (solve[constructor; try assumption; eapply Crct_Sort; eassumption]).
-  - eapply Crct_Prf. eassumption.
-  - destruct i. econstructor; try assumption.
-    + admit.
-    +
-
-    eapply Crct_Sort. eassumption.
-
-  
-  try (solve[inversion_Clear H0; intuition]).
-  try (solve[inversion_Clear H1; intuition]).
- *****************)
-
-Lemma isL2Cnstr_WcbvEval_TCnstr:
-  forall t i x arty, isL2Cnstr t = Some (i, x, arty) ->
-                     forall p u, WcbvEval p t u -> u = TConstruct i x arty.
-Proof.
-  intros t.
-  functional induction (isL2Cnstr t); intros; try discriminate.
-  - myInjection H. inversion_Clear H0. reflexivity.
-  - eapply IHo. assumption. inversion_Clear H0. eassumption.
-Qed.
-
-Lemma isL2Cnstr_WcbvEval_TApp:
-  forall t i x arty, isL2Cnstr t = Some (i, x, arty) ->
-                     forall p et, WcbvEval p t et ->
-  forall arg args earg eargs,
-    WcbvEval p arg earg -> WcbvEvals p args eargs ->
-    WcbvEval p (TApp t arg args) (TApp (TConstruct i x arty) earg eargs).
-Proof.
-  intros t.
-  functional induction (isL2Cnstr t); intros; try discriminate.
-  - myInjection H. rewrite <- (mkApp_goodFn _  eargs). constructor.
-    + constructor; eapply Crct_Sort. 
-    + not_isLambda.
-    + not_isFix.
-    + intuition.
-    + not_isApp.
-  - rewrite <- (mkApp_goodFn _  eargs). constructor.
-    + inversion_Clear H0. erewrite <- (isL2Cnstr_WcbvEval_TCnstr). 
-      * constructor. apply H4. 
-      * eassumption.
-      * eassumption.
-    + not_isLambda.
-    + not_isFix.
-    + intuition.
-    + not_isApp.
-Qed.
-                         
+             
 
 Lemma WcbvEval_mkApp_nil:
   forall t, WFapp t -> forall p s, WcbvEval p t s ->
@@ -230,10 +173,6 @@ Lemma WcbvEval_weaken:
                                  WcbvEvals ((nm,ec)::p) ts ss).
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
-  (***
-  - econstructor. inversion_Clear H0. .constructor; assumption.
-  - constructor. inversion_Clear H; constructor; assumption.
-***)
   - destruct (string_dec nm nm0).
     + subst. inversion_Clear H0.
       * unfold lookupDfn in e.
@@ -253,6 +192,9 @@ Proof.
     + apply H. assumption.
     + apply H0. assumption.
   - eapply wAppFix; intuition. eassumption.
+  - eapply wAppCong; try eassumption.
+    + eapply H. assumption.
+    + eapply H0. assumption.
   - eapply wCase; intuition; eassumption.
 Qed.
 
@@ -383,6 +325,8 @@ Proof.
   intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
   - eapply wERTCtrn. apply wERTCstep. apply sCast. apply H. 
     inversion_Clear H0. assumption.
+  - eapply wERTCtrn. apply wERTCstep. apply sProof. apply H. 
+    inversion_Clear H0. assumption.
   - eapply wERTCtrn; intuition.
     eapply wERTCtrn.
     + apply wERTCstep. apply sConst. apply lookupDfn_LookupDfn. eassumption.
@@ -497,6 +441,11 @@ Function wcbvEval
             | Ret et => Ret et
             | Exc s => raise ("wcbvEval: TCast: " ++ s)
           end
+        | TProof t =>
+          match wcbvEval n t with
+            | Ret et => Ret et
+            | Exc s => raise ("wcbvEval: TProof: " ++ s)
+          end
         | TApp fn a1 args =>
           match wcbvEval n fn with
             | Exc s => raise ("wcbvEval TApp: fn doesn't eval: " ++ s)
@@ -552,7 +501,6 @@ Function wcbvEval
         | TConstruct i cn arty => ret (TConstruct i cn arty)
         | TInd i => ret (TInd i)
         | TSort srt => ret (TSort srt)
-        | TProof => ret TProof
         (** should never appear **)
         | TRel _ => raise "wcbvEval: unbound Rel"
         | TWrong => ret TWrong
@@ -576,7 +524,6 @@ Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
 with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.
 Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'.
 
-(************  FIX THIS ****************************
 (** wcbvEval and WcbvEval are the same relation **)
 Lemma wcbvEval_WcbvEval:
   forall tmr,
@@ -590,7 +537,7 @@ Proof.
     intros; try discriminate; try (myInjection p1);
     try(solve[constructor]); intuition.
   - eapply wConst; intuition.
-    + unfold LookupDfn. apply lookup_Lookup. eassumption.
+    + unfold lookupDfn. rewrite e1. reflexivity. 
   - specialize (H1 _ p1). specialize (H _ e1). specialize (H0 _ e2).
     eapply wAppLam; eassumption.
   - specialize (H0 _ p1). specialize (H _ e1). subst.
@@ -600,6 +547,7 @@ Proof.
     eapply wAppCong; try eassumption.
     + destruct Fn; try not_isLambda. contradiction.
     + destruct Fn; try not_isFix. contradiction.
+    + reflexivity.
   - eapply wCase; try eassumption.
     + apply H; eassumption.
     + apply H0; eassumption. 
@@ -619,10 +567,14 @@ Lemma pre_WcbvEval_wcbvEval:
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   - destruct H. exists (S x). intros m hm. simpl. rewrite (j m x); try omega.
     + rewrite (H (m - 1)); try omega. reflexivity.
+  - destruct H. exists (S x). intros mm h. cbn.
+    rewrite (j mm x); try omega. rewrite H. reflexivity. omega.
   - destruct H. exists (S x). intros mm h. simpl.
     rewrite (j mm x); try omega.
-    unfold LookupDfn in l. rewrite (Lookup_lookup l).
-    apply H. omega.
+    unfold lookupDfn in e. destruct (lookup nm p). destruct e0. myInjection e.
+    + rewrite H. reflexivity. omega.
+    + discriminate.
+    + discriminate.
   - destruct H, H0, H1. exists (S (max x (max x0 x1))). intros m h.
     assert (j1:= max_fst x (max x0 x1)). 
     assert (lx: m > x). omega.
@@ -654,7 +606,7 @@ Lemma pre_WcbvEval_wcbvEval:
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     cbn. rewrite (j mx x); try omega. rewrite (H0 (mx - 1)); try omega.
     rewrite (H (mx - 1)); try omega.
-    destruct fn'; try reflexivity.
+    destruct fn'; try reflexivity; repeat (try (apply f_equal; assumption)).
     + elim n; auto.
     + elim n0; auto.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
@@ -697,6 +649,5 @@ Proof.
   specialize (k1 (max x0 x1) (max_snd x0 x1)).
   rewrite k0 in k1. injection k1. intuition.
 Qed.
-********************************************)
   
 End wcbvEval_sec.

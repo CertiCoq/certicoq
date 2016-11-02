@@ -157,7 +157,15 @@ Definition
 ****************************)
 
 (** Store strings reversed to make inequality testing faster **)
-Fixpoint revStr (str accum: string): string := str.
+(***  FIX: DEBUGGIBG ONLY  strip off "Coq.Init." ******)
+Fixpoint revStr (str accum: string): string :=
+  match str with
+    | String "C" (String "o" (String "q" (String "."
+       (String "I" (String "n" (String "i" (String "t"
+        (String "." x)))))))) => x
+    | String "T" (String "o" (String "p" (String "." x))) => x
+    | y => y
+  end.
  (***
   match str with
     | String asci st => revStr st (String asci accum)
@@ -167,6 +175,10 @@ Fixpoint revStr (str accum: string): string := str.
 Definition revInd (i:inductive): inductive :=
   match i with
     | mkInd nm m => mkInd (revStr nm EmptyString) m
+  end.
+Definition rev_npars (np: inductive * nat) :=
+  match np with
+    | (i, n) => (revInd i, n)
   end.
 
 (** translate Gregory Malecha's [term] into my [Term] **)
@@ -223,7 +235,7 @@ Function term_Term (t:term) : Term :=
       end
     | tCase npars ty mch brs =>
       let Ars := map fst brs in
-      (TCase (npars, Ars) (term_Term ty) (term_Term mch)
+      (TCase (rev_npars npars, Ars) (term_Term ty) (term_Term mch)
              (terms_Terms (fun x => term_Term (snd x)) brs))
     | tFix defs m => (TFix (defs_Defs term_Term defs) m)
     | _ => TWrong "term_Term: Unknown term"

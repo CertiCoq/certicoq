@@ -147,7 +147,7 @@ match e with
 end.
 
 
-
+(***
 Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a p0L1)).
 Eval vm_compute in (exception_map print5 (ctranslateTo certiL5 p0L1)).
 Eval vm_compute in ( (ctranslateTo certiL5 p0L1)).
@@ -157,6 +157,7 @@ Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a evo)).
 Eval vm_compute in (exception_map print5 (ctranslateTo certiL5 evo)).
 
 Check  @cps_cvt_corr.
+ ***)
 
 (*
      = Ret

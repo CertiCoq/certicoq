@@ -1,6 +1,5 @@
 (******)
 Add LoadPath "../common" as Common.
-Add LoadPath "../L1_5_box" as L1_5.
 Add LoadPath "../L2_typeStripped" as L2.
 (******)
 

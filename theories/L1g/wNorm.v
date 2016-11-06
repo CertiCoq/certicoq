@@ -1,7 +1,3 @@
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1g" as L1g.
-(****)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.

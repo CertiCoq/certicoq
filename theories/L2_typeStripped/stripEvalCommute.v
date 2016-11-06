@@ -1,8 +1,3 @@
-(******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1g_box" as L1g.
-Add LoadPath "../L2_typeStripped" as L2.
-(******)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -118,22 +113,59 @@ induction m; induction ds; try intuition.
 - simpl. intuition.
 Qed.
 
+
+Lemma TCast_hom:
+  forall tm ty,
+    (forall pr, ty <> L1g.compile.TCast pr L1g.compile.prop /\
+     strip (L1g.compile.TCast tm ty) = TCast (strip tm)) \/
+    (exists pr, ty = L1g.compile.TCast pr L1g.compile.prop /\
+     strip (L1g.compile.TCast tm ty) = TProof (strip tm)).
+Proof.
+  intros. destruct (L1g.term.isProofCast_dec (L1g.compile.TCast tm ty)).
+  - right. destruct H as [x0 [x1 jx]]. injection jx. intros. subst.
+    exists x1. intuition.
+  - left. intros. unfold isProofCast in H. split.
+    + intros h. subst.
+      assert (j: forall prf prp,
+         L1g.compile.TCast tm (L1g.compile.TCast pr L1g.compile.prop) <>
+         L1g.compile.TCast prf (L1g.compile.TCast prp L1g.compile.prop)).
+      { intros. intuition. apply H. exists tm, pr. reflexivity. }
+      eapply j. reflexivity.
+    + destruct ty; cbn; try reflexivity. destruct ty2; try reflexivity.
+      case_eq s; intros; try reflexivity.
+      subst. elim H. exists tm, ty1. reflexivity.
+Qed.
+
+(*************************
+Lemma TCast_hom':
+  forall tm ck ty pr,
+    ty = L1g.compile.TCast pr ck L1g.compile.prop ->
+    strip (L1g.compile.TCast tm ck ty) = TProof (strip tm))
+
+    strip (L1g.compile.TCast tm ck ty) = (TCast (strip tm)) \/
+    (exists pr c, ty = L1g.compile.TCast pr c L1g.compile.prop /\
+                strip (L1g.compile.TCast tm ck ty) = (TProof (strip tm))).
+Proof.
+  destruct ty; cbn; try (solve[left; reflexivity]).
+  destruct ty2; cbn; try (solve[left; reflexivity]).
+  destruct s; cbn; try (left; reflexivity); try (right; reflexivity).
+  right. exists ty1, c. intuition.
+Qed.
+ ************)
+
 Lemma canonicalP_hom:
   forall t, optStripCanP (L1g.term.canonicalP t) = canonicalP (strip t).
-Admitted.
-(**********************
 Proof.
-  destruct t; cbn; try reflexivity.
-  destruct t2; cbn; try reflexivity.
-
-  
-  destruct t2_2; cbn; try reflexivity.
-  - destruct s; try reflexivity.
-  - destruct t1; try reflexivity.
-
-    destruct t2_2. cbn; try reflexivity.
-Qed.
- ****************)
+  intros t. case_eq t; intros; try reflexivity.
+  - destruct (L1g.term.isProofCast_dec (L1g.compile.TCast t0 t1)).
+    + destruct H0 as [x0 [x1 jx]]. myInjection jx. reflexivity.
+    + destruct t1; cbn; try reflexivity. destruct t1_2; cbn; try reflexivity.
+      destruct s; reflexivity.
+  - destruct t0; cbn; try reflexivity.
+    destruct t0_2; try reflexivity.
+    destruct t0_2_2; try reflexivity.
+    destruct s; reflexivity.
+Qed.      
 
 Lemma tnth_hom:
  forall ts n, optStrip (L1g.term.tnth n ts) = tnth n (strips ts).
@@ -260,15 +292,6 @@ Proof.
   - rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
 Qed.
 
-Lemma TCast_hom:
-  forall tm ck ty,
-    strip (L1g.compile.TCast tm ck ty) = (TCast (strip tm)) \/
-    strip (L1g.compile.TCast tm ck ty) = (TProof (strip tm)).
-Proof.
-  destruct ty; cbn; try (solve[left; reflexivity]).
-  destruct ty2; cbn; try (solve[left; reflexivity]).
-  destruct s; cbn; try (left; reflexivity); try (right; reflexivity).
-Qed.
 
 Lemma instantiate_tappend_commute:
   forall ts us tin n,
@@ -348,6 +371,203 @@ Proof.
     rewrite mkApp_idempotent. simpl. rewrite tappend_tnil. reflexivity. 
 Qed.
 
+(***)
+Lemma instantiate_hom:
+  (forall bod arg n, strip (L1g.term.instantiate arg n bod) =
+                     instantiate (strip arg) n (strip bod)) /\
+    (forall bods arg n, strips (L1g.term.instantiates arg n bods) =
+                    instantiates (strip arg) n (strips bods)) /\
+    (forall ds arg n, stripDs (L1g.term.instantiateDefs arg n ds) =
+                      instantiateDefs (strip arg) n (stripDs ds)).
+Proof.
+  apply L1g.compile.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
+  - simpl. destruct (lt_eq_lt_dec n n0); cbn.
+    + destruct s.
+      * rewrite (proj1 (nat_compare_gt n0 n)); try omega. cbn. reflexivity.
+      * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
+        rewrite mkApp_tnil_ident. reflexivity.
+    + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
+  -  admit.
+    (*************
+    destruct (isCastProp_dec t0).
+     + unfold isCastProp in H1. destruct H1 as [prp k]. subst. 
+       cbn. rewrite H. reflexivity.
+     + unfold isCastProp in H1.
+       assert (j: forall prp, t0 <> L1g.compile.TCast prp L1g.compile.prop).
+       { intros prp h. elim H1. exists prp. assumption. }
+       destruct t0; cbn; try (rewrite H; reflexivity).
+       * { destruct (n ?= n0); try (rewrite H; reflexivity).
+           - case_eq arg; intros; try (rewrite H; reflexivity).
+             case_eq t1; intros; try (rewrite H; reflexivity).
+             case_eq s; intros; try (rewrite H; reflexivity).
+             admit. }
+       * { destruct (L1g.term.instantiate arg n t0_2); try reflexivity;
+           destruct t0_2; rewrite H; try reflexivity;
+           destruct s; try rewrite H; try reflexivity.
+           admit.
+           reflexivity.
+           assert (j: ~ isProofCast (L1g.compile.TCast t t0)).
+     *******************************)
+  - change (TProd n (strip (L1g.term.instantiate arg (S n0) t0)) =
+            (TProd n (instantiate (strip arg) (S n0) (strip t0)))).
+    rewrite H0. reflexivity.
+  - change (TLambda n (strip (L1g.term.instantiate arg (S n0) t0)) =
+            (TLambda n (instantiate (strip arg) (S n0) (strip t0)))).
+    rewrite H0. reflexivity.
+  - change (TLetIn n (strip (L1g.term.instantiate arg n0 t))
+                   (strip (L1g.term.instantiate arg (S n0) t1)) =
+            (TLetIn n (instantiate (strip arg) n0 (strip t))
+                    (instantiate (strip arg) (S n0) (strip t1)))).
+    rewrite H. rewrite H1. reflexivity.
+  - change (strip (L1g.compile.mkApp
+                     (L1g.term.instantiate arg n t)
+                     (L1g.compile.tcons (L1g.term.instantiate arg n t0)
+                                         (L1g.term.instantiates arg n t1))) =
+            instantiate (strip arg) n (strip (L1g.compile.TApp t t0 t1))). 
+    rewrite TApp_hom. 
+    change
+      (strip (L1g.compile.mkApp (L1g.term.instantiate arg n t)
+                                 (L1g.compile.tcons (L1g.term.instantiate arg n t0)
+                                                     (L1g.term.instantiates arg n t1))) =
+       (mkApp (instantiate (strip arg) n (strip t))
+              (tcons (instantiate (strip arg) n (strip t0))
+                     (instantiates (strip arg) n (strips t1))))).
+    rewrite <- H. rewrite <- H0. rewrite <- H1. 
+    rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
+  - change (TCase p (strip (L1g.term.instantiate arg n t0))
+                  (strips (L1g.term.instantiates arg n t1)) =
+            (TCase p (instantiate (strip arg) n (strip t0))
+                   (instantiates (strip arg) n (strips t1)))).
+    rewrite H0. rewrite H1. reflexivity.
+  - change (TFix (stripDs (L1g.term.instantiateDefs
+                             arg (n0 + L1g.term.dlength d) d)) n =
+            (TFix (instantiateDefs (strip arg)
+                                   (n0 + dlength (stripDs d)) (stripDs d)) n)).
+    rewrite H. rewrite dlength_hom. reflexivity.
+  - change (tcons (strip (L1g.term.instantiate arg n t))
+                  (strips (L1g.term.instantiates arg n t0)) =
+            tcons (instantiate (strip arg) n (strip t))
+                  (instantiates (strip arg) n (strips t0))).
+    rewrite H. rewrite H0. reflexivity.
+  - change (dcons n (strip (L1g.term.instantiate arg n1 t0)) n0
+                  (stripDs (L1g.term.instantiateDefs arg n1 d)) =
+            dcons n (instantiate (strip arg) n1 (strip t0)) n0
+                  (instantiateDefs (strip arg) n1 (stripDs d))).
+    rewrite H0. rewrite H1. reflexivity.
+Admitted.   
+
+(*******************
+Lemma instantiate_hom:
+  (forall bod arg n, (** ~ isProofCast (L1g.term.instantiate arg n bod) -> **)
+                     strip (L1g.term.instantiate arg n bod) =
+                     instantiate (strip arg) n (strip bod)) /\
+    (forall bods arg n, strips (L1g.term.instantiates arg n bods) =
+                    instantiates (strip arg) n (strips bods)) /\
+    (forall ds arg n, stripDs (L1g.term.instantiateDefs arg n ds) =
+                      instantiateDefs (strip arg) n (stripDs ds)).
+Proof.
+  apply L1g.compile.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
+  - simpl. destruct (lt_eq_lt_dec n n0); cbn.
+    + destruct s.
+      * rewrite (proj1 (nat_compare_gt n0 n)); try omega. cbn. reflexivity.
+      * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
+        rewrite mkApp_tnil_ident. reflexivity.
+    + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
+  -  destruct (isCastProp_dec t0).
+     + unfold isCastProp in H1. destruct H1 as [prp k]. subst. 
+       cbn. rewrite H. reflexivity.
+     + unfold isCastProp in H1.
+       assert (j: forall prp, t0 <> L1g.compile.TCast prp L1g.compile.prop).
+       { intros prp h. elim H1. exists prp. assumption. }
+       destruct t0; cbn; try (rewrite H; reflexivity).
+       * { destruct (n ?= n0); try (rewrite H; reflexivity).
+           - case_eq arg; intros; try (rewrite H; reflexivity).
+             case_eq t1; intros; try (rewrite H; reflexivity).
+             case_eq s; intros; try (rewrite H; reflexivity).
+             admit. }
+       * { destruct (L1g.term.instantiate arg n t0_2); try reflexivity;
+           destruct t0_2; rewrite H; try reflexivity;
+           destruct s; try rewrite H; try reflexivity.
+           admit.
+           reflexivity.
+    assert (j: ~ isProofCast (L1g.compile.TCast t t0)).
+     { intros k. elim H1. apply instantiate_pres_isProofCast. assumption. }
+     destruct (isCastProp_dec t0).
+     + unfold isCastProp in H2. destruct H2 as [prp k]. subst.
+
+       
+     rewrite (strip_TCast_TCast'); try assumption.
+          change
+      (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                (L1g.term.instantiate arg n t0)) =
+       TCast (instantiate (strip arg) n (strip t))).
+     rewrite (strip_TCast_TCast'); try assumption.
+     rewrite <- H. reflexivity.
+     intros h.  destruct h as [x0 [x1 kx]]. 
+     
+     rewrite (strip_TCast_TCast'); try assumption.
+    change
+      (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                (L1g.term.instantiate arg n t0)) =
+       instantiate (strip arg) n (TCast (strip t))).
+    rewrite (strip_TCast_TCast').
+     + rewrite H. reflexivity.
+       intros h.  destruct h as [x0 [x1 kx]]. elim H1.
+       unfold isProofCast.
+       change
+      (exists prf prp : L1g.compile.Term,
+         (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                            (L1g.term.instantiate arg n t0) =
+         L1g.compile.TCast prf (L1g.compile.TCast prp L1g.compile.prop))).
+       exists (L1g.term.instantiate arg n t). rewrite kx.
+
+    rewrite (strip_TCast_TCast').
+    assert (j: ~ isProofCast (L1g.compile.TCast t t0)).
+    { intros k. elim H1. apply instantiate_pres_isProofCast. assumption. }
+    
+    change (TCast (strip (L1g.term.instantiate arg n t)) =
+            TCast (instantiate (strip arg) n (strip t))).
+    rewrite H. reflexivity.
+    intros h. destruct h as [x0 [x1 kx]]. elim H1. unfold isProofCast.
+    change
+      (exists prf prp : L1g.compile.Term,
+         (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                            (L1g.term.instantiate arg n t0) =
+         L1g.compile.TCast prf (L1g.compile.TCast prp L1g.compile.prop))).
+    exists (L1g.term.instantiate arg n t).
+
+    
+    + intros h. elim H1. unfold isProofCast. unfold isProofCast in h.
+      destruct h as [prf [prp j]]. cbn.
+
+
+      apply instantiate_pres_isProofCast.
+    rewrite strip_TCast_TCast; try assumption. rewrite H. reflexivity.
+    + unfold isProofCast in H1. destruct H1 as [prf [prp j]].
+      change
+        (~ isProofCast (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                          (L1g.term.instantiate arg n t0))) in H1.
+      rewrite j in H1.
+
+      exists (L1g.term.instantiate arg n t).
+    + destruct H1 as [x jx]. subst. cbn. rewrite H. reflexivity.
+    + rewrite strip_TCast_TCast; try assumption.
+      change
+        (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                  (L1g.term.instantiate arg n t0)) =
+         instantiate (strip arg) n (TCast (strip t))).
+      erewrite <- strip_TCast_TCast; try eassumption.
+      rewrite strip_TCast_TCast at 1. rewrite H.
+      change
+        (instantiate (strip arg) n (TCast (strip t)) =
+         instantiate (strip arg) n (strip (L1g.compile.TCast t t0))).
+      rewrite strip_TCast_TCast. reflexivity. assumption.
+
+      Check TCast_hom.
+      destruct (isCastProp_dec (L1g.term.instantiate arg n t0)).
+
+
+      
 Lemma instantiate_hom:
     (forall bod arg n, strip (L1g.term.instantiate arg n bod) =
                    instantiate (strip arg) n (strip bod)) /\
@@ -363,7 +583,138 @@ Proof.
       * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
         rewrite mkApp_tnil_ident. reflexivity.
     + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
-  - admit.
+  - destruct (isCastProp_dec t0).
+    + destruct H1 as [x jx]. subst. cbn. rewrite H. reflexivity.
+    + rewrite strip_TCast_TCast; try assumption.
+      change
+        (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                  (L1g.term.instantiate arg n t0)) =
+         instantiate (strip arg) n (TCast (strip t))).
+      erewrite <- strip_TCast_TCast; try eassumption.
+      rewrite strip_TCast_TCast at 1. rewrite H.
+      change
+        (instantiate (strip arg) n (TCast (strip t)) =
+         instantiate (strip arg) n (strip (L1g.compile.TCast t t0))).
+      rewrite strip_TCast_TCast. reflexivity. assumption.
+
+      Check TCast_hom.
+      destruct (isCastProp_dec (L1g.term.instantiate arg n t0)).
+
+      
+      
+      * unfold isCastProp in H2. TCast (instantiate (strip arg) n (strip t)) =
+   instantiate (strip arg) n (strip (L1g.compile.TCast t t0))
+        destruct H2 as [prp j]. rewrite j. cbn.
+      rewrite strip_TCast_TCast; try assumption.
+       change
+        (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                  (L1g.term.instantiate arg n t0)) =
+         instantiate (strip arg) n (TCast (strip t))).
+       Check (L1g.term.instantiate_pres_isCastProp). _ _ _ H1).
+
+    + unfold isCastProp in H1.
+      assert (j: forall prp, t0 <> L1g.compile.TCast prp L1g.compile.prop). admit.
+      rewrite strip_TCast_TCast; try assumption.
+      change
+        (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                  (L1g.term.instantiate arg n t0)) =
+        instantiate (strip arg) n (TCast (strip t))).
+      case_eq (L1g.term.instantiate arg n t0); intros; cbn;
+      rewrite H; try reflexivity.
+      destruct t2; try reflexivity.
+      destruct s; try reflexivity.
+      specialize (j t1). rewrite <- H2 in j.
+      specialize (H0 arg n). rewrite H2 in H0. cbn in H0.
+
+
+
+      
+      destruct t0; cbn; try (rewrite H; reflexivity).
+      
+      rewrite strip_TCast_TCast; try assumption.
+      destruct t0; cbn; try (rewrite H; reflexivity).
+      * { destruct (n ?= n0); rewrite H.
+          -
+
+        
+      change
+        (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                  (L1g.term.instantiate arg n t0)) =
+        instantiate (strip arg) n (TCast (strip t))).
+      destruct t0; cbn; try (rewrite H; reflexivity).
+      * 
+
+      
+  - destruct (isProofCast_dec (L1g.compile.TCast t t0)).
+    + destruct H1 as [x0 [x1 jx]]. myInjection jx. cbn. rewrite H. reflexivity.
+    + rewrite (strip_TCast_TCast' H1).
+      change
+        (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                  (L1g.term.instantiate arg n t0)) =
+        instantiate (strip arg) n (TCast (strip t))).
+      rewrite (strip_TCast_TCast').
+      * rewrite H. reflexivity.
+      * intros h. elim H1. unfold isProofCast. unfold isProofCast in h.
+        destruct h as [x0 [x1 jx]]. exists t.
+
+isProofCast
+     (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                        (L1g.term.instantiate arg n t0)) ->
+isProofCast (L1g.compile.TCast t t0)
+
+            
+      change
+        ()
+        
+      unfold isProofCast in H1.
+      assert (j: forall prf prp,
+         L1g.compile.TCast t t0 <>
+         L1g.compile.TCast prf (L1g.compile.TCast prp L1g.compile.prop)).
+      { intros prf prp h. apply H1. exists prf, prp. assumption. }
+      HERE
+      destruct t0; cbn; try (solve[rewrite H; reflexivity]).
+      * destruct (n ?= n0); try (solve[rewrite H; reflexivity]).
+        destruct arg; try (solve[rewrite H; reflexivity]).
+        destruct arg2; try (solve[rewrite H; reflexivity]).
+        destruct s; try (solve[rewrite H; reflexivity]).
+        
+        elim H1. exists t.
+
+      * rewrite H. reflexivity.
+
+    destruct (TCast_hom t t0) as [h | h]. 
+    + change
+      (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                (L1g.term.instantiate arg n t0)) =
+       instantiate (strip arg) n (strip (L1g.compile.TCast t t0))).
+      specialize (h (L1g.term.instantiate arg n t)). destruct h.
+      rewrite H2.
+      
+    destruct (L1g.term.instantiate arg n t)(TCast_hom t t0) as [h | h]. 
+    + rewrite h.
+      change
+        (strip (L1g.compile.TCast (L1g.term.instantiate arg n t)
+                                  (L1g.term.instantiate arg n t0)) =
+         TCast (instantiate (strip arg) n (strip t))).
+    
+    
+    destruct (TCast_hom t c t0) as [h | h].
+    + rewrite h.
+    
+    destruct (TCast_hom (L1g.term.instantiate arg n t) c
+                        (L1g.term.instantiate arg n t0)).destruct (TCast_hom t c t0) as [h | h]. 
+rewrite h. rewrite h.
+    
+    + rewrite H1. rewrite H2. rewrite H.
+      
+      rewrite H. 
+  - change
+      (strip (L1g.compile.TCast (L1g.term.instantiate arg n t) c
+                                (L1g.term.instantiate arg n t0)) =
+       instantiate (strip arg) n (strip (L1g.compile.TCast t c t0))).
+
+admit.
+    
         (**********************
   - destruct (L1g.term.isCast_dec t0).
     + destruct i as [x0 [x1 [x2 jx]]]. subst.
@@ -431,14 +782,16 @@ Proof.
                   (instantiateDefs (strip arg) n1 (stripDs d))).
     rewrite H0. rewrite H1. reflexivity.
 Admitted.
+ ****************)
 
 Lemma whBetaStep_hom:
   forall bod arg args,
     strip (L1g.term.whBetaStep bod arg args) =
     whBetaStep (strip bod) (strip arg) (strips args).
-intros bod arg args.
-unfold L1g.term.whBetaStep, whBetaStep.
-rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
+Proof.
+  intros bod arg args.
+  unfold L1g.term.whBetaStep, whBetaStep.
+  rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
 Qed.
 
 Lemma TConstruct_hom:

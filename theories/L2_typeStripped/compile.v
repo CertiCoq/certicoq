@@ -1,7 +1,3 @@
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1g" as L1g.
-(****)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -63,9 +59,9 @@ Function strip (t:L1gTerm) : Term :=
   match t with
     | L1g.compile.TRel n => TRel n
     | L1g.compile.TSort s => TSort s
-    | L1g.compile.TCast t _ (L1g.compile.TCast _ _ (L1g.compile.prop)) =>
+    | L1g.compile.TCast t (L1g.compile.TCast _ (L1g.compile.prop)) =>
       TProof (strip t)
-    | L1g.compile.TCast t _ _ => TCast (strip t)
+    | L1g.compile.TCast t _ => TCast (strip t)
     | L1g.compile.TProd nm _ bod => TProd nm (strip bod)
     | L1g.compile.TLambda nm _ bod => TLambda nm (strip bod)
     | L1g.compile.TLetIn nm dfn _ bod =>
@@ -91,15 +87,35 @@ with stripDs (ts:L1gDefs) : Defs :=
     | L1g.compile.dcons nm _ t m ds => dcons nm (strip t) m (stripDs ds)
   end.
 
-Lemma notPrf_stripCast:
-  forall x, ~ L1g.term.isProp x ->
-  forall t1 ck1 t2 ck2,
-    strip (L1g.compile.TCast
-             t1 ck1 (L1g.compile.TCast t2 ck2 x)) = TCast (strip t1).
-  destruct x; intros; cbn; try reflexivity.
-  destruct s; try reflexivity.
-  elim H. reflexivity.
+Lemma strip_TCast_TCast:
+  forall t, ~ L1g.term.isCastProp t ->
+            forall u, strip (L1g.compile.TCast u t) = TCast (strip u).
+Proof.
+  intros t ht u. unfold isCastProp in ht.
+  assert (j: forall prp, t <> L1g.compile.TCast prp L1g.compile.prop).
+  { intros prp j. elim ht. exists prp. assumption. }
+  destruct t; cbn; try reflexivity.
+  destruct t2; cbn; try reflexivity.
+  destruct s; cbn; try reflexivity.
+  specialize (j t1). destruct j. reflexivity.
 Qed.
+
+  
+Lemma strip_TCast_TCast':
+  forall u t, ~ L1g.term.isProofCast (L1g.compile.TCast u t) ->
+            strip (L1g.compile.TCast u t) = TCast (strip u).
+Proof.
+  intros u t h. unfold isProofCast in h.
+  assert (j: forall prf prp,
+            L1g.compile.TCast u t <>
+            L1g.compile.TCast prf (L1g.compile.TCast prp L1g.compile.prop)).
+  { intros prf prp k. apply h. exists prf, prp. assumption. }
+  destruct t; cbn; try reflexivity.
+  destruct t2; cbn; try reflexivity.
+  destruct s; cbn; try reflexivity.
+  specialize (j u t1). destruct j. reflexivity.
+Qed.
+
 
 (** environments and programs **)
 Function stripEC (ec:L1gEC) : AstCommon.envClass Term :=

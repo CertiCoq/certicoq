@@ -52,7 +52,7 @@ Inductive awndEval : Term -> Term -> Prop :=
           tnth ix (tcons arg args) = Some t -> canonicalP t = Some z ->
           awndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
-| aCast: forall t ck ty, awndEval (TCast t ck ty) t
+| aCast: forall t ty, awndEval (TCast t ty) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches or Fix ***)
@@ -139,7 +139,7 @@ intros nm tp bod s h. inversion_Clear h.
 Qed.
 
 Lemma awndEval_Cast_inv:
-  forall tm ck ty s, awndEval (TCast tm ck ty) s -> tm = s.
+  forall tm ty s, awndEval (TCast tm ty) s -> tm = s.
   inversion 1.
   - reflexivity.
   - destruct (mkApp_isApp t arg args) as [x0 [x1 [x2 j]]].

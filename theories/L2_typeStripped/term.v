@@ -1,9 +1,5 @@
 (*** type fields are stripped from term notations ***)
 
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_5_box" as L1_5.
-Add LoadPath "../L2_typeStripped" as L2.
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.

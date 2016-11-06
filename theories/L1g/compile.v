@@ -1,9 +1,4 @@
 
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_QuotedCoq" as L1.
-(****)
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.omega.Omega.
@@ -32,7 +27,7 @@ Set Implicit Arguments.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
-| TCast      : Term -> cast_kind -> Term -> Term
+| TCast      : Term -> Term -> Term
 | TProd      : name -> Term (* type *) -> Term -> Term
 | TLambda    : name -> Term (* type *) -> Term -> Term
 | TLetIn     : name ->
@@ -209,8 +204,8 @@ Function term_Term (t:term) : Term :=
                     | sProp => SProp
                     | sSet => SSet
                     | sType _ => SType  (* throwing away sort info *)
-                  end)
-    | tCast tm ck ty => (TCast (term_Term tm) ck (term_Term ty))
+             end)
+    | tCast tm _ ty => (TCast (term_Term tm) (term_Term ty))
     | tProd nm ty bod => (TProd nm (term_Term ty) (term_Term bod))
     | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))
     | tLetIn nm dfn ty bod =>

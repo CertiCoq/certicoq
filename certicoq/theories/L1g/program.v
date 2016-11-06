@@ -1,8 +1,3 @@
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_QuotedCoq" as L1.
-Add LoadPath "../L1g" as L1g.
-(****)
 
 Require Import Coq.Bool.Bool.
 Require Import Coq.Lists.List.
@@ -107,8 +102,8 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctWkTrmTyp: forall n p t s nm, Crct p n t ->
            fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
-| CrctCast: forall n p t ck ty, Crct p n t -> Crct p n ty ->
-                                Crct p n (TCast t ck ty)
+| CrctCast: forall n p t ty, Crct p n t -> Crct p n ty ->
+                                Crct p n (TCast t ty)
 | CrctProd: forall n p nm ty bod,
               Crct p (S n) bod -> Crct p n ty -> Crct p n (TProd nm ty bod)
 | CrctLam: forall n p nm ty bod,
@@ -604,11 +599,11 @@ Qed.
 
 Lemma Crct_invrt_Cast:
   forall p n cast,
-    Crct p n cast -> forall t ck ty, cast = (TCast t ck ty) ->
+    Crct p n cast -> forall t ty, cast = (TCast t ty) ->
     Crct p n t /\ Crct p n ty.
 induction 1; intros; try discriminate.
-- assert (j:= IHCrct1 _ _ _ H2). intuition.
-- assert (j:= IHCrct _ _ _ H1). intuition.
+- assert (j:= IHCrct1 _ _ H2). intuition.
+- assert (j:= IHCrct _ _ H1). intuition.
 - injection H1; intros; subst. auto.
 Qed.
 

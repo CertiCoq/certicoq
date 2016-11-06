@@ -31,8 +31,8 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wProd: forall nm ty ty' bod,
           WcbvEval p ty ty' ->
           WcbvEval p (TProd nm ty bod) (TProd nm ty' bod)
-| wCast: forall t s ck ty,
-           WcbvEval p t s ->  WcbvEval p (TCast t ck ty) s
+| wCast: forall t s ty,
+           WcbvEval p t s ->  WcbvEval p (TCast t ty) s
 | wConstruct: forall i r arty,
                 WcbvEval p (TConstruct i r arty) (TConstruct i r arty)
 | wInd: forall i, WcbvEval p (TInd i) (TInd i) 
@@ -379,7 +379,7 @@ Function wcbvEval
               raise ("wcbvEval, TConst ecTyp " ++ nm)
             | _ => raise ("wcbvEval: TConst environment miss:  " ++ nm)
           end
-        | TCast t ck _ =>
+        | TCast t _ =>
           match wcbvEval n t with
             | Ret et => Ret et
             | Exc s => raise ("wcbvEval: TCast: " ++ s)

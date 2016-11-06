@@ -1,9 +1,4 @@
 
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1g" as L1g.
-(****)
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
@@ -52,7 +47,7 @@ Inductive wndEval : Term -> Term -> Prop :=
           canonicalP t = Some z ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
-| sCast: forall t ck ty, wndEval (TCast t ck ty) t
+| sCast: forall t ty, wndEval (TCast t ty) t
 (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches 
@@ -385,7 +380,7 @@ intros nm tp bod s h. inversion_Clear h.
 Qed.
 
 Lemma wndEval_Cast_inv:
-  forall tm ck ty s, wndEval (TCast tm ck ty) s -> tm = s.
+  forall tm ty s, wndEval (TCast tm ty) s -> tm = s.
 inversion 1.
 - reflexivity.
 Qed.

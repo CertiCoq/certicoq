@@ -27,6 +27,7 @@ Set Implicit Arguments.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
+| TProof     : Term -> Term
 | TCast      : Term -> Term -> Term
 | TProd      : name -> Term (* type *) -> Term -> Term
 | TLambda    : name -> Term (* type *) -> Term -> Term
@@ -205,6 +206,7 @@ Function term_Term (t:term) : Term :=
                     | sSet => SSet
                     | sType _ => SType  (* throwing away sort info *)
              end)
+    | tCast tm _ (tCast _ _ (tSort sProp)) => TProof (term_Term tm)
     | tCast tm _ ty => (TCast (term_Term tm) (term_Term ty))
     | tProd nm ty bod => (TProd nm (term_Term ty) (term_Term bod))
     | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))

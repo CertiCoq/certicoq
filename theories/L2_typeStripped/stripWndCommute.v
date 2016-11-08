@@ -1,8 +1,3 @@
-(******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1g_box" as L1g.
-Add LoadPath "../L2_typeStripped" as L2.
-(******)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -81,7 +76,6 @@ Proof.
     refine (sFix _ _ _ _ _ _).
     rewrite <- dnthBody_hom. rewrite <- optStripDnth_hom.
     apply f_equal. eassumption.
-  - admit.
   - rewrite mkApp_hom. refine (sAppFn _ _ _). inversion_Clear H0.
     apply H. assumption.
     + rewrite TApp_hom in H1. rewrite mkApp_hom in H1.
@@ -95,15 +89,14 @@ Proof.
     inversion_Clear H0. apply H.
     + constructor; assumption.
     + intros h. myInjection h. elim H1. rewrite H0, H2. reflexivity.
-Admitted.
+Qed.
 
 Lemma TConst_strip_inv:
   forall nm r, TConst nm = strip r -> r = L1g.compile.TConst nm.
 Proof.
   destruct r; intros; try discriminate.
-  - admit.
-  - myInjection H. reflexivity.
-Admitted.
+  myInjection H. reflexivity.
+Qed.
 
 
 (**************************

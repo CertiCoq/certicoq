@@ -2,6 +2,11 @@
 *** equivalent for well-formed programs
 **)
 
+(****)
+Add LoadPath "../common" as Common.
+Add LoadPath "../L2_5_box" as L2_5.
+(****)
+
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
@@ -10,9 +15,8 @@ Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Operators_Properties.
 Require Import Coq.Setoids.Setoid.
 Require Import Common.Common.
-Require Import L1g.compile.
-Require Import L1g.term.
-Require Import L1g.program.
+Require Import L2_5.term.
+Require Import L2_5.program.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -21,65 +25,52 @@ Set Implicit Arguments.
 
 (*** alrernative non-deterministic small step evaluation relation ***)
 Section Env.
-Variable p: environ Term.
+Variable p:environ Term.
 Inductive awndEval : Term -> Term -> Prop :=
 (** contraction steps **)
 | aConst: forall (s:string) (t:Term),
          LookupDfn s p t -> awndEval (TConst s) t
-| aBeta: forall (nm:name) (ty bod arg:Term) (args:Terms),
-           awndEval (TApp (TLambda nm ty bod) arg args)
+| aBeta: forall (nm:name) (bod arg:Term) (args:Terms),
+           awndEval (TApp (TLambda nm bod) arg args)
                    (whBetaStep bod arg args)
      (* note: [instantiate] is total *)
-| aLetIn: forall (nm:name) (dfn ty bod:Term),
-            awndEval (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
+| aLetIn: forall (nm:name) (dfn bod:Term),
+            awndEval (TLetIn nm dfn bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| aCase: forall (ml: inductive * nat * list nat) (ty s mch:Term)
+| aCase: forall (ml: inductive * nat * list nat) (s mch:Term)
                  (args brs ts:Terms) (n arty:nat),
             canonicalP mch = Some (n, args, arty) ->
             tskipn (snd (fst ml)) args = Some ts ->
             whCaseStep n ts brs = Some s ->
-            awndEval (TCase ml ty mch brs) s
+            awndEval (TCase ml mch brs) s
 | aFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
-               (x:Term) (ix:nat) (t:Term) z,
+               (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          tnth ix (tcons arg args) = Some t ->
-          canonicalP t = Some z ->
           awndEval (TApp (TFix dts m) arg args)
-                  (pre_whFixStep x dts (tcons arg args))
-| aCast: forall t ty, awndEval (TCast t ty) t
-| aPrf: forall t, awndEval (TProof t) t
+                   (pre_whFixStep x dts (tcons arg args))
+| aCast: forall t, awndEval (TCast t) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
- *** no congruence on Case branches or Fix ***)
+*** no congruence on Case branches or Fix ***)
 | aAppFn:  forall (t r arg:Term) (args:Terms),
               awndEval t r ->
               awndEval (mkApp t (tcons arg args)) (mkApp r (tcons arg args))
 | aAppArgs: forall (t arg brg:Term) (args brgs:Terms),
               awndEvals (tcons arg args) (tcons brg brgs) ->
               awndEval (TApp t arg args) (TApp t brg brgs)
-| aProdTy:  forall (nm:name) (t1 t2 bod:Term),
-              awndEval t1 t2 ->
-              awndEval (TProd nm t1 bod) (TProd nm t2 bod)
-| aLamTy:   forall (nm:name) (t1 t2 bod:Term),
-              awndEval t1 t2 ->
-              awndEval (TLambda nm t1 bod) (TLambda nm t2 bod)
-| aLetInTy: forall (nm:name) (t1 t2 d bod:Term),
-              awndEval t1 t2 ->
-              awndEval (TLetIn nm d t1 bod) (TLetIn nm d t2 bod)
-| aLetInDef:forall (nm:name) (t d1 d2 bod:Term),
+| aLetInDef:forall (nm:name) (d1 d2 bod:Term),
               awndEval d1 d2 ->
-              awndEval (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
-| aCaseTy:  forall (ml: inductive * nat * list nat) (ty uy mch:Term) (brs:Terms),
-              awndEval ty uy ->
-              awndEval (TCase ml ty mch brs) (TCase ml uy mch brs)
-| aCaseArg: forall (ml: inductive * nat * list nat) (ty mch can:Term) (brs:Terms),
+              awndEval (TLetIn nm d1 bod) (TLetIn nm d2 bod)
+| aCaseArg:
+    forall (ml:inductive * nat * list nat) (mch can:Term) (brs:Terms),
               awndEval mch can ->
-              awndEval (TCase ml ty mch brs) (TCase ml ty can brs)
-| aCaseBrs: forall (ml: inductive * nat * list nat) (ty mch:Term) (brs brs':Terms),
+              awndEval (TCase ml mch brs) (TCase ml can brs)
+| aCaseBrs:
+    forall (ml:inductive * nat * list nat) (mch:Term) (brs brs':Terms),
               awndEvals brs brs' ->
-              awndEval (TCase ml ty mch brs) (TCase ml ty mch brs')
+              awndEval (TCase ml mch brs) (TCase ml mch brs')
 with awndEvals : Terms -> Terms -> Prop :=
      | aaHd: forall (t r:Term) (ts:Terms), 
                awndEval t r ->
@@ -115,28 +106,9 @@ Proof.
   - apply aaTl. apply IHds.
 Qed.
 
-Lemma awndEval_Lam_inv:
-  forall nm tp bod s,
-    awndEval (TLambda nm tp bod) s ->
-    exists tp', awndEval tp tp' /\ s = (TLambda nm tp' bod).
-intros nm tp bod s h. inversion_Clear h.
-- assert (j:= mkApp_isApp t arg args).
-  destruct j as [x0 [x1 [x2 k]]]. rewrite k in H. discriminate.
-- exists t2. split; [assumption | reflexivity].
-Qed.
-
-Lemma awndEval_Prod_inv:
-  forall nm tp bod s,
-    awndEval (TProd nm tp bod) s ->
-    exists tp', awndEval tp tp' /\ s = (TProd nm tp' bod).
-intros nm tp bod s h. inversion_Clear h.
-- assert (j:= mkApp_isApp t arg args).
-  destruct j as [x0 [x1 [x2 k]]]. rewrite k in H. discriminate.
-- exists t2. split; [assumption | reflexivity].
-Qed.
 
 Lemma awndEval_Cast_inv:
-  forall tm ty s, awndEval (TCast tm ty) s -> tm = s.
+  forall tm s, awndEval (TCast tm) s -> tm = s.
   inversion 1.
   - reflexivity.
   - destruct (mkApp_isApp t arg args) as [x0 [x1 [x2 j]]].
@@ -166,7 +138,6 @@ Proof.
     + eapply j. eassumption.
     + constructor; assumption.
   - inversion_Clear H. assumption.
-  - inversion_Clear H. assumption.
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.
     + constructor; assumption.
@@ -195,8 +166,7 @@ Hint Constructors awndEvalRTC awndEvalsRTC.
 
 
 Lemma awndEvalRTC_pres_WFapp:
-  WFaEnv p ->
-  forall t s, awndEvalRTC t s -> WFapp t -> WFapp s.
+    WFaEnv p -> forall t s, awndEvalRTC t s -> WFapp t -> WFapp s.
 Proof.
   intros hp.
   induction 1; intros; try assumption.
@@ -222,11 +192,6 @@ Qed.
 End Env.
 Hint Constructors awndEval awndEvals.
 Hint Constructors awndEvalRTC awndEvalsRTC.
-(***
-Hint Constructors awndEvalTC awndEvalsTC.
-Hint Constructors awndEvalTCl awndEvalsTCl.
-***)
-
 
 
 (**

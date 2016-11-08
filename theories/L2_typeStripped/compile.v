@@ -59,8 +59,7 @@ Function strip (t:L1gTerm) : Term :=
   match t with
     | L1g.compile.TRel n => TRel n
     | L1g.compile.TSort s => TSort s
-    | L1g.compile.TCast t (L1g.compile.TCast _ (L1g.compile.prop)) =>
-      TProof (strip t)
+    | L1g.compile.TProof t => TProof (strip t)
     | L1g.compile.TCast t _ => TCast (strip t)
     | L1g.compile.TProd nm _ bod => TProd nm (strip bod)
     | L1g.compile.TLambda nm _ bod => TLambda nm (strip bod)
@@ -87,6 +86,7 @@ with stripDs (ts:L1gDefs) : Defs :=
     | L1g.compile.dcons nm _ t m ds => dcons nm (strip t) m (stripDs ds)
   end.
 
+(************
 Lemma strip_TCast_TCast:
   forall t, ~ L1g.term.isCastProp t ->
             forall u, strip (L1g.compile.TCast u t) = TCast (strip u).
@@ -100,7 +100,6 @@ Proof.
   specialize (j t1). destruct j. reflexivity.
 Qed.
 
-  
 Lemma strip_TCast_TCast':
   forall u t, ~ L1g.term.isProofCast (L1g.compile.TCast u t) ->
             strip (L1g.compile.TCast u t) = TCast (strip u).
@@ -115,7 +114,7 @@ Proof.
   destruct s; cbn; try reflexivity.
   specialize (j u t1). destruct j. reflexivity.
 Qed.
-
+*******************)
 
 (** environments and programs **)
 Function stripEC (ec:L1gEC) : AstCommon.envClass Term :=

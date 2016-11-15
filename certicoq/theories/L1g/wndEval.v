@@ -104,8 +104,17 @@ Qed.
 
 (**************
 Lemma wndEval_not_rfl:
-  forall t, ~ wndEval t t.
+  Crct p 0 prop ->
+  (forall t t', wndEval t t' -> t <> t') /\
+  (forall ts ts', wndEvals ts ts' -> ts <> ts').
 Proof.
+  intros hp. apply wndEvalEvals_ind; intros.
+  - unfold LookupDfn in l. assert (j:= LookupDfn_lookupDfn l eq_refl).
+    unfold  lookupDfn in j. destruct (lookup s p).
+    + destruct e. myInjection j. Check (proj1 Crct_not_bad_Lookup).
+  
+
+  
   apply (wf_ind TrmSize (fun t => ~ wndEval t t)).
   intros t whih. destruct t; intros h; try (solve[inversion h]).
   - inversion h. assert (j := f_equal TrmSize H3). simpl in j. omega.
@@ -207,6 +216,18 @@ Proof.
   - cbn. constructor. assumption.
   - cbn. constructor. apply IHfsts. assumption.
 Qed.
+
+(*** needs that wndEval is not reflexive ***
+Goal
+  forall t t', wndEval t t' ->
+                 forall us us', wndEvals (tcons t us) (tcons t' us') ->
+                                us = us'.
+Proof.
+  induction 1; intros; try inversion_Clear H0; try reflexivity.
+  - unfold LookupDfn in H. inversion_Clear H.
+
+******************)
+
 
 Lemma wndEval_mkApp_mkApp:
   forall s u, wndEval s u -> WFapp s ->
@@ -508,7 +529,7 @@ Proof.
     split. eapply wERTCtrn; eassumption.  eapply wEsRTCtrn; eassumption. 
 Qed.
 
- Lemma wndEvalsRTC_tcons:
+Lemma wndEvalsRTC_tcons:
   forall brgs brgs', wndEvalsRTC brgs brgs' ->
     forall a1 args, brgs = (tcons a1 args) ->
      forall a1' args', brgs' = (tcons a1' args') ->
@@ -527,7 +548,35 @@ Proof.
     + eapply wEsRTCtrn; eassumption.
 Qed.
 
+Lemma wndEvalsRTC_mk_tconsr:
+  forall us us',
+    wndEvalsRTC us us' ->
+    forall t, wndEvalsRTC (tcons t us) (tcons t us').
+Proof.
+  induction 1; intros.
+  - constructor.
+  - constructor. constructor. assumption.
+  - eapply wEsRTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
+Qed.
 
+Lemma wndEvalsRTC_mk_tconsl:
+  forall t t', wndEvalRTC t t' ->
+  forall us, wndEvalsRTC (tcons t us) (tcons t' us).
+Proof.
+  induction 1; intros.
+  - constructor.
+  - constructor. constructor. assumption.
+  - eapply wEsRTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+      
+Lemma wndEvalsRTC_mk_tappendr:
+  forall ts us us',
+    wndEvalsRTC us us' -> wndEvalsRTC (tappend ts us) (tappend ts us').
+Proof.
+  induction ts; cbn; intros.
+  - assumption.
+  - eapply wndEvalsRTC_mk_tconsr. intuition.
+Qed.
 
 Inductive wndEvalTCl: Term -> Term -> Prop :=
 | wETClstep: forall t s, wndEval t s -> wndEvalTCl t s
@@ -769,45 +818,6 @@ Proof.
   intros. apply wndEvalsRTC_appendr. apply wndEvalsRTC_tcons_hd. assumption.
 Qed.
 
-(**********
-Lemma wndEvalsRTC_Case_mch:
-  forall t t',
-    wndEvalRTC t t' -> 
-    forall ix brfsts brlsts,
-      tsplit ix (tappend brfsts (tcons t brlsts)) =
-      Some (mkSplit brfsts t brlsts) ->
-    forall i ns ty mch,
-      wndEvalRTC (TCase (i, ix, ns) ty mch (tappend brfsts (tcons t brlsts)))
-                 (TCase (i, ix, ns) ty mch (tappend brfsts (tcons t' brlsts))).
-Proof.
-  induction 1; intros.
-  - constructor.
-  - constructor. constructor. apply wndEvals_inside. assumption.
-  - eapply wERTCtrn.
-    + eapply IHwndEvalRTC1. eassumption.
-    + eapply wndEvalRTC_Case_brs. apply wndEvalsRTC_inside. assumption.
-Qed.
- ************)
-
-(***********
-Lemma wndEvalsRTC_Fix_guard:
-  forall t t', wndEvalRTC t t' ->
-  forall m dts x ix, dnthBody m dts = Some (x, ix) ->
-  forall arg args, tnth ix (tcons arg args) = Some t ->
-  forall z, canonicalP t' = Some z ->
-            wndEvalRTC (TApp (TFix dts m) arg args)
-                       (pre_whFixStep x dts (tcons arg args)).
-Proof.
-  induction 1; intros.
-  - constructor. eapply sFix; try eassumption. assert (j:= tnth_tsplit_sanity ix0 (tappend brfsts (tcons t brlsts))).
-    rewrite H1 in j. destruct brfsts; cbn; cbn in j.
-    + destruct ix0 in j. constructor. eapply sFix; try eassumption.
-  - constructor. constructor. apply wndEvals_inside. assumption.
-  - eapply wERTCtrn.
-    + eapply IHwndEvalRTC1. eassumption.
-    + eapply wndEvalRTC_Case_brs. apply wndEvalsRTC_inside. assumption.
-Qed.
- ***************)
 
 End Env.
 Hint Constructors wndEval wndEvals.

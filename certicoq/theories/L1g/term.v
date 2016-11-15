@@ -352,6 +352,14 @@ rewrite IHts. reflexivity.
 Qed.
 Hint Rewrite tappend_tnil : tappend.
 
+Lemma nil_tappend:
+  forall ts us:Terms, tnil = tappend ts us -> ts = tnil /\ us = tnil.
+Proof.
+  induction ts; cbn; intros.
+  - intuition.
+  - discriminate.
+Qed.
+
 Lemma tappend_assoc:
   forall xts yts zts,
        (tappend xts (tappend yts zts)) = (tappend (tappend xts yts) zts).
@@ -446,8 +454,8 @@ Function tskipn (n:nat) (l:Terms) : option Terms :=
     | S _, tnil => None
   end.
 
-Record split := mkSplit {fsts:Terms; nst:Term; lasts:Terms}.
-Function tsplit (n:nat) (l:Term) (ls:Terms) {struct ls} : option split :=
+Record split := mkSplit {fsts:Terms; nst:Term; lsts:Terms}.
+Function tsplit (n:nat) (l:Term) (ls:Terms) {struct n} : option split :=
   match n, ls with
     | 0, tnil => Some (mkSplit tnil l tnil)
     | _, tnil => None
@@ -469,20 +477,220 @@ Eval cbv in tsplit 4 (TRel 0) testts.
 Eval cbv in tsplit 5 (TRel 0) testts.
 ***)
 
+Lemma tsplit_0_Some:
+  forall ts t, tsplit 0 t ts = Some (mkSplit tnil t ts).
+Proof. 
+  destruct ts; intros; reflexivity.
+Qed.
+
+Lemma tsplit_tcons:
+  forall ix t ts frsts u lasts,
+    tsplit ix t ts = Some {| fsts:= frsts; nst:= u; lsts:= lasts |} ->
+         tcons t ts = tappend frsts (tcons u lasts).
+Proof.
+  intros ix t ts.
+  functional induction (tsplit ix t ts); intros; try discriminate.
+  - myInjection H. reflexivity.
+  - myInjection H. reflexivity.
+  - myInjection H. cbn. apply f_equal2. reflexivity.
+    apply IHo. assumption.
+Qed. 
+  
 Lemma tsplit_sanity:
   forall n t ts, match tsplit n t ts with
                  | None => n > tlength ts
                  | Some (mkSplit s1 s2 s3) =>
-                   tcons t ts = tappend s1 (tcons s2 s3)
+                   tcons t ts = tappend s1 (tcons s2 s3) /\
+                   n = tlength s1
                end.
 Proof.
   intros n t ts. functional induction (tsplit n t ts); intros; cbn.
-  - reflexivity.
+  - intuition.
   - destruct n. elim y. omega.
-  - destruct ls. elim y. reflexivity.
+  - destruct ls. elim y. intuition.
   - rewrite e1 in IHo. omega.
+  - rewrite e1 in IHo. rewrite (proj1 IHo). rewrite (proj2 IHo).
+    intuition.
+Qed.
+
+Function atsplit (n:nat) (ls:Terms) {struct ls} : option split :=
+  match n, ls with
+    | _, tnil => None
+    | 0, tcons t ts => Some (mkSplit tnil t ts)
+    | S m, tcons t ts =>
+      match atsplit m ts with
+        | Some (mkSplit fs u ls) => Some (mkSplit (tcons t fs) u ls)
+        | None => None
+      end
+  end.
+(*********
+Eval cbv in atsplit 0 (tcons (TRel 0) testts).
+Eval cbv in atsplit 1 (tcons (TRel 0) testts).
+Eval cbv in atsplit 2 (tcons (TRel 0) testts).
+Eval cbv in atsplit 3 (tcons (TRel 0) testts).
+Eval cbv in atsplit 4 (tcons (TRel 0) testts).
+Eval cbv in atsplit 5 (tcons (TRel 0) testts).
+***********)
+
+Lemma atsplit_tsplit:
+  forall n u us, atsplit n (tcons u us) = tsplit n u us.
+Proof.
+  intros n u us.
+  functional induction (tsplit n u us); cbn; intros;
+  try reflexivity; try discriminate.
+  - destruct n.
+    + elim y.
+    + destruct n; reflexivity.
+  - destruct m.
+    + rewrite e1 in IHo. cbn in IHo. discriminate.
+    + rewrite e1 in IHo. cbn in IHo. destruct (atsplit m ts).
+      destruct s. discriminate. reflexivity.
+  - rewrite e1 in IHo. cbn in IHo.
+    destruct m.
+    + injection IHo; intros. subst fs. subst. reflexivity.
+    + destruct (atsplit m ts).
+      * destruct s0. injection IHo; intros. subst fs. subst.
+        reflexivity.
+      * discriminate.      
+Qed.
+
+Lemma atsplit_S:
+  forall m ts fs u ls,
+    atsplit m ts = Some {| fsts:= fs; nst:= u; lsts:= ls |} ->
+    forall t, atsplit (S m) (tcons t ts) =
+              Some {| fsts:= tcons t fs; nst:= u; lsts:= ls |}.
+Proof.
+  intros; functional induction (atsplit m ts); intros; try discriminate.
+  - injection H; intros. subst fs. subst. cbn. reflexivity.
+  - injection H; intros. subst fs. subst. cbn. rewrite e1. reflexivity.
+Qed.
+
+Function aatsplit (n:nat) (ls:Terms) {struct n} : option split :=
+  match n, ls with
+    | _, tnil => None
+    | 0, tcons t ts => Some (mkSplit tnil t ts)
+    | S m, tcons t ts =>
+      match aatsplit m ts with
+        | Some (mkSplit fs u ls) => Some (mkSplit (tcons t fs) u ls)
+        | None => None
+      end
+  end.
+
+Lemma aatsplit_atsplit:
+  forall n ts, aatsplit n ts = atsplit n ts.
+Proof.
+  intros n ts. functional induction (atsplit n ts); cbn; try reflexivity.
+  - destruct n; reflexivity.
+  - rewrite IHo. destruct (atsplit m ts).
+    + destruct s. myInjection e1. reflexivity.
+    + discriminate.
   - rewrite e1 in IHo. rewrite IHo. reflexivity.
 Qed.
+      
+(*****)
+Fixpoint treverse (ts: Terms) : Terms :=
+  match ts with
+    | tnil => tnil
+    | tcons b bs => tappend (treverse bs) (tunit b)
+  end.
+
+Fixpoint tfrsts (n:nat) (ts:Terms) : option Terms :=
+  match n, ts with
+    | 0, _ => Some tnil
+    | S m, tnil => None
+    | S m, tcons u us => match tfrsts m us with
+                           | None => None
+                           | Some xs => Some (tcons u xs)
+                         end
+  end.
+Definition tlasts (n:nat) (ts:Terms) : option Terms :=
+  match tfrsts (tlength ts - n) (treverse ts) with
+    | None => None
+    | Some us => Some (treverse us)
+  end.
+
+
+(***
+Definition aatsplit: forall (n:nat) (ls:Terms) (p: n < tlength ls), split.
+Proof.
+  induction n; induction ls; cbn; intros; try omega.
+  - destruct ls. assert (j: 0 < tlength ls).
+    {
+
+    omega. constructor.
+  intros n ls. induction 1; intros.
+  let lgth := tlength ls
+  in match tfsts n ls, tlsts (lgth - n) ls with
+       | us, (tcons v vs) => mkSplit us v vs
+       | _, _ => None
+     end.
+
+Goal
+  forall n ts, forall p, atsplit n ts = @aatsplit n ts p.
+Proof.
+  intros. functional induction (atsplit n ts); intros.
+  - cbn in p. omega.
+  - cbn. destruct (tlsts (S (tlength ts)) (tcons t ts)).
+    + destruct t0.
+***)
+
+(*************
+Goal
+  forall n m, n < m -> forall ts, m = tlength ts ->
+               exists frsts t lasts, ts = (tappend frsts (tcons t lasts)) /\
+                                     (tlength frsts = n).
+Proof.
+  induction 1; intros.
+  - destruct ts.
+    + cbn in H; discriminate.
+    + cbn in H. assert (j: n = tlength ts). omega.
+      
+
+  
+Lemma aatsplit_replace:
+  forall ix bs fsts t lsts,
+    aatsplit ix bs = Some (mkSplit fsts t lsts) ->
+    forall t', exists bs', aatsplit ix bs' = Some (mkSplit fsts t' lsts).
+Proof.
+  induction ix; induction bs; cbn; intros; try discriminate.
+  - injection H; intros. subst fsts0. subst.
+    exists (tcons t' lsts0). reflexivity.
+  - exists (tappend fsts0 (tcons t' 
+
+
+  
+  - exists (tappend fsts0 (tcons t' lsts0)).
+    destruct bs; cbn in H.
+    + discriminate.
+    + injection H; intros. subst fsts0. subst. cbn. reflexivity.
+  - destruct bs; cbn in H.
+    + discriminate.
+    + specialize (IHix _ fsts0).
+
+      
+    + exists (tappend fsts0 (tcons t' lsts0)).
+      destruct (tappend_mk_canonical fsts0 t' lsts0) as [x0 [x1 jx]].
+      rewrite jx. cbn. case_eq (aatsplit ix x1); intros.
+      * destruct s. apply f_equal. apply f_equal3.
+        destruct fsts0. cbn in jx. myInjection jx.
+
+  
+  intros. functional induction (aatsplit ix bs); try discriminate.
+  - injection H; intros. subst fsts0. subst.
+    exists (tcons t' lsts0). reflexivity.
+  - injection H; intros. subst fsts0. subst ls0. subst u.
+    exists (tcons t0 ts). cbn.
+    rewrite e1.
+  
+  intros. functional induction (atsplit ix bs); try discriminate.
+  - injection H; intros. subst fsts0. subst. exists (tcons t' lsts0).
+    cbn. reflexivity.
+  - injection H; intros. subst fsts0. subst.
+    destruct ts.
+    + cbn in e1. destruct m; discriminate.
+    + 
+    assert (j:= atsplit_S _ _ e1).
+*****************)
   
 Function tnth (n:nat) (l:Terms) {struct l} : option Term :=
   match l with
@@ -506,6 +714,84 @@ Proof.
     + cbn in IHo. assumption.
   - rewrite e1 in IHo. destruct m; cbn in IHo; assumption.
 Qed.
+
+(*************************** 
+Goal
+  forall ix bs b fsts t lsts,
+    tsplit ix b bs = Some (mkSplit fsts t lsts) ->
+    forall t', exists b' bs', tsplit ix b' bs' = Some (mkSplit fsts t' lsts).
+Proof.
+  intros. functional induction (tsplit ix b bs).
+  - myInjection H. exists t', tnil. reflexivity.
+  - destruct n; discriminate.
+  - myInjection H. destruct lsts0.
+    + elim y.
+    + exists t', (tcons t0 lsts0). reflexivity.
+  - discriminate.
+  - injection H; intros. subst fsts0. subst.
+    exists l, (tappend fs (tcons t' lsts0)). 
+    destruct fs, m; cbn. reflexivity.
+
+
+
+
+
+
+    induction ix; destruct bs; intros.
+  - rewrite tsplit_0_Some in H. injection H; intros. subst fsts0. subst.
+    exists t', tnil. reflexivity.
+  - rewrite tsplit_0_Some in H. injection H; intros. subst fsts0. subst.
+    exists t', (tcons t bs). reflexivity.
+  - cbn in H. discriminate.
+  - cbn in H. destruct (tsplit ix t bs).
+    + destruct s. injection H; intros. subst fsts0. subst.
+      exists b, (tappend fsts1 (tcons t' lsts0)). unfold tsplit.
+
+      
+  intros. case_eq bs; intros.
+  - subst bs. cbn in H. destruct ix.
+    + myInjection H. exists t', tnil. reflexivity.
+    + discriminate.
+  - subst bs. cbn in H. destruct ix.
+    + injection H. intros. subst lsts0. subst t. subst fsts0.
+      exists t', (tcons t0 t1). reflexivity.
+    + destruct (tsplit ix t0 t1).
+      * destruct s. myInjection H. exists b, (tappend fsts1 (tcons t' lsts0)).
+        unfold tsplit.
+
+
+  intros.
+  assert (j0:= tsplit_sanity ix b bs). rewrite H in j0.
+  assert (j1:= tnth_tsplit_sanity ix b bs). rewrite H in j1. cbn in j1.
+  destruct ix.
+  - myInjection j1.
+                
+
+  destruct (tappend_mk_canonical fsts0 t' lsts0) as [x0 [x1 jx]].
+
+  + myInjection jx. exists t', x1.
+
+
+
+      intros. functional induction (tsplit ix b bs).
+******************************)
+
+Lemma step_in_split:
+  forall ix b bs fsts t lsts,
+    tsplit ix b bs = Some (mkSplit fsts t lsts) ->
+    forall t', exists b' bs', tsplit ix b' bs' = Some (mkSplit fsts t' lsts).
+Proof.
+Admitted.
+(********************
+  intros. functional induction (tsplit ix b bs).
+  - myInjection H. exists t', tnil. reflexivity.
+  - destruct n; discriminate.
+  - myInjection H. destruct lsts0.
+    + elim y.
+    + exists t', (tcons t0 lsts0). reflexivity.
+  - discriminate.
+  - myInjection H. exists l, (tappend fs (tcons t' lsts0)). 
+    destruct fs, lsts0, m; cbn. m. reflexivity.                                 **************************)
 
 Lemma tnth_extend1:
   forall n l t,  tnth n l = Some t -> n < tlength l.

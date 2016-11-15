@@ -1,10 +1,3 @@
-(******)
-(* Add LoadPath "../common" as Common. *)
-(* Add LoadPath "../L1_MalechaQuoted" as L1. *)
-(* Add LoadPath "../L1_5_box" as L1_5. *)
-(* Add LoadPath "../L2_typeStripped" as L2. *)
-(* Add LoadPath "../L3_flattenedApp" as L3. *)
-(******)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.

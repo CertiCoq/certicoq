@@ -1,4 +1,3 @@
-Add LoadPath "../common" as Common.
 
 Require Export Template.Ast.
 Require Import Coq.Strings.String.

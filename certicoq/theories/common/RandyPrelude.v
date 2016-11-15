@@ -5,10 +5,6 @@
 ** because of types like Sort, ...
 *)
 
-(****)
-Add LoadPath "../common" as Common.
-(****)
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.

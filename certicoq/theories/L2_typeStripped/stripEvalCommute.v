@@ -521,9 +521,11 @@ Proof.
       * discriminate.
     + rewrite <- tcons_hom. rewrite pre_whFixStep_hom.
       assumption.
-  - rewrite mkApp_hom. refine (wAppCong _ _ _ _); try eassumption.
+  - rewrite mkApp_hom. destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]].
+    rewrite j in H0. eapply wAppCong; try eassumption.
     + intros h. elim n. apply isLambda_hom. assumption.
-    + intros h. elim n0. apply isFix_hom. assumption.      
+    + intros h. elim n0. apply isFix_hom. assumption.
+    + rewrite j.  reflexivity. 
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.
@@ -533,11 +535,12 @@ Proof.
 Qed.
 Print Assumptions WcbvEval_hom.
 
-
 Lemma Prf_strip_inv:
-  forall s, TProof = strip s -> s = L1g.compile.TProof.
+  forall s st, TProof st = strip s ->
+              exists t, s = L1g.compile.TProof t /\ st = strip t.
 Proof.
-  destruct s; simpl; intros h; try discriminate. reflexivity.
+  destruct s; simpl; intros h; try discriminate.
+  intros. myInjection H. exists s. intuition.
 Qed.
   
 Lemma Lam_strip_inv:
@@ -560,11 +563,11 @@ Qed.
 
 Lemma Cast_strip_inv:
   forall tm s, TCast tm = strip s ->
-   exists stm ck sty, 
-     (L1g.compile.TCast stm ck sty) = s /\ tm = strip stm.
+   exists stm sty, 
+     (L1g.compile.TCast stm sty) = s /\ tm = strip stm.
 Proof.
   intros tm; destruct s; simpl; intros h; try discriminate.
-  - myInjection h. exists s1, c, s2. intuition. 
+  - myInjection h. exists s1, s2. intuition. 
 Qed.
 
 Lemma Construct_strip_inv:

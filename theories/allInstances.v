@@ -1,5 +1,6 @@
 Require Export Common.certiClasses.
 Require Export L2.instances.
+Require Export L2_5.instances.
 Require Export L4.instances.
 Require Export L6.instances.
 
@@ -14,6 +15,7 @@ Require Import ZArith.
 Require Import Common.Common.
 Require Import String.
 Open Scope string_scope.
+
 
 Eval compute in (ctranslateTo certiL4 p).
 
@@ -135,7 +137,7 @@ Set Template Cast Propositions.
 Quote Recursively Definition pgcd :=
 Gcd.
 
-
+Eval compute in (cTerm certiL2).
 Let pcgd2 : cTerm certiL2.
 let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
 Defined.

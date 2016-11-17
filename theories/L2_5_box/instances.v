@@ -13,10 +13,8 @@ Instance WfL2_5_Term : WellFormed (Program L2_5.compile.Term) :=
 
 Instance certiL2_5 : CerticoqLanguage (Program L2_5.compile.Term) := {}.
 
-Local Generalizable Variable Lj.
 
-
-Instance certiL2_5_to_L3: 
+Instance certiL2_to_L2_5: 
   CerticoqTotalTranslation (Program L2.compile.Term) (Program L2_5.compile.Term) :=
 L2_5.compile.L2Pgm_Program.
 

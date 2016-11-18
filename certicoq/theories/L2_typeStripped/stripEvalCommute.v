@@ -44,6 +44,14 @@ Definition optStripCanP
                              | None => None
                              | Some (n, t, m) => Some (n, strips t, m)
                            end.
+Definition optStrip_split
+           (b: option L1g.term.split): option split :=
+  match b with
+    | None => None
+    | Some (L1g.term.mkSplit fsts t lsts) =>
+      Some (mkSplit (strips fsts) (strip t) (strips lsts))
+  end.
+
 
 Lemma optStrip_hom: forall y, optStrip (Some y) = Some (strip y).
 induction y; simpl; reflexivity.
@@ -59,8 +67,21 @@ Lemma optStripCanP_hom:
   forall y n m, optStripCanP (Some (n, y, m)) = Some (n, strips y, m).
 induction y; simpl; reflexivity.
 Qed.
+Lemma optStrip_split_hom:
+  forall fsts t lsts,
+    optStrip_split (Some (L1g.term.mkSplit fsts t lsts)) =
+    Some (mkSplit (strips fsts) (strip t) (strips lsts)).
+Proof.
+  induction fsts; cbn; intros; try reflexivity.
+Qed.
                               
-
+Lemma tlength_hom:
+  forall ts, tlength (strips ts) = L1g.term.tlength ts.
+Proof.
+  induction ts; intros; try reflexivity.
+  - cbn. apply f_equal. assumption.
+Qed.
+  
 Lemma Lookup_hom:
   forall p s ec, Lookup s p ec -> Lookup s (stripEnv p) (stripEC ec).
 Proof.
@@ -492,7 +513,34 @@ Proof.
       rewrite <- (dcons_hom _ L1g.compile.prop). simpl. reflexivity.
 Qed.
 
-(******************  fix later *******************)
+Lemma tsplit_hom:
+  forall ix arg args,
+    optStrip_split (L1g.term.tsplit ix arg args) =
+    tsplit ix (strip arg) (strips args).
+Proof.
+  intros ix arg args.
+  functional induction (L1g.term.tsplit ix arg args); cbn; intros.
+  - reflexivity.
+  - destruct n. elim y. reflexivity.
+  - destruct ls; cbn; reflexivity.
+  - case_eq (tsplit m (strip t) (strips ts)); intros.
+    + destruct s.
+      assert (j0:= L1g.term.tsplit_sanity m t ts). rewrite e1 in j0.
+      assert (j1:= tsplit_sanity m (strip t) (strips ts)).
+      rewrite H in j1. destruct j1.
+      assert (j2: tlength (strips ts) = tlength fsts + tlength lsts).
+      { apply (f_equal tlength) in H0. rewrite tlength_tappend in H0.
+        cbn in H0. omega. }
+      rewrite tlength_hom in j2. rewrite j2 in j0. rewrite H1 in j0. omega.
+    + reflexivity.
+  - destruct (tsplit m (strip t) (strips ts)).
+    + destruct s0. rewrite e1 in IHo. rewrite optStrip_split_hom in IHo.
+      myInjection IHo. reflexivity.
+    + rewrite e1 in IHo.  rewrite optStrip_split_hom in IHo.
+      discriminate.
+Qed.
+
+
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L1g.wcbvEval.WcbvEval p t t' ->
@@ -511,16 +559,20 @@ Proof.
         cbn. reflexivity.
       * discriminate.
     + rewrite H0 in e. discriminate.
-  - refine (wAppLam _ _ _ _); try eassumption.
+  - eapply wAppLam; try eassumption.
     + rewrite whBetaStep_hom in H1. eassumption.
-  - refine (wLetIn _ _ _ _). eassumption.
+  - eapply wLetIn. eassumption.
     rewrite <- (proj1 instantiate_hom). assumption.
-  - refine (wAppFix _ _ _ _ _); try eassumption.
-    + rewrite <- dnthBody_hom. destruct (L1g.term.dnthBody m dts).
-      * rewrite e. reflexivity.
-      * discriminate.
-    + rewrite <- tcons_hom. rewrite pre_whFixStep_hom.
-      assumption.
+  - eapply wAppFix.
+    Focus 2. rewrite <- dnthBody_hom. rewrite e. reflexivity. 
+    Focus 4. rewrite <- pre_whFixStep_hom in H1.
+      rewrite tappend_hom in H1.
+      eapply H1.
+    Focus 2. rewrite <- tsplit_hom.
+    rewrite e0. rewrite optStrip_split_hom. apply f_equal. apply f_equal3;
+      try reflexivity.
+    * apply H.
+    * apply H0.
   - rewrite mkApp_hom. destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]].
     rewrite j in H0. eapply wAppCong; try eassumption.
     + intros h. elim n. apply isLambda_hom. assumption.
@@ -534,6 +586,7 @@ Proof.
     + rewrite <- canonicalP_hom. rewrite e. reflexivity.
 Qed.
 Print Assumptions WcbvEval_hom.
+
 
 Lemma Prf_strip_inv:
   forall s st, TProof st = strip s ->
@@ -700,10 +753,10 @@ Print Assumptions L2WcbvEval_sound_for_L1gwndEval.
 (*** unstrip: replace every missing type field with [prop]  ***)
 Function unstrip (t:Term) : L1gTerm :=
   match t with
-    | TProof => L1g.compile.TProof
+    | TProof t => L1g.compile.TProof (unstrip t)
     | TRel n => L1g.compile.TRel n
     | TSort s => L1g.compile.TSort s
-    | TCast t => L1g.compile.TCast (unstrip t) Cast L1g.compile.prop
+    | TCast t => L1g.compile.TCast (unstrip t) L1g.compile.prop
     | TProd nm bod => L1g.compile.TProd nm L1g.compile.prop (unstrip bod)
     | TLambda nm bod => L1g.compile.TLambda nm L1g.compile.prop (unstrip bod)
     | TLetIn nm dfn bod =>
@@ -717,7 +770,7 @@ Function unstrip (t:Term) : L1gTerm :=
     | TCase n mch brs =>
            L1g.compile.TCase n L1g.compile.prop (unstrip mch) (unstrips brs)
     | TFix ds n => L1g.compile.TFix (unstripDs ds) n
-    | TWrong => L1g.compile.TWrong
+    | TWrong => L1g.compile.TWrong ""
   end
 with unstrips (ts:Terms) : L1gTerms := 
   match ts with
@@ -766,4 +819,3 @@ Fixpoint unstripEnv (p:environ Term) : environ L1g.compile.Term :=
     | nil => nil
     | cons (nm, ec) q => cons (nm, (unstripEC ec)) (unstripEnv q)
   end.
-**********************************)

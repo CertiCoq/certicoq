@@ -1536,3 +1536,66 @@ Proof.
   apply my_exp_ind; intros; try rewrite_hyps; simpl; try rewrite_hyps; trivial.
   destruct lt_dec. reflexivity. now rewrite N.add_0_r.
 Qed.
+
+Fixpoint exps_as_list (e:exps) : list exp :=
+match e with
+| enil => []
+| econs h tl => h::(exps_as_list tl)
+end.
+
+Definition sbst_real_list :exp -> (list exp) -> exp :=
+fold_right  (fun v ee => ee{0 ::= v}).
+
+Lemma sbst_list_real (le : exps) (e:exp):
+  sbst_list e le = sbst_real_list e (exps_as_list le).
+Proof using.
+  induction le;[reflexivity | ].
+  simpl. congruence.
+Qed.
+
+Eval compute in (list_to_zero 4).
+Eval compute in (seq 0 4).
+
+(* Move to Coq.Lists.List ? *)
+Lemma seq_add : forall n m s,
+  seq s (n+m) = (seq s n)++(seq (s+n) m).
+Proof using.
+  intros ?. induction n; simpl; intros m s;
+    [ rewrite <- plus_n_O; reflexivity | ].
+  f_equal. rewrite IHn. f_equal. simpl.
+  rewrite plus_n_Sm. reflexivity.
+Qed.
+
+(* Move to Coq.Lists.List ? *)
+Lemma fold_right_map {A B C: Type} 
+  (f: B -> C -> C) (m: A->B) (s:C) (l: list A) :
+fold_right f s (map m l)
+= fold_right (fun a c => f (m a) c) s l.
+Proof using.
+  induction l; simpl;congruence.
+Qed.
+
+(* Move to RandyPrelude? *)
+Lemma list_to_zero_rev n: list_to_zero n = rev (seq 0 n).
+Proof.
+  rewrite <- (rev_involutive (list_to_zero n )).
+  f_equal.
+  induction n; [reflexivity | ].
+  simpl list_to_zero. simpl rev. rewrite IHn. clear IHn.
+  replace (S n) with (n + 1)%nat by omega.
+  rewrite seq_add. reflexivity.
+Qed.
+
+Lemma sbst_fix_real (e : exp) (es:efnlst):
+  sbst_fix es e = 
+    sbst_real_list 
+      e 
+      (map (fun ndx => Fix_e es (N.of_nat ndx)) (seq 0 (efnlength es))).
+Proof using.
+  unfold sbst_fix. rewrite list_to_zero_rev.
+  rewrite <- fold_left_rev_right.
+  unfold sbst_real_list. rewrite rev_involutive.
+  f_equal.
+  symmetry.
+  apply fold_right_map.
+Qed.

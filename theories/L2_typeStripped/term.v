@@ -397,6 +397,87 @@ Function tnth (n:nat) (l:Terms) {struct l} : option Term :=
                     end
   end.
 
+Record split := mkSplit {fsts:Terms; nst:Term; lsts:Terms}.
+Function tsplit (n:nat) (l:Term) (ls:Terms) {struct n} : option split :=
+  match n, ls with
+    | 0, tnil => Some (mkSplit tnil l tnil)
+    | _, tnil => None
+    | 0, ts => Some (mkSplit tnil l ts)
+    | S m, tcons t ts =>
+      match tsplit m t ts with
+        | None => None
+        | Some (mkSplit fs s ls) => Some (mkSplit (tcons l fs) s ls)
+      end
+  end.
+(***
+Definition testts:=
+  (tcons (TRel 1) (tcons (TRel 2) (tcons (TRel 3) (tunit (TRel 4))))).
+Eval cbv in tsplit 0 (TRel 0) testts.
+Eval cbv in tsplit 1 (TRel 0) testts.
+Eval cbv in tsplit 2 (TRel 0) testts.
+Eval cbv in tsplit 3 (TRel 0) testts.
+Eval cbv in tsplit 4 (TRel 0) testts.
+Eval cbv in tsplit 5 (TRel 0) testts.
+***)
+
+Lemma tsplit_0_Some:
+  forall ts t, tsplit 0 t ts = Some (mkSplit tnil t ts).
+Proof. 
+  destruct ts; intros; reflexivity.
+Qed.
+
+Lemma tsplit_tcons:
+  forall ix t ts frsts u lasts,
+    tsplit ix t ts = Some {| fsts:= frsts; nst:= u; lsts:= lasts |} ->
+         tcons t ts = tappend frsts (tcons u lasts).
+Proof.
+  intros ix t ts.
+  functional induction (tsplit ix t ts); intros; try discriminate.
+  - myInjection H. reflexivity.
+  - myInjection H. reflexivity.
+  - myInjection H. cbn. apply f_equal2. reflexivity.
+    apply IHo. assumption.
+Qed. 
+  
+Lemma tsplit_sanity:
+  forall n t ts, match tsplit n t ts with
+                 | None => n > tlength ts
+                 | Some (mkSplit s1 s2 s3) =>
+                   tcons t ts = tappend s1 (tcons s2 s3) /\
+                   n = tlength s1
+               end.
+Proof.
+  intros n t ts. functional induction (tsplit n t ts); intros; cbn.
+  - intuition.
+  - destruct n. elim y. omega.
+  - destruct ls. elim y. intuition.
+  - rewrite e1 in IHo. omega.
+  - rewrite e1 in IHo. rewrite (proj1 IHo). rewrite (proj2 IHo).
+    intuition.
+Qed.
+
+Lemma tnth_tsplit_sanity:
+  forall n t ts, match tsplit n t ts with
+                 | None => tnth n (tcons t ts) = None
+                 | Some sp => tnth n (tcons t ts) = Some (nst sp)
+               end.
+Proof.
+  intros n t ts. functional induction (tsplit n t ts); cbn; try reflexivity.
+  - destruct n. elim y. reflexivity.
+  - rewrite e1 in IHo. destruct m.
+    + cbn in IHo. discriminate.
+    + cbn in IHo. assumption.
+  - rewrite e1 in IHo. destruct m; cbn in IHo; assumption.
+Qed.
+
+Lemma tnth_tlength_sanity:
+  forall fsts t lsts,
+    tnth (tlength fsts) (tappend fsts (tcons t lsts)) = Some t.
+Proof.
+  induction fsts0; intros. reflexivity.
+  - cbn. apply IHfsts0.
+Qed.
+
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
     | dnil => 0

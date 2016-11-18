@@ -428,6 +428,35 @@ Proof.
     + eapply wEsRTCtrn; eassumption.
 Qed.
 
+Lemma wndEvalsRTC_mk_tconsr:
+  forall us us',
+    wndEvalsRTC us us' ->
+    forall t, wndEvalsRTC (tcons t us) (tcons t us').
+Proof.
+  induction 1; intros.
+  - constructor.
+  - constructor. constructor. assumption.
+  - eapply wEsRTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
+Qed.
+
+Lemma wndEvalsRTC_mk_tconsl:
+  forall t t', wndEvalRTC t t' ->
+  forall us, wndEvalsRTC (tcons t us) (tcons t' us).
+Proof.
+  induction 1; intros.
+  - constructor.
+  - constructor. constructor. assumption.
+  - eapply wEsRTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+      
+Lemma wndEvalsRTC_mk_tappendr:
+  forall ts us us',
+    wndEvalsRTC us us' -> wndEvalsRTC (tappend ts us) (tappend ts us').
+Proof.
+  induction ts; cbn; intros.
+  - assumption.
+  - eapply wndEvalsRTC_mk_tconsr. intuition.
+Qed.
 
 
 Inductive wndEvalTCl: Term -> Term -> Prop :=

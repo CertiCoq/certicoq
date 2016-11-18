@@ -454,7 +454,16 @@ Function tskipn (n:nat) (l:Terms) : option Terms :=
     | S _, tnil => None
   end.
 
+Fixpoint le (n m: nat): bool :=
+  match n, m with
+    | 0, _ => true
+    | S n, S m => le n m
+    | _, _ => false
+  end.
+
+
 Record split := mkSplit {fsts:Terms; nst:Term; lsts:Terms}.
+
 Function tsplit (n:nat) (l:Term) (ls:Terms) {struct n} : option split :=
   match n, ls with
     | 0, tnil => Some (mkSplit tnil l tnil)
@@ -608,89 +617,6 @@ Definition tlasts (n:nat) (ts:Terms) : option Terms :=
     | None => None
     | Some us => Some (treverse us)
   end.
-
-
-(***
-Definition aatsplit: forall (n:nat) (ls:Terms) (p: n < tlength ls), split.
-Proof.
-  induction n; induction ls; cbn; intros; try omega.
-  - destruct ls. assert (j: 0 < tlength ls).
-    {
-
-    omega. constructor.
-  intros n ls. induction 1; intros.
-  let lgth := tlength ls
-  in match tfsts n ls, tlsts (lgth - n) ls with
-       | us, (tcons v vs) => mkSplit us v vs
-       | _, _ => None
-     end.
-
-Goal
-  forall n ts, forall p, atsplit n ts = @aatsplit n ts p.
-Proof.
-  intros. functional induction (atsplit n ts); intros.
-  - cbn in p. omega.
-  - cbn. destruct (tlsts (S (tlength ts)) (tcons t ts)).
-    + destruct t0.
-***)
-
-(*************
-Goal
-  forall n m, n < m -> forall ts, m = tlength ts ->
-               exists frsts t lasts, ts = (tappend frsts (tcons t lasts)) /\
-                                     (tlength frsts = n).
-Proof.
-  induction 1; intros.
-  - destruct ts.
-    + cbn in H; discriminate.
-    + cbn in H. assert (j: n = tlength ts). omega.
-      
-
-  
-Lemma aatsplit_replace:
-  forall ix bs fsts t lsts,
-    aatsplit ix bs = Some (mkSplit fsts t lsts) ->
-    forall t', exists bs', aatsplit ix bs' = Some (mkSplit fsts t' lsts).
-Proof.
-  induction ix; induction bs; cbn; intros; try discriminate.
-  - injection H; intros. subst fsts0. subst.
-    exists (tcons t' lsts0). reflexivity.
-  - exists (tappend fsts0 (tcons t' 
-
-
-  
-  - exists (tappend fsts0 (tcons t' lsts0)).
-    destruct bs; cbn in H.
-    + discriminate.
-    + injection H; intros. subst fsts0. subst. cbn. reflexivity.
-  - destruct bs; cbn in H.
-    + discriminate.
-    + specialize (IHix _ fsts0).
-
-      
-    + exists (tappend fsts0 (tcons t' lsts0)).
-      destruct (tappend_mk_canonical fsts0 t' lsts0) as [x0 [x1 jx]].
-      rewrite jx. cbn. case_eq (aatsplit ix x1); intros.
-      * destruct s. apply f_equal. apply f_equal3.
-        destruct fsts0. cbn in jx. myInjection jx.
-
-  
-  intros. functional induction (aatsplit ix bs); try discriminate.
-  - injection H; intros. subst fsts0. subst.
-    exists (tcons t' lsts0). reflexivity.
-  - injection H; intros. subst fsts0. subst ls0. subst u.
-    exists (tcons t0 ts). cbn.
-    rewrite e1.
-  
-  intros. functional induction (atsplit ix bs); try discriminate.
-  - injection H; intros. subst fsts0. subst. exists (tcons t' lsts0).
-    cbn. reflexivity.
-  - injection H; intros. subst fsts0. subst.
-    destruct ts.
-    + cbn in e1. destruct m; discriminate.
-    + 
-    assert (j:= atsplit_S _ _ e1).
-*****************)
   
 Function tnth (n:nat) (l:Terms) {struct l} : option Term :=
   match l with
@@ -715,83 +641,14 @@ Proof.
   - rewrite e1 in IHo. destruct m; cbn in IHo; assumption.
 Qed.
 
-(*************************** 
-Goal
-  forall ix bs b fsts t lsts,
-    tsplit ix b bs = Some (mkSplit fsts t lsts) ->
-    forall t', exists b' bs', tsplit ix b' bs' = Some (mkSplit fsts t' lsts).
+Lemma tnth_tlength_sanity:
+  forall fsts t lsts,
+    tnth (tlength fsts) (tappend fsts (tcons t lsts)) = Some t.
 Proof.
-  intros. functional induction (tsplit ix b bs).
-  - myInjection H. exists t', tnil. reflexivity.
-  - destruct n; discriminate.
-  - myInjection H. destruct lsts0.
-    + elim y.
-    + exists t', (tcons t0 lsts0). reflexivity.
-  - discriminate.
-  - injection H; intros. subst fsts0. subst.
-    exists l, (tappend fs (tcons t' lsts0)). 
-    destruct fs, m; cbn. reflexivity.
+  induction fsts0; intros. reflexivity.
+  - cbn. apply IHfsts0.
+Qed.
 
-
-
-
-
-
-    induction ix; destruct bs; intros.
-  - rewrite tsplit_0_Some in H. injection H; intros. subst fsts0. subst.
-    exists t', tnil. reflexivity.
-  - rewrite tsplit_0_Some in H. injection H; intros. subst fsts0. subst.
-    exists t', (tcons t bs). reflexivity.
-  - cbn in H. discriminate.
-  - cbn in H. destruct (tsplit ix t bs).
-    + destruct s. injection H; intros. subst fsts0. subst.
-      exists b, (tappend fsts1 (tcons t' lsts0)). unfold tsplit.
-
-      
-  intros. case_eq bs; intros.
-  - subst bs. cbn in H. destruct ix.
-    + myInjection H. exists t', tnil. reflexivity.
-    + discriminate.
-  - subst bs. cbn in H. destruct ix.
-    + injection H. intros. subst lsts0. subst t. subst fsts0.
-      exists t', (tcons t0 t1). reflexivity.
-    + destruct (tsplit ix t0 t1).
-      * destruct s. myInjection H. exists b, (tappend fsts1 (tcons t' lsts0)).
-        unfold tsplit.
-
-
-  intros.
-  assert (j0:= tsplit_sanity ix b bs). rewrite H in j0.
-  assert (j1:= tnth_tsplit_sanity ix b bs). rewrite H in j1. cbn in j1.
-  destruct ix.
-  - myInjection j1.
-                
-
-  destruct (tappend_mk_canonical fsts0 t' lsts0) as [x0 [x1 jx]].
-
-  + myInjection jx. exists t', x1.
-
-
-
-      intros. functional induction (tsplit ix b bs).
-******************************)
-
-Lemma step_in_split:
-  forall ix b bs fsts t lsts,
-    tsplit ix b bs = Some (mkSplit fsts t lsts) ->
-    forall t', exists b' bs', tsplit ix b' bs' = Some (mkSplit fsts t' lsts).
-Proof.
-Admitted.
-(********************
-  intros. functional induction (tsplit ix b bs).
-  - myInjection H. exists t', tnil. reflexivity.
-  - destruct n; discriminate.
-  - myInjection H. destruct lsts0.
-    + elim y.
-    + exists t', (tcons t0 lsts0). reflexivity.
-  - discriminate.
-  - myInjection H. exists l, (tappend fs (tcons t' lsts0)). 
-    destruct fs, lsts0, m; cbn. m. reflexivity.                                 **************************)
 
 Lemma tnth_extend1:
   forall n l t,  tnth n l = Some t -> n < tlength l.
@@ -806,7 +663,8 @@ Proof.
   induction n; intros.
   - destruct l. simpl in H. omega. exists t. reflexivity.
   - destruct l. inversion H. simpl in H.
-    specialize (IHn _ (lt_S_n _ _ H)). destruct IHn. exists x. simpl. assumption.
+    specialize (IHn _ (lt_S_n _ _ H)). destruct IHn. exists x.
+    simpl. assumption.
 Qed.
 
 Lemma tnth_append:

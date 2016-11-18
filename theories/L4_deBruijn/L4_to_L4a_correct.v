@@ -130,6 +130,8 @@ Qed.
 Definition mkNVarN (p : N * Ast.name) : NVar := 
 let (n, name) := p in mkNVar (mkVar n) name.
 
+SearchAbout @ssubst app.
+Check simple_ssubst_app.
 
 Lemma L4_to_L4a_fvars: 
   (forall n (s : exp),
@@ -192,7 +194,7 @@ Proof using.
 
 (* App_e *)
 - intros ? ? H1ind H1wf H2ind ? Hin. simpl in Hin.
-  repeat (rewrite list.in_app_iff in Hin).
+  repeat (rewrite list.in_app_iff in Hin). 
   rewrite or_false_r in Hin.
   dorn Hin; eauto.
 

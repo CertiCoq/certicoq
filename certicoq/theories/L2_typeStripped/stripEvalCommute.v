@@ -587,7 +587,39 @@ Proof.
 Qed.
 Print Assumptions WcbvEval_hom.
 
+(*** What is the problem?? ***)
+Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
+Inductive Acc (y: nat) : Prop :=
+  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
+Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
+  intros. destruct H. apply H. apply H0.
+  Defined.
+Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
+  match n with
+    | _ => @loop (S n) (@Acc_inv _ a (S n) (lt_n n))
+  end.
+Axiom Acc0Ax : Acc 0.
+Definition loop0 := (@loop O Acc0Ax).
+Eval vm_compute in loop0.   (** Coq does not loop **)
 
+Require Import Template.Template.
+Quote Recursively Definition p_loop0 := loop0.
+Definition L1P_loop0 :=
+  Eval vm_compute in (L1g.compile.program_Program p_loop0).
+Definition L1P_env := Eval vm_compute in (env L1P_loop0).
+Definition L1P_main := Eval vm_compute in (main L1P_loop0).
+(** L1g raises exception that recursive arg is not canonical **)
+Eval vm_compute in (L1g.wcbvEval.wcbvEval L1P_env 1000 L1P_main).
+
+Definition P_loop0 := Eval vm_compute in (program_Program p_loop0).
+Definition P_env := Eval vm_compute in (env P_loop0).
+Definition P_main := Eval vm_compute in (main P_loop0).
+(** wcbvEval raises exception "out of time": non-terminating **)
+Eval vm_compute in (wcbvEval P_env 1000 P_main).
+
+Check (proj1 (WcbvEval_hom L1P_env) L1P_main).
+
+    
 Lemma Prf_strip_inv:
   forall s st, TProof st = strip s ->
               exists t, s = L1g.compile.TProof t /\ st = strip t.

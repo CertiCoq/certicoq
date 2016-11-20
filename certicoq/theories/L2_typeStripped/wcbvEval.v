@@ -493,22 +493,14 @@ Function wcbvEval
                     | None => raise ("wcbvEval TApp: tsplit not defined")
                     | Some (mkSplit fsts t lsts) =>
                       match wcbvEval n t with
-                        | Exc _ => raise ("wcbvEval TFix: tnth not defined")
+                        | Exc s =>
+                          raise ("wcbvEval TFix: tnth not defined; " ++ s)
                         | Ret et =>
                           wcbvEval n (pre_whFixStep
                                         x dts (tappend fsts (tcons et lsts)))
                       end
                   end
               end
-(********
-            | Ret (TFix dts m) =>
-              match dnthBody m dts with
-                | None =>
-                  raise ("wcbvEval TApp: dnthBody doesn't eval")
-                | Some (x, ix) =>
-                  wcbvEval n (pre_whFixStep x dts (tcons a1 args))
-              end
-*************)
             | Ret Fn =>             (* no redex; congruence rule *)
               match wcbvEvals n (tcons a1 args) with
                 | Exc s => raise ("wcbvEval TApp: args don't eval: " ++ s)

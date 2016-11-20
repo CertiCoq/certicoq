@@ -40,65 +40,6 @@ Goal
   wcbvEval envx 30 mainx = Ret ans_and_rect_x.
   vm_compute. reflexivity.
 Qed.
-Goal WcbvEval envx mainx prop.
-Proof.
-  change (WcbvEval envx (TConst "and_rect_x") prop).
-  eapply wConst. cbn. reflexivity.
-  eapply wAppLam.
-  - eapply wConst. cbn. reflexivity. eapply wLam. eapply wSort.
-  - eapply wAppCong.
-    + eapply wInd.
-    + not_isLambda.
-    + not_isFix.
-    + eapply wCons. eapply wInd. eapply wCons.
-      * { eapply wAppCong.
-          - eapply wConstruct.
-          - not_isLambda.
-          - not_isFix.
-          - eapply wCons. eapply wAppCong.
-            + eapply wConstruct.
-            + not_isLambda.
-            + not_isFix.
-            + eapply wCons. eapply wConstruct. eapply wNil.
-            + eapply wNil. }
-      * { eapply wCons.
-          - eapply wAppCong.
-            + eapply wConstruct.
-            + not_isLambda.
-            + not_isFix.
-            + eapply wCons. eapply wAppCong.
-              * eapply wConstruct.
-              * not_isLambda.
-              * not_isFix.
-              * eapply wCons. eapply wConstruct. eapply wNil.
-              * eapply wNil.
-          - eapply wNil. }
-  - unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
-    + eapply wLam. eapply wSort.
-    + eapply wInd.
-    + unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
-      * eapply wLam. eapply wSort.
-      * { eapply wAppCong.
-          - eapply wInd.
-          - not_isLambda.
-          - not_isFix.
-          - eapply wCons. eapply wInd. eapply wCons.
-            + eapply wAppCong. eapply wInd. not_isLambda. not_isFix.
-              eapply wCons. eapply wInd. eapply wCons. eapply wAppCong.
-              eapply wConstruct. not_isLambda. not_isFix. eapply wCons.
-              eapply wAppCong. eapply wConstruct. not_isLambda.
-              not_isFix. eapply wCons. eapply wConstruct. eapply wNil.
-              eapply wNil. eapply wCons. eapply wAppCong. eapply wConstruct.
-              not_isLambda. not_isFix. eapply wCons. eapply wAppCong.
-              eapply wConstruct. not_isLambda. not_isFix. eapply wCons.
-              eapply wConstruct. eapply wNil. eapply wNil. eapply wNil.
-            + eapply wNil. }
-      * { unfold whBetaStep, mkApp, instantiate. eapply wAppLam.
-          - eapply wLam. eapply wProd. cbn. eapply wAppCong.
-            + eapply wInd.
-            + not_isLambda.
-            + not_isFix.
-            + 
         
 Set Template Cast Propositions. 
 Definition my_and_rect := 
@@ -119,13 +60,49 @@ Definition my_mainx := main P_my_and_rect_x.
 Eval cbv in (wcbvEval my_envx 30 my_mainx).
 Goal
   wcbvEval envx 30 mainx = Ret ans_my_and_rect_x.
-  cbv. reflexivity.
-Qed.
+  cbv. 
+Abort.  (** RHS in [Proof].  [Proof] removed by wcbvEval on LHS. **)
 
 
 Set Template Cast Propositions. 
 Set Printing Width 80.
 Set Printing Depth 1000.
+
+(** Abhishek's example of looping: in L1g we test the guard **)
+Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
+Inductive Acc (y: nat) : Prop :=
+  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
+Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
+  intros. destruct H. apply H. apply H0.
+  Defined.
+Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
+  match n with
+    | _ => @loop (S n) (@Acc_inv _ a (S n) (lt_n n))
+  end.
+Axiom Acc0Ax : Acc 0.
+Definition loop0 := (@loop O Acc0Ax).
+Eval vm_compute in loop0.   (** Coq does not loop **)
+
+Quote Recursively Definition p_loop0 := loop0.
+Definition P_loop0 := Eval vm_compute in (program_Program p_loop0).
+Definition P_env := Eval vm_compute in (env P_loop0).
+Definition P_main := Eval vm_compute in (main P_loop0).
+(** wcbvEval raises exception that recursive ard is not canonical **)
+Eval vm_compute in wcbvEval P_env 1000 P_main.
+
+(*****************************
+Goal
+  WcbvEval P_env P_main prop.
+Proof.
+  unfold P_main. eapply wConst. cbn. reflexivity.
+  eapply wAppFix.
+  - eapply wConst. cbn. reflexivity. eapply wFix.
+  - cbn. reflexivity.
+  - cbn. reflexivity.
+  - eapply wPrf. eapply wAx.
+  - cbn. (** stuck here **)
+******************)
+
 
 Function Plus1 (n : nat) {wf lt n} : nat :=
   match n with
@@ -152,323 +129,20 @@ Notation "^ x" := (nNamed x)  (at level 85).
 Notation "^" := (nAnon).
 
 
-Unset Template Cast Propositions. 
-Print and_rect.
-Quote Recursively Definition p_and_rect := and_rect.
-Print p_and_rect.
-Definition P_and_rect : Program Term :=
-  Eval vm_compute in program_Program p_and_rect.
-Print P_and_rect.
-
-(** evaluation of [Function]s defined with measure or wf **)
+(** evaluation of [Function]s defined with measure or wf **
 Time Quote Recursively Definition p_Plus1x := Plus1x.
 Time Definition P_Plus1x : Program Term :=
   Eval vm_compute in program_Program p_Plus1x.
+Time Definition P_ans :=
+  Eval vm_compute in match P_Plus1x with
+                       | mkPgm P_main P_env => wcbvEval P_env 1000 P_main
+                     end.
+Print P_ans.
+(**********************)
 Time Definition P_env := Eval vm_compute in (env P_Plus1x).
 Time Definition P_main := Eval vm_compute in (main P_Plus1x).
 Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
-Print P_ans.
-
-Print Plus1_terminate.
-Eval vm_compute in Plus1_terminate.
-Time Quote Recursively Definition p_Plus1_terminate := Plus1_terminate.
-Time Definition P_Plus1_terminate : Program Term :=
-  Eval vm_compute in program_Program p_Plus1_terminate.
-Time Definition P_env1 := Eval vm_compute in (env P_Plus1_terminate).
-Time Definition P_main1 := Eval vm_compute in (main P_Plus1_terminate).
-
-Goal WcbvEval P_env1 P_main1 prop.
-  unfold P_main1. eapply wConst. cbn. reflexivity.
-  eapply wAppLam. eapply wLam.
-  - eapply wAppCong.
-    + eapply wInd.
-    + not_isLambda.
-    + not_isFix.
-    + eapply wCons.
-      * eapply wProd. eapply wInd.
-      * { eapply wCons.
-          - eapply wAppLam.
-            + eapply wConst. cbn. reflexivity. eapply wLam. eapply wSort.
-            + eapply wInd.
-            + cbn. eapply wAppLam.
-              * eapply wLam. eapply wProd. eapply wInd.
-              * eapply wConst. native_compute. reflexivity.
-                eapply wLam. eapply wInd.
-              * { cbn. eapply wProd. eapply wInd. }
-          - eapply wNil. }
-  - eapply wConst. cbn. reflexivity. eapply wAppCong.
-    + eapply wConstruct.                   
-    + not_isLambda.
-    + not_isFix.
-    + eapply wCons.
-      * eapply wProd. eapply wInd.
-      * { eapply wCons. eapply wAppLam.
-          - eapply wConst. cbn. reflexivity. eapply wLam. eapply wSort.
-          - eapply wInd.
-          - cbn. eapply wAppLam.
-            + eapply wLam. eapply wProd. eapply wInd.
-            + eapply wConst. cbn. reflexivity. eapply wLam.
-              eapply wInd.
-            + cbn. eapply wProd. eapply wInd.
-          - eapply wCons.
-            + eapply wLam. eapply wInd.
-            + eapply wCons.
-              * { eapply wConst. cbn.  reflexivity. eapply wAppLam.
-                  - eapply wConst. cbn. reflexivity. eapply wLam. eapply wSort.
-                  - eapply wInd.
-                  - cbn. eapply wAppLam.
-                    + eapply wLam. eapply wProd. eapply wInd.
-                    + eapply wLam. eapply wInd.
-                    + cbn. eapply wAppLam.
-                      * eapply wLam. eapply wProd. eapply wInd.
-                      * eapply wLam. eapply wInd.
-                      * cbn. eapply wCast. eapply wLam. eapply wInd. }
-              * eapply wNil. }
-  - cbn. eapply wAppLam.
-    + eapply wLam. eapply wAppCong. eapply wInd. not_isLambda. not_isFix.
-      eapply wCons. eapply wProd. eapply wInd. eapply wCons.
-      eapply wAppLam. eapply wConst. cbn. reflexivity. eapply wLam.
-      eapply wSort. eapply wInd. cbn. eapply wAppLam. eapply wLam.
-      eapply wProd. eapply wInd. eapply wConst.  cbn. reflexivity.
-      eapply wLam. eapply wInd. cbn. eapply wProd. eapply wInd. eapply wNil.
-    + eapply wAppCong.
-      * eapply wConstruct.
-      * not_isLambda.
-      * not_isFix.
-      * { eapply wCons.
-          - eapply wProd. eapply wInd.
-          - eapply wCons.
-            + eapply wProd. eapply wInd.
-            + eapply wCons. eapply wLam. eapply wInd. eapply wCons.
-              eapply wLam. eapply wInd. eapply wNil. }
-    + cbn. eapply wAppLam.
-      * { eapply wLam. eapply wAppCong.
-          - eapply wInd.
-          - not_isLambda.
-          - not_isFix.
-          - eapply wCons.
-            + eapply wProd. eapply wInd.
-            + eapply wCons.
-              * { eapply wAppLam.
-                  - eapply wConst. cbn. reflexivity. eapply wLam. eapply wSort.
-                  - eapply wInd.
-                  - cbn. eapply wAppLam.
-                    + eapply wLam. eapply wProd. eapply wInd.
-                    + eapply wConst. cbn. reflexivity. eapply wLam.
-                      eapply wInd.
-                    + cbn. eapply wProd. eapply wInd. }
-              * eapply wNil. }
-      * { eapply wAppCong.
-          - eapply wConstruct.
-          - not_isLambda.
-          - not_isFix.
-          - eapply wCons.
-            + eapply wProd. eapply wInd.
-            + eapply wCons. eapply wProd. eapply wInd. eapply wCons.
-              eapply wLam. eapply wInd. eapply wCons. eapply wLam.
-              eapply wInd. eapply wNil. }
-      * cbn.
-
-
-Qed.
-                    
-            Eval vm_compute in (lookup "Top.Plus1_terminate" P_env).
-Quote Recursively Definition Pt := Plus1_terminate.
-Print Pt.
-
-Goal  (** Plus1x does normalize in L1g **)
-  WcbvEval P_env P_main prop.
-Proof.
-  unfold P_main. eapply wConst. cbn. reflexivity.
-  - eapply wAppLam.
-    + eapply wConst. cbn. reflexivity. apply wLam. apply wInd.
-    + eapply wConst. cbn. reflexivity. eapply wAppCong.
-      * eapply wConstruct.
-      * not_isLambda.
-      * not_isFix.
-      * eapply wCons. eapply wConstruct. eapply wNil.
-    + cbn. eapply wCase.
-      Print Plus1_terminate.
-      * { eapply wAppLam.   (** evaluating the match argument **)
-          - eapply wConst. Print P_env. cbn. reflexivity.
-            + eapply wAppLam.
-              * { eapply wLam. eapply wAppCong.
-                  - eapply wInd.
-                  - not_isLambda.
-                  - not_isFix.
-                  - eapply wCons.
-                    + eapply wProd. eapply wInd.
-                    + eapply wCons.
-                      * { eapply wAppLam.
-                          - eapply wConst. cbn. reflexivity.
-                            eapply wLam. eapply wSort.
-                          - eapply wInd.
-                          - cbv. eapply wAppLam.
-
-
-                      * apply wPrf.
-              * { cbn. eapply wAppLam.
-                  - eapply wLam.
-                  - apply wPrf.
-                  - cbn. eapply wAppLam.
-                    + eapply wLam.
-                    + eapply wPrf.
-                    + cbn. eapply wAppLam.
-                      * eapply wConst. cbn. reflexivity. eapply wLam.
-                      * eapply wProd.
-                      * { cbn. eapply wAppLam.
-                          - eapply wLam.
-                          - eapply wAppLam.
-                            + eapply wConst. cbn. reflexivity. eapply wLam.
-                            + eapply wInd.
-                            + cbn. eapply wAppLam.
-                              * eapply wLam.
-                              * eapply wConst. cbn. reflexivity. eapply wLam.
-                              * cbn. eapply wProd.
-                          - cbn. eapply wAppLam.
-                            + eapply wLam.
-                            + eapply wProd.
-                            + cbn. eapply wAppLam.
-                              * eapply wConst. cbn. reflexivity. eapply wLam.
-                              * eapply wProd.
-                              * { cbn. eapply wAppLam. eapply wLam.
-                                  - eapply wProd.
-                                  - cbn. eapply wAppLam. eapply wLam.
-                                    + eapply wProd.
-                                    + cbn. eapply wAppLam. eapply wLam.
-                                      * eapply wLam.
-                                      * { cbn. eapply wAppLam. eapply wLam.
-                                          - eapply wPrf.
-                                          - cbn. eapply wLam. } } } }
-          - eapply wAppCong.
-            + eapply wConstruct.
-            + not_isLambda.
-            + not_isFix.
-            + eapply wCons. eapply wConstruct. eapply wNil.
-          - cbn. eapply wLam. }
-      * cbn.  (** stuck **)
-
-
-
-
-
-
-
-        unfold P_main. eapply wConst. cbn. reflexivity.
-  refine (wAppLam _ _ _ _). eapply wConst. cbn.  reflexivity.
-  apply wLam. admit. 
-  eapply wConst. cbn.  reflexivity.
-  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
-  eapply wCons. eapply wConstruct. eapply wNil.
-
-  cbn.
-  eapply wCase. eapply wAppLam.
-  eapply wConst. cbn.  reflexivity.
-  eapply wAppLam. eapply wLam. (* apply wPrf. *) admit. admit.
-   
-  cbn. eapply wAppLam. eapply wLam.   (* apply wPrf. *) admit. admit.
-
-  cbn.
-  eapply wAppLam. eapply wLam.   (* apply wPrf. *) admit. admit.
-  
-  cbn.
-  eapply wAppLam. eapply wConst. cbn.  reflexivity.
-  eapply wLam. admit. (* ? *) eapply wProd. eapply wInd.
-
-  cbn.
-  eapply wAppLam. eapply wLam. admit.
-  eapply wAppLam. eapply wConst.
-  cbn. reflexivity.  eapply wLam. admit. eapply wInd.
-
-  cbn.
-  eapply wAppLam.  eapply wLam. admit.
-  eapply wConst. cbn. reflexivity.
-  eapply wLam.  admit.
-
-  cbn. eapply wProd. admit.
-
-  cbn.
-  eapply wAppLam.  eapply wLam. admit. eapply wProd. admit.
-
-  cbn.
-  eapply wAppLam. eapply wConst. cbn. reflexivity. eapply wLam. admit.
-  eapply wProd. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit.
-  eapply wProd. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit.
-  eapply wProd. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit.
-  eapply wLam. admit.
-
-  cbn. eapply wAppLam. eapply wLam. admit. admit.
-  cbn. eapply wCase. 
-  eapply wAppCong. eapply wConstruct. not_isLambda. not_isFix.
-  eapply wCons. eapply wConstruct. eapply wNil.  cbn.
-  eapply wLam.  cbn.
-  
-
-
-
-(*********
-Definition x:nat := 2.
-Definition Plus1x := Plus1 x.
-(* [program] of the program *)
-Quote Recursively Definition p_Plus1x := Plus1x.
-(* L2 [Program] of the program *)
-Definition P_Plus1x := Eval native_compute in (program_Program p_Plus1x).
-Quote Recursively Definition cbv_Plus1x :=  (* [program] of Coq's answer *)
-  ltac:(let t:=(eval vm_compute in Plus1x) in exact t).
-Definition ans_Plus1x :=  (* L2 [Term] of Coq's answer *)
-  Eval vm_compute in (main (program_Program cbv_Plus1x)).
-
-Goal
-  let env := (env P_Plus1x) in
-  let main := (main P_Plus1x) in
-  wcbvEval env 500 main = Ret ans_Plus1x.
-  vm_compute. reflexivity.
-Qed.
-
-Definition sublist (l1 l2:list string) : bool :=
-  forallb (fun x1 => existsb (fun x2 => string_eq_bool x1 x2) l2) l1.
-Definition eqlist (l1 l2:list string) : bool := sublist l1 l2 && sublist l2 l1.
-*****************)
-
-(**********
-Function Plus1 (n : nat) {wf lt n} : nat :=
-match n with
-| 0 => 1
-| S p => S (Plus1 p)
-end.
-- intros. omega.
-- apply lt_wf.
-Defined.
-Print Plus1.
-Notation "↾ x" := (exist _ x _) (at level 100).
-Notation SIGTYPE := (sig _).
-Notation EXTYPE := (ex _).
-Notation "↾ x" := (exist _ x _) (at level 100).
-Notation SIGTYPE := (sig _).
-Notation EXTYPE := (ex _).
- ********************)
-Definition x:nat := 2.
-Definition Plus1x := Plus1 x.
-
-(***
-Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
-Notation SS := (TConstruct NN 1 1).
-Notation ZZ := (TConstruct NN 0 0).
-Notation Lam := (TLambda).
-Notation Pi := (TProd).
-Notation "^ x" := (nNamed x)  (at level 85).
-Notation "^" := (nAnon).
-Notation "# x" := (TConst x) (at level 85).
-Infix "@" := TApp  (at level 90, left associativity).
-Infix ":t:" := tcons  (at level 87, right associativity).
-Notation "c :t|" := (c :t: tnil) (at level 90).
- *********)
+************************)
 
 
 (** does Coq eval match branches ? **)
@@ -489,29 +163,9 @@ Definition L1g_mbt := Eval cbv in (program_Program p_mbt).
 Definition mbt_env := env L1g_mbt.  (* L1g environ *)
 Definition mbt_main := main L1g_mbt. (* L1g main function *)
 Eval cbv in (wcbvEval mbt_env 10 mbt_main).
-  
-(** Abhishek's example of looping in L1 **
-Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
-Inductive Acc (y: nat) : Prop :=
-  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
-Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
-  intros. destruct H. apply H. apply H0.
-  Defined.
-Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
-  match n with
-    | _ => loop (S n) (Acc_inv _ a (S n) (lt_n n))
-  end.
-Axiom Acc0Ax : Acc 0.
-Eval vm_compute in (loop O Acc0Ax) .
-Quote Recursively Definition p_loop0 := (loop 0 Acc0Ax).
-Print p_loop0.
-***)
+
 
 Set Implicit Arguments.
-
-Definition NN := nat.
-Quote Recursively Definition p_nat := NN.
-Print p_nat.
 
 Definition LL := list.
 Quote Definition q_LL := LL.

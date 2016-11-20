@@ -152,7 +152,7 @@ Definition
   (fst (fst (pre_checked_term_Term (termSize t)))) t.
 ****************************)
 
-(** Store strings reversed to make inequality testing faster **)
+(** Store strings reversed to make inequality testing faster **
 (***  FIX: DEBUGGIBG ONLY  strip off "Coq.Init." ******)
 Fixpoint revStr (str accum: string): string :=
   match str with
@@ -176,6 +176,7 @@ Definition rev_npars (np: inductive * nat) :=
   match np with
     | (i, n) => (revInd i, n)
   end.
+ **************************)
 
 (** translate Gregory Malecha's [term] into my [Term] **)
 Section datatypeEnv_sec.
@@ -217,22 +218,21 @@ Function term_Term (t:term) : Term :=
     | tApp fn (cons u us) => TApp (term_Term fn) (term_Term u)
                                   (terms_Terms term_Term us)
     | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
-      let rth := revStr pth EmptyString in
-      match lookup rth e with  (* only lookup ecTyp at this point! *)
+      match lookup pth e with  (* only lookup ecTyp at this point! *)
         | Some (ecTyp _ 0 nil) => TAx  (* note coding of axion in environ *)
         | Some (ecTyp _ _ _) =>
           TWrong ("Const refers to inductive: " ++ pth)
-        | _  => TConst rth
+        | _  => TConst pth
       end
-    | tInd ind => TInd (revInd ind)
+    | tInd ind => TInd ind
     | tConstruct ind m =>
-      match cnstrArity e (revInd ind) m with
-        | Ret arty => (TConstruct (revInd ind) m arty)
+      match cnstrArity e ind m with
+        | Ret arty => (TConstruct ind m arty)
         | Exc str => TWrong ("term_Term: Cnstr arity not found: " ++ str)
       end
     | tCase npars ty mch brs =>
       let Ars := map fst brs in
-      (TCase (rev_npars npars, Ars) (term_Term ty) (term_Term mch)
+      (TCase (npars, Ars) (term_Term ty) (term_Term mch)
              (terms_Terms (fun x => term_Term (snd x)) brs))
     | tFix defs m => (TFix (defs_Defs term_Term defs) m)
     | _ => TWrong "term_Term: Unknown term"
@@ -251,11 +251,9 @@ Fixpoint program_datatypeEnv (p:program) (e:environ Term) : environ Term :=
     | PConstr _ _ p => program_datatypeEnv p e
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
-      program_datatypeEnv p (cons (pair (revStr nm EmptyString)
-                                        (ecTyp Term npar Ibs)) e)
+      program_datatypeEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
     | PAxiom nm _ p =>
-      program_datatypeEnv p (cons (pair (revStr nm EmptyString)
-                                        (ecTyp Term 0 nil)) e)
+      program_datatypeEnv p (cons (pair nm (ecTyp Term 0 nil)) e)
   end.
 
 Fixpoint program_Pgm
@@ -263,15 +261,12 @@ Fixpoint program_Pgm
   match p with
     | PIn t => {| main:= (term_Term dtEnv t); env:= e |}
     | PConstr nm t p =>
-      program_Pgm dtEnv p (cons (pair (revStr nm EmptyString)
-                                      (ecTrm (term_Term dtEnv t))) e)
+      program_Pgm dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv t))) e)
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
-      program_Pgm dtEnv p (cons (pair (revStr nm EmptyString)
-                                      (ecTyp Term npar Ibs)) e)
+      program_Pgm dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
     | PAxiom nm ty p =>
-      program_Pgm dtEnv p (cons (pair (revStr nm EmptyString)
-                                      (ecAx Term)) e)
+      program_Pgm dtEnv p (cons (pair nm (ecAx Term)) e)
   end.
 
 Definition program_Program (p:program) : Program Term :=

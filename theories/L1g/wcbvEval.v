@@ -58,13 +58,6 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
              WcbvEval p (pre_whFixStep x dts
                                        (tappend fsts (tcons t' lsts))) s ->
              WcbvEval p (TApp fn arg args) s 
- (********************           
-             tnth ix (tcons arg args) = Some t ->
-             WcbvEval p t t' ->
-             canonicalP t' = Some z ->   (* test Fix is guarded *)
-             WcbvEval p (pre_whFixStep x dts (tcons arg args)) s ->
-             WcbvEval p (TApp fn arg args) s
-***************)
 | wAppCong: forall fn fn' arg args aargs',
               WcbvEval p fn fn' ->
               ~ isLambda fn' -> ~ isFix fn' ->
@@ -431,9 +424,9 @@ Function wcbvEval
                         | Ret et =>
                           match canonicalP et with (* test Fix is guarded *)
                             | Some _ =>
-                              wcbvEval n
-                                       (pre_whFixStep
-                                          x dts (tappend fsts (tcons et lsts)))
+                              wcbvEval
+                                n (pre_whFixStep
+                                     x dts (tappend fsts (tcons et lsts)))
                             | None => raise ("wcbvEval TFix: rec arg")
                           end
                       end

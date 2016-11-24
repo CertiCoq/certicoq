@@ -33,6 +33,7 @@ Add LoadPath "../L4_deBruijn" as L4.
 
 Require Export Common.Common.  (* shared namespace *)
 Require Import ExtLib.Data.List.
+Require Import L4.polyEval.
 Require Import L4.L4a_to_L5.
 Require Import SquiggleEq.varImplZ.
 Require Import L4.L5a.

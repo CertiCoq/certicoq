@@ -8,30 +8,7 @@ Local Opaque N.sub.
 
 
 Require Import Coq.Classes.Morphisms.
-(*
-Lemma N_plus_minus:
-  forall n:N, n > 0 -> (n - 1 + 1) = (n + 1 - 1).
-Proof using.
-  intros.
-  induction n using N.peano_ind; intros; lia.
-Qed.
 
-Lemma N_plus_minus_eq:
-  forall n:N, (n + 1 - 1) = n.
-Proof using.
-  induction n using N.peano_ind; intros; lia.
-Qed.
-
-Lemma N_i_plus_1:
-  forall i:N, (i + 1) = (1 + i).
-  induction i using N.peano_ind; intros; lia.
-Qed.
-Lemma N_i11:
-  forall i, (i + 1 + 1) = (1 + i + 1).
-Proof using.
-  induction i using N.peano_ind; intros; lia.
-Qed.
-*)
 
 (* MathClasses or Extlib may habe a much richer theory and implementation *)
 Require Import Coq.Classes.DecidableClass.
@@ -46,43 +23,11 @@ Require Import SquiggleEq.lmap.
 
 Open Scope nat_scope.
 
-Instance NEqDec : Deq N.
-Proof using.
-  intros x y. exists (N.eqb x y). apply N.eqb_eq.
-Defined.
-
-Definition deqOption {A:Type} `{Deq A} (oa ob : option A) : bool :=
-match (oa,ob) with
-| (Some a, Some b) => decide (a=b)
-| (None, None) => true
-| _ => false 
-end.
-
-Lemma deqOptionCorr {A:Type} `{Deq A} :
-  forall x y, deqOption x y = true <-> x = y.
-Proof.
-  destruct x, y; unfold deqOption; simpl; auto; 
-  unfold decide; try rewrite  Decidable_spec;
-  split; intro;
-  subst; try discriminate; auto.
-  inverts H0. refl.
-Qed.
-
-
-
-Instance optionEqDec {A:Type} `{Deq A}: Deq (option A).
-Proof using.
-  intros x y. exists (deqOption x y). apply deqOptionCorr.
-Defined.
 
 Require Import Common.classes Common.AstCommon.
 
-Instance IndEqDec : Deq (inductive * N).
-Proof using.
-intros x y.
-destruct (eq_dec x y). exists true. tauto.
-exists false. split; congruence. 
-Defined.
+Require Import L4.polyEval.
+
 
 (*
 Instance NatEq : Eq nat := { eq_dec := eq_nat_dec }.
@@ -100,19 +45,7 @@ Defined.
 (** * Source Expressions. *)
 (**************************)
 
-Definition dcon : Set := inductive * N.
 
-Inductive L4Opid : Set :=
- | NLambda
-(** number of functions that are mutually defined, index of the one which
-is referred to here.*)
- | NFix (nMut index: nat) 
- | NDCon (dc : dcon) (nargs : nat)
- | NApply
-(* Not longer using projection based semantics for mutual fixpoints 
-| NProj (selector :nat) (** which one to project out*) *)
- | NLet
- | NMatch (dconAndNumArgs : list (dcon * nat)).
 
 Require Import Coq.Strings.Ascii.
 
@@ -141,16 +74,7 @@ Definition L4OpidString (l : L4Opid) : string :=
   end.
 
 
-Definition OpBindingsL4 (nc : L4Opid) : list nat :=
-  match nc with
-  | NLambda    => [1]
-  | NFix nMut _ => repeat nMut nMut
-  | NDCon _ nargs    => repeat 0 nargs
-  | NApply     => [0,0]
-(*  | NProj _ => [0] *)
-  | NLet => [0,1]
-  | NMatch numargsInBranches => 0::(List.map snd numargsInBranches)
-  end.
+
 
 Instance decc: DeqSumbool L4Opid.
 Proof using.
@@ -160,11 +84,6 @@ Defined.
 
 Require Import SquiggleEq.alphaeq.
 
-
-Instance CoqL4GenericTermSig : GenericTermSig L4Opid:=
-{| 
-  OpBindings := OpBindingsL4;
-|}.
 
 
 (**********************)
@@ -246,8 +165,10 @@ Context {NVar} {deqnvar : Deq NVar}
 Notation USERVAR := true (only parsing).
 Notation CPSVAR := false (only parsing).
 
+(* TODO: delete and use the one in polyEval.v *)
 Definition branch {s} : Type := (dcon * (@BTerm NVar s))%type.
 
+(* TODO: delete and use the one in polyEval.v *)
 (** Find a branch in a match expression corresponding to a given constructor
     and arity. *)
 Definition find_branch {s} (d:dcon) (m:nat) (matcht :list (@branch s)) : 

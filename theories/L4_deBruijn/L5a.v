@@ -1,6 +1,8 @@
 
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
+Require Import L4.polyEval.
+
 Require Import L4.L4a_to_L5.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
   Coq.Program.Program Coq.micromega.Psatz.
@@ -68,32 +70,7 @@ Require Import ExtLib.Structures.Monads.
 
 Import Monad.MonadNotation.
 Open Scope monad_scope.
-
-(* Move *)
-
-Definition flatten {m} {A: Type} `{Monad m} (lm:list (m A)) : m (list A) :=
-fold_right (fun a l => l <- l;; 
-                       a <- a;; 
-                      ret (a :: l))
-          (ret []) 
-          lm.
-
-
-
-(*
-
-Eval vm_compute in flatten ([Some 1; Some 2]).
-Some [1; 2]
-
-Eval vm_compute in flatten ([Some 1; Some 2]).
-
-fold_left gives
-   = Some [2; 1]
-     : option (list nat)
-*)
-
-
-
+Require Import Common.ExtLibMisc.
 
 
 

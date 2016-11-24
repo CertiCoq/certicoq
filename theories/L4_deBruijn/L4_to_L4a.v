@@ -1,5 +1,6 @@
 Require Import L4.expression.
 Require Import L4.variables.
+Require Import polyEval.
 Require Import L4.L4a_to_L5.
 
 Require Import SquiggleEq.export.
@@ -37,6 +38,8 @@ fold_left insertName nvars names.
 
 Require Import SquiggleEq.list.
 Open Scope N_scope.
+
+
 
 Definition translateb {NVar : Type} (mkVar : (N * Ast.name) -> NVar) max
 (names: pmap Ast.name) 

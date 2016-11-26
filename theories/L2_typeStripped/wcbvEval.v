@@ -119,7 +119,6 @@ Proof.
     + cbn in h. rewrite j in h. myInjection h. assumption.
     + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
 Qed.
-  
 (**************************************************)
 
 (** wcbvEval preserves WFapp **)

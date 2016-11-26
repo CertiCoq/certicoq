@@ -15,6 +15,11 @@ Open Scope bool.
 Open Scope list.
 Set Implicit Arguments.
 
+Definition thd_tl ts t us: (Term * Terms) :=
+  match ts with
+    | tnil => (t, us)
+    | tcons v vs => (v, tappend vs (tcons t us))
+  end.
 
 (** Printing terms in exceptions for debugging purposes **)
 Fixpoint print_term (t:Term) : string :=
@@ -503,7 +508,19 @@ Proof.
   - myInjection H. reflexivity.
   - myInjection H. cbn. apply f_equal2. reflexivity.
     apply IHo. assumption.
-Qed. 
+Qed.
+
+Lemma tcons_tsplit:
+  forall (frsts ts lasts:Terms) t u,
+    tcons t ts = tappend frsts (tcons u lasts) ->
+     tsplit (tlength frsts) t ts = Some (mkSplit frsts u lasts).
+Proof.
+  induction frsts; intros;cbn in *.
+  - myInjection H. destruct lasts; reflexivity.
+  - destruct (tappend_mk_canonical frsts u lasts) as [y [ys jy]].
+    rewrite jy in H. myInjection H.
+    erewrite IHfrsts. reflexivity. rewrite jy. reflexivity.
+Qed.
   
 Lemma tsplit_sanity:
   forall n t ts, match tsplit n t ts with
@@ -640,7 +657,22 @@ Proof.
     + cbn in IHo. assumption.
   - rewrite e1 in IHo. destruct m; cbn in IHo; assumption.
 Qed.
-
+    
+Lemma tsplit_tnth_sanity:
+  forall xs n u, tnth n xs = Some u ->
+                 exists t ts frsts lasts,
+                   xs = tcons t ts /\
+                   tsplit n t ts = Some (mkSplit frsts u lasts).
+Proof.
+  intros xs n u.
+  functional induction (tnth n xs); intros; try discriminate.
+  - myInjection H. exists u, xs, tnil, xs. intuition. cbn.
+    destruct xs; reflexivity.
+  - destruct (IHo H) as [y0 [y1 [y2 [y3 [jy1 jy2]]]]]. subst xs.
+    exists x, (tcons y0 y1), (tcons x y2), y3. intuition.
+    cbn. rewrite jy2. reflexivity.
+Qed.
+    
 Lemma tnth_tlength_sanity:
   forall fsts t lsts,
     tnth (tlength fsts) (tappend fsts (tcons t lsts)) = Some t.
@@ -649,7 +681,13 @@ Proof.
   - cbn. apply IHfsts0.
 Qed.
 
-
+Lemma tnth_None_tsplit_None:
+  forall n t ts, tsplit n t ts = None -> tnth n (tcons t ts) = None.
+Proof.
+  intros. assert (k:= tnth_tsplit_sanity n t ts). rewrite H in k.
+  assumption.
+Qed.
+  
 Lemma tnth_extend1:
   forall n l t,  tnth n l = Some t -> n < tlength l.
 Proof.
@@ -1059,6 +1097,58 @@ Lemma tskipn_pres_WFapp:
   - inversion_Clear hargs. apply IHo; try assumption.
   - discriminate.
 Qed.
+
+(**************
+Lemma tsplit_pres_WFapp:
+  forall ix args, WFapps args -> forall arg, WFapp arg -> 
+  forall fsts t lsts, tsplit ix arg args = Some (mkSplit fsts t lsts) ->
+    WFapps fsts /\ WFapp t /\ WFapps lsts.
+Proof.
+  intros. HERE rewrite tsplit_tcons.
+  induction ix; induction 1; cbn; intros.
+  - myInjection H0. intuition.
+  - myInjection H2. intuition.
+  - discriminate.
+  - specialize (IHix _ H0 _ H1). eapply IHix. rewrite <- H2.
+    destruct (tsplit ix t ts).
+    + destruct s.  myInjection H2. destruct (tsplit ix arg ts).
+      * destruct s.
+    
+    + eapply IHix. 
+    + destruct s. myInjection H2. specialize (IHWFapps _ H1).
+
+
+      
+    + myInjection H1. intuition.
+    + myInjection H1. intuition.
+    + eapply IHWFapps. rewrite <- H1.
+      * { destruct (tsplit ix t tnil).
+          - destruct s. myInjection H1.
+      try eassumption. instantiate (1:= 0). cbn.
+    
+  intros ix arg args fsts t lsts.
+  functional induction (tsplit ix arg args); intros; try discriminate.
+
+
+
+
+
+  Lemma tsplit_pres_WFapp:
+  forall ix arg args fsts t lsts,
+    tsplit ix arg args = Some (mkSplit fsts t lsts) ->
+    WFapp arg -> WFapps args ->
+    WFapps fsts /\ WFapp t /\ WFapps lsts.
+Proof.
+  intros ix arg args fsts t lsts.
+  functional induction (tsplit ix arg args); intros; try discriminate.
+  - myInjection H. intuition.
+  - myInjection H. intuition.
+  - myInjection H. apply IHo. rewrite e1.
+    apply f_equal. apply f_equal3; try reflexivity.
+
+
+Qed.
+********************************)
 
 (** compiling well formed terms to Term produces well formed Terms **)
 (******

@@ -562,4 +562,58 @@ match sop with
 end.
 
 
+Lemma injectiveNsuccpos:  injective_fun N.succ_pos.
+Proof.
+  intros a b Heq.
+  apply (f_equal Npos) in Heq.
+  do 2 rewrite N.succ_pos_spec in Heq.
+  apply N.succ_inj in Heq.
+  assumption.
+Qed.
+
+Instance NEqDec : Deq N.
+Proof using.
+  intros x y. exists (N.eqb x y). apply N.eqb_eq.
+Defined.
+
+Require Import Psatz.
+
+Lemma injSucc : injective_fun N.succ.
+Proof using.
+  clear.
+  intros ? ? Heq.
+  lia.
+Qed.
+
+Definition proj_as_option {A Q: Type} {P : A->Type} (a': {a : A & (P a)} + Q)
+   : option A :=
+   match a' with
+     | inl (existT _ a' _) => Some a'
+     |  inr _ => None
+   end.
+
+Definition deqOption {A:Type} `{Deq A} (oa ob : option A) : bool :=
+match (oa,ob) with
+| (Some a, Some b) => decide (a=b)
+| (None, None) => true
+| _ => false 
+end.
+
+Lemma deqOptionCorr {A:Type} `{Deq A} :
+  forall x y, deqOption x y = true <-> x = y.
+Proof.
+  destruct x, y; unfold deqOption; simpl; auto; 
+  unfold decide; try rewrite  Decidable_spec;
+  split; intro;
+  subst; try discriminate; auto.
+  inverts H0. refl.
+Qed.
+
+Instance optionEqDec {A:Type} `{Deq A}: Deq (option A).
+Proof using.
+  (* if it is already defined, don't create a duplicate instance *)
+  Fail (eauto with typeclass_instances; fail).
+  intros x y. exists (deqOption x y). apply deqOptionCorr.
+Defined.
+
 

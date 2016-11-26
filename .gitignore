@@ -1,0 +1,8 @@
+*.vo
+*.v.d
+*.glob
+*.aux
+*.out
+*.html
+*.cache
+Makefile.coq

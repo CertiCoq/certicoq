@@ -12,7 +12,6 @@
 ./varImplZ.v
 ./varInterface.v
 ./varImplPeano.v
-./termsAbs.v
 ./universe.v
 ./LibTactics.v
 ./UsefulTypes.v

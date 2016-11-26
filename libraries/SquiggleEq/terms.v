@@ -70,22 +70,13 @@ with BTerm : Type :=
 *)
 
 (* begin hide *)
-(*
-Scheme NTerm_mut := Induction for NTerm Sort Prop
-with BTerm_mut := Induction for BTerm Sort Prop.
-*)
+
 
 (*
 Definition term_rel := NTerm -> NTerm -> Type.
 *)
 
-(*
-Definition iscanonical (t : NTerm) :=
-  match t with
-    | oterm (Can _) _ => true
-    | _ => false
-  end.
-*)
+
 Definition isvar (t : NTerm) :=
   match t with
     | vterm _ => true
@@ -152,65 +143,6 @@ Inductive nt_wf: NTerm -> [univ] :=
 with bt_wf : BTerm -> [univ] :=
 | wfbt : forall (lnv : list NVar) (nt: NTerm),
          nt_wf nt -> bt_wf (bterm lnv nt).
-
-(*  For example, the Opid [(Can NLambda)] takes only one [BTerm] an that [BTerm]
-  must have exactly one bound variable.
-  Hence [OpBindings (Can NLambda) = [1]]. *)
-
-(** % \noindent \\* %
-  The only interesting case here is for the [oterm] case. The
-  [wfot] constructor requires
-  that the number of bound variables of the bound terms in the list
-  match the signature ([OpBindings o]) of the corresponding operator [o].
-  
-  % \noindent \\* % We abstract the [Opid]s into two categories, canonical
-    and noncanonical.
-
-  [
-    Inductive Opid : Set :=
-
-     | Can  : CanonicalOp -> Opid
-
-     | NCan : NonCanonicalOp -> Opid.
-
-  ]
-% \noindent \\* % This distinction is important from the point of view of computation
-    and simplifies many definitions and properties about computation and
-    also makes them more easily extensible.
-    Nuprl has a lazy computation system and
-    an [NTerm] is in normal(canonical) form if its outermost [Opid] is a [CanonicalOp].
-    No further computation is performed on terms in canonical form.
-    For example, lambda abstraction are constructed by the following [Opid] :
-
-% \noindent \\* % [Can NLambda] 
-
-% \noindent \\* % We have [OpBindings (Can NLambda) = [1]].
-
-    
-    On the other hand, an [NTerm] whose outermost [Opid] is a [NonCanonicalOp] is
-    not in normal form and can compute to some other term, or to an error.
-    An an  example, terms denoting function applications are constructed by the
-    following [Opid]:
-% \noindent \\* % [NCan NApply] 
-
-% \noindent \\* % We have [OpBindings (NCan NApply) = [0,0]].
-
-
-    The only restriction in defining [CanonicalOp] and [NonCanonicalOp] is 
-    that the equality in these types should be decidable.
-    We will soon show the full-blown definition of
-    the [Opid]s of Nuprl.
-    Before that, we define functions that compute the free variables and
-    bound variables of a term.
-    Note how these functions have just two cases 
-    and are robust against addition/deletion of new operators([Opid]s) to the 
-    language.
-    If we had defined [NTerm] in the usual way(with one constructor for each [Opid]),
-    these definitions would be of the form of a long pattern match with one case for each [Opid].
-    However, these definitions only care about the binding structure.
-    We will reap more benefits of this uniformity when we define substitution and alpha equality
-    in the next subsection.
-*)
 
 
 End terms.

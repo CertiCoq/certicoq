@@ -2017,18 +2017,9 @@ Proof. induction l2; intros ? Hlen ?   Hin. inverts Hin as Hin;
    simpl. right; auto. omega.
 Qed.
 
-(** just like nth, but no need to provide a default element *)
-Fixpoint select {A:Type} (n:nat) (l:list A): option A :=
-   match n with
-  | 0 => match l with
-         | [] => None
-         | x :: _ => Some x
-         end
-  | S m => match l with
-           | [] => None
-           | _ :: t => select m t 
-           end
-  end.
+(** nth_error was aleady in the library. *)
+Definition select {A:Type} (n:nat) (l:list A): option A  :=
+nth_error l n.
 
 Lemma nth_select1: forall {A:Type} (n:nat) (l:list A)  (def: A),
   n < length l -> select  n l= Some (nth n l def).
@@ -3232,6 +3223,151 @@ Proof using.
   clear Hinb IHl. intros Hc. apply Hin. apply in_map. assumption.
 Qed.
 
+(* Move to Coq.Lists.List ? *)
+Lemma seq_add : forall n m s,
+  List.seq s (n+m) = (List.seq s n)++(List.seq (s+n) m).
+Proof using.
+  intros ?. induction n; simpl; intros m s;
+    [ rewrite <- plus_n_O; reflexivity | ].
+  f_equal. rewrite IHn. f_equal. simpl.
+  rewrite plus_n_Sm. reflexivity.
+Qed.
 
+(* Move to Coq.Lists.List ? *)
+Lemma fold_right_map {A B C: Type} 
+  (f: B -> C -> C) (m: A->B) (s:C) (l: list A) :
+fold_right f s (map m l)
+= fold_right (fun a c => f (m a) c) s l.
+Proof using.
+  induction l; simpl;congruence.
+Qed.
+
+Require Import Coq.Unicode.Utf8.
+Lemma  fold_left_right_rev:
+  ∀ (A B : Type) (f : A → B → B) (l : list A) (i : B),
+  fold_right f i l = fold_left (λ (x : B) (y : A), f y x) (rev l) i.
+Proof.
+  intros.
+  rewrite <- (rev_involutive l) at 1.
+  apply fold_left_rev_right.
+Qed.
+
+(* Move *)
+Lemma map_nth2:
+  forall (A B : Type) (f : A -> B) (l : list A) (d : A)  (db: B) (n : nat),
+  n < length l
+  -> nth n (map f l) db = f (nth n l d).
+Proof using.
+  intros. rewrite nth_indep with (d':= (f d));[| rewrite map_length; assumption].
+  apply map_nth.
+Qed.
+
+
+Require Import PArith.
+Require Import NArith.
+
+Open Scope N_scope.
+
+Lemma Nseq_add : forall (n m:nat) (s:N),
+  (seq N.succ s (n+m) = (seq N.succ s n)++(seq N.succ (s+N.of_nat n) m)).
+Proof using.
+  intros ?. induction n; intros m s;
+    [ rewrite N.add_0_r ; reflexivity | ].
+  rewrite Nat2N.inj_succ. simpl.
+  f_equal. rewrite IHn. do 2 f_equal.
+  lia.
+Qed.
+
+(* move to list.v *)
+Definition NLength {A:Type} (lv: list A) : N := N.of_nat (length lv).
+
+Lemma NLength_length {A:Type} (lv: list A) : 
+  N.to_nat (NLength lv)
+  = length lv.
+Proof using.
+  unfold NLength.
+  lia.
+Qed.
+
+  Lemma seq_NoDup len start : NoDup (seq N.succ start len).
+  Proof using.
+    clear.
+   revert start; induction len; simpl; constructor; trivial.
+   rewrite in_seq_Nplus. intros (H,_).
+    lia.
+  Qed.
+
+Lemma seq_rev_N : forall l n,
+  rev (seq N.succ n l) = map (fun x => n + n + N.of_nat l-x-1) (seq N.succ n l).
+Proof using.
+  clear.
+  induction l; auto.
+  intro.
+  replace (S l) with (l + 1)%nat at 1 by omega.
+  rewrite Nnat.Nat2N.inj_succ.
+  rewrite Nseq_add. simpl.
+  rewrite rev_app_distr. simpl.
+  f_equal;[ lia |].
+  rewrite IHl.
+  rewrite  seq_shift.
+  rewrite map_map. unfold compose. simpl.
+  apply eq_maps. intros ? ?.
+  lia.
+Qed.
+
+Hint Rewrite @NLength_length : list.
+Hint Rewrite @NLength_length : SquiggleEq.
+
+Close Scope N_scope.
+
+Lemma flat_map_single {A B:Type} (f: A->B) (l:list A) :
+flat_map (fun x => [f x]) l
+= map f l.
+Proof using.
+  induction l;auto.
+Qed.
+
+
+Lemma combine_app : forall {A B} (la1 la2 : list A) {lb1 lb2 : list B},
+  length la1 = length lb1
+  ->
+  combine (la1 ++ la2) (lb1 ++ lb2)
+  = (combine la1 lb1) ++ (combine la2 lb2).
+Proof using.
+  induction la1; intros ? ? ? Heq; destruct lb1 as [| b1 lb1]; invertsn Heq;[refl|].
+  rewrite combine_cons.
+  do 3 rewrite <- app_comm_cons.
+  rewrite combine_cons.
+  f_equal. eauto.
+Qed.
+
+
+
+
+(* Move *)
+Lemma lforall_rev {A:Type} (P: A -> Prop):
+  forall l, lforall P l -> lforall P (rev l).
+Proof using.
+  intros ?. unfold lforall. setoid_rewrite <- in_rev.
+  tauto.
+Qed.
+
+(* Move *)
+Lemma rev_combine {A B:Type} : forall (la : list A) (lb: list B),
+length la = length lb
+-> rev (combine la lb) = combine (rev la) (rev lb).
+Proof using.
+  induction la; intros ? Heq; destruct lb as [|b lb]; invertsn Heq; [refl|].
+  simpl. rewrite combine_app;[| autorewrite with list; assumption].
+  rewrite IHla by assumption.
+  refl.
+Qed.
+
+(* Move *)
+Lemma option_map_id {T:Type}: forall (k:option T), 
+  option_map id k = k.
+Proof using.
+  intros. destruct k; refl.
+Qed.
 
 

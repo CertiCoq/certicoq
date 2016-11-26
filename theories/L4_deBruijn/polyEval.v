@@ -89,36 +89,6 @@ the abstraction theorem for a proof of the complete natural induction principle
 *)
 
 
-Definition deqOption {A:Type} `{Deq A} (oa ob : option A) : bool :=
-match (oa,ob) with
-| (Some a, Some b) => decide (a=b)
-| (None, None) => true
-| _ => false 
-end.
-
-Lemma deqOptionCorr {A:Type} `{Deq A} :
-  forall x y, deqOption x y = true <-> x = y.
-Proof.
-  destruct x, y; unfold deqOption; simpl; auto; 
-  unfold decide; try rewrite  Decidable_spec;
-  split; intro;
-  subst; try discriminate; auto.
-  inverts H0. refl.
-Qed.
-
-Instance optionEqDec {A:Type} `{Deq A}: Deq (option A).
-Proof using.
-  (* if it is already defined, don't create a duplicate instance *)
-  Fail (eauto with typeclass_instances; fail).
-  intros x y. exists (deqOption x y). apply deqOptionCorr.
-Defined.
-
-Instance NEqDec2 : Deq N.
-Proof using.
-  intros x y. exists (N.eqb x y). apply N.eqb_eq.
-Defined.
-
-
 (* All of above is not specific to Certicoq and should eventually end up
 in the SquiggleEq library.*)
 

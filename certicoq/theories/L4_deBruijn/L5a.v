@@ -3,7 +3,7 @@ Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
 Require Import L4.polyEval.
 
-Require Import L4.L4a_to_L5.
+Require Import L4.L4_2_to_L5.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
   Coq.Program.Program Coq.micromega.Psatz.
 
@@ -37,7 +37,7 @@ with val_c : Type :=
     to be (list NVar) -> list (val_c) -> val_c.
     
     Unlike previously, when a lambda was implicit in a fix, the ci must now explicitly be a value.
-    Currently, [L4a_to_L5.eval_Proj_e] only reduces if cis are lambdas.
+    Currently, [L4_2_to_L5.eval_Proj_e] only reduces if cis are lambdas.
     We may allow arbitrary values.
   *)
 | Fix_c : list ((list NVar) * val_c) -> nat ->  val_c.
@@ -85,7 +85,7 @@ match c with
       ret (Ret_c f a)
  | terms.oterm CCall [bterm [] fn; bterm [] cont; bterm [] arg] => 
  (** we know that the CPS translation only produces Call_c terms that are variables. see 
-    [L4a_to_L5.cps_cvt] and [L4a_to_L5.cps_cvt_apply]. *)
+    [L4_2_to_L5.cps_cvt] and [L4_2_to_L5.cps_cvt_apply]. *)
       fn <- getVar fn ;; 
       cont <- getVar cont ;;
       arg <- getVar arg ;;
@@ -218,7 +218,7 @@ Local Opaque varClass.
 Local Opaque varClassP.
 Local Opaque contVars.
 
-Require Import L4.L4a_to_L5.
+Require Import L4.L4_2_to_L5.
 
 
 Lemma translateVal_cps_cvt_Some : forall (t:NTerm),
@@ -355,12 +355,12 @@ Proof using.
 Admitted.
 
 Require Import L4.expression.
-Require Import L4.L4_to_L4a.
+Require Import L4.L4_to_L4_2.
 
 (*
 Definition L4_to_L5a (e:L4.expression.exp) : option val_c :=
-  let l4a := L4.L4_to_L4a.L4_to_L4a e in
-  let l5 := L4a_to_L5.cps_cvt l4a in
+  let L4_2 := L4.L4_to_L4_2.L4_to_L4_2 e in
+  let l5 := L4_2_to_L5.cps_cvt L4_2 in
   translateVal l5.
 *)
 
@@ -391,12 +391,12 @@ Section L1_to_L5a.
 (* definitions from Greg's email dated July 5th 3:56PM EST *)
 
 Let compile_L1_to_L4 := L3_to_L4.program_exp.
-Require Import L4.L4_to_L4a.
-Let compile_L1_to_L4a (e : Ast.program) :=
-  L4.L4_to_L4a.L4_to_L4a (compile_L1_to_L4 e).
+Require Import L4.L4_to_L4_2.
+Let compile_L1_to_L4_2 (e : Ast.program) :=
+  L4.L4_to_L4_2.L4_to_L4_2 (compile_L1_to_L4 e).
 
 Let compile_L1_to_cps (e : Ast.program)  :=
-  L4a_to_L5.cps_cvt (compile_L1_to_L4a e).
+  L4_2_to_L5.cps_cvt (compile_L1_to_L4_2 e).
 
 Definition compile_L1_to_L5a (e:Ast.program) : exception val_c:=
   let e := compile_L1_to_cps e in

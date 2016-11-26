@@ -1,7 +1,7 @@
 Require Import L4.expression.
 Require Import L4.variables.
 Require Import polyEval.
-Require Import L4.L4a_to_L5.
+Require Import L4.L4_2_to_L5.
 
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
@@ -44,7 +44,7 @@ Open Scope N_scope.
 Definition translateb {NVar : Type} (mkVar : (N * Ast.name) -> NVar) max
 (names: pmap Ast.name) 
 translate
- d (nn: (N * list Ast.name)) (e:exp)  :  (@L4a_to_L5.branch NVar L4Opid) :=
+ d (nn: (N * list Ast.name)) (e:exp)  :  (@L4_2_to_L5.branch NVar L4Opid) :=
     let (n,vnames) := nn in
     let vars := (seq N.succ max (N.to_nat n)) in
     let nvars := (combine vars vnames) in
@@ -114,7 +114,7 @@ match e with
 end
 with translatelb {NVar : Type} (mkVar : (N * Ast.name) -> NVar)
 (max:N) (names: pmap Ast.name) (lb:branches_e) {struct lb}
-  : list (@L4a_to_L5.branch NVar L4Opid):=
+  : list (@L4_2_to_L5.branch NVar L4Opid):=
 match lb with
 | brnil_e => []
 | brcons_e d n e tl => 
@@ -133,11 +133,11 @@ Require Import L6.cps.
 
 
 
-Definition L4aTerm :Type := (@NTerm NVar L4Opid).
+Definition L4_2Term :Type := (@NTerm NVar L4Opid).
 
 
 (* uservars are supposed to be even, so multiply by 2 x0 *)
-Definition L4_to_L4a (n:N) (e:expression.exp) : L4aTerm :=
+Definition L4_to_L4_2 (n:N) (e:expression.exp) : L4_2Term :=
   translate mkNVar n Empty e.
 
 (*
@@ -147,7 +147,7 @@ Notation NVar := cps.var.
 
 Require Import SquiggleEq.export.
 Require Import L4.expression.
-Require Import L4.L4a_to_L5.
+Require Import L4.L4_2_to_L5.
 
 Definition freshVar (lv : list NVar) : NVar :=
 hd nvarx (freshVars 1 (Some true) lv []).
@@ -251,8 +251,8 @@ end).
 Defined.
 
 Print swap4.
-Time Eval vm_compute in (L4_to_L4a pl4).
-Time Eval compute in (L4_to_L4a pl4).
+Time Eval vm_compute in (L4_to_L4_2 pl4).
+Time Eval compute in (L4_to_L4_2 pl4).
 (*0.003 secs*)
 
 Time Eval vm_compute in (Old.translate nil pl4).
@@ -270,12 +270,12 @@ Local Opaque App_e.
 Compute runs much slower.
 These Opacity directives cut down the time from 40s to 13.929s
 *)
-Definition pl4a := ltac:(let t:= eval compute in (L4_to_L4a swap4) in exact t).
-Definition pl4aOld := ltac:(let t:= eval compute in (Old.translate nil swap4) in exact t).
+Definition pL4_2 := ltac:(let t:= eval compute in (L4_to_L4_2 swap4) in exact t).
+Definition pL4_2Old := ltac:(let t:= eval compute in (Old.translate nil swap4) in exact t).
 
 Print swap4. (* Why are branches lambdas? *)
-Print pl4a.
-Print pl4aOld.
+Print pL4_2.
+Print pL4_2Old.
 
 Local Transparent Match_e.
 Local Transparent Fix_e.
@@ -293,11 +293,11 @@ Proof.
   decide equality.
 Defined.
 
-Print pl4a.
-Print pl4aOld.
+Print pL4_2.
+Print pL4_2Old.
 
-Eval vm_compute in (free_vars pl4aOld).
-Eval vm_compute in (free_vars pl4a).
+Eval vm_compute in (free_vars pL4_2Old).
+Eval vm_compute in (free_vars pL4_2).
 
 Print deqpos.
 

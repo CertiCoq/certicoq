@@ -540,7 +540,7 @@ Proof.
       discriminate.
 Qed.
 
-
+(******************  FIX   *******************
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L1g.wcbvEval.WcbvEval p t t' ->
@@ -577,7 +577,8 @@ Proof.
     rewrite j in H0. eapply wAppCong; try eassumption.
     + intros h. elim n. apply isLambda_hom. assumption.
     + intros h. elim n0. apply isFix_hom. assumption.
-    + rewrite j.  reflexivity. 
+    + rewrite j.  reflexivity.
+  -
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.
@@ -851,3 +852,4 @@ Fixpoint unstripEnv (p:environ Term) : environ L1g.compile.Term :=
     | nil => nil
     | cons (nm, ec) q => cons (nm, (unstripEC ec)) (unstripEnv q)
   end.
+ **********************)

@@ -50,24 +50,24 @@ Focus 2.
   or can the L3_to_L4 translation syntactically preserve big step eval? *)
 Abort.
 
-Require Import L4_to_L4a.
-Require Import L4a_to_L5.
+Require Import L4_to_L4_2.
+Require Import L4_2_to_L5.
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
 
 
-Global  Program Instance : BigStepOpSem L4aTerm := eval.
+Global  Program Instance : BigStepOpSem L4_2Term := eval.
 
 (** all variables must be user variables *)
-Global Program Instance : WellFormed L4aTerm :=
+Global Program Instance : WellFormed L4_2Term :=
   fun e  => varsOfClass (all_vars e) true /\ isprogram e.
 
-Global Instance certiL4a: CerticoqLanguage (prod ienv L4aTerm) := {}.
+Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2Term) := {}.
 
 
-Global Instance certiL4_to_L4a: 
-  CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4a) :=
-  (fun p => (fst p, (L4_to_L4a (0)%N (snd p)))).
+Global Instance certiL4_to_L4_2: 
+  CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4_2) :=
+  (fun p => (fst p, (L4_to_L4_2 (0)%N (snd p)))).
 
 Require Import L4.variables.
 
@@ -79,8 +79,8 @@ Global Program Instance : WellFormed L5Term := isprogram.
 
 Global Instance certiL5: CerticoqLanguage (ienv * L5Term) := {}.
 
-Global Instance certiL4a_to_L5:
-  CerticoqTotalTranslation (cTerm certiL4a) (cTerm certiL5):=
+Global Instance certiL4_2_to_L5:
+  CerticoqTotalTranslation (cTerm certiL4_2) (cTerm certiL5):=
   (fun x => (fst x,  (cps_cvt (snd x)))).
 
 
@@ -134,11 +134,11 @@ Import ListNotations.
 Require Import Program.
 
 
-Definition print4 (t: cTerm certiL4a) : string :=
-(tprint "" NVar2string  L4a_to_L5.L4OpidString  (snd t)).
+Definition print4 (t: cTerm certiL4_2) : string :=
+(tprint "" NVar2string  L4_2_to_L5.L4OpidString  (snd t)).
 
 Definition print5 (t: cTerm certiL5) : string :=
-(tprint "" NVar2string  L4a_to_L5.L5OpidString  (snd t)).
+(tprint "" NVar2string  L4_2_to_L5.L5OpidString  (snd t)).
 
 Definition exception_map {A B:Type} (f: A->B) (e: exception A) : exception B:=
 match e with
@@ -148,12 +148,12 @@ end.
 
 
 (***
-Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a p0L1)).
+Eval vm_compute in (exception_map print4 (ctranslateTo certiL4_2 p0L1)).
 Eval vm_compute in (exception_map print5 (ctranslateTo certiL5 p0L1)).
 Eval vm_compute in ( (ctranslateTo certiL5 p0L1)).
 
 Quote Recursively Definition evo := (andb (even 0) (odd 1)).
-Eval vm_compute in (exception_map print4 (ctranslateTo certiL4a evo)).
+Eval vm_compute in (exception_map print4 (ctranslateTo certiL4_2 evo)).
 Eval vm_compute in (exception_map print5 (ctranslateTo certiL5 evo)).
 
 Check  @cps_cvt_corr.

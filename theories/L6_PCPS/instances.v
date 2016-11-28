@@ -38,7 +38,7 @@ Instance bigStepOpSemL3Term : BigStepHetero (L6env * cps.exp) cps.val :=
   ∃ (n:nat), (L6.eval.bstep_e pr cenv env e v n).
 
 (* Fix *)
-Instance WfL3Term : WellFormed (L6env * cps.exp) :=
+Instance WfL3Term : GoodTerm (L6env * cps.exp) :=
   fun p  => True .
 
 Instance certiL6 : CerticoqLanguage (L6env * cps.exp) := {}.

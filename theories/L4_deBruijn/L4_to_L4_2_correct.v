@@ -605,7 +605,7 @@ L4_to_L4a.translate mkVar 0 (sbst v2 0 t)
 Lemma L4_to_L4a_preserves_wf : 
   certiClasses.wfPreserving (cTerm certiL4) (cTerm certiL4a).
 Proof.
-  intros ? ?. simpl. unfold wf. unfold WellFormed_instance_1.
+  intros ? ?. simpl. unfold wf. unfold GoodTerm_instance_1.
   compute in s.
   compute in H.
 Abort.

@@ -11,12 +11,12 @@ Instance bigStepOpSemL3Term : BigStepOpSem (Program L3.compile.Term) :=
 (* Move [wf_environ] to L3? 
 Require Import L4.L3_to_L4_correct.
 
-Instance WfL3Term : WellFormed (Program L3.compile.Term) :=
+Instance WfL3Term : GoodTerm (Program L3.compile.Term) :=
   fun p  => L3.program.Crct (env p) 0 (main p) /\ (wf_environ (env p)).
 *)
 
 (* Fix -- use the one above when L4.L3_to_L4_correct.v compiles *)
-Instance WfL3Term : WellFormed (Program L3.compile.Term) :=
+Instance WfL3Term : GoodTerm (Program L3.compile.Term) :=
   fun p  => True.
 
 Instance certiL3 : CerticoqLanguage (Program L3.compile.Term) := {}.

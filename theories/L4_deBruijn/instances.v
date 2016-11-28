@@ -11,9 +11,9 @@ Definition dummyEnvBigStep {E T: Type}  (bt : BigStepOpSem T)
 : BigStepOpSem (E * T) :=
   (fun e v => (fst e) = (fst v) /\ (snd e) ⇓ (snd v)).
 
-Definition dummyEnvWf {E T: Type}  (bt : WellFormed T)
-: WellFormed (E * T) :=
-  (fun e => wf (snd e)).
+Definition dummyEnvWf {E T: Type}  (bt : GoodTerm T)
+: GoodTerm (E * T) :=
+  (fun e => goodTerm (snd e)).
 
 (* very low priority *)
 Existing Instance dummyEnvBigStep | 1000000.
@@ -25,7 +25,7 @@ Let L4Term := prod ienv  L4.expression.exp.
 Instance certiL4eval : BigStepOpSem L4.expression.exp := eval.
 
 
-Instance certiL4wf: WellFormed L4.expression.exp :=
+Instance certiL4wf: GoodTerm L4.expression.exp :=
  L4.expression.exp_wf (0%N).
 
 
@@ -59,7 +59,7 @@ Require Import SquiggleEq.UsefulTypes.
 Global  Program Instance : BigStepOpSem L4_2Term := eval.
 
 (** all variables must be user variables *)
-Global Program Instance : WellFormed L4_2Term :=
+Global Program Instance : GoodTerm L4_2Term :=
   fun e  => varsOfClass (all_vars e) true /\ isprogram e.
 
 Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2Term) := {}.
@@ -75,7 +75,7 @@ Definition L5Term :Type := (@NTerm NVar L5Opid).
 
 Global Program Instance : BigStepOpSem L5Term := eval_c.
 
-Global Program Instance : WellFormed L5Term := isprogram.
+Global Program Instance : GoodTerm L5Term := isprogram.
 
 Global Instance certiL5: CerticoqLanguage (ienv * L5Term) := {}.
 
@@ -90,7 +90,7 @@ Require Import L4.L5a.
 Global Program Instance : BigStepOpSem L4.L5a.val_c := fun _ _ => True.
 
 (** Fix *)
-Global Program Instance : WellFormed L4.L5a.val_c := fun x => False.
+Global Program Instance : GoodTerm L4.L5a.val_c := fun x => False.
 
 Global Instance certiL5a: CerticoqLanguage (ienv * L4.L5a.val_c) := {}.
 

@@ -8,7 +8,7 @@ Instance bigStepOpSemL2_5_Term : BigStepOpSem (Program L2_5.compile.Term) :=
   fun _ _ => True.
 
 (** FIX!! *)
-Instance WfL2_5_Term : WellFormed (Program L2_5.compile.Term) :=
+Instance WfL2_5_Term : GoodTerm (Program L2_5.compile.Term) :=
   fun _  => True.
 
 Instance certiL2_5 : CerticoqLanguage (Program L2_5.compile.Term) := {}.

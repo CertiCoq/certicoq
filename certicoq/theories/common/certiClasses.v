@@ -3,7 +3,7 @@ Require Import Common.exceptionMonad.
 Require Import Common.AstCommon.
 
 
-Class WellFormed (Term: Type) := wf : Term  -> Prop.
+Class GoodTerm (Term: Type) := goodTerm : Term  -> Prop.
 
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
@@ -46,11 +46,11 @@ Instance liftTotal `{CerticoqTotalTranslation Src Dst} : CerticoqTranslation Src
 
 
 Definition wfPreserving `{CerticoqTranslation Src Dst}
-    `{WellFormed Src} `{WellFormed Dst} : Prop := 
+    `{GoodTerm Src} `{GoodTerm Dst} : Prop := 
   ∀ (s: Src), 
-    wf s 
+    goodTerm s 
     -> match translate Src Dst s with
-      | Ret t => wf t
+      | Ret t => goodTerm t
       | Exc _ => False
       end.
 
@@ -58,13 +58,13 @@ Arguments wfPreserving Src Dst {H} {H0} {H1}.
 
 (** A Certicoq language must have an associated bigstep operational semantics and 
   a well formedness predicate (possibly \_.True) *)
-Class CerticoqLanguage `{BigStepHetero Term Value} `{WellFormed Term} := 
+Class CerticoqLanguage `{BigStepHetero Term Value} `{GoodTerm Term} := 
 {
   (* Sensible, but not needed yet.
   wfPreserved : forall (s v : Term), 
-    wf s
+    goodTerm s
     -> s ⇓ v
-    -> wf v
+    -> goodTerm v
   *)
 }.
 
@@ -82,10 +82,10 @@ Arguments CerticoqLanguage Term {Value} {H} {H0}.
 
 Definition bigStepPreserving `{CerticoqTranslation Src Dst} 
   `{CerticoqTranslation SrcValue DstValue}
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{WellFormed Src}
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
   :=
    ∀ (s:Src) (sv: SrcValue), 
-    wf s 
+    goodTerm s 
     -> s ⇓ sv
     -> (translate Src Dst s) ⇓ (translate SrcValue DstValue sv).
 
@@ -110,9 +110,9 @@ Global Instance composeTranslation `{CerticoqTranslation Src Inter}
 
 
 Lemma composePreservesWf (Src Inter Dst: Type)
-  {wfi: WellFormed Inter}
-  {wfs: WellFormed Src}
-  {wft: WellFormed Dst}
+  {wfi: GoodTerm Inter}
+  {wfs: GoodTerm Src}
+  {wft: GoodTerm Dst}
   {t1 : CerticoqTranslation Src Inter}
   {t2 : CerticoqTranslation Inter Dst} :
 wfPreserving Src Inter
@@ -204,26 +204,26 @@ Notation "s ⊑ t" := (obsLe s t) (at level 65).
 (* Similar to what Zoe suggested on 	Wed, Aug 17, 2016 at 8:57 AM *)
 Definition obsPreserving 
   `{CerticoqTranslation Src Dst} 
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{WellFormed Src}
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
    `{ObserveHead SrcValue} `{ObserveSubterms SrcValue} 
    `{ObserveHead DstValue} `{ObserveSubterms DstValue}
   :=
    ∀ (s:Src) (sv: SrcValue), 
-    wf s 
+    goodTerm s 
     -> (s ⇓ sv)
     -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ⊑ dv.
 
 Global Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
 
-Class CerticoqLanguage2 `{BigStepHetero Term Value} `{WellFormed Term} 
+Class CerticoqLanguage2 `{BigStepHetero Term Value} `{GoodTerm Term} 
    `{ObserveHead Value} `{ObserveSubterms Value} 
 := 
 {
   (* Sensible, but not needed yet.
   wfPreserved : forall (s v : Term), 
-    wf s
+    goodTerm s
     -> s ⇓ v
-    -> wf v
+    -> goodTerm v
   *)
 }.
 
@@ -371,14 +371,14 @@ Qed.
 
 Lemma obsPreservingWeakenObs
   `{CerticoqTranslation Src Dst} 
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{WellFormed Src}
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
    `{os: ObserveHead Obs1 SrcValue} `{ObserveSubterms SrcValue} 
    `{od: ObserveHead Obs1 DstValue} `{ObserveSubterms DstValue}:
     obsPreserving Obs1 Src Dst
     -> obsPreserving Obs2 Src Dst.
 Proof.
-  intros Ho ? ? Hwf He.
-  specialize (Ho _ _ Hwf He). clear Hwf He.
+  intros Ho ? ? HgoodTerm He.
+  specialize (Ho _ _ HgoodTerm He). clear HgoodTerm He.
   destruct Ho as [dv Hev].
   exists dv.
   split;[tauto|]. apply proj2 in Hev.
@@ -400,7 +400,7 @@ Local Instance certicoqTranslationCorrectWeakenObs
       (CerticoqLanguage2WeakenObs Ld).
 Proof using.
   destruct Ht1.
-  constructor;[assumption|]. (* wf is independent of observations *)
+  constructor;[assumption|]. (* goodTerm is independent of observations *)
   apply obsPreservingWeakenObs. assumption.
 Qed.
 
@@ -512,7 +512,7 @@ Lemma bigStepPreservingReflecting
   {_:bigStepPreserving Src Dst} :
   (deterministicBigStep Dst)
   -> ∀ (s:Src), 
-    wf s
+    goodTerm s
     -> normalizes s
     -> bigStepReflecting Src Dst s.
 Proof.

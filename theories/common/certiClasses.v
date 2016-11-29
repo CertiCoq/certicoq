@@ -45,7 +45,7 @@ Instance liftTotal `{CerticoqTotalTranslation Src Dst} : CerticoqTranslation Src
   fun (x:Src) => Ret (translateT Src Dst x). 
 
 
-Definition wfPreserving `{CerticoqTranslation Src Dst}
+Definition goodPreserving `{CerticoqTranslation Src Dst}
     `{GoodTerm Src} `{GoodTerm Dst} : Prop := 
   ∀ (s: Src), 
     goodTerm s 
@@ -54,14 +54,14 @@ Definition wfPreserving `{CerticoqTranslation Src Dst}
       | Exc _ => False
       end.
 
-Arguments wfPreserving Src Dst {H} {H0} {H1}.
+Arguments goodPreserving Src Dst {H} {H0} {H1}.
 
 (** A Certicoq language must have an associated bigstep operational semantics and 
   a well formedness predicate (possibly \_.True) *)
 Class CerticoqLanguage `{BigStepHetero Term Value} `{GoodTerm Term} := 
 {
   (* Sensible, but not needed yet.
-  wfPreserved : forall (s v : Term), 
+  goodPreserved : forall (s v : Term), 
     goodTerm s
     -> s ⇓ v
     -> goodTerm v
@@ -96,7 +96,7 @@ Class CerticoqTranslationCorrect
   `{CerticoqLanguage Src SrcValue} `{CerticoqLanguage Dst DstValue}
   `{CerticoqTranslation Src Dst} `{CerticoqTranslation SrcValue DstValue} := 
 {
-  certiWfPres : wfPreserving Src Dst;
+  certiGoodPres : goodPreserving Src Dst;
   certiBigStepPres : bigStepPreserving Src Dst; (* consider  [obsPreserving] below*)
 }.
 
@@ -109,15 +109,15 @@ Global Instance composeTranslation `{CerticoqTranslation Src Inter}
 λ s, bind (translate Src Inter s) (translate Inter Dst).
 
 
-Lemma composePreservesWf (Src Inter Dst: Type)
-  {wfi: GoodTerm Inter}
-  {wfs: GoodTerm Src}
-  {wft: GoodTerm Dst}
+Lemma composePreservesGood (Src Inter Dst: Type)
+  {goodi: GoodTerm Inter}
+  {goods: GoodTerm Src}
+  {goodt: GoodTerm Dst}
   {t1 : CerticoqTranslation Src Inter}
   {t2 : CerticoqTranslation Inter Dst} :
-wfPreserving Src Inter
--> wfPreserving Inter Dst
--> wfPreserving Src Dst.
+goodPreserving Src Inter
+-> goodPreserving Inter Dst
+-> goodPreserving Src Dst.
 Proof.
   intros Hsi Hit s Hs.
   apply Hsi in Hs.
@@ -143,10 +143,10 @@ Instance composeCerticoqTranslationCorrect
     : CerticoqTranslationCorrect Src Dst.
 Proof.
   destruct Ht1, Ht2.
-  constructor;[eapply composePreservesWf; eauto|].
-  intros ? ? Hwf Hev.
+  constructor;[eapply composePreservesGood; eauto|].
+  intros ? ? Hgood Hev.
   apply certiBigStepPres0 in Hev;[| assumption].
-  apply certiWfPres0 in Hwf.
+  apply certiGoodPres0 in Hgood.
   unfold composeTranslation, translate in *.
   destruct (t1 s), (t1v sv); compute in Hev; try contradiction.
   apply certiBigStepPres1 in Hev;[| assumption].
@@ -220,7 +220,7 @@ Class CerticoqLanguage2 `{BigStepHetero Term Value} `{GoodTerm Term}
 := 
 {
   (* Sensible, but not needed yet.
-  wfPreserved : forall (s v : Term), 
+  goodPreserved : forall (s v : Term), 
     goodTerm s
     -> s ⇓ v
     -> goodTerm v
@@ -235,7 +235,7 @@ Class CerticoqTranslationCorrect2 Src SrcValue Dst DstValue S1 S2 S3 S4 D1 D2 D3
   `{@CerticoqLanguage2 Dst DstValue D1 D2 D3 D4}
   `{CerticoqTranslation Src Dst} := 
 {
-  certiWfPres2 : wfPreserving Src Dst;
+  certiGoodPres2 : goodPreserving Src Dst;
   obsePres : obsPreserving Src Dst;
 }.
 *)
@@ -252,7 +252,7 @@ Class CerticoqTranslationCorrect2
   `{CerticoqLanguage2 Dst DstValue}
   `{CerticoqTranslation Src Dst} := 
 {
-  certiWfPres2 : wfPreserving Src Dst;
+  certiGoodPres2 : goodPreserving Src Dst;
   obsePres : obsPreserving Src Dst;
 }.
 
@@ -297,7 +297,7 @@ eapply obsLeTrns.
 Qed.
 
 (* making it global can cause ambiguities – see below *)
-(* The proof of [obsPreserving] needs the proof of [wfPreserving]. So the former
+(* The proof of [obsPreserving] needs the proof of [goodPreserving]. So the former
 cannot be done in isolation *)
 Local Instance composeCerticoqTranslationCorrect2
   `{Ls: CerticoqLanguage2 Src SrcValue}
@@ -311,10 +311,10 @@ Local Instance composeCerticoqTranslationCorrect2
     : CerticoqTranslationCorrect2 Ls Ld.
 Proof.
   destruct Ht1, Ht2.
-  constructor;[eapply composePreservesWf; eauto; fail|].
-  intros ? ? Hwf Hev.
+  constructor;[eapply composePreservesGood; eauto; fail|].
+  intros ? ? Hgood Hev.
   apply obsePres0 in Hev;[| assumption].
-  apply certiWfPres3 in Hwf.
+  apply certiGoodPres3 in Hgood.
   unfold composeTranslation, translate in *.
   destruct (t1 s); compute in Hev; try contradiction.
   destruct Hev as [iv Hev].

@@ -25,11 +25,11 @@ Require Import SquiggleEq.list.
 
 Open Scope program_scope.
 
-Definition dummyind := Ast.mkInd "" 0%nat.
 
 Open Scope N_scope.
 
 Section L4Inst.
+
 
 (**
 The proof in SquiggleEq of substitution commuting with DB to named
@@ -119,13 +119,12 @@ if decide (length (fst b) = O) then Some (snd b) else None.
   (with DB to named conversion) dont hold *)
 Let applyBTerm (b : BTerm) (l: list Term) : option Term :=
 let (n,t):=b in
-if (NLength n <? (maxFree t)) then None
+  if (Z.of_nat (length n) <? (maxFree t))%Z then None
 else 
-  (let l0 := map (fun t => (maxFree t) =? 0) l in
-  if (ball l0) then Some (sbst_real_list t l) else None).
+  (if (ZLmax (map maxFree l) <? 0) then Some (sbst_real_list t l) else None).
 
 
-Definition L4Abs : L4.polyEval.TermAbs L4Opid :=
+Definition L4Abs : L4.TermAbs.TermAbs L4Opid :=
 (@Build_TermAbs _ _ 
   Term 
   BTerm 

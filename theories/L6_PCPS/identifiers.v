@@ -1,3 +1,7 @@
+(* Library for identifiers. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
         Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles Omega.
 Require Import Libraries.Coqlib.
@@ -2615,8 +2619,8 @@ with bound_var_fundefs_ctx: fundefs_ctx -> Ensemble var :=
                           bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v
      | Bound_Fcons24_c: forall f t xs e cfds v,
                           bound_var_fundefs_ctx cfds v ->
-                          bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v
-.
+                          bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v.
+
 Hint Constructors bound_var_ctx.
 Hint Constructors bound_var_fundefs_ctx.
 
@@ -2649,192 +2653,199 @@ Proof.
   split; intros x' H; inv H; eauto. 
 Qed.
 
-Lemma bound_var_Case_nilnil_c: forall v t c,
-                                 Same_set _ (bound_var_ctx (Ecase_c v nil t c nil))
-                                            (bound_var_ctx c).
+Lemma bound_var_Case_nilnil_c :
+  forall v t c,
+    Same_set _ (bound_var_ctx (Ecase_c v nil t c nil))
+             (bound_var_ctx c).
 Proof.
   split; intros x H; inv H; eauto. inversion H7. inversion H7.
 Qed.  
-  
-Lemma bound_var_Case_cons1_c: forall v t' e lce t c lce',
-  Same_set _ (bound_var_ctx (Ecase_c v ((t',e)::lce) t c lce'))
-            (Union _ (bound_var e) (bound_var_ctx (Ecase_c v lce t c lce'))).
-  Proof with eauto with Ensembles_DB.
-    split; intros; intro; intros.
-    - inversion H; subst; eauto.
-      inversion H7; subst.
-      + inversion H0; subst.
-        left; auto.
-      + right. eapply Bound_Case2_c; eauto.
-    - inversion H; subst.
-      eapply Bound_Case2_c. apply H0. constructor; eauto.
-      inversion H0; subst; eauto.
-      eapply Bound_Case2_c.
-      apply H7. constructor 2; eauto.
-  Qed.
 
-Lemma bound_var_Case_cons2_c: forall v t' e lce t c lce',
-  Same_set _ (bound_var_ctx (Ecase_c v lce t c ((t',e)::lce')))
-            (Union _ (bound_var e) (bound_var_ctx (Ecase_c v lce t c lce'))).
-  Proof with eauto with Ensembles_DB.
-    split; intros; intro; intros.
-    - inversion H; subst.
-      right.
-      eapply Bound_Case1_c; eauto.
-      right; eapply Bound_Case2_c; eauto.
-      inversion H7. inversion H0; subst.
+Lemma bound_var_Case_cons1_c :
+  forall v t' e lce t c lce',
+    Same_set _ (bound_var_ctx (Ecase_c v ((t',e)::lce) t c lce'))
+             (Union _ (bound_var e) (bound_var_ctx (Ecase_c v lce t c lce'))).
+Proof with eauto with Ensembles_DB.
+  split; intros; intro; intros.
+  - inversion H; subst; eauto.
+    inversion H7; subst.
+    + inversion H0; subst.
       left; auto.
-      right; eapply Bound_Case3_c; eauto.
-    - inversion H; subst.
-      eapply Bound_Case3_c; eauto.
-      constructor 1. reflexivity.
-      inversion H0; subst; eauto.
-      eapply Bound_Case3_c; eauto. constructor 2. eauto.
-  Qed.      
+    + right. eapply Bound_Case2_c; eauto.
+  - inversion H; subst.
+    eapply Bound_Case2_c. apply H0. constructor; eauto.
+    inversion H0; subst; eauto.
+    eapply Bound_Case2_c.
+    apply H7. constructor 2; eauto.
+Qed.
 
-  Lemma bound_var_Case_c: forall v l c l0 t,
-                            Same_set var
-                                     (bound_var_ctx (Ecase_c v l t c l0))
+Lemma bound_var_Case_cons2_c :
+  forall v t' e lce t c lce',
+    Same_set _ (bound_var_ctx (Ecase_c v lce t c ((t',e)::lce')))
+             (Union _ (bound_var e) (bound_var_ctx (Ecase_c v lce t c lce'))).
+Proof with eauto with Ensembles_DB.
+  split; intros; intro; intros.
+  - inversion H; subst.
+    right.
+    eapply Bound_Case1_c; eauto.
+    right; eapply Bound_Case2_c; eauto.
+    inversion H7. inversion H0; subst.
+    left; auto.
+    right; eapply Bound_Case3_c; eauto.
+  - inversion H; subst.
+    eapply Bound_Case3_c; eauto.
+    constructor 1. reflexivity.
+    inversion H0; subst; eauto.
+    eapply Bound_Case3_c; eauto. constructor 2. eauto.
+Qed.      
+
+Lemma bound_var_Case_c :
+  forall v l c l0 t,
+    Same_set var
+             (bound_var_ctx (Ecase_c v l t c l0))
              (Union var (bound_var (Ecase v l))
                     (Union _ (bound_var_ctx c)
-                           (bound_var (Ecase v l0))))
-.
-  Proof.
-    split; intros; intro; intros.
-    - inversion H; subst.
-      right; left; auto.
-      left.
-      eapply Bound_Ecase; eauto.
-      right; right.
-      eapply Bound_Ecase; eauto.
-    - inversion H; subst.
-      inversion H0; subst.
-      eapply Bound_Case2_c; eauto.
-      inversion H0; subst.
-      eapply Bound_Case1_c; eauto.
-      inversion H1; subst.
-      eapply Bound_Case3_c; eauto.
-  Qed.
-      
-  Lemma bound_var_Fun1_c: forall fds c,
+                           (bound_var (Ecase v l0)))).
+Proof.
+  split; intros; intro; intros.
+  - inversion H; subst.
+    right; left; auto.
+    left.
+    eapply Bound_Ecase; eauto.
+    right; right.
+    eapply Bound_Ecase; eauto.
+  - inversion H; subst.
+    inversion H0; subst.
+    eapply Bound_Case2_c; eauto.
+    inversion H0; subst.
+    eapply Bound_Case1_c; eauto.
+    inversion H1; subst.
+    eapply Bound_Case3_c; eauto.
+Qed.
+
+Lemma bound_var_Fun1_c :
+  forall fds c,
     Same_set _ (bound_var_ctx (Efun1_c fds c))
              (Union _ (bound_var_fundefs fds) (bound_var_ctx c)).
-  Proof.
-    split; intros x H; inv H; eauto.
-  Qed.
+Proof.
+  split; intros x H; inv H; eauto.
+Qed.
 
 
-    Lemma bound_var_Fun2_c: forall cfds e,
+Lemma bound_var_Fun2_c :
+  forall cfds e,
     Same_set _ (bound_var_ctx (Efun2_c cfds e))
              (Union _ (bound_var_fundefs_ctx cfds) (bound_var e)).
-  Proof.
-    split; intros x H; inv H; eauto.
-  Qed.
+Proof.
+  split; intros x H; inv H; eauto.
+Qed.
 
 
-  Lemma bound_var_Fcons1_c: forall c v l e0 f, 
-        Same_set _ (bound_var_fundefs_ctx (Fcons1_c v c l e0 f))
- (Union var (Singleton var v)
-       (Union var (FromList l)
-          (Union var (bound_var_ctx e0)
-             (bound_var_fundefs f)))).
-  Proof.
-    split; intros x H; inv H; eauto.
-    - inversion H0; subst.
-      apply Bound_Fcons11_c; eauto.
-    - inversion H0; subst.
-      eapply Bound_Fcons12_c; auto.
-      inversion H; subst.
-      eapply Bound_Fcons13_c; auto.
-      eapply Bound_Fcons14_c; auto.
-  Qed.
+Lemma bound_var_Fcons1_c :
+  forall c v l e0 f,
+    Same_set _ (bound_var_fundefs_ctx (Fcons1_c v c l e0 f))
+             (Union var (Singleton var v)
+                    (Union var (FromList l)
+                           (Union var (bound_var_ctx e0)
+                                  (bound_var_fundefs f)))).
+Proof.
+  split; intros x H; inv H; eauto.
+  - inversion H0; subst.
+    apply Bound_Fcons11_c; eauto.
+  - inversion H0; subst.
+    eapply Bound_Fcons12_c; auto.
+    inversion H; subst.
+    eapply Bound_Fcons13_c; auto.
+    eapply Bound_Fcons14_c; auto.
+Qed.
 
-  Lemma bound_var_Fcons2_c: forall c v l e0 f,
-     Same_set var (bound_var_fundefs_ctx (Fcons2_c v c l e0 f))
-    (Union var (Singleton var v)
-       (Union var (FromList l)
-          (Union var (bound_var e0) (bound_var_fundefs_ctx f)))).
-  Proof.
-    split; intros x H; inv H; eauto.
-    - inversion H0; subst.
-      apply Bound_Fcons21_c; eauto.
-    - inversion H0; subst.
-      eapply Bound_Fcons22_c; auto.
-      inversion H; subst.
-      eapply Bound_Fcons23_c; auto.
-      eapply Bound_Fcons24_c; auto.
-  Qed.
+Lemma bound_var_Fcons2_c :
+  forall c v l e0 f,
+    Same_set var (bound_var_fundefs_ctx (Fcons2_c v c l e0 f))
+             (Union var (Singleton var v)
+                    (Union var (FromList l)
+                           (Union var (bound_var e0) (bound_var_fundefs_ctx f)))).
+Proof.
+  split; intros x H; inv H; eauto.
+  - inversion H0; subst.
+    apply Bound_Fcons21_c; eauto.
+  - inversion H0; subst.
+    eapply Bound_Fcons22_c; auto.
+    inversion H; subst.
+    eapply Bound_Fcons23_c; auto.
+    eapply Bound_Fcons24_c; auto.
+Qed.
 
-  
-  Theorem bound_var_app_ctx: forall e,
-    forall c, Same_set _ (bound_var (app_ctx_f c e))
-                       (Union _ (bound_var_ctx c) (bound_var e))
- with bound_var_app_f_ctx: forall e,
-    forall f, Same_set _ (bound_var_fundefs (app_f_ctx_f f e))
-             (Union _ (bound_var_fundefs_ctx f) (bound_var e)).
-  Proof with eauto with Ensembles_DB.
-    intro e.
-    induction c; simpl; eauto.
-    - rewrite bound_var_Hole_c...
-    - rewrite bound_var_Econstr.
-      rewrite IHc.
-      symmetry.
-      rewrite bound_var_Econstr_c.
-      rewrite <- Ensembles_util.Union_assoc.
-      rewrite Ensembles_util.Union_commut with (s2 :=  (bound_var e)).
-      rewrite <- Ensembles_util.Union_assoc. reflexivity.
-    - normalize_bound_var.
-      rewrite bound_var_Eproj_c.
-      rewrite IHc.
-      rewrite <- Ensembles_util.Union_assoc.
-      rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
-      rewrite <- Ensembles_util.Union_assoc. reflexivity.
-    - normalize_bound_var.
-      rewrite bound_var_Eprim_c.
-      rewrite IHc.
-      rewrite <- Ensembles_util.Union_assoc.
-      rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
-      rewrite <- Ensembles_util.Union_assoc. reflexivity.
-    - normalize_bound_var.
-      normalize_bound_var.      
-      rewrite IHc.      
-      rewrite bound_var_Case_c.
-      rewrite <- Ensembles_util.Union_assoc.
+
+Theorem bound_var_app_ctx:
+  forall e, forall c, Same_set _ (bound_var (app_ctx_f c e))
+                (Union _ (bound_var_ctx c) (bound_var e))
+with bound_var_app_f_ctx:
+  forall e, forall f, Same_set _ (bound_var_fundefs (app_f_ctx_f f e))
+                     (Union _ (bound_var_fundefs_ctx f) (bound_var e)).
+Proof with eauto with Ensembles_DB.
+  intro e.
+  induction c; simpl; eauto.
+  - rewrite bound_var_Hole_c...
+  - rewrite bound_var_Econstr.
+    rewrite IHc.
+    symmetry.
+    rewrite bound_var_Econstr_c.
+    rewrite <- Ensembles_util.Union_assoc.
+    rewrite Ensembles_util.Union_commut with (s2 :=  (bound_var e)).
+    rewrite <- Ensembles_util.Union_assoc. reflexivity.
+  - normalize_bound_var.
+    rewrite bound_var_Eproj_c.
+    rewrite IHc.
+    rewrite <- Ensembles_util.Union_assoc.
+    rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
+    rewrite <- Ensembles_util.Union_assoc. reflexivity.
+  - normalize_bound_var.
+    rewrite bound_var_Eprim_c.
+    rewrite IHc.
+    rewrite <- Ensembles_util.Union_assoc.
+    rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
+    rewrite <- Ensembles_util.Union_assoc. reflexivity.
+  - normalize_bound_var.
+    normalize_bound_var.      
+    rewrite IHc.      
+    rewrite bound_var_Case_c.
+    rewrite <- Ensembles_util.Union_assoc.
+    rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
+    rewrite Ensembles_util.Union_assoc with (s3 := (bound_var e)). 
+    rewrite Ensembles_util.Union_assoc. 
+    reflexivity.
+  - normalize_bound_var.
+    rewrite IHc.
+    rewrite bound_var_Fun1_c.
+    rewrite <- Ensembles_util.Union_assoc.
+    reflexivity.
+  - normalize_bound_var.
+    rewrite bound_var_Fun2_c.
+    rewrite bound_var_app_f_ctx.
+    rewrite <- Ensembles_util.Union_assoc.
+    rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
+    rewrite <- Ensembles_util.Union_assoc.
+    reflexivity.
+  - induction f; intros; simpl.
+    + normalize_bound_var.
+      rewrite bound_var_app_ctx.
+      rewrite bound_var_Fcons1_c.        
+      rewrite <-  Ensembles_util.Union_assoc.
       rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
-      rewrite Ensembles_util.Union_assoc with (s3 := (bound_var e)). 
-      rewrite Ensembles_util.Union_assoc. 
+      repeat (rewrite Ensembles_util.Union_assoc).
       reflexivity.
-    - normalize_bound_var.
-      rewrite IHc.
-      rewrite bound_var_Fun1_c.
-      rewrite <- Ensembles_util.Union_assoc.
+      
+    + normalize_bound_var.
+      rewrite IHf.
+      rewrite bound_var_Fcons2_c.
+      rewrite <-  Ensembles_util.Union_assoc.
+      repeat (rewrite Ensembles_util.Union_assoc).
       reflexivity.
-    - normalize_bound_var.
-      rewrite bound_var_Fun2_c.
-      rewrite bound_var_app_f_ctx.
-      rewrite <- Ensembles_util.Union_assoc.
-      rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
-      rewrite <- Ensembles_util.Union_assoc.
-      reflexivity.
-    - induction f; intros; simpl.
-      + normalize_bound_var.
-        rewrite bound_var_app_ctx.
-        rewrite bound_var_Fcons1_c.        
-        rewrite <-  Ensembles_util.Union_assoc.
-        rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
-        repeat (rewrite Ensembles_util.Union_assoc).
-        reflexivity.
-        
-      + normalize_bound_var.
-        rewrite IHf.
-        rewrite bound_var_Fcons2_c.
-        rewrite <-  Ensembles_util.Union_assoc.
-        repeat (rewrite Ensembles_util.Union_assoc).
-        reflexivity.
-  Qed.
+Qed.
 
-  (* unique_bindings for contexts *)
-  Inductive unique_bindings_c : exp_ctx -> Prop :=
+(* unique_bindings for contexts *)
+Inductive unique_bindings_c : exp_ctx -> Prop :=
 | UBc_Hole:
     unique_bindings_c Hole_c 
 | UBc_Constr :
@@ -2871,42 +2882,43 @@ Lemma bound_var_Case_cons2_c: forall v t' e lce t c lce',
       unique_bindings_c c ->
       unique_bindings_c (Eprim_c x p ys c)
 with unique_bindings_fundefs_c : fundefs_ctx -> Prop :=
-| UBc_cons1 :
-    forall f tau ys c defs,
-      ~ (bound_var_ctx c) f ->
-      ~ (bound_var_fundefs defs) f ->
-      Disjoint var (bound_var_ctx c) (FromList ys) ->
-      Disjoint var (bound_var_fundefs defs) (FromList ys) ->
-      Disjoint var (bound_var_ctx c) (bound_var_fundefs defs) ->
-      ~ FromList ys f ->
-      NoDup ys ->
-      unique_bindings_c c ->
-      unique_bindings_fundefs defs ->
-      unique_bindings_fundefs_c (Fcons1_c f tau ys c defs)
-| UBc_cons2 :
-    forall f tau ys e cdefs,
-      ~ (bound_var e) f ->
-      ~ (bound_var_fundefs_ctx cdefs) f ->
-      Disjoint var (bound_var e) (FromList ys) ->
-      Disjoint var (bound_var_fundefs_ctx cdefs) (FromList ys) ->
-      Disjoint var (bound_var e) (bound_var_fundefs_ctx cdefs) ->
-      ~ FromList ys f ->
-      NoDup ys ->
-      unique_bindings e ->
-      unique_bindings_fundefs_c cdefs ->
-      unique_bindings_fundefs_c (Fcons2_c f tau ys e cdefs).
+     | UBc_cons1 :
+         forall f tau ys c defs,
+           ~ (bound_var_ctx c) f ->
+           ~ (bound_var_fundefs defs) f ->
+           Disjoint var (bound_var_ctx c) (FromList ys) ->
+           Disjoint var (bound_var_fundefs defs) (FromList ys) ->
+           Disjoint var (bound_var_ctx c) (bound_var_fundefs defs) ->
+           ~ FromList ys f ->
+           NoDup ys ->
+           unique_bindings_c c ->
+           unique_bindings_fundefs defs ->
+           unique_bindings_fundefs_c (Fcons1_c f tau ys c defs)
+     | UBc_cons2 :
+         forall f tau ys e cdefs,
+           ~ (bound_var e) f ->
+           ~ (bound_var_fundefs_ctx cdefs) f ->
+           Disjoint var (bound_var e) (FromList ys) ->
+           Disjoint var (bound_var_fundefs_ctx cdefs) (FromList ys) ->
+           Disjoint var (bound_var e) (bound_var_fundefs_ctx cdefs) ->
+           ~ FromList ys f ->
+           NoDup ys ->
+           unique_bindings e ->
+           unique_bindings_fundefs_c cdefs ->
+           unique_bindings_fundefs_c (Fcons2_c f tau ys e cdefs).
 
 
 
-  Local Hint Constructors unique_bindings_c unique_bindings_fundefs_c.
-  Local Hint Constructors unique_bindings unique_bindings_fundefs. 
+Local Hint Constructors unique_bindings_c unique_bindings_fundefs_c.
+Local Hint Constructors unique_bindings unique_bindings_fundefs. 
 
 
-Theorem unique_bindings_Ecase_app: forall v l1 l2,
-  unique_bindings (Ecase v (l1++l2)) <->
-  unique_bindings (Ecase v l1) /\
-  unique_bindings (Ecase v l2) /\
-  Disjoint _ (bound_var (Ecase v l1)) (bound_var (Ecase v l2)).
+Theorem unique_bindings_Ecase_app :
+  forall v l1 l2,
+    unique_bindings (Ecase v (l1++l2)) <->
+    unique_bindings (Ecase v l1) /\
+    unique_bindings (Ecase v l2) /\
+    Disjoint _ (bound_var (Ecase v l1)) (bound_var (Ecase v l2)).
 Proof.
   induction l1; split; intros.
   - split. auto.
@@ -2948,13 +2960,14 @@ Proof.
     2: apply H1. left; auto.
 Qed.
 
-    
-Theorem ub_app_ctx_f: forall e,
-   ( forall c,                        
+
+Theorem ub_app_ctx_f:
+  forall e,
+    (forall c,                        
        unique_bindings (c |[ e ]|) <->
        (unique_bindings_c c /\ unique_bindings e /\ Disjoint _ (bound_var_ctx c) (bound_var e)))
-   /\
-   ( forall fds,
+    /\
+    (forall fds,
        unique_bindings_fundefs (fds <[ e ]>) <->
        (unique_bindings_fundefs_c fds /\ unique_bindings e /\ Disjoint _ (bound_var_fundefs_ctx fds) (bound_var e))).
 Proof.
@@ -2965,7 +2978,7 @@ Proof.
     rewrite bound_var_Hole_c.
     eauto with Ensembles_DB.
   - destructAll. apply H0.
-    (* Constr *)
+  (* Constr *)
   - inv H0.    apply H in H6.
     destructAll.
     split.
@@ -2995,7 +3008,7 @@ Proof.
     apply H5; auto.
     inv H2. specialize (H v).
     apply H. split. constructor. auto.
-    (* Eproj *)
+  (* Eproj *)
   - inv H0.    apply H in H7.
     destructAll.
     split.
@@ -3025,7 +3038,7 @@ Proof.
     apply H5; auto.
     inv H2. specialize (H v).
     apply H. split. constructor. auto.
-    (* prim *)
+  (* prim *)
   - inv H0.    apply H in H6.
     destructAll.
     split.
@@ -3055,7 +3068,7 @@ Proof.
     apply H5; auto.
     inv H2. specialize (H v).
     apply H. split. constructor. auto.
-    (* case *)
+  (* case *)
   - simpl in H0.
     revert H0. induction l; intros.
     +  simpl in H0. inv H0.
@@ -3186,7 +3199,7 @@ Proof.
       rewrite bound_var_Ecase_cons.
       apply Union_Disjoint_r.
       auto. auto.
-    (* efun1 *)
+  (* efun1 *)
   - simpl in H0. inv H0.
     apply H in H3.
     destructAll.
@@ -3221,7 +3234,7 @@ Proof.
     2: apply H2.
     intro. intro.
     left; auto.
-    (* efun2 *)
+  (* efun2 *)
   - inv H0. apply H in H4. clear H.
     destructAll.
     rewrite bound_var_app_f_ctx in H5.
@@ -3248,7 +3261,7 @@ Proof.
     eapply Union_Disjoint_r; auto.
     eapply Disjoint_Included_l; eauto.
     right; auto.
-    (* fcons1 *)
+  (* fcons1 *)
   - inv H0.
     apply H in H13. clear H.
     destructAll.
@@ -3305,7 +3318,7 @@ Proof.
     apply Disjoint_sym.
     eapply  Disjoint_Included_l. 2: apply H2.
     right; right; right; auto.    
-    (* fcons2 *)
+  (* fcons2 *)
   - simpl in H0.
     inv H0.
     apply H in H14. clear H.
@@ -3359,4 +3372,3 @@ Proof.
     apply Union_Disjoint_r; auto.
     eapply Disjoint_Included_l; eauto. right; right; left; auto.
 Qed.
-

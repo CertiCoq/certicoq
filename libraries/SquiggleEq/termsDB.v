@@ -44,11 +44,14 @@ Definition isvar (t : DTerm) :=
   end.
 
 
-Definition getOpid (n: DTerm) : option Opid :=
+Definition getOpidBTerms (n: DTerm) : option (Opid * list DBTerm) :=
 match n with
 | vterm _ => None
-| oterm o _ => Some o
-end. 
+| oterm o lb => Some (o, lb)
+end.
+
+Definition getOpid (n: DTerm) : option Opid :=
+  option_map fst (getOpidBTerms n).
 
 
 Definition get_nt  (bt: DBTerm ) : DTerm :=
@@ -130,6 +133,18 @@ match e with
 | bterm m t => bterm m (subst_aux v (NLength m+k) t)%N
 end.
 
+
+Fixpoint maxFree {Name Opid:Type} (e:@DTerm Name Opid)
+  : Z :=
+(match e with
+| vterm i => Z.of_N i
+| oterm _ lbt => ZLmax (map maxFree_bt lbt) (-1)
+end)%Z
+with maxFree_bt {Name Opid:Type}  (e:@DBTerm Name Opid): Z:=
+(match e with
+| bterm m t => (maxFree t) - (Z.of_nat (length m))
+end)%Z.
+
 Require Import ExtLib.Data.Map.FMapPositive.
 
 Definition lookupNDef {Name:Type} (def: Name) (names : pmap Name) (var:N) : Name :=
@@ -164,6 +179,37 @@ match e with
     let names := insertNs names nvars in
     let bvars := map mkVar nvars in
     terms.bterm bvars (fromDB defn mkVar (max+ N.of_nat len) names dt)
+end.
+
+Fixpoint shift {Name Opid : Type} (d(*isp*) s(*tart*) :N)
+   (e:@DTerm Name Opid) {struct e}
+  : (@DTerm Name Opid) :=
+match e with
+| vterm i => vterm (if(i <? s) then i else (i+d))
+| oterm o lbt => oterm o (map (shift_bt d s) lbt)
+end
+with shift_bt {Name Opid : Type} (d(*isp*) s(*tart*) :N)
+   (e:@DBTerm Name Opid) {struct e}
+  : (@DBTerm Name Opid) :=
+match e with
+| bterm ln dt => 
+    bterm ln (shift d (s+NLength ln) dt)
+end.
+
+Fixpoint subst_simpl {Name Opid :Type} (sub: list (N*DTerm)) (e:@DTerm Opid Name) {struct e}
+  : @DTerm Opid Name:=
+match e with
+| vterm i => 
+  match ALFind sub i with
+  | Some v => shift i 0 v
+  | None => vterm i (* never decremented (simple) *)
+  end
+| oterm o lbt => oterm o (map (subst_simpl_bt sub) lbt)
+end
+with subst_simpl_bt {Opid Name:Type} (sub: list (N*DTerm))
+     (e:@DBTerm Opid Name): @DBTerm Opid Name:=
+match e with
+| bterm m t => bterm m (subst_simpl (ALMapDom (N.add (NLength m)) sub) t)
 end.
 
 (* copied from terms2.v *)
@@ -383,6 +429,35 @@ Proof using.
   lia.
 Qed.
 
+Lemma exp_wf_maxFree: 
+  (forall (s : @DTerm Name Opid) (n:N),
+    fvars_below n s
+    -> maxFree s < Z.of_N n)%Z
+  *
+  (forall (s : @DBTerm Name Opid) (n:N),
+    fvars_below_bt n s
+    -> maxFree_bt s < Z.of_N n)%Z.
+Proof using.
+  apply NTerm_BTerm_ind.
+- intros v n Hfb.
+   simpl in *.
+   inverts Hfb.
+   lia.
+- intros lb n Hind nn Hfb. 
+  simpl in *.
+  inverts Hfb.
+  apply ZLmax_lub_lt.
+  intros ? Hin. simpl in Hin.
+  dorn Hin; subst; simpl in *; try lia;[].
+  apply in_map_iff in Hin. exrepnd. subst.
+  eauto.
+- intros lb n Hind nn Hfb. simpl in *.
+  simpl in *.
+  invertsn Hfb. unfold NLength in Hfb.
+  apply Hind in Hfb. lia.
+Qed.
+
+
 Local Opaque lookupNDef.
 (* Local Opaque insertNs. *)
 Local Opaque insertN.
@@ -438,6 +513,9 @@ Proof using getIdCorr getId.
   apply in_combine_l in Hin1.
   rewrite getIdCorr. assumption.
 Qed.
+
+
+
 
 Let fvarsProp (n:N) names (vars : list NVar): Prop := 
 lforall
@@ -1069,6 +1147,24 @@ Proof using gts getIdCorr getId.
       lia.
 Qed.
 
+
+Lemma shiftComm1 : 
+(forall v (nf s d: N) names,
+fvars_below nf v
+-> (fromDB s names (shift d s v))
+   ≡ fromDB s names v)*
+(forall v (nf s d: N) names,
+fvars_below_bt nf v
+-> (fromDB_bt s names (shift_bt d s v))
+   ∘≡ fromDB_bt s names v).
+Proof.
+  apply NTerm_BTerm_ind.
+- intros i ? ? ? ? Hfb. simpl.
+  cases_if as Hd;[apply N.ltb_lt in Hd| apply N.ltb_ge in Hd];[refl|].
+  unfold fromDB. simpl.
+Abort.
+
+
 Lemma fromDBHigherAlpha : forall v (n1 n2 : N) names1 names2,
 fvars_below 0 v
 -> fromDB n2 names2 v
@@ -1328,6 +1424,40 @@ Proof using gts getIdCorr getId deqo.
   apply seq_NoDup.
 Qed.
 
+(* this is a the version with lifting. 
+Now that we may substitute with non-closed terms, 
+  what should the first argument of fromDB be?
+  With non-closed terms, the first argument matters, even upto alpha equality,
+  because it changes the fvars of the result.
+*)
+Lemma fromDB_ssubst_simple:
+  let subn s names ns d := (ALMap (fun x => var names (ns +d -x -1)) (fromDB ns names) s) in
+  (forall (e : DTerm) (nf d:N) names (sub : list (N*DTerm)),
+    fvars_below (nf + d) e
+    -> lforall (fun s =>  (fst s) < nf) sub
+    -> fromDB nf names (subst_simpl sub e)
+       ≡
+       substitution.ssubst (fromDB (nf+d) names e) (subn sub names nf d))
+  *
+  (forall (e : DBTerm) (nf d:N) names (sub : list (N*DTerm)),
+    fvars_below_bt (nf+d) (* why nf? how to determine this when subbing with non-closed things?*) e
+(* at least, previously knew we wanted to start with 0 in the final result *)
+    -> lforall (fun s =>  fvars_below nf (snd s) /\ (fst s) < nf) sub (* the second conjunct is WLOG, because fvars are below nf *)
+    -> fromDB_bt nf names (subst_simpl_bt sub e)
+       ∘≡
+       substitution.ssubst_bterm (fromDB_bt nf names e) (subn sub names nf d))
+.
+Proof using gts getIdCorr getId deqo.
+  simpl.
+  apply NTerm_BTerm_ind.
+- intros i ? ? ? ? Hfb Hsf. simpl.
+  inverts Hfb.
+  rewrite sub_findALFind. unfold var.
+  change (mkNVar (nf + d - i - 1, lookupNDef def names (nf +d - i - 1))) with
+    (((λ x : N, mkNVar (nf +d- x - 1, lookupNDef def names (nf +d - x - 1)))) i).
+  rewrite ALFindMap2.
+  + dALFind ss; try refl. simpl.
+Abort.
 
 End DBToNamed.
 

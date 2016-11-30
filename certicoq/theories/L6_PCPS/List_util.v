@@ -1,3 +1,8 @@
+(* List library utilities. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
+
 Require Import Coq.Lists.List Coq.Relations.Relations Coq.Classes.RelationClasses
         Coq.omega.Omega Coq.Numbers.BinNums Coq.Structures.OrdersEx Coq.Sets.Ensembles
         Coq.Lists.SetoidList.

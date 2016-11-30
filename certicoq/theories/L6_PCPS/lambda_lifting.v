@@ -1,3 +1,7 @@
+(* Computational definition and declarative spec for lambda lifting. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.List_util
         L6.functions L6.Ensembles_util.
 Require Import Coq.ZArith.Znumtheory.
@@ -275,6 +279,15 @@ with fundefs_lambda_lift B fvm fm :=
 
  *)
 
+Definition lambda_lift (e : exp) ftag : exp :=
+  let next := ((max_var e 1%positive) + 1)%positive in
+  let state := mkCont next ftag in
+  let '(e, s) :=
+      runState
+        (exp_lambda_lift e (Maps.PTree.empty VarInfo)
+                         (Maps.PTree.empty FunInfo))
+        state in
+  e.
 
 (** * Relational Defintion *)
 

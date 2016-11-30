@@ -1,3 +1,7 @@
+(* Composition of L6 transformations and correctness. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import L6.cps L6.ctx L6.cps_util L6.List_util L6.eval L6.identifiers
         L6.functions L6.hoare L6.Ensembles_util L6.closure_conversion
         L6.closure_conversion_correct L6.closure_conversion_corresp L6.hoisting
@@ -14,8 +18,6 @@ Open Scope fun_scope.
 
 (** * Composition of L6 transformations and their correctness proofs *)
 
-
-
 Section L6_trans.
    
     Variable (clo_tag : cTag).
@@ -28,7 +30,7 @@ Section L6_trans.
         forall ct vs1 vs2,
           (* This can be potentially changed to [Forall2]. The reason for using
              [Forall2_asym] is for the logical relation to be complete w.r.t. to
-             contextual equivalence but this is something we necessarily need  *)
+             contextual equivalence but this is something we don't necessarily need  *)
           Forall2_asym obs_rel vs1 vs2 ->
           obs_rel (Vconstr ct vs1) (Vconstr ct vs2)
     | Obs_fun :

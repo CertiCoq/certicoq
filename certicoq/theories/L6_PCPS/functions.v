@@ -1,3 +1,7 @@
+(* Function library. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import L6.Ensembles_util.
 Require Import Libraries.Coqlib.
 Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos

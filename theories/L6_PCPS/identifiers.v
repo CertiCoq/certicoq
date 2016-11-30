@@ -2549,3 +2549,814 @@ Proof.
   now rewrite <- Hseq; eauto.
   now rewrite Hseq; eauto.
 Qed.
+
+(* bound variables for expression and function contexts *)
+Inductive bound_var_ctx: exp_ctx -> Ensemble var  :=
+| Bound_Constr1_c: forall v t ys c,
+    bound_var_ctx (Econstr_c v t ys c) v
+| Bound_Constr2_c: forall c v v' t ys,
+    bound_var_ctx c v ->
+    bound_var_ctx (Econstr_c v' t ys c) v
+| Bound_Proj1_c: forall  t n r c v,
+                   bound_var_ctx (Eproj_c v t n r c) v
+| Bound_Proj2_c: forall  t n r c v' v,
+                   bound_var_ctx c v' ->
+                   bound_var_ctx (Eproj_c v t n r c) v'
+| Bound_Prim1_c: forall  x f ys c,
+                   bound_var_ctx (Eprim_c x f ys c) x
+| Bound_Prim2_c: forall  t r c v' v,
+                   bound_var_ctx c v' ->
+                   bound_var_ctx (Eprim_c v t r c) v'
+| Bound_Case1_c: forall v v' lce t c lce',
+     bound_var_ctx c v' ->
+     bound_var_ctx (Ecase_c v lce t c lce') v'
+| Bound_Case2_c: forall v v' e lce t' t c lce',
+                   bound_var e v' ->
+                   List.In (t',e) lce ->
+                   bound_var_ctx (Ecase_c v lce t c lce') v'
+| Bound_Case3_c: forall v v' e lce t' t c lce',
+                   bound_var e v' ->
+                   List.In (t',e) lce' ->
+                   bound_var_ctx (Ecase_c v lce t c lce') v'
+| Bound_Fun11_c: forall fds v c,
+     bound_var_fundefs fds v ->
+     bound_var_ctx (Efun1_c fds c) v
+| Bound_Fun12_c: forall fds v c,
+                  bound_var_ctx c v ->
+                  bound_var_ctx (Efun1_c fds c) v
+| Bound_Fun21_c: forall cfds v e,
+                   bound_var_fundefs_ctx cfds v ->
+                   bound_var_ctx (Efun2_c cfds e) v
+| Bound_Fun22_c: forall cfds v e,
+                   bound_var e v ->
+                   bound_var_ctx (Efun2_c cfds e) v
+with bound_var_fundefs_ctx: fundefs_ctx -> Ensemble var :=
+     | Bound_Fcons11_c: forall f t xs c fds, 
+                          bound_var_fundefs_ctx (Fcons1_c f t xs c fds) f
+     | Bound_Fcons12_c: forall f t xs c fds v,
+                          List.In v xs ->
+                          bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
+                                                
+     | Bound_Fcons13_c: forall f t xs c fds v,
+                          bound_var_ctx c v ->
+                          bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
+     | Bound_Fcons14_c: forall f t xs c fds v,
+                          bound_var_fundefs fds v ->
+                          bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
+
+     | Bound_Fcons21_c: forall f t xs e cfds, 
+                          bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) f
+     | Bound_Fcons22_c: forall f t xs e cfds v,
+                          List.In v xs ->
+                          bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v
+
+     | Bound_Fcons23_c: forall f t xs e cfds v,
+                          bound_var e v ->
+                          bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v
+     | Bound_Fcons24_c: forall f t xs e cfds v,
+                          bound_var_fundefs_ctx cfds v ->
+                          bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v
+.
+Hint Constructors bound_var_ctx.
+Hint Constructors bound_var_fundefs_ctx.
+
+Lemma bound_var_Econstr_c x t ys c :
+  Same_set _ (bound_var_ctx (Econstr_c x t ys c))
+           (Union var (bound_var_ctx c) (Singleton _ x)).
+Proof.
+  split; intros x' H; inv H; eauto. inv H0; eauto.
+Qed.
+
+Lemma bound_var_Eproj_c v t n r c :
+  Same_set _ (bound_var_ctx (Eproj_c v t n r c))
+           (Union var (bound_var_ctx c) (Singleton _ v)).
+Proof.
+  split; intros x' H; inv H; eauto. inv H0; eauto.
+Qed.
+
+
+Lemma bound_var_Eprim_c x tau y c :
+  Same_set _ (bound_var_ctx (Eprim_c x tau y c))
+           (Union var (bound_var_ctx c) (Singleton _ x)).
+Proof.
+  split; intros x' H; inv H; eauto. inv H0; eauto.
+Qed.
+
+Lemma bound_var_Hole_c :
+  Same_set _ (bound_var_ctx Hole_c)
+           (Empty_set var).
+Proof.
+  split; intros x' H; inv H; eauto. 
+Qed.
+
+Lemma bound_var_Case_nilnil_c: forall v t c,
+                                 Same_set _ (bound_var_ctx (Ecase_c v nil t c nil))
+                                            (bound_var_ctx c).
+Proof.
+  split; intros x H; inv H; eauto. inversion H7. inversion H7.
+Qed.  
+  
+Lemma bound_var_Case_cons1_c: forall v t' e lce t c lce',
+  Same_set _ (bound_var_ctx (Ecase_c v ((t',e)::lce) t c lce'))
+            (Union _ (bound_var e) (bound_var_ctx (Ecase_c v lce t c lce'))).
+  Proof with eauto with Ensembles_DB.
+    split; intros; intro; intros.
+    - inversion H; subst; eauto.
+      inversion H7; subst.
+      + inversion H0; subst.
+        left; auto.
+      + right. eapply Bound_Case2_c; eauto.
+    - inversion H; subst.
+      eapply Bound_Case2_c. apply H0. constructor; eauto.
+      inversion H0; subst; eauto.
+      eapply Bound_Case2_c.
+      apply H7. constructor 2; eauto.
+  Qed.
+
+Lemma bound_var_Case_cons2_c: forall v t' e lce t c lce',
+  Same_set _ (bound_var_ctx (Ecase_c v lce t c ((t',e)::lce')))
+            (Union _ (bound_var e) (bound_var_ctx (Ecase_c v lce t c lce'))).
+  Proof with eauto with Ensembles_DB.
+    split; intros; intro; intros.
+    - inversion H; subst.
+      right.
+      eapply Bound_Case1_c; eauto.
+      right; eapply Bound_Case2_c; eauto.
+      inversion H7. inversion H0; subst.
+      left; auto.
+      right; eapply Bound_Case3_c; eauto.
+    - inversion H; subst.
+      eapply Bound_Case3_c; eauto.
+      constructor 1. reflexivity.
+      inversion H0; subst; eauto.
+      eapply Bound_Case3_c; eauto. constructor 2. eauto.
+  Qed.      
+
+  Lemma bound_var_Case_c: forall v l c l0 t,
+                            Same_set var
+                                     (bound_var_ctx (Ecase_c v l t c l0))
+             (Union var (bound_var (Ecase v l))
+                    (Union _ (bound_var_ctx c)
+                           (bound_var (Ecase v l0))))
+.
+  Proof.
+    split; intros; intro; intros.
+    - inversion H; subst.
+      right; left; auto.
+      left.
+      eapply Bound_Ecase; eauto.
+      right; right.
+      eapply Bound_Ecase; eauto.
+    - inversion H; subst.
+      inversion H0; subst.
+      eapply Bound_Case2_c; eauto.
+      inversion H0; subst.
+      eapply Bound_Case1_c; eauto.
+      inversion H1; subst.
+      eapply Bound_Case3_c; eauto.
+  Qed.
+      
+  Lemma bound_var_Fun1_c: forall fds c,
+    Same_set _ (bound_var_ctx (Efun1_c fds c))
+             (Union _ (bound_var_fundefs fds) (bound_var_ctx c)).
+  Proof.
+    split; intros x H; inv H; eauto.
+  Qed.
+
+
+    Lemma bound_var_Fun2_c: forall cfds e,
+    Same_set _ (bound_var_ctx (Efun2_c cfds e))
+             (Union _ (bound_var_fundefs_ctx cfds) (bound_var e)).
+  Proof.
+    split; intros x H; inv H; eauto.
+  Qed.
+
+
+  Lemma bound_var_Fcons1_c: forall c v l e0 f, 
+        Same_set _ (bound_var_fundefs_ctx (Fcons1_c v c l e0 f))
+ (Union var (Singleton var v)
+       (Union var (FromList l)
+          (Union var (bound_var_ctx e0)
+             (bound_var_fundefs f)))).
+  Proof.
+    split; intros x H; inv H; eauto.
+    - inversion H0; subst.
+      apply Bound_Fcons11_c; eauto.
+    - inversion H0; subst.
+      eapply Bound_Fcons12_c; auto.
+      inversion H; subst.
+      eapply Bound_Fcons13_c; auto.
+      eapply Bound_Fcons14_c; auto.
+  Qed.
+
+  Lemma bound_var_Fcons2_c: forall c v l e0 f,
+     Same_set var (bound_var_fundefs_ctx (Fcons2_c v c l e0 f))
+    (Union var (Singleton var v)
+       (Union var (FromList l)
+          (Union var (bound_var e0) (bound_var_fundefs_ctx f)))).
+  Proof.
+    split; intros x H; inv H; eauto.
+    - inversion H0; subst.
+      apply Bound_Fcons21_c; eauto.
+    - inversion H0; subst.
+      eapply Bound_Fcons22_c; auto.
+      inversion H; subst.
+      eapply Bound_Fcons23_c; auto.
+      eapply Bound_Fcons24_c; auto.
+  Qed.
+
+  
+  Theorem bound_var_app_ctx: forall e,
+    forall c, Same_set _ (bound_var (app_ctx_f c e))
+                       (Union _ (bound_var_ctx c) (bound_var e))
+ with bound_var_app_f_ctx: forall e,
+    forall f, Same_set _ (bound_var_fundefs (app_f_ctx_f f e))
+             (Union _ (bound_var_fundefs_ctx f) (bound_var e)).
+  Proof with eauto with Ensembles_DB.
+    intro e.
+    induction c; simpl; eauto.
+    - rewrite bound_var_Hole_c...
+    - rewrite bound_var_Econstr.
+      rewrite IHc.
+      symmetry.
+      rewrite bound_var_Econstr_c.
+      rewrite <- Ensembles_util.Union_assoc.
+      rewrite Ensembles_util.Union_commut with (s2 :=  (bound_var e)).
+      rewrite <- Ensembles_util.Union_assoc. reflexivity.
+    - normalize_bound_var.
+      rewrite bound_var_Eproj_c.
+      rewrite IHc.
+      rewrite <- Ensembles_util.Union_assoc.
+      rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
+      rewrite <- Ensembles_util.Union_assoc. reflexivity.
+    - normalize_bound_var.
+      rewrite bound_var_Eprim_c.
+      rewrite IHc.
+      rewrite <- Ensembles_util.Union_assoc.
+      rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
+      rewrite <- Ensembles_util.Union_assoc. reflexivity.
+    - normalize_bound_var.
+      normalize_bound_var.      
+      rewrite IHc.      
+      rewrite bound_var_Case_c.
+      rewrite <- Ensembles_util.Union_assoc.
+      rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
+      rewrite Ensembles_util.Union_assoc with (s3 := (bound_var e)). 
+      rewrite Ensembles_util.Union_assoc. 
+      reflexivity.
+    - normalize_bound_var.
+      rewrite IHc.
+      rewrite bound_var_Fun1_c.
+      rewrite <- Ensembles_util.Union_assoc.
+      reflexivity.
+    - normalize_bound_var.
+      rewrite bound_var_Fun2_c.
+      rewrite bound_var_app_f_ctx.
+      rewrite <- Ensembles_util.Union_assoc.
+      rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
+      rewrite <- Ensembles_util.Union_assoc.
+      reflexivity.
+    - induction f; intros; simpl.
+      + normalize_bound_var.
+        rewrite bound_var_app_ctx.
+        rewrite bound_var_Fcons1_c.        
+        rewrite <-  Ensembles_util.Union_assoc.
+        rewrite Ensembles_util.Union_commut with (s1 := (bound_var e)).
+        repeat (rewrite Ensembles_util.Union_assoc).
+        reflexivity.
+        
+      + normalize_bound_var.
+        rewrite IHf.
+        rewrite bound_var_Fcons2_c.
+        rewrite <-  Ensembles_util.Union_assoc.
+        repeat (rewrite Ensembles_util.Union_assoc).
+        reflexivity.
+  Qed.
+
+  (* unique_bindings for contexts *)
+  Inductive unique_bindings_c : exp_ctx -> Prop :=
+| UBc_Hole:
+    unique_bindings_c Hole_c 
+| UBc_Constr :
+    forall x t ys c,
+      ~ (bound_var_ctx c) x ->
+      unique_bindings_c c ->
+      unique_bindings_c (Econstr_c x t ys c)
+| UBc_Proj :
+    forall x tau n y c,
+      ~ (bound_var_ctx c) x ->
+      unique_bindings_c c ->
+      unique_bindings_c (Eproj_c x tau n y c)
+| UBc_Case :
+    forall x t c te te',
+      unique_bindings (Ecase x (te++te')) ->
+      unique_bindings_c c ->
+      Disjoint var (bound_var_ctx c) (bound_var (Ecase x (te++te'))) ->
+      unique_bindings_c (Ecase_c x te t c te')
+| UBc_Fun1 :
+    forall defs c,
+      unique_bindings_c c ->
+      unique_bindings_fundefs defs ->
+      Disjoint var (bound_var_ctx c) (bound_var_fundefs defs) ->
+      unique_bindings_c (Efun1_c defs c)
+| UBc_Fun2 :
+    forall cdefs e,
+      unique_bindings e ->
+      unique_bindings_fundefs_c cdefs ->
+      Disjoint var (bound_var e) (bound_var_fundefs_ctx cdefs) ->
+      unique_bindings_c (Efun2_c cdefs e)
+| UBc_Prim :
+    forall x p ys c,
+      ~ (bound_var_ctx c) x ->
+      unique_bindings_c c ->
+      unique_bindings_c (Eprim_c x p ys c)
+with unique_bindings_fundefs_c : fundefs_ctx -> Prop :=
+| UBc_cons1 :
+    forall f tau ys c defs,
+      ~ (bound_var_ctx c) f ->
+      ~ (bound_var_fundefs defs) f ->
+      Disjoint var (bound_var_ctx c) (FromList ys) ->
+      Disjoint var (bound_var_fundefs defs) (FromList ys) ->
+      Disjoint var (bound_var_ctx c) (bound_var_fundefs defs) ->
+      ~ FromList ys f ->
+      NoDup ys ->
+      unique_bindings_c c ->
+      unique_bindings_fundefs defs ->
+      unique_bindings_fundefs_c (Fcons1_c f tau ys c defs)
+| UBc_cons2 :
+    forall f tau ys e cdefs,
+      ~ (bound_var e) f ->
+      ~ (bound_var_fundefs_ctx cdefs) f ->
+      Disjoint var (bound_var e) (FromList ys) ->
+      Disjoint var (bound_var_fundefs_ctx cdefs) (FromList ys) ->
+      Disjoint var (bound_var e) (bound_var_fundefs_ctx cdefs) ->
+      ~ FromList ys f ->
+      NoDup ys ->
+      unique_bindings e ->
+      unique_bindings_fundefs_c cdefs ->
+      unique_bindings_fundefs_c (Fcons2_c f tau ys e cdefs).
+
+
+
+  Local Hint Constructors unique_bindings_c unique_bindings_fundefs_c.
+  Local Hint Constructors unique_bindings unique_bindings_fundefs. 
+
+
+Theorem unique_bindings_Ecase_app: forall v l1 l2,
+  unique_bindings (Ecase v (l1++l2)) <->
+  unique_bindings (Ecase v l1) /\
+  unique_bindings (Ecase v l2) /\
+  Disjoint _ (bound_var (Ecase v l1)) (bound_var (Ecase v l2)).
+Proof.
+  induction l1; split; intros.
+  - split. auto.
+    split. apply H.
+    split; intro; intro. inv H0.
+    inv H1.
+    inv H6.
+  -  destructAll.
+     apply H0.
+  - simpl in H. inv H.
+    apply IHl1 in H3. clear IHl1.
+    destructAll.
+    split. constructor; auto. rewrite bound_var_Ecase_app in H5.
+    eapply Disjoint_Included_r.
+    2: apply H5.
+    left; auto.
+    split; auto. rewrite bound_var_Ecase_cons.
+    apply Union_Disjoint_l.
+    rewrite bound_var_Ecase_app in H5.
+    eapply Disjoint_Included_r.
+    2: apply H5.
+    right; auto.
+    apply H1.
+  - simpl.
+    destruct H.
+    destructAll.
+    destruct a.
+    inv H.
+    rewrite bound_var_Ecase_cons in H1.
+    constructor. apply IHl1; auto.
+    split; auto.
+    split; auto.
+    eapply Disjoint_Included_l.
+    2: apply H1. right; auto.
+    auto.
+    rewrite bound_var_Ecase_app. apply Union_Disjoint_r.
+    auto.
+    eapply Disjoint_Included_l.
+    2: apply H1. left; auto.
+Qed.
+
+    
+Theorem ub_app_ctx_f: forall e,
+   ( forall c,                        
+       unique_bindings (c |[ e ]|) <->
+       (unique_bindings_c c /\ unique_bindings e /\ Disjoint _ (bound_var_ctx c) (bound_var e)))
+   /\
+   ( forall fds,
+       unique_bindings_fundefs (fds <[ e ]>) <->
+       (unique_bindings_fundefs_c fds /\ unique_bindings e /\ Disjoint _ (bound_var_fundefs_ctx fds) (bound_var e))).
+Proof.
+  intro e.
+  apply exp_fundefs_ctx_mutual_ind; split; intros.
+  (* Hole *)
+  - simpl in H.  split; auto. split; auto.
+    rewrite bound_var_Hole_c.
+    eauto with Ensembles_DB.
+  - destructAll. apply H0.
+    (* Constr *)
+  - inv H0.    apply H in H6.
+    destructAll.
+    split.
+    constructor.
+    intro. apply H3.
+    apply bound_var_app_ctx.
+    left; auto.
+    auto.
+    split; auto.
+    rewrite bound_var_Econstr_c.
+    apply Union_Disjoint_l; auto.
+    split; intro. intro.
+    inv H4. inv H5.
+    apply H3.
+    apply bound_var_app_ctx. right; auto.
+  - destructAll. inv H0.
+    assert (unique_bindings (e0 |[ e ]|)).
+    apply H. split; auto. split; auto.
+    rewrite bound_var_Econstr_c in H2.
+    eapply Disjoint_Included_l in H2.
+    apply H2.
+    left; auto.
+    clear H.
+    constructor; auto.
+    intro.
+    apply bound_var_app_ctx in H. inv H.
+    apply H5; auto.
+    inv H2. specialize (H v).
+    apply H. split. constructor. auto.
+    (* Eproj *)
+  - inv H0.    apply H in H7.
+    destructAll.
+    split.
+    constructor.
+    intro. apply H3.
+    apply bound_var_app_ctx.
+    left; auto.
+    auto.
+    split; auto.
+    rewrite bound_var_Eproj_c.
+    apply Union_Disjoint_l; auto.
+    split; intro. intro.
+    inv H4. inv H5.
+    apply H3.
+    apply bound_var_app_ctx. right; auto.
+  - destructAll. inv H0.
+    assert (unique_bindings (e0 |[ e ]|)).
+    apply H. split; auto. split; auto.
+    rewrite bound_var_Eproj_c in H2.
+    eapply Disjoint_Included_l in H2.
+    apply H2.
+    left; auto.
+    clear H.
+    constructor; auto.
+    intro.
+    apply bound_var_app_ctx in H. inv H.
+    apply H5; auto.
+    inv H2. specialize (H v).
+    apply H. split. constructor. auto.
+    (* prim *)
+  - inv H0.    apply H in H6.
+    destructAll.
+    split.
+    constructor.
+    intro. apply H3.
+    apply bound_var_app_ctx.
+    left; auto.
+    auto.
+    split; auto.
+    rewrite bound_var_Eprim_c.
+    apply Union_Disjoint_l; auto.
+    split; intro. intro.
+    inv H4. inv H5.
+    apply H3.
+    apply bound_var_app_ctx. right; auto.
+  - destructAll. inv H0.
+    assert (unique_bindings (e0 |[ e ]|)).
+    apply H. split; auto. split; auto.
+    rewrite bound_var_Eprim_c in H2.
+    eapply Disjoint_Included_l in H2.
+    apply H2.
+    left; auto.
+    clear H.
+    constructor; auto.
+    intro.
+    apply bound_var_app_ctx in H. inv H.
+    apply H5; auto.
+    inv H2. specialize (H v).
+    apply H. split. constructor. auto.
+    (* case *)
+  - simpl in H0.
+    revert H0. induction l; intros.
+    +  simpl in H0. inv H0.
+       apply H in H6.
+       clear H. destructAll.
+       rewrite bound_var_app_ctx in H7. split.
+       constructor; auto.
+       simpl. eapply Disjoint_Included_l. 2: apply H7.
+       left; auto. split; auto.
+       split; intro. intro. destruct H2. inv H2.
+       inv H1. specialize (H2 x). apply H2; auto.
+       inv H13.
+       inv H7.
+       specialize (H2 x).
+       apply H2. split; auto.
+       econstructor.
+       apply H12. eauto.
+    +  simpl in H0. inv H0.
+       assert (H4' := H4).
+       apply IHl in H4. destructAll.
+       split. constructor; auto. simpl. constructor; auto.
+       apply unique_bindings_Ecase_l in H4'.
+       destruct l0. destructAll. rewrite app_nil_r.
+       auto.
+       destruct p.
+       destructAll.
+       inv H7.
+       apply unique_bindings_Ecase_r; auto.
+       rewrite bound_var_Ecase_cons in H10.
+       eapply Disjoint_Included_r.
+       2: apply H10. left; auto.
+       apply Disjoint_sym; auto.
+       rewrite bound_var_Ecase_cons in H10.
+       eapply Disjoint_Included_r.
+       2: apply H10. right; auto.
+       rewrite bound_var_Ecase_app.
+       eapply Disjoint_Included_r. 2: apply H6.
+       rewrite bound_var_Ecase_app.
+       rewrite bound_var_Ecase_cons. eauto with Ensembles_DB.
+       inv H0; auto.
+       simpl.
+       rewrite bound_var_Ecase_cons.
+       rewrite bound_var_Case_c in H2.
+       apply Union_Disjoint_r.
+       apply Disjoint_sym.
+       eapply Disjoint_Included_r.
+       2: apply H6.
+       intro.
+       intro.
+       eapply Bound_Ecase.
+       apply bound_var_app_ctx. left; apply H3.
+       apply in_app. right. constructor. auto.
+       inv H0.
+       auto.
+       split; auto.
+       rewrite bound_var_Case_c.
+       apply Union_Disjoint_l.
+       rewrite bound_var_Ecase_cons.
+       apply Union_Disjoint_l.
+       eapply Disjoint_Included_r.
+       2: apply H6.
+       intro.
+       intro.
+       eapply Bound_Ecase.
+       apply bound_var_app_ctx. right; apply H3.
+       apply in_app. right. constructor. auto.
+       eapply Disjoint_Included_l.
+       2: apply H2.
+       rewrite bound_var_Case_c.
+       left; auto.
+       apply Union_Disjoint_l.
+       eapply Disjoint_Included_l.
+       2: apply H2.
+       rewrite bound_var_Case_c.
+       right; left; auto.
+       eapply Disjoint_Included_l.
+       2: apply H2.
+       rewrite bound_var_Case_c.
+       right; right; auto.       
+  - simpl.
+    destructAll.
+    inv H0.
+    rewrite bound_var_Case_c in H2.
+    assert ( unique_bindings (e0 |[ e ]|)).
+    apply H.
+    split; auto.
+    split; auto.
+    eapply Disjoint_Included_l.
+    2: apply H2. right; left; auto.
+    clear H.
+    destruct l0.
+    +  apply unique_bindings_Ecase_r; auto.
+       rewrite app_nil_r in H6. apply H6.
+       rewrite bound_var_app_ctx.
+       apply Union_Disjoint_r.
+       rewrite app_nil_r in H10.
+       apply Disjoint_sym.
+       auto.
+       eapply Disjoint_Included_l.
+       2: apply H2. left; auto.
+       split. intros. intro. inv H. inv H3. inv H11.
+       split. intros. intro. inv H. inv H4. inv H11.
+    + destruct p.
+      apply unique_bindings_Ecase_l in H6; auto. destructAll.
+      apply unique_bindings_Ecase_r; auto.
+      constructor; auto.
+      apply Disjoint_sym.
+      apply H6.
+      rewrite bound_var_app_ctx.
+      apply Union_Disjoint_r.
+      apply Disjoint_sym.
+      eapply Disjoint_Included_r. 2: apply H10.
+      intro. intro. inv H8.
+      eapply Bound_Ecase. apply H13. apply in_app. left; eauto.
+      eapply Disjoint_Included_l.
+      2: apply H2.
+      left; auto.
+      rewrite bound_var_app_ctx.
+      apply Union_Disjoint_r.
+      split. intro. intro. inv H8. inv H10.
+      specialize (H8 x). apply H8.
+      split; auto.
+      inv H11.
+      econstructor.
+      apply H14. apply in_app. right; eauto.
+      eapply Disjoint_Included_l. 2: apply H2.
+      right; right; auto.
+      rewrite bound_var_Ecase_cons.
+      apply Union_Disjoint_r.
+      auto. auto.
+    (* efun1 *)
+  - simpl in H0. inv H0.
+    apply H in H3.
+    destructAll.
+    clear H.
+    split. constructor; auto.
+    eapply Disjoint_Included_l. 2: apply H5.
+    intro. intro.
+    apply bound_var_app_ctx. left; auto.
+    split; auto.
+    rewrite bound_var_Fun1_c.
+    apply Union_Disjoint_l; auto.
+    apply Disjoint_sym.
+    eapply Disjoint_Included_l. 2: apply H5.
+    intro. intro.
+    apply bound_var_app_ctx. right; auto.
+  - destructAll.
+    inv H0.
+    assert (unique_bindings (e0 |[ e ]|)).
+    apply H.
+    split; auto.
+    split; auto.
+    rewrite bound_var_Fun1_c in H2.
+    eapply Disjoint_Included_l.
+    2: apply H2.
+    right; auto.
+    simpl. constructor; auto.
+    rewrite bound_var_app_ctx.
+    rewrite bound_var_Fun1_c in H2.
+    apply Union_Disjoint_l; auto.
+    apply Disjoint_sym.
+    eapply Disjoint_Included_l.
+    2: apply H2.
+    intro. intro.
+    left; auto.
+    (* efun2 *)
+  - inv H0. apply H in H4. clear H.
+    destructAll.
+    rewrite bound_var_app_f_ctx in H5.
+    split. constructor; auto.
+    eapply Disjoint_Included_r.
+    2: eauto.
+    left; auto.
+    split; auto.
+    rewrite bound_var_Fun2_c.
+    apply Union_Disjoint_l; auto.
+    eapply Disjoint_Included_r.
+    2: eauto.
+    right; auto.    
+  - simpl.
+    rewrite bound_var_Fun2_c in H0.
+    destructAll.
+    inv H0.
+    assert (unique_bindings_fundefs (f5 <[ e ]>)).
+    apply H. split; auto. split; auto.
+    eapply Disjoint_Included_l; eauto.
+    left; auto.
+    constructor; auto.
+    rewrite bound_var_app_f_ctx.
+    eapply Union_Disjoint_r; auto.
+    eapply Disjoint_Included_l; eauto.
+    right; auto.
+    (* fcons1 *)
+  - inv H0.
+    apply H in H13. clear H.
+    destructAll.
+    rewrite bound_var_app_ctx in H8.
+    rewrite bound_var_app_ctx in H10.
+    split.
+    constructor; auto.
+    intro; apply H6. apply bound_var_app_ctx. left; auto.
+    eapply Disjoint_Included_l. 2: apply H8.
+    left; auto.
+    eapply Disjoint_Included_l. 2: apply H10.
+    left; auto.
+    split; auto.
+    rewrite bound_var_Fcons1_c.
+    apply Union_Disjoint_l; auto.
+    split; intro. intro. destruct H2.
+    inv H2.
+    apply H6.
+    apply bound_var_app_ctx. right; auto.
+    apply Union_Disjoint_l; auto.
+    apply Disjoint_sym.
+    eapply Disjoint_Included_l.
+    2: apply H8.
+    right; auto.
+    apply Union_Disjoint_l; auto.
+    apply Disjoint_sym.
+    eapply Disjoint_Included_l.
+    2: apply H10.
+    right; auto.    
+  - destructAll.
+    simpl.
+    inv H0.
+    rewrite bound_var_Fcons1_c in H2.
+    assert ( unique_bindings (e0 |[ e ]|) ).
+    apply H.
+    split; auto.
+    split; auto.
+    eapply Disjoint_Included_l.
+    2: apply H2.
+    right. right. left; auto.
+    clear H.
+    constructor; auto.
+    intro.
+    apply bound_var_app_ctx in H. inv H.
+    apply H8; auto.
+    inv H2. specialize (H v). apply H. split. left; auto. auto.
+    rewrite bound_var_app_ctx.
+    apply Union_Disjoint_l; auto.
+    apply Disjoint_sym.
+    eapply  Disjoint_Included_l. 2: apply H2.
+    right; left; auto.
+    rewrite bound_var_app_ctx.
+    apply Union_Disjoint_l; auto.
+    apply Disjoint_sym.
+    eapply  Disjoint_Included_l. 2: apply H2.
+    right; right; right; auto.    
+    (* fcons2 *)
+  - simpl in H0.
+    inv H0.
+    apply H in H14. clear H.
+    destructAll.
+    rewrite bound_var_app_f_ctx in H9.
+    rewrite bound_var_app_f_ctx in H10.
+    split.
+    constructor; auto. intro; apply H7.
+    apply bound_var_app_f_ctx. left; auto.
+    eapply Disjoint_Included_l.
+    2: apply H9. left; auto.
+    eapply Disjoint_Included_r.
+    2: apply H10. left; auto.
+    split; auto.
+    rewrite bound_var_Fcons2_c.
+    apply Union_Disjoint_l.
+    split; intro. intro. apply H7.
+    inv H2. inv H3.
+    apply bound_var_app_f_ctx. right; auto.
+    apply Union_Disjoint_l.
+    apply Disjoint_sym.
+    eapply Disjoint_Included_l.
+    2: apply H9.
+    right; auto.
+    apply Union_Disjoint_l; auto.
+    eapply Disjoint_Included_r.
+    2: apply H10.
+    right; auto.
+  - simpl.
+    destructAll.
+    rewrite bound_var_Fcons2_c in H2.
+    inv H0.
+    assert (unique_bindings_fundefs (f7 <[ e ]>) ).
+    apply H.
+    split; auto. split; auto.
+    eapply Disjoint_Included_l.
+    2: apply H2.
+    right; right; right; auto.
+    clear H.
+    constructor; auto.
+    intro.
+    apply bound_var_app_f_ctx in H. inv H.
+    apply H9; auto.
+    inv H2. specialize (H v).
+    apply H. split. left; auto. auto.
+    rewrite bound_var_app_f_ctx.
+    apply Union_Disjoint_l; auto.
+    apply Disjoint_sym.
+    eapply Disjoint_Included_l; eauto. right; left; auto.
+    rewrite bound_var_app_f_ctx.
+    apply Union_Disjoint_r; auto.
+    eapply Disjoint_Included_l; eauto. right; right; left; auto.
+Qed.
+

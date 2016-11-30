@@ -3370,4 +3370,82 @@ Proof using.
   intros. destruct k; refl.
 Qed.
 
+Definition NLmax :  (list N) -> N  -> N :=
+  fold_left N.max.
 
+Lemma NLmax_le2 : forall  lp p1 p2, 
+  (p1 <= p2 -> NLmax lp p1 <= NLmax lp p2)%N.
+Proof using.
+  induction lp; auto.
+  intros ? ? Hle. simpl.
+  apply IHlp. lia.
+Qed.
+
+
+Lemma NLmax_le3 : forall  x lp p, 
+  (In x (p::lp) -> x <= NLmax lp p)%N.
+Proof.
+  induction lp; intros ? Hin.
+- apply in_single_iff in Hin. subst. reflexivity.
+- simpl in *. dorn Hin; [ | dorn Hin]; subst; auto.
+  + eapply transitivity;[apply IHlp; left; refl | apply NLmax_le2; lia].
+  + eapply transitivity;[apply IHlp; left; refl | apply NLmax_le2; lia].
+Qed.
+
+Lemma NLmax_le : forall  x lp, 
+  (In x lp -> x <= NLmax lp 0)%N.
+Proof.
+  intros. apply NLmax_le3. sp.
+Qed.
+
+(* the 4 items below are exact copies [Z/N] of the 4 above *)
+Definition ZLmax :  (list Z) -> Z  -> Z :=
+  fold_left Z.max.
+
+Lemma ZLmax_le2 : forall  lp p1 p2, 
+  (p1 <= p2 -> ZLmax lp p1 <= ZLmax lp p2)%Z.
+Proof using.
+  induction lp; auto.
+  intros ? ? Hle. simpl.
+  apply IHlp. lia.
+Qed.
+
+
+Lemma ZLmax_le3 : forall  x lp p, 
+  (In x (p::lp) -> x <= ZLmax lp p)%Z.
+Proof.
+  induction lp; intros ? Hin.
+- apply in_single_iff in Hin. subst. reflexivity.
+- simpl in *. dorn Hin; [ | dorn Hin]; subst; auto.
+  + eapply transitivity;[apply IHlp; left; refl | apply ZLmax_le2; lia].
+  + eapply transitivity;[apply IHlp; left; refl | apply ZLmax_le2; lia].
+Qed.
+
+Lemma ZLmax_le : forall  x lp, 
+  (In x lp -> x <= ZLmax lp 0)%Z.
+Proof.
+  intros. apply ZLmax_le3. sp.
+Qed.
+
+
+Lemma ZLmax_lub : forall  lp p ub, 
+  ((forall x, In x (p::lp) -> x <= ub) -> ZLmax lp p <= ub)%Z.
+Proof.
+  induction lp; intros ? ? Hin.
+- simpl.  apply Hin.  sp. 
+- simpl in *. apply IHlp.
+  intros ? Hinn. apply Hin.
+  dorn Hinn; auto;[].
+  pose proof (Zmax_spec p a) as Hz. subst.
+  firstorder.
+Qed.
+
+Lemma ZLmax_lub_lt : forall  lp p ub, 
+  ((forall x, In x (p::lp) -> x < ub) -> ZLmax lp p < ub)%Z.
+Proof.
+  intros lp p ub.
+  pose proof (ZLmax_lub lp p (Z.pred ub)) as Hz.
+  setoid_rewrite <- Z.lt_succ_r in Hz.
+  setoid_rewrite <- Zsucc_pred in Hz.
+  exact Hz.
+Qed.

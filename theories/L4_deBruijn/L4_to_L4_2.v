@@ -1,3 +1,8 @@
+(* This file is deprecated. Once the proof of correctness
+of the new translation, which is via L4_1 and is currently untested, 
+goes through, this file will be deleted.
+*)
+
 Require Import L4.expression.
 Require Import L4.variables.
 Require Import polyEval.

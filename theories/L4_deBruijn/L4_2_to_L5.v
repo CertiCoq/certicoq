@@ -206,7 +206,6 @@ Definition Proj_e (arg : NTerm) (selector : nat)  : NTerm :=
 Definition Fix_e' (lbt : list BTerm) (n:nat) : NTerm :=
   oterm (NFix (length lbt) n) lbt.
 
-(** fix (\xf. (\x..,,)) *)
 Definition Fix_e (xf : list NVar) (args : list NTerm)  (n:nat) : NTerm :=
   Fix_e' (List.map (bterm xf) args) n.
 
@@ -594,7 +593,7 @@ Proof using varclass.
   rewrite allvars_bterm.
   apply in_app_iff. tauto.
 
-- unfold Fix_e, Fix_e', App_e,  sub, pinds, len in *.
+- unfold Fix_e', App_e,  sub, pinds, len in *.
   apply_clear IHHe3.
   rwsimplC.
   rwsimpl Hn.

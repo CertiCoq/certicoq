@@ -1634,54 +1634,56 @@ Proof using.
   apply fold_right_map.
 Qed.
 
-Function maxFree (e:exp): N :=
+Open Scope Z_scope.
+Function maxFree (e:exp): Z :=
   match e with
-    | Var_e i => i
-    | App_e e1 e2 => N.max (maxFree e1) (maxFree e2)
+    | Var_e i => Z.of_N i
+    | App_e e1 e2 => Z.max (maxFree e1) (maxFree e2)
     | Lam_e _ e' => maxFree e' -1
     | Con_e _ es => maxFreeC es
-    | Let_e na a f => N.max (maxFree a) (maxFree f - 1)
-    | Match_e e p bs => 0
-    | Fix_e es k' => 0
-    | Ax_e s => 0
+    | Let_e na a f => Z.max (maxFree a) (maxFree f - 1)
+    | Match_e e p bs => Z.max (maxFree e) (maxFreeB bs)
+    | Fix_e es k' => maxFreeF es - (Z.of_N (efnlst_length es))
+    | Ax_e s => -1
   end
-with maxFreeC (es:exps) : N :=
+with maxFreeC (es:exps) : Z :=
     match es with
-    | enil => 0
-    | econs f fs => N.max (maxFree f) (maxFreeC fs)
+    | enil => -1
+    | econs f fs => Z.max (maxFree f) (maxFreeC fs)
     end
-with maxFreeF (es:efnlst) : N :=
+with maxFreeF (es:efnlst) : Z :=
     match es with
-    | eflnil => 0
-    | eflcons _ f fs => N.max (maxFree f) (maxFreeF fs)
+    | eflnil => -1
+    | eflcons _ f fs => Z.max (maxFree f) (maxFreeF fs)
     end
-with maxFreeB  (bs:branches_e) : N :=
+with maxFreeB  (bs:branches_e) : Z :=
        match bs with
-    | brnil_e => 0
-    | brcons_e _ n b bs => N.max (maxFree b - (nargs n)) (maxFreeB bs)
+    | brnil_e => -1
+    | brcons_e _ n b bs => Z.max (maxFree b - (Z.of_N (nargs n))) (maxFreeB bs)
        end.
 
-(* not necessarily equal because exp_wf is monotone in 1st argument.*)
 Lemma exp_wf_maxFree: 
   (forall n (s : exp),
     exp_wf n s 
-    -> maxFree s <= n)
+    -> maxFree s < Z.of_N n)
  /\
   (forall n (s : exps),
     exps_wf n s
-    -> maxFreeC s <= n)
+    -> maxFreeC s < Z.of_N n)
  /\
   (forall n (s : efnlst),
     efnlst_wf n s 
-    -> maxFreeF s <= n)
+    -> maxFreeF s < Z.of_N n)
  /\
   (forall n (s : branches_e),
     branches_wf n s 
-    -> maxFreeB s <= n).
+    -> maxFreeB s < Z.of_N n).
 Proof using.
-  apply my_exp_wf_ind; intros; simpl in *; lia.
+  apply my_exp_wf_ind; intros; simpl in *; try lia.
 Qed.
-SearchAbout compose.
+
+Close Scope Z_scope.
+
 
 Definition fnames (e:efnlst) : list (Ast.name) :=
 map fst (efnlst_as_list e).

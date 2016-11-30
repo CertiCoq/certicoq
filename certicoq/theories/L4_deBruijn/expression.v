@@ -131,6 +131,7 @@ Inductive exp_wf: N -> exp -> Prop :=
                              exp_wf i (Let_e n e1 e2)
 | fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + i) es ->
                                      exp_wf i (Fix_e es k)
+(* Fix?: Axiom applied to anything should reduce to Axiom *)
 | ax_e_wf : forall i s, exp_wf i (Ax_e s)
 with exps_wf: N -> exps -> Prop :=
 | enil_wf: forall i, exps_wf i enil
@@ -546,6 +547,7 @@ Inductive eval: exp -> exp -> Prop :=
     enthopt (N.to_nat n) es = Some e' ->
     eval (App_e (sbst_fix es e') v2) e'' ->
     eval (App_e e e2) e''
+(** Fix? :  (Ax _) --> Ax *)
 | eval_Ax_e s : eval (Ax_e s) (Ax_e s)
 with evals: exps -> exps -> Prop :=
      | evals_nil: evals enil enil
@@ -1543,6 +1545,38 @@ match e with
 | econs h tl => h::(exps_as_list tl)
 end.
 
+Fixpoint exps_from_list (es: list exp) : exps :=
+match es with
+| [] => enil
+| h::tl => econs h (exps_from_list tl)
+end.
+
+Fixpoint efnlst_as_list (e:efnlst) : list (name * exp) :=
+match e with
+| eflnil => []
+| eflcons n e tl => (n,e)::(efnlst_as_list tl)
+end.
+
+Fixpoint efnlst_from_list (e: list (name * exp)) : efnlst :=
+match e with
+| [] => eflnil
+| (n,e)::tl =>  eflcons n e (efnlst_from_list tl)
+end.
+
+
+Fixpoint branches_as_list (e:branches_e) : list (dcon * (N * list name) * exp) :=
+match e with
+| brnil_e => []
+| brcons_e d ns e tl => (d,ns,e)::(branches_as_list tl)
+end.
+
+Fixpoint branches_from_list (e:list (dcon * (N * list name) * exp)) : branches_e :=
+match e with
+| [] => brnil_e
+| (d,ns,e)::tl => brcons_e d ns e (branches_from_list tl)
+end.
+
+
 Definition sbst_real_list :exp -> (list exp) -> exp :=
 fold_right  (fun v ee => ee{0 ::= v}).
 
@@ -1599,3 +1633,55 @@ Proof using.
   symmetry.
   apply fold_right_map.
 Qed.
+
+Function maxFree (e:exp): N :=
+  match e with
+    | Var_e i => i
+    | App_e e1 e2 => N.max (maxFree e1) (maxFree e2)
+    | Lam_e _ e' => maxFree e' -1
+    | Con_e _ es => maxFreeC es
+    | Let_e na a f => N.max (maxFree a) (maxFree f - 1)
+    | Match_e e p bs => 0
+    | Fix_e es k' => 0
+    | Ax_e s => 0
+  end
+with maxFreeC (es:exps) : N :=
+    match es with
+    | enil => 0
+    | econs f fs => N.max (maxFree f) (maxFreeC fs)
+    end
+with maxFreeF (es:efnlst) : N :=
+    match es with
+    | eflnil => 0
+    | eflcons _ f fs => N.max (maxFree f) (maxFreeF fs)
+    end
+with maxFreeB  (bs:branches_e) : N :=
+       match bs with
+    | brnil_e => 0
+    | brcons_e _ n b bs => N.max (maxFree b - (nargs n)) (maxFreeB bs)
+       end.
+
+(* not necessarily equal because exp_wf is monotone in 1st argument.*)
+Lemma exp_wf_maxFree: 
+  (forall n (s : exp),
+    exp_wf n s 
+    -> maxFree s <= n)
+ /\
+  (forall n (s : exps),
+    exps_wf n s
+    -> maxFreeC s <= n)
+ /\
+  (forall n (s : efnlst),
+    efnlst_wf n s 
+    -> maxFreeF s <= n)
+ /\
+  (forall n (s : branches_e),
+    branches_wf n s 
+    -> maxFreeB s <= n).
+Proof using.
+  apply my_exp_wf_ind; intros; simpl in *; lia.
+Qed.
+SearchAbout compose.
+
+Definition fnames (e:efnlst) : list (Ast.name) :=
+map fst (efnlst_as_list e).

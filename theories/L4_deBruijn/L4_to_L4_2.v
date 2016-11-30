@@ -17,6 +17,7 @@ Require Import Coq.Arith.Arith
 Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program 
 Coq.micromega.Psatz.
 
+(* delete *)
 Definition dummyind := Ast.mkInd "" 0%nat.
 
 Require Import Common.RandyPrelude.
@@ -52,12 +53,6 @@ translate
     let bvars := map mkVar nvars in 
     (d, bterm bvars (translate mkVar (max+n) names e)).
 
-Fixpoint fnames (e:efnlst) {struct e}: list (Ast.name) :=
-match e with
-| eflnil => []
-| eflcons f h tl => 
-    f::(fnames tl)
-end.
 
 Fixpoint translate {NVar : Type} (mkVar : (N * Ast.name) -> NVar) 
   (max : N) (names: pmap Ast.name)(e:exp) {struct e}: (@NTerm NVar L4Opid):=

@@ -1,3 +1,7 @@
+(* Computational definition and declarative spec for function hoisting. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import L6.cps L6.cps_util L6.identifiers L6.eval L6.env L6.ctx L6.relations
         L6.logical_relations L6.Ensembles_util L6.List_util.
 Require Import Libraries.Coqlib.

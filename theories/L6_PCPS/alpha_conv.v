@@ -1,3 +1,8 @@
+(* Definition and semantics preservation proof for alpha conversion. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
+
 Require Import L6.cps L6.ctx L6.cps_util L6.set_util L6.identifiers L6.Ensembles_util L6.List_util
         L6.eval L6.logical_relations L6.functions.
 Require Import Libraries.Coqlib.

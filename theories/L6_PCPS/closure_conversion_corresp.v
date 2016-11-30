@@ -1,3 +1,7 @@
+(* Correspondence of the computational definition and the declarative spec for closure conversion. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.hoare L6.Ensembles_util
         L6.List_util L6.closure_conversion L6.closure_conversion_correct L6.functions
         L6.logical_relations L6.eval.

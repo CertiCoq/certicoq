@@ -1,3 +1,7 @@
+(* Computational definition and declarative spec for closure conversion. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import L6.cps L6.cps_util L6.set_util L6.relations L6.hoisting L6.identifiers L6.ctx
         L6.Ensembles_util L6.List_util L6.alpha_conv L6.functions.
 Require Import Coq.ZArith.Znumtheory.

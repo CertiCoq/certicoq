@@ -1,3 +1,7 @@
+(* Well-scopedness definition for L6. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import L6.set_util L6.cps L6.eval L6.cps_util L6.ctx L6.identifiers.
 Require Import Coq.MSets.MSetRBT Coq.Lists.List.
 Require Import Libraries.Coqlib.
@@ -138,7 +142,8 @@ Open Scope ctx_scope.
 
 Lemma env_subset_set Γ Γ' x v :
   env_subset Γ Γ' ->
-  env_subset (M.set x v Γ) (M.set x v Γ').
+  env_subset (M.set x v Γ) (M.set x v Γ')
+.
 Proof.
   intros Hsub x' v' Hget. rewrite M.gsspec in *.
   destruct (peq x' x); eauto.

@@ -1,3 +1,7 @@
+(* Set library utilities. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import Coq.PArith.PArith Coq.MSets.MSetRBT Coq.Classes.Morphisms.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.

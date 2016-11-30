@@ -1,3 +1,7 @@
+(* Hoare triples to reason about the state monad. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad
         Coq.Classes.Morphisms Coq.Lists.List.
 Require Import functions.

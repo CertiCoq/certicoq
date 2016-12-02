@@ -971,6 +971,221 @@ Definition unique_binding_f' fds:Prop :=
     num_binding_f fds v n /\ n <= 1.
 
 
+Theorem num_occur_n:
+  forall e x n m,
+  num_occur e x n ->
+  n = m ->
+  num_occur e x m.
+Proof.
+  intros; subst. apply H.
+Qed.
+
+Theorem num_occur_fds_n:
+  forall f x n m,
+  num_occur_fds f x n ->
+  n = m ->
+  num_occur_fds f x m.
+Proof.
+  intros; subst. apply H.
+Qed.
+
+
+Theorem num_occur_app_case:
+  forall l' x l n,
+  num_occur_case (l ++ l') x n <->
+  exists n1 n2, num_occur_case l x n1 /\ num_occur_case l' x n2 /\ n1 + n2 = n.
+Proof.
+  induction l; split; intros.
+  -  exists 0, n.
+  split.  constructor.
+  split; auto.
+  -  destructAll.
+     simpl. inv H.
+     apply H0.
+  -  simpl in H.
+     inv H. apply IHl in H5. destructAll.
+     eexists. eexists.
+     split. constructor; eauto.
+     split; eauto.
+     omega.
+  - simpl.
+    destructAll.
+    inv H.
+    replace (n + m + x1) with (n + (m + x1)) by omega.
+    constructor. auto.
+    apply IHl. exists m, x1. split; auto.     
+Qed.
+
+
+Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc.
+Theorem num_occur_app_ctx_mut: 
+  forall e x, 
+  (forall c n, num_occur (c |[ e ]|) x n
+             <-> exists n1 n2, num_occur_ec c x n1 /\ num_occur e x n2 /\ n = n1 + n2) /\
+  (forall fc n,  num_occur_fds (fc <[ e ]>) x n
+    <-> exists n1 n2, num_occur_fdc fc x n1 /\ num_occur e x n2 /\ n = n1 + n2).
+Proof.
+  intros e x.
+  exp_fundefs_ctx_induction IHc IHf; split; intros.
+  - simpl in H.
+    exists 0, n. split; auto.
+  - destructAll. simpl.
+    inv H. apply H0.
+  - inv H. apply IHc in H6. destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_n.
+    constructor. rewrite IHc.
+    eexists; eexists; eauto.
+    omega.
+  - inv H. apply IHc in H7. destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+      - destructAll.
+    inv H.
+    eapply num_occur_n.
+    constructor. rewrite IHc.
+    eexists; eexists; eauto.
+    omega.
+  - inv H. apply IHc in H6. destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+      - destructAll.
+    inv H.
+    eapply num_occur_n.
+    constructor. rewrite IHc.
+    eexists; eexists; eauto.
+    omega.
+  - inv H.
+    apply num_occur_app_case in H4.
+    destructAll.
+    inv H0. apply IHc in H6.
+    destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split. eauto.
+    omega.
+  - destructAll.
+    inv H. simpl.
+    eapply num_occur_n.
+    constructor.
+    apply num_occur_app_case. eexists; eexists. split; eauto.
+    split. constructor; eauto. apply IHc. eexists; eexists; eauto.
+    reflexivity.
+    simpl. omega.
+  - inv H. apply IHc in H2.
+    destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_n. simpl. constructor.
+    apply IHc. eexists; eexists; eauto.
+    apply H6.
+    omega.
+  - inv H.
+    apply IHf in H5.
+    destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+  - destructAll.
+    inv H.
+    simpl.
+    eapply num_occur_n. constructor; eauto.
+    apply IHf.
+    eexists; eexists; eauto.
+    omega.
+    - inv H. apply IHc in H7.
+    destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+    - destructAll.
+      inv H.
+      simpl.
+      replace (n+ m + x1) with ((n + x1)+m) by omega.      
+      constructor.
+      apply IHc.
+      eexists; eexists; eauto.
+      eauto.
+  - inv H.
+    apply IHf in H8.
+    destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+  -  destructAll.
+     inv H.
+     simpl.
+     replace (n+ m + x1) with (n + (m +x1)) by omega.      
+     constructor.
+     auto.
+     apply IHf.
+     eexists; eexists; eauto.    
+Qed.
+
+Theorem num_occur_app_ctx: 
+  forall e x, 
+  (forall c n, num_occur (c |[ e ]|) x n
+             <-> exists n1 n2, num_occur_ec c x n1 /\ num_occur e x n2 /\ n = n1 + n2) .
+Proof.
+  apply num_occur_app_ctx_mut.
+Qed.
+
+Theorem num_occur_fds_app_ctx: 
+  forall e x, 
+  (forall fc n,  num_occur_fds (fc <[ e ]>) x n
+    <-> exists n1 n2, num_occur_fdc fc x n1 /\ num_occur e x n2 /\ n = n1 + n2).
+Proof.
+  apply num_occur_app_ctx_mut.
+Qed.
+
+Lemma e_num_occur_mut: forall v ,
+                       (forall e, exists n, num_occur e v n) /\
+                       (forall fds, exists n, num_occur_fds fds v n).
+Proof.
+   intro v.
+    apply exp_def_mutual_ind; intros; try (solve [destructAll; eexists; eauto]).
+    - inv H; inv H0.
+      inv H. eexists.
+      constructor. constructor; eauto.
+Qed.
+
+Theorem e_num_occur: forall v ,
+                       (forall e, exists n, num_occur e v n).                     
+Proof.
+  apply e_num_occur_mut.
+Qed.  
+
+Theorem e_num_occur_fds: forall v ,
+                       (forall fds, exists n, num_occur_fds fds v n).                     
+Proof.
+  apply e_num_occur_mut.
+Qed.  
+
+
 (* 
 Inductive bv_e: exp -> list var -> Prop :=
 | Constr_bv :

@@ -61,14 +61,6 @@ Definition seto {A:Type} (x:var)(oa:option A) (map:M.t A):=
 
 Notation get_c := (getd 0%nat).
 Notation get_b := (getd false).
-
-(* todo: replace with equivalent find_def *)
-  Fixpoint get_fun (f:var) (fds:fundefs): option (fTag * list var * exp) :=
-    match fds with
-      | Fnil => None
-      | Fcons f' t xs e fds' =>
-        if (var_dec f f') then Some (t, xs, e) else get_fun f fds'
-    end.
     
   
   
@@ -339,7 +331,7 @@ End MEASURECONTRACT.
                 
 
 
-  Fixpoint set_list {A:Type}  (l : list (M.elt * A)) (map: M.t A) : M.t A :=
+  Definition set_list {A:Type}  (l : list (M.elt * A)) (map: M.t A) : M.t A :=
     fold_right (fun xv cmap => M.set (fst xv) (snd xv) cmap ) map l.
 
 

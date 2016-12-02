@@ -2603,7 +2603,7 @@ with bound_var_fundefs_ctx: fundefs_ctx -> Ensemble var :=
                                                 
      | Bound_Fcons13_c: forall f t xs c fds v,
                           bound_var_ctx c v ->
-                          bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
+                           bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
      | Bound_Fcons14_c: forall f t xs c fds v,
                           bound_var_fundefs fds v ->
                           bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
@@ -3371,4 +3371,154 @@ Proof.
     rewrite bound_var_app_f_ctx.
     apply Union_Disjoint_r; auto.
     eapply Disjoint_Included_l; eauto. right; right; left; auto.
+Qed.
+
+
+Local Hint Constructors bound_var bound_var_fundefs.
+
+Lemma bound_var_dec_mut :
+  (forall e, Decidable (bound_var e)) /\
+  (forall B, Decidable (bound_var_fundefs B)).
+Proof.
+  apply exp_def_mutual_ind; intros; split; intro x.
+  - inv H. specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x).
+    subst. auto.
+    right.
+    intro. inv H0; auto.
+  -  right.
+     intro.  inv H.
+     inv H4.
+  - inv H; inv H0.
+    specialize (Dec x).
+    specialize (Dec0 x).
+    inv Dec; auto.
+    left.
+    eapply Bound_Ecase. apply H.
+    constructor. reflexivity.
+    inv Dec0. left.
+    inv H0.
+    auto.
+    eapply Bound_Ecase. apply H3.
+    constructor 2; eauto.
+    right.
+    intro. inv H1.
+    inv H6. inv H1.
+    auto.
+    apply H0. eauto.
+  -  inv H. specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x).
+    subst. auto.
+    right.
+    intro. inv H0; auto.
+  - inv H.
+    specialize (Dec x).
+    inv Dec; auto.
+    inv H0.
+    specialize (Dec x).
+    inv Dec; auto.
+    right. intro. inv H1; auto.
+  - right. intro. inv H. 
+  -  inv H. specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x).
+    subst. auto.
+    right.
+    intro. inv H0; auto.
+  - right. intro. inv H.
+  - inv H. specialize (Dec x).
+    inv Dec; auto.
+    inv H0.
+    specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x); subst; auto.
+    destruct (in_dec var_dec x l); auto.
+    right.
+    intro. inv H1; auto.
+    inv H8; auto. inv H1. auto.
+  - right. intro. inv H.
+Qed.
+
+Theorem bound_var_dec :
+  forall e, Decidable (bound_var e).
+Proof.
+  apply bound_var_dec_mut.
+Qed.
+
+Theorem bound_var_fundefs_dec :
+  forall B, Decidable (bound_var_fundefs B).
+Proof.
+  apply bound_var_dec_mut.
+Qed.
+
+Local Hint Constructors bound_var_ctx bound_var_fundefs_ctx.
+
+Lemma bound_var_ctx_dec_mut :
+  (forall c, Decidable (bound_var_ctx c)) /\
+  (forall Bc, Decidable (bound_var_fundefs_ctx Bc)).
+Proof.
+  exp_fundefs_ctx_induction IHc IHf; split; intro x; try (inv IHc; specialize (Dec x); inv Dec; auto);
+  try (inv IHf; specialize (Dec x); inv Dec; auto).
+  - right; intro; inv H.
+  - destruct (var_dec v x); subst; auto.
+    right; intro Hbv; inv Hbv; auto.
+  - destruct (var_dec v x); subst; auto.
+    right; intro Hbv; inv Hbv; auto.
+  - destruct (var_dec v x); subst; auto.
+    right; intro Hbv; inv Hbv; auto.
+  - destruct (bound_var_dec (Ecase v l)).
+    specialize (Dec x).
+    inv Dec; auto.
+    left.
+    inv H0.
+    eapply Bound_Case2_c; eauto.
+    destruct (bound_var_dec (Ecase v l0)).
+    specialize (Dec x).
+    inv Dec; auto.
+    left.
+    inv H1.
+    eapply Bound_Case3_c; eauto.
+    right.
+    intro. inv H2; auto.
+    apply H0; eauto.
+    apply H1; eauto.
+  - destruct (bound_var_fundefs_dec f4).
+    specialize (Dec x).
+    inv Dec; auto.
+    right. intro.
+    inv H1; auto.
+  - destruct (bound_var_dec e).
+    specialize (Dec x).
+    inv Dec; auto.
+    right. intro.
+    inv H1; auto. 
+  - destruct (bound_var_fundefs_dec f6).
+    specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x); subst; auto.
+    destruct (in_dec var_dec x l); auto.
+    right.
+    intro. inv H1; auto.
+  - destruct (bound_var_dec e).
+    specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x); subst; auto.
+    destruct (in_dec var_dec x l); auto.
+    right.
+    intro. inv H1; auto.
+Qed.
+
+Theorem bound_var_ctx_dec :
+  forall c, Decidable (bound_var_ctx c).
+Proof.
+  apply bound_var_ctx_dec_mut.
+Qed.
+
+
+Theorem bound_var_fundefs_ctx_dec :
+  forall Bc, Decidable (bound_var_fundefs_ctx Bc).
+Proof.
+  apply bound_var_ctx_dec_mut.
 Qed.

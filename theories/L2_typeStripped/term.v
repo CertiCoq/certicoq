@@ -1595,3 +1595,8 @@ Proof.
   assumption. constructor. assumption.
 Qed.
   
+(*** correctness assumption for removing fixpoint unrolling guard ***
+Definition WFfixp:
+  forall (ds:Defs) (m:nat) (args:Terms)
+         (TApp (TFix ds m) args)
+ *******************)

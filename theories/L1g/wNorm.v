@@ -18,7 +18,8 @@ Set Implicit Arguments.
 
 
 (** Weak typed normal form: normal form of wndEval:
-*** no wndEval steps possible (including no step(**********
+*** no wndEval steps possible (including no step
+(**********
 Lemma wndEvalRTC_Prf:
   forall t t', wndEvalRTC t t' -> wndEvalRTC (TProof t) t'.
 induction 1.
@@ -52,36 +53,66 @@ Inductive WNorm: Term -> Prop :=
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
-Hint Constructors WNorm WNorm.
+Hint Constructors WNorm WNorms.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
       with WNorms_ind' := Induction for WNorms Sort Prop.
 Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.
 
-Ltac rght := solve [right; intros h; inversion_Clear h; contradiction].
+Ltac rght := solve [right; intros h; inversion_Clear h;
+                    first [contradiction | isLam_inv | isApp_inv]].
 Ltac lft := solve [left; constructor; assumption].
 
-(*** Is this desirable ??? ***
-Lemma WNorm_WFapp:
-  (forall s, WNorm s -> WFapp s) /\
-  (forall ss, WNorms ss -> WFapps ss) /\
-  (forall dts, WDNorms dts -> WFappDs dts).
-Proof.
-  apply WNormWNorms_ind; intros; constructor; try assumption.
-Qed.
- ****)
-
-(** WNorm is decidable **)
+(** WNorm is decidable **
 Lemma WNorm_dec:
   (forall t, WNorm t \/ ~ WNorm t) /\
   (forall ts, WNorms ts \/ ~ WNorms ts) /\
   (forall (ds:Defs), True).
 Proof.
+  Local Ltac argNotNorm h1 h2 :=
+    right; intro j; inversion_Clear j;
+    try (elim h1; auto); try (inversion_Clear h2; contradiction).
   apply TrmTrmsDefs_ind; intros; auto;
   try (solve[right; intros h; inversion h]);
   try (solve[left; constructor]).
   - destruct H; [lft|rght].  
   - destruct H; [lft|rght].
-  - destruct (isLambda_dec t). rght.
+  - destruct (isApp_dec t); try rght.
+    destruct (isLambda_dec t); try rght.
+    destruct (isFix_dec t).
+    + destruct i as [x0 [x1 jx]]; subst.
+      destruct H0, H1;
+        try (right; intro j; inversion_Clear j;
+             inversion_Clear H6; contradiction).
+      case_eq (dnthBody x1 x0); intros.
+      * { case_eq (tnth (snd p0) (tcons t0 t1)); intros.
+          - case_eq (canonicalP t); intros.
+            + right. intros j. inversion_Clear j.
+              * elim H11. auto.
+              * rewrite H2 in H10. myInjection H10.
+                unfold snd in H3. rewrite H11 in H3. myInjection H3.
+                rewrite H4 in H12. discriminate.
+            + left. destruct p0. eapply WNAppFix; try eassumption. intuition.
+          - left.
+
+    
+  - destruct (isFix_dec t).
+    + destruct i as [x0 [x1 jx]]; subst. destruct H.
+      * admit.
+      * elim H. auto.
+    + 
+      * { inversion_Clear H. destruct H0, H1.
+          - case_eq (dnthBody x1 x0); intros.
+            + case_eq (tnth (snd p0) (tcons t0 t1)); intros.
+              * { case_eq (canonicalP t); intros.
+                  - right. intros j. inversion_Clear j.
+                    + elim H10. auto.
+                    + rewrite H3 in H11. discriminate.
+
+                      
+  - destruct (isLambda_dec t).
+    + rght.
+    +
+      try rght. intros h. inversion_Clear h. contradiction.
     destruct (isFix_dec t). rght.
     destruct (isApp_dec t). rght.
     destruct H, H0, H1; try rght.
@@ -95,6 +126,7 @@ Proof.
   - destruct H, H0; try rght.
     + left. constructor; assumption.
 Qed.
+ ************)
 
 Lemma WNorms_tappendl:
   forall ts us, WNorms (tappend ts us) -> WNorms ts.
@@ -114,18 +146,57 @@ Proof.
 Qed.
 
 (********************
+Lemma wcbv_WNorm:
+  WFaEnv p ->
+  (forall n t s, wcbvEval p n t = Ret s -> WNorm s).
+Proof.
+  intros hp. induction n; intros. cbn in H. discriminate.
+  - eapply IHn.
+
 Lemma Wcbv_WNorm:
   WFaEnv p ->
-  (forall t s, WcbvEval p t s -> WFapp t -> WNorm s) /\
-  (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss).
+  (forall t s, WcbvEval p t s -> WNorm s) /\
+  (forall ts ss, WcbvEvals p ts ss -> WNorms ss).
 Proof.
   intros hp.
-  apply WcbvEvalEvals_ind; simpl; intros; try (solve[constructor]);
+  apply WcbvEvalEvals_ind; simpl; intros;
+  try (solve[constructor; try assumption]); try assumption.
+  - destruct (WcbvEvals_tcons_tcons w0) as [y0 [y1 jy]]. subst aargs'.
+    inversion_Clear w0. inversion_Clear H0.
+    destruct (mkApp_isApp_lem fn' y0 y1) as [x0 [x1 [x2 [k1 k2]]]].
+    rewrite k1. clear k1.
+    destruct k2; [destruct H0 as  [j1 [j2 [j3 j4]]]; subst |
+                  destruct H0 as [j1 [j2 j3]]].
+    + constructor; try assumption. constructor; try assumption.
+    + constructor. try assumption.
+      * constructor; try assumption.
+      * { destruct (mkApp_isApp_lem fn' y0 y1) as [z0 [z1 [z2 [c1 c2]]]].
+          rewrite c1 in k1. clear c1. myInjection k1. inversion_Clear w0.
+          inversion_Clear H0. destruct c2.
+          - destruct H0 as [h1 [hb [hc hd]]]. contradiction.
+          - destruct H0 as [h1 [hb hc]]. 
+            constructor. myInjection k1. inversion_Clear H. assumption. 
+
+        constructor.
+
+
+          
+      * destruct H1 as [j1 [j2 [j3 j4]]]. subst. assumption.
+      * destruct H1 as [j1 [j2 j3]].
+        destruct j1 as [z0 [z1 [z2 jz]]]. rewrite jz in k1.
+        cbn in k1. myInjection k1. inversion_Clear H. assumption. 
+      * destruct H1 as [j1 [j2 [j3 j4]]]. subst. assumption.
+      *
+        
+      destruct i as [x0 [x1 [x2 jx]]]. rewrite jx.
+
+  
   try inversion_Clear H0; intuition.
-  - apply H. assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.
-  - inversion_Clear H2. apply H1. 
+  - apply H. assert (k:= lookupDfn_LookupDfn _ _ e).
+    assert (j:= Lookup_pres_WFapp hp k). inversion_Clear j. assumption.
+  - inversion_Clear H2. apply H1.
     assert (j:= proj1 (wcbvEval_pres_WFapp hp) _ _ w H7). inversion_Clear j.
-    assert (j: WFapps (tcons a1' args')).
+    assert (j: WFapps (tcons a1' args)).
     { apply (proj2 (wcbvEval_pres_WFapp hp) _ _ w0).
       constructor; assumption. }
     inversion_Clear j.
@@ -189,5 +260,14 @@ Lemma wNorm_no_wndStep:
 unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
 elim (proj1 (wNorm_no_wndStep_lem) _ _ h1). assumption.
 Qed.
+
+(*** correctness assumption for removing fixpoint unrolling guard ***)
+Definition WFfixp (t:Term) :=
+  forall (ds:Defs) (m:nat) (arg:Term) (args:Terms),
+    t = (TApp (TFix ds m) arg args) ->
+  forall x ix, dnthBody m ds = Some (x, ix) ->
+  forall t, tnth ix (tcons arg args) = Some t ->
+  WNorm t -> exists z, canonicalP t = Some z.
+ (*******************)
 
 End Sec_environ.

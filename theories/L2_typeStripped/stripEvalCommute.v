@@ -56,6 +56,10 @@ Definition optStrip_split
 Lemma optStrip_hom: forall y, optStrip (Some y) = Some (strip y).
 induction y; simpl; reflexivity.
 Qed.
+Lemma optStrip_hom_None: optStrip (@None L1g.compile.Term) = @None (Term).
+  reflexivity.
+Qed.
+
 Lemma optStrips_hom: forall y, optStrips (Some y) = Some (strips y).
 induction y; simpl; reflexivity.
 Qed.
@@ -104,10 +108,42 @@ Proof.
   apply Lookup_hom. apply (lookup_Lookup _ _ h).
 Qed.
   
+Lemma lookup_hom_None:
+  forall p nm,
+    lookup nm p = None -> lookup nm (stripEnv p) = None.
+Proof.
+  induction p; intros.
+  - cbn. reflexivity.
+  - destruct a. destruct (string_dec nm s).
+    + subst. cbn in H. rewrite string_eq_bool_rfl in H. discriminate.
+    + cbn. rewrite (string_eq_bool_neq n).
+      cbn in H. rewrite (string_eq_bool_neq n) in H.
+      apply IHp. assumption.
+Qed.
+  
 Lemma LookupDfn_hom:
- forall p s t, LookupDfn s p t -> LookupDfn s (stripEnv p) (strip t).
-unfold LookupDfn. intros.
-assert (j:= Lookup_hom H). exact j.
+  forall p s t, LookupDfn s p t -> LookupDfn s (stripEnv p) (strip t).
+Proof.
+  unfold LookupDfn. intros.
+  assert (j:= Lookup_hom H). exact j.
+Qed.
+
+Lemma lookupDfn_hom:
+  forall p nm t,
+    lookupDfn nm p = Ret t -> lookupDfn nm (stripEnv p) = Ret (strip t).
+Proof.
+  induction p; intros.
+  - cbn in *. discriminate.
+  - destruct a. unfold lookupDfn. cbn. unfold lookupDfn in H. cbn in H.
+    destruct (string_dec nm s).
+    + subst. cbn. cbn in H.
+      rewrite string_eq_bool_rfl. rewrite string_eq_bool_rfl in H.
+      destruct e; try discriminate.
+      * myInjection H. cbn. reflexivity.
+    + rewrite (string_eq_bool_neq n). rewrite (string_eq_bool_neq n) in H.
+      case_eq (lookup nm p); intros; rewrite H0 in H; try discriminate.
+      * rewrite (lookup_hom _ _ H0). destruct e0; try discriminate.
+        cbn. myInjection H. reflexivity.
 Qed.
 
 Lemma dlength_hom:
@@ -513,6 +549,7 @@ Proof.
       rewrite <- (dcons_hom _ L1g.compile.prop). simpl. reflexivity.
 Qed.
 
+(*****
 Lemma tsplit_hom:
   forall ix arg args,
     optStrip_split (L1g.term.tsplit ix arg args) =
@@ -539,8 +576,84 @@ Proof.
     + rewrite e1 in IHo.  rewrite optStrip_split_hom in IHo.
       discriminate.
 Qed.
-
+***********************)
 (******************  FIX   *******************
+Lemma WcbvEval_hom:
+  forall p,
+    (forall t t', L1g.wcbvEval.WcbvEval p t t' -> WFfixp t' ->
+                  WcbvEval (stripEnv p) (strip t) (strip t')) /\
+    (forall ts ts', L1g.wcbvEval.WcbvEvals p ts ts' ->
+                    WcbvEvals (stripEnv p) (strips ts) (strips ts')).
+Proof.
+  intros p.
+  apply L1g.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
+  try (solve[constructor; trivial]).
+  - cbn. constructor. apply H. assumption.
+  - cbn. constructor. apply H. eassumption.
+  - cbn. refine (wConst _ _ (H _)); try assumption.
+    + apply lookupDfn_hom. assumption.
+  - cbn. eapply wAppLam.
+    + apply H. unfold WFfixp; intros. discriminate.
+    + apply H0. unfold WFfixp; intros. subst a1'.
+      admit.
+    + specialize (H1 H2). rewrite whBetaStep_hom in H1. assumption.
+  - cbn. specialize (H0 H1). eapply wLetIn.
+    + apply H. admit.
+    + rewrite <- (proj1 instantiate_hom). assumption.
+  - cbn. eapply wAppFix.
+    Focus 2. rewrite <- dnthBody_hom. rewrite e. reflexivity. 
+    Focus 4. rewrite <- pre_whFixStep_hom in H1.
+      rewrite tappend_hom in H1. eapply H1. assumption.
+    Focus 2. rewrite <- tsplit_hom.
+    rewrite e0. rewrite optStrip_split_hom. apply f_equal. apply f_equal3;
+      try reflexivity.
+    * apply H. unfold WFfixp; intros. discriminate.
+    * apply H0. admit.
+  - cbn. destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]].
+    rewrite j in H0. eapply wAppCong; try eassumption.
+    + apply H. admit.
+    + intros h. elim n. apply isLambda_hom. assumption.
+    + intros h. elim n0. apply isFix_hom. assumption.
+    + cbn. rewrite mkApp_hom. rewrite j. reflexivity.
+  - (** show L1g.term.canonicalP t' = Some ..., so this case can't happen **)
+    assert (j: exists s, L1g.term.canonicalP t' = Some s).
+    { destruct (L1g.term.canonicalP t'); try discriminate.
+      unfold WFfixp in H2. destruct aargs'.
+      + cbn in *.
+        destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons w1) as [x0 [x1 jx]].
+        discriminate.
+      + cbn in *. specialize (H2 dts m t0 aargs' eq_refl _ _ e).
+        destruct ix.
+        * myInjection e0. specialize (H2 t0 eq_refl).
+          destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons' w1).
+
+    }
+    destruct j as [x0 jx]. rewrite jx in e1. discriminate.
+
+(*****    
+  - destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons w1) as [y0 [y1 jy]].
+    rewrite jy. rewrite L1g.term.mkApp_goodFn; try L1g.term.not_isApp.
+    rewrite TApp_hom. rewrite TApp_hom. rewrite TFix_hom.
+    assert (k:= dnthBody_hom m dts). rewrite e in k. cbn in k. symmetry in k.
+    assert (k1:= tnth_hom (L1g.compile.tcons arg args) ix).
+    rewrite e0 in k1.
+    eapply (wAppFix _ _ H k _ H0).
+      
+    assert (k1:= tnth_tsplit_sanity ix (strip arg) (strips args)).
+    Check (wAppFix _ _ H k).
+
+    apply wAppFixCong.
+ *****)   
+
+  - refine (wCase _ _ _ _ _ _ _); try eassumption.
+    * rewrite <- canonicalP_hom. rewrite e. reflexivity.
+    * rewrite <- tskipn_hom. rewrite e0. reflexivity.
+    * rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
+  - refine (wCaseCong _ _ _ _); try eassumption.
+    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
+Qed.
+Print Assumptions WcbvEval_hom.
+
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L1g.wcbvEval.WcbvEval p t t' ->
@@ -549,9 +662,9 @@ Lemma WcbvEval_hom:
                     WcbvEvals (stripEnv p) (strips ts) (strips ts')).
 Proof.
   intros p.
-  apply L1g.wcbvEval.WcbvEvalEvals_ind; cbn; intros; try reflexivity;
+  apply L1g.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
   try (solve[constructor; trivial]).
-  - refine (wConst _ _ _); try eassumption.
+  - cbn. refine (wConst _ _ _); try eassumption.
     unfold lookupDfn. unfold lookupDfn in e.
     case_eq (lookup nm p); intros.
     + rewrite H0 in e. destruct e0.
@@ -578,7 +691,29 @@ Proof.
     + intros h. elim n. apply isLambda_hom. assumption.
     + intros h. elim n0. apply isFix_hom. assumption.
     + rewrite j.  reflexivity.
-  -
+  - (** show L1g.term.canonicalP t' = Some ..., so this case can't happen **)
+    assert (j: exists s, L1g.term.canonicalP t' = Some s).
+    { 
+
+
+    }
+    destruct j as [x0 jx]. rewrite jx in e1. discriminate.
+
+(*****    
+  - destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons w1) as [y0 [y1 jy]].
+    rewrite jy. rewrite L1g.term.mkApp_goodFn; try L1g.term.not_isApp.
+    rewrite TApp_hom. rewrite TApp_hom. rewrite TFix_hom.
+    assert (k:= dnthBody_hom m dts). rewrite e in k. cbn in k. symmetry in k.
+    assert (k1:= tnth_hom (L1g.compile.tcons arg args) ix).
+    rewrite e0 in k1.
+    eapply (wAppFix _ _ H k _ H0).
+      
+    assert (k1:= tnth_tsplit_sanity ix (strip arg) (strips args)).
+    Check (wAppFix _ _ H k).
+
+    apply wAppFixCong.
+ *****)   
+
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.
@@ -587,38 +722,6 @@ Proof.
     + rewrite <- canonicalP_hom. rewrite e. reflexivity.
 Qed.
 Print Assumptions WcbvEval_hom.
-
-(*** What is the problem?? ***)
-Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
-Inductive Acc (y: nat) : Prop :=
-  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
-Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
-  intros. destruct H. apply H. apply H0.
-  Defined.
-Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
-  match n with
-    | _ => @loop (S n) (@Acc_inv _ a (S n) (lt_n n))
-  end.
-Axiom Acc0Ax : Acc 0.
-Definition loop0 := (@loop O Acc0Ax).
-Eval vm_compute in loop0.   (** Coq does not loop **)
-
-Require Import Template.Template.
-Quote Recursively Definition p_loop0 := loop0.
-Definition L1P_loop0 :=
-  Eval vm_compute in (L1g.compile.program_Program p_loop0).
-Definition L1P_env := Eval vm_compute in (env L1P_loop0).
-Definition L1P_main := Eval vm_compute in (main L1P_loop0).
-(** L1g raises exception that recursive arg is not canonical **)
-Eval vm_compute in (L1g.wcbvEval.wcbvEval L1P_env 1000 L1P_main).
-
-Definition P_loop0 := Eval vm_compute in (program_Program p_loop0).
-Definition P_env := Eval vm_compute in (env P_loop0).
-Definition P_main := Eval vm_compute in (main P_loop0).
-(** wcbvEval raises exception "out of time": non-terminating **)
-Eval vm_compute in (wcbvEval P_env 1000 P_main).
-
-Check (proj1 (WcbvEval_hom L1P_env) L1P_main).
 
     
 Lemma Prf_strip_inv:

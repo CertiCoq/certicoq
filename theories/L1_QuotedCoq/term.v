@@ -1,19 +1,25 @@
 
-Add LoadPath "../common" as Common.
-
 Require Export Template.Ast.
+Require Import Template.Template.
 Require Import Coq.Strings.String.
 Require Import Coq.Bool.Bool.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
 Require Import Coq.omega.Omega.
-
 Require Import Common.Common.
-
 Open Scope list_scope.
 Open Scope bool_scope.
+
 Set Implicit Arguments.
+
+(*****
+Axiom canonClsdGrds:
+  forall (ds:mfixpoint term) (n:nat),
+  forall (dnm:name) (dty dbod:term) (dra:nat),
+    nth_error ds n = Some (mkdef term dnm dty dbod dra) -> True.
+    (gt:term)
+ *************)
 
 Ltac not_isApp :=
   let hh := fresh "h"

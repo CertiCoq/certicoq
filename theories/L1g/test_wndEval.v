@@ -1,8 +1,4 @@
 
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_QuotedCoq" as L1.
-Add LoadPath "." as L1g.
-
 Require Import Template.Template.
 Require Import Coq.Relations.Relation_Operators.
 Require Import Common.Common.

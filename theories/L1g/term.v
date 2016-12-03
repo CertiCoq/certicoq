@@ -61,13 +61,6 @@ Ltac not_is2 :=
             Ltac not_isApp := not_is3.
             Ltac not_isLambda := not_is3.
             
-Ltac isApp_inv h :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with yy := fresh "y"
-  with zz := fresh "z"
-  with jj := fresh "j"
-  in destruct h as [xx [yy [zz jj]]]; discriminate.
 Ltac isApp :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -77,7 +70,7 @@ Ltac isApp :=
   with zz := fresh "z"
   with ll := fresh "l" in
   intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
-  destruct kk as [zz ll].
+             destruct kk as [zz ll].
 
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
@@ -175,6 +168,16 @@ intros. exists nm, ty, bod. reflexivity.
 Qed.
 Hint Resolve IsLambda.
 
+Ltac isLam_inv :=
+  let  xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with jj := fresh "j" in
+  match goal with
+    | [ h : (isLambda ?a) |- _ ] =>
+      destruct h as [xx [yy [zz jj]]]; discriminate
+  end.
+              
 Lemma isLambda_dec: forall t, {isLambda t}+{~ isLambda t}.
 induction t;
   try (solve [right; intros h; unfold isLambda in h;
@@ -236,7 +239,17 @@ intros. exists fn, arg, args. reflexivity.
 Qed.
 Hint Resolve IsApp.
 
-Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
+Ltac isApp_inv :=
+  let  xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with jj := fresh "j" in
+  match goal with
+    | [ h : (isApp ?a) |- _ ] =>
+      destruct h as [xx [yy [zz jj]]]; discriminate
+  end.
+
+             Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 destruct t; try (right; not_isApp). 
 left. auto.
 Qed.
@@ -262,23 +275,22 @@ Proof.
 Qed.
 
 Definition isFix (t:Term) : Prop :=
-  exists ds n, t = TFix ds n.
-Lemma IsFix: forall ds n, isFix (TFix ds n).
-intros. exists ds, n. reflexivity.
+  exists ds m, t = TFix ds m.
+Lemma IsFix: forall ds m, isFix (TFix ds m).
+intros. exists ds, m. reflexivity.
 Qed.
 Hint Resolve IsFix.
 
 Ltac not_isFix :=
   let hh := fresh "h"
   with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y" in
+  with yy := fresh "y" 
+  with jj := fresh "j" in
   intros hh; destruct hh as [xx [yy jj]]; discriminate.
 
 Lemma isFix_dec: forall t, {isFix t}+{~ isFix t}.
 induction t;
-  try (solve [right; intros h; unfold isFix in h;
-              elim h; intros x h1; elim h1; intros x0 h2; discriminate]).
+  try (solve [right; not_isFix]).
 left. auto.
 Qed.
 
@@ -713,13 +725,19 @@ Proof.
   - apply IHn. assumption.
 Qed.
 
-
 (** operations on Defs **)
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
     | dnil => 0
     | dcons _ _ _ _ ts => S (dlength ts)
   end.
+
+(***
+Function dnth (n:nat) (l:Defs) (q:n <= S (dlength ds)) {struct l} : 
+  match l with
+    | dnil => 
+    |
+ ***********)
 
 Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
   match l with
@@ -991,7 +1009,8 @@ Inductive WFapp: Term -> Prop :=
 | wfaCase: forall m ty mch brs,
             WFapp mch -> WFapps brs -> WFapp ty ->
             WFapp (TCase m ty mch brs)
-| wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
+| wfaFix: forall defs m,
+            WFappDs defs -> WFapp (TFix defs m)
 with WFapps: Terms -> Prop :=
 | wfanil: WFapps tnil
 | wfacons: forall t ts, WFapp t -> WFapps ts -> WFapps (tcons t ts)
@@ -1863,9 +1882,9 @@ Proof.
     + apply H0; assumption.
     + apply H2; assumption.
     + apply H4; assumption.
-   - change (WFapp (TFix (instantiateDefs t (n + dlength defs) defs) m)).
-     constructor.
-     + apply H0. assumption.
+  - change (WFapp (TFix (instantiateDefs t (n + dlength defs) defs) m)).
+    constructor.
+    + apply H0. assumption.
    - change (WFapps (tcons (instantiate t0 n t) (instantiates t0 n ts))).
      constructor.
      + apply H0. assumption.
@@ -1998,3 +2017,4 @@ Proof.
   intros. apply instantiate_pres_WFapp.
   assumption. constructor. assumption.
 Qed.
+

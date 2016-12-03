@@ -1,7 +1,4 @@
 
-Add LoadPath "../common" as Common.
-Add LoadPath "." as L1g.
-
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.PeanoNat.
 Require Import Coq.Arith.Peano_dec.
@@ -22,6 +19,22 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation NNN := (TInd NN).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
+Notation LLL := (TInd LL).
+Notation CONS := (TConstruct LL 1 3).
+Notation NIL := (TConstruct LL 0 1).
+Notation Lam := (TLambda).
+Notation tLam := (tLambda).
+Notation Pi := (TProd).
+Notation tPi := (tProd).
+Notation PROP := (TSort sProp).
+Notation tPROP := (tSort sProp).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
 Unset Template Cast Propositions. 
 Quote Recursively Definition p_and_rect := and_rect.
 Print p_and_rect.
@@ -84,11 +97,84 @@ Definition loop0 := (@loop O Acc0Ax).
 Eval vm_compute in loop0.   (** Coq does not loop **)
 
 Quote Recursively Definition p_loop0 := loop0.
+Print p_loop0.
 Definition P_loop0 := Eval vm_compute in (program_Program p_loop0).
 Definition P_env := Eval vm_compute in (env P_loop0).
 Definition P_main := Eval vm_compute in (main P_loop0).
-(** wcbvEval raises exception that recursive ard is not canonical **)
 Eval vm_compute in wcbvEval P_env 1000 P_main.
+
+
+(** axioms in arguments to a data constructor **)
+Axiom anat:nat.
+Fixpoint double n := match n with
+                       | 0 => 0
+                       | S m => S (S (double m))
+                     end.
+Definition doubleX := (double (S (S anat))).
+Eval cbv in doubleX.
+Quote Recursively Definition p_doubleX := doubleX.
+Definition P_doubleX := Eval vm_compute in (program_Program p_doubleX).
+Definition P_doubleXenv := Eval vm_compute in (env P_doubleX).
+Definition P_doubleXmain := Eval vm_compute in (main P_doubleX).
+Eval vm_compute in wcbvEval P_doubleXenv 1000 P_doubleXmain.
+
+Fixpoint listDouble (ls:list nat) :=
+  match ls with
+    | nil => nil
+    | cons _ us => cons 0 (cons 0 (listDouble us))
+  end.
+Definition listDoubleX := (listDouble (cons anat (cons anat nil))).
+Eval cbv in listDoubleX.
+Quote Recursively Definition p_listDoubleX := listDoubleX.
+Definition P_listDoubleX := Eval vm_compute in (program_Program p_listDoubleX).
+Definition P_listDoubleXenv := Eval vm_compute in (env P_listDoubleX).
+Definition P_listDoubleXmain := Eval vm_compute in (main P_listDoubleX).
+Eval vm_compute in wcbvEval P_listDoubleXenv 1000 P_listDoubleXmain.
+
+
+(****  try a singleton match  ****)
+Fixpoint kjhhgfk (n:nat) (p:n = n) :=
+  match p with
+    | eq_refl _  => n
+  end.
+Quote Recursively Definition p_kjhhgfk := kjhhgfk.
+Print p_kjhhgfk.
+Definition kjhhgfkX := (kjhhgfk (eq_refl anat)).
+Eval cbv in kjhhgfkX.
+(******
+(fix kjhhgfk (n : nat) (p : n = n) {struct n} : nat :=
+          match p with
+          | eq_refl => n
+          end) anat eq_refl
+***********)
+Quote Recursively Definition p_kjhhgfkX := kjhhgfkX.
+Definition P_kjhhgfkX := Eval vm_compute in (program_Program p_kjhhgfkX).
+Definition P_kjhhgfkXenv := Eval vm_compute in (env P_kjhhgfkX).
+Definition P_kjhhgfkXmain := Eval vm_compute in (main P_kjhhgfkX).
+Eval vm_compute in wcbvEval P_kjhhgfkXenv 1000 P_kjhhgfkXmain.
+(**************
+TApp
+            (TFix
+               (dcons (^ "kjhhgfk")
+                  (Pi (^ "n") NNN
+                     (Pi (^ "p")
+                        (TApp (TInd (mkInd "Coq.Init.Logic.eq" 0)) NNN
+                           (tcons (TRel 0) (tunit (TRel 0)))) NNN))
+                  (Lam (^ "n") NNN
+                     (Lam (^ "p")
+                        (TApp (TInd (mkInd "Coq.Init.Logic.eq" 0)) NNN
+                           (tcons (TRel 0) (tunit (TRel 0))))
+                        (TCase (mkInd "Coq.Init.Logic.eq" 0, 2, 0 :: nil)
+                           (Lam (^ "n") NNN
+                              (Lam (^ "p")
+                                 (TApp (TInd (mkInd "Coq.Init.Logic.eq" 0)) NNN
+                                    (tcons (TRel 2) (tunit (TRel 0)))) NNN))
+                           (TProof (TRel 0)) (tunit (TRel 1))))) 0 dnil) 0) TAx
+            (tunit
+               (TApp (TConstruct (mkInd "Coq.Init.Logic.eq" 0) 0 2) NNN
+                  (tunit TAx)))
+********************)
+
 
 (*****************************
 Goal
@@ -115,18 +201,6 @@ Defined.
 Definition x := 1.
 Definition Plus1x := Plus1 x.
 Eval vm_compute in Plus1x.
-
-Notation NN := (mkInd "Init.Datatypes.nat" 0).
-Notation SS := (TConstruct NN 1 1).
-Notation ZZ := (TConstruct NN 0 0).
-Notation Lam := (TLambda).
-Notation tLam := (tLambda).
-Notation Pi := (TProd).
-Notation tPi := (tProd).
-Notation PROP := (TSort sProp).
-Notation tPROP := (tSort sProp).
-Notation "^ x" := (nNamed x)  (at level 85).
-Notation "^" := (nAnon).
 
 
 (** evaluation of [Function]s defined with measure or wf **

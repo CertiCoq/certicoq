@@ -22,7 +22,7 @@ Require Import Common.RandyPrelude.
 Open Scope N_scope.
 
 Require Import ExtLib.Data.Map.FMapPositive.
-Require Import L4.TermAbs.
+Require Import Common.TermAbs.
 Require Import SquiggleEq.termsDB.
 
 
@@ -83,12 +83,32 @@ match lb with
 end.
 
 
-Definition mkVar (n:N) :=  (xO (N.succ_pos n)).
+Definition mkVar (n:N) : positive :=  (xO (N.succ_pos n)).
 
-Definition mkNVar (p: N*Ast.name) := 
+Definition mkNVar (p: N*Ast.name) : NVar := 
   let (n, name) := p in (mkVar n, name).
 
-Check @fromDB.
+Definition getId (i:positive): N := (N.pred (N.pos (Pos.div2 i))).
+
+Definition getNId :NVar -> N := getId ∘ fst.
+
+Lemma getIdMkVar : forall i,
+  getId (mkVar i) = i.
+Proof using Type.
+  intros.
+  unfold getId. simpl.
+  rewrite N.pos_pred_succ.
+  refl.
+Qed.
+
+Lemma getIdMkNVar : forall n s,
+  getNId (mkNVar (n,s)) = n.
+Proof using Type.
+  intros. unfold getNId. simpl.
+  unfold compose. simpl.
+  apply getIdMkVar.
+Qed.
+
 
 Require Import L6.cps.
 

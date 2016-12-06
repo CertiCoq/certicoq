@@ -16,9 +16,12 @@ and ExtLib packages of G. Malecha.  One way to get it is using opam:
 # opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
 
 
-  Then to install coq:
+  Then to install coq and certicoq's dependencies :
 
-# opam install coq coq-template-coq coq-ext-lib
+# opam install coq coq-template-coq coq-ext-lib coq-squiggle-eq
+
+If you have already installed some package manually, you can choose the --fake keyword for opam to assume that it is installed, e.g.:
+# opam install --fake coq
 
 
 Alternatively, you can install Coq from source or download a binary from:
@@ -28,10 +31,18 @@ https://coq.inria.fr/coq-85
 and install the packages from source:
 
 https://github.com/coq-ext-lib/coq-ext-lib
-https://github.com/gmalecha/template-coq/commit/2540cb532b1c4e773dff0381fe77f03cc83b77fd (branch : coq-8.5)
+https://github.com/gmalecha/template-coq (branch : coq-8.5)
+https://github.com/aa755/SquiggleEq
 
 
 
+Updating dependencies:
+------------------------
+
+When the above repositories are updated, you may need to update your installation.
+If you chose opam, you can do
+# opam update
+# opam upgrade coq-template-coq coq-ext-lib coq-squiggle-eq 
 
 
 Building the compiler:
@@ -49,7 +60,9 @@ Troubleshooting:
 
 If the above fails, try the following
 
-1) "make clean" at certicoq/ and then try to build again
+0) update the dependencies, as explained above
+
+1) "make clean" at certicoq/ and then try to build again. Try "make cleanCoqc" as well.
 
 2) Ensure that your working copy is EXACTLY the same as the contents of SVN repo. Unversioned files and directories should also be removed because they can 
 interfere with how Coq resolves imports and how Makefile tracks dependences (via coqdep).
@@ -67,5 +80,5 @@ https://github.com/JasonGross/coq-tools/
 
 
 If errors remain AFTER step 2, please send an email to the certicoq mailing list.
-Until step 2, others may have no idea about the state of the working copy of your machine, so their help may not be applicable.
+Until step 2, others cannot be sure about the state of the working copy of your machine, so their help may not be applicable.
 

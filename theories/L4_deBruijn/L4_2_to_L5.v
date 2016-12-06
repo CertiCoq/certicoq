@@ -74,14 +74,6 @@ Definition L4OpidString (l : L4Opid) : string :=
   end.
 
 
-
-
-Instance decc: DeqSumbool L4Opid.
-Proof using.
-  intros ? ?. unfold DecidableSumbool.
-   repeat(decide equality).
-Defined.
-
 Require Import SquiggleEq.alphaeq.
 
 

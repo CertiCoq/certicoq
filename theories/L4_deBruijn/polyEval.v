@@ -1,6 +1,6 @@
 Require Import SquiggleEq.export.
 Require Import Common.classes Common.AstCommon.
-Require Import TermAbs.
+Require Import Common.TermAbs.
 Require Import SquiggleEq.bin_rels.
 Require Import SquiggleEq.eq_rel.
 Require Import SquiggleEq.universe.
@@ -52,6 +52,12 @@ Definition OpBindingsL4 (nc : L4Opid) : list nat :=
   | NLet => [0,1]
   | NMatch numargsInBranches => 0::(List.map snd numargsInBranches)
   end.
+
+Instance decc: DeqSumbool L4Opid.
+Proof using.
+  intros ? ?. unfold DecidableSumbool.
+   repeat(decide equality).
+Defined.
 
 Instance CoqL4GenericTermSig : GenericTermSig L4Opid:=
 {| 
@@ -156,3 +162,4 @@ match n with
 end.
 
 End PolyEval.
+

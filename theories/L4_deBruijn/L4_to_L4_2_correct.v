@@ -54,6 +54,7 @@ Let BTerm : Set := ((list Ast.name) *exp).
 (** this was needed in eval to select the right branch *)
 Let numBvars (b:BTerm) : nat (* switch to N? *) := length (fst b).
 
+Require Import L4.L4_to_L4_1_to_L4_2.
 
 Let toOpidBTerms (t:Term) : option (L4Opid * list BTerm):=
 match t  return option (L4Opid * list BTerm) with
@@ -121,10 +122,10 @@ Let applyBTerm (b : BTerm) (l: list Term) : option Term :=
 let (n,t):=b in
   if (Z.of_nat (length n) <? (maxFree t))%Z then None
 else 
-  (if (ZLmax (map maxFree l) <? 0) then Some (sbst_real_list t l) else None).
+  (if (ZLmax (map maxFree l) (-1) <? 0)%Z then Some (sbst_real_list t l) else None).
 
-
-Definition L4Abs : L4.TermAbs.TermAbs L4Opid :=
+Require Import TermAbs.
+Definition L4Abs : Common.TermAbs.TermAbs L4Opid :=
 (@Build_TermAbs _ _ 
   Term 
   BTerm 
@@ -134,3 +135,46 @@ Definition L4Abs : L4.TermAbs.TermAbs L4Opid :=
   applyBTerm 
   fromOpidBTerms
   (fun e => ([],e))).
+
+End L4Inst.
+
+Require Import Common.TermAbs_parametricity.
+
+Parametricity Recursive eval_n.
+Require Import L4.variables.
+
+(* should be automatically provalble for all types with decidable equality.
+  However, it cannot be internally stated. *)
+Global Instance EqIfRL4Opid : EqIfR L4Opid_R.
+Proof using.
+  constructor; intros Hyp; subst.
+- inverts Hyp; auto; f_equal; try apply eqIfR; auto.
+  unfold dcon in *.
+Admitted.
+
+Let TermAbs_R_NamedDB2 :=
+  (@TermAbs_R_NamedDB Ast.name NVar _ L4Opid _ _ _ _  _ _ Ast.nAnon mkNVar getNId getIdMkNVar
+     L4Opid_R L4_o_polyEval_o_CoqL4GenericTermSig_R EqIfRL4Opid).
+
+Lemma L4_1_to_L4_2_free_thm:
+  forall (t1 : L4_1_Term) n,
+termsDB.fvars_below 0 t1 (* free thm also implies that eval_n preserves this *)->
+(option_R _ _ alpha_eq)
+   (option_map tL4_1_to_L4_2 (@eval_n (TermAbsDB Ast.name L4Opid) n t1))
+   (@eval_n (Named.TermAbsImpl variables.NVar L4Opid) n (tL4_1_to_L4_2 t1)).
+Proof using.
+  intros ? ? Hfb.
+  pose proof (L4_o_polyEval_o_eval_n_R 
+    (TermAbsDB Ast.name L4Opid) (Named.TermAbsImpl variables.NVar L4Opid)
+    TermAbs_R_NamedDB2 n n ltac:(apply eqIfR; refl) t1) as Hp.
+  simpl in Hp.
+  unfold Term_R in Hp.
+  specialize (Hp _ (conj Hfb (alpha_eq_refl _))).
+  simpl in Hp.
+  destruct (@eval_n (TermAbsDB Ast.name L4Opid) n t1).
+  - invertsna Hp Hp. setoid_rewrite <- Hp0.
+    constructor. tauto.
+  - invertsna Hp Hp. setoid_rewrite <- Hp.
+    constructor.
+Qed.
+  

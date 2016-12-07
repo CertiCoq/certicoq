@@ -6,9 +6,9 @@ Require Export L4.instances.
 Require Export L6.instances.
 
 Set Template Cast Propositions.
-Quote Recursively Definition p := (3 + 4).
 
-
+Quote Recursively Definition p := (3+4).
+                                  
 Open Scope Z_scope.
 Require Import ZArith.
 (* Print Instances CerticoqLanguage. *)
@@ -16,6 +16,7 @@ Require Import ZArith.
 Require Import Common.Common.
 Require Import String.
 Open Scope string_scope.
+
 
 
 Eval compute in (ctranslateTo certiL4 p).
@@ -34,7 +35,6 @@ Print Instances CerticoqTranslation.
 Print Instances CerticoqTotalTranslation.
 Print Instances CerticoqLanguage.
 *)
-
 
 Quote Recursively Definition swap := 
 (fun  (p: nat  * bool) =>
@@ -171,7 +171,6 @@ Eval compute in pgcd4astr.
 *)
 
 
-
 Definition p6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) p) in 
 match t with
@@ -179,21 +178,44 @@ match t with
 end).
 Defined.
 
-Require Import L6_to_Clight.
+Require Import L6_to_Clight Maps.
 
-
-Definition compile_L6 (t : cTerm certiL6) : Clight.program :=
-  let '((_, cenv, _, _), prog) := t in
-  stripNameState (stripOption (compile prog cenv)).
-
-
-Require Import Maps.
+Definition compile_L6 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
+  let '((_, cenv, _, nenv), prog) := t in
+  let p := stripNameState (compile prog cenv nenv) in
+  (fst p, stripOption (snd p)).
 
 Open Scope positive_scope.
 
 Definition p7 := compile_L6 p6.
 
-Require Import L6.cps_show.
+Require Import L6.cps L6.cps_show.
+
+Inductive blah : Type :=
+| blah1 : blah -> blah
+| blah2 : blah -> blah
+| blah3 : blah
+| blah4 : blah
+.
+
+Definition blahFun (b : blah) : blah :=
+  match b with
+  | blah1 b' => b'
+  | blah2 b' => blah1 b'
+  | blah3 => blah4
+  | blah4 => blah1 blah3
+  end.
+
+Quote Recursively Definition blahProg := (blahFun (blah2 (blahFun blah4))).
+
+Definition blahProg6 : cTerm certiL6.
+(let t:= eval vm_compute in (translateTo (cTerm certiL6) blahProg) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
+Definition blahProg7 := compile_L6 blahProg6.
 
 Definition show_exn {A:Type} (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   match x with
@@ -211,7 +233,7 @@ match t with
 end).
 Defined.
 
-(*
+
 Definition swap6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) swap) in 
 match t with
@@ -220,7 +242,7 @@ end).
 Defined.
 
 Definition swap7 := compile_L6 swap6.
-*)
+
 
 Quote Recursively Definition three := 3.
 
@@ -311,9 +333,10 @@ Definition comp_fEnv7 := compile_L6 comp_fEnv6.
 
 Require Import runtime.runtime.
 
-Definition test := L6_to_Clight.print_Clight_dest p7 "output/threePlusFour.c".
+Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (M.elements (fst prog)) file.
 
-Definition test2 := L6_to_Clight.print_Clight_dest runtime.runtime.prog "gc.c".
+Definition test := printProg p7 "output/threePlusFour.c".
+(*Definition test := printProg blahProg7 "output/blah.c".*)
 
 
 

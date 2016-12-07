@@ -26,7 +26,7 @@ open !Clight
 
 (* Naming temporaries *)
 
-let temp_name (id: ident) = "$" ^ Z.to_string (Z.Zpos id)
+let temp_name = extern_atom
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
 
@@ -286,5 +286,19 @@ let print_if prog =
 
 let print_dest prog dest =
   let oc = open_out (implode dest) in
+  print_program (formatter_of_out_channel oc) prog;
+  close_out oc
+
+let add_name (a, n) =
+  match n with
+  | Ast0.Coq_nAnon -> () 
+  | Ast0.Coq_nNamed s ->
+      Hashtbl.add atom_of_string (camlstring_of_coqstring s) a;
+      Hashtbl.add string_of_atom a (camlstring_of_coqstring s);
+      ()
+
+let print_dest_names prog names dest =
+  let oc = open_out (camlstring_of_coqstring dest) in
+  List.iter add_name names;
   print_program (formatter_of_out_channel oc) prog;
   close_out oc

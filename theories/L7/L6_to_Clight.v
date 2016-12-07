@@ -4,23 +4,27 @@
   2016 -- Matthew Weaver 
  *)
 Require Import Coq.ZArith.ZArith
-Coq.Lists.List List_util
-Coq.Program.Basics.
+        Coq.Program.Basics
+        Coq.Strings.String
+        Coq.Lists.List List_util.
 
 Require Import ExtLib.Structures.Monads
         ExtLib.Data.Monads.OptionMonad
-        ExtLib.Data.Monads.StateMonad.
+        ExtLib.Data.Monads.StateMonad
+        ExtLib.Data.String.
 
 Import MonadNotation.
 Open Scope monad_scope.
 
+Require Import Template.Ast.
+
 Require Import compcert.common.AST
         compcert.common.Errors
         compcert.lib.Integers
-        compcert.lib.Maps
         compcert.cfrontend.Cop
         compcert.cfrontend.Ctypes
-        compcert.cfrontend.Clight.
+        compcert.cfrontend.Clight
+        compcert.common.Values.
 
 Require Import L6.cps.
 
@@ -380,10 +384,10 @@ Fixpoint asgnAppVars (vs : list positive) (ind : list N) :
   end.
 
 (* FIX: Think am using wrong type annotation in [Ederef] expressions *)
-Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.tree positive) : option statement :=
+Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : option statement :=
   match e with
   | Econstr x t vs e' =>
-    prog <- assignConstructor cenv x t vs ;;
+    prog <- assignConstructor cenv x t (rev vs) ;;
          prog' <- translate_body e' fenv cenv map ;;
          ret (prog ; prog')
   | Ecase x cs =>
@@ -397,13 +401,27 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.tree posi
                    let '(ls , ls') := p' in
                    match isBoxed cenv (fst p) with
                    | false =>
-                     ret ((LScons (Some tag)
-                                  prog
-                                  ls), ls')
+                     match ls with
+                     | LSnil =>
+                       ret ((LScons None
+                                    prog
+                                    ls), ls')
+                     | LScons _ _ _ =>
+                       ret ((LScons (Some tag)
+                                    prog
+                                    ls), ls')
+                     end
                    | true =>
-                     ret (ls, (LScons (Some tag)
-                                      prog
-                                      ls'))
+                     match ls' with
+                     | LSnil =>
+                       ret (ls, (LScons None
+                                        prog
+                                        ls'))
+                     | LScons _ _ _ =>
+                       ret (ls, (LScons (Some tag)
+                                        prog
+                                        ls'))
+                     end
                    end
             end) cs) ;;
       let '(ls , ls') := p in
@@ -424,7 +442,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.tree posi
         ret (asgn ; 
                call ([funTy] (var x)))
   | Eprim x p vs e => None
-  | Ehalt x => ret Sskip
+  | Ehalt x => ret (Sreturn (Some (var x)))
   end.
 
 Definition mkFun (vs : list positive) (body : statement) : function :=
@@ -435,7 +453,8 @@ Definition mkFun (vs : list positive) (body : statement) : function :=
              nil
              body.
 
-Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.tree positive) : 
+
+Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : 
   option (list (positive * globdef Clight.fundef type)) :=
   match fnd with
   | Fnil => ret nil
@@ -470,18 +489,22 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.
     end
   end.
 
-Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.tree positive) :
+Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv : cEnv) (m : M.t positive) :
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is main *)
-    funs <- translate_fundefs fnd fenv cenv map ;; 
+    funs <- translate_fundefs fnd fenv cenv m ;; 
          let localVars := get_allocs e in
-         body <- translate_body e fenv cenv map ;;
-              gcArrIdent <- M.get mainIdent map ;;
+         body <- translate_body e fenv cenv m ;;
+              gcArrIdent <- M.get mainIdent m ;;
               ret ((bodyIdent , Gfun (Internal
-                                        (mkFun localVars
-                                               (reserve gcArrIdent 2%Z ;
-                                                  body))))
+                                        (mkfunction val
+                                                    cc_default
+                                                    nil
+                                                    (map (fun x => (x , val)) localVars)
+                                                    nil
+                                                    (reserve gcArrIdent 2%Z ;
+                                                       body))))
                      :: funs)
   | _ => None
   end.
@@ -499,22 +522,32 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | n :: l' => (Init_int32 (Int.repr (Z.of_N n))) :: (make_ind_array l')
   end.
 
+Definition show_pos x := nat2string10 (Pos.to_nat x).
+
+Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t Ast.name) : M.t Ast.name :=
+  match M.get f nenv with
+  | None => M.set f_inf (nNamed (append (show_pos f) "_info")) nenv
+  | Some n => match n with
+              | nAnon => M.set f_inf (nNamed (append (show_pos f) "_info")) nenv
+              | nNamed s => M.set f_inf (nNamed (append s "_info")) nenv
+              end
+  end.
 
 (* needs cleanup (pull out more helper functions) *)
-Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv)
-  : nState (option ((list (positive * globdef Clight.fundef type)) * (M.tree positive))) :=
+Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t Ast.name)
+  : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t Ast.name)) :=
   match fnd with
-  | Fnil => ret (Some (nil, M.empty positive))
+  | Fnil => ret (Some (nil, M.empty positive, nenv))
   | Fcons x t vs e fnd' =>
     match M.get t fenv with
     | None => ret None
     | Some inf =>
       let '(n, l) := inf in
-      rest <- make_fundef_info fnd' fenv ;;
+      rest <- make_fundef_info fnd' fenv nenv ;;
            match rest with
            | None => ret None
            | Some rest' =>
-             let '(defs, map) := rest' in 
+             let '(defs, map, nenv') := rest' in 
              info_name <- getName ;;
                        let len := Z.of_nat (length l) in
                        let ind :=
@@ -522,33 +555,39 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv)
                              (Tarray intTy
                                      (len + 2%Z)
                                      noattr)
-                            ((Init_int32 (Int.repr (Z.of_N n))) :: (Init_int32 (Int.repr len)) :: (make_ind_array l)) false false in
+                            ((Init_int32 (Int.repr (Z.of_N n))) :: (Init_int32 (Int.repr len)) :: (make_ind_array l)) true false in
                        ret (Some (((info_name , Gvar ind) :: defs) ,
-                                 M.set x info_name map))
+                                  M.set x info_name map ,
+                                  update_nEnv_fun_info x info_name nenv'))
            end
     end
   end.
 
-Fixpoint make_funinfo (e : exp) (fenv : fEnv) : nState (option ((list (positive * globdef Clight.fundef type)) * M.tree positive)) :=
+Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name)
+  : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t Ast.name)) :=
   match e with
   | Efun fnd e' =>
-    p <- make_fundef_info fnd fenv ;;
+    p <- make_fundef_info fnd fenv nenv ;;
       match p with
       | None => ret None
       | Some p' =>
-        let '(defs, map) := p' in 
+        let '(defs, map, nenv') := p' in 
         info_name <- getName ;;
                   let ind :=
                       mkglobvar
                         (Tarray intTy
                                 2%Z
                                 noattr)
-                        ((Init_int32 (Int.repr (Z.of_nat (max_allocs e')))) :: (Init_int32 Int.zero) :: nil) false false in
-                  ret (Some (((info_name , Gvar ind) :: defs) ,
-                             M.set mainIdent info_name map))
+                        ((Init_int32 (Int.repr (Z.of_nat (max_allocs e')))) :: (Init_int32 Int.zero) :: nil) true false in
+                  ret (Some (
+                           ((info_name , Gvar ind) :: defs),
+                           (M.set mainIdent info_name map),
+                           (M.set info_name (nNamed "body_info"%string) nenv')))
       end
   | _ => ret None
   end.
+
+Print External.
 
 Definition global_defs (e : exp)
   : list (positive * globdef Clight.fundef type) :=
@@ -560,7 +599,7 @@ Definition global_defs (e : exp)
                                     false false))
     :: (gcIdent , Gfun (External (EF_external "gc"
                                               (mksignature (Tany32 :: nil) None cc_default))
-                                 (Tcons valPtr (Tcons (Tpointer threadInf noattr) Tnil))
+                                 (Tcons (Tpointer (Tint I32 Unsigned noattr) noattr) (Tcons (Tpointer threadInf noattr) Tnil))
                                  Tvoid
                                  cc_default
        ))
@@ -568,44 +607,45 @@ Definition global_defs (e : exp)
 
 
 
-Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) :
-  nState (option ((list (positive * globdef Clight.fundef type)))) :=
-  fun_inf' <- make_funinfo e fenv ;;
+Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) (nenv : M.t Ast.name) :
+  nState (option (M.t Ast.name * (list (positive * globdef Clight.fundef type)))) :=
+  fun_inf' <- make_funinfo e fenv nenv ;;
            match fun_inf' with
            | Some p =>
-             let '(fun_inf, map) := p in
+             let '(fun_inf, map, nenv') := p in
              match translate_funs e fenv cenv map with
              | None => ret None
              | Some fun_defs' =>
                let fun_defs := rev fun_defs' in
-               ret (Some ((((global_defs e)
-                              ++ ((tinfIdent , Gvar (
-                                                   mkglobvar
-                                                     threadInf
-                                                     ((Init_addrof argsIdent Int.zero)
-                                                        :: (Init_int32 (Int.repr ((Z.of_nat (max_args e)))))
-                                                        :: (Init_addrof allocIdent Int.zero)
-                                                        :: (Init_addrof limitIdent Int.zero) :: nil)
-                                                     false false
-                                  )) :: nil) ++ fun_inf ++ fun_defs)))) 
+               ret (Some (nenv',
+                          ((((global_defs e)
+                               ++ ((tinfIdent , Gvar (
+                                                    mkglobvar
+                                                      threadInf
+                                                      ((Init_addrof argsIdent Int.zero)
+                                                         :: (Init_int32 (Int.repr ((Z.of_nat (max_args e)))))
+                                                         :: (Init_addrof allocIdent Int.zero)
+                                                         :: (Init_addrof limitIdent Int.zero) :: nil)
+                                                      false false
+                                   )) :: nil) ++ fun_inf ++ fun_defs))))) 
              end
            | None => ret None
            end.
 
-
 Require Import Clightdefs.
 
+(*
 Definition composites : list composite_definition :=
 (Composite threadInfIdent Struct
    ((argsIdent, (tptr tint)) :: (numArgsIdent, tint) :: (allocIdent, (tptr (tptr tint))) ::
     (limitIdent, (tptr (tptr tint))) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
     nil)
    noattr :: nil).
-
+*)
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
            (main : ident) : option Clight.program :=
-  let res := Ctypes.make_program composites defs (bodyIdent :: nil) main in
+  let res := Ctypes.make_program nil defs (bodyIdent :: nil) main in
   match res with
   | Error e => None
   | OK p => Some p
@@ -616,15 +656,6 @@ Proof.
   reflexivity.
 Qed.
 
-Definition compile' (e : exp) (cenv : cEnv) :
-  nState (option Clight.program) :=
-  let fenv := compute_fEnv e in
-  p <- make_defs e fenv cenv ;;
-          match p with
-          | None => ret None
-          | Some defs =>
-             ret (mk_prog_opt defs mainIdent)
-          end.
 
 Definition x : ident := 40%positive.
 Definition y : ident := 41%positive.
@@ -646,9 +677,8 @@ Definition test : exp := Efun
                                  (Eproj c t 4%N x
                                         (Eapp f t' (b :: c :: nil)))).
 
-Definition testRes := compile' test (M.empty _).
-
-Definition compile (e : exp) (cenv : cEnv) :
+(*
+Definition compile' (e : exp) (cenv : cEnv) :
   nState (option Clight.program) :=
   let fenv := compute_fEnv e in
   p <- make_defs e fenv cenv ;;
@@ -658,18 +688,32 @@ Definition compile (e : exp) (cenv : cEnv) :
              ret (mk_prog_opt defs mainIdent)
           end.
 
+
+Definition testRes := compile' test (M.empty _).
+ *)
+
+Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
+  nState (M.t Ast.name * option Clight.program) :=
+  let fenv := compute_fEnv e in
+  p' <- make_defs e fenv cenv nenv ;;
+     match p' with
+     | None => ret (nenv, None)
+     | Some p =>
+       let '(nenv', defs) := p in
+             ret (nenv', (mk_prog_opt defs mainIdent))
+          end.
+
 Definition err {A : Type} (s : String.string) : res A :=
   Error ((MSG s) :: nil).
 
 Definition empty_program : Clight.program :=
   Build_program nil nil mainIdent nil refl.
 
-Definition stripOption (p : nState (option Clight.program))
-  : nState Clight.program :=
-  p' <- p ;; 
-     match p' with
-     | None => ret empty_program
-     | Some p'' => ret p''
+Definition stripOption (p : (option Clight.program))
+  : Clight.program := 
+     match p with
+     | None => empty_program
+     | Some p' => p'
      end.
 
 Definition stripOption' (p : nState (option Clight.program)) (q : Clight.program)
@@ -684,14 +728,38 @@ Definition bogus : positive := 3000%positive.
 Definition stripNameState {A : Type} (p : nState A) : A :=
   fst (p.(runState) bogus).
 
+(*
 Definition test_result := stripNameState (stripOption (compile test (M.empty _))).
-
-Require Import String.
+*)
 
 Variable (print_Clight : Clight.program -> unit).
 Variable (print_Clight_dest : Clight.program -> String.string -> unit).
+Variable (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
 Variable (print : String.string -> unit).
 
+Definition ensure_unique : list (positive * name) -> list (positive * name) :=
+  fun l => map (fun p =>
+                  let '(x , n) := p in
+                  match n with
+                  | nAnon => (x , n)
+                  | nNamed s => (x , nNamed (append s (append "_"%string (show_pos x))))
+                  end) l.
+                    
+
+Definition print_Clight_dest_names : Clight.program -> list (positive * name) -> String.string -> unit :=
+  fun p s l => print_Clight_dest_names' p
+                                        ((argsIdent, nNamed "args"%string)
+                                           :: (allocIdent, nNamed "alloc"%string)
+                                           :: (limitIdent, nNamed "limit"%string)
+                                           :: (gcIdent, nNamed "garbage_collect"%string)
+                                           :: (mainIdent, nNamed "main"%string)
+                                           :: (bodyIdent, nNamed "body"%string)
+                                           :: (threadInfIdent, nNamed "thread_info"%string)
+                                           :: (tinfIdent, nNamed "tinfo"%string)
+                                           :: (heapInfIdent, nNamed "heap"%string)
+                                           :: (numArgsIdent, nNamed "num_args"%string)
+                                           :: (ensure_unique s))
+                                        l.
 
 Fixpoint print_err (errs : errmsg) : unit :=
   match errs with
@@ -710,4 +778,6 @@ Definition print_err_Clight (p : res Clight.program) : unit :=
   | OK p' => print_Clight p'
   end.
 
+(*
 Definition print_test := print_Clight (test_result).
+*)

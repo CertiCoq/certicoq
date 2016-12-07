@@ -2,7 +2,6 @@ Require compcert.common.AST
         compcert.common.Errors
         compcert.common.Values
         compcert.lib.Integers
-        compcert.lib.Maps
         compcert.cfrontend.Cop
         compcert.cfrontend.Ctypes
         compcert.cfrontend.Clight
@@ -31,6 +30,7 @@ Extract Constant L5_to_L6.default_tag => "Camlcoq.P.of_int 3000".
 (* L6_to_Clight *)
 Extract Constant L6_to_Clight.print_Clight => "PrintClight.print_if".
 Extract Constant L6_to_Clight.print_Clight_dest => "PrintClight.print_dest".
+Extract Constant L6_to_Clight.print_Clight_dest_names' => "PrintClight.print_dest_names".
 Extract Constant L6_to_Clight.print => "print_string".
 (* TEMP STUFF *)
 Extract Constant L6_to_Clight.allocIdent => "Camlcoq.P.of_int 28".
@@ -53,7 +53,7 @@ Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1".
 
 (* Avoid name clashes *)
-Extraction Blacklist List String Int Ast.
+Extraction Blacklist List String Int Ast Char.
 
 (* Cutting the dependency to R. *)
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".

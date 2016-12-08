@@ -1,9 +1,15 @@
 CC=gcc
-CFLAGS= -g -O3 -fcall-used-rdi -fcall-used-rsi -fcall-used-rbx -fomit-frame-pointer
+CFLAGS= -g 
+# CFLAGS= -g -O3 -fcall-used-rdi -fcall-used-rsi -fcall-used-rbx -fomit-frame-pointer
 TIME= /bin/time -f "%U %P"
 
 # CFLAGS=  -m32 -g -O3   ///use this for 32-bit x86 mode
 
+
+three: main.o threePlusFour.o nogc.o
+	${CC} ${CFLAGS} main.o threePlusFour.o nogc.o -o three
+
+threePlusFour.o: threePlusFour.c gc.h
 
 all: gc.o nogc.o gctest gctest2 gctest3 gctest4 ocamltest ocamltest-nonopt
 
@@ -15,13 +21,13 @@ time: all
 	${TIME} ./ocamltest 10000000 >/dev/null
 	${TIME} ./ocamltest-nonopt 10000000 >/dev/null
 
-gctest: testmain.o gctest.o gc.o
+gctest: testmain.o gctest.o gc.o testmain.o
 	${CC} ${CFLAGS} testmain.o gctest.o gc.o -o gctest
 
-gctest2: gctest2.o gc.o
+gctest2: gctest2.o gc.o testmain.o
 	${CC} ${CFLAGS} testmain.o gctest2.o gc.o -o gctest2
 
-gctest3: gctest3.o gc.o
+gctest3: gctest3.o gc.o testmain.o
 	${CC} ${CFLAGS} testmain.o gctest3.o gc.o -o gctest3
 
 gctest4: gctest4.o gc.o
@@ -34,6 +40,7 @@ ocamltest-nonopt: ocamltest.ml
 	ocamlc ocamltest.ml -o ocamltest-nonopt
 
 
+main.o: main.c config.h values.h gc.h
 testmain.o: testmain.c config.h values.h gc.h
 gc.o: gc.c config.h values.h gc.h
 nogc.o: nogc.c config.h values.h gc.h

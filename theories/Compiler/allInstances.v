@@ -134,9 +134,10 @@ Proof.
 Defined.
 
 Set Template Cast Propositions.
-
-Quote Recursively Definition pgcd :=
-Gcd.
+(* Set Template Share Strings. *)
+(* Finished transaction in 240.419 secs (238.36u,1.897s) (successful) *)
+(* Finished transaction in 258.043 secs (248.104u,4.228s) (successful) without sharing *)
+Time Quote Recursively Definition pgcd := Gcd.
 
 Eval compute in (cTerm certiL2).
 Let pcgd2 : cTerm certiL2.

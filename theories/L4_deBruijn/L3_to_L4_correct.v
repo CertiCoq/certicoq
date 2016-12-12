@@ -5,7 +5,8 @@
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
   Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
-Require Export Common.Common.  (* shared namespace *)
+Require Export Common.Common.
+(* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
@@ -1636,7 +1637,15 @@ Proof with eauto.
     eapply wcbeval_preserves_wf.
     eapply Crct_WFTrm. apply wft.
     eauto.
-    (* Application in normal form *) admit.
+    (* Application in normal form *)
+    eapply Crct_invrt_App in wft; trivial.
+    destruct wft as [Crctfn [Crctarg notcfn]].
+    constructor.
+    assert (Crct e 0 efn) by eauto.
+    (* There's a contradiction here: efn is a Crct closed term, which isn't a lambda or   fix or constructor or application, also not a rel as it is closed.
+But it could still be a:
+   - Proof, Prod, LetIn Const Ax Ind Case or Wrong. How can we prove it isn't?? *)
+    admit.
     
   + (* Case *)
     unfold translate; simpl.

@@ -132,7 +132,7 @@ Require Export BinPosDef.
   Bijection string <-> positive taken from Iris (BSD license) *)
 Require Import List.
 Import ListNotations.
-Module StringIndexed.
+Module StringPos.
   Definition t := string.
   Close Scope nat_scope.
   Local Open Scope list_scope.
@@ -202,6 +202,5 @@ Module StringIndexed.
   Proof.
     apply string_dec.
   Qed.
-End StringIndexed.
 
-Module SMap := IMap(StringIndexed).
+End StringPos.

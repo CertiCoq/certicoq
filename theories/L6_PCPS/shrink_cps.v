@@ -196,19 +196,20 @@ Admitted.
     Qed.
 
     Theorem case_size: forall g v k cl,
-         findtag cl g = Some k -> 
+                         List.In (g, k) cl ->
          (term_size k < term_size (Ecase v cl))%nat.
     Proof.
       induction cl; intro; simpl in H.
       - inversion H.
       - destruct a.
-        destruct (M.elt_eq c g).
-        + inversion H; subst.
-          admit.
-        + apply IHcl in H.
-          admit.
-    Admitted.
-    
+        inv H.
+        + inv H0.
+          simpl. omega.
+        + apply IHcl in H0.
+          simpl. simpl in H0.
+          omega.
+    Qed.
+         
     Theorem subterm_or_eq_size: forall e e', subterm_or_eq e e' -> (term_size e <= term_size e')%nat.
     Proof.
     Admitted.
@@ -444,16 +445,25 @@ with update_census_f (sig:r_map) (fds:fundefs) (fun_delta: var -> c_map -> nat) 
  Definition dec_census (sig:r_map) (e:exp) (count:c_map) := update_census sig e (fun v c => get_c v c - 1)%nat  count.
  Definition dec_census_list (sig:r_map) (ys:list var) (count:c_map) := update_census_list sig ys (fun v c => get_c v c - 1)%nat count.
 
- (* Decrease the count by each cl except the one(s) that match y *)
+(* Decrease the count by each clause *)
+ Fixpoint dec_census_all_case (sig:r_map) (cl:list (var*exp))  (count:c_map) :=
+   match cl with
+     | [] => count
+     | (k, e)::cl' =>
+       let count' := dec_census_all_case sig cl' count in
+         dec_census sig e count'
+   end.
+ 
+ (* Decrease the count by each cl except the first one that matches y *)
  Fixpoint dec_census_case (sig:r_map) (cl:list (var*exp)) (y:var) (count:c_map) :=
    match cl with
      | [] => count
      | (k, e)::cl' =>
-       let count' := dec_census_case sig cl' y count in
        if (var_dec k y) then
-         count'
+         dec_census_all_case sig cl' count
        else
-         dec_census sig e count
+         let count' := dec_census_case sig cl' y count in
+         dec_census sig e count'
    end.
 
  (* assume NoDup(ys++xs) *)
@@ -477,7 +487,7 @@ Definition rename_init (vp: list (var * var)): r_map :=
 
    
 
-   Fixpoint rename_all (sigma:r_map) (e:exp) : exp :=
+Fixpoint rename_all (sigma:r_map) (e:exp) : exp :=
   match e with
     | Econstr x t ys e' => Econstr x t (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
     | Eprim x f ys e' => Eprim x f (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
@@ -648,7 +658,130 @@ Proof.
     apply remove_all_empty.
   - auto.
 Qed.
-    
+
+
+  Fixpoint all_fun_name_ctx (cfds:fundefs_ctx) : list var :=
+  match cfds with
+    | Fcons1_c f t ys c fds' => f::(all_fun_name fds')
+    | Fcons2_c f t ys e cfds' => f::(all_fun_name_ctx cfds')
+  end.
+
+  Theorem all_fun_name_ctx_same:
+    forall e f,
+      all_fun_name_ctx f = all_fun_name (f <[ e ]>). 
+  Proof.
+    induction f; auto.
+    simpl.
+    rewrite IHf. auto.
+  Qed.
+
+  
+  Fixpoint rename_all_ctx (sigma:r_map) (c:exp_ctx): exp_ctx :=
+    match c with
+      | Hole_c => Hole_c 
+      | Econstr_c x t ys c' =>
+        Econstr_c x t (apply_r_list sigma ys) (rename_all_ctx (M.remove x sigma) c')
+      | Eprim_c x f ys c' =>
+        Eprim_c x f (apply_r_list sigma ys) (rename_all_ctx (M.remove x sigma) c')
+      | Eproj_c v t n y c' => Eproj_c v t n (apply_r sigma y) (rename_all_ctx (M.remove v sigma) c')
+      | Ecase_c v l t c' l' =>
+        let f cl := (List.map (fun (p:var*exp) => let (k, e) := p in
+                                                            (k, rename_all sigma e)) cl) in
+      Ecase_c (apply_r sigma v) (f l) t (rename_all_ctx sigma c') (f l')
+    | Efun1_c fl c' =>
+      let fs := all_fun_name fl in
+      let fl' := rename_all_fun (remove_all sigma fs) fl in      
+      Efun1_c fl' (rename_all_ctx (remove_all sigma fs) c')
+    | Efun2_c cf e =>
+      let fs := all_fun_name_ctx cf in
+      let cf' := rename_all_fun_ctx (remove_all sigma fs) cf in      
+      Efun2_c cf' (rename_all (remove_all sigma fs) e)
+    end
+  with rename_all_fun_ctx (sigma:r_map) (fc: fundefs_ctx): fundefs_ctx :=
+         match fc with
+           | Fcons1_c f t ys c fds' =>  Fcons1_c f t ys (rename_all_ctx (remove_all sigma ys) c) (rename_all_fun sigma fds')
+           | Fcons2_c f t ys e cfds' =>  Fcons2_c f t ys (rename_all (remove_all sigma ys) e) (rename_all_fun_ctx sigma cfds')
+         end.
+
+
+  (* no-shadow version of rename_all. *)
+  Fixpoint rename_all_ns (sigma:r_map) (e:exp) : exp :=
+  match e with
+    | Econstr x t ys e' => Econstr x t (apply_r_list sigma ys) (rename_all_ns sigma e')
+    | Eprim x f ys e' => Eprim x f (apply_r_list sigma ys) (rename_all_ns sigma e')
+    | Eproj v t n y e' => Eproj v t n (apply_r sigma y) (rename_all_ns sigma e')
+    | Ecase v cl =>
+      Ecase (apply_r sigma v) (List.map (fun (p:var*exp) => let (k, e) := p in
+                                                            (k, rename_all_ns sigma e)) cl)
+    | Efun fl e' =>
+      let fl' := rename_all_fun_ns sigma fl in
+      Efun fl' (rename_all_ns sigma e')
+    | Eapp f t ys =>
+      Eapp (apply_r sigma f) t (apply_r_list sigma ys)
+    | Ehalt v => Ehalt (apply_r sigma v)       
+    end
+with rename_all_fun_ns (sigma:r_map) (fds:fundefs): fundefs :=
+       match fds with
+         | Fnil => Fnil
+         | Fcons v' t ys e fds' => Fcons v' t ys (rename_all_ns sigma e) (rename_all_fun_ns sigma fds')
+       end.
+
+
+    Fixpoint rename_all_ctx_ns (sigma:r_map) (c:exp_ctx): exp_ctx :=
+      match c with
+      | Hole_c => Hole_c 
+      | Econstr_c x t ys c' =>
+        Econstr_c x t (apply_r_list sigma ys) (rename_all_ctx_ns sigma c')
+      | Eprim_c x f ys c' =>
+        Eprim_c x f (apply_r_list sigma ys) (rename_all_ctx_ns sigma c')
+      | Eproj_c v t n y c' => Eproj_c v t n (apply_r sigma y) (rename_all_ctx_ns sigma c')
+      | Ecase_c v l t c' l' =>
+        let f cl := (List.map (fun (p:var*exp) => let (k, e) := p in
+                                                            (k, rename_all_ns sigma e)) cl) in
+      Ecase_c (apply_r sigma v) (f l) t (rename_all_ctx_ns sigma c') (f l')
+    | Efun1_c fl c' =>
+      let fl' := rename_all_fun_ns sigma fl in      
+      Efun1_c fl' (rename_all_ctx_ns sigma c')
+    | Efun2_c cf e =>
+      let cf' := rename_all_fun_ctx_ns sigma cf in      
+      Efun2_c cf' (rename_all_ns sigma e)
+    end
+  with rename_all_fun_ctx_ns (sigma:r_map) (fc: fundefs_ctx): fundefs_ctx :=
+         match fc with
+           | Fcons1_c f t ys c fds' =>  Fcons1_c f t ys (rename_all_ctx_ns sigma c) (rename_all_fun_ns sigma fds')
+           | Fcons2_c f t ys e cfds' =>  Fcons2_c f t ys (rename_all_ns sigma e) (rename_all_fun_ctx_ns sigma cfds')
+         end.
+
+         Theorem prop_rename_all_ns:
+           forall sub sub',
+             map_get_r _ sub sub' ->
+           (forall e, rename_all_ns sub e = rename_all_ns sub' e) /\
+           (forall fds,rename_all_fun_ns sub fds = rename_all_fun_ns sub' fds) .
+         Proof.
+           intros.
+           apply exp_def_mutual_ind; intros; simpl; auto.
+           - erewrite prop_apply_r_list; eauto.
+             rewrite H0.
+             auto.
+           - erewrite prop_apply_r; eauto.
+           - simpl in H1. inv H1.
+             rewrite H0.
+             reflexivity.
+           - erewrite prop_apply_r; eauto.
+             rewrite H0.
+             auto.
+           - rewrite H1.
+             rewrite H0.
+             reflexivity.
+           - erewrite prop_apply_r; eauto.
+             erewrite prop_apply_r_list; eauto.
+           - erewrite prop_apply_r_list; eauto.
+             rewrite H0; auto.
+           - erewrite prop_apply_r; eauto.
+           - rewrite H0; rewrite H1; auto.
+         Qed.
+
+
 Definition rename y x e := 
   rename_all (M.set x y (M.empty var)) e.
 
@@ -712,34 +845,43 @@ Qed.
       exists y cl, e = Ecase y cl /\
                    sublist cl' cl.
 
+
+  Theorem subcl_refl:
+    forall {v} cl,
+     subcl_e cl (Ecase v cl).
+  Proof.
+    intros.
+    exists v. exists cl.
+    split; auto.
+    intro; intros; auto.
+  Qed.
   
-  Program
-  Fixpoint contractcases (oes: exp * ctx_map * b_map)
-    (fcon: r_map -> c_map -> 
-           forall esi:(exp*ctx_map*b_map), (term_sub_inl_size esi < term_sub_inl_size oes)%nat ->
-                                    {esir:(exp * c_map * b_map) & (b_map_le_i (snd esi) (snd esir))})
-    (sig:r_map) (count:c_map) (inl:b_map) (sub:ctx_map) (cl:list (var*exp))
-    (pfe:subcl_e cl (fst (fst oes))) (pfsub: (sub_inl_size sub inl <= sub_inl_size (snd (fst oes)) (snd oes))%nat)
-    : {lsi:(list (var*exp) * c_map * b_map) & (b_map_le_i inl (snd lsi))} :=
-    match cl with
-      | [] => existT _ ([], count, inl) (ble_refl inl)
-      | (y,e)::cl' =>
-        match fcon sig count (e, sub, inl) (_:(term_sub_inl_size (e,sub, inl) < term_sub_inl_size oes)%nat) with
-          | existT _ (e', count', inl') bp =>
-            (match contractcases oes fcon sig count' inl' sub cl' _ _ with
-                 existT _ (cl'', count'', inl'') bp' =>
-                 existT _ ((y,e')::cl'', count'', inl'') (b_map_le_i_trans _ _ bp _ bp')
-             end)
-        end
-    end.
-  Next Obligation.     
-    simpl in pfe.
+(* termination conditions for contractcases *)
+  Theorem subcl_size {y e cl' e0 sub inl c b}:
+    subcl_e ((y, e) :: cl') e0 ->
+    sub_inl_size sub inl <= sub_inl_size c b ->
+    term_sub_inl_size (e, sub, inl) < term_sub_inl_size (e0, c, b).
+  Proof.
+    intros pfe pfsub.
     inversion pfe.
-    destructAll.
-  Admitted.
-  Next Obligation.
-    simpl in *.
-    inversion pfe.
+    destructAll. 
+    unfold term_sub_inl_size; simpl.
+    assert (term_size e < term_size (Ecase x x0)).
+    eapply case_size.
+    inv pfe. destruct H. destruct H. inv H. apply H1. constructor. reflexivity.
+    simpl in H.
+    rewrite <- plus_Sn_m.
+    apply plus_lt_le_compat.
+    apply H.
+    auto.
+  Qed.
+
+  Theorem  subcl_e_cons_l {y e cl e0}:
+    subcl_e ((y, e) :: cl) e0 ->
+    subcl_e cl e0.
+  Proof.
+    intros.
+    inv H.
     destructAll.
     exists x, x0.
     split. auto.
@@ -747,64 +889,275 @@ Qed.
     apply H0.
     constructor 2. auto.
   Qed.
-  Next Obligation.
-    simpl.
-    simpl in pfsub. 
+
+  Theorem sub_inl_size_compat {sub inl inl' c b}:
+     sub_inl_size sub inl <= sub_inl_size c b ->
+     b_map_le_i inl inl' -> sub_inl_size sub inl' <= sub_inl_size c b.
+  Proof.
     etransitivity.
-    clear Heq_anonymous.
-    eapply b_map_le_c in bp.
-    eapply sub_size_le. apply bp. auto.
+    eapply b_map_le_c in H0.
+    eapply sub_size_le.
+    eauto.
+    eauto.
   Qed.
 
-    (* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)
+Function contractcases (oes: exp * ctx_map * b_map)
+    (fcon: r_map -> c_map -> 
+           forall esi:(exp*ctx_map*b_map), (term_sub_inl_size esi < term_sub_inl_size oes)%nat ->
+                                    {esir:(exp * c_map * b_map) & (b_map_le_i (snd esi) (snd esir))})
+    (sig:r_map) (count:c_map) (inl:b_map) (sub:ctx_map) (cl:list (var*exp))
+    (pfe:subcl_e cl (fst (fst oes))) (pfsub: (sub_inl_size sub inl <= sub_inl_size (snd (fst oes)) (snd oes))%nat)
+: {lsi:(list (var*exp) * c_map * b_map) & (b_map_le_i inl (snd lsi))} :=
+        (match cl as x return x = cl -> _ with
+        | [] => fun _ => existT _ ([], count, inl) (ble_refl inl)
+        | (y,e)::cl' => fun Heq_cl => 
+        (match fcon sig count (e, sub, inl) (subcl_size (eq_ind_r (fun x => subcl_e x _) pfe Heq_cl) pfsub)with
+          | existT _ (e', count', inl') bp =>
+            (match contractcases oes fcon sig count' inl' sub cl' (subcl_e_cons_l (eq_ind_r (fun x => subcl_e x _) pfe Heq_cl)) (sub_inl_size_compat pfsub bp) with
+                 existT _ (cl'', count'', inl'') bp' =>
+                 existT _ ((y,e')::cl'', count'', inl'') (b_map_le_i_trans _ _ bp _ bp')
+             end)
+        end)
+    end) (eq_refl cl).
 
 
-  Program
-  Fixpoint postcontractfun (oes: exp * ctx_map * b_map)
+    
+  
+(* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)
+
+Theorem subfds_Fcons {f t ys e fds' e0}: 
+  subfds_e (Fcons f t ys e fds') e0 ->
+  subfds_e fds' e0.
+Proof.
+  intro.
+  inv H. destructAll. exists x, x0.
+  split; auto.
+  eapply subfds_or_eq_left.
+  2: apply H0.
+  apply subfds_cons.
+Qed.
+  
+
+Theorem sub_inl_size_pcf {sub inl c b f}: 
+ sub_inl_size sub inl <= sub_inl_size c b ->
+  sub_inl_size (M.remove f sub) inl <= sub_inl_size c b.
+Proof.
+  intros.
+  etransitivity.
+  apply sub_remove_size'.
+  auto.
+Qed.
+
+ Theorem tsis_sub_pcf {sub inl c b e0 f t ys fds' e}:
+ sub_inl_size sub inl <= sub_inl_size c b ->
+  subfds_e (Fcons f t ys e fds') e0 ->
+  term_sub_inl_size (e, sub, inl) < term_sub_inl_size (e0, c, b).
+ Proof.
+   intros pfsub pfe.
+   (program_simpl; simpl in pfsub; simpl in pfe; unfold term_sub_inl_size; simpl; apply subfds_e_size in pfe; simpl in pfe).
+   omega.
+ Qed.
+
+ Theorem tsis_sub_pcf' {sub inl c b inl'}:
+   sub_inl_size sub inl <= sub_inl_size c b ->
+   b_map_le_i inl inl' ->
+   sub_inl_size sub inl' <= sub_inl_size c b.
+ Proof.      
+   intros.
+   etransitivity.
+   eapply sub_size_le. eapply b_map_le_c.
+   eauto.
+   auto.
+ Qed.   
+ 
+
+Function postcontractfun (oes: exp * ctx_map * b_map)
              (fcon: r_map -> c_map -> 
            forall esi:(exp*ctx_map*b_map), (term_sub_inl_size esi < term_sub_inl_size oes)%nat ->
                                     {esir:(exp * c_map * b_map) & (b_map_le_i (snd esi) (snd esir))})
     (sig:r_map) (count:c_map) (inl:b_map) (sub:ctx_map) (fds: fundefs) 
         (pfe:subfds_e fds (fst (fst oes))) (pfsub: (sub_inl_size sub inl <= sub_inl_size (snd (fst oes)) (snd oes))%nat)
     : { fsi:(fundefs * c_map * b_map) & (b_map_le_i inl (snd fsi))} :=
-    match fds with
-      | Fnil => existT _ (Fnil, count, inl) (ble_refl inl)
+    (match fds  as x return x = fds -> _  with
+      | Fnil => fun _ => existT _ (Fnil, count, inl) (ble_refl inl)
       | Fcons f t ys e fds' =>
+        fun Heq_fds =>
         (match (get_b f inl) with
            | true =>
               (* DEBUG: might want to verify here that the variable is actually dead *)
-               postcontractfun oes fcon sig count inl sub fds' _ _
+               postcontractfun oes fcon sig count inl sub fds' (subfds_Fcons (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds)) pfsub
            | false =>
              (match (get_c f count) with
                 | 0%nat => (* deadF *)                     
                   let count' := dec_census sig e count in
-                  postcontractfun oes fcon sig count' inl (M.remove f sub) fds' _ _
+                  postcontractfun oes fcon sig count' inl sub fds' (subfds_Fcons (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds)) pfsub
                 | _ =>
-                  match (fcon sig count (e,sub,inl) (_:(term_sub_inl_size (e,sub, inl) < term_sub_inl_size oes)%nat)) with
+                  match (fcon sig count (e,sub,inl) (tsis_sub_pcf pfsub (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds))) with
                     | existT _ (e', count', inl') bp =>                   
-                      match postcontractfun oes fcon sig count' inl' sub fds' _ _ with
+                      match postcontractfun oes fcon sig count' inl' sub fds' (subfds_Fcons (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds)) (tsis_sub_pcf' pfsub bp) with
                         | existT _ (fds'', count'', inl'') bp' =>
                           existT _ (Fcons f t ys e' fds'', count'', inl'') (b_map_le_i_trans _ _ bp _ bp')
                             end
                   end
               end)
          end)
-    end.
-  Solve Obligations with (program_simpl; simpl; simpl in pfe; destruct pfe; destructAll; exists x, x0;  split; auto; eapply subfds_or_eq_left; [apply subfds_cons | apply H0]).
-  Solve Obligations with (program_simpl; simpl;  simpl in pfsub; eapply le_trans; [apply sub_remove_size' |  assumption]).
- Solve Obligations with (program_simpl; simpl in pfsub; simpl in pfe; unfold term_sub_inl_size; simpl; apply subfds_e_size in pfe; simpl in pfe; omega).
- Solve Obligations with (program_simpl; simpl; simpl in pfe; eapply subfds_e_subfds; [apply subfds_cons | apply pfe]).
+    end) (eq_refl fds).
+
+
+Theorem subfds_refl:
+  forall {e} fds,
+    subfds_e fds (Efun fds e).
+Proof.
+  intros.
+  exists fds, e.
+  split.
+  apply rt_refl.
+  right; auto.
+Qed.
+ Print b_map_le_i.
+
+ 
+ Program Fixpoint contract (sig:r_map) (count:c_map) (e:exp) (sub:ctx_map) (im:b_map) {measure (term_sub_inl_size (e,sub,im))} : {esir:(exp * c_map * b_map) & (b_map_le_i im (snd esir))} :=
+     match e with
+       |  Ehalt v =>
+          existT _ (Ehalt (apply_r sig v), count, im) ( ble_refl _)
+       | Econstr x t ys e' =>
+           match (get_c x count) with
+             | 0%nat =>
+               let count' := dec_census_list sig ys count in 
+               contract sig count' e' sub im
+               
+          | _ =>
+            match contract sig count e' (M.set x (SVconstr t ys) sub) im  with
+              | existT _  (e'', count', im') bp =>
+                (match (get_c x count') with
+                   | 0%nat =>
+                     let count'' := dec_census_list sig ys count'  in
+                     existT _ (e'', count'', im') bp
+                   | _ =>
+                     let ys' := apply_r_list sig ys in
+                     existT _ (Econstr x t ys' e'', count', im') bp
+                 end)
+            end
+        end
+       | Eproj v t n y e =>
+        let y' := apply_r sig y in
+        match (M.get y' sub) with
+          | Some (SVconstr t' ys) =>
+            (match (nthN ys n) with
+               | Some yn =>
+                 let yn' := apply_r sig yn in
+                 let count' := M.set y' ((get_c y' count) - 1)%nat count in
+                 let count'' := M.set v 0%nat (M.set yn' (get_c v count + get_c yn' count)%nat count') in
+                 contract (M.set v yn' sig) count'' e  sub im
+               | None =>
+                 match contract sig count e sub im  with
+                   | existT _ (e', count', im') bp =>
+                     existT _ (Eproj v t n y' e', count', im') bp
+                 end
+             end)
+          | _ =>
+            (match (contract sig count e sub im) with
+               | existT _ (e', count', im') bp =>
+                 existT _ (Eproj v t n y' e', count', im') bp
+             end)
+        end
+       | Eprim x f ys e=>
+        let ys' := apply_r_list sig ys in
+        (match contract sig count e sub im with
+            | existT _  (e', count', im') bp  =>
+                     existT _ (Eprim x f ys' e', count', im') bp
+         end)
+       | Ecase v cl =>
+        let v' := apply_r sig v in
+        (match (M.get v' sub) with
+           | Some (SVconstr t lv) =>
+             (match findtag cl t with
+                | Some k =>
+                  (* decrease count of each (sig e') other than k *)
+                  contract sig (dec_census_case sig cl t count) k  sub im
+                | None =>
+                  (* fold over case body *)
+                  (match contractcases (Ecase v cl, sub, im)
+                                      (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub cl (subcl_refl cl) (le_n _)  with
+                    | existT _ (cl', count', im') bp =>                      
+                      existT _ (Ecase v' cl', count', im') bp
+                  end)
+              end)
+           | _ =>
+             (match contractcases (Ecase v cl, sub, im)
+                                 (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub cl (subcl_refl cl) (le_n _) with
+               | existT _ (cl', count', im') bp  =>
+                  
+                 existT _ (Ecase v' cl', count', im') bp
+             end)
+         end )
+       | Efun fl e =>
+        (match  precontractfun sig count sub fl with
+         | (fl', count', sub') =>
+           (match contract sig count' e sub' im with
+                existT _ (e', count'', im') bp =>
+                match postcontractfun (Efun fl' e, sub, im') 
+                                      (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count''
+                                      im' sub fl' (subfds_refl fl') (le_n _) with 
+                  | existT _ (fl'', count''', im'') bp' =>
+                    (match fl'' with (* eliminate empty function defns. *)
+                       | Fnil => existT _ ( e', count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+                       |  _  =>  existT _ (Efun fl'' e', count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+                     end)
+                end
+            end)
+         end)
+      
+       | Eapp f t ys =>
+        let f' := apply_r sig f in
+        let ys' := apply_r_list sig ys in
+        (match get_c f' count with
+        | 1%nat => (match (M.get f' sub) with
+                      | Some (SVfun t xs m)  =>
+                            let im' := M.set f' true im in
+                            (* update counts of ys' and xs after setting f' to 0 *)
+                            let count' := update_count_inlined ys' xs (M.set f' 0 count) in
+                            (match contract (set_list (combine xs ys') sig) count' m  sub im' with
+                               | existT _ (e, c, i) bp => existT _ (e, c, i) (b_map_i_true _ _ _ bp)
+                             end)
+                      | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
+                    end) 
+        | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
+         end)
+     end.
+Solve Obligations with (program_simpl; unfold term_sub_inl_size; simpl;  rewrite plus_n_Sm; rewrite <- Nat.add_lt_mono_l;  eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; omega)]).
+
+ Next Obligation.  Defined.
+ Solve Obligations with (program_simpl; unfold term_sub_inl_size; simpl; symmetry in Heq_anonymous; apply findtag_not_empty in Heq_anonymous; omega).
  Next Obligation.
-   program_simpl.
-   simpl in pfsub.
-   etransitivity.
-   clear Heq_anonymous.
-   eapply sub_size_le. eapply b_map_le_c. eauto.
-   auto.
- Qed.
+   unfold term_sub_inl_size in *; simpl in *.
+   assert (term_size k < term_size (Ecase v cl))%nat.
+   symmetry in Heq_anonymous.
+   apply findtag_In_patterns in Heq_anonymous.   
+   eapply case_size; eauto.
+   simpl in H. omega.   
+   Defined.
+  Next Obligation.
+    assert ((forall im, sub_inl_size sub' im <= funs_size (fl) + sub_inl_size sub im /\ funs_size fl' <= funs_size fl))%nat. eapply precontractfun_size. eauto.  unfold term_sub_inl_size. simpl. specialize (H im). apply le_lt_n_Sm. omega.    Defined.
+  Next Obligation.
+  unfold term_sub_inl_size; simpl.
+  unfold term_sub_inl_size in H. simpl in H.
+  assert (Heq0 := Heq_anonymous0).
+  eapply precontractfun_size with ( im := b) in Heq0.  
+  assert (sub_inl_size sub im' <= sub_inl_size sub im).
+  apply sub_size_le.
+  apply b_map_le_c; auto.
+  eapply lt_le_trans. apply H.
+  omega.
+Defined.  
+Next Obligation.
+  unfold term_sub_inl_size; simpl.
+  symmetry in Heq_anonymous. apply sub_remove_size with (im :=  im) in Heq_anonymous. omega.
+Defined.
 
-
-
+(*
+ 
   Program Fixpoint contract (sig:r_map) (count:c_map) (es:exp * ctx_map * b_map) {measure (term_sub_inl_size es)} : {esir:(exp * c_map * b_map) & (b_map_le_i (snd es) (snd esir))} :=
     match es with
       | ( Ehalt v, sub, im) =>
@@ -863,7 +1216,6 @@ Qed.
                 | Some k =>
                   (* decrease count of each (sig e') other than k *)
                   let count' := dec_census_case sig cl t count in
-                  (* recursive call to contract (will most likely) inline the definition of (sig k) *)
                   contract sig count' (k, sub, im)
                 | None =>
                   (* fold over case body *)
@@ -915,14 +1267,15 @@ Qed.
                     end) 
         | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
          end)
-    end. 
-  
+    end.
  Solve Obligations with (program_simpl; unfold term_sub_inl_size; simpl;  rewrite plus_n_Sm; rewrite <- Nat.add_lt_mono_l;  eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; omega)]).
  Next Obligation.  apply ble_refl. Defined. 
  Solve Obligations with (program_simpl; unfold term_sub_inl_size; simpl; symmetry in Heq_anonymous; apply findtag_not_empty in Heq_anonymous; omega).
  Next Obligation.
    unfold term_sub_inl_size in *; simpl in *.
    assert (term_size k < term_size (Ecase v cl))%nat.
+   symmetry in Heq_anonymous.
+   apply findtag_In_patterns in Heq_anonymous.   
    eapply case_size; eauto.
    simpl in H. omega.   
  Qed.
@@ -945,7 +1298,121 @@ Next Obligation.  exists fl'. exists e. split. apply rt_refl. right. auto. Qed.
 Next Obligation.
   unfold term_sub_inl_size; simpl.
   symmetry in Heq_anonymous. apply sub_remove_size with (im :=  b) in Heq_anonymous. omega.
-Qed.
+Qed. *)
+
+
+Theorem contract_eq:
+  forall sig count e sub im,
+  contract sig count e sub im  =
+    match e with
+       |  Ehalt v =>
+          existT _ (Ehalt (apply_r sig v), count, im) ( ble_refl _)
+       | Econstr x t ys e' =>
+           match (get_c x count) with
+             | 0%nat =>
+               let count' := dec_census_list sig ys count in 
+               contract sig count' e' sub im
+               
+          | _ =>
+            match contract sig count e' (M.set x (SVconstr t ys) sub) im  with
+              | existT _  (e'', count', im') bp =>
+                (match (get_c x count') with
+                   | 0%nat =>
+                     let count'' := dec_census_list sig ys count'  in
+                     existT _ (e'', count'', im') bp
+                   | _ =>
+                     let ys' := apply_r_list sig ys in
+                     existT _ (Econstr x t ys' e'', count', im') bp
+                 end)
+            end
+        end
+       | Eproj v t n y e =>
+        let y' := apply_r sig y in
+        match (M.get y' sub) with
+          | Some (SVconstr t' ys) =>
+            (match (nthN ys n) with
+               | Some yn =>
+                 let yn' := apply_r sig yn in
+                 let count' := M.set y' ((get_c y' count) - 1)%nat count in
+                 let count'' := M.set v 0%nat (M.set yn' (get_c v count + get_c yn' count)%nat count') in
+                 contract (M.set v yn' sig) count'' e  sub im
+               | None =>
+                 match contract sig count e sub im  with
+                   | existT _ (e', count', im') bp =>
+                     existT _ (Eproj v t n y' e', count', im') bp
+                 end
+             end)
+          | _ =>
+            (match (contract sig count e sub im) with
+               | existT _ (e', count', im') bp =>
+                 existT _ (Eproj v t n y' e', count', im') bp
+             end)
+        end
+       | Eprim x f ys e=>
+        let ys' := apply_r_list sig ys in
+        (match contract sig count e sub im with
+            | existT _  (e', count', im') bp  =>
+                     existT _ (Eprim x f ys' e', count', im') bp
+         end)
+       | Ecase v cl =>
+        let v' := apply_r sig v in
+        (match (M.get v' sub) with
+           | Some (SVconstr t lv) =>
+             (match findtag cl t with
+                | Some k =>
+                  (* decrease count of each (sig e') other than k *)
+                  contract sig (dec_census_case sig cl t count) k  sub im
+                | None =>
+                  (* fold over case body *)
+                  (match contractcases (Ecase v cl, sub, im)
+                                      (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub cl (subcl_refl cl) (le_n _)  with
+                    | existT _ (cl', count', im') bp =>                      
+                      existT _ (Ecase v' cl', count', im') bp
+                  end)
+              end)
+           | _ =>
+             (match contractcases (Ecase v cl, sub, im)
+                                 (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub cl (subcl_refl cl) (le_n _) with
+               | existT _ (cl', count', im') bp  =>
+                  
+                 existT _ (Ecase v' cl', count', im') bp
+             end)
+         end )
+       | Efun fl e =>
+        (match  precontractfun sig count sub fl with
+         | (fl', count', sub') =>
+           (match contract sig count' e sub' im with
+                existT _ (e', count'', im') bp =>
+                match postcontractfun (Efun fl' e, sub, im') 
+                                      (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count''
+                                      im' sub fl' (subfds_refl fl') (le_n _) with 
+                  | existT _ (fl'', count''', im'') bp' =>
+                    (match fl'' with (* eliminate empty function defns. *)
+                       | Fnil => existT _ ( e', count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+                       |  _  =>  existT _ (Efun fl'' e', count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+                     end)
+                end
+            end)
+         end)
+      
+       | Eapp f t ys =>
+        let f' := apply_r sig f in
+        let ys' := apply_r_list sig ys in
+        (match get_c f' count with
+        | 1%nat => (match (M.get f' sub) with
+                      | Some (SVfun t xs m)  =>
+                            let im' := M.set f' true im in
+                            (* update counts of ys' and xs after setting f' to 0 *)
+                            let count' := update_count_inlined ys' xs (M.set f' 0 count) in
+                            (match contract (set_list (combine xs ys') sig) count' m  sub im' with
+                               | existT _ (e, c, i) bp => existT _ (e, c, i) (b_map_i_true _ _ _ bp)
+                             end)
+                      | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
+                    end) 
+        | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
+         end)
+     end.
+Admitted.
 
 
 
@@ -954,7 +1421,7 @@ End CONTRACT.
 
 Definition shrink_top (e:exp) : exp :=
   let count := init_census e in
-  match (contract (M.empty var) count (e, (M.empty svalue), (M.empty bool))) with
+  match (contract (M.empty var) count e (M.empty svalue) (M.empty bool)) with
     | existT _ (e', _, _) _ => e'
   end.
 

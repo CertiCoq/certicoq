@@ -68,14 +68,18 @@ Proof.
     + apply LookupDfn_hom. assumption.
   - rewrite whBetaStep_hom. constructor.
   - rewrite (proj1 instantiate_hom). constructor.
-  - refine (sCase _ _ _ _ _ _ _); try eassumption.
+  - eapply sCase; try eassumption.
     + rewrite <- canonicalP_hom. rewrite e. reflexivity.
     + rewrite <- tskipn_hom. rewrite e0. reflexivity.
     + rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
   - rewrite <- pre_whFixStep_hom. rewrite tcons_hom.
-    refine (sFix _ _ _ _ _ _).
-    rewrite <- dnthBody_hom. rewrite <- optStripDnth_hom.
-    apply f_equal. eassumption.
+    eapply sFix. Check sFix.
+    + rewrite <- dnthBody_hom. rewrite <- optStripDnth_hom. rewrite e.
+      reflexivity.
+    + rewrite <- tcons_hom. rewrite <- tnth_hom. rewrite <- optStrip_hom.
+      rewrite e0. reflexivity.
+    + rewrite <- canonicalP_hom. rewrite e1. rewrite <- optStripCanP_hom'.
+      reflexivity.
   - rewrite mkApp_hom. refine (sAppFn _ _ _). inversion_Clear H0.
     apply H. assumption.
     + rewrite TApp_hom in H1. rewrite mkApp_hom in H1.

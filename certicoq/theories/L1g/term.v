@@ -725,19 +725,13 @@ Proof.
   - apply IHn. assumption.
 Qed.
 
+(****
 (** operations on Defs **)
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
     | dnil => 0
     | dcons _ _ _ _ ts => S (dlength ts)
   end.
-
-(***
-Function dnth (n:nat) (l:Defs) (q:n <= S (dlength ds)) {struct l} : 
-  match l with
-    | dnil => 
-    |
- ***********)
 
 Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
   match l with
@@ -748,6 +742,24 @@ Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
                          end
   end.
 
+
+Lemma n_lt_0 : forall n, n < 0 -> Term * nat.
+Proof.
+  intros. omega.
+Defined.
+
+Fixpoint
+  dnth_lt (ds:Defs) : forall (n:nat), (n < dlength ds) -> Term * nat :=
+  match ds return forall n, (n < dlength ds) -> Term * nat with
+  | dnil => n_lt_0
+  | dcons nm ty bod ri es =>
+    fun n =>
+      match n return (n < dlength (dcons nm ty bod ri es)) -> Term * nat with
+        | 0 => fun _ => (bod, ri)
+        | S m => fun H => dnth_lt es (lt_S_n _ _ H)
+      end
+  end.
+***************************)
 
 (** syntactic control of "TApp": no nested apps, app must have an argument **)
 Function mkApp (t:Term) (args:Terms) {struct t} : Term :=

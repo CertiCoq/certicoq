@@ -470,6 +470,21 @@ Proof.
   - rewrite e1 in IHo. destruct m; cbn in IHo; assumption.
 Qed.
 
+Lemma tsplit_tnth_sanity:
+  forall xs n u, tnth n xs = Some u ->
+                 exists t ts frsts lasts,
+                   xs = tcons t ts /\
+                   tsplit n t ts = Some (mkSplit frsts u lasts).
+Proof.
+  intros xs n u.
+  functional induction (tnth n xs); intros; try discriminate.
+  - myInjection H. exists u, xs, tnil, xs. intuition. cbn.
+    destruct xs; reflexivity.
+  - destruct (IHo H) as [y0 [y1 [y2 [y3 [jy1 jy2]]]]]. subst xs.
+    exists x, (tcons y0 y1), (tcons x y2), y3. intuition.
+    cbn. rewrite jy2. reflexivity.
+Qed.
+    
 Lemma tnth_tlength_sanity:
   forall fsts t lsts,
     tnth (tlength fsts) (tappend fsts (tcons t lsts)) = Some t.
@@ -478,6 +493,32 @@ Proof.
   - cbn. apply IHfsts0.
 Qed.
 
+Lemma tnth_extend1:
+  forall n l t,  tnth n l = Some t -> n < tlength l.
+Proof.
+  induction n; induction l; simpl; intros; try discriminate; try omega.
+  - apply lt_n_S. eapply IHn. eassumption.
+Qed.
+
+Lemma tnth_extend2:
+  forall n l,  n < tlength l -> exists t, tnth n l = Some t.
+Proof.
+  induction n; intros.
+  - destruct l. simpl in H. omega. exists t. reflexivity.
+  - destruct l. inversion H. simpl in H.
+    specialize (IHn _ (lt_S_n _ _ H)). destruct IHn. exists x.
+    simpl. assumption.
+Qed.
+
+Lemma tnth_append:
+  forall n args t, tnth n args = Some t ->
+            forall brgs, tnth n (tappend args brgs) = Some t.
+Proof.
+  induction n; induction args; simpl; intros; try discriminate; try assumption.
+  - apply IHn. assumption.
+Qed.
+
+(** operations on Defs **)
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
     | dnil => 0

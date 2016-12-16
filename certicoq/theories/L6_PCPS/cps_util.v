@@ -10,12 +10,7 @@ Import ListNotations.
 
 Close Scope Z_scope.
 
-Ltac destructAll :=
-  match goal with
-    | [ H : _ /\ _ |- _] => destruct H; destructAll
-    | [ H : exists E, _ |- _ ] => destruct H; destructAll
-    | _ => subst
-  end.
+
 
 Definition var_dec := M.elt_eq.
 
@@ -745,9 +740,13 @@ Inductive dsubterm_e:exp -> exp -> Prop :=
 | dsubterm_constr: forall x t ys e, dsubterm_e e (Econstr x t ys e)
 | dsubterm_proj: forall v t n y e, dsubterm_e e (Eproj v t n y e)
 | dsubterm_prim: forall x p ys e, dsubterm_e e (Eprim x p ys e)
+| dsubterm_case: forall x e g cl, List.In (g, e) cl -> dsubterm_e e (Ecase x cl)
 | dsubterm_fds:
     forall e' fds e,
       dsubterm_fds_e e' fds -> dsubterm_e e' (Efun fds e)
+| dsubterm_fds2:
+    forall fds e,
+      dsubterm_e e (Efun fds e)
 with dsubterm_fds_e: exp -> fundefs -> Prop :=
      | dsubterm_cons:
          forall e f t ys fds', dsubterm_fds_e e (Fcons f t ys e fds')
@@ -1185,7 +1184,169 @@ Proof.
   apply e_num_occur_mut.
 Qed.  
 
+    Theorem num_occur_det:
+      forall v, 
+      (forall e n m,
+        num_occur e v n ->
+        num_occur e v m ->
+        n = m) /\
+           (forall fds n m,
+              num_occur_fds fds v n ->
+              num_occur_fds fds v m ->
+              n = m).
+    Proof.
+      intro.
+      apply exp_def_mutual_ind; intros; try (inv H1; inv H0; eauto); try (inv H; inv H0; eauto).
+      - inv H5. inv H4. reflexivity.
+      - inv H1. inv H2. inv H7. inv H6.
+        specialize (H0 (num_occur_list [v0] v + m) (num_occur_list [v0] v+m0)).
+        replace (num_occur_list [v0] v + (n1 + m)) with (n1 + (num_occur_list [v0] v + m)) by omega.
+        rewrite H0.
+        specialize (H _ _ H8 H7). omega.
+        constructor; auto.
+        constructor; auto.                
+      -       inv H1; inv H2; eauto.
+      -       inv H1; inv H2; eauto.
+    Qed.
 
+    
+              Theorem num_occur_ec_n:
+         forall e x n m,
+           num_occur_ec e x n ->
+           n = m ->
+           num_occur_ec e x m.
+       Proof.
+         intros; subst; auto.
+       Qed.
+
+
+       Theorem num_occur_fdc_n:
+         forall e x n m,
+           num_occur_fdc e x n ->
+           n = m ->
+           num_occur_fdc e x m.
+       Proof.
+         intros; subst; auto.
+       Qed.
+
+
+       Definition dead_var e: Ensemble var :=
+         fun v => num_occur e v 0.
+
+       Definition dead_var_fundefs e: Ensemble var :=
+         fun v => num_occur_fds e v 0.
+       
+       
+       Definition dead_var_ctx c:Ensemble var :=
+         fun v => num_occur_ec c v 0.
+
+       Definition dead_var_fundefs_ctx f : Ensemble var :=
+         fun v => num_occur_fdc f v 0.
+
+Theorem num_occur_ec_comp_ctx_mut:
+  (forall (c1 c2 : exp_ctx) (n : nat) x,
+   num_occur_ec (comp_ctx_f c1 c2) x n <->
+   (exists n1 n2 : nat,
+      num_occur_ec c1 x n1 /\ num_occur_ec c2 x n2 /\ n = n1 + n2)) /\
+  (forall (fc : fundefs_ctx) c (n : nat) x,
+   num_occur_fdc (comp_f_ctx_f fc c) x n <->
+   (exists n1 n2 : nat,
+      num_occur_fdc fc x n1 /\ num_occur_ec c x n2 /\ n = n1 + n2)).
+Proof.       
+  exp_fundefs_ctx_induction IHc1 IHfc1; simpl; split; intros; eauto.
+  - destructAll. inv H; auto.
+  - inv H. apply IHc1 in H6. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_ec_n.
+    constructor. rewrite IHc1. eauto.
+    omega.
+  - inv H. apply IHc1 in H7. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_ec_n.
+    constructor. rewrite IHc1. eauto.
+    omega.
+  - inv H. apply IHc1 in H6. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_ec_n.
+    constructor. rewrite IHc1. eauto.
+    omega.
+ - inv H. apply IHc1 in H8. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_ec_n.
+    constructor; eauto. rewrite IHc1. eauto.
+    omega.
+ - inv H. apply IHc1 in H2. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_ec_n.
+    constructor; eauto. rewrite IHc1. eauto.
+    omega.
+  - inv H. apply IHfc1 in H5. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_ec_n.
+    constructor; eauto. rewrite IHfc1. eauto.
+    omega.
+      - inv H. apply IHc1 in H7. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_fdc_n.
+    constructor; eauto. rewrite IHc1. eauto.
+    omega.
+  - inv H. apply IHfc1 in H8. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_fdc_n.
+    constructor; eauto. rewrite IHfc1. eauto.
+    omega.
+Qed.
+    
+ Theorem num_occur_ec_comp_ctx:
+  (forall (c1 c2 : exp_ctx) (n : nat) x,
+   num_occur_ec (comp_ctx_f c1 c2) x n <->
+   (exists n1 n2 : nat,
+      num_occur_ec c1 x n1 /\ num_occur_ec c2 x n2 /\ n = n1 + n2)).
+ Proof.
+   intros. apply num_occur_ec_comp_ctx_mut.
+ Qed.   
+
+ Theorem num_occur_fdc_comp_ctx:
+  (forall (fc : fundefs_ctx) c (n : nat) x,
+   num_occur_fdc (comp_f_ctx_f fc c) x n <->
+   (exists n1 n2 : nat,
+      num_occur_fdc fc x n1 /\ num_occur_ec c x n2 /\ n = n1 + n2)).
+ Proof.
+   intros. apply num_occur_ec_comp_ctx_mut.
+ Qed.   
+    
 (* 
 Inductive bv_e: exp -> list var -> Prop :=
 | Constr_bv :

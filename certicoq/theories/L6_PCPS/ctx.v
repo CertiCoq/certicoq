@@ -1,6 +1,6 @@
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega.
 Require Import L6.cps.
-
+Require Import Libraries.CpdtTactics L6.set_util.
 Import ListNotations.
 
 (** Expression evaluation contexts *)
@@ -269,3 +269,172 @@ Proof.
   rewrite <- app_ctx_f_fuse.
   rewrite <- app_ctx_f_correct in H1, H2. rewrite H1. eauto.
 Qed.
+
+    Lemma comp_ctx_f_assoc_mut:
+      (forall c1 c2 c3,
+         comp_ctx_f (comp_ctx_f c1 c2) c3 = comp_ctx_f c1 (comp_ctx_f c2 c3)) /\
+      (forall f c2 c3, comp_f_ctx_f (comp_f_ctx_f f c2) c3 =
+                       comp_f_ctx_f f (comp_ctx_f c2 c3)).
+    Proof.
+      exp_fundefs_ctx_induction IHc1 IHf; intros; simpl; auto; try (rewrite IHc1; auto).
+      - rewrite IHf; auto.
+      - rewrite IHf; auto.
+    Qed.
+
+    Theorem comp_ctx_f_assoc:
+      (forall c1 c2 c3,
+         comp_ctx_f (comp_ctx_f c1 c2) c3 = comp_ctx_f c1 (comp_ctx_f c2 c3)).
+    Proof.
+      intros; apply comp_ctx_f_assoc_mut; auto.
+    Qed.      
+
+    Theorem comp_f_ctx_f_assoc:
+      (forall f c2 c3, comp_f_ctx_f (comp_f_ctx_f f c2) c3 =
+                       comp_f_ctx_f f (comp_ctx_f c2 c3)).
+      Proof.
+      intros; apply comp_ctx_f_assoc_mut; auto.
+      Qed.
+
+
+      Ltac destructAll :=
+  match goal with
+    | [ H : _ /\ _ |- _] => destruct H; destructAll
+    | [ H : exists E, _ |- _ ] => destruct H; destructAll
+    | _ => subst
+  end.
+      
+      Theorem comp_ctx_split_mut:
+        (forall c1 c2 c3 c4,
+          comp_ctx_f c1 c2 = comp_ctx_f c3 c4 ->
+          (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ c1 = comp_ctx_f c3 c41 /\ c2 = c42) \/ 
+          (exists c31 c32, c3 = comp_ctx_f c31 c32 /\ c1 = c31 /\ c2 = comp_ctx_f c32 c4)) /\
+        (forall f1 c2 f3 c4, comp_f_ctx_f f1 c2 = comp_f_ctx_f f3 c4 ->
+                             (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ f1 = comp_f_ctx_f f3 c41 /\ c2 = c42) \/
+         (exists f31 c32, f3 = comp_f_ctx_f f31 c32 /\ f1 = f31 /\ c2 = comp_ctx_f c32 c4))
+      .
+      Proof.
+        exp_fundefs_ctx_induction IHc1 IHf; intros.
+        - simpl in H.
+          right.          
+          exists Hole_c, c3.
+          auto.
+        - simpl in H. destruct c3; inv H.          
+          + simpl in H0.
+            left.
+            destruct c4; inv H0.
+            exists ( Econstr_c v0 c l0 e), c2.
+            auto.
+          + apply IHc1 in H4. destruct H4.
+            * left.
+              destructAll.
+              exists x, x0.
+              auto.
+            * right. destructAll.
+              exists (Econstr_c v0 c l0 x), x0.
+              auto.
+        - simpl in H. destruct c3; inv H.
+          + simpl in H0.
+            left.
+            destruct c4; inv H0.
+             exists ( Eproj_c v1 c n0 v2 e ),  c2; auto.
+          + apply IHc1 in H5. destruct H5.
+            * left.
+              destructAll.
+              exists x, x0.
+              auto.
+            * right. destructAll.
+              exists ( Eproj_c v1 c n0 v2 x), x0;
+                auto.
+        - simpl in H. destruct c3; inv H.
+          + simpl in H0.
+            left.
+            destruct c4; inv H0.
+             exists ( Eprim_c v0 p0 l0 e ),  c2; auto.
+          + apply IHc1 in H4. destruct H4.
+            * left.
+              destructAll.
+              exists x, x0.
+              auto.
+            * right. destructAll.
+              exists (Eprim_c v0 p0 l0 x ), x0;
+              auto.
+        - simpl in H. destruct c3; inv H.
+          + simpl in H0. left.
+            exists (Ecase_c v l t e l0), c2.
+            auto.
+          + apply IHc1 in H4.
+            destruct H4; destructAll.
+            * left.
+              exists x, x0; auto.
+            * right.
+              exists (Ecase_c v0 l1 c x l2), x0.
+              auto.
+        - simpl in H.
+          destruct c3; inv H.
+          + simpl in H0.
+            left.
+            exists (Efun1_c f4 e), c2.
+            auto.
+          + apply IHc1 in H2.
+            destruct H2; destructAll.
+            * left.
+              exists x, x0; auto.
+            * right.
+              exists (Efun1_c f x), x0.
+              auto.              
+        - simpl in H.
+          destruct c3; inv H.
+          + simpl in H0.
+            left.
+            exists (Efun2_c f5 e), c2.
+            auto.
+          + apply IHf in H1.
+            destruct H1.
+            * left.
+              destructAll.
+              simpl. exists x, x0.
+              auto.
+            * right.
+              destructAll.
+              exists ( Efun2_c x e0), x0.
+              auto.
+        - destruct f3; inv H.
+          apply IHc1 in H4.
+          destruct H4; destructAll.
+          * left.
+            simpl.
+            exists x, x0.
+            auto.
+          * right.
+            exists (Fcons1_c v0 c l0 x f), x0; auto.            
+        - simpl in H.
+          destruct f3; inv H.
+          apply IHf in H5.
+          destruct H5.
+          * left.
+              destructAll.
+              simpl. exists x, x0.
+              auto.
+            * right.
+              destructAll.
+              exists (Fcons2_c v0 c l0 e0 x), x0.
+              auto.              
+      Qed.
+
+            Theorem comp_ctx_split:
+        (forall c1 c2 c3 c4,
+          comp_ctx_f c1 c2 = comp_ctx_f c3 c4 ->
+          (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ c1 = comp_ctx_f c3 c41 /\ c2 = c42) \/ 
+          (exists c31 c32, c3 = comp_ctx_f c31 c32 /\ c1 = c31 /\ c2 = comp_ctx_f c32 c4)).
+            Proof.
+              apply comp_ctx_split_mut; auto.
+            Qed.
+            
+              Theorem comp_f_ctx_split:
+                (forall f1 c2 f3 c4, comp_f_ctx_f f1 c2 = comp_f_ctx_f f3 c4 ->
+                                     (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ f1 = comp_f_ctx_f f3 c41 /\ c2 = c42) \/
+                                     (exists f31 c32, f3 = comp_f_ctx_f f31 c32 /\ f1 = f31 /\ c2 = comp_ctx_f c32 c4))
+              .
+                            Proof.
+              apply comp_ctx_split_mut; auto.
+            Qed.              

@@ -41,7 +41,8 @@ Inductive Term : Type :=
                nat (* arity *) -> Term
 | TCase      : (inductive * nat * list nat) (* # of pars, args per branch *) ->
                Term (* type info *) -> Term -> Terms -> Term
-| TFix       : Defs -> nat -> Term
+| TFix       : Defs (* all mutual bodies *)->
+               nat (* indx of this body *) -> Term
 | TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
@@ -178,6 +179,39 @@ Definition rev_npars (np: inductive * nat) :=
   end.
  **************************)
 
+(** operations on Defs **)
+Fixpoint dlength (ts:Defs) : nat :=
+  match ts with 
+    | dnil => 0
+    | dcons _ _ _ _ ts => S (dlength ts)
+  end.
+
+Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
+  match l with
+    | dnil => None
+    | dcons _ _ x ix t => match n with
+                           | 0 => Some (x, ix)
+                           | S m => dnthBody m t
+                         end
+  end.
+
+Lemma n_lt_0 : forall n, n < 0 -> Term * nat.
+Proof.
+  intros. omega.
+Defined.
+
+Fixpoint
+  dnth_lt (ds:Defs) : forall (n:nat), (n < dlength ds) -> Term * nat :=
+  match ds return forall n, (n < dlength ds) -> Term * nat with
+  | dnil => n_lt_0
+  | dcons nm ty bod ri es =>
+    fun n =>
+      match n return (n < dlength (dcons nm ty bod ri es)) -> Term * nat with
+        | 0 => fun _ => (bod, ri)
+        | S m => fun H => dnth_lt es (lt_S_n _ _ H)
+      end
+  end.
+
 (** translate Gregory Malecha's [term] into my [Term] **)
 Section datatypeEnv_sec.
   Variable e : environ Term.
@@ -234,7 +268,7 @@ Function term_Term (t:term) : Term :=
       let Ars := map fst brs in
       (TCase (npars, Ars) (term_Term ty) (term_Term mch)
              (terms_Terms (fun x => term_Term (snd x)) brs))
-    | tFix defs m => (TFix (defs_Defs term_Term defs) m)
+    | tFix defs m => TFix (defs_Defs term_Term defs) m
     | _ => TWrong "term_Term: Unknown term"
   end.
 

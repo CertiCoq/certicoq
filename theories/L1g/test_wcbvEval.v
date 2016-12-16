@@ -19,6 +19,47 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+(** example from Coq club 
+"Question about the formal definition of the guard condition"
+Here we check the unrolling guard
+**)
+Fixpoint diverge (n : nat) := let x := diverge n in 0.  (* well-typed *)
+Definition diverge0 : nat := diverge 0.
+Eval cbn in diverge0.  (* converges *)
+(* Eval cbv in diverge0.   DIVERGES! *)
+Quote Recursively Definition p_diverge0 := diverge0.
+Print p_diverge0.
+Definition P_diverge0 := Eval vm_compute in (program_Program p_diverge0).
+Definition P_div_env := Eval vm_compute in (env P_diverge0).
+Definition P_div_main := Eval vm_compute in (main P_diverge0).
+Eval vm_compute in wcbvEval P_div_env 1000 P_div_main.  (* also diverges! *)
+Goal
+  WcbvEval P_div_env P_div_main prop.
+Proof.
+  unfold P_div_main. eapply wConst.
+  - cbn. reflexivity.
+  - eapply wAppFix.
+    + eapply wConst.
+      * cbn. reflexivity.
+      * eapply wFix.
+    + cbn. reflexivity.
+    + cbn. reflexivity.
+    + eapply wConstruct.
+    + cbn. reflexivity.
+    + cbn. eapply wAppLam.
+      * eapply wLam. eapply wInd.
+      * eapply wConstruct.
+      * { cbn. eapply wLetIn.
+          - eapply wAppFix.
+            + eapply wFix.
+            + cbn. reflexivity.
+            + cbn. reflexivity.
+            + eapply wConstruct.
+            + cbn. reflexivity.
+            + cbn. eapply wAppLam.
+Abort.
+
+
 Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
 Notation NNN := (TInd NN).
 Notation SS := (TConstruct NN 1 1).
@@ -50,7 +91,7 @@ Definition ans_and_rect_x :=
 Definition envx := env P_and_rect_x.
 Definition mainx := main P_and_rect_x.
 Goal
-  wcbvEval envx 30 mainx = Ret ans_and_rect_x.
+  wcbvEval envx 90 mainx = Ret ans_and_rect_x.
   vm_compute. reflexivity.
 Qed.
         
@@ -82,15 +123,15 @@ Set Printing Width 80.
 Set Printing Depth 1000.
 
 (** Abhishek's example of looping: in L1g we test the guard **)
-Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
+Inductive Lt (n:nat) : nat -> Prop := Lt_n: Lt n (S n).
 Inductive Acc (y: nat) : Prop :=
-  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
-Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
+  Acc_intro : (forall x: nat, Lt y x -> Acc x) -> Acc y.
+Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), Lt x y -> Acc y.
   intros. destruct H. apply H. apply H0.
   Defined.
 Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
   match n with
-    | _ => @loop (S n) (@Acc_inv _ a (S n) (lt_n n))
+    | _ => @loop (S n) (@Acc_inv _ a (S n) (Lt_n n))
   end.
 Axiom Acc0Ax : Acc 0.
 Definition loop0 := (@loop O Acc0Ax).
@@ -240,13 +281,6 @@ Eval cbv in (wcbvEval mbt_env 10 mbt_main).
 
 
 Set Implicit Arguments.
-
-Definition LL := list.
-Quote Definition q_LL := LL.
-Print  q_LL.
-Quote Definition q_eLL := Eval cbv in LL.
-Print  q_eLL.
-
 
 (** non-recursive fixpoint has non-null Defs **)
 Fixpoint tst (b:bool) : bool := true.

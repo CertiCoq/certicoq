@@ -147,7 +147,7 @@ Proof.
 Qed.
 
 Lemma dlength_hom:
-  forall ds, L1g.term.dlength ds = dlength (stripDs ds).
+  forall ds, L1g.compile.dlength ds = dlength (stripDs ds).
 induction ds. intuition. simpl. rewrite IHds. reflexivity.
 Qed.
 
@@ -172,7 +172,7 @@ reflexivity.
 Qed.
 
 Lemma dnthBody_hom: 
-  forall m ds, optStripDnth (L1g.term.dnthBody m ds) =
+  forall m ds, optStripDnth (L1g.compile.dnthBody m ds) =
                dnthBody m (stripDs ds).
 induction m; induction ds; try intuition.
 - simpl. intuition.
@@ -426,7 +426,7 @@ Proof.
                    (instantiates (strip arg) n (strips t1)))).
     rewrite H0. rewrite H1. reflexivity.
   - change (TFix (stripDs (L1g.term.instantiateDefs
-                             arg (n0 + L1g.term.dlength d) d)) n =
+                             arg (n0 + L1g.compile.dlength d) d)) n =
             (TFix (instantiateDefs
                      (strip arg) (n0 + dlength (stripDs d)) (stripDs d)) n)).
     rewrite H. rewrite dlength_hom. reflexivity.
@@ -549,7 +549,6 @@ Proof.
       rewrite <- (dcons_hom _ L1g.compile.prop). simpl. reflexivity.
 Qed.
 
-(*****
 Lemma tsplit_hom:
   forall ix arg args,
     optStrip_split (L1g.term.tsplit ix arg args) =
@@ -576,83 +575,12 @@ Proof.
     + rewrite e1 in IHo.  rewrite optStrip_split_hom in IHo.
       discriminate.
 Qed.
-***********************)
-(******************  FIX   *******************
-Lemma WcbvEval_hom:
-  forall p,
-    (forall t t', L1g.wcbvEval.WcbvEval p t t' -> WFfixp t' ->
-                  WcbvEval (stripEnv p) (strip t) (strip t')) /\
-    (forall ts ts', L1g.wcbvEval.WcbvEvals p ts ts' ->
-                    WcbvEvals (stripEnv p) (strips ts) (strips ts')).
-Proof.
-  intros p.
-  apply L1g.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
-  try (solve[constructor; trivial]).
-  - cbn. constructor. apply H. assumption.
-  - cbn. constructor. apply H. eassumption.
-  - cbn. refine (wConst _ _ (H _)); try assumption.
-    + apply lookupDfn_hom. assumption.
-  - cbn. eapply wAppLam.
-    + apply H. unfold WFfixp; intros. discriminate.
-    + apply H0. unfold WFfixp; intros. subst a1'.
-      admit.
-    + specialize (H1 H2). rewrite whBetaStep_hom in H1. assumption.
-  - cbn. specialize (H0 H1). eapply wLetIn.
-    + apply H. admit.
-    + rewrite <- (proj1 instantiate_hom). assumption.
-  - cbn. eapply wAppFix.
-    Focus 2. rewrite <- dnthBody_hom. rewrite e. reflexivity. 
-    Focus 4. rewrite <- pre_whFixStep_hom in H1.
-      rewrite tappend_hom in H1. eapply H1. assumption.
-    Focus 2. rewrite <- tsplit_hom.
-    rewrite e0. rewrite optStrip_split_hom. apply f_equal. apply f_equal3;
-      try reflexivity.
-    * apply H. unfold WFfixp; intros. discriminate.
-    * apply H0. admit.
-  - cbn. destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]].
-    rewrite j in H0. eapply wAppCong; try eassumption.
-    + apply H. admit.
-    + intros h. elim n. apply isLambda_hom. assumption.
-    + intros h. elim n0. apply isFix_hom. assumption.
-    + cbn. rewrite mkApp_hom. rewrite j. reflexivity.
-  - (** show L1g.term.canonicalP t' = Some ..., so this case can't happen **)
-    assert (j: exists s, L1g.term.canonicalP t' = Some s).
-    { destruct (L1g.term.canonicalP t'); try discriminate.
-      unfold WFfixp in H2. destruct aargs'.
-      + cbn in *.
-        destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons w1) as [x0 [x1 jx]].
-        discriminate.
-      + cbn in *. specialize (H2 dts m t0 aargs' eq_refl _ _ e).
-        destruct ix.
-        * myInjection e0. specialize (H2 t0 eq_refl).
-          destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons' w1).
 
-    }
-    destruct j as [x0 jx]. rewrite jx in e1. discriminate.
-
-(*****    
-  - destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons w1) as [y0 [y1 jy]].
-    rewrite jy. rewrite L1g.term.mkApp_goodFn; try L1g.term.not_isApp.
-    rewrite TApp_hom. rewrite TApp_hom. rewrite TFix_hom.
-    assert (k:= dnthBody_hom m dts). rewrite e in k. cbn in k. symmetry in k.
-    assert (k1:= tnth_hom (L1g.compile.tcons arg args) ix).
-    rewrite e0 in k1.
-    eapply (wAppFix _ _ H k _ H0).
-      
-    assert (k1:= tnth_tsplit_sanity ix (strip arg) (strips args)).
-    Check (wAppFix _ _ H k).
-
-    apply wAppFixCong.
- *****)   
-
-  - refine (wCase _ _ _ _ _ _ _); try eassumption.
-    * rewrite <- canonicalP_hom. rewrite e. reflexivity.
-    * rewrite <- tskipn_hom. rewrite e0. reflexivity.
-    * rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
-  - refine (wCaseCong _ _ _ _); try eassumption.
-    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
+Lemma optStripCanP_hom':
+  forall z, optStripCanP (Some z) =
+            Some (fst (fst z), strips (snd (fst z)), snd z).
+intros. destruct z as [[z0 z1] z2]. cbn. reflexivity.
 Qed.
-Print Assumptions WcbvEval_hom.
 
 Lemma WcbvEval_hom:
   forall p,
@@ -664,56 +592,34 @@ Proof.
   intros p.
   apply L1g.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
   try (solve[constructor; trivial]).
-  - cbn. refine (wConst _ _ _); try eassumption.
-    unfold lookupDfn. unfold lookupDfn in e.
-    case_eq (lookup nm p); intros.
-    + rewrite H0 in e. destruct e0.
-      * myInjection e. erewrite lookup_hom; try eassumption.
-        cbn. reflexivity.
-      * discriminate.
-    + rewrite H0 in e. discriminate.
-  - eapply wAppLam; try eassumption.
-    + rewrite whBetaStep_hom in H1. eassumption.
-  - eapply wLetIn. eassumption.
-    rewrite <- (proj1 instantiate_hom). assumption.
-  - eapply wAppFix.
-    Focus 2. rewrite <- dnthBody_hom. rewrite e. reflexivity. 
-    Focus 4. rewrite <- pre_whFixStep_hom in H1.
-      rewrite tappend_hom in H1.
-      eapply H1.
-    Focus 2. rewrite <- tsplit_hom.
-    rewrite e0. rewrite optStrip_split_hom. apply f_equal. apply f_equal3;
-      try reflexivity.
-    * apply H.
-    * apply H0.
-  - rewrite mkApp_hom. destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]].
-    rewrite j in H0. eapply wAppCong; try eassumption.
+  - cbn. econstructor; try eassumption. apply lookupDfn_hom. assumption.
+  - cbn. eapply wAppLam.
+    + apply H. 
+    + apply H0. 
+    + rewrite whBetaStep_hom in H1. assumption.
+  - cbn. eapply wLetIn.
+    + apply H. 
+    + rewrite <- (proj1 instantiate_hom). assumption.
+  - cbn. eapply wAppFix.
+    + eapply H.
+    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
+    + rewrite <- tsplit_hom.
+      rewrite e0. rewrite optStrip_split_hom. apply f_equal. apply f_equal3;
+        try reflexivity.
+    + apply H0.
+    + rewrite <- canonicalP_hom. rewrite e1. apply optStripCanP_hom'.
+    + rewrite <- pre_whFixStep_hom in H1. 
+      rewrite tappend_hom in H1. eapply H1.
+  - destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]]. rewrite j in H0.
+    cbn. rewrite mkApp_hom. eapply wAppCong. try eassumption.
     + intros h. elim n. apply isLambda_hom. assumption.
     + intros h. elim n0. apply isFix_hom. assumption.
-    + rewrite j.  reflexivity.
-  - (** show L1g.term.canonicalP t' = Some ..., so this case can't happen **)
-    assert (j: exists s, L1g.term.canonicalP t' = Some s).
-    { 
-
-
-    }
-    destruct j as [x0 jx]. rewrite jx in e1. discriminate.
-
-(*****    
-  - destruct (L1g.wcbvEval.WcbvEvals_tcons_tcons w1) as [y0 [y1 jy]].
-    rewrite jy. rewrite L1g.term.mkApp_goodFn; try L1g.term.not_isApp.
-    rewrite TApp_hom. rewrite TApp_hom. rewrite TFix_hom.
-    assert (k:= dnthBody_hom m dts). rewrite e in k. cbn in k. symmetry in k.
-    assert (k1:= tnth_hom (L1g.compile.tcons arg args) ix).
-    rewrite e0 in k1.
-    eapply (wAppFix _ _ H k _ H0).
-      
-    assert (k1:= tnth_tsplit_sanity ix (strip arg) (strips args)).
-    Check (wAppFix _ _ H k).
-
-    apply wAppFixCong.
- *****)   
-
+    + rewrite j. cbn in H0. assumption.
+  - cbn. eapply wAppFixCong; try eassumption.
+    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
+    + rewrite <- tcons_hom. rewrite <- tnth_hom. rewrite <- optStrip_hom.
+      rewrite e0. reflexivity.
+    + rewrite <- canonicalP_hom. rewrite e1. reflexivity.
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.
@@ -955,4 +861,3 @@ Fixpoint unstripEnv (p:environ Term) : environ L1g.compile.Term :=
     | nil => nil
     | cons (nm, ec) q => cons (nm, (unstripEC ec)) (unstripEnv q)
   end.
- **********************)

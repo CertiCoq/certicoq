@@ -18,17 +18,7 @@ Set Implicit Arguments.
 
 
 (** Weak typed normal form: normal form of wndEval:
-*** no wndEval steps possible (including no step
-(**********
-Lemma wndEvalRTC_Prf:
-  forall t t', wndEvalRTC t t' -> wndEvalRTC (TProof t) t'.
-induction 1.
-- constructor. constructor.
--  constructor. constructor. apply sPrf. assumption.
-- eapply wERTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
-Qed.
- **********)
-s in type fields.
+*** no wndEval steps possible (including no steps in type fields.
 *** TRel is not itself a weak typed normal form, but unbound indices
 *** may occur under a binder in a weak typed normal form
 **)
@@ -50,6 +40,12 @@ Inductive WNorm: Term -> Prop :=
            WNorm fn -> WNorms (tcons t ts) ->
            ~ isLambda fn -> ~ isFix fn -> ~ isApp fn ->
            WNorm (TApp fn t ts)
+| WNAppFix: forall ds m t ts x ix u,
+              WNorms (tcons t ts) ->
+              dnthBody m ds = Some (x, ix) ->
+              tnth ix (tcons t ts) = Some u ->
+              canonicalP u = None ->   (* Fix not guarded *)
+              WNorm (TApp (TFix ds m) t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
@@ -148,11 +144,23 @@ Qed.
 (********************
 Lemma wcbv_WNorm:
   WFaEnv p ->
-  (forall n t s, wcbvEval p n t = Ret s -> WNorm s).
+  forall n t s, wcbvEval p n t = Ret s -> WNorm s.
 Proof.
-  intros hp. induction n; intros. cbn in H. discriminate.
-  - eapply IHn.
+  intros hp n t.
+  functional induction (wcbvEval p n t); intros; try discriminate;
+  try (solve[myInjection H; apply IHe0; eassumption]);
+  try (solve[apply IHe2; assumption]).
+  - apply IHe0. assumption.
+  - myInjection H. destruct ergs.
+    + constructor.
+    + eapply WNAppFix; try eassumption.
+      * constructor.
 
+    myInjection H. apply IHe1.
+
+****************)    
+
+(************ hopefully fix this later  ****************
 Lemma Wcbv_WNorm:
   WFaEnv p ->
   (forall t s, WcbvEval p t s -> WNorm s) /\
@@ -167,7 +175,7 @@ Proof.
     rewrite k1. clear k1.
     destruct k2; [destruct H0 as  [j1 [j2 [j3 j4]]]; subst |
                   destruct H0 as [j1 [j2 j3]]].
-    + constructor; try assumption. constructor; try assumption.
+    + cbn. constructor; try assumption. constructor; try assumption.
     + constructor. try assumption.
       * constructor; try assumption.
       * { destruct (mkApp_isApp_lem fn' y0 y1) as [z0 [z1 [z2 [c1 c2]]]].
@@ -252,22 +260,21 @@ Proof.
   - inversion h. subst. elim H4. exists nm, ty, bod. reflexivity.
   - inversion h. subst. elim H6.
     eapply canonicalP_isCanonical. eassumption.
-  - inversion h. subst. elim H5. apply IsFix.
+  - inversion_Clear h.
+    + elim H5. auto.
+    + rewrite e in H4. myInjection H4. rewrite H5 in e0. myInjection e0.
+      rewrite e1 in H6. discriminate.
+  - inversion_Clear h.
+    + contradiction.
+    + elim H. constructor.
 Qed.
 
 Lemma wNorm_no_wndStep:
   forall t, WNorm t -> no_wnd_step p t.
-unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
-elim (proj1 (wNorm_no_wndStep_lem) _ _ h1). assumption.
+Proof.
+  unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
+  elim (proj1 (wNorm_no_wndStep_lem) _ _ h1). assumption.
 Qed.
 
-(*** correctness assumption for removing fixpoint unrolling guard ***)
-Definition WFfixp (t:Term) :=
-  forall (ds:Defs) (m:nat) (arg:Term) (args:Terms),
-    t = (TApp (TFix ds m) arg args) ->
-  forall x ix, dnthBody m ds = Some (x, ix) ->
-  forall t, tnth ix (tcons arg args) = Some t ->
-  WNorm t -> exists z, canonicalP t = Some z.
- (*******************)
 
 End Sec_environ.

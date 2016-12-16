@@ -150,4 +150,13 @@ unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
 elim (proj1 wNorm_no_wndStep_lem _ _ h1). assumption.
 Qed.
 
+(*** correctness assumption for removing fixpoint unrolling guard ***)
+Definition WFfixp (t:Term) :=
+  forall (ds:Defs) (m:nat) (arg:Term) (args:Terms),
+    t = (TApp (TFix ds m) arg args) ->
+  forall x ix, dnthBody m ds = Some (x, ix) ->
+  forall t, tnth ix (tcons arg args) = Some t ->
+  WNorm t -> exists z, canonicalP t = Some z.
+ (*******************)
+
 End Sec_environ.

@@ -38,9 +38,11 @@ Inductive wndEval : Term -> Term -> Prop :=
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml mch brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
-               (x:Term) (ix:nat),
+               (x t:Term) (ix:nat) z,
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
+          tnth ix (tcons arg args) = Some t ->
+          canonicalP t = Some z ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t, wndEval (TCast t) t
@@ -145,7 +147,10 @@ Proof.
   - rewrite whBetaStep_absorbs_mkApp. apply sBeta.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
     eapply sCase; eassumption.
-  - rewrite pre_whFixStep_absorbs_mkApp. simpl. eapply sFix; try eassumption.
+  - rewrite pre_whFixStep_absorbs_mkApp. cbn. eapply sFix; try eassumption.
+    destruct ix; cbn; cbn in H0.
+    + myInjection H0. reflexivity.
+    + eapply tnth_append. assumption.    
   - rewrite mkApp_idempotent. simpl. rewrite <- (mkApp_goodFn _ _ H3).
     apply IHwndEval; assumption.
   - inversion_Clear H; eapply sAppArgs. 

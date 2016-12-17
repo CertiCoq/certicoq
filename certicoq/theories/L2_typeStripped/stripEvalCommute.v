@@ -602,14 +602,11 @@ Proof.
     + rewrite <- (proj1 instantiate_hom). assumption.
   - cbn. eapply wAppFix.
     + eapply H.
-    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite <- tsplit_hom.
-      rewrite e0. rewrite optStrip_split_hom. apply f_equal. apply f_equal3;
-        try reflexivity.
     + apply H0.
+    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
+    + rewrite <- tcons_hom. rewrite <- tnth_hom. rewrite e0. reflexivity.
     + rewrite <- canonicalP_hom. rewrite e1. apply optStripCanP_hom'.
-    + rewrite <- pre_whFixStep_hom in H1. 
-      rewrite tappend_hom in H1. eapply H1.
+    + rewrite <- pre_whFixStep_hom in H1. eapply H1.
   - destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]]. rewrite j in H0.
     cbn. rewrite mkApp_hom. eapply wAppCong. try eassumption.
     + intros h. elim n. apply isLambda_hom. assumption.

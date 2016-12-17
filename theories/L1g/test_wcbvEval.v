@@ -42,21 +42,6 @@ Proof.
     + eapply wConst.
       * cbn. reflexivity.
       * eapply wFix.
-    + cbn. reflexivity.
-    + cbn. reflexivity.
-    + eapply wConstruct.
-    + cbn. reflexivity.
-    + cbn. eapply wAppLam.
-      * eapply wLam. eapply wInd.
-      * eapply wConstruct.
-      * { cbn. eapply wLetIn.
-          - eapply wAppFix.
-            + eapply wFix.
-            + cbn. reflexivity.
-            + cbn. reflexivity.
-            + eapply wConstruct.
-            + cbn. reflexivity.
-            + cbn. eapply wAppLam.
 Abort.
 
 

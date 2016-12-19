@@ -733,15 +733,16 @@ Proof with now eauto with Ensembles_DB.
     eexists; simpl. rewrite Hget, Hgetl. reflexivity.
 Qed.
 
-
-
-
 Inductive dsubterm_e:exp -> exp -> Prop :=
-| dsubterm_constr: forall x t ys e, dsubterm_e e (Econstr x t ys e)
-| dsubterm_proj: forall v t n y e, dsubterm_e e (Eproj v t n y e)
-| dsubterm_prim: forall x p ys e, dsubterm_e e (Eprim x p ys e)
-| dsubterm_case: forall x e g cl, List.In (g, e) cl -> dsubterm_e e (Ecase x cl)
-| dsubterm_fds:
+| dsubterm_constr :
+    forall x t ys e, dsubterm_e e (Econstr x t ys e)
+| dsubterm_proj :
+    forall v t n y e, dsubterm_e e (Eproj v t n y e)
+| dsubterm_prim :
+    forall x p ys e, dsubterm_e e (Eprim x p ys e)
+| dsubterm_case :
+    forall x e g cl, List.In (g, e) cl -> dsubterm_e e (Ecase x cl)
+| dsubterm_fds :
     forall e' fds e,
       dsubterm_fds_e e' fds -> dsubterm_e e' (Efun fds e)
 | dsubterm_fds2:
@@ -760,7 +761,7 @@ Inductive subterm_fds_e: exp -> fundefs -> Prop :=
 | subterm_cons:
     forall e e' f t ys fds', subterm_e e' e -> subterm_fds_e e' (Fcons f t ys e fds')
 | subterm_cons_fds:
-         forall e' fds' f t ys e , subterm_fds_e e' fds' -> subterm_fds_e e' (Fcons f t ys e fds').
+    forall e' fds' f t ys e , subterm_fds_e e' fds' -> subterm_fds_e e' (Fcons f t ys e fds').
 
 
 Inductive subfds_fds: fundefs -> fundefs -> Prop :=
@@ -820,7 +821,7 @@ Inductive num_occur: exp -> var -> nat -> Prop :=
       num_occur (Eproj v' t n' y e) v (num_occur_list [y] v + n)
 | Num_occ_app:
     forall f t ys v,
-                 num_occur (Eapp f t ys) v (num_occur_list (f::ys) v)
+      num_occur (Eapp f t ys) v (num_occur_list (f::ys) v)
 | Num_occ_fun:
     forall e v n m fl,
       num_occur e v n ->
@@ -828,7 +829,7 @@ Inductive num_occur: exp -> var -> nat -> Prop :=
       num_occur (Efun fl e) v (n + m )
 | Num_occ_halt:
     forall v v',
-       num_occur (Ehalt v) v' (num_occur_list [v] v')
+      num_occur (Ehalt v) v' (num_occur_list [v] v')
 with num_occur_fds: fundefs -> var -> nat -> Prop :=
      | Num_occ_nil :
          forall v,
@@ -853,74 +854,93 @@ with num_occur_case: list (var * exp) -> var -> nat -> Prop :=
  (* number of times var occurs in a context *) 
 Inductive num_occur_ec: exp_ctx -> var -> nat -> Prop :=
 | Noec_hole: forall v, num_occur_ec Hole_c v 0
-| Noec_constr: forall c v n x t ys,
-                 num_occur_ec c v n ->
-                 num_occur_ec (Econstr_c x t ys c) v (num_occur_list ys v + n)
-| Noec_prim: forall c v n x f ys,
-               num_occur_ec c v n ->
-               num_occur_ec (Eprim_c x f ys c) v (num_occur_list ys v + n )
-| Noec_proj: forall  v n y v' t n' c,
-               num_occur_ec c v n ->
-               num_occur_ec (Eproj_c v' t n' y c) v (num_occur_list [y] v + n)
-| Noec_case: forall cl cl' c v n m tg y p,
-            num_occur_case cl v n ->
-            num_occur_ec c v m ->
-            num_occur_case cl' v p ->
-            num_occur_ec (Ecase_c y cl tg c cl') v (num_occur_list [y] v + n+m+p)
-| Noec_fun1: forall n m fds c v,
-               num_occur_ec c v n ->
-               num_occur_fds fds v m ->
-               num_occur_ec (Efun1_c fds c) v (n+m)
-| Noec_fun2: forall n m fdc e v ,
-               num_occur e v n ->
-               num_occur_fdc fdc v m ->
+| Noec_constr:
+  forall c v n x t ys,
+    num_occur_ec c v n ->
+    num_occur_ec (Econstr_c x t ys c) v (num_occur_list ys v + n)
+| Noec_prim:
+    forall c v n x f ys,
+      num_occur_ec c v n ->
+      num_occur_ec (Eprim_c x f ys c) v (num_occur_list ys v + n )
+| Noec_proj:
+    forall  v n y v' t n' c,
+      num_occur_ec c v n ->
+      num_occur_ec (Eproj_c v' t n' y c) v (num_occur_list [y] v + n)
+| Noec_case:
+    forall cl cl' c v n m tg y p,
+      num_occur_case cl v n ->
+      num_occur_ec c v m ->
+      num_occur_case cl' v p ->
+      num_occur_ec (Ecase_c y cl tg c cl') v (num_occur_list [y] v + n+m+p)
+| Noec_fun1:
+    forall n m fds c v,
+      num_occur_ec c v n ->
+      num_occur_fds fds v m ->
+      num_occur_ec (Efun1_c fds c) v (n+m)
+| Noec_fun2:
+    forall n m fdc e v ,
+      num_occur e v n ->
+      num_occur_fdc fdc v m ->
                num_occur_ec (Efun2_c fdc e) v (n + m)
 with num_occur_fdc : fundefs_ctx -> var -> nat -> Prop :=
-     | Nofc_fcons1 : forall v n m fds t ys c f,
-                       num_occur_ec c v n ->
-                       num_occur_fds fds v m ->
-                       num_occur_fdc (Fcons1_c f t ys c fds) v  (n + m)
-     | Nofc_fcons2 : forall e v n m fdc f t ys,
-                       num_occur e v n ->
-                       num_occur_fdc fdc v m ->
-                       num_occur_fdc (Fcons2_c f t ys e fdc) v (n + m).
+     | Nofc_fcons1 :
+         forall v n m fds t ys c f,
+           num_occur_ec c v n ->
+           num_occur_fds fds v m ->
+           num_occur_fdc (Fcons1_c f t ys c fds) v  (n + m)
+     | Nofc_fcons2 :
+         forall e v n m fdc f t ys,
+           num_occur e v n ->
+           num_occur_fdc fdc v m ->
+           num_occur_fdc (Fcons2_c f t ys e fdc) v (n + m).
 
 
 Inductive num_binding_e: exp -> var -> nat -> Prop :=
-| Ub_constr: forall v t ys e v' m,
-               num_binding_e e v m -> 
-               num_binding_e (Econstr v' t ys e) v (num_occur_list [v'] v + m)
-| Ub_proj: forall v' t n' y e v n, 
-    num_binding_e e v n ->
-    num_binding_e (Eproj v' t n' y e) v (num_occur_list [v'] v + n)
-| Ub_prim: forall e v n x f ys,
-    num_binding_e e v n ->
-    num_binding_e (Eprim x f ys e) v (num_occur_list [x] v + n)
-| Ub_app: forall f t ys v,
-    num_binding_e (Eapp f t ys) v 0
-| Ub_case: forall l v n y,
-    num_binding_l l v n ->
-    num_binding_e (Ecase y l ) v n
-| Ub_fun: forall fds v n m e,
-    num_binding_f fds v n ->
-    num_binding_e e v m ->
-    num_binding_e (Efun fds e) v (n+m)
-| Ub_halt: forall v v',
-    num_binding_e (Ehalt v) v' 0          
+| Ub_constr:
+  forall v t ys e v' m,
+    num_binding_e e v m -> 
+    num_binding_e (Econstr v' t ys e) v (num_occur_list [v'] v + m)
+| Ub_proj:
+    forall v' t n' y e v n,
+      num_binding_e e v n ->
+      num_binding_e (Eproj v' t n' y e) v (num_occur_list [v'] v + n)
+| Ub_prim:
+    forall e v n x f ys,
+      num_binding_e e v n ->
+      num_binding_e (Eprim x f ys e) v (num_occur_list [x] v + n)
+| Ub_app:
+    forall f t ys v,
+      num_binding_e (Eapp f t ys) v 0
+| Ub_case:
+    forall l v n y,
+      num_binding_l l v n ->
+      num_binding_e (Ecase y l ) v n
+| Ub_fun:
+    forall fds v n m e,
+      num_binding_f fds v n ->
+      num_binding_e e v m ->
+      num_binding_e (Efun fds e) v (n+m)
+| Ub_halt:
+    forall v v',
+      num_binding_e (Ehalt v) v' 0          
 with num_binding_l: list (cTag*exp) -> var -> nat -> Prop :=
-      | Ub_cons: forall e l v n m k,
-          num_binding_e e v n ->
-          num_binding_l l v m ->
-             num_binding_l ((k,e)::l) v (n+m)
-        | Ub_nil: forall v,
-            num_binding_l [] v 0 
-with num_binding_f: fundefs -> var -> nat -> Prop :=
-     | Ub_fcons: forall e v n fds v' t ys m,
-         num_binding_e e v n ->
-         num_binding_f fds v m ->                        
-         num_binding_f (Fcons v' t ys e fds) v (num_occur_list (v'::ys) v+n+m)
-     | Ub_fnil: forall v,
-         num_binding_f Fnil v 0.
+     | Ub_cons:
+         forall e l v n m k,
+           num_binding_e e v n ->
+           num_binding_l l v m ->
+           num_binding_l ((k,e)::l) v (n+m)
+     | Ub_nil:
+         forall v,
+           num_binding_l [] v 0 
+with num_binding_f : fundefs -> var -> nat -> Prop :=
+     | Ub_fcons:
+         forall e v n fds v' t ys m,
+           num_binding_e e v n ->
+           num_binding_f fds v m ->                        
+           num_binding_f (Fcons v' t ys e fds) v (num_occur_list (v'::ys) v+n+m)
+     | Ub_fnil:
+         forall v,
+           num_binding_f Fnil v 0.
 
 
 Scheme nbe_ind := Induction for num_binding_e Sort Prop
@@ -928,24 +948,24 @@ Scheme nbe_ind := Induction for num_binding_e Sort Prop
                   with nbf_ind:= Induction for num_binding_f Sort Prop.
 
 
-
-
-Theorem e_num_binding: forall v e,
-                       exists n, num_binding_e e v n
-                                 with e_num_binding_f: forall v fds,
-                                                       exists n, num_binding_f fds v n.                                                                 
+Theorem e_num_binding :
+  forall v e,
+  exists n, num_binding_e e v n
+with e_num_binding_f :
+       forall v fds,
+       exists n, num_binding_f fds v n.                                                                 
 Proof.  
   - induction e; destructAll.
-     + exists (num_occur_list [v0] v  + x); constructor; auto.
-             + assert (exists n, num_binding_l l v n).
-               { induction l.
-                 exists 0; constructor.
-                 destruct a.
-                 specialize (e_num_binding v e).
-                 destructAll. eexists; constructor; eauto.
-               }
-               destruct H. exists x; constructor; auto.
-             + exists (num_occur_list [v0] v + x); constructor; auto.
+    + exists (num_occur_list [v0] v  + x); constructor; auto.
+    + assert (exists n, num_binding_l l v n).
+      { induction l.
+        exists 0; constructor.
+        destruct a.
+        specialize (e_num_binding v e).
+        destructAll. eexists; constructor; eauto.
+      }
+      destruct H. exists x; constructor; auto.
+    + exists (num_occur_list [v0] v + x); constructor; auto.
     + specialize (e_num_binding_f v f).
       destructAll.
       eexists; constructor; eauto.
@@ -962,7 +982,7 @@ Qed.
     
 Definition unique_bindings' e: Prop :=
   forall v,
-    exists n,
+  exists n,
     num_binding_e e v n /\ n <= 1.
 
 Definition unique_binding_f' fds:Prop :=
@@ -972,18 +992,18 @@ Definition unique_binding_f' fds:Prop :=
 
 Theorem num_occur_n:
   forall e x n m,
-  num_occur e x n ->
-  n = m ->
-  num_occur e x m.
+    num_occur e x n ->
+    n = m ->
+    num_occur e x m.
 Proof.
   intros; subst. apply H.
 Qed.
 
 Theorem num_occur_fds_n:
   forall f x n m,
-  num_occur_fds f x n ->
-  n = m ->
-  num_occur_fds f x m.
+    num_occur_fds f x n ->
+    n = m ->
+    num_occur_fds f x m.
 Proof.
   intros; subst. apply H.
 Qed.
@@ -991,22 +1011,22 @@ Qed.
 
 Theorem num_occur_app_case:
   forall l' x l n,
-  num_occur_case (l ++ l') x n <->
-  exists n1 n2, num_occur_case l x n1 /\ num_occur_case l' x n2 /\ n1 + n2 = n.
+    num_occur_case (l ++ l') x n <->
+    exists n1 n2, num_occur_case l x n1 /\ num_occur_case l' x n2 /\ n1 + n2 = n.
 Proof.
   induction l; split; intros.
-  -  exists 0, n.
-  split.  constructor.
-  split; auto.
-  -  destructAll.
-     simpl. inv H.
-     apply H0.
-  -  simpl in H.
-     inv H. apply IHl in H5. destructAll.
-     eexists. eexists.
-     split. constructor; eauto.
-     split; eauto.
-     omega.
+  - exists 0, n.
+    split.  constructor.
+    split; auto.
+  - destructAll.
+    simpl. inv H.
+    apply H0.
+  - simpl in H.
+    inv H. apply IHl in H5. destructAll.
+    eexists. eexists.
+    split. constructor; eauto.
+    split; eauto.
+    omega.
   - simpl.
     destructAll.
     inv H.
@@ -1017,12 +1037,13 @@ Qed.
 
 
 Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc.
+
 Theorem num_occur_app_ctx_mut: 
   forall e x, 
-  (forall c n, num_occur (c |[ e ]|) x n
-             <-> exists n1 n2, num_occur_ec c x n1 /\ num_occur e x n2 /\ n = n1 + n2) /\
-  (forall fc n,  num_occur_fds (fc <[ e ]>) x n
-    <-> exists n1 n2, num_occur_fdc fc x n1 /\ num_occur e x n2 /\ n = n1 + n2).
+    (forall c n, num_occur (c |[ e ]|) x n
+            <-> exists n1 n2, num_occur_ec c x n1 /\ num_occur e x n2 /\ n = n1 + n2) /\
+    (forall fc n,  num_occur_fds (fc <[ e ]>) x n
+              <-> exists n1 n2, num_occur_fdc fc x n1 /\ num_occur e x n2 /\ n = n1 + n2).
 Proof.
   intros e x.
   exp_fundefs_ctx_induction IHc IHf; split; intros.
@@ -1060,7 +1081,7 @@ Proof.
     constructor; eauto.
     split; eauto.
     omega.
-      - destructAll.
+  - destructAll.
     inv H.
     eapply num_occur_n.
     constructor. rewrite IHc.
@@ -1112,21 +1133,21 @@ Proof.
     apply IHf.
     eexists; eexists; eauto.
     omega.
-    - inv H. apply IHc in H7.
+  - inv H. apply IHc in H7.
     destructAll.
     eexists; eexists.
     split.
     constructor; eauto.
     split; eauto.
     omega.
-    - destructAll.
-      inv H.
-      simpl.
-      replace (n+ m + x1) with ((n + x1)+m) by omega.      
-      constructor.
-      apply IHc.
-      eexists; eexists; eauto.
-      eauto.
+  - destructAll.
+    inv H.
+    simpl.
+    replace (n+ m + x1) with ((n + x1)+m) by omega.      
+    constructor.
+    apply IHc.
+    eexists; eexists; eauto.
+    eauto.
   - inv H.
     apply IHf in H8.
     destructAll.
@@ -1135,35 +1156,36 @@ Proof.
     constructor; eauto.
     split; eauto.
     omega.
-  -  destructAll.
-     inv H.
-     simpl.
-     replace (n+ m + x1) with (n + (m +x1)) by omega.      
-     constructor.
-     auto.
-     apply IHf.
-     eexists; eexists; eauto.    
+  - destructAll.
+    inv H.
+    simpl.
+    replace (n+ m + x1) with (n + (m +x1)) by omega.      
+    constructor.
+    auto.
+    apply IHf.
+    eexists; eexists; eauto.    
 Qed.
 
 Theorem num_occur_app_ctx: 
   forall e x, 
-  (forall c n, num_occur (c |[ e ]|) x n
-             <-> exists n1 n2, num_occur_ec c x n1 /\ num_occur e x n2 /\ n = n1 + n2) .
+    (forall c n, num_occur (c |[ e ]|) x n
+            <-> exists n1 n2, num_occur_ec c x n1 /\ num_occur e x n2 /\ n = n1 + n2).
 Proof.
   apply num_occur_app_ctx_mut.
 Qed.
 
 Theorem num_occur_fds_app_ctx: 
   forall e x, 
-  (forall fc n,  num_occur_fds (fc <[ e ]>) x n
-    <-> exists n1 n2, num_occur_fdc fc x n1 /\ num_occur e x n2 /\ n = n1 + n2).
+    (forall fc n,  num_occur_fds (fc <[ e ]>) x n
+              <-> exists n1 n2, num_occur_fdc fc x n1 /\ num_occur e x n2 /\ n = n1 + n2).
 Proof.
   apply num_occur_app_ctx_mut.
 Qed.
 
-Lemma e_num_occur_mut: forall v ,
-                       (forall e, exists n, num_occur e v n) /\
-                       (forall fds, exists n, num_occur_fds fds v n).
+Lemma e_num_occur_mut:
+  forall v,
+    (forall e, exists n, num_occur e v n) /\
+    (forall fds, exists n, num_occur_fds fds v n).
 Proof.
    intro v.
     apply exp_def_mutual_ind; intros; try (solve [destructAll; eexists; eauto]).
@@ -1172,86 +1194,88 @@ Proof.
       constructor. constructor; eauto.
 Qed.
 
-Theorem e_num_occur: forall v ,
-                       (forall e, exists n, num_occur e v n).                     
+Theorem e_num_occur:
+  forall v,
+    (forall e, exists n, num_occur e v n).                     
 Proof.
   apply e_num_occur_mut.
 Qed.  
 
-Theorem e_num_occur_fds: forall v ,
-                       (forall fds, exists n, num_occur_fds fds v n).                     
+Theorem e_num_occur_fds :
+  forall v,
+    (forall fds, exists n, num_occur_fds fds v n).                     
 Proof.
   apply e_num_occur_mut.
 Qed.  
 
-    Theorem num_occur_det:
-      forall v, 
-      (forall e n m,
-        num_occur e v n ->
-        num_occur e v m ->
-        n = m) /\
-           (forall fds n m,
-              num_occur_fds fds v n ->
-              num_occur_fds fds v m ->
-              n = m).
-    Proof.
-      intro.
-      apply exp_def_mutual_ind; intros; try (inv H1; inv H0; eauto); try (inv H; inv H0; eauto).
-      - inv H5. inv H4. reflexivity.
-      - inv H1. inv H2. inv H7. inv H6.
-        specialize (H0 (num_occur_list [v0] v + m) (num_occur_list [v0] v+m0)).
-        replace (num_occur_list [v0] v + (n1 + m)) with (n1 + (num_occur_list [v0] v + m)) by omega.
-        rewrite H0.
-        specialize (H _ _ H8 H7). omega.
-        constructor; auto.
-        constructor; auto.                
-      -       inv H1; inv H2; eauto.
-      -       inv H1; inv H2; eauto.
-    Qed.
-
-    
-              Theorem num_occur_ec_n:
-         forall e x n m,
-           num_occur_ec e x n ->
-           n = m ->
-           num_occur_ec e x m.
-       Proof.
-         intros; subst; auto.
-       Qed.
+Theorem num_occur_det:
+  forall v, 
+    (forall e n m,
+       num_occur e v n ->
+       num_occur e v m ->
+       n = m) /\
+    (forall fds n m,
+       num_occur_fds fds v n ->
+       num_occur_fds fds v m ->
+       n = m).
+Proof.
+  intro.
+  apply exp_def_mutual_ind; intros; try (inv H1; inv H0; eauto); try (inv H; inv H0; eauto).
+  - inv H5. inv H4. reflexivity.
+  - inv H1. inv H2. inv H7. inv H6.
+    specialize (H0 (num_occur_list [v0] v + m) (num_occur_list [v0] v+m0)).
+    replace (num_occur_list [v0] v + (n1 + m)) with (n1 + (num_occur_list [v0] v + m)) by omega.
+    rewrite H0.
+    specialize (H _ _ H8 H7). omega.
+    constructor; auto.
+    constructor; auto.                
+  - inv H1; inv H2; eauto.
+  - inv H1; inv H2; eauto.
+Qed.
 
 
-       Theorem num_occur_fdc_n:
-         forall e x n m,
-           num_occur_fdc e x n ->
-           n = m ->
-           num_occur_fdc e x m.
-       Proof.
-         intros; subst; auto.
-       Qed.
+Theorem num_occur_ec_n:
+  forall e x n m,
+    num_occur_ec e x n ->
+    n = m ->
+    num_occur_ec e x m.
+Proof.
+  intros; subst; auto.
+Qed.
 
 
-       Definition dead_var e: Ensemble var :=
-         fun v => num_occur e v 0.
+Theorem num_occur_fdc_n:
+  forall e x n m,
+    num_occur_fdc e x n ->
+    n = m ->
+    num_occur_fdc e x m.
+Proof.
+  intros; subst; auto.
+Qed.
 
-       Definition dead_var_fundefs e: Ensemble var :=
-         fun v => num_occur_fds e v 0.
-       
-       
-       Definition dead_var_ctx c:Ensemble var :=
-         fun v => num_occur_ec c v 0.
 
-       Definition dead_var_fundefs_ctx f : Ensemble var :=
-         fun v => num_occur_fdc f v 0.
+Definition dead_var e: Ensemble var :=
+  fun v => num_occur e v 0.
+
+Definition dead_var_fundefs e: Ensemble var :=
+  fun v => num_occur_fds e v 0.
+
+
+Definition dead_var_ctx c:Ensemble var :=
+  fun v => num_occur_ec c v 0.
+
+Definition dead_var_fundefs_ctx f : Ensemble var :=
+  fun v => num_occur_fdc f v 0.
 
 Theorem num_occur_ec_comp_ctx_mut:
   (forall (c1 c2 : exp_ctx) (n : nat) x,
-   num_occur_ec (comp_ctx_f c1 c2) x n <->
-   (exists n1 n2 : nat,
-      num_occur_ec c1 x n1 /\ num_occur_ec c2 x n2 /\ n = n1 + n2)) /\
+     num_occur_ec (comp_ctx_f c1 c2) x n <->
+     (exists n1 n2 : nat,
+        num_occur_ec c1 x n1 /\ num_occur_ec c2 x n2 /\ n = n1 + n2)) /\
   (forall (fc : fundefs_ctx) c (n : nat) x,
-   num_occur_fdc (comp_f_ctx_f fc c) x n <->
-   (exists n1 n2 : nat,
-      num_occur_fdc fc x n1 /\ num_occur_ec c x n2 /\ n = n1 + n2)).
+     num_occur_fdc (comp_f_ctx_f fc c) x n <->
+     (exists n1 n2 : nat,
+        num_occur_fdc fc x n1 /\ num_occur_ec c x n2 /\ n = n1 + n2)).
 Proof.       
   exp_fundefs_ctx_induction IHc1 IHfc1; simpl; split; intros; eauto.
   - destructAll. inv H; auto.
@@ -1329,23 +1353,23 @@ Proof.
     omega.
 Qed.
     
- Theorem num_occur_ec_comp_ctx:
+Theorem num_occur_ec_comp_ctx:
   (forall (c1 c2 : exp_ctx) (n : nat) x,
-   num_occur_ec (comp_ctx_f c1 c2) x n <->
-   (exists n1 n2 : nat,
-      num_occur_ec c1 x n1 /\ num_occur_ec c2 x n2 /\ n = n1 + n2)).
- Proof.
-   intros. apply num_occur_ec_comp_ctx_mut.
- Qed.   
+     num_occur_ec (comp_ctx_f c1 c2) x n <->
+     (exists n1 n2 : nat,
+        num_occur_ec c1 x n1 /\ num_occur_ec c2 x n2 /\ n = n1 + n2)).
+Proof.
+  intros. apply num_occur_ec_comp_ctx_mut.
+Qed.   
 
- Theorem num_occur_fdc_comp_ctx:
+Theorem num_occur_fdc_comp_ctx:
   (forall (fc : fundefs_ctx) c (n : nat) x,
-   num_occur_fdc (comp_f_ctx_f fc c) x n <->
-   (exists n1 n2 : nat,
-      num_occur_fdc fc x n1 /\ num_occur_ec c x n2 /\ n = n1 + n2)).
- Proof.
-   intros. apply num_occur_ec_comp_ctx_mut.
- Qed.   
+     num_occur_fdc (comp_f_ctx_f fc c) x n <->
+     (exists n1 n2 : nat,
+        num_occur_fdc fc x n1 /\ num_occur_ec c x n2 /\ n = n1 + n2)).
+Proof.
+  intros. apply num_occur_ec_comp_ctx_mut.
+Qed.   
     
 (* 
 Inductive bv_e: exp -> list var -> Prop :=

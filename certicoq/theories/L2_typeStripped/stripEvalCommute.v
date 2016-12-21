@@ -617,6 +617,11 @@ Proof.
     + rewrite <- tcons_hom. rewrite <- tnth_hom. rewrite <- optStrip_hom.
       rewrite e0. reflexivity.
     + rewrite <- canonicalP_hom. rewrite e1. reflexivity.
+  - cbn. eapply wAppFixCong1; try eassumption.
+    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
+    + rewrite <- tcons_hom. rewrite <- tnth_hom. cbn. destruct ix; cbn in e0.
+      * discriminate.
+      * rewrite e0. reflexivity.
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.

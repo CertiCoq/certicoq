@@ -121,6 +121,21 @@ Section trm_Sec.
 Variable trm: Set.
 Variable trm_dec: forall (s t:trm), s = t \/ s <> t.
 
+Definition trms := list trm.
+Record split := mkSplit {fsts:trms; nst:trm; lsts:trms}.
+
+Function Split (n:nat) (ls:trms) {struct ls} : option split :=
+  match n, ls with
+    | _, nil => None
+    | 0, cons t ts => Some (mkSplit nil t ts)
+    | S m, cons t ts =>
+      match Split m ts with
+        | Some (mkSplit fs u ls) => Some (mkSplit (cons t fs) u ls)
+        | None => None
+      end
+  end.
+
+
 (** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
 Inductive envClass := 
 | ecTrm (_:trm)

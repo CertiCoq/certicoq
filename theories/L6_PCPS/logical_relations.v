@@ -579,7 +579,7 @@ Section Log_rel.
       + eapply preord_env_P_antimon; [ now eapply IHB; eauto | ]...
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-        edestruct setlist_length as [rho2' Hs']; eauto.
+        edestruct (@setlist_length val) as [rho2' Hs']; eauto.
         exists xs1. exists e1. exists rho2'. split; eauto.
         split; [ now eauto |]. intros Hleq Hpre'. 
         eapply Hyp. omega.
@@ -655,7 +655,7 @@ Section Log_rel.
         inv H0; eauto. inv H; eauto. inv H0; try contradiction; eauto.
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-        edestruct setlist_length as [rho2' Hs']; eauto.
+        edestruct (@setlist_length val) as [rho2' Hs']; eauto.
         exists xs1. exists e1. exists rho2'. split; eauto.
         split. eauto. intros Hleq Hpre'.
         eapply preord_exp_refl. 
@@ -836,7 +836,7 @@ Section Log_rel.
     { intros f. rewrite preord_val_eq.
       intros vs1 vs2 j t1 xs1 e' rho1' Hlen Hf Hs.
       edestruct find_def_def_funs_ctx as [H1 | [c [H1 H2]]]; eauto.
-      + edestruct setlist_length as [rho2' Hs']; eauto.
+      + edestruct (@setlist_length val) as [rho2' Hs']; eauto.
         do 4 eexists; eauto. split; eauto.
         intros Hleq Hall.
         eapply preord_exp_refl.
@@ -848,7 +848,7 @@ Section Log_rel.
         eapply find_def_correct in Hf; eauto.
         eapply occurs_free_in_fun in Hfv; eauto.
         inv Hfv. exfalso. eauto. right. eapply Union_commut. eauto.
-      + subst. edestruct setlist_length as [rho2' Hs']; eauto.
+      + subst. edestruct (@setlist_length val) as [rho2' Hs']; eauto.
         do 4 eexists; eauto. split; eauto.
         intros Hleq Hall. eapply Hpre; eauto.
         eapply preord_env_P_setlist_l; [| | eauto | eauto | eauto ].
@@ -1041,7 +1041,7 @@ Section Log_rel.
       + eapply IHB; eauto.
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-        edestruct setlist_length as [rho2' Hs']; eauto.
+        edestruct (@setlist_length val) as [rho2' Hs']; eauto.
         exists xs1. exists e1. exists rho2'. split; eauto.
         split. eauto. intros Hleq Hpre. 
         eapply Hyp2; try omega.
@@ -1253,7 +1253,7 @@ Section Log_rel.
         eauto with Ensembles_DB typeclass_instances.
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-        edestruct setlist_length as [rho2' Hs']; eauto.
+        edestruct (@setlist_length val) as [rho2' Hs']; eauto.
         exists xs1. exists e1. exists rho2'. split; eauto.
         specialize (find_def_name_in_fundefs _ _ _ Hf); intros Hname.
         destruct (@Dec _ _  (Decidable_name_in_fundefs B2) v).
@@ -1290,7 +1290,7 @@ Section Log_rel.
     revert f tau xs e B1 B2 rho1 rho2. induction k using lt_wf_rec1.
     intros f tau xs e B1 B2 rho1 rho2 Hcl1 Hcl2 Hun HD Hyp. rewrite preord_val_eq.
     intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-    edestruct setlist_length as [rho2' Hs']; eauto. simpl in Hf.
+    edestruct (@setlist_length val) as [rho2' Hs']; eauto. simpl in Hf.
     destruct (M.elt_eq f f); try congruence. inv Hf. do 3 eexists. split. simpl.
     destruct (M.elt_eq f f); try congruence. eauto. split; eauto.
     intros Hleq Hpre'. simpl in Hs, Hs'. rewrite def_funs_append in Hs'.
@@ -1367,7 +1367,7 @@ Section Log_rel.
       + destruct (M.elt_eq v f); subst.
         * eapply preord_val_def_funs_append_pre; eauto.
         * rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs.
-          edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+          edestruct (@setlist_length val) as [rho2'' Hs']; [eauto | | ]. eauto.
           exists xs1, e1, rho2''. repeat split; eauto.
           simpl in *. destruct (M.elt_eq v f); try congruence.
           specialize (find_def_name_in_fundefs _ _ _ Hf); intros Hname.
@@ -1466,7 +1466,7 @@ Section Log_rel.
           simpl. apply preord_env_P_extend.
           rewrite Setminus_Same_set_Empty_set. apply preord_env_Empty_set.
           { rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs.
-            edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+            edestruct (@setlist_length val) as [rho2'' Hs']; [eauto | | ]. eauto.
             exists xs1, e1, rho2''. repeat split; eauto.
             erewrite <- find_def_split_fds; eauto.
             intros Hleq Hpre'. eapply preord_exp_refl; eauto.
@@ -1506,7 +1506,7 @@ Section Log_rel.
           simpl. apply preord_env_P_extend.
           rewrite Setminus_Same_set_Empty_set. apply preord_env_Empty_set.
           { rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs.
-            edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+            edestruct (@setlist_length val) as [rho2'' Hs']; [eauto | | ]. eauto.
             exists xs1, e1, rho2''. repeat split; eauto.
             erewrite <- find_def_split_fds; eauto.
             intros Hleq Hpre'. eapply preord_exp_refl; eauto.
@@ -1571,7 +1571,7 @@ Section Log_rel.
         * simpl. eapply preord_env_P_extend.
           rewrite Setminus_Same_set_Empty_set. apply preord_env_Empty_set.
           rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs. 
-          edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+          edestruct (@setlist_length val) as [rho2'' Hs']; [eauto | | ]. eauto.
           exists xs1, e1, rho2''. repeat split; eauto.
           erewrite <- find_def_Included_fun_in_fundefs; eauto.
           eapply fun_in_fundefs_name_in_fundefs. now eapply find_def_correct; eauto.
@@ -1671,7 +1671,7 @@ Section Log_rel.
         * simpl. eapply preord_env_P_extend.
           rewrite Setminus_Same_set_Empty_set. apply preord_env_Empty_set.
           rewrite preord_val_eq. intros vs1 vs2 j t1 xs1 e1 rho1'' Hlen Hf Hs. 
-          edestruct setlist_length as [rho2'' Hs']; [eauto | | ]. eauto.
+          edestruct (@setlist_length val) as [rho2'' Hs']; [eauto | | ]. eauto.
           exists xs1, e1, rho2''. repeat split; eauto.
           erewrite <- find_def_Same_set_fun_in_fundefs; eauto.
           intros Hleq Hpre'. eapply preord_exp_refl; eauto.

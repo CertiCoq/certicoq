@@ -241,9 +241,8 @@ Proof.
   - inv Hspl.
 Qed.
 
-
 (** Lemmas about [getlist] *)
-Lemma getlist_In (rho : env) ys x vs :
+Lemma getlist_In {A} (rho : M.t A) ys x vs :
   getlist ys rho = Some vs ->
   List.In x ys ->
   exists v, M.get x rho = Some v.
@@ -255,7 +254,7 @@ Proof.
     destruct (getlist ys rho) eqn:Heq'; try discriminate; eauto.
 Qed.
 
-Lemma In_getlist (xs : list var) (rho : env) :
+Lemma In_getlist {A} (xs : list var) (rho : M.t A) :
   (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
   exists vs, getlist xs rho = Some vs. 
 Proof.                                            
@@ -268,7 +267,7 @@ Proof.
       reflexivity. 
 Qed.
 
-Lemma getlist_nth_get (xs : list var) (vs : list val) rho (x : var) N :
+Lemma getlist_nth_get {A} (xs : list var) (vs : list A) rho (x : var) N :
   getlist xs rho = Some vs ->
   nthN xs N = Some x ->
   exists v, nthN vs N = Some v /\ M.get x rho = Some v. 
@@ -454,10 +453,10 @@ Proof.
       repeat eexists; eauto; rewrite M.gso; eauto.
 Qed.
 
-Lemma get_setlist_In_xs x xs vs rho rho' :
+Lemma get_setlist_In_xs {A} x xs vs rho rho' :
   In var (FromList xs) x ->
   setlist xs vs rho = Some rho' ->
-  exists v : val, M.get x rho' = Some v.
+  exists v : A, M.get x rho' = Some v.
 Proof.
   revert rho rho' vs. induction xs; intros rho rho' vs Hin Hset.
   - rewrite FromList_nil in Hin. exfalso.
@@ -473,7 +472,8 @@ Proof.
         eexists. simpl. rewrite M.gso; eauto. 
 Qed.
 
-Lemma setlist_not_In (xs : list var) (vs : list val) (rho rho' : env) (x : var) : 
+Lemma setlist_not_In {A} (xs : list var) (vs : list A)
+      (rho rho' : M.t A) (x : var) :
   setlist xs vs rho = Some rho' ->
   ~ List.In x xs ->
   M.get x rho = M.get x rho'.
@@ -486,8 +486,8 @@ Proof.
     rewrite M.gso; eauto.
 Qed.
 
-Lemma setlist_length (rho rho' rho1 : env)
-      (xs : list var) (vs1 vs2 : list val) :
+Lemma setlist_length {A} (rho rho' rho1 : M.t A)
+      (xs : list var) (vs1 vs2 : list A) :
   length vs1 = length vs2 -> 
   setlist xs vs1 rho = Some rho1 ->
   exists rho2, setlist xs vs2 rho' = Some rho2.
@@ -583,7 +583,7 @@ Proof.
     simpl. f_equal. inv Hset. eauto.
 Qed.
 
-Lemma getlist_reset_lst σ xs ys (vs : list val) rho rho' l  : 
+Lemma getlist_reset_lst {A} σ xs ys (vs : list A) rho rho' l  : 
   setlist ys vs rho = Some rho' ->
   getlist (map σ xs) rho = Some vs ->
   Disjoint _ (image σ (FromList l)) (FromList ys) ->
@@ -596,7 +596,7 @@ Proof with now eauto with Ensembles_DB.
   - destruct ys; try discriminate.
     inv Hget. inv Hset. reflexivity.
   - destruct ys; try discriminate. simpl in *.
-    inv Hlen. destruct vs; try discriminate.
+    inv Hlen. destruct vs as [| v vs]; try discriminate.
     destruct (setlist ys vs rho) eqn:Hset'; try discriminate.
     destruct (M.get (σ x) rho) eqn:Hget'; try discriminate.
     destruct (getlist (map σ xs) rho) eqn:Hgetl; try discriminate.

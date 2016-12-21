@@ -1293,7 +1293,7 @@ Section Closure_conversion_correct.
         intros Hc. eapply Hnin2'. right. eauto.
       + rewrite cc_approx_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hfind Hset.
-        edestruct setlist_length
+        edestruct (@setlist_length val)
         with (rho' := def_funs B2 B2 (M.set Γ (Vconstr c vs) rho')
                                (M.set Γ (Vconstr c vs) rho')) as [rho2' Hset'].
         eassumption. now eauto.
@@ -1768,7 +1768,7 @@ Section Closure_conversion_correct.
             eapply make_closures_image_Included. eassumption. eassumption.
           + edestruct Hvar as [vs' [Hgetlist' Hall]]; eauto.
             intros x N v _ _ Hnth Hget. rewrite Hget' in Hgetlist'; inv Hgetlist'.
-            edestruct getlist_nth_get as [v' [Hnth' Hget'']].
+            edestruct (@getlist_nth_get val) as [v' [Hnth' Hget'']].
             now apply Hgetlist. eassumption.
             edestruct (@Forall2_nthN val) as [v'' [Hget''' Hcc'']]. eassumption.
             eassumption. rewrite Hget in Hget''. inv Hget''. eauto.
@@ -1852,7 +1852,7 @@ Section Closure_conversion_correct.
               eassumption. now eauto.
             * edestruct Hvar as [vs' [Hgetlist' Hall]]; eauto.
               intros x N v _ _ Hnth Hget. rewrite Hget' in Hgetlist'; inv Hgetlist'.
-              edestruct getlist_nth_get as [v' [Hnth' Hget'']].
+              edestruct (@getlist_nth_get val) as [v' [Hnth' Hget'']].
               now apply Hgetlist. eassumption.
               edestruct (@Forall2_nthN val) as [v'' [Hget''' Hcc'']]. eassumption.
               eassumption. rewrite Hget in Hget''. inv Hget''. eauto.

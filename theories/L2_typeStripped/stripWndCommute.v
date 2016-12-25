@@ -73,13 +73,10 @@ Proof.
     + rewrite <- tskipn_hom. rewrite e0. reflexivity.
     + rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
   - rewrite <- pre_whFixStep_hom. rewrite tcons_hom.
-    eapply sFix. Check sFix.
+    eapply sFix.
     + rewrite <- dnthBody_hom. rewrite <- optStripDnth_hom. rewrite e.
       reflexivity.
-    + rewrite <- tcons_hom. rewrite <- tnth_hom. rewrite <- optStrip_hom.
-      rewrite e0. reflexivity.
-    + rewrite <- canonicalP_hom. rewrite e1. rewrite <- optStripCanP_hom'.
-      reflexivity.
+    + rewrite tlength_hom. assumption. 
   - rewrite mkApp_hom. refine (sAppFn _ _ _). inversion_Clear H0.
     apply H. assumption.
     + rewrite TApp_hom in H1. rewrite mkApp_hom in H1.

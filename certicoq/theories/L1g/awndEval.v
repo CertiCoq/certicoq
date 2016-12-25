@@ -41,18 +41,17 @@ Inductive awndEval : Term -> Term -> Prop :=
             whCaseStep n ts brs = Some s ->
             awndEval (TCase ml ty mch brs) s
 | aFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
-               (x:Term) (ix:nat) (t:Term) z,
+               (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          tnth ix (tcons arg args) = Some t ->
-          canonicalP t = Some z ->
+          ix <= tlength args ->
           awndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | aCast: forall t ty, awndEval (TCast t ty) t
-| aPrf: forall t, awndEval (TProof t) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
  *** no congruence on Case branches or Fix ***)
+| aProof: forall t s, awndEval t s -> awndEval (TProof t) (TProof s)
 | aAppFn:  forall (t r arg:Term) (args:Terms),
               awndEval t r ->
               awndEval (mkApp t (tcons arg args)) (mkApp r (tcons arg args))
@@ -166,7 +165,6 @@ Proof.
     + eapply j. eassumption.
     + constructor; assumption.
   - inversion_Clear H. assumption.
-  - inversion_Clear H. assumption.
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.
     + constructor; assumption.
@@ -177,6 +175,7 @@ Proof.
     specialize (H j). inversion_Clear H.
     constructor; assumption.
 Qed.
+
 
 (** reflexive-transitive closure of wndEval **)
 Inductive awndEvalRTC: Term -> Term -> Prop :=

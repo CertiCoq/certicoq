@@ -1,5 +1,4 @@
 
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Ascii.
@@ -214,6 +213,14 @@ Proof.
   destruct t;
   try (right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate).
   - left. auto.
+Qed.
+
+Definition isProof (t:Term) : Prop := t = TProof.
+
+Lemma isProof_dec: forall t, isProof t \/ ~ isProof t.
+Proof.
+  destruct t; try (right; intros h; discriminate).
+  - left. reflexivity. 
 Qed.
 
 Function isL2_5Cnstr (t:Term) : option (inductive * nat * nat) :=

@@ -86,9 +86,12 @@ Definition xor (b1 b2:bool) : bool :=
   end.
 Definition ascii_dec_bool (a b:ascii): bool :=
   match a, b with
-    | Ascii a0 a1 a2 a3 a4 a5 a6 a7, Ascii b0 b1 b2 b3 b4 b5 b6 b7 =>
-      andb (andb (andb (xor a0 b0) (xor a1 b1)) (andb (xor a2 b2) (xor a3 b3)))
-           (andb (andb (xor a4 b4) (xor a5 b5)) (andb (xor a6 b6) (xor a7 b7)))
+    | Ascii a0 a1 a2 a3 a4 a5 a6 a7,
+      Ascii b0 b1 b2 b3 b4 b5 b6 b7 =>
+      andb (andb (andb (xor a0 b0) (xor a1 b1))
+                 (andb (xor a2 b2) (xor a3 b3)))
+           (andb (andb (xor a4 b4) (xor a5 b5))
+                 (andb (xor a6 b6) (xor a7 b7)))
   end.
 
 Definition ascii_eq_bool (a1 a2:ascii) : bool :=

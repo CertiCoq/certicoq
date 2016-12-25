@@ -4,6 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.EqNat.
 Require Import Coq.Arith.Compare_dec.
+Require Import Coq.omega.Omega.
 Require Import Common.AstCommon.
 Require Import L1g.term.
 Require Import L1g.program.
@@ -30,6 +31,7 @@ Inductive WNorm: Term -> Prop :=
 | WNProd: forall nm ty bod, WNorm ty -> WNorm (TProd nm ty bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNAx: WNorm TAx
+| WNProof: forall t, WNorm t -> WNorm (TProof t)
 | WNCase: forall mch n ty brs,
             WNorm mch -> WNorm ty -> WNorms brs -> ~ isCanonical mch ->
             WNorm (TCase n ty mch brs)
@@ -40,11 +42,10 @@ Inductive WNorm: Term -> Prop :=
            WNorm fn -> WNorms (tcons t ts) ->
            ~ isLambda fn -> ~ isFix fn -> ~ isApp fn ->
            WNorm (TApp fn t ts)
-| WNAppFix: forall ds m t ts x ix u,
+| WNAppFix: forall ds m t ts x ix,
               WNorms (tcons t ts) ->
               dnthBody m ds = Some (x, ix) ->
-              tnth ix (tcons t ts) = Some u ->
-              canonicalP u = None ->   (* Fix not guarded *)
+              ix > tlength ts ->  (* too few args to see rec arg *)
               WNorm (TApp (TFix ds m) t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
@@ -262,8 +263,7 @@ Proof.
     eapply canonicalP_isCanonical. eassumption.
   - inversion_Clear h.
     + elim H5. auto.
-    + rewrite e in H4. myInjection H4. rewrite H5 in e0. myInjection e0.
-      rewrite e1 in H6. discriminate.
+    + rewrite e in H4. myInjection H4. omega.
   - inversion_Clear h.
     + contradiction.
     + elim H. constructor.

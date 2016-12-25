@@ -292,9 +292,11 @@ Lemma mkApp_hom:
 forall fn args,
   strip (L1g.compile.mkApp fn args) = mkApp (strip fn) (strips args).
 Proof.
-  induction fn; induction args; simpl; try reflexivity.
-  - rewrite tappend_tnil. rewrite L1g.term.tappend_tnil. reflexivity.
-  - rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
+  destruct args; try (reflexivity).
+  - rewrite L1g.term.mkApp_tnil_ident. rewrite mkApp_tnil_ident.
+    reflexivity.
+  - destruct fn; try reflexivity.
+    cbn. rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
 Qed.
 
 
@@ -604,24 +606,16 @@ Proof.
     + eapply H.
     + apply H0.
     + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite <- tcons_hom. rewrite <- tnth_hom. rewrite e0. reflexivity.
-    + rewrite <- canonicalP_hom. rewrite e1. apply optStripCanP_hom'.
+    + rewrite tlength_hom. assumption.
     + rewrite <- pre_whFixStep_hom in H1. eapply H1.
   - destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]]. rewrite j in H0.
     cbn. rewrite mkApp_hom. eapply wAppCong. try eassumption.
     + intros h. elim n. apply isLambda_hom. assumption.
     + intros h. elim n0. apply isFix_hom. assumption.
     + rewrite j. cbn in H0. assumption.
-  - cbn. eapply wAppFixCong; try eassumption.
-    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite <- tcons_hom. rewrite <- tnth_hom. rewrite <- optStrip_hom.
-      rewrite e0. reflexivity.
-    + rewrite <- canonicalP_hom. rewrite e1. reflexivity.
   - cbn. eapply wAppFixCong1; try eassumption.
     + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite <- tcons_hom. rewrite <- tnth_hom. cbn. destruct ix; cbn in e0.
-      * discriminate.
-      * rewrite e0. reflexivity.
+    + rewrite tlength_hom. assumption. 
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.

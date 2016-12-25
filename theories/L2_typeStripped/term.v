@@ -214,6 +214,19 @@ induction t;
 left. auto.
 Qed.
 
+Definition isProof (t:Term) : Prop := exists s, t = TProof s.
+Lemma IsProof: forall t, isProof (TProof t).
+intros. exists t. reflexivity.
+Qed.
+Hint Resolve IsProof.
+
+Lemma isProof_dec: forall t, isProof t \/ ~ isProof t.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x jx]; discriminate).
+  - left. auto.
+Qed.
+
 Definition isConstruct (t:Term) : Prop :=
   exists i n arty, t = TConstruct i n arty.
 Lemma IsConstruct: forall i n arty, isConstruct (TConstruct i n arty).

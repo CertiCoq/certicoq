@@ -38,19 +38,19 @@ Inductive wndEval : Term -> Term -> Prop :=
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml mch brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
-               (x t:Term) (ix:nat) z,
+               (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          tnth ix (tcons arg args) = Some t ->
-          canonicalP t = Some z ->
+          ix <= tlength args ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t, wndEval (TCast t) t
-| sProof: forall t, wndEval (TProof t) t
-(*** congruence steps ***)
+                          (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches 
 *** congruence on type of Fix ***)
+(** | sProof: forall t r, wndEval t r -> wndEval (TProof t) (TProof r) **)
+| sProof: forall t r, wndEval t r -> wndEval (TProof t) (TProof r)
 | sAppFn:  forall (t r arg:Term) (args:Terms),
               wndEval t r ->
               wndEval (TApp t arg args) (mkApp r (tcons arg args))
@@ -148,11 +148,10 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
     eapply sCase; eassumption.
   - rewrite pre_whFixStep_absorbs_mkApp. cbn. eapply sFix; try eassumption.
-    destruct ix; cbn; cbn in H0.
-    + myInjection H0. reflexivity.
-    + eapply tnth_append. assumption.    
-  - rewrite mkApp_idempotent. simpl. rewrite <- (mkApp_goodFn _ _ H3).
-    apply IHwndEval; assumption.
+    rewrite tlength_tappend. omega.
+  - rewrite <- (@mkApp_goodFn (TProof r)). apply sAppFn. apply sProof.
+    assumption. not_isApp.
+  - rewrite mkApp_idempotent. constructor. assumption.
   - inversion_Clear H; eapply sAppArgs. 
     + constructor. eassumption.
     + constructor. apply wndEval_tappendl. assumption.
@@ -1038,6 +1037,15 @@ induction 1; intros.
 - eapply wERTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
 Qed.
 
+Lemma wndEvalRTC_Proof:
+  forall t t', wndEvalRTC t t' -> wndEvalRTC (TProof t) (TProof t').
+Proof.
+  induction 1; intros.
+  - constructor.
+  - constructor. apply sProof. assumption.
+  - eapply wERTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+
 Lemma wndEvalsRTC_tcons_hd:
   forall t ts u,
     wndEvalRTC t u -> wndEvalsRTC (tcons t ts) (tcons u ts).
@@ -1079,19 +1087,22 @@ Lemma wndEval_strengthen:
         ~ PoccTrm nm t -> wndEval p t s) /\
   (forall ts ss, wndEvals pp ts ss -> forall nm ec p, pp = (nm,ec)::p ->
         ~ PoccTrms nm ts -> wndEvals p ts ss).
-intros pp. apply wndEvalEvals_ind; intros; auto.
-- apply sConst; subst. unfold LookupDfn in *. destruct (string_dec s nm).
-  + subst. elim H0. constructor.
-  + refine (Lookup_strengthen l _ _). reflexivity. assumption.
-- eapply sCase; eassumption.
-- eapply sFix; eassumption.
-- apply sAppFn. apply (H nm ec); trivial.
-  intros h. elim H1. constructor. assumption.
-- apply sAppArgs. apply (H nm ec); trivial. assert (j:= notPocc_TApp H1).
-  intros h. inversion h; intuition.
-- apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
-- apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
-- apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
-- apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
-- apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
+Proof.
+  intros pp. apply wndEvalEvals_ind; intros; auto.
+  - apply sConst; subst. unfold LookupDfn in *. destruct (string_dec s nm).
+    + subst. elim H0. constructor.
+    + refine (Lookup_strengthen l _ _). reflexivity. assumption.
+  - eapply sCase; eassumption.
+  - eapply sFix; eassumption.
+  - constructor. subst pp. eapply H. reflexivity.
+    intros h. elim H1. constructor. assumption.
+  - apply sAppFn. apply (H nm ec); trivial.
+    intros h. elim H1. constructor. assumption.
+  - apply sAppArgs. apply (H nm ec); trivial. assert (j:= notPocc_TApp H1).
+    intros h. inversion h; intuition.
+  - apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
+  - apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
+  - apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
+  - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
+  - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
 Qed.

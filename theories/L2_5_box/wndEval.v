@@ -47,6 +47,7 @@ Inductive wndEval : Term -> Term -> Prop :=
                (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
+          ix <= tlength args ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t, wndEval (TCast t) t
@@ -196,6 +197,7 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
     eapply sCase; eassumption.
   - rewrite pre_whFixStep_absorbs_mkApp. simpl. eapply sFix; try eassumption.
+    rewrite tlength_tappend. omega.
   - rewrite mkApp_idempotent. simpl. rewrite <- (mkApp_goodFn _ _ H3).
     apply IHwndEval; assumption.
   - inversion_Clear H; eapply sAppArgs. 
@@ -466,6 +468,35 @@ Proof.
     + eapply wEsRTCtrn; eassumption.
 Qed.
 
+Lemma wndEvalsRTC_mk_tconsr:
+  forall us us',
+    wndEvalsRTC us us' ->
+    forall t, wndEvalsRTC (tcons t us) (tcons t us').
+Proof.
+  induction 1; intros.
+  - constructor.
+  - constructor. constructor. assumption.
+  - eapply wEsRTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
+Qed.
+
+Lemma wndEvalsRTC_mk_tconsl:
+  forall t t', wndEvalRTC t t' ->
+  forall us, wndEvalsRTC (tcons t us) (tcons t' us).
+Proof.
+  induction 1; intros.
+  - constructor.
+  - constructor. constructor. assumption.
+  - eapply wEsRTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
+Qed.
+      
+Lemma wndEvalsRTC_mk_tappendr:
+  forall ts us us',
+    wndEvalsRTC us us' -> wndEvalsRTC (tappend ts us) (tappend ts us').
+Proof.
+  induction ts; cbn; intros.
+  - assumption.
+  - eapply wndEvalsRTC_mk_tconsr. intuition.
+Qed.
 
 
 Inductive wndEvalTCl: Term -> Term -> Prop :=

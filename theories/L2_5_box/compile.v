@@ -115,23 +115,6 @@ with instantiates_ind' := Induction for instantiates Sort Prop
 with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop.
 End Instantiate_sec.
 
-(************
-Fixpoint lamDepth (t:Term) : nat :=
-  match t with
-    | TLambda _ body => S (lamDepth body)
-    | _ => 0
-  end.
-
-Fixpoint applyBranchToProof (n:nat) (br:Term) : Term :=
-  match n with
-    | 0 => br
-    | S m => match br with
-               | TLambda _ body => applyBranchToProof m (instantiate TProof 0 body)
-               | x => x
-             end
-  end.
- ***********************)
-
 Fixpoint m_Proofs m : Terms :=
   match m with
     | 0 => tnil
@@ -159,11 +142,11 @@ Function L2Term_Term (t:L2Term) : Term :=
     | L2.compile.TAx => TAx
     | L2.compile.TInd ind => TInd ind
     | L2.compile.TConstruct ind m arty => TConstruct ind m arty
-    | L2.compile.TCase ((_, _, nargs) as m) mch brs =>
-      match L2Term_Term mch, L2Terms_Terms brs, nargs with
-          | TProof, tunit Br, cons n nil => applyBranchToProof n Br
-          | Mch, Brs, _ => TCase m Mch Brs
-      end
+    | L2.compile.TCase
+        (_, _, (cons n nil)) (L2.compile.TProof _) (L2.compile.tunit br) =>
+      applyBranchToProof n (L2Term_Term br)
+    | L2.compile.TCase m mch brs =>
+      TCase m (L2Term_Term mch) (L2Terms_Terms brs)
     | L2.compile.TFix defs m => TFix (L2Defs_Defs defs) m
     | L2.compile.TWrong => TWrong
   end

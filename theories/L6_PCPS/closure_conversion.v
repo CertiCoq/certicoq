@@ -130,7 +130,7 @@ Section CC.
                    (fst pat) = (fst pat') /\
                    exists C' e',
                      snd pat' = C' |[ e' ]| /\
-                                            Closure_conversion Scope Funs f c Γ FVs (snd pat) e' C')
+                     Closure_conversion Scope Funs f c Γ FVs (snd pat) e' C')
                 pats pats' ->
         Closure_conversion Scope Funs f c Γ FVs (Ecase x pats) (Ecase x' pats') C
   | CC_Eproj :
@@ -145,7 +145,9 @@ Section CC.
   | CC_Efun :
       forall Scope Funs f f' c Γ c' Γ' FVs FVs' FVs'' B B' e e' C C' Ce S1 S1' S2 S2' S3,
         (* The environment contains all the variables that are free in B *)
-        Same_set _ (occurs_free_fundefs B) (FromList FVs') ->
+        (occurs_free_fundefs B) <--> (FromList FVs') ->
+        (* needed for cost preservation *)
+        NoDup FVs' ->
         (* Project the FVs to construct the environment *)
         Disjoint _ S1 (Union _ Scope
                              (Union _ (image f (Setminus _ Funs Scope))

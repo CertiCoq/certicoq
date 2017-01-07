@@ -132,8 +132,9 @@ Section L6_trans.
     Qed.
 
     (** The closure conversion logical relation implies [obs_rel_cc] *)
-    Lemma  cc_approx_val_implies_obs_rel_cc k v1 v2 :
-      cc_approx_val pr cenv clo_tag k v1 v2 -> obs_rel_cc v1 v2.
+    Lemma  cc_approx_val_implies_obs_rel_cc k S v1 v2 :
+      cc_approx_val pr cenv clo_tag k S v1 v2 ->
+      obs_rel_cc v1 v2.
     Proof.
       revert v2; induction v1 using val_ind'; intros v2 Hpre; rewrite cc_approx_val_eq in Hpre.
       - destruct v2; simpl in *; try contradiction. inv Hpre. inv H0; eauto.
@@ -152,8 +153,10 @@ Section L6_trans.
       - destruct v2; simpl in *; try contradiction. subst. constructor.
     Qed.
 
-    Check closure_conversion_hoist.
+    (** Currently cannot compose the two logical relations because of the cost invariants.
+        TODO fix *)
     
+(* 
     (** Top level correctness property of closure conversion and hoisting for closed terms *)
     Corollary closure_conversion_hoist_correct k e ctag itag nmap :
       (* [e] is closed *)
@@ -161,7 +164,8 @@ Section L6_trans.
       (* [e] has unique bindings *)
       unique_bindings e ->
       (* Then [e] and its translation are related by the logical relation *)
-      cc_approx_exp pr cenv clo_tag k
+      (* No *)
+      cc_approx_exp pr cenv clo_tag k (fun _ _ => True) (fun _ _ _ => True)
                     (e, M.empty val)
                     (snd (fst (closure_conversion_hoist clo_tag e ctag itag cenv nmap, M.empty val)),
                      snd (closure_conversion_hoist clo_tag e ctag itag cenv nmap, M.empty val)).
@@ -323,5 +327,6 @@ Section L6_trans.
         unfold S, Γ, In in H. zify; omega.
       - apply preord_env_P_refl.
     Qed.  
-
+*)
+    
 End L6_trans.

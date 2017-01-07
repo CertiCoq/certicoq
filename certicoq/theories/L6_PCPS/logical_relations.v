@@ -1700,14 +1700,15 @@ Section Log_rel.
  *                (e1, ρ1[x1 -> v1, f1 -> (\f1 x1. e1, ρ1)]) ~_j 
  *                (e2, [x2 -> v2, f2 -> (\f2 x2. e2, ρ2), Γ -> ρ])
  *)
-  Fixpoint cc_approx_val (k : nat) (v1 v2 : val) {struct k} : Prop :=
+  Fixpoint cc_approx_val (k : nat) (P : nat -> relation (exp * env *  nat)) (v1 v2 : val) {struct k} : Prop :=
     let cc_approx_exp (k : nat) (p1 p2 : exp * env) : Prop :=
         let '(e1, rho1) := p1 in
         let '(e2, rho2) := p2 in
         forall v1 c1,
-          c1 <= k -> bstep_e pr cenv rho1 e1 v1 c1 ->
-          exists v2 c2, bstep_e pr cenv rho2 e2 v2 c2 /\ 
-                   cc_approx_val (k - c1) v1 v2
+          c1 <= k -> bstep_cost pr cenv rho1 e1 v1 c1 ->
+          exists v2 c2, bstep_cost pr cenv rho2 e2 v2 c2 /\
+                   P k (e1, rho1, c1) (e2, rho2, c2) /\
+                   cc_approx_val (k - c1) P v1 v2
     in
     let fix cc_approx_val_aux (v1 v2 : val) {struct v1} : Prop :=
         let fix Forall2_aux vs1 vs2 :=
@@ -1734,7 +1735,7 @@ Section Log_rel.
                 match k with
                   | 0 => True
                   | S k =>
-                    let R := cc_approx_val (k - (k-j)) in
+                    let R := cc_approx_val (k - (k-j)) P in
                     j < S k ->
                     Forall2 R vs1 vs2 ->
                     cc_approx_exp (k - (k - j)) (e1, rho1') (e2, rho2')
@@ -1746,16 +1747,19 @@ Section Log_rel.
         end
     in cc_approx_val_aux v1 v2.
 
-  Definition cc_approx_exp (k : nat) (p1 p2 : exp * env) : Prop :=
+  Definition cc_approx_exp (k : nat) (P1 : relation nat)
+             (P2 : nat -> relation (exp * env * nat)) (p1 p2 : exp * env) : Prop :=
     let '(e1, rho1) := p1 in
     let '(e2, rho2) := p2 in
     forall v1 c1,
-      c1 <= k -> bstep_e pr cenv rho1 e1 v1 c1 ->
-      exists v2 c2, bstep_e pr cenv rho2 e2 v2 c2 /\
-               cc_approx_val (k - c1) v1 v2.
-
+      c1 <= k -> bstep_cost pr cenv rho1 e1 v1 c1 ->
+      exists v2 c2, bstep_cost pr cenv rho2 e2 v2 c2 /\
+               (* extra invariants for cost *)
+               P1 c1 c2 /\
+               cc_approx_val (k - c1) P2 v1 v2.
+  
   (** More compact definition of the value relation *)
-  Definition cc_approx_val' (k : nat) (v1 v2 : val) : Prop :=
+  Definition cc_approx_val' (k : nat) (P : nat -> relation (exp * env * nat)) (v1 v2 : val) : Prop :=
     match v1, v2 with
       | Vfun rho1 defs1 f1,
         Vconstr tag ((Vfun rho2 defs2 f2) ::  (Vconstr tag' fvs) :: l) =>
@@ -1769,17 +1773,17 @@ Section Log_rel.
             find_def f2 defs2 = Some (t, Γ :: xs2, e2) /\
             Some rho2' = setlist (Γ :: xs2) ((Vconstr tag' fvs) :: vs2)
                                  (def_funs defs2 defs2 rho2 rho2) /\
-            (j < k -> Forall2 (cc_approx_val j) vs1 vs2 ->
-             cc_approx_exp j (e1, rho1') (e2, rho2'))
+            (j < k -> Forall2 (cc_approx_val j P) vs1 vs2 ->
+             cc_approx_exp j (fun c1 c2 => P j (e1, rho1', c1) (e2, rho2', c2)) P (e1, rho1') (e2, rho2'))
       | Vconstr t1 vs1, Vconstr t2 vs2 =>
-        t1 = t2 /\ Forall2_asym (cc_approx_val k) vs1 vs2
+        t1 = t2 /\ Forall2_asym (cc_approx_val k P) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
       | _, _ => False
     end.
-
+  
   (** Correspondence of the two definitions *)
-  Lemma cc_approx_val_eq (k : nat) (v1 v2 : val) :
-    cc_approx_val k v1 v2 <-> cc_approx_val' k v1 v2.
+  Lemma cc_approx_val_eq (k : nat) P (v1 v2 : val) :
+    cc_approx_val k P v1 v2 <-> cc_approx_val' k P v1 v2.
   Proof.
     destruct k as [ | k ]; destruct v1; destruct v2;
     eauto; try (split; intros H; (now simpl in H; inv H)).
@@ -1824,49 +1828,49 @@ Section Log_rel.
 
   (** Environment relation for a single point (i.e. variable) : 
    * ρ1 ~_k^x ρ2 iff ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)
-  Definition cc_approx_var_env (k : nat) (rho1 rho2 : env) (x y : var) : Prop :=
+  Definition cc_approx_var_env (k : nat) P (rho1 rho2 : env) (x y : var) : Prop :=
     forall v1, 
       M.get x rho1 = Some v1 -> 
-      exists v2, M.get y rho2 = Some v2 /\ cc_approx_val k v1 v2.
+      exists v2, M.get y rho2 = Some v2 /\ cc_approx_val k P v1 v2.
 
   (** Environment relation for a set of points (i.e. predicate over variables) : 
    * ρ1 ~_k^S ρ2 iff 
    *   forall x, S x -> ρ1(x) = Some v -> ρ2(x) = Some v' /\ v ~_k v' *)
-  Definition cc_approx_env_P (P : Ensemble var) k rho1 rho2 :=
-    forall (x : var), P x -> cc_approx_var_env k rho1 rho2 x x.
+  Definition cc_approx_env_P (S : Ensemble var) k P rho1 rho2 :=
+    forall (x : var), S x -> cc_approx_var_env k P rho1 rho2 x x.
 
   (** Environment relation for the whole domain of definition :
    * ρ1 ~_k ρ2 iff forall x, ρ1(x) = v => ρ2(x) = v' /\ v ~_k v' *)
-  Definition cc_approx_env (k : nat) (rho1 rho2 : env) : Prop :=
-    cc_approx_env_P (fun _ => True) k rho1 rho2.
-
+  Definition cc_approx_env (k : nat) P (rho1 rho2 : env) : Prop :=
+    cc_approx_env_P (fun _ => True) k P rho1 rho2.
+  
   (** Lemmas about extending the environment *)
   Lemma cc_approx_var_env_extend_eq :
-    forall (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
-      cc_approx_val k v1 v2 ->
-      cc_approx_var_env k (M.set x v1 rho1) (M.set x v2 rho2) x x.
+    forall (rho1 rho2 : env) (k : nat) P (x : var) (v1 v2 : val),
+      cc_approx_val k P v1 v2 ->
+      cc_approx_var_env k P (M.set x v1 rho1) (M.set x v2 rho2) x x.
   Proof.
-    intros rho1 rho2 k x v1 v2 Hval x' Hget.
+    intros rho1 rho2 k P x v1 v2 Hval x' Hget.
     rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss. split; eauto.
   Qed.
 
   Lemma cc_approx_var_env_extend_neq :
-    forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
-      cc_approx_var_env k rho1 rho2 y y ->
+    forall (rho1 rho2 : env) (k : nat) P (x y : var) (v1 v2 : val),
+      cc_approx_var_env k P rho1 rho2 y y ->
       y <> x ->
-      cc_approx_var_env k (M.set x v1 rho1) (M.set x v2 rho2) y y.
+      cc_approx_var_env k P (M.set x v1 rho1) (M.set x v2 rho2) y y.
   Proof.
-    intros rho1 rho2 k x  y v1 v2 Hval Hneq x' Hget.
+    intros rho1 rho2 k P x y v1 v2 Hval Hneq x' Hget.
     rewrite M.gso in *; eauto.
   Qed.
 
   Lemma cc_approx_var_env_extend :
-    forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
-      cc_approx_var_env k rho1 rho2 y y ->
-      cc_approx_val k v1 v2 ->
-      cc_approx_var_env k (M.set x v1 rho1) (M.set x v2 rho2) y y.
+    forall (rho1 rho2 : env) (k : nat) P (x y : var) (v1 v2 : val),
+      cc_approx_var_env k P rho1 rho2 y y ->
+      cc_approx_val k P v1 v2 ->
+      cc_approx_var_env k P (M.set x v1 rho1) (M.set x v2 rho2) y y.
   Proof.
-    intros rho1 rho2 k x y v1 v2 Henv Hval.
+    intros rho1 rho2 k P x y v1 v2 Henv Hval.
     destruct (peq y x); subst.
     - apply cc_approx_var_env_extend_eq; eauto.
     - apply cc_approx_var_env_extend_neq; eauto.
@@ -1874,16 +1878,85 @@ Section Log_rel.
 
   (** The environment relation is antimonotonic in the set
    * of free variables *) 
-  Lemma cc_approx_env_P_antimon (P1 P2 : var -> Prop) k rho1 rho2 :
-    cc_approx_env_P P2 k rho1 rho2 ->
-    (Included var P1 P2) ->
-    cc_approx_env_P P1 k rho1 rho2.
+  Lemma cc_approx_env_P_antimon (P1 P2 : var -> Prop) k P rho1 rho2 :
+    cc_approx_env_P P2 k P rho1 rho2 ->
+    P1 \subset P2 ->
+    cc_approx_env_P P1 k P rho1 rho2.
   Proof.
     intros Hpre Hin x HP2. eapply Hpre; eapply Hin; eauto.
   Qed.
 
-  Global Instance cc_approx_env_proper :
-    Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+  Lemma cc_approx_exp_rel_mon (P1 P1' : relation nat) P2 k e1 rho1 e2 rho2 :
+    cc_approx_exp k P1 P2 (e1, rho1) (e2, rho2) ->
+    inclusion nat P1 P1' ->
+    cc_approx_exp  k P1' P2 (e1, rho1) (e2, rho2).
+  Proof.
+    intros Hcc Hin v1 c1 Hleq Hstep.
+    edestruct Hcc as [v2 [c2 [Hstep2 [HP Hval]]]]; eauto.
+    repeat eexists; eauto.
+  Qed.
+
+  Lemma cc_approx_exp_same_rel_IH (P1 : relation nat) P2 P2' k e1 rho1 e2 rho2 :
+    (forall m v1 v2,
+       m <= k ->
+       cc_approx_val m P2 v1 v2 ->
+       cc_approx_val m P2' v1 v2) ->
+    cc_approx_exp k P1 P2 (e1, rho1) (e2, rho2) ->
+    (forall n, same_relation _ (P2 n) (P2' n)) ->
+    cc_approx_exp k P1 P2' (e1, rho1) (e2, rho2).
+  Proof.
+    intros IH Hcc Hin v1 c1 Hleq Hstep.
+    edestruct Hcc as [v2 [c2 [Hstep2 [HP Hval]]]]; eauto.
+    repeat eexists; eauto. eapply IH; eauto. omega.
+  Qed.
+  
+  Lemma cc_approx_val_same_rel (k : nat) P1 P2 v1 v2 :
+    cc_approx_val k P1 v1 v2 ->
+    (forall n, same_relation _ (P1 n) (P2 n)) ->
+    cc_approx_val k P2 v1 v2.
+  Proof.
+    revert v1 v2 P1 P2.
+    induction k using lt_wf_rec1.
+    intros x; induction x using val_ind'; simpl; eauto;
+    intros v2 P1 P2 Hval Hin; rewrite cc_approx_val_eq in *;
+    destruct v2; try contradiction. 
+    - destruct Hval as [Heq Hall]; subst; simpl; eauto.
+    - destruct Hval as [Heq Hall]; subst; simpl; eauto.
+      inv Hall. split; eauto. constructor; eauto.
+      assert
+        (Hsuf :
+           cc_approx_val' k P2 (Vconstr c l) (Vconstr c l')).
+      { rewrite <- cc_approx_val_eq. eapply IHx0; eauto. 
+        rewrite cc_approx_val_eq. split; eauto. }
+      now inv Hsuf.
+    - destruct l; try contradiction.
+      destruct v0; try contradiction.
+      destruct l; try contradiction.
+      destruct v1; try contradiction.
+      intros vs1 vs2 i t1 xs1 e1 rho1' Hlen Hdef Hset.
+      edestruct Hval as [Gamma [xs2 [e2 [rho2' [Hteq [Hdef' [Hset' Hi]]]]]]]; eauto.
+      do 4 eexists; repeat split; eauto. intros Hlt Hall.
+      eapply cc_approx_exp_same_rel_IH; [| | eassumption ].
+      intros; eapply H; eauto; omega.
+      eapply cc_approx_exp_rel_mon.
+      eapply Hi; eauto. eapply Forall2_monotonic; [| eassumption ].
+      intros. eapply H; eauto. now firstorder. now firstorder.
+    - eauto.
+  Qed.
+
+  Lemma cc_approx_exp_same_rel (P : relation nat) P1 P2 k e1 rho1 e2 rho2 :
+    cc_approx_exp k P P1 (e1, rho1) (e2, rho2) ->
+    (forall n, same_relation _ (P1 n) (P2 n)) ->
+    cc_approx_exp k P P2 (e1, rho1) (e2, rho2).
+  Proof.
+    intros Hcc Hin v1 c1 Hleq Hstep.
+    edestruct Hcc as [v2 [c2 [Hstep2 [HP Hval]]]]; eauto.
+    repeat eexists; eauto. eapply cc_approx_val_same_rel; eauto.
+  Qed.
+  
+
+  Global Instance cc_approx_env_proper_set :
+    Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            cc_approx_env_P.
   Proof.
     intros s1 s2 [H1 H2]; split; intros Hpre;
@@ -1891,43 +1964,42 @@ Section Log_rel.
   Qed.
 
   (** Lemmas about the sets that index the environment relation *)
-  Lemma cc_approx_env_Empty_set k (rho1 rho2 : env) :
-    cc_approx_env_P (Empty_set var) k rho1 rho2.
+  Lemma cc_approx_env_Empty_set k P (rho1 rho2 : env) :
+    cc_approx_env_P (Empty_set var) k P rho1 rho2.
   Proof.
     intros x H. inv H.
   Qed.
 
-  Lemma cc_approx_env_P_union (P1 P2 : var -> Prop) k rho1 rho2 :
-    cc_approx_env_P P1 k rho1 rho2 ->
-    cc_approx_env_P P2 k rho1 rho2 ->
-    cc_approx_env_P (Union var P1 P2) k rho1 rho2.
+  Lemma cc_approx_env_P_union (P1 P2 : var -> Prop) k P rho1 rho2 :
+    cc_approx_env_P P1 k P rho1 rho2 ->
+    cc_approx_env_P P2 k P rho1 rho2 ->
+    cc_approx_env_P (Union var P1 P2) k P rho1 rho2.
   Proof.
     intros Hpre1 Hpre2 x HP2. inv HP2; eauto.
   Qed.
 
-  Lemma cc_approx_env_P_inter_l (P1 P2 : var -> Prop) k rho1 rho2 :
-    cc_approx_env_P P1 k rho1 rho2 ->
-    cc_approx_env_P (Intersection var P1 P2) k rho1 rho2.
+  Lemma cc_approx_env_P_inter_l (P1 P2 : var -> Prop) k P rho1 rho2 :
+    cc_approx_env_P P1 k P rho1 rho2 ->
+    cc_approx_env_P (Intersection var P1 P2) k P rho1 rho2.
   Proof.
     intros Hpre x HP2. inv HP2; eauto.
   Qed.
-
-  Lemma cc_approx_env_P_inter_r (P1 P2 : var -> Prop) k rho1 rho2 :
-    cc_approx_env_P P2 k rho1 rho2 ->
-    cc_approx_env_P (Intersection var P1 P2) k rho1 rho2.
+  
+  Lemma cc_approx_env_P_inter_r (P1 P2 : var -> Prop) k P rho1 rho2 :
+    cc_approx_env_P P2 k P rho1 rho2 ->
+    cc_approx_env_P (Intersection var P1 P2) k P rho1 rho2.
   Proof.
-    intros Hpre x HP2.
-    inv HP2; eauto.
+    intros Hpre x HP2. inv HP2; eauto.
   Qed.
-
+  
   (** Extend the related environments with a single point *)
   Lemma cc_approx_env_P_extend :
-    forall P (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
-      cc_approx_env_P (Setminus var P (Singleton var x)) k rho1 rho2 ->
-      cc_approx_val k v1 v2 ->
-      cc_approx_env_P P k (M.set x v1 rho1) (M.set x v2 rho2).
+    forall S (rho1 rho2 : env) (k : nat) P (x : var) (v1 v2 : val),
+      cc_approx_env_P (Setminus var S (Singleton var x)) k P rho1 rho2 ->
+      cc_approx_val k P v1 v2 ->
+      cc_approx_env_P S k P (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
-    intros P rho1 rho2 k x v1 v2 Henv Hval x' HP v1' Hget.
+    intros S rho1 rho2 k P x v1 v2 Henv Hval x' HP v1' Hget.
     rewrite M.gsspec in Hget. destruct (peq x' x); subst.
     - inv Hget. eexists. rewrite M.gss. split; eauto.
     - apply Henv in Hget; eauto. destruct Hget as [v2' [Heq Hpre]].
@@ -1938,15 +2010,15 @@ Section Log_rel.
   (** Extend the related environments with a list *)
   Lemma cc_approx_env_P_setlist_l:
     forall (P1 P2 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
-      (k : nat) (xs : list var) (vs1 vs2 : list val),
-      cc_approx_env_P P1 k rho1 rho2 ->
+      (k : nat) P (xs : list var) (vs1 vs2 : list val),
+      cc_approx_env_P P1 k P rho1 rho2 ->
       (forall x, ~ List.In x xs -> P2 x -> P1 x) ->
-      Forall2 (cc_approx_val k) vs1 vs2 ->
+      Forall2 (cc_approx_val k P) vs1 vs2 ->
       setlist xs vs1 rho1 = Some rho1' ->
       setlist xs vs2 rho2 = Some rho2' ->
-      cc_approx_env_P P2 k rho1' rho2'.
+      cc_approx_env_P P2 k P rho1' rho2'.
   Proof.
-    intros P1 P2 rho1' rho2' rho1 rho2 k xs vs1 vs2 Hpre Hyp Hall Hset1 Hset2
+    intros P1 P2 rho1' rho2' rho1 rho2 k P xs vs1 vs2 Hpre Hyp Hall Hset1 Hset2
            x HP v Hget.
     destruct (in_dec var_dec x xs).
     - edestruct setlist_Forall2_get as [v1 [v2 [Hget1 [Hget2 HP']]]]; eauto.
@@ -1957,12 +2029,12 @@ Section Log_rel.
   Qed.
 
 
-  Lemma cc_approx_var_env_getlist (rho1 rho2 : env) (k : nat)
+  Lemma cc_approx_var_env_getlist (rho1 rho2 : env) (k : nat) P
         (xs ys : list var) (vs1 : list val) :
-    Forall2 (cc_approx_var_env k rho1 rho2) xs ys ->
+    Forall2 (cc_approx_var_env k P rho1 rho2) xs ys ->
     getlist xs rho1 = Some vs1 ->
     exists vs2,
-      getlist ys rho2 = Some vs2 /\ Forall2 (cc_approx_val k) vs1 vs2.
+      getlist ys rho2 = Some vs2 /\ Forall2 (cc_approx_val k P) vs1 vs2.
   Proof.
     revert ys vs1. induction xs as [| x xs IHxs]; intros ys vs2 Hall Hget.
     - destruct ys; inv Hall. inv Hget. eexists. split; simpl; eauto.
@@ -1975,13 +2047,13 @@ Section Log_rel.
       eexists. split; simpl; eauto. rewrite Hget, Heq. eauto.
   Qed.
 
-  Lemma cc_approx_env_P_getlist_l (P : var -> Prop) (rho1 rho2 : env) (k : nat)
+  Lemma cc_approx_env_P_getlist_l (P : var -> Prop) (rho1 rho2 : env) (k : nat) S
         (xs : list var) (vs1 : list val) :
-    cc_approx_env_P P k rho1 rho2 ->
+    cc_approx_env_P P k S rho1 rho2 ->
     Included _ (FromList xs) P ->
     getlist xs rho1 = Some vs1 ->
     exists vs2,
-      getlist xs rho2 = Some vs2 /\ Forall2 (cc_approx_val k) vs1 vs2.
+      getlist xs rho2 = Some vs2 /\ Forall2 (cc_approx_val k S) vs1 vs2.
   Proof.
     intros Henv. revert vs1.
     induction xs as [| x xs IHxs]; intros vs1 Hp Hget.
@@ -1995,42 +2067,42 @@ Section Log_rel.
         constructor. apply Hp. now constructor.
   Qed.
 
-  Corollary cc_approx_env_getlist_l (rho1 rho2 : env) (k : nat)
+  Corollary cc_approx_env_getlist_l (rho1 rho2 : env) (k : nat) S
             (xs : list var) (vs1 : list val) :
-    cc_approx_env k rho1 rho2 ->
+    cc_approx_env k S rho1 rho2 ->
     getlist xs rho1 = Some vs1 ->
     exists vs2,
-      getlist xs rho2 = Some vs2 /\ Forall2 (cc_approx_val k) vs1 vs2.
+      getlist xs rho2 = Some vs2 /\ Forall2 (cc_approx_val k S) vs1 vs2.
   Proof.
     intros. eapply cc_approx_env_P_getlist_l; eauto.
     intros x H'; simpl; eauto.
   Qed.
-
-  Corollary cc_approx_env_extend (rho1 rho2 : env) (k : nat)
+  
+  Corollary cc_approx_env_extend (rho1 rho2 : env) (k : nat) S
             (x : var) (v1 v2 : val) :
-    cc_approx_env k rho1 rho2 ->
-    cc_approx_val k v1 v2 ->
-    cc_approx_env k (M.set x v1 rho1) (M.set x v2 rho2).
+    cc_approx_env k S rho1 rho2 ->
+    cc_approx_val k S v1 v2 ->
+    cc_approx_env k S (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
     intros H1 Hval. apply cc_approx_env_P_extend; eauto.
     eapply cc_approx_env_P_antimon; eauto. intros x' H; simpl; eauto.
   Qed.
 
   Corollary cc_approx_env_setlist_l (rho1 rho2 rho1' rho2' : env) (k : nat)
-            (xs : list var) (vs1 vs2 : list val) :
-    cc_approx_env k rho1 rho2 ->
-    Forall2 (cc_approx_val k) vs1 vs2 ->
+            S (xs : list var) (vs1 vs2 : list val) :
+    cc_approx_env k S rho1 rho2 ->
+    Forall2 (cc_approx_val k S) vs1 vs2 ->
     setlist xs vs1 rho1 = Some rho1' ->
     setlist xs vs2 rho2 = Some rho2' ->
-    cc_approx_env k rho1' rho2'.
+    cc_approx_env k S rho1' rho2'.
   Proof.
     intros. eapply cc_approx_env_P_setlist_l; eauto.
   Qed.
 
-  Lemma cc_approx_env_P_set_not_in_P_r P k rho rho' x v :
-    cc_approx_env_P P k rho rho' ->
+  Lemma cc_approx_env_P_set_not_in_P_r P k S rho rho' x v :
+    cc_approx_env_P P k S rho rho' ->
     ~ In _ P x ->
-    cc_approx_env_P P k rho (M.set x v rho').
+    cc_approx_env_P P k S rho (M.set x v rho').
   Proof. 
     intros Hcc Hnin y Py v' Hget.
     edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
@@ -2040,20 +2112,20 @@ Section Log_rel.
     - eauto.
   Qed.
 
-  Lemma cc_approx_env_P_def_funs_not_In_P_l k rho1 rho2 S B B' :
+  Lemma cc_approx_env_P_def_funs_not_In_P_l k S rho1 rho2 P B B' :
     Disjoint _ S (name_in_fundefs B') ->
-    cc_approx_env_P S k rho1 rho2 ->
-    cc_approx_env_P S k (def_funs B B' rho1 rho1) rho2.
+    cc_approx_env_P S k P rho1 rho2 ->
+    cc_approx_env_P S k P (def_funs B B' rho1 rho1) rho2.
   Proof.
     intros Hd Hcc x HS v Hget. eapply Hcc; eauto. 
     erewrite <- def_funs_neq. eassumption.  
     intros Hc. eapply Hd; constructor; eauto.
   Qed.
-
-  Lemma cc_approx_env_P_def_funs_not_In_P_r k rho1 rho2 S B B' :
+  
+  Lemma cc_approx_env_P_def_funs_not_In_P_r k P rho1 rho2 S B B' :
     Disjoint _ S (name_in_fundefs B') ->
-    cc_approx_env_P S k rho1 rho2 ->
-    cc_approx_env_P S k rho1 (def_funs B B' rho2 rho2).
+    cc_approx_env_P S k P rho1 rho2 ->
+    cc_approx_env_P S k P rho1 (def_funs B B' rho2 rho2).
   Proof.
     intros Hd Hcc x HS v Hget.
     edestruct Hcc as [v' [Hget' Hcc']]; eauto.
@@ -2061,13 +2133,13 @@ Section Log_rel.
     rewrite def_funs_neq. eassumption.
     intros Hc. eapply Hd; constructor; eauto.
   Qed.
-
+  
   (** * Index Monotonicity Properties *)
 
   (** The value relation is monotonic in the step index *)
-  Lemma cc_approx_val_monotonic (k : nat) :
+  Lemma cc_approx_val_monotonic (k : nat) P :
     (forall v1 v2 j,
-       cc_approx_val k v1 v2 -> j <= k -> cc_approx_val j v1 v2).
+       cc_approx_val k P v1 v2 -> j <= k -> cc_approx_val j P v1 v2).
   Proof.
     intros v1 v2 h Hpre Hleq. try rewrite cc_approx_val_eq in *.
     revert v2 Hpre; induction v1 using val_ind'; intros v2 Hpre;
@@ -2087,29 +2159,29 @@ Section Log_rel.
   Qed.
 
   (** The expression relation is monotonic in the step index *)
-  Lemma cc_approx_exp_monotonic (k : nat) :
-    (forall rho1 e1 rho2 e2 j,
-       cc_approx_exp k (rho1, e1) (rho2, e2) ->
-       j <= k -> cc_approx_exp j (rho1, e1) (rho2, e2)).
+  Lemma cc_approx_exp_monotonic (k j : nat) P1 P2 rho1 e1 rho2 e2 :
+    cc_approx_exp k P1 P2 (rho1, e1) (rho2, e2) ->
+    j <= k ->
+    cc_approx_exp j P1 P2 (rho1, e1) (rho2, e2).
   Proof.
-    intros rho1 e1 rho2 e2 j Hpre Hleq v1 c1 Hlt Hstep.
-    edestruct (Hpre v1 c1) as [v2 [c2 [H1 H2]]]; eauto. omega.
-    do 2 eexists; split; eauto.
-    eapply cc_approx_val_monotonic. eapply H2. omega.
+    intros Hpre Hleq v1 c1 Hlt Hstep.
+    edestruct (Hpre v1 c1) as [v2 [c2 [H1 [H2 H3]]]]; eauto. omega.
+    do 2 eexists; repeat split; eauto.
+    eapply cc_approx_val_monotonic; eauto. omega.
   Qed.
-
+  
   (** The environment relations are monotonic in the step index *)
   Lemma cc_approx_env_P_monotonic :
-    forall P (k j : nat) (rho1 rho2 : env),
-      j <= k -> cc_approx_env_P P k rho1 rho2 -> cc_approx_env_P P j rho1 rho2.
+    forall P (k j : nat) S (rho1 rho2 : env),
+      j <= k -> cc_approx_env_P P k S rho1 rho2 -> cc_approx_env_P P j S rho1 rho2.
   Proof.
-    intros P k j rho1 rho2 Hleq Hpre x HP v Hget.
+    intros P k j S rho1 rho2 Hleq Hpre x HP v Hget.
     edestruct Hpre as [v2 [Heq Hpre2]]; eauto.
     eexists; split; eauto. eapply cc_approx_val_monotonic; eauto.
   Qed.
 
-  Lemma cc_approx_env_monotonic k j rho1 rho2 :
-    j <= k -> cc_approx_env k rho1 rho2 -> cc_approx_env j rho1 rho2.
+  Lemma cc_approx_env_monotonic k j S rho1 rho2 :
+    j <= k -> cc_approx_env k S rho1 rho2 -> cc_approx_env j S rho1 rho2.
   Proof.
     intros Hleq H. eapply cc_approx_env_P_monotonic; eauto.
   Qed.
@@ -2117,110 +2189,159 @@ Section Log_rel.
 
   (** * Compatibility lemmas *)
 
-  Lemma cc_approx_exp_const_compat k rho1 rho2 x t ys1 ys2 e1 e2 :
-    Forall2 (cc_approx_var_env k rho1 rho2) ys1 ys2 ->
+  Lemma cc_approx_exp_constr_compat k (S S' : relation nat) P
+        rho1 rho2 x t ys1 ys2 e1 e2 :
+    Forall2 (cc_approx_var_env k P rho1 rho2) ys1 ys2 ->
+    (forall c1 c2 c, 1 + length ys1 <= c -> S c1 c2 -> S' (c1 + c) (c2 + c)) ->
     (forall vs1 vs2 : list val,
-       Forall2 (cc_approx_val k) vs1 vs2 ->
-       cc_approx_exp k (e1, M.set x (Vconstr t vs1) rho1)
+       (* needed by cost proof *)
+       getlist ys1 rho1 = Some vs1 ->
+       Forall2 (cc_approx_val k P) vs1 vs2 ->
+       cc_approx_exp k S P (e1, M.set x (Vconstr t vs1) rho1)
                      (e2, M.set x (Vconstr t vs2) rho2)) ->
-    cc_approx_exp k (Econstr x t ys1 e1, rho1) (Econstr x t ys2 e2, rho2).
+    cc_approx_exp k S' P (Econstr x t ys1 e1, rho1) (Econstr x t ys2 e2, rho2).
   Proof.
-    intros Hall Hpre v1 c1 Hleq1 Hstep1. inv Hstep1.
+    intros Hall Hyp Hpre v1 c1 Hleq1 Hstep1. inv Hstep1.
     edestruct (cc_approx_var_env_getlist rho1 rho2) as [vs2' [Hget' Hpre']];
       [| eauto |]; eauto.
-    edestruct Hpre as [v2 [c2 [Hstep Hval]]]; eauto.
+    edestruct Hpre as [v2 [c2 [Hstep [HS Hval]]]]; [| | | eassumption | ]; eauto.
+    omega.
     repeat eexists; eauto. econstructor; eauto.
+    eapply Forall2_length in Hall. rewrite Hall.
+    rewrite !plus_assoc_reverse. eapply Hyp; eauto. omega.
+    eapply cc_approx_val_monotonic; eauto. omega.
   Qed.
-
-  Lemma cc_approx_exp_proj_compat k rho1 rho2 x tau n y1 y2 e1 e2 :
-    cc_approx_var_env k rho1 rho2 y1 y2 ->
-    (forall v1 v2,
-       cc_approx_val k v1 v2 -> 
-       cc_approx_exp k (e1, M.set x v1 rho1)
+  
+  Lemma cc_approx_exp_proj_compat k (S S' : relation nat) P
+        rho1 rho2 x tau n y1 y2 e1 e2 :
+    cc_approx_var_env k P rho1 rho2 y1 y2 ->
+    (forall c1 c2, S c1 c2 -> S' (c1 + 1) (c2 + 1)) ->
+    (forall v1 v2 c vs,
+       (* needed for cost proof *)
+       M.get y1 rho1 = Some (Vconstr c vs) ->
+       List.In v1 vs ->
+       cc_approx_val k P v1 v2 -> 
+       cc_approx_exp k S P (e1, M.set x v1 rho1)
                      (e2, M.set x v2 rho2)) ->
-    cc_approx_exp k (Eproj x tau n y1 e1, rho1) (Eproj x tau n y2 e2, rho2).
+    cc_approx_exp k S' P (Eproj x tau n y1 e1, rho1) (Eproj x tau n y2 e2, rho2).
   Proof.
-    intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
+    intros Henv Hyp Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
     edestruct Henv as [v' [Hget Hpre]]; eauto.
     destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
     inv Hpre.
-    edestruct (Forall2_asym_nthN (cc_approx_val k) vs l) as [v2 [Hnth Hval]]; eauto.
-    edestruct Hexp as [v2' [c2 [Hstep Hval']]]; eauto.
-    repeat eexists; eauto. econstructor; eauto.
+    edestruct (Forall2_asym_nthN (cc_approx_val k P) vs l) as [v2 [Hnth Hval]]; eauto.
+    edestruct Hexp as [v2' [c2 [Hstep [HS Hval']]]];
+      [| | |  | eassumption | ]; eauto.
+    now eapply nthN_In; eauto. omega.
+    repeat eexists; eauto. now econstructor; eauto.
+    eapply cc_approx_val_monotonic; eauto. omega.
   Qed.
-
-  Lemma cc_approx_exp_case_nil_compat k rho1 rho2 x1 x2 :
-    cc_approx_exp k (Ecase x1 [], rho1) (Ecase x2 [], rho2).
+  
+  Lemma cc_approx_exp_case_nil_compat k S P rho1 rho2 x1 x2 :
+    cc_approx_exp k S P (Ecase x1 [], rho1) (Ecase x2 [], rho2).
   Proof.
     intros v1 c1 Hleq1 Hstep1. inv Hstep1. inv H4.
   Qed.
 
-  Lemma cc_approx_exp_case_cons_compat k rho1 rho2 x1 x2 c e1 e2 P1 P2:
+  Lemma find_tag_nth_same_tags (P1 P2 : list (cTag * exp)) c e e' n n':
     Forall2 (fun p1 p2 => fst p1 = fst p2) P1 P2 ->
-    cc_approx_var_env k rho1 rho2 x1 x2 ->
-    cc_approx_exp k (e1, rho1) (e2, rho2) ->
-    cc_approx_exp k (Ecase x1 P1, rho1)
-                  (Ecase x2 P2, rho2) ->
-    cc_approx_exp k (Ecase x1 ((c, e1) :: P1), rho1)
-                  (Ecase x2 ((c, e2) :: P2), rho2).
+    find_tag_nth P1 c e n ->
+    find_tag_nth P2 c e' n' ->
+    n = n'.
   Proof.
-    intros Hall Henv Hexp_hd Hexp_tl v1 c1 Hleq1 Hstep1. inv Hstep1. inv H4.
-    destruct (M.elt_eq c t) eqn:Heq; subst.
-    - inv H0. edestruct Hexp_hd as [v2 [c2 [Hstep2 Hpre2]]]; eauto.
+    intros Hall. revert n n'.
+    induction Hall; intros n n' Hf Hf'; inv Hf; inv Hf'; eauto;
+    simpl in H; subst; congruence.
+  Qed.
+
+  Lemma cc_approx_exp_case_cons_compat k (S S' S'' : relation nat) P
+        rho1 rho2 x1 x2 t e1 e2 P1 P2:
+    Forall2 (fun p1 p2 => fst p1 = fst p2) P1 P2 ->
+    (forall c1 c2 c, 1 <= c -> S c1 c2 -> S'' (c1 + c) (c2 + c)) ->
+    (forall c1 c2 c, 1 <= c -> S' c1 c2 -> S'' (c1 + c) (c2 + c)) ->
+    cc_approx_var_env k P rho1 rho2 x1 x2 ->
+    cc_approx_exp k S P (e1, rho1) (e2, rho2) ->
+    cc_approx_exp k S' P (Ecase x1 P1, rho1)
+                  (Ecase x2 P2, rho2) ->
+    cc_approx_exp k S'' P (Ecase x1 ((t, e1) :: P1), rho1)
+                  (Ecase x2 ((t, e2) :: P2), rho2).
+  Proof.
+    intros Hall Hyp1 Hyp2 Henv Hexp_hd Hexp_tl v1 c1 Hleq1 Hstep1.
+    inv Hstep1. inv H4.
+    - inv H2. rewrite H5 in H4; inv H4.
+      edestruct Hexp_hd as [v2 [c2 [Hstep2 [HS Hpre2]]]]; [| eassumption | ]; eauto.
+      omega.
       edestruct Henv as [v2' [Hget Hpre]]; eauto.
       rewrite cc_approx_val_eq in Hpre.
       destruct v2'; try (now simpl in Hpre; contradiction). inv Hpre. 
-      repeat eexists; eauto. econstructor; eauto; [| now simpl; rewrite Heq; eauto ].
-      inv H2. econstructor; eauto. eapply caseConsistent_same_cTags; eassumption.
-    - edestruct Hexp_tl as [v2 [c2 [Hstep2 Hpre2]]]; eauto. inv H2.
-      econstructor; eauto. inv Hstep2.
-      edestruct Henv as [v2' [Hget Hpre]]; eauto.
+      repeat eexists. econstructor; eauto; try now constructor; eauto.
+      econstructor; eauto. eapply caseConsistent_same_cTags; eassumption.
+      now eauto.
+      eapply cc_approx_val_monotonic; eauto. omega.
+    - edestruct Hexp_tl as [v2 [c2 [Hstep2 [HS Hpre2]]]];
+      [| econstructor; eauto; now inv H2 | ].
+      omega.
+      edestruct Henv as [v2' [Hget Hpre]]; eauto. inv Hstep2.
       rewrite cc_approx_val_eq in Hpre.
       destruct v2'; try (now simpl in Hpre; contradiction). inv Hpre.
-      rewrite Hget in H4; inv H4.
-      repeat eexists; eauto. econstructor; eauto; [| now simpl; rewrite Heq; eauto ].
-      inv H2. econstructor; eauto.
-  Qed.
-  
-  Lemma cc_approx_exp_halt_compat k rho1 rho2 x1 x2 :
-    cc_approx_var_env k rho1 rho2 x1 x2 ->
-    cc_approx_exp k (Ehalt x1, rho1) (Ehalt x2, rho2).
+      rewrite Hget in H3; inv H3.
+      repeat eexists.
+      + econstructor; eauto. 
+        inv H2. econstructor; eauto.
+        econstructor; eauto.
+      + eapply find_tag_nth_same_tags in H6; [| eassumption |]; eauto.
+        rewrite <- !plus_assoc_reverse. subst; eauto.
+      + eapply cc_approx_val_monotonic; eauto. omega.
+  Qed.  
+
+  Lemma cc_approx_exp_halt_compat k (S : relation nat) P rho1 rho2 x1 x2 :
+    S 1 1 ->
+    cc_approx_var_env k P rho1 rho2 x1 x2 ->
+    cc_approx_exp k S P (Ehalt x1, rho1) (Ehalt x2, rho2).
   Proof.
-    intros Henv v1 c1 Hleq1 Hstep1. inv Hstep1.
+    intros Hr Henv v1 c1 Hleq1 Hstep1. inv Hstep1.
     edestruct Henv as [v' [Hget Hpre]]; eauto.
     repeat eexists; eauto. now econstructor; eauto.
     eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.
-    
+  
   Axiom Prim_axiom_cc :
     forall f f' v1,
       M.get f pr = Some f' ->
-      forall k vs1 vs2,
-        Forall2 (cc_approx_val k) vs1 vs2 ->
+      forall k S vs1 vs2,
+        Forall2 (cc_approx_val k S) vs1 vs2 ->
         f' vs1 = Some v1 ->
         exists v2,
           f' vs2 = Some v2 /\                      
-          cc_approx_val k v1 v2.
-
-  Lemma cc_approx_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
-    Forall2 (cc_approx_var_env k rho1 rho2) ys1 ys2 ->
-    (forall v1 v2,
-       cc_approx_val k v1 v2 -> 
-       cc_approx_exp k (e1, M.set x1 v1 rho1)
+          cc_approx_val k S v1 v2.
+  
+  Lemma cc_approx_exp_prim_compat k (S S' : relation nat) P rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
+    (forall c1 c2 c, 1 + length ys1 <= c -> S c1 c2 -> S' (c1 + c) (c2 + c)) ->
+    Forall2 (cc_approx_var_env k P rho1 rho2) ys1 ys2 ->
+    (forall v1 v2 vs f',
+       (* needed by the cost proof *)
+       getlist ys1 rho1 = Some vs ->
+       M.get f pr = Some f' ->
+       f' vs = Some v1 ->
+       cc_approx_val k P v1 v2 -> 
+       cc_approx_exp k S P (e1, M.set x1 v1 rho1)
                      (e2, M.set x2 v2 rho2)) ->
-    cc_approx_exp k (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
+    cc_approx_exp k S' P (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
   Proof.
-    intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
+    intros Hyp Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
     edestruct cc_approx_var_env_getlist as [vs2 [Hget' Hpre']]; eauto.
     edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
-    edestruct Hexp as [v2' [c2 [Hstepv2' Hprev2']]]; eauto.
-    repeat eexists; eauto. econstructor; eauto.
+    edestruct Hexp as [v2' [c2 [Hstepv2' [HS Hprev2']]]]; [| | | | | eassumption |]; eauto.
+    omega. repeat eexists; eauto. econstructor; eauto.
+    eapply Forall2_length in Henv. rewrite Henv.
+    rewrite !plus_assoc_reverse. eapply Hyp; eauto. omega.
+    eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.
-
+  
   (** Lift a value predicate to a subset of an environment *)
   Definition lift_P_env (S : Ensemble var) (P : Ensemble val) (rho : env) :=
     forall x v, S x -> M.get x rho = Some v -> P v.
-
+  
   Lemma lift_P_env_antimon S S' P rho :
     Included _ S S' ->
     lift_P_env S' P rho ->
@@ -2344,29 +2465,34 @@ Section Log_rel.
     - inv Hnth; eauto.
     - eapply IHl; eauto.  
   Qed. 
-  
+
   Lemma cc_approx_exp_respects_preord_exp_r_pre (k : nat)
         (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
     (forall j v1 v2 v3,
        j <= k ->
-       cc_approx_val j v1 v2 ->
+       cc_approx_val j (fun _ _ _ => True) v1 v2 ->
        (forall k, preord_val k v2 v3) ->
-       cc_approx_val j v1 v3) ->
-    cc_approx_exp k (e1, rho1) (e2, rho2) ->
+       cc_approx_val j (fun _ _ _ => True) v1 v3) ->
+    cc_approx_exp k (fun _ _ => True) (fun _ _ _ => True) (e1, rho1) (e2, rho2) ->
     (forall k', preord_exp k' (e2, rho2) (e3, rho3)) ->
-    cc_approx_exp k (e1, rho1) (e3, rho3).
+    cc_approx_exp k (fun _ _ => True) (fun _ _ _ => True) (e1, rho1) (e3, rho3).
   Proof.
     intros IH Hexp1 Hexp2 v1 c Hleq1 Hstep1. 
-    edestruct Hexp1 as [v2 [c2 [Hstep2 Hpre2]]]; eauto. 
-    edestruct (Hexp2 c2) as [v3 [c3 [Hstep3 Hpre3]]]; [| eauto | ]. omega.
+    edestruct Hexp1 as [v2 [c2 [Hstep2 [HS Hpre2]]]]; eauto. 
+    edestruct (Hexp2 c2) with (v1 := v2) as [v3 [c3 [Hstep3 Hpre3]]]; eauto.
+    admit. (* need to modify the other LR or prove corresp of the two semantics *)
     exists v3, c3. split; eauto.
+    admit. (* need to modify the other LR or prove corresp of the two semantics *)    
+    split; eauto.
     eapply IH; [ omega | now eauto | ].
     intros m.
-    edestruct (Hexp2 (m + c2)) as [v3' [c3' [Hstep3' Hpre3']]]; [| eauto |]. omega.
+    edestruct (Hexp2 (m + c2)) with (c1 := c2) (v1 := v2)
+      as [v3' [c3' [Hstep3' Hpre3']]]; [| eauto |]. omega.
+    admit. (* need to modify the other LR or prove corresp of the two semantics *)        
     eapply bstep_e_deterministic in Hstep3; eauto. inv Hstep3.
-    eapply preord_val_monotonic; eauto. omega.
-  Qed.
-
+    eapply preord_val_monotonic. eauto. omega.
+  Admitted.
+ 
   Lemma occurs_free_closed_fundefs f tau xs e B :
     fun_in_fundefs B (f, tau, xs, e) ->
     closed_fundefs B ->
@@ -2379,9 +2505,9 @@ Section Log_rel.
   Qed.
 
   Lemma cc_approx_val_respects_preord_val_r (k : nat) (v1 v2 v3 : val) :
-    cc_approx_val k v1 v2 ->
+    cc_approx_val k (fun _ _ _ => True) v1 v2 ->
     (forall k, preord_val k v2 v3) ->
-    cc_approx_val k v1 v3.
+    cc_approx_val k (fun _ _ _ => True) v1 v3.
   Proof.
     revert v1 v2 v3. induction k using lt_wf_rec.
     induction v1 using val_ind'; intros v2 v3 Happrox Hpre;
@@ -2399,7 +2525,7 @@ Section Log_rel.
       + eapply IHv1; [ now eauto |].
         intros k'. specialize (Hpre k').
         rewrite preord_val_eq in Hpre. inv Hpre. now inv H1.
-      + assert (Hsuf : cc_approx_val' k (Vconstr c0 l) (Vconstr c0 l1)).
+      + assert (Hsuf : cc_approx_val' k (fun _ _ _ => True) (Vconstr c0 l) (Vconstr c0 l1)).
         { rewrite <- cc_approx_val_eq.
           eapply IHv0 with (v2 := Vconstr c0 l0).
           - rewrite cc_approx_val_eq. now split; eauto.
@@ -2443,14 +2569,14 @@ Section Log_rel.
 
   Corollary cc_approx_exp_respects_preord_exp_r (k : nat)
         (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
-    cc_approx_exp k (e1, rho1) (e2, rho2) ->
+    cc_approx_exp k (fun _ _ => True) (fun _ _ _ => True) (e1, rho1) (e2, rho2) ->
     (forall k', preord_exp k' (e2, rho2) (e3, rho3)) ->
-    cc_approx_exp k (e1, rho1) (e3, rho3).
+    cc_approx_exp k (fun _ _ => True) (fun _ _ _ => True) (e1, rho1) (e3, rho3).
   Proof.
     eapply cc_approx_exp_respects_preord_exp_r_pre.
     now intros; eapply cc_approx_val_respects_preord_val_r; eauto.
   Qed.
-
+  
   (* The following are obsolete *)
   (* TODO: move to identifiers.v *)
   Inductive closed_fundefs_in_val : val -> Prop :=

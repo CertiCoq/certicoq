@@ -760,7 +760,7 @@ Section CC_correct.
       eapply project_var_Proper; [ symmetry; eassumption | | | | | | | | | ];
       try reflexivity. eassumption.
       eapply H. eassumption. eapply f_eq_subdomain_antimon; [| eassumption ]...
-    - econstructor; try reflexivity. eassumption.
+    - econstructor; try reflexivity. eassumption. eassumption.
       rewrite <- image_f_eq_subdomain;  eassumption.
       eapply project_vars_Proper; [ symmetry; eassumption | | | | | | | | | ];
       try reflexivity. eassumption. rewrite <- image_f_eq_subdomain; eassumption.
@@ -1082,8 +1082,10 @@ Section CC_correct.
           { eapply Disjoint_free_set in Minv. eapply Disjoint_sym in Minv.
             repeat normalize_bound_var_in_ctx. now eauto 15 with Ensembles_DB.
             eapply binding_not_in_map_antimon; [| eassumption ]. now apply Included_Union_l. }
-          econstructor; [ |  | eassumption | | |  | eassumption | eassumption | ]. 
-          now eapply fundefs_fv_correct. now eauto with Ensembles_DB.
+          econstructor; [ | |  | eassumption | | |  | eassumption | eassumption | ]. 
+          now eapply fundefs_fv_correct.
+          eapply NoDupA_NoDup. now eapply PS.elements_spec2w.
+          now eauto with Ensembles_DB.
           eapply Disjoint_Included_r; [| eassumption ]. 
           eapply Included_Union_compat. now apply name_in_fundefs_bound_var_fundefs.
           now apply Included_refl.
@@ -1269,7 +1271,7 @@ Section CC_correct.
     (* [FVmap] does not contain the variables in [S] or [Γ] *)
     binding_not_in_map (Union _ S (Singleton _ Γ)) FVmap ->
     (* [Scope] invariant *)
-    cc_approx_env_P pr cenv clo_tag Scope k rho rho' ->
+    cc_approx_env_P pr cenv clo_tag Scope k boundG rho rho' ->
     (* [Fun] invariant *)
     Fun_inv pr cenv clo_tag k rho rho' Scope Funs (subst FVmap) c Γ ->
     (* Free variables invariant *)
@@ -1286,7 +1288,7 @@ Section CC_correct.
       exp_closure_conv clo_tag e FVmap c Γ
     {{ fun s ef s' =>
          let '(e', f) := ef in 
-         cc_approx_exp pr cenv clo_tag k (e, rho) (f e', rho')    
+         cc_approx_exp pr cenv clo_tag k (boundL k e rho) boundG (e, rho) (f e', rho')    
     }}.
   Proof.
     intros IFVmap HGamma Hin_map_rho Hin_map_FVmap Hun
@@ -3162,14 +3164,14 @@ Section CC_correct.
     (* [FVmap] does not contain the variables in [S] or [Γ] *)
     binding_not_in_map (Union _ S (Singleton _ Γ)) FVmap ->
     (* [Scope] invariant *)
-    cc_approx_env_P pr cenv clo_tag Scope k rho rho' ->
+    cc_approx_env_P pr cenv clo_tag Scope k boundG rho rho' ->
     (* [S] is disjoint with the free and bound variables of [e] and [Γ] *)
     Disjoint _ S  (Union _ (bound_var e)
                          (Union _ (occurs_free e) (Singleton _ Γ))) ->
     {{ fun s => fresh S (next_var s) }}
       exp_closure_conv clo_tag e FVmap c Γ
     {{ fun s ef s' =>
-         cc_approx_exp pr cenv clo_tag k (e, rho) ((snd ef) (fst ef), rho') /\
+         cc_approx_exp pr cenv clo_tag k (boundL k e rho) boundG (e, rho) ((snd ef) (fst ef), rho') /\
          Included _ (occurs_free ((snd ef) (fst ef))) (occurs_free e) /\
          unique_bindings ((snd ef) (fst ef)) /\
          closed_fundefs_in_exp ((snd ef) (fst ef)) /\

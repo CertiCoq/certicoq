@@ -3,11 +3,11 @@
  *)
 
 
-Require Import Coq.Lists.List Coq.Relations.Relations Coq.Classes.RelationClasses
-        Coq.omega.Omega Coq.Numbers.BinNums Coq.Structures.OrdersEx Coq.Sets.Ensembles
-        Coq.Lists.SetoidList.
+From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
+         omega.Omega Numbers.BinNums Structures.OrdersEx Sets.Ensembles
+         Lists.SetoidList ZArith Arith.
 
-Require Import Ensembles_util.
+From L6 Require Import Ensembles_util.
 
 Import ListNotations.
 
@@ -383,4 +383,63 @@ Proof.
   intros Hc. eapply H. eapply In_InA.
   now eauto with typeclass_instances.
   eassumption.
+Qed.
+
+(** Lemmas about [fold_left] *)
+
+Lemma fold_left_monotonic {A} f1 f2 (l : list A) n1 n2 :
+  (forall x1 x1' x2 ,
+     x1 <= x1' -> f1 x1 x2 <= f2 x1' x2) ->
+  n1 <= n2 ->
+  fold_left f1 l n1 <= fold_left f2 l n2.
+Proof.
+  revert n1 n2; induction l; eauto.
+Qed.
+
+Lemma fold_left_extensive {A} f (l : list A) n :
+  (forall c x, x <= f x c) ->
+  n <= fold_left f l n.
+Proof.
+  revert n; induction l; eauto; intros n H.
+  simpl. eapply le_trans. now eapply H.
+  now eapply IHl.
+Qed.
+
+Lemma fold_left_comm {A B} (f : A -> B -> A) (l : list B) n m :
+  (forall x y z, f (f x y) z = f (f x z) y) ->
+  fold_left f l (f n m) = f (fold_left f l n) m.
+Proof.
+  revert n; induction l; eauto; intros n Hyp; simpl.
+  rewrite <- IHl; eauto. f_equal. eauto.
+Qed.
+
+(** Max of list given a measure function and corresponding lemmas *)
+
+Definition max_list_nat_with_measure {A} (f : A -> nat) i (ls : list A) : nat :=
+  fold_left (fun c v => max c (f v)) ls i.
+
+Lemma max_list_nat_spec1 {A} (f : A -> nat) l z :
+  z <= max_list_nat_with_measure f z l.
+Proof. 
+  eapply fold_left_extensive. 
+  intros. eapply Nat.le_max_l. 
+Qed.
+
+Lemma max_list_nat_spec2 {A} (f : A -> nat) l z x :
+  List.In x l -> (f x <= max_list_nat_with_measure f z l)%nat.
+Proof.
+  revert z. induction l; intros z Hin.
+  - inv Hin.
+  - inv Hin; simpl. 
+    + eapply le_trans; [| now eapply max_list_nat_spec1 ].
+      eapply Nat.le_max_r.
+    + now apply IHl.
+Qed.
+
+Lemma max_list_nat_acc_mon {A} (f : A -> nat) l z1 z2  :
+  z1 <= z2 ->
+  max_list_nat_with_measure f z1 l <= max_list_nat_with_measure f z2 l.
+Proof.
+  intros. eapply fold_left_monotonic; eauto.
+  intros. eapply Nat.max_le_compat_r. eassumption.
 Qed.

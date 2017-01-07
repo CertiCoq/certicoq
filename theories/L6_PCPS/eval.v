@@ -1,9 +1,9 @@
-Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets
-        Coq.MSets.MSetRBT Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles
-        Coq.Relations.Relations.
-Require Import ExtLib.Structures.Monad  ExtLib.Data.Monads.OptionMonad ExtLib.Core.Type.
-Require Import Common.AstCommon.
-Require Import cps List_util.
+From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
+         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles
+         Relations.Relations.
+From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
+From Common Require Import AstCommon.
+From L6 Require Import cps List_util size_cps.
 
 Import ListNotations MonadNotation.
 
@@ -37,7 +37,7 @@ Section EVAL.
         caseConsistent ((t', e) :: l) t.
   
   (** Big step semantics with cost counting *)
-  Inductive bstep_e :  env -> exp -> val -> nat -> Prop :=
+  Inductive bstep_e : env -> exp -> val -> nat -> Prop :=
   | BStep_constr :
       forall (x : var) (t : cTag) (ys :list var) (e : exp)
         (rho rho' : env) (vs : list val) (v : val) (c : nat),
@@ -90,7 +90,110 @@ Section EVAL.
         M.get x rho = Some v ->
         bstep_e rho (Ehalt x) v 0.
 
+
+  Inductive find_tag_nth : list (cTag * exp) -> cTag -> exp -> nat -> Prop :=
+  | find_tag_hd :
+      forall c e l,
+        find_tag_nth ((c, e) :: l) c e 1
+  | find_tag_lt :
+      forall c e l c' e' n,
+        find_tag_nth l c' e' n ->
+        c <> c' ->
+        find_tag_nth ((c, e) :: l) c' e' (n + 1).          
+     
+
+  (** Big step semantics with a more precise cost model.
+    * The goal is that the number of machine instructions that
+    * correspond to each rule is proportional to the assigned cost. *)
+  Inductive bstep_cost :  env -> exp -> val -> nat -> Prop :=
+  | BStepc_constr :
+      forall (x : var) (t : cTag) (ys :list var) (e : exp)
+        (rho rho' : env) (vs : list val) (v : val) (c : nat),
+        getlist ys rho = Some vs ->
+        M.set x (Vconstr t vs) rho = rho' ->
+        bstep_cost rho' e v c ->
+        bstep_cost rho (Econstr x t ys e) v (c + 1 + length ys)
+  | BStepc_proj :
+      forall (t : cTag) (vs : list val) 
+        (rho : env) (x : var) (n : N) (y : var)
+        (e : exp) (v v': val) (c : nat),
+        M.get y rho = Some (Vconstr t vs) ->
+        (* The number of instructions generated here should be
+         * independent of n. We just need to add an offset *)
+        nthN vs n = Some v -> 
+        bstep_cost (M.set x v rho) e v' c ->
+        bstep_cost rho (Eproj x t n y e) v' (c + 1)
+  | BStepc_case :
+      forall (y : var) (v : val) (e : exp) (t : cTag) (cl : list (cTag * exp))
+        (vl : list val) (rho : env) (n c : nat),
+        M.get y rho = Some (Vconstr t vl) ->
+        caseConsistent cl t ->
+        find_tag_nth cl t e n ->
+        bstep_cost rho e v c ->
+        bstep_cost rho (Ecase y cl) v (c + n)
+  | BStepc_app :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
+        (xs : list var) (e : exp) (rho'' rho : env) (f : var)
+        (t : cTag) (ys : list var) (v : val) (c : nat),
+        M.get f rho = Some (Vfun rho' fl f') ->
+        getlist ys rho = Some vs ->
+        (* The number of instructions generated here should be
+         * independent of the size of B. We just need to
+         * jump to a label *)
+        find_def f' fl = Some (t,xs,e) ->
+        setlist xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        bstep_cost rho'' e v c ->
+        bstep_cost rho (Eapp f t ys) v (c + 1 + length ys)
+  | BStepc_fun :
+      forall (rho : env) (B : fundefs) (e : exp) (v : val) (c : nat),
+        bstep_cost (def_funs B B rho rho) e v c ->
+        (* The definition of a function should incur no cost *)
+        bstep_cost rho (Efun B e) v c
+  | BStepc_prim :
+      forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
+        (f' : list val -> option val) (ys : list var) (e : exp)
+        (v v' : val) (c : nat),
+        getlist ys rho = Some vs ->
+        M.get f pr = Some f' ->
+        f' vs = Some v ->
+        M.set x v rho = rho' ->
+        bstep_cost rho' e v' c ->
+        bstep_cost rho (Eprim x f ys e) v' (c + 1 + length ys)
+  | BStepc_halt :
+      forall x v rho,
+        M.get x rho = Some v ->
+        bstep_cost rho (Ehalt x) v 1.
+
+  Ltac subst_exp :=
+    match goal with
+      | [H1 : ?e = ?e1, H2 : ?e = ?e2 |- _ ] =>
+        rewrite H1 in H2; inv H2
+    end.
+
+  Lemma find_tag_nth_deterministic l c e n e' n' :
+    find_tag_nth l c e n ->
+    find_tag_nth l c e' n' ->
+    e = e' /\ n = n'.
+  Proof.
+    intros H1.
+    revert e' n'; induction H1; intros e1 n1 H2;
+    inv H2; try congruence; eauto. eapply IHfind_tag_nth in H8.
+    inv H8; eauto.
+  Qed.
     
+  Lemma bstep_cost_deterministic e rho v1 v2 c1 c2 :
+    bstep_cost rho e v1 c1 ->
+    bstep_cost rho e v2 c2 ->
+    v1 = v2 /\ c1 = c2.
+  Proof.
+    intros Heval1 Heval2.
+    revert c2 Heval2; induction Heval1; intros c2 Heval2;
+    inv Heval2; repeat subst_exp; eauto;
+    try now edestruct IHHeval1 as [Heq1 Heq2]; eauto.
+    eapply find_tag_nth_deterministic in H7; eauto; inv H7.
+    now edestruct IHHeval1 as [Heq1 Heq2]; eauto.
+  Qed.
+
   (** Small step semantics -- Relational definition *)
   (* TODO : this semantics currently does not match the big step semantics.
    * We need them to match and a proof that they indeed match. *)
@@ -205,13 +308,7 @@ Section EVAL.
 
   
   (** Reflexive transitive closure of the small-step relation *)
-  Definition mstep: relation state := clos_refl_trans_1n state step.
-
-  Ltac subst_exp :=
-    match goal with
-      | [H1 : ?e = ?e1, H2 : ?e = ?e2 |- _ ] =>
-        rewrite H1 in H2; inv H2
-    end.
+  Definition mstep : relation state := clos_refl_trans_1n state step.
 
   (** The evalutation semantics is deterministic *)
   Lemma bstep_e_deterministic e rho v1 v2 c1 c2 :

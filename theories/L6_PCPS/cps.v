@@ -8,7 +8,7 @@ Require Import L6.List_util.
 
 Require Import Libraries.Maps.
 
-Import MonadNotation.
+Import MonadNotation ListNotations.
 
 Open Scope monad_scope.
 
@@ -310,7 +310,6 @@ Definition unkown_iTyInfo : iTyInfo := nil.
 Definition cEnv := M.t cTyInfo.  (* An constructor environment maps [cTag]s to their information *)
 
 Definition iEnv := M.t iTyInfo. (* An inductive type environment maps [iTag]s to their constructors with their arities *)
-
 
 (****** TEMPORARY JUNK: MUST DELETE *****)
 Definition add_cloTag (c i : positive) (cenv : cEnv) : cEnv :=

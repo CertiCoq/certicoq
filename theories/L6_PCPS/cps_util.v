@@ -10,8 +10,6 @@ Import ListNotations.
 
 Close Scope Z_scope.
 
-
-
 Definition var_dec := M.elt_eq.
 
 (** Lemmas about [findtag] *)

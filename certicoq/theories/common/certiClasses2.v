@@ -13,15 +13,31 @@ Class ObserveNthSubterm (Value:Type) := observeNthSubterm: nat -> Value -> optio
 
 Section YesNoQuestions.
 
-
-Context {Question:Set}.
+(* Zoe's suggestion for Question *)
+Inductive Question : Set  := 
+| Cnstr : Ast.inductive -> nat -> Question 
+| Abs : Question.
 
 
 (* Given a value of a language, we can observe it by asking it yes/no questions. 
-The intention is that Question := inductive*nat.
-(i,n) represents the question "Are you the nth constructor of the inductive i?".
+[Cnstr i n] represents the question "Are you the nth constructor of the inductive i?".
+[Abs] represents the question 
+"Are you an abstraction (do you represent a lambda or fixpoint)?".
+
 A value can respond "yes" to many such questions.
 Thus, the compiler is allowed to to use the same representation for different types.
+
+Regarding Erasure:
+If a value [v] has sort Prop, then in L1g, 
+[questionHead _ v is] supposed to be false.
+We can then do whatever we want with such values.
+Another choice is that if a value [v] is a constructor (and not, e.g., a lambda or fix)
+of sort Prop, then in L1g, 
+[questionHead _ v is] supposed to be false.
+After erasure,
+[questionHead (Cnstr _ _) \box] is false
+[questionHead Abs \box] is true.
+Note that \box eventually becomes a fixpoint.
 *)
 Class QuestionHead (Value:Type) := questionHead: Question -> Value -> bool.
 
@@ -161,4 +177,30 @@ Qed.
 End YesNoQuestions.
 
 Notation "s ⊑ t" := (obsLe s t) (at level 65).
+
+
+(** Here are some other correctness properties that we may be interested in: *)
+
+(** A translation can be proved correct trivially if the questionHead function
+in the destination says yes to everything. This property of 
+the questionHead function enforces that
+if it says "yes" to some constructor of an inductive type, it must say
+"no" to all other constructors of the SAME inductive type *)
+
+Definition nonTrivialQuestionHead (Value : Type)
+  `{@QuestionHead Value} : Prop:=
+forall (v:Value) (i: Ast.inductive) n, 
+  (questionHead (Cnstr i n) v = true)
+  -> forall m, m<>n ->  questionHead (Cnstr i m) v = false.
+  
+(** We can also ask every language to declare their notion of application 
+as a function of type Term->Value->Term.
+Then, in obsLe, we can also exploit 
+observations on values resulting from applications of functions to values. *)
+
+
+
+
+
+
 

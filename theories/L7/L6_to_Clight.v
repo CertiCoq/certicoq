@@ -41,11 +41,13 @@ Variable (heapInfIdent : ident).
 Variable (numArgsIdent : ident).
 
 (* temporary function to get something working *)
-Fixpoint makeArgList (vs : list positive) : list N :=
+Fixpoint makeArgList' (vs : list positive) : list N :=
   match vs with
   | nil => nil
-  | x :: vs' => (N.of_nat (length vs')) :: (makeArgList vs')
+  | x :: vs' => (N.of_nat (length vs')) :: (makeArgList' vs')
   end.
+
+Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
 
 Fixpoint compute_fEnv' (n : nat) (fenv : fEnv) (e : exp) : fEnv :=
   match n with
@@ -219,16 +221,16 @@ Inductive cRep : Type :=
 
 Definition make_cRep (cenv : cEnv) (ct : cTag) : option cRep :=
   p <- M.get ct cenv ;;
-    let '(name, it , n , r) := p in
+    let '(name, it , a , n) := p in
     let ienv := compute_iEnv cenv in
     l <- M.get it ienv ;;
-      match (n =? 0)%N with
+      match (a =? 0)%N with
       | true =>
         n' <- getEnumOrdinal ct l ;;
            ret (enum n')
       | false =>
         n' <- getBoxedOrdinal ct l ;;
-           ret (boxed n' r)
+           ret (boxed n' a)
       end.
 
 Notation funTy := (Tfunction Tnil Tvoid
@@ -238,9 +240,20 @@ Notation funTy := (Tfunction Tnil Tvoid
                               cc_structret := false |}).
 
 Notation intTy := (Tint I32 Signed
-                       {| attr_volatile := false; attr_alignas := None |}).
+                        {| attr_volatile := false; attr_alignas := None |}).
 
-Notation val := intTy. (* in Clight, SIZEOF_PTR == SIZEOF_INT *)
+Notation uintTy := (Tint I32 Unsigned
+                         {| attr_volatile := false; attr_alignas := None |}).
+
+Notation longTy := (Tlong Signed
+                        {| attr_volatile := false; attr_alignas := None |}).
+
+Notation ulongTy := (Tlong Unsigned
+                        {| attr_volatile := false; attr_alignas := None |}).
+
+
+Notation val := uintTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *)
+Notation uval := uintTy.
 
 Notation valPtr := (Tpointer val
                             {| attr_volatile := false; attr_alignas := None |}).
@@ -251,7 +264,7 @@ Notation "'funVar' x" := (Evar x funTy) (at level 20).
 
 Notation allocPtr := (Evar allocIdent valPtr).
 Notation limitPtr := (Evar limitIdent valPtr).
-Notation args := (Evar argsIdent valPtr). (*wrong! is array *) 
+Notation args := (Evar argsIdent valPtr).
 Notation gc := (Evar gcIdent funTy).
 Notation threadInf := (Tstruct threadInfIdent noattr).
 Notation tinf := (Evar tinfIdent threadInf).
@@ -292,25 +305,28 @@ Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 Notation "'Field(' t ',' n ')'" :=
   ( *(add ([valPtr] t) (c_int n%Z intTy))) (at level 36). (* what is the type of int being added? *)
 
+Notation "'args[' n ']'" :=
+  ( *(add args (c_int n%Z val))) (at level 36).
+
 Definition reserve (funInf : positive) (l : Z) : statement :=
-  let arr := (Evar funInf (Tarray intTy l noattr)) in
+  let arr := (Evar funInf (Tarray uintTy l noattr)) in
   Sifthenelse
-    (!(Ebinop Ole (allocPtr +' (Ederef arr intTy)) limitPtr type_bool))
+    (!(Ebinop Ole (allocPtr +' (Ederef arr uintTy)) limitPtr type_bool))
     (Scall None gc (arr :: (Eaddrof tinf (Tpointer threadInf noattr)) :: nil))
     Sskip.
      
 Fixpoint makeTagZ (cenv : cEnv) (ct : cTag) : option Z :=
   rep <- make_cRep cenv ct ;;
       match rep with
-      | enum t => ret (Z.of_N (t * 2 + 1))
-      | boxed t a => ret (Z.of_N (a * 2 ^ 10 + t * 2))
+      | enum t => ret (Z.of_N ((N.shiftl t 1) + 1))
+      | boxed t a => ret (Z.of_N ((N.shiftl a 10) + (N.shiftl t 1)))
       end.
 
 Definition makeTag (cenv : cEnv) (ct : cTag) : option expr :=
   t <- makeTagZ cenv ct ;;
     ret (c_int t val).
 
-Fixpoint assignConstructor (cenv : cEnv) (x : positive) (t : cTag) (vs : list positive) :=
+Fixpoint assignConstructor' (cenv : cEnv) (x : positive) (t : cTag) (vs : list positive) :=
   match vs with
   | nil =>
     tag <- makeTag cenv t;;
@@ -319,24 +335,26 @@ Fixpoint assignConstructor (cenv : cEnv) (x : positive) (t : cTag) (vs : list po
         | enum _ =>           
           ret (x ::= tag)
         | boxed _ a =>
-          ret (x ::= allocPtr +' (c_int Z.one val);
+          ret (x ::= [val] (allocPtr +' (c_int Z.one val));
                  allocPtr :::= allocPtr +'
                                            (c_int (Z.of_N (a + 1)) val) ;
                  Field(var x, -1) :::= tag)
         end
   | cons v vs' =>
-    prog <- assignConstructor cenv x t vs' ;;
+    prog <- assignConstructor' cenv x t vs' ;;
          ret (prog ;
-                Field(var x, Z.of_nat (length vs')) :::= var v)
+                Field(var x, Z.of_nat (length vs')) :::= [val] (var v))
   end.
+
+Definition assignConstructor (cenv : cEnv) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv x t (rev vs).
 
 Definition isPtr (x : positive) :=
   int_eq
     (Ebinop Oand
-            ([intTy] (var x))
-            (c_int 1 intTy)
-            intTy)
-    (c_int 0 intTy).
+            ([val] (var x))
+            (c_int 1 val)
+            val)
+    (c_int 0 val).
 
 Definition isBoxed (cenv : cEnv) (ct : cTag) : bool :=
   match make_cRep cenv ct with
@@ -360,8 +378,8 @@ Fixpoint asgnFunVars (vs : list positive) (ind : list N) :
     | nil => None
     | cons i ind' =>             
       rest <- asgnFunVars vs' ind' ;;
-           ret (v ::= Field(args, Z.of_N i) ;
-                  rest)
+           ret  (v ::= args[ Z.of_N i ] ;
+                rest)
     end
   end.
 
@@ -378,16 +396,15 @@ Fixpoint asgnAppVars (vs : list positive) (ind : list N) :
     | nil => None
     | cons i ind' =>             
       rest <- asgnAppVars vs' ind' ;;
-           ret (Field(args, Z.of_N i) :::= (var v) ;
-                  rest)
+           ret (args[ Z.of_N i ] :::= (var v) ;
+               rest)
     end
   end.
 
-(* FIX: Think am using wrong type annotation in [Ederef] expressions *)
 Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : option statement :=
   match e with
   | Econstr x t vs e' =>
-    prog <- assignConstructor cenv x t (rev vs) ;;
+    prog <- assignConstructor cenv x t vs ;;
          prog' <- translate_body e' fenv cenv map ;;
          ret (prog ; prog')
   | Ecase x cs =>
@@ -400,25 +417,25 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positiv
                    tag <- makeTagZ cenv (fst p) ;;
                    let '(ls , ls') := p' in
                    match isBoxed cenv (fst p) with
-                   | false =>
+                   | true =>
                      match ls with
                      | LSnil =>
                        ret ((LScons None
                                     prog
                                     ls), ls')
                      | LScons _ _ _ =>
-                       ret ((LScons (Some tag)
+                       ret ((LScons (Some (Z.shiftr (Z.land tag 255) 1))
                                     prog
                                     ls), ls')
                      end
-                   | true =>
+                   | false =>
                      match ls' with
                      | LSnil =>
                        ret (ls, (LScons None
                                         prog
                                         ls'))
                      | LScons _ _ _ =>
-                       ret (ls, (LScons (Some tag)
+                       ret (ls, (LScons (Some (Z.shiftr tag 1))
                                         prog
                                         ls'))
                      end
@@ -427,9 +444,9 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positiv
       let '(ls , ls') := p in
       ret (Sifthenelse
              (isPtr x)
-             (Sswitch (var x)
+             (Sswitch (Ebinop Oshr (Ebinop Oand (Field(var x, -1)) (Econst_int (Int.repr 255) val) val) (Econst_int (Int.repr 1) val) val)
                       ls)  
-             (Sswitch ( *([valPtr] (var x)))
+             (Sswitch (Ebinop Oshr (var x) (Econst_int (Int.repr 1) val) val)
                       ls')) 
   | Eproj x t n v e' =>
     prog <- translate_body e' fenv cenv map ;;
@@ -452,7 +469,6 @@ Definition mkFun (vs : list positive) (body : statement) : function :=
              (map (fun x => (x , val)) vs)
              nil
              body.
-
 
 Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : 
   option (list (positive * globdef Clight.fundef type)) :=
@@ -528,12 +544,11 @@ Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t Ast.name) : M.t
   match M.get f nenv with
   | None => M.set f_inf (nNamed (append (show_pos f) "_info")) nenv
   | Some n => match n with
-              | nAnon => M.set f_inf (nNamed (append (show_pos f) "_info")) nenv
+              | nAnon => M.set f_inf (nNamed (append (append "x" (show_pos f)) "_info")) nenv
               | nNamed s => M.set f_inf (nNamed (append s "_info")) nenv
               end
   end.
 
-(* needs cleanup (pull out more helper functions) *)
 Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t Ast.name)
   : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t Ast.name)) :=
   match fnd with
@@ -552,7 +567,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t Ast.name)
                        let len := Z.of_nat (length l) in
                        let ind :=
                            mkglobvar
-                             (Tarray intTy
+                             (Tarray uintTy
                                      (len + 2%Z)
                                      noattr)
                             ((Init_int32 (Int.repr (Z.of_N n))) :: (Init_int32 (Int.repr len)) :: (make_ind_array l)) true false in
@@ -575,7 +590,7 @@ Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name)
         info_name <- getName ;;
                   let ind :=
                       mkglobvar
-                        (Tarray intTy
+                        (Tarray uintTy
                                 2%Z
                                 noattr)
                         ((Init_int32 (Int.repr (Z.of_nat (max_allocs e')))) :: (Init_int32 Int.zero) :: nil) true false in
@@ -587,15 +602,15 @@ Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name)
   | _ => ret None
   end.
 
-Print External.
+Print init_data.
 
 Definition global_defs (e : exp)
   : list (positive * globdef Clight.fundef type) :=
   let maxArgs := (Z.of_nat (max_args e)) in
-  (allocIdent, Gvar (mkglobvar valPtr nil false false))
-    :: (limitIdent , Gvar (mkglobvar valPtr nil false false))
+  (allocIdent, Gvar (mkglobvar valPtr ((Init_int32 (Int.zero)) :: nil) false false))
+    :: (limitIdent , Gvar (mkglobvar valPtr  ((Init_int32 (Int.zero)) :: nil) false false))
     :: (argsIdent , Gvar (mkglobvar (Tarray val maxArgs noattr)
-                                    nil
+                                    ((Init_int32 (Int.zero)) :: nil)
                                     false false))
     :: (gcIdent , Gfun (External (EF_external "gc"
                                               (mksignature (Tany32 :: nil) None cc_default))
@@ -604,8 +619,6 @@ Definition global_defs (e : exp)
                                  cc_default
        ))
     :: nil.
-
-
 
 Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) (nenv : M.t Ast.name) :
   nState (option (M.t Ast.name * (list (positive * globdef Clight.fundef type)))) :=
@@ -634,18 +647,18 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) (nenv : M.t Ast.name)
 
 Require Import Clightdefs.
 
-(*
+Print members.
+
 Definition composites : list composite_definition :=
 (Composite threadInfIdent Struct
-   ((argsIdent, (tptr tint)) :: (numArgsIdent, tint) :: (allocIdent, (tptr (tptr tint))) ::
-    (limitIdent, (tptr (tptr tint))) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
+   ((argsIdent, tptr valPtr) :: (numArgsIdent, tint) :: (allocIdent, tptr valPtr) ::
+    (limitIdent, tptr valPtr) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
     nil)
    noattr :: nil).
-*)
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
            (main : ident) : option Clight.program :=
-  let res := Ctypes.make_program nil defs (bodyIdent :: nil) main in
+  let res := Ctypes.make_program composites defs (bodyIdent :: nil) main in
   match res with
   | Error e => None
   | OK p => Some p
@@ -724,7 +737,7 @@ Definition stripOption' (p : nState (option Clight.program)) (q : Clight.program
      | Some p'' => ret p''
      end.
 
-Definition bogus : positive := 3000%positive.
+Definition bogus : positive := 80000%positive.
 Definition stripNameState {A : Type} (p : nState A) : A :=
   fst (p.(runState) bogus).
 

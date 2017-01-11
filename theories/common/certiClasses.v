@@ -3,6 +3,7 @@ Require Import Common.exceptionMonad.
 Require Import Common.AstCommon.
 
 
+(* This operations picks out the "good" terms in the language. All bets are off about the terms that are not good *)
 Class GoodTerm (Term: Type) := goodTerm : Term  -> Prop.
 
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.

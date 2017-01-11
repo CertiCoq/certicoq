@@ -935,7 +935,7 @@ Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
         cps_cvt_apply cps_cvt (cps_cvt e1) e2
     | terms.oterm (NDCon d nargs) es => 
         let knames := 
-          map (mkSuggestion ∘ (fun x => append x "kdcon") ∘ nat2string10) (seq 0 (length es)) in
+          map (mkSuggestion ∘ (fun x => append "x" (append x "kdcon")) ∘ nat2string10) (seq 0 (length es)) in
         let kvars := contVars (S (length es)) ((mkSuggestion "k")::knames)in
         let k := hd nvarx kvars  in
         let tlkv := tail kvars  in

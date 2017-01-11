@@ -1,3 +1,5 @@
 #!/bin/sh
 
-ocamlbuild -lib Str $1 ; ./$1
+file=${1-allInstances.native}
+ocamlbuild -lib Str $file
+./$file

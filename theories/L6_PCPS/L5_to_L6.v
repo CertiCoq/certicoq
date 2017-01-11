@@ -309,7 +309,7 @@ arguments are:
                       | Lam_c x k e =>                        
                         let '(ce, n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) (set_nt (Pos.succ n) (snd k, kon_tag) (set_n n (snd x)  tgm)) (Pos.add n 2%positive) in
                         let '(cfds, n'', tgm) := convert_fds fds' sv sk tgm fnames' n' in
-                        (Fcons currn fun_tag (n::(Pos.succ n)::nil) ce cfds, n'', tgm) (* todo: add the tag for x *)
+                        (Fcons currn fun_tag ((Pos.succ n)::n::nil) ce cfds, n'', tgm) (* todo: add the tag for x *)
                       | _ => (Fnil, n, tgm) (* this should not happen *)
                     end) 
                  | (_, _) => (Fnil, n, tgm)
@@ -366,12 +366,8 @@ Definition convert_env (g:ienv): (iEnv*cEnv * conId_map) := convert_env' g (M.em
 
 Definition convert_top (ee:ienv*cps) : (cEnv*nEnv*exp) :=
   let '(_, cG, dcm) := convert_env (fst ee) in 
-  let '(er, n, tgm) := convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (4000%positive) in
+  let '(er, n, tgm) := convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (100000%positive) in
   let '(_, _, nM) := tgm in
   (cG, nM, er).
-
-
-
-
 
 About nEnv.

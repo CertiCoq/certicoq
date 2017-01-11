@@ -340,7 +340,7 @@ let extern_atom a =
   try
     Hashtbl.find string_of_atom a
   with Not_found ->
-    Printf.sprintf "$%d" (P.to_int a)
+    Printf.sprintf "x%d" (P.to_int a)
 
 let first_unused_ident () = !next_atom
 

@@ -26,7 +26,8 @@ Require Import compcert.common.AST
         compcert.cfrontend.Clight
         compcert.common.Values.
 
-Require Import L6.cps.
+Require Import L6.cps
+               L6.identifiers.
 
 Variable (argsIdent : ident).
 Variable (allocIdent : ident).
@@ -37,7 +38,6 @@ Variable (bodyIdent : ident).
 Variable (threadInfIdent : ident).
 Variable (tinfIdent : ident).
 Variable (heapInfIdent : ident).
-
 Variable (numArgsIdent : ident).
 
 (* temporary function to get something working *)
@@ -602,8 +602,6 @@ Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name)
   | _ => ret None
   end.
 
-Print init_data.
-
 Definition global_defs (e : exp)
   : list (positive * globdef Clight.fundef type) :=
   let maxArgs := (Z.of_nat (max_args e)) in
@@ -664,63 +662,26 @@ Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
   | OK p => Some p
   end.
 
-Theorem refl {A : Type} {a : A} : a = a.
-Proof.
-  reflexivity.
-Qed.
-
-
-Definition x : ident := 40%positive.
-Definition y : ident := 41%positive.
-Definition z : ident := 42%positive.
-Definition w : ident := 43%positive.
-Definition f : positive:= 12%positive.
-Definition b : positive := 8%positive.
-Definition c : positive := 2%positive.
-Definition t : cTag := 9%positive.
-Definition t' : fTag := 13%positive.
-Definition t'' : fTag := 15%positive.
-
-Definition test : exp := Efun
-                          (Fcons f t'
-                                 (y :: z :: nil)
-                                 (Eapp y t'' (z :: nil))
-                                 Fnil)
-                          (Eproj b t 2%N x
-                                 (Eproj c t 4%N x
-                                        (Eapp f t' (b :: c :: nil)))).
-
-(*
-Definition compile' (e : exp) (cenv : cEnv) :
-  nState (option Clight.program) :=
-  let fenv := compute_fEnv e in
-  p <- make_defs e fenv cenv ;;
-          match p with
-          | None => ret None
-          | Some defs =>
-             ret (mk_prog_opt defs mainIdent)
-          end.
-
-
-Definition testRes := compile' test (M.empty _).
- *)
+Check make_defs.
 
 Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
-  nState (M.t Ast.name * option Clight.program) :=
+  M.t Ast.name * option Clight.program :=
   let fenv := compute_fEnv e in
-  p' <- make_defs e fenv cenv nenv ;;
-     match p' with
-     | None => ret (nenv, None)
-     | Some p =>
-       let '(nenv', defs) := p in
-             ret (nenv', (mk_prog_opt defs mainIdent))
-          end.
+  let p'' := make_defs e fenv cenv nenv in
+  let n := ((max_var e 100) + 1)%positive in
+  let p' := fst (p''.(runState) n) in
+  match p' with
+  | None => (nenv, None)
+  | Some p =>
+    let '(nenv', defs) := p in
+    (nenv', (mk_prog_opt defs mainIdent))
+  end.
 
 Definition err {A : Type} (s : String.string) : res A :=
   Error ((MSG s) :: nil).
 
 Definition empty_program : Clight.program :=
-  Build_program nil nil mainIdent nil refl.
+  Build_program nil nil mainIdent nil eq_refl.
 
 Definition stripOption (p : (option Clight.program))
   : Clight.program := 
@@ -728,22 +689,6 @@ Definition stripOption (p : (option Clight.program))
      | None => empty_program
      | Some p' => p'
      end.
-
-Definition stripOption' (p : nState (option Clight.program)) (q : Clight.program)
-  : nState Clight.program :=
-  p' <- p ;; 
-     match p' with
-     | None => ret q
-     | Some p'' => ret p''
-     end.
-
-Definition bogus : positive := 80000%positive.
-Definition stripNameState {A : Type} (p : nState A) : A :=
-  fst (p.(runState) bogus).
-
-(*
-Definition test_result := stripNameState (stripOption (compile test (M.empty _))).
-*)
 
 Variable (print_Clight : Clight.program -> unit).
 Variable (print_Clight_dest : Clight.program -> String.string -> unit).

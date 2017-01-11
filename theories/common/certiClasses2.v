@@ -6,26 +6,26 @@ Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
 
 Require Import List.
-(* unlike ObserveSubterms, here the compiler need not keep track of the number of subterms.
-When trying to observe the nth subterm of a value having only m (m<n) subterms,
-all bets are off about the returned value.*)
+(* Some values, e.g. constructors, can have subterms. This operation allows asking for the nth subterm.
+When trying to observe the nth subterm of a value having only m (m<n) subterms, all bets are off about the returned value.
+*)
 Class ObserveNthSubterm (Value:Type) := observeNthSubterm: nat -> Value -> option Value.
 
 Section YesNoQuestions.
 
 
-(* Question is intented to be (inductive*nat (*which constructor *)).
-The idea is that given a value, we can ask (several) 
-questions about it of the form:
-"Are you nth constructor of the inductive i?"
-The answer can be yes for several distinct queries, thus allowing the compiler
-to use the same representation for different types.
-*)
 Context {Question:Set}.
 
 
+(* Given a value of a language, we can observe it by asking it yes/no questions. 
+The intention is that Question := inductive*nat.
+(i,n) represents the question "Are you the nth constructor of the inductive i?".
+A value can respond "yes" to many such questions.
+Thus, the compiler is allowed to to use the same representation for different types.
+*)
 Class QuestionHead (Value:Type) := questionHead: Question -> Value -> bool.
 
+(* A value in the destination should say "yes" to all the questions to which the corresponding source value said "yes" to *)
 Definition yesPreserved `{QuestionHead SrcValue} `{QuestionHead DstValue}
 (s: SrcValue) (d: DstValue)
  := forall (q:Question), implb (questionHead q s) (questionHead q d) = true.
@@ -35,7 +35,8 @@ Section ObsLe.
 (* Typically, Src=SrcValue *)
 Context `{QuestionHead SrcValue} `{ObserveNthSubterm SrcValue} 
    `{QuestionHead DstValue} `{ObserveNthSubterm DstValue}.
-   
+
+(* obsLe extends yesPreserved to corresponding subterms *)   
 (* Coinductive, in case we add support for Coq's coinductive types lateron.
 Currently, [Inductive] should suffice *)
 CoInductive obsLe : SrcValue -> DstValue -> Prop :=
@@ -86,6 +87,9 @@ Class CerticoqLanguage (Term Value:Type)
 
 Global Arguments CerticoqLanguage Term Value {H} {H0} {H1} {H2}.
 
+(* The final correctness property is just the conjunction of goodPreserving and obsPreserving.
+The lemma [composeCerticoqTranslationCorrect] below
+shows that composes correctness proofs of adjacent translations. *)
 Class CerticoqTranslationCorrect
   `{CerticoqLanguage Src SrcValue} 
   `{CerticoqLanguage Dst DstValue}

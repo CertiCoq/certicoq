@@ -5,6 +5,7 @@ Require Export L2_5.instances.
 Require Export L4.instances.
 Require Export L6.instances.
 
+
 Set Template Cast Propositions.
 
 Quote Recursively Definition p := (3+4).
@@ -18,7 +19,7 @@ Require Import String.
 Open Scope string_scope.
 
 
-
+(*
 Eval compute in (ctranslateTo certiL4 p).
 
 Time Eval compute in (ctranslateTo certiL5a p).
@@ -26,6 +27,7 @@ Time Eval compute in (ctranslateTo certiL5a p).
 
 Eval compute in (cTerm certiL6).
 Eval compute in (ctranslateTo certiL6 p).
+*)
 
 (* 
 To debug typeclass resolution problems, try:
@@ -49,7 +51,7 @@ Ltac computeExtract certiL4 f:=
 match t with
 |Ret ?xx => exact xx
 end).
-
+(*
 
 
 Definition swap4 : (cTerm certiL4).
@@ -134,10 +136,9 @@ Proof.
 Defined.
 
 Set Template Cast Propositions.
-(* Set Template Share Strings. *)
-(* Finished transaction in 240.419 secs (238.36u,1.897s) (successful) 2641M *)
-(* Finished transaction in 258.043 secs (248.104u,4.228s) (successful) without sharing 3850M *)
-Time Quote Recursively Definition pgcd := Gcd.
+
+Quote Recursively Definition pgcd :=
+Gcd.
 
 Eval compute in (cTerm certiL2).
 Let pcgd2 : cTerm certiL2.
@@ -170,7 +171,10 @@ let t:= eval vm_compute in (print4 pcgd4a) in exact t.
 Defined.
 Eval compute in pgcd4astr.
 *)
+*)
 
+Add LoadPath "../benchmarks".
+Require Import Binom.
 
 Definition p6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) p) in 
@@ -197,17 +201,27 @@ Inductive blah : Type :=
 | blah2 : blah -> blah
 | blah3 : blah
 | blah4 : blah
+| blah5 : blah
+| blah6 : blah -> blah -> blah
+| blah7 : blah
 .
 
-Definition blahFun (b : blah) : blah :=
+Fixpoint blah_fun (b : blah) : blah :=
   match b with
-  | blah1 b' => b'
+  | blah1 b' => blah_fun b'
   | blah2 b' => blah1 b'
   | blah3 => blah4
   | blah4 => blah1 blah3
+  | blah5 => blah6 (blah1 blah7) blah5
+  | blah6 b' b'' => blah2 (blah_fun b'')
+  | blah7 => blah7
   end.
 
-Quote Recursively Definition blahProg := (blahFun (blah2 (blahFun blah4))).
+Definition fst_blah := blah2 (blah1 blah4).
+
+Definition snd_blah := blah6 blah3 (blah2 blah7).
+
+Quote Recursively Definition blahProg := (blah_fun (blah1 (blah6 fst_blah snd_blah))).
 
 Definition blahProg6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) blahProg) in 
@@ -224,16 +238,21 @@ Definition show_exn {A:Type} (x : exceptionMonad.exception (cTerm certiL6)) : st
   | exceptionMonad.Ret ((p,cenv,g, nenv), e) => show_exp nenv cenv e
   end.
 
-Eval compute in (show_exn (Ret p6)).
+(*Eval compute in (show_exn (Ret p6)).*)
 
-Quote Recursively Definition test_fun := (fun x : nat => (x + 4)%nat).
-Definition test_fun6 : cTerm certiL6.
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) test_fun) in 
+Quote Recursively Definition binom := Binom.carry.
+Definition binom6 : cTerm certiL6.
+(let t:= eval vm_compute in (translateTo (cTerm certiL6) binom) in 
 match t with
 |Ret ?xx => exact xx
 end).
 Defined.
 
+Set Printing Depth 100.
+
+Eval compute in (show_exn (Ret binom6)).
+
+Definition binom7 := compile_L6 binom6.
 
 Definition swap6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) swap) in 
@@ -244,42 +263,17 @@ Defined.
 
 Definition swap7 := compile_L6 swap6.
 
-
-Quote Recursively Definition three := 3.
-
-Definition three6 : cTerm certiL6. 
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) three) in 
-match t with
-|Ret ?xx => exact xx
-end).
-Defined.
-
-Definition three7 := compile_L6 three6.
-
-
-Require Import L6.cps.
-
-Quote Recursively Definition cpsTerm := (Efun
-                                         (Fcons f t'
-                                                (y :: z :: nil)
-                                                (Eapp y t'' (z :: nil))
-                                                Fnil)
-                                         (Eproj b t 2%N x
-                                                (Eproj c t 4%N x
-                                                       (Eapp f t' (b :: c :: nil))))).
-
-Definition cpsTerm6 : cTerm certiL6.
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) cpsTerm) in 
-match t with
-|Ret ?xx => exact xx
-end).
-Defined.
-Definition cpsTerm7 := compile_L6 cpsTerm6.
-
 (*
-Add LoadPath "../benchmarks".
-Require Import Color.
- *)
+Quote Recursively Definition graph_color := mygraph.
+
+Definition graph_color6 : cTerm certiL6.
+  (let t:= eval vm_compute in (translateTo (cTerm certiL6) graph_color) in
+       match t with
+       | Ret ?xx => exact xx
+       end).
+Defined.
+Definition graph_color7 := compile_L6 graph_color6.
+*)
 
 (*
 Add LoadPath "../benchmarks".
@@ -336,8 +330,10 @@ Require Import runtime.runtime.
 
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (M.elements (fst prog)) file.
 
+
 Definition test := printProg p7 "output/threePlusFour.c".
 (*Definition test := printProg blahProg7 "output/blah.c".*)
+(*Definition test := printProg binom7 "output/binom.c".*)
 
 
 

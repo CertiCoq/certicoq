@@ -11,9 +11,11 @@ Require compcert.common.AST
         compcert.common.Globalenvs
         Int31.
 
+Add LoadPath "../benchmarks".
+
 Require L6.L5_to_L6
         L7.L6_to_Clight
-        allInstances.
+        Compiler.allInstances.
 
 (* Standard lib *)
 Require Import ExtrOcamlBasic.
@@ -26,7 +28,7 @@ Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 (* L5_to_L6 *)
 Extract Constant L5_to_L6.fun_tag => "Camlcoq.P.of_int 3".
 Extract Constant L5_to_L6.kon_tag => "Camlcoq.P.of_int 2".
-Extract Constant L5_to_L6.default_tag => "Camlcoq.P.of_int 3000".
+Extract Constant L5_to_L6.default_tag => "Camlcoq.P.of_int 20000".
 (* L6_to_Clight *)
 Extract Constant L6_to_Clight.print_Clight => "PrintClight.print_if".
 Extract Constant L6_to_Clight.print_Clight_dest => "PrintClight.print_dest".
@@ -72,4 +74,4 @@ Separate Extraction
          Floats.Float32.from_parsed Floats.Float.from_parsed
          Floats.Float32.of_bits Floats.Float.of_bits
          Floats.Float32.to_bits Floats.Float.to_bits
-         allInstances.test.
+         Compiler.allInstances.test.

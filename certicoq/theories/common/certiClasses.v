@@ -200,21 +200,25 @@ CoInductive obsLe
     -> obsLe s d.
 
 
-Notation "s ⊑ t" := (obsLe s t) (at level 65).
+Section obsPreserving.
+Context (Src Dst : Type) {SrcValue DstValue : Type} (VR : SrcValue -> DstValue -> Prop).
+Notation "s ⊑ t" := (VR s t) (at level 65).
 
 (* Similar to what Zoe suggested on 	Wed, Aug 17, 2016 at 8:57 AM *)
 Definition obsPreserving 
   `{CerticoqTranslation Src Dst} 
    `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
-   `{ObserveHead SrcValue} `{ObserveSubterms SrcValue} 
-   `{ObserveHead DstValue} `{ObserveSubterms DstValue}
   :=
    ∀ (s:Src) (sv: SrcValue), 
     goodTerm s 
     -> (s ⇓ sv)
     -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ⊑ dv.
+End obsPreserving.
 
-Global Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
+Notation "s ⊑ t" := (obsLe s t) (at level 65).
+
+Global Arguments obsPreserving Src Dst  {SrcValue} {DstValue} VR {H} 
+{H0} {H1} {H2}.
 
 Class CerticoqLanguage2 `{BigStepHetero Term Value} `{GoodTerm Term} 
    `{ObserveHead Value} `{ObserveSubterms Value} 
@@ -254,7 +258,7 @@ Class CerticoqTranslationCorrect2
   `{CerticoqTranslation Src Dst} := 
 {
   certiGoodPres2 : goodPreserving Src Dst;
-  obsePres : obsPreserving Src Dst;
+  obsePres : obsPreserving Src Dst obsLe;
 }.
 
 Global Arguments CerticoqTranslationCorrect2
@@ -375,8 +379,8 @@ Lemma obsPreservingWeakenObs
    `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
    `{os: ObserveHead Obs1 SrcValue} `{ObserveSubterms SrcValue} 
    `{od: ObserveHead Obs1 DstValue} `{ObserveSubterms DstValue}:
-    obsPreserving Obs1 Src Dst
-    -> obsPreserving Obs2 Src Dst.
+    obsPreserving Src Dst (obsLe Obs1)
+    -> obsPreserving Src Dst  (obsLe Obs2).
 Proof.
   intros Ho ? ? HgoodTerm He.
   specialize (Ho _ _ HgoodTerm He). clear HgoodTerm He.
@@ -496,11 +500,28 @@ Qed.
 
 Definition bigStepReflecting `{CerticoqTranslation Src Dst}
   `{CerticoqTranslation SrcValue DstValue}  
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} (s:Src) : Prop :=
- ∀ (td: exception DstValue), 
-    (translate Src Dst s) ⇓ td
-    -> ∃ (d:SrcValue), s ⇓ d ∧ td = translate SrcValue DstValue d.
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} 
+   (s:Src)
+    : Prop :=
+ ∀ (dv: DstValue), 
+    (translate Src Dst s) ⇓ (Ret dv)
+    -> ∃ (sv:SrcValue), s ⇓ sv ∧ Ret dv = translate SrcValue DstValue sv.
 
+
+Section obsPreserving.
+Context (Src Dst : Type) {SrcValue DstValue : Type} (VR : SrcValue -> DstValue -> Prop).
+Notation "s ⊑ t" := (VR s t) (at level 65).
+
+(* Similar to the new +, except this one does not enforce preservation of non-termination *)
+Definition obsReflecting `{CerticoqTranslation Src Dst}
+   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} 
+   (s:Src)
+    : Prop :=
+ ∀ (dv: DstValue), 
+    (translate Src Dst s) ⇓ (Ret dv)
+    -> ∃ (sv:SrcValue), s ⇓ sv ∧ sv ⊑ dv .
+    
+End obsPreserving.
 
 Arguments bigStepReflecting Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} s.
 
@@ -531,30 +552,29 @@ eapply Hd.
 *)
 Qed.
 
+Lemma obsPreservingReflecting 
+  `{CerticoqTranslation Src Dst}
+  `{CerticoqLanguage Src SrcValue}
+  `{CerticoqLanguage Dst DstValue} 
+  (RV : SrcValue → DstValue → Prop)
+  {Ho:obsPreserving Src Dst RV} : (* * *)
+  (deterministicBigStep Dst)
+  -> ∀ (s:Src), 
+    goodTerm s
+    -> normalizes s
+    -> obsReflecting Src Dst RV s. (* + *)
+Proof.
+  intros Hd ? Hp Hn ? Ht.
+  destruct Hn as [sv  Hn].
+  pose proof Hn as Hnb.
+  eapply Ho in Hn;[| assumption].
+  destruct Hn as [dvv Hn].
+  destruct Hn as [Hnt  Hnr].
+  apply deterministicBigStepLiftExc in Hd.
+  specialize (Hd _ _ _ Hnt Ht).
+  inversion Hd. subst. clear Hd.
+  exists sv. split; assumption.
+Qed.
 
-Fixpoint FunctionType (L:list Type) (R:Type): Type :=
-match L with
-| nil => R
-| cons H T => H -> (FunctionType T R)
-end.
 
-Fixpoint excFunction (L:list Type) (R:Type) (err: String.string) {struct L}: 
-  (FunctionType (List.map exception L) (exception R)) :=
-match L return (FunctionType (List.map exception L) (exception R)) with
-| nil => Exc err
-| cons H T => λ (he : exception H), (excFunction T R err)
-end.
-
-
-Fixpoint liftExeption (L:list Type) (R:Type) 
-  (f: FunctionType L R) {struct L}: (FunctionType (List.map exception L) (exception R)) :=
-match L 
-  return (FunctionType L R -> FunctionType (List.map exception L) (exception R)) with
-| nil => λ f, Ret f
-| cons H T => fun ff he => 
-    match he with
-    | Exc err => excFunction T R err
-    | Ret h =>  liftExeption T R (ff h)
-    end
-end f.
 

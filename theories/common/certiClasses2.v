@@ -71,20 +71,7 @@ End ObsLe.
 
 Notation "s ⊑ t" := (obsLe s t) (at level 65).
 
-(* Similar to what Zoe suggested on 	Wed, Aug 17, 2016 at 8:57 AM *)
-Definition obsPreserving 
-  `{CerticoqTranslation Src Dst}
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
-   `{QuestionHead SrcValue} `{ObserveNthSubterm SrcValue} 
-   `{QuestionHead DstValue} `{ObserveNthSubterm DstValue}
-  :=
-   ∀ (s:Src) (sv: SrcValue), 
-    goodTerm s 
-    -> (s ⇓ sv)
-    -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ⊑ dv.
 
-
-Global Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
 
 Class CerticoqLanguage (Term Value:Type)
   `{BigStepHetero Term Value} `{GoodTerm Term} 
@@ -112,7 +99,7 @@ Class CerticoqTranslationCorrect
   `{CerticoqTranslation Src Dst} := 
 {
   certiGoodPres2 : goodPreserving Src Dst;
-  obsePres : obsPreserving Src Dst;
+  obsePres : obsPreserving Src Dst obsLe;
 }.
 
 Global Arguments CerticoqTranslationCorrect

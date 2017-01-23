@@ -1368,53 +1368,24 @@ Theorem num_occur_fdc_comp_ctx:
 Proof.
   intros. apply num_occur_ec_comp_ctx_mut.
 Qed.   
-    
-(* 
-Inductive bv_e: exp -> list var -> Prop :=
-| Constr_bv :
-    forall e l x t ys, bv_e e l -> bv_e (Econstr x t ys e) (x::l)
-| Case_bv :
-    forall v cl, bv_e (Ecase v cl) []
-| Proj_bv:
-    forall v t n y e l, bv_e e l -> bv_e (Eproj v t n y e) (v::l)
-| Fun_bv:
-    forall fl e l1 l2, bv_f fl l1 -> bv_e e l2 -> bv_e (Efun fl e) (l1 ++ l2)
-| App_bv :
-    forall f t ys, bv_e (Eapp f t ys) []
-| Prim_bv :
-    forall x f ys e l, bv_e e l -> bv_e (Eprim x f ys e) (x::l)
-| Halt_bv:
-    forall v, bv_e (Ehalt v) []
-with bv_f : fundefs -> list var -> Prop :=
-     | Cons_bv :
-         forall f t ys e fds l1 l2,
-           bv_e e l1 ->
-           bv_f fds l2 ->
-           bv_f (Fcons f t ys e fds) (f::(ys++(l1++l2)))
-     | Nil_bv : bv_f Fnil [].
 
-Hint Constructors bv_e bv_f.
-
-Theorem e_bv_e :
-  forall e, exists l, bv_e e l
-                      with e_bv_f: forall f, exists l, bv_f f l.
+Theorem num_occur_ec_det:
+  forall c v n m,
+    num_occur_ec c v n ->
+    num_occur_ec c v m ->
+    n = m.
 Proof.
-  induction e; destructAll; clear e_bv_e; eauto.
-  specialize (e_bv_f f). destruct e_bv_f. eauto. 
-  induction f; destructAll; clear e_bv_f; eauto.
-  specialize (e_bv_e e); destruct e_bv_e. eauto.
-Qed.
-
-Theorem bv_e_det: forall e l1 l2, bv_e e l1 -> bv_e e l2 -> l1 = l2
-                             with bv_f_det: forall f l1 l2, bv_f f l1 -> bv_f f l2 -> l1 = l2.                     
-Proof.
-  - induction e; clear bv_e_det; intros; auto; inversion H; inversion H0; subst; auto.  
-    + specialize (IHe _ _ H7 H14); subst; reflexivity.
-    + specialize (IHe _ _ H7 H14); subst; reflexivity.
-    + specialize (bv_f_det f _ _ H3 H8); specialize (IHe _ _ H5 H10); subst; reflexivity.
-    + specialize (IHe _ _ H7 H14); subst; reflexivity.
-  - induction f; clear bv_f_det; intros; auto; inversion H; inversion H0; subst.
-    + specialize (bv_e_det e _ _ H7 H15); specialize (IHf _ _ H8 H16); subst; reflexivity.
-    + reflexivity.
-Qed. 
-*)
+  intros.
+  assert (num_occur (Ehalt v) v 1).
+  eapply num_occur_n. constructor. simpl. destruct (cps_util.var_dec v v). auto. exfalso; auto.
+  assert (num_occur (c |[ Ehalt v ]|)  v (n +1)).
+  apply num_occur_app_ctx. exists n, 1; auto.
+  assert (num_occur (c |[ Ehalt v ]|)  v (m +1)).
+  apply num_occur_app_ctx. exists m, 1; auto.
+  eapply plus_reg_l.
+  eapply (proj1 (num_occur_det _)). 
+  rewrite NPeano.Nat.add_comm.
+  apply H2.
+  rewrite NPeano.Nat.add_comm.
+  apply H3.
+Qed.      

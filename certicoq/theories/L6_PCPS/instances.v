@@ -13,7 +13,7 @@ Require Import Common.Common.
 Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
-Require Import uncurry shrink_cps closure_conversion hoisting L6_to_Clight.
+Require Import uncurry closure_conversion hoisting L6_to_Clight.
 
 
 
@@ -44,20 +44,7 @@ Instance WfL3Term : GoodTerm (L6env * cps.exp) :=
 Instance certiL6 : CerticoqLanguage (L6env * cps.exp) := {}.
 
 
-(* 
 
-Add LoadPath "../" as Top.
- Add LoadPath "../common" as Common. 
- Add LoadPath "../L1_QuotedCoq" as L1.
- Add LoadPath "../L1g" as L1g.
- Add LoadPath "../L1_5_box" as L1_5.
- Add LoadPath "../L2_typeStripped" as L2. 
- Add LoadPath "../L3_flattenedApp" as L3. 
- Add LoadPath "../L4_deBruijn" as L4.
- Add LoadPath "../L5_CPS" as CPS. 
- Add LoadPath "./" as L6.
-
- *)
 
 Open Scope positive_scope.
 
@@ -66,15 +53,19 @@ Definition bogus_iTag := 2000%positive.
 Definition bogus_cloTag := 1500%positive.
 Definition bogus_cloiTag := 1501%positive.
 
+Definition default_tag := 1336%positive.
+Definition fun_tag := 1337%positive.
+Definition kon_tag := 1338%positive.
+
 Instance certiL5a_t0_L6: 
   CerticoqTotalTranslation (cTerm certiL5a) (cTerm certiL6) := 
   fun v =>
     match v with
         | pair venv vt => 
-          let '(cenv, nenv, t) := convert_top (venv, L5a.Halt_c vt) in
+          let '(cenv, nenv, t) := convert_top default_tag fun_tag kon_tag (venv, L5a.Halt_c vt) in
           let '(cenv',nenv', t') := closure_conversion_hoist
                                    bogus_cloTag
-                                   (shrink_top t)
+                                  (shrink_top t)  
                                    bogus_cTag
                                    bogus_iTag
                                    cenv nenv in

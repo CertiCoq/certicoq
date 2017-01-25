@@ -173,8 +173,9 @@ Eval compute in pgcd4astr.
 *)
 *)
 
-Add LoadPath "../benchmarks".
-Require Import Binom.
+Require Import Benchmarks.Binom
+        Benchmarks.Color
+        Benchmarks.vs.
 
 Definition p6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) p) in 
@@ -183,11 +184,18 @@ match t with
 end).
 Defined.
 
+Definition ext_comp := fun prog =>
+  let t := (translateTo (cTerm certiL6) prog) in
+  match t with
+  | Ret xx => xx
+  | _ => p6
+  end.
+
 Require Import L6_to_Clight Maps.
 
 Definition compile_L6 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
   let '((_, cenv, _, nenv), prog) := t in
-  let p := stripNameState (compile prog cenv nenv) in
+  let p := compile prog cenv nenv in
   (fst p, stripOption (snd p)).
 
 Open Scope positive_scope.
@@ -238,21 +246,7 @@ Definition show_exn {A:Type} (x : exceptionMonad.exception (cTerm certiL6)) : st
   | exceptionMonad.Ret ((p,cenv,g, nenv), e) => show_exp nenv cenv e
   end.
 
-(*Eval compute in (show_exn (Ret p6)).*)
 
-Quote Recursively Definition binom := Binom.carry.
-Definition binom6 : cTerm certiL6.
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) binom) in 
-match t with
-|Ret ?xx => exact xx
-end).
-Defined.
-
-Set Printing Depth 100.
-
-Eval compute in (show_exn (Ret binom6)).
-
-Definition binom7 := compile_L6 binom6.
 
 Definition swap6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) swap) in 
@@ -263,8 +257,10 @@ Defined.
 
 Definition swap7 := compile_L6 swap6.
 
+
+
 (*
-Quote Recursively Definition graph_color := mygraph.
+Quote Recursively Definition graph_color := (run G16).
 
 Definition graph_color6 : cTerm certiL6.
   (let t:= eval vm_compute in (translateTo (cTerm certiL6) graph_color) in
@@ -331,13 +327,15 @@ Require Import runtime.runtime.
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (M.elements (fst prog)) file.
 
 
-Definition test := printProg p7 "output/threePlusFour.c".
+(*Definition test := printProg p7 "output/threePlusFour.c".*)
 (*Definition test := printProg blahProg7 "output/blah.c".*)
-(*Definition test := printProg binom7 "output/binom.c".*)
+(*Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".*)
+(*Definition test := printProg graph_color7 "output/color.c".*)
 
+Quote Recursively Definition binom := Binom.main.
+Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".
 
-
-
-
-
-
+(*
+Quote Recursively Definition vs := vs.main.
+Definition test := printProg (compile_L6 (ext_comp vs)) "output/vs.c".
+*)

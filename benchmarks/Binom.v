@@ -1,6 +1,7 @@
-Require Import Coq.Arith.Arith.
-Import NPeano.
-Import List.
+Require Import Coq.Arith.Arith
+               Coq.Numbers.Natural.Peano.NPeano
+               List.
+
 Import ListNotations.
 
 Definition key := nat.
@@ -37,7 +38,7 @@ Definition insert (x: key) (q: priqueue) : priqueue :=
 
 Fixpoint join (p q: priqueue) (c: tree) : priqueue :=
   match p, q, c with
-    [], _ , _            => carry q c
+  | [], _ , _            => carry q c
   | _, [], _             => carry p c
   | Leaf::p', Leaf::q', _              => c :: join p' q' Leaf
   | Leaf::p', q1::q', Leaf            => q1 :: join p' q' Leaf
@@ -45,7 +46,7 @@ Fixpoint join (p q: priqueue) (c: tree) : priqueue :=
   | p1::p', Leaf::q', Leaf            => p1 :: join p' q' Leaf
   | p1::p', Leaf::q',Node _ _ _   => Leaf :: join p' q' (smash c p1)
   | p1::p', q1::q', _                   => c :: join p' q' (smash p1 q1)
- end.
+  end.
 
 Fixpoint unzip (t: tree) (cont: priqueue -> priqueue) : priqueue :=
   match t with

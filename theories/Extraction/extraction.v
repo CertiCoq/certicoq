@@ -11,8 +11,6 @@ Require compcert.common.AST
         compcert.common.Globalenvs
         Int31.
 
-Add LoadPath "../benchmarks".
-
 Require L6.L5_to_L6
         L7.L6_to_Clight
         Compiler.allInstances.

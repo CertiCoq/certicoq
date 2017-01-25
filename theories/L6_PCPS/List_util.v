@@ -190,6 +190,15 @@ Proof.
       apply (IHx _ _ H6) in H8. assumption.
 Qed.
 
+Lemma Forall2_trans_strong (A : Type) (R1 R2 R3 : A -> A -> Prop) (l1 l2 l3 : list A) : 
+  (forall l1 l2 l3, R1 l1 l2 -> R2 l2 l3 -> R3 l1 l3) ->
+  Forall2 R1 l1 l2 -> Forall2 R2 l2 l3 -> Forall2 R3 l1 l3.
+Proof.
+  intros H Hall1; revert l3; induction Hall1; intros l3 Hall2 ; eauto.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor; eauto.
+Qed.
+
 (** Lemmas about [nthN] *)
 
 Lemma In_nthN (A : Type) (l : list A) (v : A) :

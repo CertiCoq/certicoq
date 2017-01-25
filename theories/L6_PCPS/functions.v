@@ -6,7 +6,7 @@ Require Import L6.Ensembles_util.
 Require Import Libraries.Coqlib.
 Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos
         Coq.Relations.Relations Coq.Classes.Morphisms Coq.Lists.List
-        Coq.Sets.Ensembles.
+        Coq.Sets.Ensembles Coq.Program.Basics.
 
 Import ListNotations.
 
@@ -56,6 +56,16 @@ Fixpoint extend_lst {A} (f: positive -> A) (xs : list positive) (xs' : list A)
 
 Notation " f '<{' xs '~>' xs' '}>' " := (extend_lst f xs xs') (at level 10, no associativity)
                                         : fun_scope.
+
+(** Apply a function n times *)
+Fixpoint app {A} (f : A -> A) (n : nat) : A ->  A :=
+  fun x =>
+    match n with
+      | 0%nat => x
+      | S n' => f (app f n' x)
+    end.
+
+Infix "^" := app (at level 30, right associativity) : fun_scope.
 
 
 (** ** Some support for partial functions *)
@@ -727,9 +737,47 @@ Qed.
 
 (** * Lemmas about [image'] *)
 
-Instance Proper_image' {A B} : Proper (f_eq ==> Same_set _ ==> Same_set B) (@image' A B).
+Instance Proper_image' {A B} :
+  Proper (f_eq ==> Same_set _ ==> Same_set B) (@image' A B).
 Proof.
   constructor; intros x' [y' [H1 H2]]; inv H0.
   rewrite H in H2. repeat eexists; eauto.
   rewrite <- H in H2. repeat eexists; eauto.
 Qed.
+
+(** * Lemmas about [compose] *)
+
+Open Scope program_scope.
+
+Lemma compose_id_neut_l {A B} (f : A -> B) :
+  f_eq (id ∘ f) f.
+Proof.
+  firstorder.
+Qed.
+
+Lemma compose_id_neut_r {A B} (f : A -> B) :
+  f_eq (f ∘ id) f.
+Proof.
+  firstorder.
+Qed.
+
+(** * Lemmas about [app] *)
+
+Lemma app_monotonic {A} (S1 S2 : Ensemble A) f n :
+  (forall S1 S2, S1 \subset S2 -> f S1 \subset f S2) ->
+  S1 \subset S2 ->
+  (f ^ n) S1 \subset (f ^ n) S2.
+Proof.
+  induction n; intros H Hsub.
+  - eassumption.
+  - simpl. apply H. eapply IHn; eassumption.
+Qed.
+
+Lemma app_plus {A} (f : A -> A) m n :
+  f_eq (f ^ (m + n)) ((f ^ m) ∘ (f ^ n)).
+Proof.
+  revert n; induction m; intros n; simpl.
+  - rewrite compose_id_neut_l. reflexivity.
+  - intros x. rewrite IHm. reflexivity.
+Qed.
+

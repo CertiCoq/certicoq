@@ -2079,7 +2079,10 @@ with fundefs_fv_aux (defs : fundefs) (scope fvset : FVSet) : FVSet * FVSet :=
 Definition exp_fv e := exp_fv_aux e empty empty.
 Definition fundefs_fv B := snd (fundefs_fv_aux B empty empty).
 
-(** * * Equivalence of computational and inductive FV definitions *)
+Definition exp_num_fv e := cardinal (exp_fv e).
+Definition fundefs_num_fv B := cardinal (fundefs_fv B).
+
+(** *  Equivalence of computational and inductive FV definitions *)
 
 (** fundefs_names is correct w.r.t name_in_fundefs *)
 Lemma fundefs_names_correct (defs : fundefs) :
@@ -2554,7 +2557,7 @@ Proof.
   now rewrite Hseq; eauto.
 Qed.
 
-(* bound variables for expression and function contexts *)
+(** * Bound variables for expression and function contexts *)
 Inductive bound_var_ctx: exp_ctx -> Ensemble var  :=
 | Bound_Constr1_c: forall v t ys c,
     bound_var_ctx (Econstr_c v t ys c) v

@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import Coq.Classes.Morphisms Coq.NArith.BinNat Coq.Lists.List Coq.Sets.Ensembles.
+Require Import Coq.Classes.Morphisms Arith Coq.NArith.BinNat Coq.Lists.List Coq.Sets.Ensembles.
 Require Import Libraries.Coqlib.
 Import ListNotations.
 
@@ -1063,6 +1063,16 @@ Proof.
     apply H; eauto.
   - inv H'. inv H0. inv H1. eexists; split; eauto. apply H3; eauto.
     apply H; eauto.
+Qed.
+
+Lemma bigcup_merge {A} (F : nat -> Ensemble A) :
+  \bigcup_n (\bigcup_m (F (n + m)%nat)) <-->  \bigcup_n (F n).
+Proof.
+  split; intros x [i [_ Hin]].
+  - destruct Hin as [j [_ Hin]].
+    exists (i + j)%nat. split; eauto. constructor.
+  - exists 0%nat. split. now constructor. exists i.
+      split; eauto. constructor.
 Qed.
 
 Hint Immediate Union_big_cup Setminus_big_cup big_cup_Singleton

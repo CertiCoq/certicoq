@@ -16,7 +16,7 @@ Open Scope monad_scope.
 
 (** * Size of CPS terms, values and environments, needed to express the upper bound on the execution cost of certain transformations *)
 
-(** The size of CPS expressions. Right know we only count the number of
+(** The size of CPS expressions. Right now we only count the number of
   * variables in a program (free or not), the number of functions and
   * the number of function definition blocks *)
 Fixpoint sizeOf_exp (e : exp) : nat :=

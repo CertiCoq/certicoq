@@ -535,6 +535,15 @@ Ltac normalize_occurs_free_in_ctx :=
       rewrite occurs_free_fundefs_Fnil in H
   end.
 
+Lemma occurs_free_fundefs_name_in_fundefs_Disjoint (defs : fundefs) :
+  Disjoint _ (name_in_fundefs defs) (occurs_free_fundefs defs).
+Proof with now eauto with Ensembles_DB.
+  induction defs.
+  - simpl. rewrite occurs_free_fundefs_Fcons.
+    eapply Union_Disjoint_l...
+  - simpl. rewrite occurs_free_fundefs_Fnil...
+Qed.
+
 (** ** Useful set inclusions *)
 
 Lemma occurs_free_fundefs_Fcons_Included f tau xs e B :

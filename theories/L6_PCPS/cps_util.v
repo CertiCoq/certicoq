@@ -422,9 +422,24 @@ Proof.
 Qed.
 
 
+Lemma getlist_In_val {A} (rho : M.t A) ys v vs :
+  getlist ys rho = Some vs ->
+  List.In v vs ->
+  exists x, List.In x ys /\ M.get x rho = Some v.
+Proof.
+  revert v vs. induction ys; intros x vs Hget H.
+  - inv Hget. now inv H.
+  - simpl in *.
+    destruct (M.get a rho) eqn:Heq; try discriminate; eauto.
+    destruct (getlist ys rho) eqn:Heq'; try discriminate; eauto.
+    inv Hget. inv H; eauto.
+    edestruct IHys as [y [Hin Hget]]; eauto.
+Qed.
+
+
 (** Lemmas about [setlist]  *)
 
-Lemma setlist_Forall2_get (P : val -> val -> Prop)
+Lemma setlist_Forall2_get {A} (P : A -> A -> Prop)
       xs vs1 vs2 rho1 rho2 rho1' rho2' x : 
   Forall2 P vs1 vs2 ->
   setlist xs vs1 rho1 = Some rho1' ->
@@ -539,9 +554,9 @@ Proof.
       constructor; eauto.
 Qed.
 
-Lemma setlist_length3 rho xs vs : 
+Lemma setlist_length3 {A} (rho : M.t A) xs vs : 
   length xs = length vs ->
-  exists rho' : M.t val, setlist xs vs rho = Some rho'.
+  exists rho', setlist xs vs rho = Some rho'.
 Proof.
   revert vs; induction xs; intros vs Hlen; destruct vs; try discriminate.
   - eexists; simpl; eauto.

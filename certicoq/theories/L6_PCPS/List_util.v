@@ -70,6 +70,20 @@ Proof.
   - destruct l2; inv Hall. constructor; eauto.
 Qed.
 
+Lemma Forall2_monotonic_strong (A : Type) (R R' : A -> A -> Prop) (l1 l2 : list A) :
+  (forall x1 x2 : A, List.In x1 l1 -> List.In x2 l2 -> R x1 x2 -> R' x1 x2) ->
+  Forall2 R l1 l2 -> Forall2 R' l1 l2.
+Proof.
+  revert l2.
+  induction l1 as [| x xs IHxs ]; intros l2 H Hall.
+  - inv Hall; eauto. 
+  - destruct l2; inv Hall. constructor; eauto.
+    eapply H; eauto. now constructor. now constructor.
+    eapply IHxs; eauto. intros. eapply H.
+    now constructor; eauto. now constructor; eauto.
+    eassumption.
+Qed.
+
 Lemma Forall2_asym_monotonic {A} (R R' : A -> A -> Prop) (l1 l2 : list A) :
   (forall x1 x2, R x1 x2 -> R' x1 x2) ->
   Forall2_asym R l1 l2 ->
@@ -93,6 +107,18 @@ Lemma Forall2_asym_refl {A} (R : A -> A -> Prop) (l : list A) :
   Forall2_asym R l l.
 Proof.
   intros H. induction l as [| x l IHl]; eauto.
+Qed.
+
+Lemma Forall2_symm (A : Type) (R : A -> A -> Prop) (l1 l2 : list A) : 
+  Symmetric R -> Forall2 R l1 l2 -> Forall2 R l2 l1.
+Proof.
+  intros H Hall; induction Hall; eauto.
+Qed.
+
+Lemma Forall2_symm_strong (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) : 
+  (forall l1 l2, R1 l1 l2 -> R2 l2 l1) -> Forall2 R1 l1 l2 -> Forall2 R2 l2 l1.
+Proof.
+  intros H Hall; induction Hall; eauto.
 Qed.
 
 Lemma Forall2_Forall {A} (P : A -> A -> Prop) l :

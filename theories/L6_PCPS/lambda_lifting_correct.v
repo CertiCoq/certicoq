@@ -313,7 +313,7 @@ Section Lambda_lifting_correct.
     destruct (peq g v).
     - subst. rewrite extend_gss in Happ. inv Happ.
       rewrite M.gss in Hget; inv Hget. rewrite Hf1 in Hdef. inv Hdef.
-      edestruct setlist_length3 with (xs := xs1 ++ ys) (vs := vs2 ++ vs) as [rho4' Hset4'].
+      edestruct (@setlist_length3 val) with (xs := xs1 ++ ys) (vs := vs2 ++ vs) as [rho4' Hset4'].
       rewrite !app_length. erewrite setlist_length_eq; [| now eauto ].
       erewrite <- (getlist_length_eq _ vs); [| eassumption ].
       rewrite map_length. congruence.

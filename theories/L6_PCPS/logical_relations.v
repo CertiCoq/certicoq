@@ -282,7 +282,7 @@ Section Log_rel.
     intros P1 P2 rho1' rho2' rho1 rho2 k xs vs1 vs2 Hpre Hyp Hall Hset1 Hset2
            x HP v Hget.
     destruct (in_dec var_dec x xs).
-    - edestruct setlist_Forall2_get as [v1 [v2 [Hget1 [Hget2 HP']]]]; eauto.
+    - edestruct (@setlist_Forall2_get val) as [v1 [v2 [Hget1 [Hget2 HP']]]]; eauto.
       rewrite Hget in Hget1. inv Hget1. repeat eexists; eauto.
     - erewrite <- setlist_not_In in Hget; eauto.
       edestruct Hpre as [v2 [Hget' Hpre']]; eauto.
@@ -2021,7 +2021,7 @@ Section Log_rel.
     intros P1 P2 rho1' rho2' rho1 rho2 k P xs vs1 vs2 Hpre Hyp Hall Hset1 Hset2
            x HP v Hget.
     destruct (in_dec var_dec x xs).
-    - edestruct setlist_Forall2_get as [v1 [v2 [Hget1 [Hget2 HP']]]]; eauto.
+    - edestruct (@setlist_Forall2_get val) as [v1 [v2 [Hget1 [Hget2 HP']]]]; eauto.
       rewrite Hget in Hget1. inv Hget1. repeat eexists; eauto.
     - erewrite <- setlist_not_In in Hget; eauto.
       edestruct Hpre as [v2 [Hget' Hpre']]; eauto.

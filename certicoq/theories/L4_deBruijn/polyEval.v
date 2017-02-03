@@ -133,6 +133,10 @@ match n with
         | Some (NDCon d ne, clb) =>
           cvs <- flatten (map absGetTerm clb);;
           b <- find_branch _ d (length cvs) (combine (map fst ldn) brs);;
+          (* TODO: skip the parameters in cvs. matches don't bind parameters.
+          (If parameters are explicit, Coq forces us to write "_" at those positions
+          in constructor patterns).
+          A similar fix is needed in L5. *)
           s <- (absApplyBTerm b cvs);;
           eval_n n s
         | _ => None

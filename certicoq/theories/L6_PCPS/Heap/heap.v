@@ -130,6 +130,14 @@ Module Type Heap.
     firstorder.
   Qed.
 
+  Lemma subheap_heap_eq {A} (H1 H2 : heap A) :
+    H1 ⊑ H2 ->
+    dom H1 |- H1 ≡ H2.
+  Proof.
+    intros Hsub l [v Hget]. rewrite Hget.
+    eapply Hsub in Hget. congruence.
+  Qed.
+
   Lemma alloc_dom {A} H (v : A) l H' :
     alloc v H = (l, H') ->
     dom H' <--> Union _ [set l] (dom H).

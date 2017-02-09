@@ -5,7 +5,7 @@
 
 From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
          omega.Omega Numbers.BinNums Structures.OrdersEx Sets.Ensembles
-         Lists.SetoidList ZArith Arith.
+         Lists.SetoidList ZArith Arith Sorting.Permutation.
 
 From L6 Require Import Ensembles_util.
 
@@ -418,6 +418,23 @@ Proof.
   intros Hc. eapply H. eapply In_InA.
   now eauto with typeclass_instances.
   eassumption.
+Qed.
+
+Lemma NoDup_cons_l {A} (l1 l2 : list A):
+  NoDup (l1 ++ l2) ->
+  NoDup l1.
+Proof.
+  induction l1; simpl; intros H; constructor; eauto.
+  - inv H. firstorder.
+  - inv H; firstorder.
+Qed.
+
+Lemma NoDup_cons_r {A} (l1 l2 : list A):
+  NoDup (l1 ++ l2) ->
+  NoDup l2.
+Proof.
+  revert l2; induction l1; intros l2 H; simpl in *; eauto.
+  inv H; eauto.
 Qed.
 
 (** Lemmas about [fold_left] *)

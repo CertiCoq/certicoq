@@ -3,12 +3,12 @@
  *)
 
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.hoare L6.Ensembles_util
-        L6.List_util L6.closure_conversion L6.closure_conversion_correct L6.functions
-        L6.logical_relations L6.eval.
+               L6.List_util L6.closure_conversion L6.closure_conversion_util L6.closure_conversion_correct
+               L6.functions L6.logical_relations L6.eval.
 Require Import Libraries.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+               Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Import ListNotations.

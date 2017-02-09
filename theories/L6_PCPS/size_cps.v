@@ -5,7 +5,7 @@
 From Coq Require Import ZArith List.
 From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
 From Common Require Import AstCommon.
-From L6 Require Import List_util cps.
+From L6 Require Import List_util cps ctx.
 
 Require Import Libraries.Maps.
 
@@ -41,6 +41,27 @@ with sizeOf_fundefs (B : fundefs) : nat :=
          | Fnil => 0
        end.
 
+(** The size of evaluation contexts *)
+Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
+  match c with
+    | Hole_c => 0
+    | Econstr_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
+    | Eproj_c _ _ _ _ c => 1 + sizeOf_exp_ctx c
+    | Eprim_c _ _ ys c => length ys + sizeOf_exp_ctx c
+    | Ecase_c _ l1 _ c l2  =>
+      1 + sizeOf_exp_ctx c
+      + fold_left (fun s p => s + sizeOf_exp (snd p)) l1 0
+      + fold_left (fun s p => s + sizeOf_exp (snd p)) l2 0 
+    | Efun1_c B c => sizeOf_fundefs B + sizeOf_exp_ctx c
+    | Efun2_c B e => sizeOf_fundefs_ctx B + sizeOf_exp e
+  end
+with sizeOf_fundefs_ctx (B : fundefs_ctx) : nat :=
+       match B with
+         | Fcons1_c _ _ xs c B =>
+           1 + length xs + sizeOf_exp_ctx c + sizeOf_fundefs B
+         | Fcons2_c _ _ xs e B =>
+           1 + length xs + sizeOf_exp e + sizeOf_fundefs_ctx B
+       end.
 
 (* Compute the maximum of a tree given a measure function *)
 Definition max_ptree_with_measure {A} (f : A -> nat) (i : nat) (rho : M.t A) :=
@@ -159,6 +180,15 @@ Proof.
   intros. eapply NPeano.Nat.max_le_compat; eauto.
   rewrite !sizeOf_val_eq. now eapply sizeOf_val_monotic.
 Qed.
+
+Lemma sizeOf_env_O rho :
+  sizeOf_env 0 rho = 0.
+Proof.
+  unfold sizeOf_env, max_ptree_with_measure.
+  rewrite M.fold_spec. generalize (M.elements rho).
+  induction l; eauto.
+Qed.
+
 
 (** Number of function definitions *)
 Fixpoint numOf_fundefs (B : fundefs) : nat := 
@@ -368,4 +398,38 @@ Proof.
   - eapply le_trans. eapply (max_list_nat_monotonic _ _ (sizeOf_val k)); eauto.
     intros. eapply sizeOf_val_monotic. omega.
     eapply sizeOf_env_getlist; eauto.
+Qed.
+
+Lemma sizeOf_exp_grt_1 e :
+  1 <= sizeOf_exp e.
+Proof.
+  induction e using exp_ind'; simpl; eauto; omega.
+Qed.
+
+(** Lemmas about context sizes *)
+Lemma sizeOf_exp_ctx_comp_ctx_mut :
+  (forall C1 C2,
+     sizeOf_exp_ctx (comp_ctx_f C1 C2) = sizeOf_exp_ctx C1 + sizeOf_exp_ctx C2) /\
+  (forall B e,
+     sizeOf_fundefs_ctx (comp_f_ctx_f B e) = sizeOf_fundefs_ctx B + sizeOf_exp_ctx e).
+Proof.
+  exp_fundefs_ctx_induction IHe IHB; 
+  try (intros C; simpl; eauto; rewrite IHe; omega);
+  try (intros C; simpl; eauto; rewrite IHB; omega).
+  (* probably tactic misses an intro pattern *)
+  intros l' C. simpl. rewrite IHe; omega.
+Qed.
+
+Corollary sizeOf_exp_ctx_comp_ctx :
+  forall C1 C2,
+    sizeOf_exp_ctx (comp_ctx_f C1 C2) = sizeOf_exp_ctx C1 + sizeOf_exp_ctx C2.
+Proof.
+  eapply sizeOf_exp_ctx_comp_ctx_mut; eauto.
+Qed.
+
+Corollary sizeOf_fundefs_ctx_comp_f_ctx :
+  forall B e,
+    sizeOf_fundefs_ctx (comp_f_ctx_f B e) = sizeOf_fundefs_ctx B + sizeOf_exp_ctx e.
+Proof.
+  eapply sizeOf_exp_ctx_comp_ctx_mut; eauto.
 Qed.

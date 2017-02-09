@@ -2,9 +2,12 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import Coq.Classes.Morphisms Arith Coq.NArith.BinNat Coq.Lists.List Coq.Sets.Ensembles.
-Require Import Libraries.Coqlib.
+From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles
+                        Sorting.Permutation.
+From Libraries Require Import Coqlib.
 Import ListNotations.
+
+Close Scope Z_scope.
 
 Ltac inv H := inversion H; clear H;  subst.
 
@@ -146,6 +149,8 @@ Proof.
   constructor; subst; intros x' H'; destruct H'; destruct H0 as [H1 H2]; eauto.
 Qed.
 
+
+
 Instance Proper_Setminus_l A :
   Proper (Same_set A ==> Logic.eq ==> Same_set A)
          (Setminus A).
@@ -160,6 +165,20 @@ Instance Proper_Setminus_r A :
 Proof.
   constructor; intros x' H'; destruct H0 as [H1 H2];
   inv H'; constructor; eauto.
+Qed.
+
+Instance Proper_Intersection_l A :
+  Proper (Same_set A ==> Logic.eq ==> Same_set A)
+         (Intersection A).
+Proof.
+  constructor; subst; intros x' H'; destruct H'; constructor; firstorder.
+Qed.
+
+Instance Proper_Intersection_r A :
+  Proper (Logic.eq ==> Same_set A ==> Same_set A)
+         (Intersection A).
+Proof.
+  constructor; subst; intros x' H'; destruct H'; constructor; firstorder.
 Qed.
 
 Instance Proper_Disjoint_l A :
@@ -467,6 +486,20 @@ Proof.
   intros x HIn. constructor 2. eauto.
 Qed.
 
+Lemma Union_Included_l {A} S1 S2 S3 :
+  Union A S1 S2 \subset S3 ->
+  S1 \subset S3.
+Proof.
+  firstorder.
+Qed.
+
+Lemma Union_Included_r {A} S1 S2 S3 :
+  Union A S1 S2 \subset S3 ->
+  S2 \subset S3.
+Proof.
+  firstorder.
+Qed.
+
 Lemma Included_Union_preserv_l {A} s1 s2 s3 :
   Included A s1 s2 ->
   Included A s1 (Union A s2 s3).
@@ -516,6 +549,12 @@ Lemma Singleton_Included {A} x S :
   Included A (Singleton A x) S.
 Proof. 
   intros H x' Hin; inv Hin; eauto.
+Qed.
+
+Lemma Singleton_Included_r {A : Type} (x : A) (S : Ensemble A) :
+  [set x] \subset S -> In A S x.
+Proof.
+  firstorder.
 Qed.
 
 Lemma Included_Setminus {A} s1 s2 s3:
@@ -952,7 +991,7 @@ Notation "\bigcup_ ( i : t ) F" := (big_cup (Full_set t) (fun i => F))
    format "'[' \bigcup_ ( i   :  t ) '/  '  F ']'", only parsing) : Ensembles_scope.
 Notation "\bigcup_ ( i 'in' A ) F" := (big_cup A (fun i => F))
   (at level 41, F at level 41, i, A at level 50,
-   format "'[' \bigcup_ ( i  'in'  A ) '/  '  F ']'") : Ensembles_scope_scope.
+   format "'[' \bigcup_ ( i  'in'  A ) '/  '  F ']'") : Ensembles_scope.
 
 
 Lemma Union_big_cup {A B} (S1 S2 : Ensemble A) f :
@@ -1127,6 +1166,53 @@ Lemma FromList_singleton {A} x :
 Proof.
   rewrite FromList_cons, FromList_nil, Union_Empty_set_neut_r.
   constructor; intros x' H; inv H; eauto.
+Qed.
+
+Lemma FromList_subset_included {A} (l1 l2 : list A) :
+  FromList l1 \subset FromList l2 <->
+  incl l1 l2.
+Proof.
+  split; eauto.
+Qed.  
+
+Lemma Same_set_FromList_length {A} (l1 l2 : list A) :
+  NoDup l1 ->
+  FromList l1 \subset FromList l2 ->
+  length l1 <= length l2.
+Proof.
+  eapply NoDup_incl_length.
+Qed.
+
+Lemma FromList_Union_split {A} (l : list A) S1 S2 :
+  FromList l \subset Union _ S1 S2 ->
+  exists l1 l2,
+    Permutation (l1 ++ l2) l /\
+    FromList l1 \subset S1 /\
+    FromList l2 \subset S2.
+Proof.
+  induction l; intros Hun.
+  - exists [], []. firstorder.
+  - rewrite FromList_cons in Hun.
+    assert (Hin1 := Union_Included_l _ _ _ Hun).
+    assert (Hin2 := Union_Included_r _ _ _ Hun).      
+    eapply Singleton_Included_r in Hin1.
+    edestruct IHl as [l1 [l2 [Hperm [Hs1 Hs2]]]]; eauto.
+    inv Hin1.
+    + eexists (a :: l1), l2. 
+      split; [| split ].
+      rewrite <- app_comm_cons. eapply perm_skip.
+      eassumption.
+      rewrite FromList_cons. eapply Union_Included; eauto.
+      eapply Singleton_Included. eauto.
+      eassumption.
+    + eexists l1, (a :: l2). 
+      split; [| split ].
+      rewrite Permutation_app_comm.
+      rewrite <- app_comm_cons. eapply perm_skip.
+      rewrite <- Permutation_app_comm. eassumption.
+      eassumption.
+      rewrite FromList_cons. eapply Union_Included; eauto.
+      eapply Singleton_Included. eauto.
 Qed.
 
 Hint Immediate FromList_nil FromList_cons FromList_app

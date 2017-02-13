@@ -2,6 +2,7 @@ Require Export Common.certiClasses.
 Require Export L2.instances.
 Require Export L1g.instances.
 Require Export L2_5.instances.
+Require Export L3.instances.
 Require Export L4.instances.
 Require Export L6.instances.
 
@@ -51,8 +52,10 @@ Ltac computeExtract certiL4 f:=
 match t with
 |Ret ?xx => exact xx
 end).
-(*
 
+Definition swap3 : (cTerm certiL3).
+computeExtract certiL3 swap.
+Defined.
 
 Definition swap4 : (cTerm certiL4).
 computeExtract certiL4 swap.
@@ -136,6 +139,21 @@ Proof.
 Defined.
 
 Set Template Cast Propositions.
+Set Template Timing.
+(* With sharing:
+Debug: Template-coq: interp_constr took 3.29999999984e-05s
+Debug: Template-coq: quote_term took 0.291718s
+Debug: Template-coq: declare_definition took 23.196019s
+
+<infomsg>Finished transaction in 23.574 secs (23.303u,0.184s) (successful)</infomsg>*)
+
+(* No sharing:
+
+Debug: Template-coq: interp_constr took 3.1000000007e-05s
+Debug: Template-coq: quote_term took 0.854424s
+Debug: Template-coq: declare_definition took 24.772596s
+
+<infomsg>Finished transaction in 26.315 secs (25.346u,0.28s) (successful)*)
 
 Quote Recursively Definition pgcd :=
 Gcd.
@@ -146,7 +164,7 @@ let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
 Defined.
 
 Let pcgd4a : cTerm certiL4_2.
-(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL4_2) pcgd2) in 
+(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL4_2) pcgd2) in
 match t with
 |Ret ?xx => exact xx
 end).
@@ -154,10 +172,10 @@ Defined.
 Require Import List.
 Import ListNotations.
 
-(* the Gcd_terminate function is in the environment. Below,
-we project that part of the environment.
-The environment is too big, because it contains even the
-definitions that were used in the erased proof. *)
+(* the Gcd_terminate function is in the environment. Below, *)
+(* we project that part of the environment. *)
+(* The environment is too big, because it contains even the *)
+(* definitions that were used in the erased proof. *)
 Eval vm_compute in (nth_error (AstCommon.env pcgd2) 1).
 (* Eval vm_compute in (nth_error (AstCommon.env pcgd3) 1). *)
 
@@ -171,7 +189,7 @@ let t:= eval vm_compute in (print4 pcgd4a) in exact t.
 Defined.
 Eval compute in pgcd4astr.
 *)
-*)
+
 
 Require Import Benchmarks.Binom
         Benchmarks.Color
@@ -326,13 +344,13 @@ Require Import runtime.runtime.
 
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (M.elements (fst prog)) file.
 
-
 (*Definition test := printProg p7 "output/threePlusFour.c".*)
 (*Definition test := printProg blahProg7 "output/blah.c".*)
 (*Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".*)
 (*Definition test := printProg graph_color7 "output/color.c".*)
 
 Quote Recursively Definition binom := Binom.main.
+
 Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".
 
 (*

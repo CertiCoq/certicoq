@@ -297,8 +297,15 @@ let add_name (a, n) =
       Hashtbl.add string_of_atom a (camlstring_of_coqstring s);
       ()
 
+let remove_primes (a, n) =
+  match n with
+  | Ast0.Coq_nAnon -> (a,n)
+  | Ast0.Coq_nNamed s ->
+     let s' = Str.global_replace (Str.regexp "'") "p" (camlstring_of_coqstring s)  in
+     (a, Ast0.Coq_nNamed (coqstring_of_camlstring s'))
+	
 let print_dest_names prog names dest =
   let oc = open_out (camlstring_of_coqstring dest) in
-  List.iter add_name names;
+  List.iter (fun n -> add_name (remove_primes n))  names;
   print_program (formatter_of_out_channel oc) prog;
   close_out oc

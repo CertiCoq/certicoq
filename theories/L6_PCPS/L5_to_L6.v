@@ -45,10 +45,11 @@ Definition tag := positive.
 
 Section Program.
   
-
-  Variable default_tag : tag.
-  Variable fun_tag: tag.
-  Variable kon_tag: tag.
+  
+  Variable default_tag : cTag.
+  Variable default_itag: iTag.
+  Variable fun_tag: fTag.
+  Variable kon_tag: fTag.
   
   
   
@@ -65,23 +66,30 @@ Section Program.
     - right; intro; apply n1. inversion H; auto.
   Defined.
   
-  Definition L6_conId := cTag.
+ 
+
+(* dcon to generated cTag and the # of parameter for the inductive type of this constructor *) 
+  Definition conId_map:= list (L5_conId * (cTag * nat)).
 
 
-  Definition conId_map:= list (L5_conId * L6_conId).
-
-
-
-
-
-  Fixpoint dcon_to_tag (a:L5_conId) (sig:conId_map) :=
+  Fixpoint dcon_to_info (a:L5_conId) (sig:conId_map) :=
     match sig with
-      | nil => default_tag
-      | ((cId, tag)::sig') => match L5_conId_dec a cId with
-                                | left _ => tag
-                                | right _ => dcon_to_tag a sig'
+      | nil => (default_tag, 0)
+      | ((cId, inf)::sig') => match L5_conId_dec a cId with
+                                | left _ => inf
+                                | right _ => dcon_to_info a sig'
                               end
     end.
+
+  Definition dcon_to_tag (a:L5_conId) (sig:conId_map) :=
+    fst (dcon_to_info a sig).
+
+  Definition dcon_to_p (a:L5_conId) (sig:conId_map) :=
+    snd (dcon_to_info a sig).
+  
+
+
+
 
 
 
@@ -94,15 +102,15 @@ Section Program.
         let (l, nm ) := (fromN (n+1) (m')) in
         (n::l, nm)
     end.
+  
 
-
-  (* Bind the m first projections of var r to variables [n, n+m[ *)
-  Fixpoint ctx_bind_proj (tg:cTag) (r:positive) (m:nat) (n:var) : (exp_ctx * var) :=
+  (* Bind m projections (starting from the (p+1)th) of var r to variables [n, n+m[, returns the generated context and n+m *)
+  Fixpoint ctx_bind_proj (tg:cTag) (r:positive) (m:nat) (n:var) (p:nat) : (exp_ctx * var) :=
     match m with
       | O => (Hole_c, n)
       | S m' =>
-        let (ctx_p', n') := ctx_bind_proj tg r m' n in
-        (Eproj_c  n' tg (N.of_nat m') r ctx_p', Pos.succ n')
+        let (ctx_p', n') := ctx_bind_proj tg r m' n p in
+        (Eproj_c  n' tg (N.of_nat (m'+p)) r ctx_p', Pos.succ n')
     end.
 
 
@@ -225,7 +233,11 @@ note : var "1" is taken as error and will be proven not to appear when input is 
                 let lxs := List.length xs in 
                 let '(cbl, n', tgm) := convert_branches bl' sv sk tgm r n in
                 let tg := dcon_to_tag dcn (fst (fst tgm)) in
-                let (ctx_p, n'') := ctx_bind_proj tg r lxs n' in 
+                (* take the first lxs projections on the scrutiny at the head of each branches
+                   02/17 - We now erase parameters as part of this translation s.t. we don't offset those projections 
+                   TODO - use the right tag for each projection *)
+                   
+                let (ctx_p, n'') := ctx_bind_proj tg r lxs n' 0 in 
                 let (names, _) := fromN n' lxs in
                 let sv' := set_s_list xs names sv in
                 let '(ce, n''', tgm) :=  convert e sv' sk tgm n'' in
@@ -261,19 +273,23 @@ Ret_c M N ->
              let fds := Fcons n' kon_tag (n::nil) e' Fnil in
              (Efun1_c fds Hole_c, n',  Pos.succ n', set_t n' kon_tag tgm )
            | Con_c dcn lv =>
-             let fix convert_v_list (lv :list val_c) (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): (exp_ctx * list var * var * conv_env) :=
-                 match lv with
-                   | nil => (Hole_c, nil, n, tgm)
-                   | v::lv' =>
+             (* skips the first p values in lv and produce an expression context binding to the returned list of variables
+                the converted values  *)
+             let fix convert_v_list (lv :list val_c) (p:nat) (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): (exp_ctx * list var * var * conv_env) :=
+                 match (p, lv) with
+                   | (S p', v::lv') =>
+                      convert_v_list lv' p' sv sk tgm n
+                   | (0, v::lv') =>
                      let '(ctx_v, vn , n', tgm) := convert_v v sv sk tgm n in
-                     let '(ctx_lv', ln', n'', tgm) := convert_v_list lv' sv sk tgm n' in
+                     let '(ctx_lv', ln', n'', tgm) := convert_v_list lv' 0 sv sk tgm n' in
                      (comp_ctx_f ctx_v ctx_lv', (vn::ln'), n'', tgm)
+                   | _ =>  (Hole_c, nil, n, tgm)
                        
-                 end in
-             let '(lv_ctx, nl, n', tgm) := convert_v_list lv sv sk tgm n in
-             let ctag := (dcon_to_tag dcn (fst (fst tgm))) in
-
-             (comp_ctx_f lv_ctx (Econstr_c n' ctag (List.rev nl) Hole_c), n', Pos.succ n', set_t n' ctag tgm)
+                 end in 
+             let (ctag, nP) := (dcon_to_info dcn (fst (fst tgm))) in
+             (* skip the first nP arguments which correspond to the inductive type's parameters *)
+             let '(lv_ctx, nl, n', tgm) := convert_v_list lv nP sv sk tgm n in
+             (comp_ctx_f lv_ctx (Econstr_c n' ctag nl Hole_c), n', Pos.succ n', set_t n' ctag tgm)
            | Fix_c lbt i =>
              (match lbt with
                 | nil => (Hole_c, (1%positive), n, tgm) (* malformed input, should not happen *) 
@@ -325,12 +341,14 @@ arguments are:
   (** process a list of constructors from inductive type ind with iTag niT.  
     - update the cEnv with a mapping from the current cTag to the cTypInfo
     - update the conId_map with a pair relating the nCon'th constructor of ind to the cTag of the current constructor
+
+   nP: number of type parameters for this bundle, kept in the dcm to erase the right number of arguments
    *)
-  Fixpoint convert_cnstrs (cct:list cTag) (itC:list Cnstr) (ind:inductive) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
+  Fixpoint convert_cnstrs (cct:list cTag) (itC:list Cnstr) (ind:inductive) (nP:nat) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
     match (cct, itC) with  
       | (cn::cct', cst::icT') =>
         let (cname, ccn) := cst in
-        convert_cnstrs cct' icT' ind (nCon+1)%N niT (M.set cn (nNamed cname, niT, N.of_nat ccn, nCon) ce) (((ind,nCon), cn)::dcm)
+        convert_cnstrs cct' icT' ind nP (nCon+1)%N niT (M.set cn (nNamed cname, niT, N.of_nat (ccn), nCon) ce) (((ind,nCon), (cn, nP))::dcm)
       | (_, _) => (ce, dcm)
     end.
 
@@ -339,17 +357,17 @@ arguments are:
     - use tag niT for this inductive datatype
     - reserve constructor tags for each constructors of the type
     - process each of the constructor, indicating they are the ith constructor of the nth type of idBundle
-
+   np: number of type parameters for this bundle
    *)
-  Fixpoint convert_typack typ (idBundle:string) (n:nat) (ice:(iEnv * cEnv* iTag * cTag * conId_map)) : (iEnv * cEnv * cTag * iTag * conId_map) :=
+  Fixpoint convert_typack typ (idBundle:string) (np:nat) (n:nat) (ice:(iEnv * cEnv* iTag * cTag * conId_map)) : (iEnv * cEnv * cTag * iTag * conId_map) :=
     let '(ie, ce, niT, ncT, dcm) := ice in 
     match typ with
       | nil => ice
       | (mkItyp itN itC ) ::typ' => 
         let (cct, ncT) := fromN ncT (length itC) in
-        let (ce, dcm) := convert_cnstrs cct itC (mkInd idBundle n) 0 niT ce dcm in
+        let (ce, dcm) := convert_cnstrs cct itC (mkInd idBundle n) np 0 niT ce dcm in
         let ityi := combine cct (map (fun (c:Cnstr) => let (_, n) := c in N.of_nat n) itC) in
-        convert_typack typ' idBundle (n+1) (M.set niT ityi ie, ce,  ncT, (Pos.succ niT), dcm)
+        convert_typack typ' idBundle np (n+1) (M.set niT ityi ie, ce,  ncT, (Pos.succ niT), dcm)
     end.
   
   Fixpoint convert_env' (g:ienv) (ice:iEnv * cEnv * cTag * iTag * conId_map) : (iEnv * cEnv * conId_map) :=
@@ -357,10 +375,9 @@ arguments are:
     match g with      
       | nil => (ie, ce, dcm)
       | (id, n, ty)::g' =>
-        (* id is name of mutual pack, n is number of type in mutual pack, ty is mutual pack *)
+        (* id is name of mutual pack, n is number of (type) parameters for this mutual pack, ty is mutual pack *)
         (* constructors are indexed with : name (string) of the mutual pack with which projection of the ty, and indice of the constructor *)      
-        convert_env' g' (convert_typack ty id 0 (ie, ce, ncT, niT, dcm)) 
-
+        convert_env' g' (convert_typack ty id n 0 (ie, ce, ncT, niT, dcm)) 
     end.
 
 
@@ -368,9 +385,12 @@ arguments are:
  - an L6 inductive environment (iEnv) mapping tags (iTag) to constructors and their arities 
  - an L6 constructor environment (cEnv) mapping tags (cTag) to information about the constructors 
  - a map (conId_map) from L5 tags (conId) to L6 constructor tags (cTag)
-convert_env' is called with the next available constructor tag (1) and the next available inductive datatype tag (1)
+convert_env' is called with the next available constructor tag and the next available inductive datatype tag, and inductive and constructor environment containing only the default "box" constructor/type
    *)
-  Definition convert_env (g:ienv): (iEnv*cEnv * conId_map) := convert_env' g (M.empty iTyInfo, M.empty cTyInfo, 1%positive, 1%positive, nil).
+  Definition convert_env (g:ienv): (iEnv*cEnv * conId_map) :=
+    let default_iEnv := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty iTyInfo) in
+    let default_cEnv := M.set default_tag (nAnon, default_itag, 0%N, 0%N) (M.empty cTyInfo) in
+    convert_env' g (default_iEnv, default_cEnv, (Pos.succ default_tag:cTag), (Pos.succ default_itag:iTag), nil).
 
 
   (** to convert from L5a to L6, first convert the environment (ienv) into a cEnv (map from constructor to info) and a conId_map (dcm) from L5 tags to L6 tags. Then, use that conId_map in the translation of the L5 term to incorporate the right L6 tag in the L6 term *)

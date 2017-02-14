@@ -53,23 +53,25 @@ Definition bogus_iTag := 2000%positive.
 Definition bogus_cloTag := 1500%positive.
 Definition bogus_cloiTag := 1501%positive.
 
-Definition default_tag := 1336%positive.
-Definition fun_tag := 1337%positive.
-Definition kon_tag := 1338%positive.
+Definition default_cTag := 1%positive.
+Definition default_iTag := 1%positive.
+Definition fun_fTag := 3%positive.
+Definition kon_fTag := 2%positive.
 
 Instance certiL5a_t0_L6: 
   CerticoqTotalTranslation (cTerm certiL5a) (cTerm certiL6) := 
   fun v =>
     match v with
         | pair venv vt => 
-          let '(cenv, nenv, t) := convert_top default_tag fun_tag kon_tag (venv, L5a.Halt_c vt) in
-          let '(cenv',nenv', t') := closure_conversion_hoist
+          let '(cenv, nenv, t) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, L5a.Halt_c vt) in
+         let '(cenv',nenv', t') :=  closure_conversion_hoist
                                    bogus_cloTag
                                   (shrink_top t)  
                                    bogus_cTag
                                    bogus_iTag
                                    cenv nenv in
-          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), M.empty _, nenv'), shrink_top  t')
+          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), M.empty _, nenv'), shrink_top  t')          
+(*          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv), M.empty _, nenv),   t)           *)
     end.
 
 

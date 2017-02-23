@@ -25,7 +25,6 @@ Inductive WNorm: Term -> Prop :=
 | WNAx: WNorm TAx
 | WNCase: forall mch n brs,
             WNorm mch -> ~ isConstruct mch ->
-            WNorms brs ->
             WNorm (TCase n mch brs)
 | WNConstruct: forall i n args,
                  WNorms args -> WNorm (TConstruct i n args)
@@ -67,7 +66,6 @@ Proof.
         inversion_Clear h. elim H5. auto.
       * destruct H0.
         { left. constructor; assumption. }
-        { right. intros h. destruct H0. inversion_Clear h. assumption. }
   - destruct H, H0;
     try (solve [right; intros h; inversion_Clear h; contradiction]).
     + left; constructor; auto.
@@ -86,9 +84,7 @@ Proof.
   try (solve [elim (H _ H4)]);
   try (solve [elim (H _ H6)]);
   try (solve [elim (H0 _ H6)]).
-  - unfold no_wnd_step, no_step in H. eelim H. eassumption.
-  - eelim H0. eassumption.
-  - eelim H0. eassumption. 
+  - unfold no_wnd_step, no_step in H0. eelim H0. eassumption.
   - eelim H0. eassumption.
 Qed.
 
@@ -100,9 +96,9 @@ Lemma pre_wNorm_WcbvEval_rfl:
 Proof.
   intros p; apply WNormWNorms_ind; intros; auto; 
   try (solve [inversion H; reflexivity]).
-  - inversion_Clear H1.
-    + rewrite (H _ H5) in n0. elim n0. auto.
-    + rewrite (H0 _ H8). rewrite (H _ H5). reflexivity.
+  - inversion_Clear H0.
+    + rewrite (H _ H4) in n0. elim n0. auto.
+    + rewrite (H _ H5). reflexivity.
   - inversion H0.
     + rewrite (H args'). reflexivity. assumption.
   - inversion_Clear H1.
@@ -114,104 +110,3 @@ Proof.
   - inversion_Clear H1. rewrite (H _ H4). rewrite (H0 _ H6). reflexivity.
 Qed.
 
-(***
-Lemma wNorm_WcbvEval_rfl:
-  forall p,
-    (forall t, WNorm t -> WcbvEval p t t) /\
-    (forall ts, WNorms ts -> WcbvEvals p ts ts).
-  intros p.
-  destruct (pre_wNorm_WcbvEval_rfl p).
-split; intros.
-- rewrite H.
-
-Check (proj1 j _ H).
-***)
-
-(*** HERE; use Crct premise
-(** If WcbvEval p t t, then t is in weak normal form **)
-Goal
-  forall (p:environ),
-    (forall t s, WcbvEval p t s -> t = s -> WNorm t) /\
-    (forall ts ss, WcbvEvals p ts ss -> ts = ss -> WNorms ts).
-intros p. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
-- subst. inversion_Clear w.
-***)
-
-
-(** If wndEval cannot step a correct program, then it is in weak normal form:
-*** This claim is false now; e.g. whFixStep or whCaseStep may fail.
-*** So we comment out this lemma.
-**
-Lemma no_wndStep_wNorm:
-  (forall p n t, Crct p n t -> n = 0 -> no_wnd_step p t -> WNorm t) /\
-  (forall p n ts, Crcts p n ts -> n = 0 ->
-                  no_wnds_step p ts -> WNorms ts) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> True).
-apply (CrctCrctsCrctDs_ind); intros; try auto; try (solve [constructor]).
-- apply H0. assumption. intros sx h. elim (H5 sx). destruct (wndEval_weaken p).
-  apply H6; assumption.
-- rewrite H2 in H. omega.
-- apply WNCast.
-  + apply H0. trivial. intros s j. 
-    elim (H4 (TCast s ck ty)). apply (sCastTrm _ _ j).
-  + apply H2. trivial. intros s j.
-    elim (H4 (TCast t ck s)). apply (sCastTy _ _ j).
-- apply WNProd. apply H2. trivial. intros s j. elim (H4 (TProd nm s bod)).
-  apply sProdTy. trivial.
-- apply WNLam. apply H2. trivial. intros s j. elim (H4 (TLambda nm s bod)).
-  apply sLamTy. trivial.
-- elim (H6 (instantiate dfn 0 bod)). apply sLetIn.
-- apply WNApp. apply H0. trivial. intros s j. elim (H6 (TApp s a args)).
-  + apply sAppFn. assumption.
-  + apply (H2 H5). intros s j. elim (H6 (TApp fn s args)).
-    apply sAppArg. assumption.
-  + induction args. auto. apply (H4 H5). intros sx j. inversion_clear j.
-    * elim (H6 (TApp fn a (tcons r args))). apply sAppArgs. apply saHd. auto.
-    * elim (H6 (TApp fn a (tcons t ss))). apply sAppArgs. apply saTl. auto.
-  + intros h. destruct h. destruct H7. destruct H7.
-    elim (H6 (whBetaStep x1 a args)). rewrite H7. apply sBeta.
-  + intros h. destruct h. destruct H7. rewrite H7 in H6.
-    unfold no_wnd_step in H6. elim H6. admit.
-(**    eelim (H6). rewrite H7. apply sFix. unfold whFixStep. destruct (whFixStep x x0 (tcons a args)). ereflexivity. rewrite H7. apply sFix.
-**)
-- eelim (H3). apply sConst. eassumption. 
-- subst. apply WNCase.
-  + apply H0. reflexivity. unfold no_wnd_step. intros s h. eelim H6. 
-    eapply wndEvalRTC_Case_mch.
-
-unfold no_wnd_step in H6.
-- subst. destruct (isCanonical_dec mch).
-  + inversion H5. edestruct H6. rewrite <- H7. apply sCase0. unfold whCaseStep. simpl. [apply sCase0 | apply sCasen].
-  + constructor; intuition.
-    * apply H7. intros s h. elim (H6 (TCase m ty s brs)). apply sCaseArg. 
-      assumption.
-    * apply H2. intros s h. elim (H6 (TCase m s mch brs)). apply sCaseTy. 
-      assumption.
-    * apply H0. intros s h. elim (H6 (TCase m ty mch s)). apply sCaseBrs.
-      assumption.
-- subst. intuition. constructor.
-  + apply H3. intros s h. elim (H4 (tcons s ts)). apply saHd. assumption.
-  + apply H0. intros s h. elim (H4 (tcons t s)). apply saTl. assumption.
-Qed.
-***)
-
-(**********************
-(** if WcbvEval p t1 t2 then t2 is in weak normal form ***)
-Goal 
-  (forall p n t, Crct p n t -> n = 0 -> forall s, WcbvEval p t s -> WNorm s) /\
-  (forall p n ts, Crcts p n ts -> n = 0 ->
-                     forall ss, WcbvEvals p ts ss -> WNorms ss) /\
-  (forall (p:environ) (n:nat) (ds:Defs), CrctDs p n ds -> True).
-apply (CrctCrctsCrctDs_ind); intros; subst; try auto.
-- inversion_Clear H0. constructor.
-- apply H0; auto.
-
-
-
-forall p n t1 t2, Crct p n t1 -> n = 0 -> WcbvEval p t1 t2 -> WNorm t2.
-intros.
-
-
- apply (proj1 (no_wndStep_wNorm) p n t1). 
-
-***********************)

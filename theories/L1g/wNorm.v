@@ -31,9 +31,8 @@ Inductive WNorm: Term -> Prop :=
 | WNProd: forall nm ty bod, WNorm ty -> WNorm (TProd nm ty bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNAx: WNorm TAx
-| WNProof: forall t, WNorm t -> WNorm (TProof t)
 | WNCase: forall mch n ty brs,
-            WNorm mch -> WNorm ty -> WNorms brs -> ~ isCanonical mch ->
+            WNorm mch -> WNorm ty -> ~ isCanonical mch ->
             WNorm (TCase n ty mch brs)
 | WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
 | WNInd: forall i, WNorm (TInd i)
@@ -259,7 +258,7 @@ Proof.
   try (solve[inversion h]);
   try (solve[inversion h; subst; contradiction]).
   - inversion h. subst. elim H4. exists nm, ty, bod. reflexivity.
-  - inversion h. subst. elim H6.
+  - inversion_Clear h. elim H5.
     eapply canonicalP_isCanonical. eassumption.
   - inversion_Clear h.
     + elim H5. auto.

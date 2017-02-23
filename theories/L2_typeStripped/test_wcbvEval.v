@@ -17,8 +17,9 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 Set Template Cast Propositions.
-Set Printing Width 110.
+Set Printing Width 80.
 Set Printing Depth 1000.
+
 
 (** tactic for WcbvEval relation **)
 Ltac terms := repeat (eapply wCons; try eapply wAppCong; try eapply wInd;
@@ -26,15 +27,15 @@ Ltac terms := repeat (eapply wCons; try eapply wAppCong; try eapply wInd;
                       try not_isLambda; try not_isFix; try eapply wNil).
 
 (** Abhishek's example of looping: in L2 we don't test the guard **)
-Inductive lt (n:nat) : nat -> Prop := lt_n: lt n (S n).
+Inductive mlt (n:nat) : nat -> Prop := mlt_n: mlt n (S n).
 Inductive Acc (y: nat) : Prop :=
-  Acc_intro : (forall x: nat, lt y x -> Acc x) -> Acc y.
-Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), lt x y -> Acc y.
+  Acc_intro : (forall x: nat, mlt y x -> Acc x) -> Acc y.
+Definition Acc_inv: forall (x:nat) (H:Acc x) (y:nat), mlt x y -> Acc y.
   intros. destruct H. apply H. apply H0.
   Defined.
 Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
   match n with
-    | _ => @loop (S n) (@Acc_inv _ a (S n) (lt_n n))
+    | _ => @loop (S n) (@Acc_inv _ a (S n) (mlt_n n))
   end.
 Axiom Acc0Ax : Acc 0.
 Definition loop0 := (@loop O Acc0Ax).
@@ -162,22 +163,27 @@ Proof.
 ********************************)
                       
 
-Notation NN := (mkInd "Datatypes.nat" 0).
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation NNN := (TInd NN).
 Notation SS := (TConstruct NN 1 1).
 Notation ZZ := (TConstruct NN 0 0).
+Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
+Notation LLL := (TInd LL).
+Notation CONS := (TConstruct LL 1 3).
+Notation NIL := (TConstruct LL 0 1).
 Notation Lam := (TLambda).
 Notation tLam := (tLambda).
 Notation Pi := (TProd).
 Notation tPi := (tProd).
 Notation PROP := (TSort sProp).
 Notation tPROP := (tSort sProp).
-Notation AND := (mkInd "Logic.and" 0).
+Notation AND := (mkInd "Coq.Init.Logic.and" 0).
 Notation CONJ := (TConstruct AND 0 4).
-Notation TRUE := (mkInd "Logic.True" 0).
+Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
 Notation II := (TConstruct TRUE 0 0).
-Notation EQ := (mkInd "Logic.eq" 0).
+Notation EQ := (mkInd "Coq.Init.Logic.eq" 0).
 Notation RFL := (TConstruct EQ 0 2).
-Notation PROD := (mkInd "Datatypes.prod" 0).
+Notation PROD := (mkInd "Coq.Init.Datatypes.prod" 0).
 Notation PAIR := (TConstruct PROD 0 4).
 Notation "^ x" := (nNamed x)  (at level 85).
 Notation "^" := (nAnon).
@@ -195,6 +201,25 @@ Notation pp1 := (TConstruct PP1 0 0).
 Quote Recursively Definition p_and_rect := and_rect.
 Print p_and_rect.
 Eval cbv in (program_Program p_and_rect).
+
+Definition and_rect_x :=
+  (and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+Quote Recursively Definition p_and_rect_x := and_rect_x.
+Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).
+Print P_and_rect_x.
+Quote Recursively Definition cbv_and_rect_x :=
+  ltac:(let t:=(eval cbv in and_rect_x) in exact t).
+Definition ans_and_rect_x :=
+  Eval cbv in (main (program_Program cbv_and_rect_x)).
+Definition envx := env P_and_rect_x.
+Definition mainx := main P_and_rect_x.
+Goal
+  wcbvEval envx 90 mainx = Ret ans_and_rect_x.
+  vm_compute. (******** HERE reflexivity.
+Qed.
+               *****************)
+Abort.
+
 Definition and_rectx :=
   and_rect (fun (x0:P0) (x1:P1) => pair (conj x1 x0) 0) (conj p0 p1).
 Eval cbv in and_rectx.

@@ -5,6 +5,7 @@ Require Import Coq.Arith.Compare_dec.
 Require Export Template.Ast.
 Require Import Common.Common.
 Require Import L2.compile.
+Require Import L2.term.
 
 
 Local Open Scope string_scope.
@@ -35,8 +36,8 @@ Inductive Term : Type :=
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* index in datatype *) ->
                nat (* arity *) -> Term
-| TCase      : (inductive * nat * list nat) (* # params, args per branch *) ->
-               Term -> Terms -> Term
+| TCase      : (inductive * nat) (* # of pars *) ->
+               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : Term
 with Terms : Type :=
@@ -55,6 +56,7 @@ Notation prop := (TSort SProp).
 Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
+Notation dunit nm t m d := (dcons nm t m d dnil).
 
 
 (*** \box in case branches: need tappend, mkApp and instantiate ***)
@@ -92,7 +94,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
       TLambda nm  (instantiate (S n) bod)
     | TProd nm bod => TProd nm (instantiate (S n) bod)
     | TCase np s ts =>
-      TCase np (instantiate n s) (instantiates n ts)
+      TCase np (instantiate n s) (instantiateDefs n ts)
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
@@ -137,16 +139,21 @@ Function L2Term_Term (t:L2Term) : Term :=
     | L2.compile.TLetIn nm dfn bod =>
       TLetIn nm (L2Term_Term dfn) (L2Term_Term bod)
     | L2.compile.TApp fn arg args =>
-      TApp (L2Term_Term fn) (L2Term_Term arg) (L2Terms_Terms args)
+      mkApp (L2Term_Term fn) (tcons (L2Term_Term arg) (L2Terms_Terms args))
     | L2.compile.TConst pth => TConst pth
     | L2.compile.TAx => TAx
     | L2.compile.TInd ind => TInd ind
     | L2.compile.TConstruct ind m arty => TConstruct ind m arty
-    | L2.compile.TCase
-        (_, _, (cons n nil)) (L2.compile.TProof _) (L2.compile.tunit br) =>
-      applyBranchToProof n (L2Term_Term br)
     | L2.compile.TCase m mch brs =>
-      TCase m (L2Term_Term mch) (L2Terms_Terms brs)
+      match L2.term.isProof_dec mch with
+        | left _ =>
+          match brs with
+            | L2.compile.dunit _ br n =>
+              applyBranchToProof n (L2Term_Term br)
+            | _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+          end
+        | right _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+      end
     | L2.compile.TFix defs m => TFix (L2Defs_Defs defs) m
     | L2.compile.TWrong => TWrong
   end
@@ -168,6 +175,42 @@ with L2Defs_Defs_ind' := Induction for L2Defs_Defs Sort Prop.
 Combined Scheme L2Term_TermEvalsDEvals_ind
          from L2Term_Term_ind', L2Terms_Terms_ind', L2Defs_Defs_ind'.
 ***)
+
+(***
+Lemma L2Term_Term_Case:
+  forall mch brs,
+    match mch, brs with
+      | L2.term.TProof _, L2.compile.dunit _ br n =>
+        applyBranchToProof n (L2Term_Term br)
+      | _, _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+    end.
+                  
+              forall m brs, L2Term_Term (L2.compile.TCase m mch brs) =
+                            TCase m (L2Term_Term mch) (L2Defs_Defs brs).
+Proof.
+***)
+
+Lemma L2Term_Term_Case_not_Proof:
+  forall mch, ~ L2.term.isProof mch ->
+              forall m brs, L2Term_Term (L2.compile.TCase m mch brs) =
+                            TCase m (L2Term_Term mch) (L2Defs_Defs brs).
+Proof.
+  intros mch hmch m brs.
+  destruct brs, mch; cbn; try reflexivity.
+  elim hmch. auto.
+Qed.
+
+Lemma L2Term_Term_Case_not_dunit:
+  forall brs, L2.term.dlength brs <> 1 ->
+              forall m mch, L2Term_Term (L2.compile.TCase m mch brs) =
+                            TCase m (L2Term_Term mch) (L2Defs_Defs brs).
+Proof.
+  intros brs hmch m mch.
+  destruct brs; intros; cbn; destruct mch; try reflexivity.
+  - destruct brs; try reflexivity.
+    + cbn in hmch. elim hmch. reflexivity.
+Qed.
+
 
 (** environments and programs **)
 Function L2EC_EC (ec:L2EC) : envClass Term :=

@@ -33,8 +33,9 @@ Inductive Term : Type :=
 | TAx        : Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* cnstr no *) -> nat (* arity *) -> Term
-| TCase      : (inductive * nat * list nat) (* # params, args per branch *) ->
-               Term -> Terms -> Term
+                                  (* use Defs to code branches *)
+| TCase      : (inductive * nat) (* # of pars *) ->
+               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : Term
 with Terms : Type :=
@@ -53,6 +54,7 @@ Notation prop := (TSort SProp).
 Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
+Notation dunit nm t m := (dcons nm t m dnil).
 
 
 Function strip (t:L1gTerm) : Term :=
@@ -71,7 +73,7 @@ Function strip (t:L1gTerm) : Term :=
     | L1g.compile.TAx => TAx
     | L1g.compile.TInd i => TInd i
     | L1g.compile.TConstruct i m arty => TConstruct i m arty
-    | L1g.compile.TCase n _ mch brs => TCase n (strip mch) (strips brs)
+    | L1g.compile.TCase n _ mch brs => TCase n (strip mch) (stripDs brs)
     | L1g.compile.TFix ds n => TFix (stripDs ds) n
     | L1g.compile.TWrong _ => TWrong
   end
@@ -126,6 +128,28 @@ Function stripEC (ec:L1gEC) : AstCommon.envClass Term :=
 Definition  stripEnv : L1gEnv -> AstCommon.environ Term :=
   List.map (fun nmec : string * L1gEC => (fst nmec, stripEC (snd nmec))).
 
+Lemma stripEcTrm_hom:
+  forall t, stripEC (ecTrm t) = ecTrm (strip t).
+Proof.
+  intros. reflexivity.
+Qed.
+
+Lemma stripEnv_pres_fresh:
+  forall nm p, fresh nm p -> fresh nm (stripEnv p).
+Proof.
+  induction 1.
+  - constructor; assumption.
+  - constructor.
+Qed.
+
+Lemma stripEnv_inv:
+  forall gp s ec p, stripEnv gp = (s, ec) :: p ->
+                    exists ec2 p2, ec =stripEC ec2 /\ p = stripEnv p2.
+Proof.
+  intros. destruct gp. discriminate. cbn in H. injection H; intros. subst.
+  exists (snd p0), gp. intuition.
+Qed.
+  
 Definition stripProgram (p:L1gPgm) : Program Term :=
   {| env:= stripEnv (env p);
      main:= strip (main p) |}.

@@ -78,6 +78,11 @@ Ltac SomeSubst :=
            | [ H:(Some _ = _) |- _ ] => rewrite H
          end.
 
+Lemma triv_exists:
+  forall (A B:Type) (C:A -> B) (a:A), exists (aa:A), C a = C aa.
+  intros A B C a. exists a. reflexivity.
+Qed.
+
 Definition xor (b1 b2:bool) : bool :=
   match b1, b2 with
     | true, true => true

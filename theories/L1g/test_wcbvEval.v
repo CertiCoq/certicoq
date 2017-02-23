@@ -19,6 +19,10 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+Set Template Cast Propositions.
+Set Printing Width 80.
+Set Printing Depth 1000.
+
 (** example from Coq club 
 "Question about the formal definition of the guard condition"
 Here we check the unrolling guard
@@ -59,11 +63,31 @@ Notation Pi := (TProd).
 Notation tPi := (tProd).
 Notation PROP := (TSort sProp).
 Notation tPROP := (tSort sProp).
+Notation AND := (mkInd "Coq.Init.Logic.and" 0).
+Notation CONJ := (TConstruct AND 0 4).
+Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
+Notation II := (TConstruct TRUE 0 0).
+Notation EQ := (mkInd "Coq.Init.Logic.eq" 0).
+Notation RFL := (TConstruct EQ 0 2).
+Notation PROD := (mkInd "Coq.Init.Datatypes.prod" 0).
+Notation PAIR := (TConstruct PROD 0 4).
 Notation "^ x" := (nNamed x)  (at level 85).
 Notation "^" := (nAnon).
-Unset Template Cast Propositions. 
+Infix ":t:" := tcons  (at level 87, right associativity).
+
+
+Inductive P0: Prop := p0.
+Inductive P1: Prop := p1.
+Notation PP0 := (mkInd "P0" 0).
+Notation pp0 := (TConstruct PP0 0 0).
+Notation PP1 := (mkInd "P1" 0).
+Notation pp1 := (TConstruct PP1 0 0).
+
+
 Quote Recursively Definition p_and_rect := and_rect.
 Print p_and_rect.
+Eval cbv in (program_Program p_and_rect).
+
 Definition and_rect_x :=
   (and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
 Quote Recursively Definition p_and_rect_x := and_rect_x.
@@ -73,41 +97,72 @@ Quote Recursively Definition cbv_and_rect_x :=
   ltac:(let t:=(eval cbv in and_rect_x) in exact t).
 Definition ans_and_rect_x :=
   Eval cbv in (main (program_Program cbv_and_rect_x)).
-Definition envx := env P_and_rect_x.
-Definition mainx := main P_and_rect_x.
+Definition env_x := env P_and_rect_x.
+Definition main_x := main P_and_rect_x.
 Goal
-  wcbvEval envx 90 mainx = Ret ans_and_rect_x.
+  wcbvEval env_x 25 main_x = Ret ans_and_rect_x.
   vm_compute. reflexivity.
 Qed.
-        
-Set Template Cast Propositions. 
+
+
+Definition and_rectx :=
+  and_rect (fun (x0:P0) (x1:P1) => pair (conj x1 x0) 0) (conj p0 p1).
+Eval cbv in and_rectx.
+Quote Recursively Definition ans_and_rectx := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in and_rectx) in exact t).
+Definition pP_ans_and_rectx := program_Program ans_and_rectx.
+Definition Ans_and_rectx :=
+  Eval cbv in (wcbvEval (env pP_ans_and_rectx) 100
+                        (main pP_ans_and_rectx)).
+Print Ans_and_rectx.
+Quote Recursively Definition p_and_rectx := and_rectx.
+Print p_and_rectx.
+Definition P_and_rectx := Eval cbv in (program_Program p_and_rectx).
+Print P_and_rectx.
+Definition P_envx := env P_and_rectx.
+Definition P_mainx := main P_and_rectx.
+Goal wcbvEval P_envx 1000 P_mainx = Ans_and_rectx.
+vm_compute. reflexivity.
+Qed.
+
+
 Definition my_and_rect := 
   fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
     match a with conj x x0 => f x x0 end.
-Quote Recursively Definition p_my_and_rect := my_and_rect.
-Print p_my_and_rect.
 Definition my_and_rect_x :=
-  (my_and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+  (@my_and_rect (2=2) (True)
+                (True /\ (2=2))
+                (fun (a:2=2) (b:True) => conj b a)
+                (conj (eq_refl 2) I)).
+Print my_and_rect_x.
+Definition eval_my_and_rect_x := Eval cbv in my_and_rect_x.
+Print eval_my_and_rect_x.
+Quote Recursively Definition p_eval_my_and_rect_x := eval_my_and_rect_x.
+Eval vm_compute in (program_Program p_eval_my_and_rect_x).
+
 Quote Recursively Definition p_my_and_rect_x := my_and_rect_x.
+Print p_my_and_rect_x.
 Definition P_my_and_rect_x := Eval cbv in (program_Program p_my_and_rect_x).
+Print P_my_and_rect_x.
 Quote Recursively Definition cbv_my_and_rect_x :=
-  ltac:(let t:=(eval cbv in my_and_rect_x) in exact t).
+  ltac:(let t:=(eval vm_compute in my_and_rect_x) in exact t).
+Print cbv_my_and_rect_x.
 Definition ans_my_and_rect_x :=
   Eval cbv in (main (program_Program cbv_my_and_rect_x)).
+Print ans_my_and_rect_x.
 Definition my_envx := env P_my_and_rect_x.
+Eval vm_compute in my_envx.
 Definition my_mainx := main P_my_and_rect_x.
-Eval cbv in (wcbvEval my_envx 30 my_mainx).
+Eval vm_compute in my_mainx.
+Eval vm_compute in (wcbvEval my_envx 30 my_mainx).
 Goal
-  wcbvEval envx 30 mainx = Ret ans_my_and_rect_x.
+  wcbvEval my_envx 30 my_mainx = Ret ans_my_and_rect_x.
   cbv. 
-Abort.  (** RHS in [Proof].  [Proof] removed by wcbvEval on LHS. **)
+Abort.  (** LHS in has nested [Proof]. **)
 
 
-Set Template Cast Propositions. 
-Set Printing Width 80.
-Set Printing Depth 1000.
 
-(** Abhishek's example of looping: in L1g we test the guard **)
+(** Abhishek's example of looping: we don't test fixpoint guard **)
 Inductive Lt (n:nat) : nat -> Prop := Lt_n: Lt n (S n).
 Inductive Acc (y: nat) : Prop :=
   Acc_intro : (forall x: nat, Lt y x -> Acc x) -> Acc y.

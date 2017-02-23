@@ -4,6 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.EqNat.
 Require Import Coq.Arith.Compare_dec.
+Require Import Coq.omega.Omega.
 Require Import Common.Common.
 Require Import L2_5.term.
 Require Import L2_5.program.
@@ -32,7 +33,7 @@ Inductive WNorm: Term -> Prop :=
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNAx: WNorm TAx
 | WNCase: forall mch n brs,
-            WNorm mch -> WNorms brs -> ~ isCanonical mch ->
+            WNorm mch -> ~ isCanonical mch ->
             WNorm (TCase n mch brs)
 | WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
 | WNInd: forall i, WNorm (TInd i)
@@ -41,6 +42,11 @@ Inductive WNorm: Term -> Prop :=
            WNorm fn -> WNorm t -> WNorms ts ->
            ~ isLambda fn -> ~ isFix fn -> ~ isApp fn ->
            WNorm (TApp fn t ts)
+| WNAppFix: forall ds m t ts x ix,
+              WNorms (tcons t ts) ->
+              dnthBody m ds = Some (x, ix) ->
+              ix > tlength ts ->  (* too few args to see rec arg *)
+              WNorm (TApp (TFix ds m) t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
@@ -102,6 +108,7 @@ Proof.
   - cbn. constructor; try assumption. apply IHWNorms. assumption.
 Qed.
 
+(***************
 Lemma WNorm_mkApp:
   (forall fn, WNorm fn -> ~ isLambda fn -> ~ isFix fn -> 
               forall args, WNorms args -> WNorm (mkApp fn args)).
@@ -111,13 +118,36 @@ Proof.
   try (solve[rewrite mkApp_goodFn; try not_isApp]);
   try (solve[inversion_Clear H1; repeat constructor; try assumption;
              try not_isFix; not_isApp]).
-  - inversion_Clear H4. constructor; try assumption.
+  - inversion_Clear H3. constructor; try assumption.
     + constructor; try assumption.
     + not_isApp.
   - inversion_Clear H7. constructor; try assumption.
     + eapply tappend_WNorms; try assumption.  constructor; try assumption.
-Qed.
+  - rewrite mkApp_tnil_ident. eapply WNAppFix; try eassumption.
+  - inversion_Clear H. cbn.
+    case_eq (ix ?= tlength ts); intros.
+    + eapply WNApp; try eassumption.
+      * constructor.
+      * apply tappend_WNorms; try assumption.
+      * not_isLambda.
+      * rewrite (nat_compare_eq _ _ H) in H1. omega.
+      * not_isApp.
+    + assert (j:= nat_compare_Lt_lt _ _ H). omega.
+    + Check (nat_compare_Gt_gt _ _ H). 
 
+    
+    case_eq (ix ?= tlength (tappend ts (tcons t0 args))); intros.
+    + eapply WNApp; try eassumption.
+      * constructor.
+      * apply tappend_WNorms; try assumption.
+      * not_isLambda.
+      * rewrite (nat_compare_eq _ _ H) in H1.
+    eapply WNAppFix; try eassumption.
+    + constructor; try assumption. apply tappend_WNorms; try assumption.
+    + rewrite tlength_tappend. omega.
+Qed.
+ **********************)
+                          
 (*********
 Lemma WNorm_TApp:
   (forall fn, WNorm fn -> ~ isLambda fn -> ~ isFix fn -> 
@@ -213,10 +243,16 @@ Proof.
   try (solve[inversion h]);
   try (solve[inversion h; subst; contradiction]).
   - inversion h. subst. elim H5. exists nm, bod. reflexivity.
-  - inversion h. subst. elim H4.
+  - inversion h. subst. elim H3.
     eapply canonicalP_isCanonical. eassumption.
-  - inversion h. subst. elim H6. apply IsFix.
-  - inversion_Clear h. elim H. constructor; assumption.
+  - inversion_Clear h.  elim H6. apply IsFix.
+    rewrite e in H4. myInjection H4. omega.
+  - inversion_Clear h. elim H.
+    + assumption.
+    + elim H. constructor.
+  - inversion_Clear h.
+    + elim H. constructor; assumption.
+    + contradiction.
 Qed.
 
 Lemma wNorm_no_wndStep:

@@ -7,9 +7,11 @@ Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Setoids.Setoid.
 Require Import Omega.
 
+Require Import Common.AstCommon.
 Require Import L1g.L1g.
 Require Import L2.program.
 Require Import L2.wndEval.
+Require Import L2.wcbvEval.
 Require Import L2.stripEvalCommute.
 Require Import L2.term.
 Require Import L2.compile.
@@ -48,7 +50,7 @@ Qed.
 ***  hypotheses.
 **)
 Lemma Wnd_hom:
-  forall p, L1g.program.WFaEnv p ->
+  forall p,
   (forall (s t:L1gTerm),
      L1g.wndEval.wndEval p s t ->
      L1g.term.WFapp s -> strip s <> strip t ->
@@ -58,7 +60,7 @@ Lemma Wnd_hom:
      L1g.term.WFapps ss -> strips ss <> strips ts ->
      wndEvals (stripEnv p) (strips ss) (strips ts)).
 Proof.
-  intros p hp.
+  intros p.
   apply L1g.wndEval.wndEvalEvals_ind; intros; try (solve [constructor]);
   try (solve[cbn in H1; elim H1; reflexivity]);
   try (solve[cbn in H1; constructor; apply H; [
@@ -99,30 +101,137 @@ Proof.
   myInjection H. reflexivity.
 Qed.
 
-
-(**************************
-Lemma L2wnd_L1gwnd:
-  forall (p:environ),
-  (forall (s t:Term), wndEval p s t ->
-     forall pp, p = stripEnv pp ->
-     forall ss, s = strip ss ->
-     forall tt, t = strip tt ->
-     L1g.wndEval.wndEval pp ss tt) /\
-  (forall (s t:Terms), wndEvals p s t ->
-     forall pp, p = stripEnv pp ->
-     forall ss, s = strips ss ->
-     forall tt, t = strips tt ->
-     L1g.wndEval.wndEvals pp ss tt) /\
-  (forall (s t:Defs), wndDEvals p s t ->
-     forall pp, p = stripEnv pp ->
-     forall ss, s = stripDs ss ->
-     forall tt, t = stripDs tt ->
-     L1g.wndEval.wndDEvals pp ss tt).
+Lemma Lookup_stripEnv_inv:
+  forall p s sec, Lookup s (stripEnv p) sec ->
+              exists u, Lookup s p u /\ stripEC u = sec.
 Proof.
-  intros p.
-  apply wndEvalEvals_ind; intros; subst.
-  - rewrite (TConst_strip_inv _ _ H0). constructor.
-  
+  induction p; intros.
+  - inversion H.
+  - destruct a, (string_dec s s0).
+    + subst s. cbn in H.
+      pose proof (LHit s0 (stripEnv p) (stripEC e)).
+      pose proof (Lookup_single_valued H H0). subst sec.
+      exists e. intuition.
+    + cbn in H. inversion_Clear H.
+      * intuition.
+      * specialize (IHp s _ H6). destruct IHp as [u [j1u j2u]].
+        exists u. intuition.
+Qed.
 
+Theorem L2wndEval_sound_for_L1gwndEval:
+  forall L2p,
+  (forall L2t L2s, wndEval L2p L2t L2s ->
+  forall p, L2p = stripEnv p ->
+  forall t, L2t = strip t ->
+            exists s, L1g.wndEval.wndEval p t s /\ strip s = L2s) /\
+  (forall L2t L2s, wndEvals L2p L2t L2s ->
+  forall p, L2p = stripEnv p ->
+  forall t, L2t = strips t ->
+            exists s, L1g.wndEval.wndEvals p t s /\ strips s = L2s).
+Proof.
+  intros L2p.
+  apply (@wndEvalEvals_ind L2p
+          (fun (L2t L2s: Term) (prf: wndEval L2p L2t L2s) =>
+    forall p: L1gEnv, L2p = stripEnv p ->
+    forall t: compile.L1gTerm, L2t = strip t ->
+    exists s: L1g.compile.Term, L1g.wndEval.wndEval p t s /\ strip s = L2s)
+       (fun (L2t L2s: Terms) (prf: wndEvals L2p L2t L2s) =>
+    forall p: L1gEnv, L2p = stripEnv p ->
+    forall t: compile.L1gTerms, L2t = strips t ->
+    exists s: L1g.compile.Terms, L1g.wndEval.wndEvals p t s /\
+                                  strips s = L2s));
+    intros.
+  - pose proof (Const_strip_inv _ H0). subst. unfold LookupDfn in *.
+    destruct (Lookup_stripEnv_inv _ _ _ l) as [x [j1x j2x]].
+    destruct x; cbn in j2x.
+    + myInjection j2x. exists l0. intuition.
+    + discriminate.
+  - destruct (App_strip_inv _ H0) as [x0 [x1 [x2 [j1x [j2x [j3x j4x]]]]]].
+    subst. clear H0.
+    destruct (Lam_strip_inv _ j2x) as [y0 [y1 [j1y j2y]]].
+    subst. rewrite <- whBetaStep_hom. exists (L1g.term.whBetaStep y1 x1 x2).
+    intuition.
+  - destruct (LetIn_strip_inv _ H0) as [x0 [x1 [x2 [j0x [j1x j2x]]]]].
+    subst. rewrite <- (proj1 instantiate_hom).
+    exists (L1g.term.instantiate x0 0 x2). intuition.
+  - destruct (Case_strip_inv _ H0) as [x0 [x1 [j0x [j1x [j2x j3x]]]]].
+    clear H0. subst.
+    rewrite <- canonicalP_hom in e.
+    case_eq (L1g.term.canonicalP x1); intros; rewrite H in e; try discriminate.
+    + destruct p0 as [[z0 z1] z2]. cbn in e. myInjection e.
+      destruct ml. cbn in e0.
+      rewrite <- tskipn_hom in e0.
+      case_eq (L1g.term.tskipn n0 z1); intros; rewrite H0 in e0;
+      try discriminate.
+      * { cbn in e0. myInjection e0.
+          rewrite <- whCaseStep_hom in e1; try discriminate.
+          case_eq (L1g.term.whCaseStep n t j0x); intros; rewrite H1 in e1;
+          try discriminate.
+          - cbn in e1. myInjection e1. exists t0. intuition.
+            econstructor; try eassumption. }
+  - destruct (App_strip_inv _ H0) as [x0 [x1 [x2 [j1x [j2x [j3x j4x]]]]]].
+    subst. clear H0.
+    destruct (Fix_strip_inv _ j2x) as [y0 [j0y j1y]]; intros. subst. clear j2x.
+    rewrite <- dnthBody_hom in e.
+    case_eq (compile.dnthBody m y0); intros; rewrite H in e; try discriminate.
+    + destruct p0. cbn in e. myInjection e. rewrite <- tcons_hom.
+      rewrite pre_whFixStep_hom.
+      exists (L1g.term.pre_whFixStep t y0 (L1g.compile.tcons x1 x2)).
+      intuition. apply (L1g.wndEval.sFix p y0 m x1 x2 H ).
+      rewrite tlength_hom in l. assumption.
+  - destruct (Cast_strip_inv _ H0) as [x0 [x1 [j0x j1x]]]. subst.
+    exists x0. intuition.
+  - destruct (Prf_strip_inv _ H0) as [x0 [j0 j1]]. subst.
+    exists x0. intuition.
+  - destruct (App_strip_inv _ H1) as [x0 [x1 [x2 [j1x [j2x [j3x j4x]]]]]].
+    subst. rewrite <- tcons_hom.
+    destruct (H p eq_refl x0 eq_refl) as [y0 [j0y j1y]].
+    subst. rewrite <- mkApp_hom.
+    exists (L1g.term.mkApp y0 (L1g.compile.tcons x1 x2)). intuition.
+  - destruct (App_strip_inv _ H1) as [x0 [x1 [x2 [j1x [j2x [j3x j4x]]]]]].
+    subst. clear H1.
+    destruct (H p eq_refl (L1g.compile.tcons x1 x2) eq_refl) as
+        [y [j0y j1y]]. clear H.
+    rewrite <- j1y in w. 
+    inversion_Clear j0y.
+    + rewrite tcons_hom in j1y. myInjection j1y.
+      rewrite <- (TApp_hom x0 r x2). exists (L1g.compile.TApp x0 r x2).
+      intuition.
+    + rewrite tcons_hom in j1y. myInjection j1y.
+      rewrite <- (TApp_hom x0 x1 ss). exists (L1g.compile.TApp x0 x1 ss).
+      intuition.
+  - destruct (LetIn_strip_inv _ H1) as [x0 [x1 [x2 [j0x [j1x j2x]]]]].
+    subst. clear H1.
+    specialize (H p eq_refl x0 eq_refl).
+    destruct H as [y [j0y j1y]]. subst. rewrite <- (TLetIn_hom nm y x1).
+    exists (L1g.compile.TLetIn nm y x1 x2). intuition.
+  - destruct (Case_strip_inv _ H1) as [x0 [x1 [j0x [j1x [j2x j3x]]]]].
+    clear H1. subst.
+    specialize (H p eq_refl x1 eq_refl).
+    destruct H as [y [j0y j1y]]. subst. rewrite <- (TCase_hom nl x0 y).
+    exists (L1g.compile.TCase nl x0 y j0x). intuition.
+  - destruct (tcons_strip_inv _ H1) as [x0 [x1 [j0x [j1x j2x]]]]. subst.
+    specialize (H p eq_refl x0 eq_refl).
+    destruct H as [y [j0y j1y]]. subst.
+    rewrite <- tcons_hom. exists (L1g.compile.tcons y x1). intuition.
+  - destruct (tcons_strip_inv _ H1) as [x0 [x1 [j0x [j1x j2x]]]]. subst.
+    specialize (H p eq_refl x1 eq_refl).
+    destruct H as [y [j0y j1y]]. subst.
+    rewrite <- tcons_hom. exists (L1g.compile.tcons x0 y). intuition.
+Qed.
+Print Assumptions L2wndEval_sound_for_L1gwndEval.
 
-**************************)
+(*** not provable ****
+Theorem L2WcbvEval_sound_for_L1gwndEval:
+  forall p t L2s, WcbvEval (stripEnv p) (strip t) L2s ->
+           WFaEnv (stripEnv p) -> WFapp (strip t)  ->        
+        exists s, L1g.wndEval.wndEvalRTC p t s /\ L2s = strip s.
+Proof.
+  intros p t L2s h1 h2 h3.
+  pose proof (proj1 (WcbvEval_wndEvalRTC h2) _ _ h1 h3).
+  inversion_Clear H.
+  - exists t. intuition.
+  -  HERE
+
+Qed.
+ *************************)

@@ -24,9 +24,9 @@ Inductive wndEval (p:environ Term) : Term -> Term -> Prop :=
             wndEval p (TLetIn nm dfn bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| sCase: forall (n :nat) (ml : inductive * nat * list nat) (s:Term)
-                (i:inductive) (args brs ts:Terms),
-           tskipn (snd (fst ml)) args = Some ts ->
+| sCase: forall (n:nat) (ml:inductive * nat) (s:Term)
+                (i:inductive) (args ts:Terms) (brs:Defs),
+           tskipn (snd ml) args = Some ts ->
            whCaseStep n ts brs = Some s ->
            wndEval p (TCase ml (TConstruct i n args) brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg f:Term),
@@ -43,12 +43,14 @@ Inductive wndEval (p:environ Term) : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (d1 d2 bod:Term),
               wndEval p d1 d2 ->
               wndEval p (TLetIn nm d1 bod) (TLetIn nm d2 bod)
-| sCaseArg: forall (ml: inductive * nat * list nat) (mch can:Term) (brs:Terms),
+| sCaseArg: forall (ml: inductive * nat) (mch can:Term) (brs:Defs),
               wndEval p mch can ->
               wndEval p (TCase ml mch brs) (TCase ml can brs)
-| sCaseBrs: forall (ml: inductive * nat * list nat) (mch:Term) (brs brs':Terms),
+ (*********
+| sCaseBrs: forall (ml: inductive * nat) (mch:Term) (brs brs':Defs),
               wndEvals p brs brs' ->
               wndEval p (TCase ml mch brs) (TCase ml mch brs')
+*****)
 with  (** step any term in a list of terms **)
 wndEvals (p:environ Term) : Terms -> Terms -> Prop :=
     | saHd: forall (t r:Term) (ts:Terms), 
@@ -248,7 +250,9 @@ intros pp. apply wndEvalEvals_ind; intros; auto.
 - apply sAppArg. apply (H nm ec); trivial. apply (notPocc_TApp H1).
 - apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
 - apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
+  (************
 - apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
+*************)
 - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
 - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
 Qed.

@@ -1,7 +1,3 @@
-(******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L2_5_box" as L2_5.
-(******)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -40,8 +36,8 @@ Inductive Term : Type :=
 | TAx        : Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* index *) -> Terms -> Term
-| TCase      : inductive * nat * list nat (* # pars, args per branch *) ->
-               Term -> Terms -> Term
+| TCase      : (inductive * nat) (* # of pars *) ->
+               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong : Term
 with Terms : Type :=
@@ -266,7 +262,7 @@ Fixpoint lift (n:nat) (t:Term) : Term :=
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg => TApp (lift n fn) (lift n arg)
     | TConstruct i x args => TConstruct i x (lifts n args)
-    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (lifts n brs)
+    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (liftDs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
     | _ => t
   end
@@ -472,7 +468,7 @@ Function strip (t:L2_5Term) : Term :=
     | L2_5.compile.TAx => TAx
     | L2_5.compile.TInd i => (TInd i)
     | L2_5.compile.TConstruct i n arity => etaExp_cnstr i n arity tnil
-    | L2_5.compile.TCase n mch brs => TCase n (strip mch) (strips brs)
+    | L2_5.compile.TCase n mch brs => TCase n (strip mch) (stripDs brs)
     | L2_5.compile.TFix ds n => TFix (stripDs ds) n
     | L2_5.compile.TWrong => TWrong
    end
@@ -611,7 +607,7 @@ Qed.
 Lemma TCase_hom:
   forall n mch brs,
     strip (L2_5.compile.TCase n mch brs) =
-    TCase n (strip mch) (strips brs).
+    TCase n (strip mch) (stripDs brs).
 reflexivity.
 Qed.
 

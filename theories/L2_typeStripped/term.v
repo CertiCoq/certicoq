@@ -14,6 +14,11 @@ Open Scope list.
 Set Implicit Arguments.
 
 
+Ltac not_is1 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j" in
+  intros hh; destruct hh as [xx jj]; discriminate.
 Ltac not_is2 :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -29,6 +34,9 @@ Ltac not_is2 :=
   intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
 Ltac not_isApp := not_is3.
 Ltac not_isLambda := not_is2.
+Ltac not_isCase := not_is3.
+Ltac not_isFix := not_is2.
+Ltac not_isCast := not_is1.
             
 Ltac isApp_inv h :=
   let hh := fresh "h"
@@ -75,7 +83,7 @@ Fixpoint print_term (t:Term) : string :=
     | TInd i => "(TIND " ++ (print_ind i) ++ ")"
     | TConstruct i n _ =>
       "(CSTR " ++ (print_ind i) ++ " " ++ (nat_to_string n) ++ ")"
-    | TCase (i, _, _) mch _ =>
+    | TCase (i, _) mch _ =>
       "(CASE " ++ (print_ind i) ++ " " ++ (print_term mch) ++
                  " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
@@ -113,11 +121,10 @@ Proof.
   - induction t; cross.
     destruct (inductive_dec i i0); destruct (eq_nat_dec n n1);
     destruct (eq_nat_dec n0 n2); [lft | rght .. ].
-  - induction t1; cross.
-    destruct p as [[i n] l], p0 as [[i0 n0] l0].
-    destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
-    destruct (inductive_dec i i0);
-    destruct (H t1); destruct (H0 t2);
+  - induction t0; cross.
+    destruct p as [i n], p0 as [i0 n0].
+    destruct (eq_nat_dec n n0); destruct (inductive_dec i i0);
+    destruct (H t0); destruct (H0 d0);
     [lft | rght .. ].
   - induction t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
@@ -141,15 +148,21 @@ Fixpoint TrmSize (t:Term) {struct t} : nat :=
     | TLambda _ bod => S (TrmSize bod)
     | TLetIn _ dfn bod => S (TrmSize dfn + TrmSize bod)
     | TApp fn a args => S (TrmSize fn + TrmSize a + TrmsSize args)
-    | TCase _ mch brs => S (TrmSize mch + TrmsSize brs)
-    | TFix ds n => S 0
+    | TCase _ mch brs => S (TrmSize mch + TrmDsSize brs)
+    | TFix ds n => S (TrmDsSize ds)
     | _ => S 0
   end
 with TrmsSize (ts:Terms) {struct ts} : nat :=
   match ts with
     | tnil => 1
     | tcons s ss => S (TrmSize s + TrmsSize ss)
+  end
+with TrmDsSize (ds:Defs) : nat :=
+  match ds with
+    | dnil => 1
+    | dcons _ t2 _ es => S (TrmSize t2 + TrmDsSize es)
   end.
+
 
 Definition isRel (t:Term) : Prop := exists n, t = TRel n.
 
@@ -180,6 +193,19 @@ induction t;
 left. auto.
 Qed.
 
+Definition isCase (t:Term) : Prop :=
+  exists xn mch ds, t = TCase xn mch ds.
+
+Lemma isCase_dec: forall t, {isCase t}+{~ isCase t}.
+Proof.
+  destruct t; try (solve[right; not_isCase]).
+  left. unfold isCase. exists p, t, d. reflexivity.
+Qed.
+Lemma IsCase: forall xn mch ds, isCase (TCase xn mch ds).
+Proof.
+  intros. exists xn, mch, ds. reflexivity.
+Qed.
+  
 Definition isApp (t:Term) : Prop :=
   exists fn arg args, t = TApp fn arg args.
 Lemma IsApp: forall fn arg args, isApp (TApp fn arg args).
@@ -200,18 +226,12 @@ intros. exists ds, n. reflexivity.
 Qed.
 Hint Resolve IsFix.
 
-Ltac not_isFix :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y" in
-  intros hh; destruct hh as [xx [yy jj]]; discriminate.
-
 Lemma isFix_dec: forall t, {isFix t}+{~ isFix t}.
-induction t;
+Proof.
+  induction t;
   try (solve [right; intros h; unfold isFix in h;
               elim h; intros x h1; elim h1; intros x0 h2; discriminate]).
-left. auto.
+  left. auto.
 Qed.
 
 Definition isProof (t:Term) : Prop := exists s, t = TProof s.
@@ -220,12 +240,12 @@ intros. exists t. reflexivity.
 Qed.
 Hint Resolve IsProof.
 
-Lemma isProof_dec: forall t, isProof t \/ ~ isProof t.
+Lemma isProof_dec: forall t, {isProof t}+{~ isProof t}.
 Proof.
   destruct t;
   try (right; intros h; destruct h as [x jx]; discriminate).
   - left. auto.
-Qed.
+Defined.
 
 Definition isConstruct (t:Term) : Prop :=
   exists i n arty, t = TConstruct i n arty.
@@ -240,6 +260,7 @@ Proof.
   try (right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate).
   - left. auto.
 Qed.
+
 
 Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n m:nat), isCanonical (TConstruct i n m)
@@ -547,7 +568,34 @@ Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
                          end
   end.
 
+Definition is_dunit (ds:Defs) : Prop :=
+  exists (nm:name) (s:Term) (n:nat), ds = dunit nm s n.
 
+Lemma is_dunit_dlength:
+  forall ds, is_dunit ds <-> dlength ds = 1.
+Proof.
+  intros ds. split; intros h.
+  - destruct h as [x0 [x1 [x2 jx]]]. subst ds. reflexivity.
+  - destruct ds.
+    + discriminate.
+    + destruct ds.
+      * exists n, t, n0. reflexivity.
+      * discriminate.
+Qed.
+
+Lemma is_dunit_dec: forall ds, is_dunit ds \/ ~ (is_dunit ds).
+Proof.
+  intros ds. case_eq ds; intros.
+  - right. intros h. destruct h as [x0 [x1 [x2 jx]]]. discriminate.
+  - case_eq d; intros; subst.
+    + left. exists n, t, n0. reflexivity.
+    + right. intros h.
+      pose proof (proj1 (is_dunit_dlength
+                           (dcons n t n0 (dcons n1 t0 n2 d0))) h).
+      discriminate.
+Qed.
+
+    
 (** syntactic control of "TApp": no nested apps, app must have an argument **)
 Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
   match t with
@@ -767,12 +815,12 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TConstruct i n n0), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TCase p fn t), arg, tnil. split. reflexivity.
+  - exists (TCase p fn d), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TFix d n), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists TWrong, arg, tnil. cbn.  split. reflexivity.
-  left. repeat split. not_isApp.
+    left. repeat split. not_isApp.
 Qed.
 
 (** well-formed terms: TApp well-formed all the way down **)
@@ -793,7 +841,7 @@ Inductive WFapp: Term -> Prop :=
 | wfaInd: forall i, WFapp (TInd i)
 | wfaConstruct: forall i m1 m2, WFapp (TConstruct i m1 m2)
 | wfaCase: forall m mch brs,
-            WFapp mch -> WFapps brs -> WFapp (TCase m mch brs)
+            WFapp mch -> WFappDs brs -> WFapp (TCase m mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
 with WFapps: Terms -> Prop :=
 | wfanil: WFapps tnil
@@ -927,7 +975,7 @@ Inductive WFTrm: Term -> nat -> Prop :=
 | wfInd: forall n i, WFTrm (TInd i) n
 | wfConstruct: forall n i m arty, WFTrm (TConstruct i m arty) n
 | wfCase: forall n m mch brs,
-            WFTrm mch n -> WFTrms brs n ->
+            WFTrm mch n -> WFTrmDs brs n ->
             WFTrm (TCase m mch brs) n
 | wfFix: forall n defs m,
            WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
@@ -974,7 +1022,7 @@ Inductive PoccTrm : Term -> Prop :=
 | PoAppR: forall fn a args, PoccTrms args -> PoccTrm (TApp fn a args)
 | PoConst: PoccTrm (TConst nm)
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
-| PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
+| PoCaseR: forall n mch brs, PoccDefs brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
 | PoCnstr: forall m1 n arty, PoccTrm (TConstruct (mkInd nm m1) n arty)
 with PoccTrms : Terms -> Prop :=
@@ -1099,7 +1147,7 @@ Qed.
 
 Lemma notPocc_TCase:
   forall n mch brs, ~ PoccTrm (TCase n mch brs) ->
-                    ~ PoccTrm mch /\ ~ PoccTrms brs.
+                    ~ PoccTrm mch /\ ~ PoccDefs brs.
 intuition. 
 Qed.
 
@@ -1273,7 +1321,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
                 Instantiate n (TConstruct ind m1 arty)
                             (TConstruct ind m1 arty)
 | ICase: forall n np s ts is its,
-           Instantiate n s is -> Instantiates n ts its ->
+           Instantiate n s is -> InstantiateDefs n ts its ->
            Instantiate n (TCase np s ts) (TCase np is its)
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
@@ -1356,7 +1404,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
       TLambda nm (instantiate (S n) bod)
     | TProd nm bod => TProd nm (instantiate (S n) bod)
     | TCase np s ts =>
-      TCase np (instantiate n s) (instantiates n ts)
+      TCase np (instantiate n s) (instantiateDefs n ts)
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
@@ -1511,7 +1559,7 @@ Proof.
     apply mkApp_pres_WFapp.
     + constructor. apply H3; assumption. apply H5. assumption.
     + apply H1. assumption.
-  - change (WFapp (TCase m (instantiate t n mch) (instantiates t n brs))).
+  - change (WFapp (TCase m (instantiate t n mch) (instantiateDefs t n brs))).
     constructor.
     + apply H0; assumption.
     + apply H2; assumption.
@@ -1586,21 +1634,21 @@ induction t.
 unfold whBetaStep; simpl; induction 1; intros.
 ****)
 
-Definition whCaseStep (cstrNbr:nat) (ts brs:Terms) : option Term :=
-  match tnth cstrNbr brs with
-    | Some t => Some (mkApp t ts)
+Definition whCaseStep (cstrNbr:nat) (ts:Terms) (brs:Defs): option Term :=
+  match dnthBody cstrNbr brs with
+    | Some (t, _) => Some (mkApp t ts)
     | None => None
   end.
 
 Lemma whCaseStep_pres_WFapp:
-  forall (brs:Terms), WFapps brs -> forall ts, WFapps ts -> 
+  forall (brs:Defs), WFappDs brs -> forall ts, WFapps ts -> 
   forall (n:nat) (s:Term), whCaseStep n ts brs = Some s -> WFapp s.
 Proof.
   intros brs hbrs ts hts n s h. unfold whCaseStep in h.
-  assert (j:= tnth_pres_WFapp hbrs n). destruct (tnth n brs).
-  - injection h; intros. rewrite <- H. apply mkApp_pres_WFapp. 
+  case_eq (dnthBody n brs); intros; rewrite H in h.
+  - destruct p. myInjection h. apply mkApp_pres_WFapp.
     + assumption.
-    + apply j. reflexivity.
+    + eapply (dnthBody_pres_WFapp hbrs n). eassumption.
   - discriminate.
 Qed.
 
@@ -1649,8 +1697,3 @@ Proof.
   assumption. constructor. assumption.
 Qed.
   
-(*** correctness assumption for removing fixpoint unrolling guard ***
-Definition WFfixp:
-  forall (ds:Defs) (m:nat) (args:Terms)
-         (TApp (TFix ds m) args)
- *******************)

@@ -28,6 +28,14 @@ Definition stripDs := L2Defs_Defs.
 Definition stripEnv := L2Env_Env.
 Definition stripEc := L2EC_EC.
 
+Lemma isApp_strip_TApp:
+  forall s1 s2 s3, isApp (strip (L2.compile.TApp s1 s2 s3)).
+Proof.
+  intros s1 s2 s3.
+  change (isApp (mkApp (strip s1) (tcons (strip s2) (strips s3)))).
+  apply (mkApp_isApp (strip s1) (strip s2) (strips s3)).
+Qed.                          
+
 Definition optStrip (t:option L2Term) : option Term :=
   match t with
     | None => None
@@ -165,80 +173,141 @@ induction ts; intros us; simpl. reflexivity.
 rewrite IHts. reflexivity.
 Qed.
 
+Lemma TCase_hom:
+  forall m mch brs,
+    strip (L2.compile.TCase m mch brs) =
+      match L2.term.isProof_dec mch with
+        | left _ =>
+          match brs with
+            | L2.compile.dunit _ br n =>
+              applyBranchToProof n (L2Term_Term br)
+            | _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+          end
+        | right _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+      end.
+Proof.
+  reflexivity.
+Qed.
+
+
 Lemma TApp_hom:
   forall fn arg args,
     strip (L2.compile.TApp fn arg args) =
-    TApp (strip fn) (strip arg) (strips args).
-induction fn; intros arg args; try reflexivity.
+    mkApp (strip fn) (strips (L2.compile.tcons arg args)).
+  induction fn; intros arg args; try reflexivity.
 Qed.
 
+(**
+Lemma hom_isApp:
+  forall t, L2.term.isApp t -> isApp (strip t).
+Proof.
+  induction t; cbn; intros; destruct H as [x0 [x1 [x2 jx]]]; try discriminate.
+  - myInjection jx. auto.
+Qed.
+ **)
 
-(*******************
 Lemma isApp_hom:
-  forall t, isApp (strip t) -> L2.term.isApp t.
+  forall t,
+    isApp (strip t) ->
+    L2.term.isApp t \/
+    exists x n u br nm,
+      t = L2.compile.TCase x (L2.compile.TProof u) (L2.compile.dunit nm br n).
 Proof.
   destruct t; cbn; intros h;
   destruct h as [x0 [x1 [x2 h]]]; try discriminate. 
-  - exists t1, t2, t3. reflexivity.
-  - destruct p as [[y0 y1] y2]. destruct y2.
+  - left. exists t1, t2, t3. reflexivity.
+  - destruct t; try discriminate. destruct d.
     + discriminate.
-    + 
-    destruct t.
+    + right. exists p, n0, t, t0, n. destruct d.
+      * reflexivity.
+      * discriminate.
 Qed.
 
 Lemma mkApp_hom:
-forall fn args,
-  strip (L2.term.mkApp fn args) = mkApp (strip fn) (L2Terms_Terms args).
+  forall fn args,
+    strip (L2.term.mkApp fn args) = mkApp (strip fn) (L2Terms_Terms args).
 Proof.
-  destruct args; try (reflexivity).
-  - rewrite L2.term.mkApp_tnil_ident. rewrite mkApp_tnil_ident.
+  intros fn args. functional induction (L2.term.mkApp fn args).
+  - rewrite TApp_hom. rewrite TApp_hom. rewrite mkApp_idempotent.
+    rewrite tcons_hom. rewrite tcons_hom. rewrite tappend_hom.
     reflexivity.
-  - destruct fn; try reflexivity.
-    + change (TApp (strip fn1) (strip fn2)
-                   (strips (L2.term.tappend t0 (L2.compile.tcons t args))) =
-              TApp (strip fn1) (strip fn2)
-                   (tappend (strips t0) (tcons (strip t) (strips args)))).
-      rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
-    + rewrite L2.term.mkApp_goodFn. rewrite tcons_hom.
-      rewrite mkApp_goodFn. rewrite TApp_hom. reflexivity.
-      * { induction fn; unfold strip;  
-          intros h; destruct h as [x0 [x1 [x2 jx]]]; cbn in jx;
-          destruct p as [[y0 y1] y2]; try discriminate.
-          - induction t0; cbn in jx.
-            + discriminate.
-            + cbn in jx. 
-            
-      * { intros h. destruct h as [x0 [x1 [x2 jx]]]. cbn in jx.
-          destruct p as [[i k] ks]. destruct fn; cbn in jx; try discriminate.
-          - admit.
-          -
-  -
-      
-      cbn. rewrite tappend_hom. L2Terms_Terms. cbn. rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
-
-
-    destruct fn; cbn.
-    rewrite L1g.term.tappend_tnil. reflexivity.
-  - destruct fn; cbn; try reflexivity.
-  - destruct fn; cbn; try reflexivity.
-  - rewrite tappend_tnil. rewrite L2.term.tappend_tnil. reflexivity.
-  -
-  
-  - rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
+  - destruct t; try (elim y); try reflexivity.
+    + destruct (L2.term.isProof_dec t).
+      destruct i as [x jx]. subst t.
+      * { destruct (L2.term.is_dunit_dec d).
+          - destruct H as [x0 [x1 [x2 jx]]]. subst d. cbn.
+            rewrite mkApp_tnil_ident. reflexivity.
+          - unfold L2Terms_Terms. rewrite mkApp_tnil_ident.
+            reflexivity. }
+      * unfold L2Terms_Terms. rewrite mkApp_tnil_ident.
+        reflexivity.
+  - destruct t; try (elim y); try reflexivity.
 Qed.
 
-  intros fn args. functional induction (L2.term.mkApp fn args).
-  -  cbn.
-  
+
+Lemma instantiate_tappend_commute:
+  forall ts us tin n,
+    instantiates tin n (tappend ts us) =
+    tappend (instantiates tin n ts) (instantiates tin n us).
+induction ts; intros.
+- reflexivity.
+- change (tcons (instantiate tin n t) (instantiates tin n (tappend ts us)) =
+          tcons (instantiate tin n t) (tappend (instantiates tin n ts)
+                                               (instantiates tin n us))).
+ rewrite IHts. reflexivity.
+Qed.
+
+Lemma instantiates_tcons_commute:
+  forall tin n t ts,
+         (instantiates tin n (tcons t ts)) = 
+         (tcons (instantiate tin n t) (instantiates tin n ts)).
+intros tin n t ts. reflexivity.
+Qed.
+
+Lemma instantiates_dcons_commute:
+  forall tin n nm t m ds,
+         (instantiateDefs tin n (dcons nm t m ds)) = 
+         (dcons nm (instantiate tin n t) m (instantiateDefs tin n ds)).
+reflexivity.
+Qed.
+    
+Lemma instantiate_mkApp_commute:
+forall tin n bod arg args,
+  instantiate tin n (mkApp bod (tcons arg args)) =
+  mkApp (instantiate tin n bod) (tcons (instantiate tin n arg)
+                                       (instantiates tin n args)).
+induction bod; simpl; intros; try reflexivity.
+- change
+    (mkApp (instantiate tin n bod1) 
+           (tcons (instantiate tin n bod2)
+                     (instantiates tin n (tappend t (tcons arg args)))) =
+     mkApp (mkApp (instantiate tin n bod1)
+                  (tcons (instantiate tin n bod2)
+                         (instantiates tin n t)))
+           (tcons (instantiate tin n arg) (instantiates tin n args))).
+  rewrite mkApp_idempotent. simpl. 
+  rewrite instantiate_tappend_commute. rewrite instantiates_tcons_commute.
+  reflexivity.
+Qed.
+      
+
+Lemma TCast_hom:
+  forall tm, strip (L2.compile.TCast tm) = TCast (strip tm).
+Proof.
+  reflexivity.
+Qed.
+
 
 Lemma instantiate_hom:
   (forall bod arg n, strip (L2.term.instantiate arg n bod) =
                      instantiate (strip arg) n (strip bod)) /\
-    (forall bods arg n, L2Terms_Terms (L2.term.instantiates arg n bods) =
-                    instantiates (strip arg) n (L2Terms_Terms bods)) /\
-    (forall ds arg n, stripDs (L2.term.instantiateDefs arg n ds) =
-                      instantiateDefs (strip arg) n (stripDs ds)).
+  (forall bods arg n, L2Terms_Terms (L2.term.instantiates arg n bods) =
+                      instantiates (strip arg) n (L2Terms_Terms bods)) /\
+  (forall ds arg n, stripDs (L2.term.instantiateDefs arg n ds) =
+                    instantiateDefs (strip arg) n (stripDs ds)).
 Proof.
+Admitted.
+     (**************************
   apply L2.compile.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
   - simpl. destruct (lt_eq_lt_dec n n0); cbn.
     + destruct s.
@@ -287,7 +356,133 @@ Check TApp_hom.
                   (instantiateDefs (strip arg) n1 (stripDs d))).
     rewrite H0. rewrite H1. reflexivity.
 Qed.
+********************)
 
+
+Lemma TProof_strip_inv:
+  forall t, TProof = strip t -> (L2.term.isProof t) \/ (L2.term.isCase t).
+Proof.
+  intros t ht. destruct t; try discriminate.
+  - left. exists t. reflexivity.
+  - unfold strip in ht.
+    destruct t1; cbn in ht; try discriminate.
+    + pose proof
+           (mkApp_isApp
+              (mkApp (L2Term_Term t1_1)
+                     (tcons (L2Term_Term t1_2) (L2Terms_Terms t)))
+              (L2Term_Term t2) (L2Terms_Terms t3)).
+      destruct H as [x0 [x1 [x2 j]]]. rewrite j in ht. discriminate.
+    + destruct (L2.term.isProof_dec t1).
+      * destruct
+          (mkApp_isApp
+             (match d with
+                | L2.compile.dnil => TCase p (L2Term_Term t1) (L2Defs_Defs d)
+                | L2.compile.dunit _ br n =>
+                  applyBranchToProof n (L2Term_Term br)
+                | L2.compile.dcons _ br n (L2.compile.dcons _ _ _ _) =>
+                  TCase p (L2Term_Term t1) (L2Defs_Defs d)
+              end) (L2Term_Term t2) (L2Terms_Terms t3)) as [x0 [x1 [x2 jx]]].
+        rewrite jx in ht. discriminate.
+      * destruct (mkApp_isApp (TCase p (L2Term_Term t1) (L2Defs_Defs d))
+                              (L2Term_Term t2) (L2Terms_Terms t3))
+          as [x0 [x1 [x2 jx]]].
+        rewrite jx in ht. discriminate.
+  - right. exists p, t, d. reflexivity.
+Qed.
+
+Lemma Const_strip_inv:
+  forall nm s, TConst nm = strip s ->
+               (L2.compile.TConst nm = s) \/ (L2.term.isCase s).
+Proof.
+  intros nm. destruct s; intros h; try discriminate.
+  - left.
+    change (TConst nm = mkApp (L2Term_Term s1)
+                        (tcons (L2Term_Term s2) (L2Terms_Terms t))) in h.
+    pose proof (mkApp_isApp (L2Term_Term s1)
+                            (L2Term_Term s2) (L2Terms_Terms t)) as k.
+    destruct k as [x0 [x1 [x2 jx]]]. rewrite jx in h. discriminate.
+  - left. cbn in h. myInjection h. reflexivity.
+  - right. exists p, s, d. reflexivity.    
+Qed.
+
+(*************
+Lemma Cast_strip_inv:
+  forall tm s, TCast tm = strip s ->
+   exists stm, (L2.compile.TCast stm) = s /\ tm = strip stm.
+Proof.
+  intros tm; destruct s; intros h; try discriminate.
+  - myInjection h. exists s. intuition.
+  - destruct (mkApp_isApp (strip s1) (strip s2) (strips t))
+      as [x0 [x1 [x2 jx]]].
+    change (TCast tm = mkApp (strip s1) (tcons (strip s2) (strips t))) in h.
+    rewrite jx in h. discriminate.
+  - change ()  HERE
+Qed.
+
+
+(*****  HERE
+Lemma Fix_strip_inv:
+  forall ds n s, TFix ds n = strip s ->
+    exists sds, (L2.compile.TFix sds n) = s /\ ds = stripDs sds.
+Proof.
+  intros ds n. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists d. intuition.
+Qed.
+
+Lemma App_strip_inv:
+  forall fn arg args s, TApp fn arg args = strip s ->
+    exists sfn sarg sargs,
+      (L2.compile.TApp sfn sarg sargs) = s /\
+      fn = strip sfn /\ arg = strip sarg /\ args = strips sargs.
+Proof.
+  intros fn arg args. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2, t. intuition.
+Qed.
+
+Lemma LetIn_strip_inv:
+  forall nm dfn bod s, TLetIn nm dfn bod = strip s ->
+    exists sdfn sty sbod,
+      (L2.compile.TLetIn nm sdfn sty sbod = s) /\
+      dfn = strip sdfn /\ bod = strip sbod.
+Proof.
+  intros nm dfn bod s. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2, s3. intuition.
+Qed.
+
+Lemma Case_strip_inv:
+  forall m mch brs s, TCase m mch brs = strip s ->
+    exists sty smch sbrs, (L2.compile.TCase m sty smch sbrs = s) /\
+              mch = strip smch /\ brs = stripDs sbrs.
+Proof.
+  intros m mch brs s. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2, d. intuition.
+Qed.
+
+Lemma tnil_strip_inv:
+  forall ts, tnil = strips ts -> ts = L2.compile.tnil.
+Proof.
+  induction ts; intros; try reflexivity.
+  - simpl in H. discriminate.
+Qed.
+
+Lemma tcons_strip_inv:
+  forall t ts us, tcons t ts = strips us ->
+    exists st sts, (L2.compile.tcons st sts = us) /\ 
+                   t = strip st /\ ts = strips sts.
+Proof.
+  intros t ts us. destruct us; simpl; intros h; try discriminate.
+  - myInjection h. exists t0, us. intuition.
+Qed.
+
+Lemma dcons_strip_inv:
+  forall nm t m ts us, dcons nm t m ts = stripDs us ->
+    exists ty st sts, (L2.compile.dcons nm ty st m sts = us) /\ 
+                   t = strip st /\ ts = stripDs sts.
+Proof.
+  intros nm t m ts us. destruct us; simpl; intros h; try discriminate.
+  - myInjection h. exists t0, t1, us. intuition.
+Qed.
+ *****************)
 
 
 Lemma WcbvEval_hom:
@@ -298,8 +493,40 @@ Lemma WcbvEval_hom:
                     WcbvEvals (stripEnv p) (L2Terms_Terms ts) (strips ts')).
 Proof.
   intros p.
-  apply L2.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
-  try (solve[ constructor; intuition]).  
+  apply L2.wcbvEval.WcbvEvalEvals_ind; intros;
+  try (solve[constructor; intuition]); try (solve[right; cbn; constructor]).
+  - cbn. destruct (strip s); inversion_Clear H.
+
+
+
+
+
+(***********************)
+Lemma WcbvEval_hom:
+  forall p,
+    (forall t t', L2.wcbvEval.WcbvEval p t t' ->
+                  strip t' = TProof \/
+                  WcbvEval (stripEnv p) (strip t) (strip t')) /\
+    (forall ts ts', L2.wcbvEval.WcbvEvals p ts ts' ->
+                    WcbvEvals (stripEnv p) (L2Terms_Terms ts) (strips ts')).
+Proof.
+  intros p.
+  apply L2.wcbvEval.WcbvEvalEvals_ind; intros;
+  try (solve[constructor; intuition]); try (solve[right; cbn; constructor]).
+  - intuition. right. cbn. constructor. assumption.
+  - destruct H; intuition. cbn.
+    destruct (L2.term.isProof_dec t). cbn.
+    + destruct i. subst t. cbn in H. intuition.
+    + destruct t; cbn in H. inversion_Clear w.  inversion_Clear w.
+cbn in H
+
+
+    + destruct H0. subst t. cbn in H. right. assumption.
+    + 
+
+      
+    intuition. right. cbn. 
+  -
   - cbn. destruct t; cbn; try (try constructor; assumption).
   - cbn. econstructor; try eassumption.
     eapply (lookupDfn_hom). assumption.
@@ -343,4 +570,4 @@ Proof.
 Qed.
 Print Assumptions WcbvEval_hom.
 
-****************************)
+ ****************************)

@@ -1,6 +1,5 @@
 (*** type fields are stripped from term notations and unary applications ***)
 
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
@@ -67,12 +66,10 @@ Proof.
     destruct (inductive_dec i i0); destruct (eq_nat_dec n n0);
     destruct (H t0);
     [lft | rght .. ].
-  - induction t1; cross.
-    destruct p as [[i n] l], p0 as [[i0 n0] l0].
-    destruct (eq_nat_dec n n0); destruct (nat_list_dec l l0);
-    destruct (inductive_dec i i0);
-    destruct (H t1); destruct (H0 t2);
-    [lft | rght .. ].
+  - induction t0; cross.
+    destruct p as [i n], p0 as [i0 n0].
+    destruct (eq_dec n n0); destruct (inductive_dec i i0);
+      destruct (H t0); destruct (H0 d0); [lft | rght .. ].
   - induction t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
   - destruct t; cross. lft.
@@ -95,15 +92,16 @@ Fixpoint TrmSize (t:Term) {struct t} : nat :=
     | TLambda _ bod => S (TrmSize bod)
     | TLetIn _ dfn bod => S (TrmSize dfn + TrmSize bod)
     | TApp fn a => S (TrmSize fn + TrmSize a)
-    | TCase _ mch brs => S (TrmSize mch + TrmsSize brs)
+    | TCase _ mch brs => S (TrmSize mch + TrmDsSize brs)
     | TFix ds n => S 0
     | _ => S 0
   end
-with TrmsSize (ts:Terms) {struct ts} : nat :=
-  match ts with
-    | tnil => 1
-    | tcons s ss => S (TrmSize s + TrmsSize ss)
+with TrmDsSize (ds:Defs) : nat :=
+  match ds with
+    | dnil => 1
+    | dcons _ t1 _ es => S (TrmSize t1 + TrmDsSize es)
   end.
+
 
 Definition isLambda (t:Term) : Prop :=
   exists nm bod, t = TLambda nm bod.
@@ -275,26 +273,35 @@ Fixpoint tnth (n:nat) (l:Terms) {struct l} : option Term :=
                       end
     end.
 
-Fixpoint dnthBody (n:nat) (l:Defs) {struct l} : option Term :=
-  match l with
-    | dnil => None
-    | dcons _ x _ t => match n with
-                           | 0 => Some x
-                           | S m => dnthBody m t
-                         end
+Fixpoint dnth (n:nat) (l:Defs) {struct l} : option (def Term) :=
+    match l with
+      | dnil => None
+      | dcons nm tm args xs => match n with
+                                 | 0 => Some (mkdef Term nm prop tm args)
+                                 | S m => dnth m xs
+                               end
+    end.
+
+Definition dnthBody (n:nat) (l:Defs) : option Term :=
+  match dnth n l with
+    | None => None
+    | Some (mkdef _ _ _ x _) => Some x
   end.
 
 Lemma dnthBody_None: forall n ds, n >= dlength ds -> dnthBody n ds = None.
-induction n; induction ds; simpl; intuition. inversion H.
+Proof.
+  unfold dnthBody.
+  induction n; induction ds; cbn; intuition. inversion H.
 Qed.
 
 Lemma dnthBody_Some:
   forall ds n, n < dlength ds -> exists d, dnthBody n ds = Some d.
-induction ds; intros nx h.
-- simpl in h. inversion h.
-- destruct nx.
-  + simpl. exists t. reflexivity.
-  + simpl. apply IHds. simpl in h. omega.
+Proof.
+  induction ds; intros nx h.
+  - simpl in h. inversion h.
+  - destruct nx.
+    + simpl. exists t. reflexivity.
+    + simpl. apply IHds. simpl in h. omega.
 Qed.
 
 
@@ -318,7 +325,7 @@ Inductive WFTrm: Term -> nat -> Prop :=
 | wfConstruct: forall n i m1 args,
                  WFTrms args n -> WFTrm (TConstruct i m1 args) n
 | wfCase: forall n m mch brs,
-            WFTrm mch n -> WFTrms brs n ->
+            WFTrm mch n -> WFTrmDs brs n ->
             WFTrm (TCase m mch brs) n
 | wfFix: forall n defs m,
            WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
@@ -463,9 +470,11 @@ Inductive PoccTrm : Term -> Prop :=
 | PoAppL: forall fn a, PoccTrm fn -> PoccTrm (TApp fn a)
 | PoAppA: forall fn a, PoccTrm a -> PoccTrm (TApp fn a)
 | PoConst: PoccTrm (TConst nm)
-| PoCaseA: forall n p l mch brs, PoccTrm (TCase ((mkInd nm n), p, l) mch brs)
+                   (******
+| PoCaseA: forall n p mch brs, PoccTrm (TCase ((mkInd nm n), p) mch brs)
+*****)
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
-| PoCaseR: forall n mch brs, PoccTrms brs -> PoccTrm (TCase n mch brs)
+| PoCaseR: forall n mch brs, PoccDefs brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
 | PoCnstrI: forall m1 m2 args,
               PoccTrm (TConstruct (mkInd nm m1) m2 args)
@@ -572,7 +581,7 @@ Qed.
 
 Lemma notPocc_TCase:
   forall n mch brs, ~ PoccTrm (TCase n mch brs) ->
-                    ~ PoccTrm mch /\ ~ PoccTrms brs.
+                    ~ PoccTrm mch /\ ~ PoccDefs brs.
 intuition. 
 Qed.
 
@@ -650,7 +659,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
               Instantiate n (TConstruct ind m1 args)
                           (TConstruct ind m1 iargs)
 | ICase: forall n np s ts is its,
-           Instantiate n s is -> Instantiates n ts its ->
+           Instantiate n s is -> InstantiateDefs n ts its ->
            Instantiate n (TCase np s ts) (TCase np is its)
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
@@ -696,24 +705,24 @@ Lemma Instantiates_no_gen:
   (forall n t s, Instantiate n t s -> PoccTrm s -> PoccTrm t) /\
   (forall n ts ss, Instantiates n ts ss -> PoccTrms ss -> PoccTrms ts) /\
   (forall n ds es, InstantiateDefs n ds es -> PoccDefs es -> PoccDefs ds).
-intro h. apply InstInstsDefs_ind; intros; auto;
-         try (solve [inversion_Clear H0; constructor; intuition]).
-- contradiction.
-- inversion H.
-- inversion_Clear H1.
-  + constructor. intuition. 
-  + apply PoLetInBod. intuition.
-- destruct (Pocc_TApp H1) as [hit | hiats]; intuition.
-- inversion_Clear H1.
-  + constructor.
-  + constructor. intuition.
-  + apply PoCaseR. intuition.
-- inversion_Clear H1.
-  + constructor. intuition.
-  + apply PoTtl. intuition.
-- inversion_Clear H1.
-  + constructor. intuition.
-  + apply PoDtl. intuition.
+Proof.
+  intro h. apply InstInstsDefs_ind; intros; auto;
+           try (solve [inversion_Clear H0; constructor; intuition]).
+  - contradiction.
+  - inversion H.
+  - inversion_Clear H1.
+    + constructor. intuition. 
+    + apply PoLetInBod. intuition.
+  - destruct (Pocc_TApp H1) as [hit | hiats]; intuition.
+  - inversion_Clear H1.
+    + apply PoCaseL. intuition.
+    + apply PoCaseR. intuition.
+  - inversion_Clear H1.
+    + constructor. intuition.
+    + apply PoTtl. intuition.
+  - inversion_Clear H1.
+    + constructor. intuition.
+    + apply PoDtl. intuition.
 Qed.
 
 Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
@@ -726,7 +735,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TApp t a => TApp (instantiate n t) (instantiate n a)
     | TLambda nm bod => TLambda nm (instantiate (S n) bod)
     | TProd nm bod => TProd nm (instantiate (S n) bod)
-    | TCase np s ts => TCase np (instantiate n s) (instantiates n ts)
+    | TCase np s ts => TCase np (instantiate n s) (instantiateDefs n ts)
     | TLetIn nm tdef bod =>
          TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
@@ -851,7 +860,7 @@ Qed.
 Lemma instantiate_TCase:
   forall n np s ts,
     instantiate n (TCase np s ts) =
-    TCase np (instantiate n s) (instantiates n ts).
+    TCase np (instantiate n s) (instantiateDefs n ts).
 Proof.
   destruct ts; intros; reflexivity.
 Qed.
@@ -935,8 +944,8 @@ Proof.
        TConstruct i n t).
     apply f_equal3; try reflexivity. apply H.
   - change (TCase p (instantiate m (lift m t))
-                  (instantiates m (lifts m t0)) =
-            TCase p t t0).
+                  (instantiateDefs m (liftDs m d)) =
+            TCase p t d).
     apply f_equal2. apply H. apply H0.
   - change
       (TFix (instantiateDefs (m + dlength (liftDs (m + dlength d) d))
@@ -1136,8 +1145,8 @@ End PoccTrm_sec.
 Definition whBetaStep (bod arg:Term) : Term := instantiate arg 0 bod.
 
 
-Definition whCaseStep (cstrNbr:nat) (args brs:Terms): option Term := 
-  match tnth cstrNbr brs with
+Definition whCaseStep (cstrNbr:nat) (args:Terms) (brs:Defs): option Term := 
+  match dnthBody cstrNbr brs with
     | Some t => Some (mkApp t args)
     | None => None
   end.

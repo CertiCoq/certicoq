@@ -37,10 +37,10 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TAx        : Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat (* index of constructor in type *) ->
-               nat (* arity *) -> Term
-| TCase      : (inductive * nat * list nat) (* # of pars, args per branch *) ->
-               Term (* type info *) -> Term -> Terms -> Term
+| TConstruct : inductive -> nat (* constructor # *) -> nat (* arity *) -> Term
+                                  (* use Defs to code branches *)
+| TCase      : (inductive * nat) (* # of pars *) -> Term (* type *) ->
+               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
 | TFix       : Defs (* all mutual bodies *)->
                nat (* indx of this body *) -> Term
 | TWrong     : string -> Term
@@ -92,15 +92,16 @@ Function tappend (ts1 ts2:Terms) : Terms :=
     | tcons t ts => tcons t (tappend ts ts2)
   end.
 
-Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
+(** No nested "TProof" ***)
+Function mkProof (t:Term) : Term :=
   match t with
-    | TApp fn b bs => TApp fn b (tappend bs args)
-    | fn => match args with
-              | tnil => fn
-              | tcons c cs => TApp fn c cs
-            end
+    | (TProof u) as x => x
+    | u => TProof u
   end.
-
+(***  test **
+Eval cbv in mkProof prop.
+Eval cbv in mkProof (TProof (TProof (TProof prop))).
+ **********)
 
 (************************
 Definition pre_checked_term_Term:
@@ -216,20 +217,26 @@ Fixpoint
 Section datatypeEnv_sec.
   Variable e : environ Term.
 Section term_Term_sec.
-  Variable A : Set.
-  Variable term_Term: A -> Term.
-  Fixpoint terms_Terms (ts:list A) : Terms :=
+  Variable term_Term: term -> Term.
+  Fixpoint terms_Terms (ts:list term) : Terms :=
     match ts with
       | nil => tnil
       | cons r rs => tcons (term_Term r) (terms_Terms rs)
     end.
-  Fixpoint defs_Defs (ds: list (def A)) : Defs :=
+  Fixpoint defs_Defs (ds: list (def term)) : Defs :=
    match ds with
      | nil => dnil
      | cons d ds =>
        dcons (dname _ d) (term_Term (dtype _ d))
              (term_Term (dbody _ d))  (rarg _ d) (defs_Defs ds )
    end.
+  (* note coding of Case branches as Defs for convenience *)
+  Fixpoint natterms_Defs (nts: list (nat * term)) : Defs :=
+    match nts with
+     | nil => dnil
+     | cons (n,t) ds => dcons nAnon prop (term_Term t) n (natterms_Defs ds)
+   end.
+               
 End term_Term_sec.
    
 Function term_Term (t:term) : Term :=
@@ -241,7 +248,7 @@ Function term_Term (t:term) : Term :=
                     | sSet => SSet
                     | sType _ => SType  (* throwing away sort info *)
              end)
-    | tCast tm _ (tCast _ _ (tSort sProp)) => TProof (term_Term tm)
+    | tCast tm _ (tCast _ _ (tSort sProp)) => mkProof (term_Term tm)
     | tCast tm _ ty => (TCast (term_Term tm) (term_Term ty))
     | tProd nm ty bod => (TProd nm (term_Term ty) (term_Term bod))
     | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))
@@ -254,8 +261,7 @@ Function term_Term (t:term) : Term :=
     | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
       match lookup pth e with  (* only lookup ecTyp at this point! *)
         | Some (ecTyp _ 0 nil) => TAx  (* note coding of axion in environ *)
-        | Some (ecTyp _ _ _) =>
-          TWrong ("Const refers to inductive: " ++ pth)
+        | Some (ecTyp _ _ _) => TWrong ("Const refers to inductive: " ++ pth)
         | _  => TConst pth
       end
     | tInd ind => TInd ind
@@ -265,9 +271,7 @@ Function term_Term (t:term) : Term :=
         | Exc str => TWrong ("term_Term: Cnstr arity not found: " ++ str)
       end
     | tCase npars ty mch brs =>
-      let Ars := map fst brs in
-      (TCase (npars, Ars) (term_Term ty) (term_Term mch)
-             (terms_Terms (fun x => term_Term (snd x)) brs))
+      TCase npars (term_Term ty) (term_Term mch) (natterms_Defs term_Term brs)
     | tFix defs m => TFix (defs_Defs term_Term defs) m
     | _ => TWrong "term_Term: Unknown term"
   end.

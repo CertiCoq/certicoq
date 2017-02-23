@@ -1,7 +1,3 @@
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L2_5_box" as L2_5.
-(****)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -71,15 +67,17 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wCase: forall mch Mch n args ml ts brs cs s arty,
                 WcbvEval p mch Mch ->
                 canonicalP Mch = Some (n, args, arty) ->
-                tskipn (snd (fst ml)) args = Some ts ->
+                tskipn (snd ml) args = Some ts ->
                 whCaseStep n ts brs = Some cs ->
                 WcbvEval p cs s ->
                 WcbvEval p (TCase ml mch brs) s
-| wCaseCong: forall mch Mch ml brs brs',
+| wCaseCong: forall mch Mch ml brs,
              WcbvEval p mch Mch ->
              canonicalP Mch = None ->
-             WcbvEvals p brs brs' ->           
-             WcbvEval p (TCase ml mch brs) (TCase ml Mch brs')
+             (***********************
+             WcbvEvals p brs brs' ->     
+********************)      
+             WcbvEval p (TCase ml mch brs) (TCase ml Mch brs)
 | wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
@@ -360,13 +358,9 @@ Proof.
           refine (canonicalP_pres_WFapp _ e).
           specialize (H H4).
           refine (wndEvalRTC_pres_WFapp _ _ _); eassumption. }
-  - inversion_Clear H1. eapply wERTCtrn.
+  - inversion_Clear H0. eapply wERTCtrn.
     + eapply wndEvalRTC_Case_mch. apply H. assumption.
-    + eapply (@wERTCtrn _ _  (TCase ml Mch brs)).
-      * apply wERTCrfl. 
-      * eapply (@wERTCtrn _ _  (TCase ml Mch brs')).
-        apply wndEvalRTC_Case_brs. intuition.
-        constructor.
+    + constructor.
   - inversion_Clear H1. eapply (@wEsRTCtrn _ _ (tcons t' ts)).
     + apply wndEvalsRTC_tcons_hd. apply H. assumption.
     + apply wndEvalsRTC_tcons_tl. apply H0. assumption.
@@ -438,6 +432,24 @@ Function wcbvEval
             | Exc str => Exc str
             | Ret emch =>
               match canonicalP emch with
+                | None => Ret (TCase ml emch brs)
+                | Some (r, args, _) =>
+                  match tskipn (snd ml) args with
+                    | None => raise "wcbvEval: Case, tskipn"
+                    | Some ts =>
+                      match whCaseStep r ts brs with
+                        | None => raise "wcbvEval: Case, whCaseStep"
+                        | Some cs => wcbvEval n cs
+                      end
+                  end
+              end
+          end
+            (********************
+        | TCase ml mch brs =>
+          match wcbvEval n mch with
+            | Exc str => Exc str
+            | Ret emch =>
+              match canonicalP emch with
                 | None =>
                   match wcbvEvals n brs with
                     | Exc _ => Exc ("wcbvEval; TCase, brs don't eval")
@@ -454,6 +466,7 @@ Function wcbvEval
                   end
               end
           end
+***********************)
         | TLetIn nm df bod =>
           match wcbvEval n df with
             | Ret df' => wcbvEval n (instantiate df' 0 bod)
@@ -609,11 +622,9 @@ Proof.
     cbn. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
     rewrite e. rewrite e0. rewrite e1. rewrite (H0 (mx - 1)); try omega.
     reflexivity.
-  - destruct H, H0. exists (S (max x x0)). intros mx h.
-    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    cbn. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
-    rewrite e. rewrite H0; try omega.
-    reflexivity.
+  - destruct H. exists (S x). intros mx h. cbn.
+    rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
+    rewrite e. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.

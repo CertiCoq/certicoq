@@ -34,10 +34,10 @@ Inductive awndEval : Term -> Term -> Prop :=
             awndEval (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| aCase: forall (ml: inductive * nat * list nat) (ty s mch:Term)
-                 (args brs ts:Terms) (n arty:nat),
+| aCase: forall (ml: inductive * nat) (ty s mch:Term)
+                 (args ts:Terms) (brs:Defs) (n arty:nat),
             canonicalP mch = Some (n, args, arty) ->
-            tskipn (snd (fst ml)) args = Some ts ->
+            tskipn (snd ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             awndEval (TCase ml ty mch brs) s
 | aFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
@@ -48,10 +48,10 @@ Inductive awndEval : Term -> Term -> Prop :=
           awndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | aCast: forall t ty, awndEval (TCast t ty) t
+| aProof: forall t, awndEval (TProof t) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
  *** no congruence on Case branches or Fix ***)
-| aProof: forall t s, awndEval t s -> awndEval (TProof t) (TProof s)
 | aAppFn:  forall (t r arg:Term) (args:Terms),
               awndEval t r ->
               awndEval (mkApp t (tcons arg args)) (mkApp r (tcons arg args))
@@ -70,15 +70,17 @@ Inductive awndEval : Term -> Term -> Prop :=
 | aLetInDef:forall (nm:name) (t d1 d2 bod:Term),
               awndEval d1 d2 ->
               awndEval (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
-| aCaseTy:  forall (ml: inductive * nat * list nat) (ty uy mch:Term) (brs:Terms),
+| aCaseTy:  forall (ml: inductive * nat) (ty uy mch:Term) (brs:Defs),
               awndEval ty uy ->
               awndEval (TCase ml ty mch brs) (TCase ml uy mch brs)
-| aCaseArg: forall (ml: inductive * nat * list nat) (ty mch can:Term) (brs:Terms),
+| aCaseArg: forall (ml: inductive * nat) (ty mch can:Term) (brs:Defs),
               awndEval mch can ->
               awndEval (TCase ml ty mch brs) (TCase ml ty can brs)
-| aCaseBrs: forall (ml: inductive * nat * list nat) (ty mch:Term) (brs brs':Terms),
+ (****
+| aCaseBrs: forall (ml: inductive * nat) (ty mch:Term) (brs brs':Defs),
               awndEvals brs brs' ->
               awndEval (TCase ml ty mch brs) (TCase ml ty mch brs')
+**************)
 with awndEvals : Terms -> Terms -> Prop :=
      | aaHd: forall (t r:Term) (ts:Terms), 
                awndEval t r ->
@@ -118,28 +120,39 @@ Lemma awndEval_Lam_inv:
   forall nm tp bod s,
     awndEval (TLambda nm tp bod) s ->
     exists tp', awndEval tp tp' /\ s = (TLambda nm tp' bod).
-intros nm tp bod s h. inversion_Clear h.
-- assert (j:= mkApp_isApp t arg args).
-  destruct j as [x0 [x1 [x2 k]]]. rewrite k in H. discriminate.
-- exists t2. split; [assumption | reflexivity].
+Proof.
+  intros nm tp bod s h. inversion_Clear h.
+  - destruct (mkApp_isApp t arg args) as [x0 [x1 [x2 k]]].
+    rewrite k in H. discriminate.
+  - exists t2. split; [assumption | reflexivity].
 Qed.
 
 Lemma awndEval_Prod_inv:
   forall nm tp bod s,
     awndEval (TProd nm tp bod) s ->
     exists tp', awndEval tp tp' /\ s = (TProd nm tp' bod).
-intros nm tp bod s h. inversion_Clear h.
-- assert (j:= mkApp_isApp t arg args).
-  destruct j as [x0 [x1 [x2 k]]]. rewrite k in H. discriminate.
-- exists t2. split; [assumption | reflexivity].
+Proof.
+  intros nm tp bod s h. inversion_Clear h.
+  - destruct (mkApp_isApp t arg args) as [x0 [x1 [x2 k]]].
+    rewrite k in H. discriminate.
+  - exists t2. split; [assumption | reflexivity].
 Qed.
 
 Lemma awndEval_Cast_inv:
   forall tm ty s, awndEval (TCast tm ty) s -> tm = s.
+Proof.
   inversion 1.
   - reflexivity.
   - destruct (mkApp_isApp t arg args) as [x0 [x1 [x2 j]]].
-  rewrite H0 in j. discriminate.
+    rewrite H0 in j. discriminate.
+Qed.
+
+Lemma WFapp_mkProof_WFapp:
+  forall t, WFapp (mkProof t) -> WFapp t.
+Proof. 
+  intros t. functional induction (mkProof t); intros.
+  - assumption.
+  - inversion_Clear H. assumption.
 Qed.
 
 Lemma awndEval_pres_WFapp:
@@ -165,6 +178,7 @@ Proof.
     + eapply j. eassumption.
     + constructor; assumption.
   - inversion_Clear H. assumption.
+  - inversion_Clear H. assumption. 
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.
     + constructor; assumption.
@@ -217,14 +231,21 @@ induction 1; intros.
   + apply IHawndEvalRTC2.
 Qed.
 
+(**************
+Lemma awndEvalRTC_Proof:
+  forall t t', awndEvalRTC t t' -> awndEvalRTC (TProof t) t'.
+induction 1; intros.
+- constructor. apply awERTCrfl.
+- constructor. apply aProof. assumption.
+- eapply awERTCtrn. 
+  + apply IHawndEvalRTC1.
+  + apply IHawndEvalRTC2.
+Qed.
+ ****************)
 
 End Env.
 Hint Constructors awndEval awndEvals.
 Hint Constructors awndEvalRTC awndEvalsRTC.
-(***
-Hint Constructors awndEvalTC awndEvalsTC.
-Hint Constructors awndEvalTCl awndEvalsTCl.
-***)
 
 
 

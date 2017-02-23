@@ -4,7 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.omega.Omega.
-Require Import Coq.Logic.JMeq.
+Require Import Coq.Logic.Decidable.
 Require Import L2.term.
 Require Import L2.program.
 Require Import L2.awndEval.
@@ -21,7 +21,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProd: forall nm bod, WcbvEval p (TProd nm bod) (TProd nm bod)
 | wCast: forall t s, WcbvEval p t s -> WcbvEval p (TCast t) s
-| wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) (TProof s)
+| wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) s
 | wConstruct: forall i r arty,
                 WcbvEval p (TConstruct i r arty) (TConstruct i r arty)
 | wInd: forall i, WcbvEval p (TInd i) (TInd i) 
@@ -63,15 +63,17 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wCase: forall mch Mch n args ml ts brs cs s arty,
                 WcbvEval p mch Mch ->
                 canonicalP Mch = Some (n, args, arty) ->
-                tskipn (snd (fst ml)) args = Some ts ->
+                tskipn (snd ml) args = Some ts ->
                 whCaseStep n ts brs = Some cs ->
                 WcbvEval p cs s ->
                 WcbvEval p (TCase ml mch brs) s
-| wCaseCong: forall mch Mch ml brs brs',
+| wCaseCong: forall mch Mch ml brs,
              WcbvEval p mch Mch ->
              canonicalP Mch = None ->
-             WcbvEvals p brs brs' ->           
-             WcbvEval p (TCase ml mch brs) (TCase ml Mch brs')
+             (*****************************
+             WcbvEvals p brs brs' ->       
+*******************************************)    
+             WcbvEval p (TCase ml mch brs) (TCase ml Mch brs)
 | wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
@@ -326,6 +328,7 @@ Proof.
 Qed.
 ****)
 
+(** WcbvEval is contained in wndEvalRTC **)
 Lemma WcbvEval_wndEvalRTC:
   forall (p:environ Term), WFaEnv p ->
     (forall t s, WcbvEval p t s -> WFapp t -> wndEvalRTC p t s) /\
@@ -418,13 +421,9 @@ Proof.
           refine (canonicalP_pres_WFapp _ e).
           specialize (H H4).
           refine (wndEvalRTC_pres_WFapp _ _ _); eassumption. }
-  - inversion_Clear H1. eapply wERTCtrn.
+  - inversion_Clear H0. eapply wERTCtrn.
     + eapply wndEvalRTC_Case_mch. apply H. assumption.
-    + eapply (@wERTCtrn _ _  (TCase ml Mch brs)).
-      * apply wERTCrfl. 
-      * eapply (@wERTCtrn _ _  (TCase ml Mch brs')).
-        apply wndEvalRTC_Case_brs. intuition.
-        constructor.
+    + constructor.
   - inversion_Clear H1. eapply (@wEsRTCtrn _ _ (tcons t' ts)).
     + apply wndEvalsRTC_tcons_hd. apply H. assumption.
     + apply wndEvalsRTC_tcons_tl. apply H0. assumption.
@@ -477,7 +476,7 @@ Function wcbvEval
           end
         | TProof t =>
           match wcbvEval n t with
-            | Ret et => Ret (TProof et)
+            | Ret et => Ret et
             | Exc s => raise ("wcbvEval: TProof: " ++ s)
           end
         | TApp fn a1 args =>
@@ -513,13 +512,9 @@ Function wcbvEval
             | Exc str => Exc str
             | Ret emch =>
               match canonicalP emch with
-                | None =>
-                  match wcbvEvals n brs with
-                    | Exc _ => Exc ("wcbvEval; TCase, brs don't eval")
-                    | Ret ebrs => Ret (TCase ml emch ebrs)
-                  end
+                | None => Ret (TCase ml emch brs)
                 | Some (r, args, arty) =>
-                  match tskipn (snd (fst ml)) args with
+                  match tskipn (snd ml) args with
                     | None => raise "wcbvEval: Case, tskipn"
                     | Some ts =>
                       match whCaseStep r ts brs with
@@ -682,11 +677,9 @@ Lemma pre_WcbvEval_wcbvEval:
     cbn. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
     rewrite e. rewrite e0. rewrite e1. rewrite (H0 (mx - 1)); try omega.
     reflexivity.
-  - destruct H, H0. exists (S (max x x0)). intros mx h.
-    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+  - destruct H. exists (S x). intros mx h.
     cbn. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
-    rewrite e. rewrite H0; try omega.
-    reflexivity.
+    rewrite e. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
@@ -717,4 +710,14 @@ Proof.
   rewrite k0 in k1. injection k1. intuition.
 Qed.
   
+Lemma wcbvEval_up:
+ forall t s tmr,
+   wcbvEval tmr t = Ret s ->
+   exists n, forall m, m >= n -> wcbvEval m t = Ret s.
+Proof.
+  intros. 
+  destruct (WcbvEval_wcbvEval (proj1 (wcbvEval_WcbvEval tmr) t s H)).
+  exists x. apply H0.
+Qed.
+
 End wcbvEval_sec.

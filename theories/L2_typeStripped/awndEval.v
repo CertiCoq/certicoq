@@ -32,10 +32,10 @@ Inductive awndEval : Term -> Term -> Prop :=
             awndEval (TLetIn nm dfn bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
-| aCase: forall (ml:inductive * nat * list nat) (s mch:Term)
-                 (args brs ts:Terms) (n arty:nat),
+| aCase: forall (ml:inductive * nat) (s mch:Term)
+                 (args ts:Terms) (brs:Defs) (n arty:nat),
             canonicalP mch = Some (n, args, arty) ->
-            tskipn (snd (fst ml)) args = Some ts ->
+            tskipn (snd ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             awndEval (TCase ml mch brs) s
 | aFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
@@ -46,10 +46,10 @@ Inductive awndEval : Term -> Term -> Prop :=
           awndEval (TApp (TFix dts m) arg args)
                    (pre_whFixStep x dts (tcons arg args))
 | aCast: forall t, awndEval (TCast t) t
+| aProof: forall t, awndEval (TProof t) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches or Fix ***)
-| aProof: forall t s, awndEval t s -> awndEval (TProof t) (TProof s)
 | aAppFn:  forall (t r arg:Term) (args:Terms),
               awndEval t r ->
               awndEval (mkApp t (tcons arg args)) (mkApp r (tcons arg args))
@@ -59,12 +59,14 @@ Inductive awndEval : Term -> Term -> Prop :=
 | aLetInDef:forall (nm:name) (d1 d2 bod:Term),
               awndEval d1 d2 ->
               awndEval (TLetIn nm d1 bod) (TLetIn nm d2 bod)
-| aCaseArg: forall (ml:inductive * nat * list nat) (mch can:Term) (brs:Terms),
+| aCaseArg: forall (ml:inductive * nat) (mch can:Term) (brs:Defs),
               awndEval mch can ->
               awndEval (TCase ml mch brs) (TCase ml can brs)
+    (****
 | aCaseBrs: forall (ml:inductive * nat * list nat) (mch:Term) (brs brs':Terms),
               awndEvals brs brs' ->
               awndEval (TCase ml mch brs) (TCase ml mch brs')
+***************)
 with awndEvals : Terms -> Terms -> Prop :=
      | aaHd: forall (t r:Term) (ts:Terms), 
                awndEval t r ->
@@ -145,6 +147,7 @@ Proof.
     apply pre_whFixStep_pres_WFapp; try assumption.
     + eapply j. eassumption.
     + constructor; assumption.
+  - inversion_Clear H. assumption.
   - inversion_Clear H. assumption.
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.

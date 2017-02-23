@@ -33,10 +33,10 @@ Inductive wndEval : Term -> Term -> Prop :=
             wndEval (TLetIn nm dfn ty bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* n is the number of parameters of the datatype *)
-| sCase: forall (ml:inductive * nat * list nat) (ty s mch:Term)
-                 (args brs ts:Terms) (n arty:nat),
+| sCase: forall (ml:inductive * nat) (ty s mch:Term)
+                 (args ts:Terms) (brs:Defs) (n arty:nat),
             canonicalP mch = Some (n, args, arty) ->
-            tskipn (snd (fst ml)) args = Some ts ->
+            tskipn (snd ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml ty mch brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
@@ -47,11 +47,11 @@ Inductive wndEval : Term -> Term -> Prop :=
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t ty, wndEval (TCast t ty) t
+| sProof: forall t, wndEval (TProof t) t
 (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches 
 *** congruence on type of Fix ***)
-| sProof: forall t s,wndEval t s -> wndEval (TProof t) (TProof s)
 | sAppFn:  forall (t r arg:Term) (args:Terms),
               wndEval t r ->
               wndEval (TApp t arg args) (mkApp r (tcons arg args))
@@ -70,18 +70,20 @@ Inductive wndEval : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (t d1 d2 bod:Term),
               wndEval d1 d2 ->
               wndEval (TLetIn nm d1 t bod) (TLetIn nm d2 t bod)
-| sCaseTy:  forall (nl:inductive * nat * list nat)
-                   (ty uy mch:Term) (brs:Terms),
+| sCaseTy:  forall (nl:inductive * nat)
+                   (ty uy mch:Term) (brs:Defs),
               wndEval ty uy ->
               wndEval (TCase nl ty mch brs) (TCase nl uy mch brs)
-| sCaseArg: forall (nl:inductive * nat * list nat)
-                   (ty mch can:Term) (brs:Terms),
+| sCaseArg: forall (nl:inductive * nat)
+                   (ty mch can:Term) (brs:Defs),
               wndEval mch can ->
               wndEval (TCase nl ty mch brs) (TCase nl ty can brs)
+ (******************
 | sCaseBrs: forall (nl:inductive * nat * list nat)
-                   (ty mch:Term) (brs brs':Terms),
+                   (ty mch:Term) (brs brs':Defs),
               wndEvals brs brs' ->
               wndEval (TCase nl ty mch brs) (TCase nl ty mch brs')
+******************)
 with wndEvals : Terms -> Terms -> Prop :=
      | saHd: forall (t r:Term) (ts:Terms), 
                wndEval t r ->
@@ -216,17 +218,30 @@ Proof.
   - cbn. constructor. apply IHfsts. assumption.
 Qed.
 
-(*** needs that wndEval is not reflexive ***
-Goal
-  forall t t', wndEval t t' ->
-                 forall us us', wndEvals (tcons t us) (tcons t' us') ->
-                                us = us'.
+(*************
+Lemma wndEval_mkProof_mkProof:
+  forall s u, wndEval s u -> WFapp s -> wndEval (mkProof s) (mkProof u).
 Proof.
-  induction 1; intros; try inversion_Clear H0; try reflexivity.
-  - unfold LookupDfn in H. inversion_Clear H.
-
-******************)
-
+  induction 1; cbn; intros hs; intros;
+  inversion_Clear hs; intuition; try discriminate;
+  try (constructor; econstructor; eassumption).
+  - rewrite mkProof_idempotent. constructor. assumption.
+  - rewrite <- (@mkProof_goodProof (TApp t brg brgs)). constructor.
+    constructor. assumption. not_isProof.
+  - rewrite <- (@mkProof_goodProof (TProd nm t2 bod)). constructor.
+    constructor. assumption. not_isProof.
+  - rewrite <- (@mkProof_goodProof (TLambda nm t2 bod)). constructor.
+    constructor. assumption. not_isProof.
+  - rewrite <- (@mkProof_goodProof (TLetIn nm d t2 bod)). constructor.
+    constructor. assumption. not_isProof.
+  - rewrite <- (@mkProof_goodProof (TLetIn nm d2 t bod)). constructor.
+    constructor. assumption. not_isProof.
+  - rewrite <- (@mkProof_goodProof (TCase (a, b) uy mch brs)). constructor.
+    constructor. assumption. not_isProof.
+  - rewrite <- (@mkProof_goodProof (TCase (a, b) ty can brs)). constructor.
+    constructor. assumption. not_isProof.
+Qed.
+ **********************)
 
 Lemma wndEval_mkApp_mkApp:
   forall s u, wndEval s u -> WFapp s ->
@@ -240,9 +255,11 @@ Proof.
     eapply sCase; eassumption.
   - rewrite pre_whFixStep_absorbs_mkApp. simpl. eapply sFix; try eassumption.
     rewrite tlength_tappend. omega.
+(***
   - rewrite <- (@mkApp_goodFn (TProof s)). eapply sAppFn.
     + apply sProof. assumption.
     + not_isApp.
+****)
   - rewrite mkApp_idempotent. constructor. assumption.
   - inversion_Clear H; eapply sAppArgs. 
     + constructor. eassumption.
@@ -265,9 +282,11 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp.
     rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
     eapply sCaseArg. assumption.
+    (*****************
   - rewrite <- mkApp_goodFn; try not_isApp.
     rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
     eapply sCaseBrs. assumption.
+****************)
 Qed.
 
 Lemma wndEvals_old_App_args:
@@ -593,8 +612,20 @@ Lemma wndEvalRTC_App_fn:
 Proof.  
   intros hp fn fn' hfn h1 arg args harg hargs.
   apply (awndEvalRTC_wndEvalRTC). assumption.
-  - apply awndEvalRTC_App_fn. apply wndEvalRTC_awndEvalRTC; try assumption.
+  - apply awndEvalRTC_App_fn. apply wndEvalRTC_awndEvalRTC; assumption.
   - apply mkApp_pres_WFapp; try constructor; assumption.
+Qed.
+
+Lemma wndEvalRTC_Proof:
+  forall t t',
+    wndEvalRTC t t' -> wndEvalRTC (TProof t) t'.
+Proof.
+  induction 1; intros.
+  - constructor. constructor.
+  - eapply wERTCtrn.
+    + eapply wERTCstep. constructor.
+    + eapply wERTCstep. assumption.
+  - eapply wERTCtrn. apply IHwndEvalRTC1. assumption.
 Qed.
 
 Lemma wndEvalsRTC_left_nil_nil:
@@ -612,7 +643,6 @@ Proof.
   + inversion H.
   + intuition.
 Qed.
-
 
 Lemma wndEvalRTC_App_arg:
   forall fn arg arg',
@@ -711,6 +741,7 @@ induction 1; intros.
 - eapply wERTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
 Qed.
 
+(**************
 Lemma wndEvalRTC_Case_brs:
   forall brs brs',
     wndEvalsRTC brs brs' -> 
@@ -721,16 +752,7 @@ induction 1; intros.
 - constructor. apply sCaseBrs. assumption.
 - eapply wERTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
 Qed.
-
-Lemma wndEvalRTC_Proof:
-  forall t t',
-    wndEvalRTC t t' -> wndEvalRTC (TProof t) (TProof t').
-Proof.
-  induction 1; intros.
-  - constructor.
-  - constructor. apply sProof. assumption.
-  - eapply wERTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
-Qed.
+ *****************)
 
 Lemma wndEvalsRTC_tcons_hd:
   forall t ts u,
@@ -857,16 +879,18 @@ Proof.
   - constructor. apply (H nm ec). eassumption.
     intros h. elim H1. constructor. assumption.
   - constructor. subst pp. eapply H. reflexivity.
-    intros h. elim H1. constructor. assumption.
-  - apply sAppArgs. apply (H nm ec); trivial. assert (j:= notPocc_TApp H1).
-    intros h. inversion h; intuition.
+    intros h. inversion_Clear h; elim H1. 
+    + apply PoAppA. assumption.
+    + apply PoAppR. assumption.
   - apply sProdTy. apply (H nm0 ec); trivial; apply (notPocc_TProd H1).
   - apply sLamTy. apply (H nm0 ec); trivial; apply (notPocc_TLambda H1).
   - apply sLetInTy. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
   - apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
   - apply sCaseTy. apply (H nm ec); trivial; apply (notPocc_TCase H1).
   - apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
+    (************
   - apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
+*************)
   - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
   - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
 Qed.

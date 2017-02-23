@@ -1,8 +1,3 @@
-(******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L2_5_box" as L2_5.
-Add LoadPath "../L3_flattenedApp" as L3.
-(******)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -398,8 +393,8 @@ Proof.
   - cbn in H0. discriminate.
 Qed.
 *********************)
-  
-(***)
+
+(******************************
 Lemma instantiate_hom:
   (forall bod, L2_5.term.WFapp bod -> forall arg n, WFTrm (strip arg) 0 ->
      strip (L2_5.term.instantiate arg n bod) =
@@ -420,14 +415,23 @@ Proof.
     + rewrite (proj1 (nat_compare_lt n m)); trivial.
   - cbn. rewrite H0; try assumption. apply f_equal.
     rewrite H2. reflexivity. assumption.
-  - admit.
+  - rewrite TApp_hom. destruct (isL2_5Cnstr fn).
+    + destruct p. destruct p.
+      
+    rewrite L2_5.term.instantiate_TApp_commute. Check mkApp_hom.
+    rewrite TApp_hom. 
+    
+HERE
+
+
+    
   - cbn. erewrite <- instantiate_etaExp; try eassumption. reflexivity.
   - rewrite TCase_hom. rewrite instantiate_TCase.
     change
      (TCase m (strip (L2_5.term.instantiate arg n mch))
-            (strips (L2_5.term.instantiates arg n brs)) =
+            (stripDs (L2_5.term.instantiateDefs arg n brs)) =
       TCase m (instantiate (strip arg) n (strip mch))
-            (instantiates (strip arg) n (strips brs))).
+            (instantiateDefs (strip arg) n (stripDs brs))).
     apply f_equal2.
     + rewrite H0; try reflexivity; try assumption.
     + rewrite H2; try reflexivity; try assumption.
@@ -437,11 +441,10 @@ Proof.
                      arg (n + (L2_5.compile.dlength defs)) defs)) m =
        TFix (instantiateDefs
                (strip arg) (n + (dlength (stripDs defs))) (stripDs defs)) m).
+    apply f_equal2; try reflexivity.
     rewrite H0; try assumption.
     apply f_equal2; try reflexivity. rewrite stripDs_pres_dlength.
-    reflexivity.
-Admitted.
-(*****************
+    reflexivity. 
   - rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
     rewrite tcons_hom. rewrite H0; try assumption.
     rewrite tcons_hom. rewrite instantiates_tcons.
@@ -450,6 +453,8 @@ Admitted.
     rewrite dcons_hom. rewrite H0; try assumption.
     rewrite dcons_hom. rewrite instantiates_dcons.
     rewrite H2. reflexivity. assumption.
+
+    
 Admitted.
  **************)
 
@@ -628,7 +633,7 @@ Qed.
 Lemma whCaseStep_hom:
   forall n brs ts,
     optStrip (L2_5.term.whCaseStep n ts brs) =
-    whCaseStep n (strips ts) (strips brs).
+    whCaseStep n (strips ts) (stripDs brs).
 (*****
 Proof.
   destruct n, brs; intros; simpl; try reflexivity.
@@ -643,16 +648,20 @@ Proof.
 ****)
 Admitted.
 
+(****************
 Lemma whBetaStep_tnil_hom:
   forall bod arg, WFTrm (strip arg) 0 -> L2_5.term.WFapp bod ->
     strip (L2_5.term.whBetaStep bod arg L2_5.compile.tnil) =
     whBetaStep (strip bod) (strip arg).
 Proof.
   intros. unfold L2_5.term.whBetaStep, whBetaStep.
+  rewrite mkApp_hom.
+  Check (proj1 instantiate_hom).
   rewrite <- (proj1 instantiate_hom); try assumption.
   rewrite L2_5.term.mkApp_tnil_ident.
   reflexivity.
 Qed.
+ *******************)
 
 Lemma whBetaStep_hom:
   forall bod arg args,

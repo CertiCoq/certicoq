@@ -1,9 +1,4 @@
 
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L2_5_box" as L2_5.
-(****)
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
@@ -37,10 +32,10 @@ Inductive wndEval : Term -> Term -> Prop :=
             wndEval (TLetIn nm dfn bod) (instantiate dfn 0 bod)
      (* Case argument must be in Canonical form *)
      (* n is the number of parameters of the datatype *)
-| sCase: forall (ml:inductive * nat * list nat) (s mch:Term)
-                 (args brs ts:Terms) (n arty:nat),
+| sCase: forall (ml:inductive * nat) (s mch:Term)
+                 (args ts:Terms) (brs:Defs) (n arty:nat),
             canonicalP mch = Some (n, args, arty) ->
-            tskipn (snd (fst ml)) args = Some ts ->
+            tskipn (snd ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             wndEval (TCase ml mch brs) s
 | sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
@@ -64,13 +59,15 @@ Inductive wndEval : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (d1 d2 bod:Term),
               wndEval d1 d2 ->
               wndEval (TLetIn nm d1 bod) (TLetIn nm d2 bod)
-| sCaseArg: forall (nl:inductive * nat * list nat) (mch can:Term) (brs:Terms),
+| sCaseArg: forall (nl:inductive * nat) (mch can:Term) (brs:Defs),
               wndEval mch can ->
               wndEval (TCase nl mch brs) (TCase nl can brs)
+                      (******************
 | sCaseBrs:
     forall (nl:inductive * nat * list nat) (mch:Term) (brs brs':Terms),
               wndEvals brs brs' ->
               wndEval (TCase nl mch brs) (TCase nl mch brs')
+***************)
 with wndEvals : Terms -> Terms -> Prop :=
      | saHd: forall (t r:Term) (ts:Terms), 
                wndEval t r ->
@@ -209,9 +206,6 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp.
     rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
     eapply sCaseArg. assumption.
-  - rewrite <- mkApp_goodFn; try not_isApp.
-    rewrite <- mkApp_goodFn; try not_isApp. eapply sAppFn. 
-    eapply sCaseBrs. assumption.
 Qed.
 
 Lemma wndEvals_old_App_args:
@@ -1062,6 +1056,7 @@ induction 1; intros.
 - eapply wERTCtrn. apply IHwndEvalRTC1. apply IHwndEvalRTC2.
 Qed.
 
+(***********
 Lemma wndEvalRTC_Case_brs:
   forall brs brs',
     wndEvalsRTC brs brs' -> 
@@ -1072,6 +1067,7 @@ induction 1; intros.
 - constructor. apply sCaseBrs. assumption.
 - eapply wERTCtrn. apply IHwndEvalsRTC1. apply IHwndEvalsRTC2.
 Qed.
+ *****************)
 
 Lemma wndEvalsRTC_tcons_hd:
   forall t ts u,
@@ -1191,7 +1187,6 @@ Proof.
     intros h. inversion h; intuition.
   - apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
   - apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
-  - apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
   - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
   - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
 Qed.

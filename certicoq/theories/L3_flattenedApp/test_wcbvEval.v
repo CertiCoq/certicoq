@@ -1,8 +1,3 @@
-(******)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L2_5_box" as L2_5.
-Add LoadPath "../L3_flattenedApp" as L3.
-(******)
 
 Require Import ExtLib.Data.String.
 Require Import omega.Omega.

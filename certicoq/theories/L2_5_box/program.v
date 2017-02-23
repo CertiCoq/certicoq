@@ -1,7 +1,3 @@
-(****)
-Add LoadPath "../common" as Common.
-Add LoadPath "../L2_5_box" as L2_5.
-(****)
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -18,55 +14,27 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 
-(** all items in an env are application-well-formed **)
-Inductive WFaEc: envClass Term -> Prop :=
-| wfaecTrm: forall (t:Term), WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall n i, WFaEc (ecTyp Term n i)
-| wfaecAx: WFaEc (ecAx Term).
+(** well-formedness of environs **)
+Definition WFaEc: envClass Term -> Prop := AstCommon.WFaEc WFapp.
 
-Inductive WFaEnv: environ Term -> Prop :=
-| wfaenil: WFaEnv nil
-| wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
-                   forall nm, WFaEnv ((nm, ec) :: p).
-
-
-(*** Common functions for evaluation ***)
-
-(** Lookup an entry in the environment **)
-(***********  remove ???  **********
-Definition LookupDfn s p (t:Term) := Lookup s p (ecTrm t).
-Definition LookupTyp s p n i := Lookup s p (ecTyp Term n i).
-Definition LookupAx s p := Lookup s p (ecAx Term).
- ******************)
+Definition WFaEnv: environ Term -> Prop := AstCommon.WFaEnv WFapp.
 
 Lemma Lookup_pres_WFapp:
   forall p, WFaEnv p -> forall nm ec, Lookup nm p ec -> WFaEc ec.
 Proof.
-  induction 1; intros nn ed h; inversion_Clear h.
-  - assumption.
-  - eapply IHWFaEnv. eassumption.
+  apply AstCommon.Lookup_pres_WFapp.
 Qed.
 
 Lemma lookup_pres_WFapp:
     forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
 Proof.
-  induction 1; intros nn ed h.
-  - inversion_Clear h.
-  - case_eq (string_eq_bool nn nm); intros j.
-    + cbn in h. rewrite j in h. myInjection h. assumption.
-    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
+  apply AstCommon.lookup_pres_WFapp.
 Qed.
 
 Lemma lookupDfn_pres_WFapp:
     forall p, WFaEnv p -> forall nm t, lookupDfn nm p = Ret t -> WFapp t.
 Proof.
-  intros p hp nm t ht. unfold lookupDfn in ht.
-  case_eq (lookup nm p); intros.
-  - rewrite H in ht. destruct e.
-    + assert (j:= lookup_pres_WFapp hp _ H). myInjection ht.
-      inversion_Clear j. assumption.
-    + discriminate.
-  - rewrite H in ht. discriminate.
+  apply lookupDfn_pres_WFapp.
 Qed.
 
 
@@ -138,7 +106,7 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
                    getCnstr itp cnum = Ret cstr ->
                    Crct p n (TConstruct (mkInd ipkgNm inum) cnum arty)
 | CrctCase: forall n p m mch brs,
-              Crct p n mch -> Crcts p n brs ->
+              Crct p n mch -> CrctDs p n brs ->
               Crct p n (TCase m mch brs)
 | CrctFix: forall n p ds m,
              Crct p 0 prop ->    (** convenient for IH *)
@@ -624,13 +592,13 @@ Qed.
 Lemma Crct_invrt_Case:
   forall p n case,
     Crct p n case -> forall m s us, case = (TCase m s us) ->
-    Crct p n s /\ Crcts p n us.
+    Crct p n s /\ CrctDs p n us.
 Proof.
   induction 1; intros; try discriminate.
   - assert (j:= IHCrct1 _ _ _ H2). intuition.
     apply (proj2 Crct_weaken); auto.
   - assert (j:= IHCrct _ _ _ H2). intuition.
-    apply (proj1 (proj2 Crct_Typ_weaken)); auto.
+    apply (proj2 (proj2 Crct_Typ_weaken)); auto.
   - injection H1; intros; subst. auto.
 Qed.
 
@@ -906,21 +874,32 @@ induction m; induction ts; intros.
 - simpl in H. eapply IHm. eassumption. inversion H0. assumption.
 Qed.
 
+Lemma dnthBody_pres_Crct:
+  forall p n (ds:Defs), CrctDs p n ds ->
+    forall m x ix, (dnthBody m ds) = Some (x, ix) -> Crct p n x.
+Proof.
+  intros p n ds h m x ix.
+  functional induction (dnthBody m ds); intros; auto.
+  - discriminate.
+  - myInjection H. inversion h. assumption.
+  - apply IHo; inversion h; assumption.
+Qed.
+
 Lemma whCaseStep_pres_Crct:
-  forall p n ts, Crcts p n ts -> forall brs, Crcts p n brs ->
+  forall p n ts, Crcts p n ts -> forall brs, CrctDs p n brs ->
   forall m s, whCaseStep m ts brs = Some s -> Crct p n s.
 Proof.
   intros p n ts h1 brs h2 m s h3. unfold whCaseStep in h3.
-  assert (j: tnth m brs = None \/ (exists t, tnth m brs = Some t)).
-  { destruct (tnth m brs).
-    + right. exists t. reflexivity.
+  assert (j: dnthBody m brs = None \/ (exists t, dnthBody m brs = Some t)).
+  { destruct (dnthBody m brs).
+    + right. exists p0. reflexivity.
     + left. reflexivity. }
   destruct j.
   - rewrite H in h3. discriminate.
-  - destruct H. rewrite H in h3. injection h3; intros. rewrite <- H0.
-    apply mkApp_pres_Crct; try assumption.
-    apply (tnth_pres_Crct h2 _ H).
-Qed. 
+  - destruct H as [x jx]. rewrite jx in h3. destruct x as [y0 y1].
+    myInjection h3. apply mkApp_pres_Crct; try assumption.
+    eapply (dnthBody_pres_Crct h2). eassumption.
+Qed.
 
 Lemma fold_left_pres_Crct:
   forall p m (f:Term -> nat -> Term) (ns:list nat) (t:Term),

@@ -120,6 +120,7 @@ Qed.
 Section trm_Sec.
 Variable trm: Set.
 Variable trm_dec: forall (s t:trm), s = t \/ s <> t.
+Variable WFapp: trm -> Prop.
 
 Definition trms := list trm.
 Record split := mkSplit {fsts:trms; nst:trm; lsts:trms}.
@@ -171,7 +172,14 @@ Proof.
   apply envClass_dec.
 Qed.
 
-(** An environ is a list of definitions. **)
+(** well formedness for an envClass **)
+Inductive WFaEc: envClass -> Prop :=
+| wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
+| wfaecTyp: forall n i, WFaEc (ecTyp n i)
+| wfaecAx: WFaEc (ecAx).
+Hint Constructors WFaEc.
+
+(** An environ is an association list of envClass. **)
 Definition environ := list (string * envClass).
 Record Program : Type := mkPgm { main:trm; env:environ }.
 
@@ -219,6 +227,12 @@ induction 1; intros h.
 - discriminate h.
 Qed.
 
+(** well formedness of an environ **)
+Inductive WFaEnv: environ -> Prop :=
+| wfaenil: WFaEnv nil
+| wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
+                   forall nm, fresh nm p -> WFaEnv ((nm, ec) :: p).
+Hint Constructors WFaEnv.
 
 (** looking a name up in an environment **)
 (** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
@@ -401,6 +415,36 @@ Lemma Lookup_strengthen:
 intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
 simpl in k. rewrite (string_eq_bool_neq j2) in k.
 apply lookup_Lookup. assumption.
+Qed.
+
+Lemma Lookup_pres_WFapp:
+  forall p, WFaEnv p -> forall nm ec, Lookup nm p ec -> WFaEc ec.
+Proof.
+  induction 1; intros nn ed h; inversion_Clear h.
+  - assumption.
+  - eapply IHWFaEnv. eassumption.
+Qed.
+
+Lemma lookup_pres_WFapp:
+    forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
+Proof.
+  induction 1; intros nn ed h.
+  - inversion_Clear h.
+  - case_eq (string_eq_bool nn nm); intros j.
+    + cbn in h. rewrite j in h. myInjection h. assumption.
+    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
+Qed.
+
+Lemma lookupDfn_pres_WFapp:
+    forall p, WFaEnv p -> forall nm t, lookupDfn nm p = Ret t -> WFapp t.
+Proof.
+  intros p hp nm t ht. unfold lookupDfn in ht.
+  case_eq (lookup nm p); intros.
+  - rewrite H in ht. destruct e.
+    + assert (j:= lookup_pres_WFapp hp _ H). myInjection ht.
+      inversion_Clear j. assumption.
+    + discriminate.
+  - rewrite H in ht. discriminate.
 Qed.
 
 

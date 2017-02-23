@@ -1,5 +1,3 @@
-Add LoadPath "../common" as Common.
-Add LoadPath "../L1_QuotedCoq" as L1.
 
 Require Export Template.Ast.
 Require Import Coq.Strings.String.
@@ -50,7 +48,6 @@ Proof.
   try (cbn in H; unfold unit in H; rewrite env_hom in H; discriminate).
   - exists t. reflexivity.
 Qed.
-
 
 Notation prop := (tSort sProp).
 Inductive Crct : nat -> environ term -> term -> Prop :=

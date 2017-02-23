@@ -13,49 +13,27 @@ Local Open Scope list.
 Set Implicit Arguments.
 
  
-(** all items in an env are application-well-formed **)
-Inductive WFaEc: envClass Term -> Prop :=
-| wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
-| wfaecTyp: forall n i, WFaEc (ecTyp _ n i)
-| wfaecAx: WFaEc (ecAx _).
+(** well-formedness of environs **)
+Definition WFaEc: envClass Term -> Prop := AstCommon.WFaEc WFapp.
 
-Inductive WFaEnv: environ Term -> Prop :=
-| wfaenil: WFaEnv nil
-| wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
-                   forall nm, WFaEnv ((nm, ec) :: p).
-Hint Constructors WFaEc WFaEnv.
+Definition WFaEnv: environ Term -> Prop := AstCommon.WFaEnv WFapp.
 
-(*** Common functions for evaluation ***)
-
-(** Lookup an entry in the environment **)
 Lemma Lookup_pres_WFapp:
   forall p, WFaEnv p -> forall nm ec, Lookup nm p ec -> WFaEc ec.
 Proof.
-  induction 1; intros nn ed h; inversion_Clear h.
-  - assumption.
-  - eapply IHWFaEnv. eassumption.
+  apply AstCommon.Lookup_pres_WFapp.
 Qed.
 
 Lemma lookup_pres_WFapp:
     forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
 Proof.
-  induction 1; intros nn ed h.
-  - inversion_Clear h.
-  - case_eq (string_eq_bool nn nm); intros j.
-    + cbn in h. rewrite j in h. myInjection h. assumption.
-    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
+  apply AstCommon.lookup_pres_WFapp.
 Qed.
 
 Lemma lookupDfn_pres_WFapp:
     forall p, WFaEnv p -> forall nm t, lookupDfn nm p = Ret t -> WFapp t.
 Proof.
-  intros p hp nm t ht. unfold lookupDfn in ht.
-  case_eq (lookup nm p); intros.
-  - rewrite H in ht. destruct e.
-    + assert (j:= lookup_pres_WFapp hp _ H). myInjection ht.
-      inversion_Clear j. assumption.
-    + discriminate.
-  - rewrite H in ht. discriminate.
+  apply lookupDfn_pres_WFapp.
 Qed.
 
 
@@ -94,7 +72,7 @@ try discriminate; try (inversion h); try reflexivity.
 - destruct fn; try discriminate. injection H4. intros. subst. apply canA.
 - apply canC.
 Qed.
-***)
+ ***)
 
 
 (** correctness specification for programs (including local closure) **)
@@ -127,7 +105,7 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
                    getCnstr itp cnum = Ret cstr ->
                    Crct p n (TConstruct (mkInd ipkgNm inum) cnum arty)
 | CrctCase: forall n p m mch brs,
-              Crct p n mch -> Crcts p n brs ->
+              Crct p n mch -> CrctDs p n brs ->
               Crct p n (TCase m mch brs)
 | CrctFix: forall n p ds m,
              Crct p 0 prop ->    (** convenient for IH *)
@@ -155,8 +133,7 @@ Scheme Crct_ind' := Minimality for Crct Sort Prop
 Combined Scheme CrctCrctsCrctDsTyp_ind from
          Crct_ind', Crcts_ind', CrctDs_ind', CrctTyp_ind'.
 Combined Scheme CrctCrctsCrctDs_ind from Crct_ind', Crcts_ind', CrctDs_ind'.
-
-
+  
 Lemma Crct_WFTrm:
   (forall p n t, Crct p n t -> WFTrm t n) /\
   (forall p n ts, Crcts p n ts -> WFTrms ts n) /\
@@ -559,13 +536,13 @@ Qed.
 Lemma Crct_invrt_Case:
   forall p n case,
     Crct p n case -> forall m s us, case = (TCase m s us) ->
-                                    Crct p n s /\ Crcts p n us.
+                                    Crct p n s /\ CrctDs p n us.
 Proof.
   induction 1; intros; try discriminate.
   - assert (j:= IHCrct1 _ _ _ H2). intuition.
     apply (proj2 Crct_weaken); auto.
   - assert (j:= IHCrct _ _ _ H2). intuition.
-    apply (proj1 (proj2 Crct_Typ_weaken)); auto.
+    apply (proj2 (proj2 Crct_Typ_weaken)); auto.
   - injection H1; intros; subst. auto.
 Qed.
 

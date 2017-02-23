@@ -23,6 +23,7 @@ Definition L1gTerm := L1g.compile.Term.
 Definition L1gTerms := L1g.compile.Terms.
 Definition L1gDefs := L1g.compile.Defs.
 
+
 Definition optStrip (t:option L1gTerm) : option Term :=
   match t with
     | None => None
@@ -188,7 +189,7 @@ Qed.
 Lemma canonicalP_hom:
   forall t, optStripCanP (L1g.term.canonicalP t) = canonicalP (strip t).
 Proof.
-  destruct t; cbn; try reflexivity.
+  destruct t; intros; cbn; try reflexivity.
   destruct t1; cbn; try reflexivity.
 Qed.
 
@@ -254,6 +255,7 @@ Proof.
   - inversion H; destruct ec; simpl; try discriminate; constructor.
     + apply (proj1 (L1WFapp_L2WFapp)). assumption.
   - assumption.
+  - apply stripEnv_pres_fresh. assumption.
 Qed.
 
 (***
@@ -290,7 +292,7 @@ Qed.
 
 Lemma mkApp_hom:
 forall fn args,
-  strip (L1g.compile.mkApp fn args) = mkApp (strip fn) (strips args).
+  strip (L1g.term.mkApp fn args) = mkApp (strip fn) (strips args).
 Proof.
   destruct args; try (reflexivity).
   - rewrite L1g.term.mkApp_tnil_ident. rewrite mkApp_tnil_ident.
@@ -325,17 +327,6 @@ Lemma instantiates_dcons_commute:
          (dcons nm (instantiate tin n t) m (instantiateDefs tin n ds)).
 reflexivity.
 Qed.
-
-(*****  to remove in favor of term.v  ***
-Lemma instantiate_TApp_mkApp:
-  forall fn tin n arg args,
-      instantiate tin n (TApp fn arg args) =
-      mkApp (instantiate tin n fn)
-           (tcons (instantiate tin n arg) (instantiates tin n args)).
-Proof.
-  intros; destruct fn; try reflexivity. 
-Qed.
-****)
     
 Lemma instantiate_mkApp_commute:
 forall tin n bod arg args,
@@ -406,14 +397,14 @@ Proof.
             (TLetIn n (instantiate (strip arg) n0 (strip t))
                     (instantiate (strip arg) (S n0) (strip t1)))).
     rewrite H. rewrite H1. reflexivity.
-  - change (strip (L1g.compile.mkApp
+  - change (strip (L1g.term.mkApp
                      (L1g.term.instantiate arg n t)
                      (L1g.compile.tcons (L1g.term.instantiate arg n t0)
                                          (L1g.term.instantiates arg n t1))) =
             instantiate (strip arg) n (strip (L1g.compile.TApp t t0 t1))). 
     rewrite TApp_hom. 
     change
-      (strip (L1g.compile.mkApp
+      (strip (L1g.term.mkApp
                 (L1g.term.instantiate arg n t)
                 (L1g.compile.tcons (L1g.term.instantiate arg n t0)
                                    (L1g.term.instantiates arg n t1))) =
@@ -423,9 +414,9 @@ Proof.
     rewrite <- H. rewrite <- H0. rewrite <- H1. 
     rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
   - change (TCase p (strip (L1g.term.instantiate arg n t0))
-                  (strips (L1g.term.instantiates arg n t1)) =
+                  (stripDs (L1g.term.instantiateDefs arg n d)) =
             (TCase p (instantiate (strip arg) n (strip t0))
-                   (instantiates (strip arg) n (strips t1)))).
+                   (instantiateDefs (strip arg) n (stripDs d)))).
     rewrite H0. rewrite H1. reflexivity.
   - change (TFix (stripDs (L1g.term.instantiateDefs
                              arg (n0 + L1g.compile.dlength d) d)) n =
@@ -474,12 +465,12 @@ Qed.
 Lemma whCaseStep_hom:
   forall n brs ts,
     optStrip (L1g.term.whCaseStep n ts brs) =
-    whCaseStep n (strips ts) (strips brs).
+    whCaseStep n (strips ts) (stripDs brs).
 destruct n, brs; intros; simpl; try reflexivity.
 - unfold whCaseStep. simpl. rewrite mkApp_hom. reflexivity.
-- unfold whCaseStep. unfold L1g.term.whCaseStep. simpl. 
-  rewrite <- tnth_hom. destruct (L1g.term.tnth n brs); simpl.
-  + rewrite mkApp_hom. reflexivity.
+- unfold whCaseStep. unfold L1g.term.whCaseStep. cbn. 
+  rewrite <- dnthBody_hom. destruct (compile.dnthBody n brs); simpl.
+  + destruct p as [x0 x1]. cbn. rewrite mkApp_hom. reflexivity.
   + reflexivity.
 Qed.
 
@@ -510,7 +501,7 @@ Qed.
 Lemma TCase_hom:
   forall n ty mch brs,
     strip (L1g.compile.TCase n ty mch brs) =
-    TCase n (strip mch) (strips brs).
+    TCase n (strip mch) (stripDs brs).
 reflexivity.
 Qed.
 
@@ -625,7 +616,37 @@ Proof.
 Qed.
 Print Assumptions WcbvEval_hom.
 
-    
+Lemma wcbvEval_hom:
+  forall p n t t',
+    L1g.wcbvEval.wcbvEval p n t = Ret t' ->
+    exists m, wcbvEval (stripEnv p) m (strip t) = Ret (strip t').
+Proof.
+  intros. 
+  assert (j1:= proj1 (L1g.wcbvEval.wcbvEval_WcbvEval p n) _ _ H).
+  assert (k0:= proj1 (WcbvEval_hom p) _ _ j1).
+  assert (j2:= @WcbvEval_wcbvEval (stripEnv p) (strip t) (strip t') k0).
+  destruct j2 as [ny jny].
+  exists ny. eapply jny. omega.
+Qed.
+  
+(*****
+Lemma wcbvEval_hom_fail:
+  forall n t p str,
+    L1g.wcbvEval.wcbvEval p n t = Exc str ->
+    forall m, exists str', wcbvEval (stripEnv p) m (strip t) = Exc str'.
+Proof.
+  induction n; cbn; intros.
+  - cbn in H.
+  induction t; cbn; intros.
+  - cbn in H. unfold L1g.wcbvEval.wcbvEval in H.
+  assert (j1:= proj1 (L1g.wcbvEval.wcbvEval_WcbvEval p n) _ _ H).
+  assert (k0:= proj1 (WcbvEval_hom p) _ _ j1).
+  assert (j2:= @WcbvEval_wcbvEval (stripEnv p) (strip t) (strip t') k0).
+  destruct j2 as [ny jny].
+  exists ny. eapply jny. omega.
+Qed.
+ *************)
+
 Lemma Prf_strip_inv:
   forall s st, TProof st = strip s ->
               exists t, s = L1g.compile.TProof t /\ st = strip t.
@@ -721,10 +742,10 @@ Qed.
 Lemma Case_strip_inv:
   forall m mch brs s, TCase m mch brs = strip s ->
     exists sty smch sbrs, (L1g.compile.TCase m sty smch sbrs = s) /\
-              mch = strip smch /\ brs = strips sbrs.
+              mch = strip smch /\ brs = stripDs sbrs.
 Proof.
   intros m mch brs s. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. exists s1, s2, t. intuition.
+  - myInjection h. exists s1, s2, d. intuition.
 Qed.
 
 Lemma tnil_strip_inv:
@@ -755,105 +776,77 @@ Qed.
 Lemma whCaseStep_Hom:
   forall n ts bs t,
     L1g.term.whCaseStep n ts bs = Some t -> 
-    whCaseStep n (strips ts) (strips bs) = Some (strip t).
+    whCaseStep n (strips ts) (stripDs bs) = Some (strip t).
 Proof.
   intros n ts bs t h. rewrite <- whCaseStep_hom. rewrite <- optStrip_hom.
   apply f_equal. assumption.
 Qed.
 
-Theorem L2WcbvEval_L1gWcbvEval:
-  forall L2p p, L2p = stripEnv p -> L1g.program.WFaEnv p ->
-  forall L2t t, L2t = strip t -> L1g.term.WFapp t ->
-  forall L2s, WcbvEval L2p L2t L2s ->
+Definition excStrip (t:exception L1gTerm) : exception Term :=
+  match t with
+    | Exc str => Exc str
+    | Ret t => Ret (strip t)
+  end.
+
+
+Theorem L2WcbvEval_sound_for_L1gWcbvEval:
+  forall (p:environ L1g.compile.Term) (t:L1g.compile.Term) (L2s:Term),
+    WcbvEval (stripEnv p) (strip t) L2s ->
   forall s, L1g.wcbvEval.WcbvEval p t s -> L2s = strip s.
 Proof.
-  intros.
-  refine (WcbvEval_single_valued _ _). eassumption.
-  subst. apply WcbvEval_hom. assumption.
+  intros. refine (WcbvEval_single_valued _ _).
+  - eassumption.
+  - apply WcbvEval_hom. assumption.
 Qed.
-Print Assumptions L2WcbvEval_L1gWcbvEval.
+Print Assumptions L2WcbvEval_sound_for_L1gWcbvEval.
+
+(******
+Theorem L2WcbvEval_sound_for_L1gwndEval:
+  forall p t s, WcbvEval (stripEnv p) (strip t) (strip s) ->
+           L1g.program.WFaEnv p -> L1g.term.WFapp t ->        
+        L1g.wndEval.wndEvalRTC p t s.
+Proof.
+  intros.
+  refine (proj1 (L1g.wcbvEval.WcbvEval_wndEvalRTC _) _ _ _ _);
+    try assumption.
+  
+Qed.
+Print Assumptions L2WcbvEval_sound_for_L1gwndEval.
+ *****************)
 
 Theorem L2WcbvEval_sound_for_L1gwndEval:
-  forall L2p L2t L2s, WcbvEval L2p L2t L2s ->
-  forall p, L2p = stripEnv p -> L1g.program.WFaEnv p -> 
-  forall t, L2t = strip t -> L1g.term.WFapp t ->       
-  forall s, L1g.wcbvEval.WcbvEval p t s ->      
-            L2s = strip s /\ L1g.wndEval.wndEvalRTC p t s.
+  forall (p:environ L1g.compile.Term) (t:L1g.compile.Term) (L2s:Term),
+    WcbvEval (stripEnv p) (strip t) L2s ->
+    forall s, L1g.wcbvEval.WcbvEval p t s ->
+              L1g.program.WFaEnv p -> L1g.term.WFapp t ->        
+              L1g.wndEval.wndEvalRTC p t s.
 Proof.
-  intros. repeat split.
-  - refine (WcbvEval_single_valued _ _). eassumption.
-    subst. apply WcbvEval_hom. assumption.
-  - refine (proj1 (L1g.wcbvEval.WcbvEval_wndEvalRTC _) _ _ _ _); assumption.
+  intros.
+  refine (proj1 (L1g.wcbvEval.WcbvEval_wndEvalRTC _) _ _ _ _); assumption.
 Qed.
 Print Assumptions L2WcbvEval_sound_for_L1gwndEval.
 
 
-(*** unstrip: replace every missing type field with [prop]  ***)
-Function unstrip (t:Term) : L1gTerm :=
-  match t with
-    | TProof t => L1g.compile.TProof (unstrip t)
-    | TRel n => L1g.compile.TRel n
-    | TSort s => L1g.compile.TSort s
-    | TCast t => L1g.compile.TCast (unstrip t) L1g.compile.prop
-    | TProd nm bod => L1g.compile.TProd nm L1g.compile.prop (unstrip bod)
-    | TLambda nm bod => L1g.compile.TLambda nm L1g.compile.prop (unstrip bod)
-    | TLetIn nm dfn bod =>
-           L1g.compile.TLetIn nm (unstrip dfn) L1g.compile.prop (unstrip bod)
-    | TApp fn arg args =>
-      L1g.compile.TApp (unstrip fn) (unstrip arg) (unstrips args)
-    | TAx => L1g.compile.TAx
-    | TConst nm => L1g.compile.TConst nm
-    | TInd i => L1g.compile.TInd i
-    | TConstruct i m arty => L1g.compile.TConstruct i m arty
-    | TCase n mch brs =>
-           L1g.compile.TCase n L1g.compile.prop (unstrip mch) (unstrips brs)
-    | TFix ds n => L1g.compile.TFix (unstripDs ds) n
-    | TWrong => L1g.compile.TWrong ""
-  end
-with unstrips (ts:Terms) : L1gTerms := 
-  match ts with
-    | tnil => L1g.compile.tnil
-    | tcons t ts => L1g.compile.tcons (unstrip t) (unstrips ts)
-  end
-with unstripDs (ts:Defs) : L1gDefs := 
-  match ts with
-    | dnil => L1g.compile.dnil
-    | dcons nm t m ds =>
-           L1g.compile.dcons nm L1g.compile.prop (unstrip t) m (unstripDs ds)
-  end.
-
-Lemma strip_leftInv_unstrip:
-  (forall (t:Term), strip (unstrip t) = t) /\
-  (forall ts:Terms, strips (unstrips ts) = ts) /\
-  (forall ds:Defs, stripDs (unstripDs ds) = ds).
+Lemma sound_and_complete:
+  forall (p:environ L1g.compile.Term) (t s:L1g.compile.Term),
+    L1g.wcbvEval.WcbvEval p t s ->
+    WcbvEval (stripEnv p) (strip t) (strip s).
 Proof.
-  apply TrmTrmsDefs_ind; simpl; intros;
-  try reflexivity; try (rewrite H; reflexivity);
-  try (rewrite H; rewrite H0; reflexivity);
-  try (rewrite H; rewrite H0; rewrite H1; reflexivity).
+  intros p t s h. apply (proj1 (WcbvEval_hom p)). assumption.
 Qed.
 
-Function unstripCnstrs (cs:list Cnstr) : list AstCommon.Cnstr :=
-  match cs with
-    | nil => nil
-    | cons (mkCnstr str arity) cs =>
-        cons (AstCommon.mkCnstr str arity) (unstripCnstrs cs)
-  end.
-Function unstripItyPack (its:itypPack) : AstCommon.itypPack :=
-  match its with
-    | nil => nil
-    | (mkItyp str itps) :: itpacks =>
-         (AstCommon.mkItyp str (unstripCnstrs itps)) ::
-                           unstripItyPack itpacks
-  end.
-Function unstripEC (ec:envClass Term) : envClass L1g.compile.Term :=
-  match ec with
-    | AstCommon.ecTrm t => ecTrm (unstrip t)
-    | AstCommon.ecTyp _ npars itp =>
-       AstCommon.ecTyp _ npars (unstripItyPack itp)
-  end.
-Fixpoint unstripEnv (p:environ Term) : environ L1g.compile.Term :=
-  match p with
-    | nil => nil
-    | cons (nm, ec) q => cons (nm, (unstripEC ec)) (unstripEnv q)
-  end.
+Lemma sac_complete:
+  forall p t s, L1g.wcbvEval.WcbvEval p t s ->
+                WcbvEval (stripEnv p) (strip t) (strip s).
+Proof.
+  intros. apply sound_and_complete. assumption.
+Qed.
+
+Lemma sac_sound:
+  forall p t s, L1g.wcbvEval.WcbvEval p t s ->
+  forall L2s, WcbvEval (stripEnv p) (strip t) L2s -> L2s = strip s.
+Proof.
+  intros p t s h1 L2s h2.
+  apply (WcbvEval_single_valued h2). apply (sound_and_complete h1).
+Qed. 
+

@@ -31,7 +31,8 @@ Definition getIndArities pack n :=
   do ity <- getInd pack n;
      ret (List.map CnstrArity ity.(itypCnstrs)).
 
-Fixpoint is_n_lambda (n : nat) (t : Term) :=
+(****
+Fixpoint is_n_lambda (n : nat) (t : Term) : bool :=
   match n with
   | 0%nat => true
   | S n => 
@@ -41,24 +42,24 @@ Fixpoint is_n_lambda (n : nat) (t : Term) :=
     end
   end.
 
-Definition CrctBranches
-           (e: environ Term) (arities: list nat) (brs: Terms) : Prop :=
-  List.length arities = tlength brs /\
-  forall i, match List.nth_error arities i, tnth i brs with
-       | Some ar, Some t => is_n_lambda ar t = true
-       | _, _ => False
-       end.
+Definition CrctBranches (e: environ Term) (brs: Defs) : Prop :=
+  forall i,
+    match dnth i brs with
+      | Some (mkdef _ _ _ 
+      | Some ar, Some t => is_n_lambda ar t = true
+      | _, _ => False
+    end.
+ ***)
 
 Definition CrctAnnot
-    (e: environ Term) (ann: inductive * nat * list nat) (brs: Terms) : Prop :=
-  let '(ind, pars, args) := ann in
+    (e: environ Term) (ann: inductive * nat) (brs: Defs) : Prop :=
+  let '(ind, pars) := ann in
   let 'mkInd mind n := ind in
   match lookup mind e with
-  | Some (ecTyp _ pars' pack) =>
-    pars' = pars /\ getIndArities pack n = Ret args /\
-    CrctBranches e args brs
+  | Some (ecTyp _ pars' pack) => pars' = pars
   | _ => False
   end.
+
 
 (** correctness specification for programs (including local closure) **)
 Inductive Crct: (environ Term) -> nat -> Term -> Prop :=
@@ -85,8 +86,8 @@ Inductive Crct: (environ Term) -> nat -> Term -> Prop :=
                    Crcts p n args ->
                    Crct p n (TConstruct (mkInd ipkgNm inum) cnum args)
 | CrctCase: forall n p m mch brs,
-    CrctAnnot p m brs ->
-              Crct p n mch -> Crcts p n brs ->
+          (***    CrctAnnot p m brs ->  ***)
+              Crct p n mch -> CrctDs p n brs ->
               Crct p n (TCase m mch brs)
 | CrctFix: forall n p ds m,
              Crct p n prop ->    (** convenient for IH *)
@@ -178,25 +179,33 @@ Lemma Crct_fresh_Pocc:
   (forall p n (ds:Defs), CrctDs p n ds -> forall nm, fresh nm p ->
                                                      ~ PoccDefs nm ds) /\
   (forall (p:environ Term) (n:nat) (itp:itypPack), CrctTyp p n itp -> True).
-apply CrctCrctsCrctDsTyp_ind; intros; try intros j; auto;
-try (solve [inversion j]);
-try (solve [inversion_clear j; elim (H0 nm); trivial]);
-try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
-try (solve [inversion_clear j; elim (H0 nm0); trivial; elim (H2 nm0); trivial]);
-try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
-try (solve [inversion_clear H4; elim (H0 nm0); trivial]).
-- inversion j; subst.
-  + elim (H1 _ H4). assumption.
-  + elim (H3 _ H4). assumption.
-- inversion j. subst.
-  elim (@fresh_Lookup_fails _ _ _ (ecTrm pd) H2). assumption.
-- inversion_Clear j. destruct H1. 
-  + eelim (fresh_Lookup_fails H5). eassumption.
-  + eelim H4; eassumption.
-- inversion j; subst.
+Proof.
+  apply CrctCrctsCrctDsTyp_ind; intros; try intros j; auto;
+  try (solve [inversion j]);
+  try (solve [inversion_clear j; elim (H0 nm); trivial]);
+  try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
+  try (solve [inversion_clear j; elim (H0 nm0); trivial;
+              elim (H2 nm0); trivial]);
+  try (solve [inversion_clear j; elim (H0 nm); trivial; elim (H2 nm); trivial]);
+  try (solve [inversion_clear H4; elim (H0 nm0); trivial]).
+  - inversion j; subst.
+    + elim (H1 _ H4). assumption.
+    + elim (H3 _ H4). assumption.
+  - inversion j. subst.
+    elim (@fresh_Lookup_fails _ _ _ (ecTrm pd) H2). assumption.
+  - inversion_Clear j. destruct H1. 
+    + eelim (fresh_Lookup_fails H5). eassumption.
+    + eelim H4; eassumption.
+      (***************
+  - inversion j. subst.
+    (********
   + red in H. apply fresh_lookup_None in H4. rewrite H4 in H. auto.
   + inversion_clear j; elim (H1 nm); trivial; elim (H3 nm); trivial.
   + inversion_clear j; elim (H1 nm); trivial; elim (H3 nm); trivial.
+     **************)
+    + specialize (H0 _ H3); contradiction.
+    + specialize (H2 _ H3); contradiction.
+****************)
 Qed.
 
 Lemma Crct_not_bad_Lookup:
@@ -223,7 +232,9 @@ try (solve [elim (H0 _ H1)]); try (solve [elim (H0 _ H2)]).
   + subst. inversion H4. assumption.
   + refine (Lookup_strengthen H4 eq_refl _). assumption.
 - elim (H1 _ H4).
+  (**
 - elim (H1 _ H4).
+***)
 Qed.
 
 Lemma  Crct_weaken:
@@ -320,15 +331,17 @@ Proof.
     + eapply H4; try eassumption.
       intros h. destruct H6. apply PoCnstrA. assumption.
   - apply CrctCase.
+    (************
     + red. destruct m as [[[mind n0] pars] args].
       simpl in H. rewrite H4 in H. simpl in H.
       revert H; case_eq (string_eq_bool mind nm); auto.
       intros. elim H5. apply string_eq_bool_eq in H. subst mind.
       constructor.
-    + eapply H1. eassumption.
-      intros h. elim H5. apply PoCaseL. assumption.
-    + eapply H3. eassumption.
-      intros h. elim H5. apply PoCaseR. assumption.
+*********************)
+    + eapply H0. eassumption.
+      intros h. elim H4. apply PoCaseL. assumption.
+    + eapply H2. eassumption.
+      intros h. elim H4. apply PoCaseR. assumption.
   - apply CrctFix.
     + eapply H0. eassumption. intros h. inversion h.
     + eapply H2. eassumption. intros h. elim H4. apply PoFix. assumption.
@@ -471,31 +484,33 @@ Proof.
   - myInjection H2. intuition.
 Qed.
 
-Lemma CrctAnnot_weaken nm (p : environ Term) m brs d :
+Lemma CrctAnnot_weaken nm (p: environ Term) m brs d:
   CrctAnnot p m brs -> fresh nm p ->
   CrctAnnot ((nm, d) :: p) m brs.
 Proof.
   intros HC Hf.
-  red.
-  destruct m as [[[mind n0] pars] args]. simpl.
-  simpl in HC.
-  case_eq (string_eq_bool mind nm); auto.
-  intros Heq%string_eq_bool_eq. subst mind.
-  apply fresh_lookup_None in Hf. now rewrite Hf in HC.
+  red. destruct m, i. cbn.
+  cbn in HC.
+  case_eq (string_eq_bool s nm); intros; auto.
+  pose proof (string_eq_bool_eq _ _ H). subst nm.
+  rewrite (proj1 (fresh_lookup_None _ _) Hf) in HC. contradiction.
 Qed.
 
 Lemma Crct_invrt_Case:
-  forall p n case,
-    Crct p n case -> forall m s us, case = (TCase m s us) ->
-    CrctAnnot p m us /\ Crct p n s /\ Crcts p n us.
-induction 1; intros; try discriminate.
-- assert (j:= IHCrct1 _ _ _ H2). intuition.
-  apply CrctAnnot_weaken; auto.
-  apply (proj2 Crct_weaken); auto.
-- assert (j:= IHCrct _ _ _ H2). intuition.
-  apply CrctAnnot_weaken; auto.
-  apply (proj1 (proj2 Crct_Typ_weaken)); auto.
-- injection H2; intros; subst. auto.
+  forall p n case, Crct p n case ->
+  forall m s us, case = (TCase m s us) -> Crct p n s /\ CrctDs p n us.
+  (***************
+    CrctAnnot p m us /\ Crct p n s /\ CrctDs p n us.
+*******************)
+Proof.
+  induction 1; intros; try discriminate.
+  - assert (j:= IHCrct1 _ _ _ H2). intuition.
+(**    apply CrctAnnot_weaken; auto. **)
+    apply (proj2 Crct_weaken); auto.
+  - assert (j:= IHCrct _ _ _ H2). intuition.
+ (**   apply CrctAnnot_weaken; auto. **)
+    apply (proj2 (proj2 Crct_Typ_weaken)); auto.
+  - myInjection H1. intuition. 
 Qed.
 
 Lemma Crct_invrt_Fix:
@@ -547,6 +562,7 @@ Proof.
   - apply CrctsCons; intuition.
 Qed.
 
+(*********
 Lemma Instantiate_pres_is_n_lambda tin n t it k :
   Instantiate tin n t it ->
   is_n_lambda k t = true -> is_n_lambda k it = true.
@@ -588,7 +604,7 @@ Proof.
   destruct (Instantiates_pres_is_n_lambda n1 i _ Ht) as [t' [Hnt' Hnlam]].
   rewrite Hnt'. intuition. now intros _ Hf.
 Qed.
-
+*****************)
 (*****
 Lemma Instantiate_pres_Crct:
   forall tin, 

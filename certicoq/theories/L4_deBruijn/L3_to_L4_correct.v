@@ -60,6 +60,8 @@ Fixpoint is_n_lambda n t :=
           end
   end.
 
+Hint Resolve (proj1 Crct_WFTrm).
+
 (* TODO move *)
 Lemma nth_error_nth A (l : list A) n d t : nth_error l n = Some t -> nth n l d = t.
 Proof. revert n; induction l; intros n; destruct n;
@@ -105,21 +107,38 @@ Lemma instantiate_preserves_wf t k k' a : (k' <= k)%nat ->
   WFTrm t (S k) ->
   WFTrm (L3.term.instantiate a k' t) k.
 Admitted.
+
+Lemma whFixStep_preserves_Crct e dts m fs :
+  Crct e 0 (TFix dts m) ->
+  whFixStep dts m = Some fs ->
+  Crct e 0 fs /\ isLambda fs.
+Proof.
+  induction 1; unfold whFixStep; simpl.
+  + intros [=].
+Admitted.
 (* End of L3 requirements *)
 
 Inductive wf_environ : environ Term -> Prop :=
 | wf_nil : wf_environ []
 | wf_cons_trm s t e :
-    WFTrm t 0 -> wf_environ e -> wf_environ (cons (s, ecTrm t) e)
+    Crct e 0 t -> wf_environ e ->
+    ~ (exists t', LookupDfn s e t') ->
+    wf_environ (cons (s, ecTrm t) e)
 | wf_cons_ty s n t e :
     wf_environ e -> wf_environ (cons (s, ecTyp Term n t) e).
+
+Inductive LookupEnv : string -> env -> exp -> Prop :=
+  LHit : forall (s : string) (p : list (string * exp)) (t : exp),
+    LookupEnv s ((s, t) :: p) t
+| LMiss : forall (s1 s2 : string) (p : env) (t t' : exp),
+    s2 <> s1 -> LookupEnv s2 p t' -> LookupEnv s2 ((s1, t) :: p) t'.
 
 Lemma wf_environ_lookup (e : environ Term) (t : Term) nm :
   wf_environ e -> LookupDfn nm e t -> WFTrm t 0.
 Proof.
   intros wfe Het. revert wfe. red in Het.
   dependent induction Het; intros wfe.
-  now inversion_clear wfe.
+  inversion_clear wfe; eauto. 
   apply IHHet. now inversion_clear wfe.
 Qed.
 
@@ -129,6 +148,7 @@ Inductive wf_tr_environ : list (string * exp) -> Prop :=
     wf_tr_environ e ->
     exp_wf 0 t -> (* Is closed w.r.t. environment *)
     is_value t -> (* Is a value *)
+    not (exists t', LookupEnv s e t') -> (* No other binding to s in the environment *)
     wf_tr_environ (cons (s, t) e).
 
 
@@ -152,13 +172,9 @@ Proof.
   induction k; simpl in *; intros.
   - now inv H.
   - inv H. intuition. constructor; auto.
-Qed.
-
-Inductive LookupEnv : string -> env -> exp -> Prop :=
-  LHit : forall (s : string) (p : list (string * exp)) (t : exp),
-    LookupEnv s ((s, t) :: p) t
-| LMiss : forall (s1 s2 : string) (p : env) (t t' : exp),
-    s2 <> s1 -> LookupEnv s2 p t' -> LookupEnv s2 ((s1, t) :: p) t'.
+    intros [t' Ht'].
+    apply H5. exists t'.
+Admitted.    
 
 Lemma cst_offset_length e nm :
   (exists t, LookupEnv nm e t) ->
@@ -183,9 +199,11 @@ Lemma lookup_eval_env:
     forall (e'' : env),
       eval_env (translate_env e) e'' ->
       wf_tr_environ e'' ->
-      exists bef bef' t',
-        eval_env bef bef' /\
-        eval (subst_env bef' (translate bef t)) t' /\
+      exists bef bef' after' t', wf_environ bef /\
+        eval_env (translate_env bef) bef' /\
+        Crct bef 0 t /\
+        eval (subst_env bef' (translate (translate_env bef) t)) t' /\
+        after' ++ bef' = e'' /\ 
         LookupEnv nm e'' t'.
 Proof.
   intros e wfe nm t Hlookup.
@@ -194,16 +212,18 @@ Proof.
   rename x0 into eve''; rename x into wfe''. 
   inv wfe. simpl in eve''.
   inv eve''.
-  do 3 eexists; intuition eauto. inv wfe''. constructor.
+  do 2 eexists. exists ((s, t') :: []); eexists; intuition eauto.
+  inv wfe''. constructor.
 
   inv wfe. inv eve''. inv wfe''.
-  destruct (IHHlookup H4 t eq_refl e' H6 H5) as
-      [bef [bef' [pt'0 [evbef [evt lookupt]]]]].
-  do 3 eexists; intuition eauto.
+  destruct (IHHlookup H4 t eq_refl e' H7 H6) as
+      [bef [bef' [after' [pt'0 [wfbef [evbef [evt [afterbef lookupt]]]]]]]].
+  exists bef. exists bef'. exists ((s1, t') :: after'). eexists; intuition eauto. 
+  simpl. subst e'. f_equal; eauto.
   constructor; eauto. 
   
   apply IHHlookup; eauto.
-Qed.  
+Qed. 
 
 Definition map_branches (f : N -> exp -> exp) :=
   fix map_branches (l : branches_e) : branches_e :=
@@ -959,19 +979,49 @@ Proof. intros H; apply (trans_env_eval e e' H). Qed.
 
 (** Well-formed environments give rise to well-formed evaluated environments *)
 
+Lemma wf_environ_lookup' e e' :
+  wf_environ e -> eval_env (translate_env e) e' ->
+  forall s t, LookupDfn s e t -> exists t', LookupEnv s e' t'.
+Proof.
+  intros Hwf.
+  revert e'; induction Hwf; simpl; intros; auto.
+  - inv H0.
+  - inv H1.
+    specialize (IHHwf _ H7).
+    inv H2.
+    exists t'. constructor.
+    destruct (IHHwf s0 t0).
+    apply H10.
+    exists x. constructor 2; eauto.
+  - inv H0.
+    eapply IHHwf; eauto.
+Qed.
+
+Lemma wf_environ_lookup'' e e' :
+  wf_environ e -> eval_env (translate_env e) e' ->
+  forall s t, LookupEnv s e' t -> exists t', LookupDfn s e t'.
+Proof.
+  intros Hwf.
+  revert e'; induction Hwf; simpl; intros; auto.
+  - inv H0.
+Admitted.
+    
 Lemma wf_environ_tr e e' :
   wf_environ e -> eval_env (translate_env e) e' -> wf_tr_environ e'.
 Proof.
   intros Hwf; revert e'; induction Hwf.
   - intros e' H; inv H. constructor.
-  - simpl; intros e' H'; inv H'. constructor; auto.
-    specialize (IHHwf _ H4).
-    pose (WFTerm_exp_wf _ _ Hwf H4 IHHwf _ _ H).
+  - simpl; intros e' H'; inv H'. specialize (IHHwf _ H5).
+    constructor; auto.
+    pose (WFTerm_exp_wf _ _ Hwf H5 IHHwf _ _ (proj1 Crct_WFTrm _ _ _ H)).
     simpl in e0.
-    rewrite (translate_env_eval _ _ _ H4) in H5.
+    rewrite (translate_env_eval _ _ _ H5) in H6.
     apply (exp_wf_subst e'0 0) in e0; auto.
-    now apply (eval_preserves_wf _ _ H5).
+    now apply (eval_preserves_wf _ _ H6).
     eapply eval_yields_value; now eauto.
+    intros [t'' Ht''].
+    apply H0.
+    eapply wf_environ_lookup'' in Ht''; eauto.
   - intros. simpl in H. eauto.
 Qed.
 
@@ -1330,18 +1380,9 @@ Proof. intros. inv H. Admitted.
    It could be a lambda, i.e. ill-formed term.
  *)
 
-Hint Resolve (proj1 Crct_WFTrm).
 Hint Resolve wcbeval_preserves_wf.
 Hint Resolve wcbeval_preserves_Crct.
 
-Lemma whFixStep_preserves_Crct e dts m fs :
-  Crct e 0 (TFix dts m) ->
-  whFixStep dts m = Some fs ->
-  Crct e 0 fs.
-Proof.
-  induction 1; unfold whFixStep; simpl.
-  + intros [=].
-Admitted.
 
 Lemma wf_dnthBody dts m nm bod :
   WFTrm (TFix dts m) 0 ->
@@ -1431,6 +1472,117 @@ Proof.
   unfold dnthBody in H. simpl in H. discriminate.
 Qed.
 
+Lemma subst_env_aux_shift aft bef t :
+  subst_env_aux (aft ++ bef) 0 (shift (N.of_nat (List.length aft)) 0 t) =
+  subst_env_aux bef 0 t.
+Proof.
+  induction aft; simpl.
+  + rewrite (proj1 shift_0). reflexivity.
+  + rewrite <- IHaft. f_equal.
+    pose proof (shift_twice t 0 0 (N.of_nat (List.length aft)) 1).
+    Transparent N.add. simpl in H.
+    rewrite N.add_comm in H.
+    assert(1 + N.of_nat (Datatypes.length aft) = (N.pos (Pos.of_succ_nat (Datatypes.length aft)))) by lia.
+    rewrite H0 in H. rewrite <- H; try lia.
+    pose (shift_away_subst (shift (N.of_nat (Datatypes.length aft)) 0 t) 0 0 0 (snd a)).
+    simpl in e. rewrite e; try lia.
+    Opaque N.add.
+    rewrite (proj1 shift_0). reflexivity.
+Qed.
+
+Lemma S_to_nat k : (S (N.to_nat k) = N.to_nat (1 + k)).
+Proof. lia. Qed.
+Lemma lookup_env_extend s e e' t : LookupEnv s e t -> exists t', LookupEnv s (e' ++ e) t'.
+Proof.
+  induction e'. inversion 1; subst. exists t. apply H.
+  simpl. exists t. auto.
+
+  intros. simpl. destruct a.
+  case_eq (string_eq_bool s s0).
+  intros. apply string_eq_bool_eq in H0. subst. exists e0. constructor.
+  intros. apply string_neq_bool_neq in H0.
+  destruct (IHe' H). eexists; eauto. constructor; eauto.
+Qed.
+
+Lemma subst_env_weaken after bef bef' k t :
+  Crct bef (N.to_nat k) t ->
+  wf_environ bef ->
+  wf_tr_environ (after ++ bef') ->
+  eval_env (translate_env bef) bef' ->
+  trans (after ++ bef') k t = shift (N.of_nat (List.length after)) k (trans bef' k t).
+Proof.
+  intros Ht Hwfbef Hwf Hbef'.
+  revert t k Ht.
+  assert 
+    ((forall t k, Crct bef (N.to_nat k) t ->
+             trans (after ++ bef') k t =
+             trans bef' (k + N.of_nat (Datatypes.length after)) t) /\
+
+     (forall a k, Crcts bef (N.to_nat k) a ->
+             trans_args (trans (after ++ bef')) k a =
+             trans_args (trans bef') (k + N.of_nat (Datatypes.length after)) a) /\
+     (forall a k, CrctDs bef (N.to_nat k) a ->
+             trans_fixes (trans (after ++ bef')) k a =
+             trans_fixes (trans bef') (k + N.of_nat (Datatypes.length after)) a /\
+             (forall i n, trans_brs (trans (after ++ bef')) i k n a =
+             trans_brs (trans bef') i (k + N.of_nat (Datatypes.length after)) n a))); cycle 1.
+  { destruct H. intros. rewrite <- trans_shift; eauto; apply H; eauto. }
+
+  apply TrmTrmsDefs_ind; intros *; simpl; auto.
+
+  + intros IH k Ht. simpl.
+    f_equal. rewrite IH. now rewrite N.add_assoc.
+    eapply Crct_invrt_Lam in Ht; eauto.
+    rewrite S_to_nat in Ht. auto.
+  + intros. eapply Crct_invrt_LetIn in H1; eauto.
+    destruct H1. rewrite H; auto.
+    rewrite H0. now rewrite N.add_assoc.
+    now rewrite S_to_nat in H2.
+  + intros IH1 ? IH2 k Ht.
+    eapply Crct_invrt_App in Ht; eauto. intuition.
+    rewrite IH1, IH2; eauto.
+  + intros. f_equal.
+    eapply Crct_invrt_Const in H as [H [pd [H' H'']]]; eauto.
+    rewrite (N.add_comm k), N.add_assoc. f_equal.
+    pose proof (wf_environ_lookup' _ _ Hwfbef Hbef' _ _ H').
+    clear -H' H0 Hwf. induction after. simpl. lia.
+    simpl.
+    destruct a. case_eq (string_eq_bool s s0).
+    intros Hss0. apply string_eq_bool_eq in Hss0. subst s0.
+    inv Hwf. elim H6.
+    destruct H0 as [ts Hts]. 
+    eapply lookup_env_extend; eauto.
+    intros. apply string_neq_bool_neq in H.
+    simpl in Hwf. inv Hwf. specialize (IHafter H4).
+    rewrite IHafter. lia.
+  + intros. rewrite H; auto. destruct i.
+    eapply Crct_invrt_Construct in H0; [ |reflexivity].
+    intuition eauto. 
+  + intros. destruct p.
+    eapply Crct_invrt_Case in H1; eauto; intuition.
+    specialize (H0 k H3). f_equal; intuition eauto.
+  + intros.
+    f_equal.
+    eapply Crct_invrt_Fix in H0; [ |reflexivity].
+    specialize (H (k + N.of_nat (dlength d))); intuition eauto.
+    destruct H.
+    assert ((N.to_nat k + dlength d)%nat = (N.to_nat (k + N.of_nat (dlength d)))) by lia.
+    now rewrite <- H.
+    assert(k + N.of_nat (dlength d) = N.of_nat (L3t.dlength d) + k) by lia.
+    rewrite <- H2. rewrite H. equaln.
+  + intros.
+    inv H1.
+    f_equal; eauto.
+  + intros.
+    inv H1. destruct (H0 k H9).
+    split; f_equal; eauto.
+    intros.
+    rewrite H; eauto.
+    destruct strip_lam.
+    f_equal.
+    now rewrite H2.
+Qed.
+
 Theorem translate_correct (e : environ Term) (t t' : Term) :
   wf_environ e -> Crct e 0 t ->
   L3eval.WcbvEval e t t' -> (* big step non-deterministic *)
@@ -1502,18 +1654,23 @@ Proof with eauto.
     assert (crctt := LookupDfn_pres_Crct wft H).
     forward IHt; [ |apply wf_environ_lookup in H; auto].
     destruct (lookup_eval_env _ wfe nm t H _ evenv wfe'') as
-        [bef [bef' [t' [evbef [evt lookupt]]]]].
+        [bef [bef' [after' [t' [wfbef [evbef [Crctt [evt [eqe' lookupt]]]]]]]]].
     destruct (subst_env_aux_var_cst e'' nm 0 _ wfe'' lookupt) as [Hs ewf].
     rewrite Hs. 
     cut(t' = (subst_env e'' (translate e'' s))).
     - intros ->.
       apply wf_value_self_eval; eauto.
     - cut (subst_env e'' (translate e'' t) =
-           subst_env bef' (translate bef t)).
+           subst_env bef' (translate (translate_env bef) t)).
       * intros. unfold translate in H1. rewrite H1 in IHt.
         pose proof (proj1 eval_single_valued _ _ IHt _ evt).
         now rewrite <- H2.
-      * admit. (* Weakening of environmanent *) 
+      * subst e''.
+        rewrite (translate_env_eval (translate_env bef) bef'); auto.
+        unfold translate at 1.
+        rewrite (subst_env_weaken after' bef bef' 0 t Crctt); eauto.
+        unfold subst_env.
+        apply subst_env_aux_shift; auto.
       
   + (* App Lam *)
     unfold translate. simpl.
@@ -1579,9 +1736,10 @@ Proof with eauto.
     destruct wft as [H1 [H2 isncstr]].
     specialize (Hfn H1).
     forward IHevfix; cycle 1.
-    assert (Crct e 0 (TFix dts m)) by eauto.
-    eapply whFixStep_preserves_Crct in H;[ | eauto].
-    constructor; eauto. admit. (* In fix steps, we must know that the items are not constructors (they must start with at least one lambda actually) *)
+    { assert (Crct e 0 (TFix dts m)) by eauto.
+      eapply whFixStep_preserves_Crct in H as [Hfs Hfs']; [ | eauto].
+      constructor; eauto. inv Hfs'. destruct H as [bod ->]. intro Hisc; inv Hisc.
+      destruct H as [n [ts eq]]. discriminate. }
     unfold translate. simpl.
     unfold subst_env; rewrite subst_env_application.
     unfold subst_env, translate in Hfn. simpl in Hfn.
@@ -1674,9 +1832,10 @@ Proof with eauto.
     destruct wft as [Crctfn [Crctarg notcfn]].
     constructor.
     assert (Crct e 0 efn) by eauto.
-    (* There's a contradiction here: efn is a Crct closed term, which isn't a lambda or   fix or constructor or application, also not a rel as it is closed.
-But it could still be a:
-   - Proof, Prod, LetIn Const Ax Ind Case or Wrong. How can we prove it isn't?? *)
+    (* There's a contradiction here: efn is a Crct closed term, which
+isn't a lambda or fix or constructor or application, also not a rel as
+it is closed.  But it could still be a: - Proof, Prod, LetIn Const Ax
+Ind Case or Wrong. How can we prove it isn't?? *)
     admit.
     
   + (* Case *)
@@ -1734,7 +1893,7 @@ But it could still be a:
     (*        (strip_lam (nth n largs 0%nat - pars) (trans e'' 0 t))) *)
     (*     (map_exps (subst_env_aux e'' 0) (trans_args (trans e'') 0 args'))) *)
     (* admit. *)
-
+    
   (** Case congruence *)
   + admit.
 

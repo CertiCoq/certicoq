@@ -122,10 +122,12 @@ Inductive wf_environ : environ Term -> Prop :=
 | wf_nil : wf_environ []
 | wf_cons_trm s t e :
     Crct e 0 t -> wf_environ e ->
-    ~ (exists t', LookupDfn s e t') ->
+    fresh s e ->
     wf_environ (cons (s, ecTrm t) e)
 | wf_cons_ty s n t e :
-    wf_environ e -> wf_environ (cons (s, ecTyp Term n t) e).
+    wf_environ e ->
+    fresh s e ->
+    wf_environ (cons (s, ecTyp Term n t) e).
 
 Inductive LookupEnv : string -> env -> exp -> Prop :=
   LHit : forall (s : string) (p : list (string * exp)) (t : exp),
@@ -174,7 +176,10 @@ Proof.
   - inv H. intuition. constructor; auto.
     intros [t' Ht'].
     apply H5. exists t'.
-Admitted.    
+    clear -Ht'.
+    induction Ht'. constructor.
+    constructor 2; eauto.
+Qed.
 
 Lemma cst_offset_length e nm :
   (exists t, LookupEnv nm e t) ->
@@ -979,7 +984,7 @@ Proof. intros H; apply (trans_env_eval e e' H). Qed.
 
 (** Well-formed environments give rise to well-formed evaluated environments *)
 
-Lemma wf_environ_lookup' e e' :
+Lemma wf_environ_pres_dfn e e' :
   wf_environ e -> eval_env (translate_env e) e' ->
   forall s t, LookupDfn s e t -> exists t', LookupEnv s e' t'.
 Proof.
@@ -993,19 +998,27 @@ Proof.
     destruct (IHHwf s0 t0).
     apply H10.
     exists x. constructor 2; eauto.
-  - inv H0.
+  - inv H1.
     eapply IHHwf; eauto.
 Qed.
 
-Lemma wf_environ_lookup'' e e' :
+Lemma wf_environ_pres_fresh e e' :
   wf_environ e -> eval_env (translate_env e) e' ->
-  forall s t, LookupEnv s e' t -> exists t', LookupDfn s e t'.
+  forall s, fresh s e -> not (exists t, LookupEnv s e' t).
 Proof.
   intros Hwf.
   revert e'; induction Hwf; simpl; intros; auto.
-  - inv H0.
-Admitted.
-    
+  - inv H. intro Ht. destruct Ht. inv H.
+  - inv H1. intro Ht. 
+    destruct Ht as [t'' Ht'].
+    inv Ht'. inv H2. apply H6; reflexivity.
+    inv H2.
+    specialize (IHHwf _ H7 s0 H4).
+    apply IHHwf. exists t''; eauto.
+  - eapply IHHwf. eauto.
+    now inv H1.
+Qed.
+
 Lemma wf_environ_tr e e' :
   wf_environ e -> eval_env (translate_env e) e' -> wf_tr_environ e'.
 Proof.
@@ -1019,9 +1032,7 @@ Proof.
     apply (exp_wf_subst e'0 0) in e0; auto.
     now apply (eval_preserves_wf _ _ H6).
     eapply eval_yields_value; now eauto.
-    intros [t'' Ht''].
-    apply H0.
-    eapply wf_environ_lookup'' in Ht''; eauto.
+    eapply wf_environ_pres_fresh; eauto.
   - intros. simpl in H. eauto.
 Qed.
 
@@ -1504,6 +1515,44 @@ Proof.
   destruct (IHe' H). eexists; eauto. constructor; eauto.
 Qed.
 
+Fixpoint mkApp_e (f : exp) (a : exps) :=
+  match a with
+  | enil => f
+  | econs e es => mkApp_e (App_e f e) es
+  end.
+
+Lemma trans_mkapp e k f a : trans e k (mkApp f a) =
+                            mkApp_e (trans e k f) (trans_args (trans e) k a).
+Proof.
+  revert f; induction a; intros; simpl; try reflexivity.
+  now rewrite IHa. 
+Qed.
+
+Lemma subst_app_e e k f a :
+  subst e k (mkApp_e f a) =
+  mkApp_e (subst e k f) (map_exps (subst e k) a).
+Proof.
+  revert e k f; induction a; simpl; intros; trivial.
+  now rewrite IHa.
+Qed.
+
+Lemma map_exps_compose f g a : map_exps f (map_exps g a) = map_exps (fun x => f (g x)) a.
+Proof.
+  induction a; simpl.
+  - reflexivity.
+  - now rewrite IHa. 
+Qed.
+
+Lemma subst_env_app_e e k f a :
+  subst_env_aux e k (mkApp_e f a) =
+  mkApp_e (subst_env_aux e k f) (map_exps (subst_env_aux e k) a).
+Proof.
+  revert k f a; induction e; simpl; intros; trivial.
+  + f_equal. induction a; trivial. simpl. f_equal. auto.
+  + rewrite subst_app_e. rewrite IHe.
+    f_equal. rewrite map_exps_compose. f_equal.
+Qed.
+
 Lemma subst_env_weaken after bef bef' k t :
   Crct bef (N.to_nat k) t ->
   wf_environ bef ->
@@ -1544,7 +1593,7 @@ Proof.
   + intros. f_equal.
     eapply Crct_invrt_Const in H as [H [pd [H' H'']]]; eauto.
     rewrite (N.add_comm k), N.add_assoc. f_equal.
-    pose proof (wf_environ_lookup' _ _ Hwfbef Hbef' _ _ H').
+    pose proof (wf_environ_pres_dfn _ _ Hwfbef Hbef' _ _ H').
     clear -H' H0 Hwf. induction after. simpl. lia.
     simpl.
     destruct a. case_eq (string_eq_bool s s0).
@@ -1581,6 +1630,190 @@ Proof.
     destruct strip_lam.
     f_equal.
     now rewrite H2.
+Qed.
+
+Fixpoint is_n_lam_app n t :=
+  match n with
+  | 0%nat => true
+  | S n => match t with
+          | Lam_e _ t => is_n_lam_app n t
+          | App_e f _ => is_n_lam_app (S (S n)) f
+          | _ => false
+          end
+  end.
+
+Fixpoint is_n_lambda_app n t :=
+  match n with
+  | 0%nat => true
+  | S n => match t with
+          | TLambda _ t => is_n_lambda_app n t
+          | TApp f _ => is_n_lambda_app (S (S n)) f
+          | _ => false
+          end
+  end.
+
+Lemma is_n_lambda_app_lam n t : is_n_lambda_app (S n) t = true ->
+                                forall e, is_n_lambda_app n (TApp t e) = true.
+Proof.
+  induction n; intros; trivial.
+Qed.
+
+Lemma Crct_mkApp e k f a : is_n_lambda_app (tlength a) f = true ->
+                           Crct e k L3t.prop -> Crct e k f -> Crcts e k a -> Crct e k (mkApp f a).
+Proof.
+  revert e k f; induction a; intros; trivial.
+  inv H2.
+
+  destruct f; simpl in H; try discriminate.
+  eapply Crct_invrt_Lam in H1; [ | reflexivity].
+  apply IHa; auto. apply is_n_lambda_app_lam. apply H. 
+  constructor; auto. intro. red in H2. destruct H2 as (i&n0&ts&eq). discriminate.
+
+  simpl. apply IHa; auto.
+  eapply Crct_invrt_App in H1; [ | reflexivity].
+  destruct H1 as (Hf1&Hf2&Hf1').
+  (* eapply Crct_invrt_Lam in Hf1; [ | reflexivity]. *)
+  
+  apply is_n_lambda_app_lam. apply is_n_lambda_app_lam. apply H.
+  constructor; auto. intro Hc; destruct Hc as (i&n'&ts&Hc). discriminate.
+Qed.
+
+Lemma is_n_lambda_is_n_lamba_app n t : is_n_lambda n t = true -> is_n_lambda_app n t = true.
+Proof.
+  revert t; induction n; destruct t; simpl; intros; try (discriminate || reflexivity).
+  now apply IHn.
+Qed.
+
+Lemma snd_strip_lam na n t : snd (strip_lam (S n) (Lam_e na t)) = snd (strip_lam n t).
+Proof. unfold strip_lam at 1. fold (strip_lam n t). now destruct strip_lam. Qed.
+
+Lemma is_n_lam_sbst e n t : is_n_lam n t = true -> forall k, is_n_lam n (sbst e k t) = true.
+Proof.
+  revert t; induction n; intros; trivial.
+  destruct t; simpl in *; try discriminate.
+  now apply IHn.
+Qed.
+
+Lemma eval_App_e f a s :
+  forall k, k = N.to_nat (exps_length a) ->
+  is_n_lam k f = true ->
+  eval (mkApp_e f a) s ->
+  eval (sbst_list (snd (strip_lam k f)) a) s.
+Proof.
+  intros k ->.
+  revert f s; induction a; simpl; intros f s; trivial.
+
+  intros Hlam Hev. rewrite <- S_to_nat in Hlam.
+  destruct f; simpl in Hlam; try discriminate.
+  specialize (IHa (sbst e 0 f) s). 
+  forward IHa; cycle 1.
+  now apply is_n_lam_sbst.
+
+  forward IHa.
+  rewrite N.add_1_l.
+  replace (N.to_nat (N.succ (exps_length a))) with (S (N.to_nat (exps_length a))) by lia.
+  rewrite snd_strip_lam.
+  Focus 2.
+Admitted.
+  (* destruct a. simpl in *. inv Hev. inv H2. *)
+  
+  (* (* (\ x \ y . t) a b -> (\y. t[x:=a]) b = ((\y . t) b) [0 := a] *) *)
+  (* Lemma sbst_list_sbst : sbst e 0 (sbst_list t a) *)
+
+(*   Focus 2. *)
+(*   simpl. case_eq (N.to_nat (exps_length a)). *)
+(*   reflexivity. intros. *)
+(*   now rewrite H in Hlam. *)
+
+(*   Focus 2. *)
+  
+  
+  
+
+  
+(* Admitted. *)
+
+
+Lemma Crcts_skipn e n i a a' : Crcts e n a -> tskipn i a = Some a' -> Crcts e n a'.
+Proof.
+  revert a a'; induction i; simpl; intros.
+  + now injection H0 as ->.
+  + destruct a. discriminate.
+    inv H.
+    eapply IHi; eauto.
+Qed.
+
+Lemma subst_env_aux_strip_lam e n k t :
+  is_n_lam n t = true ->
+  subst_env_aux e (N.of_nat n + k) (snd (strip_lam n t)) =
+  (snd (strip_lam n (subst_env_aux e k t))).
+Proof.
+  revert n t; induction e; simpl; intros; trivial.
+  rewrite <- IHe. f_equal.
+  generalize (snd a). intros; clear IHe a.
+  revert k t e0 H; induction n; simpl; intros; trivial.
+  destruct t; simpl in H; try discriminate.
+  rewrite snd_strip_lam.
+  simpl. rewrite snd_strip_lam.
+  specialize (IHn (1 + k) _ e0 H).
+  rewrite <- IHn. equaln.
+  clear -H.
+  revert t k H; induction n; intros; destruct t; simpl in *; eauto.
+  discriminate.
+Qed.
+
+Lemma is_n_lambda_is_n_lam n e k a : is_n_lambda n%nat a = true -> is_n_lam n (trans e k a) = true.
+Proof.
+  revert e k a ; induction n; intros; trivial.
+  destruct a; try discriminate. simpl in *.
+  now apply IHn.
+Qed.
+
+(* Move *)
+Lemma Crct_invrt_Case e n ann mch brs :
+  Crct e n (TCase ann mch brs) ->
+  Crct e n mch /\ CrctDs e n brs /\
+  (forall i t, dnth i brs = Some t -> Crct e n (dbody _ t)).
+Admitted.
+
+Lemma exps_length_trans f k a : exps_length (trans_args f k a) = N.of_nat (tlength a).
+Proof. induction a; simpl; trivial. rewrite IHa. lia. Qed.
+
+Lemma exps_skipn_cons n a e : exps_skipn (1 + n) (econs a e) = exps_skipn n e.
+Proof.
+  simpl. rewrite N.add_1_l. case_eq (N.succ n). intros. lia.
+  intros.
+  rewrite <- H. now rewrite N.pred_succ.
+Qed.      
+
+Lemma exps_length_skipn n e : exps_length (exps_skipn (N.of_nat n) e) = exps_length e - N.of_nat n.
+Proof.
+  revert e; induction n; destruct e. simpl in *. trivial. simpl. lia. trivial.
+  assert (N.of_nat (S n) = 1 + N.of_nat n) by lia. rewrite H.
+  simpl exps_length at 2.
+  replace (1 + exps_length e0 - (1 + N.of_nat n)) with (exps_length e0 - N.of_nat n) by lia.
+  rewrite <- IHn.
+  now rewrite exps_skipn_cons.
+Qed.
+Lemma tskipn_length n a a' : tskipn n a = Some a' ->
+                             (tlength a' = tlength a - n)%nat.
+Proof.
+  revert a a'; induction n; simpl; intros *.
+  intros [=->]. lia.
+  destruct a. intros; discriminate.
+  intros; now apply IHn.
+Qed.
+  
+Lemma is_n_lam_subst_env n t e : is_n_lam n t = true -> is_n_lam n (subst_env_aux e 0 t) = true.
+Proof.
+  revert t; induction e; simpl; trivial.
+  intros t Ht.
+  apply IHe.
+
+  clear -Ht. generalize 0.
+  revert t Ht; induction n; intros; trivial.
+  destruct t; simpl in Ht; try discriminate.
+  apply (IHn _ Ht).
 Qed.
 
 Theorem translate_correct (e : environ Term) (t t' : Term) :
@@ -1843,10 +2076,9 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     (* Reduction case *)
     intros * evmch IHmch Hi Hskip Hcasestep Hcs IHcs Hcrct.
     assert(Hwf:=proj1 Crct_WFTrm _ _ _ Hcrct).
-    destruct ml as [[ind pars] largs].
+    destruct ml as [ind pars].
     assert (Hwf':=wftrm_case _ _ _ _ _ Hcrct).
-    eapply Crct_invrt_Case in Hcrct; [ |reflexivity].
-    destruct Hcrct as [Hmch Hbrs].
+    eapply Crct_invrt_Case in Hcrct as (Hmch&Hbrs&Hbr).
     assert (Har:WFTrm (TConstruct i n (* arty *) args) 0).
     inv Hwf.
     eapply wcbeval_preserves_wf; eauto.
@@ -1858,42 +2090,45 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     case_eq (dnthBody n brs); [intros t H | intros H];
       rewrite H in Hcasestep; try easy.
     apply dnthBody_dnth in H. destruct H as [def [Hdnth Ht]].
+    assert(Hargsdef:tlength args' = rarg _ def).
+    (* Well-formedness of case *)
+    admit.
+
     econstructor.
     rewrite subst_env_aux_con_e in IHmch. apply IHmch.
     simpl in Hskip.
     erewrite exps_skip_tskipn; eauto.
     rewrite exps_length_map.
-    assert(exps_length (trans_args (trans e'') 0 args') =
-           N.of_nat (tlength args)).
-    admit. (* wf of case + construct *)
-    rewrite H.
-    assert(tlength args = rarg _ def). admit.
-    rewrite H0.
+    assert(Hargs':= exps_length_trans (trans e'') 0 args').
+    rewrite Hargs'.
+    rewrite Hargsdef.
     apply L3_tnth_find_branch; eauto.
-    admit. 
-    (* simpl in *. *)
-    (* (** Substitution of arguments *) *)
-    (* erewrite exps_skip_tskipn; eauto. *)
-
-    (* clear Hann. *)
-    (* destruct Hwf' as [Hlen Hbrs']. *)
-    (* assert((subst_env_aux e'' 0 (trans e'' 0 (tfold_left args' t))) = *)
-    (*        (sbst_list *)
-    (*     (subst_env_aux e'' (N.of_nat (nth n largs 0%nat - pars) + 0) *)
-    (*        (strip_lam (nth n largs 0%nat - pars) (trans e'' 0 t))) *)
-    (*     (map_exps (subst_env_aux e'' 0) (trans_args (trans e'') 0 args')))). *)
-    (* induction args'. simpl. *)
-    (* assert (nth n largs 0%nat = pars). *)
-    
-    (* Lemma subst_args args t cs s : *)
-    (*   tfold_left args t = Some cs -> *)
-    (*   L3eval.WcbvEval e cs s -> *)
-    (*   (sbst_list *)
-    (*     (subst_env_aux e'' (N.of_nat (nth n largs 0%nat - pars) + 0) *)
-    (*        (strip_lam (nth n largs 0%nat - pars) (trans e'' 0 t))) *)
-    (*     (map_exps (subst_env_aux e'' 0) (trans_args (trans e'') 0 args'))) *)
-    (* admit. *)
-    
+    destruct def as [dna dty dbody rarg]; simpl in *.
+    subst t. 
+    injection Hcasestep; intros <-.
+    specialize (Hwf' _ _ Hdnth). simpl in Hwf'.
+    forward IHcs.
+    rewrite trans_mkapp in IHcs.
+    rewrite subst_env_app_e in IHcs.
+    rewrite subst_env_aux_strip_lam.
+    eapply eval_App_e.
+    - rewrite <- Hargsdef.
+      rewrite exps_length_skipn, exps_length_map, exps_length_trans.
+      apply tskipn_length in Hskip. lia.
+    - apply (is_n_lambda_is_n_lam _ e'' 0) in Hwf'. 
+      now apply is_n_lam_subst_env.
+    - rewrite (exps_skip_tskipn _ _ args') by auto.
+      apply IHcs.
+    - now apply is_n_lambda_is_n_lam.
+    - apply wcbeval_preserves_Crct in evmch; auto.
+      destruct ind as [ind ml].
+      eapply Crct_invrt_Construct in evmch; [ |reflexivity].
+      destruct evmch as [crcte [crctss [pars' [itypk [look crctc]]]]].
+      eapply Crct_mkApp; auto.
+      -- apply is_n_lambda_is_n_lamba_app. now rewrite Hargsdef.
+      -- apply (Hbr _ _ Hdnth).
+      -- eapply Crcts_skipn; eauto.
+          
   (** Case congruence *)
   + admit.
 

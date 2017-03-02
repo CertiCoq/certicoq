@@ -50,24 +50,24 @@ Focus 2.
   or can the L3_to_L4 translation syntactically preserve big step eval? *)
 Abort.
 
-Require Import L4_to_L4_2.
-Require Import L4_2_to_L5.
+Require Import L4.L4_2_to_L5.
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
+Require Import L4.L4_to_L4_1_to_L4_2.
 
 
-Global  Program Instance : BigStepOpSem L4_2Term := eval.
+Global  Program Instance : BigStepOpSem L4_2_Term := eval.
 
 (** all variables must be user variables *)
-Global Program Instance : GoodTerm L4_2Term :=
+Global Program Instance : GoodTerm L4_2_Term :=
   fun e  => varsOfClass (all_vars e) true /\ isprogram e.
 
-Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2Term) := {}.
+Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2_Term) := {}.
 
 
 Global Instance certiL4_to_L4_2: 
   CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4_2) :=
-  (fun p => (fst p, (L4_to_L4_2 (0)%N (snd p)))).
+  (fun p => (fst p, ( tL4_to_L4_2 (snd p)))).
 
 Require Import L4.variables.
 
@@ -82,7 +82,6 @@ Global Instance certiL5: CerticoqLanguage (ienv * L5Term) := {}.
 Global Instance certiL4_2_to_L5:
   CerticoqTotalTranslation (cTerm certiL4_2) (cTerm certiL5):=
   (fun x => (fst x,  (cps_cvt (snd x)))).
-
 
 Require Import L4.L5a.
 
@@ -104,6 +103,7 @@ Global Instance certiL5_to_L5a:
 
 
 Require Import Template.Template.
+Open Scope nat_scope.
 Quote Recursively Definition p0L1 := (fun vl vr:nat => vl + vr). 
 
 Require Import L2.instances.

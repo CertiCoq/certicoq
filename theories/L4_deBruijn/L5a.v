@@ -355,7 +355,6 @@ Proof using.
 Admitted.
 
 Require Import L4.expression.
-Require Import L4.L4_to_L4_2.
 
 (*
 Definition L4_to_L5a (e:L4.expression.exp) : option val_c :=

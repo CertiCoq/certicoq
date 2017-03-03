@@ -54,7 +54,7 @@ match e with
         ((bterm [] (tL4_to_L4_1 d))::(List.map snd brs))
 
 
-| Ax_e _ => oterm (NDCon (dummyind, N.zero) 0)  nil (* FIX! *) 
+| Ax_e s => oterm (NBox s) []
 end
 with ltL4_to_L4_1  (e:exps) {struct e}: list (@DTerm Ast.name L4Opid) :=
 match e with
@@ -127,3 +127,5 @@ Definition tL4_1_to_L4_2 (e:L4_1_Term) : L4_2_Term :=
 (* L4_1 is not intended to be visible to the rest of certicoq *)
 Definition tL4_to_L4_2 : L4.expression.exp -> L4_2_Term :=
   tL4_1_to_L4_2 ∘ tL4_to_L4_1.
+
+

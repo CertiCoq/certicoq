@@ -34,15 +34,17 @@ Import Monad.MonadNotation.
 Open Scope monad_scope.
 Definition dcon : Set := inductive * N.
 
+Require Import String.
 Inductive L4Opid : Set :=
  | NLambda
  | NFix (nMut index: nat) 
  | NDCon (dc : dcon) (nargs : nat)
  | NApply
  | NLet
- | NMatch (dconAndNumArgs : list (dcon * nat)).
+ | NMatch (dconAndNumArgs : list (dcon * nat))
+ | NBox (s: string).
 
-Definition OpBindingsL4 (nc : L4Opid) : list nat :=
+Definition OpBindingsL4 (nc : @L4Opid) : list nat :=
   match nc with
   | NLambda    => [1]
   | NFix nMut _ => repeat nMut nMut
@@ -51,15 +53,16 @@ Definition OpBindingsL4 (nc : L4Opid) : list nat :=
 (*  | NProj _ => [0] *)
   | NLet => [0,1]
   | NMatch numargsInBranches => 0::(List.map snd numargsInBranches)
+  | NBox _ => []
   end.
 
-Instance decc: DeqSumbool L4Opid.
+Instance decc : DeqSumbool (L4Opid).
 Proof using.
   intros ? ?. unfold DecidableSumbool.
-   repeat(decide equality).
+  repeat(decide equality).
 Defined.
 
-Instance CoqL4GenericTermSig : GenericTermSig L4Opid:=
+Instance CoqL4GenericTermSig : GenericTermSig (@L4Opid):=
 {| 
   OpBindings := OpBindingsL4;
 |}.
@@ -93,7 +96,7 @@ Section PolyEval.
 (** eval_n for L4 (congrete DB), L4a (generic named), and
 the (yet to be added) generic (Squiggle-style) DB language between them.
 *)
-Context (Opid:Type) {gts:GenericTermSig Opid} {Abs4_4a: @TermAbs L4Opid _}.
+Context {Abs4_4a: @TermAbs (@L4Opid) _}.
 
 Local Notation AbsTerm := (AbsTerm _ Abs4_4a).
 Local Notation absGetOpidBTerms := (absGetOpidBTerms _ Abs4_4a).
@@ -106,6 +109,8 @@ Local Notation absMakeBTerm := (absMakeBTerm _ Abs4_4a).
 Typeclasses eauto :=4.
 
 Open Scope program_scope.
+
+Require Import List.
 
 (* generalized from L4.expresssion.eval_n *)
 Fixpoint eval_n (n:nat) (e:AbsTerm) {struct n} :  option AbsTerm :=
@@ -136,7 +141,11 @@ match n with
           (* TODO: skip the parameters in cvs. matches don't bind parameters.
           (If parameters are explicit, Coq forces us to write "_" at those positions
           in constructor patterns).
-          A similar fix is needed in L5. *)
+          A similar fix is needed in L5. 
+
+ UPDATE: no fix is needed here or in L5. parameters of constructors should just be discarded
+ much earlier : in L1
+*)
           s <- (absApplyBTerm b cvs);;
           eval_n n s
         | _ => None
@@ -158,6 +167,8 @@ match n with
             s <- (absApplyBTerm im ls);;
             s_a_pp <- (absMakeTerm (map absMakeBTerm [s;a]) NApply);;
             eval_n n s_a_pp
+        (* box applied to anything becomes box *)
+        | Some (NBox s,[]) => absMakeTerm [] (NBox s)
         | _ => None
         end
     | _ => None

@@ -3,7 +3,7 @@ Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
 Require Import L4.polyEval.
 
-Require Import L4.L4_2_to_L5.
+Require Import L4.L4_5_to_L5.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
   Coq.Program.Program Coq.micromega.Psatz.
 
@@ -218,7 +218,6 @@ Local Opaque varClass.
 Local Opaque varClassP.
 Local Opaque contVars.
 
-Require Import L4.L4_2_to_L5.
 
 
 Lemma translateVal_cps_cvt_Some : forall (t:NTerm),

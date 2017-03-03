@@ -120,6 +120,7 @@ match n with
   match (o,lbt) with
   (* values *)
   | (NLambda,_)
+  | (NBox _,_)
   | (NFix _ _,_) => Some e
 
   (* (possibly) non-values *)

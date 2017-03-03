@@ -57,10 +57,17 @@ match fst d with
     ; ":"; nat2string10 n; ":"; s]
 end.
 
+Inductive L4_5Opid : Set :=
+ | NLambda
+ | NFix (nMut index: nat) 
+ | NDCon (dc : dcon) (nargs : nat)
+ | NApply
+ | NLet
+ | NMatch (dconAndNumArgs : list (dcon * nat)).
 
 Open Scope string_scope.
 
-Definition L4OpidString (l : L4Opid) : string :=
+Definition L4_5OpidString (l : L4_5Opid) : string :=
   match l with
   | NLambda    => "λ"
   | NFix _ _ => "fix"
@@ -73,6 +80,27 @@ Definition L4OpidString (l : L4Opid) : string :=
       terms.flatten ["match |";terms.flattenDelim " " (map dconString ld);"|"]
   end.
 
+Definition OpBindingsL4_5 (nc : @L4_5Opid) : list nat :=
+  match nc with
+  | NLambda    => [1]
+  | NFix nMut _ => repeat nMut nMut
+  | NDCon _ nargs    => repeat 0 nargs
+  | NApply     => [0,0]
+(*  | NProj _ => [0] *)
+  | NLet => [0,1]
+  | NMatch numargsInBranches => 0::(List.map snd numargsInBranches)
+  end.
+
+Instance decL4_5Opid : DeqSumbool (L4_5Opid).
+Proof using.
+  intros ? ?. unfold DecidableSumbool.
+  repeat(decide equality).
+Defined.
+
+Instance CoqL4_5GenericTermSig : GenericTermSig (@L4_5Opid):=
+{| 
+  OpBindings := OpBindingsL4_5;
+|}.
 
 Require Import SquiggleEq.alphaeq.
 
@@ -174,9 +202,9 @@ Definition find_branch {s} (d:dcon) (m:nat) (matcht :list (@branch s)) :
 
 
 
-Notation BTerm := (@BTerm NVar L4Opid).
-Notation NTerm := (@NTerm NVar L4Opid).
-Notation oterm := (@oterm NVar L4Opid).
+Notation BTerm := (@BTerm NVar L4_5Opid).
+Notation NTerm := (@NTerm NVar L4_5Opid).
+Notation oterm := (@oterm NVar L4_5Opid).
 
 Definition Lam_e (v : NVar) (b : NTerm) : NTerm :=
   oterm NLambda [bterm [v] b].
@@ -2555,8 +2583,8 @@ Ltac unfoldSubst :=
   unfold ssubst; simpl;
   fold (@ssubst NVar _ _ _ _ L5Opid);
   fold (@ssubst_bterm NVar _ _ _ _ L5Opid);
-  fold (@ssubst NVar _ _ _ _ L4Opid);
-  fold (@ssubst_bterm NVar _ _ _ _ L4Opid).
+  fold (@ssubst NVar _ _ _ _ L4_5Opid);
+  fold (@ssubst_bterm NVar _ _ _ _ L4_5Opid).
 
 
 Lemma cps_cvt_corr_app_let_common_part:

@@ -61,8 +61,8 @@ Definition swap4 : (cTerm certiL4).
 computeExtract certiL4 swap.
 Defined.
 
-Definition swap4a : cTerm certiL4_2.
-computeExtract certiL4_2 swap.
+Definition swap4a : cTerm certiL4_5.
+computeExtract certiL4_5 swap.
 Defined.
 
 Print swap4.
@@ -86,8 +86,8 @@ Definition prev4 : cTerm certiL4.
 computeExtract certiL4 prev.
 Defined.
 
-Definition prev4a : cTerm certiL4_2.
-computeExtract certiL4_2 prev.
+Definition prev4a : cTerm certiL4_5.
+computeExtract certiL4_5 prev.
 Defined.
 
 Definition prev5 : cTerm certiL5.
@@ -163,8 +163,8 @@ Let pcgd2 : cTerm certiL2.
 let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
 Defined.
 
-Let pcgd4a : cTerm certiL4_2.
-(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL4_2) pcgd2) in
+Let pcgd4a : cTerm certiL4_5.
+(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL4_5) pcgd2) in
 match t with
 |Ret ?xx => exact xx
 end).

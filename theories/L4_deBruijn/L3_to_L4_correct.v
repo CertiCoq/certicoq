@@ -1331,6 +1331,118 @@ Proof.
   - eapply instantiate_preserves_wf; eauto. lia.
 Qed.
 
+Lemma find_branch_map_branches_some n m f brs t :
+  find_branch n m (map_branches f brs) = Some t ->
+  exists t', find_branch n m brs = Some t' /\ t = f m t'.
+Proof.
+  induction brs; simpl; intros; try discriminate.
+
+  destruct n as [ind n].
+  destruct d as [ind' d].
+  destruct inductive_dec.
+  destruct N.eq_dec.
+  subst ind' d.
+  destruct N.eq_dec.
+  injection H; intros <-.
+  do 2 eexists; eauto. subst m. eauto.
+  discriminate.
+  subst ind'.
+  apply (IHbrs H).
+  apply (IHbrs H).
+Qed.
+
+Lemma find_branch_map_branches_none n m f brs :
+  find_branch n m (map_branches f brs) = None -> find_branch n m brs = None.
+Proof.
+  induction brs; simpl; intros; eauto. 
+  destruct n, d, inductive_dec; eauto.
+  destruct N.eq_dec; eauto. destruct N.eq_dec; eauto. discriminate.
+Qed.
+
+Fixpoint nth_branch n b :=
+  match b with
+  | brnil_e => None
+  | brcons_e dc an exp exps =>
+    match n with
+    | 0%nat => Some exp
+    | S n => nth_branch n exps
+    end
+  end.
+
+Lemma find_branch_trans e (t : def Term) (i : inductive) (n : nat) brs :
+  dnth n brs = Some t ->
+  find_branch (dcon_of_con i n) (N.of_nat (rarg Term t)) (trans_brs (trans e) i 0 0 brs) =
+  nth_branch n (trans_brs (trans e) i 0 0 brs).
+Proof.
+  assert(0 = N.of_nat (dlength brs - dlength brs)) by lia.
+  revert H.
+  generalize (le_refl (dlength brs)).
+  assert(0 <= N.of_nat n) by lia.
+  revert H.
+  replace n with (n - N.to_nat 0)%nat at 2 4 by lia.
+  generalize 0 at 1 2 3 5 6 8 as k.
+  revert t i n; induction brs at -2 -3.
+
+  simpl; intros; discriminate.
+
+  intros.
+  simpl.
+  destruct strip_lam.
+  destruct n1. 
+  - simpl.
+    destruct inductive_dec.
+    destruct k.
+    + destruct N.eq_dec.
+      reflexivity. simpl in H0.
+      elim n1. injection H2; intros <-.
+      simpl. reflexivity.
+    + elimtype False. lia.
+    + now elim n1.
+      
+  - Opaque N.eq_dec. simpl.
+    destruct inductive_dec.
+    destruct k.
+    destruct N.eq_dec. discriminate.
+    simpl.
+    specialize (IHd t0 i (S n1) 1).
+    forward IHd; [ |lia].
+    simpl in H0, H1, H2.
+    forward IHd; [ |lia].
+    forward IHd; [ |lia].
+    simpl in IHd. simpl in H1. rewrite Nat.sub_0_r in IHd.
+    specialize (IHd H2).
+    apply IHd.
+
+    destruct N.eq_dec. injection e2; intros <-.
+    simpl in *.
+    replace (Pos.to_nat (Pos.of_succ_nat n1)) with (S n1) in * by lia.
+    rewrite Nat.sub_diag in *. simpl.
+    destruct N.eq_dec. reflexivity.
+    injection H2; intros <-. simpl in n2.
+    elim n2; reflexivity.
+
+    simpl.
+    case_eq (Pos.to_nat p). simpl.
+    intros Hp. specialize (IHd t0 i (S n1) (N.pos p + 1)).
+    do 4 (forward IHd; [ |lia]).
+    rewrite IHd. equaln.
+
+
+    intros.
+    simpl.
+
+    assert(n3 = Pos.to_nat p - 1)%nat by lia.
+    subst n3.
+    assert (n1 - (Pos.to_nat p - 1) = S (n1 - Pos.to_nat p))%nat by lia.
+    rewrite H4. simpl.
+    erewrite IHd. equaln. lia. simpl in H0. lia. simpl in H1. lia.
+    rewrite <- H2.
+    assert (S n1 - N.to_nat (N.pos p) = S (n1 - N.to_nat (N.pos p)))%nat by lia.
+    rewrite H5. simpl dnth at 2. equaln.
+
+    now elim n2.
+Qed.
+
 (** Lookup is the same *)
 Lemma L3_tnth_find_branch n e brs t i f :
   dnth n brs = Some t ->
@@ -1338,27 +1450,35 @@ Lemma L3_tnth_find_branch n e brs t i f :
               (map_branches f (trans_brs (trans e) i 0 0 brs)) =
   Some (f (N.of_nat (rarg _ t)) (snd (strip_lam (rarg _ t) (trans e 0 (dbody _ t))))).
 Proof.
-  revert brs t i; induction n; simpl; intros brs t i. 
-  - intros H. destruct brs; simpl in H.
-    + discriminate.
-    + injection H. intros <-. 
-      simpl. destruct strip_lam eqn:Heq. simpl.
-      destruct inductive_dec; try contradiction.
-      destruct N.eq_dec; try contradiction.
-      reflexivity. elim n1. reflexivity.
-      now elim n1.
+  intros Hnth.
+  case_eq (find_branch (dcon_of_con i n) (N.of_nat (rarg Term t))
+                       (map_branches f (trans_brs (trans e) i 0 0 brs))).
+  intros. f_equal.
+  apply find_branch_map_branches_some in H. destruct H as [exp [findbr ->]].
+  f_equal.
+  rewrite find_branch_trans in findbr; eauto.
+  revert n Hnth findbr. generalize 0 at 2.
+  induction brs; simpl in * ; intros.
+  - discriminate. 
+  - destruct n2.
+    + simpl in findbr. 
+      injection Hnth; intros <-; simpl in *.
+      destruct strip_lam. now injection findbr.
+    + apply (IHbrs (n1 + 1) n2 Hnth). clear IHbrs.
+      destruct strip_lam. now simpl in findbr.
+  - intros.
+    elimtype False.
+    apply find_branch_map_branches_none in H.
+    rewrite find_branch_trans in H; eauto.
+    revert n H Hnth. generalize 0 at 2.
+    induction brs; simpl in *; intros. discriminate.
+    destruct n2.
+    injection Hnth ; intros <-. simpl in *.
+    destruct strip_lam. discriminate.
+    destruct strip_lam. simpl in H.
+    eauto.
+Qed.
       
-  - destruct brs.
-    + discriminate. 
-    + intros H. specialize (IHn _ _ i H).
-      simpl trans_brs. simpl map_branches.
-      simpl find_branch.
-      unfold dcon_of_con in IHn.
-      destruct (strip_lam _ (trans _ _ t0)); simpl.
-      destruct inductive_dec. simpl.
-      simpl.
-Admitted.
-
 (* TODO move *)
 Lemma exps_length_map f l :
   exps_length (map_exps f l) = exps_length l.

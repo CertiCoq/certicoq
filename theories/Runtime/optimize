@@ -1,0 +1,7 @@
+#!/bin/csh
+foreach A (0 1 2 3 4 5 6 7 8 9 10 11 12)
+gcc -g -O3 -c -DNURSERY_SIZE="(1024<<$A)" gc.c
+make gctest3
+echo A = $A
+/bin/time -f "%U %P" ./gctest3 1000000 >/dev/null
+end

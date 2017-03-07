@@ -29,6 +29,15 @@ Instance certiL4wf: GoodTerm L4.expression.exp :=
  L4.expression.exp_wf (0%N).
 
 
+Require Import certiClasses2.
+(* FIX!! *)
+Global Instance QuestionHeadTermL : QuestionHead (ienv * L4.expression.exp) :=
+fun q t => false.
+
+(* FIX!! *)
+Global Instance ObsSubtermTermL : ObserveNthSubterm (ienv * L4.expression.exp) :=
+fun n t => None.
+
 Global Instance certiL4: CerticoqLanguage (ienv * L4.expression.exp) := {}.
 
 Global  Instance certiL3_to_L4: 
@@ -36,19 +45,6 @@ Global  Instance certiL3_to_L4:
 fun p => Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
    (L3_to_L4.translate_program (AstCommon.env p) (main p))).
 
-Global  Instance failed: 
-  CerticoqTranslationCorrect (Program L3.compile.Term) L4Term.
-constructor.
-Focus 2.
-- intros ? ? Hwf He.
-  destruct Hwf.
-  unfold certiClasses.translate,
-    certiL3_to_L4, liftBigStepException, bigStepEval.
-  unfold translate_program.
-(*  Fail eapply L3_to_L4_correct.translate_correct.  *)
-(* not applicable!! do we need to change the end to end correctness property?, 
-  or can the L3_to_L4 translation syntactically preserve big step eval? *)
-Abort.
 
 Require Import L4.L4_5_to_L5.
 Require Import SquiggleEq.export.
@@ -62,6 +58,14 @@ Global  Program Instance : BigStepOpSem L4_5_Term := eval.
 (** all variables must be user variables *)
 Global Program Instance : GoodTerm L4_5_Term :=
   fun e  => varsOfClass (all_vars e) true /\ isprogram e.
+
+(* FIX!! *)
+Global Instance QuestionHeadTermL45 : QuestionHead (prod ienv L4_5_Term) :=
+fun q t => false.
+
+(* FIX!! *)
+Global Instance ObsSubtermTermL45 : ObserveNthSubterm (prod ienv L4_5_Term) :=
+fun n t => None.
 
 Global Instance certiL4_5: CerticoqLanguage (prod ienv L4_5_Term) := {}.
 
@@ -78,6 +82,14 @@ Global Program Instance : BigStepOpSem L5Term := eval_c.
 
 Global Program Instance : GoodTerm L5Term := isprogram.
 
+(* FIX!! *)
+Global Instance QuestionHeadTermL5 : QuestionHead (ienv * L5Term) :=
+fun q t => false.
+
+(* FIX!! *)
+Global Instance ObsSubtermTermL5 : ObserveNthSubterm (ienv * L5Term) :=
+fun n t => None.
+
 Global Instance certiL5: CerticoqLanguage (ienv * L5Term) := {}.
 
 Global Instance certiL4_5_to_L5:
@@ -91,6 +103,14 @@ Global Program Instance : BigStepOpSem L4.L5a.val_c := fun _ _ => True.
 
 (** Fix *)
 Global Program Instance : GoodTerm L4.L5a.val_c := fun x => False.
+
+(* FIX!! *)
+Global Instance QuestionHeadTermL5a : QuestionHead (ienv * L4.L5a.val_c) :=
+fun q t => false.
+
+(* FIX!! *)
+Global Instance ObsSubtermTermL5a: ObserveNthSubterm (ienv * L4.L5a.val_c) :=
+fun n t => None.
 
 Global Instance certiL5a: CerticoqLanguage (ienv * L4.L5a.val_c) := {}.
 

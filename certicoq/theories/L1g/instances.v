@@ -2,6 +2,8 @@ Require Import L1g.compile.
 Require Import L1g.wcbvEval.
 Require Import certiClasses.
 Require Import Common.Common.
+Require Import Common.classes.
+Require Import certiClasses2.
 
 Instance bigStepOpSemL1gTerm : BigStepOpSem (Program L1g.compile.Term) :=
   BigStepOpWEnv _ WcbvEval.
@@ -10,7 +12,35 @@ Instance bigStepOpSemL1gTerm : BigStepOpSem (Program L1g.compile.Term) :=
 Instance WfL1gTerm : GoodTerm (Program L1g.compile.Term) :=
   fun _  => True.
 
-Instance certiL1g : CerticoqLanguage (Program L1g.compile.Term) := {}.
+Require Import SquiggleEq.UsefulTypes.
+Require Import DecidableClass.
+
+Definition flattenApp (t:L1g.compile.Term) : (L1g.compile.Term * (list L1g.compile.Term)).
+Admitted.
+
+Global Instance QuestionHeadL2Term : QuestionHead (Program L1g.compile.Term) :=
+fun q t =>
+match q, fst (flattenApp (main t)) with
+| Cnstr ind ci, TConstruct ind2 ci2 _(*nargs*) =>
+  andb (decide (ind=ind2)) (decide (ci=ci2))
+| Abs, TLambda _ _ _ => true
+| _, _ => false 
+end.
+
+Global Instance ObsSubtermL2Term : ObserveNthSubterm (Program L1g.compile.Term) :=
+fun n t =>
+match  (flattenApp (main t)) with
+| (TConstruct _ _ _ , subterms) =>
+  match List.nth_error subterms  n with
+  | Some st => Some {| env := env t; main := st |}
+  | None => None
+  end
+| _ => None
+end.
+
+
+
+Instance certiL1g : CerticoqLanguage (Program L1g.compile.Term):= {}.
 
 Local Generalizable Variable Lj.
 
@@ -22,13 +52,15 @@ Definition translateTo `{CerticoqTranslation (Program L1g.compile.Term) Lj}
 
 Arguments translateTo Lj {H} p.
 
-Definition ctranslateTo {Term Value BigStep WF} 
-  (Lj : @CerticoqLanguage Term Value BigStep WF)
+Require Import certiClasses.
+
+Definition ctranslateTo {Term Value BigStep WF QH ObsS } 
+  (Lj : @CerticoqLanguage Term Value BigStep WF QH ObsS)
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
    : program -> exception (cTerm Lj) :=
   translateTo (cTerm Lj).
 
-Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} Lj {H} p.
+Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
 
 
 

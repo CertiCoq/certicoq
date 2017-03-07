@@ -19,6 +19,15 @@ Instance WfL3Term : GoodTerm (Program L3.compile.Term) :=
 Instance WfL3Term : GoodTerm (Program L3.compile.Term) :=
   fun p  => True.
 
+Require Import certiClasses2.
+(* FIX!! *)
+Global Instance QuestionHeadTermL : QuestionHead (Program L3.compile.Term) :=
+fun q t => false.
+
+(* FIX!! *)
+Global Instance ObsSubtermL : ObserveNthSubterm (Program L3.compile.Term) :=
+fun n t => None.
+
 Instance certiL3 : CerticoqLanguage (Program L3.compile.Term) := {}.
 
 Instance certiL2_to_L3: 

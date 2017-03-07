@@ -1,4 +1,5 @@
 Require Export Common.certiClasses.
+Require Export Common.certiClasses2.
 Require Export L2.instances.
 Require Export L1g.instances.
 Require Export L2_5.instances.

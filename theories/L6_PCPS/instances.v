@@ -37,9 +37,21 @@ Instance bigStepOpSemL3Term : BigStepHetero (L6env * cps.exp) cps.val :=
   let '(pr, cenv, env, nenv,  e) := p in
   ∃ (n:nat), (L6.eval.bstep_e pr cenv env e v n).
 
+Require Import certiClasses2.
+
 (* Fix *)
 Instance WfL3Term : GoodTerm (L6env * cps.exp) :=
   fun p  => True .
+
+
+Require Import certiClasses2.
+(* FIX!! *)
+Global Instance QuestionHeadTermL : QuestionHead cps.val :=
+fun q t => false.
+
+(* FIX!! *)
+Global Instance ObsSubtermL : ObserveNthSubterm cps.val :=
+fun n t => None.
 
 Instance certiL6 : CerticoqLanguage (L6env * cps.exp) := {}.
 

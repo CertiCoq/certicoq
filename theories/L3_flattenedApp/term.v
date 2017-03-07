@@ -291,7 +291,7 @@ Definition dnthBody (n:nat) (l:Defs) : option Term :=
 Lemma dnthBody_None: forall n ds, n >= dlength ds -> dnthBody n ds = None.
 Proof.
   unfold dnthBody.
-  induction n; induction ds; cbn; intuition. inversion H.
+  induction n; induction ds; cbn; intuition;  inversion H.
 Qed.
 
 Lemma dnthBody_Some:

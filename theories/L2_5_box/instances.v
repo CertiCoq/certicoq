@@ -11,6 +11,16 @@ Instance bigStepOpSemL2_5_Term : BigStepOpSem (Program L2_5.compile.Term) :=
 Instance WfL2_5_Term : GoodTerm (Program L2_5.compile.Term) :=
   fun _  => True.
 
+Require Import certiClasses2.
+(* FIX!! *)
+Global Instance QuestionHeadTermL : QuestionHead (Program L2_5.compile.Term) :=
+fun q t => false.
+
+(* FIX!! *)
+Global Instance ObsSubtermTermL : ObserveNthSubterm (Program L2_5.compile.Term) :=
+fun n t => None.
+
+
 Instance certiL2_5 : CerticoqLanguage (Program L2_5.compile.Term) := {}.
 
 

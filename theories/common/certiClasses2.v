@@ -190,4 +190,17 @@ observations on values resulting from applications of functions to values. *)
 
 
 
+(* can be used to get the Term type from an instance *)
+Definition cTerm `{CerticoqLanguage Term Value} : Type := Term.
+(* can be used to get the Value type from an instance *)
+Definition cValue `{CerticoqLanguage Term Value} : Type := Term.
+
+Arguments cTerm {Term} {Value} {H} {H0} {H1} {H2} _.
+Arguments cValue {Term} {Value} {H} {H0} {H1} {H2} _.
+
+
+Arguments CerticoqLanguage Term {Value} {H} {H0} {H1} {H2}.
+
+
+
 

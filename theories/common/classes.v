@@ -16,3 +16,12 @@ Instance NatEq: Eq nat := { eq_dec := eq_nat_dec }.
 Instance AsciiEq: Eq ascii := { eq_dec:= ascii_dec }.
 Instance StringEq: Eq string := { eq_dec:= string_dec }.
 
+Require Import SquiggleEq.UsefulTypes.
+Require Import Template.Ast.
+
+Global Instance EqDecInd : Deq inductive.
+eapply @deqAsSumbool.
+unfold DeqSumbool. intros.
+unfold DecidableSumbool.
+repeat decide equality.
+Defined.

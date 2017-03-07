@@ -248,3 +248,12 @@ Qed.
 
 
 
+Require Import SquiggleEq.UsefulTypes.
+Require Import Template.Ast.
+
+Global Instance EqDecInd : Deq inductive.
+eapply @deqAsSumbool.
+unfold DeqSumbool. intros.
+unfold DecidableSumbool.
+repeat decide equality.
+Defined.

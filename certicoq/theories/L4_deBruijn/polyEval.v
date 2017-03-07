@@ -23,12 +23,7 @@ Require Import SquiggleEq.varInterface.
 Require Import Common.ExtLibMisc.
 Require Import ExtLib.Structures.Monads.
 Require Import ExtLib.Data.Monads.OptionMonad.
-
-Instance IndEqDec : Deq (inductive).
-Proof using.
-  apply @deqAsSumbool.
-  exact eq_dec.
-Defined.
+Require Import Common.certiClasses.
 
 Import Monad.MonadNotation.
 Open Scope monad_scope.

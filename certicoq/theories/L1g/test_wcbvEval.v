@@ -19,9 +19,17 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+Set Printing Width 60.
+Print and_rect.
+Quote Recursively Definition p_and_rect := and_rect.
+Print p_and_rect.
+
 Set Template Cast Propositions.
 Set Printing Width 80.
 Set Printing Depth 1000.
+
+Quote Recursively Definition p_and_rect := and_rect.
+Print p_and_rect.
 
 (** example from Coq club 
 "Question about the formal definition of the guard condition"

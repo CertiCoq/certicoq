@@ -1,5 +1,6 @@
 Require Import L2.compile.
 Require Import L2.wcbvEval.
+Require Import L2.term.
 Require Import certiClasses.
 Require Import Common.Common.
 Require Import L1g.instances.
@@ -74,8 +75,79 @@ Proof.
     repeat progress (unfold bigStepEval, bigStepEvalSame,
                      liftBigStepException, bigStepOpSemL1gTerm,
                      translate, translateT, BigStepOpWEnv,
-                     liftTotal, certiL2Eval, certiL1g_to_L2).
-    cbn. intros. destruct H0.
+                     liftTotal, certiL2Eval, certiL1g_to_L2,
+                     observeNthSubterm).
+    cbn. intros. destruct H0. destruct s, sv. cbn in H1. subst env.
+    cbn in H0. cbn. clear H. (* ?? *)
+    exists (stripProgram {| main := main0; env := env0 |}).
+    cbn. split. Set Printing All. split. 
+    + apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ H0).
+    + reflexivity.
+    + constructor.
+      * { unfold yesPreserved. intros. unfold stripProgram, implb.
+          unfold questionHead, QuestionHeadL2Term, QuestionHeadL1gTerm.
+          destruct q. cbn. destruct main0; cbn; try reflexivity.
+          - destruct main0_1; cbn; try reflexivity.
+            destruct (decide (i = i0)); cbn; try reflexivity.
+            destruct (PeanoNat.Nat.eqb n n0); try reflexivity.
+          - destruct (decide (i = i0)); cbn; try reflexivity.
+            destruct (PeanoNat.Nat.eqb n n0); try reflexivity.
+          - cbn. destruct main0; cbn; try reflexivity.
+            destruct main0_1; try reflexivity. }
+      * { intros. unfold observeNthSubterm,
+                  ObsSubtermL2Term, ObsSubtermL1gTerm.
+          destruct main0; cbn; try constructor.
+          - destruct main0_1; cbn; try constructor.
+            induction n; induction (L1g.compile.Terms_list t); cbn.
+            + constructor. constructor. admit. admit.
+            + constructor. constructor. admit. admit.
+            + cbn. rewrite (proj2 (List.nth_error_None nil n)).
+              admit. admit.
+            + admit.
+          - admit. }
+Admitted.
+              
+
+
+(***************************
+
+    + unfold yesPreserved. intros. unfold stripProgram, implb.
+      unfold questionHead, QuestionHeadL2Term, instances.QuestionHeadL2Term.
+      destruct q. cbn. destruct main0; cbn; try reflexivity.
+      * destruct main0_1; cbn; try reflexivity.
+        destruct (decide (i = i0)); cbn; try reflexivity.
+        destruct (PeanoNat.Nat.eqb n n0); try reflexivity.
+      * destruct (decide (i = i0)); cbn; try reflexivity.
+        destruct (PeanoNat.Nat.eqb n n0); try reflexivity.
+      * cbn. destruct main0; cbn; try reflexivity.
+        destruct main0_1; try reflexivity.
+    + intros. unfold observeNthSubterm. 
+      unfold ObsSubtermL2Term, instances.ObsSubtermL2Term.
+      destruct main0; cbn; try constructor.
+      * { destruct main0_1; cbn; try constructor.
+          induction n; cbn.
+          - constructor. constructor.
+            + unfold yesPreserved. intros. induction q.
+              destruct main0_2; cbn; try reflexivity.
+              * destruct main0_2_1; cbn; try reflexivity.
+                destruct (decide (i0 = i1)); cbn; try reflexivity.
+                destruct (PeanoNat.Nat.eqb n n2); reflexivity.
+              * destruct (decide (i0 = i1)); cbn; try reflexivity.
+                destruct (PeanoNat.Nat.eqb n n2); reflexivity.
+              * destruct main0_2; cbn; try reflexivity.
+                destruct main0_2_1; cbn; try reflexivity.
+            + intros. destruct main0_2; cbn; try constructor.
+              * { destruct main0_2_1; cbn; try constructor.
+                  destruct n; cbn.
+                  - constructor. constructor.
+                    + unfold yesPreserved. intros. destruct q.
+                
+                
+              * destruct (decide (i0 = ind2)); cbn; try reflexivity.
+              cbn.
+
+      
+      
     exists (stripProgram sv). cbn. repeat split.
     + apply (proj1 (stripEvalCommute.WcbvEval_hom (env s)) _ _ H0).
     + destruct s, sv. cbn in H1. rewrite H1. cbn. reflexivity.
@@ -83,7 +155,28 @@ Proof.
     + intros. unfold observeNthSubterm,
               ObsSubtermL2Term, instances.ObsSubtermL2Term.
       destruct sv. cbn. unfold flattenApp, instances.flattenApp.
-      induction main; cbn; try constructor.
-      *
+      destruct main; cbn; try constructor.
+      * { destruct (L1g.term.isConstruct_dec main1) as [[x0 [x1 [x2 j]]] | j].
+          - subst main1. cbn.
+            destruct (List.nth_error (main2 :: L1g.compile.Terms_list t) n).
+            + destruct
+                (List.nth_error
+                   (compile.strip main2 :: Terms_list (compile.strips t)) n).
+              * constructor. constructor. unfold yesPreserved. intros.
+                unfold implb. unfold questionHead.
+                destruct (instances.QuestionHeadL2Term
+                            q {| main := t0; env := env |}).
+                destruct q. cbn. destruct t1; cbn. cbn in H0. cbn in H1.
+                subst env.
 
+                
+                unfold instances.QuestionHeadL2Term.
+                destruct (instances.QuestionHeadL2Term
+                            q {| main := t0; env := env |}).
+                destruct q. cbn.
+
+                admit.
+              * cbn in H0. rewrite H1 in H0. cbn in H0.
+                rewrite j in H1. cbn in H1. subst env. subst main1.
 Admitted.    
+***************************)

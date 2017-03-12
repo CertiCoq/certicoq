@@ -8,7 +8,8 @@ Require Import certiClasses2.
 Instance bigStepOpSemL1gTerm: BigStepOpSem (Program L1g.compile.Term) :=
   BigStepOpWEnv _ WcbvEval.
 
-(** FIX!! *)
+(** If the compiler only correctly compiles terms with some properties,
+ add them here. *)
 Instance WfL1gTerm: GoodTerm (Program L1g.compile.Term) :=
   fun _  => True.
 
@@ -43,8 +44,6 @@ Global Instance ObsSubtermL1gTerm:
       | _ => None
     end.
 
-
-
 Instance certiL1g: CerticoqLanguage (Program L1g.compile.Term):= {}.
 
 Local Generalizable Variable Lj.
@@ -66,9 +65,3 @@ Definition ctranslateTo {Term Value BigStep WF QH ObsS }
   translateTo (cTerm Lj).
 
 Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
-
-
-
-
-
-

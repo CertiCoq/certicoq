@@ -6,10 +6,13 @@ Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
 
 Require Import List.
-(* Some values, e.g. constructors, can have subterms. This operation allows asking for the nth subterm.
-When trying to observe the nth subterm of a value having only m (m<n) subterms, all bets are off about the returned value.
+(* Some values, e.g. constructors, can have subterms.
+   This operation allows asking for the nth subterm.
+   When trying to observe the nth subterm of a value having only m (m<n)
+   subterms, all bets are off about the returned value.
 *)
-Class ObserveNthSubterm (Value:Type) := observeNthSubterm: nat -> Value -> option Value.
+Class ObserveNthSubterm (Value:Type) :=
+  observeNthSubterm: nat -> Value -> option Value.
 
 Section YesNoQuestions.
 
@@ -41,10 +44,12 @@ Note that \box eventually becomes a fixpoint.
 *)
 Class QuestionHead (Value:Type) := questionHead: Question -> Value -> bool.
 
-(* A value in the destination should say "yes" to all the questions to which the corresponding source value said "yes" to *)
+(* A value in the destination should say "yes" to all the questions
+   to which the corresponding source value said "yes"
+*)
 Definition yesPreserved `{QuestionHead SrcValue} `{QuestionHead DstValue}
 (s: SrcValue) (d: DstValue)
- := forall (q:Question), implb (questionHead q s) (questionHead q d) = true.
+  := forall (q:Question), implb (questionHead q s) (questionHead q d) = true.
 
 Section ObsLe.
 
@@ -114,6 +119,17 @@ Lemma obsLeTrns
   -> i ⊑ d 
   -> s ⊑ d.
 Proof.
+  (************
+  induction 1. intros.
+  constructor.  Set Printing All.
+  - unfold yesPreserved. intros.
+    unfold yesPreserved in H5. specialize (H5 q).
+    inversion H7. subst.   
+    unfold yesPreserved in H8. specialize (H8 q).
+    inversion H7. subst.
+    unfold yesPreserved in H10. specialize (H10 q).
+    unfold implb in *.
+**********)
   cofix.
   intros ? ? ? Ha Hb.
   inversion Ha as [ss is Hah Has]. subst. clear Ha.

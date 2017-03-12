@@ -22,34 +22,39 @@ Inductive Question : Set  :=
 | Abs : Question.
 
 
-(* Given a value of a language, we can observe it by asking it yes/no questions. 
-[Cnstr i n] represents the question "Are you the nth constructor of the inductive i?".
-[Abs] represents the question 
-"Are you an abstraction (do you represent a lambda or fixpoint)?".
-
+(** Given a value of a language, we can observe it by asking it yes/no
+questions. 
+ [Cnstr i n] represents the question "Are you the nth constructor
+      of the inductive i?".
+ [Abs] represents the question "Are you an abstraction
+    (do you represent a lambda or fixpoint)?".
 A value can respond "yes" to many such questions.
-Thus, the compiler is allowed to to use the same representation for different types.
+Thus, the compiler is allowed to to use the same representation for
+different types.
 
 Regarding Erasure:
 If a value [v] has sort Prop, then in L1g, 
-[questionHead _ v is] supposed to be false.
+  [questionHead _ v is] supposed to be false.
 We can then do whatever we want with such values.
-Another choice is that if a value [v] is a constructor (and not, e.g., a lambda or fix)
-of sort Prop, then in L1g, 
+Another choice is that if a value [v] is a constructor 
+(and not, e.g., a lambda or fix) of sort Prop, then in L1g, 
 [questionHead _ v is] supposed to be false.
+
 After erasure,
-[questionHead (Cnstr _ _) \box] is false
-[questionHead Abs \box] is true.
+  [questionHead (Cnstr _ _) \box] is false
+  [questionHead Abs \box] is true.
 Note that \box eventually becomes a fixpoint.
 *)
 Class QuestionHead (Value:Type) := questionHead: Question -> Value -> bool.
 
-(* A value in the destination should say "yes" to all the questions
+(** A value in the destination should say "yes" to all the questions
    to which the corresponding source value said "yes"
-*)
-Definition yesPreserved `{QuestionHead SrcValue} `{QuestionHead DstValue}
-(s: SrcValue) (d: DstValue)
-  := forall (q:Question), implb (questionHead q s) (questionHead q d) = true.
+**)
+Definition yesPreserved
+           `{QuestionHead SrcValue} `{QuestionHead DstValue}
+           (s: SrcValue) (d: DstValue) :=
+  forall (q:Question), implb (questionHead q s) (questionHead q d) = true.
+
 
 Section ObsLe.
 
@@ -58,8 +63,9 @@ Context `{QuestionHead SrcValue} `{ObserveNthSubterm SrcValue}
    `{QuestionHead DstValue} `{ObserveNthSubterm DstValue}.
 
 (* obsLe extends yesPreserved to corresponding subterms *)   
-(* Coinductive, in case we add support for Coq's coinductive types lateron.
-Currently, [Inductive] should suffice *)
+(* Coinductive, in case we add support for Coq's coinductive types later on.
+Currently, [Inductive] should suffice 
+*)
 CoInductive obsLe : SrcValue -> DstValue -> Prop :=
 | sameObs : forall (s : SrcValue) (d : DstValue),
     yesPreserved s d
@@ -188,7 +194,8 @@ Notation "s ⊑ t" := (obsLe s t) (at level 65).
 in the destination says yes to everything. This property of 
 the questionHead function enforces that
 if it says "yes" to some constructor of an inductive type, it must say
-"no" to all other constructors of the SAME inductive type *)
+"no" to all other constructors of the SAME inductive type 
+**)
 
 Definition nonTrivialQuestionHead (Value : Type)
   `{@QuestionHead Value} : Prop:=
@@ -199,11 +206,8 @@ forall (v:Value) (i: Ast.inductive) n,
 (** We can also ask every language to declare their notion of application 
 as a function of type Term->Value->Term.
 Then, in obsLe, we can also exploit 
-observations on values resulting from applications of functions to values. *)
-
-
-
-
+observations on values resulting from applications of functions to values. 
+**)
 
 
 (* can be used to get the Term type from an instance *)
@@ -216,7 +220,3 @@ Arguments cValue {Term} {Value} {H} {H0} {H1} {H2} _.
 
 
 Arguments CerticoqLanguage Term {Value} {H} {H0} {H1} {H2}.
-
-
-
-

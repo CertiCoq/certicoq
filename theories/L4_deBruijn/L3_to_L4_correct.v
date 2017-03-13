@@ -1752,16 +1752,6 @@ Proof.
     now rewrite H2.
 Qed.
 
-Fixpoint is_n_lam_app n t :=
-  match n with
-  | 0%nat => true
-  | S n => match t with
-          | Lam_e _ t => is_n_lam_app n t
-          | App_e f _ => is_n_lam_app (S (S n)) f
-          | _ => false
-          end
-  end.
-
 Fixpoint is_n_lambda_app n t :=
   match n with
   | 0%nat => true
@@ -1807,6 +1797,9 @@ Qed.
 Lemma snd_strip_lam na n t : snd (strip_lam (S n) (Lam_e na t)) = snd (strip_lam n t).
 Proof. unfold strip_lam at 1. fold (strip_lam n t). now destruct strip_lam. Qed.
 
+Lemma fst_strip_lam na n t : fst (strip_lam (S n) (Lam_e na t)) = na :: fst (strip_lam n t).
+Proof. unfold strip_lam at 1. fold (strip_lam n t). now destruct strip_lam. Qed.
+
 Lemma is_n_lam_sbst e n t : is_n_lam n t = true -> forall k, is_n_lam n (sbst e k t) = true.
 Proof.
   revert t; induction n; intros; trivial.
@@ -1814,45 +1807,201 @@ Proof.
   now apply IHn.
 Qed.
 
+Lemma closed_sbst_map v k l : exps_wf 0 l -> map_exps (sbst v k) l = l.
+Proof.
+  induction l; simpl; intros; trivial.
+  inv H. rewrite (IHl H4).
+  f_equal. rewrite (proj1 (sbst_closed_id v) k); eauto; try lia.
+Qed.
+
+Lemma sbst_sbst_list v k f l :
+  exp_wf 0 v -> exps_wf 0 l ->
+  sbst v k (sbst_list f l) =
+  sbst_list (sbst v (exps_length l + k) f)
+            (map_exps (sbst v k) l).
+Proof.
+  revert v k f; induction l; simpl; intros.
+  - equaln.
+  - inv H0.
+    rewrite (proj1 (closed_subst_sbst _ H)). 
+    rewrite (proj1 (closed_subst_sbst _ H4)).
+    rewrite substitution; try lia.
+    simpl.
+    rewrite <- !(proj1 (closed_subst_sbst _ H)). 
+    rewrite (proj1 (sbst_closed_id v) 0); try lia; auto.
+    rewrite <- (proj1 (closed_subst_sbst _ H4)). 
+    rewrite (IHl v (1 + k) f); auto.
+    rewrite (proj1 (sbst_closed_id v) 0 e H4 k); try lia; auto.
+    f_equal. f_equal. equaln.
+    rewrite !closed_sbst_map; auto.
+Qed.
+
+Lemma eval_sbst_list_eval f f' a s k :
+  is_n_lam (S k) f = true ->
+  eval f f' ->
+  eval (sbst_list (snd (strip_lam (N.to_nat (exps_length a)) f')) a) s ->
+  eval (sbst_list (snd (strip_lam (N.to_nat (exps_length a)) f)) a) s.
+Proof.
+  revert f f' s k; induction a. simpl.
+  - intros.
+    pose proof (proj1 eval_idempotent _ _ H0).
+    pose proof (proj1 eval_single_valued _ _ H2 _ H1). now subst.
+  - intros.
+    destruct f; try discriminate. inv H0.
+    auto.
+Qed.
+
+Lemma evals_preserves_length {a a'} : evals a a' -> exps_length a = exps_length a'.
+Proof. induction 1; simpl; trivial. now rewrite IHevals. Qed.
+
+Lemma is_n_lam_eval n f : is_n_lam (N.to_nat (1 + n)) f = true -> eval f f.
+Proof.
+  intros.
+  rewrite <- S_to_nat in H.
+  destruct f; try discriminate. constructor.
+Qed.
+
+Lemma eval_lam_app n f e s : exp_wf 0 e -> is_value e -> eval (sbst e 0 f) s -> eval (Lam_e n f $ e) s.
+Proof.
+  intros.
+  econstructor. constructor.
+  now apply wf_value_self_eval.
+  apply H1.
+Qed.
+
+Lemma eval_is_n_lam n t t' : is_n_lam n t = true -> eval t t' -> is_n_lam n t' = true.
+Proof.
+  induction n; simpl; intros Hlam; auto.
+  
+  destruct t; try discriminate.
+  intros. inv H.
+  auto.
+Qed.
+
+Lemma mk_App_einv {f a s} : eval (mkApp_e f a) s -> exists s', eval f s'.
+Proof.
+  revert f; induction a; simpl; intros.
+  - now exists s.
+  - specialize (IHa (f $ e) H).
+    destruct IHa.
+    inv H0. now exists (Lam_e na e1').
+    exists (Fix_e es n). auto.
+Qed.
+
+Lemma eval_mkApp_e_inner f f' s' a s :
+  let n := (N.to_nat (exps_length a)) in
+  is_n_lam n s' = true -> 
+  eval f s' ->
+  eval f' s' -> 
+  eval (mkApp_e f a) s -> eval (mkApp_e f' a) s.
+Proof.
+  revert f f' s' s; induction a; intros *; intros Hlam evf evf' evapp; simpl in *.
+  - now rewrite <- (proj1 eval_single_valued _ _ evf _ evapp).
+  - subst n; simpl in *.
+    rewrite <- S_to_nat in Hlam.
+    destruct s'; try discriminate. simpl in Hlam.
+    destruct (mk_App_einv evapp) as [s'' evs''].
+    
+    assert(eval (f' $ e) s'').
+    { inv evs''. injection (proj1 eval_single_valued _ _ evf _ H1). intros -> ->.
+      econstructor; eauto. 
+      pose proof (proj1 eval_single_valued _ _ evf _ H1). discriminate. }
+    eapply (IHa (f $ e) (f' $ e) s'' s ); auto.
+    
+    inv evs''.
+    injection (proj1 eval_single_valued _ _ evf _ H2). intros -> ->.
+    eapply (is_n_lam_sbst v2 _) in Hlam.
+    eapply eval_is_n_lam; eauto.
+    pose proof (proj1 eval_single_valued _ _ evf _ H2). discriminate.
+Qed.
+
+Lemma eval_mkApp_e_inv f a s :
+  is_n_lam (N.to_nat (exps_length a)) f = true ->
+  exp_wf 0 f -> exps_wf 0 a -> are_values a ->
+  eval (mkApp_e f a) s ->
+  exists f', eval f f' /\ eval (sbst_list (snd (strip_lam (N.to_nat (exps_length a)) f')) a) s.
+Proof.
+  revert f; induction a; intros f.
+  - 
+    simpl.
+    intros. do 2 eexists; intuition eauto. 
+    eapply eval_idempotent; eauto.
+    
+  - simpl.
+    intros Hfe.
+    rewrite <- S_to_nat in Hfe. destruct f; try discriminate.
+    intros wff wfa vas Hev.
+    simpl in Hfe.
+    rewrite <- S_to_nat.
+    destruct a.
+    + simpl in Hev.
+      inv Hev; inv H1.
+      specialize (IHa (e1' {0 ::= v2}) eq_refl).
+      inv wff. inv wfa. inv vas. 
+      apply wf_value_self_eval in H3; eauto.
+      pose proof (proj1 eval_single_valued _ _ H3 _ H2). subst v2.
+      forward IHa.
+      specialize (IHa (enil_wf _) enil_are_values H4).
+      destruct IHa as (f'&evf'&evf's).
+      exists (Lam_e na e1'). 
+      intuition auto. constructor. 
+      apply eval_preserves_wf in H2; auto.
+    + simpl in IHa. simpl in Hev. simpl in Hfe.
+      exists (Lam_e n f).
+      inv wff; inv wfa.
+      specialize (IHa (sbst e 0 f)). simpl in IHa.
+      inv H4. inv vas. intuition auto. constructor.
+      forward IHa; [ | now apply is_n_lam_sbst ].
+      forward IHa; eauto. forward IHa; eauto.
+      specialize (IHa H4).
+      pose proof (is_n_lam_eval _ _ H).
+      forward IHa.
+      destruct IHa as (f'&evf&evsbst).
+      simpl.
+      pose proof (proj1 eval_single_valued _ _ evf _ H8). subst f'.
+      rewrite <- S_to_nat. rewrite <- S_to_nat in H.
+      rewrite snd_strip_lam.
+      pose (substitution (sbst_list (snd (strip_lam (S (N.to_nat (exps_length a))) f)) a) e0 e 0 0).
+      forward e1; try lia. simpl in e1.
+      rewrite <- (proj1 (closed_subst_sbst _ H3)) in e1; auto.
+      rewrite <- (proj1 (closed_subst_sbst _ H5)) in e1.
+      rewrite e1. rewrite (proj1 (subst_closed_id e) 0); eauto.
+      rewrite <- (proj1 (closed_subst_sbst _ H3)). 
+      rewrite <- (proj1 (closed_subst_sbst _ H5)).
+      clear e1.
+      rewrite sbst_sbst_list; eauto.
+      assert (Hstrip:=strip_lam_sbst (N.to_nat (1 + exps_length a)) e 0 f).
+      specialize (Hstrip Hfe).
+      destruct Hstrip as [Hstrip _].
+      rewrite N.add_0_r. rewrite N.add_0_r in Hstrip.
+      rewrite N.add_comm. rewrite S_to_nat. rewrite Nnat.N2Nat.id in Hstrip.
+      rewrite <- Hstrip.
+      inv H4.
+      rewrite closed_sbst_map; auto.
+      
+      apply (eval_mkApp_e_inner (Lam_e n f $ e) (sbst e 0 f) (sbst e 0 f) (econs e0 a)); auto.
+      apply eval_lam_app; auto.
+Qed.
+    
 Lemma eval_App_e f a s :
   forall k, k = N.to_nat (exps_length a) ->
+       exp_wf 0 f ->
+       exps_wf 0 a ->
+       are_values a ->
   is_n_lam k f = true ->
   eval (mkApp_e f a) s ->
   eval (sbst_list (snd (strip_lam k f)) a) s.
 Proof.
-  intros k ->.
-  revert f s; induction a; simpl; intros f s; trivial.
+  intros k -> ?????.
+  apply eval_mkApp_e_inv in H3; auto. destruct H3 as (f'&evf&evs).
+  destruct a; simpl in *.
+  pose (proj1 eval_idempotent _ _ evf).
+  pose proof (proj1 eval_single_valued _ _ evs _ e); subst f'. auto.
 
-  intros Hlam Hev. rewrite <- S_to_nat in Hlam.
-  destruct f; simpl in Hlam; try discriminate.
-  specialize (IHa (sbst e 0 f) s). 
-  forward IHa; cycle 1.
-  now apply is_n_lam_sbst.
-
-  forward IHa.
-  rewrite N.add_1_l.
-  replace (N.to_nat (N.succ (exps_length a))) with (S (N.to_nat (exps_length a))) by lia.
-  rewrite snd_strip_lam.
-  Focus 2.
-Admitted.
-  (* destruct a. simpl in *. inv Hev. inv H2. *)
-  
-  (* (* (\ x \ y . t) a b -> (\y. t[x:=a]) b = ((\y . t) b) [0 := a] *) *)
-  (* Lemma sbst_list_sbst : sbst e 0 (sbst_list t a) *)
-
-(*   Focus 2. *)
-(*   simpl. case_eq (N.to_nat (exps_length a)). *)
-(*   reflexivity. intros. *)
-(*   now rewrite H in Hlam. *)
-
-(*   Focus 2. *)
-  
-  
-  
-
-  
-(* Admitted. *)
-
+  rewrite <- S_to_nat in H2.
+  destruct f; try discriminate.
+  now inv evf.
+Qed.
 
 Lemma Crcts_skipn e n i a a' : Crcts e n a -> tskipn i a = Some a' -> Crcts e n a'.
 Proof.
@@ -2235,6 +2384,11 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     - rewrite <- Hargsdef.
       rewrite exps_length_skipn, exps_length_map, exps_length_trans.
       apply tskipn_length in Hskip. lia.
+    - apply exp_wf_subst_aux; auto. eapply (WFTerm_exp_wf e e'' wfe evenv wfe'' dbody 0).
+      specialize (Hbr _ _ Hdnth). simpl in Hbr.
+      now apply Crct_WFTrm in Hbr.
+    - admit. (* WF proof *)
+    - admit. (* Wcbveval produces values ! *)
     - apply (is_n_lambda_is_n_lam _ e'' 0) in Hwf'. 
       now apply is_n_lam_subst_env.
     - rewrite (exps_skip_tskipn _ _ args') by auto.

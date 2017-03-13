@@ -3,7 +3,7 @@ Require Import Coq.Arith.Arith
                List.
 
 Import ListNotations.
-
+Import Nat. (* For 8.5.0 *)
 Definition key := nat.
 
 Inductive tree : Type :=

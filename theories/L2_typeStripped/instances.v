@@ -61,9 +61,9 @@ Instance certiL1g_to_L2:
 
 Require Import certiClasses2.
 
-Lemma flattenAppCommutes : forall main,
-    (flattenApp (strip main)) =
-    (strip (fst (instances.flattenApp main)), List.map strip (snd (instances.flattenApp main))).
+Lemma flattenAppCommutes : forall main : L1g.compile.Term,
+  flattenApp (strip main) =
+  (strip (fst (instances.flattenApp main)), List.map strip (snd (instances.flattenApp main))).
 Proof using.
   destruct main; auto.
   simpl. f_equal. f_equal.
@@ -72,6 +72,7 @@ Proof using.
 Qed.
 
 Require Import Coq.btauto.Btauto.
+Require Import SquiggleEq.list.
 
 Lemma compileObsEq:
   forall (main : L1g.compile.Term) (env : environ L1g.compile.Term),
@@ -94,14 +95,13 @@ Proof.
     destruct (instances.flattenApp main) as [f args].
     simpl. clear main.
     destruct f; cbn; try constructor.
-    Require Import SquiggleEq.list.
     rewrite nth_error_map.
-    remember  (List.nth_error args n) as ln. setoid_rewrite <- Heqln.
+    unfold compile.L1gTerm.
+    remember  (List.nth_error args n) as ln.
     clear Heqln. destruct ln; try constructor.
     apply compileObsEq.
-    Fail idtac. (* We're done *)
-Admitted.
-    
+Qed.
+
 Global Instance certiL1g_to_L2Correct :
   CerticoqTranslationCorrect certiL1g certiL2.
 Proof.

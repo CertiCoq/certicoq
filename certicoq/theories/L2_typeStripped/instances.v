@@ -62,8 +62,8 @@ Instance certiL1g_to_L2:
 Require Import certiClasses2.
 
 Lemma flattenAppCommutes : forall main : L1g.compile.Term,
-  flattenApp (strip main) =
-  (strip (fst (instances.flattenApp main)), List.map strip (snd (instances.flattenApp main))).
+  flattenApp (L2.compile.strip main) =
+  (strip (fst (L1g.instances.flattenApp main)), List.map strip (snd (L1g.instances.flattenApp main))).
 Proof using.
   destruct main; auto.
   simpl. f_equal. f_equal.
@@ -83,7 +83,7 @@ Proof.
   - intros q. unfold questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
     simpl. rewrite flattenAppCommutes.
     clear.
-    remember (fst (instances.flattenApp main)) as mm.
+    remember (fst (L1g.instances.flattenApp main)) as mm.
     clear Heqmm. simpl.
     clear main.
     destruct mm, q; cbn; try reflexivity.
@@ -92,7 +92,7 @@ Proof.
   - intros ?.
     unfold observeNthSubterm, ObsSubtermL1gTerm, ObsSubtermL2Term. simpl.
     rewrite flattenAppCommutes.
-    destruct (instances.flattenApp main) as [f args].
+    destruct (L1g.instances.flattenApp main) as [f args].
     simpl. clear main.
     destruct f; cbn; try constructor.
     rewrite nth_error_map.

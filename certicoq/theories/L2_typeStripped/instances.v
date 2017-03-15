@@ -107,19 +107,20 @@ Global Instance certiL1g_to_L2Correct :
 Proof.
   split.
   - intros ? ?. cbn. unfold translateT, certiL1g_to_L2. trivial.
-    (* The GoodTerm instance of L1g and L2 may need to be strengthened 
-       to complete the next subgoal. Currently, they evaluete to True.
-     *)
   - intros ? ?. 
     repeat progress (unfold bigStepEval, bigStepEvalSame,
                      liftBigStepException, bigStepOpSemL1gTerm,
                      translate, translateT, BigStepOpWEnv,
                      liftTotal, certiL2Eval, certiL1g_to_L2,
                      observeNthSubterm).
-    cbn. intros. destruct H0. destruct s, sv. cbn in H1. subst env.
-    cbn in H0. cbn. clear H. (* ?? *)
-    exists (stripProgram {| main := main0; env := env0 |}).
+    cbn. intros _ Hev. destruct Hev as [Hev HevEnv].
+    destruct s as [smain senv]. 
+    destruct sv as [svmain svenv]. cbn in *. subst svenv.
+    exists (stripProgram {| main := svmain; env := senv |}).
     cbn. split; [split; [ | reflexivity] | ]. 
-    + apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ H0).
+    + apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).
     + clear. apply compileObsEq.
 Qed.
+
+Print Assumptions certiL1g_to_L2Correct.
+(* Closed under the global context *)

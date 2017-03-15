@@ -24,15 +24,29 @@ Let L4Term := prod ienv  L4.expression.exp.
 
 Instance certiL4eval : BigStepOpSem L4.expression.exp := eval.
 
-
 Instance certiL4wf: GoodTerm L4.expression.exp :=
  L4.expression.exp_wf (0%N).
 
 
 Require Import certiClasses2.
+
+Definition question_head (Q : Question) (ie : ienv) (e : L4.expression.exp) :=
+  match Q with
+  | Abs => match e with
+            Lam_e _ _ => true
+          | Fix_e _ _ => true
+          | _ => false
+          end
+  | Cnstr i n =>
+    match e with
+    | Con_e (i', n') args =>
+      if eq_dec i i' then N.eqb (N.of_nat n) n' else false
+    | _ => false
+    end
+  end.
 (* FIX!! *)
 Global Instance QuestionHeadTermL : QuestionHead (ienv * L4.expression.exp) :=
-fun q t => false.
+  fun q t => question_head q (fst t) (snd t).
 
 (* FIX!! *)
 Global Instance ObsSubtermTermL : ObserveNthSubterm (ienv * L4.expression.exp) :=
@@ -45,6 +59,46 @@ Global  Instance certiL3_to_L4:
 fun p => Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
    (L3_to_L4.translate_program (AstCommon.env p) (main p))).
 
+Require Import L4.L3_to_L4_correct.
+
+Lemma eval_env e : wf_environ e -> exists e', eval_env (translate_env e) e'.
+Proof.
+  induction 1.
+  - exists nil; constructor.
+  - destruct IHwf_environ.
+    simpl.
+    pose proof (L3_to_L4_correct.translate_correct e t).
+    eexists.
+    constructor. apply H2.
+Admitted. 
+
+Global Instance certiL3_to_L4_correct :
+  CerticoqTranslationCorrect certiL3 certiL4.
+Proof.
+  split.
+  - red; unfold certiClasses.translate, goodTerm, WfL3Term.
+    intros.
+    pose proof (L3_to_L4_correct.Crct_wf_environ _ _ H).
+    unfold certiL3_to_L4. hnf.
+    simpl. destruct s. simpl in *.
+    unfold translate_program. simpl.
+    unfold translate. simpl.
+    now apply exp_wf_lets.
+
+  - red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
+    pose (Crct_wf_environ _ _ H).
+    repeat red in H0.
+    destruct H0.
+    pose proof (L3_to_L4_correct.translate_correct (AstCommon.env s) _ _ w H H0).
+    simpl in H2. unfold certiL3_to_L4.
+    destruct (eval_env _ w).
+    specialize (H2 _ H3).
+    eexists (inductive_env (AstCommon.env s), _). split. repeat red. split. simpl.
+    reflexivity.
+    simpl. repeat red. apply H2.
+    { constructor. red. simpl. reflexivity.
+      intros. constructor. }
+Qed.
 
 Require Import L4.L4_5_to_L5.
 Require Import SquiggleEq.export.

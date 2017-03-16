@@ -337,7 +337,7 @@ Require Import Common.certiClasses.
 Local Instances are cleared at the end of a section.
 A more specific instance
 is redeclared in L4.instances using "Existing Instance" *)
-Local Instance L4_2Eval : BigStepOpSem NTerm := eval.
+Local Instance L4_2Eval : BigStepOpSem NTerm NTerm := eval.
 
 
 (** will be used in [eval_reduces_fvars] and cps_cvt_corr *)

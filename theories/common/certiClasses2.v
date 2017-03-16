@@ -1,11 +1,9 @@
 Require Import Common.exceptionMonad.
 Require Import Common.certiClasses.
-
 Require Import Coq.Unicode.Utf8.
+Require Import List.
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
-
-Require Import List.
 (* Some values, e.g. constructors, can have subterms.
    This operation allows asking for the nth subterm.
    When trying to observe the nth subterm of a value having only m (m<n)
@@ -77,15 +75,13 @@ with obsLeOp : option SrcValue -> option DstValue -> Prop :=
 | obsSome: forall s d, obsLe s d -> obsLeOp (Some s) (Some d)
 | obsNone: forall d, obsLeOp None d.
 
-
 End ObsLe.
 
 Notation "s ⊑ t" := (obsLe s t) (at level 65).
 
 
-
 Class CerticoqLanguage (Term Value:Type)
-  `{BigStepHetero Term Value} `{GoodTerm Term} 
+  `{BigStepOpSem Term Value} `{GoodTerm Term} 
    `{QuestionHead Value} `{ObserveNthSubterm Value} 
 := 
 {

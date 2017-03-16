@@ -4,7 +4,8 @@ Require Import certiClasses.
 Require Import Common.Common.
 
 (** FIX!! *)
-Instance bigStepOpSemL2_5_Term : BigStepOpSem (Program L2_5.compile.Term) :=
+Instance bigStepOpSemL2_5_Term:
+  BigStepOpSem (Program Term) (Program Term) :=
   fun _ _ => True.
 
 (** FIX!! *)

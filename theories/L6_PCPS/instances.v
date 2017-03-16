@@ -32,7 +32,7 @@ Let L6env : Type := prims * cEnv * eval.env * nEnv.
    which type they belong to. env is the environment that contains valuations for the free
    variables of a term.
  *)
-Instance bigStepOpSemL3Term : BigStepHetero (L6env * cps.exp) cps.val :=
+Instance bigStepOpSemL3Term : BigStepOpSem (L6env * cps.exp) cps.val :=
   λ p v,
   let '(pr, cenv, env, nenv,  e) := p in
   ∃ (n:nat), (L6.eval.bstep_e pr cenv env e v n).

@@ -5,7 +5,8 @@ Require Import Common.Common.
 
 
 (* Do we need to use [L4.L3_to_L4_correct.eval_env]? on the environment*)
-Instance bigStepOpSemL3Term : BigStepOpSem (Program L3.compile.Term) :=
+Instance bigStepOpSemL3Term:
+  BigStepOpSem (Program Term) (Program Term) :=
   BigStepOpWEnv _ WcbvEval.
 
 Instance WfL3Term : GoodTerm (Program L3.compile.Term) :=

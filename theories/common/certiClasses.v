@@ -1,6 +1,6 @@
 Require Import Common.exceptionMonad.
-
 Require Import Common.AstCommon.
+Require Import Coq.Unicode.Utf8.
 
 
 (* This operations picks out the "good" terms in the language.
@@ -9,24 +9,15 @@ Class GoodTerm (Term: Type) := goodTerm : Term  -> Prop.
 
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
-(** A [Term] can contain an environment embedded in it. 
-Use this class when there is a separate type (and translation?) for values *)
-Class BigStepHetero (Term Value:Type) := bigStepEval: Term -> Value -> Prop.
+(** A [Term] can contain an environment embedded in it. *)
+Class BigStepOpSem (Term Value:Type) := bigStepEval: Term -> Value -> Prop.
 
-(** Use this class when values are just a subcollection of terms. *)
-Class BigStepOpSem (Term:Type) := bigStepEvalSame:> BigStepHetero Term Term.
-
-(* In either case, one can use ⇓ to refer to the big step eval relation *)
-
+(* one can use ⇓ to refer to the big step eval relation *)
 Notation "s ⇓ t" := (bigStepEval s t) (at level 70).
 
 
-
-Require Import Coq.Unicode.Utf8.
-
-
-Instance liftBigStepException `{BigStepHetero Term Value} 
-  : BigStepHetero (exception Term) (exception Value) :=
+Instance liftBigStepException `{BigStepOpSem Term Value} 
+  : BigStepOpSem (exception Term) (exception Value) :=
 λ (s : exception Term) (sv : exception Value),
 match (s, sv) with
 | (Ret s, Ret sv) => s ⇓ sv
@@ -60,7 +51,7 @@ Arguments goodPreserving Src Dst {H} {H0} {H1}.
 
 Definition bigStepPreserving `{CerticoqTranslation Src Dst} 
   `{CerticoqTranslation SrcValue DstValue}
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
+   `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} `{GoodTerm Src}
   :=
    ∀ (s:Src) (sv: SrcValue), 
     goodTerm s 
@@ -107,7 +98,7 @@ Notation "s ⊑ t" := (VR s t) (at level 65).
 (* Similar to what Zoe suggested on 	Wed, Aug 17, 2016 at 8:57 AM *)
 Definition obsPreserving 
   `{CerticoqTranslation Src Dst} 
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} `{GoodTerm Src}
+   `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} `{GoodTerm Src}
   :=
    ∀ (s:Src) (sv: SrcValue), 
     goodTerm s 
@@ -127,16 +118,17 @@ Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H
 *)
 
 
-Instance  BigStepOpWEnv (Term:Set) (ev: (environ Term) -> Term -> Term -> Prop) :
-  BigStepOpSem (Program Term) :=
-λ p1 p2, ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
+Instance BigStepOpWEnv
+         (Term:Set) (ev:(environ Term) -> Term -> Term -> Prop) :
+  BigStepOpSem (Program Term) (Program Term) :=
+  λ p1 p2, ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
 
-Definition normalizes `{BigStepHetero Term Value} (s:Term): Prop :=
-∃ (sv : Value) , s ⇓ sv.
+Definition normalizes `{BigStepOpSem Term Value} (s:Term): Prop :=
+  ∃ (sv : Value) , s ⇓ sv.
 
 
 (* Todo : generalize over Coq.Init.Logic.eq. *)
-Definition deterministicBigStep `{BigStepHetero Term Value} :=
+Definition deterministicBigStep `{BigStepOpSem Term Value} :=
 ∀ (s :Term) (v1 v2 : Value), s ⇓ v1 -> s ⇓ v2 -> v1 = v2.
 
 Arguments deterministicBigStep Term {Value} {H}.
@@ -149,7 +141,7 @@ match translate Src Dst s with
 end.
 
 
-Lemma deterministicBigStepLiftExc `{BigStepHetero Term Value}:
+Lemma deterministicBigStepLiftExc `{BigStepOpSem Term Value}:
   deterministicBigStep Term
   -> deterministicBigStep (exception Term).
 Proof.
@@ -166,7 +158,7 @@ Qed.
 
 Definition bigStepReflecting `{CerticoqTranslation Src Dst}
   `{CerticoqTranslation SrcValue DstValue}  
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} 
+   `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} 
    (s:Src)
     : Prop :=
  ∀ (dv: DstValue), 
@@ -180,7 +172,7 @@ Notation "s ⊑ t" := (VR s t) (at level 65).
 
 (* Similar to the new +, except this one does not enforce preservation of non-termination *)
 Definition obsReflecting `{CerticoqTranslation Src Dst}
-   `{BigStepHetero Src SrcValue} `{BigStepHetero Dst DstValue} 
+   `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} 
    (s:Src)
     : Prop :=
  ∀ (dv: DstValue), 
@@ -197,8 +189,8 @@ Lemma bigStepPreservingReflecting
   `{CerticoqTranslation SrcValue DstValue}
   `{GoodTerm Src}
   `{GoodTerm Dst}
-  `{BigStepHetero Src SrcValue}
-  `{BigStepHetero Dst DstValue}
+  `{BigStepOpSem Src SrcValue}
+  `{BigStepOpSem Dst DstValue}
   {_:bigStepPreserving Src Dst} :
   (deterministicBigStep Dst)
   -> ∀ (s:Src), 
@@ -224,8 +216,8 @@ Lemma obsPreservingReflecting
   `{CerticoqTranslation Src Dst}
   `{GoodTerm Src}
   `{GoodTerm Dst}
-  `{BigStepHetero Src SrcValue}
-  `{BigStepHetero Dst DstValue}
+  `{BigStepOpSem Src SrcValue}
+  `{BigStepOpSem Dst DstValue}
   (RV : SrcValue → DstValue → Prop)
   {Ho:obsPreserving Src Dst RV} : (* * *)
   (deterministicBigStep Dst)

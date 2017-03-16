@@ -18,15 +18,15 @@ Import Nnat.
 Require Import CpdtTactics.
 
 
-(******)
+(******
 Add LoadPath "../common" as Common.
 Add LoadPath "../L1g" as L1g.
 Add LoadPath "../L1_QuotedCoq" as L1.
 Add LoadPath "../L1_5_box" as L1_5.
 Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
+******)
 Add LoadPath "../L4_deBruijn" as L4.
-(******)
 
 Require Export Common.Common.  (* shared namespace *)
 Require Import ExtLib.Data.List.

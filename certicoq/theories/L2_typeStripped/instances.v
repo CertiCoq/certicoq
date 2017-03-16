@@ -7,8 +7,6 @@ Require Import L1g.instances.
 Require Import certiClasses2.
 Require Import L2.stripEvalCommute.
 
-Instance bigStepOpSemL2Term: BigStepOpSem (Program L2.compile.Term) :=
-  BigStepOpWEnv _ WcbvEval.
 
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)
@@ -46,9 +44,10 @@ Global Instance ObsSubtermL2Term :
       | _ => None
     end.
 
-Global Instance certiL2Eval: BigStepOpSem (Program L2.compile.Term).
+Global Instance certiL2Eval:
+  BigStepOpSem (Program L2.compile.Term) (Program L2.compile.Term).
   apply BigStepOpWEnv.
-  apply WcbvEval.
+  exact WcbvEval.
 Defined.
 
 Global Instance certiL2: CerticoqLanguage (Program L2.compile.Term).
@@ -61,9 +60,11 @@ Instance certiL1g_to_L2:
 
 Require Import certiClasses2.
 
-Lemma flattenAppCommutes : forall main : L1g.compile.Term,
+Lemma flattenAppCommutes:
+  forall main : L1g.compile.Term,
   flattenApp (L2.compile.strip main) =
-  (strip (fst (L1g.instances.flattenApp main)), List.map strip (snd (L1g.instances.flattenApp main))).
+  (strip (fst (L1g.instances.flattenApp main)),
+   List.map strip (snd (L1g.instances.flattenApp main))).
 Proof using.
   destruct main; auto.
   simpl. f_equal. f_equal.
@@ -74,9 +75,46 @@ Qed.
 Require Import Coq.btauto.Btauto.
 Require Import SquiggleEq.list.
 
+(****
 Lemma compileObsEq:
-  forall (main : L1g.compile.Term) (env : environ L1g.compile.Term),
-    {| main := main; env := env |} ⊑ stripProgram {| main := main; env := env |}.
+  forall L1gp: Program L1g.compile.Term, L1gp ⊑ stripProgram L1gp.
+Proof.
+  cofix.
+  intros. constructor.
+  - unfold yesPreserved. intros q.
+    unfold questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
+    cbn. rewrite flattenAppCommutes. clear.
+
+  destruct L1gp.
+  cofix.
+  intros. constructor.
+  - intros q. unfold questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
+    simpl. rewrite flattenAppCommutes.
+    clear.
+    remember (fst (L1g.instances.flattenApp main)) as mm.
+    clear Heqmm. simpl.
+    clear main.
+    destruct mm, q; cbn; try reflexivity.
+    unfold implb.
+    btauto.
+  - intros ?.
+    unfold observeNthSubterm, ObsSubtermL1gTerm, ObsSubtermL2Term. simpl.
+    rewrite flattenAppCommutes.
+    destruct (L1g.instances.flattenApp main) as [f args].
+    simpl. 
+    destruct f; cbn; try constructor.
+    rewrite nth_error_map.
+    unfold compile.L1gTerm.
+    remember  (List.nth_error args n) as ln.
+    clear Heqln. destruct ln; try constructor. Check compileObsEq.
+    apply compileObsEq.
+Qed.
+****)
+    
+Lemma compileObsEq:
+  forall (main: L1g.compile.Term) (env: environ L1g.compile.Term),
+    {| main := main; env := env |} ⊑
+      stripProgram {| main := main; env := env |}.
 Proof.
   cofix.
   intros. constructor.
@@ -107,18 +145,15 @@ Global Instance certiL1g_to_L2Correct :
 Proof.
   split.
   - intros ? ?. cbn. unfold translateT, certiL1g_to_L2. trivial.
-  - intros ? ?. 
-    repeat progress (unfold bigStepEval, bigStepEvalSame,
-                     liftBigStepException, bigStepOpSemL1gTerm,
-                     translate, translateT, BigStepOpWEnv,
-                     liftTotal, certiL2Eval, certiL1g_to_L2,
-                     observeNthSubterm).
-    cbn. intros _ Hev. destruct Hev as [Hev HevEnv].
+  - intros ? ? _ Hev. cbn.
+    repeat progress (unfold translateT, certiL1g_to_L2). 
+    destruct Hev as [Hev HevEnv].
     destruct s as [smain senv]. 
     destruct sv as [svmain svenv]. cbn in *. subst svenv.
     exists (stripProgram {| main := svmain; env := senv |}).
-    cbn. split; [split; [ | reflexivity] | ]. 
+    split. split. cbn. 
     + apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).
+    + reflexivity.
     + clear. apply compileObsEq.
 Qed.
 

@@ -5,7 +5,7 @@ Require Import Common.Common.
 Require Import Common.classes.
 Require Import certiClasses2.
 
-Instance bigStepOpSemL1gTerm: BigStepOpSem (Program L1g.compile.Term) :=
+Instance bigStepOpSemL1gTerm: BigStepOpSem (Program Term) (Program Term) :=
   BigStepOpWEnv _ WcbvEval.
 
 (** If the compiler only correctly compiles terms with some properties,

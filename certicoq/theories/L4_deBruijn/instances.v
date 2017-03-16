@@ -7,8 +7,8 @@ Require Import L3.instances.
 
 Require Import BinNat.
 
-Definition dummyEnvBigStep {E T: Type}  (bt : BigStepOpSem T)
-: BigStepOpSem (E * T) :=
+Definition dummyEnvBigStep {E T: Type}  (bt : BigStepOpSem T T)
+: BigStepOpSem (E * T) (E * T) :=
   (fun e v => (fst e) = (fst v) /\ (snd e) ⇓ (snd v)).
 
 Definition dummyEnvWf {E T: Type}  (bt : GoodTerm T)
@@ -22,7 +22,7 @@ Existing Instance dummyEnvWf | 1000000.
 
 Let L4Term := prod ienv  L4.expression.exp.
 
-Instance certiL4eval : BigStepOpSem L4.expression.exp := eval.
+Instance certiL4eval: BigStepOpSem L4.expression.exp L4.expression.exp := eval.
 
 Instance certiL4wf: GoodTerm L4.expression.exp :=
  L4.expression.exp_wf (0%N).
@@ -107,7 +107,7 @@ Require Import L4.L4_to_L4_1_to_L4_2.
 Require Import L4.L4_2_to_L4_5.
 
 
-Global  Program Instance : BigStepOpSem L4_5_Term := eval.
+Global  Program Instance : BigStepOpSem L4_5_Term L4_5_Term := eval.
 
 (** all variables must be user variables *)
 Global Program Instance : GoodTerm L4_5_Term :=
@@ -132,7 +132,7 @@ Require Import L4.variables.
 
 Definition L5Term :Type := (@NTerm NVar L5Opid).
 
-Global Program Instance : BigStepOpSem L5Term := eval_c.
+Global Program Instance : BigStepOpSem L5Term L5Term := eval_c.
 
 Global Program Instance : GoodTerm L5Term := isprogram.
 
@@ -153,7 +153,8 @@ Global Instance certiL4_5_to_L5:
 Require Import L4.L5a.
 
 (* Fix. Define subst and evaluation on L5a by going to L5 via a bijection? *)
-Global Program Instance : BigStepOpSem L4.L5a.val_c := fun _ _ => True.
+Global Program Instance : BigStepOpSem L4.L5a.val_c  L4.L5a.val_c :=
+  fun _ _ => True.
 
 (** Fix *)
 Global Program Instance : GoodTerm L4.L5a.val_c := fun x => False.

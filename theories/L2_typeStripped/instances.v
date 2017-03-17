@@ -140,19 +140,18 @@ Proof.
     apply compileObsEq.
 Qed.
 
-Global Instance certiL1g_to_L2Correct :
+Global Instance certiL1g_to_L2Correct:
   CerticoqTranslationCorrect certiL1g certiL2.
 Proof.
   split.
   - intros ? ?. cbn. unfold translateT, certiL1g_to_L2. trivial.
-  - intros ? ? _ Hev. cbn.
-    repeat progress (unfold translateT, certiL1g_to_L2). 
+  - intros ? ? _ Hev. cbn. unfold translateT, certiL1g_to_L2.
     destruct Hev as [Hev HevEnv].
     destruct s as [smain senv]. 
     destruct sv as [svmain svenv]. cbn in *. subst svenv.
     exists (stripProgram {| main := svmain; env := senv |}).
-    split. split. cbn. 
-    + apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).
+    split. split.
+    + cbn. apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).
     + reflexivity.
     + clear. apply compileObsEq.
 Qed.

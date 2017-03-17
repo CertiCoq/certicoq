@@ -7,6 +7,13 @@ Require Import certiClasses2.
 
 Instance bigStepOpSemL1gTerm: BigStepOpSem (Program Term) (Program Term) :=
   BigStepOpWEnv _ WcbvEval.
+(***
+Instance bigStepOpSemL1gTerm: BigStepOpSem (Program Term) (Program Term).
+Proof.
+  unfold BigStepOpSem. intros s sv.
+  apply (WcbvEval (env s) (main s) (main sv)).
+Defined.
+***)
 
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)

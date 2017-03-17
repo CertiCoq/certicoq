@@ -89,13 +89,12 @@ Proof.
 Qed.
 
 
-
-
 Section obsPreserving.
-Context (Src Dst : Type) {SrcValue DstValue : Type} (VR : SrcValue -> DstValue -> Prop).
+Context (Src Dst: Type) {SrcValue DstValue: Type}
+          (VR: SrcValue -> DstValue -> Prop).
 Notation "s ⊑ t" := (VR s t) (at level 65).
 
-(* Similar to what Zoe suggested on 	Wed, Aug 17, 2016 at 8:57 AM *)
+(* Similar to what Zoe suggested on Wed, Aug 17, 2016 at 8:57 AM *)
 Definition obsPreserving 
   `{CerticoqTranslation Src Dst} 
    `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} `{GoodTerm Src}
@@ -103,8 +102,19 @@ Definition obsPreserving
    ∀ (s:Src) (sv: SrcValue), 
     goodTerm s 
     -> (s ⇓ sv)
-    -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧  sv ⊑ dv.
+    -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧ sv ⊑ dv.
 End obsPreserving.
+(****
+Definition obsPreserving 
+  `{CerticoqTranslation Src Dst} 
+   `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} `{GoodTerm Src}
+  :=
+   ∀ (s:Src) (sv: SrcValue), 
+    goodTerm s 
+    -> (s ⇓ sv)
+    -> forall (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) -> sv ⊑ dv.
+End obsPreserving.
+***)
 
 (* 
 Notation "s =⊏  t" := (obsLe StrongObservation s t) (at level 65). 
@@ -117,11 +127,12 @@ Arguments CerticoqLanguage2 Term Value {H} {H0} {H1} {H2}.
 Arguments obsPreserving Src Dst {H} {SrcValue} {H0} {DstValue} {H1} {H2} {H3} {H4} {H5} {H6}.
 *)
 
-
+(***** needed ?? **)
 Instance BigStepOpWEnv
          (Term:Set) (ev:(environ Term) -> Term -> Term -> Prop) :
   BigStepOpSem (Program Term) (Program Term) :=
   λ p1 p2, ev (env p1) (main p1) (main p2) /\ (env p1 = env p2).
+(**************)
 
 Definition normalizes `{BigStepOpSem Term Value} (s:Term): Prop :=
   ∃ (sv : Value) , s ⇓ sv.

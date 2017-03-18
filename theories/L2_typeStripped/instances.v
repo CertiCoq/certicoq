@@ -46,8 +46,8 @@ Global Instance ObsSubtermL2Term :
 
 Global Instance certiL2Eval:
   BigStepOpSem (Program L2.compile.Term) (Program L2.compile.Term).
-  apply BigStepOpWEnv.
-  exact WcbvEval.
+Proof.
+  intros s sv. destruct s, sv. exact (WcbvEval env main main0 /\ env = env0).
 Defined.
 
 Global Instance certiL2: CerticoqLanguage (Program L2.compile.Term).
@@ -74,42 +74,6 @@ Qed.
 
 Require Import Coq.btauto.Btauto.
 Require Import SquiggleEq.list.
-
-(****
-Lemma compileObsEq:
-  forall L1gp: Program L1g.compile.Term, L1gp ⊑ stripProgram L1gp.
-Proof.
-  cofix.
-  intros. constructor.
-  - unfold yesPreserved. intros q.
-    unfold questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
-    cbn. rewrite flattenAppCommutes. clear.
-
-  destruct L1gp.
-  cofix.
-  intros. constructor.
-  - intros q. unfold questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
-    simpl. rewrite flattenAppCommutes.
-    clear.
-    remember (fst (L1g.instances.flattenApp main)) as mm.
-    clear Heqmm. simpl.
-    clear main.
-    destruct mm, q; cbn; try reflexivity.
-    unfold implb.
-    btauto.
-  - intros ?.
-    unfold observeNthSubterm, ObsSubtermL1gTerm, ObsSubtermL2Term. simpl.
-    rewrite flattenAppCommutes.
-    destruct (L1g.instances.flattenApp main) as [f args].
-    simpl. 
-    destruct f; cbn; try constructor.
-    rewrite nth_error_map.
-    unfold compile.L1gTerm.
-    remember  (List.nth_error args n) as ln.
-    clear Heqln. destruct ln; try constructor. Check compileObsEq.
-    apply compileObsEq.
-Qed.
-****)
     
 Lemma compileObsEq:
   forall (main: L1g.compile.Term) (env: environ L1g.compile.Term),
@@ -145,10 +109,9 @@ Global Instance certiL1g_to_L2Correct:
 Proof.
   split.
   - intros ? ?. cbn. unfold translateT, certiL1g_to_L2. trivial.
-  - intros ? ? _ Hev. cbn. unfold translateT, certiL1g_to_L2.
-    destruct Hev as [Hev HevEnv].
-    destruct s as [smain senv]. 
-    destruct sv as [svmain svenv]. cbn in *. subst svenv.
+  - unfold obsPreserving. intros s sv _ Hev. cbn.
+    destruct s as [smain senv], sv as [svmain svenv]. cbn in *.
+    destruct Hev as [Hev HevEnv]. subst svenv.
     exists (stripProgram {| main := svmain; env := senv |}).
     split. split.
     + cbn. apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).

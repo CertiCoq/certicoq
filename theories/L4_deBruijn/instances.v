@@ -86,16 +86,15 @@ Proof.
     now apply exp_wf_lets.
 
   - red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
-    pose (Crct_wf_environ _ _ H).
-    repeat red in H0.
-    destruct H0.
-    pose proof (L3_to_L4_correct.translate_correct (AstCommon.env s) _ _ w H H0).
-    simpl in H2. unfold certiL3_to_L4.
+    pose (Crct_wf_environ _ _ H). destruct s, sv. cbn in *.
+    destruct H0. subst env0.
+    pose proof (L3_to_L4_correct.translate_correct env _ _ w H H0).
+    simpl in H1.
     destruct (eval_env _ w).
-    specialize (H2 _ H3).
-    eexists (inductive_env (AstCommon.env s), _). split. repeat red. split. simpl.
+    specialize (H1 _ H2).
+    eexists (inductive_env env, _). split. repeat red. split. simpl.
     reflexivity.
-    simpl. repeat red. apply H2.
+    simpl. repeat red. apply H1.
     { constructor. red. simpl. reflexivity.
       intros. constructor. }
 Qed.

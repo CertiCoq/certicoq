@@ -5,15 +5,10 @@ Require Import Common.Common.
 Require Import Common.classes.
 Require Import certiClasses2.
 
-Instance bigStepOpSemL1gTerm: BigStepOpSem (Program Term) (Program Term) :=
-  BigStepOpWEnv _ WcbvEval.
-(***
 Instance bigStepOpSemL1gTerm: BigStepOpSem (Program Term) (Program Term).
 Proof.
-  unfold BigStepOpSem. intros s sv.
-  apply (WcbvEval (env s) (main s) (main sv)).
+  intros s sv. destruct s, sv. exact (WcbvEval env main main0 /\ env = env0).
 Defined.
-***)
 
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)

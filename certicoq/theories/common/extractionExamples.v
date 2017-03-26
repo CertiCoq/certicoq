@@ -1,5 +1,5 @@
 Recursive Extraction False_rect.
-(* the false argument was not erased. the type argument was erased *)
+(* the False argument was not erased. the type argument was erased *)
 
 
 Recursive Extraction eq_rect.
@@ -20,7 +20,7 @@ Recursive Extraction f2.
 
 Definition f3 (A:Type) : nat := 0.
 
-(* turns off remmoval of unused args:
+(* turns off removal of args:
 Set Extraction Conservative Types. 
  *)
 
@@ -38,3 +38,24 @@ Recursive Extraction f5.
 Definition f6 (b:bool) (A: Type) : nat := 0.
 
 Recursive Extraction f6.
+
+Definition f7 (b:bool) :=
+  match b return if b then Type->nat else nat with
+  | true => fun (a:Type) => 0 (* not erased, because it is not a top-level lambda? *)
+  |false => 0
+  end.
+
+Recursive Extraction f7.
+
+(** Existential types become Obj.t *)
+
+Definition xx := {T:Type & T-> T ->T}.
+
+Recursive Extraction xx.
+
+Inductive ExistentialType : Type:=
+ext : forall (T:Set), (T->T->T) -> ExistentialType.
+
+Recursive Extraction ExistentialType.
+
+

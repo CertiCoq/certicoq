@@ -74,7 +74,67 @@ Qed.
 
 Require Import Coq.btauto.Btauto.
 Require Import SquiggleEq.list.
-    
+
+(** funny behavior of yesPreserved and ⊑ **)
+Quote Recursively Definition p_true := (fun (x:True) => true).
+Definition P_true := Eval cbv in (program_Program p_true).
+
+Quote Recursively Definition p_false := (fun (x:True) => false).
+Definition P_false := Eval cbv in (program_Program p_false).
+
+Lemma foo:
+  yesPreserved P_true P_false.
+Proof.
+  unfold P_true, P_false, yesPreserved, questionHead, QuestionHeadL2Term; cbn.
+  unfold implb. destruct q; reflexivity.
+Qed.
+
+(**  This seems wrong! **)
+Goal P_true ⊑ P_false.
+Proof.
+  unfold P_true, P_false. constructor.
+  - apply foo.
+  - intros. unfold observeNthSubterm, ObsSubtermL2Term. cbn. constructor.
+Qed.
+
+
+Lemma identity_pres_yes:
+  forall (p:Program Term), yesPreserved p p.
+Proof.
+  destruct p. unfold yesPreserved, questionHead, QuestionHeadL2Term; cbn.
+  destruct q.
+  - destruct (fst (flattenApp main)); unfold implb; try reflexivity.
+    btauto.
+  - destruct (fst (flattenApp main)); unfold implb; try reflexivity.
+Qed.
+
+Lemma stripProgram_pres_yes:
+  forall (p:Program L1g.compile.Term), yesPreserved p (stripProgram p).
+Proof.
+  destruct p. unfold stripProgram. cbn.
+  unfold yesPreserved, questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
+  cbn. rewrite flattenAppCommutes.
+  remember (fst (L1g.instances.flattenApp main)) as mm. cbn.
+  destruct mm, q; cbn; try reflexivity.
+  unfold implb. btauto.
+Qed.
+
+Lemma my_stripProgram_pres_yes:
+  forall (main: L1g.compile.Term) (env: environ L1g.compile.Term) stv otv,
+    L1g.wcbvEval.WcbvEval env main stv ->
+    WcbvEval (stripEnv env) (strip main) otv ->
+    yesPreserved {| main := stv; env := env |}
+      {| main := otv; env := stripEnv env |}.
+Proof.
+  intros.
+  pose proof (sac_sound H H0). subst.
+  unfold yesPreserved, questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
+  cbn. rewrite flattenAppCommutes.
+  remember (fst (L1g.instances.flattenApp stv)) as mm. cbn.
+  destruct mm, q; cbn; try reflexivity.
+  unfold implb. btauto.
+Qed.
+
 Lemma compileObsEq:
   forall (main: L1g.compile.Term) (env: environ L1g.compile.Term),
     {| main := main; env := env |} ⊑
@@ -82,20 +142,34 @@ Lemma compileObsEq:
 Proof.
   cofix.
   intros. constructor.
-  - intros q. unfold questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
-    simpl. rewrite flattenAppCommutes.
-    clear.
-    remember (fst (L1g.instances.flattenApp main)) as mm.
-    clear Heqmm. simpl.
-    clear main.
-    destruct mm, q; cbn; try reflexivity.
-    unfold implb.
-    btauto.
+  - set (p:= {| main := main; env := env |}). apply stripProgram_pres_yes.
   - intros ?.
-    unfold observeNthSubterm, ObsSubtermL1gTerm, ObsSubtermL2Term. simpl.
+    unfold observeNthSubterm, ObsSubtermL1gTerm, ObsSubtermL2Term. cbn.
     rewrite flattenAppCommutes.
     destruct (L1g.instances.flattenApp main) as [f args].
-    simpl. clear main.
+    cbn. clear main.
+    destruct f; cbn; try constructor.
+    rewrite nth_error_map.
+    unfold compile.L1gTerm.
+    remember  (List.nth_error args n) as ln.
+    clear Heqln. destruct ln; try constructor.
+    apply compileObsEq.
+Qed.
+Print Assumptions compileObsEq.
+
+Goal
+  forall (main: L1g.compile.Term) (env: environ L1g.compile.Term),
+    {| main := main; env := env |} ⊑
+      stripProgram {| main := main; env := env |}.
+Proof.
+  cofix.
+  intros. constructor.
+  - set (p:= {| main := main; env := env |}). apply stripProgram_pres_yes.
+  - intros ?. 
+    unfold observeNthSubterm, ObsSubtermL1gTerm, ObsSubtermL2Term. cbn.
+    rewrite flattenAppCommutes.
+    destruct (L1g.instances.flattenApp main) as [f args].
+    cbn. clear main.
     destruct f; cbn; try constructor.
     rewrite nth_error_map.
     unfold compile.L1gTerm.
@@ -104,20 +178,20 @@ Proof.
     apply compileObsEq.
 Qed.
 
+
 Global Instance certiL1g_to_L2Correct:
   CerticoqTranslationCorrect certiL1g certiL2.
 Proof.
   split.
   - intros ? ?. cbn. unfold translateT, certiL1g_to_L2. trivial.
-  - unfold obsPreserving. intros s sv _ Hev. cbn.
-    destruct s as [smain senv], sv as [svmain svenv]. cbn in *.
+  - unfold obsPreserving. intros s sv _ Hev.
+    destruct s as [smain senv], sv as [svmain svenv]. cbn.
     destruct Hev as [Hev HevEnv]. subst svenv.
     exists (stripProgram {| main := svmain; env := senv |}).
     split. split.
     + cbn. apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).
     + reflexivity.
-    + clear. apply compileObsEq.
+    + apply compileObsEq.
 Qed.
-
 Print Assumptions certiL1g_to_L2Correct.
 (* Closed under the global context *)

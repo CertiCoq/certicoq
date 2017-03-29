@@ -100,6 +100,9 @@ eapply wAppLam; repeat (try constructor; try omega; try not_isApp).
 change (WcbvEval nil xxxx xxxx).
 Abort.
              
+Axiom converges:
+  forall (p:environ Term) (t:Term), exists tv, WcbvEval p t tv.
+
 
 Lemma WcbvEval_mkApp_nil:
   forall t, WFapp t -> forall p s, WcbvEval p t s ->

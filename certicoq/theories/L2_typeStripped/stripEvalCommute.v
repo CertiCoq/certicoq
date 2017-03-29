@@ -616,7 +616,19 @@ Proof.
 Qed.
 Print Assumptions WcbvEval_hom.
 
-Lemma wcbvEval_hom:
+(** WcbvEval_hom is nice, but it is stronger than necessary to prove 
+*** certiL1g_to_L2Correct (in instances.v).
+**)
+Corollary strip_pres_eval:
+  forall (p:environ L1g.compile.Term) (t tv:L1g.compile.Term),
+    L1g.wcbvEval.WcbvEval p t tv ->
+    exists stv, WcbvEval (stripEnv p) (strip t) stv.
+Proof.
+  intros. exists (strip tv). apply (proj1 (WcbvEval_hom _)).
+  assumption.
+Qed.
+
+Corollary wcbvEval_hom:
   forall p n t t',
     L1g.wcbvEval.wcbvEval p n t = Ret t' ->
     exists m, wcbvEval (stripEnv p) m (strip t) = Ret (strip t').
@@ -628,24 +640,7 @@ Proof.
   destruct j2 as [ny jny].
   exists ny. eapply jny. omega.
 Qed.
-  
-(*****
-Lemma wcbvEval_hom_fail:
-  forall n t p str,
-    L1g.wcbvEval.wcbvEval p n t = Exc str ->
-    forall m, exists str', wcbvEval (stripEnv p) m (strip t) = Exc str'.
-Proof.
-  induction n; cbn; intros.
-  - cbn in H.
-  induction t; cbn; intros.
-  - cbn in H. unfold L1g.wcbvEval.wcbvEval in H.
-  assert (j1:= proj1 (L1g.wcbvEval.wcbvEval_WcbvEval p n) _ _ H).
-  assert (k0:= proj1 (WcbvEval_hom p) _ _ j1).
-  assert (j2:= @WcbvEval_wcbvEval (stripEnv p) (strip t) (strip t') k0).
-  destruct j2 as [ny jny].
-  exists ny. eapply jny. omega.
-Qed.
- *************)
+
 
 Lemma Prf_strip_inv:
   forall s st, TProof st = strip s ->
@@ -849,4 +844,4 @@ Proof.
   intros p t s h1 L2s h2.
   apply (WcbvEval_single_valued h2). apply (sound_and_complete h1).
 Qed. 
-
+Print Assumptions sac_sound.

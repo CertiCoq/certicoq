@@ -93,6 +93,14 @@ with stripDs (ts:L1gDefs) : Defs :=
     | L1g.compile.dcons nm _ t m ds => dcons nm (strip t) m (stripDs ds)
   end.
 
+Lemma TLambda_strip_inv:
+  forall nm bod t, TLambda nm bod = strip t ->
+                   exists bod' ty, t = L1g.compile.TLambda nm ty bod'.
+Proof.
+  induction t; intros; cbn in *; try discriminate. myInjection H.
+  exists t2, t1. reflexivity.
+Qed.
+  
 (************
 Lemma strip_TCast_TCast:
   forall t, ~ L1g.term.isCastProp t ->

@@ -75,7 +75,7 @@ Instance certiL5a_t0_L6:
   fun v =>
     match v with
         | pair venv vt => 
-          let '(cenv, nenv, t) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, L5a.Halt_c vt) in
+          let '(cenv, nenv, t) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
          let '(cenv',nenv', t') :=  closure_conversion_hoist
                                    bogus_cloTag
                                   (shrink_top t)  

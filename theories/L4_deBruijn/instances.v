@@ -34,7 +34,6 @@ Definition question_head (Q : Question) (ie : ienv) (e : L4.expression.exp) :=
   match Q with
   | Abs => match e with
             Lam_e _ _ => true
-          | Fix_e _ _ => true
           | _ => false
           end
   | Cnstr i n =>
@@ -44,13 +43,28 @@ Definition question_head (Q : Question) (ie : ienv) (e : L4.expression.exp) :=
     | _ => false
     end
   end.
-(* FIX!! *)
+
 Global Instance QuestionHeadTermL : QuestionHead (ienv * L4.expression.exp) :=
   fun q t => question_head q (fst t) (snd t).
 
-(* FIX!! *)
+Fixpoint exps_nthopt (n:nat) (xs:exps): option exp :=
+  match n, xs with 
+    | 0%nat, expression.econs h _ => Some h
+    | S n, expression.econs _ t => exps_nthopt n t
+    | _, _ => None
+  end.
+
+Definition observe_nth_subterm n (e : exp) :=
+  match e with
+  | Con_e _ args => exps_nthopt n args
+  | _ => None
+  end.
+
 Global Instance ObsSubtermTermL : ObserveNthSubterm (ienv * L4.expression.exp) :=
-fun n t => None.
+  fun n t => match observe_nth_subterm n (snd t) with
+          | None => None
+          | Some e => Some (fst t, e)
+          end.
 
 Global Instance certiL4: CerticoqLanguage (ienv * L4.expression.exp) := {}.
 
@@ -61,16 +75,19 @@ fun p => Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
 
 Require Import L4.L3_to_L4_correct.
 
-Lemma eval_env e : wf_environ e -> exists e', eval_env (translate_env e) e'.
+Lemma same_args_same_obs n t e t' :
+  same_args same_obs t e = true -> tnth n t = Some t' ->
+  exists e', exps_nthopt n e = Some e' /\ same_obs t' e' = true.
 Proof.
-  induction 1.
-  - exists nil; constructor.
-  - destruct IHwf_environ.
-    simpl.
-    pose proof (L3_to_L4_correct.translate_correct e t).
-    eexists.
-    constructor. apply H2.
-Admitted.
+  clear.
+  revert t e t'; induction n; intros *; simpl.
+  destruct t; simpl; intros; try destruct e; try discriminate.
+  injection H0. intros ->. exists e. now apply andb_prop in H as [Ht' Ha].
+
+  intros Ha Ht. destruct t; destruct e; try discriminate.
+  simpl in Ha. apply andb_prop in Ha as [Hte Ht0].
+  eapply IHn; eauto.
+Qed.
 
 Global Instance certiL3_to_L4_correct :
   CerticoqTranslationCorrect certiL3 certiL4.
@@ -86,17 +103,60 @@ Proof.
     now apply exp_wf_lets.
 
   - red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
-    pose (Crct_wf_environ _ _ H). destruct s, sv. cbn in *.
-    destruct H0. subst env0.
-    pose proof (L3_to_L4_correct.translate_correct env _ _ w H H0).
-    simpl in H1.
-    destruct (eval_env _ w).
-    specialize (H1 _ H2).
-    eexists (inductive_env env, _). split. repeat red. split. simpl.
-    reflexivity.
-    simpl. repeat red. apply H1.
-    { constructor. red. simpl. reflexivity.
-      intros. constructor. }
+    assert(He:=Crct_wf_environ _ _ H).
+    repeat red in H0.
+    destruct s. destruct sv.
+    destruct H0. 
+    pose proof (L3_to_L4_correct.translate_correct' env _ _ _ He H H0 H1). 
+    simpl in H2. unfold certiL3_to_L4. 
+    destruct H2 as [sv' [evsv obs]].
+    eexists (inductive_env env, sv');
+      split. repeat red. split. simpl; auto. simpl.
+    + apply evsv.
+    + simpl in obs. 
+      clear evsv He H1 H0 H. revert main0 sv' obs. clear.
+      apply (TrmTrms_ind (fun (main : Term) => forall (sv' : exp),
+                same_obs main sv' = true ->
+                {| main := main; AstCommon.env := env0 |} ⊑ (inductive_env env, sv'))
+                         (fun ts => forall d i n n0 es, same_args same_obs ts es = true ->
+                 obsLeOp (observeNthSubterm n0 {| main := TConstruct i n ts; AstCommon.env := env0 |})
+                         (observeNthSubterm n0 (inductive_env env, Con_e d es)))
+                          (fun _ => True));
+        try constructor;
+      try (match goal with |- yesPreserved _ _ => intros q; destruct q end);
+      intros; try red; trivial; try constructor.
+      rename H0 into obs.
+      simpl in *; unfold questionHead. simpl.
+      destruct sv'; trivial; intros; simpl in *; try discriminate.
+      destruct d; simpl in *.
+      destruct inductive_dec; simpl; trivial. subst.
+      destruct PeanoNat.Nat.eq_dec; simpl; trivial. subst. simpl.
+      unfold eq_decb in obs. unfold eq_dec in obs. simpl in obs. 
+      destruct inductive_dec; simpl in *; subst; try contradiction || discriminate.
+      destruct PeanoNat.Nat.eq_dec; simpl in *; try discriminate. subst n.
+      rewrite Nnat.N2Nat.id. apply N.eqb_refl.
+
+      destruct sv'; intros; try discriminate.
+      simpl in H0. apply andb_prop in H0.
+      destruct H0 as [_ obs]. now apply H.
+
+      destruct es; simpl in *.
+      unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
+      simpl. 
+      unfold instances.observe_nth_subterm. simpl. destruct n0; simpl; constructor.
+      discriminate.
+
+      unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
+      unfold instances.observe_nth_subterm.
+      simpl. 
+      destruct es; simpl in H1; try discriminate.
+      apply andb_prop in H1 as [Ht Ht0].
+      destruct n0; simpl.
+      constructor. apply (H _ Ht).
+
+      specialize (H0 d i n n0 es Ht0).
+      unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL in *.
+      unfold instances.observe_nth_subterm in *. simpl in H0. apply H0.
 Qed.
 
 
@@ -194,6 +254,7 @@ Definition oldTranslation : (cTerm certiL4_5) -> (cTerm certiL5):=
   (fun x => (fst x, (cps_cvt (snd x)))).
 
 Require Import SquiggleEq.tactics.
+Require Import ExtLib.Data.ListNth.
 
 (* Move to L4_5_to_L5 *)
 Hint Unfold isprogram : eval.
@@ -213,7 +274,7 @@ Proof using.
   + unfold yesPreserved, questionHead, QuestionHeadTermL45, QuestionHeadTermL5; cbn.
     destruct q; auto. unfold implb. btauto.
   + clear H. rename H0 into Hind. intros ?. cbn. repeat rewrite List.map_map.
-    repeat rewrite  list.nth_error_map.
+    repeat rewrite nth_error_map.
     remember (List.nth_error es n) as esso.
     destruct esso as [ess | ]; try constructor.
     simpl. apply Hind.

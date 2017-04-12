@@ -545,14 +545,14 @@ Lemma stripAppApp_notCnstr:
     strip (L2_5.compile.TApp y0 y1 y2) = TApp fn s -> isL2_5Cnstr y0 = None.
 Proof.
   induction y0; intros; cbn; try reflexivity.
-  - cbn in H. case_eq (isL2_5Cnstr y0); intros; try reflexivity.
+  - simpl in H. case_eq (isL2_5Cnstr y0); intros; try reflexivity.
     destruct p, p. rewrite H0 in H.
     destruct (@etaExp_cnstr_Lam_or_Cnstr
                 i n0 (n - S (tlength (strips y2)))
                 (tcons (strip y1) (strips y2))).
     + destruct H1 as [x0 j]. rewrite j in H. discriminate.
     + destruct H1 as [x0 j]. rewrite j in H. discriminate.
-  - cbn in H.
+  - simpl in H.
     destruct (@etaExp_cnstr_Lam_or_Cnstr
                 i n (n0 - S (tlength (strips y2)))
                 (tcons (strip y1) (strips y2))).

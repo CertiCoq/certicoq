@@ -36,6 +36,38 @@ Ltac case_call f :=
 
 Ltac equaln := repeat (f_equal; try lia); auto.
 
+(* Observations *)
+Require Import Bool.
+
+Definition eq_decb {A} `{Eq A} (x y : A) : bool :=
+  match eq_dec x y with left _ => true | right _ => false end.
+
+Lemma eq_decb_refl {A} `{Eq A} (x : A) : eq_decb x x = true.
+Proof.
+  unfold eq_decb. destruct eq_dec; trivial. elim n; reflexivity.
+Qed.
+
+Section same_args.
+  Variable f : Term -> exp -> bool.
+
+  Fixpoint same_args (a : Terms) (a' : exps) :=
+    match a, a' with
+    | tnil, enil => true
+    | tcons t ts, econs e es => f t e && same_args ts es
+    | _, _ => false 
+    end.
+End same_args.
+
+Fixpoint same_obs (t : Term) (v : exp) :=
+  match t, v with
+  | TConstruct i n args, Con_e dc args' =>
+    (eq_decb i (fst dc)) && (eq_decb n (N.to_nat (snd dc))) && same_args same_obs args args'
+  | TConstruct _ _ _, _ => false
+  | TLambda _ _, Lam_e _ _ => true
+  | TLambda _ _, _ => false
+  | _, _ => true 
+  end.
+
 (** Should be true in L3 *)
 Lemma wftrm_fix dts m t n :
   L3t.WFTrm (TFix dts m) n ->
@@ -119,7 +151,7 @@ Proof.
   intros.
   dependent induction H1.
   - admit.
-  - apply (IHWcbvEval H). admit.
+  - admit.
   - admit.
   - admit.
   - admit.
@@ -139,7 +171,7 @@ Proof.
   intros wfe Het. revert wfe. red in Het.
   dependent induction Het; intros wfe.
   inversion_clear wfe; eauto. 
-  apply IHHet. now inversion_clear wfe.
+  apply IHHet; now inversion_clear wfe.
 Qed.
 
 Inductive wf_tr_pre_environ : list (string * exp) -> Prop :=
@@ -912,7 +944,7 @@ Proof.
 
   (* Var *)
   - intros n k k' wfn kk'. inv wfn.
-    rewrite L3.term.instantiate_equation.
+    unfold instantiate.
     rewrite nat_compare_equiv.
     unfold nat_compare_alt.
     destruct (lt_eq_lt_dec k' n) as [[Hlt|Heq]|Hgt]; try lia.
@@ -932,14 +964,14 @@ Proof.
   - (* Lambda *)
     intros n t Ht k k' wft kk'.
     assert ((1 + N.of_nat k) = N.of_nat (S k)) by lia.
-    rewrite L3.term.instantiate_equation. simpl.
+    rewrite instantiate_TLambda. simpl.
     rewrite H, Ht. simpl. f_equal. repeat (f_equal; try lia).
     inv wft. auto. lia.
     
   - (* LetIn *)
     intros s dfn IHdfn bod IHbod k k' wfbod kk'.
     inv wfbod.
-    rewrite L3.term.instantiate_equation; simpl.
+    cbn.
     f_equal. rewrite IHdfn; auto.
     assert(N.of_nat (S k) = 1 + N.of_nat k) by lia.
     specialize (IHbod (S k)).
@@ -948,12 +980,11 @@ Proof.
 
   - (* Application *)
     intros t IHt fn IHfn k k' wft kk'. inv wft.
-    rewrite L3.term.instantiate_equation; simpl.
-    repeat (f_equal; rewrite_hyps; try lia; eauto).
+    cbn. repeat (f_equal; rewrite_hyps; try lia; eauto).
 
   - (* Const *)
     intros nm k k' wft kk'. inv wft.
-    rewrite L3.term.instantiate_equation; simpl.
+    cbn. 
     destruct lt_dec. lia.
     simpl. assert(exists t, LookupEnv nm e t). admit. (*WFtrm environment *)
     destruct H as [t Ht].
@@ -962,18 +993,18 @@ Proof.
 
   - (* Constructor *)
     intros i m (* arty *) args IHargs k k' wft kk'. inv wft.
-    rewrite L3.term.instantiate_equation; simpl.
+    cbn.
     f_equal. destruct (IHargs k k'  H3  kk'); auto.
     
   - (* Match *)
     intros. inv H1. destruct (H0 k k' H8 H2).
-    rewrite L3.term.instantiate_equation; simpl; intuition.
+    cbn; intuition.
     rewrite_hyps; f_equal; simpl; eauto.
 
   - (* Fix *)
     intros defs IHdefs n k k' wft kk'. inv wft.
     specialize (IHdefs (k + dlength defs)%nat).
-    rewrite L3.term.instantiate_equation; simpl; intuition.
+    rewrite instantiate_TFix.
     assert (k' + dlength defs <= k + dlength defs)%nat by lia.
     specialize (IHdefs (k' + dlength defs)%nat H2 H).
     f_equal; simpl; eauto.
@@ -987,7 +1018,7 @@ Proof.
 
   - intros t IHt ts IHts k k' wft kk'. inv wft.
     specialize (IHt k k' H1 kk'). specialize (IHts k k' H3 kk').
-    rewrite L3.term.instantiates_equation.
+    rewrite instantiates_tcons.
     simpl. now rewrite IHt, IHts.
     
   - tauto.
@@ -995,7 +1026,7 @@ Proof.
   - intros n t IHt ann ts IHts k k' wft kk'. inv wft. 
     specialize (IHt k k' H4 kk'). specialize (IHts k k' H5 kk').
     destruct IHts as [IHts IHbrs].
-    rewrite L3.term.instantiateDefs_equation.
+    cbn. repeat fold (instantiate a k' t).
     simpl. rewrite IHt. split; equaln.
     intros i l.
 
@@ -1310,7 +1341,7 @@ Lemma L3sbst_fix_preserves_lam dts nm bod :
 Proof.
   revert nm bod; induction (list_to_zero (dlength dts)); simpl; intros.
   reflexivity.
-  simpl. setoid_rewrite L3.term.instantiate_equation at 2.
+  simpl. rewrite L3.term.instantiate_TLambda. 
   simpl. rewrite IHl. reflexivity.
 Qed.
 
@@ -2199,18 +2230,15 @@ Proof.
   rewrite H0. inv H. eauto.
 Qed.
 
-Theorem translate_correct (e : environ Term) (t t' : Term) :
+Theorem translate_correct_subst (e : environ Term) (t t' : Term) :
   wf_environ e -> Crct e 0 t ->
-  L3eval.WcbvEval e t t' -> (* big step non-deterministic *)
+  L3eval.WcbvEval e t t' -> 
   let e' := translate_env e in
   forall e'', eval_env e' e'' ->
-  eval (mkLets e' (translate e' t)) (subst_env e'' (translate e' t')).
-  (* big-step deterministic *)
+  eval (subst_env e'' (translate e'' t)) (subst_env e'' (translate e'' t')).
 Proof with eauto.
   cbn. intros wfe crctt H e'' evenv.
   assert(wfe'':=wf_environ_tr _ _ wfe evenv).
-  eapply eval_lets... 
-  rewrite !(translate_env_eval _ _ _ evenv).
   revert t t' H crctt.
   assert ((forall t t' : Term,
    L3eval.WcbvEval e t t' ->
@@ -2531,3 +2559,75 @@ Ind Case or Wrong. How can we prove it isn't?? *)
   (** Generalized goal *)
   + tauto.
 Admitted.
+
+Lemma WcbvEval_env_eval_env e e' :
+  wf_environ e -> L3eval.WcbvEval_env e e' -> exists e'', eval_env (translate_env e) e''.
+Proof.
+  induction 2.
+  - exists nil; constructor.
+  - inv H. destruct (IHWcbvEval_env H6) as [e'' Hev].
+    simpl. 
+    exists ((nm, subst_env e'' (translate (translate_env e) t')) :: e'').
+    constructor; auto.
+    pose proof (translate_correct_subst e t t' H6 H5 H1 _ Hev).
+    now rewrite !(translate_env_eval _ _ _ Hev).
+  - inv H.
+    destruct (IHWcbvEval_env H3) as [e'' Hev].
+    simpl.
+    now exists e''.
+Qed.
+
+Theorem translate_correct (e : environ Term) (t t' : Term) :
+  wf_environ e -> Crct e 0 t ->
+  L3eval.WcbvEval e t t' -> (* big step non-deterministic *)
+  let e' := translate_env e in
+  forall e'', eval_env e' e'' ->
+  eval (mkLets e' (translate e' t)) (subst_env e'' (translate e' t')).
+  (* big-step deterministic *)
+Proof with eauto.
+  cbn. intros wfe crctt H e'' evenv.
+  assert(wfe'':=wf_environ_tr _ _ wfe evenv).
+  eapply eval_lets...
+  rewrite !(translate_env_eval _ _ _ evenv).
+  eapply translate_correct_subst; eauto.
+Qed.
+
+Lemma obs_prevervation t e :
+  same_obs t (subst_env e (translate e t)) = true.
+Proof.
+  revert t.
+  eapply (@TrmTrms_ind
+  (fun t : Term => same_obs t (subst_env e (translate e t)) = true)
+  (fun ts => same_args same_obs ts
+                    (map_terms (fun x : L3t.Term => subst_env_aux e 0 (trans e 0 x)) ts) = true)
+  (fun ds => True)); simpl; auto.
+
+  - intros.
+    unfold translate, subst_env.
+    simpl. rewrite subst_env_aux_lam. reflexivity.
+
+  - intros.
+    unfold translate, subst_env.
+    rewrite subst_env_aux_constructor.
+    intuition trivial. simpl.
+    now rewrite Nnat.Nat2N.id; repeat rewrite eq_decb_refl; simpl.
+  - intros. unfold translate, subst_env in H. rewrite H. now simpl.
+Qed.
+
+Theorem translate_correct' (e e' : environ Term) (t t' : Term) :
+  wf_environ e -> Crct e 0 t ->
+  L3eval.WcbvEval_env e e' ->
+  L3eval.WcbvEval e t t' -> (* big step non-deterministic *)
+  exists v,
+    eval (mkLets (translate_env e) (translate (translate_env e) t)) v /\
+    same_obs t' v = true.
+Proof with eauto.
+  cbn. intros wfe crctt He H.
+  destruct (WcbvEval_env_eval_env _ _ wfe He) as [e'' evenv].
+  assert(wfe'':=wf_environ_tr _ _ wfe evenv).
+  econstructor. split. eapply eval_lets...
+  rewrite !(translate_env_eval _ _ _ evenv).
+  eapply translate_correct_subst; eauto.
+
+  apply obs_prevervation.
+Qed.

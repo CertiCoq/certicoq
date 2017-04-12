@@ -76,6 +76,15 @@ Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
      with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
 Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
 
+Inductive WcbvEval_env : environ Term -> environ Term -> Prop :=
+| WcbvEval_env_nil : WcbvEval_env nil nil
+| WcbvEval_env_trm nm e e' t t' :
+    WcbvEval_env e e' ->
+    WcbvEval e t t' -> WcbvEval_env ((nm, ecTrm t) :: e) ((nm, ecTrm t') :: e')
+| WcbvEval_env_typ nm e e' n t :
+    WcbvEval_env e e' ->
+    WcbvEval_env ((nm, ecTyp _ n t) :: e) ((nm, ecTyp _ n t) :: e').
+
 (** when reduction stops **)
 Definition no_Wcbv_step (p:environ Term) (t:Term) : Prop :=
   no_step (WcbvEval p) t.
@@ -493,7 +502,7 @@ Proof.
     destruct emch; try rewrite H0; try reflexivity; try omega.
     elim n. auto.
   - destruct H; destruct H0. exists (S (max x x0)). intros m h.
-    assert (l:= max_fst x x0). assert (l2:= max_snd x x0). cbn.
+    assert (l:= max_fst x x0). assert (l2:= max_snd x x0). simpl.
     rewrite (j m (max x x0)); try omega. rewrite H; try omega.
     rewrite H0. reflexivity. omega.
 Qed.

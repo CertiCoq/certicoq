@@ -1128,7 +1128,8 @@ Proof using.
   reflexivity.
 Qed.
 
-
+Tactic Notation "inverts" hyp(H) :=
+  inverts keep H; try clear H.
 
 Local Opaque remove_nvars.
 Lemma substKlam_cTrivial2 : forall x xx (b t : CTerm),
@@ -1145,12 +1146,12 @@ Proof using.
     reflexivity.
   - unfold KLam_c. do 3 f_equal.
     apply ssubst_aux_trivial_disj.
-    intros ? ? Hin. simpl in *. in_reasoning; inverts Hin.
+    intros ? ? Hin. simpl in *. in_reasoning. inverts Hin.
     unfold closed in Hb. simpl in Hb.
     autorewrite with core list in Hb.
     rewrite nil_remove_nvars_iff in Hb.
     eauto.
-    firstorder.
+    firstorder. auto.
 Qed.
 
 Local Opaque memvar.

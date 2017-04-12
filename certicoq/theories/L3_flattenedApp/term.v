@@ -997,7 +997,7 @@ Proof.
   - cbn. apply f_equal2. apply H. omega. apply H0. omega.
   - cbn. apply f_equal. apply H. omega.
   - cbn. apply f_equal2. apply H. omega. apply H0. omega.
-  - cbn. apply f_equal2; try omega.
+  - simpl. apply f_equal2; try omega.
     assert (j: dlength d = dlength (liftDs (k + dlength d) d)).
     { rewrite liftDs_pres_dlength. reflexivity. }
     assert (j0: dlength d = dlength (liftDs (i + dlength d) d)).

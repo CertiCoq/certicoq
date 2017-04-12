@@ -43,7 +43,7 @@ Context (Src Dst: Type)
      If really needed, one can always use sum types to combine the term and value types.*)
           `{QuestionHead Src} `{ObserveNthSubterm Src}
    `{QuestionHead Dst} `{ObserveNthSubterm Dst}
-   `{BigStepOpSem Src} `{BigStepOpSem Dst}.
+   `{BigStepOpSem Src} `{BigStepOpSem Dst} `{GoodTerm Src}.
 
 (* Because we may need to compute in subterms before obseving them, this definition
 bakes in computations. *)
@@ -74,7 +74,7 @@ CoInductive compObsLeLink : Src -> Dst -> Prop :=
               d ⇓ dv /\
               yesPreserved sv dv
               /\ (forall n:nat, compObsLeOpLink (observeNthSubterm n sv) (observeNthSubterm n dv))
-              /\ (questionHead  Abs sv = true -> forall svArg,
+              /\ (questionHead  Abs sv = true -> forall svArg, goodTerm svArg ->
                     compObsLeOpLink
                       (Some (mkApp sv svArg))
                       (exception_option (mkAppEx dv (translate Src Dst svArg))))
@@ -87,7 +87,6 @@ with compObsLeOpLink : option Src -> option Dst -> Prop :=
 | obsNoneLink : forall d, compObsLeOpLink None d.
 
 
-Context `{GoodTerm Src}.
 Definition compObsPreserving :=
    ∀ (s:Src),
     goodTerm s 
@@ -210,7 +209,9 @@ Context (Src Inter Dst : Type)
 
 Notation "s ⊑ t" := (compObsLeLink _ _ s t) (at level 65).
 
-Lemma compObsLeLinkTransitive  :
+Lemma compObsLeLinkTransitive
+      {Hgpsi : goodPreserving Src Inter}
+      {Hgpid : goodPreserving Inter Dst}:
    forall   (s : Src) (i : Inter) (d : Dst),
   s ⊑ i
   -> i ⊑ d 
@@ -230,7 +231,7 @@ Proof.
   destruct Hcd as [Hyesd Hsubd].
   exists dv. split;[ assumption|].
   assert (forall (A B: Prop), A -> (A-> B) -> A/\B) as Hp by (intros; tauto).
-  apply Hp;[|intros Hyessd; split].
+  apply Hp;[|intros Hyessd; split]; clear Hp.
 - clear Hsubi Hsubd.
   unfold yesPreserved in *. intros q.
   specialize (Hyesi q).
@@ -249,18 +250,19 @@ Proof.
 - intros Habs.
   apply proj2 in Hsubi.
   apply proj2 in Hsubd.
-  intros ?.
-  specialize (Hsubi Habs svArg).
+  intros ? Hgsv.
+  specialize (Hsubi Habs svArg Hgsv).
   unfold yesPreserved in Hyesi.
   specialize (Hyesi Abs).
   rewrite Habs in Hyesi.
   simpl in Hyesi.
   specialize (Hsubd Hyesi).
   inverts Hsubi as Hsub Heq.
+  apply Hgpsi in Hgsv.
   unfold composeTranslation, translate in *.
   destruct (t1 svArg) as [| ivArg];[inverts Heq|].
   simpl in *. inverts Heq.
-  specialize (Hsubd ivArg).
+  specialize (Hsubd ivArg Hgsv).
   inverts Hsubd as Hsubd Heq.
   destruct (t2 ivArg) as [|dvArg ];[inverts Heq|].
   simpl in *. inverts Heq.
@@ -291,6 +293,7 @@ Proof.
   constructor.
   inverts Heqi.
   eapply compObsLeLinkTransitive; eauto.
+  Unshelve. eauto. eauto.
 Qed.
 
 

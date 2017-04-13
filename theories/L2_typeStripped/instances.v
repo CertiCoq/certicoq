@@ -6,7 +6,7 @@ Require Import Common.Common.
 Require Import L1g.instances.
 Require Import certiClasses2.
 Require Import L2.stripEvalCommute.
-
+Require Import ExtLib.Data.ListNth.
 
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)

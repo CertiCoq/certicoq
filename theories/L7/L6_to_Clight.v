@@ -459,7 +459,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positiv
         ret (asgn ; 
                call ([funTy] (var x)))
   | Eprim x p vs e => None
-  | Ehalt x => ret (Sreturn (Some (var x)))
+  | Ehalt x => ret (Sreturn None)
   end.
 
 Definition mkFun (vs : list positive) (body : statement) : function :=

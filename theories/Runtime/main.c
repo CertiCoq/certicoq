@@ -44,9 +44,7 @@ void maincont_code(void) {
 value maincont[2] = {(value)maincont_code, 0};
 
 int main(int argc, char *argv[]) {
-  value x = body();
-  args[0]=0;
-  args[1]=(value)maincont;
-  ((void (*)(void))(((value *)x)[0]))();
+  body();
+  maincont_code();
   return 0;
 }

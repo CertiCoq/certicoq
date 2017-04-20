@@ -13,7 +13,7 @@ struct space {
    or start <= next <= limit.  The words in start..next  are allocated
    and initialized, and the words from next..limit are available to allocate. */
 
-#define MAX_SPACES 10  /* how many generations */
+#define MAX_SPACES 12  /* how many generations */
 
 #ifndef RATIO
 #define RATIO 2   /* size of generation i+1 / size of generation i */
@@ -163,8 +163,10 @@ void forward_roots (value *from_start,  /* beginning of from-space */
    n = fi[1];
    args = ti->args;
   
-  for(i = 0; i < n; i++)
-    forward(from_start, from_limit, next, args+roots[i], DEPTH);
+   for(i = 0; i < n; i++) {
+     assert (roots[i] < MAX_ARGS);
+     forward(from_start, from_limit, next, args+roots[i], DEPTH);
+   }
 }  
 
 #define No_scan_tag 251
@@ -266,6 +268,21 @@ struct heap *create_heap()
   return h;
 }
 
+struct thread_info *make_tinfo(void) {
+  struct heap *h;
+  struct thread_info *tinfo;
+  h = create_heap();
+  tinfo = (struct thread_info *)malloc(sizeof(struct thread_info));
+  if (!tinfo) {
+    fprintf(stderr, "Could not allocate thread_info struct\n");
+    exit(1);
+  }
+  tinfo->heap=h;
+  tinfo->alloc=h->spaces[0].start;
+  tinfo->limit=h->spaces[0].limit;
+  return tinfo;
+}
+
 void resume(fun_info fi, struct thread_info *ti)
 /* When the garbage collector is all done, it does not "return"
    to the mutator; instead, it uses this function (which does not return)
@@ -282,8 +299,8 @@ void resume(fun_info fi, struct thread_info *ti)
   hi = h->spaces[0].limit;
   if (hi-lo < num_allocs)
     abort_with ("Nursery is too small for function's num_allocs\n");
-  *ti->alloc = lo;
-  *ti->limit = hi;
+  ti->alloc = lo;
+  ti->limit = hi;
 }  
 
 void garbage_collect(fun_info fi, struct thread_info *ti)
@@ -298,8 +315,8 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
     return;
   } else {
     int i;
-    assert (h->spaces[0].limit == *ti->limit);
-    h->spaces[0].next = *ti->alloc; /* this line is probably unnecessary */
+    assert (h->spaces[0].limit == ti->limit);
+    h->spaces[0].next = ti->alloc; /* this line is probably unnecessary */
     for (i=0; i<MAX_SPACES-1; i++) {
       /* Starting with the youngest generation, collect each generation
          into the next-older generation.  Usually, when doing that,

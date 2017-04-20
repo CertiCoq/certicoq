@@ -96,31 +96,16 @@ typedef const uintnat *fun_info;
 
 struct heap;     /* abstract, opaque */
 
+#define MAX_ARGS 1024
+
 struct thread_info {
-  value *args;   /* Where is the args array */
-  int argc;      /* How many slots in the args array */
-  value **alloc; /* pointer to the alloc pointer  */
-  value **limit; /* pointer to the limit pointer */
+  value *alloc; /* alloc pointer  */
+  value *limit; /* limit pointer */
   struct heap *heap;  /* Description of the generations in the heap */
+  value args[MAX_ARGS];   /* the args array */
 };
 
-/* The "heap" field should be initialized to NULL by the mutator;
-  the garbage collector will fill it in at the first call to
-  garbage_collect().
-
-  Note that BOTH of these structures can be fully populated
-  statically (at link time) by the mutator, as none rely on
-  dynamic (run time) values.  (Except "heap", which will be NULL
-  at link time.)
-
-  Example of a link-time mutator-created thread_info:
-value my_args[987];
-value bogus[1];
-value *my_start=bogus;
-value *my_limit=bogus;
-struct thread_info my_thread_info = 
-    {my_args, 987, &my_start, &my_limit, NULL};
-*/
+struct thread_info *make_tinfo(void);
 
 void garbage_collect(fun_info fi, struct thread_info *ti);
 /* Performs one garbage collection; 

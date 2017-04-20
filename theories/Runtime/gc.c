@@ -21,7 +21,7 @@ struct space {
 #endif
 
 #ifndef NURSERY_SIZE
-#define NURSERY_SIZE ((1<<20)/sizeof(value))  /* 1 megabyte */
+#define NURSERY_SIZE (1<<16)
 #endif
 /* The size of generation 0 (the "nursery") should approximately match the 
    size of the level-2 cache of the machine, according to:
@@ -33,8 +33,8 @@ struct space {
      (which is the size of the Intel Core i7 per-core L2 cache).
     http://www.tomshardware.com/reviews/Intel-i7-nehalem-cpu,2041-10.html
     https://en.wikipedia.org/wiki/Nehalem_(microarchitecture)
-  Notwithstanding those results, empirical measurements show that 
-   1 or 2 megabytes works fastest.
+   Empirical measurements show that 64k works well 
+    (or anything in the range from 32k to 128k).
 */
 
 #ifndef DEPTH
@@ -204,7 +204,7 @@ void do_generation (struct space *from,  /* descriptor of from-space */
 {  value *p = to->next;
   assert(from->next-from->start <= to->limit-to->next);
   forward_roots(from->start, from->limit, &to->next, fi, ti);
-  do_scan(from->start, from->limit, to->start, &to->next);
+  do_scan(from->start, from->limit, p, &to->next);
   if(0)  fprintf(stderr,"%5.3f%% occupancy\n",
 	  (to->next-p)/(double)(from->next-from->start));
   from->next=from->start;

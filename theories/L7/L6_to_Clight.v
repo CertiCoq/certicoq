@@ -39,7 +39,7 @@ Variable (threadInfIdent : ident).
 Variable (tinfIdent : ident).
 Variable (heapInfIdent : ident).
 Variable (numArgsIdent : ident).
-
+Definition maxArgs := 1024%Z.
 (* temporary function to get something working *)
 Fixpoint makeArgList' (vs : list positive) : list N :=
   match vs with
@@ -233,7 +233,15 @@ Definition make_cRep (cenv : cEnv) (ct : cTag) : option cRep :=
            ret (boxed n' a)
       end.
 
-Notation funTy := (Tfunction Tnil Tvoid
+Notation threadInf := (Tpointer (Tstruct threadInfIdent noattr) noattr).
+
+Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid
+                            {|
+                              cc_vararg := false;
+                              cc_unproto := false;
+                              cc_structret := false |}).
+
+Notation gcTy := (Tfunction (Tcons (Tpointer (Tint I32 Unsigned noattr) noattr) (Tcons threadInf Tnil)) Tvoid
                             {|
                               cc_vararg := false;
                               cc_unproto := false;
@@ -262,12 +270,14 @@ Notation "'var' x" := (Etempvar x val) (at level 20).
 Notation "'ptrVar' x" := (Etempvar x valPtr) (at level 20).
 Notation "'funVar' x" := (Evar x funTy) (at level 20).
 
-Notation allocPtr := (Evar allocIdent valPtr).
-Notation limitPtr := (Evar limitIdent valPtr).
-Notation args := (Evar argsIdent valPtr).
-Notation gc := (Evar gcIdent funTy).
-Notation threadInf := (Tstruct threadInfIdent noattr).
+Notation allocPtr := (Etempvar allocIdent valPtr).
+Notation limitPtr := (Etempvar limitIdent valPtr).
+Notation args := (Etempvar argsIdent valPtr).
+Notation gc := (Evar gcIdent gcTy).
+
 Notation tinf := (Evar tinfIdent threadInf).
+Notation tinfd := (Ederef tinf threadInf).
+
 Notation heapInf := (Tstruct heapInfIdent noattr).
 
 Definition add (a b : expr) := Ebinop Oadd a b valPtr.
@@ -298,7 +308,7 @@ Notation c_int := c_int'.
 Notation "'while(' a ')' '{' b '}'" :=
   (Swhile a b) (at level 60).
 
-Notation "'call' f " := (Scall None f nil) (at level 35).
+Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
@@ -312,7 +322,7 @@ Definition reserve (funInf : positive) (l : Z) : statement :=
   let arr := (Evar funInf (Tarray uintTy l noattr)) in
   Sifthenelse
     (!(Ebinop Ole (allocPtr +' (Ederef arr uintTy)) limitPtr type_bool))
-    (Scall None gc (arr :: (Eaddrof tinf (Tpointer threadInf noattr)) :: nil))
+    (Scall None gc (arr :: tinf :: nil))
     Sskip.
      
 Fixpoint makeTagZ (cenv : cEnv) (ct : cTag) : option Z :=
@@ -383,22 +393,32 @@ Fixpoint asgnFunVars (vs : list positive) (ind : list N) :
     end
   end.
 
-Fixpoint asgnAppVars (vs : list positive) (ind : list N) :
+
+       
+Fixpoint asgnAppVars' (vs : list positive) (ind : list N) :
   option statement := 
   match vs with
   | nil =>
     match ind with
-    | nil => ret Sskip
+    | nil => ret (Efield tinfd allocIdent valPtr  :::= allocPtr)
     | cons _ _ => None
     end
   | cons v vs' =>
     match ind with
     | nil => None
     | cons i ind' =>             
-      rest <- asgnAppVars vs' ind' ;;
+      rest <- asgnAppVars' vs' ind' ;;
            ret (args[ Z.of_N i ] :::= (var v) ;
                rest)
     end
+  end.
+
+(* Optional, reduce register pressure *)
+Definition asgnAppVars vs ind :=
+  match asgnAppVars' vs ind with
+    | Some s =>
+     ret (argsIdent ::= Efield tinfd argsIdent valPtr;s)
+    | None => None 
   end.
 
 Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : option statement :=
@@ -465,8 +485,8 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positiv
 Definition mkFun (vs : list positive) (body : statement) : function :=
   mkfunction Tvoid
              cc_default
-             nil
-             (map (fun x => (x , val)) vs)
+             ((tinfIdent , threadInf) :: nil)
+             ((map (fun x => (x , val)) vs)++(allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
              nil
              body.
 
@@ -481,7 +501,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.
       match translate_body e fenv cenv map with
       | None => None
       | Some body =>
-         let localVars := vs ++ (get_allocs e) in
+         let localVars := vs ++ (get_allocs e) in  (* ADD ALLOC ETC>>> HERE *)
          match M.get t fenv with
          | None => None
          | Some inf =>
@@ -494,10 +514,13 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.
                   | Some gcArrIdent =>
                          ret ((f , Gfun (Internal
                                            (mkFun localVars
-                                                  ((reserve gcArrIdent
-                                                            (Z.of_N (l + 2))) ;
-                                                     asgn ;
-                                                     body)))) :: rest)
+                                                  ((allocIdent ::= Efield tinfd allocIdent valPtr ;
+                                                    limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                                    argsIdent ::= Efield tinfd argsIdent valPtr ;
+                                                    (reserve gcArrIdent
+                                                            (Z.of_N (l + 2)))) ;
+                                                    asgn ;
+                                                    body)))) :: rest)
                   end
              end
          end
@@ -510,17 +533,20 @@ Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv : cEnv) (m : M.t positive)
   match e with
   | Efun fnd e =>                      (* currently assuming e is main *)
     funs <- translate_fundefs fnd fenv cenv m ;; 
-         let localVars := get_allocs e in
+         let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
          body <- translate_body e fenv cenv m ;;
               gcArrIdent <- M.get mainIdent m ;;
               ret ((bodyIdent , Gfun (Internal
-                                        (mkfunction val
+                                        (mkfunction Tvoid
                                                     cc_default
+                                                    ((tinfIdent, threadInf)::nil)
+                                                    ((map (fun x => (x , val)) localVars) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
                                                     nil
-                                                    (map (fun x => (x , val)) localVars)
-                                                    nil
-                                                    (reserve gcArrIdent 2%Z ;
-                                                       body))))
+                                                    ( allocIdent ::= Efield tinfd allocIdent valPtr ;
+                                                      limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                                      argsIdent ::= Efield tinfd argsIdent valPtr ;
+                                                      reserve gcArrIdent 2%Z ;
+                                                      body))))
                      :: funs)
   | _ => None
   end.
@@ -604,15 +630,16 @@ Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name)
 
 Definition global_defs (e : exp)
   : list (positive * globdef Clight.fundef type) :=
-  let maxArgs := (Z.of_nat (max_args e)) in
+(*  let maxArgs := (Z.of_nat (max_args e)) in
   (allocIdent, Gvar (mkglobvar valPtr ((Init_int32 (Int.zero)) :: nil) false false))
     :: (limitIdent , Gvar (mkglobvar valPtr  ((Init_int32 (Int.zero)) :: nil) false false))
     :: (argsIdent , Gvar (mkglobvar (Tarray val maxArgs noattr)
                                     ((Init_int32 (Int.zero)) :: nil)
                                     false false))
-    :: (gcIdent , Gfun (External (EF_external "gc"
+    :: *)
+    (gcIdent , Gfun (External (EF_external "gc"
                                               (mksignature (Tany32 :: nil) None cc_default))
-                                 (Tcons (Tpointer (Tint I32 Unsigned noattr) noattr) (Tcons (Tpointer threadInf noattr) Tnil))
+                                 (Tcons (Tpointer (Tint I32 Unsigned noattr) noattr) (Tcons threadInf Tnil))
                                  Tvoid
                                  cc_default
        ))
@@ -630,15 +657,7 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) (nenv : M.t Ast.name)
                let fun_defs := rev fun_defs' in
                ret (Some (nenv',
                           ((((global_defs e)
-                               ++ ((tinfIdent , Gvar (
-                                                    mkglobvar
-                                                      threadInf
-                                                      ((Init_addrof argsIdent Int.zero)
-                                                         :: (Init_int32 (Int.repr ((Z.of_nat (max_args e)))))
-                                                         :: (Init_addrof allocIdent Int.zero)
-                                                         :: (Init_addrof limitIdent Int.zero) :: nil)
-                                                      false false
-                                   )) :: nil) ++ fun_inf ++ fun_defs))))) 
+                               ++ fun_inf ++ fun_defs))))) 
              end
            | None => ret None
            end.
@@ -648,11 +667,11 @@ Require Import Clightdefs.
 Print members.
 
 Definition composites : list composite_definition :=
-(Composite threadInfIdent Struct
-   ((argsIdent, tptr valPtr) :: (numArgsIdent, tint) :: (allocIdent, tptr valPtr) ::
-    (limitIdent, tptr valPtr) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
-    nil)
-   noattr :: nil).
+ (Composite threadInfIdent Struct
+   ((allocIdent, valPtr) ::
+                         (limitIdent, valPtr) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
+                         (argsIdent, (Tarray uintTy maxArgs noattr))::nil)
+   noattr ::  nil).
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
            (main : ident) : option Clight.program :=

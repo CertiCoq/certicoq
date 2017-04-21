@@ -109,7 +109,7 @@ void abort_with(char *s) {
    somewhere into the "from-space" defined by from_start and from_limit */
 
 #define getcolor(hd) (((hd)>>8)&3)
-#define setcolor(hd,c) (hd|(c<<8))
+#define setcolor(hd,c) ((hd&(~(3<<8)))|(c<<8))
 
 void forward (value *from_start,  /* beginning of from-space */
 	      value *from_limit,  /* end of from-space */
@@ -209,7 +209,6 @@ void do_generation (struct space *from,  /* descriptor of from-space */
 /* Copy the live objects out of the "from" space, into the "to" space,
    using fi and ti to determine the roots of liveness. */
 {  value *p = to->next;
-  assert(from->next-from->start <= to->limit-to->next);
   forward_roots(from->start, from->limit, &to->next, fi, ti);
   do_scan(from->start, from->limit, p, &to->next);
   if(0)  fprintf(stderr,"%5.3f%% occupancy\n",
@@ -301,7 +300,7 @@ void resume(fun_info fi, struct thread_info *ti)
   value *lo, *hi;
   uintnat num_allocs = fi[0];
   assert (h);
-  lo = h->spaces[0].start;
+  lo = h->spaces[0].next;
   hi = h->spaces[0].limit;
   if (hi-lo < num_allocs)
     abort_with ("Nursery is too small for function's num_allocs\n");
@@ -309,10 +308,68 @@ void resume(fun_info fi, struct thread_info *ti)
   ti->limit = hi;
 }  
 
+int is_in_heap(struct heap *h, value v) {
+  int i;
+  if (Is_block(v)) {
+    for (i=0; i<MAX_SPACES; i++) {
+      value *start = h->spaces[i].start;
+      value *limit = h->spaces[i].limit;
+      if (start==NULL)
+        return 0;
+      else if (start <= (value*)v && (value*)v < limit)
+        return 1;
+    }
+  }
+  return 0;
+}
+
+int mark (struct heap *h,
+	  value v)
+/* What it does:  Count the number of words of live objects
+   reachable from p that are within the heap; at the same
+   time, set the color of each object to 2.  By the way,
+   the forward() function will treat color=2 the same as color=0,
+   and will reset the color, thus erasing the 2 mark.
+*/
+ {
+   int in_heap = is_in_heap(h,v);
+   if(in_heap) {
+      header_t hd = Hd_val(v); 
+      if(getcolor(hd) & 2) {
+	/* already marked */
+      } else {
+	int i;
+	int sz;
+	Hd_val(v) = setcolor(hd, 2);
+        sz = Wosize_hd(hd);
+	int count=sz+1;
+	for(i = 0; i < sz; i++)
+	  count+=mark(h,Field(v, i));
+	return count;
+      }
+    }
+  return 0;
+}
+
+int mark_roots (fun_info fi, struct thread_info *ti) {
+  struct heap *h = ti->heap;
+  const uintnat *roots = fi+2;
+  uintnat i, n = fi[1];
+  int count=0;
+  
+  for (i=0; i<n; i++) {
+    count += mark(h, ti->args[roots[i]]);
+  }
+  return count;
+}
+
 void garbage_collect(fun_info fi, struct thread_info *ti)
 /* See the header file for the interface-spec of this function. */
 {
   struct heap *h = ti->heap;
+  value *x;
+  int count=0;
+  
   if (h==NULL) {
     /* If the heap has not yet been initialized, create it and resume */
     h = create_heap();
@@ -321,8 +378,9 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
     return;
   } else {
     int i;
+    
     assert (h->spaces[0].limit == ti->limit);
-    h->spaces[0].next = ti->alloc; /* this line is probably unnecessary */
+    h->spaces[0].next = ti->alloc;
     for (i=0; i<MAX_SPACES-1; i++) {
       /* Starting with the youngest generation, collect each generation
          into the next-older generation.  Usually, when doing that,
@@ -331,13 +389,27 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
 
       /* If the next generation does not yet exist, create it */
       if (h->spaces[i+1].start==NULL) {
+	if (i>0) {
+  	  count = mark_roots(fi,ti);
+	  int size = h->spaces[i-1].limit-h->spaces[i-1].start;
+	  assert (h->spaces[i-1].next == h->spaces[i-1].start);
+	
+	  if (count+fi[0] <= size) {
+	    /*fprintf(stderr, "Bingo! Back to generation %d\n",i-1);*/
+	    do_generation(h->spaces+i, h->spaces+(i-1), fi, ti);
+	    assert (h->spaces[i-1].next-h->spaces[i-1].start == count);
+	    resume(fi,ti);
+	    return;
+	  }
+	}
 	int w = h->spaces[i].limit-h->spaces[i].start;
 	create_space(h->spaces+(i+1), RATIO*w);
       }
       /* Copy all the objects in generation i, into generation i+1 */
-  if(0)
-      fprintf(stderr, "Generation %d:  ", i);
+      if (0) fprintf(stderr, "Generation %d\n", i);
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+      x = h->spaces[i-1].next;
+      assert (count==0 || h->spaces[i-1].next-x == count);
       /* If there's enough space in gen i+1 to guarantee that the
          NEXT collection into i+1 will succeed, we can stop here */
       if (h->spaces[i].limit - h->spaces[i].start
@@ -379,49 +451,6 @@ void free_heap (struct heap *h) {
   free (h);
 }
 
-int is_in_heap(struct heap *h, value v) {
-  int i;
-  if (Is_block(v)) {
-    for (i=0; i<MAX_SPACES; i++) {
-      value *start = h->spaces[i].start;
-      value *limit = h->spaces[i].limit;
-      if (start==NULL)
-        return 0;
-      else if (start <= (value*)v && (value*)v < limit)
-        return 1;
-    }
-  }
-  return 0;
-}
-
-int mark (struct heap *h,
-	  value v)
-/* What it does:  Count the number of words of live objects
-   reachable from p that are within the heap; at the same
-   time, set the color of each object to 2.  By the way,
-   the forward() function will treat color=2 the same as color=0,
-   and will reset the color, thus erasing the 2 mark.
-*/
- {
-   int in_heap = is_in_heap(h,v);
-   if(in_heap) {
-      header_t hd = Hd_val(v); 
-      if(getcolor(hd)) {
-	/* already marked */
-      } else {
-	int i;
-	int sz;
-	Hd_val(v) = setcolor(hd,2);
-        sz = Wosize_hd(hd);
-	int count=sz+1;
-	for(i = 0; i < sz; i++)
-	  count+=mark(h,Field(v, i));
-	return count;
-      }
-    }
-  return 0;
-}
-
 value* extract_answer(struct thread_info *ti) {
   value p;
   value *target, *low, *high, *next;
@@ -439,12 +468,12 @@ value* extract_answer(struct thread_info *ti) {
   target[0]= 1<<10;
   target[1]= p;
   next = target+2;
-  /* fprintf(stderr, "Target size = %d\n", size); */
+  fprintf(stderr, "Target size = %d\n", size);
   h = ti->heap;
   for (i=0; i<MAX_SPACES-1; i++) {
     low = h->spaces[i].start;
     high = h->spaces[i].next;
-    /* fprintf(stderr, "Before generation %d, words=%d\n",i,next-target); */
+    fprintf(stderr, "Before generation %d, words=%d\n",i,next-target);
     if (low==NULL)
       break;
     do_scan(low, high, target, &next);

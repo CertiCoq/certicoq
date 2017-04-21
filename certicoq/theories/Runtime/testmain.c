@@ -28,19 +28,32 @@ void done(struct thread_info *ti) {
 extern void build(struct thread_info *);
 
 int main(int argc, char *argv[]) {
-  struct thread_info *tinfo;
-  value n, t;
+  struct thread_info *ti;
+  value n, t, count; value *y;
   int x; stack = &x;
   assert (argc==2);
   n = Val_long (atoi(argv[1]));
   t = Val_long(0);
-  tinfo = make_tinfo();
-  tinfo->args[4]=n;
-  tinfo->args[1]=t;
-  build(tinfo);
-  t = tinfo->args[1];
-  n = measure(t);
-  printf("Tree has %d nodes\n", n);
+  ti = make_tinfo();
+  ti->args[4]=n;
+  ti->args[1]=t;
+  build(ti);
+  count = measure(ti->args[1]);
+  printf("Tree has %d nodes\n", count);
+  y = extract_answer(ti);
+  count = measure(y[1]);
+  printf("Extracted tree has %d nodes\n", count);
+  printf("Doing it again\n");
+  ti->args[4]=n;
+  ti->args[1]=t;
+  build(ti);
+  printf("First tree has %d nodes\n", measure(y[1]));  
+  free(y);
+  count = measure(ti->args[1]);
+  printf("Heap tree has %d nodes\n", count);
+  y = extract_answer(ti);
+  printf("Second tree has %d nodes\n", measure(y[1]));  
+  free(y);
   return 0;
 }
 

@@ -43,6 +43,7 @@ ocamltest-nonopt: ocamltest.ml
 main.o: main.c config.h values.h gc.h
 testmain.o: testmain.c config.h values.h gc.h
 gc.o: gc.c config.h values.h gc.h
+	${CC} ${CFLAGS} -c -DECONOMIZE_GENERATIONS gc.c
 nogc.o: nogc.c config.h values.h gc.h
 gctest.o: config.h values.h gc.h
 gctest2.o: config.h values.h gc.h

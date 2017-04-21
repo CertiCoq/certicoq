@@ -389,6 +389,7 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
 
       /* If the next generation does not yet exist, create it */
       if (h->spaces[i+1].start==NULL) {
+#ifdef ECONOMIZE_GENERATIONS
 	if (i>0) {
   	  count = mark_roots(fi,ti);
 	  int size = h->spaces[i-1].limit-h->spaces[i-1].start;
@@ -402,6 +403,7 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
 	    return;
 	  }
 	}
+#endif
 	int w = h->spaces[i].limit-h->spaces[i].start;
 	create_space(h->spaces+(i+1), RATIO*w);
       }

@@ -108,6 +108,9 @@ void abort_with(char *s) {
 /* Assuming v is a pointer (Is_block(v)), tests whether v points
    somewhere into the "from-space" defined by from_start and from_limit */
 
+#define getcolor(hd) (((hd)>>8)&3)
+#define setcolor(hd,c) (hd|(c<<8))
+
 void forward (value *from_start,  /* beginning of from-space */
 	      value *from_limit,  /* end of from-space */
 	      value **next,       /* next available spot in to-space */
@@ -128,7 +131,8 @@ void forward (value *from_start,  /* beginning of from-space */
   if(Is_block(v)) {
     if(Is_from(from_start, from_limit, v)) {
       header_t hd = Hd_val(v); 
-      if(hd == 0) { /* already forwarded */
+      /* Note: the higher color bit may be 0 or 1; see "mark" function below */
+      if(getcolor(hd) & 1) { /* already forwarded */
 	*p = Field(v,0);
       } else {
 	int i;
@@ -137,10 +141,11 @@ void forward (value *from_start,  /* beginning of from-space */
         sz = Wosize_hd(hd);
 	new = *next+1;
 	*next = new+sz; 
-	for(i = -1; i < sz; i++) {
+	Field(new,-1) = setcolor(hd,0);
+	for(i = 0; i < sz; i++) {
 	  Field(new, i) = Field(v, i);
 	}
-	Hd_val(v) = 0;
+	Hd_val(v) = setcolor(hd,1);
 	Field(v, 0) = (value)new;
 	*p = (value)new;
 	if (depth>0)
@@ -224,6 +229,7 @@ uintnat gensize(uintnat words)
      preferably words*RATIO, and without overflowing the size of an
      unsigned integer. */
   /* minor bug:  this assumes sizeof(uintnat)==sizeof(void*)==sizeof(value) */
+  assert(sizeof(uintnat)==sizeof(void*) && sizeof(void*)==sizeof(value));
   if (words > maxint/(2*sizeof(value)))
     abort_with("Next generation would be too big for address space\n");
   d = maxint/RATIO;
@@ -372,3 +378,78 @@ void free_heap (struct heap *h) {
   }
   free (h);
 }
+
+int is_in_heap(struct heap *h, value v) {
+  int i;
+  if (Is_block(v)) {
+    for (i=0; i<MAX_SPACES; i++) {
+      value *start = h->spaces[i].start;
+      value *limit = h->spaces[i].limit;
+      if (start==NULL)
+        return 0;
+      else if (start <= (value*)v && (value*)v < limit)
+        return 1;
+    }
+  }
+  return 0;
+}
+
+int mark (struct heap *h,
+	  value v)
+/* What it does:  Count the number of words of live objects
+   reachable from p that are within the heap; at the same
+   time, set the color of each object to 2.  By the way,
+   the forward() function will treat color=2 the same as color=0,
+   and will reset the color, thus erasing the 2 mark.
+*/
+ {
+   int in_heap = is_in_heap(h,v);
+   if(in_heap) {
+      header_t hd = Hd_val(v); 
+      if(getcolor(hd)) {
+	/* already marked */
+      } else {
+	int i;
+	int sz;
+	Hd_val(v) = setcolor(hd,2);
+        sz = Wosize_hd(hd);
+	int count=sz+1;
+	for(i = 0; i < sz; i++)
+	  count+=mark(h,Field(v, i));
+	return count;
+      }
+    }
+  return 0;
+}
+
+value* extract_answer(struct thread_info *ti) {
+  value p;
+  value *target, *low, *high, *next;
+  struct heap *h;
+  int size, i;
+  /* Step one: cons a wrapper around the root.  The purpose is
+    that the extracted answer will thus always be a heap
+    pointer, not an external pointer.  That guarantees that the
+    value returned from extract_answer will be a new freeable object. */
+  assert (ti->heap->spaces[0].limit==ti->limit);
+  ti->heap->spaces[0].next=ti->alloc;
+  p = ti->args[answer_index];    
+  size = mark(ti->heap,p)+2;
+  target = (value *)malloc(sizeof(value) * size);
+  target[0]= 1<<10;
+  target[1]= p;
+  next = target+2;
+  /* fprintf(stderr, "Target size = %d\n", size); */
+  h = ti->heap;
+  for (i=0; i<MAX_SPACES-1; i++) {
+    low = h->spaces[i].start;
+    high = h->spaces[i].next;
+    /* fprintf(stderr, "Before generation %d, words=%d\n",i,next-target); */
+    if (low==NULL)
+      break;
+    do_scan(low, high, target, &next);
+    h->spaces[i].next=low;
+  }
+  assert (next-target == size);
+  return target;
+}  

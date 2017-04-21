@@ -134,4 +134,21 @@ void reset_heap(struct heap *h);
  * done in the first garbage_collect() call of the next execution.
  */
 
+/* which slot of the args array has the answer of a certicoq program */
+#define answer_index 1
+
+value* extract_answer(struct thread_info *ti);
+/* y=extract_answer(x,ti) copies the dag rooted at ti->args[answer_index]
+  into a compact data structure starting at y[1], outside the heap,
+  in a single malloc'ed (therefore freeable) object at address y.
+  All within-the-heap pointers will now be within the object y.
+  If (the answer within) the heap pointed to records outside
+  the heap, then those will point at their original locations
+  outside the object y. 
+
+  Note that the start is *(y+1), not (y+1); that is, there's an
+  extra wrapper-record round the object.  That's so that the
+  root-within-the-heap and the root-outside-the-heap (or root-unboxed)
+  can be treated uniformly by the caller of extract_answer().
+*/
 

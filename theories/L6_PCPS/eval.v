@@ -181,6 +181,7 @@ Section EVAL.
     inv H8; eauto.
   Qed.
     
+  Unset Regular Subst Tactic.
   Lemma bstep_cost_deterministic e rho v1 v2 c1 c2 :
     bstep_cost rho e v1 c1 ->
     bstep_cost rho e v2 c2 ->

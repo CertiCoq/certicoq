@@ -1584,15 +1584,16 @@ Section Closure_conversion_correct.
         destruct l1; try contradiction. destruct v0, l1; try contradiction.
         destruct v2; try contradiction. 
         rewrite H17 in H7. inv H7. 
-        rewrite H11 in H20. inv H20. eapply bstep_cost_deterministic in H21; eauto. inv H21.
+        rewrite H11 in H20. inv H20. eapply bstep_cost_deterministic in H21.
+        2:eapply H12. inv H21.
         assert (Hlen := List_util.Forall2_length _ _ _ H9).
         edestruct H6 with (vs2 := l0) (j := k - 1)
           as [Γ' [xs2 [e2 [rho2'' [Heq [Hfind [Hset Hyp]]]]]]]; eauto.
-        edestruct Hyp as [v2' [c'2 [Hstep2 [[Hle1 Hle2] Hcc']]]]; try eassumption.
+        edestruct Hyp with (c1:=c1) as [v2' [c'2 [Hstep2 [[Hle1 Hle2] Hcc']]]]; try eassumption.
         - omega.
         - eapply List_util.Forall2_monotonic; [| eassumption ].
           intros. eapply cc_approx_val_monotonic. eassumption. omega.
-        - omega.
+        - omega.          
         - subst.
           assert (Heq: length ys' = length l).
           { symmetry. do 2 (erewrite getlist_length_eq; [| eassumption ]).

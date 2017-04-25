@@ -607,7 +607,7 @@ Proof.
     assert (j4:= max_snd x1 x2).
     assert (j5:= max_fst x1 x2).
     assert (lx1: mx > x2). omega.
-    cbn. rewrite (j mx x0); try omega. rewrite H; try omega.
+    simpl. rewrite (j mx x0); try omega. rewrite H; try omega.
     rewrite e. rewrite H0; try omega.
     destruct (le_lt_dec ix (tlength args)).
     + rewrite H1; try omega. reflexivity.
@@ -616,14 +616,14 @@ Proof.
     exists (S (max x1 x0)). intros mx h.
     assert (l1:= max_fst x1 x0). assert (l2:= max_snd x1 x0).
     destruct (WcbvEvals_tcons_tcons w0) as [z0 [z1 jz]]. subst aargs'.
-    cbn. rewrite (j mx x1); try omega; try omega.
-    rewrite (jx1); try omega.  try rewrite jx0; try omega.
+    simpl. rewrite (j mx x1); try omega; try omega.
+    rewrite (jx1); try omega. rewrite jx0; try omega.
     destruct fn'; try omega; try reflexivity.
     + elim n. auto.
     + elim n0. auto.
   - destruct H, H0. exists (S (max x1 x0)). intros mx h.
     assert (l1:= max_fst x1 x0). assert (l2:= max_snd x1 x0).
-    cbn. rewrite (j mx x1); try omega. rewrite (H (mx - 1)); try omega.
+    simpl. rewrite (j mx x1); try omega. rewrite (H (mx - 1)); try omega.
     rewrite e. rewrite H0; try omega. destruct (le_lt_dec ix (tlength args)).
     + omega.
     + reflexivity.

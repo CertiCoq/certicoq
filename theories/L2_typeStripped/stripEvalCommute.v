@@ -525,7 +525,7 @@ Lemma tsplit_hom:
     tsplit ix (strip arg) (strips args).
 Proof.
   intros ix arg args.
-  functional induction (L1g.term.tsplit ix arg args); cbn; intros.
+  functional induction (L1g.term.tsplit ix arg args); simpl; intros.
   - reflexivity.
   - destruct n. elim y. reflexivity.
   - destruct ls; cbn; reflexivity.

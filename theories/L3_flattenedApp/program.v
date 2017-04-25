@@ -394,12 +394,13 @@ Qed.
 Lemma Crct_invrt_Construct:
   forall p n ipkgNm inum cnum args,
     crctTerm p n (TConstruct (mkInd ipkgNm inum) cnum args) ->
+    crctTerms p n args /\
     exists npars itypk,
       LookupTyp ipkgNm p npars itypk /\
       exists (ip:ityp), getInd itypk inum = Ret ip /\
-                        exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
+                   exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
 Proof.
-  intros. inversion_Clear H. exists pars, ipkg. intuition.
+  intros. inversion_Clear H. intuition. exists pars, ipkg. intuition.
   exists itp. intuition. exists cstr. intuition.
 Qed.
 

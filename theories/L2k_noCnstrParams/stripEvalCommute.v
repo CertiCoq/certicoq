@@ -248,7 +248,7 @@ Qed.
 Lemma isFix_hom:
   forall t, isFix (strip t) -> L2.term.isFix t.
 Proof.
-  induction t; intros; cbn in *;
+  induction t; intros; simpl in *;
   try (destruct H as [x0 [x1 jx]]; discriminate); auto.
   - destruct t1; try (destruct H as [x0 [x1 jx]]; discriminate).
     assert (j:= etaExp_cnstr_sanity i n n0 n1 (tcons (strip t2) (strips t3))).

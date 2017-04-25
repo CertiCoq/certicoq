@@ -536,7 +536,8 @@ Section CC_correct.
     eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
     intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
     apply pre_post_mp_l. eapply bind_triple. now apply put_triple.
-    intros x s. eapply return_triple. intros s' [[H1 H3] H2]; subst. inv H1.
+    intros x s. eapply return_triple. intros s'. intros <-. intros [H1 H2]; subst. inv H1.
+    intros.
     eassumption.
   Qed.
 
@@ -948,7 +949,7 @@ Section CC_correct.
         * intros Hc. apply HD2.
           rewrite bound_var_Ecase_cons, occurs_free_Ecase_cons.
           inv Hc; eauto.
-        * intros [e'' f s''].   
+        * intros [e'' f] s''.   
           edestruct e''; eapply return_triple; intros s''' [C2 [Hctx2 [Hcc2'  Hf2]]];
           inv Hcc2'. 
           eexists. repeat split. eassumption.

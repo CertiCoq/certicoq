@@ -32,7 +32,7 @@ Lemma TApp_mkApp_step_lem:
     TApp fn arg args = mkApp fn' (tcons arg args) -> fn = fn'.
 Proof.
   destruct fn'; cbn; intros; cbn; try myInjection H; try reflexivity.
-  injection H. intros.
+  try (injection H; intros).
   assert (j:= f_equal tlength H0). cbn in j.
   rewrite tlength_tappend in j. cbn in j. omega.
 Qed.
@@ -92,6 +92,8 @@ Proof.
     inversion_Clear H0. apply H.
     + constructor; assumption.
     + intros h. myInjection h. elim H1. rewrite H0, H2. reflexivity.
+  - simpl in H1. inversion_clear H0. simpl.
+    constructor. apply H; auto. intros h. elim H1. rewrite h. reflexivity.
 Qed.
 
 Lemma TConst_strip_inv:

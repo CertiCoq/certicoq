@@ -3,6 +3,7 @@ Require Export Common.certiClasses2.
 Require Export L2.instances.
 Require Export L1g.instances.
 Require Export L2_5.instances.
+Require Export L2k.instances.
 Require Export L3.instances.
 Require Export L4.instances.
 Require Export L6.instances.
@@ -54,10 +55,6 @@ match t with
 |Ret ?xx => exact xx
 end).
 
-Definition swap3 : (cTerm certiL2).
-computeExtract certiL2 swap.
-Defined.
-(* 
 Definition swap4 : (cTerm certiL4).
 computeExtract certiL4 swap.
 Defined.
@@ -80,9 +77,8 @@ Quote Recursively Definition prev := (fun x =>
  | 0 => 0
 | S n => n
 end)%nat.
-*)
-(*
-Local Opaque L4_2_to_L5.Match_e.
+
+(*Local Opaque L4_2_to_L5.Match_e.
 Local Opaque L4_2_to_L5.Fix_e.
 Local Opaque L4_2_to_L5.Con_e.
 Local Opaque L4_2_to_L5.Lam_e.
@@ -90,7 +86,6 @@ Local Opaque L4_2_to_L5.Let_e.
 Local Opaque L4_2_to_L5.App_e.
 *)
 
-(*
 Definition prev4 : cTerm certiL4.
 computeExtract certiL4 prev.
 Defined.
@@ -129,7 +124,6 @@ Definition prev3 := ltac:(computeExtract certiL3 prev).
 Require Import L3_to_L4.
 Definition prev3Ienv := L4.L3_to_L4.inductive_env (AstCommon.env prev3).
 Eval vm_compute in prev3Ienv.
- *)
 
 Require Import NPeano.
 Require Import Recdef.
@@ -151,8 +145,8 @@ Defined.
 Set Template Cast Propositions.
 Time Quote Recursively Definition pgcd := Gcd.
 
-Let pcgd2 : cTerm certiL2.
-let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
+Let pcgd2 : cTerm certiL3.
+let T:= eval vm_compute in (L3.compile.program_Program pgcd) in exact T.
 Defined.
 
 (*
@@ -189,22 +183,21 @@ Require Import Benchmarks.Binom
         Benchmarks.Color
         Benchmarks.vs.
 
-(** MS: before Randy's patches, fast up to L5, does not seem to terminate in the L5-L6 phase.
-Now stuck in L2-L3 phase *)
-Definition p6 : cTerm certiL3.
-Fail Timeout 2 (let t:= eval vm_compute in (translateTo (cTerm certiL3) p) in 
+(** MS: fast up to L5, does not seem to terminate in the L5-L6 phase. *)
+Definition p6 : cTerm certiL5.
+ (let t:= eval vm_compute in (translateTo (cTerm certiL5) p) in 
 match t with
 |Ret ?xx => exact xx
 end).
 Abort.
 
-(*Definition ext_comp := fun prog =>
+Definition ext_comp := fun prog =>
   let t := (translateTo (cTerm certiL6) prog) in
   match t with
   | Ret xx => xx
   | _ => swap6
   end.
-*)
+
 Require Import L6_to_Clight.
 Require Import compcert.lib.Maps.
 
@@ -340,7 +333,7 @@ Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (s
 
 Quote Recursively Definition binom := Binom.main.
 
-(* Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c". *)
+Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".
 
 (*
 Quote Recursively Definition vs := vs.main.

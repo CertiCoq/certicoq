@@ -28,7 +28,7 @@ Definition flattenApp (t:L1g.compile.Term):
 Global Instance QuestionHeadL1gTerm: QuestionHead (Program L1g.compile.Term) :=
   fun q t =>
     match q, fst (flattenApp (main t)) with
-      | Cnstr ind ci, TConstruct ind2 ci2 _(*nargs*) =>
+      | Cnstr ind ci, TConstruct ind2 ci2 _ _ =>
         andb (decide (ind=ind2)) (decide (ci=ci2))
       | Abs, TLambda _ _ _ => true
       | _, _ => false 
@@ -38,7 +38,7 @@ Global Instance ObsSubtermL1gTerm:
   ObserveNthSubterm (Program L1g.compile.Term) :=
   fun n t =>
     match  (flattenApp (main t)) with
-      | (TConstruct _ _ _ , subterms) =>
+      | (TConstruct _ _ _ _, subterms) =>
         match List.nth_error subterms  n with
           | Some st => Some {| env := env t; main := st |}
           | None => None

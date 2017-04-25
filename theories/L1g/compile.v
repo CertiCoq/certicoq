@@ -37,8 +37,9 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TAx        : Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat (* constructor # *) -> nat (* arity *) -> Term
-                                  (* use Defs to code branches *)
+| TConstruct : inductive -> nat (* constructor # *) ->
+               nat (* # pars *) -> nat (* # args *) -> Term
+                       (* use Defs to code case branches *)
 | TCase      : (inductive * nat) (* # of pars *) -> Term (* type *) ->
                Term (* discriminee *) -> Defs (* # args, branch *) -> Term
 | TFix       : Defs (* all mutual bodies *)->
@@ -223,7 +224,8 @@ Fixpoint
 
 (** translate Gregory Malecha's [term] into my [Term] **)
 Section datatypeEnv_sec.
-  Variable e : environ Term.
+  Variable datatypeEnv : environ Term.
+  
 Section term_Term_sec.
   Variable term_Term: term -> Term.
   Fixpoint terms_Terms (ts:list term) : Terms :=
@@ -267,16 +269,16 @@ Function term_Term (t:term) : Term :=
     | tApp fn (cons u us) => TApp (term_Term fn) (term_Term u)
                                   (terms_Terms term_Term us)
     | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
-      match lookup pth e with  (* only lookup ecTyp at this point! *)
+      match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
         | Some (ecTyp _ 0 nil) => TAx  (* note coding of axion in environ *)
         | Some (ecTyp _ _ _) => TWrong ("Const refers to inductive: " ++ pth)
         | _  => TConst pth
       end
     | tInd ind => TInd ind
     | tConstruct ind m =>
-      match cnstrArity e ind m with
-        | Ret arty => (TConstruct ind m arty)
-        | Exc str => TWrong ("term_Term: Cnstr arity not found: " ++ str)
+      match cnstrArity datatypeEnv ind m with
+        | Ret (npars, nargs) => TConstruct ind m npars nargs
+        | Exc _ => TWrong "term_Term, tConstruct"
       end
     | tCase npars ty mch brs =>
       TCase npars (term_Term ty) (term_Term mch) (natterms_Defs term_Term brs)
@@ -287,21 +289,10 @@ Function term_Term (t:term) : Term :=
 End datatypeEnv_sec.
     
 (** environments and programs **)
-(** given an L0 program, return an L1 environment containing the
+(** given an L0 program, return an L1g environment containing the
 *** datatypes of the program: this can be done without a term 
 *** translation function
 **)
-Fixpoint program_datatypeEnv (p:program) (e:environ Term) : environ Term :=
-  match p with
-    | PIn _ => e
-    | PConstr _ _ p => program_datatypeEnv p e
-    | PType nm npar ibs p =>
-      let Ibs := ibodies_itypPack ibs in
-      program_datatypeEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
-    | PAxiom nm _ p =>
-      program_datatypeEnv p (cons (pair nm (ecTyp Term 0 nil)) e)
-  end.
-
 Fixpoint program_Pgm
          (dtEnv: environ Term) (p:program) (e:environ Term) : Program Term :=
   match p with
@@ -311,7 +302,7 @@ Fixpoint program_Pgm
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
       program_Pgm dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
-    | PAxiom nm ty p =>
+    | PAxiom nm _ p =>
       program_Pgm dtEnv p (cons (pair nm (ecAx Term)) e)
   end.
 

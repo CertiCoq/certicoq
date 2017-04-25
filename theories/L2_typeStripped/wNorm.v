@@ -30,7 +30,7 @@ Inductive WNorm: Term -> Prop :=
 | WNCase: forall mch n brs,
             WNorm mch -> ~ isCanonical mch ->
             WNorm (TCase n mch brs)
-| WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
+| WNConstruct: forall i n np na, WNorm (TConstruct i n np na)
 | WNInd: forall i, WNorm (TInd i)
 | WNSort: forall s, WNorm (TSort s)
 | WNApp: forall fn t ts,

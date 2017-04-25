@@ -4,8 +4,8 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Export Template.Ast.
 Require Import Common.Common.
-Require Import L2.compile.
-Require Import L2.term.
+Require Import L2k.compile.
+Require Import L2k.term.
 
 
 Local Open Scope string_scope.
@@ -13,30 +13,26 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition L2Term := L2.compile.Term.
-Definition L2Terms := L2.compile.Terms.
-Definition L2Defs := L2.compile.Defs.
-Definition L2EC := envClass L2Term.
-Definition L2Env := environ L2Term.
-Definition L2Pgm := Program L2Term.
+Definition L2kTerm := L2k.compile.Term.
+Definition L2kTerms := L2k.compile.Terms.
+Definition L2kDefs := L2k.compile.Defs.
+Definition L2kEC := envClass L2kTerm.
+Definition L2kEnv := environ L2kTerm.
+Definition L2kPgm := Program L2kTerm.
 
 
 Inductive Term : Type :=
 | TRel       : nat -> Term
-| TSort      : Srt -> Term
 | TProof     : Term
 | TCast      : Term -> Term
-| TProd      : name -> Term -> Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name ->
                Term (* dfn *) -> Term (* body *) -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
 | TAx        : Term
-| TInd       : inductive -> Term
-| TConstruct : inductive -> nat (* index in datatype *) ->
-               nat (* arity *) -> Term
-| TCase      : (inductive * nat) (* # of pars *) ->
+| TConstruct : inductive -> nat (* index in datatype *) -> Terms -> Term
+| TCase      : inductive ->
                Term (* discriminee *) -> Defs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : Term
@@ -52,9 +48,6 @@ Scheme Trm_ind' := Induction for Term Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
 Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
 Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
-Notation prop := (TSort SProp).
-Notation set_ := (TSort SSet).
-Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
 Notation dunit nm t m d := (dcons nm t m d dnil).
 
@@ -92,13 +85,13 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
       mkApp (instantiate n t) (tcons (instantiate n a) (instantiates n ts))
     | TLambda nm  bod =>
       TLambda nm  (instantiate (S n) bod)
-    | TProd nm bod => TProd nm (instantiate (S n) bod)
     | TCase np s ts =>
       TCase np (instantiate n s) (instantiateDefs n ts)
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
     | TCast t => instantiate n t
+    | TConstruct i m args => TConstruct i m (instantiates n args)
     | x => x
   end
 with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
@@ -128,82 +121,80 @@ Fixpoint applyBranchToProof nargs (br:Term) : Term :=
     | S m => mkApp br (tcons TProof (m_Proofs m))
   end.
 
-Function L2Term_Term (t:L2Term) : Term :=
+Function L2kTerm_Term (t:L2kTerm) : Term :=
   match t with
-    | L2.compile.TRel n => TRel n
-    | L2.compile.TSort srt => TSort srt
-    | L2.compile.TProof t => TProof
-    | L2.compile.TCast tm => TCast (L2Term_Term tm)
-    | L2.compile.TProd nm bod => TProd nm (L2Term_Term bod)
-    | L2.compile.TLambda nm bod => TLambda nm (L2Term_Term bod)
-    | L2.compile.TLetIn nm dfn bod =>
-      TLetIn nm (L2Term_Term dfn) (L2Term_Term bod)
-    | L2.compile.TApp fn arg args =>
-      mkApp (L2Term_Term fn) (tcons (L2Term_Term arg) (L2Terms_Terms args))
-    | L2.compile.TConst pth => TConst pth
-    | L2.compile.TAx => TAx
-    | L2.compile.TInd ind => TInd ind
-    | L2.compile.TConstruct ind m arty => TConstruct ind m arty
-    | L2.compile.TCase m mch brs =>
-      match L2.term.isProof_dec mch with
+    | L2k.compile.TRel n => TRel n
+    | L2k.compile.TProof t => TProof
+    | L2k.compile.TCast tm => TCast (L2kTerm_Term tm)
+    | L2k.compile.TLambda nm bod => TLambda nm (L2kTerm_Term bod)
+    | L2k.compile.TLetIn nm dfn bod =>
+      TLetIn nm (L2kTerm_Term dfn) (L2kTerm_Term bod)
+    | L2k.compile.TApp fn arg args =>
+      mkApp (L2kTerm_Term fn) (tcons (L2kTerm_Term arg) (L2kTerms_Terms args))
+    | L2k.compile.TConst pth => TConst pth
+    | L2k.compile.TAx => TAx
+    | L2k.compile.TConstruct ind m args =>
+      TConstruct ind m (L2kTerms_Terms args)
+    | L2k.compile.TCase m mch brs =>
+      match L2k.term.isProof_dec mch with
         | left _ =>
           match brs with
-            | L2.compile.dunit _ br n =>
-              applyBranchToProof n (L2Term_Term br)
-            | _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+            | L2k.compile.dunit _ br n =>
+              applyBranchToProof n (L2kTerm_Term br)
+            | _ => TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs)
           end
-        | right _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+        | right _ => TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs)
       end
-    | L2.compile.TFix defs m => TFix (L2Defs_Defs defs) m
-    | L2.compile.TWrong => TWrong
+    | L2k.compile.TFix defs m => TFix (L2kDefs_Defs defs) m
+    | L2k.compile.TWrong => TWrong
   end
-with L2Terms_Terms (ts:L2Terms) : Terms :=
+with L2kTerms_Terms (ts:L2kTerms) : Terms :=
        match ts with
-         | L2.compile.tnil => tnil
-         | L2.compile.tcons u us => tcons (L2Term_Term u) (L2Terms_Terms us)
+         | L2k.compile.tnil => tnil
+         | L2k.compile.tcons u us => tcons (L2kTerm_Term u) (L2kTerms_Terms us)
        end
-with L2Defs_Defs (ds:L2Defs) : Defs :=
+with L2kDefs_Defs (ds:L2kDefs) : Defs :=
        match ds with
-         | L2.compile.dnil => dnil
-         | L2.compile.dcons nm tm m ds =>
-           dcons nm (L2Term_Term tm) m (L2Defs_Defs ds)
+         | L2k.compile.dnil => dnil
+         | L2k.compile.dcons nm tm m ds =>
+           dcons nm (L2kTerm_Term tm) m (L2kDefs_Defs ds)
        end.
 (****
-Functional Scheme L2Term_Term_ind' := Induction for L2Term_Term Sort Prop
-with L2Terms_Terms_ind' := Induction for L2Terms_Terms Sort Prop
+Functional Scheme L2kTerm_Term_ind' := Induction for L2kTerm_Term Sort Prop
+with L2kTerms_Terms_ind' := Induction for L2kTerms_Terms Sort Prop
 with L2Defs_Defs_ind' := Induction for L2Defs_Defs Sort Prop.
-Combined Scheme L2Term_TermEvalsDEvals_ind
-         from L2Term_Term_ind', L2Terms_Terms_ind', L2Defs_Defs_ind'.
+Combined Scheme L2kTerm_TermEvalsDEvals_ind
+         from L2kTerm_Term_ind', L2kTerms_Terms_ind', L2Defs_Defs_ind'.
 ***)
 
 (***
-Lemma L2Term_Term_Case:
+Lemma L2kTerm_Term_Case:
   forall mch brs,
     match mch, brs with
-      | L2.term.TProof _, L2.compile.dunit _ br n =>
-        applyBranchToProof n (L2Term_Term br)
-      | _, _ => TCase m (L2Term_Term mch) (L2Defs_Defs brs)
+      | L2k.term.TProof _, L2k.compile.dunit _ br n =>
+        applyBranchToProof n (L2kTerm_Term br)
+      | _, _ => TCase m (L2kTerm_Term mch) (L2Defs_Defs brs)
     end.
                   
-              forall m brs, L2Term_Term (L2.compile.TCase m mch brs) =
-                            TCase m (L2Term_Term mch) (L2Defs_Defs brs).
+              forall m brs, L2kTerm_Term (L2k.compile.TCase m mch brs) =
+                            TCase m (L2kTerm_Term mch) (L2Defs_Defs brs).
 Proof.
 ***)
 
-Lemma L2Term_Term_Case_not_Proof:
-  forall mch, ~ L2.term.isProof mch ->
-              forall m brs, L2Term_Term (L2.compile.TCase m mch brs) =
-                            TCase m (L2Term_Term mch) (L2Defs_Defs brs).
+Lemma L2kTerm_Term_Case_not_Proof:
+  forall mch, ~ L2k.term.isProof mch ->
+              forall m brs, L2kTerm_Term (L2k.compile.TCase m mch brs) =
+                            TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs).
 Proof.
   intros mch hmch m brs.
   destruct brs, mch; cbn; try reflexivity.
   elim hmch. auto.
 Qed.
 
-Lemma L2Term_Term_Case_not_dunit:
-  forall brs, L2.term.dlength brs <> 1 ->
-              forall m mch, L2Term_Term (L2.compile.TCase m mch brs) =
-                            TCase m (L2Term_Term mch) (L2Defs_Defs brs).
+Lemma L2kTerm_Term_Case_not_dunit:
+  forall brs, L2k.compile.dlength brs <> 1 ->
+              forall m mch, L2kTerm_Term (L2k.compile.TCase m mch brs) =
+                            TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs).
 Proof.
   intros brs hmch m mch.
   destruct brs; intros; cbn; destruct mch; try reflexivity.
@@ -213,25 +204,25 @@ Qed.
 
 
 (** environments and programs **)
-Function L2EC_EC (ec:L2EC) : envClass Term :=
+Function L2kEC_EC (ec:L2kEC) : envClass Term :=
   match ec with
-    | ecTrm t => ecTrm (L2Term_Term t)
+    | ecTrm t => ecTrm (L2kTerm_Term t)
     | ecTyp _ n itp => ecTyp Term n itp
   end.
 
-Definition L2Env_Env: L2Env -> environ Term :=
-  List.map (fun (nmec: string * L2EC) => (fst nmec, L2EC_EC (snd nmec))).
+Definition L2kEnv_Env: L2kEnv -> environ Term :=
+  List.map (fun (nmec: string * L2kEC) => (fst nmec, L2kEC_EC (snd nmec))).
 
-Definition L2Pgm_Program (p:L2Pgm) : Program Term:=
-  {| env:= L2Env_Env (env p);
-     main:= L2Term_Term (main p) |}.
+Definition L2kPgm_Program (p:L2kPgm) : Program Term:=
+  {| env:= L2kEnv_Env (env p);
+     main:= L2kTerm_Term (main p) |}.
 
 
 (*** from L2 to L2_5 ***)
 Definition program_Program (p:program) : Program Term :=
-  L2Pgm_Program (L2.compile.program_Program p).
+  L2kPgm_Program (L2k.compile.program_Program p).
 
 (***
-Definition term_Term (e:AstCommon.environ L2Term) (t:term) : Term :=
-  L2Term_Term (L2.compile.term_Term e t).
+Definition term_Term (e:AstCommon.environ L2kTerm) (t:term) : Term :=
+  L2kTerm_Term (L2k.compile.term_Term e t).
 ***)

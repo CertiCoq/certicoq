@@ -68,12 +68,12 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctConst: forall n p pd nm,
                Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
 | CrctAx: forall n p, Crct p n prop -> Crct p n TAx
-| CrctConstruct: forall n p ipkgNm inum cnum arty ipkg itp cstr m,
+| CrctConstruct: forall n p ipkgNm inum cnum ipkg itp cstr m np na,
                    Crct p n prop ->
                    LookupTyp ipkgNm p m ipkg ->
                    getInd ipkg inum = Ret itp ->
                    getCnstr itp cnum = Ret cstr ->
-                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum arty)
+                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum np na)
 | CrctCase: forall nm tx cx pack n p ty mch brs,
               LookupTyp nm p tx pack ->
               Crct p n mch -> CrctDs p n brs -> Crct p n ty -> 
@@ -623,20 +623,20 @@ Qed.
 
 Lemma Crct_invrt_Construct:
   forall p n construct, Crct p n construct ->
-  forall ipkgNm inum cnum arty,
-    construct = (TConstruct (mkInd ipkgNm inum) cnum arty) ->
+  forall ipkgNm inum cnum npars nargs,
+    construct = (TConstruct (mkInd ipkgNm inum) cnum npars nargs) ->
     Crct p n prop /\
-    exists npars itypk,
-      LookupTyp ipkgNm p npars itypk /\
+    exists np itypk,
+      LookupTyp ipkgNm p np itypk /\
       exists (ip:ityp), getInd itypk inum = Ret ip /\
       exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
 induction 1; intros; try discriminate.
-- assert (j:= IHCrct1 _ _ _ _ H2). intuition.
-  destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
+- assert (j:= IHCrct1 _ _ _ _ _ H2). intuition.
+  destruct H4 as [np [itypk [h1 h2]]]. exists np, itypk. intuition.
   destruct h1; split; try assumption.
   apply Lookup_weaken; trivial.
-- assert (j:= IHCrct _ _ _ _ H1). intuition.
-  destruct H3 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
+- assert (j:= IHCrct _ _ _ _ _ H1). intuition.
+  destruct H3 as [np [itypk [h1 h2]]]. exists np, itypk. intuition.
   destruct h1; split; trivial. 
   apply Lookup_weaken; trivial.
 - myInjection H3. intuition.
@@ -836,37 +836,3 @@ Proof.
     + intros. apply H. assumption.
     + apply H. assumption.
 Qed.
-
-(***
-Lemma whFixStep_pres_Crct:
-  forall dts m args,
-  forall p i, CrctDs p i dts -> Crcts p i args -> i >= dlength dts ->
-              Crcts p i args -> Crct p i (whFixStep dts m args).
-Proof.
-  Admitted.
-(***)
-  intros dts m args p i h2 h3 h4.
-  unfold whFixStep, pre_whFixStep.
-(*  Check fold_left_pres_mkApp. *)
-  induction dts.
-  - simpl in *. inversion_Clear h2. inversion_Clear h4. assumption.
-    assert (j: n + 0 = n). induction n; auto.
-    rewrite j in *. constructor; try assumption. not_isApp.
-  - simpl in h3. eapply IHdts. simpl in h1. simpl.
-
-    rewrite 
-    constructor.
-  functional induction (fold_left
-            (fun (bod : Term) (ndx : nat) => instantiate (TFix dts ndx) 0 bod)
-            (list_to_zero (dlength dts)) (dnthBody m dts)).
-  - rewrite <- h1. inversion_Clear h4.
-    +
-  - simpl in *. destruct args.
-  - unfold whFixStep in h1. simpl in h1. discriminate.
-  - simpl in h3. unfold whFixStep in h1. simpl in h1.
-    injection h1; intros j. rewrite <- j. admit.
-  - unfold whFixStep in h1. simpl in h1.
-
- destruct (dnthBody m dts).
-***)
-

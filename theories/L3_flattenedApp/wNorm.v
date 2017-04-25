@@ -6,7 +6,6 @@ Require Import Coq.Arith.EqNat.
 Require Import Coq.Arith.Compare_dec.
 Require Import L3.term.
 Require Import L3.program.
-Require Import L3.wndEval.
 Require Import L3.wcbvEval.
 Require Import L3.compile.
 
@@ -20,7 +19,6 @@ Set Implicit Arguments.
 Inductive WNorm: Term -> Prop :=
 | WNPrf: WNorm TProof
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
-| WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNAx: WNorm TAx
 | WNCase: forall mch n brs,
@@ -28,8 +26,6 @@ Inductive WNorm: Term -> Prop :=
             WNorm (TCase n mch brs)
 | WNConstruct: forall i n args,
                  WNorms args -> WNorm (TConstruct i n args)
-| WNInd: forall i, WNorm (TInd i)
-| WNSort: forall s, WNorm (TSort s)
 | WNApp: forall fn t,
            WNorm fn -> WNorm t ->
            ~ (isLambda fn) -> ~ (isFix fn) -> WNorm (TApp fn t)
@@ -71,22 +67,6 @@ Proof.
     + left; constructor; auto.
 Qed.
 
-
-(** If a program is in weak normal form, it has no wndEval step **)
-Lemma wNorm_no_wndStep:
-  forall p,
-    (forall t, WNorm t -> no_wnd_step p t) /\
-    (forall ts, WNorms ts -> no_wnds_step p ts).
-Proof.
-  intros p; apply WNormWNorms_ind; intros;
-  unfold no_wnd_step, no_wnds_step;
-  intros x h; inversion_Clear h; auto;
-  try (solve [elim (H _ H4)]);
-  try (solve [elim (H _ H6)]);
-  try (solve [elim (H0 _ H6)]).
-  - unfold no_wnd_step, no_step in H0. eelim H0. eassumption.
-  - eelim H0. eassumption.
-Qed.
 
 (** If a program is in weak normal form, it WcbvEval to itself **)
 Lemma pre_wNorm_WcbvEval_rfl:

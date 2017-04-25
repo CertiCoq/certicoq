@@ -30,8 +30,8 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
           WcbvEval p (TProd nm ty bod) (TProd nm ty' bod)
 | wCast: forall t s ty,
            WcbvEval p t s ->  WcbvEval p (TCast t ty) s
-| wConstruct: forall i r arty,
-                WcbvEval p (TConstruct i r arty) (TConstruct i r arty)
+| wConstruct: forall i r np na,
+                WcbvEval p (TConstruct i r np na) (TConstruct i r np na)
 | wInd: forall i, WcbvEval p (TInd i) (TInd i) 
 | wSort: forall srt, WcbvEval p (TSort srt) (TSort srt)
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
@@ -68,9 +68,9 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
              dnthBody m dts = Some (x, ix) ->
              ix > tlength args ->     (* too few args *)
              WcbvEval p (TApp fn arg args) (TApp (TFix dts m) arg' args')
-| wCase: forall mch Mch n args ml ts brs cs s ty arty,
+| wCase: forall mch Mch n args ml ts brs cs s ty,
                 WcbvEval p mch Mch ->
-                canonicalP Mch = Some (n, args, arty) ->
+                canonicalP Mch = Some (n, args) ->
                 tskipn (snd ml) args = Some ts ->
                 whCaseStep n ts brs = Some cs ->
                 WcbvEval p cs s ->
@@ -451,7 +451,7 @@ Function wcbvEval
                     | Exc str => Exc str
                     | Ret etp => Ret (TCase ml etp emch brs)
                   end
-                | Some (r, args, _) =>
+                | Some (r, args) =>
                   match tskipn (snd ml) args with
                     | None => raise "wcbvEval: Case, tskipn"
                     | Some ts =>
@@ -480,7 +480,7 @@ Function wcbvEval
         (** already in whnf ***)
         | TAx => ret TAx
         | TFix mfp br => ret (TFix mfp br)
-        | TConstruct i cn arty => ret (TConstruct i cn arty)
+        | TConstruct i cn np na => ret (TConstruct i cn np na)
         | TInd i => ret (TInd i)
         | TSort srt => ret (TSort srt)
         (** should never appear **)

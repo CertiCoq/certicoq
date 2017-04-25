@@ -8,7 +8,6 @@ Require Import Coq.omega.Omega.
 Require Import Coq.Logic.JMeq.
 Require Import L3.term.
 Require Import L3.program.
-Require Import L3.wndEval.
 Require Import L3.compile.
 
 Local Open Scope string_scope.
@@ -21,13 +20,9 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wPrf: WcbvEval p TProof TProof
 | wLam: forall nm bod,
           WcbvEval p (TLambda nm bod) (TLambda nm bod)
-| wProd: forall nm bod,
-          WcbvEval p (TProd nm bod) (TProd nm bod)
 | wConstruct: forall i r args args',
                 WcbvEvals p args args' ->
                 WcbvEval p (TConstruct i r args) (TConstruct i r args')
-| wInd: forall i, WcbvEval p (TInd i) (TInd i) 
-| wSort: forall s, WcbvEval p (TSort s) (TSort s)
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
 | wAx: WcbvEval p TAx TAx
 | wConst: forall nm (t s:Term),
@@ -51,20 +46,15 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
               ~ isLambda efn -> ~ isFix efn ->
               WcbvEval p arg arg1 ->
               WcbvEval p (TApp fn arg) (TApp efn arg1)
-| wCase: forall mch i n ml args args' brs cs s,
-           WcbvEval p mch (TConstruct i n args) ->
-           i = fst ml ->
-           tskipn (snd ml) args = Some args' ->  (* drop parameters *)
-           whCaseStep n args' brs = Some cs ->
+| wCase: forall mch i j n args brs cs s,
+           WcbvEval p mch (TConstruct j n args) ->
+           whCaseStep n args brs = Some cs ->
            WcbvEval p cs s ->
-           WcbvEval p (TCase ml mch brs) s
-| wCaseCong: forall ml mch emch brs,
+           WcbvEval p (TCase i mch brs) s
+| wCaseCong: forall i mch emch brs,
            WcbvEval p mch emch ->
            ~ isConstruct emch ->
-           (*************
-           WcbvEvals p brs ebrs ->
-*********************)
-           WcbvEval p (TCase ml mch brs) (TCase ml emch brs)
+           WcbvEval p (TCase i mch brs) (TCase i emch brs)
 | wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
@@ -355,6 +345,17 @@ Function wcbvEval
               end
             | Exc _ => raise "wcbvEval: TApp, fn doesn't eval"
           end
+        | TCase i mch brs =>
+          match wcbvEval n mch with
+            | Exc str => Exc str
+            | Ret (TConstruct _ ix args) =>
+              match whCaseStep ix args brs with
+                | None => raise "wcbvEval: Case, whCaseStep"
+                | Some cs => wcbvEval n cs
+              end
+            | Ret mch' => ret (TCase i mch' brs)
+          end
+            (***********************
         | TCase ml mch brs =>
           match wcbvEval n mch with
             | Ret (TConstruct i r args) =>
@@ -370,6 +371,7 @@ Function wcbvEval
             | Ret emch => Ret (TCase ml emch brs)
             | Exc s => Exc s
           end
+********************)
         | TLetIn nm df bod =>
           match wcbvEval n df with
             | Exc s => raise s
@@ -378,10 +380,7 @@ Function wcbvEval
         (** already in whnf ***)
         | TAx => ret TAx
         | TLambda nn t => ret (TLambda nn t)
-        | TProd nn t => ret (TProd nn t)
         | TFix mfp br => ret (TFix mfp br)
-        | TInd i => ret (TInd i)
-        | TSort srt => ret (TSort srt)
         | TProof => ret TProof
         (** should never appear **)
         | TRel _ => raise "wcbvEval: unbound Rel"
@@ -432,10 +431,10 @@ Proof.
     try (myInjection H1); try (apply wAppCong); try assumption;
     try (solve[not_isApp]).
   - subst. specialize (H _ e1). specialize (H0 _ p1). 
-    refine (wCase _ _ _ _ _ _ _); eassumption || reflexivity.
+    refine (wCase _ _ _ _ _); try eassumption.
   - specialize (H _ e1). 
     eapply wCaseCong; try assumption. 
-    destruct emch; try not_isConstruct. contradiction. 
+    destruct mch'; try not_isConstruct. contradiction. 
   - eapply wLetIn.
     + apply H. eassumption.
     + apply H0. assumption.
@@ -493,10 +492,7 @@ Proof.
     exists (S (max x x0)). intros m hm. cbn.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     rewrite (j m (max x x0)); try omega.
-    rewrite hx; try omega. rewrite e0; try omega. rewrite e1; try omega.
-    destruct (inductive_dec i (fst ml)).
-    + apply hx0; try omega.
-    + elim n0; assumption.
+    rewrite hx; try omega. rewrite e; try omega. apply hx0; try omega.
   - destruct H. exists (S x). intros m h. cbn.
     rewrite (j m x); try omega. rewrite (H (m - 1)); try omega.
     destruct emch; try rewrite H0; try reflexivity; try omega.

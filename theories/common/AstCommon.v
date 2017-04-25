@@ -83,10 +83,12 @@ Defined.
 
 
 (** certiCoq representation of inductive types **)
-(* a constructor; the string only for human readability *)
+(* a data constructor is a string (for human readability)
+** and the number of non-parameter args it expects *)
 Record Cnstr := mkCnstr { CnstrNm:string; CnstrArity:nat }.
 
-(* a type is a list of Cnstrs; string only for human readability *)
+(* an inductive type is a string (for human readability)
+** and a list of Cnstrs *)
 Record ityp := mkItyp { itypNm:string; itypCnstrs:list Cnstr }.
 
 (* a mutual type package is a list of ityps *)
@@ -181,6 +183,32 @@ Hint Constructors WFaEc.
 
 (** An environ is an association list of envClass. **)
 Definition environ := list (string * envClass).
+
+(** compute an [environ] of just the inductive types and axioms from a
+*** template-coq [program].  Independent of term structure
+**)
+(* Malecha's [program] is inside out *)
+Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
+  mkCnstr (fst (fst c)) (snd c).
+
+Definition ibody_ityp (iib:ident * inductive_body) : ityp :=
+  let Ctors := map cnstr_Cnstr (ctors (snd iib))
+  in mkItyp (fst iib) Ctors.
+
+Definition ibodies_itypPack (ibs:list (ident * inductive_body)) : itypPack :=
+  map ibody_ityp ibs.
+
+Fixpoint program_datatypeEnv (p:program) (e:environ) : environ :=
+  match p with
+    | PIn _ => e
+    | PConstr _ _ p => program_datatypeEnv p e
+    | PType nm npar ibs p =>
+      let Ibs := ibodies_itypPack ibs in
+      program_datatypeEnv p (cons (pair nm (ecTyp npar Ibs)) e)
+    | PAxiom nm _ p =>
+      program_datatypeEnv p (cons (pair nm (ecTyp 0 nil)) e)
+  end.
+
 Record Program : Type := mkPgm { main:trm; env:environ }.
 
 (** for debugging **)
@@ -459,7 +487,8 @@ Definition getCnstr (ip:ityp) (cnum:nat) : exception Cnstr :=
 
 (** total constructor arity (including parameters) is only computed
 *** on the fly during translation from L2 to L3 **)
-Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) : exception nat :=
+Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) :
+  exception (nat (* parameters *) * nat (* args *)) :=
   match i with
     | mkInd nm tndx =>
       match lookupTyp nm p with
@@ -470,7 +499,7 @@ Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) : exception nat :=
             | Ret ity => match getCnstr ity cndx with
                            | Exc str =>
                              raise ("cnstrArity; getCnstr fails: " ++ str)
-                           | Ret itp => ret (npars + (CnstrArity itp))
+                           | Ret itp => ret (npars, CnstrArity itp)
                          end
           end
        end

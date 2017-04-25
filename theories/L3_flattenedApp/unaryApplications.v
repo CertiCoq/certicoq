@@ -8,7 +8,6 @@ Require Import Omega.
 Require Import L2_5.L2_5.
 Require Import L3.term.
 Require Import L3.program.
-Require Import L3.wndEval.
 Require Import L3.wcbvEval.
 Require Import L3.wNorm.
 Require Import L3.compile.
@@ -69,6 +68,7 @@ Proof.
   - cbn. rewrite IHts. reflexivity.
 Qed.
 
+(***********
 Lemma mkApp_hom:
   forall ts t,
     isL2_5Cnstr t = None -> ~ L2_5.term.isApp t ->
@@ -79,7 +79,7 @@ Proof.
   - rewrite L2_5.term.mkApp_goodFn.
     cbn. rewrite H. reflexivity. assumption.
 Qed.
-
+***************)
 
 (******
 Lemma mkApp_hom':
@@ -239,74 +239,6 @@ Proof.
   cbn. destruct H. exists fn1, fn2, t. reflexivity.
 Qed.
 
-
-Lemma TApp_TConstruct_hom:
-  forall i n arty arg args,
-    strip (L2_5.compile.TApp (L2_5.compile.TConstruct i n arty) arg args) =
-    etaExp_cnstr i n (arty - S (tlength (strips args)))
-                               (tcons (strip arg) (strips args)).
-Proof.
-  reflexivity.
-Qed.
-
-        
-Lemma notCnstr_mkApp_hom:
-  forall t arg args,
-    isL2_5Cnstr t = None ->
-    ~ L2_5.term.isApp t ->
-    strip (L2_5.compile.mkApp t (L2_5.compile.tcons arg args)) =
-    mkApp (strip t) (tcons (strip arg) (strips args)).
-Proof.
-  induction t; intros; try reflexivity.
-  - cbn. cbn in H. rewrite H. reflexivity. 
-  - destruct H0. auto. 
-  - discriminate.
-Qed. 
-
-Lemma TApp_mkApp_hom:
-  forall fn arg args,
-    isL2_5Cnstr fn = None ->
-    strip (L2_5.compile.TApp fn arg args) =
-    mkApp (strip fn) (tcons (strip arg) (strips args)).
-Proof.
-  induction fn; intros; try reflexivity.
-  - cbn in H. cbn. rewrite H. reflexivity. 
-  - discriminate.
-Qed.
-
-Lemma TApp_notApp_mkApp_hom:
-  forall fn arg args,
-    ~ L2_5.term.isApp fn -> isL2_5Cnstr fn = None ->
-    strip (L2_5.compile.TApp fn arg args) =
-    mkApp (strip fn) (tcons (strip arg) (strips args)).
-Proof.
-  induction fn; intros; try reflexivity.
-  - cbn in H0.  cbn.  rewrite H0. reflexivity.
-  - cbn in H0. discriminate.
-Qed.
-
-Lemma isL2_5Cnstr_instantiate_None:
-  forall fn tin n,
-    isL2_5Cnstr fn = None ->
-    (L2_5.term.isL2_5Rel fn = None \/ isL2_5Cnstr tin = None) ->
-    isL2_5Cnstr (L2_5.term.instantiate tin n fn) = None.
-Proof.
-  induction fn; intros; try reflexivity.
-  - cbn. case_eq (n0 ?= n); intros;Compare_Prop; subst; try reflexivity.
-    + cbn in H0. destruct H0; try assumption. discriminate. 
-  - cbn in H. cbn in H0. apply (IHfn _ _ H H0).
-  - change
-      (isL2_5Cnstr (L2_5.compile.mkApp (L2_5.term.instantiate tin n fn1)
-                                (L2_5.compile.tcons
-                                   (L2_5.term.instantiate tin n fn2)
-                                   (L2_5.term.instantiates tin n t))) =
-       None).
-    assert (j:= mkApp_isApp (L2_5.term.instantiate tin n fn1)
-                            (L2_5.term.instantiate tin n fn2)
-                            (L2_5.term.instantiates tin n t)).
-    destruct j as [x0 [x1 [x2 k]]]. rewrite k. assumption.
-  - discriminate.
-Qed.
 
 (*********************
 Lemma mkApp_instantiate_hom:
@@ -693,12 +625,6 @@ Proof.
   try reflexivity; try rewrite <- tappend_assoc; cbn.
   - rewrite IHargs. unfold pre_mkApp. unfold pre_mkApp in IHt.
  ***)
-
-Lemma isL2_5Cnstr_in_L3:
-  forall fn, L2_5.term.isL2_5Cnstr fn = isL2_5Cnstr fn.
-Proof.
-  intros; reflexivity.
-Qed.
 
   
 (******

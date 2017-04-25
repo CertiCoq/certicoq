@@ -4,6 +4,12 @@ Require Import Coq.Unicode.Utf8.
 Require Import List.
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
+Inductive liftLe {S D: Type} (R: S -> D -> Prop): option S -> option D -> Prop :=
+(* defining this using pattern matching confuses the strict positivity checker.
+  Can this part be defined outside generically, using induction? *)
+| liftSome: forall s d, R s d -> liftLe R (Some s) (Some d)
+| liftNone: forall d, liftLe R None d.
+
 (* Some values, e.g. constructors, can have subterms.
    This operation allows asking for the nth subterm.
    When trying to observe the nth subterm of a value having only m (m<n)
@@ -71,9 +77,57 @@ CoInductive obsLe : SrcValue -> DstValue -> Prop :=
     -> obsLe s d
 with obsLeOp : option SrcValue -> option DstValue -> Prop :=
 (* defining this using pattern matching confuses the strict positivity checker.
-  Can this part be defined outside generically, using induction? *)
+  TODO: consider using liftLe *)
 | obsSome: forall s d, obsLe s d -> obsLeOp (Some s) (Some d)
 | obsNone: forall d, obsLeOp None d.
+
+
+(** Sometimes, the greatest fixedpoint is obtained at \omega.
+*)
+Inductive obsLeInd : nat-> SrcValue -> DstValue -> Prop :=
+| obsLeS: forall m (s : SrcValue) (d : DstValue),
+    yesPreserved s d
+    -> (forall n:nat, liftLe (obsLeInd m) (observeNthSubterm n s) (observeNthSubterm n d))
+    -> obsLeInd (S m) s d
+| obsLeO: forall s d, obsLeInd O s d. (** \top element in the space of relations *)
+
+(** this part is generally easy and unconditional *)
+Lemma fromCoInd s d:
+  obsLe s d -> forall m, obsLeInd m s d.
+Proof using.
+  intros Hc m. revert Hc. revert s. revert d.
+  induction m as [ | m Hind]; intros ? ? Hc;
+    [ constructor; fail
+    | destruct Hc as [? ? Hyes Hsub];
+      constructor; [ assumption | ] ].
+  intros n. specialize (Hsub n).
+  inversion Hsub; subst; clear Hsub; constructor; eauto.
+Qed.
+
+(** This part is generally hard and conditional.
+Here, it is unconditional. [obsLe] does not depend on computations.
+However, in certiclasses3, where obsLe mentions computation, we may need the 
+big step eval in L6 to be deterministic.
+*)
+Lemma toCoInd s d:
+  (forall m, obsLeInd m s d) -> obsLe s d.
+Proof using.
+  revert s d.
+  cofix. intros ? ? Hi. pose proof Hi as Hib.
+  specialize (Hi 1); inversion Hi as [ ? ? ? Hyes Hsub | ]; subst. clear Hi.
+  constructor; [ assumption | ].
+  intros ?.
+  specialize (Hsub n).
+  inversion Hsub; subst; clear Hsub; constructor.
+  apply toCoInd. revert H3. revert H4. revert Hib.
+  clear.
+  intros.
+  specialize (Hib (S m)).
+  inversion Hib as  [ ? ? ? _ Hsubb | ]. subst. clear Hib.
+  specialize (Hsubb n).
+  rewrite <- H3, <- H4 in Hsubb.
+  inversion Hsubb. assumption.
+Qed.  
 
 End ObsLe.
 
@@ -216,3 +270,6 @@ Arguments cValue {Term} {Value} {H} {H0} {H1} {H2} _.
 
 
 Arguments CerticoqLanguage Term {Value} {H} {H0} {H1} {H2}.
+
+
+

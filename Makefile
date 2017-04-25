@@ -3,7 +3,6 @@ all: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries
 #	$(MAKE) -C libraries/SquiggleEq
 	$(MAKE) -C theories
-	
 
 theories/Makefile:
 	cd theories;coq_makefile -f _CoqProject -o Makefile
@@ -20,7 +19,7 @@ cleanCoqc:
 	find -name *.vo | xargs rm
 	find -name *.glob | xargs rm
 	find -name *.v.d | xargs rm
-	
+
 gitsuperclean:
 	git reset HEAD --hard
-	git clean -xf
+	git clean -xdf

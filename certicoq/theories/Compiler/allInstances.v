@@ -48,16 +48,16 @@ end).
 
 
 
-Ltac computeExtract certiL4 f:=
-(let t:= eval compute in (translateTo (cTerm certiL4) f) in 
+Ltac computeExtract certiL f:=
+(let t:= eval compute in (translateTo (cTerm certiL) f) in 
 match t with
 |Ret ?xx => exact xx
 end).
 
-Definition swap3 : (cTerm certiL3).
-computeExtract certiL3 swap.
+Definition swap3 : (cTerm certiL2).
+computeExtract certiL2 swap.
 Defined.
-
+(* 
 Definition swap4 : (cTerm certiL4).
 computeExtract certiL4 swap.
 Defined.
@@ -68,12 +68,19 @@ Defined.
 
 Print swap4.
 
+Definition swap6 : cTerm certiL6.
+(let t:= eval vm_compute in (translateTo (cTerm certiL6) swap) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
 Quote Recursively Definition prev := (fun x => 
  match x with
  | 0 => 0
 | S n => n
 end)%nat.
-
+*)
 (*
 Local Opaque L4_2_to_L5.Match_e.
 Local Opaque L4_2_to_L5.Fix_e.
@@ -83,6 +90,7 @@ Local Opaque L4_2_to_L5.Let_e.
 Local Opaque L4_2_to_L5.App_e.
 *)
 
+(*
 Definition prev4 : cTerm certiL4.
 computeExtract certiL4 prev.
 Defined.
@@ -121,6 +129,7 @@ Definition prev3 := ltac:(computeExtract certiL3 prev).
 Require Import L3_to_L4.
 Definition prev3Ienv := L4.L3_to_L4.inductive_env (AstCommon.env prev3).
 Eval vm_compute in prev3Ienv.
+ *)
 
 Require Import NPeano.
 Require Import Recdef.
@@ -140,36 +149,20 @@ Proof.
 Defined.
 
 Set Template Cast Propositions.
-Set Template Timing.
-(* With sharing:
-Debug: Template-coq: interp_constr took 3.29999999984e-05s
-Debug: Template-coq: quote_term took 0.291718s
-Debug: Template-coq: declare_definition took 23.196019s
+Time Quote Recursively Definition pgcd := Gcd.
 
-<infomsg>Finished transaction in 23.574 secs (23.303u,0.184s) (successful)</infomsg>*)
-
-(* No sharing:
-
-Debug: Template-coq: interp_constr took 3.1000000007e-05s
-Debug: Template-coq: quote_term took 0.854424s
-Debug: Template-coq: declare_definition took 24.772596s
-
-<infomsg>Finished transaction in 26.315 secs (25.346u,0.28s) (successful)*)
-
-Quote Recursively Definition pgcd :=
-Gcd.
-
-Eval compute in (cTerm certiL2).
 Let pcgd2 : cTerm certiL2.
 let T:= eval vm_compute in (L2.compile.program_Program pgcd) in exact T.
 Defined.
 
+(*
 Let pcgd4a : cTerm certiL4_5.
 (let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL4_5) pcgd2) in
 match t with
 |Ret ?xx => exact xx
 end).
 Defined.
+*)
 Require Import List.
 Import ListNotations.
 
@@ -196,21 +189,24 @@ Require Import Benchmarks.Binom
         Benchmarks.Color
         Benchmarks.vs.
 
-Definition p6 : cTerm certiL6.
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) p) in 
+(** MS: before Randy's patches, fast up to L5, does not seem to terminate in the L5-L6 phase.
+Now stuck in L2-L3 phase *)
+Definition p6 : cTerm certiL3.
+Fail Timeout 2 (let t:= eval vm_compute in (translateTo (cTerm certiL3) p) in 
 match t with
 |Ret ?xx => exact xx
 end).
-Defined.
+Abort.
 
-Definition ext_comp := fun prog =>
+(*Definition ext_comp := fun prog =>
   let t := (translateTo (cTerm certiL6) prog) in
   match t with
   | Ret xx => xx
-  | _ => p6
+  | _ => swap6
   end.
-
-Require Import L6_to_Clight Maps.
+*)
+Require Import L6_to_Clight.
+Require Import compcert.lib.Maps.
 
 Definition compile_L6 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
   let '((_, cenv, _, nenv), prog) := t in
@@ -219,7 +215,7 @@ Definition compile_L6 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
 
 Open Scope positive_scope.
 
-Definition p7 := compile_L6 p6.
+(* Definition p7 := compile_L6 p6. *)
 
 Require Import L6.cps L6.cps_show.
 
@@ -250,14 +246,14 @@ Definition snd_blah := blah6 blah3 (blah2 blah7).
 
 Quote Recursively Definition blahProg := (blah_fun (blah1 (blah6 fst_blah snd_blah))).
 
-Definition blahProg6 : cTerm certiL6.
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) blahProg) in 
-match t with
-|Ret ?xx => exact xx
-end).
-Defined.
+(* Definition blahProg6 : cTerm certiL6. *)
+(* (let t:= eval vm_compute in (translateTo (cTerm certiL6) blahProg) in  *)
+(* match t with *)
+(* |Ret ?xx => exact xx *)
+(* end). *)
+(* Defined. *)
 
-Definition blahProg7 := compile_L6 blahProg6.
+(* Definition blahProg7 := compile_L6 blahProg6. *)
 
 Definition show_exn {A:Type} (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   match x with
@@ -266,15 +262,7 @@ Definition show_exn {A:Type} (x : exceptionMonad.exception (cTerm certiL6)) : st
   end.
 
 
-
-Definition swap6 : cTerm certiL6.
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) swap) in 
-match t with
-|Ret ?xx => exact xx
-end).
-Defined.
-
-Definition swap7 := compile_L6 swap6.
+(* Definition swap7 := compile_L6 swap6. *)
 
 
 
@@ -352,7 +340,7 @@ Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (s
 
 Quote Recursively Definition binom := Binom.main.
 
-Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".
+(* Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c". *)
 
 (*
 Quote Recursively Definition vs := vs.main.

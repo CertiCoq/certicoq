@@ -2,37 +2,17 @@
     mutually recursive functions, data constructors, and pattern matching.
  *)
 
-(* (******) *)
-(* Add LoadPath "../common" as Common. *)
-(* Add LoadPath "../L1g" as L1g. *)
-(* Add LoadPath "../L2_typeStripped" as L2. *)
-(* Add LoadPath "../L3_flattenedApp" as L3. *)
-(* Add LoadPath "../L4_deBruijn" as L4. *)
-(* (******) *)
-
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
+        Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
-
-(***
-Require L3.term.
-Require L3.wcbvEval.
-Require L3.wNorm.
-Require L3.unaryApplications.
-***)
 Require Import L3.compile.
-
-(***
-Module L3eval := L3.wcbvEval.
-Module L3U := L3.unaryApplications.
-Module L3N := L3.wNorm.
-***)
 Module L3t := L3.compile.
-
 Require Import L4.expression.
 
+(** Tactics *)
 Ltac forward H :=
   match type of H with
   | ?T -> _ => let H' := fresh in cut T;[intros H'; specialize (H H') | ]
@@ -108,21 +88,17 @@ Section TermTranslation.
     | L3t.TWrong => Ax_e "wrong"
     | L3t.TProof => (* TODO: Ax_e for now *) Ax_e "proof"
     | L3t.TRel n => Var_e (N.of_nat n)
-    | L3t.TSort s => (* Erase *) erased_exp
-    | L3t.TProd n t => (* Erase *) erased_exp
     | L3t.TLambda n t => Lam_e n (trans (1+k) t)
     | L3t.TLetIn n t u => Let_e n (trans k t) (trans (1+k) u)
     | L3t.TApp t u => App_e (trans k t) (trans k u)
     | L3t.TConst s => (* Transform to let-binding *)
       Var_e (cst_offset e s + k)
-    | L3t.TInd i => (* Erase *) erased_exp
     | L3t.TConstruct ind c args =>
       let args' := trans_args trans k args in
       Con_e (dcon_of_con ind c) args'
-    | L3t.TCase ann t brs =>
-      let '(ind, pars) := ann in
+    | L3t.TCase ind t brs =>
       let brs' := trans_brs trans ind k 0%N brs in
-      Match_e (trans k t) (N.of_nat pars) brs'
+      Match_e (trans k t) 0 brs'
     | L3t.TFix d n =>
       let len := L3t.dlength d in
       let defs' := trans_fixes trans (N.of_nat len + k) d in
@@ -191,16 +167,3 @@ Definition translate_program (e : environ L3.compile.Term) (t : L3t.Term) : exp 
 Definition program_exp (pgm:program) : exp :=
   let (main, env) := myprogram_Program pgm in
   translate_program env main.
-
-(**************  never used ???  *******************
-Definition term_exp (e:L3t.environ L3.compile.Term) (t:term) : exception exp :=
-  let e' := stripEvalCommute.stripEnv e in
-  match L3U.term_Term e' t with
-  | Exc s => Exc ("Error while translating term to L3: " ++ s)
-  | Ret trm =>
-    match L3U.stripEnv e' with
-    | Exc s => Exc ("Error while stripping environ L3.compile.Termment: " ++ s)
-    | Ret e => Ret (translate_program e trm)
-    end
-  end.
-***************************************************)

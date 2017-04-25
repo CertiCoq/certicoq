@@ -364,7 +364,7 @@ Proof.
   intros t ht. destruct t; try discriminate.
   - left. exists t. reflexivity.
   - unfold strip in ht.
-    destruct t1; cbn in ht; try discriminate.
+    destruct t1; simpl in ht; try discriminate.
     + pose proof
            (mkApp_isApp
               (mkApp (L2kTerm_Term t1_1)

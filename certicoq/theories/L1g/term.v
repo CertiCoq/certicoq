@@ -1728,11 +1728,12 @@ with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
            dcons nm (instantiate n ty)
                  (instantiate n bod) rarg (instantiateDefs n ds)
        end.
-Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop
-with instantiates_ind' := Induction for instantiates Sort Prop
-with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop.
-Combined Scheme instantiateAll_ind
-         from instantiate_ind', instantiates_ind', instantiateDefs_ind'.
+
+(* Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop *)
+(* with instantiates_ind' := Induction for instantiates Sort Prop *)
+(* with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop. *)
+(* Combined Scheme instantiateAll_ind *)
+(*          from instantiate_ind', instantiates_ind', instantiateDefs_ind'. *)
 
 
 Lemma instantiateDefs_pres_dlength:

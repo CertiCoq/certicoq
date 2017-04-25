@@ -36,20 +36,51 @@ let name_of_chunk = function
   | Many32 -> "any32"
   | Many64 -> "any64"
 
-let rec implode = function
-    []       -> ""
-  | charlist -> (Char.escaped (List.hd charlist)) ^
-                (implode (List.tl charlist))
-
 let name_of_external = function
-  | EF_external(name, sg) -> sprintf "extern %S" (implode name)
-  | EF_builtin(name, sg) -> sprintf "builtin %S" (implode name)
+  | EF_external(name, sg) -> sprintf "extern %S" (camlstring_of_coqstring name)
+  | EF_builtin(name, sg) -> sprintf "builtin %S" (camlstring_of_coqstring name)
+  | EF_runtime(name, sg) -> sprintf "runtime %S" (camlstring_of_coqstring name)
   | EF_vload chunk -> sprintf "volatile load %s" (name_of_chunk chunk)
   | EF_vstore chunk -> sprintf "volatile store %s" (name_of_chunk chunk)
   | EF_malloc -> "malloc"
   | EF_free -> "free"
   | EF_memcpy(sz, al) ->
       sprintf "memcpy size %s align %s " (Z.to_string sz) (Z.to_string al)
-  | EF_annot(text, targs) -> sprintf "annot %S" (implode text)
-  | EF_annot_val(text, targ) ->  sprintf "annot_val %S" (implode text)
-  | EF_inline_asm (text, blah1, blah2) -> sprintf "inline_asm %S" (implode text)
+  | EF_annot(text, targs) -> sprintf "annot %S" (camlstring_of_coqstring text)
+  | EF_annot_val(text, targ) ->  sprintf "annot_val %S" (camlstring_of_coqstring text)
+  | EF_inline_asm(text, sg, clob) -> sprintf "inline_asm %S" (camlstring_of_coqstring text)
+  | EF_debug(kind, text, targs) ->
+      sprintf "debug%d %S" (P.to_int kind) (extern_atom text)
+
+let rec print_builtin_arg px oc = function
+  | BA x -> px oc x
+  | BA_int n -> fprintf oc "int %ld" (camlint_of_coqint n)
+  | BA_long n -> fprintf oc "long %Ld" (camlint64_of_coqint n)
+  | BA_float n -> fprintf oc "float %.15F" (camlfloat_of_coqfloat n)
+  | BA_single n -> fprintf oc "single %.15F" (camlfloat_of_coqfloat32 n)
+  | BA_loadstack(chunk, ofs) ->
+      fprintf oc "%s[sp + %ld]" (name_of_chunk chunk) (camlint_of_coqint ofs)
+  | BA_addrstack(ofs) ->
+      fprintf oc "sp + %ld" (camlint_of_coqint ofs)
+  | BA_loadglobal(chunk, id, ofs) ->
+      fprintf oc "%s[&%s + %ld]"
+              (name_of_chunk chunk) (extern_atom id) (camlint_of_coqint ofs)
+  | BA_addrglobal(id, ofs) ->
+      fprintf oc "&%s + %ld" (extern_atom id) (camlint_of_coqint ofs)
+  | BA_splitlong(hi, lo) ->
+      fprintf oc "splitlong(%a, %a)"
+                 (print_builtin_arg px) hi (print_builtin_arg px) lo
+
+let rec print_builtin_args px oc = function
+  | [] -> ()
+  | [a] -> print_builtin_arg px oc a
+  | a1 :: al ->
+      fprintf oc "%a, %a" (print_builtin_arg px) a1 (print_builtin_args px) al
+
+let rec print_builtin_res px oc = function
+  | BR x -> px oc x
+  | BR_none -> fprintf oc "_"
+  | BR_splitlong(hi, lo) ->
+      fprintf oc "splitlong(%a, %a)"
+                 (print_builtin_res px) hi (print_builtin_res px) lo
+

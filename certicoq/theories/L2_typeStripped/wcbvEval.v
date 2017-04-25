@@ -654,21 +654,21 @@ Lemma pre_WcbvEval_wcbvEval:
     assert (j4:= max_snd x1 x2).
     assert (j5:= max_fst x1 x2).
     assert (lx1: mx > x2). omega.
-    cbn. rewrite (j mx x0); try omega. rewrite H; try omega.
+    simpl. rewrite (j mx x0); try omega. rewrite H; try omega.
     rewrite e. rewrite H0; try omega.
     destruct (le_lt_dec ix (tlength args)).
     + rewrite H1; try omega. reflexivity.
     + omega.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    cbn. rewrite (j mx x); try omega. rewrite (H0 (mx - 1)); try omega.
-    rewrite (H (mx - 1)); try omega.
+    simpl. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
+    rewrite H0; try omega.
     destruct fn'; try reflexivity.
     + elim n; auto.
     + elim n0; auto.
   - destruct H, H0. exists (S (max x1 x0)). intros mx h.
     assert (l1:= max_fst x1 x0). assert (l2:= max_snd x1 x0).
-    cbn. rewrite (j mx x1); try omega. rewrite (H (mx - 1)); try omega.
+    simpl. rewrite (j mx x1); try omega. rewrite (H (mx - 1)); try omega.
     rewrite e. rewrite H0; try omega. destruct (le_lt_dec ix (tlength args)).
     + omega.
     + reflexivity.

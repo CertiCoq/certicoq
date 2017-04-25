@@ -1472,9 +1472,9 @@ with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
          | dcons nm bod rarg ds =>
            dcons nm (instantiate n bod) rarg (instantiateDefs n ds)
        end.
-Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop
-with instantiates_ind' := Induction for instantiates Sort Prop
-with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop.
+(* Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop *)
+(* with instantiates_ind' := Induction for instantiates Sort Prop *)
+(* with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop. *)
 
 Lemma instantiates_pres_tlength:
   forall n ds, tlength (instantiates n ds) = tlength ds.

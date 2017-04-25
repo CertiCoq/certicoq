@@ -6,10 +6,10 @@ Require Import Recdef.
 Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
-Require Import L1g.L1g.
-Require Import L2.compile.
-Require Import L2.term.
-Require Import L2.wcbvEval.
+Require Import L2.L2.
+Require Import L2k.compile.
+Require Import L2k.term.
+Require Import L2k.wcbvEval.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -17,33 +17,8 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 Set Template Cast Propositions.
-Set Printing Width 100.
+Set Printing Width 80.
 Set Printing Depth 1000.
-
-Print list.
-Inductive mist (A:Type) := mil: mist A | mcons: A -> mist A -> mist A.
-Print mist.
-Eval cbv in ((fun (x:forall A:Type, mist A) => x Prop) mil).
-
-(**********
-Inductive NN: Prop := NN0: NN | NNS: NN -> NN.
-Quote Recursively Definition p_NN1:= (NNS NN0).
-Eval cbv in (program_Program p_NN1).
-Fixpoint NNplus (m n: NN) : NN :=
-  match m with
-    | NN0 => n
-    | NNS u => NNplus u n
-  end.
-Inductive NNle (n:NN) : NN -> Prop :=
-| NNle_n : NNle n n
-| NNle_S : forall m:NN, NNle n m -> NNle n (NNS m).
- ******************)
-
-Quote Recursively Definition p_map := List.map.
-Eval cbv in (program_Program p_map).
-Check cons. Check @nil.
-Definition Nil : forall A:Type, list A := @nil.
-Eval cbv in ((fun (x:forall A:Type, list A) => x Prop) Nil).
 
 (** tactic for WcbvEval relation **)
 Ltac terms := repeat (eapply wCons; try eapply wAppCong; try eapply wInd;
@@ -354,6 +329,18 @@ Proof.
     omega.
   - exact lt_wf.
 Defined.
+(***
+Definition Gcdx := (Gcd 4 2).
+Eval cbv in Gcdx.
+Time Quote Recursively Definition pGcdx := Gcdx.
+Time Definition PGcdx := Eval cbv in (program_Program pGcdx).
+Time Definition Penv_Gcdx := env PGcdx.
+Time Definition Pmain_Gcdx := main PGcdx.
+Time Definition ans_Gcdx := Eval cbv in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
+Print ans_Gcdx.
+***)
+
+
 
 (***&
 Quote Recursively Definition pGcd := Gcd.
@@ -435,7 +422,7 @@ Print P_yyyyX.
 Goal
     let env := (env P_yyyyX) in
     let main := (main P_yyyyX) in
-    wcbvEval env 5 main = Ret ans_yyyyX.
+    wcbvEval (env) 100 (main) = Ret ans_yyyyX.
   vm_compute. reflexivity.
 Qed.
 
@@ -666,7 +653,8 @@ Fixpoint size (t : Tree) : nat :=
   match t with
     | T ts => S (fold (fun t a => size t + a) 0 ts)
   end.
-Definition myTree := (T (cons (T (unit (T nil))) (cons (T (unit (T nil))) nil))).
+Definition myTree := (T (cons (T (unit (T nil)))
+                              (cons (T (unit (T nil))) nil))).
 Eval cbv in size myTree.
 Definition size_myTree := size myTree.
 Quote Recursively Definition cbv_size_myTree :=

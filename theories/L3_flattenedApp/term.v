@@ -48,12 +48,13 @@ Lemma TermTerms_dec:
 Proof.
   apply TrmTrmsDefs_ind.
   - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-  - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
   - induction t; cross. intuition.
   - induction t0; cross.
-    destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
+    destruct (name_dec n n0); destruct (H t0); [lft | rght ..].
+    (***
   - induction t0; cross.
     destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
+***)
   - induction t1; cross.
     destruct (name_dec n n0); destruct (H t1_1); destruct (H0 t1_2); 
     [lft | rght ..]. 
@@ -61,17 +62,16 @@ Proof.
     destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
   - induction t; cross. destruct (string_dec s s0); [lft | rght].
   - induction t; cross. left. reflexivity.
+    (**
   - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
+**)
   - induction t0; cross.
     destruct (inductive_dec i i0); destruct (eq_nat_dec n n0);
     destruct (H t0);
     [lft | rght .. ].
   - induction t0; cross.
-    destruct p as [i n], p0 as [i0 n0].
-    destruct (eq_dec n n0); destruct (inductive_dec i i0);
-      destruct (H t0); destruct (H0 d0); [lft | rght .. ].
-  - induction t; cross.
-    destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
+    destruct (inductive_dec i i0), (H t0), (H0 d0); [lft | rght .. ].
+  - induction t; cross. destruct (eq_nat_dec n n0), (H d0); [lft | rght .. ].
   - destruct t; cross. lft.
   - induction tt; cross. lft.
   - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
@@ -88,7 +88,6 @@ Definition Terms_dec := proj1 (proj2 TermTerms_dec).
 
 Fixpoint TrmSize (t:Term) {struct t} : nat :=
   match t with
-    | TProd _ bod => S (TrmSize bod)
     | TLambda _ bod => S (TrmSize bod)
     | TLetIn _ dfn bod => S (TrmSize dfn + TrmSize bod)
     | TApp fn a => S (TrmSize fn + TrmSize a)
@@ -277,7 +276,7 @@ Fixpoint dnth (n:nat) (l:Defs) {struct l} : option (def Term) :=
     match l with
       | dnil => None
       | dcons nm tm args xs => match n with
-                                 | 0 => Some (mkdef Term nm prop tm args)
+                                 | 0 => Some (mkdef Term nm TAx tm args)
                                  | S m => dnth m xs
                                end
     end.
@@ -310,18 +309,14 @@ Qed.
 **)
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
-| wfSort: forall n s, WFTrm (TSort s) n
-| wfProd: forall n nm bod,
-            WFTrm bod (S n) -> WFTrm (TProd nm bod) n
 | wfLambda: forall n nm bod,
             WFTrm bod (S n) -> WFTrm (TLambda nm bod) n
 | wfLetIn: forall n nm dfn bod,
              WFTrm dfn n -> WFTrm bod (S n) ->
              WFTrm (TLetIn nm dfn bod) n
-| wfApp: forall n fn t, ~ isConstruct fn ->
-           WFTrm fn n -> WFTrm t n -> WFTrm (TApp fn t) n
+| wfApp: forall n fn t, WFTrm fn n -> WFTrm t n -> WFTrm (TApp fn t) n
+| wfAx: forall n, WFTrm TAx n
 | wfConst: forall n nm, WFTrm (TConst nm) n
-| wfInd: forall n i, WFTrm (TInd i) n
 | wfConstruct: forall n i m1 args,
                  WFTrms args n -> WFTrm (TConstruct i m1 args) n
 | wfCase: forall n m mch brs,
@@ -353,7 +348,6 @@ Proof.
   try (rewrite H0; try reflexivity; omega);
   try (rewrite H0, H2; try reflexivity; omega).
   - case_eq (m ?= i); intros; Compare_Prop; try reflexivity; omega.
-  - rewrite H1, H3; try assumption. reflexivity.
 Qed.
 
 Lemma WFTrm_up:
@@ -388,10 +382,6 @@ Proof.
   apply WFTrmTrmsDefs_ind; intros; cbn; try (solve[constructor]);
   try (solve[constructor; intuition]).
   - case_eq (m ?= n0); intros; Compare_Prop; subst; constructor; omega.
-  - constructor; intuition.
-    + destruct H4 as [x0 [x1 [x2 j]]]. 
-      destruct fn; cbn; try discriminate.
-      * cbn in j. myInjection j. apply H. auto.
   - constructor. rewrite liftDs_pres_dlength.
     refine (H0 (n0 + dlength defs)).
 Qed. 
@@ -461,7 +451,6 @@ Section PoccTrm_sec.
 Variable nm:string.
 
 Inductive PoccTrm : Term -> Prop :=
-| PoProdBod: forall s bod, PoccTrm bod -> PoccTrm (TProd s bod)
 | PoLambdaBod: forall s bod, PoccTrm bod -> PoccTrm (TLambda s bod)
 | PoLetInDfn: forall s dfn bod,
                 PoccTrm dfn -> PoccTrm (TLetIn s dfn bod)
@@ -470,9 +459,9 @@ Inductive PoccTrm : Term -> Prop :=
 | PoAppL: forall fn a, PoccTrm fn -> PoccTrm (TApp fn a)
 | PoAppA: forall fn a, PoccTrm a -> PoccTrm (TApp fn a)
 | PoConst: PoccTrm (TConst nm)
-                   (******
-| PoCaseA: forall n p mch brs, PoccTrm (TCase ((mkInd nm n), p) mch brs)
-*****)
+     (***
+| PoCaseA: forall n mch brs, PoccTrm (TCase (mkInd nm n) mch brs)
+***)
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
 | PoCaseR: forall n mch brs, PoccDefs brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
@@ -563,11 +552,6 @@ Lemma Pocc_TApp:
 inversion 1; intuition.
 Qed.
 
-Lemma notPocc_TProd:
-  forall n bod, ~ PoccTrm (TProd n bod) -> ~ PoccTrm bod.
-intuition. 
-Qed.
-
 Lemma notPocc_TLambda:
   forall n bod, ~ PoccTrm (TLambda n bod) -> ~ PoccTrm bod.
 intuition. 
@@ -638,10 +622,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelEq: forall n, Instantiate n (TRel n) tin
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
-| ISort: forall n srt, Instantiate n (TSort srt) (TSort srt)
-| IProd: forall n nm bod ibod,
-             Instantiate (S n) bod ibod -> 
-             Instantiate n (TProd nm bod) (TProd nm ibod)
 | ILambda: forall n nm bod ibod,
              Instantiate (S n) bod ibod -> 
              Instantiate n (TLambda nm bod) (TLambda nm ibod)
@@ -649,11 +629,10 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
                Instantiate n dfn idfn -> Instantiate (S n) bod ibod ->
                Instantiate n (TLetIn nm dfn bod) (TLetIn nm idfn ibod)
 | IApp: forall n t a it ia ,
-          ~ isConstruct t ->
           Instantiate n t it -> Instantiate n a ia ->
           Instantiate n (TApp t a) (TApp it ia)
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
-| IInd: forall n ind, Instantiate n (TInd ind) (TInd ind)
+| IAx: forall n, Instantiate n TAx TAx
 | IConstruct: forall n ind m1 args iargs,
               Instantiates n args iargs ->
               Instantiate n (TConstruct ind m1 args)
@@ -665,6 +644,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
 | IProof: forall n, Instantiate n TProof TProof
+| IWrong: forall n, Instantiate n TWrong TWrong                                
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,
@@ -734,7 +714,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
                 end
     | TApp t a => TApp (instantiate n t) (instantiate n a)
     | TLambda nm bod => TLambda nm (instantiate (S n) bod)
-    | TProd nm bod => TProd nm (instantiate (S n) bod)
     | TCase np s ts => TCase np (instantiate n s) (instantiateDefs n ts)
     | TLetIn nm tdef bod =>
          TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
@@ -782,17 +761,17 @@ Proof.
 Qed.
 
 Lemma instantiate_Instantiate:
-  (forall t m, WFTrm t m -> forall n, Instantiate n t (instantiate n t)) /\
-  (forall ts m, WFTrms ts m ->
-                forall n, Instantiates n ts (instantiates n ts)) /\
-  (forall (ds:Defs) (m:nat), WFTrmDs ds m -> 
-               forall n, InstantiateDefs n ds (instantiateDefs n ds)).
+  (forall t n, Instantiate n t (instantiate n t)) /\
+  (forall ts n, Instantiates n ts (instantiates n ts)) /\
+  (forall (ds:Defs) n, InstantiateDefs n ds (instantiateDefs n ds)).
 Proof.
-  apply WFTrmTrmsDefs_ind; cbn; intros xn; intuition.
-  - destruct (lt_eq_lt_dec n m). destruct s.
-    + rewrite (proj1 (nat_compare_lt _ _) l). apply (IRelLt l).
-    + rewrite (proj2 (nat_compare_eq_iff _ _) e). rewrite e. apply IRelEq.
-    + rewrite (proj1 (nat_compare_gt _ _) l). apply (IRelGt l). 
+  apply TrmTrmsDefs_ind; intros; cbn; try (solve [constructor]);
+  try (solve[constructor; intuition]).
+  - unfold instantiate. destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
+    + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
+    + rewrite (proj2 (nat_compare_eq_iff _ _) h). subst. apply IRelEq.
+    + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
+      assumption. assumption.
 Qed.
 
 Lemma instant_pres_PoccTrm:
@@ -934,35 +913,16 @@ Proof.
     + cbn. Compare_Prop. erewrite (proj2 (Nat.compare_lt_iff _ _)).
       reflexivity. omega.
   - cbn. apply f_equal. rewrite <- H at 2. reflexivity.
-  - cbn. apply f_equal. rewrite <- H at 2. reflexivity.
   - cbn. apply f_equal2.
     + apply H.
     + rewrite <- H0 at 2. reflexivity.
   - cbn. apply f_equal2. apply H. apply H0.
-  - change
-      (TConstruct i n (instantiates m (lifts m t)) =
-       TConstruct i n t).
-    apply f_equal3; try reflexivity. apply H.
-  - change (TCase p (instantiate m (lift m t))
-                  (instantiateDefs m (liftDs m d)) =
-            TCase p t d).
-    apply f_equal2. apply H. apply H0.
-  - change
-      (TFix (instantiateDefs (m + dlength (liftDs (m + dlength d) d))
-                             (liftDs (m + dlength d) d)) n =
-       TFix d n).
-    rewrite liftDs_pres_dlength.
+  - cbn. apply f_equal3; try reflexivity. apply H.
+  - cbn. apply f_equal2. apply H. apply H0.
+  - cbn. rewrite liftDs_pres_dlength.
     apply f_equal2; try reflexivity. apply H.
-  - change
-      (tcons (instantiate m (lift m t))
-             (instantiates m (lifts m t0)) =
-       tcons t t0).
-    apply f_equal2. apply H. apply H0.
-  - change
-      (dcons n (instantiate m (lift m t)) n0
-             (instantiateDefs m (liftDs m (d))) =
-       dcons n t n0 d).
-    apply f_equal3; try reflexivity. apply H. apply H0.
+  - cbn. apply f_equal2. apply H. apply H0.
+  - cbn. apply f_equal3; try reflexivity. apply H. apply H0.
 Qed.
 
 Lemma lift_lift:
@@ -991,7 +951,6 @@ Proof.
     + rewrite (@match_cn_Gt n); try omega.
       destruct i. reflexivity.
       case_eq (n ?= i); intros; Compare_Prop; try omega. reflexivity.
-  - cbn. apply f_equal. rewrite H; try omega. reflexivity.
   - cbn. apply f_equal. rewrite H; try omega. reflexivity.
   - cbn. apply f_equal2. apply H. omega. apply H0. omega.
   - cbn. apply f_equal2. apply H. omega. apply H0. omega.

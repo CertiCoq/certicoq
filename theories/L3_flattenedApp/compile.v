@@ -26,17 +26,14 @@ Definition L2_5Pgm := Program L2_5Term.
 
 Inductive Term : Type :=
 | TRel       : nat -> Term
-| TSort      : Srt -> Term
 | TProof     : Term 
-| TProd      : name -> Term -> Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term -> Term
 | TConst     : string -> Term
 | TAx        : Term
-| TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* index *) -> Terms -> Term
-| TCase      : (inductive * nat) (* # of pars *) ->
+| TCase      : inductive ->
                Term (* discriminee *) -> Defs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong : Term
@@ -52,9 +49,6 @@ Scheme Trm_ind' := Induction for Term Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
 Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
 Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
-Notation prop := (TSort SProp).
-Notation set_ := (TSort SSet).
-Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
 
 
@@ -257,7 +251,6 @@ Fixpoint lift (n:nat) (t:Term) : Term :=
                         | Lt => m
                         | _ => S m
                       end)
-    | TProd nm bod => TProd nm (lift (S n) bod)
     | TLambda nm bod => TLambda nm (lift (S n) bod)
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg => TApp (lift n fn) (lift n arg)
@@ -445,29 +438,23 @@ Proof.
 Qed.
 
   
-(** Auxiliary function to avoid case blowup when expanding [strip] in L3 **)
+(** Auxiliary function to avoid case blowup when expanding [strip] in L3 **
 Definition isL2_5Cnstr: L2_5Term -> option (inductive * nat * nat) :=
   L2_5.term.isL2_5Cnstr.
-  
+ ****)
+
 Function strip (t:L2_5Term) : Term :=
   match t with
     | L2_5.compile.TProof => TProof
     | L2_5.compile.TRel n => (TRel n)
-    | L2_5.compile.TSort s => (TSort s)
     | L2_5.compile.TCast s => strip s
-    | L2_5.compile.TProd nm bod => TProd nm (strip bod)
     | L2_5.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2_5.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
     | L2_5.compile.TApp fn arg args =>
-      let sargs := tcons (strip arg) (strips args) in
-      match isL2_5Cnstr fn with 
-        | Some (i, n, arty) => etaExp_cnstr i n (arty - (tlength sargs)) sargs
-        | None => mkApp (strip fn) sargs
-       end
+      mkApp (strip fn) (tcons (strip arg) (strips args))
     | L2_5.compile.TConst nm => TConst nm
     | L2_5.compile.TAx => TAx
-    | L2_5.compile.TInd i => (TInd i)
-    | L2_5.compile.TConstruct i n arity => etaExp_cnstr i n arity tnil
+    | L2_5.compile.TConstruct i n args => TConstruct i n (strips args)
     | L2_5.compile.TCase n mch brs => TCase n (strip mch) (stripDs brs)
     | L2_5.compile.TFix ds n => TFix (stripDs ds) n
     | L2_5.compile.TWrong => TWrong
@@ -506,6 +493,7 @@ Proof.
   cbn. rewrite IHds. reflexivity.
 Qed.
   
+(**********
 Lemma isL2_5Cnstr_TApp_None:
   forall fn t ts, isL2_5Cnstr (L2_5.compile.TApp fn t ts) = None.
 Proof.
@@ -576,7 +564,6 @@ Proof.
   - rewrite (IHu _ _ _ H). reflexivity.
   - myInjection H. reflexivity.
 Qed.
-
                                          
 Lemma TFix_hom:
   forall defs n,
@@ -660,6 +647,8 @@ Lemma TApp_hom:
 Proof.
   intros. case_eq fn; intros; try reflexivity.
 Qed.
+ ***********)
+
 
 
 Function stripEC (ec:L2_5EC) : envClass Term :=

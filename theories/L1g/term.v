@@ -35,7 +35,7 @@ Fixpoint print_term (t:Term) : string :=
       " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
     | TConst s => "[" ++ s ++ "]"
     | TInd _ => " TIND "
-    | TConstruct _ _ n => " (CSTR " ++ (nat_to_string n) ++ ") "
+    | TConstruct _ _ _ _ => " (CSTR) "
     | TCase n _ mch _ =>
       " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++ (print_term mch) ++
                  " _ " ++") "
@@ -111,8 +111,8 @@ Proof.
   - destruct t; cross. lft.
   - destruct t; cross. destruct (inductive_dec i i0); [lft | rght].
   - destruct t; cross.
-    destruct (inductive_dec i i0); destruct (eq_nat_dec n n1);
-    destruct (eq_nat_dec n0 n2); [lft | rght .. ].
+    destruct (inductive_dec i i0), (eq_nat_dec n n2),
+    (eq_nat_dec n0 n3), (eq_nat_dec n1 n4); [lft | rght .. ].
   - destruct t1; cross. destruct p as [i n], p0 as [i0 n0].
     + destruct (eq_dec n n0); destruct (inductive_dec i i0);
       destruct (H t1_1); destruct (H0 t1_2);
@@ -309,41 +309,41 @@ left. auto.
 Qed.
 
 Definition isConstruct (t:Term) : Prop :=
-  exists i n m, t = TConstruct i n m.
-Lemma IsConstruct: forall i n m, isConstruct (TConstruct i n m).
-intros. exists i, n, m. reflexivity.
+  exists i n np na, t = TConstruct i n np na.
+Lemma IsConstruct: forall i n np na, isConstruct (TConstruct i n np na).
+intros. exists i, n, np, na. reflexivity.
 Qed.
 Hint Resolve IsConstruct.
 
 Lemma isConstruct_dec: forall t, isConstruct t \/ ~ isConstruct t.
 Proof.
   destruct t;
-  try (right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate).
+  try (right; intros h; destruct h as [x0 [x1 [x2 [x3 j]]]]; discriminate).
   - left. auto.
 Qed.
 
 
 Inductive isCanonical : Term -> Prop :=
-| canC: forall (i:inductive) (n m:nat), isCanonical (TConstruct i n m)
-| canA: forall (arg:Term) (args:Terms) (i:inductive) (n m:nat), 
-          isCanonical (TApp (TConstruct i n m) arg args).
+| canC: forall (i:inductive) (n np na:nat), isCanonical (TConstruct i n np na)
+| canA: forall (arg:Term) (args:Terms) (i:inductive) (n np na:nat), 
+          isCanonical (TApp (TConstruct i n np na) arg args).
 Hint Constructors isCanonical.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
 Proof.
   induction t; try (solve [right; intros h; inversion h; inversion H;
                            destruct H1; discriminate]).
-   - destruct (isConstruct_dec t1).
-    + left. unfold isConstruct in H. destruct H as [x0 [x1 [x2 j]]]. subst.
-      constructor.
+  - destruct (isConstruct_dec t1).
+    + left. unfold isConstruct in H. destruct H as [x0 [x1 [x2 [x3 j]]]].
+      subst. constructor.
     + right. intros h. inversion_Clear h. elim H. auto.
   - left. constructor.
 Qed.
-
-Function canonicalP (t:Term) : option (nat * Terms * nat) :=
+     
+Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
-    | TConstruct _ r m => Some (r, tnil, m)
-    | TApp (TConstruct _ r m) arg args => Some (r, tcons arg args, m)
+    | TConstruct _ r _ _ => Some (r, tnil)
+    | TApp (TConstruct _ r _ _) arg args => Some (r, tcons arg args)
     | _ => None
   end.
 
@@ -359,8 +359,8 @@ Lemma isCanonical_canonicalP:
   forall t, isCanonical t -> exists x, canonicalP t = Some x.
 Proof.
   induction 1; simpl.
-  - exists (n, tnil, m). reflexivity.
-  - exists (n, tcons arg args, m). reflexivity.
+  - exists (n, tnil). reflexivity.
+  - exists (n, tcons arg args). reflexivity.
 Qed.
 
 (** some utility operations on [Terms] ("lists" of Term) **)
@@ -929,7 +929,7 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TInd i), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TConstruct i n n0), arg, tnil. split. reflexivity.
+  - exists (TConstruct i n n0 n1), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TCase p fn1 fn2 d), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
@@ -975,7 +975,7 @@ Inductive WFapp: Term -> Prop :=
 | wfaConst: forall nm, WFapp (TConst nm)
 | wfaAx: WFapp TAx
 | wfaInd: forall i, WFapp (TInd i)
-| wfaConstruct: forall i m1 m2, WFapp (TConstruct i m1 m2)
+| wfaConstruct: forall i m np na, WFapp (TConstruct i m np na)
 | wfaCase: forall m ty mch brs,
             WFapp mch -> WFappDs brs -> WFapp ty ->
             WFapp (TCase m ty mch brs)
@@ -1005,7 +1005,7 @@ Qed.
 
 Lemma canonicalP_pres_WFapp:
   forall t, WFapp t ->
-        forall r args arty, canonicalP t = Some (r, args, arty) -> WFapps args.
+  forall r args, canonicalP t = Some (r, args) -> WFapps args.
 Proof.
   induction t; simpl; intros; try discriminate.
   - destruct t1; try discriminate. myInjection H0. inversion_Clear H.
@@ -1243,7 +1243,7 @@ Inductive WFTrm: Term -> nat -> Prop :=
 | wfConst: forall n nm, WFTrm (TConst nm) n
 | wfAx: forall n, WFTrm TAx n
 | wfInd: forall n i, WFTrm (TInd i) n
-| wfConstruct: forall n i m1 m2, WFTrm (TConstruct i m1 m2) n
+| wfConstruct: forall n i m np na, WFTrm (TConstruct i m np na) n
 | wfCase: forall n m ty mch brs,
             WFTrm mch n -> WFTrmDs brs n -> WFTrm ty n ->
             WFTrm (TCase m ty mch brs) n
@@ -1301,7 +1301,7 @@ Inductive PoccTrm : Term -> Prop :=
 | PoCaseR: forall n ty mch brs, PoccDefs brs -> PoccTrm (TCase n ty mch brs)
 | PoCaseTy: forall n ty mch brs, PoccTrm ty -> PoccTrm (TCase n ty mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
-| PoCnstr: forall m1 m2 m3, PoccTrm (TConstruct (mkInd nm m1) m2 m3)
+| PoCnstr: forall m1 m2 np na, PoccTrm (TConstruct (mkInd nm m1) m2 np na)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
 | PoTtl: forall t ts, PoccTrms ts -> PoccTrms (tcons t ts)
@@ -1336,13 +1336,15 @@ intros s2 h j. elim h. rewrite <- j. auto.
 Qed.
 
 Lemma Pocc_TCnstr:
-  forall s2 m1 m2 m3, PoccTrm (TConstruct (mkInd s2 m1) m2 m3) -> nm = s2.
-intros s2 m1 m2 m3 h. inversion h. reflexivity.
+  forall s2 m1 m2 np na,
+    PoccTrm (TConstruct (mkInd s2 m1) m2 np na) -> nm = s2.
+intros s2 m1 m2 np na h. inversion h. reflexivity.
 Qed.
 
 Lemma notPocc_TCnstr:
-  forall s2 m1 m2 m3, ~ PoccTrm (TConstruct (mkInd s2 m1) m2 m3) -> nm <> s2.
-intros s2 m1 m2 m3 h j. elim h. rewrite <- j. auto. 
+  forall s2 m1 m2 np na,
+    ~ PoccTrm (TConstruct (mkInd s2 m1) m2 np na) -> nm <> s2.
+intros s2 m1 m2 np na h j. elim h. rewrite <- j. auto. 
 Qed.
 
 Lemma PoccTrms_tappendl:
@@ -1615,8 +1617,8 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
 | IAx: forall n, Instantiate n TAx TAx
 | IInd: forall n ind, Instantiate n (TInd ind) (TInd ind)
-| IConstruct: forall n ind m1 m2,
-                Instantiate n (TConstruct ind m1 m2) (TConstruct ind m1 m2)
+| IConstruct: forall n ind m1 np na,
+      Instantiate n (TConstruct ind m1 np na) (TConstruct ind m1 np na)
 | ICase: forall n np ty s ts is its ity,
            Instantiate n s is -> Instantiate n ty ity ->
            InstantiateDefs n ts its ->
@@ -2006,4 +2008,3 @@ Proof.
   intros. apply instantiate_pres_WFapp.
   assumption. constructor. assumption.
 Qed.
-

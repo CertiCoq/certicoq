@@ -32,7 +32,8 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TAx        : Term
 | TInd       : inductive -> Term
-| TConstruct : inductive -> nat (* cnstr no *) -> nat (* arity *) -> Term
+| TConstruct : inductive -> nat (* cnstr no *) ->
+               nat (* # pars *) -> nat (* # args *) -> Term
                                   (* use Defs to code branches *)
 | TCase      : (inductive * nat) (* # of pars *) ->
                Term (* discriminee *) -> Defs (* # args, branch *) -> Term
@@ -77,7 +78,7 @@ Function strip (t:L1gTerm) : Term :=
     | L1g.compile.TConst nm => TConst nm
     | L1g.compile.TAx => TAx
     | L1g.compile.TInd i => TInd i
-    | L1g.compile.TConstruct i m arty => TConstruct i m arty
+    | L1g.compile.TConstruct i m np na => TConstruct i m np na
     | L1g.compile.TCase n _ mch brs => TCase n (strip mch) (stripDs brs)
     | L1g.compile.TFix ds n => TFix (stripDs ds) n
     | L1g.compile.TWrong _ => TWrong

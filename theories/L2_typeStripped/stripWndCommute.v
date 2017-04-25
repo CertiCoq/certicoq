@@ -158,7 +158,7 @@ Proof.
     clear H0. subst.
     rewrite <- canonicalP_hom in e.
     case_eq (L1g.term.canonicalP x1); intros; rewrite H in e; try discriminate.
-    + destruct p0 as [[z0 z1] z2]. cbn in e. myInjection e.
+    + destruct p0 as [z0 z1]. cbn in e. myInjection e.
       destruct ml. cbn in e0.
       rewrite <- tskipn_hom in e0.
       case_eq (L1g.term.tskipn n0 z1); intros; rewrite H0 in e0;

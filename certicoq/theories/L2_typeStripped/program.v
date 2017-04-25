@@ -98,12 +98,12 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctConst: forall n p pd nm,
                Crct p 0 prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
 | CrctAx: forall n p, Crct p 0 prop -> Crct p n TAx
-| CrctConstruct: forall n p ipkgNm inum cnum arty ipkg itp cstr pars,
+| CrctConstruct: forall n p ipkgNm inum cnum np na ipkg itp cstr pars,
                    Crct p 0 prop ->
                    LookupTyp ipkgNm p pars ipkg ->
                    getInd ipkg inum = Ret itp ->
                    getCnstr itp cnum = Ret cstr ->
-                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum arty)
+                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum np na)
 | CrctCase: forall n p m mch brs,
               Crct p n mch -> CrctDs p n brs ->
               Crct p n (TCase m mch brs)
@@ -578,8 +578,8 @@ Qed.
 
 Lemma Crct_invrt_Construct:
   forall p n construct, Crct p n construct ->
-   forall ipkgNm inum cnum arty,
-     construct = (TConstruct (mkInd ipkgNm inum) cnum arty) ->
+   forall ipkgNm inum cnum np na,
+     construct = (TConstruct (mkInd ipkgNm inum) cnum np na) ->
     Crct p n prop /\
     exists npars itypk,
       LookupTyp ipkgNm p npars itypk /\
@@ -587,10 +587,10 @@ Lemma Crct_invrt_Construct:
                         exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
 Proof.
   induction 1; intros; try discriminate.
-  - assert (j:= IHCrct1 _ _ _ _ H2). intuition.
+  - assert (j:= IHCrct1 _ _ _ _ _ H2). intuition.
     destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
     destruct h1. split; try assumption. apply Lookup_weaken; trivial.
-  - assert (j:= IHCrct _ _ _ _ H2). intuition.
+  - assert (j:= IHCrct _ _ _ _ _ H2). intuition.
     destruct H4 as [npars [itypk [h1 h2]]]. exists npars, itypk. intuition.
     destruct h1. split; try assumption. apply Lookup_weaken; trivial.
   - myInjection H3. intuition.
@@ -659,11 +659,7 @@ Lemma Instantiate_pres_Crct:
   forall m p, n <= m -> CrctDs p (S m) ds -> Crct p m tin -> CrctDs p m ids).
 Proof.
   intros tin. apply InstInstsDefs_ind; intros; trivial.
-  - destruct (Crct_invrt_Rel H0 eq_refl).
-    erewrite mkApp_tnil_ident; eassumption.
-  - apply CrctRel.
-    + omega.
-    + eapply Crct_Sort. eassumption.
+  - destruct (Crct_invrt_Rel H0 eq_refl). constructor. omega. assumption.
   - destruct (Crct_invrt_Rel H0 eq_refl). apply CrctRel.
     + omega.
     + eapply Crct_Sort. eassumption.

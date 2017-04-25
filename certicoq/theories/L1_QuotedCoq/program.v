@@ -11,24 +11,13 @@ Require Import L1.term.
 Open Scope list_scope.
 Set Implicit Arguments.
 
-(** Malecha's [program] is inside out **)
-Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
-  mkCnstr (fst (fst c)) (snd c).
-
-Definition ibody_ityp (iib:ident * inductive_body) : ityp :=
-  let Ctors := map cnstr_Cnstr (ctors (snd iib))
-  in mkItyp (fst iib) Ctors.
-
-Definition ibodies_itypPack (ibs:list (ident * inductive_body)) : itypPack :=
-  map ibody_ityp ibs.
-
 (** note the backwards environ, a la template_coq **)
 Fixpoint program_mypgm (p:program) (e:environ term) : AstCommon.Program term :=
   match p with
     | PIn t => {| main:= t; env:= e |}
     | PConstr nm t p => program_mypgm p (snoc e (nm ,ecTrm t))
     | PType nm npar ibs p => 
-      let Ibs := ibodies_itypPack ibs
+      let Ibs := AstCommon.ibodies_itypPack ibs
       in program_mypgm p (snoc e (nm, ecTyp term npar Ibs))
     | PAxiom nm _ p => program_mypgm p (snoc e (nm, ecAx term))
   end.

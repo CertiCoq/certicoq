@@ -33,8 +33,8 @@ Inductive awndEval : Term -> Term -> Prop :=
      (* Case argument must be in Canonical form *)
      (* np is the number of parameters of the datatype *)
 | aCase: forall (ml:inductive * nat) (s mch:Term)
-                 (args ts:Terms) (brs:Defs) (n arty:nat),
-            canonicalP mch = Some (n, args, arty) ->
+                 (args ts:Terms) (brs:Defs) (n:nat),
+            canonicalP mch = Some (n, args) ->
             tskipn (snd ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
             awndEval (TCase ml mch brs) s

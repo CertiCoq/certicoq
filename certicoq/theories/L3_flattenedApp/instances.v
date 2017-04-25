@@ -6,11 +6,12 @@ Require Import Common.Common.
 Instance bigStepOpSemL3Term:
   BigStepOpSem (Program Term) (Program Term).
 Proof.
-  intros s sv. destruct s, sv. exact (WcbvEval_env env env0 /\ WcbvEval env main main0).
+  intros s sv. destruct s, sv.
+  exact (WcbvEval_env env env0 /\ WcbvEval env main main0).
 Defined.
 
 Instance WfL3Term : GoodTerm (Program L3.compile.Term) :=
-  fun p  => L3.program.Crct (env p) 0 (main p).
+  fun p  => L3.program.crctTerm (env p) 0 (main p).
 
 Require Import certiClasses2.
 (* FIX!! *)

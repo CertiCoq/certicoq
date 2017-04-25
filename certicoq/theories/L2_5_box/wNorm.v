@@ -8,8 +8,6 @@ Require Import Coq.omega.Omega.
 Require Import Common.Common.
 Require Import L2_5.term.
 Require Import L2_5.program.
-Require Import L2_5.wndEval.
-Require Import L2_5.awndEval.
 Require Import L2_5.wcbvEval.
 
 Local Open Scope string_scope.
@@ -29,15 +27,12 @@ Variable p: environ Term.
 Inductive WNorm: Term -> Prop :=
 | WNPrf: WNorm TProof
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
-| WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNAx: WNorm TAx
 | WNCase: forall mch n brs,
             WNorm mch -> ~ isCanonical mch ->
             WNorm (TCase n mch brs)
 | WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
-| WNInd: forall i, WNorm (TInd i)
-| WNSort: forall srt, WNorm (TSort srt)
 | WNApp: forall fn t ts,
            WNorm fn -> WNorm t -> WNorms ts ->
            ~ isLambda fn -> ~ isFix fn -> ~ isApp fn ->
@@ -233,32 +228,5 @@ Proof.
   - inversion_Clear H1. constructor; intuition.
 Qed.
 **********************)
-
-(** If a program is in weak normal form, it has no wndEval step **)
-Lemma wNorm_no_wndStep_lem:
-  (forall t s, wndEval p t s -> ~ WNorm t) /\
-  (forall ts ss, wndEvals p ts ss -> ~ WNorms ts).
-Proof.
-  apply wndEvalEvals_ind; intros; intros h;
-  try (solve[inversion h]);
-  try (solve[inversion h; subst; contradiction]).
-  - inversion h. subst. elim H5. exists nm, bod. reflexivity.
-  - inversion h. subst. elim H3.
-    eapply canonicalP_isCanonical. eassumption.
-  - inversion_Clear h.  elim H6. apply IsFix.
-    rewrite e in H4. myInjection H4. omega.
-  - inversion_Clear h. elim H.
-    + assumption.
-    + elim H. constructor.
-  - inversion_Clear h.
-    + elim H. constructor; assumption.
-    + contradiction.
-Qed.
-
-Lemma wNorm_no_wndStep:
-  forall t, WNorm t -> no_wnd_step p t.
-unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
-elim (proj1 (wNorm_no_wndStep_lem) _ _ h1). assumption.
-Qed.
 
 End Sec_environ.

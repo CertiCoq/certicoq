@@ -6,8 +6,7 @@ Require Import Common.Common.
 Require Import L1g.instances.
 Require Import certiClasses2.
 Require Import L2.stripEvalCommute.
-Require Import ExtLib.Data.ListNth.
-Set Template Cast Propositions.
+
 
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)
@@ -24,10 +23,11 @@ Definition flattenApp (t:L2.compile.Term) :
     | s => (s, nil)
   end.
 
+(***********
 Global Instance QuestionHeadL2Term: QuestionHead (Program L2.compile.Term) :=
   fun q t =>
     match q, fst (flattenApp (main t)) with
-      | Cnstr ind ci, TConstruct ind2 ci2 _ _ =>
+      | Cnstr ind ci, TConstruct ind2 ci2 _(*nargs*) =>
         andb (decide (ind=ind2)) (decide (ci=ci2))
       | Abs, TLambda _ _ => true
       | _, _ => false 
@@ -37,7 +37,7 @@ Global Instance ObsSubtermL2Term :
   ObserveNthSubterm (Program L2.compile.Term) :=
   fun n t =>
     match  (flattenApp (main t)) with
-      | (TConstruct _ _ _ _, subterms) =>
+      | (TConstruct _ _ _ , subterms) =>
         match List.nth_error subterms  n with
           | Some st => Some {| env := env t; main := st |}
           | None => None
@@ -83,7 +83,7 @@ Definition P_true := Eval cbv in (program_Program p_true).
 Quote Recursively Definition p_false := (fun (x:True) => false).
 Definition P_false := Eval cbv in (program_Program p_false).
 
-Lemma foo1:
+Lemma foo:
   yesPreserved P_true P_false.
 Proof.
   unfold P_true, P_false, yesPreserved, questionHead, QuestionHeadL2Term; cbn.
@@ -94,32 +94,10 @@ Qed.
 Goal P_true ⊑ P_false.
 Proof.
   unfold P_true, P_false. constructor.
-  - apply foo1.
+  - apply foo.
   - intros. unfold observeNthSubterm, ObsSubtermL2Term. cbn. constructor.
 Qed.
 
-(** yesPreserved and proofs **)
-Inductive NN: Prop := NN0: NN | NNS: NN -> NN.
-Quote Recursively Definition p_NN0 := NN0.
-Definition P_NN0 := Eval cbv in (program_Program p_NN0).
-
-Quote Recursively Definition p_NN1:= (NNS NN0).
-Definition P_NN1 := Eval cbv in (program_Program p_NN1).
-
-Goal
-  yesPreserved P_NN0 P_NN1.
-Proof.
-  unfold P_NN0, P_NN1, yesPreserved, questionHead, QuestionHeadL2Term.
-  cbn. unfold implb. destruct q; try reflexivity.
-Qed.
-
-Goal
-  yesPreserved P_NN1 P_NN0.
-Proof.
-  unfold P_NN0, P_NN1, yesPreserved, questionHead, QuestionHeadL2Term.
-  cbn. unfold implb. destruct q; try reflexivity.
-Qed.
- 
 
 Lemma identity_pres_yes:
   forall (p:Program Term), yesPreserved p p.
@@ -218,3 +196,5 @@ Proof.
 Qed.
 Print Assumptions certiL1g_to_L2Correct.
 (* Closed under the global context *)
+
+*************)

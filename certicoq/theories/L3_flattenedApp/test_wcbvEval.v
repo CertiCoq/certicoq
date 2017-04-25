@@ -13,7 +13,23 @@ Local Open Scope bool.
 Local Open Scope list.
 Local Open Scope string_scope.
 
-Set Template Cast Propositions.  (** L1 doesn't strip proofs **)
+Set Template Cast Propositions. 
+
+Inductive LL (B:Type) : Type := NN: LL B | CC: B -> LL B -> LL B.
+Definition CCC := CC.
+Definition tt := true.
+Definition ffs := (CC bool false (NN bool)).
+Quote Recursively Definition p_CC := CC.
+Eval cbv in (program_Program p_CC).
+Quote Recursively Definition p_CC_bool := (CC bool).
+Eval cbv in (program_Program p_CC_bool).
+Quote Recursively Definition p_CC_bool_tt := (CC bool tt).
+Eval cbv in (program_Program p_CC_bool_tt).
+Quote Recursively Definition p_CC_bool_tt_ffs := (CC bool tt ffs).
+Eval cbv in (program_Program p_CC_bool_tt_ffs).
+
+Reset LL.
+
 Set Printing Width 80.
 Set Printing Depth 1000.
 Set Implicit Arguments.
@@ -24,9 +40,7 @@ Notation SS := (TConstruct NN 1).
 Notation ZZ := (TConstruct NN 0).
 Notation Lam := (TLambda).
 Notation tLam := (tLambda).
-Notation Pi := (TProd).
 Notation tPi := (tProd).
-Notation PROP := (TSort sProp).
 Notation tPROP := (tSort sProp).
 Notation AND := (mkInd "Logic.and" 0).
 Notation CONJ := (TConstruct AND 0).
@@ -43,11 +57,11 @@ Notation "fn [| arg @ args |]" :=
   (TApp fn arg args)  (at level 90, left associativity).
 
 
-
 (** Check eta expansion of constructors **)
 Quote Recursively Definition pcons := (@cons bool).
 Definition Pcons := Eval cbv in (program_Program pcons).
 Print Pcons.
+
 Inductive fyy : Set := Fyy: bool -> bool -> bool -> fyy.
 Quote Recursively Definition pFyy := Fyy.
 Definition PFyy := Eval cbv in (program_Program pFyy).

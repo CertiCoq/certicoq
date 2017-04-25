@@ -93,70 +93,70 @@ Global Instance certiL3_to_L4_correct :
   CerticoqTranslationCorrect certiL3 certiL4.
 Proof.
   split.
-  - red; unfold certiClasses.translate, goodTerm, WfL3Term.
-    intros.
-    pose proof (L3_to_L4_correct.Crct_wf_environ _ _ H).
-    unfold certiL3_to_L4. hnf.
-    simpl. destruct s. simpl in *.
-    unfold translate_program. simpl.
-    unfold translate. simpl.
-    now apply exp_wf_lets.
+{ red; unfold certiClasses.translate, goodTerm, WfL3Term.
+  intros.
+  pose proof (L3.program.Crct_invrt_any H).
+  unfold certiL3_to_L4. hnf.
+  simpl. destruct s. simpl in *.
+  unfold translate_program. simpl.
+  unfold translate. simpl.
+  now apply exp_wf_lets. }
 
-  - red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
-    assert(He:=Crct_wf_environ _ _ H).
-    repeat red in H0.
-    destruct s. destruct sv.
-    destruct H0. 
-    pose proof (L3_to_L4_correct.translate_correct' env _ _ _ He H H0 H1). 
-    simpl in H2. unfold certiL3_to_L4. 
-    destruct H2 as [sv' [evsv obs]].
-    eexists (inductive_env env, sv');
-      split. repeat red. split. simpl; auto. simpl.
-    + apply evsv.
-    + simpl in obs. 
-      clear evsv He H1 H0 H. revert main0 sv' obs. clear.
-      apply (TrmTrms_ind (fun (main : Term) => forall (sv' : exp),
-                same_obs main sv' = true ->
-                {| main := main; AstCommon.env := env0 |} ⊑ (inductive_env env, sv'))
-                         (fun ts => forall d i n n0 es, same_args same_obs ts es = true ->
+{ red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
+  assert(He:=L3.program.Crct_invrt_any H).
+  repeat red in H0.
+  destruct s. destruct sv.
+  destruct H0. 
+  pose proof (L3_to_L4_correct.translate_correct' env _ _ _ He H H0 H1). 
+  simpl in H2. unfold certiL3_to_L4. 
+  destruct H2 as [sv' [evsv obs]].
+  eexists (inductive_env env, sv');
+    split. repeat red. split. simpl; auto. simpl.
+  { apply evsv. }
+  clear evsv He H1 H0 H. revert main0 sv' obs. clear.
+  apply (TrmTrms_ind
+             (fun (main : Term) => forall (sv' : exp),
+                  same_obs main sv' = true ->
+                  {| main := main; AstCommon.env := env0 |} ⊑ (inductive_env env, sv'))
+             (fun ts => forall d i n n0 es, same_args same_obs ts es = true ->
                  obsLeOp (observeNthSubterm n0 {| main := TConstruct i n ts; AstCommon.env := env0 |})
                          (observeNthSubterm n0 (inductive_env env, Con_e d es)))
-                          (fun _ => True));
+             (fun _ => True));
         try constructor;
-      try (match goal with |- yesPreserved _ _ => intros q; destruct q end);
-      intros; try red; trivial; try constructor.
-      rename H0 into obs.
-      simpl in *; unfold questionHead. simpl.
-      destruct sv'; trivial; intros; simpl in *; try discriminate.
-      destruct d; simpl in *.
-      destruct inductive_dec; simpl; trivial. subst.
-      destruct PeanoNat.Nat.eq_dec; simpl; trivial. subst. simpl.
-      unfold eq_decb in obs. unfold eq_dec in obs. simpl in obs. 
-      destruct inductive_dec; simpl in *; subst; try contradiction || discriminate.
-      destruct PeanoNat.Nat.eq_dec; simpl in *; try discriminate. subst n.
-      rewrite Nnat.N2Nat.id. apply N.eqb_refl.
+        try (match goal with |- yesPreserved _ _ => intros q; destruct q end);
+        intros; try red; trivial; try constructor.
+  rename H0 into obs.
+  simpl in *; unfold questionHead. simpl.
+  destruct sv'; trivial; intros; simpl in *; try discriminate.
+  destruct d; simpl in *.
+  destruct inductive_dec; simpl; trivial. subst.
+  destruct PeanoNat.Nat.eq_dec; simpl; trivial. subst. simpl.
+  unfold eq_decb in obs. unfold eq_dec in obs. simpl in obs. 
+  destruct inductive_dec; simpl in *; subst; try contradiction || discriminate.
+  destruct PeanoNat.Nat.eq_dec; simpl in *; try discriminate. subst n.
+  rewrite Nnat.N2Nat.id. apply N.eqb_refl.
+  
+  destruct sv'; intros; try discriminate.
+  simpl in H0. apply andb_prop in H0.
+  destruct H0 as [_ obs]. now apply H.
+  
+  destruct es; simpl in *.
+  unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
+  simpl. 
+  unfold instances.observe_nth_subterm. simpl. destruct n0; simpl; constructor.
+  discriminate.
 
-      destruct sv'; intros; try discriminate.
-      simpl in H0. apply andb_prop in H0.
-      destruct H0 as [_ obs]. now apply H.
+  unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
+  unfold instances.observe_nth_subterm.
+  simpl. 
+  destruct es; simpl in H1; try discriminate.
+  apply andb_prop in H1 as [Ht Ht0].
+  destruct n0; simpl.
+  constructor. apply (H _ Ht).
 
-      destruct es; simpl in *.
-      unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
-      simpl. 
-      unfold instances.observe_nth_subterm. simpl. destruct n0; simpl; constructor.
-      discriminate.
-
-      unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
-      unfold instances.observe_nth_subterm.
-      simpl. 
-      destruct es; simpl in H1; try discriminate.
-      apply andb_prop in H1 as [Ht Ht0].
-      destruct n0; simpl.
-      constructor. apply (H _ Ht).
-
-      specialize (H0 d i n n0 es Ht0).
-      unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL in *.
-      unfold instances.observe_nth_subterm in *. simpl in H0. apply H0.
+  specialize (H0 d i n n0 es Ht0).
+  unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL in *.
+  unfold instances.observe_nth_subterm in *. simpl in H0. apply H0. }
 Qed.
 
 

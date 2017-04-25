@@ -1701,17 +1701,18 @@ Section Lambda_lifting_correct.
           now apply name_in_fundefs_bound_var_fundefs.
           normalize_bound_var...
           apply image_monotonic. eapply Included_trans. eassumption.
-          normalize_occurs_free... symmetry; eassumption.
+          do 2 rewrite occurs_free_Efun at 1...
+          symmetry; eassumption.
           intros Hc. eapply H9. now apply name_in_fundefs_bound_var_fundefs.
         * congruence.
         * eapply Union_Disjoint_l.
           eapply Disjoint_Included_l.
           eapply Add_functions_FunsFVs_Included_r. eassumption.
           apply Union_Disjoint_l. clear Hfvs2. now eauto with Ensembles_DB.
-          eapply Disjoint_Included_l. eassumption.
-          eapply Union_Disjoint_l. eapply Disjoint_sym. eassumption.
+          eapply Disjoint_Included_l. apply Hin. (* eassumption. *)
+          eapply Union_Disjoint_l. eapply Disjoint_sym... 
           clear Hlf2 Hfvs2. now eauto with Ensembles_DB.
-          clear HD2. now eauto with Ensembles_DB.
+          clear HD2. eapply Disjoint_sym in HD1. now eauto with Ensembles_DB.
         * clear Hlf2 Hf2. 
           eapply Disjoint_Included_l.
           eapply Add_functions_LiftedFuns_Included_r. eassumption.
@@ -1756,17 +1757,17 @@ Section Lambda_lifting_correct.
           eapply Included_Union_compat. reflexivity.
           now apply name_in_fundefs_bound_var_fundefs.
           eapply image_monotonic. eapply Union_Included.
-          eapply Included_trans. eassumption. normalize_occurs_free...
+          eapply Included_trans. eapply Hin. normalize_occurs_free...
           eapply Included_trans. eapply Add_functions_FunsFVs_Included_r.
           eassumption. eapply Union_Included. now eauto with Ensembles_DB.
-          eapply Included_trans. eassumption. normalize_occurs_free...
+          eapply Included_trans. eapply Hin. normalize_occurs_free...
           eapply Disjoint_Included_l. eapply Add_functions_FunsFVs_Included_r.
           eassumption. eapply Union_Disjoint_l.
           eapply Disjoint_Included_r; [| eassumption ].
           eapply Included_Union_compat. reflexivity.
           eapply Included_trans. now apply name_in_fundefs_bound_var_fundefs.
           normalize_bound_var...
-          eapply Disjoint_Included_r; [| eassumption ].
+          eapply Disjoint_Included_r; [| exact HD2 ].
           eapply Included_Union_compat. reflexivity.
           eapply Included_trans. now apply name_in_fundefs_bound_var_fundefs.
           normalize_bound_var...

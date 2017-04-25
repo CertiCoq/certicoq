@@ -105,7 +105,7 @@ Qed.
 Theorem set_set: forall t e e' x y sub, x <> y -> map_get_r t (M.set x e (M.set y e' sub)) (M.set y e' (M.set x e sub)).
 Proof.
   unfold map_get_r; intros. 
-  destruct (var_dec v x); destruct (var_dec v y); subst.
+  destruct (var_dec v x); destruct (var_dec v y); try (subst x || subst y).
   - apply H in e1. inversion e1.
   - rewrite M.gss. rewrite M.gso. rewrite M.gss. reflexivity. assumption.
   -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption. 
@@ -177,7 +177,7 @@ Section GETD.
                       getd d v sub = a2 ->
                       a1 = a2.
   Proof.
-    unfold getd; intros; destruct (M.get v sub); subst; assumption. 
+    unfold getd; intros; destruct (M.get v sub); subst; trivial.
   Qed.
 
   Theorem gdss: forall A (d:A) x c v,                  
@@ -274,7 +274,7 @@ Section EQDMAP.
   Theorem set_set_d: forall t d e e' x y sub, x <> y -> map_getd_r t d (M.set x e (M.set y e' sub)) (M.set y e' (M.set x e sub)).
   Proof.
     unfold map_getd_r; intros. unfold getd.
-    destruct (var_dec v x); destruct (var_dec v y); subst.
+    destruct (var_dec v x); destruct (var_dec v y); try (subst x || subst y).
     - apply H in e1. inversion e1.
     - rewrite M.gss. rewrite M.gso. rewrite M.gss. reflexivity. assumption.
     -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption. 

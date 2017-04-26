@@ -147,8 +147,6 @@ Class CerticoqLanguage (Term Value:Type)
   *)
 }.
 
-
-
 Global Arguments CerticoqLanguage Term Value {H} {H0} {H1} {H2}.
 
 (* The final correctness property is just the conjunction of goodPreserving and obsPreserving.

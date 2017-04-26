@@ -188,6 +188,14 @@ Defined.
 Eval compute in pgcd4astr.
 *)
 
+Definition L4normalize (t: cTerm certiL4) (n: nat)
+  : exception (cTerm certiL4)
+  := bigStepEvaln n t.
+
+Print Instances BigStepOpSemExec.
+Definition L42normalize (t: cTerm certiL4_2) (n: nat)
+  : exception (cTerm certiL4_2)
+  := bigStepEvaln n t.
 
 Require Import Benchmarks.Binom
         Benchmarks.Color

@@ -184,11 +184,24 @@ Require Import Benchmarks.Binom
         Benchmarks.vs.
 
 (** MS: fast up to L5, does not seem to terminate in the L5-L6 phase. *)
-Definition p6 : cTerm certiL5.
- (let t:= eval vm_compute in (translateTo (cTerm certiL5) p) in 
+Definition p5a : cTerm certiL5a.
+ (let t:= eval vm_compute in (translateTo (cTerm certiL5a) p) in 
 match t with
 |Ret ?xx => exact xx
 end).
+Defined.
+
+
+Definition p6 :  (cTerm certiL6).
+set (t := (certiClasses.translate (cTerm certiL5a) (cTerm certiL6) p5a)).
+unfold certiClasses.translate in t.
+unfold liftTotal in t. simpl in t.
+unfold translateT in t.
+unfold certiL5a_t0_L6 in t.
+ (* these gets stuck
+  simpl in t.
+  vm_compute in t.  
+  *)
 Abort.
 
 Definition ext_comp := fun prog =>

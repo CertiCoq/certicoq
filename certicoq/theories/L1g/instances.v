@@ -67,3 +67,13 @@ Definition ctranslateTo {Term Value BigStep WF QH ObsS }
   translateTo (cTerm Lj).
 
 Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
+
+
+Definition ctranslateEval {Term Value BigStep WF QH ObsS } 
+  (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
+   `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
+   `{BigStepOpSemExec (cTerm Lj) (cTerm Lj)}
+  (p: program) (n:nat) : exception (cTerm Lj) :=
+  do p <- translateTo (cTerm Lj) p ; bigStepEvaln n p.
+
+Arguments ctranslateEval {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} p n.

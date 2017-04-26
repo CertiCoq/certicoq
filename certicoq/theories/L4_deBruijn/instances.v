@@ -23,6 +23,13 @@ Existing Instance dummyEnvWf | 1000000.
 Let L4Term := prod ienv  L4.expression.exp.
 
 Instance certiL4eval: BigStepOpSem L4.expression.exp L4.expression.exp := eval.
+Global Instance L4_evaln : BigStepOpSemExec (ienv * L4.expression.exp)
+                                            (ienv * L4.expression.exp) :=
+  fun n p => match  (eval_n n (snd p)) with
+             | Some v => Ret (fst p,v)
+             | None => Exc "None"
+                           end.
+
 
 Instance certiL4wf: GoodTerm L4.expression.exp :=
  L4.expression.exp_wf (0%N).
@@ -165,9 +172,42 @@ Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
 Require Import L4.L4_to_L4_1_to_L4_2.
 Require Import L4.L4_2_to_L4_5.
+Require Import DecidableClass.
+
+(** Fix or remove *)
+Global Instance L4_2_eval : BigStepOpSem L4_2_Term L4_2_Term := fun _ _ => True.
+
+Require Import Common.TermAbs.
+
+Global Instance L4_2_evaln
+  : BigStepOpSemExec (ienv * L4_2_Term) (ienv * L4_2_Term) :=
+  fun n e => match (@polyEval.eval_n (Named.TermAbsImpl variables.NVar polyEval.L4Opid) n (snd e)) with
+          | None => Exc "None"
+          | Some v => Ret (fst e, v)
+          end.
 
 
-Global  Program Instance : BigStepOpSem L4_5_Term L4_5_Term := eval.
+(** Fix or remove *)
+Global Instance : GoodTerm L4_2_Term :=
+  fun e  => False.
+
+(** Fix or remove *)
+Global Instance QuestionHeadTermL42 : QuestionHead (prod ienv L4_2_Term) :=
+fun q t => false.
+
+(** Fix or remove *)
+Global Instance ObsSubtermTermL42 : ObserveNthSubterm (prod ienv L4_2_Term) :=
+  fun n t => None.
+
+(** Fix or remove *)
+Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2_Term) := {}.
+
+Global Instance certiL4_to_L4_2: 
+  CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4_2) :=
+  fun p => (fst p, (tL4_to_L4_2 (snd p))).
+
+
+Global Program Instance : BigStepOpSem L4_5_Term L4_5_Term := eval.
 
 (** all variables must be user variables *)
 Global Program Instance : GoodTerm L4_5_Term :=
@@ -196,11 +236,9 @@ Global Instance ObsSubtermTermL45 : ObserveNthSubterm (prod ienv L4_5_Term) :=
 Global Instance certiL4_5: CerticoqLanguage (prod ienv L4_5_Term) := {}.
 
 
-Global Instance certiL4_to_L4_5: 
-  CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4_5) :=
-  fun p => (fst p, (L4_2_to_L4_5 (tL4_to_L4_2 (snd p))) ).
-
-  
+Global Instance certiL4_2_to_L4_5: 
+  CerticoqTotalTranslation (cTerm certiL4_2) (cTerm certiL4_5) :=
+  fun p => (fst p, (L4_2_to_L4_5  (snd p))).
 
 
 Require Import L4.variables.
@@ -292,7 +330,7 @@ Proof.
   unfold certiClasses.translate, liftTotal, bigStepEval,
   liftBigStepException, translateT, certiL4_5_to_L5. simpl.
   simpl. hnf. simpl.
-  unfold goodTerm, dummyEnvWf, goodTerm, GoodTerm_instance_0, isprogram, closed in Hgood.
+  unfold goodTerm, dummyEnvWf, goodTerm, GoodTerm_instance_1, isprogram, closed in Hgood.
   destruct s as [? s]; simpl in *. repnd.
   hnf. simpl. symmetry. rewrite cps_cvt_aux_fvars; auto. rewrite Hgood2. refl.
 - red. intros ? ? Hgood Heval.
@@ -306,7 +344,7 @@ Proof.
   repeat progress (unfold bigStepEval, dummyEnvBigStep; simpl).
   unfold BigStepOpSem_instance_1. simpl.
   simpl. unfold bigStepEval, dummyEnvBigStep. simpl.
-  unfold goodTerm, dummyEnvWf, goodTerm, GoodTerm_instance_0 in Hgood.
+  unfold goodTerm, dummyEnvWf, goodTerm, GoodTerm_instance_1 in Hgood.
   simpl in *. repnd. destruct Hgood1 as [Hclosed Hwf].
   rename Hgood0 into Hvc. rename Hgood into Hfixwf.
   dands;[reflexivity | | ].

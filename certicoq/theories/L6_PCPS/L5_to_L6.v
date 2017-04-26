@@ -359,19 +359,19 @@ arguments are:
     - process each of the constructor, indicating they are the ith constructor of the nth type of idBundle
    np: number of type parameters for this bundle
    *)
-  Fixpoint convert_typack typ (idBundle:string) (np:nat) (n:nat) (ice:(iEnv * cEnv* iTag * cTag * conId_map)) : (iEnv * cEnv * cTag * iTag * conId_map) :=
-    let '(ie, ce, niT, ncT, dcm) := ice in 
+  Fixpoint convert_typack typ (idBundle:string) (np:nat) (n:nat) (ice:(iEnv * cEnv*  cTag * iTag * conId_map)) : (iEnv * cEnv * cTag * iTag * conId_map) :=
+    let '(ie, ce, ncT, niT, dcm) := ice in 
     match typ with
       | nil => ice
       | (mkItyp itN itC ) ::typ' => 
-        let (cct, ncT) := fromN ncT (length itC) in
-        let (ce, dcm) := convert_cnstrs cct itC (mkInd idBundle n) np 0 niT ce dcm in
+        let (cct, ncT') := fromN ncT (length itC) in
+        let (ce', dcm') := convert_cnstrs cct itC (mkInd idBundle n) np 0 niT ce dcm in
         let ityi := combine cct (map (fun (c:Cnstr) => let (_, n) := c in N.of_nat n) itC) in
-        convert_typack typ' idBundle np (n+1) (M.set niT ityi ie, ce,  ncT, (Pos.succ niT), dcm)
+        convert_typack typ' idBundle np (n+1) (M.set niT ityi ie, ce', ncT', (Pos.succ niT) , dcm')
     end.
   
   Fixpoint convert_env' (g:ienv) (ice:iEnv * cEnv * cTag * iTag * conId_map) : (iEnv * cEnv * conId_map) :=
-    let '(ie, ce, niT, ncT, dcm) := ice in 
+    let '(ie, ce, ncT, niT, dcm) := ice in 
     match g with      
       | nil => (ie, ce, dcm)
       | (id, n, ty)::g' =>

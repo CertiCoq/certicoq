@@ -58,11 +58,16 @@ Definition show_tree t := (show_tree_c t "")%string.
 (* Variables are shown using "x" as a prefix if their original name is not known*)
 Definition show_var (x:positive) :=
   match M.get x nenv with
-    | Some (nNamed s) => s%string
+    | Some (nNamed s) => (s+++("_")+++(show_pos x))%string
     | _ => ("x" +++ (show_pos x))%string
   end.
 
-
+Definition show_name (no:Ast.name) (d:string) :=
+  match no with
+    | nNamed s => s
+    | nAnon => d
+  end.
+                 
 Definition show_con (tg:cTag) :=
   match M.get tg cenv with
     | Some (nNamed s, i, t, n) => s
@@ -144,6 +149,76 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
   | Eapp x ft ys => emit (show_var x) ;; emit (show_vars ys) ;; newline
   | Ehalt x  => emit "halt " ;; emit (show_var x) ;; newline
   end%string.
+About fold_left.
+
+Fixpoint emit_val (indent:nat) (v:val) : M unit :=
+  tab indent ;;
+      match v with 
+        | Vconstr tg l =>
+          emit "constr "%string;;emit (show_con tg);;emit " "%string;; newline;;
+               fold_left (fun u v => emit_val (indent+1) v) l newline
+        | Vfun rho fds f =>
+          (match  find_def f fds with
+             | Some (t', xs ,e) =>
+             (*               emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;;newline;;emit_exp (4 + indent) e ;; newline *)
+               emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;; emit "..."%string ;; newline
+
+             | None => emit "ERROR! FUN "%string ;; emit (show_var f);;emit " NOT FOUND!"%string;;newline
+           end)
+        | Vint i => emit "Int "%string;;newline
+      end.
+      (*
+with emit_vals (indent:nat) (vl:list val): M unit :=
+       match vl with
+         | v::vl' =>
+           emit_val indent v;;
+                     newline;;
+                     emit_vals indent vl' 
+         | nil => newline
+       end. *)
+         
+Definition show_val (v:val) : string := 
+  String chr_newline
+          (show_tree (snd (runState (emit_val 0 v) Emp))).
+
+
+Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)):M unit :=
+  match rhol with
+    | cons (p, v)  rhol' =>
+      emit "| "%string;;emit (show_var p);;emit " |->"%string;; newline;;
+           emit_val (indent+1) v;;newline
+      ;; emit_env' indent rhol'
+    | nil => newline
+  end.
+
+Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*cTyInfo)):M unit :=
+  match cenvl with
+    | cons (p, (name, it, arr, ord)) cenvl' =>
+      emit "| "%string;;emit (show_pos p);;emit " |-> ("%string;;
+           emit (show_name name ("cons_"++(show_pos p)));; emit " "%string;; emit (show_pos it);; emit " "%string;;emit (show_binnat arr);;
+           emit " "%string;;emit (show_binnat ord);;emit " )"%string
+           ;;newline
+           ;; emit_cenv' indent cenvl'
+
+    | nil => newline
+  end.
+
+Definition emit_env (indent:nat) (rho:M.t val): M unit :=
+  emit "rho:{"%string;;newline;;emit_env' indent (M.elements rho);;emit "}"%string.
+  
+Definition emit_cenv (indent:nat) (cenv:M.t cTyInfo):M unit :=
+    emit "cenv:{"%string;;newline;;emit_cenv' indent (M.elements cenv);;emit "}"%string.
+
+
+Definition show_env (rho:M.t val) : string :=
+    String chr_newline
+          (show_tree (snd (runState (emit_env 0 rho) Emp))).
+
+
+Definition show_cenv (cenv:M.t cTyInfo): string :=
+  String chr_newline
+          (show_tree (snd (runState (emit_cenv 0 cenv) Emp))).
+  
 
 (* We add an extra newline at the front so that Coq will display the
    whole program correctly when we evaluate. *)

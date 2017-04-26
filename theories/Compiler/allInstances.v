@@ -11,7 +11,8 @@ Require Export L6.instances.
 
 Set Template Cast Propositions.
 
-Quote Recursively Definition p := (3+4).
+
+
                                   
 Open Scope Z_scope.
 Require Import ZArith.
@@ -20,6 +21,9 @@ Require Import ZArith.
 Require Import Common.Common.
 Require Import String.
 Open Scope string_scope.
+
+
+Quote Recursively Definition p := (3+4)%nat.
 
 
 (*
@@ -41,7 +45,7 @@ Print Instances CerticoqTotalTranslation.
 Print Instances CerticoqLanguage.
 *)
 
-Quote Recursively Definition swap := 
+Definition swap' := 
 (fun  (p: nat  * bool) =>
 match p with
 (x,y) => (y,x)
@@ -49,11 +53,14 @@ end).
 
 
 
-Ltac computeExtract certiL f:=
-(let t:= eval compute in (translateTo (cTerm certiL) f) in 
-match t with
-|Ret ?xx => exact xx
-end).
+
+ Quote Recursively Definition swap := ((swap' (S O, false)), (swap' (O, true))).
+
+Ltac computeExtract certiL4 f:=
+(let t:= eval compute in (translateTo (cTerm certiL4) f) in 
+     match t with
+       |Ret ?xx => exact xx
+     end).
 
 Definition swap4 : (cTerm certiL4).
 computeExtract certiL4 swap.
@@ -72,11 +79,14 @@ match t with
 end).
 Defined.
 
+
 Quote Recursively Definition prev := (fun x => 
  match x with
  | 0 => 0
 | S n => n
 end)%nat.
+
+
 
 (*Local Opaque L4_2_to_L5.Match_e.
 Local Opaque L4_2_to_L5.Fix_e.
@@ -155,8 +165,8 @@ Let pcgd4a : cTerm certiL4_5.
 match t with
 |Ret ?xx => exact xx
 end).
-Defined.
-*)
+Defined. *)
+
 Require Import List.
 Import ListNotations.
 
@@ -164,7 +174,7 @@ Import ListNotations.
 (* we project that part of the environment. *)
 (* The environment is too big, because it contains even the *)
 (* definitions that were used in the erased proof. *)
-Eval vm_compute in (nth_error (AstCommon.env pcgd2) 1).
+(* Eval vm_compute in (nth_error (AstCommon.env pcgd2) 1). *)
 (* Eval vm_compute in (nth_error (AstCommon.env pcgd3) 1). *)
 
 Require Import SquiggleEq.terms.
@@ -261,16 +271,33 @@ Quote Recursively Definition blahProg := (blah_fun (blah1 (blah6 fst_blah snd_bl
 
 (* Definition blahProg7 := compile_L6 blahProg6. *)
 
-Definition show_exn {A:Type} (x : exceptionMonad.exception (cTerm certiL6)) : string :=
+Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   match x with
   | exceptionMonad.Exc s => s
   | exceptionMonad.Ret ((p,cenv,g, nenv), e) => show_exp nenv cenv e
   end.
 
 
-(* Definition swap7 := compile_L6 swap6. *)
+
+Definition show_val_exn  nenv cenv (x : exceptionMonad.exception val) : string :=
+  match x with
+  | exceptionMonad.Exc s => s
+  | exceptionMonad.Ret v => show_val nenv cenv v
+  end.
 
 
+
+
+Definition L5a_comp_L6 (v:(ienv * L4.L5a.cps)): ((L6.eval.prims * cEnv * L6.eval.env * nEnv)* L6.cps.exp):= 
+    match v with
+        | pair venv vt => 
+          let '(cenv, nenv, t) := L6.L5_to_L6.convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
+          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv), M.empty _, nenv),   L6.shrink_cps.shrink_top t)
+    end.
+
+
+
+Quote Recursively Definition vs := vs.main.
 
 (*
 Quote Recursively Definition graph_color := (run G16).
@@ -336,19 +363,135 @@ Definition comp_fEnv7 := compile_L6 comp_fEnv6.
  *)
 
 Require Import runtime.runtime.
-
+(*
+Quote Recursively Definition binom := Binom.main.
+Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5a) binom).
+*)
+(*
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (M.elements (fst prog)) file.
+*)
 
-(*Definition test := printProg p7 "output/threePlusFour.c".*)
+
+(* Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".*)
+
+(*  Definition test := printProg (compile_L6 (ext_comp swap)) "output/swap.c".   *)
+
+(* Definition test := printProg p7 "output/threePlusFour.c".*)
 (*Definition test := printProg blahProg7 "output/blah.c".*)
-(*Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".*)
+(*  *)
 (*Definition test := printProg graph_color7 "output/color.c".*)
 
-Quote Recursively Definition binom := Binom.main.
 
-Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".
+(*  Definition binom6 := Eval native_compute in (ctranslateTo certiL6 binom). *)
+(* Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".*)
+
+Definition run_L6_exn  (x : exceptionMonad.exception (cTerm certiL6)) :=
+  match x with
+  | exceptionMonad.Exc s =>  exceptionMonad.Exc s
+  | exceptionMonad.Ret ((p,cenv,g, nenv), e) => L6.eval.bstep_f p cenv g e 2000
+  end.
+
+ 
+Check L6.eval.sstep_f.
+
+Fixpoint step_L6_exn'  (x : (cTerm certiL6)) (n:nat) :=
+  match n with
+    | O =>
+      match x with
+        | ((p,cenv,rho, nenv), e)=> Ret (rho , e)
+      end
+    | S n' =>
+      let '((p,cenv,rho, nenv), e) := x in
+      (match (L6.eval.sstep_f p cenv rho e 1) with
+         | Ret (rho', e') => step_L6_exn' ((p, cenv, rho', nenv), e') n'
+         | Exc s => Exc ("Error :"++s++" at "++(nat2string10 n)++" from end")%string
+       end)
+  end.
+
+
+      
+Definition bind_exn {A B:Type} (f:A -> B) (e: exceptionMonad.exception A) :=
+  match e with
+        | exceptionMonad.Exc s => exceptionMonad.Exc s
+        | exceptionMonad.Ret e' => exceptionMonad.Ret (f e')
+  end.
+
+Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).
 
 (*
-Quote Recursively Definition vs := vs.main.
-Definition test := printProg (compile_L6 (ext_comp vs)) "output/vs.c".
+
+
+Set Printing Depth 1000.
+Print vs5.
+
+Definition vs3 := Eval native_compute in (translateTo (cTerm certiL3) vs).
 *)
+
+
+
+(*
+Definition test := run_L6_exn (comp_L6 binom).
+Eval native_compute in test.
+ *)
+
+About L7.L6_to_Clight.print.
+
+
+
+
+Definition comp_L6 p := match p
+                          with
+                            | Exc s => Exc s
+                            | Ret v =>  Ret (L5a_comp_L6 v)                                           
+                          end.
+
+Definition comp_to_L6:= fun p =>
+                       comp_L6 (translateTo (cTerm certiL5a) p).
+  
+
+Definition print_L6 p := L7.L6_to_Clight.print (show_exn p).
+
+
+
+
+Definition step_L6_exn := fun e => bind e (fun (x:(cTerm certiL6)) =>
+                                             step_L6_exn' x 30).
+
+
+About step_L6_exn.
+
+Definition print_eval_L6 p  :=
+  L7.L6_to_Clight.print (match p with
+                           | exceptionMonad.Exc s =>  s
+                           | exceptionMonad.Ret ((prim,cenv,g, nenv), e) => show_val_exn nenv cenv (L6.eval.bstep_f prim cenv g e 2000)
+                        end).
+
+About show_exp.
+
+
+Definition print_step_L6 p  :=
+  L7.L6_to_Clight.print (match p with
+                           | exceptionMonad.Exc s =>  s
+                           | exceptionMonad.Ret ((prim, cenv, g, nenv), e) => match step_L6_exn p  with
+                                                                                    | Exc s => s
+                                                                                    | Ret (g', e') => (show_cenv cenv)++(show_env nenv cenv g') ++ (show_exp nenv cenv e')
+                                                                                                                                                                                         end
+                        end).
+
+
+
+Extraction Language Ocaml.
+(* Standard lib *)
+Require Import ExtrOcamlBasic.
+Require Import ExtrOcamlString.
+Require Import ExtrOcamlNatInt.
+(* Coqlib *)
+Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
+
+Extract Constant L7.L6_to_Clight.print => "print_string".
+
+Definition test := print_step_L6 (comp_L6 vs5).
+
+
+Extraction "test.ml" test.
+

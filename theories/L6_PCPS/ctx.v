@@ -436,3 +436,11 @@ Theorem comp_f_ctx_split:
 Proof.
   apply comp_ctx_split_mut; auto.
 Qed.              
+
+(* prefix a fundefs ctx with a fundefs *)
+Fixpoint app_fundefs_ctx (f:fundefs) (fc:fundefs_ctx): fundefs_ctx:=
+  match f with
+    | Fnil => fc
+    | Fcons x t xs e f' =>
+      Fcons2_c x t xs e (app_fundefs_ctx f' fc)
+  end.

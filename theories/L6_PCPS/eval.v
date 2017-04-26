@@ -2,10 +2,12 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles
          Relations.Relations.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From Common Require Import AstCommon.
+Import ListNotations.
+Require Import Coq.Strings.String.
+From Common Require Import AstCommon exceptionMonad.
 From L6 Require Import cps List_util size_cps.
 
-Import ListNotations MonadNotation.
+
 
 (** An [env]ironment maps [var]s to their [val]ues *)
 Definition env := M.t val. 
@@ -91,6 +93,249 @@ Section EVAL.
         bstep_e rho (Ehalt x) v 0.
 
 
+Require Import ExtLib.Structures.Monad.
+
+
+(* fuel-based evaluator, could also use n from bstep_e with a termination lex (n, e) *)
+
+Fixpoint caseConsistent_f (l:list (cTag * exp)) (t:cTag): bool :=
+  match l with
+    | nil => true
+    | (t', e)::l' =>
+      caseConsistent_f l' t &&
+      match (M.get t cenv) with
+        | Some (a, ty, n, i) =>
+          (match (M.get t' cenv) with
+              | Some (a', ty', n', i') =>
+                Pos.eqb ty  ty'
+              | _ => false
+           end)
+        | _ => false
+      end
+  end.
+
+
+Theorem caseConsistent_c:
+  forall l t,
+    caseConsistent l t <-> caseConsistent_f l t = true.
+Proof.
+  induction l; split; intros.
+  - reflexivity.
+  - constructor.
+  - inv H. simpl.
+    rewrite H3. rewrite H2.
+    apply andb_true_iff.
+    split.
+    apply IHl; auto.
+    apply Pos.eqb_refl. 
+  - simpl in H.
+    destruct a.
+    inv H.
+    destruct (M.get t cenv) eqn:tc.
+    destruct c0. destruct p. destruct p.
+    destruct (M.get c cenv) eqn:cc.
+    destruct c0. destruct p. destruct p. apply andb_true_iff in H1.
+    inv H1. econstructor; eauto. apply Peqb_true_eq in H0. auto. apply IHl. auto.
+    apply andb_true_iff in H1. inv H1. inv H0.
+    apply andb_true_iff in H1. inv H1. inv H0.
+Qed.
+
+
+Definition l_opt {A} (e:option A) (s:string):exception A :=
+  match e with
+    | None => Exc s
+    | Some e => Ret e
+  end.
+
+Fixpoint sstep_f (rho:env) (e:exp) (n:nat): exception (env* exp) :=
+
+  match n with
+    | O => Ret (rho, e)
+    | S n' =>
+      ( match e with
+          | Eprim x f ys e' =>
+            do vs  <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
+            do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
+            do v <- l_opt (f' vs) ("Eprim: prim did not compute");
+            let rho' := M.set x v rho in
+            sstep_f rho' e' n'
+          | Econstr x t ys e' =>
+              do vs <- l_opt (getlist ys rho) ("Econstr: failed to get args");
+            let rho' := M.set x (Vconstr t vs) rho in
+            sstep_f rho' e' n'
+          | Eproj x t m y e' =>
+            (match (M.get y rho) with
+               | Some (Vconstr t' vs) =>
+                 if Pos.eqb t t' then
+                   do v <- l_opt (nthN vs m) ("Eproj: projection failed");
+                   let rho' := M.set x v rho in
+                     sstep_f rho' e' n'
+                 else (exceptionMonad.Exc "Proj: tag check failed")
+               | _ => (exceptionMonad.Exc "Proj: var not found")
+             end)
+          | Efun fl e' =>
+            let rho' := def_funs fl fl rho rho in
+            sstep_f rho' e' n'
+          | Ehalt x =>
+            Ret (rho, Ehalt x)
+          | Ecase y cl =>
+            match M.get y rho with
+              | Some (Vconstr t vs) =>
+                do e <- l_opt (findtag cl t) ("Case: branch not found");
+                  if caseConsistent_f cl t then 
+                    sstep_f rho e n'
+                  else     (exceptionMonad.Exc "Case: consistency failure")
+              | Some _ =>  (exceptionMonad.Exc "Case: arg is not a constructor")
+              | None => (exceptionMonad.Exc "Case: arg not found")
+            end          
+          | Eapp f t ys =>
+            (match (M.get f rho) with
+               | Some (Vfun rho' fl f') =>
+                 do vs <- l_opt (getlist ys rho) ("App: failed to get args");
+                    (match  find_def f' fl with
+                       | Some (t', xs ,e) =>
+                         if (Pos.eqb t t') then
+                           do rho'' <- l_opt (setlist xs vs (def_funs fl fl rho' rho')) ("Fun: setlist failed");   
+                                 sstep_f rho'' e n'
+                         else (exceptionMonad.Exc "Fun: tag check failed")
+                       | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
+                     end)
+               |  _ => (exceptionMonad.Exc "Fun: Bundle not found")
+             end)
+        end)
+  end.
+
+
+
+
+Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exceptionMonad.exception val :=
+  match n with
+    | O => exceptionMonad.Exc "out of fuel"
+    | S n' =>
+      ( match e with
+          | Eprim x f ys e' =>
+            do vs  <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
+          do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
+          do v <- l_opt (f' vs) ("Eprim: prim did not compute");
+            let rho' := M.set x v rho in
+            bstep_f rho' e' n'
+          | Econstr x t ys e' =>
+            do vs <- l_opt (getlist ys rho) ("Econstr: failed to get args");
+               let rho' := M.set x (Vconstr t vs) rho in
+               bstep_f rho' e' n'
+          | Eproj x t m y e' =>
+            (match (M.get y rho) with
+               | Some (Vconstr t' vs) =>
+                 if Pos.eqb t t' then
+                    do v <- l_opt (nthN vs m) ("Eproj: projection failed");
+                     let rho' := M.set x v rho in
+                     bstep_f rho' e' n'
+                 else (exceptionMonad.Exc "Proj: tag check failed")
+               | _ => (exceptionMonad.Exc "Proj: var not found")
+             end)
+          | Efun fl e' =>
+            let rho' := def_funs fl fl rho rho in
+            bstep_f rho' e' n'
+          | Ehalt x =>
+            match (M.get x rho) with
+              | Some v => exceptionMonad.Ret v
+              | None => (exceptionMonad.Exc "Halt: value not found")
+            end
+          | Ecase y cl =>
+            match M.get y rho with
+              | Some (Vconstr t vs) =>
+                 do e <- l_opt (findtag cl t) ("Case: branch not found");
+                  if caseConsistent_f cl t then
+                    bstep_f rho e n'
+                  else (exceptionMonad.Exc "Case: consistency failure")
+              | _ => (exceptionMonad.Exc "Case: branch not found")
+            end          
+          | Eapp f t ys =>
+            (match (M.get f rho) with
+               | Some (Vfun rho' fl f') =>
+                 do vs <- l_opt (getlist ys rho) ("App: failed to get args");
+                    (match  find_def f' fl with
+                       | Some (t', xs ,e) =>
+                         if (Pos.eqb t t') then
+                           do rho'' <- l_opt (setlist xs vs (def_funs fl fl rho' rho')) ("Fun: setlist failed");   
+                                 bstep_f rho'' e n'
+                         else (exceptionMonad.Exc "Fun: tag check failed")
+                       | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
+                     end)
+               |  _ => (exceptionMonad.Exc "Fun: Bundle not found")
+             end)
+        end)
+  end.
+
+
+
+Theorem bstep_f_sound:
+  forall n rho e v, 
+  bstep_f rho e n = Ret v ->
+  exists m, bstep_e rho e v m.
+Proof.
+  induction n; intros. inv H.
+  simpl in H.
+  destruct e.
+  -  destruct (getlist l rho) eqn:glr; [| inv H].
+     apply IHn in H. inv H.
+     exists x. econstructor; eauto.
+  - destruct (M.get v0 rho) eqn:gv0r.
+    destruct v1. destruct (findtag l c) eqn:flc.
+    destruct (caseConsistent_f l c) eqn:clc.
+    apply caseConsistent_c in clc.
+    apply IHn in H. inv H. exists x.
+    econstructor; eauto.
+    inv H. inv H. inv H. inv H. inv H.
+  - destruct (M.get v1 rho) eqn:gv1r; [|inv H].
+    destruct v2; [ | inv H | inv H].
+    destruct (c=?c0)%positive eqn:eqcc0; [| inv H].
+    destruct (nthN l n0) eqn:nln0; [| inv H].
+    apply IHn in H. inv H.
+    apply Peqb_true_eq in eqcc0. subst.
+    exists x. econstructor; eauto.
+  - apply IHn in H. inv H.
+    exists x.
+    constructor;
+    auto.
+  - destruct (M.get v0 rho) eqn:gv0r; [| inv H].
+    destruct v1; [inv H| | inv H].
+    destruct (getlist l rho) eqn:glr; [| inv H].
+    destruct (find_def v1 f0) eqn:gv1f0; [| inv H].
+    destruct p. destruct p.
+    destruct (f =? f1)%positive eqn:ff1; [| inv H].
+    apply Peqb_true_eq in ff1. subst.
+    destruct ( setlist l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H].
+    simpl in H.
+    unfold l_opt in H. rewrite ll0 in H.
+    simpl in H. 
+    apply IHn in H. inv H. exists (x+1).
+    econstructor; eauto.
+    rewrite ll0 in H1.
+    simpl in H1. inv H1.    
+  - destruct (getlist l rho) eqn:glr; [| inv H].
+    destruct (M.get p pr) eqn:ppr; [| inv H].
+    destruct (o l0) eqn:ol0; [| inv H].
+    simpl in H. rewrite ol0 in H. simpl in H. 
+    apply IHn in H. inv H. exists x.
+    econstructor; eauto.
+    rewrite ol0 in H1. simpl in H1. inv H1.
+  - destruct (M.get v0 rho) eqn:gv0r.
+    inv H.
+    exists 0. constructor; auto.
+    inv H.
+Qed.
+
+(* lexicographic on (n, size of e) 
+Theorem bstep_f_complete:
+  forall n rho e v,
+    bstep_e rho e v n -> 
+    exists m, bstep_f rho e m = Some v. *)
+
+
+
+
+
   Inductive find_tag_nth : list (cTag * exp) -> cTag -> exp -> nat -> Prop :=
   | find_tag_hd :
       forall c e l,
@@ -105,6 +350,7 @@ Section EVAL.
   (** Big step semantics with a more precise cost model.
     * The goal is that the number of machine instructions that
     * correspond to each rule is proportional to the assigned cost. *)
+
   Inductive bstep_cost :  env -> exp -> val -> nat -> Prop :=
   | BStepc_constr :
       forall (x : var) (t : cTag) (ys :list var) (e : exp)
@@ -112,7 +358,7 @@ Section EVAL.
         getlist ys rho = Some vs ->
         M.set x (Vconstr t vs) rho = rho' ->
         bstep_cost rho' e v c ->
-        bstep_cost rho (Econstr x t ys e) v (c + 1 + length ys)
+        bstep_cost rho (Econstr x t ys e) v (c + 1 + (List.length ys))
   | BStepc_proj :
       forall (t : cTag) (vs : list val) 
         (rho : env) (x : var) (n : N) (y : var)
@@ -143,7 +389,7 @@ Section EVAL.
         find_def f' fl = Some (t,xs,e) ->
         setlist xs vs (def_funs fl fl rho' rho') = Some rho'' ->
         bstep_cost rho'' e v c ->
-        bstep_cost rho (Eapp f t ys) v (c + 1 + length ys)
+        bstep_cost rho (Eapp f t ys) v (c + 1 + List.length ys)
   | BStepc_fun :
       forall (rho : env) (B : fundefs) (e : exp) (v : val) (c : nat),
         bstep_cost (def_funs B B rho rho) e v c ->
@@ -158,12 +404,17 @@ Section EVAL.
         f' vs = Some v ->
         M.set x v rho = rho' ->
         bstep_cost rho' e v' c ->
-        bstep_cost rho (Eprim x f ys e) v' (c + 1 + length ys)
+        bstep_cost rho (Eprim x f ys e) v' (c + 1 + List.length ys)
   | BStepc_halt :
       forall x v rho,
         M.get x rho = Some v ->
         bstep_cost rho (Ehalt x) v 1.
 
+
+
+
+  
+  
   Ltac subst_exp :=
     match goal with
       | [H1 : ?e = ?e1, H2 : ?e = ?e2 |- _ ] =>
@@ -232,6 +483,7 @@ Section EVAL.
   
   (** Small step semantics -- Computational definition *)
   (* TODO : this is inconsistent with [step].  we need computational case_consistent *)
+  (*
   Definition stepf (s: env * exp) : option (env * exp) :=
     let (rho,e) := s in
     match e with
@@ -275,7 +527,7 @@ Section EVAL.
         (* need to go from value to exp somehow ... *)
         None
     end.
-
+*)
 (* TODO : to update the following we need a computational definition of case_consistent *)
 (*  (** Correspondence of the two small step semantics definitions *)
   Lemma step_stepf:
@@ -362,7 +614,8 @@ Section EVAL.
   Qed.
   
 End EVAL.
-  
+
+
   (** The following are not used anywhere. They have to do either with "well-typedness"
     * or observable values. We need to go through them to decide if can can through them
     * away altogether. *)

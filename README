@@ -18,7 +18,9 @@ and ExtLib packages of G. Malecha.  One way to get it is using opam:
 
   Then to install coq and certicoq's dependencies :
 
-# opam install coq coq-template-coq coq-ext-lib coq-squiggle-eq
+# opam install coq.8.6
+# opam pin add coq 8.6
+# opam install coq-template-coq coq-ext-lib coq-squiggle-eq
 
 If you have already installed some package manually, you can choose the --fake keyword for opam to assume that it is installed, e.g.:
 # opam install --fake coq
@@ -26,12 +28,12 @@ If you have already installed some package manually, you can choose the --fake k
 
 Alternatively, you can install Coq from source or download a binary from:
 
-https://coq.inria.fr/coq-85
+https://coq.inria.fr/coq-86
 
 and install the packages from source:
 
 https://github.com/coq-ext-lib/coq-ext-lib
-https://github.com/gmalecha/template-coq (branch : coq-8.5)
+https://github.com/gmalecha/template-coq (branch : coq-8.6)
 https://github.com/aa755/SquiggleEq
 
 

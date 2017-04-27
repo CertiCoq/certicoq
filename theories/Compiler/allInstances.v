@@ -144,13 +144,26 @@ Require Import Recdef.
 Set Implicit Arguments.
 Require Import Omega.
 
+Function Gcd (a b : nat) {wf lt a} : nat :=
+match a with
+ | O => b 
+ | S k =>  Gcd (b mod S k)  (S k)
+end
+.
+Proof.
+- intros m n k Heq. subst. apply Nat.mod_upper_bound.
+  omega.
+- exact lt_wf.
+Defined.
+
+
 Function foo (n:nat) {measure id n} :=
   0%nat.
 
 
 (** unfold just enough so that the fixpoint structure is visible *)
-Time Quote Recursively Definition pfoo :=
-  ltac:(let t:= eval unfold foo,foo_terminate in foo in exact t).
+Quote Recursively Definition pfoo :=
+  ltac:(let t:= eval unfold foo,foo_terminate in foo in exact (t 1%nat)).
 
 
 Definition pfoo3 := Eval vm_compute in (ctranslateTo certiL3 pfoo).
@@ -163,20 +176,10 @@ Definition showMainBody3 (t : exception (cTerm certiL3)) : exception L3.compile.
 Definition showEnvNamed (name: string) (t : exception (cTerm certiL3)) :=
   exception_map (fun tt => lookup name (@AstCommon.env _ tt)) t.
 
-Print pfoo3.
+Require Import L3.compile.
 Eval vm_compute in (showMainBody3 pfoo3).
+Eval vm_compute in (ctranslateEval certiL4 pfoo 1000).
 
-Function Gcd (a b : nat) {wf lt a} : nat :=
-match a with
- | O => b 
- | S k =>  Gcd (b mod S k)  (S k)
-end
-.
-Proof.
-- intros m n k Heq. subst. apply Nat.mod_upper_bound.
-  omega.
-- exact lt_wf.
-Defined.
 
 Set Template Cast Propositions.
 Time Quote Recursively Definition pgcd := Gcd.

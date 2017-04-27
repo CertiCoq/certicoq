@@ -57,7 +57,7 @@ end).
 
 
 
- Quote Recursively Definition swap := ((swap' (S O, false)), (swap' (O, true))).
+Quote Recursively Definition swap := ((swap' (S O, false)), (swap' (O, true))).
 
 
 Ltac computeExtract certiL4 f:=
@@ -143,6 +143,28 @@ Require Import NPeano.
 Require Import Recdef.
 Set Implicit Arguments.
 Require Import Omega.
+
+Function foo (n:nat) {measure id n} :=
+  0%nat.
+
+
+(** unfold just enough so that the fixpoint structure is visible *)
+Time Quote Recursively Definition pfoo :=
+  ltac:(let t:= eval unfold foo,foo_terminate in foo in exact t).
+
+
+Definition pfoo3 := Eval vm_compute in (ctranslateTo certiL3 pfoo).
+
+(** show the main body (discard the env) of an L3 term *)
+Definition showMainBody3 (t : exception (cTerm certiL3)) : exception L3.compile.Term :=
+  exception_map (@main _ ) t.
+
+(** Show the definition a particilar item (identified by name) in the environment *)
+Definition showEnvNamed (name: string) (t : exception (cTerm certiL3)) :=
+  exception_map (fun tt => lookup name (@AstCommon.env _ tt)) t.
+
+Print pfoo3.
+Eval vm_compute in (showMainBody3 pfoo3).
 
 Function Gcd (a b : nat) {wf lt a} : nat :=
 match a with

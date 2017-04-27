@@ -784,7 +784,7 @@ inversion Heqj.
 do_comp clause_cspec' x y; subst; auto.
 right; intro; subst. rewrite comp_refl in e; auto. inversion e.
 right; intro; subst. rewrite comp_refl in e; auto. inversion e.
-Qed.
+Defined.
 
 Lemma lt_strorder : StrictOrder lt.
 Proof. destruct clause_cspec'; auto. Qed.
@@ -1580,6 +1580,10 @@ Function main (n : positive) (units l : list clause) {measure nat_of_P n}
                 end
             end.
 Proof. Admitted.
+Check main.
+Check positive ->
+       list clause ->
+       list clause -> superposition_result * list clause * M.t * M.t.
 
 (* end show *)
 
@@ -2243,7 +2247,7 @@ Definition check_entailment (ent: entailment) : veristar_result :=
      end.
 
 End VeriStar. 
-
+Check VeriStar.check_entailment.
 
 
 (* example.v *)
@@ -2359,7 +2363,9 @@ Compute cnf harder_ent2.
 Compute cnf harder_ent3.
 (* Compute check_entailment example_ent.
     ... doesn't work, because of opaque termination proofs ... 
-*)
+ *)
+
+Definition ce_example_ent := check_entailment example_ent.
 
 Definition main :=
   map check_entailment
@@ -2369,5 +2375,3 @@ Definition main :=
         harder_ent3].        
 
 Extraction "vs" main.
-
-

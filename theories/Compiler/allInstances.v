@@ -156,10 +156,17 @@ Proof.
 - exact lt_wf.
 Defined.
 
+Lemma fooAx1 : forall n n0 : nat, n = S n0 -> (id n0 < id (S n0))%nat.
+Admitted.
 
-Function foo (n:nat) {measure id n} :=
-  0%nat.
-
+Check ltac:(let t:= type of fooAx1 in exact t). (** Prop *)
+Function foo (n:nat) {measure id n} : nat:=
+  match n with
+  | O => 1%nat
+  | S n => foo n
+  end.
+exact fooAx1.
+Defined.
 
 (** unfold just enough so that the fixpoint structure is visible *)
 Quote Recursively Definition pfoo :=
@@ -177,8 +184,9 @@ Definition showEnvNamed (name: string) (t : exception (cTerm certiL3)) :=
   exception_map (fun tt => lookup name (@AstCommon.env _ tt)) t.
 
 Require Import L3.compile.
+Set Printing Depth 10000.
 Eval vm_compute in (showMainBody3 pfoo3).
-Eval vm_compute in (ctranslateEval certiL4 pfoo 1000).
+Eval vm_compute in (ctranslateEval certiL4 pfoo 10000).
 
 
 Set Template Cast Propositions.

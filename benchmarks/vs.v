@@ -2123,6 +2123,80 @@ Definition incorp (s t : M.t) :=
 
 (** The main loop of the prover *)
 
+Lemma the_loop_termination1: 
+forall (n : positive) (sigma : list space_atom) (nc : clause) (s : M.t),
+(n =? 1)%positive = false ->
+forall (p : superposition_result * list clause * M.t) (t : M.t)
+  (p0 : superposition_result * list clause) (s_star : M.t)
+  (s0 : superposition_result) (units : list clause) (R : model)
+  (selected : M.t),
+s0 = Superposition.C_example R selected ->
+p0 = (Superposition.C_example R selected, units) ->
+p = (Superposition.C_example R selected, units, s_star) ->
+check_clauseset s = (Superposition.C_example R selected, units, s_star, t) ->
+isEq
+  (M.compare
+     (incorp
+        (print_wf_set
+           (do_wellformed
+              (print_spatial_model
+                 (norm (print_wf_set selected)
+                    (PosSpaceClause [] [] (simplify_atoms units sigma))) R)))
+        s_star) s_star) = true ->
+is_model_of_PI (rev R) (print_spatial_model (simplify units nc) R) = true ->
+isEq
+  (M.compare
+     (incorp
+        (print_wf_set
+           (do_wellformed
+              (print_spatial_model
+                 (norm (print_wf_set selected)
+                    (PosSpaceClause [] [] (simplify_atoms units sigma))) R)))
+        s_star)
+     (incorp
+        (print_unfold_set
+           (pures
+              (unfolding
+                 (print_spatial_model
+                    (norm (print_wf_set selected)
+                       (PosSpaceClause [] [] (simplify_atoms units sigma))) R)
+                 (print_spatial_model2
+                    (print_spatial_model
+                       (norm (print_wf_set selected)
+                          (PosSpaceClause [] [] (simplify_atoms units sigma)))
+                       R) (norm selected (simplify units nc)) R))))
+        (incorp
+           (print_wf_set
+              (do_wellformed
+                 (print_spatial_model
+                    (norm (print_wf_set selected)
+                       (PosSpaceClause [] [] (simplify_atoms units sigma))) R)))
+           s_star))) = false -> Pos.to_nat (Pos.pred n) < Pos.to_nat n.
+Admitted.
+
+Lemma the_loop_termination2:
+forall (n : positive) (sigma : list space_atom),
+forall s : M.t,
+(n =? 1)%positive = false ->
+forall (p : superposition_result * list clause * M.t) (t : M.t)
+  (p0 : superposition_result * list clause) (s_star : M.t)
+  (s0 : superposition_result) (units : list clause) (R : model)
+  (selected : M.t),
+s0 = Superposition.C_example R selected ->
+p0 = (Superposition.C_example R selected, units) ->
+p = (Superposition.C_example R selected, units, s_star) ->
+check_clauseset s = (Superposition.C_example R selected, units, s_star, t) ->
+isEq
+  (M.compare
+     (incorp
+        (print_wf_set
+           (do_wellformed
+              (print_spatial_model
+                 (norm (print_wf_set selected)
+                    (PosSpaceClause [] [] (simplify_atoms units sigma))) R)))
+        s_star) s_star) = false -> Pos.to_nat (Pos.pred n) < Pos.to_nat n.
+Admitted.
+
 (* begin show *)
 
 Function the_loop 
@@ -2149,7 +2223,9 @@ Function the_loop
   | (Superposition.Aborted l, units, _, _) => Aborted l cl
   end.
 Proof.
-Admitted.
+intros; eapply the_loop_termination1; eauto.
+intros; eapply the_loop_termination2; eauto.
+Defined.
 
 (* end show *)
 (* Required to work around Coq bug #2613 *)

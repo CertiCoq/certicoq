@@ -24,6 +24,9 @@ Open Scope string_scope.
 
 
 Quote Recursively Definition p := (3+4)%nat.
+Eval vm_compute in (ctranslateEval certiL4 p 100).
+Eval vm_compute in (ctranslateEval certiL4_2 p 100).
+Eval vm_compute in (ctranslateEval certiL4_5 p 100).
 
 
 (*
@@ -56,9 +59,7 @@ end).
 
  Quote Recursively Definition swap := ((swap' (S O, false)), (swap' (O, true))).
 
-Eval vm_compute in (ctranslateEval certiL4 p 100).
-Eval vm_compute in (ctranslateEval certiL4_2 p 100).
- 
+
 Ltac computeExtract certiL4 f:=
 (let t:= eval compute in (translateTo (cTerm certiL4) f) in 
      match t with

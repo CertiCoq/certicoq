@@ -1,6 +1,6 @@
 Require Import L4.expression.
 Require Import L4.variables.
-Require Import polyEval.
+Require Import L4.polyEval.
 
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
@@ -20,8 +20,9 @@ Coq.micromega.Psatz.
 Require Import Common.RandyPrelude.
 Open Scope N_scope.
 Require Import L4.L4_to_L4_1_to_L4_2.
-Require Import L4.L4_5_to_L5. (* TODO: rename L4_2 to L4 *)
+Require Import L4.L4_5_to_L5.
 Require Import SquiggleEq.list.
+
 
 (* Move. and replace in SquiggleEq.terms*)
 Definition btMapNt {O O2 V} (f: @NTerm V O  -> @NTerm V O2)
@@ -31,6 +32,96 @@ match b with
 end.
 
 Definition L4_5_Term :Type := (@NTerm NVar L4_5Opid).
+
+Section PolyEval45.
+
+
+Require Import Common.TermAbs.  
+Context {Abs4_4a: @TermAbs (@L4_5Opid) _}.
+
+Local Notation AbsTerm := (AbsTerm _ Abs4_4a).
+Local Notation absGetOpidBTerms := (absGetOpidBTerms _ Abs4_4a).
+Local Notation absApplyBTerm := (absApplyBTerm _ Abs4_4a).
+Local Notation absGetTerm := (absGetTerm _ Abs4_4a).
+Local Notation absMakeTerm := (absMakeTerm _ Abs4_4a).
+Local Notation absMakeBTerm := (absMakeBTerm _ Abs4_4a).
+
+
+Typeclasses eauto :=4.
+
+Open Scope program_scope.
+
+Require Import List.
+
+Require Import Common.ExtLibMisc.
+Require Import ExtLib.Structures.Monads.
+Require Import ExtLib.Data.Monads.OptionMonad.
+Import Monad.MonadNotation.
+Open Scope monad_scope.
+
+(* generalized from L4.expresssion.eval_n *)
+Fixpoint eval_n (n:nat) (e:AbsTerm) {struct n} :  option AbsTerm :=
+match n with
+|0%nat => None
+| S n =>  match (absGetOpidBTerms e) with |None => None | Some (o,lbt) =>
+  match (o,lbt) with
+  (* values *)
+  | (NLambda,_)
+  | (NFix _ _,_) => Some e
+
+  (* (possibly) non-values *)
+  | (NLet, [a;f]) =>
+        a <- absGetTerm a;;
+        a <- eval_n n a ;;
+        s <- (absApplyBTerm f [a]);;
+        eval_n n s
+  | (NDCon d ne, lb) => 
+        vs <- flatten (map (fun b => t <- absGetTerm b ;; eval_n n t)lb) ;;
+        (absMakeTerm (map absMakeBTerm vs) o)
+  | (NMatch ldn, disc::brs) => 
+        disc <- absGetTerm disc;;
+        disc <- eval_n n disc;;
+        match (absGetOpidBTerms disc) with
+        | Some (NDCon d ne, clb) =>
+          cvs <- flatten (map absGetTerm clb);;
+          b <- polyEval.find_branch _ d (length cvs) (combine (map fst ldn) brs);;
+          (* TODO: skip the parameters in cvs. matches don't bind parameters.
+          (If parameters are explicit, Coq forces us to write "_" at those positions
+          in constructor patterns).
+          A similar fix is needed in L5. 
+
+ UPDATE: no fix is needed here or in L5. parameters of constructors should just be discarded
+ much earlier : in L1
+*)
+          s <- (absApplyBTerm b cvs);;
+          eval_n n s
+        | _ => None
+        end
+  | (NApply, [f;a]) =>
+        a <- absGetTerm a;;
+        a <- eval_n n a ;;
+        f <- absGetTerm f;;
+        f <- eval_n n f;;
+        match (absGetOpidBTerms f) with
+        | Some (NLambda,[b]) =>
+            s <- (absApplyBTerm b [a]);;
+            eval_n n s
+        | Some (NFix nMut i,lm) =>
+            let pinds := List.seq 0 (length lm) in
+            let ls := map (fun n => absMakeTerm lm (NFix nMut n)) pinds in
+            ls <- flatten ls;;
+            im <- select i lm;;
+            s <- (absApplyBTerm im ls);;
+            s_a_pp <- (absMakeTerm (map absMakeBTerm [s;a]) NApply);;
+            eval_n n s_a_pp
+        (* box applied to anything becomes box *)
+        | _ => None
+        end
+    | _ => None
+  end
+  end
+end.
+End PolyEval45.
 
 Definition mapOpidL4_to_L4_5 (o: L4Opid) : L4_5Opid :=
   match o with
@@ -62,9 +153,9 @@ Require Import Common.TermAbs.
 Require Import SquiggleEq.tactics.
 Require Import SquiggleEq.LibTactics.
 
-
+(** use the function version defined above ? *)
 Lemma L4_2_to_L4_5_correct n t v:
-  let eval42 := @eval_n (Named.TermAbsImpl variables.NVar L4Opid) in
+  let eval42 := @polyEval.eval_n (Named.TermAbsImpl variables.NVar L4Opid) in
   (eval42 n t) = Some v
   -> eval (L4_2_to_L4_5 t) (L4_2_to_L4_5 v).
 Proof using.

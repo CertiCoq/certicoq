@@ -245,6 +245,13 @@ Require Import L4.variables.
 
 Definition L5Term :Type := (@NTerm NVar L5Opid).
 
+Global Instance L4_5_evaln
+  : BigStepOpSemExec (ienv * L4_5_Term) (ienv * L4_5_Term) :=
+  fun n e => match (@L4_2_to_L4_5.eval_n (Named.TermAbsImpl variables.NVar L4_5Opid) n (snd e)) with
+          | None => Exc "None"
+          | Some v => Ret (fst e, v)
+          end.
+
 Global Program Instance : BigStepOpSem L5Term L5Term := eval_c.
 
 (* may need to strengthened: consider adding the predicated nt_wf and fixwf.

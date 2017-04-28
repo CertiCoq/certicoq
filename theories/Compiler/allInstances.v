@@ -21,10 +21,18 @@ Require Import String.
 Open Scope string_scope.
 
 
+
+
+
+
+Quote Recursively Definition One := 1%positive.
 Quote Recursively Definition p := (3+4)%nat.
+(*
 Eval vm_compute in (ctranslateEval certiL4 p 100).
 Eval vm_compute in (ctranslateEval certiL4_2 p 100).
 Eval vm_compute in (ctranslateEval certiL4_5 p 100).
+*)
+
 
 
 (*
@@ -34,7 +42,7 @@ Time Eval compute in (ctranslateTo certiL5a p).
 
 
 Eval compute in (cTerm certiL6).
-Eval compute in (ctranslateTo certiL6 p).
+
 *)
 
 (* 
@@ -74,12 +82,27 @@ Defined.
 
 Print swap4.
 
-Definition swap6 : cTerm certiL6.
+
+About  Nat.le_lt_trans. 
+SearchAbout ( (_ <= _)%nat -> (_ < _)%nat -> (_ < _)%nat).
+About OrdersEx.Nat_as_DT.le_lt_trans.
+
+(* Definition swap6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) swap) in 
 match t with
 |Ret ?xx => exact xx
 end).
 Defined.
+*)
+
+
+Definition One6 : cTerm certiL6.
+(let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in 
+match t with
+|Ret ?xx => exact xx
+end).
+Defined.
+
 
 
 Quote Recursively Definition prev := (fun x => 
@@ -157,6 +180,7 @@ Defined.
 Lemma fooAx1 : forall n n0 : nat, n = S n0 -> (id n0 < id (S n0))%nat.
 Admitted.
 
+
 Check ltac:(let t:= type of fooAx1 in exact t). (** Prop *)
 Function foo (n:nat) {measure id n} : nat:=
   match n with
@@ -166,12 +190,14 @@ Function foo (n:nat) {measure id n} : nat:=
 exact fooAx1.
 Defined.
 
+
+
 (** unfold just enough so that the fixpoint structure is visible *)
 Quote Recursively Definition pfoo :=
   ltac:(let t:= eval unfold foo,foo_terminate in foo in exact (t 1%nat)).
 
 
-Definition pfoo3 := Eval vm_compute in (ctranslateTo certiL3 pfoo).
+Definition pfoo3 := Eval native_compute in (ctranslateTo certiL3 pfoo).
 
 (** show the main body (discard the env) of an L3 term *)
 Definition showMainBody3 (t : exception (cTerm certiL3)) : exception L3.compile.Term :=
@@ -185,6 +211,8 @@ Require Import L3.compile.
 Set Printing Depth 10000.
 Eval vm_compute in (showMainBody3 pfoo3).
 Eval vm_compute in (ctranslateEval certiL4 pfoo (N.to_nat 9000)).
+
+
 
 
 Set Template Cast Propositions.
@@ -204,7 +232,6 @@ Defined. *)
 
 Require Import List.
 Import ListNotations.
-
 (* the Gcd_terminate function is in the environment. Below, *)
 (* we project that part of the environment. *)
 (* The environment is too big, because it contains even the *)
@@ -222,7 +249,13 @@ let t:= eval vm_compute in (print4 pcgd4a) in exact t.
 Defined.
 Eval compute in pgcd4astr.
 *)
+(*
 
+Print Instances BigStepOpSemExec.
+Definition L42normalize (t: cTerm certiL4_2) (n: nat)
+  : exception (cTerm certiL4_2)
+  := bigStepEvaln n t.
+*)
 
 Require Import Benchmarks.Binom
         Benchmarks.Color
@@ -236,31 +269,35 @@ match t with
 end).
 Defined.
 
+About eq_refl.
+ Print  Coq.Init.Logic.eq_refl.
 
 Definition p6 :  (cTerm certiL6).
 set (t := (certiClasses.translate (cTerm certiL5a) (cTerm certiL6) p5a)).
 unfold certiClasses.translate in t.
 unfold liftTotal in t. simpl in t.
 unfold translateT in t.
-unfold certiL5a_t0_L6 in t.
- (* these gets stuck
-  simpl in t.
-  vm_compute in t.  
-  *)
+
+(* unfold certiL5a_t0_L6 in t.
+native_compute in t. *)
 Abort.
+
+
+
 
 Definition ext_comp := fun prog =>
   let t := (translateTo (cTerm certiL6) prog) in
   match t with
   | Ret xx => xx
-  | _ => swap6
+  | _ => One6
   end.
-
+ 
 Require Import L6_to_Clight.
 Require Import compcert.lib.Maps.
 
+
 Definition compile_L6 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
-  let '((_, cenv, _, nenv), prog) := t in
+  let '((_, cenv , nenv), (_, prog)) := t in
   let p := compile prog cenv nenv in
   (fst p, stripOption (snd p)).
 
@@ -309,16 +346,13 @@ Quote Recursively Definition blahProg := (blah_fun (blah1 (blah6 fst_blah snd_bl
 Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   match x with
   | exceptionMonad.Exc s => s
-  | exceptionMonad.Ret ((p,cenv,g, nenv), e) => show_exp nenv cenv e
+  | exceptionMonad.Ret ((p,cenv, nenv), (g, e)) => show_exp nenv cenv e
   end.
 
 
 
-Definition show_val_exn  nenv cenv (x : exceptionMonad.exception val) : string :=
-  match x with
-  | exceptionMonad.Exc s => s
-  | exceptionMonad.Ret v => show_val nenv cenv v
-  end.
+
+
 
 
 
@@ -331,8 +365,8 @@ Definition L5a_comp_L6 (v:(ienv * L4.L5a.cps)): ((L6.eval.prims * cEnv * L6.eval
     end.
 
 
-
-Quote Recursively Definition vs := vs.main.
+(*
+ Quote Recursively Definition vs := vs.main.  *)
 
 (*
 Quote Recursively Definition graph_color := (run G16).
@@ -398,18 +432,18 @@ Definition comp_fEnv7 := compile_L6 comp_fEnv6.
  *)
 
 Require Import runtime.runtime.
-(*
-Quote Recursively Definition binom := Binom.main.
-Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5a) binom).
-*)
-(*
+
+(* Quote Recursively Definition binom := Binom.main.
+ Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5a) binom).*)
+
+
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (M.elements (fst prog)) file.
-*)
+
 
 
 (* Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".*)
 
-(*  Definition test := printProg (compile_L6 (ext_comp swap)) "output/swap.c".   *)
+
 
 (* Definition test := printProg p7 "output/threePlusFour.c".*)
 (*Definition test := printProg blahProg7 "output/blah.c".*)
@@ -420,38 +454,11 @@ Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (s
 (*  Definition binom6 := Eval native_compute in (ctranslateTo certiL6 binom). *)
 (* Definition test := printProg (compile_L6 (ext_comp binom)) "output/binom.c".*)
 
-Definition run_L6_exn  (x : exceptionMonad.exception (cTerm certiL6)) :=
-  match x with
-  | exceptionMonad.Exc s =>  exceptionMonad.Exc s
-  | exceptionMonad.Ret ((p,cenv,g, nenv), e) => L6.eval.bstep_f p cenv g e 2000
-  end.
-
- 
-Check L6.eval.sstep_f.
-
-Fixpoint step_L6_exn'  (x : (cTerm certiL6)) (n:nat) :=
-  match n with
-    | O =>
-      match x with
-        | ((p,cenv,rho, nenv), e)=> Ret (rho , e)
-      end
-    | S n' =>
-      let '((p,cenv,rho, nenv), e) := x in
-      (match (L6.eval.sstep_f p cenv rho e 1) with
-         | Ret (rho', e') => step_L6_exn' ((p, cenv, rho', nenv), e') n'
-         | Exc s => Exc ("Error :"++s++" at "++(nat2string10 n)++" from end")%string
-       end)
-  end.
 
 
       
-Definition bind_exn {A B:Type} (f:A -> B) (e: exceptionMonad.exception A) :=
-  match e with
-        | exceptionMonad.Exc s => exceptionMonad.Exc s
-        | exceptionMonad.Ret e' => exceptionMonad.Ret (f e')
-  end.
 
-Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).
+(*  Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs). *)
 
 (*
 
@@ -469,8 +476,6 @@ Definition test := run_L6_exn (comp_L6 binom).
 Eval native_compute in test.
  *)
 
-About L7.L6_to_Clight.print.
-
 
 
 
@@ -478,40 +483,65 @@ Definition comp_L6 p := match p
                           with
                             | Exc s => Exc s
                             | Ret v =>  Ret (L5a_comp_L6 v)                                           
-                          end.
+                        end.
+
+
+
 
 Definition comp_to_L6:= fun p =>
                        comp_L6 (translateTo (cTerm certiL5a) p).
   
 
-Definition print_L6 p := L7.L6_to_Clight.print (show_exn p).
 
 
 
 
-Definition step_L6_exn := fun e => bind e (fun (x:(cTerm certiL6)) =>
-                                             step_L6_exn' x 30).
 
 
-About step_L6_exn.
 
-Definition print_eval_L6 p  :=
-  L7.L6_to_Clight.print (match p with
-                           | exceptionMonad.Exc s =>  s
-                           | exceptionMonad.Ret ((prim,cenv,g, nenv), e) => show_val_exn nenv cenv (L6.eval.bstep_f prim cenv g e 2000)
-                        end).
 
-About show_exp.
+ 
+
+
+(* Multistep *)
+Fixpoint mstep_L6  (x : (cTerm certiL6)) (n:nat) :=
+  match n with
+    | O =>
+      Ret x
+    | S n' =>
+      let '((p,cenv, nenv), (rho, e)) := x in
+      (match (L6.eval.sstep_f p cenv rho e) with
+         | Ret (rho', e') => mstep_L6 ((p, cenv, nenv), (rho',e')) n'
+         | Exc s => Exc ("Error :"++s++" at "++(nat2string10 n)++" from end")%string
+       end)
+  end.
+
+
+
+(* this will be split into two function when I fix the type of values for L6 *)
+Definition print_BigStepResult_L6 p  n:=
+  let '((prim,cenv, nenv), (rho, e)) := p in
+  L7.L6_to_Clight.print (
+      match (L6_evaln n p) with
+      | Error s _ => s
+      | OutOfTime (_, (rho', e')) => "Out of time:"++ (show_env nenv cenv rho')++ (show_exp nenv cenv e')
+      | Result v => show_val nenv cenv v
+      end).
+
+
+
 
 
 Definition print_step_L6 p  :=
   L7.L6_to_Clight.print (match p with
                            | exceptionMonad.Exc s =>  s
-                           | exceptionMonad.Ret ((prim, cenv, g, nenv), e) => match step_L6_exn p  with
+                           | exceptionMonad.Ret _ => match bind p (fun p => mstep_L6 p 30)  with
                                                                                     | Exc s => s
-                                                                                    | Ret (g', e') => (show_cenv cenv)++(show_env nenv cenv g') ++ (show_exp nenv cenv e')
+                                                                                    | Ret ((prim, cenv, nenv), (g', e')) => (show_cenv cenv)++(show_env nenv cenv g') ++ (show_exp nenv cenv e')
                                                                                                                                                                                          end
                         end).
+
+
 
 
 
@@ -525,8 +555,15 @@ Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 
 Extract Constant L7.L6_to_Clight.print => "print_string".
 
-Definition test := print_step_L6 (comp_L6 vs5).
+Definition test := printProg (compile_L6 (ext_comp swap)) "output/swap.c".  
+
+(* Definition test := print_step_L6 (comp_L6 vs5).
+
+*)
 
 
-Extraction "test.ml" test.
+
+
+
+
 

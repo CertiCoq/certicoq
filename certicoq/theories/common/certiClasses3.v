@@ -19,6 +19,10 @@ Class CerticoqLanguage (Term:Type)
 {
 }.
 
+Definition sameValues {Term:Type}
+  `{BigStepOpSem Term} (a b : Term)
+:= forall (v: Term), a ⇓ v <-> b ⇓ v.
+
 Class CerticoqLinkableLanguage (Term:Type)
   `{BigStepOpSem Term} `{GoodTerm Term} 
   `{QuestionHead Term} `{ObserveNthSubterm Term}
@@ -296,5 +300,59 @@ Proof.
   Unshelve. eauto. eauto.
 Qed.
 
+Require Import Morphisms.
+
+Global Instance  compObsLeLinkRespectsSameVal:
+  Proper (eq ==> sameValues ==> iff) ((@compObsLeLink Src Inter _ _ _ _ _ _ _ _ _ _  )).
+Proof using.
+  intros s1 s2 Heqs d1 d2 Hsvd. subst. rename s2 into s.
+  split.
+- revert Hsvd s.  revert d1 d2.
+  cofix.
+  intros ? ? Hsvd ? Hs.
+  constructor.
+  inverts Hs.
+  unfold sameValues in Hsvd.
+  firstorder. (* no idea what it did *)
+- revert Hsvd s.  revert d1 d2.
+  cofix.
+  intros ? ? Hsvd ? Hs.
+  constructor.
+  inverts Hs.
+  unfold sameValues in Hsvd.
+  firstorder.
+Qed. 
+
+(* A more general version of the above
+Global Instance  compObsLeLinkRespectsSameVal2:
+  Proper (sameValues ==> sameValues ==> iff) ((@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  )).
+Proof using.
+  intros s1 s2 Hsvs d1 d2 Hsvd. subst.
+  split.
+- revert  s1 s2 Hsvs d1 d2 Hsvd.
+  cofix.
+  intros ? ? Hsvs ? ? Hsvd Hs.
+  constructor.
+  inverts Hs.
+  unfold sameValues in *.
+  firstorder. (* no idea what it did *)
+- revert Hsvd s.  revert d1 d2.
+  cofix.
+  intros ? ? Hsvd ? Hs.
+  constructor.
+  inverts Hs.
+  unfold sameValues in Hsvd.
+  firstorder.
+Qed. 
+ *)
+
+Local Instance  compObsLeLinkRespectsEval:
+  Proper (eq ==> bigStepEval  ==> Basics.impl) ((@compObsLeLink Src Inter _ _ _ _ _ _ _ _ _ _  )).
+Proof using.
+  intros s1 s2 Heqs d1 d2 Hsvd Hs1. subst.
+  constructor.
+  intros ? Heval.
+  (* need that the second arg of bigStepeval is terminal *)
+Abort.
 
 End ComposeLink.

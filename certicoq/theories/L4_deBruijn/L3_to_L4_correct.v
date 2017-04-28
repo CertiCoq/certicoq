@@ -1862,7 +1862,7 @@ Proof.
     inv H1.
     f_equal; eauto.
   + intros.
-    inv H1. destruct (H0 k H10).
+    inv H1. destruct (H0 k H11).
     split; f_equal; eauto.
     intros.
     rewrite H; eauto.

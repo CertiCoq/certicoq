@@ -156,7 +156,6 @@ Definition L5OpidString (l : L5Opid) : string :=
       terms.flatten ["match |";terms.flattenDelim " " (map dconString ld);"|"]
   end.
 
-
 Definition cdecc: DeqSumbool L5Opid.
 Proof using.
   intros ? ?. unfold DecidableSumbool.
@@ -169,6 +168,91 @@ Instance CPSGenericTermSig : GenericTermSig L5Opid:=
   OpBindings := CPSOpBindings;
 |}.
 
+Section cpsPolyEval.
+
+  Require Import Common.TermAbs.
+Require Import Common.ExtLibMisc.
+Require Import ExtLib.Structures.Monads.
+Require Import ExtLib.Data.Monads.OptionMonad.
+Import Monad.MonadNotation.
+Open Scope monad_scope.
+
+
+  Context {Abs5a: @TermAbs (@L5Opid) _}.
+
+Local Notation AbsTerm := (AbsTerm _ Abs5a).
+Local Notation absGetOpidBTerms := (absGetOpidBTerms _ Abs5a).
+Local Notation absApplyBTerm := (absApplyBTerm _ Abs5a).
+Local Notation absGetTerm := (absGetTerm _ Abs5a).
+Local Notation absMakeTerm := (absMakeTerm _ Abs5a).
+Local Notation absMakeBTerm := (absMakeBTerm _ Abs5a).
+
+
+Typeclasses eauto :=4.
+
+Open Scope program_scope.
+
+Require Import List.
+Require Import certiClasses.
+
+Local Notation "' x" := (certiClasses.injectOption x) (at level 70).
+
+(* this function is polymorphic over the interface AbsTerm, which abstracts over
+de-bruijn/named terms. The main benefit of this ugly abstract definition is that parametricity
+will give us many free theorems: eval_n respects alpha equality, preserves closedness....*)
+Fixpoint eval_n (n:nat) (e:AbsTerm) {struct n} :  bigStepResult AbsTerm AbsTerm :=
+match n with
+|0%nat => OutOfTime e
+| S n =>  match (absGetOpidBTerms e) with
+         | None => Error "cant analyze term" (Some e)
+         | Some (o,lbt) =>
+  match (o,lbt) with
+  (* values *)
+  | (CHalt, [v]) =>
+    v <- 'absGetTerm v;; Result v
+  | (CRet, [klam;v]) =>
+    klam <- ' absGetTerm klam ;;
+    v <- ' absGetTerm v ;;
+    match absGetOpidBTerms klam with
+    | Some (CKLambda, [b]) =>
+      sub <- ' absApplyBTerm b [v];; eval_n n sub
+    | _ => Error "expected a kont lambda" (Some klam)
+    end            
+  | (CCall, [lam;v1;v2]) =>
+    lam <- ' absGetTerm lam ;;
+    v1 <- ' absGetTerm v1 ;;
+    v2 <- ' absGetTerm v2 ;;
+    match absGetOpidBTerms lam with
+    | Some (CLambda, [b]) =>
+      sub <- ' absApplyBTerm b [v2; v1];; eval_n n sub
+
+    | Some (CFix nMut i,lm) =>
+       let pinds := List.seq 0 (length lm) in
+       let ls := map (fun n => absMakeTerm lm (CFix nMut n)) pinds in
+       ls <- ' flatten ls;;
+       im <- ' select i lm;;
+       s <- ' (absApplyBTerm im ls);;
+       s_a_pp <- ' (absMakeTerm (map absMakeBTerm [s;v1;v2]) CCall);;
+       eval_n n s_a_pp
+    | _ => Error "expected a lambda" (Some lam)
+    end            
+  | (CMatch ldn, disc::brs) => 
+     disc <- 'absGetTerm disc;;
+     match (absGetOpidBTerms disc) with
+     | Some (CDCon d ne, clb) =>
+       cvs <- ' flatten (List.map absGetTerm clb);;
+       b <- ' find_branch _ d (length cvs) (combine (map fst ldn) brs);;
+       s <- ' absApplyBTerm b cvs;;
+       eval_n n s
+     | _ => Error "expected a constructor" (Some disc)
+     end
+     
+  | _ => Error "unexpected case" (Some e)
+  end
+  end
+end.
+
+End cpsPolyEval.
 
 Require Import L4.varInterface.
 

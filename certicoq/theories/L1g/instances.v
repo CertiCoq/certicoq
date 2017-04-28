@@ -76,7 +76,7 @@ Definition ctranslateEval {Term Value BigStep WF QH ObsS }
   (p: program) (n:nat) : bigStepResult (cTerm Lj) (cValue Lj) :=
   match translateTo (cTerm Lj) p with
   | Ret e => bigStepEvaln n e
-  | Exc s => Error s 
+  | Exc s => Error s None 
   end.
 
 Arguments ctranslateEval {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} p n.

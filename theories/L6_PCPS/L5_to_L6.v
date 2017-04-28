@@ -26,7 +26,7 @@ Add LoadPath "../L1_5_box" as L1_5.
 Add LoadPath "../L2_typeStripped" as L2.
 Add LoadPath "../L3_flattenedApp" as L3.
 ******)
-Add LoadPath "../L4_deBruijn" as L4.
+
 
 Require Export Common.Common.  (* shared namespace *)
 Require Import ExtLib.Data.List.
@@ -287,8 +287,10 @@ Ret_c M N ->
                        
                  end in 
              let (ctag, nP) := (dcon_to_info dcn (fst (fst tgm))) in
+             (* OS : as of r7849, parameters are already stripped so we can ignore arg p in convert_v_list *)
              (* skip the first nP arguments which correspond to the inductive type's parameters *)
-             let '(lv_ctx, nl, n', tgm) := convert_v_list lv nP sv sk tgm n in
+             (*             let '(lv_ctx, nl, n', tgm) := convert_v_list lv nP sv sk tgm n in *)
+             let '(lv_ctx, nl, n', tgm) := convert_v_list lv 0 sv sk tgm n in
              (comp_ctx_f lv_ctx (Econstr_c n' ctag nl Hole_c), n', Pos.succ n', set_t n' ctag tgm)
            | Fix_c lbt i =>
              (match lbt with

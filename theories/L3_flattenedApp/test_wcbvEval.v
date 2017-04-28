@@ -3,7 +3,7 @@ Require Import ExtLib.Data.String.
 Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
-Require L2_5.L2_5.         (* whole L2 library is exported by L2.L2 *)
+Require L2_5.L2_5.         (* whole L2_5 library is exported by L2_5.L2_5 *)
 Require Import L3.compile. 
 Require Import L3.term.
 Require Import L3.program.
@@ -15,20 +15,97 @@ Local Open Scope string_scope.
 
 Set Template Cast Propositions. 
 
+(*** examples with parameters  *****)
+Axiom xxxxxx : Set.
+Notation Lam := (TLambda).
+Notation "@ x" := (nNamed x)  (at level 85).
+Notation LLL := (mkInd "Top.LL" 0).
+Notation "^ x" := (TRel x)    (at level 85).
+Notation NNN := (TConstruct LLL 0).
+Notation CCC := (TConstruct LLL 1).
+Notation Bool := (mkInd "Coq.Init.Datatypes.bool" 0).
+Notation tt := (TConstruct Bool 0 tnil).
+Notation ff := (TConstruct Bool 1 tnil).
+
 Inductive LL (B:Type) : Type := NN: LL B | CC: B -> LL B -> LL B.
-Definition CCC := CC.
-Definition tt := true.
-Definition ffs := (CC bool false (NN bool)).
 Quote Recursively Definition p_CC := CC.
 Eval cbv in (program_Program p_CC).
 Quote Recursively Definition p_CC_bool := (CC bool).
 Eval cbv in (program_Program p_CC_bool).
-Quote Recursively Definition p_CC_bool_tt := (CC bool tt).
+Quote Recursively Definition p_CC_bool_tt := (CC bool true).
 Eval cbv in (program_Program p_CC_bool_tt).
-Quote Recursively Definition p_CC_bool_tt_ffs := (CC bool tt ffs).
+Definition ffs := (CC bool false (NN bool)).
+Quote Recursively Definition p_CC_bool_tt_ffs := (CC bool true ffs).
 Eval cbv in (program_Program p_CC_bool_tt_ffs).
 
-Reset LL.
+Set Printing Width 80.
+Set Printing Depth 1000.
+
+Fixpoint Map (B A:Type) (f:B -> A) (bs:LL B) : LL A :=
+  match bs with
+    | NN _ => NN A
+    | CC _ x xs => CC A (f x) (Map B A f xs)
+  end.
+
+Quote Recursively Definition p_Map := Map.
+Eval cbv in (program_Program p_Map).
+
+Arguments nil : clear implicits.
+Arguments cons : clear implicits.
+Arguments eq_refl : clear implicits.
+Inductive vec (A:Type) (n:nat) : Type :=
+| vecc : forall (l:list A), length l = n -> vec A n.
+Quote Recursively Definition p_vec := vec.
+Arguments vecc : clear implicits.
+
+Quote Recursively Definition p_vecc := vecc.
+Eval cbv in (program_Program p_vecc).
+Quote Recursively Definition p_vecc_bool := (vecc bool).
+Eval cbv in (program_Program p_vecc_bool).
+Quote Recursively Definition p_vecc_bool_0 := (vecc bool 0).
+Eval cbv in (program_Program p_vecc_bool_0).
+Quote Recursively Definition p_vecc_bool_0_nil := (vecc bool 0 (nil bool)).
+Eval cbv in (program_Program p_vecc_bool_0_nil).
+Quote Recursively Definition p_vecc_bool_0_nil_eqr :=
+  (vecc bool 0 (nil bool) (eq_refl nat 0)).
+Eval cbv in (program_Program p_vecc_bool_0_nil_eqr).
+
+(***
+Fixpoint up_to (n:nat) : list nat :=
+  match n with
+    | 0 => nil nat
+    | S m => cons nat m (up_to m)
+  end.
+
+Lemma length_up_to:
+  forall (n:nat), length (up_to n) = n.
+Proof.
+  induction n. reflexivity. cbn. rewrite IHn. reflexivity.
+Qed.
+
+Check (fun (n:nat) => vecc nat n (up_to n) (length_up_to n)).
+
+Fixpoint foo (n:nat) (v:vec nat n) {struct n} : vec nat :=
+  match n with
+    | 0 => nil A
+    | S m => match v with
+               | vecc _ _ (nil _) _ => nil A
+               | vecc _ _ (cons _ x xs) _ => xs
+             end
+  end.
+                 cons A x (vec_list
+                             A m
+                             (vecc A (length xs) xs (eq_refl nat (length xs))))
+             end
+  end.
+                                                                
+    | vecc _ _ (nil _) _, _ => nil A
+    | vecc _ _ (cons _ x xs) (eq_refl _ _), m =>
+      cons A x (vec_list A (pred m) (vecc A (pred m) xs (eq_refl nat _)))
+  end.
+ ***)
+
+Reset xxxxxx.  (** end examples with paameters **)
 
 Set Printing Width 80.
 Set Printing Depth 1000.

@@ -14,7 +14,36 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Ltac not_isApp :=
+Ltac not_is0 :=
+  let hh := fresh "h" in
+  intros hh; discriminate.
+Ltac not_is1 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j" in
+  intros hh; destruct hh as [xx jj]; discriminate.
+Ltac not_is2 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y" in
+  intros hh; destruct hh as [xx [yy jj]]; discriminate.
+ Ltac not_is3 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y"
+  with zz := fresh "z" in
+  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
+            
+            Ltac not_isApp := not_is2.
+            Ltac not_isLambda := not_is2.
+            Ltac not_isCase := not_is3.
+            Ltac not_isFix := not_is2.
+            Ltac not_isCast := not_is1.
+            Ltac not_isConstruct := not_is3.
+  (****
+  Ltac not_isApp :=
   let hh := fresh "h"
   with xx := fresh "x"
   with jj := fresh "j"
@@ -35,7 +64,7 @@ Ltac not_isConstruct :=
   with xx2 := fresh "x2"
   with ll := fresh "l" in
   intros hh; destruct hh as [xx0 [xx1 [xx2 l]]]; discriminate.
-
+************************)
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
 Local Ltac rght := right; injection; intuition.
@@ -169,6 +198,14 @@ induction t;
   try (solve [right; intros h;
               destruct h as [x [nx [ts j]]]; discriminate]).
 - left. auto.
+Qed.
+
+Definition isProof (t:Term) : Prop := t = TProof.
+
+Lemma isProof_dec: forall t, isProof t \/ ~ isProof t.
+Proof.
+  destruct t; try (right; intros h; discriminate).
+  - left. reflexivity. 
 Qed.
 
 
@@ -344,10 +381,10 @@ Lemma WF_nolift:
   (forall ts n, WFTrms ts n -> forall i, n <= i -> lifts i ts = ts) /\
   (forall ds n, WFTrmDs ds n -> forall i, n <= i -> liftDs i ds = ds).  
 Proof.
-  apply WFTrmTrmsDefs_ind; cbn; intros; try reflexivity;
-  try (rewrite H0; try reflexivity; omega);
-  try (rewrite H0, H2; try reflexivity; omega).
-  - case_eq (m ?= i); intros; Compare_Prop; try reflexivity; omega.
+  apply WFTrmTrmsDefs_ind; intros; try reflexivity;
+  try (cbn; rewrite H0; try reflexivity; omega);
+  try (cbn; rewrite H0, H2; try reflexivity; omega).
+  - cbn; case_eq (m ?= i); intros; Compare_Prop; try omega. reflexivity.
 Qed.
 
 Lemma WFTrm_up:
@@ -379,10 +416,10 @@ Lemma lift_pres_WFTrm:
   (forall ts m, WFTrms ts m -> forall n, WFTrms (lifts n ts) (S m)) /\
   (forall ds m, WFTrmDs ds m -> forall n, WFTrmDs (liftDs n ds) (S m)).
 Proof.
-  apply WFTrmTrmsDefs_ind; intros; cbn; try (solve[constructor]);
-  try (solve[constructor; intuition]).
-  - case_eq (m ?= n0); intros; Compare_Prop; subst; constructor; omega.
-  - constructor. rewrite liftDs_pres_dlength.
+  apply WFTrmTrmsDefs_ind; intros; try (solve[cbn; constructor]);
+  try (solve[cbn; constructor; intuition]).
+  - cbn; case_eq (m ?= n0); intros; Compare_Prop; subst; constructor; omega.
+  - cbn; constructor. rewrite liftDs_pres_dlength.
     refine (H0 (n0 + dlength defs)).
 Qed. 
 
@@ -425,6 +462,46 @@ Proof.
   assumption.
 Qed.
   
+(***********
+Goal
+  forall dts x t, dnthBody x dts = Some t -> forall n, WFTrmDs dts n ->
+                  isLambda t.
+Proof.
+  induction dts; induction x; intros.
+  - cbv in H. discriminate.
+  - cbv in H. discriminate.
+  - cbv in H. myInjection H. inversion_Clear H0. assumption.
+  - inversion_Clear H0. eapply IHdts; try eassumption.
+Qed.
+
+
+intros. inversion_Clear H. inversion_Clear H4.
+  - unfold dnthBody in H0. cbn in H0. discriminate.
+  - inversion_Clear H2.
+    + unfold dnthBody in H0. destruct m.
+      * cbn in H0. myInjection H0. assumption.
+      * cbn in H0. discriminate.
+    +         
+
+      induction m; destruct dts; intros.
+  - cbn in H0. discriminate.
+  - cbn in H0. myInjection H0. inversion_Clear H.  inversion_Clear H3.
+    assumption.
+  - cbn in H0. discriminate.
+  - unfold dnthBody in H0. cbn in H0. destruct (dnth m dts). destruct d.
+    myInjection H0. eapply IHm.
+                
+    eapply IHm. constructor. constructor.
+
+  
+  induction dts; induction m; intros.
+  - cbn in H0. discriminate.
+  - cbn in H0. discriminate.
+  - cbn in H0. myInjection H0. inversion_Clear H. eapply IHdts. eapply H.
+
+    eapply IHdts.
+    inversion_Clear H. inversion_Clear H4.
+  
   
 Lemma strip_presWFTrm:
   (forall t n, L2_5.term.WFTrm t n -> WFTrm (strip t) n) /\
@@ -442,7 +519,7 @@ Admitted.
         destruct h as [x0 [x1 [x2 j]]].         
         destruct fn; cbn in j; try discriminate.
        ****)
-
+*****************)
   
 (*** Some basic operations and properties of [Term] ***)
 

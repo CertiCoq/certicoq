@@ -310,7 +310,8 @@ Function wcbvEval
                           wcbvEval n (pre_whFixStep x dts (tcons arg' args'))
                         | right _ _ =>  ret (TApp (TFix dts m) arg' args')
                       end
-                    | _ => raise ("wcbvEval TAppFix: args don't eval")
+                    | Ret tnil => raise ("wcbvEval TAppFix: args nil")
+                    | Exc s => raise ("wcbvEval TAppFix: args " ++ s)
                   end
               end
             | Ret Fn =>              (* no redex; congruence rule *)

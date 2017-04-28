@@ -104,7 +104,7 @@ with crctTerms: environ Term -> nat -> Terms -> Prop :=
 with crctDs: environ Term -> nat -> Defs -> Prop :=
 | cdsNil: forall p n, crctEnv p -> crctDs p n dnil
 | cdsCons: forall p n nm bod ix ds,
-             crctEnv p -> crctTerm p n bod -> crctDs p n ds ->
+             crctEnv p -> crctTerm p n bod -> isLambda bod -> crctDs p n ds ->
              crctDs p n (dcons nm bod ix ds).
 Hint Constructors crctTerm crctTerms crctDs crctEnv.
 Scheme crct_ind' := Minimality for crctTerm Sort Prop
@@ -175,6 +175,8 @@ Proof.
   - unfold LookupTyp in H1. destruct H1.
     elim (Lookup_fresh_neq H1 H6). reflexivity.
   - specialize (H5 _ H6). contradiction.
+  - elim (H2 _ H6). assumption.
+  - elim (H5 _ H6). assumption.     
 Qed.    
 
 Lemma Crct_weaken:
@@ -273,9 +275,9 @@ Proof.
     try (eapply H4; try reflexivity; intros h; elim H6;
          constructor; assumption).
   - inversion_Clear H; econstructor; try assumption;
-    try (eapply H2; try reflexivity; intros h; elim H6;
+    try (eapply H2; try reflexivity; intros h; elim H7;
          constructor; assumption);
-    try (eapply H4; try reflexivity; intros h; elim H6;
+    try (eapply H5; try reflexivity; intros h; elim H7;
          constructor; assumption).
 Qed.
 
@@ -418,8 +420,8 @@ Proof.
   induction 1; intros.
   - inversion H0.
   - destruct m.
-    + cbn in H2. myInjection H2. assumption.
-    + eapply IHcrctDs. cbn in H2. eassumption.
+    + cbn in H3. myInjection H3. assumption.
+    + eapply IHcrctDs. cbn in H3. eassumption.
 Qed.
 
 Lemma Crcts_append:
@@ -486,6 +488,7 @@ Proof.
       * eapply Crct_UP. eassumption. omega.
   - inversion_Clear H2. apply ctsCons; intuition.
   - inversion_Clear H2. constructor; intuition.
+    destruct H12 as [x0 [x1 jx]]. subst bod. inversion_Clear i. auto.
 Qed.
 
 Lemma instantiate_pres_Crct:

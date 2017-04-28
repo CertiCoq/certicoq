@@ -20,6 +20,58 @@ Set Template Cast Propositions.
 Set Printing Width 80.
 Set Printing Depth 1000.
 
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation NNN := (TInd NN).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
+Notation LLL := (TInd LL).
+Notation CONS := (TConstruct LL 1 3).
+Notation NIL := (TConstruct LL 0 1).
+Notation Lam := (TLambda).
+Notation tLam := (tLambda).
+Notation Pi := (TProd).
+Notation tPi := (tProd).
+Notation PROP := (TSort sProp).
+Notation tPROP := (tSort sProp).
+Notation AND := (mkInd "Coq.Init.Logic.and" 0).
+Notation CONJ := (TConstruct AND 0 4).
+Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
+Notation II := (TConstruct TRUE 0 0).
+Notation EQ := (mkInd "Coq.Init.Logic.eq" 0).
+Notation RFL := (TConstruct EQ 0 2).
+Notation PROD := (mkInd "Coq.Init.Datatypes.prod" 0).
+Notation PAIR := (TConstruct PROD 0 4).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Infix ":t:" := tcons  (at level 87, right associativity).
+Notation "fn [| arg @ args |]" :=
+  (TApp fn arg args)  (at level 90, left associativity).
+
+Require Import Benchmarks.vs.
+Print Assumptions vs.main.
+Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
+Time Definition P_ce_example_ent :=
+  Eval cbv in (program_Program p_ce_example_ent).
+Time Definition P_env_ce_example_ent := env P_ce_example_ent.
+Time Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
+Time Definition eval_ce_example_ent :=
+  Eval cbv in (wcbvEval P_env_ce_example_ent 200 P_main_ce_example_ent).
+Set Printing Width 150.
+Print eval_ce_example_ent.
+
+Require Import Benchmarks.vs.
+Print Assumptions vs.main.
+Time Quote Recursively Definition p_vs := vs.main.
+Time Definition P_vs := Eval cbv in (program_Program p_vs).
+Time Definition P_env_vs := env P_vs.
+Time Definition P_main_vs := AstCommon.main P_vs.
+Time Definition eval_vs := Eval cbv in (wcbvEval P_env_vs 200 P_main_vs).
+Set Printing Width 150.
+Print eval_vs.
+
+
+
 (** tactic for WcbvEval relation **)
 Ltac terms := repeat (eapply wCons; try eapply wAppCong; try eapply wInd;
                       try eapply wConstruct; try eapply wInd;

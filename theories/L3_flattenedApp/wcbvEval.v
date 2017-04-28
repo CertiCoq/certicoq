@@ -18,6 +18,8 @@ Set Implicit Arguments.
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wPrf: WcbvEval p TProof TProof
+| waPrf: forall fn arg,
+    WcbvEval p fn TProof -> WcbvEval p (TApp fn arg) TProof
 | wLam: forall nm bod,
           WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wConstruct: forall i r args args',
@@ -43,7 +45,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
                WcbvEval p (TApp fn arg) s
 | wAppCong: forall fn efn arg arg1,
               WcbvEval p fn efn ->
-              ~ isLambda efn -> ~ isFix efn ->
+              ~ isLambda efn -> ~ isFix efn -> TProof <> efn ->
               WcbvEval p arg arg1 ->
               WcbvEval p (TApp fn arg) (TApp efn arg1)
 | wCase: forall mch i j n args brs cs s,
@@ -334,9 +336,10 @@ Function wcbvEval
                 | None => raise ""
                 | Some fs => wcbvEval n (TApp fs a1)
               end
+            | Ret TProof => Ret TProof
             | Ret Fn =>
               match wcbvEval n a1 with
-                | Exc s =>  raise "wcbvEval: TApp, arg doesn't eval"
+                | Exc s => raise "wcbvEval: TApp, arg doesn't eval"
                 | Ret ea1 =>
                   match Fn with
                     | TLambda _ bod => wcbvEval n (whBetaStep bod ea1)
@@ -355,23 +358,6 @@ Function wcbvEval
               end
             | Ret mch' => ret (TCase i mch' brs)
           end
-            (***********************
-        | TCase ml mch brs =>
-          match wcbvEval n mch with
-            | Ret (TConstruct i r args) =>
-              if eq_dec i (fst ml) then
-                match tskipn (snd ml) args with
-                  | None => raise "wcbvEval: Case, tskipn"
-                  | Some ts => match whCaseStep r ts brs with
-                                 | None => raise "wcbvEval: Case, whCaseStep"
-                                 | Some cs => wcbvEval n cs
-                               end
-                end
-              else raise "wcbvEval: TCase: i doesn't match"
-            | Ret emch => Ret (TCase ml emch brs)
-            | Exc s => Exc s
-          end
-********************)
         | TLetIn nm df bod =>
           match wcbvEval n df with
             | Exc s => raise s
@@ -423,13 +409,13 @@ Proof.
     eapply lookup_Lookup. eassumption. apply H. assumption.
   - specialize (H _ e1). specialize (H0 _ p1).
     eapply wAppFix; try eassumption.
-  - specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ p1).
+  - destruct Fn; try discriminate.
+    specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ p1).
     eapply wAppLam; try eassumption.
-    destruct Fn; try discriminate. myInjection e3. eassumption.
+    myInjection e3. assumption.
   - specialize (H _ e1). specialize (H0 _ e2).
     destruct T; try contradiction;
-    try (myInjection H1); try (apply wAppCong); try assumption;
-    try (solve[not_isApp]).
+      try (apply wAppCong; try eassumption; try not_is0; try not_is2).
   - subst. specialize (H _ e1). specialize (H0 _ p1). 
     refine (wCase _ _ _ _ _); try eassumption.
   - specialize (H _ e1). 
@@ -453,6 +439,8 @@ Proof.
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   - destruct H. exists (S x). intros m h. simpl.
     rewrite (j m x); try omega. rewrite H; try omega. reflexivity.
+  - destruct H. exists (S x). intros mx hm. simpl.
+    rewrite (j mx 0); try omega. rewrite H; try omega. reflexivity.
   - destruct H. exists (S x). intros mx hm. simpl. unfold LookupDfn in l.
     rewrite (Lookup_lookup l). rewrite (j mx 0); try omega. apply H.
     omega.
@@ -486,6 +474,7 @@ Proof.
     rewrite (H (mx - 1)); try omega.
     rewrite (H0 (mx - 1)); try omega.
     destruct efn; try reflexivity.
+    + contradiction.
     + elim n. auto.
     + elim n0. auto.
   - destruct H as [x hx]. destruct H0 as [x0 hx0].
@@ -529,3 +518,9 @@ Qed.
 
 End wcbvEval_sec.
 
+(***
+Require Import Ascii String ExtrOcamlString.
+
+Definition wcbvE := wcbvEval.
+Extraction "wcbvEval" wcbvE.
+****)

@@ -19,11 +19,17 @@ Require Import uncurry closure_conversion hoisting L6_to_Clight.
 
 (* 1 - environment of primitive operations
    2 - environment of constructors (from which datatypes can be reconstructed)
-  3 - evaluation environment mapping free variables to values
-  4 - name environment mapping variables to their original name if it exists
+  3 - name environment mapping variables to their original name if it exists
 *)
-Let L6env : Type := prims * cEnv * eval.env * nEnv.
+Let L6env : Type := prims * cEnv *  nEnv.
 
+
+ (*  - evaluation environment mapping free variables to values
+     - expression *) 
+Let L6term: Type := eval.env * cps.exp.
+
+
+Let L6val: Type := cps.val.
 
 (* A: Should pr cenv env be particular values? The translation from L5a doesn't produce
   these values. If it did, we could make the terms contain this information, as in L3 *)
@@ -32,28 +38,48 @@ Let L6env : Type := prims * cEnv * eval.env * nEnv.
    which type they belong to. env is the environment that contains valuations for the free
    variables of a term.
  *)
-Instance bigStepOpSemL3Term : BigStepOpSem (L6env * cps.exp) cps.val :=
+Instance bigStepOpSemL6Term : BigStepOpSem (L6env * L6term) L6val :=
   λ p v,
-  let '(pr, cenv, env, nenv,  e) := p in
+  let '(pr, cenv, nenv, (env, e)) := p in
+
+  (* should not modify pr, cenv and nenv 
+  let '(pr', cenv', env', nenv', val) := v in *)
   ∃ (n:nat), (L6.eval.bstep_e pr cenv env e v n).
 
 Require Import certiClasses2.
 
-(* Fix *)
-Instance WfL3Term : GoodTerm (L6env * cps.exp) :=
-  fun p  => True .
 
 
-Require Import certiClasses2.
+
+
+
+
+(* Probably want some fact about the wellformedness of L6env w.r.t. L6term *)
+  Instance WfL6Term : GoodTerm (L6env * L6term) :=
+   fun p =>  let '(pr, cenv, nenv, (env, e)) := p in
+           identifiers.unique_bindings e.
+
+
+
 (* FIX!! *)
-Global Instance QuestionHeadTermL : QuestionHead cps.val :=
+Global Instance QuestionHeadTermL : QuestionHead  L6val :=
 fun q t => false.
 
 (* FIX!! *)
-Global Instance ObsSubtermL : ObserveNthSubterm cps.val :=
+Global Instance ObsSubtermL : ObserveNthSubterm L6val :=
 fun n t => None.
 
-Instance certiL6 : CerticoqLanguage (L6env * cps.exp) := {}.
+Instance certiL6 : CerticoqLanguage (L6env * L6term) := {}.
+Eval compute in cValue certiL6.
+
+Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) :=
+  fun n p =>
+    let '((penv, cenv, nenv), (rho, e)) := p in 
+    match bstep_f penv cenv rho e n with
+    | exceptionMonad.Exc s => Error s None
+    | Ret (inl t) => OutOfTime ((penv,cenv,nenv), t)
+    | Ret (inr v) => Result v
+    end.
 
 
 
@@ -76,13 +102,14 @@ Instance certiL5a_t0_L6:
     match v with
         | pair venv vt => 
           let '(cenv, nenv, t) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
-         let '(cenv',nenv', t') :=  closure_conversion_hoist
+(*          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv), M.empty _, nenv),   shrink_top t)         *)
+        let '(cenv',nenv', t') :=  closure_conversion_hoist
                                    bogus_cloTag
-                                  (shrink_top t)  
+                                  (shrink_top t) 
                                    bogus_cTag
                                    bogus_iTag
                                    cenv nenv in
-          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), M.empty _, nenv'), shrink_top  t')          
+          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv'),  (M.empty _,  shrink_top t')) 
 (*          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv), M.empty _, nenv),   t)           *)
     end.
 

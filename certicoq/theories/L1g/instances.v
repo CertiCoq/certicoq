@@ -72,7 +72,7 @@ Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
 Definition ctranslateEval {Term Value BigStep WF QH ObsS } 
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
-   `{BigStepOpSemExec (cTerm Lj) (cTerm Lj)}
+   `{BigStepOpSemExec (cTerm Lj) (cValue Lj)}
   (p: program) (n:nat) : bigStepResult (cTerm Lj) (cValue Lj) :=
   match translateTo (cTerm Lj) p with
   | Ret e => bigStepEvaln n e

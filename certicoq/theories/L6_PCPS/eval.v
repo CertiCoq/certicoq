@@ -147,43 +147,40 @@ Definition l_opt {A} (e:option A) (s:string):exception A :=
     | Some e => Ret e
   end.
 
-Fixpoint sstep_f (rho:env) (e:exp) (n:nat): exception (env* exp) :=
-
-  match n with
-    | O => Ret (rho, e)
-    | S n' =>
-      ( match e with
-          | Eprim x f ys e' =>
-            do vs  <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
-            do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
-            do v <- l_opt (f' vs) ("Eprim: prim did not compute");
-            let rho' := M.set x v rho in
-            sstep_f rho' e' n'
-          | Econstr x t ys e' =>
-              do vs <- l_opt (getlist ys rho) ("Econstr: failed to get args");
-            let rho' := M.set x (Vconstr t vs) rho in
-            sstep_f rho' e' n'
-          | Eproj x t m y e' =>
-            (match (M.get y rho) with
-               | Some (Vconstr t' vs) =>
-                 if Pos.eqb t t' then
-                   do v <- l_opt (nthN vs m) ("Eproj: projection failed");
-                   let rho' := M.set x v rho in
-                     sstep_f rho' e' n'
-                 else (exceptionMonad.Exc "Proj: tag check failed")
-               | _ => (exceptionMonad.Exc "Proj: var not found")
-             end)
-          | Efun fl e' =>
-            let rho' := def_funs fl fl rho rho in
-            sstep_f rho' e' n'
-          | Ehalt x =>
-            Ret (rho, Ehalt x)
-          | Ecase y cl =>
+Fixpoint sstep_f (rho:env) (e:exp) : exception (env* exp) :=
+  match e with
+  | Eprim x f ys e' =>
+    do vs  <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
+      do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
+      do v <- l_opt (f' vs) ("Eprim: prim did not compute");
+      let rho' := M.set x v rho in
+      Ret (rho', e')
+  | Econstr x t ys e' =>
+    do vs <- l_opt (getlist ys rho) ("Econstr: failed to get args");
+      let rho' := M.set x (Vconstr t vs) rho in
+      Ret (rho', e')
+  | Eproj x t m y e' =>
+    (match (M.get y rho) with
+     | Some (Vconstr t' vs) =>
+       if Pos.eqb t t' then
+         do v <- l_opt (nthN vs m) ("Eproj: projection failed");
+           let rho' := M.set x v rho in
+           Ret (rho', e')
+       else (exceptionMonad.Exc "Proj: tag check failed")
+     | _ => (exceptionMonad.Exc "Proj: var not found")
+     end)
+  | Efun fl e' =>
+    let rho' := def_funs fl fl rho rho in
+    Ret (rho', e')
+  | Ehalt x =>
+    (* Maybe fail? *)
+    Ret (rho, Ehalt x)
+  | Ecase y cl =>
             match M.get y rho with
               | Some (Vconstr t vs) =>
                 do e <- l_opt (findtag cl t) ("Case: branch not found");
                   if caseConsistent_f cl t then 
-                    sstep_f rho e n'
+                    Ret (rho, e)
                   else     (exceptionMonad.Exc "Case: consistency failure")
               | Some _ =>  (exceptionMonad.Exc "Case: arg is not a constructor")
               | None => (exceptionMonad.Exc "Case: arg not found")
@@ -196,21 +193,22 @@ Fixpoint sstep_f (rho:env) (e:exp) (n:nat): exception (env* exp) :=
                        | Some (t', xs ,e) =>
                          if (Pos.eqb t t') then
                            do rho'' <- l_opt (setlist xs vs (def_funs fl fl rho' rho')) ("Fun: setlist failed");   
-                                 sstep_f rho'' e n'
+                                 Ret (rho'', e)
                          else (exceptionMonad.Exc "Fun: tag check failed")
                        | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
                      end)
                |  _ => (exceptionMonad.Exc "Fun: Bundle not found")
              end)
-        end)
   end.
 
 
 
 
-Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exceptionMonad.exception val :=
+
+(* Either fail with an Exn, runs out of fuel and return (Ret) inl of the current state or finish to evaluate and return inr of a val *)
+Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exception ((env * exp) + val) :=
   match n with
-    | O => exceptionMonad.Exc "out of fuel"
+    | O => exceptionMonad.Ret (inl (rho, e))
     | S n' =>
       ( match e with
           | Eprim x f ys e' =>
@@ -238,7 +236,7 @@ Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exceptionMonad.exception val :=
             bstep_f rho' e' n'
           | Ehalt x =>
             match (M.get x rho) with
-              | Some v => exceptionMonad.Ret v
+              | Some v => exceptionMonad.Ret (inr v)
               | None => (exceptionMonad.Exc "Halt: value not found")
             end
           | Ecase y cl =>
@@ -271,7 +269,7 @@ Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exceptionMonad.exception val :=
 
 Theorem bstep_f_sound:
   forall n rho e v, 
-  bstep_f rho e n = Ret v ->
+  bstep_f rho e n = Ret (inr v) ->
   exists m, bstep_e rho e v m.
 Proof.
   induction n; intros. inv H.

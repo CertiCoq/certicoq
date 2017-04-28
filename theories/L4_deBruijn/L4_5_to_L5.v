@@ -178,7 +178,7 @@ Import Monad.MonadNotation.
 Open Scope monad_scope.
 
 
-  Context {Abs5a: @TermAbs (@L5Opid) _}.
+  Context {Abs5a: @TermAbs (@L5Opid)}.
 
 Local Notation AbsTerm := (AbsTerm _ Abs5a).
 Local Notation absGetOpidBTerms := (absGetOpidBTerms _ Abs5a).
@@ -275,13 +275,10 @@ Definition branch {s} : Type := (dcon * (@BTerm NVar s))%type.
 (* TODO: delete and use the one in polyEval.v *)
 (** Find a branch in a match expression corresponding to a given constructor
     and arity. *)
+
 Definition find_branch {s} (d:dcon) (m:nat) (matcht :list (@branch s)) : 
-    option BTerm 
-  := 
-  let obr :=
-  find 
-    (fun a : (@branch s) => decide ((d,m) = (fst a, num_bvars (snd a)))) matcht in
-  option_map snd obr.
+    option BTerm
+  := @polyEval.find_branch s (Named.TermAbsImpl NVar s) d m matcht.
 
 
 
@@ -443,7 +440,7 @@ Lemma find_branch_some: forall  {s} (d:dcon) (m:nat) (bs :list (@branch s)) b,
   -> LIn (d,b) bs /\ LIn b (map snd bs) /\ num_bvars b = m
   /\ find (fun a : branch => decide (d = fst a) && (m =? num_bvars (snd a))) bs = Some (d, b).
 Proof using.
-  unfold find_branch. intros ? ? ? ? ? .
+  unfold find_branch, polyEval.find_branch. intros ? ? ? ? ? .
   destFind; intros Hdf; [| inverts Hdf].
   destruct bss as [dd bt].
   inverts Hdf.
@@ -762,6 +759,7 @@ Instance CExpSubstitute : Substitute CTerm CTerm :=
   { substitute := fun rep x t => subst t x rep}.
 
 Print eval.
+
 (** OPTIMISED Big-step evaluation for CPS expressions.
     Notice that only computations
     are evaluated -- values are inert so to speak. *)
@@ -791,11 +789,90 @@ Inductive eval_c : CTerm -> CTerm -> Prop :=
     let len := Datatypes.length lbt in
     let pinds := seq 0 len in
     let sub := map (Fix_c' lbt) pinds in
+    num_bvars bt = len ->
     select i lbt = Some bt -> 
     eval_c (Call_c (apply_bterm bt sub) k arg) v ->
     eval_c (Call_c (Fix_c' lbt i) k arg) v.
 
 Hint Constructors eval_c.
+
+
+(* Move to SquiggleEq.list *)
+
+Lemma combine_eta {A B:Type} : forall (lp: list (A*B)), combine (map fst lp) (map snd lp) = lp.
+Proof using.
+  clear. intros.
+  rewrite combine_map.
+  rewrite map_ext with (g:=id);[ apply map_id | ].
+  intros. destruct a; auto.
+Qed.
+
+(* Move to SquiggleEq.ExtLibmisc *)
+Lemma flatten_map_Some {A B:Type} (f: A->B) (vs: list A):
+  (flatten (map (fun x : A => Some (f x)) vs)) = Some (map f vs).
+Proof using.
+  induction vs; auto.
+  simpl. rewrite IHvs. reflexivity.
+Qed.  
+
+(*
+Lemma findBranchSame
+find_branch d (Datatypes.length vs) bs = Some c
+(polyEval.find_branch L5Opid d (Datatypes.length v)
+             (combine (map fst (map (fun b : dcon * CBTerm => (fst b, num_bvars (snd b))) bs))
+                      (map snd bs)))
+*)
+
+Lemma L5BigStepExecCorr: @BigStepOpSemExecCorrect CTerm CTerm eval_c
+  (@eval_n (Named.TermAbsImpl NVar L5Opid)).
+Proof using.
+  constructor.
+- admit.
+- intros ? ? Hev. induction Hev.
+  (** eval_Halt_c *)
+  + exists 1. reflexivity.
+
+  (** eval_Ret_c *)
+  + destruct IHHev as [n IHHev].
+    exists (S n). assumption.
+
+  (** eval_Call_c *)
+  + destruct IHHev as [n IHHev].
+    exists (S n). assumption.
+
+  (** eval_Match_c *)
+  + destruct IHHev as [n IHHev].
+    exists (S n). unfold bigStepEvaln.
+    simpl.
+    repeat rewrite map_map. simpl.
+    rewrite combine_eta. unfold find_branch in H.
+    rewrite flatten_map_Some. rewrite map_id.
+    simpl. rewrite H. simpl.
+    unfold Named.applyBTermClosed.
+    apply find_branch_some in H.
+    cases_if; [exact IHHev | ].
+    apply beq_nat_false in H0.
+    repnd. congruence.
+
+  (** eval_Fix_app_c *)
+  + destruct IHHev as [n IHHev].
+    exists (S n). unfold bigStepEvaln. simpl.
+    unfold  Named.mkBTermSafe.
+    fold len.
+    rewrite flatten_map_Some.
+    unfold Fix_c' in sub.
+    fold len in sub.
+    fold pinds.
+    fold sub.
+    simpl. rewrite H0. 
+    unfold Named.applyBTermClosed.
+    simpl. rewrite H.
+    unfold sub at 1.
+    rewrite map_length.
+    unfold pinds. rewrite seq_length.
+    rewrite <- beq_nat_refl. simpl. exact IHHev.
+    Fail idtac. (* done, except the first - bullet*)
+Admitted.
 
 (** Useful for rewriting. *)
 Lemma eval_ret :
@@ -2647,14 +2724,15 @@ forall (lbt : list CBTerm) (i : nat) (k arg v : CTerm) (bt : CBTerm) l,
   let sub := map (Fix_c' lbt) pinds in
   select i lbt = Some bt ->
   l = length lbt ->
+  num_bvars bt = l ->
   let Fix := coterm (CFix l i) lbt in
   eval_c (Call_c Fix k arg) v <->
   eval_c (Call_c (apply_bterm bt sub) k arg) v.
 Proof using.
   intros ?  ? ? ? ? ? ? ? ? ? ? ?; simpl; subst; split ; intros;[| econstructor; eauto].
-  inversion H0. subst. clear H0.
-  rewrite H7 in H. inverts H.
-  exact H8.
+  inversion H1. subst. clear H0.
+  rewrite H9 in H. inverts H.
+  exact H10.
 Qed.
 
 
@@ -3298,7 +3376,7 @@ Proof using.
   Focus 2.
     repeat rewrite map_map. simpl.
     rewrite combine_map.
-    unfold find_branch.
+    unfold find_branch, polyEval.find_branch.
     erewrite find_map_same_compose;[ simpl; refl | | apply Hfr].
     intros. unfold compose. simpl. destruct (snd a). refl.
     
@@ -3442,7 +3520,7 @@ Proof using.
     [ | apply is_value_eval_end; auto].
   
   rewrite eval_FixApp; rwsimplC; eauto;
-    [ | apply select_map; apply Hsel].
+    [ | apply select_map; apply Hsel | assumption].
   apply eq_iff.
   f_equal.
   f_equal.
@@ -3836,3 +3914,4 @@ match goal with
 [H : context [contVars m ?s] |- _ ] => addContVarsSpecOld  m s H vn
 | [ |- context [contVars m ?s] ] => addContVarsSpecOld  m s H vn
 end.
+

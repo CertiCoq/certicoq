@@ -41,6 +41,17 @@ Global Instance Monad_bigStepResult (Term :Type): Monad (bigStepResult Term) :=
                            end
 }.
 
+Definition mapBigStepRes {T1 V1 T2 V2 : Type}
+           (ft : T1 -> T2)
+           (fv : V1 -> V2)
+           (tr : bigStepResult T1 V1) : bigStepResult T2 V2 :=
+  match tr with
+  | Result v => Result (fv v)
+  | OutOfTime t => OutOfTime (ft t)
+  | Error s t => Error s (option_map ft t)
+  end.
+
+
 Definition injectOption {Term V:Type} (oa : option V) : bigStepResult Term V :=
   match oa with
   | Some v => Result v

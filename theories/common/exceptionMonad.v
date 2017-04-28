@@ -70,3 +70,9 @@ Definition exception_option (A:Type) (e:exception A) : option A :=
     | Ret a => Some a
     | Exc s => None
   end.
+
+Definition exception_map {A B:Type} (f: A->B) (e: exception A) : exception B:=
+match e with
+| Ret a => Ret (f a)
+| Exc s => Exc s
+end.

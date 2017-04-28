@@ -455,11 +455,12 @@ Definition print4 (t: cTerm certiL4_5) : string :=
 Definition print5 (t: cTerm certiL5) : string :=
 (tprint "" NVar2string  L4_5_to_L5.L5OpidString  (snd t)).
 
-Definition exception_map {A B:Type} (f: A->B) (e: exception A) : exception B:=
-match e with
-| Ret a => Ret (f a)
-| Exc s => Exc s
-end.
+Require Import L1g.instances.
+
+Definition ctranslateEvalL5a
+   `{CerticoqTranslation (Program L1g.compile.Term) (cTerm certiL5)}
+   (p: program) (n:nat) : bigStepResult (option L5a.cps)  (option L5a.val_c) :=
+  mapBigStepRes (L5a.translateCPS ∘ snd) (L5a.translateVal ∘ snd) (ctranslateEval certiL5 p n).
 
 (*
 Require Import L1g.instances.

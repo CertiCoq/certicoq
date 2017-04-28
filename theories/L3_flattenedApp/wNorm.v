@@ -28,7 +28,8 @@ Inductive WNorm: Term -> Prop :=
                  WNorms args -> WNorm (TConstruct i n args)
 | WNApp: forall fn t,
            WNorm fn -> WNorm t ->
-           ~ (isLambda fn) -> ~ (isFix fn) -> WNorm (TApp fn t)
+           ~ (isLambda fn) -> ~ (isFix fn) -> fn <> TProof ->
+           WNorm (TApp fn t)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
@@ -51,7 +52,8 @@ Proof.
   try (solve[left; constructor]).
   - destruct (isLambda_dec t). rght.
     destruct (isFix_dec t). rght.
-    destruct H; destruct H0; try rght.
+    destruct (isProof_dec t). rght.
+    destruct H, H0; try rght.
     + left. apply WNApp; auto.
   - destruct H.
     + left. constructor. assumption.
@@ -82,11 +84,11 @@ Proof.
   - inversion H0.
     + rewrite (H args'). reflexivity. assumption.
   - inversion_Clear H1.
-    + rewrite (H _ H4) in n. elim n. exists nm, bod. reflexivity.
-    + rewrite (H _ H4) in n0. elim n0. exists dts, m. reflexivity.
+    + rewrite (H _ H5) in n1. elim n1. auto.
+    + rewrite (H _ H4) in n. elim n. auto. 
+    + rewrite (H _ H4) in n0. elim n0. auto.
     + apply f_equal2.
       * apply H. assumption.
       * apply H0. assumption.
   - inversion_Clear H1. rewrite (H _ H4). rewrite (H0 _ H6). reflexivity.
 Qed.
-

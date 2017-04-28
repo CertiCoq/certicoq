@@ -17,8 +17,21 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 Set Template Cast Propositions.
-Set Printing Width 100.
+Set Printing Width 150.
 Set Printing Depth 1000.
+
+(***
+Require Import Benchmarks.vs.
+Print Assumptions vs.main.
+Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
+Time Definition P_ce_example_ent :=
+  Eval cbv in (program_Program p_ce_example_ent).
+Time Definition P_env_ce_example_ent := env P_ce_example_ent.
+Time Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
+Time Definition eval_ce_example_ent :=
+  Eval cbv in (wcbvEval P_env_ce_example_ent 1000 P_main_ce_example_ent).
+Print eval_ce_example_ent.
+****)
 
 Print list.
 Inductive mist (A:Type) := mil: mist A | mcons: A -> mist A -> mist A.

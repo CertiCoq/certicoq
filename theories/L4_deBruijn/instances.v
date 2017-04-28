@@ -26,8 +26,8 @@ Instance certiL4eval: BigStepOpSem L4.expression.exp L4.expression.exp := eval.
 Global Instance L4_evaln : BigStepOpSemExec (ienv * L4.expression.exp)
                                             (ienv * L4.expression.exp) :=
   fun n p => match  (eval_n n (snd p)) with
-             | Some v => Ret (fst p,v)
-             | None => Exc "None"
+             | Some v => Result (fst p,v)
+             | None => Error "None"
                            end.
 
 
@@ -182,8 +182,8 @@ Require Import Common.TermAbs.
 Global Instance L4_2_evaln
   : BigStepOpSemExec (ienv * L4_2_Term) (ienv * L4_2_Term) :=
   fun n e => match (@polyEval.eval_n (Named.TermAbsImpl variables.NVar polyEval.L4Opid) n (snd e)) with
-          | None => Exc "None"
-          | Some v => Ret (fst e, v)
+          | None => Error "None"
+          | Some v => Result (fst e, v)
           end.
 
 
@@ -248,8 +248,8 @@ Definition L5Term :Type := (@NTerm NVar L5Opid).
 Global Instance L4_5_evaln
   : BigStepOpSemExec (ienv * L4_5_Term) (ienv * L4_5_Term) :=
   fun n e => match (@L4_2_to_L4_5.eval_n (Named.TermAbsImpl variables.NVar L4_5Opid) n (snd e)) with
-          | None => Exc "None"
-          | Some v => Ret (fst e, v)
+          | None => Error "None"
+          | Some v => Result (fst e, v)
           end.
 
 Global Program Instance : BigStepOpSem L5Term L5Term := eval_c.

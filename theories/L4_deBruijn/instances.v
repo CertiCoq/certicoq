@@ -27,7 +27,7 @@ Global Instance L4_evaln : BigStepOpSemExec (ienv * L4.expression.exp)
                                             (ienv * L4.expression.exp) :=
   fun n p => match  (eval_n n (snd p)) with
              | Some v => Result (fst p,v)
-             | None => Error "None"
+             | None => Error "None" None
                            end.
 
 
@@ -182,7 +182,7 @@ Require Import Common.TermAbs.
 Global Instance L4_2_evaln
   : BigStepOpSemExec (ienv * L4_2_Term) (ienv * L4_2_Term) :=
   fun n e => match (@polyEval.eval_n (Named.TermAbsImpl variables.NVar polyEval.L4Opid) n (snd e)) with
-          | None => Error "None"
+          | None => Error "None" None
           | Some v => Result (fst e, v)
           end.
 
@@ -248,7 +248,7 @@ Definition L5Term :Type := (@NTerm NVar L5Opid).
 Global Instance L4_5_evaln
   : BigStepOpSemExec (ienv * L4_5_Term) (ienv * L4_5_Term) :=
   fun n e => match (@L4_2_to_L4_5.eval_n (Named.TermAbsImpl variables.NVar L4_5Opid) n (snd e)) with
-          | None => Error "None"
+          | None => Error "None" None
           | Some v => Result (fst e, v)
           end.
 
@@ -259,6 +259,14 @@ It seems that there is currently there is no proof that cps_cvt nt_wf.
 A more direct alternative to nt_wf could be the predicate that says that the conversion from
 L5 to L5a succeeds.  *)
 Global Program Instance : GoodTerm L5Term := closed (*isprogram *).
+
+Global Instance L5_evaln
+  : BigStepOpSemExec (ienv * L5Term) (ienv * L5Term) :=
+  fun n e => match (@L4_5_to_L5.eval_n (Named.TermAbsImpl variables.NVar L5Opid) n (snd e)) with
+          | Result v => Result (fst e, v)
+          | Error s t => Error s (option_map (fun p => (fst e, p)) t)
+          | OutOfTime t => OutOfTime (fst e, t)
+          end.
 
 Global Instance QuestionHeadTermL5 : QuestionHead (ienv * L5Term) :=
 fun q t =>

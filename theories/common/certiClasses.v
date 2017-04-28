@@ -17,7 +17,7 @@ Require Import String.
 Inductive bigStepResult (Term Value:Type) :=
 | Result : Value -> bigStepResult Term Value
 | OutOfTime : Term -> bigStepResult Term Value
-| Error : string -> bigStepResult Term Value.
+| Error : string -> option Term -> bigStepResult Term Value.
 
 Class BigStepOpSemExec (Term Value:Type)
   := bigStepEvaln: nat -> Term -> bigStepResult Term Value.
@@ -28,6 +28,25 @@ Notation "s ⇓ t" := (bigStepEval s t) (at level 70).
 Arguments Result {Term} {Value} v.
 Arguments OutOfTime {Term} {Value} e.
 Arguments Error {Term} {Value} s.
+
+
+Require Import ExtLib.Structures.Monads.
+
+Global Instance Monad_bigStepResult (Term :Type): Monad (bigStepResult Term) :=
+{ ret := @Result Term
+; bind := fun _ _ r f => match r with
+                             | Result v => f v
+                             | OutOfTime t => OutOfTime t
+                             | Error s ot => Error s ot
+                           end
+}.
+
+Definition injectOption {Term V:Type} (oa : option V) : bigStepResult Term V :=
+  match oa with
+  | Some v => Result v
+  | None => Error "None" None
+  end.               
+  
 
 Class BigStepOpSemExecCorrect {Term Value:Type}
       {bs: BigStepOpSem Term Value} (bse: BigStepOpSemExec Term Value) :=
@@ -81,7 +100,7 @@ Definition bigStepPreserving `{CerticoqTranslation Src Dst}
 
 Arguments bigStepPreserving Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} {H3}.
 
-
+Require Import Common.exceptionMonad.
 
 Global Instance composeTranslation `{CerticoqTranslation Src Inter} 
   `{CerticoqTranslation Inter Dst} :

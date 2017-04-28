@@ -31,9 +31,9 @@ Quote Recursively Definition p := (3+4)%nat.
 Eval vm_compute in (ctranslateEval certiL4 p 100).
 Eval vm_compute in (ctranslateEval certiL4_2 p 100).
 Eval vm_compute in (ctranslateEval certiL4_5 p 100).
-*)
-
-
+Eval vm_compute in (ctranslateEval certiL5 p 100). *)
+(* does the evaluation in L5 and then translates the result to L5a *)
+Eval vm_compute in (ctranslateEvalL5a p 100).
 
 (*
 Eval compute in (ctranslateTo certiL4 p).

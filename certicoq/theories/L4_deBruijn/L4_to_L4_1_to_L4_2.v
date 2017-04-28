@@ -71,7 +71,7 @@ match e with
     ::(ftL4_to_L4_1 tl)
 end
 with btL4_to_L4_1 (lb:branches_e) {struct lb}
-  : list (@polyEval.branch L4Opid _ (@TermAbsDB _ _ _)):=
+  : list (@polyEval.branch L4Opid (@TermAbsDB _ _)):=
 match lb with
 | brnil_e => []
 | brcons_e d n e tl => 

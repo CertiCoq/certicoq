@@ -12,16 +12,28 @@ Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 (** A [Term] can contain an environment embedded in it. *)
 Class BigStepOpSem (Term Value:Type) := bigStepEval: Term -> Value -> Prop.
 
-Class BigStepOpSemExec (Term Value:Type) := bigStepEvaln: nat -> Term -> exception Value.
+Require Import String.
+
+Inductive bigStepResult (Term Value:Type) :=
+| Result : Value -> bigStepResult Term Value
+| OutOfTime : Term -> bigStepResult Term Value
+| Error : string -> bigStepResult Term Value.
+
+Class BigStepOpSemExec (Term Value:Type)
+  := bigStepEvaln: nat -> Term -> bigStepResult Term Value.
 
 (* one can use ⇓ to refer to the big step eval relation *)
 Notation "s ⇓ t" := (bigStepEval s t) (at level 70).
 
+Arguments Result {Term} {Value} v.
+Arguments OutOfTime {Term} {Value} e.
+Arguments Error {Term} {Value} s.
+
 Class BigStepOpSemExecCorrect {Term Value:Type}
       {bs: BigStepOpSem Term Value} (bse: BigStepOpSemExec Term Value) :=
   { (** weaken = to a custom equality, which can be instantiated, e.g. by alpha equality? *)
-    bseSound: forall n e v, bigStepEvaln n e = Ret v -> e ⇓ v;
-    bseComplete: forall e v, e ⇓ v -> exists n, bigStepEvaln n e = Ret v
+    bseSound: forall n e v, bigStepEvaln n e = Result v -> e ⇓ v;
+    bseComplete: forall e v, e ⇓ v -> exists n, bigStepEvaln n e = Result v
   }.
       
 

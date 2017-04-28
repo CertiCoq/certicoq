@@ -11,9 +11,7 @@ Require Export L6.instances.
 
 Set Template Cast Propositions.
 
-
-
-                                  
+                
 Open Scope Z_scope.
 Require Import ZArith.
 (* Print Instances CerticoqLanguage. *)
@@ -186,7 +184,7 @@ Definition showEnvNamed (name: string) (t : exception (cTerm certiL3)) :=
 Require Import L3.compile.
 Set Printing Depth 10000.
 Eval vm_compute in (showMainBody3 pfoo3).
-Eval vm_compute in (ctranslateEval certiL4 pfoo 10000).
+Eval vm_compute in (ctranslateEval certiL4 pfoo (N.to_nat 9000)).
 
 
 Set Template Cast Propositions.
@@ -225,14 +223,6 @@ Defined.
 Eval compute in pgcd4astr.
 *)
 
-Definition L4normalize (t: cTerm certiL4) (n: nat)
-  : exception (cTerm certiL4)
-  := bigStepEvaln n t.
-
-Print Instances BigStepOpSemExec.
-Definition L42normalize (t: cTerm certiL4_2) (n: nat)
-  : exception (cTerm certiL4_2)
-  := bigStepEvaln n t.
 
 Require Import Benchmarks.Binom
         Benchmarks.Color

@@ -70,7 +70,7 @@ Context (Opid:Type) {gts:GenericTermSig Opid} {ta : TermAbs Opid}.
 (* this definition of branch and find_branch is shared with 
 L4a and L5 *)
 Definition branch 
-  : Type := (dcon * (@AbsBTerm Opid  gts ta))%type.
+  : Type := (dcon * (@AbsBTerm Opid ta))%type.
 
 
 (** Find a branch in a match expression corresponding to a given constructor
@@ -91,7 +91,7 @@ Section PolyEval.
 (** eval_n for L4 (congrete DB), L4a (generic named), and
 the (yet to be added) generic (Squiggle-style) DB language between them.
 *)
-Context {Abs4_4a: @TermAbs (@L4Opid) _}.
+Context {Abs4_4a: @TermAbs (@L4Opid)}.
 
 Local Notation AbsTerm := (AbsTerm _ Abs4_4a).
 Local Notation absGetOpidBTerms := (absGetOpidBTerms _ Abs4_4a).

@@ -37,7 +37,7 @@ Section PolyEval45.
 
 
 Require Import Common.TermAbs.  
-Context {Abs4_4a: @TermAbs (@L4_5Opid) _}.
+Context {Abs4_4a: @TermAbs (@L4_5Opid)}.
 
 Local Notation AbsTerm := (AbsTerm _ Abs4_4a).
 Local Notation absGetOpidBTerms := (absGetOpidBTerms _ Abs4_4a).

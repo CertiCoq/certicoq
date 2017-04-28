@@ -32,7 +32,7 @@ Generalizable Variable Opid.
 However, that would make it almost impossible to write programs over this interface
 without using Ltac *)
 
-Record TermAbs (Opid:Type) {gts:GenericTermSig Opid} : Type :=
+Record TermAbs (Opid:Type) (* {gts:GenericTermSig Opid} *) : Type :=
 {
   AbsTerm : Type;
   AbsBTerm : Type;
@@ -119,7 +119,7 @@ Definition applyBTermClosed (b : BTerm) (l: list NTerm) : option (@NTerm NVar Op
 if (num_bvars b =? length l) then Some (apply_bterm b l) else None.
 
 Definition TermAbsImpl : TermAbs Opid :=
- (@Build_TermAbs _ _ 
+ (@Build_TermAbs _ 
   (@NTerm NVar Opid) (@BTerm NVar Opid)
    num_bvars
    getOpidBTerms
@@ -154,7 +154,7 @@ Some (oterm o lb).
 
 
 Definition TermAbsDB : TermAbs Opid :=
- (@Build_TermAbs _ _ 
+ (@Build_TermAbs _ 
   (@DTerm Name Opid) (@DBTerm Name Opid)
    num_bvars
    getOpidBTerms

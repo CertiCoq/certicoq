@@ -764,6 +764,19 @@ Print eval.
     Notice that only computations
     are evaluated -- values are inert so to speak. *)
 Inductive eval_c : CTerm -> CTerm -> Prop :=
+(** the problem with the rule below is that it can be instantiated even with v := Call_c _ _ _, which is not a value.
+This breaks the invariant that the RHS of eval_c doesn't compute further. 
+In Greg's version, there was a separate type for values. Thus perhaps that version did not have this problem.
+
+Some possible fixes can be:
+| eval_Halt_c : forall v, is_valuec v -> eval_c (Halt_c v) v
+| eval_Halt_c : forall v, eval_c (Halt_c v) (Halt_c v)
+
+Also, for all values v, we should nave eval_c  v v. Need to add rules to enforce this.
+We can either have separate clauses as in L4_5.eval, or have the following rule
+| eval_terminal_c : forall v, is_valuec v -> eval_c v v
+
+*)
 | eval_Halt_c : forall v, eval_c (Halt_c v) v
 | eval_Ret_c : forall x c v v',
                  eval_c (c {x := v}) v' -> 
@@ -1039,22 +1052,34 @@ Qed.
     [cps_cvt(e{x:=v}) = (cps_cvt e){x:=(cps_vt_val v)}].
  *)
 
+  Definition haltCont  := KLam_c contVar (Halt_c (vterm contVar)).
 Section CPS_CVT.
 (** recursive call *)
   Variable cps_cvt : NTerm -> CTerm (*val_c *).
-  
+
+
+  Definition cps_cvt_apply_aux ce1 e2 k k1 k2 :=
+        (Ret_c ce1 (* e1 may not already be a lambda *)
+               (KLam_c k1 (Ret_c e2
+                                  (KLam_c k2 (Call_c (vterm k1) k (vterm k2)))))).
+
       (* cont \k.(ret [e1] (cont \v1.(ret [e2] (cont \v2.call v1 k v2)))) *)
   Definition cps_cvt_apply  (ce1 : CTerm) (e2: NTerm) : CTerm :=
       let knames := ["k";"kapf";"kapArg"] in
       let kvars := contVars 3 (map mkSuggestion knames)in 
       let k := nth 0 kvars nvarx in  
       let k1 := nth 1 kvars nvarx in  
-      let k2 := nth 2 kvars nvarx in  
-       KLam_c k 
-        (Ret_c ce1 (* e1 may not already be a lambda *)
-               (KLam_c k1 (Ret_c (cps_cvt e2)
-                                  (KLam_c k2 (Call_c (vterm k1) (vterm k) (vterm k2)))))).
+      let k2 := nth 2 kvars nvarx in
+       (KLam_c k (cps_cvt_apply_aux ce1 (cps_cvt e2) (vterm k) k1 k2)).
 
+  (* used in the linkable correctness instance *)
+  Definition mkAppHalt  (ce1 : CTerm) (e2: CTerm) : CTerm :=
+      let knames := ["k";"kapf";"kapArg"] in
+      let kvars := contVars 3 (map mkSuggestion knames)in 
+      let k := nth 0 kvars nvarx in  
+      let k1 := nth 1 kvars nvarx in  
+      let k2 := nth 2 kvars nvarx in
+      cps_cvt_apply_aux ce1 e2 haltCont k1 k2.
 
   Definition cps_cvt_lambda (x : NVar) (b: NTerm) : CTerm :=
           let kv := contVar in
@@ -2001,7 +2026,7 @@ Lemma cps_cvt_apply_ssubst_commutes_aux :
   cps_cvt_apply_step cps_ssubst_commutes.
 Proof using.
   intros ? ? Hind ? Hwf Hfwf H1s H2s H3s Hs. 
-  simpl. unfold cps_cvt_apply. simpl.
+  simpl. unfold cps_cvt_apply, cps_cvt_apply_aux. simpl.
   addContVarsSpec 3 Hs kv. repnd. clear Heqlvcvf.
   simpl in *.
   unfold KLam_c, Ret_c.
@@ -2325,7 +2350,7 @@ eval_c (Call_c (cps_cvt_val ev) k (cps_cvt_val ev2)) v).
 Proof using.
   intros ? ? ? ? ? ? ? ? ? ? ?.
   subst evalt.
-  unfold cps_cvt_apply.
+  unfold cps_cvt_apply, cps_cvt_apply_aux.
   addContVarsSpec 3 Hvc kv.
   rewrite eval_ret.
   simpl. unfold subst. 

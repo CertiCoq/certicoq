@@ -127,6 +127,17 @@ is referred to here.*)
  (** each member of the list corresponds to a branch. 
     it says how many variables are bound in that branch*).
 
+Definition valueL5Opid (o : L5Opid) : bool :=
+  match o with
+  | CLambda => true
+  | CKLambda => true
+  | CDCon _ _ => true
+  | CFix _ _ => true
+  | _ => false
+  end.
+                
+
+
 Definition CPSOpBindings (c : L5Opid) 
     : list nat :=
   match c with
@@ -204,13 +215,13 @@ Fixpoint eval_n (n:nat) (e:AbsTerm) {struct n} :  bigStepResult AbsTerm AbsTerm 
 match n with
 |0%nat => OutOfTime e
 | S n =>  match (absGetOpidBTerms e) with
-         | None => Error "cant analyze term" (Some e)
+         | None => Error "failed to analyze term" (Some e)
          | Some (o,lbt) =>
-  match (o,lbt) with
+  match o,lbt with
   (* values *)
-  | (CHalt, [v]) =>
+  | CHalt, [v] =>
     v <- 'absGetTerm v;; Result v
-  | (CRet, [klam;v]) =>
+  | CRet, [klam;v] =>
     klam <- ' absGetTerm klam ;;
     v <- ' absGetTerm v ;;
     match absGetOpidBTerms klam with
@@ -218,7 +229,7 @@ match n with
       sub <- ' absApplyBTerm b [v];; eval_n n sub
     | _ => Error "expected a kont lambda" (Some klam)
     end            
-  | (CCall, [lam;v1;v2]) =>
+  | CCall, [lam;v1;v2] =>
     lam <- ' absGetTerm lam ;;
     v1 <- ' absGetTerm v1 ;;
     v2 <- ' absGetTerm v2 ;;
@@ -236,7 +247,7 @@ match n with
        eval_n n s_a_pp
     | _ => Error "expected a lambda" (Some lam)
     end            
-  | (CMatch ldn, disc::brs) => 
+  | CMatch ldn, disc::brs => 
      disc <- 'absGetTerm disc;;
      match (absGetOpidBTerms disc) with
      | Some (CDCon d ne, clb) =>
@@ -247,7 +258,9 @@ match n with
      | _ => Error "expected a constructor" (Some disc)
      end
      
-  | _ => Error "unexpected case" (Some e)
+  | o, _ => if valueL5Opid o
+           then Result e
+           else  Error "unexpected case" (Some e)
   end
   end
 end.
@@ -760,6 +773,9 @@ Instance CExpSubstitute : Substitute CTerm CTerm :=
 
 Print eval.
 
+Definition isValueL5 (t:CTerm) : Prop :=
+  option_map valueL5Opid (getOpid t) = Some true.
+
 (** OPTIMISED Big-step evaluation for CPS expressions.
     Notice that only computations
     are evaluated -- values are inert so to speak. *)
@@ -777,7 +793,8 @@ We can either have separate clauses as in L4_5.eval, or have the following rule
 | eval_terminal_c : forall v, is_valuec v -> eval_c v v
 
 *)
-| eval_Halt_c : forall v, eval_c (Halt_c v) v
+| eval_Halt_c : forall v, (* isValueL5 v -> *) eval_c (Halt_c v) v
+| eval_Val_c : forall v, isValueL5 v -> eval_c v v
 | eval_Ret_c : forall x c v v',
                  eval_c (c {x := v}) v' -> 
                  eval_c (Ret_c (KLam_c x c) v) v'
@@ -845,6 +862,9 @@ Proof using.
   (** eval_Halt_c *)
   + exists 1. reflexivity.
 
+  + unfold isValueL5 in H. rename H into Hisv. destruct v; invertsn Hisv.
+    rename l into o. exists 1. destruct o; inverts Hisv; reflexivity.
+
   (** eval_Ret_c *)
   + destruct IHHev as [n IHHev].
     exists (S n). assumption.
@@ -892,7 +912,8 @@ Lemma eval_ret :
   forall x c v v', eval_c (Ret_c (KLam_c x c) v) v' 
   <-> eval_c (c{x := v}) v'.
 Proof using.
-  intros. split ; intro. inversion H. subst ; auto. constructor ; auto.
+  intros. split ; intro. inversion H; try (inverts H0; fail). subst ; auto.
+  constructor ; auto.
 Qed.
 
 (** Useful for rewriting. *)
@@ -900,7 +921,7 @@ Lemma eval_call : forall xk x c v1 v2 v',
    eval_c (Call_c (Lam_c x xk c) v1 v2) v'
   <-> eval_c (ssubst c [(x,v2);(xk,v1)]) v'.
 Proof using.
-  intros ; split ; intro; inversion H ; subst ; auto.
+  intros ; split ; intro; inversion H ; try (inverts H0; fail); subst ; auto. 
 Qed.
 
 (*
@@ -2516,7 +2537,8 @@ Lemma eval_match :
     (eval_c (Match_c (Con_c d vs) bs) v' <-> eval_c (apply_bterm c vs) v').
 Proof using.
   intros ? ? ? ? ? Hf; split ; intros;[| econstructor; eauto].
-  inverts H. apply map_eq_injective in H4; [| intros ? ? ?; congruence].
+  inverts H; try (inverts H0; fail).
+  apply map_eq_injective in H4; [| intros ? ? ?; congruence].
   eapply list_pair_ext in H5; eauto;[subst; congruence|].
   apply (f_equal (map fst)) in H0.
   do 2 rewrite map_map in H0.
@@ -2755,7 +2777,7 @@ forall (lbt : list CBTerm) (i : nat) (k arg v : CTerm) (bt : CBTerm) l,
   eval_c (Call_c (apply_bterm bt sub) k arg) v.
 Proof using.
   intros ?  ? ? ? ? ? ? ? ? ? ? ?; simpl; subst; split ; intros;[| econstructor; eauto].
-  inversion H1. subst. clear H0.
+  inversion H1;try (inverts H2; fail). subst. clear H0.
   rewrite H9 in H. inverts H.
   exact H10.
 Qed.

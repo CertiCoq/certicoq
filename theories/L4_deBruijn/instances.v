@@ -577,6 +577,7 @@ Local Instance L4_5MkApply : MkApply  (ienv * L4_5_Term) :=
   Require Import L4_5_to_L5.
   (* Move *)
   
+(*
 Lemma evalc_terminal
      : forall e v,
       eval_c e v -> eval_c v v.
@@ -584,9 +585,8 @@ Proof using.
   intros ? ? Heval.
   induction Heval; auto;[]. (* eval_halt_c case. fix. require some kind of an is_value.
 A ugly hacky way would be to require that it is the vps_cvt_val of something. *)
-Admitted.
+Abort.
 
-(* this is not true. the argument of Halt_c may be anything *)
 Lemma evalc_halt
      : forall hv v,
       eval_c (Halt_c hv) v <-> eval_c hv v.
@@ -595,9 +595,9 @@ Proof using.
   split; intros Hyp.
   - inversion Hyp. subst. eapply evalc_terminal; eauto.
   - (* need the is_value hyp? *)
-
 Abort.    
-  
+ *)
+
 Lemma goodSubterms25 : forall o lbt,
     @goodTerm L4_5_Term _ (oterm o lbt)
     -> forall nt, In (bterm [] nt) lbt  -> goodTerm nt.
@@ -615,7 +615,62 @@ Proof using.
   - rewrite Bool.andb_true_iff in Hg. apply proj2 in Hg.
     rewrite list.ball_true in Hg. apply Hg.
     apply in_map_iff. eexists; dands; eauto. reflexivity.
-Qed.    
+Qed. 
+
+Require Import SquiggleEq.list.
+Lemma goodSubtermsApp : forall (a b: L4_5_Term),
+    goodTerm a
+    -> goodTerm b
+    -> goodTerm (App_e a b).
+Proof using.
+  autounfold with certiclasses in *.
+  intros ? ? H1g H2g.
+  unfold App_e. 
+  rwsimplC. unfold compose. simpl.
+  unfold isprogram, closed in *.
+  simpl. rwsimplC. repnd.
+  dands; eauto with SquiggleEq.
+  - rwHyps. refl.
+  - ntwfauto. rewrite  or_false_r in HntwfIn. subst. ntwfauto.
+Qed.
+
+
+Lemma value_cps_val (v : L4_5_Term) :
+  is_value v -> closed v -> eval_c (cps_cvt_val v) (cps_cvt_val v).
+Proof using.
+  intros Hisv Hcl.
+  destruct Hisv; try (apply eval_Val_c; reflexivity).
+  inversion Hcl.
+Qed. (** need to fix eval_c to make this true *)
+
+Lemma value_cps_val_only (v : L4_5_Term) vc:
+  eval_c (cps_cvt_val v) vc -> vc= (cps_cvt_val v).
+Proof using.
+  intros Hev.
+  destruct v.
+  inversion Hev;subst. invertsn H.
+  rename l into o.
+  destruct o; invertsna Hev Hevv; auto; provefalse.
+  - destruct l0; invertsn Hevv. destruct b. destruct l; invertsn Hevv.
+    destruct l; invertsn Hevv. destruct l0; invertsn Hevv.
+  - clear Hevv.  rename Hevv0 into Hevv.
+    destruct l0 as [ | ? l]; invertsn Hevv.
+    destruct b. do 2 (destruct l0 as [ | ? l0]; invertsn Hevv).
+    destruct l as [ | ? l]; invertsn Hevv.
+  - clear Hevv.  rename Hevv0 into Hevv.
+    destruct l0 as [ | ? l]; invertsn Hevv.
+    destruct b. do 2 (destruct l0 as [ | ? l0]; invertsn Hevv).
+    destruct l as [ | ? l]; invertsn Hevv.
+  - clear Hevv Hevv0.  rename Hevv1 into Hevv.
+    destruct l0 as [ | ? l]; invertsn Hevv.
+    destruct b. do 2 (destruct l0 as [ | ? l0]; invertsn Hevv).
+    destruct l as [ | ? l]; invertsn Hevv.
+  - clear Hevv Hevv0 Hevv1.  rename Hevv2 into Hevv.
+    destruct l0 as [ | ? l]; invertsn Hevv.
+    destruct b. do 2 (destruct l0 as [ | ? l0]; invertsn Hevv).
+    destruct l as [ | ? l]; invertsn Hevv.
+Qed.
+
 
 Lemma obsLinkableL45: compObsPreservingLinkable  (ienv * L4_5_Term) (ienv * L5Term).
 Proof.
@@ -687,11 +742,14 @@ Proof.
     rewrite (cps_val_ret_flip ess); unfold isprogram; eauto; try reflexivity.
     simpl.
     rewrite eval_ret. simpl. unfold subst. simpl.
-    admit. (* need a fix to L4_5_to_L5.eval_c, as indicated in comments there *)
+    split; intros Hyp.
+    * inversion Hyp; try (inversion H0; fail); subst. apply value_cps_val; eauto.
+    * apply value_cps_val_only in Hyp; eauto. subst. apply eval_Halt_c.
+
   + intros Hq ? Hga. unfold mkApp, L4_5MkApply, L5MkApply. simpl.
     destruct svArg as [clear  svArg]. simpl. hnf in Hga. simpl in *. clear clear.
     specialize (obsLinkableL45 (senv, App_e sv svArg)).
-    assert (ident : goodTerm (senv, App_e sv svArg)) by admit. (* app preserves goodness *)
+    assert (ident : goodTerm (senv, App_e sv svArg)) by (apply goodSubtermsApp; auto).
     specialize (obsLinkableL45 ident).
     invertsn obsLinkableL45.
     unfold translateT, certiL4_5_to_L5 in obsLinkableL45.

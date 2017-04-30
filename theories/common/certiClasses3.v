@@ -37,8 +37,6 @@ Definition mkAppEx {Term:Type}  {mka: MkApply Term} (f:Term) (arg : exception Te
   | Ret arg => Ret (mkApp f arg)
   | _ => arg
   end.
-  
-  
 
 Section CompObsPreserving.
 
@@ -58,13 +56,8 @@ CoInductive compObsLe : Src -> Dst -> Prop :=
         -> (exists dv:Dst,
               d ⇓ dv /\
               yesPreserved sv dv
-              /\ (forall n:nat, compObsLeOp (observeNthSubterm n sv) (observeNthSubterm n dv))))
-    -> compObsLe s d
-with compObsLeOp : option Src -> option Dst -> Prop :=
-(* defining this using pattern matching confuses the strict positivity checker.
-  Can this part be defined outside generically, using induction? *)
-| obsSome: forall s d, compObsLe s d -> compObsLeOp (Some s) (Some d)
-| obsNone: forall d, compObsLeOp None d.
+              /\ (forall n:nat, liftLe compObsLe (observeNthSubterm n sv) (observeNthSubterm n dv))))
+    -> compObsLe s d.
 
 
 Context   `{CerticoqTranslation Src Dst}  `{MkApply Src}  `{MkApply Dst}.
@@ -77,29 +70,113 @@ CoInductive compObsLeLink : Src -> Dst -> Prop :=
         -> (exists dv:Dst,
               d ⇓ dv /\
               yesPreserved sv dv
-              /\ (forall n:nat, compObsLeOpLink (observeNthSubterm n sv) (observeNthSubterm n dv))
+              /\ (forall n:nat, liftLe compObsLeLink (observeNthSubterm n sv) (observeNthSubterm n dv))
               /\ (questionHead  Abs sv = true -> forall svArg, goodTerm svArg ->
-                    compObsLeOpLink
+                   liftLe compObsLeLink
                       (Some (mkApp sv svArg))
                       (exception_option (mkAppEx dv (translate Src Dst svArg))))
           ))
-    -> compObsLeLink s d
-with compObsLeOpLink : option Src -> option Dst -> Prop :=
-(* defining this using pattern matching confuses the strict positivity checker.
-  Can this part be defined outside generically, using induction? *)
-| obsSomeLink : forall s d, compObsLeLink s d -> compObsLeOpLink (Some s) (Some d)
-| obsNoneLink : forall d, compObsLeOpLink None d.
+    -> compObsLeLink s d.
+
+Hint Constructors liftLe : certiclasses.
+
+Inductive compObsLeLinkN : nat -> Src -> Dst -> Prop :=
+| sameObsLinkS : forall m (s : Src) (d : Dst),
+    (forall (sv:Src),
+        s ⇓ sv
+        -> (exists dv:Dst,
+              d ⇓ dv /\
+              yesPreserved sv dv
+              /\ (forall n:nat, liftLe (compObsLeLinkN m) (observeNthSubterm n sv) (observeNthSubterm n dv))
+              /\ (questionHead  Abs sv = true -> forall svArg, goodTerm svArg ->
+                   liftLe (compObsLeLinkN m)
+                      (Some (mkApp sv svArg))
+                      (exception_option (mkAppEx dv (translate Src Dst svArg))))
+          ))
+    -> compObsLeLinkN (S m) s d
+| sameObsLinkO : forall (s : Src) (d : Dst), compObsLeLinkN 0 s d.
 
 
+Require Import SquiggleEq.tactics.
+Require Import SquiggleEq.LibTactics.
+(** this part is generally easy and unconditional *)
+Lemma fromCoInd s d:
+  compObsLeLink s d -> forall m, compObsLeLinkN m s d.
+Proof using.
+  intros Hc m. revert Hc. revert d. revert s.
+  induction m as [ | m Hind]; intros ? ? Hc;
+    [ constructor; fail | ].
+  destruct Hc as [? ? Hc].
+  constructor.
+  intros sv Hev. specialize (Hc sv Hev).
+  destruct Hc as [dv Hc]. repnd.
+  exists dv. dands; eauto with certiclasses.
+Qed.
+
+(* transparent, to pass productivity checks. replace in certiclasses2*)
+Lemma  liftLeRimpl {S D: Type} (R1 R2: S -> D -> Prop) os od:
+  Rimpl R1 R2 -> liftLe R1 os od -> liftLe R2 os od.
+Proof.
+  intros Hr Hl.
+  inverts Hl; constructor.
+  apply Hr. assumption.
+Defined.
+
+Lemma toCoInd {dstDet: deterministicBigStep Dst}s d:
+  (forall m, compObsLeLinkN m s d) -> compObsLeLink s d.
+Proof using.
+  revert d. revert s.
+  cofix.
+  intros ? ? Hi.
+  constructor.
+  intros ? Hev. pose proof Hi as Hib.
+  specialize (Hi 1); inversion Hi as [ ? ? ? Hc | ]; subst. clear Hi.
+  specialize (Hc sv Hev).
+  destruct Hc as [dv Hc]. repnd.
+  exists dv.
+  dands; auto.
+  - clear Hc. intros n.
+    apply liftLeRimpl with (R1:= fun a b => forall m, compObsLeLinkN m a b); eauto.
+    
+    specialize (Hc2 n). invertsna Hc2 H0c;[ | constructor].
+    rename s0 into svn.
+    rename d0 into dvn.
+    constructor.
+    intros m.
+    specialize (Hib (S m)).
+    invertsna Hib Hib.
+    specialize (Hib sv Hev).
+    destruct Hib as [dvv Hib]. repnd.
+    specialize (dstDet _ _ _ Hib0 Hc0). subst. clear Hib0 Hib.
+    specialize (Hib2 n).
+    rewrite <- H0c1, <- H0c0 in Hib2.
+    inverts Hib2. assumption.
+
+  - clear Hc2. intros Hq ? Hg.
+    specialize (Hc Hq _ Hg).
+    apply liftLeRimpl with (R1:= fun a b => forall m, compObsLeLinkN m a b); eauto.
+    invertsna Hc H0c.
+    constructor.
+    intros m.
+    specialize (Hib (S m)).
+    invertsna Hib Hib.
+    specialize (Hib sv Hev).
+    destruct Hib as [dvv Hib]. repnd.
+    specialize (dstDet _ _ _ Hib0 Hc0). subst. clear Hib0 Hib2.
+    specialize (Hib Hq _ Hg).
+    rewrite  <- H0c0 in Hib.
+    inverts Hib. assumption.
+Qed.    
+        
 Definition compObsPreserving :=
    ∀ (s:Src),
-    goodTerm s 
-    -> compObsLeOp (Some s) (exception_option (translate Src Dst s)).
+    goodTerm s
+    -> liftLe compObsLe (Some s) (exception_option (translate Src Dst s)).
 
 Definition compObsPreservingLinkable :=
    ∀ (s:Src),
     goodTerm s 
-    -> compObsLeOpLink (Some s) (exception_option (translate Src Dst s)).
+    -> liftLe compObsLeLink (Some s) (exception_option (translate Src Dst s)).
 
 End CompObsPreserving.
 

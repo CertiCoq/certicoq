@@ -2365,7 +2365,26 @@ Compute cnf harder_ent3.
     ... doesn't work, because of opaque termination proofs ... 
  *)
 
+Definition example_myent := Entailment
+  (Assertion nil nil)
+  (Assertion [Equ a a] nil).
+Definition ce_example_myent := check_entailment example_myent.
+(***
+Extraction "ce_example_myent" ce_example_myent.
+Time Compute ce_example_myent.
+ ***********)
+Definition example_myfail := Entailment
+  (Assertion [Equ b c] nil)
+  (Assertion [Equ a b] nil).
+Definition ce_example_myfail := check_entailment example_myfail.
+
 Definition ce_example_ent := check_entailment example_ent.
+Definition ce_harder_ent := check_entailment harder_ent.
+Definition ce_harder_ent2 := check_entailment harder_ent.
+Definition ce_harder_ent3 := check_entailment harder_ent.
+
+
+
 
 Definition main :=
   map check_entailment

@@ -22,24 +22,34 @@ Definition thd_tl ts t us: (Term * Terms) :=
   end.
 
 (** Printing terms in exceptions for debugging purposes **)
+Definition print_name nm : string :=
+  match nm with
+  | nAnon => " _ "
+  | nNamed str => str
+  end.
+Definition print_inductive i : string :=
+  match i with
+  | mkInd str n => "str"
+  end.
 Fixpoint print_term (t:Term) : string :=
   match t with
-    | TRel n => " (" ++ (nat_to_string n) ++ ") "
+    | TRel n => "(" ++ (nat_to_string n) ++ ")"
     | TSort _ => " SRT "
-    | TProof tm => " (PRF" ++ (print_term tm) ++ ") "
+    | TProof tm => "(PRF" ++ (print_term tm) ++ ")"
     | TCast _ _ => " CAST "
     | TProd _ _ _ => " PROD "
     | TLambda _ _ _ => " LAM "
-    | TLetIn _ _ _ _ => " LET "
+    | TLetIn nm _ dfn bod =>
+      (" LET " ++ (print_name nm) ++ (print_term dfn) ++ (print_term bod))
     | TApp fn arg args =>
-      " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
+      "(APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ")"
     | TConst s => "[" ++ s ++ "]"
     | TInd _ => " TIND "
-    | TConstruct _ _ _ _ => " (CSTR) "
+    | TConstruct i _ _ _ => "(CSTR " ++ (print_inductive i) ++")"
     | TCase n _ mch _ =>
-      " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++ (print_term mch) ++
-                 " _ " ++") "
-    | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+      "(CASE " ++ (nat_to_string (snd n)) ++ " _ " ++ (print_term mch) ++
+                 " _ " ++")"
+    | TFix _ n => "(FIX " ++ (nat_to_string n) ++ ")"
     | TAx => " Ax "
     | TWrong str => (" Wrong " ++ str )
   end.

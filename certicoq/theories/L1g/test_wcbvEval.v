@@ -18,6 +18,28 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
+Set Template Cast Propositions.
+
+Require Import Benchmarks.vs.
+Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
+Time Definition P_ce_example_myent :=
+  Eval vm_compute in (program_Program p_ce_example_myent).
+Definition P_env_ce_example_myent := env P_ce_example_myent.
+Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
+(*** raises exception *****
+Time Definition eval_ce_example_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myent 4000 P_main_ce_example_myent).
+Print eval_ce_example_myent.
+**********************)
+Require Import Ascii String ExtrOcamlString.
+Require Import extraction.ExtrOcamlNatInt.
+Extract Inductive bool => "bool" [ "true" "false" ].
+Extract Inductive sumbool => "bool" [ "true" "false" ].
+Extract Inductive list => "list" [ "[]" "(::)" ].
+Definition cee := (wcbvEval P_env_ce_example_myent 6000 P_main_ce_example_myent).
+Extraction "ce_example_myent" cee.
+
 
 Set Printing Width 60.
 Print and_rect.
@@ -28,8 +50,6 @@ Set Template Cast Propositions.
 Set Printing Width 80.
 Set Printing Depth 1000.
 
-Quote Recursively Definition p_and_rect := and_rect.
-Print p_and_rect.
 
 (** example from Coq club 
 "Question about the formal definition of the guard condition"

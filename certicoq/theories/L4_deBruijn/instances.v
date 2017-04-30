@@ -672,9 +672,12 @@ Proof using.
 Qed.
 
 
-Lemma obsLinkableL45: compObsPreservingLinkable  (ienv * L4_5_Term) (ienv * L5Term).
+Lemma obsLinkableL45:
+  compObsPreservingLinkable  (ienv * L4_5_Term) (ienv * L5Term).
+Abort.
+(***************************8
 Proof.
-  intros ?.
+  intros ?. 
   revert s.
   cofix.
   intros ? Hgood.
@@ -780,5 +783,5 @@ Proof.
     apply cps_val_outer. apply is_valueb_corr. eapply eval_yields_value'; eauto.
     Fail idtac.
 Abort.
-
+************************)
   End Temp.

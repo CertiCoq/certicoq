@@ -1,5 +1,4 @@
 
-Require Import ExtLib.Data.String.
 Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
@@ -12,8 +11,72 @@ Require Import L3.wcbvEval.
 Local Open Scope bool.
 Local Open Scope list.
 Local Open Scope string_scope.
+Set Template Cast Propositions.
 
-Set Template Cast Propositions. 
+(** Require Import ExtLib.Data.String. ??  **)
+
+Require Import Benchmarks.vs.
+Require Import Ascii String ExtrOcamlString.
+Require Import extraction.ExtrOcamlNatInt.
+Extract Inductive bool => "bool" [ "true" "false" ].
+Extract Inductive sumbool => "bool" [ "true" "false" ].
+Extract Inductive list => "list" [ "[]" "(::)" ].
+
+(*****  this works ****
+Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
+Time Definition P_ce_example_myent :=
+  Eval vm_compute in (program_Program p_ce_example_myent).
+Definition P_env_ce_example_myent := env P_ce_example_myent.
+Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
+Time Definition eval_ce_example_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myent 4000 P_main_ce_example_myent).
+Print eval_ce_example_myent.
+ *****)
+
+Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
+Time Definition P_ce_example_ent :=
+  Eval vm_compute in (program_Program p_ce_example_ent).
+Definition P_env_ce_example_ent := env P_ce_example_ent.
+Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
+Time Definition eval_ce_example_ent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_ent 4000 P_main_ce_example_ent).
+Print eval_ce_example_ent.
+(**************  this works *****
+Definition cee :=
+  (wcbvEval P_env_ce_example_ent 6000 P_main_ce_example_ent).
+Extraction "ce_example_ent" cee.
+***************)
+
+(****  this works  ***
+Time Quote Recursively Definition p_ce_example_myfail := vs.ce_example_myfail.
+Time Definition P_ce_example_myfail :=
+  Eval vm_compute in (program_Program p_ce_example_myfail).
+Definition P_env_ce_example_myfail := env P_ce_example_myfail.
+Definition P_main_ce_example_myfail := AstCommon.main P_ce_example_myfail.
+Time Definition eval_ce_example_myfail :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myfail 4000 P_main_ce_example_myfail).
+Print eval_ce_example_myfail.
+ ****)
+
+Time Quote Recursively Definition p_ce_harder_ent := vs.ce_harder_ent.
+Time Definition P_ce_harder_ent :=
+  Eval vm_compute in (program_Program p_ce_harder_ent).
+Definition P_env_ce_harder_ent := env P_ce_harder_ent.
+Definition P_main_ce_harder_ent := AstCommon.main P_ce_harder_ent.
+(******  doesn't work ****
+Time Definition eval_ce_harder_ent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_harder_ent 4000 P_main_ce_harder_ent).
+Print eval_ce_harder_ent.
+Definition cee :=
+  (wcbvEval P_env_ce_harder_ent 6000 P_main_ce_harder_ent).
+Extraction "ce_example_harder_ent" cee.
+*****)
+
+
 
 (*** examples with parameters  *****)
 Axiom xxxxxx : Set.

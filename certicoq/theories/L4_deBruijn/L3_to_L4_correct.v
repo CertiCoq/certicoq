@@ -2209,7 +2209,9 @@ Theorem translate_correct_subst (e : environ Term) (t t' : Term) :
   L3eval.WcbvEval e t t' -> 
   let e' := translate_env e in
   forall e'', eval_env e' e'' ->
-  eval (subst_env e'' (translate e'' t)) (subst_env e'' (translate e'' t')).
+    eval (subst_env e'' (translate e'' t)) (subst_env e'' (translate e'' t')).
+Admitted.
+(*****
 Proof with eauto.
   cbn. intros wfe crctt H e'' evenv.
   assert(wfe'':=wf_environ_tr _ _ wfe evenv).
@@ -2519,6 +2521,7 @@ Ind Case or Wrong. How can we prove it isn't?? *)
   (** Generalized goal *)
   + tauto.
 Admitted.
+ ************************)
 
 Lemma WcbvEval_env_eval_env e e' :
   wf_environ e -> L3eval.WcbvEval_env e e' -> exists e'', eval_env (translate_env e) e''.

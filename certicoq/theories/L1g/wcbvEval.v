@@ -391,118 +391,122 @@ Section wcbvEval_sec.
 Variable p : environ Term.
 
 Function wcbvEval
-         (tmr:nat) (t:Term) {struct tmr}: exception Term :=
+         (tmr:nat) (topt:Term) {struct tmr}: exception Term :=
   match tmr with 
-    | 0 => raise ("out of time: " ++ print_term t)
-    | S n =>
-      match t with      (** look for a redex **)
-        | TProof t =>
-          match wcbvEval n t with
-            | Ret et => Ret et
-            | _ => raise ("wcbvEval: TProof")
-          end
-        | TConst nm =>
-          match (lookup nm p) with
-            | Some (AstCommon.ecTrm t) => wcbvEval n t
-                  (** note hack coding of axioms in environment **)
-            | Some _ => raise ("wcbvEval, TConst ecTyp " ++ nm)
-            | _ => raise ("wcbvEval: TConst environment miss:  " ++ nm)
-          end
-        | TCast t _ =>
-          match wcbvEval n t with
-            | Ret et => Ret et
-            | Exc s => raise ("wcbvEval: TCast: " ++ s)
-          end
-        | TApp fn a1 args =>
-          match wcbvEval n fn with
-            | Exc s => raise ("wcbvEval TApp: fn doesn't eval: " ++ s)
-            | Ret (TLambda _ _ bod) =>      (* beta redex *)
-              match wcbvEval n a1 with
-                | Exc s =>  raise ("wcbvEval TApp: arg doesn't eval: " ++ s)
-                | Ret b1 => wcbvEval n (whBetaStep bod b1 args)
-              end
-            | Ret (TFix dts m) =>           (* Fix redex *)
-              match dnthBody m dts with
-                | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
-                | Some (x, ix) =>
-                  match wcbvEvals n (tcons a1 args) with
-                    | Ret (tcons arg' args') =>
-                      match le_lt_dec ix (tlength args) with
-                        | left _ _ =>
-                          wcbvEval n (pre_whFixStep x dts (tcons arg' args'))
-                        | right _ _ =>  ret (TApp (TFix dts m) arg' args')
-                      end
-                    | _ => raise ("wcbvEval TAppFix: args don't eval")
-                  end
-              end
-            | Ret Fn =>              (* no redex; congruence rule *)
-              match wcbvEvals n (tcons a1 args) with
-                | Exc s => raise ("wcbvEval TApp: args don't eval: " ++ s)
-                | Ret ergs => ret (mkApp Fn ergs)
-              end
-          end
-        | TCase ml tp mch brs =>
-          match wcbvEval n mch with
-            | Exc str => Exc str
-            | Ret emch =>
-              match canonicalP emch with
-                | None =>
-                  match wcbvEval n tp with
-                    | Exc str => Exc str
-                    | Ret etp => Ret (TCase ml etp emch brs)
-                  end
-                | Some (r, args) =>
-                  match tskipn (snd ml) args with
-                    | None => raise "wcbvEval: Case, tskipn"
-                    | Some ts =>
-                      match whCaseStep r ts brs with
-                        | None => raise "wcbvEval: Case, whCaseStep"
-                        | Some cs => wcbvEval n cs
-                      end
-                  end
-              end
-          end
-        | TLetIn nm df _ bod =>
-          match wcbvEval n df with
-            | Ret df' => wcbvEval n (instantiate df' 0 bod)
-            | Exc s => raise ("wcbvEval: TLetIn: " ++ s)
-          end
-        | TLambda nn ty t => 
-          match wcbvEval n ty with
-            | Exc str => Exc str
-            | Ret ty' => ret (TLambda nn ty' t)
-          end
-        | TProd nn ty t =>
-          match wcbvEval n ty with
-            | Exc str => Exc str
-            | Ret ty' => ret (TProd nn ty' t)
-          end
-        (** already in whnf ***)
-        | TAx => ret TAx
-        | TFix mfp br => ret (TFix mfp br)
-        | TConstruct i cn np na => ret (TConstruct i cn np na)
-        | TInd i => ret (TInd i)
-        | TSort srt => ret (TSort srt)
-        (** should never appear **)
-        | TRel _ => raise "wcbvEval: unbound Rel"
-        | TWrong str => ret (TWrong str)
+  | 0 => raise ("out of time: " ++ print_term topt)
+  | S n =>
+    match topt with      (** look for a redex **)
+    | TProof t =>
+      match wcbvEval n t with
+      | Ret et => Ret et
+      | _ => raise ("wcbvEval: TProof")
       end
+    | TConst nm =>
+      match (lookup nm p) with
+      | Some (AstCommon.ecTrm t) => wcbvEval n t
+      (** note hack coding of axioms in environment **)
+      | Some _ => raise ("wcbvEval, TConst ecTyp " ++ nm)
+      | _ => raise ("wcbvEval: TConst environment miss:  " ++ nm ++ print_term topt)
+      end
+    | TCast t _ =>
+      match wcbvEval n t with
+      | Ret et => Ret et
+      | Exc s => raise ("wcbvEval: TCast: " ++ print_term topt)
+      end
+    | TApp fn a1 args =>
+      match wcbvEval n fn with
+      | Exc s =>
+        raise ("wcbvEval TApp: fn doesn't eval: " ++ print_term topt)
+      | Ret (TLambda _ _ bod) =>      (* beta redex *)
+        match wcbvEval n a1 with
+        | Exc s =>
+          raise ("wcbvEval TApp: arg doesn't eval: " ++ print_term topt)
+        | Ret b1 => wcbvEval n (whBetaStep bod b1 args)
+        end
+      | Ret (TFix dts m) =>           (* Fix redex *)
+        match dnthBody m dts with
+        | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
+        | Some (x, ix) =>
+          match wcbvEvals n (tcons a1 args) with
+          | Ret (tcons arg' args') =>
+            match le_lt_dec ix (tlength args) with
+            | left _ _ =>
+              wcbvEval n (pre_whFixStep x dts (tcons arg' args'))
+            | right _ _ =>  ret (TApp (TFix dts m) arg' args')
+            end
+          | _ =>
+            raise ("wcbvEval TAppFix: args don't eval" ++ print_term topt)
+          end
+        end
+      | Ret Fn =>              (* no redex; congruence rule *)
+        match wcbvEvals n (tcons a1 args) with
+        | Exc s =>
+          raise ("wcbvEval TApp: args don't eval: " ++ print_term topt)
+        | Ret ergs => ret (mkApp Fn ergs)
+        end
+      end
+    | TCase ml tp mch brs =>
+      match wcbvEval n mch with
+      | Exc str => Exc str
+      | Ret emch =>
+        match canonicalP emch with
+        | None =>
+          match wcbvEval n tp with
+          | Exc str => Exc str
+          | Ret etp => Ret (TCase ml etp emch brs)
+          end
+        | Some (r, args) =>
+          match tskipn (snd ml) args with
+          | None => raise ("wcbvEval: Case, tskipn " ++ print_term topt)
+          | Some ts =>
+            match whCaseStep r ts brs with
+            | None => raise ("wcbvEval: Case, whCaseStep" ++ print_term topt)
+            | Some cs => wcbvEval n cs
+            end
+          end
+        end
+      end
+    | TLetIn _ df _ bod =>
+      match wcbvEval n df with
+      | Ret df' => wcbvEval n (instantiate df' 0 bod)
+      | Exc s => raise ("wcbvEval: TLetIn:" ++ print_term topt)
+      end
+    | TLambda nn ty t => 
+      match wcbvEval n ty with
+      | Exc str => Exc str
+      | Ret ty' => ret (TLambda nn ty' t)
+      end
+    | TProd nn ty t =>
+      match wcbvEval n ty with
+      | Exc str => Exc str
+      | Ret ty' => ret (TProd nn ty' t)
+      end
+    (** already in whnf ***)
+    | TAx => ret TAx
+    | TFix mfp br => ret (TFix mfp br)
+    | TConstruct i cn np na => ret (TConstruct i cn np na)
+    | TInd i => ret (TInd i)
+    | TSort srt => ret (TSort srt)
+    (** should never appear **)
+    | TRel _ => raise "wcbvEval: unbound Rel"
+    | TWrong str => ret (TWrong str)
+    end
   end
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr} : exception Terms :=
        match tmr with 
-         | 0 => raise "out of time"
-         | S n => match ts with             (** look for a redex **)
-                    | tnil => ret tnil
-                    | tcons s ss =>
-                      match wcbvEval n s with
-                        | Exc s => raise ("wcbEvals: tconsl " ++ s)
-                        | Ret es =>
-                          match wcbvEvals n ss with
-                            | Exc s => raise ("wcbEvals: tconsr " ++ s)
-                            | Ret ess => ret (tcons es ess)
-                          end
-                      end
+       | 0 => raise "out of time"
+       | S n => match ts with             (** look for a redex **)
+                | tnil => ret tnil
+                | tcons s ss =>
+                  match wcbvEval n s with
+                  | Exc s => raise ("wcbEvals: tconsl " ++ s)
+                  | Ret es =>
+                    match wcbvEvals n ss with
+                    | Exc s => raise ("wcbEvals: tconsr " ++ s)
+                    | Ret ess => ret (tcons es ess)
+                    end
                   end
+                end
        end.
 Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
 with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.

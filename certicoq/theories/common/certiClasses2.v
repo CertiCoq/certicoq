@@ -10,11 +10,30 @@ Inductive liftLe {S D: Type} (R: S -> D -> Prop): option S -> option D -> Prop :
 | liftSome: forall s d, R s d -> liftLe R (Some s) (Some d)
 | liftNone: forall d, liftLe R None d.
 
-(* Some values, e.g. constructors, can have subterms.
+
+(** is this defined in the Coq standard library of ExtLib? *)
+Definition Rimpl {S D: Type} (R1 R2: S -> D -> Prop) :=
+  forall s d, R1 s d -> R2 s d.
+
+Require Import SquiggleEq.LibTactics.
+(** Could have used RImpl for the conclusion as well, Coq's hint search is not so good
+ at unfolding definitions. *)
+Lemma  liftLeRimpl {S D: Type} (R1 R2: S -> D -> Prop) os od:
+  Rimpl R1 R2 -> liftLe R1 os od -> liftLe R2 os od.
+Proof.
+  intros Hr Hl.
+  inverts Hl; constructor.
+  apply Hr. assumption.
+Qed.
+
+Hint Resolve liftLeRimpl : certiclasses.
+
+
+(** Some values, e.g. constructors, can have subterms.
    This operation allows asking for the nth subterm.
    When trying to observe the nth subterm of a value having only m (m<n)
    subterms, all bets are off about the returned value.
-*)
+ *)
 Class ObserveNthSubterm (Value:Type) :=
   observeNthSubterm: nat -> Value -> option Value.
 

@@ -6,7 +6,7 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Require Import Common.AstCommon.
 Require Import L6.List_util.
 
-Require Import Libraries.Maps.
+Require Import compcert.lib.Maps.
 
 Import MonadNotation ListNotations.
 

@@ -9,7 +9,7 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation PS.
-Require Import Libraries.Maps.
+Require Import compcert.lib.Maps.
 
 Close Scope Z_scope.
 

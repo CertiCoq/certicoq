@@ -8,7 +8,8 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From L6 Require Import cps cps_util eval List_util Ensembles_util functions
         identifiers Heap.heap.
-From Libraries Require Import Coqlib.
+Require Import compcert.lib.Coqlib.
+
 
 Open Scope Ensembles_scope.
 

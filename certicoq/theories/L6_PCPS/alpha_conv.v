@@ -5,7 +5,7 @@
 
 Require Import L6.cps L6.ctx L6.cps_util L6.set_util L6.identifiers L6.Ensembles_util L6.List_util
         L6.eval L6.logical_relations L6.functions.
-Require Import Libraries.Coqlib.
+Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.

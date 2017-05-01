@@ -3,8 +3,8 @@
  *)
 
 From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles
-                        Sorting.Permutation.
-From Libraries Require Import Coqlib.
+Sorting.Permutation.
+Require Import compcert.lib.Coqlib.
 Import ListNotations.
 
 Close Scope Z_scope.

@@ -3,7 +3,7 @@
  *)
 
 Require Import L6.Ensembles_util.
-Require Import Libraries.Coqlib.
+Require Import compcert.lib.Coqlib.
 Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos
         Coq.Relations.Relations Coq.Classes.Morphisms Coq.Lists.List
         Coq.Sets.Ensembles Coq.Program.Basics.

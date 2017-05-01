@@ -5,7 +5,7 @@
 From L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions closure_conversion
                        closure_conversion_util eval logical_relations.
-From Libraries Require Import Coqlib.
+Require Import compcert.lib.Coqlib.
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
                         NArith.BinNat PArith.BinPos Sets.Ensembles Omega

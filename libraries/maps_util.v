@@ -1,10 +1,10 @@
-Require Maps.
+Require Import compcert.lib.Maps.
 Require Import Coq.Relations.Relations.
 Require Import Relations.
 Require Import Setoid.
 Require Import Morphisms.
 Import RelationClasses.
-Require Import CpdtTactics Permutation.
+Require Import Libraries.CpdtTactics Permutation.
 (* Utility library for Compcert's Maps *)
 
 
@@ -106,7 +106,7 @@ Theorem set_set: forall t e e' x y sub, x <> y -> map_get_r t (M.set x e (M.set 
 Proof.
   unfold map_get_r; intros. 
   destruct (var_dec v x); destruct (var_dec v y); try (subst x || subst y).
-  - apply H in e1. inversion e1.
+  - exfalso; auto. 
   - rewrite M.gss. rewrite M.gso. rewrite M.gss. reflexivity. assumption.
   -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption. 
   - rewrite M.gso. rewrite M.gso. rewrite M.gso. rewrite M.gso. reflexivity. assumption. assumption. assumption. assumption.
@@ -275,7 +275,7 @@ Section EQDMAP.
   Proof.
     unfold map_getd_r; intros. unfold getd.
     destruct (var_dec v x); destruct (var_dec v y); try (subst x || subst y).
-    - apply H in e1. inversion e1.
+    - exfalso; auto. 
     - rewrite M.gss. rewrite M.gso. rewrite M.gss. reflexivity. assumption.
     -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption. 
     - rewrite M.gso. rewrite M.gso. rewrite M.gso. rewrite M.gso. reflexivity. assumption. assumption. assumption. assumption.

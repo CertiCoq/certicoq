@@ -10,7 +10,7 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
-Require Import Libraries.Maps.
+Require Import compcert.lib.Maps. 
 
 Open Scope ctx_scope.
 Open Scope fun_scope.
@@ -239,7 +239,7 @@ Section CC.
   | BoundVar : VarInfo.
 
   (* Maps variables to [VarInfo] *)
-  Definition VarInfoMap := Maps.PTree.t VarInfo.
+  Definition VarInfoMap := M.t VarInfo.
 
   Record state_contents :=
     mkCont { next_var : var ; nect_cTag : cTag ; next_iTag : iTag; cenv : cEnv;
@@ -360,7 +360,7 @@ Section CC.
     (* put the free variables in a new map *)
     let fvs := PS.elements fv in
     let '(map_new', n) :=
-        (fix add_fvs l n map :=
+        (fix add_fvs (l:list M.elt) n map :=
            match l with
              | [] => (map, n)
              | x :: xs =>

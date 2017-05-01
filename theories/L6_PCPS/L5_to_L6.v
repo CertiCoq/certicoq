@@ -12,7 +12,7 @@ Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Strings.String.
 Require Import ExtLib.Data.List.
 Require Import ExtLib.Data.Bool.
-Require Libraries.Maps.
+Require compcert.lib.Maps.
 Require Coq.funind.Recdef.
 Import Nnat.
 Require Import CpdtTactics.

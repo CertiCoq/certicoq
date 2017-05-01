@@ -4,7 +4,8 @@
 
 Require Import L6.set_util L6.cps L6.eval L6.cps_util L6.ctx L6.identifiers.
 Require Import Coq.MSets.MSetRBT Coq.Lists.List.
-Require Import Libraries.Coqlib.
+Require Import compcert.lib.Coqlib.
+
 
 Import PS.
 

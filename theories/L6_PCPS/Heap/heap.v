@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From L6 Require Import Ensembles_util functions.
-From Libraries Require Import Coqlib.
+Require Import compcert.lib.Coqlib.
 
 Close Scope Z_scope.
 

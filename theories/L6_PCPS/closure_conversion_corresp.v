@@ -5,7 +5,7 @@
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.hoare L6.Ensembles_util
                L6.List_util L6.closure_conversion L6.closure_conversion_util L6.closure_conversion_correct
                L6.functions L6.logical_relations L6.eval.
-Require Import Libraries.Coqlib.
+Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
                Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -557,10 +557,10 @@ Section CC_correct.
            binding_not_in_map (Complement _ (FromList (PS.elements fv))) FVmap_n /\
            FVmap_inv FVmap_n (Empty_set _) (Empty_set _) (PS.elements fv)
      }}.
-  Proof.
+  Proof. 
     intros Hb1 Hb2 Minv. unfold make_env.
     destruct ((fix
-                 add_fvs (l : list Maps.PTree.elt) (n : N) (map : Maps.PTree.t VarInfo)
+                 add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
                  {struct l} : Maps.PTree.t VarInfo * N :=
                  match l with
                    | [] => (map, n)
@@ -579,7 +579,7 @@ Section CC_correct.
       + intros e. rewrite Hctx. rewrite <- app_ctx_f_fuse. now f_equal.
       + replace map_new with
         (fst ((fix
-                add_fvs (l : list Maps.PTree.elt) (n : N)
+                add_fvs (l : list M.elt) (n : N)
                 (map : Maps.PTree.t VarInfo) {struct l} :
                 Maps.PTree.t VarInfo * N :=
                 match l with
@@ -1359,7 +1359,7 @@ Section CC_correct.
   Proof with now eauto with Ensembles_DB.
     unfold make_env.
     destruct
-      ((fix add_fvs (l : list Maps.PTree.elt)
+      ((fix add_fvs (l : list M.elt)
             (n : N)
             (map : Maps.PTree.t VarInfo)
             {struct l} :
@@ -1640,7 +1640,7 @@ Section CC_correct.
       + unfold make_env.
         destruct
           ((fix
-              add_fvs (l : list Maps.PTree.elt) (n : N) (map : Maps.PTree.t VarInfo)
+              add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
               {struct l} : Maps.PTree.t VarInfo * N :=
               match l with
                 | [] => (map, n)
@@ -2026,7 +2026,7 @@ Section CC_correct.
     intros Hi HD. unfold make_env.
     destruct
       ((fix
-          add_fvs (l : list Maps.PTree.elt) (n : N) (map : Maps.PTree.t VarInfo)
+          add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
           {struct l} : Maps.PTree.t VarInfo * N :=
           match l with
             | [] => (map, n)
@@ -2732,7 +2732,7 @@ Section CC_correct.
       intros Γ' s1. eapply pre_curry_l. intros Hf1. unfold make_env.
       destruct
         ((fix
-            add_fvs (l : list Maps.PTree.elt) (n : N) (map : Maps.PTree.t VarInfo)
+            add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
             {struct l} : Maps.PTree.t VarInfo * N :=
             match l with
               | [] => (map, n)

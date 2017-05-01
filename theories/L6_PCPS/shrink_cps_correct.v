@@ -5,18 +5,18 @@ Require Import Coq.Classes.Morphisms.
 Import RelationClasses.
 
 Require Import ExtLib.Data.Bool.
-Require Libraries.Maps.
+
 Require Coq.funind.Recdef.
-Import Nnat.
+
 Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles Coq.Logic.Decidable Coq.Lists.ListDec.
 Require Import Libraries.CpdtTactics Coq.Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
-Require Import Libraries.Coqlib L6.Ensembles_util. 
+Require Import compcert.lib.Coqlib L6.Ensembles_util. 
 Require Import L6.cps.
 Require Import L6.ctx L6.logical_relations.
 Require Import L6.cps_util L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers.
-
+Import Nnat.
    Ltac pi0 :=
     repeat match goal with
              | [ H: _ + _ = 0 |- _ ] =>  apply plus_is_O in H; destruct H; subst; pi0
@@ -2817,7 +2817,7 @@ Proof.
       auto.
     + rewrite apply_r_set2 by auto.
       assert (apply_r sigma v0 <> x).
-      unfold apply_r. destruct (M.get v0 sigma) eqn:gv0s.
+      unfold apply_r. destruct (@M.get M.elt v0 sigma) eqn:gv0s.
       intro; subst. apply H0; eauto.
       auto.
       rewrite apply_r_set2 by auto.
@@ -2911,7 +2911,7 @@ Proof.
       rewrite apply_r_empty.
       reflexivity.
       unfold apply_r.
-      destruct (M.get v sigma) eqn:gvs.
+      destruct (@M.get M.elt v sigma) eqn:gvs.
       intro; subst.
       apply H. exists v; auto.
       auto.
@@ -3565,7 +3565,7 @@ Qed.
     induction l; intros.
     - simpl app.
       simpl app in H1.
-      simpl in H1.      destruct (M.get x rho1) eqn:gxr.
+      simpl in H1. destruct (M.get x rho1) eqn:gxr.
       apply H in gxr. destructAll.
       destruct (getlist l' rho1) eqn:glr.
       eapply preord_env_P_getlist_l in glr; eauto. destructAll.
@@ -5465,14 +5465,17 @@ Proof.
   apply Range_map_remove.
 Qed.
 
+
+
 Theorem apply_r_sigma_in:
   forall sigma a,
   In _ (Union _ (Setminus _ (Singleton _ a) (Dom_map sigma)) (Range_map sigma)) (apply_r sigma a).
 Proof.
   unfold apply_r.
   intros.
-  destruct (Maps.PTree.get a sigma) eqn:gas.
-  right. exists a. auto.
+  destruct (@M.get M.elt a sigma) eqn:gas.
+  right. exists a.
+  auto.
   left.
   split.
   constructor.
@@ -7111,10 +7114,11 @@ Proof.
     eapply num_occur_n. constructor; eauto.
     assert (Hn := num_occur_arl _ _ [v] Hxy).
     simpl in Hn. simpl. unfold var in *.
+    unfold M.elt in *.
     omega.
     eapply num_occur_n. constructor. auto.
     assert (Hnn := num_occur_set_arl _ _ Hxy [v]).
-    simpl. simpl in Hnn. unfold var in *. omega.
+    simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. omega.
   - inv H1; inv H2. inv H7; inv H6.
     specialize (H _ _ H8 H7).
     assert (num_occur (Ecase v l) x ( num_occur_list [v] x + m)).
@@ -7136,11 +7140,11 @@ Proof.
     split.
     eapply num_occur_n. constructor; eauto. 
     assert (Hn := num_occur_arl _ _ [v0] Hxy).
-    simpl in Hn. simpl. unfold var in *.
+    simpl in Hn. simpl. unfold var, M.elt in *.
     omega.
     eapply num_occur_n. constructor; eauto.
     assert (Hnn := num_occur_set_arl _ _ Hxy [v0]).
-    simpl. simpl in Hnn. unfold var in *. omega.
+    simpl. simpl in Hnn. unfold var, M.elt in *. omega.
   - inv H1; inv H2.
     specialize (H _ _ H8 H9).
     specialize (H0 _ _ H5 H4).
@@ -7149,9 +7153,9 @@ Proof.
   - inv H; inv H0. split; eapply num_occur_n; eauto.    
     assert (Hn := num_occur_arl _ _ (v::l) Hxy).
     simpl in Hn. simpl.
-    unfold var in *. omega.
+    unfold var, M.elt in *. omega.
     assert (Hnn := num_occur_set_arl _ _ Hxy (v::l)).
-    simpl. simpl in Hnn. unfold var in *. omega.
+    simpl. simpl in Hnn. unfold var, M.elt in *. omega.
   - specialize (H _ _ H8 H7).
     destruct H.
     split; eapply num_occur_n; eauto.
@@ -7160,10 +7164,10 @@ Proof.
   - inv H; inv H0.
     split; eapply num_occur_n; eauto.
     assert (Hn := num_occur_arl _ _ [v] Hxy).
-    simpl in Hn. simpl. unfold var in *.
+    simpl in Hn. simpl. unfold var, M.elt in *.
     omega.
     assert (Hnn := num_occur_set_arl _ _ Hxy [v]).
-    simpl. simpl in Hnn. unfold var in *. omega.
+    simpl. simpl in Hnn. unfold var, M.elt in *. omega.
   - inv H1; inv H2. specialize (H _ _ H10 H9).
     specialize (H0 _ _ H11 H12).
     destruct H; destruct H0.

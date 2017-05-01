@@ -1,5 +1,9 @@
 -R . "Libraries" -R ../theories/compcert "compcert"
 
+# Compcert
+../theories/compcert/lib/Coqlib.v
+../theories/compcert/lib/Maps.v
+
 # libraries
 maps_util.v
 HashMap.v

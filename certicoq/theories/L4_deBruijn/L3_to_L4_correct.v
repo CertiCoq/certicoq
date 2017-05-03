@@ -502,6 +502,11 @@ Proof.
   induction e; simpl; try apply IHe; auto.
 Qed.
 
+Lemma subst_env_aux_prf e k : subst_env_aux e k Prf_e = Prf_e.
+Proof.
+  induction e; simpl; try apply IHe; auto.
+Qed.
+
 Lemma subst_env_erased_exp e : subst_env e erased_exp = erased_exp.
 Proof. apply subst_env_aux_ax. Qed.
 
@@ -685,6 +690,8 @@ Proof.
     assert (N.of_nat k + (1 + i) = N.pos (Pos.of_succ_nat k) + i) by lia.
     rewrite H0 in IHk.
     destruct_call strip_lam. simpl in *. eauto.
+
+  - (* Prf *) constructor.
 
   - (* Ax *) constructor.
 Qed.
@@ -1999,6 +2006,7 @@ Proof.
     destruct IHa.
     inv H0. now exists (Lam_e na e1').
     exists (Fix_e es n). auto.
+    eexists; eauto.
 Qed.
 
 Lemma eval_mkApp_e_inner f f' s' a s :
@@ -2018,7 +2026,8 @@ Proof.
     assert(eval (f' $ e) s'').
     { inv evs''. injection (proj1 eval_single_valued _ _ evf _ H1). intros -> ->.
       econstructor; eauto. 
-      pose proof (proj1 eval_single_valued _ _ evf _ H1). discriminate. }
+      pose proof (proj1 eval_single_valued _ _ evf _ H1). discriminate.
+      pose proof (proj1 eval_single_valued _ _ evf _ H2). discriminate. }
     eapply (IHa (f $ e) (f' $ e) s'' s ); auto.
     
     inv evs''.
@@ -2026,6 +2035,7 @@ Proof.
     eapply (is_n_lam_sbst v2 _) in Hlam.
     eapply eval_is_n_lam; eauto.
     pose proof (proj1 eval_single_valued _ _ evf _ H2). discriminate.
+    pose proof (proj1 eval_single_valued _ _ evf _ H3). discriminate.
 Qed.
 
 Lemma eval_mkApp_e_inv f a s :
@@ -2048,7 +2058,7 @@ Proof.
     rewrite <- S_to_nat.
     destruct a.
     + simpl in Hev.
-      inv Hev; inv H1.
+      inv Hev; try inv H1.
       specialize (IHa (e1' {0 ::= v2}) eq_refl).
       inv wff. inv wfa. inv vas. 
       apply wf_value_self_eval in H3; eauto.
@@ -2059,6 +2069,7 @@ Proof.
       exists (Lam_e na e1'). 
       intuition auto. constructor. 
       apply eval_preserves_wf in H2; auto.
+      inv H2.
     + simpl in IHa. simpl in Hev. simpl in Hfe.
       exists (Lam_e n f).
       inv wff; inv wfa.
@@ -2229,7 +2240,14 @@ Proof with eauto.
 
   + (* Proof *)
     intros wft. unfold translate. simpl.
-    unfold subst_env; rewrite subst_env_aux_ax. constructor.
+    unfold subst_env; rewrite subst_env_aux_prf. constructor.
+
+  + (* Proof application *)
+    intros.
+    unfold translate in *; simpl in *.
+    unfold subst_env in *; rewrite subst_env_aux_prf in *.
+    rewrite subst_env_application. constructor.
+    apply H. now apply Crct_invrt_App in H0.
 
   + (* Lambda *)
     cbn. intros nm bod wft.
@@ -2380,9 +2398,10 @@ Proof with eauto.
          econstructor. constructor.
          pose (eval_yields_value _ _ H5).
          apply (proj1 wf_value_self_eval _ i).
+
          eapply eval_preserves_wf; eauto.
          apply exp_wf_subst; eauto 3.
-         eapply (WFTerm_exp_wf _ _ _ evenv wfe'' _ 0); eauto.
+         eapply (WFTerm_exp_wf _ _ wfe evenv wfe'' _ 0); eauto.
 
          change ((subst_env_aux e'' (1 + 0)
              (trans e'' (1 + 0)
@@ -2422,11 +2441,20 @@ Proof with eauto.
          simpl in Hfs.
          rewrite <- Hfs in H4. simpl in H4.
          rewrite subst_env_aux_lam in H4. inv H4.
-         
+
+      * intros Hfs.
+        apply wcbeval_preserves_wf in evfn; eauto.
+        destruct (wftrm_fix _ _ _ _ evfn eqt') as [nm [bod ->]].
+        elimtype False.
+        rewrite L3sbst_fix_preserves_lam in Hfs.
+        simpl in Hfs.
+        rewrite <- Hfs in H3. simpl in H3.
+        rewrite subst_env_aux_lam in H3. inv H3.
+
     - rewrite t' in fixstep. discriminate.
     
   + (* App no redex: this cannot produce a well-formed value *)
-    intros * evfn Hfn nlam nfix evarg Harg wft.
+    intros * evfn Hfn nlam nfix nproof evarg Harg wft.
     cut (WNorm (TApp efn arg1)). intros wnorm.
     cut (WFTrm (TApp efn arg1) 0). intros wft'.
     pose proof (wnorm_closed _ wft' wnorm).

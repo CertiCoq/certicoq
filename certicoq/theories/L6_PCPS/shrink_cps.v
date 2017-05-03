@@ -12,13 +12,14 @@ Require Import ExtLib.Data.Bool.
 
 Require Coq.funind.Recdef.
 Import Nnat.
-Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles .
+Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles.
 Require Import Libraries.CpdtTactics Coq.Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
 Require Import L6.cps.
 Require Import L6.ctx.
 Require Import L6.cps_util L6.List_util L6.identifiers.
+
 
 
 Definition var_dec := M.elt_eq.
@@ -88,14 +89,76 @@ Section MEASURECONTRACT.
       | SVfun t lv e => term_size e 
     end.
 
-  (** Computes the sum of the sizes of every unlined function in sub *)
-  Definition sub_inl_size (sub:ctx_map) (inl:b_map) : nat :=
-    M.fold  (fun n => fun f => fun v => 
-                                 (if (get_b f inl) then
-                                    0 else svalue_size v) + n
-            ) sub 0. 
+  Definition svalue_inl_size (f:(positive*svalue)) (inl:b_map): nat :=
+    (if (get_b (fst f) inl) then
+                                    0 else svalue_size (snd f)).
+
+
+  Theorem svalue_inl_le:
+    forall i v im,
+      svalue_inl_size (i,v) im <= svalue_size v.
+  Proof.
+    intros.
+    unfold svalue_inl_size.
+    simpl.
+    destruct (get_b i im); omega.
+  Qed.
 
   
+  (** Computes the sum of the sizes of every unlined function in sub *)
+  Definition list_inl_size (sub:list (positive*svalue)) (inl:b_map):=
+    fold_right plus 0 (map (fun v => svalue_inl_size v inl) sub).
+
+
+
+  Theorem list_inl_size_app: forall l l' inl,
+  list_inl_size (l++l') inl = list_inl_size l inl + list_inl_size l' inl .
+  Proof.
+    induction l; intros.
+    reflexivity.
+    unfold list_inl_size. simpl.
+    unfold list_inl_size in IHl.
+    rewrite IHl.
+    omega.
+  Qed.
+    
+  Definition sub_inl_size (sub:ctx_map) (inl:b_map):=
+    fold_left plus (map (fun v => svalue_inl_size v inl) (M.elements sub)) 0. 
+
+  Theorem sub_inl_proof:
+    forall sub inl,
+    sub_inl_size sub inl = 
+      list_inl_size (M.elements sub) inl.
+  Proof.
+    unfold sub_inl_size, list_inl_size. intros. apply fold_symmetric; intros; omega.
+  Qed.
+
+
+  Theorem sub_inl_same:
+    forall l l' inl,
+    Permutation l l' ->
+    list_inl_size l inl = list_inl_size l' inl.
+  Proof.
+    intros l l' inl Hp.
+    induction Hp.
+    - auto.
+    - unfold list_inl_size. simpl. auto.
+    - unfold list_inl_size. simpl. omega.
+    - omega.
+  Qed.
+
+  (* Use M.elements_extensional 
+  Theorem proper_elements: forall {t} sub sub',
+    map_get_r t sub sub' -> forall v, (List.In v (M.elements sub) <-> List.In v (M.elements sub')).
+  Proof. 
+    intros. destruct v. split; intro Hin; apply M.elements_complete in Hin.
+    rewrite H in Hin.
+    apply M.elements_correct in Hin; auto.
+    rewrite <- H in Hin. apply M.elements_correct in Hin. auto.
+  Qed. *)
+
+  
+
   Theorem min_term_size:
     forall e,
       1 <= term_size e. 
@@ -124,66 +187,174 @@ Section MEASURECONTRACT.
 
   
 
-  
+   
   Definition term_sub_inl_size (esi: (exp * ctx_map * b_map)): nat :=
     term_size (fst (fst esi)) + sub_inl_size (snd (fst esi)) (snd esi).
 
 
 
 
+  
 
-  (* part of compcert 2.5 *)
-  Theorem elements_remove:
-    forall (A: Type) i v (m: M.t A),
-      M.get i m = Some v ->
-      exists l1 l2, M.elements m = l1 ++ (i,v) :: l2 /\ M.elements (M.remove i m) = l1 ++ l2.
-  Admitted.
-  
-  (* should be part of compcert :P *)
-  Theorem element_set_none:
-    forall (A: Type) i v (m: M.t A),
-      M.get i m = None -> 
-      exists l1 l2, M.elements m = l1 ++ l2 /\ M.elements (M.set i v m) = l1 ++ (i,v)::l2.
-  Admitted.
-  
-  Theorem element_set_some:
-    forall (A: Type) i v v' (m: M.t A),
-      M.get i m = Some v'  -> 
-      exists l1 l2, M.elements m = l1 ++ (i, v') :: l2 /\ M.elements (M.set i v m) = l1 ++ (i,v)::l2.
-  Admitted.
 
-  
-  Definition equiv_size : (var * svalue) -> (var * svalue) -> Prop :=
-    fun es => fun es' => svalue_size (snd es) = svalue_size (snd es').
 
-  
-  Theorem equiv_size_eq: Equivalence equiv_size.
+
+  Theorem NoDup_list_norepet:
+    forall {A} (l:list A), NoDup l <-> Coqlib.list_norepet l.
   Proof.
-    split; crush.
-  Defined.
+    intros.
+    induction l; split; intro; auto.
+    constructor. constructor.
+    inv H; constructor; eauto.
+    apply  IHl. auto.
+    inv H; constructor; auto.
+    apply IHl. auto.
+  Qed.
+
+  Theorem fold_right_plus_init:
+    forall l n,
+      fold_right plus n l = fold_right plus 0 l + n.
+  Proof.
+    induction l; intros.
+    reflexivity.
+    simpl. rewrite IHl. omega.
+  Qed.
+
+  Theorem svalue_inl_not: forall a x im,
+   fst a <> x ->
+    svalue_inl_size a (M.set x true im) = svalue_inl_size a im. 
+  Proof.
+    intros. destruct a.
+    unfold svalue_inl_size. simpl in *.
+    unfold get_b. rewrite M.gso; auto.
+  Qed.
+    
+  Theorem list_inl_size_not_in: forall x im x0,
+      ~ List.In x (map fst x0) ->
+      list_inl_size x0 (M.set x true im) = list_inl_size x0 im.
+  Proof.
+    induction x0; unfold list_inl_size in *; intros.
+    auto.
+    simpl. rewrite IHx0.
+    rewrite svalue_inl_not. auto.
+    intro; apply H. simpl. auto.
+    intro. apply H.
+    destruct a. simpl. auto.
+  Qed.
+    
+  Theorem sub_inl_fun_size: forall x t xs e im sub,
+      M.get x sub = Some (SVfun t xs e) ->
+      get_b x im = false ->
+                                                    (sub_inl_size sub im  = sub_inl_size sub (M.set x true im) + term_size e )%nat.
+  Proof.
+    intros.
+    apply M.elements_remove in H.
+    destructAll.
+    do 2 (rewrite sub_inl_proof).
+    assert (NoDup (List.map fst (M.elements sub))).
+    apply NoDup_list_norepet. apply M.elements_keys_norepet.
+    rewrite H in H2.
+    rewrite Coqlib.list_append_map in H2.
+    simpl in H2.
+    apply NoDup_remove_2 in H2.
+    rewrite H. 
+    do 2 (rewrite list_inl_size_app).
+    rewrite list_inl_size_not_in.
+    unfold list_inl_size. simpl.
+    assert (~List.In x (map fst x1)).
+    intro. apply H2.
+    apply Coqlib.in_app. auto.
+    eapply list_inl_size_not_in in H3.
+    unfold list_inl_size in H3. rewrite H3.
+    unfold svalue_inl_size.
+    simpl. rewrite H0.
+    unfold get_b. rewrite M.gss. omega.
+    intro. apply H2.
+    apply Coqlib.in_app. auto.
+  Qed.
 
   
+  Hint Resolve sub_inl_fun_size: mtss.
   
-  Theorem sub_remove_size: forall x t xs e im sub, M.get x sub = Some (SVfun t xs e) ->
-                                                   (sub_inl_size sub im  = sub_inl_size sub (M.set x true im) + term_size e )%nat.
-  Admitted.
-  (*    intros. unfold sub_size. unfold fold1r.  apply elements_remove in H. do 3 destruct H.  rewrite H0. rewrite H.   rewrite SetoidList.fold_right_commutes. apply plus_comm. apply equiv_size_eq. crush. intro. intros. intro. intros. unfold equiv_size in H1. subst. rewrite OrdersEx.Nat_as_OT.add_cancel_r.   assumption.  crush. *)
-
-
-  Hint Resolve sub_remove_size: mtss.
-
-  
+    
   Theorem sub_remove_size': forall x sub inl,
                               (sub_inl_size (M.remove x sub) inl <= sub_inl_size sub inl)%nat.
-  Admitted.
+  Proof.
+    intros.
+    destruct (M.get x sub) eqn:gxs.
+    - do 2 (rewrite sub_inl_proof).
+      apply M.elements_remove in gxs.
+      destructAll.
+      rewrite H. rewrite H0.
+      unfold list_inl_size.
+      do 2 (rewrite Coqlib.list_append_map).
+      simpl.
+      do 2 (rewrite fold_right_app). simpl.
+      rewrite fold_right_plus_init.
+      rewrite fold_right_plus_init with (n :=  (svalue_inl_size (x, s) inl + fold_right Init.Nat.add 0 (map (fun v : positive * svalue => svalue_inl_size v inl) x1))).
+      omega.
+    - unfold sub_inl_size.
+      erewrite M.elements_extensional. 
+      apply Nat.eq_le_incl.
+      reflexivity.
+      apply remove_none. auto.
+  Qed.     
+    
 
 
+  Theorem set_none_size: forall x sub im v, 
+                           M.get x sub = None ->
+                           (sub_inl_size (M.set x v sub) im =  svalue_inl_size (x,v) im + sub_inl_size sub im)%nat.
+  Proof.
+    intros x sub im v gxs.
+    do 2 (rewrite sub_inl_proof).
+    apply elements_set_none with (v := v) in gxs. destructAll.
+    rewrite H, H0.
+    clear H0. clear H. unfold list_inl_size.
+    do 2 (rewrite Coqlib.list_append_map).
+    simpl.
+    do 2 (rewrite fold_right_app).
+    simpl.
+    rewrite fold_right_plus_init.
+    rewrite fold_right_plus_init with (n := (fold_right Init.Nat.add 0 (map (fun v0 : positive * svalue => svalue_inl_size v0 im) x1))).
+    assert (svalue_inl_size (x, v) im <= svalue_size v) by apply svalue_inl_le.
+    omega.      
+  Qed.
+  
+  Theorem set_some_size: forall x sub im v v',
+                           M.get x sub = Some v' ->
+                           (sub_inl_size (M.set x v sub) im + svalue_inl_size (x, v') im = sub_inl_size sub im + svalue_inl_size (x,v) im)%nat.
+  Proof.
+    intros x sub im v v' gxs.
+    do 2 (rewrite sub_inl_proof).
+    apply elements_set_some with (v := v) in gxs.
+    destructAll. rewrite H, H0.
+    clear H; clear H0.
+    unfold list_inl_size.
+    do 2 (rewrite Coqlib.list_append_map).
+    simpl.
+    do 2 (rewrite fold_right_app).
+    simpl.
+    rewrite fold_right_plus_init.
+    rewrite fold_right_plus_init with (n := (svalue_inl_size (x, v') im + fold_right Init.Nat.add 0 (map (fun v0 : positive * svalue => svalue_inl_size v0 im) x1))).
+    omega.
+  Qed.
 
 
   
   Theorem sub_set_size: forall v x sub im, (sub_inl_size (M.set x v sub) im  <= svalue_size v + sub_inl_size sub im)%nat.
-  Admitted.
-  
+  Proof.
+    intros.
+    assert (svalue_inl_size (x, v) im <= svalue_size v) by apply svalue_inl_le.
+    destruct (M.get x sub) eqn:gxs.
+    - apply set_some_size with (v := v) (im := im) in gxs.
+      omega.
+    - apply set_none_size with (v := v) (im := im) in gxs. 
+      omega.
+  Qed.
+
+       
+      
   
   Theorem constr_sub_size: forall e v t lv sub im,                                 (term_sub_inl_size (e, M.set v (SVconstr t lv) sub, im) < term_sub_inl_size (Econstr v t lv e, sub, im))%nat.
   Proof.
@@ -306,10 +477,30 @@ Section MEASURECONTRACT.
     - rewrite gdso by auto. apply H.
   Defined.
 
+  Theorem svalue_inl_b_map_le : forall inl inl',
+      b_map_le inl inl' ->
+      forall v,
+        svalue_inl_size v inl' <= svalue_inl_size v inl.
+  Proof.
+    intros. unfold svalue_inl_size. destruct v; simpl.
+    destruct (get_b p inl) eqn:gbp.
+    apply  H in gbp. rewrite gbp; auto.
+    destruct (get_b p inl'); omega.
+  Qed.
+    
+    
   Theorem sub_size_le : forall sub inl inl',
                           b_map_le inl inl' ->
                           sub_inl_size sub inl' <= sub_inl_size sub inl.
-  Admitted.
+  Proof.
+    intros.
+    do 2 (rewrite sub_inl_proof). remember (M.elements sub) as l.
+    clear Heql. induction l.
+    reflexivity.
+    unfold list_inl_size in *. simpl.
+    assert ( svalue_inl_size a inl' <=  svalue_inl_size a inl) by (apply svalue_inl_b_map_le; auto).
+    omega.
+  Qed.
 
   
   Inductive b_map_le_i : b_map -> b_map -> Prop :=
@@ -851,24 +1042,6 @@ Section CONTRACT.
     end.
 
 
-  Theorem set_none_size: forall x sub im val, 
-                           M.get x sub = None ->
-                           (sub_inl_size (M.set x val sub) im =  svalue_size val + sub_inl_size sub im)%nat.
-  Admitted.
-
-  Theorem set_some_size: forall x sub im val val',
-                           M.get x sub = Some val' ->
-                           (sub_inl_size (M.set x val sub) im + svalue_size val' = sub_inl_size sub im + svalue_size val)%nat.
-  Admitted.
-
-  
-  Theorem set_svalue_size : forall x val sub im,
-                              (sub_inl_size (M.set x val sub) im <= sub_inl_size sub im + svalue_size val)%nat.
-  Proof.    
-    intros; destruct (M.get x sub) eqn:gxs.
-    - apply set_some_size with (val := val) (im:=im) in gxs. omega. 
-    - apply set_none_size with (val := val) (im := im) in gxs. omega.
-  Defined.
   
   Theorem precontractfun_size: forall fds sig count sub fds' count' sub',
                                  ((fds', count', sub') =  precontractfun sig count sub fds -> (forall im, sub_inl_size sub' im <= funs_size (fds) + sub_inl_size sub im /\ funs_size fds' <= funs_size fds))%nat.
@@ -876,7 +1049,7 @@ Section CONTRACT.
     induction fds; intros; simpl in H.    
     - destruct (get_c v count) eqn: gcvc.
       + specialize (IHfds _ _ _ _ _ _ H im). simpl. omega.
-      +  assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds). destruct (precontractfun sig count sub fds). destruct p. eauto. destructAll. assert (H0' := H0). specialize (IHfds _ _ _ _ _ _ H0 im).  rewrite <- H0' in H. inversion H; subst. simpl. split. eapply le_trans. apply set_svalue_size.  simpl. omega. omega.
+      +  assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds). destruct (precontractfun sig count sub fds). destruct p. eauto. destructAll. assert (H0' := H0). specialize (IHfds _ _ _ _ _ _ H0 im).  rewrite <- H0' in H. inversion H; subst. simpl. split. eapply le_trans. apply sub_set_size.  simpl. omega. omega.
     -  inversion H; subst. simpl. omega.
   Defined.
 
@@ -1343,14 +1516,18 @@ Section CONTRACT.
            | 1%nat => (match (M.get f' sub) with
                          | Some (SVfun t' xs m)  =>
                            (* need t = t' and |xs| = |ys| *)
-                           if (andb (Pos.eqb t' t) (Init.Nat.eqb (length ys) (length xs))) then                    
+                           (match (andb (Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im))))
+                           with
+                           | true => 
                              let im' := M.set f' true im in
                              (* update counts of ys' and xs after setting f' to 0 *)
                              let count' := update_count_inlined ys' xs (M.set f' 0 count) in
                              (match contract (set_list (combine xs ys') sig) count' m  sub im' with
                                 | existT (e, c, i) bp => existT _ (e, c, i) (b_map_i_true _ _ _ bp)
                               end)
-                           else existT _ (Eapp f' t ys', count, im) (ble_refl im)
+                           | false =>
+                             existT _ (Eapp f' t ys', count, im) (ble_refl im)
+                            end)
                          | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
                        end) 
            | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
@@ -1379,8 +1556,15 @@ Section CONTRACT.
     eapply lt_le_trans. apply H.
     omega.
   Defined.
-  Next Obligation.     unfold term_sub_inl_size; simpl.
-    symmetry in Heq_anonymous. apply sub_remove_size with (im :=  im) in Heq_anonymous. omega.
+  Next Obligation.  unfold term_sub_inl_size; simpl.
+    symmetry in Heq_anonymous1.  
+    apply sub_inl_fun_size with (im :=  im) in Heq_anonymous1. omega.
+    symmetry in Heq_anonymous.
+    apply Bool.andb_true_iff in Heq_anonymous.
+    destructAll.
+    apply Bool.andb_true_iff in H0.
+    destructAll.
+    apply Bool.negb_true_iff. auto.
   Defined.
   
 
@@ -1541,5 +1725,4 @@ Definition shrink_top (e:exp) : exp :=
   match (contract (M.empty var) count e (M.empty svalue) (M.empty bool)) with
     | existT (e', _, _) _ => e'
   end.
-
 

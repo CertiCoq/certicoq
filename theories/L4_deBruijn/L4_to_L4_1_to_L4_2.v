@@ -55,6 +55,8 @@ match e with
 
 
 | Ax_e s => oterm (NBox s) []
+
+| Prf_e => oterm (NBox "proof") []
 end
 with ltL4_to_L4_1  (e:exps) {struct e}: list (@DTerm Ast.name L4Opid) :=
 match e with

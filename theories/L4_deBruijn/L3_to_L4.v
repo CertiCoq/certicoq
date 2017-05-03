@@ -86,7 +86,7 @@ Section TermTranslation.
     match t with
     | L3t.TAx => Ax_e ""
     | L3t.TWrong => Ax_e "wrong"
-    | L3t.TProof => (* TODO: Ax_e for now *) Ax_e "proof"
+    | L3t.TProof => Prf_e
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TLambda n t => Lam_e n (trans (1+k) t)
     | L3t.TLetIn n t u => Let_e n (trans k t) (trans (1+k) u)

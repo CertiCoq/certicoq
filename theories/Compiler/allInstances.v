@@ -21,10 +21,6 @@ Require Import String.
 Open Scope string_scope.
 
 
-
-
-
-
 Quote Recursively Definition One := 1%positive.
 Quote Recursively Definition p := (3+4)%nat.
 (*

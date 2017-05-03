@@ -316,10 +316,10 @@ Eval cbn in (etaExp_cnstr
 Function strip (t:L2Term) : Term :=
   match t with
     | L2.compile.TRel n => TRel n
-    | L2.compile.TSort s => TAx
+    | L2.compile.TSort s => TProof TAx
     | L2.compile.TProof t => TProof (strip t)
     | L2.compile.TCast t => TCast (strip t)
-    | L2.compile.TProd nm bod => TAx
+    | L2.compile.TProd nm bod => TProof TAx
     | L2.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
     | L2.compile.TApp fn arg args =>
@@ -332,7 +332,7 @@ Function strip (t:L2Term) : Term :=
       end
     | L2.compile.TConst nm => TConst nm
     | L2.compile.TAx => TAx
-    | L2.compile.TInd i => TAx
+    | L2.compile.TInd i => TProof TAx
     | L2.compile.TConstruct i m npars nargs =>
       etaExp_cnstr i m npars nargs tnil
     | L2.compile.TCase (i,_) mch brs => TCase i (strip mch) (stripDs brs)

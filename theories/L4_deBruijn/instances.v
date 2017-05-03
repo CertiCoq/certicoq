@@ -3,9 +3,39 @@ Require Import certiClasses.
 Require Import Common.Common.
 Require Import L3.compile.
 Require Import L4.L3_to_L4.
+Require Import L4.L3_to_L3_eta.
 Require Import L3.instances.
 
 Require Import BinNat.
+Require Import certiClasses2.
+
+Definition L3_eta_Program := Program Term.
+Typeclasses Opaque L3_eta_Program.
+
+Instance bigStepOpSemL3_etaTerm:
+  BigStepOpSem L3_eta_Program L3_eta_Program :=
+  bigStepOpSemL3Term.
+
+Global Instance ObsSubtermL3_eta : ObserveNthSubterm L3_eta_Program :=
+  L3.instances.ObsSubtermL.
+
+Global Instance QuestionHeadTermL3_eta : QuestionHead L3_eta_Program :=
+  L3.instances.QuestionHeadTermL.
+
+Instance WfL3_etaTerm : GoodTerm L3_eta_Program :=
+  WfL3Term.
+
+Global Instance certiL3_eta: CerticoqLanguage L3_eta_Program := {}.
+
+Global  Instance certiL3_to_L3_eta: 
+  CerticoqTranslation (cTerm certiL3) (cTerm certiL3_eta) :=
+  fun p => Ret (L3_to_L3_eta.Program_Program p).
+
+Global Instance certiL3_to_L3_eta_correct :
+  CerticoqTranslationCorrect certiL3 certiL3_eta.
+Proof.
+  (* WIP *)
+Admitted.
 
 Definition dummyEnvBigStep {E T: Type}  (bt : BigStepOpSem T T)
 : BigStepOpSem (E * T) (E * T) :=
@@ -33,9 +63,6 @@ Global Instance L4_evaln : BigStepOpSemExec (ienv * L4.expression.exp)
 
 Instance certiL4wf: GoodTerm L4.expression.exp :=
  L4.expression.exp_wf (0%N).
-
-
-Require Import certiClasses2.
 
 Definition question_head (Q : Question) (ie : ienv) (e : L4.expression.exp) :=
   match Q with
@@ -75,9 +102,10 @@ Global Instance ObsSubtermTermL : ObserveNthSubterm (ienv * L4.expression.exp) :
 
 Global Instance certiL4: CerticoqLanguage (ienv * L4.expression.exp) := {}.
 
-Global  Instance certiL3_to_L4: 
-  CerticoqTranslation (cTerm certiL3) (cTerm certiL4)  :=
-fun p => Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
+Global  Instance certiL3_eta_to_L4: 
+  CerticoqTranslation (cTerm certiL3_eta) (cTerm certiL4)  :=
+  fun p =>
+    Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
    (L3_to_L4.translate_program (AstCommon.env p) (main p))).
 
 Require Import L4.L3_to_L4_correct.
@@ -96,16 +124,16 @@ Proof.
   eapply IHn; eauto.
 Qed.
 
-Global Instance certiL3_to_L4_correct :
-  CerticoqTranslationCorrect certiL3 certiL4.
+Global Instance certiL3_eta_to_L4_correct :
+  CerticoqTranslationCorrect certiL3_eta certiL4.
 Proof.
   split.
 { red; unfold certiClasses.translate, goodTerm, WfL3Term.
   intros.
   pose proof (L3.program.Crct_invrt_any H).
-  unfold certiL3_to_L4. hnf.
+  unfold certiL3_eta_to_L4. hnf.
   simpl. destruct s. simpl in *.
-  unfold translate_program. simpl.
+  unfold L3_to_L4.translate_program. simpl.
   unfold translate. simpl.
   now apply exp_wf_lets. }
 
@@ -115,7 +143,7 @@ Proof.
   destruct s. destruct sv.
   destruct H0. 
   pose proof (L3_to_L4_correct.translate_correct' env _ _ _ He H H0 H1). 
-  simpl in H2. unfold certiL3_to_L4. 
+  simpl in H2. unfold certiL3_eta_to_L4. 
   destruct H2 as [sv' [evsv obs]].
   eexists (inductive_env env, sv');
     split. repeat red. split. simpl; auto. simpl.

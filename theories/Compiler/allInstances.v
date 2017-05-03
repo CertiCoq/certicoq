@@ -208,23 +208,23 @@ Set Printing Depth 10000.
 Eval vm_compute in (showMainBody3 pfoo3).
 Eval vm_compute in (ctranslateEval certiL4 pfoo (N.to_nat 9000)).
 
-
-
-
 Set Template Cast Propositions.
-Time Quote Recursively Definition pgcd := Gcd.
+Time Quote Recursively Definition pgcd := (Gcd 4 2).
 
-Let pcgd2 : cTerm certiL3.
-let T:= eval vm_compute in (L3.compile.program_Program pgcd) in exact T.
+Let pgcd4 : cTerm certiL4.
+  let T:= eval vm_compute in (translateTo (cTerm certiL4) pgcd) in
+      match T with
+      | Ret ?x => exact x
+      end.
 Defined.
+Eval cbv in expression.eval_n 20000 (snd pgcd4).
 
-(*
-Let pcgd4a : cTerm certiL4_5.
-(let t:= eval vm_compute in (certiClasses.translate (cTerm certiL2) (cTerm certiL4_5) pcgd2) in
-match t with
-|Ret ?xx => exact xx
-end).
-Defined. *)
+(* Let pcgd4a : cTerm certiL4_5. *)
+(* (let t:= eval vm_compute in (certiClasses.translate (cTerm certiL3) (cTerm certiL4_5) pcgd2) in *)
+(* match t with *)
+(* |Ret ?xx => exact xx *)
+(* end). *)
+(* Defined. *)
 
 Require Import List.
 Import ListNotations.
@@ -273,7 +273,6 @@ set (t := (certiClasses.translate (cTerm certiL5a) (cTerm certiL6) p5a)).
 unfold certiClasses.translate in t.
 unfold liftTotal in t. simpl in t.
 unfold translateT in t.
-
 (* unfold certiL5a_t0_L6 in t.
 native_compute in t. *)
 Abort.
@@ -556,10 +555,3 @@ Definition test := printProg (compile_L6 (ext_comp swap)) "output/swap.c".
 (* Definition test := print_step_L6 (comp_L6 vs5).
 
 *)
-
-
-
-
-
-
-

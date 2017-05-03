@@ -16,11 +16,9 @@ Set Template Cast Propositions.
 (** Require Import ExtLib.Data.String. ??  **)
 
 Require Import Benchmarks.vs.
+Require Import ExtrOcamlBasic.
 Require Import Ascii String ExtrOcamlString.
 Require Import extraction.ExtrOcamlNatInt.
-Extract Inductive bool => "bool" [ "true" "false" ].
-Extract Inductive sumbool => "bool" [ "true" "false" ].
-Extract Inductive list => "list" [ "[]" "(::)" ].
 
 (*****  this works ****
 Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
@@ -34,6 +32,7 @@ Time Definition eval_ce_example_myent :=
 Print eval_ce_example_myent.
  *****)
 
+(**************  this works *****
 Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
 Time Definition P_ce_example_ent :=
   Eval vm_compute in (program_Program p_ce_example_ent).
@@ -43,7 +42,6 @@ Time Definition eval_ce_example_ent :=
   Eval vm_compute in
     (wcbvEval P_env_ce_example_ent 4000 P_main_ce_example_ent).
 Print eval_ce_example_ent.
-(**************  this works *****
 Definition cee :=
   (wcbvEval P_env_ce_example_ent 6000 P_main_ce_example_ent).
 Extraction "ce_example_ent" cee.
@@ -69,12 +67,13 @@ Definition P_main_ce_harder_ent := AstCommon.main P_ce_harder_ent.
 (******  doesn't work ****
 Time Definition eval_ce_harder_ent :=
   Eval vm_compute in
-    (wcbvEval P_env_ce_harder_ent 4000 P_main_ce_harder_ent).
+    (wcbvEval P_env_ce_harder_ent 1080 P_main_ce_harder_ent).
 Print eval_ce_harder_ent.
-Definition cee :=
-  (wcbvEval P_env_ce_harder_ent 6000 P_main_ce_harder_ent).
-Extraction "ce_example_harder_ent" cee.
 *****)
+Definition cee :=
+  (wcbvEval P_env_ce_harder_ent 1080 P_main_ce_harder_ent).
+Extraction "ce_example_harder_ent" cee.
+(*****)
 
 
 
@@ -117,7 +116,7 @@ Arguments nil : clear implicits.
 Arguments cons : clear implicits.
 Arguments eq_refl : clear implicits.
 Inductive vec (A:Type) (n:nat) : Type :=
-| vecc : forall (l:list A), length l = n -> vec A n.
+| vecc : forall (l:list A), List.length l = n -> vec A n.
 Quote Recursively Definition p_vec := vec.
 Arguments vecc : clear implicits.
 
@@ -227,7 +226,7 @@ Time Quote Recursively Definition p_Plus1x := Plus1x.
 Time Definition P_Plus1x : Program Term :=
   Eval vm_compute in program_Program p_Plus1x.
 Time Definition P_env := Eval vm_compute in (env P_Plus1x).
-Time Definition P_main := Eval vm_compute in (main P_Plus1x).
+Time Definition P_main := Eval vm_compute in ( AstCommon.main P_Plus1x).
 Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
 Print P_ans.
                              
@@ -239,7 +238,7 @@ Quote Recursively Definition p_mbt :=
   end.
 Definition L1g_mbt := Eval cbv in (program_Program p_mbt).
 Definition mbt_env := env L1g_mbt.  (* L1g environ *)
-Definition mbt_main := main L1g_mbt. (* L1g main function *)
+Definition mbt_main := AstCommon.main L1g_mbt. (* L1g main function *)
 Eval cbv in (wcbvEval mbt_env 10 mbt_main).
 
 (** vector addition **)
@@ -258,7 +257,8 @@ Quote Recursively Definition cbv_vplus0123 := (* [program] of Coq's answer *)
   ltac:(let t:=(eval cbv in (vplus0123)) in exact t).
 Print cbv_vplus0123.
 (* [Term] of Coq's answer *)
-Definition ans_vplus0123 := Eval cbv in (main (program_Program cbv_vplus0123)).
+Definition ans_vplus0123 :=
+  Eval cbv in (AstCommon.main (program_Program cbv_vplus0123)).
 (* [program] of the program *)
 Quote Recursively Definition p_vplus0123 := vplus0123.
 Print p_vplus0123.
@@ -266,7 +266,7 @@ Definition P_vplus0123 := Eval cbv in (program_Program p_vplus0123).
 Print P_vplus0123.
 Goal
   let env := (env P_vplus0123) in
-  let main := (main P_vplus0123) in
+  let main := (AstCommon.main P_vplus0123) in
   wcbvEval (env) 100 (main) = Ret ans_vplus0123.
   vm_compute. reflexivity.
 Qed.
@@ -295,7 +295,7 @@ Quote Recursively Definition cbv_yyyyX := (* [program] of Coq's answer *)
   ltac:(let t:=(eval cbv in (yyyyX)) in exact t).
 Print cbv_yyyyX.
 (* [Term] of Coq's answer *)
-Definition ans_yyyyX := Eval cbv in (main (program_Program cbv_yyyyX)).
+Definition ans_yyyyX := Eval cbv in (AstCommon.main (program_Program cbv_yyyyX)).
 (* [program] of the program *)
 Quote Recursively Definition p_yyyyX := yyyyX.
 Print p_yyyyX.
@@ -303,7 +303,7 @@ Definition P_yyyyX := Eval cbv in (program_Program p_yyyyX).
 Print P_yyyyX.
 Goal
     let env := (env P_yyyyX) in
-    let main := (main P_yyyyX) in
+    let main := (AstCommon.main P_yyyyX) in
     wcbvEval (env) 100 (main) = Ret ans_yyyyX.
   vm_compute. reflexivity.
 Qed.
@@ -335,7 +335,7 @@ Definition arden_size := (forest_size arden).
 Quote Recursively Definition cbv_arden_size :=
   ltac:(let t:=(eval cbv in arden_size) in exact t).
 Definition ans_arden_size :=
-  Eval cbv in (main (program_Program cbv_arden_size)).
+  Eval cbv in (AstCommon.main (program_Program cbv_arden_size)).
 (* [program] of the program *)
 Quote Recursively Definition p_arden_size := arden_size.
 Print p_arden_size.
@@ -343,7 +343,7 @@ Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
 Print P_arden_size.
 Goal
   let env := (env P_arden_size) in
-  let main := (main P_arden_size) in
+  let main := (AstCommon.main P_arden_size) in
   wcbvEval (env) 100 (main) = Ret ans_arden_size.
   vm_compute. reflexivity.
 Qed.
@@ -364,7 +364,7 @@ Quote Recursively Definition cbv_ack35 :=
   ltac:(let t:=(eval cbv in ack35) in exact t).
 Print cbv_ack35.
 Definition ans_ack35 :=
-  Eval cbv in (main (program_Program cbv_ack35)).
+  Eval cbv in (AstCommon.main (program_Program cbv_ack35)).
 Print ans_ack35.
 (* [program] of the program *)
 Quote Recursively Definition p_ack35 := ack35.
@@ -373,7 +373,7 @@ Definition P_ack35 := Eval cbv in (program_Program p_ack35).
 Print P_ack35.
 Goal
   let env := (env P_ack35) in
-  let main := (main P_ack35) in
+  let main := (AstCommon.main P_ack35) in
   wcbvEval (env) 2000 (main) = Ret ans_ack35.
   vm_compute. reflexivity.
 Qed.
@@ -396,7 +396,7 @@ Quote Recursively Definition cbv_pierce :=
   ltac:(let t:=(eval cbv in pierce) in exact t).
 Print cbv_pierce.
 Definition ans_pierce :=
-  Eval cbv in (main (program_Program cbv_pierce)).
+  Eval cbv in (AstCommon.main (program_Program cbv_pierce)).
 Print ans_pierce.
 (* [program] of the program *)
 Quote Recursively Definition p_pierce := pierce.
@@ -405,7 +405,7 @@ Definition P_pierce := Eval cbv in (program_Program p_pierce).
 Print P_pierce.
 Goal
   let env := (env P_pierce) in
-  let main := (main P_pierce) in
+  let main := (AstCommon.main P_pierce) in
   wcbvEval (env) 2000 (main) = Ret ans_pierce.
   vm_compute. reflexivity.
 Qed.
@@ -417,7 +417,7 @@ Quote Recursively Definition cbv_Scomb :=
   ltac:(let t:=(eval cbv in Scomb) in exact t).
 Print cbv_Scomb.
 Definition ans_Scomb :=
-  Eval cbv in (main (program_Program cbv_Scomb)).
+  Eval cbv in (AstCommon.main (program_Program cbv_Scomb)).
 Print ans_Scomb.
 (* [program] of the program *)
 Quote Recursively Definition p_Scomb := Scomb.
@@ -426,7 +426,7 @@ Definition P_Scomb := Eval cbv in (program_Program p_Scomb).
 Print P_Scomb.
 Goal
   let env := (env P_Scomb) in
-  let main := (main P_Scomb) in
+  let main := (AstCommon.main P_Scomb) in
   wcbvEval (env) 2000 (main) = Ret ans_pierce.
   vm_compute. reflexivity.
 Qed.
@@ -447,13 +447,13 @@ Definition Foo0ty := (Foo 0 true (ww uu)).
 Quote Recursively Definition cbv_Foo0ty :=
   ltac:(let t:=(eval cbv in Foo0ty) in exact t).
 Definition ans_Foo0ty :=
-  Eval cbv in (main (program_Program cbv_Foo0ty)).
+  Eval cbv in (AstCommon.main (program_Program cbv_Foo0ty)).
 (* [program] of the program *)
 Quote Recursively Definition p_Foo0ty := Foo0ty.
 Definition P_Foo0ty := Eval cbv in (program_Program p_Foo0ty).
 Goal
   let env := (env P_Foo0ty) in
-  let main := (main P_Foo0ty) in
+  let main := (AstCommon.main P_Foo0ty) in
   wcbvEval (env) 30 (main) = Ret ans_Foo0ty.
   vm_compute. reflexivity.
 Qed.
@@ -471,13 +471,13 @@ Definition slowFib3 := (slowFib 3).
 Quote Recursively Definition cbv_slowFib3 :=
   ltac:(let t:=(eval cbv in slowFib3) in exact t).
 Definition ans_slowFib3 :=
-  Eval cbv in (main (program_Program cbv_slowFib3)).
+  Eval cbv in (AstCommon.main (program_Program cbv_slowFib3)).
 (* [program] of the program *)
 Quote Recursively Definition p_slowFib3 := slowFib3.
 Definition P_slowFib3 := Eval cbv in (program_Program p_slowFib3).
 Goal
   let env := (env P_slowFib3) in
-  let main := (main P_slowFib3) in
+  let main := (AstCommon.main P_slowFib3) in
   wcbvEval (env) 30 (main) = Ret ans_slowFib3.
   vm_compute. reflexivity.
 Qed.
@@ -493,13 +493,13 @@ Definition fib9 := fib 9.
 Quote Recursively Definition cbv_fib9 :=
   ltac:(let t:=(eval cbv in fib9) in exact t).
 Definition ans_fib9 :=
-  Eval cbv in (main (program_Program cbv_fib9)).
+  Eval cbv in (AstCommon.main (program_Program cbv_fib9)).
 (* [program] of the program *)
 Quote Recursively Definition p_fib9 := fib9.
 Definition P_fib9 := Eval cbv in (program_Program p_fib9).
 Goal
   let env := (env P_fib9) in
-  let main := (main P_fib9) in
+  let main := (AstCommon.main P_fib9) in
   wcbvEval (env) 1000 (main) = Ret ans_fib9.
   vm_compute. reflexivity.
 Qed.
@@ -536,13 +536,13 @@ Definition sumPL_myPL := (sumPList myPList).
 Quote Recursively Definition cbv_sumPL_myPL :=
   ltac:(let t:=(eval cbv in sumPL_myPL) in exact t).
 Definition ans_sumPL_myPL :=
-  Eval cbv in (main (program_Program cbv_sumPL_myPL)).
+  Eval cbv in (AstCommon.main (program_Program cbv_sumPL_myPL)).
 (* [program] of the program *)
 Quote Recursively Definition p_sumPL_myPL := sumPL_myPL.
 Definition P_sumPL_myPL := Eval cbv in (program_Program p_sumPL_myPL).
 Goal
   let env := (env P_sumPL_myPL) in
-  let main := (main P_sumPL_myPL) in
+  let main := (AstCommon.main P_sumPL_myPL) in
   wcbvEval (env) 1000 (main) = Ret ans_sumPL_myPL.
   vm_compute. reflexivity.
 Qed.
@@ -570,13 +570,13 @@ Definition size_myTree := size myTree.
 Quote Recursively Definition cbv_size_myTree :=
   ltac:(let t:=(eval cbv in size_myTree) in exact t).
 Definition ans_size_myTree :=
-  Eval cbv in (main (program_Program cbv_size_myTree)).
+  Eval cbv in (AstCommon.main (program_Program cbv_size_myTree)).
 (* [program] of the program *)
 Quote Recursively Definition p_size_myTree := size_myTree.
 Definition P_size_myTree := Eval cbv in (program_Program p_size_myTree).
 Goal
   let env := (env P_size_myTree) in
-  let main := (main P_size_myTree) in
+  let main := (AstCommon.main P_size_myTree) in
   wcbvEval (env) 1000 (main) = Ret ans_size_myTree.
   vm_compute. reflexivity.
 Qed.
@@ -598,6 +598,6 @@ Eval cbv in Gcdx.
 Time Quote Recursively Definition pGcdx := Gcdx.
 Time Definition PGcdx := Eval cbv in (program_Program pGcdx).
 Time Definition Penv_Gcdx := env PGcdx.
-Time Definition Pmain_Gcdx := main PGcdx.
+Time Definition Pmain_Gcdx := AstCommon.main PGcdx.
 Time Definition ans_Gcdx := Eval cbv in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
 Print ans_Gcdx.

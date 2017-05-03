@@ -14,6 +14,9 @@ Class BigStepOpSem (Term Value:Type) := bigStepEval: Term -> Value -> Prop.
 
 Require Import String.
 
+(* one can use ⇓ to refer to the big step eval relation *)
+Notation "s ⇓ t" := (bigStepEval s t) (at level 70).
+
 Inductive bigStepResult (Term Value:Type) :=
 | Result : Value -> bigStepResult Term Value
 | OutOfTime : Term -> bigStepResult Term Value
@@ -22,16 +25,13 @@ Inductive bigStepResult (Term Value:Type) :=
 Class BigStepOpSemExec (Term Value:Type)
   := bigStepEvaln: nat -> Term -> bigStepResult Term Value.
 
-(* one can use ⇓ to refer to the big step eval relation *)
-Notation "s ⇓ t" := (bigStepEval s t) (at level 70).
-
 Arguments Result {Term} {Value} v.
 Arguments OutOfTime {Term} {Value} e.
 Arguments Error {Term} {Value} s.
 
-
 Require Import ExtLib.Structures.Monads.
 
+(** for an example usage of this monad, see eval_n in L4_deBruijn/L4_5_to_L5.v *)
 Global Instance Monad_bigStepResult (Term :Type): Monad (bigStepResult Term) :=
 { ret := @Result Term
 ; bind := fun _ _ r f => match r with
@@ -40,6 +40,8 @@ Global Instance Monad_bigStepResult (Term :Type): Monad (bigStepResult Term) :=
                              | Error s ot => Error s ot
                            end
 }.
+
+
 
 Definition mapBigStepRes {T1 V1 T2 V2 : Type}
            (ft : T1 -> T2)

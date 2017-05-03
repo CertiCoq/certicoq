@@ -4,11 +4,12 @@ Require Import Relations.
 Require Import Setoid.
 Require Import Morphisms.
 Import RelationClasses.
-Require Import Libraries.CpdtTactics Permutation.
+Require Import Libraries.CpdtTactics Permutation ExtLib.Data.List Coq.NArith.BinNat.
 (* Utility library for Compcert's Maps *)
 
 
 (* Sections: 
+    DES: Useful facts about the PTree instance of Maps
     EQMAP: map_get_r (equivalence relation on accessible content) and related
     GETD : Get with default interpreation of None
     EQDMAP: map_getd_r (equivalence relation with default interpretation of None) and related
@@ -17,6 +18,121 @@ Require Import Libraries.CpdtTactics Permutation.
 
 Module M := Maps.PTree.
 Definition var_dec := M.elt_eq.
+
+Ltac destructAll :=
+  match goal with
+    | [ H : _ /\ _ |- _] => destruct H; destructAll
+    | [ H : exists E, _ |- _ ] => destruct H; destructAll
+    | _ => subst
+  end.
+
+
+Section DES.
+
+    Theorem xelements_set_leaf {A}: forall  (v:A) i j acc,
+    M.xelements (M.set i v Maps.PTree.Leaf) j acc = ((M.prev_append j i), v)::acc.
+    Proof.
+      induction i; intros; simpl.
+      - rewrite IHi. simpl. reflexivity.
+      - rewrite IHi. simpl. reflexivity.
+      - unfold M.prev.
+        reflexivity.
+    Qed.
+
+    Theorem elements_set_leaf {A}: forall (v:A) i,
+        M.elements (M.set i v M.Leaf) = cons (i,v) nil.
+    Proof.
+      intros. unfold M.elements.
+      rewrite xelements_set_leaf. simpl. reflexivity.
+  Qed.
+
+    Theorem xelements_set_none:
+    forall (A: Type) v (m: M.t A) i j acc,
+      M.get i m = None -> 
+      exists l1 l2, M.xelements m j acc = app l1 l2 /\ M.xelements (M.set i v m) j acc = app l1 (cons (M.prev_append j i,v) l2).
+    Proof.
+      induction m; intros.
+      - exists nil, acc.
+        split; auto.
+        rewrite xelements_set_leaf. reflexivity.
+      - destruct i; simpl in *.
+        + apply IHm2 with (j:= xI j) (acc := acc) in H; do 3 (destruct H). 
+          rewrite H; rewrite H0.
+          destruct o.
+          *  exists (M.xelements m1 (xO j) ((M.prev j, a) :: x)), x0.
+             do 2 (rewrite <- M.xelements_append).  auto.
+          *  exists (M.xelements m1 (xO j) x), x0.
+             do 2 (rewrite <- M.xelements_append).  auto. 
+        + apply IHm1 with (j := xO j) (acc := nil) in H; destructAll.
+          destruct o.
+          *  replace ((M.prev j, a)::M.xelements m2 (xI j) acc) with (nil++((M.prev j, a)::M.xelements m2 (xI j) acc)) by auto.
+             do 2 (rewrite M.xelements_append).  rewrite H; rewrite H0.
+             exists x, (app x0 (cons (M.prev j, a) (M.xelements m2 (xI j) acc))).
+             rewrite app_assoc. split; auto.
+            rewrite <- app_assoc. auto.          
+          * replace (M.xelements m2 (xI j) acc) with (nil++(M.xelements m2 (xI j) acc)) by auto.
+            do 2 (rewrite M.xelements_append).  rewrite H; rewrite H0. 
+            exists x, (x0 ++ (M.xelements m2 (xI j) acc)).
+            rewrite app_assoc. split; auto.
+            rewrite <- app_assoc. auto.          
+        + destruct o; inversion H.
+          exists  (M.xelements m1 (xO j) nil), (M.xelements m2 (xI j) acc).
+          do 2 (rewrite <- M.xelements_append). simpl.  auto.
+    Qed.
+
+
+      Theorem elements_set_none:
+    forall (A: Type) v (m: M.t A) i ,
+      M.get i m = None -> 
+      exists l1 l2, M.elements m = l1 ++ l2 /\ M.elements (M.set i v m) = l1 ++ (i,v)::l2.
+  Proof.
+    unfold M.elements.
+    intros.
+    apply  xelements_set_none with (v:= v) (j := xH) (m := m) (acc := nil) in H. 
+    simpl in H. apply H.
+  Qed.
+
+      Theorem xelements_set_some:
+    forall (A: Type) v v' (m: M.t A) i j acc,
+      M.get i m = Some v' -> 
+      exists l1 l2, M.xelements m j acc = l1 ++ (M.prev_append j i,v')::l2 /\ M.xelements (M.set i v m) j acc = l1 ++ (M.prev_append j i,v)::l2.
+    Proof.
+      induction m; intros.
+      - rewrite M.gempty in H. inversion H.
+      - destruct i; simpl in *.
+        + apply IHm2 with (j:= xI j) (acc := acc) in H; destructAll.
+          rewrite H; rewrite H0.
+          destruct o.
+          *  exists (M.xelements m1 (xO j) ((M.prev j, a) :: x)), x0.
+             do 2 (rewrite <- M.xelements_append).  auto.
+          *  exists (M.xelements m1 (xO j) x), x0.
+             do 2 (rewrite <- M.xelements_append).  auto.  
+        + apply IHm1 with (j := xO j) (acc := nil) in H; destructAll.
+          destruct o.
+          *  replace ((M.prev j, a)::M.xelements m2 (xI j) acc) with (nil++((M.prev j, a)::M.xelements m2 (xI j) acc)) by auto.
+             do 2 (rewrite M.xelements_append).  rewrite H; rewrite H0.
+             exists x, (x0 ++ (M.prev j, a)::(M.xelements m2 (xI j) acc)).
+             do 2 (rewrite <- app_assoc). auto.  
+          * replace (M.xelements m2 (xI j) acc) with (nil++(M.xelements m2 (xI j) acc)) by auto.
+            do 2 (rewrite M.xelements_append).  rewrite H; rewrite H0. 
+            exists x, (x0 ++ (M.xelements m2 (xI j) acc)).            
+            do 2 (rewrite <- app_assoc). auto.        
+        + destruct o; inversion H.
+          exists  (M.xelements m1 (xO j) nil), (M.xelements m2 (xI j) acc).
+          do 2 (rewrite <- M.xelements_append). simpl.  auto.
+    Qed.
+
+  Theorem elements_set_some:
+    forall (A: Type) i v v' (m: M.t A),
+      M.get i m = Some v'  -> 
+      exists l1 l2, M.elements m = l1 ++ (i, v') :: l2 /\ M.elements (M.set i v m) = l1 ++ (i,v)::l2.
+  Proof.
+    unfold M.elements. intros.
+    eapply xelements_set_some with (j := xH) in H. simpl in H. apply H.
+  Qed.  
+
+
+End DES.  
 
 Section EQMAP.
 

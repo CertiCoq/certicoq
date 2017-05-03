@@ -315,76 +315,77 @@ Variable p:environ Term.
 Function wcbvEval
          (tmr:nat) (t:Term) {struct tmr} : exception Term :=
   match tmr with 
-    | 0 => Exc "out of time"          (** out of time  **)
-    | S n =>
-      match t with      (** look for a redex **)
-        | TConst nm =>
-          match (lookup nm p) with
-            | Some (ecTrm t) => wcbvEval n t
-            | Some (ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
-            | _ => raise "wcbvEval: TConst environment miss"
-          end
-        | TConstruct i cn args => 
-          match wcbvEvals n args with
-            | Ret args' => Ret (TConstruct i cn args')
-            | Exc s => raise s
-          end
-        | TApp fn a1 =>
-          match wcbvEval n fn with
-            | Ret (TFix dts m) =>
-              match whFixStep dts m with
-                | None => raise ""
-                | Some fs => wcbvEval n (TApp fs a1)
-              end
-            | Ret TProof => Ret TProof
-            | Ret Fn =>
-              match wcbvEval n a1 with
-                | Exc s => raise "wcbvEval: TApp, arg doesn't eval"
-                | Ret ea1 =>
-                  match Fn with
-                    | TLambda _ bod => wcbvEval n (whBetaStep bod ea1)
-                    | T => Ret (TApp T ea1)
-                  end
-              end
-            | Exc _ => raise "wcbvEval: TApp, fn doesn't eval"
-          end
-        | TCase i mch brs =>
-          match wcbvEval n mch with
-            | Exc str => Exc str
-            | Ret (TConstruct _ ix args) =>
-              match whCaseStep ix args brs with
-                | None => raise "wcbvEval: Case, whCaseStep"
-                | Some cs => wcbvEval n cs
-              end
-            | Ret mch' => ret (TCase i mch' brs)
-          end
-        | TLetIn nm df bod =>
-          match wcbvEval n df with
-            | Exc s => raise s
-            | Ret df' => wcbvEval n (instantiate df' 0 bod)
-          end
-        (** already in whnf ***)
-        | TAx => ret TAx
-        | TLambda nn t => ret (TLambda nn t)
-        | TFix mfp br => ret (TFix mfp br)
-        | TProof => ret TProof
-        (** should never appear **)
-        | TRel _ => raise "wcbvEval: unbound Rel"
-        | TWrong => ret TWrong
+  | 0 => Exc "out of time"          (** out of time  **)
+  | S n =>
+    match t with      (** look for a redex **)
+    | TConst nm =>
+      match (lookup nm p) with
+      | Some (ecTrm t) => wcbvEval n t
+      | Some (ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
+      | _ => raise "wcbvEval: TConst environment miss"
       end
+    | TConstruct i cn args => 
+      match wcbvEvals n args with
+      | Ret args' => Ret (TConstruct i cn args')
+      | Exc s => raise s
+      end
+    | TApp fn a1 =>
+      match wcbvEval n fn with
+      | Exc s => raise ("wcbvEval: TApp, fn doesn't eval " ++ s)
+      | Ret (TLambda _ bod) =>  (* beta redex *)
+        match wcbvEval n a1 with
+        | Exc s =>  raise ("wcbvEval TApp: beta, arg doesn't eval: " ++ s)
+        | Ret b1 => wcbvEval n (whBetaStep bod b1)
+        end
+      | Ret (TFix dts m) =>    (* fix redex *)
+        match whFixStep dts m with
+        | None => raise "TApp, Fix redex, whFixStep"
+        | Some fs => wcbvEval n (TApp fs a1)
+        end
+      | Ret TProof => Ret TProof  (* proof redex *)
+      | Ret T =>  (* App congruence *)
+        match wcbvEval n a1 with
+        | Exc s => raise "wcbvEval: TApp congruence, arg doesn't eval"
+        | Ret ea1 => Ret (TApp T ea1)
+        end
+      end
+    | TCase i mch brs =>
+      match wcbvEval n mch with
+      | Exc str => Exc str
+      | Ret (TConstruct _ ix args) =>
+        match whCaseStep ix args brs with
+        | None => raise "wcbvEval: Case, whCaseStep"
+        | Some cs => wcbvEval n cs
+        end
+      | Ret mch' => ret (TCase i mch' brs)
+      end
+    | TLetIn nm df bod =>
+      match wcbvEval n df with
+      | Exc s => raise s
+      | Ret df' => wcbvEval n (instantiate df' 0 bod)
+      end
+    (** already in whnf ***)
+    | TAx => ret TAx
+    | TLambda nn t => ret (TLambda nn t)
+    | TFix mfp br => ret (TFix mfp br)
+    | TProof => ret TProof
+    (** should never appear **)
+    | TRel _ => raise "wcbvEval: unbound Rel"
+    | TWrong => ret TWrong
+    end
   end
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
      : exception Terms :=
        (match tmr with 
-          | 0 => raise "out of time"         (** out of time  **)
-          | S n => match ts with             (** look for a redex **)
-                     | tnil => ret tnil
-                     | tcons s ss =>
-                       match wcbvEval n s, wcbvEvals n ss with
-                         | Ret es, Ret ess => Ret (tcons es ess)
-                         | _, _ => Exc ""
-                       end
+        | 0 => raise "out of time"         (** out of time  **)
+        | S n => match ts with             (** look for a redex **)
+                 | tnil => ret tnil
+                 | tcons s ss =>
+                   match wcbvEval n s, wcbvEvals n ss with
+                   | Ret es, Ret ess => Ret (tcons es ess)
+                   | _, _ => Exc ""
                    end
+                 end
         end).
 Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
 with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.
@@ -407,15 +408,20 @@ Proof.
     try(solve[constructor]); intuition.
   - eapply wConst. unfold LookupDfn.
     eapply lookup_Lookup. eassumption. apply H. assumption.
+  - specialize (H _ e1). specialize (H0 _ e2).
+    eapply wAppLam; try eassumption.
+    apply H1. assumption.
   - specialize (H _ e1). specialize (H0 _ p1).
     eapply wAppFix; try eassumption.
-  - destruct Fn; try discriminate.
-    specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ p1).
-    eapply wAppLam; try eassumption.
-    myInjection e3. assumption.
   - specialize (H _ e1). specialize (H0 _ e2).
-    destruct T; try contradiction;
-      try (apply wAppCong; try eassumption; try not_is0; try not_is2).
+    constructor; try assumption.
+    + destruct (isLambda_dec T); try assumption.
+      destruct i as [x0 [x1 jx]]. subst. contradiction.
+    + destruct (isFix_dec T); try assumption.
+      destruct i as [x0 [x1 jx]]. subst. contradiction.
+    + destruct (isProof_dec T); try assumption; unfold isProof in H1.
+      * subst. contradiction.
+      * apply neq_sym. assumption.
   - subst. specialize (H _ e1). specialize (H0 _ p1). 
     refine (wCase _ _ _ _ _); try eassumption.
   - specialize (H _ e1). 

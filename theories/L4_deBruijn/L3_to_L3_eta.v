@@ -1,6 +1,7 @@
-(** Naive conversion to a deBruijn-only expression language for a core calculus including
-    mutually recursive functions, data constructors, and pattern matching.
- *)
+(** Intermediate L3_eta language.
+
+  Enforce eta-expanded branches in match, so that the following L3-L4 phase
+  can strip them correctly. *)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
         Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
@@ -22,39 +23,6 @@ Import L3t.
 
 Section TermTranslation.
     
-  Fixpoint strip_lam (k : nat) (e : exp) : list name * exp :=
-    match k, e with
-    | 0%nat, _ => ([], e)
-    | S n, Lam_e na e => let '(names, e) := strip_lam n e in
-                       (na :: names, e)
-    | S n, _ => ([],e)
-    end.
-
-  (* Section fixes. *)
-  (*   Variable trans : N -> L3t.Term -> exp. *)
-  (*   Definition trans_args (k : N) (t : L3t.Terms) : exps := *)
-  (*     map_terms (trans k) t. *)
-  (*   Fixpoint trans_brs ind k n l := *)
-  (*     match l with *)
-  (*     | L3t.dnil => brnil_e *)
-  (*     | L3t.dcons na t nargs ts => *)
-  (*       let '(names, t') := strip_lam nargs (trans k t) in *)
-  (*       brcons_e (ind,n) (N.of_nat nargs, names) t' *)
-  (*                (trans_brs ind k (n + 1)%N ts) *)
-  (*     end. *)
-  (*   Fixpoint trans_fixes k l := *)
-  (*     match l with *)
-  (*     | L3t.dnil => eflnil *)
-  (*     | L3t.dcons na t _ l' => *)
-  (*       eflcons na (trans k t) (trans_fixes k l') *)
-  (*     end. *)
-
-  (* End fixes. *)
-
-  (* Move Γ |- body : τ1 -> .. -> τn -> τ to 
-     Γ, x1 : τ1, .., xn : τn |- body x1 .. xn : τ
-   *)
-  
 
   Fixpoint is_n_lambda n t :=
     match n with
@@ -65,14 +33,13 @@ Section TermTranslation.
             end
     end.
 
+  (* Move Γ |- body : τ1 -> .. -> τn -> τ to 
+     Γ, x1 : τ1, .., xn : τn |- body x1 .. xn : τ
+   *)
+
   Fixpoint eta_expand_aux (n : nat) (t : Term) : Term :=
     match n with
     | 0%nat => t
-    (* | S n, TLambda na t => *)
-    (*   (* Γ |- λ t : τ1 -> τ2 .. τn -> τ to  *)
-    (*      Γ, τ1 |- t : τ2 .. τn -> τ *)
-    (*    *)  *)
-    (*   TLambda na (eta_expand_aux n t k) *)
     | S n' =>
       TLambda nAnon (eta_expand_aux n' (TApp (lift 0 t) (TRel 0)))
     end.
@@ -217,20 +184,6 @@ Proof.
     now specialize (IHmatch_annot _ _ _ H1 H2).
 Qed.
 
-(* Lemma WcbvEval_mkApp_einv {e f a s} : WcbvEval e (mkApp f a) s -> *)
-(*                                       exists s', WcbvEval e f s' /\ WcbvEval e (mkApp s' a) s. *)
-(* Proof. *)
-(*   revert f; induction a; simpl; intros. *)
-(*   - exists s. intuition. admit. *)
-(*   - specialize (IHa (TApp f t) H). *)
-(*     destruct IHa. *)
-(*     destruct H0 as [H0 H1]. inv H0. *)
-(*     * exists TProof. intuition. admit. *)
-(*     * exists (TLambda nm bod). admit. *)
-(*     * exists (TFix dts m). auto. admit. *)
-(*     * exists efn.  admit. *)
-(* Admitted. *)
-
 Lemma WcbvEval_mkApp_einv {e f a s} : WcbvEval e (mkApp f a) s ->
                                       exists s', WcbvEval e f s'.
 Proof.
@@ -307,19 +260,6 @@ Proof.
   f_equal. rewrite <- (proj1 (instantiate_lift _)); auto. 
   lia.
 Qed.
-
-Fixpoint strip_lambda (k : nat) (e : Term) : Term :=
-  match k, e with
-  | 0%nat, _ => e
-  | S n, TLambda na e => strip_lambda n e
-  | S n, _ => e
-  end.
-
-Fixpoint instantiates (e : Term) (ts : Terms) : Term :=
-  match ts with
-  | tnil => e
-  | tcons t ts => instantiates (instantiate t 0 e) ts
-  end.
   
 Lemma wcbvEval_eta e t s n : WcbvEval e t s -> exists s', WcbvEval e (eta_expand_aux n t) s'.
 Proof.
@@ -328,6 +268,7 @@ Proof.
   - now exists s.
   - simpl. eexists. constructor.
 Qed.
+
 Lemma is_n_lambda_eta n t : is_n_lambda n (eta_expand_aux n t) = true.
 Proof.
   revert t; induction n; intros; trivial.
@@ -496,18 +437,6 @@ Admitted.
 (** start-to-L4 translations **)
 Definition myprogram_Program : program -> Program Term :=
   L3t.program_Program.
-(*************
-  do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
-    let e' := stripEvalCommute.stripEnv (program.env pgm0) in
-    match L3U.stripEnv e' with
-    | Ret senv => 
-      match L3U.strip e' (stripEvalCommute.strip (program.main pgm0)) with
-      | Ret smain => Ret {| main := smain; L3.program.env := senv |}
-      | Exc s => Exc ("Error in stripping: " ++ s)
-      end
-    | Exc s => Exc ("Error while stripping environ L3.compile.Termment: " ++ s)
-    end.
- *************)
 
 Definition translate_program (e : environ L3.compile.Term) (t : L3t.Term) : L3t.Term :=
   trans 0 t.

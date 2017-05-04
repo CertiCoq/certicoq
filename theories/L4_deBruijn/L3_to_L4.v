@@ -144,9 +144,11 @@ Definition inductive_env (e : environ L3.compile.Term) : ienv :=
 Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : string * exp) => Let_e (fst x) (snd x) acc) e t.
 
+Require Import L3_to_L3_eta.
+
 (** start-to-L4 translations **)
 Definition myprogram_Program : program -> Program Term :=
-  L3t.program_Program.
+  program_L3_eta.
 (*************
   do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
     let e' := stripEvalCommute.stripEnv (program.env pgm0) in

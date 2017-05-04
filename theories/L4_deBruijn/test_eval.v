@@ -219,6 +219,6 @@ Time Definition P_ce_example_ent :=
   Eval vm_compute in (program_exp p_ce_example_ent).
 
 Time Definition eval_ce_example_ent :=
-  Eval vm_compute in (expression.eval_n 5000 P_ce_example_ent).
+  Eval vm_compute in (expression.eval_n 6000 P_ce_example_ent).
 Print eval_ce_example_ent.
 

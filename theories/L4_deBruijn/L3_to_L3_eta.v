@@ -65,21 +65,21 @@ Section TermTranslation.
             end
     end.
 
-  Fixpoint eta_expand_aux (n : nat) (t : Term) (k : Terms) : Term :=
+  Fixpoint eta_expand_aux (n : nat) (t : Term) : Term :=
     match n with
-    | 0%nat => mkApp t (treverse k)
+    | 0%nat => t
     (* | S n, TLambda na t => *)
     (*   (* Γ |- λ t : τ1 -> τ2 .. τn -> τ to  *)
     (*      Γ, τ1 |- t : τ2 .. τn -> τ *)
     (*    *)  *)
     (*   TLambda na (eta_expand_aux n t k) *)
     | S n' =>
-      TLambda nAnon (eta_expand_aux n' (lift 0 t) (tcons (TRel n') k))
+      TLambda nAnon (eta_expand_aux n' (TApp (lift 0 t) (TRel 0)))
     end.
 
   Definition eta_expand n t :=
     if is_n_lambda n t then t
-    else eta_expand_aux n t tnil.
+    else eta_expand_aux n t.
       
   Eval compute in is_n_lambda 1 (TLambda (nNamed "x") (TRel 0)).
   Eval compute in eta_expand 1 (TLambda (nNamed "x") (TRel 0)).
@@ -217,17 +217,31 @@ Proof.
     now specialize (IHmatch_annot _ _ _ H1 H2).
 Qed.
 
-Lemma WcbvEval_mkApp_einv {e f a s} : WcbvEval e (mkApp f a) s -> exists s', WcbvEval e f s'.
+(* Lemma WcbvEval_mkApp_einv {e f a s} : WcbvEval e (mkApp f a) s -> *)
+(*                                       exists s', WcbvEval e f s' /\ WcbvEval e (mkApp s' a) s. *)
+(* Proof. *)
+(*   revert f; induction a; simpl; intros. *)
+(*   - exists s. intuition. admit. *)
+(*   - specialize (IHa (TApp f t) H). *)
+(*     destruct IHa. *)
+(*     destruct H0 as [H0 H1]. inv H0. *)
+(*     * exists TProof. intuition. admit. *)
+(*     * exists (TLambda nm bod). admit. *)
+(*     * exists (TFix dts m). auto. admit. *)
+(*     * exists efn.  admit. *)
+(* Admitted. *)
+
+Lemma WcbvEval_mkApp_einv {e f a s} : WcbvEval e (mkApp f a) s ->
+                                      exists s', WcbvEval e f s'.
 Proof.
   revert f; induction a; simpl; intros.
-  - now exists s.
+  - exists s. intuition. 
   - specialize (IHa (TApp f t) H).
-    destruct IHa.
-    inv H0.
-    * now exists TProof.
-    * now exists (TLambda nm bod).
-    * exists (TFix dts m). auto.
-    * now exists efn. 
+    destruct IHa. inv H0.
+    * now exists TProof. 
+    * now exists (TLambda nm bod). 
+    * now exists (TFix dts m). 
+    * now exists efn.  
 Qed.
 
 Lemma WcbvEval_is_n_lam e n t t' : is_n_lambda n t = true -> WcbvEval e t t' -> is_n_lambda n t' = true.
@@ -239,86 +253,124 @@ Proof.
   auto.
 Qed.
 
-Lemma WcbvEval_mkApp_inner e f f' s' a s :
-  let n := tlength a in
-  is_n_lambda n s' = true ->
-  WcbvEval e f s' ->
-  WcbvEval e f' s' ->
-  WcbvEval e (mkApp f a) s -> WcbvEval e (mkApp f' a) s.
-Proof.
-  revert f f' s' s; induction a; intros *; intros Hlam evf evf' evapp; simpl in *.
-  - now rewrite <- (WcbvEval_single_valued evf evapp).
-  - subst n; simpl in *.
-    destruct s'; try discriminate.
-    destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
-    
-    assert(WcbvEval e (TApp f' t) s'').
-    { inv evs''.
-      pose proof (WcbvEval_single_valued evf H2). discriminate.
-      injection (WcbvEval_single_valued evf H1). intros -> ->.
-      econstructor; eauto.
-      pose proof (WcbvEval_single_valued evf H1). discriminate.
-      pose proof (WcbvEval_single_valued evf H1). subst efn. elim H2. red.
-      do 2 eexists ; reflexivity. }
-    eapply (IHa (TApp f t) (TApp f' t) s'' s ); auto.
-    
-    inv evs''.
-    pose proof (WcbvEval_single_valued evf H3). discriminate.
-    injection (WcbvEval_single_valued evf H2). intros -> ->.
-    eapply WcbvEval_is_n_lam. 2:apply H5. admit.
-    pose proof (WcbvEval_single_valued evf H2). discriminate.
-    pose proof (WcbvEval_single_valued evf H2). subst efn. elim H3.
-    do 2 eexists; reflexivity.
+Lemma wcbvEval_no_step e s t : WcbvEval e s t -> WcbvEval e t t.
 Admitted.
+Hint Resolve wcbvEval_no_step.
+
+Lemma WcbvEval_mkApp_inner e f s' a s :
+  (WcbvEval e f s' ->
+   WcbvEval e (mkApp s' a) s -> WcbvEval e (mkApp f a) s) /\
+  (WcbvEval e f s' ->
+   WcbvEval e (mkApp f a) s -> WcbvEval e (mkApp s' a) s).
+  
+Proof.
+  revert f s' s; induction a; intros *; split; intros evf evapp; simpl in *.
+  - pose (wcbvEval_no_step _ _ _ evf). rewrite <- (WcbvEval_single_valued w evapp). eauto.
+  - rewrite <- (WcbvEval_single_valued evf evapp). eauto.
+    
+  - simpl in *.
+    destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
+    assert(WcbvEval e (TApp f t) s'').
+    { pose (wcbvEval_no_step _ _ _ evf). inv evs''. 
+      pose proof (WcbvEval_single_valued w H2). subst s'. repeat  constructor.  auto.
+      pose proof (WcbvEval_single_valued w H1). subst s'. 
+      econstructor; eauto.
+      pose proof (WcbvEval_single_valued w H1). subst s'.
+      eapply wAppFix; eauto.
+      pose proof (WcbvEval_single_valued w H1). subst efn.
+      eapply wAppCong; eauto. }
+    eapply (proj1 (IHa (TApp f t) s'' s)); eauto.
+    eapply (proj2 (IHa (TApp s' t) s'' s)); eauto.
+
+  - simpl in *.
+    destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
+    assert(WcbvEval e (TApp s' t) s'').
+    { inv evs''. 
+      pose proof (WcbvEval_single_valued evf H2). subst s'. repeat  constructor.  auto.
+      pose proof (WcbvEval_single_valued evf H1). subst s'. 
+      econstructor; eauto.
+      pose proof (WcbvEval_single_valued evf H1). subst s'.
+      eapply wAppFix; eauto.
+      pose proof (WcbvEval_single_valued evf H1). subst efn.
+      eapply wAppCong; eauto. }
+    eapply (proj1 (IHa _ _ s)). eauto.
+    eapply (proj2 (IHa _ _ s)). eapply evs''. apply evapp.
+Qed.
+
+Lemma instantiate_eta t k n u : WFTrm t 0 -> instantiate t k (eta_expand_aux n u) =
+                                            eta_expand_aux n (instantiate t k u).
+Proof.
+  revert k u; induction n; intros. simpl. auto.
+  simpl. rewrite instantiate_TLambda.
+  f_equal. rewrite IHn; auto.
+  f_equal. rewrite instantiate_TApp_commute.
+  f_equal. rewrite <- (proj1 (instantiate_lift _)); auto. 
+  lia.
+Qed.
+
+Fixpoint strip_lambda (k : nat) (e : Term) : Term :=
+  match k, e with
+  | 0%nat, _ => e
+  | S n, TLambda na e => strip_lambda n e
+  | S n, _ => e
+  end.
+
+Fixpoint instantiates (e : Term) (ts : Terms) : Term :=
+  match ts with
+  | tnil => e
+  | tcons t ts => instantiates (instantiate t 0 e) ts
+  end.
+  
+Lemma wcbvEval_eta e t s n : WcbvEval e t s -> exists s', WcbvEval e (eta_expand_aux n t) s'.
+Proof.
+  induction n; intros.
+  simpl.
+  - now exists s.
+  - simpl. eexists. constructor.
+Qed.
+Lemma is_n_lambda_eta n t : is_n_lambda n (eta_expand_aux n t) = true.
+Proof.
+  revert t; induction n; intros; trivial.
+  simpl. now rewrite IHn.
+Qed.
 
 Lemma eval_app_terms e f args s :
+  WFTrms args 0 -> WcbvEvals e args args ->
   WcbvEval e (mkApp f args) s ->
   WcbvEval e (mkApp (eta_expand (tlength args) f) args) s.
 Proof.
-  revert e f s; induction args; intros.
-  simpl; trivial.
+  intros wfargs nosteps.
+  unfold eta_expand. case_eq (is_n_lambda (tlength args) f). trivial.
+  intros _.
+  revert e f s wfargs nosteps; induction args; intros.
+  { simpl; trivial. }
+  simpl in *; pose proof (WcbvEval_mkApp_einv H).
+  destruct H0 as [s' evft].
+  destruct (wcbvEval_eta _ _ _ (tlength args) evft).
 
-  simpl.
-  unfold eta_expand.
-  destruct is_n_lambda. auto.
+  eapply WcbvEval_mkApp_inner with (s':=x). 
+  - eapply wAppLam with (a1':=t). constructor.
+    now inv nosteps.
+    unfold whBetaStep.
+    rewrite instantiate_eta.
+    rewrite instantiate_TApp_commute.
+    cbn. rewrite (proj1 (instantiate_noLift t)).
+    exact H0. now inv wfargs.
+  - eapply (proj2 (WcbvEval_mkApp_inner _ _ _ _ _)). eauto.
+    eapply IHargs. now inv wfargs. now inv nosteps. eauto.
+Qed.    
 
-  simpl.
-  Lemma WcbvEval_mkApp e f f' a s :
-    WcbvEval e f f' -> WcbvEval e (mkApp f' a) s ->
-    WcbvEval e (mkApp f a) s.
-  Proof.
-    intros evff' evf'a.
-    dependent induction evf'a.
-  Admitted.
+Lemma trans_terms_pres_tlength n a : tlength a = tlength (trans_terms n a).
+Proof. induction a; trivial. simpl. now rewrite IHa. Qed.
 
-  eapply WcbvEval_mkApp.
-  eapply wAppLam. constructor. admit.
-  simpl in H. unfold whBetaStep.
-Admitted.
-    
-  
-  
-
-(* Lemma eval_app_terms e f args s : *)
-(*   WcbvEval e (mkApp f args) s -> *)
-(*   WcbvEval e (mkApp (eta_expand (tlength args) f) args) s. *)
-(* Proof. *)
-(*   revert e f s; induction args; intros. *)
-(*   simpl; trivial. *)
-  
-(*   simpl in *. specialize (IHargs _ _ _ H). unfold eta_expand. *)
-(*   case_eq (is_n_lambda (S (tlength args)) f). auto. *)
-(*   intros. *)
-
-  
-  
-(*   eapply WcbvEval_mkApp_inner. 2:apply IHargs. *)
-  
-(*   simpl. *)
-(* Admitted. *)
+Lemma trans_mkApp n t u : trans n (mkApp t u) = mkApp (trans n t) (trans_terms n u).
+Proof.
+  revert t; induction u; trivial.
+  simpl. intros. now rewrite IHu. 
+Qed.
 
 Lemma whCase_step e i n args brs cs s :
-  crctEnv e -> crctDs e 0 brs -> crctAnn e i brs ->
+  crctEnv e -> crctDs e 0 brs -> crctAnn e i brs -> crctTerms e 0 args ->
   cnstrArity e i n = Ret (0%nat, tlength args) ->
   whCaseStep n args brs = Some cs -> WcbvEval e cs s ->
   WcbvEval (transEnv e) (trans 0 cs) (trans 0 s) ->
@@ -326,7 +378,7 @@ Lemma whCase_step e i n args brs cs s :
     whCaseStep n (trans_terms 0 args) (trans_brs i 0 brs) =
     Some cs' /\ WcbvEval (transEnv e) cs' (trans 0 s).
 Proof.
-  intros crcte crctds crctann crctar Hcase Hev IHev.
+  intros crcte crctds crctann crctargs crctar Hcase Hev IHev.
   unfold whCaseStep in Hcase.
   revert Hcase; case_eq (dnthBody n brs). intros t Hdn [= <-].
   unfold whCaseStep.
@@ -353,16 +405,17 @@ Proof.
   clear Hnth H .
 
   clear crctar Hdn.
-  revert dbody s Hev IHev.
-  induction args. simpl.
-  unfold eta_expand. simpl. trivial.
+  rewrite (trans_terms_pres_tlength 0 args).
+  eapply eval_app_terms.
+  eapply (proj1 (proj2 Crct_WFTrm)).
+  admit. admit.
+  now rewrite trans_mkApp in IHev.
 
-  simpl; intros dbody s Hev IHev.
-  specialize (IHargs _ _ Hev IHev).
-  simpl in IHargs.
-    
+  intros. rewrite H in Hdn. discriminate.
+
+  intros. discriminate.
 Admitted.
-  
+
 Theorem translate_correct_subst (e : environ Term) (t t' : Term) :
   crctEnv e -> crctTerm e 0 t ->
   WcbvEval e t t' -> 
@@ -424,10 +477,21 @@ Proof.
     admit. admit. admit.
 
   - intros * evmch IHmch Hcase evcs IHcs crcte crctc.
-    apply Crct_invrt_Case in crctc as [crctmch crctbrs].
-    econstructor. eauto.
+    apply Crct_invrt_Case in crctc as [crctmch [crctbrs [crctann H']]].
+    pose (whCase_step e i n args brs cs s crcte crctbrs crctann).
+    forward e0. forward e0. specialize (e0 Hcase evcs).
+    forward e0. destruct e0 as [cs' [whtrans evtrans]].
+    econstructor; eauto.
+    eapply IHcs; eauto.
+    admit. (* Well-formedness *)
+    admit. (* Well-formedness *)
+    admit.
     
-Admitted.    
+  - intros * evmch IHmch. admit.
+
+  - intros. inv H1. constructor; auto.
+  - intros. apply H; auto.
+Admitted.
     
 (** start-to-L4 translations **)
 Definition myprogram_Program : program -> Program Term :=

@@ -16,6 +16,7 @@ Require Import String.
 Require Import Axioms.
 Require Import Classical.
 Require Import Coqlib.
+Require Import certiClasses.
 Require Import Errors.
 Require Import Maps.
 Require Import Integers.
@@ -27,13 +28,17 @@ Require Import Events.
 Require Import Globalenvs.
 Require Import Ctypes.
 Require Import Cop.
-Require Cexec.
+Require compcert.cfrontend.Cexec.  
 Require Import Clight.
+
+
 
 Local Open Scope string_scope.
 Local Open Scope list_scope.
 Local Open Scope error_monad_scope.
 Import ListNotations.
+
+
 
 (** * Events, volatile memory accesses, and external functions. *)
 
@@ -385,12 +390,13 @@ Definition at_final_state (S: state): res int :=
 Definition is_stopped s :=
   match s with Returnstate _ Kstop _ => true | _ => false end.
 
-Function stepstar (ge: genv) (s: state) (fuel: Z) {measure Z.to_nat fuel}: res state :=
+Function stepstar (ge: genv) (s: state) (fuel: Z) {measure Z.to_nat fuel}: (bigStepResult state state) :=
   if Z.leb fuel Z0 
-  then Error [MSG "Ran out of fuel"]
+  then OutOfTime s
   else match step ge s with OK s' =>
-          if is_stopped s' then OK s' else stepstar ge s' (Zpred fuel)
-      | err => err
+          if is_stopped s' then Result s' else stepstar ge s' (Zpred fuel)
+                       | Error [MSG err] => certiClasses.Error err (Some s)
+                       | _ => certiClasses.Error "Non-msg error in stepstar" (Some s)
      end.
 Proof.
 intros.
@@ -400,10 +406,25 @@ Search (Z.to_nat (Z.succ _)).
 rewrite Z2Nat.inj_succ; omega.
 Defined.
 
-Definition run (p: program) (fuel: Z) : res int :=
- do (ge,s) <- do_initial_state p;
- do s' <- stepstar ge s fuel;
- at_final_state s.
+
+
+Definition run (p: program) (fuel: Z) : bigStepResult state int :=
+  match ( do_initial_state p) with
+    | OK (ge,s) =>
+      (match (stepstar ge s fuel) with
+      | Result s => (match (at_final_state s) with
+                     | OK r => certiClasses.Result r
+                     | Error [MSG err] => certiClasses.Error err (Some s)
+                     | _ => certiClasses.Error "Unknown error in at_final_state" (Some s)
+                     end)
+      | OutOfTime s => OutOfTime s
+      | certiClasses.Error e os => certiClasses.Error e os
+       end)
+    | Error [MSG err] => certiClasses.Error ("Error while initializing state: "++err) None
+    | _ => certiClasses.Error "Non-msg error in do_initial_state" None
+  end.
+    
+
 
 
 

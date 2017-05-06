@@ -173,4 +173,4 @@ Definition program_Program (p:program) : Program Term :=
   stripProgram (L1g.compile.program_Program p).
 
 Definition term_Term (e:AstCommon.environ L1gTerm) (t:term) : Term :=
-  strip (L1g.compile.term_Term e t).
+  strip (L1g.compile.term_Term e false t).

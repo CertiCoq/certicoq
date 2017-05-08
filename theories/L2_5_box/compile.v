@@ -30,7 +30,6 @@ Inductive Term : Type :=
                Term (* dfn *) -> Term (* body *) -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
-| TAx        : Term
 | TConstruct : inductive -> nat (* index in datatype *) -> Terms -> Term
 | TCase      : inductive ->
                Term (* discriminee *) -> Defs (* # args, branch *) -> Term
@@ -132,7 +131,6 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
     | L2k.compile.TApp fn arg args =>
       mkApp (L2kTerm_Term fn) (tcons (L2kTerm_Term arg) (L2kTerms_Terms args))
     | L2k.compile.TConst pth => TConst pth
-    | L2k.compile.TAx => TAx
     | L2k.compile.TConstruct ind m args =>
       TConstruct ind m (L2kTerms_Terms args)
     | L2k.compile.TCase m mch brs =>
@@ -146,6 +144,7 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
         | right _ => TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs)
       end
     | L2k.compile.TFix defs m => TFix (L2kDefs_Defs defs) m
+    | L2k.compile.TAx => TWrong
     | L2k.compile.TWrong => TWrong
   end
 with L2kTerms_Terms (ts:L2kTerms) : Terms :=

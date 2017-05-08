@@ -84,7 +84,6 @@ Section TermTranslation.
   
   Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
-    | L3t.TAx => Ax_e ""
     | L3t.TWrong => Ax_e "wrong"
     | L3t.TProof => Prf_e
     | L3t.TRel n => Var_e (N.of_nat n)

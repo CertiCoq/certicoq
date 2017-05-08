@@ -90,10 +90,6 @@ Proof.
   - induction t1; cross. 
     destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
   - induction t; cross. destruct (string_dec s s0); [lft | rght].
-  - induction t; cross. left. reflexivity.
-    (**
-  - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
-**)
   - induction t0; cross.
     destruct (inductive_dec i i0); destruct (eq_nat_dec n n0);
     destruct (H t0);
@@ -313,7 +309,7 @@ Fixpoint dnth (n:nat) (l:Defs) {struct l} : option (def Term) :=
     match l with
       | dnil => None
       | dcons nm tm args xs => match n with
-                                 | 0 => Some (mkdef Term nm TAx tm args)
+                                 | 0 => Some (mkdef Term nm TProof tm args)
                                  | S m => dnth m xs
                                end
     end.
@@ -352,7 +348,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
              WFTrm dfn n -> WFTrm bod (S n) ->
              WFTrm (TLetIn nm dfn bod) n
 | wfApp: forall n fn t, WFTrm fn n -> WFTrm t n -> WFTrm (TApp fn t) n
-| wfAx: forall n, WFTrm TAx n
 | wfConst: forall n nm, WFTrm (TConst nm) n
 | wfConstruct: forall n i m1 args,
                  WFTrms args n -> WFTrm (TConstruct i m1 args) n
@@ -709,7 +704,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
           Instantiate n t it -> Instantiate n a ia ->
           Instantiate n (TApp t a) (TApp it ia)
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
-| IAx: forall n, Instantiate n TAx TAx
 | IConstruct: forall n ind m1 args iargs,
               Instantiates n args iargs ->
               Instantiate n (TConstruct ind m1 args)

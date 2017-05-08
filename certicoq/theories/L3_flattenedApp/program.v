@@ -74,7 +74,6 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
            crctTerm p n (TApp fn arg)
 | ctConst: forall p n pd nm,
              crctEnv p -> LookupDfn nm p pd -> crctTerm p n (TConst nm)
-| ctAx: forall p n, crctEnv p -> crctTerm p n TAx
 | ctConstructor: forall p n ipkgNm inum cnum args ipkg itp cstr pars,
                    crctEnv p -> LookupTyp ipkgNm p pars ipkg ->
                    getInd ipkg inum = Ret itp ->

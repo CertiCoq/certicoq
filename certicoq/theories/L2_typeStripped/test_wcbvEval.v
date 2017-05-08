@@ -6,7 +6,6 @@ Require Import Recdef.
 Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
-Require Import L1g.L1g.
 Require Import L2.compile.
 Require Import L2.term.
 Require Import L2.wcbvEval.
@@ -19,6 +18,12 @@ Set Implicit Arguments.
 Set Template Cast Propositions.
 Set Printing Width 150.
 Set Printing Depth 1000.
+
+Quote Recursively Definition p_Type := Type.
+Print p_Type.
+Definition P_Type := Eval cbv in (program_Program p_Type).
+Print P_Type.
+
 
 (***
 Require Import Benchmarks.vs.

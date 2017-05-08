@@ -31,7 +31,6 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term -> Term
 | TConst     : string -> Term
-| TAx        : Term
 | TConstruct : inductive -> nat (* index *) -> Terms -> Term
 | TCase      : inductive ->
                Term (* discriminee *) -> Defs (* # args, branch *) -> Term
@@ -453,7 +452,6 @@ Function strip (t:L2_5Term) : Term :=
     | L2_5.compile.TApp fn arg args =>
       mkApp (strip fn) (tcons (strip arg) (strips args))
     | L2_5.compile.TConst nm => TConst nm
-    | L2_5.compile.TAx => TAx
     | L2_5.compile.TConstruct i n args => TConstruct i n (strips args)
     | L2_5.compile.TCase n mch brs => TCase n (strip mch) (stripDs brs)
     | L2_5.compile.TFix ds n => TFix (stripDs ds) n

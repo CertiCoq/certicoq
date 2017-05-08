@@ -47,50 +47,53 @@ Hint Constructors AstCommon.Lookup.
 (** correctness specification for programs (including local closure) **)
 Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctSrt: forall n srt, Crct nil n (TSort srt)
-| CrctWkTrmTrm: forall n p t s nm, Crct p n t -> Crct p n s ->
-           fresh nm p -> Crct ((nm,ecTrm s)::p) n t
-| CrctWkTrmTyp: forall n p t s nm, Crct p n t ->
-           fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
+| CrctWkTrmTrm: forall n p t s nm,
+    Crct p n t -> Crct p n s -> fresh nm p -> Crct ((nm,ecTrm s)::p) n t
+| CrctWkTrmTyp: forall n p t s nm,
+    Crct p n t -> fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
-| CrctCast: forall n p t ty, Crct p n t -> Crct p n ty ->
-                             Crct p n (TCast t ty)
+| CrctCast: forall n p t ty,
+    Crct p n t -> Crct p n ty -> Crct p n (TCast t ty)
 | CrctPrf: forall n p t, Crct p n t -> Crct p n (TProof t)
 | CrctProd: forall n p nm ty bod,
-              Crct p (S n) bod -> Crct p n ty -> Crct p n (TProd nm ty bod)
+    Crct p (S n) bod -> Crct p n ty -> Crct p n (TProd nm ty bod)
 | CrctLam: forall n p nm ty bod,
-             Crct p (S n) bod -> Crct p n ty -> Crct p n (TLambda nm ty bod)
+    Crct p (S n) bod -> Crct p n ty -> Crct p n (TLambda nm ty bod)
 | CrctLetIn: forall n p nm dfn ty bod,
-         Crct p n dfn -> Crct p (S n) bod -> Crct p n ty -> 
-         Crct p n (TLetIn nm dfn ty bod)
+    Crct p n dfn -> Crct p (S n) bod -> Crct p n ty -> 
+    Crct p n (TLetIn nm dfn ty bod)
 | CrctApp: forall n p fn a args,
-             ~ (isApp fn) -> Crct p n fn -> Crct p n a -> Crcts p n args ->
-             Crct p n (TApp fn a args)
+    ~ (isApp fn) -> Crct p n fn -> Crct p n a -> Crcts p n args ->
+    Crct p n (TApp fn a args)
 | CrctConst: forall n p pd nm,
-               Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
+    Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
 | CrctAx: forall n p, Crct p n prop -> Crct p n TAx
 | CrctConstruct: forall n p ipkgNm inum cnum ipkg itp cstr m np na,
-                   Crct p n prop ->
-                   LookupTyp ipkgNm p m ipkg ->
-                   getInd ipkg inum = Ret itp ->
-                   getCnstr itp cnum = Ret cstr ->
-                   Crct p n (TConstruct (mkInd ipkgNm inum) cnum np na)
+    Crct p n prop ->
+    LookupTyp ipkgNm p m ipkg ->
+    getInd ipkg inum = Ret itp ->
+    getCnstr itp cnum = Ret cstr ->
+    Crct p n (TConstruct (mkInd ipkgNm inum) cnum np na)
 | CrctCase: forall nm tx cx pack n p ty mch brs,
-              LookupTyp nm p tx pack ->
-              Crct p n mch -> CrctDs p n brs -> Crct p n ty -> 
-              Crct p n (TCase ((mkInd nm tx), cx) ty mch brs)
+    LookupTyp nm p tx pack ->
+    Crct p n mch -> CrctDs p n brs -> Crct p n ty -> 
+    Crct p n (TCase ((mkInd nm tx), cx) ty mch brs)
 | CrctFix: forall n p ds m,
-             Crct p n prop ->    (** convenient for IH *)
-             CrctDs p (n + dlength ds) ds -> Crct p n (TFix ds m)
+    Crct p n prop ->    (** convenient for IH *)
+    (******
+    (dnthBody m ds = Some t -> isLambda t) ->
+    ******************)
+    CrctDs p (n + dlength ds) ds -> Crct p n (TFix ds m)
 | CrctInd: forall n p ind, Crct p n prop -> Crct p n (TInd ind)
 with Crcts: environ Term -> nat -> Terms -> Prop :=
-| CrctsNil: forall n p, Crct p n prop -> Crcts p n tnil
-| CrctsCons: forall n p t ts,
-               Crct p n t -> Crcts p n ts -> Crcts p n (tcons t ts)
+     | CrctsNil: forall n p, Crct p n prop -> Crcts p n tnil
+     | CrctsCons: forall n p t ts,
+         Crct p n t -> Crcts p n ts -> Crcts p n (tcons t ts)
 with CrctDs: environ Term -> nat -> Defs -> Prop :=
-| CrctDsNil: forall n p, Crct p n prop -> CrctDs p n dnil
-| CrctDsCons: forall n p dn dty db dra ds,
-          Crct p n dty -> Crct p n db -> CrctDs p n ds ->
-          CrctDs p n (dcons dn dty db dra ds).
+     | CrctDsNil: forall n p, Crct p n prop -> CrctDs p n dnil
+     | CrctDsCons: forall n p dn dty db dra ds,
+         Crct p n dty -> Crct p n db -> CrctDs p n ds ->
+         CrctDs p n (dcons dn dty db dra ds).
 Hint Constructors Crct Crcts CrctDs.
 Scheme Crct_ind' := Minimality for Crct Sort Prop
   with Crcts_ind' := Minimality for Crcts Sort Prop

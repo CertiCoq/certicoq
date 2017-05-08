@@ -1274,7 +1274,6 @@ Inductive WNorm: Term -> Prop :=
 | WNPrf: WNorm TProof
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNAx: WNorm TAx
 | WNConstruct: forall i n (* arty *) args, WNorms args -> WNorm (TConstruct i n (* arty *) args)
 | WNNeutral: forall e, WNeutral e -> WNorm e
 with WNorms: Terms -> Prop :=
@@ -2264,11 +2263,6 @@ Proof with eauto.
     unfold translate; simpl.
     unfold subst_env. rewrite subst_env_aux_fix_e. constructor.
 
-  + (* Ax *)
-    intros wft.
-    unfold translate, subst_env. simpl.
-    apply eval_axiom.
-    
   + (* Const *)
     unfold translate.
     intros nm t s H evalts IHt wft.

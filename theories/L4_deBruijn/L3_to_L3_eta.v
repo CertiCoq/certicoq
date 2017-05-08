@@ -60,7 +60,6 @@ Section TermTranslation.
   
   Fixpoint trans (k : nat) (t : Term) : Term :=
     match t with
-    | TAx => TAx
     | TWrong => TWrong
     | TProof => TProof
     | TRel n => TRel n

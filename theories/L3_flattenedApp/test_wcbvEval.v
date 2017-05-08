@@ -15,67 +15,9 @@ Set Template Cast Propositions.
 
 (** Require Import ExtLib.Data.String. ??  **)
 
-Require Import Benchmarks.vs.
 Require Import ExtrOcamlBasic.
 Require Import Ascii String ExtrOcamlString.
 Require Import extraction.ExtrOcamlNatInt.
-
-(*****  this works ****
-Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
-Time Definition P_ce_example_myent :=
-  Eval vm_compute in (program_Program p_ce_example_myent).
-Definition P_env_ce_example_myent := env P_ce_example_myent.
-Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
-Time Definition eval_ce_example_myent :=
-  Eval vm_compute in
-    (wcbvEval P_env_ce_example_myent 4000 P_main_ce_example_myent).
-Print eval_ce_example_myent.
- *****)
-
-(**************  this works *****
-Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
-Time Definition P_ce_example_ent :=
-  Eval vm_compute in (program_Program p_ce_example_ent).
-Definition P_env_ce_example_ent := env P_ce_example_ent.
-Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
-Time Definition eval_ce_example_ent :=
-  Eval vm_compute in
-    (wcbvEval P_env_ce_example_ent 4000 P_main_ce_example_ent).
-Print eval_ce_example_ent.
-Definition cee :=
-  (wcbvEval P_env_ce_example_ent 6000 P_main_ce_example_ent).
-Extraction "ce_example_ent" cee.
-***************)
-
-(****  this works  ***
-Time Quote Recursively Definition p_ce_example_myfail := vs.ce_example_myfail.
-Time Definition P_ce_example_myfail :=
-  Eval vm_compute in (program_Program p_ce_example_myfail).
-Definition P_env_ce_example_myfail := env P_ce_example_myfail.
-Definition P_main_ce_example_myfail := AstCommon.main P_ce_example_myfail.
-Time Definition eval_ce_example_myfail :=
-  Eval vm_compute in
-    (wcbvEval P_env_ce_example_myfail 4000 P_main_ce_example_myfail).
-Print eval_ce_example_myfail.
- ****)
-
-Time Quote Recursively Definition p_ce_harder_ent := vs.ce_harder_ent.
-Time Definition P_ce_harder_ent :=
-  Eval vm_compute in (program_Program p_ce_harder_ent).
-Definition P_env_ce_harder_ent := env P_ce_harder_ent.
-Definition P_main_ce_harder_ent := AstCommon.main P_ce_harder_ent.
-(******  doesn't work ****
-Time Definition eval_ce_harder_ent :=
-  Eval vm_compute in
-    (wcbvEval P_env_ce_harder_ent 1080 P_main_ce_harder_ent).
-Print eval_ce_harder_ent.
-*****)
-Definition cee :=
-  (wcbvEval P_env_ce_harder_ent 1080 P_main_ce_harder_ent).
-Extraction "ce_example_harder_ent" cee.
-(*****)
-
-
 
 (*** examples with parameters  *****)
 Axiom xxxxxx : Set.
@@ -224,7 +166,7 @@ Eval vm_compute in Plus1x.
 (** evaluation of [Function]s defined with measure or wf **)
 Time Quote Recursively Definition p_Plus1x := Plus1x.
 Time Definition P_Plus1x : Program Term :=
-  Eval vm_compute in program_Program p_Plus1x.
+  Eval vm_compute in program_Program p_Plus1x. 
 Time Definition P_env := Eval vm_compute in (env P_Plus1x).
 Time Definition P_main := Eval vm_compute in ( AstCommon.main P_Plus1x).
 Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
@@ -593,6 +535,7 @@ Proof.
   - exact lt_wf.
 Defined.
 
+(**** works
 Definition Gcdx := (Gcd 4 2).
 Eval cbv in Gcdx.
 Time Quote Recursively Definition pGcdx := Gcdx.
@@ -601,3 +544,60 @@ Time Definition Penv_Gcdx := env PGcdx.
 Time Definition Pmain_Gcdx := AstCommon.main PGcdx.
 Time Definition ans_Gcdx := Eval cbv in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
 Print ans_Gcdx.
+ ****)
+
+Require Import Benchmarks.vs.
+
+(*****  this works ****
+Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
+Time Definition P_ce_example_myent :=
+  Eval vm_compute in (program_Program p_ce_example_myent).
+Definition P_env_ce_example_myent := env P_ce_example_myent.
+Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
+Time Definition eval_ce_example_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myent 4000 P_main_ce_example_myent).
+Print eval_ce_example_myent.
+ *****)
+
+(**************  this works *****)
+Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
+Time Definition P_ce_example_ent :=
+  Eval vm_compute in (program_Program p_ce_example_ent).
+Definition P_env_ce_example_ent := env P_ce_example_ent.
+Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
+Time Definition eval_ce_example_ent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_ent 4000 P_main_ce_example_ent).
+Print eval_ce_example_ent.
+***************)
+
+(****  this works  ***
+Time Quote Recursively Definition p_ce_example_myfail := vs.ce_example_myfail.
+Time Definition P_ce_example_myfail :=
+  Eval vm_compute in (program_Program p_ce_example_myfail).
+Definition P_env_ce_example_myfail := env P_ce_example_myfail.
+Definition P_main_ce_example_myfail := AstCommon.main P_ce_example_myfail.
+Time Definition eval_ce_example_myfail :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myfail 4000 P_main_ce_example_myfail).
+Print eval_ce_example_myfail.
+ ****)
+
+(******  Not in L3, worked in L4  
+Time Quote Recursively Definition p_ce_harder_ent := vs.ce_harder_ent.
+Time Definition P_ce_harder_ent :=
+  Eval vm_compute in (program_Program p_ce_harder_ent).
+Definition P_env_ce_harder_ent := env P_ce_harder_ent.
+Definition P_main_ce_harder_ent := AstCommon.main P_ce_harder_ent.
+(******  doesn't work ****
+Time Definition eval_ce_harder_ent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_harder_ent 1080 P_main_ce_harder_ent).
+Print eval_ce_harder_ent.
+*****)
+Definition cee :=
+  (wcbvEval P_env_ce_harder_ent 1080 P_main_ce_harder_ent).
+Extraction "ce_example_harder_ent" cee.
+*****)
+

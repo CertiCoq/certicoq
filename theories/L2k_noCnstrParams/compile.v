@@ -49,9 +49,6 @@ Scheme Trm_ind' := Induction for Term Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
 Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
 Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
-Notation prop := (TSort SProp).
-Notation set_ := (TSort SSet).
-Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
 Notation dunit nm t m := (dcons nm t m dnil).
 

@@ -70,9 +70,6 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wCaseCong: forall mch Mch ml brs,
              WcbvEval p mch Mch ->
              canonicalP Mch = None ->
-             (*****************************
-             WcbvEvals p brs brs' ->       
-*******************************************)    
              WcbvEval p (TCase ml mch brs) (TCase ml Mch brs)
 | wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=

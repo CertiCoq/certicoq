@@ -199,11 +199,10 @@ Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
     | _ => @loop (S n) (@Acc_inv _ a (S n) (Lt_n n))
   end.
 Axiom Acc0Ax : Acc 0.
-Definition loop0 := (@loop O Acc0Ax).
-Eval vm_compute in loop0.   (** Coq does not loop **)
+Eval vm_compute in (@loop (O + 0)).
+Eval vm_compute in  (@loop (O + 0) Acc0Ax).   (** Coq does not loop **)
 
-Quote Recursively Definition p_loop0 := loop0.
-Print p_loop0.
+Quote Recursively Definition p_loop0 := (@loop (O + 0) Acc0Ax).
 Definition P_loop0 := Eval vm_compute in (program_Program p_loop0).
 Definition P_env := Eval vm_compute in (env P_loop0).
 Definition P_main := Eval vm_compute in (main P_loop0).

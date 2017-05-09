@@ -79,9 +79,6 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
              WcbvEval p mch Mch ->
              canonicalP Mch = None ->
              WcbvEval p ty ty' ->
-             (*****
-             WcbvEvals p brs brs' ->
-**************************)           
              WcbvEval p (TCase ml ty mch brs) (TCase ml ty' Mch brs)
 | wWrong: forall str, WcbvEval p (TWrong str) (TWrong str)
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
@@ -93,9 +90,6 @@ Hint Constructors WcbvEval WcbvEvals.
 Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
      with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
 Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
-
-Axiom converges:
-  forall (p:environ Term) (t:Term), exists tv, WcbvEval p t tv.
 
 (** evaluate omega = (\x.xx)(\x.xx): nontermination **)
 Definition xx := (TLambda nAnon prop (TApp (TRel 0) (TRel 0) tnil)).

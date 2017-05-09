@@ -67,7 +67,7 @@ Section Branches.
 
 Context (Opid:Type) {gts:GenericTermSig Opid} {ta : TermAbs Opid}.
 
-(* this definition of branch and find_branch is shared with 
+(** this definition of branch and find_branch is shared with 
 L4a and L5 *)
 Definition branch 
   : Type := (dcon * (@AbsBTerm Opid ta))%type.
@@ -88,8 +88,8 @@ End Branches.
 Section PolyEval.
 
 
-(** eval_n for L4 (congrete DB), L4a (generic named), and
-the (yet to be added) generic (Squiggle-style) DB language between them.
+(** eval_n for L4 (concrete de-bruijn), L4_1 (generic de-bruijn), and
+the L4_2 (generic named).
 *)
 Context {Abs4_4a: @TermAbs (@L4Opid)}.
 
@@ -107,6 +107,7 @@ Open Scope program_scope.
 
 Require Import List.
 
+Require Import SquiggleEq.ExtLibMisc.
 (* generalized from L4.expresssion.eval_n *)
 Fixpoint eval_n (n:nat) (e:AbsTerm) {struct n} :  option AbsTerm :=
 match n with
@@ -174,3 +175,21 @@ end.
 
 End PolyEval.
 
+Require Import SquiggleEq.AssociationList.
+Lemma findBranchMapBtCommute {O1 O2 V} deqv vc vcf fr
+        (f : @NTerm V O1 -> @NTerm V O2) n d nargs lbt:
+  @find_branch _ (@Named.TermAbsImpl V O2 vc deqv vcf fr) d n (combine nargs (map (btMapNt f) lbt))=
+  option_map (btMapNt f) (@find_branch _ (@Named.TermAbsImpl V O1 vc deqv vcf fr)  d n (combine nargs lbt)).
+Proof using.
+  unfold find_branch.
+  rewrite option_map_map.
+  rewrite <- (map_id nargs).
+  setoid_rewrite <- ALMapCombine.
+  rewrite map_id. unfold ALMap.
+  erewrite find_map_same_compose2;[ | refl].
+  unfold compose. simpl.
+  rewrite option_map_map. simpl.
+  f_equal.
+  erewrite find_ext;[ | intros ?; rewrite numBvarsBtMapNt; refl].
+  refl.
+Qed.

@@ -165,3 +165,38 @@ Definition TermAbsDB : TermAbs Opid :=
 
 
 End SquiggleDBInst.
+
+(* Move to Common.TermAbsImpl *)
+Lemma getNtNamedMapBtCommute {O1 O2 V} (f : @NTerm V O1 -> @NTerm V O2) b:
+  Named.safeGetNT _ _ (btMapNt f b) = option_map f (Named.safeGetNT _ _ b).
+Proof using.
+  destruct b as [l ?]. simpl. destruct l; refl.
+Qed.
+
+Require Import SquiggleEq.terms.
+(* Move to Common.TermAbsImpl *)
+Lemma numBvarsBtMapNt {O1 O2 V} (f : @NTerm V O1 -> @NTerm V O2) (b : @BTerm V O1):
+  num_bvars (btMapNt f b) = num_bvars b.
+Proof using.
+  destruct b; refl.
+Qed.
+
+Require Import SquiggleEq.ExtLibMisc.
+(* Move to Common.TermAbsImpl *)
+Lemma safeGetNTmap {O V} (lbt: list (@BTerm V O)) m:
+  map num_bvars lbt = repeat 0%nat m->
+  (flatten (map (Named.safeGetNT V O) lbt)) =
+  Some (map get_nt lbt).
+Proof using.
+  revert m.
+  induction lbt; auto;[].
+  intros ? Hm.
+  simpl in *.
+  simpl.
+  destruct m; [invertsn Hm | ].
+  simpl in *. inverts Hm as Hma Hm.
+  rewrite Hma in Hm.
+  specialize (IHlbt _ Hm).
+  rewrite IHlbt. destruct a as [lv nt].
+  destruct lv; [refl |  inverts Hma].
+Qed.

@@ -570,7 +570,6 @@ Time Definition eval_ce_example_ent :=
   Eval vm_compute in
     (wcbvEval P_env_ce_example_ent 4000 P_main_ce_example_ent).
 Print eval_ce_example_ent.
-***************)
 
 (****  this works  ***
 Time Quote Recursively Definition p_ce_example_myfail := vs.ce_example_myfail.

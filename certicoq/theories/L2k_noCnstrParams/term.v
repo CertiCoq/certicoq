@@ -279,44 +279,44 @@ Proof.
   - left. auto.
 Defined.
 
-
-Definition isCanonical (t:Term) : Prop :=
-  exists (i:inductive) (n:nat) (args:Terms), t = (TConstruct i n args).
-
-Lemma IsCanonical:
-  forall i n ts, isCanonical (TConstruct i n ts).
-intros. unfold isCanonical. exists i, n, ts. reflexivity. 
-Qed.
-Hint Resolve IsCanonical.
+Inductive isCanonical : Term -> Prop :=
+| canC: forall (i:inductive) (n:nat) args, isCanonical (TConstruct i n args)
+| canP: forall t, isCanonical t -> isCanonical (TProof t).
+Hint Constructors isCanonical.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
 Proof.
-  induction t;
-  try (solve [right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate]).
-  - left. auto.
+  induction t; try (solve [right; intros h; inversion h; inversion H;
+                           destruct H1; discriminate]).
+  - destruct IHt.
+    + left. constructor. assumption.
+    + right. intros h. inversion_clear h. contradiction.
+  - left. constructor.
 Qed.
-
-(***********
+     
 Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
     | TConstruct _ r args => Some (r, args)
-    | x => None
+    | TProof t => canonicalP t
+    | _ => None
   end.
 
 Lemma canonicalP_isCanonical:
   forall t x, canonicalP t = Some x -> isCanonical t.
 Proof.
-  induction t; simpl; intros; try discriminate. auto.
+  induction t; simpl; intros; try discriminate.
+  - constructor. eapply IHt. eassumption.
+  - constructor.
 Qed.
 
 Lemma isCanonical_canonicalP:
   forall t, isCanonical t -> exists x, canonicalP t = Some x.
 Proof.
-  induction 1; cbn.
-  - exists (n, tnil, m). reflexivity.
-  - exists (n, tcons arg args, m). reflexivity.
+  induction 1; simpl.
+  - exists (n, args). reflexivity.
+  - assumption.
 Qed.
-***************)
+
 
 (** some utility operations on [Terms] ("lists" of Term) **)
 Function tappend (ts1 ts2:Terms) : Terms :=
@@ -858,6 +858,15 @@ Proof.
   induction 1. constructor. cbn.
   apply tappend_pres_WFapps. assumption.
   constructor. assumption. constructor.
+Qed.
+
+Lemma canonicalP_pres_WFapp:
+  forall t, WFapp t ->
+  forall r args, canonicalP t = Some (r, args) -> WFapps args.
+Proof.
+  induction t; simpl; intros; try discriminate.
+  - eapply IHt; inversion_Clear H; eassumption.
+  - myInjection H0. inversion_Clear H. assumption.
 Qed.
 
   

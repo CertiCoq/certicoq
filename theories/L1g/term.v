@@ -218,6 +218,18 @@ left. auto.
 Qed.
 
 Definition isProof (t:Term) := exists prf, t = TProof prf.
+Lemma IsProof: forall t, isProof (TProof t).
+intros. exists t. reflexivity.
+Qed.
+Hint Resolve IsProof.
+
+Lemma isProof_dec: forall t, {isProof t}+{~ isProof t}.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x jx]; discriminate).
+  - left. auto.
+Defined.
+
 Lemma mkProof_isProof:
   forall t, isProof (mkProof t).
 Proof.
@@ -336,13 +348,17 @@ Qed.
 Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n np na:nat), isCanonical (TConstruct i n np na)
 | canA: forall (arg:Term) (args:Terms) (i:inductive) (n np na:nat), 
-          isCanonical (TApp (TConstruct i n np na) arg args).
+    isCanonical (TApp (TConstruct i n np na) arg args)
+| canP: forall t, isCanonical t -> isCanonical (TProof t).
 Hint Constructors isCanonical.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
 Proof.
   induction t; try (solve [right; intros h; inversion h; inversion H;
                            destruct H1; discriminate]).
+  - destruct IHt.
+    + left. constructor. assumption.
+    + right. intros h. inversion_clear h. contradiction.
   - destruct (isConstruct_dec t1).
     + left. unfold isConstruct in H. destruct H as [x0 [x1 [x2 [x3 j]]]].
       subst. constructor.
@@ -354,6 +370,7 @@ Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
     | TConstruct _ r _ _ => Some (r, tnil)
     | TApp (TConstruct _ r _ _) arg args => Some (r, tcons arg args)
+    | TProof t => canonicalP t
     | _ => None
   end.
 
@@ -361,6 +378,7 @@ Lemma canonicalP_isCanonical:
   forall t x, canonicalP t = Some x -> isCanonical t.
 Proof.
   induction t; simpl; intros; try discriminate.
+  - constructor. eapply IHt. eassumption.
   - destruct t1; try discriminate. constructor.
   - constructor.
 Qed.
@@ -371,6 +389,7 @@ Proof.
   induction 1; simpl.
   - exists (n, tnil). reflexivity.
   - exists (n, tcons arg args). reflexivity.
+  - assumption.
 Qed.
 
 (** some utility operations on [Terms] ("lists" of Term) **)
@@ -1018,6 +1037,7 @@ Lemma canonicalP_pres_WFapp:
   forall r args, canonicalP t = Some (r, args) -> WFapps args.
 Proof.
   induction t; simpl; intros; try discriminate.
+  - eapply IHt; inversion_Clear H; eassumption.
   - destruct t1; try discriminate. myInjection H0. inversion_Clear H.
     constructor; assumption.
   - myInjection H0. constructor.

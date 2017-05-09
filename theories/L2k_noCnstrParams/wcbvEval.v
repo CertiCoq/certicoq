@@ -56,21 +56,22 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
              dnthBody m dts = Some (x, ix) ->
              ix > tlength args ->     (* too few args *)
              WcbvEval p (TApp fn arg args) (TApp (TFix dts m) arg' args')
-| wCase: forall mch i n args ml brs cs s,
-           WcbvEval p mch (TConstruct i n args) ->
+| wCase: forall mch Mch n args ml brs cs s,
+           WcbvEval p mch Mch ->
+                canonicalP Mch = Some (n, args) ->
                 whCaseStep n args brs = Some cs ->
                 WcbvEval p cs s ->
                 WcbvEval p (TCase ml mch brs) s
 | wCaseCong: forall mch Mch ml brs,
-               WcbvEval p mch Mch ->
-               ~ (isCanonical Mch) ->
-             WcbvEval p (TCase ml mch brs) (TCase ml Mch brs)
+    WcbvEval p mch Mch ->
+    canonicalP Mch = None ->
+    WcbvEval p (TCase ml mch brs) (TCase ml Mch brs)
 | wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
 | wNil: WcbvEvals p tnil tnil
 | wCons: forall t t' ts ts',
-           WcbvEval p t t' -> WcbvEvals p ts ts' -> 
-           WcbvEvals p (tcons t ts) (tcons t' ts').
+    WcbvEval p t t' -> WcbvEvals p ts ts' -> 
+    WcbvEvals p (tcons t ts) (tcons t' ts').
 Hint Constructors WcbvEval WcbvEvals.
 Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
      with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
@@ -177,8 +178,8 @@ Proof.
     specialize (H0 k). inversion_Clear H0.
     constructor; try assumption. not_isApp.
   - inversion_Clear H1. apply H0. 
-    refine (whCaseStep_pres_WFapp _ _ _ e). assumption.
-    specialize (H H4). inversion_Clear H. assumption.
+    refine (whCaseStep_pres_WFapp _ _ _ _); try eassumption.
+    refine (canonicalP_pres_WFapp _ e). intuition.
 Qed.
 
 Lemma WcbvEval_weaken:
@@ -269,13 +270,15 @@ Function wcbvEval
           end
         | TCase ml mch brs =>
           match wcbvEval n mch with
-            | Exc str => Exc str
-            | Ret (TConstruct i ix args) =>
-              match whCaseStep ix args brs with
-                | None => raise "wcbvEval: Case, whCaseStep"
-                | Some cs => wcbvEval n cs
-              end
-            | Ret mch' => ret (TCase ml mch' brs)
+          | Exc str => Exc str
+          | Ret emch =>
+            match canonicalP emch with
+            | None => Ret (TCase ml emch brs)
+            | Some (r, args) => match whCaseStep r args brs with
+                                | None => raise "wcbvEval: Case, whCaseStep"
+                                | Some cs => wcbvEval n cs
+                                end
+            end
           end
         | TLetIn nm df bod =>
           match wcbvEval n df with
@@ -341,9 +344,6 @@ Proof.
   - eapply wCase; try eassumption.
     + apply H. eassumption.
     + apply H0. eassumption.
-  - eapply wCaseCong.
-    + apply H. assumption.
-    + intros h. destruct h as [x0 [x1 [x2 j]]]. subst. assumption.
   - eapply wLetIn; intuition.
     + apply H. assumption.
 Qed.
@@ -433,11 +433,10 @@ Lemma pre_WcbvEval_wcbvEval:
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     cbn. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
-    rewrite e. apply (H0 (mx - 1)); try omega.
+    rewrite e. rewrite e0. apply (H0 (mx - 1)); try omega.
   - destruct H. exists (S x). intros mx h.
     cbn. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.
-    destruct Mch; try reflexivity.
-    elim n. auto.
+    rewrite e. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx x); try omega. rewrite (H (mx - 1)); try omega.

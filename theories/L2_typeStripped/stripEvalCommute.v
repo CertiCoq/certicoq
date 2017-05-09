@@ -189,8 +189,8 @@ Qed.
 Lemma canonicalP_hom:
   forall t, optStripCanP (L1g.term.canonicalP t) = canonicalP (strip t).
 Proof.
-  destruct t; intros; cbn; try reflexivity.
-  destruct t1; cbn; try reflexivity.
+  induction t; intros; cbn; try reflexivity; try assumption.
+  - destruct t1; cbn; try reflexivity.
 Qed.
 
 Lemma tnth_hom:

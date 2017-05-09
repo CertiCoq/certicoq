@@ -20,7 +20,7 @@ Require Import SquiggleEq.list.
 Require Import SquiggleEq.LibTactics.
 Require Import SquiggleEq.tactics.
 Require Import SquiggleEq.AssociationList.
-
+Require Import SquiggleEq.ExtLibMisc.
 Open Scope nat_scope.
 
 
@@ -391,8 +391,6 @@ Inductive eval : NTerm -> NTerm -> Prop :=
                  eval e2 v2 ->
                  eval (e1'{x := v2}) v -> 
                  eval (App_e e1 e2) v
-(**AA: do we need to go inside constructors for weak-head evaluation? 
-What if we add coinductives? *)
 | eval_Con_e : forall d es vs, 
     length es = length vs
     -> (forall e v, (LIn (e,v) (combine es vs)) -> eval e v)
@@ -426,6 +424,49 @@ What if we add coinductives? *)
 
 *)
 
+Lemma eval_con_e2 d es vs le lv:
+  Datatypes.length es = Datatypes.length vs ->
+  Datatypes.length es = le ->
+  Datatypes.length vs = lv ->
+  (forall e v : NTerm, LIn (e, v) (combine es vs) -> eval e v) ->
+  eval (oterm (NDCon d le) (map (bterm []) es))
+    (oterm (NDCon d lv) (map (bterm []) vs)).
+Proof using.
+  intros. subst.
+  apply eval_Con_e; auto.
+Qed.
+
+
+Lemma eval_fix_e2 es n l1 l2:
+  l1=l2
+  -> l1 = length es
+  -> eval (oterm (NFix l1 n) es) (oterm (NFix l2 n) es).
+Proof using.
+  intros. subst. apply eval_Fix_e.
+Qed.
+
+Lemma eval_match_e2  e d vs e' v dcn lbt:
+                   eval e (Con_e d vs) ->
+                   find_branch d (Datatypes.length vs) (combine (map fst dcn) lbt) = Some e' ->
+                   eval (apply_bterm e' vs) v ->
+                   Datatypes.length dcn = Datatypes.length lbt ->
+ map num_bvars lbt = map snd dcn ->
+eval
+    (oterm (NMatch dcn)
+       (bterm [] e :: lbt)) v.
+Proof using.
+  intros.
+  set (brs := combine (map fst dcn) lbt).
+  pose proof (fun f => eval_Match_e e brs d vs e' v H f H1) as Hbr.
+  unfold Match_e in Hbr. unfold brs in Hbr.
+  rewrite <- combine_map_snd in Hbr; [ | rewrite map_length; auto].
+  assert (Hr: dcn = (map (fun b : dcon * BTerm => (fst b, num_bvars (snd b)))
+                     (combine (map fst dcn) lbt))); [ | rewrite Hr; eauto ].
+  rewrite <- (combine_eta dcn) at 1.
+  rewrite  <- combine_of_map_snd.
+  congruence.
+Qed.  
+  
 Require Import Common.certiClasses.
 (* Enables the ⇓ notation.
 Local Instances are cleared at the end of a section.
@@ -826,24 +867,6 @@ We can either have separate clauses as in L4_5.eval, or have the following rule
 
 Hint Constructors eval_c.
 
-
-(* Move to SquiggleEq.list *)
-
-Lemma combine_eta {A B:Type} : forall (lp: list (A*B)), combine (map fst lp) (map snd lp) = lp.
-Proof using.
-  clear. intros.
-  rewrite combine_map.
-  rewrite map_ext with (g:=id);[ apply map_id | ].
-  intros. destruct a; auto.
-Qed.
-
-(* Move to SquiggleEq.ExtLibmisc *)
-Lemma flatten_map_Some {A B:Type} (f: A->B) (vs: list A):
-  (flatten (map (fun x : A => Some (f x)) vs)) = Some (map f vs).
-Proof using.
-  induction vs; auto.
-  simpl. rewrite IHvs. reflexivity.
-Qed.  
 
 (*
 Lemma findBranchSame

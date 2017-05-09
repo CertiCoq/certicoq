@@ -70,7 +70,7 @@ Require Import ExtLib.Structures.Monads.
 
 Import Monad.MonadNotation.
 Open Scope monad_scope.
-Require Import Common.ExtLibMisc.
+Require Import SquiggleEq.ExtLibMisc.
 
 
 
@@ -179,36 +179,6 @@ Ltac dimpn H :=
   | ?T1 -> ?T2 => let name := fresh "hyp" in
                   assert (name : T1);[auto| specialize (H name)]
   end.
-
-(* Move  *)
-Lemma isSomeBindRet {A B:Type}: forall (v:option A) (f:A->B),
-  isSome v 
-  -> isSome (x <- v ;; (ret (f x))).
-Proof using.
-  intros ? ? His.
-  simpl. destruct v; auto.
-Qed.
-
-Lemma isSomeFlatten {A} : forall (lo : list (option A)),
-  (forall a, In a lo -> isSome a)
-  -> isSome (flatten lo).
-Proof using.
-  unfold flatten. intros ? Hin.
-  induction lo; simpl in *; auto.
-  dLin_hyp.
-  destruct a; simpl in *; try tauto; auto.
-  intros.
-  specialize (IHlo Hin). clear Hin.
-  destruct ((fold_right
-            (fun (a : option A) (l0 : option (list A)) =>
-             match l0 with
-             | Some v => match a with
-                         | Some v0 => Some (v0 :: v)
-                         | None => None
-                         end
-             | None => None
-             end) (Some []) lo)); auto.
-Qed.
 
 Local Opaque freshVars.
 Local Opaque varClass.

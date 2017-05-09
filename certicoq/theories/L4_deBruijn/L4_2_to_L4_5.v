@@ -15,21 +15,13 @@ Require Import SquiggleEq.lmap.
 Require Import Coq.Arith.Arith 
 Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program 
 Coq.micromega.Psatz.
-
+Require Import SquiggleEq.ExtLibMisc.
 
 Require Import Common.RandyPrelude.
 Open Scope N_scope.
 Require Import L4.L4_to_L4_1_to_L4_2.
 Require Import L4.L4_5_to_L5.
 Require Import SquiggleEq.list.
-
-
-(* Move. and replace in SquiggleEq.terms*)
-Definition btMapNt {O O2 V} (f: @NTerm V O  -> @NTerm V O2)
-   (b: @BTerm V O) : @BTerm V O2 :=
-match b with
-|bterm lv nt => bterm lv (f nt)
-end.
 
 Definition L4_5_Term :Type := (@NTerm NVar L4_5Opid).
 
@@ -59,7 +51,7 @@ Require Import ExtLib.Data.Monads.OptionMonad.
 Import Monad.MonadNotation.
 Open Scope monad_scope.
 
-(* generalized from L4.expresssion.eval_n *)
+(* modified from L4.polyEval.eval_n to remove the cases for \box *)
 Fixpoint eval_n (n:nat) (e:AbsTerm) {struct n} :  option AbsTerm :=
 match n with
 |0%nat => None
@@ -85,14 +77,6 @@ match n with
         | Some (NDCon d ne, clb) =>
           cvs <- flatten (map absGetTerm clb);;
           b <- polyEval.find_branch _ d (length cvs) (combine (map fst ldn) brs);;
-          (* TODO: skip the parameters in cvs. matches don't bind parameters.
-          (If parameters are explicit, Coq forces us to write "_" at those positions
-          in constructor patterns).
-          A similar fix is needed in L5. 
-
- UPDATE: no fix is needed here or in L5. parameters of constructors should just be discarded
- much earlier : in L1
-*)
           s <- (absApplyBTerm b cvs);;
           eval_n n s
         | _ => None
@@ -114,7 +98,6 @@ match n with
             s <- (absApplyBTerm im ls);;
             s_a_pp <- (absMakeTerm (map absMakeBTerm [s;a]) NApply);;
             eval_n n s_a_pp
-        (* box applied to anything becomes box *)
         | _ => None
         end
     | _ => None
@@ -153,70 +136,316 @@ Require Import Common.TermAbs.
 Require Import SquiggleEq.tactics.
 Require Import SquiggleEq.LibTactics.
 
-(** use the function version defined above ? *)
-Lemma L4_2_to_L4_5_correct n t v:
-  let eval42 := @polyEval.eval_n (Named.TermAbsImpl variables.NVar L4Opid) in
-  (eval42 n t) = Some v
+
+Require Import SquiggleEq.AssociationList.
+
+
+Section evaln42_45.
+
+Lemma L4_2_to_L4_5_fvars t:
+  nt_wf t ->    
+  (free_vars (L4_2_to_L4_5 t)) =  free_vars t.
+Proof using.
+  induction t as [x | o lbt Hind] using NTerm_better_ind; intros Hwf; auto;[].
+  simpl.
+  assert (Hb: flat_map free_vars_bterm (map (btMapNt L4_2_to_L4_5) lbt)
+          = flat_map free_vars_bterm lbt).
+    rewrite flat_map_map. apply eq_flat_maps. unfold compose, btMapNt. simpl.
+    intros bt Hin. destruct bt as [lv nt].
+    simpl. erewrite Hind; eauto. ntwfauto.
+
+  destruct o; [ | | | | | | ]; auto;[].
+  simpl. ntwfauto. simpl in *. destruct lbt; auto;[].
+  inverts HntwfSig.
+Qed.  
+
+Require Import SquiggleEq.alphaeq.
+
+Lemma ssubst_aux_commute f sub:
+  ssubst_aux (L4_2_to_L4_5 f) (map_sub_range L4_2_to_L4_5 sub) =
+    L4_2_to_L4_5 (ssubst_aux f sub).
+Proof using.
+  revert sub.
+  induction f as [x | o lbt Hind] using NTerm_better_ind; intros ?;
+    [simpl; rewrite sub_find_map; dsub_find s; auto | ].
+  simpl.  rewrite map_map.
+  assert (
+      map (fun x : BTerm => ssubst_bterm_aux (btMapNt L4_2_to_L4_5 x) (map_sub_range L4_2_to_L4_5 sub))
+          lbt = map (fun x : BTerm => btMapNt L4_2_to_L4_5 (ssubst_bterm_aux x sub)) lbt).
+    apply eq_maps.
+    intros bt Hin.
+    destruct bt as [lv nt]. simpl.
+    f_equal. rewrite sub_filter_map_range_comm. apply (Hind nt lv); auto.
+  destruct o; simpl; try rewrite map_map; f_equal; [ | | | | | | ]; auto;[].
+  unfold Fix_e', Lam_e. simpl.
+  do 6 f_equal.
+  rewrite <- sub_filter_app_r.
+  rewrite sub_find_sub_filter; [refl | cpx].
+Qed.  
+
+Lemma ssubst_commute f sub:
+  prog_sub sub
+  -> ssubst (L4_2_to_L4_5 f) (map_sub_range L4_2_to_L4_5 sub) =
+    L4_2_to_L4_5 (ssubst f sub).
+Proof using.
+  intros Hs.
+  change_to_ssubst_aux8;[ apply ssubst_aux_commute; auto | ].
+  unfold range, map_sub_range.
+  rewrite map_map, flat_map_map.
+  unfold compose. simpl.
+  rewrite (proj2 (@flat_map_empty _ _ _ _)); auto.
+  intros s Hin. destruct s as [x t]. specialize (Hs _ _ Hin).
+  simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
+Qed.
+
+Let eval42 := @polyEval.eval_n (Named.TermAbsImpl variables.NVar L4Opid).
+Let eval45 := @eval_n (Named.TermAbsImpl variables.NVar L4_5Opid).
+
+
+(**  can be obtained for free using a parametricity plugin *)
+Lemma eval42PreservesGoodness n t:
+  isprogram t -> option_rectp (isprogram) True (eval42 n t).
+Admitted.
+
+
+Ltac simplApplyBTerm Hd :=
+   unfold Named.applyBTermClosed;
+   repeat rewrite map_length; repeat rewrite numBvarsBtMapNt; simpl;
+   cases_if as Hd;[apply beq_nat_true in Hd | ].
+
+Hint Constructors eval : certicoq.
+
+(* (evaln n) does not commute with L4_2_to_L4_5 :
+box x  evaluates to box
+fix (\f\y.f) x evaluates to (\y.fix (\f\y.f)) x, not fix (\f\y.f).
+The latter is achieved only after 1 additional step.
+*)
+Lemma L4_2_to_L4_5_correct t n v:
+  isprogram t
+  -> (eval42 n t) = Some v
   -> eval (L4_2_to_L4_5 t) (L4_2_to_L4_5 v).
 Proof using.
-  intros ?.
-  revert v.
-  revert t.
-  induction n; intros ? ? Hev;[inverts Hev; fail | destruct t as [vv | o lbt];[ | destruct o]].
-- inverts Hev.
-- (* in this case, need to constrain the shape of the bound terms of lambda in eval_n *) admit.
-- admit.
-- admit.
-- (* apply *)
-  simpl in Hev.
-  destruct lbt as [ | bt1 lbt]; invertsn Hev.
-  destruct lbt as [ | bt2 lbt]; invertsn Hev.
-  destruct lbt as [ | ]; invertsn Hev.
-  destruct bt2 as [lv arg].
-  simpl in Hev.
-  destruct lv; invertsn Hev.
-  remember (eval42 n arg) as ea.
-  symmetry in Heqea.
-  destruct ea as [argv | invertsn Heq].
-  destruct bt1 as [lv ff].
-  simpl in Hev.
-  destruct lv; invertsn Hev.
-  remember (eval42 n ff) as ef.
-  symmetry in Heqef.
-  destruct ef as [ffv | invertsn Heq].
-  destruct ffv as [? | fvo fvlbt]; [ | destruct fvo]; invertsn Hev.
-  + (* lambda *) admit.
-  + (* fix *) admit.
-  + (* box *)
-    destruct fvlbt; [ | invertsn Hev].
-    simpl.
-    apply IHn in Heqea.
-    apply IHn in Heqef.
+  revert t v.
+  induction n as [ | n Hind]; intros ? ? Hpr Hev; [invertsn Hev | ].
+  destruct t as [x | o lbt]; [ invertsn Hev | ].
+  apply isprogram_ot_iff in Hpr. repnd.
+  destruct o; try invertsn Hev.
+  (* lambda value *)
+- let tac:= invertsn Hpr0 in destructlbt lbt tac.
+  let tac:= invertsn H2 in destructlbt lbt tac.
+  let tac:= invertsn Hpr0 in destructbtdeep2 b tac.
+  simpl. apply eval_Lam_e.
+  (* fix value *)
+- apply (f_equal (@length _ )) in Hpr0.
+  simpl in *. autorewrite with list in Hpr0.
+  apply eval_fix_e2; try rewrite map_length; auto.
+  
+(* constructor value *)
+- simpl. revert Hev.
+  unfold L4_5_Term. f_equal. pose proof Hpr0 as Hlen.
+  apply map0lbt2 in Hpr0. remember (map get_nt lbt) as lnt.
+  clear Heqlnt. subst.
+  rewrite map_map. simpl.
+  match goal with
+    [ |- context[flatten ?l]] =>
+    remember (flatten l) as olvt
+  end.
+  unfold Named.mkBTermSafe.
+  destruct olvt as [lvt | ]; intros Hev; invertsn Hev.
+  repeat rewrite map_map. simpl.
+  repeat rewrite map_map. simpl.
+  apply (f_equal (@length _)) in Hlen. simpl in Hlen.
+  autorewrite with list in Hlen.
+  symmetry in Heqolvt.
+  pose proof (flattenSomeImpliesLen _ _ Heqolvt) as Hlenn.
+  rewrite map_length in Hlenn.
+  apply' (@flattenSomeImplies) Heqolvt.
+  rewrite <- map_map.
+  rewrite <- (map_map L4_2_to_L4_5). subst.
+  apply eval_con_e2; repeat rewrite map_length; auto.
+  intros ? ? Hin.
+  apply lin_combine_map_implies in Hin. exrepnd. subst.
+  pose proof Hin0 as Hint.
+  apply in_combine_l in Hint.
+  apply (in_map (bterm [])) in Hint.
+  specialize (Hpr _ Hint). apply isprogram_bt_nobnd in Hpr.
+  apply Hind; auto; [].
+  apply Heqolvt.
+  rewrite <- (map_id lvt).
+  change b with (id b).
+  apply lin_combine_map. assumption.
+- simpl.
+  simpl; destruct lbt as [ | f lbt]; simpl; try invertsn Hev;[].
+  simpl. simpl in *. let tac:=(invertsn Hpr0) in destructbtdeep2 f tac.
+  simpl in *. pose proof (Hpr _ ltac:(left; refl)) as Hprf.
+  apply isprogram_bt_nobnd in Hprf.
+  simpl in *.
+  simpl; destruct lbt as [ | a lbt]; simpl;  try invertsn Hev ;[].
+  simpl. simpl in *. let tac:=(invertsn Hpr0) in destructbtdeep2 a tac.
+  simpl; destruct lbt as [ | a lbt]; simpl;  try invertsn Hev ;[].
+  simpl in *. pose proof (Hpr _ ltac:(right; left; refl)) as Hpra.
+  apply isprogram_bt_nobnd in Hpra.
+  pose proof (eval42PreservesGoodness n _ Hpra) as Hprfa.
+  pose proof (eval42PreservesGoodness n _ Hprf) as Hprfe.
+  pose proof (fun v => Hind _ v Hprf) as Hindf.
+  pose proof (fun v => Hind _ v Hpra) as Hinda.
+  destruct (eval42 n ant) as [av | ]; simpl in *;[ | invertsn Hev].
+  destruct (eval42 n fnt) as [fv | ]; simpl in *;[ | invertsn Hev].
+  specialize (Hindf _ eq_refl).
+  specialize (Hinda _ eq_refl).
+  destruct fv as [ |fvo fvlbt]; [ invertsn Hev| ].
+  apply isprogram_ot_iff in Hprfe. repnd.
+  simpl in *. destruct fvo;  simpl in *; try  invertsn Hev.
+  (* Lambda *)
+  + simpl; destruct fvlbt as [ | f fvlbt]; simpl; try invertsn Hev;[].
+    simpl; destruct fvlbt as [ | ff fvlbt]; simpl; try invertsn Hev ;[].
+    revert Hev.
+    simplApplyBTerm Hd; intros Hev; [ | invertsn Hev].
+    let tac := invertsn Hprfe0 in destructbtdeep2 f tac.
+    simpl in *.
+    apply Hind in Hev;[ |  apply isprogram_bt_implies; eauto; inreasoning;cpx].
+    unfold apply_bterm in *. simpl in *.
+    rewrite <- ssubst_commute in Hev;[ | prove_sub_range_sat].
+    simpl in *.
+    eapply eval_App_e; eauto.
+
+  (* Fix *)
+  + revert Hev.
+    unfold Named.mkBTermSafe. simpl. repeat rewrite map_map.
+    do 1 rewrite flatten_map_Some. intros Hev.
+    remember (select index fvlbt) as ofbs.
+    destruct ofbs as [fbs | ];[ | invertsn Hev]. symmetry in Heqofbs.
+    simpl in *. revert Hev.
+    simplApplyBTerm Hd; intros Hev; [ | invertsn Hev].
+    apply Hind in Hev ;[
+                   | apply isprogram_ot_iff; split; [refl | inreasoning; cpx]
+                     ;try apply implies_isprogram_bt0; eauto ].
+    * unfold apply_bterm in *.
+      destruct fbs as [flv fntt].
+      simpl in *.
+      apply (select_map (btMapNt L4_2_to_L4_5)) in Heqofbs.
+      rewrite <- ssubst_commute in Hev.
+      Focus 2.
+        intros ? ? Hin. apply in_combine, proj2 in Hin.
+        apply in_map_iff in Hin. exrepnd. subst. clear Hin0.
+        apply isprogram_ot_iff. eauto; fail.
+
+      rewrite  map_sub_range_combine, map_map in Hev.
+      apply (f_equal (@length _)) in Hprfe0. simpl in Hprfe0.
+      unfold num_bvars in *. simpl in *. autorewrite with list in Hprfe0.
+      autorewrite with list in Hd.
+      subst.
+      eapply eval_FixApp_e; eauto;
+        unfold num_bvars, Fix_e' in *; simpl in *;
+          repeat rewrite map_length; try assumption; try congruence.
+    * apply nth_error_In in Heqofbs.
+      apply isprogram_bt_implies; try rewrite map_length; eauto.
+      intros ? Hin.
+      apply in_map_iff in Hin. exrepnd. subst. clear Hin0.
+      apply isprogram_ot_iff. eauto.
+  + destruct fvlbt; inverts Hprfe0.
+    simpl. unfold apply_bterm. simpl. unfold Lam_e. simpl.
+    inverts Hev. simpl.
     eapply eval_FixApp_e; eauto;[reflexivity| | reflexivity].
     simpl. unfold apply_bterm. simpl.
     eapply eval_App_e; eauto;[apply eval_Lam_e | eapply eval_end; eauto| ].
-    simpl.
-    inverts Hev.
-    simpl.
-    (* if we revive the proof that eval preserves alpha equality, 
-        then we can say that the substitution is a no-op upto alpha equality.
-       boundvar renaming may happen if [argv] has [nvary] or [nvarx] free.
-       We can also pick  [nvary] or [nvary] to be disjoint from user vars.
-       
-      Alternatively, because we are evaluating closed terms, we can assume that
-      [t] is closed, which will imply that argv is closed.
-     *)
-    assert (closed argv) as Hca by admit.
-    unfold subst.
-    rewrite ssubst_trivial4; simpl; eauto; [ apply eval_Fix_e | ].
-    intros ? ? Hin. rewrite or_false_r in Hin. inverts Hin.
-    unfold closed in Hca.
-  (* do a separate proof that L4_2_to_L4_5 preserves free variables *)
-    admit.
-  + (* box *) inverts Hev.
-  + (* box *) inverts Hev.
+    simpl. unfold subst. clear Hprfe.
+    rewrite ssubst_trivial3;[apply eval_Fix_e; fail | ].
+    inreasoning. invertsn H. simpl.
+    rewrite  L4_2_to_L4_5_fvars;[ | apply Hprfa].
+    rewrite (proj1 Hprfa). unfold disjoint. firstorder.
+  
+(* let *)
+- simpl; destruct lbt as [ | a lbt]; simpl; try invertsn Hev ;[].
+  simpl; destruct lbt as [ | f lbt]; simpl; try invertsn Hev ;[].
+  simpl; destruct lbt as [ | ]; simpl; try invertsn Hev ;[].
+  simpl. destruct a as [la a]; simpl; try invertsn Hev ;[].
+  simpl. destruct la; simpl; try invertsn Hev ; [].
+  simpl. destruct f as [lf f]; simpl; try invertsn Hev ;[].
+  simpl. revert Hev. unfold Named.applyBTermClosed, num_bvars. simpl.
+  cases_if; auto; [ | do 1 rewrite matchNoneNone; intros Hev; invertsn Hev].
+  destruct lf as [ | x lf]; invertsn H.
+  destruct lf as [ | xx lf]; invertsn H.
+  pose proof (Hpr (bterm [] a) ltac:(cpx)) as Hw. apply isprogram_bt_nobnd in Hw.
+  specialize (Hpr _ ltac:(right;cpx)).
+  pose proof (fun v => Hind _ v Hw) as Hinda.
+  do 1 rewrite <- fold_option_bind.
+  pose proof (eval42PreservesGoodness n a Hw) as Hpre. intros Hev.
+  destruct (eval42 n a) as [av42 | ]; simpl in *;[ | invertsn Hev].
+  specialize (Hinda _ eq_refl).
+  apply Hind in Hev;[ | apply isprogram_bt_implies; auto;  inreasoning; cpx ].
+  unfold apply_bterm in *. simpl in *.
+  rewrite <- ssubst_commute in Hev; auto; [ | prove_sub_range_sat].
+  eapply eval_Let_e; eauto.
 
-- admit.
-- admit.
-- admit.
-Admitted.
+  (* match *)
+- simpl.
+  simpl; destruct lbt as [ | d lbt]; simpl; try invertsn Hev ;[].
+  simpl. simpl in *. let tac:=(invertsn Hpr0) in destructbtdeep2 d tac.
+  simpl in *. pose proof (Hpr _ ltac:(left; refl)) as Hprd.
+  apply isprogram_bt_nobnd in Hprd.
+  pose proof (eval42PreservesGoodness n _ Hprd) as Hpre.
+  pose proof (fun v => Hind _ v Hprd) as Hindd.
+  destruct (eval42 n dnt) as [vd | ];[ simpl | invertsn Hev].
+  specialize (Hindd _ eq_refl).
+  destruct vd as [ | do dlbt ]; [ invertsn Hev | simpl ].
+  destruct do; try  invertsn Hev;[]; simpl in *.
+(*  do 1 rewrite map_map in Hev.
+  erewrite map_ext;[ | intros; rewrite getNtNamedMapBtCommute; refl].
+  setoid_rewrite <- opmap_flatten_map. *)
+  apply isprogram_ot_iff in Hpre. repnd; simpl in *.
+  erewrite safeGetNTmap in Hev; eauto. simpl.
+  rewrite map_length in Hev.
+  (*  rewrite findBranchMapBtCommute. *)
+  simpl in *.
+  match type of Hev with
+    context[@polyEval.find_branch ?o ?ta ?d ?na ?b] 
+      => remember  (@polyEval.find_branch o ta d na b) as sb; destruct sb as [br | ]
+   end;[ | invertsn Hev].
+  simpl in *.
+  unfold Named.applyBTermClosed in *.
+  revert Hev.
+  rewrite map_length in *. (* rewrite numBvarsBtMapNt. *)
+  cases_if; intros Hev; [ | invertsn Hev].
+  revert Hev.
+  simpl. destruct br as [brlv br]. simpl.
+  apply beq_nat_true in H.
+  eapply isProgramLNoBnd in Hpre; eauto.
+  pose proof Hpre0 as Hnt.
+  apply map0lbt2 in Hnt.
+  symmetry in Heqsb.
+  simpl in *. pose proof Hpr0 as Hbb.
+  apply (f_equal (@length _)) in Hpr0. unfold num_bvars in *.
+  pose proof Heqsb as Heqsbb.
+  apply find_branch_some in Heqsb.
+  rewrite <- combine_map_snd in Heqsb; [ | repeat rewrite map_length in *;  congruence].
+  apply proj2, proj1 in Heqsb.
+  repnd. specialize (Hpr _ ltac:(right; apply Heqsb)).
+  intros Hev.
+  apply Hind in Hev;[ | apply isprogram_bt_implies; try rewrite map_length; eauto].
+  unfold apply_bterm in *. simpl in *.
+  rewrite <- ssubst_commute in Hev;
+    [ | intros ? s Hin; apply Hpre; eapply in_combine_r; eauto; fail].
+  rewrite  map_sub_range_combine in Hev.
+  apply (f_equal (@length _)) in Hpre0. simpl in Hpre0.
+  unfold num_bvars in *. simpl in *. autorewrite with list in *.
+  subst.
+  eapply eval_match_e2; eauto; autorewrite with list; auto.
+  + unfold Con_e.
+    rewrite Hnt in Hindd. simpl in Hindd.
+    match goal with
+      [H: eval ?l ?r1  |- eval ?l ?r2 ] => assert (r1=r2);[ | congruence]
+    end.
+    f_equal; f_equal;[ |   rewrite map_map; simpl;rewrite <- map_map; refl].
+    repeat rewrite map_length. refl.
+  + rewrite map_length. setoid_rewrite findBranchMapBtCommute.
+    rewrite map_length. rewrite Heqsbb. refl.
+  + assumption.
+  + revert Hbb. clear. rewrite map_map. intro.
+    erewrite map_ext;[ | intros; rewrite numBvarsBtMapNt; refl]. assumption.
+- simpl. apply eval_Fix_e.
+Qed.
+
+Print Assumptions L4_2_to_L4_5_correct.
+End evaln42_45.
+

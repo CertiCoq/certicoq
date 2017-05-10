@@ -202,11 +202,11 @@ Let eval42 := @polyEval.eval_n (Named.TermAbsImpl variables.NVar L4Opid).
 Let eval45 := @eval_n (Named.TermAbsImpl variables.NVar L4_5Opid).
 
 
-(**  can be obtained for free using a parametricity plugin *)
+(**  can be obtained for free using a parametricity plugin 
 Lemma eval42PreservesGoodness n t:
   isprogram t -> option_rectp (isprogram) True (eval42 n t).
 Admitted.
-
+*)
 
 Ltac simplApplyBTerm Hd :=
    unfold Named.applyBTermClosed;
@@ -223,25 +223,27 @@ The latter is achieved only after 1 additional step.
 Lemma L4_2_to_L4_5_correct t n v:
   isprogram t
   -> (eval42 n t) = Some v
-  -> eval (L4_2_to_L4_5 t) (L4_2_to_L4_5 v).
+  -> isprogram v /\ eval (L4_2_to_L4_5 t) (L4_2_to_L4_5 v).
 Proof using.
   revert t v.
   induction n as [ | n Hind]; intros ? ? Hpr Hev; [invertsn Hev | ].
   destruct t as [x | o lbt]; [ invertsn Hev | ].
+  pose proof Hpr as Hprb.
   apply isprogram_ot_iff in Hpr. repnd.
   destruct o; try invertsn Hev.
   (* lambda value *)
 - let tac:= invertsn Hpr0 in destructlbt lbt tac.
   let tac:= invertsn H2 in destructlbt lbt tac.
   let tac:= invertsn Hpr0 in destructbtdeep2 b tac.
-  simpl. apply eval_Lam_e.
+  simpl. split; [assumption | apply eval_Lam_e ].
   (* fix value *)
 - apply (f_equal (@length _ )) in Hpr0.
   simpl in *. autorewrite with list in Hpr0.
+  split; [assumption | ].
   apply eval_fix_e2; try rewrite map_length; auto.
   
 (* constructor value *)
-- simpl. revert Hev.
+- clear Hprb. simpl. revert Hev.
   unfold L4_5_Term. f_equal. pose proof Hpr0 as Hlen.
   apply map0lbt2 in Hpr0. remember (map get_nt lbt) as lnt.
   clear Heqlnt. subst.
@@ -254,12 +256,30 @@ Proof using.
   destruct olvt as [lvt | ]; intros Hev; invertsn Hev.
   repeat rewrite map_map. simpl.
   repeat rewrite map_map. simpl.
-  apply (f_equal (@length _)) in Hlen. simpl in Hlen.
-  autorewrite with list in Hlen.
   symmetry in Heqolvt.
   pose proof (flattenSomeImpliesLen _ _ Heqolvt) as Hlenn.
-  rewrite map_length in Hlenn.
   apply' (@flattenSomeImplies) Heqolvt.
+  apply (f_equal (@length _)) in Hlen. simpl in Hlen.
+  autorewrite with list in Hlen.
+  rewrite map_length in Hlenn.
+  split; [ | ].
+    apply isprogram_ot_iff. simpl.
+    unfold num_bvars. rewrite map_map.
+    simpl. rewrite repeat_map_len.
+    split;[ f_equal; congruence | ].
+    intros ? Hin. apply in_map_iff in Hin.
+    exrepnd. subst.
+    apply implies_isprogram_bt0.
+    eapply combine_in_right in Hin0;[ | rewrite <- Hlenn,
+                                        <- (map_length (fun x : NTerm => eval42 n x)); refl ].
+    exrepnd. pose proof Hin1 as Hinb.
+    rewrite <- (map_id lvt) in Hinb.
+    apply lin_combine_map_implies in Hinb. exrepnd. subst.
+    apply Heqolvt in Hin1. subst.
+    eapply Hind; eauto.
+    apply in_combine_l in Hinb0. apply (in_map (bterm [])) in Hinb0.
+    apply Hpr in Hinb0. apply isprogram_bt_nobnd in Hinb0. assumption.
+    
   rewrite <- map_map.
   rewrite <- (map_map L4_2_to_L4_5). subst.
   apply eval_con_e2; repeat rewrite map_length; auto.
@@ -285,8 +305,6 @@ Proof using.
   simpl; destruct lbt as [ | a lbt]; simpl;  try invertsn Hev ;[].
   simpl in *. pose proof (Hpr _ ltac:(right; left; refl)) as Hpra.
   apply isprogram_bt_nobnd in Hpra.
-  pose proof (eval42PreservesGoodness n _ Hpra) as Hprfa.
-  pose proof (eval42PreservesGoodness n _ Hprf) as Hprfe.
   pose proof (fun v => Hind _ v Hprf) as Hindf.
   pose proof (fun v => Hind _ v Hpra) as Hinda.
   destruct (eval42 n ant) as [av | ]; simpl in *;[ | invertsn Hev].
@@ -294,6 +312,8 @@ Proof using.
   specialize (Hindf _ eq_refl).
   specialize (Hinda _ eq_refl).
   destruct fv as [ |fvo fvlbt]; [ invertsn Hev| ].
+  destruct Hindf as [Hprfe Hindf].
+  destruct Hinda as [Hprae Hinda].
   apply isprogram_ot_iff in Hprfe. repnd.
   simpl in *. destruct fvo;  simpl in *; try  invertsn Hev.
   (* Lambda *)
@@ -307,6 +327,7 @@ Proof using.
     unfold apply_bterm in *. simpl in *.
     rewrite <- ssubst_commute in Hev;[ | prove_sub_range_sat].
     simpl in *.
+    repnd. split; [assumption | ].
     eapply eval_App_e; eauto.
 
   (* Fix *)
@@ -335,6 +356,7 @@ Proof using.
       unfold num_bvars in *. simpl in *. autorewrite with list in Hprfe0.
       autorewrite with list in Hd.
       subst.
+      repnd. split; [assumption | ].
       eapply eval_FixApp_e; eauto;
         unfold num_bvars, Fix_e' in *; simpl in *;
           repeat rewrite map_length; try assumption; try congruence.
@@ -346,14 +368,15 @@ Proof using.
   + destruct fvlbt; inverts Hprfe0.
     simpl. unfold apply_bterm. simpl. unfold Lam_e. simpl.
     inverts Hev. simpl.
+    split; [ apply isprogram_ot_iff; simpl; firstorder | ].
     eapply eval_FixApp_e; eauto;[reflexivity| | reflexivity].
     simpl. unfold apply_bterm. simpl.
     eapply eval_App_e; eauto;[apply eval_Lam_e | eapply eval_end; eauto| ].
     simpl. unfold subst. clear Hprfe.
     rewrite ssubst_trivial3;[apply eval_Fix_e; fail | ].
     inreasoning. invertsn H. simpl.
-    rewrite  L4_2_to_L4_5_fvars;[ | apply Hprfa].
-    rewrite (proj1 Hprfa). unfold disjoint. firstorder.
+    rewrite  L4_2_to_L4_5_fvars;[ | apply Hprae].
+    rewrite (proj1 Hprae). unfold disjoint. firstorder.
   
 (* let *)
 - simpl; destruct lbt as [ | a lbt]; simpl; try invertsn Hev ;[].
@@ -370,12 +393,13 @@ Proof using.
   specialize (Hpr _ ltac:(right;cpx)).
   pose proof (fun v => Hind _ v Hw) as Hinda.
   do 1 rewrite <- fold_option_bind.
-  pose proof (eval42PreservesGoodness n a Hw) as Hpre. intros Hev.
+  intros Hev.
   destruct (eval42 n a) as [av42 | ]; simpl in *;[ | invertsn Hev].
   specialize (Hinda _ eq_refl).
   apply Hind in Hev;[ | apply isprogram_bt_implies; auto;  inreasoning; cpx ].
-  unfold apply_bterm in *. simpl in *.
+  unfold apply_bterm in *. simpl in *. repnd.
   rewrite <- ssubst_commute in Hev; auto; [ | prove_sub_range_sat].
+  repnd. split; [assumption | ].
   eapply eval_Let_e; eauto.
 
   (* match *)
@@ -384,10 +408,10 @@ Proof using.
   simpl. simpl in *. let tac:=(invertsn Hpr0) in destructbtdeep2 d tac.
   simpl in *. pose proof (Hpr _ ltac:(left; refl)) as Hprd.
   apply isprogram_bt_nobnd in Hprd.
-  pose proof (eval42PreservesGoodness n _ Hprd) as Hpre.
   pose proof (fun v => Hind _ v Hprd) as Hindd.
   destruct (eval42 n dnt) as [vd | ];[ simpl | invertsn Hev].
   specialize (Hindd _ eq_refl).
+  destruct Hindd as [Hpre Hindd].
   destruct vd as [ | do dlbt ]; [ invertsn Hev | simpl ].
   destruct do; try  invertsn Hev;[]; simpl in *.
 (*  do 1 rewrite map_map in Hev.
@@ -430,6 +454,7 @@ Proof using.
   apply (f_equal (@length _)) in Hpre0. simpl in Hpre0.
   unfold num_bvars in *. simpl in *. autorewrite with list in *.
   subst.
+  repnd. split; [assumption | ].
   eapply eval_match_e2; eauto; autorewrite with list; auto.
   + unfold Con_e.
     rewrite Hnt in Hindd. simpl in Hindd.
@@ -443,9 +468,13 @@ Proof using.
   + assumption.
   + revert Hbb. clear. rewrite map_map. intro.
     erewrite map_ext;[ | intros; rewrite numBvarsBtMapNt; refl]. assumption.
-- simpl. apply eval_Fix_e.
+- simpl.
+  split; [assumption | ].
+  apply eval_Fix_e.
 Qed.
 
 Print Assumptions L4_2_to_L4_5_correct.
+(* Closed under the global context *)
+
 End evaln42_45.
 

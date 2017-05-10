@@ -3,18 +3,9 @@ This section should be moved to SquiggleEq-parametricity.
 (SquiggleEq should not depend on parametricity because 
 the parametricity plugin may depend on it.)
 
-(* Compiling this section needs the parametricity plugin 
-https://github.com/aa755/paramcoq/tree/v85-patched
-and a version Coq 8.5 that has 1 fix of 8.6 back-ported.
-
-In future, when Certicoq compiles with Coq 8.6, the following plugin that works with
-pure Coq 8.6 may be used
+Compiling this section needs a parametricity plugin.
+Currently, the following one can be used.
 https://github.com/aa755/paramcoq/tree/v86
-*)
-
-Because the polyEval function, whose abstraction theorem is needed, depends
-on SquiggleEq and ExtLib, which dont compile with Coq 8.6, only 
-the patch 8.5 version can be used.
 *)
 Declare ML Module "paramcoq".
 Require Import Common.TermAbs.
@@ -38,8 +29,14 @@ Require Import Coq.Classes.DecidableClass.
 Require Import Coq.Classes.Morphisms.
 Definition t_iff (a b: Type) := (prod (a->b) (b->a)).
 
+
 Class EqIfR {A:Type} (Ar : A -> A-> Type)  := eqIfR: forall (a1 a2:A), 
   t_iff (Ar a1 a2) (a1=a2).
+
+Global Instance EqIfReq {A:Type}: EqIfR (@eq A).
+Proof using.
+  constructor; tauto.
+Qed.
 
 Inductive list_RP {A₁ A₂ : Type} (A_R : A₁ -> A₂ -> Prop) : list A₁ -> list A₂ -> Prop :=
     nil_R : list_RP A_R [] []
@@ -55,6 +52,18 @@ Proof using.
     destruct l2; try inverts Hyp; try constructor; try eauto;
     try (provefalse; inverts Hyp; fail); try apply IHl1; eauto;
     try inverts Hyp; auto.
+Qed.
+
+Lemma list_Rext (A₁ A₂ : Type) (A_R1 A_R2 : A₁ -> A₂ -> Prop) :
+  (forall a1 a2, (A_R1 a1 a2) <-> (A_R2 a1 a2))
+  -> forall l1 l2,
+  (list_RP A_R1 l1 l2) <-> (list_RP A_R2 l1 l2).
+Proof using.
+  intros Hext. unfold t_iff in *.
+  induction l1; intros l2; split; intros Hyp; 
+    destruct l2; try inverts Hyp; try constructor; try eauto;
+    try (provefalse; inverts Hyp; fail); try apply IHl1; eauto;
+    try inverts Hyp; firstorder.
 Qed.
 
 (* SquiggleEq uses this style in the definition of alpha equality *)
@@ -149,10 +158,11 @@ Qed.
 Global Instance list_R_eq  {A} (A_R : A->A->Type) :
   EqIfR A_R -> EqIfR (list_R _ _ A_R).
 Proof.
-  intros Ha x. induction x; intros y; split; intros Hyp; inverts Hyp;
+  intros Ha x. induction x; intros y; split; intros Hyp; try invertsn Hyp; subst;
   try constructor; try f_equal; auto; try apply Ha; try apply IHx; auto.
 Qed.
 
+Parametricity Recursive GenericTermSig.
 Definition eq_GenericTermSig_R   (Opid:Type) (gts : GenericTermSig Opid) :
   GenericTermSig_R Opid Opid eq gts gts.
 Proof using.
@@ -165,11 +175,47 @@ Defined.
 
 Infix "<=>" := t_iff.
 
-Section DBToNamed.
+Section ParamRels.
 (* this context list was copied from SquiggleEq.termsDB *)
 Context {Name NVar VarClass Opid : Type} {deqv vcc fvv}
   `{vartyp: @VarType NVar VarClass deqv vcc fvv}
   `{deqo: Deq Opid} {gts : GenericTermSig Opid} (def:Name).
+
+Definition TermAbs_R_NamedAlphaClosedWf Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
+TermAbs_R Opid Opid Opid_R
+    (Named.TermAbsImpl NVar Opid)
+    (Named.TermAbsImpl NVar Opid).
+Proof using vartyp deqo def gts.
+  (* could also have used the arity 1 version. but that would need many lemmas *)
+  eapply TermAbs_R_Build_TermAbs_R with 
+    (AbsTerm_R := fun t1 t2  => isprogram t1 /\ t1 = t2)
+      (AbsBTerm_R := fun t1 t2  => isprogram_bt t1 /\ t1 = t2); [ | | | | | ].
+- intros ? ? Hp. apply nat_R_eq.  repnd. subst. refl.
+- intros t1 t Hp. repnd. subst. destruct t; try constructor.
+  constructor;[ apply eqIfR; refl | ].
+  apply  list_R_map_lforall. split.
+  + apply isprogram_ot_iff in Hp0. repnd. assumption.
+  + rewrite map_id. apply list_R_eq;[constructor; tauto | refl].
+- intros b1 b Hpr. repnd. subst. destruct b as [lv ?].
+  destruct lv; constructor.
+  apply isprogram_bt_nobnd in Hpr0. auto.
+- intros b1 b Hpr lt1 lt Hpt. repnd. subst.
+  apply list_R_map_lforall in Hpt.
+  rewrite map_id in Hpt.
+  repnd.  apply list_R_eq in Hpt; [ | eauto with typeclass_instances].
+  subst. unfold Named.applyBTermClosed. case_if as Hd; constructor.
+  apply beq_nat_true in Hd.
+  split;[| refl ].
+  apply isprogram_bt_implies; auto.
+- intros ? lt Hlt ? o Ho.
+  apply eqIfR in Ho. subst.
+  apply list_R_map_lforall in Hlt.
+  rewrite map_id in Hlt. repnd.
+  apply list_R_eq in Hlt; [ | eauto with typeclass_instances]. subst.
+  constructor.
+(* To preserve nt_wf, Named.mkBTermSafe must do a check that (map num_bvars lbt) is correct,
+even when lbt are isprogram_bt *)
+Abort.
 
 Lemma alpha_eq_ot_list_R (o:Opid) (la: list (@BTerm NVar Opid)) lb:
   alpha_eq (terms.oterm o la) (terms.oterm o lb)
@@ -196,6 +242,7 @@ Proof using.
 Qed.
 
 Require Import SquiggleEq.termsDB.
+Section DBToNamed.
 
   Variable mkNVar: (N * Name) -> NVar.
   Variable getId: NVar -> N.
@@ -225,11 +272,11 @@ Qed.
 
 
 
-Definition TermAbs_R_NamedDB Opid_R gtsr {Hoeq: @EqIfR Opid Opid_R}: 
-TermAbs_R Opid Opid Opid_R gts gts gtsr 
+Definition TermAbs_R_NamedDB Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
+TermAbs_R Opid Opid Opid_R
     (TermAbsDB Name Opid)
     (Named.TermAbsImpl NVar Opid).
-Proof using vartyp mkNVar getIdCorr getId deqo def .
+Proof using vartyp mkNVar getIdCorr getId deqo def gts.
   eapply TermAbs_R_Build_TermAbs_R with 
     (AbsTerm_R := Term_R)
     (AbsBTerm_R := BTerm_R).
@@ -294,7 +341,6 @@ Proof using vartyp mkNVar getIdCorr getId deqo def .
   erewrite namesInsWierd1 with (def0:=def) (nf:=0) (names:=FMapPositive.Empty); eauto.
   subst. simpl.
   rewrite Hc,<- Hallb.
-  SearchAbout N.sub 0%N.
   rewrite map_map.
   apply eq_maps.
   intros.
@@ -321,7 +367,11 @@ Definition TermAbs_R_NamedDB2 :
 TermAbs_R_NamedDB (eq_GenericTermSig_R Opid gts).
 *)
 
+
+
+
 End DBToNamed.
 
+End ParamRels.
 
 

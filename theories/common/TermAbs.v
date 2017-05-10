@@ -166,7 +166,6 @@ Definition TermAbsDB : TermAbs Opid :=
 
 End SquiggleDBInst.
 
-(* Move to Common.TermAbsImpl *)
 Lemma getNtNamedMapBtCommute {O1 O2 V} (f : @NTerm V O1 -> @NTerm V O2) b:
   Named.safeGetNT _ _ (btMapNt f b) = option_map f (Named.safeGetNT _ _ b).
 Proof using.
@@ -174,7 +173,6 @@ Proof using.
 Qed.
 
 Require Import SquiggleEq.terms.
-(* Move to Common.TermAbsImpl *)
 Lemma numBvarsBtMapNt {O1 O2 V} (f : @NTerm V O1 -> @NTerm V O2) (b : @BTerm V O1):
   num_bvars (btMapNt f b) = num_bvars b.
 Proof using.
@@ -182,7 +180,6 @@ Proof using.
 Qed.
 
 Require Import SquiggleEq.ExtLibMisc.
-(* Move to Common.TermAbsImpl *)
 Lemma safeGetNTmap {O V} (lbt: list (@BTerm V O)) m:
   map num_bvars lbt = repeat 0%nat m->
   (flatten (map (Named.safeGetNT V O) lbt)) =

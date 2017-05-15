@@ -21,6 +21,7 @@ Set Implicit Arguments.
 
 Definition L1gTerm := L1g.compile.Term.
 Definition L1gTerms := L1g.compile.Terms.
+Definition L1gBrs := L1g.compile.Brs.
 Definition L1gDefs := L1g.compile.Defs.
 
 
@@ -39,6 +40,7 @@ Definition optStripDnth (b: option (L1gTerm * nat)) : option (Term * nat) :=
                              | None => None
                              | Some (t, n) => Some (strip t, n)
                            end.
+Definition optStripBnth := optStripDnth.
 Definition optStripCanP
            (b: option (nat * L1gTerms)): option (nat * Terms) :=
                            match b with
@@ -68,6 +70,7 @@ Lemma optStripDnth_hom:
   forall y n, optStripDnth (Some (y, n)) = Some (strip y, n).
 induction y; simpl; reflexivity.
 Qed.
+Definition optStripBnth_hom := optStripDnth_hom.
 Lemma optStripCanP_hom:
   forall y n, optStripCanP (Some (n, y)) = Some (n, strips y).
 induction y; simpl; reflexivity.
@@ -179,6 +182,13 @@ induction m; induction ds; try intuition.
 - simpl. intuition.
 Qed.
 
+Lemma bnth_hom:
+  forall m ds, optStripBnth (L1g.compile.bnth m ds) =
+               bnth m (stripBs ds).
+induction m; induction ds; try intuition.
+- simpl. intuition.
+Qed.
+
 
 Lemma TCast_hom:
   forall tm ty, strip (L1g.compile.TCast tm ty) = TCast (strip tm).
@@ -242,9 +252,10 @@ Qed.
 Lemma L1WFapp_L2WFapp:
   (forall t, L1g.term.WFapp t -> WFapp (strip t)) /\
   (forall ts, L1g.term.WFapps ts -> WFapps (strips ts)) /\
+  (forall ts, L1g.term.WFappBs ts -> WFappBs (stripBs ts)) /\
   (forall ds, L1g.term.WFappDs ds -> WFappDs (stripDs ds)).
 Proof.
-  apply L1g.term.WFappTrmsDefs_ind; simpl; constructor; auto.
+  apply L1g.term.WFappTrmsBrsDefs_ind; simpl; constructor; auto.
   intros h. elim H. apply isApp_hom. assumption.
 Qed.
 
@@ -352,10 +363,12 @@ Lemma instantiate_hom:
                      instantiate (strip arg) n (strip bod)) /\
     (forall bods arg n, strips (L1g.term.instantiates arg n bods) =
                     instantiates (strip arg) n (strips bods)) /\
+    (forall brs arg n, stripBs (L1g.term.instantiateBrs arg n brs) =
+                    instantiateBrs (strip arg) n (stripBs brs)) /\
     (forall ds arg n, stripDs (L1g.term.instantiateDefs arg n ds) =
                       instantiateDefs (strip arg) n (stripDs ds)).
 Proof.
-  apply L1g.compile.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
+  apply L1g.compile.TrmTrmsBrsDefs_ind; intros; try (simpl; reflexivity).
   - simpl. destruct (lt_eq_lt_dec n n0); cbn.
     + destruct s.
       * rewrite (proj1 (nat_compare_gt n0 n)); try omega. cbn. reflexivity.
@@ -391,9 +404,9 @@ Proof.
     rewrite <- H. rewrite <- H0. rewrite <- H1. 
     rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
   - change (TCase p (strip (L1g.term.instantiate arg n t0))
-                  (stripDs (L1g.term.instantiateDefs arg n d)) =
+                  (stripBs (L1g.term.instantiateBrs arg n b)) =
             (TCase p (instantiate (strip arg) n (strip t0))
-                   (instantiateDefs (strip arg) n (stripDs d)))).
+                   (instantiateBrs (strip arg) n (stripBs b)))).
     rewrite H0. rewrite H1. reflexivity.
   - change (TFix (stripDs (L1g.term.instantiateDefs
                              arg (n0 + L1g.compile.dlength d) d)) n =
@@ -405,6 +418,11 @@ Proof.
             tcons (instantiate (strip arg) n (strip t))
                   (instantiates (strip arg) n (strips t0))).
     rewrite H. rewrite H0. reflexivity.
+  - change (bcons n (strip (L1g.term.instantiate arg n0 t))
+                  (stripBs (L1g.term.instantiateBrs arg n0 b)) =
+            bcons n (instantiate (strip arg) n0 (strip t))
+                  (instantiateBrs (strip arg) n0 (stripBs b))).
+    rewrite H0. rewrite H. reflexivity.
   - change (dcons n (strip (L1g.term.instantiate arg n1 t0)) n0
                   (stripDs (L1g.term.instantiateDefs arg n1 d)) =
             dcons n (instantiate (strip arg) n1 (strip t0)) n0
@@ -442,11 +460,11 @@ Qed.
 Lemma whCaseStep_hom:
   forall n brs ts,
     optStrip (L1g.term.whCaseStep n ts brs) =
-    whCaseStep n (strips ts) (stripDs brs).
+    whCaseStep n (strips ts) (stripBs brs).
 destruct n, brs; intros; simpl; try reflexivity.
 - unfold whCaseStep. simpl. rewrite mkApp_hom. reflexivity.
 - unfold whCaseStep. unfold L1g.term.whCaseStep. cbn. 
-  rewrite <- dnthBody_hom. destruct (compile.dnthBody n brs); simpl.
+  rewrite <- bnth_hom. destruct (compile.bnth n brs); simpl.
   + destruct p as [x0 x1]. cbn. rewrite mkApp_hom. reflexivity.
   + reflexivity.
 Qed.
@@ -478,7 +496,7 @@ Qed.
 Lemma TCase_hom:
   forall n ty mch brs,
     strip (L1g.compile.TCase n ty mch brs) =
-    TCase n (strip mch) (stripDs brs).
+    TCase n (strip mch) (stripBs brs).
 reflexivity.
 Qed.
 
@@ -765,10 +783,10 @@ Qed.
 Lemma Case_strip_inv:
   forall m mch brs s, TCase m mch brs = strip s ->
     exists sty smch sbrs, (L1g.compile.TCase m sty smch sbrs = s) /\
-              mch = strip smch /\ brs = stripDs sbrs.
+              mch = strip smch /\ brs = stripBs sbrs.
 Proof.
   intros m mch brs s. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. exists s1, s2, d. intuition.
+  - myInjection h. exists s1, s2, b. intuition.
 Qed.
 
 Lemma tnil_strip_inv:
@@ -799,7 +817,7 @@ Qed.
 Lemma whCaseStep_Hom:
   forall n ts bs t,
     L1g.term.whCaseStep n ts bs = Some t -> 
-    whCaseStep n (strips ts) (stripDs bs) = Some (strip t).
+    whCaseStep n (strips ts) (stripBs bs) = Some (strip t).
 Proof.
   intros n ts bs t h. rewrite <- whCaseStep_hom. rewrite <- optStrip_hom.
   apply f_equal. assumption.

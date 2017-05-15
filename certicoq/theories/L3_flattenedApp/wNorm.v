@@ -21,10 +21,9 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNCase: forall mch n brs,
-            WNorm mch -> ~ isConstruct mch ->
-            WNorm (TCase n mch brs)
+    WNorm mch -> ~ isConstruct mch -> WNorm (TCase n mch brs)
 | WNConstruct: forall i n args,
-                 WNorms args -> WNorm (TConstruct i n args)
+    WNorms args -> WNorm (TConstruct i n args)
 | WNApp: forall fn t,
            WNorm fn -> WNorm t ->
            ~ (isLambda fn) -> ~ (isFix fn) -> fn <> TProof ->
@@ -42,11 +41,12 @@ Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.
 Lemma WNorm_dec: 
   (forall t, WNorm t \/ ~ WNorm t) /\
   (forall ts, WNorms ts \/ ~ WNorms ts) /\
+  (forall (bs:Brs), True) /\
   (forall (ds:Defs), True).
 Proof.
   Ltac rght := solve [right; intros h; inversion_Clear h; contradiction].
   Ltac lft := solve [left; constructor; assumption].
-  apply TrmTrmsDefs_ind; intros; auto;
+  apply TrmTrmsBrsDefs_ind; intros; auto;
   try (solve[right; intros h; inversion h]);
   try (solve[left; constructor]).
   - destruct (isLambda_dec t). rght.

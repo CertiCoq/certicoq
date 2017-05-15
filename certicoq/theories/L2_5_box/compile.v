@@ -15,6 +15,7 @@ Set Implicit Arguments.
 
 Definition L2kTerm := L2k.compile.Term.
 Definition L2kTerms := L2k.compile.Terms.
+Definition L2kBrs := L2k.compile.Brs.
 Definition L2kDefs := L2k.compile.Defs.
 Definition L2kEC := envClass L2kTerm.
 Definition L2kEnv := environ L2kTerm.
@@ -32,24 +33,28 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TConstruct : inductive -> nat (* index in datatype *) -> Terms -> Term
 | TCase      : inductive ->
-               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
+               Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
+with Brs : Type :=
+| bnil : Brs
+| bcons : nat -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Defs.
+Hint Constructors Term Terms Brs Defs.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
+  with Brs_ind' := Induction for Brs Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
-Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
-Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
+Combined Scheme TrmTrmsBrsDefs_ind
+         from Trm_ind', Trms_ind', Brs_ind', Defs_ind'.
 Notation tunit t := (tcons t tnil).
-Notation dunit nm t m d := (dcons nm t m d dnil).
-
+Notation dunit nm t m := (dcons nm t m dnil).
+Notation bunit t m := (bcons t m dnil).
 
 (*** \box in case branches: need tappend, mkApp and instantiate ***)
 Function tappend (ts1 ts2:Terms) : Terms :=
@@ -62,6 +67,12 @@ Fixpoint dlength (ts:Defs) : nat :=
     | dnil => 0
     | dcons _ _ _ ts => S (dlength ts)
   end.
+Function blength (ts:Brs) : nat :=
+  match ts with 
+    | bnil => 0
+    | bcons _ _ ts => S (blength ts)
+  end.
+
 (** syntactic control of "TApp": no nested apps, app must have an argument **)
 Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
   match t with
@@ -82,10 +93,8 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
                 end
     | TApp t a ts =>
       mkApp (instantiate n t) (tcons (instantiate n a) (instantiates n ts))
-    | TLambda nm  bod =>
-      TLambda nm  (instantiate (S n) bod)
-    | TCase np s ts =>
-      TCase np (instantiate n s) (instantiateDefs n ts)
+    | TLambda nm bod => TLambda nm  (instantiate (S n) bod)
+    | TCase np s ts => TCase np (instantiate n s) (instantiateBrs n ts)
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
@@ -98,6 +107,11 @@ with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
          | tnil => tnil
          | tcons t ts => tcons (instantiate n t) (instantiates n ts)
        end
+with instantiateBrs (n:nat) (bs:Brs) {struct bs} : Brs :=
+       match bs with
+         | bnil => bnil
+         | bcons m t ts => bcons m (instantiate n t) (instantiateBrs n ts)
+       end
 with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
        match ds with
          | dnil => dnil
@@ -106,6 +120,7 @@ with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
        end.
 Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop
 with instantiates_ind' := Induction for instantiates Sort Prop
+with instantiateBrs_ind' := Induction for instantiateBrs Sort Prop
 with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop.
 End Instantiate_sec.
 
@@ -137,11 +152,11 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
       match L2k.term.isProof_dec mch with
         | left _ =>
           match brs with
-            | L2k.compile.dunit _ br n =>
+            | L2k.compile.bunit n br =>
               applyBranchToProof n (L2kTerm_Term br)
-            | _ => TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs)
+            | _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
           end
-        | right _ => TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs)
+        | right _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
       end
     | L2k.compile.TFix defs m => TFix (L2kDefs_Defs defs) m
     | L2k.compile.TAx => TWrong
@@ -151,6 +166,11 @@ with L2kTerms_Terms (ts:L2kTerms) : Terms :=
        match ts with
          | L2k.compile.tnil => tnil
          | L2k.compile.tcons u us => tcons (L2kTerm_Term u) (L2kTerms_Terms us)
+       end
+with L2kBrs_Brs (ts:L2kBrs) : Brs :=
+       match ts with
+         | L2k.compile.bnil => bnil
+         | L2k.compile.bcons n u us => bcons n (L2kTerm_Term u) (L2kBrs_Brs us)
        end
 with L2kDefs_Defs (ds:L2kDefs) : Defs :=
        match ds with
@@ -183,17 +203,17 @@ Proof.
 Lemma L2kTerm_Term_Case_not_Proof:
   forall mch, ~ L2k.term.isProof mch ->
               forall m brs, L2kTerm_Term (L2k.compile.TCase m mch brs) =
-                            TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs).
+                            TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs).
 Proof.
   intros mch hmch m brs.
   destruct brs, mch; cbn; try reflexivity.
   elim hmch. auto.
 Qed.
 
-Lemma L2kTerm_Term_Case_not_dunit:
-  forall brs, L2k.compile.dlength brs <> 1 ->
+Lemma L2kTerm_Term_Case_not_bunit:
+  forall brs, L2k.compile.blength brs <> 1 ->
               forall m mch, L2kTerm_Term (L2k.compile.TCase m mch brs) =
-                            TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs).
+                            TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs).
 Proof.
   intros brs hmch m mch.
   destruct brs; intros; cbn; destruct mch; try reflexivity.

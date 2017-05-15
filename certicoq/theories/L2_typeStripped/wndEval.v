@@ -32,7 +32,7 @@ Inductive wndEval : Term -> Term -> Prop :=
      (* Case argument must be in Canonical form *)
      (* n is the number of parameters of the datatype *)
 | sCase: forall (ml:inductive * nat) (s mch:Term)
-                 (args ts:Terms) (brs:Defs) (n:nat),
+                 (args ts:Terms) (brs:Brs) (n:nat),
             canonicalP mch = Some (n, args) ->
             tskipn (snd ml) args = Some ts ->
             whCaseStep n ts brs = Some s ->
@@ -59,14 +59,9 @@ Inductive wndEval : Term -> Term -> Prop :=
 | sLetInDef:forall (nm:name) (d1 d2 bod:Term),
               wndEval d1 d2 ->
               wndEval (TLetIn nm d1 bod) (TLetIn nm d2 bod)
-| sCaseArg: forall (nl:inductive * nat) (mch can:Term) (brs:Defs),
+| sCaseArg: forall (nl:inductive * nat) (mch can:Term) (brs:Brs),
               wndEval mch can ->
               wndEval (TCase nl mch brs) (TCase nl can brs)
-     (*****
-| sCaseBrs: forall (nl:inductive * nat * list nat) (mch:Term) (brs brs':Terms),
-              wndEvals brs brs' ->
-              wndEval (TCase nl mch brs) (TCase nl mch brs')
-***************)
 with wndEvals : Terms -> Terms -> Prop :=
      | saHd: forall (t r:Term) (ts:Terms), 
                wndEval t r ->
@@ -1109,9 +1104,6 @@ Proof.
     intros h. inversion h; intuition.
   - apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
   - apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
-    (*************************
-  - apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
-************************)
   - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
   - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
 Qed.

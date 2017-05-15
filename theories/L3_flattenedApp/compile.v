@@ -18,6 +18,7 @@ Set Implicit Arguments.
 
 Definition L2_5Term := L2_5.compile.Term.
 Definition L2_5Terms := L2_5.compile.Terms.
+Definition L2_5Brs := L2_5.compile.Brs.
 Definition L2_5Defs := L2_5.compile.Defs.
 Definition L2_5EC := envClass L2_5Term.
 Definition L2_5Env := environ L2_5Term.
@@ -33,22 +34,28 @@ Inductive Term : Type :=
 | TConst     : string -> Term
 | TConstruct : inductive -> nat (* index *) -> Terms -> Term
 | TCase      : inductive ->
-               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
+               Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong : Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
+with Brs : Type :=
+| bnil : Brs
+| bcons : nat -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs. 
-Hint Constructors Term Terms Defs.
+Hint Constructors Term Terms Brs Defs.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
+  with Brs_ind' := Induction for Brs Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
-Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
-Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
+Combined Scheme TrmTrmsBrsDefs_ind
+         from Trm_ind', Trms_ind', Brs_ind', Defs_ind'.
 Notation tunit t := (tcons t tnil).
+Notation dunit nm t m := (dcons nm t m dnil).
+Notation bunit t m := (bcons t m dnil).
 
 
 Definition isConstruct (t:Term) : Prop :=
@@ -242,6 +249,12 @@ Fixpoint dlength (ts:Defs) : nat :=
     | dcons _ _ _ ts => S (dlength ts)
   end.
 
+Fixpoint blength (ts:Brs) : nat :=
+  match ts with 
+    | bnil => 0
+    | bcons _ _ ts => S (blength ts)
+  end.
+
 
 (** lift a Term over a new binding **)
 Fixpoint lift (n:nat) (t:Term) : Term :=
@@ -254,7 +267,7 @@ Fixpoint lift (n:nat) (t:Term) : Term :=
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg => TApp (lift n fn) (lift n arg)
     | TConstruct i x args => TConstruct i x (lifts n args)
-    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (liftDs n brs)
+    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (liftBs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
     | _ => t
   end
@@ -262,6 +275,11 @@ with lifts (n:nat) (ts:Terms) : Terms :=
        match ts with
          | tnil => tnil
          | tcons u us => tcons (lift n u) (lifts n us)
+       end
+with liftBs (n:nat) (ts:Brs) : Brs :=
+       match ts with
+         | bnil => bnil
+         | bcons m u us => bcons m (lift n u) (liftBs n us)
        end
 with liftDs n (ds:Defs) : Defs :=
        match ds with
@@ -279,6 +297,14 @@ Qed.
 
 Lemma liftDs_pres_dlength:
   forall n ds, dlength (liftDs n ds) = dlength ds.
+Proof.
+  induction ds.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
+Lemma liftBs_pres_blength:
+  forall n ds, blength (liftBs n ds) = blength ds.
 Proof.
   induction ds.
   + reflexivity.
@@ -453,7 +479,7 @@ Function strip (t:L2_5Term) : Term :=
       mkApp (strip fn) (tcons (strip arg) (strips args))
     | L2_5.compile.TConst nm => TConst nm
     | L2_5.compile.TConstruct i n args => TConstruct i n (strips args)
-    | L2_5.compile.TCase n mch brs => TCase n (strip mch) (stripDs brs)
+    | L2_5.compile.TCase n mch brs => TCase n (strip mch) (stripBs brs)
     | L2_5.compile.TFix ds n => TFix (stripDs ds) n
     | L2_5.compile.TWrong => TWrong
    end
@@ -462,6 +488,11 @@ with strips (ts:L2_5Terms) : Terms :=
     | L2_5.compile.tnil => tnil
     | L2_5.compile.tcons t ts => tcons (strip t) (strips ts)
   end
+with stripBs (ts:L2_5Brs) : Brs := 
+  match ts with
+  | L2_5.compile.bnil => bnil
+  | L2_5.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
+  end
 with stripDs (ts:L2_5Defs) : Defs := 
   match ts with
     | L2_5.compile.dnil => dnil
@@ -469,6 +500,7 @@ with stripDs (ts:L2_5Defs) : Defs :=
   end.
 Functional Scheme strip_ind' := Induction for strip Sort Prop
 with strips_ind' := Induction for strips Sort Prop
+with stripBs_ind' := Induction for stripBs Sort Prop
 with stripDs_ind' := Induction for stripDs Sort Prop.
 (*** Anomaly: Uncaught exception Term.DestKO. Please report. ***
 Combined Scheme stripStripsStripDs_ind

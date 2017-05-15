@@ -15,6 +15,7 @@ Set Implicit Arguments.
 
 Definition L2Term := L2.compile.Term.
 Definition L2Terms := L2.compile.Terms.
+Definition L2Brs := L2.compile.Brs.
 Definition L2Defs := L2.compile.Defs.
 Definition L2Pgm := Program L2Term.
 Definition L2EC := envClass L2Term.
@@ -34,23 +35,28 @@ Inductive Term : Type :=
 | TConstruct : inductive -> nat (* index *) -> Terms -> Term
          (* use Defs to code branches in Case *)
 | TCase      : inductive -> Term (* discriminee *) ->
-               Defs (* # args, branch *) -> Term
+               Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
+with Brs : Type :=
+| bnil : Brs
+| bcons : nat -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Defs.
+Hint Constructors Term Terms Brs Defs.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
+  with Brs_ind' := Induction for Brs Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
-Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
-Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
+Combined Scheme TrmTrmsBrsDefs_ind
+         from Trm_ind', Trms_ind', Brs_ind', Defs_ind'.
 Notation tunit t := (tcons t tnil).
 Notation dunit nm t m := (dcons nm t m dnil).
+Notation bunit t m := (bcons t m bnil).
 
 Fixpoint Terms_list (ts:Terms) : list Term :=
   match ts with
@@ -62,6 +68,12 @@ Function tlength (ts:Terms) : nat :=
   match ts with 
     | tnil => 0
     | tcons _ ts => S (tlength ts)
+  end.
+
+Function blength (ts:Brs) : nat :=
+  match ts with 
+    | bnil => 0
+    | bcons _ _ ts => S (blength ts)
   end.
 
 Lemma tlength_S:
@@ -169,7 +181,7 @@ Function lift (n:nat) (t:Term) : Term :=
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg args => TApp (lift n fn) (lift n arg) (lifts n args)
     | TConstruct i x args => TConstruct i x (lifts n args)
-    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (liftDs n brs)
+    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (liftBs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
     | _ => t
   end
@@ -178,6 +190,11 @@ with lifts (n:nat) (ts:Terms) : Terms :=
          | tnil => tnil
          | tcons u us => tcons (lift n u) (lifts n us)
        end
+with liftBs (n:nat) (ts:Brs) : Brs :=
+       match ts with
+         | bnil => bnil
+         | bcons m b bs => bcons m (lift n b) (liftBs n bs)
+       end
 with liftDs n (ds:Defs) : Defs :=
        match ds with
          | dnil => dnil
@@ -185,8 +202,10 @@ with liftDs n (ds:Defs) : Defs :=
        end.
 Functional Scheme lift_ind' := Induction for lift Sort Prop
 with lifts_ind' := Induction for lifts Sort Prop
+with liftBs_ind' := Induction for liftBs Sort Prop
 with liftDs_ind' := Induction for liftDs Sort Prop.
-Combined Scheme liftLiftsLiftDs_ind from lift_ind', lifts_ind', liftDs_ind'.
+Combined Scheme liftLiftsliftBsLiftDs_ind
+         from lift_ind', lifts_ind', liftBs_ind', liftDs_ind'.
 
 
 Lemma lifts_pres_tlength:
@@ -332,7 +351,7 @@ Function strip (t:L2Term) : Term :=
     | L2.compile.TInd i => TProof TAx
     | L2.compile.TConstruct i m npars nargs =>
       etaExp_cnstr i m npars nargs tnil
-    | L2.compile.TCase (i,_) mch brs => TCase i (strip mch) (stripDs brs)
+    | L2.compile.TCase (i,_) mch brs => TCase i (strip mch) (stripBs brs)
     | L2.compile.TFix ds n => TFix (stripDs ds) n
     | L2.compile.TWrong => TWrong
   end
@@ -340,6 +359,11 @@ with strips (ts:L2Terms) : Terms :=
   match ts with
     | L2.compile.tnil => tnil
     | L2.compile.tcons t ts => tcons (strip t) (strips ts)
+  end
+with stripBs (bs:L2Brs) : Brs := 
+  match bs with
+    | L2.compile.bnil => bnil
+    | L2.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
   end
 with stripDs (ts:L2Defs) : Defs := 
   match ts with

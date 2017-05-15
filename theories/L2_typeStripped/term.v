@@ -97,9 +97,10 @@ Local Ltac cross := try (solve [right; intros h; discriminate]).
 Lemma TermTerms_dec: 
   (forall (s t:Term), s = t \/ s <> t) /\
   (forall (ss tt:Terms), ss = tt \/ ss <> tt) /\
+  (forall (ss tt:Brs), ss = tt \/ ss <> tt) /\
   (forall (dd ee:Defs), dd = ee \/ dd <> ee).
 Proof.
-  apply TrmTrmsDefs_ind.
+  apply TrmTrmsBrsDefs_ind; intros.
   - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
   - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
   - induction t0; cross.
@@ -122,16 +123,18 @@ Proof.
     destruct (inductive_dec i i0), (eq_nat_dec n n2),
       (eq_nat_dec n0 n3), (eq_nat_dec n1 n4);  
       [lft | rght .. ].
-  - induction t0; cross.
-    destruct p as [i n], p0 as [i0 n0].
-    destruct (eq_nat_dec n n0); destruct (inductive_dec i i0);
-    destruct (H t0); destruct (H0 d0);
-    [lft | rght .. ].
+  - destruct t0; cross.
+    destruct p as [i n], p0 as [i0 n0];
+    destruct (eq_nat_dec n n0), (inductive_dec i i0);
+    destruct (H t0), (H0 b0); [lft | rght .. ].
   - induction t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
   - destruct t; cross. lft.
   - induction tt; cross. lft.
   - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
+  - destruct tt; cross; lft.
+  - destruct tt; cross.
+    destruct (eq_nat_dec n n0), (H t0), (H0 tt); [lft | rght .. ].
   - induction ee; cross. lft.
   - induction ee; cross.
     destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
@@ -149,7 +152,7 @@ Fixpoint TrmSize (t:Term) {struct t} : nat :=
     | TLambda _ bod => S (TrmSize bod)
     | TLetIn _ dfn bod => S (TrmSize dfn + TrmSize bod)
     | TApp fn a args => S (TrmSize fn + TrmSize a + TrmsSize args)
-    | TCase _ mch brs => S (TrmSize mch + TrmDsSize brs)
+    | TCase _ mch brs => S (TrmSize mch + TrmBsSize brs)
     | TFix ds n => S (TrmDsSize ds)
     | _ => S 0
   end
@@ -157,6 +160,11 @@ with TrmsSize (ts:Terms) {struct ts} : nat :=
   match ts with
     | tnil => 1
     | tcons s ss => S (TrmSize s + TrmsSize ss)
+  end
+with TrmBsSize (ts:Brs) {struct ts} : nat :=
+  match ts with
+    | bnil => 1
+    | bcons _ s ss => S (TrmSize s + TrmBsSize ss)
   end
 with TrmDsSize (ds:Defs) : nat :=
   match ds with
@@ -200,7 +208,7 @@ Definition isCase (t:Term) : Prop :=
 Lemma isCase_dec: forall t, {isCase t}+{~ isCase t}.
 Proof.
   destruct t; try (solve[right; not_isCase]).
-  left. unfold isCase. exists p, t, d. reflexivity.
+  left. unfold isCase. exists p, t, b. reflexivity.
 Qed.
 Lemma IsCase: forall xn mch ds, isCase (TCase xn mch ds).
 Proof.
@@ -552,7 +560,13 @@ Proof.
   - apply IHn. assumption.
 Qed.
 
-(** operations on Defs **)
+(** operations on Defs and branches **)
+Fixpoint blength (ts:Brs) : nat :=
+  match ts with 
+    | bnil => 0
+    | bcons _ _ ts => S (blength ts)
+  end.
+
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
     | dnil => 0
@@ -566,6 +580,15 @@ Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
                            | 0 => Some (x, ix)
                            | S m => dnthBody m t
                          end
+  end.
+
+Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
+  match l with
+    | bnil => None
+    | bcons ix x bs => match n with
+                           | 0 => Some (x, ix)
+                           | S m => bnth m bs
+                       end
   end.
 
 Definition is_dunit (ds:Defs) : Prop :=
@@ -815,7 +838,7 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TConstruct i n n0 n1), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TCase p fn d), arg, tnil. split. reflexivity.
+  - exists (TCase p fn b), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TFix d n), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
@@ -841,21 +864,26 @@ Inductive WFapp: Term -> Prop :=
 | wfaInd: forall i, WFapp (TInd i)
 | wfaConstruct: forall i m1 np na, WFapp (TConstruct i m1 np na)
 | wfaCase: forall m mch brs,
-            WFapp mch -> WFappDs brs -> WFapp (TCase m mch brs)
+            WFapp mch -> WFappBs brs -> WFapp (TCase m mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
 with WFapps: Terms -> Prop :=
 | wfanil: WFapps tnil
 | wfacons: forall t ts, WFapp t -> WFapps ts -> WFapps (tcons t ts)
+with WFappBs: Brs -> Prop :=
+| wfabnil: WFappBs bnil
+| wfabcons: forall n b bs, WFapp b -> WFappBs bs ->  WFappBs (bcons n b bs)
 with WFappDs: Defs -> Prop :=
 | wfadnil: WFappDs dnil
 | wfadcons: forall nm bod arg ds,
              WFapp bod -> WFappDs ds ->
              WFappDs (dcons nm bod arg ds).
-Hint Constructors WFapp WFapps WFappDs.
+Hint Constructors WFapp WFapps WFappBs WFappDs.
 Scheme WFapp_ind' := Minimality for WFapp Sort Prop
   with WFapps_ind' := Minimality for WFapps Sort Prop
+  with WFappBs_ind' := Minimality for WFappBs Sort Prop
   with WFappDs_ind' := Minimality for WFappDs Sort Prop.
-Combined Scheme WFappTrmsDefs_ind from WFapp_ind', WFapps_ind', WFappDs_ind'.
+Combined Scheme WFappTrmsBrsDefs_ind
+         from WFapp_ind', WFapps_ind', WFappBs_ind', WFappDs_ind'.
 
 Lemma tappend_pres_WFapps:
   forall ts, WFapps ts -> forall us, WFapps us -> WFapps (tappend ts us).
@@ -953,6 +981,16 @@ Lemma tskipn_pres_WFapp:
   - discriminate.
 Qed.
 
+Lemma bnth_pres_WFapp:
+  forall (brs:Brs), WFappBs brs ->
+                    forall n t m, bnth n brs = Some (t,m) -> WFapp t.
+Proof.
+  intros brs h n t.
+  functional induction (bnth n brs); intros; try discriminate.
+  - myInjection H. inversion h. assumption.
+  - eapply IHo; inversion h; eassumption.
+Qed.
+
 
 (** well-formed terms: TApp well-formed all the way down **)
 (*** not used essentially at the moment **)
@@ -976,30 +1014,37 @@ Inductive WFTrm: Term -> nat -> Prop :=
 | wfInd: forall n i, WFTrm (TInd i) n
 | wfConstruct: forall n i m np na, WFTrm (TConstruct i m np na) n
 | wfCase: forall n m mch brs,
-            WFTrm mch n -> WFTrmDs brs n ->
+            WFTrm mch n -> WFTrmBs brs n ->
             WFTrm (TCase m mch brs) n
 | wfFix: forall n defs m,
            WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
 with WFTrms: Terms -> nat -> Prop :=
 | wfnil: forall n, WFTrms tnil n
 | wfcons: forall n t ts, WFTrm t n -> WFTrms ts n -> WFTrms (tcons t ts) n
+with WFTrmBs: Brs -> nat -> Prop :=
+| wfbnil: forall n, WFTrmBs bnil n
+| wfbcons: forall n m b bs,
+    WFTrm b n -> WFTrmBs bs n -> WFTrmBs (bcons m b bs) n
 with WFTrmDs: Defs -> nat -> Prop :=
 | wfdnil: forall n, WFTrmDs dnil n
 | wfdcons: forall n nm bod arg ds,
              WFTrm bod n -> WFTrmDs ds n ->
              WFTrmDs (dcons nm bod arg ds) n.
-Hint Constructors WFTrm WFTrms WFTrmDs.
+Hint Constructors WFTrm WFTrms WFTrmBs WFTrmDs.
 Scheme WFTrm_ind' := Minimality for WFTrm Sort Prop
   with WFTrms_ind' := Minimality for WFTrms Sort Prop
+  with WFTrmBs_ind' := Minimality for WFTrmBs Sort Prop
   with WFTrmDs_ind' := Minimality for WFTrmDs Sort Prop.
-Combined Scheme WFTrmTrmsDefs_ind from WFTrm_ind', WFTrms_ind', WFTrmDs_ind'.
+Combined Scheme WFTrmTrmsBrsDefs_ind
+         from WFTrm_ind', WFTrms_ind', WFTrmBs_ind', WFTrmDs_ind'.
 
 Lemma WFTrm_WFapp:
   (forall t n, WFTrm t n -> WFapp t) /\
   (forall ts n, WFTrms ts n -> WFapps ts) /\
+  (forall bs n, WFTrmBs bs n -> WFappBs bs) /\
   (forall ds n, WFTrmDs ds n -> WFappDs ds).
 Proof.
-  apply WFTrmTrmsDefs_ind; intros; try (constructor; try assumption).
+  apply WFTrmTrmsBrsDefs_ind; intros; try (constructor; try assumption).
 Qed.
 
 
@@ -1022,23 +1067,30 @@ Inductive PoccTrm : Term -> Prop :=
 | PoAppA: forall fn a args, PoccTrm a -> PoccTrm (TApp fn a args)
 | PoAppR: forall fn a args, PoccTrms args -> PoccTrm (TApp fn a args)
 | PoConst: PoccTrm (TConst nm)
+| PoCaseA: forall n p mch brs, PoccTrm (TCase ((mkInd nm n), p) mch brs)
 | PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
-| PoCaseR: forall n mch brs, PoccDefs brs -> PoccTrm (TCase n mch brs)
+| PoCaseR: forall n mch brs, PoccBrs brs -> PoccTrm (TCase n mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
 | PoCnstr: forall m1 n np na, PoccTrm (TConstruct (mkInd nm m1) n np na)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
 | PoTtl: forall t ts, PoccTrms ts -> PoccTrms (tcons t ts)
+with PoccBrs : Brs -> Prop :=
+| PoBhd: forall n t ts, PoccTrm t -> PoccBrs (bcons n t ts)
+| PoBtl: forall n t ts, PoccBrs ts -> PoccBrs (bcons n t ts)
 with PoccDefs : Defs -> Prop :=
 | PoDhd_bod: forall dn db dra ds,
            PoccTrm db -> PoccDefs (dcons dn db dra ds)
 | PoDtl: forall dn db dra ds,
            PoccDefs ds -> PoccDefs (dcons dn db dra ds).
-Hint Constructors PoccTrm PoccTrms PoccDefs.
+Hint Constructors PoccTrm PoccTrms PoccBrs PoccDefs.
 Scheme poTrm_ind' := Minimality for PoccTrm Sort Prop
   with poTrms_ind' := Minimality for PoccTrms Sort Prop
+  with poBrs_ind' := Minimality for PoccBrs Sort Prop
   with poDefs_ind' := Minimality for PoccDefs Sort Prop.
-Combined Scheme poTrmTrmsDefs_ind from poTrm_ind', poTrms_ind', poDefs_ind'.
+Combined Scheme poTrmTrmsBrsDefs_ind
+         from poTrm_ind', poTrms_ind', poBrs_ind', poDefs_ind'.
+
 
 Lemma Pocc_TConst: forall s2, PoccTrm (TConst s2) -> nm = s2.
 intros s2 h. inversion h. reflexivity.
@@ -1148,7 +1200,7 @@ Qed.
 
 Lemma notPocc_TCase:
   forall n mch brs, ~ PoccTrm (TCase n mch brs) ->
-                    ~ PoccTrm mch /\ ~ PoccDefs brs.
+                    ~ PoccTrm mch /\ ~ PoccBrs brs.
 intuition. 
 Qed.
 
@@ -1227,43 +1279,10 @@ Qed.
 Lemma Pocc_fn_mkApp_lem:
   forall fn, PoccTrm fn -> forall args, PoccTrm (mkApp fn args).
 Proof.
-  induction 1.
-  - destruct args; simpl.
-    + apply PoProdBod. assumption.
-    + apply PoAppL. apply PoProdBod. assumption.
-  - destruct args; simpl.
-    + apply PoLambdaBod. assumption.
-    + apply PoAppL. apply PoLambdaBod. assumption.
-  - destruct args; simpl.
-    + apply PoCast. assumption.
-    + apply PoAppL. apply PoCast. assumption.
-  - destruct args; simpl.
-    + apply PoProof. assumption.
-    + apply PoAppL. apply PoProof. assumption.
- - destruct args; simpl.
-    + apply PoLetInDfn. assumption.
-    + apply PoAppL. apply PoLetInDfn. assumption.
-  - destruct args; simpl.
-    + apply PoLetInBod. assumption.
-    + apply PoAppL. apply PoLetInBod. assumption.
-  - simpl. intros brgs. apply PoAppL. assumption.
-  - simpl. intros brgs. apply PoAppA. assumption.
-  - simpl. intros brgs. apply PoAppR. apply PoccTrms_tappendl. assumption.
-  - destruct args; simpl.
-    + apply PoConst.
-    + apply PoAppL. apply PoConst.
-  - destruct args; simpl.
-    + apply PoCaseL. assumption.
-    + apply PoAppL. apply PoCaseL. assumption.
-  - destruct args; simpl.
-    + apply PoCaseR. assumption.
-    + apply PoAppL. apply PoCaseR. assumption.
-  - destruct args; simpl.
-    + apply PoFix. assumption.
-    + apply PoAppL. apply PoFix. assumption.
-  - destruct args; simpl.
-    + apply PoCnstr; assumption.
-    + apply PoAppL. apply PoCnstr.
+  induction 1;
+    try (solve[destruct args; simpl;
+       [constructor; assumption | repeat constructor; assumption]]).
+  - simpl. intros brgs. apply PoAppR. apply PoccTrms_tappendl. assumption. 
 Qed.
 
 Lemma Pocc_TApp_mkApp:
@@ -1321,7 +1340,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IConstruct: forall n ind m1 np na,
        Instantiate n (TConstruct ind m1 np na) (TConstruct ind m1 np na)
 | ICase: forall n np s ts is its,
-           Instantiate n s is -> InstantiateDefs n ts its ->
+           Instantiate n s is -> InstantiateBrs n ts its ->
            Instantiate n (TCase np s ts) (TCase np is its)
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
@@ -1332,6 +1351,12 @@ with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Icons: forall n t ts it its,
            Instantiate n t it -> Instantiates n ts its ->
            Instantiates n (tcons t ts) (tcons it its)
+with InstantiateBrs: nat -> Brs -> Brs -> Prop :=
+| Ibnil: forall n, InstantiateBrs n bnil bnil
+| Ibcons: forall n m b bs ib ibs,
+            Instantiate n b ib ->
+            InstantiateBrs n bs ibs ->
+            InstantiateBrs n (bcons m b bs) (bcons m ib ibs)
 with InstantiateDefs: nat -> Defs -> Defs -> Prop :=
 | Idnil: forall n, InstantiateDefs n dnil dnil
 | Idcons: forall n nm bod rarg ds ibod ids,
@@ -1339,12 +1364,23 @@ with InstantiateDefs: nat -> Defs -> Defs -> Prop :=
             InstantiateDefs n ds ids ->
             InstantiateDefs n (dcons nm bod rarg ds)
                             (dcons nm ibod rarg ids).
-Hint Constructors Instantiate Instantiates InstantiateDefs.
+Hint Constructors Instantiate Instantiates InstantiateBrs InstantiateDefs.
 Scheme Instantiate_ind' := Induction for Instantiate Sort Prop
   with Instantiates_ind' := Induction for Instantiates Sort Prop
+  with InstantiateBrs_ind' := Induction for InstantiateBrs Sort Prop
   with InstantiateDefs_ind' := Induction for InstantiateDefs Sort Prop.
-Combined Scheme InstInstsDefs_ind from 
-         Instantiate_ind', Instantiates_ind', InstantiateDefs_ind'.
+Combined Scheme InstInstsBrsDefs_ind
+         from Instantiate_ind', Instantiates_ind',
+              InstantiateBrs_ind', InstantiateDefs_ind'.
+
+
+Lemma InstantiateBrs_pres_blength:
+  forall n bs ibs, InstantiateBrs n bs ibs -> blength bs = blength ibs.
+Proof.
+  induction 1.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
 
 Lemma InstantiateDefs_pres_dlength:
   forall n ds ids, InstantiateDefs n ds ids -> dlength ds = dlength ids.
@@ -1354,13 +1390,22 @@ Proof.
   + simpl. intuition.
 Qed.
 
+Lemma Instantiate_pres_isLambda:
+  forall t, isLambda t ->
+            forall n it, Instantiate n t it -> isLambda it.
+Proof.
+  intros t ht n it hit. destruct ht as [x0 [x1 jx]]. subst.
+  inversion_Clear hit. auto.
+Qed.          
+
 Lemma Instantiates_no_gen:
   (~ PoccTrm tin) ->
   (forall n t s, Instantiate n t s -> PoccTrm s -> PoccTrm t) /\
   (forall n ts ss, Instantiates n ts ss -> PoccTrms ss -> PoccTrms ts) /\
+  (forall n ts ss, InstantiateBrs n ts ss -> PoccBrs ss -> PoccBrs ts) /\
   (forall n ds es, InstantiateDefs n ds es -> PoccDefs es -> PoccDefs ds).
 Proof.
-  intro h. apply InstInstsDefs_ind; intros; auto.
+  intro h. apply InstInstsBrsDefs_ind; intros; auto.
   - contradiction.
   - inversion H.
   - inversion_Clear H0.
@@ -1377,6 +1422,7 @@ Proof.
   - destruct (Pocc_mkApp_inv _ _ H2) as [hit | hiats]; intuition.
     inversion hiats; intuition.
   - inversion_Clear H1.
+    +constructor.
     + constructor. intuition.
     + apply PoCaseR. intuition.
   - inversion_Clear H0.
@@ -1384,6 +1430,9 @@ Proof.
   - inversion_Clear H1.
     + constructor. intuition.
     + apply PoTtl. intuition.
+  - inversion_Clear H1.
+    + constructor. intuition.
+    + apply PoBtl. intuition.
   - inversion_Clear H1.
     + constructor. intuition. 
     + apply PoDtl. intuition. 
@@ -1402,7 +1451,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
       TLambda nm (instantiate (S n) bod)
     | TProd nm bod => TProd nm (instantiate (S n) bod)
     | TCase np s ts =>
-      TCase np (instantiate n s) (instantiateDefs n ts)
+      TCase np (instantiate n s) (instantiateBrs n ts)
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
@@ -1414,6 +1463,11 @@ with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
        match args with
          | tnil => tnil
          | tcons t ts => tcons (instantiate n t) (instantiates n ts)
+       end
+with instantiateBrs (n:nat) (bs:Brs) {struct bs} : Brs :=
+       match bs with
+         | bnil => bnil
+         | bcons m t ts => bcons m (instantiate n t) (instantiateBrs n ts)
        end
 with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
        match ds with
@@ -1462,8 +1516,9 @@ Qed.
 Lemma Instantiate_instantiate:
   (forall n t it, Instantiate n t it -> instantiate n t = it) /\
   (forall n ts its, Instantiates n ts its -> instantiates n ts = its) /\
+  (forall n ts its, InstantiateBrs n ts its -> instantiateBrs n ts = its) /\
   (forall n ds ids, InstantiateDefs n ds ids -> instantiateDefs n ds = ids).
-apply InstInstsDefs_ind; intros; simpl; intuition; try (subst; reflexivity).
+apply InstInstsBrsDefs_ind; intros; simpl; intuition; try (subst; reflexivity).
 - rewrite nat_compare_EQ. reflexivity.
 - rewrite (proj1 (nat_compare_gt n m) g). reflexivity.
 - rewrite (proj1 (nat_compare_lt n m) l). reflexivity.
@@ -1472,9 +1527,10 @@ Qed.
 Lemma instantiate_Instantiate:
   (forall t n, Instantiate n t (instantiate n t)) /\
   (forall ts n, Instantiates n ts (instantiates n ts)) /\
+  (forall bs n, InstantiateBrs n bs (instantiateBrs n bs)) /\
   (forall (ds:Defs) n, InstantiateDefs n ds (instantiateDefs n ds)).
 Proof.
-  apply TrmTrmsDefs_ind; intros; simpl; try (solve [constructor]);
+  apply TrmTrmsBrsDefs_ind; intros; simpl; try (solve [constructor]);
   try (solve[constructor; intuition]).
   - destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
     + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
@@ -1486,35 +1542,14 @@ Qed.
 Lemma instant_pres_PoccTrm:
   (forall tbod, PoccTrm tbod -> forall n, PoccTrm (instantiate n tbod)) /\
   (forall ts, PoccTrms ts -> forall n, PoccTrms (instantiates n ts)) /\
+  (forall bs, PoccBrs bs -> forall n, PoccBrs (instantiateBrs n bs)) /\
   (forall (Ds:Defs), PoccDefs Ds -> forall n, PoccDefs (instantiateDefs n Ds)).
 Proof.
-  apply poTrmTrmsDefs_ind; intros; cbn; try solve [constructor; trivial].
+  apply poTrmTrmsBrsDefs_ind; intros; cbn; try solve [constructor; trivial].
   - eapply Pocc_TApp_mkApp. apply PoAppL. auto.
   - eapply Pocc_TApp_mkApp. apply PoAppA. auto.
   - eapply Pocc_TApp_mkApp. apply PoAppR. auto.
 Qed.
-
-(****
-Lemma instantiate_is_Const:
-  forall n tbod,
-    instantiate n tbod = TConst nm -> 
-    (tbod = TRel n /\ tin = TConst nm) \/ (tbod = TConst nm).
-Proof.
-  induction tbod; intros h; simpl; intuition; try discriminate.
-  - unfold instantiate in h.
-    case_eq (nat_compare n n0); intros; rewrite H in h.
-    + left. split. rewrite (nat_compare_eq _ _ H). reflexivity.
-      * destruct tin; simpl in h; try discriminate. assumption.
-    + discriminate.
-    + discriminate.
-  - subst. cbn in h. rewrite match_cn_Eq in h; try reflexivity.
-    rewrite mkApp_tnil_ident in h. subst.
-    - simpl in h.
-    assert (j:= mkApp_isApp (instantiate n tbod1)
-                            (instantiate n tbod2) (instantiates n t)).
-    destruct j as [x0 [x1 [x2 k]]]. rewrite k in h. discriminate.
-Qed.
- ****)
 
 Lemma instantiate_TApp_mkApp:
   forall n fn arg args,
@@ -1527,15 +1562,18 @@ Qed.
 End Instantiate_sec.
 End PoccTrm_sec.
 
+
 Lemma instantiate_pres_WFapp:
   (forall bod, WFapp bod ->
               forall t, WFapp t -> forall n, WFapp (instantiate t n bod)) /\
   (forall ts, WFapps ts ->
               forall t, WFapp t -> forall n, WFapps (instantiates t n ts)) /\
+  (forall bs, WFappBs bs ->
+              forall t, WFapp t -> forall n, WFappBs (instantiateBrs t n bs)) /\
   (forall ds, WFappDs ds ->
               forall t, WFapp t -> forall n, WFappDs (instantiateDefs t n ds)).
 Proof.
-  apply WFappTrmsDefs_ind; intros;
+  apply WFappTrmsBrsDefs_ind; intros;
   try (solve [unfold instantiate; constructor]).
   - destruct (lt_eq_lt_dec n m) as [[h|h]|h]; unfold instantiate.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
@@ -1558,7 +1596,7 @@ Proof.
     apply mkApp_pres_WFapp.
     + constructor. apply H3; assumption. apply H5. assumption.
     + apply H1. assumption.
-  - change (WFapp (TCase m (instantiate t n mch) (instantiateDefs t n brs))).
+  - change (WFapp (TCase m (instantiate t n mch) (instantiateBrs t n brs))).
     constructor.
     + apply H0; assumption.
     + apply H2; assumption.
@@ -1566,6 +1604,11 @@ Proof.
      constructor.
      + apply H0. assumption.
    - change (WFapps (tcons (instantiate t0 n t) (instantiates t0 n ts))).
+     constructor.
+     + apply H0. assumption.
+     + apply H2. assumption.
+   - change (WFappBs (bcons n (instantiate t n0 b)
+                            (instantiateBrs t n0 bs))).
      constructor.
      + apply H0. assumption.
      + apply H2. assumption.
@@ -1633,21 +1676,21 @@ induction t.
 unfold whBetaStep; simpl; induction 1; intros.
 ****)
 
-Definition whCaseStep (cstrNbr:nat) (ts:Terms) (brs:Defs): option Term :=
-  match dnthBody cstrNbr brs with
+Definition whCaseStep (cstrNbr:nat) (ts:Terms) (brs:Brs): option Term :=
+  match bnth cstrNbr brs with
     | Some (t, _) => Some (mkApp t ts)
     | None => None
   end.
 
 Lemma whCaseStep_pres_WFapp:
-  forall (brs:Defs), WFappDs brs -> forall ts, WFapps ts -> 
+  forall (brs:Brs), WFappBs brs -> forall ts, WFapps ts -> 
   forall (n:nat) (s:Term), whCaseStep n ts brs = Some s -> WFapp s.
 Proof.
   intros brs hbrs ts hts n s h. unfold whCaseStep in h.
-  case_eq (dnthBody n brs); intros; rewrite H in h.
+  case_eq (bnth n brs); intros; rewrite H in h.
   - destruct p. myInjection h. apply mkApp_pres_WFapp.
     + assumption.
-    + eapply (dnthBody_pres_WFapp hbrs n). eassumption.
+    + eapply (bnth_pres_WFapp hbrs n). eassumption.
   - discriminate.
 Qed.
 

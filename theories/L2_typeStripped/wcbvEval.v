@@ -205,7 +205,7 @@ Proof.
         rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _) H8) in e.
         discriminate.
       * unfold lookupDfn in e.
-        rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _) H8) in e.
+        rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _) H7) in e.
         discriminate. 
     + eapply wConst.
       * rewrite <- (lookupDfn_weaken' n). eassumption. 

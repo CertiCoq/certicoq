@@ -41,29 +41,31 @@ Inductive Term : Type :=
                nat (* # pars *) -> nat (* # args *) -> Term
                        (* use Defs to code case branches *)
 | TCase      : (inductive * nat) (* # of pars *) -> Term (* type *) ->
-               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
+               Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs (* all mutual bodies *)->
                nat (* indx of this body *) -> Term
 | TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
+with Brs: Type :=
+     | bnil: Brs
+     | bcons: nat -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Defs.
+Hint Constructors Term Terms Brs Defs.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
+  with Brs_ind' := Induction for Brs Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
-Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
-Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
-Scheme Trm_ind2 := Induction for Term Sort Type
-  with Trms_ind2 := Induction for Terms Sort Type
-  with Defs_ind2 := Induction for Defs Sort Type.
+Combined Scheme TrmTrmsBrsDefs_ind
+         from Trm_ind', Trms_ind', Brs_ind', Defs_ind'.
 Notation prop := (TSort SProp).
 Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
+Notation btunit n t := (bcons n t bnil).
 Notation dunit nm t m := (dcons nm t m dnil).
 
 Fixpoint Terms_list (ts:Terms) : list Term :=
@@ -189,6 +191,13 @@ Definition rev_npars (np: inductive * nat) :=
   end.
  **************************)
 
+(** operations on Brs and Defs **)
+Fixpoint blength (ts:Brs) : nat :=
+  match ts with 
+    | bnil => 0
+    | bcons _ _ ts => S (blength ts)
+  end.
+
 (** operations on Defs **)
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
@@ -203,6 +212,15 @@ Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
                            | 0 => Some (x, ix)
                            | S m => dnthBody m t
                          end
+  end.
+
+Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
+  match l with
+    | bnil => None
+    | bcons ix x bs => match n with
+                           | 0 => Some (x, ix)
+                           | S m => bnth m bs
+                       end
   end.
 
 Lemma n_lt_0 : forall n, n < 0 -> Term * nat.
@@ -234,6 +252,7 @@ Section term_Term_sec.
       | nil => tnil
       | cons r rs => tcons (term_Term prf r) (terms_Terms rs)
     end.
+  (* Fixpoint defs *)
   Fixpoint defs_Defs (ds: list (def term)) : Defs :=
    match ds with
      | nil => dnil
@@ -241,17 +260,16 @@ Section term_Term_sec.
        dcons (dname _ d) (term_Term prf (dtype _ d))
              (term_Term prf (dbody _ d))  (rarg _ d) (defs_Defs ds )
    end.
-  (* note coding of Case branches as Defs for convenience *)
-  Fixpoint natterms_Defs (nts: list (nat * term)) : Defs :=
+  (* Case branches *)
+  Fixpoint natterms_Brs (nts: list (nat * term)) : Brs :=
     match nts with
-     | nil => dnil
-     | cons (n,t) ds =>
-       dcons nAnon prop (term_Term prf t) n (natterms_Defs ds)
+     | nil => bnil
+     | cons (n,t) ds => bcons n (term_Term prf t) (natterms_Brs ds)
    end.
                
 End term_Term_sec.
 
-(* "prf" arg is true if inside a proof.  This allows failureto compile
+(* "prf" arg is true if inside a proof.  This allows to reject
 ** programs containing axioms that are used outside of proofs
 *)
 Function term_Term (prf:bool) (t:term) : Term :=
@@ -288,7 +306,7 @@ Function term_Term (prf:bool) (t:term) : Term :=
       end
     | tCase npars ty mch brs, p =>
       TCase npars (term_Term p ty) (term_Term p mch)
-            (natterms_Defs p term_Term brs)
+            (natterms_Brs p term_Term brs)
     | tFix defs m, p => TFix (defs_Defs p term_Term defs) m
     | _, _ => TWrong "term_Term: Unknown term"
   end.

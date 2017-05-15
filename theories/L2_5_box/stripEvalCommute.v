@@ -20,6 +20,7 @@ Set Implicit Arguments.
 
 Definition L2kTerm := L2k.compile.Term.
 Definition L2kTerms := L2k.compile.Terms.
+Definition L2kBrs := L2k.compile.Brs.
 Definition L2kDefs := L2k.compile.Defs.
 Definition strip := L2kTerm_Term.
 Definition strips := L2kTerms_Terms.
@@ -178,11 +179,11 @@ Lemma TCase_hom:
       match L2k.term.isProof_dec mch with
         | left _ =>
           match brs with
-            | L2k.compile.dunit _ br n =>
+            | L2k.compile.bunit n br =>
               applyBranchToProof n (L2kTerm_Term br)
-            | _ => TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs)
+            | _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
           end
-        | right _ => TCase m (L2kTerm_Term mch) (L2kDefs_Defs brs)
+        | right _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
       end.
 Proof.
   reflexivity.
@@ -209,15 +210,15 @@ Lemma isApp_hom:
   forall t,
     isApp (strip t) ->
     L2k.term.isApp t \/
-    exists x n u br nm,
-      t = L2k.compile.TCase x (L2k.compile.TProof u) (L2k.compile.dunit nm br n).
+    exists x n u br,
+      t = L2k.compile.TCase x (L2k.compile.TProof u) (L2k.compile.bunit br n).
 Proof.
   destruct t; cbn; intros h;
   destruct h as [x0 [x1 [x2 h]]]; try discriminate. 
   - left. exists t1, t2, t3. reflexivity.
-  - destruct t; try discriminate. destruct d.
+  - destruct t; try discriminate. destruct b.
     + discriminate.
-    + right. exists i, n0, t, t0, n. destruct d.
+    + right. exists i, t0, t, n. destruct b.
       * reflexivity.
       * discriminate.
 Qed.
@@ -233,8 +234,8 @@ Proof.
   - destruct t; try (elim y); try reflexivity.
     + destruct (L2k.term.isProof_dec t).
       destruct i0 as [x jx]. subst t.
-      * { destruct (L2k.term.is_dunit_dec d).
-          - destruct H as [x0 [x1 [x2 jx]]]. subst d. cbn.
+      * { destruct (L2k.term.is_bunit_dec b).
+          - destruct H as [x0 [x1 jx]]. subst b. cbn.
             rewrite mkApp_tnil_ident. reflexivity.
           - unfold L2kTerms_Terms. rewrite mkApp_tnil_ident.
             reflexivity. }
@@ -374,19 +375,19 @@ Proof.
     + destruct (L2k.term.isProof_dec t1).
       * destruct
           (mkApp_isApp
-             (match d with
-                | L2k.compile.dnil => TCase i (L2kTerm_Term t1) (L2kDefs_Defs d)
-                | L2k.compile.dunit _ br n =>
+             (match b with
+                | L2k.compile.bnil => TCase i (L2kTerm_Term t1) (L2kBrs_Brs b)
+                | L2k.compile.bunit n br =>
                   applyBranchToProof n (L2kTerm_Term br)
-                | L2k.compile.dcons _ br n (L2k.compile.dcons _ _ _ _) =>
-                  TCase i (L2kTerm_Term t1) (L2kDefs_Defs d)
+                | L2k.compile.bcons br n (L2k.compile.bcons _ _ _) =>
+                  TCase i (L2kTerm_Term t1) (L2kBrs_Brs b)
               end) (L2kTerm_Term t2) (L2kTerms_Terms t3)) as [x0 [x1 [x2 jx]]].
         rewrite jx in ht. discriminate.
-      * destruct (mkApp_isApp (TCase i (L2kTerm_Term t1) (L2kDefs_Defs d))
+      * destruct (mkApp_isApp (TCase i (L2kTerm_Term t1) (L2kBrs_Brs b))
                               (L2kTerm_Term t2) (L2kTerms_Terms t3))
           as [x0 [x1 [x2 jx]]].
         rewrite jx in ht. discriminate.
-  - right. exists i, t, d. reflexivity.
+  - right. exists i, t, b. reflexivity.
 Qed.
 
 Lemma Const_strip_inv:
@@ -401,7 +402,7 @@ Proof.
                             (L2kTerm_Term s2) (L2kTerms_Terms t)) as k.
     destruct k as [x0 [x1 [x2 jx]]]. rewrite jx in h. discriminate.
   - left. cbn in h. myInjection h. reflexivity.
-  - right. exists i, s, d. reflexivity.    
+  - right. exists i, s, b. reflexivity.    
 Qed.
 
 (*************

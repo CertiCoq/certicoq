@@ -19,6 +19,7 @@ Set Implicit Arguments.
 
 Definition L2_5Term := L2_5.compile.Term.
 Definition L2_5Terms := L2_5.compile.Terms.
+Definition L2_5Brs := L2_5.compile.Brs.
 Definition L2_5Defs := L2_5.compile.Defs.
 Definition L2_5Environ := AstCommon.environ L2_5.compile.Term.
 
@@ -565,7 +566,7 @@ Qed.
 Lemma whCaseStep_hom:
   forall n brs ts,
     optStrip (L2_5.term.whCaseStep n ts brs) =
-    whCaseStep n (strips ts) (stripDs brs).
+    whCaseStep n (strips ts) (stripBs brs).
 (*****
 Proof.
   destruct n, brs; intros; simpl; try reflexivity.

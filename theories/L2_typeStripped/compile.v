@@ -14,6 +14,7 @@ Set Implicit Arguments.
 
 Definition L1gTerm := L1g.compile.Term.
 Definition L1gTerms := L1g.compile.Terms.
+Definition L1gBrs := L1g.compile.Brs.
 Definition L1gDefs := L1g.compile.Defs.
 Definition L1gPgm := Program L1gTerm.
 Definition L1gEC := envClass L1gTerm.
@@ -36,21 +37,25 @@ Inductive Term : Type :=
                nat (* # pars *) -> nat (* # args *) -> Term
                                   (* use Defs to code branches *)
 | TCase      : (inductive * nat) (* # of pars *) ->
-               Term (* discriminee *) -> Defs (* # args, branch *) -> Term
+               Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
+with Brs : Type :=
+| bnil : Brs
+| bcons : nat -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Defs.
+Hint Constructors Term Terms Brs Defs.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
+  with Brs_ind' := Induction for Brs Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
-Combined Scheme TrmTrmsDefs_ind from Trm_ind', Trms_ind', Defs_ind'.
-Combined Scheme TrmTrms_ind from Trm_ind', Trms_ind'.
+Combined Scheme TrmTrmsBrsDefs_ind
+         from Trm_ind', Trms_ind', Brs_ind', Defs_ind'.
 Notation prop := (TSort SProp).
 Notation set_ := (TSort SSet).
 Notation type_ := (TSort SType).
@@ -79,7 +84,7 @@ Function strip (t:L1gTerm) : Term :=
     | L1g.compile.TAx => TAx
     | L1g.compile.TInd i => TInd i
     | L1g.compile.TConstruct i m np na => TConstruct i m np na
-    | L1g.compile.TCase n _ mch brs => TCase n (strip mch) (stripDs brs)
+    | L1g.compile.TCase n _ mch brs => TCase n (strip mch) (stripBs brs)
     | L1g.compile.TFix ds n => TFix (stripDs ds) n
     | L1g.compile.TWrong _ => TWrong
   end
@@ -87,6 +92,11 @@ with strips (ts:L1gTerms) : Terms :=
   match ts with
     | L1g.compile.tnil => tnil
     | L1g.compile.tcons t ts => tcons (strip t) (strips ts)
+  end
+with stripBs (bs:L1gBrs) : Brs := 
+  match bs with
+    | L1g.compile.bnil => bnil
+    | L1g.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
   end
 with stripDs (ts:L1gDefs) : Defs := 
   match ts with

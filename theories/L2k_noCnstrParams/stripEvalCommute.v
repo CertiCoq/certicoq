@@ -270,9 +270,10 @@ Qed.
 Lemma L2WFapp_L2kWFapp:
   (forall t, L2.term.WFapp t -> WFapp (strip t)) /\
   (forall ts, L2.term.WFapps ts -> WFapps (strips ts)) /\
+  (forall ts, L2.term.WFappBs ts -> WFappBs (stripBs ts)) /\
   (forall ds, L2.term.WFappDs ds -> WFappDs (stripDs ds)).
 Proof.
-  apply L2.term.WFappTrmsDefs_ind; cbn; try constructor; auto; intros.
+  apply L2.term.WFappTrmsBrsDefs_ind; cbn; try constructor; auto; intros.
   - destruct fn; cbn; auto; try (constructor; try assumption; not_isApp).
     + apply etaExp_cnstr_pres_WFapp. constructor; assumption.
     + destruct p. constructor; try assumption. not_isApp.

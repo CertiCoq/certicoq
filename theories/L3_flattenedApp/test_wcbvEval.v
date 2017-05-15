@@ -535,7 +535,7 @@ Proof.
   - exact lt_wf.
 Defined.
 
-(**** works
+(**** works  ***
 Definition Gcdx := (Gcd 4 2).
 Eval cbv in Gcdx.
 Time Quote Recursively Definition pGcdx := Gcdx.
@@ -560,7 +560,7 @@ Time Definition eval_ce_example_myent :=
 Print eval_ce_example_myent.
  *****)
 
-(**************  this works *****)
+(**************  this works *****
 Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
 Time Definition P_ce_example_ent :=
   Eval vm_compute in (program_Program p_ce_example_ent).

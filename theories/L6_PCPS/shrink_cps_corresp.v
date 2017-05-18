@@ -3833,6 +3833,7 @@ Section CONTRACT.
     exists x0. apply M.elements_correct. auto.
   Qed.
 
+  SearchAbout rename_all occurs_free.
   (* Variables are bound by (1) binding on the stem (2) mutually rec. functions *)
   Theorem occurs_free_app_bound_stem x e:        
     occurs_free e x ->
@@ -9225,11 +9226,13 @@ Section CONTRACT.
           split; auto. split; auto.
           simpl in H5. apply sig_inv_combine in H5. destruct H5. auto.
         * (* eligible to be inlined? *)
-          destruct (andb (Pos.eqb f0 f) (Nat.eqb (length l) (length l0))) eqn:Hel.
-          {
+          destruct (andb (Pos.eqb f0 f) (andb (Init.Nat.eqb (length l) (length l0)) (negb (get_b (apply_r sig v) inl)))) eqn:Hel.
+          { 
             (* function inlining *)
             apply andb_true_iff in Hel.
-            destruct Hel as (Hel1, Hel2).
+            destruct Hel as (Hel1, Hel23).
+            apply andb_true_iff in Hel23.
+            destruct Hel23 as (Hel2, Hel3).
             apply Peqb_true_eq in Hel1.
             apply beq_nat_true in Hel2. subst.
             
@@ -9322,7 +9325,7 @@ Section CONTRACT.
               reflexivity.
               right. simpl; rewrite Hsvi.
               constructor.  auto.
-            }
+            } 
             
             assert (rename_all_ctx_ns sig
                                       (inlined_ctx_f
@@ -9338,7 +9341,7 @@ Section CONTRACT.
               rewrite inlined_fundefs_append.
               rewrite rename_all_ns_fundefs_append.
               simpl. rewrite Hsvi. auto.
-            }
+            } 
             assert (H_inl_ctx: (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
                                                   (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0))
                                                                  (M.set (apply_r sig v) true inl)) =
@@ -9348,7 +9351,7 @@ Section CONTRACT.
             repeat normalize_ctx. simpl. do 2 (rewrite inlined_fundefs_append).
             simpl. unfold get_b. rewrite M.gss. reflexivity.
 
-
+ 
             assert (Hdjl0 : Disjoint _ (name_in_fundefs
                                           (rename_all_fun_ns sig
                                                              (inlined_fundefs_f
@@ -9604,7 +9607,7 @@ Section CONTRACT.
               repeat normalize_ctx.
               rewrite <- app_ctx_f_fuse. simpl.
               rewrite inlined_fundefs_append.
-              rewrite rename_all_ns_fundefs_append.
+              rewrite rename_all_ns_fundefs_append. 
               constructor 2.
               { (* l0 can be staged for sig *) 
                 intro. intro.
@@ -9741,7 +9744,7 @@ Section CONTRACT.
                                                (Efun1_c
                                                   (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))) in HeqHc; auto.
             inv H6.
-            destructAll.
+            destructAll. 
             assert (H_rn_ctx': rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
                                                  (inlined_ctx_f
                                                     (comp_ctx_f x
@@ -9754,12 +9757,11 @@ Section CONTRACT.
                                                                  (Efun1_c
                                                                     (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
                                                      im')).
-            {
-              apply eq_P_rename_all_ctx_ns. intro. intro.
+            { apply eq_P_rename_all_ctx_ns. intro. intro.
               assert (Hl0 := Decidable_FromList l0).
               inv Hl0. specialize (Dec x3).
               inv Dec.
-              exfalso. apply H12.
+              exfalso. apply H12. 
 
               (* show that x3 cannot be in the Dom of sig *)
               assert (~ (Dom_map sig x3)).
@@ -9775,7 +9777,6 @@ Section CONTRACT.
               right.
               simpl. rewrite Hsvi.
               constructor. right. auto.
-
               assert ( (inlined_ctx_f
                           (comp_ctx_f x
                                       (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2))
@@ -9787,7 +9788,7 @@ Section CONTRACT.
               repeat normalize_ctx. simpl.
               rewrite inlined_fundefs_append. simpl.
               assert (get_b (apply_r sig v) im' = true).
-              apply b_map_le_c in b. apply b.
+              apply b_map_le_c in b.  apply b.
               unfold get_b. rewrite M.gss. auto.
               rewrite H15.
               rewrite inlined_fundefs_append. auto.
@@ -9828,8 +9829,9 @@ Section CONTRACT.
                 auto.
             }
             unfold term_sub_inl_size in *; simpl in *.
-            apply sub_remove_size with (im := inl) in garvs'.
+            apply sub_inl_fun_size with (im := inl) in garvs'.
             omega.
+            apply negb_true_iff. auto.
             { (* count for app inlined case*)
               rewrite H_inl_simpl.
               eapply count_inlining; eauto.
@@ -10292,7 +10294,7 @@ Section CONTRACT.
 
   
 
-  (* if I want to handle terms with disjoint bv and of instead of closed, used this with xs = fv (e) : *)
+  (* To handle terms with disjoint bv and of instead of closed, used this with xs = fv (e) : *)
   Theorem sr_unwrap_halt:
     forall f t xs e  e',
       gen_sr_rw (Efun (Fcons f t xs e Fnil) (Ehalt f)) e' ->

@@ -235,6 +235,20 @@ and print_stmt_for p s =
   | _ ->
       fprintf p "({ %a })" print_stmt s
 
+
+	      
+(* adds forward ref for all internal functions *)	      
+let print_forwardref p (id, gd) =
+  match gd with
+  | Gfun (Internal f) ->
+       fprintf p "extern %s;@ @ "
+            (name_cdecl (name_function_parameters (extern_atom id)
+                                                  f.fn_params f.fn_callconv)
+			f.fn_return)
+  | _ -> ()
+
+
+	      
 let print_function p id f =
   fprintf p "%s@ "
             (name_cdecl (name_function_parameters (extern_atom id)
@@ -271,6 +285,7 @@ let print_program p prog =
   fprintf p "@[<v 0>";
   List.iter (declare_composite p) prog.prog_types;
   List.iter (define_composite p) prog.prog_types;
+  List.iter (print_forwardref p) prog.prog_defs;
   List.iter (print_globdef p) prog.prog_defs;
   fprintf p "@]@."
 
@@ -302,7 +317,8 @@ let remove_primes (a, n) =
   | Ast0.Coq_nAnon -> (a,n)
   | Ast0.Coq_nNamed s ->
      let s' = Str.global_replace (Str.regexp "'") "p" (camlstring_of_coqstring s)  in
-     (a, Ast0.Coq_nNamed (coqstring_of_camlstring s'))
+     let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
+     (a, Ast0.Coq_nNamed (coqstring_of_camlstring s''))
 	
 let print_dest_names prog names dest =
   let oc = open_out (camlstring_of_coqstring dest) in

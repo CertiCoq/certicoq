@@ -129,8 +129,8 @@ Global Instance certiL3_eta_to_L4_correct :
 Proof.
   split.
 { red; unfold certiClasses.translate, goodTerm, WfL3Term.
-  intros.
-  pose proof (L3.program.Crct_invrt_any H).
+  intros. red in H. red in H.
+  pose proof (proj1 L3.program.Crct_CrctEnv _ _ _ H).
   unfold certiL3_eta_to_L4. hnf.
   simpl. destruct s. simpl in *.
   unfold L3_to_L4.translate_program. simpl.
@@ -138,7 +138,7 @@ Proof.
   now apply exp_wf_lets. }
 
 { red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
-  assert(He:=L3.program.Crct_invrt_any H).
+  assert(He:=proj1 L3.program.Crct_CrctEnv _ _ _ H).
   repeat red in H0.
   destruct s. destruct sv.
   destruct H0. 
@@ -149,14 +149,14 @@ Proof.
     split. repeat red. split. simpl; auto. simpl.
   { apply evsv. }
   clear evsv He H1 H0 H. revert main0 sv' obs. clear.
-  apply (TrmTrms_ind
+  apply (TrmTrmsBrsDefs_ind
              (fun (main : Term) => forall (sv' : exp),
                   same_obs main sv' = true ->
                   {| main := main; AstCommon.env := env0 |} ⊑ (inductive_env env, sv'))
              (fun ts => forall d i n n0 es, same_args same_obs ts es = true ->
                  obsLeOp (observeNthSubterm n0 {| main := TConstruct i n ts; AstCommon.env := env0 |})
                          (observeNthSubterm n0 (inductive_env env, Con_e d es)))
-             (fun _ => True));
+             (fun _ => True) (fun _ => True));
         try constructor;
         try (match goal with |- yesPreserved _ _ => intros q; destruct q end);
         intros; try red; trivial; try constructor.

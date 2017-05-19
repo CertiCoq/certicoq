@@ -82,13 +82,13 @@ Section TermTranslation.
     | tnil => tnil
     | tcons t ts => tcons (trans k t) (trans_terms k ts)
     end
-  with trans_brs (i : inductive) (k : nat) (brs : Defs) : Defs :=
+  with trans_brs (i : inductive) (k : nat) (brs : Brs) : Brs :=
     match brs with
-    | dnil => dnil
-    | dcons na t n brs =>
+    | bnil => bnil
+    | bcons n t brs =>
       let transt := trans k t in
       let etat := eta_expand n transt in
-      dcons na etat n (trans_brs i k brs)
+      bcons n etat (trans_brs i k brs)
     end
   with trans_fixes (k : nat) (d : Defs) : Defs :=
     match d with
@@ -124,12 +124,12 @@ Lemma wcbvEval_pres_Crct e t t' :
   crctTerm e 0 t -> WcbvEval e t t' -> crctTerm e 0 t'.
 Admitted.
 
-Inductive match_annot : list Cnstr -> Defs -> Prop :=
-| match_annot_nil : match_annot [] dnil
-| match_annot_cons na t args c cnstrs ds :
+Inductive match_annot : list Cnstr -> Brs -> Prop :=
+| match_annot_nil : match_annot [] bnil
+| match_annot_cons t args c cnstrs ds :
     c.(CnstrArity) = args ->
     match_annot cnstrs ds ->
-    match_annot (c :: cnstrs) (dcons na t args ds).
+    match_annot (c :: cnstrs) (bcons args t ds).
          
 Definition crctAnn (e : environ Term) ann brs :=
   let 'mkInd nm tndx := ann in
@@ -140,9 +140,9 @@ Definition crctAnn (e : environ Term) ann brs :=
 
 Lemma Crct_invrt_Case e n ann mch brs :
   crctTerm e n (TCase ann mch brs) ->
-  crctTerm e n mch /\ crctDs e n brs /\
+  crctTerm e n mch /\ crctBs e n brs /\
   crctAnn e ann brs /\
-  (forall i t, dnth i brs = Some t -> crctTerm e n (dbody _ t)).
+  (forall i t, bnth i brs = Some t -> crctTerm e n (fst t)).
 Admitted.
 
 Lemma Crct_construct {e : environ Term} {i n args} : crctEnv e ->
@@ -151,14 +151,14 @@ Lemma Crct_construct {e : environ Term} {i n args} : crctEnv e ->
 Proof. intros. inv H. Admitted.
 
 Lemma dnthBody_trans n t i brs :
-  dnth n brs = Some t -> exists t',
-    dnth n (trans_brs i 0 brs) = Some t' /\
-    t'.(dbody _) = eta_expand (t.(rarg _)) (trans 0 t.(dbody _)).
+  bnth n brs = Some t -> exists t',
+    bnth n (trans_brs i 0 brs) = Some t' /\
+    fst t' = eta_expand (snd t) (trans 0 (fst t)).
 Proof.
   revert n t i; induction brs; intros *.
   simpl; intros. discriminate.
   
-  simpl. unfold dnthBody. destruct n1. simpl.
+  simpl. destruct n0. simpl.
   intros [= <-].
   eexists; split; eauto.
   simpl.
@@ -172,7 +172,7 @@ Arguments String.append : simpl never.
 Lemma match_annot_n {cnstrs brs n c t} :
   match_annot cnstrs brs ->
   exnNth cnstrs n = Ret c ->
-  dnth n brs = Some t -> CnstrArity c = t.(rarg _).
+  bnth n brs = Some t -> CnstrArity c = snd t.
 Proof.
   intros H; revert n c t; induction H; intros; simpl; auto.
   - discriminate.
@@ -310,7 +310,7 @@ Proof.
 Qed.
 
 Lemma whCase_step e i n args brs cs s :
-  crctEnv e -> crctDs e 0 brs -> crctAnn e i brs -> crctTerms e 0 args ->
+  crctEnv e -> crctBs e 0 brs -> crctAnn e i brs -> crctTerms e 0 args ->
   cnstrArity e i n = Ret (0%nat, tlength args) ->
   whCaseStep n args brs = Some cs -> WcbvEval e cs s ->
   WcbvEval (transEnv e) (trans 0 cs) (trans 0 s) ->
@@ -320,17 +320,17 @@ Lemma whCase_step e i n args brs cs s :
 Proof.
   intros crcte crctds crctann crctargs crctar Hcase Hev IHev.
   unfold whCaseStep in Hcase.
-  revert Hcase; case_eq (dnthBody n brs). intros t Hdn [= <-].
+  revert Hcase; case_eq (bnth n brs). intros [t arg] Hdn [= <-].
   unfold whCaseStep.
   
-  unfold dnthBody in Hdn. case_eq (dnth n brs). intros. rewrite H in Hdn.
+  unfold dnthBody in Hdn. case_eq (bnth n brs). intros. rewrite H in Hdn.
   destruct (dnthBody_trans _ _ i _ H) as [cs' [Hnth Heq]].
   unfold dnthBody. rewrite Hnth. destruct cs'. simpl in *.
   eexists; split; eauto.
   
-  subst dbody.
-  destruct d. simpl in *.
-  assert(tlength args = rarg0).
+  destruct p. simpl in *.
+  injection Hdn. intros -> ->.
+  assert(tlength args = arg).
   { unfold crctAnn in *. destruct i as [nm ndx].
     destruct crctann as [pack [ityp [Hlook [Hind Hann]]]].
     unfold cnstrArity in crctar. red in Hlook. destruct Hlook as [Hlook none].
@@ -341,10 +341,10 @@ Proof.
     intros; rewrite H0 in crctar.
     injection crctar. intros.
     assert (me:=match_annot_n Hann H0 H). simpl in me. congruence. }
-  subst rarg0. injection Hdn ; intros <-.
   clear Hnth H .
 
   clear crctar Hdn.
+  subst t0. simpl in *. rewrite <- H0.
   rewrite (trans_terms_pres_tlength 0 args).
   eapply eval_app_terms.
   eapply (proj1 (proj2 Crct_WFTrm)).
@@ -367,7 +367,7 @@ Proof.
   WcbvEval (transEnv e) (trans 0 t) (trans 0 t')) /\
           (forall t t' : Terms,
    WcbvEvals e t t' ->
-   crctTerms e 0 t ->
+   crctEnv e -> crctTerms e 0 t ->
    WcbvEvals (transEnv e) (trans_terms 0 t) (trans_terms 0 t'))).
   clear; apply WcbvEvalEvals_ind; simpl; auto.
 
@@ -429,7 +429,7 @@ Proof.
     
   - intros * evmch IHmch. admit.
 
-  - intros. inv H1. constructor; auto.
+  - intros. inv H2. constructor; auto.
   - intros. apply H; auto.
 Admitted.
     

@@ -67,8 +67,8 @@ Section TermTranslation.
       map_terms (trans k) t.
     Fixpoint trans_brs ind k n l :=
       match l with
-      | L3t.dnil => brnil_e
-      | L3t.dcons na t nargs ts =>
+      | L3t.bnil => brnil_e
+      | L3t.bcons nargs t ts =>
         let '(names, t') := strip_lam nargs (trans k t) in
         brcons_e (ind,n) (N.of_nat nargs, names) t'
                  (trans_brs ind k (n + 1)%N ts)

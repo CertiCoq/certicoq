@@ -104,9 +104,9 @@ Notation wf_environ := crctEnv.
 *)
 Lemma Crct_invrt_Case e n ann mch brs :
   Crct e n (TCase ann mch brs) ->
-  Crct e n mch /\ CrctDs e n brs /\
-  (forall i t, dnth i brs = Some t -> Crct e n (dbody _ t)
-                                /\ is_n_lambda (rarg _ t) (dbody _ t) = true).
+  Crct e n mch /\ crctBs e n brs /\
+  (forall i t, bnth i brs = Some t -> Crct e n (fst t)
+                                /\ is_n_lambda (snd t) (fst t) = true).
 Admitted.
   
 Lemma wcbeval_preserves_wf e t t' :
@@ -164,7 +164,8 @@ Proof.
   intros wfe Het. revert wfe. red in Het.
   dependent induction Het; intros wfe.
   inversion_clear wfe; eauto. 
-  apply IHHet; now inversion_clear wfe.
+  apply IHHet; inversion_clear wfe; auto.
+  now apply Crct_CrctEnv in H1.
 Qed.
 
 Inductive wf_tr_pre_environ : list (string * exp) -> Prop :=
@@ -245,13 +246,13 @@ Proof.
   red in Hlookup.
   generalize_eqs_vars Hlookup. induction Hlookup; simplify_dep_elim;
   rename x0 into eve''; rename x into wfe''. 
-  inv wfe. simpl in eve''.
+  inv wfe. pose proof (proj1 Crct_CrctEnv _ _ _ H3). simpl in eve''.
   inv eve''.
   do 2 eexists. exists ((s, t') :: []); eexists; intuition eauto.
   inv wfe''. constructor.
 
-  inv wfe. inv eve''. inv wfe''.
-  destruct (IHHlookup H3 t eq_refl e' H7 H6) as
+  inv wfe. pose proof (proj1 Crct_CrctEnv _ _ _ H4). inv eve''. inv wfe''.
+  destruct (IHHlookup H0 t eq_refl e' H7 H6) as
       [bef [bef' [after' [pt'0 [wfbef [evbef [evt [afterbef lookupt]]]]]]]].
   exists bef. exists bef'. exists ((s1, t') :: after'). eexists; intuition eauto. 
   simpl. subst e'. f_equal; eauto.
@@ -712,17 +713,17 @@ Lemma WFTerm_exp_wf_ind e e' :
           exp_wf (N.of_nat (n + List.length e')) (trans e' (N.of_nat n) t)) /\
   (forall t n, WFTrms t n ->
     exps_wf (N.of_nat (n + List.length e')) (trans_args (trans e') (N.of_nat n) t)) /\
-  (forall t n, WFTrmDs t n ->
-          efnlst_wf (N.of_nat (n + List.length e'))
-                    (trans_fixes (trans e') (N.of_nat n) t)
-          /\
+  (forall t n, WFTrmBs t n ->
           forall i k,
             branches_wf (N.of_nat (n + List.length e'))
-                        (trans_brs (trans e') i (N.of_nat n) k t)).
+                        (trans_brs (trans e') i (N.of_nat n) k t)) /\
+  (forall t n, WFTrmDs t n ->
+          efnlst_wf (N.of_nat (n + List.length e'))
+                    (trans_fixes (trans e') (N.of_nat n) t)).
 Proof.
   assert(Har:forall n, N.pos (Pos.of_succ_nat n) = 1 + N.of_nat n) by (intros; lia).
   intros wfe evee' wfe'.
-  apply WFTrmTrmsDefs_ind; intros; unfold translate;
+  apply WFTrmTrmsBrsDefs_ind; intros; unfold translate;
   cbn -[trans_brs] in *; repeat constructor; eauto; try lia.
 
   - (* Lambda *) 
@@ -734,8 +735,6 @@ Proof.
     intros. forward H. lia.
     (* Needs well-formedness condition of terms: well scoped definitions *)
     admit.
-  - destruct m as [i l]. simpl. destruct H2.
-    apply H3.
   - rewrite efnlst_length_trans.
     assert (N.of_nat (n + dlength defs + Datatypes.length e') =
             N.of_nat (dlength defs + n + Datatypes.length e')) by lia.
@@ -744,12 +743,11 @@ Proof.
     setoid_rewrite Nat.add_comm at 3.
     rewrite Nat.add_assoc.
     apply H0.
-  - now destruct H2.
-  - destruct H2. intros. simpl.
+  - simpl.
     destruct strip_lam eqn:Hs. constructor.
     change e0 with (snd (l, e0)). rewrite <- Hs.
     apply exp_wf_strip_lam. apply H0.
-    apply H3.
+    apply H2.
 Admitted.
 
 Lemma WFTerm_exp_wf_ind' e (e' := translate_env e) :
@@ -758,17 +756,17 @@ Lemma WFTerm_exp_wf_ind' e (e' := translate_env e) :
           exp_wf (N.of_nat (n + List.length e')) (trans e' (N.of_nat n) t)) /\
   (forall t n, WFTrms t n ->
     exps_wf (N.of_nat (n + List.length e')) (trans_args (trans e') (N.of_nat n) t)) /\
-  (forall t n, WFTrmDs t n ->
-          efnlst_wf (N.of_nat (n + List.length e'))
-                    (trans_fixes (trans e') (N.of_nat n) t)
-          /\
+  (forall t n, WFTrmBs t n ->
           forall i k,
             branches_wf (N.of_nat (n + List.length e'))
-                        (trans_brs (trans e') i (N.of_nat n) k t)).
+                        (trans_brs (trans e') i (N.of_nat n) k t)) /\
+  (forall t n, WFTrmDs t n ->
+          efnlst_wf (N.of_nat (n + List.length e'))
+                    (trans_fixes (trans e') (N.of_nat n) t)).
 Proof.
   assert(Har:forall n, N.pos (Pos.of_succ_nat n) = 1 + N.of_nat n) by (intros; lia).
   intros wfe wfe'.
-  apply WFTrmTrmsDefs_ind; intros; unfold translate;
+  apply WFTrmTrmsBrsDefs_ind; intros; unfold translate;
   cbn -[trans_brs] in *; repeat constructor; eauto; try lia.
 
   - (* Lambda *) 
@@ -780,8 +778,6 @@ Proof.
     intros. forward H. lia.
     (* Needs well-formedness condition of terms: well scoped definitions *)
     admit.
-  - destruct m as [i l]. simpl. destruct H2.
-    apply H3.
   - rewrite efnlst_length_trans.
     assert (N.of_nat (n + dlength defs + Datatypes.length e') =
             N.of_nat (dlength defs + n + Datatypes.length e')) by lia.
@@ -790,12 +786,11 @@ Proof.
     setoid_rewrite Nat.add_comm at 3.
     rewrite Nat.add_assoc.
     apply H0.
-  - now destruct H2.
-  - destruct H2. intros. simpl.
+  - simpl.
     destruct strip_lam eqn:Hs. constructor.
     change e0 with (snd (l, e0)). rewrite <- Hs.
     apply exp_wf_strip_lam. apply H0.
-    apply H3.
+    apply H2.
 Admitted.
 
 Lemma WFTerm_exp_wf e e' :
@@ -809,6 +804,7 @@ Lemma wf_pre_environ_pres_fresh e :
   not (exists t, LookupEnv s (translate_env e) t).
 Proof.
   intros Hwf.
+(*
   induction Hwf; simpl; intros; auto.
   - inv H. intro Ht. destruct Ht. inv H.
   - inv H1. intro Ht. 
@@ -818,10 +814,12 @@ Proof.
   - eapply IHHwf.
     now inv H0.
 Qed.
-
+ *)
+Admitted. (* Change in wf_environ not giving the right IH for ecTrm *)
+  
 Lemma wf_environ_pre e : wf_environ e -> wf_tr_pre_environ (translate_env e).
 Proof.
-  induction 1.
+(*  induction 1.
   - constructor.
   - simpl. constructor; auto.
     unfold translate.
@@ -830,7 +828,8 @@ Proof.
     now apply wf_pre_environ_pres_fresh.
   - now simpl.
 Qed.
-    
+ *)
+Admitted. (* Same change *)
 (** Translation respects shifting (only applied to initially closed [a]'s) *)
 
 Lemma trans_shift e a n k : WFTrm a (N.to_nat k) ->
@@ -843,14 +842,15 @@ Proof.
      (forall a k, WFTrms a (N.to_nat k) ->
              (trans_args (trans e) (k + N.of_nat n) a =
               shifts (N.of_nat n) k (trans_args (trans e) k a))) /\
-     (forall a k, WFTrmDs a (N.to_nat k) ->
+     (forall a k, WFTrmBs a (N.to_nat k) ->
+             forall n' i,
+                 (trans_brs (trans e) i (k + N.of_nat n) n' a =
+                  shift_branches (N.of_nat n) k (trans_brs (trans e) i k n' a))) /\
+       (forall a k, WFTrmDs a (N.to_nat k) ->
              trans_fixes (trans e) (k + N.of_nat n) a =
              shift_fns (N.of_nat n) k (trans_fixes (trans e) k a)
-     /\
-     (forall n' i,
-                 (trans_brs (trans e) i (k + N.of_nat n) n' a =
-             shift_branches (N.of_nat n) k (trans_brs (trans e) i k n' a))))); [ |tauto].
-  clear. apply TrmTrmsDefs_ind; intros *; auto.
+     )); [ |tauto].
+  clear. apply TrmTrmsBrsDefs_ind; intros *; auto.
 
   - simpl; destruct lt_dec. reflexivity.
     intros Hwf; inv Hwf. lia.
@@ -876,33 +876,31 @@ Proof.
 
   - intros IH ts IH2 k Hwf. inv Hwf. simpl.
     rewrite (IH k); auto.
-    destruct i as [ind args]. simpl.
+    (* destruct i as [ind args]. simpl. *)
     f_equal.
-    destruct (IH2 k); auto.
+    destruct (IH2 k H4 0 i); auto.
 
   - intros IH n' k Hwf. inv Hwf. simpl.
     f_equal.
     rewrite N.add_assoc. specialize (IH (N.of_nat (L3t.dlength d) + k)).
-    destruct IH.
     assert ((N.to_nat (N.of_nat (dlength d) + k))%nat =
             (N.to_nat k + dlength d)%nat) by lia.
-    now rewrite H.
+    rewrite H in IH.
     rewrite efnlst_length_trans.
-    unfold shift_fns. equaln.
+    unfold shift_fns in IH. equaln.
 
   - intros IHt ts IH k Hwf. inv Hwf. simpl.
     rewrite IHt; auto.
     destruct (IH k); auto.
 
-  - intros IHt ts Defs Hwf k HwfDs. inv HwfDs.
-    destruct (Hwf k H5) as [Hwf' Hwf'']; clear Hwf. split. 
+  - intros IHt ts Hwf k HwfBs n' i.
+    inv HwfBs.
+    specialize (Hwf k H4 (n' + 1) i).
 
-    simpl. equaln.
-
-    intros n' i.
     simpl.
-    rewrite Hwf''. rewrite IHt; auto.
-    generalize (strip_lam_shift' ts (N.of_nat n) k (trans e k t)).
+    rewrite Hwf.
+    rewrite IHt; auto. 
+    generalize (strip_lam_shift' n0 (N.of_nat n) k (trans e k t)).
     destruct strip_lam eqn:stripshift.
     destruct (strip_lam _ (trans _ _ _)) eqn:striptrans.
     simpl. intros Hl. forward Hl. destruct Hl as [Hl He0]; subst.
@@ -932,15 +930,17 @@ Proof.
          (trans_args (trans e) (N.of_nat k) (L3.term.instantiates a k' b) =
           (trans_args (trans e) (1 + N.of_nat k) b)
             {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)})) /\
+    (forall b k k', WFTrmBs b (S k) -> (k' <= k)%nat ->
+        (forall i l,
+        trans_brs (trans e) i (N.of_nat k) l (L3.term.instantiateBrs a k' b) =
+        (trans_brs (trans e) i (1 + N.of_nat k) l b)
+          {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)})) /\
+
     (forall b k k', WFTrmDs b (S k) -> (k' <= k)%nat ->
         trans_fixes (trans e) (N.of_nat k) (L3.term.instantiateDefs a k' b) =
         (trans_fixes (trans e) (1 + N.of_nat k) b)
-          {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)} /\
-    (forall i l,
-        trans_brs (trans e) i (N.of_nat k) l (L3.term.instantiateDefs a k' b) =
-        (trans_brs (trans e) i (1 + N.of_nat k) l b)
-          {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)}))).
-  apply TrmTrmsDefs_ind; try reflexivity.
+          {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans e 0 a)})).
+  apply TrmTrmsBrsDefs_ind; try reflexivity.
 
   (* Var *)
   - intros n k k' wfn kk'. inv wfn.
@@ -997,7 +997,7 @@ Proof.
     f_equal. destruct (IHargs k k'  H3  kk'); auto.
     
   - (* Match *)
-    intros. inv H1. destruct (H0 k k' H8 H2).
+    intros. inv H1. specialize (H0 k k' H8 H2).
     cbn; intuition.
     rewrite_hyps; f_equal; simpl; eauto.
 
@@ -1012,7 +1012,7 @@ Proof.
     rewrite <- instantiateDefs_pres_dlength.
     assert ((N.of_nat (k + dlength defs)) =
             (N.of_nat (dlength defs) + N.of_nat k)) by lia.
-    rewrite <- H0. rewrite (proj1 IHdefs).
+    rewrite <- H0. rewrite IHdefs.
     simpl. repeat (f_equal; try lia).
 
 
@@ -1021,18 +1021,13 @@ Proof.
     rewrite instantiates_tcons.
     simpl. now rewrite IHt, IHts.
     
-  - tauto.
-
-  - intros n t IHt ann ts IHts k k' wft kk'. inv wft. 
-    specialize (IHt k k' H4 kk'). specialize (IHts k k' H5 kk').
-    destruct IHts as [IHts IHbrs].
+  - intros n t IHt ts IHts k k' wft kk' i l. inv wft. 
+    specialize (IHt k k' H3 kk'). specialize (IHts k k' H4 kk').
     cbn. repeat fold (instantiate a k' t).
-    simpl. rewrite IHt. split; equaln.
-    intros i l.
-
-    specialize (IHbrs i (l + 1)). simpl.
-    rewrite IHbrs.
-    generalize (strip_lam_subst ann
+    simpl. rewrite IHt. equaln.
+    specialize (IHts i (l + 1)). simpl.
+    rewrite IHts.
+    generalize (strip_lam_subst n
                                 (shift (N.of_nat (k - k')) 0 (trans e 0 a))
                                 k' (trans e (1 + N.of_nat k) t)).
     (* rewrite IHbrs.  *)
@@ -1044,6 +1039,12 @@ Proof.
     (* Well-formedness of matches *)
     admit.
 
+  - intros n t IHt n0 ds IHds k k' wft kk'. inv wft.
+    specialize (IHds k k' H5 kk').
+    specialize (IHt k k' H4 kk').
+    cbn. repeat fold (instantiate a k' t). 
+    simpl. rewrite IHt. equaln.
+    
   - tauto.
 Admitted.
 
@@ -1078,22 +1079,23 @@ Proof. induction 1; simpl; rewrite_hyps; trivial. Qed.
 Lemma trans_env_eval e e' : eval_env e e' ->
                                 (forall t n, trans e n t = trans e' n t) /\
   (forall es n, trans_args (trans e) n es = trans_args (trans e') n es) /\
-  (forall d k, trans_fixes (trans e) k d = trans_fixes (trans e') k d /\
-          (forall ind n, trans_brs (trans e) ind k n d = trans_brs (trans e') ind k n d)).
+  (forall d k ind n, trans_brs (trans e) ind k n d = trans_brs (trans e') ind k n d) /\
+  (forall d k, trans_fixes (trans e) k d = trans_fixes (trans e') k d).
 Proof.
   intros eve.
-  apply TrmTrmsDefs_ind; simpl; intros; try rewrite_hyps; trivial.
+  apply TrmTrmsBrsDefs_ind; simpl; intros; try rewrite_hyps; trivial.
   
   - erewrite eval_env_offset; eauto.
-  - destruct (H0 n). 
-    destruct i as [ind args].
-    f_equal. apply H2.
-  - f_equal. apply H.
-  - split; auto.
-  - destruct (H0 k). split; auto. f_equal; auto.
-    intros. destruct (strip_lam n0 (trans e' k t)).
-    f_equal; auto.
 Qed.
+(*   - destruct (H0 n).  *)
+(*     destruct i as [ind args]. *)
+(*     f_equal. apply H2. *)
+(*   - f_equal. apply H. *)
+(*   - split; auto. *)
+(*   - destruct (H0 k). split; auto. f_equal; auto. *)
+(*     intros. destruct (strip_lam n0 (trans e' k t)). *)
+(*     f_equal; auto. *)
+(* Qed. *)
 
 Lemma translate_env_eval e e' t : eval_env e e' -> translate e t = translate e' t.
 Proof. intros H; apply (trans_env_eval e e' H). Qed.
@@ -1103,54 +1105,56 @@ Proof. intros H; apply (trans_env_eval e e' H). Qed.
 Lemma wf_environ_pres_dfn e e' :
   wf_environ e -> eval_env (translate_env e) e' ->
   forall s t, LookupDfn s e t -> exists t', LookupEnv s e' t'.
-Proof.
-  intros Hwf.
-  revert e'; induction Hwf; simpl; intros; auto.
-  - inv H0.
-  - inv H1.
-    specialize (IHHwf _ H7).
-    inv H2.
-    exists t'. constructor.
-    destruct (IHHwf s0 t).
-    apply H10.
-    exists x. constructor 2; eauto.
-  - inv H1.
-    eapply IHHwf; eauto.
-Qed.
-
+(* Proof. *)
+(*   intros Hwf. *)
+(*   revert e'; induction Hwf; simpl; intros; auto. *)
+(*   - inv H0. *)
+(*   - inv H1. *)
+(*     specialize (IHHwf _ H7). *)
+(*     inv H2. *)
+(*     exists t'. constructor. *)
+(*     destruct (IHHwf s0 t). *)
+(*     apply H10. *)
+(*     exists x. constructor 2; eauto. *)
+(*   - inv H1. *)
+(*     eapply IHHwf; eauto. *)
+(* Qed. *)
+Admitted.
 Lemma wf_environ_pres_fresh e e' :
   wf_environ e -> eval_env (translate_env e) e' ->
   forall s, fresh s e -> not (exists t, LookupEnv s e' t).
-Proof.
-  intros Hwf.
-  revert e'; induction Hwf; simpl; intros; auto.
-  - inv H. intro Ht. destruct Ht. inv H.
-  - inv H1. intro Ht. 
-    destruct Ht as [t'' Ht'].
-    inv Ht'. inv H2. apply H6; reflexivity.
-    inv H2.
-    specialize (IHHwf _ H7 s0 H4).
-    apply IHHwf. exists t''; eauto.
-  - eapply IHHwf. eauto.
-    now inv H1.
-Qed.
+(* Proof. *)
+(*   intros Hwf. *)
+(*   revert e'; induction Hwf; simpl; intros; auto. *)
+(*   - inv H. intro Ht. destruct Ht. inv H. *)
+(*   - inv H1. intro Ht.  *)
+(*     destruct Ht as [t'' Ht']. *)
+(*     inv Ht'. inv H2. apply H6; reflexivity. *)
+(*     inv H2. *)
+(*     specialize (IHHwf _ H7 s0 H4). *)
+(*     apply IHHwf. exists t''; eauto. *)
+(*   - eapply IHHwf. eauto. *)
+(*     now inv H1. *)
+(* Qed. *)
+Admitted.
 
 Lemma wf_environ_tr e e' :
   wf_environ e -> eval_env (translate_env e) e' -> wf_tr_environ e'.
-Proof.
-  intros Hwf; revert e'; induction Hwf.
-  - intros e' H; inv H. constructor.
-  - simpl; intros e' H'; inv H'. specialize (IHHwf _ H5).
-    constructor; auto.
-    pose (WFTerm_exp_wf _ _ Hwf H5 IHHwf _ _ (proj1 Crct_WFTrm _ _ _ H0)).
-    simpl in e.
-    rewrite (translate_env_eval _ _ _ H5) in H6.
-    apply (exp_wf_subst e'0 0) in e; auto.
-    now apply (eval_preserves_wf _ _ H6).
-    eapply eval_yields_value; now eauto.
-    eapply wf_environ_pres_fresh; eauto.
-  - intros. simpl in H. eauto.
-Qed.
+(* Proof. *)
+(*   intros Hwf; revert e'; induction Hwf. *)
+(*   - intros e' H; inv H. constructor. *)
+(*   - simpl; intros e' H'; inv H'. specialize (IHHwf _ H5). *)
+(*     constructor; auto. *)
+(*     pose (WFTerm_exp_wf _ _ Hwf H5 IHHwf _ _ (proj1 Crct_WFTrm _ _ _ H0)). *)
+(*     simpl in e. *)
+(*     rewrite (translate_env_eval _ _ _ H5) in H6. *)
+(*     apply (exp_wf_subst e'0 0) in e; auto. *)
+(*     now apply (eval_preserves_wf _ _ H6). *)
+(*     eapply eval_yields_value; now eauto. *)
+(*     eapply wf_environ_pres_fresh; eauto. *)
+(*   - intros. simpl in H. eauto. *)
+(* Qed. *)
+Admitted.
 
 (** Evaluated environments are closed *)
 
@@ -1263,10 +1267,10 @@ Proof.
     apply H1. apply H0. auto.
 Qed.
 
-Fixpoint terms_of_defs (d : Defs) : Terms :=
+Fixpoint terms_of_brs (d : Brs) : Terms :=
   match d with
-  | dcons _ t _ ds => tcons t (terms_of_defs ds)
-  | dnil => tnil
+  | bcons _ t ds => tcons t (terms_of_brs ds)
+  | bnil => tnil
   end.
 
 (** Weak typed normal form of wndEval: no wndEval steps possible. **)
@@ -1283,7 +1287,7 @@ with WNorms: Terms -> Prop :=
 with WNeutral : Term -> Prop :=
 | WNVar n : WNeutral (TRel n)
 | WNApp f a : WNeutral f -> WNorm a -> WNeutral (TApp f a)
-| WNCase mch n brs : WNeutral mch -> WNorms (terms_of_defs brs) -> WNeutral (TCase n mch brs).
+| WNCase mch n brs : WNeutral mch -> WNorms (terms_of_brs brs) -> WNeutral (TCase n mch brs).
 
 Hint Constructors WNorm WNeutral WNorms.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
@@ -1506,14 +1510,14 @@ Fixpoint nth_branch n b :=
     end
   end.
 
-Lemma find_branch_trans e (t : def Term) (i : inductive) (n : nat) brs :
-  dnth n brs = Some t ->
-  find_branch (dcon_of_con i n) (N.of_nat (rarg Term t)) (trans_brs (trans e) i 0 0 brs) =
+Lemma find_branch_trans e (t : Term * nat) (i : inductive) (n : nat) brs :
+  bnth n brs = Some t ->
+  find_branch (dcon_of_con i n) (N.of_nat (snd t)) (trans_brs (trans e) i 0 0 brs) =
   nth_branch n (trans_brs (trans e) i 0 0 brs).
 Proof.
-  assert(0 = N.of_nat (dlength brs - dlength brs)) by lia.
+  assert(0 = N.of_nat (blength brs - blength brs)) by lia.
   revert H.
-  generalize (le_refl (dlength brs)).
+  generalize (le_refl (blength brs)).
   assert(0 <= N.of_nat n) by lia.
   revert H.
   replace n with (n - N.to_nat 0)%nat at 2 4 by lia.
@@ -1525,70 +1529,70 @@ Proof.
   intros.
   simpl.
   destruct strip_lam.
-  destruct n1. 
+  destruct n0. 
   - simpl.
     destruct inductive_dec.
     destruct k.
     + destruct N.eq_dec.
       reflexivity. simpl in H0.
-      elim n1. injection H2; intros <-.
+      elim n0. injection H2; intros <-.
       simpl. reflexivity.
     + elimtype False. lia.
-    + now elim n1.
+    + now elim n0.
       
   - Opaque N.eq_dec. simpl.
     destruct inductive_dec.
     destruct k.
     destruct N.eq_dec. discriminate.
     simpl.
-    specialize (IHd t0 i (S n1) 1).
-    forward IHd; [ |lia].
+    specialize (IHb t0 i (S n0) 1).
+    forward IHb; [ |lia].
     simpl in H0, H1, H2.
-    forward IHd; [ |lia].
-    forward IHd; [ |lia].
-    simpl in IHd. simpl in H1. rewrite Nat.sub_0_r in IHd.
-    specialize (IHd H2).
-    apply IHd.
+    forward IHb; [ |lia].
+    forward IHb; [ |lia].
+    simpl in IHb. simpl in H1. rewrite Nat.sub_0_r in IHb.
+    specialize (IHb H2).
+    apply IHb.
 
     destruct N.eq_dec. injection e2; intros <-.
     simpl in *.
-    replace (Pos.to_nat (Pos.of_succ_nat n1)) with (S n1) in * by lia.
+    replace (Pos.to_nat (Pos.of_succ_nat n0)) with (S n0) in * by lia.
     rewrite Nat.sub_diag in *. simpl.
     destruct N.eq_dec. reflexivity.
-    injection H2; intros <-. simpl in n2.
-    elim n2; reflexivity.
+    injection H2; intros <-. simpl in n1.
+    elim n1; reflexivity.
 
     simpl.
     case_eq (Pos.to_nat p). simpl.
-    intros Hp. specialize (IHd t0 i (S n1) (N.pos p + 1)).
-    do 4 (forward IHd; [ |lia]).
-    rewrite IHd. equaln.
+    intros Hp. specialize (IHb t0 i (S n0) (N.pos p + 1)).
+    do 4 (forward IHb; [ |lia]).
+    rewrite IHb. equaln.
 
 
     intros.
     simpl.
 
-    assert(n3 = Pos.to_nat p - 1)%nat by lia.
-    subst n3.
-    assert (n1 - (Pos.to_nat p - 1) = S (n1 - Pos.to_nat p))%nat by lia.
+    assert(n2 = Pos.to_nat p - 1)%nat by lia.
+    subst n2.
+    assert (n0 - (Pos.to_nat p - 1) = S (n0 - Pos.to_nat p))%nat by lia.
     rewrite H4. simpl.
-    erewrite IHd. equaln. lia. simpl in H0. lia. simpl in H1. lia.
+    erewrite IHb. equaln. lia. simpl in H0. lia. simpl in H1. lia.
     rewrite <- H2.
-    assert (S n1 - N.to_nat (N.pos p) = S (n1 - N.to_nat (N.pos p)))%nat by lia.
-    rewrite H5. simpl dnth at 2. equaln.
+    assert (S n0 - N.to_nat (N.pos p) = S (n0 - N.to_nat (N.pos p)))%nat by lia.
+    rewrite H5. simpl bnth at 2. equaln.
 
-    now elim n2.
+    now elim n1.
 Qed.
 
 (** Lookup is the same *)
 Lemma L3_tnth_find_branch n e brs t i f :
-  dnth n brs = Some t ->
-  find_branch (dcon_of_con i n) (N.of_nat (rarg _ t))
+  bnth n brs = Some t ->
+  find_branch (dcon_of_con i n) (N.of_nat (snd t))
               (map_branches f (trans_brs (trans e) i 0 0 brs)) =
-  Some (f (N.of_nat (rarg _ t)) (snd (strip_lam (rarg _ t) (trans e 0 (dbody _ t))))).
+  Some (f (N.of_nat (snd t)) (snd (strip_lam (snd t) (trans e 0 (fst t))))).
 Proof.
   intros Hnth.
-  case_eq (find_branch (dcon_of_con i n) (N.of_nat (rarg Term t))
+  case_eq (find_branch (dcon_of_con i n) (N.of_nat (snd t))
                        (map_branches f (trans_brs (trans e) i 0 0 brs))).
   intros. f_equal.
   apply find_branch_map_branches_some in H. destruct H as [exp [findbr ->]].
@@ -1597,11 +1601,11 @@ Proof.
   revert n Hnth findbr. generalize 0 at 2.
   induction brs; simpl in * ; intros.
   - discriminate. 
-  - destruct n2.
+  - destruct n1.
     + simpl in findbr. 
       injection Hnth; intros <-; simpl in *.
       destruct strip_lam. now injection findbr.
-    + apply (IHbrs (n1 + 1) n2 Hnth). clear IHbrs.
+    + apply (IHbrs (n0 + 1) n1 Hnth). clear IHbrs.
       destruct strip_lam. now simpl in findbr.
   - intros.
     elimtype False.
@@ -1609,7 +1613,7 @@ Proof.
     rewrite find_branch_trans in H; eauto.
     revert n H Hnth. generalize 0 at 2.
     induction brs; simpl in *; intros. discriminate.
-    destruct n2.
+    destruct n1.
     injection Hnth ; intros <-. simpl in *.
     destruct strip_lam. discriminate.
     destruct strip_lam. simpl in H.
@@ -1815,14 +1819,15 @@ Proof.
      (forall a k, crctTerms bef (N.to_nat k) a ->
              trans_args (trans (after ++ bef')) k a =
              trans_args (trans bef') (k + N.of_nat (Datatypes.length after)) a) /\
+     (forall a k, crctBs bef (N.to_nat k) a ->
+             forall i n, trans_brs (trans (after ++ bef')) i k n a =
+                    trans_brs (trans bef') i (k + N.of_nat (Datatypes.length after)) n a) /\
      (forall a k, CrctDs bef (N.to_nat k) a ->
              trans_fixes (trans (after ++ bef')) k a =
-             trans_fixes (trans bef') (k + N.of_nat (Datatypes.length after)) a /\
-             (forall i n, trans_brs (trans (after ++ bef')) i k n a =
-             trans_brs (trans bef') i (k + N.of_nat (Datatypes.length after)) n a))); cycle 1.
+             trans_fixes (trans bef') (k + N.of_nat (Datatypes.length after)) a)); cycle 1.
   { destruct H. intros. rewrite <- trans_shift; eauto; apply H; eauto. }
 
-  apply TrmTrmsDefs_ind; intros *; simpl; auto.
+  apply TrmTrmsBrsDefs_ind; intros *; simpl; auto.
 
   + intros IH k Ht. simpl.
     f_equal. rewrite IH. now rewrite N.add_assoc.
@@ -1859,22 +1864,24 @@ Proof.
     f_equal.
     eapply Crct_invrt_Fix in H0.
     specialize (H (k + N.of_nat (dlength d))); intuition eauto.
-    destruct H.
     assert ((N.to_nat k + dlength d)%nat = (N.to_nat (k + N.of_nat (dlength d)))) by lia.
-    now rewrite <- H.
     assert(k + N.of_nat (dlength d) = N.of_nat (L3t.dlength d) + k) by lia.
-    rewrite <- H2. rewrite H. equaln.
+    rewrite H2 in H. rewrite H. equaln.
+    rewrite <- H2. now rewrite <- H1.
   + intros.
     inv H1.
     f_equal; eauto.
   + intros.
-    inv H1. destruct (H0 k H11).
-    split; f_equal; eauto.
+    inv H1. specialize (H0 k H8).
+    f_equal; eauto.
     intros.
     rewrite H; eauto.
     destruct strip_lam.
     f_equal.
-    now rewrite H2.
+    now rewrite H0.
+  + intros.
+    inv H1. specialize (H0 k H10).
+    f_equal; eauto.
 Qed.
 
 Fixpoint is_n_lambda_app n t :=
@@ -2214,6 +2221,12 @@ Proof.
   rewrite H0. inv H. eauto.
 Qed.
 
+Lemma LookupDfn_pres_Crct:
+  forall p n t, crctTerm p n t ->
+                forall nm u, LookupDfn nm p u -> crctTerm p 0 u.
+Proof.
+Admitted.
+
 Theorem translate_correct_subst (e : environ Term) (t t' : Term) :
   wf_environ e -> Crct e 0 t ->
   L3eval.WcbvEval e t t' -> 
@@ -2268,7 +2281,7 @@ Proof with eauto.
     intros nm t s H evalts IHt wft.
     simpl.
     unfold subst_env at 1.
-    assert (crctt := LookupDfn_pres_Crct wft H).
+    assert (crctt := LookupDfn_pres_Crct _ _ _ wft _ _ H).
     forward IHt; [ |apply wf_environ_lookup in H; auto].
     destruct (lookup_eval_env _ wfe nm t H _ evenv wfe'') as
         [bef [bef' [after' [t' [wfbef [evbef [Crctt [evt [eqe' lookupt]]]]]]]]].
@@ -2416,12 +2429,11 @@ Proof with eauto.
          intros Hi.
          constructor.
          rewrite efnlst_length_map, efnlst_length_trans.
-         pose proof (proj2 (proj2 (WFTerm_exp_wf_ind e e'' wfe evenv wfe''))).
+         pose proof (proj2 (proj2 (proj2 (WFTerm_exp_wf_ind e e'' wfe evenv wfe'')))).
          specialize (H0 dts (L3t.dlength dts)).
          forward H0; eauto.
          rewrite !N.add_0_r.
          apply efnlst_wf_subst_env; eauto.
-         destruct H0. apply H0.
          now inv evfn.
          
       * (* Impossible, as t' must be a lambda, so cannot evaluate to a fix *)
@@ -2481,10 +2493,9 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     specialize (IHmch Hmch).
     unfold subst_env in *; rewrite subst_env_aux_match.
     unfold L3.term.whCaseStep in Hcasestep.
-    case_eq (dnthBody n brs); [intros t H | intros H];
+    case_eq (bnth n brs); [intros t H | intros H];
       rewrite H in Hcasestep; try easy.
-    apply dnthBody_dnth in H. destruct H as [def [Hdnth Ht]].
-    assert(Hargsdef:tlength args = rarg _ def).
+    assert(Hargsdef:tlength args = snd t).
     (* Well-formedness of case *)
     admit.
 
@@ -2498,10 +2509,9 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     rewrite Hargs'.
     rewrite Hargsdef.
     apply L3_tnth_find_branch; eauto.
-    destruct def as [dna dty dbody rarg]; simpl in *.
-    subst t. 
+    destruct t as [dbody rarg]; simpl in *.
     injection Hcasestep; intros <-.
-    specialize (Hbr _ _ Hdnth). simpl in Hbr.
+    specialize (Hbr _ _ H). simpl in Hbr.
     destruct Hbr as [Hbr Hwf'].
     forward IHcs.
     rewrite trans_mkapp in IHcs.
@@ -2535,7 +2545,7 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     
   (** Terms *)
   + intros; constructor.
-  + intros. inv H1. specialize (H0 H8). simpl.
+  + intros. inv H1. specialize (H0 H7). simpl.
     constructor; auto.
 
   (** Generalized goal *)
@@ -2547,11 +2557,13 @@ Lemma WcbvEval_env_eval_env e e' :
 Proof.
   induction 2.
   - exists nil; constructor.
-  - inv H. destruct (IHWcbvEval_env H5) as [e'' Hev].
+  - inv H.
+    assert (wfe := (proj1 Crct_CrctEnv _ _ _ H6)).
+    destruct (IHWcbvEval_env wfe) as [e'' Hev].
     simpl. 
     exists ((nm, subst_env e'' (translate (translate_env e) t')) :: e'').
     constructor; auto.
-    pose proof (translate_correct_subst e t t' H5 H7 H1 _ Hev).
+    pose proof (translate_correct_subst e t t' wfe H6 H1 _ Hev).
     now rewrite !(translate_env_eval _ _ _ Hev).
   - inv H.
     destruct (IHWcbvEval_env H3) as [e'' Hev].
@@ -2578,10 +2590,11 @@ Lemma obs_prevervation t e :
   same_obs t (subst_env e (translate e t)) = true.
 Proof.
   revert t.
-  eapply (@TrmTrms_ind
+  eapply (@TrmTrmsBrsDefs_ind
   (fun t : Term => same_obs t (subst_env e (translate e t)) = true)
   (fun ts => same_args same_obs ts
                     (map_terms (fun x : L3t.Term => subst_env_aux e 0 (trans e 0 x)) ts) = true)
+  (fun bs => True)
   (fun ds => True)); simpl; auto.
 
   - intros.

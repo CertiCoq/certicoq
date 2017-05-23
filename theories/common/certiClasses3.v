@@ -379,49 +379,30 @@ Qed.
 
 Require Import Morphisms.
 
-Global Instance  compObsLeLinkRespectsSameVal:
-  Proper (eq ==> sameValues ==> iff) ((@compObsLeLink Src Inter _ _ _ _ _ _ _ _ _ _  )).
-Proof using.
-  intros s1 s2 Heqs d1 d2 Hsvd. subst. rename s2 into s.
-  split.
-- revert Hsvd s.  revert d1 d2.
-  cofix.
-  intros ? ? Hsvd ? Hs.
-  constructor.
-  inverts Hs.
-  unfold sameValues in Hsvd.
-  firstorder. (* no idea what it did *)
-- revert Hsvd s.  revert d1 d2.
-  cofix.
-  intros ? ? Hsvd ? Hs.
-  constructor.
-  inverts Hs.
-  unfold sameValues in Hsvd.
-  firstorder.
-Qed. 
+(* Outside this section, this definition should not depend at all on Src and Dst.*)
+Definition leObsId : Inter -> Inter -> Prop :=  ((@compObsLeLink Inter Inter _ _ _ _ _ _ _ (fun x => Ret x) _ _ )).
 
-(* A more general version of the above
-Global Instance  compObsLeLinkRespectsSameVal2:
-  Proper (sameValues ==> sameValues ==> iff) ((@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  )).
+Definition eqObsId (a b : Inter) := leObsId a b /\ leObsId b a. 
+
+
+Lemma sameValuesImpliesLeObsId a b: sameValues a b -> leObsId a b.
 Proof using.
-  intros s1 s2 Hsvs d1 d2 Hsvd. subst.
-  split.
-- revert  s1 s2 Hsvs d1 d2 Hsvd.
-  cofix.
-  intros ? ? Hsvs ? ? Hsvd Hs.
-  constructor.
-  inverts Hs.
-  unfold sameValues in *.
-  firstorder. (* no idea what it did *)
-- revert Hsvd s.  revert d1 d2.
-  cofix.
-  intros ? ? Hsvd ? Hs.
-  constructor.
-  inverts Hs.
-  unfold sameValues in Hsvd.
-  firstorder.
-Qed. 
- *)
+  revert a b. cofix.
+  intros ? ? Hs. constructor. intros sv Hsv.
+  specialize (proj1 (Hs _) Hsv). intros Hsvb.
+  exists sv. dands; auto; try reflexivity.
+- intros. apply liftLeRimpl with (R1:= sameValues); auto.
+  apply liftLeRefl. unfold Reflexive, sameValues. reflexivity.
+- intros. simpl. constructor. apply sameValuesImpliesLeObsId.
+  unfold Reflexive, sameValues. reflexivity.
+Qed.
+
+Lemma sameValuesImpliesEqObsId a b: sameValues a b -> eqObsId a b.
+Proof using.
+  intros Hs. split; apply sameValuesImpliesLeObsId; auto.
+  unfold Reflexive, sameValues in *. firstorder.
+Qed.
+
 
 Local Instance  compObsLeLinkRespectsEval:
   Proper (eq ==> bigStepEval  ==> Basics.impl) ((@compObsLeLink Src Inter _ _ _ _ _ _ _ _ _ _  )).
@@ -433,3 +414,223 @@ Proof using.
 Abort.
 
 End ComposeLink.
+
+
+Lemma goodPreservingId {Src:Type} {Hg: GoodTerm Src}:
+  @goodPreserving Src Src (fun x => Ret x) _ _.
+Proof using.
+  intros ? ?.
+  simpl. assumption.
+Qed.
+Arguments eqObsId {Inter} {H4} {H5} {H6} {H7} {H8}.
+Arguments leObsId {Inter} {H4} {H5} {H6} {H7} {H8}.
+
+Section LinkObsProper.
+Context {Src Dst : Type}
+        `{Ls: CerticoqLinkableLanguage Src}
+        `{Ld: CerticoqLinkableLanguage Dst}.
+Lemma compObsLeLink_proper_Feq t1 t2:
+  (forall s,  t1 s =  t2 s) -> forall a b,
+  (@compObsLeLink Src Dst _ _ _ _ _ _ _ t1 _ _ ) a b 
+  -> (@compObsLeLink Src Dst _ _ _ _ _ _ _ t2 _ _ ) a b.
+Proof using.
+  intros feq.
+  cofix.
+  intros ? ? Hl.
+  constructor. invertsn Hl.
+  intros sv Hev. specialize (Hl sv Hev). exrepnd.
+  exists dv. dands; eauto using  liftLeRimpl;[].
+  intros Hq sva Hga. specialize (Hl0 Hq sva Hga). unfold translate in *.
+  rewrite <- feq. simpl in *.
+  eauto using liftLeRimpl.
+Qed.
+  
+Context {t : CerticoqTranslation Src Dst}
+        {tg: goodPreserving Src Dst}.
+
+
+  
+Lemma compObsLeLinkRespectsLe:
+  Proper ((Basics.flip leObsId) ==> leObsId ==> Basics.impl) (@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  ).
+Proof using tg.
+  intros l1 l2 Heql r1 r2 Heqr Hc.
+  unfold leObsId, Basics.flip in *.
+  eapply compObsLeLinkTransitive with (t1:= fun x => Ret x); eauto;
+    [apply goodPreservingId| ].
+  eapply compObsLeLinkTransitive with (t2:= fun x => Ret x) in Hc; eauto; try assumption;
+    [|apply goodPreservingId];[].
+  eapply compObsLeLink_proper_Feq;[| exact Hc].
+  intros. unfold composeTranslation, translate. destruct (t s); reflexivity.
+Qed.
+  
+Global Instance compObsLeLinkRespectsEqObs:
+  Proper (eqObsId ==> eqObsId ==> iff) (@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  ).
+Proof using tg.
+  intros  ? ? Hleq ? ? Hreq. unfold eqObsId in *. repnd.
+  split; apply compObsLeLinkRespectsLe; auto.
+Qed.
+
+
+Local Instance  compObsLeLinkRespectsSameVal:
+  Proper (sameValues ==> sameValues ==> iff) (@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  ).
+Proof using H5 tg.
+  intros ? ? ? ? ? ?.
+  apply compObsLeLinkRespectsEqObs; apply sameValuesImpliesEqObsId; assumption.
+Qed.
+
+End LinkObsProper.
+
+Section EqObsEquiv.
+Context {Src Dst : Type}
+        `{Ls: CerticoqLinkableLanguage Src}.
+
+Global Instance compObsLeLinkSymm:
+  Symmetric eqObsId.
+Proof using.
+  intros x y. unfold eqObsId. tauto.
+Qed.
+
+Global Instance compObsLeLinkRefl:
+  Reflexive eqObsId.
+Proof using.
+  intros x. apply sameValuesImpliesEqObsId. unfold sameValues. reflexivity.
+Qed.
+
+Global Instance compObsLeLinkEquiv:
+  Equivalence eqObsId.
+Proof using.
+  constructor; eauto with typeclass_instances.
+  intros ? ? ? H1eq  H2eq. unfold eqObsId, leObsId.
+  split.
+- eapply compObsLeLinkRespectsEqObs;[apply compObsLeLinkRefl| symmetry; eauto
+                                       | unfold eqObsId in *; tauto].
+- eapply compObsLeLinkRespectsEqObs; [apply compObsLeLinkRefl|  eauto
+                                      | unfold eqObsId in *; tauto].
+Unshelve.
+  apply goodPreservingId.
+  apply goodPreservingId.
+Qed.
+
+End EqObsEquiv.
+
+Section LinkingIllustration.
+Context {Src Dst : Type}
+        `{Ls: CerticoqLinkableLanguage Src}
+        `{Ld: CerticoqLinkableLanguage Dst}
+        {comp1 : CerticoqTranslation Src Dst}
+        {Ht1: CerticoqLinkableTranslationCorrect Ls Ld}.
+
+(** Suppose [f] computes to a function (lambda) [fv] in the [Src] language *)
+Variable f:Src.
+Variable fv:Src.
+Hypothesis fcomputes: f ⇓ fv.
+Hypothesis flam : questionHead Abs fv = true. (** [fv] may say yes to other questions as well *)
+
+(** [f] compiles to [fd] *)
+Variable fd:Dst.
+Hypothesis compilef : translate Src Dst f = Ret fd.
+
+(** [fd] computes to [fdv] *)
+Variable fdv:Dst.
+Hypothesis compilefd : fd ⇓ fdv.
+
+(** Now consider an argument [t] to [f] in Src. *)
+Variable t:Src.
+
+Notation "s ⊑ t" := (compObsLeLink _ _ s t) (at level 65).
+
+(** Suppose we SEPARATELY [t] compile by the SAME compiler it to get [td] *)
+Variable td:Dst.
+Section SameCompiler.
+Hypothesis compilet : translate Src Dst t = Ret td.
+
+
+(** The destination language has a notion of application. Consider the destination term: *)
+Let fdtd := mkApp fdv td.
+
+
+(** We would like [fdtd] be be observationally equal to [mkApp fv t], which is an easy
+corrollary of the linkable correctness property: *)
+Corollary fdtdCorrect {dd : deterministicBigStep Dst}
+  : goodTerm f -> goodTerm t -> mkApp fv t  ⊑ mkApp fdv td.
+Proof.
+  intros Hgf Hgt.
+  destruct Ht1.
+  specialize (obsePresLink0 f Hgf).
+  rewrite compilef in obsePresLink0. simpl in *.
+  invertsn obsePresLink0.
+  invertsn obsePresLink0.
+  specialize (obsePresLink0 fv fcomputes).
+  exrepnd. clear obsePresLink2 obsePresLink3.
+  unfold deterministicBigStep in dd.
+  apply dd with (v2:= fdv) in obsePresLink0;[ subst | assumption].
+  specialize (obsePresLink1 flam t Hgt).
+  rewrite compilet in obsePresLink1. simpl in obsePresLink1.
+  invertsn obsePresLink1. assumption.
+Qed.
+End SameCompiler.
+
+Section DiffCompiler.
+(** Now suppose, we use DIFFERENT compiler to compile [td]. First, we
+list the needed properties for the other compiler [comp2] *)
+
+Variable (comp2 : CerticoqTranslation Src Dst).
+
+(** on good inputs, the compilers produce observationally equivalent outputs. *)
+Hypothesis c2Equiv :
+  forall s:Src, goodTerm s
+           -> liftExc eqObsId (@translate _ _ comp2 s) (@translate _ _ comp1 s).
+
+Hypothesis mkAppCongr : forall (ff tt1 tt2: Dst),
+    (* consider adding this:  goodTerm ff -> , which will need ⇓ to be goodpreserving*)
+     goodTerm tt1
+    -> goodTerm tt2
+    -> eqObsId tt1 tt2
+    -> eqObsId (mkApp ff tt1) (mkApp ff tt2).
+
+Instance mkAppRW : Proper (eq ==> eqObsId ==> eqObsId) (@mkApp Dst _).
+Proof using.
+  intros ? ? ? ? ? ?. subst.
+  apply mkAppCongr.
+  (* need goodTerm *)
+Abort.
+
+Hypothesis compilet : @translate Src Dst comp2 t = Ret td.
+
+(** Again, consider the application term in the destination language, where the function
+  and the arg are compiled by different compilers *)
+Let fdtd := mkApp fdv td.
+
+Notation "s ⊑ t" := (@compObsLeLink _ _ _ _ _ _ _ _ _ comp1  _ _ s t) (at level 65).
+
+(** Again, we would like [fdtd] be be observationally equal to [mkApp fv t], which is a
+corrollary of the linkable correctness property: *)
+Corollary fdtdCorrectDiff {dd : deterministicBigStep Dst} {fp2 : @goodPreserving Src Dst comp2 _ _}
+  : goodTerm f -> goodTerm t -> mkApp fv t  ⊑ mkApp fdv td.
+Proof.
+  intros Hgf Hgt.
+  destruct Ht1.
+  specialize (obsePresLink0 f Hgf).
+  rewrite compilef in obsePresLink0. simpl in *.
+  invertsn obsePresLink0.
+  invertsn obsePresLink0.
+  specialize (obsePresLink0 fv fcomputes).
+  exrepnd. clear obsePresLink2 obsePresLink3.
+  unfold deterministicBigStep in dd.
+  apply dd with (v2:= fdv) in obsePresLink0;[ subst | assumption].
+  specialize (obsePresLink1 flam t Hgt).
+  pose proof certiGoodPresLink0 as Hgpb.
+  specialize (certiGoodPresLink0 t Hgt).
+  specialize (c2Equiv t Hgt).
+  destruct (@translate Src Dst comp1 t); try contradiction.
+  specialize (fp2 t Hgt). rewrite compilet in fp2.
+  simpl in obsePresLink1. rewrite compilet in c2Equiv. simpl in c2Equiv.
+  apply mkAppCongr  with (ff:=fdv) in c2Equiv; eauto;[].
+  invertsna obsePresLink1 Hinv.
+  eapply compObsLeLinkRespectsEqObs; [reflexivity | apply c2Equiv |].
+  exact Hinv.
+  Unshelve. assumption.
+Qed.
+
+End DiffCompiler.
+End LinkingIllustration.

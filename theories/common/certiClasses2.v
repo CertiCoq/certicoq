@@ -28,6 +28,14 @@ Qed.
 
 Hint Resolve liftLeRimpl : certiclasses.
 
+Require Import Coq.btauto.Btauto.
+Require Import Morphisms.
+
+Global Instance  liftLeRefl {A:Type} (R: A -> A -> Prop)
+  {rl: Reflexive R} : Reflexive (liftLe R).
+Proof using.
+  intros x. destruct x; constructor; auto.
+Defined.
 
 (** Some values, e.g. constructors, can have subterms.
    This operation allows asking for the nth subterm.
@@ -148,6 +156,11 @@ Proof using.
   inversion Hsubb. assumption.
 Qed.  
 
+Global Instance  yesPreservedRefl: Reflexive (@yesPreserved SrcValue _ SrcValue _).
+Proof using.
+  intros x q. unfold implb. btauto. 
+Qed.
+
 End ObsLe.
 
 Notation "s ⊑ t" := (obsLe s t) (at level 65).
@@ -249,6 +262,7 @@ Proof.
   intros ? ?.
   eapply obsLeTrns with (i:=iv); eauto.
 Qed.
+
 
 End YesNoQuestions.
 

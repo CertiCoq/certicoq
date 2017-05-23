@@ -77,6 +77,11 @@ match (s, sv) with
 | (_,_) => False
 end.
 
+Definition liftExc {T:Type} (R: T->T->Prop) (oa1 oa2 : exception T) :=
+  match oa1, oa2 with
+  | Ret a1, Ret a2 => R a1 a2
+  | _,_ => False
+  end.
 
 Class CerticoqTranslation (Src Dst : Type) : Type
   := translate : Src -> exception Dst.

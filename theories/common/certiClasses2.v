@@ -173,6 +173,24 @@ Class CerticoqTranslationCorrect
 Global Arguments CerticoqTranslationCorrect
   {Src} {SrcValue} {H} {H0} {H1} {H2} H3 {Dst} {DstValue} {H4} {H5} {H6} {H7} H8 {H9}.
 
+Lemma yesPreservedTransitive {SrcValue InterValue DstValue:Type}
+         `{QuestionHead SrcValue} 
+   `{QuestionHead InterValue} 
+   `{QuestionHead DstValue} 
+      (s : SrcValue) (i : InterValue) (d : DstValue):
+  yesPreserved s i
+  -> yesPreserved i d 
+  -> yesPreserved s d.
+Proof using.
+  unfold yesPreserved. intros Hyesi Hyesd q.
+  specialize (Hyesi q).
+  specialize (Hyesd q).
+  destruct (questionHead q s); simpl in *;[| reflexivity]. 
+  rewrite Hyesi in Hyesd. assumption.
+Qed.
+
+
+
 Lemma obsLeTrns
    `{QuestionHead SrcValue} `{ObserveNthSubterm SrcValue} 
    `{QuestionHead InterValue} `{ObserveNthSubterm InterValue} 
@@ -197,13 +215,10 @@ Proof.
   intros ? ? ? Ha Hb.
   inversion Ha as [ss is Hah Has]. subst. clear Ha.
   inversion Hb as [is ds Hbh Hbs]. subst. clear Hb.
-  constructor; auto.
-- unfold yesPreserved in *. intros q.
-  specialize (Hah q).
-  specialize (Hbh q).
-  destruct (questionHead q s); simpl in *;[| reflexivity]. 
-  rewrite Hah in Hbh. assumption.
-- clear Hah Hbh. intros n.
+  constructor; auto;
+    [eauto using (@yesPreservedTransitive SrcValue InterValue DstValue); fail
+    |].
+ clear Hah Hbh. intros n.
   specialize (Has n).
   specialize (Hbs n).
   destruct Has;[| constructor ].

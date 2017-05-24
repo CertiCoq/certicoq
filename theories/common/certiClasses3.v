@@ -95,14 +95,9 @@ Proof.
   destruct (Hbh _ Hevi) as [dv  Hcd]. clear Hbh.
   destruct Hcd as [Hevd Hcd].
   destruct Hcd as [Hyesd Hsubd].
-  exists dv. split;[ assumption| split].
-- clear Hsubi Hsubd.
-  unfold yesPreserved in *. intros q.
-  specialize (Hyesi q).
-  specialize (Hyesd q).
-  destruct (questionHead q sv); simpl in *;[| reflexivity]. 
-  rewrite Hyesi in Hyesd. assumption.
-- clear Hyesi Hyesd.
+  exists dv. split;[ assumption| split];
+    [eauto using (@yesPreservedTransitive Src Inter Dst) | ]; [].
+  clear Hyesi Hyesd.
   intros n.
   specialize (Hsubi n).
   specialize (Hsubd n).

@@ -183,13 +183,8 @@ Proof.
   destruct Hcd as [Hyesd Hsubd].
   exists dv. split;[ assumption|].
   assert (forall (A B: Prop), A -> (A-> B) -> A/\B) as Hp by (intros; tauto).
-  apply Hp;[|intros Hyessd; split]; clear Hp.
-- clear Hsubi Hsubd.
-  unfold yesPreserved in *. intros q.
-  specialize (Hyesi q).
-  specialize (Hyesd q).
-  destruct (questionHead q sv); simpl in *;[| reflexivity]. 
-  rewrite Hyesi in Hyesd. assumption.
+  apply Hp;[|intros Hyessd; split]; clear Hp;
+    [eauto using (@yesPreservedTransitive Src Inter Dst) | | ];[|].
 - clear Hyesi Hyesd.
   intros n.
   apply proj1 in Hsubi.

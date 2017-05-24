@@ -571,6 +571,7 @@ Check  @cps_cvt_corr.
 
 
 Require Import Common.certiClasses3.
+Require Import Common.certiClassesLinkable.
 
 Section Temp.
 

@@ -14,6 +14,26 @@ Hint Constructors liftLe : certiclasses.
 Definition Rimpl {S D: Type} (R1 R2: S -> D -> Prop) :=
   forall s d, R1 s d -> R2 s d.
 
+Definition liftLeR {S D: Type} (R: S -> D -> Prop) (os: option S) (od: option D) : Prop :=
+  match os with
+  | None => True
+  | Some s =>
+    match od with
+    | Some d => R s d
+    | None => False
+    end
+  end.
+
+Lemma  liftLeTrans {S I D: Type} (Rsi : S -> I -> Prop) (Rid : I -> D -> Prop) (Rsd : S -> D -> Prop) :
+   (forall s i d, Rsi s i -> Rid i d -> Rsd s d)
+   -> forall s i d, liftLe Rsi s i -> liftLe Rid i d -> liftLe Rsd s d.
+Proof.
+  intros Ht ? ? ? Hsi Hid.
+  inversion Hsi; subst; eauto with certiclasses.
+  inversion Hid. subst; constructor.
+  eauto.
+Qed. 
+
 Require Import SquiggleEq.LibTactics.
 (** Could have used RImpl for the conclusion as well, Coq's hint search is not so good
  at unfolding definitions. *)

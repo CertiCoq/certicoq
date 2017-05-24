@@ -4,7 +4,7 @@ Require Import Coq.Unicode.Utf8.
 Require Import List.
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
-Inductive liftLe {S D: Type} (R: S -> D -> Prop): option S -> option D -> Prop :=
+CoInductive liftLe {S D: Type} (R: S -> D -> Prop): option S -> option D -> Prop :=
 (* defining this using pattern matching confuses the strict positivity checker.
   Can this part be defined outside generically, using induction? *)
 | liftSome: forall s d, R s d -> liftLe R (Some s) (Some d)

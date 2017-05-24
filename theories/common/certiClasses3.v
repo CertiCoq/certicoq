@@ -490,10 +490,17 @@ Proof using.
   intros x y. unfold eqObsId. tauto.
 Qed.
 
+Global Instance sameValuesEquiv:
+  Equivalence sameValues.
+Proof using.
+  constructor; unfold sameValues;
+    intros x; firstorder.
+Qed.
+
 Global Instance compObsLeLinkRefl:
   Reflexive leObsId.
 Proof using.
-  intros x. apply sameValuesImpliesLeObsId. unfold sameValues. reflexivity.
+  intros x. apply sameValuesImpliesLeObsId. reflexivity.
 Qed.
 
 Global Instance compObsEqLinkRefl:
@@ -587,12 +594,15 @@ Hypothesis c2Equiv :
   forall s:Src, goodTerm s
            -> liftExc leObsId (@translate _ _ comp1 s) (@translate _ _ comp2 s).
 
-Hypothesis mkAppCongrLe : forall (ff tt1 tt2: Dst),
+Definition appArgCongr : Prop :=
+  forall (ff tt1 tt2: Dst),
     (* consider adding this:  goodTerm ff -> , which will need ⇓ to be goodpreserving*)
      goodTerm tt1
     -> goodTerm tt2
     -> leObsId tt1 tt2
     -> leObsId (mkApp ff tt1) (mkApp ff tt2).
+
+Hypothesis mkAppCongrLe : appArgCongr.
 
 Lemma mkAppCongr : forall (ff tt1 tt2: Dst),
     (* consider adding this:  goodTerm ff -> , which will need ⇓ to be goodpreserving*)
@@ -644,7 +654,7 @@ Proof.
   destruct (@translate Src Dst comp1 t); try contradiction.
   specialize (fp2 t Hgt). rewrite compilet in fp2.
   simpl in obsePresLink1. rewrite compilet in c2Equiv. simpl in c2Equiv.
-  apply mkAppCongrLe  with (ff:=fdv) in c2Equiv; eauto;[].
+  apply (mkAppCongrLe fdv) in c2Equiv; eauto;[].
   invertsna obsePresLink1 Hinv.
   eapply compObsLeLinkRespectsLe; [reflexivity | apply c2Equiv |].
   exact Hinv.

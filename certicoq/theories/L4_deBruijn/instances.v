@@ -702,8 +702,6 @@ Qed.
 
 Lemma obsLinkableL45:
   compObsPreservingLinkable  (ienv * L4_5_Term) (ienv * L5Term).
-Abort.
-(***************************8
 Proof.
   intros ?. 
   revert s.
@@ -765,12 +763,12 @@ Proof.
     revert obsLinkableL45.
     assert (Hp:forall A B, (A<->B)->(A->B)) by tauto.
     apply Hp. clear Hp.
-    apply compObsLeLinkRespectsSameVal;[ reflexivity | ].
+    eapply compObsLeLinkRespectsSameVal;[ reflexivity | ].
     intros ?.
     apply and_iff_compat_l.
     simpl.  unfold haltCont.
-    repeat (autounfold with certiclasses eval in ident;  simpl in ident). repnd.
-    rewrite (cps_val_ret_flip ess); unfold isprogram; eauto; try reflexivity.
+    repeat (autounfold with certiclasses eval in ident;  simpl in ident). repnd. simpl.
+    setoid_rewrite (cps_val_ret_flip ess); unfold isprogram; eauto; try reflexivity.
     simpl.
     rewrite eval_ret. simpl. unfold subst. simpl.
     split; intros Hyp.
@@ -789,20 +787,23 @@ Proof.
     revert obsLinkableL45.
     assert (Hp:forall A B, (A<->B)->(A->B)) by tauto.
     apply Hp. clear Hp.
-    apply compObsLeLinkRespectsSameVal;[ reflexivity | ].
-    unfold sameValues. intros v.
-    apply and_iff_compat_l.
-    simpl.  rewrite eval_ret. simpl.
+    eapply compObsLeLinkRespectsSameVal;[ reflexivity | ].
+    unfold sameValues. intros v. simpl. 
+    apply and_iff_compat_l. 
+    simpl. autounfold with certiclasses. simpl.
+    rewrite eval_ret. (* setoid_rewrite does more rewriting *)
+    simpl.
     assert (forall (l1 l2 r: L5Term), l1=l2 -> (eval_c l1 r <-> eval_c l2 r)) as Hp by (intros;subst;tauto).
     apply Hp. clear Hp.
-    unfold subst. change_to_ssubst_aux8; [ | apply list.disjoint_nil_r ].
     Local Transparent ssubst_aux ssubst_bterm_aux sub_filter.
+    unfold subst.
     autounfold with certiclasses in Hgoodsv.
     unfold isprogram, closed in *.
     assert (free_vars (cps_cvt sv) = []) as Hs.
       (symmetry; rewrite cps_cvt_aux_fvars ; repnd; auto).
     assert (free_vars (cps_cvt svArg) = []) as Hsa by
-      (symmetry; rewrite cps_cvt_aux_fvars ; repnd; auto; congruence).
+      (symmetry; rewrite cps_cvt_aux_fvars ; repnd; auto; congruence). repnd.
+    change_to_ssubst_aux8; [  | simpl; disjoint_reasoningv2 ].
     simpl.
     rewrite (fst ssubst_aux_trivial5) at 1; [ | simpl; rewrite Hs; apply list.disjoint_nil_l ].
     rewrite (fst ssubst_aux_trivial5); [ | simpl; rewrite Hsa; apply list.disjoint_nil_l ].
@@ -810,6 +811,24 @@ Proof.
     repeat f_equal.
     apply cps_val_outer. apply is_valueb_corr. eapply eval_yields_value'; eauto.
     Fail idtac.
+    Unshelve.
+    apply goodPres45.
+    apply goodPres45.
 Abort.
-************************)
+
+Lemma appArgCongrL5 : @appArgCongr (ienv*L5Term) _ _ _ _ _ .
+Proof using.
+  cofix.
+  intros ? ? ? H1g H2g Hle.
+  unfold leObsId in *.
+  constructor.
+  invertsn Hle. 
+  intros sv Hev. autounfold with certiclasses in Hev.
+  unfold dummyEnvBigStep in Hev.
+  destruct tt1 as [env tt1]. destruct ff as [envv ff].
+  destruct sv as [envvv sv].
+  simpl in Hev. repnd. subst.
+  autounfold with certiclasses in Hev.
+  induction Hev.
+Abort.  
   End Temp.

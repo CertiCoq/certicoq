@@ -2,6 +2,30 @@ Require Import Common.exceptionMonad.
 Require Import Common.AstCommon.
 Require Import Coq.Unicode.Utf8.
 
+CoInductive liftLe {S D: Type} (R: S -> D -> Prop): option S -> option D -> Prop :=
+(* defining this using pattern matching confuses the strict positivity checker.
+  Can this part be defined outside generically, using induction? *)
+| liftSome: forall s d, R s d -> liftLe R (Some s) (Some d)
+| liftNone: forall d, liftLe R None d.
+
+Hint Constructors liftLe : certiclasses.
+
+(** is this defined in the Coq standard library of ExtLib? *)
+Definition Rimpl {S D: Type} (R1 R2: S -> D -> Prop) :=
+  forall s d, R1 s d -> R2 s d.
+
+Require Import SquiggleEq.LibTactics.
+(** Could have used RImpl for the conclusion as well, Coq's hint search is not so good
+ at unfolding definitions. *)
+Lemma  liftLeRimpl {S D: Type} (R1 R2: S -> D -> Prop) os od:
+  Rimpl R1 R2 -> liftLe R1 os od -> liftLe R2 os od.
+Proof.
+  intros Hr Hl.
+  inverts Hl; constructor.
+  apply Hr. assumption.
+Defined.
+
+Hint Resolve liftLeRimpl : certiclasses.
 
 (* This operations picks out the "good" terms in the language.
  All bets are off about the terms that are not good *)
@@ -12,10 +36,15 @@ Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 (** A [Term] can contain an environment embedded in it. *)
 Class BigStepOpSem (Term Value:Type) := bigStepEval: Term -> Value -> Prop.
 
+
 Require Import String.
 
 (* one can use ⇓ to refer to the big step eval relation *)
 Notation "s ⇓ t" := (bigStepEval s t) (at level 70).
+
+Definition sameValues {Term:Type}
+  `{BigStepOpSem Term} (a b : Term)
+:= forall (v: Value), a ⇓ v <-> b ⇓ v.
 
 Inductive bigStepResult (Term Value:Type) :=
 | Result : Value -> bigStepResult Term Value
@@ -301,3 +330,10 @@ unfold DeqSumbool. intros.
 unfold DecidableSumbool.
 repeat decide equality.
 Defined.
+
+Lemma goodPreservingId {Src:Type} {Hg: GoodTerm Src}:
+  @goodPreserving Src Src (fun x => Ret x) _ _.
+Proof using.
+  intros ? ?.
+  simpl. assumption.
+Qed.

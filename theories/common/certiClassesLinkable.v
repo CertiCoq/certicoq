@@ -448,12 +448,7 @@ Section DiffCompiler.
 (** Now suppose, we use DIFFERENT compiler to compile [td]. First, we
 list the needed properties for the other compiler [comp2] *)
 
-Variable (comp2 : CerticoqTranslation Src Dst).
 
-(** on good inputs, the compilers produce observationally equivalent outputs. *)
-Hypothesis c2Equiv :
-  forall s:Src, goodTerm s
-           -> liftExc leObsId (@translate _ _ comp1 s) (@translate _ _ comp2 s).
 
 Definition appArgCongr : Prop :=
   forall (ff tt1 tt2: Dst),
@@ -485,18 +480,23 @@ Proof using.
   (* need goodTerm *)
 Abort.
 
-Hypothesis compilet : @translate Src Dst comp2 t = Ret td.
+Notation "s ⊑ t" := (@compObsLeLink _ _ _ _ _ _ _ _ _ comp1  _ _ s t) (at level 65).
+Hypothesis compilet :  (@translate Src Dst comp1 t) = Ret td.
+(** Suppose that instead of td, we wish to use another term td', which we produced manually
+or by magic. We also proved that it is a good term and is greater than td *)
+Variable td':Dst.
+Hypothesis td'good: goodTerm td'.
+Hypothesis td'Le : leObsId td td'.
 
 (** Again, consider the application term in the destination language, where the function
   and the arg are compiled by different compilers *)
-Let fdtd := mkApp fdv td.
+Let fdtd := mkApp fdv td'.
 
-Notation "s ⊑ t" := (@compObsLeLink _ _ _ _ _ _ _ _ _ comp1  _ _ s t) (at level 65).
 
 (** Again, we would like [fdtd] be be observationally equal to [mkApp fv t], which is a
 corrollary of the linkable correctness property: *)
-Corollary fdtdCorrectDiff {dd : deterministicBigStep Dst} {fp2 : @goodPreserving Src Dst comp2 _ _}
-  : goodTerm f -> goodTerm t -> mkApp fv t  ⊑ mkApp fdv td.
+Corollary fdtdCorrectDiff {dd : deterministicBigStep Dst}
+  : goodTerm f -> goodTerm t -> mkApp fv t  ⊑ mkApp fdv td'.
 Proof.
   intros Hgf Hgt.
   destruct Ht1.
@@ -511,17 +511,13 @@ Proof.
   specialize (obsePresLink1 flam t Hgt).
   pose proof certiGoodPresLink0 as Hgpb.
   specialize (certiGoodPresLink0 t Hgt).
-  specialize (c2Equiv t Hgt).
-  destruct (@translate Src Dst comp1 t); try contradiction.
-  specialize (fp2 t Hgt). rewrite compilet in fp2.
-  simpl in obsePresLink1. rewrite compilet in c2Equiv. simpl in c2Equiv.
-  apply (mkAppCongrLe fdv) in c2Equiv; eauto;[].
-  invertsna obsePresLink1 Hinv.
-  eapply compObsLeLinkRespectsLe; [reflexivity | apply c2Equiv |].
-  exact Hinv.
+  rewrite compilet in *. simpl in *.
+  invertsna obsePresLink1 Hinvf.
+  apply (mkAppCongrLe fdv) in td'Le; eauto;[].
+  eapply compObsLeLinkRespectsLe; [reflexivity | apply td'Le |].
+  exact Hinvf.
   Unshelve. assumption.
 Qed.
 
 End DiffCompiler.
 End LinkingIllustration.
-

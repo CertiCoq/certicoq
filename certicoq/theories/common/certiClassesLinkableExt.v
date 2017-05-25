@@ -145,3 +145,48 @@ be arbitrary and come from arbitrary compilers or by hand.
 Abort.
 End Nn.
 End ComposeLinkExt.
+
+
+(** Relating the extensional version in this file to the non-extensional version
+in certiClassesLinkable.v *)
+
+Section ExtImpliesNonExt.
+Context (Src Dst : Type)
+        `{Ls: CerticoqLinkableLanguage Src}
+        `{Ld: CerticoqLinkableLanguage Dst}
+        {t1 : CerticoqTranslation Src Dst}
+        {Hgg : CerticoqLinkableTranslationCorrect Ls Ld}.
+
+Section Nn.
+  Variable n:nat.
+  Notation "s ⊑ t" := (compObsLeLinkExtN  _ _ n s t) (at level 65).
+  Notation "s ≲ t" := (compObsLeLinkN  _ _ n s t) (at level 65).
+
+Lemma extImpliesNonExt (s:Src) (t:Dst) : s ⊑ t -> s ≲ t.
+Proof using.
+  revert s t.
+  induction n as [| m Hind];[constructor |].
+  intros ? ? Hlt. 
+  clear n. rename m into n.
+  simpl in Hlt.
+  constructor.
+  intros ? Hev.
+  specialize (Hlt _ Hev). exrepnd.
+  exists dv. dands; eauto using liftLeRimpl;[].
+  clear Hlt3.
+  intros Hq svArg Hg.
+  specialize (Hlt0 Hq svArg).
+  destruct Hgg.
+  specialize (certiGoodPresLink svArg Hg).
+  specialize (obsePresLink svArg Hg).
+  destruct (translate Src Dst svArg) as [ | tsvArg];[contradiction | ].
+  inverts obsePresLink. 
+  simpl. constructor.
+  apply Hind.
+  apply Hlt0; eauto.
+  apply Hind.
+  idtac.
+  Fail apply H11.
+Abort.
+End Nn.
+End ExtImpliesNonExt.

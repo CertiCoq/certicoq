@@ -184,7 +184,7 @@ Proof using.
   simpl. constructor.
   apply Hind.
   apply Hlt0; eauto.
-  apply Hind.
+  Fail apply Hind.
   idtac.
   Fail apply H11.
 Abort.

@@ -171,8 +171,8 @@ Lemma compObsLeLinkTransitive
 Proof.
   cofix.
   intros ? ? ? Ha Hb.
-  inversion Ha as [ss is Hah Has]. subst. clear Ha.
-  inversion Hb as [is ds Hbh Hbs]. subst. clear Hb.
+  inverts Ha as Hah.
+  inverts Hb as Hbh.
   constructor; auto.
   intros ? Hevs.
   destruct (Hah _ Hevs) as [iv  Hci]. clear Hah.
@@ -216,6 +216,68 @@ Proof.
   constructor. eauto.
 Qed.
 
+Section obsLeN.
+Variable n:nat.
+Notation "s ⊑ t" := (compObsLeLinkN _ _  n s t) (at level 65).
+
+(** same as as [compObsLeLinkTransitive] above *)
+Lemma compObsLeLinkNTransitive
+      {Hgpsi : goodPreserving Src Inter}
+      {Hgpid : goodPreserving Inter Dst}:
+   forall   (s : Src) (i : Inter) (d : Dst),
+  s ⊑ i
+  -> i ⊑ d 
+  -> s ⊑ d.
+Proof.
+  induction n as [| m Hind];[ constructor |].
+  intros ? ? ? Ha Hb.
+  clear n. rename m into n.
+  inverts Ha as Hah.
+  inverts Hb as Hbh.
+  constructor; auto.
+  intros ? Hevs.
+  destruct (Hah _ Hevs) as [iv  Hci]. clear Hah.
+  destruct Hci as [Hevi Hci].
+  destruct Hci as [Hyesi Hsubi].
+  destruct (Hbh _ Hevi) as [dv  Hcd]. clear Hbh.
+  destruct Hcd as [Hevd Hcd].
+  destruct Hcd as [Hyesd Hsubd].
+  exists dv. split;[ assumption|].
+  assert (forall (A B: Prop), A -> (A-> B) -> A/\B) as Hp by (intros; tauto).
+  apply Hp;[|intros Hyessd; split]; clear Hp;
+    [eauto using (@yesPreservedTransitive Src Inter Dst) | | ];[|].
+- clear Hyesi Hyesd.
+  intros m.
+  apply proj1 in Hsubi.
+  apply proj1 in Hsubd.
+  specialize (Hsubi m).
+  specialize (Hsubd m).
+  destruct Hsubi;[| constructor ].
+  inversion Hsubd. subst. clear Hsubd.
+  constructor. eauto.
+- intros Habs.
+  apply proj2 in Hsubi.
+  apply proj2 in Hsubd.
+  intros ? Hgsv.
+  specialize (Hsubi Habs svArg Hgsv).
+  unfold yesPreserved in Hyesi.
+  specialize (Hyesi Abs).
+  rewrite Habs in Hyesi.
+  simpl in Hyesi.
+  specialize (Hsubd Hyesi).
+  inverts Hsubi as Hsub Heq.
+  apply Hgpsi in Hgsv.
+  unfold composeTranslation, translate in *.
+  destruct (t1 svArg) as [| ivArg];[inverts Heq|].
+  simpl in *. inverts Heq.
+  specialize (Hsubd ivArg Hgsv).
+  inverts Hsubd as Hsubd Heq.
+  destruct (t2 ivArg) as [|dvArg ];[inverts Heq|].
+  simpl in *. inverts Heq.
+  constructor. eauto.
+Qed.
+
+End obsLeN.
 Global Instance composeCerticoqLinkableTranslationCorrect
 (* we don't need a translation for the value type, although typically Src=SrcValue*)
   {Ht1: CerticoqLinkableTranslationCorrect Ls Li}
@@ -305,7 +367,23 @@ Proof using.
   rewrite <- feq. simpl in *.
   eauto using liftLeRimpl.
 Qed.
-  
+
+(* proof same as above *)
+Lemma compObsLeLinkN_proper_Feq t1 t2:
+  (forall s,  t1 s =  t2 s) -> forall n a b,
+  (@compObsLeLinkN Src Dst _ _ _ _ _ _ _ t1  _ _ n) a b 
+  -> (@compObsLeLinkN Src Dst _ _ _ _ _ _ _ t2  _ _ n) a b.
+Proof using.
+  intros feq n.  induction n;[ constructor |].
+  intros ? ? Hl.
+  constructor. invertsn Hl.
+  intros sv Hev. specialize (Hl sv Hev). exrepnd.
+  exists dv. dands; eauto using  liftLeRimpl;[].
+  intros Hq sva Hga. specialize (Hl0 Hq sva Hga). unfold translate in *.
+  rewrite <- feq. simpl in *.
+  eauto using liftLeRimpl.
+Qed.
+
 Context {t : CerticoqTranslation Src Dst}
         {tg: goodPreserving Src Dst}.
 
@@ -323,7 +401,22 @@ Proof using tg.
   eapply compObsLeLink_proper_Feq;[| exact Hc].
   intros. unfold composeTranslation, translate. destruct (t s); reflexivity.
 Qed.
-  
+
+Lemma compObsLeLinkNRespectsLe n:
+  Proper ((Basics.flip leObsId) ==> leObsId ==> Basics.impl) (@compObsLeLinkN  Src Dst _ _ _ _ _ _ _ _ _ _ n ).
+Proof using tg.
+  intros l1 l2 Heql r1 r2 Heqr Hc.
+  unfold leObsId, Basics.flip in *.
+  apply fromCoInd with (m:=n)in Heql.
+  apply fromCoInd with (m:=n)in Heqr.
+  eapply compObsLeLinkNTransitive with (t1:= fun x => Ret x); eauto;
+    [apply goodPreservingId|].
+  eapply compObsLeLinkNTransitive with (t2:= fun x => Ret x) in Hc; eauto; try assumption;
+    [|apply goodPreservingId];[].
+  eapply compObsLeLinkN_proper_Feq;[| exact Hc].
+  intros. unfold composeTranslation, translate. destruct (t s); reflexivity.
+Qed.
+
 Global Instance compObsLeLinkRespectsEqObs:
   Proper (eqObsId ==> eqObsId ==> iff) (@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  ).
 Proof using tg.
@@ -331,12 +424,26 @@ Proof using tg.
   split; apply compObsLeLinkRespectsLe; auto.
 Qed.
 
+Global Instance compObsLeLinkNRespectsEqObs n :
+  Proper (eqObsId ==> eqObsId ==> iff) (@compObsLeLinkN Src Dst _ _ _ _ _ _ _ _ _ _ n).
+Proof using tg.
+  intros  ? ? Hleq ? ? Hreq. unfold eqObsId in *. repnd.
+  split; apply compObsLeLinkNRespectsLe; auto.
+Qed.
 
-Local Instance  compObsLeLinkRespectsSameVal:
+
+Global Instance  compObsLeLinkRespectsSameVal:
   Proper (sameValues ==> sameValues ==> iff) (@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  ).
 Proof using H5 tg.
   intros ? ? ? ? ? ?.
   apply compObsLeLinkRespectsEqObs; apply sameValuesImpliesEqObsId; assumption.
+Qed.
+
+Global Instance  compObsLeLinkNRespectsSameVal n:
+  Proper (sameValues ==> sameValues ==> iff) (@compObsLeLinkN Src Dst _ _ _ _ _ _ _ _ _ _ n).
+Proof using H5 tg.
+  intros ? ? ? ? ? ?.
+  apply compObsLeLinkNRespectsEqObs; apply sameValuesImpliesEqObsId; assumption.
 Qed.
 
 End LinkObsProper.

@@ -700,15 +700,18 @@ Proof using.
     destruct l as [ | ? l]; invertsn Hevv.
 Qed.
 
+Lemma L5DetBigStep :
+  deterministicBigStep (ienv * L5Term).
+Admitted.
 
 Lemma obsLinkableL45:
   compObsPreservingLinkable  (ienv * L4_5_Term) (ienv * L5Term).
 Proof.
-  intros ?. 
-  revert s.
-  cofix.
-  intros ? Hgood.
-  constructor. constructor.
+  intros s Hgood. simpl. constructor.
+  apply toCoInd; [ apply L5DetBigStep | ].
+  intros cm.
+  revert dependent s.
+  induction cm as [ | cm obsLinkableL45];constructor.
   intros ? Heval.
   simpl.
   destruct Heval as [Heq Heval].
@@ -748,7 +751,7 @@ Proof.
     inversion Hvalue;
     (* Not induction. Even though the arguments of constructors are all values, 
      they may be lambdas, and after application, they may need computation *)
-    simpl; try (clear obsLinkableL45; compute; constructor; fail). subst.
+    simpl; try (clear obsLinkableL45; compute; constructor; constructor; fail). subst.
     repeat rewrite List.map_map.
     repeat rewrite nth_error_map.
     remember (List.nth_error es n) as esso.
@@ -758,13 +761,11 @@ Proof.
     assert (ident : goodTerm (senv, ess)) by
       (eapply goodSubterms25;[apply Hgoodsv | apply in_map; assumption]).
     specialize (obsLinkableL45 ident).
-    invertsn obsLinkableL45.
     unfold translateT, certiL4_5_to_L5 in obsLinkableL45.
-    simpl in *.
     revert obsLinkableL45.
     assert (Hp:forall A B, (A<->B)->(A->B)) by tauto.
-    apply Hp. clear Hp.
-    eapply compObsLeLinkRespectsSameVal;[ reflexivity | ].
+    apply Hp. clear Hp. simpl.
+    eapply compObsLeLinkNRespectsSameVal;[ reflexivity | ].
     intros ?.
     apply and_iff_compat_l.
     simpl.  unfold haltCont.
@@ -778,17 +779,17 @@ Proof.
 
   + intros Hq ? Hga. unfold mkApp, L4_5MkApply, L5MkApply. simpl.
     destruct svArg as [clear  svArg]. simpl. hnf in Hga. simpl in *. clear clear.
+    (* apply the coinduction hypothesis to the full app *)
     specialize (obsLinkableL45 (senv, App_e sv svArg)).
     assert (ident : goodTerm (senv, App_e sv svArg)) by (apply goodSubtermsApp; auto).
     specialize (obsLinkableL45 ident).
-    invertsn obsLinkableL45.
     unfold translateT, certiL4_5_to_L5 in obsLinkableL45.
-    simpl in *. unfold mkAppHalt. unfold cps_cvt_apply in obsLinkableL45.
+    simpl in *. unfold mkAppHalt. unfold cps_cvt_apply in obsLinkableL45. simpl.
     constructor.
     revert obsLinkableL45.
     assert (Hp:forall A B, (A<->B)->(A->B)) by tauto.
     apply Hp. clear Hp.
-    eapply compObsLeLinkRespectsSameVal;[ reflexivity | ].
+    eapply compObsLeLinkNRespectsSameVal;[ reflexivity | ].
     unfold sameValues. intros v. simpl. 
     apply and_iff_compat_l. 
     simpl. autounfold with certiclasses. simpl.
@@ -815,7 +816,7 @@ Proof.
     Unshelve.
     apply goodPres45.
     apply goodPres45.
-Abort.
+Qed.
 
 Lemma appArgCongrL5 : @appArgCongr (ienv*L5Term) _ _ _ _ _ .
 Proof using.
@@ -831,5 +832,5 @@ Proof using.
   simpl in Hev. repnd. subst.
   autounfold with certiclasses in Hev.
   induction Hev.
-Abort.  
+Abort.
   End Temp.

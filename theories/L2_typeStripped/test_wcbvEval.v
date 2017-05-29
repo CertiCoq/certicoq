@@ -25,16 +25,28 @@ Definition P_Type := Eval cbv in (program_Program p_Type).
 Print P_Type.
 
 
-(***
+(******
 Require Import Benchmarks.vs.
-Print Assumptions vs.main.
+
+Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
+Time Definition P_ce_example_myent :=
+  Eval vm_compute in (program_Program p_ce_example_myent).
+Definition P_env_ce_example_myent :=
+  Eval vm_compute in (env P_ce_example_myent).
+Definition P_main_ce_example_myent :=
+  Eval vm_compute in (AstCommon.main P_ce_example_myent).
+Time Definition eval_ce_example_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myent 4000 P_main_ce_example_myent).
+Print eval_ce_example_myent.
+
 Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
 Time Definition P_ce_example_ent :=
-  Eval cbv in (program_Program p_ce_example_ent).
+  Eval vm_compute in (program_Program p_ce_example_ent).
 Time Definition P_env_ce_example_ent := env P_ce_example_ent.
 Time Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
 Time Definition eval_ce_example_ent :=
-  Eval cbv in (wcbvEval P_env_ce_example_ent 1000 P_main_ce_example_ent).
+  Eval vm_compute in (wcbvEval P_env_ce_example_ent 1000 P_main_ce_example_ent).
 Print eval_ce_example_ent.
 ****)
 
@@ -373,12 +385,20 @@ Proof.
   - exact lt_wf.
 Defined.
 
-(***&
-Quote Recursively Definition pGcd := Gcd.
-Definition PGcd := Eval cbv in (program_Program pGcd).
+(***)
+Definition Gcdx := (Gcd 4 2).
+Eval cbv in Gcdx.
+Time Quote Recursively Definition pGcdx := Gcdx.
+Time Definition PGcdx := Eval vm_compute in (program_Program pGcdx).
+Time Definition Penv_Gcdx := env PGcdx.
+Time Definition Pmain_Gcdx := main PGcdx.
+Time Definition ans_Gcdx :=
+ Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
+Print ans_Gcdx.
+***)
 
 
-(** Andrew's example **)
+(** Andrew's example **
 Function sqrt' (n x0 x diff: Z) {measure Z.to_nat diff} : Z :=
   (if diff =? 0 then x
    else let y := Z.div2 (x + Z.div n x)

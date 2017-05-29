@@ -462,11 +462,6 @@ Proof.
   - cbn. rewrite IHts. reflexivity.
 Qed.
 
-  
-(** Auxiliary function to avoid case blowup when expanding [strip] in L3 **
-Definition isL2_5Cnstr: L2_5Term -> option (inductive * nat * nat) :=
-  L2_5.term.isL2_5Cnstr.
- ****)
 
 Function strip (t:L2_5Term) : Term :=
   match t with
@@ -476,7 +471,7 @@ Function strip (t:L2_5Term) : Term :=
     | L2_5.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2_5.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
     | L2_5.compile.TApp fn arg args =>
-      mkApp (strip fn) (tcons (strip arg) (strips args))
+      mkApp (TApp (strip fn) (strip arg)) (strips args)
     | L2_5.compile.TConst nm => TConst nm
     | L2_5.compile.TConstruct i n args => TConstruct i n (strips args)
     | L2_5.compile.TCase n mch brs => TCase n (strip mch) (stripBs brs)
@@ -523,6 +518,15 @@ Proof.
   cbn. rewrite IHds. reflexivity.
 Qed.
   
+Lemma tappend_hom:
+  forall ts us,
+    strips (L2_5.compile.tappend ts us) = tappend (strips ts) (strips us).
+Proof.
+  induction ts; intros us; simpl. reflexivity.
+  rewrite IHts. reflexivity.
+Qed.
+
+
 (**********
 Lemma isL2_5Cnstr_TApp_None:
   forall fn t ts, isL2_5Cnstr (L2_5.compile.TApp fn t ts) = None.
@@ -656,13 +660,6 @@ Lemma dcons_hom:
   forall nm t m ds,
     stripDs (L2_5.compile.dcons nm t m ds) = dcons nm (strip t) m (stripDs ds).
 reflexivity.
-Qed.
-
-Lemma tappend_hom:
-  forall ts us,
-    strips (L2_5.compile.tappend ts us) = tappend (strips ts) (strips us).
-induction ts; intros us; simpl. reflexivity.
-rewrite IHts. reflexivity.
 Qed.
 
 Lemma TApp_hom:

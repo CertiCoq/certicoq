@@ -186,7 +186,7 @@ intros. exists i, n, args. reflexivity.
 Qed.
 Hint Resolve IsConstruct.
 
-Lemma isConstruct_dec: forall t, isConstruct t \/ ~ isConstruct t.
+Lemma isConstruct_dec: forall t, {isConstruct t}+{~ isConstruct t}.
 Proof.
   destruct t;
   try (right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate).
@@ -197,27 +197,6 @@ Lemma mkEtaLams_sanityS:
   forall (xtra:nat) (body:Term), isLambda (mkEtaLams (S xtra) body).
 Proof.
   intros. cbn. auto.
-Qed.
-
-(***
-Lemma mkEtaLams_sanity0:
-  forall (body:Term), (mkEtaLams 0 body) = body.
-Proof.
-  intros. cbn. auto.
-Qed.
- ***)
-
-Lemma etaExp_cnstr_sanity:
-  forall (i:inductive) (x npars nargs:nat) (args:Terms),
-    match (npars + nargs) - (tlength args) with
-      | 0 => isConstruct (etaExp_cnstr i x npars nargs args)
-      | S _ => isLambda (etaExp_cnstr i x npars nargs args)
-    end.
-Proof.
-  intros. unfold etaExp_cnstr.
-  case_eq (npars + nargs - tlength args); intros h; cbn.
-  - auto.
-  - intros; auto.
 Qed.
 
 
@@ -254,11 +233,11 @@ intros. exists fn, arg, args. reflexivity.
 Qed.
 Hint Resolve IsApp.
 
-
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 destruct t; try (right; not_isApp). 
 left. auto.
 Qed.
+
 
 Definition isFix (t:Term) : Prop :=
   exists ds n, t = TFix ds n.
@@ -397,6 +376,18 @@ Proof.
   - injection H; intros.  assert (j:= f_equal tlength H0).
     rewrite tlength_tappend in j. cbn in j.
     specialize (IHbs _ _ _ H0). rewrite IHbs. rewrite H1. reflexivity.
+Qed.
+
+Lemma lifts_tappend:
+  forall n ts us,
+  lifts n (tappend ts us) = tappend (lifts n ts) (lifts n us).
+Proof.
+  induction ts; intros.
+  - reflexivity.
+  - change
+      (lifts n (tcons t (tappend ts us)) =
+       tcons (lift n t) (tappend (lifts n ts) (lifts n us))).
+    rewrite <- IHts. reflexivity.
 Qed.
 
 Fixpoint tmap (fn:Term -> Term) (ts:Terms) : Terms :=
@@ -749,33 +740,6 @@ Proof.
   - rewrite <- tappend_assoc. simpl. reflexivity.
 Qed.
 
-(*******
-Lemma mkApp_character:
-  forall fn args, ~ isApp (mkApp fn args) \/
-   (exists fn' arg' args', mkApp fn args = TApp fn' arg' args' /\ ~ isApp fn').
-Proof.
-  intros fn args.
-  functional induction (mkApp fn args).
-  - destruct IHt.
-    + left. assumption.
-    + right. assumption.
-  - destruct t; try (left; not_isApp). elim y.
-  - destruct t. 
-    + right. exists (TRel n), c, cs. intuition. isApp_inv H.
-    + right. exists (TSort s), c, cs. intuition. isApp_inv H.
-    + right. exists (TCast t), c, cs. intuition. isApp_inv H.
-    + right. exists (TProd n t), c, cs. intuition. isApp_inv H.
-    + right. exists (TLambda n t), c, cs. intuition. isApp_inv H.
-    + right. exists (TLetIn n t1 t2), c, cs. intuition. isApp_inv H.
-    + left. elim y.
-    + right. exists (TConst s), c, cs. intuition. isApp_inv H.
-    + right. exists (TInd i), c, cs. intuition. isApp_inv H.
-    + right. exists (TConstruct i n n0), c, cs. intuition. isApp_inv H.
-    + right. exists (TCase n t t0), c, cs. intuition. isApp_inv H.
-    + right. exists (TFix d n), c, cs. intuition. isApp_inv H.
-Qed.
-***)
-
 Lemma isApp_mkApp_isApp:
   forall t, isApp (mkApp t tnil) -> isApp t.
 Proof.
@@ -857,6 +821,53 @@ Proof.
   - exists TWrong, arg, tnil. cbn.  split. reflexivity.
     left. repeat split. not_isApp.
 Qed.
+
+Lemma lift_App:
+  forall fn arg args n,
+    lift n (TApp fn arg args) = TApp (lift n fn) (lift n arg) (lifts n args).
+  reflexivity.
+Qed.
+
+Lemma isApp_lift_isApp:
+  forall t n, isApp (lift n t) -> isApp t.
+Proof.
+  induction t; cbn; intros;
+  destruct H as [x0 [x1 [x2 jx]]]; try discriminate. auto.
+Qed.
+
+Lemma lift_pres_isApp:
+  forall t, isApp t -> forall n, isApp (lift n t).
+Proof.
+  destruct t; intros; destruct H as [x0 [x1 [x2 jx]]]; try discriminate.
+  cbn. auto.
+Qed.
+
+Lemma lift_pres_isApp_contra:
+  forall t n, isApp (lift n t) -> isApp t.
+Proof.
+  destruct t; intros; destruct H as [x0 [x1 [x2 jx]]]; try discriminate.
+  cbn in jx. myInjection jx. auto.
+Qed.
+
+Lemma lift_mkApp:
+  forall n fn args, lift n (mkApp fn args) = mkApp (lift n fn) (lifts n args).
+Proof.
+  intros. destruct args.
+  - rewrite mkApp_tnil_ident. cbn. rewrite mkApp_tnil_ident. reflexivity.
+  - destruct (isApp_dec fn).
+    + destruct i as [x0 [x1 [x2 jx]]]. subst.
+      change
+        (TApp (lift n x0)
+              (lift n x1) (lifts n (tappend x2 (tcons t args))) =
+         TApp (lift n x0)
+              (lift n x1) (tappend (lifts n x2) (lifts n (tcons t args)))).
+      apply f_equal3; try reflexivity.
+      rewrite lifts_tappend. reflexivity.
+    + rewrite mkApp_goodFn; try assumption.
+      unfold lifts. rewrite mkApp_goodFn. reflexivity.
+      intros h. elim n0. eapply isApp_lift_isApp. eassumption.
+Qed.
+
 
 (** well-formed terms: TApp well-formed all the way down **)
 Inductive WFapp: Term -> Prop :=
@@ -1008,13 +1019,6 @@ Lemma tskipn_pres_WFapp:
   - discriminate.
 Qed.
 
-Lemma lift_pres_isApp:
-  forall t n, isApp (lift n t) -> isApp t.
-Proof.
-  induction t; cbn; intros;
-  destruct H as [x0 [x1 [x2 jx]]]; try discriminate.
-  - myInjection jx. auto.
-Qed.
 
 Lemma lifts_pres_WFapps:
   (forall t, WFapp t -> forall n, WFapp (lift n t)) /\
@@ -1023,9 +1027,10 @@ Lemma lifts_pres_WFapps:
   (forall ds, WFappDs ds -> forall n, WFappDs (liftDs n ds)).
 Proof.
   apply WFappTrmsBrsDefs_ind; cbn; intros; try (constructor; intuition).
-  - apply H. eapply (lift_pres_isApp). eassumption.
+  - apply H. eapply (isApp_lift_isApp). eassumption.
 Qed.                             
 
+(**********
 Lemma addDummyArgs_pres_WFapps:
   forall n args, WFapps args -> WFapps (addDummyArgs n args).
 Proof.
@@ -1052,13 +1057,52 @@ Proof.
   - constructor. intuition.
 Qed.
 
-Lemma etaExp_cnstr_pres_WFapp:
-  forall i x np na args, WFapps args -> WFapp (etaExp_cnstr i x np na args).
+Lemma manyMore_pres_WFapps:
+  forall args, WFapps args -> forall i x na, WFapp (manyMore i x na args).
 Proof.
+  induction 1; intros.
+  - induction na.
+    + cbn. constructor. constructor.
+    + change (WFapp (ec_rec (oneMore b) m
+
+                (manyMore i x (S na) tnil))
+
+
+    
+Qed.
+
+Lemma etaExp_cnstr_pres_WFapp:
+  forall args, WFapps args ->
+               forall np i x na, WFapp (etaExp_cnstr i x np na args).
+Proof.
+  induction 1; intros.
+  - induction np.
+    + cbn.
+
+    
   intros. unfold etaExp_cnstr. apply mkEtaLams_pres_WFapp.
   constructor. apply mkEtaArgs_pres_WFapps. assumption.   
 Qed.
+  
+Lemma etaExp_cnstr_sanity:
+  forall (i:inductive) (x npars nargs:nat) (args:Terms),
+    match (npars + nargs) - (tlength args) with
+    | 0 => etaExp_cnstr i x npars nargs args =
+           TConstruct i x (mkEtaArgs npars nargs args)
+    | S a =>
+      (etaExp_cnstr i x npars nargs args) =
+      TLambda nAnon
+              (mkEtaLams a (TConstruct i x (mkEtaArgs npars nargs args)))
+    end.
+Proof.
+  intros. unfold etaExp_cnstr.
+  case_eq (npars + nargs - tlength args); intros h; cbn.
+  - reflexivity.
+  - intros. reflexivity.
+Qed.
+ ********************)
 
+(******************
 Lemma etaExp_cnstr_Sanity:
   forall (i:inductive) (x npars nargs:nat) (args:Terms),
     let xx := npars + nargs - (tlength args) in
@@ -1076,12 +1120,33 @@ Qed.
 
 Lemma etaExp_cnstr_Sanity':
   forall (i:inductive) (x npars nargs:nat) (args:Terms),
-    isConstruct (etaExp_cnstr i x npars nargs args) \/
-    isLambda (etaExp_cnstr i x npars nargs args).
+    etaExp_cnstr i x npars nargs args =
+    TConstruct i x (mkEtaArgs npars nargs args) \/
+    etaExp_cnstr i x npars nargs args =
+    TLambda nAnon
+            (mkEtaLams (pred ((npars + nargs) - (tlength args)))
+                       (TConstruct i x (mkEtaArgs npars nargs args))).
 Proof.
-  intros. assert (j:= etaExp_cnstr_Sanity i x npars nargs args).
-  cbn in j. destruct j as [h | h]; destruct h; intuition.
+  intros. assert (j:= etaExp_cnstr_sanity i x npars nargs args).
+  destruct (npars + nargs - tlength args).
+  - left. assumption.
+  - right. exact j. 
 Qed.
+
+Lemma strip_pres_isApp:
+  forall t, isApp (strip t) -> L2.term.isApp t.
+Proof.
+  induction t; intros h; 
+    destruct h as [x0 [x1 [x2 jx]]]; try discriminate.
+  - destruct (L2.term.isConstruct_dec t1).
+    + destruct i as [y0 [y1 [y2 [y3 jy]]]]. subst. auto.
+    + destruct t1; try auto.
+  - cbn in jx. pose proof (etaExp_cnstr_sanity i n n0 n1 tnil) as h.
+    destruct (n0 + n1 - tlength tnil); rewrite jx in h; discriminate.
+  - destruct p. cbn in jx. discriminate.        
+Qed.
+ ***************)
+
 
 (** well-formed terms: TApp well-formed all the way down **)
 (*** not used essentially at the moment **)
@@ -1135,12 +1200,765 @@ Proof.
   apply WFTrmTrmsBrsDefs_ind; intros; try (constructor; try assumption).
 Qed.
 
+Lemma WF_nolift:
+  (forall t n, WFTrm t n -> forall i, n <= i -> lift i t = t) /\
+  (forall ts n, WFTrms ts n -> forall i, n <= i -> lifts i ts = ts) /\
+  (forall ts n, WFTrmBs ts n -> forall i, n <= i -> liftBs i ts = ts) /\
+  (forall ds n, WFTrmDs ds n -> forall i, n <= i -> liftDs i ds = ds).  
+Proof.
+  apply WFTrmTrmsBrsDefs_ind; intros; try reflexivity;
+  try (cbn; rewrite H0; try reflexivity; omega);
+  try (cbn; rewrite H0, H2; try reflexivity; omega).
+  - cbn. case_eq (m ?= i); intros; Compare_Prop; try omega. reflexivity.
+  - cbn. rewrite H1; try assumption. rewrite H3; try assumption.
+    rewrite H5; try assumption. reflexivity.
+Qed.
+
+Remark ClosedTermsNoLift:
+  forall t, WFTrm t 0 -> forall i, lift i t = t.
+Proof.
+  intros. eapply WF_nolift. eassumption. omega.
+Qed.                                           
+
+Lemma WF_lift_closed:
+  forall t n, WFTrm t n -> WFTrm (lift n t) n.
+Proof.
+  intros. pose proof (proj1 WF_nolift _ _ H n) as h. rewrite h; try omega.
+  assumption.
+Qed.                                            
+
+Lemma WF_lifts_closed:
+  forall ts n, WFTrms ts n -> WFTrms (lifts n ts) n.
+Proof.
+  intros. pose proof (proj1 (proj2 WF_nolift) _ _ H n) as h.
+  rewrite h; try omega. assumption.
+Qed.                                            
+
+Lemma WF_liftBs_closed:
+  forall ts n, WFTrmBs ts n -> WFTrmBs (liftBs n ts) n.
+Proof.
+  intros. pose proof (proj1 (proj2 (proj2 WF_nolift)) _ _ H n) as h.
+  rewrite h; try omega. assumption.
+Qed.                                            
+
+Lemma WF_liftDs_closed:
+  forall ts n, WFTrmDs ts n -> WFTrmDs (liftDs n ts) n.
+Proof.
+  intros. pose proof (proj2 (proj2 (proj2 WF_nolift)) _ _ H n) as h.
+  rewrite h; try omega. assumption.
+Qed.                                            
+
+ 
+Lemma WFTrm_up:
+  (forall t m, WFTrm t m -> WFTrm t (S m)) /\
+  (forall ts m, WFTrms ts m -> WFTrms ts (S m)) /\
+  (forall ts m, WFTrmBs ts m -> WFTrmBs ts (S m)) /\
+  (forall ds m, WFTrmDs ds m -> WFTrmDs ds (S m)).
+Proof.
+  apply WFTrmTrmsBrsDefs_ind; cbn; intros; constructor; try assumption; omega.
+Qed.
+  
+Lemma tappend_pres_WFTrms:
+  forall ts ss m, WFTrms ts m -> WFTrms ss m -> WFTrms (tappend ts ss) m.
+Proof.
+  induction ts; intros.
+  - cbn. assumption.
+  - cbn. inversion_Clear H. constructor; intuition.
+Qed.
+
+Lemma treverse_pres_WFTrms:
+  forall ts m, WFTrms ts m -> WFTrms (treverse ts) m.
+Proof.
+  induction ts; intros.
+  - cbn. constructor.
+  - inversion_Clear H. cbn. apply tappend_pres_WFTrms; intuition.
+Qed.
+
+Lemma lift_pres_WFTrm:
+  (forall t m, WFTrm t m -> forall n, WFTrm (lift n t) (S m)) /\
+  (forall ts m, WFTrms ts m -> forall n, WFTrms (lifts n ts) (S m)) /\
+  (forall ts m, WFTrmBs ts m -> forall n, WFTrmBs (liftBs n ts) (S m)) /\
+  (forall ds m, WFTrmDs ds m -> forall n, WFTrmDs (liftDs n ds) (S m)).
+Proof.
+  apply WFTrmTrmsBrsDefs_ind; intros; try (solve[cbn; constructor]);
+  try (solve[cbn; constructor; intuition]).
+  - cbn; case_eq (m ?= n0); intros; Compare_Prop; subst; constructor; omega.
+  - change
+      (WFTrm (TApp (lift n0 fn) (lift n0 t) (lifts n0 ts)) (S n)).
+    constructor; intuition. elim H. eapply isApp_lift_isApp. eassumption.
+  - change
+      (WFTrm (TFix (liftDs (n0 + dlength defs) defs) m) (S n)).
+    constructor. rewrite liftDs_pres_dlength. apply (H0 (n0 + dlength defs)).
+Qed. 
+
 
 (*** Some basic operations and properties of [Term] ***)
 
+(** Instantiate index n of a term with a _locally_closed_ term, so
+*** we do not lift.  But we do increment n when going under a binder 
+**)
+Section Instantiate_sec.
+Variable tin: Term.
+
+Inductive Instantiate: nat -> Term -> Term -> Prop :=
+| IRelEq: forall n, Instantiate n (TRel n) tin
+| IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
+| IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
+| ICast: forall n t it,
+           Instantiate n t it -> Instantiate n (TCast t) (TCast it)
+| IProof: forall n t it,
+           Instantiate n t it -> Instantiate n (TProof t) (TProof it)
+| ILambda: forall n nm bod ibod,
+             Instantiate (S n) bod ibod -> 
+             Instantiate n (TLambda nm bod) (TLambda nm ibod)
+| ILetIn: forall n nm dfn bod idfn ibod,
+            Instantiate n dfn idfn -> Instantiate (S n) bod ibod ->
+            Instantiate n (TLetIn nm dfn bod) (TLetIn nm idfn ibod)
+| IApp: forall n t a ts it ia its,
+       Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
+       Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
+| IConst: forall n s, Instantiate n (TConst s) (TConst s)
+| IAx: forall n, Instantiate n TAx TAx
+| IConstruct: forall n ind m1 args iargs,
+                Instantiates n args iargs ->
+                Instantiate n (TConstruct ind m1 args)
+                            (TConstruct ind m1 iargs)
+| ICase: forall n np s ts is its,
+           Instantiate n s is -> InstantiateBrs n ts its ->
+           Instantiate n (TCase np s ts) (TCase np is its)
+| IFix: forall n d m id, 
+          InstantiateDefs (n + dlength d) d id ->
+          Instantiate n (TFix d m) (TFix id m)
+| IWrong: forall n, Instantiate n TWrong TWrong
+with Instantiates: nat -> Terms -> Terms -> Prop :=
+| Inil: forall n, Instantiates n tnil tnil
+| Icons: forall n t ts it its,
+           Instantiate n t it -> Instantiates n ts its ->
+           Instantiates n (tcons t ts) (tcons it its)
+with InstantiateBrs: nat -> Brs -> Brs -> Prop :=
+| Ibnil: forall n, InstantiateBrs n bnil bnil
+| Ibcons: forall n m b bs ib ibs,
+            Instantiate n b ib ->
+            InstantiateBrs n bs ibs ->
+            InstantiateBrs n (bcons m b bs) (bcons m ib ibs)
+with InstantiateDefs: nat -> Defs -> Defs -> Prop :=
+| Idnil: forall n, InstantiateDefs n dnil dnil
+| Idcons: forall n nm bod rarg ds ibod ids,
+            Instantiate n bod ibod ->
+            InstantiateDefs n ds ids ->
+            InstantiateDefs n (dcons nm bod rarg ds)
+                            (dcons nm ibod rarg ids).
+Hint Constructors Instantiate Instantiates InstantiateBrs InstantiateDefs.
+Scheme Instantiate_ind' := Induction for Instantiate Sort Prop
+  with Instantiates_ind' := Induction for Instantiates Sort Prop
+  with InstantiateBrs_ind' := Induction for InstantiateBrs Sort Prop
+  with InstantiateDefs_ind' := Induction for InstantiateDefs Sort Prop.
+Combined Scheme InstInstsBrsDefs_ind
+         from Instantiate_ind', Instantiates_ind',
+              InstantiateBrs_ind', InstantiateDefs_ind'.
+
+
+Lemma InstantiateBrs_pres_blength:
+  forall n bs ibs, InstantiateBrs n bs ibs -> blength bs = blength ibs.
+Proof.
+  induction 1.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
+Lemma InstantiateDefs_pres_dlength:
+  forall n ds ids, InstantiateDefs n ds ids -> dlength ds = dlength ids.
+Proof.
+  induction 1.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
+Lemma Instantiate_pres_isLambda:
+  forall t, isLambda t -> forall n it, Instantiate n t it -> isLambda it.
+Proof.
+  intros t ht n it hit. destruct ht as [x0 [x1 jx]]. subst.
+  inversion_Clear hit. auto.
+Qed.          
+
+Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
+  match tbod with
+    | TRel m => match nat_compare n m with
+                  | Datatypes.Eq => tin
+                  | Gt => TRel m
+                  | Lt => TRel (pred m)
+                end
+    | TApp t a ts =>
+      mkApp (instantiate n t) (tcons (instantiate n a) (instantiates n ts))
+    | TLambda nm bod =>
+      TLambda nm (instantiate (S n) bod)
+    | TCase np s ts =>
+      TCase np (instantiate n s) (instantiateBrs n ts)
+    | TLetIn nm tdef bod =>
+      TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
+    | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
+    | TCast t => TCast (instantiate n t)
+    | TProof t => TProof (instantiate n t)
+    | TConstruct i m args => TConstruct i m (instantiates n args)
+    | x => x
+  end
+with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
+       match args with
+         | tnil => tnil
+         | tcons t ts => tcons (instantiate n t) (instantiates n ts)
+       end
+with instantiateBrs (n:nat) (bs:Brs) {struct bs} : Brs :=
+       match bs with
+         | bnil => bnil
+         | bcons m t ts => bcons m (instantiate n t) (instantiateBrs n ts)
+       end
+with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
+       match ds with
+         | dnil => dnil
+         | dcons nm bod rarg ds =>
+           dcons nm (instantiate n bod) rarg (instantiateDefs n ds)
+       end.
+(* Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop *)
+(* with instantiates_ind' := Induction for instantiates Sort Prop *)
+(* with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop. *)
+
+Lemma instantiates_pres_tlength:
+  forall n ds, tlength (instantiates n ds) = tlength ds.
+Proof.
+  induction ds.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
+Lemma instantiateDefs_pres_dlength:
+  forall n ds, dlength ds = dlength (instantiateDefs n ds).
+Proof.
+  induction ds.
+  + reflexivity.
+  + simpl. intuition.
+Qed.
+
+Lemma instantiates_tcons_commute:
+  forall n t ts,
+         (instantiates n (tcons t ts)) = 
+         (tcons (instantiate n t) (instantiates n ts)).
+intros n t ts. reflexivity.
+Qed.
+
+Lemma instantiates_dcons_commute:
+  forall n nm t m ds,
+         (instantiateDefs n (dcons nm t m ds)) = 
+         (dcons nm (instantiate n t) m (instantiateDefs n ds)).
+reflexivity.
+Qed.
+    
+Lemma instantiates_tappend:
+  forall ts us n,
+    instantiates n (tappend ts us) =
+    tappend (instantiates n ts) (instantiates n us).
+Proof.
+  induction ts; intros.
+  - reflexivity.
+  - change (tcons (instantiate n t) (instantiates n (tappend ts us)) =
+            tcons (instantiate n t) (tappend (instantiates n ts)
+                                             (instantiates n us))).
+    rewrite IHts. reflexivity.
+Qed.
+
+Lemma instantiate_mkApp_commute:
+forall n bod arg args,
+  instantiate n (mkApp bod (tcons arg args)) =
+  mkApp (instantiate n bod) (tcons (instantiate n arg)
+                                       (instantiates n args)).
+induction bod; simpl; intros; try reflexivity.
+- change
+    (mkApp (instantiate n bod1) 
+           (tcons (instantiate n bod2)
+                     (instantiates n (tappend t (tcons arg args)))) =
+     mkApp (mkApp (instantiate n bod1)
+                  (tcons (instantiate n bod2)
+                         (instantiates n t)))
+           (tcons (instantiate n arg) (instantiates n args))).
+  rewrite mkApp_idempotent. simpl. 
+  rewrite instantiates_tappend. rewrite instantiates_tcons_commute.
+  reflexivity.
+Qed.
+
+Lemma Instantiate_instantiate:
+  (forall n t it, Instantiate n t it -> instantiate n t = it) /\
+  (forall n ts its, Instantiates n ts its -> instantiates n ts = its) /\
+  (forall n ts its, InstantiateBrs n ts its -> instantiateBrs n ts = its) /\
+  (forall n ds ids, InstantiateDefs n ds ids -> instantiateDefs n ds = ids).
+apply InstInstsBrsDefs_ind; intros; simpl; intuition; try (subst; reflexivity).
+- rewrite nat_compare_EQ. reflexivity.
+- rewrite (proj1 (nat_compare_gt n m) g). reflexivity.
+- rewrite (proj1 (nat_compare_lt n m) l). reflexivity.
+Qed.
+
+Lemma instantiate_Instantiate:
+  (forall t n, Instantiate n t (instantiate n t)) /\
+  (forall ts n, Instantiates n ts (instantiates n ts)) /\
+  (forall bs n, InstantiateBrs n bs (instantiateBrs n bs)) /\
+  (forall (ds:Defs) n, InstantiateDefs n ds (instantiateDefs n ds)).
+Proof.
+  apply TrmTrmsBrsDefs_ind; intros; simpl; try (solve [constructor]);
+  try (solve[constructor; intuition]).
+  - destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
+    + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
+    + rewrite (proj2 (nat_compare_eq_iff _ _) h). subst. apply IRelEq.
+    + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
+      assumption. assumption.
+Qed.
+
+Lemma instantiate_TApp_mkApp:
+  forall n fn arg args,
+  instantiate n (TApp fn arg args) =
+   mkApp (instantiate n fn) (instantiates n (tcons arg args)).
+Proof.
+  intros. cbn. reflexivity.
+Qed.
+
+
+Lemma instantiate_pres_WFapp:
+  (forall bod, WFapp bod ->
+              WFapp tin -> forall n, WFapp (instantiate n bod)) /\
+  (forall ts, WFapps ts ->
+              WFapp tin -> forall n, WFapps (instantiates n ts)) /\
+  (forall bs, WFappBs bs ->
+              WFapp tin -> forall n, WFappBs (instantiateBrs n bs)) /\
+  (forall ds, WFappDs ds ->
+              WFapp tin -> forall n, WFappDs (instantiateDefs n ds)).
+Proof.
+  apply WFappTrmsBrsDefs_ind; intros;
+  try (solve [unfold instantiate; constructor]).
+  - destruct (lt_eq_lt_dec n m) as [[h|h]|h]; unfold instantiate.
+    + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
+    + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
+    + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
+  - cbn. constructor. apply H0. assumption.
+  - cbn. constructor. apply H0. assumption.
+  - change (WFapp (TLambda nm (instantiate (S n) bod))).
+    constructor.
+    + apply H0. assumption.
+  - change (WFapp (TLetIn nm (instantiate n dfn) (instantiate (S n) bod))).
+    constructor.
+    + apply H0. assumption.
+    + apply H2. assumption.
+  - change (WFapp (mkApp (instantiate n fn) 
+                         (tcons (instantiate n t) (instantiates n ts)))).
+    apply mkApp_pres_WFapp.
+    + constructor. apply H3; assumption. apply H5. assumption.
+    + apply H1. assumption.
+  - change (WFapp (TConstruct i m1 (instantiates n args))).
+    constructor. intuition.
+  - change (WFapp (TCase m (instantiate n mch) (instantiateBrs n brs))).
+    constructor.
+    + apply H0; assumption.
+    + apply H2; assumption.
+   - change (WFapp (TFix (instantiateDefs (n + dlength defs) defs) m)).
+     constructor.
+     + apply H0. assumption.
+   - change (WFapps (tcons (instantiate n t) (instantiates n ts))).
+     constructor.
+     + apply H0. assumption.
+     + apply H2. assumption.
+   - change (WFappBs (bcons n (instantiate n0 b)
+                            (instantiateBrs n0 bs))).
+     constructor.
+     + apply H0. assumption.
+     + apply H2. assumption.       
+   - change (WFappDs (dcons nm (instantiate n bod) arg
+                            (instantiateDefs n ds))).
+     constructor.
+     + apply H0. assumption.
+     + apply H2. assumption.
+Qed.
+
+Lemma treverse_instantiates:
+  forall n args,
+  treverse (instantiates n args) = instantiates n (treverse args).
+Proof.
+  induction args.
+  - reflexivity.
+  - change
+      (treverse (tcons (instantiate n t) (instantiates n args)) =
+       instantiates n (treverse (tcons t args))).
+    change
+      (tappend (treverse (instantiates n args))
+               (tunit (instantiate n t)) =
+       instantiates n (tappend (treverse args) (tunit t))).
+    rewrite IHargs. rewrite instantiates_tappend. reflexivity.
+Qed.
+     
+
+Lemma instantiate_noLift:
+  (forall t p, WFTrm t p ->
+               forall m, instantiate m (lift m t) = t) /\
+  (forall ts p, WFTrms ts p ->
+                forall m, instantiates m (lifts m ts) = ts) /\
+  (forall ts p, WFTrmBs ts p ->
+                forall m, instantiateBrs m (liftBs m ts) = ts) /\
+  (forall ds p, WFTrmDs ds p ->
+                forall m, instantiateDefs m (liftDs m ds) = ds).
+Proof.
+  apply WFTrmTrmsBrsDefs_ind; intros; try reflexivity.
+  - unfold lift. case_eq (m ?= m0); intros j.
+    + cbn. Compare_Prop. subst. rewrite (proj2 (Nat.compare_lt_iff _ _)).
+      reflexivity. omega.
+    + cbn. Compare_Prop. rewrite (proj2 (Nat.compare_gt_iff _ _)).
+      reflexivity. omega.
+    + cbn. Compare_Prop. erewrite (proj2 (Nat.compare_lt_iff _ _)).
+      reflexivity. omega.
+  - cbn. apply f_equal. apply H0. 
+  - cbn. apply f_equal. apply H0. 
+  - cbn. apply f_equal2. reflexivity. apply H0.
+  - cbn. apply f_equal2. apply H0. apply H2.
+  - change (mkApp (instantiate m (lift m fn))
+                  (tcons (instantiate m (lift m t))
+                         (instantiates m (lifts m ts))) =
+            TApp fn t ts).
+    rewrite H1. rewrite H3. rewrite H5. rewrite mkApp_cons_App.
+    reflexivity. assumption.
+  - change
+      (TConstruct i m (instantiates m0 (lifts m0 args)) =
+       TConstruct i m args).
+    rewrite H0. reflexivity.
+  - change
+     (TCase m (instantiate m0 (lift m0 mch))
+            (instantiateBrs m0 (liftBs m0 brs)) =
+      TCase m mch brs).
+    rewrite H0. rewrite H2. reflexivity.
+  - change
+      (instantiate m0 (TFix (liftDs (m0 + dlength defs) defs) m) =
+       TFix defs m).
+    change
+      (TFix (instantiateDefs (m0 + dlength (liftDs (m0 + dlength defs) defs))
+                         (liftDs (m0 + dlength defs) defs)) m =
+       TFix defs m).
+    rewrite liftDs_pres_dlength. rewrite H0. reflexivity.
+  - cbn. apply f_equal2. apply H0. apply H2.
+  - cbn. apply f_equal3; try reflexivity. apply H0. apply H2.
+  - cbn. apply f_equal3; try reflexivity. apply H0. apply H2.
+Qed.
+
+Lemma lift_lift:
+  (forall t i k, i < S k ->
+                 lift (S k) (lift i t) = lift i (lift k t)) /\
+  (forall ts i k, i < S k ->
+                  lifts (S k) (lifts i ts) = lifts i (lifts k ts)) /\
+  (forall ts i k, i < S k ->
+                  liftBs (S k) (liftBs i ts) = liftBs i (liftBs k ts)) /\
+  (forall ds i k, i < S k ->
+                  liftDs (S k) (liftDs i ds) = liftDs i (liftDs k ds)).
+Proof.
+  apply TrmTrmsBrsDefs_ind; intros; try reflexivity.
+  - unfold lift at 4; unfold lift at 2.
+    case_eq (n ?= i); intros; case_eq (n ?= k); intros;
+    repeat Compare_Prop; subst; try omega; cbn.
+    + subst. rewrite (@match_cn_Eq i); try reflexivity.
+      destruct i. reflexivity. rewrite (@match_cn_Gt _ i).
+      reflexivity. omega.
+    + rewrite (match_cn_Lt j0); try omega.
+      rewrite (@match_cn_Eq i); reflexivity.
+    + rewrite (match_cn_Lt j0); try omega.
+      rewrite (@match_cn_Lt n). reflexivity. omega.
+    + rewrite (@match_cn_Eq k); try omega.
+      destruct i. reflexivity.
+      rewrite (@match_cn_Gt k). reflexivity. omega.
+    + rewrite (match_cn_Lt j). rewrite (@match_cn_Gt n). reflexivity. omega.
+    + rewrite (@match_cn_Gt n); try omega.
+      destruct i. reflexivity.
+      case_eq (n ?= i); intros; Compare_Prop; try omega. reflexivity.
+  - cbn. apply f_equal. rewrite H; try omega. reflexivity.
+  - cbn. apply f_equal. apply H. assumption. 
+  - cbn. apply f_equal2. reflexivity. apply H. omega.
+  - cbn. apply f_equal2.
+    + apply H. assumption.
+    + apply H0. omega.
+  - cbn. apply f_equal3.
+    + apply H. assumption.
+    + apply H0. assumption.
+    + apply H1. assumption.
+  - cbn. apply f_equal2. reflexivity. apply H. assumption.
+  - cbn. apply f_equal2.
+    + apply H. assumption.
+    + apply H0. assumption.
+  - change
+      (lift (S k) (TFix (liftDs (i + dlength d) d) n) =
+       lift i (TFix (liftDs (k + dlength d) d) n)).
+    change
+      (TFix (liftDs (S (k + dlength (liftDs (i + dlength d) d)))
+                    (liftDs (i + dlength d) d))
+            n =
+       lift i (TFix (liftDs (k + dlength d) d) n)).
+    change
+      (TFix (liftDs (S (k + dlength (liftDs (i + dlength d) d)))
+                    (liftDs (i + dlength d) d))
+            n =
+       TFix (liftDs (i + dlength (liftDs (k + dlength d) d))
+                    (liftDs (k + dlength d) d))
+            n).
+    apply f_equal2; try reflexivity.
+    rewrite liftDs_pres_dlength. rewrite liftDs_pres_dlength. rewrite H.
+    reflexivity. omega.
+  - cbn. apply f_equal2. rewrite H; try omega. reflexivity.
+    rewrite H0. reflexivity. omega.
+  - cbn. apply f_equal3; try reflexivity.
+    rewrite H; try omega. reflexivity.
+    rewrite H0; try omega. reflexivity.
+  - cbn. apply f_equal4; try reflexivity.
+    rewrite H; try omega. reflexivity.
+    rewrite H0; try omega. reflexivity.
+Qed.
+
+Lemma lift_instantiate:
+  (forall t nin n,
+    nin < S n -> WFTrm tin 0 ->
+      lift n (instantiate nin t) = instantiate nin (lift (S n) t)) /\
+  (forall ts nin n,
+    nin < S n -> WFTrm tin 0 ->
+    lifts n (instantiates nin ts) =
+    instantiates nin (lifts (S n) ts)) /\
+  (forall ts nin n,
+    nin < S n -> WFTrm tin 0 ->
+    liftBs n (instantiateBrs nin ts) =
+    instantiateBrs nin (liftBs (S n) ts)) /\
+  (forall ds nin n,
+    nin < S n -> WFTrm tin 0 ->
+    liftDs n (instantiateDefs nin ds) =
+    instantiateDefs nin (liftDs (S n) ds)).
+Proof.
+  apply TrmTrmsBrsDefs_ind; intros; try reflexivity;
+  try (cbn; rewrite H; try omega; try reflexivity; assumption);
+  try (cbn; rewrite H, H0; try omega; try reflexivity; assumption).
+  - unfold instantiate at 1. unfold lift at 2.
+    case_eq (nin ?= n); intros; case_eq (n ?= S n0); intros;
+    repeat Compare_Prop; unfold instantiate; try omega.
+    + erewrite (proj1 WF_nolift _ _ H0); try omega.
+      rewrite (proj2 (Nat.compare_eq_iff _ _)). reflexivity. assumption.
+    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega. cbn.
+      rewrite j. cbn. rewrite (proj2 (Nat.compare_eq_iff _ _)); reflexivity.
+    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega. cbn.
+      case_eq (Nat.pred n ?= n0); intros k; Compare_Prop; try omega.
+      reflexivity.      
+    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega. cbn.
+      case_eq (Nat.pred n ?= n0); intros k; Compare_Prop; try omega.
+      apply f_equal. omega.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega.
+      cbn. rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega.
+      reflexivity.
+  - rewrite instantiate_TApp_mkApp.
+    change (lift n (mkApp (instantiate nin t)
+                          (instantiates nin (tcons t0 t1))) =
+            instantiate nin (TApp (lift (S n) t)
+                                  (lift (S n) t0) (lifts (S n) t1))).
+    rewrite instantiate_TApp_mkApp.
+    change
+      (lift n (mkApp (instantiate nin t)
+                     (tcons (instantiate nin t0) (instantiates nin t1))) =
+       mkApp (instantiate nin (lift (S n) t))
+             (instantiates nin (tcons (lift (S n) t0) (lifts (S n) t1)))).
+    rewrite lift_mkApp. 
+    rewrite H; try assumption. apply f_equal2; try reflexivity.
+    change
+      (tcons (lift n (instantiate nin t0)) (lifts n (instantiates nin t1)) =
+       tcons (instantiate nin (lift (S n) t0))
+              (instantiates nin (lifts (S n) t1))).
+    rewrite H0; try assumption. rewrite H1; try assumption. reflexivity.
+  - change
+      (TFix (liftDs (n0 + dlength (instantiateDefs (nin + dlength d) d))
+                  (instantiateDefs (nin + dlength d) d)) n =
+       TFix (instantiateDefs (nin + dlength (liftDs (S n0 + dlength d) d))
+                             (liftDs (S n0 + dlength d) d)) n).
+    erewrite <- instantiateDefs_pres_dlength.
+    rewrite liftDs_pres_dlength.
+    apply f_equal2; try reflexivity.
+    erewrite H. reflexivity. omega. eassumption.
+Qed.
+    
+Lemma instantiate_lift:
+  (forall t nin n,
+    n < S nin -> WFTrm tin 0 ->
+      lift n (instantiate nin t) = instantiate (S nin) (lift n t)) /\
+  (forall ts nin n,
+    n < S nin -> WFTrm tin 0 ->
+      lifts n (instantiates nin ts) = instantiates (S nin) (lifts n ts)) /\
+  (forall ts nin n,
+    n < S nin -> WFTrm tin 0 ->
+    liftBs n (instantiateBrs nin ts) =
+    instantiateBrs (S nin) (liftBs n ts)) /\
+  (forall t nin n,
+    n < S nin -> WFTrm tin 0 ->
+      liftDs n (instantiateDefs nin t) = instantiateDefs (S nin) (liftDs n t)).
+Proof.
+  apply TrmTrmsBrsDefs_ind; intros; try reflexivity;
+  try (cbn; rewrite H; try omega; try reflexivity; assumption);
+  try (cbn; rewrite H, H0; try omega; try reflexivity; assumption).
+  - unfold instantiate at 1. unfold lift at 2.
+    case_eq (nin ?= n); intros; case_eq (n ?= n0); intros;
+    repeat Compare_Prop; unfold instantiate; try omega.
+    + subst. rewrite match_cn_Eq; try omega.
+      erewrite (proj1 WF_nolift _ _ H0); try omega. reflexivity.
+    + subst. rewrite match_cn_Eq; try omega.
+      erewrite (proj1 WF_nolift _ _ H0); try omega. reflexivity.
+    + rewrite match_cn_Lt; try omega. cbn.
+      case_eq (Nat.pred n ?= n0); intros k; repeat Compare_Prop; try omega.
+      * assert (k0: S (Init.Nat.pred n) = n). omega.
+        rewrite k0. reflexivity.
+      * assert (k0: S (Init.Nat.pred n) = n). omega.
+        rewrite k0. reflexivity.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega. cbn.
+      rewrite match_cn_Eq; try omega. reflexivity.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega. cbn.
+      rewrite match_cn_Lt; try omega. reflexivity.
+    + rewrite match_cn_Gt; try omega. cbn. rewrite match_cn_Gt; try omega.
+      reflexivity.
+  - change
+      (lift n (instantiate nin (TApp t t0 t1)) =
+       instantiate (S nin) (TApp (lift n t) (lift n t0) (lifts n t1))).
+    rewrite instantiate_TApp_mkApp. rewrite instantiate_TApp_mkApp.
+    rewrite lift_mkApp. apply f_equal2.
+    + apply H; try assumption.
+    + change
+        (tcons (lift n (instantiate nin t0)) (lifts n (instantiates nin t1)) =
+         tcons (instantiate (S nin) (lift n t0))
+               (instantiates (S nin) (lifts n t1))).
+      rewrite H0; try rewrite H1; try assumption. reflexivity.
+  - cbn. apply f_equal2; try reflexivity.
+    rewrite H; try assumption.
+    + rewrite <- instantiateDefs_pres_dlength. rewrite liftDs_pres_dlength.
+      reflexivity.
+    + rewrite <- instantiateDefs_pres_dlength. omega.
+Qed.
+
+Lemma instantiate_closed_null:
+  (forall t p, WFTrm t p ->
+               forall m, m >= p -> instantiate m t = t) /\
+  (forall ts p, WFTrms ts p ->
+                forall m, m >= p -> instantiates m ts = ts) /\
+  (forall ts p, WFTrmBs ts p ->
+                forall m, m >= p -> instantiateBrs m ts = ts) /\
+  (forall ds p, WFTrmDs ds p ->
+                forall m, m >= p -> instantiateDefs m ds = ds).
+Proof.
+  apply WFTrmTrmsBrsDefs_ind; intros; try reflexivity.
+  - cbn. assert (j: m0 > m). omega.
+    rewrite (proj1 (nat_compare_gt m0 m)); trivial.
+  - cbn. rewrite H0; trivial.
+  - cbn. rewrite H0; trivial.
+  - cbn. rewrite H0. trivial. omega.
+  - cbn. rewrite H0; try assumption. rewrite H2; try omega. trivial.
+  - cbn. rewrite H1; try assumption. rewrite H3; try assumption.
+    rewrite H5; try assumption. rewrite mkApp_goodFn; trivial.
+  - cbn. rewrite H0; trivial.
+  - cbn. rewrite H0; try assumption. rewrite H2; trivial.
+  - cbn. rewrite H0; trivial. omega.  
+  - cbn. rewrite H0; trivial. rewrite H2; trivial.
+  - cbn. rewrite H0; trivial. rewrite H2; trivial.
+  - cbn. rewrite H0; trivial. rewrite H2; trivial.
+Qed.
+
+
+(***************************
+  
+Goal
+  forall bod n, WFTrm bod n -> forall t, oneMore bod = Some t -> WFTrm t n.
+Proof.
+  induction 1; intros; try (cbn in *; discriminate).
+  - cbn in H0. destruct (oneMore bod).
+    + myInjection H0. constructor. intuition.
+    + discriminate.
+  - cbn in H0. myInjection H0. constructor. constructor.
+    apply tappend_pres_WFTrms.
+    + Check (WF_lifts_closed).
+
+
+      Goal
+  forall args n,
+    WFTrms args n ->
+    forall i x npars nargs,
+      WFTrm (etaExp_cnstr i x npars nargs args) n.
+Proof. 
+  induction 1; induction npars; intros.
+  - cbn. 
+
+
+
+  Goal
+  forall npars args nargs n, n >= nargs ->
+    mkEtaArgs npars nargs (instantiates n args) =
+    instantiates n (mkEtaArgs npars nargs args).
+Proof.
+  induction npars; intros.
+  - cbn. destruct args.
+    + cbn. replace (nargs - 0) with nargs; try omega. admit.
+    + admit.
+  - cbn. destruct args.
+    + cbn.
+Qed.
+
+
+Goal
+  forall args n,
+    WFTrms args n ->
+    forall m, m < n -> WFTrms (addDummyArgs m args) n.
+Proof.
+  induction 1; intros.
+  - induction m.
+    + cbn. constructor.
+    + cbn.
+  - inversion_Clear H. apply tappend_pres_WFTrms.
+    + apply treverse_pres_WFTrms. trivial.
+    + constructor; trivial.
+  - cbn.
+
+      
+       
+    Goal
+  forall args n,
+    WFTrms args n -> WFTrms (addDummyArgs n args) n.
+Proof.
+  induction 1; induction n.
+  - cbn. constructor.
+  - cbn.               
+
+
+
+(*****    
+Goal
+  forall args, WFTrms args 0 -> forall m, WFTrms (addDummyArgs m args) 0.
+Proof.
+  induction 1; intros.
+
+               
+    forall m n, addDummyArgs m (instantiates n args) =
+                instantiates n (addDummyArgs m args).
+Proof.
+  induction 1; intros.
+  - cbn. reflexivity. rewrite treverse_instantiates. reflexivity.
+  - cbn. rewrite <- IHm. 
+************)
+  
+
+Goal
+  forall npars args nargs n, n >= nargs ->
+    mkEtaArgs npars nargs (instantiates n args) =
+    instantiates n (mkEtaArgs npars nargs args).
+Proof.
+  induction npars; intros.
+  - cbn. destruct args.
+    + cbn. replace (nargs - 0) with nargs; try omega. admit.
+    + admit.
+  - cbn. destruct args.
+    + cbn.
+Qed.
+
+*******************************)
+
+    
 (** occurrances of a constant in a term (ignoring type components) **)
 Section PoccTrm_sec.
-Variable nm:string.
+Variable nm: string.
 
 Inductive PoccTrm : Term -> Prop :=
 | PoLambdaBod: forall s bod, PoccTrm bod -> PoccTrm (TLambda s bod)
@@ -1426,92 +2244,9 @@ Proof.
 Qed.
 
 
-(** Instantiate index n of a term with a _locally_closed_ term, so
-*** we do not lift.  But we do increment n when going under a binder 
-**)
-Section Instantiate_sec.
-Variable (tin:Term).
-
-Inductive Instantiate: nat -> Term -> Term -> Prop :=
-| IRelEq: forall n, Instantiate n (TRel n) tin
-| IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
-| IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
-| ICast: forall n t it,
-           Instantiate n t it -> Instantiate n (TCast t) (TCast it)
-| IProof: forall n t it,
-           Instantiate n t it -> Instantiate n (TProof t) (TProof it)
-| ILambda: forall n nm bod ibod,
-             Instantiate (S n) bod ibod -> 
-             Instantiate n (TLambda nm bod) (TLambda nm ibod)
-| ILetIn: forall n nm dfn bod idfn ibod,
-            Instantiate n dfn idfn -> Instantiate (S n) bod ibod ->
-            Instantiate n (TLetIn nm dfn bod) (TLetIn nm idfn ibod)
-| IApp: forall n t a ts it ia its,
-       Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
-       Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
-| IConst: forall n s, Instantiate n (TConst s) (TConst s)
-| IAx: forall n, Instantiate n TAx TAx
-| IConstruct: forall n ind m1 args iargs,
-                Instantiates n args iargs ->
-                Instantiate n (TConstruct ind m1 args)
-                            (TConstruct ind m1 iargs)
-| ICase: forall n np s ts is its,
-           Instantiate n s is -> InstantiateBrs n ts its ->
-           Instantiate n (TCase np s ts) (TCase np is its)
-| IFix: forall n d m id, 
-          InstantiateDefs (n + dlength d) d id ->
-          Instantiate n (TFix d m) (TFix id m)
-| IWrong: forall n, Instantiate n TWrong TWrong
-with Instantiates: nat -> Terms -> Terms -> Prop :=
-| Inil: forall n, Instantiates n tnil tnil
-| Icons: forall n t ts it its,
-           Instantiate n t it -> Instantiates n ts its ->
-           Instantiates n (tcons t ts) (tcons it its)
-with InstantiateBrs: nat -> Brs -> Brs -> Prop :=
-| Ibnil: forall n, InstantiateBrs n bnil bnil
-| Ibcons: forall n m b bs ib ibs,
-            Instantiate n b ib ->
-            InstantiateBrs n bs ibs ->
-            InstantiateBrs n (bcons m b bs) (bcons m ib ibs)
-with InstantiateDefs: nat -> Defs -> Defs -> Prop :=
-| Idnil: forall n, InstantiateDefs n dnil dnil
-| Idcons: forall n nm bod rarg ds ibod ids,
-            Instantiate n bod ibod ->
-            InstantiateDefs n ds ids ->
-            InstantiateDefs n (dcons nm bod rarg ds)
-                            (dcons nm ibod rarg ids).
-Hint Constructors Instantiate Instantiates InstantiateBrs InstantiateDefs.
-Scheme Instantiate_ind' := Induction for Instantiate Sort Prop
-  with Instantiates_ind' := Induction for Instantiates Sort Prop
-  with InstantiateBrs_ind' := Induction for InstantiateBrs Sort Prop
-  with InstantiateDefs_ind' := Induction for InstantiateDefs Sort Prop.
-Combined Scheme InstInstsBrsDefs_ind
-         from Instantiate_ind', Instantiates_ind',
-              InstantiateBrs_ind', InstantiateDefs_ind'.
 
 
-Lemma InstantiateBrs_pres_blength:
-  forall n bs ibs, InstantiateBrs n bs ibs -> blength bs = blength ibs.
-Proof.
-  induction 1.
-  + reflexivity.
-  + simpl. intuition.
-Qed.
 
-Lemma InstantiateDefs_pres_dlength:
-  forall n ds ids, InstantiateDefs n ds ids -> dlength ds = dlength ids.
-Proof.
-  induction 1.
-  + reflexivity.
-  + simpl. intuition.
-Qed.
-
-Lemma Instantiate_pres_isLambda:
-  forall t, isLambda t -> forall n it, Instantiate n t it -> isLambda it.
-Proof.
-  intros t ht n it hit. destruct ht as [x0 [x1 jx]]. subst.
-  inversion_Clear hit. auto.
-Qed.          
 
 Lemma Instantiates_no_gen:
   (~ PoccTrm tin) ->
@@ -1551,110 +2286,6 @@ Proof.
     + apply PoDtl. intuition. 
 Qed.
 
-Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
-  match tbod with
-    | TRel m => match nat_compare n m with
-                  | Datatypes.Eq => tin
-                  | Gt => TRel m
-                  | Lt => TRel (pred m)
-                end
-    | TApp t a ts =>
-      mkApp (instantiate n t) (tcons (instantiate n a) (instantiates n ts))
-    | TLambda nm bod =>
-      TLambda nm (instantiate (S n) bod)
-    | TCase np s ts =>
-      TCase np (instantiate n s) (instantiateBrs n ts)
-    | TLetIn nm tdef bod =>
-      TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
-    | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TCast t => TCast (instantiate n t)
-    | TProof t => TProof (instantiate n t)
-    | TConstruct i m args => TConstruct i m (instantiates n args)
-    | x => x
-  end
-with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
-       match args with
-         | tnil => tnil
-         | tcons t ts => tcons (instantiate n t) (instantiates n ts)
-       end
-with instantiateBrs (n:nat) (bs:Brs) {struct bs} : Brs :=
-       match bs with
-         | bnil => bnil
-         | bcons m t ts => bcons m (instantiate n t) (instantiateBrs n ts)
-       end
-with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
-       match ds with
-         | dnil => dnil
-         | dcons nm bod rarg ds =>
-           dcons nm (instantiate n bod) rarg (instantiateDefs n ds)
-       end.
-(* Functional Scheme instantiate_ind' := Induction for instantiate Sort Prop *)
-(* with instantiates_ind' := Induction for instantiates Sort Prop *)
-(* with instantiateDefs_ind' := Induction for instantiateDefs Sort Prop. *)
-
-Lemma instantiates_pres_tlength:
-  forall n ds, tlength (instantiates n ds) = tlength ds.
-Proof.
-  induction ds.
-  + reflexivity.
-  + simpl. intuition.
-Qed.
-
-Lemma instantiateDefs_pres_dlength:
-  forall n ds, dlength ds = dlength (instantiateDefs n ds).
-Proof.
-  induction ds.
-  + reflexivity.
-  + simpl. intuition.
-Qed.
-
-(*****
-Lemma instantiate_AppConstruct:
-   forall nin i n arty arg args,
-     instantiate nin (TApp (TConstruct i n arty) arg args) =
-     TApp (TConstruct i n arty)
-          (instantiate nin arg) (instantiates nin args).
-Proof.
-  intros.
-
-  reflexivity.
-Qed.
-
-Lemma instantiate_mkAppConstruct:
-   forall nin i n arty arg args,
-     instantiate nin (TApp (TConstruct i n arty) arg args) =
-     mkApp (TConstruct i n arty) (instantiates nin (tcons arg args)).
-Proof.
-   reflexivity.
-Qed.
- ****)
-
-Lemma Instantiate_instantiate:
-  (forall n t it, Instantiate n t it -> instantiate n t = it) /\
-  (forall n ts its, Instantiates n ts its -> instantiates n ts = its) /\
-  (forall n ts its, InstantiateBrs n ts its -> instantiateBrs n ts = its) /\
-  (forall n ds ids, InstantiateDefs n ds ids -> instantiateDefs n ds = ids).
-apply InstInstsBrsDefs_ind; intros; simpl; intuition; try (subst; reflexivity).
-- rewrite nat_compare_EQ. reflexivity.
-- rewrite (proj1 (nat_compare_gt n m) g). reflexivity.
-- rewrite (proj1 (nat_compare_lt n m) l). reflexivity.
-Qed.
-
-Lemma instantiate_Instantiate:
-  (forall t n, Instantiate n t (instantiate n t)) /\
-  (forall ts n, Instantiates n ts (instantiates n ts)) /\
-  (forall bs n, InstantiateBrs n bs (instantiateBrs n bs)) /\
-  (forall (ds:Defs) n, InstantiateDefs n ds (instantiateDefs n ds)).
-Proof.
-  apply TrmTrmsBrsDefs_ind; intros; simpl; try (solve [constructor]);
-  try (solve[constructor; intuition]).
-  - destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
-    + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
-    + rewrite (proj2 (nat_compare_eq_iff _ _) h). subst. apply IRelEq.
-    + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
-      assumption. assumption.
-Qed.
-
 Lemma instant_pres_PoccTrm:
   (forall tbod, PoccTrm tbod -> forall n, PoccTrm (instantiate n tbod)) /\
   (forall ts, PoccTrms ts -> forall n, PoccTrms (instantiates n ts)) /\
@@ -1667,71 +2298,9 @@ Proof.
   - eapply Pocc_TApp_mkApp. apply PoAppR. auto.
 Qed.
 
-Lemma instantiate_TApp_mkApp:
-  forall n fn arg args,
-  instantiate n (TApp fn arg args) =
-   mkApp (instantiate n fn) (instantiates n (tcons arg args)).
-Proof.
-  intros. cbn. reflexivity.
-Qed.
 
-End Instantiate_sec.
 End PoccTrm_sec.
-
-Lemma instantiate_pres_WFapp:
-  (forall bod, WFapp bod ->
-              forall t, WFapp t -> forall n, WFapp (instantiate t n bod)) /\
-  (forall ts, WFapps ts ->
-              forall t, WFapp t -> forall n, WFapps (instantiates t n ts)) /\
-  (forall bs, WFappBs bs ->
-              forall t, WFapp t -> forall n, WFappBs (instantiateBrs t n bs)) /\
-  (forall ds, WFappDs ds ->
-              forall t, WFapp t -> forall n, WFappDs (instantiateDefs t n ds)).
-Proof.
-  apply WFappTrmsBrsDefs_ind; intros;
-  try (solve [unfold instantiate; constructor]).
-  - destruct (lt_eq_lt_dec n m) as [[h|h]|h]; unfold instantiate.
-    + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
-    + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
-    + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
-  - cbn. constructor. apply H0. assumption.
-  - cbn. constructor. apply H0. assumption.
-  - change (WFapp (TLambda nm (instantiate t (S n) bod))).
-    constructor.
-    + apply H0. assumption.
-  - change (WFapp (TLetIn nm (instantiate t n dfn) (instantiate t (S n) bod))).
-    constructor.
-    + apply H0. assumption.
-    + apply H2. assumption.
-  - change (WFapp (mkApp (instantiate t0 n fn) 
-                         (tcons (instantiate t0 n t) (instantiates t0 n ts)))).
-    apply mkApp_pres_WFapp.
-    + constructor. apply H3; assumption. apply H5. assumption.
-    + apply H1. assumption.
-  - change (WFapp (TConstruct i m1 (instantiates t n args))).
-    constructor. intuition.
-  - change (WFapp (TCase m (instantiate t n mch) (instantiateBrs t n brs))).
-    constructor.
-    + apply H0; assumption.
-    + apply H2; assumption.
-   - change (WFapp (TFix (instantiateDefs t (n + dlength defs) defs) m)).
-     constructor.
-     + apply H0. assumption.
-   - change (WFapps (tcons (instantiate t0 n t) (instantiates t0 n ts))).
-     constructor.
-     + apply H0. assumption.
-     + apply H2. assumption.
-   - change (WFappBs (bcons n (instantiate t n0 b)
-                            (instantiateBrs t n0 bs))).
-     constructor.
-     + apply H0. assumption.
-     + apply H2. assumption.       
-   - change (WFappDs (dcons nm (instantiate t n bod) arg
-                            (instantiateDefs t n ds))).
-     constructor.
-     + apply H0. assumption.
-     + apply H2. assumption.
-Qed.
+End Instantiate_sec.
 
 
 (** operations for weak reduction and weak evaluation **)

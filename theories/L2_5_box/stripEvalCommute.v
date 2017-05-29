@@ -264,6 +264,13 @@ Lemma instantiates_tcons_commute:
 intros tin n t ts. reflexivity.
 Qed.
 
+Lemma instantiates_bcons_commute:
+  forall tin n t m ds,
+         (instantiateBrs tin n (bcons m t ds)) = 
+         (bcons m (instantiate tin n t) (instantiateBrs tin n ds)).
+reflexivity.
+Qed.
+
 Lemma instantiates_dcons_commute:
   forall tin n nm t m ds,
          (instantiateDefs tin n (dcons nm t m ds)) = 

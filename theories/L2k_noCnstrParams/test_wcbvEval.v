@@ -1,7 +1,4 @@
 
-Require Import Coq.Arith.Compare_dec.
-Require Import Coq.Arith.PeanoNat.
-Require Import Coq.Arith.Peano_dec.
 Require Import Recdef.
 Require Import omega.Omega.
 Require Import Template.Template.
@@ -30,6 +27,10 @@ Notation ZZ := (TConstruct NN 0 0).
 Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
 Notation CONS := (TConstruct LL 1 3).
 Notation NIL := (TConstruct LL 0 1).
+Notation VSR := (mkInd "Benchmarks.vs.VeriStar.veristar_result" 0).
+Notation VSR_Val := (TConstruct VSR 0).
+Notation VSR_Modl := (TConstruct VSR 1).
+Notation VSR_Abrt := (TConstruct VSR 2).
 Notation Lam := (TLambda).
 Notation tLam := (tLambda).
 Notation tPi := (tProd).
@@ -49,12 +50,32 @@ Notation "fn [| arg @ args |]" :=
   (TApp fn arg args)  (at level 90, left associativity).
 
 
-(** tactic for WcbvEval relation **)
-Ltac terms := repeat (eapply wCons; try eapply wAppCong;
-                      try eapply wConstruct;
-                      try not_isLambda; try not_isFix; try eapply wNil).
-
 (** Abhishek's example of looping: in L2 we don't test the guard **)
+Require Import Arith.
+Axiom AAax: Acc gt 0.
+Fixpoint loop (n:nat) (x:nat) (a:Acc gt n) {struct a} : nat :=
+  match n with
+  | _ => @loop (S n) x (Acc_inv a (S n) (gt_Sn_n n))
+  end.
+Fixpoint pool (n:nat) (a:Acc gt n) {struct a} : nat -> nat :=
+  match n with
+  | _ => @pool (S n) (Acc_inv a (S n) (gt_Sn_n n))
+  end.
+Definition loop02 := @loop O 2.
+Eval vm_compute in loop02.    (** Coq does not loop **)
+Recursive Extraction loop02.
+Definition pool0AAax := @pool O AAax.
+Eval vm_compute in pool0AAax.    (** Coq does not loop **)
+Recursive Extraction pool0AAax.
+
+Definition loop02AAax := @loop O 2 AAax.
+Eval vm_compute in loop02AAax.
+Recursive Extraction loop02AAax.
+Definition pool0AAax2 := @pool O AAax 2.
+Eval vm_compute in pool0AAax2.
+Recursive Extraction pool0AAax2.
+
+(***********
 Inductive mlt (n:nat) : nat -> Prop := mlt_n: mlt n (S n).
 Inductive Acc (y: nat) : Prop :=
   Acc_intro : (forall x: nat, mlt y x -> Acc x) -> Acc y.
@@ -75,121 +96,7 @@ Definition P_env := Eval vm_compute in (env P_loop0).
 Definition P_main := Eval vm_compute in (main P_loop0).
 (** wcbvEval raises exception "out of time": non-terminating **)
 Eval vm_compute in wcbvEval P_env 1000 P_main.
-
-(***************
-Goal
-  WcbvEval P_env P_main prop.
-Proof.
-  unfold P_main. eapply wConst. cbn. reflexivity.
-  eapply wAppFix.
-  - eapply wConst. cbn. reflexivity. eapply wFix.
-  - cbn. reflexivity.
-  - cbn. reflexivity.
-  - eapply wProof. eapply wAx.
-  - cbn. eapply wAppLam.
-    + eapply wLam.
-    + eapply wConstruct.
-    + cbn. eapply wAppLam.
-      * eapply wLam.
-      * eapply wAx.
-      * { cbn. eapply wAppFix.
-          - eapply wFix.
-          - cbn. reflexivity.
-          - cbn. reflexivity.
-          - eapply wProof. eapply wAppLam.
-            + eapply wConst. cbn. reflexivity. eapply wProof. eapply wLam.
-            + eapply wConstruct.
-            + cbn. eapply wAppLam.
-              * eapply wLam.
-              * eapply wAx.
-              * { cbn. eapply wAppLam.
-                  - eapply wLam.
-                  - eapply wAppCong.
-                    + eapply wConstruct.
-                    + not_isLambda.
-                    + not_isFix.
-                    + terms.
-                    + cbn. reflexivity.
-                  - cbn. eapply wAppLam.
-                    + eapply wLam.
-                    + eapply wAppCong.
-                      * eapply wConstruct.
-                      * not_isLambda.
-                      * not_isFix.
-                      * terms.
-                      * cbn. reflexivity.
-                    + cbn. eapply wCaseCong.
-                      * eapply wAx.
-                      * cbn. reflexivity.
-                      * terms. eapply wLam. }
-          - cbn. eapply wAppLam.
-            + eapply wLam.
-            + eapply wAppCong.
-              * eapply wConstruct.
-              * not_isLambda.
-              * not_isFix.
-              * terms.
-              * cbn. reflexivity.
-            + cbn. eapply wAppLam.
-              * eapply wLam.
-              * { eapply wCaseCong.
-                  - eapply wAx.
-                  - cbn. reflexivity.
-                  - terms. eapply wLam. }
-              * { cbn. eapply wAppFix.
-                  - eapply wFix.
-                  - cbn. reflexivity.
-                  - cbn. reflexivity.
-                  - eapply wProof. eapply wAppLam.
-                    + eapply wConst. cbn. reflexivity. eapply wProof.
-                      eapply wLam.
-                    + eapply wAppCong.
-                      * eapply wConstruct.
-                      * not_isLambda.
-                      * not_isFix.
-                      * terms.
-                      * cbn. reflexivity.
-                    + cbn. eapply wAppLam.
-                      * eapply wLam.
-                      * { eapply wCaseCong.
-                          - eapply wAx.
-                          - reflexivity.
-                          - terms. eapply wLam. }
-                      * { cbn. eapply wAppLam.
-                          - eapply wLam.
-                          - eapply wAppCong.
-                            + eapply wConstruct.
-                            + not_isLambda.
-                            + not_isFix.
-                            + terms. cbn. reflexivity.
-                            + cbn. reflexivity.
-                          - cbn. eapply wAppLam.
-                            + eapply wLam.
-                            + eapply wAppCong.
-                              * eapply wConstruct.
-                              * not_isLambda.
-                              * not_isFix.
-                              * terms. cbn. reflexivity.
-                              * cbn. reflexivity.
-                            + cbn. eapply wCaseCong.
-                              * { eapply wCaseCong.
-                                  - eapply wAx.
-                                  - cbn. reflexivity.
-                                  - terms. eapply wLam. }
-                              * cbn. reflexivity.
-                              * terms. eapply wLam. }
-                  - cbn. eapply wAppLam.
-                    + eapply wLam.
-                    + eapply wAppCong.
-                      * eapply wConstruct.
-                      * not_isLambda.
-                      * not_isFix.
-                      * terms. cbn. reflexivity.
-                      * cbn. reflexivity.
-                    + cbn. eapply wAppLam.
-
-********************************)
-                      
+*****************************)                      
 
 Inductive P0: Prop := p0.
 Inductive P1: Prop := p1.
@@ -276,10 +183,13 @@ Fixpoint slowFib (n:nat) : nat :=
              end
   end.
 Definition slowFib3 := (slowFib 3).
+Compute slowFib3.
 Quote Recursively Definition cbv_slowFib3 :=
   ltac:(let t:=(eval cbv in slowFib3) in exact t).
+Eval cbv in (program_Program cbv_slowFib3).
 Definition ans_slowFib3 :=
   Eval cbv in (main (program_Program cbv_slowFib3)).
+Print ans_slowFib3.
 (* [program] of the program *)
 Quote Recursively Definition p_slowFib3 := slowFib3.
 Print p_slowFib3.
@@ -288,7 +198,7 @@ Print P_slowFib3.
 Goal
   let env := (env P_slowFib3) in
   let main := (main P_slowFib3) in
-  wcbvEval (env) 30 (main) = Ret ans_slowFib3.
+  wcbvEval env 30 main = Ret ans_slowFib3.
   vm_compute. reflexivity.
 Qed.
 
@@ -300,7 +210,7 @@ Function Plus1 (n : nat) {wf lt n} : nat :=
 - intros. omega.
 - apply lt_wf.
 Defined.
-Definition x := 1.
+Definition x := 4.
 Definition Plus1x := Plus1 x.
 Eval vm_compute in Plus1x.
 
@@ -331,20 +241,23 @@ Proof.
     omega.
   - exact lt_wf.
 Defined.
+
 (***
 Definition Gcdx := (Gcd 4 2).
 Eval cbv in Gcdx.
 Time Quote Recursively Definition pGcdx := Gcdx.
-Time Definition PGcdx := Eval cbv in (program_Program pGcdx).
+Time Definition PGcdx :=
+  Eval vm_compute in (L2k.compile.program_Program pGcdx).
 Time Definition Penv_Gcdx := env PGcdx.
 Time Definition Pmain_Gcdx := main PGcdx.
-Time Definition ans_Gcdx := Eval cbv in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
+Time Definition ans_Gcdx :=
+ Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
 Print ans_Gcdx.
 ***)
 
 
 
-(***&
+(***
 Quote Recursively Definition pGcd := Gcd.
 Definition PGcd := Eval cbv in (program_Program pGcd).
 
@@ -468,6 +381,39 @@ Goal
 Qed.
 
 (** Ackermann **)
+Fixpoint ackn (Ack:nat -> nat) (m:nat) {struct m} : nat :=
+  match m with
+  | 0 => Ack 1
+  | S q => Ack (ackn Ack q)
+  end.
+Fixpoint Ack (n:nat) {struct n} : nat -> nat :=
+  match n with
+    | 0 => S
+    | S p => ackn (Ack p)
+  end.
+Quote Recursively Definition p_Ack := Ack.
+Print p_Ack.
+Definition P_Ack := Eval cbv in (program_Program p_Ack).
+Print P_Ack.
+Time Compute Ack 3 7.
+
+Fixpoint ACK (n:nat) {struct n} : nat -> nat :=
+  match n with
+    | 0 => S
+    | S p => let fix ackn (m:nat) {struct m} :=
+                 match m with
+                   | 0 => ACK p 1
+                   | S q => ACK p (ackn q)
+                 end
+             in ackn
+  end.
+Quote Recursively Definition p_ACK := ACK.
+Print p_ACK.
+Definition P_ACK := Eval cbv in (program_Program p_ACK).
+Print P_ACK.
+Compute ACK 3 7.
+
+
 Fixpoint ack (n m:nat) {struct n} : nat :=
   match n with
     | 0 => S m
@@ -478,6 +424,7 @@ Fixpoint ack (n m:nat) {struct n} : nat :=
                  end
              in ackn m
   end.
+Compute ack 3 7.
 Definition ack35 := (ack 3 5).
 Quote Recursively Definition cbv_ack35 :=
   ltac:(let t:=(eval cbv in ack35) in exact t).
@@ -673,3 +620,40 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+Require Import Benchmarks.vs.
+
+(*** raises exception: out of time *****
+Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
+Time Definition P_ce_example_myent :=
+  Eval vm_compute in (program_Program p_ce_example_myent).
+Definition P_env_ce_example_myent := env P_ce_example_myent.
+Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
+Time Definition eval_ce_example_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myent 4500 P_main_ce_example_myent).
+Print eval_ce_example_myent.
+**********************)
+
+(********************
+Time Quote Recursively Definition p_myMain := vs.myMain.
+Time Definition P_myMain :=
+  Eval vm_compute in (L2k.compile.program_Program p_myMain).
+Definition P_env_myMain := env P_myMain.
+Definition P_main_myMain := AstCommon.main P_myMain.
+Time Definition eval_myMain :=
+  Eval vm_compute in (wcbvEval P_env_myMain 8000 P_main_myMain).
+Set Printing Width 150.
+Print eval_myMain.
+************)
+
+(********************
+Print Assumptions vs.main.
+Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
+Time Definition P_ce_example_ent :=
+  Eval vm_compute in (program_Program p_ce_example_ent).
+Time Definition P_env_ce_example_ent := env P_ce_example_ent.
+Time Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
+Time Definition eval_ce_example_ent :=
+  Eval vm_compute in (wcbvEval P_env_ce_example_ent 1000 P_main_ce_example_ent).
+Print eval_ce_example_ent.
+**********************)

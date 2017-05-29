@@ -831,6 +831,16 @@ Lemma tskipn_pres_WFapp:
   - discriminate.
 Qed.
 
+Lemma lookup_pres_WFapp:
+    forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
+Proof.
+  induction 1; intros nn ed h.
+  - inversion_Clear h.
+  - case_eq (string_eq_bool nn nm); intros j.
+    + cbn in h. rewrite j in h. myInjection h. assumption.
+    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
+Qed.
+
 (** compiling well formed terms to Term produces well formed Terms **
 *** not used ****
 Lemma L2Term_Term_pres_isApp:

@@ -173,6 +173,14 @@ induction t;
 left. auto.
 Qed.
 
+Lemma mkApp_isApp:
+  forall ts fn t, isApp (mkApp fn (tcons t ts)).
+Proof.
+  induction ts; intros.
+  - cbn. auto.
+  - cbn. apply IHts.
+Qed.
+
 Definition isFix (t:Term) : Prop :=
   exists ds n, t = TFix ds n.
 Lemma IsFix: forall ds n, isFix (TFix ds n).
@@ -986,7 +994,15 @@ Proof.
   reflexivity.
 Qed.
  
-Lemma instantiates_dcons:
+Lemma instantiateBs_bcons:
+   forall n m arg args,
+    instantiateBrs n (bcons m arg args) =
+    bcons m (instantiate n arg) (instantiateBrs n args).
+Proof.
+  reflexivity.
+Qed.
+ 
+Lemma instantiateDs_dcons:
    forall n nm t m ds,
     instantiateDefs n (dcons nm t m ds) =
     dcons nm (instantiate n t) m (instantiateDefs n ds).

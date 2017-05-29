@@ -104,6 +104,13 @@ with stripDs (ts:L1gDefs) : Defs :=
     | L1g.compile.dcons nm _ t m ds => dcons nm (strip t) m (stripDs ds)
   end.
 
+Lemma strips_tcons:
+  forall t ts,
+    strips (L1g.compile.tcons t ts) = tcons (strip t) (strips ts).
+Proof.
+  reflexivity.
+Qed.
+
 Lemma TLambda_strip_inv:
   forall nm bod t, TLambda nm bod = strip t ->
                    exists bod' ty, t = L1g.compile.TLambda nm ty bod'.

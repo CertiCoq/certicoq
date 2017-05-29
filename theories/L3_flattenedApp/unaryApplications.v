@@ -34,6 +34,11 @@ Definition optStrips (ts:option L2_5Terms) : option Terms :=
     | None => None
     | Some ts => Some (strips ts)
   end.
+Definition optStripBnth (b: option (nat * L2_5Term)) : option (nat * Term) :=
+                           match b with
+                             | None => None
+                             | Some (n, t) => Some (n, strip t)
+                           end.
 Definition optStripDnth (b: option (L2_5Term * nat)) : option (Term * nat) :=
                            match b with
                              | None => None
@@ -51,6 +56,10 @@ Qed.
 Lemma optStrips_hom: forall y, optStrips (Some y) = Some (strips y).
 induction y; simpl; reflexivity.
 Qed.
+Lemma optStripBnth_hom:
+  forall y n, optStripBnth (Some (n, y)) = Some (n, strip y).
+induction y; simpl; reflexivity.
+Qed.
 Lemma optStripDnth_hom:
   forall y n, optStripDnth (Some (y, n)) = Some (strip y, n).
 induction y; simpl; reflexivity.
@@ -60,6 +69,20 @@ Lemma optStripCanP_hom:
 induction y; simpl; reflexivity.
 Qed.
 
+Lemma isConstruct_hom:
+  forall t, isConstruct (strip t) ->
+            L2_5.term.isConstruct t \/ L2_5.term.isCast t.
+Proof.
+  destruct t; intros h;
+    try (cbn; destruct h as [x0 [x1 [x2 h]]]; discriminate). 
+  - cbn in h. right. auto.
+  - change
+      (isConstruct (mkApp (strip t1) (tcons (strip t2) (strips t3)))) in h.
+    pose proof (mkApp_isApp (strips t3) (strip t1) (strip t2)) as k.
+    destruct k as [x0 [x1 jx]]. rewrite jx in h.
+    destruct h as [y0 [y1 [y2 jy]]]. discriminate.
+  - destruct h as [x0 [x1 [x2 h]]]. cbn in h. myInjection h. auto.
+Qed.
 
 Lemma tlength_hom:
   forall ts, tlength (strips ts) = L2_5.term.tlength ts.
@@ -69,18 +92,42 @@ Proof.
   - cbn. rewrite IHts. reflexivity.
 Qed.
 
-(***********
+Lemma tcons_hom:
+  forall t ts, strips (L2_5.compile.tcons t ts) =
+               tcons (strip t) (strips ts).
+reflexivity.
+Qed.
+
+Lemma bcons_hom:
+  forall t m ts, stripBs (L2_5.compile.bcons m t ts) =
+               bcons m (strip t) (stripBs ts).
+reflexivity.
+Qed.
+
+Lemma dcons_hom:
+  forall nm t m ts, stripDs (L2_5.compile.dcons nm t m ts) =
+               dcons nm (strip t)m  (stripDs ts).
+reflexivity.
+Qed.
+
+
 Lemma mkApp_hom:
   forall ts t,
-    isL2_5Cnstr t = None -> ~ L2_5.term.isApp t ->
     strip (L2_5.compile.mkApp t ts) = mkApp (strip t) (strips ts).
 Proof.
-  induction ts; intros; cbn.
-  - rewrite L2_5.term.mkApp_tnil_ident. reflexivity.
-  - rewrite L2_5.term.mkApp_goodFn.
-    cbn. rewrite H. reflexivity. assumption.
+  intros. functional induction (L2_5.compile.mkApp t ts).
+  - change
+      (mkApp (TApp (strip fn) (strip b))
+             (strips (L2_5.compile.tappend bs args)) =
+       mkApp (strip (L2_5.compile.TApp fn b bs)) (strips args)).
+    change
+      (mkApp (TApp (strip fn) (strip b))
+             (strips (L2_5.compile.tappend bs args)) =
+       mkApp (mkApp (TApp (strip fn) (strip b)) (strips bs)) (strips args)).
+    rewrite mkApp_idempotent. rewrite L3.compile.tappend_hom. reflexivity.
+  - reflexivity.
+  - reflexivity.
 Qed.
-***************)
 
 (******
 Lemma mkApp_hom':
@@ -116,6 +163,51 @@ Proof.
   - cbn. apply LMiss; assumption. 
 Qed.
 
+Lemma lookup_hom:
+  forall p nm ec,
+    lookup nm p = Some ec -> lookup nm (stripEnv p) = Some (stripEC ec).
+Proof.
+  intros p nm ec h. apply Lookup_lookup.
+  apply Lookup_hom. apply (lookup_Lookup _ _ h).
+Qed.
+  
+Lemma lookup_hom_None:
+  forall p nm,
+    lookup nm p = None -> lookup nm (stripEnv p) = None.
+Proof.
+  induction p; intros.
+  - cbn. reflexivity.
+  - destruct a. destruct (string_dec nm s).
+    + subst. cbn in H. rewrite string_eq_bool_rfl in H. discriminate.
+    + cbn. rewrite (string_eq_bool_neq n).
+      cbn in H. rewrite (string_eq_bool_neq n) in H.
+      apply IHp. assumption.
+Qed.
+  
+Lemma LookupDfn_hom:
+  forall p s t, LookupDfn s p t -> LookupDfn s (stripEnv p) (strip t).
+Proof.
+  unfold LookupDfn. intros.
+  assert (j:= Lookup_hom H). exact j.
+Qed.
+
+Lemma lookupDfn_hom:
+  forall p nm t,
+    lookupDfn nm p = Ret t -> lookupDfn nm (stripEnv p) = Ret (strip t).
+Proof.
+  induction p; intros.
+  - cbn in *. discriminate.
+  - destruct a. unfold lookupDfn. cbn. unfold lookupDfn in H. cbn in H.
+    destruct (string_dec nm s).
+    + subst. cbn. cbn in H.
+      rewrite string_eq_bool_rfl. rewrite string_eq_bool_rfl in H.
+      destruct e; try discriminate.
+      * myInjection H. cbn. reflexivity.
+    + rewrite (string_eq_bool_neq n). rewrite (string_eq_bool_neq n) in H.
+      case_eq (lookup nm p); intros; rewrite H0 in H; try discriminate.
+      * rewrite (lookup_hom _ _ H0). destruct e0; try discriminate.
+        cbn. myInjection H. reflexivity.
+Qed.
 
 (***
 Lemma mkApp_hom_TApp:
@@ -210,25 +302,6 @@ Admitted.
     unfold etaExp_cnstr in *. cbn.
     cbn in *.
  ****************)
-
-(********
-Lemma mkApp_hom:
-  forall fn t ts u us,
-    isL2_5Cnstr fn = None ->
-    mkApp (strip (L2_5.compile.TApp fn u us)) (strip t) (strips ts) =
-    strip (L2_5.term.mkApp (L2_5.compile.TApp fn u us) (L2_5.compile.tcons t ts)).
-Proof.
-  cbn; intros. rewrite H. destruct fn. cbn. unfold mkApp. rewrite mkApp_idempotent.
-
-  destruct fn; intros; cbn; try reflexivity.
-  -
-    +  unfold etaExp_cnstr. destruct p. destruct p. cbn.
-    + cbn in H. rewrite H0 in H. elim H. unfold etaExp_cnstr.
-
-
-         destruct p as [[x0 x1] x2]. unfold etaExp_cnstr. cbn.
- *****)
-
 
 Lemma mkApp_goodFn:
   forall fn arg args,
@@ -327,234 +400,84 @@ Proof.
 Qed.
 *********************)
 
-(******************************
 Lemma instantiate_hom:
-  (forall bod, L2_5.term.WFapp bod -> forall arg n, WFTrm (strip arg) 0 ->
-     strip (L2_5.term.instantiate arg n bod) =
+  (forall bod arg n,
+     strip (L2_5.compile.instantiate arg n bod) =
      instantiate (strip arg) n (strip bod)) /\
-  (forall bods, L2_5.term.WFapps bods -> forall arg n, WFTrm (strip arg) 0 -> 
-     strips (L2_5.term.instantiates arg n bods) =
+  (forall bods arg n,
+     strips (L2_5.compile.instantiates arg n bods) =
      instantiates (strip arg) n (strips bods)) /\
-  (forall ds, L2_5.term.WFappDs ds -> forall arg n, WFTrm (strip arg) 0 ->
-          stripDs (L2_5.term.instantiateDefs arg n ds) =
+  (forall bods arg n,
+     stripBs (L2_5.compile.instantiateBrs arg n bods) =
+     instantiateBrs (strip arg) n (stripBs bods)) /\
+  (forall ds arg n,
+          stripDs (L2_5.compile.instantiateDefs arg n ds) =
      instantiateDefs (strip arg) n (stripDs ds)).
 Proof.
-  apply L2_5.term.WFappTrmsDefs_ind; intros; try (cbn; reflexivity);
-  try (cbn; rewrite H0; try reflexivity; assumption).
-  - cbn. destruct (lt_eq_lt_dec m n); cbn.
+  apply L2_5.compile.TrmTrmsBrsDefs_ind; intros; try (cbn; reflexivity);
+  try (cbn; rewrite H; reflexivity).
+  - cbn. destruct (lt_eq_lt_dec n0 n); cbn.
     + destruct s.
-      * rewrite (proj1 (nat_compare_gt n m)); try omega. reflexivity.
+      * rewrite (proj1 (nat_compare_lt n0 n)); try omega. reflexivity.
       * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
-    + rewrite (proj1 (nat_compare_lt n m)); trivial.
-  - cbn. rewrite H0; try assumption. apply f_equal.
-    rewrite H2. reflexivity. assumption.
-  - rewrite TApp_hom. destruct (isL2_5Cnstr fn).
-    + destruct p. destruct p.
-      
-    rewrite L2_5.term.instantiate_TApp_commute. Check mkApp_hom.
-    rewrite TApp_hom. 
-    
-HERE
-
-
-    
-  - cbn. erewrite <- instantiate_etaExp; try eassumption. reflexivity.
-  - rewrite TCase_hom. rewrite instantiate_TCase.
+    + rewrite (proj1 (nat_compare_gt n0 n)); trivial.
+  - cbn. rewrite H. rewrite H0. reflexivity.
+  - change
+      (strip (L2_5.compile.mkApp (L2_5.compile.instantiate arg n t)
+                                 (L2_5.compile.tcons
+                                    (L2_5.compile.instantiate arg n t0)
+                                    (L2_5.compile.instantiates arg n t1))) =
+       instantiate (strip arg) n
+                   (mkApp (TApp (strip t) (strip t0)) (strips t1))).
+    rewrite instantiate_mkApp_commute.
     change
-     (TCase m (strip (L2_5.term.instantiate arg n mch))
-            (stripDs (L2_5.term.instantiateDefs arg n brs)) =
-      TCase m (instantiate (strip arg) n (strip mch))
-            (instantiateDefs (strip arg) n (stripDs brs))).
-    apply f_equal2.
-    + rewrite H0; try reflexivity; try assumption.
-    + rewrite H2; try reflexivity; try assumption.
+      (strip
+         (L2_5.compile.mkApp (compile.instantiate arg n t)
+                             (L2_5.compile.tcons
+                                (compile.instantiate arg n t0)
+                                (compile.instantiates arg n t1))) =
+       mkApp (TApp (instantiate (strip arg) n (strip t))
+                   (instantiate (strip arg) n (strip t0)))
+             (instantiates (strip arg) n (strips t1))).
+    rewrite mkApp_hom.
+    rewrite <- H; trivial. rewrite <- H0; trivial. rewrite <- H1; trivial.
+  - change
+      (strip (compile.instantiate arg n0 (L2_5.compile.TConstruct i n t)) =
+       TConstruct i n (instantiates (strip arg) n0 (strips t))).
+    rewrite <- H; trivial.
+  - change
+     (TCase i (strip (L2_5.term.instantiate arg n t))
+            (stripBs (L2_5.compile.instantiateBrs arg n b)) =
+      TCase i (instantiate (strip arg) n (strip t))
+            (instantiateBrs (strip arg) n (stripBs b))).
+    rewrite H; trivial. rewrite H0; trivial.
   - change
       (TFix
          (stripDs (L2_5.term.instantiateDefs
-                     arg (n + (L2_5.compile.dlength defs)) defs)) m =
-       TFix (instantiateDefs
-               (strip arg) (n + (dlength (stripDs defs))) (stripDs defs)) m).
-    apply f_equal2; try reflexivity.
-    rewrite H0; try assumption.
-    apply f_equal2; try reflexivity. rewrite stripDs_pres_dlength.
-    reflexivity. 
-  - rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
-    rewrite tcons_hom. rewrite H0; try assumption.
-    rewrite tcons_hom. rewrite instantiates_tcons.
-    rewrite H2. reflexivity. assumption.
-  - rewrite L2_5.stripEvalCommute.instantiates_dcons_commute.
-    rewrite dcons_hom. rewrite H0; try assumption.
-    rewrite dcons_hom. rewrite instantiates_dcons.
-    rewrite H2. reflexivity. assumption.
-
-    
-Admitted.
- **************)
-
-
-(*********************
-Lemma instantiate_hom:
-  (forall bod arg n, WFTrm (strip arg) 0 ->
-     L2_5.term.WFapp bod ->
-     strip (L2_5.term.instantiate arg n bod) =
-     instantiate (strip arg) n (strip bod)) /\
-  (forall bods arg n, WFTrm (strip arg) 0 ->
-     L2_5.term.WFapps bods ->
-     strips (L2_5.term.instantiates arg n bods) =
-     instantiates (strip arg) n (strips bods)) /\
-  (forall ds arg n, WFTrm (strip arg) 0 ->
-     L2_5.term.WFappDs ds ->
-     stripDs (L2_5.term.instantiateDefs arg n ds) =
-     instantiateDefs (strip arg) n (stripDs ds)).
-Proof.
-  apply L2_5.compile.TrmTrmsDefs_ind; intros; try (simpl; reflexivity).
-  - simpl. destruct (lt_eq_lt_dec n n0); cbn.
-    + destruct s.
-      * rewrite (proj1 (nat_compare_gt n0 n)); try omega. reflexivity.
-      * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
-        rewrite L2_5.compile.mkApp_tnil_ident. reflexivity.
-    + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
-  - inversion_Clear H1.
-    change (strip (L2_5.term.instantiate arg n t) =
-            (instantiate (strip arg) n (strip t))).
-    rewrite H; try reflexivity; assumption.
-  - inversion_Clear H1.
-    change (TProd n (strip (L2_5.term.instantiate arg (S n0) t)) =
-            (TProd n (instantiate (strip arg) (S n0) (strip t)))).
-    rewrite H; try reflexivity; assumption.
-  - inversion_Clear H1.
-    change (TLambda n (strip (L2_5.term.instantiate arg (S n0) t)) =
-            (TLambda n (instantiate (strip arg) (S n0) (strip t)))).
-    rewrite H; try reflexivity; assumption.
-  - inversion_Clear H2.
-    change (TLetIn n (strip (L2_5.term.instantiate arg n0 t))
-                   (strip (L2_5.term.instantiate arg (S n0) t0)) =
-            (TLetIn n (instantiate (strip arg) n0 (strip t))
-                    (instantiate (strip arg) (S n0) (strip t0)))).
-    rewrite H, H0; try reflexivity; try assumption.
-    (*********************)
-  - inversion_Clear H3. rewrite TApp_hom. rewrite instantiate_TApp_mkApp.
-    case_eq (isL2_5Cnstr t).
-    + intros p h. destruct p as [[p0 p1] p2]. rewrite tlength_hom.
-      destruct (etaExp_cnstr_Lam_or_Cnstr'
-                  p0 p1 (p2 - S (L2_5.term.tlength t1))
-                  (tcons (strip t0) (strips t1))).
-      * {destruct H3 as [ytra [k1 k2]]. rewrite k2.
-         rewrite instantiate_TLambda.
-         rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
-         rewrite L2_5.compile.mkApp_goodFn.
-         rewrite TApp_hom.
-         destruct (isL2_5Cnstr_spec _ h).
-         - rewrite H3. unfold L2_5.term.instantiate at 1.
-           unfold isL2_5Cnstr. unfold L2_5.term.isL2_5Cnstr.
-           rewrite H0, H1; try assumption.
-           rewrite instantiates_pres_tlength. rewrite tlength_hom.
-            destruct
-             (etaExp_cnstr_Lam_or_Cnstr'
-                p0 p1
-                (p2 - S (L2_5.term.tlength t1))
-                (tcons (instantiate (strip arg) n (strip t0))
-                       (instantiates (strip arg) n (strips t1)))).
-            + destruct H4 as [ztra [j1 j2]].
-              rewrite j2. apply f_equal.
-              assert (tra: ytra = ztra). omega. rewrite tra.
-              rewrite instantiate_mkEtaLams.
-              rewrite <- instantiates_mkEtaArgs; try assumption.
-              rewrite instantiates_tcons. unfold instantiate at 2.
-              rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega.
-              rewrite <- instantiates_tcons.
-              rewrite <- instantiates_pres_treverse.
-              rewrite (proj1 (proj2 (instantiate_lift _)));
-                try omega; try assumption.
-              reflexivity.
-            + destruct H4 as [ztra [j1 j2]]. rewrite j1 in k1. discriminate.
-         - destruct H3 as [u [j1 j2]]. subst. cbn in h. cbn.
-           rewrite tlength_hom. rewrite L2_5.term.instantiates_pres_tlength. 
-
-              
-         rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
-          rewrite mkApp_hom.
-          rewrite tcons_hom. rewrite H, H0, H1.
-          erewrite (isL2_5Cnstr_Some t h).
-          rewrite (etaExp_cnstr_tnil).
-          rewrite instantiate_mkEtaLams. rewrite instantiate_TLambda.       
-              rewrite TApp_hom.
-          rewrite mkApp_hom.
-          rewrite H.
-          rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
-          rewrite tcons_hom. rewrite H0, H1.
-          rewrite TApp_hom. rewrite h. rewrite H3. unfold strip at 2.
-          unfold etaExp_cnstr.
-          rewrite instantiate_TApp_mkApp.
-                destruct (L2_5.term.isL2_5Cnstr_spec _ h).
-      rewrite mkApp_goodFn.
-      - rewrite TApp_hom. rewrite <- H3. rewrite h. unfold etaExp_cnstr.
-      rewrite H0, H1; try assumption.
-      cbn. rewrite h. rewrite <- instantiates_tcons.
-      unfold etaExp_cnstr. rewrite instantiates_pres_tlength.
-      destruct (tlength (tcons (strip t0) (strips t1)) ?= p2).
-      * reflexivity.
-      * rewrite instantiate_mkEtaLams. rewrite instantiate_TConstruct.
-        rewrite <- tcons_hom. rewrite strips_pres_tlength.
-        set (q:= L2_5.term.tlength (L2_5.compile.tcons t0 t1)).
-        eapply f_equal. eapply f_equal.
-        rewrite <- instantiates_pres_treverse.
-        rewrite instantiates_mkEtaArgs. reflexivity.
-        assumption.
-      * rewrite instantiate_TConstruct. apply f_equal.
-        rewrite instantiates_ttake. reflexivity.
-      * intros j. destruct j as [x0 [x1 [x2 k]]]. discriminate.
-(************  ????
-    + intros h. rewrite TApp_hom. rewrite h.
-      case_eq (L2_5.term.isApp_dec t); intros.
-      destruct i as [x0 [x1 [x2 j]]].
-      * admit.
-      * rewrite L2_5.term.instantiate_TApp_mkApp.
-      unfold L2_5.term.instantiate. rewrite j.
-******************)      
-    + intros h. rewrite (TApp_mkApp_hom _ _ _ h).
-      rewrite instantiate_mkApp_commute.
-      rewrite <- H; try assumption.
-      rewrite instantiates_tcons.
-      rewrite <- H0; try assumption. rewrite <- H1; try assumption.
-      rewrite L2_5.term.instantiate_TApp_mkApp.
-      apply mkApp_instantiate_hom; try assumption.
-      admit. admit.
-  - cbn. apply instantiate_etaExp. assumption.
-  - inversion_Clear H2.
-    rewrite TCase_hom. rewrite instantiate_TCase.
-    change
-     (TCase p (strip (L2_5.term.instantiate arg n t))
-            (strips(L2_5.term.instantiates arg n t0)) =
-      TCase p (instantiate (strip arg) n (strip t))
-            (instantiates (strip arg) n (strips t0))).
-    apply f_equal2.
-    + rewrite H; try reflexivity; try assumption.
-    + rewrite H0; try reflexivity; try assumption.
-  - inversion_Clear H1.
-    change
-      (TFix
-         (stripDs (L2_5.term.instantiateDefs
-                     arg (n0 + (L2_5.term.dlength d)) d)) n =
+                     arg (n0 + (L2_5.compile.dlength d)) d)) n =
        TFix (instantiateDefs
                (strip arg) (n0 + (dlength (stripDs d))) (stripDs d)) n).
-    rewrite H; try assumption.
-    apply f_equal2; try reflexivity. rewrite stripDs_pres_dlength.
-    reflexivity.
-  - inversion_Clear H2. rewrite tcons_hom. rewrite instantiates_tcons.
-    rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
-    rewrite tcons_hom.
-    rewrite H; try assumption. rewrite H0; try assumption. reflexivity.
-  - inversion_Clear H2. rewrite dcons_hom. rewrite instantiates_dcons.
-    rewrite L2_5.stripEvalCommute.instantiates_dcons_commute.
-    rewrite dcons_hom.
-    rewrite H; try assumption. rewrite H0; try assumption. reflexivity.
-Admitted.
-*************************)
+    rewrite H. rewrite stripDs_pres_dlength. reflexivity. 
+  - rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
+    rewrite tcons_hom. rewrite tcons_hom. rewrite instantiates_tcons.
+    rewrite <- H; trivial. rewrite H0; trivial.
+  - rewrite L2_5.stripEvalCommute.instantiates_bcons_commute.
+    rewrite bcons_hom. rewrite bcons_hom. rewrite instantiateBs_bcons.
+    rewrite <- H; trivial. rewrite H0; trivial.
+  - rewrite L2_5.stripEvalCommute.instantiates_dcons_commute.
+    rewrite dcons_hom. rewrite dcons_hom. rewrite instantiateDs_dcons.
+    rewrite <- H; trivial. rewrite H0; trivial.
+Qed.
+
 
 Lemma tnth_hom:
- forall ts n, optStrip (L2_5.term.tnth n ts) = tnth n (strips ts).
+  forall ts n, optStrip (L2_5.term.tnth n ts) = tnth n (strips ts).
 induction ts; simpl; intros n; case n; try reflexivity; trivial.
+Qed.
+
+Lemma bnth_hom:
+  forall ts n, optStripDnth (L2_5.term.bnth n ts) = bnth n (stripBs ts).
+induction ts; cbn; intros m; case m; try reflexivity; trivial.
 Qed. 
 
 Lemma tskipn_hom:
@@ -567,19 +490,15 @@ Lemma whCaseStep_hom:
   forall n brs ts,
     optStrip (L2_5.term.whCaseStep n ts brs) =
     whCaseStep n (strips ts) (stripBs brs).
-(*****
 Proof.
   destruct n, brs; intros; simpl; try reflexivity.
   - unfold whCaseStep. cbn. apply f_equal. rewrite mkApp_hom.
     reflexivity.
-    
-    admit. (* rewrite mkApp_hom. reflexivity. *)
-  - unfold whCaseStep. unfold L2_5.term.whCaseStep. simpl. 
-    rewrite <- tnth_hom. destruct (L2_5.term.tnth n brs); simpl.
-    + admit. (* rewrite mkApp_hom. reflexivity. *)
+  - unfold whCaseStep. unfold L2_5.term.whCaseStep. cbn. 
+    rewrite <- bnth_hom. destruct (L2_5.term.bnth n brs); simpl.
+    + destruct p. cbn. rewrite mkApp_hom. reflexivity. 
     + reflexivity.
-****)
-Admitted.
+Qed.
 
 (****************
 Lemma whBetaStep_tnil_hom:
@@ -600,21 +519,11 @@ Lemma whBetaStep_hom:
   forall bod arg args,
     strip (L2_5.term.whBetaStep bod arg args) =
     mkApp (whBetaStep (strip bod) (strip arg)) (strips args).
-Admitted.
-(*******
 Proof.
-  induction args; cbn; intros.
-  - unfold L2_5.term.whBetaStep, whBetaStep.
-    rewrite L2_5.compile.mkApp_tnil_ident. apply (proj1 instantiate_hom).
-  - unfold L2_5.term.whBetaStep, whBetaStep.
-    unfold L2_5.term.whBetaStep, whBetaStep in IHargs.
-    rewrite <- (proj1 instantiate_hom) in IHargs.
-    
+  intros. unfold L2_5.term.whBetaStep, whBetaStep.
+  rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
+Qed.
 
- rewrite <- (proj1 instantiate_hom). 
-   unfold mkApp.
-    destruct (L2_5.term.instantiate arg 0 bod); cbn.
-******)
 
 (***
 Goal
@@ -628,76 +537,64 @@ Proof.
  ***)
 
   
-(******
 Lemma WcbvEval_hom:
   forall p,
-    (forall t t', L2_5.wcbvEval.WcbvEval p t t' -> L2_5.term.WFTrm t 0 ->
-              (**    L2_5.program.Crct p 0 t ->  **)
+    (forall t t', L2_5.wcbvEval.WcbvEval p t t' ->
                   WcbvEval (stripEnv p) (strip t) (strip t')) /\
-    (forall ts ts', L2_5.wcbvEval.WcbvEvals p ts ts' -> L2_5.term.WFTrms ts 0 ->
-              (**      L2_5.program.Crcts p 0 ts ->  **)
+    (forall ts ts', L2_5.wcbvEval.WcbvEvals p ts ts' ->
                     WcbvEvals (stripEnv p) (strips ts) (strips ts')).
 Proof.
   intros p.
   apply L2_5.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
-  try (solve[constructor; trivial]); try assumption.
-  - cbn. inversion_Clear H0; intuition.
-  - cbn. rewrite etaExp_cnstr_tnil. induction arty.
-    + cbn. constructor. constructor.
-    + cbn. constructor.
-  - eapply wConst; try eassumption.
-    + unfold LookupDfn in *.
-      assert (j:= Lookup_hom l). cbn in j. eassumption.
-    +  apply H. Check (L2_5.wcbvEval.WcbvEval_pres_WFTrm). intuition.
-   (**    apply H. inversion H0. intuition. subst. inversion_Clear H0.**)
+    try (solve[constructor; trivial]); try assumption.
+  - cbn. econstructor; try eassumption. apply LookupDfn_hom.
+    unfold LookupDfn. unfold lookupDfn in e. case_eq (lookup nm p); intros.
+    + rewrite H0 in e. destruct e0.
+      * myInjection e. apply lookup_Lookup. assumption.
+      * discriminate.
+    + rewrite H0 in e. discriminate.
   - (* beta step in L2_5 *)
-    rewrite TApp_hom. cbn in H.
-    case_eq (isL2_5Cnstr fn); intros.
-    + (* fn is a Constructor or Cast: L2_5 beta is impossible *)
-      destruct p0, p0.
-      discriminate (isL2_5Cnstr_WcbvEval_TCnstr H3 w).
-    + (* L2_5 beta step *)
-      cbn. induction args.
-      * { eapply wAppLam; try eassumption.
-          - apply H. constructor.
-        rewrite whBetaStep_tnil_hom in H1. assumption.
-
-      rewrite TApp_hom. cbn in H.
-      assert (k: isL2_5Cnstr fn = None).
-      { unfold isL2_5Cnstr. destruct fn; try reflexivity.
-        - elim H2. auto. }
-      rewrite TApp_hom. rewrite k. cbn. cbn in H.
-      induction args.
-      * cbn. refine (wAppLam _ _ _); try eassumption.
-        cbn in H1. Check whBetaStep_hom. rewrite <- whBetaStep_hom.
-
-
-      
-      rewrite (TApp_hom fn a1 args). rewrite j.
-      rewrite whBetaStep_hom in H1. cbn.
-      Check whBetaStep_hom.
-      Check (wAppLam H H0).
-      assert (k:= (L2_5.compile.TLambda nm bod)).
-cbn.
-      
-      cbn in *. rewrite j. destruct fn; inversion_Clear H; cbn.
-      * rewrite <- H4.
-        
-      destruct bod; cbn; rewrite j; destruct fn; cbn.
-      eapply wAppLam.
-      rewrite TApp_hom. unfold etaExp_cnstr. destruct fn. rewrite tunit_treverse. cbn.
-      
-    + destruct p0. destruct p0. unfold etaExp_cnstr.
-      destruct (n - tlength (tcons (strip a1) (strips args))).
-      * cbn. rewrite tappend_tnil.
-      change (WcbvEval (stripEnv p) (TLam).
-  - eapply wLetIn; try eassumption.
+    change
+      (WcbvEval (stripEnv p)
+                (mkApp (TApp (strip fn) (strip a1)) (strips args))
+                (strip s)).
+    admit.
+  - cbn. eapply wLetIn; try eassumption.
     rewrite <- (proj1 (instantiate_hom)). assumption.
-  - admit.
-  - admit.
-  - eapply wCase; try eassumption. rewrite whCaseStep_hom in e1.
-*************)
-
+  - (* Fix step in L2_5 *)
+    change
+      (WcbvEval (stripEnv p)
+                (mkApp (TApp (strip fn) (strip arg)) (strips args))
+                (strip s)).
+    admit.
+  - (* App congruence in L2_5 *)
+    change
+      (WcbvEval (stripEnv p)
+                (mkApp (TApp (strip fn) (strip arg)) (strips args))
+                (strip (L2_5.compile.mkApp fn' aargs'))).
+    admit.
+  - change
+      (WcbvEval (stripEnv p)
+                (TCase ml (strip mch) (stripBs brs)) (strip s)).
+    eapply (@wCase (stripEnv p)
+                  (strip mch) ml i _ _
+                  (stripBs brs) (strip cs) (strip s));
+      try assumption.
+    + exact H. 
+    + rewrite <- whCaseStep_hom. rewrite e. reflexivity.
+  - (* case congruence in L2_5 *)
+    change
+      (WcbvEval (stripEnv p)
+                (TCase ml (strip mch) (stripBs brs))
+                (TCase ml (strip Mch) (stripBs brs))).
+    constructor; try assumption.
+    intros h. elim n. destruct (isConstruct_hom _ h).
+    + destruct H0 as [x0 [x1 [x2 jx]]]. subst. econstructor.
+      exists x1, x2. reflexivity.
+    + destruct H0 as [x0 jx]. subst. cbn in h. cbn in H.
+      elim (proj1 (L2_5.wcbvEval.WcbvEval_not_Cast p) _ _ w). auto.
+Admitted.
+ 
 (*****
 Lemma whBetaStep_hom:
   forall bod arg args,

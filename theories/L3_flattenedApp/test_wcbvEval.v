@@ -119,6 +119,13 @@ Set Implicit Arguments.
 Notation NN := (mkInd "Datatypes.nat" 0).
 Notation SS := (TConstruct NN 1).
 Notation ZZ := (TConstruct NN 0).
+Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
+Notation CONS := (TConstruct LL 1).
+Notation NIL := (TConstruct LL 0).
+Notation VSR := (mkInd "Benchmarks.vs.VeriStar.veristar_result" 0).
+Notation VSR_Val := (TConstruct VSR 0).
+Notation VSR_Modl := (TConstruct VSR 1).
+Notation VSR_Abrt := (TConstruct VSR 2).
 Notation Lam := (TLambda).
 Notation tLam := (tLambda).
 Notation tPi := (tProd).
@@ -539,14 +546,27 @@ Defined.
 Definition Gcdx := (Gcd 4 2).
 Eval cbv in Gcdx.
 Time Quote Recursively Definition pGcdx := Gcdx.
-Time Definition PGcdx := Eval cbv in (program_Program pGcdx).
+Time Definition PGcdx := Eval vm_compute in (program_Program pGcdx).
 Time Definition Penv_Gcdx := env PGcdx.
 Time Definition Pmain_Gcdx := AstCommon.main PGcdx.
-Time Definition ans_Gcdx := Eval cbv in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
+Time Definition ans_Gcdx :=
+ Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
 Print ans_Gcdx.
- ****)
+****)
 
 Require Import Benchmarks.vs.
+
+(****** works, quickly **************)
+Time Quote Recursively Definition p_myMain := vs.myMain.
+Time Definition P_myMain :=
+  Eval vm_compute in (L3.compile.program_Program p_myMain).
+Definition P_env_myMain := env P_myMain.
+Definition P_main_myMain := AstCommon.main P_myMain.
+Time Definition eval_myMain :=
+  Eval vm_compute in (wcbvEval P_env_myMain 4000 P_main_myMain).
+Set Printing Width 80.
+Print eval_myMain.
+
 
 (*****  this works ****
 Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
@@ -570,6 +590,7 @@ Time Definition eval_ce_example_ent :=
   Eval vm_compute in
     (wcbvEval P_env_ce_example_ent 4000 P_main_ce_example_ent).
 Print eval_ce_example_ent.
+ ******************)
 
 (****  this works  ***
 Time Quote Recursively Definition p_ce_example_myfail := vs.ce_example_myfail.

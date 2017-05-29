@@ -31,14 +31,6 @@ Time Definition eval_ce_example_myent :=
   Eval vm_compute in
     (wcbvEval P_env_ce_example_myent 4000 P_main_ce_example_myent).
 Print eval_ce_example_myent.
-Require Import Ascii String ExtrOcamlString.
-Require Import extraction.ExtrOcamlNatInt.
-Extract Inductive bool => "bool" [ "true" "false" ].
-Extract Inductive sumbool => "bool" [ "true" "false" ].
-Extract Inductive list => "list" [ "[]" "(::)" ].
-Definition cee :=
- (wcbvEval P_env_ce_example_myent 6000 P_main_ce_example_myent).
-Extraction "ce_example_myent" cee.
 **********************)
 
 
@@ -200,13 +192,14 @@ Fixpoint loop (n:nat) (a:Acc n) {struct a} : nat :=
   end.
 Axiom Acc0Ax : Acc 0.
 Eval vm_compute in (@loop (O + 0)).
-Eval vm_compute in  (@loop (O + 0) Acc0Ax).   (** Coq does not loop **)
+Eval vm_compute in (@loop (O + 0) Acc0Ax).   (** Coq does not loop **)
+Extraction "loop" loop.
 
 Quote Recursively Definition p_loop0 := (@loop (O + 0) Acc0Ax).
 Definition P_loop0 := Eval vm_compute in (program_Program p_loop0).
 Definition P_env := Eval vm_compute in (env P_loop0).
 Definition P_main := Eval vm_compute in (main P_loop0).
-Eval vm_compute in wcbvEval P_env 1000 P_main.
+Eval vm_compute in wcbvEval P_env 100 P_main.
 
 
 (** axioms in arguments to a data constructor **)

@@ -233,24 +233,24 @@ Function wcbvEval
         | TCast t =>
           match wcbvEval n t with
             | Ret et => Ret et
-            | Exc s => raise ("wcbvEval: TCast: " ++ s)
+            | Exc s => raise ("wcbvEval, TCast: " ++ s)
           end
         | TProof t =>
           match wcbvEval n t with
             | Ret et => Ret et
-            | Exc s => raise ("wcbvEval: TProof: " ++ s)
+            | Exc s => raise ("wcbvEval, TProof: " ++ s)
           end
         | TApp fn a1 args =>
           match wcbvEval n fn with
-            | Exc s => raise ("wcbvEval TApp: fn doesn't eval: " ++ s)
+            | Exc s => raise ("wcbvEval, TApp: fn: " ++ s)
             | Ret (TLambda _ bod) =>
               match wcbvEval n a1 with
-                | Exc s =>  raise ("wcbvEval TApp: arg doesn't eval: " ++ s)
+                | Exc s =>  raise ("wcbvEval, TAppLam, arg: " ++ s)
                 | Ret b1 => wcbvEval n (whBetaStep bod b1 args)
               end
             | Ret (TFix dts m) =>           (* Fix redex *)
               match dnthBody m dts with
-                | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
+                | None => raise ("wcbvEval, TAppFix, dnthBody: ")
                 | Some (x, ix) =>
                   match wcbvEvals n (tcons a1 args) with
                     | Ret (tcons arg' args') =>
@@ -259,18 +259,19 @@ Function wcbvEval
                           wcbvEval n (pre_whFixStep x dts (tcons arg' args'))
                         | right _ _ =>  ret (TApp (TFix dts m) arg' args')
                       end
-                    | _ => raise ("wcbvEval TAppFix: args don't eval")
+                    | Ret tnil => raise ("wcbvEval TAppFix: impossible ")
+                    | Exc s => raise ("wcbvEval TAppFix, args: " ++ s)
                   end
               end
             | Ret Fn =>              (* no redex; congruence rule *)
               match wcbvEvals n (tcons a1 args) with
-                | Exc s => raise ("wcbvEval TApp: args don't eval: " ++ s)
+                | Exc s => raise ("wcbvEval, TAppCong, args: " ++ s)
                 | Ret ergs => ret (mkApp Fn ergs)
               end
           end
         | TCase ml mch brs =>
           match wcbvEval n mch with
-          | Exc str => Exc str
+          | Exc str => raise ("wcbvEval, TCase, mch: " ++  str)
           | Ret emch =>
             match canonicalP emch with
             | None => Ret (TCase ml emch brs)
@@ -283,12 +284,12 @@ Function wcbvEval
         | TLetIn nm df bod =>
           match wcbvEval n df with
             | Ret df' => wcbvEval n (instantiate df' 0 bod)
-            | Exc s => raise ("wcbvEval: TLetIn: " ++ s)
+            | Exc s => raise ("wcbvEval, TLetIn, def: " ++ s)
           end
         | TConstruct i cn args =>
           match wcbvEvals n args with
             | Ret args' => ret (TConstruct i cn args')
-            | Exc s => raise ("wcbvEval: TConstruct: " ++ s)
+            | Exc s => raise ("wcbvEval, TConstruct, args: " ++ s)
           end
         (** already in whnf ***)
         | TAx => ret TAx
@@ -308,8 +309,8 @@ with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
                      | tcons s ss =>
                        match wcbvEval n s, wcbvEvals n ss with
                          | Ret es, Ret ess => ret (tcons es ess)
-                         | Exc s, _ => raise s
-                         | Ret _, Exc s => raise s
+                         | Exc s, _ => raise ("wcbvEvals, hd: " ++ s)
+                         | Ret _, Exc s => raise ("wcbvEvals, tl: " ++ s)
                        end
                    end
         end).

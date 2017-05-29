@@ -263,7 +263,7 @@ intros. exists i, n, np, na. reflexivity.
 Qed.
 Hint Resolve IsConstruct.
 
-Lemma isConstruct_dec: forall t, isConstruct t \/ ~ isConstruct t.
+Lemma isConstruct_dec: forall t, {isConstruct t}+{~ isConstruct t}.
 Proof.
   destruct t;
   try (right; intros h; destruct h as [x0 [x1 [x2 [x3 j]]]]; discriminate).
@@ -285,9 +285,9 @@ Proof.
     + left. constructor. assumption.
     + right. intros h. inversion_clear h. contradiction.
   - destruct (isConstruct_dec t1).
-    + left. unfold isConstruct in H. destruct H as [x0 [x1 [x2 [x3 j]]]].
+    + left. destruct i as [x0 [x1 [x2 [x3 j]]]].
       subst. constructor.
-    + right. intros h. inversion_Clear h. elim H. auto.
+    + right. intros h. inversion_Clear h. elim n. auto.
   - left. constructor.
 Qed.
      

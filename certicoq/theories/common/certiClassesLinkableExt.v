@@ -141,6 +141,9 @@ We have svArg <= iArg  and svArg <= dvArg, but we dont have iArg <= dvArg, or 10
 
 Note that, by design, dvArg is not the translation svArg. We wanted the app arg to 
 be arbitrary and come from arbitrary compilers or by hand.
+
+If we had used obsEq instead of obsLe, this would be provable. We can use symmetry on
+(OPsi m) and then use transitivity.
 *)
 Abort.
 End Nn.

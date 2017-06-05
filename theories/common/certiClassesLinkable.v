@@ -138,7 +138,6 @@ Class CerticoqLinkableTranslationCorrect {Src Dst : Type}
   `{CerticoqLinkableLanguage Src} 
   `{CerticoqLinkableLanguage Dst}
   `{CerticoqTranslation Src Dst}
-   `{BigStepOpSem Src} `{BigStepOpSem Dst} 
   := 
 {
   certiGoodPresLink : goodPreserving Src Dst;
@@ -147,7 +146,7 @@ Class CerticoqLinkableTranslationCorrect {Src Dst : Type}
 
 
 Global Arguments CerticoqLinkableTranslationCorrect
-  {Src} {Dst} {H} {H0} {H1} {H2} {H3}  H4 {H5} {H6} {H7} {H8} {H9} H10 {H11} {H12} {H13}.
+  {Src} {Dst} {H} {H0} {H1} {H2} {H3}  H4 {H5} {H6} {H7} {H8} {H9} H10 {H11}.
 
 Notation "s ⊑ t" := (compObsLeLink _ _ s t) (at level 65).
 

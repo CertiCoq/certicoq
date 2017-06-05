@@ -60,7 +60,6 @@ Class CerticoqTranslationCorrect {Src Dst : Type}
   `{CerticoqLanguage Src} 
   `{CerticoqLanguage Dst}
   `{CerticoqTranslation Src Dst}
-   `{BigStepOpSem Src} `{BigStepOpSem Dst} 
   := 
 {
   certiGoodPres : goodPreserving Src Dst;
@@ -69,7 +68,7 @@ Class CerticoqTranslationCorrect {Src Dst : Type}
 
 
 Global Arguments CerticoqTranslationCorrect
-  {Src} {Dst} {H} {H0} {H1} {H2} H3  {H4} {H5} {H6} {H7} H8 {H9} {H10} {H11}.
+  {Src} {Dst} {H} {H0} {H1} {H2} H3  {H4} {H5} {H6} {H7} H8 {H9}.
 
 Notation "s ⊑ t" := (compObsLe _ _ s t) (at level 65).
 

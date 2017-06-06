@@ -102,11 +102,29 @@ Notation wf_environ := crctEnv.
   + closure w.r.t environment and correcness of annotations
   of cases.
 *)
+
+
+Inductive match_annot : list Cnstr -> Brs -> Prop :=
+| match_annot_nil : match_annot [] bnil
+| match_annot_cons t args c cnstrs ds :
+    c.(CnstrArity) = args ->
+    match_annot cnstrs ds ->
+    match_annot (c :: cnstrs) (bcons args t ds).
+         
+Definition crctAnn (e : environ Term) ann brs :=
+  let 'mkInd nm tndx := ann in
+  exists pack ityp,
+    LookupTyp nm e 0 pack /\
+    getInd pack tndx = Ret ityp /\
+    match_annot ityp.(itypCnstrs) brs.
+
+
 Lemma Crct_invrt_Case e n ann mch brs :
   Crct e n (TCase ann mch brs) ->
   Crct e n mch /\ crctBs e n brs /\
   (forall i t, bnth i brs = Some t -> Crct e n (fst t)
-                                /\ is_n_lambda (snd t) (fst t) = true).
+                                /\ is_n_lambda (snd t) (fst t) = true) /\
+  crctAnn e ann brs.
 Admitted.
   
 Lemma wcbeval_preserves_wf e t t' :
@@ -132,25 +150,20 @@ Proof.
   + intros [=].
 Admitted.
 
-Lemma wftrm_construct {e : environ Term} {i n args} : wf_environ e ->
-  L3t.WFTrm (TConstruct i n args) 0 ->
+Lemma crct_construct {e : environ Term} {i n args} : wf_environ e ->
+  crctTerm e 0 (TConstruct i n args) ->
   cnstrArity e i n = Ret (0%nat, tlength args).
-Proof. intros. inv H. Admitted.
+Proof. intros. inv H0. Admitted.
 
-Lemma wcbeval_values e mch ind n args : wf_environ e -> Crct e 0 mch ->
-                                        L3eval.WcbvEval e mch (TConstruct ind n args) ->
-                                        L3eval.no_Wcbvs_step e args.
+(* End of L3 requirements *)
+
+Lemma LookupDfn_pres_Crct:
+  forall p n t, crctTerm p n t ->
+                forall nm u, LookupDfn nm p u -> crctTerm p 0 u.
 Proof.
   intros.
-  dependent induction H1.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
-(* End of L3 requirements *)
+  apply Crct_CrctEnv in H. apply Crct_LookupDfn_Crct in H0; auto.
+Qed.
 
 Inductive LookupEnv : string -> env -> exp -> Prop :=
   LHit : forall (s : string) (p : list (string * exp)) (t : exp),
@@ -799,37 +812,55 @@ Lemma WFTerm_exp_wf e e' :
          exp_wf (N.of_nat (n + List.length e')) (trans e' (N.of_nat n) t).
 Proof. apply WFTerm_exp_wf_ind. Qed.
 
+Lemma crctEnv_ind : forall P : forall e : environ Term, crctEnv e -> Prop,
+    P [] ceNil ->
+    (forall (nm : string) (s : Term) (p : environ Term) (f0 : fresh nm p) (c : Crct p 0 s),
+        let wf := proj1 Crct_CrctEnv p 0%nat s c in
+        P p wf ->
+        P ((nm, ecTrm s) :: p) (ceTrmCons f0 c)) ->
+    (forall (nm : string) (m : nat) (s : itypPack) (p : environ Term) (c : wf_environ p),
+        P p c -> forall f1 : fresh nm p, P ((nm, ecTyp Term m s) :: p) (ceTypCons m s c f1)) ->
+    forall (e : environ Term) (c : wf_environ e), P e c.
+Proof.
+  intros. induction e.
+  dependent inversion c. auto. 
+
+  destruct a. destruct e0.
+  inversion_clear c.
+  dependent inversion c. apply H0.
+  apply IHe.
+
+  dependent inversion c.
+  apply H1. apply IHe.
+Qed.
+
 Lemma wf_pre_environ_pres_fresh e :
   wf_environ e -> forall s, fresh s e ->
   not (exists t, LookupEnv s (translate_env e) t).
 Proof.
   intros Hwf.
-(*
-  induction Hwf; simpl; intros; auto.
-  - inv H. intro Ht. destruct Ht. inv H.
-  - inv H1. intro Ht. 
+
+  induction Hwf using crctEnv_ind; simpl.
+  - intros s Hs Ht; auto. inv Hs. destruct Ht. inv H.
+  - intros s' Hs Ht. inv Hs. 
     destruct Ht as [t'' Ht'].
-    inv Ht'. apply H6; reflexivity.
-    apply (IHHwf _ H4). exists t''; eauto.
-  - eapply IHHwf.
-    now inv H0.
+    inv Ht'. apply H3; reflexivity.
+    apply (IHHwf _ H1). exists t''; eauto.
+  - intros s' Hs Ht. inv Hs. eapply IHHwf. apply H1. apply Ht.
 Qed.
- *)
-Admitted. (* Change in wf_environ not giving the right IH for ecTrm *)
   
 Lemma wf_environ_pre e : wf_environ e -> wf_tr_pre_environ (translate_env e).
 Proof.
-(*  induction 1.
+ induction 1 using crctEnv_ind.
   - constructor.
   - simpl. constructor; auto.
     unfold translate.
-    destruct (WFTerm_exp_wf_ind' p H IHcrctEnv).
-    apply (H2 s 0%nat). eauto.
+    destruct (WFTerm_exp_wf_ind' p wf IHcrctEnv).
+    apply (H s 0%nat). eauto.
     now apply wf_pre_environ_pres_fresh.
   - now simpl.
 Qed.
- *)
-Admitted. (* Same change *)
+
 (** Translation respects shifting (only applied to initially closed [a]'s) *)
 
 Lemma trans_shift e a n k : WFTrm a (N.to_nat k) ->
@@ -905,7 +936,7 @@ Proof.
     destruct (strip_lam _ (trans _ _ _)) eqn:striptrans.
     simpl. intros Hl. forward Hl. destruct Hl as [Hl He0]; subst.
     equaln. 
-    (* WF condition on matches *)
+    (* is_n_lam WF condition on matches *)
     admit.
   
 Admitted.    
@@ -1036,7 +1067,7 @@ Proof.
     simpl. intros Hl. forward Hl.
     destruct Hl as [Hl He0]; subst.
     f_equal. 
-    (* Well-formedness of matches *)
+    (* Well-formedness of matches: is_n_lam *)
     admit.
 
   - intros n t IHt n0 ds IHds k k' wft kk'. inv wft.
@@ -1087,15 +1118,6 @@ Proof.
   
   - erewrite eval_env_offset; eauto.
 Qed.
-(*   - destruct (H0 n).  *)
-(*     destruct i as [ind args]. *)
-(*     f_equal. apply H2. *)
-(*   - f_equal. apply H. *)
-(*   - split; auto. *)
-(*   - destruct (H0 k). split; auto. f_equal; auto. *)
-(*     intros. destruct (strip_lam n0 (trans e' k t)). *)
-(*     f_equal; auto. *)
-(* Qed. *)
 
 Lemma translate_env_eval e e' t : eval_env e e' -> translate e t = translate e' t.
 Proof. intros H; apply (trans_env_eval e e' H). Qed.
@@ -1105,56 +1127,54 @@ Proof. intros H; apply (trans_env_eval e e' H). Qed.
 Lemma wf_environ_pres_dfn e e' :
   wf_environ e -> eval_env (translate_env e) e' ->
   forall s t, LookupDfn s e t -> exists t', LookupEnv s e' t'.
-(* Proof. *)
-(*   intros Hwf. *)
-(*   revert e'; induction Hwf; simpl; intros; auto. *)
-(*   - inv H0. *)
-(*   - inv H1. *)
-(*     specialize (IHHwf _ H7). *)
-(*     inv H2. *)
-(*     exists t'. constructor. *)
-(*     destruct (IHHwf s0 t). *)
-(*     apply H10. *)
-(*     exists x. constructor 2; eauto. *)
-(*   - inv H1. *)
-(*     eapply IHHwf; eauto. *)
-(* Qed. *)
-Admitted.
+Proof.
+  intros Hwf.
+  revert e'; induction Hwf using crctEnv_ind; simpl; intros; auto.
+  - inv H0.
+  - inv H.
+    specialize (IHHwf _ H5).
+    inv H0.
+    exists t'. constructor.
+    destruct (IHHwf s0 t).
+    apply H8.
+    exists x. constructor 2; eauto.
+  - inv H0.
+    eapply IHHwf; eauto.
+Qed.
+
 Lemma wf_environ_pres_fresh e e' :
   wf_environ e -> eval_env (translate_env e) e' ->
   forall s, fresh s e -> not (exists t, LookupEnv s e' t).
-(* Proof. *)
-(*   intros Hwf. *)
-(*   revert e'; induction Hwf; simpl; intros; auto. *)
-(*   - inv H. intro Ht. destruct Ht. inv H. *)
-(*   - inv H1. intro Ht.  *)
-(*     destruct Ht as [t'' Ht']. *)
-(*     inv Ht'. inv H2. apply H6; reflexivity. *)
-(*     inv H2. *)
-(*     specialize (IHHwf _ H7 s0 H4). *)
-(*     apply IHHwf. exists t''; eauto. *)
-(*   - eapply IHHwf. eauto. *)
-(*     now inv H1. *)
-(* Qed. *)
-Admitted.
+Proof.
+  intros Hwf.
+  revert e'; induction Hwf using crctEnv_ind; simpl; intros; auto.
+  - inv H. intro Ht. destruct Ht. inv H.
+  - inv H0. intro Ht.
+    destruct Ht as [t'' Ht'].
+    inv Ht'. inv H. apply H5; reflexivity.
+    inv H.
+    specialize (IHHwf _ H6 s0 H3).
+    apply IHHwf. exists t''; eauto.
+  - eapply IHHwf. eauto.
+    now inv H0.
+Qed.
 
 Lemma wf_environ_tr e e' :
   wf_environ e -> eval_env (translate_env e) e' -> wf_tr_environ e'.
-(* Proof. *)
-(*   intros Hwf; revert e'; induction Hwf. *)
-(*   - intros e' H; inv H. constructor. *)
-(*   - simpl; intros e' H'; inv H'. specialize (IHHwf _ H5). *)
-(*     constructor; auto. *)
-(*     pose (WFTerm_exp_wf _ _ Hwf H5 IHHwf _ _ (proj1 Crct_WFTrm _ _ _ H0)). *)
-(*     simpl in e. *)
-(*     rewrite (translate_env_eval _ _ _ H5) in H6. *)
-(*     apply (exp_wf_subst e'0 0) in e; auto. *)
-(*     now apply (eval_preserves_wf _ _ H6). *)
-(*     eapply eval_yields_value; now eauto. *)
-(*     eapply wf_environ_pres_fresh; eauto. *)
-(*   - intros. simpl in H. eauto. *)
-(* Qed. *)
-Admitted.
+Proof.
+  intros Hwf; revert e'; induction Hwf using crctEnv_ind. 
+  - intros e' H; inv H. constructor.
+  - simpl; intros e' H'; inv H'. specialize (IHHwf _ H3).
+    constructor; auto.
+    pose (WFTerm_exp_wf p _ wf H3 IHHwf _ _ (proj1 Crct_WFTrm _ _ _ c)).
+    simpl in e.
+    rewrite (translate_env_eval _ _ _ H3) in H4.
+    apply (exp_wf_subst e'0 0) in e; auto.
+    now apply (eval_preserves_wf _ _ H4).
+    eapply eval_yields_value; now eauto.
+    eapply wf_environ_pres_fresh; eauto.
+  - intros. simpl in H. eauto.
+Qed.
 
 (** Evaluated environments are closed *)
 
@@ -2221,11 +2241,19 @@ Proof.
   rewrite H0. inv H. eauto.
 Qed.
 
-Lemma LookupDfn_pres_Crct:
-  forall p n t, crctTerm p n t ->
-                forall nm u, LookupDfn nm p u -> crctTerm p 0 u.
+Lemma match_annot_brs ityp brs n itp t :
+  match_annot (itypCnstrs ityp) brs ->
+  getCnstr ityp n = Ret itp ->
+  bnth n brs = Some t -> snd t = CnstrArity itp.
 Proof.
-Admitted.
+  destruct ityp. simpl. intros Hm. revert t itp n.
+  unfold getCnstr. simpl.
+  induction Hm; simpl; intros; try discriminate.
+  destruct n. injection H0. intros ->.
+  injection H1. destruct t0.  intros [= -> ->].
+  simpl. auto with arith.
+  eapply IHHm. eauto. eauto.
+Qed.
 
 Theorem translate_correct_subst (e : environ Term) (t t' : Term) :
   wf_environ e -> Crct e 0 t ->
@@ -2485,19 +2513,25 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     assert (i = j) by admit. (* Missing check in wcbveval *)
     subst i.
     assert(Hwf:=proj1 Crct_WFTrm _ _ _ Hcrct).
-    eapply Crct_invrt_Case in Hcrct as (Hmch&Hbrs&Hbr).
-    assert (Har:WFTrm (TConstruct j n (* arty *) args) 0).
-    inv Hwf.
-    eapply wcbeval_preserves_wf; eauto.
-    apply (wftrm_construct wfe) in Har.
+    eapply Crct_invrt_Case in Hcrct as (Hmch&Hbrs&Hbr&Hann).
+    assert (Har:crctTerm e 0 (TConstruct j n (* arty *) args)).
+    eapply wcbeval_preserves_Crct; eauto.
+    apply (crct_construct wfe) in Har.
     specialize (IHmch Hmch).
     unfold subst_env in *; rewrite subst_env_aux_match.
     unfold L3.term.whCaseStep in Hcasestep.
     case_eq (bnth n brs); [intros t H | intros H];
       rewrite H in Hcasestep; try easy.
     assert(Hargsdef:tlength args = snd t).
-    (* Well-formedness of case *)
-    admit.
+    { unfold cnstrArity in Har. unfold crctAnn in Hann.
+      destruct j. destruct Hann as [pack [ityp [Htyp [Hind Hann]]]].
+      destruct Htyp as [Htyp Hnnil]. apply Lookup_lookup in Htyp.
+      unfold lookupTyp in Har. rewrite Htyp in Har. destruct pack; try discriminate.
+      rewrite Hind in Har.
+      revert Har. case_eq (getCnstr ityp n). intros ; discriminate.
+      intros.
+      rewrite (match_annot_brs ityp brs n c t Hann H0 H).
+      now injection Har. }
 
     econstructor.
     rewrite subst_env_aux_con_e in IHmch. apply IHmch.
@@ -2523,7 +2557,11 @@ Ind Case or Wrong. How can we prove it isn't?? *)
       lia.
     - apply exp_wf_subst_aux; auto. eapply (WFTerm_exp_wf e e'' wfe evenv wfe'' dbody 0).
       now apply Crct_WFTrm in Hbr.
-    - admit. (* WF proof *)
+    - eapply wcbeval_preserves_Crct in evmch; eauto.
+      rewrite exps_skipn0.
+      destruct j. eapply Crct_invrt_Construct in evmch as [crctArgs _].
+      (* eapply (proj1 (proj2 subst_preserves_wf')). *)
+      admit. (* TODO wf proof *)
     - rewrite exps_skipn0.
       admit. (* Wcbveval produces values ! *)
     - apply (is_n_lambda_is_n_lam _ e'' 0) in Hwf'. 
@@ -2550,6 +2588,7 @@ Ind Case or Wrong. How can we prove it isn't?? *)
 
   (** Generalized goal *)
   + tauto.
+    
 Admitted.
 
 Lemma WcbvEval_env_eval_env e e' :

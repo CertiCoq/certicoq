@@ -550,12 +550,6 @@ Proof.
 Qed.
 End SameCompiler.
 
-Section DiffCompiler.
-(** Now suppose, we use DIFFERENT compiler to compile [td]. First, we
-list the needed properties for the other compiler [comp2] *)
-
-
-
 Definition appArgCongr : Prop :=
   forall (ff tt1 tt2: Dst),
     (* consider adding this:  goodTerm ff -> , which will need ⇓ to be goodpreserving*)
@@ -563,6 +557,10 @@ Definition appArgCongr : Prop :=
     -> goodTerm tt2
     -> leObsId tt1 tt2
     -> leObsId (mkApp ff tt1) (mkApp ff tt2).
+
+Section ManualTargetArgTargetRel.
+(** Now suppose, we use DIFFERENT compiler to compile [td]. First, we
+list the needed properties for the other compiler [comp2] *)
 
 Hypothesis mkAppCongrLe : appArgCongr.
 
@@ -586,7 +584,6 @@ Proof using.
   (* need goodTerm *)
 Abort.
 
-Notation "s ⊑ t" := (@compObsLeLink _ _ _ _ _ _ _ _ _ comp1  _ _ s t) (at level 65).
 Hypothesis compilet :  (@translate Src Dst comp1 t) = Ret td.
 (** Suppose that instead of td, we wish to use another term td', which we produced manually
 or by magic. We also proved that it is a good term and is greater than td *)
@@ -625,5 +622,63 @@ Proof.
   Unshelve. assumption.
 Qed.
 
-End DiffCompiler.
+End ManualTargetArgTargetRel.
+
+(** 
+Similar to the above section, except that the manually produced target argument [td']
+has to be proved to be related to the corresponding [Src] term [t] instead of the
+compilation result [td]. This was requested by Andrew Appel.
+*)
+Section ManualTargetArgSrcRel.
+
+  (** In this section, this is all we know about [td]. We dont anymore have the hypothesis
+  that [td] was obtained from compiling [t] *)
+  Hypothesis argRelated :  t ⊑ td.
+  Hypothesis tdGood :  goodTerm td.
+
+  Hypothesis mkAppCongrLe : appArgCongr.
+
+Corollary fdtdCorrectDiff {dd : deterministicBigStep Dst}
+  : goodTerm f -> goodTerm t -> mkApp fv t  ⊑ mkApp fdv td.
+Proof.
+  intros Hgf Hgt.
+  destruct Ht1.
+  specialize (obsePresLink0 f Hgf).
+  rewrite compilef in obsePresLink0. simpl in *.
+  invertsn obsePresLink0.
+  invertsn obsePresLink0.
+  specialize (obsePresLink0 fv fcomputes).
+  exrepnd. clear obsePresLink2 obsePresLink3.
+  unfold deterministicBigStep in dd.
+  apply dd with (v2:= fdv) in obsePresLink0;[ subst | assumption].
+  specialize (obsePresLink1 flam t Hgt).
+  pose proof certiGoodPresLink0 as Hgpb.
+  specialize (certiGoodPresLink0 t Hgt).
+  destruct Ht1.
+  specialize (obsePresLink0 t Hgt).
+  destruct (@translate Src Dst comp1 t) as [| tdc]; try contradiction.
+  simpl in *.
+  invertsna obsePresLink1 Hinvf.
+  invertsna obsePresLink0 Hinvt.
+  (** 
+   [Hinvf] is what we get from using the correctness property of the compiler, instantiated
+   for the function [f]. We have to somehow replace [tdc] by [td] there. 
+   Recall that [tdc] is the result of compiling [td]. 
+
+   The only way to use [mkAppCongr], which is congruence in [Dst],
+   is to show that [tdc ⊑ td].
+   We may, however, choose to have a different assumption instead of [mkAppCongr].
+ *)
+  
+  eapply compObsLeLinkRespectsLe; [reflexivity | apply (mkAppCongrLe _ tdc _) | ]; auto.
+
+(** 
+This goal seems unprovable. We have both [t ⊑ tdc] and [t ⊑ td].
+That says nothing about the ordering between [tdc] and [td]. 
+*)
+  
+Abort.
+
+End ManualTargetArgSrcRel.
+
 End LinkingIllustration.

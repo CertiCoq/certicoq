@@ -214,15 +214,34 @@ Proof.
   destruct (mkApp_isApp_lem fn' x0 x1) as [y0 [y1 [y2 jy]]].
   destruct jy. rewrite H1. intros k. destruct k as [z0 jz]. discriminate.
 Qed.
-  
+
+Definition ii := TLambda nAnon (TRel 0).
+Goal
+  WcbvEval nil (TApp ii ii (tcons ii (tunit ii))) ii.
+Proof.
+  eapply wAppLam.
+  - unfold ii. eapply wLam.
+  - unfold ii. eapply wLam.
+  - cbn. eapply wAppLam.
+    + eapply wLam.
+    + unfold ii. eapply wLam.
+    + cbn. eapply wAppLam.
+      * eapply wLam.
+      * unfold ii. eapply wLam.
+      * cbn. eapply wLam.
+Qed.
+
+      
 (*****
-Lemma wcbvEval_no_further:
+Lemma WcbvEval_no_further:
   forall p,
   (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
   (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss).
 Proof.
   intros p.
   apply WcbvEvalEvals_ind; cbn; intros; auto.
+  destruct (WcbvEvals_tcons_tcons w0) as [x0 [x1 jx]]. subst.
+  rewrite mkApp_goodFn.
   destruct (WcbvEvals_tcons_tcons w0) as [x0 [x1 jx]]. subst.
   destruct (mkApp_isApp_lem fn' x0 x1) as [y0 [y1 [y2 jy]]].
   destruct jy. rewrite H1. destruct H2.

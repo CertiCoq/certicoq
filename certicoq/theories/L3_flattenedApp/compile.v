@@ -167,6 +167,15 @@ Proof.
   induction ts; intros. reflexivity.
   - cbn. rewrite IHts. rewrite tappend_pres_tlength. cbn. omega.
 Qed.
+
+Lemma tcons_has_last:
+  forall ts t, exists us u, tcons t ts = tappend us (tunit u).
+Proof.
+  induction ts; intros; cbn.
+  - exists tnil, t. reflexivity.
+  - destruct (IHts t) as [x0 [x1 jx]]. rewrite jx.
+    exists (tcons t0 x0), x1. cbn. reflexivity.
+Qed.
   
 Function tfirsts_tlast (t:Term) (ts:Terms) : Terms * Term :=
   match ts with

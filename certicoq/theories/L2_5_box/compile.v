@@ -159,7 +159,7 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
         | right _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
       end
     | L2k.compile.TFix defs m => TFix (L2kDefs_Defs defs) m
-    | L2k.compile.TAx => TWrong
+    | L2k.compile.TAx _ => TWrong
     | L2k.compile.TWrong => TWrong
   end
 with L2kTerms_Terms (ts:L2kTerms) : Terms :=

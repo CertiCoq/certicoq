@@ -67,7 +67,7 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
     Crct p n (TApp fn a args)
 | CrctConst: forall n p pd nm,
     Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
-| CrctAx: forall n p, Crct p n prop -> Crct p n TAx
+| CrctAx: forall n p t, Crct p n prop -> Crct p n (TAx t)
 | CrctConstruct: forall n p ipkgNm inum cnum ipkg itp cstr m np na,
     Crct p n prop ->
     LookupTyp ipkgNm p m ipkg ->

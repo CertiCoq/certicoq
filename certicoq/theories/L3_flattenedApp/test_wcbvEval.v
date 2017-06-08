@@ -530,6 +530,27 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+Function Gcd (a b : nat) {wf lt a} : nat :=
+match a with
+ | O => b 
+ | S k => Gcd (b mod S k) (S k)
+end.
+Admitted.
+Set Printing Width 100.
+Print Assumptions Gcd.
+Definition Gcd42 := Gcd 4 2.
+Compute Gcd42.
+Print Gcd_terminate.
+Extraction "Gcd42" Gcd42.
+Time Quote Recursively Definition pGcd42 := Gcd42.
+Time Definition PGcd42 :=
+  Eval vm_compute in (L2k.compile.program_Program pGcd42).
+Time Definition Penv_Gcd42 := env PGcd42.
+Time Definition Pmain_Gcd42 := main PGcd42.
+Time Definition ans_Gcd42 :=
+ Eval vm_compute in (wcbvEval Penv_Gcd42 1000 Pmain_Gcd42).
+Print ans_Gcd42.
+
 (** well founded definition **)
 Function Gcd (a b : nat) {wf lt a} : nat :=
 match a with

@@ -77,7 +77,7 @@ Fixpoint print_term (t:Term) : string :=
     | TApp fn arg args =>
       "(" ++ (print_term fn) ++ " @ " ++ (print_term arg) ++ " _ " ++ ")"
     | TConst s => "[" ++ s ++ "]"
-    | TAx => " TAx "
+    | TAx _ => " TAx "
     | TConstruct i n _ =>
       "(CSTR " ++ (print_ind i) ++ " " ++ (nat_to_string n) ++ ")"
     | TCase i mch _ =>
@@ -111,7 +111,8 @@ Proof.
   - induction t2; cross.
     destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
   - induction t; cross. destruct (string_dec s s0); [lft | rght].
-  - destruct t; cross. lft.
+  - destruct t; cross.
+    destruct (proj1 L2.term.TermTerms_dec l l0); [lft | rght ..]. 
   - induction t0; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n0); destruct (H t0);
       [lft | rght .. ].
@@ -810,7 +811,7 @@ Proof.
       * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists TAx, arg, tnil. split. reflexivity.
+  - exists (TAx l), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TConstruct i n t), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
@@ -881,7 +882,7 @@ Inductive WFapp: Term -> Prop :=
            ~ (isApp fn) -> WFapp fn -> WFapp t -> WFapps ts ->
            WFapp (TApp fn t ts)
 | wfaConst: forall nm, WFapp (TConst nm)
-| wfaAx: WFapp TAx
+| wfaAx: forall t, WFapp (TAx t)
 | wfaConstruct: forall i m1 args, WFapps args -> WFapp (TConstruct i m1 args)
 | wfaCase: forall m mch brs,
             WFapp mch -> WFappBs brs -> WFapp (TCase m mch brs)
@@ -1163,7 +1164,7 @@ Inductive WFTrm: Term -> nat -> Prop :=
            ~ (isApp fn) -> WFTrm fn n -> WFTrm t n -> WFTrms ts n ->
            WFTrm (TApp fn t ts) n
 | wfConst: forall n nm, WFTrm (TConst nm) n
-| wfAx: forall n, WFTrm TAx n
+| wfAx: forall n t, WFTrm (TAx t) n
 | wfConstruct: forall n i m args,
                  WFTrms args n -> WFTrm (TConstruct i m args) n
 | wfCase: forall n m mch brs,
@@ -1318,7 +1319,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
        Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
        Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
-| IAx: forall n, Instantiate n TAx TAx
+| IAx: forall n t, Instantiate n (TAx t) (TAx t)
 | IConstruct: forall n ind m1 args iargs,
                 Instantiates n args iargs ->
                 Instantiate n (TConstruct ind m1 args)

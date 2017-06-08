@@ -641,18 +641,13 @@ Proof.
     + rewrite <- (proj1 instantiate_hom). assumption.
   - cbn. eapply wAppFix.
     + eapply H.
-    + apply H0.
     + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite tlength_hom. assumption.
-    + rewrite <- pre_whFixStep_hom in H1. eapply H1.
+    + rewrite <- pre_whFixStep_hom in H0. eapply H0.
   - destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]]. rewrite j in H0.
     cbn. rewrite mkApp_hom. eapply wAppCong. try eassumption.
     + intros h. elim n. apply isLambda_hom. assumption.
     + intros h. elim n0. apply isFix_hom. assumption.
     + rewrite j. cbn in H0. assumption.
-  - cbn. eapply wAppFixCong1; try eassumption.
-    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite tlength_hom. assumption. 
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.

@@ -385,7 +385,7 @@ Proof.
   - exact lt_wf.
 Defined.
 
-(***)
+(*** out of space ****
 Definition Gcdx := (Gcd 4 2).
 Eval cbv in Gcdx.
 Time Quote Recursively Definition pGcdx := Gcdx.
@@ -721,3 +721,16 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+Require Import Benchmarks.vs.
+
+(****** runs out of space **************)
+Time Quote Recursively Definition p_myMain := vs.myMain.
+Time Definition P_myMain :=
+  Eval vm_compute in (L2.compile.program_Program p_myMain).
+Definition P_env_myMain := env P_myMain.
+Definition P_main_myMain := AstCommon.main P_myMain.
+Time Definition eval_myMain :=
+  Eval vm_compute in (wcbvEval P_env_myMain 4000 P_main_myMain).
+Set Printing Width 80.
+Print eval_myMain.
+************************)

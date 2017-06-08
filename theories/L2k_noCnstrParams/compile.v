@@ -30,7 +30,7 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
-| TAx        : Term
+| TAx        : L2Term -> Term
 (* constructors fully applied: eta expand and drop parameters *)
 | TConstruct : inductive -> nat (* index *) -> Terms -> Term
          (* use Defs to code branches in Case *)
@@ -344,10 +344,10 @@ Eval cbn in (etaExp_cnstr
 Function strip (t:L2Term) : Term :=
   match t with
     | L2.compile.TRel n => TRel n
-    | L2.compile.TSort s => TProof TAx
+    | L2.compile.TSort s => TProof (TAx (L2.compile.TSort s))
     | L2.compile.TProof t => TProof (strip t)
     | L2.compile.TCast t => TCast (strip t)
-    | L2.compile.TProd nm bod => TProof TAx
+    | L2.compile.TProd nm bod => TProof (TAx (L2.compile.TProd nm bod))
     | L2.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
     | L2.compile.TApp fn arg args =>
@@ -359,8 +359,8 @@ Function strip (t:L2Term) : Term :=
         | _ => TApp (strip fn) sarg sargs
       end
     | L2.compile.TConst nm => TConst nm
-    | L2.compile.TAx => TAx
-    | L2.compile.TInd i => TProof TAx
+    | L2.compile.TAx s => TAx (L2.compile.TConst s)
+    | L2.compile.TInd i => TProof (TAx (L2.compile.TInd i))
     | L2.compile.TConstruct i m npars nargs =>
       etaExp_cnstr i m npars nargs tnil
     | L2.compile.TCase (i,_) mch brs => TCase i (strip mch) (stripBs brs)

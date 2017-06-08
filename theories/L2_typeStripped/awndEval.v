@@ -42,7 +42,6 @@ Inductive awndEval : Term -> Term -> Prop :=
                (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          ix <= tlength args ->
           awndEval (TApp (TFix dts m) arg args)
                    (pre_whFixStep x dts (tcons arg args))
 | aCast: forall t, awndEval (TCast t) t

@@ -24,7 +24,7 @@ Variable p:environ Term.
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNAx: WNorm TAx
+| WNAx: forall t, WNorm (TAx t)
 | WNCase: forall mch n brs,
             WNorm mch -> ~ isCanonical mch ->
             WNorm (TCase n mch brs)
@@ -33,11 +33,6 @@ Inductive WNorm: Term -> Prop :=
            WNorm fn -> WNorm t -> WNorms ts ->
            ~ (isLambda fn) -> ~ (isFix fn) -> ~ isApp fn ->
            WNorm (TApp fn t ts)
-| WNAppFix: forall ds m t ts x ix,
-              WNorms (tcons t ts) ->
-              dnthBody m ds = Some (x, ix) ->
-              ix > tlength ts ->  (* too few args to see rec arg *)
-              WNorm (TApp (TFix ds m) t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).

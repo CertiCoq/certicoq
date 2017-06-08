@@ -26,7 +26,7 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNAx: WNorm TAx
+| WNAx: forall s, WNorm (TAx s)
 | WNCase: forall mch n brs,
             WNorm mch -> ~ isCanonical mch ->
             WNorm (TCase n mch brs)
@@ -37,11 +37,6 @@ Inductive WNorm: Term -> Prop :=
            WNorm fn -> WNorm t -> WNorms ts ->
            ~ (isLambda fn) -> ~ (isFix fn) -> ~ isApp fn ->
            WNorm (TApp fn t ts)
-| WNAppFix: forall ds m t ts x ix,
-              WNorms (tcons t ts) ->
-              dnthBody m ds = Some (x, ix) ->
-              ix > tlength ts ->  (* too few args to see rec arg *)
-              WNorm (TApp (TFix ds m) t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
@@ -148,13 +143,8 @@ Proof.
     eapply canonicalP_isCanonical. eassumption.
   - inversion_Clear h.
     + elim H6. auto.
-    + rewrite e in H4. myInjection H4. omega.
-  - inversion_Clear h.
-    + contradiction.
-    + elim H. constructor.
   - inversion_Clear h.
     + elim H. constructor; assumption.
-    + contradiction.
 Qed.
 
 Lemma wNorm_no_wndStep:

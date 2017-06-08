@@ -78,7 +78,6 @@ Proof.
     eapply sFix.
     + rewrite <- dnthBody_hom. rewrite <- optStripDnth_hom. rewrite e.
       reflexivity.
-    + rewrite tlength_hom. assumption. 
   - rewrite mkApp_hom. refine (sAppFn _ _ _). inversion_Clear H0.
     apply H. assumption.
     + rewrite TApp_hom in H1. rewrite mkApp_hom in H1.
@@ -180,7 +179,6 @@ Proof.
       rewrite pre_whFixStep_hom.
       exists (L1g.term.pre_whFixStep t y0 (L1g.compile.tcons x1 x2)).
       intuition. apply (L1g.wndEval.sFix p y0 m x1 x2 H ).
-      rewrite tlength_hom in l. assumption.
   - destruct (Cast_strip_inv _ H0) as [x0 [x1 [j0x j1x]]]. subst.
     exists x0. intuition.
   - destruct (Prf_strip_inv _ H0) as [x0 [j0 j1]]. subst.

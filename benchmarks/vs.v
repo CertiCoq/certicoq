@@ -1,5 +1,7 @@
 (* basic.v *)
 
+Require Import BinPos.
+
 Set Implicit Arguments.
 Unset Strict Implicit.
 
@@ -307,10 +309,6 @@ Proof.
  contradiction (H _ e).
 Qed.
 
-Lemma comp_eq: forall {A} (cmp: A -> A -> comparison) (cspec: CompSpec' cmp),
-   forall x y, Eq = cmp x y -> x=y.
-Proof.
-Admitted.
 
 Lemma comp_trans:  forall {A} (cmp: A -> A -> comparison) (cspec: CompSpec' cmp),
       forall x y z, Lt = cmp x y -> Lt = cmp y z -> Lt = cmp x z.
@@ -373,63 +371,7 @@ Fixpoint compare_list {A: Type} (f: A -> A -> comparison) (xl yl : list A)
   | nil , _ :: _ => Lt
   | _ :: _ , nil => Gt
   | nil, nil => Eq
-  end.
-
-Lemma list_cspec:
-  forall  {A} (cmp: A -> A -> comparison) (cmp_spec: CompSpec' cmp),
-    CompSpec' (compare_list cmp).
-Proof.
-Admitted.
-
-Hint Resolve @list_cspec.
- 
-Lemma comp_antisym:  forall {A} (cmp: A -> A -> comparison) (cspec: CompSpec' cmp),
-      forall x y, Lt = cmp x y <-> Gt = cmp y x.
-Admitted.
-
-Lemma NoDup_rsort_uniq:
-  forall {A} (cmp: A -> A -> comparison) (cspec: CompSpec' cmp),
-  forall  l, NoDup (rsort_uniq cmp l).
-Proof.
-intros.
-assert (Sorted (fun x y => Gt = cmp x y) (rsort_uniq cmp l)).
-induction l.
-simpl. constructor.
-simpl.
-remember (rsort_uniq cmp l) as l0; clear - IHl cspec.
-induction IHl. 
-constructor. constructor. constructor.
-simpl.
-do_comp cspec a a0.
-subst.
-constructor; auto.
-constructor; auto.
-destruct l; simpl. constructor.
-apply comp_antisym; auto.
-do_comp cspec a a1; simpl; constructor; auto.
-subst. apply comp_antisym; auto.
-inversion H; clear H; subst; auto.
-apply comp_antisym; auto.
-constructor; auto. constructor; auto.
-apply comp_antisym; auto.
-(* End Sorted proof *)
-induction H. constructor.
-constructor; auto.
-intro.
-clear IHSorted.
-revert H0 H1; induction H; intros.
-contradiction H1.
-simpl in H2; destruct H2.
-subst. 
-inversion H1; clear H1; subst.
-clear -cspec H3. rewrite comp_refl in H3; [congruence|auto].
-inversion H1; clear H1; subst.
-apply IHSorted; auto.
-inversion H0; clear H0; subst; constructor.
-clear - cspec H1 H4.
-apply comp_antisym; apply comp_antisym in H4; apply comp_antisym in H1; auto.
-eapply comp_trans; eauto.
-Qed.
+  end.    
  
 Lemma Forall_sortu:
   forall  {A} (f: A -> Prop) (cmp: A -> A -> comparison) l, 
@@ -506,7 +448,7 @@ Inductive clause : Type :=
 | NegSpaceClause : forall (gamma : list pure_atom) (sigma : list space_atom) 
   (delta : list pure_atom), clause.
 
-Definition expr_cmp e e' :=
+Definition expr_cmp e e' : comparison :=
  match e, e' with
    | Nil , Nil => Eq
    | Nil, _ => Lt
@@ -514,15 +456,16 @@ Definition expr_cmp e e' :=
    | Var v, Var v' => Ident.compare v v'
  end.
 
+Lemma expr_cmp_rfl:
+  forall e:expr, expr_cmp e e = Eq.
+Proof.
+  destruct e; try reflexivity.
+  cbn. apply (proj2 (Pos.compare_eq_iff v v)). reflexivity.
+Qed.
+  
 Lemma var_cspec : StrictCompSpec (@Logic.eq var) Ident.lt Ident.compare.
 Proof. split; [apply Ident.lt_strorder|apply Ident.compare_spec]. Qed.
-
 Hint Resolve var_cspec.
-
-Lemma expr_cspec: CompSpec' expr_cmp.
-Admitted.
-
-Hint Resolve expr_cspec.
 
 Definition pure_atom_cmp (a a': pure_atom) : comparison :=
  match a, a' with
@@ -532,6 +475,19 @@ Definition pure_atom_cmp (a a': pure_atom) : comparison :=
      end
  end.
 
+Lemma pure_atom_cmp_rfl:
+  forall a:pure_atom, pure_atom_cmp a a = Eq.
+Proof.
+  destruct a. cbn. rewrite expr_cmp_rfl. rewrite expr_cmp_rfl. reflexivity.
+Qed.
+                                            
+Lemma compare_list_pure_atom_cmp_rfl:
+  forall delta, compare_list pure_atom_cmp delta delta = Eq.
+Proof.
+  induction delta. try reflexivity.
+  cbn. rewrite pure_atom_cmp_rfl. assumption.
+Qed.  
+  
 Hint Rewrite @comp_refl using solve[auto] : comp.
 
 Ltac comp_tac :=
@@ -545,14 +501,6 @@ Ltac comp_tac :=
   | H: Eq = ?A |- context [?A] => rewrite <- H 
  end.
 
-Lemma pure_atom_cspec: CompSpec' pure_atom_cmp.
-Admitted.
-
-Hint Resolve pure_atom_cspec. 
-
-Lemma pure_atom_cmp_eq a b : a = b <-> Eq = pure_atom_cmp a b.
-Admitted.
-Hint Resolve pure_atom_cmp_eq.
 
 (** ordering expressions, atoms and clauses *)
 
@@ -580,7 +528,8 @@ Definition mkPureClause (gamma delta: list pure_atom) : clause :=
 Definition order_eqv_clause (c: clause) :=
   match c with 
   | PureClause pa pa' _ _ => 
-        mkPureClause (normalize_atoms (filter nonreflex_atom pa)) (normalize_atoms pa')
+    mkPureClause (normalize_atoms (filter nonreflex_atom pa))
+                 (normalize_atoms pa')
   | PosSpaceClause pa pa' sa' => 
     PosSpaceClause (normalize_atoms (filter nonreflex_atom pa)) 
                    (normalize_atoms pa') sa'
@@ -659,10 +608,6 @@ Definition compare_space_atom (a b : space_atom) : comparison :=
   | Lseg i j , Lseg i' j' => match expr_cmp i i' with Eq => expr_cmp j j' | c => c end
   end.
 
-Lemma space_atom_cspec: CompSpec' compare_space_atom.
-Admitted.
-
-Hint Resolve space_atom_cspec.
 
 Definition compare_clause (cl1 cl2 : clause) : comparison :=
   match cl1 , cl2 with
@@ -686,23 +631,33 @@ Definition compare_clause (cl1 cl2 : clause) : comparison :=
   | NegSpaceClause _ _ _ , PosSpaceClause _ _ _ => Gt
   end.
 
-Lemma clause_cspec: CompSpec' compare_clause.
-Admitted.
-Hint Resolve clause_cspec.
-
+(***
+Lemma compare_clause_rfl:
+  forall (cl:clause), compare_clause cl cl = Eq.
+Proof.
+  destruct cl; subst.
+  - induction gamma, delta; try reflexivity.
+    + cbn. rewrite pure_atom_cmp_rfl.
+      rewrite compare_list_pure_atom_cmp_rfl. reflexivity.
+    + cbn. rewrite pure_atom_cmp_rfl.
+      rewrite compare_list_pure_atom_cmp_rfl. reflexivity.
+    + cbn. rewrite pure_atom_cmp_rfl.
+      rewrite compare_list_pure_atom_cmp_rfl.
+      rewrite pure_atom_cmp_rfl.
+      rewrite compare_list_pure_atom_cmp_rfl. reflexivity.
+  - 
+****)
+    
 Definition rev_cmp {A : Type} (cmp : A -> A -> comparison) := 
   fun a b => match cmp a b with Eq => Eq | Lt => Gt | Gt => Lt end.
-
-Lemma rev_cmp_cspec {A} (c: A -> A -> comparison) : 
-  CompSpec' c -> CompSpec' (rev_cmp c).
-Admitted.
 
 Lemma rev_cmp_eq : forall {A : Type} (cmp : A -> A -> comparison) (x y : A), 
   (forall x0 y0 : A, Eq = cmp x0 y0 -> x0 = y0) -> 
   Eq = rev_cmp cmp x y -> x = y.
 Proof.
 intros until y; intros H H1. 
-unfold rev_cmp in H1. remember (cmp x y) as b. destruct b;try solve[congruence].
+unfold rev_cmp in H1. remember (cmp x y) as b.
+destruct b;try solve[congruence].
 apply H; auto.
 Qed.
 
@@ -724,8 +679,14 @@ Definition compare_clause' (cl1 cl2 : clause) : comparison :=
   end.
 
 Lemma clause_cspec': CompSpec' compare_clause'.
+Proof.
+  unfold compare_clause', CompSpec', StrictCompSpec. split. constructor.
+  - unfold Irreflexive, Reflexive, complement. intros.
+    rewrite (proj2 (Pos.compare_eq_iff _ _)) in H; try reflexivity.
+    admit.
+  - admit.
+  - intros. unfold CompSpec. admit.
 Admitted.
-
 Hint Resolve clause_cspec'.
 
 Definition clause_length (cl : clause) : Z := 
@@ -746,9 +707,6 @@ Definition compare_clause'1 (cl1 cl2 : clause) : comparison :=
   | c => c
   end.
 
-Lemma clause_cspec'1: CompSpec' compare_clause'1.
-Admitted.
-Hint Resolve clause_cspec'1.
 
 Module OrderedClause <: OrderedType 
   with Definition t:=clause 
@@ -929,12 +887,6 @@ Definition subst_clause i e cl : clause :=
                      (subst_spaces i e sa')
   end.
 
-(* fix this *)
-
-Definition var_eqZ v v' := Ident.eq v v'.
-
-Lemma eq_pos_var_eqZ v v' : true = eq_var v v' -> var_eqZ v v'.
-Admitted.
 
 (* general functions that should be moved elsewhere *)
 
@@ -964,20 +916,12 @@ Notation sortu_atms := (rsort_uniq pure_atom_cmp).
 Notation insu_atm := (insert_uniq pure_atom_cmp).
 Notation sortu_clauses := (rsort_uniq compare_clause).
 
-
-Lemma compare_clause_eq_equivalence: 
-     RelationClasses.Equivalence (fun c1 c2 => Eq = compare_clause c1 c2).
-Admitted.
-
 Lemma pure_clause_ext:
   forall gamma delta p Pp p' Pp',
      PureClause gamma delta p Pp = PureClause gamma delta p' Pp'.
 Proof.
   intros. subst. auto.
 Qed.
-
-Lemma expr_eq_eq' : forall e1 e2, true = expr_eq e1 e2 -> e1=e2.
-Admitted.
 
 Lemma mem_spec': forall s x, M.mem x s = false <-> ~M.In x s.
 Proof.
@@ -1181,8 +1125,6 @@ Definition compare_clause2 (cl1 cl2 : clause) :=
   | _, _ => compare_clause cl1 cl2
   end.
 
-Lemma compare_clause_eq cl1 cl2 : Eq = compare_clause cl1 cl2 -> cl1 = cl2.
-Admitted.
 
 Inductive ce_type := CexpL | CexpR | CexpEf.
 
@@ -1193,8 +1135,8 @@ Module DebuggingHooks.
 (* To add a new debugging hook, do the following: 
    -define a new function equal to the identity on the type of whatever 
    value you want to report 
-   -define a corresponding ML function with the same name in extract/debugging.ml 
-   to do the actual reporting
+   -define a corresponding ML function with the same name in
+     extract/debugging.ml to do the actual reporting
 *)
 Definition print_new_pures_set (s: M.t) := s.
 
@@ -1580,6 +1522,7 @@ Function main (n : positive) (units l : list clause) {measure nat_of_P n}
                 end
             end.
 Proof. Admitted.
+Print Assumptions main.
 Check main.
 Check positive ->
        list clause ->
@@ -1606,12 +1549,12 @@ Definition purecnf (en: entailment) : M.t :=
 
 Definition check (ent : entailment) 
   : superposition_result * list clause * M.t*M.t := 
-  main 1000000 nil (print_pures_list 
+  main 1000000000 nil (print_pures_list 
     (rsort (rev_cmp compare_clause2) (M.elements (purecnf ent)))).
 
 Definition check_clauseset (s : M.t) 
   : superposition_result * list clause * M.t*M.t := 
-  main 1000000 nil (print_pures_list 
+  main 1000000000 nil (print_pures_list 
     (rsort (rev_cmp compare_clause2) (M.elements (M.filter not_taut s)))).
 
 End Superposition.
@@ -2127,7 +2070,8 @@ Definition incorp (s t : M.t) :=
 
 (** The main loop of the prover *)
 
-Lemma the_loop_termination1: 
+(**************************
+          Lemma the_loop_termination1: 
 forall (n : positive) (sigma : list space_atom) (nc : clause) (s : M.t),
 (n =? 1)%positive = false ->
 forall (p : superposition_result * list clause * M.t) (t : M.t)
@@ -2200,7 +2144,8 @@ isEq
                     (PosSpaceClause [] [] (simplify_atoms units sigma))) R)))
         s_star) s_star) = false -> Pos.to_nat (Pos.pred n) < Pos.to_nat n.
 Admitted.
-
+************************)
+  
 (* begin show *)
 
 Function the_loop 
@@ -2225,11 +2170,15 @@ Function the_loop
               else C_example R
          else the_loop (Ppred n) sigma' nc' nu_s c
   | (Superposition.Aborted l, units, _, _) => Aborted l cl
-  end.
+       end.
+Admitted.
+(**************
 Proof.
 intros; eapply the_loop_termination1; eauto.
 intros; eapply the_loop_termination2; eauto.
 Defined.
+ *******************)
+Print Assumptions the_loop.
 
 (* end show *)
 (* Required to work around Coq bug #2613 *)
@@ -2241,7 +2190,7 @@ Definition check_entailment (ent: entailment) : veristar_result :=
      | Entailment (Assertion pi sigma) (Assertion pi' sigma') =>
        match mk_pureR pi, mk_pureR pi' with 
        | (piplus, piminus), (pi'plus, pi'minus) =>
-           the_loop 1000000 sigma (NegSpaceClause pi'plus sigma' pi'minus)
+           the_loop 1000000000 sigma (NegSpaceClause pi'plus sigma' pi'minus)
              (print_new_pures_set s) empty_clause
        end
      end.
@@ -2369,21 +2318,41 @@ Definition example_myent := Entailment
   (Assertion nil nil)
   (Assertion [Equ a a] nil).
 Definition ce_example_myent := check_entailment example_myent.
-(***
+Eval vm_compute in ce_example_myent.
 Extraction "ce_example_myent" ce_example_myent.
-Time Compute ce_example_myent.
- ***********)
-Definition example_myfail := Entailment
+
+
+Definition example1_myent := Entailment
+  (Assertion [Equ a b] nil)
+  (Assertion [Equ b a] nil).
+Definition ce_example1_myent := check_entailment example1_myent.
+
+Definition example2_myent := Entailment
+  (Assertion [Equ a b; Equ b c] nil)
+  (Assertion [Equ c a] nil).
+Definition ce_example2_myent := check_entailment example2_myent.
+
+Definition example1_myfail := Entailment
+  (Assertion nil nil)
+  (Assertion [Equ a b] nil).
+Definition ce_example1_myfail := check_entailment example1_myfail.
+
+Definition example2_myfail := Entailment
   (Assertion [Equ b c] nil)
   (Assertion [Equ a b] nil).
-Definition ce_example_myfail := check_entailment example_myfail.
+Definition ce_example2_myfail := check_entailment example2_myfail.
 
 Definition ce_example_ent := check_entailment example_ent.
+
+Definition myMain := [ce_example_myent; ce_example1_myent;
+                        ce_example2_myent;
+                        ce_example1_myfail; ce_example1_myfail;
+                          ce_example_ent].
+                        
+
 Definition ce_harder_ent := check_entailment harder_ent.
 Definition ce_harder_ent2 := check_entailment harder_ent.
 Definition ce_harder_ent3 := check_entailment harder_ent.
-
-
 
 
 Definition main :=
@@ -2394,3 +2363,4 @@ Definition main :=
         harder_ent3].        
 
 Extraction "vs" main.
+Print Assumptions main.

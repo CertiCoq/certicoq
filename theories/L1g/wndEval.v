@@ -43,7 +43,6 @@ Inductive wndEval : Term -> Term -> Prop :=
                (x:Term) (ix:nat),
           (** ix is index of recursive argument **)
           dnthBody m dts = Some (x, ix) ->
-          ix <= tlength args ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
 | sCast: forall t ty, wndEval (TCast t ty) t
@@ -248,7 +247,6 @@ Proof.
   - rewrite <- mkApp_goodFn; try not_isApp. apply sAppFn.
     eapply sCase; eassumption.
   - rewrite pre_whFixStep_absorbs_mkApp. simpl. eapply sFix; try eassumption.
-    rewrite tlength_tappend. omega.
 (***
   - rewrite <- (@mkApp_goodFn (TProof s)). eapply sAppFn.
     + apply sProof. assumption.

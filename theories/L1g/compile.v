@@ -35,7 +35,7 @@ Inductive Term : Type :=
                Term (* dfn *) -> Term (* type *) -> Term (* body *) -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
-| TAx        : Term
+| TAx        : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* constructor # *) ->
                nat (* # pars *) -> nat (* # args *) -> Term
@@ -294,7 +294,7 @@ Function term_Term (prf:bool) (t:term) : Term :=
     | tConst pth, p =>   (* ref to axioms in environ made into [TAx] *)
       match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
       | Some (ecTyp _ 0 nil) =>
-        if p then TAx else TWrong ("Axiom not in a proof")
+        if p then (TAx pth) else TWrong ("Axiom not in a proof")
         | Some (ecTyp _ _ _) => TWrong ("Const refers to inductive: " ++ pth)
         | _  => TConst pth
       end

@@ -31,7 +31,7 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
-| TAx        : Term
+| TAx        : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* cnstr no *) ->
                nat (* # pars *) -> nat (* # args *) -> Term
@@ -81,7 +81,7 @@ Function strip (t:L1gTerm) : Term :=
     | L1g.compile.TApp fn arg args =>
       TApp (strip fn) (strip arg) (strips args)
     | L1g.compile.TConst nm => TConst nm
-    | L1g.compile.TAx => TAx
+    | L1g.compile.TAx s => TAx s
     | L1g.compile.TInd i => TInd i
     | L1g.compile.TConstruct i m np na => TConstruct i m np na
     | L1g.compile.TCase n _ mch brs => TCase n (strip mch) (stripBs brs)

@@ -202,49 +202,107 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
-Function Plus1 (n : nat) {wf lt n} : nat :=
-  match n with
-    | 0 => 1
-    | S p => S (Plus1 p)
-  end.
-- intros. omega.
-- apply lt_wf.
+Definition div : forall x y, y > 0 -> { z | z*y <= x < (S z)*y }.
+Proof.
+  induction x as [x Hrec] using (well_founded_induction lt_wf).
+  intros y Hy.
+  case_eq (y <=? x); intros.  (* do we have y≤x or x<y ? *)
+  (* first case: y≤x *)
+  - pose proof (leb_complete _ _ H) as j1.
+    assert (Hxy : x-y < x) by omega.
+    destruct (Hrec (x-y) Hxy y Hy) as [z Hz]. (* ie: let z = div (x-y) y *)
+    exists (S z); simpl in *; omega. (* ie: z+1 fits as (div x y) *)
+  (* second case: x<y *)
+  - pose proof (leb_complete_conv _ _ H).
+    exists 0; omega.
 Defined.
-Definition x := 4.
-Definition Plus1x := Plus1 x.
-Eval vm_compute in Plus1x.
+Print div.
 
+Function copy (n : nat) {wf lt n} : nat :=
+  match n with
+    | 0 => 0
+    | S p => S (copy p)
+  end.
+Admitted.
+Print Assumptions copy.
+(* Transparent copy_terminate. *)
+(****
+- intros. constructor. 
+- apply lt_wf.
+Defined.  
+Print copy_tcc.
 
-(** evaluation of [Function]s defined with measure or wf **
-Time Quote Recursively Definition p_Plus1x := Plus1x.
-Time Definition P_Plus1x : Program Term :=
-  Eval vm_compute in program_Program p_Plus1x.
-Time Definition P_ans :=
-  Eval vm_compute in match P_Plus1x with
-                       | mkPgm P_main P_env => wcbvEval P_env 1000 P_main
-                     end.
-Print P_ans.
-(*********)
-Time Definition P_env := Eval vm_compute in (env P_Plus1x).
-Time Definition P_main := Eval vm_compute in (main P_Plus1x).
-Time Definition P_ans := Eval vm_compute in (wcbvEval P_env 1000 P_main).
-*********)
-  
+Print copy.
+Definition x := 2.
+Definition copyx := copy x.
+Set Printing Width 200.
+Compute copyx.
+Print copy_terminate.   (* Opaque, but printable *)
+Check (forall n:nat, {v:nat | exists p:nat, forall k:nat, p < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def n = v}:Set).
 
-Function Gcd (a b : nat) {wf lt a} : nat :=
+Definition cp_term :=    (* Transparent *)
+  (fun h:(forall n p:nat, n = S p -> p < S p) /\ well_founded lt =>
+ let H := h:(forall n p:nat, n = S p -> p < S p) /\ well_founded lt in
+ (fun _TmpHyp:(forall n p:nat, n = S p -> p < S p) /\ well_founded lt =>
+  and_rec
+    (fun (H0:forall n p:nat, n = S p -> p < S p) (H1:well_founded lt) (n:nat) =>
+     let Acc_n := (let wf_R := H1:well_founded lt in wf_R n):Acc lt n in
+     (fix hrec (n0:nat) (Acc_n0:Acc lt n0) {struct Acc_n0}:{v:nat | exists p:nat, forall k:nat, p < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def n0 = v} :=
+        match n0 as n1 return (n0 = n1 -> {v:nat | exists p:nat, forall k:nat, p < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def n1 = v}) with
+        | 0 =>
+            fun _:n0 = 0 =>
+            exist (fun v:nat => exists p:nat, forall k:nat, p < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def 0 = v) 0
+              (ex_intro (fun p:nat => forall k:nat, p < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def 0 = 0) 1
+                 (fun k:nat =>
+                  match k as n1 return (1 < n1 -> forall def:nat -> nat, Recdef.iter (nat -> nat) n1 copy_F def 0 = 0) with
+                  | 0 => fun h0:1 < 0 => False_ind (forall def:nat -> nat, Recdef.iter (nat -> nat) 0 copy_F def 0 = 0) (Nat.nlt_0_r 1 h0)
+                  | S k0 => fun (_:1 < S k0) (def:nat -> nat) => eq_refl
+                  end))
+        | S p =>
+            fun teq:n0 = S p =>
+            sig_rec
+              (fun _:{v:nat | exists p0:nat, forall k:nat, p0 < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def p = v} =>
+               {v:nat | exists p0:nat, forall k:nat, p0 < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def (S p) = v})
+              (fun (rec_res:nat) (p2:exists p0:nat, forall k:nat, p0 < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def p = rec_res) =>
+               exist (fun v:nat => exists p0:nat, forall k:nat, p0 < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def (S p) = v) (S rec_res)
+                 (ex_ind
+                    (fun (x:nat) (H2:forall k:nat, x < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def p = rec_res) =>
+                     max_type_ind 0 x (fun _:max_type 0 x => exists p0:nat, forall k:nat, p0 < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def (S p) = S rec_res)
+                       (fun (v:nat) (_:0 <= v) (l0:x <= v) =>
+                        ex_intro (fun p0:nat => forall k:nat, p0 < k -> forall def:nat -> nat, Recdef.iter (nat -> nat) k copy_F def (S p) = S rec_res) (S v)
+                          (fun k:nat =>
+                           match k as n1 return (S v < n1 -> forall def:nat -> nat, Recdef.iter (nat -> nat) n1 copy_F def (S p) = S rec_res) with
+                           | 0 => fun h0:S v < 0 => False_ind (forall def:nat -> nat, Recdef.iter (nat -> nat) 0 copy_F def (S p) = S rec_res) (Nat.nlt_0_r (S v) h0)
+                           | S k0 => fun (h':S v < S k0) (def:nat -> nat) => eq_ind_r (fun n1:nat => S n1 = S rec_res) eq_refl (H2 k0 (Nat.le_lt_trans x v k0 l0 (lt_S_n v k0 h')) def)
+                           end)) (max 0 x)) p2)) (hrec p (Acc_inv Acc_n0 (eq_ind_r (fun n1:nat => p < n1) (H0 n0 p teq) teq)))
+        end eq_refl) n Acc_n) _TmpHyp) H) copy_tcc.
+
+Compute (let (x, _) := cp_term 2 in x).
+
+Time Quote Recursively Definition pcopyx := copyx.
+Time Definition Pcopyx :=
+  Eval vm_compute in (L2k.compile.program_Program pcopyx).
+Time Definition Penv_copyx := env Pcopyx.
+Time Definition Pmain_copyx := main Pcopyx.
+Time Definition ans_copyx :=
+ Eval vm_compute in (wcbvEval Penv_copyx 1000 Pmain_copyx).
+Print ans_copyx.
+*****************)
+
+Function Gcd (a b:nat) {wf lt a}:nat :=
 match a with
  | O => b 
- | S k =>  Gcd (b mod S k)  (S k)
+ | S k => Gcd (b mod S k) (S k)
 end.
 Proof.
   - intros m n k Heq. subst. apply Nat.mod_upper_bound.
-    omega.
+    intros h. discriminate.
   - exact lt_wf.
 Defined.
-
-(***
+Print Gcd_tcc.
 Definition Gcdx := (Gcd 4 2).
 Eval cbv in Gcdx.
+(***** runs out of memory here  ****
 Time Quote Recursively Definition pGcdx := Gcdx.
 Time Definition PGcdx :=
   Eval vm_compute in (L2k.compile.program_Program pGcdx).
@@ -258,12 +316,8 @@ Print ans_Gcdx.
 
 
 (***
-Quote Recursively Definition pGcd := Gcd.
-Definition PGcd := Eval cbv in (program_Program pGcd).
-
-
 (** Andrew's example **)
-Function sqrt' (n x0 x diff: Z) {measure Z.to_nat diff} : Z :=
+Function sqrt' (n x0 x diff: Z) {measure Z.to_nat diff}:Z :=
   (if diff =? 0 then x
    else let y := Z.div2 (x + Z.div n x)
         in if y =? x0 then Z.min x0 x
@@ -282,9 +336,9 @@ Print Vector.t.
 
 Definition vplus (n:nat) :
   Vector.t nat n -> Vector.t nat n -> Vector.t nat n := (Vector.map2 plus).
-Definition v01 : Vector.t nat 2 :=
+Definition v01:Vector.t nat 2 :=
   (Vector.cons nat 0 1 (Vector.cons nat 1 0 (Vector.nil nat))).
-Definition v23 : Vector.t nat 2 :=
+Definition v23:Vector.t nat 2 :=
   (Vector.cons nat 2 1 (Vector.cons nat 3 0 (Vector.nil nat))).
 Definition vplus0123 := (vplus v01 v23).
 Quote Recursively Definition cbv_vplus0123 := (* [program] of Coq's answer *)
@@ -304,9 +358,9 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
-Inductive pack (A:Prop) : Prop := Pack: A -> A -> A -> A -> pack A.
+Inductive pack (A:Prop):Prop := Pack: A -> A -> A -> A -> pack A.
 Axiom packax: forall A, pack A -> pack A.
-Definition pack_nat (A:Prop) (a:pack A) : nat :=
+Definition pack_nat (A:Prop) (a:pack A):nat :=
   match packax a with
     | Pack b1 b2 b3 b4 => 0
   end.
@@ -315,11 +369,11 @@ Check p_pack_nat.
 Definition P_pack_nat := Eval cbv in (program_Program p_pack_nat).
 Print P_pack_nat.
 
-Inductive xxxx : Set :=
+Inductive xxxx:Set :=
 | xxxxl: forall n:nat, n = 0 -> xxxx
 | xxxxr: forall n:nat, n = 1 -> xxxx.
 Print xxxx.
-Axiom Xxxx : xxxx.
+Axiom Xxxx:xxxx.
 Definition yyyy (f:xxxx) :=
   match f with xxxxl q => f | xxxxr q => f end.
 Definition yyyyX := (yyyy Xxxx).
@@ -343,17 +397,17 @@ Qed.
 
 (** mutual recursion **)
 Set Implicit Arguments.
-Inductive tree (A:Set) : Set :=
-  node : A -> forest A -> tree A
-with forest (A:Set) : Set :=
-     | leaf : A -> forest A
-     | fcons : tree A -> forest A -> forest A.
+Inductive tree (A:Set):Set :=
+  node:A -> forest A -> tree A
+with forest (A:Set):Set :=
+     | leaf:A -> forest A
+     | fcons:tree A -> forest A -> forest A.
 
-Fixpoint tree_size (t:tree bool) : nat :=
+Fixpoint tree_size (t:tree bool):nat :=
   match t with
     | node a f => S (forest_size f)
   end
-with forest_size (f:forest bool) : nat :=
+with forest_size (f:forest bool):nat :=
        match f with
          | leaf b => 1
          | fcons t f1 => (tree_size t + forest_size f1)
@@ -381,12 +435,12 @@ Goal
 Qed.
 
 (** Ackermann **)
-Fixpoint ackn (Ack:nat -> nat) (m:nat) {struct m} : nat :=
+Fixpoint ackn (Ack:nat -> nat) (m:nat) {struct m}:nat :=
   match m with
   | 0 => Ack 1
   | S q => Ack (ackn Ack q)
   end.
-Fixpoint Ack (n:nat) {struct n} : nat -> nat :=
+Fixpoint Ack (n:nat) {struct n}:nat -> nat :=
   match n with
     | 0 => S
     | S p => ackn (Ack p)
@@ -397,7 +451,7 @@ Definition P_Ack := Eval cbv in (program_Program p_Ack).
 Print P_Ack.
 Time Compute Ack 3 7.
 
-Fixpoint ACK (n:nat) {struct n} : nat -> nat :=
+Fixpoint ACK (n:nat) {struct n}:nat -> nat :=
   match n with
     | 0 => S
     | S p => let fix ackn (m:nat) {struct m} :=
@@ -414,7 +468,7 @@ Print P_ACK.
 Compute ACK 3 7.
 
 
-Fixpoint ack (n m:nat) {struct n} : nat :=
+Fixpoint ack (n m:nat) {struct n}:nat :=
   match n with
     | 0 => S m
     | S p => let fix ackn (m:nat) {struct m} :=
@@ -445,12 +499,12 @@ Goal
 Qed.
 
 (** SASL tautology function: variable arity **)
-Fixpoint tautArg (n:nat) : Type :=
+Fixpoint tautArg (n:nat):Type :=
   match n with
     | 0 => bool
     | S n => bool -> tautArg n
   end.
-Fixpoint taut (n:nat) : tautArg n -> bool :=
+Fixpoint taut (n:nat):tautArg n -> bool :=
   match n with
     | 0 => (fun x => x)
     | S n => fun x => taut n (x true) && taut n (x false)
@@ -498,7 +552,7 @@ Qed.
 
 Inductive uuyy: Set := uu | yy.
 Inductive wwzz: Set := ww (_:uuyy)| zz (_:nat) (_:uuyy) (_:bool).
-Definition Foo : nat -> bool -> wwzz -> wwzz := 
+Definition Foo:nat -> bool -> wwzz -> wwzz := 
   fun (n:nat) (b:bool) (x:wwzz) =>
     match n,x,b with
       | 0, _, true => ww uu
@@ -523,12 +577,12 @@ Qed.
 
 
 (* fast Fib *)
-Fixpoint fibrec (n:nat) (fs:nat * nat) {struct n} : nat :=
+Fixpoint fibrec (n:nat) (fs:nat * nat) {struct n}:nat :=
   match n with
     | 0 => fst fs
     | (S n) => fibrec n (pair ((fst fs) + (snd fs)) (fst fs))
   end.
-Definition fib : nat -> nat := fun n => fibrec n (pair 0 1).
+Definition fib:nat -> nat := fun n => fibrec n (pair 0 1).
 Definition fib9 := fib 9.
 Quote Recursively Definition cbv_fib9 :=
   ltac:(let t:=(eval cbv in fib9) in exact t).
@@ -545,19 +599,19 @@ Goal
 Qed.
 
 (** Heterogenous datatypes, a la Matthes **)
-Inductive PList : Set->Type:=  (* powerlists *)
-| zero : forall A:Set, A -> PList A
-| succ : forall A:Set, PList (A * A)%type -> PList A.
+Inductive PList:Set->Type:=  (* powerlists *)
+| zero:forall A:Set, A -> PList A
+| succ:forall A:Set, PList (A * A)%type -> PList A.
 
-Definition myPList : PList nat :=
+Definition myPList:PList nat :=
   succ (succ (succ (zero (((1,2),(3,4)),((5,6),(7,8)))))).
 
-Fixpoint unzip (A:Set) (l:list (A*A)) {struct l} : list A :=
+Fixpoint unzip (A:Set) (l:list (A*A)) {struct l}:list A :=
   match l return list A with
     | nil => nil
     | cons (a1,a2) l' => cons a1 (cons a2 (unzip l'))
   end.
-Fixpoint PListToList (A:Set) (l:PList A) {struct l} : list A :=
+Fixpoint PListToList (A:Set) (l:PList A) {struct l}:list A :=
   match l in PList A return list A with
     | zero a => cons a (nil )
     | succ l' => unzip (PListToList l')
@@ -565,7 +619,7 @@ Fixpoint PListToList (A:Set) (l:PList A) {struct l} : list A :=
 
 Eval compute in PListToList myPList.
 
-Fixpoint gen_sumPList (A:Set) (l:PList A) {struct l} : (A->nat)->nat :=
+Fixpoint gen_sumPList (A:Set) (l:PList A) {struct l}:(A->nat)->nat :=
   match l in PList A return (A->nat)->nat with
     | zero a => fun f => f a
     | succ l' =>
@@ -589,16 +643,16 @@ Qed.
 
 Set Implicit Arguments.
 Section List.
-Variables X Y : Type.
-Variable f : X -> Y -> Y.
-Fixpoint fold (y : Y) (xs : list X) : Y :=
+Variables X Y:Type.
+Variable f:X -> Y -> Y.
+Fixpoint fold (y:Y) (xs:list X):Y :=
   match xs with
     | nil => y
     | cons x xr => fold (f x y) xr
   end.
 End List.
-Inductive Tree := T : list Tree -> Tree.
-Fixpoint size (t : Tree) : nat :=
+Inductive Tree := T:list Tree -> Tree.
+Fixpoint size (t:Tree):nat :=
   match t with
     | T ts => S (fold (fun t a => size t + a) 0 ts)
   end.
@@ -621,8 +675,9 @@ Goal
 Qed.
 
 Require Import Benchmarks.vs.
+Print Assumptions main.
 
-(*** raises exception: out of time *****
+(*** raises exception: out of time *****)
 Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
 Time Definition P_ce_example_myent :=
   Eval vm_compute in (program_Program p_ce_example_myent).
@@ -631,6 +686,7 @@ Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
 Time Definition eval_ce_example_myent :=
   Eval vm_compute in
     (wcbvEval P_env_ce_example_myent 4500 P_main_ce_example_myent).
+Set Printing Width 100.
 Print eval_ce_example_myent.
 **********************)
 
@@ -642,7 +698,7 @@ Definition P_env_myMain := env P_myMain.
 Definition P_main_myMain := AstCommon.main P_myMain.
 Time Definition eval_myMain :=
   Eval vm_compute in (wcbvEval P_env_myMain 8000 P_main_myMain).
-Set Printing Width 150.
+Set Printing Width 100.
 Print eval_myMain.
 ************)
 

@@ -558,6 +558,13 @@ Proof.
       (WcbvEval (stripEnv p)
                 (mkApp (TApp (strip fn) (strip a1)) (strips args))
                 (strip s)).
+    cbn in H.
+    unfold L2_5.term.whBetaStep in w1.
+    rewrite whBetaStep_hom in H1. unfold whBetaStep in H1.
+    destruct args.
+    + cbn. econstructor; eassumption.
+    + rewrite tcons_hom. Check tcons_has_last. Check mkApp_out. cbn.
+      
     admit.
   - cbn. eapply wLetIn; try eassumption.
     rewrite <- (proj1 (instantiate_hom)). assumption.

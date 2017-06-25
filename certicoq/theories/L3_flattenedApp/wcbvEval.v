@@ -569,6 +569,25 @@ Proof.
 Qed.
   
 
+Lemma WcbvEval_mkApp_step:
+  forall args p fn s,
+    WcbvEval p fn s ->
+    forall t, WcbvEval p (mkApp s args) t ->
+    WcbvEval p (mkApp fn args) t.
+Proof.
+  induction args; intros.
+  - cbn. cbn in H0.
+    pose proof (proj1 (WcbvEval_no_further p) _ _ H) as k.
+    rewrite (WcbvEval_single_valued H0 k). assumption.
+  - cbn. cbn in H0. destruct (isLambda_dec fn).
+    + destruct i as [y0 [y1 jy]]. subst. inversion_Clear H. assumption.
+    + destruct (isFix_dec fn).
+      * destruct i as [y0 [y1 jy]]. subst. inversion_Clear H. assumption.
+      * { destruct (isProof_dec fn). cbv in H1. subst. inversion_Clear H.
+          - assumption. 
+          - admit. }
+Admitted.
+
 (***************  Check WFTrm.
 Goal 
   forall u n, WFTrm u n ->

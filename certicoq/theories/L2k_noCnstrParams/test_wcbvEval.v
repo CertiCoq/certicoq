@@ -217,7 +217,24 @@ Proof.
     exists 0; omega.
 Defined.
 Print div.
+Extraction div.
 
+Definition funnyDiv: forall x y, { z | z*(S y) <= x < (S z)*(S y) }.
+Proof.
+  induction x as [x Hrec] using (well_founded_induction lt_wf).
+  intros y.
+  case_eq (S y <=? x); intros.
+  - pose proof (leb_complete _ _ H) as j1.
+    assert (Hxy : x-(S y) < x) by omega.
+    destruct (Hrec (x- S y) Hxy y) as [z Hz]. (* ie: let z = div (x-y) y *)
+    exists (S z); simpl in *; omega. (* ie: z+1 fits as (div x y) *)
+  - pose proof (leb_complete_conv _ _ H).
+    exists 0. cbn. omega.
+Defined.
+Print funnyDiv.
+Extraction funnyDiv.
+
+  
 Function copy (n : nat) {wf lt n} : nat :=
   match n with
     | 0 => 0
@@ -225,6 +242,9 @@ Function copy (n : nat) {wf lt n} : nat :=
   end.
 Admitted.
 Print Assumptions copy.
+
+Compute (copy 2).
+Print copy_terminate.
 (* Transparent copy_terminate. *)
 (****
 - intros. constructor. 

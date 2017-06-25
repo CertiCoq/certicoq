@@ -338,6 +338,7 @@ Lemma pre_WcbvEval_wcbvEval:
                exists n, forall m, m >= n -> wcbvEval (S m) t = Ret s) /\
   (forall ts ss, WcbvEvals p ts ss ->
                  exists n, forall m, m >= n -> wcbvEvals (S m) ts = Ret ss).
+Proof.
   assert (j:forall m x, m > x -> m = S (m - 1)).
   { induction m; intuition. }
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).

@@ -536,7 +536,34 @@ Proof.
   - rewrite IHargs. unfold pre_mkApp. unfold pre_mkApp in IHt.
  ***)
 
-  
+Lemma isApp_mkApp_TApp:
+  forall args fn arg, isApp (mkApp (TApp fn arg) args).
+Proof.
+  induction args; intros.
+  - cbn. auto.
+  - cbn. apply IHargs.
+Qed.
+      
+Lemma TProof_mkApp_invrt:
+  forall fn args, TProof = mkApp fn args -> fn = TProof /\ args = tnil.
+Proof.
+  intros fn args. destruct args; cbn; intros.
+  - intuition.
+  - pose proof (isApp_mkApp_TApp args fn t) as k.
+    destruct (k) as [x0 [x1 jx]]. rewrite jx in H. discriminate.
+Qed.
+
+Lemma WcbvEval_mkApp_invrt:
+  forall p fn args t,
+    WcbvEval p (mkApp fn args) t -> WcbvEval p fn fn ->
+    (exists s, WcbvEval p fn s /\ WcbvEval p (mkApp s args) t).
+Proof.
+  intros p fn args t. destruct args; cbn; intros.
+  - exists t. intuition. eapply (proj1 (WcbvEval_no_further p)). eassumption.
+  - exists fn. intuition.
+Qed.
+
+(*****                                               
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L2_5.wcbvEval.WcbvEval p t t' ->
@@ -559,11 +586,26 @@ Proof.
                 (mkApp (TApp (strip fn) (strip a1)) (strips args))
                 (strip s)).
     cbn in H.
+    eapply WcbvEval_mkApp_step. eapply wAppLam; try eassumption.
+    rewrite whBetaStep_hom in H1. unfold whBetaStep in *.
+    + instantiate (1:= whBetaStep (strip bod) (strip a1')).
+      unfold whBetaStep.
+    + rewrite whBetaStep_hom in H1. apply H1.
+  -
+
+    Check WcbvEval_mkApp_step.
+
+    cbn in H.
     unfold L2_5.term.whBetaStep in w1.
     rewrite whBetaStep_hom in H1. unfold whBetaStep in H1.
     destruct args.
     + cbn. econstructor; eassumption.
-    + rewrite tcons_hom. Check tcons_has_last. Check mkApp_out. cbn.
+    + rewrite tcons_hom.
+      eapply WcbvEval_mkApp_step.
+      Check tcons_has_last. Check mkApp_out.
+
+
+      cbn.
       
     admit.
   - cbn. eapply wLetIn; try eassumption.
@@ -601,7 +643,8 @@ Proof.
     + destruct H0 as [x0 jx]. subst. cbn in h. cbn in H.
       elim (proj1 (L2_5.wcbvEval.WcbvEval_not_Cast p) _ _ w). auto.
 Admitted.
- 
+ *********************)
+
 (*****
 Lemma whBetaStep_hom:
   forall bod arg args,

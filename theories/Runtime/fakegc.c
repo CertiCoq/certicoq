@@ -6,26 +6,27 @@
 #include "values.h"
 #include "gc.h"
 
+int GC = 0;
 /* This is an alternate implementation of the gc.h interface,
    that does no garbage collection.  Useful for debugging 
    both programs and proofs. */
 
-#define SIZE (1<<25)  /* 16 million words */
+#define SIZE (1<<8)  /* 16 million words */
 
 
 
 
 struct heap {
-  value *start, *next, *limit;
-  value space [SIZE];  
+  value *start, *limit;
+  value *space;
 };
 
 struct heap *create_heap()
 {
-  struct heap *h = (struct heap *) malloc (sizeof (struct heap));
+  struct heap *h = (struct heap *) malloc (sizeof *h);
+  h->space =  (value *)malloc(sizeof (value)*64);
   h->start = h->space;
-  h->next = h->space;
-  h->limit = h->space+SIZE;
+  h->limit = h->space;
   return h;
 }
 
@@ -54,35 +55,38 @@ void resume(fun_info fi, struct thread_info *ti)
    of the new values for the alloc and limit pointers.
 */
  {
-  struct heap *h = ti->heap;
+   fprintf(stderr, "In resume");
+   struct heap *h = ti->heap;
   value *lo, *hi;
-  uintnat num_allocs = fi[0];
   assert (h);
+  fprintf(stderr, " h ok \n");
+  
+  uintnat num_allocs = fi[0];
   lo = h->start;
-  hi = h->limit;
+  hi = h->start+num_allocs;
+  fprintf(stderr, "Space in heap = %d, num allocs = %d \n", (hi-lo), num_allocs);
+
   if (hi-lo < num_allocs) {
     fprintf(stderr, "Heap is too small for function's num_allocs\n");
     exit(1);
   }
   ti->alloc = lo;
-  ti->limit = hi;
+  ti->limit = lo;
 }  
 
 void garbage_collect(fun_info fi, struct thread_info *ti) {
-  struct heap *h = ti->heap;
-  if (h==NULL) {
-    /* If the heap has not yet been initialized, create it and resume */
-    h = (struct heap *) malloc (sizeof *h);
-    h->start = h->space;
-    h->next = h->space;
-    h->limit = h->space+SIZE;
-    ti->heap = h;
-    resume(fi,ti);
-    return;
-  } else {
-    fprintf(stderr, "Ran out of heap, and no garbage collector present!\n");
-    exit(1);
-  }
+  GC = GC+ 1;
+  uintnat num_allocs = fi[0];
+  fprintf(stderr, "GC = %d for %d values \n", GC, num_allocs);
+  struct heap *h = (struct heap *) malloc (sizeof (struct heap));
+  fprintf(stderr, "gc1\n ");
+  h->space =  (value *)malloc(sizeof (value)*num_allocs);
+  fprintf(stderr, "gc2\n ");
+  h->start = h->space;
+  h->limit = h->space + num_allocs;
+  ti->heap = h;
+  resume(fi,ti);
+  return;
 }
   
 
@@ -91,5 +95,4 @@ void free_heap(struct heap *h) {
 }
 
 void reset_heap(struct heap *h) {
-  h->next = h->start;
 }

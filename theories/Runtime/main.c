@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "gc.h"
+#include <time.h>
 
-extern value body(void);
+extern value body(struct thread_info *);
 
 extern value args[];
 
@@ -35,16 +36,37 @@ static void printtree(FILE *f, value v) {
   fprintf(f, "\n");
 }
 
-void maincont_code(void) {
+
+/* halt x is extracted to set args[1] to x */
+void maincont_code(struct thread_info *tinfo) {
+  unsigned int *args;
+  args = tinfo->args;
   value y = args[1];
   printtree(stdout, y);
   exit(0);
 }
 
+
+
+/*
+OS: Checks if an int represents a pointer, implemented as an extern in Clight
+ */
+_Bool is_ptr(unsigned int s) {
+  return (_Bool) Is_block(s);
+} 
+
+
+
 value maincont[2] = {(value)maincont_code, 0};
 
 int main(int argc, char *argv[]) {
-  body();
-  maincont_code();
+  struct thread_info* tinfo;
+  tinfo = make_tinfo();
+  clock_t start = clock(), diff;
+  body(tinfo);
+  diff = clock() - start;
+  int msec = diff * 1000 / CLOCKS_PER_SEC;
+  printf("Time taken %d seconds %d milliseconds\n", msec/1000, msec%1000);
+  maincont_code(tinfo);
   return 0;
 }

@@ -93,7 +93,7 @@ Qed.
 (* Rules about inlining/constant-folding *)
 | Constr_case: forall x c cl co e ys,
     findtag cl co = Some e ->
-    (* x isn't rebind on the way to the case statement *)
+    (* x isn't shadowed on the way to the case statement *)
       ~bound_stem_ctx c x ->
       rw (Econstr x co ys (c |[ Ecase x cl ]|)) (Econstr x co ys (c |[e]|))
 

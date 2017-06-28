@@ -45,9 +45,11 @@ Definition tag := positive.
 
 Section Program.
   
-  
+  (* starting cTag and iTag for user-defined inductives *)
   Variable default_tag : cTag.
   Variable default_itag: iTag.
+  
+  (* fTag for regular and continuation functions *)
   Variable fun_tag: fTag.
   Variable kon_tag: fTag.
   
@@ -344,7 +346,7 @@ arguments are:
     - update the cEnv with a mapping from the current cTag to the cTypInfo
     - update the conId_map with a pair relating the nCon'th constructor of ind to the cTag of the current constructor
 
-   nP: number of type parameters for this bundle, kept in the dcm to erase the right number of arguments
+   nP: number of type parameters for this bundle, kept in the dcm to erase the right number of arguments (this should now always be 0 as type param are erased at L3
    *)
   Fixpoint convert_cnstrs (cct:list cTag) (itC:list Cnstr) (ind:inductive) (nP:nat) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
     match (cct, itC) with  
@@ -372,10 +374,10 @@ arguments are:
         convert_typack typ' idBundle np (n+1) (M.set niT ityi ie, ce', ncT', (Pos.succ niT) , dcm')
     end.
   
-  Fixpoint convert_env' (g:ienv) (ice:iEnv * cEnv * cTag * iTag * conId_map) : (iEnv * cEnv * conId_map) :=
+  Fixpoint convert_env' (g:ienv) (ice:iEnv * cEnv * cTag * iTag * conId_map) : (iEnv * cEnv * cTag * iTag * conId_map) :=
     let '(ie, ce, ncT, niT, dcm) := ice in 
     match g with      
-      | nil => (ie, ce, dcm)
+      | nil => ice
       | (id, n, ty)::g' =>
         (* id is name of mutual pack, n is number of (type) parameters for this mutual pack, ty is mutual pack *)
         (* constructors are indexed with : name (string) of the mutual pack with which projection of the ty, and indice of the constructor *)      
@@ -389,18 +391,18 @@ arguments are:
  - a map (conId_map) from L5 tags (conId) to L6 constructor tags (cTag)
 convert_env' is called with the next available constructor tag and the next available inductive datatype tag, and inductive and constructor environment containing only the default "box" constructor/type
    *)
-  Definition convert_env (g:ienv): (iEnv*cEnv * conId_map) :=
+  Definition convert_env (g:ienv): (iEnv * cEnv*  cTag * iTag * conId_map) :=
     let default_iEnv := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty iTyInfo) in
     let default_cEnv := M.set default_tag (nAnon, default_itag, 0%N, 0%N) (M.empty cTyInfo) in
     convert_env' g (default_iEnv, default_cEnv, (Pos.succ default_tag:cTag), (Pos.succ default_itag:iTag), nil).
 
 
   (** to convert from L5a to L6, first convert the environment (ienv) into a cEnv (map from constructor to info) and a conId_map (dcm) from L5 tags to L6 tags. Then, use that conId_map in the translation of the L5 term to incorporate the right L6 tag in the L6 term *)
-  Definition convert_top (ee:ienv*cps) : (cEnv*nEnv*exp) :=
-    let '(_, cG, dcm) := convert_env (fst ee) in 
+  Definition convert_top (ee:ienv*cps) : (cEnv*nEnv*cTag*iTag * exp) :=
+    let '(_, cG, ctag, itag,  dcm) := convert_env (fst ee) in 
     let '(er, n, tgm) := convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (100%positive) in
     let '(_, _, nM) := tgm in
-    (cG, nM, er).
+    (cG, nM,ctag, itag, er).
 
 
 End Program.

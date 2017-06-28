@@ -86,13 +86,17 @@ Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) :=
 
 Open Scope positive_scope.
 
-Definition bogus_cTag := 1000%positive.
-Definition bogus_iTag := 2000%positive.
-Definition bogus_cloTag := 1500%positive.
-Definition bogus_cloiTag := 1501%positive.
 
-Definition default_cTag := 1%positive.
-Definition default_iTag := 1%positive.
+
+(* starting tags for L5_to_L6, anything under default is reserved for special constructors/types *)
+Definition default_cTag := 99%positive.
+Definition default_iTag := 99%positive.
+
+(* assigned for the constructor and the type of closures *)
+Definition bogus_cloTag := 15%positive.
+Definition bogus_cloiTag := 16%positive.
+
+(* tags for functions and continuations *)
 Definition fun_fTag := 3%positive.
 Definition kon_fTag := 2%positive.
 
@@ -101,16 +105,14 @@ Instance certiL5a_t0_L6:
   fun v =>
     match v with
         | pair venv vt => 
-          let '(cenv, nenv, t) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
-(*          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv), M.empty _, nenv),   shrink_top t)         *)
+          let '(cenv, nenv, next_cTag, next_iTag, t) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
         let '(cenv',nenv', t') :=  closure_conversion_hoist
                                    bogus_cloTag
-                                  (shrink_top t) 
-                                   bogus_cTag
-                                   bogus_iTag
+                                  (  shrink_top t) 
+                                   next_cTag
+                                   next_iTag
                                    cenv nenv in
-          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv'),  (M.empty _,  shrink_top t')) 
-(*          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv), M.empty _, nenv),   t)           *)
+          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv'),  (M.empty _,   shrink_top t')) 
     end.
 
 

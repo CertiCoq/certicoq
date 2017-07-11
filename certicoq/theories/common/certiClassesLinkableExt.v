@@ -101,15 +101,15 @@ Proof.
   repnd. rename Hsi0 into Hevi.
   simpl in Hid.
   specialize (Hid _ Hevi).
-  destruct Hid as [dv Hsd].
+  destruct Hid as [dv Hid].
   repnd.
   exists dv.
   dands; auto; [eauto using (@yesPreservedTransitive Src Inter Dst) | | ].
-- intros ?. clear Hsd Hsi. 
+- intros ?. clear Hid Hsi. 
   simpl.
   eapply liftLeTrans; eauto.
-- clear Hsd2 Hsi2.
-  intros Habs. rename Hsd into Hsubd.
+- clear Hid2 Hsi2.
+  intros Habs. rename Hid into Hsubd.
   rename Hsi into Hsubi.
   intros ? ? Hgs Hgd Hobsd.
   specialize (fun d => Hsubi Habs _ d Hgs).

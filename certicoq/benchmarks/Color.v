@@ -716,6 +716,9 @@ Definition add_edge (e: (E.t*E.t)) (g: graph) : graph :=
 Definition mk_graph (el: list (E.t*E.t)) :=
   fold_right add_edge (M.empty _) el.
 
+
+
+
 Definition run (G: graph_description) := 
   let result := M.elements (color (make_palette G) (mk_graph (parse_graph G)))
   in (fst G + Z.of_nat (length (snd G)), Z.of_nat (length result))%Z.
@@ -730,13 +733,13 @@ Definition palette: S.t := fold_right S.add S.empty (1::2::3::nil)%positive.
 
 Definition mygraph := mk_graph ( (5,6)::(6,2)::(5,2)::(1,5)::(1,2)::(2,4)::(1,4)::nil)%positive.
 
-Compute (S.elements (Mdomain mygraph)).
+Definition ex_1 := (S.elements (Mdomain mygraph)).
 (*   = 4%positive
        :: 2%positive :: 6%positive :: 1%positive :: 5%positive :: nil
      : list S.elt
 *)
 
-Compute (M.elements (color palette mygraph)).
+Definition ex_2 := (M.elements (color palette mygraph)).
 (*   = (4%positive, 1%positive)
        :: (2%positive, 3%positive)
           :: (6%positive, 2%positive)
@@ -1430,8 +1433,10 @@ Definition graph40 :=
 ])%Z.
 
 (* Time Compute (run graph40). *)
+Definition main := run G16.
 
-Extraction "color" run graph40.
+
+(* Extraction "color.ml" main. *)
 (* Some code in ocaml to time this test case:
   let timeit() = let t = Sys.time() in let r = run graph40 in (Sys.time()-.t, r);;
  On my machine, vm_compute takes 2.171 seconds, ocaml takes 1.453 seconds.

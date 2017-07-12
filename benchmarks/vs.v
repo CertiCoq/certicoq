@@ -2355,12 +2355,21 @@ Definition ce_harder_ent2 := check_entailment harder_ent.
 Definition ce_harder_ent3 := check_entailment harder_ent.
 
 
+
+Definition main_h :=
+  check_entailment harder_ent.
+
 Definition main :=
-  map check_entailment
-      [example_ent;
+  check_entailment example_ent
+(*  map
+    check_entailment
+    [example_myent;
+      example_ent; 
+      harder_ent] *)
+       (*
         harder_ent;
         harder_ent2;
-        harder_ent3].        
+        harder_ent3 *).        
 
 Extraction "vs" main.
-Print Assumptions main.
+

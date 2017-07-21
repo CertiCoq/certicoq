@@ -116,12 +116,15 @@ Set Printing Depth 1000.
 Set Implicit Arguments.
 
 
-Notation NN := (mkInd "Datatypes.nat" 0).
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
 Notation SS := (TConstruct NN 1).
 Notation ZZ := (TConstruct NN 0).
 Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
 Notation CONS := (TConstruct LL 1).
 Notation NIL := (TConstruct LL 0).
+Notation BB := (mkInd "Coq.Init.Datatypes.bool" 0).
+Notation tt := (TConstruct BB 0).
+Notation ff := (TConstruct BB 1).
 Notation VSR := (mkInd "Benchmarks.vs.VeriStar.veristar_result" 0).
 Notation VSR_Val := (TConstruct VSR 0).
 Notation VSR_Modl := (TConstruct VSR 1).
@@ -143,6 +146,117 @@ Notation "^" := (nAnon).
 Infix ":t:" := tcons  (at level 87, right associativity).
 Notation "fn [| arg @ args |]" :=
   (TApp fn arg args)  (at level 90, left associativity).
+
+
+Fixpoint copy (n : nat) : nat :=
+  match n with
+    | 0 => 0
+    | S p => S (copy p)
+  end.
+Quote Recursively Definition pcopy := copy.
+Definition Pcopy := Eval cbv in (program_Program pcopy).
+Print Pcopy.
+
+(** mutual recursion **)
+Set Implicit Arguments.
+Inductive tree (A:Set) : Set :=
+  node : A -> forest A -> tree A
+with forest (A:Set) : Set :=
+     | leaf : A -> forest A
+     | fcons : tree A -> forest A -> forest A.
+
+Fixpoint tree_size (t:tree bool) : nat :=
+  match t with
+    | node a f => S (forest_size f)
+  end
+with forest_size (f:forest bool) : nat :=
+       match f with
+         | leaf b => 1
+         | fcons t f1 => (tree_size t + forest_size f1)
+       end.
+
+Definition arden: forest bool :=
+  fcons (node true (fcons (node true (leaf false)) (leaf true)))
+        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
+               (leaf false)).
+Definition arden_tree := node true arden.
+Definition arden_size := (forest_size arden + tree_size arden_tree).
+Quote Recursively Definition cbv_arden_size :=
+  ltac:(let t:=(eval cbv in arden_size) in exact t).
+Definition ans_arden_size :=
+  Eval cbv in (AstCommon.main (program_Program cbv_arden_size)).
+(* [program] of the program *)
+Quote Recursively Definition p_arden_size := arden_size.
+Print p_arden_size.
+Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
+Print P_arden_size.
+Goal
+  let env := (env P_arden_size) in
+  let main := (AstCommon.main P_arden_size) in
+  wcbvEval (env) 100 (main) = Ret ans_arden_size.
+  vm_compute. reflexivity.
+Qed.
+
+Definition sherwood: forest bool :=
+  fcons (node false (leaf true)) (leaf false).
+Eval cbv in (forest_size sherwood).
+Quote Recursively Definition p_sherwood_size := (forest_size sherwood).
+Print p_sherwood_size.
+Definition P_sherwood_size := Eval cbv in (program_Program p_sherwood_size).
+Print P_sherwood_size.
+Definition P_sherwood_main := (AstCommon.main P_sherwood_size).
+Eval compute in P_sherwood_main.
+Definition P_sherwood_env := (AstCommon.env P_sherwood_size).
+Set Printing Width 120.
+Eval cbv in (wcbvEval P_sherwood_env 30 (TConst "Top.forest_size")).
+Eval cbv in (dnthBody 1 (dcons (^ "tree_size")
+               (Lam (^ "t")
+                  (TCase (mkInd "Top.tree" 0) (TRel 0)
+                     (bcons 2
+                        (Lam (^ "a")
+                           (Lam (^ "f") (SS (TApp (TRel 3) (TRel 0) :t: tnil))))
+                        bnil))) 0
+               (dunit (^ "forest_size")
+                  (Lam (^ "f")
+                     (TCase (mkInd "Top.tree" 1) (TRel 0)
+                        (bcons 1 (Lam (^ "b") (SS (ZZ tnil :t: tnil)))
+                           (bcons 2
+                              (Lam (^ "t")
+                                 (Lam (^ "f1")
+                                    (TApp
+                                       (TApp (TConst "Coq.Init.Nat.add")
+                                          (TApp (TRel 4) (TRel 1)))
+                                       (TApp (TRel 3) (TRel 0))))) bnil)))) 0))).
+Eval cbv in (pre_whFixStep (Lam (^ "f")
+            (TCase (mkInd "Top.tree" 1) (TRel 0)
+               (bcons 1 (Lam (^ "b") (SS (ZZ tnil :t: tnil)))
+                  (bcons 2
+                     (Lam (^ "t")
+                        (Lam (^ "f1")
+                           (TApp
+                              (TApp (TConst "Coq.Init.Nat.add")
+                                 (TApp (TRel 4) (TRel 1)))
+                              (TApp (TRel 3) (TRel 0))))) bnil))))
+                     (dcons (^ "tree_size")
+               (Lam (^ "t")
+                  (TCase (mkInd "Top.tree" 0) (TRel 0)
+                     (bcons 2
+                        (Lam (^ "a")
+                           (Lam (^ "f") (SS (TApp (TRel 3) (TRel 0) :t: tnil))))
+                        bnil))) 0
+               (dunit (^ "forest_size")
+                  (Lam (^ "f")
+                     (TCase (mkInd "Top.tree" 1) (TRel 0)
+                        (bcons 1 (Lam (^ "b") (SS (ZZ tnil :t: tnil)))
+                           (bcons 2
+                              (Lam (^ "t")
+                                 (Lam (^ "f1")
+                                    (TApp
+                                       (TApp (TConst "Coq.Init.Nat.add")
+                                          (TApp (TRel 4) (TRel 1)))
+                                       (TApp (TRel 3) (TRel 0))))) bnil)))) 0))
+                     (TConst "Top.sherwood")).
+              
 
 
 (** Check eta expansion of constructors **)
@@ -257,45 +371,6 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
-
-(** mutual recursion **)
-Set Implicit Arguments.
-Inductive tree (A:Set) : Set :=
-  node : A -> forest A -> tree A
-with forest (A:Set) : Set :=
-     | leaf : A -> forest A
-     | fcons : tree A -> forest A -> forest A.
-
-Fixpoint tree_size (t:tree bool) : nat :=
-  match t with
-    | node a f => S (forest_size f)
-  end
-with forest_size (f:forest bool) : nat :=
-       match f with
-         | leaf b => 1
-         | fcons t f1 => (tree_size t + forest_size f1)
-       end.
-
-Definition arden: forest bool :=
-  fcons (node true (fcons (node true (leaf false)) (leaf true)))
-        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
-               (leaf false)).
-Definition arden_size := (forest_size arden).
-Quote Recursively Definition cbv_arden_size :=
-  ltac:(let t:=(eval cbv in arden_size) in exact t).
-Definition ans_arden_size :=
-  Eval cbv in (AstCommon.main (program_Program cbv_arden_size)).
-(* [program] of the program *)
-Quote Recursively Definition p_arden_size := arden_size.
-Print p_arden_size.
-Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
-Print P_arden_size.
-Goal
-  let env := (env P_arden_size) in
-  let main := (AstCommon.main P_arden_size) in
-  wcbvEval (env) 100 (main) = Ret ans_arden_size.
-  vm_compute. reflexivity.
-Qed.
 
 (** Ackermann **)
 Fixpoint ack (n m:nat) {struct n} : nat :=
@@ -544,7 +619,7 @@ Print Gcd_terminate.
 Extraction "Gcd42" Gcd42.
 Time Quote Recursively Definition pGcd42 := Gcd42.
 Time Definition PGcd42 :=
-  Eval vm_compute in (L2k.compile.program_Program pGcd42).
+  Eval vm_compute in (program_Program pGcd42).
 Time Definition Penv_Gcd42 := env PGcd42.
 Time Definition Pmain_Gcd42 := main PGcd42.
 Time Definition ans_Gcd42 :=
@@ -552,10 +627,10 @@ Time Definition ans_Gcd42 :=
 Print ans_Gcd42.
 
 (** well founded definition **)
-Function Gcd (a b : nat) {wf lt a} : nat :=
+Function GCD (a b : nat) {wf lt a} : nat :=
 match a with
  | O => b 
- | S k =>  Gcd (b mod S k)  (S k)
+ | S k =>  GCD (b mod S k)  (S k)
 end.
 Proof.
   - intros m n k Heq. subst. apply Nat.mod_upper_bound.
@@ -563,7 +638,7 @@ Proof.
   - exact lt_wf.
 Defined.
 
-(**** works  ***
+(**** works  ***)
 Definition Gcdx := (Gcd 4 2).
 Eval cbv in Gcdx.
 Time Quote Recursively Definition pGcdx := Gcdx.
@@ -573,7 +648,7 @@ Time Definition Pmain_Gcdx := AstCommon.main PGcdx.
 Time Definition ans_Gcdx :=
  Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
 Print ans_Gcdx.
-****)
+
 
 Require Import Benchmarks.vs.
 

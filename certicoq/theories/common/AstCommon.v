@@ -393,7 +393,7 @@ Lemma LookupDfn_single_valued:
     LookupDfn nm p t -> LookupDfn nm p r -> t = r.
 Proof.
   unfold LookupDfn. intros nm p t r h1 h2.
-  injection (Lookup_single_valued h1 h2). intuition.
+  injection (Lookup_single_valued h1 h2); intros. assumption.
 Qed.
 
 Lemma lookup_fresh_neq:

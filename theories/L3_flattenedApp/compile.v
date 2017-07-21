@@ -264,7 +264,6 @@ Fixpoint blength (ts:Brs) : nat :=
     | bcons _ _ ts => S (blength ts)
   end.
 
-
 (** lift a Term over a new binding **)
 Fixpoint lift (n:nat) (t:Term) : Term :=
   match t with
@@ -436,7 +435,6 @@ Proof.
                (mkEtaArgs xtra (tcons (TRel 0) (lifts 0 (treverse ts))))).
     reflexivity.
 Qed.
-
 
 (** turn (App fn [x1;...;xn]) into (App (... (App fn x1) x2 ...) xn) **)
 Function mkApp (fn:Term) (ts:Terms) : Term :=

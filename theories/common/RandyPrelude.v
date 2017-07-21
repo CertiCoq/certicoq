@@ -292,6 +292,60 @@ Fixpoint list_to_zero (n:nat) : list nat :=
     | S n => n :: (list_to_zero n)
   end.
 
+Lemma In_list_to_zero:
+  forall n m, In n (list_to_zero m) -> n < m.
+Proof.
+  induction m; intros.
+  - cbn in *. contradiction.
+  - destruct H.
+    + subst; omega.
+    + pose proof (IHm H). omega.
+Qed.
+
+Lemma list_to_zero_length:
+  forall m, List.length (list_to_zero m) = m.
+Proof.
+  induction m. reflexivity.
+  cbn. rewrite IHm. reflexivity.
+Qed.
+
+Fixpoint list_to_1 (n:nat) : list nat :=
+  match n with
+  | 0 => nil
+  | S 0 => nil
+  | S n => n :: (list_to_zero n)
+  end.
+
+Lemma list_to_zero_S:
+  forall n, list_to_zero (S n) = (cons n nil) ++ list_to_zero n.
+Proof.
+  induction n. reflexivity. cbn. reflexivity.
+Qed.
+  
+
+Definition list_to_n (n:nat) : list nat := List.rev (list_to_zero n).
+
+Lemma In_list_to_n:
+  forall n m, In n (list_to_n m) -> n < m.
+Proof.
+  intros. apply In_list_to_zero. rewrite <- rev_involutive.
+  apply (proj1 (in_rev _ _)). exact H.
+Qed.
+
+Lemma list_to_n_length:
+  forall m, List.length (list_to_n m) = m.
+Proof.
+  intros. unfold list_to_n. rewrite rev_length. apply list_to_zero_length.
+Qed.
+
+Lemma list_to_n_S:
+  forall n, list_to_n (S n) = (list_to_n n) ++ (cons n nil).
+Proof.
+  induction n; reflexivity.
+Qed.
+  
+
+
 Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
   match xs, n with
     | nil, _ => raise "exnNth; no hit"

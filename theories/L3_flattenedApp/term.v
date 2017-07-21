@@ -35,36 +35,12 @@ Ltac not_is2 :=
   with yy := fresh "y"
   with zz := fresh "z" in
   intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
-            
-            Ltac not_isApp := not_is2.
-            Ltac not_isLambda := not_is2.
-            Ltac not_isCase := not_is3.
-            Ltac not_isFix := not_is2.
-            Ltac not_isCast := not_is1.
-            Ltac not_isConstruct := not_is3.
-  (****
-  Ltac not_isApp :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with kk := fresh "k" in
-  intros hh; destruct hh as [xx [yy kk]]; discriminate.
-Ltac isApp_inv h :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with yy := fresh "y"
-  with zz := fresh "z"
-  with jj := fresh "j"
-  in destruct h as [xx [yy [zz jj]]]; discriminate.
-Ltac not_isConstruct :=
-  let hh := fresh "h"
-  with xx0 := fresh "x"
-  with xx1 := fresh "x1"
-  with xx2 := fresh "x2"
-  with ll := fresh "l" in
-  intros hh; destruct hh as [xx0 [xx1 [xx2 l]]]; discriminate.
-************************)
+Ltac not_isApp := not_is2.
+Ltac not_isLambda := not_is2.
+Ltac not_isCase := not_is3.
+Ltac not_isFix := not_is2.
+Ltac not_isCast := not_is1.
+Ltac not_isConstruct := not_is3.
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
 Local Ltac rght := right; injection; intuition.
@@ -318,7 +294,7 @@ Fixpoint tnth (n:nat) (l:Terms) {struct l} : option Term :=
                       end
     end.
 
-Fixpoint dnth (n:nat) (l:Defs) {struct l} : option (def Term) :=
+Function dnth (n:nat) (l:Defs) {struct l} : option (def Term) :=
     match l with
       | dnil => None
       | dcons nm tm args xs => match n with
@@ -327,7 +303,36 @@ Fixpoint dnth (n:nat) (l:Defs) {struct l} : option (def Term) :=
                                end
     end.
 
-Definition dnthBody (n:nat) (l:Defs) : option Term :=
+Lemma dnth_lt:
+  forall n dts x, dnth n dts = Some x -> n < dlength dts.
+Proof.
+  intros n dts x. functional induction (dnth n dts); intros.
+  - discriminate.
+  - cbn. omega.
+  - specialize (IHo H). cbn. omega.
+Qed.
+    
+Lemma dnth_weaken:
+  forall dts m s,
+    dnth m dts = Some s ->
+    forall nm t n, exists u, dnth m (dcons nm t n dts) = Some u.
+Proof.
+  induction dts; induction m; intros.
+  - exists (mkdef Term nm TProof t n). reflexivity.
+  - cbn in H. discriminate.
+  - exists (mkdef Term nm TProof t0 n1). reflexivity.
+  - eapply IHdts. exact H.
+Qed.
+
+Lemma dnth_Weaken:
+  forall dts m s,
+    dnth m dts = Some s ->
+    forall nm t n, dnth (S m) (dcons nm t n dts) = Some s.
+Proof.
+  intros. cbn. assumption.
+Qed.
+
+Function dnthBody (n:nat) (l:Defs) : option Term :=
   match dnth n l with
     | None => None
     | Some (mkdef _ _ _ x _) => Some x
@@ -349,6 +354,21 @@ Proof.
     + simpl. apply IHds. simpl in h. omega.
 Qed.
 
+Lemma dnthBody_lt:
+  forall n dts x, dnthBody n dts = Some x -> n < dlength dts.
+Proof.
+  intros n dts x. functional induction (dnthBody n dts); intros.
+  - discriminate.
+  - myInjection H. eapply dnth_lt. eassumption.
+Qed.
+
+Lemma dnthBody_S:
+  forall dts m nm t q, dnthBody (S m) (dcons nm t q dts) = dnthBody m dts.
+Proof.
+  induction dts; intros; reflexivity.
+Qed.
+
+
 Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
   match l with
     | bnil => None
@@ -358,9 +378,7 @@ Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
                        end
   end.
 
-(** well-formed terms: locally closed, TApp well-formed
-*** not used essentially at the moment
-**)
+(** well-formed terms: locally closed, TApp well-formed **)
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
 | wfLambda: forall n nm bod,
@@ -385,8 +403,9 @@ with WFTrmBs: Brs -> nat -> Prop :=
     WFTrm b n -> WFTrmBs bs n -> WFTrmBs (bcons m b bs) n
 with WFTrmDs: Defs -> nat -> Prop :=
 | wfdnil: forall n, WFTrmDs dnil n
-| wfdcons: forall n nm bod arg ds,
-    WFTrm bod n -> WFTrmDs ds n -> WFTrmDs (dcons nm bod arg ds) n.
+| wfdcons: forall n nm bod narg ds,
+    WFTrm bod n -> isLambda bod -> WFTrmDs ds n ->
+    WFTrmDs (dcons nm bod narg ds) n.
 Hint Constructors WFTrm WFTrms WFTrmBs WFTrmDs.
 Scheme WFTrm_ind' := Minimality for WFTrm Sort Prop
   with WFTrms_ind' := Minimality for WFTrms Sort Prop
@@ -405,6 +424,10 @@ Proof.
   try (cbn; rewrite H0; try reflexivity; omega);
   try (cbn; rewrite H0, H2; try reflexivity; omega).
   - cbn. case_eq (m ?= i); intros; Compare_Prop; try omega. reflexivity.
+  - change
+      (dcons nm (lift i bod) narg (liftDs i ds) = dcons nm bod narg ds).
+    rewrite H0; try assumption. rewrite H3; try assumption.
+    reflexivity.
 Qed.
 
 Lemma WFTrm_up:
@@ -414,6 +437,19 @@ Lemma WFTrm_up:
   (forall ds m, WFTrmDs ds m -> WFTrmDs ds (S m)).
 Proof.
   apply WFTrmTrmsBrsDefs_ind; cbn; intros; constructor; try assumption; omega.
+Qed.
+  
+Lemma WFTrm_Up:
+  (forall t m, WFTrm t m -> forall n, m <= n -> WFTrm t n).
+Proof.
+  intros t m h. induction 1. assumption. apply WFTrm_up. assumption.
+Qed.
+  
+Lemma WFTrmDs_Up:
+  (forall ds m, WFTrmDs ds m -> forall n, m <= n -> WFTrmDs ds n).
+Proof.
+  intros ds m h. induction 1. assumption.
+  apply (proj2 (proj2 (proj2 WFTrm_up))). assumption.
 Qed.
   
 Lemma tappend_pres_WFTrms:
@@ -432,6 +468,7 @@ Proof.
   - inversion_Clear H. cbn. apply tappend_pres_WFTrms; intuition.
 Qed.
 
+(***********
 Lemma lift_pres_WFTrm:
   (forall t m, WFTrm t m -> forall n, WFTrm (lift n t) (S m)) /\
   (forall ts m, WFTrms ts m -> forall n, WFTrms (lifts n ts) (S m)) /\
@@ -452,11 +489,11 @@ Lemma mkEtaLams_pres_WFTrm:
 Proof.
   induction 1; induction xtra; intros; cbn; constructor; cbn; subst;
   try (solve[apply IHxtra; omega]);
-  try (rewrite <- plus_n_O in *); try assumption.
+  try (rewrite <- plus_n_O in; try assumption.
                                   constructor. constructor; assumption.
 Qed.
 
-Lemma mkEtaArgs_pres_WFtrm:
+Lemma mkEtaArgs_pres_WFTrm:
   forall arty ts m, WFTrms ts m -> WFTrms (mkEtaArgs arty ts) (m + arty).
 Proof.
   induction arty; intros.
@@ -479,9 +516,11 @@ Lemma WFTrm_etaExp_cnstr:
 Proof.
   intros. unfold etaExp_cnstr.
   eapply mkEtaLams_pres_WFTrm; try reflexivity. 
-  apply mkEtaArgs_pres_WFtrm. apply treverse_pres_WFTrms.
+  apply mkEtaArgs_pres_WFTrm. apply treverse_pres_WFTrms.
   assumption.
 Qed.
+*******)
+
   
 (***********
 Goal
@@ -800,8 +839,49 @@ Lemma Instantiate_pres_isLambda:
 Proof.
   intros t ht n it hit. destruct ht as [x0 [x1 jx]]. subst.
   inversion_Clear hit. auto.
-Qed.          
+Qed.
 
+(** Instantiate preserves closedness **)
+Lemma Instantiate_pres_WFTrm:
+  (forall n bod ibod,
+      Instantiate n bod ibod ->
+      forall m, n <= m -> WFTrm bod (S m) -> WFTrm tin m -> WFTrm ibod m) /\
+  (forall n bods ibods,
+      Instantiates n bods ibods ->
+      forall m, n <= m -> WFTrms bods (S m) -> WFTrm tin m -> WFTrms ibods m) /\
+  (forall n ts ss,
+      InstantiateBrs n ts ss ->
+      forall m, n <= m -> WFTrmBs ts (S m) -> WFTrm tin m -> WFTrmBs ss m) /\
+  (forall n ts ss,
+      InstantiateDefs n ts ss ->
+      forall m, n <= m -> WFTrmDs ts (S m) -> WFTrm tin m -> WFTrmDs ss m).
+Proof.
+  apply InstInstsBrsDefs_ind; intros; trivial;
+  try (inversion_Clear H1; constructor; try assumption; apply H; assumption);
+  try (inversion_Clear H0; try econstructor; try eassumption; omega).
+  - inversion_Clear H1. constructor; try assumption.
+    apply H; try assumption; try omega. apply (proj1 WFTrm_up). assumption.
+  - inversion_Clear H2. econstructor; try eassumption.
+    + apply H; try eassumption.
+    + apply H0; try eassumption; try omega.
+      apply (proj1 WFTrm_up). assumption.
+  - inversion_Clear H2. constructor; try assumption.
+    + apply H; try assumption.
+    + apply H0; try assumption.
+  - inversion_Clear H2. constructor; try assumption.
+    + apply H; try assumption.
+    + apply H0; try assumption.
+  - pose proof (InstantiateDefs_pres_dlength i) as k.
+    inversion_Clear H1. constructor; try omega.
+    + eapply H; try omega; rewrite <- k. assumption.
+      * eapply WFTrm_Up. eassumption. omega.
+  - inversion_Clear H2. apply wfcons; intuition.
+  - inversion_Clear H2. constructor; intuition.
+  - inversion_Clear H2. constructor; intuition.
+    eapply Instantiate_pres_isLambda; eassumption.
+Qed.
+
+  
 Lemma Instantiates_no_gen:
   (~ PoccTrm tin) ->
   (forall n t s, Instantiate n t s -> PoccTrm s -> PoccTrm t) /\
@@ -830,7 +910,7 @@ Proof.
     + constructor. intuition.
     + apply PoDtl. intuition.
 Qed.
-
+  
 Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
   match tbod with
     | TRel m => match nat_compare n m with
@@ -906,6 +986,16 @@ Proof.
     + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
       assumption. assumption.
 Qed.
+
+Lemma instantiate_pres_WFTrm:
+  forall m bod, WFTrm bod (S m) -> WFTrm tin m -> 
+                  forall n, n <= m -> WFTrm (instantiate n bod) m.
+Proof.
+  intros.
+  apply (proj1 (Instantiate_pres_WFTrm) n bod); try assumption.
+  refine (proj1 (instantiate_Instantiate) _ _).
+Qed.
+
 
 Lemma instant_pres_PoccTrm:
   (forall tbod, PoccTrm tbod -> forall n, PoccTrm (instantiate n tbod)) /\
@@ -1040,7 +1130,7 @@ Proof.
   - destruct fn; cbn; try reflexivity. 
   - destruct fn; rewrite IHt; cbn; try reflexivity.
 Qed.
-
+  
 Lemma instantiate_noLift:
   (forall t  m, instantiate m (lift m t) = t) /\
   (forall ts m, instantiates m (lifts m ts) = ts) /\
@@ -1210,6 +1300,7 @@ Proof.
     + rewrite <- instantiateDefs_pres_dlength. omega.
 Qed.
 
+(**************
 Lemma instantiates_ttake:
   forall ts m n, ttake (instantiates n ts) m = instantiates n (ttake ts m).
 Proof.
@@ -1252,6 +1343,7 @@ Proof.
     rewrite instantiate_mkEtaLams. rewrite <- instantiates_mkEtaArgs.
     cbn. reflexivity. assumption.
 Qed.
+ ********************)
 
 End Instantiate_sec.
 End PoccTrm_sec.
@@ -1260,22 +1352,608 @@ End PoccTrm_sec.
 (** operations for weak reduction and weak evaluation **)
 Definition whBetaStep (bod arg:Term) : Term := instantiate arg 0 bod.
 
-
+Lemma whBetaStep_pres_WFTrm:
+  forall bod n, WFTrm bod (S n) ->
+                forall arg, WFTrm arg n-> WFTrm (whBetaStep bod arg) n.
+Proof.
+  intros. unfold whBetaStep.
+  eapply instantiate_pres_WFTrm; try eassumption. omega.
+Qed. 
+                                                             
 Definition whCaseStep (cstrNbr:nat) (args:Terms) (brs:Brs): option Term := 
   match bnth cstrNbr brs with
     | Some (t, _) => Some (mkApp t args)
     | None => None
   end.
 
+Lemma mkApp_pres_WFTrm:
+  forall n args, WFTrms args n ->
+                   forall fn, WFTrm fn n ->
+                              WFTrm (mkApp fn args) n.
+Proof.
+  induction 1; intros; cbn.
+  - assumption.
+  - apply IHWFTrms. constructor; assumption.
+Qed.
+
+Lemma bnth_pres_WFTrm:
+  forall n (brs:Brs), WFTrmBs brs n ->
+    forall m x ix, bnth m brs = Some (x, ix) -> WFTrm x n.
+Proof.
+  intros n brs h m x ix.
+  functional induction (bnth m brs); intros; auto.
+  - discriminate.
+  - myInjection H. inversion_Clear h. assumption.
+  - apply IHo; inversion h; assumption.
+Qed.
+
+Lemma whCaseStep_pres_WFTrm:
+  forall n ts, WFTrms ts n -> forall brs, WFTrmBs brs n ->
+  forall m s, whCaseStep m ts brs = Some s -> WFTrm s n.
+Proof.
+  intros n ts h1 brs h2 m s h3. unfold whCaseStep in h3.
+  assert (j: bnth m brs = None \/ (exists t, bnth m brs = Some t)).
+  { destruct (bnth m brs).
+    + destruct p. right. exists (t, n0). reflexivity.
+    + left. reflexivity. }
+  destruct j.
+  - rewrite H in h3. discriminate.
+  - destruct H as [x jx]. rewrite jx in h3. destruct x as [y0 y1].
+    myInjection h3. apply mkApp_pres_WFTrm; try assumption.
+    eapply (bnth_pres_WFTrm h2). eassumption.
+Qed.
+
 (** Unfolding a Fixpoint **)
 (** "dts" is a list of the mutual fixpoint definitions
 *** "m" tells which of the definitions is being called
 **)
-Definition whFixStep (dts:Defs) (m:nat) : option Term :=
-  let ldts := dlength dts in
+Function whFixStep (dts:Defs) (m:nat) : option Term :=
   match dnthBody m dts with
     | Some body => Some (fold_left
                            (fun bod ndx => instantiate (TFix dts ndx) 0 bod)
-                           (list_to_zero ldts) body)
+                           (list_to_zero (dlength dts)) body)
     | None => None
   end.
+
+Function whFixStep_rev (dts:Defs) (m:nat) : option Term :=
+  match dnthBody m dts with
+    | Some body => Some (fold_right
+                           (fun ndx bod => instantiate (TFix dts ndx) 0 bod)
+                           body (list_to_n (dlength dts)))
+    | None => None
+  end.
+  
+Lemma whFixStep_whFixStep_rev:
+  forall (dts:Defs) (m:nat), whFixStep dts m = whFixStep_rev dts m.
+Proof.
+  intros. unfold whFixStep, whFixStep_rev, list_to_n.
+  destruct (dnthBody m dts); try reflexivity.
+  - rewrite fold_left_rev_right. reflexivity.
+Qed.
+  
+Definition pre_whFixStep body dts arg : Term :=
+  let f := fold_left
+             (fun bod ndx => instantiate (TFix dts ndx) 0 bod)
+             (list_to_zero (dlength dts)) body in
+  (TApp f arg).
+Functional Scheme pre_whFixStep_ind := Induction for pre_whFixStep Sort Prop.
+
+(** the function used in whFixStep is [instantiate], which reduces 
+*** height by one.  Hence this lemma  ***)
+Lemma fold_left_pres_WFTrm:
+  forall (f:Term -> nat -> Term) (ns:list nat) (a:nat),
+    (forall u m, m >= a ->
+                 WFTrm u (S m) -> forall n, In n ns -> WFTrm (f u n) m) ->
+    forall t, WFTrm t (a + List.length ns) -> WFTrm (fold_left f ns t) a.
+Proof.
+  intros f. induction ns; cbn; intros.
+  - replace (a + 0) with a in H0. assumption. omega.
+  - apply IHns.
+    + intros. apply H; try assumption. apply (or_intror H3).
+    + replace (a0 + S (Datatypes.length ns))
+        with (S (a0 + (Datatypes.length ns))) in H0.
+      assert (j: a0 + Datatypes.length ns >= a0). omega.
+      specialize (H t _ j H0).
+      apply H. apply (or_introl eq_refl). omega.
+Qed.
+
+
+(**********
+Lemma fold_left_pres_WFTrm:
+  forall m (f:Term -> nat -> Term) (ns:list nat),
+    (forall u, WFTrm u m -> forall n, In n ns -> WFTrm (f u n) m) ->
+    forall t, WFTrm t m ->
+              WFTrm (fold_left f ns t) m.
+Proof.
+  intros n f. induction ns; simpl; intros.
+  - assumption.
+  - apply IHns.
+    + intros. apply H. assumption. apply (or_intror H2).
+    + apply H. assumption. apply (or_introl eq_refl).
+Qed.
+
+(** the function used in whFixStep is [instantiate], which reduces 
+*** height by one.  Hence this lemma . ***)
+Lemma fold_left_pres_WFTrm:
+  forall dts,
+    let f := fun bod ndx => instantiate (TFix dts ndx) 0 bod in
+    forall m, WFTrmDs dts (m + dlength dts) ->
+              forall t, WFTrm t (m + dlength dts) ->
+                WFTrm (fold_left f (list_to_zero (dlength dts)) t) m.
+Proof.
+  induction dts; simpl; intros.
+  - replace (m + 0) with m in H0. assumption. omega.
+  - 
+
+    apply IHdts. apply instantiate_pres_WFTrm; try omega.
+    + replace (S (m + Datatypes.length ns))
+        with (m + S (Datatypes.length ns)). assumption. omega.
+    + constructor. 
+    + intros. apply H. assumption. apply (or_intror H2).
+    + apply H.
+      replace (S (m + Datatypes.length ns))
+        with (m + S (Datatypes.length ns)).
+      assumption. omega. apply (or_introl eq_refl).
+Qed.
+  ******************)
+
+Lemma dnth_WFTrmDs_WFTrm:
+  forall m dts fs, dnth m dts = Some fs ->
+                   forall n, WFTrmDs dts n -> WFTrm (dbody _ fs) n.
+Proof.
+  intros m dts fs.
+  functional induction (dnth m dts); intros; try discriminate.
+  - inversion_Clear H0; myInjection H; cbn; assumption.
+  - inversion_Clear H0. intuition.
+Qed.
+
+Lemma dnthBody_pres_WFTrm:
+  forall m dts fs, dnthBody m dts = Some fs ->
+                   forall n, WFTrmDs dts n -> WFTrm fs n.
+Proof.
+  intros m dts fs.
+  functional induction (dnthBody m dts); intros; try discriminate.
+  - myInjection H. apply (dnth_WFTrmDs_WFTrm _ e H0). 
+Qed.
+
+Lemma whFixStep_pres_WFTrm:
+  forall dts n,
+    WFTrmDs dts (n + dlength dts) ->
+    forall m bod, whFixStep dts m = Some bod -> WFTrm bod n.
+Proof.
+  unfold whFixStep. intros. case_eq (dnthBody m dts); intros.
+  - assert (j: m < dlength dts).
+    { eapply dnthBody_lt. eassumption. }
+    rewrite H1 in H0. myInjection H0.
+    apply fold_left_pres_WFTrm.
+    + intros. apply instantiate_pres_WFTrm; try omega. assumption.
+      pose proof (In_list_to_zero _ _ H3) as j0.
+      constructor. pose proof (dnthBody_pres_WFTrm _ H1 H) as k2.
+      eapply WFTrmDs_Up. eassumption. omega.
+    + rewrite list_to_zero_length.
+      apply (dnthBody_pres_WFTrm _ H1).
+      eapply WFTrmDs_Up. eassumption. omega.
+  - rewrite H1 in H0. discriminate.
+Qed.
+
+(*************
+Goal
+  forall dts m n, WFTrm (TFix dts m) n ->
+                  forall bod, whFixStep dts m = Some bod -> WFTrm bod n.
+Proof.
+  induction dts; induction m; intros.
+  - cbn in H0. discriminate.
+  - cbn in H0. discriminate.
+  - inversion_Clear H. cbn in H4. inversion_Clear H4.
+    cbn in H0. myInjection H0. apply fold_left_pres_WFTrm; intros.
+    + apply instantiate_pres_WFTrm; try assumption; try omega.
+      constructor. cbn. constructor; try assumption.
+      eapply WFTrm_Up; try eassumption. omega.
+      eapply WFTrmDs_Up; try eassumption. omega.
+    + rewrite list_to_zero_length.
+      apply instantiate_pres_WFTrm; try assumption; try omega.
+      * replace (S (n1 + dlength dts)) with (n1 + S (dlength dts));
+          try omega. assumption.
+      * constructor. cbn. constructor; try assumption.
+        eapply WFTrm_Up; try eassumption; try omega.
+        eapply WFTrmDs_Up; try eassumption. omega.
+  - inversion_Clear H. cbn in H4. inversion_Clear H4. eapply IHdts.
+    + instantiate (1:= S m). constructor. cbn. constructor; try assumption.
+    +
+      
+    cbn in H0. myInjection H0. apply fold_left_pres_WFTrm; intros.
+
+    inversion_Clear H. cbn in H4. inversion_Clear H4.
+    eapply IHdts.
+    
+    + cbn in H0. myInjection H0. apply fold_left_pres_WFTrm.
+      * admit.
+        (***************
+      *{ intros. apply instantiate_pres_WFTrm; try assumption; try omega.
+         constructor. inversion_Clear H. inversion_Clear H5.
+         constructor; try assumption.
+         *****************)
+      *{ apply instantiate_pres_WFTrm; try omega.
+         - inversion_Clear H. inversion_Clear H3. apply (proj1 WFTrm_up).
+           rewrite list_to_zero_length. cbn in H5. cbn in H7.
+         
+         
+    intros. unfold whFixStep in H0. destruct (dnthBody m dts).
+    + myInjection H0. apply fold_left_pres_WFTrm.
+      * intros. apply instantiate_pres_WFTrm; try omega. assumption.      
+        constructor.
+
+Goal
+  forall dts m n, WFTrm (TFix dts m) n ->
+                  forall bod, whFixStep dts m = Some bod -> WFTrm bod n.
+Proof.
+  induction 1.
+  - intros. unfold whFixStep in H0. destruct (dnthBody m dts).
+    + myInjection H0. apply fold_left_pres_WFTrm.
+      * intros. apply instantiate_pres_WFTrm; try omega. assumption.      
+        constructor.
+
+
+        Check (whFixStep_pres_WFTrm _ H0).
+                     whFixStep dts m = Some bod -> WFTrm bod n.
+  
+Lemma whFixStep_pres_WFTrm:
+  forall dts n,
+    WFTrmDs dts n -> forall m bod, whFixStep dts m = Some bod -> WFTrm bod n.
+Proof.
+  induction dts; intros.
+  - discriminate.
+  - inversion_Clear H. destruct m.
+    + cbn in H0. myInjection H0. apply fold_left_pres_WFTrm.
+      *{ intros. apply instantiate_pres_WFTrm; try omega. assumption.
+         - constructor. constructor.
+           
+    eapply IHdts; try eassumption.
+***************)
+
+(************************    
+Lemma whFixStep_pres_WFTrm:
+  forall dts n,
+    WFTrmDs dts n -> forall m bod, whFixStep dts m = Some bod -> WFTrm bod n.
+Proof.
+  unfold whFixStep. intros. case_eq (dnthBody m dts); intros.
+  - assert (j: m < dlength dts).
+    { eapply dnthBody_lt. eassumption. }
+    rewrite H1 in H0. myInjection H0.
+    apply fold_left_pres_WFTrm.
+    + intros. apply instantiate_pres_WFTrm; try omega. assumption.
+      pose proof (In_list_to_zero _ _ H2) as j0.
+      constructor. pose proof (dnthBody_pres_WFTrm _ H1 H) as k2.
+    rewrite <- list_to_zero_length in k2.
+    replace (Datatypes.length (list_to_zero (n + dlength dts)))
+            with (n + (Datatypes.length (list_to_zero (dlength dts)))) in k2.
+    refine (fold_left_pres_WFTrm
+             (fun (bod : Term) (ndx : nat) => instantiate (TFix dts ndx) 0 bod)
+             (list_to_zero (dlength dts)) _ n k2).
+    + intros. pose proof (In_list_to_zero _ _ H2) as k1.
+      apply instantiate_pres_WFTrm; try omega. assumption.
+      constructor. 
+    + rewrite list_to_zero_length. eapply dnthBody_pres_WFTrm; eassumption.
+  - rewrite H1 in H0. discriminate.
+Admitted.
+
+Goal
+  forall m dts bod, whFixStep_rev dts m = Some bod ->
+   forall n, WFTrmDs dts (n + dlength dts) -> WFTrm bod n.
+Proof.
+  unfold whFixStep_rev. intros m dts bod.
+  functional induction (dnthBody m dts); intros.
+  - discriminate.
+  - myInjection H. apply fold_right_pres_WFTrm; intros.
+    apply instantiate_pres_WFTrm; try assumption; try omega.
+    + constructor.
+**************)
+
+(***************  
+Goal
+  forall nm t0 q dts n,
+    WFTrmDs (dcons nm t0 q dts) (n + S (dlength dts)) ->
+    forall bod m, whFixStep (dcons nm t0 q dts) m = Some bod ->
+                 WFTrm bod n.
+Proof.
+  unfold whFixStep. intros. destruct m, dts.
+  - cbn in H0. myInjection H0.
+    apply instantiate_pres_WFTrm; try omega.
+    + inversion_Clear H. cbn in H5.
+      replace (S n) with (n + 1); try omega. assumption.
+    + constructor. cbn. cbn in H. assumption.
+  - cbn in H0. myInjection H0. apply fold_left_pres_WFTrm.
+    + intros. apply instantiate_pres_WFTrm; try assumption; try omega.
+      constructor. cbn. cbn in H.
+      apply (@WFTrmDs_Up _ (n + S (S (dlength dts)))); try omega.
+      assumption.
+    + cbn in H. inversion_Clear H. rewrite list_to_zero_length.
+      apply instantiate_pres_WFTrm; try omega.
+      apply instantiate_pres_WFTrm; try omega.
+      * replace (S (S (n + dlength dts))) with (n + S (S (dlength dts)));
+          try omega. assumption.
+      * constructor. cbn. constructor; try assumption.
+        eapply (@WFTrm_Up _ (n + S (S (dlength dts)))). assumption. omega.
+        eapply (@WFTrmDs_Up _ (n + S (S (dlength dts)))). assumption. omega.
+      * constructor. cbn. constructor; try assumption.
+        eapply (@WFTrm_Up _ (n + S (S (dlength dts)))). assumption. omega.
+        eapply (@WFTrmDs_Up _ (n + S (S (dlength dts)))). assumption. omega.
+  - cbn in H0. discriminate.
+  - case_eq (dnthBody (S m) (dcons nm t0 q (dcons n0 t n1 dts))); intros.
+    + rewrite H1 in H0. myInjection H0. apply fold_left_pres_WFTrm.
+      * intros. apply instantiate_pres_WFTrm; try assumption; try omega.
+        constructor. cbn. cbn in H.
+        apply (@WFTrmDs_Up _ (n + S (S (dlength dts)))); try omega.
+        assumption.
+      *{ rewrite list_to_zero_length. cbn in H.
+         apply instantiate_pres_WFTrm; try omega.
+         - apply instantiate_pres_WFTrm; try omega.
+           + inversion_Clear H. inversion_Clear H7. 
+      
+        destruct m. unfold dnthBody, dnth, dlength in H0.
+    injection H0; intros.
+    change
+      ((fold_left
+            (fun (bod : Term) (ndx : nat) =>
+             instantiate (TFix (dcons nm t0 q (dunit nm t1 q)) ndx) 0 bod)
+            (list_to_zero 2) t1) = bod) in H1.
+    rewrite <- H1. cbn.
+
+
+
+
+Goal
+  forall nm t0 t1 q n,
+    WFTrmDs (dcons nm t0 q (dunit nm t1 q)) (S (S n)) ->
+    forall bod m, whFixStep (dcons nm t0 q (dunit nm t1 q)) m = Some bod ->
+                 WFTrm bod n.
+Proof.
+  unfold whFixStep. intros. destruct m.
+  - cbn in H0. myInjection H0.
+    apply instantiate_pres_WFTrm; try omega.
+    + apply instantiate_pres_WFTrm; try omega.
+      * inversion_Clear H. assumption.
+      * constructor. cbn.
+        replace (S (n + 2)) with (S (S (S n))); try omega.
+        apply (proj2 (proj2 (proj2 WFTrm_up))). assumption.
+    + constructor. cbn.
+        replace (n + 2) with (S (S n)); try omega. assumption.
+  - destruct m. unfold dnthBody, dnth, dlength in H0.
+    injection H0; intros.
+
+    myInjection H0.
+    + apply instantiate_pres_WFTrm; try omega.
+      * apply instantiate_pres_WFTrm; try omega.
+        inversion_Clear H. inversion_Clear H7. assumption.
+        constructor. cbn.
+        replace (S (n + 2)) with (S (S (S n))); try omega.
+        apply (proj2 (proj2 (proj2 WFTrm_up))). assumption.
+      * inversion_Clear H. inversion_Clear H7.
+        constructor. cbn.
+        replace (n + 2) with (S (S n)); try omega.
+        constructor; try assumption.
+        constructor; try assumption.
+    + cbn in H0. discriminate.
+Qed.
+
+
+Fixpoint list_to_1 (n:nat) : list nat :=
+  match n with
+  | 0 => nil
+  | S 0 => nil
+  | S n => n :: (list_to_zero n)
+  end.
+
+Goal
+  forall dts nm t q t0,
+  fold_left
+    (fun (bod:Term) (ndx:nat) =>
+       instantiate (TFix (dcons nm t q dts) ndx) 0 bod)
+    (list_to_zero (dlength dts)) t0 =
+  instantiate (TFix (dcons nm t q dts) 0) 0
+    (fold_left
+       (fun (bod:Term) (ndx:nat) =>
+       instantiate (TFix (dcons nm t q dts) ndx) 0 bod)
+       (list_to_zero (dlength dts)) t0).
+Proof.
+  induction dts; intros. reflexivity. cbn. rewrite <- IHdts.
+
+
+
+  
+Goal
+  forall m dts nm t q,
+      whFixStep (dcons nm t q dts) (S m) =
+      match (whFixStep dts m) with
+      | Some s => Some (instantiate (TFix (dcons nm t q dts) 0) 0 s)
+      | None => None
+      end.
+Proof.
+  intros. unfold whFixStep.
+  replace (dlength (dcons nm t q dts)) with (S (dlength dts)); try reflexivity.
+  rewrite list_to_zero_S.
+  replace (dnthBody (S m) (dcons nm t q dts)) with (dnthBody m dts);
+    try reflexivity.
+  - destruct (dnthBody m dts); try reflexivity.
+    cbn. apply f_equal.
+
+  - rewrite fold_left_app.
+  Check (fold_left_app
+           (fun (bod : Term) (ndx : nat) =>
+              instantiate (TFix (dcons nm t q dts) ndx) 0 bod)
+           (dlength dts :: nil) (list_to_zero (dlength dts))).
+
+
+  Goal
+  forall m dts,
+    m < S (dlength dts) ->
+    forall nm t q,
+      whFixStep (dcons nm t q dts) m =
+      match (whFixStep dts 1) with
+      | Some s => Some (instantiate (TFix (dcons nm t q dts) 0) 0 s)
+      | None => None
+      end.
+Proof.
+  intros. unfold whFixStep.
+  replace (dlength (dcons nm t q dts)) with (S (dlength dts)); try reflexivity.
+  rewrite list_to_zero_S.
+  Check (fold_left_app
+           (fun (bod : Term) (ndx : nat) =>
+              instantiate (TFix (dcons nm t q dts) ndx) 0 bod)
+           (dlength dts :: nil) (list_to_zero (dlength dts))).
+
+  
+  Goal
+  forall m dts,
+    m < S (dlength dts) ->
+    forall nm t q,
+      whFixStep (dcons nm t q dts) m =
+      match (whFixStep dts 1) with
+      | Some s => Some (instantiate (TFix (dcons nm t q dts) 0) 0 s)
+      | None => None
+      end.
+Proof.
+  intros. rewrite whFixStep_whFixStep_rev.
+  unfold whFixStep_rev.
+  replace (dlength (dcons nm t q dts)) with (S (dlength dts)); try reflexivity.
+  rewrite list_to_n_S.
+  Check fold_right_app.
+  rewrite fold_right_app.
+  - cbn.
+
+  
+  case_eq m; intros.
+  - subst m. cbn in H2. myInjection H2.
+
+Goal
+  forall dts a, WFTrmDs dts a ->
+  forall nm t0 t1 q, dts = (dcons nm t0 q (dunit nm t1 q)) ->
+  forall n, a = (S (S n)) ->
+    forall bod m, whFixStep (dcons nm t0 q (dunit nm t1 q)) m = Some bod ->
+                 WFTrm bod n.
+Proof.
+  intros.
+  rewrite whFixStep_whFixStep_rev in H2. unfold whFixStep_rev. induction m.
+  - cbn in H2. myInjection H2. apply instantiate_pres_WFTrm; try omega.
+    + inversion_Clear H. inversion_Clear H7.
+      apply instantiate_pres_WFTrm; try omega; try assumption.
+      constructor. constructor; try assumption.
+      * cbn. apply (proj1 WFTrm_up).
+        replace (n + 2) with (S (S n)). assumption. omega.
+      * constructor. cbn. apply (proj1 WFTrm_up).
+        replace (n + 2) with (S (S n)). assumption. omega. assumption.
+        constructor.
+    + inversion_Clear H. inversion_Clear H7. constructor. constructor.
+      * cbn. replace (n + 2) with (S (S n)). assumption. omega.
+      * assumption.
+      * constructor; auto. cbn.
+        replace (n + 2) with (S (S n)). assumption. omega.
+  - apply IHm.
+    unfold whFixStep_rev in H2. case_eq m; intros.
+    + subst m. cbn in H2. myInjection H2. cbn.
+
+
+    
+    case_eq (nat_compare (S m) (dlength dts)); intros.
+    + pose proof (proj1 (nat_compare_eq_iff _ _) H3) as j0.
+      assert (j1: m < dlength dts). omega.
+      rewrite <- H0 in H2. erewrite dnthBody_None in H2. discriminate. omega.
+    + pose proof (proj2 (nat_compare_lt _ _) H3) as j0.
+      assert (j1: m < dlength dts). omega.
+      rewrite <- H0 in H2. rewrite <- H0 in IHm.
+      edestruct (dnthBody_Some _ j1) as [y0 jy].
+      rewrite jy in IHm. edestruct (dnthBody_Some _ j0) as [z0 jz].
+      rewrite jz in H2. apply IHm. apply f_equal. myInjection H2.
+      
+    destruct (dnthBody_Some _ j1) as [y0 jy].
+    rewrite <- H0 in IHm. rewrite jy in IHm.
+    rewrite <- H0 in H2. erewrite dnthBody_None in H2. discriminate.
+
+    destruct m. cbn in H2. cbn in IHm.
+    + myInjection H2. apply IHm. apply f_equal. cbn. myInjection H2. reflexivity.
+
+
+      
+Goal
+  forall nm t0 t1 q n,
+    WFTrmDs (dcons nm t0 q (dunit nm t1 q)) (S (S n)) ->
+    forall bod m, whFixStep (dcons nm t0 q (dunit nm t1 q)) m = Some bod ->
+                 WFTrm bod n.
+Proof.
+  unfold whFixStep. intros. destruct m.
+  - cbn in H0. myInjection H0.
+    apply instantiate_pres_WFTrm; try omega.
+    + apply instantiate_pres_WFTrm; try omega.
+      * inversion_Clear H. assumption.
+      * constructor. cbn.
+        replace (S (n + 2)) with (S (S (S n))); try omega.
+        apply (proj2 (proj2 (proj2 WFTrm_up))). assumption.
+    + constructor. cbn.
+        replace (n + 2) with (S (S n)); try omega. assumption.
+  - destruct m. cbn in H0. myInjection H0.
+    + apply instantiate_pres_WFTrm; try omega.
+      * apply instantiate_pres_WFTrm; try omega.
+        inversion_Clear H. inversion_Clear H7. assumption.
+        constructor. cbn.
+        replace (S (n + 2)) with (S (S (S n))); try omega.
+        apply (proj2 (proj2 (proj2 WFTrm_up))). assumption.
+      * inversion_Clear H. inversion_Clear H7.
+        constructor. cbn.
+        replace (n + 2) with (S (S n)); try omega.
+        constructor; try assumption.
+        constructor; try assumption.
+    + cbn in H0. discriminate.
+Qed.
+
+(**********
+Lemma whFixStep_S:
+  forall dts nm t q m,
+    whFixStep (dcons nm t q dts) (S m) = whFixStep dts m.
+Proof.
+  induction dts; intros.
+  - reflexivity.
+  - unfold whFixStep. rewrite dnthBody_S.
+    destruct (dnthBody m (dcons n t n0 dts)); try reflexivity.
+    apply f_equal. unfold list_to_zero.
+    replace (dlength (dcons nm t0 q (dcons n t n0 dts)))
+      with (S (S (dlength dts))).
+    replace (dlength (dcons n t n0 dts)) with (S (dlength dts)).
+    cbn.
+**************)
+    
+Goal
+  forall dts a, WFTrmDs dts a ->
+  forall nm t0 t1 q, dts = (dcons nm t0 q (dunit nm t1 q)) ->
+  forall n, a = (S (S n)) ->
+    forall bod m, whFixStep (dcons nm t0 q (dunit nm t1 q)) m = Some bod ->
+                 WFTrm bod n.
+Proof.
+  induction 1; cbn; intros.
+  - discriminate.
+  - myInjection H2. destruct m.
+    + cbn in H4. myInjection H4. apply instantiate_pres_WFTrm; try omega.
+      *{ apply instantiate_pres_WFTrm; try omega; try assumption.
+         constructor. constructor; try assumption.
+         - cbn. apply (proj1 WFTrm_up).
+           replace (n0 + 2) with (S (S n0)). assumption. omega.
+         - constructor.
+           + inversion_Clear H1. cbn. apply (proj1 WFTrm_up).
+             replace (n0 + 2) with (S (S n0)). assumption. omega.
+           + admit.
+           + constructor. }
+      *{ constructor. constructor; try assumption.
+         - cbn. replace (n0 + 2) with (S (S n0)). assumption. omega.
+         - constructor.
+           + inversion_Clear H1. cbn. 
+             replace (n0 + 2) with (S (S n0)). assumption. omega.
+           + admit.
+           + constructor. }
+    + rewrite dnthBody_S in H4.
+
+
+
+
+      eapply IHWFTrmDs; try reflexivity.
+    + inversion_Clear H1. clear H10.
+ ******************)
+  

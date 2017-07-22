@@ -78,6 +78,7 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
                    LookupTyp ipkgNm p pars ipkg ->
                    getInd ipkg inum = Ret itp ->
                    getCnstr itp cnum = Ret cstr ->
+                   CnstrArity cstr = tlength args ->
                    crctTerms p n args ->
                    crctTerm p n (TConstruct (mkInd ipkgNm inum) cnum args)
 | ctCase: forall p n m mch brs,
@@ -204,7 +205,7 @@ Proof.
   try (specialize (H4 _ H5); contradiction).
   - unfold LookupDfn in H1. elim (Lookup_fresh_neq H1 H2). reflexivity.
   - unfold LookupTyp in H. destruct H.
-    elim (Lookup_fresh_neq H H4). reflexivity.
+    elim (Lookup_fresh_neq H H5). reflexivity.
   - specialize (H0 _ H2). contradiction.
   - specialize (H2 _ H4). contradiction.
   - inversion H6. 
@@ -290,10 +291,10 @@ Proof.
   - econstructor; try eassumption.
     + unfold LookupTyp in *. split; intuition.
       eapply Lookup_strengthen. eassumption. reflexivity.
-      inversion_Clear H4.
-      * elim H5. constructor.
+      inversion_Clear H5.
+      * elim H6. constructor.
       * assumption.
-    + eapply H3. reflexivity. intros h. elim H5. apply PoCnstrA.
+    + eapply H4. reflexivity. intros h. elim H6. apply PoCnstrA.
       assumption.
   - econstructor; try eassumption.
     + eapply H0. reflexivity. intros h. elim H4. constructor. assumption.
@@ -363,7 +364,7 @@ Lemma pre_Crct_LookupDfn_Crct:
 Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros; unfold LookupDfn in *;
   try (eapply H0; eassumption); try (eapply H1; eassumption).
-  - eapply H3; eassumption.          
+  - eapply H4; eassumption.          
   - inversion H.
   - inversion_Clear H2.
     + apply Crct_weaken; assumption.
@@ -535,6 +536,8 @@ Proof.
     + apply H; try eassumption.
     + apply H0; try eassumption.
   - inversion_Clear H1. econstructor; try eassumption.
+    rewrite H11. erewrite Instantiates_pres_tlength; try eassumption.
+    reflexivity.
     apply H; try eassumption.
   - inversion_Clear H2. constructor; try assumption.
     + apply H; try eassumption.

@@ -21,50 +21,51 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | waPrf: forall fn arg,
     WcbvEval p fn TProof -> WcbvEval p (TApp fn arg) TProof
 | wLam: forall nm bod,
-          WcbvEval p (TLambda nm bod) (TLambda nm bod)
+    WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wConstruct: forall i r args args',
-                WcbvEvals p args args' ->
-                WcbvEval p (TConstruct i r args) (TConstruct i r args')
+    WcbvEvals p args args' ->
+    WcbvEval p (TConstruct i r args) (TConstruct i r args')
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
 | wConst: forall nm (t s:Term),
-            LookupDfn nm p t -> WcbvEval p t s -> WcbvEval p (TConst nm) s
+    LookupDfn nm p t -> WcbvEval p t s -> WcbvEval p (TConst nm) s
 | wAppLam: forall (fn bod a1 a1' s:Term) (nm:name),
-               WcbvEval p fn (TLambda nm bod) ->
-               WcbvEval p a1 a1' ->
-               WcbvEval p (whBetaStep bod a1') s ->
-               WcbvEval p (TApp fn a1) s
+    WcbvEval p fn (TLambda nm bod) ->
+    WcbvEval p a1 a1' ->
+    WcbvEval p (whBetaStep bod a1') s ->
+    WcbvEval p (TApp fn a1) s
 | wLetIn: forall (nm:name) (dfn bod dfn' s:Term),
-            WcbvEval p dfn dfn' ->
-            WcbvEval p (instantiate dfn' 0 bod) s ->
-            WcbvEval p (TLetIn nm dfn bod) s
+    WcbvEval p dfn dfn' ->
+    WcbvEval p (instantiate dfn' 0 bod) s ->
+    WcbvEval p (TLetIn nm dfn bod) s
 | wAppFix: forall dts m (x fn arg s:Term),
     WcbvEval p fn (TFix dts m) ->
     whFixStep dts m = Some x ->
     WcbvEval p (TApp x arg) s ->
     WcbvEval p (TApp fn arg) s
 | wAppCong: forall fn efn arg arg1,
-              WcbvEval p fn efn ->
-              ~ isLambda efn -> ~ isFix efn -> TProof <> efn ->
-              WcbvEval p arg arg1 ->
-              WcbvEval p (TApp fn arg) (TApp efn arg1)
+    WcbvEval p fn efn ->
+    ~ isLambda efn -> ~ isFix efn -> TProof <> efn ->
+    WcbvEval p arg arg1 ->
+    WcbvEval p (TApp fn arg) (TApp efn arg1)
 | wCase: forall mch i j n args brs cs s,
-           WcbvEval p mch (TConstruct j n args) ->
-           whCaseStep n args brs = Some cs ->
-           WcbvEval p cs s ->
-           WcbvEval p (TCase i mch brs) s
+    WcbvEval p mch (TConstruct j n args) ->
+    i = j ->
+    whCaseStep n args brs = Some cs ->
+    WcbvEval p cs s ->
+    WcbvEval p (TCase i mch brs) s
 | wCaseCong: forall i mch emch brs,
-           WcbvEval p mch emch ->
-           ~ isConstruct emch ->
-           WcbvEval p (TCase i mch brs) (TCase i emch brs)
+    WcbvEval p mch emch ->
+    ~ isConstruct emch ->
+    WcbvEval p (TCase i mch brs) (TCase i emch brs)
 | wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
-| wNil: WcbvEvals p tnil tnil
-| wCons: forall t t' ts ts',
-           WcbvEval p t t' -> WcbvEvals p ts ts' -> 
-           WcbvEvals p (tcons t ts) (tcons t' ts').
+     | wNil: WcbvEvals p tnil tnil
+     | wCons: forall t t' ts ts',
+         WcbvEval p t t' -> WcbvEvals p ts ts' -> 
+         WcbvEvals p (tcons t ts) (tcons t' ts').
 Hint Constructors WcbvEval WcbvEvals.
 Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
-     with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
+  with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
 Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
 
 Inductive WcbvEval_env : environ Term -> environ Term -> Prop :=
@@ -476,10 +477,14 @@ Function wcbvEval
     | TCase i mch brs =>
       match wcbvEval n mch with
       | Exc str => Exc str
-      | Ret (TConstruct _ ix args) =>
-        match whCaseStep ix args brs with
-        | None => raise "wcbvEval: Case, whCaseStep"
-        | Some cs => wcbvEval n cs
+      | Ret (TConstruct j ix args) =>
+        match inductive_dec i j with
+          | left _ =>
+            match whCaseStep ix args brs with
+            | None => raise "wcbvEval: Case, whCaseStep"
+            | Some cs => wcbvEval n cs
+            end
+          | right _ =>raise "wcbvEval: Case, constructor of wrong type"
         end
       | Ret mch' => ret (TCase i mch' brs)
       end
@@ -546,7 +551,7 @@ Proof.
       * subst. contradiction.
       * apply neq_sym. assumption.
   - subst. specialize (H _ e1). specialize (H0 _ p1). 
-    refine (wCase _ _ _ _ _); try eassumption.
+    refine (wCase _ _ _ _ _); try eassumption. reflexivity.
   - specialize (H _ e1). 
     eapply wCaseCong; try assumption. 
     destruct mch'; try not_isConstruct. contradiction. 
@@ -610,7 +615,10 @@ Proof.
     exists (S (max x x0)). intros m hm. cbn.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     rewrite (j m (max x x0)); try omega.
-    rewrite hx; try omega. rewrite e; try omega. apply hx0; try omega.
+    rewrite hx; try omega. rewrite e0, e.
+    destruct (inductive_dec j0 j0).
+    + apply hx0; try omega.
+    + intuition.
   - destruct H. exists (S x). intros m h. cbn.
     rewrite (j m x); try omega. rewrite (H (m - 1)); try omega.
     destruct emch; try rewrite H0; try reflexivity; try omega.
@@ -662,5 +670,3 @@ Proof.
   - destruct (IHts t) as [x0 [x1 jx]]. rewrite jx. exists (tcons t0 x0), x1.
     cbn. reflexivity.
 Qed.
-  
-

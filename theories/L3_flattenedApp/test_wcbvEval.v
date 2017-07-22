@@ -646,8 +646,11 @@ Time Definition PGcdx := Eval vm_compute in (program_Program pGcdx).
 Time Definition Penv_Gcdx := env PGcdx.
 Time Definition Pmain_Gcdx := AstCommon.main PGcdx.
 Time Definition ans_Gcdx :=
- Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
-Print ans_Gcdx.
+  Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
+Goal (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx) =
+Ret (SS (SS (ZZ tnil :t: tnil) :t: tnil)).
+  reflexivity.
+Qed.
 
 
 Require Import Benchmarks.vs.

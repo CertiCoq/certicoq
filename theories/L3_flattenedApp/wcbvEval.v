@@ -89,6 +89,14 @@ Goal WcbvEval nil xxxx xxxx.
 unfold xxxx, xx. eapply wAppLam. eapply wLam. eapply wLam.
 Abort.
 
+Lemma WcbvEvals_pres_tlength:
+  forall p ts ss, WcbvEvals p ts ss -> tlength ts = tlength ss.
+Proof.
+  induction ts; intros; inversion_Clear H.
+  - reflexivity.
+  - cbn. erewrite IHts; try eassumption. reflexivity.
+Qed.
+
 Lemma WcbvEval_weaken:
   forall p,
     (forall t s, WcbvEval p t s -> forall nm ec, fresh nm p ->
@@ -224,7 +232,8 @@ Proof.
     try (inversion_Clear H; intuition);
     try (inversion_Clear H0; intuition);
     try (inversion_Clear H1; intuition).
-  - econstructor; try eassumption. intuition.
+  - econstructor; try eassumption; intuition.
+    rewrite H9. eapply WcbvEvals_pres_tlength; try eassumption.
   - erewrite (@LookupDfn_single_valued Term _ _ _ _ l H5) in H.
     eapply H. eapply LookupDfn_pres_Crct; try eassumption.
   - inversion_Clear H2. specialize (H _ H7). specialize (H0 _ H8).
@@ -238,7 +247,6 @@ Proof.
   - apply H0. eapply whCaseStep_pres_Crct; try eassumption.
     specialize (H _ H6). inversion_Clear H. assumption.
 Qed.
-
 
 
 (************  in progress  ****

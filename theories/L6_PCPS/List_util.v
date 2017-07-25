@@ -13,6 +13,16 @@ Import ListNotations.
 
 Ltac inv H := inversion H; clear H; subst.
 
+
+(* returns [n, n+m[ *)
+ Fixpoint fromN (n:N) (m:nat): list N :=
+  match m with
+  | 0 => nil
+  | S m'  => n::(fromN (BinNat.N.succ n)  m')
+  end.
+ 
+
+  
 (** Definition of [nthN]. Same as [nth_error] but the argument is
   * of type [N] instead of [nat] *)
 Function nthN {A: Type} (al: list A) (n: N) : option A :=

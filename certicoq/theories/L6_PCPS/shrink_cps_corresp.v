@@ -3,8 +3,8 @@ Require Import Coq.Relations.Relations.
 Require Import Coq.Setoids.Setoid.
 Require Import Coq.Classes.Morphisms.
 Import RelationClasses.
-
-
+  
+  
 
 Require Import ExtLib.Data.Bool.
 Require compcert.lib.Maps.
@@ -18,6 +18,9 @@ Require Import compcert.lib.Coqlib L6.Ensembles_util.
 Require Import L6.cps.
 Require Import L6.ctx L6.logical_relations.
 Require Import L6.cps_util L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers  L6.stemctx.
+
+
+
 Require Import L6.shrink_cps_correct.
 
 
@@ -7699,7 +7702,7 @@ Section CONTRACT.
         gsr_clos ce ce' /\ c_count ce' count' /\ inl_inv im' sub ce' /\
         sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) e' .
   Proof.
-    intros e sub inl. remember (1 + term_sub_inl_size (e, sub,inl)) as n. assert (n > term_sub_inl_size (e, sub, inl)). omega. clear Heqn. revert e sub inl H. induction n; intros. inversion H. destruct e; rewrite contract_eq in H6.
+    intros e sub inl. remember (1 + term_sub_inl_size (e, sub,inl)) as n. assert (n > term_sub_inl_size (e, sub, inl)). omega. clear Heqn. revert e sub inl H. induction n; intros. inversion H. destruct e; rewrite contract_eq in H6; unfold contract_def in H6.
     - (* constr *)
       destruct (get_c v count) eqn:gvc.
       + (* dead constr *)
@@ -8967,7 +8970,7 @@ Section CONTRACT.
         apply cmap_view_proj; auto.
         repeat normalize_ctx.
         apply sig_inv_full_push. simpl. simpl in H5. auto.            
-    - (* fun *)
+    - (* fun *) 
       remember (precontractfun sig count sub f).
       destruct p.
       destruct p.
@@ -10361,6 +10364,7 @@ Section CONTRACT.
       inv H1.
     }
   Qed.
+
 
 
 End CONTRACT.

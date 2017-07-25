@@ -32,7 +32,7 @@ Proof.
   simpl in H. edestruct (M.elt_eq c' c).
   - inv H. now left.
   - right. eauto.
-Qed.
+Defined.
    
 Lemma findtag_append_spec {A} c P P' (v : A) :
   findtag (P ++ P') c = Some v ->
@@ -793,13 +793,38 @@ Definition subfds_e: fundefs -> exp -> Prop :=
   fun fds  e =>
     exists fds' e', subterm_or_eq (Efun fds' e') e /\  subfds_or_eq fds fds'.
 
-Definition subfds_or_eq_left:
+
+Theorem subfds_rebase:
+  forall fds v f l e fds', 
+  subfds_fds (Fcons v f l e fds) fds' ->
+  subfds_fds fds fds'.
+Proof.
+  induction fds'; intros.
+  inv H.
+  apply IHfds' in H2. constructor. auto.
+  constructor. constructor 2.
+  inv H.
+Qed.
+
+Theorem subfds_trans:
+  forall fds' fds fds'',
+    subfds_fds fds fds' -> subfds_fds fds' fds'' -> subfds_fds fds fds''.
+Proof.
+  induction fds'; intros.
+  - inv H.
+    apply subfds_rebase in H0. eapply IHfds'; eauto.
+    apply subfds_rebase in H0. auto.
+  - inv H.
+Qed.
+    
+Theorem subfds_or_eq_left:
   forall fds' fds fds'',
     subfds_fds fds fds' -> subfds_or_eq fds' fds'' -> subfds_or_eq fds fds''.
 Proof.
-  induction fds'; intros.
-  - inversion H; subst. eapply IHfds'. apply H3. admit. admit.
-Admitted.  
+  intros. inv H0.
+  - left. eapply subfds_trans; eauto. 
+  - left. auto.
+Qed.
 
 Theorem subfds_e_subfds:
   forall fds e fds', subfds_fds fds' fds -> subfds_e fds e -> subfds_e fds' e.

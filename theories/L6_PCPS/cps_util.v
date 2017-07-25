@@ -1425,8 +1425,8 @@ Proof.
   apply num_occur_app_ctx. exists m, 1; auto.
   eapply plus_reg_l.
   eapply (proj1 (num_occur_det _)). 
-  rewrite NPeano.Nat.add_comm.
+  rewrite Nat.add_comm.
   apply H2.
-  rewrite NPeano.Nat.add_comm.
+  rewrite Nat.add_comm.
   apply H3.
 Qed.      

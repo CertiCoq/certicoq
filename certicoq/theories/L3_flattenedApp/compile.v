@@ -15,6 +15,7 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
+Notation lunit x := (cons x nil).
 
 Definition L2_5Term := L2_5.compile.Term.
 Definition L2_5Terms := L2_5.compile.Terms.
@@ -469,6 +470,13 @@ Proof.
   - cbn. rewrite IHts. reflexivity.
 Qed.
 
+Lemma mkApp_tl:
+  forall bs fn b, mkApp fn (tappend bs (tunit b)) = TApp (mkApp fn bs) b.
+Proof.
+  induction bs; intros.
+  - reflexivity.
+  - cbn. rewrite IHbs. reflexivity.
+Qed.
 
 Function strip (t:L2_5Term) : Term :=
   match t with
@@ -531,6 +539,12 @@ Lemma tappend_hom:
 Proof.
   induction ts; intros us; simpl. reflexivity.
   rewrite IHts. reflexivity.
+Qed.
+
+Lemma TFix_hom:
+  forall defs n,
+    strip (L2_5.compile.TFix defs n) = TFix (stripDs defs) n.
+reflexivity.
 Qed.
 
 
@@ -606,12 +620,6 @@ Proof.
   - myInjection H. reflexivity.
 Qed.
                                          
-Lemma TFix_hom:
-  forall defs n,
-    strip (L2_5.compile.TFix defs n) = TFix (stripDs defs) n.
-reflexivity.
-Qed.
-
 Lemma TProd_hom:
   forall nm bod,
     strip (L2_5.compile.TProd nm bod) = TProd nm (strip bod).

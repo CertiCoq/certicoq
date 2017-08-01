@@ -37,11 +37,11 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p dfn dfn' ->
     WcbvEval p (instantiate dfn' 0 bod) s ->
     WcbvEval p (TLetIn nm dfn bod) s
-| wAppFix: forall dts m (x fn arg s:Term),
+| wAppFix: forall dts m (fn arg s x:Term),
     WcbvEval p fn (TFix dts m) ->
-    whFixStep dts m = Some x ->
-    WcbvEval p (TApp x arg) s ->
-    WcbvEval p (TApp fn arg) s
+    dnthBody m dts = Some x ->
+    WcbvEval p (pre_whFixStep x dts arg) s ->
+    WcbvEval p (TApp fn arg) s 
 | wAppCong: forall fn efn arg arg1,
     WcbvEval p fn efn ->
     ~ isLambda efn -> ~ isFix efn -> TProof <> efn ->
@@ -132,46 +132,6 @@ Proof.
   apply WcbvEvalEvals_ind; cbn; intros; auto.
 Qed.
 
-(****
-Lemma WcbvEval_pres_Crct:
-  (forall p n t, crctTerm p n t ->
-                forall s, WcbvEval p t s -> crctTerm p n s) /\
-  (forall p n t, crctTerms p n t ->
-                forall s, WcbvEvals p t s -> crctTerms p n s) /\
-  (forall p n t, crctBs p n t -> True) /\
-  (forall p n t, crctDs p n t -> True) /\
-  (forall p, crctEnv p -> True).
-Proof.
-  apply crctCrctsCrctBsDsEnv_ind; intros; trivial;
-    try (inversion_Clear H1; constructor; assumption).
-  - inversion_Clear H2.
-  - inversion_Clear H3. specialize (H0 _ H8).
-*****)
-
-
-(****************************
-Lemma WcbvEval_pres_Crct:
-    (forall p m t, crctTerm p m t ->
-                 forall s, WcbvEval p t s -> crctTerm p m s) /\
-    (forall p m ts, crctTerms p m ts ->
-                  forall ss, WcbvEvals p ts ss -> crctTerms p m ss) /\
-    (forall p m ts, crctBs p m ts -> True) /\
-    (forall p m ts, crctDs p m ts -> True) /\
-    (forall p, crctEnv p -> True).
-Proof.
-  apply crctCrctsCrctBsDsEnv_ind; intros;
-    try (solve[inversion H2]);
-    try (inversion_Clear H1; econstructor; intuition);
-    try (inversion_Clear H2; econstructor; intuition);
-    try (inversion_Clear H; econstructor; intuition);
-    try (inversion_Clear H3; econstructor; intuition).
-  - inversion_Clear H3. eapply H0. eapply instantiate_pres_Crct.  
-
-  - inversion H1. constructor. assumption.
-  - inversion_Clear H1. constructor. assumption.
-  -
- ******************************)
-
 Lemma dnthBody_pres_WFTrmDs:
   forall dts n,
     (forall m fs, dnthBody m dts = Some fs -> WFTrm fs n /\ isLambda fs) ->
@@ -216,7 +176,11 @@ Proof.
   - eapply H0. apply instantiate_pres_WFTrm; intuition. 
   - specialize (H _ H4). inversion_Clear H. eapply H0.
     constructor; try assumption.
-    eapply whFixStep_pres_WFTrm; try eassumption.
+    apply fold_left_pres_WFTrm.
+    + intros. apply instantiate_pres_WFTrm; try assumption; try omega.
+      constructor. eapply WFTrmDs_Up. eassumption. omega.
+    + apply (dnthBody_pres_WFTrm _ e).
+      rewrite list_to_zero_length. assumption.
   - apply H0. eapply whCaseStep_pres_WFTrm; try eassumption.
     specialize (H _ H6). inversion_Clear H. assumption.
 Qed.
@@ -244,9 +208,46 @@ Proof.
     apply H. assumption.
   - specialize (H _ H6). inversion_Clear H. eapply H0.
     constructor; try assumption.
-    eapply whFixStep_pres_Crct; try eassumption.
+    apply fold_left_pres_Crct.
+    + intros. apply instantiate_pres_Crct; try assumption; try omega.
+      constructor. eapply CrctDs_Up. eassumption. omega.
+      eapply In_list_to_zero. assumption.
+    + apply (dnthBody_pres_Crct _ e). eapply CrctDs_Up. eassumption. 
+      rewrite list_to_zero_length. omega.
   - apply H0. eapply whCaseStep_pres_Crct; try eassumption.
     specialize (H _ H6). inversion_Clear H. assumption.
+Qed.
+
+Lemma WcbvEval_mkApp_WcbvEval:
+  forall p args s t,
+    WcbvEval p (mkApp s args) t -> exists u, WcbvEval p s u.
+Proof.
+  induction args; intros.
+  - cbn in H. exists t. assumption.
+  - cbn in *. specialize (IHargs _ _ H). destruct IHargs as [x jx].
+    inversion_clear jx.
+    + exists TProof. assumption.
+    + exists (TLambda nm bod). assumption.
+    + exists (TFix dts m). assumption.
+    + exists efn. assumption.
+Qed.
+
+Lemma WcbvEval_mkApp_TApp_WcbvEval:
+  forall p args s a t,
+    WcbvEval p (mkApp (TApp s a) args) t -> exists u, WcbvEval p s u.
+Proof.
+  induction args; intros; cbn in *.
+  - inversion_clear H.
+    + exists TProof. assumption.
+    + exists (TLambda nm bod). assumption.
+    + exists (TFix dts m). assumption.
+    + exists efn. assumption.
+  - specialize (IHargs _ _ _ H). destruct IHargs as [x jx].
+    + inversion_clear jx.
+      * exists TProof. assumption.
+      * exists (TLambda nm bod). assumption.
+      * exists (TFix dts m). assumption.
+      * exists efn. assumption.
 Qed.
 
 
@@ -462,10 +463,10 @@ Function wcbvEval
         | Exc s =>  raise ("wcbvEval TApp: beta, arg doesn't eval: " ++ s)
         | Ret b1 => wcbvEval n (whBetaStep bod b1)
         end
-      | Ret (TFix dts m) =>    (* fix redex *)
-        match whFixStep dts m with
-        | None => raise "TApp, Fix redex, whFixStep"
-        | Some x => wcbvEval n (TApp x a1)
+      | Ret (TFix dts m) =>           (* Fix redex *)
+        match dnthBody m dts with
+        | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
+        | Some x => wcbvEval n (pre_whFixStep x dts a1)
         end
       | Ret TProof => Ret TProof  (* proof redex *)
       | Ret T =>  (* App congruence *)

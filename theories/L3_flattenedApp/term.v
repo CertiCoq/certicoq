@@ -108,6 +108,40 @@ with TrmDsSize (ds:Defs) : nat :=
   end.
 
 
+Definition isApp (t:Term) : Prop :=
+  exists fn arg, t = TApp fn arg.
+Lemma IsApp: forall fn arg, isApp (TApp fn arg).
+intros. exists fn, arg. reflexivity.
+Qed.
+Hint Resolve IsApp.
+
+Ltac isApp :=
+  match goal with
+    | |- isApp (TApp ?fn ?arg) => exists fn, arg; reflexivity
+  end.
+
+Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
+induction t;
+  try (right; intros h; destruct h as [fn [arg k]]; discriminate). 
+left. auto.
+Qed.
+
+Lemma mkApp_isApp:
+  forall ts fn t, isApp (mkApp fn (tcons t ts)).
+Proof.
+  induction ts; intros.
+  - cbn. auto.
+  - cbn. apply IHts.
+Qed.
+
+Lemma isApp_mkApp_TApp:
+  forall args fn arg, isApp (mkApp (TApp fn arg) args).
+Proof.
+  induction args; intros.
+  - cbn. auto.
+  - cbn. apply IHargs.
+Qed.
+      
 Definition isLambda (t:Term) : Prop :=
   exists nm bod, t = TLambda nm bod.
 Lemma IsLambda: forall nm bod, isLambda (TLambda nm bod).
@@ -122,39 +156,18 @@ induction t;
 left. auto.
 Qed.
 
-Definition isApp (t:Term) : Prop :=
-  exists fn arg, t = TApp fn arg.
-Lemma IsApp: forall fn arg, isApp (TApp fn arg).
-intros. exists fn, arg. reflexivity.
-Qed.
-Hint Resolve IsApp.
-
-Ltac isApp :=
-  match goal with
-    | |- isApp (TApp ?fn ?arg) => exists fn, arg; reflexivity
-  end.
-
-(***
-Lemma mkApp_tcons:
-  forall (fn arg:Term) (args:Terms), isApp (mkApp fn (tcons arg args)).
+Lemma isLambda_strip_invrt:
+  forall fn, isLambda (strip fn) ->
+             (L2_5.term.isLambda fn) \/ (L2_5.term.isCast fn).
 Proof.
-  induction args; cbn; intros; destruct fn; try isApp.
-  - admit.
-  - cbn in IHargs. exists (TRel n), arg. reflexivity.
- ***)
-
-Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
-induction t;
-  try (right; intros h; destruct h as [fn [arg k]]; discriminate). 
-left. auto.
-Qed.
-
-Lemma mkApp_isApp:
-  forall ts fn t, isApp (mkApp fn (tcons t ts)).
-Proof.
-  induction ts; intros.
-  - cbn. auto.
-  - cbn. apply IHts.
+  induction fn; intros; destruct H; try destruct H;
+    try (cbn in *; discriminate).
+  - right. exists fn. reflexivity.
+  - left. exists n, fn. reflexivity.
+  - change (mkApp (strip fn1) (tcons (strip fn2)  (strips t)) = TLambda x x0)
+      in H.
+    destruct (mkApp_isApp (strips t) (strip fn1) (strip fn2)) as [z0 [z1 jz]].
+    rewrite jz in H. discriminate.
 Qed.
 
 Definition isFix (t:Term) : Prop :=

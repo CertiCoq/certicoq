@@ -524,26 +524,155 @@ Proof.
   rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
 Qed.
 
-
-(***
-Goal
-  forall args fn arg,
-    strip (L2_5.compile.TApp fn arg args) =
-    TApp (strip fn) (strips args)) (strip arg).
+Lemma dlength_hom:
+  forall dts, dlength (stripDs dts) = L2_5.compile.dlength dts.
 Proof.
-  destruct fn; cbn; induction args; cbn; intros;
-  try reflexivity; try rewrite <- tappend_assoc; cbn.
-  - rewrite IHargs. unfold pre_mkApp. unfold pre_mkApp in IHt.
- ***)
+  induction dts; cbn. reflexivity. rewrite IHdts. reflexivity.
+Qed.
 
-Lemma isApp_mkApp_TApp:
-  forall args fn arg, isApp (mkApp (TApp fn arg) args).
+Lemma dnthBody_hom:
+  forall dts m,
+    dnthBody m (stripDs dts) =
+    option_map (fun x => strip (fst x)) (L2_5.term.dnthBody m dts).
 Proof.
-  induction args; intros.
-  - cbn. auto.
-  - cbn. apply IHargs.
+  induction dts; intros.
+  - reflexivity.
+  - case_eq m; intros.
+    + unfold dnthBody, L2_5.term.dnthBody. rewrite dcons_hom. unfold dnth.
+      reflexivity.
+    + rewrite dcons_hom.
+      change
+        (dnthBody n1 (stripDs dts) =
+         option_map (fun x : compile.L2_5Term * nat => strip (fst x))
+                    (L2_5.term.dnthBody n1 dts)).
+      rewrite <- IHdts. reflexivity.
+Qed.
+
+Lemma fold_left_hom:
+forall (F:L2_5Term -> nat -> L2_5Term) 
+       (stripF:Term -> nat -> Term) (ns:list nat) (t:L2_5Term),
+  (forall (s:L2_5Term) (n:nat), strip (F s n) = stripF (strip s) n) ->
+  strip (fold_left F ns t) = fold_left stripF ns (strip t).
+Proof.
+  induction ns; intros t h.
+  - intuition.
+  - simpl. rewrite IHns.
+    + rewrite h. reflexivity.
+    + assumption.
+Qed.
+
+Lemma L25dnthBody_dnthBody:
+  forall m dts L25bod q,
+    L2_5.term.dnthBody m dts = Some (L25bod, q) ->
+    forall t, dnthBody m (stripDs dts) = Some t -> strip L25bod = t.
+Proof.
+  induction m; induction dts; intros.
+  - cbn in H0. discriminate.
+  - specialize (IHdts L25bod). cbn in H.
+    change (Some (strip t) = Some t0) in H0.
+    myInjection H. myInjection H0. reflexivity.
+  - cbn in H. discriminate.
+  - cbn in H.
+    change (dnthBody m (stripDs dts) = Some t0) in H0.
+    specialize (IHm _ _ _ H _ H0). assumption.
+Qed.
+
+Lemma pre_whFixStep_hom:
+  forall x dts arg args,
+    mkApp (pre_whFixStep (strip x) (stripDs dts) (strip arg)) (strips args) =
+    strip (L2_5.term.pre_whFixStep x dts (L2_5.compile.tcons arg args)).
+Proof.
+  intros. unfold pre_whFixStep, L2_5.term.pre_whFixStep.
+  rewrite mkApp_hom. rewrite tcons_hom. cbn. eapply f_equal2; try reflexivity.
+  erewrite fold_left_hom.
+  - rewrite <- dlength_hom. reflexivity.
+  - intros. cbn. rewrite (proj1 instantiate_hom). rewrite TFix_hom.
+    reflexivity.
+Qed.
+
+(**********
+Lemma whFixStep_hom:
+  forall L25bod q dts m,
+    L2_5.term.dnthBody m dts = Some (L25bod, q) ->
+    forall bod,
+      dnthBody m (stripDs dts) = Some bod ->
+      forall args,
+        strip (L2_5.term.pre_whFixStep L25bod dts args) =
+        mkApp (fold_left
+                 (fun bod ndx => instantiate (TFix (stripDs dts) ndx) 0 bod)
+                 (list_to_zero (dlength (stripDs dts))) bod)
+              (strips args).
+Proof.
+  intros. unfold L2_5.term.pre_whFixStep. rewrite mkApp_hom.
+***************)
+
+Lemma whFixStep_hom:
+  forall L25bod q dts m,
+    L2_5.term.dnthBody m dts = Some (L25bod, q) ->
+    forall bod,
+      dnthBody m (stripDs dts) = Some bod ->
+      forall args,
+        strip (L2_5.term.pre_whFixStep L25bod dts args) =
+        mkApp (fold_left
+                 (fun bod ndx => instantiate (TFix (stripDs dts) ndx) 0 bod)
+                 (list_to_zero (dlength (stripDs dts))) bod)
+              (strips args).
+Proof.
+  intros. unfold L2_5.term.pre_whFixStep. rewrite mkApp_hom.
+  apply f_equal2; try reflexivity.
+  rewrite <- dlength_hom.
+  rewrite (fold_left_hom
+             (fun (bod:L2_5.compile.Term) (ndx:nat) =>
+                L2_5.term.instantiate (L2_5.compile.TFix dts ndx) 0 bod)
+             (fun (bod:Term) (ndx:nat) =>
+                instantiate (TFix (stripDs dts) ndx) 0 bod)
+             (list_to_zero (dlength (stripDs dts)))).
+  - apply f_equal2. reflexivity.
+    rewrite (@L25dnthBody_dnthBody _ _ _ _ H _ H0). reflexivity.
+  - intros. rewrite (proj1 instantiate_hom).
+    apply f_equal2; try reflexivity.
+Qed.
+
+Lemma whFixStep_hom':
+  forall L25bod q dts args m,
+    L2_5.term.dnthBody m dts = Some (L25bod, q) ->
+    whFixStep (stripDs dts) m = Some (strip L25bod) ->
+    strip (L2_5.term.pre_whFixStep L25bod dts args) =
+    mkApp  (strip L25bod) (strips args).
+Proof.
+  intros. unfold L2_5.term.pre_whFixStep. unfold whFixStep in H0.
+  case_eq (dnthBody m (stripDs dts)); intros.
+  - rewrite H1 in H0. myInjection H0.
+    rewrite mkApp_hom. apply f_equal2; try reflexivity.
+    rewrite <- H2. rewrite <- dlength_hom.
+    rewrite (fold_left_hom
+             (fun (bod:L2_5.compile.Term) (ndx:nat) =>
+                L2_5.term.instantiate (L2_5.compile.TFix dts ndx) 0 bod)
+             (fun (bod:Term) (ndx:nat) =>
+                instantiate (TFix (stripDs dts) ndx) 0 bod)
+             (list_to_zero (dlength (stripDs dts)))).
+    + apply f_equal2. reflexivity.
+      rewrite (@L25dnthBody_dnthBody _ _ _ _ H _ H1). reflexivity.
+    + intros. rewrite (proj1 instantiate_hom).
+      apply f_equal2; try reflexivity.
+  - rewrite H1 in H0. discriminate.
 Qed.
       
+Lemma isLambda_invrt:
+  forall fn, isLambda (strip fn) ->
+             L2_5.term.isLambda fn \/ L2_5.term.isCast fn.
+Proof.
+  intros fn h. destruct h as [x0 [x1 jx]].
+  destruct fn; try (cbn in jx; discriminate).
+  - right. auto.
+  - left. auto.
+  - change (mkApp (TApp (strip fn1) (strip fn2)) (strips t) =
+            TLambda x0 x1) in jx.
+    destruct (isApp_mkApp_TApp (strips t) (strip fn1) (strip fn2))
+      as [y0 [y1 jy]].
+    rewrite jx in jy. discriminate.
+Qed.
+
 Lemma TProof_mkApp_invrt:
   forall fn args, TProof = mkApp fn args -> fn = TProof /\ args = tnil.
 Proof.
@@ -563,7 +692,75 @@ Proof.
   - exists fn. intuition.
 Qed.
 
-(*****                                               
+Lemma TApp_Hom:
+  forall fn arg args,
+    strip (L2_5.compile.TApp fn arg args) =
+    mkApp (strip fn) (tcons (strip arg) (strips args)).
+  induction fn; intros arg args; try reflexivity.
+Qed.
+
+Lemma treverse_terms_ind:
+ forall (P : Terms -> Prop),
+       P tnil ->
+       (forall (a: Term) (l:Terms),
+           P (treverse l) -> P (treverse (tcons a l))) ->
+       forall l:Terms, P (treverse l).
+Proof.
+  intros. induction l.
+  - cbn. assumption.
+  - eapply H0. assumption.
+Qed.
+
+Lemma treverse_ind:
+  forall (P: Terms -> Prop),
+    P tnil ->
+    (forall (x: Term) (l: Terms), P l -> P (tappend l (tunit x))) ->
+    forall l: Terms, P l.
+Proof.
+  intros.
+  assert (j: treverse (treverse l) = l). apply treverse_involutive.
+  rewrite <-j.
+  apply treverse_terms_ind.
+  - assumption.
+  - intros. cbn. apply H0. assumption.
+Qed.
+
+Lemma WcbvEval_mkApp_step:
+  forall p fn s,
+    WcbvEval p fn s -> 
+    forall args t, WcbvEval p (mkApp s args) t ->
+                   WcbvEval p (mkApp fn args) t.
+Proof.
+  intros p fn s h0.  
+  induction args using treverse_ind; intros.
+  - cbn in *.
+    pose proof (proj1 (WcbvEval_no_further p) _ _ h0) as k.
+    rewrite <- (WcbvEval_single_valued k H). assumption.
+  - rewrite mkApp_tl. rewrite mkApp_tl in H. inversion_clear H.
+    + constructor. eapply IHargs. eassumption.
+    + specialize (IHargs _ H0). econstructor; eassumption.
+    + specialize (IHargs _ H0). econstructor; eassumption.
+    + specialize (IHargs _ H0). econstructor; eassumption.
+Qed.
+
+Lemma WcbvEval_mkApp_fn:
+  forall p args fn fn',
+   WcbvEval p fn fn' ->
+   forall s, WcbvEval p (mkApp fn args) s -> WcbvEval p (mkApp fn' args) s.
+Proof.
+  induction args using treverse_ind; intros.
+  - cbn in *. rewrite (WcbvEval_single_valued H H0).
+    eapply WcbvEval_no_further. eassumption.
+  - rewrite mkApp_tl. rewrite mkApp_tl in H0.
+    inversion_clear H0. econstructor; try eassumption.
+    + eapply IHargs; eassumption.
+    + econstructor; try eassumption. eapply IHargs; eassumption.
+    + eapply wAppFix; try eassumption. eapply IHargs; try eassumption.
+    + eapply wAppCong; try eassumption. eapply IHargs; try eassumption.
+Qed.
+  
+
+(*********                                             
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L2_5.wcbvEval.WcbvEval p t t' ->
@@ -581,18 +778,68 @@ Proof.
       * discriminate.
     + rewrite H0 in e. discriminate.
   - (* beta step in L2_5 *)
-    change
-      (WcbvEval (stripEnv p)
-                (mkApp (TApp (strip fn) (strip a1)) (strips args))
-                (strip s)).
-    cbn in H.
-    eapply WcbvEval_mkApp_step. eapply wAppLam; try eassumption.
-    rewrite whBetaStep_hom in H1. unfold whBetaStep in *.
+    rewrite whBetaStep_hom in H1.
+    destruct (WcbvEval_mkApp_WcbvEval _ _ H1) as [y jy].
+    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
+    + eapply wAppLam; eassumption.
+    + eapply WcbvEval_mkApp_fn; eassumption. 
+  - cbn. econstructor; try eassumption. rewrite <- (proj1 instantiate_hom).
+    apply H0.
+  - (* Fix in L2_5 *)
+    rewrite <- pre_whFixStep_hom in H0.
+    change (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
+    destruct (WcbvEval_mkApp_WcbvEval _ _ H0) as [y jy].
+    assert (j: dnthBody m (stripDs dts) = Some (strip x)).
+    { rewrite dnthBody_hom. rewrite e. cbn. reflexivity. }
+    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
+    + eapply wAppFix; eassumption. 
+    + eapply WcbvEval_mkApp_fn; eassumption.
+  - rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
+    + eapply wAppCong. eassumption.
+      * intros h. destruct (isLambda_invrt _ h). contradiction.
+        destruct H1 as [x jx]. subst fn'. cbn in h.
+
+        elim n. destruct h as [x0 [x1 jx]].
+
+      
+
+
+        change (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
+    erewrite whFixStep_hom in H1; try eassumption.
+    + rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
+      * eapply wAppFix. eassumption.
+        unfold whFixStep. rewrite dnthBody_hom. rewrite e. cbn.
+        reflexivity. instantiate (1:= strip s).  admit.
+
+      * eapply WcbvEval_mkApp_step. eapply H1.
+
+        Print whFixStep.   
+    unfold L2_5.term.pre_whFixStep in w1.
+    erewrite fold_left_hom in w1.
+    
+    inversion_Clear w1.
+Check (@L25dnthBody_dnthBody _ _ _ _ e).
+    
+    destruct (WcbvEval_mkApp_WcbvEval _ _ H1) as [y jy].
+    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
+    + eapply wAppFix. eassumption.
+      unfold whFixStep. rewrite dnthBody_hom. rewrite e. cbn.
+      eapply f_equal.
+      unfold L2_5.term.pre_whFixStep in w1.
+Check whFixStep_hom.
+
+    change (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
+
+rewrite whBetaStep_hom in H1. unfold whBetaStep in *.
     + instantiate (1:= whBetaStep (strip bod) (strip a1')).
       unfold whBetaStep.
     + rewrite whBetaStep_hom in H1. apply H1.
   -
 
+    Check whFixStep_hom.
+    erewrite whFixStep_hom in H1; try eassumption.
+
+    
     Check WcbvEval_mkApp_step.
 
     cbn in H.

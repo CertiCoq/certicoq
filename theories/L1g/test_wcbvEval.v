@@ -34,7 +34,7 @@ Print eval_ce_example_myent.
 **********************)
 
 
-Set Printing Width 60.
+Set Printing Width 80.
 Print and_rect.
 Quote Recursively Definition p_and_rect := and_rect.
 Print p_and_rect.
@@ -250,43 +250,6 @@ Definition P_kjhhgfkX := Eval vm_compute in (program_Program p_kjhhgfkX).
 Definition P_kjhhgfkXenv := Eval vm_compute in (env P_kjhhgfkX).
 Definition P_kjhhgfkXmain := Eval vm_compute in (main P_kjhhgfkX).
 Eval vm_compute in wcbvEval P_kjhhgfkXenv 1000 P_kjhhgfkXmain.
-(**************
-TApp
-            (TFix
-               (dcons (^ "kjhhgfk")
-                  (Pi (^ "n") NNN
-                     (Pi (^ "p")
-                        (TApp (TInd (mkInd "Coq.Init.Logic.eq" 0)) NNN
-                           (tcons (TRel 0) (tunit (TRel 0)))) NNN))
-                  (Lam (^ "n") NNN
-                     (Lam (^ "p")
-                        (TApp (TInd (mkInd "Coq.Init.Logic.eq" 0)) NNN
-                           (tcons (TRel 0) (tunit (TRel 0))))
-                        (TCase (mkInd "Coq.Init.Logic.eq" 0, 2, 0 :: nil)
-                           (Lam (^ "n") NNN
-                              (Lam (^ "p")
-                                 (TApp (TInd (mkInd "Coq.Init.Logic.eq" 0)) NNN
-                                    (tcons (TRel 2) (tunit (TRel 0)))) NNN))
-                           (TProof (TRel 0)) (tunit (TRel 1))))) 0 dnil) 0) TAx
-            (tunit
-               (TApp (TConstruct (mkInd "Coq.Init.Logic.eq" 0) 0 2) NNN
-                  (tunit TAx)))
-********************)
-
-
-(*****************************
-Goal
-  WcbvEval P_env P_main prop.
-Proof.
-  unfold P_main. eapply wConst. cbn. reflexivity.
-  eapply wAppFix.
-  - eapply wConst. cbn. reflexivity. eapply wFix.
-  - cbn. reflexivity.
-  - cbn. reflexivity.
-  - eapply wPrf. eapply wAx.
-  - cbn. (** stuck here **)
-******************)
-
 
 Function Plus1 (n : nat) {wf lt n} : nat :=
   match n with

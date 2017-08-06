@@ -43,7 +43,6 @@ Inductive wndEval : Term -> Term -> Prop :=
           dnthBody m dts = Some (x, ix) ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
-| sCast: forall t, wndEval (TCast t) t
 | sProof: forall t, wndEval (TProof t) t
                           (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
@@ -300,12 +299,6 @@ Lemma wndEval_Prod_inv:
   forall nm bod s,
     wndEval (TProd nm bod) s -> s = (TProd nm bod).
 intros nm bod s h. inversion_Clear h.
-Qed.
-
-Lemma wndEval_Cast_inv:
-  forall tm s, wndEval (TCast tm) s -> tm = s.
-inversion 1.
-- reflexivity.
 Qed.
 
 (** when reduction stops **)

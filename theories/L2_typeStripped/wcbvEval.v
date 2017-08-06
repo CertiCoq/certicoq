@@ -20,7 +20,6 @@ Set Implicit Arguments.
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProd: forall nm bod, WcbvEval p (TProd nm bod) (TProd nm bod)
-| wCast: forall t s, WcbvEval p t s -> WcbvEval p (TCast t) s
 | wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) s
 | wConstruct: forall i r np na,
                 WcbvEval p (TConstruct i r np na) (TConstruct i r np na)
@@ -315,8 +314,6 @@ Lemma WcbvEval_wndEvalRTC:
     (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> wndEvalsRTC p ts ss).
 Proof.
   intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
-  - eapply wERTCtrn. apply wERTCstep. apply sCast. apply H. 
-    inversion_Clear H0. assumption.
   - inversion_Clear H0. eapply wndEvalRTC_Proof. intuition. 
   - eapply wERTCtrn; intuition.
     eapply wERTCtrn.
@@ -425,11 +422,6 @@ Function wcbvEval
       (** note hack coding of axioms in environment **)
       | Some (ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
-      end
-    | TCast t =>
-      match wcbvEval n t with
-      | Ret et => Ret et
-      | Exc s => raise ("wcbvEval: TCast: " ++ s)
       end
     | TProof t =>
       match wcbvEval n t with
@@ -560,8 +552,6 @@ Lemma pre_WcbvEval_wcbvEval:
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   - destruct H. exists (S x). intros m hm. simpl. rewrite (j m x); try omega.
     + rewrite (H (m - 1)); try omega. reflexivity.
-  - destruct H. exists (S x). intros mm h. cbn.
-    rewrite (j mm x); try omega. rewrite H. reflexivity. omega.
   - destruct H. exists (S x). intros mm h. simpl.
     rewrite (j mm x); try omega.
     unfold lookupDfn in e. destruct (lookup nm p). destruct e0. myInjection e.

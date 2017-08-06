@@ -482,7 +482,6 @@ Function strip (t:L2_5Term) : Term :=
   match t with
     | L2_5.compile.TProof => TProof
     | L2_5.compile.TRel n => (TRel n)
-    | L2_5.compile.TCast s => strip s
     | L2_5.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2_5.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
     | L2_5.compile.TApp fn arg args =>

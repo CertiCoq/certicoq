@@ -28,7 +28,6 @@ Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
 | TProof     : Term -> Term
-| TCast      : Term -> Term -> Term
 | TProd      : name -> Term (* type *) -> Term -> Term
 | TLambda    : name -> Term (* type *) -> Term -> Term
 | TLetIn     : name ->
@@ -282,12 +281,11 @@ Function term_Term (prf:bool) (t:term) : Term :=
                     | sType _ => SType  (* throwing away sort info *)
              end)
     | tCast tm _ (tCast _ _ (tSort sProp)), _ => mkProof (term_Term true tm)
-    | tCast tm _ ty, p => (TCast (term_Term p tm) (term_Term p ty))
+    | tCast tm _ ty, p => term_Term p tm
     | tProd nm ty bod, p => (TProd nm (term_Term p ty) (term_Term p bod))
     | tLambda nm ty bod, p => (TLambda nm (term_Term p ty) (term_Term p bod))
     | tLetIn nm dfn ty bod, p =>
       (TLetIn nm (term_Term p dfn) (term_Term p ty) (term_Term p bod))
-    | tApp (tApp _ _) us, _ => TWrong "term_Term: nested App"
     | tApp fn nil, _ => TWrong "term_Term: App with no arg"
     | tApp fn (cons u us), p => TApp (term_Term p fn) (term_Term p u)
                                   (terms_Terms p term_Term us)

@@ -44,7 +44,6 @@ Inductive awndEval : Term -> Term -> Prop :=
           dnthBody m dts = Some (x, ix) ->
           awndEval (TApp (TFix dts m) arg args)
                    (pre_whFixStep x dts (tcons arg args))
-| aCast: forall t, awndEval (TCast t) t
 | aProof: forall t, awndEval (TProof t) t
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
@@ -112,14 +111,6 @@ intros nm bod s h. inversion_Clear h.
   destruct j as [x0 [x1 [x2 k]]]. rewrite k in H. discriminate.
 Qed.
 
-Lemma awndEval_Cast_inv:
-  forall tm s, awndEval (TCast tm) s -> tm = s.
-  inversion 1.
-  - reflexivity.
-  - destruct (mkApp_isApp t arg args) as [x0 [x1 [x2 j]]].
-    rewrite H0 in j. discriminate.
-Qed.
-
 Lemma awndEval_pres_WFapp:
   WFaEnv p ->
   (forall t s, awndEval t s -> WFapp t -> WFapp s) /\
@@ -141,7 +132,6 @@ Proof.
     apply pre_whFixStep_pres_WFapp; try assumption.
     + eapply j. eassumption.
     + constructor; assumption.
-  - inversion_Clear H. assumption.
   - inversion_Clear H. assumption.
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.

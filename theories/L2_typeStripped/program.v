@@ -83,7 +83,6 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctWkTrmTyp: forall n p t s nm,
     Crct p n t -> fresh nm p -> forall m, Crct ((nm,ecTyp _ m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
-| CrctCast: forall n p t, Crct p n t -> Crct p n (TCast t)
 | CrctProof: forall n p t, Crct p n t -> Crct p n (TProof t)
 | CrctProd: forall n p nm bod,
             Crct p n prop -> Crct p (S n) bod -> Crct p n (TProd nm bod)
@@ -345,9 +344,6 @@ Proof.
   - injection H2; intros. subst. assumption.
   - apply CrctRel; try assumption. eapply H1. eapply H2.
     intros h. inversion h.
-  - apply CrctCast.
-    + eapply H0. eassumption.
-      intros h. elim H2. apply PoCast. assumption.
   - apply CrctProof; try assumption.
     + eapply H0. eassumption.
       * intros h. elim H2. apply PoProof. assumption.
@@ -591,15 +587,6 @@ Proof.
   - myInjection H2. intuition. exists pack. assumption.
 Qed.
 
-Lemma Crct_invrt_Cast:
-  forall p n cast,
-    Crct p n cast -> forall t, cast = (TCast t) -> Crct p n t.
-induction 1; intros; try discriminate.
-- assert (j:= IHCrct1 _ H2). intuition.
-- assert (j:= IHCrct _ H1). intuition.
-- injection H0; intros; subst. auto.
-Qed.
-
 Lemma Crct_invrt_Proof:
   forall p n cast,
     Crct p n cast -> forall t, cast = (TProof t) -> Crct p n t.
@@ -711,8 +698,6 @@ Proof.
     + omega.
     + eapply Crct_Sort. eassumption.
   - eapply Crct_Sort; eassumption.
-  - pose proof (Crct_invrt_Cast H1 eq_refl) as h. apply CrctCast.
-    apply H; trivial.
   - constructor. apply H; try assumption.
     apply(Crct_invrt_Proof H1 eq_refl). 
   - pose proof (Crct_invrt_Prod H1 eq_refl) as h. apply CrctProd.

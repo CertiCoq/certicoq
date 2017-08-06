@@ -52,8 +52,6 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctWkTrmTyp: forall n p t s nm,
     Crct p n t -> fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
-| CrctCast: forall n p t ty,
-    Crct p n t -> Crct p n ty -> Crct p n (TCast t ty)
 | CrctPrf: forall n p t, Crct p n t -> Crct p n (TProof t)
 | CrctProd: forall n p nm ty bod,
     Crct p (S n) bod -> Crct p n ty -> Crct p n (TProd nm ty bod)
@@ -154,9 +152,6 @@ Inductive Crct: environ -> nat -> envClass -> Prop :=
            fresh nm p -> Crct ((nm,s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p 0 (ecTrm prop) ->
                          Crct p n (ecTrm (TRel m))
-| CrctCast: forall n p t ck ty,
-              Crct p n (ecTrm t) -> Crct p n (ecTrm ty) ->
-              Crct p n (ecTrm (TCast t ck ty))
 | CrctProd: forall n p nm ty bod,
               Crct p (S n) (ecTrm bod) -> Crct p n (ecTrm ty) ->
               Crct p n (ecTrm (TProd nm ty bod))
@@ -335,11 +330,6 @@ Proof.
   - injection H2; intros. subst. assumption.
   - apply CrctRel; try assumption. eapply H1. eapply H2.
     intros h. inversion h.
-  - apply CrctCast.
-    + eapply H0. eassumption.
-      intros h. elim H4. apply PoCastTm. assumption.
-    + eapply H2. eassumption.
-      intros h. elim H4. apply PoCastTy. assumption.
   - apply CrctPrf; try assumption.
     + eapply H0.
       * eassumption.
@@ -596,16 +586,6 @@ Proof.
   - myInjection H3. intuition. exists pack. assumption.
 Qed.
 
-Lemma Crct_invrt_Cast:
-  forall p n cast,
-    Crct p n cast -> forall t ty, cast = (TCast t ty) ->
-    Crct p n t /\ Crct p n ty.
-induction 1; intros; try discriminate.
-- assert (j:= IHCrct1 _ _ H2). intuition.
-- assert (j:= IHCrct _ _ H1). intuition.
-- injection H1; intros; subst. auto.
-Qed.
-
 Lemma Crct_invrt_Proof:
   forall p n prf,
     Crct p n prf -> forall t, prf = TProof t -> Crct p n t.
@@ -717,9 +697,6 @@ Proof.
   - eapply Crct_Sort; eassumption.
   - specialize (H m p H0 (Crct_invrt_Proof H1 eq_refl) H2).
     constructor. assumption.
-  - destruct (Crct_invrt_Cast H2 eq_refl). apply CrctCast.
-    + apply H; trivial.
-    + apply H0; trivial.
   - destruct (Crct_invrt_Prod H2 eq_refl). apply CrctProd.
     + apply H; trivial. omega. apply (proj1 Crct_up). assumption.
     + apply H0; trivial.

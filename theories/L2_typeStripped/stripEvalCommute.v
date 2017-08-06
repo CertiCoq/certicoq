@@ -189,13 +189,6 @@ induction m; induction ds; try intuition.
 - simpl. intuition.
 Qed.
 
-
-Lemma TCast_hom:
-  forall tm ty, strip (L1g.compile.TCast tm ty) = TCast (strip tm).
-Proof.
-  reflexivity.
-Qed.
-
 Lemma canonicalP_hom:
   forall t, optStripCanP (L1g.term.canonicalP t) = canonicalP (strip t).
 Proof.
@@ -374,7 +367,6 @@ Proof.
       * rewrite (proj1 (nat_compare_gt n0 n)); try omega. cbn. reflexivity.
       * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
     + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
-  - cbn. rewrite H. reflexivity.
   - cbn. rewrite H. reflexivity.
   - change (TProd n (strip (L1g.term.instantiate arg (S n0) t0)) =
             (TProd n (instantiate (strip arg) (S n0) (strip t0)))).
@@ -706,15 +698,6 @@ Lemma Prod_strip_inv:
      (L1g.compile.TProd nm sty sbod) = s /\ bod = strip sbod.
 Proof.
   intros nm bod; destruct s; simpl; intros h; try discriminate.
-  - myInjection h. exists s1, s2. intuition. 
-Qed.
-
-Lemma Cast_strip_inv:
-  forall tm s, TCast tm = strip s ->
-   exists stm sty, 
-     (L1g.compile.TCast stm sty) = s /\ tm = strip stm.
-Proof.
-  intros tm; destruct s; simpl; intros h; try discriminate.
   - myInjection h. exists s1, s2. intuition. 
 Qed.
 

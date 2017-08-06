@@ -179,8 +179,6 @@ Proof.
       rewrite pre_whFixStep_hom.
       exists (L1g.term.pre_whFixStep t y0 (L1g.compile.tcons x1 x2)).
       intuition. apply (L1g.wndEval.sFix p y0 m x1 x2 H ).
-  - destruct (Cast_strip_inv _ H0) as [x0 [x1 [j0x j1x]]]. subst.
-    exists x0. intuition.
   - destruct (Prf_strip_inv _ H0) as [x0 [j0 j1]]. subst.
     exists x0. intuition.
   - destruct (App_strip_inv _ H1) as [x0 [x1 [x2 [j1x [j2x [j3x j4x]]]]]].

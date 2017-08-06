@@ -71,7 +71,6 @@ Fixpoint print_term (t:Term) : string :=
   match t with
     | TRel n => "(Rel " ++ (nat_to_string n) ++ ")"
     | TProof t => "(PRF " ++ print_term t ++ ")"
-    | TCast t  => "(CAST " ++ print_term t ++ ")"
     | TLambda nm t => "(LAM "++ (print_name nm) ++ " [" ++ print_term t ++ "])"
     | TLetIn nm _ _ => "(LET " ++ (print_name nm) ++ ")"
     | TApp fn arg args =>
@@ -99,8 +98,6 @@ Lemma TermTerms_dec:
 Proof.
   apply TrmTrmsBrsDefs_ind; intros.
   - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-  - induction t0; cross.
-    destruct (H t0); [lft | rght ..].
   - induction t0; cross.
     destruct (H t0); [lft | rght ..].
   - induction t0; cross.
@@ -198,20 +195,6 @@ Lemma mkEtaLams_sanityS:
   forall (xtra:nat) (body:Term), isLambda (mkEtaLams (S xtra) body).
 Proof.
   intros. cbn. auto.
-Qed.
-
-
-Definition isCast (t:Term) : Prop := exists tm, t = TCast tm.
-Lemma IsCast: forall t, isCast (TCast t).
-intros. exists t. reflexivity.
-Qed.
-Hint Resolve IsCast.
-
-Lemma isCast_dec: forall t, {isCast t}+{~ isCast t}.
-induction t;
-  try (solve [right; intros h; unfold isCast in h;
-              destruct h as [tm j]; discriminate]).
-left. auto.
 Qed.
 
 Definition isCase (t:Term) : Prop :=
@@ -789,8 +772,6 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TProof fn), arg, tnil. split. reflexivity.
     + left. intuition. revert H. not_isApp. 
-  - exists (TCast fn), arg, tnil. split. reflexivity.
-    + left. intuition. revert H. not_isApp. 
   - exists (TLambda n fn), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TLetIn n fn1 fn2), arg, tnil. split. reflexivity.
@@ -873,7 +854,6 @@ Qed.
 (** well-formed terms: TApp well-formed all the way down **)
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
-| wfaCast: forall tm, WFapp tm -> WFapp (TCast tm)
 | wfaProof: forall tm, WFapp tm -> WFapp (TProof tm)
 | wfaLambda: forall nm bod, WFapp bod -> WFapp (TLambda nm bod)
 | wfaLetIn: forall nm dfn bod,
@@ -1153,7 +1133,6 @@ Qed.
 (*** not used essentially at the moment **)
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
-| wfCast: forall n t, WFTrm t n -> WFTrm (TCast t) n
 | wfProof: forall n t, WFTrm t n -> WFTrm (TProof t) n
 | wfLambda: forall n nm bod,
             WFTrm bod (S n) -> WFTrm (TLambda nm bod) n
@@ -1305,8 +1284,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelEq: forall n, Instantiate n (TRel n) tin
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
-| ICast: forall n t it,
-           Instantiate n t it -> Instantiate n (TCast t) (TCast it)
 | IProof: forall n t it,
            Instantiate n t it -> Instantiate n (TProof t) (TProof it)
 | ILambda: forall n nm bod ibod,
@@ -1398,7 +1375,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TCast t => TCast (instantiate n t)
     | TProof t => TProof (instantiate n t)
     | TConstruct i m args => TConstruct i m (instantiates n args)
     | x => x
@@ -1537,7 +1513,6 @@ Proof.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - cbn. constructor. apply H0. assumption.
-  - cbn. constructor. apply H0. assumption.
   - change (WFapp (TLambda nm (instantiate (S n) bod))).
     constructor.
     + apply H0. assumption.
@@ -1611,7 +1586,6 @@ Proof.
     + cbn. Compare_Prop. erewrite (proj2 (Nat.compare_lt_iff _ _)).
       reflexivity. omega.
   - cbn. apply f_equal. apply H0. 
-  - cbn. apply f_equal. apply H0. 
   - cbn. apply f_equal2. reflexivity. apply H0.
   - cbn. apply f_equal2. apply H0. apply H2.
   - change (mkApp (instantiate m (lift m fn))
@@ -1670,7 +1644,6 @@ Proof.
     + rewrite (@match_cn_Gt n); try omega.
       destruct i. reflexivity.
       case_eq (n ?= i); intros; Compare_Prop; try omega. reflexivity.
-  - cbn. apply f_equal. rewrite H; try omega. reflexivity.
   - cbn. apply f_equal. apply H. assumption. 
   - cbn. apply f_equal2. reflexivity. apply H. omega.
   - cbn. apply f_equal2.
@@ -1846,7 +1819,6 @@ Proof.
   - cbn. assert (j: m0 > m). omega.
     rewrite (proj1 (nat_compare_gt m0 m)); trivial.
   - cbn. rewrite H0; trivial.
-  - cbn. rewrite H0; trivial.
   - cbn. rewrite H0. trivial. omega.
   - cbn. rewrite H0; try assumption. rewrite H2; try omega. trivial.
   - cbn. rewrite H1; try assumption. rewrite H3; try assumption.
@@ -1859,103 +1831,6 @@ Proof.
   - cbn. rewrite H0; trivial. rewrite H2; trivial.
 Qed.
 
-
-(***************************
-  
-Goal
-  forall bod n, WFTrm bod n -> forall t, oneMore bod = Some t -> WFTrm t n.
-Proof.
-  induction 1; intros; try (cbn in *; discriminate).
-  - cbn in H0. destruct (oneMore bod).
-    + myInjection H0. constructor. intuition.
-    + discriminate.
-  - cbn in H0. myInjection H0. constructor. constructor.
-    apply tappend_pres_WFTrms.
-    + Check (WF_lifts_closed).
-
-
-      Goal
-  forall args n,
-    WFTrms args n ->
-    forall i x npars nargs,
-      WFTrm (etaExp_cnstr i x npars nargs args) n.
-Proof. 
-  induction 1; induction npars; intros.
-  - cbn. 
-
-
-
-  Goal
-  forall npars args nargs n, n >= nargs ->
-    mkEtaArgs npars nargs (instantiates n args) =
-    instantiates n (mkEtaArgs npars nargs args).
-Proof.
-  induction npars; intros.
-  - cbn. destruct args.
-    + cbn. replace (nargs - 0) with nargs; try omega. admit.
-    + admit.
-  - cbn. destruct args.
-    + cbn.
-Qed.
-
-
-Goal
-  forall args n,
-    WFTrms args n ->
-    forall m, m < n -> WFTrms (addDummyArgs m args) n.
-Proof.
-  induction 1; intros.
-  - induction m.
-    + cbn. constructor.
-    + cbn.
-  - inversion_Clear H. apply tappend_pres_WFTrms.
-    + apply treverse_pres_WFTrms. trivial.
-    + constructor; trivial.
-  - cbn.
-
-      
-       
-    Goal
-  forall args n,
-    WFTrms args n -> WFTrms (addDummyArgs n args) n.
-Proof.
-  induction 1; induction n.
-  - cbn. constructor.
-  - cbn.               
-
-
-
-(*****    
-Goal
-  forall args, WFTrms args 0 -> forall m, WFTrms (addDummyArgs m args) 0.
-Proof.
-  induction 1; intros.
-
-               
-    forall m n, addDummyArgs m (instantiates n args) =
-                instantiates n (addDummyArgs m args).
-Proof.
-  induction 1; intros.
-  - cbn. reflexivity. rewrite treverse_instantiates. reflexivity.
-  - cbn. rewrite <- IHm. 
-************)
-  
-
-Goal
-  forall npars args nargs n, n >= nargs ->
-    mkEtaArgs npars nargs (instantiates n args) =
-    instantiates n (mkEtaArgs npars nargs args).
-Proof.
-  induction npars; intros.
-  - cbn. destruct args.
-    + cbn. replace (nargs - 0) with nargs; try omega. admit.
-    + admit.
-  - cbn. destruct args.
-    + cbn.
-Qed.
-
-*******************************)
-
     
 (** occurrances of a constant in a term (ignoring type components) **)
 Section PoccTrm_sec.
@@ -1963,7 +1838,6 @@ Variable nm: string.
 
 Inductive PoccTrm : Term -> Prop :=
 | PoLambdaBod: forall s bod, PoccTrm bod -> PoccTrm (TLambda s bod)
-| PoCast: forall t, PoccTrm t -> PoccTrm (TCast t)
 | PoProof: forall t, PoccTrm t -> PoccTrm (TProof t)
 | PoLetInDfn: forall s dfn bod,
                 PoccTrm dfn -> PoccTrm (TLetIn s dfn bod)
@@ -2189,9 +2063,6 @@ Proof.
     + apply PoLambdaBod. assumption.
     + apply PoAppL. apply PoLambdaBod. assumption.
   - destruct args; simpl.
-    + apply PoCast. assumption.
-    + apply PoAppL. apply PoCast. assumption.
-  - destruct args; simpl.
     + apply PoProof. assumption.
     + apply PoAppL. apply PoProof. assumption.
  - destruct args; simpl.
@@ -2259,8 +2130,6 @@ Proof.
   intro h. apply InstInstsBrsDefs_ind; intros; auto.
   - contradiction.
   - inversion H.
-  - inversion_Clear H0.
-    + constructor. intuition.
   - inversion_Clear H0.
     + constructor. intuition.
   - inversion_Clear H0.

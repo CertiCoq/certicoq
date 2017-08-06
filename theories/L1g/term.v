@@ -36,7 +36,6 @@ Fixpoint print_term (t:Term) : string :=
     | TRel n => "(" ++ (nat_to_string n) ++ ")"
     | TSort _ => " SRT "
     | TProof tm => "(PRF" ++ (print_term tm) ++ ")"
-    | TCast _ _ => " CAST "
     | TProd _ _ _ => " PROD "
     | TLambda _ _ _ => " LAM "
     | TLetIn nm _ dfn bod =>
@@ -105,8 +104,6 @@ Proof.
   - Case "TSort". destruct t; cross. destruct (Srt_dec s s0); [lft | rght].
   - destruct t0; cross. destruct (H t0); [lft | rght ..]. 
   - destruct t1; cross.
-    destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
-  - destruct t1; cross.
     destruct (name_dec n n0);
       destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
   - destruct t1; cross.
@@ -156,7 +153,6 @@ Fixpoint TrmSize (t:Term) : nat :=
     | TApp fn a args => S (TrmSize fn + TrmSize a + TrmsSize args)
     | TCase _ ty mch brs => S (TrmSize ty + TrmSize mch + TrmBsSize brs)
     | TFix ds _ => S (TrmDsSize ds)
-    | TCast t ty => S (TrmSize t + TrmSize ty)
     | _ => 1
   end
 with TrmsSize (ts:Terms) : nat :=
@@ -212,20 +208,6 @@ induction t;
 left. auto.
 Qed.
 
-Definition isCast (t:Term) : Prop :=
-  exists tm ty, t = TCast tm ty.
-Lemma IsCast: forall t ty, isCast (TCast t ty).
-intros. exists t, ty. reflexivity.
-Qed.
-Hint Resolve IsCast.
-
-Lemma isCast_dec: forall t, {isCast t}+{~ isCast t}.
-induction t;
-  try (solve [right; intros h; unfold isCast in h;
-              destruct h as [tm [ty j]]; discriminate]).
-left. auto.
-Qed.
-
 Definition isProof (t:Term) := exists prf, t = TProof prf.
 Lemma IsProof: forall t, isProof (TProof t).
 intros. exists t. reflexivity.
@@ -245,37 +227,6 @@ Proof.
   induction t; cbn; intros; unfold isProof;
   try assumption; try apply (triv_exists).
 Qed.
-
-(*************
-Definition isCastProp (t:Term) := exists prp, t = TCast prp prop.
-
-Lemma isCastProp_dec: forall t, isCastProp t \/ ~ isCastProp t.
-Proof.
-  intros. destruct (isCast_dec t).
-  - destruct i as [x0 [x1 jx]]. destruct (isProp_dec x1).
-    + unfold isProp in H. subst. left.
-      unfold isCastProp. exists x0. reflexivity.
-    + right. intros h. elim H. unfold isCastProp in h.
-      destruct h as [y jy]. subst. myInjection jy. reflexivity.
-  - right. unfold isCast in n. unfold isCastProp.
-    intros h. destruct h as [y jy]. elim n. exists y, prop.
-    assumption.
-Qed.
-
-Lemma isProofCast_dec: forall t, isProofCast t \/ ~ isProofCast t.
-Proof.
-  intros t. destruct (isCast_dec t).
-  - destruct i as [tm [ty j]].
-    + destruct (isCastProp_dec ty).
-      * left. unfold isCastProp in H. destruct H as [x jx]. subst.
-        unfold isProofCast. exists tm, x. reflexivity.
-      * right. intros h. elim H. destruct h as [y0 [y1 jy]].
-        unfold isCastProp. exists y1. subst. myInjection jy.
-        reflexivity.
-  - right. intros h. elim n. destruct h as [x0 [x1 jx]].
-    subst. auto.
-Qed.
- ***********************)
 
 Definition isApp (t:Term) : Prop :=
   exists fn arg args, t = TApp fn arg args.
@@ -297,26 +248,6 @@ Ltac isApp_inv :=
              Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 destruct t; try (right; not_isApp). 
 left. auto.
-Qed.
-
-Definition isCastApp (t:Term) : Prop :=
-  exists fn arg args ty, t = TCast (TApp fn arg args) ty.
-Lemma IsAppCast:
-  forall fn arg args ty, isCastApp (TCast (TApp fn arg args) ty).
-intros. unfold isCastApp.
-exists fn, arg, args, ty. reflexivity.
-Qed.
-Hint Resolve IsAppCast.
-
-Lemma isCastApp_dec: forall t, {isCastApp t}+{~ isCastApp t}.
-Proof.
-  destruct t;
-  try (solve [right; intros h;
-              destruct h as [x1 [x2 [x3 [x4 h]]]]; discriminate]).
-  destruct t1;
-    try (solve [right; intros h;
-                destruct h as [x1 [x2 [x3 [x4 h]]]]; discriminate]).
-  left. exists t1_1, t1_2, t, t2. reflexivity.
 Qed.
 
 Definition isFix (t:Term) : Prop :=
@@ -939,8 +870,6 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TProof fn), arg, tnil. split. reflexivity.
     + left. intuition. revert H. not_isApp. 
-  - exists (TCast fn1 fn2), arg, tnil. split. reflexivity.
-    + left. intuition. revert H. not_isApp. 
   - exists (TProd n fn1 fn2), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TLambda n fn1 fn2), arg, tnil. split. reflexivity.
@@ -999,7 +928,6 @@ Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
 | wfaSort: forall srt, WFapp (TSort srt)
 | wfaProof: forall t, WFapp t -> WFapp (TProof t)
-| wfaCast: forall tm ty, WFapp tm -> WFapp ty -> WFapp (TCast tm ty)
 | wfaProd: forall nm ty bod,
             WFapp bod -> WFapp ty -> WFapp (TProd nm ty bod)
 | wfaLambda: forall nm ty bod,
@@ -1162,7 +1090,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
 | wfSort: forall n srt, WFTrm (TSort srt) n
 | wfProof: forall n t, WFTrm t n -> WFTrm (TProof t) n
-| wfCast: forall n t ty, WFTrm t n -> WFTrm ty n -> WFTrm (TCast t ty) n
 | wfProd: forall n nm ty bod,
             WFTrm bod (S n) -> WFTrm ty n -> WFTrm (TProd nm ty bod) n
 | wfLambda: forall n nm ty bod,
@@ -1224,8 +1151,6 @@ Inductive PoccTrm : Term -> Prop :=
 | PoProdTy: forall s ty bod, PoccTrm ty -> PoccTrm (TProd s ty bod)
 | PoLambdaBod: forall s ty bod, PoccTrm bod -> PoccTrm (TLambda s ty bod)
 | PoLambdaTy: forall s ty bod, PoccTrm ty -> PoccTrm (TLambda s ty bod)
-| PoCastTm: forall t ty, PoccTrm t -> PoccTrm (TCast t ty)
-| PoCastTy: forall t ty, PoccTrm ty -> PoccTrm (TCast t ty)
 | PoLetInDfn: forall s ty dfn bod,
                 PoccTrm dfn -> PoccTrm (TLetIn s dfn ty bod)
 | PoLetInBod: forall s ty dfn bod,
@@ -1487,58 +1412,6 @@ Proof.
   constructor. inversion_Clear H. inversion_Clear H1. assumption.
 Qed.
                               
-(*****************
-Function fPocc (n:nat) (t:Term): bool :=
-  match n with
-    | 0 => false
-    | S n =>
-      match t with
-        | TCast t ty => fPocc n t || fPocc n ty
-        | TProd _ ty t => fPocc n t || fPocc n ty
-        | TLambda _ ty t => fPocc n t || fPocc n ty
-        | TLetIn _ dfn ty t => fPocc n dfn || fPocc n t || fPocc n ty
-        | TApp fn arg args => fPocc n fn || fPocc n arg || fPoccs n args
-        | TConst str => string_eq_bool str nm
-        | TCase _ ty mch brs =>  fPocc n ty || fPocc n mch || fPoccBs n brs
-        | TFix ds _ => fPoccDs n ds
-        | _ => false
-      end
-  end
-with fPoccs (n:nat) (ts:Terms): bool :=
-       match n with
-         | 0 => false
-         | S n =>
-           match ts with
-             | tnil => false
-             | tcons u us => fPocc n u || fPoccs n us
-           end
-       end
-with fPoccBs (n:nat) (ds:Brs): bool :=
-       match n with
-         | 0 => false
-         | S n =>
-           match ds with
-             | bnil => false
-             | bcons _ u us => fPocc n u || fPoccBs n us
-           end
-       end
-with fPoccDs (n:nat) (ds:Defs): bool :=
-       match n with
-         | 0 => false
-         | S n =>
-           match ds with
-             | dnil => false
-             | dcons _ u1 u2 _ us => fPocc n u1 || fPocc n u2 || fPoccDs n us
-           end
-       end.
-
-Function fPocc_env (p:environ Term) : bool :=
-  match p with
-    | cons (_, ecTrm t) ps => fPocc 1000 t || fPocc_env ps
-    | cons (_, ecTyp _ _ _) ps => fPocc_env ps
-    | nil => false
-  end.
-****************************)
 
 (** Instantiate index n of a term with a _locally_closed_ term, so
 *** we do not lift.  But we do increment n when going under a binder 
@@ -1553,9 +1426,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | ISort: forall n srt, Instantiate n (TSort srt) (TSort srt)
 | IPrf: forall n t it,
           Instantiate n t it -> Instantiate n (TProof t) (TProof it)
-| ICast: forall n t ty it ity,
-           Instantiate n t it -> Instantiate n ty ity ->
-           Instantiate n (TCast t ty) (TCast it ity)
 | IProd: forall n nm ty bod ibod ity,
              Instantiate (S n) bod ibod -> Instantiate n ty ity ->
              Instantiate n (TProd nm ty bod) (TProd nm ity ibod)
@@ -1646,9 +1516,6 @@ Proof.
   - constructor. apply H. inversion_Clear H0. assumption.
   - inversion_Clear H1.
     + constructor. intuition.
-    + apply PoCastTy. intuition.
-  - inversion_Clear H1.
-    + constructor. intuition.
     + apply PoProdTy. intuition.
   - inversion_Clear H1.
     + constructor. apply H. assumption.
@@ -1696,7 +1563,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef ty bod =>
       TLetIn nm (instantiate n tdef) (instantiate n ty) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TCast t ty => TCast (instantiate n t) (instantiate n ty)
     | x => x
   end
 with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
@@ -1793,10 +1659,6 @@ Proof.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - cbn. constructor. apply H0. assumption.
-  - change (WFapp (TCast (instantiate t n tm) (instantiate t n ty))).
-    constructor.
-    + apply H0. assumption.
-    + apply H2. assumption.
   - change (WFapp (TProd nm (instantiate t n ty) (instantiate t (S n) bod))).
     constructor.
     + apply H0. assumption.

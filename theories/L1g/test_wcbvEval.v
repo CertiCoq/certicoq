@@ -381,6 +381,26 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+(** nested applications because of [Cast] **)
+Definition Plus11 := ((plus 1 : nat -> nat) 1).
+Quote Recursively Definition cbv_Plus11 := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (Plus11)) in exact t).
+Print cbv_Plus11.
+(* [Term] of Coq's answer *)
+Definition ans_Plus11 := Eval cbv in (main (program_Program cbv_Plus11)).
+Print ans_Plus11.
+(* [program] of the program *)
+Quote Recursively Definition p_Plus11 := Plus11.
+Print p_Plus11.
+Definition P_Plus11 := Eval cbv in (program_Program p_Plus11).
+Print P_Plus11.
+Goal
+  let env := (env P_Plus11) in
+  let main := (main P_Plus11) in
+  wcbvEval (env) 100 (main) = Ret ans_Plus11.
+  vm_compute. reflexivity.
+Qed.
+
 
 (** vector addition **)
 Require Coq.Vectors.Vector.

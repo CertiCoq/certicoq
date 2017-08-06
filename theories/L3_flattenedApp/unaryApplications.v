@@ -70,12 +70,10 @@ induction y; simpl; reflexivity.
 Qed.
 
 Lemma isConstruct_hom:
-  forall t, isConstruct (strip t) ->
-            L2_5.term.isConstruct t \/ L2_5.term.isCast t.
+  forall t, isConstruct (strip t) -> L2_5.term.isConstruct t.
 Proof.
   destruct t; intros h;
     try (cbn; destruct h as [x0 [x1 [x2 h]]]; discriminate). 
-  - cbn in h. right. auto.
   - change
       (isConstruct (mkApp (strip t1) (tcons (strip t2) (strips t3)))) in h.
     pose proof (mkApp_isApp (strips t3) (strip t1) (strip t2)) as k.
@@ -110,6 +108,13 @@ Lemma dcons_hom:
 reflexivity.
 Qed.
 
+Lemma TApp_hom:
+  forall fn arg args,
+    strip (L2_5.compile.TApp fn arg args) =
+    mkApp (strip fn) (strips (L2_5.compile.tcons arg args)).
+  destruct fn; intros arg args; try reflexivity.
+Qed.
+
 
 Lemma mkApp_hom:
   forall ts t,
@@ -128,6 +133,21 @@ Proof.
   - reflexivity.
   - reflexivity.
 Qed.
+
+Lemma TCase_hom:
+  forall i de brs ,
+    strip (L2_5.compile.TCase i de brs) = TCase i (strip de) (stripBs brs).
+Proof.
+  intros. reflexivity. 
+Qed.
+
+Lemma TConstruct_hom:
+  forall i ix ts ,
+    strip (L2_5.compile.TConstruct i ix ts) = TConstruct i ix (strips ts).
+Proof.
+  intros. reflexivity. 
+Qed.
+
 
 (******
 Lemma mkApp_hom':
@@ -312,93 +332,6 @@ Proof.
   destruct fn; intros; try reflexivity.
   cbn. destruct H. exists fn1, fn2, t. reflexivity.
 Qed.
-
-
-(*********************
-Lemma mkApp_instantiate_hom:
-  forall fn tin arg args n,
-    ~ L2_5.term.isApp fn -> isL2_5Cnstr fn = None ->
-    isL2_5Cnstr tin = None -> ~ L2_5.term.isApp tin ->
-    strip
-      (L2_5.compile.mkApp
-         (L2_5.term.instantiate tin n fn)
-         (L2_5.term.instantiates tin n (L2_5.compile.tcons arg args))) =
-    mkApp (strip (L2_5.term.instantiate tin n fn))
-          (strips (L2_5.term.instantiates tin n (L2_5.compile.tcons arg args))).
-Proof.
-  induction fn; intros; try reflexivity.
-  - unfold L2_5.term.instantiate at 1. unfold L2_5.term.instantiate at 1.
-    case_eq (n0 ?= n); intros.
-    + Compare_Prop. subst. rewrite L2_5.compile.mkApp_tnil_ident.
-      rewrite mkApp_hom; try assumption. reflexivity.
-    + rewrite (L2_5.stripEvalCommute.instantiates_tcons_commute).
-      rewrite L2_5.compile.mkApp_goodFn.
-      * rewrite TApp_mkApp_hom; reflexivity. 
-      * intros h. destruct h as [x0 [x1 [x2 k]]]. discriminate.
-    + rewrite (L2_5.stripEvalCommute.instantiates_tcons_commute).
-      rewrite L2_5.compile.mkApp_goodFn.
-      * rewrite TApp_mkApp_hom; reflexivity. 
-      * intros h. destruct h as [x0 [x1 [x2 k]]]. discriminate.
-  - rewrite mkApp_hom.
-    + reflexivity.
-    + cbn in H0. cbn. destruct fn; try reflexivity.
-      * cbn. destruct (n ?= n0); try reflexivity.
-        rewrite L2_5.compile.mkApp_tnil_ident. assumption.
-      * apply isL2_5Cnstr_instantiate_None.
-        cbn in H0. assumption. right. assumption.
-      * { change
-            (isL2_5Cnstr (L2_5.compile.mkApp
-                          (L2_5.term.instantiate tin n fn1)
-                          (L2_5.term.instantiates tin n
-                                                (L2_5.compile.tcons fn2 t))) =
-             None).
-          destruct fn1; try (cbn; reflexivity).
-          apply isL2_5Cnstr_mkApp_None.
-          - cbn. destruct (n ?= n0); try reflexivity.
-            rewrite L2_5.compile.mkApp_tnil_ident. assumption.
-          - 
-
-      
-    + change
-        (isL2_5Cnstr (L2_5.compile.mkApp
-                      (L2_5.term.instantiate tin n fn1)
-                      (L2_5.term.instantiates tin n (L2_5.compile.tcons fn2 t))) =
-         None).
-      destruct fn1; try (cbn; reflexivity).
-        (***
-  - rewrite mkApp_hom.
-    + reflexivity.
-    + change
-        (isL2_5Cnstr (L2_5.compile.mkApp
-                      (L2_5.term.instantiate tin n fn1)
-                      (L2_5.term.instantiates tin n (L2_5.compile.tcons fn2 t))) =
-         None).
-      destruct fn1; try (cbn; reflexivity).
-      * { unfold L2_5.term.instantiate.
-          case_eq (n ?= n0); intros; Compare_Prop; subst.
-          - rewrite L2_5.compile.mkApp_tnil_ident. unfold L2_5.compile.mkApp.
-            destruct tin; reflexivity.
-          - unfold L2_5.compile.mkApp.
-            rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
-            auto.
-          - unfold L2_5.compile.mkApp.
-            rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
-            auto. }
-      * change
-          (isL2_5Cnstr
-             (L2_5.compile.mkApp
-                (L2_5.compile.mkApp (L2_5.term.instantiate tin n fn1_1)
-                               (L2_5.term.instantiates
-                                  tin n (L2_5.compile.tcons fn1_2 t0)))
-                (L2_5.term.instantiates tin n (L2_5.compile.tcons fn2 t)))
-           = None).
-        rewrite L2_5.compile.mkApp_idempotent.
-        destruct fn1_1; cbn; try reflexivity.
-*****)
-  - elim H. auto.
-  - cbn in H0. discriminate.
-Qed.
-*********************)
 
 Lemma instantiate_hom:
   (forall bod arg n,
@@ -659,18 +592,41 @@ Proof.
 Qed.
       
 Lemma isLambda_invrt:
-  forall fn, isLambda (strip fn) ->
-             L2_5.term.isLambda fn \/ L2_5.term.isCast fn.
+  forall fn, isLambda (strip fn) -> L2_5.term.isLambda fn.
 Proof.
   intros fn h. destruct h as [x0 [x1 jx]].
   destruct fn; try (cbn in jx; discriminate).
-  - right. auto.
-  - left. auto.
+  - auto.
   - change (mkApp (TApp (strip fn1) (strip fn2)) (strips t) =
             TLambda x0 x1) in jx.
     destruct (isApp_mkApp_TApp (strips t) (strip fn1) (strip fn2))
       as [y0 [y1 jy]].
     rewrite jx in jy. discriminate.
+Qed.
+
+Lemma isFix_invrt:
+  forall fn, isFix (strip fn) -> L2_5.term.isFix fn.
+Proof.
+  intros fn h. destruct h as [x0 [x1 jx]].
+  destruct fn; try (cbn in jx; discriminate).
+  - change (mkApp (TApp (strip fn1) (strip fn2)) (strips t) =
+            TFix x0 x1) in jx.
+    destruct (isApp_mkApp_TApp (strips t) (strip fn1) (strip fn2))
+      as [y0 [y1 jy]].
+    rewrite jx in jy. discriminate.
+  - auto.
+Qed.
+
+Lemma isProof_invrt:
+  forall fn, TProof = (strip fn) -> L2_5.term.isProof fn.
+Proof.
+  intros fn h.
+  destruct fn; try (cbn in h; discriminate).
+  - unfold L2_5.term.isProof. reflexivity.
+  - change (TProof = mkApp (TApp (strip fn1) (strip fn2)) (strips t)) in h.
+    destruct (isApp_mkApp_TApp (strips t) (strip fn1) (strip fn2))
+      as [x0 [x1 jx]].
+    rewrite jx in h. discriminate.
 Qed.
 
 Lemma TProof_mkApp_invrt:
@@ -725,6 +681,49 @@ Proof.
   - intros. cbn. apply H0. assumption.
 Qed.
 
+(************
+Lemma WcbvEval_mkApp_step_args:
+  forall p args args',
+      WcbvEvals p args args' ->
+      forall fn s, WcbvEval p (mkApp fn args') s ->
+                   WcbvEval p (mkApp fn args) s.
+Proof.
+  induction args; intros.
+  - inversion_Clear H. assumption.
+  - inversion_Clear H. cbn. eapply IHargs; try eassumption. cbn in H0.
+    eapply WcbvEval_mkApp_step; try eassumption.
+    destruct (wappend _ _ H) as [y0 [ y1 [jya [jyb jyc]]]]. clear H.
+    subst args'. rewrite mkApp_tl in H0. inversion_Clear H0.
+    + constructor. eapply IHargs; eassumption.
+    + eapply wAppLam; try eassumption.
+      * eapply IHargs; try eassumption.
+      * unfold whBetaStep in *. eapply IHargs; try eassumption.
+
+
+      Check (IHargs _ _ _ _ H2). econstructor; try eassumption.
+
+    econstructor; try eassumption.
+**************)
+
+
+
+Lemma WcbvEval_mkApp_fn:
+  forall p fn fn',
+   WcbvEval p fn fn' ->
+   forall args s, WcbvEval p (mkApp fn args) s ->
+                  WcbvEval p (mkApp fn' args) s.
+Proof.
+  induction args using treverse_ind; intros.
+  - cbn in *. rewrite (WcbvEval_single_valued H H0).
+    eapply WcbvEval_no_further. eassumption.
+  - rewrite mkApp_tl. rewrite mkApp_tl in H0.
+    inversion_clear H0.
+    + econstructor; try eassumption. eapply  IHargs; eassumption.
+    + econstructor; try eassumption. eapply IHargs; eassumption.
+    + eapply wAppFix; try eassumption. eapply IHargs; try eassumption.
+    + eapply wAppCong; try eassumption. eapply IHargs; try eassumption.
+Qed.
+  
 Lemma WcbvEval_mkApp_step:
   forall p fn s,
     WcbvEval p fn s -> 
@@ -743,13 +742,208 @@ Proof.
     + specialize (IHargs _ H0). econstructor; eassumption.
 Qed.
 
-Lemma WcbvEval_mkApp_fn:
+(***************
+Lemma WcbvEval_step:
+  forall p fn fn',
+    WcbvEval p fn fn' -> 
+    forall arg arg',
+      WcbvEval p arg arg' ->
+      forall t, WcbvEval p (TApp fn' arg') t -> WcbvEval p (TApp fn arg) t.
+Proof.
+  induction 1; intros.
+  - inversion_Clear H0; try inversion H3.
+    * constructor. constructor.
+    * inversion_Clear H3. elim H6. reflexivity.
+  - inversion_Clear H1; try inversion H4.
+    * apply waPrf. apply waPrf. assumption.
+    * inversion H4. contradiction.
+  - inversion_Clear H0.
+    + inversion_Clear H4.
+    + inversion_Clear H3. econstructor; try econstructor; try eassumption.
+      pose proof (proj1 (WcbvEval_no_further _) _ _ H) as k.
+      rewrite <- (WcbvEval_single_valued H4 k). assumption.
+    + inversion H3.
+    + inversion_Clear H3. elim H4. auto.
+  - inversion_Clear H1. 
+    + inversion H5.
+    + inversion H4.
+    + inversion H4.
+    + inversion_Clear H4. apply wAppCong; try eassumption.
+      * constructor. 
+        pose proof (proj2 (WcbvEval_no_further _) _ _ H) as k.
+        rewrite (WcbvEvals_single_valued H10 k). assumption.
+      * pose proof (proj1 (WcbvEval_no_further _) _ _ H0) as k.
+        rewrite (WcbvEval_single_valued H9 k). assumption.
+  - inversion_Clear H0.
+    + inversion H4.
+    + inversion_Clear H3.
+    + inversion_Clear H3. econstructor.
+      *
+    
+    + constructor. constructor.
+    + inversion H3.
+    + 
+      apply (@waPrf p TProof _ (wPrf p)). 
+
+    
+  intros. inversion_Clear H1.
+  - constructor.
+    pose proof (proj1 (WcbvEval_no_further p) _ _ H) as k.
+    rewrite <- (WcbvEval_single_valued k); assumption.
+  - 
+
+
+    induction args using treverse_ind; intros.
+  - cbn in *.
+    pose proof (proj1 (WcbvEval_no_further p) _ _ h0) as k.
+    rewrite <- (WcbvEval_single_valued k H). assumption.
+  - rewrite mkApp_tl. rewrite mkApp_tl in H. inversion_clear H.
+    + constructor. eapply IHargs. eassumption.
+    + specialize (IHargs _ H0). econstructor; eassumption.
+    + specialize (IHargs _ H0). econstructor; eassumption.
+    + specialize (IHargs _ H0). econstructor; eassumption.
+Qed.
+
+
+Lemma WcbvEval_mkApp_steps:
   forall p args fn fn',
-   WcbvEval p fn fn' ->
-   forall s, WcbvEval p (mkApp fn args) s -> WcbvEval p (mkApp fn' args) s.
+    WcbvEval p fn fn' ->
+    forall args',
+      WcbvEvals p args args' ->
+      forall s, WcbvEval p (mkApp fn' args') s ->
+                WcbvEval p (mkApp fn args) s.
+Proof.
+  induction args; intros.
+  - inversion_Clear H0. cbn in *.
+    pose proof (proj1 (WcbvEval_no_further p) _ _ H) as k.
+    erewrite (WcbvEval_single_valued H1); eassumption.
+  - inversion_Clear H0. cbn. cbn in H1. eapply IHargs.
+
+
+    Lemma WcbvEval_mkApp_fn_args:
+  forall p args fn fn',
+    WcbvEval p fn fn' ->
+    forall args',
+      WcbvEvals p args args' ->
+      forall s, WcbvEval p (mkApp fn args) s ->
+                WcbvEval p (mkApp fn' args') s.
 Proof.
   induction args using treverse_ind; intros.
-  - cbn in *. rewrite (WcbvEval_single_valued H H0).
+  - inversion_clear H0. eapply WcbvEval_mkApp_fn; eassumption.
+  - destruct (wappend _ _ H0) as [y0 [ y1 [jya [jyb jyc]]]]. clear H0.
+    subst args'.
+    change (WcbvEval p (mkApp fn' (tappend y0 (tunit y1))) s).
+
+    cbn. rewrite mkApp_tl. econstructor.
+
+    rewrite mkApp_tl in H1. eapply IHargs. Check (IHargs _ _ _ _ jyb).
+
+Lemma WcbvEval_mkApp_step_args:
+  forall p args args',
+      WcbvEvals p args args' ->
+      forall fn s, WcbvEval p (mkApp fn args') s ->
+                   WcbvEval p (mkApp fn args) s.
+Proof.
+  induction args; intros.
+  - inversion_Clear H. assumption.
+  - inversion_Clear H. cbn. eapply IHargs; try eassumption. cbn in H0.
+    
+    eapply WcbvEval_mkApp_fn; try eassumption.
+    destruct (wappend _ _ H) as [y0 [ y1 [jya [jyb jyc]]]]. clear H.
+    subst args'. rewrite mkApp_tl in H0. inversion_Clear H0.
+
+
+
+    Lemma WcbvEval_mkApp_step_args:
+  forall p args args',
+      WcbvEvals p args args' ->
+      forall fn s, WcbvEval p (mkApp fn args') s ->
+                   WcbvEval p (mkApp fn args) s.
+Proof.
+  induction args using treverse_ind; intros.
+  - inversion_Clear H. assumption.
+  - destruct (wappend _ _ H) as [y0 [ y1 [jya [jyb jyc]]]]. clear H.
+    subst args'. rewrite mkApp_tl. econstructor.
+
+
+
+
+    Lemma WcbvEval_mkApp_args:
+  forall p args args',
+      WcbvEvals p args args' ->
+      forall fn s, WcbvEval p (mkApp fn args) s ->
+                   WcbvEval p (mkApp fn args') s.
+Proof.
+  induction args using treverse_ind; intros.
+  - inversion_Clear H. assumption.
+  - destruct (wappend _ _ H) as [y0 [ y1 [jya [jyb jyc]]]]. clear H.
+    subst args'. rewrite mkApp_tl.
+
+
+  Lemma WcbvEval_mkApp_fn_args:
+  forall p args fn fn',
+    WcbvEval p fn fn' ->
+    forall args',
+      WcbvEvals p args args' ->
+      forall s, WcbvEval p (mkApp fn args) s ->
+                WcbvEval p (mkApp fn' args') s.
+Proof.
+  induction args using treverse_ind; intros.
+  - inversion_clear H0. eapply WcbvEval_mkApp_fn; eassumption.
+  - destruct (wappend _ _ H0) as [y0 [ y1 [jya [jyb jyc]]]]. clear H0.
+    subst args'. rewrite mkApp_tl.
+
+    rewrite mkApp_tl in H1. eapply IHargs. Check (IHargs _ _ _ _ jyb).
+
+    
+
+    eapply WcbvEval_mkApp_step.
+    rewrite mkApp_tl in H1.
+
+
+    eapply IHargs; try eassumption.
+
+
+    inversion_Clear H1.
+    Check (IHargs _ _ _ us ju). try eassumption.
+    
+    destruct (tappend_mk_canonical args x tnil) as [x0 [x1 jx]].
+    rewrite jx in H0. rewrite jx in H1.
+    inversion_Clear H0. cbn. eapply IHargs; try eassumption. cbn in *. destruct fn'.
+    + inversion H.
+
+
+
+    eapply IHargs; try eassumption.
+
+    eapply IHargs; try eassumption.
+    inversion_Clear H0. cbn in *.
+    eapply IHargs; try eassumption.
+
+
+  
+  induction args using treverse_ind; intros.
+  - inversion_clear H0. eapply WcbvEval_mkApp_fn; eassumption.
+  - destruct (tappend_mk_canonical args x tnil) as [x0 [x1 jx]].
+    rewrite jx in H0. rewrite jx in H1. inversion_Clear H0.
+    eapply IHargs; try eassumption.
+
+
+    cbn. eapply WcbvEval_mkApp_step. eapply WcbvEval_mkApp_fn.
+
+    eapply IHargs; try eassumption.
+
+
+  - inversion_Clear H0.
+    + destruct (tappend_mk_canonical args x tnil) as [x0 [x1 jx]].
+      rewrite jx in H3. discriminate.
+    + specialize (IHargs _ _ H).
+
+      rewrite <- H2 in H1.  (* cbn in H1. cbn. *)
+      eapply IHargs; try eassumption.
+      
+    
+                rewrite (WcbvEval_single_valued H H0).
     eapply WcbvEval_no_further. eassumption.
   - rewrite mkApp_tl. rewrite mkApp_tl in H0.
     inversion_clear H0. econstructor; try eassumption.
@@ -758,9 +952,36 @@ Proof.
     + eapply wAppFix; try eassumption. eapply IHargs; try eassumption.
     + eapply wAppCong; try eassumption. eapply IHargs; try eassumption.
 Qed.
-  
+***************************)
 
-(*********                                             
+Lemma waPrf_args:
+  forall p args fn,
+    WcbvEval p fn TProof -> WcbvEval p (mkApp fn args) TProof.
+Proof.
+  induction args; intros.
+  - cbn. assumption.
+  - cbn. eapply WcbvEval_mkApp_step.
+    + apply waPrf. assumption.
+    + eapply IHargs. constructor.
+Qed.
+
+Lemma wAppCong':
+  forall p args args' fn fn',
+    WcbvEvals p args args' ->
+    WcbvEval p fn fn' ->
+    ~ isLambda fn' -> ~ isFix fn' -> TProof <> fn' ->
+    WcbvEval p (mkApp fn args) (mkApp fn' args').
+Proof.
+  induction args; intros.
+  - inversion_Clear H. cbn. assumption.
+  - inversion_Clear H. cbn. apply IHargs; try assumption.
+    + apply wAppCong; try assumption.
+    + intros h. destruct h as [x0 [x1 jx]]. discriminate.
+    + intros h. destruct h as [x0 [x1 jx]]. discriminate.
+    + intros h. discriminate.
+Qed.
+
+
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L2_5.wcbvEval.WcbvEval p t t' ->
@@ -771,6 +992,11 @@ Proof.
   intros p.
   apply L2_5.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
     try (solve[constructor; trivial]); try assumption.
+  - simpl. eapply WcbvEval_mkApp_step.
+    + constructor. assumption.
+    + eapply WcbvEval_mkApp_step.
+      * econstructor.
+      * apply waPrf_args. constructor.
   - cbn. econstructor; try eassumption. apply LookupDfn_hom.
     unfold LookupDfn. unfold lookupDfn in e. case_eq (lookup nm p); intros.
     + rewrite H0 in e. destruct e0.
@@ -795,285 +1021,27 @@ Proof.
     + eapply wAppFix; eassumption. 
     + eapply WcbvEval_mkApp_fn; eassumption.
   - rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
-    + eapply wAppCong. eassumption.
-      * intros h. destruct (isLambda_invrt _ h). contradiction.
-        destruct H1 as [x jx]. subst fn'. cbn in h.
-
-        elim n. destruct h as [x0 [x1 jx]].
-
-      
-
-
-        change (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
-    erewrite whFixStep_hom in H1; try eassumption.
-    + rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
-      * eapply wAppFix. eassumption.
-        unfold whFixStep. rewrite dnthBody_hom. rewrite e. cbn.
-        reflexivity. instantiate (1:= strip s).  admit.
-
-      * eapply WcbvEval_mkApp_step. eapply H1.
-
-        Print whFixStep.   
-    unfold L2_5.term.pre_whFixStep in w1.
-    erewrite fold_left_hom in w1.
-    
-    inversion_Clear w1.
-Check (@L25dnthBody_dnthBody _ _ _ _ e).
-    
-    destruct (WcbvEval_mkApp_WcbvEval _ _ H1) as [y jy].
-    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
-    + eapply wAppFix. eassumption.
-      unfold whFixStep. rewrite dnthBody_hom. rewrite e. cbn.
-      eapply f_equal.
-      unfold L2_5.term.pre_whFixStep in w1.
-Check whFixStep_hom.
-
-    change (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
-
-rewrite whBetaStep_hom in H1. unfold whBetaStep in *.
-    + instantiate (1:= whBetaStep (strip bod) (strip a1')).
-      unfold whBetaStep.
-    + rewrite whBetaStep_hom in H1. apply H1.
-  -
-
-    Check whFixStep_hom.
-    erewrite whFixStep_hom in H1; try eassumption.
-
-    
-    Check WcbvEval_mkApp_step.
-
-    cbn in H.
-    unfold L2_5.term.whBetaStep in w1.
-    rewrite whBetaStep_hom in H1. unfold whBetaStep in H1.
-    destruct args.
-    + cbn. econstructor; eassumption.
-    + rewrite tcons_hom.
-      eapply WcbvEval_mkApp_step.
-      Check tcons_has_last. Check mkApp_out.
-
-
-      cbn.
-      
-    admit.
-  - cbn. eapply wLetIn; try eassumption.
-    rewrite <- (proj1 (instantiate_hom)). assumption.
-  - (* Fix step in L2_5 *)
-    change
-      (WcbvEval (stripEnv p)
-                (mkApp (TApp (strip fn) (strip arg)) (strips args))
-                (strip s)).
-    admit.
-  - (* App congruence in L2_5 *)
-    change
-      (WcbvEval (stripEnv p)
-                (mkApp (TApp (strip fn) (strip arg)) (strips args))
-                (strip (L2_5.compile.mkApp fn' aargs'))).
-    admit.
-  - change
-      (WcbvEval (stripEnv p)
-                (TCase ml (strip mch) (stripBs brs)) (strip s)).
-    eapply (@wCase (stripEnv p)
-                  (strip mch) ml i _ _
-                  (stripBs brs) (strip cs) (strip s));
-      try assumption.
-    + exact H. 
-    + rewrite <- whCaseStep_hom. rewrite e. reflexivity.
-  - (* case congruence in L2_5 *)
-    change
-      (WcbvEval (stripEnv p)
-                (TCase ml (strip mch) (stripBs brs))
-                (TCase ml (strip Mch) (stripBs brs))).
-    constructor; try assumption.
-    intros h. elim n. destruct (isConstruct_hom _ h).
-    + destruct H0 as [x0 [x1 [x2 jx]]]. subst. econstructor.
-      exists x1, x2. reflexivity.
-    + destruct H0 as [x0 jx]. subst. cbn in h. cbn in H.
-      elim (proj1 (L2_5.wcbvEval.WcbvEval_not_Cast p) _ _ w). auto.
-Admitted.
- *********************)
-
-(*****
-Lemma whBetaStep_hom:
-  forall bod arg args,
-    strip (L2_5.term.whBetaStep bod arg args) =
-    whBetaStep (strip bod) (strip arg) (strips args).
-intros bod arg args.
-unfold L2_5.term.whBetaStep, whBetaStep.
-rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
+    + eapply wAppCong; try eassumption.
+      * intros h. elim n. apply isLambda_invrt. assumption.
+      * intros h. elim n0. apply isFix_invrt. assumption.
+      * intros h. elim n1. rewrite (isProof_invrt _ h). reflexivity.
+    + rewrite mkApp_hom. rewrite tcons_hom. cbn.
+      eapply wAppCong'; try assumption.
+      *{ apply wAppCong.
+         - eapply (proj1 (WcbvEval_no_further _)). eassumption.
+         - intros h. pose proof (isLambda_invrt _ h). contradiction.
+         - intros h. pose proof (isFix_invrt _ h). contradiction.
+         - intros h. elim n1. symmetry. apply isProof_invrt. assumption.
+         - eapply (proj1 (WcbvEval_no_further _)). eassumption. }
+      * intros h. destruct h as [x0 [x1 jx]]. discriminate.
+      * intros h. destruct h as [x0 [x1 jx]]. discriminate.
+      * intros h. elim n1. discriminate.
+  - rewrite TCase_hom. rewrite TConstruct_hom in H. 
+    eapply wCase; try eassumption.
+    rewrite <- whCaseStep_hom. rewrite e. reflexivity.
+  - rewrite TCase_hom. rewrite TCase_hom. apply wCaseCong; try assumption.
+    intros h. elim n. pose proof (isConstruct_hom _ h). 
+    destruct H0 as [x0 [x1 [x2 jx]]]. rewrite jx. econstructor.
+    instantiate (1:= x0). exists x1, x2. reflexivity.
 Qed.
- *****)
-
-
-(*********************
-Lemma WcbvEval_hom:
-  forall (p:L2_5Env), 
-  (forall t t': L2_5Term, L2_5.wcbvEval.WcbvEval p t t' ->
-                        L3.wcbvEval.WcbvEval (L3.compile.stripEnv p)
-                                             (L3.compile.strip t)
-                                             (L3.compile.strip t')) /\
-  (forall ts ts', L2_5.wcbvEval.WcbvEvals p ts ts' ->
-                  L3.wcbvEval.WcbvEvals (L3.compile.stripEnv p)
-                                        (L3.compile.strips ts)
-                                        (L3.compile.strips ts')).
-Proof.
-  intros p.
-  apply L2_5.wcbvEval.WcbvEvalEvals_ind; cbn; intros; try reflexivity;
-  try intuition; try (rewrite <- H; rewrite <- H0; constructor).
-  - induction arty.
-    + constructor. constructor.
-    + cbn. rewrite mkEta_under_Lambda. constructor. 
-  - econstructor. unfold LookupDfn in l. unfold LookupDfn. apply (Lookup_hom l).
-    assumption.
-  - destruct (L2_5.term.isLambda_dec fn).
-    + destruct i as [x0 [x1 j0]]. rewrite j0. induction args; cbn.
-      * repeat econstructor. inversion_Clear H0. eassumption.
-        rewrite whBetaStep_hom in H1.
-        
-exact H1.
-    
-
-
-    
-  - destruct (L2_5.term.isLambda_dec fn).
-    + destruct i as [x0 [x1 j0]]. rewrite j0. cbn; destruct a1; cbn.
-      assert (k:= TApp_hom (L2_5.compile.TLambda x0 x1)). cbn in k.
-
-
-    ; destruct args; cbn.
-    + econstructor. inversion w. 
-    
-  - unfold LookupDfn in l. rewrite (Lookup_lookup l).
-    econstructor. unfold LookupDfn. apply Lookup_hom.
-    inversion_Clear l.
-
-    
-    inversion_Clear l. cbn. rewrite string_eq_bool_rfl.
-    unfold program.ecAx. unfold AstCommon.ecAx. cbn.
-    constructor.
-    Check (stripEnv_not_LookupAx p).
-    Check (Lookup_hom l). destruct (lookup nm p).
-    + constructor. 
-    + destruct e.
-      * unfold AstCommon.LookupDfn.inversion l.
-      * eapply wConst. unfold AstCommon.LookupDfn. Print AstCommon.ecAx.
-        unfold AstCommon.ecAx in l.
-        change ((@AstCommon.Lookup Term) nm p (AstCommon.ecAx Term)) in l.
-        Check (Lookup_hom l).
-
-        rewrite <- H. eapply wConst.
-        unfold AstCommon.LookupDfn.
-        Check Lookup_hom. apply Lookup_hom.
-      unfold LookupAx in l.
-
-    rewrite <- H0. rewrite <- H1.
-    
-  - myInjection H. myInjection H0. constructor.
-  - case_eq (strip p bod); intros x hx; rewrite hx in *.
-    + discriminate.
-    + myInjection H. myInjection H0. constructor.
-  - case_eq (strip p bod); intros x hx; rewrite hx in *.
-    + discriminate.
-    + myInjection H. myInjection H0. constructor.
-  - intuition.
-  - case_eq (etaExp_cnstr p i r tnil); intros x hx; rewrite hx in *.
-    + discriminate.
-    + myInjection H. myInjection H0. constructor.
-*******)
-
-
-(**** L2_5 and L3 agree on cbv evaluation  ****
-Lemma wndEval_types_irrelevant:
-  forall (p:L2_5Environ),
-    (forall (t s:L2_5Term),
-       L2_5.wcbvEval.WcbvEval p t s ->
-       WcbvEval (stripEnv p) (strip p t) (strip p s))  /\
-    (forall ts ss,
-       L2_5.wcbvEval.WcbvEvals p ts ss ->
-       WcbvEvals (stripEnv p) (strips p ts) (strips p ss)).
-Proof.
-  intros p.
-  apply L2_5.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
-  try (solve[constructor; trivial]); try assumption.
-  - admit. (** rewrite TConstruct_hom.  cbn. **)
-  - unfold LookupAx in l. cbn. assert (j:= Lookup_lookup l). 
-    Check j. Check (lookup nm p).
-    destruct (lookup nm p).
-    + destruct e. refine (wConst _ _). unfold AstCommon.LookupDfn.
-    rewrite j.
-
-    
-  - rewrite TFix_hom. rewrite TFix_hom. 
-    
-  - change (strip p t = Some tt) in H0. eapply H; assumption.
-  - unfold strip in H. unfold strip in H0. rewrite H in H0.
-    myInjection H0. clear H0. unfold etaExp_cnstr in H.
-    destruct (cnstrArity p i r).
-    + destruct (PeanoNat.Nat.compare (tlength tnil) n).
-      * myInjection H. constructor. constructor.
-      * myInjection H. clear H. rewrite <- minus_n_O.
-        { induction n.
-          - simpl. constructor. constructor.
-          - change 
-              (WcbvEval pp
-                        (mkEta (TLambda nAnon
-                                        (TConstruct i r (etaArgs (S n)))) n)
-                        (mkEta (TLambda nAnon
-                                        (TConstruct i r (etaArgs (S n)))) n)).
-            simpl. rewrite mkEta_under_Lambda. constructor. }
-      * discriminate.
-    + discriminate.
-  - rewrite (strip_Ind_invrt H). rewrite (strip_Ind_invrt H0). constructor.
-  - unfold strip in H. unfold strip in H0. myInjection H. myInjection H0.
-    constructor.
-  -
-
-
-
-
-
-Qed.
-
-***)
-
-
-(***  scratch below  *****
-Section FlatApp.
-Variable flatApp: L2_5Term -> Term.
-Fixpoint flatApps (ts:L2_5Terms) : Terms :=
-  match ts with
-    | L2_5.term.tnil => tnil
-    | L2_5.term.tcons s ss => tcons (flatApp s) (flatApps ss)
-  end.
-Fixpoint flatAppDs (ts:L2_5Defs) : Defs :=
-  match ts with
-    | L2_5.term.dnil => dnil
-    | L2_5.term.dcons nm bod n ds => dcons nm (flatApp bod) n (flatAppDs ds)
-  end.
-Fixpoint mkApp (fn:Term) (l:L2_5Terms) : Term :=
-    match l with
-      | L2_5.term.tnil => fn
-      | L2_5.term.tcons b t => mkApp (TApp fn (flatApp b)) t
-    end.
-End FlatApp.
-
-Function flatApp (t:L2_5Term) : Term :=
-  match t with
-    | L2_5.term.TRel n => TRel n
-    | L2_5.term.TSort s => TSort s
-    | L2_5.term.TProd nm bod => TProd nm (flatApp bod)
-    | L2_5.term.TLambda nm bod => TLambda nm (flatApp bod)
-    | L2_5.term.TLetIn nm dfn bod => TLetIn nm (flatApp dfn) (flatApp bod)
-    | L2_5.term.TApp fn arg args =>
-      match fn with 
-        | L2_5.term.TConstruct i n =>
-             TConstruct i n (tcons (flatApp arg) (flatApps args))
-        | x => mkApp flatApp (flatApp x)
-                     (tcons (flatApp arg) (flatApps flatApp args))
-      end
-    | L2_5.term.TConst nm => TConst nm
-    | L2_5.term.TInd i => TInd i
-    | L2_5.term.TConstruct i n => TConstruct i n tnil
-    | L2_5.term.TCase n mch brs => TCase n (flatApp mch) (flatApps brs)
-    | L2_5.term.TFix ds n => TFix (flatAppDs ds) n
-  end.
-***)
+Print Assumptions WcbvEval_hom.

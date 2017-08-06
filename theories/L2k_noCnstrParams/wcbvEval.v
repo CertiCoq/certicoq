@@ -17,7 +17,6 @@ Set Implicit Arguments.
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
-| wCast: forall t s, WcbvEval p t s -> WcbvEval p (TCast t) s
 | wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) s
 | wConstruct: forall i r args args',
                 WcbvEvals p args args' ->
@@ -213,11 +212,6 @@ Function wcbvEval
       | Some (ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
-    | TCast t =>
-      match wcbvEval n t with
-      | Ret et => Ret et
-      | Exc s => raise ("wcbvEval, TCast: " ++ s)
-      end
     | TProof t =>
       match wcbvEval n t with
       | Ret et => Ret et
@@ -344,8 +338,6 @@ Proof.
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   - destruct H. exists (S x). intros m hm. simpl. rewrite (j m x); try omega.
     + rewrite (H (m - 1)); try omega. reflexivity.
-  - destruct H. exists (S x). intros mm h. cbn.
-    rewrite (j mm x); try omega. rewrite H. reflexivity. omega.
   - destruct H. exists (S x). intros mm h. simpl. 
     rewrite (j mm x); try omega.
     rewrite H. reflexivity. omega.

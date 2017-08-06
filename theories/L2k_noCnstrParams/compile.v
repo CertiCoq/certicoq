@@ -25,7 +25,6 @@ Definition L2Env := environ L2Term.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TProof     : Term -> Term
-| TCast      : Term -> Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
@@ -178,7 +177,6 @@ Function lift (n:nat) (t:Term) : Term :=
                         | _ => S m
                       end)
     | TProof t => TProof (lift n t)
-    | TCast t => TCast (lift n t)
     | TLambda nm bod => TLambda nm (lift (S n) bod)
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg args => TApp (lift n fn) (lift n arg) (lifts n args)
@@ -346,7 +344,6 @@ Function strip (t:L2Term) : Term :=
     | L2.compile.TRel n => TRel n
     | L2.compile.TSort s => TProof (TAx (L2.compile.TSort s))
     | L2.compile.TProof t => TProof (strip t)
-    | L2.compile.TCast t => TCast (strip t)
     | L2.compile.TProd nm bod => TProof (TAx (L2.compile.TProd nm bod))
     | L2.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)

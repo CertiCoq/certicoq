@@ -25,7 +25,6 @@ Definition L2kPgm := Program L2kTerm.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TProof     : Term
-| TCast      : Term -> Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name ->
                Term (* dfn *) -> Term (* body *) -> Term
@@ -98,7 +97,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TCast t => instantiate n t
     | TConstruct i m args => TConstruct i m (instantiates n args)
     | x => x
   end
@@ -139,7 +137,6 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
   match t with
     | L2k.compile.TRel n => TRel n
     | L2k.compile.TProof t => TProof
-    | L2k.compile.TCast tm => TCast (L2kTerm_Term tm)
     | L2k.compile.TLambda nm bod => TLambda nm (L2kTerm_Term bod)
     | L2k.compile.TLetIn nm dfn bod =>
       TLetIn nm (L2kTerm_Term dfn) (L2kTerm_Term bod)

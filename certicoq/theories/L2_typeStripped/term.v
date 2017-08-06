@@ -72,7 +72,6 @@ Fixpoint print_term (t:Term) : string :=
     | TRel n => "(Rel " ++ (nat_to_string n) ++ ")"
     | TSort _ => " SRT "
     | TProof t => "(PRF " ++ print_term t ++ ")"
-    | TCast t  => "(CAST " ++ print_term t ++ ")"
     | TProd nm t => "(PROD "++ (print_name nm) ++ " [" ++ print_term t ++ "])"
     | TLambda nm t => "(LAM "++ (print_name nm) ++ " [" ++ print_term t ++ "])"
     | TLetIn nm _ _ => "(LET " ++ (print_name nm) ++ ")"
@@ -103,8 +102,6 @@ Proof.
   apply TrmTrmsBrsDefs_ind; intros.
   - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
   - induction t; cross. destruct (Srt_dec s s0); [lft | rght].
-  - induction t0; cross.
-    destruct (H t0); [lft | rght ..].
   - induction t0; cross.
     destruct (H t0); [lft | rght ..].
   - induction t0; cross.
@@ -186,19 +183,6 @@ Lemma isLambda_dec: forall t, {isLambda t}+{~ isLambda t}.
 induction t;
   try (solve [right; intros h; unfold isLambda in h;
               elim h; intros x h1; elim h1; intros x0 h2; discriminate]).
-left. auto.
-Qed.
-
-Definition isCast (t:Term) : Prop := exists tm, t = TCast tm.
-Lemma IsCast: forall t, isCast (TCast t).
-intros. exists t. reflexivity.
-Qed.
-Hint Resolve IsCast.
-
-Lemma isCast_dec: forall t, {isCast t}+{~ isCast t}.
-induction t;
-  try (solve [right; intros h; unfold isCast in h;
-              destruct h as [tm j]; discriminate]).
 left. auto.
 Qed.
 
@@ -808,8 +792,6 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TProof fn), arg, tnil. split. reflexivity.
     + left. intuition. revert H. not_isApp. 
-  - exists (TCast fn), arg, tnil. split. reflexivity.
-    + left. intuition. revert H. not_isApp. 
   - exists (TProd n fn), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TLambda n fn), arg, tnil. split. reflexivity.
@@ -850,7 +832,6 @@ Qed.
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
 | wfaSort: forall srt, WFapp (TSort srt)
-| wfaCast: forall tm, WFapp tm -> WFapp (TCast tm)
 | wfaProof: forall tm, WFapp tm -> WFapp (TProof tm)
 | wfaProd: forall nm bod, WFapp bod -> WFapp (TProd nm bod)
 | wfaLambda: forall nm bod, WFapp bod -> WFapp (TLambda nm bod)
@@ -997,7 +978,6 @@ Qed.
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
 | wfSort: forall n s, WFTrm (TSort s) n
-| wfCast: forall n t, WFTrm t n -> WFTrm (TCast t) n
 | wfProof: forall n t, WFTrm t n -> WFTrm (TProof t) n
 | wfProd: forall n nm bod,
             WFTrm bod (S n) -> WFTrm (TProd nm bod) n
@@ -1057,7 +1037,6 @@ Variable nm:string.
 Inductive PoccTrm : Term -> Prop :=
 | PoProdBod: forall s bod, PoccTrm bod -> PoccTrm (TProd s bod)
 | PoLambdaBod: forall s bod, PoccTrm bod -> PoccTrm (TLambda s bod)
-| PoCast: forall t, PoccTrm t -> PoccTrm (TCast t)
 | PoProof: forall t, PoccTrm t -> PoccTrm (TProof t)
 | PoLetInDfn: forall s dfn bod,
                 PoccTrm dfn -> PoccTrm (TLetIn s dfn bod)
@@ -1318,8 +1297,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
 | ISort: forall n srt, Instantiate n (TSort srt) (TSort srt)
-| ICast: forall n t it,
-           Instantiate n t it -> Instantiate n (TCast t) (TCast it)
 | IProof: forall n t it,
            Instantiate n t it -> Instantiate n (TProof t) (TProof it)
 | IProd: forall n nm bod ibod,
@@ -1414,8 +1391,6 @@ Proof.
     + constructor. intuition.
   - inversion_Clear H0.
     + constructor. intuition. 
-  - inversion_Clear H0.
-    + constructor. intuition. 
   - inversion_Clear H1.
     + constructor. intuition. 
     + apply PoLetInBod. intuition.
@@ -1455,7 +1430,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TCast t => TCast (instantiate n t)
     | TProof t => TProof (instantiate n t)
     | x => x
   end
@@ -1579,7 +1553,6 @@ Proof.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
-  - cbn. constructor. apply H0. assumption.
   - cbn. constructor. apply H0. assumption.
   - change (WFapp (TProd nm (instantiate t (S n) bod))).
     constructor.

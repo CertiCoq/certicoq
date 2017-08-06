@@ -25,7 +25,6 @@ Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
 | TProof     : Term -> Term
-| TCast      : Term -> Term
 | TProd      : name -> Term -> Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
@@ -73,7 +72,6 @@ Function strip (t:L1gTerm) : Term :=
     | L1g.compile.TRel n => TRel n
     | L1g.compile.TSort s => TSort s
     | L1g.compile.TProof t => TProof (strip t)
-    | L1g.compile.TCast t _ => TCast (strip t)
     | L1g.compile.TProd nm _ bod => TProd nm (strip bod)
     | L1g.compile.TLambda nm _ bod => TLambda nm (strip bod)
     | L1g.compile.TLetIn nm dfn _ bod =>

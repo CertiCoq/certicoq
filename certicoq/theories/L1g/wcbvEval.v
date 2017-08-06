@@ -28,8 +28,6 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wProd: forall nm ty ty' bod,
           WcbvEval p ty ty' ->
           WcbvEval p (TProd nm ty bod) (TProd nm ty' bod)
-| wCast: forall t s ty,
-           WcbvEval p t s ->  WcbvEval p (TCast t ty) s
 | wConstruct: forall i r np na,
                 WcbvEval p (TConstruct i r np na) (TConstruct i r np na)
 | wInd: forall i, WcbvEval p (TInd i) (TInd i) 
@@ -227,10 +225,7 @@ Proof.
     eapply wERTCtrn. 
     + apply wndEvalRTC_Prod_typ. eapply H. assumption.
     + constructor. 
-  - eapply wERTCtrn; inversion_Clear H0.
-    + apply wERTCstep. apply sCast.
-    + apply H. assumption.
-   - eapply wERTCtrn; intuition.
+  - eapply wERTCtrn; intuition.
     eapply wERTCtrn.
     + apply wERTCstep. apply sConst. apply lookupDfn_LookupDfn. eassumption.
     + apply H. eapply (lookupDfn_pres_WFapp hp).  eassumption. 
@@ -362,11 +357,6 @@ Function wcbvEval
       | Some _ => raise ("wcbvEval, TConst ecTyp " ++ nm)
       | _ => raise ("wcbvEval: TConst environment miss:  "
                       ++ nm ++ print_term topt)
-      end
-    | TCast t _ =>
-      match wcbvEval n t with
-      | Ret et => Ret et
-      | Exc s => raise ("wcbvEval: TCast: " ++ print_term topt)
       end
     | TApp fn a1 args =>
       match wcbvEval n fn with
@@ -515,8 +505,6 @@ Proof.
     + rewrite (H (m - 1)); try omega. reflexivity.
   - destruct H.  exists (S x). intros m h. simpl.
     rewrite (j m x); try omega. rewrite H; try omega. reflexivity.
-  - destruct H. exists (S x). intros mm h. cbn. 
-    rewrite (j mm x); try omega. rewrite H. reflexivity. omega.
   - destruct H. exists (S x). intros mm h. cbn.
     rewrite (j mm x); try omega.
     unfold lookupDfn in e. destruct (lookup nm p); try discriminate.

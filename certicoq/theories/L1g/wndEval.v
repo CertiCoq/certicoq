@@ -45,7 +45,6 @@ Inductive wndEval : Term -> Term -> Prop :=
           dnthBody m dts = Some (x, ix) ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
-| sCast: forall t ty, wndEval (TCast t ty) t
 | sProof: forall t, wndEval (TProof t) t
 (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
@@ -370,7 +369,6 @@ Proof.
     + admit.
     + constructor; assumption. 
     +
-  - destruct (Crct_invrt_Cast H eq_refl) as [h1 h2]. assumption.
   - destruct (Crct_invrt_App H0 eq_refl) as [h1 [h2 [h3 h4]]].
     apply mkApp_pres_Crct.
     + apply H. assumption.
@@ -424,11 +422,6 @@ intros nm tp bod s h. inversion_Clear h.
 - exists t2. split; [assumption | reflexivity].
 Qed.
 
-Lemma wndEval_Cast_inv:
-  forall tm ty s, wndEval (TCast tm ty) s -> tm = s.
-inversion 1.
-- reflexivity.
-Qed.
 
 (** when reduction stops **)
 Definition no_wnd_step (t:Term) : Prop :=
@@ -880,9 +873,6 @@ Proof.
   - apply sLetInDef. apply (H nm0 ec); trivial; apply (notPocc_TLetIn H1).
   - apply sCaseTy. apply (H nm ec); trivial; apply (notPocc_TCase H1).
   - apply sCaseArg. apply (H nm ec); trivial; apply (notPocc_TCase H1).
-    (************
-  - apply sCaseBrs. apply (H nm ec); trivial; apply (notPocc_TCase H1).
-*************)
   - apply saHd. apply (H nm ec). trivial. apply (notPoccTrms H1).
   - apply saTl. apply (H nm ec). trivial. apply (notPoccTrms H1).
 Qed.

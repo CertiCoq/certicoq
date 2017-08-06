@@ -76,7 +76,6 @@ Qed.
 
 Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctRel: forall p n m, crctEnv p -> m < n -> crctTerm p n (TRel m)
-| ctCast: forall p n t, crctTerm p n t -> crctTerm p n (TCast t)
 | ctProof: forall p n t, crctTerm p n t -> crctTerm p n (TProof t)
 | ctLam: forall p n nm bod,
            crctTerm p (S n) bod -> crctTerm p n (TLambda nm bod)
@@ -279,8 +278,6 @@ Proof.
     constructor. assumption.
   - constructor. eapply H0. reflexivity. intros h. elim H2.
     constructor. assumption.
-  - constructor. eapply H0. reflexivity. intros h. elim H2.
-    constructor. assumption.
   - constructor. eapply H0. reflexivity.
     + intros h. elim H4. apply PoLetInDfn. assumption.
     + eapply H2. reflexivity. intros h. elim H4. eapply PoLetInBod.
@@ -383,12 +380,6 @@ Qed.
 Lemma Crct_invrt_Case:
   forall p n m s us,
     crctTerm p n (TCase m s us) -> crctTerm p n s /\ crctBs p n us.
-Proof.
-   intros. inversion_Clear H. intuition.
-Qed.
-
-Lemma Crct_invrt_Cast:
-  forall p n t, crctTerm p n (TCast t) -> crctTerm p n t.
 Proof.
    intros. inversion_Clear H. intuition.
 Qed.

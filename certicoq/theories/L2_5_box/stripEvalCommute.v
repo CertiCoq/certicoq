@@ -297,14 +297,6 @@ induction bod; simpl; intros; try reflexivity.
   reflexivity.
 Qed.
       
-
-Lemma TCast_hom:
-  forall tm, strip (L2k.compile.TCast tm) = TCast (strip tm).
-Proof.
-  reflexivity.
-Qed.
-
-
 Lemma instantiate_hom:
   (forall bod arg n, strip (L2k.term.instantiate arg n bod) =
                      instantiate (strip arg) n (strip bod)) /\

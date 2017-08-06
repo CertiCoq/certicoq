@@ -37,7 +37,6 @@ Ltac not_is2 :=
             Ltac not_isLambda := not_is2.
             Ltac not_isCase := not_is3.
             Ltac not_isFix := not_is2.
-            Ltac not_isCast := not_is1.
 Ltac isApp_inv h :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -62,7 +61,6 @@ Fixpoint print_term (t:Term) : string :=
   match t with
     | TRel n => " (" ++ (nat_to_string n) ++ ") "
     | TProof => " PRF "
-    | TCast _  => " CAST "
     | TLambda _ _  => " LAM "
     | TLetIn _ _ _  => " LET "
     | TApp fn arg args =>
@@ -88,7 +86,6 @@ Proof.
   apply TrmTrmsBrsDefs_ind; intros.
   - Case "TRel". destruct t; cross. destruct (eq_nat_dec n n0); [lft | rght].
   - Case "TProof". destruct t; cross. lft.
-  - Case "TCast". destruct t0; cross. destruct (H t0); [lft | rght ..]. 
   - destruct t0; cross.
     destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
   - destruct t1; cross.
@@ -130,7 +127,6 @@ Fixpoint TrmSize (t:Term) : nat :=
     | TApp fn a args => S (TrmSize fn + TrmSize a + TrmsSize args)
     | TCase _ mch brs => S (TrmSize mch + TrmBsSize brs)
     | TFix ds _ => S (TrmDsSize ds)
-    | TCast t => S (TrmSize t)
     | _ => 1
   end
 with TrmsSize (ts:Terms) : nat :=
@@ -159,19 +155,6 @@ Hint Resolve IsLambda.
 Lemma isLambda_dec: forall t, {isLambda t}+{~ isLambda t}.
 induction t; try (solve[right; not_isLambda]).
 left. auto.
-Qed.
-
-Definition isCast (t:Term) : Prop :=
-  exists tm, t = TCast tm.
-Lemma IsCast: forall t, isCast (TCast t).
-intros. exists t. reflexivity.
-Qed.
-Hint Resolve IsCast.
-
-Lemma isCast_dec: forall t, {isCast t}+{~ isCast t}.
-Proof.
-  destruct t;  try (solve[right; not_isCast]).
-  left. auto.
 Qed.
 
 Definition isCase (t:Term) : Prop :=
@@ -254,7 +237,6 @@ Qed.
 Function isL2_5Rel (t:Term) : option nat :=
   match t with
     | TRel n => Some n
-    | TCast u => isL2_5Rel u
     | _ => None
   end.
 
@@ -653,8 +635,6 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists TProof, arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TCast fn), arg, tnil. split. reflexivity.
-    + left. intuition. revert H. not_isApp. 
   - exists (TLambda n fn), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TLetIn n fn1 fn2), arg, tnil. split. reflexivity.
@@ -706,7 +686,6 @@ Qed.
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
 | wfaPrf: WFapp TProof
-| wfaCast: forall tm, WFapp tm -> WFapp (TCast tm)
 | wfaLambda: forall nm bod,
             WFapp bod -> WFapp (TLambda nm bod)
 | wfaLetIn: forall nm dfn bod,
@@ -974,7 +953,6 @@ Qed.
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
 | wfPrf: forall n, WFTrm TProof n
-| wfCast: forall t n, WFTrm t n -> WFTrm (TCast t) n
 | wfLambda: forall n nm bod,
             WFTrm bod (S n) -> WFTrm (TLambda nm bod) n
 | wfLetIn: forall n nm dfn bod,
@@ -1028,7 +1006,6 @@ Variable nm:string.
 
 Inductive PoccTrm : Term -> Prop :=
 | PoLambdaBod: forall s bod, PoccTrm bod -> PoccTrm (TLambda s bod)
-| PoCastTm: forall t, PoccTrm t -> PoccTrm (TCast t)
 | PoLetInDfn: forall s dfn bod,
                 PoccTrm dfn -> PoccTrm (TLetIn s dfn bod)
 | PoLetInBod: forall s dfn bod,
@@ -1235,9 +1212,6 @@ Proof.
     + apply PoLambdaBod. assumption.
     + apply PoAppL. apply PoLambdaBod. assumption.
   - destruct args; simpl.
-    + apply PoCastTm. assumption.
-    + apply PoAppL. apply PoCastTm. assumption.
-  - destruct args; simpl.
     + apply PoLetInDfn. assumption.
     + apply PoAppL. apply PoLetInDfn. assumption.
   - destruct args; simpl.
@@ -1303,7 +1277,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
 | IProof: forall n, Instantiate n TProof TProof
-| ICast: forall n t it, Instantiate n t it -> Instantiate n (TCast t) it
 | ILambda: forall n nm bod ibod,
              Instantiate (S n) bod ibod ->
              Instantiate n (TLambda nm bod) (TLambda nm ibod)
@@ -1529,7 +1502,6 @@ Proof.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
-  - cbn. apply H0. assumption.
   - change (WFapp (TLambda nm (instantiate t (S n) bod))).
     constructor.
     + apply H0. assumption.

@@ -72,6 +72,8 @@ with efnlst: Type :=
 | eflcons: name -> exp -> efnlst -> efnlst
 with branches_e: Type :=
 | brnil_e: branches_e
+(* in  [brcons_e d (n,lnames) ...], is there a guarantee that [n=length lnames]?
+If yes, does the wf definition for L4 imply the above? *)
 | brcons_e: dcon -> (N * (* # args *) list name (* arg names *)) -> exp ->
             branches_e -> branches_e.
 Notation "[| e |]" := (econs e enil).

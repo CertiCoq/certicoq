@@ -29,25 +29,23 @@ Ltac computeExtract certiL4 f:=
        |Ret ?xx => exact xx
      end).
 
-Require Import Benchmarks.Binom
-        Benchmarks.Color
-        Benchmarks.vs.
 
 
 Quote Recursively Definition One := 1%positive.
+(*
 Definition One6 : cTerm certiL6.
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in 
 match t with
 |Ret ?xx => exact xx
 end).
-Defined.
+Defined. *)
 
 
 Definition ext_comp := fun prog =>
   let t := (translateTo (cTerm certiL6) prog) in
   match t with
   | Ret xx => xx
-  | _ => One6
+  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
   end.
  
 Require Import L6_to_Clight.
@@ -67,9 +65,8 @@ Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
 
-
 Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
-  let '((_, cenv , nenv), (_, prog)) := t in
+  let '((_, cenv , nenv, fenv), (_, prog)) := t in
   let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
                    prog cenv nenv in
   (fst p, stripOption mainIdent (snd p)).
@@ -88,11 +85,10 @@ Definition compile_opt_L7 p  :=
 
 Require Import L6.cps L6.cps_show.
 
-
 Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   match x with
   | exceptionMonad.Exc s => s
-  | exceptionMonad.Ret ((p,cenv, nenv), (g, e)) => show_exp nenv cenv e
+  | exceptionMonad.Ret ((p,cenv, nenv, fenv), (g, e)) => L6.cps_show.show_exp nenv cenv true e
   end.
 
 Require Import L6_to_Clight.
@@ -115,6 +111,9 @@ Require Import L6.cps L6.cps_show.
  *)
 
   
+Require Import Benchmarks.Binom
+        Benchmarks.Color
+        Benchmarks.vs.
 
 
 
@@ -154,21 +153,20 @@ Fixpoint mstep_L6  (x : (cTerm certiL6)) (n:nat) :=
     | O =>
       Ret x
     | S n' =>
-      let '((p,cenv, nenv), (rho, e)) := x in
+      let '((p,cenv, nenv, fenv), (rho, e)) := x in
       (match (L6.eval.sstep_f p cenv rho e) with
-         | Ret (rho', e') => mstep_L6 ((p, cenv, nenv), (rho',e')) n'
+         | Ret (rho', e') => mstep_L6 ((p, cenv, nenv, fenv), (rho',e')) n'
          | Exc s => Exc ("Error :"++s++" at "++(nat2string10 n)++" from end")%string
        end)
   end.
 
-
 Definition print_BigStepResult_L6 p  n:=
-  let '((prim,cenv, nenv), (rho, e)) := p in
+  let '((prim,cenv, nenv, fenv), (rho, e)) := p in
   L7.L6_to_Clight.print (
       match (L6_evaln n p) with
       | Error s _ => s
-      | OutOfTime (_, (rho', e')) => "Out of time:"++ (show_env nenv cenv rho')++ (show_exp nenv cenv e')
-      | Result v => show_val nenv cenv v
+      | OutOfTime (_, (rho', e')) => "Out of time:"++ (show_env nenv cenv false rho')++ (show_exp nenv cenv false e')
+      | Result v => show_val nenv cenv false v
       end).
 
  Definition comp_L6 p := match p

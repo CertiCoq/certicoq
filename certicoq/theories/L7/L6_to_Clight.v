@@ -34,7 +34,7 @@ Variable (print_Clight : Clight.program -> unit).
 Variable (print_Clight_dest : Clight.program -> String.string -> unit).
 Variable (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
 Variable (print : String.string -> unit).
-About fEnv.
+
 
 Section TRANSLATION.
 
@@ -53,7 +53,10 @@ Section TRANSLATION.
   Variable (caseIdent:ident). (* ident for the case variable , TODO: generate that automatically and only when needed *)
   
   Definition maxArgs := 1024%Z.
-(* temporary function to get something working *)
+
+ 
+  (* temporary function to get something working *)
+  (* returns (n-1)::(n-2):...::0::nil for a list of size n *)
 Fixpoint makeArgList' (vs : list positive) : list N :=
   match vs with
   | nil => nil
@@ -62,6 +65,8 @@ Fixpoint makeArgList' (vs : list positive) : list N :=
 
 Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
 
+
+(* Compute an fEnv by looking at the number of arguments functions are applied to, assumes that all functions sharing the same tags have the same arity *)
 Fixpoint compute_fEnv' (n : nat) (fenv : fEnv) (e : exp) : fEnv :=
   match n with
   | 0 => fenv
@@ -177,7 +182,7 @@ Fixpoint max_args (e : exp) : nat :=
   | Efun fnd e' => max (max_args_fundefs fnd) (max_args e')
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_args e'
-  | Ehalt x => 1 
+  | Ehalt x => 2 
   end
 with max_args_fundefs (fnd : fundefs) :=
        match fnd with
@@ -485,7 +490,7 @@ Definition asgnAppVars vs ind :=
     | None => None 
   end.
 
-SearchAbout (nat -> N).
+
 
 Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : option statement :=
   match e with

@@ -43,24 +43,24 @@ Section Uncurry_correct.
     eapply bind_triple. now apply post_trivial.
     intros l' s'. apply return_triple. eauto.
   Qed.
-  
+
 
   (* Un-nesting the Efun case from the main proof *) 
-  Lemma uncurry_fundefs_correct k B1 B1' B2 e S :
+  Lemma uncurry_fundefs_correct k B1 B1' B2  e S :
     (* The induction hypothesis for expressions *)
     (forall m : nat,
        m < k ->
        forall (e : exp) S,
          Disjoint var S (Union var (bound_var e) (occurs_free e)) ->
-         {{fun s : var * bool => fresh S (fst s)}} 
+         {{fun s : stateType => fresh S (fst ((fst (fst (fst (fst (fst s)))))))}} 
            uncurry_exp e
-         {{fun (_ : var * bool) (e' : exp) (s' : var * bool) =>
+         {{fun (_ : stateType) (e' : exp) (s' : stateType) =>
              (forall rho rho',
                 preord_env_P pr cenv (occurs_free e) m rho rho' ->
-                preord_exp pr cenv m (e, rho) (e', rho')) /\ fresh S (fst s') }}) ->
+                preord_exp pr cenv m (e, rho) (e', rho')) /\ fresh S (fst (fst (fst (fst (fst (fst s')))))) }}) ->
     (* Assumption about the set [S]  *)
     Disjoint _ S (Union _ (bound_var_fundefs B2) (occurs_free_fundefs B2)) ->
-    {{ fun s =>  fresh S (fst s) }}
+    {{ fun s =>  fresh S (fst (fst (fst (fst (fst (fst s)))))) }}
       uncurry_fundefs B2
     {{ fun s B2' s' =>
          (forall rho rho',
@@ -74,7 +74,7 @@ Section Uncurry_correct.
                can assume that B1 R B1' and the proof goes through.*)
             preord_env_P pr cenv (Union _ (occurs_free (Efun B1 e)) (name_in_fundefs B2)) k
                          (def_funs B1 B2 rho rho) (def_funs B1' B2' rho' rho')) /\
-         fresh S (fst s')
+         fresh S (fst (fst (fst (fst (fst (fst s'))))))
     }}.
   Proof.
     revert B2 B1 B1' e S. induction k as [k IHk] using lt_wf_rec1.
@@ -142,13 +142,13 @@ Section Uncurry_correct.
        is denoted by the precondition [fresh S (fst s)]. S is disjoint from all
        the free or bound identifiers in the term *)
     Disjoint _ S (Union _ (bound_var e) (occurs_free e)) ->
-    {{ fun s => fresh S (fst s) }}
+    {{ fun s => fresh S (fst (fst (fst (fst (fst (fst s)))))) }}
       uncurry_exp e
     {{ fun s e' s' =>
          (forall rho rho',
             preord_env_P pr cenv (occurs_free e) k rho rho' ->
             preord_exp pr cenv k (e, rho) (e', rho')) /\
-         fresh S (fst s')
+         fresh S (fst (fst (fst (fst (fst  (fst s'))))))
     }}.
   Proof with now eauto with Ensembles_DB.
     revert e; induction k as [k IHk] using lt_wf_rec1.

@@ -147,7 +147,7 @@ Definition l_opt {A} (e:option A) (s:string):exception A :=
     | Some e => Ret e
   end.
 
-Fixpoint sstep_f (rho:env) (e:exp) : exception (env* exp) :=
+Definition sstep_f (rho:env) (e:exp) : exception (env* exp) :=
   match e with
   | Eprim x f ys e' =>
     do vs  <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
@@ -173,8 +173,9 @@ Fixpoint sstep_f (rho:env) (e:exp) : exception (env* exp) :=
     let rho' := def_funs fl fl rho rho in
     Ret (rho', e')
   | Ehalt x =>
-    (* Maybe fail? *)
-    Ret (rho, Ehalt x)
+  (* Maybe fail? *)
+    (exceptionMonad.Exc "Halt: can't step")
+(*    Ret (rho, Ehalt x) *)
   | Ecase y cl =>
             match M.get y rho with
               | Some (Vconstr t vs) =>
@@ -445,8 +446,6 @@ Theorem bstep_f_complete:
   Qed.
 
   (** Small step semantics -- Relational definition *)
-  (* TODO : this semantics currently does not match the big step semantics.
-   * We need them to match and a proof that they indeed match. *)
   Inductive step: state -> state -> Prop := 
   | Step_constr: forall vs rho x t ys e,
                    getlist ys rho = Some vs ->
@@ -478,84 +477,89 @@ Theorem bstep_f_complete:
   (* | Step_halt : forall x v rho, *)
   (*                 M.get x rho = Some v -> *)
   (*                 step (rho, Ehalt x) (rho, v) *).
-  
-  (** Small step semantics -- Computational definition *)
-  (* TODO : this is inconsistent with [step].  we need computational case_consistent *)
-  (*
-  Definition stepf (s: env * exp) : option (env * exp) :=
-    let (rho,e) := s in
-    match e with
-      | Econstr x t ys e => 
-        vs <- getlist ys rho ;; 
-        ret (M.set x (Vconstr t vs) rho, e)
-      | Eproj x t n y e =>
-        match M.get y rho with
-          | Some (Vconstr t' vs) =>
-            v <- nthN vs n ;; ret (M.set x v rho, e)
-          | _ => None
-        end
-      | Ecase y cl =>
-        match M.get y rho with
-          | Some (Vconstr t vl) =>
-            e' <- findtag cl t ;; ret (rho, e')
-          | _ => None
-        end
-      | Efun fl e => 
-        ret (def_funs fl fl rho rho, e)
-      | Eapp f t ys =>
-        match M.get f rho with
-            | Some (Vfun rho' fl f') =>
-              vs <- getlist ys rho ;;
-                 match find_def f' fl with
-                   | Some (t',xs,e) =>
-                     (* if (Coqlib.peq t t') then *)
-                       rho'' <- setlist xs vs (def_funs fl fl rho' rho') ;;
-                       ret (rho'', e)
-                     (* else None *)
-                   | _ => None
-                 end
-            | _ => None
-        end
-      | Eprim x f ys e =>
-        vs <- getlist ys rho ;;
-        f' <- M.get f pr ;;
-        v <- f' vs ;;
-        ret (M.set x v rho, e)
-      | Ehalt x =>
-        (* need to go from value to exp somehow ... *)
-        None
-    end.
-*)
-(* TODO : to update the following we need a computational definition of case_consistent *)
-(*  (** Correspondence of the two small step semantics definitions *)
-  Lemma step_stepf:
-    forall s s',
-      step s s' ->
-      stepf s = Some s'.
+
+  (* small-step matches big-step *)
+
+
+  Inductive halt_state: (env * exp) -> val -> Prop :=
+    | Chalt :
+        forall rho x v,
+          M.get x rho = Some v ->
+          halt_state (rho, Ehalt x) v.
+
+        
+    Theorem bstep_step_corresp:
+    forall n rho e v rho' e',
+      step (rho, e) (rho', e') ->
+      bstep_e rho e v n ->
+      exists n', bstep_e rho' e' v n'.
   Proof.
-    intros [rho e] [rho' e'] H;
-    inv H; simpl;
-    repeat match goal with
-             | H: ?A= _ |- match ?A with _ => _ end = _ => rewrite H 
-           end; 
-    auto.
+    intros. inversion H; subst.
+    - inversion H0; subst. exists n.
+      rewrite H2 in H9. inv H9; auto.
+    - inv H0. rewrite H4 in H11. inv H11.
+      rewrite H12 in H6. inv H6. 
+      exists n; auto.
+    - inv H0. rewrite H5 in H3. inv H3.
+      rewrite H9 in H7; inv H7.
+      exists n; auto.
+    - inversion H0; subst. eauto.
+    - inv H0. rewrite H5 in H4; inv H4.
+      rewrite H11 in H7; inv H7.
+      rewrite H6 in H9; inv H9.
+      rewrite H8 in H14; inv H14.
+      eauto.
+    - inv H0. rewrite H5 in H8; inv H8.
+      rewrite H6 in H10; inv H10.
+      rewrite H13 in H7; inv H7.
+      eauto.
   Qed.
 
-  Lemma stepf_step:
-    forall s s',
-      stepf s = Some s' ->
-      step s s'.
+  Theorem step_pre_bstep_corresp:
+    forall n rho e v rho' e',
+      step (rho, e) (rho', e') ->
+      bstep_e rho' e' v n ->
+      exists n', bstep_e rho e v n'.
   Proof.
-    intros [rho e] [rho' e'] H.
+    intros. inversion H; subst; try solve [eexists; econstructor; eauto].
+  Qed.  
+
+  (** Correspondence of the two small step semantics definitions *)
+  Lemma sstep_f_complete:
+    forall (rho : env) (e : exp) (rho':env) (e':exp),  step (rho,e) (rho', e') -> sstep_f rho e = Ret (rho', e').
+   Proof.
+    intros rho e rho' e' H;
+      inv H; simpl;
+    repeat match goal with
+           | H: ?A = Some _ |- context [ l_opt ?A] => rewrite H; simpl; clear H
+           | H: ?A= _ |- match ?A with _ => _ end = _ => rewrite H
+           | [ |- context [(?A =? ?A)%positive]] => rewrite Pos.eqb_refl 
+           end; auto.
+    apply caseConsistent_c in H5. rewrite H5. auto.
+   Qed. 
+
+
+Theorem sstep_f_sound:
+              forall (rho : env) (e : exp) (rho':env) (e':exp), sstep_f rho e = Ret (rho', e') -> step (rho,e) (rho', e').    
+  Proof.
+    intros rho e rho' e' H.
     destruct e; simpl in H; 
     repeat 
       match goal with
-        | H: match ?A with _ => _ end = Some _ |- _ => destruct A eqn:?; inv H
-        | H: Some _ = Some _ |- _ => inv H
+      | H: match ?A with _ => _ end = Ret _ |- _ => destruct A eqn:?; inv H
+      | H: exceptionMonad.bind ?A _ = Ret _ |- _ => destruct A eqn:?; try (solve [inv H]); simpl in H
+      | H: l_opt ?A _ = Ret _ |- _ => destruct A eqn:?; try (solve [inv H]); simpl in H 
+      | H: Some _ = Some _ |- _ => inv H
+      | H: Ret _ = Ret _ |- _ => inv H
+      | H : (_ =? _)%positive = true |- _ => apply Peqb_true_eq in H; subst
       end;
     try solve [econstructor; eauto].
-    
-  Qed. *)
+    - apply caseConsistent_c in Heqb.
+      econstructor; eauto.
+    - inv H.
+  Qed. 
+
+  
 
   
   (** Reflexive transitive closure of the small-step relation *)
@@ -610,7 +614,67 @@ Theorem bstep_f_complete:
       + assert (Heq : y = y0) by (eapply step_deterministic; eassumption).
         subst. apply IHHs1.  eassumption. 
   Qed.
-  
+
+  (* proof of equivalence of small and big step semantics *)
+  Lemma bstep_then_mstep:
+    forall rho e v n,
+      bstep_e rho e v n ->
+      exists rho' x,
+        mstep (rho, e) (rho', Ehalt x) /\ M.get x rho' = Some v.
+  Proof.
+    intros. induction H.
+    - destruct IHbstep_e. destruct H2. destruct H2.
+      exists x0, x1. split. econstructor 2. constructor; eauto. rewrite H0.
+      apply H2. auto.
+    - destruct IHbstep_e. destruct H2. inv H2. exists x0, x1.
+      split. econstructor 2. econstructor; eauto.
+      apply H3. auto.
+    - destruct IHbstep_e. destruct H3. inv H3. exists x, x0. split.
+      econstructor 2. econstructor; eauto. apply H4. auto.
+    - destruct IHbstep_e. destruct H4. inv H4.
+      exists x, x0. split; auto.
+      econstructor 2. econstructor; eauto. auto.
+    - destruct IHbstep_e. destruct H0. destruct H0. exists x, x0.
+      split; auto. econstructor 2.
+      econstructor; eauto. auto.
+    - destruct IHbstep_e. destruct H4. destruct H4.
+      exists x0, x1. split; auto.
+      econstructor 2. econstructor; eauto. auto.
+    - exists rho, x.
+      split; auto.
+      constructor.
+  Qed.
+
+  Lemma mstep_then_bstep:
+    forall s s',
+      mstep s s' ->
+      forall v,
+      halt_state s' v ->
+      exists n, bstep_e (fst s) (snd s) v n.
+  Proof.
+    intros s s' H.
+    induction H; intros.
+    - inv H. exists 0; simpl.
+      constructor; auto.
+    - apply IHclos_refl_trans_1n in H1.
+      destruct H1. 
+      destruct x; destruct y; simpl in *.
+      eapply step_pre_bstep_corresp; eauto.
+  Qed.
+
+  Theorem bstep_mstep_equiv:
+    forall s v,
+       (exists s', mstep s s' /\ halt_state s' v) <-> (exists n, bstep_e (fst s) (snd s) v n).
+  Proof.
+    intros. split; intros.
+    - do 2 (destruct H).
+      eapply mstep_then_bstep; eauto.
+    - destruct H. destruct s. simpl in H.
+      apply bstep_then_mstep in H. do 3 (destruct H).
+      exists (x0, Ehalt x1). split; auto.
+      constructor; auto.
+  Qed.      
+    
 End EVAL.
 
 

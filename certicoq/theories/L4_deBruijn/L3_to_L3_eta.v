@@ -122,7 +122,11 @@ Qed.
 
 Lemma wcbvEval_pres_Crct e t t' :
   crctTerm e 0 t -> WcbvEval e t t' -> crctTerm e 0 t'.
-Admitted.
+Proof.
+  intros.
+  destruct (WcbvEval_pres_Crct e).
+  now apply (H1 t).
+Qed.
 
 Inductive match_annot : list Cnstr -> Brs -> Prop :=
 | match_annot_nil : match_annot [] bnil
@@ -150,7 +154,7 @@ Lemma Crct_construct {e : environ Term} {i n args} : crctEnv e ->
   cnstrArity e i n = Ret (0%nat, tlength args).
 Proof. intros. inv H. Admitted.
 
-Lemma dnthBody_trans n t i brs :
+Lemma bnth_trans n t i brs :
   bnth n brs = Some t -> exists t',
     bnth n (trans_brs i 0 brs) = Some t' /\
     fst t' = eta_expand (snd t) (trans 0 (fst t)).
@@ -206,7 +210,9 @@ Proof.
 Qed.
 
 Lemma wcbvEval_no_step e s t : WcbvEval e s t -> WcbvEval e t t.
-Admitted.
+Proof.
+  apply WcbvEval_no_further.
+Qed.
 Hint Resolve wcbvEval_no_step.
 
 Lemma WcbvEval_mkApp_inner e f s' a s :
@@ -313,18 +319,19 @@ Lemma whCase_step e i n args brs cs s :
   crctEnv e -> crctBs e 0 brs -> crctAnn e i brs -> crctTerms e 0 args ->
   cnstrArity e i n = Ret (0%nat, tlength args) ->
   whCaseStep n args brs = Some cs -> WcbvEval e cs s ->
+  WcbvEvals (transEnv e) (trans_terms 0 args) (trans_terms 0 args) ->
   WcbvEval (transEnv e) (trans 0 cs) (trans 0 s) ->
   exists cs',
     whCaseStep n (trans_terms 0 args) (trans_brs i 0 brs) =
     Some cs' /\ WcbvEval (transEnv e) cs' (trans 0 s).
 Proof.
-  intros crcte crctds crctann crctargs crctar Hcase Hev IHev.
+  intros crcte crctds crctann crctargs crctar Hcase Hev evargs IHev.
   unfold whCaseStep in Hcase.
   revert Hcase; case_eq (bnth n brs). intros [t arg] Hdn [= <-].
   unfold whCaseStep.
   
   unfold dnthBody in Hdn. case_eq (bnth n brs). intros. rewrite H in Hdn.
-  destruct (dnthBody_trans _ _ i _ H) as [cs' [Hnth Heq]].
+  destruct (bnth_trans _ _ i _ H) as [cs' [Hnth Heq]].
   unfold dnthBody. rewrite Hnth. destruct cs'. simpl in *.
   eexists; split; eauto.
   
@@ -348,13 +355,75 @@ Proof.
   rewrite (trans_terms_pres_tlength 0 args).
   eapply eval_app_terms.
   eapply (proj1 (proj2 Crct_WFTrm)).
-  admit. admit.
+  (* trans preserves crct *)
+  admit.
+  apply evargs.
   now rewrite trans_mkApp in IHev.
 
   intros. rewrite H in Hdn. discriminate.
 
   intros. discriminate.
 Admitted.
+
+Lemma dnthBody_trans n t i brs :
+  dnthBody n brs = Some t -> 
+    dnthBody n (trans_fixes i brs) = Some (trans i t).
+Proof.
+  revert n t i; induction brs as [ |na t k ds]; intros *.
+  simpl; intros. discriminate.
+  
+  simpl. destruct n. simpl.
+  intros [= <-].
+  eexists; split; eauto.
+  
+  intros. now eapply IHds.
+Qed.
+
+Lemma pre_whFixStep_pres_Crct:
+  forall (dts:Defs) p n a m x,
+    crctDs p (n + dlength dts) dts -> crctTerm p n a ->
+    dnthBody m dts = Some x ->
+    crctTerm p n (pre_whFixStep x dts a).
+Proof.
+  intros.
+  unfold pre_whFixStep.
+  pose (whFixStep_pres_Crct n H m).
+  unfold whFixStep in c. rewrite H1 in c.
+  specialize (c _ eq_refl).
+  constructor. apply c. apply H0.
+Qed.
+
+(** Evaluated constructors have their arguments evaluated *)
+Lemma wcbvEval_construct e mch i n args :
+  crctEnv e -> crctTerm e 0 mch ->
+  WcbvEval e mch (TConstruct i n args) ->
+  WcbvEvals e args args.
+Proof.
+  intros.
+  dependent induction H1.
+  - now eapply WcbvEval_no_further in H1.
+  - eapply IHWcbvEval; eauto. eapply LookupDfn_pres_Crct in H2; eauto.
+  - eapply IHWcbvEval3; eauto.
+    eapply Crct_invrt_App in H0 as [H1 H2].
+    eapply WcbvEval_pres_Crct in H1_; eauto.
+    eapply WcbvEval_pres_Crct in H1_0; eauto.
+    eapply Crct_invrt_Lam in H1_.
+    eapply whBetaStep_pres_Crct; eauto.
+  - eapply IHWcbvEval2; eauto.
+    eapply Crct_invrt_LetIn in H0 as [Hdfn Hbod].
+    eapply WcbvEval_pres_Crct in H1_; eauto.
+    eapply instantiate_pres_Crct; eauto.
+  - eapply IHWcbvEval2; eauto.
+    apply Crct_invrt_App in H0 as [Hfn Harg].
+    eapply WcbvEval_pres_Crct in H1_; eauto.
+    eapply Crct_invrt_Fix in H1_.
+    eapply pre_whFixStep_pres_Crct; eauto.
+  - eapply IHWcbvEval2; eauto.
+    apply Crct_invrt_Case in H0 as (Hmch & Hbrs & Hann & Hts). 
+    eapply WcbvEval_pres_Crct in H1_; eauto.
+    eapply whCaseStep_pres_Crct in H1; eauto.
+    destruct i0; now eapply Crct_invrt_Construct in H1_ as [Hargs0 _].
+Qed.
 
 Theorem translate_correct_subst (e : environ Term) (t t' : Term) :
   crctEnv e -> crctTerm e 0 t ->
@@ -401,15 +470,22 @@ Proof.
     apply Crct_invrt_LetIn in crctt as [crctdn crctbod].
     econstructor; eauto.
     forward IHbod; auto. forward IHbod.
-    admit.
-    admit.
+    admit. (* Substitutivity of trans *)
+    apply instantiate_pres_Crct; eauto.
+    eapply WcbvEval_pres_Crct; eauto.
 
   - intros * evfix IHfix Hfix evapp IHapp crcte crcta.
+    specialize (IHapp crcte).    
     apply Crct_invrt_App in crcta as [crctfn crctarg].
-    eapply wAppFix with (fs := trans 0 fs). forward IHfix; auto.
-    admit.
-    apply IHapp; auto.
-    admit.
+    eapply wAppFix with (s := trans 0 s). forward IHfix; auto.
+    apply (dnthBody_trans _ _ (L3t.dlength dts + 0)) in Hfix.
+    apply Hfix.
+    eapply WcbvEval_pres_Crct in evfix; eauto.
+    apply Crct_invrt_Fix in evfix. simpl in evfix.
+    eapply pre_whFixStep_pres_Crct in Hfix; eauto; simpl; eauto.
+    specialize (IHapp Hfix).
+    unfold pre_whFixStep. simpl.
+    admit. (* trans of fixstep *)
 
   - intros * wfn IHfn notlam notfix nproof evarg IHarg crcte crcta.
     apply Crct_invrt_App in crcta as [crctfn crctarg].
@@ -418,17 +494,20 @@ Proof.
 
   - intros * evmch IHmch Hcase evcs IHcs crcte crctc.
     apply Crct_invrt_Case in crctc as [crctmch [crctbrs [crctann H']]].
+    specialize (IHmch crcte crctmch).
     pose (whCase_step e i n args brs cs s crcte crctbrs crctann).
     forward e0. forward e0. specialize (e0 Hcase evcs).
-    forward e0. destruct e0 as [cs' [whtrans evtrans]].
+    forward e0. forward e0. destruct e0 as [cs' [whtrans evtrans]].
     econstructor; eauto.
     eapply IHcs; eauto.
-    admit. (* Well-formedness *)
-    admit. (* Well-formedness *)
-    admit.
+    eapply whCaseStep_pres_Crct in Hcase; eauto.
+    apply wcbvEval_construct in IHmch; eauto.
+    admit. (* Well-formedness preserved by trans *) admit. admit.
+    eapply WcbvEval_pres_Crct in evmch; eauto.
+    destruct i. now eapply Crct_invrt_Construct in evmch as [Hargs _].
     
   - intros * evmch IHmch. admit.
-
+    (* Stuck matches are impossible *)
   - intros. inv H2. constructor; auto.
   - intros. apply H; auto.
 Admitted.

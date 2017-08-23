@@ -3,11 +3,9 @@
     mutually recursive functions, data constructors, and pattern matching.
 
   Remaining admits related to L3:  
-  + wf conditions on L3 below
-  + on top of that: wcbvEval produces values, but stuck applications and 
+  + wcbvEval produces values, but stuck applications and 
   cases are not values in L4.expression. Underapplied Fix though, are they values?
   + Similarly, (2 admits) cases that should no longer be treated in wcbvEval: stuck app and case. 
-  + missing i = j check in wcbvEval (case annotation and constructor annotation should match)
 
   TODO in L3_eta
   + move to an enriched Crct_Term predicate after L3_eta for is_n_lambda of branches (2 admits)
@@ -46,8 +44,6 @@ Ltac case_call f :=
 
 Ltac equaln := repeat (f_equal; try lia); auto.
 
-(** L3 requirement, to move to the corrsponding files *)
-
 Fixpoint is_n_lambda n t :=
   match n with
   | 0%nat => true
@@ -80,14 +76,22 @@ Lemma Crct_invrt_Case e n ann mch brs :
   crctAnn e ann brs.
 Admitted.
 
+Lemma crct_construct {e : environ Term} {i n args} : crctEnv e ->
+  crctTerm e 0 (TConstruct i n args) ->
+  cnstrArity e i n = Ret (0%nat, tlength args).
+Proof. intros. inv H0. Admitted.
+
 Lemma crctTerm_fix e dts m t n :
   crctTerm e n (TFix dts m) ->
   L3.term.dnthBody m dts = Some t -> isLambda t.
 Proof.
   intros. inv H.
-  revert m H6 H0. induction H5; intros. inversion H6.
-  simpl in H6. destruct m; cbn in H0. injection H1; now intros ->.
-  eapply (IHcrctDs m). lia. eauto.
+  revert m H6 H0. induction H5; intros.
+  - destruct m; cbn in H0. injection H2; now intros ->.
+    discriminate.
+  - destruct m. unfold dnthBody in H1. simpl in *. injection H1.
+    now intros ->. 
+    eapply (IHcrctDs m). simpl dlength in H6. lia. eauto.
 Qed.
 
 Lemma whFixStep_preserves_crctTerm e dts m fs :
@@ -95,27 +99,53 @@ Lemma whFixStep_preserves_crctTerm e dts m fs :
   whFixStep dts m = Some fs ->
   crctTerm e 0 fs /\ isLambda fs.
 Proof.
-  induction 1; unfold whFixStep; simpl.
-  + intros [=].
-Admitted.
+  intros.
+  split. eapply whFixStep_pres_Crct in H0; eauto.
+  apply Crct_invrt_Fix in H. eauto.
+  unfold whFixStep in H0.
+  case_eq (dnthBody m dts).
+  intros. rewrite H1 in H0.
+  injection H0; intros <-. clear H0.
+  eapply crctTerm_fix in H1; eauto.
+  clear H.
+  revert t H1.
+  generalize dts at 1.
+  induction dts. simpl. auto.
+  { simpl. intros.
+    apply IHdts.
+    inv H1. destruct H as [bod ->].
+    rewrite instantiate_TLambda. eexists.
+    eexists. reflexivity. }
+  intros He; rewrite He in H0. discriminate.
+Qed.
+
+(** L3 requirement, to move to the corrsponding files *)
 
 Lemma whBetaStep_preserves_crctTerm e bod a :
   crctTerm e 1 bod -> crctTerm e 0 a ->
   crctTerm e 0 (whBetaStep bod a).
-Admitted.
-
+Proof.
+  intros.
+  apply whBetaStep_pres_Crct; eauto.
+Qed.
 
 Lemma whCaseStep_preserves_crctTerm e n args brs cs :
   crctTerms e 0 args -> crctBs e 0 brs ->
   whCaseStep n args brs = Some cs ->
   crctTerm e 0 cs.
-Admitted.
+Proof.
+  intros.
+  eapply whCaseStep_pres_Crct; eauto.
+Qed.
 
 Lemma instantiate_preserves_crctTerm e t k k' a : (k' <= k)%nat ->
   crctTerm e 0 a ->
   crctTerm e (S k) t ->
   crctTerm e k (L3.term.instantiate a k' t).
-Admitted.
+Proof.
+  intros.
+  eapply instantiate_pres_Crct; eauto.
+Qed.
 
 Lemma WcbvEval_preserves_crctTerm e : crctEnv e ->
   (forall t t', L3eval.WcbvEval e t t' -> 
@@ -123,47 +153,9 @@ Lemma WcbvEval_preserves_crctTerm e : crctEnv e ->
   (forall ts ts', L3eval.WcbvEvals e ts ts' -> 
   crctTerms e 0 ts -> crctTerms e 0 ts').
 Proof.
-  intros wfe.
-  apply L3eval.WcbvEvalEvals_ind; trivial; intros; try constructor; eauto.
-
-  - destruct i. apply Crct_invrt_Construct in H0.
-    intuition. destruct H2 as [npars [itypk [Hlook [ip [geti [ctr getctr]]]]]].
-    econstructor; eauto. 
-
-  - apply H. now apply Crct_LookupDfn_Crct in l.
-  - apply H1.
-    apply Crct_invrt_App in H2. destruct H2. specialize (H0 H3).
-    specialize (H H2).
-    apply whBetaStep_preserves_crctTerm; eauto. now apply Crct_invrt_Lam in H.
-
-  - apply Crct_invrt_LetIn in H1. destruct H1 as [Hdfn Hbod].
-    specialize (H Hdfn). apply H0. apply instantiate_preserves_crctTerm; eauto.
-
-  - apply Crct_invrt_App in H1. destruct H1 as [Hfn Harg].
-    specialize (H Hfn). apply H0. constructor; auto.
-    apply (whFixStep_preserves_crctTerm _ _ _ _ H e0).
-
-  - apply Crct_invrt_App in H1. intuition.
-
-  - apply Crct_invrt_App in H1. intuition.
-
-  - apply Crct_invrt_Case in H1. intuition.
-    destruct j. apply Crct_invrt_Construct in H4. 
-    apply H0. eapply whCaseStep_preserves_crctTerm in e0; eauto.
-    intuition.
-
-  - apply Crct_invrt_Case in H0. intuition.
-
-  - apply Crct_invrt_Case in H0. intuition.
-
-  - inv H1. intuition.
-  - inv H1; intuition.
+  intros. split; intros;
+            eapply L3eval.WcbvEval_pres_Crct; eauto.
 Qed.
-
-Lemma crct_construct {e : environ Term} {i n args} : crctEnv e ->
-  crctTerm e 0 (TConstruct i n args) ->
-  cnstrArity e i n = Ret (0%nat, tlength args).
-Proof. intros. inv H0. Admitted.
 
 Inductive wcbv_value : Term -> Prop :=
     var_wcbv_value : forall i : nat, wcbv_value (TRel i)
@@ -1136,8 +1128,8 @@ Proof.
 
   - (* Constructor *)
     intros i m (* arty *) args IHargs k k' wft kk'. inv wft.
-    cbn.
-    f_equal. destruct (IHargs k k' H7 kk'); auto.
+    destruct (IHargs k k' H8 kk').
+    cbn; f_equal; auto.
     
   - (* Match *)
     intros. inv H1. specialize (H0 k k' H9 H2).
@@ -1183,11 +1175,15 @@ Proof.
     admit.
 
   - intros n t IHt n0 ds IHds k k' wft kk'. inv wft.
-    specialize (IHds k k' H7 kk').
-    specialize (IHt k k' H4 kk').
-    cbn. repeat fold (instantiate a k' t). 
-    simpl. rewrite IHt. equaln.
-    
+    + specialize (IHt k k' H6 kk').
+      cbn. repeat fold (instantiate a k' t). 
+      simpl. rewrite IHt. equaln.
+      
+    + specialize (IHds k k' H7 kk').
+      specialize (IHt k k' H4 kk').
+      cbn. repeat fold (instantiate a k' t). 
+      simpl. rewrite IHt. equaln.
+      
   - tauto.
 Admitted.
 
@@ -1778,9 +1774,12 @@ Proof.
   remember (dlength dts) as dtsl. clear Heqdtsl. revert m H4.
   induction dts; simpl.
   + intros _ _ [=].
-  + destruct m. intros _ [=]. inv H3.
+  + destruct m. intros Hdtsl [=]. inv H3.
+    now inv H8. 
     now inv H6.
-    intros H2. apply IHdts. now inv H3. lia.
+    intros H2. intros.
+    eapply IHdts. inv H3; auto. discriminate. assert(m < dtsl)%nat by lia. apply H0.
+    apply H.
 Qed.
 
 Lemma crct_fix_any e dts m :
@@ -2004,7 +2003,8 @@ Proof.
     f_equal.
     now rewrite H0.
   + intros.
-    inv H1. specialize (H0 k H10).
+    inv H1. simpl. rewrite H; eauto.
+    specialize (H0 k H10).
     f_equal; eauto.
 Qed.
 
@@ -2560,8 +2560,8 @@ Proof with eauto.
     specialize (Hfn H1).
     forward IHevfix; cycle 1.
     { assert (crctTerm e 0 (TFix dts m)). apply WcbvEval_preserves_crctTerm in evfn; eauto. 
-      eapply whFixStep_preserves_crctTerm in H as [Hfs Hfs']; [ | eauto].
-      constructor; eauto. }
+      apply Crct_invrt_Fix in H.
+      eapply L3_to_L3_eta.pre_whFixStep_pres_Crct; eauto. }
     unfold translate. simpl.
     unfold subst_env; rewrite subst_env_application.
     unfold subst_env, translate in Hfn. simpl in Hfn.
@@ -2628,19 +2628,18 @@ Proof with eauto.
          apply WcbvEval_preserves_crctTerm in evfn; eauto.
          destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [nm [bod ->]].
          elimtype False.
-         rewrite L3sbst_fix_preserves_lam in Hfs.
-         simpl in Hfs.
-         rewrite <- Hfs in H4. simpl in H4.
+         subst x.
+         rewrite L3sbst_fix_preserves_lam in H4.
+         simpl in H4.
          rewrite subst_env_aux_lam in H4. inv H4.
 
       * intros Hfs.
         apply WcbvEval_preserves_crctTerm in evfn; eauto.
         destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [nm [bod ->]].
         elimtype False.
-        rewrite L3sbst_fix_preserves_lam in Hfs.
-        simpl in Hfs.
-        rewrite <- Hfs in H3. simpl in H3.
-        rewrite subst_env_aux_lam in H3. inv H3.
+        subst x.
+        rewrite L3sbst_fix_preserves_lam in H3.
+        simpl in H3. rewrite subst_env_aux_lam in H3. inv H3.
 
     - rewrite t' in fixstep. discriminate.
     
@@ -2669,11 +2668,9 @@ Ind Case or Wrong. How can we prove it isn't?? *)
     unfold translate; simpl.
     (* Reduction case *)
     intros * evmch IHmch Hcasestep Hcs IHcs Hcrct.
-    assert (i = j) by admit. (* Missing check in WcbvEval *)
-    subst i.
     assert(Hwf:=proj1 Crct_WFTrm _ _ _ Hcrct).
     eapply Crct_invrt_Case in Hcrct as (Hmch&Hbrs&Hbr&Hann).
-    assert (Har:crctTerm e 0 (TConstruct j n (* arty *) args)).
+    assert (Har:crctTerm e 0 (TConstruct i n (* arty *) args)).
     eapply WcbvEval_preserves_crctTerm; eauto.
     apply (crct_construct wfe) in Har.
     specialize (IHmch Hmch).
@@ -2683,7 +2680,7 @@ Ind Case or Wrong. How can we prove it isn't?? *)
       rewrite H in Hcasestep; try easy.
     assert(Hargsdef:tlength args = snd t).
     { unfold cnstrArity in Har. unfold crctAnn in Hann.
-      destruct j. destruct Hann as [pack [ityp [Htyp [Hind Hann]]]].
+      destruct i. destruct Hann as [pack [ityp [Htyp [Hind Hann]]]].
       destruct Htyp as [Htyp Hnnil]. apply Lookup_lookup in Htyp.
       unfold lookupTyp in Har. rewrite Htyp in Har. destruct pack; try discriminate.
       rewrite Hind in Har.
@@ -2716,7 +2713,7 @@ Ind Case or Wrong. How can we prove it isn't?? *)
       now eapply (crctTerm_exp_wf e e'' wfe evenv wfe'' dbody 0).
     - eapply WcbvEval_preserves_crctTerm in evmch; eauto.
       rewrite exps_skipn0.
-      destruct j. eapply Crct_invrt_Construct in evmch as [crctArgs _].
+      destruct i. eapply Crct_invrt_Construct in evmch as [crctArgs _].
       pose proof (proj1 (proj2 crctTerm_exp_wf_ind) _ _ _ crctArgs e'' wfe evenv wfe'').
       now apply exps_wf_subst.
     - rewrite exps_skipn0.
@@ -2731,7 +2728,7 @@ Ind Case or Wrong. How can we prove it isn't?? *)
       apply IHcs.
     - now apply is_n_lambda_is_n_lam.
     - apply WcbvEval_preserves_crctTerm in evmch; auto.
-      destruct j as [ind ml].
+      destruct i as [ind ml].
       eapply Crct_invrt_Construct in evmch.
       destruct evmch as [crcte [crctss [pars' [itypk [look crctc]]]]].
       eapply Crct_mkApp; auto.

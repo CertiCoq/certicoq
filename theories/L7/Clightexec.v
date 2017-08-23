@@ -541,7 +541,6 @@ Proof.
 intros.
 apply Z.leb_gt in teq.
 rewrite <- (Z.succ_pred fuel) at 2.
-Search (Z.to_nat (Z.succ _)).
 rewrite Z2Nat.inj_succ; omega.
 Defined.
 

@@ -1,11 +1,7 @@
 
-Require Import L6.cps.
-Require Import L6.cps_util.
-Require Import L6.eval.
  
 Require Import L4.instances. 
-Require Import L6.L5_to_L6.
-Require Import L6.shrink_cps.
+
 
 Require Import Common.certiClasses.
 Require Import Common.Common.
@@ -13,15 +9,17 @@ Require Import Common.Common.
 Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
-Require Import uncurry closure_conversion hoisting L6_to_Clight.
+From L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion hoisting.
+From L7 Require Import L6_to_Clight.
 
 
 
 (* 1 - environment of primitive operations
    2 - environment of constructors (from which datatypes can be reconstructed)
   3 - name environment mapping variables to their original name if it exists
+  4 - a map from function tags to information about that class of function
 *)
-Let L6env : Type := prims * cEnv *  nEnv.
+Let L6env : Type := prims * cEnv *  nEnv * fEnv.
 
 
  (*  - evaluation environment mapping free variables to values
@@ -40,7 +38,7 @@ Let L6val: Type := cps.val.
  *)
 Instance bigStepOpSemL6Term : BigStepOpSem (L6env * L6term) L6val :=
   λ p v,
-  let '(pr, cenv, nenv, (env, e)) := p in
+  let '(pr, cenv, nenv, fenv, (env, e)) := p in
 
   (* should not modify pr, cenv and nenv 
   let '(pr', cenv', env', nenv', val) := v in *)
@@ -56,7 +54,7 @@ Require Import certiClasses2.
 
 (* Probably want some fact about the wellformedness of L6env w.r.t. L6term *)
   Instance WfL6Term : GoodTerm (L6env * L6term) :=
-   fun p =>  let '(pr, cenv, nenv, (env, e)) := p in
+   fun p =>  let '(pr, cenv, nenv, fenv, (env, e)) := p in
            identifiers.unique_bindings e.
 
 
@@ -74,10 +72,10 @@ Eval compute in cValue certiL6.
 
 Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) :=
   fun n p =>
-    let '((penv, cenv, nenv), (rho, e)) := p in 
+    let '((penv, cenv, nenv, fenv), (rho, e)) := p in 
     match bstep_f penv cenv rho e n with
     | exceptionMonad.Exc s => Error s None
-    | Ret (inl t) => OutOfTime ((penv,cenv,nenv), t)
+    | Ret (inl t) => OutOfTime ((penv,cenv,nenv, fenv), t)
     | Ret (inr v) => Result v
     end.
 
@@ -105,14 +103,20 @@ Instance certiL5a_t0_L6:
   fun v =>
     match v with
         | pair venv vt => 
-          let '(cenv, nenv, next_cTag, next_iTag, t) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
-        let '(cenv',nenv', t') :=  closure_conversion_hoist
+          let '(cenv, nenv, fenv, next_cTag, next_iTag, e) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
+          let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in  
+ (*         let e := postuncurry_contract e s d in            *)
+(*          let e := shrink_cps.shrink_top e in  *)
+(*          let e :=  inlinesmall_contract e 10 10 in *)
+(*          let e := inline_uncurry_contract e s 10 10 in  *)
+          let e := shrink_cps.shrink_top e in    
+          let '(cenv',nenv', t') :=  closure_conversion_hoist
                                    bogus_cloTag
-                                  (  shrink_top t) 
+                                   e
                                    next_cTag
                                    next_iTag
                                    cenv nenv in
-          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv'),  (M.empty _,   shrink_top t')) 
+          ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', fenv),  (M.empty _,   shrink_top t')) 
     end.
 
 

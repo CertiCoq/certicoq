@@ -20,6 +20,7 @@ Section PP.
 
   Variable (nenv:nEnv).
   Variable (cenv:cEnv).
+  Variable (ftag_flag:bool). (* true if print tag *)
   
 (* Convert various numbers to strings *)
 Definition show_nat := nat2string10.
@@ -73,6 +74,9 @@ Definition show_con (tg:cTag) :=
     | Some (nNamed s, i, t, n) => s
     | _ => ("con_"+++(show_pos tg))%string
   end.
+
+Definition show_ftag (tg:fTag) :=
+  if ftag_flag then ("<"+++(show_pos tg)+++">")%string else ""%string.
 
 (* Show a list of variables as comma separated and wrapped in parens. *)
 Definition show_vars (xs:list positive) :=
@@ -140,13 +144,14 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
             | Fnil => ret tt
             | Fcons x tg xs e fds' =>
               tab (2 + indent) ;;
-              emit "fun " ;; emit (show_var x) ;;
+                  emit "fun " ;; emit (show_var x) ;;
+                   emit (show_ftag tg);;
                    emit (show_vars xs) ;; emit " := " ;; newline ;;
                    emit_exp (4 + indent) e ;;
                    iter fds'
             end) fds ;;
          tab indent ;; emit "] in" ;; newline ;; emit_exp indent e
-  | Eapp x ft ys => emit (show_var x) ;; emit (show_vars ys) ;; newline
+  | Eapp x ft ys => emit (show_var x) ;; emit (show_ftag ft);; emit (show_vars ys) ;; newline
   | Ehalt x  => emit "halt " ;; emit (show_var x) ;; newline
   end%string.
 About fold_left.
@@ -160,8 +165,8 @@ Fixpoint emit_val (indent:nat) (v:val) : M unit :=
         | Vfun rho fds f =>
           (match  find_def f fds with
              | Some (t', xs ,e) =>
-             (*               emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;;newline;;emit_exp (4 + indent) e ;; newline *)
-               emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;; emit "..."%string ;; newline
+                           emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;;newline;;emit_exp (4 + indent) e ;; newline 
+(*               emit "fun "%string ;; emit (show_var f);;emit (show_ftag t');;emit (show_vars xs);;emit ":="%string;; emit "..."%string ;; newline *)
 
              | None => emit "ERROR! FUN "%string ;; emit (show_var f);;emit " NOT FOUND!"%string;;newline
            end)

@@ -1,4 +1,4 @@
-(* Generic beta-contraction phase for (stateful) heuristics based on function definitions and call sites, with limited inlining depth
+(* Generic beta-contraction phase for (stateful) heuristics based on function definitions and call sites, with bounded inlining depth
    *)
 Require Import L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List.
@@ -16,9 +16,8 @@ Require Import Coq.Structures.OrdersEx.
 
 (* St is the type of the [scoped] state used by the  heuristic *)
 Record InlineHeuristic (St:Type) := { 
-                     update_postDef:(fundefs -> r_map -> St -> St); (* update inlining decisions before converting the body of the program *)
-                     update_inFun:(var -> tag -> list var -> exp -> r_map -> St -> St); (* update inlining decisions when converting a function *)
-                     update_inDef:(fundefs -> r_map -> St -> St ); (* update inlining decisions after converting the bodies of functions *)
+                     update_funDef:(fundefs -> r_map -> St -> (St * St)); (* update inlining decision at functions declaraction. First state is used for the body of the program, second for the function definitions *)
+                     update_inFun:(var -> tag -> list var -> exp -> r_map -> St -> St); (* update inlining decisions when converting a function within a bundle *)
                      update_App:(var -> tag -> list var -> St -> (St*bool)) (* update and return inlining decision for f on function application *) }.
 
 
@@ -43,10 +42,6 @@ Section Beta.
   
 
 
-(*  Variable update_postDef:(fundefs -> r_map -> St -> St). (* update inlining decisions before converting the body of the program *)
-  Variable update_inFun:(var -> tag -> list var -> exp -> r_map -> St -> St). (* update inlining decisions when converting a function *)
-  Variable update_inDef:(fundefs -> r_map -> St -> St ). (* update inlining decisions after converting the bodies of functions *)
-  Variable update_App:(var -> tag -> list var -> St -> (St*bool)). (* update and return inlining decision for f on function application *) *)
 
   Fixpoint add_fundefs (fds:fundefs) (del:M.t (tag * list var * exp)):M.t (tag * list var * exp) :=
     match fds with
@@ -148,10 +143,9 @@ Function beta_contract_fds (fds:fundefs) (fcon: St -> forall e:exp, (term_size e
          ret (Eproj x t n y' e')
        | Efun fds e =>
          let del' := add_fundefs fds del in
-         let s := update_postDef _ IH fds sig s in
-         e' <- beta_contract (d, e) sig del' s;;
-         let s := update_inDef _ IH fds sig s in
-         fds' <- beta_contract_fds fds (fun s e p => beta_contract (d,e) sig del' s ) fds sig s _  ;;
+         let (s1, s2) := update_funDef _ IH fds sig s in
+         e' <- beta_contract (d, e) sig del' s1;;
+         fds' <- beta_contract_fds fds (fun s e p => beta_contract (d,e) sig del' s) fds sig s2 _  ;;
          (* would want just this but fails at last QED (wrong number of arguments), even though it works for case... *)
          (*(fix beta_contract_fds (fdc:fundefs) (s:St) (p:  cps_util.subfds_or_eq fdc fds) :fundefs :=
                         match fdc with
@@ -219,23 +213,17 @@ End Beta.
 
 Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool) (IH1:InlineHeuristic St1) (IH2:InlineHeuristic St2):InlineHeuristic (prod St1 St2) :=
   {|
-    update_postDef :=
+    update_funDef :=
       fun fds sigma (s:(prod St1 St2)) => 
         let (s1, s2) := s in
-        let s1' := update_postDef _ IH1 fds sigma s1 in
-        let s2' := update_postDef _ IH2 fds sigma s2 in
-        (s1', s2');
+        let (s11, s12) := update_funDef _ IH1 fds sigma s1 in
+        let (s21, s22) := update_funDef _ IH2 fds sigma s2 in
+        ((s11, s21) , (s12, s22));
     update_inFun  :=
       fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) =>
         let (s1, s2) := s in
         let s1' := update_inFun _ IH1 f t xs e sigma s1 in
         let s2' := update_inFun _ IH2 f t xs e sigma s2 in    
-        (s1', s2');
-    update_inDef  :=
-      fun (fds:fundefs) (sigma:r_map) (s:_) => 
-        let (s1, s2) := s in
-        let s1' := update_inDef _ IH1 fds sigma s1 in
-        let s2' := update_inDef _ IH2 fds sigma s2 in
         (s1', s2');
     update_App  :=
       fun (f:var) (t:tag) (ys:list var) (s:_) =>
@@ -250,9 +238,8 @@ Definition PostUncurryIH : InlineHeuristic (M.t nat) :=
   (* at the start, uncurry shell (i.e. not the outermost) all maps to 1 *)
 (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
   {|  
-    update_postDef  := fun (fds:fundefs) (sigma:r_map) (s:_) => s;
+    update_funDef  := fun (fds:fundefs) (sigma:r_map) (s:_) => (s, s);
     update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => s;
-    update_inDef := fun (fds:fundefs) (sigma:r_map) (s:_) =>  s;
     update_App := fun (f:var) (t:tag) (ys:list var) (s:_) =>
     match (M.get f s, ys) with
     | (Some 1, k::ys') =>
@@ -273,16 +260,15 @@ Definition postuncurry_contract (e:exp) (s:M.t nat) (d:nat) :=
 Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
   {|
     (* Add small, [todo: non-recursive] functions to s *)
-    update_postDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
-                         (fix upd (fds:fundefs) (sigma:r_map) (s:_) :=
-                                        match fds with
-                                        | Fcons f t xs e fdc' => if (Init.Nat.ltb (term_size e) bound) then
-                                                                   upd fdc' sigma (M.set f true s)
-                                                                 else  upd fdc' sigma s
-                                        | Fnil => s
-                                        end) fds sigma s);
+    update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) => let s' := 
+                                   (fix upd (fds:fundefs) (sigma:r_map) (s:_) :=
+                                      match fds with
+                                      | Fcons f t xs e fdc' => if (Init.Nat.ltb (term_size e) bound) then
+                                                                 upd fdc' sigma (M.set f true s)
+                                                               else  upd fdc' sigma s
+                                      | Fnil => s
+                                      end) fds sigma s in (s', s'));
     update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => (M.remove f s);
-    update_inDef := fun (fds:fundefs) (sigma:r_map) (s:_) =>  s;
     update_App := fun (f:var) (t:tag) (ys:list var) (s:_) =>
                     match M.get f s with
                     | Some true => (M.remove f s, true)

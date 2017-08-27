@@ -2543,7 +2543,6 @@ Proof using.
   rewrite ssubst_aux_trivial_disj;
       [auto 
         | disjoint_reasoningv2;[]; rewrite cps_cvt_aux_fvars; auto].
-  Focus 2. rwsimplAll. disjoint_reasoningv.
   repeat f_equal.
   rewrite sub_filter_disjoint1;[|disjoint_reasoningv2].
   apply Hind; auto;[tauto|].
@@ -3300,7 +3299,7 @@ Proof using.
   rwsimpl Hcle.
   apply app_eq_nil in Hcle.
   progress autorewrite with SquiggleEq in *. repnd.
-  ntwfauto. rewrite cons_as_app in Hvc. rwsimpl Hvc. repnd.
+  ntwfauto. repnd.
   simpl in Hfwf.
   unfold compose in Hfwf. simpl in Hfwf.
   rewrite andb_true_r in Hfwf.
@@ -3309,7 +3308,7 @@ Proof using.
 
   rewrite cps_cvt_apply_eval; unfold evalt; unfold isprogram, closed; dands;
     eauto using eval_Lam_e; eauto with eval; try tauto;
-    [| rwsimplC; auto | ntwfauto | rwsimplC; tauto];[].
+    [| rwsimplC; auto | ntwfauto | rwsimplC];[|  auto with SquiggleEq; fail].
 
   clear IHHe1.
   rewrite <- IHHe2; eauto with eval; unfold closed;
@@ -3323,7 +3322,7 @@ Proof using.
   simpl.
   rewrite cps_cvt_corr_app_let_common_part; eauto with eval;
     [refl | ].
-  rwsimplC; dands; eauto with eval.
+  rwsimplC; dands; eauto with eval;[]; auto with SquiggleEq.
 
 
 (* eval_Match_e *)

@@ -21,8 +21,6 @@ Require Import String.
 Open Scope string_scope.
 
 
-
-
 Ltac computeExtract certiL4 f:=
 (let t:= eval compute in (translateTo (cTerm certiL4) f) in 
      match t with
@@ -71,14 +69,17 @@ Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
                    prog cenv nenv in
   (fst p, stripOption mainIdent (snd p)).
 
-Open Scope positive_scope.
-
 
 Definition compile_opt_L7 p  :=
   match p with
   | Ret p => Ret (compile_L7 p)
   | Exc s => Exc s
   end.
+
+Definition compile_template_L7 (p : program) : exception (L5_to_L6.nEnv * Clight.program)  :=
+  compile_opt_L7 (translateTo (cTerm certiL6) p).
+
+Open Scope positive_scope.
   
 
 

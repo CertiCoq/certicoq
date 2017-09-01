@@ -1,11 +1,14 @@
 
-all: theories/Makefile libraries/Makefile
+all: theories/Makefile libraries/Makefile theories/Makefile.plugin
 	$(MAKE) -C libraries
 #	$(MAKE) -C libraries/SquiggleEq
 	$(MAKE) -C theories
 
 theories/Makefile:
 	cd theories;coq_makefile -f _CoqProject -o Makefile
+
+theories/Makefile.plugin:
+	cd theories;coq_makefile -f _PluginProject -o Makefile.plugin
 
 libraries/Makefile:
 	cd libraries;coq_makefile -f _CoqProject -o Makefile

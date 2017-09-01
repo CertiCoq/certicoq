@@ -52,8 +52,10 @@ Extract Constant Int31.compare31 => "Camlcoq.Int31.compare".
 Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1".
 
-(* Avoid name clashes *)
-Extraction Blacklist List String Int Ast Char.
+Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
+
+(* Avoid name clashes with OCaml or Coq module names *)
+Extraction Blacklist List String Nat Int Ast Char Instances Classes Term Monad Coqlib.
 
 (* Cutting the dependency to R. *)
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
@@ -63,7 +65,6 @@ Extract Inlined Constant Fappli_IEEE.round_mode => "fun _ -> assert false".
 Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 
 Cd "Extraction".
-
 Separate Extraction
          Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
          Csyntax
@@ -72,4 +73,7 @@ Separate Extraction
          Floats.Float32.from_parsed Floats.Float.from_parsed
          Floats.Float32.of_bits Floats.Float.of_bits
          Floats.Float32.to_bits Floats.Float.to_bits
-         Compiler.allInstances.test.
+         String.length
+         Compiler.allInstances.printProg
+         Compiler.allInstances.compile_template_L7.
+Cd "..".

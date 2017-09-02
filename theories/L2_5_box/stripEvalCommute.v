@@ -358,8 +358,9 @@ Qed.
 ********************)
 
 
+(**************
 Lemma TProof_strip_inv:
-  forall t, TProof = strip t -> (L2k.term.isProof t) \/ (L2k.term.isCase t).
+  forall t, TProof = strip t -> (L2k.term.isProof t) \/ (L2k.term.isDummy t).
 Proof.
   intros t ht. destruct t; try discriminate.
   - left. exists t. reflexivity.
@@ -387,7 +388,9 @@ Proof.
           as [x0 [x1 [x2 jx]]].
         rewrite jx in ht. discriminate.
   - right. exists i, t, b. reflexivity.
+  -
 Qed.
+ *********************)
 
 Lemma Const_strip_inv:
   forall nm s, TConst nm = strip s ->

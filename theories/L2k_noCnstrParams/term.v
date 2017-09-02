@@ -32,11 +32,20 @@ Ltac not_is2 :=
   with yy := fresh "y"
   with zz := fresh "z" in
   intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
+Ltac not_is4 :=
+  let hh := fresh "h"
+  with xx := fresh "x"
+  with jj := fresh "j"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with ww := fresh "w" in
+  intros hh; destruct hh as [xx [yy [zz [ww jj]]]]; discriminate.
 Ltac not_isApp := not_is3.
 Ltac not_isLambda := not_is2.
 Ltac not_isCase := not_is3.
 Ltac not_isFix := not_is2.
 Ltac not_isCast := not_is1.
+Ltac not_isConstruct := not_is3.
             
 Ltac isApp_inv h :=
   let hh := fresh "h"
@@ -84,6 +93,7 @@ Fixpoint print_term (t:Term) : string :=
                  " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
     | TWrong => "TWrong"
+    | TDummy => "TDummy"
   end.
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
@@ -111,7 +121,7 @@ Proof.
   - destruct t; cross.
     destruct (proj1 L2.term.TermTerms_dec l l0); [lft | rght ..]. 
   - induction t0; cross.
-    destruct (inductive_dec i i0), (eq_nat_dec n n0); destruct (H t0);
+    destruct (inductive_dec i i0), (eq_nat_dec n n0), (H t0);
       [lft | rght .. ].
   - induction t0; cross.
     destruct (inductive_dec i i0), (H t0), (H0 b0);
@@ -119,6 +129,7 @@ Proof.
   - induction t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
   - destruct t; cross. lft.
+  - destruct t; cross. intuition.
   - induction tt; cross. lft.
   - induction tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
   - destruct tt; cross; lft.
@@ -187,15 +198,563 @@ Hint Resolve IsConstruct.
 Lemma isConstruct_dec: forall t, {isConstruct t}+{~ isConstruct t}.
 Proof.
   destruct t;
-  try (right; intros h; destruct h as [x0 [x1 [x2 j]]]; discriminate).
+  try (right; intros h; destruct h as [x1 [x2 [x3 j]]]; discriminate).
   - left. auto.
 Qed.
 
+Definition isWrong (t:Term) : Prop :=  t = TWrong.
+Lemma IsWrong: isWrong TWrong.
+  intros. reflexivity.
+Qed.
+Hint Resolve IsWrong.
+
+Lemma isWrong_dec: forall t, {isWrong t}+{~ isWrong t}.
+Proof.
+  destruct t;
+  try (right; intros h; discriminate).
+  - left. auto.
+Qed.
+
+Definition isDummy (t:Term) : Prop :=  t = TDummy.
+Lemma IsDummy: isDummy TDummy.
+  intros. reflexivity.
+Qed.
+Hint Resolve IsDummy.
+
+Lemma isDummy_dec: forall t, {isDummy t}+{~ isDummy t}.
+Proof.
+  destruct t;
+  try (right; intros h; discriminate).
+  - left. auto.
+Qed.
+
+
+Lemma etaExpand_args_up:
+  forall na actualArgs (F:Terms -> Term) computedArgs,
+    isLambda (etaExpand_args
+                na actualArgs (fun b => TLambda nAnon (F b)) computedArgs) ->
+    isLambda (etaExpand_args
+                (S na) actualArgs (fun b => TLambda nAnon (F b)) computedArgs).
+Proof.
+  induction na; intros.
+  - cbn in *. destruct actualArgs.
+    + auto.
+    + destruct actualArgs;auto.
+  - cbn in *. destruct actualArgs.
+    + refine (IHna tnil (fun b : Terms => TLambda nAnon (F b))
+                  (tappend (lifts 0 computedArgs) (tunit (TRel 0))) _).
+      assumption.
+    + eapply IHna. assumption.
+Qed.
+
+(*********************
+Lemma etaExpand_args_up:
+  forall na actualArgs (F:Terms -> Term) computedArgs,
+    isLambda (etaExpand_args na actualArgs F computedArgs) ->
+    isLambda (etaExpand_args (S na) actualArgs F computedArgs).
+Proof.
+  induction na; intros.
+  - induction actualArgs.
+    + cbn. auto.
+    + cbn. destruct H as [x0 [x1 jx]]. destruct actualArgs. admit. admit.
+
+  - cbn in *. destruct actualArgs.
+    + eapply (IHna tnil (fun b : Terms => TLambda nAnon (F b))
+                  (tappend (lifts 0 computedArgs) (tunit (TRel 0)))).
+      assumption.
+    + eapply IHna. assumption.
+Qed.
+ **************)
+
+Lemma na_isLambda_etaExpand_args:
+  forall na actualArgs,
+    na >= tlength actualArgs ->
+    forall (F:Terms -> Term) computedArgs,
+      isLambda (etaExpand_args na actualArgs
+                               (fun b => TLambda nAnon (F b))
+                               computedArgs).
+Proof.
+    induction na; induction actualArgs; cbn; intros; try omega; auto.
+    - refine (IHna tnil _  (fun b : Terms => TLambda nAnon (F b))
+                   (tappend (lifts 0 computedArgs) (tunit (TRel 0)))).
+      cbn. omega.
+    - refine (IHna actualArgs _  F (tappend computedArgs (tunit t))).
+      omega.
+Qed.
+
+(************
+Lemma isLambda_etaExpand_args:
+  forall npa nall,
+    npa > nall ->
+    forall np na,
+      npa = np + na ->
+      forall computedArgs actualArgs, eapply IHnp.
+        nall = tlength computedArgs + tlength actualArgs ->
+        forall (F:Terms -> Term),
+          isLambda (etaExpand_args na actualArgs (fun b => TLambda nAnon (F b)) computedArgs).
+Proof.
+  induction npa; induction nall; cbn; intros; try omega.
+  - destruct computedArgs, actualArgs, na; cbn in *.
+      * eapply IHnpa.
+**************)
+
+Lemma na_isConstruct_etaExpand_args:
+  forall na actualArgs,
+    na < tlength actualArgs ->
+    forall i m (F:Terms -> Terms) computedArgs,
+      isConstruct (etaExpand_args
+                     na actualArgs (fun b => TConstruct i m (F b)) computedArgs).
+Proof.
+  induction na; induction actualArgs; cbn; intros; try omega.
+  - auto.
+  - assert (j0: na < tlength actualArgs). omega.
+    eapply IHna. assumption.
+Qed.
+
+Lemma na_isLam_or_isConstruct_etaExpand_args:
+  forall na actualArgs computedArgs,
+    (forall F:Terms -> Term,
+        isLambda
+          (etaExpand_args
+             na actualArgs (fun b => TLambda nAnon (F b)) computedArgs)) \/
+    (forall i m (F:Terms -> Terms),
+        isConstruct
+          (etaExpand_args
+             na actualArgs (fun b => TConstruct i m (F b)) computedArgs)).
+Proof.
+  intros. destruct (le_lt_dec (tlength actualArgs) na).
+  - left. intros. eapply na_isLambda_etaExpand_args. omega.
+  - right. intros. eapply na_isConstruct_etaExpand_args. omega.
+Qed.
+
+Lemma pre_isConstruct_etaExpand:
+  forall i m,
+    etaExpand (fun b : Terms => TConstruct i m b) tnil tnil 0 0 =
+    TConstruct i m tnil.
+Proof.
+  cbn. intuition.
+Qed.
+
+(****************
+Goal
+    forall np na computedArgs actualArgs (F:Terms -> Term),
+      isLambda (etaExpand (fun b => TLambda nAnon (F b))
+                          computedArgs actualArgs np na).
+Proof.
+  induction np; induction na; induction computedArgs; induction actualArgs;
+    cbn; intros; auto.
+  - eapply na_isLambda_etaExpand_args. cbn. omega.
+  - eapply na_isLambda_etaExpand_args. destruct na, actualArgs.
+    + admit.
+    + 
+  - eapply na_isLambda_etaExpand_args. cbn. omega.
+  - eapply na_isLambda_etaExpand_args. 
+
+
+  Lemma isLambda_etaExpand:
+  forall nallArgs np,
+    np > nallArgs ->
+    forall computedArgs actualArgs,
+          nallArgs = tlength computedArgs + tlength actualArgs ->
+    forall na (F:Terms -> Term),
+      isLambda (etaExpand F computedArgs actualArgs np na).
+Proof.
+  induction nallArgs; intros np; case_eq np; intros; cbn; try omega. 
+  - assert (j0: computedArgs = tnil). admit.
+    assert (j1: actualArgs = tnil). admit.
+    subst. cbn.
+    Check (@IHnp 0 _ tnil tnil).
+    subst computedArgs. cbn.
+    eapply IHnp.
+    cbn.
+
+    assert (j: np = S (pred np) \/ na = S (pred na)). omega. destruct j.
+    + rewrite H1 in *. eapply IHnpa.
+      * cbn. omega.
+      * replace (S (Init.Nat.pred np) + na)
+          with (S (Init.Nat.pred np + na)) in H0; try omega.
+
+  
+  - assert (j: np = 0 /\ na = 0). omega. destruct j. subst. cbn. auto.
+  - assert (j: np = S (pred np) \/ na = S (pred na)). omega. destruct j.
+    + rewrite H1 in *. cbn. eapply IHnpa.
+      * cbn. omega.
+      * replace (S (Init.Nat.pred np) + na)
+          with (S (Init.Nat.pred np + na)) in H0; try omega.
+    + rewrite H1 in *.
+      replace (np + S (Init.Nat.pred na))
+          with (S (np + Init.Nat.pred na)) in H0; try omega.
+      myInjection H0. 
+      eapply (IHnpa ).
+      * cbn. omega.
+      * apply f_equal2. reflexivity. rewrite H1 at 2. cbn.
+
+
+
+      eapply IHnpa.
+      * cbn. omega.
+      * replace (np + S (Init.Nat.pred na))
+          with (S (np + Init.Nat.pred na)) in H0; try omega.
+        myInjection H0. apply f_equal2. reflexivity.
+
+        rewrite H1. cbn.
+
+      
+    eapply isLambda_etaExpand_args. cbn. assumption.
+  - eapply IHnp. omega.
+Qed.
+
+Lemma isLambda_etaExpand:
+  forall np na actualArgs,
+    na >= tlength actualArgs ->
+    forall (F:Terms -> Term) computedArgs,
+      isLambda (etaExpand (fun b : Terms => TLambda nAnon (F b))
+                          computedArgs actualArgs np na).
+Proof.
+  induction np; induction actualArgs; cbn; intros; try omega; auto.
+  - eapply isLambda_etaExpand_args. cbn. omega.
+  - eapply isLambda_etaExpand_args. cbn. assumption.
+  - eapply IHnp. omega.
+Qed.
+
+Lemma isConstruct_etaExpand:
+  forall np na actualArgs,
+    na < tlength actualArgs ->
+    forall i m (F:Terms -> Terms) computedArgs,
+      isConstruct
+        (etaExpand (fun b : Terms => TConstruct i m (F b))
+                   computedArgs actualArgs np na).
+Proof.
+  induction np; induction actualArgs; cbn; intros; try omega; auto.
+  - eapply isConstruct_etaExpand_args. cbn. omega.
+  - eapply (IHnp ).
+Qed.
+ ***********************)
+
+
+
+(*******************
+Goal
+  forall actualArgs np na,
+    np + na = tlength actualArgs ->
+      forall i m computedArgs,
+        isConstruct (etaExpand (fun b => TConstruct i m b)
+                               computedArgs actualArgs np na).
+Proof.
+  induction actualArgs; intros; cbn in H.
+  - assert (jnp: np = 0). omega.
+    assert (jna: na = 0). omega. subst. cbn. auto.
+  - assert (k: np = S (pred np) \/ na = S (pred na)). omega. destruct k.
+    + rewrite H0. cbn. refine (IHactualArgs _ _ _ _ _ _).
+      rewrite H0 in H. omega.
+    + destruct np.
+      rewrite H0 in *. cbn in *. myInjection H. refine (IHactualArgs _ _ _ _ _ _).
+      rewrite H0 in H. omega.
+
+      Check (IHactualArgs (S np) na _ i m computedArgs).
+
+Proof.
+  induction npa; induction actualArgs; cbn; intros; try discriminate.
+  - assert (jnp: np = 0). omega.
+    assert (jna: na = 0). omega. subst. cbn. auto.
+  - assert (j0: np = S (tlength actualArgs) - na). omega.
+    assert (j1: na = S (tlength actualArgs) - np). omega.
+    assert (k: np = S (pred np) \/ na = S (pred na)). omega. destruct k.
+    + assert (k0: npa = tlength actualArgs). omega.
+      Check (IHnpa
+
+      rewrite j0. cbn. destruct na; cbn in *.
+    + assert (j1: np = S npa). omega. Check (IHactualArgs
+
+
+    assert (j1: na = S (tlength actualArgs) - np). omega.
+
+    
+Goal
+  forall actualArgs np na computedArgs,
+    (forall F, isLambda (etaExpand F computedArgs actualArgs np na)) \/
+    (forall i m, isConstruct (etaExpand (fun b => TConstruct i m b)
+                           computedArgs actualArgs np na)) \/
+    (forall F, isWrong (etaExpand F computedArgs actualArgs np na)).
+Proof.
+  induction actualArgs; induction np; induction na; cbn; intros.
+  - right. auto.
+  - assert (j: na >= tlength tnil). cbn. omega.
+    left. intros.
+    apply (@isLambda_etaExpand_args
+             na tnil j F (tappend (lifts 0 computedArgs) (tunit (TRel 0)))).
+  - assert (j: 0 >= tlength tnil). cbn. omega.
+    left. intros.
+    apply (@isLambda_etaExpand np 0 tnil j F tnil).
+  - assert (j: S na >= tlength tnil). cbn. omega.
+    left. intros.
+    apply (@isLambda_etaExpand np (S na) tnil j F tnil).
+  - intuition.
+  - right. left.
+
+ Goal
+  forall actualArgs np na computedArgs i m,
+    isLambda (etaExpand (fun b => TConstruct i m b)
+                        computedArgs actualArgs np na) \/
+    isConstruct (etaExpand (fun b => TConstruct i m b)
+                           computedArgs actualArgs np na) \/
+    isWrong (etaExpand (fun b => TConstruct i m b)
+                           computedArgs actualArgs np na).
+Proof.
+  induction actualArgs; induction np; induction na; cbn; intros.
+  - right. auto.
+  - assert (j: na >= tlength tnil). cbn. omega.
+    left.
+    apply (@isLambda_etaExpand_args
+             na tnil j (fun b => TConstruct i m b)
+             (tappend (lifts 0 computedArgs) (tunit (TRel 0)))).
+  - assert (j: 0 >= tlength tnil). cbn. omega.
+    left.
+    apply (@isLambda_etaExpand np 0 tnil j (fun b => TConstruct i m b) tnil).
+  - assert (j: S na >= tlength tnil). cbn. omega.
+    left.
+    apply (@isLambda_etaExpand np (S na) tnil j (fun b => TConstruct i m b) tnil).
+  - intuition.
+  -
+ ***************************)  
+
+
+    (************
+Lemma etaExpand_np_up:
+  forall np na actualArgs (F:Terms -> Term) computedArgs,
+    isLambda (etaExpand F computedArgs actualArgs np na) ->
+    isLambda (etaExpand F computedArgs actualArgs (S np) na).
+Proof.
+  intros. cbn. destruct actualArgs.
+  - cbn.
+
+  functional induction (etaExpand F computedArgs actualArgs np na).
+  - cbn. refine (isLambda_etaExpand_args _ _ _ _). cbn. omega.
+  - cbn.
+
+  - cbn in *. destruct actualArgs.
+    + refine (isLambda_etaExpand_args _ _ _ _). cbn. omega.
+    +
+  - cbn. destruct actualArgs.
+    assert (j: na = 0 \/ na = S (pred na)). omega. destruct j.
+    + subst. cbn. auto.
+    + rewrite H0. refine (etaExpand_args_up _ _ _ _ _).
+
+
+
+      Lemma etaExpand_np_up:
+  forall np na actualArgs (F:Terms -> Term) computedArgs,
+    isLambda (etaExpand F computedArgs actualArgs np na) ->
+    isLambda (etaExpand (fun b => TLambda nAnon (F b))
+                        computedArgs actualArgs (S np) na).
+Proof.
+  induction np; induction actualArgs; intros.
+  - cbn in *. 
+    + refine (isLambda_etaExpand_args _ _ _ _). cbn. omega.
+  - cbn. destruct actualArgs.
+    assert (j: na = 0 \/ na = S (pred na)). omega. destruct j.
+    + subst. cbn. auto.
+    + rewrite H0. refine (etaExpand_args_up _ _ _ _ _).
+      
+Goal
+  forall npa np na,
+    npa = np + na ->
+    forall actualArgs, npa >= tlength actualArgs ->
+    forall (F:Terms -> Term) computedArgs,
+      isLambda (etaExpand (fun b => TLambda nAnon (F b))
+                          computedArgs
+                          actualArgs np na).
+Proof.
+  induction npa; induction actualArgs; cbn; intros; try omega; auto.
+  - assert (j: np = 0 /\ na = 0). omega. destruct j. subst. cbn. auto.
+  - assert (j: np > 0 \/ na > 0). omega. destruct j.
+    assert (j0: npa = pred (np + na)). omega.
+    + refine (IHnpa (pred np) na _ tnil _ _ _). omega.
+
+
+
+
+      Goal
+  forall (np na:nat) (actualArgs:Terms),
+    np + na > tlength actualArgs ->
+    forall (i: inductive) (r: nat) (computedArgs:Terms),
+      isLambda (etaExpand (fun b : Terms => TConstruct i r b)
+                          computedArgs actualArgs np na).
+Proof.
+  induction np; induction na; induction actualArgs;
+    cbn; intros; try omega.
+  - specialize (IHna tnil). cbn in IHna.
+  
+
+Goal
+  forall na np i r, na > 0 -> isLambda (strip (L2.compile.TConstruct i r np na)).
+Proof.
+  cbn. intros.
+  induction na; intros; try omega. cbn.
+  specialize (IHna 0 i r). cbn in IHna.
+  
+  - cbn. replace np with (S (pred np)); try omega.
+    cbn.
+
+    induction na.
+  - destruct np.
+    + cbn. auto.
+    + cbn. cbn in IHnp.
+      specialize (IHnp i r). cbn in IHnp.
+
+  - induction na; cbn.
+    + right. auto.
+    + unfold etaExpand_args.
+    
+    assert (j1: na = 0). omega. subst. cbn. right. auto.
+  - assert (j: np <> 0 \/ na <> 0). omega. destruct j.
+    + assert (j: np = S (pred np)). omega. rewrite j in *. cbn.
+Admitted.
+*******************)
+
+(***********
+Goal
+  forall npa np na i r, npa = np + na ->
+         isLambda
+         (etaExpand (np + na)
+                    (fun b : Terms => TLambda nAnon (TConstruct i r b)) tnil tnil np na).
+Proof.
+  intros.
+  functional induction (etaExpand (np + na)
+                    (fun b : Terms => TLambda nAnon (TConstruct i r b)) tnil tnil np na).
+  induction npa; intros; cbn.
+  - assert (j0: np = 0). omega.
+    assert (j1: na = 0). omega. subst. cbn. auto. 
+  - assert (j: np <> 0 \/ na <> 0). omega. destruct j.
+    + assert (j: np = S (pred np)). omega. rewrite j in *. 
+      assert (j0: npa = Init.Nat.pred np + na). omega.
+      specialize (IHnpa (pred np) _ i r j0). 
+
+
+      unfold etaExpand. case_eq na; intros; subst. auto.
+
+    
+  - rewrite <- H. cbn. destruct np. destruct na.
+    + omega.
+    + cbn in H. myInjection H. cbn in IHnpa.
+
+
+  induction np; induction na.
+  - cbn. right. auto.
+  - cbn. destruct na.
+    + cbn. left. auto.
+    + cbn in IHna.
+      
+    unfold etaExpand.
+****************)
+
+
+
+    
+  (******************
+Goal
+  forall args npars nargs i n,
+    tlength args >= npars + nargs ->
+    isConstruct
+      (etaExpand
+         (npars + nargs) (fun b : Terms => TConstruct i n b)  tnil args npars nargs).
+Proof.
+  induction args; cbn; intros.
+  - assert (j0: npars = 0). omega.
+    assert (j1: nargs = 0). omega.
+    subst. cbn. auto.
+  - assert (npars >= S (pred npars) \/ nargs >= S (pred nargs)). omega.
+    destruct H0.
+    + rewrite H0 in H. myInjection H.
+     specialize (IHargs (Init.Nat.pred npars) nargs i n H1).       
+      rewrite H0. cbn. assumption.
+    + rewrite H0 in H.
+       replace (npars + S (Init.Nat.pred nargs))
+        with (S (npars + (Init.Nat.pred nargs))) in H; try omega.
+      myInjection H.
+      specialize (IHargs npars (Init.Nat.pred nargs) i n H1).
+
+
+      Goal
+  forall args npars nargs i n,
+    tlength args = npars + nargs ->
+    isConstruct
+      (etaExpand
+         (npars + nargs) (fun b : Terms => TConstruct i n b)  tnil args npars nargs).
+Proof.
+  induction args; cbn; intros.
+  - assert (j0: npars = 0). omega.
+    assert (j1: nargs = 0). omega.
+    subst. cbn. auto.
+  - assert (npars = S (pred npars) \/ nargs = S (pred nargs)). omega.
+    destruct H0.
+    + rewrite H0 in H. myInjection H.
+     specialize (IHargs (Init.Nat.pred npars) nargs i n H1).       
+      rewrite H0. cbn. assumption.
+    + rewrite H0 in H.
+       replace (npars + S (Init.Nat.pred nargs))
+        with (S (npars + (Init.Nat.pred nargs))) in H; try omega.
+      myInjection H.
+      specialize (IHargs npars (Init.Nat.pred nargs) i n H1).
+      rewrite <- H0. 
+      rewrite H0 in H1.
+
+      
+      replace (npars + S (Init.Nat.pred nargs))
+        with (S (npars + (Init.Nat.pred nargs))); try omega.
+      specialize (IHargs npars (Init.Nat.pred nargs) i n H1). cbn. assumption.
+
+      
+      cbn.
+      cbn in H. myInjection H.
+      
+      rewrite H0 in IHargs. cbn in IHargs.
+
+
+    
+  Lemma etaExpandSanity:
+  forall fuel npars nargs args i n,
+    fuel = npars + nargs ->
+    tlength args < npars  ->
+    isLambda (etaExpand (npars + nargs)
+                        (fun b : Terms => TConstruct i n b) tnil args npars nargs).
+Proof.
+  induction fuel; cbn; intros; try omega.
+  destruct npars, nargs; try omega.
+  - assert (j0: fuel = npars + 0). omega.
+      Check (IHfuel (S npars) 0). _ _ _ j0).
+    
+  induction npars; intros.
+  - destruct args, nargs; cbn in H; omega.
+  - destruct args, nargs; cbn in *.
+    + eapply IHnpars.
+    tlength args <= nargs  ->
+    isLambda (etaExpand (npars + nargs)
+                        (fun b : Terms => TConstruct i n b) tnil args npars nargs) /\
+    
+    
+    isConstruct
+      (etaExpand (npars + nargs)
+                 (fun b : Terms => TConstruct i n b) tnil args npars nargs).
+Proof.
+  induction args; intros.
+  - destruct npars.
+    + cbn. destruct nargs.
+      * cbn. auto.
+      * cbn. 
+  
+  intros. induction npars; induction nargs; cbn; intros.
+  - destruct args. auto. unfold tlength in H. omega.
+  - destruct args. cbn in IHnargs.
+ ******************)
+
+(***
 Lemma mkEtaLams_sanityS:
   forall (xtra:nat) (body:Term), isLambda (mkEtaLams (S xtra) body).
 Proof.
   intros. cbn. auto.
 Qed.
+ ***)
 
 Definition isCase (t:Term) : Prop :=
   exists xn mch ds, t = TCase xn mch ds.
@@ -252,7 +811,8 @@ Proof.
 Defined.
 
 Inductive isCanonical : Term -> Prop :=
-| canC: forall (i:inductive) (n:nat) args, isCanonical (TConstruct i n args)
+| canC: forall (i:inductive) (n:nat) args,
+    isCanonical (TConstruct i n args)
 | canP: forall t, isCanonical t -> isCanonical (TProof t).
 Hint Constructors isCanonical.
 
@@ -266,7 +826,7 @@ Proof.
   - left. constructor.
 Qed.
      
-Function canonicalP (t:Term) : option (nat * Terms) :=
+Function canonicalP (t:Term) : option  (nat * Terms) :=
   match t with
     | TConstruct _ r args => Some (r, args)
     | TProof t => canonicalP t
@@ -548,11 +1108,11 @@ Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
                          end
   end.
 
-Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
+Function bnth (n:nat) (l:Brs) {struct l} : option (Term) :=
   match l with
     | bnil => None
-    | bcons ix x bs => match n with
-                           | 0 => Some (x, ix)
+    | bcons _ x bs => match n with
+                           | 0 => Some x
                            | S m => bnth m bs
                        end
   end.
@@ -802,6 +1362,8 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists TWrong, arg, tnil. cbn.  split. reflexivity.
     left. repeat split. not_isApp.
+  - exists TDummy, arg, tnil. split. reflexivity.
+    + left. intuition. revert H. not_isApp. 
 Qed.
 
 Lemma lift_App:
@@ -863,7 +1425,8 @@ Inductive WFapp: Term -> Prop :=
            WFapp (TApp fn t ts)
 | wfaConst: forall nm, WFapp (TConst nm)
 | wfaAx: forall t, WFapp (TAx t)
-| wfaConstruct: forall i m1 args, WFapps args -> WFapp (TConstruct i m1 args)
+| wfaConstruct: forall i m1 args,
+    WFapps args -> WFapp (TConstruct i m1 args)
 | wfaCase: forall m mch brs,
             WFapp mch -> WFappBs brs -> WFapp (TCase m mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
@@ -903,16 +1466,6 @@ Proof.
   constructor. assumption. constructor.
 Qed.
 
-Lemma canonicalP_pres_WFapp:
-  forall t, WFapp t ->
-  forall r args, canonicalP t = Some (r, args) -> WFapps args.
-Proof.
-  induction t; simpl; intros; try discriminate.
-  - eapply IHt; inversion_Clear H; eassumption.
-  - myInjection H0. inversion_Clear H. assumption.
-Qed.
-
-  
 Lemma WFapps_tappendl:
   forall ts us, WFapps (tappend ts us) -> WFapps ts.
 Proof.
@@ -982,7 +1535,7 @@ Qed.
 
 Lemma bnth_pres_WFapp:
   forall (brs:Brs), WFappBs brs ->
-                    forall n t m, bnth n brs = Some (t,m) -> WFapp t.
+                    forall n t, bnth n brs = Some t-> WFapp t.
 Proof.
   intros brs h n t.
   functional induction (bnth n brs); intros; try discriminate.
@@ -1308,6 +1861,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
 | IWrong: forall n, Instantiate n TWrong TWrong
+| IDummy: forall n, Instantiate n TDummy TDummy
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,
@@ -1442,6 +1996,15 @@ Proof.
     rewrite IHts. reflexivity.
 Qed.
 
+Lemma instantiates_at_last:
+  forall ts n t,
+    tappend (instantiates n ts) (tunit (instantiate n t)) =
+    instantiates n (tappend ts (tunit t)).
+Proof.
+  intros. rewrite instantiates_tappend. rewrite instantiates_tcons_commute.
+  reflexivity.
+Qed.
+  
 Lemma instantiate_mkApp_commute:
 forall n bod arg args,
   instantiate n (mkApp bod (tcons arg args)) =
@@ -2231,22 +2794,30 @@ unfold whBetaStep; simpl; induction 1; intros.
 
 Definition whCaseStep (cstrNbr:nat) (ts:Terms) (brs:Brs): option Term :=
   match bnth cstrNbr brs with
-    | Some (t, _) => Some (mkApp t ts)
+    | Some t => Some (mkApp t ts)
     | None => None
   end.
 
+(****
+Definition whCaseStep (cstrNbr:nat) (brs:Brs): option Term :=
+  bnth cstrNbr brs.
+****)
+(***********
 Lemma whCaseStep_pres_WFapp:
   forall (brs:Brs), WFappBs brs -> forall ts, WFapps ts -> 
   forall (n:nat) (s:Term), whCaseStep n ts brs = Some s -> WFapp s.
 Proof.
   intros brs hbrs ts hts n s h. unfold whCaseStep in h.
   case_eq (bnth n brs); intros; rewrite H in h.
-  - destruct p. myInjection h. apply mkApp_pres_WFapp.
+  - destruct p.
+    destruct t; try (myInjection h; apply mkApp_pres_WFapp;
+                     [assumption | eapply (bnth_pres_WFapp hbrs n); eassumption]).
+    myInjection h.
     + assumption.
     + eapply (bnth_pres_WFapp hbrs n). eassumption.
   - discriminate.
 Qed.
-
+****************)
 
 (** Unfolding a Fixpoint **)
 (** "dts" is a list of the mutual fixpoint definitions
@@ -2292,3 +2863,36 @@ Proof.
   assumption. constructor. assumption.
 Qed.
   
+(*******************
+Function ietaExpand_args   (* no more parameters expected *)
+         tin nin
+         (nargs:nat) (actualArgs:Terms)             (* inputs *)
+         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
+          { struct nargs } : Term :=
+  match nargs, actualArgs with
+  (* no more actual args, no more pars or args expected: finished *)
+  | 0, tnil => (instantiate tin nin (body computedArgs))
+  (* more actual args than [npars + nargs]: impossible *)
+  | 0, tcons u us => body tnil
+  (* no more actual args but more args expected: eta expand *)
+  | S n, tnil =>
+    ietaExpand_args tin nin n tnil (fun b => TLambda nAnon (body b))
+              (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
+  (* more args *)
+  | S n, tcons u us =>
+    ietaExpand_args tin nin n us body (tappend computedArgs (tunit u))
+  end.
+Functional Scheme ietaExpand_args_ind :=
+  Induction for ietaExpand_args Sort Prop.
+
+Goal
+  forall tin nin
+         (nargs:nat) (actualArgs:Terms)             (* inputs *)
+         (body:Terms -> Term) (computedArgs:Terms),  (* accumulators *)
+    ietaExpand_args tin nin nargs actualArgs body computedArgs =
+    instantiate tin nin (etaExpand_args nargs actualArgs body computedArgs).
+Proof.
+  intros tin nin.
+  induction nargs; induction actualArgs; cbn; intros;
+    try reflexivity.
+********************************)

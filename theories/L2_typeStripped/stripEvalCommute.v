@@ -635,17 +635,10 @@ Proof.
     + eapply H.
     + rewrite <- dnthBody_hom. rewrite e. reflexivity.
     + rewrite <- pre_whFixStep_hom in H0. eapply H0.
-  - destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]]. rewrite j in H0.
-    cbn. rewrite mkApp_hom. eapply wAppCong. try eassumption.
-    + intros h. elim n. apply isLambda_hom. assumption.
-    + intros h. elim n0. apply isFix_hom. assumption.
-    + rewrite j. cbn in H0. assumption.
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.
     * rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
-  - refine (wCaseCong _ _ _ _); try eassumption.
-    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
 Qed.
 Print Assumptions WcbvEval_hom.
 

@@ -206,27 +206,31 @@ Proof.
   elim h. auto.
 Qed.
 
+(***
 Lemma TAppCnstr_hom:
   forall i m npars nargs arg args, 
     strip (L2.compile.TApp (L2.compile.TConstruct i m npars nargs) arg args) =
-    etaExp_cnstr i m npars nargs (tcons (strip arg) (strips args)).
+    etaExpand i m npars nargs (tcons (strip arg) (strips args)).
 Proof.
   intros. reflexivity.
 Qed.
+ ****)
 
 (***
 Lemma isApp_hom:
-  forall t,
-    isApp (strip t) -> L2.term.isApp t.
+  forall t, isApp (strip t) -> L2.term.isApp t.
 Proof.
   destruct t; cbn; intros h;
   destruct h as [x0 [x1 [x2 h]]]; try discriminate; auto.     
-  - destruct (etaExp_cnstr_Sanity' i n n0 n1 tnil);
+  - cbn in h. Check etaExp_cnstr_Sanity'.
+
+    destruct (etaExp_cnstr_Sanity' i n n0 n1 tnil);
     rewrite h in H; discriminate.
   - destruct p. discriminate.
 Qed.
- ****)
+ ***)
 
+(*************
 Lemma isLambda_hom:
   forall t,
     isLambda (strip t) ->
@@ -239,7 +243,6 @@ Proof.
   - right. left. auto.
 Qed.
 
-(*************
 Lemma isFix_hom:
   forall t, isFix (strip t) -> L2.term.isFix t.
 Proof.
@@ -320,6 +323,286 @@ Proof.
   - rewrite mkApp_idempotent. simpl. reflexivity.
 Qed.
 
+(*****************  HERE ***
+Goal
+  forall nargs ts arg n computedArgs F,
+    WFTrm arg 0 ->
+    (forall us m, F (instantiates arg m us) = instantiate arg m (F us)) ->
+    (forall us m (F:Terms -> Term),
+        instantiate arg m (F us) = instantiate arg (S m) (F us)) ->
+    etaExpand_args
+      nargs (instantiates arg n ts) F (instantiates arg n computedArgs) =
+    instantiate arg n (etaExpand_args nargs ts F computedArgs).
+Proof.
+  induction nargs; induction ts; intros; try reflexivity.
+  - cbn. rewrite <- H0. reflexivity.
+  - cbn. rewrite <- H0. reflexivity.
+  - cbn. assert (j: nargs >= tlength tnil). cbn. omega.
+    rewrite (proj1 (proj2 (instantiate_lift arg))); try assumption; try omega.
+    replace (tunit (TRel 0)) with (instantiates arg (S n) (tunit (TRel 0)))
+      by reflexivity.
+    rewrite <- (instantiates_tappend arg (lifts 0 computedArgs)).
+    unfold instantiates at 2.
+    rewrite (proj1 (nat_compare_gt (S n) 0)); try omega.
+    rewrite <- (IHnargs
+                  _ _ _
+                  (compile.tappend (lifts 0 computedArgs) (tunit (TRel 0))));
+      try eassumption.
+    + cbn. 
+      admit.
+    + intros.
+    change
+      (TLambda nAnon (F (instantiates arg m us)) =
+       TLambda nAnon (instantiate arg (S m) ((F us)))).
+    rewrite H0, H1. reflexivity.
+
+    
+    rewrite <- H1.    
+    change (TLambda nAnon (instantiate arg m (F us)) =
+            (TLambda nAnon (instantiate arg (S m) (F us)))).
+    apply f_equal2. reflexivity.
+     Check (tappend_pres_lifts).
+
+
+
+    Goal
+  forall nargs ts arg n computedArgs F,
+    WFTrm arg 0 ->
+    (forall us m, F (instantiates arg m us) = instantiate arg m (F us)) ->
+    etaExpand_args
+      nargs (instantiates arg n ts)
+      (fun b : Terms => TLambda nAnon (F b))
+      (instantiates arg n computedArgs) =
+    instantiate
+      arg n (etaExpand_args nargs ts (fun b : Terms => TLambda nAnon (F b))
+                            computedArgs).
+Proof.
+  induction nargs; induction ts; intros; try reflexivity.
+  - cbn. rewrite H0. reflexivity.
+  - cbn. rewrite <- H0. reflexivity.
+  - cbn. assert (j: nargs >= tlength tnil). cbn. omega.
+    rewrite (proj1 (proj2 (instantiate_lift arg))); try assumption; try omega.
+    replace (tunit (TRel 0)) with (instantiates arg (S n) (tunit (TRel 0)))
+      by reflexivity.
+    rewrite <- (instantiates_tappend arg (lifts 0 computedArgs)).
+    unfold instantiates at 2.
+    rewrite (proj1 (nat_compare_gt (S n) 0)); try omega.
+    rewrite <- (IHnargs
+                  _ _ _
+                  (compile.tappend (lifts 0 computedArgs) (tunit (TRel 0))));
+      try eassumption.
+    cbn.
+
+    Check (tappend_pres_lifts).
+
+
+    Goal
+  forall nargs ts arg n computedArgs i m,
+    WFTrm arg 0 ->
+    etaExpand_args
+      nargs (instantiates arg n ts)
+      (fun b : Terms => TConstruct i m b) (instantiates arg n computedArgs) =
+    instantiate
+      arg n (etaExpand_args nargs ts
+                            (fun b : Terms => TConstruct i m b) computedArgs).
+Proof.
+  induction nargs; induction ts; intros; try reflexivity.
+  - cbn. assert (j: nargs >= tlength tnil). cbn. omega.
+    rewrite (proj1 (proj2 (instantiate_lift arg))); try assumption; try omega.
+    replace (tunit (TRel 0)) with (instantiates arg (S n) (tunit (TRel 0)))
+      by reflexivity.
+    rewrite <- (instantiates_tappend arg (lifts 0 computedArgs) _ (S n)).
+    unfold instantiates at 2. rewrite (proj1 (nat_compare_gt (S n) 0));
+                                try omega.
+    Check (IHnargs
+             tnil arg n (compile.tappend (lifts 0 computedArgs) (tunit (TRel 0)))
+             i m).
+    destruct (@isLambda_etaExpand_args
+                nargs tnil j
+                (fun b : Terms => TConstruct i m b)
+             (compile.tappend (lifts 0 computedArgs) (tunit (TRel 0))))
+      as [x0 [x1 jx]].
+    rewrite jx.
+    destruct (@isLambda_etaExpand_args
+                nargs tnil j
+                (fun b : Terms => TConstruct i m b)
+             (compile.tappend (lifts 0 computedArgs) (tunit (TRel 0))))
+      as [x0 [x1 jx]].
+    rewrite jx.
+
+
+    unfold instantiate.
+  - cbn. rewrite instantiates_at_last. destruct ts.
+    + cbn. unfold etaExpand_args.
+
+
+
+      Goal
+  forall nargs arg n t ts computedArgs i m,
+    etaExpand_args nargs (tcons (instantiate arg n t) (instantiates arg n ts))
+                   (fun b : Terms => TConstruct i m b) (instantiates arg n computedArgs) =
+    instantiate arg n (etaExpand_args nargs (tcons t ts)
+                                      (fun b : Terms => TConstruct i m b)
+                                      computedArgs).
+Proof.
+  induction nargs; induction ts; intros; try reflexivity.
+  - admit.
+  - cbn. rewrite instantiates_at_last. destruct ts.
+    + cbn. unfold etaExpand_args.
+
+
+              
+              Goal
+  forall npars x3 i m computedArgs arg n t ts,
+    etaExpand (fun b : Terms => TConstruct i m b) (instantiates arg n computedArgs)
+    (tcons (instantiate arg n t) (instantiates arg n ts)) npars x3 =
+  instantiate arg n
+    (etaExpand (fun b : Terms => TConstruct i m b) computedArgs (tcons t ts) npars x3).
+Proof.
+  induction npars; intros.
+  - cbn.
+ **********************)
+
+(********************
+Lemma instantiate_hom:
+  (forall bod n, L2.term.WFTrm bod n -> 
+                 forall arg, strip (L2.term.instantiate arg n bod) =
+                             instantiate (strip arg) n (strip bod)) /\
+  (forall bods n, L2.term.WFTrms bods n ->
+                  forall arg, strips (L2.term.instantiates arg n bods) =
+                              instantiates (strip arg) n (strips bods)) /\
+  (forall bods n, L2.term.WFTrmBs bods n ->
+                  forall arg, stripBs (L2.term.instantiateBrs arg n bods) =
+                              instantiateBrs (strip arg) n (stripBs bods)) /\
+  (forall ds n, L2.term.WFTrmDs ds n  ->
+                forall arg, stripDs (L2.term.instantiateDefs arg n ds) =
+                            instantiateDefs (strip arg) n (stripDs ds)).
+Proof.
+  apply L2.term.WFTrmTrmsBrsDefs_ind; intros;
+    try (cbn; reflexivity); try (cbn; rewrite H0; reflexivity).
+  - cbn. rewrite (proj1 (nat_compare_gt n m)). reflexivity. omega.
+  - cbn. rewrite H0. rewrite H2. reflexivity.
+  - rewrite L2.term.instantiate_TApp_mkApp.
+    change
+      (strip (L2.term.mkApp (L2.term.instantiate arg n fn)
+                            (L2.compile.tcons
+                               (L2.term.instantiate arg n t)
+                               (L2.term.instantiates arg n ts))) =
+       instantiate (strip arg) n (strip (L2.compile.TApp fn t ts))).
+    destruct (L2.term.isConstruct_dec fn).
+    + destruct i as [x0 [x1 [x2 [x3 jx]]]]. subst.
+      unfold L2.term.instantiate at 1.
+      rewrite L2.term.mkApp_goodFn; try not_isApp.
+      change
+        (strip
+           (L2.compile.TApp
+              (L2.compile.TConstruct x0 x1 x2 x3) (L2.term.instantiate arg n t)
+              (L2.term.instantiates arg n ts)) =
+         instantiate
+           (strip arg) n
+           (etaExpand (fun b => TConstruct x0 x1 b)
+                      tnil (tcons (strip t) (strips ts)) x2 x3)).
+      change
+        (etaExpand (fun b => TConstruct x0 x1 b)
+                   tnil (tcons (strip (L2.term.instantiate arg n t))
+                               (strips (L2.term.instantiates arg n ts))) x2 x3 =
+         instantiate
+           (strip arg) n
+           (etaExpand (fun b => TConstruct x0 x1 b)
+                      tnil (tcons (strip t) (strips ts)) x2 x3)).
+      rewrite H3, H5. destruct x2.
+      * cbn.
+
+      unfold strip at 1.
+      
+      change
+        (strip
+           (L2.compile.TApp (L2.compile.TConstruct x0 x1 x2 x3)
+                            (L2.term.instantiate arg n t)
+                            (L2.term.instantiates arg n ts)) =
+         instantiate (strip arg) n
+                     (etaExp_cnstr x0 x1 x2 x3 (tcons (strip t) (strips ts)))).
+      change
+        (etaExp_cnstr x0 x1 x2 x3
+                      (tcons (strip (L2.term.instantiate arg n t))
+                             (strips (L2.term.instantiates arg n ts))) =
+         instantiate (strip arg) n
+                     (etaExp_cnstr x0 x1 x2 x3 (tcons (strip t) (strips ts)))).
+      rewrite H3. rewrite H5.
+      change
+        (etaExp_cnstr x0 x1 x2 x3
+                      (instantiates (strip arg) n
+                                    (tcons (strip t) (strips ts))) =
+         instantiate (strip arg) n
+                     (etaExp_cnstr x0 x1 x2 x3 (tcons (strip t) (strips ts)))).
+      destruct (etaExp_cnstr_Sanity' x0 x1 x2 x3 (tcons (strip t) (strips ts))).
+      * { rewrite H6.
+          destruct (etaExp_cnstr_Sanity'
+                      x0 x1 x2 x3 (instantiates
+                                     (strip arg) n (tcons (strip t)
+                                                          (strips ts)))).
+          - rewrite H7.
+         
+
+
+Lemma whBetaStep_hom:
+  forall bod arg args,
+    L2.term.WFTrm bod 0 ->
+    strip (L2.term.whBetaStep bod arg args) =
+    whBetaStep (strip bod) (strip arg) (strips args).
+Proof.
+  intros bod arg args h.
+  unfold L2.term.whBetaStep, whBetaStep.
+  destruct args.
+  - rewrite L2.term.mkApp_tnil_ident. rewrite mkApp_tnil_ident. Check instantiate_hom.
+    apply (proj1 instantiate_hom). assumption.
+  - rewrite <- (proj1 instantiate_hom); try assumption.
+    destruct (L2.term.isApp_dec (L2.term.instantiate arg 0 bod)).
+    + destruct i as [x0 [x1 [x2 jx]]]. rewrite jx. clear jx.
+    change
+      (strip (L2.compile.TApp
+                x0 x1 (L2.term.tappend x2 (L2.compile.tcons t args))) =
+       mkApp (strip (L2.compile.TApp x0 x1 x2))
+             (strips (L2.compile.tcons t args))).
+    destruct (L2.term.isConstruct_dec x0).
+      * { destruct i as [i0 [i1 [i2 [i3 ji]]]]. subst.
+        change
+          (etaExp_cnstr i0 i1 i2 i3
+                        (tcons (strip x1)
+                               (strips (L2.term.tappend
+                                          x2 (L2.compile.tcons t args)))) =
+           mkApp (etaExp_cnstr i0 i1 i2 i3
+                        (tcons (strip x1) (strips x2)))
+                 (strips (L2.compile.tcons t args))).
+        rewrite strips_tappend. rewrite tcons_hom.   
+        destruct (etaExp_cnstr_Sanity' i0 i1 i2 i3
+                                        (tcons (strip x1) (strips x2))).
+          - rewrite H. rewrite mkApp_goodFn; try not_isApp.
+        destruct (etaExp_cnstr_Sanity' i0 i1 i2 i3
+                                         (tcons (strip x1)
+                                                (compile.tappend (strips x2) (tcons (strip t) (strips args))))).
+        rewrite H0.
+
+        rewrite <- (proj1 instantiate_hom); try assumption.
+    rewrite jx. destruct (L2.term.isConstruct_dec x0).
+    + destruct i as [y0 [y1 [y2 [y3 jy]]]]. subst.
+      change
+        (etaExp_cnstr y0 y1 y2 y3
+                      (tcons (strip x1) (strips (L2.term.tappend x2 args))) =
+         mkApp (etaExp_cnstr y0 y1 y2 y3
+                             (tcons (strip x1) (strips x2)))
+               (strips args)).
+      destruct (etaExp_cnstr_Sanity'
+                  y0 y1 y2 y3
+                  (tcons (strip x1) (strips (L2.term.tappend x2 args)))),
+      (etaExp_cnstr_Sanity'  y0 y1 y2 y3 (tcons (strip x1) (strips x2)));
+        rewrite H; rewrite H0.
+      * { cbn. destruct args. cbn.
+          - apply f_equal3; try reflexivity.
+            apply f_equal3; try reflexivity.
+            apply f_equal2; try reflexivity.
+            rewrite L2.term.tappend_tnil. reflexivity.
+          -
 (****
 Goal
   forall i n npars nargs arg args,
@@ -331,11 +614,21 @@ Proof.
     + cbn.
 ****)
 
+(*****
 Lemma mkApp_hom:
 forall fn args, ~ L2.term.isApp fn ->
   strip (L2.term.mkApp fn args) = mkApp (strip fn) (strips args).
 Proof.
+  intros. destruct args.
+  - rewrite L2.term.mkApp_tnil_ident. rewrite mkApp_tnil_ident. reflexivity.
+  - rewrite L2.term.mkApp_goodFn; try assumption. 
+    assert (j: ~ isApp (strip fn)).
+    { intros h. elim H. apply isApp_hom. assumption. }
+
+  
 Admitted.
+ ****)
+
 (***
   intros. destruct args.
   - rewrite L2.term.mkApp_tnil_ident. rewrite mkApp_tnil_ident. reflexivity.
@@ -377,7 +670,6 @@ Admitted.
     case_eq fn; intros; try reflexivity.
     cbn. rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
 Qed.
-***)
 
 Lemma etaExp_spec:
   forall i m npars nargs args,
@@ -391,6 +683,85 @@ Proof.
   - left. auto.
   - right. cbn. auto.
 Qed.
+***)
+
+Lemma isApp_strip:
+  forall fn,
+    ~ L2.term.isConstruct fn ->
+    forall arg args, strip (L2.compile.TApp fn arg args) = TApp (strip fn) (strip arg) (strips args).
+Proof.
+  destruct fn; cbn; intros; auto. elim H. auto.
+Qed.
+
+(************* MAIN *************)
+Lemma WcbvEval_hom:
+  forall p,
+    (forall t t', L2.wcbvEval.WcbvEval p t t' ->
+                  WcbvEval (stripEnv p) (strip t) (strip t')) /\
+    (forall ts ts', L2.wcbvEval.WcbvEvals p ts ts' ->
+                    WcbvEvals (stripEnv p) (strips ts) (strips ts')).
+Proof.
+  intros p.
+  apply L2.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
+    try (solve[constructor; trivial]).
+  - cbn. destruct np; cbn.
+    + destruct na; cbn.
+      * constructor. constructor.
+      * assert (j: na >= tlength tnil). cbn. omega.
+        destruct (@isLambda_etaExpand_args
+                    na tnil j (fun b => TConstruct i r b)
+                    (tunit (TRel 0))) as [x0 [x1 jx]].
+        rewrite jx. constructor.
+    + assert (j: na >= tlength tnil). cbn. omega.
+      destruct (@isLambda_etaExpand
+                  np na tnil j (fun b => TConstruct i r b) tnil)
+        as [x0 [x1 jx]]. rewrite jx. constructor.
+  - cbn. econstructor; try eassumption. apply lookupDfn_hom. assumption.
+  - destruct (L2.term.isConstruct_dec fn).
+    + destruct i as [x0 [x1 [x2 [x3 jx]]]]. subst.
+      cbn in H.
+      change
+        (WcbvEval (stripEnv p)
+                  (etaExpand (fun b => TConstruct x0 x1 b)
+                             tnil (tcons (strip a1) (strips args)) x2 x3)
+                  (strip s)).
+      admit.
+    + rewrite (isApp_strip n a1 args). eapply wAppLam. eassumption. eapply H0.
+      change
+        (WcbvEval (stripEnv p) (strip (L2.term.whBetaStep bod a1' args)) (strip s)) in H1.
+
+
+      unfold strip at 1 in H1. eapply H1.
+      cbn.
+      change
+        (WcbvEval (stripEnv p) (strip (L2.compile.TApp fn a1 args)) (strip s)).
+      change
+        (WcbvEval (stripEnv p) (strip (L2.compile.TApp fn a1 args)) (strip s)).
+
+  - cbn. eapply wAppLam.
+    + apply H. 
+    + apply H0. 
+    + rewrite whBetaStep_hom in H1. assumption.
+  - cbn. eapply wLetIn.
+    + apply H. 
+    + rewrite <- (proj1 instantiate_hom). assumption.
+  - cbn. eapply wAppFix.
+    + eapply H.
+    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
+    + rewrite <- pre_whFixStep_hom in H0. eapply H0.
+  - destruct (WcbvEvals_tcons_tcons H0) as [a' [args' j]]. rewrite j in H0.
+    cbn. rewrite mkApp_hom. eapply wAppCong. try eassumption.
+    + intros h. elim n. apply isLambda_hom. assumption.
+    + intros h. elim n0. apply isFix_hom. assumption.
+    + rewrite j. cbn in H0. assumption.
+  - refine (wCase _ _ _ _ _ _ _); try eassumption.
+    * rewrite <- canonicalP_hom. rewrite e. reflexivity.
+    * rewrite <- tskipn_hom. rewrite e0. reflexivity.
+    * rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
+  - refine (wCaseCong _ _ _ _); try eassumption.
+    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
+Qed.
+*****)
 
 
 (*******************  broken from here  *****

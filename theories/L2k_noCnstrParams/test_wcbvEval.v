@@ -21,11 +21,12 @@ Print p_Type.
 Definition P_Type := Eval cbv in (program_Program p_Type).
 Print P_Type.
 
+(***
 Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
-Notation SS := (TConstruct NN 1 1).
+Notation SS := (TConstruct NN 1 0).
 Notation ZZ := (TConstruct NN 0 0).
 Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
-Notation CONS := (TConstruct LL 1 3).
+Notation CONS := (TConstruct LL 1 1).
 Notation NIL := (TConstruct LL 0 1).
 Notation VSR := (mkInd "Benchmarks.vs.VeriStar.veristar_result" 0).
 Notation VSR_Val := (TConstruct VSR 0).
@@ -40,14 +41,167 @@ Notation CONJ := (TConstruct AND 0 4).
 Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
 Notation II := (TConstruct TRUE 0 0).
 Notation EQ := (mkInd "Coq.Init.Logic.eq" 0).
-Notation RFL := (TConstruct EQ 0 2).
+Notation RFL := (TConstruct EQ 0 1).
 Notation PROD := (mkInd "Coq.Init.Datatypes.prod" 0).
-Notation PAIR := (TConstruct PROD 0 4).
+Notation PAIR := (TConstruct PROD 0 2).
 Notation "^ x" := (nNamed x)  (at level 85).
 Notation "^" := (nAnon).
 Infix ":t:" := tcons  (at level 87, right associativity).
 Notation "fn [| arg @ args |]" :=
   (TApp fn arg args)  (at level 90, left associativity).
+Notation IND := (compile.TInd).
+ ***)
+
+(*******)
+Set Printing Width 175.
+Quote Recursively Definition p_0 := 0.
+Definition oldP_0 := Eval cbv in (main (L2.compile.program_Program p_0)).
+Print oldP_0.
+Definition P_0 := Eval cbv in (main (program_Program p_0)).
+Print P_0.
+
+Quote Recursively Definition p_1 := 1.
+Definition oldP_1 := Eval cbv in (main (L2.compile.program_Program p_1)).
+Print oldP_1.
+Definition P_1 := Eval cbv in (main (program_Program p_1)).
+Print P_1.
+                                      
+Quote Recursively Definition p_nil := @nil.
+Definition oldP_nil := Eval cbv in (main (L2.compile.program_Program p_nil)).
+Print oldP_nil.
+Definition P_nil := Eval cbv in (main (program_Program p_nil)).
+Print P_nil.
+
+Quote Recursively Definition p_nilb := (@nil bool).
+Definition oldP_nilb := Eval cbv in (main (L2.compile.program_Program p_nilb)).
+Print oldP_nilb.
+Definition P_nilb := Eval cbv in (main (program_Program p_nilb)).
+Print P_nilb.
+
+Quote Recursively Definition p_cons := @cons.
+Definition oldP_cons := Eval cbv in (main (L2.compile.program_Program p_cons)).
+Print oldP_cons.
+Definition P_cons := Eval cbv in (main (program_Program p_cons)).
+Print P_cons.
+
+Quote Recursively Definition p_consb := (@cons bool).
+Definition oldP_consb := Eval cbv in (main (L2.compile.program_Program p_consb)).
+Print oldP_consb.
+Definition P_consb := Eval cbv in (main (program_Program p_consb)).
+Print P_consb.
+
+Quote Recursively Definition p_consbt := (cons true).
+Definition oldP_consbt := Eval cbv in (main (L2.compile.program_Program p_consbt)).
+Print oldP_consbt.
+Definition P_consbt := Eval cbv in (main (program_Program p_consbt)).
+Print P_consbt.
+
+Quote Recursively Definition p_consbtbs := (cons true nil).
+Definition oldP_consbtbs := Eval cbv in (main (L2.compile.program_Program p_consbtbs)).
+Print oldP_consbtbs.
+Definition P_consbtbs := Eval cbv in (main (program_Program p_consbtbs)).
+Print P_consbtbs.
+
+
+Fixpoint testEtaNA (l:nat) : nat :=
+  match l with
+  | 0 => 0
+  | S x => S (testEtaNA x)
+  end.
+Quote Recursively Definition p_testEtaNAAns :=
+    ltac:(let t:=(eval cbv in (testEtaNA 0)) in exact t).
+Definition P_testEtaNAAns := Eval cbv in (main (L2k.compile.program_Program p_testEtaNAAns)).
+Print P_testEtaNAAns.
+Quote Recursively Definition p_texNA := (testEtaNA 0).
+Definition P_texNA := Eval cbv in (L2k.compile.program_Program p_texNA).
+Print P_texNA.
+Goal
+  let envx := @env Term P_texNA in
+  let mainx := main P_texNA in
+  wcbvEval envx 90 mainx = Ret P_testEtaNAAns.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+
+Goal
+  let envx := env P_texNA in
+  let mainx := main P_texNA in
+  WcbvEval envx mainx P_testEtaNAAns.
+Proof.
+  intros. unfold envx, mainx, P_testEtaNAAns. 
+  unfold P_texNA at 2. unfold main.
+  eapply wAppFix.
+  - eapply wConst.
+    + cbn. reflexivity.
+    + eapply wFix.
+  - unfold dnthBody. reflexivity.
+  - unfold pre_whFixStep, dlength, list_to_zero, List.fold_left.
+    unfold instantiate. unfold nat_compare. unfold mkApp.
+    eapply wAppLam.
+    + eapply wLam.
+    + eapply wConstruct. eapply wNil.
+    + unfold whBetaStep, instantiate, nat_compare, mkApp.
+      eapply wCase.
+      * eapply wConstruct. eapply wNil.
+      * cbn. reflexivity.
+      * unfold whCaseStep, bnth. reflexivity.
+      * unfold mkApp. eapply wConstruct. eapply wNil.
+Qed.
+
+  
+Fixpoint testEta (l:list bool) : list bool :=   (** copy **)
+  match l with
+  | nil => nil
+  | x :: xs => x :: testEta xs
+  end.
+Quote Recursively Definition p_testEtaAns :=
+    ltac:(let t:=(eval cbv in (testEta (true::nil))) in exact t).
+Definition P_testEtaAns :=
+  Eval cbv in (main (L2k.compile.program_Program p_testEtaAns)).
+Print P_testEtaAns.
+Quote Recursively Definition p_tex := (testEta (true::nil)).
+Definition P_tex := Eval cbv in (L2k.compile.program_Program p_tex).
+Print P_tex.
+
+Goal
+  let envx := env P_tex in
+  let mainx := main P_tex in
+  wcbvEval envx 90 mainx = Ret P_testEtaAns.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+            
+        
+Definition testEta1 (bs:list nat) cs := bs ++ cs.
+Definition testEta1x := testEta1 (0::nil) nil.
+Quote Recursively Definition p_testEta1Ans :=
+    ltac:(let t:=(eval cbv in testEta1x) in exact t).
+Definition P_testEta1Ans := Eval cbv in (main (program_Program p_testEta1Ans)).
+Print P_testEta1Ans.
+Quote Recursively Definition p_tex1 := testEta1x.
+Definition P_tex1:= Eval cbv in (program_Program p_tex1).
+Print P_tex1.
+
+Goal
+  let envx := env P_tex1 in
+  let mainx := main P_tex1 in
+  wcbvEval envx 90 mainx = Ret P_testEta1Ans.
+  vm_compute.  reflexivity.
+Qed.
+
+
+Definition testEta2 := Eval cbv in  (1 :: nil).
+Quote Recursively Definition p_testEta2Ans :=
+  ltac:(let t:=(eval cbv in testEta2) in exact t).
+Definition P_testEta2Ans := Eval cbv in (main (program_Program p_testEta2Ans)).
+Quote Recursively Definition p_testEta2 := testEta2.
+Definition P_testEta2 := Eval cbv in (program_Program p_testEta2).
+Goal
+  let envx := env P_testEta2 in
+  let mainx := main P_testEta2 in
+  wcbvEval envx 90 mainx = Ret P_testEta2Ans.
+  vm_compute. reflexivity. 
+Qed.
 
 
 (** Abhishek's example of looping: in L2 we don't test the guard **)
@@ -143,8 +297,8 @@ Definition P_and_rectx := Eval cbv in (program_Program p_and_rectx).
 Print P_and_rectx.
 Definition P_envx := env P_and_rectx.
 Definition P_mainx := main P_and_rectx.
-Goal wcbvEval P_envx 1000 P_mainx = Ans_and_rectx.
-vm_compute. reflexivity.
+Goal wcbvEval P_envx 100 P_mainx = Ans_and_rectx.
+vm_compute. reflexivity. 
 Qed.
 
 Definition my_and_rect := 
@@ -245,6 +399,11 @@ Print Assumptions copy.
 
 Compute (copy 2).
 Print copy_terminate.
+Check forall n : nat,
+       {v : nat |
+       exists p : nat,
+         forall k : nat,
+         p < k -> forall def : nat -> nat, Recdef.iter (nat -> nat) k copy_F def n = v}.
 (* Transparent copy_terminate. *)
 (****
 - intros. constructor. 
@@ -697,7 +856,7 @@ Qed.
 Require Import Benchmarks.vs.
 Print Assumptions main.
 
-(*** raises exception: out of time *****)
+(*** raises exception: out of time *****
 Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
 Time Definition P_ce_example_myent :=
   Eval vm_compute in (program_Program p_ce_example_myent).
@@ -705,7 +864,7 @@ Definition P_env_ce_example_myent := env P_ce_example_myent.
 Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
 Time Definition eval_ce_example_myent :=
   Eval vm_compute in
-    (wcbvEval P_env_ce_example_myent 4500 P_main_ce_example_myent).
+    (wcbvEval P_env_ce_example_myent 5000 P_main_ce_example_myent).
 Set Printing Width 100.
 Print eval_ce_example_myent.
 **********************)
@@ -717,7 +876,7 @@ Time Definition P_myMain :=
 Definition P_env_myMain := env P_myMain.
 Definition P_main_myMain := AstCommon.main P_myMain.
 Time Definition eval_myMain :=
-  Eval vm_compute in (wcbvEval P_env_myMain 8000 P_main_myMain).
+  Eval vm_compute in (wcbvEval P_env_myMain 7000 P_main_myMain).
 Set Printing Width 100.
 Print eval_myMain.
 ************)

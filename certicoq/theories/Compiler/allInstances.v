@@ -121,7 +121,8 @@ Require Import Benchmarks.Binom
 
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
 (* Quote Recursively Definition binom := Binom.main.    *)
-  Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)   
+(* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
+Quote Recursively Definition graph_color := 2.  (*(Color.run G16)*)   
 
 
 

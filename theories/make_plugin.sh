@@ -1,8 +1,14 @@
 #env /bin/sh
-
-if [ -f Extraction/AstCommon.ml ]
+if [ ! -f "plugin/astCommon.ml" ]
 then
     sh clean_extraction.sh
+else
+    a=`stat -f "%m" Extraction/AstCommon.ml`
+    b=`stat -f "%m" plugin/astCommon.ml`
+    if [ "$a" -gt "$b" ]
+	then
+	sh clean_extraction.sh
+    fi
 fi
 
-make -f Makefile.plugin ${@}
+exec make -f Makefile.plugin ${@}

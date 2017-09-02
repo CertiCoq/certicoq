@@ -177,10 +177,6 @@ Lemma wcbvEval_values e :
   (forall ts ts', L3eval.WcbvEvals e ts ts' -> wcbv_values ts').
 Proof.
   apply L3eval.WcbvEvalEvals_ind; try constructor; eauto.
-
-  (** Should disappear *)
-  intros. admit. (* App congruence *)
-  intros. admit. (* Case congruence *)
 Admitted.
 
 (* End of L3 requirements *)

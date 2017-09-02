@@ -26,8 +26,7 @@ Inductive Term : Type :=
 | TRel       : nat -> Term
 | TProof     : Term
 | TLambda    : name -> Term -> Term
-| TLetIn     : name ->
-               Term (* dfn *) -> Term (* body *) -> Term
+| TLetIn     : name -> Term (* dfn *) -> Term (* body *) -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
 | TConstruct : inductive -> nat (* index in datatype *) -> Terms -> Term
@@ -156,6 +155,7 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
         | right _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
       end
     | L2k.compile.TFix defs m => TFix (L2kDefs_Defs defs) m
+    | L2k.compile.TDummy => TProof
     | L2k.compile.TAx _ => TWrong
     | L2k.compile.TWrong => TWrong
   end

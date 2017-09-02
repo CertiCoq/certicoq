@@ -197,7 +197,6 @@ Proof.
     * now exists TProof. 
     * now exists (TLambda nm bod). 
     * now exists (TFix dts m). 
-    * now exists efn.  
 Qed.
 
 Lemma WcbvEval_is_n_lam e n t t' : is_n_lambda n t = true -> WcbvEval e t t' -> is_n_lambda n t' = true.
@@ -234,9 +233,7 @@ Proof.
       pose proof (WcbvEval_single_valued w H1). subst s'. 
       econstructor; eauto.
       pose proof (WcbvEval_single_valued w H1). subst s'.
-      eapply wAppFix; eauto.
-      pose proof (WcbvEval_single_valued w H1). subst efn.
-      eapply wAppCong; eauto. }
+      eapply wAppFix; eauto. }
     eapply (proj1 (IHa (TApp f t) s'' s)); eauto.
     eapply (proj2 (IHa (TApp s' t) s'' s)); eauto.
 
@@ -248,9 +245,7 @@ Proof.
       pose proof (WcbvEval_single_valued evf H1). subst s'. 
       econstructor; eauto.
       pose proof (WcbvEval_single_valued evf H1). subst s'.
-      eapply wAppFix; eauto.
-      pose proof (WcbvEval_single_valued evf H1). subst efn.
-      eapply wAppCong; eauto. }
+      eapply wAppFix; eauto. }
     eapply (proj1 (IHa _ _ s)). eauto.
     eapply (proj2 (IHa _ _ s)). eapply evs''. apply evapp.
 Qed.
@@ -487,11 +482,6 @@ Proof.
     unfold pre_whFixStep. simpl.
     admit. (* trans of fixstep *)
 
-  - intros * wfn IHfn notlam notfix nproof evarg IHarg crcte crcta.
-    apply Crct_invrt_App in crcta as [crctfn crctarg].
-    constructor; auto.
-    admit. admit. admit.
-
   - intros * evmch IHmch Hcase evcs IHcs crcte crctc.
     apply Crct_invrt_Case in crctc as [crctmch [crctbrs [crctann H']]].
     specialize (IHmch crcte crctmch).
@@ -508,7 +498,6 @@ Proof.
     
   - intros * evmch IHmch. admit.
     (* Stuck matches are impossible *)
-  - intros. inv H2. constructor; auto.
   - intros. apply H; auto.
 Admitted.
     

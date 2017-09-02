@@ -10,7 +10,7 @@ plugin/binInt.mli
 plugin/char0.mli
 plugin/cop.mli
 plugin/decidableClass.mli
-plugin/errors.mli
+plugin/errors0.mli
 plugin/fMapPositive.mli
 plugin/fcore_FLT.mli
 plugin/fcore_Zaux.mli
@@ -70,7 +70,7 @@ plugin/fcalc_bracket.mli
 plugin/fMapPositive.ml
 plugin/extLibMisc.mli
 plugin/extLibMisc.ml
-plugin/errors.ml
+plugin/errors0.ml
 plugin/decidableClass.ml
 plugin/coqlib0.mli
 plugin/cop.ml
@@ -94,9 +94,9 @@ plugin/string1.ml
 plugin/usefulTypes.ml
 plugin/zArith_dec.ml
 plugin/zbool.ml
-plugin/compile.mli
 plugin/compile0.mli
 plugin/compile1.mli
+plugin/compile2.mli
 plugin/cps.mli
 plugin/ctx.mli
 plugin/eval.mli
@@ -118,8 +118,8 @@ plugin/varImplZ.ml
 plugin/varImplDummyPair.ml
 plugin/terms.ml
 plugin/identifiers.mli
-plugin/compile2.mli
-plugin/compile.ml
+plugin/compile3.mli
+plugin/compile0.ml
 plugin/closure_conversion.mli
 plugin/ordersFacts.ml
 plugin/mSetInterface.ml
@@ -139,9 +139,9 @@ plugin/floats.mli
 plugin/integers.ml
 plugin/maps.ml
 plugin/values.mli
-plugin/compile0.ml
 plugin/compile1.ml
-plugin/compile3.mli
+plugin/compile2.ml
+plugin/compile4.mli
 plugin/cps.ml
 plugin/ctx.ml
 plugin/eval.ml
@@ -157,7 +157,7 @@ plugin/term0.ml
 plugin/termsDB.ml
 plugin/variables.ml
 plugin/identifiers.ml
-plugin/compile2.ml
+plugin/compile3.ml
 plugin/closure_conversion.ml
 plugin/l5a.ml
 plugin/l5_to_L6.ml
@@ -173,7 +173,7 @@ plugin/fappli_IEEE_extra.ml
 plugin/floats.ml
 plugin/l3_to_L4.mli
 plugin/values.ml
-plugin/compile3.ml
+plugin/compile4.ml
 plugin/instances2.ml
 plugin/instances4.ml
 plugin/instances5.mli

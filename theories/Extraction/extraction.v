@@ -55,7 +55,7 @@ Extract Constant Int31.In => "1".
 Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 
 (* Avoid name clashes with OCaml or Coq module names *)
-Extraction Blacklist List String Nat Int Ast Char Instances Classes Term Monad Coqlib.
+Extraction Blacklist List String Nat Int Ast Char Instances Classes Term Monad Coqlib Errors Compile.
 
 (* Cutting the dependency to R. *)
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".

@@ -4,7 +4,7 @@ BinInt
 Char0
 Cop
 DecidableClass
-Errors
+Errors0
 FMapPositive
 Fcore_FLT
 Fcore_Zaux
@@ -51,9 +51,9 @@ Fcalc_round
 Integers
 MSetRBT
 Maps
-Compile
 Compile0
 Compile1
+Compile2
 Cps
 Ctx
 Eval
@@ -68,7 +68,7 @@ Term0
 TermsDB
 Variables
 Identifiers
-Compile2
+Compile3
 Closure_conversion
 L5a
 L5_to_L6
@@ -80,7 +80,7 @@ Fappli_IEEE_bits
 Fappli_IEEE_extra
 Floats
 Values
-Compile3
+Compile4
 Instances2
 Instances4
 L3_to_L3_eta

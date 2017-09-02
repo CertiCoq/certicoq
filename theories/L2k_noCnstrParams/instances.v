@@ -36,7 +36,7 @@ Global Instance ObsSubtermL2kTerm :
   ObserveNthSubterm (Program L2k.compile.Term) :=
   fun n t =>
     match  (flattenApp (main t)) with
-      | (TConstruct _ _ _ , subterms) =>
+      | (TConstruct _ _ _, subterms) =>
         match List.nth_error subterms  n with
           | Some st => Some {| env := env t; main := st |}
           | None => None

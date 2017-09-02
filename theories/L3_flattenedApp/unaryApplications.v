@@ -721,7 +721,6 @@ Proof.
     + econstructor; try eassumption. eapply  IHargs; eassumption.
     + econstructor; try eassumption. eapply IHargs; eassumption.
     + eapply wAppFix; try eassumption. eapply IHargs; try eassumption.
-    + eapply wAppCong; try eassumption. eapply IHargs; try eassumption.
 Qed.
   
 Lemma WcbvEval_mkApp_step:
@@ -737,7 +736,6 @@ Proof.
     rewrite <- (WcbvEval_single_valued k H). assumption.
   - rewrite mkApp_tl. rewrite mkApp_tl in H. inversion_clear H.
     + constructor. eapply IHargs. eassumption.
-    + specialize (IHargs _ H0). econstructor; eassumption.
     + specialize (IHargs _ H0). econstructor; eassumption.
     + specialize (IHargs _ H0). econstructor; eassumption.
 Qed.
@@ -965,6 +963,7 @@ Proof.
     + eapply IHargs. constructor.
 Qed.
 
+(**********
 Lemma wAppCong':
   forall p args args' fn fn',
     WcbvEvals p args args' ->
@@ -980,7 +979,7 @@ Proof.
     + intros h. destruct h as [x0 [x1 jx]]. discriminate.
     + intros h. discriminate.
 Qed.
-
+******************)
 
 Lemma WcbvEval_hom:
   forall p,
@@ -1020,28 +1019,8 @@ Proof.
     rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
     + eapply wAppFix; eassumption. 
     + eapply WcbvEval_mkApp_fn; eassumption.
-  - rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
-    + eapply wAppCong; try eassumption.
-      * intros h. elim n. apply isLambda_invrt. assumption.
-      * intros h. elim n0. apply isFix_invrt. assumption.
-      * intros h. elim n1. rewrite (isProof_invrt _ h). reflexivity.
-    + rewrite mkApp_hom. rewrite tcons_hom. cbn.
-      eapply wAppCong'; try assumption.
-      *{ apply wAppCong.
-         - eapply (proj1 (WcbvEval_no_further _)). eassumption.
-         - intros h. pose proof (isLambda_invrt _ h). contradiction.
-         - intros h. pose proof (isFix_invrt _ h). contradiction.
-         - intros h. elim n1. symmetry. apply isProof_invrt. assumption.
-         - eapply (proj1 (WcbvEval_no_further _)). eassumption. }
-      * intros h. destruct h as [x0 [x1 jx]]. discriminate.
-      * intros h. destruct h as [x0 [x1 jx]]. discriminate.
-      * intros h. elim n1. discriminate.
   - rewrite TCase_hom. rewrite TConstruct_hom in H. 
     eapply wCase; try eassumption.
     rewrite <- whCaseStep_hom. rewrite e. reflexivity.
-  - rewrite TCase_hom. rewrite TCase_hom. apply wCaseCong; try assumption.
-    intros h. elim n. pose proof (isConstruct_hom _ h). 
-    destruct H0 as [x0 [x1 [x2 jx]]]. rewrite jx. econstructor.
-    instantiate (1:= x0). exists x1, x2. reflexivity.
 Qed.
 Print Assumptions WcbvEval_hom.

@@ -29,14 +29,14 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
-| TAx        : L2Term -> Term
-(* constructors fully applied: eta expand and drop parameters *)
-| TConstruct : inductive -> nat (* index *) -> Terms -> Term
-         (* use Defs to code branches in Case *)
+| TAx        : L2Term -> Term  (* L2Term is just a comment! *)
+(* constructors fully applied: eta expand *)
+| TConstruct : inductive -> nat (* cnstr no *) -> Terms (* args *) -> Term
 | TCase      : inductive -> Term (* discriminee *) ->
                Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : Term
+| TDummy     : Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -115,6 +115,13 @@ Proof.
   - reflexivity.
   - cbn. rewrite IHts. reflexivity.
 Qed.
+
+Fixpoint tdrop n ts : Terms :=
+  match n, ts with
+  | 0, us => us
+  | S m, tnil => tnil
+  | S m, tcons _ us => tdrop m us
+  end.
 
 (** reversing Terms **)
 Fixpoint treverse (ts: Terms) : Terms :=
@@ -247,138 +254,82 @@ Qed.
 *** lift [x1;...;xn] k times,
 *** then append the k fresh variables and surround with k lambdas
 **)
-(******************************)
-Function addDummyArgs n args :=
-  match n with
-    | 0 => treverse args
-    | S m => addDummyArgs m (tcons (TRel 0) (lifts 0 args))
+Function etaExpand_args   (* no more parameters expected *)
+         (nargs:nat) (actualArgs:Terms)             (* inputs *)
+         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
+          { struct nargs } : Term :=
+  match nargs, actualArgs with
+  (* no more actual args, no more pars or args expected: finished *)
+  | 0, tnil => body computedArgs
+  (* more actual args than [npars + nargs]: impossible *)
+  | 0, tcons u us => body tnil
+  (* no more actual args but more args expected: eta expand *)
+  | S n, tnil =>
+    etaExpand_args n tnil (fun b => TLambda nAnon (body b))
+              (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
+  (* more args *)
+  | S n, tcons u us =>
+    etaExpand_args n us body (tappend computedArgs (tunit u))
   end.
-         
-Function mkEtaArgs npars nargs args: Terms :=
-  match npars, args with
-    | S m, tcons u us => mkEtaArgs m nargs us
-    | 0, us => (* removed all params, possibly some args left *)
-      (addDummyArgs (nargs - tlength us) (treverse us))
-    | _, tnil => (* possibly some params left, no args visible *)
-      (addDummyArgs nargs tnil)
+Functional Scheme etaExpand_args_ind :=
+  Induction for etaExpand_args Sort Prop.
+                                      
+(* strip params, eta expand as required,
+** then call etaExpand_args on remaining args *)
+Function etaExpand
+         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
+         (actualArgs:Terms) (npars nargs:nat)  (* inputs *) : Term :=
+  match actualArgs, npars with
+  (* drop an actual arg and reduce param count *)
+  | tcons u us, S n => etaExpand (fun b => body b) tnil us n nargs
+  (* no more actual args, but more params exprcted *)
+  | tnil, S n => etaExpand (fun b => TLambda nAnon (body b)) tnil tnil n nargs
+  (* keep an actual arg and reduce arg count *)
+  | aa, 0 => etaExpand_args nargs aa body computedArgs
   end.
-                                               
-Lemma addDummyArgs_sanity:
-  forall n args, tlength (addDummyArgs n args) = n + (tlength args).
-Proof.
-  induction n; induction args; cbn in *; intros; try reflexivity.
-  - rewrite tunit_treverse. rewrite <- treverse_pres_tlength. reflexivity.
-  - rewrite IHn. cbn. omega.
-  - rewrite IHn. cbn. rewrite lifts_pres_tlength. omega.
-Qed.                                           
-
-Function mkEtaLams (xtraArity:nat) (body:Term) : Term :=
-  match xtraArity with
-    | 0 => body
-    | S n => TLambda nAnon (mkEtaLams n body)
-  end.
-  
-Function etaExp_cnstr
-           (i:inductive) (x npars nargs:nat) (args:Terms) : Term :=
-  let body := TConstruct i x (mkEtaArgs npars nargs args) in
-  mkEtaLams (npars + nargs - (tlength args)) body.
-
-
-Eval cbn in (etaExp_cnstr (mkInd "" 0) 9 1 2 tnil).
-Eval cbn in (etaExp_cnstr (mkInd "" 0) 9 1 2 (tcons (TConst "A") tnil)).
-Eval cbn in (etaExp_cnstr (mkInd "" 0) 9 1 2
-                          (tcons (TConst "A") (tcons (TConst "b") tnil))).
-Eval cbn in (etaExp_cnstr
-               (mkInd "" 0) 9 1 2
-               (tcons (TConst "A")
-                      (tcons (TConst "b") (tcons (TConst "bs") tnil)))).
-(********************************)
-
-(************************************
-(** oneMore preserves closed **)
-Fixpoint oneMore bod : Term :=
-  match bod with
-  | TConstruct i x args =>
-    TLambda nAnon (TConstruct i x (tappend (lifts 0 args) (tunit (TRel 0))))
-  | TLambda _ b => TLambda nAnon (oneMore b)
-  | _ => TWrong
-  end.
-
-Fixpoint manyMore (b:Term) (m:nat) {struct m} :=
-      match m with
-      | 0 => b
-      | S m => manyMore (oneMore b) m
-      end.
-
-Function mkEtaLams (xtraArity:nat) (body:Term) : Term :=
-  match xtraArity with
-    | 0 => body
-    | S n => TLambda nAnon (mkEtaLams n body)
-  end.
-
-Function etaExp_cnstr
-           (i:inductive) (x npars nargs:nat) (args:Terms) : Term :=
-  match npars, args with
-  | S m, tcons u us => (* more params to remove, more args visible *)
-    etaExp_cnstr i x m nargs us
-  | 0, us => (* all params gone, [us] are remaining args *)
-    manyMore (TConstruct i x us) (nargs - tlength us)
-  | _, tnil => (* some params left, no args visible: need more Lams *)
-    mkEtaLams npars (manyMore (TConstruct i x tnil) nargs)
-  end.
-
-(***********
-Eval cbn in (etaExp_cnstr (mkInd "" 0) 9 1 2 tnil).
-Eval cbn in (etaExp_cnstr (mkInd "" 0) 9 1 2 (tcons (TConst "A") tnil)).
-Eval cbn in (etaExp_cnstr (mkInd "" 0) 9 1 2
-                          (tcons (TConst "A") (tcons (TConst "b") tnil))).
-Eval cbn in (etaExp_cnstr
-               (mkInd "" 0) 9 1 2
-               (tcons (TConst "A")
-                      (tcons (TConst "b") (tcons (TConst "bs") tnil)))).
-********************)
-***********************************************)
+Functional Scheme etaExpand_ind := Induction for etaExpand Sort Prop.
 
 Function strip (t:L2Term) : Term :=
   match t with
-    | L2.compile.TRel n => TRel n
-    | L2.compile.TSort s => TProof (TAx (L2.compile.TSort s))
-    | L2.compile.TProof t => TProof (strip t)
-    | L2.compile.TProd nm bod => TProof (TAx (L2.compile.TProd nm bod))
-    | L2.compile.TLambda nm bod => TLambda nm (strip bod)
-    | L2.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
-    | L2.compile.TApp fn arg args =>
-      let sarg := strip arg in
-      let sargs := strips args in
-      match fn with
-        | L2.compile.TConstruct i m npars nargs =>
-          etaExp_cnstr i m npars nargs (tcons sarg sargs)
-        | _ => TApp (strip fn) sarg sargs
-      end
-    | L2.compile.TConst nm => TConst nm
-    | L2.compile.TAx s => TAx (L2.compile.TConst s)
-    | L2.compile.TInd i => TProof (TAx (L2.compile.TInd i))
+  | L2.compile.TRel n => TRel n
+  | L2.compile.TSort s => TDummy
+  | L2.compile.TProof t => TProof (strip t)
+  | L2.compile.TProd nm bod => TDummy
+  | L2.compile.TLambda nm bod => TLambda nm (strip bod)
+  | L2.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
+  | L2.compile.TApp fn arg args => 
+    let sarg := strip arg in
+    let sargs := strips args in
+    match fn with
     | L2.compile.TConstruct i m npars nargs =>
-      etaExp_cnstr i m npars nargs tnil
-    | L2.compile.TCase (i,_) mch brs => TCase i (strip mch) (stripBs brs)
-    | L2.compile.TFix ds n => TFix (stripDs ds) n
-    | L2.compile.TWrong => TWrong
+      let F := fun b => TConstruct i m b in
+      etaExpand F tnil (tcons sarg sargs) npars nargs
+    | _ => TApp (strip fn) sarg sargs
+    end
+  | L2.compile.TConst nm => TConst nm
+  | L2.compile.TAx s => TAx (L2.compile.TConst s)
+  | L2.compile.TInd i => TDummy
+  | L2.compile.TConstruct i m npars nargs =>
+    etaExpand (fun b => TConstruct i m b) tnil tnil npars nargs
+  | L2.compile.TCase (i,_) mch brs => TCase i (strip mch) (stripBs brs)
+  | L2.compile.TFix ds n => TFix (stripDs ds) n
+  | L2.compile.TWrong => TWrong
   end
 with strips (ts:L2Terms) : Terms := 
-  match ts with
-    | L2.compile.tnil => tnil
-    | L2.compile.tcons t ts => tcons (strip t) (strips ts)
-  end
+       match ts with
+       | L2.compile.tnil => tnil
+       | L2.compile.tcons t ts => tcons (strip t) (strips ts)
+       end
 with stripBs (bs:L2Brs) : Brs := 
-  match bs with
-    | L2.compile.bnil => bnil
-    | L2.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
-  end
+       match bs with
+       | L2.compile.bnil => bnil
+       | L2.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
+       end
 with stripDs (ts:L2Defs) : Defs := 
-  match ts with
-    | L2.compile.dnil => dnil
-    | L2.compile.dcons nm t m ds => dcons nm (strip t) m (stripDs ds)
-  end.
+       match ts with
+       | L2.compile.dnil => dnil
+       | L2.compile.dcons nm t m ds => dcons nm (strip t) m (stripDs ds)
+       end.
 
 Lemma strips_tcons:
   forall t ts,
@@ -449,12 +400,11 @@ Proof.
   exists (snd p0), gp. intuition.
 Qed.
 
-
 Definition stripProgram (p:L2Pgm) : Program Term :=
   {| env:= stripEnv (env p);
      main:= strip (main p) |}.
 
-(*** from L1g to L2k ***)
+(*** from L2 to L2k ***)
 Definition program_Program (p:program) : Program Term :=
   stripProgram (L2.compile.program_Program p).
 

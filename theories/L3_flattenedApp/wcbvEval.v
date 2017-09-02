@@ -43,21 +43,11 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     dnthBody m dts = Some x ->
     WcbvEval p (pre_whFixStep x dts arg) s ->
     WcbvEval p (TApp fn arg) s 
-| wAppCong: forall fn efn arg arg1,
-    WcbvEval p fn efn ->
-    ~ isLambda efn -> ~ isFix efn -> TProof <> efn ->
-    WcbvEval p arg arg1 ->
-    WcbvEval p (TApp fn arg) (TApp efn arg1)
 | wCase: forall mch i n args brs cs s,
     WcbvEval p mch (TConstruct i n args) ->
     whCaseStep n args brs = Some cs ->
     WcbvEval p cs s ->
     WcbvEval p (TCase i mch brs) s
-| wCaseCong: forall i mch emch brs,
-    WcbvEval p mch emch ->
-    ~ isConstruct emch ->
-    WcbvEval p (TCase i mch brs) (TCase i emch brs)
-| wWrong: WcbvEval p TWrong TWrong
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
      | wNil: WcbvEvals p tnil tnil
      | wCons: forall t t' ts ts',
@@ -249,7 +239,6 @@ Proof.
     + exists TProof. assumption.
     + exists (TLambda nm bod). assumption.
     + exists (TFix dts m). assumption.
-    + exists efn. assumption.
 Qed.
 
 Lemma WcbvEval_mkApp_TApp_WcbvEval:
@@ -261,13 +250,11 @@ Proof.
     + exists TProof. assumption.
     + exists (TLambda nm bod). assumption.
     + exists (TFix dts m). assumption.
-    + exists efn. assumption.
   - specialize (IHargs _ _ _ H). destruct IHargs as [x jx].
     + inversion_clear jx.
       * exists TProof. assumption.
       * exists (TLambda nm bod). assumption.
       * exists (TFix dts m). assumption.
-      * exists efn. assumption.
 Qed.
 
 (****  HERE  ***
@@ -489,7 +476,6 @@ Function wcbvEval
       end
     | TApp fn a1 =>
       match wcbvEval n fn with
-      | Exc s => raise ("wcbvEval: TApp, fn doesn't eval " ++ s)
       | Ret (TLambda _ bod) =>  (* beta redex *)
         match wcbvEval n a1 with
         | Exc s =>  raise ("wcbvEval TApp: beta, arg doesn't eval: " ++ s)
@@ -501,25 +487,20 @@ Function wcbvEval
         | Some x => wcbvEval n (pre_whFixStep x dts a1)
         end
       | Ret TProof => Ret TProof  (* proof redex *)
-      | Ret T =>  (* App congruence *)
-        match wcbvEval n a1 with
-        | Exc s => raise "wcbvEval: TApp congruence, arg doesn't eval"
-        | Ret ea1 => Ret (TApp T ea1)
-        end
+      | _ => raise "wcbvEval, TApp: fn"
       end
-    | TCase i mch brs =>
+    | TCase ml mch brs =>
       match wcbvEval n mch with
-      | Exc str => Exc str
-      | Ret (TConstruct j ix args) =>
-        match inductive_dec i j with
-          | left _ =>
-            match whCaseStep ix args brs with
-            | None => raise "wcbvEval: Case, whCaseStep"
-            | Some cs => wcbvEval n cs
-            end
-          | right _ =>raise "wcbvEval: Case, constructor of wrong type"
+      | Ret (TConstruct i ix args) =>
+        match inductive_dec i ml with
+        | left _ =>
+          match whCaseStep ix args brs with
+          | None => raise "wcbvEval: Case, whCaseStep"
+          | Some cs => wcbvEval n cs
+          end
+        | right _ => raise "wcbvEval: Case, constructor of wrong type"
         end
-      | Ret mch' => ret (TCase i mch' brs)
+      | _ => raise "wcbvEval: Case, discriminee not canonical"
       end
     | TLetIn nm df bod =>
       match wcbvEval n df with
@@ -532,7 +513,7 @@ Function wcbvEval
     | TProof => ret TProof
     (** should never appear **)
     | TRel _ => raise "wcbvEval: unbound Rel"
-    | TWrong => ret TWrong
+    | TWrong => raise "TWrong"
     end
   end
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
@@ -574,20 +555,8 @@ Proof.
     apply H1. assumption.
   - specialize (H _ e1). specialize (H0 _ p1).
     eapply wAppFix; try eassumption.
-  - specialize (H _ e1). specialize (H0 _ e2).
-    constructor; try assumption.
-    + destruct (isLambda_dec T); try assumption.
-      destruct i as [x0 [x1 jx]]. subst. contradiction.
-    + destruct (isFix_dec T); try assumption.
-      destruct i as [x0 [x1 jx]]. subst. contradiction.
-    + destruct (isProof_dec T); try assumption; unfold isProof in H1.
-      * subst. contradiction.
-      * apply neq_sym. assumption.
   - subst. specialize (H _ e1). specialize (H0 _ p1). 
-    refine (wCase _ _ _ _); try eassumption. 
-  - specialize (H _ e1). 
-    eapply wCaseCong; try assumption. 
-    destruct mch'; try not_isConstruct. contradiction. 
+    refine (wCase _ _ _ _); try eassumption.
   - eapply wLetIn.
     + apply H. eassumption.
     + apply H0. assumption.
@@ -602,63 +571,48 @@ Lemma pre_WcbvEval_wcbvEval:
     (forall ts ss, WcbvEvals p ts ss ->
         exists n, forall m, m >= n -> wcbvEvals (S m) ts = Ret ss).
 Proof.
-  assert (j:forall m x, m > x -> m = S (m - 1)). induction m; intuition.
+  assert (j:forall m, m > 0 -> m = S (m - 1)). induction m; intuition.
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
   - destruct H. exists (S x). intros m h. simpl.
-    rewrite (j m x); try omega. rewrite H; try omega. reflexivity.
+    rewrite (j m); try omega. rewrite H; try omega. reflexivity.
   - destruct H. exists (S x). intros mx hm. simpl.
-    rewrite (j mx 0); try omega. rewrite H; try omega. reflexivity.
+    rewrite (j mx); try omega. rewrite H; try omega. reflexivity.
   - destruct H. exists (S x). intros mx hm. simpl. unfold LookupDfn in l.
-    rewrite (Lookup_lookup l). rewrite (j mx 0); try omega. apply H.
+    rewrite (Lookup_lookup l). rewrite (j mx); try omega. apply H.
     omega.
   - destruct H, H0, H1. exists (S (max x (max x0 x1))). intros m h.
     assert (k:wcbvEval m fn = Ret (TLambda nm bod)).
-    { rewrite (j m (max x (max x0 x1))). apply H.
+    { rewrite (j m). apply H.
       assert (l:= max_fst x (max x0 x1)); omega. omega. }
     assert (k0:wcbvEval m a1 = Ret a1').
-    { rewrite (j m (max x (max x0 x1))). apply H0.
+    { rewrite (j m). apply H0.
       assert (l:= max_snd x (max x0 x1)). assert (l':= max_fst x0 x1).
       omega. omega. }
     simpl. rewrite k0. rewrite k.
-    rewrite (j m (max x (max x0 x1))). apply H1. 
+    rewrite (j m). apply H1. 
     assert (l:= max_snd x (max x0 x1)). assert (l':= max_snd x0 x1).
     omega. omega.
-  - destruct H; destruct H0. exists (S (max x x0)). intros m h. simpl.
+  - destruct H, H0. exists (S (max x x0)). intros m h. simpl.
     assert (k:wcbvEval m dfn = Ret dfn'). 
     assert (l:= max_fst x x0).
-    rewrite (j m (max x x0)). apply H. omega. omega.
+    rewrite (j m). apply H. omega. omega.
     rewrite k.
     assert (l:= max_snd x x0).
-    rewrite (j m x0). apply H0. omega. omega.
+    rewrite (j m). apply H0. omega. omega.
   - destruct H; destruct H0. exists (S (max x0 x1)). intros mx h.
     assert (l1:= max_fst x0 x1). assert (l2:= max_snd x0 x1).
-    simpl. rewrite (j mx x0); try rewrite (H (mx - 1)); try omega.
+    simpl. rewrite (j mx); try rewrite (H (mx - 1)); try omega.
     rewrite e. apply H0. omega.
-  - destruct H, H0. exists (S (max x x0)). intros mx h.
-    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    cbn. rewrite (j mx x); try omega.
-    rewrite (H (mx - 1)); try omega.
-    rewrite (H0 (mx - 1)); try omega.
-    destruct efn; try reflexivity.
-    + contradiction.
-    + elim n. auto.
-    + elim n0. auto.
-  - destruct H as [x hx]. destruct H0 as [x0 hx0].
-    exists (S (max x x0)). intros m hm. cbn.
-    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    rewrite (j m (max x x0)); try omega.
-    rewrite hx; try omega. rewrite e.
-    destruct (inductive_dec i i).
-    + apply hx0; try omega.
-    + intuition.
-  - destruct H. exists (S x). intros m h. cbn.
-    rewrite (j m x); try omega. rewrite (H (m - 1)); try omega.
-    destruct emch; try rewrite H0; try reflexivity; try omega.
-    elim n. auto.
   - destruct H; destruct H0. exists (S (max x x0)). intros m h.
     assert (l:= max_fst x x0). assert (l2:= max_snd x x0). simpl.
-    rewrite (j m (max x x0)); try omega. rewrite H; try omega.
-    rewrite H0. reflexivity. omega.
+    rewrite (j m); try omega. rewrite H; try omega.
+    destruct (inductive_dec i i).
+    + rewrite e. rewrite H0. reflexivity. omega.
+    + elim n0. reflexivity.
+  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    simpl. rewrite (j mx); try omega. rewrite (H (mx - 1)); try omega.
+    rewrite H0; try omega. reflexivity.
 Qed.
 
 Lemma WcbvEval_wcbvEval:

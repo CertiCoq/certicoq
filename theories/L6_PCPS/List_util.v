@@ -21,8 +21,6 @@ Ltac inv H := inversion H; clear H; subst.
   | S m'  => n::(fromN (BinNat.N.succ n)  m')
   end.
  
-
-  
 (** Definition of [nthN]. Same as [nth_error] but the argument is
   * of type [N] instead of [nat] *)
 Function nthN {A: Type} (al: list A) (n: N) : option A :=
@@ -233,6 +231,40 @@ Proof.
   intros H Hall1; revert l3; induction Hall1; intros l3 Hall2 ; eauto.
   - inv Hall2. constructor.
   - inv Hall2. constructor; eauto.
+Qed.
+
+Lemma Forall2_forall (A B : Type) (R : A -> B -> B -> Prop) (l1 l2 : list B) :
+  inhabited A ->
+  (forall k, Forall2 (R k) l1 l2) ->
+  Forall2 (fun x1 x2 => forall k, R k x1 x2) l1 l2.
+Proof.
+  intros [w]. revert l2. induction l1; intros l2 Hyp.
+  - specialize (Hyp w).
+    inversion Hyp; subst. now constructor.
+  - assert (Hyp' := Hyp w). inversion Hyp'.
+    subst. constructor. intros k.
+    specialize (Hyp k). inv Hyp. eassumption.
+    eapply IHl1. intros k.
+    specialize (Hyp k). inv Hyp. eassumption.
+Qed.
+
+Lemma Forall2_conj (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) :
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l1 l2 ->
+  Forall2 (fun x1 x2 => R1 x1 x2 /\ R2 x1 x2) l1 l2.
+Proof.
+  intros H1 H2. induction H1.
+  - constructor.
+  - inv H2; constructor; now eauto.
+Qed.
+
+Lemma Forall2_flip (A : Type) (R : A -> A -> Prop) (l1 l2 : list A) :
+  Forall2 (fun x1 x2 => R x2 x1) l2 l1 ->
+  Forall2 R l1 l2.
+Proof.
+  intros Hall. induction Hall.
+  - now constructor.
+  - constructor; eassumption.
 Qed.
 
 (** Lemmas about [nthN] *)

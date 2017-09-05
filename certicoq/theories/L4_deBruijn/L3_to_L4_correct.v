@@ -2638,29 +2638,8 @@ Proof with eauto.
         simpl in H3. rewrite subst_env_aux_lam in H3. inv H3.
 
     - rewrite t' in fixstep. discriminate.
-    
-  + (* App no redex: this cannot produce a well-formed value *)
-    intros * evfn Hfn nlam nfix nproof evarg Harg wft.
-    cut (WNorm (TApp efn arg1)). intros wnorm.
-    cut (WFTrm (TApp efn arg1) 0). intros wft'.
-    pose proof (wnorm_closed _ wft' wnorm).
-    inv wft'. inv wnorm. contradiction.
-    (* Eval preserves wf *)
-    apply Crct_invrt_App in wft. destruct wft as [Hfn' Harg'].
-    eapply Crct_WFTrm.
-    apply WcbvEval_preserves_crctTerm in evfn; eauto.
-    apply WcbvEval_preserves_crctTerm in evarg; eauto.
-    (* Application in normal form *)
-    eapply Crct_invrt_App in wft; trivial.
-    destruct wft as [Crctfn Crctarg].
-    constructor.
-    (* There's a contradiction here: efn is a crctTerm closed term, which
-isn't a lambda or fix or constructor or application, also not a rel as
-it is closed.  But it could still be a: - Proof, Prod, LetIn Const Ax
-Ind Case or Wrong. How can we prove it isn't?? *)
-    admit.
-    
-  + (* Case *)
+
+ + (* Case *)
     unfold translate; simpl.
     (* Reduction case *)
     intros * evmch IHmch Hcasestep Hcs IHcs Hcrct.
@@ -2730,11 +2709,6 @@ Ind Case or Wrong. How can we prove it isn't?? *)
       eapply Crct_mkApp; auto.
       -- apply is_n_lambda_is_n_lamba_app. now rewrite Hargsdef.
           
-  (** Case congruence *)
-  + admit.
-
-  + intros. now apply Crct_invrt_wrong in H.
-    
   (** Terms *)
   + intros; constructor.
   + intros. inv H1. specialize (H0 H7). simpl.
@@ -2742,8 +2716,7 @@ Ind Case or Wrong. How can we prove it isn't?? *)
 
   (** Generalized goal *)
   + tauto.
-    
-Admitted.
+Qed.
 
 Lemma WcbvEval_env_eval_env e e' :
   crctEnv e -> L3eval.WcbvEval_env e e' -> exists e'', eval_env (translate_env e) e''.

@@ -745,6 +745,12 @@ Proof.
   rewrite <- H in H2. repeat eexists; eauto.
 Qed.
 
+Lemma image'_Empty_set {A B} (f : A -> option B) :
+  image' f (Empty_set _) <--> Empty_set _.
+Proof.
+  firstorder.
+Qed.
+
 (** * Lemmas about [compose] *)
 
 Open Scope program_scope.

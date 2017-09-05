@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
 From L6 Require Import functions cps eval cps_util identifiers ctx Ensembles_util
                        List_util Heap.heap Heap.heap_defs Heap.space_sem.
-Require Import compcert.lib.Coqlib.
+From compcert Require Import lib.Coqlib.
 
 Import ListNotations.
 
@@ -869,9 +869,26 @@ Module CC_log_rel (H : Heap).
         eexists. split; simpl; eauto. rewrite Hyp1. rewrite Hget.
         constructor. apply Hp. now constructor.
   Qed.
-  
-  (** * Compatibility lemmas *)
 
+
+  (** * heap_eq respectx cc_approx *)
+
+   Lemma cc_approx_exp_heap_eq (k : nat) (P1 : Inv) (P2 : GInv) (H1 H2 H1' H2' : heap block)
+         (rho1 rho2 : env) (e1 e2 : exp) :
+    (e1, rho1, H1) ⪯ ^ (k; P1; P2) (e2, rho2, H2) ->
+    reach' H1 (env_locs rho1 (occurs_free e1)) |- H1 ≡ H1' ->
+    reach' H2 (env_locs rho2 (occurs_free e2)) |- H2 ≡ H2' ->
+    (e1, rho1, H1') ⪯ ^ (k; P1; P2) (e2, rho2, H2').
+   Proof with now eauto with Ensembles_DB.
+     intros Hexp Heq1 Heq2 H1'' H2'' r1 c1 m1 Heq1' Heq2'.
+     eapply Hexp.
+     eapply Equivalence_Transitive. eassumption.
+     rewrite reach'_heap_eq; eassumption.
+     eapply Equivalence_Transitive. eassumption.
+     rewrite reach'_heap_eq; eassumption.
+   Qed.
+
+  (** * Compatibility lemmas *)
 
   (** TODO move *)
   Definition AppClo f t xs f' Γ :=

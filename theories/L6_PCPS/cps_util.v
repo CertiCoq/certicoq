@@ -422,7 +422,6 @@ Proof.
     simpl. congruence.
 Qed.
 
-
 Lemma getlist_In_val {A} (rho : M.t A) ys v vs :
   getlist ys rho = Some vs ->
   List.In v vs ->
@@ -796,8 +795,8 @@ Definition subfds_e: fundefs -> exp -> Prop :=
 
 Theorem subfds_rebase:
   forall fds v f l e fds', 
-  subfds_fds (Fcons v f l e fds) fds' ->
-  subfds_fds fds fds'.
+    subfds_fds (Fcons v f l e fds) fds' ->
+    subfds_fds fds fds'.
 Proof.
   induction fds'; intros.
   inv H.
@@ -838,7 +837,7 @@ Qed.
 
 Definition num_occur_list (lv:list var) (v:var) : nat :=
   fold_right (fun v' n => if (var_dec v v') then 1 + n
-                          else n) 0 lv.
+                       else n) 0 lv.
 
 (* number of time var occurs in exp (free or not)*)
 Inductive num_occur: exp -> var -> nat -> Prop :=
@@ -889,8 +888,7 @@ with num_occur_case: list (var * exp) -> var -> nat -> Prop :=
            num_occur_case ((k,e)::cl) v (n+m).
 
 
-
- (* number of times var occurs in a context *) 
+(* number of times var occurs in a context *) 
 Inductive num_occur_ec: exp_ctx -> var -> nat -> Prop :=
 | Noec_hole: forall v, num_occur_ec Hole_c v 0
 | Noec_constr:
@@ -992,7 +990,7 @@ Theorem e_num_binding :
   exists n, num_binding_e e v n
 with e_num_binding_f :
        forall v fds,
-       exists n, num_binding_f fds v n.                                                                 
+       exists n, num_binding_f fds v n.               
 Proof.  
   - induction e; destructAll.
     + exists (num_occur_list [v0] v  + x); constructor; auto.
@@ -1108,7 +1106,7 @@ Proof.
     constructor; eauto.
     split; eauto.
     omega.
-      - destructAll.
+  - destructAll.
     inv H.
     eapply num_occur_n.
     constructor. rewrite IHc.

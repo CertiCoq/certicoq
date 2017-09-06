@@ -165,14 +165,13 @@ Fixpoint emit_val (indent:nat) (v:val) : M unit :=
         | Vfun rho fds f =>
           (match  find_def f fds with
              | Some (t', xs ,e) =>
-                           emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;;newline;;emit_exp (4 + indent) e ;; newline 
-(*               emit "fun "%string ;; emit (show_var f);;emit (show_ftag t');;emit (show_vars xs);;emit ":="%string;; emit "..."%string ;; newline *)
-
+               emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;;newline;;emit_exp (4 + indent) e ;; newline 
+            (* emit "fun "%string ;; emit (show_var f);;emit (show_ftag t');;emit (show_vars xs);;emit ":="%string;; emit "..."%string ;; newline *)
              | None => emit "ERROR! FUN "%string ;; emit (show_var f);;emit " NOT FOUND!"%string;;newline
            end)
         | Vint i => emit "Int "%string;;newline
       end.
-      (*
+(*
 with emit_vals (indent:nat) (vl:list val): M unit :=
        match vl with
          | v::vl' =>
@@ -212,24 +211,24 @@ Definition emit_env (indent:nat) (rho:M.t val): M unit :=
   emit "rho:{"%string;;newline;;emit_env' indent (M.elements rho);;emit "}"%string.
   
 Definition emit_cenv (indent:nat) (cenv:M.t cTyInfo):M unit :=
-    emit "cenv:{"%string;;newline;;emit_cenv' indent (M.elements cenv);;emit "}"%string.
+  emit "cenv:{"%string;;newline;;emit_cenv' indent (M.elements cenv);;emit "}"%string.
 
 
 Definition show_env (rho:M.t val) : string :=
-    String chr_newline
-          (show_tree (snd (runState (emit_env 0 rho) Emp))).
+  String chr_newline
+         (show_tree (snd (runState (emit_env 0 rho) Emp))).
 
 
 Definition show_cenv (cenv:M.t cTyInfo): string :=
   String chr_newline
-          (show_tree (snd (runState (emit_cenv 0 cenv) Emp))).
+         (show_tree (snd (runState (emit_cenv 0 cenv) Emp))).
   
 
 (* We add an extra newline at the front so that Coq will display the
    whole program correctly when we evaluate. *)
 Definition show_exp (x:exp) : string := 
   String chr_newline
-          (show_tree (snd (runState (emit_exp 0 x) Emp))).
+         (show_tree (snd (runState (emit_exp 0 x) Emp))).
 
 (*  Some tests -- commented out for now. *)
 (*
@@ -321,4 +320,5 @@ Let P2 :=
 
 Eval vm_compute in show_exp P2.
  *)
+
 End PP.

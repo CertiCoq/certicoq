@@ -2720,10 +2720,10 @@ Qed.
 (** * Bound variables for expression and function contexts *)
 Inductive bound_var_ctx: exp_ctx -> Ensemble var  :=
 | Bound_Constr1_c: forall v t ys c,
-    bound_var_ctx (Econstr_c v t ys c) v
+                     bound_var_ctx (Econstr_c v t ys c) v
 | Bound_Constr2_c: forall c v v' t ys,
-    bound_var_ctx c v ->
-    bound_var_ctx (Econstr_c v' t ys c) v
+                     bound_var_ctx c v ->
+                     bound_var_ctx (Econstr_c v' t ys c) v
 | Bound_Proj1_c: forall  t n r c v,
                    bound_var_ctx (Eproj_c v t n r c) v
 | Bound_Proj2_c: forall  t n r c v' v,
@@ -2735,8 +2735,8 @@ Inductive bound_var_ctx: exp_ctx -> Ensemble var  :=
                    bound_var_ctx c v' ->
                    bound_var_ctx (Eprim_c v t r c) v'
 | Bound_Case1_c: forall v v' lce t c lce',
-     bound_var_ctx c v' ->
-     bound_var_ctx (Ecase_c v lce t c lce') v'
+                   bound_var_ctx c v' ->
+                   bound_var_ctx (Ecase_c v lce t c lce') v'
 | Bound_Case2_c: forall v v' e lce t' t c lce',
                    bound_var e v' ->
                    List.In (t',e) lce ->
@@ -2746,11 +2746,11 @@ Inductive bound_var_ctx: exp_ctx -> Ensemble var  :=
                    List.In (t',e) lce' ->
                    bound_var_ctx (Ecase_c v lce t c lce') v'
 | Bound_Fun11_c: forall fds v c,
-     bound_var_fundefs fds v ->
-     bound_var_ctx (Efun1_c fds c) v
+                   bound_var_fundefs fds v ->
+                   bound_var_ctx (Efun1_c fds c) v
 | Bound_Fun12_c: forall fds v c,
-                  bound_var_ctx c v ->
-                  bound_var_ctx (Efun1_c fds c) v
+                   bound_var_ctx c v ->
+                   bound_var_ctx (Efun1_c fds c) v
 | Bound_Fun21_c: forall cfds v e,
                    bound_var_fundefs_ctx cfds v ->
                    bound_var_ctx (Efun2_c cfds e) v
@@ -2766,7 +2766,7 @@ with bound_var_fundefs_ctx: fundefs_ctx -> Ensemble var :=
                                                 
      | Bound_Fcons13_c: forall f t xs c fds v,
                           bound_var_ctx c v ->
-                           bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
+                          bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
      | Bound_Fcons14_c: forall f t xs c fds v,
                           bound_var_fundefs fds v ->
                           bound_var_fundefs_ctx (Fcons1_c f t xs c fds) v
@@ -2942,10 +2942,10 @@ Qed.
 
 Theorem bound_var_app_ctx:
   forall e, forall c, Same_set _ (bound_var (app_ctx_f c e))
-                (Union _ (bound_var_ctx c) (bound_var e))
-with bound_var_app_f_ctx:
-  forall e, forall f, Same_set _ (bound_var_fundefs (app_f_ctx_f f e))
-                     (Union _ (bound_var_fundefs_ctx f) (bound_var e)).
+                     (Union _ (bound_var_ctx c) (bound_var e))
+            with bound_var_app_f_ctx:
+                   forall e, forall f, Same_set _ (bound_var_fundefs (app_f_ctx_f f e))
+                                      (Union _ (bound_var_fundefs_ctx f) (bound_var e)).
 Proof with eauto with Ensembles_DB.
   intro e.
   induction c; simpl; eauto.
@@ -3007,79 +3007,78 @@ Proof with eauto with Ensembles_DB.
       reflexivity.
 Qed.
 
-  Ltac normalize_bound_var_ctx' :=
-    match goal with
-      | [ |- context[bound_var_ctx Hole_c]] =>
-        rewrite bound_var_Hole_c 
-      | [|- context[bound_var_ctx (Econstr_c _ _ _ _)]] =>
-        rewrite bound_var_Econstr_c
-      | [|- context[bound_var_ctx (Eproj_c _ _ _ _ _)]] =>
-        rewrite bound_var_Eproj_c
-      | [|- context[bound_var_ctx (Ecase_c _ _ _ _ _)]] =>
-        rewrite bound_var_Case_c
-      | [ |- context[bound_var_ctx (Efun1_c _ _)]] =>
-        rewrite bound_var_Fun1_c 
-      | [ |- context[bound_var_ctx (Efun2_c _ _)] ] =>
-        rewrite bound_var_Fun2_c
-      | [|- context[bound_var_ctx (Eprim_c _ _ _ _)]] =>
-        rewrite bound_var_Eprim_c
-      | [|- context[bound_var_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
-        rewrite bound_var_Fcons1_c
-      | [|- context[bound_var_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
-        rewrite bound_var_Fcons2_c
-    end.
+Ltac normalize_bound_var_ctx' :=
+  match goal with
+    | [ |- context[bound_var_ctx Hole_c]] =>
+      rewrite bound_var_Hole_c 
+    | [|- context[bound_var_ctx (Econstr_c _ _ _ _)]] =>
+      rewrite bound_var_Econstr_c
+    | [|- context[bound_var_ctx (Eproj_c _ _ _ _ _)]] =>
+      rewrite bound_var_Eproj_c
+    | [|- context[bound_var_ctx (Ecase_c _ _ _ _ _)]] =>
+      rewrite bound_var_Case_c
+    | [ |- context[bound_var_ctx (Efun1_c _ _)]] =>
+      rewrite bound_var_Fun1_c 
+    | [ |- context[bound_var_ctx (Efun2_c _ _)] ] =>
+      rewrite bound_var_Fun2_c
+    | [|- context[bound_var_ctx (Eprim_c _ _ _ _)]] =>
+      rewrite bound_var_Eprim_c
+    | [|- context[bound_var_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
+      rewrite bound_var_Fcons1_c
+    | [|- context[bound_var_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
+      rewrite bound_var_Fcons2_c
+  end.
 
-  Ltac normalize_bound_var_ctx_in_ctx' :=
-    match goal with
-      | [ H: context[bound_var_ctx Hole_c] |- _] =>
-        rewrite bound_var_Hole_c in H
-      | [ H : context[bound_var_ctx (Econstr_c _ _ _ _)] |- _ ] =>
-        rewrite bound_var_Econstr_c in H
-      | [ H : context[bound_var_ctx (Eproj_c _ _ _ _ _)]  |- _ ] =>
-        rewrite bound_var_Eproj_c in H
-      | [H: context[bound_var_ctx (Ecase_c _ _ _ _ _)] |- _] =>
-        rewrite bound_var_Case_c in H
-      | [ H : context[bound_var_ctx (Efun1_c _ _)] |- _ ] =>
-        rewrite bound_var_Fun1_c in H
-      | [ H : context[bound_var_ctx (Efun2_c _ _)] |- _ ] =>
-        rewrite bound_var_Fun2_c in H
-      | [ H : context[bound_var_ctx (Eprim_c _ _ _ _)] |- _ ] =>
-        rewrite bound_var_Eprim_c in H
-      | [H:context[bound_var_fundefs_ctx (Fcons1_c _ _ _ _ _)] |- _] =>
-        rewrite bound_var_Fcons1_c in H
-      | [H: context[bound_var_fundefs_ctx (Fcons2_c _ _ _ _ _)] |- _] =>
-        rewrite bound_var_Fcons2_c in H
-    end.
+Ltac normalize_bound_var_ctx_in_ctx' :=
+  match goal with
+    | [ H: context[bound_var_ctx Hole_c] |- _] =>
+      rewrite bound_var_Hole_c in H
+    | [ H : context[bound_var_ctx (Econstr_c _ _ _ _)] |- _ ] =>
+      rewrite bound_var_Econstr_c in H
+    | [ H : context[bound_var_ctx (Eproj_c _ _ _ _ _)]  |- _ ] =>
+      rewrite bound_var_Eproj_c in H
+    | [H: context[bound_var_ctx (Ecase_c _ _ _ _ _)] |- _] =>
+      rewrite bound_var_Case_c in H
+    | [ H : context[bound_var_ctx (Efun1_c _ _)] |- _ ] =>
+      rewrite bound_var_Fun1_c in H
+    | [ H : context[bound_var_ctx (Efun2_c _ _)] |- _ ] =>
+      rewrite bound_var_Fun2_c in H
+    | [ H : context[bound_var_ctx (Eprim_c _ _ _ _)] |- _ ] =>
+      rewrite bound_var_Eprim_c in H
+    | [H:context[bound_var_fundefs_ctx (Fcons1_c _ _ _ _ _)] |- _] =>
+      rewrite bound_var_Fcons1_c in H
+    | [H: context[bound_var_fundefs_ctx (Fcons2_c _ _ _ _ _)] |- _] =>
+      rewrite bound_var_Fcons2_c in H
+  end.
 
-  Theorem bound_var_ctx_comp_ctx:      
-    (forall c1 c2,
-       Same_set _ (bound_var_ctx (comp_ctx_f c1 c2))
-                (Union _ (bound_var_ctx c1) (bound_var_ctx c2)))/\
-    (forall fc1 c2,
-       Same_set _ (bound_var_fundefs_ctx (comp_f_ctx_f fc1 c2))
-                (Union _ (bound_var_fundefs_ctx fc1) (bound_var_ctx c2)))
-  .
-  Proof.
-    exp_fundefs_ctx_induction IHc1 IHfc1; simpl; split; repeat (normalize_bound_var_ctx'); try (rewrite IHc1); try (rewrite IHfc1); repeat (normalize_bound_var_ctx'); repeat (normalize_bound_var); eauto 25 with Ensembles_DB.
-  Qed.
+Theorem bound_var_ctx_comp_ctx:      
+  (forall c1 c2,
+     Same_set _ (bound_var_ctx (comp_ctx_f c1 c2))
+              (Union _ (bound_var_ctx c1) (bound_var_ctx c2)))/\
+  (forall fc1 c2,
+     Same_set _ (bound_var_fundefs_ctx (comp_f_ctx_f fc1 c2))
+              (Union _ (bound_var_fundefs_ctx fc1) (bound_var_ctx c2))).
+Proof.
+  exp_fundefs_ctx_induction IHc1 IHfc1; simpl; split; repeat (normalize_bound_var_ctx'); try (rewrite IHc1); try (rewrite IHfc1); repeat (normalize_bound_var_ctx'); repeat (normalize_bound_var); eauto 25 with Ensembles_DB.
+Qed.
 
-  Ltac  normalize_bound_var_ctx :=
-    first [
-        match goal with
-          | [|- context[bound_var_ctx (comp_ctx_f _ _)]] =>
-            rewrite (proj1 (bound_var_ctx_comp_ctx))
-          | [|- context [bound_var_fundefs_ctx (comp_f_ctx_f _ _)]] =>
-            rewrite (proj1 (bound_var_ctx_comp_ctx))
-        end | normalize_bound_var_ctx'].
+Ltac  normalize_bound_var_ctx :=
+  first [
+      match goal with
+        | [|- context[bound_var_ctx (comp_ctx_f _ _)]] =>
+          rewrite (proj1 (bound_var_ctx_comp_ctx))
+        | [|- context [bound_var_fundefs_ctx (comp_f_ctx_f _ _)]] =>
+          rewrite (proj1 (bound_var_ctx_comp_ctx))
+      end | normalize_bound_var_ctx'].
 
-  Ltac  normalize_bound_var_ctx_in_ctx :=
-    first [
-        match goal with
-          | [H:context[bound_var_ctx (comp_ctx_f _ _)] |- _] =>
-            rewrite (proj2 (bound_var_ctx_comp_ctx)) in H
-          | [H:context [bound_var_fundefs_ctx (comp_f_ctx_f _ _)] |- _] =>
-            rewrite (proj2 (bound_var_ctx_comp_ctx)) in H
-        end| normalize_bound_var_ctx_in_ctx'].
+Ltac  normalize_bound_var_ctx_in_ctx :=
+  first [
+      match goal with
+        | [H:context[bound_var_ctx (comp_ctx_f _ _)] |- _] =>
+          rewrite (proj2 (bound_var_ctx_comp_ctx)) in H
+        | [H:context [bound_var_fundefs_ctx (comp_f_ctx_f _ _)] |- _] =>
+          rewrite (proj2 (bound_var_ctx_comp_ctx)) in H
+      end| normalize_bound_var_ctx_in_ctx'].
 
 
 (* unique_bindings for contexts *)
@@ -3646,11 +3645,11 @@ Proof.
     auto.
     apply H0. eauto.
   -  inv H. specialize (Dec x).
-    inv Dec; auto.
-    destruct (var_dec v x).
-    subst. auto.
-    right.
-    intro. inv H0; auto.
+     inv Dec; auto.
+     destruct (var_dec v x).
+     subst. auto.
+     right.
+     intro. inv H0; auto.
   - inv H.
     specialize (Dec x).
     inv Dec; auto.
@@ -3660,11 +3659,11 @@ Proof.
     right. intro. inv H1; auto.
   - right. intro. inv H. 
   -  inv H. specialize (Dec x).
-    inv Dec; auto.
-    destruct (var_dec v x).
-    subst. auto.
-    right.
-    intro. inv H0; auto.
+     inv Dec; auto.
+     destruct (var_dec v x).
+     subst. auto.
+     right.
+     intro. inv H0; auto.
   - right. intro. inv H.
   - inv H. specialize (Dec x).
     inv Dec; auto.
@@ -3761,51 +3760,43 @@ Proof.
   apply bound_var_ctx_dec_mut.
 Qed.
 
-  Fixpoint names_in_fundefs_ctx B:=
-    match B with
-      | Fcons1_c f' _ _ _ B0 => Union var [set f'] (name_in_fundefs B0)
-      | Fcons2_c f' _ _ _ B0 => Union var [set f'] (names_in_fundefs_ctx B0)
-    end. 
-  
+Fixpoint names_in_fundefs_ctx B:=
+  match B with
+    | Fcons1_c f' _ _ _ B0 => Union var [set f'] (name_in_fundefs B0)
+    | Fcons2_c f' _ _ _ B0 => Union var [set f'] (names_in_fundefs_ctx B0)
+  end. 
+
+Theorem name_in_fundefs_ctx_ctx:
+  forall e cf, 
+    Same_set _ (names_in_fundefs_ctx cf) (name_in_fundefs (cf <[ e ]>)).
+Proof.
+  induction cf.
+  simpl. eauto with Ensembles_DB.
+  simpl. rewrite IHcf.
+  eauto with Ensembles_DB.
+Qed.         
+
+Theorem name_in_fundefs_ctx_bound_var_fundefs :
+  forall B, names_in_fundefs_ctx B \subset bound_var_fundefs_ctx B.
+Proof.
+  intros.
+  induction B; normalize_bound_var_ctx'; simpl; eauto with Ensembles_DB.
+  assert (Hf4 := name_in_fundefs_bound_var_fundefs f).
+  eauto with Ensembles_DB.
+Qed.
 
 
+Theorem name_in_fundefs_ctx_comp:
+  forall c,
+  forall f5,
+    (names_in_fundefs_ctx (comp_f_ctx_f f5 c) <-->
+                          (names_in_fundefs_ctx f5)).
+Proof.
+  intro c.
+  induction f5; simpl; eauto with Ensembles_DB.
+Qed.
 
-
-
-
-
-
-  Theorem name_in_fundefs_ctx_ctx:
-    forall e cf, 
-      Same_set _ (names_in_fundefs_ctx cf) (name_in_fundefs (cf <[ e ]>)).
-  Proof.
-    induction cf.
-    simpl. eauto with Ensembles_DB.
-    simpl. rewrite IHcf.
-    eauto with Ensembles_DB.
-  Qed.         
-
-    Theorem name_in_fundefs_ctx_bound_var_fundefs :
-    forall B, names_in_fundefs_ctx B \subset bound_var_fundefs_ctx B.
-  Proof.
-    intros.
-    induction B; normalize_bound_var_ctx'; simpl; eauto with Ensembles_DB.
-    assert (Hf4 := name_in_fundefs_bound_var_fundefs f).
-    eauto with Ensembles_DB.
-  Qed.
-
-
-  Theorem name_in_fundefs_ctx_comp:
-    forall c,
-    forall f5,
-      (names_in_fundefs_ctx (comp_f_ctx_f f5 c) <-->
-                           (names_in_fundefs_ctx f5)).
-  Proof.
-    intro c.
-    induction f5; simpl; eauto with Ensembles_DB.
-  Qed.
-
-  Theorem Decidable_singleton_var: forall v, Decidable (Singleton var v).
+Theorem Decidable_singleton_var: forall v, Decidable (Singleton var v).
 Proof.
   intro.
   apply Build_Decidable.
@@ -3817,178 +3808,177 @@ Proof.
 Qed.
 
 
-  Theorem Decidable_name_in_fundefs_ctx :
-    forall cf, Decidable (names_in_fundefs_ctx cf).
-  Proof.
-    induction cf; simpl.
-    apply Decidable_Union.
-    apply Decidable_singleton_var.
-    apply Decidable_name_in_fundefs.
-    apply Decidable_Union.
-    apply Decidable_singleton_var.
-    auto.
-  Qed.
-  
-  SearchAbout Decidable bound_var.
-  SearchAbout Decidable.
-
-  Require Import Coq.Logic.Decidable.
-  Theorem decidable_Disjoint_FromList {A:Type}: 
-    forall S, Decidable S ->
-              forall (l:list A), decidable (Disjoint A (FromList l) S).
-  Proof.
-    induction l.
-    - left. rewrite FromList_nil.  eauto with Ensembles_DB.
-    - inv IHl.
-      inv H. specialize (Dec a). inv Dec.
-      right. rewrite FromList_cons. intro.  inv H1. specialize (H2 a). eauto 25 with Ensembles_DB.
-      left. rewrite FromList_cons. eauto with Ensembles_DB.
-      right. rewrite FromList_cons. eauto with Ensembles_DB.
-  Qed.      
-      
-  Theorem decidable_Disjoint_db_mut:
-    forall S, Decidable S -> 
-    (forall e, decidable (Disjoint _ (bound_var e) S)) /\
-   (forall fds, decidable (Disjoint _ (bound_var_fundefs fds) S)).
-  Proof.
-    intros.
-    apply exp_def_mutual_ind; intros.
-    - inv H0.
-      + inv H. specialize (Dec v). inv Dec.
-        * right. intro. rewrite bound_var_Econstr in H0. inv H0. specialize (H2 v). eauto with Ensembles_DB.
-        *  left. rewrite bound_var_Econstr. eauto with Ensembles_DB.
-      + right. intro. rewrite bound_var_Econstr in H0. eauto with Ensembles_DB.
-    - left. rewrite bound_var_Ecase_nil. eauto with Ensembles_DB.
-    - inv H1. inv H0.
-      left. rewrite bound_var_Ecase_cons. eauto with Ensembles_DB.
-      right. rewrite bound_var_Ecase_cons. eauto with Ensembles_DB.
-      right. rewrite bound_var_Ecase_cons. eauto with Ensembles_DB.
-    - inv H0.
-      + inv H. specialize (Dec v). inv Dec.
-        * right. rewrite bound_var_Eproj. intro. inv H0. specialize (H2 v). eauto with Ensembles_DB.
-        * left. rewrite bound_var_Eproj. eauto with Ensembles_DB.
-      + right. rewrite bound_var_Eproj. eauto with Ensembles_DB.
-    - inv H1. inv H0.
-      left; rewrite bound_var_Efun. eauto with Ensembles_DB.
-      right; rewrite bound_var_Efun. eauto with Ensembles_DB.
-      right; rewrite bound_var_Efun. eauto with Ensembles_DB.
-    - left. rewrite bound_var_Eapp. eauto with Ensembles_DB.
-    - inv H0.
-      + inv H. specialize (Dec v). inv Dec.
-        * right; rewrite bound_var_Eprim. intro. inv H0. specialize (H2 v). eauto with Ensembles_DB.
-        * left. rewrite bound_var_Eprim. eauto with Ensembles_DB.
-      + right. rewrite bound_var_Eprim. eauto with Ensembles_DB.
-    - left. rewrite bound_var_Ehalt. eauto with Ensembles_DB.
-    - inv H0.
-      + inv H1.
-        * assert (decidable (Disjoint _ (FromList l) S)). eapply decidable_Disjoint_FromList. apply H.
-          inv H. specialize (Dec v). inv Dec.
-          right. rewrite bound_var_fundefs_Fcons. intro.  inv H3. specialize (H4 v). eauto 25 with Ensembles_DB.
-          inv H1. left. rewrite bound_var_fundefs_Fcons. eauto with Ensembles_DB.
-          right. rewrite bound_var_fundefs_Fcons. eauto with Ensembles_DB.
-        * right. rewrite bound_var_fundefs_Fcons. eauto 25 with Ensembles_DB.
-      +         right. rewrite bound_var_fundefs_Fcons. eauto 25 with Ensembles_DB.
-    - left. rewrite bound_var_fundefs_Fnil. eauto with Ensembles_DB.
+Theorem Decidable_name_in_fundefs_ctx :
+  forall cf, Decidable (names_in_fundefs_ctx cf).
+Proof.
+  induction cf; simpl.
+  apply Decidable_Union.
+  apply Decidable_singleton_var.
+  apply Decidable_name_in_fundefs.
+  apply Decidable_Union.
+  apply Decidable_singleton_var.
+  auto.
 Qed.
 
-  Theorem decidable_Disjoint_bv:
-    forall S, Decidable S -> 
-    (forall e, decidable (Disjoint _ (bound_var e) S)).
-  Proof.
-    intros. apply decidable_Disjoint_db_mut. auto.
-  Qed.
+SearchAbout Decidable bound_var.
+SearchAbout Decidable.
 
-  Theorem decidable_Disjoint_bv_fundefs:
-    forall S, Decidable S -> 
-    (forall fds, decidable (Disjoint _ (bound_var_fundefs fds) S)).
-  Proof.
-    intros. apply decidable_Disjoint_db_mut. auto.
-  Qed.
-  
-  Theorem decidable_ub_mut:
-    (forall e, decidable (unique_bindings e)) /\
-    (forall fds, decidable (unique_bindings_fundefs fds)).
-  Proof.
-      apply exp_def_mutual_ind; intros.
-      - inv H.
-        assert (H := bound_var_dec e).
-        inv H. specialize (Dec v).
-        inv Dec.
-        right. intro. inv H1. auto.
-        left. constructor; auto.
-        right. intro; inv H. auto.
-      - left. constructor.
-      - inv H.
-        inv H0.
-        assert (decidable (Disjoint _ (bound_var e) (bound_var (Ecase v l)))).
-        apply decidable_Disjoint_bv. apply bound_var_dec.
-        inv H0. left. constructor; auto.
-        right. intro. inv H0; auto.
-        right. intro; inv H0; auto.
-        right. intro; inv H; auto.
-      - inv H.         
-        assert (H':= bound_var_dec e).
-        inv H'.
-        specialize (Dec v). inv Dec.
-        right; intro. inv H1; auto.
-        left. constructor; auto.
-        right. intro. inv H; auto.
-      - inv H. inv H0.
-        assert (decidable (Disjoint _ (bound_var e)(bound_var_fundefs f2))).
-        eapply decidable_Disjoint_bv. apply bound_var_fundefs_dec.
-        inv H0. left; constructor; auto.
-        right. intro. inv H0; auto.
-        right. intro. inv H0; auto.
-        right. intro. inv H; auto.
-      - left. constructor.
-      - inv H.
-        assert (H := bound_var_dec e).
+Require Import Coq.Logic.Decidable.
+Theorem decidable_Disjoint_FromList {A:Type}: 
+  forall S, Decidable S ->
+       forall (l:list A), decidable (Disjoint A (FromList l) S).
+Proof.
+  induction l.
+  - left. rewrite FromList_nil.  eauto with Ensembles_DB.
+  - inv IHl.
+    inv H. specialize (Dec a). inv Dec.
+    right. rewrite FromList_cons. intro.  inv H1. specialize (H2 a). eauto 25 with Ensembles_DB.
+    left. rewrite FromList_cons. eauto with Ensembles_DB.
+    right. rewrite FromList_cons. eauto with Ensembles_DB.
+Qed.      
+
+Theorem decidable_Disjoint_db_mut:
+  forall S, Decidable S -> 
+       (forall e, decidable (Disjoint _ (bound_var e) S)) /\
+       (forall fds, decidable (Disjoint _ (bound_var_fundefs fds) S)).
+Proof.
+  intros.
+  apply exp_def_mutual_ind; intros.
+  - inv H0.
+    + inv H. specialize (Dec v). inv Dec.
+      * right. intro. rewrite bound_var_Econstr in H0. inv H0. specialize (H2 v). eauto with Ensembles_DB.
+      *  left. rewrite bound_var_Econstr. eauto with Ensembles_DB.
+    + right. intro. rewrite bound_var_Econstr in H0. eauto with Ensembles_DB.
+  - left. rewrite bound_var_Ecase_nil. eauto with Ensembles_DB.
+  - inv H1. inv H0.
+    left. rewrite bound_var_Ecase_cons. eauto with Ensembles_DB.
+    right. rewrite bound_var_Ecase_cons. eauto with Ensembles_DB.
+    right. rewrite bound_var_Ecase_cons. eauto with Ensembles_DB.
+  - inv H0.
+    + inv H. specialize (Dec v). inv Dec.
+      * right. rewrite bound_var_Eproj. intro. inv H0. specialize (H2 v). eauto with Ensembles_DB.
+      * left. rewrite bound_var_Eproj. eauto with Ensembles_DB.
+    + right. rewrite bound_var_Eproj. eauto with Ensembles_DB.
+  - inv H1. inv H0.
+    left; rewrite bound_var_Efun. eauto with Ensembles_DB.
+    right; rewrite bound_var_Efun. eauto with Ensembles_DB.
+    right; rewrite bound_var_Efun. eauto with Ensembles_DB.
+  - left. rewrite bound_var_Eapp. eauto with Ensembles_DB.
+  - inv H0.
+    + inv H. specialize (Dec v). inv Dec.
+      * right; rewrite bound_var_Eprim. intro. inv H0. specialize (H2 v). eauto with Ensembles_DB.
+      * left. rewrite bound_var_Eprim. eauto with Ensembles_DB.
+    + right. rewrite bound_var_Eprim. eauto with Ensembles_DB.
+  - left. rewrite bound_var_Ehalt. eauto with Ensembles_DB.
+  - inv H0.
+    + inv H1.
+      * assert (decidable (Disjoint _ (FromList l) S)). eapply decidable_Disjoint_FromList. apply H.
         inv H. specialize (Dec v). inv Dec.
-        right.
-        intro; inv H1; auto.
-        left. constructor; auto.
-        right. intro; inv H; auto.        
-      - left. constructor.
-      - inv H. inv H0.
-        assert (He:= bound_var_dec e).
-        assert (Hf5 := bound_var_fundefs_dec f5).
-        assert (decidable (Disjoint var (bound_var e) (FromList l))). apply decidable_Disjoint_bv. apply Decidable_FromList.
-        assert (decidable (Disjoint var (bound_var_fundefs f5) (FromList l))). apply decidable_Disjoint_bv_fundefs. apply Decidable_FromList.
-        inv H0.
-        inv H2.
-        assert (Hl := Decidable_FromList l).
-        assert (Hln : decidable (NoDup l)). apply ListDec.NoDup_decidable. unfold ListDec.decidable_eq.
-        intros.
-        assert (Hxy := var_dec x y).
-        inv Hxy; auto. left. reflexivity. right. auto.
-        inv Hln.
-        inv He. specialize (Dec v). inv Dec.
-        right.  intro. inv H5; auto. 
-        inv Hf5. specialize (Dec v). inv Dec.
-        right. intro. inv H6; auto.
-        inv Hl. specialize (Dec v). inv Dec.
-        right. intro. inv H7; auto.
-        assert (decidable (Disjoint _ (bound_var e) (bound_var_fundefs f5))).
-        apply decidable_Disjoint_bv. apply bound_var_fundefs_dec. inv H7.
-        left. constructor; auto.
-        right. intro. inv H7; auto.
-        right. intro. inv H4; auto.
-        right. intro. inv H2; auto.
-        right. intro. inv H0; auto.
-        right. intro. inv H0; auto.
-        right; intro. inv H; auto.                
-      - left. constructor.
+        right. rewrite bound_var_fundefs_Fcons. intro.  inv H3. specialize (H4 v). eauto 25 with Ensembles_DB.
+        inv H1. left. rewrite bound_var_fundefs_Fcons. eauto with Ensembles_DB.
+        right. rewrite bound_var_fundefs_Fcons. eauto with Ensembles_DB.
+      * right. rewrite bound_var_fundefs_Fcons. eauto 25 with Ensembles_DB.
+    +         right. rewrite bound_var_fundefs_Fcons. eauto 25 with Ensembles_DB.
+  - left. rewrite bound_var_fundefs_Fnil. eauto with Ensembles_DB.
 Qed.
 
+Theorem decidable_Disjoint_bv:
+  forall S, Decidable S -> 
+       (forall e, decidable (Disjoint _ (bound_var e) S)).
+Proof.
+  intros. apply decidable_Disjoint_db_mut. auto.
+Qed.
 
-    Theorem decidable_ub:
-      forall e, decidable (unique_bindings e).
-    Proof.
-      intros. apply decidable_ub_mut.
-    Qed.
+Theorem decidable_Disjoint_bv_fundefs:
+  forall S, Decidable S -> 
+       (forall fds, decidable (Disjoint _ (bound_var_fundefs fds) S)).
+Proof.
+  intros. apply decidable_Disjoint_db_mut. auto.
+Qed.
 
-    Theorem decidable_ub_fundefs:
-      forall fds, decidable (unique_bindings_fundefs fds).
-      Proof.
-        intros. apply decidable_ub_mut.
-    Qed.
+Theorem decidable_ub_mut:
+  (forall e, decidable (unique_bindings e)) /\
+  (forall fds, decidable (unique_bindings_fundefs fds)).
+Proof.
+  apply exp_def_mutual_ind; intros.
+  - inv H.
+    assert (H := bound_var_dec e).
+    inv H. specialize (Dec v).
+    inv Dec.
+    right. intro. inv H1. auto.
+    left. constructor; auto.
+    right. intro; inv H. auto.
+  - left. constructor.
+  - inv H.
+    inv H0.
+    assert (decidable (Disjoint _ (bound_var e) (bound_var (Ecase v l)))).
+    apply decidable_Disjoint_bv. apply bound_var_dec.
+    inv H0. left. constructor; auto.
+    right. intro. inv H0; auto.
+    right. intro; inv H0; auto.
+    right. intro; inv H; auto.
+  - inv H.         
+    assert (H':= bound_var_dec e).
+    inv H'.
+    specialize (Dec v). inv Dec.
+    right; intro. inv H1; auto.
+    left. constructor; auto.
+    right. intro. inv H; auto.
+  - inv H. inv H0.
+    assert (decidable (Disjoint _ (bound_var e)(bound_var_fundefs f2))).
+    eapply decidable_Disjoint_bv. apply bound_var_fundefs_dec.
+    inv H0. left; constructor; auto.
+    right. intro. inv H0; auto.
+    right. intro. inv H0; auto.
+    right. intro. inv H; auto.
+  - left. constructor.
+  - inv H.
+    assert (H := bound_var_dec e).
+    inv H. specialize (Dec v). inv Dec.
+    right.
+    intro; inv H1; auto.
+    left. constructor; auto.
+    right. intro; inv H; auto.        
+  - left. constructor.
+  - inv H. inv H0.
+    assert (He:= bound_var_dec e).
+    assert (Hf5 := bound_var_fundefs_dec f5).
+    assert (decidable (Disjoint var (bound_var e) (FromList l))). apply decidable_Disjoint_bv. apply Decidable_FromList.
+    assert (decidable (Disjoint var (bound_var_fundefs f5) (FromList l))). apply decidable_Disjoint_bv_fundefs. apply Decidable_FromList.
+    inv H0.
+    inv H2.
+    assert (Hl := Decidable_FromList l).
+    assert (Hln : decidable (NoDup l)). apply ListDec.NoDup_decidable. unfold ListDec.decidable_eq.
+    intros.
+    assert (Hxy := var_dec x y).
+    inv Hxy; auto. left. reflexivity. right. auto.
+    inv Hln.
+    inv He. specialize (Dec v). inv Dec.
+    right.  intro. inv H5; auto. 
+    inv Hf5. specialize (Dec v). inv Dec.
+    right. intro. inv H6; auto.
+    inv Hl. specialize (Dec v). inv Dec.
+    right. intro. inv H7; auto.
+    assert (decidable (Disjoint _ (bound_var e) (bound_var_fundefs f5))).
+    apply decidable_Disjoint_bv. apply bound_var_fundefs_dec. inv H7.
+    left. constructor; auto.
+    right. intro. inv H7; auto.
+    right. intro. inv H4; auto.
+    right. intro. inv H2; auto.
+    right. intro. inv H0; auto.
+    right. intro. inv H0; auto.
+    right; intro. inv H; auto.                
+  - left. constructor.
+Qed.
+
+Theorem decidable_ub:
+  forall e, decidable (unique_bindings e).
+Proof.
+  intros. apply decidable_ub_mut.
+Qed.
+
+Theorem decidable_ub_fundefs:
+  forall fds, decidable (unique_bindings_fundefs fds).
+Proof.
+  intros. apply decidable_ub_mut.
+Qed.

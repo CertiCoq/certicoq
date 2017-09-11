@@ -16,87 +16,118 @@ Module SpaceSem (H : Heap).
 
   Import H Defs.
 
+  Inductive ans : Type :=
+  | Res : res -> ans
+  | OOT : ans (* out of time *)
+  | OOM : ans (* out of memory. XXX not used *).
+
+
+  (* The cost of evaluating the head *)
+  Definition cost (e : exp) : nat :=
+    match e with
+      | Econstr x t ys e => 1 + length ys
+      | Ecase y cl => 1 
+      | Eproj x t n y e => 1
+      | Efun B e => fundefs_num_fv B + 1 (* XXX maybe revisit *)
+      | Eapp f t ys => 1 + length ys
+      | Eprim x p ys e => 1 + length ys
+      | Ehalt x => 1
+    end.
+  
   (** Non-deterministic semantics with garbage collection *)
   Inductive big_step :
     heap block -> (* The heap. Maps locations to values *)
     env -> (* The environment. Maps variables to locations *)
     exp -> (* The expression to be evaluated *)
-    res -> (* The final result, which is a pair of a location an a heap *)
-    nat -> (* The concrete cost of the evaluation  *)
-    nat -> (* The maximum space required for the evaluation *)
-    Type := (* This will bite us. Change it. *)
+    ans -> (* The result of evaluation *)
+    nat -> (* Upper bound for the number of the evaluation steps *)
+    nat -> (* Maximum space required for the evaluation *)
+    Type := (* XXX This will bite us. Change it. *)
+  | Eval_oot : (* Out of time *)
+      forall (H : heap block) (rho : env) (e : exp) (c m : nat),
+        size_heap H = m ->
+        c < cost e ->
+        big_step H rho e OOT 0 m
   | Eval_constr :
-      forall (H H' : heap block) (rho rho' : env) (x : var) (t : cTag) (ys : list var)
-        (e : exp) (vs : list value) (l : loc) (r : res) (c : nat) (m : nat),
+      forall (H H' : heap block) (rho : env) (x : var) (t : cTag) (ys : list var)
+        (e : exp) (vs : list value) (l : loc) (r : ans) (c : nat) (m : nat),
+        c >= cost (Econstr x t ys e) ->
         getlist ys rho = Some vs ->
         alloc (Vconstr t vs) H = (l, H') ->
-        big_step H' (M.set x (Loc l) rho) e r c m ->
-        big_step H rho (Econstr x t ys e) r (c + 1 + length ys) m
+        big_step H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m ->
+        big_step H rho (Econstr x t ys e) r c m
   | Eval_proj :
       forall (H : heap block) (rho : env) (x : var) (t : cTag) (n : N) (y : var)
-        (e : exp) (l : loc) (v : value) (vs : list value) (r : res) (c m : nat),
+        (e : exp) (l : loc) (v : value) (vs : list value) (r : ans) (c m : nat),
+        c >= cost (Eproj x t n y e) ->
         M.get y rho = Some (Loc l) ->
         get l H = Some (Vconstr t vs) -> 
         nthN vs n = Some v ->
-        big_step H (M.set x v rho) e r c m ->
-        big_step H rho (Eproj x t n y e) r (c + 1) m
+        big_step H (M.set x v rho) e r (c - cost (Eproj x t n y e)) m ->
+        big_step H rho (Eproj x t n y e) r c m
   | Eval_case :
       forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
-        (l : loc) (t : cTag) (vs : list value)
-        (e : exp) (r : res) (c m : nat),
+        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat),
+        c >= cost (Ecase y cl) ->
         M.get y rho = Some (Loc l) ->
         get l H = Some (Vconstr t vs) ->
         findtag cl t = Some e ->
-        big_step H rho e r c m ->
-        big_step H rho (Ecase y cl) r (c + 1) m
+        big_step H rho e r (c - cost (Ecase y cl)) m ->
+        big_step H rho (Ecase y cl) r c m
   | Eval_fun :
       forall (H H' : heap block) (rho : env) (B : fundefs)
-        (l : loc) (e : exp) (r : res)
-        (c : nat) (m : nat),
+        (l : loc) (e : exp) (r : ans) (c : nat) (m : nat),
+        c >= cost (Efun B e) ->
         alloc (Vfun rho B) H = (l, H') ->
-        big_step H' (def_funs B l rho) e r c m ->
-        big_step H rho (Efun B e) r (c + fundefs_num_fv B + 1) m
+        big_step H' (def_funs B l rho) e r (c - cost (Efun B e)) m ->
+        big_step H rho (Efun B e) r c m
   | Eval_app :
       forall (H : heap block) (rho rho' rho'' : env) (B : fundefs) (f f' : var)
         (t : cTag) (xs : list var) (e : exp) (l : loc) (vs : list value)
-        (ys : list var) (r : res) (c : nat) (m : nat),
+        (ys : list var) (r : ans) (c : nat) (m : nat),
+        c >= cost (Eapp f t ys) ->
         M.get f rho = Some (FunPtr l f') ->
         get l H = Some (Vfun rho' B) -> 
         getlist ys rho = Some vs ->
         find_def f' B = Some (t, xs, e) ->
         setlist xs vs (def_funs B l rho') = Some rho'' ->
-        big_step H rho'' e r c m ->
-        big_step H rho (Eapp f t ys) r (c + 1 + length ys) m
+        big_step H rho'' e r (c - cost (Eapp f t ys)) m ->
+        big_step H rho (Eapp f t ys) r c m
   | Eval_halt :
-      forall (H : heap block) rho x v m,
+      forall (H : heap block) rho x v c m,
+        c >= cost (Ehalt x) -> 
         M.get x rho = Some v ->
         size_heap H = m ->
-        big_step H rho (Ehalt x) (v, H) 1 m
+        big_step H rho (Ehalt x) (Res (v, H)) c m
   | Eval_GC :
-      forall (H H1 H2 : heap block) (rho : env) (e : exp) (r : res) (c : nat) (m m' : nat),
+      forall (H H' H'' : heap block) (rho : env) (e : exp) (r : ans) (c : nat) (m m' : nat),
         (* Garbage collect H *)
-        collect (env_locs rho (occurs_free e)) H H1 ->
-        (* The live part of H. *)
-        live (env_locs rho (occurs_free e)) H H2 ->
-        size_heap H1 = m' ->
-        big_step H1 rho e r c m ->
-        big_step H rho e r (c + m') (max m m').
+        collect (env_locs rho (occurs_free e)) H H' ->
+        (* (* The live part of H. *) *)
+        live (env_locs rho (occurs_free e)) H H'' ->
+        size H'' = m' -> c >= m' ->  
+        big_step H' rho e r (c - m') m ->
+        big_step H rho e r c (max m m').  
   
-
   (** Deterministic semantics with perfect garbage collection
    * The execution time cost model does not account for the cost of GC  *)
   Inductive big_step_perfect_GC :
     heap block -> (* The heap. Maps locations to values *)
     env -> (* The environment. Maps variables to locations *)
     exp -> (* The expression to be evaluated *)
-    res -> (* The final result, which is a pair of a location an a heap *)
-    nat -> (* The concrete cost of the evaluation  *)
+    ans -> (* The final result, which is a pair of a location an a heap *)
+    nat -> (* Upper bound for the number of the evaluation steps  *)
     nat -> (* The maximum space required for the evaluation *)
     Prop :=
+  | Eval_oot_per :
+      forall (H : heap block) (rho : env) (e : exp) (c m : nat),
+        c < cost e ->
+        big_step_perfect_GC H rho e OOT c m
   | Eval_constr_per :
       forall (H H' H'' : heap block) (rho rho' : env) (x : var) (t : cTag)
-        (ys :list var) (e : exp) (vs : list value) (l : loc) (r : res)
+        (ys :list var) (e : exp) (vs : list value) (l : loc) (r : ans)
         (c m m' : nat),
+        c >= cost (Econstr x t ys e) ->
         getlist ys rho = Some vs ->
         alloc (Vconstr t vs) H = (l, H') ->
         
@@ -104,13 +135,14 @@ Module SpaceSem (H : Heap).
         live (env_locs (M.set x (Loc l) rho) (occurs_free e)) H' H'' ->
         size_heap H' = m' ->
         
-        big_step_perfect_GC H'' (M.set x (Loc l) rho) e r c m ->
+        big_step_perfect_GC H'' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m ->
 
-        big_step_perfect_GC H rho (Econstr x t ys e) r (c + 1 + length ys) (max m m')
+        big_step_perfect_GC H rho (Econstr x t ys e) r c (max m m')
   | Eval_proj_per :
       forall (H H' : heap block) (rho : env) (x : var) (t : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
-        (r : res) (c m m' : nat),
+        (r : ans) (c m m' : nat),
+        c >= cost (Eproj x t n y e) -> 
         M.get y rho = Some (Loc l) ->
         get l H = Some (Vconstr t vs) -> 
         nthN vs n = Some v ->
@@ -119,12 +151,13 @@ Module SpaceSem (H : Heap).
         live (env_locs (M.set x v rho) (occurs_free e)) H H' ->
         size_heap H = m' ->
 
-        big_step_perfect_GC H' (M.set x v rho) e r c m ->
+        big_step_perfect_GC H' (M.set x v rho) e r (c - 1) m ->
 
-        big_step_perfect_GC H rho (Eproj x t n y e) r (c + 1) (max m m')
+        big_step_perfect_GC H rho (Eproj x t n y e) r c (max m m')
   | Eval_case_per :
       forall (H H' : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
-        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : res) (c m m' : nat),
+        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m m' : nat),
+        c >= cost (Ecase y cl) ->
         M.get y rho = Some (Loc l) ->
         get l H = Some (Vconstr t vs) ->
         findtag cl t = Some e ->
@@ -133,25 +166,27 @@ Module SpaceSem (H : Heap).
         live ((env_locs rho) (occurs_free e)) H H' ->
         size_heap H = m' ->
 
-        big_step_perfect_GC H' rho e r c m ->
+        big_step_perfect_GC H' rho e r (c - cost (Ecase y cl)) m ->
         
-        big_step_perfect_GC H rho (Ecase y cl) r (c + 1) (max m m')
+        big_step_perfect_GC H rho (Ecase y cl) r c (max m m')
   | Eval_fun_per :
       forall (H H' H'': heap block) (rho : env) (B : fundefs)
-        (l : loc) (e : exp) (r : res) (c : nat) (m m' : nat),
+        (l : loc) (e : exp) (r : ans) (c : nat) (m m' : nat),
+        c >= cost (Efun B e) ->
         alloc (Vfun rho B) H = (l, H') ->
         
         (* collect H' *)
         live ((env_locs (def_funs B l rho)) (occurs_free e)) H' H'' ->
         size_heap H' = m' ->
 
-        big_step_perfect_GC H'' (def_funs B l rho) e r c m ->
+        big_step_perfect_GC H'' (def_funs B l rho) e r (c - cost (Efun B e)) m ->
 
-        big_step_perfect_GC H rho (Efun B e) r (c + fundefs_num_fv B + 1) (max m m')
+        big_step_perfect_GC H rho (Efun B e) r c (max m m')
   | Eval_app_per : 
       forall (H H' : heap block) (rho rho' rho'' : env) (B : fundefs) (f f' : var)
         (t : cTag) (xs ys : list var) (e : exp) (l : loc) (vs : list value)
-        (r : res) (size c m m' : nat),
+        (r : ans) (size c m m' : nat),
+        c >= cost (Eapp f t ys) ->
         M.get f rho = Some (FunPtr l f') ->
         get l H = Some (Vfun rho' B) -> 
         getlist ys rho = Some vs ->
@@ -162,14 +197,15 @@ Module SpaceSem (H : Heap).
         live ((env_locs rho'') (occurs_free e)) H H' ->
         size_heap H = m' ->
 
-        big_step_perfect_GC H' rho'' e r c m ->
-        big_step_perfect_GC H rho (Eapp f t ys) r (c + 1 + length ys) (max m m')
+        big_step_perfect_GC H' rho'' e r (c - cost (Eapp f t ys)) m ->
+        big_step_perfect_GC H rho (Eapp f t ys) r c (max m m')
   | Eval_halt_per :
-      forall H rho x l m,
+      forall H rho x l c m,
+        c >= cost (Ehalt x) ->
         M.get x rho = Some l ->
         size_heap H = m ->
-        big_step_perfect_GC H rho (Ehalt x) (l, H) 1 m.
-
+        big_step_perfect_GC H rho (Ehalt x) (Res (l, H)) c m.
+  
  (** Deterministic semantics with garbage collection when needed.
    * The execution time cost model accounts for the cost of GC  *)
  Context (Hmax : nat).
@@ -178,62 +214,62 @@ Module SpaceSem (H : Heap).
     heap block -> (* The heap. Maps locations to values *)
     env -> (* The environment. Maps variables to locations *)
     exp -> (* The expression to be evaluated *)
-    res -> (* The final result, which is a pair of a location an a heap *)
-    nat -> (* The concrete cost of the evaluation  *)
+    ans -> (* The final result, which is a pair of a location an a heap *)
+    nat -> (* Upper bound for the number of the evaluation steps  *)
     nat -> (* The maximum space required for the evaluation *)
     Prop :=
   | Eval_constr_need :
       forall (H H' : heap block) (rho rho' : env) (x : var) (t : cTag) (ys :list var)
-        (e : exp) (vs : list value) (l : loc) (r : res) (c m : nat),
-
+        (e : exp) (vs : list value) (l : loc) (r : ans) (c m : nat),
+        c >= cost (Econstr x t ys e) ->
         (* No GC is needed *)
         size_heap H < Hmax ->
-
+        
         getlist ys rho = Some vs ->
         alloc (Vconstr t vs) H = (l, H') ->
-        big_step_GC_when_needed H' (M.set x (Loc l) rho) e r c m ->
-        big_step_GC_when_needed H rho (Econstr x t ys e) r (c + 1 + length ys) m
+        big_step_GC_when_needed H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m ->
+        big_step_GC_when_needed H rho (Econstr x t ys e) r c m
   | Eval_proj_need :
       forall (H : heap block) (rho : env) (x : var) (t : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
-        (r : res) (c m : nat),
-        
+        (r : ans) (c m : nat),
+        c >= cost (Eproj x t n y e) ->
         (* No GC is needed *)
         size_heap H < Hmax ->
         
         M.get y rho = Some (Loc l) ->
         get l H = Some (Vconstr t vs) -> 
         nthN vs n = Some v ->
-        big_step_GC_when_needed H (M.set x v rho) e r c m ->
-        big_step_GC_when_needed H rho (Eproj x t n y e) r (c + 1) m
+        big_step_GC_when_needed H (M.set x v rho) e r (c - cost (Eproj x t n y e)) m ->
+        big_step_GC_when_needed H rho (Eproj x t n y e) r c m
   | Eval_case_need :
       forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
         (l : loc) (t : cTag) (vs : list value)
-        (e : exp) (r : res) (size c m : nat),
-
+        (e : exp) (r : ans) (size c m : nat),
+        c >= cost (Ecase y cl) ->
         (* No GC is needed *)
         size_heap H < Hmax ->
 
         M.get y rho = Some (Loc l) ->
         get l H = Some (Vconstr t vs) ->
         findtag cl t = Some e ->
-        big_step_GC_when_needed H rho e r c m ->
-        big_step_GC_when_needed H rho (Ecase y cl) r (c + 1) m
+        big_step_GC_when_needed H rho e r (c - cost (Ecase y cl)) m ->
+        big_step_GC_when_needed H rho (Ecase y cl) r c m
   | Eval_fun_need :
       forall (H H' : heap block) (rho : env) (B : fundefs)
-        (l : loc) (e : exp) (r : res) (size c m : nat),
-
+        (l : loc) (e : exp) (r : ans) (size c m : nat),
+        c >= cost (Efun B e) ->
         (* No GC is needed *)
         size_heap H < Hmax ->
 
         alloc (Vfun rho B) H = (l, H') ->  
-        big_step_GC_when_needed H' (def_funs B l rho) e r c m ->
-        big_step_GC_when_needed H rho (Efun B e) r (c + fundefs_num_fv B + 1) m
+        big_step_GC_when_needed H' (def_funs B l rho) e r (c - cost (Efun B e)) m ->
+        big_step_GC_when_needed H rho (Efun B e) r c m
   | Eval_app_need : 
       forall (H : heap block) (rho rho' rho'' : env) (B : fundefs) (f f' : var)
         (t : cTag) (xs ys : list var) (e : exp) (l : loc) (vs : list value)
-        (r : res) (size c m : nat),
-
+        (r : ans) (size c m : nat),
+        c >= cost (Eapp f t ys) ->
         (* No GC is needed *)
         size_heap H < Hmax ->
         
@@ -242,82 +278,97 @@ Module SpaceSem (H : Heap).
         getlist ys rho = Some vs ->
         find_def f B = Some (t, xs, e) ->
         setlist xs vs (def_funs B l rho') = Some rho'' ->
-        big_step_GC_when_needed H rho'' e r c m ->
-        big_step_GC_when_needed H rho (Eapp f t ys) r (c + 1 + length ys) m
+        big_step_GC_when_needed H rho'' e r (c - cost (Eapp f t ys)) m ->
+        big_step_GC_when_needed H rho (Eapp f t ys) r c m
   | Eval_halt_need :
-      forall (H : heap block) (rho : env) (x : var) (v : value) (m : nat),
+      forall (H : heap block) (rho : env) (x : var) (v : value) (c m : nat),
+        c >= cost (Ehalt x) ->
         M.get x rho = Some v ->
         size_heap H = m ->
-        big_step_GC_when_needed H rho (Ehalt x) (v, H) 1 m
+        big_step_GC_when_needed H rho (Ehalt x) (Res (v, H)) c m
   | Eval_GC_need :
-      forall (H H' : heap block) (rho : env) (e : exp) (r : res) (c : nat) (m m' : nat),
+      forall (H H' : heap block) (rho : env) (e : exp) (r : ans) (c : nat) (m m' : nat),
         (* Garbage collect H *)
         live (env_locs rho (occurs_free e)) H H' ->
         size_heap H' = m' ->
         (* Collect only if it's needed *)
         Hmax <= m' ->
-        big_step_GC_when_needed H' rho e r c m ->
-        big_step_GC_when_needed H rho e r (c + m') (max m m').
-
-   Fixpoint noGC {Heap rho e v c m} (H : big_step Heap rho e v c m) : Prop :=
-    match H with
-      | Eval_constr Hp Hp' rho rho' x t ys e ls l r c m x0 x1 H' =>
-        noGC H'
-      | Eval_proj H rho x t n y e l l' ls r c m x0 x1 x2 H' =>
-        noGC H'
-      | Eval_case H rho y cl l t ls e r c m x x0 x1 H' =>
-        noGC H'
-      | Eval_fun Hp Hp' rho B l e r c m x H' =>
-        noGC H'
-      | Eval_app H rho rho' rho'' B f f' t xs e l ls ys r c m x x0 x1 x2 x3 H' =>
-        noGC H'
-      | Eval_halt _ _ _ _ _ _ _ => True
-      | Eval_GC _ _ _ _ _ _ _ _ _ _ _ _ _ => False
-    end.
-
+        c >= m' ->
+        big_step_GC_when_needed H' rho e r (c - m') m ->
+        big_step_GC_when_needed H rho e r c (max m m').
+ 
+ Fixpoint noGC {Heap rho e v c m} (H : big_step Heap rho e v c m) : Prop :=
+   match H with
+     | Eval_oot _ _ _ _ _ _ _ => True
+     | Eval_constr Hp Hp' rho x t ys e ls l r c m H x0 x1 H' =>
+       noGC H'
+     | Eval_proj H rho x t n y e l l' ls r c m _ x0 x1 x2 H' =>
+       noGC H'
+     | Eval_case H rho y cl l t ls e r c m _ x x0 x1 H' =>
+       noGC H'
+     | Eval_fun Hp Hp' rho B l e r c m _ x H' =>
+       noGC H'
+     | Eval_app H rho rho' rho'' B f f' t xs e l ls ys r c m _ x x0 x1 x2 x3 H' =>
+       noGC H'
+     | Eval_halt _ _ _ _ _ _ _ _ _ => True
+     | Eval_GC _ _ _ _ _ _ _ _ _ _ _ _ _ _ => False
+   end.
+ 
    (** Size of the [big_step] derivation *)
    Fixpoint size_big_step {Heap rho e v c m} (H : big_step Heap rho e v c m) : nat :=
     match H with
+      | Eval_oot _ _ _ _ _ _ _ => 0
       | Eval_constr Hp Hp' rho rho' x t ys e ls l r c m x0 x1 H' =>
         S (size_big_step H')
-      | Eval_proj H rho x t n y e l l' ls r c m x0 x1 x2 H' =>
+      | Eval_proj H rho x t n y e l l' ls r c m _ x0 x1 x2 H' =>
         S (size_big_step H')
-      | Eval_case H rho y cl l t ls e r c m x x0 x1 H' =>
+      | Eval_case H rho y cl l t ls e r c m _ x x0 x1 H' =>
         S (size_big_step H')
-      | Eval_fun Hp Hp' rho B l e r c m x H' =>
+      | Eval_fun Hp Hp' rho B l e r c m _ x H' =>
         S (size_big_step H')
-      | Eval_app H rho rho' rho'' B f f' t xs e l ls ys r c m x x0 x1 x2 x3 H' =>
+      | Eval_app H rho rho' rho'' B f f' t xs e l ls ys r c m _ x x0 x1 x2 x3 H' =>
         S (size_big_step H')
-      | Eval_halt _ _ _ _ _ _ _ => 0
-      | Eval_GC _ _ _ _ _ _ _ _ _ _ _ _ H' => S (size_big_step H')
+      | Eval_halt _ _ _ _ _ _ _ _ _ => 0
+      | Eval_GC _ _ _ _ _ _ _ _ _ _ _ _ _ H' => S (size_big_step H')
     end.
    
+   Definition is_res (r : ans) : Prop :=
+     match r with
+       | Res _ =>  True
+       | _ => False
+     end.
 
-   Lemma big_step_deterministic  H1 H2 rho1 rho2 e r1 c1 m1 r2 c2 m2 :
+   Lemma big_step_deterministic  H1 H2 rho1 rho2 e r1 r1' c1 m1 r2 r2' c2 m2 :
      well_formed (reach' H1 (env_locs rho1 (occurs_free e))) H1 ->
      well_formed (reach' H2 (env_locs rho2 (occurs_free e))) H2 ->
      env_locs rho1 (occurs_free e) \subset dom H1 ->
      env_locs rho2 (occurs_free e) \subset dom H2 ->
      big_step H1 rho1 e r1 c1 m1 -> (* D1 *)
      big_step H2 rho2 e r2 c2 m2 -> (* D2 *)
+     r1 = Res r1' -> r2 = Res r2' ->
      (occurs_free e) |- (H1, rho1) ⩪ (H2, rho2) ->
-     r1 ≈ r2.
+     r1' ≈ r2'.
    Proof with now eauto with Ensembles_DB.
      (* Lexicographic induction on the size of the first derivation and the size of the second derivation *)
      intros Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Hbs2. remember (size_big_step Hbs1) as n.
-     revert H1 H2 rho1 rho2 e r1 c1 m1 r2 c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Heqn Hbs2.
+     revert H1 H2 rho1 rho2 e r1 r1' c1 m1 r2 r2' c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Heqn Hbs2.
      induction n as [n IH1] using lt_wf_rec1.
-     intros H1 H2 rho1 rho2 e r1 c1 m1 r2 c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Heqn Hbs2.
+     intros H1 H2 rho1 rho2 e r1 r1' c1 m1 r2 r2' c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Heqn Hbs2.
      subst.
      remember (size_big_step Hbs2) as m.
-     revert H1 H2 rho1 rho2 e r1 c1 m1 r2 c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Hbs2 Heqm IH1.
+     revert H1 H2 rho1 rho2 e r1 r1' c1 m1 r2 r2' c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Hbs2 Heqm IH1.
      induction m as [m IH2] using lt_wf_rec1.  
-     intros H1 H2 rho1 rho2 e r1 c1 m1 r2 c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Hbs2 Heqm IH1 Heq.
-     destruct Hbs1; simpl in *. 
+     intros H1 H2 rho1 rho2 e r1 r1' c1 m1 r2 r2' c2 m2 Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Hbs2
+            Heqm IH1 Heq1 Heq2 Heq.
+     
+     destruct Hbs1; simpl in *.
+     - (* D1 : OOT *) discriminate.
      - (* D1 : Eval_constr *)
        subst m. remember (Econstr x t ys e) as e'. destruct Hbs2; inv Heqe'; simpl in *.
+       + (* D2 : OOT *) discriminate.
        + (* D2 : Eval_constr *)
-         eapply IH1 with (Hbs1 := Hbs1); [ | | | | | reflexivity | |]. 
+         subst.
+         eapply IH1 with (Hbs1 := Hbs1); [ | | | | | reflexivity | | reflexivity | reflexivity |]. 
          * omega.
          * eapply well_formed_antimon. eapply reach'_set_monotonic.
            eapply env_locs_monotonic. now apply occurs_free_Econstr_Included.
@@ -361,12 +412,13 @@ Module SpaceSem (H : Heap).
            intros. now symmetry. now split; eapply Heq.
            rewrite occurs_free_Econstr... eassumption. eassumption.
        + (* D2 : Eval_GC *)
-         assert (Hex : exists  (Hbs1' : big_step H rho (Econstr x t ys e) r (c + 1 + length ys) m0),
+         assert (Hex : exists  (Hbs1' : big_step H rho (Econstr x t ys e) (Res r1') c m0),
                          size_big_step Hbs1' = S (size_big_step Hbs1)).
-         { exists (Eval_constr H H' rho (M.set x (Loc l) rho)  x t ys e vs l r c m0 e0 e1 Hbs1).
+         { exists (Eval_constr H H' rho x t ys e vs l (Res r1') c m0 g e0 e1 Hbs1).
            reflexivity. }
          destruct Hex as [Hbs1' Hsize]. 
-         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1'); [ | | | | | reflexivity | | ]; try eassumption.
+         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1');
+           [ | | | | | reflexivity | | reflexivity | reflexivity |]; try eassumption.
          * omega.
          * rewrite <- reach'_heap_eq; eauto. eapply well_formed_heap_eq.
            eassumption. now eapply reach'_closed; eauto.
@@ -374,15 +426,18 @@ Module SpaceSem (H : Heap).
            eapply collect_heap_eq. eassumption.      
          * eapply heap_eq_dom; [| eassumption | now apply reach'_extensive ].
            eapply collect_heap_eq. eassumption.
-         * intros. subst. eapply IH1 with (Hbs1 := Hbs0); [| | | | | reflexivity | |]; try eassumption.
+         * intros. subst. eapply IH1 with (Hbs1 := Hbs0);
+             [| | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
            omega.
          * edestruct Equivalence_heap_env_equiv. eapply Equivalence_Transitive; eauto.
            eapply reach_heap_env_equiv.
            eapply collect_heap_eq. eassumption.
      - (* D1 : Eval_proj *)
        subst m. remember (Eproj x t n y e) as e'. destruct Hbs2; inv Heqe'; simpl in *.
+       + (* D2 : OOT *) discriminate.
        + (* D2 : Eval_proj *)
-         eapply IH1 with (Hbs1 := Hbs1); [ | | | | | reflexivity | |]; try eassumption.
+         eapply IH1 with (Hbs1 := Hbs1); [ | | | | | reflexivity | | reflexivity | reflexivity |];
+         try eassumption.
          * omega.
          * eapply well_formed_antimon. eapply reach'_set_monotonic.
            eapply Included_trans.
@@ -451,11 +506,12 @@ Module SpaceSem (H : Heap).
              rewrite e2 in Hnth; inv Hnth. now rewrite <- res_approx_fuel_eq. }
            now eauto.
        + (* D2 : Eval_GC *)
-         assert (Hex : exists  (Hbs1' : big_step H rho (Eproj x t n y e) r (c + 1) m0), size_big_step Hbs1' = S (size_big_step Hbs1)).
-         { exists (Eval_proj H rho x t n y e l v vs r c m0 e0 e1 e2 Hbs1).
+         assert (Hex : exists  (Hbs1' : big_step H rho (Eproj x t n y e) (Res r1') c m0), size_big_step Hbs1' = S (size_big_step Hbs1)).
+         { exists (Eval_proj H rho x t n y e l v vs (Res r1') c m0 g e0 e1 e2 Hbs1).
            reflexivity. }
         destruct Hex as [Hbs1' Hsize].
-        eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1'); [ | | | | | reflexivity | | ]; try eassumption.
+         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1');
+           [ | | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
          * omega.
          * rewrite <- reach'_heap_eq; eauto. eapply well_formed_heap_eq.
            eassumption. now eapply reach'_closed; eauto.
@@ -463,20 +519,23 @@ Module SpaceSem (H : Heap).
            eapply collect_heap_eq. eassumption.
          * eapply heap_eq_dom; [| eassumption | now apply reach'_extensive ].
            eapply collect_heap_eq. eassumption.
-         * intros. subst. eapply IH1 with (Hbs1 := Hbs0); [| | | | | reflexivity | |]; try eassumption.
+         * intros. subst. eapply IH1 with (Hbs1 := Hbs0);
+             [| | | | | reflexivity | | reflexivity | reflexivity |]; try eassumption.
            omega.
          * edestruct Equivalence_heap_env_equiv. eapply Equivalence_Transitive; eauto.
            eapply reach_heap_env_equiv.
            eapply collect_heap_eq. eassumption.
      - (* D1 : Eval_case *)
        subst m. remember (Ecase y cl) as e'. destruct Hbs2; inv Heqe'; simpl in *.
+       + (* D2 : OOT *) discriminate.
        + (* D2 : Eval_case *)
          eapply Heq in e0. edestruct e0 as [l' [Hget Heql']].
          rewrite e4 in Hget; inv Hget.
          eapply Heql' with (n := 0) in e1. destruct e1 as [vs1' [Hget' Heql'']].
          rewrite e5 in Hget'. inv Hget'.
          eapply Heql' with (n := 0) in e5. rewrite e2 in e6; inv e6.
-         eapply IH1 with (Hbs1 := Hbs1); [ | | | | | reflexivity | | ]; try eassumption; eauto.   
+         eapply IH1 with (Hbs1 := Hbs1);
+           [ | | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption; eauto.
          * eapply well_formed_antimon; [| eassumption ].
            eapply reach'_set_monotonic. eapply env_locs_monotonic.
            rewrite occurs_free_Ecase_Included. reflexivity.
@@ -499,10 +558,11 @@ Module SpaceSem (H : Heap).
            eapply cps_util.findtag_In. eassumption.
          * eauto.
        + (* D2 : Eval_GC *)
-         assert (Hex : exists  (Hbs1' : big_step H rho (Ecase y cl) r (c + 1) m0), size_big_step Hbs1' = S (size_big_step Hbs1)).
-         { exists (Eval_case H rho y cl l t vs e r c m0 e0 e1 e2 Hbs1). reflexivity. }
+         assert (Hex : exists  (Hbs1' : big_step H rho (Ecase y cl) (Res r1') c m0), size_big_step Hbs1' = S (size_big_step Hbs1)).
+         { exists (Eval_case H rho y cl l t vs e (Res r1') c m0 g e0 e1 e2 Hbs1). reflexivity. }
          destruct Hex as [Hbs1' Hsize].
-         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1'); [ | | | | | reflexivity | | ]; try eassumption.
+         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1');
+           [ | | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
          * omega.
          * rewrite <- reach'_heap_eq; eauto. eapply well_formed_heap_eq.
            eassumption. now eapply reach'_closed; eauto.
@@ -510,15 +570,18 @@ Module SpaceSem (H : Heap).
            eapply collect_heap_eq. eassumption.
          * eapply heap_eq_dom; [| eassumption | now apply reach'_extensive ].
            eapply collect_heap_eq. eassumption.
-         * intros. subst. eapply IH1 with (Hbs1 := Hbs0); [| | | | | reflexivity | |]; try eassumption.
+         * intros. subst.
+           eapply IH1 with (Hbs1 := Hbs0);
+             [| | | | | reflexivity | | reflexivity | reflexivity |]; try eassumption.
            omega.
          * edestruct Equivalence_heap_env_equiv. eapply Equivalence_Transitive; eauto.
            eapply reach_heap_env_equiv.
            eapply collect_heap_eq. eassumption.
      - (* D1 : Eval_fun *)
        subst m. remember (Efun B e) as e'. destruct Hbs2; inv Heqe'; simpl in *.
-       + (* D2 : Eval_fun *)
-         eapply IH1 with (Hbs1 := Hbs1); [| | | | | reflexivity | eassumption |].
+       + (* D2 : OOT *) discriminate.
+       + (* D2 : Eval_fun *) 
+         eapply IH1 with (Hbs1 := Hbs1); [| | | | | reflexivity | | reflexivity | reflexivity | ].
          * omega.
          * eapply well_formed_antimon. eapply reach'_set_monotonic.
            eapply env_locs_monotonic. now apply occurs_free_Efun_Included.
@@ -546,6 +609,7 @@ Module SpaceSem (H : Heap).
            eapply dom_subheap. now eapply alloc_subheap; eauto.
            eapply Singleton_Included.
            now eapply alloc_In_dom; eauto.
+         * eassumption.
          * eapply heap_env_equiv_antimon; [| now apply occurs_free_Efun_Included ].
            eapply (heap_env_equiv_def_funs_alloc _ _ _ H H0).
            now eapply reach'_closed; eauto.
@@ -564,11 +628,11 @@ Module SpaceSem (H : Heap).
            eapply heap_env_equiv_antimon; [ eassumption | ]...
            eassumption. eassumption.
        + (* D2 : Eval_GC *)
-         assert (Hex : exists  (Hbs1' : big_step H rho (Efun B e) r (c + fundefs_num_fv B + 1) m0), size_big_step Hbs1' = S (size_big_step Hbs1)).
-         { exists (Eval_fun H H' rho B l e r c m0 e0 Hbs1).
+         assert (Hex : exists  (Hbs1' : big_step H rho (Efun B e) (Res r1') c m0), size_big_step Hbs1' = S (size_big_step Hbs1)).
+         { exists (Eval_fun H H' rho B l e (Res r1') c m0 g e0 Hbs1).
            reflexivity. }
          destruct Hex as [Hbs1' Hsize].
-         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1'); [| | |  | | reflexivity | | ]; try eassumption.
+         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1'); [| | |  | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
          * omega.
          * rewrite <- reach'_heap_eq; eauto. eapply well_formed_heap_eq.
            eassumption. now eapply reach'_closed; eauto.
@@ -576,15 +640,18 @@ Module SpaceSem (H : Heap).
            eapply collect_heap_eq. eassumption.
          * eapply heap_eq_dom; [| eassumption | now apply reach'_extensive ].
            eapply collect_heap_eq. eassumption.
-         * intros. subst. eapply IH1 with (Hbs1 := Hbs0); [| | | | | reflexivity | |]; try eassumption.
+         * intros. subst.
+           eapply IH1 with (Hbs1 := Hbs0);
+             [| | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
            omega.
          * edestruct Equivalence_heap_env_equiv. eapply Equivalence_Transitive; eauto.
            eapply reach_heap_env_equiv. 
            eapply collect_heap_eq. eassumption.
      - (* D1 : Eval_app *)
        subst m. remember (Eapp f t ys) as e'. destruct Hbs2; inv Heqe'; simpl in *.
+       + (* D2 : OOT *) discriminate.
        + (* D2 : Eval_app *)
-         assert (r ≈ r0).
+         assert (r1' ≈ r2').
          { assert (Hgetf' := e6). assert (Hgetl' := e7).
            eapply Heq in e6. destruct e6 as [l' [Hget Hequiv]].
            rewrite Hget in e0; inv e0.
@@ -605,7 +672,7 @@ Module SpaceSem (H : Heap).
              intros l1 [x [Hin1 Hget1]].
              repeat eexists; eauto. repeat eexists; eauto. now rewrite Hgetf'.
              eexists; split; eauto. }
-           eapply IH1 with (Hbs1 := Hbs1); [| | | | | reflexivity | eassumption |].         
+           eapply IH1 with (Hbs1 := Hbs1); [| | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.         
            - omega.
            - eapply well_formed_antimon; [| eassumption ].
              eapply Included_trans. eapply reach'_set_monotonic.
@@ -678,12 +745,13 @@ Module SpaceSem (H : Heap).
            - eauto. }
          firstorder.
        + (* D2 : Eval_GC *)
-         assert (Hex : exists (Hbs1' : big_step H rho (Eapp f t ys) r (c + 1 + length ys) m0),
+         assert (Hex : exists (Hbs1' : big_step H rho (Eapp f t ys) (Res r1') c m0),
                          size_big_step Hbs1' = S (size_big_step Hbs1)).
-         { exists (Eval_app H rho rho' rho'' B f f' t xs e l vs ys r c m0 e0 e1 e2 e3 e4 Hbs1).
+         { exists (Eval_app H rho rho' rho'' B f f' t xs e l vs ys (Res r1') c m0 g e0 e1 e2 e3 e4 Hbs1).
            reflexivity. }
          destruct Hex as [Hbs1' Hsize].
-         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1'); [| | | | | reflexivity | | ]; try eassumption.
+         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1');
+           [| | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
          * omega.
          * rewrite <- reach'_heap_eq; eauto. eapply well_formed_heap_eq.
            eassumption. now eapply reach'_closed; eauto.
@@ -691,20 +759,25 @@ Module SpaceSem (H : Heap).
            eapply collect_heap_eq. eassumption.
          * eapply heap_eq_dom; [| eassumption | now apply reach'_extensive ].
            eapply collect_heap_eq. eassumption.
-         * intros. subst. eapply IH1 with (Hbs1 := Hbs0); [| | | | | reflexivity | |]; try eassumption.
+         * intros. subst.
+           eapply IH1 with (Hbs1 := Hbs0); [| | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
            omega.
          * edestruct Equivalence_heap_env_equiv. eapply Equivalence_Transitive; eauto.
            eapply reach_heap_env_equiv. eapply collect_heap_eq. eassumption.      
      - (* D1 : Eval_GC *)
        subst m. remember (Ehalt x) as e'. destruct Hbs2; inv Heqe'; simpl in *.
+       + (* D2 : OOT *) discriminate.
        + (* D2 : Eval_halt *)
          eapply Heq in e1; eauto. destruct e1 as [l' [Hget Hequiv]].
+         inv Heq1; inv Heq2.
          rewrite e in Hget; inv Hget. symmetry. eassumption.
        + (* D2 : Eval_GC *)
-         assert (Hex : exists  (Hbs1' : big_step H rho (Ehalt x) (v, H) 1 (size_heap H)), size_big_step Hbs1' = 0).
-         { exists (Eval_halt H rho x v (size_heap H) e eq_refl). eauto. }
+         assert (Hex : exists  (Hbs1' : big_step H rho (Ehalt x) (Res (v, H)) c (size_heap H)), size_big_step Hbs1' = 0).
+         { exists (Eval_halt H rho x v c (size_heap H) g e eq_refl). eauto. }
          destruct Hex as [Hbs1' Hsize].
-         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1'); [| | | | | reflexivity | | ]; try eassumption.
+         inv Heq1.
+         eapply IH2 with (Hbs2 := Hbs2) (Hbs1 := Hbs1');
+           [| | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
          * omega.
          * rewrite <- reach'_heap_eq; eauto. eapply well_formed_heap_eq.
            eassumption. now eapply reach'_closed; eauto.
@@ -712,13 +785,14 @@ Module SpaceSem (H : Heap).
            eapply collect_heap_eq. eassumption.
          * eapply heap_eq_dom; [| eassumption | now apply reach'_extensive ].
            eapply collect_heap_eq. eassumption.
-         * intros. subst. eapply IH1 with (Hbs1 := Hbs1); [| | | | | reflexivity | |]; try eassumption.
+         * intros. subst. eapply IH1 with (Hbs1 := Hbs1);
+             [| | | | | reflexivity | | reflexivity | reflexivity | ]; try eassumption.
            omega. 
          * edestruct Equivalence_heap_env_equiv. eapply Equivalence_Transitive; eauto.
            eapply reach_heap_env_equiv.
            eapply collect_heap_eq. eassumption.
      - (* D1 : Eval_GC *)
-       eapply IH1 with (Hbs1 := Hbs1); [| | | | | reflexivity | eassumption |].
+       eapply IH1 with (Hbs1 := Hbs1); [| | | | | reflexivity | eassumption | | | ].
        + omega.
        + rewrite <- reach'_heap_eq; eauto. eapply well_formed_heap_eq.
          eassumption. now eapply reach'_closed; eauto.
@@ -727,6 +801,8 @@ Module SpaceSem (H : Heap).
        + eassumption.
        + eapply heap_eq_dom; [| eassumption | now apply reach'_extensive ].
          eapply collect_heap_eq. eassumption.
+       + eassumption.
+       + eassumption.
        + eassumption.
        + edestruct Equivalence_heap_env_equiv. eapply Equivalence_Transitive; try eassumption.
          symmetry. eapply reach_heap_env_equiv.

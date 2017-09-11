@@ -32,7 +32,7 @@ Module Type Heap.
 
   Parameter heap : Type -> Type. 
   
-  Parameter emp : forall {A}, heap A.
+  Parameter emp : forall {A : Type}, heap A.
   
   Parameter get : forall {A : Type}, loc -> heap A -> option A.
   

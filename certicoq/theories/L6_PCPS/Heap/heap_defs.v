@@ -35,7 +35,7 @@ Module HeapDefs (H : Heap).
   (* Function pointer *)
   | Vfun : env -> fundefs -> block.
 
-
+  (** The result of evaluation *)
   Definition res : Type := value * heap block.
 
 (*
@@ -59,7 +59,7 @@ Module HeapDefs (H : Heap).
 
 *)
 
-  (** Approximation of results with fuel *)
+  (** Syntactic Approximation of results with fuel *)
   Fixpoint res_approx_fuel (n : nat) (r1 r2 : res) : Prop :=
     let '(v1, H1) := r1 in
     let '(v2, H2) := r2 in
@@ -77,6 +77,8 @@ Module HeapDefs (H : Heap).
                        (fun l1 l2 => res_approx_fuel (n'-(n'-i)) (l1, H1) (l2, H2)) vs1 vs2
                  end
       | FunPtr l1 off1, FunPtr l2 off2 =>
+        (* We require that offset and code are syntactically the equal,
+           and that the relevant parts of the environments are related *)
         off1 = off2 /\
         forall rho1 B,
           get l1 H1 = Some (Vfun rho1 B) ->
@@ -222,7 +224,7 @@ Module HeapDefs (H : Heap).
         env_locs rho (occurs_free_fundefs B)
     end.
 
-  (** The location that are pointed by the locations in S *)
+  (** The locations that are pointed by the locations in S *)
   Definition post (H : heap block) (S : Ensemble loc) :=
     [ set l : loc | exists l' v, l' \in S /\ get l' H = Some v /\ l \in locs v].  
   
@@ -911,8 +913,7 @@ Module HeapDefs (H : Heap).
   (** * Lemmas about locs *)
 
   (* TODO move *)
-  Instance Decidable_FromList A
-           (H : forall (x y : A), {x = y} + {x <> y}) (l : list A) :
+  Instance Decidable_FromList A (H : forall (x y : A), {x = y} + {x <> y}) (l : list A) :
     Decidable (FromList l).
   Proof.
     constructor. intros x. induction l. 

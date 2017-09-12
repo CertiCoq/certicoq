@@ -897,19 +897,19 @@ Module CC_log_rel (H : Heap).
 
   (** * Compatibility lemmas *)
 
+  (** Apply a closure after closure conversion *)
   (** TODO move *)
   Definition AppClo f t xs f' Γ :=
     Eproj f' clo_tag 0%N f
           (Eproj Γ clo_tag 1%N f
                  (Eapp f' t (Γ :: xs))).
 
-
   Section Compat.
-
+    
     Variable (IG : GInv). (* Global Invariant *)
     Variable (IL1 IL2 IL: Inv). (* Local Invariants *)
     Variable (II : IInv). (* Initial Invariant *)
-
+    
     (** The initial invariant should respect heap equality *)
     Variable
       (InitInvRespectsHeapEq :
@@ -918,7 +918,15 @@ Module CC_log_rel (H : Heap).
            reach' H2 (env_locs rho2 (occurs_free e2)) |- H2 ≡ H2' ->
            II (H1, rho1, e1) (H2, rho2, e2) ->
            II (H1', rho1, e1) (H2', rho2, e2)).
+
+    Variable
+      (InvCostRefl :
+         forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) (c k : nat),
+           II (H1, rho1, e1) (H2, rho2, e2) ->
+           
+           IL k (H1, rho1, e1, c, size_heap H1) (H2, rho2, e2, c, size_heap H2)).
     
+
     (** * Compatibility properties for the local invariants *)
     
     (** Constructor compatibility *)
@@ -942,7 +950,7 @@ Module CC_log_rel (H : Heap).
 
            IL k (H1, rho1, Econstr x1 t ys1 e1, c1, max m1 (size_heap H1 + c))
               (H2, rho2, Econstr x2 t ys2 e2, c2, max m2 (size_heap H2 + c))).
-
+    
     (** Projection compatibility *)
     Variable
       (InvProjCompat :
@@ -1018,7 +1026,7 @@ Module CC_log_rel (H : Heap).
            (c1 c2 m1 m2 c i k : nat) (vs1 vs2 : list value),
            
            M.get f1 rho1 = Some (FunPtr lf1 f1') ->
-           get lf1 H1 = Some (Vfun rho1' B1) ->
+            get lf1 H1 = Some (Vfun rho1' B1) ->
            getlist xs1 rho1 = Some vs1 ->
            find_def f1' B1 = Some (t, ys1, e1) ->
            setlist ys1 vs1 (def_funs B1 lf1 rho1') = Some rho1'' ->
@@ -1061,7 +1069,7 @@ Module CC_log_rel (H : Heap).
 
            IL k (H1, rho1, Efun B1 e1, c1 + fundefs_num_fv B1 + c, max m1 (size_heap H1 + s))
               (H2, rho2, Efun B2 e2, c2 + fundefs_num_fv B2 + c, max m2 (size_heap H2 + s))).
-(* 
+
     (** Constructor compatibility *)
     Lemma cc_approx_exp_constr_compat (k : nat)
           rho1 rho2 H1 H2 x1 x2 t ys1 ys2 e1 e2 :
@@ -1075,65 +1083,76 @@ Module CC_log_rel (H : Heap).
          (* quantify over all equal heaps *)
          reach' H1 (env_locs rho1 (occurs_free (Econstr x1 t ys1 e1))) |- H1 ≡ H1' ->
          reach' H2 (env_locs rho2 (occurs_free (Econstr x2 t ys2 e2))) |- H2 ≡ H2' ->
-                                                                                                                                         (* allocate a new location for the constructed value *)
-                                                                                                                                           alloc (Vconstr t vs1) H1' = (l1, H1'') ->
-                                                                                                                                           alloc (Vconstr t vs2) H2' = (l2, H2'') ->
-                                                                                                                                           Forall2 (fun l1 l2 => (Res (l1, H1')) ≺ ^ (i; IG) (Res (l2, H2'))) vs1 vs2 ->
-                                                                                                                                           (e1, M.set x1 (Loc l1) rho1, H1'') ⪯ ^ (i; IL1; IG)
-          (e2, M.set x2 (Loc l2) rho2, H2'')) ->
+         (* allocate a new location for the constructed value *)
+         alloc (Vconstr t vs1) H1' = (l1, H1'') ->
+         alloc (Vconstr t vs2) H2' = (l2, H2'') ->
+         Forall2 (fun l1 l2 => (Res (l1, H1')) ≺ ^ (i; IG) (Res (l2, H2'))) vs1 vs2 ->
+         (e1, M.set x1 (Loc l1) rho1, H1'') ⪯ ^ (i; IL1; IG)
+         (e2, M.set x2 (Loc l2) rho2, H2'')) ->
       
       (Econstr x1 t ys1 e1, rho1, H1) ⪯ ^ (k; IL; IG) (Econstr x2 t ys2 e2, rho2, H2).
     Proof with now eauto with Ensembles_DB.
       intros Hall Hinit Hpre H1' H2' v1 c1 m1 Heq1 Heq2 Hleq1 Hstep1.
-      inv Hstep1. admit.
-      edestruct (cc_approx_var_env_getlist k IG rho1 rho2) as [ls2 [Hget' Hpre']];
-        [| eauto |]; eauto.
-      destruct (alloc (Vconstr t ls2) H2') as [l' H2''] eqn:Ha.
-      edestruct (live_exists (env_locs (M.set x2 (Loc l') rho2) (occurs_free e2)) H2'')
-        as [H2''' Hl2].
-      eapply Decidable_env_locs; eauto with typeclass_instances.
-      eapply Forall2_length in Hall.
-      (* rewrite Hall. *)
-      assert (Hlen : @length M.elt ys1 = @length M.elt ys2).
-      { erewrite (@getlist_length_eq value ys1 vs); [| eassumption ].
-        erewrite (@getlist_length_eq value ys2 ls2); [| eassumption ].
-        eapply Forall2_length. eassumption. }
-      edestruct Hpre with (i := c1 - cost (Econstr x1 t ys1 e1)) as [v2 [c2 [m2 [Hstep [HS Hval]]]]];
-        [ |  eassumption | eassumption | eassumption | eassumption | | | | | eassumption | ].
-      - simpl in H6. simpl. omega.
-      - eapply Forall2_monotonic_strong; [| eassumption ]. intros ? ? ? ? H.
-        eapply cc_approx_val_monotonic.
-        eapply cc_approx_val_heap_eq. now apply H.
-        eapply heap_eq_antimon; [| eassumption ]. eapply reach'_set_monotonic.
-        eapply Singleton_Included. eapply FromList_env_locs. eassumption.
-        normalize_occurs_free... rewrite FromList_map_image_FromList.
-        eapply In_image; eassumption.
-        eapply heap_eq_antimon; [| eassumption ]. eapply reach'_set_monotonic.
-        eapply Singleton_Included. eapply FromList_env_locs. eassumption.
-        normalize_occurs_free... rewrite FromList_map_image_FromList.
-        eapply In_image; eassumption. omega.
-      - eapply collect_heap_eq. eapply live_collect. eassumption.
-      - eapply collect_heap_eq. eapply live_collect. eassumption.
-      - simpl. omega.
-      - repeat eexists; eauto.
-        + econstructor; eauto. simpl. simpl in H6. setoid_rewrite Hlen in H6. (* Why??? *)
-
-          omega. eassumption.
-        + rewrite <- Hall, <- plus_n_O.
-          unfold size_heap. 
-          erewrite (size_with_measure_alloc _ _ _ H1' H'); [| reflexivity | eassumption ].
-          erewrite size_with_measure_alloc with (H' := H2''); [| reflexivity | eassumption ].
-          simpl. replace (c + 1 + length ys1) with (c + S (length ys1)) by omega.
-          replace (c2 + 1 + length ys1) with (c2 + S (length ys1)) by omega.
-          erewrite <- (getlist_length_eq ys1 vs); [| eassumption ].
-          replace (length ls2) with (length ys1).
-          eapply InvConstrCompat; try eassumption. omega. 
-          eapply InitInvRespectsHeapEq; eassumption.
-          erewrite <- (getlist_length_eq _ ls2); [| eassumption ]. eassumption.
-        + replace (k - (c + 1 + length ys2)) with (k - (1 + length ys2) - c) by omega.
-          eassumption.
+      inv Hstep1.
+      (* Timeout! *)
+      - { simpl in H0. exists OOT, c1. eexists. repeat split. 
+          - econstructor. simpl. erewrite <- Forall2_length. eassumption.
+            eassumption. reflexivity.
+          - eapply InvCostRefl. eapply InitInvRespectsHeapEq; eassumption.
+          - now rewrite cc_approx_val_eq. }
+      (* Termination *)
+      - { edestruct (cc_approx_var_env_getlist k IG rho1 rho2) as [ls2 [Hget' Hpre']];
+          [| eauto |]; eauto.
+          destruct (alloc (Vconstr t ls2) H2') as [l' H2''] eqn:Ha.
+          edestruct (live_exists (env_locs (M.set x2 (Loc l') rho2) (occurs_free e2)) H2'')
+            as [H2''' Hl2].
+          eapply Decidable_env_locs; eauto with typeclass_instances.
+          eapply Forall2_length in Hall.
+          (* rewrite Hall. *)
+          assert (Hlen : @length M.elt ys1 = @length M.elt ys2).
+          { erewrite (@getlist_length_eq value ys1 vs); [| eassumption ].
+            erewrite (@getlist_length_eq value ys2 ls2); [| eassumption ].
+            eapply Forall2_length. eassumption. }
+          edestruct Hpre with (i := k - (cost (Econstr x1 t ys1 e1))) as [v2 [c2 [m2 [Hstep [HS Hval]]]]];
+            [ |  eassumption | eassumption | eassumption | eassumption | | | | | eassumption | ].
+          - simpl in H6. simpl. omega.
+          - eapply Forall2_monotonic_strong; [| eassumption ]. intros ? ? ? ? H.
+            eapply cc_approx_val_monotonic.
+            eapply cc_approx_val_heap_eq. now apply H.
+            eapply heap_eq_antimon; [| eassumption ]. eapply reach'_set_monotonic.
+            eapply Singleton_Included. eapply FromList_env_locs. eassumption.
+            normalize_occurs_free... rewrite FromList_map_image_FromList.
+            eapply In_image; eassumption.
+            eapply heap_eq_antimon; [| eassumption ]. eapply reach'_set_monotonic.
+            eapply Singleton_Included. eapply FromList_env_locs. eassumption.
+            normalize_occurs_free... rewrite FromList_map_image_FromList.
+            eapply In_image; eassumption. omega.
+          - eapply collect_heap_eq. eapply live_collect. eassumption.
+          - eapply collect_heap_eq. eapply live_collect. eassumption.
+          - simpl. simpl in H6. omega.
+          - repeat eexists; eauto.
+            + eapply Eval_constr_per with (c := c2 + cost (Econstr x2 t ys2 e2))
+              ; [ | | | | | | rewrite NPeano.Nat.add_sub ]; try eassumption.
+              omega. reflexivity. 
+            + simpl. rewrite <- Hall.
+              (* <- plus_n_O. *)
+              unfold size_heap. 
+              erewrite (size_with_measure_alloc _ _ _ H1' H'); [| reflexivity | eassumption ].
+              erewrite size_with_measure_alloc with (H' := H2''); [| reflexivity | eassumption ].
+              simpl.
+              (* replace (c + 1 + length ys1) with (c + S (length ys1)) by omega. *)
+              (* replace (c2 + 1 + length ys1) with (c2 + S (length ys1)) by omega. *)
+              erewrite <- (getlist_length_eq ys1 vs); [| eassumption ].
+              replace (length ls2) with (length ys1).
+              eapply InvConstrCompat; try eassumption.
+              Focus 2. replace (c2 + S (length ys1) - S (length ys1)) with c2 by omega.
+              eassumption. simpl. simpl in H6. omega.
+              eapply InitInvRespectsHeapEq; eassumption.
+              erewrite <- (getlist_length_eq _ ls2); [| eassumption ]. eassumption.
+            + rewrite cc_approx_val_eq. eapply cc_approx_val_monotonic.
+              rewrite <- cc_approx_val_eq. eassumption. omega. }
     Qed.
-
+  (*
     (** Projection compatibility *)
     Lemma cc_approx_exp_proj_compat (k : nat) rho1 rho2 H1 H2 x1 x2 t n y1 y2 e1 e2 :
 

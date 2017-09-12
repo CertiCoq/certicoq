@@ -122,6 +122,7 @@ Module SpaceSem (H : Heap).
   | Eval_oot_per :
       forall (H : heap block) (rho : env) (e : exp) (c m : nat),
         c < cost e ->
+        size_heap H = m ->
         big_step_perfect_GC H rho e OOT c m
   | Eval_constr_per :
       forall (H H' H'' : heap block) (rho rho' : env) (x : var) (t : cTag)

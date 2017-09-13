@@ -321,7 +321,7 @@ Fixpoint program_Pgm
          (e:environ Term) : Program Term :=
   match p with
     | PIn t => {| main:= (term_Term dtEnv prf t); env:= e |}
-    | PConstr nm t p =>
+    | PConstr nm ty t p =>
       program_Pgm prf dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv prf t))) e)
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in

@@ -191,17 +191,17 @@ Definition environ := list (string * envClass).
 Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
   mkCnstr (fst (fst c)) (snd c).
 
-Definition ibody_ityp (iib:ident * inductive_body) : ityp :=
+Definition ibody_ityp (iib:ident * term * inductive_body) : ityp :=
   let Ctors := map cnstr_Cnstr (ctors (snd iib))
-  in mkItyp (fst iib) Ctors.
+  in mkItyp (fst (fst iib)) Ctors.
 
-Definition ibodies_itypPack (ibs:list (ident * inductive_body)) : itypPack :=
+Definition ibodies_itypPack (ibs:list (ident * term * inductive_body)) : itypPack :=
   map ibody_ityp ibs.
 
 Fixpoint program_datatypeEnv (p:program) (e:environ) : environ :=
   match p with
     | PIn _ => e
-    | PConstr _ _ p => program_datatypeEnv p e
+    | PConstr _ _ _ p => program_datatypeEnv p e
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
       program_datatypeEnv p (cons (pair nm (ecTyp npar Ibs)) e)

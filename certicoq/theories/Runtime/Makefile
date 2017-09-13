@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS= -g -O2
+CFLAGS=-m32 -g -O2
 # CFLAGS= -g -O3 -fcall-used-rdi -fcall-used-rsi -fcall-used-rbx -fomit-frame-pointer
 TIME= /bin/time -f "%U %P"
 

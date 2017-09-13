@@ -1,6 +1,6 @@
 Require Import Arith.
 Require Import CertiCoq.
 
-Definition foo := 2.
+Definition foo := 3 + 4.
 
-Certicoq Compile foo.
+CertiCoq Compile foo.

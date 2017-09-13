@@ -15,7 +15,7 @@ Set Implicit Arguments.
 Fixpoint program_mypgm (p:program) (e:environ term) : AstCommon.Program term :=
   match p with
     | PIn t => {| main:= t; env:= e |}
-    | PConstr nm t p => program_mypgm p (snoc e (nm ,ecTrm t))
+    | PConstr nm ty t p => program_mypgm p (snoc e (nm ,ecTrm t))
     | PType nm npar ibs p => 
       let Ibs := AstCommon.ibodies_itypPack ibs
       in program_mypgm p (snoc e (nm, ecTyp term npar Ibs))

@@ -2,13 +2,8 @@
     to a deBruijn-only expression language  for a core calculus including
     mutually recursive functions, data constructors, and pattern matching.
 
-  Remaining admits related to L3:  
-  + wcbvEval produces values, but stuck applications and 
-  cases are not values in L4.expression. Underapplied Fix though, are they values?
-  + Similarly, (2 admits) cases that should no longer be treated in wcbvEval: stuck app and case. 
-
   TODO in L3_eta
-  + move to an enriched Crct_Term predicate after L3_eta for is_n_lambda of branches (2 admits)
+  + move to an enriched Crct_Term predicate after L3_eta for is_n_lambda of branches (last 2 admits here)
 *)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List

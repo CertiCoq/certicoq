@@ -11,7 +11,7 @@ From L6 Require Import cps cps_util eval List_util Ensembles_util functions
 Require Import compcert.lib.Coqlib.
 
 Module SpaceSem (H : Heap).
-
+  
   Module Defs := HeapDefs H.
 
   Import H Defs.
@@ -23,6 +23,7 @@ Module SpaceSem (H : Heap).
 
 
   (* The cost of evaluating the head *)
+  (* TODO make semantics parametric in the cost model *)
   Definition cost (e : exp) : nat :=
     match e with
       | Econstr x t ys e => 1 + length ys

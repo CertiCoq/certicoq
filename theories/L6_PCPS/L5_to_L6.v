@@ -398,11 +398,12 @@ convert_env' is called with the next available constructor tag and the next avai
 
 
   (** to convert from L5a to L6, first convert the environment (ienv) into a cEnv (map from constructor to info) and a conId_map (dcm) from L5 tags to L6 tags. Then, use that conId_map in the translation of the L5 term to incorporate the right L6 tag in the L6 term *)
-  Definition convert_top (ee:ienv*cps) : (cEnv*nEnv*cTag*iTag * exp) :=
+  Definition convert_top (ee:ienv*cps) : (cEnv*nEnv*fEnv*cTag*iTag * exp) :=
     let '(_, cG, ctag, itag,  dcm) := convert_env (fst ee) in 
     let '(er, n, tgm) := convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (100%positive) in
     let '(_, _, nM) := tgm in
-    (cG, nM,ctag, itag, er).
+    let fenv:fEnv := M.set fun_tag (2%N, (0%N::1%N::nil)) (M.set kon_tag (1%N, (0%N::nil)) (M.empty _) ) in
+    (cG, nM, fenv, ctag, itag, er).
 
 
 End Program.

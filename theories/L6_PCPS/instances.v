@@ -93,14 +93,15 @@ Instance certiL5a_t0_L6:
   CerticoqTotalTranslation (cTerm certiL5a) (cTerm certiL6) := 
   fun v =>
     match v with
-        | pair venv vt => 
-          let '(cenv, nenv, next_cTag, next_iTag, e) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
-          (* let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   *)
+    | pair venv vt =>
+      let '(cenv, nenv, fenv, next_cTag, next_iTag, e) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
+
+           let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
           (* let e := postuncurry_contract e s d in            *)
           (* let e := shrink_cps.shrink_top e in  *)
           (* let e :=  inlinesmall_contract e 10 10 in *)
-          (* let e := inline_uncurry_contract e s 10 10 in  *)
-          let e := shrink_cps.shrink_top e in
+           let e := inline_uncurry_contract e s 10 10 in  
+           let e := shrink_cps.shrink_top e in
           let '(cenv',nenv', t') := closure_conversion_hoist
                                       bogus_cloTag
                                       e

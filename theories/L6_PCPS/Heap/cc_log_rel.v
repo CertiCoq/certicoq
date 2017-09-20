@@ -925,7 +925,16 @@ Module CC_log_rel (H : Heap).
            II (H1, rho1, e1) (H2, rho2, e2) ->
            
            IL k (H1, rho1, e1, c, size_heap H1) (H2, rho2, e2, c, size_heap H2)).
-    
+
+    (* For when the target timeouts with a slightly larger heap *)
+    Variable
+      (InvCostRefl' :
+         forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) (c k m : nat),
+           II (H1, rho1, e1) (H2, rho2, e2) ->
+
+           m >= 1 -> (* might change *)
+
+           IL k (H1, rho1, e1, c, size_heap H1) (H2, rho2, e2, c, size_heap H2 + m)).
 
     (** * Compatibility properties for the local invariants *)
     
@@ -1162,8 +1171,8 @@ Module CC_log_rel (H : Heap).
          (* quantify over all equal heaps *)
          reach' H1 (env_locs rho1 (occurs_free (Eproj x1 t n y1 e1))) |- H1 ≡ H1' ->
          reach' H2 (env_locs rho2 (occurs_free (Eproj x2 t n y2 e2))) |- H2 ≡ H2' ->
-                                                                                                                         (Res (v1, H1)) ≺ ^ (i; IG) (Res (v2, H2)) ->
-                                                                                                                         (e1, M.set x1 v1 rho1, H1') ⪯ ^ (i ; IL1; IG) (e2, M.set x2 v2 rho2, H2')) ->
+         (Res (v1, H1)) ≺ ^ (i; IG) (Res (v2, H2)) ->
+         (e1, M.set x1 v1 rho1, H1') ⪯ ^ (i ; IL1; IG) (e2, M.set x2 v2 rho2, H2')) ->
       
       (Eproj x1 t n y1 e1, rho1, H1) ⪯ ^ (k ; IL; IG) (Eproj x2 t n y2 e2, rho2, H2).
     Proof.
@@ -1340,58 +1349,76 @@ Module CC_log_rel (H : Heap).
           now rewrite Hget; eauto.
     Qed.
 
-(*
-
+    
     (** Abstraction compatibility *)
     Lemma cc_approx_exp_fun_compat (k : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 :
       II (H1, rho1, Efun B1 e1) (H2, rho2, Efun B2 e2)  ->
+      (* needed to prove timeout preservation *)
+      fundefs_num_fv B1 < cost e2 -> 
       (forall i l1 l2 H1' H2' H1'' H2'',
          i < k ->
          (* quantify over all equal heaps *)
          reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1))) |- H1 ≡ H1' ->
          reach' H2 (env_locs rho2 (occurs_free (Efun B2 e2))) |- H2 ≡ H2' ->
-         (* allocate a new location for the abstraction *)
+         (* allocate a new location for the function block *)
          alloc (Vfun rho1 B1) H1' = (l1, H1'') ->
          alloc (Vfun rho2 B2) H2' = (l2, H2'') ->
          (e1, def_funs B1 l1 rho1, H1'') ⪯ ^ (i; IL1; IG)
          (e2, def_funs B2 l2 rho2, H2'')) ->
       (Efun B1 e1, rho1, H1) ⪯ ^ (k ; IL; IG) (Efun B2 e2, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hinit Hpre H1' H2' v1 c1 m1 Heq1 Heq2 Hleq1 Hstep1.
+      intros Hinit Hcost Hpre H1' H2' v1 c1 m1 Heq1 Heq2 Hleq1 Hstep1.
       inv Hstep1.
-      - (* Timeout! *)
-        { simpl in H0. exists OOT, c1. eexists. repeat split. 
-          - econstructor. simpl. admit.
-            reflexivity.
-          - eapply InvCostRefl. eapply InitInvRespectsHeapEq; eassumption.
-          - now rewrite cc_approx_val_eq. }
+      (* Timeout! *)
+      - { simpl in H0. exists OOT, c1.  
+          - destruct (lt_dec c1 (cost (Efun B2 e2))).
+            + eexists. repeat split. econstructor. simpl.
+              eassumption. reflexivity.
+              eapply InvCostRefl.
+              eapply InitInvRespectsHeapEq; eassumption.
+              now rewrite cc_approx_val_eq.
+            + destruct (alloc (Vfun rho2 B2) H2') as [l H2''] eqn:Heq.
+              destruct (live_exists (env_locs (def_funs B2 l rho2) (occurs_free e2)) H2'' ) as [H2''' Hlive].
+              eapply Decidable_env_locs. eauto with typeclass_instances.
+              eexists. repeat split.
+              eapply Eval_fun_per. 
+              omega. eassumption. eassumption. reflexivity.
+              econstructor. simpl. omega. reflexivity.
+              unfold size_heap.
+              rewrite Nat_as_OT.max_r.
+              erewrite (size_with_measure_alloc _ _ _ H2' H2''); [| reflexivity | eassumption ].
+              simpl. eapply InvCostRefl'. eapply InitInvRespectsHeapEq; eassumption. omega.
+              eapply size_with_measure_subheap.
+              eapply live_subheap. eassumption.
+              now rewrite cc_approx_val_eq. }
+      (* Termination *)
       - { destruct (alloc (Vfun rho2 B2) H2') as [l' H2''] eqn:Ha.
           edestruct (live_exists (env_locs (def_funs B2 l' rho2) (occurs_free e2)) H2'')
             as [H2''' Hl2].
           eapply Decidable_env_locs; eauto with typeclass_instances.
-
-          edestruct Hpre with (i := k - 1) as [v2 [c2 [m2 [Hstep [HS Hval]]]]];
+          
+          edestruct Hpre with (i := k - cost (Efun B1 e1)) as [v2 [c2 [m2 [Hstep [HS Hval]]]]];
             [ |  eassumption | eassumption | eassumption | eassumption | | | | eassumption | ].
-          - simpl in H4. omega.
+          - simpl in H4. simpl. omega.
           - eapply collect_heap_eq. eapply live_collect. eassumption.
           - eapply collect_heap_eq. eapply live_collect. eassumption.
           - simpl in H4. simpl. omega.
           - repeat eexists; eauto.
             + eapply Eval_fun_per with (c := c2 + cost (Efun B2 e2)); try eassumption.
-              omega. reflexivity.
-              rewrite NPeano.Nat.add_sub. eassumption.
+              omega. reflexivity. rewrite NPeano.Nat.add_sub. eassumption.
             + unfold size_heap. 
               erewrite (size_with_measure_alloc _ _ _ H1' H'); [| reflexivity | eassumption ].
               erewrite size_with_measure_alloc with (H' := H2''); [| reflexivity | eassumption ].
-              eapply InvFunCompat with (i := k - 1); try eassumption.
-              simpl in H4. omega.
+              eapply InvFunCompat with (i := k - cost (Efun B1 e1)); try eassumption.
+              simpl in H4. simpl. omega.
               rewrite NPeano.Nat.add_sub. eassumption.
               now eauto.
-            + rewrite cc_approx_val_eq in *.
-              eapply cc_approx_val_monotonic. eassumption. simpl.
-              simpl in H4. omega.
+            + rewrite cc_approx_val_eq in *. 
+              eapply cc_approx_val_monotonic. eassumption.
+              simpl. simpl in H4. omega. }
     Qed.
 
+    (* 
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k : nat) rho1 rho2 H1 H2 t f1 xs1 f2 f2' Γ xs2 :
       ~ Γ \in (f2 |: FromList xs2) ->
@@ -1404,6 +1431,13 @@ Module CC_log_rel (H : Heap).
     Proof with now eauto with Ensembles_DB.
       intros Hnin1 Hnin2 Hneq Henv Hall Hi H1' H2' v1 c1 m1 Heq1 Heq2 Hleq1 Hstep1.
       inv Hstep1.
+      (* Timeout! *)
+      - { simpl in H0. exists OOT, c1. eexists. repeat split. 
+          - econstructor. simpl.  eassumption. reflexivity.
+          - eapply InvCostRefl.
+            eapply InitInvRespectsHeapEq; eassumption.
+          - now rewrite cc_approx_val_eq. }
+      -
       (* weaken the hypotheses *)
       eapply cc_approx_var_env_heap_eq in Henv;
         try now (eapply heap_eq_antimon; [| eassumption ];
@@ -1584,45 +1618,6 @@ Module CC_log_rel (H : Heap).
         repeat normalize_occurs_free. eauto.
     Qed.
 
-    (** Abstraction compatibility *)
-    Lemma cc_approx_exp_fun_compat (k : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 :
-      II (H1, rho1, Efun B1 e1) (H2, rho2, Efun B2 e2)  ->
-      (forall i l1 l2 H1' H2' H1'' H2'',
-         i < k ->
-         (* quantify over all equal heaps *)
-         reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1))) |- H1 ≡ H1' ->
-         reach' H2 (env_locs rho2 (occurs_free (Efun B2 e2))) |- H2 ≡ H2' ->
-         (* allocate a new location for the abstraction *)
-         alloc (Vfun rho1 B1) H1' = (l1, H1'') ->
-         alloc (Vfun rho2 B2) H2' = (l2, H2'') ->
-         (e1, def_funs B1 l1 rho1, H1'') ⪯ ^ (i; IL1; IG)
-         (e2, def_funs B2 l2 rho2, H2'')) ->
-      (Efun B1 e1, rho1, H1) ⪯ ^ (k ; IL; IG) (Efun B2 e2, rho2, H2).
-    Proof with now eauto with Ensembles_DB.
-      intros Hinit Hpre H1' H2' v1 c1 m1 Heq1 Heq2 Hleq1 Hstep1.
-      inv Hstep1.
-      destruct (alloc (Vfun rho2 B2) H2') as [l' H2''] eqn:Ha.
-      edestruct (live_exists (env_locs (def_funs B2 l' rho2) (occurs_free e2)) H2'')
-        as [H2''' Hl2].
-      eapply Decidable_env_locs; eauto with typeclass_instances.
-
-      edestruct Hpre with (i := k - 1) as [v2 [c2 [m2 [Hstep [HS Hval]]]]];
-        [ |  eassumption | eassumption | eassumption | eassumption | | | | eassumption | ].
-      - omega.
-      - eapply collect_heap_eq. eapply live_collect. eassumption.
-      - eapply collect_heap_eq. eapply live_collect. eassumption.
-      - omega.
-      - repeat eexists; eauto.
-        + now econstructor; eauto.
-        + rewrite <- plus_n_O.
-          unfold size_heap. 
-          erewrite (size_with_measure_alloc _ _ _ H1' H'); [| reflexivity | eassumption ].
-          erewrite size_with_measure_alloc with (H' := H2''); [| reflexivity | eassumption ].
-          eapply InvFunCompat; try eassumption.
-          omega. now eauto.
-        + rewrite cc_approx_val_eq in *.
-          eapply cc_approx_val_monotonic. eassumption. omega.
-    Qed.
 *)
   End Compat.
 

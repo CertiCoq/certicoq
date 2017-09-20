@@ -6,7 +6,7 @@ Installation instructions
 Installing dependencies:
 ------------------------
 
-  To install the compiler, you need Coq.8.5 along with the Template
+  To install the compiler, you need Coq.8.6 along with the Template
 and ExtLib packages of G. Malecha.  One way to get it is using opam:
 
   To add the official Coq repositories, you need:

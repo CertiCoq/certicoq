@@ -5,4 +5,16 @@
 *.out
 *.html
 *.cache
+*.cm*
+*.o
+*.a
+*.ml*.d
 Makefile.coq
+/libraries/Makefile
+/theories/Makefile
+/theories/Makefile.plugin
+/theories/plugin/*.ml
+/theories/plugin/*.mli
+/theories/Extraction/*.ml
+/theories/Extraction/*.mli
+

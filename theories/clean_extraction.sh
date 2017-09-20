@@ -2,7 +2,7 @@
 
 echo "Cleaning result of extraction"
 
-# Remove modules already built as part of template-plugin
+# Move extracted modules to build the certicoq compiler plugin
 cd Extraction
 
 # Uncapitalize modules to circumvent a bug of coqdep with mllib files
@@ -15,6 +15,7 @@ done
 
 cd ..
 
+# Remove extracted modules already linked in template_coq_plugin.
 cd plugin
 rm -f datatypes.* ascii.* binPosDef.* binPos.* binNat.* binNums.* bool.* nat0.* string0.*
 cd ..

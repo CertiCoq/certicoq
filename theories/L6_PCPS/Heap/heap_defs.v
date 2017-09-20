@@ -302,10 +302,17 @@ Module HeapDefs (H : Heap).
     - destruct (get l H2) eqn:Hget2; eauto.
       specialize (Hc1 _ _ Hget2). congruence.
   Qed.
-  
- 
-  (** * Lemmas about [post] and [reach'] *)
 
+  Lemma collect_subheap S H1 H2 :
+    collect S H1 H2 ->
+    H2 ⊑ H1.
+  Proof.
+    now firstorder.
+  Qed.
+
+
+  (** * Lemmas about [post] and [reach'] *)
+  
 
   (** Set monotonicity lemmas *)
   
@@ -967,6 +974,14 @@ Module HeapDefs (H : Heap).
     firstorder.
   Qed.
 
+  Lemma live_subheap S H1 H2 :
+    live S H1 H2 ->
+    H2 ⊑ H1. 
+  Proof.
+    intros H. eapply collect_subheap.
+    eapply live_collect; eassumption.
+  Qed.
+  
   Lemma live_idempotent (S : Ensemble loc) (H1 H2 : heap block) :
     live S H1 H2 ->
     live S H2 H2.

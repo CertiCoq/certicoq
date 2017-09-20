@@ -22,6 +22,34 @@ Set Implicit Arguments.
 Require Coq.Strings.String. 
 Open Scope string_scope.
 
+
+Section PP.
+Require Import Coq.Strings.String Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
+Local Open Scope string_scope.
+
+Definition digit_to_string (n:nat): string :=
+  match n with
+    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4"
+    | 5 => "5" | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
+  end%nat.
+
+Program Fixpoint nat_to_string (n:nat) {measure n}: string :=
+  (match n <? 10 as x return n <? 10 = x -> string with
+     | true => fun _ => digit_to_string n
+     | false => fun pf =>
+                  let m := NPeano.Nat.div n 10 in
+                  (nat_to_string m) ++ (digit_to_string (n - 10 * m))
+   end eq_refl)%nat.
+Next Obligation.
+  apply (NPeano.Nat.div_lt n 10%nat).
+  destruct n. unfold NPeano.Nat.ltb in *. simpl in *.
+  discriminate. auto with arith.
+  auto with arith.
+Defined.
+
+End PP.
+
+
 Definition
   andb_true_true (b1 b2:bool) (q:b1 && b2 = true) : b1 = true /\ b2 = true.
 Proof.
@@ -344,13 +372,13 @@ Proof.
   induction n; reflexivity.
 Qed.
   
-
-
 Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
   match xs, n with
-    | nil, _ => raise "exnNth; no hit"
-    | cons x xs, 0 => ret x
-    | cons x xs, S m => exnNth xs m
+  | nil, _ =>
+    raise ("(exnNth:" ++ nat_to_string (List.length xs) ++ ","
+                      ++ nat_to_string n ++ ")")
+    | cons y ys, 0 => ret y
+    | cons y ys, S m => exnNth ys m
   end.
 
 Lemma bool_not_neq: forall (b1 b2:bool), (~ b1 <> b2) <-> b1 = b2.
@@ -595,29 +623,3 @@ Lemma max_snd: forall m n, max m n >= n.
 induction m; induction n; simpl; intuition.
 Qed.
 
-
-Section PP.
-Require Import Coq.Strings.String Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
-Local Open Scope string_scope.
-
-Definition digit_to_string (n:nat): string :=
-  match n with
-    | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4"
-    | 5 => "5" | 6 => "6" | 7 => "7" | 8 => "8" | _ => "9"
-  end%nat.
-
-Program Fixpoint nat_to_string (n:nat) {measure n}: string :=
-  (match n <? 10 as x return n <? 10 = x -> string with
-     | true => fun _ => digit_to_string n
-     | false => fun pf =>
-                  let m := NPeano.Nat.div n 10 in
-                  (nat_to_string m) ++ (digit_to_string (n - 10 * m))
-   end eq_refl)%nat.
-Next Obligation.
-  apply (NPeano.Nat.div_lt n 10%nat).
-  destruct n. unfold NPeano.Nat.ltb in *. simpl in *.
-  discriminate. auto with arith.
-  auto with arith.
-Defined.
-
-End PP.

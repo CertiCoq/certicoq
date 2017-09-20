@@ -85,7 +85,6 @@ Fixpoint print_term (t:Term) : string :=
     | TApp fn arg args =>
       "(" ++ (print_term fn) ++ " @ " ++ (print_term arg) ++ " _ " ++ ")"
     | TConst s => "[" ++ s ++ "]"
-    | TAx _ => " TAx "
     | TConstruct i n _ =>
       "(CSTR " ++ (print_ind i) ++ " " ++ (nat_to_string n) ++ ")"
     | TCase i mch _ =>
@@ -118,8 +117,6 @@ Proof.
   - induction t2; cross.
     destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
   - induction t; cross. destruct (string_dec s s0); [lft | rght].
-  - destruct t; cross.
-    destruct (proj1 L2.term.TermTerms_dec l l0); [lft | rght ..]. 
   - induction t0; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n0), (H t0);
       [lft | rght .. ].
@@ -314,6 +311,25 @@ Qed.
 Lemma na_isLam_or_isConstruct_etaExpand_args:
   forall na actualArgs computedArgs,
     (forall F:Terms -> Term,
+        tlength actualArgs <= na /\
+        isLambda
+          (etaExpand_args
+             na actualArgs (fun b => TLambda nAnon (F b)) computedArgs)) \/
+    (forall i m (F:Terms -> Terms),
+        tlength actualArgs > na /\
+        isConstruct
+          (etaExpand_args
+             na actualArgs (fun b => TConstruct i m (F b)) computedArgs)).
+Proof.
+  intros. destruct (le_lt_dec (tlength actualArgs) na).
+  - left. intros. split. omega. eapply na_isLambda_etaExpand_args. omega.
+  - right. intros. split. omega. eapply na_isConstruct_etaExpand_args. omega.
+Qed.
+
+(****************
+Lemma na_isLam_or_isConstruct_etaExpand_args:
+  forall na actualArgs computedArgs,
+    (forall F:Terms -> Term,
         isLambda
           (etaExpand_args
              na actualArgs (fun b => TLambda nAnon (F b)) computedArgs)) \/
@@ -326,25 +342,128 @@ Proof.
   - left. intros. eapply na_isLambda_etaExpand_args. omega.
   - right. intros. eapply na_isConstruct_etaExpand_args. omega.
 Qed.
+ ***************)
 
 Lemma pre_isConstruct_etaExpand:
   forall i m,
-    etaExpand (fun b : Terms => TConstruct i m b) tnil tnil 0 0 =
+    etaExpand (fun b : Terms => TConstruct i m b) tnil 0 0 =
     TConstruct i m tnil.
 Proof.
   cbn. intuition.
 Qed.
 
-(****************
+Lemma etaExpand_no_params:
+  forall (actualArgs:Terms) (nargs:nat) (F:Terms -> Term),
+    etaExpand F actualArgs 0 nargs =
+    etaExpand_args nargs actualArgs F tnil.
+Proof.
+  intros. cbn. destruct actualArgs; reflexivity.
+Qed.
+
+(*************
 Goal
-    forall np na computedArgs actualArgs (F:Terms -> Term),
-      isLambda (etaExpand (fun b => TLambda nAnon (F b))
-                          computedArgs actualArgs np na).
+  forall (npars nargs:nat) (params actualArgs:Terms) (F:Terms -> Term),
+    npars > tlength params ->
+    etaExpand F (tappend params actualArgs) npars nargs =
+    etaExpand_args nargs actualArgs F tnil.
+Proof.
+  induction params; intros; cbn.
+  - destruct npars. omega. destruct actualArgs; cbn.
+
+    induction npars; intros; cbn.
+  - destruct params; cbn.
+    + destruct actualArgs; try reflexivity.
+    + omega.
+  - destruct params; cbn.
+    + erewrite <- IHnpars.
+
+    try reflexivity. rewrite <- IHparams. reflexivity.
+Qed.
+
+
+Goal
+  forall (actualArgs:Terms) (npars nargs:nat)
+         (F:Terms -> Term) (computedArgs:Terms),
+    tlength actualArgs < npars ->
+    etaExpand F computedArgs actualArgs npars nargs =
+    etaExpand_args nargs actualArgs F computedArgs.
+Proof.
+
+
+Goal
+  forall (actualArgs:Terms) (npars nargs:nat)
+  (F:Terms -> Term) (computedArgs:Terms),
+    tlength actualArgs >= npars ->
+    etaExpand F computedArgs actualArgs npars nargs =
+    etaExpand_args nargs actualArgs F computedArgs.
+Proof.
+  induction actualArgs; destruct npars; cbn; intros;
+    try omega; try reflexivity.
+  assert (j: tlength actualArgs >= npars). omega.
+  
+  rewrite (IHactualArgs _ _ F tnil j).
+
+
+  
+  Lemma pre_isLambda_etaExpand:
+  forall np na F,
+    isLambda
+      (etaExpand (fun b : Terms => TLambda nAnon (F b)) tnil tnil np na).
+Proof.
+  induction np; intros.
+  - cbn. induction na; cbn.
+    + auto.
+    + unfold etaExpand_args.
+  - cbn. apply IHnp. 
+
+
+      (****************)
+Goal
+  forall actualArgs np na computedArgs (F:Terms -> Term),
+    S (tlength actualArgs) < np ->
+      isLambda (etaExpand (fun b => F b) computedArgs actualArgs np na).
+Proof.
+  induction actualArgs; induction np; intros; try omega.
+  - assert (j: np = S (pred np)). cbn in H. omega.
+    rewrite j in *. cbn.
+    change
+      (isLambda
+         (etaExpand (fun b : Terms => TLambda nAnon (TLambda nAnon (F b))) tnil
+                    tnil np na)).
+
+
+    Lemma pre_isConstruct_etaExpand:
+      forall np na F,
+  isLambda
+    (etaExpand
+       (fun b : Terms => TLambda nAnon (TLambda nAnon (TLambda nAnon (F b))))
+       tnil tnil (S np) na).
+
+
+
+  ) \/
+    (forall i m (F:Terms -> Terms),
+        isConstruct
+          (etaExpand_args
+             na actualArgs (fun b => TConstruct i m (F b)) computedArgs)).
+Proof.
+  intros.
+  intros. destruct (le_lt_dec (tlength actualArgs) na).
+  - left. intros. split. omega. eapply na_isLambda_etaExpand_args. omega.
+  - right. intros. split. omega. eapply na_isConstruct_etaExpand_args. omega.
+Qed.
+    
 Proof.
   induction np; induction na; induction computedArgs; induction actualArgs;
     cbn; intros; auto.
   - eapply na_isLambda_etaExpand_args. cbn. omega.
-  - eapply na_isLambda_etaExpand_args. destruct na, actualArgs.
+  - destruct (na_isLam_or_isConstruct_etaExpand_args na actualArgs (tunit t)).
+    + destruct (H F) as [x0 [x1 jx]]. rewrite jx. auto.
+    +
+  - destruct (dec_le (tlength actualArgs) na F).
+    + eapply na_isLambda_etaExpand_args. omega.
+    +
+                                                      
     + admit.
     + 
   - eapply na_isLambda_etaExpand_args. cbn. omega.
@@ -429,8 +548,7 @@ Proof.
   - eapply isConstruct_etaExpand_args. cbn. omega.
   - eapply (IHnp ).
 Qed.
- ***********************)
-
+ ****************)
 
 
 (*******************
@@ -1352,8 +1470,6 @@ Proof.
       * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TAx l), arg, tnil. split. reflexivity.
-    left. intuition. revert H. not_isApp.
   - exists (TConstruct i n t), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TCase i fn b), arg, tnil. split. reflexivity.
@@ -1424,7 +1540,6 @@ Inductive WFapp: Term -> Prop :=
            ~ (isApp fn) -> WFapp fn -> WFapp t -> WFapps ts ->
            WFapp (TApp fn t ts)
 | wfaConst: forall nm, WFapp (TConst nm)
-| wfaAx: forall t, WFapp (TAx t)
 | wfaConstruct: forall i m1 args,
     WFapps args -> WFapp (TConstruct i m1 args)
 | wfaCase: forall m mch brs,
@@ -1696,7 +1811,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
            ~ (isApp fn) -> WFTrm fn n -> WFTrm t n -> WFTrms ts n ->
            WFTrm (TApp fn t ts) n
 | wfConst: forall n nm, WFTrm (TConst nm) n
-| wfAx: forall n t, WFTrm (TAx t) n
 | wfConstruct: forall n i m args,
                  WFTrms args n -> WFTrm (TConstruct i m args) n
 | wfCase: forall n m mch brs,
@@ -1849,7 +1963,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
        Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
        Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
-| IAx: forall n t, Instantiate n (TAx t) (TAx t)
 | IConstruct: forall n ind m1 args iargs,
                 Instantiates n args iargs ->
                 Instantiate n (TConstruct ind m1 args)

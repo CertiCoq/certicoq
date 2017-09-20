@@ -612,7 +612,41 @@ Proof.
     admit.
 ****)
 
-    
+Lemma Construct_strip_inv:
+  forall i n np na s,
+    TConstruct i n np na = strip s -> L1g.compile.TConstruct i n np na = s.
+Proof.
+  intros i n. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. reflexivity.
+Qed.
+
+Lemma L1g_isConstruct_isConstruct:
+  forall t, L1g.term.isConstruct t <-> isConstruct (strip t).
+Proof.
+  intros t. split; intros h.
+  - destruct h as [x0 [x1 [x2 [x3 jx]]]]. subst. cbn. auto.
+  - destruct h as [x0 [x1 [x2 [x3 jx]]]]. unfold L1g.term.isConstruct.
+    exists x0, x1, x2, x3. symmetry. erewrite Construct_strip_inv.
+    reflexivity. symmetry. assumption.
+Qed.
+
+Lemma Ind_strip_inv:
+  forall i s, TInd i = strip s -> L1g.compile.TInd i = s.
+Proof.
+  intros i. destruct s; simpl; intros h; try discriminate.
+  - myInjection h. reflexivity.
+Qed.
+
+Lemma L1g_isInd_isInd:
+  forall t, L1g.term.isInd t <-> isInd (strip t).
+Proof.
+  intros t. split; intros h.
+  - destruct h as [x0 jx]. subst. cbn. auto.
+  - destruct h as [x0 jx]. unfold L1g.term.isInd.
+    exists x0. symmetry. erewrite Ind_strip_inv.
+    reflexivity. symmetry. assumption.
+Qed.
+  
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L1g.wcbvEval.WcbvEval p t t' ->
@@ -635,6 +669,9 @@ Proof.
     + eapply H.
     + rewrite <- dnthBody_hom. rewrite e. reflexivity.
     + rewrite <- pre_whFixStep_hom in H0. eapply H0.
+  - cbn. eapply wAppCong; try eassumption. destruct o.
+    + left. apply (proj1 (L1g_isConstruct_isConstruct _)). assumption.
+    + right. apply (proj1 (L1g_isInd_isInd _)). assumption.    
   - refine (wCase _ _ _ _ _ _ _); try eassumption.
     * rewrite <- canonicalP_hom. rewrite e. reflexivity.
     * rewrite <- tskipn_hom. rewrite e0. reflexivity.
@@ -694,25 +731,10 @@ Proof.
   - myInjection h. exists s1, s2. intuition. 
 Qed.
 
-Lemma Construct_strip_inv:
-  forall i n np na s,
-    TConstruct i n np na = strip s -> L1g.compile.TConstruct i n np na = s.
-Proof.
-  intros i n. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. reflexivity.
-Qed.
-
 Lemma Sort_strip_inv:
   forall srt s, TSort srt = strip s -> L1g.compile.TSort srt = s.
 Proof.
   intros srt. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. reflexivity.
-Qed.
-
-Lemma Ind_strip_inv:
-  forall i s, TInd i = strip s -> L1g.compile.TInd i = s.
-Proof.
-  intros i. destruct s; simpl; intros h; try discriminate.
   - myInjection h. reflexivity.
 Qed.
 

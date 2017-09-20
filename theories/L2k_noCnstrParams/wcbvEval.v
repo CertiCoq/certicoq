@@ -22,7 +22,6 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEvals p args args' ->
     WcbvEval p (TConstruct i r args) (TConstruct i r args')
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
-| wAx: forall t, WcbvEval p (TAx t) (TAx t)
 | wConst: forall nm (t s:Term),
     lookupDfn nm p = Ret t -> WcbvEval p t s ->
     WcbvEval p (TConst nm) s
@@ -298,7 +297,6 @@ Function wcbvEval
       | Exc s => raise ("wcbvEval, TConstruct, args: " ++ s)
       end
     (** already in whnf ***)
-    | TAx t => ret (TAx t)
     | TDummy => ret TDummy
     | TLambda nn t => ret (TLambda nn t)
     | TFix mfp br => ret (TFix mfp br)

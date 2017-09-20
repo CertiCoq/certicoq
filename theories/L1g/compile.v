@@ -34,7 +34,6 @@ Inductive Term : Type :=
                Term (* dfn *) -> Term (* type *) -> Term (* body *) -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
-| TAx        : string -> Term
 | TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* constructor # *) ->
                nat (* # pars *) -> nat (* # args *) -> Term
@@ -86,8 +85,9 @@ Fixpoint print_template_term (t:term) : string :=
     | tApp fn args =>
       " (APP" ++ (print_template_term fn) ++ " _ " ++ ") "
     | tConst s => "[" ++ s ++ "]"
-    | tInd _ => " IND "
-    | tConstruct _ n => " (CSTR " ++ (nat_to_string n) ++ ") "
+    | tInd i => ("(IND:" ++ print_inductive i ++ ")")
+    | tConstruct i n =>
+      "(CSTR:" ++ print_inductive i ++ ":" ++ (nat_to_string n) ++ ") "
     | tCase n _ mch _ =>
       " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++
                 (print_template_term mch) ++ " _ " ++") "
@@ -244,26 +244,25 @@ Section datatypeEnv_sec.
   Variable datatypeEnv : environ Term.
   
 Section term_Term_sec.
-  Variable prf: bool.   (** "true" if translating insde a proof **)
-  Variable term_Term: bool -> term -> Term.
+  Variable term_Term: term -> Term.
   Fixpoint terms_Terms (ts:list term) : Terms :=
     match ts with
       | nil => tnil
-      | cons r rs => tcons (term_Term prf r) (terms_Terms rs)
+      | cons r rs => tcons (term_Term r) (terms_Terms rs)
     end.
   (* Fixpoint defs *)
   Fixpoint defs_Defs (ds: list (def term)) : Defs :=
    match ds with
      | nil => dnil
      | cons d ds =>
-       dcons (dname _ d) (term_Term prf (dtype _ d))
-             (term_Term prf (dbody _ d))  (rarg _ d) (defs_Defs ds )
+       dcons (dname _ d) (term_Term (dtype _ d))
+             (term_Term (dbody _ d))  (rarg _ d) (defs_Defs ds )
    end.
   (* Case branches *)
   Fixpoint natterms_Brs (nts: list (nat * term)) : Brs :=
     match nts with
      | nil => bnil
-     | cons (n,t) ds => bcons n (term_Term prf t) (natterms_Brs ds)
+     | cons (n,t) ds => bcons n (term_Term t) (natterms_Brs ds)
    end.
                
 End term_Term_sec.
@@ -271,42 +270,41 @@ End term_Term_sec.
 (* "prf" arg is true if inside a proof.  This allows to reject
 ** programs containing axioms that are used outside of proofs
 *)
-Function term_Term (prf:bool) (t:term) : Term :=
-  match t, prf with
-    | tRel n, _ => TRel n
-    | tSort srt, _ =>
+Function term_Term (t:term) : Term :=
+  match t with
+    | tRel n => TRel n
+    | tSort srt =>
       TSort (match srt with 
                     | sProp => SProp
                     | sSet => SSet
                     | sType _ => SType  (* throwing away sort info *)
              end)
-    | tCast tm _ (tCast _ _ (tSort sProp)), _ => mkProof (term_Term true tm)
-    | tCast tm _ ty, p => term_Term p tm
-    | tProd nm ty bod, p => (TProd nm (term_Term p ty) (term_Term p bod))
-    | tLambda nm ty bod, p => (TLambda nm (term_Term p ty) (term_Term p bod))
-    | tLetIn nm dfn ty bod, p =>
-      (TLetIn nm (term_Term p dfn) (term_Term p ty) (term_Term p bod))
-    | tApp fn nil, _ => TWrong "term_Term: App with no arg"
-    | tApp fn (cons u us), p => TApp (term_Term p fn) (term_Term p u)
-                                  (terms_Terms p term_Term us)
-    | tConst pth, p =>   (* ref to axioms in environ made into [TAx] *)
+    | tCast tm _ (tCast _ _ (tSort sProp)) => mkProof (term_Term tm)
+    | tCast tm _ ty => term_Term tm
+    | tProd nm ty bod => (TProd nm (term_Term ty) (term_Term bod))
+    | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))
+    | tLetIn nm dfn ty bod =>
+      (TLetIn nm (term_Term dfn) (term_Term ty) (term_Term bod))
+    | tApp fn nil => TWrong "term_Term:App no arg"
+    | tApp fn (cons u us) => TApp (term_Term fn) (term_Term u)
+                                  (terms_Terms term_Term us)
+    | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
       match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
-      | Some (ecTyp _ 0 nil) =>
-        if p then (TAx pth) else TWrong ("Axiom not in a proof")
-        | Some (ecTyp _ _ _) => TWrong ("Const refers to inductive: " ++ pth)
-        | _  => TConst pth
+      | Some (ecTyp _ _ _) =>
+        TWrong ("term_Term:Const inductive or axiom: " ++ pth)
+      | _  => TConst pth
       end
-    | tInd ind, _ => TInd ind
-    | tConstruct ind m, _ =>
+    | tInd ind => TInd ind
+    | tConstruct ind m =>
       match cnstrArity datatypeEnv ind m with
         | Ret (npars, nargs) => TConstruct ind m npars nargs
-        | Exc _ => TWrong "term_Term, tConstruct"
+        | Exc s => TWrong ("term_Term;tConstruct:" ++ s)
       end
-    | tCase npars ty mch brs, p =>
-      TCase npars (term_Term p ty) (term_Term p mch)
-            (natterms_Brs p term_Term brs)
-    | tFix defs m, p => TFix (defs_Defs p term_Term defs) m
-    | _, _ => TWrong "term_Term: Unknown term"
+    | tCase npars ty mch brs =>
+      TCase npars (term_Term ty) (term_Term mch)
+            (natterms_Brs term_Term brs)
+    | tFix defs m => TFix (defs_Defs term_Term defs) m
+    | _ => TWrong "(term_Term:Unknown)"
   end.
 
 End datatypeEnv_sec.
@@ -317,19 +315,19 @@ End datatypeEnv_sec.
 *** translation function
 **)
 Fixpoint program_Pgm
-         (prf:bool) (dtEnv: environ Term) (p:program)
+         (dtEnv: environ Term) (p:program)
          (e:environ Term) : Program Term :=
   match p with
-    | PIn t => {| main:= (term_Term dtEnv prf t); env:= e |}
+    | PIn t => {| main:= (term_Term dtEnv t); env:= e |}
     | PConstr nm ty t p =>
-      program_Pgm prf dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv prf t))) e)
+      program_Pgm dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv t))) e)
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
-      program_Pgm prf dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
+      program_Pgm dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
     | PAxiom nm _ p =>
-      program_Pgm prf dtEnv p (cons (pair nm (ecAx Term)) e)
+      program_Pgm dtEnv p (cons (pair nm (ecAx Term)) e)
   end.
 
 Definition program_Program (p:program) : Program Term :=
   let dtEnv := program_datatypeEnv p (nil (A:= (string * envClass Term))) in
-  program_Pgm false dtEnv p nil.
+  program_Pgm dtEnv p nil.

@@ -555,40 +555,34 @@ Print P_pack_nat.
 Inductive xxxx:Prop :=
 | xxxxl: forall n:nat, n = 0 -> xxxx
 | xxxxr: forall n:nat, n = 1 -> xxxx.
-Print xxxx.
 Axiom Xxxx:xxxx.
-Definition yyyy (f:xxxx) :=
-  match f with xxxxl q => f | xxxxr q => f end.
+Definition yyyy (f:xxxx) := match f with xxxxl q => f | xxxxr q => f end.
 Definition yyyyX := (yyyy Xxxx).
-Print yyyyX.
 Quote Recursively Definition cbv_yyyyX := (* [program] of Coq's answer *)
   ltac:(let t:=(eval cbv in (yyyyX)) in exact t).
 Print cbv_yyyyX.
 (* [Term] of Coq's answer *)
 Definition ans_yyyyX := Eval cbv in (main (program_Program cbv_yyyyX)).
+Print ans_yyyyX.
 (* [program] of the program *)
 Quote Recursively Definition p_yyyyX := yyyyX.
 Print p_yyyyX.
 Definition P_yyyyX := Eval cbv in (program_Program p_yyyyX).
 Print P_yyyyX.
-Definition env := Eval cbv in (env P_yyyyX).
-Definition main := Eval cbv in (main P_yyyyX).
-
-HERE
-Goal WcbvEval env main ans_yyyyX.
+Definition xxxx_env := Eval cbv in (env P_yyyyX).
+Definition xxxx_main := Eval cbv in (main P_yyyyX).
+(*********** what is the problem? 
+** axiom inside proof, but proofs haven't been stripped yet at L2k
+ ***********
+Goal WcbvEval xxxx_env xxxx_main ans_yyyyX.
 Proof.
   unfold main. eapply wProof. eapply wConst.
   - unfold env. cbn. reflexivity.
   - eapply wProof. eapply wAppLam.  
-    +  eapply wConst. cbn. reflexivity. eapply wProof. eapply wLam.
-    + eapply wAx.
-    + cbn. eapply wCase.
-      * eapply wAx.
-      * cbn.
-
-
-      Goal
-  wcbvEval env 2 main = Ret ans_yyyyX.
+    + eapply wConst. cbn. reflexivity. eapply wProof. eapply wLam.
+****************)
+Goal
+  wcbvEval xxxx_env 10 xxxx_main = Ret ans_yyyyX.
   vm_compute.
   (**********
 reflexivity.
@@ -820,6 +814,7 @@ Fixpoint PListToList (A:Set) (l:PList A) {struct l}:list A :=
 
 Eval compute in PListToList myPList.
 
+Set printing width 150.
 Fixpoint gen_sumPList (A:Set) (l:PList A) {struct l}:(A->nat)->nat :=
   match l in PList A return (A->nat)->nat with
     | zero a => fun f => f a
@@ -878,7 +873,7 @@ Qed.
 Require Import Benchmarks.vs.
 Print Assumptions main.
 
-(*** raises exception: out of time *****
+(*** Exc: contains an axiom which is a proof, not stripped yet ******
 Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
 Time Definition P_ce_example_myent :=
   Eval vm_compute in (program_Program p_ce_example_myent).
@@ -886,7 +881,7 @@ Definition P_env_ce_example_myent := env P_ce_example_myent.
 Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
 Time Definition eval_ce_example_myent :=
   Eval vm_compute in
-    (wcbvEval P_env_ce_example_myent 5000 P_main_ce_example_myent).
+    (wcbvEval P_env_ce_example_myent 500 P_main_ce_example_myent).
 Set Printing Width 100.
 Print eval_ce_example_myent.
 **********************)

@@ -174,16 +174,16 @@ rewrite IHts. reflexivity.
 Qed.
 
 Lemma TCase_hom:
-  forall m mch brs,
-    strip (L2k.compile.TCase m mch brs) =
+  forall mch brs,
+    strip (L2k.compile.TCase mch brs) =
       match L2k.term.isProof_dec mch with
         | left _ =>
           match brs with
             | L2k.compile.bunit n br =>
               applyBranchToProof n (L2kTerm_Term br)
-            | _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
+            | _ => TCase (L2kTerm_Term mch) (L2kBrs_Brs brs)
           end
-        | right _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
+        | right _ => TCase (L2kTerm_Term mch) (L2kBrs_Brs brs)
       end.
 Proof.
   reflexivity.
@@ -210,15 +210,15 @@ Lemma isApp_hom:
   forall t,
     isApp (strip t) ->
     L2k.term.isApp t \/
-    exists x n u br,
-      t = L2k.compile.TCase x (L2k.compile.TProof u) (L2k.compile.bunit br n).
+    exists n u br,
+      t = L2k.compile.TCase (L2k.compile.TProof u) (L2k.compile.bunit br n).
 Proof.
   destruct t; cbn; intros h;
   destruct h as [x0 [x1 [x2 h]]]; try discriminate. 
   - left. exists t1, t2, t3. reflexivity.
   - destruct t; try discriminate. destruct b.
     + discriminate.
-    + right. exists i, t0, t, n. destruct b.
+    + right. exists t0, t, n. destruct b.
       * reflexivity.
       * discriminate.
 Qed.
@@ -233,7 +233,6 @@ Proof.
     reflexivity.
   - destruct t; try (elim y); try reflexivity.
     + destruct (L2k.term.isProof_dec t).
-      destruct i0 as [x jx]. subst t.
       * { destruct (L2k.term.is_bunit_dec b).
           - destruct H as [x0 [x1 jx]]. subst b. cbn.
             rewrite mkApp_tnil_ident. reflexivity.
@@ -404,7 +403,7 @@ Proof.
                             (L2kTerm_Term s2) (L2kTerms_Terms t)) as k.
     destruct k as [x0 [x1 [x2 jx]]]. rewrite jx in h. discriminate.
   - left. cbn in h. myInjection h. reflexivity.
-  - right. exists i, s, b. reflexivity.    
+  - right. exists s, b. reflexivity.    
 Qed.
 
 (*************

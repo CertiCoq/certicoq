@@ -29,12 +29,14 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
+(***
+| TInd       : inductive -> Term
+***)
 (* constructors fully applied: eta expand *)
 | TConstruct : inductive -> nat (* cnstr no *) -> Terms (* args *) -> Term
-| TCase      : inductive -> Term (* discriminee *) ->
-               Brs (* # args, branch *) -> Term
+| TCase      : Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
-| TWrong     : Term
+| TWrong     : string -> Term
 | TDummy     : Term
 with Terms : Type :=
 | tnil : Terms
@@ -187,7 +189,7 @@ Function lift (n:nat) (t:Term) : Term :=
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg args => TApp (lift n fn) (lift n arg) (lifts n args)
     | TConstruct i x args => TConstruct i x (lifts n args)
-    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (liftBs n brs)
+    | TCase mch brs => TCase (lift n mch) (liftBs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
     | _ => t
   end
@@ -288,11 +290,25 @@ Function etaExpand
   (* drop an actual arg and reduce param count *)
   | tcons u us, S n => etaExpand body us n nargs
   (* no more actual args, but more params exprcted *)
+  | tnil, n => etaExpand_args nargs tnil (nLambda n body) tnil
+  (* no more params expected; start on args *)
+  | aa, 0 => etaExpand_args nargs aa body tnil
+  end.
+
+(***********************
+Function etaExpand
+         (body:Terms -> Term)  (* accumulator *)
+         (actualArgs:Terms) (npars nargs:nat)  (* inputs *) : Term :=
+  match actualArgs, npars with
+  (* drop an actual arg and reduce param count *)
+  | tcons u us, S n => etaExpand body us n nargs
+  (* no more actual args, but more params exprcted *)
   | tnil, S n => etaExpand (fun b => TLambda nAnon (body b)) tnil n nargs
   (* no more params expected; start on args *)
   | aa, 0 => etaExpand_args nargs aa body tnil
   end.
 Functional Scheme etaExpand_ind := Induction for etaExpand Sort Prop.
+ ******************)
 
 Function strip (t:L2Term) : Term :=
   match t with
@@ -312,12 +328,12 @@ Function strip (t:L2Term) : Term :=
     | _ => TApp (strip fn) sarg sargs
     end
   | L2.compile.TConst nm => TConst nm
-  | L2.compile.TInd i => TDummy
+  | L2.compile.TInd _ => TDummy
   | L2.compile.TConstruct i m npars nargs =>
     etaExpand (fun b => TConstruct i m b) tnil npars nargs
-  | L2.compile.TCase (i,_) mch brs => TCase i (strip mch) (stripBs brs)
+  | L2.compile.TCase _ mch brs => TCase (strip mch) (stripBs brs)
   | L2.compile.TFix ds n => TFix (stripDs ds) n
-  | L2.compile.TWrong => TWrong
+  | L2.compile.TWrong str => TWrong str
   end
 with strips (ts:L2Terms) : Terms := 
        match ts with

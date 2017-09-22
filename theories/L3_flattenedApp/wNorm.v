@@ -20,8 +20,8 @@ Inductive WNorm: Term -> Prop :=
 | WNPrf: WNorm TProof
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNCase: forall mch n brs,
-    WNorm mch -> ~ isConstruct mch -> WNorm (TCase n mch brs)
+| WNCase: forall mch brs,
+    WNorm mch -> ~ isConstruct mch -> WNorm (TCase mch brs)
 | WNConstruct: forall i n args,
     WNorms args -> WNorm (TConstruct i n args)
 | WNApp: forall fn t,
@@ -60,7 +60,7 @@ Proof.
   - destruct H; try rght.
     + destruct (isConstruct_dec t).
       * right. destruct H1 as [x0 [x1 [x2 j]]]. subst. intros h.
-        inversion_Clear h. elim H5. auto.
+        inversion_Clear h. elim H4. auto.
       * destruct H0.
         { left. constructor; assumption. }
   - destruct H, H0;
@@ -77,8 +77,7 @@ Lemma pre_wNorm_WcbvEval_rfl:
 Proof.
   intros p; apply WNormWNorms_ind; intros; auto; 
   try (solve [inversion H; reflexivity]).
-  - inversion_Clear H0.
-    + rewrite (H _ H4) in n0. elim n0. auto.
+  - inversion_Clear H0. specialize (H _ H3). subst. elim n. auto.
   - inversion H0.
     + rewrite (H args'). reflexivity. assumption.
   - inversion_Clear H1.

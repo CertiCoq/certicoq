@@ -395,9 +395,9 @@ Proof.
                      (instantiates (strip arg) n (strips t1))))).
     rewrite <- H. rewrite <- H0. rewrite <- H1. 
     rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
-  - change (TCase p (strip (L1g.term.instantiate arg n t0))
+  - change (TCase (snd p) (strip (L1g.term.instantiate arg n t0))
                   (stripBs (L1g.term.instantiateBrs arg n b)) =
-            (TCase p (instantiate (strip arg) n (strip t0))
+            (TCase (snd p) (instantiate (strip arg) n (strip t0))
                    (instantiateBrs (strip arg) n (stripBs b)))).
     rewrite H0. rewrite H1. reflexivity.
   - change (TFix (stripDs (L1g.term.instantiateDefs
@@ -488,7 +488,7 @@ Qed.
 Lemma TCase_hom:
   forall n ty mch brs,
     strip (L1g.compile.TCase n ty mch brs) =
-    TCase n (strip mch) (stripBs brs).
+    TCase (snd n) (strip mch) (stripBs brs).
 reflexivity.
 Qed.
 
@@ -775,11 +775,11 @@ Qed.
 
 Lemma Case_strip_inv:
   forall m mch brs s, TCase m mch brs = strip s ->
-    exists sty smch sbrs, (L1g.compile.TCase m sty smch sbrs = s) /\
+    exists i sty smch sbrs, (L1g.compile.TCase (i, m) sty smch sbrs = s) /\
               mch = strip smch /\ brs = stripBs sbrs.
 Proof.
   intros m mch brs s. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. exists s1, s2, b. intuition.
+  - myInjection h. destruct p. exists i, s1, s2, b. intuition.
 Qed.
 
 Lemma tnil_strip_inv:

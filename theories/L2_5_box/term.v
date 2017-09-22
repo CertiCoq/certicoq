@@ -35,7 +35,7 @@ Ltac not_is2 :=
   intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
             Ltac not_isApp := not_is3.
             Ltac not_isLambda := not_is2.
-            Ltac not_isCase := not_is3.
+            Ltac not_isCase := not_is2.
             Ltac not_isFix := not_is2.
 Ltac isApp_inv h :=
   let hh := fresh "h"
@@ -67,10 +67,10 @@ Fixpoint print_term (t:Term) : string :=
       " (APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ") "
     | TConst s => "[" ++ s ++ "]"
     | TConstruct _ n _ => " (CSTR " ++ (nat_to_string n) ++ ") "
-    | TCase n mch _ =>
-      " (CASE " ++ " _ " ++ (print_term mch) ++ " _ " ++") "
+    | TCase mch _ =>
+      " (CASE:" ++ (print_term mch) ++ " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
-    | TWrong => "TWrong"
+    | TWrong str => ("(TWrong:" ++ str ++ ")")
   end.
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
@@ -99,11 +99,10 @@ Proof.
     destruct (inductive_dec i i0), (eq_nat_dec n n0), (H t0);
     [lft | rght .. ].
   - induction t0; cross.
-    destruct (inductive_dec i i0), (H t0), (H0 b0);
-    [lft | rght .. ].
-   - destruct t; cross.
+    destruct (H t0), (H0 b0); [lft | rght .. ].
+  - destruct t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-  - destruct t; cross. lft. 
+  - destruct t; cross. destruct (string_dec s s0); [lft | rght .. ]. 
   - destruct tt; cross. lft.
   - destruct tt; cross. destruct (H t1); destruct (H0 tt); [lft | rght .. ].
   - destruct tt; cross; lft.
@@ -125,7 +124,7 @@ Fixpoint TrmSize (t:Term) : nat :=
     | TLambda _ bod => S (TrmSize bod)
     | TLetIn _ dfn bod => S (TrmSize dfn + TrmSize bod)
     | TApp fn a args => S (TrmSize fn + TrmSize a + TrmsSize args)
-    | TCase _ mch brs => S (TrmSize mch + TrmBsSize brs)
+    | TCase mch brs => S (TrmSize mch + TrmBsSize brs)
     | TFix ds _ => S (TrmDsSize ds)
     | _ => 1
   end
@@ -158,12 +157,12 @@ left. auto.
 Qed.
 
 Definition isCase (t:Term) : Prop :=
-  exists xn mch ds, t = TCase xn mch ds.
+  exists mch ds, t = TCase mch ds.
 
 Lemma isCase_dec: forall t, {isCase t}+{~ isCase t}.
 Proof.
   destruct t; try (solve[right; not_isCase]).
-  left. unfold isCase. exists i, t, b. reflexivity.
+  left. unfold isCase. exists t, b. reflexivity.
 Qed.
 
 Definition isApp (t:Term) : Prop :=
@@ -657,11 +656,11 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TConstruct i n t), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TCase i fn b), arg, tnil. split. reflexivity.
+  - exists (TCase fn b), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TFix d n), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists TWrong, arg, tnil. cbn.  split. reflexivity.
+  - exists (TWrong s), arg, tnil. cbn.  split. reflexivity.
     left. repeat split. not_isApp.
 Qed.
 
@@ -696,8 +695,8 @@ Inductive WFapp: Term -> Prop :=
            WFapp (TApp fn t ts)
 | wfaConst: forall nm, WFapp (TConst nm)
 | wfaConstruct: forall i m args, WFapps args -> WFapp (TConstruct i m args)
-| wfaCase: forall m mch brs,
-            WFapp mch -> WFappBs brs -> WFapp (TCase m mch brs)
+| wfaCase: forall mch brs,
+            WFapp mch -> WFappBs brs -> WFapp (TCase mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
 with WFapps: Terms -> Prop :=
 | wfanil: WFapps tnil
@@ -964,8 +963,8 @@ Inductive WFTrm: Term -> nat -> Prop :=
 | wfConst: forall n nm, WFTrm (TConst nm) n
 | wfConstruct: forall n i m args,
     WFTrms args n -> WFTrm (TConstruct i m args) n
-| wfCase: forall n m mch brs,
-    WFTrm mch n -> WFTrmBs brs n -> WFTrm (TCase m mch brs) n
+| wfCase: forall n mch brs,
+    WFTrm mch n -> WFTrmBs brs n -> WFTrm (TCase mch brs) n
 | wfFix: forall n defs m,
            WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
 with WFTrms: Terms -> nat -> Prop :=
@@ -1014,8 +1013,8 @@ Inductive PoccTrm : Term -> Prop :=
 | PoAppA: forall fn a args, PoccTrm a -> PoccTrm (TApp fn a args)
 | PoAppR: forall fn a args, PoccTrms args -> PoccTrm (TApp fn a args)
 | PoConst: PoccTrm (TConst nm)
-| PoCaseL: forall n mch brs, PoccTrm mch -> PoccTrm (TCase n mch brs)
-| PoCaseR: forall n mch brs, PoccBrs brs -> PoccTrm (TCase n mch brs)
+| PoCaseL: forall mch brs, PoccTrm mch -> PoccTrm (TCase mch brs)
+| PoCaseR: forall mch brs, PoccBrs brs -> PoccTrm (TCase mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
 | PoCnstri: forall m1 m2 m3, PoccTrm (TConstruct (mkInd nm m1) m2 m3)
 | PoCnstrargs: forall i n args,
@@ -1145,7 +1144,7 @@ intuition.
 Qed.
 
 Lemma notPocc_TCase:
-  forall n mch brs, ~ PoccTrm (TCase n mch brs) ->
+  forall mch brs, ~ PoccTrm (TCase mch brs) ->
                     ~ PoccTrm mch /\ ~ PoccBrs brs.
 intuition. 
 Qed.
@@ -1291,14 +1290,14 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
                 Instantiates n args iargs ->
                 Instantiate n (TConstruct ind m1 args)
                             (TConstruct ind m1 iargs)
-| ICase: forall n np s ts is its,
+| ICase: forall n s ts is its,
            Instantiate n s is ->
            InstantiateBrs n ts its ->
-           Instantiate n (TCase np s ts) (TCase np is its)
+           Instantiate n (TCase s ts) (TCase is its)
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
-| IWrong: forall n, Instantiate n TWrong TWrong
+| IWrong: forall n s, Instantiate n (TWrong s) (TWrong s)
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
 | Icons: forall n t ts it its,
@@ -1517,8 +1516,7 @@ Proof.
     + apply H1. assumption.
   - change (WFapp (TConstruct i m (instantiates t n args))).
     constructor. intuition.
-  - change (WFapp (TCase m (instantiate t n mch)
-                         (instantiateBrs t n brs))).
+  - change (WFapp (TCase (instantiate t n mch) (instantiateBrs t n brs))).
     constructor.
     + apply H0; assumption.
     + apply H2; assumption.

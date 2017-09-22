@@ -30,10 +30,9 @@ Inductive Term : Type :=
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
 | TConstruct : inductive -> nat (* index in datatype *) -> Terms -> Term
-| TCase      : inductive ->
-               Term (* discriminee *) -> Brs (* # args, branch *) -> Term
+| TCase      : Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
-| TWrong     : Term
+| TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -92,7 +91,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TApp t a ts =>
       mkApp (instantiate n t) (tcons (instantiate n a) (instantiates n ts))
     | TLambda nm bod => TLambda nm  (instantiate (S n) bod)
-    | TCase np s ts => TCase np (instantiate n s) (instantiateBrs n ts)
+    | TCase s ts => TCase (instantiate n s) (instantiateBrs n ts)
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
@@ -144,19 +143,19 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
     | L2k.compile.TConst pth => TConst pth
     | L2k.compile.TConstruct ind m args =>
       TConstruct ind m (L2kTerms_Terms args)
-    | L2k.compile.TCase m mch brs =>
+    | L2k.compile.TCase mch brs =>
       match L2k.term.isProof_dec mch with
         | left _ =>
           match brs with
             | L2k.compile.bunit n br =>
               applyBranchToProof n (L2kTerm_Term br)
-            | _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
+            | _ => TCase (L2kTerm_Term mch) (L2kBrs_Brs brs)
           end
-        | right _ => TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs)
+        | right _ => TCase (L2kTerm_Term mch) (L2kBrs_Brs brs)
       end
     | L2k.compile.TFix defs m => TFix (L2kDefs_Defs defs) m
     | L2k.compile.TDummy => TProof
-    | L2k.compile.TWrong => TWrong
+    | L2k.compile.TWrong str => TWrong str
   end
 with L2kTerms_Terms (ts:L2kTerms) : Terms :=
        match ts with
@@ -198,20 +197,20 @@ Proof.
 
 Lemma L2kTerm_Term_Case_not_Proof:
   forall mch, ~ L2k.term.isProof mch ->
-              forall m brs, L2kTerm_Term (L2k.compile.TCase m mch brs) =
-                            TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs).
+              forall brs, L2kTerm_Term (L2k.compile.TCase mch brs) =
+                            TCase (L2kTerm_Term mch) (L2kBrs_Brs brs).
 Proof.
-  intros mch hmch m brs.
+  intros mch hmch brs.
   destruct brs, mch; cbn; try reflexivity.
   elim hmch. auto.
 Qed.
 
 Lemma L2kTerm_Term_Case_not_bunit:
   forall brs, L2k.compile.blength brs <> 1 ->
-              forall m mch, L2kTerm_Term (L2k.compile.TCase m mch brs) =
-                            TCase m (L2kTerm_Term mch) (L2kBrs_Brs brs).
+              forall mch, L2kTerm_Term (L2k.compile.TCase mch brs) =
+                            TCase (L2kTerm_Term mch) (L2kBrs_Brs brs).
 Proof.
-  intros brs hmch m mch.
+  intros brs hmch mch.
   destruct brs; intros; cbn; destruct mch; try reflexivity.
   - destruct brs; try reflexivity.
     + cbn in hmch. elim hmch. reflexivity.

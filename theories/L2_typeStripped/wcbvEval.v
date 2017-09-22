@@ -53,7 +53,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wCase: forall mch Mch n args ml ts brs cs s ,
     WcbvEval p mch Mch ->
     canonicalP Mch = Some (n, args) ->
-    tskipn (snd ml) args = Some ts ->
+    tskipn ml args = Some ts ->
     whCaseStep n ts brs = Some cs ->
     WcbvEval p cs s ->
     WcbvEval p (TCase ml mch brs) s
@@ -450,7 +450,7 @@ Function wcbvEval
         match canonicalP emch with
         | None => raise ("wcbvEval: Case, discriminee not canonical")
         | Some (r, args) =>
-          match tskipn (snd ml) args with
+          match tskipn ml args with
           | None => raise "wcbvEval: Case, tskipn"
           | Some ts =>
             match whCaseStep r ts brs with
@@ -474,7 +474,7 @@ Function wcbvEval
     | TSort srt => ret (TSort srt)
     (** should never appear **)
     | TRel _ => raise "wcbvEval: unbound Rel"
-    | TWrong => raise "TWrong"
+    | TWrong s => raise ("(TWrong:" ++ s ++")")
     end
   end
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}

@@ -22,18 +22,14 @@ Definition thd_tl ts t us: (Term * Terms) :=
   end.
 
 (** Printing terms in exceptions for debugging purposes **)
-Definition print_name nm : string :=
-  match nm with
-  | nAnon => " _ "
-  | nNamed str => str
-  end.
-Definition print_inductive i : string :=
-  match i with
-  | mkInd str n => "str"
+Fixpoint tlength (ts:Terms) : nat :=
+  match ts with 
+    | tnil => 0
+    | tcons _ ts => S (tlength ts)
   end.
 Fixpoint print_term (t:Term) : string :=
   match t with
-    | TRel n => "(" ++ (nat_to_string n) ++ ")"
+    | TRel n => "(REL " ++ (nat_to_string n) ++ ")"
     | TSort _ => " SRT "
     | TProof tm => "(PRF" ++ (print_term tm) ++ ")"
     | TProd _ _ _ => " PROD "
@@ -41,15 +37,16 @@ Fixpoint print_term (t:Term) : string :=
     | TLetIn nm _ dfn bod =>
       (" LET " ++ (print_name nm) ++ (print_term dfn) ++ (print_term bod))
     | TApp fn arg args =>
-      "(APP" ++ (print_term fn) ++ (print_term arg) ++ " _ " ++ ")"
+      "(APP" ++ (print_term fn) ++ (print_term arg) ++ " "
+             ++ nat_to_string (tlength args) ++ ")"
     | TConst s => "[" ++ s ++ "]"
-    | TInd _ => " TIND "
-    | TConstruct i _ _ _ => "(CSTR " ++ (print_inductive i) ++")"
+    | TInd i => "(TIND" ++ print_inductive i ++ ")"
+    | TConstruct i ix _ _ =>
+      "(CSTR" ++ (print_inductive i) ++ nat_to_string ix ++ ")"
     | TCase n _ mch _ =>
       "(CASE " ++ (nat_to_string (snd n)) ++ " _ " ++ (print_term mch) ++
                  " _ " ++")"
     | TFix _ n => "(FIX " ++ (nat_to_string n) ++ ")"
-    | TAx s => "(Ax " ++ s ++")"
     | TWrong str => (" Wrong " ++ str )
   end.
 
@@ -115,7 +112,6 @@ Proof.
       [lft | rght ..]. 
   - destruct t2; cross.
     destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
-  - destruct t; cross. destruct (string_dec s s0); [lft | rght].
   - destruct t; cross. destruct (string_dec s s0); [lft | rght].
   - destruct t; cross. destruct (inductive_dec i i0); [lft | rght].
   - destruct t; cross.
@@ -270,6 +266,20 @@ induction t;
 left. auto.
 Qed.
 
+Definition isInd (t:Term) : Prop :=
+  exists i, t = TInd i.
+Lemma IsInd: forall i, isInd (TInd i).
+intros. exists i. reflexivity.
+Qed.
+Hint Resolve IsInd.
+
+Lemma isInd_dec: forall t, isInd t \/ ~ isInd t.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x0 j]; discriminate).
+  - left. auto.
+Qed.
+
 Definition isConstruct (t:Term) : Prop :=
   exists i n np na, t = TConstruct i n np na.
 Lemma IsConstruct: forall i n np na, isConstruct (TConstruct i n np na).
@@ -333,12 +343,6 @@ Proof.
 Qed.
 
 (** some utility operations on [Terms] ("lists" of Term) **)
-Fixpoint tlength (ts:Terms) : nat :=
-  match ts with 
-    | tnil => 0
-    | tcons _ ts => S (tlength ts)
-  end.
-
 Lemma tappend_tnil: forall ts:Terms, tappend ts tnil = ts.
 induction ts; simpl; try reflexivity.
 rewrite IHts. reflexivity.
@@ -892,8 +896,6 @@ Proof.
       * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TAx s), arg, tnil. split. reflexivity.
-    left. intuition. revert H. not_isApp.
   - exists (TInd i), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TConstruct i n n0 n1), arg, tnil. split. reflexivity.
@@ -939,7 +941,6 @@ Inductive WFapp: Term -> Prop :=
            ~ (isApp fn) -> WFapp fn -> WFapp t -> WFapps ts ->
            WFapp (TApp fn t ts)
 | wfaConst: forall nm, WFapp (TConst nm)
-| wfaAx: forall s, WFapp (TAx s)
 | wfaInd: forall i, WFapp (TInd i)
 | wfaConstruct: forall i m np na, WFapp (TConstruct i m np na)
 | wfaCase: forall m ty mch brs,
@@ -1101,7 +1102,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
            ~ (isApp fn) -> WFTrm fn n -> WFTrm t n -> WFTrms ts n ->
            WFTrm (TApp fn t ts) n
 | wfConst: forall n nm, WFTrm (TConst nm) n
-| wfAx: forall n t, WFTrm (TAx t)  n
 | wfInd: forall n i, WFTrm (TInd i) n
 | wfConstruct: forall n i m np na, WFTrm (TConstruct i m np na) n
 | wfCase: forall n m ty mch brs,
@@ -1440,7 +1440,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
           Instantiate n t it -> Instantiate n a ia -> Instantiates n ts its ->
           Instantiate n (TApp t a ts) (mkApp it (tcons ia its))
 | IConst: forall n s, Instantiate n (TConst s) (TConst s)
-| IAx: forall n t, Instantiate n (TAx t) (TAx t)
 | IInd: forall n ind, Instantiate n (TInd ind) (TInd ind)
 | IConstruct: forall n ind m1 np na,
       Instantiate n (TConstruct ind m1 np na) (TConstruct ind m1 np na)

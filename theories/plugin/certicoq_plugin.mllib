@@ -89,6 +89,9 @@ AST
 Ctypes
 L3_to_L4
 Instances5
+Alpha_fresh
+Beta_contraction
+Uncurry
 Instances6
 Csyntax
 Clightdefs

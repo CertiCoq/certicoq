@@ -13,6 +13,17 @@ Open Scope list_scope.
 Set Implicit Arguments.
 
 
+(** Printing terms in exceptions for debugging purposes **)
+Definition print_name nm : string :=
+  match nm with
+  | nAnon => " _ "
+  | nNamed str => str
+  end.
+Definition print_inductive (i:inductive) : string :=
+  match i with
+  | mkInd str n => ("(inductive:" ++ str ++ ":" ++ nat_to_string n ++ ")")
+  end.
+
 Lemma name_dec: forall (s1 s2:name), {s1 = s2}+{s1 <> s2}.
 induction s1; induction s2; try (solve [right; intros h; discriminate]).
 - left; reflexivity.
@@ -90,6 +101,12 @@ Record Cnstr := mkCnstr { CnstrNm:string; CnstrArity:nat }.
 (* an inductive type is a string (for human readability)
 ** and a list of Cnstrs *)
 Record ityp := mkItyp { itypNm:string; itypCnstrs:list Cnstr }.
+
+Definition print_ityp (x:ityp) : string :=
+  match x with
+  | mkItyp str ys =>
+    ("(ityp:" ++ str ++ "," ++ nat_to_string (List.length ys) ++ ")")
+  end.
 
 (* a mutual type package is a list of ityps *)
 Definition itypPack := list ityp.
@@ -492,15 +509,17 @@ Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) :
   match i with
     | mkInd nm tndx =>
       match lookupTyp nm p with
-        | Exc str => raise ("cnstrArity; lookupTyp fails: " ++ str)
+        | Exc str => raise ("cnstrArity;lookupTyp: " ++ str)
         | Ret (npars, itypkg) =>
           match getInd itypkg tndx with
-            | Exc str => raise ("cnstrArity; getInd fails: " ++ str)
-            | Ret ity => match getCnstr ity cndx with
-                           | Exc str =>
-                             raise ("cnstrArity; getCnstr fails: " ++ str)
-                           | Ret itp => ret (npars, CnstrArity itp)
-                         end
+            | Exc str => raise ("cnstrArity;getInd: " ++ str)
+            | Ret ity =>
+              match getCnstr ity cndx with
+              | Exc str => raise ("cnstrArity;getCnstr:"
+                                      ++ print_inductive i
+                                      ++ print_ityp ity ++ ")" ++ str)
+              | Ret itp => ret (npars, CnstrArity itp)
+              end
           end
        end
   end.

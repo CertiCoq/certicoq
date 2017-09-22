@@ -65,7 +65,6 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
     Crct p n (TApp fn a args)
 | CrctConst: forall n p pd nm,
     Crct p n prop -> LookupDfn nm p pd -> Crct p n (TConst nm)
-| CrctAx: forall n p t, Crct p n prop -> Crct p n (TAx t)
 | CrctConstruct: forall n p ipkgNm inum cnum ipkg itp cstr m np na,
     Crct p n prop ->
     LookupTyp ipkgNm p m ipkg ->
@@ -365,7 +364,6 @@ Proof.
     inversion H1.
     + rewrite H6 in j. nreflexivity j.
     + eassumption.
-  - eapply CrctAx. eapply H0; try eassumption. intros h. inversion h. 
   - eapply CrctConstruct; try eassumption.
     + eapply H0. eapply H4. intros h. inversion h.
     + rewrite H4 in H1.
@@ -718,7 +716,6 @@ Proof.
     + destruct H3 as [x [h1 h2]]. eapply (@CrctConst _ _ x); trivial.
       * eapply Crct_Sort. eassumption.
   - constructor. eapply Crct_Sort. eassumption.
-  - apply CrctInd. eapply Crct_Sort. eassumption.
   - destruct ind. edestruct (Crct_invrt_Construct H0).
     + reflexivity.
     + destruct H3 as [npars [ip [h1 [it [h2 [ctr h3]]]]]].

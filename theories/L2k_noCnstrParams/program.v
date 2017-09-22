@@ -86,17 +86,19 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
            crctTerm p n fn -> ~ isApp fn -> crctTerm p n arg ->
            crctTerms p n args -> crctTerm p n (TApp fn arg args)
 | ctConst: forall p n pd nm,
-             crctEnv p -> LookupDfn nm p pd -> crctTerm p n (TConst nm)
-| ctAx: forall p n t, crctEnv p -> crctTerm p n (TAx t)
+    crctEnv p -> LookupDfn nm p pd -> crctTerm p n (TConst nm)
+(*************
+| ctInd: forall i n p, crctEnv p -> crctTerm p n (TInd i)
+*************)
 | ctConstructor: forall p n ipkgNm inum cnum args ipkg itp cstr pars,
                    LookupTyp ipkgNm p pars ipkg ->
                    getInd ipkg inum = Ret itp ->
                    getCnstr itp cnum = Ret cstr ->
                    crctTerms p n args ->
                    crctTerm p n (TConstruct (mkInd ipkgNm inum) cnum args)
-| ctCase: forall p n m mch brs,
+| ctCase: forall p n mch brs,
             crctTerm p n mch -> crctBs p n brs ->
-            crctTerm p n (TCase m mch brs)
+            crctTerm p n (TCase mch brs)
 | ctFix: forall p n ds m,
            crctDs p (n + dlength ds) ds -> m < dlength ds ->
            crctTerm p n (TFix ds m)
@@ -318,7 +320,7 @@ Proof.
 Qed.
 
 Lemma TWrong_not_Crct:
-  forall p n, ~ crctTerm p n TWrong.
+  forall p n s, ~ crctTerm p n (TWrong s).
 Proof.
   induction p; intros; intros h.
   - inversion h.
@@ -378,8 +380,8 @@ Proof.
 Qed.
 
 Lemma Crct_invrt_Case:
-  forall p n m s us,
-    crctTerm p n (TCase m s us) -> crctTerm p n s /\ crctBs p n us.
+  forall p n s us,
+    crctTerm p n (TCase s us) -> crctTerm p n s /\ crctBs p n us.
 Proof.
    intros. inversion_Clear H. intuition.
 Qed.

@@ -1,6 +1,6 @@
 Require Import Libraries.CpdtTactics.
 Require Import compcert.lib.Coqlib.
-Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util L6.functions.
+Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util L6.functions L6.tactics.
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
         Coq.omega.Omega Coq.Sets.Ensembles Coq.Relations.Relation_Operators.

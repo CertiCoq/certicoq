@@ -5,7 +5,7 @@
 Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
         Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles Omega Coq.Sorting.Permutation.
 Require Import compcert.lib.Coqlib.
-Require Import L6.cps L6.cps_util L6.ctx L6.set_util L6.Ensembles_util L6.List_util L6.size_cps.
+Require Import L6.cps L6.cps_util L6.ctx L6.set_util L6.Ensembles_util L6.List_util L6.size_cps L6.tactics.
 Import ListNotations.
 
 Import PS.

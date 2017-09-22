@@ -7,7 +7,7 @@ From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
          omega.Omega Numbers.BinNums Structures.OrdersEx Sets.Ensembles
          Lists.SetoidList ZArith Arith Sorting.Permutation.
 
-From L6 Require Import Ensembles_util.
+From L6 Require Import Ensembles_util tactics.
 
 Import ListNotations.
 

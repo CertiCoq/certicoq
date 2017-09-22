@@ -16,12 +16,6 @@ Module SpaceSem (H : Heap).
 
   Import H Defs.
 
-  Inductive ans : Type :=
-  | Res : res -> ans
-  | OOT : ans (* out of time *)
-  | OOM : ans (* out of memory. XXX not used *).
-
-
   (* The cost of evaluating the head *)
   (* TODO make semantics parametric in the cost model *)
   Definition cost (e : exp) : nat :=
@@ -810,5 +804,18 @@ Module SpaceSem (H : Heap).
          symmetry. eapply reach_heap_env_equiv.
          eapply collect_heap_eq. eassumption.
    Qed.
-   
+
+   Lemma big_step_perfect_gc_heap_eq H1 H2 rho1 rho2 e (r : ans) c m :
+     big_step_perfect_GC H1 rho1 e r c m ->
+     (occurs_free e) |- (H1, rho1) ⩪ (H2, rho2) ->
+                       (exists r', big_step_perfect_GC H2 rho2 e r c m /\
+                              ans_equiv r r').
+   Admitted.
+
+   Lemma heap_eq_respects_heap_env_equiv S H1 H2 rho :
+     (env_locs rho S) |- H1 ≡ H2 ->
+                        S |- (H1, rho) ⩪ (H2, rho).
+   Proof.
+   Admitted.
+
 End SpaceSem.

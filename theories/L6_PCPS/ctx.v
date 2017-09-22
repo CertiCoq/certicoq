@@ -1,5 +1,5 @@
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega.
-Require Import L6.cps.
+Require Import L6.cps L6.tactics.
 Require Import Libraries.CpdtTactics L6.set_util.
 Import ListNotations.
 
@@ -294,14 +294,6 @@ Theorem comp_f_ctx_f_assoc:
 Proof.
   intros; apply comp_ctx_f_assoc_mut; auto.
 Qed.
-
-
-Ltac destructAll :=
-  match goal with
-    | [ H : _ /\ _ |- _] => destruct H; destructAll
-    | [ H : exists E, _ |- _ ] => destruct H; destructAll
-    | _ => subst
-  end.
 
 Theorem comp_ctx_split_mut:
   (forall c1 c2 c3 c4,

@@ -3,9 +3,7 @@
  *)
 
 Require Import Coq.Relations.Relations Coq.Classes.RelationClasses.
-Require Import cps ctx.
-
-Ltac inv H := inversion H; clear H; subst.
+From L6 Require Import cps ctx tactics.
 
 Section Relations.
 

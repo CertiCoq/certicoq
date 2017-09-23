@@ -44,12 +44,12 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p (TApp fn arg args) s 
 | wAppDummy: forall fn arg args, 
     WcbvEval p fn TDummy -> WcbvEval p (TApp fn arg args) TDummy
-| wCase: forall mch Mch n args brs cs s,
+| wCase: forall i mch Mch n args brs cs s,
     WcbvEval p mch Mch ->
     canonicalP Mch = Some (n, args) ->
     whCaseStep n args brs = Some cs ->
     WcbvEval p cs s ->
-    WcbvEval p (TCase mch brs) s
+    WcbvEval p (TCase i mch brs) s
 | wDummy: WcbvEval p TDummy TDummy
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
      | wNil: WcbvEvals p tnil tnil
@@ -113,8 +113,8 @@ Proof.
     + specialize (H _ H4). discriminate.
     + specialize (H _ H4). discriminate.
   - inversion_Clear H1.
-    + specialize (H _ H4). subst. rewrite H5 in e.
-      myInjection e. rewrite H6 in e0. myInjection e0.
+    + specialize (H _ H5). subst. rewrite H6 in e.
+      myInjection e. rewrite H8 in e0. myInjection e0.
       apply H0. assumption.
   - inversion_Clear H1. specialize (H _ H4). specialize (H0 _ H6). subst.
     reflexivity.
@@ -286,7 +286,7 @@ Function wcbvEval
       | Ret s => raise ("(wcbvEval;TApp:fn:" ++ print_term s ++ ")")
       | Exc str =>  raise ("(wcbvEval;TApp:fnExc:" ++ str ++ ")")
       end
-    | TCase mch brs =>
+    | TCase _ mch brs =>
       match wcbvEval n mch with
       | Ret emch =>
         match canonicalP emch with

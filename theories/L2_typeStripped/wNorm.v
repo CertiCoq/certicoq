@@ -8,8 +8,6 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
 Require Import L2.term.
 Require Import L2.program.
-Require Import L2.wndEval.
-Require Import L2.wcbvEval.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -129,28 +127,5 @@ Proof.
   - inversion_Clear H1. constructor; intuition.
 Qed.
 *************************************)
-
-(** If a program is in weak normal form, it has no wndEval step **)
-Lemma wNorm_no_wndStep_lem:
-  (forall t s, wndEval p t s -> ~ WNorm t) /\
-  (forall ts ss, wndEvals p ts ss -> ~ WNorms ts).
-Proof.
-  apply wndEvalEvals_ind; intros; intros h;
-  try (solve[inversion h]);
-  try (solve[inversion h; subst; contradiction]).
-  - inversion h. subst. elim H5. exists nm, bod. reflexivity.
-  - inversion h. subst. elim H3.
-    eapply canonicalP_isCanonical. eassumption.
-  - inversion_Clear h.
-    + elim H6. auto.
-  - inversion_Clear h.
-    + elim H. constructor; assumption.
-Qed.
-
-Lemma wNorm_no_wndStep:
-  forall t, WNorm t -> no_wnd_step p t.
-unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
-elim (proj1 wNorm_no_wndStep_lem _ _ h1). assumption.
-Qed.
 
 End Sec_environ.

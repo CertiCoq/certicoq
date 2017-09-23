@@ -81,9 +81,9 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
                    CnstrArity cstr = tlength args ->
                    crctTerms p n args ->
                    crctTerm p n (TConstruct (mkInd ipkgNm inum) cnum args)
-| ctCase: forall p n mch brs,
+| ctCase: forall p n i mch brs,
             crctTerm p n mch -> crctBs p n brs ->
-            crctTerm p n (TCase mch brs)
+            crctTerm p n (TCase i mch brs)
 | ctFix: forall p n ds m,
            crctDs p (n + dlength ds) ds -> m < dlength ds ->
            crctTerm p n (TFix ds m)
@@ -422,8 +422,8 @@ Proof.
 Qed.
 
 Lemma Crct_invrt_Case:
-  forall p n s us,
-    crctTerm p n (TCase s us) -> crctTerm p n s /\ crctBs p n us.
+  forall p n i s us,
+    crctTerm p n (TCase i s us) -> crctTerm p n s /\ crctBs p n us.
 Proof.
    intros. inversion_Clear H. intuition.
 Qed.

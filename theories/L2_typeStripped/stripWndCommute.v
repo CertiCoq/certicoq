@@ -10,7 +10,6 @@ Require Import Omega.
 Require Import Common.AstCommon.
 Require Import L1g.L1g.
 Require Import L2.program.
-Require Import L2.wndEval.
 Require Import L2.wcbvEval.
 Require Import L2.stripEvalCommute.
 Require Import L2.term.
@@ -48,7 +47,7 @@ Qed.
 (** Since L1g.wndEval.wndEval may make steps in parts of a term that are
 *** erased in L2, and since L2.WndEval is not reflexive, we add <>
 ***  hypotheses.
-**)
+**
 Lemma Wnd_hom:
   forall p,
   (forall (s t:L1gTerm),
@@ -240,3 +239,4 @@ Proof.
 Qed.
  *************************)
 ****************************************)
+******************************)

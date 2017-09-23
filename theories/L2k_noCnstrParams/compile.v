@@ -29,12 +29,10 @@ Inductive Term : Type :=
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
 | TConst     : string -> Term
-(***
-| TInd       : inductive -> Term
-***)
 (* constructors fully applied: eta expand *)
 | TConstruct : inductive -> nat (* cnstr no *) -> Terms (* args *) -> Term
-| TCase      : Term (* discriminee *) -> Brs (* # args, branch *) -> Term
+| TCase      : inductive ->
+               Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : string -> Term
 | TDummy     : Term
@@ -189,7 +187,7 @@ Function lift (n:nat) (t:Term) : Term :=
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg args => TApp (lift n fn) (lift n arg) (lifts n args)
     | TConstruct i x args => TConstruct i x (lifts n args)
-    | TCase mch brs => TCase (lift n mch) (liftBs n brs)
+    | TCase i mch brs => TCase i (lift n mch) (liftBs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
     | _ => t
   end
@@ -331,7 +329,7 @@ Function strip (t:L2Term) : Term :=
   | L2.compile.TInd _ => TDummy
   | L2.compile.TConstruct i m npars nargs =>
     etaExpand (fun b => TConstruct i m b) tnil npars nargs
-  | L2.compile.TCase _ mch brs => TCase (strip mch) (stripBs brs)
+  | L2.compile.TCase i mch brs => TCase (fst i) (strip mch) (stripBs brs)
   | L2.compile.TFix ds n => TFix (stripDs ds) n
   | L2.compile.TWrong str => TWrong str
   end

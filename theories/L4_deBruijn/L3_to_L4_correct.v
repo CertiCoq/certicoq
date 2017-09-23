@@ -158,7 +158,7 @@ Inductive wcbv_value : Term -> Prop :=
   | con_wcbv_value : forall (d : inductive) (n : nat) (es : Terms), wcbv_values es -> wcbv_value (TConstruct d n es)
   | fix_wcbv_value : forall (es : Defs) (k : nat), wcbv_value (TFix es k)
   | prf_wcbv_value : wcbv_value TProof
-  | wrong_wcbv_value : wcbv_value TWrong
+  | wrong_wcbv_value : forall str, wcbv_value (TWrong str)
 with wcbv_values : Terms -> Prop :=
     enil_wcbv_values : wcbv_values tnil
   | econs_wcbv_values : forall (e : Term) (es : Terms),
@@ -1831,12 +1831,13 @@ Proof.
   auto.
 Qed.
 
-Lemma Crct_invrt_wrong_aux p n x : crctTerm p n x -> x = TWrong -> False.
+Lemma Crct_invrt_wrong_aux p n x str :
+  crctTerm p n x -> x = (TWrong str) -> False.
 Proof.
   induction 1; intros; congruence.
 Qed.
 
-Lemma Crct_invrt_wrong p n : crctTerm p n TWrong -> False.
+Lemma Crct_invrt_wrong p n str : crctTerm p n (TWrong str) -> False.
 Proof. intros; eapply Crct_invrt_wrong_aux; eauto. Qed.
 
 Lemma dnthBody_dnth n brs t : dnthBody n brs = Some t -> exists d, dnth n brs = Some d /\ dbody _ d = t.

@@ -4,12 +4,10 @@
 
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad
         Coq.Classes.Morphisms Coq.Lists.List.
-Require Import functions.
+From L6 Require Import functions tactics.
 Import MonadNotation ListNotations.
 
 Open Scope monad_scope.
-
-Ltac inv H := inversion H; clear H; subst.
 
 Definition triple {A S} (pre : S -> Prop) (e : state S A)
            (post : S -> A -> S -> Prop) : Prop :=

@@ -38,6 +38,12 @@ Module HeapDefs (H : Heap).
   (** The result of evaluation *)
   Definition res : Type := value * heap block.
 
+  Inductive ans : Type :=
+  | Res : res -> ans
+  | OOT : ans (* out of time *)
+  | OOM : ans (* out of memory. XXX not used *).
+
+
 (*
 
   (** Definitions for unboxed function pointers *)
@@ -168,8 +174,16 @@ Module HeapDefs (H : Heap).
   (** Result equivalence. Two results represent the exact same value *)
   Definition res_equiv (r1 r2 : res) : Prop :=
     forall n, res_approx_fuel' n r1 r2 /\ res_approx_fuel' n r2 r1.
-  
+
   Infix "≈" := res_equiv (at level 70, no associativity).
+
+  Definition ans_equiv (a1 a2 : ans) :=
+    match a1, a2 with
+      | Res r1, Res r2 => r1 ≈ r2
+      | OOT, OOT => True
+      | _, _  => False
+    end.
+
   
   (** Approximation lifted to the environments *)
   Definition heap_env_approx (S : Ensemble var) p1 p2 : Prop :=
@@ -945,6 +959,12 @@ Module HeapDefs (H : Heap).
     Decidable S ->
     exists H', live S H H'.
   Proof.
+  Admitted.
+
+  Lemma live_deterministic S H1 H2 H2' :
+    live S H1 H2 ->
+    live S H1 H2' ->
+    Full_set _ |- H2 ≡ H2'.
   Admitted.
 
   Lemma live_heap_eq (S : Ensemble loc) (H1 H1' H2 : heap block) :

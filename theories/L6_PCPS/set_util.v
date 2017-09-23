@@ -3,12 +3,11 @@
  *)
 
 Require Import Coq.PArith.PArith Coq.MSets.MSetRBT Coq.Classes.Morphisms.
+From L6 Require Import tactics.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 
 Import PS.
-
-Ltac inv H := inversion H; clear H; subst.
 
 (** Some set lemmas that might be useful *)
 Lemma Subset_add s s' e :

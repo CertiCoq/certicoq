@@ -401,10 +401,6 @@ Theorem bstep_f_complete:
         bstep_cost rho (Ehalt x) v 1.
 
 
-
-
-  
-  
   Ltac subst_exp :=
     match goal with
       | [H1 : ?e = ?e1, H2 : ?e = ?e2 |- _ ] =>

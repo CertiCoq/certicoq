@@ -135,8 +135,8 @@ Proof.
 Qed.
 
 Lemma TCase_hom:
-  forall de brs ,
-    strip (L2_5.compile.TCase de brs) = TCase (strip de) (stripBs brs).
+  forall i de brs ,
+    strip (L2_5.compile.TCase i de brs) = TCase i (strip de) (stripBs brs).
 Proof.
   intros. reflexivity. 
 Qed.
@@ -379,9 +379,9 @@ Proof.
        TConstruct i n (instantiates (strip arg) n0 (strips t))).
     rewrite <- H; trivial.
   - change
-     (TCase (strip (L2_5.term.instantiate arg n t))
+     (TCase i (strip (L2_5.term.instantiate arg n t))
             (stripBs (L2_5.compile.instantiateBrs arg n b)) =
-      TCase (instantiate (strip arg) n (strip t))
+      TCase i (instantiate (strip arg) n (strip t))
             (instantiateBrs (strip arg) n (stripBs b))).
     rewrite H; trivial. rewrite H0; trivial.
   - change

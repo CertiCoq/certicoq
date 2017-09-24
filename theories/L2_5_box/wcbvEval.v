@@ -49,7 +49,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p mch (TConstruct i n args) ->
     whCaseStep n args brs = Some cs ->
     WcbvEval p cs s ->
-    WcbvEval p (TCase mch brs) s
+    WcbvEval p (TCase i mch brs) s
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
      | wNil: WcbvEvals p tnil tnil
      | wCons: forall t t' ts ts',
@@ -224,12 +224,16 @@ Function wcbvEval
       | Ret TProof => Ret TProof  (* proof redex *)
       | _ => raise "wcbvEval, TApp: fn"
       end
-    | TCase mch brs =>
+   | TCase ml mch brs =>
       match wcbvEval n mch with
       | Ret (TConstruct i ix args) =>
-        match whCaseStep ix args brs with
+        match inductive_dec i ml with
+        | left _ =>
+          match whCaseStep ix args brs with
           | None => raise "wcbvEval: Case, whCaseStep"
           | Some cs => wcbvEval n cs
+          end
+        | right _ => raise "wcbvEval: Case, constructor of wrong type"
         end
       | _ => raise "wcbvEval: Case, discriminee not canonical"
       end
@@ -290,7 +294,7 @@ Proof.
   - specialize (H0 _ p1). specialize (H _ e1).
     eapply wAppFix; try eassumption.
   - eapply wCase; try eassumption.
-    + apply H. apply e1. 
+    + apply H. rewrite <- _x. apply e1. 
     + apply H0; eassumption. 
   - eapply wLetIn; intuition.
     + apply H. assumption.

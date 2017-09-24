@@ -47,7 +47,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p mch (TConstruct i n args) ->
     whCaseStep n args brs = Some cs ->
     WcbvEval p cs s ->
-    WcbvEval p (TCase mch brs) s
+    WcbvEval p (TCase i mch brs) s
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
      | wNil: WcbvEvals p tnil tnil
      | wCons: forall t t' ts ts',
@@ -112,10 +112,6 @@ Lemma WcbvEval_weaken:
                   WcbvEvals ((nm,ec)::p) ts ss).
 Proof.
   intros p hp. apply WcbvEvalEvals_ind; intros; auto.
-  (****************
-  - specialize (H nm ec H0). apply waPrf; intuition. destruct ec.
-    + apply (proj1 Crct_weaken); try assumption.
-******************)
   - eapply wConst. 
     + apply Lookup_weaken; eassumption.
     + apply H. assumption.
@@ -192,7 +188,7 @@ Proof.
     + apply (dnthBody_pres_WFTrm _ e).
       rewrite list_to_zero_length. assumption.
   - apply H0. eapply whCaseStep_pres_WFTrm; try eassumption.
-    specialize (H _ H4). inversion_Clear H. assumption.
+    specialize (H _ H6). inversion_Clear H. assumption.
 Qed.
 
 Lemma WcbvEval_pres_Crct:
@@ -489,14 +485,18 @@ Function wcbvEval
       | Ret TProof => Ret TProof  (* proof redex *)
       | _ => raise "wcbvEval, TApp: fn"
       end
-    | TCase mch brs =>
+    | TCase ml mch brs =>
       match wcbvEval n mch with
       | Ret (TConstruct i ix args) =>
-        match whCaseStep ix args brs with
-        | None => raise "wcbvEval: Case, whCaseStep"
-        | Some cs => wcbvEval n cs
+        match inductive_dec i ml with
+        | left _ =>
+          match whCaseStep ix args brs with
+          | None => raise "wcbvEval: Case, whCaseStep"
+          | Some cs => wcbvEval n cs
+          end
+        | right _ => raise "wcbvEval: Case, constructor of wrong type"
         end
-      | _ => raise "wcbvEval:Case, discriminee not canonical"
+      | _ => raise "wcbvEval: Case, discriminee not canonical"
       end
     | TLetIn nm df bod =>
       match wcbvEval n df with

@@ -7,8 +7,6 @@ Require Import Coq.omega.Omega.
 Require Import Coq.Logic.Decidable.
 Require Import L2.term.
 Require Import L2.program.
-Require Import L2.awndEval.
-Require Import L2.wndEval.
         
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -53,7 +51,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wCase: forall mch Mch n args ml ts brs cs s ,
     WcbvEval p mch Mch ->
     canonicalP Mch = Some (n, args) ->
-    tskipn ml args = Some ts ->
+    tskipn (snd ml) args = Some ts ->
     whCaseStep n ts brs = Some cs ->
     WcbvEval p cs s ->
     WcbvEval p (TCase ml mch brs) s
@@ -297,105 +295,6 @@ Proof.
 Qed.
 ****)
 
-(** WcbvEval is contained in wndEvalRTC **)
-Lemma WcbvEval_wndEvalRTC:
-  forall (p:environ Term), WFaEnv p ->
-    (forall t s, WcbvEval p t s -> WFapp t -> wndEvalRTC p t s) /\
-    (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> wndEvalsRTC p ts ss).
-Proof.
-  intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
-  - inversion_Clear H0. eapply wndEvalRTC_Proof. intuition. 
-  - eapply wERTCtrn; intuition.
-    eapply wERTCtrn.
-    + apply wERTCstep. apply sConst. apply lookupDfn_LookupDfn. eassumption.
-    + apply H. eapply (lookupDfn_pres_WFapp hp).  eassumption.
-  - inversion_Clear H2.
-    eapply (@wERTCtrn _ _ (TApp (TLambda nm bod) a1 args)).
-    + rewrite <- mkApp_goodFn; try assumption.
-      rewrite <- mkApp_goodFn; try not_isApp.
-      apply wndEvalRTC_App_fn; try assumption. intuition.
-    + eapply (@wERTCtrn _ _ (TApp (TLambda nm bod) a1' args)).
-      * eapply wndEvalRTC_App_arg; try reflexivity.
-        apply H0. assumption.
-      * { apply (@wERTCtrn _ _ (whBetaStep bod a1' args)).
-          - apply wERTCstep. apply sBeta. 
-          - apply H1. apply whBetaStep_pres_WFapp; try eassumption.
-            + assert (j:= proj1 (WcbvEval_pres_WFapp hp) _ _ w H7).
-              inversion_Clear j. assumption.
-            + apply (proj1 (WcbvEval_pres_WFapp hp) _ _ w0 H8). }
-  - inversion_Clear H1. eapply (@wERTCtrn _ _ (TLetIn nm dfn' bod)).
-    + apply wndEvalRTC_LetIn_dfn. intuition.
-    + eapply wERTCtrn. apply wERTCstep. apply sLetIn. apply H0.
-      apply instantiate_pres_WFapp; try assumption.
-      * eapply (proj1 (WcbvEval_pres_WFapp hp)); try eassumption.
- - inversion_clear H1. specialize (H H3).
-    assert (j0: WFapps (tcons arg args)).
-    { constructor; assumption. }
-    assert (j2: WFapp (TFix dts m)).
-    { refine (proj1 (WcbvEval_pres_WFapp hp) _ _ w _). assumption. }
-    inversion_clear j2.
-    assert (j3: WFapp x).
-    { refine (dnthBody_pres_WFapp _ _ e). assumption. }
-    assert (j4: WFapp (pre_whFixStep x dts (tcons arg args))).
-    { refine (pre_whFixStep_pres_WFapp _ _ _); try assumption. }
-    specialize (H0 j4).
-    refine (@wERTCtrn _ _ (TApp (TFix dts m) arg args) _ _ _).
-    + rewrite <- mkApp_goodFn; try assumption.
-      rewrite <- mkApp_goodFn; try not_isApp.
-      apply wndEvalRTC_App_fn; assumption.
-    + eapply (@wERTCtrn _ _  (pre_whFixStep x dts (tcons arg args))).
-      * eapply wERTCstep. eapply sFix; try eassumption.
-      * assumption.
- - inversion_Clear H2.
-   specialize (H H7). specialize (H0 H8). specialize (H1 H9).
-    eapply (@wERTCtrn _ _ (TApp fn arg' args')).
-   + eapply wndEvalsRTC_App_args; try reflexivity; try assumption.
-     eapply (@wEsRTCtrn _  _ (tcons arg' args)).
-     eapply wndEvalsRTC_mk_tconsl; assumption.
-     eapply wndEvalsRTC_mk_tconsr; assumption.
-   + rewrite <- (mkApp_goodFn _ _ H6). rewrite <- mkApp_goodFn.
-     eapply wndEvalRTC_App_fn; try assumption.
-     * eapply (proj1 (WcbvEval_pres_WFapp hp)). eapply w0. assumption.
-     * eapply (proj2 (WcbvEval_pres_WFapp hp)). eapply w1. eassumption.
-     * destruct o.
-       destruct H2 as [y0 [y1 [y2 [y3 jy]]]]. subst. not_isApp.
-       destruct H2 as [y0 jy]. subst. not_isApp.       
-  - inversion_Clear H1. eapply wERTCtrn. 
-    + eapply wndEvalRTC_Case_mch. apply H. assumption.
-    + eapply (@wERTCtrn _ _ cs). 
-      * apply wERTCstep. eapply sCase; eassumption.
-      * { apply H0. refine (whCaseStep_pres_WFapp _ _ _ e1). assumption.
-          refine (tskipn_pres_WFapp _ _ e0).
-          refine (canonicalP_pres_WFapp _ e).
-          specialize (H H4).
-          refine (wndEvalRTC_pres_WFapp _ _ _); eassumption. }
-  - inversion_Clear H1. eapply (@wEsRTCtrn _ _ (tcons t' ts)).
-    + apply wndEvalsRTC_tcons_hd. apply H. assumption.
-    + apply wndEvalsRTC_tcons_tl. apply H0. assumption.
-Qed.
-
-
-(** WcbvEval is in the transitive closure of wndEval **)
-(**
-Lemma WcbvEval_wndEvalTC:
-  forall (p:environ),
-    (forall t s, WcbvEval p t s -> t <> s -> wndEvalTC p t s) /\
-    (forall ts ss, WcbvEvals p ts ss -> ts <> ss -> wndEvalsTC p ts ss).
-intros p. apply WcbvEvalEvals_ind; intros; try (nreflexivity H).
-**)
-
-(***
-Lemma wcbvEval_no_further:
-  forall p,
-  (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
-  (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss).
-Proof.
-  intros p.
-  apply WcbvEvalEvals_ind; simpl; intros; auto.
-Qed.
-****)
-
-
 Section wcbvEval_sec.
 Variable p:environ Term.
 
@@ -450,7 +349,7 @@ Function wcbvEval
         match canonicalP emch with
         | None => raise ("wcbvEval: Case, discriminee not canonical")
         | Some (r, args) =>
-          match tskipn ml args with
+          match tskipn (snd ml) args with
           | None => raise "wcbvEval: Case, tskipn"
           | Some ts =>
             match whCaseStep r ts brs with

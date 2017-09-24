@@ -11,7 +11,6 @@ Require Import L1g.L1g.
 Require Import L2.compile.
 Require Import L2.term.
 Require Import L2.program.
-Require Import L2.wndEval.
 Require Import L2.wcbvEval.
 
 Local Open Scope string_scope.
@@ -354,12 +353,12 @@ Qed.
 Lemma instantiate_hom:
   (forall bod arg n, strip (L1g.term.instantiate arg n bod) =
                      instantiate (strip arg) n (strip bod)) /\
-    (forall bods arg n, strips (L1g.term.instantiates arg n bods) =
-                    instantiates (strip arg) n (strips bods)) /\
-    (forall brs arg n, stripBs (L1g.term.instantiateBrs arg n brs) =
-                    instantiateBrs (strip arg) n (stripBs brs)) /\
-    (forall ds arg n, stripDs (L1g.term.instantiateDefs arg n ds) =
-                      instantiateDefs (strip arg) n (stripDs ds)).
+  (forall bods arg n, strips (L1g.term.instantiates arg n bods) =
+                      instantiates (strip arg) n (strips bods)) /\
+  (forall brs arg n, stripBs (L1g.term.instantiateBrs arg n brs) =
+                     instantiateBrs (strip arg) n (stripBs brs)) /\
+  (forall ds arg n, stripDs (L1g.term.instantiateDefs arg n ds) =
+                    instantiateDefs (strip arg) n (stripDs ds)).
 Proof.
   apply L1g.compile.TrmTrmsBrsDefs_ind; intros; try (simpl; reflexivity).
   - simpl. destruct (lt_eq_lt_dec n n0); cbn.
@@ -395,9 +394,9 @@ Proof.
                      (instantiates (strip arg) n (strips t1))))).
     rewrite <- H. rewrite <- H0. rewrite <- H1. 
     rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
-  - change (TCase (snd p) (strip (L1g.term.instantiate arg n t0))
+  - change (TCase p (strip (L1g.term.instantiate arg n t0))
                   (stripBs (L1g.term.instantiateBrs arg n b)) =
-            (TCase (snd p) (instantiate (strip arg) n (strip t0))
+            (TCase p (instantiate (strip arg) n (strip t0))
                    (instantiateBrs (strip arg) n (stripBs b)))).
     rewrite H0. rewrite H1. reflexivity.
   - change (TFix (stripDs (L1g.term.instantiateDefs
@@ -488,7 +487,7 @@ Qed.
 Lemma TCase_hom:
   forall n ty mch brs,
     strip (L1g.compile.TCase n ty mch brs) =
-    TCase (snd n) (strip mch) (stripBs brs).
+    TCase n (strip mch) (stripBs brs).
 reflexivity.
 Qed.
 
@@ -646,9 +645,9 @@ Proof.
     exists x0. symmetry. erewrite Ind_strip_inv.
     reflexivity. symmetry. assumption.
 Qed.
-  
+
 Lemma WcbvEval_hom:
-  forall p,
+  forall (p:L1gEnv),
     (forall t t', L1g.wcbvEval.WcbvEval p t t' ->
                   WcbvEval (stripEnv p) (strip t) (strip t')) /\
     (forall ts ts', L1g.wcbvEval.WcbvEvals p ts ts' ->
@@ -775,11 +774,11 @@ Qed.
 
 Lemma Case_strip_inv:
   forall m mch brs s, TCase m mch brs = strip s ->
-    exists i sty smch sbrs, (L1g.compile.TCase (i, m) sty smch sbrs = s) /\
+    exists sty smch sbrs, (L1g.compile.TCase m sty smch sbrs = s) /\
               mch = strip smch /\ brs = stripBs sbrs.
 Proof.
   intros m mch brs s. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. destruct p. exists i, s1, s2, b. intuition.
+  - myInjection h. exists s1, s2, b. intuition.
 Qed.
 
 Lemma tnil_strip_inv:

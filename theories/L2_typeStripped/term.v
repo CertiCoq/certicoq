@@ -81,8 +81,8 @@ Fixpoint print_term (t:Term) : string :=
     | TInd i => "(TIND " ++ (print_ind i) ++ ")"
     | TConstruct i n _ _ =>
       "(CSTR " ++ (print_ind i) ++ " " ++ (nat_to_string n) ++ ")"
-    | TCase np mch _ =>
-      "(CASE:" ++ (nat_to_string np) ++ " " ++ (print_term mch) ++ ")"
+    | TCase i mch _ =>
+      "(CASE:" ++ (print_ind (fst i)) ++ " " ++ (print_term mch) ++ ")"
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
     | TWrong str => ("(TWrong:" ++ str ++ ")")
   end.
@@ -115,10 +115,11 @@ Proof.
   - induction t; cross. destruct (inductive_dec i i0); [lft | rght].
   - induction t; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n2),
-      (eq_nat_dec n0 n3), (eq_nat_dec n1 n4);  
-      [lft | rght .. ].
+      (eq_nat_dec n0 n3), (eq_nat_dec n1 n4); [lft | rght .. ].
   - destruct t0; cross.
-    destruct (eq_nat_dec n n0), (H t0), (H0 b0); [lft | rght .. ].
+    destruct p as [i n], p0 as [i0 n0];
+    destruct (eq_nat_dec n n0), (inductive_dec i i0);
+    destruct (H t0), (H0 b0); [lft | rght .. ].
   - induction t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
   - destruct t; cross. destruct (string_dec s s0); [lft | rght .. ].
@@ -187,7 +188,7 @@ Definition isCase (t:Term) : Prop :=
 Lemma isCase_dec: forall t, {isCase t}+{~ isCase t}.
 Proof.
   destruct t; try (solve[right; not_isCase]).
-  left. unfold isCase. exists n, t, b. reflexivity.
+  left. unfold isCase. exists p, t, b. reflexivity.
 Qed.
 Lemma IsCase: forall xn mch ds, isCase (TCase xn mch ds).
 Proof.
@@ -827,7 +828,7 @@ Proof.
     left. intuition. revert H. not_isApp.
   - exists (TConstruct i n n0 n1), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
-  - exists (TCase n fn b), arg, tnil. split. reflexivity.
+  - exists (TCase p fn b), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
   - exists (TFix d n), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.

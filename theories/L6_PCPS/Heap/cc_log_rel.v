@@ -1771,6 +1771,38 @@ Module CC_log_rel (H : Heap).
             repeat normalize_occurs_free. eauto. }
     Qed.
 
+    Require Import L6.ctx.
+    
+    Definition cost_ctx (c : exp_ctx) : nat :=
+      match c with
+        | Econstr_c x t ys c => 1 + length ys
+        | Ecase_c _ _ _ _ _ => 1 
+        | Eproj_c x t n y e => 1
+        | Efun1_c B e => fundefs_num_fv B + 1 (* XXX maybe revisit *)
+        | Eprim_c x p ys c => 1 + length ys
+        | Hole_c => 0
+        | Efun2_c _ _ => 0 (* maybe fix but not needed for now *)
+      end.
+    
+    Definition size_reachable (S : Ensemble loc) (H1 : heap block) (s : nat ) : Prop :=
+      exists H2, live S H1 H2 /\ size H2 = s. 
+    
+    (* Interpretation of a context as a heap and an environment *) 
+    Inductive ctx_to_heap_env : exp_ctx -> exp -> heap block -> env -> heap block -> env -> nat -> nat -> Prop := 
+    | Econstr_to_heap_env :
+        forall x t' xs C e t vs l rho1 H1 H1' H1'' rho2 H2 c (m m' : nat),
+          getlist xs rho1 = Some vs ->
+          alloc (Vconstr t vs) H1 = (l, H1') ->
+
+          live (env_locs (M.set x (Loc l) rho1) (occurs_free (C |[ e ]|))) H1' H1'' ->
+          size_heap H1' = m' ->
+          
+          ctx_to_heap_env C e  H1'' (M.set x (Loc l) rho1) H2 rho2 c m ->
+          ctx_to_heap_env (Econstr_c x t' xs C) e H1 rho1 H2 rho2
+                          (c + cost_ctx (Econstr_c x t' xs C))
+                          (max m m').
+    
+
   End Compat.
 
 End CC_log_rel.

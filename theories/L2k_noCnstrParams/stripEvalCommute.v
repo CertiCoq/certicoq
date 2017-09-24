@@ -692,8 +692,9 @@ Lemma isApp_strip:
 Proof.
   destruct fn; cbn; intros; auto. elim H. auto.
 Qed.
+ ********************)
 
-(************* MAIN *************)
+(************* MAIN *************
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L2.wcbvEval.WcbvEval p t t' ->
@@ -708,13 +709,14 @@ Proof.
     + destruct na; cbn.
       * constructor. constructor.
       * assert (j: na >= tlength tnil). cbn. omega.
-        destruct (@isLambda_etaExpand_args
-                    na tnil j (fun b => TConstruct i r b)
-                    (tunit (TRel 0))) as [x0 [x1 jx]].
+        destruct (@na_isLambda_etaExpand_args
+                 na tnil j (fun b => TConstruct i r b)
+                 (tunit (TRel 0))) as [x0 [x1 jx]].
         rewrite jx. constructor.
     + assert (j: na >= tlength tnil). cbn. omega.
-      destruct (@isLambda_etaExpand
-                  np na tnil j (fun b => TConstruct i r b) tnil)
+      Check (pre_isConstruct_etaExpand ).
+      destruct (@na_isLambda_etaExpand_args
+                  na tnil j (fun b => TConstruct i r b) tnil)
         as [x0 [x1 jx]]. rewrite jx. constructor.
   - cbn. econstructor; try eassumption. apply lookupDfn_hom. assumption.
   - destruct (L2.term.isConstruct_dec fn).

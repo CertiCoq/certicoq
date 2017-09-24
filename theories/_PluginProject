@@ -177,6 +177,12 @@ plugin/compile4.ml
 plugin/instances2.ml
 plugin/instances4.ml
 plugin/instances5.mli
+plugin/alpha_fresh.mli
+plugin/alpha_fresh.ml
+plugin/beta_contraction.mli
+plugin/beta_contraction.ml
+plugin/uncurry.mli
+plugin/uncurry.ml
 plugin/instances6.mli
 plugin/l3_to_L3_eta.ml
 plugin/csyntax.mli

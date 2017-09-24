@@ -22,54 +22,52 @@ Variable p:environ Term.
 Inductive wndEval : Term -> Term -> Prop :=
 (*** contraction steps ***)
 | sConst: forall (s:string) (t:Term),
-           LookupDfn s p t -> wndEval (TConst s) t
+    LookupDfn s p t -> wndEval (TConst s) t
 | sBeta: forall (nm:name) (bod arg:Term) (args:Terms),
-           wndEval (TApp (TLambda nm bod) arg args)
-                   (whBetaStep bod arg args)
-     (* note: [instantiate] is total *)
+    wndEval (TApp (TLambda nm bod) arg args)
+            (whBetaStep bod arg args)
+(* note: [instantiate] is total *)
 | sLetIn: forall (nm:name) (dfn bod:Term),
-            wndEval (TLetIn nm dfn bod) (instantiate dfn 0 bod)
-     (* Case argument must be in Canonical form *)
-     (* n is the number of parameters of the datatype *)
-| sCase: forall (ml:inductive * nat) (s mch:Term)
-                 (args ts:Terms) (brs:Brs) (n:nat),
-            canonicalP mch = Some (n, args) ->
-            tskipn (snd ml) args = Some ts ->
-            whCaseStep n ts brs = Some s ->
-            wndEval (TCase ml mch brs) s
-| sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms)
-               (x:Term) (ix:nat),
-          (** ix is index of recursive argument **)
-          dnthBody m dts = Some (x, ix) ->
-          wndEval (TApp (TFix dts m) arg args)
-                  (pre_whFixStep x dts (tcons arg args))
+    wndEval (TLetIn nm dfn bod) (instantiate dfn 0 bod)
+(* Case argument must be in Canonical form *)
+(* n is the number of parameters of the datatype *)
+| sCase: forall (ml:nat) (s mch:Term) (args ts:Terms) (brs:Brs) (n:nat),
+    canonicalP mch = Some (n, args) ->
+    tskipn ml args = Some ts ->
+    whCaseStep n ts brs = Some s ->
+    wndEval (TCase ml mch brs) s
+| sFix: forall (dts:Defs) (m:nat) (arg:Term) (args:Terms) (x:Term) (ix:nat),
+    (** ix is index of recursive argument **)
+    dnthBody m dts = Some (x, ix) ->
+    wndEval (TApp (TFix dts m) arg args)
+            (pre_whFixStep x dts (tcons arg args))
 | sProof: forall t, wndEval (TProof t) t
-                          (*** congruence steps ***)
+(*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
-*** no congruence on Case branches 
-*** congruence on type of Fix ***)
+ *** no congruence on Case branches 
+ *** congruence on type of Fix ***)
 | sAppFn:  forall (t r arg:Term) (args:Terms),
-              wndEval t r ->
-              wndEval (TApp t arg args) (mkApp r (tcons arg args))
+    wndEval t r ->
+    wndEval (TApp t arg args) (mkApp r (tcons arg args))
 | sAppArgs: forall (t arg brg:Term) (args brgs:Terms),
-              wndEvals (tcons arg args) (tcons brg brgs) ->
-              wndEval (TApp t arg args) (TApp t brg brgs)
+    wndEvals (tcons arg args) (tcons brg brgs) ->
+    wndEval (TApp t arg args) (TApp t brg brgs)
 | sLetInDef:forall (nm:name) (d1 d2 bod:Term),
-              wndEval d1 d2 ->
-              wndEval (TLetIn nm d1 bod) (TLetIn nm d2 bod)
-| sCaseArg: forall (nl:inductive * nat) (mch can:Term) (brs:Brs),
-              wndEval mch can ->
-              wndEval (TCase nl mch brs) (TCase nl can brs)
+    wndEval d1 d2 ->
+    wndEval (TLetIn nm d1 bod) (TLetIn nm d2 bod)
+| sCaseArg: forall (nl:nat) (mch can:Term) (brs:Brs),
+    wndEval mch can ->
+    wndEval (TCase nl mch brs) (TCase nl can brs)
 with wndEvals : Terms -> Terms -> Prop :=
      | saHd: forall (t r:Term) (ts:Terms), 
-               wndEval t r ->
-               wndEvals (tcons t ts) (tcons r ts)
+         wndEval t r ->
+         wndEvals (tcons t ts) (tcons r ts)
      | saTl: forall (t:Term) (ts ss:Terms),
-               wndEvals ts ss ->
-               wndEvals (tcons t ts) (tcons t ss).
+         wndEvals ts ss ->
+         wndEvals (tcons t ts) (tcons t ss).
 Hint Constructors wndEval wndEvals.
 Scheme wndEval1_ind := Induction for wndEval Sort Prop
-     with wndEvals1_ind := Induction for wndEvals Sort Prop.
+  with wndEvals1_ind := Induction for wndEvals Sort Prop.
 Combined Scheme wndEvalEvals_ind from wndEval1_ind, wndEvals1_ind.
 
 (** example: evaluate omega = (\x.xx)(\x.xx): nontermination **)

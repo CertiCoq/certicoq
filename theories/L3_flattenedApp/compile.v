@@ -34,10 +34,9 @@ Inductive Term : Type :=
 | TApp       : Term -> Term -> Term
 | TConst     : string -> Term
 | TConstruct : inductive -> nat (* index *) -> Terms -> Term
-| TCase      : inductive ->
-               Term (* discriminee *) -> Brs (* # args, branch *) -> Term
+| TCase      : Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
-| TWrong : Term
+| TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -276,7 +275,7 @@ Fixpoint lift (n:nat) (t:Term) : Term :=
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg => TApp (lift n fn) (lift n arg)
     | TConstruct i x args => TConstruct i x (lifts n args)
-    | TCase iparsapb mch brs => TCase iparsapb (lift n mch) (liftBs n brs)
+    | TCase mch brs => TCase (lift n mch) (liftBs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
     | _ => t
   end
@@ -488,9 +487,9 @@ Function strip (t:L2_5Term) : Term :=
       mkApp (TApp (strip fn) (strip arg)) (strips args)
     | L2_5.compile.TConst nm => TConst nm
     | L2_5.compile.TConstruct i n args => TConstruct i n (strips args)
-    | L2_5.compile.TCase n mch brs => TCase n (strip mch) (stripBs brs)
+    | L2_5.compile.TCase mch brs => TCase (strip mch) (stripBs brs)
     | L2_5.compile.TFix ds n => TFix (stripDs ds) n
-    | L2_5.compile.TWrong => TWrong
+    | L2_5.compile.TWrong str => TWrong str
    end
 with strips (ts:L2_5Terms) : Terms := 
   match ts with

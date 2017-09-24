@@ -28,9 +28,9 @@ Inductive WNorm: Term -> Prop :=
 | WNPrf: WNorm TProof
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNCase: forall mch n brs,
+| WNCase: forall mch brs,
             WNorm mch -> ~ isCanonical mch ->
-            WNorm (TCase n mch brs)
+            WNorm (TCase mch brs)
 | WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
 | WNApp: forall fn t ts,
            WNorm fn -> WNorm t -> WNorms ts ->

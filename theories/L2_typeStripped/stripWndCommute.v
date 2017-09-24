@@ -119,6 +119,7 @@ Proof.
         exists u. intuition.
 Qed.
 
+(**** why do I want this ????  ****************
 Theorem L2wndEval_sound_for_L1gwndEval:
   forall L2p,
   (forall L2t L2s, wndEval L2p L2t L2s ->
@@ -155,10 +156,15 @@ Proof.
   - destruct (LetIn_strip_inv _ H0) as [x0 [x1 [x2 [j0x [j1x j2x]]]]].
     subst. rewrite <- (proj1 instantiate_hom).
     exists (L1g.term.instantiate x0 0 x2). intuition.
-  - destruct (Case_strip_inv _ H0) as [x0 [x1 [j0x [j1x [j2x j3x]]]]].
-    clear H0. subst.
-    rewrite <- canonicalP_hom in e.
-    case_eq (L1g.term.canonicalP x1); intros; rewrite H in e; try discriminate.
+  - destruct (Case_strip_inv _ H0) as [x0 [x1 [j0x [j1x [j2x [j3x j4x]]]]]].
+    clear H0. subst. rewrite <- canonicalP_hom in e.
+    case_eq (L1g.term.canonicalP x1); intros.
+    + destruct p0 as [z0 z1]. cbn in e. myInjection e.
+      destruct ml. cbn in e0.
+      rewrite <- tskipn_hom in e0.
+      case_eq (L1g.term.tskipn n0 z1); intros; rewrite H0 in e0;
+
+    rewrite H in e; try discriminate.
     + destruct p0 as [z0 z1]. cbn in e. myInjection e.
       destruct ml. cbn in e0.
       rewrite <- tskipn_hom in e0.
@@ -233,3 +239,4 @@ Proof.
 
 Qed.
  *************************)
+****************************************)

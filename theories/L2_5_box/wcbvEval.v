@@ -49,7 +49,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p mch (TConstruct i n args) ->
     whCaseStep n args brs = Some cs ->
     WcbvEval p cs s ->
-    WcbvEval p (TCase i mch brs) s
+    WcbvEval p (TCase mch brs) s
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
      | wNil: WcbvEvals p tnil tnil
      | wCons: forall t t' ts ts',
@@ -125,8 +125,8 @@ Proof.
     { constructor; assumption. }
     apply H0. apply pre_whFixStep_pres_WFapp; try eassumption; intuition.
     + eapply dnthBody_pres_WFapp; try eassumption.
-  - apply H0. inversion_Clear H1. 
-    refine (whCaseStep_pres_WFapp H6 _ _ e).
+  - apply H0. inversion_Clear H1.
+    eapply whCaseStep_pres_WFapp; try eassumption.
     specialize (H H4). inversion_Clear H. assumption.
 Qed.
 
@@ -224,16 +224,12 @@ Function wcbvEval
       | Ret TProof => Ret TProof  (* proof redex *)
       | _ => raise "wcbvEval, TApp: fn"
       end
-    | TCase ml mch brs =>
+    | TCase mch brs =>
       match wcbvEval n mch with
       | Ret (TConstruct i ix args) =>
-        match inductive_dec i ml with
-        | left _ =>
-          match whCaseStep ix args brs with
+        match whCaseStep ix args brs with
           | None => raise "wcbvEval: Case, whCaseStep"
           | Some cs => wcbvEval n cs
-          end
-        | right _ => raise "wcbvEval: Case, constructor of wrong type"
         end
       | _ => raise "wcbvEval: Case, discriminee not canonical"
       end
@@ -252,8 +248,8 @@ Function wcbvEval
     | TFix mfp br => ret (TFix mfp br)
     | TProof => ret TProof
     (** should never appear **)
-    | TRel _ => raise "wcbvEval: unbound Rel"
-    | TWrong => raise "TWrong"
+    | TRel _ => raise "wcbvEval:unbound Rel"
+    | (TWrong s) as u => raise (print_term u)
     end
   end
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
@@ -294,7 +290,7 @@ Proof.
   - specialize (H0 _ p1). specialize (H _ e1).
     eapply wAppFix; try eassumption.
   - eapply wCase; try eassumption.
-    + apply H. rewrite <- _x. apply e1. 
+    + apply H. apply e1. 
     + apply H0; eassumption. 
   - eapply wLetIn; intuition.
     + apply H. assumption.

@@ -24,21 +24,19 @@ Variable p:environ Term.
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNAx: forall t, WNorm (TAx t)
-| WNCase: forall mch n brs,
-            WNorm mch -> ~ isCanonical mch ->
-            WNorm (TCase n mch brs)
+| WNCase: forall mch brs,
+    WNorm mch -> ~ isCanonical mch -> WNorm (TCase mch brs)
 | WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
 | WNApp: forall fn t ts,
-           WNorm fn -> WNorm t -> WNorms ts ->
-           ~ (isLambda fn) -> ~ (isFix fn) -> ~ isApp fn ->
-           WNorm (TApp fn t ts)
+    WNorm fn -> WNorm t -> WNorms ts ->
+    ~ (isLambda fn) -> ~ (isFix fn) -> ~ isApp fn ->
+    WNorm (TApp fn t ts)
 with WNorms: Terms -> Prop :=
-| WNtnil: WNorms tnil
-| WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
+     | WNtnil: WNorms tnil
+     | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
 Hint Constructors WNorm WNorm.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
-      with WNorms_ind' := Induction for WNorms Sort Prop.
+  with WNorms_ind' := Induction for WNorms Sort Prop.
 Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.
 
 Lemma WNorms_tappendl:

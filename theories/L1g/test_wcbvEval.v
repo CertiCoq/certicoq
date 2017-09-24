@@ -43,6 +43,19 @@ Set Template Cast Propositions.
 Set Printing Width 80.
 Set Printing Depth 1000.
 
+Set Implicit Arguments.
+
+Inductive even : nat -> Set :=
+| even_O : even 0
+| even_S : forall n, odd n -> even (S n)
+with odd : nat -> Set :=
+     | odd_S : forall n, even n -> odd (S n).
+
+Definition seo := even_O.
+Quote Recursively Definition p_seo := seo.
+Print p_seo.
+Eval cbv in (program_Program p_seo).
+
 
 (** example from Coq club 
 "Question about the formal definition of the guard condition"
@@ -433,12 +446,15 @@ Qed.
 
 
 (** mutual recursion **)
-Set Implicit Arguments.
 Inductive tree (A:Set) : Set :=
   node : A -> forest A -> tree A
 with forest (A:Set) : Set :=
      | leaf : A -> forest A
      | fcons : tree A -> forest A -> forest A.
+
+Definition sf: forest bool := (fcons (node true (leaf false)) (leaf true)).
+Quote Recursively Definition p_sf := sf.
+Eval cbv in (program_Program p_sf).
 
 Fixpoint tree_size (t:tree bool) : nat :=
   match t with
@@ -454,6 +470,7 @@ Definition arden: forest bool :=
   fcons (node true (fcons (node true (leaf false)) (leaf true)))
         (fcons (node true (fcons (node true (leaf false)) (leaf true)))
                (leaf false)).
+Quote Recursively Definition p_arden := arden.
 Definition arden_size := (forest_size arden).
 Quote Recursively Definition cbv_arden_size :=
   ltac:(let t:=(eval cbv in arden_size) in exact t).
@@ -464,10 +481,11 @@ Quote Recursively Definition p_arden_size := arden_size.
 Print p_arden_size.
 Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
 Print P_arden_size.
+Eval cbv in (env P_arden_size).
 Goal
   let env := (env P_arden_size) in
   let main := (main P_arden_size) in
-  wcbvEval (env) 100 (main) = Ret ans_arden_size.
+  wcbvEval env 50 main = Ret ans_arden_size.
   vm_compute. reflexivity.
 Qed.
 

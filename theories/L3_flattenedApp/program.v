@@ -51,14 +51,19 @@ Definition CrctBranches (e: environ Term) (brs: Defs) : Prop :=
     end.
  ***)
 
-Definition CrctAnnot
-    (e: environ Term) (ann: inductive * nat) (brs: Defs) : Prop :=
-  let '(ind, pars) := ann in
-  let 'mkInd mind n := ind in
-  match lookup mind e with
-  | Some (ecTyp _ pars' pack) => pars' = pars
-  | _ => False
-  end.
+Inductive match_annot : list Cnstr -> Brs -> Prop :=
+| match_annot_nil : match_annot nil bnil
+| match_annot_cons t args c cnstrs ds :
+    c.(CnstrArity) = args ->
+    match_annot cnstrs ds ->
+    match_annot (c :: cnstrs) (bcons args t ds).
+         
+Definition crctAnnot (e : environ Term) ann brs :=
+  let 'mkInd nm tndx := ann in
+  exists pack ityp,
+    LookupTyp nm e 0 pack /\
+    getInd pack tndx = Ret ityp /\
+    match_annot ityp.(itypCnstrs) brs.
 
 (** correctness specification for programs (including local closure) **)
 Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
@@ -74,16 +79,17 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
            crctTerm p n (TApp fn arg)
 | ctConst: forall p n pd nm,
              crctEnv p -> LookupDfn nm p pd -> crctTerm p n (TConst nm)
-| ctConstructor: forall p n ipkgNm inum cnum args ipkg itp cstr pars,
-                   LookupTyp ipkgNm p pars ipkg ->
+| ctConstructor: forall p n ipkgNm inum cnum args ipkg itp cstr,
+                   LookupTyp ipkgNm p 0 ipkg ->
                    getInd ipkg inum = Ret itp ->
                    getCnstr itp cnum = Ret cstr ->
                    CnstrArity cstr = tlength args ->
                    crctTerms p n args ->
                    crctTerm p n (TConstruct (mkInd ipkgNm inum) cnum args)
 | ctCase: forall p n i mch brs,
-            crctTerm p n mch -> crctBs p n brs ->
-            crctTerm p n (TCase i mch brs)
+    crctTerm p n mch -> crctBs p n brs ->
+    crctAnnot p i brs ->
+    crctTerm p n (TCase i mch brs)
 | ctFix: forall p n ds m,
            crctDs p (n + dlength ds) ds -> m < dlength ds ->
            crctTerm p n (TFix ds m)
@@ -206,10 +212,14 @@ Proof.
   - unfold LookupDfn in H1. elim (Lookup_fresh_neq H1 H2). reflexivity.
   - unfold LookupTyp in H. destruct H.
     elim (Lookup_fresh_neq H H5). reflexivity.
+  - specialize (H2 _ H4). contradiction.
+  - destruct H3 as (pack&ityp&Hlook&_).
+    unfold LookupTyp in Hlook. destruct Hlook.
+    elim (Lookup_fresh_neq H3 H4). reflexivity.
   - specialize (H0 _ H2). contradiction.
   - specialize (H2 _ H4). contradiction.
   - inversion H6. 
-Qed.    
+Qed.
 
 Lemma Crct_weaken:
   (forall p n t, crctTerm p n t -> 
@@ -233,6 +243,10 @@ Proof.
     apply neq_sym. apply (Lookup_fresh_neq H1 H2). eassumption.
   - destruct H. unfold LookupTyp. split; try eassumption.
     constructor; try eassumption.
+    apply neq_sym. eapply Lookup_fresh_neq; eassumption.
+  - red. red in H3. destruct i. destruct H3 as [pack [ityp0 [Hlook [Hget Hann]]]].
+    exists pack. exists ityp0. intuition.
+    destruct Hlook. split; auto. constructor; auto.
     apply neq_sym. eapply Lookup_fresh_neq; eassumption.
 Qed.
 
@@ -258,7 +272,11 @@ Proof.
     apply neq_sym. apply (Lookup_fresh_neq H1 H2). eassumption.
   - unfold LookupTyp in *. destruct H. split; try eassumption.
     constructor; try eassumption.
-    apply neq_sym. apply (Lookup_fresh_neq l). assumption.
+    apply neq_sym. apply (Lookup_fresh_neq H). assumption.
+  - red. red in H3. destruct i. destruct H3 as [pack [ityp0 [Hlook [Hget Hann]]]].
+    exists pack. exists ityp0. intuition.
+    destruct Hlook. split; auto. constructor; auto.
+    apply neq_sym. eapply Lookup_fresh_neq; eassumption.
 Qed.
 
 Lemma Crct_strengthen:
@@ -297,9 +315,13 @@ Proof.
     + eapply H4. reflexivity. intros h. elim H6. apply PoCnstrA.
       assumption.
   - econstructor; try eassumption.
-    + eapply H0. reflexivity. intros h. elim H4. constructor. assumption.
-    + eapply H2. reflexivity. intros h. elim H4.
+    + eapply H0. reflexivity. intros h. elim H5. constructor. assumption.
+    + eapply H2. reflexivity. intros h. elim H5.
       apply PoCaseR. assumption.
+    + destruct i. destruct H3 as (pack&ityp&Hlook&Hget&Hann).
+      exists pack, ityp. split; auto.
+      destruct Hlook as [Hlook Hnil]. split; auto.
+      inversion Hlook; subst. elim H5. apply PoCaseAnn. assumption.
   - econstructor; try eassumption. eapply H0. reflexivity. intros h.
     elim H3. constructor. assumption.
   - constructor.
@@ -423,7 +445,7 @@ Qed.
 
 Lemma Crct_invrt_Case:
   forall p n i s us,
-    crctTerm p n (TCase i s us) -> crctTerm p n s /\ crctBs p n us.
+    crctTerm p n (TCase i s us) -> crctTerm p n s /\ crctBs p n us /\ crctAnnot p i us.
 Proof.
    intros. inversion_Clear H. intuition.
 Qed.
@@ -439,12 +461,13 @@ Lemma Crct_invrt_Construct:
   forall p n ipkgNm inum cnum args,
     crctTerm p n (TConstruct (mkInd ipkgNm inum) cnum args) ->
     crctTerms p n args /\
-    exists npars itypk,
-      LookupTyp ipkgNm p npars itypk /\
+    exists itypk,
+      LookupTyp ipkgNm p 0 itypk /\
       exists (ip:ityp), getInd itypk inum = Ret ip /\
-                   exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
+                        exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr /\
+                                            CnstrArity ctr = tlength args.
 Proof.
-  intros. inversion_Clear H. intuition. exists pars, ipkg. intuition.
+  intros. inversion_Clear H. intuition. exists ipkg. intuition.
   exists itp. intuition. exists cstr. intuition.
 Qed.
 
@@ -542,6 +565,11 @@ Proof.
   - inversion_Clear H2. constructor; try assumption.
     + apply H; try eassumption.
     + apply H0; try eassumption.
+    + destruct i as [ind k].
+      destruct H11 as (pack&ityp&Hlook&Hget&Hann).
+      exists pack, ityp; intuition auto.
+      destruct ityp. simpl in *. clear H H0; revert Hann its i1; clear.
+      induction 1; inversion_clear 1; constructor; auto.
   - pose proof (InstantiateDefs_pres_dlength i) as k.
     inversion_Clear H1. constructor; try omega. apply H. omega.
     + replace (S (m0 + dlength id)) with (S m0 + dlength d); try omega.

@@ -389,11 +389,13 @@ Qed.
 (** environments and programs **)
 Function stripEC (ec:L2EC) : AstCommon.envClass Term :=
   match ec with
-    | ecTrm t => ecTrm (strip t)
-    | ecTyp _ n itp => ecTyp Term n itp
+  | ecTrm t => ecTrm (strip t)
+  | ecTyp _ n itp =>
+    (** We stripped the parameters of all constructors *)
+    ecTyp Term 0 itp
   end.
 
-Definition  stripEnv : L2Env -> AstCommon.environ Term :=
+Definition stripEnv : L2Env -> AstCommon.environ Term :=
   List.map (fun nmec : string * L2EC => (fst nmec, stripEC (snd nmec))).
 
 Lemma stripEcTrm_hom:

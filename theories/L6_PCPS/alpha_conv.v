@@ -272,7 +272,7 @@ Section Alpha_conv_correct.
   Qed.
   
   Lemma preord_env_P_inj_set (P : Ensemble var) (rho1 rho2 : env) 
-        (k : nat)  f(x y : var) (v1 v2 : val) : 
+        (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
     preord_val pr cenv k v1 v2 ->
     injective_subdomain (Union _ P (Singleton _ x)) (f {x ~> y}) ->
@@ -294,7 +294,7 @@ Section Alpha_conv_correct.
   Qed.
   
   Lemma preord_env_P_inj_set_alt (P : Ensemble var) (rho1 rho2 : env) 
-        (k : nat)  f(x y : var) (v1 v2 : val) : 
+        (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
     preord_val pr cenv k v1 v2 ->
     ~ In _ (image f (Setminus _ P (Singleton _ x))) y ->

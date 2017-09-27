@@ -589,6 +589,7 @@ Inductive PoccTrm : Term -> Prop :=
 | PoConst: PoccTrm (TConst nm)
 | PoCaseL: forall i mch brs, PoccTrm mch -> PoccTrm (TCase i mch brs)
 | PoCaseR: forall i mch brs, PoccBrs brs -> PoccTrm (TCase i mch brs)
+| PoCaseAnn: forall k mch brs, PoccTrm (TCase (mkInd nm k) mch brs)
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
 | PoCnstrI: forall m1 m2 args,
               PoccTrm (TConstruct (mkInd nm m1) m2 args)
@@ -891,6 +892,7 @@ Proof.
   - inversion_Clear H1.
     + apply PoCaseL. intuition.
     + apply PoCaseR. intuition.
+    + apply PoCaseAnn.
   - inversion_Clear H1.
     + constructor. intuition.
     + apply PoTtl. intuition.

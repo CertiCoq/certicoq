@@ -545,8 +545,10 @@ Qed.
 (** environments and programs **)
 Function stripEC (ec:L2dEC) : AstCommon.envClass Term :=
   match ec with
-    | ecTrm t => ecTrm (strip t)
-    | ecTyp _ n itp => ecTyp Term n itp
+  | ecTrm t => ecTrm (strip t)
+  | ecTyp _ n itp =>
+    (** We stripped the parameters of all constructors *)
+    ecTyp Term 0 itp
   end.
 
 Definition  stripEnv : L2dEnv -> AstCommon.environ Term :=

@@ -222,7 +222,7 @@ Proof.
     + apply (dnthBody_pres_Crct _ e). eapply CrctDs_Up. eassumption. 
       rewrite list_to_zero_length. omega.
   - apply H0. eapply whCaseStep_pres_Crct; try eassumption.
-    specialize (H _ H6). inversion_Clear H. assumption.
+    specialize (H _ H7). inversion_Clear H. assumption.
 Qed.
 
 Lemma WcbvEval_mkApp_WcbvEval:

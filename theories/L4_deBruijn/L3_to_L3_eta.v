@@ -22,7 +22,6 @@ Ltac forward H :=
 Import L3t.
 
 Section TermTranslation.
-    
 
   Fixpoint is_n_lambda n t :=
     match n with
@@ -95,7 +94,6 @@ Section TermTranslation.
     | dnil => dnil
     | dcons na t n ds => dcons na (trans k t) n (trans_fixes k ds)
     end.
-
   
 End TermTranslation.
 
@@ -113,6 +111,7 @@ Fixpoint transEnv (p:environ Term) : environ Term :=
     | cons (nm, ec) q => cons (nm, transEC ec) (transEnv q)
   end.
 
+
 Lemma Lookup_trans_env e nm t : LookupDfn nm e t -> LookupDfn nm (transEnv e) (trans 0 t).
 Proof.
   red. intros H. red in H.
@@ -128,31 +127,33 @@ Proof.
   now apply (H1 t).
 Qed.
 
-Inductive match_annot : list Cnstr -> Brs -> Prop :=
-| match_annot_nil : match_annot [] bnil
-| match_annot_cons t args c cnstrs ds :
-    c.(CnstrArity) = args ->
-    match_annot cnstrs ds ->
-    match_annot (c :: cnstrs) (bcons args t ds).
-         
-Definition crctAnn (e : environ Term) ann brs :=
-  let 'mkInd nm tndx := ann in
-  exists pack ityp,
-    LookupTyp nm e 0 pack /\
-    getInd pack tndx = Ret ityp /\
-    match_annot ityp.(itypCnstrs) brs.
-
 Lemma Crct_invrt_Case e n ann mch brs :
   crctTerm e n (TCase ann mch brs) ->
   crctTerm e n mch /\ crctBs e n brs /\
-  crctAnn e ann brs /\
+  crctAnnot e ann brs /\
   (forall i t, bnth i brs = Some t -> crctTerm e n (fst t)).
-Admitted.
+Proof.
+  intros.
+  apply Crct_invrt_Case in H. intuition. clear H2.
+  revert H i t H1.
+  induction 1; simpl; intros; try discriminate.
+  destruct i. injection H2 as <-; auto.
+  eapply IHcrctBs; eauto.
+Qed.
 
 Lemma Crct_construct {e : environ Term} {i n args} : crctEnv e ->
   crctTerm e 0 (TConstruct i n args) ->
   cnstrArity e i n = Ret (0%nat, tlength args).
-Proof. intros. inv H. Admitted.
+Proof.
+  intros.
+  destruct i.
+  apply Crct_invrt_Construct in H0 as (crctArgs&itypk&Hlook&ip&Hip&ctr&Hctr&Hargs).
+  unfold cnstrArity.
+  destruct Hlook as [Hlook Hne].
+  apply Lookup_lookup in Hlook.
+  unfold lookupTyp. rewrite Hlook. destruct itypk. elim Hne; reflexivity.
+  rewrite Hip, Hctr. unfold ret. repeat f_equal. assumption.
+Qed.
 
 Lemma bnth_trans n t i brs :
   bnth n brs = Some t -> exists t',
@@ -314,7 +315,7 @@ Proof.
 Qed.
 
 Lemma whCase_step e i n args brs cs s :
-  crctEnv e -> crctBs e 0 brs -> crctAnn e i brs -> crctTerms e 0 args ->
+  crctEnv e -> crctBs e 0 brs -> crctAnnot e i brs -> crctTerms e 0 args ->
   cnstrArity e i n = Ret (0%nat, tlength args) ->
   whCaseStep n args brs = Some cs -> WcbvEval e cs s ->
   WcbvEvals (transEnv e) (trans_terms 0 args) (trans_terms 0 args) ->
@@ -336,7 +337,7 @@ Proof.
   destruct p. simpl in *.
   injection Hdn. intros -> ->.
   assert(tlength args = arg).
-  { unfold crctAnn in *. destruct i as [nm ndx].
+  { unfold crctAnnot in *. destruct i as [nm ndx].
     destruct crctann as [pack [ityp [Hlook [Hind Hann]]]].
     unfold cnstrArity in crctar. red in Hlook. destruct Hlook as [Hlook none].
     apply Lookup_lookup in Hlook. unfold lookupTyp in *. rewrite Hlook in crctar.
@@ -505,12 +506,15 @@ Proof.
     eapply IHcs; eauto.
     eapply whCaseStep_pres_Crct in Hcase; eauto.
     apply wcbvEval_construct in IHmch; eauto.
-    admit. (* Well-formedness preserved by trans *) admit. admit.
+    admit. (* Well-formedness preserved by trans *) admit.
+    eapply WcbvEval_pres_Crct in evmch; eauto.
+    now apply Crct_construct in evmch.
     eapply WcbvEval_pres_Crct in evmch; eauto.
     destruct i. now eapply Crct_invrt_Construct in evmch as [Hargs _].
     
-  - intros * evmch IHmch. admit.
-    (* Stuck matches are impossible *)
+  - intros * evmch IHmch. intros.
+    inv H1.
+    constructor; auto.
   - intros. apply H; auto.
 Admitted.
     

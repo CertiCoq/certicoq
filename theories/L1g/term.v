@@ -7,7 +7,6 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.omega.Omega.
 Require Export Common.Common.
-Require Export L1.term.
 Require Export L1g.compile.
 
 Open Scope string_scope.

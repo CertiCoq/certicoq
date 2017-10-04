@@ -1,5 +1,6 @@
 
 Require Export Template.Ast.
+Require Import Template.Template.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
@@ -455,11 +456,20 @@ Proof.
 Qed.
 
 Lemma Lookup_strengthen:
-  forall (nm1:string) pp t, Lookup nm1 pp t -> 
-       forall nm2 ec p, pp = (nm2,ec)::p -> nm1 <> nm2 -> Lookup nm1 p t.
-intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
-simpl in k. rewrite (string_eq_bool_neq j2) in k.
-apply lookup_Lookup. assumption.
+  forall (nm1:string) pp t,
+    Lookup nm1 pp t -> 
+    forall nm2 ec p, pp = (nm2,ec)::p -> nm1 <> nm2 -> Lookup nm1 p t.
+Proof.
+  intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
+  simpl in k. rewrite (string_eq_bool_neq j2) in k.
+  apply lookup_Lookup. assumption.
+Qed.
+
+Lemma lookup_strengthen:
+  forall (nm1 nm2:string) ec p,
+    nm1 <> nm2 -> lookup nm1 ((nm2,ec)::p) = lookup nm1 p.
+Proof.
+  intros. cbn. rewrite (string_eq_bool_neq H). reflexivity.
 Qed.
 
 Lemma Lookup_pres_WFapp:

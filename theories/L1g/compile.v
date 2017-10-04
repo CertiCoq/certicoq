@@ -5,7 +5,6 @@ Require Import Coq.omega.Omega.
 Require Import Coq.Bool.Bool.
 Require Import Template.Ast.
 Require Import Common.Common.
-Require Import L1.L1.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

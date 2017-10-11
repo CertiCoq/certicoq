@@ -134,5 +134,5 @@ Instance ProdRep (B : Type -> Type) `{forall (A : Type) (H : Rep A), Rep (B A)}
 
 (* This resembles a lot the approach we follow in QuickChick to automatically
    generate correctness proofs for automatically generated generators. We do the
-   proof term generation in OCaml, but it think it we be nice to do it in Coq
+   proof term generation in OCaml, but I think it would be nice to do it in Coq
    and then reflect the terms. *)

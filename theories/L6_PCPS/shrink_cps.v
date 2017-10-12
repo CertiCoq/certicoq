@@ -1661,7 +1661,7 @@ Section CONTRACT.
  Arguments contract:simpl never.
 Obligation Tactic := program_simplify ; auto with *.
 
-
+Definition hide_body {A} {a : A} := a.
                                 
 
 Theorem contract_eq:
@@ -1670,38 +1670,16 @@ Theorem contract_eq:
       contract_def sig count e sub im.
 Proof.
   intros.
-    destruct e. 
-    - (* Econstr *)
-      unfold contract. unfold contract_func.
-      WfExtensionality.unfold_sub contract (contract sig count (Econstr v c l e) sub im); lazy [projT1 projT2 fst snd]; unfold contract_def; unfold contract; unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity.            
-    - (* Ecase *)
-      unfold contract; unfold contract_func;
-        WfExtensionality.unfold_sub contract (contract sig count (Ecase v l) sub im); lazy [projT1 projT2 fst snd].
-      unfold contract_def; unfold contract; unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity.
-      
-    - (* Eproj *)
-      unfold contract; unfold contract_func;
-      WfExtensionality.unfold_sub contract (contract sig count (Eproj v c n v0 e) sub im); lazy [projT1 projT2 fst snd]; unfold contract_def; unfold contract; unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity.
-
-        - (* Efun *)
-      unfold contract. unfold contract_func.
-      WfExtensionality.unfold_sub contract (contract sig count (Efun f e) sub im); lazy [projT1 projT2 fst snd].      
-      unfold contract_def; unfold contract; unfold contract_func; lazy [projT1 projT2 fst snd].
-      reflexivity.
-(*      remember (precontractfun sig count sub f) as pcff. *)            
-    - (* Eapp *)
-
-                      unfold contract; unfold contract_func;
-        WfExtensionality.unfold_sub contract (contract sig count (Eapp v f l) sub im); lazy [projT1 projT2 fst snd].
-      
-      
-      unfold contract_def; unfold contract; unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity.
-    - (* Eprim *)
-      unfold contract. unfold contract_func.
-      WfExtensionality.unfold_sub contract (contract sig count (Eprim v p l e) sub im); lazy [projT1 projT2 fst snd]; unfold contract_def; unfold contract; unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity.
-    - (* Ehalt *)
-      lazy.
- reflexivity.
+  unfold contract. unfold contract_func.
+  match goal with
+    |- context C [@Fix_sub ?A ?R ?wf ?P ?f ?a] =>
+    set (body := hide_body (a:=f)) in |-;
+    let newg := context C [ @Fix_sub A R wf P body a ] in convert_concl_no_check newg
+  end.
+  WfExtensionality.unfold_sub contract (contract sig count e sub im).
+  destruct e;
+   (* Econstr *)
+    lazy [projT1 projT2 fst snd]; unfold contract_def; unfold contract; unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity.
 Qed. 
     
 

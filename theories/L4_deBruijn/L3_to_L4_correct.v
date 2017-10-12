@@ -78,7 +78,7 @@ Proof. intros. inv H0. Admitted.
 
 Lemma crctTerm_fix e dts m t n :
   crctTerm e n (TFix dts m) ->
-  L3.term.dnthBody m dts = Some t -> isLambda t.
+  L3.term.dnthBody m dts = Some t -> L3t.isLambda t.
 Proof.
   intros. inv H.
   revert m H6 H0. induction H5; intros.
@@ -92,7 +92,7 @@ Qed.
 Lemma whFixStep_preserves_crctTerm e dts m fs :
   crctTerm e 0 (TFix dts m) ->
   whFixStep dts m = Some fs ->
-  crctTerm e 0 fs /\ isLambda fs.
+  crctTerm e 0 fs /\ L3t.isLambda fs.
 Proof.
   intros.
   split. eapply whFixStep_pres_Crct in H0; eauto.
@@ -835,6 +835,9 @@ Proof.
     change e with (snd (l, e)). rewrite <- Hs.
     apply exp_wf_strip_lam. apply H0; eauto.
     apply H2; eauto.
+
+  - destruct H3 as [na [body ->]]. exact I.
+  - destruct H1 as [na [body ->]]. exact I.
 Qed.
 
 Lemma translate_env_pres_Lookup nm p t : crctEnv p -> Lookup nm p t ->
@@ -900,6 +903,8 @@ Proof.
     change e with (snd (l, e)). rewrite <- Hs.
     apply exp_wf_strip_lam. apply H0; eauto.
     apply H2; eauto.
+  - destruct H3 as [na [body ->]]. exact I.
+  - destruct H1 as [na [body ->]]. exact I.
 Qed.
 
 Lemma crctTerm_exp_wf e e' :
@@ -1811,7 +1816,9 @@ Proof.
   replace (N.of_nat (k + Datatypes.length e'')) with
   (N.of_nat k + N.of_nat (Datatypes.length e'')) in H by lia.
   eapply exp_wf_subst_aux in H. apply H. eauto.
-  apply IHefnlst_wf.
+  - destruct e ; try contradiction.
+    now rewrite subst_env_aux_lam.
+  - apply IHefnlst_wf.
 Qed.
 
 Lemma eval_app_lam e fn b b' s :

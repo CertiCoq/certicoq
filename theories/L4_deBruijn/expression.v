@@ -120,6 +120,12 @@ Fixpoint enthopt (n:nat) (xs:efnlst): option exp :=
 Definition nargs (n : N * list name) : N := fst n.
 Definition arg_names (n : N * list name) : list name := snd n.
 
+Definition isLambda (e : exp) :=
+  match e with
+  | Lam_e _ _ => True
+  | _ => False
+  end.
+
 (** [exp_wf i e] ensures there is no free variable above [i]. *)
 Inductive exp_wf: N -> exp -> Prop :=
 | var_e_wf: forall i j, j < i -> exp_wf i (Var_e j)
@@ -141,7 +147,7 @@ with exps_wf: N -> exps -> Prop :=
 | econs_wf: forall i e es, exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
 with efnlst_wf: N -> efnlst -> Prop :=
 | flnil_wf_e: forall i, efnlst_wf i eflnil
-| flcons_wf_e: forall i f e es, exp_wf i e -> efnlst_wf i es ->
+| flcons_wf_e: forall i f e es, exp_wf i e -> isLambda e -> efnlst_wf i es ->
                            efnlst_wf i (eflcons f e es)
 with branches_wf: N -> branches_e -> Prop :=
 | brnil_wf: forall i, branches_wf i brnil_e
@@ -1222,7 +1228,8 @@ Proof.
   - constructor; auto. rewrite efnlst_length_sbst.
     apply H; try lia; auto.
   - constructor; auto. 
-  - constructor; auto. 
+  - constructor; auto.
+    + destruct e; simpl in i0; try contradiction. exact I.
   - constructor; auto. apply H; try lia; auto.
 Qed.
 
@@ -1270,7 +1277,7 @@ Proof.
   - destruct n; discriminate.
   - inversion H; subst. destruct n0; simpl in *.
     + injection H0; intros; subst; auto. 
-    + specialize (IHes H6 n0 e0).
+    + specialize (IHes H7 n0 e0).
       apply IHes. auto.
 Qed.
 
@@ -1504,7 +1511,8 @@ Proof.
   - constructor; auto. apply H0; try lia; auto.
   - constructor; auto. rewrite efnlst_length_subst; apply H; try lia; auto.
   - constructor; auto. 
-  - constructor; auto. 
+  - constructor; auto.
+    + destruct e; contradiction || constructor.
   - constructor; auto. apply H; try lia; auto.
 Qed.
 

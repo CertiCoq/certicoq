@@ -348,13 +348,14 @@ Definition valuePredTranslateLe (Src Dst : Type)
     isValue sv -> translate _ Dst sv = Ret dv -> sv ⊑ dv.
 
 Lemma certicoqTranslationCorrect_suff2
-  `{Ls: CerticoqLanguage Src Src}
-  `{Ld: CerticoqLanguage Dst Dst}
-  {isv : IsValue Src}
+  `{Ls: CerticoqLanguage Src SrcValue}
+  `{Ld: CerticoqLanguage Dst DstValue}
   {t1 : CerticoqTranslation Src Dst}
+  {t1v : CerticoqTranslation SrcValue DstValue}
   (bgs : bigStepPreserving Src Dst)
   (gp: goodPreserving Src Dst)
-  (vt : valuePredTranslateLe Src Dst)
+  {isv : IsValue SrcValue}
+  (vt : valuePredTranslateLe SrcValue DstValue)
   (isvc : IsValueComplete) (* soundness is not needed. *)
   :
   CerticoqTranslationCorrect Ls Ld.
@@ -368,7 +369,7 @@ Proof using.
   specialize (gp s Hgs).
   specialize (vt sv).
   destruct (translate Src Dst s); simpl in *; try contradiction.
-  destruct (translate Src Dst sv) as [ | dv]; simpl in *; try contradiction.
+  destruct (translate SrcValue DstValue sv) as [ | dv]; simpl in *; try contradiction.
   eauto.
 Qed.
 
@@ -427,19 +428,20 @@ Proof using.
 Qed.  
   
 Lemma certicoqTranslationCorrect_suff3
-  `{Ls: CerticoqLanguage Src Src}
-  `{Ld: CerticoqLanguage Dst Dst}
-  {isv : IsValue Src}
+  `{Ls: CerticoqLanguage Src SrcValue}
+  `{Ld: CerticoqLanguage Dst DstValue}
   {t1 : CerticoqTranslation Src Dst}
+  {t1v : CerticoqTranslation SrcValue DstValue}
+  {isv : IsValue SrcValue}
   (bgs : bigStepPreserving Src Dst)
   (gp: goodPreserving Src Dst)
-  (vty : valuePredTranslateYesPreserved Src Dst)
-  (vto : valuePredTranslateObserveNthCommute Src Dst)
+  (vty : valuePredTranslateYesPreserved SrcValue DstValue)
+  (vto : valuePredTranslateObserveNthCommute SrcValue DstValue)
   (isvc : IsValueComplete) (* soundness is not needed. *)
   :
   CerticoqTranslationCorrect Ls Ld.
 Proof using.
   eapply valuePredTranslateLe_suff in vto; eauto;[].
   clear vty.
-  apply certicoqTranslationCorrect_suff2; auto.
-Qed.  
+  eapply certicoqTranslationCorrect_suff2; eauto.
+Qed.

@@ -342,27 +342,6 @@ Hint Resolve @eval_yields_value' @eval_preseves_varclass
   @eval_preseves_wf @eval_preserves_closed conj
   @cps_cvt_val_closed @cps_cvt_closed @eval_preserves_fixwf @eval_end: eval.
 
-Require Import Btauto.
-Lemma valueObsEq (senv: ienv) : forall (sv:L4_5_Term), is_value sv ->
-                                                  (senv, sv) ⊑ (senv, cps_cvt_val sv).
-Proof using.
-  intros ? Hisv.
-  induction Hisv; simpl. (* this is proof by induction, not coinduction *)
-- constructor; compute; intros qn; [ destruct qn | ]; constructor.
-- constructor; compute; intros qn; [ destruct qn | ]; constructor.
-- constructor.
-  + unfold yesPreserved, questionHead, QuestionHeadTermL45, QuestionHeadTermL5; cbn.
-    destruct q; auto. unfold implb. btauto.
-  + clear H. rename H0 into Hind. intros ?. cbn. repeat rewrite List.map_map.
-    repeat rewrite nth_error_map.
-    remember (List.nth_error es n) as esso.
-    destruct esso as [ess | ]; try constructor.
-    simpl. apply Hind.
-    eapply List.nth_error_In.
-    symmetry. eassumption.
-- constructor; compute; intros qn; [ destruct qn | ]; try constructor.
-Qed.
-                                                  
 Require Import L4.variables.
 Require Import L4.varInterface.
 
@@ -372,16 +351,10 @@ Require Import L4.varInterface.
        yesPreserved questionHead QuestionHeadTermL45 QuestionHeadTermL5
        BigStepOpSem_instance_1  BigStepOpSem_instance_0
        goodTerm dummyEnvWf goodTerm GoodTerm_instance_0
-       GoodTerm_instance_1: certiclasses.
+       GoodTerm_instance_1
+       observeNthSubterm : certiclasses.
 
   Require Import Morphisms.
-Global Instance evalPreservesGood :
-  Proper (eval ==> Basics.impl) (@goodTerm L4_5_Term _).
-Proof using.
-  intros e v Hev Hg.
-  hnf. autounfold with certiclasses eval in *. repnd.
-  dands; eauto with eval typeclass_instances.
-Qed.
 
 (* all variants of the correctness property need this part *)
 Lemma goodPres45 : goodPreserving (ienv * L4_5_Term) (ienv * L5Term).
@@ -394,6 +367,114 @@ Proof using.
   destruct s as [? s]; simpl in *. repnd.
   hnf. simpl. symmetry. rewrite cps_cvt_aux_fvars; auto. rewrite Hgood2. refl.
 Qed.
+
+Global Instance IsValueL45 : IsValue (cTerm certiL4_5) :=
+  fun t => L4_5_to_L5.is_value (snd t).
+Require Import Btauto.
+    
+
+(* this proof, which was developed later, uses lemmas in the certiclasses library *)
+Module SimplerProof.
+
+Let certiL4_5_to_L5Val:
+  CerticoqTranslation (cTerm certiL4_5) (cTerm certiL5):=
+  @liftTotal _ _ (fun x => (fst x, (cps_cvt_val (snd x)))).
+
+  Lemma certiL4_5_to_L5Correct_evalPres:
+    @bigStepPreserving (cTerm certiL4_5) (cTerm certiL5) _ _ _ (certiL4_5_to_L5Val) _ _ _ .
+  Proof using.
+    intros ?.
+    intros ?.
+    destruct s as [? s].
+    destruct sv as [senv sv]. 
+    autounfold with certiclasses. simpl.
+    autounfold with certiclasses. simpl.
+    intros Hgood Heval. repnd. subst.
+    simpl in *. repnd. destruct Hgood1 as [Hclosed Hwf].
+    rename Hgood0 into Hvc. rename Hgood into Hfixwf.
+    dands;[auto | ].
+    pose proof
+         (cps_cvt_corr _ _ Hwf Hfixwf Hvc Heval
+                       Hclosed haltCont
+                       eq_refl
+                       ((cps_cvt_val sv)))
+      as Hcps.
+    apply Hcps. clear Hcps.
+    hnf in Heval.
+    rewrite (cps_val_ret_flip sv); try split; eauto with eval typeclass_instances.
+    unfold haltCont.
+    apply haltContAp.
+  Qed.
+
+            
+  Require Import SquiggleEq.LibTactics.
+  Lemma certiL4_5_to_L5Correct:
+    CerticoqTranslationCorrect certiL4_5 certiL5.
+  Proof.
+    eapply (@certicoqTranslationCorrect_suff3
+             _ _ _ _ _ _ _ _ _ _ _ _ _ _  _ certiL4_5_to_L5Val).
+    - apply certiL4_5_to_L5Correct_evalPres.
+    - apply goodPres45.
+    - intros ? ? Hsv Heq. inverts Heq.
+      destruct sv as [? ev]. hnf.
+      autounfold with certiclasses in *.
+      inverts Hsv; simpl in *; subst.
+      + intros q.  destruct q; constructor.
+      + intros q.  destruct q; constructor.
+      + intros q.  destruct q; try auto;[]; simpl.
+        unfold implb; btauto.
+      + intros q.  destruct q; constructor.
+    - intros ? ? ? Hsv Heq. inverts Heq.
+      destruct sv as [? ev]. hnf.
+      autounfold with certiclasses.
+      inverts Hsv; simpl in *; subst; simpl; [ | | | ]; try auto; [].
+      simpl.
+      repeat rewrite List.map_map.
+      repeat rewrite nth_error_map.
+      remember (List.nth_error es n) as esso.
+      destruct esso as [ess | ]; auto.
+      simpl. split; auto.
+      symmetry in Heqesso.
+      apply List.nth_error_In in Heqesso.
+      apply H. simpl. assumption.
+    - intros ? ? ?. destruct t, v. simpl in *.
+      eapply eval_yields_value'. apply H.
+   Qed.
+End SimplerProof.
+
+Global Instance evalPreservesGood :
+  Proper (eval ==> Basics.impl) (@goodTerm L4_5_Term _).
+Proof using.
+  intros e v Hev Hg.
+  hnf. autounfold with certiclasses eval in *. repnd.
+  dands; eauto with eval typeclass_instances.
+Qed.
+
+Module OldProof.
+  (* this proof is by induction, but the above proof uses the lemma
+     certiClasses2.certicoqTranslationCorrect_suff3, where the corresponding part
+     is provem by coinduction (not induction) *)
+Lemma valueObsEq (senv: ienv) : forall (sv:L4_5_Term), is_value sv ->
+                                                  (senv, sv) ⊑ (senv, cps_cvt_val sv).
+Proof using.
+  intros ? Hisv.
+  induction Hisv; simpl. (* this is proof by induction, not coinduction *)
+- constructor; compute; intros qn; [ destruct qn | ]; constructor.
+- constructor; compute; intros qn; [ destruct qn | ]; constructor.
+- constructor.
+  + unfold yesPreserved, questionHead, QuestionHeadTermL45, QuestionHeadTermL5; cbn.
+    destruct q; auto. unfold implb. btauto.
+  + clear H. rename H0 into Hind. intros ?. cbn.
+    repeat rewrite List.map_map.
+    repeat rewrite nth_error_map.
+    remember (List.nth_error es n) as esso.
+    destruct esso as [ess | ]; try constructor.
+    simpl. apply Hind.
+    eapply List.nth_error_In.
+    symmetry. eassumption.
+- constructor; compute; intros qn; [ destruct qn | ]; try constructor.
+Qed.
+                                                  
 
 Global Instance certiL4_5_to_L5Correct: CerticoqTranslationCorrect certiL4_5 certiL5.
 (* Again, proof by induction *)
@@ -431,6 +512,7 @@ Proof.
     revert Heval. clear.
     apply valueObsEq.
 Qed.
+End OldProof.
 
 
 Require Import L4.L5a.

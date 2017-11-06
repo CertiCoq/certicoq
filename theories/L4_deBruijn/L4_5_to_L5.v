@@ -291,7 +291,7 @@ Definition branch {s} : Type := (dcon * (@BTerm NVar s))%type.
 
 Definition find_branch {s} (d:dcon) (m:nat) (matcht :list (@branch s)) : 
     option BTerm
-  := @polyEval.find_branch s (Named.TermAbsImpl NVar s) d m matcht.
+  := @polyEval.find_branch s (Named.TermAbsImplUnstrict NVar s) d m matcht.
 
 
 
@@ -491,17 +491,17 @@ Qed.
 
 Lemma find_branch_some: forall  {s} (d:dcon) (m:nat) (bs :list (@branch s)) b,
   find_branch d m bs = Some b
-  -> LIn (d,b) bs /\ LIn b (map snd bs) /\ num_bvars b = m
-  /\ find (fun a : branch => decide (d = fst a) && (m =? num_bvars (snd a))) bs = Some (d, b).
+  -> LIn (d,b) bs /\ LIn b (map snd bs) /\ num_bvars b = m.
 Proof using.
   unfold find_branch, polyEval.find_branch. intros ? ? ? ? ? .
   destFind; intros Hdf; [| inverts Hdf].
   destruct bss as [dd bt].
-  inverts Hdf.
-  repnd.
-  apply Decidable_sound in Heqsnl.
-  simpl in Heqsnl.
-  inverts Heqsnl. dands; auto.
+  rewrite decide_decideP in Hdf.
+  simpl in Hdf.
+  cases_if in Hdf;inverts Hdf.
+  simpl in *. repnd.
+  apply Decidable_sound in Heqsnl. subst.
+  dands; auto.
   apply in_map_iff. eexists; split; eauto;  simpl; auto.
 Qed.
 
@@ -877,7 +877,7 @@ find_branch d (Datatypes.length vs) bs = Some c
 *)
 
 Lemma L5BigStepExecCorr: @BigStepOpSemExecCorrect CTerm CTerm eval_c
-  (@eval_n (Named.TermAbsImpl NVar L5Opid)).
+  (@eval_n (Named.TermAbsImplUnstrict NVar L5Opid)).
 Proof using.
   constructor.
 - admit.
@@ -913,7 +913,7 @@ Proof using.
   (** eval_Fix_app_c *)
   + destruct IHHev as [n IHHev].
     exists (S n). unfold bigStepEvaln. simpl.
-    unfold  Named.mkBTermSafe.
+    unfold  Named.mkBTerm.
     fold len.
     rewrite flatten_map_Some.
     unfold Fix_c' in sub.
@@ -3343,6 +3343,7 @@ Proof using.
   unfold compose in Hfwf. simpl in Hfwf.
   apply andb_true_iff in Hfwf. repnd.
   specialize (IHHe1 ltac:(ntwfauto) ltac:(auto) Hvc0  Hcle0).
+  pose proof H as Hfb.
   apply find_branch_some in H as H. rename H into Hfr.
 
   unfold num_bvars in Hfr.
@@ -3443,12 +3444,14 @@ Proof using.
     intros ? _. destruct (snd x); refl; fail.
 
   Focus 2.
+    unfold find_branch.
+    setoid_rewrite findBranchMapBtCommute.
     repeat rewrite map_map. simpl.
-    rewrite combine_map.
-    unfold find_branch, polyEval.find_branch.
-    erewrite find_map_same_compose;[ simpl; refl | | apply Hfr].
-    intros. unfold compose. simpl. destruct (snd a). refl.
-    
+    rewrite combine_eta.
+    unfold find_branch in Hfb.
+    rewrite Hfb. simpl. refl.
+
+  clear Hfb.
   unfold apply_bterm. simpl.
   unfold ssubst at 1. simpl.
   fold (@ssubst _ _ _ _ _ L5Opid).

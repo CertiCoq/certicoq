@@ -183,8 +183,8 @@ Context {Name NVar VarClass Opid : Type} {deqv vcc fvv}
 
 Definition TermAbs_R_NamedAlphaClosedWf Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
 TermAbs_R Opid Opid Opid_R
-    (Named.TermAbsImpl NVar Opid)
-    (Named.TermAbsImpl NVar Opid).
+    (Named.TermAbsImplUnstrict NVar Opid)
+    (Named.TermAbsImplUnstrict NVar Opid).
 Proof using vartyp deqo def gts.
   (* could also have used the arity 1 version. but that would need many lemmas *)
   eapply TermAbs_R_Build_TermAbs_R with 
@@ -214,8 +214,48 @@ Proof using vartyp deqo def gts.
   apply list_R_eq in Hlt; [ | eauto with typeclass_instances]. subst.
   constructor.
 (* To preserve nt_wf, Named.mkBTermSafe must do a check that (map num_bvars lbt) is correct,
-even when lbt are isprogram_bt *)
+even when lbt are isprogram_bt. thus, use the strict version, below *)
 Abort.
+
+Definition TermAbs_R_NamedAlphaClosedWf Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
+TermAbs_R Opid Opid Opid_R
+    (Named.TermAbsImpl NVar Opid)
+    (Named.TermAbsImpl NVar Opid).
+Proof using vartyp deqo def gts.
+  (* could also have used the arity 1 version. but that would need many lemmas *)
+  eapply TermAbs_R_Build_TermAbs_R with 
+    (AbsTerm_R := fun t1 t2  => isprogram t1 /\ t1 = t2)
+      (AbsBTerm_R := fun t1 t2  => isprogram_bt t1 /\ t1 = t2); [ | | | | | ].
+- intros ? ? Hp. apply nat_R_eq.  repnd. subst. refl.
+- intros t1 t Hp. repnd. subst. destruct t; try constructor.
+  constructor;[ apply eqIfR; refl | ].
+  apply  list_R_map_lforall. split.
+  + apply isprogram_ot_iff in Hp0. repnd. assumption.
+  + rewrite map_id. apply list_R_eq;[constructor; tauto | refl].
+- intros b1 b Hpr. repnd. subst. destruct b as [lv ?].
+  destruct lv; constructor.
+  apply isprogram_bt_nobnd in Hpr0. auto.
+- intros b1 b Hpr lt1 lt Hpt. repnd. subst.
+  apply list_R_map_lforall in Hpt.
+  rewrite map_id in Hpt.
+  repnd.  apply list_R_eq in Hpt; [ | eauto with typeclass_instances].
+  subst. unfold Named.applyBTermClosed. case_if as Hd; constructor.
+  apply beq_nat_true in Hd.
+  split;[| refl ].
+  apply isprogram_bt_implies; auto.
+- intros ? lt Hlt ? o Ho.
+  apply eqIfR in Ho. subst.
+  apply list_R_map_lforall in Hlt.
+  rewrite map_id in Hlt. repnd.
+  apply list_R_eq in Hlt; [ | eauto with typeclass_instances]. subst.
+  unfold Named.mkBTermSafe.
+  rewrite decide_decideP.
+  cases_if; constructor;[].
+  split; auto;[].
+  apply isprogram_ot_if_eauto; eauto.
+- intros. repnd. split; [ | congruence].
+  apply implies_isprogram_bt0. assumption.
+Qed.
 
 Lemma alpha_eq_ot_list_R (o:Opid) (la: list (@BTerm NVar Opid)) lb:
   alpha_eq (terms.oterm o la) (terms.oterm o lb)
@@ -272,10 +312,10 @@ Qed.
 
 
 
-Definition TermAbs_R_NamedDB Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
+Definition TermAbs_R_NamedDBUnstrict Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
 TermAbs_R Opid Opid Opid_R
-    (TermAbsDB Name Opid)
-    (Named.TermAbsImpl NVar Opid).
+    (TermAbsDBUnstrict Name Opid)
+    (Named.TermAbsImplUnstrict NVar Opid).
 Proof using vartyp mkNVar getIdCorr getId deqo def gts.
   eapply TermAbs_R_Build_TermAbs_R with 
     (AbsTerm_R := Term_R)
@@ -358,6 +398,129 @@ Proof using vartyp mkNVar getIdCorr getId deqo def gts.
   simpl. repnd.
   rewrite Hfb. split;[constructor; simpl; assumption| refl].
 Defined.
+
+(* exact same proof as of, except the second last bullet, for mkBTermSafe *)
+
+
+Definition TermAbs_R_NamedDB Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
+TermAbs_R Opid Opid Opid_R
+    (TermAbsDB Name Opid)
+    (Named.TermAbsImpl NVar Opid).
+Proof using vartyp mkNVar getIdCorr getId deqo def gts.
+  eapply TermAbs_R_Build_TermAbs_R with 
+    (AbsTerm_R := Term_R)
+    (AbsBTerm_R := BTerm_R).
+- intros ? ? ?. apply nat_R_eq. apply numBvars_R. assumption.
+- intros d n Hal.  unfold Term_R in Hal. repnd.
+  destruct d.
+  + destruct n;[| provefalse; inverts Hal].
+    simpl. constructor. 
+  + destruct n;[provefalse; inverts Hal |].
+    simpl in *. pose proof Hal as Halb.
+    apply alphaGetOpid in Hal.
+    simpl in Hal. inverts Hal.
+    constructor.
+    constructor;[apply eqIfR; refl|].
+    apply alpha_eq_ot_list_R in Halb.
+    unfold BTerm_R.
+    apply list_RP_same.
+    inverts Hal0.
+    apply list_RP_same.
+    apply (list_R_map_lforall). dands; auto.
+- intros d b Hal. unfold BTerm_R in *. repnd.
+  unfold safeGetNT.
+  unfold Named.safeGetNT.
+  pose proof Hal as Halb.
+  apply properAlphaNumbvars in Hal.
+  destruct d, b. unfold terms.num_bvars in *. simpl in *.
+  rewrite lengthMapCombineSeq in Hal.
+  destruct l, l0; inverts Hal; constructor.
+  simpl in Halb. inverts Hal0.
+  apply alphaeqbt_nilv2 in Halb. simpl in H1. split; assumption.
+- intros d b Hal ld ln Hall.
+  unfold applyBTermClosed, Named.applyBTermClosed.
+  pose proof Hal as Halb.
+  apply numBvars_R in Hal.
+  rewrite <- Hal.
+  pose proof Hall as Hallb.
+  apply list_R_binrel_list in Hallb. apply fst in Hallb.
+  rewrite Hallb. destruct d as [lnm dt].
+  cases_if as Hc; simpl; constructor;[].
+  apply DecidableClass.Decidable_eq_nat_obligation_1 in Hc.
+  unfold num_bvars, NLength, terms.num_bvars in *. simpl in *.
+  apply list_R_map_lforall in Hall. repnd.
+  unfold BTerm_R in *. repnd. invertsn Halb0.
+  rewrite N.add_0_r in Halb0. 
+  split;
+    [eapply fvars_below_subst_aux_list; eauto; unfold NLength in *; congruence |].
+  rewrite fromDB_ssubst_eval2
+    with (ln0:=lnm);unfold NLength in *; eauto;[| congruence].
+  apply apply_bterm_alpha_congr with 
+      (lnt1:= (map (fromDB def mkNVar 0 FMapPositive.Empty) ld))
+      (lnt2 := ln) in Halb; unfold terms.num_bvars; simpl; autorewrite with list;
+        [ |apply alpha_eq_list; assumption | congruence].
+  rewrite <- Halb.
+  unfold apply_bterm. simpl.
+  assert (forall (x y : @NTerm NVar Opid) , x= y -> alpha_eq x y) 
+    by (intros; subst; refl).
+  apply H. f_equal;[congruence|].
+  f_equal.
+  match goal with
+  [|- ?l=_] => remember l
+  end.
+  erewrite namesInsWierd1 with (def0:=def) (nf:=0) (names:=FMapPositive.Empty); eauto.
+  subst. simpl.
+  rewrite Hc,<- Hallb.
+  rewrite map_map.
+  apply eq_maps.
+  intros.
+  setoid_rewrite N.sub_0_r. refl.
+- intros d b Hal ? ln Hall. subst.
+  unfold mkBTermSafe.
+  unfold Named.mkBTermSafe.
+  apply eqIfR in Hall. subst.
+  apply list_R_map_lforall in Hal.
+  pose proof alpha_eq_ot_list_R.
+
+  (* Move to SquiggleEq.tiff *)
+Ltac dtiffs3 := repeat match goal with
+[ H: forall _ : ?X, _ <=> _ |- _] => 
+    let Hl:= fresh H "tl" in
+    let Hr:= fresh H "tr" in
+    pose proof (fun x:X => tiff_fst (H x)) as Hl;
+    pose proof (fun x:X => tiff_snd (H x)) as Hr; hide_hyp H
+| [ H: forall (_ : ?X) (_ : ?Y), _ <=> _ |- _] => 
+    let Hl:= fresh H "tl" in
+    let Hr:= fresh H "tr" in
+    pose proof (fun x:X => (fun y:Y => tiff_fst (H x y))) as Hl;
+    pose proof (fun x:X => (fun y:Y => tiff_snd (H x y))) as Hr; hide_hyp H
+| [ H: forall (_ : ?X) (_ : ?Y) (_ : ?Z), _ <=> _ |- _] => 
+    let Hl:= fresh H "tl" in
+    let Hr:= fresh H "tr" in
+    pose proof (fun x:X => (fun (y:Y) (z:Z) => fst (H x y z))) as Hl;
+    pose proof (fun x:X => (fun (y:Y) (z:Z) => snd (H x y z))) as Hr; hide_hyp H
+                       end; show_hyps.
+
+  dtiffs3.
+  repnd. rename ln into o.
+  apply Xtr  with (x:=o) in Hal.
+  pose proof Hal as Hnum.
+  apply alpha_eq_ot_numvars in Hnum.
+  rewrite map_map in Hnum. clear Xtl Xtr.
+  simpl in Hnum.
+  rewrite map_ext with (g:=num_bvars) in Hnum;
+    [| intros bb; destruct bb; unfold num_bvars, terms.num_bvars;
+       simpl; autorewrite with list; refl].
+  rewrite Hnum.
+  clear Hnum.
+  cases_if; constructor;[].
+  split;[constructor |]; assumption.
+  
+- unfold Term_R, BTerm_R. intros ? ? Hfb.
+  simpl. repnd.
+  rewrite Hfb. split;[constructor; simpl; assumption| refl].
+Defined.
+
 
 (*
 Definition TermAbs_R_NamedDB2 :  

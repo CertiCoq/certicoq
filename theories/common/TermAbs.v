@@ -104,9 +104,12 @@ match b with
 end.
 
 
-Definition mkBTermSafe (lb : list BTerm) (o: Opid) : option (@NTerm NVar Opid) :=
+Definition mkBTerm (lb : list BTerm) (o: Opid) : option (@NTerm NVar Opid) :=
 (* if (decide ((map num_bvars lb) = OpBindings o))%nat then Some (oterm o lb) else None. *)
 Some (oterm o lb).
+
+Definition mkBTermSafe (lb : list BTerm) (o: Opid) : option (@NTerm NVar Opid) :=
+ if (decide ((map num_bvars lb) = OpBindings o))%nat then Some (oterm o lb) else None.
 
 (* move to SquiggleEq.terms? *)
 Definition getOpidBTerms (t: @NTerm NVar Opid) : option (Opid * list BTerm):=
@@ -117,6 +120,16 @@ end.
 
 Definition applyBTermClosed (b : BTerm) (l: list NTerm) : option (@NTerm NVar Opid) :=
 if (num_bvars b =? length l) then Some (apply_bterm b l) else None.
+
+Definition TermAbsImplUnstrict : TermAbs Opid :=
+ (@Build_TermAbs _ 
+  (@NTerm NVar Opid) (@BTerm NVar Opid)
+   num_bvars
+   getOpidBTerms
+   safeGetNT
+   applyBTermClosed
+   mkBTerm
+   (bterm [])).
 
 Definition TermAbsImpl : TermAbs Opid :=
  (@Build_TermAbs _ 
@@ -148,9 +161,23 @@ Definition applyBTermClosed (b : DBTerm) (l: list DTerm) : option (@DTerm Name O
 let (n,t):=b in
   if (num_bvars b  =? length l)%nat then  Some (subst_aux_list 0 t l) else None.
 
-Definition mkBTermSafe (lb : list DBTerm) (o: Opid) : option (@DTerm Name Opid) :=
+Definition mkBTerm (lb : list DBTerm) (o: Opid) : option (@DTerm Name Opid) :=
 (*if (decide ((map num_bvars lb) = OpBindings o))%nat then Some (oterm o lb) else None. *)
 Some (oterm o lb).
+
+
+Definition mkBTermSafe (lb : list DBTerm) (o: Opid) : option (@DTerm Name Opid) :=
+if (decide ((map num_bvars lb) = OpBindings o))%nat then Some (oterm o lb) else None.
+
+Definition TermAbsDBUnstrict : TermAbs Opid :=
+ (@Build_TermAbs _ 
+  (@DTerm Name Opid) (@DBTerm Name Opid)
+   num_bvars
+   getOpidBTerms
+   safeGetNT
+   applyBTermClosed
+   mkBTerm
+   (bterm [])).
 
 
 Definition TermAbsDB : TermAbs Opid :=
@@ -162,7 +189,6 @@ Definition TermAbsDB : TermAbs Opid :=
    applyBTermClosed
    mkBTermSafe
    (bterm [])).
-
 
 End SquiggleDBInst.
 

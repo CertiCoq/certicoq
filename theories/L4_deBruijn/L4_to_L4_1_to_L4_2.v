@@ -25,6 +25,15 @@ Require Import ExtLib.Data.Map.FMapPositive.
 Require Import Common.TermAbs.
 Require Import SquiggleEq.termsDB.
 
+(** It is the id function if fst p = (length (snd p)). Otherwise, the list of names
+is truncated or padded to make the length right. If we can guarantee the equality, 
+we can replace this function with the identity function *)
+Definition mkNames (p: N*list Ast.name) :=
+  let (n,vnames) := p in
+  let vnames := firstn  (N.to_nat n) vnames in
+  list.listPad Ast.nAnon vnames  (N.to_nat n).
+
+
 
 Fixpoint tL4_to_L4_1 (e:exp) {struct e}: (@DTerm Ast.name L4Opid):=
 match e with
@@ -54,7 +63,7 @@ match e with
         ((bterm [] (tL4_to_L4_1 d))::(List.map snd brs))
 
 
-| Ax_e s => oterm (NBox s) []
+| Ax_e s => oterm (NApply) []
 
 | Prf_e => oterm (NBox "proof") []
 end
@@ -73,14 +82,11 @@ match e with
     ::(ftL4_to_L4_1 tl)
 end
 with btL4_to_L4_1 (lb:branches_e) {struct lb}
-  : list (@polyEval.branch L4Opid (@TermAbsDB _ _)):=
+  : list (@polyEval.branch L4Opid (@TermAbsDBUnstrict _ _)):=
 match lb with
 | brnil_e => []
 | brcons_e d n e tl => 
-    let (n,vnames) := n in
-    let vnames := firstn  (N.to_nat n) vnames in
-    let vnames := list.listPad Ast.nAnon vnames  (N.to_nat n) in
-    (d, bterm vnames (tL4_to_L4_1 e))
+    (d, bterm (mkNames n) (tL4_to_L4_1 e))
     ::(btL4_to_L4_1 tl)
 end.
 

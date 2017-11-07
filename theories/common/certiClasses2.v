@@ -255,10 +255,12 @@ Proof.
   eapply obsLeTrns with (i:=iv); eauto.
 Qed.
 
-
 End YesNoQuestions.
 
+
 Notation "s ⊑ t" := (obsLe s t) (at level 65).
+
+
 
 
 (** Here are some other correctness properties that we may be interested in: *)
@@ -294,5 +296,152 @@ Arguments cValue {Term} {Value} {H} {H0} {H1} {H2} _.
 
 Arguments CerticoqLanguage Term {Value} {H} {H0} {H1} {H2}.
 
+Definition evalPreservesGoodness `{Ls: BigStepOpSem Src SrcValue}
+  `{GoodTerm Src} `{GoodTerm SrcValue} :=
+  forall (s:Src) (sv: SrcValue),
+    s ⇓ sv -> goodTerm s -> goodTerm sv.
+
+(* This can be typically be easily proven by induction on sv *)
+Definition valueTypeTranslateLe (SrcValue DstValue : Type)
+           `{CerticoqTranslation SrcValue DstValue}
+           `{QuestionHead SrcValue}
+           `{QuestionHead DstValue}
+           `{ObserveNthSubterm SrcValue}
+           `{ObserveNthSubterm DstValue} : Prop :=
+  forall (sv: SrcValue) (dv: DstValue),
+    translate _ DstValue sv = Ret dv -> sv ⊑ dv.
+
+Lemma certicoqTranslationCorrect_suff1
+  `{Ls: CerticoqLanguage Src SrcValue}
+  `{Ld: CerticoqLanguage Dst DstValue}
+  {t1 : CerticoqTranslation Src Dst}
+  {t1v : CerticoqTranslation SrcValue DstValue}
+  (bgs : bigStepPreserving Src Dst)
+  (gp: goodPreserving Src Dst)
+  (vt : valueTypeTranslateLe SrcValue DstValue)
+  :
+  CerticoqTranslationCorrect Ls Ld.
+Proof using.
+  constructor;[assumption|].
+  intros ? ? Hgs Hev.
+  apply bgs in Hev;[| assumption].
+  hnf in Hev.
+  specialize (gp s Hgs).
+  specialize (vt sv).
+  destruct (translate Src Dst s); simpl in *; try contradiction.
+  destruct (translate SrcValue DstValue sv) as [ | dv]; simpl in *; try contradiction.
+  eauto.
+Qed.
 
 
+
+(* For the case when the type of terms and values is the same. In many lemmas
+  IsValue only needs to be complete (not sound) *)
+Definition valuePredTranslateLe (Src Dst : Type)
+           `{CerticoqTranslation Src Dst}
+           `{IsValue Src}
+           `{QuestionHead Src}
+           `{QuestionHead Dst}
+           `{ObserveNthSubterm Src}
+           `{ObserveNthSubterm Dst} : Prop :=
+  forall (sv: Src) (dv: Dst),
+    isValue sv -> translate _ Dst sv = Ret dv -> sv ⊑ dv.
+
+Lemma certicoqTranslationCorrect_suff2
+  `{Ls: CerticoqLanguage Src SrcValue}
+  `{Ld: CerticoqLanguage Dst DstValue}
+  {t1 : CerticoqTranslation Src Dst}
+  {t1v : CerticoqTranslation SrcValue DstValue}
+  (bgs : bigStepPreserving Src Dst)
+  (gp: goodPreserving Src Dst)
+  {isv : IsValue SrcValue}
+  (vt : valuePredTranslateLe SrcValue DstValue)
+  (isvc : IsValueComplete) (* soundness is not needed. *)
+  :
+  CerticoqTranslationCorrect Ls Ld.
+Proof using.
+  constructor;[assumption|].
+  intros ? ? Hgs Hev.
+  pose proof Hev as Hevb.
+  apply bgs in Hev;[| assumption].
+  apply isvc in Hevb.
+  hnf in Hev.
+  specialize (gp s Hgs).
+  specialize (vt sv).
+  destruct (translate Src Dst s); simpl in *; try contradiction.
+  destruct (translate SrcValue DstValue sv) as [ | dv]; simpl in *; try contradiction.
+  eauto.
+Qed.
+
+Definition valuePredTranslateYesPreserved (Src Dst : Type)
+           `{CerticoqTranslation Src Dst}
+           `{IsValue Src}
+           `{QuestionHead Src}
+           `{QuestionHead Dst}
+           `{ObserveNthSubterm Src}
+           `{ObserveNthSubterm Dst} : Prop :=
+  forall (sv: Src) (dv: Dst),
+    isValue sv -> translate _ Dst sv = Ret dv ->
+    yesPreserved sv dv.
+
+Definition valuePredTranslateObserveNthCommute (Src Dst : Type)
+           `{CerticoqTranslation Src Dst}
+           `{IsValue Src}
+           `{QuestionHead Src}
+           `{QuestionHead Dst}
+           `{ObserveNthSubterm Src}
+           `{ObserveNthSubterm Dst} : Prop :=
+  forall (sv: Src) (dv: Dst) n,
+    isValue sv -> translate _ Dst sv = Ret dv ->
+    option_map (translate _ Dst) (observeNthSubterm n sv) =
+    option_map (@Ret _) (observeNthSubterm n dv)
+    /\ (match (observeNthSubterm n sv)  with
+       | Some s => isValue s
+       | None => True
+       end).
+
+
+Require Import SquiggleEq.LibTactics.
+Require Import SquiggleEq.tactics.
+Lemma valuePredTranslateLe_suff  (Src Dst : Type)
+           `{CerticoqTranslation Src Dst}
+           `{IsValue Src}
+           `{QuestionHead Src}
+           `{QuestionHead Dst}
+           `{ObserveNthSubterm Src}
+           `{ObserveNthSubterm Dst} :
+  valuePredTranslateObserveNthCommute Src Dst
+  -> valuePredTranslateYesPreserved Src Dst
+  -> valuePredTranslateLe Src Dst.
+Proof using.
+  intros Ho Hy.
+  cofix.
+  intros ? ? Hv Ht.
+  constructor;[eauto|].
+  intros.
+  specialize (Ho _ _ n Hv Ht).
+  destruct (observeNthSubterm n sv);[| constructor].
+  simpl in Ho. repnd.
+  destruct (observeNthSubterm n dv); inverts Ho0.
+  constructor.
+  apply valuePredTranslateLe_suff; auto.
+Qed.  
+  
+Lemma certicoqTranslationCorrect_suff3
+  `{Ls: CerticoqLanguage Src SrcValue}
+  `{Ld: CerticoqLanguage Dst DstValue}
+  {t1 : CerticoqTranslation Src Dst}
+  {t1v : CerticoqTranslation SrcValue DstValue}
+  {isv : IsValue SrcValue}
+  (bgs : bigStepPreserving Src Dst)
+  (gp: goodPreserving Src Dst)
+  (vty : valuePredTranslateYesPreserved SrcValue DstValue)
+  (vto : valuePredTranslateObserveNthCommute SrcValue DstValue)
+  (isvc : IsValueComplete) (* soundness is not needed. *)
+  :
+  CerticoqTranslationCorrect Ls Ld.
+Proof using.
+  eapply valuePredTranslateLe_suff in vto; eauto;[].
+  clear vty.
+  eapply certicoqTranslationCorrect_suff2; eauto.
+Qed.

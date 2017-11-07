@@ -198,8 +198,8 @@ Proof using.
   simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
 Qed.
 
-Let eval42 := @polyEval.eval_n (Named.TermAbsImpl variables.NVar L4Opid).
-Let eval45 := @eval_n (Named.TermAbsImpl variables.NVar L4_5Opid).
+Let eval42 := @polyEval.eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid).
+Let eval45 := @eval_n (Named.TermAbsImplUnstrict variables.NVar L4_5Opid).
 
 
 (**  can be obtained for free using a parametricity plugin 
@@ -243,7 +243,8 @@ Proof using.
   apply eval_fix_e2; try rewrite map_length; auto.
   
 (* constructor value *)
-- clear Hprb. simpl. revert Hev.
+- clear Hprb. simpl.
+  revert Hev.
   unfold L4_5_Term. f_equal. pose proof Hpr0 as Hlen.
   apply map0lbt2 in Hpr0. remember (map get_nt lbt) as lnt.
   clear Heqlnt. subst.
@@ -307,18 +308,19 @@ Proof using.
   apply isprogram_bt_nobnd in Hpra.
   pose proof (fun v => Hind _ v Hprf) as Hindf.
   pose proof (fun v => Hind _ v Hpra) as Hinda.
-  destruct (eval42 n ant) as [av | ]; simpl in *;[ | invertsn Hev].
-  destruct (eval42 n fnt) as [fv | ]; simpl in *;[ | invertsn Hev].
+  destruct (eval42 n fnt) as [fv | ]; simpl in *;[ | invertsn Hev; fail].
   specialize (Hindf _ eq_refl).
-  specialize (Hinda _ eq_refl).
   destruct fv as [ |fvo fvlbt]; [ invertsn Hev| ].
   destruct Hindf as [Hprfe Hindf].
-  destruct Hinda as [Hprae Hinda].
-  apply isprogram_ot_iff in Hprfe. repnd.
   simpl in *. destruct fvo;  simpl in *; try  invertsn Hev.
   (* Lambda *)
-  + simpl; destruct fvlbt as [ | f fvlbt]; simpl; try invertsn Hev;[].
+  +
+    simpl; destruct fvlbt as [ | f fvlbt]; simpl; try invertsn Hev;[].
     simpl; destruct fvlbt as [ | ff fvlbt]; simpl; try invertsn Hev ;[].
+    destruct (eval42 n ant) as [av | ]; simpl in *;[ | invertsn Hev].
+    specialize (Hinda _ eq_refl).
+    destruct Hinda as [Hprae Hinda].  
+    apply isprogram_ot_iff in Hprfe. repnd.
     revert Hev.
     simplApplyBTerm Hd; intros Hev; [ | invertsn Hev].
     let tac := invertsn Hprfe0 in destructbtdeep2 f tac.
@@ -331,8 +333,14 @@ Proof using.
     eapply eval_App_e; eauto.
 
   (* Fix *)
-  + revert Hev.
-    unfold Named.mkBTermSafe. simpl. repeat rewrite map_map.
+  +
+    destruct (eval42 n ant) as [av | ]; simpl in *;[ | invertsn Hev].
+    specialize (Hinda _ eq_refl).
+    destruct Hinda as [Hprae Hinda].  
+    apply isprogram_ot_iff in Hprfe. repnd.
+
+    revert Hev.
+    unfold Named.mkBTerm. simpl. repeat rewrite map_map.
     do 1 rewrite flatten_map_Some. intros Hev.
     remember (select index fvlbt) as ofbs.
     destruct ofbs as [fbs | ];[ | invertsn Hev]. symmetry in Heqofbs.
@@ -365,11 +373,19 @@ Proof using.
       intros ? Hin.
       apply in_map_iff in Hin. exrepnd. subst. clear Hin0.
       apply isprogram_ot_iff. eauto.
-  + destruct fvlbt; inverts Hprfe0.
+  + destruct fvlbt; invertsn Hev.
+    destruct (eval42 n ant) as [av | ]; simpl in *;[ | invertsn Hev].
+    specialize (Hinda _ eq_refl).
+    destruct Hinda as [Hprae Hinda].  
+    apply isprogram_ot_iff in Hprfe. repnd.
     simpl. unfold apply_bterm. simpl. unfold Lam_e. simpl.
-    inverts Hev. simpl.
-    split; [ apply isprogram_ot_iff; simpl; firstorder | ].
-    eapply eval_FixApp_e; eauto;[reflexivity| | reflexivity].
+    invertsn Hev.
+    split; [ apply isprogram_ot_iff; simpl; firstorder; fail | ].
+
+    (* evaluate arg in boxapp case of L4.polyEval *)
+    eapply eval_FixApp_e; unfold select; simpl; eauto; simpl; eauto.
+
+    
     simpl. unfold apply_bterm. simpl.
     eapply eval_App_e; eauto;[apply eval_Lam_e | eapply eval_end; eauto| ].
     simpl. unfold subst. clear Hprfe.

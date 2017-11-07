@@ -357,3 +357,11 @@ Proof using.
   intros ? ?.
   simpl. assumption.
 Qed.
+
+Class IsValue (T:Type) := isValue: T -> Prop.
+
+Definition IsValueSound {T V:Type} {bgs: BigStepOpSem T V} {isv: IsValue V} :=
+  forall v, isValue v -> exists t, t ⇓ v.
+
+Definition IsValueComplete {T V:Type} {bgs: BigStepOpSem T V} {isv: IsValue V} :=
+  forall t v, t ⇓ v -> isValue v.

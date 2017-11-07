@@ -2,4 +2,14 @@
   ("-emacs-U" "-R" "../compcert" "compcert"
               "-R" "../../libraries" "Libraries"
               "-R" "../common" "Common"
-              "-R" "." "L6")))))
+              "-R" "../L1_QuotedCoq" "L1"
+              "-R" "../L1g" "L1g"
+              "-R" "../L1_QuotedCoq" "L1"
+              "-R" "../L2_typeStripped" "L2"
+              "-R" "../L2k_noCnstrParams" "L2k"
+              "-R" "../L2_5_box" "L2_5"
+              "-R" "../L3_flattenedApp" "L3"
+              "-R" "../L4_deBruijn" "L4"
+              "-R" "." "L6"
+              "-R" "../L7" "L7"
+              )))))

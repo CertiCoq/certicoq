@@ -222,6 +222,8 @@ Module Type Heap.
   Parameter size : forall {A}, heap A -> nat.
   
   Parameter size_with_measure : forall {A}, (A -> nat) -> heap A -> nat.
+
+  Parameter size_reachable_with_measure : forall {A}, (A -> nat) -> heap A -> nat.
   
   Parameter size_emp :
     forall (A : Type), @size A emp = 0%nat.

@@ -68,7 +68,7 @@ Section Branches.
 Context (Opid:Type) {gts:GenericTermSig Opid} {ta : TermAbs Opid}.
 
 (** this definition of branch and find_branch is shared with 
-L4a and L5 *)
+L4_1 .... L5 *)
 Definition branch 
   : Type := (dcon * (@AbsBTerm Opid ta))%type.
 
@@ -80,8 +80,11 @@ Definition find_branch  (d:dcon) (m:nat) (matcht :list branch) :
   := 
   let obr :=
   find 
-    (fun a : (branch) => decide ((d,m) = (fst a, absNumBound _ _ (snd a)))) matcht in
-  option_map snd obr.
+    (fun a : (branch) => decide (d = (fst a))) matcht in
+  match obr with
+  | Some a => if decide (m=absNumBound _ _ (snd a)) then Some (snd a) else None
+  | None => None
+  end.
 
 End Branches.
 
@@ -94,6 +97,7 @@ the L4_2 (generic named).
 Context {Abs4_4a: @TermAbs (@L4Opid)}.
 
 Local Notation AbsTerm := (AbsTerm _ Abs4_4a).
+Local Notation AbsBTerm := (AbsBTerm _ Abs4_4a).
 Local Notation absGetOpidBTerms := (absGetOpidBTerms _ Abs4_4a).
 Local Notation absApplyBTerm := (absApplyBTerm _ Abs4_4a).
 Local Notation absGetTerm := (absGetTerm _ Abs4_4a).
@@ -107,8 +111,10 @@ Open Scope program_scope.
 
 Require Import List.
 
+
 Require Import SquiggleEq.ExtLibMisc.
 (* generalized from L4.expresssion.eval_n *)
+
 Fixpoint eval_n (n:nat) (e:AbsTerm) {struct n} :  option AbsTerm :=
 match n with
 |0%nat => None
@@ -125,9 +131,9 @@ match n with
         a <- eval_n n a ;;
         s <- (absApplyBTerm f [a]);;
         eval_n n s
-  | (NDCon d ne, lb) => 
-        vs <- flatten (map (fun b => t <- absGetTerm b ;; eval_n n t)lb) ;;
-        (absMakeTerm (map absMakeBTerm vs) o)
+  | (NDCon d ne, lb) =>
+     vs <- flatten (map (fun b => t <- absGetTerm b ;; eval_n n t)lb) ;; 
+      (absMakeTerm (map absMakeBTerm vs) o)
   | (NMatch ldn, disc::brs) => 
         disc <- absGetTerm disc;;
         disc <- eval_n n disc;;
@@ -148,24 +154,29 @@ match n with
         | _ => None
         end
   | (NApply, [f;a]) =>
-        a <- absGetTerm a;;
-        a <- eval_n n a ;;
         f <- absGetTerm f;;
         f <- eval_n n f;;
         match (absGetOpidBTerms f) with
         | Some (NLambda,[b]) =>
+            a <- absGetTerm a;;
+            a <- eval_n n a ;;
             s <- (absApplyBTerm b [a]);;
             eval_n n s
         | Some (NFix nMut i,lm) =>
             let pinds := List.seq 0 (length lm) in
             let ls := map (fun n => absMakeTerm lm (NFix nMut n)) pinds in
+            a <- absGetTerm a;;
+            a <- eval_n n a ;;
             ls <- flatten ls;;
             im <- select i lm;;
             s <- (absApplyBTerm im ls);;
             s_a_pp <- (absMakeTerm (map absMakeBTerm [s;a]) NApply);;
             eval_n n s_a_pp
         (* box applied to anything becomes box *)
-        | Some (NBox s,[]) => absMakeTerm [] (NBox s)
+        | Some (NBox s,[]) =>
+            a <- absGetTerm a;;
+            _ <- eval_n n a ;;
+            absMakeTerm [] (NBox s)
         | _ => None
         end
     | _ => None
@@ -178,18 +189,20 @@ End PolyEval.
 Require Import SquiggleEq.AssociationList.
 Lemma findBranchMapBtCommute {O1 O2 V} deqv vc vcf fr
         (f : @NTerm V O1 -> @NTerm V O2) n d nargs lbt:
-  @find_branch _ (@Named.TermAbsImpl V O2 vc deqv vcf fr) d n (combine nargs (map (btMapNt f) lbt))=
-  option_map (btMapNt f) (@find_branch _ (@Named.TermAbsImpl V O1 vc deqv vcf fr)  d n (combine nargs lbt)).
+  @find_branch _ (@Named.TermAbsImplUnstrict V O2 vc deqv vcf fr) d n
+               (combine nargs (map (btMapNt f) lbt))=
+  option_map (btMapNt f) (@find_branch _ (@Named.TermAbsImplUnstrict V O1 vc deqv vcf fr)  d n (combine nargs lbt)).
 Proof using.
   unfold find_branch.
-  rewrite option_map_map.
   rewrite <- (map_id nargs).
   setoid_rewrite <- ALMapCombine.
   rewrite map_id. unfold ALMap.
   erewrite find_map_same_compose2;[ | refl].
   unfold compose. simpl.
-  rewrite option_map_map. simpl.
-  f_equal.
-  erewrite find_ext;[ | intros ?; rewrite numBvarsBtMapNt; refl].
-  refl.
+  unfold branch. simpl.
+  destruct (find (fun x : dcon * BTerm => decide (d = fst x)) (combine nargs lbt));
+    [| refl].
+  simpl.
+  rewrite numBvarsBtMapNt.
+  cases_if; refl.
 Qed.

@@ -103,15 +103,15 @@ Section EVAL.
       | nil => true
       | (t', e)::l' =>
         caseConsistent_f l' t &&
-                         match (M.get t cenv) with
-                           | Some (a, ty, n, i) =>
-                             (match (M.get t' cenv) with
-                                | Some (a', ty', n', i') =>
-                                  Pos.eqb ty  ty'
-                                | _ => false
-                              end)
-                           | _ => false
-                         end
+        match (M.get t cenv) with
+          | Some (a, ty, n, i) =>
+            (match (M.get t' cenv) with
+               | Some (a', ty', n', i') =>
+                 Pos.eqb ty  ty'
+               | _ => false
+             end)
+          | _ => false
+        end
     end.
 
 

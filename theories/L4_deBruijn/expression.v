@@ -1722,3 +1722,66 @@ Close Scope Z_scope.
 
 Definition fnames (e:efnlst) : list (Ast.name) :=
 map fst (efnlst_as_list e).
+
+
+Require Import SquiggleEq.ExtLibMisc.
+(* the suffix s stands for "simpler". Unlike eval_n, this is not a mutual fixpoint.
+In he Con_e cases, we convert [exps] to [list exp] and use list functions.
+An advantage is that when evaluating constructor argument, the fuel stays constant,
+and does not need to be threaded through (as decrements) the arguments. *)
+Function eval_ns (n:nat) (e:exp) {struct n}: option exp := 
+  match n with
+    | 0%nat => None
+    | S n => match e with
+               | Lam_e na d => Some (Lam_e na d)
+               | Fix_e es k => Some (Fix_e es k)
+               | Prf_e => Some Prf_e
+               | Con_e d es =>
+                 match ExtLibMisc.flatten (map (eval_ns n) (exps_as_list es)) with
+                     | None => None
+                     | Some vs => Some (Con_e d (exps_from_list vs))
+                 end
+               | App_e e1 e2 =>
+                 match eval_ns n e1 with
+                   | Some (Lam_e _ e1') => 
+                     match eval_ns n e2 with
+                       | None => None
+                       | Some e2' => eval_ns n (e1'{0 ::= e2'})
+                     end
+                   | Some (Fix_e es k) =>
+                     match eval_ns n e2 with
+                     | None => None
+                     | Some e2' =>
+                       match enthopt (N.to_nat k) es with
+                       | Some e' =>
+                         let t' := sbst_fix es e' in
+                         eval_ns n (App_e t' e2')
+                       | _ => None
+                       end
+                     end
+                   | Some Prf_e => (* Some Prf_e *)
+                     match eval_ns n e2 with
+                       | None => None
+                       | Some e2' => Some Prf_e
+                     end                     
+                   | _ => None
+                  end
+               | Let_e _ e1 e2 =>
+                 match eval_ns n e1 with
+                   | None => None
+                   | Some v1 => eval_ns n (e2{0::=v1})
+                 end
+               | Match_e e p bs =>
+                 match eval_ns n e with
+                 | Some (Con_e d vs) =>
+                   match find_branch d (exps_length vs) bs with
+                     | None => None
+                     | Some e' => eval_ns n (sbst_list e' vs)
+                   end
+                   | _ => None
+                 end
+               | Ax_e s => (* Some (Ax_e s) *)
+                 None
+               | Var_e e => None
+             end
+  end.

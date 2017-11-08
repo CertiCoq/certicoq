@@ -8,7 +8,6 @@ Require Import NArith.
 Require Import L4.expression.
 Require Import Basics.
 
-
 Require Import L4.polyEval.
 Require Import SquiggleEq.export.
 Require Import SquiggleEq.UsefulTypes.
@@ -22,30 +21,413 @@ Require Import SquiggleEq.tactics.
 Require Import Coq.Unicode.Utf8.
 Require Import List.
 Require Import SquiggleEq.list.
-(* Move to SquiggleEq.list *)
-Hint Rewrite app_length repeat_length firstn_length : list.
-(* Move to SquiggleEq.list *)
-Lemma listPadId {A:Type} d (l: list A) n :
-  (n <= length l)%nat -> listPad d l n = l.
-Proof using.
-  clear.
-  intros Hyp.
-  unfold listPad.
-  assert (n-length l =0)%nat  as Heq by omega.
-  rewrite Heq. simpl.
-  autorewrite with list. refl.
-Qed.
+
 
 
 Open Scope program_scope.
 
 
 Open Scope N_scope.
-Require Import Common.TermAbs_parametricity.
-
-Parametricity Recursive eval_n.
 Require Import L4.variables.
 
+
+
+Require Import SquiggleEq.termsDB.
+Require Import Libraries.CpdtTactics.
+
+(* Move to expression.v *)
+Lemma EfnListSbst a m e:
+  efnlst_as_list (sbst_efnlst a m e)
+  = map (fun p => (fst p, sbst a m (snd p))) (efnlst_as_list e).
+Proof using.
+  induction e; crush.
+Qed.
+
+(* Move to expression.v *)
+Lemma EfnListLength e:
+  efnlst_length e
+  = NLength (efnlst_as_list e).
+Proof using.
+  unfold NLength.
+  induction e; auto.
+  Local Opaque N.of_nat.
+  Local Opaque N.add.
+  simpl. lia.
+  Local Transparent N.of_nat.
+  Local Transparent N.add.
+Qed.
+
+Require Import L4.L4_to_L4_1_to_L4_2.
+
+
+(** Move to L4_to_L4_1_to_L4_2.v *)
+Lemma mkNamesLengthNat p : length (mkNames p) = N.to_nat (fst p).
+Proof using.
+  unfold mkNames. destruct p.
+  simpl. unfold NLength. rewrite  listPad_length_eq; [lia | ].
+  apply firstn_le_length.
+Qed.
+
+(** Move to L4_to_L4_1_to_L4_2.v *)
+Lemma mkNamesLength p : NLength (mkNames p) = fst p.
+Proof using.
+  unfold mkNames. destruct p.
+  simpl. unfold NLength. rewrite  listPad_length_eq; [lia | ].
+  apply firstn_le_length.
+Qed.
+
+Require Import Common.TermAbs.
+
+
+Lemma  substCommutesL4_to_L4_1 (a:exp) :
+  (∀ (e : exp) m, tL4_to_L4_1 (sbst a m e) = subst_aux (tL4_to_L4_1 a) m (tL4_to_L4_1 e))
+  /\
+  (∀ (es : exps) m, ltL4_to_L4_1 (sbsts a m es)
+                    = map (subst_aux (tL4_to_L4_1 a) m) (ltL4_to_L4_1 es))
+  /\
+  (∀ (es : efnlst) m, ftL4_to_L4_1 (sbst_efnlst a m es)
+                      = map (subst_aux (tL4_to_L4_1 a) m) (ftL4_to_L4_1 es))
+  /\
+  (∀ (es : branches_e) m, btL4_to_L4_1 (sbst_branches a m es)
+                          = map (fun b: (@branch L4Opid (TermAbsDBUnstrict Ast.name L4Opid))
+                                 => let (d,bt) := b in
+                                   (d, subst_aux_bt (tL4_to_L4_1 a) m bt)) (btL4_to_L4_1 es)).
+Proof using.
+  clear.
+  apply my_exp_ind;
+    simpl; unfold compose in *; crush;[ | | | | ].
+  (* 1 var case. and the remaining ones need another induction *)
+- simpl. (* variables *) 
+  pose proof (N.compare_spec n m) as Hc. remember (n ?= m) as cmp.
+  destruct cmp; inverts Hc; subst; auto; [ | | ];
+  cases_ifd Hn; simpl in *; try cases_ifd Hnn; try lia; auto.
+- (* data constructor *)
+  repeat rewrite map_map. unfold compose. repeat rewrite map_length. refl.
+- rewrite <- H0. rewrite <- H. simpl.
+  repeat rewrite map_map. unfold compose. repeat rewrite map_length.
+  rewrite H0.  repeat rewrite map_map. unfold compose. simpl. clear.
+  do 2 f_equal.
+  + unfold num_bvars.
+    erewrite map_ext;
+      [ |
+        intros; rewrite rewritePairMatch; simpl;  rewrite get_bcvars_subst_aux_bt; refl]. refl.
+  + erewrite map_ext;
+      [ |
+        intros; rewrite rewritePairMatch; refl]. simpl. refl.
+- repeat rewrite map_map. unfold compose. repeat rewrite map_length.
+  clear H.
+  f_equal.  simpl. unfold fnames.
+  rewrite EfnListSbst. rewrite map_map. unfold compose. simpl.
+  rewrite EfnListLength. unfold NLength.
+  rewrite map_length. refl.
+- do 3 f_equal. fold (mkNames (a0,b)).
+  rewrite mkNamesLength. refl.
+Qed.
+
+Lemma  lsubstCommutesL4_to_L4_1: ∀ (d : exp) (le : list exp),
+    tL4_to_L4_1 (sbst_real_list d le)
+    = subst_aux_list 0 (tL4_to_L4_1 d) (map tL4_to_L4_1 le).
+Proof using.
+  intros. unfold sbst_real_list. unfold subst_aux_list. revert d.
+  induction le; simpl; auto.
+  intros d. rewrite <- IHle. 
+  simpl. generalize (fold_right (λ v ee : exp, sbst v 0 ee) d le).
+  intros. apply substCommutesL4_to_L4_1.
+Qed.
+
+
+Print Assumptions eval_evaln.
+Print evaln_eval.
+Print eval_n_monotone.
+
+Definition  eval41 := @polyEval.eval_n (TermAbsDBUnstrict Ast.name L4Opid).
+
+
+(* Move to expression.v *)
+Lemma ftL4_to_L4_1_list es:
+map (tL4_to_L4_1 ∘ snd) (efnlst_as_list es) =  (ftL4_to_L4_1 es).
+Proof using.
+  induction es; crush.
+Qed.
+
+(* Move to expression.v *)
+Lemma ltL4_to_L4_1_list es:
+map (tL4_to_L4_1) (exps_as_list es) =  (ltL4_to_L4_1 es).
+Proof using.
+  induction es; crush.
+Qed.
+
+(* Move to expression.v *)
+Lemma bL4_to_L4_1_list es:
+  map (fun b:(expression.dcon * (N * list Ast.name) * exp) =>
+         let (b,e) := b in
+         let (d,n) := b in
+         (d, bterm (mkNames n) (tL4_to_L4_1 e)))
+      (branches_as_list es)
+  =  (btL4_to_L4_1 es).
+Proof using.
+  induction es; crush.
+Qed.
+
+(*
+Definition find_branch_as_find (lb: list (expression.dcon * (N * list Ast.name) * exp)) d m:=
+  find (fun b:(expression.dcon * (N * list Ast.name) * exp) =>
+         let (b,_) := b in
+         let (db,dn) := b in
+         decide ((d,m) = (db, fst dn))) lb.
+ *)
+
+Lemma NNateqb (a b:nat):
+  Nat.eqb a b = N.eqb (N.of_nat a) (N.of_nat b).
+Proof using.
+  pose proof (Nat.eqb_spec a b) as H.
+  pose proof (N.eqb_spec (N.of_nat a) (N.of_nat b)) as Hh.
+  destruct (Nat.eqb a b),(N.of_nat a =? N.of_nat b); inverts H; inverts Hh; try lia; refl.
+Qed.  
+
+Definition find_branchb d (b: (expression.dcon * (N * list Ast.name) * exp)) : bool :=
+         let (b,_) := b in
+         let (db,dn) := b in
+         decide ((d) = (db)).
+
+Print find_branch.
+
+Lemma Nateqb_eqdec {A:Type} (t e : A) n1 n2:
+  (if (Nat.eqb n1 n2) then t else e)
+  = if (Nat.eq_dec n1 n2) then t else e.
+Proof using.
+  symmetry.
+  cases_if;[subst; rewrite Nat.eqb_refl; refl| ].
+  apply Nat.eqb_neq in H.
+  rewrite H. refl.
+Qed.
+
+Lemma Neqb_eqdec {A:Type} (t e : A) n1 n2:
+  (if (N.eqb n1 n2) then t else e)
+  = if (N.eq_dec n1 n2) then t else e.
+Proof using.
+  symmetry.
+  cases_if;[subst; rewrite N.eqb_refl; refl| ].
+  apply N.eqb_neq in H.
+  rewrite H. refl.
+Qed.
+
+Lemma find_branch_as_find_correct d l b:
+  expression.find_branch d (N.of_nat l) b
+  = match (find (find_branchb d) (branches_as_list b)) with
+    | Some a => if decide (l = N.to_nat (fst (snd (fst a)))) then Some (snd a) else None
+    | None => None
+    end.
+Proof using.
+  induction b;[refl | ].
+  Local Opaque classes.eq_dec.
+  simpl.
+  cases_if; subst;[ rewrite deq_refl | symmetry; rewrite decide_decideP; cases_if; cpx].
+  Local Transparent classes.eq_dec.
+  simpl.
+  rewrite Nat.eqb_sym.
+  rewrite NNateqb.
+  rewrite N2Nat.id.
+  unfold nargs.
+  setoid_rewrite <- Neqb_eqdec.
+  refl.
+Qed.
+
+(* Move to expression.v *)
+Lemma ltL4_to_L4_1_from_list es:
+map (tL4_to_L4_1) es  = (ltL4_to_L4_1 (exps_from_list es)).
+Proof using.
+  induction es; crush.
+Qed.
+
+
+
+(* Move to expression.v *)
+Lemma efnlst_as_list_len es:
+  length (efnlst_as_list es) =  efnlength es.
+Proof using.
+  induction es; crush.
+Qed.
+
+(* Move to expression.v *)
+Lemma exps_as_list_len es:
+  NLength (exps_as_list es) =  exps_length es.
+Proof using.
+  unfold NLength.
+  induction es; [refl | ].
+  simpl exps_as_list. simpl length.
+  Local Opaque N.add.
+  simpl exps_length.
+  lia.
+  Local Transparent N.add.
+Qed.
+
+(* Move to expression.v *)
+Lemma enthopt_translate n es:
+option_map tL4_to_L4_1 (enthopt (N.to_nat n) es) = nth_error (ftL4_to_L4_1 es) (N.to_nat n).
+Proof using.
+ revert es.
+ induction n using N.peano_rect; simpl; destruct es as [ | he es]; simpl;
+   try rewrite N2Nat.inj_succ; simpl; eauto.
+Qed.
+
+(*
+Lemma evals_commute_L4_to_L4_1 m
+      (Hind1: ∀ (e : exp), option_map tL4_to_L4_1 (expression.eval_n (pred m) e)
+                          =  eval41 (pred m) (tL4_to_L4_1 e))
+      (Hind2: ∀ (e : exp), option_map tL4_to_L4_1 (expression.eval_n m e)
+                          =  eval41 m (tL4_to_L4_1 e)):
+  forall es,
+    option_map ltL4_to_L4_1 (eval_ns m es) =
+    ExtLibMisc.flatten (map (eval41 (pred m)) (ltL4_to_L4_1 es)).
+Proof using.
+  revert Hind1 Hind2.
+  clear. intros ? ? ?.
+  destruct m;[ apply False_rect; omega | ].
+  induction es;[ refl| ].
+  simpl evals_n at 1. simpl.
+  simpl Nat.pred in IHes.
+  simpl Nat.pred in Hind1.
+  simpl.
+  rewrite <- Hind1.
+  clear Hind1.
+  destruct  (expression.eval_n m e); [ | refl].
+  simpl.
+  setoid_rewrite <- IHes.
+  remember ( S m) as sm.
+  
+  simpl.
+.  
+    (* unprovable. fuel needs to go down in polyEval. *)
+Abort.
+ *)
+Local Opaque mkNames.  
+Arguments num_bvars {Name} {Opid} / bt.
+Hint Rewrite mkNamesLengthNat: list.
+
+Lemma  evalCommLemma m:
+  (∀ (e : exp), option_map tL4_to_L4_1 (expression.eval_ns m e) =  eval41 m (tL4_to_L4_1 e))
+(*  /\
+  (∀ (es : exps), option_map ltL4_to_L4_1 (expression.evals_n m es)
+                    = ExtLibMisc.flatten (map (eval41 m) (ltL4_to_L4_1 es)))
+  /\
+  (∀ (es : efnlst), True)
+  /\
+  (∀ (es : branches_e), True) *).
+Proof using.
+  induction m  as [ m Hind] using lt_wf_ind.
+  destruct m;[ refl | ].
+  pose proof (Hind m ltac:(omega)) as IHm.
+  clear Hind.
+  destruct e; auto.
+- simpl.
+  do 2 rewrite <- IHm.
+  (*clear IHm. needed one more time *)
+  destruct (expression.eval_ns m e1) as [f | ]; simpl; [ | refl].
+  destruct f; try refl;[ | | ]; simpl.
+  + (* lambda *)
+    destruct (expression.eval_ns m e2) as [a | ]; simpl; try refl.
+    pose proof (substCommutesL4_to_L4_1 a) as X.
+    repnd.
+    crush; fail.
+  + (* fix *)
+    destruct (expression.eval_ns m e2) as [a | ]; simpl; try refl.
+    unfold mkBTerm.
+    rewrite flatten_map_Some. simpl.
+    unfold select.
+    rewrite nth_error_map.
+    rewrite <- enthopt_translate.
+    destruct (enthopt (N.to_nat n) e); simpl; [ | refl].
+    unfold num_bvars. simpl.
+    autorewrite with list.
+    unfold fnames.
+    rewrite <- ftL4_to_L4_1_list at 1.
+    repeat rewrite map_length.
+    rewrite Nat.eqb_refl.
+    simpl.
+    rewrite IHm. clear IHm. simpl.
+    unfold compose. simpl.
+    do 4 f_equal.
+    rewrite sbst_fix_real.
+    rewrite lsubstCommutesL4_to_L4_1.
+    f_equal.
+    repeat rewrite map_map.
+    unfold compose.
+    simpl.
+    erewrite map_ext;[ | intros; rewrite Nat2N.id; refl].
+    symmetry.
+    unfold fnames.
+    f_equal.
+    rewrite <- ftL4_to_L4_1_list.
+    autorewrite with list.
+    rewrite efnlst_as_list_len. refl.
+  +(* Prf_e *)
+    destruct (expression.eval_ns m e2); simpl; refl.
+- simpl.
+  repeat rewrite map_map. unfold compose.
+  simpl.
+  rewrite  <-  ltL4_to_L4_1_list.
+  rewrite map_map. unfold compose.
+  symmetry.
+  erewrite map_ext;[ | intros; symmetry; apply IHm].
+  simpl.
+  rewrite <-fold_option_map.
+  repeat setoid_rewrite <- opmap_flatten_map2.
+  rewrite option_map_map.
+  simpl. autorewrite with list.
+  remember (ExtLibMisc.flatten (map (eval_ns m) (exps_as_list e))) as fl.
+  symmetry in Heqfl.
+  destruct fl;[ | refl].
+  simpl. rewrite map_map. unfold compose.
+  f_equal. rewrite <- ltL4_to_L4_1_from_list.
+  rewrite map_map. f_equal.
+  f_equal.
+  apply flattenSomeImpliesLen in Heqfl.
+  autorewrite with list in *. assumption.
+- simpl. rewrite <- IHm.
+  destruct (eval_ns m e) as [disc | ];[ simpl |  refl].
+  destruct disc; try refl;[]. simpl.
+  rename e0 into es.
+  rewrite map_map. unfold compose. simpl.
+  rewrite flatten_map_Some.
+  rewrite map_map. unfold compose. simpl.
+  rewrite combine_eta.
+  autorewrite with list.
+  rewrite <- ltL4_to_L4_1_list.
+  autorewrite with list.
+  rewrite <-  exps_as_list_len.
+  rewrite <- bL4_to_L4_1_list.
+  unfold find_branch, NLength.
+  rewrite find_branch_as_find_correct.
+  erewrite find_map_same_compose2 with (f:= find_branchb d);
+    [ | intros; repnd; unfold compose; simpl; unfold num_bvars; simpl;
+        refl ].
+  remember (find (find_branchb d) (branches_as_list b)) as f.
+  destruct f; [ | refl].
+  simpl.
+  repnd. simpl.
+  simpl.
+  do 1 autorewrite with list. simpl.
+  cases_if;[ | refl]. simpl.
+  do 1 autorewrite with list. simpl.
+  rewrite Nat.eqb_sym.
+  rewrite H.
+  simpl.
+  rewrite sbst_list_real.
+  rewrite map_id.
+  rewrite <- lsubstCommutesL4_to_L4_1.
+  apply IHm.
+- simpl. rewrite <- IHm.
+  destruct (eval_ns m e1);[ | refl].
+  simpl.
+  pose proof (substCommutesL4_to_L4_1 e) as X.
+  repnd.
+  crush; fail.
+Qed.
+
+
+Require Import Common.TermAbs_parametricity.
+Parametricity Recursive eval_n.
 
 (* should be automatically provalble for all types with decidable equality.
   However, it cannot be internally stated. *)
@@ -63,207 +445,6 @@ Proof using.
 - inverts Hyp; auto; f_equal; try apply eqIfR; auto.
   unfold dcon in *.
 Admitted.
-Section L4Inst.
-
-
-(**
-The proof in SquiggleEq of substitution commuting with DB to named
-only works when substituting with closed terms, and to produce closed terms.
-Thus, we need to either carry enough proofs to ensure the applicability of that
-proof or have the instantiation of [absApplyBTerm] check those decidable conditions
-and return None if they are not met.
-Although the former choice avoids checks, it may end up paying large performance
-penalties for carrying around proofs. Also, carrying around proofs make 
-it hard to write down programs without using tactics.
-In the latter choice, if the checks are indeed too costly (note that these
-checks are only in the evaln function, which is only for debugging purposes),
-we can later prove that on closed inputs, the eval function
-produces the same answer as another one that doesn't do the checks.
-
-
-Some day, there should be an unconditional proof of substitution commuting with
-DB to named conversion.
-*)
-
-Let Term : Set := exp.
-Let BTerm : Set := ((list Ast.name) *exp).
-
-(** this was needed in eval to select the right branch *)
-Let numBvars (b:BTerm) : nat (* switch to N? *) := length (fst b).
-
-Require Import L4.L4_to_L4_1_to_L4_2.
-
-Let toOpidBTerms (t:Term) : option (L4Opid * list BTerm):=
-match t  return option (L4Opid * list BTerm) with
-| Var_e _ => None
-| Lam_e n x => Some (NLambda, [([n],x)])
-| App_e f a => Some (NApply, [([],f) ; ([],a)])
-| Let_e n a f => Some (NLet, [([],a) ; ([n],f)])
-| Con_e d es => 
-    let es := exps_as_list es in 
-    Some (NDCon d (length es), map (fun e => ([],e)) es)
-| Match_e e _ bs =>
-    let bs := branches_as_list bs in
-    let numBound p := (fst (snd (fst p))) in 
-    let op :(list (dcon * nat)) := 
-        map (fun p => (fst (fst p), (N.to_nat (numBound p)))) bs in
-    let lb  := 
-        map (fun p => ((snd (snd (fst p))), snd p) ) bs in
-    Some (NMatch op, ([],e)::lb)
-| Fix_e fs n =>
-    let fs := efnlst_as_list fs in
-    let ns := map fst fs in
-    Some (NFix (length fs) (N.to_nat n), map (fun e => (ns,snd e)) fs)
-
-| Ax_e s => Some (NBox s, [])
-(** based on  L4_to_L4_1_to_L4_2 tL4_to_L4_1*)
-| Prf_e => Some (NBox "proof", [])
-end.
-
-Require Import ExtLib.Structures.Monads.
-Require Import ExtLib.Data.Monads.OptionMonad.
-Require Import Common.ExtLibMisc.
-
-Import Monad.MonadNotation.
-Open Scope monad_scope.
-
-Typeclasses eauto :=5.
-
-(** just switch the input and output in toOpidBTerms *)
-Let fromOpidBTerms  (l: list BTerm) (o: L4Opid) : option Term :=
-match (o,l) with
-| (NLambda, [([n],x)]) => Some (Lam_e n x)
-| (NApply, [([],f) ; ([],a)]) => Some (App_e f a)
-| (NLet, [([],a) ; ([n],f)]) => Some (Let_e n a f)
-| (NDCon d l, cs) => Some (Con_e d (exps_from_list (map snd cs)))
-| (NMatch op, ([],e)::lb) => Some (Match_e e 0 (* params? *) 
-    (branches_from_list 
-      (map 
-          (fun ob => let o := fst ob in let b := snd ob in
-            (fst o, (NLength (fst b) , fst b) , snd b)) 
-          (combine op lb))))
-| (NFix l n, fs)
-   => let fes := map snd fs in
-      f1 <-head fs;;
-        let names := fst f1 in
-        Some (Fix_e (efnlst_from_list (combine names fes)) (N.of_nat n))
-(* Axioms ? Indistinguisable from constructors ? *)
-| _ => None
-end.
-
-Let getTerm (b : BTerm) : option Term :=
-if decide (length (fst b) = O) then Some (snd b) else None.
-
-(** must return None when the conditions for the substitution commuting
-  (with DB to named conversion) dont hold *)
-Let applyBTerm (b : BTerm) (l: list Term) : option Term :=
-let (n,t):=b in
-  if (Z.of_nat (length n) <? (maxFree t))%Z then None
-else 
-  (if (ZLmax (map maxFree l) (-1) <? 0)%Z then Some (sbst_real_list t l) else None).
-
-Require Import TermAbs.
-Definition L4Abs : Common.TermAbs.TermAbs L4Opid :=
-(@Build_TermAbs _
-  Term 
-  BTerm 
-  numBvars 
-  toOpidBTerms 
-  getTerm 
-  applyBTerm 
-  fromOpidBTerms
-  (fun e => ([],e))).
-
-
-Require Import SquiggleEq.termsDB.
-Definition bL4_to_L4_1 (b:BTerm) : @DBTerm Ast.name L4Opid :=
-  termsDB.bterm (fst b) (tL4_to_L4_1 (snd b)).
-
-Require Import L4.variables.
-
-Lemma L4L41toOpidBtermsR:
-   ∀ (H : exp) (H0 : DTerm),
-  tL4_to_L4_1 H = H0
-  → option_R (L4Opid * list BTerm) (L4Opid * list DBTerm)
-      (prod_R L4Opid L4Opid L4Opid_R (list BTerm) (list DBTerm)
-         (list_R BTerm DBTerm (λ (b4 : BTerm) (b41 : DBTerm), bL4_to_L4_1 b4 = b41)))
-      (toOpidBTerms H) (getOpidBTerms H0).
-Proof.
-- intros d ? Hal. subst. 
-  destruct d; simpl; repeat constructor; try apply eqIfR; try refl.
-  + clear. induction e; auto; simpl; congruence.
-  + clear. induction e; constructor; eauto.
-  + clear. induction b; auto; simpl in *. destruct p. simpl; f_equal; eauto.
-    f_equal. unfold num_bvars. simpl.
-    unfold listPad. autorewrite with list. lia.
-  + clear.  simpl.  induction b; simpl; try constructor; eauto.
-    destruct p; constructor; eauto.
-  (* need to remove the listPad business. it comes from tL4_to_L4_1 
-In brcons_e, there is a number used for db computations as # bound vars.
-Then there are names. would the names have the same length as n.
-If not, using listPad. update getOpidBterms to also do the padding
-   *)
-Admitted.
-
-Lemma L4L41applyBTerm:
- ∀ (H : BTerm) (H0 : DBTerm),
-  bL4_to_L4_1 H = H0
-  → ∀ (H1 : list exp) (H2 : list DTerm),
-    list_R exp DTerm (λ (t4 : exp) (t41 : DTerm), tL4_to_L4_1 t4 = t41) H1 H2
-    → option_R exp DTerm (λ (t4 : exp) (t41 : DTerm), tL4_to_L4_1 t4 = t41) 
-               (applyBTerm H H1) (applyBTermClosed Ast.name L4Opid H0 H2).
-Proof.
-Admitted.
-
-Lemma L4L41fromOpidBtermsR:
-  ∀ (H : list BTerm) (H0 : list DBTerm),
-  list_R BTerm DBTerm (λ (b4 : BTerm) (b41 : DBTerm), bL4_to_L4_1 b4 = b41) H H0
-  → ∀ H1 H2 : L4Opid,
-    L4Opid_R H1 H2
-    → option_R exp DTerm (λ (t4 : exp) (t41 : DTerm), tL4_to_L4_1 t4 = t41) 
-               (fromOpidBTerms H H1) (mkBTermSafe Ast.name L4Opid H0 H2).
-Proof.
-  intros lbt ? Hp ? o Ho. apply eqIfR in Ho. subst.
-  apply list_RP_same in Hp.
-  eapply list_Rext in Hp;
-    [ | intros ? ?;rewrite <- (and_true_l (bL4_to_L4_1 a1 = a2)); tauto].
-  apply list_RP_same in Hp.
-  apply list_R_map in Hp.
-  apply list_R_eq in Hp;[ |  eauto with typeclass_instances]. subst.
-Admitted.
-
-Definition TermAbs_R_L4_L4_1 : 
-  TermAbs_R L4Opid L4Opid L4Opid_R
-    L4Abs    
-    (TermAbsDB Ast.name L4Opid).
-Proof using.
-  eapply TermAbs_R_Build_TermAbs_R with 
-    (AbsTerm_R := fun t4 t41 => tL4_to_L4_1 t4 = t41)
-    (AbsBTerm_R := fun b4 b41 => bL4_to_L4_1 b4 = b41).
-- intros b ? ?. subst.  apply nat_R_eq. destruct b. refl.
-- apply L4L41toOpidBtermsR. 
-- intros t ? Hp. subst; destruct t. simpl. destruct l; simpl; try constructor; refl.
-- apply L4L41applyBTerm.
-- apply L4L41fromOpidBtermsR.
-- intros t ? Hp. subst. refl.
-Defined. (* NOT Qed. the parametricity relations between Terms and BTerms is a part of the proof *)
-
-End L4Inst.
-
-
-Lemma L4_to_L4_1_free_thm:
-  forall (t1 : L4.expression.exp) n,
-    (option_map tL4_to_L4_1 (@eval_n L4Abs n t1))
-    =
-   (@eval_n  (TermAbsDB Ast.name L4Opid) n (tL4_to_L4_1 t1)).
-Proof using.
-  intros ? ?.
-  pose proof (L4_o_polyEval_o_eval_n_R 
-   L4Abs  (TermAbsDB Ast.name L4Opid)
-   TermAbs_R_L4_L4_1 n n ltac:(apply eqIfR; refl) t1 _ eq_refl) as Hp.
-  simpl in Hp.
-  inverts Hp; simpl in *; congruence.
-Qed.  
   
 Let TermAbs_R_NamedDB2 :=
   (@TermAbs_R_NamedDB Ast.name NVar _ L4Opid _ _ _ _  _ _ Ast.nAnon mkNVar getNId getIdMkNVar
@@ -271,7 +452,7 @@ Let TermAbs_R_NamedDB2 :=
 
 Lemma L4_1_to_L4_2_free_thm:
   forall (t1 : L4_1_Term) n,
-termsDB.fvars_below 0 t1 (* free thm also implies that eval_n preserves this *)->
+termsDB.fvars_below 0 t1 (* the undelying free thm also implies that eval_n preserves this *)->
 (option_R _ _ alpha_eq)
    (option_map tL4_1_to_L4_2 (@eval_n (TermAbsDB Ast.name L4Opid) n t1))
    (@eval_n (Named.TermAbsImpl variables.NVar L4Opid) n (tL4_1_to_L4_2 t1)).

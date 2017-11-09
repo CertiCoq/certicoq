@@ -38,6 +38,17 @@ Notation "[ 'set' a ]" := (Ensembles.Singleton _ a)
 Notation "[ 'set' a : T ]" := [set (a : T)]
   (at level 0, a at level 99, format "[ 'set'  a   :  T ]") :  Ensembles_scope.
 
+Notation "A :|: B" := (Union _ A B) (at level 52, left associativity)
+                      : Ensembles_scope.
+Notation "a |: A" := ([set a] :|: A) (at level 52, left associativity)
+                     : Ensembles_scope.
+
+Notation "A :&: B" := (Intersection _ A B) (at level 48, left associativity)
+                      : Ensembles_scope.
+
+Notation "A \\ B" := (Setminus _ A B) (at level 52, left associativity)
+                     : Ensembles_scope.
+
 (** * Equivalence and preorder properties *)
 
 Lemma Included_refl {A} s1 :
@@ -1117,6 +1128,14 @@ Qed.
 Hint Immediate Union_big_cup Setminus_big_cup big_cup_Singleton
      big_cup_Empty_set: Ensembles_DB.
 Hint Resolve Included_big_cup_l Same_Set_big_cup_l : Ensembles_DB.
+
+(** * List of sets union *)
+
+Fixpoint Union_list {A} (l : list (Ensemble A)) : Ensemble A :=
+  match l with
+    | nil => Empty_set _
+    | cons x xs => x :|: Union_list xs
+  end.
 
 
 (** * Coercion from lists *)

@@ -11,19 +11,6 @@ Require Import compcert.lib.Coqlib.
 
 Close Scope Z_scope.
 
-(* TODO move *)
-Notation "A :|: B" := (Union _ A B) (at level 52, left associativity)
-                      : Ensembles_scope.
-Notation "a |: A" := ([set a] :|: A) (at level 52, left associativity)
-                     : Ensembles_scope.
-
-Notation "A :&: B" := (Intersection _ A B) (at level 48, left associativity)
-                      : Ensembles_scope.
-
-Notation "A \\ B" := (Setminus _ A B) (at level 52, left associativity)
-                     : Ensembles_scope.
-
-
 Module Type Heap.
 
   Parameter loc : Type.

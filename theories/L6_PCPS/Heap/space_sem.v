@@ -83,7 +83,7 @@ Module SpaceSem (H : Heap).
         (* allocate the closure environment *)
         (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)
-        (Hfuns : def_closures B B rho H' cloTag env_loc = (H'', rho'))
+        (Hfuns : def_closures B B rho H' env_loc = (H'', rho'))
         (Hbs : big_step H'' rho' e r (c - cost (Efun B e)) m),
         big_step H rho (Efun B e) r c m
   | Eval_app :
@@ -93,7 +93,7 @@ Module SpaceSem (H : Heap).
         (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
         (* Look up the closure *)
-        (Hgetl : get l H = Some (Constr cloTag [FunPtr B f'; Loc env_loc]))
+        (Hgetl : get l H = Some (Clos (FunPtr B f') (Loc env_loc)))
         (* Look up the closure environment *)
         (Hget_env : get env_loc H = Some (Env rho_clo))
         (* Find the code *)
@@ -101,7 +101,7 @@ Module SpaceSem (H : Heap).
         (* Look up the actual parameters *)
         (Hargs : getlist ys rho = Some vs)
         (* Allocate mutually defined closures *)
-        (Hredef : def_closures B B rho_clo H cloTag env_loc = (H', rho_clo1))
+        (Hredef : def_closures B B rho_clo H env_loc = (H', rho_clo1))
         (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
         (Hbs : big_step H' rho_clo2 e r (c - cost (Eapp f t ys)) m),
         big_step H rho (Eapp f t ys) r c m
@@ -190,7 +190,7 @@ Module SpaceSem (H : Heap).
         (* allocate the closure environment *)
         (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)
-        (Hfuns : def_closures B B rho H' cloTag env_loc = (H'', rho'))
+        (Hfuns : def_closures B B rho H' env_loc = (H'', rho'))
 
         (* collect H'' *)
         (Hgc : live (env_locs rho' (occurs_free e)) H'' H''')
@@ -206,7 +206,7 @@ Module SpaceSem (H : Heap).
         (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
         (* Look up the closure *)
-        (Hgetl : get l H = Some (Constr cloTag [FunPtr B f'; Loc env_loc]))
+        (Hgetl : get l H = Some (Clos (FunPtr B f') (Loc env_loc)))
         (* Look up the closure environment *)
         (Hget_env : get env_loc H = Some (Env rho_clo))
         (* Find the code *)
@@ -214,7 +214,7 @@ Module SpaceSem (H : Heap).
         (* Look up the actual parameters *)
         (Hargs : getlist ys rho = Some vs)
         (* Allocate mutually defined closures *)
-        (Hredef : def_closures B B rho_clo H cloTag env_loc = (H', rho_clo1))
+        (Hredef : def_closures B B rho_clo H env_loc = (H', rho_clo1))
         (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
         
         (* collect H' *)
@@ -388,7 +388,7 @@ Module SpaceSem (H : Heap).
         big_step_GC_when_needed H rho (Ecase y cl) r c m
   | Eval_fun_need :
       forall (H H' H'' : heap block) (rho rho_clo rho' : env) (B : fundefs)
-        (env_loc : loc) (cloTag : cTag) (e : exp) (r : ans) (size c m : nat)
+        (env_loc : loc) (e : exp) (r : ans) (size c m : nat)
         (Hcost: c >= cost (Efun B e))
         (* No GC is needed *)
         (Hheap : size_heap H < Hmax)
@@ -397,7 +397,7 @@ Module SpaceSem (H : Heap).
         (* allocate the closure environment *)
         (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)
-        (Hfuns : def_closures B B rho H' cloTag env_loc = (H'', rho'))
+        (Hfuns : def_closures B B rho H' env_loc = (H'', rho'))
         (Hbs : big_step_GC_when_needed H'' rho' e r (c - cost (Efun B e)) m),
         big_step_GC_when_needed H rho (Efun B e) r c m
   | Eval_app_need :
@@ -409,7 +409,7 @@ Module SpaceSem (H : Heap).
         (Hheap : size_heap H < Hmax)
         (Hgetf : M.get f rho = Some (Loc l))
         (* Look up the closure *)
-        (Hgetl : get l H = Some (Constr cloTag [FunPtr B f'; Loc env_loc]))
+        (Hgetl : get l H = Some (Clos (FunPtr B f') (Loc env_loc)))
         (* Look up the closure environment *)
         (Hget_env : get env_loc H = Some (Env rho_clo))
         (* Find the code *)
@@ -417,7 +417,7 @@ Module SpaceSem (H : Heap).
         (* Look up the actual parameters *)
         (Hargs : getlist ys rho = Some vs)
         (* Allocate mutually defined closures *)
-        (Hredef : def_closures B B rho_clo H cloTag env_loc = (H', rho_clo1))
+        (Hredef : def_closures B B rho_clo H env_loc = (H', rho_clo1))
         (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
         (Hbs : big_step_GC_when_needed H' rho_clo2 e r (c - cost (Eapp f t ys)) m),
         big_step_GC_when_needed H rho (Eapp f t ys) r c m
@@ -837,9 +837,9 @@ Module SpaceSem (H : Heap).
         eapply Heq in Hgetf; [| normalize_occurs_free; now eauto with Ensembles_DB ].
         destruct Hgetf as [l' [Hget Hequiv]]. repeat subst_exp.
         rewrite res_equiv_eq in Hequiv. simpl in Hequiv.
-        rewrite Hgetl, Hgetl0 in Hequiv. destruct Hequiv as [_ Hall].
-        inv Hall. inv H6. clear H8. rewrite res_equiv_eq in H4, H5.
-        simpl in H4, H5. inv H4. rewrite Hget_env, Hget_env0 in H5. 
+        rewrite Hgetl, Hgetl0 in Hequiv. destruct Hequiv as [Hv1 Hv2].
+        rewrite res_equiv_eq in Hv1, Hv2.
+        simpl in Hv1, Hv2. inv Hv1. rewrite Hget_env, Hget_env0 in Hv2. 
         repeat subst_exp.
         assert (Henv1 :  env_locs rho_clo (Full_set var) \subset
                          reach' H (env_locs rho (occurs_free (Eapp f t ys)))).
@@ -847,7 +847,7 @@ Module SpaceSem (H : Heap).
           eapply Included_Union_preserv_r.
           eapply Included_trans; [| now eapply Included_post_n_reach' with (n := 2) ].
           simpl. rewrite env_locs_Singleton; try eassumption. simpl. rewrite post_Singleton; try eassumption.
-          simpl. rewrite Union_Empty_set_neut_l, Union_Empty_set_neut_r.
+          simpl. rewrite Union_Empty_set_neut_l.
           rewrite post_Singleton; try eassumption. eapply env_locs_monotonic... }
         assert (Henv2 :  env_locs rho_clo0 (Full_set var) \subset
                          reach' H0 (env_locs rho0 (occurs_free (Eapp f t ys)))).
@@ -855,7 +855,7 @@ Module SpaceSem (H : Heap).
           eapply Included_Union_preserv_r.
           eapply Included_trans; [| now eapply Included_post_n_reach' with (n := 2) ].
           simpl. rewrite env_locs_Singleton; try eassumption. simpl. rewrite post_Singleton; try eassumption.
-          simpl. rewrite Union_Empty_set_neut_l, Union_Empty_set_neut_r.
+          simpl. rewrite Union_Empty_set_neut_l.
           rewrite post_Singleton; try eassumption. eapply env_locs_monotonic... }
         assert (Hvs1 : Union_list (map val_loc vs) \subset
                        env_locs rho (occurs_free (Eapp f t ys))).

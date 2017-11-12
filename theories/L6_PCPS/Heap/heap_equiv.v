@@ -1308,7 +1308,7 @@ Module HeapEquiv (H : Heap).
       rewrite FromList_cons...
   Qed.
 
-  Lemma heap_env_equiv_def_funs S S1 S2 H1 H2 rho1 rho2 clo_rho1 clo_rho2 B B0 c l1 l2 :
+  Lemma heap_env_equiv_def_funs S S1 S2 H1 H2 rho1 rho2 clo_rho1 clo_rho2 B B0 l1 l2 :
     closed S1 H1 -> closed S2 H2 ->
     env_locs rho1 (Setminus _ S (name_in_fundefs B)) \subset S1 ->
     env_locs rho2 (Setminus _ S (name_in_fundefs B)) \subset S2 ->
@@ -1319,49 +1319,46 @@ Module HeapEquiv (H : Heap).
     (occurs_free_fundefs B0) \subset (Setminus _ S (name_in_fundefs B)) ->
     (Loc l1, H1) ≈ (Loc l2, H2) ->             
     Setminus _ S (name_in_fundefs B) |- (H1, rho1) ⩪ (H2, rho2) ->
-    S |- (def_closures B B0 rho1 H1 c l1) ⩪ (def_closures B B0 rho2 H2 c l2).
+    S |- (def_closures B B0 rho1 H1 l1) ⩪ (def_closures B B0 rho2 H2 l2).
   Proof with (now eauto with Ensembles_DB).
     revert S rho1 rho2; induction B;
     intros S rho1 rho2 Hc1 Hc2 Hinl1 Hinl2 He1 He2 Hg1 Hg2 Hsub Hloc Heq; simpl; eauto.
-    - destruct (def_closures B B0 rho1 H1 c l1) as [H1' rho1'] eqn:Hd1.
-      destruct (def_closures B B0 rho2 H2 c l2) as [H2' rho2'] eqn:Hd2.
-      destruct (alloc (Constr c [FunPtr B0 v; Loc l1]) _) as [l1' H1''] eqn:Ha1.
-      destruct (alloc (Constr c [FunPtr B0 v; Loc l2]) _) as [l2' H2''] eqn:Ha2.
+    - destruct (def_closures B B0 rho1 H1 l1) as [H1' rho1'] eqn:Hd1.
+      destruct (def_closures B B0 rho2 H2 l2) as [H2' rho2'] eqn:Hd2.
+      destruct (alloc (Clos (FunPtr B0 v) (Loc l1)) _) as [l1' H1''] eqn:Ha1.
+      destruct (alloc (Clos (FunPtr B0 v) (Loc l2)) _) as [l2' H2''] eqn:Ha2.
       edestruct (def_funs_exists_new_set (S \\ [set v]) S1 H1 H1' rho1 rho1' clo_rho1 B) as [S1' [HsubS1 [Hcl1 Henv1]]]; eauto.
       eapply Included_trans; [| now apply Hinl1 ]. simpl. rewrite <- !Setminus_Union...
       edestruct (def_funs_exists_new_set (S \\ [set v]) S2 H2 H2' rho2 rho2' clo_rho2 B) as [S2' [HsubS2 [Hcl2 Henv2]]]; eauto.
       eapply Included_trans; [| now apply Hinl2 ]. simpl. rewrite <- !Setminus_Union...
       eapply heap_env_equiv_alloc_alt; (try now apply Ha1); (try now apply Ha2); eauto.
-      + simpl. rewrite Union_Empty_set_neut_r, Union_Empty_set_neut_l.
+      + simpl. rewrite Union_Empty_set_neut_l.
         eapply Singleton_Included. eapply dom_subheap.
         eapply def_funs_subheap. now eauto. now eexists; eauto.
-      + simpl. rewrite Union_Empty_set_neut_r, Union_Empty_set_neut_l.
+      + simpl. rewrite Union_Empty_set_neut_l.
         eapply Singleton_Included. eapply dom_subheap.
         eapply def_funs_subheap. now eauto. now eexists; eauto.
-      + simpl. rewrite Union_Empty_set_neut_r, Union_Empty_set_neut_l.
+      + simpl. rewrite Union_Empty_set_neut_l.
         rewrite post_Singleton; [| eapply def_funs_subheap; now eauto ].
         eapply Included_trans...
-      + simpl. rewrite Union_Empty_set_neut_r, Union_Empty_set_neut_l.
+      + simpl. rewrite Union_Empty_set_neut_l.
         rewrite post_Singleton; [| eapply def_funs_subheap; now eauto ].
         eapply Included_trans...
       + setoid_rewrite <- Hd1. setoid_rewrite <- Hd2.
         simpl in Heq, Hinl1, Hinl2. rewrite <- !Setminus_Union in Heq, Hinl1, Hinl2.
         eapply IHB; try eassumption.
         eapply Included_trans; [ eassumption |]. simpl. rewrite <- !Setminus_Union...
-      + simpl. split. now eauto.
-        constructor.
-        * rewrite res_equiv_eq. simpl; split; eauto.
-        *  constructor. eapply res_equiv_weakening_alt.
-           now apply Hc1. now apply Hc2. eassumption.
-           now eapply def_funs_subheap; eauto.
-           now eapply def_funs_subheap; eauto.
-           eapply Singleton_Included. now eexists; eauto.
-           eapply Singleton_Included. now eexists; eauto.
-           simpl. rewrite post_Singleton; [ | eassumption ].
-           eassumption. 
-           simpl. rewrite post_Singleton; [ | eassumption ].
-           eassumption. 
-           now constructor.
+      + simpl. split. rewrite res_equiv_eq; now eauto.
+        eapply res_equiv_weakening_alt.
+        now apply Hc1. now apply Hc2. eassumption.
+        now eapply def_funs_subheap; eauto.
+        now eapply def_funs_subheap; eauto.
+        eapply Singleton_Included. now eexists; eauto.
+        eapply Singleton_Included. now eexists; eauto.
+        simpl. rewrite post_Singleton; [ | eassumption ].
+        eassumption. 
+        simpl. rewrite post_Singleton; [ | eassumption ].
+        eassumption. 
     - simpl. rewrite Setminus_Empty_set_neut_r in Heq.
       eassumption.
   Qed.
@@ -1680,4 +1677,4 @@ Module HeapEquiv (H : Heap).
     split; now eapply heap_env_approx_restrict_env; eauto.
   Qed.
 
-End HeapEquiv. 
+End HeapEquiv.

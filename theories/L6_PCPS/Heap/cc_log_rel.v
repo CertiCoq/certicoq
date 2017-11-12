@@ -15,22 +15,16 @@ Module CC_log_rel (H : Heap).
 
   Module Sem := SpaceSem H.
 
-  Import H Sem.Defs Sem.
-
+  Import H Sem.Equiv Sem.Equiv.Defs Sem.
+  
   (** Global invariant *)
-  Definition GInv :=
-    nat -> (* The step index *)
-    relation (heap block * env * exp * nat * nat).
+  Definition GInv := relation (nat * nat).
   
   (** Local invariant *)
-  (* XXX Same type as the GInv. Merge them at some point *)
-  Definition Inv :=
-    nat -> (* The step index *)
-    relation (heap block * env * exp * nat * nat).
-
+  Definition Inv := relation (nat * nat).
+  
   (** Initial invariant *)
-  Definition IInv :=
-    relation (heap block * env * exp).
+  Definition IInv := relation (heap block * env * exp).
   
   (** Tag for closure records *)
   Variable (clo_tag : cTag). 
@@ -69,7 +63,7 @@ Module CC_log_rel (H : Heap).
   Section cc_approx.
     
     Variable (cc_approx_val : nat -> GInv -> ans -> ans -> Prop). 
-
+    
     (** * Expression relation *)
 
     Definition cc_approx_exp (k : nat) (P1 : Inv) (P2 : GInv)
@@ -77,21 +71,32 @@ Module CC_log_rel (H : Heap).
       let '(e1, rho1, H1) := p1 in
       let '(e2, rho2, H2) := p2 in
       forall (H1' H2' : heap block) (r1 : ans) (c1 m1 : nat),
-        reach' H1 (env_locs rho1 (occurs_free e1)) |- H1 ≡ H1' ->
-        reach' H2 (env_locs rho2 (occurs_free e2)) |- H2 ≡ H2' ->
+        (env_locs rho1 (occurs_free e1)) |- H1 ≃ H1' ->
+        (env_locs rho2 (occurs_free e2)) |- H2 ≃ H2' ->
         c1 <= k ->
         big_step_perfect_GC H1' rho1 e1 r1 c1 m1 ->
         not_stuck H1' rho1 e1 ->
         exists (r2 : ans) (c2 m2 : nat),
-          big_step_perfect_GC H2' rho2 e2 r2 c2 m2 /\
+          big_step_perfect_GC_cc H2' rho2 e2 r2 c2 m2 /\
           (* extra invariants for costs *)
-          P1 k (H1', rho1, e1, c1, m1) (H2', rho2, e2, c2, m2) /\
+          P1 (c1, m1) (c2, m2) /\
           cc_approx_val (k - c1) P2 r1 r2.
-   
+    
+
+    Definition closure_env_approx k (P : GInv) FVs (cenv : env) (H1 : heap block)
+               (Γ : loc) (H2 : heap block): Prop :=
+      forall (x : var) N (v : value),
+        nthN FVs N = Some x ->
+        M.get x cenv= Some v ->
+        exists (c : cTag) (vs' : list value) (v' : value),
+          get Γ H1 = Some (Constr c vs') ->
+          nthN vs' N = Some v' /\
+          cc_approx_val k P (Res (v, H1)) (Res (v', H2)).
+    
   End cc_approx.
   
   (** * Value relation *)
-
+  
   Fixpoint cc_approx_val (k : nat) (P : GInv) (r1 r2 : ans) {struct k} : Prop :=
     match r1, r2 with
       | OOT, OOT => True (* Both programs timeout *)
@@ -107,7 +112,39 @@ Module CC_log_rel (H : Heap).
                   let R l1 l2 := cc_approx_val k P (Res (l1, H1)) (Res (l2, H2)) in
                   Forall2 R vs1 vs2
               end
-          | FunPtr lf1 f1, Loc l2 =>
+          | FunPtr B1 f1, FunPtr B2 f2 =>
+            forall (xs1 : list var) (ft : fTag) (e1 : exp)
+              (H1' H1 H1'' : heap block) (crho1 crho1' crho1'' : env)
+              (vs1 vs2 : list value) (el1 : loc) (Γ : loc) (FVs : list var)
+              (j : nat),
+              get el1 H1 = Some (Env crho1) ->
+              find_def f1 B1 = Some (ft, xs1, e1) ->
+
+              def_closures B1 B1 rho1 H1 lf1 crho1 = Some (crho1', H1') ->
+              setlist xs1 vs1 crho1' = Some crho1'' ->
+
+              (occurs_free_fundefs B) <--> (FromList FVs) ->
+              NoDup FVs ->
+
+              exists (xs2 : list var) (e2 : exp) (rho2' : env),
+                find_def f2 B2 = Some (ft, xs2, e2) /\
+                Some rho2' = setlist xs2 (venv :: vs2) (def_funs B2 lf2 rho2) /\
+                match k with
+                  | 0 => True
+                  | S k =>
+                    j < S k ->
+                    (forall H1' H2',
+                       let R v1 v2 := cc_approx_val (k - (k - j)) P (Res (v1, H1')) (Res (v2, H2')) in
+                        |- H1' ≃ H1'' ->
+                        |- H2 ≃ H2' ->
+                       Forall2 R vs1 vs2 ->
+                       closure_env_approx cc_approx_val (k - (k - j)) P FVs cenv H1'' Γ H2'  ->
+                       cc_approx_exp cc_approx_val
+                                     (k - (k - j))
+                                     P P 
+                                     (e1, crho1'', H1'') (e2, rho2', H2'))
+                  end
+
             exists rho1 B1 lf2 f2 venv rho2 B2,
               get lf1 H1 = Some (Vfun rho1 B1) /\
               get l2 H2 = Some (Vconstr clo_tag [(FunPtr lf2 f2) ; venv]) /\

@@ -29,8 +29,10 @@ Module HeapDefs (H : Heap).
   
   (** A block in the heap *)
   Inductive block :=
-  (* Constructed value *)
+  (* A constructed value *)
   | Constr : cTag -> list value -> block
+  (* A closure pair *)
+  | Clos : value -> value -> block 
   (* The environment of a closure *)
   (* Decoupled from the closure pair to capture sharing of environment between mutually
    * recursive functions *)
@@ -65,6 +67,7 @@ Module HeapDefs (H : Heap).
     match v with
       | Constr t ls => (* The size of the constructor representation *)
         1 + length ls
+      | Clos _ _ => 2
       | Env rho =>
         1 + size_map rho
     end.
@@ -77,6 +80,7 @@ Module HeapDefs (H : Heap).
   Definition locs (v : block) : Ensemble loc :=
     match v with
       | Constr t ls => Union_list (map val_loc ls)
+      | Clos v1 v2 => val_loc v1 :|: val_loc v2
       | Env rho => env_locs rho (Full_set _)
     end.
   
@@ -942,6 +946,7 @@ Module HeapDefs (H : Heap).
     destruct v; simpl.
     - eapply Decidable_map_UnionList; eauto with typeclass_instances.
       eapply Decidable_val_loc.
+    - eapply Decidable_Union; eapply Decidable_val_loc. 
     - eapply Decidable_env_locs. constructor; intros x; left; constructor.
   Qed.  
   

@@ -27,7 +27,7 @@ Module SpaceSem (H : Heap).
       | Econstr x t ys e => 1 + length ys
       | Ecase y cl => 1 
       | Eproj x t n y e => 1
-      | Efun B e => fundefs_num_fv B + 1 (* XXX maybe revisit *)
+      | Efun B e => fundefs_num_fv B + 1
       | Eapp f t ys => 1 + length ys
       | Eprim x p ys e => 1 + length ys
       | Ehalt x => 1

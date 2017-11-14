@@ -241,14 +241,15 @@ Definition getBoxedOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
 
 Inductive cRep : Type :=
 | enum : N -> cRep
-(* [enum t] represents a constructor with no parameters with tag [t] *)
+(* [enum t] represents a constructor with no parameters with ordinal [t] *)
 | boxed : N -> N -> cRep.
-(* [boxed t a] represents a construct with arity [a] and tag [t]  *)
+(* [boxed t a] represents a construct with arity [a] and ordinal [t]  *)
 
-Definition make_cRep (cenv : cEnv) (ct : cTag) : option cRep :=
+
+
+Definition make_cRep (cenv:cEnv) (ienv : iEnv) (ct : cTag) : option cRep :=
   p <- M.get ct cenv ;;
     let '(name, it , a , n) := p in
-    let ienv := compute_iEnv cenv in
     l <- M.get it ienv ;;
       match (a =? 0)%N with
       | true =>
@@ -378,15 +379,15 @@ Definition reserve (funInf : positive) (l : Z) : statement :=
 
 
 (* Don't shift the tag for boxed, make sure it is under 255 *)
-Fixpoint makeTagZ (cenv : cEnv) (ct : cTag) : option Z :=
-  rep <- make_cRep cenv ct ;;
+Fixpoint makeTagZ (cenv:cEnv) (ienv : iEnv) (ct : cTag) : option Z :=
+  rep <- make_cRep cenv ienv ct ;;
       match rep with
       | enum t => ret (Z.of_N ((N.shiftl t 1) + 1))
       | boxed t a => ret (Z.of_N ((N.shiftl a 10) + t))
       end.
 
-Definition makeTag (cenv : cEnv) (ct : cTag) : option expr :=
-  t <- makeTagZ cenv ct ;;
+Definition makeTag (cenv: cEnv) (ienv : iEnv) (ct : cTag) : option expr :=
+  t <- makeTagZ cenv ienv ct ;;
     ret (c_int t val).
 
 (* If x is a in our global map, then Evar, otherwise Etempvar *)
@@ -397,11 +398,11 @@ Definition makeVar (x:positive) (m:M.t positive) :=
   end.   
 
 (* map is here to identify which value represents function  *)
-Fixpoint assignConstructor' (cenv : cEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
+Fixpoint assignConstructor' (cenv:cEnv) (ienv : iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
   match vs with
   | nil =>
-    tag <- makeTag cenv t;;
-        rep <- make_cRep cenv t ;;
+    tag <- makeTag cenv ienv t;;
+        rep <- make_cRep cenv ienv t ;;
         match rep with
         | enum _ =>           
           ret (x ::= tag)
@@ -412,14 +413,14 @@ Fixpoint assignConstructor' (cenv : cEnv) (map:M.t positive) (x : positive) (t :
                  Field(var x, -1) :::= tag)
         end
   | cons v vs' =>
-    prog <- assignConstructor' cenv map x t vs' ;;
+    prog <- assignConstructor' cenv ienv map x t vs' ;;
          (* if v is a function name, funVar, otherwise lvar *)
     let vv := makeVar v map in      
             ret (prog ;
                    Field(var x, Z.of_nat (length vs')) :::= (*[val]*) vv)                                 
   end.
 
-Definition assignConstructor (cenv : cEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv map x t (rev vs).
+Definition assignConstructor (cenv:cEnv) (ienv : iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv ienv map x t (rev vs).
 
 
 (* This is not valid in Clight if x is a Vptr, implementing instead as an external function
@@ -435,8 +436,8 @@ Definition isPtr (x : positive) :=
 Definition isPtr (retId:positive) (v:positive) :=
   Scall (Some retId) ptr ([val](var v) :: nil).
 
-Definition isBoxed (cenv : cEnv) (ct : cTag) : bool :=
-  match make_cRep cenv ct with
+Definition isBoxed (cenv:cEnv) (ienv : iEnv) (ct : cTag) : bool :=
+  match make_cRep cenv ienv ct with
   | None => false
   | Some rep => match rep with
                | enum t => false
@@ -492,11 +493,11 @@ Definition asgnAppVars vs ind :=
 
 
 
-Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : option statement :=
+Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : iEnv) (map : M.t positive) : option statement :=
   match e with
   | Econstr x t vs e' =>
-    prog <- assignConstructor cenv map x t vs ;;
-         prog' <- translate_body e' fenv cenv map ;;
+    prog <- assignConstructor cenv ienv map x t vs ;;
+         prog' <- translate_body e' fenv cenv ienv map ;;
          ret (prog ; prog')
   | Ecase x cs =>
     (* ls <- boxed cases (Vptr), ls <- unboxed (Vint) *)
@@ -504,11 +505,11 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positiv
             match l with
             | nil => ret (LSnil, LSnil)
             | cons p l' =>
-              prog <- translate_body (snd p) fenv cenv map ;;
+              prog <- translate_body (snd p) fenv cenv ienv map ;;
                    p' <- makeCases l' ;;
-                   tag <- makeTagZ cenv (fst p) ;;
+                   tag <- makeTagZ cenv ienv (fst p) ;;
                    let '(ls , ls') := p' in
-                   match isBoxed cenv (fst p) with
+                   match isBoxed cenv ienv (fst p) with
                    | true =>
                      match ls with
                      | LSnil =>
@@ -542,7 +543,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv : cEnv) (map : M.t positiv
                Sswitch (Ebinop Oshr (var x) (Econst_int (Int.repr 1) val) val)
                       ls'))
   | Eproj x t n v e' =>
-    prog <- translate_body e' fenv cenv map ;;
+    prog <- translate_body e' fenv cenv ienv map ;;
          ret (x ::= Field(var v, Z.of_N n) ;
                 prog)
   | Efun fnd e => None
@@ -567,15 +568,15 @@ Definition mkFun (vs : list positive) (body : statement) : function :=
              nil
              body.
 
-Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.t positive) : 
+Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : iEnv) (map : M.t positive) : 
   option (list (positive * globdef Clight.fundef type)) :=
   match fnd with
   | Fnil => ret nil
   | Fcons f t vs e fnd' =>
-    match translate_fundefs fnd' fenv cenv map with
+    match translate_fundefs fnd' fenv cenv ienv map with
     | None => None
     | Some rest =>
-      match translate_body e fenv cenv map with
+      match translate_body e fenv cenv ienv map with
       | None => None
       | Some body =>
          let localVars := vs ++ (get_allocs e) in  (* ADD ALLOC ETC>>> HERE *)
@@ -607,13 +608,13 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv : cEnv) (map : M.
 
 
 
-Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv : cEnv) (m : M.t positive) :
+Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : iEnv) (m : M.t positive) :
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
-    funs <- translate_fundefs fnd fenv cenv m ;; 
+    funs <- translate_fundefs fnd fenv cenv ienv m ;; 
          let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
-         body <- translate_body e fenv cenv m ;;
+         body <- translate_body e fenv cenv ienv m ;;
               gcArrIdent <- M.get mainIdent m ;;
               ret ((bodyIdent , Gfun (Internal
                                         (mkfunction Tvoid
@@ -746,13 +747,13 @@ Definition global_defs (e : exp)
       ))
     :: nil.
 
-Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) (nenv : M.t Ast.name) :
+Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : iEnv) (nenv : M.t Ast.name) :
   nState (option (M.t Ast.name * (list (positive * globdef Clight.fundef type)))) :=
   fun_inf' <- make_funinfo e fenv nenv ;;
            match fun_inf' with
            | Some p =>
              let '(fun_inf, map, nenv') := p in
-             match translate_funs e fenv cenv map with
+             match translate_funs e fenv cenv ienv map with
              | None => ret None
              | Some fun_defs' =>
                let fun_defs := rev fun_defs' in
@@ -765,7 +766,7 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv : cEnv) (nenv : M.t Ast.name)
 
 Require Import Clightdefs.
 
-Print members.
+
 
 Definition composites : list composite_definition :=
  (Composite threadInfIdent Struct
@@ -820,7 +821,8 @@ Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
   M.t Ast.name * option Clight.program :=
   let e := wrap_in_fun e in 
   let fenv := compute_fEnv e in
-  let p'' := make_defs e fenv cenv nenv in
+  let ienv := compute_iEnv cenv in 
+  let p'' := make_defs e fenv cenv ienv nenv in
   let n := ((max_var e 100) + 1)%positive in
   let p' := fst (p''.(runState) n) in
   match p' with

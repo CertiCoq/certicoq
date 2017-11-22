@@ -81,7 +81,7 @@ Proof.
   - inversion H0.
     + rewrite (H args'). reflexivity. assumption.
   - inversion_Clear H1.
-    + rewrite (H _ H5) in n1. elim n1. auto.
+    + rewrite (H _ H4) in n1. elim n1. auto.
     + rewrite (H _ H4) in n. elim n. auto. 
     + rewrite (H _ H4) in n0. elim n0. auto.
   - inversion_Clear H1. rewrite (H _ H4). rewrite (H0 _ H6). reflexivity.

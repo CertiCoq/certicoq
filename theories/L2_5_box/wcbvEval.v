@@ -22,8 +22,11 @@ Set Implicit Arguments.
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProof: WcbvEval p TProof TProof
-| waPrf: forall fn arg args,
-    WcbvEval p fn TProof -> WcbvEval p (TApp fn arg args) TProof
+| waPrf: forall fn arg arg' args args',
+    WcbvEval p fn TProof ->
+    WcbvEval p arg arg' ->
+    WcbvEvals p args args' ->
+    WcbvEval p (TApp fn arg args) TProof
 | wConstruct: forall i r args args',
     WcbvEvals p args args' ->
     WcbvEval p (TConstruct i r args) (TConstruct i r args')
@@ -110,6 +113,7 @@ Proof.
   apply WcbvEvalEvals_ind; intros; try assumption;
   try (solve[inversion_Clear H0; intuition]);
   try (solve[inversion_Clear H1; intuition]).
+  - constructor.
   - apply H. unfold lookupDfn in e. case_eq (lookup nm p); intros xc.
     + intros k. assert (j:= lookup_pres_WFapp hp _ k).
       rewrite k in e. destruct xc. 
@@ -138,6 +142,10 @@ Lemma WcbvEval_weaken:
                    WcbvEvals ((nm,ec)::p) ts ss).
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
+  - eapply waPrf.
+    + apply H. assumption.
+    + apply H0. assumption.
+    + apply H1. assumption.
   - destruct (string_dec nm nm0).
     + subst. 
       * unfold lookupDfn in e.
@@ -154,7 +162,6 @@ Proof.
   - eapply wAppFix; try eassumption; intuition.
   - eapply wCase; intuition; eassumption.
 Qed.
-
 
 Definition ii := TLambda nAnon (TRel 0).
 Goal
@@ -221,7 +228,11 @@ Function wcbvEval
         | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
         | Some (x, ix) => wcbvEval n (pre_whFixStep x dts (tcons a1 args))
         end
-      | Ret TProof => Ret TProof  (* proof redex *)
+      | Ret TProof =>   (* proof redex *)
+        match wcbvEval n a1, wcbvEvals n args with
+        | Ret _, Ret _ => Ret TProof
+        | _, _ =>  raise ("wcbvEval TApp: Proof, args don't eval")
+        end
       | _ => raise "wcbvEval, TApp: fn"
       end
    | TCase ml mch brs =>
@@ -293,6 +304,8 @@ Proof.
     eapply wAppLam; eassumption.
   - specialize (H0 _ p1). specialize (H _ e1).
     eapply wAppFix; try eassumption.
+  - specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ e3).
+    eapply waPrf; eassumption.
   - eapply wCase; try eassumption.
     + apply H. rewrite <- _x. apply e1. 
     + apply H0; eassumption. 
@@ -322,10 +335,19 @@ Proof.
   assert (j:forall m, m > 0 -> m = S (m - 1)).
   { induction m; intuition. }
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
+  - destruct H, H0, H1. exists (S (max x (max x0 x1))). intros m h.
+    assert (j1:= max_fst x (max x0 x1)). 
+    assert (lx: m > x). omega.
+    assert (j2:= max_snd x (max x0 x1)).
+    assert (j3:= max_fst x0 x1).
+    assert (lx0: m > x0). omega.
+    assert (j4:= max_snd x0 x1).
+    assert (j5:= max_fst x0 x1).
+    assert (lx1: m > x1). omega.
+    simpl. rewrite (j m). rewrite H. rewrite H0. rewrite H1. reflexivity.
+    omega. omega. omega. omega.
   - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
     + rewrite (H (m - 1)); try omega. reflexivity.
-  - destruct H. exists (S x). intros m h. simpl.
-    rewrite (j m); try omega. rewrite H; try omega. reflexivity.
   - destruct H. exists (S x). intros mm h. simpl.
     rewrite (j mm); try omega.
     unfold lookupDfn in e. destruct (lookup nm p). destruct e0. myInjection e.

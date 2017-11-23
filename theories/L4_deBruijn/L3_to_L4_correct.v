@@ -2456,7 +2456,7 @@ Proof with eauto.
     unfold translate in *; simpl in *.
     unfold subst_env in *; rewrite subst_env_aux_prf in *.
     rewrite subst_env_application. constructor.
-    apply H. now apply Crct_invrt_App in H0.
+    apply H. now apply Crct_invrt_App in H1.
 
   + (* Lambda *)
     cbn. intros nm bod wft.

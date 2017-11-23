@@ -228,24 +228,26 @@ Proof.
   - simpl in *.
     destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
     assert(WcbvEval e (TApp f t) s'').
-    { pose (wcbvEval_no_step _ _ _ evf). inv evs''. 
-      pose proof (WcbvEval_single_valued w H2). subst s'. repeat  constructor.  auto.
-      pose proof (WcbvEval_single_valued w H1). subst s'. 
-      econstructor; eauto.
-      pose proof (WcbvEval_single_valued w H1). subst s'.
-      eapply wAppFix; eauto. }
+    { pose (wcbvEval_no_step _ _ _ evf). inv evs''.
+      + pose proof (WcbvEval_single_valued w H1). subst s'.
+        eapply waPrf; eassumption.
+      + pose proof (WcbvEval_single_valued w H1). subst s'.
+        eapply wAppLam; eassumption.        
+      + pose proof (WcbvEval_single_valued w H1). subst s'.
+        eapply wAppFix; eassumption.  }     
     eapply (proj1 (IHa (TApp f t) s'' s)); eauto.
     eapply (proj2 (IHa (TApp s' t) s'' s)); eauto.
 
   - simpl in *.
     destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
     assert(WcbvEval e (TApp s' t) s'').
-    { inv evs''. 
-      pose proof (WcbvEval_single_valued evf H2). subst s'. repeat  constructor.  auto.
-      pose proof (WcbvEval_single_valued evf H1). subst s'. 
-      econstructor; eauto.
-      pose proof (WcbvEval_single_valued evf H1). subst s'.
-      eapply wAppFix; eauto. }
+    { inv evs''.
+      + pose proof (WcbvEval_single_valued evf H1). subst s'.
+        eapply waPrf. constructor. eassumption.
+      + pose proof (WcbvEval_single_valued evf H1). subst s'.
+        eapply wAppLam; try eassumption. econstructor.     
+      + pose proof (WcbvEval_single_valued evf H1). subst s'.
+        eapply wAppFix; try eassumption.  econstructor.  }     
     eapply (proj1 (IHa _ _ s)). eauto.
     eapply (proj2 (IHa _ _ s)). eapply evs''. apply evapp.
 Qed.
@@ -434,11 +436,13 @@ Proof.
    crctEnv e -> crctTerms e 0 t ->
    WcbvEvals (transEnv e) (trans_terms 0 t) (trans_terms 0 t'))).
   clear; apply WcbvEvalEvals_ind; simpl; auto.
-
-  - intros fn arg evprf IHev crcte crctt.
+  - admit.
+(********** this no longer works *****
+  - intros fn arg evprf IHev crcte crctt _ _ _.
     apply Crct_invrt_App in crctt.
     constructor. intuition eauto.
-
+ ***********)
+    
   - intros i r args args' evargs evtras crcte crctc.
     destruct i as [ipkg inum]. 
     apply Crct_invrt_Construct in crctc.

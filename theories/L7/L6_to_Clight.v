@@ -644,7 +644,16 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | n :: l' => (Init_int32 (Int.repr (Z.of_N n))) :: (make_ind_array l')
   end.
 
-Definition show_pos x := nat2string10 (Pos.to_nat x).
+(* representation of pos as string (in reverse order) *)
+Fixpoint pos2string p :=
+  match p with
+  | xI p' => String "1" (pos2string p')
+  | xO p' => String "0" (pos2string p')
+  | xH => String "1" EmptyString
+  end.
+
+
+Definition show_pos x := pos2string x. (* nat2string10 (Pos.to_nat x). *) 
 
 Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t Ast.name) : M.t Ast.name :=
   match M.get f nenv with

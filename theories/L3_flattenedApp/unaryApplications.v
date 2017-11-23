@@ -735,7 +735,7 @@ Proof.
     pose proof (proj1 (WcbvEval_no_further p) _ _ h0) as k.
     rewrite <- (WcbvEval_single_valued k H). assumption.
   - rewrite mkApp_tl. rewrite mkApp_tl in H. inversion_clear H.
-    + constructor. eapply IHargs. eassumption.
+    + econstructor. eapply IHargs. eassumption. eassumption.
     + specialize (IHargs _ H0). econstructor; eassumption.
     + specialize (IHargs _ H0). econstructor; eassumption.
 Qed.
@@ -953,16 +953,35 @@ Qed.
 ***************************)
 
 Lemma waPrf_args:
-  forall p args fn,
+  forall p args args',
+    WcbvEvals p args args' ->
+    forall fn,
     WcbvEval p fn TProof -> WcbvEval p (mkApp fn args) TProof.
 Proof.
-  induction args; intros.
+  induction 1; intros.
   - cbn. assumption.
   - cbn. eapply WcbvEval_mkApp_step.
-    + apply waPrf. assumption.
-    + eapply IHargs. constructor.
+    + eapply waPrf; eassumption.
+    + eapply IHWcbvEvals. constructor.
 Qed.
 
+(*************
+Lemma waPrf_args:
+  forall p arg arg',
+    WcbvEval p arg arg' ->
+    forall fn args,
+    WcbvEval p fn TProof -> WcbvEval p (mkApp fn (tcons arg args)) TProof.
+Proof.
+  induction 1; cbn; intros.
+  - eapply WcbvEval_mkApp_step.
+    + eapply waPrf. eassumption. econstructor.
+    + eapply IHWcbvEvals. constructor.
+  - cbn. assumption.
+  - cbn. eapply WcbvEval_mkApp_step.
+    + eapply waPrf; eassumption.
+    + eapply IHWcbvEvals. constructor.
+Qed.
+**************)
 (**********
 Lemma wAppCong':
   forall p args args' fn fn',
@@ -992,10 +1011,10 @@ Proof.
   apply L2_5.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
     try (solve[constructor; trivial]); try assumption.
   - simpl. eapply WcbvEval_mkApp_step.
-    + constructor. assumption.
+    + eapply waPrf; eassumption.
     + eapply WcbvEval_mkApp_step.
       * econstructor.
-      * apply waPrf_args. constructor.
+      * eapply waPrf_args. eassumption. constructor.
   - cbn. econstructor; try eassumption. apply LookupDfn_hom.
     unfold LookupDfn. unfold lookupDfn in e. case_eq (lookup nm p); intros.
     + rewrite H0 in e. destruct e0.

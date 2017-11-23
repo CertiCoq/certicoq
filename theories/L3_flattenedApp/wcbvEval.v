@@ -18,8 +18,9 @@ Set Implicit Arguments.
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wPrf: WcbvEval p TProof TProof
-| waPrf: forall fn arg,
+| waPrf: forall fn arg arg',
     WcbvEval p fn TProof ->
+    WcbvEval p arg arg' ->
     WcbvEval p (TApp fn arg) TProof
 | wLam: forall nm bod,
     WcbvEval p (TLambda nm bod) (TLambda nm bod)
@@ -112,6 +113,9 @@ Lemma WcbvEval_weaken:
                   WcbvEvals ((nm,ec)::p) ts ss).
 Proof.
   intros p hp. apply WcbvEvalEvals_ind; intros; auto.
+  - eapply waPrf.
+    + apply H. assumption.
+    + apply H0. assumption.
   - eapply wConst. 
     + apply Lookup_weaken; eassumption.
     + apply H. assumption.
@@ -477,12 +481,16 @@ Function wcbvEval
         | Exc s =>  raise ("wcbvEval TApp: beta, arg doesn't eval: " ++ s)
         | Ret b1 => wcbvEval n (whBetaStep bod b1)
         end
-      | Ret (TFix dts m) =>           (* Fix redex *)
+      | Ret (TFix dts m) =>   (* Fix redex *)
         match dnthBody m dts with
         | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
         | Some x => wcbvEval n (pre_whFixStep x dts a1)
         end
-      | Ret TProof => Ret TProof  (* proof redex *)
+      | Ret TProof =>       (* proof redex *)
+        match wcbvEval n a1 with
+        | Exc s =>  raise ("wcbvEval TApp: Proof, arg doesn't eval: " ++ s)
+        | Ret b1 => Ret TProof
+        end
       | _ => raise "wcbvEval, TApp: fn"
       end
     | TCase ml mch brs =>
@@ -551,6 +559,8 @@ Proof.
     apply H1. assumption.
   - specialize (H _ e1). specialize (H0 _ p1).
     eapply wAppFix; try eassumption.
+  - specialize (H _ e1). specialize (H0 _ e2).
+    eapply waPrf; eassumption.
   - subst. specialize (H _ e1). specialize (H0 _ p1). 
     refine (wCase _ _ _ _); try eassumption.
   - eapply wLetIn.
@@ -569,10 +579,12 @@ Lemma pre_WcbvEval_wcbvEval:
 Proof.
   assert (j:forall m, m > 0 -> m = S (m - 1)). induction m; intuition.
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
+  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    simpl. rewrite (j mx); try omega. rewrite H; try omega.
+    rewrite H0; try omega. reflexivity.
   - destruct H. exists (S x). intros m h. simpl.
     rewrite (j m); try omega. rewrite H; try omega. reflexivity.
-  - destruct H. exists (S x). intros mx hm. simpl.
-    rewrite (j mx); try omega. rewrite H; try omega. reflexivity.
   - destruct H. exists (S x). intros mx hm. simpl. unfold LookupDfn in l.
     rewrite (Lookup_lookup l). rewrite (j mx); try omega. apply H.
     omega.

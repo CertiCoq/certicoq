@@ -6,7 +6,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From L6 Require Import Ensembles_util functions.
+From L6 Require Import Ensembles_util functions List_util.
 From Libraries Require Import Coqlib.
 
 

@@ -14,10 +14,12 @@ Import ListNotations.
 
 Open Scope Ensembles_scope.
 
-Module HeapDefs (H : Heap).
-  
-  Import H.
+Module HeapDefs (H : Heap) .
 
+  Module HL := HeapLemmas H.
+
+  Import H HL.
+  
   (** * Heap definitions *)
 
   (** A value is a location or a function pointer offset *)

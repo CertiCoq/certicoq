@@ -4,10 +4,12 @@
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
-         Classes.Morphisms.
+         Classes.Morphisms Sorting.Permutation.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From L6 Require Import Ensembles_util functions.
+From L6 Require Import Ensembles_util functions List_util cps.
 Require Import compcert.lib.Coqlib.
+
+Import ListNotations.
 
 Close Scope Z_scope.
 
@@ -26,6 +28,9 @@ Module Type Heap.
   Parameter set : forall {A : Type}, A -> loc -> heap A -> heap A.
   
   Parameter alloc : forall {A : Type}, A -> heap A -> loc * heap A.
+  
+  Parameter emp_get :
+    forall (A : Type) (l : loc), get l (@emp A) = None. 
 
   Parameter gss :
     forall A (x : A) (l : loc) (H : heap A),
@@ -58,6 +63,89 @@ Module Type Heap.
 
   Infix "⊑" := subheap (at level 70, no associativity).
   
+  (** Extensional equality of heaps *)
+  Definition heap_eq {A} (S : Ensemble loc) (H1 H2 : heap A) :=
+    forall x, x \in S -> get x H1 = get x H2.
+
+  Notation  "S |- H1 ≡ H2" := (heap_eq S H1 H2) (at level 70, no associativity).
+  
+  (** Domain *)
+  Definition dom {A} (H : heap A) : Ensemble loc :=
+    domain (fun l => get l H).
+  
+  (** The restriction of a heap in a given domain *)
+  Parameter restrict : forall {A}, Ensemble loc -> heap A -> heap A -> Prop.  
+
+  Parameter restrict_subheap :
+    forall A S (H1 H2 : heap A),
+      restrict S H1 H2 ->
+      H2 ⊑ H1.
+
+  Parameter restrict_In :
+    forall A (l : loc) (S : Ensemble loc) (H H' : heap A),
+      restrict S H H' ->
+      l \in S -> 
+      get l H' = get l H. 
+  
+  Parameter restrict_notIn :
+    forall A (l : loc) (S : Ensemble loc) (H H' : heap A),
+      restrict S H H' ->
+      ~ l \in S -> 
+      get l H' = None.
+
+  (** Restriction in a decidable domain exists. Useful for garbage collection *)
+  Parameter restrict_exists :
+    forall A S (H : heap A),
+      Decidable S ->
+      exists H', restrict S H H'.
+
+
+  (** Elements *)
+  Parameter heap_elements : forall {A}, heap A -> list (loc * A).
+
+  Parameter heap_elements_sound :
+    forall (A : Type) (h : heap A) (l : loc) (v : A),
+      List.In (l, v) (heap_elements h) -> get l h = Some v.
+
+  Parameter heap_elements_complete :
+    forall (A : Type) (h : heap A) (l : loc) (v : A),
+      get l h = Some v -> List.In (l, v) (heap_elements h).
+  
+  Parameter heap_elements_NoDup :
+    forall (A : Type) (h : heap A),
+     NoDup (heap_elements h).
+
+  (** Size of a heap *)
+
+  (** The cardinality of the domain *)
+  Definition size {A : Type} (h : heap A) : nat := List.length (heap_elements h).
+  
+  Definition size_with_measure {A : Type} (f : A -> nat) (h : heap A) : nat :=
+    fold_left (fun acc h => acc + f (snd h)) (heap_elements h) 0%nat.
+
+
+  Parameter splits : forall {A}, heap A -> heap A -> heap A -> Prop. 
+
+  Parameter splits_spec_Some :
+    forall {A} (H1 H2 H : heap A) (l : loc) (v : A),
+      splits H H1 H2 ->
+      get l H = Some v ->
+      (get l H1 = Some v /\ get l H2 = None) \/
+      (get l H2 = None /\ get l H2 = Some v).
+
+  Parameter splits_spec_None :
+    forall {A} (H1 H2 H : heap A) (l : loc),
+      splits H H1 H2 ->
+      get l H = None ->
+      get l H1 = None /\ get l H2 = None.
+
+End Heap.
+
+
+Module HeapLemmas (H : Heap).
+
+  Import H.
+
   Lemma alloc_subheap {A} (H1 H1' : heap A) l v :
     alloc v H1 = (l, H1') ->
     H1 ⊑ H1'.
@@ -81,12 +169,6 @@ Module Type Heap.
     firstorder.
   Qed.
 
-  (** Extensional equality of heaps *)
-  Definition heap_eq {A} (S : Ensemble loc) (H1 H2 : heap A) :=
-    forall x, x \in S -> get x H1 = get x H2.
-
-  Notation  "S |- H1 ≡ H2" := (heap_eq S H1 H2) (at level 70, no associativity).
-  
   Instance Equivalence_heap_eq {A} S : Equivalence (@heap_eq A S).
   Proof.
     constructor. now firstorder. now firstorder.
@@ -97,7 +179,7 @@ Module Type Heap.
   Proof.
     intros S1 S2 Heq x1 x2 Heq1 y1 y2 Heq2; subst. firstorder.
   Qed.
-  
+
   Lemma heap_eq_antimon {A} S1 S2 (H1 H2 : heap A) :
     S1 \subset S2 ->
     S2 |- H1 ≡ H2 ->
@@ -106,10 +188,6 @@ Module Type Heap.
     firstorder.
   Qed.
 
-  (** Domain *)
-  Definition dom {A} (H : heap A) : Ensemble loc :=
-    domain (fun l => get l H).
-  
   Lemma dom_subheap {A} (H1 H2 : heap A) :
     H1 ⊑ H2 ->
     dom H1 \subset dom H2. 
@@ -159,32 +237,6 @@ Module Type Heap.
     rewrite Heq in Hget; eauto.  eexists; eauto.
   Qed.
 
-  (** The restriction of a heap in a given domain *)
-  Parameter restrict : forall {A}, Ensemble loc -> heap A -> heap A -> Prop.  
-
-  Parameter restrict_subheap :
-    forall A S (H1 H2 : heap A),
-      restrict S H1 H2 ->
-      H2 ⊑ H1.
-
-  Parameter restrict_In :
-    forall A (l : loc) (S : Ensemble loc) (H H' : heap A),
-      restrict S H H' ->
-      l \in S -> 
-      get l H' = get l H. 
-  
-  Parameter restrict_notIn :
-    forall A (l : loc) (S : Ensemble loc) (H H' : heap A),
-      restrict S H H' ->
-      ~ l \in S -> 
-      get l H' = None.
-
-  (** Restriction in a decidable domain exists. Useful for garbage collection *)
-  Parameter restrict_exists :
-    forall A S (H : heap A),
-      Decidable S ->
-      exists H', restrict S H H'.
-
   Lemma restrict_domain :
     forall A S (H1 H2 : heap A),
       Decidable S ->
@@ -203,59 +255,124 @@ Module Type Heap.
       destruct H as [v Hget]. exists v. congruence.
   Qed.      
 
-  (** Size of a heap *)
+  Lemma heap_elements_empty (A : Type) :
+    @heap_elements A emp = [].
+  Proof.
+    destruct (@heap_elements _ emp) as [| [l v] ls] eqn:Hh.
+    reflexivity.
+    assert (Hd : get l emp = Some v).
+    { eapply heap_elements_sound. rewrite Hh. now constructor. }
+    rewrite emp_get in Hd. discriminate.
+  Qed.
 
-  (** The cardinality of the domain *)
-  Parameter size : forall {A}, heap A -> nat.
-  
-  Parameter size_with_measure : forall {A}, (A -> nat) -> heap A -> nat.
+  Lemma heap_elements_alloc (A : Type) (h h' : heap A) (l : loc) (v : A) :
+    alloc v h = (l, h') -> 
+    Permutation (heap_elements h') ((l, v) :: (heap_elements h)) .
+  Proof.
+    intros Ha. 
+    eapply NoDup_Permutation.
+    - eapply heap_elements_NoDup. 
+    - constructor.
+      intros Hin. eapply heap_elements_sound in Hin.
+      eapply alloc_fresh in Ha. congruence.
+      eapply heap_elements_NoDup.
+    - intros [l' v']; split; intros Hin.
+      + eapply heap_elements_sound in Hin. 
+        destruct (loc_dec l l'); subst.
+        * erewrite gas in Hin; [| eassumption ]. 
+          inv Hin. now constructor.
+        * erewrite gao in Hin; eauto.
+          constructor 2. eapply heap_elements_complete.
+          eassumption.
+      + inv Hin.
+        * inv H.
+          eapply heap_elements_complete.
+          erewrite gas; [| eassumption ].
+          reflexivity.
+        * eapply heap_elements_sound in H.
+          eapply heap_elements_complete.
+          erewrite gao; eauto.
+          intros Hc. subst.
+          erewrite alloc_fresh in H; eauto.
+          congruence.
+  Qed.
 
-  Parameter size_reachable_with_measure : forall {A}, (A -> nat) -> heap A -> nat.
-  
-  Parameter size_emp :
+  Lemma subheap_Subperm (A : Type) (h1 h2 : heap A) : 
+    h1 ⊑ h2 ->
+    Subperm (heap_elements h1) (heap_elements h2).
+  Proof.
+    intros Hsub.
+    eapply incl_Subperm.
+    now eapply heap_elements_NoDup.
+    intros [l v] Hin. eapply heap_elements_sound in Hin. 
+    eapply heap_elements_complete.
+    eauto.
+  Qed.
+
+  Lemma size_emp :
     forall (A : Type), @size A emp = 0%nat.
-  
-  Parameter size_alloc :
-    forall (A : Type) (x : A) (H : heap A) (H' : heap A) (l : loc) (s : nat),
-      size H = s ->
-      alloc x H = (l, H') ->
-      size H' = (s + 1)%nat.
+  Proof.
+    intros. unfold size. simpl.
+    rewrite heap_elements_empty. reflexivity.
+  Qed.
 
-  Parameter size_subheap :
+  Lemma size_alloc (A : Type) (x : A) (H : heap A) (H' : heap A) (l : loc) (s : nat):
+    size H = s ->
+    alloc x H = (l, H') ->
+    size H' = (s + 1)%nat.
+  Proof.
+    intros Hs1 Ha.
+    unfold size in *. eapply heap_elements_alloc in Ha.
+    erewrite Permutation_length; [| eassumption ].
+    simpl. omega.
+  Qed.
+
+  Lemma size_subheap :
     forall A (H1 H2 : heap A), H1 ⊑ H2 -> size H1 <= size H2.
-  
-  Parameter size_with_measure_emp :
-    forall (A : Type) f, @size_with_measure A f emp = 0%nat.
-  
-  Parameter size_with_measure_alloc :
-    forall (A : Type) f (x : A) (H : heap A) (H' : heap A) (l : loc) (s : nat),
-      size_with_measure f H = s ->
-      alloc x H = (l, H') ->
-      size_with_measure f H' = (s + f x)%nat.
+  Proof.
+    intros A H1 H2 Hsub.
+    eapply Subperm_length.
+    eapply subheap_Subperm.
+    eassumption.
+  Qed.
 
-  Parameter size_with_measure_subheap :
+  Lemma size_with_measure_emp (A : Type) f :
+    @size_with_measure A f emp = 0%nat.
+  Proof.
+    unfold size_with_measure.
+    rewrite heap_elements_empty. reflexivity.
+  Qed.
+
+  Lemma size_with_measure_alloc
+        (A : Type) f (x : A) (H : heap A) (H' : heap A) (l : loc) (s : nat) : 
+    size_with_measure f H = s ->
+    alloc x H = (l, H') ->
+    size_with_measure f H' = (s + f x)%nat.
+  Proof.
+    intros Hs1 Ha.
+    unfold size_with_measure in *. eapply heap_elements_alloc in Ha.
+    erewrite fold_permutation; [| now firstorder | eassumption ].
+    simpl.
+    replace (f x) with ((fun acc h => acc + f (snd h)) 0 (l, x)); [| reflexivity ].
+    erewrite List_util.fold_left_comm with (f0 := fun acc h => acc + f (snd h)); [| now firstorder ].
+    omega.
+  Qed.
+
+  Lemma size_with_measure_subheap :
     forall A f (H1 H2 : heap A),
       H1 ⊑ H2 ->
       size_with_measure f H1 <= size_with_measure f H2.
+  Proof.
+    intros A f H1 H2 Hsub. unfold size_with_measure.
+    eapply fold_left_subperm; eauto.
+    now firstorder.
+    now firstorder.
+    now firstorder.
+    now firstorder.
+    eapply subheap_Subperm. eassumption.
+  Qed.
 
-  (** Split a heap. Not used. *)
-  
-  Parameter splits : forall {A}, heap A -> heap A -> heap A -> Prop. 
-
-  Parameter splits_spec_Some :
-    forall {A} (H1 H2 H : heap A) (l : loc) (v : A),
-      splits H H1 H2 ->
-      get l H = Some v ->
-      (get l H1 = Some v /\ get l H2 = None) \/
-      (get l H2 = None /\ get l H2 = Some v).
-
-  Parameter splits_spec_None :
-    forall {A} (H1 H2 H : heap A) (l : loc),
-      splits H H1 H2 ->
-      get l H = None ->
-      get l H1 = None /\ get l H2 = None.
-
-Lemma splits_subheap_l {A} (H H1 H2 : heap A) : 
+  Lemma splits_subheap_l {A} (H H1 H2 : heap A) : 
     splits H H1 H2 -> H1 ⊑ H.
   Proof.
     intros Hs l v Hget. destruct (get l H) eqn:Heq'.
@@ -275,4 +392,4 @@ Lemma splits_subheap_l {A} (H H1 H2 : heap A) :
        destruct Heq'; congruence.
   Qed.
 
-End Heap.
+End HeapLemmas.

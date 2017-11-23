@@ -15,10 +15,10 @@ Import ListNotations.
 Open Scope Ensembles_scope.
 
 Module HeapEquiv (H : Heap).
-  
+
   Module Defs := HeapDefs H.
 
-  Import H Defs.
+  Import H Defs.HL Defs.
 
   (** Syntactic approximation of results with fuel *)
   Fixpoint res_approx_fuel (n : nat) (r1 r2 : res) : Prop :=

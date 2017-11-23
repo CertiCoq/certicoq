@@ -47,8 +47,20 @@ Inductive Forall2_asym {A} (R : relation A) : list A -> list A -> Prop :=
 | Forall2_asym_cons :
     forall x y l l', R x y -> Forall2_asym R l l' -> Forall2_asym R (x :: l) (y :: l').
 
-Hint Constructors Forall2_asym.
 
+(** Sublist and subpermutation *)
+
+Inductive Sublist {A : Type} : list A -> list A -> Prop :=
+  | sublist_nil : Sublist [] []
+  | sublist_cons :
+      forall l1 x l2, Sublist l1 l2 -> Sublist l1 (x :: l2)
+  | sublist_skip :
+      forall l1 x l2, Sublist l1 l2 -> Sublist (x :: l1) (x :: l2).
+
+Definition Subperm {A : Type} (l1 l2 : list A) :=
+  exists l2', Sublist l1 l2' /\ Permutation l2' l2. 
+
+Hint Constructors Forall2_asym.
 
 (** Lemmas about [Forall2] and [Forall2_asym] *)
 Lemma Forall2_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
@@ -536,4 +548,162 @@ Lemma max_list_nat_acc_mon {A} (f : A -> nat) l z1 z2  :
 Proof.
   intros. eapply fold_left_monotonic; eauto.
   intros. eapply Nat.max_le_compat_r. eassumption.
+Qed.
+
+(** Lemmas about [incl] *)
+
+Lemma incl_nil {A : Type} (l : list A) :
+  incl l [] -> l = [].
+Proof.
+  intros Hin. destruct l; eauto.
+  specialize (Hin a (or_introl eq_refl)).
+  inv Hin.
+Qed.
+
+Lemma incl_app_cons {A : Type} (x : A) (l1 l2 l3: list A) :
+  incl l1 (l2 ++ x :: l3) ->
+  ~ In x l1 ->
+  incl l1 (l2 ++ l3).
+Proof.
+  intros Hin1 Hnin y Hin. assert (Hin' := Hin). eapply Hin1 in Hin.
+  eapply in_app_or in Hin. inv Hin.
+  + eapply in_or_app. now left.
+  + inv H. contradiction.
+    eapply in_or_app. now right.
+Qed.
+
+
+(** Lemmas about [Permutation] *)
+
+Definition fold_permutation (A B : Type) (l1 l2 : list A) (f : B -> A -> B) acc : 
+  (forall x y z, f (f z y) x = f (f z x) y) ->
+  Permutation l1 l2 ->
+  fold_left f l1 acc = fold_left f l2 acc. 
+Proof.
+  intros Hassoc Hp. revert acc. induction Hp; intros acc.
+  - reflexivity.
+  - simpl. rewrite IHHp. reflexivity.
+  - simpl. rewrite Hassoc. reflexivity.
+  - rewrite IHHp1. eapply IHHp2.
+Qed.
+
+(** Lemmas about [Sublist] *)
+
+Lemma Sublist_nil {A : Type} (l : list A) :
+  Sublist [] l.
+Proof.
+  induction l.
+  - now constructor.
+  - eapply sublist_cons; eauto.
+Qed.
+
+Lemma Sublist_incl {A : Type} (l1 l2 : list A) :
+  Sublist l1 l2 ->
+  incl l1 l2.
+Proof.
+  intros Hsub. induction Hsub; firstorder.
+Qed.
+
+Lemma Sublist_cons_r (A : Type) (l1 l2 : list A) (a : A) :
+  Sublist l1 (a :: l2) ->
+  ~ In a l1 ->
+  Sublist l1 l2.
+Proof.
+  intros Hs Hin. inv Hs. 
+  eassumption. now firstorder.
+Qed.
+
+Lemma fold_left_sublist (A B : Type) (l1 l2 : list A) (f : B -> A -> B)
+      (pleq : B -> B -> Prop) acc : 
+  Reflexive pleq ->
+  (forall x1 x2 y, pleq x1 x2 -> pleq x1 (f x2 y)) ->
+  (forall x1 x2 y, pleq x1 x2 -> pleq (f x1 y) (f x2 y)) ->
+  Sublist l1 l2 ->
+  pleq (fold_left f l1 acc) (fold_left f l2 acc). 
+Proof.
+  intros Hrefl Hincr Hmon Hsub.
+  assert (Hleq : pleq acc acc).
+  { eapply Hrefl. }
+  revert Hleq. generalize acc at 1 3 as acc1.
+  generalize acc as acc2. 
+  induction Hsub; intros acc1 acc2 Hleq.
+  - eassumption.
+  - simpl. eapply IHHsub. eapply Hincr. eassumption.
+  - simpl. eapply IHHsub. eapply Hmon. eassumption.
+Qed.
+
+Lemma Sublist_length {A : Type} (l1 l2 : list A) : 
+  Sublist l1 l2 ->
+  length l1 <= length l2.
+Proof.
+  intros Hsub; induction Hsub; eauto; simpl; omega.
+Qed.
+
+
+(** Lemmas about [Subperm] *)
+
+Lemma Subperm_nil {A : Type} (l : list A) :
+  Subperm [] l.
+Proof.
+  exists l. split.
+  - apply Sublist_nil.
+  - eapply Permutation_refl.
+Qed.
+
+Lemma Subperm_incl {A : Type} (l1 l2 : list A) :
+  Subperm l1 l2 ->
+  incl l1 l2.
+Proof.
+  intros [l3 [Hsub Hperm]].
+  eapply incl_tran.
+  eapply Sublist_incl. eassumption.
+  intros y Hin. eapply Permutation_in; eauto.
+Qed.  
+
+
+Lemma incl_Subperm {A : Type} (l1 l2 : list A) :
+  NoDup l1 ->
+  incl l1 l2 ->
+  Subperm l1 l2.
+Proof.
+  revert l2. induction l1; intros l2 Hnd1 Hincl.
+  - exists l2. split. eapply Sublist_nil. eapply Permutation_refl.
+  - inv Hnd1.
+    assert (Ha : In a l2) by firstorder.
+    assert (Hin : incl l1 l2) by firstorder.
+    assert (Hs := in_split _ _ Ha).
+    destruct Hs as [l2' [l2'' Heq]].
+    subst. eapply incl_app_cons in Hin; [| eassumption ]. 
+    eapply IHl1 in Hin; [| eassumption ]. 
+    destruct Hin as [l3 [Hsub Hperm]].
+    eexists (a :: l3).
+    split.
+    now eapply sublist_skip.
+    eapply perm_trans. eapply perm_skip. eassumption.
+    eapply Permutation_cons_app.
+    eapply Permutation_refl.
+Qed.
+
+Lemma fold_left_subperm (A B : Type) (l1 l2 : list A) (f : B -> A -> B)
+      (pleq : B -> B -> Prop) acc : 
+  preorder B pleq ->
+  (forall x1 x2 y, pleq x1 x2 -> pleq x1 (f x2 y)) ->
+  (forall x1 x2 y, pleq x1 x2 -> pleq (f x1 y) (f x2 y)) ->
+  (forall (x y : A) (z : B), f (f z y) x = f (f z x) y) ->
+  Subperm l1 l2 ->
+  pleq (fold_left f l1 acc) (fold_left f l2 acc). 
+Proof.
+  intros [Hrefl Htra] Hincr Hmon Hassoc [l3 [Hsub Hperm]].
+  eapply Htra.
+  eapply fold_left_sublist; eauto.
+  erewrite fold_permutation; eauto.
+Qed.
+
+Lemma Subperm_length {A : Type} (l1 l2 : list A) : 
+  Subperm l1 l2 ->
+  length l1 <= length l2.
+Proof.
+  intros [l3 [Hsub Hperm]].
+  rewrite <- (Permutation_length Hperm); eauto.
+  eapply Sublist_length; eauto.
 Qed.

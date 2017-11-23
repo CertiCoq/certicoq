@@ -18,7 +18,7 @@ Module SpaceSem (H : Heap).
   
   Context (cloTag : cTag).
 
-  Import H Equiv.Defs Equiv.
+  Import H Equiv.Defs Equiv.Defs.HL Equiv.
 
   (* The cost of evaluating the head *)
   (* TODO make semantics parametric in the cost model *)

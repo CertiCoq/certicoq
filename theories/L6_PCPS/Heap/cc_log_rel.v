@@ -75,10 +75,10 @@ Module CC_log_rel (H : Heap).
         (occurs_free e2) |- (H2, rho2) ⩪ (H2', rho2') ->
         II (H1, rho1, e1) (H2, rho2, e2) ->
         c1 <= k ->
-        big_step_perfect_GC H1' rho1' e1 r1 c1 m1 ->
+        big_step_GC H1' rho1' e1 r1 c1 m1 ->
         not_stuck H1' rho1' e1 ->
         exists (r2 : ans) (c2 m2 : nat),
-          big_step_perfect_GC_cc H2' rho2' e2 r2 c2 m2 /\
+          big_step_GC_cc H2' rho2' e2 r2 c2 m2 /\
           (* extra invariants for costs *)
           P1 (c1, m1) (c2, m2) /\
           cc_approx_val (k - c1) II P2 r1 r2.

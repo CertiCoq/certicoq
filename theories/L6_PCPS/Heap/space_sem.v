@@ -230,6 +230,101 @@ Module SpaceSem (H : Heap).
         (Hsize : size_heap H = m),
         big_step_perfect_GC H rho (Ehalt x) (Res (l, H)) c m.
 
+  (** Deterministic semantics with garbage collection upon function entry.
+    * We will show that it takes asymptotically the same amount of space as perfect garbage collection *)
+  Inductive big_step_GC :
+    heap block -> (* The heap. Maps locations to values *)
+    env -> (* The environment. Maps variables to locations *)
+    exp -> (* The expression to be evaluated *)
+    ans -> (* The final result, which is a pair of a location an a heap *)
+    nat -> (* Upper bound for the number of the evaluation steps  *)
+    nat -> (* The maximum space required for the evaluation *)
+    Prop :=
+  | Eval_oot_gc :
+      forall (H : heap block) (rho : env) (e : exp) (c m : nat)
+        (Hcost : c < cost e) 
+        (Hsize : size_heap H = m),
+        (big_step_GC H rho e OOT c m)
+  | Eval_constr_gc :
+      forall (H H' : heap block) (rho rho' : env) (x : var) (t : cTag)
+        (ys : list var) (e : exp) (vs : list value) (l : loc) (r : ans)
+        (c m : nat)
+        (Hcost :  c >= cost (Econstr x t ys e))
+        (Hget : getlist ys rho = Some vs)
+        (Halloc : alloc (Constr t vs) H = (l, H'))
+                
+        (Hbs : big_step_GC H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
+
+        big_step_GC H rho (Econstr x t ys e) r c m
+  | Eval_proj_gc :
+      forall (H : heap block) (rho : env) (x : var) (t : cTag) (n : N)
+        (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
+        (r : ans) (c m : nat)
+        (Hcost : c >= cost (Eproj x t n y e))
+        (Hgety : M.get y rho = Some (Loc l))
+        (Hgetl : get l H = Some (Constr t vs))
+        (Hnth : nthN vs n = Some v)
+        
+        (Hbs : big_step_GC H (M.set x v rho) e r (c - 1) m),
+        
+        big_step_GC H rho (Eproj x t n y e) r c m
+  | Eval_case_gc :
+      forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
+        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m m' : nat)
+        (Hcost : c >= cost (Ecase y cl))
+        (Hgety : M.get y rho = Some (Loc l))
+        (Hgetl : get l H = Some (Constr t vs))
+        (Htag : findtag cl t = Some e)
+        
+        (Hbs : big_step_GC H rho e r (c - cost (Ecase y cl)) m),
+        
+        big_step_GC H rho (Ecase y cl) r c m
+  | Eval_fun_gc :
+      forall (H H' H'' : heap block) (rho rho_clo rho' : env) (B : fundefs)
+        (env_loc : loc) (e : exp) (r : ans) (c : nat) (m : nat)
+        (Hcost : c >= cost (Efun B e))
+        (* find the closure environment *)
+        (Hres : restrict_env (occurs_free_fundefs B) rho rho_clo)
+        (* allocate the closure environment *)
+        (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
+        (* allocate the closures *)
+        (Hfuns : def_closures B B rho H' env_loc = (H'', rho'))
+        
+        (Hbs : big_step_GC H'' rho' e r (c - cost (Efun B e)) m),
+
+        big_step_GC H rho (Efun B e) r c m
+    
+  | Eval_app_gc :
+      forall (H H' H'' : heap block) (rho rho_clo rho_clo1 rho_clo2 : env) (B : fundefs)
+        (f f' : var) (t : cTag) (xs : list var) (e : exp) (l env_loc: loc)
+        (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
+        (Hcost : c >= cost (Eapp f t ys))
+        (Hgetf : M.get f rho = Some (Loc l))
+        (* Look up the closure *)
+        (Hgetl : get l H = Some (Clos (FunPtr B f') (Loc env_loc)))
+        (* Look up the closure environment *)
+        (Hget_env : get env_loc H = Some (Env rho_clo))
+        (* Find the code *)
+        (Hfind : find_def f' B = Some (t, xs, e))
+        (* Look up the actual parameters *)
+        (Hargs : getlist ys rho = Some vs)
+        (* Allocate mutually defined closures *)
+        (Hredef : def_closures B B rho_clo H env_loc = (H', rho_clo1))
+        (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
+        
+        (* collect H' *)
+        (Hgc : live ((env_locs rho_clo2) (occurs_free e)) H' H'')
+        (Hsize : size_heap H' = m')
+        
+        (Hbs : big_step_GC H'' rho_clo2 e r (c - cost (Eapp f t ys)) m),
+        big_step_GC H rho (Eapp f t ys) r c (max m m')
+  | Eval_halt_gc :
+      forall H rho x l c m
+        (Hcost : c >= cost (Ehalt x))
+        (Hget : M.get x rho = Some l)
+        (Hsize : size_heap H = m),
+        big_step_GC H rho (Ehalt x) (Res (l, H)) c m.
+
 
   Fixpoint def_funs (B B0 : fundefs) rho :=
     match B with
@@ -240,7 +335,7 @@ Module SpaceSem (H : Heap).
 
   (** Deterministic semantics with perfect garbage collection, for closure converted code
    * The execution time cost model does not account for the cost of GC  *)
-  Inductive big_step_perfect_GC_cc :
+  Inductive big_step_GC_cc :
     heap block -> (* The heap. Maps locations to values *)
     env -> (* The environment. Maps variables to locations *)
     exp -> (* The expression to be evaluated *)
@@ -252,66 +347,52 @@ Module SpaceSem (H : Heap).
       forall (H : heap block) (rho : env) (e : exp) (c m : nat)
         (Hcost : c < cost e) 
         (Hsize : size_heap H = m),
-        (big_step_perfect_GC_cc H rho e OOT c m)
+        (big_step_GC_cc H rho e OOT c m)
   | Eval_constr_per_cc :
-      forall (H H' H'' : heap block) (rho rho' : env) (x : var) (t : cTag)
+      forall (H H' : heap block) (rho rho' : env) (x : var) (t : cTag)
         (ys :list var) (e : exp) (vs : list value) (l : loc) (r : ans)
-        (c m m' : nat)
+        (c m : nat)
         (Hcost :  c >= cost (Econstr x t ys e))
         (Hget : getlist ys rho = Some vs)
         (Halloc : alloc (Constr t vs) H = (l, H'))
-        
-        (* collect H' *)
-        (Hgc : live (env_locs (M.set x (Loc l) rho) (occurs_free e)) H' H'')
-        (Hsize : size_heap H' = m')
-        
-        (Hbs : big_step_perfect_GC_cc H'' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
+              
+        (Hbs : big_step_GC_cc H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
 
-        big_step_perfect_GC_cc H rho (Econstr x t ys e) r c (max m m')
+        big_step_GC_cc H rho (Econstr x t ys e) r c m
   | Eval_proj_per_cc :
-      forall (H H' : heap block) (rho : env) (x : var) (t : cTag) (n : N)
+      forall (H : heap block) (rho : env) (x : var) (t : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
-        (r : ans) (c m m' : nat)
+        (r : ans) (c m : nat)
         (Hcost : c >= cost (Eproj x t n y e))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
         (Hnth : nthN vs n = Some v)
 
-        (* collect H *)
-        (Hgc : live (env_locs (M.set x v rho) (occurs_free e)) H H')
-        (Hsize : size_heap H = m')
-
-        (Hbs : big_step_perfect_GC_cc H' (M.set x v rho) e r (c - 1) m),
+        (Hbs : big_step_GC_cc H (M.set x v rho) e r (c - 1) m),
         
-        big_step_perfect_GC_cc H rho (Eproj x t n y e) r c (max m m')
+        big_step_GC_cc H rho (Eproj x t n y e) r c m
   | Eval_case_per_cc :
       forall (H H' : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
-        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m m' : nat)
+        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
         (Hcost : c >= cost (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
         (Htag : findtag cl t = Some e)
 
-        (* collect H *)
-        (Hgc : live ((env_locs rho) (occurs_free e)) H H')
-        (Hsize : size_heap H = m')
 
-        (Hbs : big_step_perfect_GC_cc H' rho e r (c - cost (Ecase y cl)) m),
+        (Hbs : big_step_GC_cc H' rho e r (c - cost (Ecase y cl)) m),
         
-        big_step_perfect_GC_cc H rho (Ecase y cl) r c (max m m')
+        big_step_GC_cc H rho (Ecase y cl) r c m
   | Eval_fun_per_cc :
-      forall (H H' H'' H''': heap block) (rho rho_clo rho' : env) (B : fundefs)
+      forall (H : heap block) (rho rho_clo rho' : env) (B : fundefs)
         (env_loc : loc) (ct : cTag) (e : exp) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost (Efun B e))
         (* add the functions in the environment *)
         (Hfuns : def_funs B B rho = rho')
-
-        (* collect H'' *)
-        (Hgc : live (env_locs rho' (occurs_free e)) H H')
-        (Hsize : size_heap H = m')
-
-        (Hbs : big_step_perfect_GC_cc H' rho' e r (c - cost (Efun B e)) m),
-        big_step_perfect_GC_cc H rho (Efun B e) r c (max m m')
+        
+        (Hbs : big_step_GC_cc H rho' e r (c - cost (Efun B e)) m),
+        
+        big_step_GC_cc H rho (Efun B e) r c m
   | Eval_app_per_cc :
       forall (H H' H'' : heap block) (rho rho_clo rho_clo1 rho_clo2 : env) (B : fundefs)
         (f f' : var) (ct : cTag) (xs : list var) (e : exp) (l env_loc: loc)
@@ -328,14 +409,14 @@ Module SpaceSem (H : Heap).
         (Hgc : live ((env_locs rho_clo) (occurs_free e)) H H')
         (Hsize : size_heap H = m')
         
-        (Hbs : big_step_perfect_GC_cc H' rho_clo e r (c - cost (Eapp f ct ys)) m),
-        big_step_perfect_GC_cc H rho (Eapp f ct ys) r c (max m m')
+        (Hbs : big_step_GC_cc H' rho_clo e r (c - cost (Eapp f ct ys)) m),
+        big_step_GC_cc H rho (Eapp f ct ys) r c (max m m')
   | Eval_halt_per_cc :
       forall H rho x l c m
         (Hcost : c >= cost (Ehalt x))
         (Hget : M.get x rho = Some l)
         (Hsize : size_heap H = m),
-        big_step_perfect_GC_cc H rho (Ehalt x) (Res (l, H)) c m.
+        big_step_GC_cc H rho (Ehalt x) (Res (l, H)) c m.
   
   (** Deterministic semantics with garbage collection when needed.
    * The execution time cost model accounts for the cost of GC  *)

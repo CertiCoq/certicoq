@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From L6 Require Import cps cps_util eval List_util Ensembles_util functions
-        identifiers Heap.heap tactics.
+        identifiers Heap.heap tactics set_util.
 Require Import compcert.lib.Coqlib.
 Import ListNotations.
 
@@ -148,9 +148,13 @@ Module HeapDefs (H : Heap) .
   Definition sub_map {A : Type} (map1 map2 : M.t A) :=
     forall x v, M.get x map1 = Some v ->
            M.get x map2 = Some v.
+
+  Definition restrict_env (s : PS.t) (rho : env) : env :=
+    M.fold
+      (fun rho' x v => if PS.mem x s then M.set x v rho' else rho') rho (M.empty _).
   
   (** [rho'] is the restriction of [rho] in [S] *)
-  Definition restrict_env (S : Ensemble var) (rho rho' : env) : Prop :=
+  Definition Restrict_env (S : Ensemble var) (rho rho' : env) : Prop :=
     (forall x, x \in S -> M.get x rho = M.get x rho') /\
     sub_map rho' rho /\ key_set rho' \subset S.
   
@@ -843,7 +847,7 @@ Module HeapDefs (H : Heap) .
   Qed.
 
   Lemma restrict_env_env_locs rho rho' S :
-    restrict_env S rho rho' ->
+    Restrict_env S rho rho' ->
     env_locs rho' (Full_set _) \subset env_locs rho S. 
   Proof.
     intros [H1 [H2 H3]] l [x [_ H]].

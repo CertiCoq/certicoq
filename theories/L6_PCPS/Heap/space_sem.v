@@ -20,8 +20,7 @@ Module SpaceSem (H : Heap).
 
   Import H Equiv.Defs Equiv.Defs.HL Equiv.
 
-  (* The cost of evaluating the head *)
-  (* TODO make semantics parametric in the cost model *)
+  (* The cost of evaluating the head constructor before CC *)
   Definition cost (e : exp) : nat :=
     match e with
       | Econstr x t ys e => 1 + length ys
@@ -33,7 +32,19 @@ Module SpaceSem (H : Heap).
       | Ehalt x => 1
     end.
 
-   
+  (* The cost of evaluating the head constructor after CC *)
+  Definition costCC (e : exp) : nat :=
+    match e with
+      | Econstr x t ys e => 1 + length ys
+      | Ecase y cl => 1 
+      | Eproj x t n y e => 1
+      | Efun B e => 1
+      | Eapp f t ys => 1 + length ys
+      | Eprim x p ys e => 1 + length ys
+      | Ehalt x => 1
+    end.
+  
+  
   (** Non-deterministic semantics with garbage collection *)
   Inductive big_step :
     heap block -> (* The heap. Maps locations to values *)
@@ -79,7 +90,7 @@ Module SpaceSem (H : Heap).
         (env_loc : loc) (e : exp) (r : ans) (c : nat) (m : nat)
         (Hcost : c >= cost (Efun B e))
         (* find the closure environment *)
-        (Hres : restrict_env (occurs_free_fundefs B) rho rho_clo)
+        (Hres : Restrict_env (occurs_free_fundefs B) rho rho_clo)
         (* allocate the closure environment *)
         (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)
@@ -186,7 +197,7 @@ Module SpaceSem (H : Heap).
         (env_loc : loc) (e : exp) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost (Efun B e))
         (* find the closure environment *)
-        (Hres : restrict_env (occurs_free_fundefs B) rho rho_clo)
+        (Hres : restrict_env (fundefs_fv B) rho = rho_clo)
         (* allocate the closure environment *)
         (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)
@@ -270,7 +281,7 @@ Module SpaceSem (H : Heap).
         big_step_GC H rho (Eproj x t n y e) r c m
   | Eval_case_gc :
       forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
-        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m m' : nat)
+        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
         (Hcost : c >= cost (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
@@ -284,7 +295,7 @@ Module SpaceSem (H : Heap).
         (env_loc : loc) (e : exp) (r : ans) (c : nat) (m : nat)
         (Hcost : c >= cost (Efun B e))
         (* find the closure environment *)
-        (Hres : restrict_env (occurs_free_fundefs B) rho rho_clo)
+        (Hres : restrict_env (fundefs_fv B) rho = rho_clo)
         (* allocate the closure environment *)
         (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)
@@ -345,25 +356,25 @@ Module SpaceSem (H : Heap).
     Prop :=
   | Eval_oot_per_cc :
       forall (H : heap block) (rho : env) (e : exp) (c m : nat)
-        (Hcost : c < cost e) 
+        (Hcost : c < costCC e) 
         (Hsize : size_heap H = m),
         (big_step_GC_cc H rho e OOT c m)
   | Eval_constr_per_cc :
-      forall (H H' : heap block) (rho rho' : env) (x : var) (t : cTag)
+      forall (H H' : heap block) (rho : env) (x : var) (t : cTag)
         (ys :list var) (e : exp) (vs : list value) (l : loc) (r : ans)
         (c m : nat)
-        (Hcost :  c >= cost (Econstr x t ys e))
+        (Hcost :  c >= costCC (Econstr x t ys e))
         (Hget : getlist ys rho = Some vs)
         (Halloc : alloc (Constr t vs) H = (l, H'))
               
-        (Hbs : big_step_GC_cc H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
+        (Hbs : big_step_GC_cc H' (M.set x (Loc l) rho) e r (c - costCC (Econstr x t ys e)) m),
 
         big_step_GC_cc H rho (Econstr x t ys e) r c m
   | Eval_proj_per_cc :
       forall (H : heap block) (rho : env) (x : var) (t : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
-        (Hcost : c >= cost (Eproj x t n y e))
+        (Hcost : c >= costCC (Eproj x t n y e))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
         (Hnth : nthN vs n = Some v)
@@ -374,30 +385,30 @@ Module SpaceSem (H : Heap).
   | Eval_case_per_cc :
       forall (H H' : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
         (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
-        (Hcost : c >= cost (Ecase y cl))
+        (Hcost : c >= costCC (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
         (Htag : findtag cl t = Some e)
 
 
-        (Hbs : big_step_GC_cc H' rho e r (c - cost (Ecase y cl)) m),
+        (Hbs : big_step_GC_cc H' rho e r (c - costCC (Ecase y cl)) m),
         
         big_step_GC_cc H rho (Ecase y cl) r c m
   | Eval_fun_per_cc :
-      forall (H : heap block) (rho rho_clo rho' : env) (B : fundefs)
-        (env_loc : loc) (ct : cTag) (e : exp) (r : ans) (c : nat) (m m' : nat)
-        (Hcost : c >= cost (Efun B e))
+      forall (H : heap block) (rho rho' : env) (B : fundefs)
+        (e : exp) (r : ans) (c : nat) (m : nat)
+        (Hcost : c >= costCC (Efun B e))
         (* add the functions in the environment *)
         (Hfuns : def_funs B B rho = rho')
         
-        (Hbs : big_step_GC_cc H rho' e r (c - cost (Efun B e)) m),
+        (Hbs : big_step_GC_cc H rho' e r (c - costCC (Efun B e)) m),
         
         big_step_GC_cc H rho (Efun B e) r c m
   | Eval_app_per_cc :
-      forall (H H' H'' : heap block) (rho rho_clo rho_clo1 rho_clo2 : env) (B : fundefs)
-        (f f' : var) (ct : cTag) (xs : list var) (e : exp) (l env_loc: loc)
+      forall (H H' : heap block) (rho rho_clo : env) (B : fundefs)
+        (f f' : var) (ct : cTag) (xs : list var) (e : exp)
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
-        (Hcost : c >= cost (Eapp f ct ys))
+        (Hcost : c >= costCC (Eapp f ct ys))
         (Hgetf : M.get f rho = Some (FunPtr B f'))
         (* Find the code *)
         (Hfind : find_def f' B = Some (ct, xs, e))
@@ -409,11 +420,11 @@ Module SpaceSem (H : Heap).
         (Hgc : live ((env_locs rho_clo) (occurs_free e)) H H')
         (Hsize : size_heap H = m')
         
-        (Hbs : big_step_GC_cc H' rho_clo e r (c - cost (Eapp f ct ys)) m),
+        (Hbs : big_step_GC_cc H' rho_clo e r (c - costCC (Eapp f ct ys)) m),
         big_step_GC_cc H rho (Eapp f ct ys) r c (max m m')
   | Eval_halt_per_cc :
       forall H rho x l c m
-        (Hcost : c >= cost (Ehalt x))
+        (Hcost : c >= costCC (Ehalt x))
         (Hget : M.get x rho = Some l)
         (Hsize : size_heap H = m),
         big_step_GC_cc H rho (Ehalt x) (Res (l, H)) c m.
@@ -474,7 +485,7 @@ Module SpaceSem (H : Heap).
         (* No GC is needed *)
         (Hheap : size_heap H < Hmax)
         (* find the closure environment *)
-        (Hres : restrict_env (occurs_free_fundefs B) rho rho_clo)
+        (Hres : restrict_env (fundefs_fv B) rho = rho_clo)
         (* allocate the closure environment *)
         (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)

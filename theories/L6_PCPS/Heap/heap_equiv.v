@@ -1653,8 +1653,8 @@ Module HeapEquiv (H : Heap).
   Lemma heap_env_approx_restrict_env S S' H1 H2 rho1 rho1' rho2 rho2' :
     heap_env_approx S (H1, rho1) (H2, rho2) ->
     S' \subset S ->
-    restrict_env S' rho1 rho1' ->
-    restrict_env S' rho2 rho2' ->
+    Restrict_env S' rho1 rho1' ->
+    Restrict_env S' rho2 rho2' ->
     heap_env_approx (Full_set _) (H1, rho1') (H2, rho2').
   Proof. 
     intros Ha Hsub [Heq1 [Hsub1 Hk1]] [Heq2 [Hsub2 Hk2]] x l Hin Hget.
@@ -1669,8 +1669,8 @@ Module HeapEquiv (H : Heap).
   Corollary heap_env_equiv_restrict_env S S' H1 H2 rho1 rho1' rho2 rho2' :
     S |- (H1, rho1) ⩪ (H2, rho2) ->
     S' \subset S ->
-    restrict_env S' rho1 rho1' ->
-    restrict_env S' rho2 rho2' ->
+    Restrict_env S' rho1 rho1' ->
+    Restrict_env S' rho2 rho2' ->
     Full_set var |- (H1, rho1') ⩪ (H2, rho2').
   Proof.
     intros [? ?] ? ? ?.

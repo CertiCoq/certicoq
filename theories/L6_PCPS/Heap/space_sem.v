@@ -267,13 +267,13 @@ Module SpaceSem (H : Heap).
         (Hbs : big_step_GC H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
 
         big_step_GC H rho (Econstr x t ys e) r c m
-  | Eval_proj_gc :
-      forall (H : heap block) (rho : env) (x : var) (t : cTag) (n : N)
+  | Eval_proj_gc : (* XXX Tag annotation in projections is redundant in this semantics *)
+      forall (H : heap block) (rho : env) (x : var) (t t' : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
         (Hcost : c >= cost (Eproj x t n y e))
         (Hgety : M.get y rho = Some (Loc l))
-        (Hgetl : get l H = Some (Constr t vs))
+        (Hgetl : get l H = Some (Constr t' vs))
         (Hnth : nthN vs n = Some v)
         
         (Hbs : big_step_GC H (M.set x v rho) e r (c - 1) m),
@@ -370,13 +370,13 @@ Module SpaceSem (H : Heap).
         (Hbs : big_step_GC_cc H' (M.set x (Loc l) rho) e r (c - costCC (Econstr x t ys e)) m),
 
         big_step_GC_cc H rho (Econstr x t ys e) r c m
-  | Eval_proj_per_cc :
-      forall (H : heap block) (rho : env) (x : var) (t : cTag) (n : N)
+  | Eval_proj_per_cc : (* XXX Tag annotation in projections is redundant in this semantics *)
+      forall (H : heap block) (rho : env) (x : var) (t t' : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
         (Hcost : c >= costCC (Eproj x t n y e))
         (Hgety : M.get y rho = Some (Loc l))
-        (Hgetl : get l H = Some (Constr t vs))
+        (Hgetl : get l H = Some (Constr t' vs))
         (Hnth : nthN vs n = Some v)
 
         (Hbs : big_step_GC_cc H (M.set x v rho) e r (c - 1) m),

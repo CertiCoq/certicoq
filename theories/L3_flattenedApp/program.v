@@ -467,7 +467,10 @@ Lemma CrctDs_invrt:
 Proof.
   intros. functional induction (dnthBody m dts).
   - discriminate.
-  - myInjection H. apply (pre_CrctDs_invrt _ e H0).
+  - myInjection H. inversion_Clear H0; try assumption.
+  - inversion_Clear H0.
+    + inversion H.
+    + intuition.
 Qed.
 
 Lemma CrctBs_invrt:
@@ -694,7 +697,10 @@ Lemma dnthBody_pres_Crct:
 Proof.
   intros m dts fs.
   functional induction (dnthBody m dts); intros; try discriminate.
-  - myInjection H. apply (dnth_crctDs_crctTerm _ e H0). 
+  - myInjection H. inversion_Clear H0; try assumption.
+  - inversion_Clear H0.
+    + inversion H.
+    + intuition. 
 Qed.
 
 Lemma whFixStep_pres_Crct:

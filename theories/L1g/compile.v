@@ -238,6 +238,16 @@ Fixpoint
       end
   end.
 
+(** syntactic control of "TApp": no nested apps, app must have an argument **)
+Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
+  match t with
+    | TApp fn b bs => TApp fn b (tappend bs args)
+    | fn => match args with
+              | tnil => fn
+              | tcons c cs => TApp fn c cs
+            end
+  end.
+
 (** translate Gregory Malecha's [term] into my [Term] **)
 Section datatypeEnv_sec.
   Variable datatypeEnv : environ Term.
@@ -284,9 +294,7 @@ Function term_Term (t:term) : Term :=
     | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))
     | tLetIn nm dfn ty bod =>
       (TLetIn nm (term_Term dfn) (term_Term ty) (term_Term bod))
-    | tApp fn nil => TWrong "term_Term:App no arg"
-    | tApp fn (cons u us) => TApp (term_Term fn) (term_Term u)
-                                  (terms_Terms term_Term us)
+    | tApp fn us => mkApp (term_Term fn) (terms_Terms term_Term us)
     | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
       match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
       | Some (ecTyp _ _ _) =>

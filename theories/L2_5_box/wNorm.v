@@ -29,18 +29,13 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNCase: forall i mch brs,
-            WNorm mch -> ~ isCanonical mch ->
-            WNorm (TCase i mch brs)
+    WNorm mch -> ~ isCanonical mch ->
+    WNorm (TCase i mch brs)
 | WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
-| WNApp: forall fn t ts,
-           WNorm fn -> WNorm t -> WNorms ts ->
-           ~ isLambda fn -> ~ isFix fn -> ~ isApp fn ->
-           WNorm (TApp fn t ts)
-| WNAppFix: forall ds m t ts x ix,
-              WNorms (tcons t ts) ->
-              dnthBody m ds = Some (x, ix) ->
-              ix > tlength ts ->  (* too few args to see rec arg *)
-              WNorm (TApp (TFix ds m) t ts)
+| WNApp: forall fn t,
+    WNorm fn -> ~ isLambda fn -> ~ isFix fn -> WNorm t ->
+    WNorm (TApp fn t)
+| WNDummy: forall str, WNorm (TDummy str)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).

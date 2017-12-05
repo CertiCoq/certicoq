@@ -22,32 +22,33 @@ Set Implicit Arguments.
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProof: WcbvEval p TProof TProof
-| waPrf: forall fn arg arg' args args',
-    WcbvEval p fn TProof ->
-    WcbvEval p arg arg' ->
-    WcbvEvals p args args' ->
-    WcbvEval p (TApp fn arg args) TProof
+| waPrf: forall fn arg,
+    WcbvEval p fn TProof -> WcbvEval p (TApp fn arg) TProof
 | wConstruct: forall i r args args',
     WcbvEvals p args args' ->
     WcbvEval p (TConstruct i r args) (TConstruct i r args')
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
+| wDummy: forall str, WcbvEval p (TDummy str) (TDummy str)
 | wConst: forall nm (t s:Term),
-    lookupDfn nm p = Ret t -> WcbvEval p t s ->
-    WcbvEval p (TConst nm) s
-| wAppLam: forall (fn bod a1 a1' s:Term) (args:Terms) (nm:name),
+    lookupDfn nm p = Ret t -> WcbvEval p t s -> WcbvEval p (TConst nm) s
+| wAppLam: forall (fn bod a1 a1' s:Term) (nm:name),
     WcbvEval p fn (TLambda nm bod) ->
     WcbvEval p a1 a1' ->
-    WcbvEval p (whBetaStep bod a1' args) s ->
-    WcbvEval p (TApp fn a1 args) s
+    WcbvEval p (whBetaStep bod a1') s ->
+    WcbvEval p (TApp fn a1) s
 | wLetIn: forall (nm:name) (dfn bod dfn' s:Term),
     WcbvEval p dfn dfn' ->
     WcbvEval p (instantiate dfn' 0 bod) s ->
     WcbvEval p (TLetIn nm dfn bod) s
-| wAppFix: forall dts m (fn arg s x:Term) (args:Terms) (ix:nat),
+| wAppFix: forall dts m (fn arg s x:Term),
     WcbvEval p fn (TFix dts m) ->
-    dnthBody m dts = Some (x, ix) ->
-    WcbvEval p (pre_whFixStep x dts (tcons arg args)) s ->
-    WcbvEval p (TApp fn arg args) s 
+    dnthBody m dts = Some x ->
+    WcbvEval p (pre_whFixStep x dts arg) s ->
+    WcbvEval p (TApp fn arg) s 
+| wAppCong: forall fn fn' arg arg', 
+    WcbvEval p fn fn' -> (isApp fn' \/ isDummy fn') ->
+    WcbvEval p arg arg' ->
+    WcbvEval p (TApp fn arg) (TApp fn' arg') 
 | wCase: forall mch i n args brs cs s,
     WcbvEval p mch (TConstruct i n args) ->
     whCaseStep n args brs = Some cs ->
@@ -64,8 +65,8 @@ Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
 Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
 
 (** evaluate omega = (\x.xx)(\x.xx): nontermination **)
-Definition xx := (TLambda nAnon (TApp (TRel 0) (TRel 0) tnil)).
-Definition xxxx := (TApp xx xx tnil).
+Definition xx := (TLambda nAnon (TApp (TRel 0) (TRel 0))).
+Definition xxxx := (TApp xx xx).
 Goal WcbvEval nil xxxx xxxx.
 unfold xxxx, xx.
 eapply wAppLam. eapply wLam. 
@@ -79,7 +80,6 @@ Lemma WcbvEval_mkApp_nil:
                  WcbvEval p (mkApp t tnil) s.
 Proof.
   intros p. induction 1; simpl; intros; try assumption.
-  - rewrite tappend_tnil. assumption.
 Qed.
 
 Lemma WcbvEvals_tcons_tcons:
@@ -113,7 +113,6 @@ Proof.
   apply WcbvEvalEvals_ind; intros; try assumption;
   try (solve[inversion_Clear H0; intuition]);
   try (solve[inversion_Clear H1; intuition]).
-  - constructor.
   - apply H. unfold lookupDfn in e. case_eq (lookup nm p); intros xc.
     + intros k. assert (j:= lookup_pres_WFapp hp _ k).
       rewrite k in e. destruct xc. 
@@ -121,14 +120,12 @@ Proof.
       * discriminate.
     + rewrite xc in e. discriminate.
   - inversion_clear H2. apply H1.
-    specialize (H H4). inversion_Clear H.
+    specialize (H H3). inversion_Clear H.
     apply (whBetaStep_pres_WFapp); intuition. 
   - inversion_Clear H1. apply H0. apply instantiate_pres_WFapp; intuition.
-  - inversion_clear H1. specialize (H H3). inversion_Clear H.
-    assert (j: WFapps (tcons arg args)).
-    { constructor; assumption. }
+  - inversion_clear H1. specialize (H H2). inversion_Clear H.
     apply H0. apply pre_whFixStep_pres_WFapp; try eassumption; intuition.
-    + eapply dnthBody_pres_WFapp; try eassumption.
+    eapply dnthBody_pres_WFapp; eassumption.
   - apply H0. inversion_Clear H1.
     eapply whCaseStep_pres_WFapp; try eassumption.
     specialize (H H4). inversion_Clear H. assumption.
@@ -142,10 +139,6 @@ Lemma WcbvEval_weaken:
                    WcbvEvals ((nm,ec)::p) ts ss).
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
-  - eapply waPrf.
-    + apply H. assumption.
-    + apply H0. assumption.
-    + apply H1. assumption.
   - destruct (string_dec nm nm0).
     + subst. 
       * unfold lookupDfn in e.
@@ -163,41 +156,96 @@ Proof.
   - eapply wCase; intuition; eassumption.
 Qed.
 
-Definition ii := TLambda nAnon (TRel 0).
-Goal
-  WcbvEval nil (TApp ii ii (tcons ii (tunit ii))) ii.
-Proof.
-  eapply wAppLam.
-  - unfold ii. eapply wLam.
-  - unfold ii. eapply wLam.
-  - cbn. eapply wAppLam.
-    + eapply wLam.
-    + unfold ii. eapply wLam.
-    + cbn. eapply wAppLam.
-      * eapply wLam.
-      * unfold ii. eapply wLam.
-      * cbn. eapply wLam.
-Qed.
-
-      
-(*****
-Lemma WcbvEval_no_further:
+Lemma pre_WcbvEval_single_valued:
   forall p,
-  (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
-  (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss).
+  (forall t s, WcbvEval p t s -> forall u, WcbvEval p t u -> s = u) /\
+  (forall t s, WcbvEvals p t s -> forall u, WcbvEvals p t u -> s = u).
 Proof.
   intros p.
-  apply WcbvEvalEvals_ind; cbn; intros; auto.
-  destruct (WcbvEvals_tcons_tcons w0) as [x0 [x1 jx]]. subst.
-  rewrite mkApp_goodFn.
-  destruct (WcbvEvals_tcons_tcons w0) as [x0 [x1 jx]]. subst.
-  destruct (mkApp_isApp_lem fn' x0 x1) as [y0 [y1 [y2 jy]]].
-  destruct jy. rewrite H1. destruct H2.
-  - destruct H2 as [z0 [z1 [z2 z3]]]. subst. cbn.
-
-  econstructor.
+  apply WcbvEvalEvals_ind; intros; try (inversion_Clear H; reflexivity).
+  - inversion_Clear H0.
+    + reflexivity.
+    + specialize (H _ H3). discriminate.
+    + specialize (H _ H3). discriminate.
+    + destruct H4.
+      * destruct H0 as [x0 [x1 jx]]. subst. specialize (H _ H3).
+        discriminate.
+      * destruct H0 as [x0 jx]. subst. specialize (H _ H3).
+        discriminate.
+  - inversion_Clear H0. apply f_equal3; try reflexivity.
+    eapply H. assumption.
+  - inversion_Clear H0. rewrite H2 in e. myInjection e.
+    eapply H. assumption.
+  - inversion_Clear H2.
+    + specialize (H _ H6). discriminate.
+    + specialize (H _ H5). myInjection H.
+      specialize (H0 _ H6). subst.
+      eapply H1. assumption.
+    + specialize (H _ H5). discriminate.
+    + specialize (H _ H5). specialize (H0 _ H8). subst. destruct H6.
+      * destruct H as [x0 [x1 jx]]. discriminate.
+      * destruct H as [x0 jx]. discriminate.
+  - inversion_Clear H1. specialize (H _ H6). subst.
+    eapply H0. assumption.
+  - inversion_Clear H1.
+    + specialize (H _ H5). discriminate.
+    + specialize (H _ H4). discriminate. 
+    + specialize (H _ H4). myInjection H. rewrite H5 in e. myInjection e.
+      intuition.
+    + specialize (H _ H4). subst. destruct H5.
+      * destruct H as [x0 [x1 jx]]. discriminate.
+      * destruct H as [x0 jx]. discriminate.
+  - inversion_Clear H1.
+    + specialize (H _ H5). subst. destruct o.
+      * destruct H as [x0 [x1 jx]]. discriminate.
+      * destruct H as [x0 jx]. discriminate.
+    + specialize (H _ H4). subst. destruct o.
+      * destruct H as [x0 [x1 jx]]. discriminate.
+      * destruct H as [x0 jx]. discriminate.
+    + specialize (H _ H4). subst. destruct o.
+      * destruct H as [x0 [x1 jx]]. discriminate.
+      * destruct H as [x0 jx]. discriminate.
+    + specialize (H _ H4). specialize (H0 _ H7). subst. reflexivity.
+  - inversion_Clear H1.
+    + specialize (H _ H5). myInjection H. rewrite H7 in e.
+      myInjection e. intuition. 
+  - inversion_Clear H1. specialize (H _ H4). specialize (H0 _ H6). subst.
+    reflexivity.
 Qed.
-*****)
+
+Lemma WcbvEval_single_valued:
+  forall p t s, WcbvEval p t s -> forall u, WcbvEval p t u -> s = u.
+Proof.
+  intros. eapply (proj1 (pre_WcbvEval_single_valued p)); eassumption.
+Qed.
+
+Lemma sv_cor:
+  forall p fn fn' t s,
+    WcbvEval p fn t -> WcbvEval p fn' t -> WcbvEval p fn s -> WcbvEval p fn' s.
+Proof.
+  intros. rewrite <- (WcbvEval_single_valued H H1). assumption.
+Qed.
+  
+Lemma WcbvEval_no_further:
+  forall p,
+    (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
+    (forall t s, WcbvEvals p t s -> WcbvEvals p s s).
+Proof.
+  intros p; apply WcbvEvalEvals_ind; intros; auto.
+Qed.
+
+Lemma WcbvEval_trn:
+  forall p s t,
+    WcbvEval p s t ->
+    forall u,
+      WcbvEval p t u -> WcbvEval p s u.
+Proof.
+  intros.
+  pose proof (proj1 (WcbvEval_no_further p) _ _ H) as j0.
+  rewrite (WcbvEval_single_valued H0 j0).
+  assumption.
+Qed.
+
 
 Section wcbvEval_sec.
 Variable p:environ Term.
@@ -216,23 +264,25 @@ Function wcbvEval
         raise ("wcbvEval, TConst ecTyp " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
-    | TApp fn a1 args =>
+    | TApp fn a1 =>
       match wcbvEval n fn with
       | Ret (TLambda _ bod) =>
         match wcbvEval n a1 with
         | Exc s =>  raise ("wcbvEval, TAppLam, arg: " ++ s)
-        | Ret b1 => wcbvEval n (whBetaStep bod b1 args)
+        | Ret b1 => wcbvEval n (whBetaStep bod b1)
         end
       | Ret (TFix dts m) =>           (* Fix redex *)
         match dnthBody m dts with
         | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
-        | Some (x, ix) => wcbvEval n (pre_whFixStep x dts (tcons a1 args))
+        | Some x => wcbvEval n (pre_whFixStep x dts a1)
         end
-      | Ret TProof =>   (* proof redex *)
-        match wcbvEval n a1, wcbvEvals n args with
-        | Ret _, Ret _ => Ret TProof
-        | _, _ =>  raise ("wcbvEval TApp: Proof, args don't eval")
+      | Ret ((TApp _ _) as u)
+      | Ret ((TDummy _) as u) =>
+        match wcbvEval n a1 with
+            | Ret ea1 => ret (TApp u ea1)
+            | Exc s => raise ("(wcbvEval;TAppCong: " ++ s ++ ")")
         end
+      | Ret TProof => Ret TProof  (* proof redex *)
       | _ => raise "wcbvEval, TApp: fn"
       end
    | TCase ml mch brs =>
@@ -259,6 +309,7 @@ Function wcbvEval
       | Exc s => raise ("wcbvEval: TConstruct, args: " ++ s)
       end
     (** already in whnf ***)
+    | TDummy str => ret (TDummy str)
     | TLambda nn t => ret (TLambda nn t)
     | TFix mfp br => ret (TFix mfp br)
     | TProof => ret TProof
@@ -304,8 +355,6 @@ Proof.
     eapply wAppLam; eassumption.
   - specialize (H0 _ p1). specialize (H _ e1).
     eapply wAppFix; try eassumption.
-  - specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ e3).
-    eapply waPrf; eassumption.
   - eapply wCase; try eassumption.
     + apply H. rewrite <- _x. apply e1. 
     + apply H0; eassumption. 
@@ -335,19 +384,10 @@ Proof.
   assert (j:forall m, m > 0 -> m = S (m - 1)).
   { induction m; intuition. }
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
-  - destruct H, H0, H1. exists (S (max x (max x0 x1))). intros m h.
-    assert (j1:= max_fst x (max x0 x1)). 
-    assert (lx: m > x). omega.
-    assert (j2:= max_snd x (max x0 x1)).
-    assert (j3:= max_fst x0 x1).
-    assert (lx0: m > x0). omega.
-    assert (j4:= max_snd x0 x1).
-    assert (j5:= max_fst x0 x1).
-    assert (lx1: m > x1). omega.
-    simpl. rewrite (j m). rewrite H. rewrite H0. rewrite H1. reflexivity.
-    omega. omega. omega. omega.
   - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
     + rewrite (H (m - 1)); try omega. reflexivity.
+  - destruct H. exists (S x). intros m h. simpl.
+    rewrite (j m); try omega. rewrite H; try omega. reflexivity.
   - destruct H. exists (S x). intros mm h. simpl.
     rewrite (j mm); try omega.
     unfold lookupDfn in e. destruct (lookup nm p). destruct e0. myInjection e.
@@ -383,6 +423,14 @@ Proof.
     rewrite e. rewrite H0; try omega. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    cbn. rewrite (j mx); try omega. rewrite H; try omega.
+    destruct o.
+    + destruct H1 as [y0 [y1 jy]]. subst.
+      rewrite H0. reflexivity. omega.
+    + destruct H1 as [y0 jy]. subst.
+      rewrite H0. reflexivity. omega.
+  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx); try omega. rewrite (H (mx - 1)); try omega.
     destruct (inductive_dec i i).
     + rewrite e. rewrite H0. reflexivity. omega.
@@ -402,19 +450,6 @@ Proof.
   exists (S x). intros m hm. specialize (H (m - 1)).
   assert (k: m = S (m - 1)). { omega. }
   rewrite k. apply H. omega.
-Qed.
-
-Lemma WcbvEval_single_valued:
-  forall t s, WcbvEval p t s -> forall u, WcbvEval p t u -> s = u.
-Proof.
-  intros t s h0 u h1.
-  assert (j0:= WcbvEval_wcbvEval h0).
-  assert (j1:= WcbvEval_wcbvEval h1).
-  destruct j0 as [x0 k0].
-  destruct j1 as [x1 k1].
-  specialize (k0 (max x0 x1) (max_fst x0 x1)).
-  specialize (k1 (max x0 x1) (max_snd x0 x1)).
-  rewrite k0 in k1. injection k1. intuition.
 Qed.
 
 End wcbvEval_sec.

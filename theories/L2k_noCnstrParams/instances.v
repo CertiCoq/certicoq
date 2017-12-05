@@ -16,13 +16,6 @@ Instance WfL2Term: GoodTerm (Program L2k.compile.Term) :=
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
-Definition flattenApp (t:L2k.compile.Term) :
-  (L2k.compile.Term * (list L2k.compile.Term)) :=
-  match t with
-    | TApp fn arg args => (fn, cons arg (Terms_list args))
-    | s => (s, nil)
-  end.
-
 Global Instance QuestionHeadL2kTerm: QuestionHead (Program L2k.compile.Term) :=
   fun q t =>
     match q, fst (flattenApp (main t)) with

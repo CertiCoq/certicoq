@@ -18,69 +18,43 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
-Set Template Cast Propositions.
-
-(*** raises exception *****
-Require Import Benchmarks.vs.
-Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
-Time Definition P_ce_example_myent :=
-  Eval vm_compute in (program_Program p_ce_example_myent).
-Definition P_env_ce_example_myent := env P_ce_example_myent.
-Definition P_main_ce_example_myent := AstCommon.main P_ce_example_myent.
-Time Definition eval_ce_example_myent :=
-  Eval vm_compute in
-    (wcbvEval P_env_ce_example_myent 4000 P_main_ce_example_myent).
-Print eval_ce_example_myent.
-**********************)
-
-
-Set Printing Width 80.
-Print and_rect.
-Quote Recursively Definition p_and_rect := and_rect.
-Print p_and_rect.
 
 Set Template Cast Propositions.
-Set Printing Width 80.
+Set Printing Width 100.
 Set Printing Depth 1000.
-
 Set Implicit Arguments.
 
-Inductive even : nat -> Set :=
-| even_O : even 0
-| even_S : forall n, odd n -> even (S n)
-with odd : nat -> Set :=
-     | odd_S : forall n, even n -> odd (S n).
-
-Definition seo := even_O.
-Quote Recursively Definition p_seo := seo.
-Print p_seo.
-Eval cbv in (program_Program p_seo).
-
-
-(** example from Coq club 
-"Question about the formal definition of the guard condition"
-Here we check the unrolling guard
-**)
-Fixpoint diverge (n : nat) := let x := diverge n in 0.  (* well-typed *)
-Definition diverge0 : nat := diverge 0.
-Eval cbn in diverge0.  (* converges *)
-(* Eval cbv in diverge0.   DIVERGES! *)
-Quote Recursively Definition p_diverge0 := diverge0.
-Print p_diverge0.
-Definition P_diverge0 := Eval vm_compute in (program_Program p_diverge0).
-Definition P_div_env := Eval vm_compute in (env P_diverge0).
-Definition P_div_main := Eval vm_compute in (main P_diverge0).
-Eval vm_compute in wcbvEval P_div_env 1000 P_div_main.  (* also diverges! *)
-Goal
-  WcbvEval P_div_env P_div_main prop.
-Proof.
-  unfold P_div_main. eapply wConst.
-  - cbn. reflexivity.
-  - eapply wAppFix.
-    + eapply wConst.
-      * cbn. reflexivity.
-      * eapply wFix.
-Abort.
+Function deProof (t:Term) : Term :=
+  match t with
+    | TRel n => TRel n
+    | TProof t => t
+    | TLambda nm ty bod => TLambda nm (deProof ty) (deProof bod)
+    | TLetIn nm ty dfn bod => TLetIn nm (deProof ty) (deProof dfn) (deProof bod)
+    | TApp fn arg args => TApp (deProof fn) (deProof arg) (deProofs args)
+    | TConst nm => TConst nm
+    | TConstruct i m np na => TConstruct i m np na
+    | TCase n ty mch brs => TCase n(deProof ty)  (deProof mch) (deProofBs brs)
+    | TFix ds n => TFix (deProofDs ds) n
+    | TWrong str => TWrong str
+    | TSort srt => TSort srt
+    | TProd nm ty bod => TProd nm (deProof ty) (deProof bod)
+    | TInd x => TInd x
+  end
+with deProofs (ts:Terms) : Terms := 
+  match ts with
+    | tnil => tnil
+    | tcons t ts => tcons (deProof t) (deProofs ts)
+  end
+with deProofBs (bs:Brs) : Brs := 
+  match bs with
+    | bnil => bnil
+    | bcons n t ts => bcons n (deProof t) (deProofBs ts)
+  end
+with deProofDs (ts:Defs) : Defs := 
+  match ts with
+    | dnil => dnil
+    | dcons nm ty t m ds => dcons nm (deProof ty) (deProof t) m (deProofDs ds)
+  end.
 
 
 Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
@@ -118,21 +92,81 @@ Notation PP1 := (mkInd "P1" 0).
 Notation pp1 := (TConstruct PP1 0 0).
 
 
+Definition plusx := (plus 0).
+Compute plusx.
+Quote Recursively Definition cbv_plusx :=
+  ltac:(let t:=(eval cbv in plusx) in exact t).
+Definition ans_plusx :=
+  Eval cbv in (main (program_Program cbv_plusx)).
+Print ans_plusx.
+(* [program] of the program *)
+Quote Recursively Definition p_plusx := plusx.
+Print plusx.
+Definition P_plusx := Eval cbv in (program_Program p_plusx).
+Goal
+  let env := (env P_plusx) in
+  let main := (main P_plusx) in
+  wcbvEval (env) 90 (main) = Ret ans_plusx.
+Proof.
+  cbv. (** Coq cbv goes under lambda, but we don't **)
+Admitted.
+
+
+Section myplus.
+  Variables (A:Type).
+  Inductive myNat : Type :=
+  | myZ: forall a:A, myNat.
+  Definition myplus (m n: myNat) : A :=
+    match m with
+    | myZ a => a
+    end.
+End myplus.
+Print myplus.
+Definition myplusx := (myplus (myZ 0) (myZ 0)).
+Compute myplusx.
+Quote Recursively Definition cbv_myplusx :=
+  ltac:(let t:=(eval cbv in myplusx) in exact t).
+Definition ans_myplusx :=
+  Eval cbv in (main (program_Program cbv_myplusx)).
+Print ans_myplusx.
+(* [program] of the program *)
+Quote Recursively Definition p_myplusx := myplusx.
+Print myplusx.
+Definition P_myplusx := Eval cbv in (program_Program p_myplusx).
+Goal  (** works in L1g **)
+  let env := (env P_myplusx) in
+  let main := (main P_myplusx) in
+  wcbvEval (env) 90 (main) = Ret ans_myplusx.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+
+
+
+Print and_rect.
+Quote Recursively Definition p_and_rect := and_rect.
+Print p_and_rect.
+Eval cbv in (program_Program p_and_rect).
+Check program_Program.
+
 Definition and_rect_x :=
-  (and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+  (and_rect (fun (a:1=1) (b:True) => conj b a) (conj (eq_refl 1) I)).
 Quote Recursively Definition p_and_rect_x := and_rect_x.
 Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).
 Print P_and_rect_x.
 Quote Recursively Definition cbv_and_rect_x :=
   ltac:(let t:=(eval cbv in and_rect_x) in exact t).
+Print cbv_and_rect_x.
 Definition ans_and_rect_x :=
-  Eval cbv in (main (program_Program cbv_and_rect_x)).
-Definition env_x := env P_and_rect_x.
-Definition main_x := main P_and_rect_x.
+  Eval cbv in (deProof (main (program_Program cbv_and_rect_x))).
+Print ans_and_rect_x.
+
 Goal
-  wcbvEval env_x 25 main_x = Ret ans_and_rect_x.
-  vm_compute. (* reflexivity. *)
-Abort.
+  let envx := env P_and_rect_x in
+  let mainx := main P_and_rect_x in
+  wcbvEval envx 25 mainx = Ret ans_and_rect_x.
+  vm_compute. reflexivity. 
+Qed.
 
 
 Definition and_rectx :=
@@ -160,10 +194,10 @@ Definition my_and_rect :=
   fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
     match a with conj x x0 => f x x0 end.
 Definition my_and_rect_x :=
-  (@my_and_rect (2=2) (True)
-                (True /\ (2=2))
-                (fun (a:2=2) (b:True) => conj b a)
-                (conj (eq_refl 2) I)).
+  (@my_and_rect (1=1) (True)
+                (True /\ (1=1))
+                (fun (a:1=1) (b:True) => conj b a)
+                (conj (eq_refl 1) I)).
 Print my_and_rect_x.
 Definition eval_my_and_rect_x := Eval cbv in my_and_rect_x.
 Print eval_my_and_rect_x.
@@ -214,6 +248,77 @@ Definition P_env := Eval vm_compute in (env P_loop0).
 Definition P_main := Eval vm_compute in (main P_loop0).
 Eval vm_compute in wcbvEval P_env 100 P_main.
 
+
+(***********************
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
+Notation CONS := (TConstruct LL 1 3).
+Notation NIL := (TConstruct LL 0 1).
+Notation Lam := (TLambda).
+Notation tLam := (tLambda).
+Notation tPi := (tProd).
+Notation tPROP := (tSort sProp).
+Notation AND := (mkInd "Coq.Init.Logic.and" 0).
+Notation CONJ := (TConstruct AND 0 4).
+Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
+Notation II := (TConstruct TRUE 0 0).
+Notation EQ := (mkInd "Coq.Init.Logic.eq" 0).
+(* Notation RFL := (TConstruct EQ 0 2). *)
+Notation PROD := (mkInd "Coq.Init.Datatypes.prod" 0).
+Notation PAIR := (TConstruct PROD 0 4).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Infix ":t:" := tcons  (at level 87, right associativity).
+
+
+Inductive P0: Prop := p0.
+Inductive P1: Prop := p1.
+Notation PP0 := (mkInd "P0" 0).
+Notation pp0 := (TConstruct PP0 0 0).
+Notation PP1 := (mkInd "P1" 0).
+Notation pp1 := (TConstruct PP1 0 0).
+
+
+
+Inductive even : nat -> Set :=
+| even_O : even 0
+| even_S : forall n, odd n -> even (S n)
+with odd : nat -> Set :=
+     | odd_S : forall n, even n -> odd (S n).
+
+Definition seo := even_O.
+Quote Recursively Definition p_seo := seo.
+Print p_seo.
+Eval cbv in (program_Program p_seo).
+
+
+(** example from Coq club 
+"Question about the formal definition of the guard condition"
+Here we check the unrolling guard
+**)
+Fixpoint diverge (n : nat) := let x := diverge n in 0.  (* well-typed *)
+Definition diverge0 : nat := diverge 0.
+Eval cbn in diverge0.  (* converges *)
+(* Eval cbv in diverge0.   DIVERGES! *)
+Quote Recursively Definition p_diverge0 := diverge0.
+Print p_diverge0.
+Definition P_diverge0 := Eval vm_compute in (program_Program p_diverge0).
+Definition P_div_env := Eval vm_compute in (env P_diverge0).
+Definition P_div_main := Eval vm_compute in (main P_diverge0).
+Eval vm_compute in wcbvEval P_div_env 1000 P_div_main.  (* also diverges! *)
+Goal
+  WcbvEval P_div_env P_div_main prop.
+Proof.
+  unfold P_div_main. eapply wConst.
+  - cbn. reflexivity.
+  - eapply wAppFix.
+    + eapply wConst.
+      * cbn. reflexivity.
+      * eapply wFix.
+Abort.
+ ************************)
 
 (** axioms in arguments to a data constructor **)
 Axiom anat:nat.

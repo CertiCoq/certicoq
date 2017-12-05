@@ -17,11 +17,24 @@ Instance WfL2Term: GoodTerm (Program L2.compile.Term) :=
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
-Definition flattenApp (t:L2.compile.Term) :
-  (L2.compile.Term * (list L2.compile.Term)) :=
+Lemma Terms_list_hom:
+  forall ts,
+    Terms_list (strips ts) = List.map strip (L1g.compile.Terms_list ts).
+Proof.
+  induction ts.
+  - reflexivity.
+  - rewrite tcons_hom.
+    change
+      (cons (strip t) (Terms_list (strips ts)) =
+       cons (strip t) (List.map strip (L1g.compile.Terms_list ts))).
+    rewrite IHts. reflexivity.
+Qed.
+
+Definition flattenApp
+           (t:L2.compile.Term): (L2.compile.Term * (list L2.compile.Term)) :=
   match t with
-    | TApp fn arg args => (fn, cons arg (Terms_list args))
-    | s => (s, nil)
+  | TApp fn arg args => (fn, cons arg (Terms_list args))
+  | s => (s, nil)
   end.
 
 Global Instance QuestionHeadL2Term: QuestionHead (Program L2.compile.Term) :=
@@ -62,16 +75,34 @@ Instance certiL1g_to_L2:
 Require Import certiClasses2.
 
 Lemma flattenAppCommutes:
-  forall main : L1g.compile.Term,
-  flattenApp (L2.compile.strip main) =
-  (strip (fst (L1g.instances.flattenApp main)),
-   List.map strip (snd (L1g.instances.flattenApp main))).
-Proof using.
+  forall main: L1g.compile.Term,
+    flattenApp (L2.compile.strip main) =
+    (strip (fst (L1g.instances.flattenApp main)),
+     List.map strip (snd (L1g.instances.flattenApp main))).
+Proof.
+Admitted.
+(***********
+  destruct main; intros; try reflexivity.
+  unfold instances.flattenApp, fst, snd. destruct main1.
+  - unfold strip at 2.
+    change
+      (flattenApp (mkApp (TRel n) (tcons (strip main2) (strips t))) =
+       (TRel n, List.map strip (main2 :: L1g.compile.Terms_list t))).
+    unfold mkApp, flattenApp. apply f_equal2. reflexivity.
+    change
+      (flattenApp (TApp (TRel n) (strip main2) (strips t)) =
+       (TRel n, List.map strip (main2 :: L1g.compile.Terms_list t))).
+    
+      (flattenApp (mkApp (TRel n) (tcons (strip main2) (strips t))) =
+       (TRel n, List.map strip (main2 :: L1g.compile.Terms_list t))).
+
+  Proof using.
   destruct main; auto.
   simpl. f_equal. f_equal.
   induction t; auto.
   simpl. f_equal. auto.
 Qed.
+ **************)
 
 Require Import Coq.btauto.Btauto.
 Require Import SquiggleEq.list.
@@ -143,14 +174,16 @@ Proof.
 Qed.
 
 Lemma my_stripProgram_pres_yes:
-  forall (main: L1g.compile.Term) (env: environ L1g.compile.Term) stv otv,
+  forall (main:L1g.compile.Term) (hmain:L1g.term.WFapp main)
+         (env:environ L1g.compile.Term) (henv:L1g.program.WFaEnv env)
+         stv otv,
     L1g.wcbvEval.WcbvEval env main stv ->
     WcbvEval (stripEnv env) (strip main) otv ->
     yesPreserved {| main := stv; env := env |}
       {| main := otv; env := stripEnv env |}.
 Proof.
   intros.
-  pose proof (sac_sound H H0). subst.
+  pose proof (sac_sound henv hmain H H0). subst.
   unfold yesPreserved, questionHead, QuestionHeadL1gTerm, QuestionHeadL2Term.
   cbn. rewrite flattenAppCommutes.
   remember (fst (L1g.instances.flattenApp stv)) as mm. cbn.
@@ -201,7 +234,6 @@ Proof.
     apply compileObsEq.
 Qed.
 
-
 Global Instance certiL1g_to_L2Correct:
   CerticoqTranslationCorrect certiL1g certiL2.
 Proof.
@@ -212,9 +244,9 @@ Proof.
     destruct Hev as [Hev HevEnv]. subst svenv.
     exists (stripProgram {| main := svmain; env := senv |}).
     split. split.
-    + cbn. apply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).
+    + cbn. eapply (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev).
+      admit.
     + reflexivity.
     + apply compileObsEq.
-Qed.
+Admitted.
 Print Assumptions certiL1g_to_L2Correct.
-(* Closed under the global context *)

@@ -53,7 +53,7 @@ Notation IND := (compile.TInd).
  ***)
 
 (*******)
-Set Printing Width 175.
+Set Printing Width 100.
 Quote Recursively Definition p_0 := 0.
 Definition oldP_0 := Eval cbv in (main (L2.compile.program_Program p_0)).
 Print oldP_0.
@@ -298,12 +298,8 @@ Print P_and_rectx.
 Definition P_envx := env P_and_rectx.
 Definition P_mainx := main P_and_rectx.
 Goal wcbvEval P_envx 100 P_mainx = Ans_and_rectx.
-  vm_compute.
-  (**************
-reflexivity. 
+  vm_compute. reflexivity. 
 Qed.
-   **************)
-Abort.
 
 Definition my_and_rect := 
   fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
@@ -569,8 +565,6 @@ Quote Recursively Definition p_yyyyX := yyyyX.
 Print p_yyyyX.
 Definition P_yyyyX := Eval cbv in (program_Program p_yyyyX).
 Print P_yyyyX.
-Definition xxxx_env := Eval cbv in (env P_yyyyX).
-Definition xxxx_main := Eval cbv in (main P_yyyyX).
 (*********** what is the problem? 
 ** axiom inside proof, but proofs haven't been stripped yet at L2k
  ***********
@@ -582,6 +576,8 @@ Proof.
     + eapply wConst. cbn. reflexivity. eapply wProof. eapply wLam.
 ****************)
 Goal
+  let xxxx_env := (env P_yyyyX) in
+  let xxxx_main := (main P_yyyyX) in
   wcbvEval xxxx_env 10 xxxx_main = Ret ans_yyyyX.
   vm_compute.
   (**********
@@ -798,8 +794,11 @@ Inductive PList:Set->Type:=  (* powerlists *)
 | zero:forall A:Set, A -> PList A
 | succ:forall A:Set, PList (A * A)%type -> PList A.
 
-Definition myPList:PList nat :=
+Definition myPList : PList nat := (succ (zero (0,1))).
+(********
+Definition myPList : PList nat :=
   succ (succ (succ (zero (((1,2),(3,4)),((5,6),(7,8)))))).
+ **********)
 
 Fixpoint unzip (A:Set) (l:list (A*A)) {struct l}:list A :=
   match l return list A with

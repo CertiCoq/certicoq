@@ -35,7 +35,8 @@ Inductive Term : Type :=
                Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : string -> Term
-| TDummy     : string -> Term   (* residual of Sorts, inductives, Products *)
+| TInd       : Term
+| TDummy     : Term    (* residual of Sorts and Products in L1g *)
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -64,34 +65,19 @@ Fixpoint Terms_list (ts:Terms) : list Term :=
     | tcons u us => cons u (Terms_list us)
   end.
 
-Function tappend (ts1 ts2:Terms) : Terms :=
-  match ts1 with
-    | tnil => ts2
-    | tcons t ts => tcons t (tappend ts ts2)
-  end.
-
-(** syntactic control of "TApp": no nested apps, app must have an argument **)
-Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
-  match t with
-  | TApp fn b bs => TApp fn b (tappend bs args)
-  | fn => match args with
-          | tnil => fn
-          | tcons c cs => TApp fn c cs
-          end
-  end.
-
 Function strip (t:L1gTerm) : Term :=
   match t with
     | L1g.compile.TRel n => TRel n
-    | L1g.compile.TSort s => TDummy "Srt"
+    | L1g.compile.TSort s => TDummy
     | L1g.compile.TProof t => TProof (strip t)
-    | L1g.compile.TProd nm _ _ => TDummy ("Prod:"++ print_name nm)
+    | L1g.compile.TProd nm _ _ => TDummy
     | L1g.compile.TLambda nm _ bod => TLambda nm (strip bod)
-    | L1g.compile.TLetIn nm dfn _ bod => TLetIn nm (strip dfn) (strip bod)
+    | L1g.compile.TLetIn nm dfn _ bod =>
+      TLetIn nm (strip dfn) (strip bod)
     | L1g.compile.TApp fn arg args =>
-      mkApp (strip fn) (tcons (strip arg) (strips args))
+      TApp (strip fn) (strip arg) (strips args)
     | L1g.compile.TConst nm => TConst nm
-    | L1g.compile.TInd i => TDummy ("Ind:"++ print_inductive i)
+    | L1g.compile.TInd _ => TInd
     | L1g.compile.TConstruct i m np na => TConstruct i m np na
     | L1g.compile.TCase n _ mch brs => TCase n (strip mch) (stripBs brs)
     | L1g.compile.TFix ds n => TFix (stripDs ds) n
@@ -120,17 +106,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma not_isApp_strip_App_App:
-  forall fn arg args,
-    ~ L1g.term.isApp fn ->
-    strip (L1g.compile.TApp fn arg args) =
-    TApp (strip fn) (strip arg) (strips args).
-Proof.
-  destruct fn; intros; try reflexivity.
-  - elim H. auto.
-Qed.
-
-(*************
 Lemma TLambda_strip_inv:
   forall nm bod t, TLambda nm bod = strip t ->
                    exists bod' ty, t = L1g.compile.TLambda nm ty bod'.
@@ -138,6 +113,8 @@ Proof.
   induction t; intros; cbn in *; try discriminate. myInjection H.
   exists t2, t1. reflexivity.
 Qed.
+  
+(************
 Lemma strip_TCast_TCast:
   forall t, ~ L1g.term.isCastProp t ->
             forall u, strip (L1g.compile.TCast u t) = TCast (strip u).

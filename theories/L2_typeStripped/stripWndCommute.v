@@ -26,6 +26,7 @@ Proof.
   intros. intros h. destruct H. apply isApp_hom. assumption.
 Qed.
 
+(********
 Lemma TApp_mkApp_step_lem:
   forall fn fn' arg args,
     TApp fn arg args = mkApp fn' (tcons arg args) -> fn = fn'.
@@ -43,6 +44,7 @@ Proof.
   destruct fn; intros; subst; cbn; intros; cbn; try reflexivity.
   elim H. exists fn1, fn2, t. reflexivity.
 Qed.
+ ***************)
 
 (** Since L1g.wndEval.wndEval may make steps in parts of a term that are
 *** erased in L2, and since L2.WndEval is not reflexive, we add <>

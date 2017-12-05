@@ -5,6 +5,8 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.EqNat.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
+Require Import Common.Common.
+Require Import L2k.compile.
 Require Import L2k.term.
 Require Import L2k.program.
 Require Import L2k.wcbvEval.
@@ -27,10 +29,10 @@ Inductive WNorm: Term -> Prop :=
 | WNCase: forall i mch brs,
     WNorm mch -> ~ isCanonical mch -> WNorm (TCase i mch brs)
 | WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
-| WNApp: forall fn t ts,
-    WNorm fn -> WNorm t -> WNorms ts ->
-    ~ (isLambda fn) -> ~ (isFix fn) -> ~ isApp fn ->
-    WNorm (TApp fn t ts)
+| WNApp: forall fn t,
+    WNorm fn -> ~ (isLambda fn) -> ~ (isFix fn) -> WNorm t ->
+    WNorm (TApp fn t)
+| WNDummy: forall str, WNorm (TDummy str)
 with WNorms: Terms -> Prop :=
      | WNtnil: WNorms tnil
      | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).

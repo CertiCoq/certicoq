@@ -2451,13 +2451,6 @@ Proof with eauto.
     intros wft. unfold translate. simpl.
     unfold subst_env; rewrite subst_env_aux_prf. constructor.
 
-  + (* Proof application *)
-    intros.
-    unfold translate in *; simpl in *.
-    unfold subst_env in *; rewrite subst_env_aux_prf in *.
-    rewrite subst_env_application. constructor.
-    apply H. now apply Crct_invrt_App in H1.
-
   + (* Lambda *)
     cbn. intros nm bod wft.
     rewrite subst_env_lam. constructor.
@@ -2642,7 +2635,17 @@ Proof with eauto.
 
     - rewrite t' in fixstep. discriminate.
 
- + (* Case *)
+      + (* Proof application *)
+        admit.
+        (****  this no longer works  ****
+    intros.
+    unfold translate in *; simpl in *.
+    unfold subst_env in *. 
+    rewrite subst_env_application. 
+    apply H. now apply Crct_invrt_App in H0.
+         ***************************)
+        
+      + (* Case *)
     unfold translate; simpl.
     (* Reduction case *)
     intros * evmch IHmch Hcasestep Hcs IHcs Hcrct.
@@ -2719,7 +2722,7 @@ Proof with eauto.
 
   (** Generalized goal *)
   + tauto.
-Qed.
+Admitted.
 
 Lemma WcbvEval_env_eval_env e e' :
   crctEnv e -> L3eval.WcbvEval_env e e' -> exists e'', eval_env (translate_env e) e''.

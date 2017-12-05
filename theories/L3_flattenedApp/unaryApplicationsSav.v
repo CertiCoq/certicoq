@@ -5,13 +5,13 @@ Require Import Coq.Strings.Ascii.
 Require Import Arith.
 Require Import Coq.Logic.JMeq.
 Require Import Omega.
+Require Import L2_5.L2_5.
 Require Import L2_5.compile.
-Require Import L2_5.stripEvalCommute.
-Require Import L3.compile.
 Require Import L3.term.
 Require Import L3.program.
 Require Import L3.wcbvEval.
 Require Import L3.wNorm.
+Require Import L3.compile.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -35,15 +35,15 @@ Definition optStrips (ts:option L2_5Terms) : option Terms :=
     | None => None
     | Some ts => Some (strips ts)
   end.
-Definition optStripBnth (b: option (L2_5Term * nat)) : option (Term * nat) :=
+Definition optStripBnth (b: option (nat * L2_5Term)) : option (nat * Term) :=
+                           match b with
+                             | None => None
+                             | Some (n, t) => Some (n, strip t)
+                           end.
+Definition optStripDnth (b: option (L2_5Term * nat)) : option (Term * nat) :=
                            match b with
                              | None => None
                              | Some (t, n) => Some (strip t, n)
-                           end.
-Definition optStripDnth (b: option L2_5Term) : option Term :=
-                           match b with
-                             | None => None
-                             | Some t=> Some (strip t)
                            end.
 Definition optStripCanP (b: option (nat * L2_5Terms)) : option (nat * Terms) :=
                            match b with
@@ -58,11 +58,11 @@ Lemma optStrips_hom: forall y, optStrips (Some y) = Some (strips y).
 induction y; simpl; reflexivity.
 Qed.
 Lemma optStripBnth_hom:
-  forall y n, optStripBnth (Some (y, n)) = Some (strip y, n).
+  forall y n, optStripBnth (Some (n, y)) = Some (n, strip y).
 induction y; simpl; reflexivity.
 Qed.
 Lemma optStripDnth_hom:
-  forall y, optStripDnth (Some y) = Some (strip y).
+  forall y n, optStripDnth (Some (y, n)) = Some (strip y, n).
 induction y; simpl; reflexivity.
 Qed.
 Lemma optStripCanP_hom:
@@ -74,8 +74,13 @@ Lemma isConstruct_hom:
   forall t, isConstruct (strip t) -> L2_5.term.isConstruct t.
 Proof.
   destruct t; intros h;
-    try (cbn; destruct h as [x0 [x1 [x2 h]]]; discriminate).
-  auto.
+    try (cbn; destruct h as [x0 [x1 [x2 h]]]; discriminate). 
+  - change
+      (isConstruct (mkApp (strip t1) (tcons (strip t2) (strips t3)))) in h.
+    pose proof (mkApp_isApp (strips t3) (strip t1) (strip t2)) as k.
+    destruct k as [x0 [x1 jx]]. rewrite jx in h.
+    destruct h as [y0 [y1 [y2 jy]]]. discriminate.
+  - destruct h as [x0 [x1 [x2 h]]]. cbn in h. myInjection h. auto.
 Qed.
 
 Lemma tlength_hom:
@@ -100,24 +105,35 @@ Qed.
 
 Lemma dcons_hom:
   forall nm t m ts, stripDs (L2_5.compile.dcons nm t m ts) =
-               dcons nm (strip t) m (stripDs ts).
+               dcons nm (strip t)m  (stripDs ts).
 reflexivity.
 Qed.
 
 Lemma TApp_hom:
-  forall fn arg,
-    strip (L2_5.compile.TApp fn arg) = TApp (strip fn) (strip arg).
+  forall fn arg args,
+    strip (L2_5.compile.TApp fn arg args) =
+    mkApp (strip fn) (strips (L2_5.compile.tcons arg args)).
 Proof.
-  destruct fn; intros arg; try reflexivity.
+  destruct fn; intros arg args; try reflexivity.
 Qed.
+
 
 Lemma mkApp_hom:
   forall ts t,
     strip (L2_5.compile.mkApp t ts) = mkApp (strip t) (strips ts).
 Proof.
   intros. functional induction (L2_5.compile.mkApp t ts).
+  - change
+      (mkApp (TApp (strip fn) (strip b))
+             (strips (L2_5.compile.tappend bs args)) =
+       mkApp (strip (L2_5.compile.TApp fn b bs)) (strips args)).
+    change
+      (mkApp (TApp (strip fn) (strip b))
+             (strips (L2_5.compile.tappend bs args)) =
+       mkApp (mkApp (TApp (strip fn) (strip b)) (strips bs)) (strips args)).
+    rewrite mkApp_idempotent. rewrite L3.compile.tappend_hom. reflexivity.
   - reflexivity.
-  - rewrite IHt0. reflexivity.
+  - reflexivity.
 Qed.
 
 Lemma TCase_hom:
@@ -309,7 +325,6 @@ Admitted.
     cbn in *.
  ****************)
 
-(*********
 Lemma mkApp_goodFn:
   forall fn arg args,
     ~ L2_5.term.isApp fn ->
@@ -319,7 +334,6 @@ Proof.
   destruct fn; intros; try reflexivity.
   cbn. destruct H. exists fn1, fn2, t. reflexivity.
 Qed.
- *************)
 
 Lemma instantiate_hom:
   (forall bod arg n,
@@ -343,7 +357,36 @@ Proof.
       * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
     + rewrite (proj1 (nat_compare_gt n0 n)); trivial.
   - cbn. rewrite H. rewrite H0. reflexivity.
-  - cbn. rewrite H. rewrite H0. reflexivity. 
+  - change
+      (strip (L2_5.compile.mkApp
+                (L2_5.compile.instantiate arg n t)
+                (L2_5.compile.tcons (L2_5.compile.instantiate arg n t0)
+                                    (L2_5.compile.instantiates arg n t1))) =
+       instantiate (strip arg) n
+                   (mkApp (TApp (strip t) (strip t0)) (strips t1))).
+    rewrite instantiate_mkApp_commute.
+
+    
+  - unfold compile.instantiate.
+  - change
+      (strip (L2_5.compile.mkApp (L2_5.compile.instantiate arg n t)
+                                 (L2_5.compile.tcons
+                                    (L2_5.compile.instantiate arg n t0)
+                                    (L2_5.compile.instantiates arg n t1))) =
+       instantiate (strip arg) n
+                   (mkApp (TApp (strip t) (strip t0)) (strips t1))).
+    rewrite instantiate_mkApp_commute.
+    change
+      (strip
+         (L2_5.compile.mkApp (compile.instantiate arg n t)
+                             (L2_5.compile.tcons
+                                (compile.instantiate arg n t0)
+                                (compile.instantiates arg n t1))) =
+       mkApp (TApp (instantiate (strip arg) n (strip t))
+                   (instantiate (strip arg) n (strip t0)))
+             (instantiates (strip arg) n (strips t1))).
+    rewrite mkApp_hom.
+    rewrite <- H; trivial. rewrite <- H0; trivial. rewrite <- H1; trivial.
   - change
       (strip (compile.instantiate arg n0 (L2_5.compile.TConstruct i n t)) =
        TConstruct i n (instantiates (strip arg) n0 (strips t))).
@@ -360,7 +403,7 @@ Proof.
                      arg (n0 + (L2_5.compile.dlength d)) d)) n =
        TFix (instantiateDefs
                (strip arg) (n0 + (dlength (stripDs d))) (stripDs d)) n).
-    rewrite H. rewrite stripDs_pres_dlength. reflexivity.
+    rewrite H. rewrite stripDs_pres_dlength. reflexivity. 
   - rewrite L2_5.stripEvalCommute.instantiates_tcons_commute.
     rewrite tcons_hom. rewrite tcons_hom. rewrite instantiates_tcons.
     rewrite <- H; trivial. rewrite H0; trivial.
@@ -372,13 +415,14 @@ Proof.
     rewrite <- H; trivial. rewrite H0; trivial.
 Qed.
 
+
 Lemma tnth_hom:
   forall ts n, optStrip (L2_5.term.tnth n ts) = tnth n (strips ts).
 induction ts; simpl; intros n; case n; try reflexivity; trivial.
 Qed.
 
 Lemma bnth_hom:
-  forall ts n, optStripBnth (L2_5.term.bnth n ts) = bnth n (stripBs ts).
+  forall ts n, optStripDnth (L2_5.term.bnth n ts) = bnth n (stripBs ts).
 induction ts; cbn; intros m; case m; try reflexivity; trivial.
 Qed. 
 
@@ -418,11 +462,12 @@ Qed.
  *******************)
 
 Lemma whBetaStep_hom:
-  forall bod arg,
-    strip (L2_5.term.whBetaStep bod arg) = whBetaStep (strip bod) (strip arg).
+  forall bod arg args,
+    strip (L2_5.term.whBetaStep bod arg args) =
+    mkApp (whBetaStep (strip bod) (strip arg)) (strips args).
 Proof.
   intros. unfold L2_5.term.whBetaStep, whBetaStep.
-  rewrite <- (proj1 instantiate_hom). reflexivity.
+  rewrite mkApp_hom. rewrite <- (proj1 instantiate_hom). reflexivity.
 Qed.
 
 Lemma dlength_hom:
@@ -431,15 +476,6 @@ Proof.
   induction dts; cbn. reflexivity. rewrite IHdts. reflexivity.
 Qed.
 
-Lemma dnthBody_hom: 
-  forall m ds,
-    optStripDnth (L2_5.term.dnthBody m ds) = dnthBody m (stripDs ds).
-Proof.
-  induction m; induction ds; intros; try intuition.
-  - simpl. intuition.
-Qed.
-
-(*********
 Lemma dnthBody_hom:
   forall dts m,
     dnthBody m (stripDs dts) =
@@ -457,7 +493,6 @@ Proof.
                     (L2_5.term.dnthBody n1 dts)).
       rewrite <- IHdts. reflexivity.
 Qed.
- ***************)
 
 Lemma fold_left_hom:
 forall (F:L2_5Term -> nat -> L2_5Term) 
@@ -473,8 +508,8 @@ Proof.
 Qed.
 
 Lemma L25dnthBody_dnthBody:
-  forall m dts L25bod,
-    L2_5.term.dnthBody m dts = Some L25bod ->
+  forall m dts L25bod q,
+    L2_5.term.dnthBody m dts = Some (L25bod, q) ->
     forall t, dnthBody m (stripDs dts) = Some t -> strip L25bod = t.
 Proof.
   induction m; induction dts; intros.
@@ -485,10 +520,9 @@ Proof.
   - cbn in H. discriminate.
   - cbn in H.
     change (dnthBody m (stripDs dts) = Some t0) in H0.
-    specialize (IHm _ _ H _ H0). assumption.
+    specialize (IHm _ _ _ H _ H0). assumption.
 Qed.
 
-(****
 Lemma pre_whFixStep_hom:
   forall x dts arg args,
     mkApp (pre_whFixStep (strip x) (stripDs dts) (strip arg)) (strips args) =
@@ -501,7 +535,6 @@ Proof.
   - intros. cbn. rewrite (proj1 instantiate_hom). rewrite TFix_hom.
     reflexivity.
 Qed.
- ************)
 
 (**********
 Lemma whFixStep_hom:
@@ -519,10 +552,9 @@ Proof.
   intros. unfold L2_5.term.pre_whFixStep. rewrite mkApp_hom.
 ***************)
 
-(************
 Lemma whFixStep_hom:
-  forall L25bod dts m,
-    L2_5.term.dnthBody m dts = Some L25bod ->
+  forall L25bod q dts m,
+    L2_5.term.dnthBody m dts = Some (L25bod, q) ->
     forall bod,
       dnthBody m (stripDs dts) = Some bod ->
       forall args,
@@ -571,7 +603,6 @@ Proof.
       apply f_equal2; try reflexivity.
   - rewrite H1 in H0. discriminate.
 Qed.
-**************)
       
 Lemma isLambda_invrt:
   forall fn, isLambda (strip fn) -> L2_5.term.isLambda fn.
@@ -579,28 +610,37 @@ Proof.
   intros fn h. destruct h as [x0 [x1 jx]].
   destruct fn; try (cbn in jx; discriminate).
   - auto.
+  - change (mkApp (TApp (strip fn1) (strip fn2)) (strips t) =
+            TLambda x0 x1) in jx.
+    destruct (isApp_mkApp_TApp (strips t) (strip fn1) (strip fn2))
+      as [y0 [y1 jy]].
+    rewrite jx in jy. discriminate.
 Qed.
 
 Lemma isFix_invrt:
   forall fn, isFix (strip fn) -> L2_5.term.isFix fn.
 Proof.
   intros fn h. destruct h as [x0 [x1 jx]].
-  destruct fn; try (cbn in jx; discriminate). auto.
+  destruct fn; try (cbn in jx; discriminate).
+  - change (mkApp (TApp (strip fn1) (strip fn2)) (strips t) =
+            TFix x0 x1) in jx.
+    destruct (isApp_mkApp_TApp (strips t) (strip fn1) (strip fn2))
+      as [y0 [y1 jy]].
+    rewrite jx in jy. discriminate.
+  - auto.
 Qed.
 
-(**********
 Lemma isProof_invrt:
   forall fn, TProof = (strip fn) -> L2_5.term.isProof fn.
 Proof.
   intros fn h.
   destruct fn; try (cbn in h; discriminate).
   - unfold L2_5.term.isProof. reflexivity.
-  - cbn in h. discriminate. change (TProof = mkApp (TApp (strip fn1) (strip fn2)) (strips t)) in h.
+  - change (TProof = mkApp (TApp (strip fn1) (strip fn2)) (strips t)) in h.
     destruct (isApp_mkApp_TApp (strips t) (strip fn1) (strip fn2))
       as [x0 [x1 jx]].
     rewrite jx in h. discriminate.
 Qed.
- ***************)
 
 Lemma TProof_mkApp_invrt:
   forall fn args, TProof = mkApp fn args -> fn = TProof /\ args = tnil.
@@ -619,6 +659,13 @@ Proof.
   intros p fn args t. destruct args; cbn; intros.
   - exists t. intuition. eapply (proj1 (WcbvEval_no_further p)). eassumption.
   - exists fn. intuition.
+Qed.
+
+Lemma TApp_Hom:
+  forall fn arg args,
+    strip (L2_5.compile.TApp fn arg args) =
+    mkApp (strip fn) (tcons (strip arg) (strips args)).
+  induction fn; intros arg args; try reflexivity.
 Qed.
 
 Lemma treverse_terms_ind:
@@ -685,8 +732,8 @@ Proof.
   - rewrite mkApp_tl. rewrite mkApp_tl in H0.
     inversion_clear H0.
     + econstructor; try eassumption. eapply  IHargs; eassumption.
-    + eapply wAppFix; try eassumption. intuition.
-    + eapply wAppCong; try eassumption. eapply IHargs; try eassumption.
+    + econstructor; try eassumption. eapply IHargs; eassumption.
+    + eapply wAppFix; try eassumption. eapply IHargs; try eassumption.
 Qed.
   
 Lemma WcbvEval_mkApp_step:
@@ -701,7 +748,7 @@ Proof.
     pose proof (proj1 (WcbvEval_no_further p) _ _ h0) as k.
     rewrite <- (WcbvEval_single_valued k H). assumption.
   - rewrite mkApp_tl. rewrite mkApp_tl in H. inversion_clear H.
-    + econstructor; try eassumption. eapply IHargs. eassumption.
+    + constructor. eapply IHargs. eassumption.
     + specialize (IHargs _ H0). econstructor; eassumption.
     + specialize (IHargs _ H0). econstructor; eassumption.
 Qed.
@@ -918,20 +965,16 @@ Proof.
 Qed.
 ***************************)
 
-(**********
 Lemma waPrf_args:
   forall p args fn,
     WcbvEval p fn TProof -> WcbvEval p (mkApp fn args) TProof.
 Proof.
   induction args; intros.
   - cbn. assumption.
-  - cbn. eapply IHargs. eapply WcbvEval_mkApp_step.
-    + apply wAppCong; try eassumption.
-      * right. reflexivity.
-      *
+  - cbn. eapply WcbvEval_mkApp_step.
+    + apply waPrf. assumption.
     + eapply IHargs. constructor.
 Qed.
- **********)
 
 (**********
 Lemma wAppCong':
@@ -951,7 +994,6 @@ Proof.
 Qed.
 ******************)
 
-(**********
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L2_5.wcbvEval.WcbvEval p t t' ->
@@ -976,7 +1018,7 @@ Proof.
   - (* beta step in L2_5 *)
     rewrite whBetaStep_hom in H1.
     destruct (WcbvEval_mkApp_WcbvEval _ _ H1) as [y jy].
-    rewrite TApp_hom. cbn. eapply WcbvEval_mkApp_step.
+    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
     + eapply wAppLam; eassumption.
     + eapply WcbvEval_mkApp_fn; eassumption. 
   - cbn. econstructor; try eassumption. rewrite <- (proj1 instantiate_hom).
@@ -987,7 +1029,7 @@ Proof.
     destruct (WcbvEval_mkApp_WcbvEval _ _ H0) as [y jy].
     assert (j: dnthBody m (stripDs dts) = Some (strip x)).
     { rewrite dnthBody_hom. rewrite e. cbn. reflexivity. }
-    rewrite TApp_hom. cbn. eapply WcbvEval_mkApp_step.
+    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
     + eapply wAppFix; eassumption. 
     + eapply WcbvEval_mkApp_fn; eassumption.
   - rewrite TCase_hom. rewrite TConstruct_hom in H. 
@@ -995,4 +1037,3 @@ Proof.
     rewrite <- whCaseStep_hom. rewrite e. reflexivity.
 Qed.
 Print Assumptions WcbvEval_hom.
-*****************)

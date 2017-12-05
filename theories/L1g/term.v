@@ -178,6 +178,14 @@ Proof.
     + intros h. unfold isProp in h. discriminate.
 Qed.
 
+Definition isWrong t : Prop := exists s, t = TWrong s.
+Lemma isWrong_dec: forall t, {isWrong t}+{~ isWrong t}.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x jx]; discriminate).
+  - left. exists s. reflexivity.
+Defined.
+
 Definition isLambda (t:Term) : Prop :=
   exists nm ty bod, t = TLambda nm ty bod.
 Lemma IsLambda: forall nm ty bod, isLambda (TLambda nm ty bod).
@@ -297,29 +305,22 @@ Qed.
 Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n np na:nat), isCanonical (TConstruct i n np na)
 | canA: forall (arg:Term) (args:Terms) (i:inductive) (n np na:nat), 
-    isCanonical (TApp (TConstruct i n np na) arg args)
-| canP: forall t, isCanonical t -> isCanonical (TProof t).
+    isCanonical (TApp (TConstruct i n np na) arg args).
 Hint Constructors isCanonical.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
 Proof.
-  induction t; try (solve [right; intros h; inversion h; inversion H;
-                           destruct H1; discriminate]).
-  - destruct IHt.
-    + left. constructor. assumption.
-    + right. intros h. inversion_clear h. contradiction.
+  destruct t; try (solve[right; intros h; inversion_Clear h]).
   - destruct (isConstruct_dec t1).
-    + left. unfold isConstruct in H. destruct H as [x0 [x1 [x2 [x3 j]]]].
-      subst. constructor.
+    + left. destruct H as [x0 [x1 [x2 [x3 j]]]]. subst. constructor.
     + right. intros h. inversion_Clear h. elim H. auto.
-  - left. constructor.
+  - left. auto.
 Qed.
      
 Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
     | TConstruct _ r _ _ => Some (r, tnil)
     | TApp (TConstruct _ r _ _) arg args => Some (r, tcons arg args)
-    | TProof t => canonicalP t
     | _ => None
   end.
 
@@ -327,7 +328,6 @@ Lemma canonicalP_isCanonical:
   forall t x, canonicalP t = Some x -> isCanonical t.
 Proof.
   induction t; simpl; intros; try discriminate.
-  - constructor. eapply IHt. eassumption.
   - destruct t1; try discriminate. constructor.
   - constructor.
 Qed.
@@ -338,8 +338,23 @@ Proof.
   induction 1; simpl.
   - exists (n, tnil). reflexivity.
   - exists (n, tcons arg args). reflexivity.
-  - assumption.
 Qed.
+
+Definition isSort t : Prop := exists s, t = TSort s.
+Lemma isSort_dec: forall t, {isSort t}+{~ isSort t}.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x jx]; discriminate).
+  - left. exists s. reflexivity.
+Defined.
+
+Definition isProd t : Prop := exists nm ty u, t = TProd nm ty u.
+Lemma isProd_dec: forall t, {isProd t}+{~ isProd t}.
+Proof.
+  destruct t;
+  try (right; intros h; destruct h as [x0 [x1 [x2 jx]]]; discriminate).
+  - left. exists n, t1, t2. reflexivity.
+Defined.
 
 (** some utility operations on [Terms] ("lists" of Term) **)
 Lemma tappend_tnil: forall ts:Terms, tappend ts tnil = ts.
@@ -604,12 +619,71 @@ Proof.
   - rewrite e1 in IHo. rewrite IHo. reflexivity.
 Qed.
       
-(*****)
+(** treverse  **)
 Fixpoint treverse (ts: Terms) : Terms :=
   match ts with
     | tnil => tnil
     | tcons b bs => tappend (treverse bs) (tunit b)
   end.
+
+Lemma treverse_tappend_distr:
+  forall x y:Terms,
+    treverse (tappend x y) = tappend (treverse y) (treverse x).
+Proof.
+  induction x as [| a l IHl]; cbn; intros.
+  - destruct y as [| a l]; cbn. reflexivity.
+    rewrite tappend_tnil. reflexivity.
+  - rewrite (IHl y). rewrite tappend_assoc. reflexivity.
+Qed.
+
+Remark treverse_tunit:
+  forall (l:Terms) (a:Term),
+    treverse (tappend l (tunit a)) = tcons a (treverse l).
+Proof.
+  intros.
+  apply (treverse_tappend_distr l (tunit a)); simpl; auto.
+Qed.
+
+Lemma treverse_involutive:
+  forall ts:Terms, treverse (treverse ts) = ts.
+Proof.
+  induction ts as [| a l IHl]; cbn; intros. reflexivity.
+  - rewrite treverse_tunit. rewrite IHl. reflexivity.
+Qed.
+   
+Remark tunit_treverse:
+    forall (l:Terms) (a:Term),
+    tappend (treverse l) (tunit a) = treverse (tcons a l).
+Proof.
+  intros. cbn. reflexivity.
+Qed.
+
+Lemma treverse_terms_ind:
+ forall (P : Terms -> Prop),
+       P tnil ->
+       (forall (a: Term) (l:Terms),
+           P (treverse l) -> P (treverse (tcons a l))) ->
+       forall l:Terms, P (treverse l).
+Proof.
+  intros. induction l.
+  - cbn. assumption.
+  - eapply H0. assumption.
+Qed.
+
+Lemma treverse_ind:
+  forall (P: Terms -> Prop),
+    P tnil ->
+    (forall (x: Term) (l: Terms), P l -> P (tappend l (tunit x))) ->
+    forall l: Terms, P l.
+Proof.
+  intros.
+  assert (j: treverse (treverse l) = l). apply treverse_involutive.
+  rewrite <-j.
+  apply treverse_terms_ind.
+  - assumption.
+  - intros. cbn. apply H0. assumption.
+Qed.
+
 
 Fixpoint tfrsts (n:nat) (ts:Terms) : option Terms :=
   match n, ts with
@@ -704,16 +778,6 @@ Proof.
   - apply IHn. assumption.
 Qed.
 
-
-(** syntactic control of "TApp": no nested apps, app must have an argument **)
-Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
-  match t with
-    | TApp fn b bs => TApp fn b (tappend bs args)
-    | fn => match args with
-              | tnil => fn
-              | tcons c cs => TApp fn c cs
-            end
-  end.
 
 Lemma mkApp_tnil_ident: forall t, mkApp t tnil = t.
   destruct t; cbn; try rewrite tappend_tnil; try reflexivity.
@@ -860,6 +924,122 @@ induction t; intros arg args h; simpl; try reflexivity.
 Qed.
 
 (** main lemma for dealing with mkApp **)
+(*********
+Lemma mkApp_isApp_lem:
+  forall fn ts arg args,
+    ts = tcons arg args ->
+    exists fn' arg' args', mkApp fn ts = TApp fn' arg' args'.
+Proof.
+  intros fn ts arg args h. functional induction (mkApp fn ts).
+  - exists fn, b, (tappend bs (tcons arg args)). reflexivity.
+  - discriminate.
+  - myInjection h. destruct (isApp_dec t).
+    + destruct i as [x0 [x1 [x2 jx]]]. subst. discriminate.
+    + destruct t.
+ ***********)
+
+(********
+Lemma mkApp_isApp_lem:
+  forall arg args fn' arg' args',
+    mkApp (TApp fn' arg' args') (tcons arg args) =
+    mkApp fn' (tcons arg' (tappend args' (tcons arg args))).
+Proof.
+  intros. unfold mkApp at 1. reflexivity.
+
+  induction fn; intros arg args; 
+    try (solve [left; split; try not_isApp; intuition]).
+  - right. exists fn1, fn2, t. intuition.
+    unfold mkApp at 1. destruct (isApp_dec fn1).
+    + destruct i as [k0 [k1 [k2 k3]]]. subst.
+ ***************)         
+
+(***********
+Lemma mkApp_isApp_lem:
+  forall fn arg args,
+    (~ isApp fn /\ mkApp fn (tcons arg args) = TApp fn arg args) \/
+    (exists fn' u us,
+        fn = TApp fn' u us /\
+        mkApp fn (tcons arg args) =
+        mkApp fn' (tcons u (tappend us (tcons arg args)))).
+Proof.
+  induction fn; intros arg args; 
+    try (solve [left; split; try not_isApp; intuition]).
+  - right. exists fn1, fn2, t. intuition.
+    unfold mkApp at 1. destruct (isApp_dec fn1).
+    + destruct i as [k0 [k1 [k2 k3]]]. subst.
+          
+    destruct (IHfn1 arg args).
+    + destruct H. rewrite mkApp_goodFn in H0; try assumption. elim H.
+
+
+      Lemma mkApp_isApp_lem:
+  forall fn arg args,
+    (~ isApp fn /\ mkApp fn (tcons arg args) = TApp fn arg args) \/
+    (exists fn' u us,
+        fn = TApp fn' u us /\
+        mkApp fn (tcons arg args) =
+        mkApp fn' (tappend (tcons u us) (tcons arg args))).
+Proof.
+  induction fn; intros arg args; unfold mkApp; cbn;
+    try (solve [left; split; try not_isApp; intuition]).
+  - destruct (IHfn1 arg args).
+    + destruct H. elim H.
+
+      
+    right. exists fn1, fn2, t. split. reflexivity.
+    destruct fn1; try reflexivity.
+    eapply f_equal3.
+  - exists (TRel n), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TSort s), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TProof fn), arg, tnil. split. reflexivity.
+    + left. intuition. revert H. not_isApp. 
+  - exists (TProd n fn1 fn2), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TLambda n fn1 fn2), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TLetIn n fn1 fn2 fn3), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists fn1, fn2, (tappend t (tunit arg)). split.
+    + apply f_equal3; try reflexivity. rewrite <- tappend_cons_lem.
+      reflexivity.
+    + right. destruct (IHfn1 fn2 t) as [x0 [x1 [x2 [jx1 jx2]]]].
+      destruct jx2.
+      * destruct H as [k0 [k1 [k2 k3]]]. subst.
+        exists x1, t. intuition.
+
+        
+  - change (exists (fn' arg' : Term) (args' : Terms),
+              TApp fn1 fn2 (tappend t (tcons arg args)) =
+              TApp fn' arg' (tappend args' args) /\
+              (~ isApp (TApp fn1 fn2 t) /\
+               fn' = TApp fn1 fn2 t /\ arg = arg' /\ args' = tnil \/
+                                                     isApp (TApp fn1 fn2 t) /\ 
+               TrmSize fn' < S (TrmSize fn1 + TrmSize fn2 + TrmsSize t) /\
+               tIn arg args')).
+    exists fn1, fn2, (tappend t (tunit arg)). split.
+    + rewrite <- tappend_assoc. simpl. reflexivity.
+    + right. split; try split.
+      * exists fn1, fn2, t. reflexivity.
+      * omega.
+      * apply tIn_tappend1.
+  - exists (TConst s), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TInd i), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TConstruct i n n0 n1), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TCase p fn1 fn2 b), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TFix d n), arg, tnil. split. reflexivity.
+    left. intuition. revert H. not_isApp.
+  - exists (TWrong s), arg, tnil. cbn. split. reflexivity.
+    left. repeat split. not_isApp.
+Qed.
+****************)
+  
+(********)
 Lemma mkApp_isApp_lem:
   forall fn arg args, exists fn' arg' args',
     mkApp fn (tcons arg args) = TApp fn' arg' (tappend args' args) /\
@@ -906,23 +1086,7 @@ Proof.
   - exists (TWrong s), arg, tnil. cbn. split. reflexivity.
     left. repeat split. not_isApp.
 Qed.
-
-Lemma mkApp_mkApp_fn:
-  forall fn, exists fn',
-    (forall arg args, exists arg' args',
-    mkApp fn (tcons arg args) = TApp fn' arg' (tappend args' args)) /\
-    (forall brg brgs, exists brg' brgs',
-      mkApp fn (tcons brg brgs) = TApp fn' brg' (tappend brgs' brgs)).
-Proof.
-  intros fn.
-  case_eq fn; intros;
-  try (solve [exists fn; subst; split; intros carg cargs;
-                     exists carg, tnil; reflexivity]).
-  - exists t. split; intros crg crgs; exists t0; cbn;
-    exists (tappend t1 (tunit crg));
-    rewrite <- tappend_assoc; reflexivity.
-Qed.
-
+(************)
    
 (** well-formed terms: TApp well-formed all the way down **)
 Inductive WFapp: Term -> Prop :=
@@ -979,7 +1143,6 @@ Lemma canonicalP_pres_WFapp:
   forall r args, canonicalP t = Some (r, args) -> WFapps args.
 Proof.
   induction t; simpl; intros; try discriminate.
-  - eapply IHt; inversion_Clear H; eassumption.
   - destruct t1; try discriminate. myInjection H0. inversion_Clear H.
     constructor; assumption.
   - myInjection H0. constructor.
@@ -1822,3 +1985,4 @@ Proof.
   intros. apply instantiate_pres_WFapp.
   assumption. constructor. assumption.
 Qed.
+

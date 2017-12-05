@@ -16,8 +16,227 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 Set Template Cast Propositions.
-Set Printing Width 150.
+Set Printing Width 100.
 Set Printing Depth 1000.
+
+Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
+Notation SS := (TConstruct NN 1 1).
+Notation ZZ := (TConstruct NN 0 0).
+Notation BB := (mkInd "Coq.Init.Datatypes.bool" 0).
+Notation ff := (TConstruct BB 1 0 0).
+Notation tt := (TConstruct BB 0 0 0).
+Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
+Notation CONS := (TConstruct LL 1 3).
+Notation NIL := (TConstruct LL 0 1).
+Notation Lam := (TLambda).
+Notation tLam := (tLambda).
+Notation AND := (mkInd "Coq.Init.Logic.and" 0).
+Notation CONJ := (TConstruct AND 0 4).
+Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
+Notation II := (TConstruct TRUE 0 0).
+Notation EQ := (mkInd "Coq.Init.Logic.eq" 0).
+Notation RFL := (TConstruct EQ 0 2).
+Notation PROD := (mkInd "Coq.Init.Datatypes.prod" 0).
+Notation PAIR := (TConstruct PROD 0 4).
+Notation "^ x" := (nNamed x)  (at level 85).
+Notation "^" := (nAnon).
+Infix ":t:" := tcons  (at level 87, right associativity).
+
+Definition tstx := 1.
+Quote Recursively Definition cbv_tstx :=
+  ltac:(let t:=(eval cbv in tstx) in exact t).
+Definition ans_tstx :=
+  Eval cbv in (main (program_Program cbv_tstx)).
+(* [program] of the program *)
+Quote Recursively Definition p_tstx := tstx.
+Definition P_tstx := Eval cbv in (program_Program p_tstx).
+Goal
+  let env := (env P_tstx) in
+  let main := (main P_tstx) in
+  wcbvEval (env) 90 (main) = Ret ans_tstx.
+  vm_compute. reflexivity.
+Qed.
+Goal
+  let env := (env P_tstx) in
+  let main := (main P_tstx) in
+  WcbvEval (env) (main) ans_tstx.
+Proof.
+  intros. unfold main, AstCommon.main, P_tstx, ans_tstx.
+  eapply wConst.
+  - reflexivity.
+  - eapply wAppCong.
+    + eapply wConstruct.
+    + left. auto.
+    + eapply wConstruct.
+    + constructor.
+Qed.
+
+Section myplus.
+  Variables (A:Type).
+  Inductive myNat : Type :=
+  | myZ: forall a:A, myNat.
+  Definition myplus (m: myNat) : A :=
+    match m with
+    | myZ a => a
+    end.
+End myplus.
+Print myplus.
+Definition myplusx := (myplus (myZ true)).
+Compute myplusx.
+Quote Recursively Definition cbv_myplusx :=
+  ltac:(let t:=(eval cbv in myplusx) in exact t).
+Definition ans_myplusx :=
+  Eval cbv in (main (program_Program cbv_myplusx)).
+Print ans_myplusx.
+(* [program] of the program *)
+Quote Recursively Definition p_myplusx := myplusx.
+Definition P_myplusx := Eval cbv in (program_Program p_myplusx).
+Goal   (** works in L2 **)
+  let env := (env P_myplusx) in
+  let main := (main P_myplusx) in
+  wcbvEval (env) 90 (main) = Ret ans_myplusx.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+Goal
+  let env := (env P_myplusx) in
+  let main := (main P_myplusx) in
+  WcbvEval (env) (main) ans_myplusx.
+Proof.
+  intros. unfold main, AstCommon.main, P_myplusx, ans_myplusx.
+  eapply wConst.
+  - reflexivity.
+  - eapply wAppLam.
+    + eapply wConst.
+      * reflexivity.
+      * eapply wLam.
+    + eapply wDummy.
+    + unfold whBetaStep, instantiate. unfold nat_compare. unfold mkApp.
+      eapply wAppLam.
+      * eapply wLam.
+      *{ eapply wAppCong.
+         - eapply wConstruct.
+         - left. auto.
+         - eapply wDummy.
+         - eapply wCons.
+           + eapply wConstruct.
+           + eapply wNil. }
+      *{ unfold whBetaStep, instantiate. unfold nat_compare. unfold mkApp.
+         eapply wCase.
+         - eapply wAppCong.
+           + eapply wConstruct.
+           + left. auto.
+           + eapply wDummy.
+           + eapply wCons.
+             * eapply wConstruct.
+             * eapply wNil.
+         - unfold canonicalP. reflexivity.
+         - reflexivity.
+         - reflexivity.
+         - unfold mkApp. eapply wAppLam.
+           + eapply wLam.
+           + eapply wConstruct.
+           + unfold whBetaStep, instantiate. unfold nat_compare.
+             eapply wConstruct. }
+Qed.
+
+Fixpoint myapp (ls ts: list nat): list nat :=
+  match ls with
+  | nil => ts
+  | cons b bs => cons b (myapp bs ts)
+  end.
+Definition myappx := (myapp (cons 0 (cons 1 nil)) nil).
+Compute myappx.
+Quote Recursively Definition cbv_myappx :=
+  ltac:(let t:=(eval cbv in myappx) in exact t).
+Definition ans_myappx :=
+  Eval cbv in (main (program_Program cbv_myappx)).
+Print ans_myappx.
+(* [program] of the program *)
+Quote Recursively Definition p_myappx := myappx.
+Definition P_myappx := Eval cbv in (program_Program p_myappx).
+Goal
+  let env := (env P_myappx) in
+  let main := (main P_myappx) in
+  wcbvEval (env) 900 (main) = Ret ans_myappx.
+  vm_compute. reflexivity.
+Qed.
+
+
+(** list reverse **)
+Fixpoint myrev (ls: list nat): list nat :=
+  match ls with
+  | nil => nil
+  | cons b bs => (myrev bs) ++ (cons b nil)
+  end.
+Definition myrevx := (myrev (cons 0 nil)).
+Compute myrevx.
+Quote Recursively Definition cbv_myrevx :=
+  ltac:(let t:=(eval cbv in myrevx) in exact t).
+Definition ans_myrevx :=
+  Eval cbv in (main (program_Program cbv_myrevx)).
+Print ans_myrevx.
+(* [program] of the program *)
+Quote Recursively Definition p_myrevx := myrevx.
+Definition P_myrevx := Eval cbv in (program_Program p_myrevx).
+Goal
+  let env := (env P_myrevx) in
+  let main := (main P_myrevx) in
+  wcbvEval (env) 90 (main) = Ret ans_myrevx.
+  vm_compute. reflexivity.
+Qed.
+
+(** hetereogenous list: type as non-parametric argument to constructor **)
+Inductive hlist : Type :=
+| hnil : hlist
+| hcons : forall (A:Type), A -> hlist -> hlist.
+Print hlist.
+
+Fixpoint hlength (l:hlist) : nat :=
+  match l with
+  | hnil => 0
+  | hcons _ k => S (hlength k)
+  end.
+
+Fixpoint hmap (f: forall (A:Type), A -> bool) (l:hlist) : list bool :=
+  match l with
+  | hnil => nil
+  | hcons a k => cons (f _ a) (hmap f k)
+  end.
+
+Recursive Extraction hmap.
+
+
+Function deProof (t:Term) : Term :=
+  match t with
+    | TRel n => TRel n
+    | TProof t => t
+    | TLambda nm bod => TLambda nm (deProof bod)
+    | TLetIn nm dfn bod => TLetIn nm (deProof dfn) (deProof bod)
+    | TApp fn arg args => TApp (deProof fn) (deProof arg) (deProofs args)
+    | TConst nm => TConst nm
+    | TConstruct i m np na => TConstruct i m np na
+    | TCase n mch brs => TCase n (deProof mch) (deProofBs brs)
+    | TFix ds n => TFix (deProofDs ds) n
+    | TDummy str => TDummy str
+    | TWrong str => TWrong str
+  end
+with deProofs (ts:Terms) : Terms := 
+  match ts with
+    | tnil => tnil
+    | tcons t ts => tcons (deProof t) (deProofs ts)
+  end
+with deProofBs (bs:Brs) : Brs := 
+  match bs with
+    | bnil => bnil
+    | bcons n t ts => bcons n (deProof t) (deProofBs ts)
+  end
+with deProofDs (ts:Defs) : Defs := 
+  match ts with
+    | dnil => dnil
+    | dcons nm t m ds => dcons nm (deProof t) m (deProofDs ds)
+  end.
+
 
 Quote Recursively Definition p_Type := Type.
 Print p_Type.
@@ -75,10 +294,6 @@ Check cons. Check @nil.
 Definition Nil : forall A:Type, list A := @nil.
 Eval cbv in ((fun (x:forall A:Type, list A) => x Prop) Nil).
 
-(** tactic for WcbvEval relation **)
-Ltac terms := repeat (eapply wCons; try eapply wInd;
-                      try eapply wConstruct; try eapply wInd;
-                      try not_isLambda; try not_isFix; try eapply wNil).
 
 (** Abhishek's example of looping: in L2 we don't test the guard **)
 Inductive mlt (n:nat) : nat -> Prop := mlt_n: mlt n (S n).
@@ -217,33 +432,6 @@ Proof.
 ********************************)
                       
 
-Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
-Notation NNN := (TInd NN).
-Notation SS := (TConstruct NN 1 1).
-Notation ZZ := (TConstruct NN 0 0).
-Notation LL := (mkInd "Coq.Init.Datatypes.list" 0).
-Notation LLL := (TInd LL).
-Notation CONS := (TConstruct LL 1 3).
-Notation NIL := (TConstruct LL 0 1).
-Notation Lam := (TLambda).
-Notation tLam := (tLambda).
-Notation Pi := (TProd).
-Notation tPi := (tProd).
-Notation PROP := (TSort sProp).
-Notation tPROP := (tSort sProp).
-Notation AND := (mkInd "Coq.Init.Logic.and" 0).
-Notation CONJ := (TConstruct AND 0 4).
-Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
-Notation II := (TConstruct TRUE 0 0).
-Notation EQ := (mkInd "Coq.Init.Logic.eq" 0).
-Notation RFL := (TConstruct EQ 0 2).
-Notation PROD := (mkInd "Coq.Init.Datatypes.prod" 0).
-Notation PAIR := (TConstruct PROD 0 4).
-Notation "^ x" := (nNamed x)  (at level 85).
-Notation "^" := (nAnon).
-Infix ":t:" := tcons  (at level 87, right associativity).
-
-
 Inductive P0: Prop := p0.
 Inductive P1: Prop := p1.
 Notation PP0 := (mkInd "P0" 0).
@@ -252,27 +440,30 @@ Notation PP1 := (mkInd "P1" 0).
 Notation pp1 := (TConstruct PP1 0 0).
 
 
+Print and_rect.
 Quote Recursively Definition p_and_rect := and_rect.
 Print p_and_rect.
 Eval cbv in (program_Program p_and_rect).
+Check program_Program.
 
 Definition and_rect_x :=
-  (and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+  (and_rect (fun (a:1=1) (b:True) => conj b a) (conj (eq_refl 1) I)).
 Quote Recursively Definition p_and_rect_x := and_rect_x.
 Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).
 Print P_and_rect_x.
 Quote Recursively Definition cbv_and_rect_x :=
   ltac:(let t:=(eval cbv in and_rect_x) in exact t).
+Print cbv_and_rect_x.
 Definition ans_and_rect_x :=
-  Eval cbv in (main (program_Program cbv_and_rect_x)).
-Definition envx := env P_and_rect_x.
-Definition mainx := main P_and_rect_x.
+  Eval cbv in (deProof (main (program_Program cbv_and_rect_x))).
+Print ans_and_rect_x.
+
 Goal
-  wcbvEval envx 90 mainx = Ret ans_and_rect_x.
-  vm_compute. (******** HERE reflexivity.
+  let envx := env P_and_rect_x in
+  let mainx := main P_and_rect_x in
+  wcbvEval envx 25 mainx = Ret ans_and_rect_x.
+  vm_compute. reflexivity.
 Qed.
-               *****************)
-Abort.
 
 Definition and_rectx :=
   and_rect (fun (x0:P0) (x1:P1) => pair (conj x1 x0) 0) (conj p0 p1).
@@ -290,9 +481,10 @@ Print P_and_rectx.
 Definition P_envx := env P_and_rectx.
 Definition P_mainx := main P_and_rectx.
 Goal wcbvEval P_envx 100 P_mainx = Ans_and_rectx.
-vm_compute. reflexivity.
+  vm_compute. reflexivity.
 Qed.
 
+Set Implicit Arguments.
 Definition my_and_rect := 
   fun (A B : Prop) (P : Type) (f : A -> B -> P) (a : A /\ B) =>
     match a with conj x x0 => f x x0 end.
@@ -306,9 +498,8 @@ Definition P_my_envx := env P_my_and_rectx.
 Definition P_my_mainx := main P_my_and_rectx.
 Eval cbv in (wcbvEval P_my_envx 100 P_my_mainx).
 
-
 Definition my_and_rect_x :=
-  (my_and_rect (fun (a:2=2) (b:True) => conj b a) (conj (eq_refl 2) I)).
+  (my_and_rect (fun (a:1=1) (b:True) => conj b a) (conj (eq_refl 1) I)).
 Quote Recursively Definition p_my_and_rect_x := my_and_rect_x.
 Definition P_my_and_rect_x := Eval cbv in (program_Program p_my_and_rect_x).
 Quote Recursively Definition cbv_my_and_rect_x :=
@@ -451,11 +642,11 @@ Check p_pack_nat.
 Definition P_pack_nat := Eval cbv in (program_Program p_pack_nat).
 Print P_pack_nat.
 
-Inductive xxxx : Prop :=
+Inductive xxxx : Set :=
 | xxxxl: forall n:nat, n = 0 -> xxxx
 | xxxxr: forall n:nat, n = 1 -> xxxx.
 Print xxxx.
-Axiom Xxxx : xxxx.
+Definition Xxxx : xxxx := xxxxl eq_refl.
 Definition yyyy (f:xxxx) :=
   match f with xxxxl q => f | xxxxr q => f end.
 Definition yyyyX := (yyyy Xxxx).
@@ -470,10 +661,13 @@ Quote Recursively Definition p_yyyyX := yyyyX.
 Print p_yyyyX.
 Definition P_yyyyX := Eval cbv in (program_Program p_yyyyX).
 Print P_yyyyX.
+                       
 Goal
     let env := (env P_yyyyX) in
     let main := (main P_yyyyX) in
-    wcbvEval env 5 main = Ret ans_yyyyX.
+    let ans :=  deProof ans_yyyyX in
+    wcbvEval env 50 main = Ret ans.
+Proof.
   vm_compute. reflexivity.
 Qed.
 
@@ -723,7 +917,7 @@ Qed.
 
 Require Import Benchmarks.vs.
 
-(****** runs out of space **************)
+(****** runs out of space **************
 Time Quote Recursively Definition p_myMain := vs.myMain.
 Time Definition P_myMain :=
   Eval vm_compute in (L2.compile.program_Program p_myMain).

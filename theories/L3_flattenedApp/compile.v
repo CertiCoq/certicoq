@@ -484,13 +484,13 @@ Function strip (t:L2_5Term) : Term :=
     | L2_5.compile.TRel n => (TRel n)
     | L2_5.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2_5.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
-    | L2_5.compile.TApp fn arg args =>
-      mkApp (TApp (strip fn) (strip arg)) (strips args)
+    | L2_5.compile.TApp fn arg => TApp (strip fn) (strip arg)
     | L2_5.compile.TConst nm => TConst nm
     | L2_5.compile.TConstruct i n args => TConstruct i n (strips args)
     | L2_5.compile.TCase i mch brs => TCase i (strip mch) (stripBs brs)
     | L2_5.compile.TFix ds n => TFix (stripDs ds) n
     | L2_5.compile.TWrong str => TWrong str
+    | L2_5.compile.TDummy _ => TProof
    end
 with strips (ts:L2_5Terms) : Terms := 
   match ts with

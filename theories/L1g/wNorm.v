@@ -28,14 +28,8 @@ Variable p: environ Term.
   
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm ty bod, WNorm ty -> WNorm (TLambda nm ty bod)
-| WNProd: forall nm ty bod, WNorm ty -> WNorm (TProd nm ty bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNCase: forall mch n ty brs,
-            WNorm mch -> WNorm ty -> ~ isCanonical mch ->
-            WNorm (TCase n ty mch brs)
 | WNConstruct: forall i n np na, WNorm (TConstruct i n np na)
-| WNInd: forall i, WNorm (TInd i)
-| WNSort: forall srt, WNorm (TSort srt)
 | WNApp: forall fn t ts,
            WNorm fn -> WNorms (tcons t ts) ->
            ~ isLambda fn -> ~ isFix fn -> ~ isApp fn ->
@@ -252,10 +246,7 @@ Proof.
   try (solve[inversion h]);
   try (solve[inversion h; subst; contradiction]).
   - inversion h. subst. elim H4. exists nm, ty, bod. reflexivity.
-  - inversion_Clear h. elim H5.
-    eapply canonicalP_isCanonical. eassumption.
-  - inversion_Clear h.
-    + elim H5. auto.
+  - inversion_Clear h. elim H5. auto.
 Qed.
 
 Lemma wNorm_no_wndStep:

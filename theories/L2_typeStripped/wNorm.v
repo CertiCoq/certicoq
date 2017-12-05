@@ -1,5 +1,4 @@
 
-
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
@@ -8,6 +7,7 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
 Require Import L2.term.
 Require Import L2.program.
+Require Import L2.wcbvEval.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -23,24 +23,21 @@ Variable p:environ Term.
   
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
-| WNProd: forall nm bod, WNorm (TProd nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNCase: forall mch n brs,
-            WNorm mch -> ~ isCanonical mch ->
-            WNorm (TCase n mch brs)
+    WNorm mch -> ~ isCanonical mch -> WNorm (TCase n mch brs)
 | WNConstruct: forall i n np na, WNorm (TConstruct i n np na)
-| WNInd: forall i, WNorm (TInd i)
-| WNSort: forall s, WNorm (TSort s)
 | WNApp: forall fn t ts,
-           WNorm fn -> WNorm t -> WNorms ts ->
-           ~ (isLambda fn) -> ~ (isFix fn) -> ~ isApp fn ->
-           WNorm (TApp fn t ts)
+    WNorm fn -> WNorm t -> WNorms ts ->
+    ~ (isLambda fn) -> ~ (isFix fn) -> ~ isApp fn ->
+    WNorm (TApp fn t ts)
+| WNDummy: forall str, WNorm (TDummy str)
 with WNorms: Terms -> Prop :=
-| WNtnil: WNorms tnil
-| WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
+     | WNtnil: WNorms tnil
+     | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
 Hint Constructors WNorm WNorm.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
-      with WNorms_ind' := Induction for WNorms Sort Prop.
+  with WNorms_ind' := Induction for WNorms Sort Prop.
 Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.
 
 (****************************
@@ -79,13 +76,17 @@ Proof.
     + eapply IHts. eassumption.
 Qed.
 
-(*********************************
-Lemma Wcbv_WNorm:
-  WFaEnv p ->
-  (forall t s, WcbvEval p t s -> WFapp t -> WNorm s) /\
-  (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> WNorms ss).
+(** WFapp or WFTrm or crctTerm ????  ****
+Lemma Lookup_pres_WFapp:
+  forall p, crctEnv p -> forall nm u, LookupDfn nm p u -> WFTrm u 0.
 Proof.
-  intros hp.
+  apply AstCommon.Lookup_pres_WFapp.
+Qed.
+
+Lemma Wcbv_WNorm:
+  (forall t s, WcbvEval p t s -> crctTerm p 0 t -> WNorm s) /\
+  (forall ts ss, WcbvEvals p ts ss -> crctTerms p 0 ts -> WNorms ss).
+Proof.
   apply WcbvEvalEvals_ind; simpl; intros; try (solve[constructor]);
   try inversion_Clear H0; intuition.
   - apply H. assert (j:= Lookup_pres_WFapp hp l). inversion j. assumption.

@@ -41,7 +41,7 @@ Definition optStripDnth (b: option (L1gTerm * nat)) : option (Term * nat) :=
                            end.
 Definition optStripBnth := optStripDnth.
 Definition optStripCanP
-           (b: option (nat * L1gTerms)): option (nat * Terms) :=
+           (b: option (nat * L1gTerms)) : option (nat * Terms) :=
                            match b with
                              | None => None
                              | Some (n, t) => Some (n, strips t)
@@ -56,14 +56,14 @@ Definition optStrip_split
 
 
 Lemma optStrip_hom: forall y, optStrip (Some y) = Some (strip y).
-induction y; simpl; reflexivity.
+destruct y; simpl; reflexivity.
 Qed.
 Lemma optStrip_hom_None: optStrip (@None L1g.compile.Term) = @None (Term).
   reflexivity.
 Qed.
 
 Lemma optStrips_hom: forall y, optStrips (Some y) = Some (strips y).
-induction y; simpl; reflexivity.
+destruct y; simpl; reflexivity.
 Qed.
 Lemma optStripDnth_hom:
   forall y n, optStripDnth (Some (y, n)) = Some (strip y, n).
@@ -189,11 +189,49 @@ induction m; induction ds; try intuition.
 Qed.
 
 Lemma canonicalP_hom:
-  forall t, optStripCanP (L1g.term.canonicalP t) = canonicalP (strip t).
+  forall t, L1g.term.WFapp t ->
+            optStripCanP (L1g.term.canonicalP t) = canonicalP (strip t).
 Proof.
-  induction t; intros; cbn; try reflexivity; try assumption.
-  - destruct t1; cbn; try reflexivity.
+  induction 1; intros; try reflexivity; try assumption.
+  change
+    (optStripCanP (L1g.term.canonicalP (L1g.compile.TApp fn t ts)) =
+     canonicalP (mkApp (strip fn) (tcons (strip t) (strips ts)))).
+   destruct fn; try reflexivity. elim H. auto.
 Qed.
+(*************
+  destruct fn.
+  - reflexivity.
+  - reflexivity.
+  - change
+      (optStripCanP
+         (L1g.term.canonicalP
+            (L1g.compile.TApp (L1g.compile.TProof fn) t ts)) =
+       canonicalP (TApp (TProof (strip fn)) (strip t) (strips ts))).
+    change
+      (optStripCanP
+         (L1g.term.canonicalP
+            (L1g.compile.TApp (L1g.compile.TProof fn) t ts)) =
+       canonicalP (TApp (TProof (strip fn)) (strip t) (strips ts))).
+    unfold optStripCanP. unfold L1g.term.canonicalP.
+    cbn in IHWFapp1.
+
+    
+Print canonicalP.
+
+    change
+      (optStripCanP
+         (L1g.term.canonicalP
+            (L1g.compile.TApp (L1g.compile.TProof fn) t ts)) =
+       canonicalP (mkApp (strip (L1g.compile.TProof fn))
+                         (tcons (strip t) (strips ts)))).
+unfold optStripCanP.
+
+
+  destruct fn; try reflexivity.
+  - elim H. auto.  
+  unfold L1g.term.canonicalP. unfold optStripCanP. unfold canonicalP.
+  destruct fn; try reflexivity.
+****************)  
 
 Lemma tnth_hom:
  forall ts n, optStrip (L1g.term.tnth n ts) = tnth n (strips ts).
@@ -214,10 +252,25 @@ Qed.
 
 Lemma TApp_hom:
   forall fn arg args,
-    strip (L1g.compile.TApp fn arg args) =
-    TApp (strip fn) (strip arg) (strips args).
-induction fn; intros arg args; try reflexivity.
+   strip (L1g.compile.TApp fn arg args) =
+    mkApp (strip fn) (tcons (strip arg) (strips args)).
+Proof.
+  destruct fn; intros arg args; try intuition;
+  try (left; repeat split; [not_is1 | not_is3 | not_is1]).  
 Qed.
+
+(*********
+Lemma TApp_hom':
+  forall fn arg args,
+   ( ~isSort fn /\ ~isProd fn /\ ~isInd fn /\ ~isApp fn /\
+    strip (L1g.compile.TApp fn arg args) =
+    TApp (strip fn) (tcons (strip arg) (strips args))) \/
+    (strip (L1g.compile.TApp fn arg args) = TDummy).    
+Proof.
+  destruct fn; intros arg args; try intuition;
+  try (left; repeat split; [not_is1 | not_is3 | not_is1]).  
+Qed.
+ ***********)
 
 Lemma isApp_hom:
   forall t, isApp (strip t) -> L1g.term.isApp t.
@@ -227,20 +280,48 @@ Proof.
   exists t1, t2, t3. reflexivity.
 Qed.
 
+(***********
+Lemma stripApp_Dummy:
+  forall fn arg args,
+    strip (L1g.compile.TApp fn arg args) = TDummy ->
+    isSort fn \/ isProd fn \/ isInd fn \/
+    mkApp (strip fn) (tcons (strip arg) (strips args)) = TDummy.
+Proof.
+  destruct fn; intros; try discriminate.
+  - left. exists s. reflexivity.
+  - right. left. exists n, fn1, fn2. reflexivity.
+  - right. right. right. exact H.
+  - right. right. left. auto.
+Qed.
+ ***************)
+
+(********
 Lemma isLambda_hom:
   forall t, isLambda (strip t) -> L1g.term.isLambda t.
 Proof.
-  destruct t; simpl; intros h; destruct h as [x0 [x1 h]]; try discriminate. 
-  exists n, t1, t2. reflexivity.
+  destruct t; intros h; destruct h as [x0 [x1 h]]; try discriminate. 
+  - exists n, t1, t2. reflexivity.
+  - destruct t1; cbn; try discriminate.
+    destruct (TApp_hom (L1g.compile.TApp t1_1 t1_2 t) t2 t3).
+    + destruct H as [y0 [y1 [y2 jy]]]. rewrite jy in h.
+      Check (@mkApp_isApp (strip (L1g.compile.TApp t1_1 t1_2 t))
+                          (strip t2) (strips t3)).
+      assert (j: strip (L1g.compile.TApp t1_1 t1_2 t) <> TDummy).
+      { intros k.
+        destruct (stripApp_Dummy _ _ _ k) as [ j | [j | [ j | j ]]].
+        -
 Qed.
 
 Lemma isFix_hom:
   forall t, isFix (strip t) -> L1g.term.isFix t.
 Proof.
-  destruct t; cbn; intros h; destruct h as [x0 [x1 h]]; try discriminate.
-  exists d, n. reflexivity. 
+  destruct t; intros h; destruct h as [x0 [x1 h]]; try discriminate.
+  - destruct t1; cbn; try discriminate.
+  - exists d, n. reflexivity. 
 Qed.
+ ******************)
 
+(*********
 Lemma L1WFapp_L2WFapp:
   (forall t, L1g.term.WFapp t -> WFapp (strip t)) /\
   (forall ts, L1g.term.WFapps ts -> WFapps (strips ts)) /\
@@ -260,6 +341,7 @@ Proof.
   - assumption.
   - apply stripEnv_pres_fresh. assumption.
 Qed.
+ ************)
 
 (***
 Lemma WFapp_hom:
@@ -293,18 +375,22 @@ Proof.
   - rewrite mkApp_idempotent. simpl. reflexivity.
 Qed.
 
+
 Lemma mkApp_hom:
-forall fn args,
-  strip (L1g.term.mkApp fn args) = mkApp (strip fn) (strips args).
+forall args fn,
+  strip (L1g.compile.mkApp fn args) = mkApp (strip fn) (strips args).
 Proof.
-  destruct args; try (reflexivity).
-  - rewrite L1g.term.mkApp_tnil_ident. rewrite mkApp_tnil_ident.
-    reflexivity.
-  - destruct fn; try reflexivity.
-    cbn. rewrite <- tcons_hom. rewrite <- tappend_hom. reflexivity.
+  intros args fn. functional induction (L1g.compile.mkApp fn args).
+  - change
+      (mkApp (strip fn)
+             (tcons (strip b) (strips (L1g.compile.tappend bs args))) =
+       mkApp (mkApp (strip fn) (tcons (strip b) (strips bs)))
+             (strips args)).
+    rewrite mkApp_idempotent. cbn. rewrite tappend_hom. reflexivity.
+  - cbn. rewrite mkApp_tnil_ident. reflexivity.
+  - rewrite tcons_hom. destruct t; try contradiction; try reflexivity.
 Qed.
-
-
+ 
 Lemma instantiate_tappend_commute:
   forall ts us tin n,
     instantiates tin n (tappend ts us) =
@@ -350,6 +436,27 @@ induction bod; simpl; intros; try reflexivity.
   reflexivity.
 Qed.
 
+(**********
+Lemma strip_TApp_Dummy_invrt:
+  forall fn arg args,
+    strip (L1g.compile.TApp fn arg args) = TDummy -> strip fn = TDummy.
+Proof.
+  destruct fn; intros; try discriminate; try reflexivity.
+  - change
+      (mkApp (strip (L1g.compile.TApp fn1 fn2 t))
+             (tcons (strip arg) (strips args)) =
+       TDummy) in H.
+    change
+      (mkApp (mkApp (strip fn1) (tcons (strip fn2) (strips t)))
+             (tcons (strip arg) (strips args)) =
+       TDummy) in H.
+    rewrite mkApp_idempotent in H. cbn in H.
+    functional inversion H.
+    change (mkApp (strip fn1) (tcons (strip fn2) (strips t)) = TDummy).
+    rewrite <- H0. reflexivity.
+Qed.
+ *********************)
+
 Lemma instantiate_hom:
   (forall bod arg n, strip (L1g.term.instantiate arg n bod) =
                      instantiate (strip arg) n (strip bod)) /\
@@ -367,9 +474,6 @@ Proof.
       * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
     + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
   - cbn. rewrite H. reflexivity.
-  - change (TProd n (strip (L1g.term.instantiate arg (S n0) t0)) =
-            (TProd n (instantiate (strip arg) (S n0) (strip t0)))).
-    rewrite H0. reflexivity.
   - change (TLambda n (strip (L1g.term.instantiate arg (S n0) t0)) =
             (TLambda n (instantiate (strip arg) (S n0) (strip t0)))).
     rewrite H0. reflexivity.
@@ -378,22 +482,20 @@ Proof.
             (TLetIn n (instantiate (strip arg) n0 (strip t))
                     (instantiate (strip arg) (S n0) (strip t1)))).
     rewrite H. rewrite H1. reflexivity.
-  - change (strip (L1g.term.mkApp
-                     (L1g.term.instantiate arg n t)
-                     (L1g.compile.tcons (L1g.term.instantiate arg n t0)
-                                         (L1g.term.instantiates arg n t1))) =
-            instantiate (strip arg) n (strip (L1g.compile.TApp t t0 t1))). 
-    rewrite TApp_hom. 
+  - rewrite TApp_hom.
     change
-      (strip (L1g.term.mkApp
-                (L1g.term.instantiate arg n t)
-                (L1g.compile.tcons (L1g.term.instantiate arg n t0)
+      (strip (L1g.term.instantiate arg n (L1g.compile.TApp t t0 t1)) =
+       instantiate (strip arg) n
+                   (mkApp (strip t) (tcons (strip t0) (strips t1)))).
+    change
+      (strip (L1g.compile.mkApp (L1g.term.instantiate arg n t)
+                                (L1g.compile.tcons
+                                   (L1g.term.instantiate arg n t0)
                                    (L1g.term.instantiates arg n t1))) =
-       (mkApp (instantiate (strip arg) n (strip t))
-              (tcons (instantiate (strip arg) n (strip t0))
-                     (instantiates (strip arg) n (strips t1))))).
-    rewrite <- H. rewrite <- H0. rewrite <- H1. 
-    rewrite mkApp_hom. rewrite tcons_hom. reflexivity.
+       instantiate (strip arg) n
+                   (mkApp (strip t) (tcons (strip t0) (strips t1)))).
+    rewrite mkApp_hom. rewrite H. rewrite tcons_hom. rewrite H0. rewrite H1.
+    rewrite <- instantiate_mkApp_commute. reflexivity.
   - change (TCase p (strip (L1g.term.instantiate arg n t0))
                   (stripBs (L1g.term.instantiateBrs arg n b)) =
             (TCase p (instantiate (strip arg) n (strip t0))
@@ -462,12 +564,6 @@ Qed.
 
 Lemma TFix_hom:
   forall defs n, strip (L1g.compile.TFix defs n) = TFix (stripDs defs) n.
-reflexivity.
-Qed.
-
-Lemma TProd_hom:
-  forall nm ty bod,
-    strip (L1g.compile.TProd nm ty bod) = TProd nm (strip bod).
 reflexivity.
 Qed.
 
@@ -561,61 +657,12 @@ Lemma optStripCanP_hom':
 intros. destruct z as [z0 z1]. cbn. reflexivity.
 Qed.
 
-(***** Can this weaker version of WcbvEval_hom be proven?
-****  Seems need stronger IH   **************
-Lemma compile_pres_wcbvEval:
-  forall p,
-    (forall t t', L1g.wcbvEval.WcbvEval p t t' ->
-                  exists u, WcbvEval (stripEnv p) (strip t) u) /\
-    (forall ts ts', L1g.wcbvEval.WcbvEvals p ts ts' ->
-                  exists us, WcbvEvals (stripEnv p) (strips ts) us).
-Proof.
-  intros p.
-  apply L1g.wcbvEval.WcbvEvalEvals_ind; intros; cbn.
-  - destruct H as [x jx]. exists x. econstructor. assumption.
-  - destruct H as [x jx]. exists (TLambda nm (strip bod)). econstructor.
-  - destruct H as [x jx]. exists (TProd nm (strip bod)). econstructor.
-  - destruct H as [x jx]. exists x. constructor. assumption.
-  - exists (TConstruct i r arty). constructor.
-  - exists (TInd i). constructor.
-  - exists (TSort srt). constructor.
-  - exists (TFix (stripDs dts) m). constructor.
-  - exists TAx. constructor.
-  - destruct H as [x jx]. exists x. econstructor; try eassumption.
-    eapply (lookupDfn_hom _ _ e).
-  - destruct H as [x jx]. destruct H0 as [y jy]. destruct H1 as [z jz].
-    rewrite whBetaStep_hom in jz. exists z.
-    eapply (@wAppLam
-             (stripEnv p) (strip fn)
-             (strip bod) (strip a1) (strip a1') z (strips args) _ _ _ jz).
-  - destruct H as [x jx]. destruct H0 as [y jy].
-    rewrite (proj1 instantiate_hom) in jy. exists y.
-    eapply (@wLetIn (stripEnv p) nm (strip dfn) (strip bod) _ _ _ jy). 
-  - destruct H as [u ju]. destruct H0 as [y jy]. destruct H1 as [z jz].
-    rewrite <- pre_whFixStep_hom in jz. cbn in jy. cbn in jz. exists z.
-    eapply (@wAppFix
-             (stripEnv p) (stripDs dts) m
-             (strip fn) (strip arg) (strip arg') z (strip x)
-          (strips args) (strips args') ix _ _ _ _ jz).
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-    Grab Existential Variables.
-    rewrite tlength_hom. assumption.
-    rewrite <- dnthBody_hom. rewrite e. cbn. reflexivity.
-    admit.
-    admit.
-****)
-
 Lemma Construct_strip_inv:
   forall i n np na s,
     TConstruct i n np na = strip s -> L1g.compile.TConstruct i n np na = s.
 Proof.
   intros i n. destruct s; simpl; intros h; try discriminate.
+  - functional inversion h.
   - myInjection h. reflexivity.
 Qed.
 
@@ -629,55 +676,149 @@ Proof.
     reflexivity. symmetry. assumption.
 Qed.
 
-Lemma Ind_strip_inv:
-  forall i s, TInd i = strip s -> L1g.compile.TInd i = s.
+Lemma App_strip_inv:
+  forall s fn arg args,
+      TApp fn arg args = strip s -> L1g.term.isApp s.
 Proof.
-  intros i. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. reflexivity.
+  induction s; try (solve[cbn; intros; discriminate]).
+  intros. auto.
 Qed.
+  
+(**********
+  Lemma App_strip_inv:
+  forall fn arg args s,
+      TApp fn arg args = strip s -> ~ isApp fn ->
+      exists sfn sarg sargs,
+        (L1g.compile.TApp sfn sarg sargs) = s /\
+        fn = strip sfn /\ arg = strip sarg /\ args = strips sargs.
+Proof.
+  intros fn arg args s k0 k1. functional inversion k0; subst.
+  exists fn0, arg0, args0. split.
+  - reflexivity.
+  - change (TApp fn arg args =
+            mkApp (strip fn0)
+                  (tcons (strip arg0) (strips args0))) in k0.
+    assert (j:~ isApp (strip fn0)).
+    { rewrite mkApp_goodFn in k0. injection k0. intros.
+      rewrite <- H2. assumption.
 
-Lemma L1g_isInd_isInd:
-  forall t, L1g.term.isInd t <-> isInd (strip t).
-Proof.
-  intros t. split; intros h.
-  - destruct h as [x0 jx]. subst. cbn. auto.
-  - destruct h as [x0 jx]. unfold L1g.term.isInd.
-    exists x0. symmetry. erewrite Ind_strip_inv.
-    reflexivity. symmetry. assumption.
+      intuition. assumption.
+    destruct (isApp_dec (strip fn0)).
+    + destruct i as [x0 [x1 [x2 jx]]].
+      
+
+  
+  destruct s; simpl; intros h; try discriminate.
+  - myInjection h. exists s1, s2, t. intuition.
 Qed.
+ ******************)
 
 Lemma WcbvEval_hom:
-  forall (p:L1gEnv),
-    (forall t t', L1g.wcbvEval.WcbvEval p t t' ->
+  forall (p:L1gEnv) (h:L1g.program.WFaEnv p),
+    (forall t t', L1g.wcbvEval.WcbvEval p t t' -> L1g.term.WFapp t ->
                   WcbvEval (stripEnv p) (strip t) (strip t')) /\
-    (forall ts ts', L1g.wcbvEval.WcbvEvals p ts ts' ->
+    (forall ts ts', L1g.wcbvEval.WcbvEvals p ts ts' -> L1g.term.WFapps ts ->
                     WcbvEvals (stripEnv p) (strips ts) (strips ts')).
 Proof.
-  intros p.
-  apply L1g.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
-  try (solve[constructor; trivial]).
-  - cbn. econstructor; try eassumption. apply lookupDfn_hom. assumption.
-  - cbn. eapply wAppLam.
-    + apply H. 
-    + apply H0. 
-    + rewrite whBetaStep_hom in H1. assumption.
-  - cbn. eapply wLetIn.
-    + apply H. 
-    + rewrite <- (proj1 instantiate_hom). assumption.
-  - cbn. eapply wAppFix.
-    + eapply H.
+  intros p h.
+  apply L1g.wcbvEval.WcbvEvalEvals_ind; intros;
+    try (solve[constructor; trivial]).
+  - cbn. econstructor; try eassumption. eapply H.
+    inversion_Clear H0. assumption.
+  - cbn. econstructor; try eassumption.
+    + apply lookupDfn_hom. eassumption.
+    + eapply H. apply (L1g.program.lookupDfn_pres_WFapp h _ e).
+  - (* beta step in L1g *)
+    inversion_Clear H2. rewrite TApp_hom.
+    rewrite mkApp_goodFn. eapply wAppLam.
+    + cbn in H. eapply H. eassumption.
+    + eapply H0. assumption.
+    + rewrite whBetaStep_hom in H1. eapply H1.
+      eapply L1g.term.whBetaStep_pres_WFapp; try assumption.
+      * pose proof (proj1 (L1g.wcbvEval.wcbvEval_pres_WFapp h) _ _ w H7) as k.
+        inversion_Clear k. assumption.
+      * eapply (proj1 (L1g.wcbvEval.wcbvEval_pres_WFapp h)); eassumption.
+    + intros k. destruct k as [x0 [x1 [x2 jx]]].
+      symmetry in jx. pose proof (App_strip_inv _ jx). contradiction.
+  - inversion_Clear H1.
+    rewrite TLetIn_hom. eapply wLetIn. eapply H. assumption.
+    rewrite <- (proj1 instantiate_hom). eapply H0.
+    eapply (proj1 (L1g.term.instantiate_pres_WFapp)). eassumption.
+    eapply L1g.wcbvEval.wcbvEval_pres_WFapp; try eassumption.
+  - inversion_Clear H1. specialize (H H6).
+    pose proof (proj1 (L1g.wcbvEval.wcbvEval_pres_WFapp h) _ _ w H6) as k.
+    inversion_Clear k.
+    change
+      (WcbvEval (stripEnv p)
+                (mkApp (strip fn) (tcons (strip arg) (strips args)))
+                (strip s)).
+    rewrite mkApp_goodFn. eapply wAppFix.
+    + change
+        (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
+      eapply H.
     + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite <- pre_whFixStep_hom in H0. eapply H0.
-  - cbn. eapply wAppCong; try eassumption. destruct o.
-    + left. apply (proj1 (L1g_isConstruct_isConstruct _)). assumption.
-    + right. apply (proj1 (L1g_isInd_isInd _)). assumption.    
-  - refine (wCase _ _ _ _ _ _ _); try eassumption.
-    * rewrite <- canonicalP_hom. rewrite e. reflexivity.
-    * rewrite <- tskipn_hom. rewrite e0. reflexivity.
-    * rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
+    + rewrite <- tcons_hom. rewrite pre_whFixStep_hom. apply H0.
+      apply (L1g.term.pre_whFixStep_pres_WFapp); try assumption.
+      * eapply L1g.term.dnthBody_pres_WFapp; eassumption.
+      * constructor; eassumption.
+    + intros k0. destruct k0 as [x0 [x1 [x2 jx]]]. symmetry in jx.
+      pose proof (App_strip_inv _ jx). contradiction.
+  - inversion_Clear H2.
+    specialize (H H7). specialize (H0 H8). specialize (H1 H9).
+    change
+      (WcbvEval (stripEnv p)
+                (mkApp (strip fn) (tcons (strip arg) (strips args)))
+                (mkApp (strip fn')
+                       (tcons (strip arg') (strips args')))).
+    destruct o.
+    + destruct H2 as [x0 [x1 [x2 [x3 jx]]]]; subst.
+      rewrite mkApp_goodFn. rewrite mkApp_goodFn.
+      * eapply wAppCong; try eassumption. left. cbn. auto.
+      * not_isApp.
+      * intros k. elim H6. destruct k as [y0 [y1 [y2 jy]]].
+        functional inversion jy. subst. auto.
+    + destruct H2 as [x0 jx]. subst.
+      rewrite mkApp_goodFn. rewrite mkApp_goodFn. cbn.
+      eapply wAppCong; try eassumption. 
+      * right.    (** ??????  ****)
+        exists (String
+                  "I" (String
+                         "n" (String "d" (String ":" (print_inductive x0))))).
+        reflexivity.
+      * cbn. not_isApp.
+      * intros k. elim H6. destruct k as [y0 [y1 [y2 jy]]].
+        functional inversion jy. subst. auto.
+  - inversion_Clear H1. specialize (H H5).
+    assert (p0: L1g.term.WFapp Mch).
+    { eapply (proj1 (L1g.wcbvEval.wcbvEval_pres_WFapp h)); eassumption. }
+    rewrite TCase_hom.  econstructor; try eassumption.
+    + erewrite <- canonicalP_hom. rewrite e. reflexivity.
+      eapply (proj1 (L1g.wcbvEval.wcbvEval_pres_WFapp h)); eassumption.
+    + destruct ml. rewrite <- tskipn_hom. rewrite e0. reflexivity.
+    + rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
+    + assert (k0: L1g.term.WFapps args).
+      { apply (L1g.term.canonicalP_pres_WFapp p0 e). }
+      assert (k: L1g.term.WFapps ts).
+      { apply (L1g.term.tskipn_pres_WFapp k0 _ e0). }
+      eapply H0. apply (L1g.term.whCaseStep_pres_WFapp H7 k _ e1).
+  - inversion_Clear H1. specialize (H H4). specialize (H0 H5).
+    rewrite tcons_hom. rewrite tcons_hom. econstructor; eassumption.
 Qed.
 Print Assumptions WcbvEval_hom.
 
+Lemma sac_sound:
+  forall p (hp:L1g.program.WFaEnv p) t (ht: L1g.term.WFapp t) s,
+    L1g.wcbvEval.WcbvEval p t s ->
+    forall L2s, WcbvEval (stripEnv p) (strip t) L2s -> L2s = strip s.
+Proof.
+  intros p hp t ht s h1 L2s h2.
+  pose proof (proj1 (WcbvEval_hom hp) _ _ h1 ht).
+  apply (WcbvEval_single_valued h2). assumption.
+Qed. 
+Print Assumptions sac_sound.
+
+
+(******************
 (** WcbvEval_hom is nice, but it is stronger than necessary to prove 
 *** certiL1g_to_L2Correct (in instances.v).
 **)
@@ -719,22 +860,6 @@ Lemma Lam_strip_inv:
 Proof.
   intros nm bod; destruct s; simpl; intros h; try discriminate.
   - myInjection h. exists s1, s2. intuition. 
-Qed.
-
-Lemma Prod_strip_inv:
-  forall nm bod s, TProd nm bod = strip s ->
-   exists sty sbod, 
-     (L1g.compile.TProd nm sty sbod) = s /\ bod = strip sbod.
-Proof.
-  intros nm bod; destruct s; simpl; intros h; try discriminate.
-  - myInjection h. exists s1, s2. intuition. 
-Qed.
-
-Lemma Sort_strip_inv:
-  forall srt s, TSort srt = strip s -> L1g.compile.TSort srt = s.
-Proof.
-  intros srt. destruct s; simpl; intros h; try discriminate.
-  - myInjection h. reflexivity.
 Qed.
 
 Lemma Const_strip_inv:
@@ -889,12 +1014,4 @@ Lemma sac_complete:
 Proof.
   intros. apply sound_and_complete. assumption.
 Qed.
-
-Lemma sac_sound:
-  forall p t s, L1g.wcbvEval.WcbvEval p t s ->
-  forall L2s, WcbvEval (stripEnv p) (strip t) L2s -> L2s = strip s.
-Proof.
-  intros p t s h1 L2s h2.
-  apply (WcbvEval_single_valued h2). apply (sound_and_complete h1).
-Qed. 
-Print Assumptions sac_sound.
+********************)

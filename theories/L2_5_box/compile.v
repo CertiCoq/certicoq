@@ -27,13 +27,14 @@ Inductive Term : Type :=
 | TProof     : Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term (* dfn *) -> Term (* body *) -> Term
-| TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
+| TApp       : Term -> Term -> Term
 | TConst     : string -> Term
 | TConstruct : inductive -> nat (* index in datatype *) -> Terms -> Term
 | TCase      : inductive ->
                Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
 | TWrong     : string -> Term
+| TDummy     : string -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -72,14 +73,53 @@ Function blength (ts:Brs) : nat :=
   end.
 
 (** syntactic control of "TApp": no nested apps, app must have an argument **)
-Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
-  match t with
-    | TApp fn b bs => TApp fn b (tappend bs args)
-    | fn => match args with
-              | tnil => fn
-              | tcons c cs => TApp fn c cs
-            end
+Function mkApp (fn:Term) (ts:Terms) : Term :=
+  match ts with
+  | tnil => fn
+  | tcons y ys => mkApp (TApp fn y) ys
   end.
+
+Lemma mkApp_idempotent:
+  forall ts (fn:Term) (ss:Terms),
+    mkApp (mkApp fn ts) ss = mkApp fn (tappend ts ss).
+Proof.
+  induction ts; destruct fn; intros; cbn; try reflexivity;
+  try rewrite <- IHts; try reflexivity.
+Qed.                                                       
+  
+Lemma mkApp_tnil: forall fn, mkApp fn tnil = fn.
+  intros. reflexivity.
+Qed.
+
+Lemma mkApp_cons:
+  forall fn u us, mkApp fn (tcons u us) = mkApp (TApp fn u) us.
+Proof.
+  intros. reflexivity.
+Qed.
+
+Lemma mkApp_out:
+  forall ts fn u,
+    mkApp fn (tappend ts (tunit u)) = TApp (mkApp fn ts) u.
+Proof.
+  induction ts; intros. reflexivity.
+  - cbn. rewrite IHts. reflexivity.
+Qed.
+
+Lemma mkApp_tl:
+  forall bs fn b, mkApp fn (tappend bs (tunit b)) = TApp (mkApp fn bs) b.
+Proof.
+  induction bs; intros.
+  - reflexivity.
+  - cbn. rewrite IHbs. reflexivity.
+Qed.
+
+Lemma mkApp_tunit:
+  forall fn u, 
+    mkApp fn (tunit u) = TApp fn u.
+Proof.
+  intros. destruct fn; try reflexivity.
+Qed.
+
 Section Instantiate_sec.
 Variable (tin:Term).
 Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
@@ -89,8 +129,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
                   | Gt => TRel m
                   | Lt => TRel (pred m)
                 end
-    | TApp t a ts =>
-      mkApp (instantiate n t) (tcons (instantiate n a) (instantiates n ts))
+    | TApp t a => TApp (instantiate n t) (instantiate n a)
     | TLambda nm bod => TLambda nm  (instantiate (S n) bod)
     | TCase i s ts => TCase i (instantiate n s) (instantiateBrs n ts)
     | TLetIn nm tdef bod =>
@@ -139,8 +178,7 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
     | L2k.compile.TLambda nm bod => TLambda nm (L2kTerm_Term bod)
     | L2k.compile.TLetIn nm dfn bod =>
       TLetIn nm (L2kTerm_Term dfn) (L2kTerm_Term bod)
-    | L2k.compile.TApp fn arg args =>
-      mkApp (L2kTerm_Term fn) (tcons (L2kTerm_Term arg) (L2kTerms_Terms args))
+    | L2k.compile.TApp fn arg => TApp (L2kTerm_Term fn) (L2kTerm_Term arg)
     | L2k.compile.TConst pth => TConst pth
     | L2k.compile.TConstruct ind m args =>
       TConstruct ind m (L2kTerms_Terms args)
@@ -155,7 +193,7 @@ Function L2kTerm_Term (t:L2kTerm) : Term :=
         | right _ => TCase i (L2kTerm_Term mch) (L2kBrs_Brs brs)
       end
     | L2k.compile.TFix defs m => TFix (L2kDefs_Defs defs) m
-    | L2k.compile.TDummy => TProof
+    | L2k.compile.TDummy str => TProof
     | L2k.compile.TWrong str => TWrong str
   end
 with L2kTerms_Terms (ts:L2kTerms) : Terms :=
@@ -177,9 +215,10 @@ with L2kDefs_Defs (ds:L2kDefs) : Defs :=
 (****
 Functional Scheme L2kTerm_Term_ind' := Induction for L2kTerm_Term Sort Prop
 with L2kTerms_Terms_ind' := Induction for L2kTerms_Terms Sort Prop
-with L2Defs_Defs_ind' := Induction for L2Defs_Defs Sort Prop.
+with L2kDefs_Defs_ind' := Induction for L2kDefs_Defs Sort Prop.
+Check L2kTerm_Term_ind'.
 Combined Scheme L2kTerm_TermEvalsDEvals_ind
-         from L2kTerm_Term_ind', L2kTerms_Terms_ind', L2Defs_Defs_ind'.
+         from L2kTerm_Term_ind', L2kTerms_Terms_ind', L2kDefs_Defs_ind'.
 ***)
 
 (***

@@ -161,10 +161,6 @@ Proof.
   induction fn; intros; destruct H; try destruct H;
     try (cbn in *; discriminate).
   - exists n, fn. reflexivity.
-  - change (mkApp (strip fn1) (tcons (strip fn2)  (strips t)) = TLambda x x0)
-      in H.
-    destruct (mkApp_isApp (strips t) (strip fn1) (strip fn2)) as [z0 [z1 jz]].
-    rewrite jz in H. discriminate.
 Qed.
 
 Definition isFix (t:Term) : Prop :=
@@ -342,11 +338,21 @@ Proof.
   intros. cbn. assumption.
 Qed.
 
+Function dnthBody (n:nat) (l:Defs) {struct l} : option Term :=
+  match l with
+    | dnil => None
+    | dcons _ x _ t => match n with
+                           | 0 => Some x
+                           | S m => dnthBody m t
+                         end
+  end.
+(*****************
 Function dnthBody (n:nat) (l:Defs) : option Term :=
   match dnth n l with
     | None => None
     | Some (mkdef _ _ _ x _) => Some x
   end.
+ ****************)
 
 Lemma dnthBody_None: forall n ds, n >= dlength ds -> dnthBody n ds = None.
 Proof.
@@ -369,7 +375,9 @@ Lemma dnthBody_lt:
 Proof.
   intros n dts x. functional induction (dnthBody n dts); intros.
   - discriminate.
-  - myInjection H. eapply dnth_lt. eassumption.
+  - myInjection H. unfold dlength. omega.
+  - specialize (IHo H).
+    change (S m < S (dlength t)). omega.
 Qed.
 
 Lemma dnthBody_S:
@@ -994,7 +1002,7 @@ Proof.
     + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). subst. apply IRelEq.
     + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
-      assumption. assumption.
+      assumption. omega.
 Qed.
 
 Lemma instantiate_pres_WFTrm:
@@ -1523,7 +1531,8 @@ Lemma dnthBody_pres_WFTrm:
 Proof.
   intros m dts fs.
   functional induction (dnthBody m dts); intros; try discriminate.
-  - myInjection H. apply (dnth_WFTrmDs_WFTrm _ e H0). 
+  - myInjection H. inversion_Clear H0. assumption.
+  - inversion_Clear H0. intuition. 
 Qed.
 
 Lemma whFixStep_pres_WFTrm:

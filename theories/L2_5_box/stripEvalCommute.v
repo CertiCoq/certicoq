@@ -7,7 +7,8 @@ Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Setoids.Setoid.
 Require Import Omega.
 
-Require Import L2k.L2k.
+Require Import Common.Common.
+Require Import L2k.stripEvalCommute.
 Require Import L2_5.compile.
 Require Import L2_5.term.
 Require Import L2_5.program.
@@ -29,11 +30,10 @@ Definition stripEnv := L2kEnv_Env.
 Definition stripEc := L2kEC_EC.
 
 Lemma isApp_strip_TApp:
-  forall s1 s2 s3, isApp (strip (L2k.compile.TApp s1 s2 s3)).
+  forall s1 s2, isApp (strip (L2k.compile.TApp s1 s2)).
 Proof.
-  intros s1 s2 s3.
-  change (isApp (mkApp (strip s1) (tcons (strip s2) (strips s3)))).
-  apply (mkApp_isApp (strip s1) (strip s2) (strips s3)).
+  intros s1 s2.
+  change (isApp (TApp (strip s1) (strip s2))). auto.
 Qed.                          
 
 Definition optStrip (t:option L2kTerm) : option Term :=
@@ -46,10 +46,10 @@ Definition optL2kTerms_Terms (ts:option L2kTerms) : option Terms :=
     | None => None
     | Some ts => Some (L2kTerms_Terms ts)
   end.
-Definition optStripDnth (b: option (L2kTerm * nat)) : option (Term * nat) :=
+Definition optStripDnth (b: option L2kTerm) : option Term  :=
                            match b with
                              | None => None
-                             | Some (t, n) => Some (strip t, n)
+                             | Some t => Some (strip t)
                            end.
 Definition optStripCanP
            (b: option (nat * L2kTerms * nat)): option (nat * Terms * nat) :=
@@ -61,11 +61,12 @@ Definition optStripCanP
 Lemma optStrip_hom: forall y, optStrip (Some y) = Some (strip y).
 induction y; simpl; reflexivity.
 Qed.
-Lemma optL2kTerms_Terms_hom: forall y, optL2kTerms_Terms (Some y) = Some (L2kTerms_Terms y).
+Lemma optL2kTerms_Terms_hom:
+  forall y, optL2kTerms_Terms (Some y) = Some (L2kTerms_Terms y).
 induction y; simpl; reflexivity.
 Qed.
 Lemma optStripDnth_hom:
-  forall y n, optStripDnth (Some (y, n)) = Some (strip y, n).
+  forall y, optStripDnth (Some y) = Some (strip y).
 induction y; simpl; reflexivity.
 Qed.
 Lemma optStripCanP_hom:
@@ -74,7 +75,8 @@ induction y; simpl; reflexivity.
 Qed.
                               
 Lemma Lookup_hom:
-  forall (p:environ L2k.compile.Term) s ec, Lookup s p ec -> Lookup s (L2kEnv_Env p) (L2kEC_EC ec).
+  forall (p:environ L2k.compile.Term) s ec,
+    Lookup s p ec -> Lookup s (L2kEnv_Env p) (L2kEC_EC ec).
 Proof.
   induction 1; destruct t.
   - change (Lookup s ((s, ecTrm (strip t)) :: (L2kEnv_Env p))
@@ -159,10 +161,11 @@ reflexivity.
 Qed.
 
 Lemma dnthBody_hom: 
-  forall m ds, optStripDnth (L2k.term.dnthBody m ds) =
-               dnthBody m (stripDs ds).
-induction m; induction ds; try intuition.
-- simpl. intuition.
+  forall m ds,
+    optStripDnth (L2k.term.dnthBody m ds) = dnthBody m (stripDs ds).
+Proof.
+  induction m; induction ds; try intuition.
+  - simpl. intuition.
 Qed.
 
 Lemma tappend_hom:
@@ -191,10 +194,9 @@ Qed.
 
 
 Lemma TApp_hom:
-  forall fn arg args,
-    strip (L2k.compile.TApp fn arg args) =
-    mkApp (strip fn) (strips (L2k.compile.tcons arg args)).
-  induction fn; intros arg args; try reflexivity.
+  forall fn arg,
+    strip (L2k.compile.TApp fn arg) = TApp (strip fn) (strip arg).
+  reflexivity.
 Qed.
 
 (**
@@ -209,13 +211,13 @@ Qed.
 Lemma isApp_hom:
   forall t,
     isApp (strip t) ->
-    L2k.term.isApp t \/
+    L2k.compile.isApp t \/
     exists x n u br,
       t = L2k.compile.TCase x (L2k.compile.TProof u) (L2k.compile.bunit br n).
 Proof.
   destruct t; cbn; intros h;
-  destruct h as [x0 [x1 [x2 h]]]; try discriminate. 
-  - left. exists t1, t2, t3. reflexivity.
+  destruct h as [x0 [x1 h]]; try discriminate. 
+  - left. auto. 
   - destruct t; try discriminate. destruct b.
     + discriminate.
     + right. exists i, t0, t, n. destruct b.
@@ -223,6 +225,7 @@ Proof.
       * discriminate.
 Qed.
 
+(***********
 Lemma mkApp_hom:
   forall fn args,
     strip (L2k.term.mkApp fn args) = mkApp (strip fn) (L2kTerms_Terms args).
@@ -242,7 +245,7 @@ Proof.
         reflexivity.
   - destruct t; try (elim y); try reflexivity.
 Qed.
-
+***************)
 
 Lemma instantiate_tappend_commute:
   forall ts us tin n,
@@ -277,6 +280,7 @@ Lemma instantiates_dcons_commute:
 reflexivity.
 Qed.
     
+(***********
 Lemma instantiate_mkApp_commute:
 forall tin n bod arg args,
   instantiate tin n (mkApp bod (tcons arg args)) =
@@ -295,7 +299,8 @@ induction bod; simpl; intros; try reflexivity.
   rewrite instantiate_tappend_commute. rewrite instantiates_tcons_commute.
   reflexivity.
 Qed.
-      
+ *********************)
+
 Lemma instantiate_hom:
   (forall bod arg n, strip (L2k.term.instantiate arg n bod) =
                      instantiate (strip arg) n (strip bod)) /\
@@ -396,13 +401,7 @@ Lemma Const_strip_inv:
                (L2k.compile.TConst nm = s) \/ (L2k.term.isCase s).
 Proof.
   intros nm. destruct s; intros h; try discriminate.
-  - left.
-    change (TConst nm = mkApp (L2kTerm_Term s1)
-                        (tcons (L2kTerm_Term s2) (L2kTerms_Terms t))) in h.
-    pose proof (mkApp_isApp (L2kTerm_Term s1)
-                            (L2kTerm_Term s2) (L2kTerms_Terms t)) as k.
-    destruct k as [x0 [x1 [x2 jx]]]. rewrite jx in h. discriminate.
-  - left. cbn in h. myInjection h. reflexivity.
+  - left. cbn in *. myInjection h. reflexivity.
   - right. exists i, s, b. reflexivity.    
 Qed.
 

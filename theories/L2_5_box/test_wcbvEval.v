@@ -718,7 +718,6 @@ Time Definition P_main_ce_example_ent := AstCommon.main P_ce_example_ent.
 Time Definition eval_ce_example_ent :=
   Eval vm_compute in (wcbvEval P_env_ce_example_ent 3000 P_main_ce_example_ent).
 Print eval_ce_example_ent.
-**********************)
 
 Require Import Ascii String ExtrOcamlString.
 Require Import extraction.ExtrOcamlNatInt.
@@ -736,3 +735,4 @@ Time Definition P_main_vs := AstCommon.main P_vs.
 Time Definition eval_vs := Eval cbv in (wcbvEval P_env_vs 200 P_main_vs).
 Set Printing Width 150.
 Print eval_vs.
+**********************)

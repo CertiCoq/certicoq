@@ -194,9 +194,9 @@ Proof.
   - exists s. intuition. 
   - specialize (IHa (TApp f t) H).
     destruct IHa. inv H0.
-    * now exists TProof. 
-    * now exists (TLambda nm bod). 
-    * now exists (TFix dts m). 
+    + exists (TLambda nm bod). assumption.
+    + exists (TFix dts m). assumption.
+    + destruct H4; (exists fn'; assumption).
 Qed.
 
 Lemma WcbvEval_is_n_lam e n t t' : is_n_lambda n t = true -> WcbvEval e t t' -> is_n_lambda n t' = true.
@@ -228,26 +228,27 @@ Proof.
   - simpl in *.
     destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
     assert(WcbvEval e (TApp f t) s'').
-    { pose (wcbvEval_no_step _ _ _ evf). inv evs''.
+    { pose (wcbvEval_no_step _ _ _ evf). inv evs''. 
       + pose proof (WcbvEval_single_valued w H1). subst s'.
-        eapply waPrf; eassumption.
+        eapply wAppLam; eassumption.
+      + pose proof (WcbvEval_single_valued w H1). subst s'. 
+        eapply wAppFix; eassumption.
       + pose proof (WcbvEval_single_valued w H1). subst s'.
-        eapply wAppLam; eassumption.        
-      + pose proof (WcbvEval_single_valued w H1). subst s'.
-        eapply wAppFix; eassumption.  }     
+        eapply wAppCong; eassumption. }
     eapply (proj1 (IHa (TApp f t) s'' s)); eauto.
     eapply (proj2 (IHa (TApp s' t) s'' s)); eauto.
 
   - simpl in *.
     destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
     assert(WcbvEval e (TApp s' t) s'').
-    { inv evs''.
+    { inv evs''. 
       + pose proof (WcbvEval_single_valued evf H1). subst s'.
-        eapply waPrf. constructor. eassumption.
+        eapply wAppLam; try eassumption. econstructor.
+      + pose proof (WcbvEval_single_valued evf H1). subst s'. 
+        eapply wAppFix; try eassumption. econstructor.
       + pose proof (WcbvEval_single_valued evf H1). subst s'.
-        eapply wAppLam; try eassumption. econstructor.     
-      + pose proof (WcbvEval_single_valued evf H1). subst s'.
-        eapply wAppFix; try eassumption.  econstructor.  }     
+        eapply wAppCong; try eassumption.
+        apply (proj1 (WcbvEval_no_further e) _ _ H1 ). }
     eapply (proj1 (IHa _ _ s)). eauto.
     eapply (proj2 (IHa _ _ s)). eapply evs''. apply evapp.
 Qed.
@@ -442,12 +443,13 @@ Proof.
     apply Crct_invrt_App in crctt.
     constructor. intuition eauto.
  ***********)
-    
-  - intros i r args args' evargs evtras crcte crctc.
+
+(******  - intros i r args args' evargs evtras crcte crctc.
     destruct i as [ipkg inum]. 
     apply Crct_invrt_Construct in crctc.
     intuition.
-
+ *********)
+    
   - intros nm t s Ht evalt IHt crcte crctt.
     econstructor; [ | eapply IHt]; eauto.
     apply Lookup_trans_env; auto.
@@ -485,6 +487,13 @@ Proof.
     specialize (IHapp Hfix).
     unfold pre_whFixStep. simpl.
     admit. (* trans of fixstep *)
+
+  - intros. inversion_Clear H2. eapply wAppCong.
+    + intuition.
+    + destruct o.
+      * left. destruct H2 as [x0 [x1 jx]]. subst. cbn. auto.
+      * right. subst. reflexivity.
+    + intuition.
 
   - intros * evmch IHmch Hcase evcs IHcs crcte crctc.
     apply Crct_invrt_Case in crctc as [crctmch [crctbrs [crctann H']]].

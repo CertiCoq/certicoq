@@ -4,6 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
+Require Import Common.Common.
 Require Import L2k.term.
 Require Import L2k.compile.
 
@@ -82,14 +83,11 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctLetIn: forall p n nm dfn bod,
              crctTerm p n dfn -> crctTerm p (S n) bod ->
              crctTerm p n (TLetIn nm dfn bod)
-| ctApp: forall p n fn arg args,
-           crctTerm p n fn -> ~ isApp fn -> crctTerm p n arg ->
-           crctTerms p n args -> crctTerm p n (TApp fn arg args)
+| ctApp: forall p n fn arg,
+           crctTerm p n fn -> crctTerm p n arg -> crctTerm p n (TApp fn arg)
 | ctConst: forall p n pd nm,
     crctEnv p -> LookupDfn nm p pd -> crctTerm p n (TConst nm)
-(*************
-| ctInd: forall i n p, crctEnv p -> crctTerm p n (TInd i)
-*************)
+| ctDummy: forall n p str, crctEnv p -> crctTerm p n (TDummy str)
 | ctConstructor: forall p n ipkgNm inum cnum args ipkg itp cstr pars,
                    LookupTyp ipkgNm p pars ipkg ->
                    getInd ipkg inum = Ret itp ->
@@ -138,7 +136,7 @@ Lemma Crct_WFTrm:
   (forall p n bs, crctBs p n bs -> WFTrmBs bs n) /\
   (forall p n (ds:Defs), crctDs p n ds -> WFTrmDs ds n) /\
   (forall p, crctEnv p -> True).
-apply crctCrctsCrctBsDsEnv_ind; intros; auto.
+apply crctCrctsCrctBsDsEnv_ind; intros; auto. 
 Qed.
 
 Lemma Crct_CrctEnv:
@@ -198,7 +196,7 @@ Proof.
   try (specialize (H5 _ H6); contradiction);
   try (specialize (H0 _ H3); contradiction);
   try (specialize (H0 _ H1); contradiction);
-  try (specialize (H0 _ H6); contradiction);
+  try (specialize (H0 _ H4); contradiction);
   try (specialize (H1 _ H4); contradiction);
   try (specialize (H3 _ H4); contradiction);
   try (specialize (H3 _ H6); contradiction).
@@ -285,9 +283,8 @@ Proof.
     + eapply H2. reflexivity. intros h. elim H4. eapply PoLetInBod.
       assumption.                                                   
   - constructor; try assumption. eapply H0. reflexivity.
-    + intros h. elim H7. eapply PoAppL. assumption.
-    + eapply H3. reflexivity. intros h. elim H7. apply PoAppA. assumption.
-    + eapply H5. reflexivity. intros h. elim H7. apply PoAppR. assumption.
+    + intros h. elim H4. eapply PoAppL. assumption.
+    + eapply H2. reflexivity. intros h. elim H4. apply PoAppA. assumption.
   - econstructor. exact H0. unfold LookupDfn in *.
     inversion_Clear H1.
     + elim H3. constructor.
@@ -372,9 +369,8 @@ Proof.
 Qed.
 
 Lemma Crct_invrt_App:
-  forall p n fn arg args,
-    crctTerm p n (TApp fn arg args) ->
-    crctTerm p n fn /\ crctTerm p n arg /\ crctTerms p n args /\ ~(isApp fn).
+  forall p n fn arg,
+    crctTerm p n (TApp fn arg) -> crctTerm p n fn /\ crctTerm p n arg.
 Proof.
    intros. inversion_Clear H. intuition.
 Qed.
@@ -413,7 +409,7 @@ Qed.
 
 Lemma CrctDs_invrt:
   forall n p dts, crctDs p n dts -> 
-    forall m x ix, dnthBody m dts = Some (x, ix) -> crctTerm p n x.
+    forall m x, dnthBody m dts = Some x -> crctTerm p n x.
 Proof.
   induction 1; intros.
   - cbn in H0. discriminate.
@@ -432,19 +428,13 @@ Proof.
 Qed.
 
 Lemma mkApp_pres_Crct:
-  forall fn p n, crctTerm p n fn ->
-  forall args, crctTerms p n args -> crctTerm p n (mkApp fn args).
+  forall p n args,
+    crctTerms p n args ->
+    forall fn, crctTerm p n fn -> crctTerm p n (mkApp fn args).
 Proof.
-  induction fn; unfold mkApp; simpl; intros p' nx h0 args h1;
-  destruct args; try assumption;
-  try (solve [inversion_Clear h1; apply ctApp; try assumption; not_isApp]).
-  - destruct (Crct_invrt_App h0) as [j1 [j2 [j3 j4]]].
-    rewrite tappend_tnil. assumption.
-  - destruct (Crct_invrt_App h0) as [j1 [j2 [j3 j4]]].
-    apply ctApp; try assumption. destruct t; simpl.
-    + inversion h1; assumption.
-    + inversion_Clear j3. constructor. assumption.
-      apply Crcts_append; assumption.
+  induction 1; intros.
+  - cbn. assumption.
+  - cbn. eapply IHcrctTerms. constructor; assumption.
 Qed.
 
 Lemma Instantiate_pres_Crct:
@@ -479,11 +469,9 @@ Proof.
   - inversion_Clear H2. constructor; try assumption.
     + apply H; assumption.                 
     + apply H0; try assumption. omega. apply (proj1 Crct_up). assumption.
-  - inversion_Clear H3. apply mkApp_pres_Crct.
+  - inversion_Clear H2. constructor.
     + apply H; assumption.
-    + apply ctsCons; try assumption.
-      * apply H0; trivial.
-      * apply H1; trivial.
+    + apply H0; assumption.
   - inversion_Clear H1. econstructor; try eassumption.
     + apply H; try eassumption.
   - inversion_Clear H2. constructor; try assumption.
@@ -511,12 +499,12 @@ Proof.
 Qed.
 
 Lemma whBetaStep_pres_Crct:
-  forall p n bod, crctTerm p (S n) bod ->
-                  forall a1 args, crctTerm p n a1 -> crctTerms p n args ->
-                                  crctTerm p n (whBetaStep bod a1 args).
+  forall p n bod,
+    crctTerm p (S n) bod ->
+    forall a1, crctTerm p n a1 -> crctTerm p n (whBetaStep bod a1).
 Proof.
-  intros. unfold whBetaStep. apply mkApp_pres_Crct; try assumption.
-  apply instantiate_pres_Crct; try assumption.  omega.
+  intros. unfold whBetaStep. apply instantiate_pres_Crct; try assumption.
+  omega.
 Qed.
 
 Lemma fold_left_pres_Crct:

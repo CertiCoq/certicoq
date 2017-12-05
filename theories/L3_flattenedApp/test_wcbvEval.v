@@ -2,7 +2,6 @@
 Require Import omega.Omega.
 Require Import Template.Template.
 Require Import Common.Common.
-Require L2_5.L2_5.         (* whole L2_5 library is exported by L2_5.L2_5 *)
 Require Import L3.compile. 
 Require Import L3.term.
 Require Import L3.program.
@@ -605,6 +604,7 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+(** well-founded def with termonation assumed: fast **)
 Function Gcd (a b : nat) {wf lt a} : nat :=
 match a with
  | O => b 
@@ -613,20 +613,21 @@ end.
 Admitted.
 Set Printing Width 100.
 Print Assumptions Gcd.
-Definition Gcd42 := Gcd 4 2.
-Compute Gcd42.
+Definition Gcdx := Gcd 4 2.
+Compute Gcdx.
 Print Gcd_terminate.
-Extraction "Gcd42" Gcd42.
-Time Quote Recursively Definition pGcd42 := Gcd42.
-Time Definition PGcd42 :=
-  Eval vm_compute in (program_Program pGcd42).
-Time Definition Penv_Gcd42 := env PGcd42.
-Time Definition Pmain_Gcd42 := main PGcd42.
-Time Definition ans_Gcd42 :=
- Eval vm_compute in (wcbvEval Penv_Gcd42 1000 Pmain_Gcd42).
-Print ans_Gcd42.
+Extraction "Gcdx" Gcdx.
+Time Quote Recursively Definition pGcdx := Gcdx.
+Time Definition PGcdx := Eval vm_compute in (program_Program pGcdx).
+Time Definition Penv_Gcdx := env PGcdx.
+Time Definition Pmain_Gcdx := main PGcdx.
+Time Definition ans_Gcdx :=
+ Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
+Goal (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx) = ans_Gcdx.
+  reflexivity.
+Qed.
 
-(** well founded definition **)
+(** well founded definition with termination proved **)
 Function GCD (a b : nat) {wf lt a} : nat :=
 match a with
  | O => b 
@@ -637,21 +638,18 @@ Proof.
     omega.
   - exact lt_wf.
 Defined.
-
 (**** works  ***)
-Definition Gcdx := (Gcd 4 2).
-Eval cbv in Gcdx.
-Time Quote Recursively Definition pGcdx := Gcdx.
-Time Definition PGcdx := Eval vm_compute in (program_Program pGcdx).
-Time Definition Penv_Gcdx := env PGcdx.
-Time Definition Pmain_Gcdx := AstCommon.main PGcdx.
-Time Definition ans_Gcdx :=
-  Eval vm_compute in (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx).
-Goal (wcbvEval Penv_Gcdx 1000 Pmain_Gcdx) =
-Ret (SS (SS (ZZ tnil :t: tnil) :t: tnil)).
+Definition GCDx := (GCD 4 2).
+Eval cbv in GCDx.
+Time Quote Recursively Definition pGCDx := GCDx.
+Time Definition PGCDx := Eval vm_compute in (program_Program pGCDx).
+Time Definition Penv_GCDx := env PGCDx.
+Time Definition Pmain_GCDx := AstCommon.main PGCDx.
+Time Definition ans_GCDx :=
+  Eval vm_compute in (wcbvEval Penv_GCDx 1000 Pmain_GCDx).
+Goal (wcbvEval Penv_GCDx 1000 Pmain_GCDx) = ans_GCDx.
   reflexivity.
 Qed.
-
 
 Require Import Benchmarks.vs.
 

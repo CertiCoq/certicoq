@@ -19,12 +19,8 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (** named cases from Software Foundations **)
-Require Coq.Strings.String. 
-Open Scope string_scope.
-
-
 Section PP.
-Require Import Coq.Strings.String Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
+Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
 Local Open Scope string_scope.
 
 Definition digit_to_string (n:nat): string :=
@@ -105,6 +101,52 @@ Ltac SomeSubst :=
            | [ H:(_ = Some _) |- _ ] => rewrite H
            | [ H:(Some _ = _) |- _ ] => rewrite H
          end.
+
+Ltac dstrct1 h :=
+  let xx := fresh "x"
+  with jj := fresh "j"
+  in destruct h as [xx jj].
+Ltac dstrct2 h :=
+  let xx := fresh "x"
+  with yy := fresh "y"
+  with jj := fresh "j"
+  in destruct h as [xx [yy jj]].
+Ltac dstrct3 h :=
+  let xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with jj := fresh "j"
+  in destruct h as [xx [yy [zz jj]]].
+Ltac dstrct4 h :=
+  let xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with ww := fresh "w"
+  with jj := fresh "j" in
+  destruct h as [xx [yy [zz [ww jj]]]].
+Ltac dstrct5 h :=
+  let xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with ww := fresh "w"
+  with uu := fresh "u"
+  with jj := fresh "j" in
+  destruct h as [xx [yy [zz [ww [uu jj]]]]].
+Ltac dstrctn h :=
+  first [dstrct5 h | dstrct4 h | dstrct3 h | dstrct2 h | dstrct1 h].
+Ltac is_inv h := dstrctn h; discriminate.
+Ltac not_isn :=
+  let hh := fresh "h" in intros hh; dstrctn hh; discriminate.
+Ltac not_isApp := not_isn.
+Ltac not_isLambda := not_isn.
+Ltac not_isCase := not_isn.
+Ltac not_isFix := not_isn.
+Ltac not_isCast := not_isn.
+Ltac not_isDummy := not_isn.
+Ltac not_isProof := not_isn.
+Ltac not_isInd := not_isn.
+Ltac not_isWrong := not_isn.
+
 
 Lemma triv_exists:
   forall (A B:Type) (C:A -> B) (a:A), exists (aa:A), C a = C aa.

@@ -50,6 +50,7 @@ Fixpoint print_term (t:Term) : string :=
   end.
 
 
+(************
 Ltac not_is1 :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -72,7 +73,6 @@ Ltac not_is3 :=
 Ltac not_isApp := not_is3.
 Ltac not_isLambda := not_is3.
 Ltac not_isProof := not_is1.            
-
 Ltac isApp :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -83,6 +83,7 @@ Ltac isApp :=
   with ll := fresh "l" in
   intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
              destruct kk as [zz ll].
+**********************)
 
 
 Section TermTerms_dec. (** to make Ltac definitions local **)

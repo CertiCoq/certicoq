@@ -951,7 +951,7 @@ Module CC_log_rel (H : Heap).
   Qed.
 
 
-  (** * heap_eq respects cc_approx *)
+  (** * cc_approx respects heap_eq  *)
 
    Lemma cc_approx_exp_heap_equiv (k : nat) (H1 H2 H1' H2' : heap block)
          (rho1 rho2 : env) (e1 e2 : exp) :
@@ -970,217 +970,17 @@ Module CC_log_rel (H : Heap).
 
    Lemma cc_approx_exp_heap_env_equiv (k : nat) (H1 H2 H1' H2' : heap block)
          (rho1 rho2 rho1' rho2' : env) (e1 e2 : exp) :
-     (e1, rho1, H1) ⪯ ^ (k; IP ; LP; GP) (e2, rho2, H2) ->
-     (occurs_free e1) |- (H1, rho1) ⩪ (H1', rho1') ->
-     (occurs_free e2) |- (H2, rho2) ⩪ (H2', rho2') ->
-     (IP (H1', rho1', e1) (H2', rho2', e2) -> IP (H1, rho1, e1) (H2, rho2, e2)) ->
-     (e1, rho1', H1') ⪯ ^ (k; IP; LP; GP) (e2, rho2', H2').
-   Proof with now eauto with Ensembles_DB.
-     intros Hexp Heq1 Heq2 Hinv H1'' H2'' rho1'' rho2'' r1 c1 m1 Heq1' Heq2' HIP Hleq Hbs Hns.
-     eapply Hexp; [| | | | eassumption | ]; eauto;
-     eapply Equivalence_Transitive; try eassumption.
-   Qed.
+    (e1, rho1, H1) ⪯ ^ (k; IP ; LP; GP) (e2, rho2, H2) ->
+    (occurs_free e1) |- (H1, rho1) ⩪ (H1', rho1') ->
+    (occurs_free e2) |- (H2, rho2) ⩪ (H2', rho2') ->
+    (IP (H1', rho1', e1) (H2', rho2', e2) -> IP (H1, rho1, e1) (H2, rho2, e2)) ->
+    (e1, rho1', H1') ⪯ ^ (k; IP; LP; GP) (e2, rho2', H2').
+  Proof with now eauto with Ensembles_DB.
+    intros Hexp Heq1 Heq2 Hinv H1'' H2'' rho1'' rho2'' r1 c1 m1 Heq1' Heq2' HIP Hleq Hbs Hns.
+    eapply Hexp; [| | | | eassumption | ]; eauto;
+    eapply Equivalence_Transitive; try eassumption.
+  Qed.
 
-   Lemma subheap_res_approx_l (k : nat) (H H' : heap block) (v : value) :
-     H ⊑ H' ->
-     res_approx_fuel k (v, H) (v, H').
-   Proof.
-     revert v. induction k as [k IHk] using lt_wf_rec1.
-     intros v Hsub.
-     rewrite res_approx_fuel_eq.
-     destruct v as [l|]; simpl; eauto.
-     destruct (get l H) as [b|] eqn:Hget; eauto.
-     destruct b as [c vs1 | v1 v2 | rho1].
-     + eexists. split.
-       eapply Hsub. eassumption.
-       intros.
-       eapply Forall2_refl. 
-       intros v. eapply IHk; eauto. 
-     + do 2 eexists. split.
-       eapply Hsub. eassumption.
-       intros. split; eapply IHk; eauto. 
-     + eexists. split.
-       eapply Hsub. eassumption.
-       intros. destruct (M.get x rho1); eauto.
-       left. do 2 eexists. split. reflexivity.
-       split. reflexivity.
-       intros i Hlt. eapply IHk; eauto.
-   Qed.
-
-   Lemma Forall2_refl_strong (A : Type) (R : A -> A -> Prop) (l : list A) :
-     (forall x : A, List.In x l -> R x x) ->
-     Forall2 R l l.
-   Proof.
-     intros Hyp. induction l; eauto.
-     constructor.
-     eapply Hyp. now constructor.
-     eapply IHl. intros x Hin. 
-     eapply Hyp. now constructor 2.
-   Qed.
-   
-   Lemma subheap_res_approx_r (k : nat) (S : Ensemble loc) (H H' : heap block) (v : value) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     val_loc v \subset (reach' H S) ->
-     H ⊑ H' ->
-     res_approx_fuel k (v, H') (v, H).
-   Proof with now eauto with Ensembles_DB.
-     revert v. induction k as [k IHk] using lt_wf_rec1.
-     intros v Hwf Hin1 Hin2 Hsub.
-     rewrite res_approx_fuel_eq.
-     destruct v as [l|]; simpl; eauto.
-     assert (Hin2':= Hin2).
-     eapply reachable_in_dom in Hin2;[ | eassumption | eassumption | reflexivity ].
-     destruct Hin2 as [b Hget].
-     assert (Hget' := Hget). eapply Hsub in Hget'.
-     rewrite Hget'.
-     eapply Singleton_Included_r in Hin2'.
-     destruct b as [c vs1 | v1 v2 | rho1].
-     + eexists. split. eassumption.
-       intros.
-       eapply Forall2_refl_strong. 
-       intros v. intros Hin. eapply IHk; eauto.
-       eapply Included_trans; [| eapply reachable_closed; try eassumption ].
-       simpl. eapply In_Union_list.
-       eapply in_map. eassumption.
-     + do 2 eexists. split. eassumption. 
-       intros i Hlt.
-       split; eapply IHk; eauto.
-       eapply Included_trans; [| eapply reachable_closed; try eassumption ]...
-       eapply Included_trans; [| eapply reachable_closed; try eassumption ]...
-     + eexists. split. eassumption.
-       intros. destruct (M.get x rho1) eqn:Hgetx; eauto.
-       left. do 2 eexists. split. reflexivity.
-       split. reflexivity.
-       intros i Hlt. eapply IHk; eauto.
-       eapply Included_trans; [| eapply reachable_closed; try eassumption ].
-       eapply get_In_env_locs; [| eassumption ]. 
-       now constructor. 
-   Qed.
-
-   Lemma subheap_res_equiv (S : Ensemble loc) (H H' : heap block) (v : value) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     val_loc v \subset (reach' H S) ->
-     H ⊑ H' ->
-     (v, H) ≈ (v, H').
-   Proof with now eauto with Ensembles_DB.
-     intros. 
-     split.
-     eapply subheap_res_approx_l; eauto.
-     eapply subheap_res_approx_r; eauto.
-   Qed.
-
-   Lemma subheap_heap_env_approx_l (S : Ensemble loc) S' (H H' : heap block) (rho : env) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     env_locs rho S' \subset (reach' H S) ->
-     H ⊑ H' ->
-     heap_env_approx S' (H, rho) (H', rho).
-   Proof with now eauto with Ensembles_DB.
-     intros Hwf Hin1 Hin2 Hsub x l Hin Hget. 
-     eexists. split; eauto. 
-     eapply subheap_res_equiv; eauto.
-     eapply Included_trans; [ | eassumption ].
-     eapply get_In_env_locs; [| eassumption ]. 
-     eassumption.
-   Qed.
-
-   Lemma subheap_heap_env_approx_r (S : Ensemble loc) S' (H H' : heap block) (rho : env) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     env_locs rho S' \subset (reach' H S) ->
-     H ⊑ H' ->
-     heap_env_approx S' (H', rho) (H, rho).
-   Proof with now eauto with Ensembles_DB.
-     intros Hwf Hin1 Hin2 Hsub x l Hin Hget. 
-     eexists. split; eauto. 
-     symmetry. eapply subheap_res_equiv; eauto.
-     eapply Included_trans; [ | eassumption ].
-     eapply get_In_env_locs; [| eassumption ]. 
-     eassumption.
-   Qed.
-
-   Lemma subheap_heap_env_equiv (S : Ensemble loc) S' (H H' : heap block) (rho : env) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     env_locs rho S' \subset (reach' H S) ->
-     H ⊑ H' ->
-     S' |- (H, rho) ⩪ (H', rho).
-   Proof with now eauto with Ensembles_DB.
-     intros Hwf Hin1 Hin2 Hsub. split.
-     now eapply subheap_heap_env_approx_l; eauto.
-     now eapply subheap_heap_env_approx_r; eauto.
-   Qed.
-     
-   Lemma subheap_block_equiv(S : Ensemble loc) (H H' : heap block) (b : block) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     locs b \subset (reach' H S) ->
-     H ⊑ H' ->
-     block_equiv (H, b) (H', b).
-   Proof with now eauto with Ensembles_DB.
-     intros Hwf Hin1 Hin2 Hsub. 
-     destruct b as [c vs | v1 v2 | rho ] .
-     + split; eauto.
-        eapply Forall2_refl_strong. 
-        intros v Hin.
-        eapply subheap_res_equiv; try eassumption.
-        eapply Included_trans; [| eassumption ].
-        simpl. eapply In_Union_list.
-        eapply in_map. eassumption.
-     + simpl. split; eapply subheap_res_equiv; try eassumption.
-       eapply Included_trans; [| eassumption ]...
-       eapply Included_trans; [| eassumption ]...       
-     + simpl. simpl in Hin2.
-       eapply subheap_heap_env_equiv; eassumption.
-   Qed.
-
-   Lemma subheap_heap_approx_l S (H H' : heap block) (rho : env) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     H ⊑ H' ->
-     heap_approx S H H'.
-   Proof.
-     intros Hwf Hs Hsub b l Hin Hget.
-     eapply Hsub in Hget.
-     eexists; split; eauto.
-     eapply subheap_block_equiv; eauto.
-     eapply Included_trans; [| eapply Included_post_reach' ].
-     intros l' Hin'. repeat eexists; eauto.
-     edestruct reachable_in_dom as [b' Hgetb']; try eassumption.
-     eapply reach'_extensive. eassumption.
-     rewrite Hgetb'. eapply Hsub in Hgetb'. congruence.
-   Qed.
-
-   Lemma subheap_heap_approx_r S (H H' : heap block) (rho : env) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     H ⊑ H' ->
-     heap_approx S H' H.
-   Proof.
-     intros Hwf Hs Hsub b l Hin Hget.
-     edestruct reachable_in_dom as [b' Hgetb']; try eassumption.
-     eapply reach'_extensive. eassumption.
-     eexists; split; eauto.
-     assert (Hgetb := Hgetb').
-     eapply Hsub in Hgetb'. subst_exp.
-     symmetry. eapply subheap_block_equiv; eauto.
-     eapply Included_trans; [| eapply Included_post_reach' ].
-     intros l' Hin'. repeat eexists; eauto.
-   Qed.
-
-   Lemma subheap_heap_equiv S (H H' : heap block) (rho : env) :
-     well_formed (reach' H S) H ->
-     S \subset dom H ->
-     H ⊑ H' ->
-     S |- H ≃ H'.
-   Proof.
-     intros Hwf Hs Hsub.
-     split. 
-     now eapply subheap_heap_approx_l; eauto.
-     now eapply subheap_heap_approx_r; eauto.
-   Qed.
    
    Lemma cc_approx_exp_heap_monotonic (k : nat) (H1 H2 H1' H2' : heap block)
          (rho1 rho2 : env) (e1 e2 : exp) :
@@ -1775,7 +1575,8 @@ Module CC_log_rel (H : Heap).
               eapply cc_approx_val_monotonic. eassumption.
               simpl. simpl in Hcost. omega. }
     Qed.
-    
+
+
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (f1 : var) (xs1 : list var)
           (f2 f2' Γ : var) (xs2 : list var) (t : fTag) (c : nat):

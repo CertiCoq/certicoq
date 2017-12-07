@@ -1121,12 +1121,12 @@ Module SpaceSem (H : Heap).
         eapply collect_heap_eq. eassumption.
   Qed.
   
-  Lemma big_step_perfect_gc_heap_eq H1 H2 rho1 rho2 e (r : ans) c m :
-    big_step_perfect_GC H1 rho1 e r c m ->
+  Lemma big_step_gc_heap_env_equiv H1 H2 rho1 rho2 e (r : ans) c m :
+    big_step_GC H1 rho1 e r c m ->
     (occurs_free e) |- (H1, rho1) ⩪ (H2, rho2) ->
-    (exists r', big_step_perfect_GC H2 rho2 e r c m /\
-           ans_equiv r r').
-  Abort.
+    (exists r' m', big_step_GC H2 rho2 e r' c m' /\
+              ans_equiv r r').
+  Admitted.
 
   Lemma heap_eq_respects_heap_env_equiv S H1 H2 rho :
     (env_locs rho S) |- H1 ≡ H2 ->

@@ -5,15 +5,15 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.omega.Omega.
-Require Export Common.Common.  (* shared namespace *)
-Require Export L2.compile.
+Require Import Common.Common.  (* shared namespace *)
+Require Import L2.compile.
 
 Open Scope string_scope.
 Open Scope bool.
 Open Scope list.
 Set Implicit Arguments.
 
-
+(********************
 Ltac not_is1 :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -67,7 +67,8 @@ Ltac not_isLamda := not_is2.
 Ltac not_isCase := not_is3.
 Ltac not_isFix := not_is2.
 Ltac not_isCast := not_is1.
-            
+ ****************************)
+
 Ltac isApp_inv h :=
   let hh := fresh "h"
   with xx := fresh "x"
@@ -312,17 +313,18 @@ Qed.
 Hint Resolve IsConstruct.
 Lemma isConstruct_dec: forall t, {isConstruct t}+{~ isConstruct t}.
 Proof.
-  destruct t; try (right; not_is4).
+  destruct t; try (right; not_isConstruct).
   - left. auto.
 Qed.
 
+(**********
 Definition isAppConstruct t :=
   exists fn arg args i m np na,
     t = TApp fn arg args /\ fn = TConstruct i m np na.
 Lemma isAppConstruct_dec:
   forall t, isAppConstruct t \/ ~ isAppConstruct t.
 Proof.
-  destruct t; try (right; not_is7).
+  destruct t; try (right; not_isn).
   - destruct (isConstruct_dec t1).
     + destruct i as [x0 [x1 [x2 [x3 jx]]]].
       left. subst t1. unfold isAppConstruct.
@@ -332,6 +334,7 @@ Proof.
       destruct h as [x0 [x1 [x2 [x3 [x4 [x5 [x6 jx]]]]]]].
       destruct jx. myInjection H. auto.
 Qed.
+ ************)
 
 (** canonical AFTER Evaluation **)
 Inductive isCanonical : Term -> Prop :=

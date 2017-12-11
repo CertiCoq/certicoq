@@ -4,6 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
+Require Import Common.Common.
 Require Import L2.term.
 Require Import L2.compile.
 

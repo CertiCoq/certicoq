@@ -7,6 +7,7 @@ Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Setoids.Setoid.
 Require Import Omega.
 
+Require Import Common.Common.
 Require Import L2.L2.
 Require Import L2k.compile.
 Require Import L2k.term.

@@ -40,7 +40,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p (pre_whFixStep x dts arg) s ->
     WcbvEval p (TApp fn arg) s 
 | wAppCong: forall fn fn' arg arg', 
-    WcbvEval p fn fn' -> (isApp fn' \/ isDummy fn') ->
+    WcbvEval p fn fn' -> (isConstruct fn' \/ isApp fn' \/ isDummy fn') ->
     WcbvEval p arg arg' ->
     WcbvEval p (TApp fn arg) (TApp fn' arg')
 | wCase: forall mch Mch n args ml ts brs cs s ,
@@ -103,7 +103,8 @@ Proof.
     + specialize (H _ H5). myInjection H.
       specialize (H0 _ H6). subst. 
       intuition.
-    + specialize (H _ H5). subst. destruct H6; is_inv H.
+    + specialize (H _ H5). subst. destruct H6; try is_inv H.
+      destruct H; try is_inv H.
   - inversion_Clear H1;
       try (specialize (H _ H4); discriminate).
     + specialize (H _ H6). subst. specialize (H0 _ H7). assumption.
@@ -112,11 +113,12 @@ Proof.
     try (specialize (H _ H5); discriminate).
     + specialize (H _ H4). myInjection H. rewrite e in H5. myInjection H5.
       intuition.
-    + specialize (H _ H4). subst. destruct H5; is_inv H.
-  - inversion_Clear H1.
-    + specialize (H _ H4). subst. destruct o; is_inv H.
-    + specialize (H _ H4). subst. destruct o; is_inv H.
-    + specialize (H _ H4). specialize (H0 _ H7). subst. reflexivity.
+    + specialize (H _ H4). subst. destruct H5; try is_inv H.
+      destruct H; try is_inv H.
+  - inversion_Clear H1; specialize (H _ H4); subst.
+    + destruct o; try is_inv H. destruct H; try is_inv H.
+    + destruct o; try is_inv H. destruct H; try is_inv H.
+    + specialize (H0 _ H7). subst. reflexivity.
   - inversion_Clear H1;
       try (specialize (IHWcbvEval1 _ H4); discriminate);
       try (specialize (IHWcbvEval1 _ H5); discriminate).
@@ -416,7 +418,8 @@ Function wcbvEval
         | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
         | Some x => wcbvEval n (pre_whFixStep x dts a1)
         end
-      | Ret ((TApp _ _) as tc)    (** congruence **)
+      | Ret ((TConstruct _ _ _ _) as tc)    (** congruence **)
+      | Ret ((TApp _ _) as tc)
       | Ret ((TDummy _) as tc) =>
         match wcbvEval n a1 with
         | Ret a1' => ret (TApp tc a1')
@@ -497,7 +500,10 @@ Proof.
   - specialize (H0 _ p1). specialize (H _ e1).
     eapply wAppFix; try eassumption.
   - specialize (H _ e1). specialize (H0 _ e2).
-    eapply wAppCong; try eassumption. right. exists _x. reflexivity. 
+    eapply wAppCong; try eassumption. left.
+    exists _x, _x0, _x1, _x2. reflexivity.
+  - specialize (H _ e1). specialize (H0 _ e2).
+    eapply wAppCong; try eassumption. right. right. exists _x. reflexivity.
   - specialize (H _ e1). specialize (H0 _ p1).
     eapply wCase; try eassumption.
   - specialize (H _ e1). specialize (H0 _ p1).
@@ -553,7 +559,9 @@ Lemma pre_WcbvEval_wcbvEval:
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx); try omega. rewrite H; try omega. destruct o.
     + dstrctn H1. subst. rewrite H0; try omega. reflexivity.
-    + dstrctn H1. subst. rewrite H0; try omega. reflexivity.
+    + destruct H1.
+      * dstrctn H1. subst. rewrite H0; try omega. reflexivity.
+      * dstrctn H1. subst. rewrite H0; try omega. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx); try omega. rewrite H; try omega.    

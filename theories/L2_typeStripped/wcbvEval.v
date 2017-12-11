@@ -5,6 +5,8 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.omega.Omega.
 Require Import Coq.Logic.Decidable.
+Require Import Common.Common.
+Require Import L2.compile.
 Require Import L2.term.
 Require Import L2.program.
         

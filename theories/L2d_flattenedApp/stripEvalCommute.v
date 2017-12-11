@@ -1032,6 +1032,21 @@ induction ns; intros t h.
   + assumption.
 Qed.
 
+(*****
+Lemma pre_whFixStep_hom:
+  forall x dts arg,
+    pre_whFixStep (strip x) (stripDs dts) (strip arg)  =
+    strip (L2.term.pre_whFixStep x dts (L2.compile.tcons arg args)).
+Proof.
+  intros. unfold pre_whFixStep, L2.term.pre_whFixStep.
+  rewrite mkApp_hom. rewrite tcons_hom. cbn. eapply f_equal2; try reflexivity.
+  erewrite fold_left_hom.
+  - rewrite <- dlength_hom. reflexivity.
+  - intros. cbn. rewrite (proj1 instantiate_hom). rewrite TFix_hom.
+    reflexivity.
+Qed.
+ *****)
+
 Lemma pre_whFixStep_hom:
   forall x dts arg args,
     mkApp (pre_whFixStep (strip x) (stripDs dts) (strip arg)) (strips args) =
@@ -1119,70 +1134,6 @@ Proof.
   - inversion_Clear H4.
 Qed.
 
-
-(*************
-Lemma WcbvEval_mkApp_WcbvEval:
-  forall p args s t,
-    WcbvEval p (mkApp s args) t -> exists u, WcbvEval p s u.
-Proof.
-  induction args; intros.
-  - rewrite mkApp_tnil in H. exists t. assumption.
-  - cbn in *. specialize (IHargs _ _ H). destruct IHargs as [x jx].
-    inversion_clear jx.
-    + exists (TLambda nm bod). assumption.
-    + exists (TFix dts m). assumption.
-    + exists fn'. assumption. 
-Qed.
-
-Lemma mkApp_isApp:
-  forall us t u, isApp (mkApp t (tcons u us)).
-Proof.
-  induction us; intros.
-  - exists t, u. reflexivity.
-  - cbn. cbn in IHus. eapply IHus.
-Qed.
- **********************)
-
-Lemma isCanonical_eval:
-  forall t,
-    isCanonical t ->
-    forall u us,
-      t = mkApp u us ->
-      forall p et, WcbvEval p t et -> exists v vs, et = mkApp v vs.
-Proof.
-  induction 1; intros.
-  - functional inversion H; subst. inversion_Clear H0.
-    + exists (TConstruct i n np na), tnil. reflexivity.
-    + destruct H.
-      replace (mkApp (TApp u y) ys) with (mkApp u (tcons y ys)) in H2;
-        try reflexivity.
-      pose proof (mkApp_isApp ys u y) as k.
-      rewrite k in H2. discriminate.
-  - inversion_Clear H1.
-Admitted.
-
-(***********
-Lemma WcbvEval_isLambda_mkApp:
-  forall p us eus,
-    WcbvEvals p us eus ->
-    forall t nm bod, WcbvEval p t (TLambda nm bod) ->
-      WcbvEval p (mkApp t us) (mkApp (TLambda nm bod) eus).
-Proof.
-  induction 1; intros.
-  - cbn. assumption.
-  - cbn. eapply IHWcbvEvals.
-    specialize (IHWcbvEvals t0 et H1 H2 H3). destruct et.
-    Check (IHWcbvEvals _ _ _ H2 H3).
-    assert (IH := forall t w, IHWcbvEvals t (TRel n) w H2 H3).
-    
-    eapply (IHWcbvEvals _ _ H1 H2 H3).
-  - cbn. destruct et; eapply (IHWcbvEvals H1 H2 H3). ; try not_isn.
-    eapply wAppCong; try eassumption.
-      try (eapply wAppCong; eassumption; not_isn).
-      try not_isLambda.
-Qed.
- *****************)
-
 Lemma hom_isCanonical:
   forall Mch, L2.term.isCanonical Mch -> isCanonical (strip Mch).
 Proof.
@@ -1214,7 +1165,7 @@ Proof.
 Qed.
 
                                                   
-(********  MAIN ********
+(********  MAIN ********)
 Lemma WcbvEval_hom:
   forall (p:L2Env) (h:L2.program.WFaEnv p),
     (forall t t', L2.wcbvEval.WcbvEval p t t' -> L2.term.WFapp t ->
@@ -1254,67 +1205,31 @@ Proof.
       assumption.
   - (** Fix **)
     inversion_Clear H1. specialize (H H6).
+    rewrite <- pre_whFixStep_hom in H0.
     pose proof (proj1 (L2.wcbvEval.WcbvEval_pres_WFapp h) _ _ w H6) as k.
     inversion_Clear k. rewrite TApp_hom.
-    cbn. rewrite TFix_hom in H. eapply (WcbvEval_mkApp_step).
-    admit. admit.
-    (*************
-    + eapply wAppFix.
-      * rewrite TFix_hom in H. eassumption.
-      * rewrite dnthBody_hom. rewrite e. reflexivity.
-      * cbn. rewrite <- pre_whFixStep_hom in H0.
-        Check (WcbvEval_mkApp_step _ _ H0).
-
-       
-        .
-
-        Check WcbvEval_mkApp_fn. eapply H0.
-
-    rewrite TFix_hom in H.
-    rewrite <- pre_whFixStep_hom in H0. rewrite TApp_hom.
-    cbn. eapply WcbvEval_mkApp_step.
-    + eapply wAppFix; try eassumption.
-      * rewrite dnthBody_hom. rewrite e. reflexivity.
-      * Check WcbvEval_mkApp_fn. eapply H0.
-    + eapply WcbvEval_mkApp_fn; eassumption.
-
-      
-    change (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
-
+    cbn. rewrite TFix_hom in H.
     
-    assert (j0: L2.term.wfApp (L2.compile.TFix (stripDs dts) m)).
-    assert (j0: WFappDs dts).
-    {  (proj1 (L2.wcbvEval.WcbvEval_pres_WFapp h) _ _ w H6). }
-  
-    assert (j: WFapp (L2.term.pre_whFixStep x dts (L2.compile.tcons arg args))).
-    { apply (L2.term.pre_whFixStep_pres_WFapp).
-      - eapply (L2.term.dnthBody_pres_WFapp); try eassumption.
-    destruct (WcbvEval_mkApp_WcbvEval _ _ H0) as [y jy].
-    assert (j: dnthBody m (stripDs dts) = Some (strip x)).
-    { rewrite dnthBody_hom. rewrite e. cbn. reflexivity. }
-    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
-    + eapply wAppFix; eassumption. 
-    + eapply WcbvEval_mkApp_fn; eassumption.
-****************)
+    assert (j0:L2.term.WFapps (L2.compile.tcons arg args)).
+    { constructor; assumption. }
+    assert (j1:L2.term.WFapp x).
+    { eapply (L2.term.dnthBody_pres_WFapp ); eassumption. }
+    specialize (H0 (L2.term.pre_whFixStep_pres_WFapp j1 H2 j0)).
+    dstrctn (WcbvEval_mkApp_WcbvEval _ _ H0).
+    eapply (WcbvEval_mkApp_step).
+    + eapply wAppFix; try eassumption.
+      rewrite (dnthBody_hom dts m). rewrite e. cbn. reflexivity.
+    + eassumption.
   - (** congruence **)
     inversion_Clear H2.
     specialize (H H7). specialize (H0 H8). specialize (H1 H9).
     rewrite TApp_hom. rewrite TApp_hom. 
     destruct o.
-    + dstrctn H2. subst.
-      cbn in H.
-      Check (WcbvEval_mkApp_fn H).
-      Check (WcbvEval_mkApp_step H).
-      admit.
-      (************
-      rewrite mkApp_goodFn. rewrite mkApp_goodFn.
-      * eapply wAppCong; try eassumption. left. cbn. auto.
-      * not_isApp.
-      * intros k. elim H6. destruct k as [y0 [y1 [y2 jy]]].
-        functional inversion jy. subst. auto.
-       *****************)
     + dstrctn H2. subst. eapply wmkAppCong'; try eassumption.
-      * right. cbn. exists x. reflexivity.
+      * left. cbn. exists x, y, z, w2. reflexivity.
+      * constructor; eassumption.
+    + dstrctn H2. subst. eapply wmkAppCong'; try eassumption.
+      * right. right. cbn. exists x. reflexivity.
       * constructor; eassumption.
   - inversion_Clear H1. specialize (H H4).
     assert (p0: L2.term.WFapp Mch).
@@ -1330,95 +1245,6 @@ Proof.
   - inversion_Clear H1. specialize (H H4). specialize (H0 H5).
     rewrite tcons_hom. rewrite tcons_hom. econstructor; eassumption.
 Qed.
-
-    
-  - (* Fix in L2 *)
-    rewrite <- pre_whFixStep_hom in H0.
-    change (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
-    destruct (WcbvEval_mkApp_WcbvEval _ _ H0) as [y jy].
-    assert (j: dnthBody m (stripDs dts) = Some (strip x)).
-    { rewrite dnthBody_hom. rewrite e. cbn. reflexivity. }
-    rewrite TApp_Hom. cbn. eapply WcbvEval_mkApp_step.
-    + eapply wAppFix; eassumption. 
-    + eapply WcbvEval_mkApp_fn; eassumption.
-  - destruct o.
-    + destruct H2 as [x0 [x1 [x2 [x3 jx]]]]. subst. cbn in H.
-      rewrite TApp_hom. rewrite TApp_hom. rewrite TConstruct_hom.
-      apply (WcbvEval_mkApp_step H). rewrite tcons_hom. rewrite tcons_hom.
-      eapply WcbvEval_mkApp; try eassumption.
-      econstructor; try eassumption. eapply wConstruct.
-      not_isLambda. not_isFix.
-    + subst. cbn in H. rewrite TApp_hom. rewrite TApp_hom.
-      apply (WcbvEval_mkApp_step H). 
-      rewrite tcons_hom. rewrite tcons_hom.
-      eapply WcbvEval_mkApp; try eassumption.
-      econstructor; try eassumption.
-      eapply (proj1 (WcbvEval_no_further (stripEnv p))).
-      eassumption.
-      * destruct H2 as [x0 jx]. subst. not_isLambda.
-      * destruct H2 as [x0 jx]. subst. not_isFix.
-  - rewrite TCase_hom. refine (wCase _ _ _ _ _ _ _); try eassumption.
-    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
-    + rewrite <- tskipn_hom. rewrite e0. reflexivity.
-    + rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
-
-
-  (***********
-  - rewrite TCase_hom. refine (wCase _ _ _ _ _ _ _); try eassumption.
-    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
-    + rewrite <- tskipn_hom. rewrite e0. reflexivity.
-    + rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
-         *************)
-  -
-Qed.
-Print Assumptions WcbvEval_hom.
-
-  - 
-  - rewrite TCase_hom. refine (wCase _ _ _ _ _ _ _); try eassumption.
-  - pose proof (L2.term.canonicalP_isCanonical _ e) as k0.
-    pose proof (hom_isCanonical k0) as k1.
-    destruct (isCanonical_canonicalP k1) as [x0 [x1 jx]].
-    rewrite TCase_hom. refine (wCase _ _ _ _ _ _ _).
-    + eassumption.
-    + eassumption.
-    + Check (hom_tskipn _ _ e0).
-    + destruct ml. cbn. cbn in e0. rewrite <- tskipn_hom. rewrite e0. reflexivity.
-    + rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
-Qed.
-Print Assumptions WcbvEval_hom.
-
-L2.term.isCanonical Mch -> isCanonical (strip Mch)
-L2.term.canonicalP Mch = Some (n, args) -> isCanonical (strip Mch).
-
-    + rewrite <- canonicalP_hom. rewrite e. reflexivity.
-
-
-      eapply (WcbvEval_mkApp_fn H). rewrite mkApp_goodFn at 2.
-      
-  - change
-      (WcbvEval (stripEnv p) (strip (L2.compile.TApp fn arg args)) (strip s)).
-    change
-      (WcbvEval (stripEnv p)
-                (mkApp (strip fn) (tcons (strip arg) (strips args)))
-                (strip s)).
-    change
-      (WcbvEval (stripEnv p) (strip fn) (strip (L2.compile.TFix dts m))) in H.
-    change
-      (WcbvEval (stripEnv p) (strip fn) (TFix (stripDs dts) m)) in H.
-
-
-    cbn. eapply wAppFix.
-    + eapply H.
-    + rewrite <- dnthBody_hom. rewrite e. reflexivity.
-    + rewrite <- pre_whFixStep_hom in H0. eapply H0.
-  - cbn. eapply wAppCong; try eassumption. destruct o.
-    + left. apply (proj1 (L2_isConstruct_isConstruct _)). assumption.
-    + right. apply L2_isInd_isInd. assumption.    
-  - refine (wCase _ _ _ _ _ _ _); try eassumption.
-    * rewrite <- canonicalP_hom. rewrite e. reflexivity.
-    * rewrite <- tskipn_hom. rewrite e0. reflexivity.
-    * rewrite <- whCaseStep_hom. rewrite e1. reflexivity.
-Qed.
 Print Assumptions WcbvEval_hom.
 
 (** WcbvEval_hom is nice, but it is stronger than necessary to prove 
@@ -1426,27 +1252,40 @@ Print Assumptions WcbvEval_hom.
 **)
 Corollary strip_pres_eval:
   forall (p:environ L2.compile.Term) (t tv:L2.compile.Term),
+    L2.program.WFaEnv p -> L2.term.WFapp t ->
     L2.wcbvEval.WcbvEval p t tv ->
     exists stv, WcbvEval (stripEnv p) (strip t) stv.
 Proof.
-  intros. exists (strip tv). apply (proj1 (WcbvEval_hom _)).
-  assumption.
+  intros. exists (strip tv). eapply (proj1 (WcbvEval_hom H)); assumption.
 Qed.
 
 Corollary wcbvEval_hom:
   forall p n t t',
+    L2.program.WFaEnv p -> L2.term.WFapp t ->
     L2.wcbvEval.wcbvEval p n t = Ret t' ->
     exists m, wcbvEval (stripEnv p) m (strip t) = Ret (strip t').
 Proof.
   intros. 
-  assert (j1:= proj1 (L2.wcbvEval.wcbvEval_WcbvEval p n) _ _ H).
-  assert (k0:= proj1 (WcbvEval_hom p) _ _ j1).
-  assert (j2:= @WcbvEval_wcbvEval (stripEnv p) (strip t) (strip t') k0).
+  assert (j1:= proj1 (L2.wcbvEval.wcbvEval_WcbvEval p n) _ _ H1).
+  assert (k0:= proj1 (WcbvEval_hom H) _ _ j1).
+  assert (j2:= @WcbvEval_wcbvEval (stripEnv p) (strip t) (strip t') (k0 H0)).
   destruct j2 as [ny jny].
   exists ny. eapply jny. omega.
 Qed.
 
+Check WFaEnv. Check WcbvEval.
+Lemma sac_sound:
+  forall p (hp:L2.program.WFaEnv p) t (ht: L2.term.WFapp t) s,
+    L2.wcbvEval.WcbvEval p t s ->
+    forall L2ds, WcbvEval (stripEnv p) (strip t) L2ds -> L2ds = strip s.
+Proof.
+  intros p hp t ht s h1 L2s h2.
+  pose proof (proj1 (WcbvEval_hom hp) _ _ h1 ht).
+  eapply (WcbvEval_single_valued); eassumption.
+Qed. 
+Print Assumptions sac_sound.
 
+(******************************
 Lemma Prf_strip_inv:
   forall s st, TProof st = strip s ->
               exists t, s = L2.compile.TProof t /\ st = strip t.
@@ -1616,14 +1455,5 @@ Lemma sac_complete:
 Proof.
   intros. apply sound_and_complete. assumption.
 Qed.
-
-Lemma sac_sound:
-  forall p t s, L2.wcbvEval.WcbvEval p t s ->
-  forall L2s, WcbvEval (stripEnv p) (strip t) L2s -> L2s = strip s.
-Proof.
-  intros p t s h1 L2s h2.
-  apply (WcbvEval_single_valued h2). apply (sound_and_complete h1).
-Qed. 
-Print Assumptions sac_sound.
 
 *********************)

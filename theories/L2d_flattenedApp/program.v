@@ -13,49 +13,7 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-(***********
-Check Term.
-Check L2d.compile.Term.
-Print L2d.compile.Term.
-Goal L2.compile.Term = L2d.compile.Term. reflexivity.
- **************)
-
-(********
-(** Check that a Term is Canonical (constructor in head)
-*** and return the constructor number and its argument list:
-*** used for a Case step, as the match argument must be canonical
-*** before Case can be evaluated
-**)
-Inductive Canonical : Term -> nat -> Terms -> Prop :=
-| canC: forall (i:inductive) (n:nat),
-          Canonical (TConstruct i n) n tnil
-| canA: forall (i:inductive) (n:nat) (t:Term) (ts:Terms),
-          Canonical (TApp (TConstruct i n) t ts) n (tcons t ts).
-Hint Constructors Canonical.
-
-
-Lemma Canonical_dec:
-  forall t n ts, Canonical t n ts \/ ~ Canonical t n ts.
-induction t; intros; try (solve [right; intros h; inversion_Clear h]).
-- destruct (isConstruct_dec t1). destruct H. elim H. intros.
-  subst. destruct (eq_nat_dec x0 n). subst.
-
-Definition canonical (t:Term) : option (nat * Terms) :=
-  match t with
-    | TConstruct _ n => Some (n, tnil)
-    | TApp (TConstruct _ n) t ts => Some (n, (tcons t ts))
-    | _ => None
-  end.
-
-Lemma Canonical_canonical:
-  forall m t, WFTrm t m -> 
-              forall n ts, Canonical t n ts <-> canonical t = Some (n, ts).
-induction 1; intros xn xts; split; intros h;
-try discriminate; try (inversion h); try reflexivity.
-- destruct fn; try discriminate. injection H4. intros. subst. apply canA.
-- apply canC.
-Qed.
- ***)
+Definition WFaEnv: environ Term -> Prop := AstCommon.WFaEnv WFapp.
 
 Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctRel: forall p n m, crctEnv p -> m < n -> crctTerm p n (TRel m)

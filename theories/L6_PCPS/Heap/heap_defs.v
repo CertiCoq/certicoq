@@ -1298,6 +1298,24 @@ Module HeapDefs (H : Heap) .
       eassumption.
   Qed.
 
+  Lemma well_formed_reach_alloc' (S S' : Ensemble var) (H H' : heap block)
+        (rho : env) (x : var) (b : block) (l : loc) :
+    well_formed (reach' H (env_locs rho (S' :|: (S \\ [set x])))) H  ->
+    env_locs rho (S' :|: (S \\ [set x])) \subset dom H ->
+    alloc b H = (l, H') ->
+    locs b \subset (reach' H (env_locs rho (S' :|: (S \\ [set x])))) ->
+    well_formed (reach' H' (env_locs (M.set x (Loc l) rho) (S' :|: S))) H'.
+  Proof with now eauto with Ensembles_DB.
+    intros Hwf Hsub Ha Hin.
+    eapply well_formed_reach_alloc with (x := x) (S := S' :|: (S \\ [set x])) in Hwf; try eassumption.
+    eapply well_formed_antimon; [| eassumption ].
+    eapply reach'_set_monotonic. eapply env_locs_monotonic.
+    rewrite <- Union_assoc.
+    eapply Included_Union_compat. reflexivity.
+    eapply Included_trans; [| eapply Included_Union_Setminus ]; eauto.
+    reflexivity. now eapply DecidableSingleton_positive.
+  Qed.
+
   Lemma well_formed_reach_set_Loc (S : Ensemble var) (H : heap block) (rho : env)
         (x : var) (l : loc) :
     well_formed (reach' H (env_locs rho S)) H ->
@@ -1320,6 +1338,24 @@ Module HeapDefs (H : Heap) .
     eapply well_formed_antimon.
     eapply reach'_set_monotonic. now eapply env_locs_set_Inlcuded.
     rewrite reach'_Union. eapply well_formed_Union; eauto.
+  Qed.
+
+  Lemma well_formed_reach_set' (S S' : Ensemble var) (H : heap block) (rho : env) 
+        (x : var) (v : value) :
+    well_formed (reach' H (env_locs rho (S' :|: (S \\ [set x])))) H ->
+    val_loc v \subset reach' H (env_locs rho (S' :|: (S \\ [set x]))) ->
+    well_formed (reach' H (env_locs (M.set x v rho) (S' :|: S))) H.
+  Proof.
+    intros Hwf1 Hin.
+    eapply well_formed_antimon.
+    eapply reach'_set_monotonic. now eapply env_locs_set_Inlcuded'.
+    rewrite reach'_Union. eapply well_formed_Union; eauto.
+    eapply well_formed_antimon; [| eassumption ].
+    rewrite (reach'_idempotent H (env_locs rho (S' :|: (S \\ [set x])))).
+    eapply reach'_set_monotonic. eassumption.
+    eapply well_formed_antimon; [| eassumption ].
+    eapply reach'_set_monotonic. eapply env_locs_monotonic.
+    rewrite Setminus_Union_distr. now eauto with Ensembles_DB.
   Qed.
   
   Lemma well_formed_def_funs S1 H1 H1' rho1 rho1'  B B0 l :

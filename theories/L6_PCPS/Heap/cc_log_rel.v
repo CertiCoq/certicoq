@@ -1675,7 +1675,7 @@ Module CC_log_rel (H : Heap).
             destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction.
             simpl in Hcc.
             destruct v as [ ? [| [| B2 f3 ] [| [ env_loc' |] [|] ]] | | ]; try contradiction.
-            edestruct Hcc as (xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
+            edestruct Hcc with (vs2 := vs) as (xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
             reflexivity. reflexivity.
             destruct (lt_dec (c1 - c - 1) 1).
             + eexists. repeat split. unfold AppClo.
@@ -1813,40 +1813,200 @@ Module CC_log_rel (H : Heap).
               eapply IGinIL1. eassumption. simpl. rewrite <- !Hlen. simpl in Hleqc.
               omega.
             * rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
-              eassumption. simpl. omega.
-    Abort.
-
-    Require Import L6.ctx.
+              eassumption. simpl. omega. }
+    Qed.
     
-    Definition cost_ctx (c : exp_ctx) : nat :=
+    Require Import L6.ctx.
+
+    Fixpoint costCC_ctx_full (c : exp_ctx) : nat :=
+      match c with
+        | Econstr_c x t ys c => 1 + length ys + costCC_ctx_full c
+        | Eproj_c x t n y c => 1 + costCC_ctx_full c
+        | Efun1_c B c => 1 + costCC_ctx_full c (* XXX maybe revisit *)
+        | Eprim_c x p ys c => 1 + length ys + costCC_ctx_full c
+        | Hole_c => 0
+        | Efun2_c _ _ => 0 (* maybe fix but not needed for now *)
+        | Ecase_c _ _ _ _ _ => 0
+      end.
+
+    Fixpoint costCC_ctx (c : exp_ctx) : nat :=
       match c with
         | Econstr_c x t ys c => 1 + length ys
-        | Ecase_c _ _ _ _ _ => 1 
-        | Eproj_c x t n y e => 1
-        | Efun1_c B e => fundefs_num_fv B + 1 (* XXX maybe revisit *)
+        | Eproj_c x t n y c => 1 
+        | Efun1_c B c => 1
         | Eprim_c x p ys c => 1 + length ys
         | Hole_c => 0
         | Efun2_c _ _ => 0 (* maybe fix but not needed for now *)
+        | Ecase_c _ _ _ _ _ => 0
       end.
     
+   
+    (* Interpretation of a context as a heap and an environment *) 
+    Inductive ctx_to_heap_env : exp_ctx -> heap block -> env -> heap block -> env -> nat -> Prop :=
+    | Hole_c_to_heap_env :
+        forall H rho,
+          ctx_to_heap_env Hole_c H rho H rho 0
+    | Econstr_c_to_rho :
+        forall H H' H'' rho rho' x t ys C vs l c,
+          getlist ys rho = Some vs ->
+          alloc (Constr t vs) H = (l, H') ->
+          
+          ctx_to_heap_env C H' (M.set x (Loc l) rho)  H'' rho'  c -> 
+          
+          ctx_to_heap_env (Econstr_c x t ys C) H rho H'' rho' (c + costCC_ctx (Econstr_c x t ys C))
+
+    | Eproj_c_to_rho :
+        forall H H' rho rho' x N t y C vs v t' l c,
+          
+          M.get y rho = Some (Loc l) ->
+          get l H = Some (Constr t' vs) ->
+          nthN vs N = Some v ->
+          
+          ctx_to_heap_env C H (M.set x v rho)  H' rho'  c -> 
+          
+          ctx_to_heap_env (Eproj_c x t N y C) H rho H' rho' (c + costCC_ctx (Eproj_c x t N y C)).
+    
+  Lemma cc_approx_exp_right_ctx_compat 
+        (k : nat) rho1 rho2 rho2' H1 H2 H2' e1 C e2 c c'
+        (IInvCtxCompat :
+           forall H1 H2 H2' rho1 rho2 rho2' e1 e2 C c, 
+             II (H1, rho1, e1) (H2, rho2, C |[ e2 ]|) ->
+             ctx_to_heap_env C H2 rho2 H2' rho2' c ->
+             II (H1, rho1, e1) (H2', rho2', e2)) :
+
+    well_formed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
+    well_formed (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) H2 ->
+    (env_locs rho1 (occurs_free e1)) \subset dom H1 ->
+    (env_locs rho2 (occurs_free (C |[ e2 ]|))) \subset dom H2 ->
+
+    ctx_to_heap_env C H2 rho2 H2' rho2' c' ->
+    (e1, rho1, H1) ⪯ ^ (k; II ; ILi (c' + c) ; IG) (e2, rho2', H2') ->
+      (e1, rho1, H1) ⪯ ^ (k ; II ; ILi c ; IG) (C |[ e2 ]|, rho2, H2).
+    Proof with now eauto with Ensembles_DB.
+      intros Hwf1 Hwf2 Henv1 Henv2 Hctx. revert c. induction Hctx; intros c1 Hpre.
+      - eassumption.
+      - rewrite <- plus_assoc in Hpre. eapply IHHctx in Hpre.
+        intros H1' H2' rho1' rho2' v1 k1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
+        edestruct heap_env_equiv_env_getlist as [vs' [Hlst Hall]]; try eassumption.
+        simpl. normalize_occurs_free...
+        destruct (alloc (Constr t vs') H2') as [l2 H2''] eqn:Halloc.
+        specialize (Hpre H1' H2'' rho1' (M.set x (Loc l2) rho2')).
+        edestruct Hpre as [r1 [c3 [m2 [Hstep2 [Hinv Hccr]]]]]. 
+        + eassumption.
+        + eapply heap_env_equiv_alloc;
+          [ | | | | | | | now apply H2 | now apply Halloc | ].
+          eapply reach'_closed; try eassumption.
+          eapply reach'_closed.
+          eapply well_formed_respects_heap_env_equiv; eassumption.
+          eapply env_locs_in_dom; eassumption.
+          eapply Included_trans; [| now eapply reach'_extensive ].
+          simpl. normalize_occurs_free.
+          eapply env_locs_monotonic...
+          eapply Included_trans; [| now eapply reach'_extensive ].
+          simpl. normalize_occurs_free.
+          eapply env_locs_monotonic...
+          simpl.
+          eapply Included_trans; [| now eapply reach'_extensive ].
+          normalize_occurs_free. rewrite env_locs_Union.
+          eapply Included_Union_preserv_l. rewrite env_locs_FromList.
+          reflexivity. eassumption.
+          simpl.
+          eapply Included_trans; [| now eapply reach'_extensive ].
+          normalize_occurs_free. rewrite env_locs_Union.
+          eapply Included_Union_preserv_l. rewrite env_locs_FromList.
+          reflexivity. eassumption.
+          eapply heap_env_equiv_antimon. eassumption.
+          simpl. normalize_occurs_free...
+          split. reflexivity. eassumption.
+        + eapply IInvCtxCompat with (C := Econstr_c x t ys Hole_c). eassumption. 
+          econstructor. eassumption. eassumption. econstructor.
+        + eassumption.
+        + eassumption.
+        + eassumption.
+        + eexists. eexists (c3 + costCC (Econstr x t ys (C |[ e2 ]|))).
+          eexists. split. simpl. eapply Eval_constr_per_cc; try eassumption.
+          simpl. omega. simpl. rewrite NPeano.Nat.add_sub. eassumption.
+          split; [| eassumption ].
+          simpl. admit.
+        + eapply well_formed_antimon with
+          (S2 := reach' H' (env_locs (M.set x (Loc l) rho) (FromList ys :|: occurs_free (C |[ e2 ]|)))).
+          eapply reach'_set_monotonic. eapply env_locs_monotonic...
+          eapply well_formed_reach_alloc'; try eassumption.
+          eapply well_formed_antimon; [| eassumption ].
+          eapply reach'_set_monotonic.
+          eapply env_locs_monotonic. 
+          simpl. normalize_occurs_free... 
+          eapply Included_trans; [| eassumption ].
+          eapply env_locs_monotonic. 
+          simpl. normalize_occurs_free...
+          eapply Included_trans; [| now eapply reach'_extensive ].
+          rewrite env_locs_Union. 
+          eapply Included_Union_preserv_l. rewrite env_locs_FromList.
+          simpl. reflexivity. eassumption.
+        + eapply Included_trans.
+          eapply env_locs_set_Inlcuded'.
+          rewrite HL.alloc_dom; try eassumption.
+          eapply Included_Union_compat. reflexivity.
+          eapply Included_trans; [| eassumption ].
+          eapply env_locs_monotonic. simpl. normalize_occurs_free...
+      - rewrite <- plus_assoc in Hpre. eapply IHHctx in Hpre.
+        intros H1' H2' rho1' rho2' v1 k1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
+        eapply Heq2 in H0; [| now constructor ].
+        edestruct H0 as [l' [Hget' Heql]].
+        rewrite res_equiv_eq in Heql. destruct l' as[l' |]; try contradiction.
+        simpl in Heql. rewrite H2 in Heql. 
+        destruct (get l' H2') eqn:Hgetl'; try contradiction.
+        destruct b as [c' vs'| | ]; try contradiction.
+        destruct Heql as [Heqt Hall]; subst.
+        edestruct (Forall2_nthN _ vs vs' _ _ Hall H3) as [v' [Hnth' Hv]].
+        specialize (Hpre H1' H2' rho1' (M.set x v' rho2')).
+        edestruct Hpre as [r1 [c3 [m2 [Hstep2 [Hinv Hccr]]]]]. 
+        + eassumption.
+        + eapply heap_env_equiv_set; try eassumption.
+          eapply heap_env_equiv_antimon. eassumption.
+          simpl. normalize_occurs_free...
+        + eapply IInvCtxCompat with (C := Eproj_c x t N y Hole_c). eassumption. 
+          econstructor. eassumption. eassumption. eassumption. econstructor.
+        + eassumption.
+        + eassumption.
+        + eassumption.
+        + eexists. eexists (c3 + costCC_ctx (Eproj_c x t N y C)).
+          eexists. split. simpl. eapply Eval_proj_per_cc; try eassumption.
+          simpl. omega. simpl. rewrite NPeano.Nat.add_sub. eassumption.
+          split; [| eassumption ].
+          simpl. admit.
+        + eapply well_formed_antimon with
+          (S2 := reach' H (env_locs (M.set x v rho) ([set y] :|: occurs_free (C |[ e2 ]|)))).
+          eapply reach'_set_monotonic. eapply env_locs_monotonic...
+          eapply well_formed_reach_set'.
+          eapply well_formed_antimon; [| eassumption ].
+          eapply reach'_set_monotonic.
+          eapply env_locs_monotonic. 
+          simpl. normalize_occurs_free...
+          rewrite env_locs_Union, reach'_Union.
+          eapply Included_Union_preserv_l. rewrite env_locs_Singleton; eauto.
+          eapply Included_trans; [| eapply Included_post_reach' ].
+          simpl. rewrite post_Singleton; eauto. simpl.
+          eapply In_Union_list. eapply in_map.
+          eapply nthN_In; eassumption.
+        + eapply Included_trans.
+          eapply env_locs_set_Inlcuded'.
+          eapply Union_Included.
+          eapply Included_trans; [| eapply reachable_in_dom; eassumption ].
+          simpl. normalize_occurs_free. rewrite env_locs_Union, reach'_Union.
+          eapply Included_Union_preserv_l. rewrite env_locs_Singleton; eauto.
+          eapply Included_trans; [| eapply Included_post_reach' ].
+          simpl. rewrite post_Singleton; eauto. simpl.
+          eapply In_Union_list. eapply in_map.
+          eapply nthN_In; eassumption.
+          eapply Included_trans; [| eassumption ].
+          eapply env_locs_monotonic. simpl. normalize_occurs_free...
+    Admitted.
+
     Definition size_reachable (S : Ensemble loc) (H1 : heap block) (s : nat ) : Prop :=
       exists H2, live S H1 H2 /\ size H2 = s. 
     
-    (* Interpretation of a context as a heap and an environment *) 
-    Inductive ctx_to_heap_env : exp_ctx -> exp -> heap block -> env -> heap block -> env -> nat -> nat -> Prop := 
-    | Econstr_to_heap_env :
-        forall x t' xs C e t vs l rho1 H1 H1' H1'' rho2 H2 c (m m' : nat),
-          getlist xs rho1 = Some vs ->
-          alloc (Vconstr t vs) H1 = (l, H1') ->
 
-          live (env_locs (M.set x (Loc l) rho1) (occurs_free (C |[ e ]|))) H1' H1'' ->
-          size_heap H1' = m' ->
-          
-          ctx_to_heap_env C e  H1'' (M.set x (Loc l) rho1) H2 rho2 c m ->
-          ctx_to_heap_env (Econstr_c x t' xs C) e H1 rho1 H2 rho2
-                          (c + cost_ctx (Econstr_c x t' xs C))
-                          (max m m').
-    
 
   End Compat.
 

@@ -324,7 +324,7 @@ Definition isConstruct (t:Term) : Prop :=
   exists i n np na, t = TConstruct i n np na.
 Lemma isConstruct_dec: forall t, {isConstruct t}+{~ isConstruct t}.
 Proof.
-  destruct t; try (right; not_is4).
+  destruct t; try (right; not_isn).
   - left. exists i, n, n0, n1. reflexivity.
 Qed.
 

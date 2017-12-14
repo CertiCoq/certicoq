@@ -7,6 +7,7 @@ Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Setoids.Setoid.
 Require Import Omega.
 
+Require Import Common.Common.
 Require Import L1g.L1g.
 Require Import L2.compile.
 Require Import L2.term.
@@ -256,7 +257,7 @@ Lemma TApp_hom:
     mkApp (strip fn) (tcons (strip arg) (strips args)).
 Proof.
   destruct fn; intros arg args; try intuition;
-  try (left; repeat split; [not_is1 | not_is3 | not_is1]).  
+  try (left; repeat split; not_isn).  
 Qed.
 
 (*********

@@ -132,8 +132,28 @@ Ltac dstrct5 h :=
   with uu := fresh "u"
   with jj := fresh "j" in
   destruct h as [xx [yy [zz [ww [uu jj]]]]].
+Ltac dstrct6 h :=
+  let xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with ww := fresh "w"
+  with uu := fresh "u"
+  with aa := fresh "a"
+  with jj := fresh "j" in
+  destruct h as [xx [yy [zz [ww [uu [aa jj]]]]]].
+Ltac dstrct7 h :=
+  let xx := fresh "x"
+  with yy := fresh "y"
+  with zz := fresh "z"
+  with ww := fresh "w"
+  with uu := fresh "u"
+  with aa := fresh "a"
+  with bb := fresh "b"
+  with jj := fresh "j" in
+  destruct h as [xx [yy [zz [ww [uu [aa [bb jj]]]]]]].
 Ltac dstrctn h :=
-  first [dstrct5 h | dstrct4 h | dstrct3 h | dstrct2 h | dstrct1 h].
+  first [dstrct7 h | dstrct6 h | dstrct5 h | dstrct4 h |
+         dstrct3 h | dstrct2 h | dstrct1 h].
 Ltac is_inv h := dstrctn h; discriminate.
 Ltac not_isn :=
   let hh := fresh "h" in intros hh; dstrctn hh; discriminate.
@@ -146,6 +166,7 @@ Ltac not_isDummy := not_isn.
 Ltac not_isProof := not_isn.
 Ltac not_isInd := not_isn.
 Ltac not_isWrong := not_isn.
+Ltac not_isConstruct := not_isn.
 
 
 Lemma triv_exists:

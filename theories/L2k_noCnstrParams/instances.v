@@ -16,6 +16,7 @@ Instance WfL2Term: GoodTerm (Program L2k.compile.Term) :=
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
+(*******
 Global Instance QuestionHeadL2kTerm: QuestionHead (Program L2k.compile.Term) :=
   fun q t =>
     match q, fst (flattenApp (main t)) with
@@ -36,19 +37,21 @@ Global Instance ObsSubtermL2kTerm :
         end
       | _ => None
     end.
-
+**************)
 Global Instance certiL2kEval:
   BigStepOpSem (Program L2k.compile.Term) (Program L2k.compile.Term).
 Proof.
   intros s sv. destruct s, sv. exact (WcbvEval env main main0 /\ env = env0).
 Defined.
 
+(**
 Global Instance certiL2k: CerticoqLanguage (Program L2k.compile.Term).
 
 Instance certiL2_to_L2k: 
   CerticoqTotalTranslation (Program L2.compile.Term)
                            (Program L2k.compile.Term) :=
   stripProgram.
+ **)
 
 
 Require Import certiClasses2.
@@ -75,6 +78,7 @@ Definition P_true := Eval cbv in (program_Program p_true).
 Quote Recursively Definition p_false := (fun (x:True) => false).
 Definition P_false := Eval cbv in (program_Program p_false).
 
+(*********
 Lemma foo:
   yesPreserved P_true P_false.
 Proof.
@@ -89,7 +93,6 @@ Proof.
   - apply foo.
   - intros. unfold observeNthSubterm, ObsSubtermL2Term. cbn. constructor.
 Qed.
-
 
 Lemma identity_pres_yes:
   forall (p:Program Term), yesPreserved p p.
@@ -108,6 +111,8 @@ Proof.
   unfold yesPreserved, questionHead, QuestionHeadL2Term.
   cbn.
 Admitted.
+*********)
+
 (*
 Lemma my_stripProgram_pres_yes:
   forall (main: L2.compile.Term) (env: environ L2.compile.Term) stv otv,

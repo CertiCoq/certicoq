@@ -116,52 +116,6 @@ Goal
   wcbvEval (env) 90 (main) = Ret ans_myplusx.
   vm_compute. reflexivity.
 Qed.
-Goal
-  let env := (env P_myplusx) in
-  let main := (main P_myplusx) in
-  WcbvEval (env) (main) ans_myplusx.
-Proof.
-  intros. unfold main, AstCommon.main, P_myplusx, ans_myplusx.
-  eapply wConst.
-  - reflexivity.
-  - eapply wAppLam.
-    + eapply wAppLam.
-      *{ eapply wConst.
-         - reflexivity.
-         - eapply wLam. }
-      * eapply wDummy.
-      * unfold whBetaStep, instantiate. unfold nat_compare. 
-        eapply wLam.
-    + eapply wAppCong.
-      *{ eapply wAppCong.
-         - eapply wConstruct.
-         - not_isLambda.
-         - not_isFix.
-         - eapply wDummy. }
-      * not_isLambda.
-      * not_isFix.
-      * eapply wConstruct.
-    + unfold whBetaStep, instantiate. unfold nat_compare.
-       eapply wCase.
-      *{ eapply wAppCong.
-         - eapply wAppCong.
-           + eapply wConstruct.
-           + not_isLambda.
-           + not_isFix.
-           + eapply wDummy.
-         - not_isLambda.
-         - not_isFix.
-         - eapply wConstruct. }
-      * unfold canonicalP. cbn. reflexivity.
-      * reflexivity.
-      * reflexivity.
-      *{ unfold mkApp. eapply wAppLam.
-         - eapply wLam.
-         - eapply wConstruct.
-         - unfold whBetaStep, instantiate. unfold nat_compare.
-           eapply wConstruct. }
-Qed.
-
            
 (** list apprend **)
 Lemma appNilDum:   (** useful lemma **)
@@ -169,8 +123,9 @@ Lemma appNilDum:   (** useful lemma **)
     WcbvEval env (TApp (NIL 0) (TDummy str)) (TApp (NIL 0) (TDummy str)).
 Proof.
   intros. eapply wAppCong.
-  eapply wConstruct. not_isLambda. not_isFix.
-  eapply wDummy.
+  - eapply wConstruct.
+  - left. exists LL, 0, 1, 0. reflexivity.
+  - eapply wDummy.
 Qed.
 
 Fixpoint myapp (ls ts: list nat): list nat :=

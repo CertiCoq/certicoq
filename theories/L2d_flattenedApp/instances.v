@@ -1,11 +1,9 @@
-Require Import L2.compile.
-Require Import L2.wcbvEval.
-Require Import L2.term.
+
+Require Import L2.L2.
+Require Import L2d.L2d.
 Require Import certiClasses.
 Require Import Common.Common.
-Require Import L1g.instances.
 Require Import certiClasses2.
-Require Import L2.stripEvalCommute.
 Require Import ExtLib.Data.ListNth.
 Set Template Cast Propositions.
 
@@ -17,10 +15,11 @@ Instance WfL2Term: GoodTerm (Program L2.compile.Term) :=
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
+(*********************
 Definition flattenApp (t:L2.compile.Term) :
   (L2.compile.Term * (list L2.compile.Term)) :=
   match t with
-    | TApp fn arg args => (fn, cons arg (Terms_list args))
+    | TApp fn arg => (fn, cons arg (Terms_list args))
     | s => (s, nil)
   end.
 
@@ -225,3 +224,4 @@ Proof.
     + apply compileObsEq.
 Admitted.
 Print Assumptions certiL1g_to_L2Correct.
+*************************)

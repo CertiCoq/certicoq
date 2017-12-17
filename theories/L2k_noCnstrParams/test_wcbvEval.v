@@ -21,6 +21,13 @@ Print p_Type.
 Definition P_Type := Eval cbv in (program_Program p_Type).
 Print P_Type.
 
+(** test eta expansion: constructor expecting 1 arg and 0 params **)
+Inductive etaC01 := EtaC01 : forall b:bool, etaC01.
+Quote Recursively Definition p_etaC01 := EtaC01.
+Definition P_etaC01 := Eval cbv in (program_Program p_etaC01).
+Print P_etaC01.
+
+
 (***
 Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
 Notation SS := (TConstruct NN 1 0).
@@ -52,52 +59,180 @@ Notation "fn [| arg @ args |]" :=
 Notation IND := (compile.TInd).
  ***)
 
+Definition tstx := true.
+Quote Recursively Definition cbv_tstx :=
+  ltac:(let t:=(eval cbv in tstx) in exact t).
+Definition ans_tstx :=
+  Eval cbv in (main (program_Program cbv_tstx)).
+(* [program] of the program *)
+Quote Recursively Definition p_tstx := tstx.
+Definition P_tstx := Eval cbv in (program_Program p_tstx).
+Goal
+  let env := (env P_tstx) in
+  let main := (main P_tstx) in
+  wcbvEval (env) 90 (main) = Ret ans_tstx.
+  vm_compute. reflexivity.
+Qed.
+
+Fixpoint Plus1 (n : nat): nat :=
+  match n with
+    | 0 => 1
+    | S p => S (Plus1 p)
+  end.
+Definition Plus1x := (Plus1 3).
+Quote Recursively Definition cbv_Plus1x :=
+  ltac:(let t:=(eval cbv in Plus1x) in exact t).
+Definition ans_Plus1x :=
+  Eval cbv in (main (program_Program cbv_Plus1x)).
+(* [program] of the program *)
+Quote Recursively Definition p_Plus1x := Plus1x.
+Definition P_Plus1x := Eval cbv in (program_Program p_Plus1x).
+Goal
+  let env := (env P_Plus1x) in
+  let main := (main P_Plus1x) in
+  wcbvEval (env) 90 (main) = Ret ans_Plus1x.
+  vm_compute. reflexivity.
+Qed.
+
+(**** very simple polymorphic match  **)
+Section myplus.
+  Variables (A:Type).
+  Inductive myNat : Type :=
+  | myZ: forall a:A, myNat.
+  Definition myplus (m: myNat) : A :=
+    match m with
+    | myZ a => a
+    end.
+End myplus.
+Print myplus.
+Definition myplusx := (myplus (myZ true)).
+Compute myplusx.
+Quote Recursively Definition cbv_myplusx :=
+  ltac:(let t:=(eval cbv in myplusx) in exact t).
+Definition ans_myplusx :=
+  Eval cbv in (main (program_Program cbv_myplusx)).
+Print ans_myplusx.
+(* [program] of the program *)
+Quote Recursively Definition p_myplusx := myplusx.
+Definition P_myplusx := Eval cbv in (program_Program p_myplusx).
+Goal
+  let env := (env P_myplusx) in
+  let main := (main P_myplusx) in
+  wcbvEval (env) 90 (main) = Ret ans_myplusx.
+  vm_compute. reflexivity.
+Qed.
+ 
+(** list apprend **)
+Fixpoint myapp (ls ts: list nat): list nat :=
+  match ls with
+  | nil => ts
+  | cons b bs => cons b (myapp bs ts)
+  end.
+Definition myappx := (myapp (cons 0 nil) nil).
+Compute myappx.
+Quote Recursively Definition cbv_myappx :=
+  ltac:(let t:=(eval cbv in myappx) in exact t).
+Definition ans_myappx :=
+  Eval cbv in (main (program_Program cbv_myappx)).
+Print ans_myappx.
+(* [program] of the program *)
+Quote Recursively Definition p_myappx := myappx.
+Definition P_myappx := Eval cbv in (program_Program p_myappx).
+Goal
+  let env := (env P_myappx) in
+  let main := (main P_myappx) in
+  wcbvEval (env) 90 (main) = Ret ans_myappx.
+  vm_compute. reflexivity.
+Qed.
+
+(** list reverse **)
+Fixpoint myrev (ls: list nat): list nat :=
+  match ls with
+  | nil => nil
+  | cons b bs => (myrev bs) ++ (cons b nil)
+  end.
+Definition myrevx := (myrev (cons 0 nil)).
+Compute myrevx.
+Quote Recursively Definition cbv_myrevx :=
+  ltac:(let t:=(eval cbv in myrevx) in exact t).
+Definition ans_myrevx :=
+  Eval cbv in (main (program_Program cbv_myrevx)).
+Print ans_myrevx.
+(* [program] of the program *)
+Quote Recursively Definition p_myrevx := myrevx.
+Definition P_myrevx := Eval cbv in (program_Program p_myrevx).
+Goal
+  let env := (env P_myrevx) in
+  let main := (main P_myrevx) in
+  wcbvEval (env) 90 (main) = Ret ans_myrevx.
+  vm_compute. reflexivity.
+Qed.
+
+
 (*******)
-Set Printing Width 100.
+Set Printing Width 80.
 Quote Recursively Definition p_0 := 0.
-Definition oldP_0 := Eval cbv in (main (L2.compile.program_Program p_0)).
+Definition oldP_0 := Eval cbv in (main (L2d.compile.program_Program p_0)).
 Print oldP_0.
 Definition P_0 := Eval cbv in (main (program_Program p_0)).
 Print P_0.
 
 Quote Recursively Definition p_1 := 1.
-Definition oldP_1 := Eval cbv in (main (L2.compile.program_Program p_1)).
+Definition oldP_1 := Eval cbv in (main (L2d.compile.program_Program p_1)).
 Print oldP_1.
 Definition P_1 := Eval cbv in (main (program_Program p_1)).
 Print P_1.
                                       
 Quote Recursively Definition p_nil := @nil.
-Definition oldP_nil := Eval cbv in (main (L2.compile.program_Program p_nil)).
+Definition oldP_nil := Eval cbv in (main (L2d.compile.program_Program p_nil)).
 Print oldP_nil.
 Definition P_nil := Eval cbv in (main (program_Program p_nil)).
 Print P_nil.
 
 Quote Recursively Definition p_nilb := (@nil bool).
-Definition oldP_nilb := Eval cbv in (main (L2.compile.program_Program p_nilb)).
+Definition oldP_nilb :=
+  Eval cbv in (main (L2d.compile.program_Program p_nilb)).
 Print oldP_nilb.
 Definition P_nilb := Eval cbv in (main (program_Program p_nilb)).
 Print P_nilb.
 
 Quote Recursively Definition p_cons := @cons.
-Definition oldP_cons := Eval cbv in (main (L2.compile.program_Program p_cons)).
+Definition oldP_cons :=
+  Eval cbv in (main (L2d.compile.program_Program p_cons)).
 Print oldP_cons.
 Definition P_cons := Eval cbv in (main (program_Program p_cons)).
 Print P_cons.
 
+Quote Recursively Definition p_lcons := (fun x => @cons x).
+Definition P_lcons := Eval cbv in (main (program_Program p_lcons)).
+Print P_lcons.
+
+Quote Recursively Definition p_llcons := (fun x => fun y => @cons x y).
+Definition P_llcons := Eval cbv in (main (program_Program p_llcons)).
+Print P_llcons.
+
+Quote Recursively Definition p_xx :=
+  (fun (y:bool) => fun (z:list bool -> bool) => z (@cons bool y nil)).
+Definition P_xx := Eval cbv in (main (program_Program p_xx)).
+Print P_xx.
+
 Quote Recursively Definition p_consb := (@cons bool).
-Definition oldP_consb := Eval cbv in (main (L2.compile.program_Program p_consb)).
+Definition oldP_consb :=
+  Eval cbv in (main (L2d.compile.program_Program p_consb)).
 Print oldP_consb.
 Definition P_consb := Eval cbv in (main (program_Program p_consb)).
 Print P_consb.
 
 Quote Recursively Definition p_consbt := (cons true).
-Definition oldP_consbt := Eval cbv in (main (L2.compile.program_Program p_consbt)).
+Definition oldP_consbt :=
+  Eval cbv in (main (L2d.compile.program_Program p_consbt)).
 Print oldP_consbt.
 Definition P_consbt := Eval cbv in (main (program_Program p_consbt)).
 Print P_consbt.
 
 Quote Recursively Definition p_consbtbs := (cons true nil).
-Definition oldP_consbtbs := Eval cbv in (main (L2.compile.program_Program p_consbtbs)).
+Definition oldP_consbtbs :=
+  Eval cbv in (main (L2d.compile.program_Program p_consbtbs)).
 Print oldP_consbtbs.
 Definition P_consbtbs := Eval cbv in (main (program_Program p_consbtbs)).
 Print P_consbtbs.
@@ -110,7 +245,8 @@ Fixpoint testEtaNA (l:nat) : nat :=
   end.
 Quote Recursively Definition p_testEtaNAAns :=
     ltac:(let t:=(eval cbv in (testEtaNA 0)) in exact t).
-Definition P_testEtaNAAns := Eval cbv in (main (L2k.compile.program_Program p_testEtaNAAns)).
+Definition P_testEtaNAAns :=
+  Eval cbv in (main (L2k.compile.program_Program p_testEtaNAAns)).
 Print P_testEtaNAAns.
 Quote Recursively Definition p_texNA := (testEtaNA 0).
 Definition P_texNA := Eval cbv in (L2k.compile.program_Program p_texNA).
@@ -277,7 +413,8 @@ Definition envx := env P_and_rect_x.
 Definition mainx := main P_and_rect_x.
 Goal
   wcbvEval envx 90 mainx = Ret ans_and_rect_x.
-  vm_compute. (******** HERE reflexivity.
+  vm_compute. (******** fails HERE because of TProof
+  reflexivity.
 Qed.
                *****************)
 Abort.

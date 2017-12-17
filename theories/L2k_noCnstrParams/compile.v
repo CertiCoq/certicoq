@@ -393,6 +393,22 @@ Qed.
 (** Carefully separate various paths to eta expansion of constructors
 *** to keep control of the shape (constructor vs lambda) of the result.
 **)
+Function etaExpand_args_Lam'   (* no more parameters expected *)
+         (nargs:nat)            (* inputs *)
+         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
+          { struct nargs } : Term :=
+  match nargs with
+  (* no more actual args, no more pars or args expected: finished *)
+  | 0 => (fun b => TLambda nAnon (body b)) computedArgs
+  (* more actual args than [npars + nargs]: impossible *)
+  | S n =>
+    etaExpand_args_Lam' n (fun b => TLambda nAnon (TLambda nAnon (body b)))
+                   (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
+  (* more actual args *)
+  end.
+Functional Scheme etaExpand_args_Lam'_ind :=
+  Induction for etaExpand_args_Lam' Sort Prop.
+
 Function etaExpand_args_Lam   (* no more parameters expected *)
          (nargs:nat) (actualArgs:Terms)             (* inputs *)
          (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
@@ -401,37 +417,41 @@ Function etaExpand_args_Lam   (* no more parameters expected *)
   (* no more actual args, no more pars or args expected: finished *)
   | 0, tnil => body computedArgs
   (* more actual args than [npars + nargs]: impossible *)
-  | 0, tcons u us => TWrong "strip; Constructor; too many args"
+  | 0, tcons _ _ => TDummy "strip; Constructor; too many args"
   (* no more actual args but more args expected: eta expand *)
   | S n, tnil =>
-    etaExpand_args_Lam n tnil (fun b => TLambda nAnon (body b))
+    etaExpand_args_Lam' n body
                    (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
   (* more actual args *)
   | S n, tcons u us =>
     etaExpand_args_Lam n us body (tappend computedArgs (tunit u))
   end.
-Functional Scheme etaExpand_args_Lam_ind :=
+Functional Scheme etaExpand_args_Lam_ind' :=
   Induction for etaExpand_args_Lam Sort Prop.
                                       
 Definition etaExpand_args_Construct   (* no more parameters expected *)
          (nargs:nat) (actualArgs:Terms)             (* inputs *)
-         (i:inductive) (m:nat)
-         (computedArgs:Terms)  (* accumulator *)
+         (i:inductive) (m:nat) (* accumulator *)
   : Term :=
   match nargs, actualArgs with
   (* no more actual args, no more pars or args expected: finished *)
-  | 0, tnil => TConstruct i m computedArgs
+  | 0, tnil => TConstruct i m tnil
   (* more actual args than [npars + nargs]: impossible *)
-  | 0, tcons u us => TWrong "strip; Constructor; too many args"
+  | 0, tcons u us => TDummy "strip; Constructor; too many args"
   (* no more actual args but more args expected: eta expand *)
   | S n, tnil =>
-    etaExpand_args_Lam n tnil (TConstruct i m)
-                   (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
+    etaExpand_args_Lam' n (TConstruct i m ) (tunit (TRel 0))
   (* more actual args *)
-  | S n, tcons u us =>
-    etaExpand_args_Lam n us (TConstruct i m) (tappend computedArgs (tunit u))
+  | S n, tcons u us => etaExpand_args_Lam n us (TConstruct i m) (tunit u)
   end.
-                                      
+(***********************                       
+  | S 0, tcons u tnil => TConstruct i m (tunit u)
+  | S 0, tcons u (tcons _ _) => TWrong "strip; Constructor; too many args"
+  | S (S n), tcons u (tcons w ws) =>
+    etaExpand_args_Lam n us (TConstruct i m) (tunit u)
+  end.
+ *********************)
+
 (* strip params, eta expand as required,
 ** then call etaExpand_args on remaining args *)
 Function nLambda (n:nat) (F:Terms -> Term) :=
@@ -450,7 +470,7 @@ Function etaExpand
   | tnil, S n =>
     etaExpand_args_Lam nargs tnil (nLambda (S n) (TConstruct i m)) tnil 
   (* no more params possible; start on args *)
-  | aa, 0 => etaExpand_args_Construct nargs aa i m tnil
+  | aa, 0 => etaExpand_args_Construct nargs aa i m
   end.
 
 Section Strip.
@@ -482,15 +502,6 @@ Function strip (t:L2dTerm) : Term :=
     | None => TApp (strip fn) sarg
     | Some (i, m, args, npars, nargs) => etaExpand i m args npars nargs
     end
-      (******************
-  | L2d.compile.TApp fn arg => 
-    let sarg := strip arg in
-    match L2d.term.CanonicalP fn with
-    | None => TApp (strip fn) sarg
-    | Some (i, m, npars, nargs, args) =>
-      etaExpand i m (tappend (strips args) (tunit sarg)) npars nargs
-    end
-*******************)
   | L2d.compile.TConst nm => TConst nm
   | L2d.compile.TConstruct i m npars nargs => etaExpand i m tnil npars nargs
   | L2d.compile.TCase i mch brs => TCase (fst i) (strip mch) (stripBs brs)

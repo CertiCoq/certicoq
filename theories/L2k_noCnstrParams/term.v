@@ -2015,6 +2015,147 @@ Proof.
     constructor. rewrite liftDs_pres_dlength. apply (H0 (n0 + dlength defs)).
 Qed. 
 
+Definition stableF (F:Terms -> Term) :=   (*** HERE ***)
+  forall ts n, WFTrms ts (S n) -> WFTrm (F ts) n.
+
+(********
+Lemma etaExpand_args_Lam'_pres_WFTrm:
+  forall nargs cArgs,
+    WFTrms cArgs 0 ->
+    forall (bod:Terms->Term), stableF (fun b => TLambda nAnon (bod b)) ->
+    WFTrm (etaExpand_args_Lam' nargs bod cArgs) 0.
+Proof.
+  induction nargs; intros.
+  - cbn. intuition. unfold stableF in H0. eapply H0.
+    apply (proj1 (proj2 WFTrm_up)). assumption.
+  - cbn. eapply IHnargs.
+    + eapply tappend_pres_WFTrms.
+      * apply WF_lifts_closed. assumption.
+      * constructor. constructor. omega. constructor.
+    + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
+Qed.
+
+Lemma etaExpand_args_Lam_tnil_pres_WFTrm:
+  forall nargs cArgs,
+    WFTrms cArgs 0 ->
+    forall (bod:Terms->Term), stableF bod ->
+    WFTrm (etaExpand_args_Lam nargs tnil bod cArgs) 0.
+Proof.
+  induction nargs; intros.
+  - cbn. intuition. unfold stableF in H0. eapply H0.
+    apply (proj1 (proj2 WFTrm_up)). assumption.
+  - cbn. eapply IHnargs.
+    + eapply tappend_pres_WFTrms.
+      * apply WF_lifts_closed. assumption.
+      * constructor. constructor. omega. constructor.
+    + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
+Qed.
+
+Lemma etaExpand_args_Lam_tnil_pres_WFTrm:
+  forall nargs cArgs n,
+    WFTrms cArgs n ->
+    forall (bod:Terms->Term), stableF bod ->
+    WFTrm (etaExpand_args_Lam nargs tnil bod cArgs) (n + nargs).
+Proof.
+  induction nargs; intros.
+  - cbn. replace (n + 0) with n; try omega. intuition.
+  - cbn. replace (n + S nargs) with (S n + nargs); try omega. eapply IHnargs.
+    + eapply tappend_pres_WFTrms.
+      * eapply (proj1 (proj2 lift_pres_WFTrm)). assumption.
+      * constructor. constructor. omega. constructor.
+    + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
+Qed.
+
+Lemma etaExpand_args_Lam_nargs_pres_WFTrm:
+  forall aArgs cArgs n,
+    WFTrms aArgs n ->
+    WFTrms cArgs n ->
+    forall (bod:Terms->Term), stableF bod ->
+    WFTrm (etaExpand_args_Lam 0 aArgs bod cArgs) n.
+Proof.
+  destruct aArgs; intros.
+  - cbn. unfold stableF in H1. intuition.
+  - cbn. constructor.
+Qed.
+
+(** etaExpand_args_Lam preserves closedness **)
+Lemma etaExpand_args_Lam_pres_WFTrm:
+  forall nargs aArgs cArgs n,
+    WFTrms aArgs n ->
+    WFTrms cArgs n ->
+    forall (bod:Terms->Term), stableF bod ->
+    WFTrm (etaExpand_args_Lam nargs aArgs bod cArgs) n.
+Proof.
+  induction nargs; destruct aArgs; intros.
+  - cbn. unfold stableF in H1. intuition.
+  - cbn. constructor.
+  - eapply etaExpand_args_Lam_tnil_pres_WFTrm; try assumption.
+  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+    eapply IHnargs; try eassumption.
+    + inversion_Clear H. apply (proj1 (proj2 WFTrm_up)). assumption.
+    + eapply tappend_pres_WFTrms.
+      * apply (proj1 (proj2 WFTrm_up)). assumption.
+      * inversion_Clear H. constructor.
+        apply (proj1 WFTrm_up). assumption. constructor.
+Qed.
+
+Lemma etaExpand_args_Lam_pres_WFTrm:
+  forall nargs aArgs cArgs n,
+    WFTrms aArgs n ->
+    WFTrms cArgs n ->
+    forall (bod:Terms->Term), stableF bod ->
+    WFTrm (etaExpand_args_Lam nargs aArgs bod cArgs) (n + nargs).
+Proof.
+  induction nargs; destruct aArgs; intros.
+  - cbn. replace (n + 0) with n; try omega. unfold stableF in H1. intuition.
+  - cbn. constructor.
+  - eapply etaExpand_args_Lam_tnil_pres_WFTrm; try assumption.
+  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+    eapply IHnargs; try eassumption.
+    + inversion_Clear H. apply (proj1 (proj2 WFTrm_up)). assumption.
+    + eapply tappend_pres_WFTrms.
+      * apply (proj1 (proj2 WFTrm_up)). assumption.
+      * inversion_Clear H. constructor.
+        apply (proj1 WFTrm_up). assumption. constructor.
+Qed.
+
+Lemma etaExpand_args_Construct_pres_WFTrm:
+  forall nargs aArgs i m n,
+    WFTrms aArgs n ->
+    WFTrm (etaExpand_args_Construct nargs aArgs i m) (n + nargs).
+Proof.
+  destruct nargs, aArgs; intros.
+  - cbn. constructor. constructor.
+  - cbn. constructor.
+  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+    eapply etaExpand_args_Lam_pres_WFTrm.
+    + constructor.
+    + constructor.
+      * constructor. omega.
+      * constructor.
+    + unfold stableF. intros. constructor. constructor.
+      apply (proj1 (proj2 WFTrm_up)). assumption.
+  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+    eapply etaExpand_args_Lam_pres_WFTrm.
+    + inversion_Clear H. apply (proj1 (proj2 WFTrm_up)). assumption.
+    + inversion_Clear H.  constructor. apply (proj1 WFTrm_up). assumption.
+      constructor.
+    + unfold stableF. intros. constructor. assumption.
+Qed.
+
+Lemma etaExpand_pres_WFTrm:
+  forall aArgs npars nargs i m n,
+    WFTrms aArgs n -> WFTrm (etaExpand i m aArgs npars nargs) (n + nargs).
+Proof.
+  induction aArgs; destruct npars; intros.
+  - cbn. eapply etaExpand_args_Construct_pres_WFTrm. constructor.
+  - cbn. eapply etaExpand_args_Lam_pres_WFTrm. constructor. constructor.
+    unfold stableF. intros. constructor. constructor.
+    apply (proj1 (proj2 WFTrm_up)). assumption.
+  - cbn. eapply etaExpand_args_Construct_pres_WFTrm. assumption.
+  - cbn. eapply IHaArgs. inversion_Clear H. assumption.
+Qed.
+**********************)      
 
 (*** Some basic operations and properties of [Term] ***)
 
@@ -2981,58 +3122,126 @@ Lemma etaExpand_args_Construct_up:
   forall nargs tlaArgs,
     nargs >= tlaArgs ->
     forall aArgs, tlaArgs = tlength aArgs ->
-    forall i m cArgs u,
-      etaExpand_args_Construct (S nargs) (tcons u aArgs) i m cArgs =
-      etaExpand_args_Lam nargs aArgs (TConstruct i m) (tappend cArgs (tunit u)).
+    forall i m u,
+      etaExpand_args_Construct (S nargs) (tcons u aArgs) i m =
+      etaExpand_args_Lam nargs aArgs (TConstruct i m) (tunit u).
 Proof.
   unfold ge. induction 1; intros.
   - rewrite H. clear. cbn. induction aArgs; cbn; reflexivity.
   - specialize (IHle aArgs H0 i m0). destruct aArgs; cbn; reflexivity.
 Qed.
 
-Lemma pre_isLambda_etaExpand_args_Lam:
+(***********
+Lemma isLambda_etaExpand_args_Lam_Lam:
   forall nargs aArgs F cArgs,
     let ea := (etaExpand_args_Lam
                  nargs aArgs (fun b : Terms => TLambda nAnon (F b)) cArgs) in
-    isLambda ea \/ isWrong ea.
+    isLambda ea \/ isDummy ea.
 Proof.
   induction nargs; induction aArgs; cbn; intros; auto.
 Qed.
 
-Lemma isLambda_etaExpand_args_Lam:
+Lemma isLambda_etaExpand_args_Lam_Construct:
   forall nargs aArgs i m cArgs,
     let ea := etaExpand_args_Lam nargs aArgs (TConstruct i m) cArgs in
-    isLambda ea \/ isConstruct ea \/ isWrong ea.
+    isLambda ea \/ isConstruct ea \/ isDummy ea.
 Proof.
   induction nargs; induction aArgs; cbn; intros.
   - right. left. auto.
   - right. right. auto.
-  - destruct (pre_isLambda_etaExpand_args_Lam
+  - destruct (isLambda_etaExpand_args_Lam_Lam
                 nargs tnil (TConstruct i m)
                 (tappend (lifts 0 cArgs) (tunit (TRel 0)))) as [h0 | h1];
-      intuition.
+    intuition.
   - destruct (IHnargs aArgs i m cArgs) as [h0 | [h1 | h2]]; intuition.
 Qed.
 
-Lemma notIsApp_pre_etaExpand_args_Lam:
+Lemma isLambda_etaExpand_args_Construct:
+  forall nargs aArgs i m,
+    let ea := (etaExpand_args_Construct nargs aArgs i m) in
+    isLambda ea \/ isConstruct ea  \/ isDummy ea.
+Proof.
+  destruct nargs, aArgs; cbn; intros; auto.
+  - destruct (isLambda_etaExpand_args_Lam_Lam
+                nargs tnil (TConstruct i m) (tunit (TRel 0))) as [h | h];
+      intuition.
+  - destruct (isLambda_etaExpand_args_Lam_Construct
+                nargs aArgs i m (tunit t)) as [h | [h|h]]; intuition.
+Qed. 
+
+Lemma isLambda_etaExpand:
+  forall nargs aArgs i m npars,
+    let ea := etaExpand i m aArgs npars nargs in
+    isLambda ea \/ isConstruct ea \/ isDummy ea.
+Proof.
+  intros. unfold ea.
+    functional induction (etaExpand i m aArgs npars nargs).
+  - intuition.
+  - cbn.
+    destruct (isLambda_etaExpand_args_Lam_Lam
+                nargs tnil (TConstruct i m ) tnil); intuition.
+  - destruct (isLambda_etaExpand_args_Construct nargs aa i m)
+      as [h0 | [h1 | h2]]; intuition.
+Qed.
+
+Lemma notIsApp_etaExpand:
+  forall i m aArgs npars nargs,
+    ~ isApp (etaExpand i m aArgs npars nargs).
+Proof.
+  intros. destruct (isLambda_etaExpand nargs aArgs i m npars)
+    as [h | [h | h]]; intros j; destruct j as [y0 [y1 jy]].
+  - destruct h as [x0 [x1 jx]]. rewrite jx in jy. discriminate.
+  - destruct h as [x0 [x1 [x2 jx]]]. rewrite jx in jy. discriminate.
+  - destruct h as [x0 jx]. rewrite jx in jy. discriminate.
+Qed.
+
+Goal
+  forall aArgs np tin n i m na,
+    instantiate tin n (etaExpand i m aArgs np na) =
+    etaExpand i m (instantiates tin n aArgs) np na.
+Proof.
+  induction aArgs; induction np; intros.
+  - cbn. case_eq na; intros.
+    + cbn. reflexivity.
+    + cbn.
+***************************)
+
+
+  
+(****************************  
+Lemma notIsApp_etaExpand_args_Lam:
   forall nargs aArgs F cArgs,
     ~ isApp (etaExpand_args_Lam
                nargs aArgs (fun b : Terms => TLambda nAnon (F b)) cArgs).
 Proof.
   intros.
-  destruct (pre_isLambda_etaExpand_args_Lam nargs aArgs F cArgs)
+  destruct (isLambda_etaExpand_args_Lam_Lam nargs aArgs F cArgs)
     as [h | h];
     intros j; destruct j as [y0 [y1 jy]].
   - destruct h as [x0 [x1 jx]]. rewrite jx in jy. discriminate.
   - destruct h as [x0 jx]. rewrite jx in jy. discriminate.
 Qed.
 
-Lemma isLambda_etaExpand_args_Construct:
+(**********)
+Lemma isLambda_etaExpand_args_Lam:
+  forall nargs aArgs bod cArgs,
+    let ea := (etaExpand_args_Lam nargs aArgs bod cArgs) in
+    isLambda ea \/ isConstruct ea  \/ isWrong ea.
+Proof.
+  induction nargs; induction aArgs; cbn; intros; auto.
+
+
+  Lemma isLambda_etaExpand_args_Construct:
   forall nargs aArgs i m cArgs,
     let ea := (etaExpand_args_Construct nargs aArgs i m cArgs) in
     isLambda ea \/ isConstruct ea  \/ isWrong ea.
 Proof.
   induction nargs; induction aArgs; cbn; intros; auto.
+  - destruct (IHnargs tnil i m cArgs).
+    + dstrctn H. unfold etaExpand_args_Construct in j.
+      destruct nargs; try discriminate.
+      unfold etaExpand_args_Lam in j.
+    
   - destruct (isLambda_etaExpand_args_Lam
              nargs tnil i m
              (compile.tappend (lifts 0 cArgs) (tunit (TRel 0)))) as [h0 | h1];
@@ -3054,6 +3263,7 @@ Proof.
   - destruct h as [x0 jx]. rewrite jx in jy. discriminate.
 Qed.
 
+ ****************
 Lemma isLambda_etaExpand:
   forall nargs aArgs i m npars,
     let ea := etaExpand i m aArgs npars nargs in
@@ -3079,7 +3289,8 @@ Proof.
   - destruct h as [x0 [x1 [x2 jx]]]. rewrite jx in jy. discriminate.
   - destruct h as [x0 jx]. rewrite jx in jy. discriminate.
 Qed.
-
+********************)
+  
 (** operations for weak reduction and weak evaluation **)
 Definition whBetaStep (bod arg:Term) : Term := instantiate arg 0 bod.
 

@@ -43,7 +43,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p (pre_whFixStep x dts arg) s ->
     WcbvEval p (TApp fn arg) s 
 | wAppCong: forall fn fn' arg arg', 
-    WcbvEval p fn fn' -> (isApp fn' \/ isDummy fn') ->
+    WcbvEval p fn fn' -> (isConstruct fn' \/ isApp fn' \/ isDummy fn') ->
     WcbvEval p arg arg' ->
     WcbvEval p (TApp fn arg) (TApp fn' arg') 
 | wCase: forall i mch Mch n args brs cs s,
@@ -101,8 +101,8 @@ Proof.
       eapply H1. assumption.
     + specialize (H _ H5). discriminate.
     + specialize (H _ H5). specialize (H0 _ H8). subst. destruct H6.
-      * destruct H as [x0 [x1 jx]]. discriminate.
-      * destruct H as [x0 jx]. discriminate.
+      * dstrctn H. discriminate.
+      * destruct H. dstrctn H. discriminate. dstrctn H. discriminate.
   - inversion_Clear H1. specialize (H _ H6). subst.
     eapply H0. assumption.
   - inversion_Clear H1.
@@ -110,15 +110,15 @@ Proof.
     + specialize (H _ H4). myInjection H. rewrite H5 in e. myInjection e.
       intuition.
     + specialize (H _ H4). subst. destruct H5.
-      * destruct H as [x0 [x1 jx]]. discriminate.
-      * destruct H as [x0 jx]. discriminate.
+      * dstrctn H. discriminate.
+      * destruct H. dstrctn H. discriminate. dstrctn H. discriminate.
   - inversion_Clear H1.
     + specialize (H _ H4). subst. destruct o.
-      * destruct H as [x0 [x1 jx]]. discriminate.
-      * destruct H as [x0 jx]. discriminate.
+      * dstrctn H. discriminate.
+      * destruct H. dstrctn H. discriminate. dstrctn H. discriminate.
     + specialize (H _ H4). subst. destruct o.
-      * destruct H as [x0 [x1 jx]]. discriminate.
-      * destruct H as [x0 jx]. discriminate.
+      * dstrctn H. discriminate.
+      * destruct H. dstrctn H. discriminate. dstrctn H. discriminate.
     + specialize (H _ H4). specialize (H0 _ H7). subst. reflexivity.
   - inversion_Clear H1.
     + specialize (H _ H5). subst. rewrite H6 in e.
@@ -291,6 +291,7 @@ Function wcbvEval
         | None => raise ("wcbvEval;TApp:dnthBody doesn't eval")
         | Some x => wcbvEval n (pre_whFixStep x dts a1)
         end
+      | Ret ((TConstruct _ _ _) as u)    (** congruence **)
       | Ret ((TApp _ _) as u)
       | Ret ((TDummy _) as u) =>
         match wcbvEval n a1 with
@@ -436,10 +437,10 @@ Proof.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     cbn. rewrite (j mx); try omega. rewrite (H (mx - 1)); try omega.
     destruct o.
-    + destruct H1 as [y0 [y1 jy]]. subst.
-      rewrite H0. reflexivity. omega.
-    + destruct H1 as [y0 jy]. subst.
-      rewrite H0. reflexivity. omega.
+    + dstrctn H1. subst. rewrite H0. reflexivity. omega.
+    + destruct H1.
+      * dstrctn H1. subst. rewrite H0. reflexivity. omega.
+      * dstrctn H1. subst. rewrite H0. reflexivity. omega.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     cbn. rewrite (j mx); try omega. rewrite (H (mx - 1)); try omega.

@@ -14,57 +14,6 @@ Open Scope list.
 Set Implicit Arguments.
 
 
-Ltac not_is1 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j" in
-  intros hh; destruct hh as [xx jj]; discriminate.
-Ltac not_is2 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y" in
-  intros hh; destruct hh as [xx [yy jj]]; discriminate.
- Ltac not_is3 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with zz := fresh "z" in
-  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
-Ltac not_is4 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with zz := fresh "z"
-  with ww := fresh "w" in
-  intros hh; destruct hh as [xx [yy [zz [ww jj]]]]; discriminate.
-Ltac not_isApp := not_is2.
-Ltac not_isLambda := not_is2.
-Ltac not_isCase := not_is3.
-Ltac not_isFix := not_is2.
-Ltac not_isCast := not_is1.
-Ltac not_isConstruct := not_is3.
-            
-Ltac isApp_inv h :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with yy := fresh "y"
-  with zz := fresh "z"
-  with jj := fresh "j"
-  in destruct h as [xx [yy [zz jj]]]; discriminate.
-Ltac isApp :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with kk := fresh "k"
-  with zz := fresh "z"
-  with ll := fresh "l" in
-  intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
-  destruct kk as [zz ll].
-
 Function mkApp (fn:Term) (ts:Terms) : Term :=
   match ts with
   | tnil => fn

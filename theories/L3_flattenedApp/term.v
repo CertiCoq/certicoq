@@ -14,33 +14,6 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Ltac not_is0 :=
-  let hh := fresh "h" in
-  intros hh; discriminate.
-Ltac not_is1 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j" in
-  intros hh; destruct hh as [xx jj]; discriminate.
-Ltac not_is2 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y" in
-  intros hh; destruct hh as [xx [yy jj]]; discriminate.
- Ltac not_is3 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with zz := fresh "z" in
-  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
-Ltac not_isApp := not_is2.
-Ltac not_isLambda := not_is2.
-Ltac not_isCase := not_is3.
-Ltac not_isFix := not_is2.
-Ltac not_isCast := not_is1.
-Ltac not_isConstruct := not_is3.
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
 Local Ltac rght := right; injection; intuition.

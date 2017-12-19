@@ -50,42 +50,6 @@ Fixpoint print_term (t:Term) : string :=
   end.
 
 
-(************
-Ltac not_is1 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j" in
-  intros hh; destruct hh as [xx jj]; discriminate.
-Ltac not_is2 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y" in
-  intros hh; destruct hh as [xx [yy jj]]; discriminate.
-Ltac not_is3 :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with zz := fresh "z" in
-  intros hh; destruct hh as [xx [yy [zz jj]]]; discriminate.
-
-Ltac not_isApp := not_is3.
-Ltac not_isLambda := not_is3.
-Ltac not_isProof := not_is1.            
-Ltac isApp :=
-  let hh := fresh "h"
-  with xx := fresh "x"
-  with jj := fresh "j"
-  with yy := fresh "y"
-  with kk := fresh "k"
-  with zz := fresh "z"
-  with ll := fresh "l" in
-  intros hh; destruct hh as [xx jj]; destruct jj as [yy kk];
-             destruct kk as [zz ll].
-**********************)
-
-
 Section TermTerms_dec. (** to make Ltac definitions local **)
 Local Ltac rght := right; injection; intuition.
 Local Ltac lft := left; subst; reflexivity.

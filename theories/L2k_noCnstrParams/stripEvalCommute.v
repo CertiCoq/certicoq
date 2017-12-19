@@ -8,7 +8,7 @@ Require Import Coq.Setoids.Setoid.
 Require Import Omega.
 
 Require Import Common.Common.
-Require Import L2.L2.
+Require Import L2d.L2d.
 Require Import L2k.compile.
 Require Import L2k.term.
 Require Import L2k.program.
@@ -201,15 +201,16 @@ Proof.
   rewrite IHts. reflexivity.
 Qed.
 
-(****
 Lemma TApp_hom:
-  forall fn arg, ~ L2d.term.isConstruct fn ->
-    strip (L2d.compile.TApp fn arg) = TApp (strip fn) (strip arg).
+  forall fn arg,
+    strip (L2d.compile.TApp fn arg) =
+    match CanonicalP strip fn (strip arg) with
+    | None => TApp (strip fn) (strip arg)
+    | Some (i, m, args, npars, nargs) => etaExpand i m args npars nargs
+    end.
 Proof.
-  destruct fn; intros arg h; try reflexivity.
-  elim h. auto.
+  reflexivity.
 Qed.
- *************)
 
 (***
 Lemma TAppCnstr_hom:
@@ -280,12 +281,14 @@ Qed.
 Lemma isApp_hom:
   forall t, isApp (strip t) -> L2d.term.isApp t.
 Proof.
+Admitted.
+(************
   destruct t; intros h; destruct h as [x0 [x1 jx]]; try discriminate.
   - auto.
   - unfold strip in jx. 
     elim (notIsApp_etaExpand i n tnil n0 n1). rewrite jx. auto.
 Qed.
-    
+ *****************)   
 
 (*********************
   destruct t; cbn; intros h;
@@ -599,13 +602,16 @@ Definition notApp (F:Terms -> Term) :=
 
 Lemma isApp_fn_not_isConstruct:
   forall fn arg,
-  isApp (strip (L2d.compile.TApp fn arg)) -> ~ L2d.term.isConstruct fn.
+    isApp (strip (L2d.compile.TApp fn arg)) -> ~ L2d.term.isConstruct fn.
 Proof.
+Admitted.
+(*******************
   intros. intro h. destruct h as [x0 [x1 [x2 [x3 jx]]]]. subst fn.
   change
     (isApp (etaExpand x0 x1 (strips (L2d.compile.tunit arg)) x2 x3)) in H.
   eelim notIsApp_etaExpand. eassumption.
 Qed.
+ *******************)
 
 (**********
 Lemma mkApp_hom:
@@ -1097,7 +1103,7 @@ Proof.
 Qed.
  ********************)
 
-(************* MAIN *************
+(************* *************
 Goal
   forall i m aArgs npars nargs p,
     WcbvEval p (etaExpand i m aArgs npars nargs)
@@ -1106,7 +1112,155 @@ Proof.
   induction aArgs; induction npars; cbn; intros.
   - cbn. repeat constructor.
   -             
+ ****************)
 
+(***
+Goal
+  forall na aArgs tin nin F cArgs,
+    instantiate tin nin
+                (etaExpand_args_Lam na aArgs F cArgs) =
+    etaExpand_args_Lam na (instantiates tin nin aArgs) F
+                       (instantiates tin nin cArgs).
+Proof.
+  induction na; induction aArgs; intros; cbn.
+  - admit.
+
+
+
+  Goal
+  forall aArgs np tin nin i n na,
+    instantiate tin nin (etaExpand i n aArgs np na) =
+    etaExpand i n (instantiates tin nin aArgs) np na.
+Proof.
+  induction aArgs; induction np; intros.
+  - cbn. unfold etaExpand_args_Construct. destruct na.
+    + reflexivity.
+    +
+****)
+
+(****
+Goal
+  forall arg n t s,
+    CanonicalP strip t (strip s) = Some (i, m, us, np, na) ->
+    instantiate (strip arg) n 
+      CanonicalP strip (L2d.term.instantiate arg n t)
+           (strip (L2d.term.instantiate arg n s)) =
+      instantiate (strip arg) n (CanonicalP strip t (strip s)).         
+***************)
+  
+(****
+Goal
+  forall arg n t s,
+    CanonicalP strip t (strip s) = None ->
+      CanonicalP strip (L2d.term.instantiate arg n t)
+           (strip (L2d.term.instantiate arg n s)) = None.
+Proof.
+  induction t; intros.
+  - cbn. destruct (nat_compare n n0).
+    + functional inversion H. subst.
+    + reflexivity.
+    + reflexivity.
+ ***************)
+
+(***  essential *****
+Lemma instantiate_hom:
+  (forall bod arg n,
+     strip (L2d.term.instantiate arg n bod) =
+     instantiate (strip arg) n (strip bod)) /\
+  (forall bods arg n,
+     strips (L2d.term.instantiates arg n bods) =
+     instantiates (strip arg) n (strips bods)) /\
+  (forall bods arg n,
+     stripBs (L2d.term.instantiateBrs arg n bods) =
+     instantiateBrs (strip arg) n (stripBs bods)) /\
+  (forall ds arg n,
+          stripDs (L2d.term.instantiateDefs arg n ds) =
+     instantiateDefs (strip arg) n (stripDs ds)).
+Proof.
+  apply L2d.compile.TrmTrmsBrsDefs_ind; intros; try (cbn; reflexivity);
+  try (cbn; rewrite H; reflexivity).
+  - cbn. destruct (lt_eq_lt_dec n0 n); cbn.
+    + destruct s.
+      * rewrite (proj1 (nat_compare_lt n0 n)); try omega. reflexivity.
+      * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
+    + rewrite (proj1 (nat_compare_gt n0 n)); trivial.
+  - cbn. rewrite H. rewrite H0. reflexivity.
+  - change
+      (strip (L2d.compile.TApp (L2d.term.instantiate arg n t)
+                               (L2d.term.instantiate arg n t0)) =
+       instantiate (strip arg) n (strip (L2d.compile.TApp t t0))).
+    rewrite TApp_hom. rewrite TApp_hom.
+    rewrite H0. rewrite H.
+
+    destruct (CanonicalP strip (L2d.term.instantiate arg n t)
+                         (strip (L2d.term.instantiate arg n t0))).
+    + repeat (destruct p). 
+      destruct (CanonicalP strip t (strip t0)).
+      * repeat (destruct p).
+
+      
+    - admit. (***  cbn. rewrite H. rewrite H0. reflexivity. ***)
+  - change
+      (strip (L2d.term.instantiate arg n2 (L2d.compile.TConstruct i n n0 n1)) =
+       instantiate (strip arg) n2 (strip (L2d.compile.TConstruct i n n0 n1))).
+    unfold strip at 3.
+    cbn. destruct n0.
+    +
+    
+      (strip (term.instantiate arg n0 (L2d.compile.TConstruct i n t)) =
+       TConstruct i n (instantiates (strip arg) n0 (strips t))).
+    rewrite <- H; trivial.
+  - change
+     (TCase i (strip (L2d.term.instantiate arg n t))
+            (stripBs (L2d.compile.instantiateBrs arg n b)) =
+      TCase i (instantiate (strip arg) n (strip t))
+            (instantiateBrs (strip arg) n (stripBs b))).
+    rewrite H; trivial. rewrite H0; trivial.
+  - change
+      (TFix
+         (stripDs (L2d.term.instantiateDefs
+                     arg (n0 + (L2d.compile.dlength d)) d)) n =
+       TFix (instantiateDefs
+               (strip arg) (n0 + (dlength (stripDs d))) (stripDs d)) n).
+    rewrite H. rewrite stripDs_pres_dlength. reflexivity.
+  - rewrite L2d.stripEvalCommute.instantiates_tcons_commute.
+    rewrite tcons_hom. rewrite tcons_hom. rewrite instantiates_tcons.
+    rewrite <- H; trivial. rewrite H0; trivial.
+  - rewrite L2d.stripEvalCommute.instantiates_bcons_commute.
+    rewrite bcons_hom. rewrite bcons_hom. rewrite instantiateBs_bcons.
+    rewrite <- H; trivial. rewrite H0; trivial.
+  - rewrite L2d.stripEvalCommute.instantiates_dcons_commute.
+    rewrite dcons_hom. rewrite dcons_hom. rewrite instantiateDs_dcons.
+    rewrite <- H; trivial. rewrite H0; trivial.
+Qed.
+ *****************)
+
+Lemma nLambda_isLambda:
+  forall np F, exists G, (nLambda (S np) F) = fun b => TLambda nAnon (G b).
+Proof.
+  induction np; intros; cbn; exists F; reflexivity.
+Qed.
+
+Lemma TLambda_hom:
+  forall nm bod,
+    strip (L2d.compile.TLambda nm bod) = TLambda nm (strip bod).
+reflexivity.
+Qed.
+
+Lemma whBetaStep_hom:
+  forall bod arg,
+    strip (L2d.term.whBetaStep bod arg) =
+    whBetaStep (strip bod) (strip arg).
+Proof.
+Admitted.
+(*************
+  intros. unfold L2d.term.whBetaStep, whBetaStep.
+  Check (proj1 instantiate_hom).
+  rewrite <- (proj1 instantiate_hom). reflexivity.
+Qed.
+ **************)
+
+(************* MAIN *************
 Lemma WcbvEval_hom:
   forall p,
     (forall t t', L2d.wcbvEval.WcbvEval p t t' ->
@@ -1117,6 +1271,32 @@ Proof.
   intros p.
   apply L2d.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
     try (solve[constructor; trivial]).
+  - unfold strip. destruct np.
+    + unfold etaExpand. unfold etaExpand_args_Construct. destruct na.
+      * econstructor. econstructor.
+      *{ destruct (isLambda_etaExpand_args_Lam_Lam
+                     na tnil (TConstruct i r) (tunit (TRel 0))).
+         - dstrctn H. rewrite j. constructor.
+         - dstrctn H. rewrite j. constructor. }
+    + unfold etaExpand. destruct (nLambda_isLambda np (TConstruct i r)).
+      rewrite H.
+      destruct (isLambda_etaExpand_args_Lam_Lam na tnil x tnil). 
+      * dstrctn H0. rewrite j. constructor.
+      * dstrctn H0. rewrite j. constructor.
+  - cbn. econstructor; try eassumption.
+    + apply lookupDfn_hom. eassumption.
+  - rewrite TApp_hom. cbn. destruct (CanonicalP strip fn (strip a1)).
+    + admit.  (**** eta expand  ***
+destruct p0 as [[[[y0 y1] y2] y3] y4].
+      destruct (isLambda_etaExpand y4 y2 y0 y1 y3) as [h|[h|h]].
+      * dstrctn h. rewrite j. eapply wAppLam.
+          unfold lifts. unfold compile.tappend. induction na.
+         - cbn. econstructor. econstructor. econstructor. econstructor.
+               *****************)
+    + rewrite TLambda_hom in H. eapply wAppLam; try eassumption.
+Check whBetaStep_hom.
+
+unfold etaExpand_args_Lam.
   - cbn. destruct np; cbn.
     + destruct na; cbn. econstructor.
 
@@ -1571,11 +1751,6 @@ Lemma TProd_hom:
 reflexivity.
 Qed.
 
-Lemma TLambda_hom:
-  forall nm ty bod,
-    strip (L2d.compile.TLambda nm ty bod) = TLambda nm (strip bod).
-reflexivity.
-Qed.
 
 Lemma TLetIn_hom:
   forall nm dfn ty bod,

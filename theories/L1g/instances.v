@@ -1,4 +1,6 @@
 Require Import L1g.compile.
+Require Import L1g.term.
+Require Import L1g.program.
 Require Import L1g.wcbvEval.
 Require Import certiClasses.
 Require Import Common.Common.
@@ -13,17 +15,59 @@ Defined.
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)
 Instance WfL1gTerm: GoodTerm (Program L1g.compile.Term) :=
-  fun _  => True.
+  fun P:Program Term =>
+    match P with
+      mkPgm trm env => WFapp trm /\ WFaEnv env
+    end.
 
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
-Definition flattenApp (t:L1g.compile.Term):
-  (L1g.compile.Term * (list L1g.compile.Term)) :=
+(** deal with "spine representation" of application in L1g **)
+Fixpoint Terms_list (ts:Terms) : list Term :=
+  match ts with
+    | tnil => nil
+    | tcons u us => cons u (Terms_list us)
+  end.
+
+Inductive WFapps_list: list Term -> Prop :=
+| WFal_nil: WFapps_list nil
+| WFal_cons: forall u us,
+    WFapp u -> WFapps_list us -> WFapps_list (cons u us).
+
+Lemma nth_pres_WFapp:
+  forall (us:list Term),
+    WFapps_list us -> forall n t, List.nth_error us n = Some t -> WFapp t.
+Proof.
+  induction 1; destruct n; intros.
+  - discriminate.
+  - cbn in H. discriminate.
+  - cbn in H1. myInjection H1. assumption.
+  - cbn in H1. eapply IHWFapps_list. eassumption.
+Qed.
+
+Lemma WFapps_WFapps_list:
+  forall (ts:Terms), WFapps ts -> WFapps_list (Terms_list ts).
+Proof.
+  induction 1.
+  - constructor.
+  - constructor; assumption.
+Qed.
+    
+Function flattenApp (t:Term): (Term * (list Term)) :=
   match t with
     | TApp fn arg args => (fn, cons arg (Terms_list args))
     | s => (s, nil)
   end.
+
+Lemma args_pres_WFapp:
+  forall (t:Term), L1g.term.WFapp t ->
+       WFapp (fst (flattenApp t)) /\ WFapps_list (snd (flattenApp t)).
+Proof.
+  induction 1; cbn; intros; repeat econstructor; try assumption.
+  - eapply WFapps_WFapps_list. assumption.
+Qed.
+
 
 Global Instance QuestionHeadL1gTerm: QuestionHead (Program L1g.compile.Term) :=
   fun q t =>

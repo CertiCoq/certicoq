@@ -5,6 +5,7 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
 Require Import Common.Common.
+Require Import L1g.L1g.
 Require Import L2.term.
 Require Import L2.compile.
 
@@ -34,7 +35,7 @@ Qed.
 Lemma lookupDfn_pres_WFapp:
     forall p, WFaEnv p -> forall nm t, lookupDfn nm p = Ret t -> WFapp t.
 Proof.
-  apply lookupDfn_pres_WFapp.
+  apply AstCommon.lookupDfn_pres_WFapp.
 Qed.
 
 
@@ -107,7 +108,7 @@ with crctEnv: environ Term -> Prop :=
 | ceTrmCons: forall nm s p,
     crctEnv p -> fresh nm p -> crctTerm p 0 s -> crctEnv ((nm, ecTrm s)::p)
 | ceTypCons: forall nm m s p,
-    crctEnv p -> fresh nm p -> crctEnv ((nm, ecTyp Term m s)::p)
+    crctEnv p -> fresh nm p -> crctEnv ((nm, AstCommon.ecTyp Term m s)::p)
 with crctTerms: environ Term -> nat -> Terms -> Prop :=
 | ctsNil: forall p n, crctEnv p -> crctTerms p n tnil
 | ctsCons: forall p n t ts,
@@ -238,18 +239,22 @@ Proof.
 Qed.
 
 Lemma Crct_weaken_Typ:
-  (forall p n t, crctTerm p n t -> 
-                 forall nm s m, fresh nm p ->
-                              crctTerm ((nm,ecTyp Term m s)::p) n t) /\
-  (forall p n ts, crctTerms p n ts -> 
-                  forall nm s m, fresh nm p ->
-                               crctTerms ((nm,ecTyp Term m s)::p) n ts) /\
-  (forall p n ts, crctBs p n ts -> 
-                  forall nm s m, fresh nm p ->
-                               crctBs ((nm,ecTyp Term m s)::p) n ts) /\
-  (forall p n ds, crctDs p n ds -> 
-                  forall nm s m, fresh nm p ->
-                               crctDs ((nm,ecTyp Term m s)::p) n ds) /\
+  (forall p n t,
+      crctTerm p n t -> 
+      forall nm s m, fresh nm p ->
+                     crctTerm ((nm,AstCommon.ecTyp Term m s)::p) n t) /\
+  (forall p n ts,
+      crctTerms p n ts -> 
+      forall nm s m, fresh nm p ->
+                     crctTerms ((nm,AstCommon.ecTyp Term m s)::p) n ts) /\
+  (forall p n ts,
+      crctBs p n ts -> 
+      forall nm s m, fresh nm p ->
+                     crctBs ((nm,AstCommon.ecTyp Term m s)::p) n ts) /\
+  (forall p n ds,
+      crctDs p n ds -> 
+      forall nm s m, fresh nm p ->
+                     crctDs ((nm,AstCommon.ecTyp Term m s)::p) n ds) /\
   (forall p, crctEnv p -> True).
 Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros;

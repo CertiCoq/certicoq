@@ -344,20 +344,51 @@ Proof.
 Qed.
  ************)
 
-(***
 Lemma WFapp_hom:
   (forall t, L1g.term.WFapp t -> WFapp (strip t)) /\
   (forall ts, L1g.term.WFapps ts -> WFapps (strips ts)) /\
+  (forall ts, L1g.term.WFappBs ts -> WFappBs (stripBs ts)) /\
   (forall ds, L1g.term.WFappDs ds -> WFappDs (stripDs ds)).
 Proof.
-   apply L1g.term.WFappTrmsDefs_ind; cbn; intros;
-  try (solve [constructor]);
-  try (solve [constructor; intuition]).
-  - constructor; try assumption.
-    + intros h. assert (j:= isApp_hom _ h). contradiction.
+  apply L1g.term.WFappTrmsBrsDefs_ind; intros;
+  try (solve [cbn; constructor]);
+  try (solve [cbn; constructor; intuition]).
+  destruct (isApp_dec (strip fn)).
+  - rewrite TApp_hom. dstrctn i. rewrite j in *. clear j.
+    inversion_Clear H1.
+    change
+      (WFapp (TApp x y (tappend z (tcons (strip t) (strips ts))))).
+    constructor; try eassumption.
+    eapply tappend_pres_WFapps; try eassumption.
+    constructor; try eassumption.
+  - rewrite TApp_hom. rewrite mkApp_goodFn; try assumption.
+    constructor; try assumption.
 Qed.
- ****)
 
+Lemma WFaEnv_hom:
+  forall p, L1g.program.WFaEnv p -> WFaEnv (stripEnv p).
+Proof.
+  induction p; intros.
+  - cbn. unfold WFaEnv. constructor.
+  - inversion_Clear H. change (WFaEnv ((nm, stripEC ec) :: stripEnv p)).
+    constructor.
+    + destruct ec.
+      * cbn. constructor. inversion_Clear H2.
+        apply (proj1 WFapp_hom). assumption.
+      * cbn. constructor.
+    + apply IHp. assumption.
+    + apply stripEnv_pres_fresh. assumption.
+Qed.
+
+Lemma WFaEc_hom:
+  forall t,
+  AstCommon.WFaEc L1g.term.WFapp (AstCommon.ecTrm t) ->
+  AstCommon.WFaEc WFapp (AstCommon.ecTrm (strip t)).
+Proof.
+  intros. inversion_Clear H. constructor. apply (proj1 WFapp_hom).
+  assumption.
+Qed.
+ 
 Lemma mkApp_tcons_lem1:
   forall fn arg args,
     mkApp (mkApp fn (tcons arg args)) tnil = mkApp fn (tcons arg args).
@@ -391,7 +422,21 @@ Proof.
   - cbn. rewrite mkApp_tnil_ident. reflexivity.
   - rewrite tcons_hom. destruct t; try contradiction; try reflexivity.
 Qed.
- 
+
+Lemma isApp_L1g_term_isApp:
+  forall main: L1g.compile.Term,
+    isApp (strip main) -> L1g.term.isApp main.
+Proof.
+  intros main h. dstrctn h. destruct main; try discriminate. auto.
+Qed.
+  
+Lemma L1g_term_isApp_isApp:
+  forall t: L1g.compile.Term, L1g.term.isApp t -> isApp (strip t).
+Proof.
+  intros t h. dstrctn h. subst. rewrite TApp_hom. apply mkApp_isApp.
+Qed.
+
+
 Lemma instantiate_tappend_commute:
   forall ts us tin n,
     instantiates tin n (tappend ts us) =

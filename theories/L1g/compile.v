@@ -65,12 +65,6 @@ Notation tunit t := (tcons t tnil).
 Notation btunit n t := (bcons n t bnil).
 Notation dunit nm t m := (dcons nm t m dnil).
 
-Fixpoint Terms_list (ts:Terms) : list Term :=
-  match ts with
-    | tnil => nil
-    | tcons u us => cons u (Terms_list us)
-  end.
-
 
 (** Printing terms in exceptions for debugging purposes **)
 Fixpoint print_template_term (t:term) : string :=

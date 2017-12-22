@@ -1604,8 +1604,20 @@ Module CC_log_rel (H : Heap).
           eapply cc_approx_val_monotonic. eassumption.
           omega.
     Qed.
-    
-    
+
+    (** XXX move/name *)
+    Lemma heap_env_equiv_def_funs' (S : Ensemble var) (H1 H2 : heap block) 
+          (rho1 rho2 : M.t value) (B B' : fundefs) : 
+      S \\ (name_in_fundefs B) |- (H1, rho1) ⩪ (H2, rho2) ->
+      S |- (H1, def_funs B B' rho1) ⩪ (H2, def_funs B B' rho2).
+    Proof with now eauto with Ensembles_DB.
+      revert S. induction B; simpl; intros S Heq.
+      - eapply heap_env_equiv_set.
+        + eapply IHB. eapply heap_env_equiv_antimon...
+        + rewrite res_equiv_eq. simpl. split; eauto.
+      - eapply heap_env_equiv_antimon...
+    Qed.
+
     (** Abstraction compatibility *)
     Lemma cc_approx_exp_fun_compat (k : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 r1 r2
           (IInvFunCompat :
@@ -1651,52 +1663,112 @@ Module CC_log_rel (H : Heap).
           edestruct Hpre with (i := k - cost (Efun B1 e1)) as [v2 [c2 [m2 [Hstep [HS Hval]]]]]
           ; [ | reflexivity | now apply Ha3 | now apply Hdef3 | | | | | eassumption | | ].
           - simpl in Hcost. simpl. omega.
-          - rewrite <- Hdef3, <- Hfuns. symmetry. admit. 
-            (* eapply heap_env_equiv_def_funs. *)
-            (* + eapply reach'_closed. *)
-            (*   eapply well_formed_alloc; [ | eassumption | ]. *)
-            (*   eapply well_formed_respects_heap_env_equiv. now apply Hwf. *)
-            (*   eassumption. *)
-            (*   eapply env_locs_in_dom; eassumption. *)
-            (*   simpl. *)
-            (*   eapply Included_trans; [| now eapply reach'_extensive ]. *)
-            (*   admit. (* XXX lemmas *) *)
-            (*   eapply Included_trans. now eapply env_locs_set_Inlcuded. *)
-            (*   eapply Union_Included. *)
-            (*   simpl. eapply Singleton_Included. eapply HL.alloc_In_dom. eassumption. *)
-            (*   eapply env_locs_in_dom. *)
-
-            (*   eapply heap_env_equiv_weaking_cor; [| | | | eassumption | | ]. *)
-            (*   eassumption. *)
-            (*   eapply well_formed_respects_heap_env_equiv; eassumption. *)
-            (*   eassumption. *)
-            (*   eapply env_locs_in_dom; eassumption. *)
-            (*   eapply HL.alloc_subheap. eassumption. *)
-            (*   eapply HL.alloc_subheap. eassumption. *)
-            (*   eapply Included_trans; [| eapply HL.dom_subheap; eapply HL.alloc_subheap; *)
-            (*                             eassumption ]. *)
-            (*   eassumption. *)
-            (* + eapply reach'_closed. *)
-            (*   eapply well_formed_reach_alloc; try eassumption. *)
-            (*   eapply Included_trans; [| now eapply reach'_extensive ]. *)
-            (*   simpl. admit. (* XXX lemmas *) *)
-              
-            (*   eapply Included_trans. now eapply env_locs_set_Inlcuded. *)
-            (*   eapply Union_Included. *)
-            (*   simpl. eapply Singleton_Included. eapply HL.alloc_In_dom. eassumption. *)
-            (*   eapply env_locs_in_dom. *)
-
-            (*   eapply heap_env_equiv_weaking_cor; [| | | | reflexivity | | ]; try eassumption. *)
-            (*   eapply HL.alloc_subheap. eassumption. *)
-            (*   eapply HL.alloc_subheap. eassumption. *)
-            (*   eapply Included_trans; [| eapply HL.dom_subheap; eapply HL.alloc_subheap; *)
-            (*                             eassumption ]. *)
-            (*   eassumption. *)
-            (* + eapply Included_trans; [| now eapply reach'_extensive ]. *)
-            (*   rewrite env_locs_set_In. *)
-            (*   eapply Included_Union_preserv_r. *)            
-
-          - admit.
+          - assert (Hequiv : occurs_free_fundefs B1 :|: occurs_free e1 \\ name_in_fundefs B1 |- (H', rho1') ⩪ (H3, rho1)).
+            { eapply heap_env_equiv_weaking_cor.
+              * eapply well_formed_antimon;
+                [| eapply well_formed_respects_heap_env_equiv; [ now apply Hwf | eassumption ] ].
+                eapply reach'_set_monotonic.
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+              * eapply well_formed_antimon; [| eassumption ].
+                eapply reach'_set_monotonic.
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+              * eapply Included_trans; [| eapply env_locs_in_dom; [ eassumption |]].
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+                eassumption.
+              * eapply Included_trans; [| eassumption ].
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+              * eapply heap_env_equiv_antimon. symmetry. eassumption.
+                normalize_occurs_free. rewrite Setminus_Union_distr...
+              * eapply HL.alloc_subheap. eassumption.
+              * eapply HL.alloc_subheap. eassumption. }
+            eapply heap_env_equiv_antimon with (S1 := occurs_free_fundefs B1 :|: occurs_free e1);
+            [| now eauto with Ensembles_DB ].
+            setoid_rewrite <- Hdef3. setoid_rewrite <- Hfuns. (* strange *)
+            symmetry.
+            eapply heap_env_equiv_def_funs. 
+            + eapply closed_alloc'; [| | eassumption ].
+              * eapply reach'_closed.
+                eapply well_formed_respects_heap_env_equiv. now apply Hwf.
+                eassumption.
+                eapply env_locs_in_dom; eassumption.
+              * eapply Included_trans; [| now eapply reach'_extensive ].
+                simpl. eapply Included_trans.
+                eapply restrict_env_env_locs.
+                eapply restrict_env_correct.
+                eapply fundefs_fv_correct.
+                eapply env_locs_monotonic. normalize_occurs_free...
+            + eapply closed_alloc'; [| | eassumption ].
+              * eapply reach'_closed; eassumption.
+              * eapply Included_trans; [| now eapply reach'_extensive ].
+                simpl.
+                simpl. eapply Included_trans.
+                eapply restrict_env_env_locs.
+                eapply restrict_env_correct.
+                eapply fundefs_fv_correct.
+                eapply env_locs_monotonic. normalize_occurs_free...
+            + eapply Included_trans; [| now eapply reach'_extensive ].
+              eapply env_locs_monotonic. normalize_occurs_free.
+              rewrite Setminus_Union_distr...
+            + eapply Included_trans; [| now eapply reach'_extensive ].
+              eapply env_locs_monotonic. normalize_occurs_free.
+              rewrite Setminus_Union_distr...
+            + eapply gas. eassumption.
+            + eapply gas. eassumption.
+            + eapply Included_trans; [| now eapply reach'_extensive ].
+              simpl. eapply Included_trans.
+              eapply restrict_env_env_locs.
+              eapply restrict_env_correct.
+              eapply fundefs_fv_correct.
+              eapply env_locs_monotonic. normalize_occurs_free...
+            + eapply Included_trans; [| now eapply reach'_extensive ].
+              simpl. eapply Included_trans.
+              eapply restrict_env_env_locs.
+              eapply restrict_env_correct.
+              eapply fundefs_fv_correct.
+              eapply env_locs_monotonic. normalize_occurs_free...
+            + rewrite Setminus_Union_distr, Setminus_Disjoint.
+              now eauto with Ensembles_DB.
+              eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint.
+            + rewrite res_equiv_eq.
+              simpl. erewrite !gas; try eassumption. simpl. 
+              eapply heap_env_equiv_restrict_env with (S' := occurs_free_fundefs B1).
+              * eapply heap_env_equiv_antimon. now apply Hequiv.
+                rewrite Setminus_Union_distr, Setminus_Disjoint.
+                eapply Included_Union_preserv_l. reflexivity.
+                eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint.
+              * reflexivity.
+              * eapply restrict_env_correct.
+                eapply fundefs_fv_correct.
+              * eapply restrict_env_correct.
+                eapply fundefs_fv_correct.
+            + eapply heap_env_equiv_weaking_cor.
+              * eapply well_formed_antimon;
+                [| eapply well_formed_respects_heap_env_equiv; [ now apply Hwf | eassumption ] ].
+                eapply reach'_set_monotonic.
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+              * eapply well_formed_antimon; [| eassumption ].
+                eapply reach'_set_monotonic.
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+              * eapply Included_trans; [| eapply env_locs_in_dom; [ eassumption |]].
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+                eassumption.
+              * eapply Included_trans; [| eassumption ].
+                eapply env_locs_monotonic. normalize_occurs_free.
+                rewrite Setminus_Union_distr...
+              * eapply heap_env_equiv_antimon. symmetry. eassumption.
+                normalize_occurs_free. rewrite Setminus_Union_distr...
+              * eapply HL.alloc_subheap. eassumption.
+              * eapply HL.alloc_subheap. eassumption.
+          - eapply heap_env_equiv_def_funs'.
+            eapply heap_env_equiv_antimon. eassumption.
+            normalize_occurs_free...
           - eapply IInvFunCompat; eauto.
           - simpl; omega.
           - intros i. edestruct (Hstuck1 (i + cost (Efun B1 e1))) as [r' [m' Hstep']].
@@ -1714,9 +1786,9 @@ Module CC_log_rel (H : Heap).
             + rewrite cc_approx_val_eq in *. 
               eapply cc_approx_val_monotonic. eassumption.
               simpl. simpl in Hcost. omega. }
-    Admitted.
+    Qed.
 
-    
+
     Variable
       (InvCompat1_str_gc :
          forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp)

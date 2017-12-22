@@ -143,15 +143,64 @@ Module HeapDefs (H : Heap) .
     [ set x : positive | match M.get x map with
                            | Some x => True
                            | None => False
-                         end ].
+                         end ]. 
 
   Definition sub_map {A : Type} (map1 map2 : M.t A) :=
     forall x v, M.get x map1 = Some v ->
            M.get x map2 = Some v.
 
+  (* XXX move *)
+  Fixpoint xfilter {A : Type} (pred : positive -> A -> bool) (m : M.t A) 
+           (i : positive) {struct m} : M.t A :=
+    match m with
+      | M.Leaf => M.Leaf
+      | M.Node l o r =>
+        let o' :=
+            match o with
+              | Some x => if pred (M.prev i) x then o else None
+              | None => None
+            end
+        in
+      M.Node' (xfilter pred l (i~0)%positive) o' (xfilter pred r (i~1)%positive)
+    end.
+  
+  Lemma xgfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A) 
+        (i j : positive) : 
+    M.get i (xfilter pred m j) =
+    match M.get i m with
+      | Some x => if pred (M.prev (M.prev_append i j)) x then Some x else None
+      | None => None
+    end.
+  Proof.
+    revert i j. induction m; intros i j; simpl.
+    - rewrite !M.gleaf. reflexivity.
+    - rewrite M.gnode'.
+      destruct i; simpl.
+      + rewrite IHm2. reflexivity.
+      + rewrite IHm1. reflexivity.
+      + destruct o; reflexivity.
+  Qed.
+
+  Definition filter  {A : Type} (pred : positive -> A -> bool) (m : M.t A) : M.t A :=
+    xfilter pred m 1.
+  
+  Lemma gfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A) 
+        (i : positive) : 
+    M.get i (filter pred m) =
+    match M.get i m with
+      | Some x => if pred i x then Some x else None
+      | None => None
+    end.
+  Proof.
+    unfold filter. rewrite xgfilter. simpl. 
+    rewrite <- M.prev_append_prev. simpl. 
+    rewrite Maps.PTree.prev_involutive. reflexivity. 
+  Qed.
+  
+  (* XXX end move *)
+  
   Definition restrict_env (s : PS.t) (rho : env) : env :=
-    M.fold
-      (fun rho' x v => if PS.mem x s then M.set x v rho' else rho') rho (M.empty _).
+    filter (fun i _ => PS.mem i s) rho.
   
   (** [rho'] is the restriction of [rho] in [S] *)
   Definition Restrict_env (S : Ensemble var) (rho rho' : env) : Prop :=
@@ -1698,4 +1747,35 @@ Module HeapDefs (H : Heap) .
       + eapply IHHall; eauto.
   Qed. 
 
+  (** Lemmas about [Restrict_env] *)
+
+  Lemma restrict_env_correct S s rho :
+    S <--> FromList (set_util.PS.elements s) ->
+    Restrict_env S rho (restrict_env s rho).
+  Proof.
+    intros Heq. unfold restrict_env.
+    split; [ | split ].
+    - intros x Hin. rewrite gfilter.
+      eapply Heq in Hin.
+      simpl in Hin.
+      unfold FromList, In in Hin. simpl in Hin.
+      eapply In_InA with (eqA := eq) in Hin; eauto with typeclass_instances.
+      eapply PS.elements_spec1 in Hin.
+      eapply PS.mem_spec in Hin. rewrite Hin.
+      destruct (M.get x rho); reflexivity.
+    - intros x v Hget.
+      rewrite gfilter in Hget.
+      destruct (M.get x rho); try discriminate.
+      destruct (PS.mem x s); try discriminate. 
+      eauto.
+    - intros x Hget. unfold key_set, In in Hget. simpl in Hget.
+      rewrite gfilter in Hget.
+      destruct (M.get x rho); try contradiction.
+      destruct (PS.mem x s) eqn:Hin; try contradiction. 
+      eapply PS.mem_spec in Hin.
+      eapply PS.elements_spec1 in Hin.
+      eapply InA_alt in Hin. destruct Hin as [x' [Heq' Hin']]; subst; eauto.
+      eapply Heq. eassumption. 
+  Qed.
+  
  End HeapDefs.

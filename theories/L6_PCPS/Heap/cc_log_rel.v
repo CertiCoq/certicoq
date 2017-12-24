@@ -16,15 +16,26 @@ Module CC_log_rel (H : Heap).
   Module Sem := SpaceSem H.
 
   Import H Sem.Equiv Sem.Equiv.Defs Sem.
+
   
-  (** Global invariant *)
+  (** ** Resource conditions  *)
+
+  (** * Initial conditions *)
+  
+  (** Local initial condition. Enforced as initial condition for the expressions being related *)
+  Definition IInv := relation (heap block * env * exp).
+
+  (** Global initial condition. Enforced as initial condition for future executions of the result *)
+  Definition GIInv := relation (heap block * env * exp).
+
+  (** * Final conditions *)
+  
+  (** Local final conditions. Holds for the result of the execution of the expressions being related. *)
+  Definition Inv := relation (nat * nat).
+
+  (** Global final conditions. Holds for the result of future execution of the result *)
   Definition GInv := relation (nat * nat).
   
-  (** Local invariant *)
-  Definition Inv := relation (nat * nat).
-  
-  (** Initial invariant *)
-  Definition IInv := relation (heap block * env * exp).
   
   (** Tag for closure records *)
   Variable (clo_tag : cTag). 
@@ -66,22 +77,22 @@ Module CC_log_rel (H : Heap).
     
     (** * Expression relation *)
     
-    Definition cc_approx_exp (k : nat) (II : IInv) (P1 : Inv) (P2 : GInv)
+    Definition cc_approx_exp (k : nat) (IIL : IInv) (IIG : GIInv) (IL : Inv) (IG : GInv)
                (p1 p2 : exp * env * heap block) : Prop :=
       let '(e1, rho1, H1) := p1 in
       let '(e2, rho2, H2) := p2 in
       forall (H1' H2' : heap block) (rho1' rho2' : env) (r1 : ans) (c1 m1 : nat),
         (occurs_free e1) |- (H1, rho1) ⩪ (H1', rho1') ->
         (occurs_free e2) |- (H2, rho2) ⩪ (H2', rho2') ->
-        II (H1', rho1', e1) (H2', rho2', e2) ->
+        IIL (H1', rho1', e1) (H2', rho2', e2) ->
         c1 <= k ->
         big_step_GC H1' rho1' e1 r1 c1 m1 ->
         not_stuck H1' rho1' e1 ->
         exists (r2 : ans) (c2 m2 : nat),
           big_step_GC_cc H2' rho2' e2 r2 c2 m2 /\
           (* extra invariants for costs *)
-          P1 (c1, m1) (c2, m2) /\
-          cc_approx_val (k - c1) II P2 r1 r2.
+          IL (c1, m1) (c2, m2) /\
+          cc_approx_val (k - c1) IIG IG r1 r2.
     
   End cc_approx.
   
@@ -128,7 +139,7 @@ Module CC_log_rel (H : Heap).
                            Forall2 R vs1 vs2 ->
                            cc_approx_exp cc_approx_val
                                          (k - (k - i))
-                                         IP P P 
+                                         IP IP P P 
                                          (e1, rho_clo3, H1'') (e2, rho2', H2')
                        end)
               | _, _ => False
@@ -138,12 +149,12 @@ Module CC_log_rel (H : Heap).
       | _, _ => False
     end.
   
-
+  
   (** Notations for approximation relation *)
-  Notation "p1 ⪯ ^ ( k ; P1 ; P2 ; P3 ) p2" :=
-    (cc_approx_exp cc_approx_val k P1 P2 P3 p1 p2)
+  Notation "p1 ⪯ ^ ( k ; P1 ; P2 ; P3 ; P4 ) p2" :=
+    (cc_approx_exp cc_approx_val k P1 P2 P3 P4 p1 p2)
       (at level 70, no associativity).
-
+  
   Definition cc_approx_block (k : nat) (IP : IInv) (P : GInv) (b1 : block) (H1 : heap block)
              (b2 : block) (H2 : heap block) : Prop :=
 
@@ -177,11 +188,11 @@ Module CC_log_rel (H : Heap).
                Forall2 R vs1 vs2 ->
                cc_approx_exp cc_approx_val
                              i
-                             IP P P 
+                             IP IP P P 
                              (e1, rho_clo3, H1'') (e2, rho2', H2'))
       | _, _ => False
     end.
-              
+  
   (** Unfold the recursion. A more compact definition of the value relation. *)
   Definition cc_approx_val' (k : nat) (IP : IInv) (P : GInv) (r1 r2 : ans) : Prop :=
     match r1, r2 with
@@ -298,7 +309,7 @@ Module CC_log_rel (H : Heap).
     * ρ1 ~_k ρ2 iff forall x, ρ1(x) = v => ρ2(x) = v' /\ v ~_k v' *)
   Definition cc_approx_env (k : nat) IP P c1 c2 : Prop :=
     c1 ⋞ ^ (Full_set _; k; IP;  P) c2.
-
+  
   (** * Environment Invariants for Closure Conversion *)
   
   (** Naming conventions in the following :
@@ -345,7 +356,8 @@ Module CC_log_rel (H : Heap).
   
   Section LogRelLemmas.
     
-    Context (IP : IInv)
+    Context (LIP : IInv)
+            (GIP : IInv)
             (LP : Inv)
             (GP : GInv).
     
@@ -354,20 +366,20 @@ Module CC_log_rel (H : Heap).
   (** The environment relation is antimonotonic in the set of free variables *) 
   Lemma cc_approx_env_P_antimon (S1 S2 : Ensemble var) (k : nat)
         (c1 c2 : (heap block) * env) :
-    c1 ⋞ ^ ( S2 ; k ; IP ; GP) c2 ->
+    c1 ⋞ ^ ( S2 ; k ; GIP ; GP) c2 ->
     S1 \subset S2 ->
-    c1 ⋞ ^ ( S1 ; k ; IP ; GP) c2.
+    c1 ⋞ ^ ( S1 ; k ; GIP ; GP) c2.
   Proof.
     destruct c1 as [H1 rho1]; destruct c2 as [H2 rho2].
     intros Hpre Hin x Hin'. eapply Hpre; eapply Hin; eauto.
   Qed.
   
   (** The expression relation is monotonic in the local invariant *)
-  Lemma cc_approx_exp_rel_mon k (LP1 LP2 : Inv) (GP1 : GInv)
+  Lemma cc_approx_exp_rel_mon k LIP1 GIP1 (LP1 LP2 : Inv) (GP1 : GInv)
         (p1 p2 : exp * env * heap block) :
-    p1 ⪯ ^ ( k ; IP ; LP1 ; GP1 ) p2 ->
+    p1 ⪯ ^ ( k ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
     inclusion _ LP1 LP2 ->
-    p1 ⪯ ^ ( k ; IP ; LP2 ; GP1 ) p2.
+    p1 ⪯ ^ ( k ; LIP1 ; GIP1 ; LP2 ; GP1 ) p2.
   Proof.
     destruct p1 as [[e1 H1] rho1].
     destruct p2 as [[e2 H2] rho2].
@@ -378,14 +390,14 @@ Module CC_log_rel (H : Heap).
   
   (** The logical relation respects equivalence of the global invariant *)
   
-  Lemma cc_approx_exp_same_rel_IH k (LP1 GP1 GP2 : GInv) p1 p2 :
+  Lemma cc_approx_exp_same_rel_IH k LIP1 GIP1 LP1 (GP1 GP2 : GInv) p1 p2 :
     (forall m r1 r2,
        m <= k ->
-       r1 ≺ ^ (m ; IP ; GP1) r2 ->
-       r1 ≺ ^ (m ; IP ; GP2) r2) ->
-    p1 ⪯ ^ ( k ; IP ; LP1 ; GP1 ) p2 ->
+       r1 ≺ ^ (m ; GIP1 ; GP1) r2 ->
+       r1 ≺ ^ (m ; GIP1 ; GP2) r2) ->
+    p1 ⪯ ^ ( k ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
     same_relation _ GP1 GP2 ->
-    p1 ⪯ ^ ( k ; IP ; LP1 ; GP2 ) p2.
+    p1 ⪯ ^ ( k ; LIP1 ; GIP1 ; LP1 ; GP2 ) p2.
   Proof.
     destruct p1 as [[e1 H1] rho1].
     destruct p2 as [[e2 H2] rho2].
@@ -400,9 +412,9 @@ Module CC_log_rel (H : Heap).
   Opaque cc_approx_exp.
   
   Lemma cc_approx_val_same_rel (k : nat) (GP1 GP2 : GInv) r1 r2 :
-    r1 ≺ ^ (k ; IP ; GP1) r2 ->
+    r1 ≺ ^ (k ; GIP ; GP1) r2 ->
     same_relation _ GP1 GP2 ->
-    r1 ≺ ^ (k ; IP ; GP2) r2.
+    r1 ≺ ^ (k ; GIP ; GP2) r2.
   Proof.
     revert GP1 GP2 r1 r2. induction k as [k IHk] using lt_wf_rec1.
     intros GP1 GP2 r1 r2.
@@ -446,9 +458,9 @@ Module CC_log_rel (H : Heap).
 
   Lemma cc_approx_exp_same_rel (P : relation nat) k (GP' : GInv)
         p1 p2 :
-    p1 ⪯ ^ ( k ; IP ; LP ; GP ) p2 ->
+    p1 ⪯ ^ ( k ; LIP ; GIP ; LP ; GP ) p2 ->
     same_relation _ GP GP' ->
-    p1 ⪯ ^ ( k ; IP ; LP ; GP' ) p2.
+    p1 ⪯ ^ ( k ; LIP ; GIP ; LP ; GP' ) p2.
   Proof.
     intros Hcc Hin. eapply cc_approx_exp_same_rel_IH; try eassumption.
     intros. eapply cc_approx_val_same_rel; eauto.
@@ -456,9 +468,9 @@ Module CC_log_rel (H : Heap).
   
   (** The value relation is monotonic in the step index *)
   Lemma cc_approx_val_monotonic (k m : nat) (r1 r2 : ans) :
-    r1 ≺ ^ (k; IP ; GP) r2 ->
+    r1 ≺ ^ (k; GIP ; GP) r2 ->
     m <= k ->
-    r1 ≺ ^ (m; IP ; GP) r2.
+    r1 ≺ ^ (m; GIP ; GP) r2.
   Proof.
     revert k r1 r2. induction m as [m IHk] using lt_wf_rec1.
     intros k r1 r2.
@@ -494,9 +506,9 @@ Module CC_log_rel (H : Heap).
   
   (** The expression relation is anti-monotonic in the step index *)
   Lemma cc_approx_exp_monotonic (k j : nat) p1 p2 :
-    p1 ⪯ ^ ( k ; IP ; LP ; GP ) p2 ->
+    p1 ⪯ ^ ( k ; LIP ; GIP ; LP ; GP ) p2 ->
     j <= k ->
-    p1 ⪯ ^ ( j ; IP ; LP ; GP ) p2.
+    p1 ⪯ ^ ( j ; LIP ; GIP ; LP ; GP ) p2.
   Proof.
     destruct p1 as [[e1 H1] rho1]; destruct p2 as [[e2 H2] rho2].
     intros Hpre Hleq H1' H2' rho1' rho2' v1 c1 m1 HH1 HH2 HIP Hleq' Hstep Hstuck.
@@ -511,9 +523,9 @@ Module CC_log_rel (H : Heap).
   (** The environment relations are anti-monotonic in the step index *)
   Lemma cc_approx_env_P_monotonic (R : Ensemble var) (k j : nat)
         c1 c2 :
-    c1 ⋞ ^ ( R ; k ; IP ; GP ) c2 ->
+    c1 ⋞ ^ ( R ; k ; GIP ; GP ) c2 ->
     j <= k ->
-    c1 ⋞ ^ ( R ; j ; IP ; GP ) c2.
+    c1 ⋞ ^ ( R ; j ; GIP ; GP ) c2.
   Proof.
     destruct c1 as [H1 rho1]; destruct c2 as [H2 rho2].
     intros Hcc Hleq x HP v Hget.
@@ -523,52 +535,42 @@ Module CC_log_rel (H : Heap).
   Qed.
   
   Lemma cc_approx_env_monotonic (k j : nat) c1 c2 :
-    cc_approx_env k IP GP c1 c2 ->
+    cc_approx_env k GIP GP c1 c2 ->
     j <= k ->
-    cc_approx_env j IP GP c1 c2.
+    cc_approx_env j GIP GP c1 c2.
   Proof.
     intros Hleq H. eapply cc_approx_env_P_monotonic; eauto.
   Qed.
   
-  (* (** * Proper Instances *) *)
-
-  (* Global Instance cc_approx_env_proper_set : *)
-  (*   Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff) *)
-  (*          cc_approx_env_P. *)
-  (* Proof. *)
-  (*   intros s1 s2 [H1 H2]; split; intros Hpre; *)
-  (*   eapply cc_approx_env_P_antimon; subst; eauto. *)
-  (* Qed. *)
-
   (** * Set lemmas *)
-
+  
   Lemma cc_approx_env_Empty_set (k : nat) c1 c2 :
-    c1 ⋞ ^ ( Empty_set var ; k ; IP ; GP ) c2.
+    c1 ⋞ ^ ( Empty_set var ; k ; GIP ; GP ) c2.
   Proof.
     destruct c1 as [H1 rho1]; destruct c2 as [H2 rho2].
     firstorder.
   Qed.
-
+  
   Lemma cc_approx_env_P_union (P1 P2 : Ensemble var) (k : nat) c1 c2 :
-    c1 ⋞ ^ ( P1 ; k ; IP ; GP) c2 ->
-    c1 ⋞ ^ ( P2 ; k ; IP ; GP ) c2 ->
-    c1 ⋞ ^ ( P1 :|: P2 ; k ; IP ; GP ) c2.
+    c1 ⋞ ^ ( P1 ; k ; GIP ; GP) c2 ->
+    c1 ⋞ ^ ( P2 ; k ; GIP ; GP ) c2 ->
+    c1 ⋞ ^ ( P1 :|: P2 ; k ; GIP ; GP ) c2.
   Proof.
     destruct c1 as [H1 rho1]; destruct c2 as [H2 rho2].
     intros Hpre1 Hpre2 x HP2. inv HP2; eauto.
   Qed.
   
   Lemma cc_approx_env_P_inter_l (P1 P2 : Ensemble var) (k : nat) c1 c2 :
-    c1 ⋞ ^ ( P1 ; k ; IP ; GP ) c2 ->
-    c1 ⋞ ^ ( P1 :&: P2 ; k ; IP ; GP ) c2.
+    c1 ⋞ ^ ( P1 ; k ; GIP ; GP ) c2 ->
+    c1 ⋞ ^ ( P1 :&: P2 ; k ; GIP ; GP ) c2.
   Proof.
     destruct c1 as [H1 rho1]; destruct c2 as [H2 rho2].
     intros Hpre x HP2. inv HP2; eauto.
   Qed.
   
   Lemma cc_approx_env_P_inter_r (P1 P2 : Ensemble var) (k : nat) c1 c2 :
-    c1 ⋞ ^ ( P2 ; k ; IP ; GP) c2 ->
-    c1 ⋞ ^ ( P1 :&: P2 ; k ; IP ; GP ) c2.
+    c1 ⋞ ^ ( P2 ; k ; GIP ; GP) c2 ->
+    c1 ⋞ ^ ( P1 :&: P2 ; k ; GIP ; GP ) c2.
   Proof.
     destruct c1 as [H1 rho1]; destruct c2 as [H2 rho2].
     intros Hpre x HP2. inv HP2; eauto.
@@ -579,8 +581,8 @@ Module CC_log_rel (H : Heap).
   Lemma cc_approx_var_env_set_eq :
     forall (k : nat) (rho1 rho2 : env) (H1 H2 : heap block)
       (x y : var) (v1 v2 : value),
-      (Res (v1, H1)) ≺ ^ (k ; IP ; GP) (Res (v2, H2)) ->
-      cc_approx_var_env k IP GP H1 (M.set x v1 rho1) H2 (M.set y v2 rho2) x y.
+      (Res (v1, H1)) ≺ ^ (k ; GIP ; GP) (Res (v2, H2)) ->
+      cc_approx_var_env k GIP GP H1 (M.set x v1 rho1) H2 (M.set y v2 rho2) x y.
   Proof.
     intros rho1 rho2 H1 H2 k x y v1 v2 Hval x' Hget.
     rewrite M.gss in Hget. inv Hget. eexists.
@@ -590,9 +592,9 @@ Module CC_log_rel (H : Heap).
   Lemma cc_approx_var_env_set_neq :
     forall (k : nat)  (rho1 rho2 : env) (H1 H2 : heap block)
       (x1 x2 y1 y2 : var) (v1 v2 : value),
-      cc_approx_var_env k IP GP H1 rho1 H2 rho2 y1 y2 ->
+      cc_approx_var_env k GIP GP H1 rho1 H2 rho2 y1 y2 ->
       y1 <> x1 -> y2 <> x2 ->
-      cc_approx_var_env k IP GP H1 (M.set x1 v1 rho1) H2 (M.set x2 v2 rho2) y1 y2.
+      cc_approx_var_env k GIP GP H1 (M.set x1 v1 rho1) H2 (M.set x2 v2 rho2) y1 y2.
   Proof. 
     intros k rho1 rho2 H1 H2 x1 x2 y1 y2 v1 v2 Hval Hneq Hneq' x' Hget.
     rewrite M.gso in *; eauto.
@@ -601,9 +603,9 @@ Module CC_log_rel (H : Heap).
   Lemma cc_approx_var_env_set :
     forall (k : nat)  (rho1 rho2 : env) (H1 H2 : heap block)
       (x y : var) (v1 v2 : value),
-      cc_approx_var_env k IP GP H1 rho1 H2 rho2 y y ->
-      (Res (v1, H1)) ≺ ^ (k; IP ; GP) (Res (v2, H2)) ->
-      cc_approx_var_env k IP GP H1 (M.set x v1 rho1) H2 (M.set x v2 rho2) y y.
+      cc_approx_var_env k GIP GP H1 rho1 H2 rho2 y y ->
+      (Res (v1, H1)) ≺ ^ (k; GIP ; GP) (Res (v2, H2)) ->
+      cc_approx_var_env k GIP GP H1 (M.set x v1 rho1) H2 (M.set x v2 rho2) y y.
   Proof.
     intros k rho1 rho2 H1 H2 x y v1 v2 Hvar Hval.
     destruct (peq y x); subst.
@@ -614,9 +616,9 @@ Module CC_log_rel (H : Heap).
   (** Extend the related environments with a single point *)
   Lemma cc_approx_env_P_set (S : Ensemble var) (k : nat)
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
-      (H1, rho1) ⋞ ^ ( S \\ [set x] ; k ; IP ; GP ) (H2, rho2) ->
-      (Res (v1, H1)) ≺ ^ (k; IP ; GP) (Res (v2, H2)) ->
-      (H1, M.set x v1 rho1) ⋞ ^ ( S; k ; IP ; GP ) (H2, M.set x v2 rho2).
+      (H1, rho1) ⋞ ^ ( S \\ [set x] ; k ; GIP ; GP ) (H2, rho2) ->
+      (Res (v1, H1)) ≺ ^ (k; GIP ; GP) (Res (v2, H2)) ->
+      (H1, M.set x v1 rho1) ⋞ ^ ( S; k ; GIP ; GP ) (H2, M.set x v2 rho2).
   Proof.
     intros Henv Hval x' HP v1' Hget.
     rewrite M.gsspec in Hget. destruct (peq x' x); subst.
@@ -629,11 +631,11 @@ Module CC_log_rel (H : Heap).
   (** Extend the related environments with a list *)
   Lemma cc_approx_env_P_setlist_l (S : Ensemble var) (k : nat)
         (rho1 rho2 rho1' rho2' : env) (H1 H2 : heap block) xs (vs1 vs2 : list value) :
-    (H1, rho1) ⋞ ^ ( S \\ (FromList xs) ; k ; IP ; GP ) (H2, rho2) ->
-    Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k ; IP ; GP ) (Res (v2, H2))) vs1 vs2 ->
+    (H1, rho1) ⋞ ^ ( S \\ (FromList xs) ; k ; GIP ; GP ) (H2, rho2) ->
+    Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k ; GIP ; GP ) (Res (v2, H2))) vs1 vs2 ->
     setlist xs vs1 rho1 = Some rho1' ->
     setlist xs vs2 rho2 = Some rho2' ->
-    (H1, rho1') ⋞ ^ ( S ; k ; IP ; GP ) (H2, rho2').
+    (H1, rho1') ⋞ ^ ( S ; k ; GIP ; GP ) (H2, rho2').
   Proof.
     intros Hcc Hall Hset1 Hset2 x HP v Hget.
     destruct (in_dec var_dec x xs).
@@ -647,9 +649,9 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_env_P_set_not_in_P_l (S : Ensemble var) (k : nat) 
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v : value) :
-    (H1, rho1) ⋞ ^ ( S ; k ; IP ; GP ) (H2, rho2) ->
+    (H1, rho1) ⋞ ^ ( S ; k ; GIP ; GP ) (H2, rho2) ->
     ~ x \in S ->
-    (H1, M.set x v rho1) ⋞ ^ ( S; k ; IP ; GP ) (H2, rho2).
+    (H1, M.set x v rho1) ⋞ ^ ( S; k ; GIP ; GP ) (H2, rho2).
   Proof. 
     intros Hcc Hnin y Py v' Hget.
     edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
@@ -660,9 +662,9 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_env_P_set_not_in_P_r (S : Ensemble var) (k : nat)
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v : value) :
-    (H1, rho1) ⋞ ^ ( S ; k ; IP ; GP ) (H2, rho2) ->
+    (H1, rho1) ⋞ ^ ( S ; k ; GIP ; GP ) (H2, rho2) ->
     ~ x \in S ->
-    (H1, rho1) ⋞ ^ ( S ; k ; IP ; GP ) (H2, M.set x v rho2).
+    (H1, rho1) ⋞ ^ ( S ; k ; GIP ; GP ) (H2, M.set x v rho2).
   Proof. 
     intros Hcc Hnin y Py v' Hget.
     edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
@@ -700,10 +702,10 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_val_res_eq (k : nat)  (H1 H2 H1' H2' : heap block)
         (v1 v2 v1' v2' : value) :
-    (Res (v1, H1)) ≺ ^ (k ; IP ; GP) (Res (v2, H2)) ->
+    (Res (v1, H1)) ≺ ^ (k ; GIP ; GP) (Res (v2, H2)) ->
     (v1, H1) ≈ (v1', H1') ->
     (v2, H2) ≈ (v2', H2') ->
-    (Res (v1', H1')) ≺ ^ (k ; IP ; GP) (Res (v2', H2')).
+    (Res (v1', H1')) ≺ ^ (k ; GIP ; GP) (Res (v2', H2')).
   Proof with now eauto with Ensembles_DB.
     revert v1 v2 v1' v2' H1 H2 H1' H2'. induction k as [k IHk] using lt_wf_rec1.
     intros v1 v2 v1' v2' H1 H2 H1' H2'.
@@ -767,10 +769,10 @@ Module CC_log_rel (H : Heap).
 
   Lemma cc_approx_val_heap_eq (k : nat) (H1 H2 H1' H2' : heap block)
         (v1 v2 : value) :
-    (Res (v1, H1)) ≺ ^ (k ; IP ; GP) (Res (v2, H2)) ->
+    (Res (v1, H1)) ≺ ^ (k ; GIP ; GP) (Res (v2, H2)) ->
     (val_loc v1) |- H1 ≃ H1' ->
     (val_loc v2) |- H2 ≃ H2' ->
-    (Res (v1, H1')) ≺ ^ (k ; IP ; GP) (Res (v2, H2')).
+    (Res (v1, H1')) ≺ ^ (k ; GIP ; GP) (Res (v2, H2')).
   Proof with now eauto with Ensembles_DB.
     intros.
     eapply cc_approx_val_res_eq. eassumption. 
@@ -780,11 +782,11 @@ Module CC_log_rel (H : Heap).
 
   Lemma cc_approx_var_env_heap_env_equiv (S1 S2 : Ensemble var) (k : nat)
         (H1 H2 H1' H2' : heap block) (rho1 rho2 rho1' rho2' : env) (x1 x2 : var) :
-    cc_approx_var_env k IP GP H1 rho1 H2 rho2 x1 x2 ->
+    cc_approx_var_env k GIP GP H1 rho1 H2 rho2 x1 x2 ->
     S1 |- (H1, rho1) ⩪ (H1', rho1') ->
     S2 |- (H2, rho2) ⩪ (H2', rho2') ->
     x1 \in S1 -> x2 \in S2 ->
-    cc_approx_var_env k IP GP H1' rho1' H2' rho2' x1 x2.
+    cc_approx_var_env k GIP GP H1' rho1' H2' rho2' x1 x2.
   Proof.
     intros Henv Heq1 Heq2 Hin1 Hin2 v1' Hget1'.
     eapply Heq1 in Hget1'; [| eassumption ].
@@ -800,10 +802,10 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_env_P_heap_eq (S : Ensemble var) (k : nat) (P : GInv)
         (H1 H2 H1' H2' : heap block) (rho1 rho2 rho1' rho2' : env) :
-    (H1, rho1) ⋞ ^ (S; k; IP; GP) (H2, rho2) ->
+    (H1, rho1) ⋞ ^ (S; k; GIP; GP) (H2, rho2) ->
     S |- (H1, rho1) ⩪ (H1', rho1') ->
     S |- (H2, rho2) ⩪ (H2', rho2') ->
-    (H1', rho1') ⋞ ^ (S; k; IP; GP) (H2', rho2').
+    (H1', rho1') ⋞ ^ (S; k; GIP; GP) (H2', rho2').
   Proof.
     intros Henv Heq1 Heq2 x HS.
     eapply cc_approx_var_env_heap_env_equiv; eauto.
@@ -912,11 +914,11 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_var_env_getlist (k : nat)
         (rho1 rho2 : env) (H1 H2 : heap block) xs ys vs1 :
-    Forall2 (cc_approx_var_env k IP GP H1 rho1 H2 rho2) xs ys ->
+    Forall2 (cc_approx_var_env k GIP GP H1 rho1 H2 rho2) xs ys ->
     getlist xs rho1 = Some vs1 ->
     exists vs2,
       getlist ys rho2 = Some vs2 /\
-      Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k; IP ; GP) (Res (v2, H2))) vs1 vs2.
+      Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k; GIP ; GP) (Res (v2, H2))) vs1 vs2.
   Proof.
     revert ys vs1. induction xs as [| x xs IHxs]; intros ys vs1 Hall Hget.
     - destruct ys; inv Hall. inv Hget. eexists. split; simpl; eauto.
@@ -931,12 +933,12 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_env_P_getlist_l (S : Ensemble var) (k : nat)
         (rho1 rho2 : env) (H1 H2 : heap block) (xs : list var) (vs1 : list value) :
-    (H1, rho1) ⋞ ^ ( S ; k ; IP ; GP ) (H2, rho2) ->
+    (H1, rho1) ⋞ ^ ( S ; k ; GIP ; GP ) (H2, rho2) ->
     (FromList xs) \subset S ->
     getlist xs rho1 = Some vs1 ->
     exists vs2,
       getlist xs rho2 = Some vs2 /\
-      Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k; IP ; GP) (Res (v2, H2))) vs1 vs2.
+      Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k; GIP ; GP) (Res (v2, H2))) vs1 vs2.
   Proof.
     intros Henv. revert vs1.
     induction xs as [| x xs IHxs]; intros ls1 Hp Hget.
@@ -951,35 +953,35 @@ Module CC_log_rel (H : Heap).
   Qed.
 
 
-  (** * cc_approx respects heap_eq  *)
+  (* (** * cc_approx respects heap_eq  *) *)
 
-   Lemma cc_approx_exp_heap_equiv (k : nat) (H1 H2 H1' H2' : heap block)
-         (rho1 rho2 : env) (e1 e2 : exp) :
-    (e1, rho1, H1) ⪯ ^ (k; IP ; LP; GP) (e2, rho2, H2) ->
-    (env_locs rho1 (occurs_free e1)) |- H1 ≃ H1' ->
-    (env_locs rho2 (occurs_free e2)) |- H2 ≃ H2' ->
-    (IP (H1', rho1, e1) (H2', rho2, e2) -> IP (H1, rho1, e1) (H2, rho2, e2)) ->
-    (e1, rho1, H1') ⪯ ^ (k; IP; LP; GP) (e2, rho2, H2').
-   Proof with now eauto with Ensembles_DB.
-     intros Hexp Heq1 Heq2 H1'' H2'' rho1' rho2' r1 c1 m1 Heq1' Heq2' HIP Hleq Hbs Hns.
-     eapply heap_env_equiv_heap_equiv in Heq1.
-     eapply heap_env_equiv_heap_equiv in Heq2.
-     eapply Hexp; [| | | eassumption | ]; eauto;     
-     eapply Equivalence_Transitive; try eassumption.
-   Qed.
+  (*  Lemma cc_approx_exp_heap_equiv (k : nat) (H1 H2 H1' H2' : heap block) *)
+  (*        (rho1 rho2 : env) (e1 e2 : exp) : *)
+  (*   (e1, rho1, H1) ⪯ ^ (k ; LIP ; GIP ; LP ; GP) (e2, rho2, H2) -> *)
+  (*   (env_locs rho1 (occurs_free e1)) |- H1 ≃ H1' -> *)
+  (*   (env_locs rho2 (occurs_free e2)) |- H2 ≃ H2' -> *)
+  (*   (IP (H1', rho1, e1) (H2', rho2, e2) -> IP (H1, rho1, e1) (H2, rho2, e2)) -> *)
+  (*   (e1, rho1, H1') ⪯ ^ (k ; LIP ; GIP ; LP ; GP) (e2, rho2, H2'). *)
+  (*  Proof with now eauto with Ensembles_DB. *)
+  (*    intros Hexp Heq1 Heq2 H1'' H2'' rho1' rho2' r1 c1 m1 Heq1' Heq2' HIP Hleq Hbs Hns. *)
+  (*    eapply heap_env_equiv_heap_equiv in Heq1. *)
+  (*    eapply heap_env_equiv_heap_equiv in Heq2. *)
+  (*    eapply Hexp; [| | | eassumption | ]; eauto;      *)
+  (*    eapply Equivalence_Transitive; try eassumption. *)
+  (*  Qed. *)
 
-   Lemma cc_approx_exp_heap_env_equiv (k : nat) (H1 H2 H1' H2' : heap block)
-         (rho1 rho2 rho1' rho2' : env) (e1 e2 : exp) :
-    (e1, rho1, H1) ⪯ ^ (k; IP ; LP; GP) (e2, rho2, H2) ->
-    (occurs_free e1) |- (H1, rho1) ⩪ (H1', rho1') ->
-    (occurs_free e2) |- (H2, rho2) ⩪ (H2', rho2') ->
-    (IP (H1', rho1', e1) (H2', rho2', e2) -> IP (H1, rho1, e1) (H2, rho2, e2)) ->
-    (e1, rho1', H1') ⪯ ^ (k; IP; LP; GP) (e2, rho2', H2').
-  Proof with now eauto with Ensembles_DB.
-    intros Hexp Heq1 Heq2 Hinv H1'' H2'' rho1'' rho2'' r1 c1 m1 Heq1' Heq2' HIP Hleq Hbs Hns.
-    eapply Hexp; [| | | | eassumption | ]; eauto;
-    eapply Equivalence_Transitive; try eassumption.
-  Qed.
+  (*  Lemma cc_approx_exp_heap_env_equiv (k : nat) (H1 H2 H1' H2' : heap block) *)
+  (*        (rho1 rho2 rho1' rho2' : env) (e1 e2 : exp) : *)
+  (*   (e1, rho1, H1) ⪯ ^ (k; IP ; LP; GP) (e2, rho2, H2) -> *)
+  (*   (occurs_free e1) |- (H1, rho1) ⩪ (H1', rho1') -> *)
+  (*   (occurs_free e2) |- (H2, rho2) ⩪ (H2', rho2') -> *)
+  (*   (IP (H1', rho1', e1) (H2', rho2', e2) -> IP (H1, rho1, e1) (H2, rho2, e2)) -> *)
+  (*   (e1, rho1', H1') ⪯ ^ (k; IP; LP; GP) (e2, rho2', H2'). *)
+  (* Proof with now eauto with Ensembles_DB. *)
+  (*   intros Hexp Heq1 Heq2 Hinv H1'' H2'' rho1'' rho2'' r1 c1 m1 Heq1' Heq2' HIP Hleq Hbs Hns. *)
+  (*   eapply Hexp; [| | | | eassumption | ]; eauto; *)
+  (*   eapply Equivalence_Transitive; try eassumption. *)
+  (* Qed. *)
 
    
    Lemma cc_approx_exp_heap_monotonic (k : nat) (H1 H2 H1' H2' : heap block)
@@ -989,8 +991,8 @@ Module CC_log_rel (H : Heap).
      (env_locs rho1 (occurs_free e1)) \subset dom H1 ->
      (env_locs rho2 (occurs_free e2)) \subset dom H2 ->
      H1 ⊑ H1' -> H2 ⊑ H2' ->
-     (e1, rho1, H1)  ⪯ ^ ( k ; IP ; LP ; GP ) (e2, rho2, H2) ->
-     (e1, rho1, H1') ⪯ ^ ( k ; IP ; LP ; GP ) (e2, rho2, H2').
+     (e1, rho1, H1)  ⪯ ^ ( k ; LIP ; GIP ; LP ; GP ) (e2, rho2, H2) ->
+     (e1, rho1, H1') ⪯ ^ ( k ; LIP ; GIP ; LP ; GP ) (e2, rho2, H2').
    Proof.
      intros Hwf1 Hwf22 Hs1 Hs2 Hsub1 Hsub2 Hyp H3 H4 rho1' rho2' r1 c1 m1 Heq1 Heq2 HIP Hleq Hstep Hns.
      eapply Hyp; [ | | eassumption | eassumption | eassumption | eassumption ].
@@ -1011,8 +1013,8 @@ Module CC_log_rel (H : Heap).
      val_loc v1 \subset dom H1 ->
      val_loc v2 \subset dom H2 ->
      H1 ⊑ H1' -> H2 ⊑ H2' ->
-     Res (v1, H1) ≺ ^ (k ; IP ; GP) Res (v2, H2) ->
-     Res (v1, H1') ≺ ^ (k ; IP ; GP) Res (v2, H2').
+     Res (v1, H1) ≺ ^ (k ; GIP ; GP) Res (v2, H2) ->
+     Res (v1, H1') ≺ ^ (k ; GIP ; GP) Res (v2, H2').
    Proof.
      revert v1 v2. induction k as [k IHk] using lt_wf_rec1.
      intros v1 v2 Hwf1 Hwf2 Hin1 Hin2 Hsub1 Hsub2 Hcc.
@@ -1104,8 +1106,24 @@ Module CC_log_rel (H : Heap).
    Qed.
    
   End LogRelLemmas.
-   (** * Compatibility lemmas *)
-   
+
+
+
+  (** * Proper Instances *)
+
+  
+  Global Instance cc_approx_env_proper_set :
+    Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+           cc_approx_env_P.
+  Proof.
+    intros s1 s2 [H1 H2]; split; intros Hpre;
+    subst; eapply cc_approx_env_P_antimon; subst; eauto. 
+  Qed.
+
+
+  (** * Compatibility lemmas *)
+
+
   (** Apply a closure converted function *)
   (** TODO move *)
    Definition AppClo f t xs f' Γ :=
@@ -1115,60 +1133,31 @@ Module CC_log_rel (H : Heap).
 
 
   Section Compat.
-    
-    Variable (IG : GInv). (* Global Invariant *)
-    Variable (ILi : nat -> Inv). (* Local Invariant indexed by a natural number indicating the amount of time units already spent for evaluation of the RHS program *) 
-    Variable (IL1 IL2 : Inv). (* Local Invariants *)
-    Variable (II : IInv). (* Initial Invariant *)
 
+    (** Conditions *)
+
+    Variable (IG : GInv). (* Final global *)
+    Variable (ILi : nat -> Inv). (* Final local indexed by a natural number indicating the amount of time units already spent for evaluation of the RHS program *) 
+    Variable (IIG : GIInv). (* Global initial *)
+    Variable (IIL1 IIL2 : IInv). (* Local initial *)
+    
     Variable (F : nat). (* A constant factor*)
     
     Variable
       (InvCostTimeout :
          forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) (k c : nat),
-           II (H1, rho1, e1) (H2, rho2, e2) ->
+           IIL1 (H1, rho1, e1) (H2, rho2, e2) ->
            ILi k (c, size_heap H1) (c - k, size_heap H2)).
-
+    
     Variable
       (InvCostBase :
          forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) (k c : nat),
            c >= 1 ->
-           II (H1, rho1, e1) (H2, rho2, e2) ->
+           IIL1 (H1, rho1, e1) (H2, rho2, e2) ->
            ILi k (c, size_heap H1) (c, size_heap H2)).
     
-
-    (* For when the target timeouts with a slightly larger heap *)
-
-    (* Variable *)
-    (*   (IInvCostRefl' : *)
-    (*      forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) (c k m : nat), *)
-    (*        II (H1, rho1, e1) (H2, rho2, e1) -> *)
-
-    (*        m <= 1 -> (* might change *) *)
-
-    (*        IL (c, size_heap H1) (c, size_heap H2 + m)). *)    
-
     
-    (** * Compatibility properties for the local invariants *)
-    Variable
-      (InvCompat1 :
-         forall (k c1 c2 c m1 m2 : nat),
-           
-           IL1 (c1 - c, m1) (c2 - c, m2) -> 
-
-           k <= F*c ->
-
-           ILi k (c1, m1) (c2, m2)).
-
-    Variable
-          (InvCompat1_str :
-         forall (k c1 c2 c1' c2' m1 m2 : nat),
-           
-           IL1 (c1 - c1', m1) (c2 - c2', m2) -> 
-
-           c1' <= c2' + k <= c1' + F*c1' ->
-
-           ILi k (c1, m1) (c2, m2)).
+    (** * Compatibility properties for local conditions *)
 
     Variable
       (InvCompat_str :
@@ -1179,35 +1168,35 @@ Module CC_log_rel (H : Heap).
            c1' <= c2' + (k1 - k2) <= c1' + F*c1' ->
 
            ILi k1 (c1, m1) (c2, m2)).
-
+    
     Variable
       (InvTransfer :
          forall (k c1 c2 c m1 m2 : nat),
            ILi (k + c) (c1, m1) (c2, m2) ->
            ILi k (c1, m1) (c2 + c, m2)).
-
+    
     (** Constructor compatibility *)
     Lemma cc_approx_exp_constr_compat (k : nat)
           (H1 H2 : heap block)  (rho1 rho2 : env)
-          (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp) (r1 r2 : nat)
-
+          (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp) (r1 r2 : nat) (a1 a2 : nat)
+          
           (IInvConstrCompat :
              forall (H1 H2 H1' H2' : heap block) (rho1 rho2 : env)
                (b1 b2 : block) (l1 l2 : loc),
-               II (H1, rho1, Econstr x1 t ys1 e1) (H2, rho2, Econstr x2 t ys2 e2) ->
+               IIL1 (H1, rho1, Econstr x1 t ys1 e1) (H2, rho2, Econstr x2 t ys2 e2) ->
                alloc b1 H1 = (l1, H1') -> 
                alloc b2 H2 = (l2, H2') ->
                size_val b1 = size_val b2 ->
                locs b1 \subset reach' H1 (env_locs rho1 (occurs_free (Econstr x1 t ys1 e1))) ->
                locs b2 \subset reach' H2 (env_locs rho2 (occurs_free (Econstr x2 t ys2 e2))) ->
-               II (H1', M.set x1 (Loc l1) rho1, e1) (H2', M.set x2 (Loc l2) rho2, e2)) : 
+               IIL2 (H1', M.set x1 (Loc l1) rho1, e1) (H2', M.set x2 (Loc l2) rho2, e2)) : 
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Econstr x1 t ys1 e1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (Econstr x2 t ys2 e2)))) H2 ->
       (env_locs rho1 (occurs_free (Econstr x1 t ys1 e1))) \subset dom H1 ->
       (env_locs rho2 (occurs_free (Econstr x2 t ys2 e2))) \subset dom H2 ->
 
-      Forall2 (cc_approx_var_env k II IG H1 rho1 H2 rho2) ys1 ys2 ->
+      Forall2 (cc_approx_var_env k IIG IG H1 rho1 H2 rho2) ys1 ys2 ->
 
       (r1 - r2) <= F*(cost (Econstr x1 t ys1 e1)) ->
 
@@ -1216,11 +1205,11 @@ Module CC_log_rel (H : Heap).
          (* allocate a new location for the constructed value *)
          alloc (Constr t vs1) H1 = (l1, H1') ->
          alloc (Constr t vs2) H2 = (l2, H2') ->
-         Forall2 (fun l1 l2 => (Res (l1, H1)) ≺ ^ (i ; II ; IG) (Res (l2, H2))) vs1 vs2 ->
-         (e1, M.set x1 (Loc l1) rho1, H1') ⪯ ^ (i ; II ; ILi r2 ; IG)
+         Forall2 (fun l1 l2 => (Res (l1, H1)) ≺ ^ (i ; IIG ; IG) (Res (l2, H2))) vs1 vs2 ->
+         (e1, M.set x1 (Loc l1) rho1, H1') ⪯ ^ (i ; IIL2 ; IIG ; ILi r2 ; IG)
          (e2, M.set x2 (Loc l2) rho2, H2')) ->
       
-      (Econstr x1 t ys1 e1, rho1, H1) ⪯ ^ (k ; II ; ILi r1 ; IG) (Econstr x2 t ys2 e2, rho2, H2).
+      (Econstr x1 t ys1 e1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r1 ; IG) (Econstr x2 t ys2 e2, rho2, H2).
     Proof with now eauto with Ensembles_DB.
       intros Hwf1 Hwf2 Hdom1 Hdom2 Hall Hleq Hpre H1' H2' rho1' rho2' v1 c1 m1
              Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
@@ -1232,7 +1221,7 @@ Module CC_log_rel (H : Heap).
           - eapply InvCostTimeout. eassumption.
           - now rewrite cc_approx_val_eq. }
       (* Termination *)
-      - { edestruct (cc_approx_var_env_getlist II IG k rho1' rho2') as [vs2 [Hget' Hpre']];
+      - { edestruct (cc_approx_var_env_getlist IIG IG k rho1' rho2') as [vs2 [Hget' Hpre']];
           [| eauto |]; eauto. 
           eapply Forall2_monotonic_strong; [| eassumption ].
           intros x1' x2' Hin1 Hin2 Hvar.
@@ -1346,21 +1335,21 @@ Module CC_log_rel (H : Heap).
 
           (IInvProjCompat :
              forall (H1 H2 : heap block) (rho1 rho2 : env) (v1 v2 : value),
-               II (H1, rho1, Eproj x1 t n y1 e1) (H2, rho2, Eproj x2 t n y2 e2) ->
+               IIL1 (H1, rho1, Eproj x1 t n y1 e1) (H2, rho2, Eproj x2 t n y2 e2) ->
                val_loc v1 \subset reach' H1 (env_locs rho1 (occurs_free (Eproj x1 t n y1 e1))) ->
                val_loc v2 \subset reach' H2 (env_locs rho2 (occurs_free (Eproj x2 t n y2 e2))) ->
-               II (H1, M.set x1 v1 rho1, e1) (H2, M.set x2 v2 rho2, e2)) :
+               IIL2 (H1, M.set x1 v1 rho1, e1) (H2, M.set x2 v2 rho2, e2)) :
 
-      cc_approx_var_env k II IG H1 rho1 H2 rho2 y1 y2 ->
+      cc_approx_var_env k IIG IG H1 rho1 H2 rho2 y1 y2 ->
 
       r1 - r2 <= F*(cost (Eproj x1 t n y1 e1)) ->
 
       (forall i v1 v2,
          i < k ->
-         (Res (v1, H1)) ≺ ^ (i ; II ; IG) (Res (v2, H2)) ->
-         (e1, M.set x1 v1 rho1, H1) ⪯ ^ (i ; II ; ILi r2 ; IG) (e2, M.set x2 v2 rho2, H2)) ->
+         (Res (v1, H1)) ≺ ^ (i ; IIG ; IG) (Res (v2, H2)) ->
+         (e1, M.set x1 v1 rho1, H1) ⪯ ^ (i ; IIL2 ; IIG ; ILi r2 ; IG) (e2, M.set x2 v2 rho2, H2)) ->
       
-      (Eproj x1 t n y1 e1, rho1, H1) ⪯ ^ (k ; II ; ILi r1 ; IG) (Eproj x2 t n y2 e2, rho2, H2).
+      (Eproj x1 t n y1 e1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r1 ; IG) (Eproj x2 t n y2 e2, rho2, H2).
     Proof.
       intros Hall Hleq Hpre H1' H2' rho1' rho2' v1 c1 m1
              Heq1' Heq2' HII Hleq1 Hstep1 Hstuck. inv Hstep1.
@@ -1407,7 +1396,7 @@ Module CC_log_rel (H : Heap).
           destruct Hcc as [Hteq Hcc]. subst.
 
           edestruct (Forall2_nthN _ _ _ _ _ Hallvs1 Hnth) as [v1' [Hnth' Hv1]].
-          edestruct (Forall2_nthN (fun l1 l2 => cc_approx_val (k - cost1) II IG (Res (l1, H1)) (Res (l2, H2))) vs1)
+          edestruct (Forall2_nthN (fun l1 l2 => cc_approx_val (k - cost1) IIG IG (Res (l1, H1)) (Res (l2, H2))) vs1)
             as [l3' [Hnth'' Hval']]; eauto. eapply Hcc. unfold cost1. simpl. simpl in Hcost. omega.
           
           edestruct (Forall2_nthN (fun v1 v2 : value => (v1, H2) ≈ (v2, H2'))) as [v2' [Hnth2' Hv2]].
@@ -1456,7 +1445,7 @@ Module CC_log_rel (H : Heap).
     (** Case compatibility *)
     Lemma cc_approx_exp_case_nil_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (c : nat) :
       c <= F * (cost (Ecase x1 [])) -> 
-      (Ecase x1 [], rho1, H1) ⪯ ^ (k ; II ; ILi c ; IG) (Ecase x2 [], rho2, H2).
+      (Ecase x1 [], rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi c ; IG) (Ecase x2 [], rho2, H2).
     Proof.
       intros Hleq H1' H2' rho1' rho2' v1 c1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hns. inv Hstep1.
       (* Timeout! *)
@@ -1474,25 +1463,25 @@ Module CC_log_rel (H : Heap).
  
       (IInvCaseHdCompat :
          forall (H1 H2 : heap block) (rho1 rho2 : env),
-           II (H1, rho1, Ecase x1 ((t, e1) :: Pats1)) (H2, rho2, Ecase x2 ((t, e2) :: Pats2)) ->
-           II (H1, rho1, e1) (H2, rho2, e2))
+           IIL1 (H1, rho1, Ecase x1 ((t, e1) :: Pats1)) (H2, rho2, Ecase x2 ((t, e2) :: Pats2)) ->
+           IIL2 (H1, rho1, e1) (H2, rho2, e2))
 
       (IInvCaseTlCompat :
          forall (H1 H2 : heap block) (rho1 rho2 : env),
-           II (H1, rho1, Ecase x1 ((t, e1) :: Pats1)) (H2, rho2, Ecase x2 ((t, e2) :: Pats2)) ->
-           II (H1, rho1, Ecase x1 Pats1) (H2, rho2, Ecase x2 Pats2)) :
+           IIL1 (H1, rho1, Ecase x1 ((t, e1) :: Pats1)) (H2, rho2, Ecase x2 ((t, e2) :: Pats2)) ->
+           IIL1 (H1, rho1, Ecase x1 Pats1) (H2, rho2, Ecase x2 Pats2)) :
         
-      cc_approx_var_env k II IG H1 rho1 H2 rho2 x1 x2 ->
+      cc_approx_var_env k IIG IG H1 rho1 H2 rho2 x1 x2 ->
 
       (r1 - r2) <= F * (cost (Ecase x1 Pats1)) -> 
 
       (forall i H1 H2 rho1 rho2,
          i < k -> 
-         (e1, rho1, H1) ⪯ ^ (i ; II ; ILi r2 ; IG) (e2, rho2, H2)) ->
+         (e1, rho1, H1) ⪯ ^ (i ; IIL2 ; IIG ; ILi r2 ; IG) (e2, rho2, H2)) ->
 
-      (Ecase x1 Pats1, rho1, H1) ⪯ ^ (k ; II ; ILi r1 ; IG) (Ecase x2 Pats2, rho2, H2) ->
+      (Ecase x1 Pats1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r1 ; IG) (Ecase x2 Pats2, rho2, H2) ->
 
-      (Ecase x1 ((t, e1) :: Pats1), rho1, H1) ⪯ ^ (k ; II ; ILi r1 ; IG) (Ecase x2 ((t, e2) :: Pats2), rho2, H2).
+      (Ecase x1 ((t, e1) :: Pats1), rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r1 ; IG) (Ecase x2 ((t, e2) :: Pats2), rho2, H2).
     Proof with now eauto with Ensembles_DB.
       intros Hvar Hleq Hexp_hd Hexp_tl H1' H2' rho1' rho2' v1 c1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
@@ -1576,17 +1565,18 @@ Module CC_log_rel (H : Heap).
     (** Halt compatibility *)
     Lemma cc_approx_exp_halt_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (r : nat) :
       r <= F * (cost (Ehalt x1)) -> 
+          
+      cc_approx_var_env k IIG IG H1 rho1 H2 rho2 x1 x2 ->
       
-      cc_approx_var_env k II IG H1 rho1 H2 rho2 x1 x2 ->
-      
-      (Ehalt x1, rho1, H1) ⪯ ^ (k ; II ; ILi r ; IG) (Ehalt x2, rho2, H2).
+      (Ehalt x1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r ; IG) (Ehalt x2, rho2, H2).
     Proof.
       intros Hleq Hvar H1' H2' rho1' rho2' v1 c1 m1 HII Heq1 Heq2 Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
       - (* Timeout! *)
         { simpl in Hcost. exists OOT, (c1 - r). eexists. repeat split. 
           - econstructor; eauto. simpl. omega.
-          - rewrite <- plus_n_O. eapply InvCostTimeout. eassumption.
+          - rewrite <- plus_n_O. eapply InvCostTimeout.
+            eassumption.
           - now rewrite cc_approx_val_eq. }
       - pose (cost1 := cost (Ehalt x1)).
         pose (cost2 := cost (Ehalt x2)).
@@ -1622,11 +1612,11 @@ Module CC_log_rel (H : Heap).
     Lemma cc_approx_exp_fun_compat (k : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 r1 r2
           (IInvFunCompat :
              forall H1 H1' H1''  H2  rho1 rho1' rho1'' rho2 env_loc, 
-               II (H1, rho1, Efun B1 e1) (H2, rho2, Efun B2 e2) ->
+               IIL1 (H1, rho1, Efun B1 e1) (H2, rho2, Efun B2 e2) ->
                restrict_env (fundefs_fv B1) rho1 = rho1' ->
                alloc (Env rho1') H1 = (env_loc, H1') ->
                def_closures B1 B1 rho1 H1' env_loc = (H1'', rho1'') ->
-               II (H1'', rho1'', e1) (H2, def_funs B2 B2 rho2, e2)) :
+               IIL2 (H1'', rho1'', e1) (H2, def_funs B2 B2 rho2, e2)) :
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1)))) H1 ->
       (env_locs rho1 (occurs_free (Efun B1 e1))) \subset dom H1 ->
@@ -1642,9 +1632,9 @@ Module CC_log_rel (H : Heap).
 
          def_closures B1 B1 rho1 H1' env_loc = (H1'', rho1') ->
 
-         (e1, rho1', H1'') ⪯ ^ (i; II ; ILi r2 ; IG)
+         (e1, rho1', H1'') ⪯ ^ (i; IIL2 ; IIG ; ILi r2 ; IG)
          (e2, def_funs B2 B2 rho2, H2)) ->
-      (Efun B1 e1, rho1, H1) ⪯ ^ (k ; II ; ILi r1 ; IG) (Efun B2 e2, rho2, H2).
+      (Efun B1 e1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r1 ; IG) (Efun B2 e2, rho2, H2).
     Proof with now eauto with Ensembles_DB.
       intros Hwf Hdom Hleq Hpre H1' H2' rho1' rho2' v1 c1
              m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
@@ -1787,14 +1777,14 @@ Module CC_log_rel (H : Heap).
               eapply cc_approx_val_monotonic. eassumption.
               simpl. simpl in Hcost. omega. }
     Qed.
-
+    
 
     Variable
       (InvCompat1_str_gc :
          forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp)
            (k1 k2 c1 c2 c1' c2' m1 m2 : nat),
 
-           II (H1, rho1, e1) (H2, rho2, e2) ->
+           IIL2 (H1, rho1, e1) (H2, rho2, e2) ->
 
            ILi k2 (c1 - c1', m1) (c2 - c2', m2) -> 
 
@@ -1803,16 +1793,18 @@ Module CC_log_rel (H : Heap).
            ILi k1 (c1, max m1 (size_heap H1)) (c2, max m2 (size_heap H2))).
     
     Variable
-      (IGinIL1 : inclusion _ IG (ILi 0)).
+      (IGinILi : inclusion _ IG (ILi 0)).
 
+    Variable
+      (IIL2inIIG : inclusion _ IIL2 IIG).
 
     Variable
       (II_gc :
          forall (H1 H2 H1' H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp),
-           II (H1, rho1, e1) (H2, rho2, e2) ->
+           IIL2 (H1, rho1, e1) (H2, rho2, e2) ->
            live (env_locs rho1 (occurs_free e1)) H1 H1' ->
            live (env_locs rho2 (occurs_free e2)) H2 H2' ->
-           II (H1', rho1, e1) (H2', rho2, e2)).
+           IIL2 (H1', rho1, e1) (H2', rho2, e2)).
     
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (f1 : var) (xs1 : list var)
@@ -1825,7 +1817,7 @@ Module CC_log_rel (H : Heap).
 
                (B2 : fundefs) (f2 f3 : var) (c ct2 : cTag) (xs2 xs2' : list var) 
                (e2 : exp) (l2 env_loc2 : loc) (vs2 : list value),
-               II (H1, rho1, Eapp f1 t xs1) (H2, rho2, AppClo f2 t xs2 f2' Γ) ->
+               IIL1 (H1, rho1, Eapp f1 t xs1) (H2, rho2, AppClo f2 t xs2 f2' Γ) ->
                (* not exactly classy.... Can we make it a bit more abstract? *)
                M.get f1 rho1 = Some (Loc l1) ->
                get l1 H1 = Some (Clos (FunPtr B1 f1') (Loc env_loc1)) ->
@@ -1842,7 +1834,7 @@ Module CC_log_rel (H : Heap).
                setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
                find_def f3 B2 = Some (ct2, xs2', e2) ->
 
-               II (H1', rho_clo2, e1) (H2, rho2', e2)) :
+               IIL2 (H1', rho_clo2, e1) (H2, rho2', e2)) :
       
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo f2 t xs2 f2' Γ)))) H2 ->
@@ -1856,13 +1848,13 @@ Module CC_log_rel (H : Heap).
       c + 3 <= F * (cost (Eapp f1 t xs1)) -> 
       length xs1 = length xs2 ->
 
-      cc_approx_var_env k II IG H1 rho1 H2 rho2 f1 f2 ->
-      Forall2 (cc_approx_var_env k II IG H1 rho1 H2 rho2) xs1 xs2 ->
-      II (H1, rho1, Eapp f1 t xs1) (H2, rho2, AppClo f2 t xs2 f2' Γ)  ->
-      (Eapp f1 t xs1, rho1, H1) ⪯ ^ (k ; II ; ILi c ; IG) (AppClo f2 t xs2 f2' Γ, rho2, H2).
+      cc_approx_var_env k IIG IG H1 rho1 H2 rho2 f1 f2 ->
+      Forall2 (cc_approx_var_env k IIG IG H1 rho1 H2 rho2) xs1 xs2 ->
+      (* II (H1, rho1, Eapp f1 t xs1) (H2, rho2, AppClo f2 t xs2 f2' Γ)  -> *)
+      (Eapp f1 t xs1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi c ; IG) (AppClo f2 t xs2 f2' Γ, rho2, H2).
     Proof with now eauto with Ensembles_DB.
       intros Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq Hleqc Hlen Hvar Hall
-             Hi H1' H2' rho1' rho2' v1 c1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
+             H1' H2' rho1' rho2' v1 c1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
       eapply (cc_approx_var_env_heap_env_equiv
                     _ _
                     (occurs_free (Eapp f1 t xs1))
@@ -1925,7 +1917,7 @@ Module CC_log_rel (H : Heap).
                [ now eauto with Ensembles_DB
                | now intros Hc; inv Hc; eapply Hnin1; eauto ]
              | now intros Hc; inv Hc; eapply Hnin2; eauto ] ].
-          edestruct (cc_approx_var_env_getlist II IG k rho1' rho2') as [vs2 [Hgetl' Hcc']];
+          edestruct (cc_approx_var_env_getlist IIG IG k rho1' rho2') as [vs2 [Hgetl' Hcc']];
             [ eassumption | now eauto |].
           edestruct Hvar as [l2 [Hget' Hcc]]; eauto.
           simpl in Hcc. rewrite Hgetl in Hcc. destruct l2 as [l2 | ]; [| contradiction ]. 
@@ -1985,7 +1977,8 @@ Module CC_log_rel (H : Heap).
             destruct Hgc as [? [? ?]]. eassumption.
           + eapply heap_env_equiv_heap_equiv.
             destruct Hgc' as [? [? ?]]. eassumption.
-          + eapply II_gc; [| eassumption | eassumption ].
+          + eapply IIL2inIIG.  
+            eapply II_gc; [| eassumption | eassumption ].
             eapply IInvAppCompat; try eassumption.
           + simpl; omega.
           + intros i. edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m' Hstep']].
@@ -2021,7 +2014,7 @@ Module CC_log_rel (H : Heap).
                 [ | | ].
               eapply IInvAppCompat; eassumption.
               replace (c2 + 1 + 1 + S (S (length xs2)) - (1 + 1 + S (S (length xs2)))) with c2 by omega. 
-              eapply IGinIL1. eassumption. simpl. rewrite <- !Hlen. simpl in Hleqc.
+              eapply IGinILi. eassumption. simpl. rewrite <- !Hlen. simpl in Hleqc.
               omega.
             * rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
               eassumption. simpl. omega. }
@@ -2039,7 +2032,7 @@ Module CC_log_rel (H : Heap).
         | Efun2_c _ _ => 0 (* maybe fix but not needed for now *)
         | Ecase_c _ _ _ _ _ => 0
       end.
-
+    
     Fixpoint costCC_ctx (c : exp_ctx) : nat :=
       match c with
         | Econstr_c x t ys c => 1 + length ys
@@ -2077,25 +2070,25 @@ Module CC_log_rel (H : Heap).
           
           ctx_to_heap_env (Eproj_c x t N y C) H rho H' rho' (c + costCC_ctx (Eproj_c x t N y C)).
     
-  Lemma cc_approx_exp_right_ctx_compat 
-        (k : nat) rho1 rho2 rho2' H1 H2 H2' e1 C e2 c c'
-        (IInvCtxCompat :
-           forall H1 H2 H2' rho1 rho2 rho2' e1 e2 C c, 
-             II (H1, rho1, e1) (H2, rho2, C |[ e2 ]|) ->
-             ctx_to_heap_env C H2 rho2 H2' rho2' c ->
-             II (H1, rho1, e1) (H2', rho2', e2)) :
+    Lemma cc_approx_exp_right_ctx_compat 
+          (k : nat) rho1 rho2 rho2' H1 H2 H2' e1 C e2 c c' (II : exp_ctx -> IInv)
+          (IInvCtxCompat :
+             forall H1 H2 H2' rho1 rho2 rho2' e1 e2 C C' c, 
+               II (comp_ctx_f C C') (H1, rho1, e1) (H2, rho2, C |[ C' |[ e2 ]| ]|) ->
+               ctx_to_heap_env C H2 rho2 H2' rho2' c ->
+               II C' (H1, rho1, e1) (H2', rho2', C' |[ e2 ]|)) :
 
-    well_formed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
-    well_formed (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) H2 ->
-    (env_locs rho1 (occurs_free e1)) \subset dom H1 ->
-    (env_locs rho2 (occurs_free (C |[ e2 ]|))) \subset dom H2 ->
+      well_formed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
+      well_formed (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) H2 ->
+      (env_locs rho1 (occurs_free e1)) \subset dom H1 ->
+      (env_locs rho2 (occurs_free (C |[ e2 ]|))) \subset dom H2 ->
 
-    ctx_to_heap_env C H2 rho2 H2' rho2' c' ->
-    (e1, rho1, H1) ⪯ ^ (k; II ; ILi (c' + c) ; IG) (e2, rho2', H2') ->
-      (e1, rho1, H1) ⪯ ^ (k ; II ; ILi c ; IG) (C |[ e2 ]|, rho2, H2).
+      ctx_to_heap_env C H2 rho2 H2' rho2' c' ->
+      (e1, rho1, H1) ⪯ ^ (k; II Hole_c ; IIG ; ILi (c' + c) ; IG) (e2, rho2', H2') ->
+      (e1, rho1, H1) ⪯ ^ (k ; II C ; IIG ; ILi c ; IG) (C |[ e2 ]|, rho2, H2).
     Proof with now eauto with Ensembles_DB.
       intros Hwf1 Hwf2 Henv1 Henv2 Hctx. revert c. induction Hctx; intros c1 Hpre.
-      - eassumption.
+      - intros ? ? ? ? ? ? ? ? ? ? ? ? ?. eapply Hpre; eauto.
       - rewrite <- plus_assoc in Hpre. eapply IHHctx in Hpre.
         intros H1' H2' rho1' rho2' v1 k1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
         edestruct heap_env_equiv_env_getlist as [vs' [Hlst Hall]]; try eassumption.
@@ -2217,7 +2210,6 @@ Module CC_log_rel (H : Heap).
 
     Definition size_reachable (S : Ensemble loc) (H1 : heap block) (s : nat ) : Prop :=
       exists H2, live S H1 H2 /\ size H2 = s. 
-    
 
 
   End Compat.

@@ -533,18 +533,10 @@ Proof.
   revert t; induction e; intros; try rewrite_hyps; simpl; auto.
 Qed.
 
-Lemma subst_env_aux_ax e k s : subst_env_aux e k (Ax_e s) = Ax_e s.
-Proof.
-  induction e; simpl; try apply IHe; auto.
-Qed.
-
 Lemma subst_env_aux_prf e k : subst_env_aux e k Prf_e = Prf_e.
 Proof.
   induction e; simpl; try apply IHe; auto.
 Qed.
-
-Lemma subst_env_erased_exp e : subst_env e erased_exp = erased_exp.
-Proof. apply subst_env_aux_ax. Qed.
 
 Lemma subst_env_aux_con_e e k i r args :
   subst_env_aux e k (Con_e (dcon_of_con i r) args) =
@@ -728,8 +720,6 @@ Proof.
     destruct_call strip_lam. simpl in *. eauto.
 
   - (* Prf *) constructor.
-
-  - (* Ax *) constructor.
 Qed.
 
 Arguments strip_lam : simpl never.
@@ -1141,15 +1131,6 @@ Proof.
 Qed.
 
 (** Evaluation in the target language *)
-
-Lemma eval_erased_exp e : eval (subst_env e erased_exp) (subst_env e erased_exp).
-Proof. rewrite subst_env_erased_exp. constructor. Qed.
-
-Lemma eval_axiom e nm : eval (subst_env e (Ax_e nm)) (subst_env e (Ax_e nm)).
-Proof.
-  unfold erased_exp, subst_env. simpl.
-  induction e; simpl; try apply IHe. constructor. 
-Qed.
 
 Lemma eval_env_offset n e e' : eval_env e e' -> cst_offset e n = cst_offset e' n.
 Proof. induction 1; simpl; rewrite_hyps; trivial. Qed.
@@ -2116,7 +2097,7 @@ Proof.
     { inv evs''. injection (proj1 eval_single_valued _ _ evf _ H1). intros -> ->.
       econstructor; eauto. 
       pose proof (proj1 eval_single_valued _ _ evf _ H1). discriminate.
-      pose proof (proj1 eval_single_valued _ _ evf _ H2). discriminate. }
+      pose proof (proj1 eval_single_valued _ _ evf _ H1). discriminate. }
     eapply (IHa (f $ e) (f' $ e) s'' s ); auto.
     
     inv evs''.
@@ -2124,7 +2105,7 @@ Proof.
     eapply (is_n_lam_sbst v2 _) in Hlam.
     eapply eval_is_n_lam; eauto.
     pose proof (proj1 eval_single_valued _ _ evf _ H2). discriminate.
-    pose proof (proj1 eval_single_valued _ _ evf _ H3). discriminate.
+    pose proof (proj1 eval_single_valued _ _ evf _ H2). discriminate.
 Qed.
 
 Lemma eval_mkApp_e_inv f a s :
@@ -2157,7 +2138,6 @@ Proof.
       exists (Lam_e na e1'). 
       intuition auto. constructor. 
       apply eval_preserves_wf in H2; auto.
-      inv H2.
     + simpl in IHa. simpl in Hev. simpl in Hfe.
       exists (Lam_e n f).
       inv wff; inv wfa.
@@ -2365,7 +2345,6 @@ Proof.
 
   - rewrite subst_env_aux_fix_e. constructor.
   - rewrite subst_env_aux_prf. constructor.
-  - rewrite subst_env_aux_ax. constructor.
   - constructor.
   - constructor; auto.
 Qed.
@@ -2583,8 +2562,8 @@ Proof with eauto.
         destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [nm [bod ->]].
         elimtype False.
         subst x.
-        rewrite L3sbst_fix_preserves_lam in H3.
-        simpl in H3. rewrite subst_env_aux_lam in H3. inv H3.
+        rewrite L3sbst_fix_preserves_lam in H5.
+        simpl in H5. rewrite subst_env_aux_lam in H5. inv H5.
 
     - rewrite t' in fixstep. discriminate.
 

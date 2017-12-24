@@ -63,8 +63,6 @@ match e with
         ((bterm [] (tL4_to_L4_1 d))::(List.map snd brs))
 
 
-| Ax_e s => oterm (NApply) []
-
 | Prf_e => oterm (NBox "proof") []
 end
 with ltL4_to_L4_1  (e:exps) {struct e}: list (@DTerm Ast.name L4Opid) :=

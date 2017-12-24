@@ -62,7 +62,6 @@ Inductive exp: Type :=
 | Match_e: exp -> forall (pars:N) (* # of parameters *), branches_e -> exp
 | Let_e: name -> exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
-| Ax_e: string -> exp
 | Prf_e : exp
 with exps: Type :=
 | enil: exps
@@ -141,7 +140,6 @@ Inductive exp_wf: N -> exp -> Prop :=
                                      exp_wf i (Fix_e es k)
 (* Fix?: Axiom applied to anything should reduce to Axiom *)
 | prf_e_wf : forall i, exp_wf i Prf_e
-| ax_e_wf : forall i s, exp_wf i (Ax_e s)
 with exps_wf: N -> exps -> Prop :=
 | enil_wf: forall i, exps_wf i enil
 | econs_wf: forall i e es, exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
@@ -227,7 +225,6 @@ Fixpoint shift n k e :=
     | Let_e na e1 e2 => Let_e na (shift n k e1) (shift n (1 + k) e2)
     | Match_e e p bs => Match_e (shift n k e) p (shift_branches' shift n k bs)
     | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + k) es) k'
-    | Ax_e s => Ax_e s
     | Prf_e => Prf_e
   end.
 
@@ -289,7 +286,6 @@ Function subst (v:exp) k (e:exp): exp :=
     | Let_e na e1 e2 => Let_e na (subst v k e1) (subst v (1 + k) e2)
     | Match_e e p bs => Match_e (subst v k e) p (subst_branches v k bs)
     | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + k) es) k'
-    | Ax_e s => Ax_e s
     | Prf_e => Prf_e
   end
 with substs (v:exp) k (es:exps) : exps :=
@@ -321,7 +317,6 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Let_e na e1 e2 => Let_e na (sbst v k e1) (sbst v (1 + k) e2)
     | Match_e e p bs => Match_e (sbst v k e) p (sbst_branches v k bs)
     | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + k) es) k'
-    | Ax_e s => Ax_e s
     | Prf_e => Prf_e
   end
 with sbsts (v:exp) k (es:exps) : exps :=
@@ -559,12 +554,11 @@ Inductive eval: exp -> exp -> Prop :=
     enthopt (N.to_nat n) es = Some e' ->
     eval (App_e (sbst_fix es e') v2) e'' ->
     eval (App_e e e2) e''
-| eval_ProofApp_e : forall f a,
+| eval_ProofApp_e : forall f a a',
     eval f Prf_e ->
+    eval a a' ->
     eval (App_e f a) Prf_e
 | eval_Prf_e : eval Prf_e Prf_e
-(** Fix? :  (Ax _) --> Ax *)
-| eval_Ax_e s : eval (Ax_e s) (Ax_e s)
 with evals: exps -> exps -> Prop :=
      | evals_nil: evals enil enil
      | evals_cons: forall e es v vs, eval e v -> evals es vs ->
@@ -594,7 +588,7 @@ Proof.
       assert (j1:v2 = v0). { apply H0. assumption. } subst.
       apply H1. assumption.
     * specialize (H _ H5); discriminate.
-    * specialize (H _ H6); discriminate.
+    * specialize (H _ H5); discriminate.
   - inversion H0. subst. apply f_equal2. reflexivity.
     apply H. assumption.
   - inversion H1. subst.
@@ -611,12 +605,11 @@ Proof.
       specialize (H0 _ H6); subst v0.
       assert (e' = e'0) by congruence; subst e'0.
       now apply H1.
-    * specialize (H _ H6); discriminate.
-  - inversion H0; subst.
-    * specialize (H _ H3); discriminate.
-    * specialize (H _ H3); discriminate.
+    * specialize (H _ H5); discriminate.
+  - inversion H1; subst.
+    * specialize (H _ H4); discriminate.
+    * specialize (H _ H4); discriminate.
     * reflexivity.
-  - inversion H. reflexivity.
   - inversion H. reflexivity.
   - inversion H. reflexivity.
   - inversion H1. subst. rewrite (H v0); try assumption.
@@ -685,7 +678,11 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                        | _ => None
                        end
                      end
-                   | Some Prf_e => Some Prf_e
+                   | Some Prf_e =>
+                     match eval_n n e2 with
+                     | None => None
+                     | Some _ => Some Prf_e
+                     end
                    | _ => None
                   end
                | Let_e _ e1 e2 =>
@@ -703,7 +700,6 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                    end
                    | _ => None
                  end
-               | Ax_e s => Some (Ax_e s)
                | Var_e e => None
              end
   end
@@ -890,12 +886,11 @@ Proof.
     * apply e6.
     * now apply H1.
   + subst.
-    injection H0. intros <-. specialize (H _ e4). econstructor 8; auto.
+    injection H1. intros <-. specialize (H _ e4). eapply eval_ProofApp_e; eauto.
   + econstructor.
     * specialize (H _ e4). eapply H.
     * specialize (H0 _ H1). apply H0.
   + econstructor; eauto. 
-  + injection H; intros h0. subst. constructor.
   + injection H; intros h0. subst. constructor.
   + injection H1; intros h0. subst. constructor.
     * apply H. assumption.
@@ -968,8 +963,14 @@ Proof.
     rewrite k0.
     replace (x0 + (x + x1 - 1))%nat with (x1 + (x + x0 - 1))%nat; try lia.
     rewrite e3, k1. reflexivity.
-  - destruct H as [x h]. exists (S x).
-    simpl. now rewrite h.
+  - destruct H as [x h].
+    destruct H0 as [x0 h0].
+    assert (j:=eval_n_Some_Succ _ _ _ h).
+    assert (j0:=eval_n_Some_Succ _ _ _ h0).
+    assert (k:= eval_n_monotone _ _ _ h).
+    assert (k0:= eval_n_monotone _ _ _ h0).
+    exists (S (x+x0)%nat). simpl. rewrite k.
+    rewrite Nat.add_comm. rewrite k0. reflexivity.
   - destruct H as [x h]. destruct H0 as [x0 h0].
     assert (j:=eval_n_Some_Succ _ _ _ h).
     assert (j0:=evals_n_Some_Succ _ _ _ h0).
@@ -1360,7 +1361,6 @@ Inductive is_value: exp -> Prop :=
 | con_is_value: forall d es, are_values es -> is_value (Con_e d es)
 | fix_is_value: forall es k, is_value (Fix_e es k)
 | prf_is_value : is_value Prf_e
-| ax_is_value : forall s, is_value (Ax_e s)
 with are_values: exps -> Prop :=
 | enil_are_values: are_values enil
 | econs_are_values: forall e es, is_value e -> are_values es ->
@@ -1392,7 +1392,6 @@ Fixpoint is_valueb (e:exp): bool :=
     | Match_e _ _ _ => false
     | Let_e _ _ _ => false
     | Fix_e _ _ => true
-    | Ax_e _ => true
     | Prf_e => true
   end
 with are_valuesb (es:exps): bool :=
@@ -1678,7 +1677,6 @@ Function maxFree (e:exp): Z :=
     | Let_e na a f => Z.max (maxFree a) (maxFree f - 1)
     | Match_e e p bs => Z.max (maxFree e) (maxFreeB bs)
     | Fix_e es k' => maxFreeF es - (Z.of_N (efnlst_length es))
-    | Ax_e s => -1
     | Prf_e => -1
   end
 with maxFreeC (es:exps) : Z :=
@@ -1780,8 +1778,6 @@ Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
                    end
                    | _ => None
                  end
-               | Ax_e s => (* Some (Ax_e s) *)
-                 None
                | Var_e e => None
              end
   end.

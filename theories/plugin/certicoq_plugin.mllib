@@ -83,6 +83,7 @@ Values
 Compile4
 Instances2
 Instances4
+Compile5
 L3_to_L3_eta
 Camlcoq
 AST
@@ -100,6 +101,7 @@ PrintAST
 PrintCsyntax
 PrintClight
 L6_to_Clight
+Instances7
 AllInstances
 Certicoq
 G_certicoq

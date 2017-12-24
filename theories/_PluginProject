@@ -163,6 +163,8 @@ plugin/l5a.ml
 plugin/l5_to_L6.ml
 plugin/l4_to_L4_1_to_L4_2.ml
 plugin/l4_2_to_L4_5.ml
+plugin/compile5.mli
+plugin/compile5.ml
 plugin/l3_to_L3_eta.mli
 plugin/fappli_IEEE.ml
 plugin/clightexec.ml
@@ -194,6 +196,8 @@ plugin/ctypes.ml
 plugin/l3_to_L4.ml
 plugin/l6_to_Clight.mli
 plugin/printAST.ml
+plugin/instances7.mli
+plugin/instances7.ml
 plugin/allInstances.mli
 plugin/instances5.ml
 plugin/instances6.ml

@@ -70,13 +70,13 @@ Section Program.
   
  
 
-(* dcon to generated cTag and the # of parameter for the inductive type of this constructor *) 
-  Definition conId_map:= list (L5_conId * (cTag * nat)).
+  (* dcon to generated cTag *)
+  Definition conId_map:= list (L5_conId * cTag).
 
 
   Fixpoint dcon_to_info (a:L5_conId) (sig:conId_map) :=
     match sig with
-      | nil => (default_tag, 0)
+      | nil => default_tag
       | ((cId, inf)::sig') => match L5_conId_dec a cId with
                                 | left _ => inf
                                 | right _ => dcon_to_info a sig'
@@ -84,11 +84,8 @@ Section Program.
     end.
 
   Definition dcon_to_tag (a:L5_conId) (sig:conId_map) :=
-    fst (dcon_to_info a sig).
+    dcon_to_info a sig.
 
-  Definition dcon_to_p (a:L5_conId) (sig:conId_map) :=
-    snd (dcon_to_info a sig).
-  
 
 
 
@@ -275,24 +272,19 @@ Ret_c M N ->
              let fds := Fcons n' kon_tag (n::nil) e' Fnil in
              (Efun1_c fds Hole_c, n',  Pos.succ n', set_t n' kon_tag tgm )
            | Con_c dcn lv =>
-             (* skips the first p values in lv and produce an expression context binding to the returned list of variables
+             (* Produce an expression context binding to the returned list of variables
                 the converted values  *)
-             let fix convert_v_list (lv :list val_c) (p:nat) (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): (exp_ctx * list var * var * conv_env) :=
-                 match (p, lv) with
-                   | (S p', v::lv') =>
-                      convert_v_list lv' p' sv sk tgm n
-                   | (0, v::lv') =>
-                     let '(ctx_v, vn , n', tgm) := convert_v v sv sk tgm n in
-                     let '(ctx_lv', ln', n'', tgm) := convert_v_list lv' 0 sv sk tgm n' in
-                     (comp_ctx_f ctx_v ctx_lv', (vn::ln'), n'', tgm)
-                   | _ =>  (Hole_c, nil, n, tgm)
+             let fix convert_v_list (lv :list val_c) (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): (exp_ctx * list var * var * conv_env) :=
+                 match lv with
+                 | v::lv' =>
+                   let '(ctx_v, vn , n', tgm) := convert_v v sv sk tgm n in
+                   let '(ctx_lv', ln', n'', tgm) := convert_v_list lv' sv sk tgm n' in
+                   (comp_ctx_f ctx_v ctx_lv', (vn::ln'), n'', tgm)
+                 | _ =>  (Hole_c, nil, n, tgm)
                        
                  end in 
-             let (ctag, nP) := (dcon_to_info dcn (fst (fst tgm))) in
-             (* OS : as of r7849, parameters are already stripped so we can ignore arg p in convert_v_list *)
-             (* skip the first nP arguments which correspond to the inductive type's parameters *)
-             (*             let '(lv_ctx, nl, n', tgm) := convert_v_list lv nP sv sk tgm n in *)
-             let '(lv_ctx, nl, n', tgm) := convert_v_list lv 0 sv sk tgm n in
+             let ctag := (dcon_to_info dcn (fst (fst tgm))) in
+             let '(lv_ctx, nl, n', tgm) := convert_v_list lv sv sk tgm n in
              (comp_ctx_f lv_ctx (Econstr_c n' ctag nl Hole_c), n', Pos.succ n', set_t n' ctag tgm)
            | Fix_c lbt i =>
              (match lbt with
@@ -339,20 +331,19 @@ arguments are:
          end.
   
   
-  Definition ienv := list (string * nat * itypPack).  
+  Definition ienv := list (string * itypPack).
   
 
   (** process a list of constructors from inductive type ind with iTag niT.  
     - update the cEnv with a mapping from the current cTag to the cTypInfo
     - update the conId_map with a pair relating the nCon'th constructor of ind to the cTag of the current constructor
 
-   nP: number of type parameters for this bundle, kept in the dcm to erase the right number of arguments (this should now always be 0 as type param are erased at L3
    *)
-  Fixpoint convert_cnstrs (cct:list cTag) (itC:list Cnstr) (ind:inductive) (nP:nat) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
+  Fixpoint convert_cnstrs (cct:list cTag) (itC:list Cnstr) (ind:inductive) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
     match (cct, itC) with  
       | (cn::cct', cst::icT') =>
         let (cname, ccn) := cst in
-        convert_cnstrs cct' icT' ind nP (nCon+1)%N niT (M.set cn (nNamed cname, niT, N.of_nat (ccn), nCon) ce) (((ind,nCon), (cn, nP))::dcm)
+        convert_cnstrs cct' icT' ind (nCon+1)%N niT (M.set cn (nNamed cname, niT, N.of_nat (ccn), nCon) ce) (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
       | (_, _) => (ce, dcm)
     end.
 
@@ -363,25 +354,25 @@ arguments are:
     - process each of the constructor, indicating they are the ith constructor of the nth type of idBundle
    np: number of type parameters for this bundle
    *)
-  Fixpoint convert_typack typ (idBundle:string) (np:nat) (n:nat) (ice:(iEnv * cEnv*  cTag * iTag * conId_map)) : (iEnv * cEnv * cTag * iTag * conId_map) :=
+  Fixpoint convert_typack typ (idBundle:string) (n:nat) (ice:(iEnv * cEnv*  cTag * iTag * conId_map)) : (iEnv * cEnv * cTag * iTag * conId_map) :=
     let '(ie, ce, ncT, niT, dcm) := ice in 
     match typ with
       | nil => ice
       | (mkItyp itN itC ) ::typ' => 
         let (cct, ncT') := fromN ncT (length itC) in
-        let (ce', dcm') := convert_cnstrs cct itC (mkInd idBundle n) np 0 niT ce dcm in
+        let (ce', dcm') := convert_cnstrs cct itC (mkInd idBundle n) 0 niT ce dcm in
         let ityi := combine cct (map (fun (c:Cnstr) => let (_, n) := c in N.of_nat n) itC) in
-        convert_typack typ' idBundle np (n+1) (M.set niT ityi ie, ce', ncT', (Pos.succ niT) , dcm')
+        convert_typack typ' idBundle (n+1) (M.set niT ityi ie, ce', ncT', (Pos.succ niT) , dcm')
     end.
   
   Fixpoint convert_env' (g:ienv) (ice:iEnv * cEnv * cTag * iTag * conId_map) : (iEnv * cEnv * cTag * iTag * conId_map) :=
     let '(ie, ce, ncT, niT, dcm) := ice in 
     match g with      
       | nil => ice
-      | (id, n, ty)::g' =>
-        (* id is name of mutual pack, n is number of (type) parameters for this mutual pack, ty is mutual pack *)
+      | (id, ty)::g' =>
+        (* id is name of mutual pack ty is mutual pack *)
         (* constructors are indexed with : name (string) of the mutual pack with which projection of the ty, and indice of the constructor *)      
-        convert_env' g' (convert_typack ty id n 0 (ie, ce, ncT, niT, dcm)) 
+        convert_env' g' (convert_typack ty id 0 (ie, ce, ncT, niT, dcm))
     end.
 
 

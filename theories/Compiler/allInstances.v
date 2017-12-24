@@ -3,6 +3,7 @@ Require Export Common.certiClasses2.
 Require Export L2.instances.
 Require Export L1g.instances.
 Require Export L2_5.instances.
+Require Export L2d.instances.
 Require Export L2k.instances.
 Require Export L3.instances.
 Require Export L4.instances.

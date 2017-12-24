@@ -9,21 +9,22 @@ Set Template Cast Propositions.
 
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)
-Instance WfL2Term: GoodTerm (Program L2.compile.Term) :=
-  fun _  => True.
+Instance WfL2Term: GoodTerm (Program L2d.compile.Term) :=
+  fun p => WFaEnv WFapp (env p).
 
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
-(*********************
-Definition flattenApp (t:L2.compile.Term) :
-  (L2.compile.Term * (list L2.compile.Term)) :=
+Fixpoint flattenApp (t:L2d.compile.Term) :
+  (L2d.compile.Term * (list L2d.compile.Term)) :=
   match t with
-    | TApp fn arg => (fn, cons arg (Terms_list args))
-    | s => (s, nil)
+  | TApp fn arg =>
+    let (fn, args) := flattenApp fn in
+    (fn, cons arg args)
+  | s => (s, nil)
   end.
 
-Global Instance QuestionHeadL2Term: QuestionHead (Program L2.compile.Term) :=
+Global Instance QuestionHeadL2Term: QuestionHead (Program L2d.compile.Term) :=
   fun q t =>
     match q, fst (flattenApp (main t)) with
       | Cnstr ind ci, TConstruct ind2 ci2 _ _ =>
@@ -33,11 +34,11 @@ Global Instance QuestionHeadL2Term: QuestionHead (Program L2.compile.Term) :=
     end.
 
 Global Instance ObsSubtermL2Term :
-  ObserveNthSubterm (Program L2.compile.Term) :=
+  ObserveNthSubterm (Program L2d.compile.Term) :=
   fun n t =>
-    match  (flattenApp (main t)) with
+    match (flattenApp (main t)) with
       | (TConstruct _ _ _ _, subterms) =>
-        match List.nth_error subterms  n with
+        match List.nth_error subterms n with
           | Some st => Some {| env := env t; main := st |}
           | None => None
         end
@@ -45,21 +46,21 @@ Global Instance ObsSubtermL2Term :
     end.
 
 Global Instance certiL2Eval:
-  BigStepOpSem (Program L2.compile.Term) (Program L2.compile.Term).
+  BigStepOpSem (Program L2d.compile.Term) (Program L2d.compile.Term).
 Proof.
   intros s sv. destruct s, sv. exact (WcbvEval env main main0 /\ env = env0).
 Defined.
 
-Global Instance certiL2: CerticoqLanguage (Program L2.compile.Term).
+Global Instance certiL2d : CerticoqLanguage (Program L2d.compile.Term).
 
 Instance certiL1g_to_L2: 
-  CerticoqTotalTranslation (Program L1g.compile.Term)
-                           (Program L2.compile.Term) :=
+  CerticoqTotalTranslation (Program L2.compile.Term)
+                           (Program L2d.compile.Term) :=
   stripProgram.
 
 
 Require Import certiClasses2.
-
+(*
 Lemma flattenAppCommutes:
   forall main : L1g.compile.Term,
   flattenApp (L2.compile.strip main) =

@@ -75,5 +75,6 @@ Separate Extraction
          Floats.Float32.to_bits Floats.Float.to_bits
          String.length
          Compiler.allInstances.printProg
-         Compiler.allInstances.compile_template_L7.
+         Compiler.allInstances.compile_template_L7
+         L7.Clightexec.run.
 Cd "..".

@@ -40,10 +40,10 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     dnthBody m dts = Some x ->
     WcbvEval p (pre_whFixStep x dts arg) s ->
     WcbvEval p (TApp fn arg) s 
-| wAppCong: forall fn fn' arg arg', 
-    WcbvEval p fn fn' -> (isApp fn' \/ fn' = TProof) ->
+| wAppProof: forall fn arg arg',
+    WcbvEval p fn TProof ->
     WcbvEval p arg arg' ->
-    WcbvEval p (TApp fn arg) (TApp fn' arg') 
+    WcbvEval p (TApp fn arg) TProof
 | wCase: forall mch i n args brs cs s,
     WcbvEval p mch (TConstruct i n args) ->
     whCaseStep n args brs = Some cs ->
@@ -127,6 +127,7 @@ Proof.
     + apply H. assumption.
     + apply e.
     + apply H0. assumption.
+  - eapply wAppProof; eauto.
   - eapply wCase; intuition; try eassumption.
 Qed.
 
@@ -222,7 +223,7 @@ Proof.
     + apply (dnthBody_pres_Crct _ e). eapply CrctDs_Up. eassumption. 
       rewrite list_to_zero_length. omega.
   - apply H0. eapply whCaseStep_pres_Crct; try eassumption.
-    specialize (H _ H6). inversion_Clear H. assumption.
+    specialize (H _ H7). inversion_Clear H. assumption.
 Qed.
 
 Lemma WcbvEval_mkApp_WcbvEval:
@@ -235,9 +236,7 @@ Proof.
     inversion_clear jx.
     + exists (TLambda nm bod). assumption.
     + exists (TFix dts m). assumption.
-    + destruct H1.
-      * destruct H1 as [y0 [y1 jy]]. subst. exists (TApp y0 y1). assumption.
-      * subst. exists TProof. assumption.
+    + exists TProof. assumption.
 Qed.
 
 Lemma WcbvEval_mkApp_TApp_WcbvEval:
@@ -248,16 +247,12 @@ Proof.
   - inversion_clear H.
     + exists (TLambda nm bod). assumption.
     + exists (TFix dts m). assumption.
-    + destruct H1.
-      * destruct H as [y0 [y1 jy]]. subst. exists (TApp y0 y1). assumption.
-      * subst. exists TProof. assumption.
+    + exists TProof. assumption.
   - specialize (IHargs _ _ _ H). destruct IHargs as [x jx].
     + inversion_clear jx.
       * exists (TLambda nm bod). assumption.
       * exists (TFix dts m). assumption.
-      *{ destruct H1.
-         - destruct H1 as [y0 [y1 jy]]. subst. exists (TApp y0 y1). assumption.
-         - subst. exists TProof. assumption. }
+      * exists TProof. assumption.
 Qed.
 
   
@@ -477,11 +472,10 @@ Function wcbvEval
         | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
         | Some x => wcbvEval n (pre_whFixStep x dts a1)
         end
-      | Ret ((TApp _ _) as u)
       | Ret ((TProof) as u) =>
         match wcbvEval n a1 with
-            | Ret ea1 => ret (TApp u ea1)
-            | Exc s => raise ("(wcbvEval;TAppCong: " ++ s ++ ")")
+            | Ret ea1 => ret TProof
+            | Exc s => raise ("(wcbvEval;TAppProof: " ++ s ++ ")")
         end
       | _ => raise "wcbvEval, TApp: fn"
       end
@@ -551,6 +545,8 @@ Proof.
     apply H1. assumption.
   - specialize (H _ e1). specialize (H0 _ p1).
     eapply wAppFix; try eassumption.
+  - specialize (H _ e1). specialize (H0 _ e2).
+    eapply wAppProof; eauto.
   - subst. specialize (H _ e1). specialize (H0 _ p1). 
     refine (wCase _ _ _ _); try eassumption.
   - eapply wLetIn.
@@ -599,10 +595,8 @@ Proof.
     rewrite e. apply H0. omega.
   - destruct H; destruct H0. exists (S (max x x0)). intros m h.
     assert (l:= max_fst x x0). assert (l2:= max_snd x x0). simpl.
-    rewrite (j m); try omega. rewrite H; try omega. destruct o.
-    + destruct H1 as [y0 [y1 jy]]. subst. rewrite H0; try omega.
-      reflexivity.
-    + subst. rewrite H0; try omega. reflexivity.
+    rewrite (j m); try omega. rewrite H; try omega.
+    rewrite H0; try omega. reflexivity.
   - destruct H; destruct H0. exists (S (max x x0)). intros m h.
     assert (l:= max_fst x x0). assert (l2:= max_snd x x0). simpl.
     rewrite (j m); try omega. rewrite H; try omega.

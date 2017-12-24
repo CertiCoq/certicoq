@@ -16,10 +16,9 @@ Instance WfL2Term: GoodTerm (Program L2k.compile.Term) :=
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
-(*******
 Global Instance QuestionHeadL2kTerm: QuestionHead (Program L2k.compile.Term) :=
   fun q t =>
-    match q, fst (flattenApp (main t)) with
+    match q, main t with
       | Cnstr ind ci, TConstruct ind2 ci2 _(*nargs*) =>
         andb (decide (ind=ind2)) (decide (ci=ci2))
       | Abs, TLambda _ _ => true
@@ -29,29 +28,28 @@ Global Instance QuestionHeadL2kTerm: QuestionHead (Program L2k.compile.Term) :=
 Global Instance ObsSubtermL2kTerm :
   ObserveNthSubterm (Program L2k.compile.Term) :=
   fun n t =>
-    match  (flattenApp (main t)) with
-      | (TConstruct _ _ _, subterms) =>
-        match List.nth_error subterms  n with
+    match main t with
+      | TConstruct _ _ subterms =>
+        match tnth n subterms with
           | Some st => Some {| env := env t; main := st |}
           | None => None
         end
       | _ => None
     end.
-**************)
+
 Global Instance certiL2kEval:
   BigStepOpSem (Program L2k.compile.Term) (Program L2k.compile.Term).
 Proof.
   intros s sv. destruct s, sv. exact (WcbvEval env main main0 /\ env = env0).
 Defined.
 
-(**
+
 Global Instance certiL2k: CerticoqLanguage (Program L2k.compile.Term).
 
 Instance certiL2_to_L2k: 
-  CerticoqTotalTranslation (Program L2.compile.Term)
+  CerticoqTotalTranslation (Program L2d.compile.Term)
                            (Program L2k.compile.Term) :=
   stripProgram.
- **)
 
 
 Require Import certiClasses2.

@@ -4,6 +4,7 @@ Require Import Common.Common.
 Require Import L3.compile.
 Require Import L4.L3_to_L4.
 Require Import L4.L3_to_L3_eta.
+Require Import L4.L3_eta_crct.
 Require Import L3.instances.
 
 Require Import BinNat.
@@ -23,7 +24,7 @@ Global Instance QuestionHeadTermL3_eta : QuestionHead L3_eta_Program :=
   L3.instances.QuestionHeadTermL.
 
 Instance WfL3_etaTerm : GoodTerm L3_eta_Program :=
-  WfL3Term.
+  fun p : Program Term => L4.L3_eta_crct.crctTerm (AstCommon.env p) 0 (main p).
 
 Global Instance certiL3_eta: CerticoqLanguage L3_eta_Program := {}.
 
@@ -129,8 +130,8 @@ Global Instance certiL3_eta_to_L4_correct :
 Proof.
   split.
 { red; unfold certiClasses.translate, goodTerm, WfL3Term.
-  intros. red in H. red in H.
-  pose proof (proj1 L3.program.Crct_CrctEnv _ _ _ H).
+  intros. red in H. 
+  pose proof (proj1 Crct_CrctEnv _ _ _ H).
   unfold certiL3_eta_to_L4. hnf.
   simpl. destruct s. simpl in *.
   unfold L3_to_L4.translate_program. simpl.
@@ -138,7 +139,7 @@ Proof.
   now apply exp_wf_lets. }
 
 { red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
-  assert(He:=proj1 L3.program.Crct_CrctEnv _ _ _ H).
+  assert(He:=proj1 Crct_CrctEnv _ _ _ H).
   repeat red in H0.
   destruct s. destruct sv.
   destruct H0. 

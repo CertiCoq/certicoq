@@ -105,8 +105,8 @@ with crctEnv: environ Term -> Prop :=
 | ceNil: crctEnv nil
 | ceTrmCons: forall nm s p,
     crctEnv p -> fresh nm p -> crctTerm p 0 s -> crctEnv ((nm, ecTrm s)::p)
-| ceTypCons: forall nm m s p,
-    crctEnv p -> fresh nm p -> crctEnv ((nm, ecTyp Term m s)::p)
+| ceTypCons: forall nm s p,
+    crctEnv p -> fresh nm p -> crctEnv ((nm, ecTyp Term 0 s)::p)
 with crctTerms: environ Term -> nat -> Terms -> Prop :=
 | ctsNil: forall p n, crctEnv p -> crctTerms p n tnil
 | ctsCons: forall p n t ts,
@@ -235,17 +235,17 @@ Qed.
 
 Lemma Crct_weaken_Typ:
   (forall p n t, crctTerm p n t -> 
-                 forall nm s m, fresh nm p ->
-                              crctTerm ((nm,ecTyp Term m s)::p) n t) /\
+                 forall nm s, fresh nm p ->
+                              crctTerm ((nm,ecTyp Term 0 s)::p) n t) /\
   (forall p n ts, crctTerms p n ts -> 
-                  forall nm s m, fresh nm p ->
-                               crctTerms ((nm,ecTyp Term m s)::p) n ts) /\
+                  forall nm s, fresh nm p ->
+                               crctTerms ((nm,ecTyp Term 0 s)::p) n ts) /\
   (forall p n ts, crctBs p n ts -> 
-                  forall nm s m, fresh nm p ->
-                               crctBs ((nm,ecTyp Term m s)::p) n ts) /\
+                  forall nm s, fresh nm p ->
+                               crctBs ((nm,ecTyp Term 0 s)::p) n ts) /\
   (forall p n ds, crctDs p n ds -> 
-                  forall nm s m, fresh nm p ->
-                               crctDs ((nm,ecTyp Term m s)::p) n ds) /\
+                  forall nm s, fresh nm p ->
+                               crctDs ((nm,ecTyp Term 0 s)::p) n ds) /\
   (forall p, crctEnv p -> True).
 Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros;

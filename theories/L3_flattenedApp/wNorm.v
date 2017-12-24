@@ -25,7 +25,7 @@ Inductive WNorm: Term -> Prop :=
 | WNConstruct: forall i n args,
     WNorms args -> WNorm (TConstruct i n args)
 | WNApp: forall fn t,
-    WNorm fn -> ~ (isLambda fn) -> ~ (isFix fn) -> WNorm t ->
+    WNorm fn -> ~ (isLambda fn) -> ~ (isFix fn) -> ~ (isProof fn) -> WNorm t ->
     WNorm (TApp fn t)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
@@ -50,6 +50,7 @@ Proof.
   try (solve[left; constructor]).
   - destruct (isLambda_dec t). rght.
     destruct (isFix_dec t). rght.
+    destruct (isProof_dec t). rght.
     destruct H, H0; try rght.
     + left. apply WNApp; auto.
   - destruct H.
@@ -81,9 +82,6 @@ Proof.
   - inversion_Clear H1.
     + specialize (H _ H4). subst. elim n. auto.
     + specialize (H _ H4). subst. elim n0. auto. 
-    + specialize (H _ H4). destruct H5.
-      * destruct H1 as [y0 [y1 jy]]. subst. specialize (H0 _ H7). subst.
-        reflexivity.
-      * subst. specialize (H0 _ H7). subst. reflexivity.
+    + specialize (H _ H4). subst. elim n1. reflexivity.
   - inversion_Clear H1. rewrite (H _ H4). rewrite (H0 _ H6). reflexivity.
 Qed.

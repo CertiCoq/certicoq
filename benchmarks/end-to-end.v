@@ -55,6 +55,10 @@ Import ListNotations.
    The following explains how can we obtain such a theorem for Coq -> L1 to
    eventually compose the two and derive the desired theorem.
 
+  This idea seems to be similar with the one presented in
+  https://pdfs.semanticscholar.org/58bb/00b882700d67779871a6208f288f68a0b71c.pdf
+  where they verify an HOL -> ML extractor.
+
  *)
 
 

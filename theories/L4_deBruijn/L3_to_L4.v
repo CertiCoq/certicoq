@@ -20,9 +20,6 @@ Ltac forward H :=
 
 Definition dcon_of_con (i : inductive) (n : nat) := (i, N.of_nat n).
 
-(** Erased terms are turned into axioms *)
-Definition erased_exp := Ax_e "erased".
-
 (** Definition environment *)
 Definition env := list (string * exp).
 
@@ -84,7 +81,7 @@ Section TermTranslation.
   
   Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
-    | L3t.TWrong _ => Ax_e "wrong"
+    | L3t.TWrong _ => Prf_e
     | L3t.TProof => Prf_e
     | L3t.TRel n => Var_e (N.of_nat n)
     | L3t.TLambda n t => Lam_e n (trans (1+k) t)

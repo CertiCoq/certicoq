@@ -686,7 +686,7 @@ Proof.
     inversion_clear H0.
     + econstructor; try eassumption. eapply  IHargs; eassumption.
     + eapply wAppFix; try eassumption. intuition.
-    + eapply wAppCong; try eassumption. eapply IHargs; try eassumption.
+    + eapply wAppProof; try eassumption. eapply IHargs; try eassumption.
 Qed.
   
 Lemma WcbvEval_mkApp_step:

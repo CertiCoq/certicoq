@@ -133,8 +133,7 @@ Lemma wcbvEval_values e :
   (forall ts ts', L3eval.WcbvEvals e ts ts' -> wcbv_values ts').
 Proof.
   apply L3eval.WcbvEvalEvals_ind; try constructor; eauto.
-  intros. admit.
-Admitted.
+Qed.
 
 (** Observations *)
 Require Import Bool.
@@ -2567,19 +2566,17 @@ Proof with eauto.
 
     - rewrite t' in fixstep. discriminate.
 
-      + (* Proof application *)
-        intros.
-        unfold translate in *; simpl in *.
-        unfold subst_env in *.
-        rewrite subst_env_application.
-        destruct o. admit.
-        subst fn'.
-        apply Crct_invrt_App in H1. destruct H1.
-        specialize (H H1). specialize (H0 H2).
-        simpl in *. rewrite subst_env_application, subst_env_aux_prf.
-        admit.
+  + (* Proof application *)
+    intros.
+    unfold translate in *; simpl in *.
+    unfold subst_env in *.
+    rewrite subst_env_application.
+    apply Crct_invrt_App in H1 as [Hfn Harg].
+    specialize (H Hfn). specialize (H0 Harg).
+    simpl in *. rewrite subst_env_aux_prf in H |- *.
+    eapply eval_ProofApp_e; eauto.
 
-      + (* Case *)
+  + (* Case *)
     unfold translate; simpl.
     (* Reduction case *)
     intros * evmch IHmch Hcasestep Hcs IHcs Hcrct.
@@ -2620,7 +2617,8 @@ Proof with eauto.
     rewrite trans_mkapp in IHcs.
     rewrite subst_env_app_e in IHcs.
     rewrite subst_env_aux_strip_lam.
-    eapply eval_App_e. 
+    eapply eval_App_e.
+
     - rewrite <- Hargsdef.
       rewrite exps_skipn0, exps_length_map, exps_length_trans.
       lia.
@@ -2656,7 +2654,7 @@ Proof with eauto.
 
   (** Generalized goal *)
   + tauto.
-Admitted.
+Qed.
 
 Lemma WcbvEval_env_eval_env e e' :
   crctEnv e -> L3eval.WcbvEval_env e e' -> exists e'', eval_env (translate_env e) e''.
@@ -2732,3 +2730,6 @@ Proof with eauto.
 
   apply obs_prevervation.
 Qed.
+
+Print Assumptions obs_prevervation.
+Print Assumptions translate_correct'.

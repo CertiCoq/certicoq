@@ -134,7 +134,7 @@ Proof.
     destruct IHa. inv H0.
     * now exists (TLambda nm bod).
     * now exists (TFix dts m).
-    * now exists fn'.
+    * now exists TProof.
 Qed.
 
 Lemma WcbvEval_is_n_lam e n t t' : is_n_lambda n t = true -> WcbvEval e t t' -> is_n_lambda n t' = true.
@@ -172,7 +172,7 @@ Proof.
       pose proof (WcbvEval_single_valued w H1). subst s'.
       eapply wAppFix; eauto.
       pose proof (WcbvEval_single_valued w H1). subst s'.
-      eapply wAppCong; eauto. }
+      eapply wAppProof; eauto. }
     eapply (proj1 (IHa (TApp f t) s'' s)); eauto.
     eapply (proj2 (IHa (TApp s' t) s'' s)); eauto.
 
@@ -185,7 +185,7 @@ Proof.
       pose proof (WcbvEval_single_valued evf H1). subst s'.
       eapply wAppFix; eauto.
       pose proof (WcbvEval_single_valued evf H1). subst s'.
-      eapply wAppCong; eauto. }
+      eapply wAppProof; eauto. }
     eapply (proj1 (IHa _ _ s)). eauto.
     eapply (proj2 (IHa _ _ s)). eapply evs''. apply evapp.
 Qed.
@@ -608,10 +608,8 @@ Proof.
 
   - intros fn arg evprf IHev crcte crctt.
     intros.
-    apply Crct_invrt_App in H1.
-    constructor; intuition eauto. left.
-    destruct H1 as [fn' [arg' ->]]. do 2 eexists; reflexivity.
-    right; subst arg. simpl. reflexivity.
+    apply Crct_invrt_App in H1 as [Hfn Harg].
+    eapply wAppProof; eauto 4.
 
   - intros * evmch IHmch Hcase evcs IHcs crcte crctc.
     apply Crct_invrt_Case in crctc as [crctmch [crctbrs [crctann H']]].

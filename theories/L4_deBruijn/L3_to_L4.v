@@ -29,9 +29,9 @@ Fixpoint cst_offset (e : env) (s : string) : N :=
   | (c, e) :: tl => if string_eq_bool s c then 0 else 1 + cst_offset tl s
   end.
 
-(** Inductive environment, kept to record parameters of inductives 
-    and arities of constructors *)
-Definition ienv := list (string * nat * itypPack).
+(** Inductive environment, kept to record arities of constructors.
+    No more parameters by this stage. *)
+Definition ienv := list (string * itypPack).
 
 Definition map_terms (f : L3t.Term -> exp) :=
   fix map_terms (l : L3t.Terms) : exps :=
@@ -131,7 +131,9 @@ Definition translate_env (e : environ L3.compile.Term) : env :=
 Definition inductive_entry_aux {A} (x : string * envClass A) acc : ienv :=
   match x with
   | (s, ecTrm t) => acc
-  | (s, ecTyp _ pars pack) => (s, pars, pack) :: acc
+  | (s, ecTyp _ pars pack) =>
+    (* pars is always 0 in the output of L2k_noCstrParams *)
+    (s, pack) :: acc
   end.
 
 Definition inductive_env (e : environ L3.compile.Term) : ienv :=

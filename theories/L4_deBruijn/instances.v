@@ -407,8 +407,8 @@ Let certiL4_5_to_L5Val:
     apply haltContAp.
   Qed.
 
-            
-  Require Import SquiggleEq.LibTactics.
+  Import SquiggleEq.LibTactics.
+
   Lemma certiL4_5_to_L5Correct:
     CerticoqTranslationCorrect certiL4_5 certiL5.
   Proof.

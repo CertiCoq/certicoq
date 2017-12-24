@@ -206,7 +206,7 @@ Lemma TApp_hom:
     strip (L2d.compile.TApp fn arg) =
     match CanonicalP strip fn (strip arg) with
     | None => TApp (strip fn) (strip arg)
-    | Some (i, m, args, npars, nargs) => etaExpand i m args npars nargs
+    | Some (F, args, npars, nargs) => etaExpand F args npars nargs
     end.
 Proof.
   reflexivity.
@@ -266,7 +266,7 @@ Proof.
 Qed.
  ************)
 
-
+(*****
 Lemma not_isApp_nLambda:
   forall F,
     (forall ts, ~ isApp (F ts)) ->
@@ -290,7 +290,6 @@ Admitted.
 Qed.
  *****************)   
 
-(*********************
   destruct t; cbn; intros h;
     destruct h as [x0 [x1 [x2 h]]]; try discriminate; auto.
   destruct n0.
@@ -1233,13 +1232,13 @@ Proof.
     rewrite dcons_hom. rewrite dcons_hom. rewrite instantiateDs_dcons.
     rewrite <- H; trivial. rewrite H0; trivial.
 Qed.
- *****************)
 
 Lemma nLambda_isLambda:
   forall np F, exists G, (nLambda (S np) F) = fun b => TLambda nAnon (G b).
 Proof.
   induction np; intros; cbn; exists F; reflexivity.
 Qed.
+ *****************)
 
 Lemma TLambda_hom:
   forall nm bod,

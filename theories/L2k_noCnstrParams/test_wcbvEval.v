@@ -79,18 +79,22 @@ Fixpoint Plus1 (n : nat): nat :=
     | 0 => 1
     | S p => S (Plus1 p)
   end.
-Definition Plus1x := (Plus1 3).
+Definition Plus1x := (Plus1 2).
+Compute Plus1x.
 Quote Recursively Definition cbv_Plus1x :=
   ltac:(let t:=(eval cbv in Plus1x) in exact t).
+Print cbv_Plus1x.
 Definition ans_Plus1x :=
   Eval cbv in (main (program_Program cbv_Plus1x)).
+Print ans_Plus1x.
 (* [program] of the program *)
 Quote Recursively Definition p_Plus1x := Plus1x.
 Definition P_Plus1x := Eval cbv in (program_Program p_Plus1x).
+Print P_Plus1x.
 Goal
   let env := (env P_Plus1x) in
   let main := (main P_Plus1x) in
-  wcbvEval (env) 90 (main) = Ret ans_Plus1x.
+  wcbvEval env 90 main = Ret ans_Plus1x.
   vm_compute. reflexivity.
 Qed.
 
@@ -169,7 +173,7 @@ Goal
 Qed.
 
 
-(*******)
+(*** testing eta and params ****)
 Set Printing Width 80.
 Quote Recursively Definition p_0 := 0.
 Definition oldP_0 := Eval cbv in (main (L2d.compile.program_Program p_0)).

@@ -213,15 +213,15 @@ Proof.
     destruct s. cbn in *. destruct H. split.
     + eapply (proj1 WFapp_hom). assumption.
     + apply (WFaEnv_hom H0).
-  - unfold obsPreserving. intros s sv _ Hev.
+  - unfold obsPreserving. intros s sv Hwf Hev.
     destruct s as [smain senv], sv as [svmain svenv]. cbn.
     destruct Hev as [Hev HevEnv]. subst svenv.
     exists (stripProgram {| main := svmain; env := senv |}).
+    hnf in Hwf. destruct Hwf as [Hwfe Hwf].
     split. split.
-    + cbn. refine (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev _).
-      * admit.
-      * admit.
+    + cbn. refine (proj1 (stripEvalCommute.WcbvEval_hom _) _ _ Hev _); auto.
     + reflexivity.
-    + apply compileObsEq.
-Admitted.
+    + simpl. apply compileObsEq.
+      eapply wcbvEval.wcbvEval_pres_WFapp; eauto.
+Qed.
 Print Assumptions certiL1g_to_L2Correct.

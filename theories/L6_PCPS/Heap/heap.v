@@ -15,10 +15,8 @@ Close Scope Z_scope.
 
 Module Type Heap.
 
-  Parameter loc : Type.
-
-  Parameter loc_dec : forall (l1 l2 : loc), { l1 = l2 } + { l1 <> l2 }.
-
+  Definition loc := positive.
+  
   Parameter heap : Type -> Type. 
   
   Parameter emp : forall {A : Type}, heap A.
@@ -145,6 +143,12 @@ End Heap.
 Module HeapLemmas (H : Heap).
 
   Import H.
+
+  Lemma loc_dec : forall (l1 l2 : loc), { l1 = l2 } + { l1 <> l2 }.
+  Proof.
+    intros l1 l2. 
+    eapply Pos.eq_dec.
+  Qed.
 
   Lemma alloc_subheap {A} (H1 H1' : heap A) l v :
     alloc v H1 = (l, H1') ->

@@ -22,41 +22,126 @@ Module ClosureConversionCorrect (H : Heap).
   
   Variable clo_tag : cTag.
 
-  Definition IG c p1 p2 :=
+
+  (* XXX maybe move *)
+  Fixpoint cost_alloc_ctx (c : exp_ctx) : nat :=
+    match c with
+      | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx c
+      | Eproj_c x t n y c => cost_alloc_ctx c
+      (* not relevant *)
+      | Efun1_c B c => cost_alloc_ctx c
+      | Eprim_c x p ys c => cost_alloc_ctx c
+      | Hole_c => 0
+      | Efun2_c f _ => cost_alloc_f_ctx f
+      | Ecase_c _ _ _ c _ => cost_alloc_ctx c
+    end
+  with
+  cost_alloc_f_ctx (f : fundefs_ctx) : nat :=
+    match f with
+      | Fcons1_c _ _ _ c _ => cost_alloc_ctx c
+      | Fcons2_c _ _ _ _ f => cost_alloc_f_ctx f
+    end.
+    
+  Lemma cost_alloc_ctx_comp_ctx_f C C' :
+    cost_alloc_ctx (comp_ctx_f C C') =
+    cost_alloc_ctx C + cost_alloc_ctx C'
+  with cost_alloc_comp_f_ctx_f f C' :
+    cost_alloc_f_ctx (comp_f_ctx_f f C') =
+    cost_alloc_f_ctx f + cost_alloc_ctx C'.
+  Proof.
+    - destruct C; simpl; try reflexivity;
+      try (rewrite cost_alloc_ctx_comp_ctx_f; omega).
+      rewrite cost_alloc_comp_f_ctx_f. omega.
+    - destruct f; simpl; try reflexivity.
+      rewrite cost_alloc_ctx_comp_ctx_f; omega.
+      rewrite cost_alloc_comp_f_ctx_f. omega.
+  Qed. 
+    
+  Definition FP c p1 p2 :=
     match p1, p2 with
       | (c1, m1), (c2, m2) =>
-        c1 + c <= c2 <= 4*(c1 + c) /\
+        c1 <= c2 + c <= 4*c1 /\
         m1 <= m2 <= 2*m1
     end.
   
-  Definition II m p1 p2 :=
+  Definition IP C p1 p2 :=
+    let m := cost_alloc_ctx C in 
     match p1, p2 with
       | (H1, rho1, e1), (H2, rho2, e2) =>
-        size_heap H1 + m <= size_heap H2 <= 2*(size_heap H1 + m) /\
+        size_heap H1 + m  <= size_heap H2 <= 2*(size_heap H1 + m) /\
         (forall m1 m2, size_reachable (env_locs rho1 (occurs_free e1)) H1 m1 ->
                   size_reachable (env_locs rho2 (occurs_free e2)) H2 m2 ->
                   m1 + m <= m2 <= 2*(m1 + m))
     end.
   
-  
+  Lemma FP_transfer (k c1 c2 c m1 m2 : nat) : 
+    FP (k + c) (c1, m1) (c2, m2) -> FP k (c1, m1) (c2 + c, m2).
+  Proof.
+    simpl. intros H. omega.
+  Qed.
 
+  Lemma ctx_to_heap_env_size_heap C rho1 rho2 H1 H2 c :
+    ctx_to_heap_env C H1 rho1 H2 rho2 c ->
+    size_heap H2 = size_heap H1 + cost_alloc_ctx C. 
+  Proof.
+    intros Hctx; induction Hctx; eauto.
+    simpl. rewrite IHHctx.
+    unfold size_heap.
+    erewrite (HL.size_with_measure_alloc _ _ _ H H');
+      [| reflexivity | eassumption ].
+    erewrite getlist_length_eq; [| eassumption ]. 
+    simpl. omega.
+  Qed.
+  
+  
+  Lemma ctx_to_heap_env_size_heap C rho1 rho2 H1 H2 c :
+    ctx_to_heap_env C H1 rho1 H2 rho2 c ->
+    size_heap H2 = size_heap H1 + cost_alloc_ctx C. 
+  Proof.
+    intros Hctx; induction Hctx; eauto.
+    simpl. rewrite IHHctx.
+    unfold size_heap.
+    erewrite (HL.size_with_measure_alloc _ _ _ H H');
+      [| reflexivity | eassumption ].
+    erewrite getlist_length_eq; [| eassumption ]. 
+    simpl. omega.
+  Qed.
+
+  Lemma IP_ctx_to_heap_env
+        (H1 H2 H2' : heap block) (rho1 rho2 rho2' : env)
+        (e1 e2 : exp) (C C' : exp_ctx) (c : nat) : 
+    IP C' (H1, rho1, e1) (H2, rho2, C |[ e2 ]|) ->
+    ctx_to_heap_env C H2 rho2 H2' rho2' c ->
+    IP (comp_ctx_f C' C) (H1, rho1, e1) (H2', rho2', e2).
+  Proof.
+    intros [HP1 Hp2] Hctx. unfold IP in *.
+    erewrite (ctx_to_heap_env_size_heap C rho2 rho2' H2 H2'); [| eassumption ].
+    rewrite cost_alloc_ctx_comp_ctx_f in *. simpl.
+    split.
+    - omega.
+    - 
+      + unfold size_heap.
+        erewrite (HL.size_with_measure_alloc _ _ _ H H') ; try eassumption. 
+          in Hpre by reflexivity.
+
+  
   (** Correctness of [Closure_conversion] *)
   Lemma Closure_conversion_correct (k : nat) (H1 H2 : heap block)
         (rho1 rho2 : env) (e1 e2 : exp) (C : exp_ctx)
         (Scope Funs : Ensemble var) (FVs : list var)
         (σ : var -> var) (c : cTag) (Γ : var) :
     (* [Scope] invariant *)
-    (H1, rho1) ⋞ ^ (Scope ; k ; II 0 ; IG 0) (H2, rho2) ->
+    (H1, rho1) ⋞ ^ (Scope ; k ; IP Hole_c ; FP 0) (H2, rho2) ->
     (* [Fun] invariant *)
-    Fun_inv k (II 0) (IG 0) rho1 H1 rho2 H2 Scope Funs σ c Γ ->
+    Fun_inv k (IP Hole_c) (FP 0) rho1 H1 rho2 H2 Scope Funs σ c Γ ->
     (* Free variables invariant *)
-    FV_inv k (II 0) (IG 0) rho1 H1 rho2 H2 Scope Funs c Γ FVs ->
+    FV_inv k (IP Hole_c) (FP 0) rho1 H1 rho2 H2 Scope Funs c Γ FVs ->
 
-    (* well formedness *)
+    (* well-formedness *)
     well_formed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
     (env_locs rho1 (occurs_free e1)) \subset dom H1 ->
-    well_formed (reach' H2 (env_locs rho2 (occurs_free e2))) H2 ->
-    (env_locs rho2 (occurs_free  (C |[ e2 ]|))) \subset dom H2 ->
+    well_formed (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) H2 ->
+    (env_locs rho2 (occurs_free (C |[ e2 ]|))) \subset dom H2 ->
 
     (* [Γ] (the current environment parameter) is not bound in e *)
     ~ In _ (bound_var e1) Γ ->
@@ -71,15 +156,19 @@ Module ClosureConversionCorrect (H : Heap).
 
     (* [e'] is the closure conversion of [e] *)
     Closure_conversion clo_tag Scope Funs σ c Γ FVs e1 e2 C ->
-    (e1, rho1, H1) ⪯ ^ (k ; II 0 ; IG 0 ; IG 0) (C |[ e2 ]|, rho2, H2).
+    (e1, rho1, H1) ⪯ ^ (k ; IP Hole_c ; IP Hole_c; FP 0 ; FP 0) (C |[ e2 ]|, rho2, H2).
   Proof with now eauto with Ensembles_DB.
     revert H1 H2 rho1 rho2 e1 e2 C Scope Funs FVs σ c Γ.
     induction k as [k IHk] using lt_wf_rec1.
     intros H1 H2 rho1 rho2 e1 e2 C Scope Funs FVs σ c Γ
-           Henv Hnin HFVs Hun Hinj Hd Hfun Hfv Hcc.
+           Henv Hnin HFVs Hwf1 Hlocs1 Hwf2 Hlos2 Hun Hinj Hd Hfun Hfv Hcc.
     induction e1 using exp_ind'; try clear IHe1.
     - (* case Econstr *)
-      inv Hcc.
+      inv Hcc.      
+      eapply cc_approx_exp_right_ctx_compat;
+        [ exact FP_transfer | | eassumption | eassumption
+        | eassumption | eassumption | | ].  
+      
       admit.
     - (* case Ecase nil *)
       inv Hcc.

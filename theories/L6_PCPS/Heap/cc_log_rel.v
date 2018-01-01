@@ -2069,14 +2069,29 @@ Module CC_log_rel (H : Heap).
           ctx_to_heap_env C H (M.set x v rho)  H' rho'  c -> 
           
           ctx_to_heap_env (Eproj_c x t N y C) H rho H' rho' (c + costCC_ctx (Eproj_c x t N y C)).
+
+
+    Lemma comp_ctx_f_Hole_c C :
+      comp_ctx_f C Hole_c = C
+    with comp_f_ctx_f_Hole_c f : 
+     comp_f_ctx_f f Hole_c = f.
+    Proof.
+      - destruct C; simpl; eauto;
+        try (rewrite comp_ctx_f_Hole_c; reflexivity). 
+        rewrite comp_f_ctx_f_Hole_c. reflexivity.
+      - destruct f; simpl; eauto.
+        rewrite comp_ctx_f_Hole_c; reflexivity.
+        rewrite comp_f_ctx_f_Hole_c. reflexivity.
+    Qed.
     
+
     Lemma cc_approx_exp_right_ctx_compat 
-          (k : nat) rho1 rho2 rho2' H1 H2 H2' e1 C e2 c c' (II : exp_ctx -> IInv)
+          (k : nat) rho1 rho2 rho2' H1 H2 H2' e1 C C' e2 c c' (II : exp_ctx -> IInv)
           (IInvCtxCompat :
              forall H1 H2 H2' rho1 rho2 rho2' e1 e2 C C' c, 
-               II (comp_ctx_f C C') (H1, rho1, e1) (H2, rho2, C |[ C' |[ e2 ]| ]|) ->
+               II C' (H1, rho1, e1) (H2, rho2, C |[ e2 ]|) ->
                ctx_to_heap_env C H2 rho2 H2' rho2' c ->
-               II C' (H1, rho1, e1) (H2', rho2', C' |[ e2 ]|)) :
+               II (comp_ctx_f C' C) (H1, rho1, e1) (H2', rho2', e2)) :
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) H2 ->
@@ -2084,12 +2099,16 @@ Module CC_log_rel (H : Heap).
       (env_locs rho2 (occurs_free (C |[ e2 ]|))) \subset dom H2 ->
 
       ctx_to_heap_env C H2 rho2 H2' rho2' c' ->
-      (e1, rho1, H1) ⪯ ^ (k; II Hole_c ; IIG ; ILi (c' + c) ; IG) (e2, rho2', H2') ->
-      (e1, rho1, H1) ⪯ ^ (k ; II C ; IIG ; ILi c ; IG) (C |[ e2 ]|, rho2, H2).
+      (e1, rho1, H1) ⪯ ^ (k; II (comp_ctx_f C' C) ; IIG ; ILi (c' + c) ; IG) (e2, rho2', H2') ->
+      (e1, rho1, H1) ⪯ ^ (k ; II C' ; IIG ; ILi c ; IG) (C |[ e2 ]|, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hwf1 Hwf2 Henv1 Henv2 Hctx. revert c. induction Hctx; intros c1 Hpre.
+      intros Hwf1 Hwf2 Henv1 Henv2 Hctx. revert c C'. induction Hctx; intros c1 C' Hpre.
       - intros ? ? ? ? ? ? ? ? ? ? ? ? ?. eapply Hpre; eauto.
-      - rewrite <- plus_assoc in Hpre. eapply IHHctx in Hpre.
+        rewrite comp_ctx_f_Hole_c. eassumption.
+      - rewrite <- plus_assoc in Hpre.
+        replace (Econstr_c x t ys C) with (comp_ctx_f (Econstr_c x t ys Hole_c) C) in Hpre by reflexivity.
+        rewrite <- comp_ctx_f_assoc with (c2 := Econstr_c x t ys Hole_c) in Hpre. 
+        eapply IHHctx in Hpre.
         intros H1' H2' rho1' rho2' v1 k1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
         edestruct heap_env_equiv_env_getlist as [vs' [Hlst Hall]]; try eassumption.
         simpl. normalize_occurs_free...
@@ -2154,7 +2173,10 @@ Module CC_log_rel (H : Heap).
           eapply Included_Union_compat. reflexivity.
           eapply Included_trans; [| eassumption ].
           eapply env_locs_monotonic. simpl. normalize_occurs_free...
-      - rewrite <- plus_assoc in Hpre. eapply IHHctx in Hpre.
+      - rewrite <- plus_assoc in Hpre.
+        replace (Eproj_c x t N y C) with (comp_ctx_f (Eproj_c x t N y Hole_c) C) in Hpre by reflexivity.
+        rewrite <- comp_ctx_f_assoc with (c2 := Eproj_c x t N y Hole_c) in Hpre. 
+        eapply IHHctx in Hpre.
         intros H1' H2' rho1' rho2' v1 k1 m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
         eapply Heq2 in H0; [| now constructor ].
         edestruct H0 as [l' [Hget' Heql]].
@@ -2207,7 +2229,7 @@ Module CC_log_rel (H : Heap).
           eapply Included_trans; [| eassumption ].
           eapply env_locs_monotonic. simpl. normalize_occurs_free...
     Qed.
-
+    
     Definition size_reachable (S : Ensemble loc) (H1 : heap block) (s : nat ) : Prop :=
       exists H2, live S H1 H2 /\ size H2 = s. 
 

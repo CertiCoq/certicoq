@@ -2178,43 +2178,89 @@ Module HeapDefs (H : Heap) .
   (*     * eexists. split; [| eassumption ]. omega. *)
   (* Qed. *)
 
-  Lemma reach_n_fixed_point_aux S H m :
-    Decidable (reach_n H m S) ->
-    (post H ^ (m + 1)) S \\ reach_n H m S <--> Empty_set _ ->
-    reach_n H (m + 1) S <--> reach_n H m S.  
-  Proof.
-    intros Hdec Heq.
+  Lemma reach_0 S H :
+    reach_n H 0 S <--> S.
+  Proof.  
     split.
-    - intros x Hin. destruct Hin as [k [Hleq Hin]].
-      destruct (NPeano.Nat.eq_dec k (m + 1)); subst.
-      + destruct Hdec. destruct (Dec x); eauto.
-        exfalso. eapply not_In_Empty_set.
-        eapply Heq. constructor; eauto.
-      + eexists. split; [| eassumption ]. omega.
-    - intros x Hin. destruct Hin as [k [Hleq Hin]].
-      eexists. split; [| eassumption ]. omega.
+    - intros x [y [H1 H2]].
+      destruct y; try omega. eauto.
+    - intros y Hin. eexists 0. split; eauto.
   Qed.
 
+  Lemma reach_n_monotonic S H m n :
+    m <= n ->
+    reach_n H m S \subset reach_n H n S.
+  Proof. 
+    revert n S. induction m; intros n S Hleq.
+    - rewrite reach_0. eapply reach_n_extensive.
+    - destruct n. omega.
+      rewrite !reach_n_unfold.
+      eapply Included_Union_compat. reflexivity.
+      eapply IHm. omega.
+  Qed.
+
+  Lemma reach_n_fixed_point_aux S H m :
+    (post H ^ (m + 1)) S \subset (reach_n H m S) ->
+    reach_n H (m + 1) S <--> reach_n H m S.  
+  Proof.
+    intros Hsub. 
+    split.
+    - intros x Hin. destruct Hin as [k [Hleq Hin]].
+      edestruct le_lt_eq_dec as [Hlt | Heq]; eauto.
+      + eexists k.
+        split. omega.
+        repeat eexists; try eassumption.
+      + subst. eapply Hsub.
+        eassumption.
+    - eapply reach_n_monotonic. omega.
+  Qed.
+  
+  Lemma post_fixed_aux S H m n :
+    (post H ^ (m + 1)) S \subset reach_n H m S ->
+    (post H ^ (n + m + 1)) S \subset reach_n H m S.  
+  Proof.
+    revert m S. induction n; eauto; intros m S Hsub.
+    simpl.
+    intros x [y [b [Hin1 [Hget Hin2]]]]. 
+    eapply IHn in Hin1; [| eassumption ].
+    destruct Hin1 as [k [Hleq Hin]].
+    edestruct le_lt_eq_dec as [Hlt | Heq]; eauto.
+    - eexists (1 + k).
+      split. omega.
+      repeat eexists; try eassumption.
+    - subst. eapply Hsub.
+      replace (m + 1) with (1 + m) by omega.
+      simpl. eexists. repeat eexists; try eassumption.
+  Qed.
+
+  Lemma post_fixed S H m n :
+    (post H ^ (m + 1)) S \subset reach_n H m S ->
+    n >= m ->
+    (post H ^ n) S \subset reach_n H m S.  
+  Proof.
+    intros Hsub1 Hleq.
+    (* edestruct le_lt_eq_dec as [Hlt | Heq]; eauto. *)
+    edestruct NPeano.Nat.le_exists_sub as [n' [Hsum Hleq']]; subst. eassumption.
+    subst.
+    destruct n'.
+    - simpl. intros x Hin. eexists; eauto.
+    - replace (Datatypes.S n' + m) with (n' + m + 1) by omega.
+      eapply post_fixed_aux. eassumption.
+  Qed.
+  
   Lemma reach_n_fixed_point S H m n :
-    Decidable (reach_n H m S) ->
-    (post H ^ (m + 1)) S \\ reach_n H m S <--> Empty_set _ ->
+    (post H ^ (m+1)) S \subset reach_n H m S ->
     reach_n H (n + m) S <--> reach_n H m S.  
   Proof.
-    intros Hdec Heq. induction n.
+    revert m. induction n; intros m Hsub.
     - reflexivity.
-    - replace (Datatypes.S n + m)  with (n + m + 1) by omega.
-      rewrite reach_S_n. rewrite IHn. 
-  (*     intros x Hin. destruct Hin as [k [Hleq Hin]]. *)
-  (*     destruct (NPeano.Nat.eq_dec k (m + 1)); subst. *)
-  (*     + destruct Hdec. destruct (Dec x); eauto. *)
-  (*       exfalso. eapply not_In_Empty_set. *)
-  (*       eapply Heq. constructor; eauto. *)
-  (*     + eexists. split; [| eassumption ]. omega. *)
-  (*   - intros x Hin. destruct Hin as [k [Hleq Hin]]. *)
-  (*     eexists. split; [| eassumption ]. omega. *)
-  (* Qed. *)
-  Abort.
-  
+    - replace (Datatypes.S n + m)  with ((n + m) + 1) by omega.
+      rewrite reach_n_fixed_point_aux.
+      eapply IHn. 
+      eassumption. eapply Included_trans. eapply post_fixed_aux.
+      eassumption. eapply reach_n_monotonic. omega.
+  Qed.
+
   Lemma dfs_correct (S  : Ensemble loc) (s s' : PS.t) (H : heap block) (n m: nat) :
     (post H ^ (m+1)) S \\ reach_n H m S <--> FromSet s ->
     reach_n H m S <--> FromSet s' ->
@@ -2229,8 +2275,13 @@ Module HeapDefs (H : Heap) .
       eapply Decidable_FromSet. 
     - destruct (PS.cardinal s) eqn:Hcar.
       + rewrite FromSet_cardinal_empty in Heq1; [| eassumption ].
-        rewrite <- Heq2. 
-        admit. 
+        rewrite <- Heq2.
+        replace (Datatypes.S (n + 1 + m)) with ((n + 2) + m) by omega. 
+        rewrite reach_n_fixed_point. reflexivity.
+        eapply Setminus_Included_Empty_set_l.
+        eapply Decidable_Same_set. symmetry. eassumption.
+        eapply Decidable_FromSet.
+        destruct Heq1. eassumption. 
       + assert (Heq : reach_n H (m + 1) S <--> FromSet (PS.union s' s)).
         { rewrite FromSet_union. rewrite <- Heq1, <- Heq2.
           rewrite Union_Setminus_Included; try reflexivity.
@@ -2261,7 +2312,8 @@ Module HeapDefs (H : Heap) .
           destruct H0 as [y [b [Hin' [Hget Hl]]]]. inv Hin'.
           exists y, b. split; eauto.
         * rewrite <- Heq. reflexivity.
-  Admitted.
-        
+  Qed.
+  
+  
 
 End HeapDefs.

@@ -164,7 +164,7 @@ Module HeapDefs (H : Heap) .
     end.
   
   Definition reach_set (H : heap block) (s : PS.t) : PS.t :=
-    dfs s PS.empty H (size_heap H).
+    dfs s PS.empty H (size H).
 
   (* TODO move *)
 
@@ -2314,6 +2314,218 @@ Module HeapDefs (H : Heap) .
         * rewrite <- Heq. reflexivity.
   Qed.
   
+  Inductive path (H : heap block) : list loc -> loc -> nat -> Prop :=
+  | Path_Singl :
+      forall ld,
+        path H [] ld 0
+  | Path_Multi :
+      forall l ls ld n b,
+        path H ls l n ->
+        ~ List.In l ls ->
+        get l H = Some b ->
+        ld \in locs b ->
+        path H (l :: ls) ld (S n).
   
+  Lemma path_NoDup H ls ld n : 
+    path H ls ld n -> NoDup ls.
+  Proof.
+    intros Hp; induction Hp; constructor; eauto.
+  Qed.
 
+  Lemma path_length H ls ld n :
+    path H ls ld n -> length ls = n.
+  Proof.
+    intros Hp; induction Hp; eauto.
+    simpl. congruence.
+  Qed.
+
+  Lemma Sublist_cons_app A (x : A) l l1 l2 :
+    Sublist l (l1 ++ (x :: l2)) ->
+    ~ List.In x l ->
+    Sublist l (l1 ++ l2).
+  Proof.
+    revert l l2 x. induction l1; intros l l2 x Hsub Hnin; simpl in *.
+    - inv Hsub; eauto.
+      exfalso; eapply Hnin; constructor; eauto.
+    - inv Hsub.
+      + eapply sublist_cons. eapply IHl1; eauto.
+      + eapply sublist_skip. eapply IHl1; eauto.
+        intros Hin. eapply Hnin. constructor 2.
+        eassumption.
+  Qed.
+
+  Lemma path_heap_elements H ls ld n :
+    path H ls ld n ->
+    Subperm ls (map fst (heap_elements H)).
+  Proof.
+    intros Hp; induction Hp.
+    - eexists; split; [| reflexivity ].
+      eapply Sublist_nil.
+    - destruct IHHp as [elems [Hsub Hperm]].
+      eapply heap_elements_complete in H1.
+      eapply in_map with (f := fst) in H1.
+      eapply Permutation.Permutation_in in H1; [| symmetry ; eassumption ].
+      edestruct in_split as [l1 [l2 Heq]]; eauto.
+      rewrite Heq in *. simpl in *.
+      eexists (l :: l1 ++ l2).
+      split.
+      + eapply sublist_skip. eapply Sublist_cons_app; eauto.
+      + eapply Permutation.Permutation_trans; try eassumption.
+        eapply Permutation.Permutation_cons_app. reflexivity.
+  Qed.
+
+  Lemma path_post_n H l ls ld n :
+    path H (ls ++ [l]) ld n ->
+    ld \in ((post H ^ n) [set l]).
+  Proof.
+    revert n ld; induction ls; intros n ld Hp; inv Hp.
+    - simpl. inv H2. repeat eexists; eauto.
+    - do 2 eexists. split.
+      + eapply IHls. eassumption.
+      + split; eauto.
+  Qed.
+
+  Lemma path_prev H l1 l2 l l' m:
+    path H (l1 ++ l :: l2) l' m ->
+    path H l2 l (length l2) /\ ~ List.In l l2.
+  Proof.
+    revert l' m; induction l1; simpl; intros l' m Hpath; inv Hpath.
+    - erewrite <- path_length in H2; eauto.
+    - eapply IHl1. simpl. eassumption.
+  Qed.
+
+  Lemma destruct_last {A} (l : list A) :
+    l = [] \/ (exists l' x, l = l' ++ [x]). 
+  Proof.
+    induction l; eauto.
+    - right. destruct IHl as [Hnil | [l' [x Hsnoc]]]; subst.
+      + eexists [], a. reflexivity.
+      + eexists (a :: l'), x. reflexivity.
+  Qed.
+
+  Lemma app_snoc {A} (l1 l2 : A) (ls1 ls2 : list A) :
+    ls1 ++ [l1] = ls2 ++ [l2] -> l1 = l2.
+  Proof.
+    revert ls2. induction ls1; intros ls2 Heq.
+    - destruct ls2. inv Heq; eauto.
+      simpl in Heq. destruct ls2.
+      now inv Heq. now inv Heq.
+    - destruct ls2.
+      * simpl in Heq; subst.
+        destruct ls1.
+        now inv Heq. now inv Heq.
+      * inv Heq. eapply IHls1; eauto.
+  Qed.
+    
+
+  Lemma post_path_n (S : Ensemble loc) H ld n :
+    ld \in (post H ^ (1 + n)) S ->
+    exists l ls m, l \in S /\ m <= (1 + n) /\ path H (ls ++ [l]) ld m.
+  Proof.
+    revert ld; induction n; intros ld Hpost.
+    - destruct Hpost as [l' [v [Hin1 [Hget Hin2]]]]. simpl in *.
+      exists l', [], 1. repeat split; eauto. simpl.
+      econstructor. now constructor.
+      now intros Hc; inv Hc. eassumption. eassumption.
+    - destruct Hpost as [l' [v [Hin1 [Hget Hpost]]]].
+      eapply IHn in Hin1. edestruct Hin1 as [l'' [ls [m [Hin [Hleq Hpath]]]]].
+      destruct (in_dec loc_dec l' (ls ++ [l''])) as [Hinl | Hninl].
+      + edestruct in_split as [ll [lr Happ]]; try eassumption.
+        destruct (destruct_last lr) as [| [lr' [r Heq]]]; subst.
+        * simpl in Happ. assert (l' = l'') by (eapply app_snoc; eauto). subst.
+          eexists l'', [], 1. repeat split; eauto. omega.
+          simpl. econstructor; eauto. now constructor.
+        * assert (l'' = r).
+          { replace (ll ++ l' :: lr' ++ [r]) with ((ll ++ l' :: lr') ++ [r]) in Happ
+              by (rewrite <- app_assoc; reflexivity).
+            eapply app_snoc; eauto. }
+          subst. rewrite Happ in Hpath.
+          erewrite <- path_length with (n := m) in Hleq, Hpath; eauto.
+          eapply path_prev in Hpath; destruct Hpath as [Hpath Hnin].
+          exists r, (l' :: lr'), (length (l' :: lr' ++ [r])).
+          repeat split; eauto. 
+          simpl. rewrite !app_length.
+          repeat (simpl in Hleq; rewrite !app_length in Hleq).
+          simpl in *. omega. 
+          simpl. econstructor; eauto. 
+      + eexists l'', (l' :: ls), (1 + m). 
+        split; eauto. split. omega.
+        econstructor; eauto.
+  Qed.
+
+  Lemma post_n_set_monotonic n (H : heap block) (S1 S2 : Ensemble loc) :
+    S1 \subset S2 -> (post H ^ n) S1 \subset (post H ^ n) S2.
+  Proof.
+    induction n; simpl; eauto with Ensembles_DB.
+    intros Hsub. eapply Included_trans.
+    eapply post_set_monotonic. now eauto.
+    reflexivity.
+  Qed.
+
+  Lemma size_heap_fixed_point S H:
+   (post H ^ (1 + (size H))) S \subset reach_n H (size H) S.
+  Proof.
+    intros x Hpost. 
+    edestruct post_path_n as [lr [ls [len [Hin [Hleq Hpath]]]]]. 
+    eassumption.
+    edestruct le_lt_eq_dec as [Hlt | Heq]; eauto.
+    - eapply path_post_n in Hpath.
+      eexists len. split; eauto. omega.
+      eapply post_n_set_monotonic; try eassumption.
+      eapply Singleton_Included. eassumption.
+    - erewrite <- (path_length _ _ _ len) in Heq, Hpath; eauto.
+      subst. eapply path_heap_elements in Hpath.
+      eapply Subperm_length in Hpath. rewrite map_length in Hpath. 
+      rewrite Heq in Hpath. unfold size in Hpath. omega.
+  Qed.
+
+  Lemma reach_n_size_H_fixed_point S H n :
+    n >= size H ->
+    reach_n H n S <--> reach' H S.
+  Proof.
+    split.
+    - intros x [m [Hleq Hin]]. eexists. split; eauto.
+      now constructor.
+    - intros x [m [_ Hin]].
+      destruct (le_lt_dec m (size H)).
+      + eexists m; split; eauto. omega.
+      + eapply reach_n_monotonic. now eauto.
+        eapply post_fixed; [| | eassumption ]; try omega.
+        replace (size H + 1) with (1 + size H) by omega.
+        eapply size_heap_fixed_point.
+  Qed.
+
+  Lemma reach'_Empty_set H :
+    reach' H (Empty_set positive) <--> Empty_set _.
+  Proof.
+    split; [| now firstorder ].
+    intros x [n [_ Hin]].
+    revert x Hin. induction n; intros x Hin. simpl in Hin.
+    inv Hin. 
+    destruct Hin as [y [v [Hin [Hget Hin']]]].
+    eapply IHn in Hin. inv Hin.
+  Qed.
+
+  Lemma reach_set_correct S s H :
+    FromSet s <--> S ->
+    FromSet (reach_set H s) <--> reach' H S.
+  Proof.
+    intros Heq. 
+    unfold reach_set.
+    unfold dfs. destruct (size H) eqn:Hs.
+    - rewrite FromSet_union, FromSet_empty, Union_Empty_set_neut_r.
+      admit.
+    - destruct (PS.cardinal s) eqn:Hcard.
+      + rewrite FromSet_cardinal_empty in Heq; eauto.
+        rewrite <- Heq, FromSet_empty. rewrite reach'_Empty_set. reflexivity.
+      + rewrite dfs_correct with (m := 0).
+        * eapply reach_n_size_H_fixed_point. omega.
+        * rewrite FromSet_diff. simpl.
+          rewrite post_set_correct; [| symmetry; eassumption ].
+          rewrite FromSet_union, reach_0, FromSet_empty, Union_Empty_set_neut_l, Heq. 
+          reflexivity.
+        * rewrite FromSet_union, reach_0, FromSet_empty, Union_Empty_set_neut_l, Heq.
+          reflexivity.
+  Admitted.
+          
 End HeapDefs.

@@ -2151,32 +2151,6 @@ Module HeapDefs (H : Heap) .
       * eexists. split; [| eassumption ]. omega.
   Qed.
 
-  Lemma reach_comp S H m n :
-    reach_n H (m + n) S <--> reach_n H m (reach_n H n S).
-  Proof.
-    induction m; simpl.
-    - admit.
-    - replace (Datatypes.S (m + n)) with ((m + n) + 1) by omega.
-      replace (Datatypes.S m) with (m + 1) by omega.
-      rewrite !reach_S_n.
-  Abort.
-  (*     split. *)
-  (*   - intros x Hin. destruct Hin as [k [Hleq Hin]]. *)
-  (*     destruct (le_lt_dec n m). *)
-  (*     + destruct (le_lt_dec k n). eexists 0. *)
-  (*       split; eauto. omega. simpl. *)
-  (*       eexists. split; eassumption. *)
-  (*       eexists (k - n). split. *)
-  (*       omega.  *)
-  (*     +  *)
-  (*       subst. *)
-  (*       * now right. *)
-  (*     * left. eexists. split; [| eassumption ]. omega. *)
-  (*   + intros x Hin. destruct Hin as [ x Hin | x Hin]. *)
-  (*     * destruct Hin as [k [Hleq Hin]]. *)
-  (*       eexists. split; [| eassumption ]. omega. *)
-  (*     * eexists. split; [| eassumption ]. omega. *)
-  (* Qed. *)
 
   Lemma reach_0 S H :
     reach_n H 0 S <--> S.
@@ -2313,7 +2287,8 @@ Module HeapDefs (H : Heap) .
           exists y, b. split; eauto.
         * rewrite <- Heq. reflexivity.
   Qed.
-  
+
+  (** Reachability (shortest) paths *) 
   Inductive path (H : heap block) : list loc -> loc -> nat -> Prop :=
   | Path_Singl :
       forall ld,
@@ -2325,7 +2300,9 @@ Module HeapDefs (H : Heap) .
         get l H = Some b ->
         ld \in locs b ->
         path H (l :: ls) ld (S n).
-  
+
+  (** Lemmas about [path] *)
+
   Lemma path_NoDup H ls ld n : 
     path H ls ld n -> NoDup ls.
   Proof.
@@ -2337,21 +2314,6 @@ Module HeapDefs (H : Heap) .
   Proof.
     intros Hp; induction Hp; eauto.
     simpl. congruence.
-  Qed.
-
-  Lemma Sublist_cons_app A (x : A) l l1 l2 :
-    Sublist l (l1 ++ (x :: l2)) ->
-    ~ List.In x l ->
-    Sublist l (l1 ++ l2).
-  Proof.
-    revert l l2 x. induction l1; intros l l2 x Hsub Hnin; simpl in *.
-    - inv Hsub; eauto.
-      exfalso; eapply Hnin; constructor; eauto.
-    - inv Hsub.
-      + eapply sublist_cons. eapply IHl1; eauto.
-      + eapply sublist_skip. eapply IHl1; eauto.
-        intros Hin. eapply Hnin. constructor 2.
-        eassumption.
   Qed.
 
   Lemma path_heap_elements H ls ld n :
@@ -2393,30 +2355,6 @@ Module HeapDefs (H : Heap) .
     - erewrite <- path_length in H2; eauto.
     - eapply IHl1. simpl. eassumption.
   Qed.
-
-  Lemma destruct_last {A} (l : list A) :
-    l = [] \/ (exists l' x, l = l' ++ [x]). 
-  Proof.
-    induction l; eauto.
-    - right. destruct IHl as [Hnil | [l' [x Hsnoc]]]; subst.
-      + eexists [], a. reflexivity.
-      + eexists (a :: l'), x. reflexivity.
-  Qed.
-
-  Lemma app_snoc {A} (l1 l2 : A) (ls1 ls2 : list A) :
-    ls1 ++ [l1] = ls2 ++ [l2] -> l1 = l2.
-  Proof.
-    revert ls2. induction ls1; intros ls2 Heq.
-    - destruct ls2. inv Heq; eauto.
-      simpl in Heq. destruct ls2.
-      now inv Heq. now inv Heq.
-    - destruct ls2.
-      * simpl in Heq; subst.
-        destruct ls1.
-        now inv Heq. now inv Heq.
-      * inv Heq. eapply IHls1; eauto.
-  Qed.
-    
 
   Lemma post_path_n (S : Ensemble loc) H ld n :
     ld \in (post H ^ (1 + n)) S ->
@@ -2506,6 +2444,30 @@ Module HeapDefs (H : Heap) .
     eapply IHn in Hin. inv Hin.
   Qed.
 
+  Lemma post_size_H_O S H :
+    size H = 0 ->
+    post H S <--> Empty_set _.
+  Proof.
+    intros Heq.
+    split; intros x.
+    - intros [y [v [Hin [Hget Hin']]]].
+      unfold size in Heq. eapply length_zero_iff_nil in Heq.
+      eapply heap_elements_complete in Hget.
+      rewrite Heq in Hget. inv Hget.
+    - intros Hin; inv Hin.
+  Qed.
+
+  Lemma reach_size_H_O S H :
+    size H = 0 ->
+    reach' H S <--> S.
+  Proof.
+    rewrite reach_unfold. intros Heq.
+    rewrite post_size_H_O; eauto. 
+    rewrite reach'_Empty_set.
+    rewrite Union_Empty_set_neut_r.
+    reflexivity.
+  Qed.
+
   Lemma reach_set_correct S s H :
     FromSet s <--> S ->
     FromSet (reach_set H s) <--> reach' H S.
@@ -2514,7 +2476,7 @@ Module HeapDefs (H : Heap) .
     unfold reach_set.
     unfold dfs. destruct (size H) eqn:Hs.
     - rewrite FromSet_union, FromSet_empty, Union_Empty_set_neut_r.
-      admit.
+      rewrite reach_size_H_O; eauto.
     - destruct (PS.cardinal s) eqn:Hcard.
       + rewrite FromSet_cardinal_empty in Heq; eauto.
         rewrite <- Heq, FromSet_empty. rewrite reach'_Empty_set. reflexivity.
@@ -2526,6 +2488,6 @@ Module HeapDefs (H : Heap) .
           reflexivity.
         * rewrite FromSet_union, reach_0, FromSet_empty, Union_Empty_set_neut_l, Heq.
           reflexivity.
-  Admitted.
+  Qed.
           
 End HeapDefs.

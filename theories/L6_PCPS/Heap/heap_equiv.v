@@ -1673,7 +1673,7 @@ Module HeapEquiv (H : Heap).
   Lemma well_formed_respects_heap_env_equiv S H1 H2 rho1 rho2 :
     well_formed (reach' H1 (env_locs rho1 S)) H1 ->
     S |- (H1, rho1) ⩪ (H2, rho2) ->
-        well_formed (reach' H2 (env_locs rho2 S)) H2.
+    well_formed (reach' H2 (env_locs rho2 S)) H2.
   Proof.
     intros Hwf Heq l2 b2 [n [_ Hin]] Heq2.
     symmetry in Heq. 

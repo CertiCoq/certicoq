@@ -94,18 +94,18 @@ Module ClosureConversionCorrect (H : Heap).
   Qed.
   
   
-  Lemma ctx_to_heap_env_size_heap C rho1 rho2 H1 H2 c :
-    ctx_to_heap_env C H1 rho1 H2 rho2 c ->
-    size_heap H2 = size_heap H1 + cost_alloc_ctx C. 
-  Proof.
-    intros Hctx; induction Hctx; eauto.
-    simpl. rewrite IHHctx.
-    unfold size_heap.
-    erewrite (HL.size_with_measure_alloc _ _ _ H H');
-      [| reflexivity | eassumption ].
-    erewrite getlist_length_eq; [| eassumption ]. 
-    simpl. omega.
-  Qed.
+  (* Lemma ctx_to_heap_env_size_heap C rho1 rho2 H1 H2 c : *)
+  (*   ctx_to_heap_env C H1 rho1 H2 rho2 c -> *)
+  (*   size_heap H2 = size_heap H1 + cost_alloc_ctx C.  *)
+  (* Proof. *)
+  (*   intros Hctx; induction Hctx; eauto. *)
+  (*   simpl. rewrite IHHctx. *)
+  (*   unfold size_heap. *)
+  (*   erewrite (HL.size_with_measure_alloc _ _ _ H H'); *)
+  (*     [| reflexivity | eassumption ]. *)
+  (*   erewrite getlist_length_eq; [| eassumption ].  *)
+  (*   simpl. omega. *)
+  (* Qed. *)
 
   Lemma IP_ctx_to_heap_env
         (H1 H2 H2' : heap block) (rho1 rho2 rho2' : env)

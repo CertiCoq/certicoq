@@ -2,8 +2,9 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import Coq.PArith.PArith Coq.MSets.MSetRBT Coq.Classes.Morphisms.
-From L6 Require Import tactics.
+From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
+         Relations.Relations Lists.List Lists.SetoidList.
+From L6 Require Import tactics Ensembles_util.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 
@@ -277,4 +278,111 @@ Instance union_proper_r x :  Proper (Equal ==> Equal) (union x).
 Proof.
   constructor; intros Hin; apply_set_specs_ctx; apply_set_specs; eauto;
   right; apply H; eauto.
+Qed.
+
+
+(** * Coercion from set *)
+
+Definition FromSet (s : PS.t) : Ensemble positive :=
+  FromList (elements s).
+
+Lemma FromSet_union s1 s2 :
+  FromSet (PS.union s1 s2) <--> FromSet s1 :|: FromSet s2.
+Proof.
+  unfold FromSet, FromList. split; intros x Hin; unfold Ensembles.In in *; simpl in *.
+  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances. 
+    eapply PS.elements_spec1 in Hin. eapply PS.union_spec in Hin.
+    inv Hin; [ left | right ]; unfold In; simpl.
+    + assert (HinA: InA Logic.eq x (PS.elements s1)).
+      { eapply PS.elements_spec1. eassumption. }
+      eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
+    + assert (HinA: InA Logic.eq x (PS.elements s2)).
+      { eapply PS.elements_spec1. eassumption. }
+      eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
+  - assert (HinA: InA Logic.eq x (PS.elements (PS.union s1 s2))).
+    { eapply PS.elements_spec1. eapply PS.union_spec.
+      inv Hin; unfold Ensembles.In in *; simpl in *.
+      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances. 
+        eapply PS.elements_spec1 in H. now left.
+      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances. 
+        eapply PS.elements_spec1 in H. now right. }
+    eapply InA_alt in HinA. destruct HinA as [y [Heq Hin']]. subst; eauto.
+Qed.
+
+Lemma FromSet_diff s1 s2 :
+  FromSet (PS.diff s1 s2) <--> FromSet s1 \\ FromSet s2.
+Proof.
+  unfold FromSet, FromList. split; intros x Hin; unfold Ensembles.In in *; simpl in *.
+  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances. 
+    eapply PS.elements_spec1 in Hin. eapply PS.diff_spec in Hin.
+    inv Hin. constructor.
+    + assert (HinA: InA Logic.eq x (PS.elements s1)).
+      { eapply PS.elements_spec1. eassumption. }
+      eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
+    + intros Hin. simpl in Hin. unfold Ensembles.In in Hin.
+      eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances.
+      eapply PS.elements_spec1 in Hin; eauto.
+  - assert (HinA: InA Logic.eq x (PS.elements (PS.diff s1 s2))).
+    { eapply PS.elements_spec1. eapply PS.diff_spec.
+      inv Hin; unfold Ensembles.In in *; simpl in *. split.
+      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances. 
+        eapply PS.elements_spec1 in H. eassumption.
+      + intros Hin. eapply PS.elements_spec1 in Hin.
+        eapply InA_alt in Hin. destruct Hin as [y [Heq Hin]].
+        subst; eauto. }
+    eapply InA_alt in HinA. destruct HinA as [y [Heq Hin']]. subst; eauto.
+Qed.
+
+Lemma FromSet_add x s :
+  FromSet (PS.add x s) <-->  x |: FromSet s.
+Proof.
+  unfold FromSet, FromList. split; intros z Hin; unfold Ensembles.In in *; simpl in *.
+  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances. 
+    eapply PS.elements_spec1 in Hin. eapply PS.add_spec in Hin.
+    inv Hin; [ left | right ]; unfold In; simpl.
+    + reflexivity.
+    + assert (HinA: InA Logic.eq z (PS.elements s)).
+      { eapply PS.elements_spec1. eassumption. }
+      eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
+  - assert (HinA: InA Logic.eq z (PS.elements (PS.add x s))).
+    { eapply PS.elements_spec1. eapply PS.add_spec.
+      inv Hin; unfold Ensembles.In in *; simpl in *.
+      + left. inv H. reflexivity.
+      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances.
+        eapply PS.elements_spec1 in H. now right. }
+    eapply InA_alt in HinA. destruct HinA as [y [Heq Hin']]. subst; eauto.
+Qed.
+
+Lemma FromSet_union_list s l:
+  FromSet (union_list s l) <--> FromSet s :|: FromList l.
+Proof.
+  revert s; induction l; intros s; simpl.
+  - rewrite FromList_nil, Union_Empty_set_neut_r.
+    reflexivity.
+  - rewrite IHl, FromSet_add, FromList_cons, Union_assoc, (Union_commut (FromSet s) [set a]). 
+    reflexivity.
+Qed.
+
+Lemma FromSet_empty :
+  FromSet PS.empty <--> Empty_set _.
+Proof.
+  split; intros x Hin; now inv Hin.
+Qed.
+
+Lemma FromSet_cardinal_empty s :
+  PS.cardinal s = 0 -> FromSet s <--> Empty_set _.
+Proof.
+  rewrite PS.cardinal_spec. intros Hc.
+  split; intros x Hin; try now inv Hin. 
+  unfold FromSet, Ensembles.In, FromList in Hin.
+  eapply In_InA with (eqA := Logic.eq) in Hin;
+    eauto with typeclass_instances.
+  destruct (PS.elements s); try congruence.
+  now inv Hin. now inv Hc.
+Qed.
+
+Instance Decidable_FromSet (s : PS.t) : Decidable (FromSet s).
+Proof.
+  unfold FromSet.
+  eapply Ensembles_util.Decidable_FromList. 
 Qed.

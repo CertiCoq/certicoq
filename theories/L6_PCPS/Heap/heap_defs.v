@@ -35,8 +35,8 @@ Module HeapDefs (H : Heap) .
   (* A closure pair *)
   | Clos : value -> value -> block 
   (* The environment of a closure *)
-  (* Decoupled from the closure pair to capture sharing of environment between mutually
-   * recursive functions *)
+  (* Decoupled from the closure pair to capture sharing of environment
+     between mutually recursive functions *)
   | Env : env -> block.
 
   (** The result of evaluation *)
@@ -140,8 +140,7 @@ Module HeapDefs (H : Heap) .
     \bigcup_(m in (fun m => m <= n)) (((post H) ^ m) (Si)).
   
 
-  (** Computational definition of reachability *)
-
+  (** Computational definition of post set *)  
   Definition post_set (H : heap block) (s : PS.t) :=
     PS.fold (fun l r =>
                match get l H with
@@ -162,16 +161,10 @@ Module HeapDefs (H : Heap) .
             dfs (PS.diff roots' visited') visited' H n
         end
     end.
-  
+
+  (** Computational definition of reachable location *)
   Definition reach_set (H : heap block) (s : PS.t) : PS.t :=
     dfs s PS.empty H (size H).
-
-  (* TODO move *)
-
-  Definition FromSet (s : PS.t) : Ensemble positive :=
-    (* fun x => PS.In x s *)
-    FromList (set_util.PS.elements s).
-
 
   (* The to definitions should be equivalent. TODO: Do the proof *)
   Lemma reach_equiv H Si :
@@ -660,14 +653,6 @@ Module HeapDefs (H : Heap) .
 
   (** * Lemmas about [env_locs] *)
   
-  (* TODO move *)
-  Lemma image'_monotonic {A B} (S1 S2 : Ensemble A) (f : A -> option B) :
-    S1 \subset S2 ->
-    image' f S1 \subset image' f S2.
-  Proof.
-    firstorder.
-  Qed.
-
   (** Set monotonicity *)
   Lemma env_locs_monotonic S1 S2 rho :
     S1 \subset S2 ->
@@ -1066,36 +1051,8 @@ Module HeapDefs (H : Heap) .
     - rewrite Union_Empty_set_neut_r. inv Hdef.
       eassumption.
   Qed.
-
   
   (** * Lemmas about locs *)
-  
-  (* TODO move *)
-  Instance Decidable_FromList A (H : forall (x y : A), {x = y} + {x <> y}) (l : list A) :
-    Decidable (FromList l).
-  Proof.
-    constructor. intros x. induction l. 
-    - right. intros H1. inv H1. 
-    - destruct (H a x); subst.
-      + left. constructor. eauto.
-      + destruct IHl. left. now constructor 2.
-        right. intros Hc. inv Hc; eauto.
-  Qed.
-
-  (* TODO move *)
-  Instance Decidable_map_UnionList {A B : Type} (f : A -> Ensemble B) (H : forall x, Decidable (f x)) l :
-    Decidable (Union_list (map f l)).
-  Proof.
-    induction l; constructor.
-    - intros x; right; intros Hc; inv Hc.
-    - intros x. simpl.
-      destruct (H a) as [Hdec]. destruct (Hdec x); eauto.
-      + left. left. eassumption.
-      + destruct IHl as [Hdec']. destruct (Hdec' x).
-        left; right; eauto.
-        right; intros Hc.
-        inv Hc; contradiction. 
-  Qed.
   
   Instance Decidable_locs v : Decidable (locs v).
   Proof.
@@ -1361,8 +1318,6 @@ Module HeapDefs (H : Heap) .
     eexists; split; eauto.
     eapply reachable_closed; eauto.
   Qed.
-
-  (* TODO move *)
     
   Lemma getlist_in_dom (S : Ensemble var) (H : heap block) (rho : env)
         (ys : list var) (vs : list value) :
@@ -1833,22 +1788,7 @@ Module HeapDefs (H : Heap) .
         eapply env_locs_monotonic...
         intros Hc. inv Hc; eauto.
   Qed.  
-
-  (* TODO move *)
-  Lemma Forall2_nthN' (A B : Type) (R : A -> B -> Prop) (l1 : list A) 
-        (l2 : list B) (n : N) (v1 : A) (v2 : B):
-    Forall2 R l1 l2 ->
-    nthN l1 n = Some v1 ->
-    nthN l2 n = Some v2 ->
-    R v1 v2.
-  Proof.
-    intros Hall. revert n. induction Hall; intros n Hnth1 Hnth2.
-    - now inv Hnth1.
-    - destruct n.
-      + inv Hnth1. inv Hnth2. eassumption.
-      + eapply IHHall; eauto.
-  Qed. 
-
+  
   (** Lemmas about [Restrict_env] *)
 
   Lemma restrict_env_correct S s rho :
@@ -1899,100 +1839,6 @@ Module HeapDefs (H : Heap) .
     - intros Hin. inv Hin.
   Qed.
 
-  Lemma FromSet_union s1 s2 :
-    FromSet (PS.union s1 s2) <--> FromSet s1 :|: FromSet s2.
-  Proof.
-    unfold FromSet, FromList. split; intros x Hin; unfold In in *; simpl in *.
-    - eapply In_InA with (eqA := eq) in Hin; eauto with typeclass_instances. 
-      eapply PS.elements_spec1 in Hin. eapply PS.union_spec in Hin.
-      inv Hin; [ left | right ]; unfold In; simpl.
-      + assert (HinA: InA eq x (PS.elements s1)).
-        { eapply PS.elements_spec1. eassumption. }
-        eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
-      + assert (HinA: InA eq x (PS.elements s2)).
-        { eapply PS.elements_spec1. eassumption. }
-        eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
-    - assert (HinA: InA eq x (PS.elements (PS.union s1 s2))).
-      { eapply PS.elements_spec1. eapply PS.union_spec.
-        inv Hin; unfold In in *; simpl in *.
-        + eapply In_InA with (eqA := eq) in H; eauto with typeclass_instances. 
-          eapply PS.elements_spec1 in H. now left.
-        + eapply In_InA with (eqA := eq) in H; eauto with typeclass_instances. 
-          eapply PS.elements_spec1 in H. now right. }
-      eapply InA_alt in HinA. destruct HinA as [y [Heq Hin']]. subst; eauto.
-  Qed.
-
-  Lemma FromSet_diff s1 s2 :
-    FromSet (PS.diff s1 s2) <--> FromSet s1 \\ FromSet s2.
-  Proof.
-    unfold FromSet, FromList. split; intros x Hin; unfold In in *; simpl in *.
-    - eapply In_InA with (eqA := eq) in Hin; eauto with typeclass_instances. 
-      eapply PS.elements_spec1 in Hin. eapply PS.diff_spec in Hin.
-      inv Hin. constructor.
-      + assert (HinA: InA eq x (PS.elements s1)).
-        { eapply PS.elements_spec1. eassumption. }
-        eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
-      + intros Hin. simpl in Hin. unfold In in Hin.
-        eapply In_InA with (eqA := eq) in Hin; eauto with typeclass_instances.
-        eapply PS.elements_spec1 in Hin; eauto.
-    - assert (HinA: InA eq x (PS.elements (PS.diff s1 s2))).
-      { eapply PS.elements_spec1. eapply PS.diff_spec.
-        inv Hin; unfold In in *; simpl in *. split.
-        + eapply In_InA with (eqA := eq) in H; eauto with typeclass_instances. 
-          eapply PS.elements_spec1 in H. eassumption.
-        + intros Hin. eapply PS.elements_spec1 in Hin.
-          eapply InA_alt in Hin. destruct Hin as [y [Heq Hin]].
-          subst; eauto. }
-      eapply InA_alt in HinA. destruct HinA as [y [Heq Hin']]. subst; eauto.
-  Qed.
-
-  Lemma FromSet_add x s :
-    FromSet (PS.add x s) <-->  x |: FromSet s.
-  Proof.
-    unfold FromSet, FromList. split; intros z Hin; unfold In in *; simpl in *.
-    - eapply In_InA with (eqA := eq) in Hin; eauto with typeclass_instances. 
-      eapply PS.elements_spec1 in Hin. eapply PS.add_spec in Hin.
-      inv Hin; [ left | right ]; unfold In; simpl.
-      + reflexivity.
-      + assert (HinA: InA eq z (PS.elements s)).
-        { eapply PS.elements_spec1. eassumption. }
-        eapply InA_alt in HinA. destruct HinA as [y [Heq Hin]]. subst; eauto.
-    - assert (HinA: InA eq z (PS.elements (PS.add x s))).
-      { eapply PS.elements_spec1. eapply PS.add_spec.
-        inv Hin; unfold In in *; simpl in *.
-        + left. inv H. reflexivity.
-        + eapply In_InA with (eqA := eq) in H; eauto with typeclass_instances.
-          eapply PS.elements_spec1 in H. now right. }
-      eapply InA_alt in HinA. destruct HinA as [y [Heq Hin']]. subst; eauto.
-  Qed.
-
-  Lemma FromSet_union_list s l:
-    FromSet (union_list s l) <--> FromSet s :|: FromList l.
-  Proof.
-    revert s; induction l; intros s; simpl.
-    - rewrite FromList_nil, Union_Empty_set_neut_r.
-      reflexivity.
-    - rewrite IHl, FromSet_add, FromList_cons, Union_assoc, (Union_commut (FromSet s) [set a]). 
-      reflexivity.
-  Qed.
-      
-  Lemma FromSet_empty :
-    FromSet PS.empty <--> Empty_set _.
-  Proof.
-    split; intros x Hin; now inv Hin.
-  Qed.
-
-  Lemma FromSet_cardinal_empty s :
-    PS.cardinal s = 0 -> FromSet s <--> Empty_set _.
-  Proof.
-    rewrite PS.cardinal_spec. intros Hc.
-    split; intros x Hin; try now inv Hin. 
-    unfold FromSet, In, FromList in Hin.
-    eapply In_InA with (eqA := eq) in Hin;
-      eauto with typeclass_instances.
-    destruct (PS.elements s); try congruence.
-    now inv Hin. now inv Hc.
-  Qed.
 
   Lemma env_locs_Leaf :
     env_locs Maps.PTree.Leaf (Full_set var) <--> Empty_set _.
@@ -2120,22 +1966,7 @@ Module HeapDefs (H : Heap) .
     rewrite FromSet_empty. reflexivity.
   Qed.
 
-  Instance Decidable_FromSet (s : PS.t) : Decidable (FromSet s).
-  Proof.
-    unfold FromSet.
-    eapply Ensembles_util.Decidable_FromList. 
-  Qed.
 
-  Lemma Decidable_Same_set A (S1 S2 : Ensemble A) :
-    S1 <--> S2 ->
-    Decidable S1 ->
-    Decidable S2.
-  Proof.
-    intros Heq Hdec. constructor. intros x.
-    destruct Hdec. destruct (Dec x).
-    left; eapply Heq; eauto.
-    right; intros Hc; eapply H; eapply Heq; eauto.
-  Qed.
 
   Lemma reach_S_n S H m :
     reach_n H (m + 1) S <--> reach_n H m S :|: (post H ^ (m + 1)) S.
@@ -2213,7 +2044,6 @@ Module HeapDefs (H : Heap) .
     (post H ^ n) S \subset reach_n H m S.  
   Proof.
     intros Hsub1 Hleq.
-    (* edestruct le_lt_eq_dec as [Hlt | Heq]; eauto. *)
     edestruct NPeano.Nat.le_exists_sub as [n' [Hsum Hleq']]; subst. eassumption.
     subst.
     destruct n'.

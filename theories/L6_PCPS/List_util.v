@@ -220,7 +220,7 @@ Proof.
   - apply IHl. intros. apply H. constructor 2; eauto.
 Qed.
 
-Theorem Forall2_Equiv:
+Lemma Forall2_Equiv:
   forall (X:Type) (R:relation X), Equivalence R -> Equivalence (Forall2 R).
 Proof.
   intros. inversion H. constructor.
@@ -278,6 +278,20 @@ Proof.
   - now constructor.
   - constructor; eassumption.
 Qed.
+
+Lemma Forall2_nthN' (A B : Type) (R : A -> B -> Prop) (l1 : list A) 
+      (l2 : list B) (n : N) (v1 : A) (v2 : B):
+  Forall2 R l1 l2 ->
+  nthN l1 n = Some v1 ->
+  nthN l2 n = Some v2 ->
+  R v1 v2.
+Proof.
+  intros Hall. revert n. induction Hall; intros n Hnth1 Hnth2.
+  - now inv Hnth1.
+  - destruct n.
+    + inv Hnth1. inv Hnth2. eassumption.
+    + eapply IHHall; eauto.
+Qed. 
 
 (** Lemmas about [nthN] *)
 

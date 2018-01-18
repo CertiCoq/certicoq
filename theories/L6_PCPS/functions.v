@@ -751,6 +751,14 @@ Proof.
   firstorder.
 Qed.
 
+Lemma image'_monotonic {A B} (S1 S2 : Ensemble A) (f : A -> option B) :
+  S1 \subset S2 ->
+  image' f S1 \subset image' f S2.
+Proof.
+  firstorder.
+Qed.
+
+
 (** * Lemmas about [compose] *)
 
 Open Scope program_scope.

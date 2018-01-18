@@ -144,6 +144,19 @@ Proof.
   right. intros Hc. inv Hc; eauto.
 Qed.
 
+(** TODO make it proper? *)
+Lemma Decidable_Same_set A (S1 S2 : Ensemble A) :
+  S1 <--> S2 ->
+  Decidable S1 ->
+  Decidable S2.
+Proof.
+  intros Heq Hdec. constructor. intros x.
+  destruct Hdec as [Dec]. destruct (Dec x).
+  left; eapply Heq; eauto.
+  right; intros Hc; eapply H; eapply Heq; eauto.
+Qed.
+
+
 (** * Proper instances *)
 
 Instance Proper_Union_l A :
@@ -967,16 +980,6 @@ Proof.
   inv Hin'. eauto.
 Qed.
 
-Lemma Decidable_Same_set {A} (s1 s2 : Ensemble A) :
-  Same_set _ s1 s2 ->
-  Decidable s1 ->
-  Decidable s2.
-Proof.
-  intros Heq Hd. constructor. intros x. destruct Hd. destruct (Dec0 x).
-  left; now apply Heq.
-  right. intros Hc. apply H. now apply Heq.
-Qed.
-
 
 Lemma Complement_antimon {A} S1 S2 :
   Included A S1 S2 ->
@@ -1232,6 +1235,32 @@ Proof.
       eassumption.
       rewrite FromList_cons. eapply Union_Included; eauto.
       eapply Singleton_Included. eauto.
+Qed.
+
+Instance Decidable_FromList_gen A (H : forall (x y : A), {x = y} + {x <> y}) (l : list A) :
+  Decidable (FromList l).
+Proof.
+  constructor. intros x. induction l. 
+  - right. intros H1. inv H1. 
+  - destruct (H a x); subst.
+    + left. constructor. eauto.
+    + destruct IHl. left. now constructor 2.
+      right. intros Hc. inv Hc; eauto.
+Qed.
+
+(* TODO move *)
+Instance Decidable_map_UnionList {A B : Type} (f : A -> Ensemble B) (H : forall x, Decidable (f x)) l :
+  Decidable (Union_list (map f l)).
+Proof.
+  induction l; constructor.
+  - intros x; right; intros Hc; inv Hc.
+  - intros x. simpl.
+    destruct (H a) as [Hdec]. destruct (Hdec x); eauto.
+    + left. left. eassumption.
+    + destruct IHl as [Hdec']. destruct (Hdec' x).
+      left; right; eauto.
+      right; intros Hc.
+      inv Hc; contradiction. 
 Qed.
 
 Hint Immediate FromList_nil FromList_cons FromList_app

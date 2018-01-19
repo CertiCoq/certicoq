@@ -6,7 +6,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From L6 Require Import cps cps_util eval List_util Ensembles_util functions
+From L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
         identifiers Heap.heap tactics Heap.heap_defs.
 Require Import compcert.lib.Coqlib.
 
@@ -384,9 +384,10 @@ Module HeapEquiv (H : Heap).
     heap_equiv S H1 H2 /\ (* locations outside S might be renamed! *)
     dom H2 \subset reach' H2 S. (* everything in the domain is reachable *)
 
-  (** The size of the reachable portion of the heap *)
-  Definition size_reach (H : heap block) (S : Ensemble loc) (n : nat) : Prop :=
-    forall H', live S H H' -> size_heap H' = n. 
+  Definition live_PS (s : PS.t) (H1 H2 : heap block) : Prop :=
+    size_heap H2 = size_reachable s H1 /\
+    heap_equiv (FromSet s) H1 H2 /\ (* locations outside S might be renamed! *)
+    dom H2 \subset reach' H2 (FromSet s). (* everything in the domain is reachable *)
 
   (** * Lemmas about [collect] *)
   

@@ -6,7 +6,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms Sorting.Permutation.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From L6 Require Import Ensembles_util functions List_util cps.
+From L6 Require Import Ensembles_util functions List_util cps set_util.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
@@ -15,10 +15,8 @@ Close Scope Z_scope.
 
 Module Type Heap.
 
-  Parameter loc : Type.
-
-  Parameter loc_dec : forall (l1 l2 : loc), { l1 = l2 } + { l1 <> l2 }.
-
+  Definition loc := positive.
+  
   Parameter heap : Type -> Type. 
   
   Parameter emp : forall {A : Type}, heap A.
@@ -115,6 +113,21 @@ Module Type Heap.
     forall (A : Type) (h : heap A),
      NoDup (heap_elements h).
 
+  (** Elements filter *)
+  Parameter heap_elements_filter : forall {A}, PS.t -> heap A -> list (loc * A).
+
+  Parameter heap_elements_filter_sound :
+    forall (A : Type) (s : PS.t) (h : heap A) (l : loc) (v : A),
+      List.In (l, v) (heap_elements h) -> get l h = Some v /\ PS.In l s.
+
+  Parameter heap_elements_filter_complete :
+    forall (A : Type) (s : PS.t) (h : heap A) (l : loc) (v : A),
+      get l h = Some v -> PS.In l s -> List.In (l, v) (heap_elements h).
+  
+  Parameter heap_elements_filter_NoDup :
+    forall (A : Type) (s : PS.t) (h : heap A),
+     NoDup (heap_elements_filter s h).
+
   (** Size of a heap *)
 
   (** The cardinality of the domain *)
@@ -122,6 +135,10 @@ Module Type Heap.
   
   Definition size_with_measure {A : Type} (f : A -> nat) (h : heap A) : nat :=
     fold_left (fun acc h => acc + f (snd h)) (heap_elements h) 0%nat.
+
+  Definition size_with_measure_filter {A : Type}
+             (f : A -> nat) (s : PS.t) (h : heap A) : nat :=
+    fold_left (fun acc h => acc + f (snd h)) (heap_elements_filter s h) 0%nat.
 
 
   Parameter splits : forall {A}, heap A -> heap A -> heap A -> Prop. 
@@ -145,6 +162,12 @@ End Heap.
 Module HeapLemmas (H : Heap).
 
   Import H.
+
+  Lemma loc_dec : forall (l1 l2 : loc), { l1 = l2 } + { l1 <> l2 }.
+  Proof.
+    intros l1 l2. 
+    eapply Pos.eq_dec.
+  Qed.
 
   Lemma alloc_subheap {A} (H1 H1' : heap A) l v :
     alloc v H1 = (l, H1') ->

@@ -220,7 +220,7 @@ Proof.
   - apply IHl. intros. apply H. constructor 2; eauto.
 Qed.
 
-Theorem Forall2_Equiv:
+Lemma Forall2_Equiv:
   forall (X:Type) (R:relation X), Equivalence R -> Equivalence (Forall2 R).
 Proof.
   intros. inversion H. constructor.
@@ -278,6 +278,20 @@ Proof.
   - now constructor.
   - constructor; eassumption.
 Qed.
+
+Lemma Forall2_nthN' (A B : Type) (R : A -> B -> Prop) (l1 : list A) 
+      (l2 : list B) (n : N) (v1 : A) (v2 : B):
+  Forall2 R l1 l2 ->
+  nthN l1 n = Some v1 ->
+  nthN l2 n = Some v2 ->
+  R v1 v2.
+Proof.
+  intros Hall. revert n. induction Hall; intros n Hnth1 Hnth2.
+  - now inv Hnth1.
+  - destruct n.
+    + inv Hnth1. inv Hnth2. eassumption.
+    + eapply IHHall; eauto.
+Qed. 
 
 (** Lemmas about [nthN] *)
 
@@ -613,6 +627,22 @@ Proof.
   eassumption. now firstorder.
 Qed.
 
+Lemma Sublist_cons_app A (x : A) l l1 l2 :
+  Sublist l (l1 ++ (x :: l2)) ->
+  ~ List.In x l ->
+  Sublist l (l1 ++ l2).
+Proof.
+  revert l l2 x. induction l1; intros l l2 x Hsub Hnin; simpl in *.
+  - inv Hsub; eauto.
+    exfalso; eapply Hnin; constructor; eauto.
+  - inv Hsub.
+    + eapply sublist_cons. eapply IHl1; eauto.
+    + eapply sublist_skip. eapply IHl1; eauto.
+      intros Hin. eapply Hnin. constructor 2.
+      eassumption.
+Qed.
+
+
 Lemma fold_left_sublist (A B : Type) (l1 l2 : list A) (f : B -> A -> B)
       (pleq : B -> B -> Prop) acc : 
   Reflexive pleq ->
@@ -707,3 +737,29 @@ Proof.
   rewrite <- (Permutation_length Hperm); eauto.
   eapply Sublist_length; eauto.
 Qed.
+
+(** Misc *)
+
+Lemma destruct_last {A} (l : list A) :
+  l = [] \/ (exists l' x, l = l' ++ [x]). 
+Proof.
+  induction l; eauto.
+  - right. destruct IHl as [Hnil | [l' [x Hsnoc]]]; subst.
+    + eexists [], a. reflexivity.
+    + eexists (a :: l'), x. reflexivity.
+Qed.
+
+Lemma app_snoc {A} (l1 l2 : A) (ls1 ls2 : list A) :
+  ls1 ++ [l1] = ls2 ++ [l2] -> l1 = l2.
+Proof.
+  revert ls2. induction ls1; intros ls2 Heq.
+  - destruct ls2. inv Heq; eauto.
+    simpl in Heq. destruct ls2.
+    now inv Heq. now inv Heq.
+  - destruct ls2.
+    * simpl in Heq; subst.
+      destruct ls1.
+      now inv Heq. now inv Heq.
+    * inv Heq. eapply IHls1; eauto.
+Qed.
+

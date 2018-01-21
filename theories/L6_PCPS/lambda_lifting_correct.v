@@ -598,11 +598,11 @@ Section Lambda_lifting_correct.
   Proof.
     intros Hd Hin. split.
     now apply Setminus_Setminus_Included.
-    destruct Hd. intros x H. destruct (Dec x).
+    destruct Hd. intros x H. destruct (Dec x) as [Hin' | Hnin].
     - constructor. now eapply Hin.
       intros Hc; inv Hc; eauto.
     - inv H.
-      + inv H1. constructor; eauto. intros Hc.
+      + inv H0. constructor; eauto. intros Hc.
         inv Hc; eauto.
       + exfalso; eauto.
   Qed.

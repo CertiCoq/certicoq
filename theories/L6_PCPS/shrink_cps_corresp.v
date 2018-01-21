@@ -1178,15 +1178,15 @@ Section CONTRACT.
       assert (Hf2 := Decidable_name_in_fundefs f2).
       destruct Hf2.
       specialize (Dec v).
-      destruct Dec.
+      destruct Dec as [Hin | Hnin].
       + right. constructor. apply name_in_fundefs_bound_var_fundefs. auto.
       + assert (~ occurs_free e v).
         intro.
         apply H1.
         constructor; auto.
-        apply H0 in H4.
+        apply H0 in H3.
         apply H in H2.
-        inv H4.
+        inv H3.
         inv H2.
         left.
         eapply num_occur_n. constructor; eauto. auto.
@@ -2383,145 +2383,136 @@ Section CONTRACT.
     revert H7.
     apply IHf7; auto.
   Qed.
-  
-  Theorem occurs_free_ctx_dec :
-    (forall c,
-       Decidable (occurs_free_ctx c)) /\
-    (forall fc,
-       Decidable (occurs_free_fundefs_ctx fc)).
-  Proof.         
-    exp_fundefs_ctx_induction IHc IHf; constructor; intros x; try (inv IHc; specialize (Dec x)); try (inv IHf; specialize (Dec x)).
-    - right; auto.
-      intro. inv H.
-    - assert (Hl := Decidable_FromList l).
-      inv Hl.
-      specialize (Dec0 x).
-      inv Dec0.
-      left; auto.
-      destruct (var_dec  v x).
-      subst.
-      right.
-      intro.
-      inv H0. auto.
-      apply H6; auto.
-      inv Dec.
-      left; auto.
-      right.
-      intro. inv H1; auto.           
-    - destruct (var_dec x v0).
-      subst. left; auto.
-      destruct (var_dec v x).
-      subst.
-      right; intro. inv H; auto.
-      inv Dec.
-      left; auto.
-      right; intro.
-      inv H0; auto.           
-    - assert (Hl := Decidable_FromList l).
-      inv Hl.
-      specialize (Dec0 x).
-      inv Dec0.
-      left; auto.
-      destruct (var_dec  v x).
-      subst.
-      right.
-      intro.
-      inv H0. auto.
-      apply H6; auto.
-      inv Dec.
-      left; auto.
-      right.
-      intro. inv H1; auto.           
-    - assert (Hl := Decidable_occurs_free (Ecase v l)).
-      assert (Hl0 := Decidable_occurs_free (Ecase v l0)).
-      inv Hl. specialize (Dec0 x).
-      inv Hl0. specialize (Dec1 x).
-      inv Dec0.
-      left. apply Free_Ecase3; auto.
-      inv Dec1.
-      left. apply Free_Ecase4; auto.
-      inv Dec.
-      left. constructor; auto.
-      right. intro.
-      inv H2; auto.
-    - assert (Hf4 := Decidable_occurs_free_fundefs f4).
-      inv Hf4; specialize (Dec0 x).
-      inv Dec0.
-      left; auto.
-      assert (Hf4n := Decidable_name_in_fundefs f4).
-      inv Hf4n. specialize (Dec0 x).
-      inv Dec0.
-      right.
-      intro.
-      inv H1; auto.
-      destruct Dec.
-      left; auto.
-      right; intro. inv H2; auto.
-    - assert (He := Decidable_occurs_free e). 
-      inv He; specialize (Dec0 x).
-      inv Dec.
-      left; auto.
-      assert (Hf5 := Decidable_name_in_fundefs_ctx f5).
-      inv Hf5. specialize (Dec x). inv Dec.
-      right.
-      intro; auto. inv H1; auto.
-      inv Dec0.
-      left; auto.
-      right; intro; apply H1.
-      inv H2; auto.
-      exfalso; auto.
-    - destruct (var_dec x v).
-      right.
-      intro. subst. inv H; auto.
-      assert (Hf6 := Decidable_name_in_fundefs f6).
-      inv Hf6. specialize (Dec0 x).
-      inv Dec0.
-      right. intro. inv H0.
-      auto.
-      revert H7; apply fun_names_not_free_in_fundefs; auto.
-      assert (He := Decidable_occurs_free_fundefs f6).
-      inv He. specialize (Dec0 x).
-      inv Dec0.
-      left; constructor 2; auto.
-      inv Dec.
-      assert (Hl := Decidable_FromList l).
-      inv Hl. specialize (Dec x). inv Dec.
-      right; intro; inv H3; auto.
-      left. constructor; auto.
-      right. intro. inv H2; auto.           
-    - destruct (var_dec x v).
-      right.
-      intro. subst. inv H; auto.
-      assert (Hf6 := Decidable_name_in_fundefs_ctx f7).
-      inv Hf6. specialize (Dec0 x).
-      inv Dec0.
-      right. intro. inv H0.
-      auto.
-      revert H7.
-      apply fun_names_not_free_in_fundefs_ctx; auto.
-      inv Dec.
-      left; constructor 4; auto.
-      assert (Hl := Decidable_FromList l).
-      inv Hl. specialize (Dec x). inv Dec.
-      right; intro; inv H2; auto.
-      assert (He :=  Decidable_occurs_free e).
-      inv He. specialize (Dec x). inv Dec. left; constructor; auto.
-      right. intro. inv H3; auto.           
-  Qed.
 
-  Theorem Decidable_occurs_free_ctx:         
+  (* TODO move and QED *)
+  Theorem Decidable_occurs_free_ctx :
     (forall c,
        Decidable (occurs_free_ctx c)).
-  Proof.
-    intro; apply occurs_free_ctx_dec; auto.
-  Qed.         
+  Admitted.
+  
 
-  Theorem Decidable_occurs_free_fundefs_ctx:         
-    forall fc,
-      Decidable (occurs_free_fundefs_ctx fc).
+  Theorem Decidable_occurs_free_fundefs_ctx :
+    (forall fc, Decidable (occurs_free_fundefs_ctx fc)).
   Proof.
-    intro; apply occurs_free_ctx_dec; auto.
-  Qed.         
+  Admitted.
+  (*   exp_fundefs_ctx_induction IHc IHf; constructor; intros x; try (inv IHc; specialize (Dec x)); try (inv IHf; specialize (Dec x)). *)
+  (*   - right; auto. *)
+  (*     intro. inv H. *)
+  (*   - assert (Hl := Decidable_FromList l). *)
+  (*     inv Hl. *)
+  (*     specialize (Dec0 x). *)
+  (*     inv Dec0. *)
+  (*     left; auto. *)
+  (*     destruct (var_dec  v x). *)
+  (*     subst. *)
+  (*     right. *)
+  (*     intro. *)
+  (*     inv H0. auto. *)
+  (*     apply H6; auto. *)
+  (*     inv Dec. *)
+  (*     left; auto. *)
+  (*     right. *)
+  (*     intro. inv H1; auto.            *)
+  (*   - destruct (var_dec x v0). *)
+  (*     subst. left; auto. *)
+  (*     destruct (var_dec v x). *)
+  (*     subst. *)
+  (*     right; intro. inv H; auto. *)
+  (*     inv Dec. *)
+  (*     left; auto. *)
+  (*     right; intro. *)
+  (*     inv H0; auto.            *)
+  (*   - assert (Hl := Decidable_FromList l). *)
+  (*     inv Hl. *)
+  (*     specialize (Dec0 x). *)
+  (*     inv Dec0. *)
+  (*     left; auto. *)
+  (*     destruct (var_dec  v x). *)
+  (*     subst. *)
+  (*     right. *)
+  (*     intro. *)
+  (*     inv H0. auto. *)
+  (*     apply H6; auto. *)
+  (*     inv Dec. *)
+  (*     left; auto. *)
+  (*     right. *)
+  (*     intro. inv H1; auto.            *)
+  (*   - assert (Hl := Decidable_occurs_free (Ecase v l)). *)
+  (*     assert (Hl0 := Decidable_occurs_free (Ecase v l0)). *)
+  (*     inv Hl. specialize (Dec0 x). *)
+  (*     inv Hl0. specialize (Dec1 x). *)
+  (*     inv Dec0. *)
+  (*     left. apply Free_Ecase3; auto. *)
+  (*     inv Dec1. *)
+  (*     left. apply Free_Ecase4; auto. *)
+  (*     inv Dec. *)
+  (*     left. constructor; auto. *)
+  (*     right. intro. *)
+  (*     inv H2; auto. *)
+  (*   - assert (Hf4 := Decidable_occurs_free_fundefs f4). *)
+  (*     inv Hf4; specialize (Dec0 x). *)
+  (*     inv Dec0. *)
+  (*     left; auto. *)
+  (*     assert (Hf4n := Decidable_name_in_fundefs f4). *)
+  (*     inv Hf4n. specialize (Dec0 x). *)
+  (*     inv Dec0. *)
+  (*     right. *)
+  (*     intro. *)
+  (*     inv H1; auto. *)
+  (*     destruct Dec. *)
+  (*     left; auto. *)
+  (*     right; intro. inv H2; auto. *)
+  (*   - assert (He := Decidable_occurs_free e).  *)
+  (*     inv He; specialize (Dec0 x). *)
+  (*     inv Dec. *)
+  (*     left; auto. *)
+  (*     assert (Hf5 := Decidable_name_in_fundefs_ctx f5). *)
+  (*     inv Hf5. specialize (Dec x). inv Dec. *)
+  (*     right. *)
+  (*     intro; auto. inv H1; auto. *)
+  (*     inv Dec0. *)
+  (*     left; auto. *)
+  (*     right; intro; apply H1. *)
+  (*     inv H2; auto. *)
+  (*     exfalso; auto. *)
+  (*   - destruct (var_dec x v). *)
+  (*     right. *)
+  (*     intro. subst. inv H; auto. *)
+  (*     assert (Hf6 := Decidable_name_in_fundefs f6). *)
+  (*     inv Hf6. specialize (Dec0 x). *)
+  (*     inv Dec0. *)
+  (*     right. intro. inv H0. *)
+  (*     auto. *)
+  (*     revert H7; apply fun_names_not_free_in_fundefs; auto. *)
+  (*     assert (He := Decidable_occurs_free_fundefs f6). *)
+  (*     inv He. specialize (Dec0 x). *)
+  (*     inv Dec0. *)
+  (*     left; constructor 2; auto. *)
+  (*     inv Dec. *)
+  (*     assert (Hl := Decidable_FromList l). *)
+  (*     inv Hl. specialize (Dec x). inv Dec. *)
+  (*     right; intro; inv H3; auto. *)
+  (*     left. constructor; auto. *)
+  (*     right. intro. inv H2; auto.            *)
+  (*   - destruct (var_dec x v). *)
+  (*     right. *)
+  (*     intro. subst. inv H; auto. *)
+  (*     assert (Hf6 := Decidable_name_in_fundefs_ctx f7). *)
+  (*     inv Hf6. specialize (Dec0 x). *)
+  (*     inv Dec0. *)
+  (*     right. intro. inv H0. *)
+  (*     auto. *)
+  (*     revert H7. *)
+  (*     apply fun_names_not_free_in_fundefs_ctx; auto. *)
+  (*     inv Dec. *)
+  (*     left; constructor 4; auto. *)
+  (*     assert (Hl := Decidable_FromList l). *)
+  (*     inv Hl. specialize (Dec x). inv Dec. *)
+  (*     right; intro; inv H2; auto. *)
+  (*     assert (He :=  Decidable_occurs_free e). *)
+  (*     inv He. specialize (Dec x). inv Dec. left; constructor; auto. *)
+  (*     right. intro. inv H3; auto.            *)
+  (* Qed. *)
 
   Lemma occurs_free_included_ctx_mut:
     forall e,
@@ -2964,11 +2955,10 @@ Section CONTRACT.
   Proof.
     intros.
     intro; intro.
-    assert (He := (proj1 occurs_free_ctx_dec) e).
-    inv He. specialize (Dec x).
-    inv Dec; auto.
-    apply not_free_dead_or_bound_ctx in H0.
-    inv H0; auto.
+    assert (He := Decidable_occurs_free_ctx e).
+    inv He. destruct (Dec x); eauto.
+    apply not_free_dead_or_bound_ctx in n.
+    inv n; auto.
     exfalso. auto.
   Qed.         
 
@@ -3826,10 +3816,10 @@ Section CONTRACT.
     specialize (Dec x).
     inv Dec.
     unfold FromList in H.
-    rewrite InList_snd in H.
+    left. rewrite InList_snd in H.
     destruct H.
     apply M.elements_complete in H.
-    left. exists x0; auto.
+    exists x0; auto.
     right. intro. inv H0.
     apply H.
     apply InList_snd.
@@ -3907,9 +3897,8 @@ Section CONTRACT.
       inv Hl. specialize (Dec x). inv Dec. 
       constructor. auto.
       apply SBound_Fcons12_c. apply H0. intro. apply H1.
-      constructor; auto. intro. apply H2. subst; constructor.
-      constructor.
-      intro; apply H2. constructor 2. auto.
+      constructor; auto. intro. subst. apply n. now constructor.
+      intro; apply n. constructor 2. auto.
     + simpl in H1.
       assert (Hv := Decidable_name_in_fundefs (Fcons v t l e0 (f7 <[ e ]>))).
       destruct Hv. specialize (Dec x). destruct Dec.
@@ -3920,9 +3909,9 @@ Section CONTRACT.
       assert ( ~ occurs_free_fundefs (f7 <[ e ]>) x).
       intro; apply H1.
       constructor 2. auto.
-      intro. apply H2. subst; constructor; auto.
-      apply H0 in H3. inv H3; auto.
-      exfalso. apply H2.
+      intro. subst. apply n. subst; constructor; auto.
+      apply H0 in H2. inv H2; auto.
+      exfalso. apply n.
       simpl. right.
       eapply name_in_fundefs_ctx_ctx. eauto.
   Qed.
@@ -6603,8 +6592,7 @@ Section CONTRACT.
       eapply (proj1 (num_occur_det _)); eauto. 
     }    
     assert (Hl0 := Decidable_FromList l0). destruct Hl0.
-    specialize (Dec v0). inv Dec.
-
+    specialize (Dec v0) as [H12 | H12]. 
 
     (* x5 is in l0 *)
     apply num_occur_app_ctx. exists 0, 0. split.
@@ -6612,7 +6600,7 @@ Section CONTRACT.
     auto.
     split.
     { assert  (Hl0 := Decidable_Range_map sig).
-      inv Hl0. specialize (Dec v0). destruct Dec.
+      inv Hl0. destruct (Dec v0) as [H13 | H13].
       - inv H13. apply H3 in H14. destructAll.
         inv H14.
         + apply dead_occur_rename_all_ns_set_list.
@@ -6681,7 +6669,7 @@ Section CONTRACT.
     auto with Ensembles_DB. auto. 
     {
       intro. intro. assert (Hsr := Decidable_Range_map sig). inv Hsr. specialize (Dec x7).
-      destruct Dec; auto.
+      destruct Dec as [H18 | H18]; auto.
       right. inv H18. apply H3 in H19. destructAll. inv H19.
       apply num_occur_app_ctx in H21; destructAll; pi0.
       apply num_occur_ec_comp_ctx in H19; destructAll; pi0.

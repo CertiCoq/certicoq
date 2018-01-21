@@ -270,8 +270,8 @@ Module HeapLemmas (H : Heap).
     - intros l Hd2. constructor.
       eapply dom_subheap. eapply restrict_subheap. eassumption.
       eassumption.
-      destruct HD. destruct (Dec l); eauto.
-      eapply restrict_notIn in H; [| eassumption ].
+      destruct HD. destruct (Dec l) as [Hin | Hnin]; eauto.
+      eapply restrict_notIn in Hnin; [| eassumption ].
       destruct Hd2. congruence.
     - intros l Hi. inv Hi.
       eapply restrict_In in H0; [| eassumption ].

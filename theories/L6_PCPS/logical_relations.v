@@ -1256,9 +1256,9 @@ Section Log_rel.
         edestruct (@setlist_length val) as [rho2' Hs']; eauto.
         exists xs1. exists e1. exists rho2'. split; eauto.
         specialize (find_def_name_in_fundefs _ _ _ Hf); intros Hname.
-        destruct (@Dec _ _  (Decidable_name_in_fundefs B2) v).
-        exfalso. inv HD2. eapply H0; eauto.
-        eapply name_not_in_fundefs_find_def_None in H.
+        destruct (@Dec _ _  (Decidable_name_in_fundefs B2) v) as [Hin | Hnin ].
+        exfalso. inv HD2. eapply H; eauto.
+        eapply name_not_in_fundefs_find_def_None in Hnin.
         erewrite find_def_fundefs_append_r; eauto.
         split. eauto. intros Hleq Hpre'.
         eapply preord_exp_refl. 

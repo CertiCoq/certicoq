@@ -1159,30 +1159,33 @@ Module HeapDefs (H : Heap) .
     intros HD. unfold env_locs, image'.
     inv HD. constructor.
     assert (forall l : loc,
-              (exists (x : M.elt) v, In M.elt S x /\
+              {exists (x : M.elt) v, In M.elt S x /\
                                 l \in val_loc v /\
-                                List.In (x, v) (M.elements rho)) \/
-              ~ (exists (x : M.elt) v, In M.elt S x /\
+                                List.In (x, v) (M.elements rho)} +
+              {~ exists (x : M.elt) v, In M.elt S x /\
                                   l \in val_loc v /\
-                                  List.In (x, v) (M.elements rho))).
+                                  List.In (x, v) (M.elements rho)}).
     { generalize (M.elements rho) as el.
       induction el as [| [x v] el IHel]; simpl; intros l1.
       - right. firstorder.
-      - destruct (Dec x).
+      - destruct (Dec x) as [Hin1 | Hnin1].
         + destruct (Decidable_val_loc v).
-          destruct (Dec0 l1); subst.
+          destruct (Dec0 l1) as [Hin2 | Hnin2]; subst.
           * left. do 2 eexists; repeat split; eauto.
-          * destruct (IHel l1) as [[x2 [v2 [H1 [H2 H3]]]] | H2].
-            left. now do 2 eexists; repeat split; eauto.
+          * destruct (IHel l1) as [Hl | Hr].
+            left. destruct Hl as [x2 [v2 [H1 [H2 H3]]]].
+            now do 2 eexists; repeat split; eauto.
             right. intros [x2 [v2 [Hc1 [Hc2 [Hc3 | Hc3]]]]]. inv Hc3; contradiction.
-            now eapply H2; eauto.
-        + destruct (IHel l1) as [[x2 [v2 [H1 [H2 H3]]]] | H2].
-          left. now do 2 eexists; repeat split; eauto.
+            now eapply Hr; eauto.
+        + destruct (IHel l1) as [Hl | Hr].
+          left. destruct Hl as [x2 [v2 [H1 [H2 H3]]]].
+          now do 2 eexists; repeat split; eauto.
           right. intros [x2 [v2 [Hc1 [Hc2 Hc3]]]]. inv Hc3.
-          inv H0; try contradiction.
-          now eapply H2; eauto. }
-    intros l. destruct (H l) as [[x [v [Hl1 [Hl2 Hl3]]]] | Hr].
-    - left. eexists; split; eauto. eapply M.elements_complete in Hl3.
+          inv H; try contradiction.
+          now eapply Hr; eauto. }
+    intros l. destruct (H l) as [Hl | Hr].
+    - left. destruct Hl as [x [v [Hl1 [Hl2 Hl3]]]].
+      eexists; split; eauto. eapply M.elements_complete in Hl3.
       rewrite Hl3. eassumption.
     - right. intros [x [H1 H2]].
       destruct (M.get x rho) eqn:Hget; try contradiction.

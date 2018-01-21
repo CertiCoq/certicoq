@@ -346,19 +346,20 @@ Section CC_correct.
       - destruct v; eauto;
         right; intros [y Hc]; congruence. 
       - right. intros [y Hc]; congruence. }
-    destruct Hdec1, Hdec2. destruct (Dec x). 
-    - eapply Hinv1 in H1.
-      unfold In in H1. rewrite Hb in H1; eauto. congruence.
-    - destruct (Dec0 x).
-      + eapply Hinv2 in H2. destruct H2 as [y Heq].
+    destruct Hdec1, Hdec2. destruct (Dec x) as [Hin | Hnin]. 
+    - eapply Hinv1 in Hin.
+      unfold In in Hin. rewrite Hb in Hin; eauto. congruence.
+    - destruct (Dec0 x) as [Hin' | Hnin'].
+      + eapply Hinv2 in Hin'. destruct Hin' as [y Heq].
         rewrite Hb in Heq; eauto. congruence.
       + inv H0; try contradiction.
-        inv H3. eapply H2; constructor; eauto.
+        inv H1. now eapply Hnin'; constructor; eauto.
         unfold In, FromList in H0.        
         edestruct In_nthN as [N Hnth]; [ eassumption |].
-        edestruct Hinv3 as [H' _].
-        assert (H3 : ~ Funs x) by (intros Hc; eapply H2; constructor; eauto).
-        specialize (H' (conj Hnth (conj H1 H3))). rewrite Hb in H'; congruence.
+        destruct (Hinv3 N x) as [Hinv3' _].
+        rewrite Hb in Hinv3'; [| eassumption ].
+        assert (H3 : ~ Funs x) by (intros Hc; eapply Hnin'; constructor; eauto).
+        specialize (Hinv3' (conj Hnth (conj Hnin H3))). congruence.
   Qed.
   
   Lemma binding_not_in_map_antimon (A : Type) (S S' : Ensemble M.elt) (rho : M.t A):

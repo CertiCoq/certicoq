@@ -439,56 +439,71 @@ Import ListNotations.
       reflexivity.
   Qed.      
 
-  (* Lemma bound_stem_ctx_dec_mut : *)
-  (*   (forall c, Decidable (bound_stem_ctx c)) /\ *)
-  (*   (forall Bc, Decidable (bound_stem_fundefs_ctx Bc)). *)
-  (* Proof. *)
-  (*   exp_fundefs_ctx_induction IHc IHf; split; intro x; try (inv IHc; specialize (Dec x); inv Dec; auto); *)
-  (*   try (inv IHf; specialize (Dec x); inv Dec; auto). *)
-  (*   - right; intro; inv H. *)
-  (*   - destruct (var_dec v x); subst; auto. *)
-  (*     right; intro Hbv; inv Hbv; auto. *)
-  (*   - destruct (var_dec v x); subst; auto. *)
-  (*     right; intro Hbv; inv Hbv; auto. *)
-  (*   - destruct (var_dec v x); subst; auto. *)
-  (*     right; intro Hbv; inv Hbv; auto. *)
-  (*   - right. intro. apply H. inv H0. auto. *)
-  (*   -  *)
-  (*     assert (Hn := Decidable_name_in_fundefs f4). *)
-  (*     inv Hn. specialize (Dec x). inv Dec. *)
-  (*     left; auto.  *)
-  (*     right. intro. apply H. inv H1. exfalso; auto. auto. *)
-  (*   - *)
-  (*     assert (Hf5 := Decidable_name_in_fundefs_ctx f5). inv Hf5. specialize (Dec x). inv Dec. *)
-  (*     left. *)
-  (*     constructor. auto. *)
-  (*     right. intro; apply H. inv H1. *)
-  (*     exfalso; auto. auto. *)
-  (*   -  destruct (in_dec var_dec x l); auto. *)
-  (*      right; intro. apply H. inv H0. exfalso; auto. auto. *)
-  (*   - right. *)
-  (*     intro; apply H. inv H0. auto. *)
-  (* Qed. *)
-
   Lemma bound_stem_ctx_dec:
     (forall c, Decidable (bound_stem_ctx c)).
   Proof.
-  Admitted.
-  (* TODO fix *)
-  (*   intro. apply bound_stem_ctx_dec_mut. *)
-  (* Qed. *)
-
+    eapply ctx_exp_mut' with (P0 := fun c => Decidable (bound_stem_fundefs_ctx c));
+    split; intro x. 
+    - right; intro; inv H.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      right. intro Hc. apply Hnin. inv Hc. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      assert (Hn := Decidable_name_in_fundefs f).
+      destruct Hn as [Decf]. destruct (Decf x); eauto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      assert (Hf := Decidable_name_in_fundefs_ctx f).
+      destruct Hf as [Decf]. destruct (Decf x); eauto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      destruct (in_dec var_dec x l); auto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto.
+  Qed.
 
   Lemma bound_stem_fundefs_ctx_dec:
     (forall c, Decidable (bound_stem_fundefs_ctx c)).
   Proof.
-  Admitted.
-  (* TODO fix *)
-  (*   intro. apply bound_stem_ctx_dec_mut. *)
-  (* Qed. *)
+    eapply ctx_fundefs_mut' with (P := fun c => Decidable (bound_stem_ctx c));
+    split; intro x. 
+    - right; intro; inv H.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      right. intro Hc. apply Hnin. inv Hc. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      assert (Hn := Decidable_name_in_fundefs f).
+      destruct Hn as [Decf]. destruct (Decf x); eauto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      assert (Hf := Decidable_name_in_fundefs_ctx f).
+      destruct Hf as [Decf]. destruct (Decf x); eauto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      destruct (in_dec var_dec x l); auto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto. auto.
+    - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
+      right. intro Hc. apply Hnin. inv Hc. exfalso; auto.
+  Qed.
 
-  
-    (** The set of bound variables of a composed context is equal to the union of the sets of bound variables of its constituents *)
+  (** The set of bound variables of a composed context is equal to the union of the sets of bound variables of its constituents *)
   Theorem bound_stem_comp_ctx_mut:
     forall c',
       (forall c,

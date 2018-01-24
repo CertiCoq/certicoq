@@ -113,20 +113,26 @@ Module Type Heap.
     forall (A : Type) (h : heap A),
      NoDup (heap_elements h).
 
+
   (** Elements filter *)
   Parameter heap_elements_filter : forall {A}, PS.t -> heap A -> list (loc * A).
 
   Parameter heap_elements_filter_sound :
     forall (A : Type) (s : PS.t) (h : heap A) (l : loc) (v : A),
-      List.In (l, v) (heap_elements h) -> get l h = Some v /\ PS.In l s.
+      List.In (l, v) (heap_elements_filter s h) -> get l h = Some v /\ PS.In l s.
 
   Parameter heap_elements_filter_complete :
     forall (A : Type) (s : PS.t) (h : heap A) (l : loc) (v : A),
-      get l h = Some v -> PS.In l s -> List.In (l, v) (heap_elements h).
+      get l h = Some v -> PS.In l s -> List.In (l, v) (heap_elements_filter s h).
   
   Parameter heap_elements_filter_NoDup :
     forall (A : Type) (s : PS.t) (h : heap A),
      NoDup (heap_elements_filter s h).
+
+  Parameter heap_elements_filter_set_Equal :
+    forall (A : Type) (s1 s2 : PS.t) (h : heap A),
+      PS.Equal s1 s2 ->
+      heap_elements_filter s1 h = heap_elements_filter s2 h.
 
   (** Size of a heap *)
 
@@ -277,7 +283,7 @@ Module HeapLemmas (H : Heap).
       eapply restrict_In in H0; [| eassumption ].
       destruct H as [v Hget]. exists v. congruence.
   Qed.      
-
+  
   Lemma heap_elements_empty (A : Type) :
     @heap_elements A emp = [].
   Proof.
@@ -320,6 +326,74 @@ Module HeapLemmas (H : Heap).
           congruence.
   Qed.
 
+  Lemma heap_elements_filter_empty (A : Type) (s : PS.t) :
+    @heap_elements_filter A s emp = [].
+  Proof.
+    destruct (@heap_elements_filter _ _ emp) as [| [l v] ls] eqn:Hh.
+    reflexivity.
+    assert (Hd : get l emp = Some v).
+    { eapply heap_elements_filter_sound. rewrite Hh. now constructor. }
+    rewrite emp_get in Hd. discriminate.
+  Qed.
+  
+  Lemma heap_elements_filter_alloc (A : Type) (s : PS.t) (h h' : heap A) (l : loc) (v : A) :
+    alloc v h = (l, h') ->
+    PS.In l s ->
+    Permutation (heap_elements_filter s h') ((l, v) :: (heap_elements_filter s h)) .
+  Proof.
+    intros Ha Hin. 
+    eapply NoDup_Permutation.
+    - eapply heap_elements_filter_NoDup. 
+    - constructor.
+      intros Hin'. eapply heap_elements_filter_sound in Hin'.
+      inv Hin'.
+      eapply alloc_fresh in Ha. congruence.
+      eapply heap_elements_filter_NoDup.
+    - intros [l' v']; split; intros Hin'.
+      + eapply heap_elements_filter_sound in Hin'. 
+        destruct (loc_dec l l'); subst.
+        * erewrite gas in Hin'; [| eassumption ]. 
+          inv Hin'. inv H. now constructor.
+        * erewrite gao in Hin'; eauto.
+          inv Hin'. constructor 2. eapply heap_elements_filter_complete.
+          eassumption. eassumption.
+      + inv Hin'.
+        * inv H.
+          eapply heap_elements_filter_complete.
+          erewrite gas; [| eassumption ].
+          reflexivity. eassumption.
+        * eapply heap_elements_filter_sound in H. inv H.
+          eapply heap_elements_filter_complete.
+          erewrite gao; eauto.
+          intros Hc. subst.
+          erewrite alloc_fresh in H0; eauto.
+          congruence. eassumption.
+  Qed.
+
+  Lemma heap_elements_filter_alloc_nin (A : Type) (s : PS.t) (h h' : heap A) (l : loc) (v : A) :
+    alloc v h = (l, h') ->
+    ~ PS.In l s ->
+    Permutation (heap_elements_filter s h') (heap_elements_filter s h).
+  Proof.
+    intros Ha Hin. 
+    eapply NoDup_Permutation.
+    - eapply heap_elements_filter_NoDup. 
+    - eapply heap_elements_filter_NoDup. 
+    - intros [l' v']; split; intros Hin'.
+      + eapply heap_elements_filter_sound in Hin'. 
+        destruct (loc_dec l l'); subst.
+        * erewrite gas in Hin'; [| eassumption ]. 
+          inv Hin'. contradiction.
+        * erewrite gao in Hin'; eauto.
+          inv Hin'. eapply heap_elements_filter_complete.
+          eassumption. eassumption.
+      + eapply heap_elements_filter_sound in Hin'. 
+        inv Hin'. 
+        eapply heap_elements_filter_complete; eauto.
+        erewrite gao; eauto.
+        intros Hc; subst; contradiction.
+  Qed.
+  
   Lemma subheap_Subperm (A : Type) (h1 h2 : heap A) : 
     h1 ⊑ h2 ->
     Subperm (heap_elements h1) (heap_elements h2).
@@ -332,6 +406,17 @@ Module HeapLemmas (H : Heap).
     eauto.
   Qed.
 
+  Lemma subheap_filter_Subperm (A : Type) (s : PS.t) (h1 h2 : heap A) : 
+    h1 ⊑ h2 ->
+    Subperm (heap_elements_filter s h1) (heap_elements_filter s h2).
+  Proof.
+    intros Hsub.
+    eapply incl_Subperm.
+    now eapply heap_elements_filter_NoDup.
+    intros [l v] Hin. eapply heap_elements_filter_sound in Hin. 
+    inv Hin. eapply heap_elements_filter_complete; eauto.
+  Qed.
+  
   Lemma size_emp :
     forall (A : Type), @size A emp = 0%nat.
   Proof.
@@ -393,6 +478,56 @@ Module HeapLemmas (H : Heap).
     now firstorder.
     now firstorder.
     eapply subheap_Subperm. eassumption.
+  Qed.
+
+  Lemma size_with_measure_filter_emp (A : Type) (s : PS.t) f :
+    @size_with_measure_filter A f s emp = 0%nat.
+  Proof.
+    unfold size_with_measure_filter.
+    rewrite heap_elements_filter_empty. reflexivity.
+  Qed.
+
+  Lemma size_with_measure_filter_alloc
+        (A : Type) f (s : PS.t) (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) : 
+    size_with_measure_filter f s H = m ->
+    alloc x H = (l, H') ->
+    PS.In l s ->
+    size_with_measure_filter f s H' = (m + f x)%nat.
+  Proof.
+    intros Hs1 Ha Hin.
+    unfold size_with_measure_filter in *. eapply heap_elements_filter_alloc in Ha; [| eassumption ].
+    erewrite fold_permutation; [| now intros; firstorder | eassumption ].
+    simpl.
+    replace (f x) with ((fun acc h => acc + f (snd h)) 0 (l, x)); [| reflexivity ].
+    erewrite List_util.fold_left_comm with (f0 := fun acc h => acc + f (snd h)); [| now firstorder ].
+    omega.
+  Qed.
+
+  Lemma size_with_measure_filter_alloc_in
+        (A : Type) f (s : PS.t) (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) : 
+    size_with_measure_filter f s H = m ->
+    alloc x H = (l, H') ->
+    ~ PS.In l s ->
+    size_with_measure_filter f s H' = m.
+  Proof.
+    intros Hs1 Ha Hnin.
+    unfold size_with_measure_filter in *. eapply heap_elements_filter_alloc_nin in Ha; [| eassumption ].
+    erewrite fold_permutation; [| now intros; firstorder | eassumption ].
+    eassumption.
+  Qed.
+  
+  Lemma size_with_measure_filter_subheap :
+    forall A f (s : PS.t) (H1 H2 : heap A),
+      H1 ⊑ H2 ->
+      size_with_measure_filter f s H1 <= size_with_measure_filter f s H2.
+  Proof.
+    intros A f s H1 H2 Hsub. unfold size_with_measure_filter.
+    eapply fold_left_subperm; eauto.
+    now firstorder.
+    now firstorder.
+    now firstorder.
+    now firstorder.
+    eapply subheap_filter_Subperm. eassumption.
   Qed.
 
   Lemma splits_subheap_l {A} (H H1 H2 : heap A) : 

@@ -379,16 +379,11 @@ Module HeapEquiv (H : Heap).
     S |- H1 ≃ H2. (* locations outside S might be renamed! *)
   
   (** [live S H1 H2] iff H2 is the live portion of H1, using S as roots *)
-  Definition live (S : Ensemble loc) (H1 H2 : heap block) : Prop :=
-    size_heap H2 <= size_heap H1 /\ (* maybe could be derived *)
-    heap_equiv S H1 H2 /\ (* locations outside S might be renamed! *)
-    dom H2 \subset reach' H2 S. (* everything in the domain is reachable *)
-
-  Definition live_PS (s : PS.t) (H1 H2 : heap block) : Prop :=
-    size_heap H2 = size_reachable s H1 /\
-    heap_equiv (FromSet s) H1 H2 /\ (* locations outside S might be renamed! *)
-    dom H2 \subset reach' H2 (FromSet s). (* everything in the domain is reachable *)
-
+  Definition live (S : Ensemble loc) {_ : ToMSet S} (H1 H2 : heap block) : Prop :=
+    size_heap H2 = size_reachable S H1 /\ (* maybe could be derived? *)
+    heap_equiv S H1 H2. (* locations outside S might be renamed! *)
+    (* dom H2 \subset reach' H2 S. (* everything in the domain is reachable *) *)
+  
   (** * Lemmas about [collect] *)
   
   (** The reachable part of the heap before and after collection are the same *)
@@ -1459,46 +1454,52 @@ Module HeapEquiv (H : Heap).
   
   (** * Lemmas about [live] *)  
 
-  Lemma live_exists S H :
-    Decidable S ->
+  Lemma live_exists S H (_ : ToMSet S) :
     exists H', live S H H'.
   Proof.
   Admitted.
   
-  Lemma live_deterministic S H1 H2 H2' :
+  Lemma live_deterministic S (_ : ToMSet S) H1 H2 H2' :
     live S H1 H2 ->
     live S H1 H2' ->
     S |- H2 ≃ H2'.
   Proof.
-    intros [Hyp1 [Hyp2 Hyp3]] [Hyp1' [Hyp2' Hyp3']].
+    intros [Hyp1 Hyp2] [Hyp1' Hyp2'].
     eapply Equivalence.equiv_transitive; eauto.
     symmetry. eassumption.
   Qed.
-
-  Lemma live_collect S H1 H2 :
+  
+  Lemma live_collect S (_ : ToMSet S) H1 H2 :
     live S H1 H2 ->
     collect S H1 H2.
   Proof.
-    firstorder.
-  Qed.
-  
-  Lemma live_idempotent (S : Ensemble loc) (H1 H2 : heap block) :
+    intros [Hs Hl]. 
+  Admitted.
+
+  Lemma live_idempotent (S : Ensemble loc) (_ : ToMSet S) (H1 H2 : heap block) :
     live S H1 H2 ->
     live S H2 H2.
   Proof.
-    intros Hl.
-    assert (Hc := live_collect _ _ _ Hl).
-    destruct Hl as [Hyp1 [Hyp2 Hyp3]]. split; eauto.
-    split; eauto.
-    reflexivity. 
-  Qed.
-
-  Instance Properlive : Proper (Same_set _ ==> eq ==> eq ==> iff) live.
+    intros [Hs Heq]. split. rewrite Hs. 
+  Abort.
+  
+  (* TODO move *)
+  Instance ToMSet_Same_set (S1 S2 : Ensemble loc) :
+    S1 <--> S2 ->
+    ToMSet S1 ->
+    ToMSet S2.
   Proof.
-    constructor; subst; intros [Hl1 [Hl2 Hl3]].
-    split; eauto. split; eauto; now rewrite <- H.
-    split; eauto. split; eauto; now rewrite H.
+    intros Heq [mset mset_eq]. rewrite Heq in mset_eq.
+    econstructor. eassumption.
   Qed.
+  
+  Lemma Proper_live S1 S2 (HS1 : ToMSet S1) (HS2 : ToMSet S2) H1 H2:
+    S1 <--> S2 ->
+    live S1 H1 H2 ->
+    live S2 H1 H2.
+  Proof.
+    intros Heq [Hs Heq1]. split; eauto.
+  Admitted.
 
 
   Lemma val_loc_in_dom (H1 H2 : heap block) (v1 v2 : value) :

@@ -2496,25 +2496,51 @@ Proof.
     inv H0. inv H.
 Qed.
 
+
+Corollary exp_fv_correct e :
+ (occurs_free e) <--> (FromSet (exp_fv e)).
+Proof.
+  destruct exp_fv_fundefs_fv_correct as [H1 _].
+  unfold exp_fv. specialize (H1 e empty empty).
+  split; intros x H.
+  - eapply FromSet_complete. reflexivity.
+    eapply H1. left; split; eauto.
+    intros Hc; inv Hc.
+  - eapply FromSet_sound in H; [| reflexivity ].
+    eapply H1 in H. destruct H as [[Hin _] | Hemp]; [| now inv Hemp].
+    eassumption.
+Qed.
+
 Corollary fundefs_fv_correct B :
-  Same_set var (occurs_free_fundefs B)
-           (FromList (PS.elements (fundefs_fv B))).
+ (occurs_free_fundefs B) <--> (FromSet (fundefs_fv B)).
 Proof.
   destruct exp_fv_fundefs_fv_correct as [_ H2].
   unfold fundefs_fv. specialize (H2 B empty empty).
   destruct (fundefs_fv_aux B empty empty) as [scope fvs].
   split; intros x H.
-  - inv H2.
-    assert (Hin : In x fvs).
-    { eapply H1. left; split; eauto. intros Hc. inv Hc. }
-    eapply PS.elements_spec1 in Hin. eapply InA_alt in Hin.
-    edestruct Hin as [y [Heq Hin']]. subst. eauto. 
-  - inv H2. simpl in H. unfold FromList, Ensembles.In in H.
-    eapply In_InA in H. eapply PS.elements_spec1 in H.
-    eapply H1 in H. inv H. inv H2; eauto. inv H2.
-    now eapply PS.E.eq_equiv.
+  - eapply FromSet_complete. reflexivity.
+    eapply H2. left; split; eauto.
+    intros Hc; inv Hc.
+  - eapply FromSet_sound in H; [| reflexivity ].
+    eapply H2 in H. destruct H as [[Hin _] | Hemp]; [| now inv Hemp].
+    eassumption.
 Qed.
 
+Instance Occurs_free_ToMSet (e : exp) : ToMSet (occurs_free e) :=
+  {
+    mset := exp_fv e
+  }.
+Proof.
+  eapply exp_fv_correct.
+Qed.
+
+Instance Occurs_free_fundefs_ToMSet (B : fundefs) : ToMSet (occurs_free_fundefs B) :=
+  {
+    mset := fundefs_fv B
+  }.
+Proof.
+  eapply fundefs_fv_correct.
+Qed.
 
 Lemma In_fold_left_l {A} (f : A -> FVSet) (l : list A)
       (si : FVSet) x:
@@ -4650,4 +4676,4 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       destruct He as [Dece].
       destruct (Dece x). now left; constructor; auto.
       now right; intros Hc; inv Hc; auto.
-  Qed.
+  Qed. 

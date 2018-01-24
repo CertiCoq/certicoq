@@ -1649,7 +1649,8 @@ Section CC_correct.
               end) _ _ _ ) as [m1' n].
         eapply bind_triple.
         apply get_vars_bound_var_Included with (S' := Union _ (bound_var (Efun f2 e)) S).
-        rewrite <- fundefs_fv_correct.
+        assert (Heq : (@FromList var (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
+        rewrite Heq, <- fundefs_fv_correct.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
         apply Included_Union_preserv_r. normalize_occurs_free...
@@ -2267,7 +2268,8 @@ Section CC_correct.
           eapply binding_not_in_map_antimon; [| eassumption ]...
           eassumption.
         * eapply make_env_occurs_free_Included. eassumption.
-          rewrite <- fundefs_fv_correct.
+          assert (Heq : (FromList (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
+          rewrite Heq, <- fundefs_fv_correct.
           eapply Disjoint_Included_l. now apply Setminus_Included.
           eapply Disjoint_Included_r; [| eassumption ].
           normalize_occurs_free...
@@ -2336,7 +2338,9 @@ Section CC_correct.
           now apply bound_var_occurs_free_fundefs_Efun_Included.
           intros B' s3. eapply return_triple. simpl in *.
           intros s4 [Hseq [_ Hf4]] Hclo. split. 
-          eapply Included_trans. eapply He. rewrite <- fundefs_fv_correct.
+          eapply Included_trans. eapply He.
+          assert (Heq : (FromList (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
+          rewrite Heq, <- fundefs_fv_correct.
           normalize_occurs_free.
           rewrite Hctx, <- app_ctx_f_fuse in Hclo. simpl in Hclo.
           assert (Hclo' : Same_set _ (occurs_free_fundefs B') (Empty_set _))
@@ -2731,6 +2735,7 @@ Section CC_correct.
         eapply Setminus_Disjoint_preserv_l... 
     - eapply bind_triple. now apply get_name_no_suff_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1. unfold make_env.
+      assert (Heqel : (@FromList var (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
       destruct
         ((fix
             add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
@@ -2745,7 +2750,7 @@ Section CC_correct.
         [ eapply get_vars_unique_bindings | eapply get_vars_bound_var_Included' ];
         eapply Setminus_Disjoint_preserv_l;
         (eapply Disjoint_Included_r; [| eassumption ]);
-        rewrite <- fundefs_fv_correct; rewrite occurs_free_Efun...
+        rewrite Heqel, <- fundefs_fv_correct; rewrite occurs_free_Efun...
       intros [xs f1] s2. eapply pre_strenghtening. intros ? [[Hun1 _] [Hin Hf]].
       exact (conj (conj Hun1 Hin) Hf).
       apply pre_curry_l; intros [Hun1 Hin1]. inv Hun.

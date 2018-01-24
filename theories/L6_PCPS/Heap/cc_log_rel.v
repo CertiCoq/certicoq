@@ -1927,7 +1927,6 @@ Module CC_log_rel (H : Heap).
           edestruct Hcc as (xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
           reflexivity. reflexivity.
           edestruct (live_exists (env_locs rho2'' (occurs_free e2)) H2') as [H2'' Hgc'].
-          eapply Decidable_env_locs. now eauto with typeclass_instances. 
           edestruct Hi' with (i := k - cost (Eapp f1 t xs1)) as [r2 [c2 [m2 [Hbs2 [Hig Hcc2]]]]];
             [ | | | | | | eassumption | | ]. 
           + simpl. omega.
@@ -1974,9 +1973,9 @@ Module CC_log_rel (H : Heap).
             * eassumption.
             * simpl; omega.
           + eapply heap_env_equiv_heap_equiv.
-            destruct Hgc as [? [? ?]]. eassumption.
+            destruct Hgc as [? ?]. eassumption.
           + eapply heap_env_equiv_heap_equiv.
-            destruct Hgc' as [? [? ?]]. eassumption.
+            destruct Hgc' as [? ?]. eassumption.
           + eapply IIL2inIIG.  
             eapply II_gc; [| eassumption | eassumption ].
             eapply IInvAppCompat; try eassumption.
@@ -2229,10 +2228,6 @@ Module CC_log_rel (H : Heap).
           eapply Included_trans; [| eassumption ].
           eapply env_locs_monotonic. simpl. normalize_occurs_free...
     Qed.
-    
-    Definition size_reachable (S : Ensemble loc) (H1 : heap block) (s : nat ) : Prop :=
-      exists H2, live S H1 H2 /\ size H2 = s. 
-
 
   End Compat.
 

@@ -186,9 +186,9 @@ Module HeapDefs (H : Heap) .
   Abort.
 
   (** Size of the reachable portion of the heap *)
-  Definition size_reachable (s : PS.t) (H : heap block) : nat :=
-    size_with_measure_filter size_val (reach_set H s) H.
-  
+  Definition size_reachable (S : Ensemble loc) {Hmset : ToMSet S} (H : heap block) : nat :=
+    size_with_measure_filter size_val (reach_set H mset) H.
+    
   (** A heap is well-formed if there are not dangling pointers in the stored values *)
   Definition well_formed (S : Ensemble loc) (H : heap block) :=
     forall l v, l \in S -> get l H = Some v -> locs v \subset dom H.
@@ -2182,7 +2182,63 @@ Module HeapDefs (H : Heap) .
       + rewrite env_locs_Node_None.
         rewrite FromSet_union, IHrho1, IHrho2. reflexivity.
   Qed.
+
+  (* TODO move *)
+  Lemma env_locs_Singleton_None x rho :
+    M.get x rho = None ->
+    env_locs rho [set x] <--> Empty_set _.
+  Proof.
+    intros Hget; split; intros l.
+    - intros [y [Hin Hget']]. inv Hin.
+      rewrite Hget in Hget'. eassumption.
+    - intros Hin. eexists; split.
+      reflexivity. rewrite Hget; eauto.
+  Qed.
   
+  Lemma env_locs_set_correct_aux S s s' (rho : env) :
+    S <--> FromSet s ->
+    env_locs rho S :|: FromSet s' <--> FromSet (PS.fold
+                                               (fun (x : PS.elt) (s' : PS.t) =>
+                                                  match M.get x rho with
+                                                    | Some (Loc l) => PS.add l s'
+                                                    | Some (FunPtr _ _) => s'
+                                                    | None => s'
+                                                  end) s s').
+  Proof with (now eauto with Ensembles_DB).
+    unfold env_locs_set, FromSet at 1. rewrite PS.fold_spec.
+
+    revert S s'; induction (PS.elements s); intros S s' Heq; simpl.
+    - rewrite FromList_nil in Heq. rewrite Heq, env_locs_Empty_set, Union_Empty_set_neut_l.
+      reflexivity.
+    - rewrite FromList_cons in Heq.
+      rewrite Heq, env_locs_Union.
+      destruct (M.get a rho) as [v | ] eqn:Hget.
+      + rewrite env_locs_Singleton; eauto.
+        rewrite <- IHl; [| reflexivity ].
+        destruct v as [l'| ].
+        * rewrite FromSet_add...
+        * simpl...
+      + rewrite env_locs_Singleton_None; eauto.
+        rewrite Union_Empty_set_neut_l. rewrite <- IHl; reflexivity.
+  Qed.
+
+  Lemma env_locs_set_correct S s (rho : env) :
+    S <--> FromSet s ->
+    env_locs rho S  <--> FromSet (env_locs_set rho s).
+  Proof with (now eauto with Ensembles_DB).
+    intros Heq. unfold env_locs_set.
+    rewrite <- env_locs_set_correct_aux; [| eassumption ].
+    rewrite FromSet_empty, Union_Empty_set_neut_r...
+  Qed.
+  
+  Instance ToMSet_env_locs (S : Ensemble var) (rho : env) (HS : ToMSet S) : ToMSet (env_locs rho S) :=
+    {
+      mset := env_locs_set rho mset
+    }.
+  Proof.
+    eapply env_locs_set_correct. eapply mset_eq.
+  Qed.
+
   Lemma locs_set_correct (b : block) :
     locs b <--> FromSet (locs_set b).
   Proof with (now eauto with Ensembles_DB).
@@ -2316,11 +2372,101 @@ Module HeapDefs (H : Heap) .
         * rewrite FromSet_union, reach_0, FromSet_empty, Union_Empty_set_neut_l, Heq.
           reflexivity.
   Qed.
-  
+
+
   (** TODO implement DFS in the heap to find reachable locs *)
   Lemma Decidable_reach' (S : Ensemble loc) (H : heap block) :
-    Decidable S ->
+    ToMSet S ->
     Decidable (reach' H S).
-  Admitted.
-        
+  Proof.
+    intros [s Heq]. eapply Decidable_Same_set.
+    eapply reach_set_correct. symmetry; eassumption.
+    eapply Decidable_FromSet.
+  Qed.
+
+  (** Lemmas about dfs *)
+
+  (* TODO move *)
+  Instance Proper_From_set : Proper (PS.Equal ==> Same_set _) FromSet.
+  Proof.
+    constructor.
+    - intros z Hin. eapply FromSet_sound in Hin; [| reflexivity ].
+      eapply FromSet_complete. reflexivity. eapply H. eassumption.
+    - intros z Hin. eapply FromSet_sound in Hin; [| reflexivity ].
+      eapply FromSet_complete. reflexivity. eapply H. eassumption.
+  Qed.
+
+  Lemma Same_set_From_set (s1 s2 : PS.t) :
+    FromSet s1 <--> FromSet s2 -> PS.Equal s1 s2.
+  Proof.
+    intros Heq z. split.
+    - intros Hin. eapply FromSet_complete in Hin; [| reflexivity ].
+      eapply FromSet_sound. reflexivity. eapply Heq. eassumption.
+    - intros Hin. eapply FromSet_complete in Hin; [| reflexivity ].
+      eapply FromSet_sound. reflexivity. eapply Heq. eassumption.
+  Qed.
+
+  Instance union_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.union.
+  Proof.
+    intros x y Heq1 x' y' Heq2; subst.
+    intros z; split; intros Hin; eapply PS.union_spec in Hin;
+    inv Hin; eapply PS.union_spec; now firstorder.
+  Qed.
+
+  Instance diff_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.diff.
+  Proof.
+    intros x y Heq1 x' y' Heq2; subst.
+    intros z; split; intros Hin; eapply PS.diff_spec in Hin;
+    inv Hin; eapply PS.diff_spec; now firstorder.
+  Qed.
+
+  Instance diff_proper_r :  Proper (eq ==> PS.Equal ==> PS.Equal) PS.diff.
+  Proof.
+    intros x y Heq1 x' y' Heq2; subst.
+    intros z; split; intros Hin; eapply PS.diff_spec in Hin;
+    inv Hin; eapply PS.diff_spec; now firstorder.
+  Qed.
+  
+  Instance cardinal_proper : Proper (PS.Equal ==> eq) PS.cardinal.
+  Proof.
+    intros x y Heq. rewrite !PS.cardinal_spec.
+    erewrite elements_eq. reflexivity. assumption.
+  Qed.
+
+  Instance Proper_post_set : Proper (eq ==> PS.Equal ==> PS.Equal) post_set.
+  Proof.
+    intros x y Heq x' y' Heq2; subst. unfold post_set. rewrite !PS.fold_spec.
+    erewrite elements_eq. reflexivity. assumption.
+  Qed.
+  
+  Instance Proper_dfs : Proper (PS.Equal ==> PS.Equal ==> Logic.eq ==> Logic.eq ==> PS.Equal) dfs.
+  Proof.
+    intros x y Heq1 x' y' Heq2 H' H Heq3 n' n Heq4; subst.
+    revert x y Heq1 x' y' Heq2. 
+    induction n; simpl; intros x y Heq1 x' y' Heq2.
+    - rewrite Heq2, Heq1. reflexivity.
+    - rewrite Heq1. destruct (PS.cardinal y). eassumption.
+      eapply IHn. repeat rewrite Heq1 at 1. rewrite Heq2. reflexivity.
+      rewrite Heq1, Heq2. reflexivity.
+  Qed.
+
+  Instance Proper_reach_set : Proper (Logic.eq ==> PS.Equal ==> PS.Equal) reach_set.
+  Proof.
+    intros x y Heq1 x' y' Heq2; subst.
+    unfold reach_set. rewrite Heq2. reflexivity.
+  Qed.
+  
+  Lemma size_reachable_same_set S1 S2 (H1 : ToMSet S1) (H2 : ToMSet S2) H :
+    S1 <--> S2 ->
+    size_reachable S1 H = size_reachable S2 H.
+  Proof.
+    unfold size_reachable. intros Heq. destruct H1 as [m1 meq1]; destruct H2 as [m2 meq2].
+    unfold mset. rewrite meq1, meq2 in Heq. eapply Same_set_From_set in Heq.
+    unfold size_with_measure_filter.
+    erewrite heap_elements_filter_set_Equal.
+    reflexivity. rewrite Heq. reflexivity.
+  Qed.
+
+  (* end move *)
+
 End HeapDefs.

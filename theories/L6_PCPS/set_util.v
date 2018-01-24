@@ -286,6 +286,27 @@ Qed.
 Definition FromSet (s : PS.t) : Ensemble positive :=
   FromList (elements s).
 
+Lemma FromSet_sound (S : Ensemble positive) (s : PS.t) x :
+  S <--> FromSet s ->
+  x \in S -> In x s.
+Proof. 
+  intros Heq Hin. eapply Heq in Hin.
+  unfold FromSet, FromList, Ensembles.In in Hin.
+  eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
+  eassumption.
+  now eapply PS.E.eq_equiv.
+Qed.
+
+Lemma FromSet_complete (S : Ensemble positive) (s : PS.t) x :
+  S <--> FromSet s ->
+  In x s -> x \in S.
+Proof. 
+  intros Heq Hin.
+  eapply Heq. unfold FromSet, FromList, Ensembles.In.
+  eapply PS.elements_spec1 in Hin. eapply InA_alt in Hin.
+  edestruct Hin as [y [Heq' Hin']]. subst. eassumption.
+Qed.
+
 Lemma FromSet_union s1 s2 :
   FromSet (PS.union s1 s2) <--> FromSet s1 :|: FromSet s2.
 Proof.
@@ -386,3 +407,11 @@ Proof.
   unfold FromSet.
   eapply Ensembles_util.Decidable_FromList. 
 Qed.
+
+(** Coercion from Ensemble to PS.t *)
+
+Class ToMSet (S : Ensemble positive) :=
+  {
+    mset : PS.t;
+    mset_eq : S <--> FromSet mset
+  }.

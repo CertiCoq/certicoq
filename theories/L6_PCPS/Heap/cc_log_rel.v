@@ -353,7 +353,34 @@ Module CC_log_rel (H : Heap).
         forall l_clo vs,
           get l_clo H1 = Some (Constr c (vf1 :: venv :: vs)) ->
           (Res (vf1, H1)) ≺ ^ ( k ; IP ; P ) (Res (Loc l_clo, H2)).
+
+  (** Versions without the logical relation. Useful when we're only interested in other invariants. *)
+
+  (** Invariant about the free variables *) 
+  Definition FV_inv_weak (rho1 : env) (rho2 : env) (H2 : heap block)
+             (Scope Funs : Ensemble var) (c : cTag) (Γ : var) (FVs : list var) : Prop :=
+    forall (x : var) N (v : value),
+      ~ In _ Scope x ->
+      ~ In _ Funs x -> 
+      nthN FVs N = Some x ->
+      M.get x rho1 = Some v ->
+      exists (vs : list value) (l : loc) (v' : value),
+        M.get Γ rho2 = Some (Loc l) /\
+        get l H2 = Some (Constr c vs) /\
+        nthN vs N = Some v'.
   
+  (** Invariant about the functions in the current function definition *)
+  Definition Fun_inv_weak (rho1 : env)  (rho2 : env)
+             (Scope Funs : Ensemble var) (σ : var -> var) (c : cTag) (Γ : var)  : Prop :=
+    forall (f : var) (vf1 : value),
+      ~ In _ Scope f ->
+      In var Funs f ->
+      M.get f rho1 = Some vf1 ->
+      exists (vf1 venv : value),
+        ~ In _ Scope (σ f) /\
+        M.get (σ f) rho2 = Some vf1 /\
+        M.get Γ rho2 = Some venv.
+
   Section LogRelLemmas.
     
     Context (LIP : IInv)

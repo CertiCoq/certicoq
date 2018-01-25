@@ -34,7 +34,7 @@ Require Import Libraries.maps_util.
  
 
 Definition loc:Type := block * int.
-Definition int_size := size_chunk Mint32.
+Definition int_size := (size_chunk Mint32).
 Definition max_args :=  Int.repr 1024%Z.
 
 Notation intTy := (Tint I32 Signed
@@ -49,7 +49,63 @@ Notation longTy := (Tlong Signed
 Notation ulongTy := (Tlong Unsigned
                         {| attr_volatile := false; attr_alignas := None |}).
 
+Definition uint_range : Z -> Prop := 
+  fun i => (0 <= i <=  Int.max_unsigned)%Z. 
+Transparent uint_range.
 
+Theorem uint_range_unsigned:
+  forall i,
+    uint_range (Int.unsigned i).
+Proof.
+  apply Int.unsigned_range_2.
+Qed.
+  
+  
+Definition uint_range_l: list Z -> Prop :=
+  fun l => Forall uint_range l.
+
+Ltac solve_uint_range:=
+  unfold Int.max_unsigned in *; unfold Int.modulus in *; simpl in *; (match goal with
+          | [H:uint_range _ |- _] => unfold uint_range in H; solve_uint_range
+          | [H:uint_range_l _ |- _] => unfold uint_range_l in H;  solve_uint_range                                                               
+          | [H: Forall uint_range _ |- _] => inv H; solve_uint_range 
+          | [|- uint_range _] => unfold uint_range; unfold Int.max_unsigned; unfold Int.modulus; simpl; try omega
+          | [|- uint_range (Int.unsigned _)] => apply uint_range_unsigned
+          | [|- uint_range_l _] => unfold uint_range_l; solve_uint_range
+          | [ |- Forall uint_range _] => constructor; solve_uint_range
+          | _ => auto
+          end).
+
+
+Theorem int_z_mul :
+  forall i y,
+    uint_range_l [i; y] -> 
+  Int.mul (Int.repr i) (Int.repr y) = Int.repr (i * y)%Z.
+Proof.
+  intros.
+  unfold Int.mul.
+  rewrite Int.unsigned_repr.
+  rewrite Int.unsigned_repr. reflexivity.
+  inv H. inv H3; auto.
+  inv H; auto.
+Qed.
+
+
+Theorem int_z_add:
+  forall i y,
+    uint_range_l [i; y] -> 
+    Int.add (Int.repr i) (Int.repr y) = Int.repr (i + y)%Z.
+Proof.
+  intros.
+  unfold Int.add.
+  rewrite Int.unsigned_repr.
+  rewrite Int.unsigned_repr.
+  reflexivity.
+  inv H. inv H3; auto.
+  inv H; auto.
+Qed.  
+  
+  
 (* TODO: move to identifiers *)
 Inductive bound_var_val: L6.cps.val -> Ensemble var :=
 | Bound_Vconstr :
@@ -385,25 +441,149 @@ Inductive is_nth_projection_of_x : positive -> Z -> positive -> statement -> Pro
                          var_or_funvar v  e ->
                           is_nth_projection_of_x x n v (Field(var x, n) :::=  e).
 
-SearchAbout Vptr.
-About Mem.store.
 
 Inductive mem_after_n_proj_store : block -> Z -> (list Values.val) -> Z -> mem -> mem ->  Prop :=
 | Mem_last:
     forall m b ofs i v m',
-    Mem.store Mint32 m b  (Int.unsigned (Int.add (Int.repr ofs) (Int.mul (Int.repr int_size) (Int.repr i)))) v = Some m' ->
+    Mem.store Mint32 m b  (Int.unsigned (Int.add (Int.repr ofs) (Int.repr (int_size*i)))) v = Some m' ->
     mem_after_n_proj_store b ofs [v] i m m'
 | Mem_next:
     forall m b ofs i v m' m'' vs,
-    Mem.store Mint32 m b (Int.unsigned (Int.add (Int.repr ofs) (Int.mul (Int.repr int_size) (Int.repr i)))) v = Some m' ->
+    Mem.store Mint32 m b (Int.unsigned (Int.add (Int.repr ofs) (Int.repr (int_size*i)))) v = Some m' ->
     mem_after_n_proj_store b ofs vs (Z.succ i) m' m'' ->
     mem_after_n_proj_store b ofs (v::vs) i m m''. 
-    
+
+ 
+
+(* mem_after_n_proj_store on area in comp(L) leaves m unchanged on L *) 
+Theorem mem_after_n_proj_store_unchanged:
+  forall L b ofs vs i m m',
+    mem_after_n_proj_store b ofs vs i m m' ->
+    uint_range_l (ofs::i::(int_size * (i+(Z.of_nat (length vs))))%Z::(ofs+int_size*(i+(Z.of_nat (length vs))))%Z::nil) ->
+  (forall j, (ofs+int_size*i) <= j < ofs+int_size*(i + Z.of_nat (length vs)) ->  ~ L b j)%Z -> 
+  Mem.unchanged_on L m m'.
+Proof.  
+  induction vs; intros; inv H.
+  - (* last assignment *)
+    eapply Mem.store_unchanged_on; eauto.
+    intros.     
+    apply H1.
+    rewrite int_z_add in H.
+    rewrite Int.unsigned_repr in H.
+    rewrite Z.mul_add_distr_l. simpl length. simpl Z.of_nat.
+    rewrite Z.add_assoc. simpl in *. omega.
+    simpl length in H0. simpl Z.of_nat in H0.
+    rewrite Z.mul_add_distr_l in H0. rewrite Z.add_assoc in H0.
+    solve_uint_range. split; try omega.
+    apply OrdersEx.Z_as_OT.add_nonneg_nonneg; try omega.
+    destruct i; try omega.
+    apply Pos2Z.is_nonneg.
+    inv H3. exfalso.
+    assert (Hpp := Zlt_neg_0 p0). omega.    
+    solve_uint_range.
+     split; try omega.
+     
+    destruct i; try omega.
+    apply Pos2Z.is_nonneg.
+    inv H3. exfalso.
+    assert (Hpp := Zlt_neg_0 p0). omega.
+    inv H5. destruct i; try omega.
+    simpl in H2.  rewrite <- Pplus_one_succ_r in H2.
+    etransitivity.
+    Focus 2. apply H2.
+    rewrite Pos.double_succ.
+    rewrite Pos.double_succ.
+    rewrite Pos.double_succ.
+    do 4 (rewrite Pos2Z.inj_succ).
+    omega.
+    etransitivity.
+    apply Pos2Z.neg_is_nonpos.
+    omega.
+  - (* IH *)
+    apply Mem.unchanged_on_trans with (m2 := m'0).
+    + eapply Mem.store_unchanged_on; eauto.
+      intros. apply H1.
+      rewrite int_z_add in H.
+      rewrite Int.unsigned_repr in H.
+      rewrite Z.mul_add_distr_l. simpl length. simpl Z.of_nat.
+      rewrite Z.add_assoc.
+      rewrite Zpos_P_of_succ_nat.
+      rewrite Zmult_succ_r.
+      rewrite Z.add_comm with (m := int_size).
+      rewrite Z.add_assoc.
+      unfold int_size in *.
+      simpl size_chunk in *.
+      omega.
+      solve_uint_range.
+      split; destruct i; try omega.
+      inv H4. apply Z.add_nonneg_nonneg. auto. apply Pos2Z.is_nonneg.
+      inv H3. assert (Hp0 := Zlt_neg_0 p0). exfalso; omega.
+      inv H7. etransitivity. Focus 2. apply H2.
+      apply Z.add_le_mono_l.
+      simpl.
+      rewrite Pos.add_xO.
+      rewrite Pos.add_xO. 
+      rewrite Pos2Z.inj_add.
+      rewrite Zplus_0_r_reverse with (n := Z.pos p0~0~0) at 1.
+      apply Z.add_le_mono. reflexivity.
+      apply Pos2Z.is_nonneg.
+      assert (Hp0 := Zlt_neg_0 p0). exfalso; omega.
+      solve_uint_range.
+      destruct i; try omega.
+      split. apply Pos2Z.is_nonneg.
+      inv H5. simpl in *. etransitivity.
+      Focus 2. apply H2.
+      do 2 (rewrite Pos.add_xO).
+      rewrite Pos2Z.inj_add.
+      rewrite Zplus_0_r_reverse with (n := Z.pos p0~0~0) at 1.
+      apply Z.add_le_mono. reflexivity.
+      apply Pos2Z.is_nonneg.
+      inv H3.
+      assert (Hp0 := Zlt_neg_0 p0). exfalso; omega.
+    +  eapply IHvs; eauto.
+       solve_uint_range.
+       split; try omega.
+       inv H4.
+       etransitivity; eauto.
+       destruct i; simpl; try omega.       
+       rewrite Pos2Z.inj_xO.
+       replace  (Z.pos (Pos.of_succ_nat (length vs))~0)%Z with  (2* Z.pos (Pos.of_succ_nat (length vs)))%Z by apply Pos2Z.inj_xO.
+       rewrite Zpos_P_of_succ_nat. omega.
+       do 2 (rewrite Pos.add_xO).
+       do 2 (rewrite Pos2Z.inj_add).
+       apply Z.add_le_mono; try omega.
+       rewrite Pos2Z.inj_xO.
+       replace (Z.pos p0~0) with (2* Z.pos p0)%Z by apply Pos2Z.inj_xO. omega.
+       rewrite Pos2Z.inj_xO.
+       replace  (Z.pos (Pos.of_succ_nat (length vs))~0)%Z with  (2* Z.pos (Pos.of_succ_nat (length vs)))%Z by apply Pos2Z.inj_xO.
+       rewrite Zpos_P_of_succ_nat. omega.
+       assert (Hp0 := Zlt_neg_0 p0). exfalso; omega.
+       assert (exists y,  Z.succ i + Z.of_nat (length vs) = Z.pos y)%Z.
+       assert (exists y, Z.succ i = Z.pos y). destruct i.  simpl. eauto. simpl. eauto.
+       assert (Hp0 := Zlt_neg_0 p0). exfalso; omega.
+       destruct H. rewrite H.  destruct vs. simpl. eauto. simpl. eauto.
+       destruct H. rewrite H.
+       split. apply Pos2Z.is_nonneg.
+       rewrite Zpos_P_of_succ_nat in H5.
+       inv H5. etransitivity; eauto.
+       rewrite Z.add_succ_comm in H. rewrite H. omega.
+       rewrite Zpos_P_of_succ_nat in H5.
+       rewrite <- Z.add_succ_comm in H5.
+       apply H5.
+       intros. apply H1.
+       inv H. split.
+       * eapply Z.le_trans; eauto.
+         rewrite <- Zmult_succ_r_reverse.
+         rewrite Zplus_assoc.
+         unfold int_size in *.
+         simpl. omega.
+       *  simpl length.  simpl Z.of_nat.
+          rewrite Zpos_P_of_succ_nat.
+          rewrite <- Z.add_succ_comm; auto.
+Qed.
 
 
-
-
-
+       
 (* trunkated headers at 32 bits (or at size_of_int) *)
 Definition repr_unboxed_L7: N -> Z -> Prop :=
  fun t => fun h => Int.eqm h (Z.of_N ((N.shiftl t 1) + 1)).
@@ -440,11 +620,7 @@ Inductive repr_switch_L6_L7: positive -> labeled_statements -> labeled_statement
                            (
                              Sswitch (Ebinop Oshr (var x) (Econst_int (Int.repr 1) val) val)
                                      ls')).
-About LScons.
 
-
-
-Print state.
 (* relate a L6.exp -| cEnv, fEnv to a series of statements in a clight program (passed as parameter) -- syntactic relation that shows the right instructions have been generated for functions body. There should not be function definitions (Efun), or primitive operations (they are not supported by our backend) in this 
 TODO: maybe this should be related to a state instead? 
 *)
@@ -595,6 +771,15 @@ with repr_val_L6_L7:  L6.cps.val -> mem -> Values.val -> Prop :=
 
 
 Definition locProp := block -> Z -> Prop.
+About Mem.load.
+(* m and m' are the _same_ over subheap L *)
+
+Definition sub_locProp: locProp -> locProp -> Prop :=
+  fun L L' => forall b ofs, L b ofs -> L' b ofs.
+
+      
+
+
 
 
 
@@ -660,6 +845,9 @@ with repr_val_ptr_list_L_L6_L7: (list L6.cps.val) -> mem -> locProp -> block -> 
            repr_val_L_L6_L7 v m L v7 -> 
            repr_val_ptr_list_L_L6_L7 vs m L b (Int.add i (Int.repr int_size)) ->
            repr_val_ptr_list_L_L6_L7 (v::vs) m L b i.
+
+
+
 
 SearchAbout get_var_or_funvar.
 
@@ -795,7 +983,8 @@ Proof.
     admit.
     unfold int_size. simpl. unfold Int.max_unsigned. simpl. omega. 
 Admitted. *)
-  
+SearchAbout  Mem.unchanged_on.
+
 Theorem repr_val_L_unchanged:
   forall v6 m L v7, 
   repr_val_L_L6_L7 v6 m L v7 ->
@@ -811,6 +1000,16 @@ Proof.
     eapply Mem.load_unchanged_on; eauto.
 Qed.
 
+Theorem repr_val_L_sub_locProp:
+    forall v6 m L v7, 
+  repr_val_L_L6_L7 v6 m L v7 ->
+  forall L', sub_locProp L L' -> 
+  repr_val_L_L6_L7 v6 m L' v7.
+Proof.
+  apply (repr_val_ind' (fun v6 m L v7 => forall L', sub_locProp L L' -> 
+                                                   repr_val_L_L6_L7 v6 m L' v7)
+                       (fun vs m L b i => forall L', sub_locProp L L' ->  repr_val_ptr_list_L_L6_L7 vs m L' b i)); intros; try (now econstructor; eauto).
+Qed.
       
 (* 
 Returns True if the pointer Vptr q_b q_ofs is reachable by crawling v7 
@@ -967,7 +1166,7 @@ Theorem repr_val_ptr_load :
 
 
 (* TODO: write this to ensure that the GC nevers runs out of space in the middle of a function*)
-Definition correct_alloc: exp -> int -> Prop := fun e i => i =  Int.repr (Z.of_nat (max_allocs e )).
+Definition correct_alloc: exp -> Z -> Prop := fun e i => i =  Z.of_nat (max_allocs e ).
 
 Theorem max_allocs_boxed: forall v c e l,
     l <> nil -> 
@@ -998,7 +1197,7 @@ Inductive correct_fundef_info: positive -> fTag -> list positive -> exp -> ident
        fi[1] = number of roots
        |fi| = 2+fi[1] *)
     gvar_init finfo = ((Init_int32 fi_0)::(Init_int32 fi_1)::fi_rest) ->
-    correct_alloc e fi_0 ->
+    correct_alloc e (Int.unsigned fi_0) ->
     fi_1 = Int.repr (Z.of_N n) ->
     n = N.of_nat (length fi_rest) -> 
     correct_fundef_info f t vs e tag. 
@@ -1097,11 +1296,11 @@ Definition protected_non_reachable_val_L7 v6 m v7 (lenv:temp_env) : Prop :=
 
 
 
-Definition protected_not_in_L (lenv:temp_env) (L:block -> Z -> Prop): Prop :=
+Definition protected_not_in_L (lenv:temp_env) (max_alloc:Z) (L:block -> Z -> Prop): Prop :=
   exists alloc_b alloc_ofs limit_b limit_ofs args_b args_ofs,
     M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
     (forall j : Z, ((Int.unsigned alloc_ofs) <= j <
-                    Int.unsigned alloc_ofs + size_chunk Mint32)%Z  ->
+                    Int.unsigned (Int.add alloc_ofs (Int.repr (int_size * max_alloc))))%Z  ->
                    ~ L alloc_b j) /\
     M.get limitIdent lenv = Some (Vptr limit_b limit_ofs) /\
         (forall j : Z, ((Int.unsigned limit_ofs) <= j <
@@ -1110,18 +1309,18 @@ Definition protected_not_in_L (lenv:temp_env) (L:block -> Z -> Prop): Prop :=
           M.get argsIdent lenv = Some (Vptr args_b args_ofs) /\
           (forall z j: Z,
               (0 <= z < Int.unsigned max_args)%Z -> 
-              ((Int.unsigned  (Int.add args_ofs (Int.mul (Int.repr int_size) (Int.repr z))))
+              ((Int.unsigned  (Int.add args_ofs (Int.repr (int_size * z))))
                <= j <
-               (Int.unsigned (Int.add args_ofs (Int.mul (Int.repr int_size) (Int.repr z)))) +  int_size)%Z ->
+               (Int.unsigned (Int.add args_ofs (Int.repr (int_size * z)))) +  int_size)%Z ->
 
                        ~ L args_b j).
 
 
 Theorem protected_not_in_L_proper:
-  forall lenv lenv' L,
+  forall lenv lenv' L z,
   map_get_r _ lenv lenv' ->
-  protected_not_in_L lenv L ->
-  protected_not_in_L lenv' L.
+  protected_not_in_L lenv z L ->
+  protected_not_in_L lenv' z L.
 Proof.
   intros.
   inv H0. destructAll. rewrite H in *.
@@ -1129,10 +1328,10 @@ Proof.
 Qed.
 
 Theorem protected_not_in_L_set:
-  forall lenv L x v,
-  protected_not_in_L lenv L ->
+  forall lenv z L x v ,
+  protected_not_in_L lenv z L ->
   ~ is_protected_id x ->
-  protected_not_in_L (M.set x v lenv) L.
+  protected_not_in_L (M.set x v lenv) z L.
 Proof.
   intros.
   destruct H.
@@ -1175,7 +1374,7 @@ Now also makes sure none of the protected portion are reachable by the v7
 
     Definition rel_mem_L6_L7: exp -> L6.eval.env -> mem -> temp_env -> Prop :=
       fun e rho m le =>
-        exists L, protected_not_in_L le L /\
+        exists L, protected_not_in_L le (Z.of_nat (max_allocs e)) L /\
         forall x, occurs_free e x ->
                   exists v6, M.get x rho = Some v6 /\
                                repr_val_id_L_L6_L7 v6 m L le x.
@@ -1201,13 +1400,17 @@ Definition traceless_step2:  genv -> state -> state -> Prop := fun ge s s' => st
 
 Definition m_tstep2 (ge:genv):=  clos_trans state (traceless_step2 ge).
 
+Hint Unfold Int.modulus Int.max_unsigned uint_range.
+Hint Transparent Int.max_unsigned Int.modulus uint_range.
+
+
 
 Theorem mem_of_Forall_nth_projection:
   forall x lenv b ofs f, 
     M.get x lenv = Some (Vptr b ofs) ->
     forall l vs s i m k,
       (0 <= i /\ i + (Z.of_nat (List.length vs)) <= Int.max_unsigned )%Z ->
-      (forall j, Int.ltu j (Int.add (Int.repr i) (Int.repr (Z.of_nat (List.length vs)))) = true -> Mem.valid_access m Mint32 b (Int.unsigned (Int.add ofs (Int.mul (Int.repr int_size) j))) Writable) ->
+      (forall j, 0 <= j < i + Z.of_nat (List.length vs) -> Mem.valid_access m Mint32 b (Int.unsigned (Int.add ofs (Int.repr  (int_size * j)))) Writable)%Z ->
       Forall_statements_in_seq'
         (is_nth_projection_of_x x) l s i ->
       Forall2 (get_var_or_funvar lenv) l vs ->
@@ -1219,38 +1422,17 @@ Proof.
   induction l; intros vs s i m k Hil_max; intros.
   - (* empty -- impossible *)
     inv H1. inv H0.
-  -  inv H1.
+  -   assert (Hi_range : uint_range i) by solve_uint_range.
+     inv H1.
      assert (Hvas :  Mem.valid_access m Mint32 b
-                                      (Int.unsigned (Int.add ofs (Int.mul (Int.repr 4) (Int.repr i))))
+                                      (Int.unsigned (Int.add ofs (Int.repr (4 * i))))
                                       Writable).
-     apply H. simpl.
-     unfold Int.ltu.
-     unfold Int.add.
-     apply Coqlib.zlt_true.
-     destruct Hil_max.
-     rewrite Int.unsigned_repr with (z := (Int.unsigned (Int.repr i) +
-                                           Int.unsigned (Int.repr (Z.pos (Pos.of_succ_nat (length l')))))%Z).
-     simpl.
-     rewrite Int.unsigned_repr with (z := (Z.pos (Pos.of_succ_nat (length l')))).
-     apply OrdersEx.Z_as_OT.lt_add_pos_r.     
-     apply Pos2Z.is_pos. 
-     split.
-     apply Z.lt_le_incl. apply Pos2Z.is_pos. 
-      eapply Z.le_le_add_le with (n := 0%Z) (m := i). auto.
-     rewrite Z.add_comm.
-     simpl. auto.
-     rewrite Int.unsigned_repr. rewrite Int.unsigned_repr.
-     split.
-     apply Z.add_nonneg_nonneg. auto.
-     apply Z.lt_le_incl. apply Pos2Z.is_pos.
-     auto. split.      apply Z.lt_le_incl. apply Pos2Z.is_pos.
-     eapply Z.le_le_add_le with (n := 0%Z) (m := i). auto.
-     rewrite Z.add_comm. auto. split; auto.
-     eapply Z.le_le_add_le with (n := 0%Z) (m := Z.of_nat (length (y :: l'))).
-     simpl.
-     apply Z.lt_le_incl.
-     apply  Pos2Z.is_pos. auto. 
-     assert (Hvra := Mem.valid_access_store m Mint32 b  (Int.unsigned (Int.add ofs (Int.mul (Int.repr 4) (Int.repr i)))) y Hvas).
+     apply H. simpl. split.
+     omega.
+     rewrite Zplus_0_r_reverse with (n := i) at 1.
+     apply Zplus_lt_compat_l.
+     apply Pos2Z.is_pos.
+     assert (Hvra := Mem.valid_access_store m Mint32 b  (Int.unsigned (Int.add ofs (Int.repr (4* i)))) y Hvas).
      destruct Hvra as [m2 Hsm2].        
      inv H0.
      + (* last statement *)
@@ -1270,7 +1452,8 @@ Proof.
          constructor.
          constructor. econstructor.  apply eval_Evar_global.  apply M.gempty.
          apply H1. constructor. constructor. constructor.
-         eapply assign_loc_value. Focus 2. apply Hsm2.
+         eapply assign_loc_value. Focus 2.
+         rewrite int_z_mul.  eauto. solve_uint_range.
          constructor.
        * inv H4. exfalso; rewrite H1 in H0; inv H0.         
          constructor. eapply step_assign with (v2 := y) (v := y). 
@@ -1278,7 +1461,9 @@ Proof.
          econstructor. apply Hxlenv. constructor.
          constructor. constructor. constructor. apply H2.
          simpl. destruct y; inv H3; auto.
-         eapply assign_loc_value. Focus 2. apply Hsm2. constructor.
+         eapply assign_loc_value. Focus 2.
+         rewrite int_z_mul. eauto. solve_uint_range. 
+         constructor.
      +  (* IH *)
        inv H9.
        specialize (IHl l'). eapply IHl with (m := m2) in H5; eauto. destruct H5 as [m3 [H5a H5b]]. exists m3.       
@@ -1295,7 +1480,8 @@ Proof.
          constructor. econstructor. econstructor. constructor. eauto. constructor.
          constructor. constructor. econstructor.          
          apply eval_Evar_global.  apply M.gempty. eauto.  constructor. constructor.
-         constructor.  eapply assign_loc_value. constructor. eauto.
+         constructor.  eapply assign_loc_value. constructor.
+         rewrite int_z_mul. eauto. solve_uint_range.
          eapply t_trans. constructor. constructor.
          apply H5a.
        * inv H4. exfalso; rewrite H1 in H0; inv H0.
@@ -1305,7 +1491,7 @@ Proof.
          constructor. econstructor. econstructor. constructor. eauto. constructor.
          constructor. constructor. econstructor. auto. simpl.
          destruct y; inv H3; auto.
-         eapply assign_loc_value. Focus 2. apply Hsm2. constructor.
+         eapply assign_loc_value. Focus 2. rewrite int_z_mul. apply Hsm2. solve_uint_range.  constructor.
          eapply t_trans. constructor. constructor.
          apply H5a.
        * destruct Hil_max.
@@ -1315,27 +1501,7 @@ Proof.
          eapply Mem.store_valid_access_1. apply Hsm2.
          apply H. simpl.
          rewrite Zpos_P_of_succ_nat.
-         rewrite Int.add_unsigned.
-         rewrite Int.add_unsigned in H1.
-         destruct Hil_max.
-         rewrite Int.unsigned_repr.
-         rewrite Int.unsigned_repr.
-         rewrite Int.unsigned_repr in H1.
-         rewrite Int.unsigned_repr in H1.
-         rewrite <- Z.add_succ_comm. auto.
-         split.
-         apply Nat2Z.is_nonneg.
-         simpl in H3. eapply Z.le_trans. Focus 2. apply H3.
-         rewrite Zpos_P_of_succ_nat.
          omega.
-         split. omega. simpl in H3.
-         rewrite Zpos_P_of_succ_nat in H3.
-         rewrite <- Z.add_succ_comm in H3.
-         omega.
-         split. omega.
-         simpl in H3. rewrite Zpos_P_of_succ_nat in H3.
-         omega.
-         split; omega.
 Qed.         
 
 
@@ -1473,27 +1639,26 @@ Section THEOREM.
 
   (* 
    correct_tinfo alloc_id limit_id args_id alloc_max le m
-  > alloc and limit are respectively valid and weak-valid pointers in memory, alloc is at least alloc_max before limit_id
+  > alloc and limit are respectively valid and weak-valid pointers in memory, alloc is at least max before limit_id
   > args points to an array of size max_args in memory before alloc 
 
 limit might be on the edge of current memory so weak_valid, alloc and args are pointing in mem. the int is the max number of blocks allocated by the function 
  
 
    *)
+ 
 
-
-
-Definition correct_tinfo: positive -> positive -> positive -> int -> temp_env ->  mem  -> Prop :=
-  fun alloc_p limit_p args_p max lenv m  =>
-    exists alloc_b alloc_ofs limit_b limit_ofs args_b args_ofs,
+Definition correct_tinfo: positive -> positive -> positive -> Z -> temp_env ->  mem  -> Prop :=
+  fun alloc_p limit_p args_p max_alloc lenv m  =>
+    exists alloc_b alloc_ofs limit_ofs args_b args_ofs,
       M.get alloc_p lenv = Some (Vptr alloc_b alloc_ofs) /\
       Mem.valid_pointer m alloc_b (Int.unsigned alloc_ofs) = true /\
       (* the max int blocks after alloc are Writable *)
-      (forall i, Int.ltu i max = true -> Mem.valid_access m Mint32 alloc_b (Int.unsigned (Int.add alloc_ofs (Int.mul (Int.repr int_size) i))) Writable ) /\
-      M.get limit_p lenv = Some (Vptr limit_b limit_ofs) /\
-      Mem.weak_valid_pointer m limit_b (Int.unsigned limit_ofs) = true /\
+      (forall i, i < max_alloc  -> ((Int.unsigned alloc_ofs) + int_size * max_alloc <=  Int.max_unsigned)    /\  Mem.valid_access m Mint32 alloc_b (Int.unsigned (Int.add alloc_ofs (Int.repr (int_size *  i)))) Writable )%Z /\
+      M.get limit_p lenv = Some (Vptr alloc_b limit_ofs) /\
+      Mem.weak_valid_pointer m alloc_b (Int.unsigned limit_ofs) = true /\
       (* alloc is at least max blocks from limit *) 
-      Val.cmpu_bool (Mem.weak_valid_pointer m) Cle (Vptr alloc_b (Int.add alloc_ofs (Int.mul (Int.repr int_size) max))) (Vptr limit_b  limit_ofs) = Some true /\
+      Val.cmpu_bool (Mem.weak_valid_pointer m) Cle (Vptr alloc_b (Int.add alloc_ofs (Int.mul (Int.repr int_size) (Int.repr max_alloc)))) (Vptr alloc_b  limit_ofs) = Some true /\
       M.get args_p lenv = Some (Vptr args_b args_ofs) /\
       Val.cmpu_bool (Mem.valid_pointer m) Clt (Vptr args_b args_ofs) (Vptr alloc_b alloc_ofs) = Some true /\
       (* the max_args int blocks after args are Writable *)
@@ -1525,7 +1690,7 @@ Definition protected_id_not_bound_id := protected_id_not_bound argsIdent allocId
 Inductive nth_arg_rel_L6_L7 (fenv:fEnv) (finfo_env:M.t positive) (p:program) (rep_env: M.t cRep) : L6.eval.env -> positive -> temp_env -> mem -> Z -> Prop :=
 | is_in_and_rel:
     forall lenv args_b args_ofs rho m n x L6v L7v L,
-       protected_not_in_L argsIdent allocIdent limitIdent lenv L -> 
+       protected_not_in_L argsIdent allocIdent limitIdent lenv 0%Z L -> 
       (* get the value rho(x)*)
       M.get x rho = Some L6v -> 
       (* get Vargs pointer and load the value from it *)
@@ -1556,6 +1721,55 @@ Inductive isPtr_sem: Events.extcall_sem :=
     isPtr_sem genv ((Vptr b ofs)::nil) m nil (Vtrue) m
 | isPtr_false : forall genv m i, 
     isPtr_sem genv ((Vint i)::nil) m nil (Vfalse) m.
+
+
+Definition bind_n_after_ptr (n:Z) (x:block) (x0:Z) (L: block -> Z -> Prop): block -> Z -> Prop :=
+  fun b ofs =>
+                   match Pos.eqb b x with
+                   | true => (match Z.leb x0 ofs with
+                              | true => 
+                                (match Z.ltb ofs (x0 + n)%Z with
+                                 | true => True
+                                 | false => L b ofs
+                                 end)
+                              | false => L b ofs
+                              end
+                             ) 
+                   | false => L b ofs
+                   end.
+
+Theorem bind_n_after_ptr_def:
+  forall n x x0 L b ofs,
+  bind_n_after_ptr n x x0 L b ofs
+  <->
+  (L b ofs \/ (b = x /\ x0 <= ofs < x0 + n))%Z.
+Proof.
+  intros. unfold bind_n_after_ptr. 
+  destruct (b =? x)%positive eqn:bxeq.
+  apply Peqb_true_eq in bxeq; subst.
+  destruct (x0 <=? ofs)%Z eqn:x0ofsle.
+  destruct (ofs <? x0 + n)%Z eqn:ofsx0lt.
+  split; auto.
+  intro. right; auto. split; auto.
+  split.
+  apply Zle_bool_imp_le in x0ofsle. auto.
+  apply Z.ltb_lt in ofsx0lt. auto.
+  split; auto. 
+  intro. inv H; auto. destruct H0.
+  apply OrdersEx.Z_as_DT.ltb_nlt in ofsx0lt.
+  exfalso; omega.
+  split; auto. intros.
+  inv H; auto.
+  destruct H0.
+  apply Z.leb_nle in x0ofsle. exfalso; omega.
+  split; auto. intro.
+  inv H; auto.
+  destruct H0.
+  apply Pos.eqb_neq in bxeq. exfalso; auto.
+Qed.
+  
+  
+  
 
 
 Theorem repr_L6_L7_are_related:
@@ -1606,7 +1820,22 @@ repr_val_ptr_list_L_L6_L7 vs m L b i
       -  (* boxed *)
         destruct H3 as [L H3].
         destruct H3 as [HpL  Hrel_mem]. destruct HpL; destructAll.
-
+        assert (Ha_l : a = N.of_nat (length l) /\ l <> []). {
+          inv H0. destructAll.
+          assert (subterm_or_eq (Econstr v c l e') (Econstr v c l e')) by constructor 2.
+          apply H0 in H14. destruct (M.get c cenv) eqn:Hmc. destruct c0. destruct p0. destruct p0.
+          subst.
+          inv H13.
+          specialize (H14 _ _ _ _ _ Hmc).
+          destructAll. inv H14. rewrite H13 in H; inv H.
+          rewrite H16 in Hmc; inv Hmc.
+          rewrite H in H13; inv H13.
+          split; auto.
+          destruct l. simpl in H21. inv H21. intro. inv H13.
+          inv H14.
+        }
+        destruct Ha_l as [Ha_l1 Ha_l2].  
+        
         (* set up for set 3: alloc is writable, and the header write is valid *)
         assert (Hv_writable:
                     Mem.valid_access m Mint32 x
@@ -1628,27 +1857,26 @@ repr_val_ptr_list_L_L6_L7 vs m L b i
           inv H3.
           rewrite H22 in Hceenv. destruct l. simpl in Hceenv. inv Hceenv.          
           unfold correct_alloc in Hmax_alloc. simpl in Hmax_alloc.
-          assert (Int.ltu Int.zero max_alloc = true).
-
-                      rewrite Zpos_P_of_succ_nat in Hmax_alloc.  rewrite Nat.add_succ_r in Hmax_alloc.  admit.
+          assert (0 <  max_alloc)%Z. rewrite Hmax_alloc. apply Pos2Z.is_pos.          
           specialize (H13 _ H3).
           rewrite Int.add_assoc. 
           replace  (Int.add (Int.mul (Int.repr 4) (Int.repr Z.one))
                             (Int.mul (Int.repr 4) (Int.repr (-1)))) with (Int.mul (Int.repr int_size) Int.zero).
-          auto.
           rewrite Int.mul_zero.
+          destruct H13. simpl in H20.
+          auto.
           rewrite Int.mul_one. 
           replace (Int.repr (-1)) with (Int.neg (Int.one)).
           rewrite <- Int.neg_mul_distr_r.
           rewrite Int.mul_one.
           rewrite Int.add_neg_zero. reflexivity.
           apply Int.neg_repr.
-          } 
+        }
+        
           assert (Hvv := Mem.valid_access_store m Mint32 x  (Int.unsigned
                                                                (Int.add (Int.add x0 (Int.mul (Int.repr 4) (Int.repr Z.one)))
                                                                         (Int.mul (Int.repr 4) (Int.repr (-1))))) (Vint (Int.repr h)) Hv_writable).
         destruct Hvv.
-
         assert ( exists m', 
                      clos_trans state (traceless_step2 (globalenv p))
                                 (State f s0 (Kseq s' k) empty_env
@@ -1686,7 +1914,7 @@ repr_val_ptr_list_L_L6_L7 vs m L b i
                    (Int.mul (Int.repr (sizeof (globalenv p) uintTy))
                       (Int.repr Z.one)))) lenv))).
         {
-          assert (Hm2 := mem_of_Forall_nth_projection threadInfIdent p).
+          assert (Hm2 := mem_of_Forall_nth_projection threadInfIdent p). 
           specialize (Hm2 v (Maps.PTree.set allocIdent
             (Vptr x
                (Int.add x0
@@ -1731,32 +1959,38 @@ repr_val_ptr_list_L_L6_L7 vs m L b i
 
          specialize (Hm2 l vs7 s0 0%Z x5 (Kseq s' k) H12).
          clear H12.
-         assert (forall j : int,
-                    Int.ltu j
-                            (Int.add (Int.repr 0) (Int.repr (Z.of_nat (length vs7)))) = true ->
-                    Mem.valid_access x5 Mint32 x
-                                     (Int.unsigned
-                                        (Int.add
-                                           (Int.add x0
-                                                    (Int.mul (Int.repr (sizeof (globalenv p) uintTy))
-                                                             (Int.repr Z.one))) (Int.mul (Int.repr int_size) j)))
-                                     Writable). {           
+         
+         assert ((forall j : Z,
+         (0 <= j < 0 + Z.of_nat (length vs7))%Z ->
+         Mem.valid_access x5 Mint32 x
+           (Int.unsigned
+              (Int.add
+                 (Int.add x0
+                    (Int.mul (Int.repr (sizeof (globalenv p) uintTy))
+                       (Int.repr Z.one))) (Int.repr (int_size * j)))) Writable)). {           
            unfold correct_tinfo in H1. destructAll.
            rewrite H1 in H3; inv H3.
            intros.
            eapply Mem.store_valid_access_1.
            eauto.
-           specialize (H13 (Int.add Int.one j)).
+           specialize (H13 (1+j)%Z).
+           rewrite <- int_z_mul. 
            rewrite Int.add_assoc.
-           rewrite <- Int.mul_add_distr_r.           
+           rewrite <- Int.mul_add_distr_r.
+           rewrite int_z_add.
+           rewrite int_z_mul.
            apply H13.
            inv Hmax_alloc.
            assert (l <> nil). intro; subst; inv H4.           
-           rewrite max_allocs_boxed in * by apply H20.
+           rewrite max_allocs_boxed in * by apply H20.           
            replace (length vs7) with (length l) in H3.
-           rewrite Int.add_zero_l in H3.
-           admit.           
-           eapply get_var_or_funvar_list_same_length. eauto.           
+           repeat rewrite Nat2Z.inj_add.  simpl Z.of_nat.
+           omega.
+           eapply get_var_or_funvar_list_same_length. eauto.
+           unfold int_size.
+           admit.
+           admit.
+           admit.
          }
          specialize (Hm2 H12 H4 (get_var_or_funvar_list_correct _ _ _ _ Hvs7)). clear H12.
          destruct Hm2 as [m2 Hm2].         
@@ -1764,21 +1998,23 @@ repr_val_ptr_list_L_L6_L7 vs m L b i
          exists m2. split; auto.
          unfold rel_mem_L6_L7_id.
          (* L' := L U alloc+4*(length l + 1) *)
-         eexists.
+         exists (bind_n_after_ptr (int_size*(1+(Z.of_nat (length l)))) x (Int.unsigned x0) L).
          split.
           - assert (~is_protected_id argsIdent allocIdent limitIdent v).
             intro. inv Hidp. eapply H14; eauto.
             eapply protected_not_in_L_proper.
             apply set_set. inv Hidp. intro. apply H12. subst. left. auto.
             apply protected_not_in_L_set; auto.
-            admit.           
+             admit.           
           - intros. 
             destruct (var_dec x6 v).
             + (* Vcontr ~ new layout *)
               subst. exists (Vconstr c vs). split.
               apply M.gss.
               econstructor 2. admit.
-              rewrite M.gso by admit. apply M.gss.
+              rewrite M.gso. apply M.gss.
+              intro; subst. inv Hidp. eapply H14. left. reflexivity.
+              constructor.
               admit.              
             + (* either from l or old stuff, either way occurs in Econstr v l e' *)
               assert (occurs_free (Econstr v c l e') x6). 
@@ -1791,8 +2027,55 @@ repr_val_ptr_list_L_L6_L7 vs m L b i
               destructAll.
               exists x7.
               split. rewrite M.gso; auto.
-              admit.
-        }
+              (* first should that m <-L> m2 so repr_val can be taken from m to m2 *)
+              assert (Mem.unchanged_on L m m2). {
+                apply Mem.unchanged_on_trans with (m2 := x5).
+                - eapply Mem.store_unchanged_on; eauto.
+                  intros. apply H5.
+                  (* x0 < i < i+1) *)
+                  inv H15.
+                  assert ((Int.add (Int.mul (Int.repr 4) (Int.repr Z.one))
+                                   (Int.mul (Int.repr 4) (Int.repr (-1)))) = Int.zero).
+                  rewrite Int.mul_mone.
+                  rewrite Int.mul_one.
+                  apply Int.add_neg_zero.
+                  rewrite Int.add_assoc in *.
+                  rewrite H15 in *.
+                  rewrite Int.add_zero in *.
+                  split; auto.
+                  rewrite max_allocs_boxed.
+                  Focus 2. intro; subst. inv H4.
+                  rewrite Nat2Z.inj_add.
+                  rewrite Nat2Z.inj_add.
+                  rewrite <- int_z_mul.                  
+                  admit.
+                  admit.
+                - eapply mem_after_n_proj_store_unchanged; eauto.                  
+                  solve_uint_range.
+                  apply uint_range_unsigned.                  
+                  admit.
+                  admit.
+                  intros. apply H5.
+                  (* j is between x0 + 2 and x0+ |vs7| *)
+                  admit.                  
+              } 
+              
+              
+              inv H14.
+              * econstructor; eauto.
+                (* x6 is a fun*)
+                inv H17;
+                eapply RSfunction_v; eauto.
+              * econstructor 2; eauto.
+                rewrite M.gso. rewrite M.gso; eauto.
+                inv Hidp.
+                eapply H14 in H13. intro. apply H13. subst.
+                left; reflexivity. left. auto.
+                eapply repr_val_L_sub_locProp.
+                eapply repr_val_L_unchanged; eauto.
+                intro. intros.
+                rewrite bind_n_after_ptr_def. auto.
+         }
 
         exists ((Maps.PTree.set allocIdent
           (Vptr x
@@ -2128,7 +2411,7 @@ repr_val *)
       eapply t_trans.
       apply t_step. constructor.
       eapply t_trans.
-      apply t_step. eapply step_assign with (v := v7) (m' := x6).  
+      apply t_step. eapply step_assign with (v := v7) (m' := x5).  
       { 
         constructor.
       econstructor. constructor; eauto.

@@ -58,7 +58,7 @@ Module HeapDefs (H : Heap) .
                         | Some v => val_loc v
                         | None => Empty_set _
                       end).
-
+  
   Definition env_locs_set (rho : env) (s : PS.t) : PS.t :=
     PS.fold (fun x s' =>
                match M.get x rho with
@@ -135,6 +135,18 @@ Module HeapDefs (H : Heap) .
   Definition reach' (H : heap block) (Si : Ensemble loc) : Ensemble loc :=
     \bigcup_(n : nat) (((post H) ^ n) (Si)).
 
+  Definition reach_res (r : res) : Ensemble loc :=
+    let '(v, H) := r in reach' H (val_loc v).
+
+  Definition reach_ans (a : ans) : Ensemble loc :=
+    match a with
+      | Res r => reach_res r
+      | _ => Empty_set _
+    end.
+
+  Definition reach_var_env (S : Ensemble var) (rho : env) (H : heap block) : Ensemble loc :=
+    reach' H (env_locs rho S). 
+  
   (** N-reachability. *)
   Definition reach_n (H : heap block) (n : nat) (Si : Ensemble loc) : Ensemble loc :=
     \bigcup_(m in (fun m => m <= n)) (((post H) ^ m) (Si)).
@@ -217,13 +229,22 @@ Module HeapDefs (H : Heap) .
     end.
 
   (* TODO move *)
+  (** A bijection between two sets. *)
+  Definition bijective {A B} (β : A -> B) (S1 : Ensemble A) (S2 : Ensemble B) :=
+    image β S1 <--> S2 /\ injective_subdomain S1 β. 
+  
+  
+  (* Notation "S |- b : H1 >->> H2" := (bijective b (reach' H1 S) (reach' H2 S)) *)
+  (*                                     (at level 70, no associativity). *)
+  
+  (* TODO move *)
   (* M utils *)
   Definition key_set {A : Type} (map : M.t A) :=
     [ set x : positive | match M.get x map with
                            | Some x => True
                            | None => False
                          end ]. 
-
+  
   Definition sub_map {A : Type} (map1 map2 : M.t A) :=
     forall x v, M.get x map1 = Some v ->
            M.get x map2 = Some v.

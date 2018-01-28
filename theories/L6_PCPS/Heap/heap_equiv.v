@@ -21,11 +21,12 @@ Module HeapEquiv (H : Heap).
   Import H Defs.HL Defs.
 
   (** Syntactic approximation of results with fuel *)
-  Fixpoint res_approx_fuel (n : nat) (r1 r2 : res) : Prop :=
+  Fixpoint res_approx_fuel (n : nat) (b1 : loc -> loc) (r1 : res) (b2 : loc -> loc) (r2 : res) : Prop :=
     let '(v1, H1) := r1 in
     let '(v2, H2) := r2 in
     match v1, v2 with
-      | Loc l1, Loc l2 => 
+      | Loc l1, Loc l2 =>
+        b2 l2 = b1 l1 /\
         match get l1 H1 with
           | Some (Constr c vs1) =>
             exists vs2, 
@@ -35,7 +36,7 @@ Module HeapEquiv (H : Heap).
                      | 0%nat => True
                      | S n' =>
                        Forall2
-                         (fun l1 l2 => res_approx_fuel (n'-(n'-i)) (l1, H1) (l2, H2)) vs1 vs2
+                         (fun l1 l2 => res_approx_fuel (n'-(n'-i)) b1 (l1, H1) b2 (l2, H2)) vs1 vs2
                    end
           | Some (Clos v1 v2) =>
             exists v1' v2',
@@ -44,8 +45,8 @@ Module HeapEquiv (H : Heap).
                    match n with
                      | 0%nat => True
                      | S n' =>
-                       res_approx_fuel (n' - (n'-i)) (v1, H1) (v1', H2) /\
-                       res_approx_fuel (n' - (n'-i)) (v2, H1) (v2', H2)
+                       res_approx_fuel (n' - (n'-i)) b1 (v1, H1) b2 (v1', H2) /\
+                       res_approx_fuel (n' - (n'-i)) b1 (v2, H1) b2 (v2', H2)
                    end
           | Some (Env rho1) =>
             exists rho2,
@@ -55,7 +56,7 @@ Module HeapEquiv (H : Heap).
                                (forall i, (i < n)%nat ->
                                      match n with
                                        | 0%nat => True
-                                       | S n' => res_approx_fuel (n'-(n'-i)) (v1, H1) (v2, H2)
+                                       | S n' => res_approx_fuel (n'-(n'-i)) b1 (v1, H1) b2 (v2, H2)
                                      end)) \/
                      (M.get x rho1 = None /\ M.get x rho2 = None))
           | None => True
@@ -65,82 +66,83 @@ Module HeapEquiv (H : Heap).
     end.
   
   (** Result equivalence. Two results represent the exact same value *)
-  Definition res_equiv (r1 r2 : res) : Prop :=
-    forall n, res_approx_fuel n r1 r2 /\ res_approx_fuel n r2 r1.
+  Definition res_equiv (b1 : loc -> loc) (r1 : res) (b2 : loc -> loc) (r2 : res) : Prop :=
+    forall n, res_approx_fuel n b1 r1 b2 r2 /\ res_approx_fuel n b2 r2 b1 r1.
+ 
+  Notation "r1 ≈_( b1 , b2 ) r2 " := (res_equiv b1 r1 b2 r2) (at level 70, no associativity).
   
-  Infix "≈" := res_equiv (at level 70, no associativity).
-
-  Definition ans_equiv (a1 a2 : ans) :=
+  Definition ans_equiv (b1 : loc -> loc) (a1 : ans) (b2 : loc -> loc) (a2 : ans) :=
     match a1, a2 with
-      | Res r1, Res r2 => r1 ≈ r2
+      | Res r1, Res r2 => r1 ≈_(b1, b2) r2
       | OOT, OOT => True
       | _, _  => False
     end.
   
   (** Approximation lifted to the environments *)
-  Definition heap_env_approx (S : Ensemble var) p1 p2 : Prop :=
+  Definition heap_env_approx (S : Ensemble var) b1 p1 b2 p2 : Prop :=
     let '(H1, rho1) := p1 in
     let '(H2, rho2) := p2 in
     forall x l, x \in S ->
            M.get x rho1 = Some l ->
            exists l', M.get x rho2 = Some l' /\
-                 (l, H1) ≈ (l', H2).
+                 (l, H1) ≈_(b1, b2) (l', H2).
   
   (** Equivalence lifted to the environments *)
-  Definition heap_env_equiv S p1 p2 : Prop :=
-    heap_env_approx S p1 p2 /\
-    heap_env_approx S p2 p1.
+  Definition heap_env_equiv S b1 p1 b2 p2 : Prop :=
+    heap_env_approx S b1 p1 b2 p2 /\
+    heap_env_approx S b2 p2 b1 p1.
   
-  Notation "S |- p1 ⩪ p2" := (heap_env_equiv S p1 p2)
-                               (at level 70, no associativity).
+  Notation "S |- p1 ⩪_( b1 , b2 ) p2" := (heap_env_equiv S b1 p1 b2 p2)
+                                           (at level 70, no associativity).
   
-  Definition block_equiv (p1 p2 : heap block * block) :=
-    let '(H1, b1) := p1 in
-    let '(H2, b2) := p2 in
-    match b1, b2 with
+  Definition block_equiv (b1 : loc -> loc) (p1 : heap block * block) (b2 : loc -> loc) (p2 : heap block * block)  :=
+    let '(H1, bl1) := p1 in
+    let '(H2, bl2) := p2 in
+    match bl1, bl2 with
       | Constr c1 vs1, Constr c2 vs2 =>
-        c1 = c2 /\ Forall2 (fun v1 v2 => (v1, H1) ≈ (v2, H2)) vs1 vs2
+        c1 = c2 /\ Forall2 (fun v1 v2 => (v1, H1) ≈_(b1, b2) (v2, H2)) vs1 vs2
       | Clos v1 v2, Clos v1' v2' =>
-        (v1, H1) ≈ (v1', H2) /\ (v2, H1) ≈ (v2', H2)
-      | Env rho1, Env rho2 => Full_set _ |- (H1, rho1) ⩪ (H2, rho2)
+        (v1, H1) ≈_(b1, b2) (v1', H2) /\ (v2, H1) ≈_(b1, b2) (v2', H2)
+      | Env rho1, Env rho2 => Full_set _ |- (H1, rho1) ⩪_(b1, b2) (H2, rho2)
       | _, _ => False
     end.
   
-  Definition heap_approx (S : Ensemble loc) H1 H2 : Prop :=
-    forall b1 l, l \in S -> get l H1 = Some b1 ->
-           exists b2, get l H2 = Some b2 /\ block_equiv (H1, b1) (H2, b2).
+  Definition heap_approx (S : Ensemble loc) b1 H1 b2 H2 : Prop :=
+    forall bl1 l, l \in S -> get l H1 = Some bl1 ->
+           exists bl2, get l H2 = Some bl2 /\ block_equiv b1 (H1, bl1) b2 (H2, bl2).
   
-  Definition heap_equiv (S : Ensemble loc) H1 H2 : Prop :=
-    heap_approx S H1 H2 /\ heap_approx S H2 H1. 
+  Definition heap_equiv (S : Ensemble loc) b1 H1 b2 H2 : Prop :=
+    heap_approx S b1 H1 b2 H2 /\ heap_approx S b2 H2 b1 H1. 
 
-  Notation  "S |- H1 ≃ H2" := (heap_equiv S H1 H2)
-                                (at level 70, no associativity).
+  Notation  "S |- H1 ≃_( b1 , b2 ) H2" := (heap_equiv S b1 H1 b2 H2)
+                                            (at level 70, no associativity).
   
   (** Equivalent definition, unfolding the recursion *)
-  Definition res_approx_fuel' (n : nat) (r1 r2 : res) : Prop :=
+  Definition res_approx_fuel' (n : nat) b1 r1 b2 r2 : Prop :=
     let '(v1, H1) := r1 in
     let '(v2, H2) := r2 in
     match v1, v2 with
-      | Loc l1, Loc l2 => 
+      | Loc l1, Loc l2 =>
+        b1 l1 = b2 l2 /\
         match get l1 H1 with
           | Some (Constr c vs1) =>
             exists vs2, 
               get l2 H2 = Some (Constr c vs2) /\
               forall i, (i < n)%nat ->
-                   Forall2 (fun l1 l2 => res_approx_fuel i (l1, H1) (l2, H2)) vs1 vs2
+                   Forall2 (fun l1 l2 => res_approx_fuel i b1 (l1, H1) b2 (l2, H2)) vs1 vs2
           | Some (Clos v1 v2) =>
             exists v1' v2',
               get l2 H2 = Some (Clos v1' v2') /\
               forall i, (i < n)%nat ->
-                   res_approx_fuel i (v1, H1) (v1', H2) /\
-                   res_approx_fuel i (v2, H1) (v2', H2)
+                   res_approx_fuel i b1 (v1, H1) b2 (v1', H2) /\
+                   res_approx_fuel i b1 (v2, H1) b2 (v2', H2)
           | Some (Env rho1) =>
             exists rho2,
               get l2 H2 = Some (Env rho2) /\
                (forall x, (exists v1 v2, M.get x rho1 = Some v1 /\
                                M.get x rho2 = Some v2 /\
                                (forall i, (i < n)%nat ->
-                                     res_approx_fuel i (v1, H1) (v2, H2))) \/
+                                     res_approx_fuel i b1 (v1, H1) b2 (v2, H2))) \/
                      (M.get x rho1 = None /\ M.get x rho2 = None))
           | None => True
         end
@@ -149,21 +151,21 @@ Module HeapEquiv (H : Heap).
     end.
   
   (** Equivalence of the two definitions *)
-  Lemma res_approx_fuel_eq n r1 r2 :
-    res_approx_fuel n r1 r2 <-> res_approx_fuel' n r1 r2.
+  Lemma res_approx_fuel_eq n b1 r1 b2 r2 :
+    res_approx_fuel n b1 r1 b2 r2 <-> res_approx_fuel' n b1 r1 b2 r2.
   Proof.
     destruct n; destruct r1 as [[l1 | B1 f1] H1]; destruct r2 as [[l2 | B2 f2] H2]; simpl.
     - destruct (get l1 H1) as [[c1 vs1 | v1 v2 | rho1]|]; [| | | now firstorder ].
       + split.
-        * intros [vs [H _ ]]. eexists. split; eauto.
+        * intros [vs [Heq1 [H _ ]]]. split; eauto. eexists. split; eauto.
           intros; omega.
-        * intros [vs [H _ ]]. eexists. split; eauto.
+        * intros [vs [Heq1 [H _ ]]]. split; eauto.
       + split.
-        * intros [v1' [v2' [H _ ]]]. eexists. eexists. split; eauto.
+        * intros [v1' [v2' [Heq1 [H _ ]]]]. split; eauto. eexists. eexists. split; eauto.
           intros; omega.
-        * intros [v1' [v2' [H _ ]]]. eexists. eexists. split; eauto.
+        * intros [v1' [v2' [Heq1 [H _ ]]]]. split; eauto.
       + split.
-        * intros [vs [H Hb ]]. eexists. split; eauto.
+        * intros [Heq [vs [H Hb]]]. eexists. split; eauto.
           intros x. destruct (Hb x) as [Hb1 | Hb1]; eauto. 
           destruct Hb1 as [v1 [v2 [Hget1 [Hget2 Ht]]]].
           left. repeat eexists; eauto. intros; omega.

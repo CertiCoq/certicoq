@@ -1603,7 +1603,7 @@ Module HeapEquiv (H : Heap).
       rewrite FromList_cons...
   Qed.
   
-  Lemma heap_env_equiv_def_funs S S1 S2 β1 β2 H1 H2 rho1 rho2 clo_rho1 clo_rho2 B B0 l1 l2 :
+  Lemma heap_env_equiv_def_funs_l S S1 S2 β1 H1 H2 rho1 rho2 clo_rho1 clo_rho2 B B0 l1 l2 :
     closed S1 H1 -> closed S2 H2 ->
     env_locs rho1 (Setminus _ S (name_in_fundefs B)) \subset S1 ->
     env_locs rho2 (Setminus _ S (name_in_fundefs B)) \subset S2 ->
@@ -1612,9 +1612,10 @@ Module HeapEquiv (H : Heap).
     env_locs clo_rho1 (Full_set _) \subset S1 ->
     env_locs clo_rho2 (Full_set _) \subset S2 ->
     (occurs_free_fundefs B0) \subset (Setminus _ S (name_in_fundefs B)) ->
-    (Loc l1, H1) ≈_(β1, β2) (Loc l2, H2) ->             
-    Setminus _ S (name_in_fundefs B) |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
-    S |- (def_closures B B0 rho1 H1 l1) ⩪_(β1, β2) (def_closures B B0 rho2 H2 l2).
+    (Loc l1, H1) ≈_(β1, id) (Loc l2, H2) ->             
+    Setminus _ S (name_in_fundefs B) |- (H1, rho1) ⩪_(β1, id) (H2, rho2) ->
+    (exists β1', S |- (def_closures B B0 rho1 H1 l1) ⩪_(β1', id) (def_closures B B0 rho2 H2 l2) /\
+                f_eq_subdomain (dom H1) β1 β1').
   Proof with (now eauto with Ensembles_DB).
     revert S rho1 rho2; induction B;
     intros S rho1 rho2 Hc1 Hc2 Hinl1 Hinl2 He1 He2 Hg1 Hg2 Hsub Hloc Heq; simpl; eauto.
@@ -1626,75 +1627,109 @@ Module HeapEquiv (H : Heap).
       eapply Included_trans; [| now apply Hinl1 ]. simpl. rewrite <- !Setminus_Union...
       edestruct (def_funs_exists_new_set (S \\ [set v]) S2 H2 H2' rho2 rho2' clo_rho2 B) as [S2' [HsubS2 [Hcl2 Henv2]]]; eauto.
       eapply Included_trans; [| now apply Hinl2 ]. simpl. rewrite <- !Setminus_Union...
-      eapply heap_env_equiv_alloc_alt; (try now apply Ha1); (try now apply Ha2); eauto.
-      + simpl. rewrite Union_Empty_set_neut_l.
-        eapply Singleton_Included. eapply dom_subheap.
-        eapply def_funs_subheap. now eauto. now eexists; eauto.
-      + simpl. rewrite Union_Empty_set_neut_l.
-        eapply Singleton_Included. eapply dom_subheap.
-        eapply def_funs_subheap. now eauto. now eexists; eauto.
-      + simpl. rewrite Union_Empty_set_neut_l.
-        rewrite post_Singleton; [| eapply def_funs_subheap; now eauto ].
-        eapply Included_trans...
-      + simpl. rewrite Union_Empty_set_neut_l.
-        rewrite post_Singleton; [| eapply def_funs_subheap; now eauto ].
-        eapply Included_trans...
-      + rewrite <- Hd1, <- Hd2.
-        simpl in Heq, Hinl1, Hinl2. rewrite <- !Setminus_Union in Heq, Hinl1, Hinl2.
-        eapply IHB; try eassumption.
-        eapply Included_trans; [ eassumption |]. simpl. rewrite <- !Setminus_Union...
-      + simpl. split. rewrite res_equiv_eq; now eauto.
-        eapply res_equiv_weakening_alt.
-        now apply Hc1. now apply Hc2. eassumption.
-        now eapply def_funs_subheap; eauto.
-        now eapply def_funs_subheap; eauto.
-        eapply Singleton_Included. now eexists; eauto.
-        eapply Singleton_Included. now eexists; eauto.
-        simpl. rewrite post_Singleton; [ | eassumption ].
-        eassumption. 
-        simpl. rewrite post_Singleton; [ | eassumption ].
-        eassumption. 
+      simpl in Heq, Hinl1, Hinl2. rewrite <- !Setminus_Union in Heq, Hinl1, Hinl2.
+
+      edestruct IHB as [β1' [HBs Heqf]]; try eassumption.
+      eapply Included_trans; [ eassumption |]. simpl. rewrite <- !Setminus_Union...
+
+      eexists (β1' {l1' ~> l2'}). split.
+      { eapply heap_env_equiv_alloc_alt; (try now apply Ha1); (try now apply Ha2); eauto.
+        + simpl. rewrite Union_Empty_set_neut_l.
+          eapply Singleton_Included. eapply dom_subheap.
+          eapply def_funs_subheap. now eauto. now eexists; eauto.
+        + simpl. rewrite Union_Empty_set_neut_l.
+          eapply Singleton_Included. eapply dom_subheap.
+          eapply def_funs_subheap. now eauto. now eexists; eauto.
+        + simpl. rewrite Union_Empty_set_neut_l.
+          rewrite post_Singleton; [| eapply def_funs_subheap; now eauto ].
+          eapply Included_trans...
+        + simpl. rewrite Union_Empty_set_neut_l.
+          rewrite post_Singleton; [| eapply def_funs_subheap; now eauto ].
+          eapply Included_trans...
+        + eapply heap_env_equiv_rename_ext with (β1 := β1') (β2 := id).
+          rewrite Hd1, Hd2 in HBs. eassumption.
+          
+          eapply f_eq_subdomain_extend_not_In_S_r. intros Hc.
+          eapply Included_Intersection_l in Hc. destruct Hc as [v1' Hget'].
+          erewrite alloc_fresh in Hget'; try eassumption.
+          discriminate.
+          
+          reflexivity. reflexivity.
+        + rewrite extend_gss. reflexivity.
+        + simpl. split. rewrite res_equiv_eq; now eauto.
+          eapply res_equiv_weakening_alt.
+          now apply Hc1. now apply Hc2.
+          
+          eapply res_equiv_rename_ext. eassumption.
+          
+          eapply f_eq_subdomain_extend_not_In_S_r. intros Hc.
+          eapply Included_Intersection_l in Hc.
+          eapply dom_subheap in Hc; [| eapply def_funs_subheap; now eauto ]. 
+          destruct Hc as [v1' Hget'].
+          erewrite alloc_fresh in Hget'; try eassumption.
+          discriminate.
+
+          eapply f_eq_subdomain_antimon; [| eassumption ].
+          eapply Included_Intersection_l.
+
+          reflexivity.
+          
+          now eapply def_funs_subheap; eauto.
+          now eapply def_funs_subheap; eauto.
+          eapply Singleton_Included. now eexists; eauto.
+          eapply Singleton_Included. now eexists; eauto.
+          simpl. rewrite post_Singleton; [ | eassumption ].
+          eassumption. 
+          simpl. rewrite post_Singleton; [ | eassumption ].
+          eassumption. }
+
+      { eapply f_eq_subdomain_extend_not_In_S_r. intros Hc.
+        eapply dom_subheap in Hc; [| eapply def_funs_subheap; now eauto ]. 
+        destruct Hc as [v1' Hget'].
+        erewrite alloc_fresh in Hget'; try eassumption.
+        discriminate. eassumption. }
     - simpl. rewrite Setminus_Empty_set_neut_r in Heq.
-      eassumption.
+      eexists. split. eassumption. reflexivity.
   Qed.
+ 
   
-  
-  Lemma res_equiv_get_Constr (H1 H2 : heap block)
+  Lemma res_equiv_get_Constr β1 β2 (H1 H2 : heap block)
         (l1 l2 : loc) (c : cTag) (vs1 : list value) :
-    (Loc l1, H1) ≈ (Loc l2, H2) ->
+    (Loc l1, H1) ≈_(β1, β2) (Loc l2, H2) ->
     get l1 H1 = Some (Constr c vs1) ->
     exists vs2,
       get l2 H2 = Some (Constr c vs2) /\
-      Forall2 (fun v1 v2 => (v1, H1) ≈ (v2, H2)) vs1 vs2.
+      Forall2 (fun v1 v2 => (v1, H1) ≈_(β1, β2) (v2, H2)) vs1 vs2.
   Proof.
     intros Hres Hget. 
     rewrite res_equiv_eq in Hres. simpl in Hres. rewrite Hget in Hres.
     destruct (get l2 H2); try contradiction.
+    destruct Hres as [Heqb Hres].
     destruct b; try contradiction. 
     destruct Hres as [Heq Hb]. subst. eexists; split; eauto. 
   Qed.
-
-  Lemma heap_env_equiv_env_get (S : Ensemble var) (H1 H2 : heap block)
+  
+  Lemma heap_env_equiv_env_get (S : Ensemble var) β1 β2 (H1 H2 : heap block)
         (rho1 rho2 : env) (x : var) (l : value) :
     M.get x rho1 = Some l ->
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     x \in S ->
     exists l',
       M.get x rho2 = Some l' /\
-      (l, H1) ≈ (l', H2).
+      (l, H1) ≈_(β1, β2) (l', H2).
   Proof.
     intros Hget Heq Hin.
     eapply Heq in Hget; eassumption.
   Qed.
   
-  Lemma heap_env_equiv_env_getlist (S : Ensemble var) (H1 H2 : heap block)
+  Lemma heap_env_equiv_env_getlist (S : Ensemble var) β1 β2 (H1 H2 : heap block)
         (rho1 rho2 : env) (xs : list var) (ls : list value) :
     getlist xs rho1 = Some ls ->
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     (FromList xs) \subset S ->
     exists ls',
       getlist xs rho2 = Some ls' /\
-      Forall2 (fun l l' => (l, H1) ≈ (l', H2)) ls ls'.
+      Forall2 (fun l l' => (l, H1) ≈_(β1, β2) (l', H2)) ls ls'.
   Proof with now eauto with Ensembles_DB.
     revert ls; induction xs; intros ls Hget Heq Hin.
     - inv Hget.
@@ -1711,14 +1746,14 @@ Module HeapEquiv (H : Heap).
       eexists; split. simpl. rewrite Hgetl2, Hgetls2.
       reflexivity. constructor; eauto.
   Qed.
+  
 
-
-  Lemma heap_env_equiv_getlist_Forall2 S H1 H2 ys vs1 vs2 rho1 rho2 :
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+  Lemma heap_env_equiv_getlist_Forall2 S β1 β2 H1 H2 ys vs1 vs2 rho1 rho2 :
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     FromList ys \subset S ->
     getlist ys rho1 = Some vs1 ->
     getlist ys rho2 = Some vs2 ->
-    Forall2 (fun l1 l2 => (l1, H1) ≈ (l2, H2)) vs1 vs2.
+    Forall2 (fun l1 l2 => (l1, H1) ≈_(β1, β2) (l2, H2)) vs1 vs2.
   Proof.
     revert vs1 vs2; induction ys; intros vs1 vs2 Heq Hin Hg1 Hg2;
     destruct vs1; destruct vs2; simpl in *; try discriminate; try now constructor.
@@ -1736,17 +1771,17 @@ Module HeapEquiv (H : Heap).
       eapply Included_trans; now eauto with Ensembles_DB.
       eapply Included_trans; now eauto with Ensembles_DB.
   Qed.
-
-  Lemma block_equiv_Constr (H1 H2 : heap block) (c : cTag) (vs vs' : list value) :
-    Forall2 (fun l1 l2 => (l1, H1) ≈ (l2, H2)) vs vs' ->
-    block_equiv (H1, Constr c vs) (H2, Constr c vs').
+  
+  Lemma block_equiv_Constr β1 β2 (H1 H2 : heap block) (c : cTag) (vs vs' : list value) :
+    Forall2 (fun l1 l2 => (l1, H1) ≈_(β1, β2) (l2, H2)) vs vs' ->
+    block_equiv (β1, H1, Constr c vs) (β2, H2, Constr c vs').
   Proof.
     simpl; split; eauto.
   Qed.
-
-  Lemma block_equiv_Fun (H1 H2 : heap block) (rho1 rho2 : env) :
-    Full_set _ |- (H1, rho1) ⩪ (H2, rho2) ->
-    block_equiv (H1, Env rho1) (H2, Env rho2).
+  
+  Lemma block_equiv_Fun β1 β2 (H1 H2 : heap block) (rho1 rho2 : env) :
+    Full_set _ |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
+    block_equiv (β1, H1, Env rho1) (β2, H2, Env rho2).
   Proof.
     simpl; eauto.
   Qed.
@@ -1758,6 +1793,7 @@ Module HeapEquiv (H : Heap).
   Proof.
   Admitted.
   
+(* 
   Lemma live_deterministic S (_ : ToMSet S) H1 H2 H2' :
     live S H1 H2 ->
     live S H1 H2' ->
@@ -1767,7 +1803,8 @@ Module HeapEquiv (H : Heap).
     eapply Equivalence.equiv_transitive; eauto.
     symmetry. eassumption.
   Qed.
-  
+ *)
+
   Lemma live_collect S (_ : ToMSet S) H1 H2 :
     live S H1 H2 ->
     collect S H1 H2.
@@ -1799,10 +1836,10 @@ Module HeapEquiv (H : Heap).
   Proof.
     intros Heq [Hs Heq1]. split; eauto.
   Admitted.
+  
 
-
-  Lemma val_loc_in_dom (H1 H2 : heap block) (v1 v2 : value) :
-    (v1, H1) ≈ (v2, H2) ->
+  Lemma val_loc_in_dom β1 β2 (H1 H2 : heap block) (v1 v2 : value) :
+    (v1, H1) ≈_(β1, β2) (v2, H2) ->
     val_loc v1 \subset dom H1 ->
     val_loc v2 \subset dom H2.
   Proof.
@@ -1821,9 +1858,9 @@ Module HeapEquiv (H : Heap).
         now eexists; eauto.
     - simpl; now eauto with Ensembles_DB. 
   Qed.
-
-  Lemma env_locs_in_dom S (H1 H2 : heap block) (rho1 rho2 : env) :
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+  
+  Lemma env_locs_in_dom S β1 β2 (H1 H2 : heap block) (rho1 rho2 : env) :
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     env_locs rho1 S \subset dom H1 ->
     env_locs rho2 S \subset dom H2.
   Proof.
@@ -1834,9 +1871,9 @@ Module HeapEquiv (H : Heap).
     eapply Included_trans; [| eassumption ].
     eapply get_In_env_locs; eauto.
   Qed.     
-
-  Lemma locs_in_dom (H1 H2 : heap block) (b1 b2 : block) :
-    block_equiv (H1, b1) (H2, b2) ->
+  
+  Lemma locs_in_dom β1 β2 (H1 H2 : heap block) (b1 b2 : block) :
+    block_equiv (β1, H1, b1) (β2, H2, b2) ->
     locs b1 \subset dom H1 ->
     locs b2 \subset dom H2.
   Proof.
@@ -1856,10 +1893,10 @@ Module HeapEquiv (H : Heap).
      - simpl in *. eapply env_locs_in_dom; eauto.
   Qed.
 
-  Lemma res_equiv_exists_loc H1 H2 v1 v2 l1 :
-    (v1, H1) ≈ (v2, H2) ->
+  Lemma res_equiv_exists_loc β1 β2 H1 H2 v1 v2 l1 :
+    (v1, H1) ≈_(β1, β2) (v2, H2) ->
     l1 \in val_loc v1 ->
-    exists l2, l2 \in val_loc v2 /\ (Loc l1, H1) ≈ (Loc l2, H2).
+    exists l2, l2 \in val_loc v2 /\ (Loc l1, H1) ≈_(β1, β2) (Loc l2, H2).
   Proof.
     intros Heq Hin. rewrite res_equiv_eq in Heq.
     destruct v1; destruct v2; try contradiction; inv Hin.
@@ -1867,10 +1904,10 @@ Module HeapEquiv (H : Heap).
     eassumption.
   Qed.
 
-  Lemma heap_env_equiv_exists_loc S H1 H2 rho1 rho2 l1 :
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+  Lemma heap_env_equiv_exists_loc S β1 β2 H1 H2 rho1 rho2 l1 :
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     l1 \in env_locs rho1 S ->
-    exists l2, l2 \in env_locs rho2 S /\ (Loc l1, H1) ≈ (Loc l2, H2).
+    exists l2, l2 \in env_locs rho2 S /\ (Loc l1, H1) ≈_(β1, β2) (Loc l2, H2).
   Proof.
     intros Heq Hin. edestruct Hin as [x [Hin' Hget]].
     destruct (M.get x rho1) as [v1 |] eqn:Hget1; [| now inv Hget].
@@ -1881,10 +1918,10 @@ Module HeapEquiv (H : Heap).
     eapply get_In_env_locs; eauto. reflexivity.
   Qed.
 
-  Lemma block_equiv_exists_loc H1 H2 b1 b2 l1 :
-    block_equiv (H1, b1) (H2, b2) ->
+  Lemma block_equiv_exists_loc β1 β2 H1 H2 b1 b2 l1 :
+    block_equiv (β1, H1, b1) (β2, H2, b2) ->
     l1 \in locs b1 ->
-    exists l2, l2 \in locs b2 /\ (Loc l1, H1) ≈ (Loc l2, H2).
+    exists l2, l2 \in locs b2 /\ (Loc l1, H1) ≈_(β1, β2) (Loc l2, H2).
   Proof.
     intros Hb Hin.
     destruct b1; destruct b2; try contradiction; simpl in Hin.
@@ -1905,16 +1942,16 @@ Module HeapEquiv (H : Heap).
     - eapply heap_env_equiv_exists_loc; eauto.
   Qed.
 
-  Lemma heap_equiv_post S H1 H2 l1 n b1 :
-    S |- H1 ≃ H2 ->
+  Lemma heap_equiv_post S β1 β2 H1 H2 l1 n b1 :
+    S |- H1 ≃_(β1, β2) H2 ->
     In _ ((post H1 ^ n) S) l1 ->
     get l1 H1 = Some b1 ->
     exists l2 b2, In _ ((post H2 ^ n) S) l2 /\ get l2 H2 = Some b2 /\
-             block_equiv (H1, b1) (H2, b2).
+             block_equiv (β1, H1, b1) (β2, H2, b2).
   Proof.
     intros Heq.
     revert l1 b1. induction n as [| n IHn]; intros l1 b1 Hin Hget.
-    - edestruct Heq as [[le Heq'] _]; eauto.
+    - edestruct Heq as [[Heq1' [le Heq']] _]; eauto.
     - simpl in Hin. simpl.
       destruct Hin as [l1' [b1' [Hin [Hget' Hin']]]]. 
       edestruct IHn as [l2' [b2' [Hpost [Hget2 Heqb]]]]; eauto.
@@ -1926,9 +1963,8 @@ Module HeapEquiv (H : Heap).
       eexists. eexists. split; eauto.
   Qed.
 
-
-  Lemma heap_equiv_respects_well_formed S H1 H2 :
-    S |- H1 ≃ H2 ->
+  Lemma heap_equiv_respects_well_formed S β1 β2 H1 H2 :
+    S |- H1 ≃_(β1, β2) H2 ->
     well_formed (reach' H1 S) H1 ->
     well_formed (reach' H2 S) H2.
   Proof.
@@ -1939,12 +1975,12 @@ Module HeapEquiv (H : Heap).
     eapply locs_in_dom; eauto. symmetry; eassumption.
   Qed.
 
-  Lemma heap_env_equiv_post S H1 H2 rho1 rho2 l1 n b1 :
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+  Lemma heap_env_equiv_post S β1 β2 H1 H2 rho1 rho2 l1 n b1 :
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     In _ ((post H1 ^ n) (env_locs rho1 S)) l1 ->
     get l1 H1 = Some b1 ->
     exists l2 b2, In _ ((post H2 ^ n) (env_locs rho2 S)) l2 /\ get l2 H2 = Some b2 /\
-             block_equiv (H1, b1) (H2, b2).
+             block_equiv (β1, H1, b1) (β2, H2, b2).
   Proof.
     intros Heq.
     revert l1 b1. induction n as [| n IHn]; intros l1 b1 Hin Hget.
@@ -1957,6 +1993,7 @@ Module HeapEquiv (H : Heap).
       simpl in Heqv. destruct v'; try contradiction.
       rewrite Hget in Heqv.
       destruct (get l H2) eqn:Hgetl; try contradiction.
+      destruct Heqv as [Hbs Heqv].
       do 2 eexists. split.
       eexists. split; eauto. rewrite Heqx'.
       reflexivity. split; eauto.
@@ -1967,13 +2004,14 @@ Module HeapEquiv (H : Heap).
       edestruct block_equiv_exists_loc as [l2 [Hl2in Hleq]]; eauto.
       rewrite res_equiv_eq in Hleq. simpl in Hleq. rewrite Hget in Hleq.
       destruct (get l2 H2) as [b2 |] eqn:Hgetl2; try contradiction.
+      destruct Hleq as [Hbs' Heqv'].
       exists l2, b2. split; [| split; now eauto ].
       eexists. eexists. split; eauto.
   Qed.
   
-  Lemma well_formed_respects_heap_env_equiv S H1 H2 rho1 rho2 :
+  Lemma well_formed_respects_heap_env_equiv S β1 β2 H1 H2 rho1 rho2 :
     well_formed (reach' H1 (env_locs rho1 S)) H1 ->
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     well_formed (reach' H2 (env_locs rho2 S)) H2.
   Proof.
     intros Hwf Heq l2 b2 [n [_ Hin]] Heq2.
@@ -1983,24 +2021,24 @@ Module HeapEquiv (H : Heap).
     eapply locs_in_dom; eauto. symmetry; eassumption.
   Qed.
   
-  Lemma heap_equiv_in_dom S S' H1 H2 :
-    S |- H1 ≃ H2 ->
+  Lemma heap_equiv_in_dom S S' β1 β2 H1 H2 :
+    S |- H1 ≃_(β1, β2) H2 ->
     S' \subset S ->
     S' \subset dom H1 ->
     S' \subset dom H2.
   Proof.
     intros Heq Hsub Hsub1 l Hin.
     edestruct Hsub1 as [b Hget]; eauto.
-    edestruct Heq as [[b' [Hget' _]] _]; eauto.
+    edestruct Heq as [[Hbs [b' [Hget' _]]] _]; eauto.
     eexists; eauto.
   Qed.
   
-  Lemma heap_env_approx_restrict_env S S' H1 H2 rho1 rho1' rho2 rho2' :
-    heap_env_approx S (H1, rho1) (H2, rho2) ->
+  Lemma heap_env_approx_restrict_env S S' β1 β2 H1 H2 rho1 rho1' rho2 rho2' :
+    heap_env_approx S (β1, (H1, rho1)) (β2, (H2, rho2)) ->
     S' \subset S ->
     Restrict_env S' rho1 rho1' ->
     Restrict_env S' rho2 rho2' ->
-    heap_env_approx (Full_set _) (H1, rho1') (H2, rho2').
+    heap_env_approx (Full_set _) (β1, (H1, rho1')) (β2, (H2, rho2')).
   Proof. 
     intros Ha Hsub [Heq1 [Hsub1 Hk1]] [Heq2 [Hsub2 Hk2]] x l Hin Hget.
     edestruct Ha as [l' [Hget' Heq]].
@@ -2011,21 +2049,21 @@ Module HeapEquiv (H : Heap).
     unfold key_set, In. now rewrite Hget; eauto.
   Qed.
 
-  Corollary heap_env_equiv_restrict_env S S' H1 H2 rho1 rho1' rho2 rho2' :
-    S |- (H1, rho1) ⩪ (H2, rho2) ->
+  Corollary heap_env_equiv_restrict_env S S' β1 β2 H1 H2 rho1 rho1' rho2 rho2' :
+    S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     S' \subset S ->
     Restrict_env S' rho1 rho1' ->
     Restrict_env S' rho2 rho2' ->
-    Full_set var |- (H1, rho1') ⩪ (H2, rho2').
+    Full_set var |- (H1, rho1') ⩪_(β1, β2) (H2, rho2').
   Proof.
     intros [? ?] ? ? ?.
     split; now eapply heap_env_approx_restrict_env; eauto.
   Qed.
 
 
-  Lemma subheap_res_approx_l (k : nat) (H H' : heap block) (v : value) :
+  Lemma subheap_res_approx_l (k : nat) β (H H' : heap block) (v : value) :
     H ⊑ H' ->
-    res_approx_fuel k (v, H) (v, H').
+    res_approx_fuel k (β, (v, H)) (β, (v, H')).
   Proof.
     revert v. induction k as [k IHk] using lt_wf_rec1.
     intros v Hsub.
@@ -2033,15 +2071,15 @@ Module HeapEquiv (H : Heap).
     destruct v as [l|]; simpl; eauto.
     destruct (get l H) as [b|] eqn:Hget; eauto.
     destruct b as [c vs1 | v1 v2 | rho1].
-    + eexists. split.
+    + split; eauto. eexists. split.
       eapply Hsub. eassumption.
       intros.
       eapply Forall2_refl. 
       intros v. eapply IHk; eauto. 
-    + do 2 eexists. split.
+    + split; eauto. do 2 eexists. split.
       eapply Hsub. eassumption.
       intros. split; eapply IHk; eauto. 
-    + eexists. split.
+    + split; eauto. eexists. split.
       eapply Hsub. eassumption.
       intros. destruct (M.get x rho1); eauto.
       left. do 2 eexists. split. reflexivity.
@@ -2060,12 +2098,12 @@ Module HeapEquiv (H : Heap).
     eapply Hyp. now constructor 2.
   Qed.
   
-  Lemma subheap_res_approx_r (k : nat) (S : Ensemble loc) (H H' : heap block) (v : value) :
+  Lemma subheap_res_approx_r (k : nat) β (S : Ensemble loc) (H H' : heap block) (v : value) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     val_loc v \subset (reach' H S) ->
     H ⊑ H' ->
-    res_approx_fuel k (v, H') (v, H).
+    res_approx_fuel k (β, (v, H')) (β, (v, H)).
   Proof with now eauto with Ensembles_DB.
     revert v. induction k as [k IHk] using lt_wf_rec1.
     intros v Hwf Hin1 Hin2 Hsub.
@@ -2074,23 +2112,23 @@ Module HeapEquiv (H : Heap).
     assert (Hin2':= Hin2).
     eapply reachable_in_dom in Hin2;[ | eassumption | eassumption | reflexivity ].
     destruct Hin2 as [b Hget].
-    assert (Hget' := Hget). eapply Hsub in Hget'.
+    assert ( Hget' := Hget). eapply Hsub in Hget'.
     rewrite Hget'.
     eapply Singleton_Included_r in Hin2'.
     destruct b as [c vs1 | v1 v2 | rho1].
-    + eexists. split. eassumption.
+    + split; eauto. eexists. split. eassumption.
       intros.
       eapply Forall2_refl_strong. 
       intros v. intros Hin. eapply IHk; eauto.
       eapply Included_trans; [| eapply reachable_closed; try eassumption ].
       simpl. eapply In_Union_list.
       eapply in_map. eassumption.
-    + do 2 eexists. split. eassumption. 
+    + split; eauto. do 2 eexists. split. eassumption. 
       intros i Hlt.
       split; eapply IHk; eauto.
       eapply Included_trans; [| eapply reachable_closed; try eassumption ]...
       eapply Included_trans; [| eapply reachable_closed; try eassumption ]...
-    + eexists. split. eassumption.
+    + split; eauto. eexists. split. eassumption.
       intros. destruct (M.get x rho1) eqn:Hgetx; eauto.
       left. do 2 eexists. split. reflexivity.
       split. reflexivity.
@@ -2100,12 +2138,12 @@ Module HeapEquiv (H : Heap).
       now constructor. 
   Qed.
   
-  Lemma subheap_res_equiv (S : Ensemble loc) (H H' : heap block) (v : value) :
+  Lemma subheap_res_equiv (S : Ensemble loc) β (H H' : heap block) (v : value) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     val_loc v \subset (reach' H S) ->
     H ⊑ H' ->
-    (v, H) ≈ (v, H').
+    (v, H) ≈_(β, β) (v, H').
   Proof with now eauto with Ensembles_DB.
     intros. 
     split.
@@ -2113,12 +2151,13 @@ Module HeapEquiv (H : Heap).
     eapply subheap_res_approx_r; eauto.
   Qed.
   
-  Lemma subheap_heap_env_approx_l (S : Ensemble loc) S' (H H' : heap block) (rho : env) :
+  Lemma subheap_heap_env_approx_l (S : Ensemble loc) S' β
+        (H H' : heap block) (rho : env) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     env_locs rho S' \subset (reach' H S) ->
     H ⊑ H' ->
-    heap_env_approx S' (H, rho) (H', rho).
+    heap_env_approx S' (β, (H, rho)) (β, (H', rho)).
   Proof with now eauto with Ensembles_DB.
     intros Hwf Hin1 Hin2 Hsub x l Hin Hget. 
     eexists. split; eauto. 
@@ -2128,12 +2167,12 @@ Module HeapEquiv (H : Heap).
     eassumption.
   Qed.
   
-  Lemma subheap_heap_env_approx_r (S : Ensemble loc) S' (H H' : heap block) (rho : env) :
+  Lemma subheap_heap_env_approx_r (S : Ensemble loc) S' β (H H' : heap block) (rho : env) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     env_locs rho S' \subset (reach' H S) ->
     H ⊑ H' ->
-    heap_env_approx S' (H', rho) (H, rho).
+    heap_env_approx S' (β, (H', rho)) (β, (H, rho)).
   Proof with now eauto with Ensembles_DB.
     intros Hwf Hin1 Hin2 Hsub x l Hin Hget. 
     eexists. split; eauto. 
@@ -2143,24 +2182,24 @@ Module HeapEquiv (H : Heap).
     eassumption.
   Qed.
   
-  Lemma subheap_heap_env_equiv (S : Ensemble loc) S' (H H' : heap block) (rho : env) :
+  Lemma subheap_heap_env_equiv (S : Ensemble loc) S' β (H H' : heap block) (rho : env) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     env_locs rho S' \subset (reach' H S) ->
     H ⊑ H' ->
-    S' |- (H, rho) ⩪ (H', rho).
+    S' |- (H, rho) ⩪_(β, β) (H', rho).
   Proof with now eauto with Ensembles_DB.
     intros Hwf Hin1 Hin2 Hsub. split.
     now eapply subheap_heap_env_approx_l; eauto.
     now eapply subheap_heap_env_approx_r; eauto.
   Qed.
   
-  Lemma subheap_block_equiv(S : Ensemble loc) (H H' : heap block) (b : block) :
+  Lemma subheap_block_equiv (S : Ensemble loc) β (H H' : heap block) (b : block) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     locs b \subset (reach' H S) ->
     H ⊑ H' ->
-    block_equiv (H, b) (H', b).
+    block_equiv (β, H, b) (β, H', b).
   Proof with now eauto with Ensembles_DB.
     intros Hwf Hin1 Hin2 Hsub. 
     destruct b as [c vs | v1 v2 | rho ] .
@@ -2178,14 +2217,14 @@ Module HeapEquiv (H : Heap).
       eapply subheap_heap_env_equiv; eassumption.
   Qed.
   
-  Lemma subheap_heap_approx_l S (H H' : heap block) (rho : env) :
+  Lemma subheap_heap_approx_l S β (H H' : heap block) (rho : env) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     H ⊑ H' ->
-    heap_approx S H H'.
+    heap_approx S (β, H) (β, H').
   Proof.
     intros Hwf Hs Hsub b l Hin Hget.
-    eapply Hsub in Hget.
+    eapply Hsub in Hget. split; eauto.
     eexists; split; eauto.
     eapply subheap_block_equiv; eauto.
     eapply Included_trans; [| eapply Included_post_reach' ].
@@ -2195,16 +2234,16 @@ Module HeapEquiv (H : Heap).
     rewrite Hgetb'. eapply Hsub in Hgetb'. congruence.
   Qed.
   
-  Lemma subheap_heap_approx_r S (H H' : heap block) (rho : env) :
+  Lemma subheap_heap_approx_r S β (H H' : heap block) (rho : env) :
     well_formed (reach' H S) H ->
     S \subset dom H ->
     H ⊑ H' ->
-    heap_approx S H' H.
+    heap_approx S (β, H') (β, H).
   Proof.
     intros Hwf Hs Hsub b l Hin Hget.
     edestruct reachable_in_dom as [b' Hgetb']; try eassumption.
     eapply reach'_extensive. eassumption.
-    eexists; split; eauto.
+    split; eauto. eexists; split; eauto.
     assert (Hgetb := Hgetb').
     eapply Hsub in Hgetb'. subst_exp.
     symmetry. eapply subheap_block_equiv; eauto.
@@ -2212,11 +2251,11 @@ Module HeapEquiv (H : Heap).
     intros l' Hin'. repeat eexists; eauto.
   Qed.
   
-  Lemma subheap_heap_equiv S (H H' : heap block) (rho : env) :
+  Lemma subheap_heap_equiv S β (H H' : heap block) (rho : env) :
      well_formed (reach' H S) H ->
      S \subset dom H ->
      H ⊑ H' ->
-     S |- H ≃ H'.
+     S |- H ≃_(β, β) H'.
   Proof.
     intros Hwf Hs Hsub.
     split. 

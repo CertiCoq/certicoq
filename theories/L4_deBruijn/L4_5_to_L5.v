@@ -2547,9 +2547,7 @@ Proof using.
   rewrite sub_filter_disjoint1;[|disjoint_reasoningv2].
   apply Hind; auto;[tauto|].
   disjoint_reasoningv.
-  admit.
-Admitted.
-
+Qed.
 
   
 (** Useful for rewriting. *)

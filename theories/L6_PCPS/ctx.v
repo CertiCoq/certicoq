@@ -124,7 +124,10 @@ Notation "f '<[' e ']>'" := (app_f_ctx_f f e)  (at level 28, no associativity)
 Open Scope ctx_scope.
 
 Scheme ctx_exp_mut := Induction for exp_ctx Sort Prop
-                      with ctx_fundefs_mut := Induction for fundefs_ctx Sort Prop.
+with ctx_fundefs_mut := Induction for fundefs_ctx Sort Prop.
+
+Scheme ctx_exp_mut' := Induction for exp_ctx Sort Type
+with ctx_fundefs_mut' := Induction for fundefs_ctx Sort Type.
 
 Lemma exp_fundefs_ctx_mutual_ind :
   forall (P : exp_ctx -> Prop) (P0 : fundefs_ctx -> Prop),

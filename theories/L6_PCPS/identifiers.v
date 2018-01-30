@@ -2,10 +2,11 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
-        Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles Omega Coq.Sorting.Permutation.
+From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos
+         MSets.MSetRBT Lists.List Sets.Ensembles Omega Sorting.Permutation Logic.Decidable.
 Require Import compcert.lib.Coqlib.
-Require Import L6.cps L6.cps_util L6.ctx L6.set_util L6.Ensembles_util L6.List_util L6.size_cps L6.tactics.
+From L6 Require Import cps cps_util ctx set_util Ensembles_util List_util size_cps tactics.
+
 Import ListNotations.
 
 Import PS.
@@ -42,8 +43,8 @@ Proof.
   - destruct (peq x v); subst.
     left. left. eauto.
     destruct (IHB x). left. right; eauto.
-    right. intros Hc. inv Hc. inv H0; congruence. 
-    exfalso. eauto.
+    right. intros Hc. inv Hc. inv H; congruence. 
+    eauto.
   - right. intros Hc; inv Hc.
 Qed.
 
@@ -670,58 +671,134 @@ Proof with eauto with Ensembles_DB.
   rewrite !name_in_fundefs_big_cup_fun_in_fundefs...
 Qed.
 
-Lemma occurs_free_dec :
-  (forall e, Decidable (occurs_free e)) /\
-  (forall B, Decidable (occurs_free_fundefs B)).
+Lemma occurs_free_dec_exp :
+  (forall e, Decidable (occurs_free e)).
+(* with occurs_free_dec_fundefs : *)
+(*   (forall B, Decidable (occurs_free_fundefs B)). *)
 Proof.
-  exp_defs_induction IHe IHl IHdefs; try inv IHe; try inv IHl;
-  try inv IHdefs; constructor; intros x.
-  - destruct (in_dec var_dec x l); eauto.
-    destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
-    destruct (Dec x); eauto.
-    right. intros Hc. inv Hc; eauto.
-  - destruct (var_dec x v); subst; eauto.
+  eapply exp_mut with (P0 := fun B => Decidable (occurs_free_fundefs B)); intros.
+  + constructor; intros x.
+    destruct (in_dec var_dec x l); eauto.
+    destruct (var_dec x v); subst.
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
+    destruct (var_dec x v); subst; eauto.
     right; intros Hc. inv Hc; congruence.
-  - destruct (var_dec x v); subst; eauto.
-    destruct (Dec x); eauto.
-    destruct (Dec0 x); eauto.
+  + constructor; intros x.
+    destruct (var_dec x v); subst; eauto.
+    destruct H as [Dec1]. destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    destruct (Dec2 x); eauto.
     right. intros Hc. inv Hc; eauto.
-  - destruct (var_dec x v0); subst; eauto.
+  + constructor; intros x.
+    destruct (var_dec x v0); subst; eauto.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
     destruct (Dec x); eauto.
     right. intros Hc. inv Hc; eauto.
-  - destruct (Decidable_name_in_fundefs f2). destruct (Dec1 x).
-    right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
-    destruct (Dec x); eauto.
-    destruct (Dec0 x); eauto.
-    right. intros Hc. inv Hc; eauto.
-  - destruct (in_dec var_dec x l); eauto.
+  + constructor; intros x. destruct (Decidable_name_in_fundefs f2).
+    destruct (Dec x).
+    * right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
+    * destruct H0 as [Dec1]. destruct H as [Dec2].
+      destruct (Dec1 x); eauto.
+      destruct (Dec2 x); eauto.
+      right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
+    destruct (in_dec var_dec x l); eauto.
     destruct (var_dec x v); subst; eauto.
     right. intros Hc. inv Hc; eauto.
-  - destruct (in_dec var_dec x l); eauto.
+  + constructor; intros x.
+    destruct (in_dec var_dec x l); eauto.
+    destruct (var_dec x v); subst.
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
+  + constructor; intros x. destruct (var_dec x v); subst; eauto.
+    right. intros Hc; inv Hc. congruence.
+  + constructor; intros x.
+    destruct (Decidable_name_in_fundefs f5).
+    destruct H as [Dec1]; destruct H0 as [Dec2].
+    destruct (var_dec x v); subst; eauto. 
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
+      now eapply fun_names_not_free_in_fundefs; eauto.
+      destruct (Dec2 x); eauto.
+      destruct (in_dec var_dec x l). right. intros Hc. inv Hc; eauto.
+      destruct (Dec1 x); eauto.
+      right.  intros Hc. inv Hc; eauto.
+  + constructor; intros x. right; intros Hc; inv Hc.
+Qed.
+
+Lemma occurs_free_dec_fundefs :
+  forall B, Decidable (occurs_free_fundefs B).
+Proof.
+  eapply fundefs_mut with (P := fun e => Decidable (occurs_free e)); intros.
+  + constructor; intros x.
+    destruct (in_dec var_dec x l); eauto.
+    destruct (var_dec x v); subst.
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
+    destruct (var_dec x v); subst; eauto.
+    right; intros Hc. inv Hc; congruence.
+  + constructor; intros x.
+    destruct (var_dec x v); subst; eauto.
+    destruct H as [Dec1]. destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    destruct (Dec2 x); eauto.
+    right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
+    destruct (var_dec x v0); subst; eauto.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
     destruct (Dec x); eauto.
     right. intros Hc. inv Hc; eauto.
-  - destruct (var_dec x v); subst; eauto.
+  + constructor; intros x. destruct (Decidable_name_in_fundefs f2).
+    destruct (Dec x).
+    * right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
+    * destruct H0 as [Dec1]. destruct H as [Dec2].
+      destruct (Dec1 x); eauto.
+      destruct (Dec2 x); eauto.
+      right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
+    destruct (in_dec var_dec x l); eauto.
+    destruct (var_dec x v); subst; eauto.
+    right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
+    destruct (in_dec var_dec x l); eauto.
+    destruct (var_dec x v); subst.
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
+  + constructor; intros x. destruct (var_dec x v); subst; eauto.
     right. intros Hc; inv Hc. congruence.
-  - destruct (Decidable_name_in_fundefs f5). destruct (Dec1 x).
-    right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
-    destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
-    destruct (Dec0 x); eauto.
-    destruct (in_dec var_dec x l). right. intros Hc. inv Hc; eauto.
-    destruct (Dec x); eauto. right. intros Hc. inv Hc; eauto.
-  - right. intros Hc. inv Hc.
+  + constructor; intros x.
+    destruct (Decidable_name_in_fundefs f5).
+    destruct H as [Dec1]; destruct H0 as [Dec2].
+    destruct (var_dec x v); subst; eauto. 
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
+      now eapply fun_names_not_free_in_fundefs; eauto.
+      destruct (Dec2 x); eauto.
+      destruct (in_dec var_dec x l). right. intros Hc. inv Hc; eauto.
+      destruct (Dec1 x); eauto.
+      right.  intros Hc. inv Hc; eauto.
+  + constructor; intros x. right; intros Hc; inv Hc.
 Qed.
+
 
 (** FV(e) is decidable *)
 Instance Decidable_occurs_free e : Decidable (occurs_free e).
 Proof.
-  now apply occurs_free_dec.
+  now apply occurs_free_dec_exp.
 Qed.
 (** FV(B) is decidable *)
 Instance Decidable_occurs_free_fundefs e : Decidable (occurs_free_fundefs e).
 Proof.
-  now apply occurs_free_dec.
+  now apply occurs_free_dec_fundefs.
 Qed.   
 
 
@@ -740,7 +817,7 @@ Proof with eauto with Ensembles_DB.
 Qed.
 
 
-(** Compatibility with contex application *)
+(** Compatibility with context application *)
 Lemma occurs_free_ctx_mut :
   (forall c e e', Same_set _ (occurs_free e) (occurs_free e') ->
                   Same_set _ (occurs_free (c |[ e ]|))
@@ -766,7 +843,7 @@ Proof.
   apply occurs_free_ctx_mut.
 Qed.
 
-Corollary occurs_free_fundefs_ctx :
+Corollary occurs_free_fundefs_ctx_c :
   forall B e e', Same_set _ (occurs_free e) (occurs_free e') ->
                  Same_set _ (occurs_free_fundefs (B <[ e ]>))
                           (occurs_free_fundefs (B <[ e' ]>)).
@@ -2006,10 +2083,10 @@ Lemma find_def_Same_set_fun_in_fundefs f B B' :
   find_def f B = find_def f B'.
 Proof.
   intros Hun1 Hun2 HS.
-  destruct (@Dec _ _ (Decidable_name_in_fundefs B) f).
+  destruct (@Dec _ _ (Decidable_name_in_fundefs B) f) as [Hin | Hnin].
   - inv HS. eapply find_def_Included_fun_in_fundefs; eauto.
   - rewrite !name_not_in_fundefs_find_def_None; eauto.
-    intros Hn. apply H.
+    intros Hn. apply Hnin.
     apply name_in_fundefs_big_cup_fun_in_fundefs in Hn.
     destruct Hn as [[[[f' t] xs] e] [H1 H2]]. inv H2.
     eapply fun_in_fundefs_name_in_fundefs. now eapply HS; eauto.
@@ -2419,25 +2496,51 @@ Proof.
     inv H0. inv H.
 Qed.
 
+
+Corollary exp_fv_correct e :
+ (occurs_free e) <--> (FromSet (exp_fv e)).
+Proof.
+  destruct exp_fv_fundefs_fv_correct as [H1 _].
+  unfold exp_fv. specialize (H1 e empty empty).
+  split; intros x H.
+  - eapply FromSet_complete. reflexivity.
+    eapply H1. left; split; eauto.
+    intros Hc; inv Hc.
+  - eapply FromSet_sound in H; [| reflexivity ].
+    eapply H1 in H. destruct H as [[Hin _] | Hemp]; [| now inv Hemp].
+    eassumption.
+Qed.
+
 Corollary fundefs_fv_correct B :
-  Same_set var (occurs_free_fundefs B)
-           (FromList (PS.elements (fundefs_fv B))).
+ (occurs_free_fundefs B) <--> (FromSet (fundefs_fv B)).
 Proof.
   destruct exp_fv_fundefs_fv_correct as [_ H2].
   unfold fundefs_fv. specialize (H2 B empty empty).
   destruct (fundefs_fv_aux B empty empty) as [scope fvs].
   split; intros x H.
-  - inv H2.
-    assert (Hin : In x fvs).
-    { eapply H1. left; split; eauto. intros Hc. inv Hc. }
-    eapply PS.elements_spec1 in Hin. eapply InA_alt in Hin.
-    edestruct Hin as [y [Heq Hin']]. subst. eauto. 
-  - inv H2. simpl in H. unfold FromList, Ensembles.In in H.
-    eapply In_InA in H. eapply PS.elements_spec1 in H.
-    eapply H1 in H. inv H. inv H2; eauto. inv H2.
-    now eapply PS.E.eq_equiv.
+  - eapply FromSet_complete. reflexivity.
+    eapply H2. left; split; eauto.
+    intros Hc; inv Hc.
+  - eapply FromSet_sound in H; [| reflexivity ].
+    eapply H2 in H. destruct H as [[Hin _] | Hemp]; [| now inv Hemp].
+    eassumption.
 Qed.
 
+Instance Occurs_free_ToMSet (e : exp) : ToMSet (occurs_free e) :=
+  {
+    mset := exp_fv e
+  }.
+Proof.
+  eapply exp_fv_correct.
+Qed.
+
+Instance Occurs_free_fundefs_ToMSet (B : fundefs) : ToMSet (occurs_free_fundefs B) :=
+  {
+    mset := fundefs_fv B
+  }.
+Proof.
+  eapply fundefs_fv_correct.
+Qed.
 
 Lemma In_fold_left_l {A} (f : A -> FVSet) (l : list A)
       (si : FVSet) x:
@@ -3613,152 +3716,222 @@ Qed.
 
 Local Hint Constructors bound_var bound_var_fundefs.
 
-Lemma bound_var_dec_mut :
-  (forall e, Decidable (bound_var e)) /\
-  (forall B, Decidable (bound_var_fundefs B)).
+
+Lemma bound_var_dec :
+  forall e, Decidable (bound_var e).
 Proof.
-  apply exp_def_mutual_ind; intros; split; intro x.
+  eapply exp_mut with (P0 := fun B => Decidable (bound_var_fundefs B));
+  intros; constructor; intros x.
   - inv H. specialize (Dec x).
     inv Dec; auto.
     destruct (var_dec v x).
     subst. auto.
     right.
-    intro. inv H0; auto.
-  -  right.
-     intro.  inv H.
-     inv H4.
-  - inv H; inv H0.
-    specialize (Dec x).
-    specialize (Dec0 x).
-    inv Dec; auto.
-    left.
-    eapply Bound_Ecase. apply H.
-    constructor. reflexivity.
-    inv Dec0. left.
-    inv H0.
-    auto.
-    eapply Bound_Ecase. apply H3.
-    constructor 2; eauto.
-    right.
-    intro. inv H1.
-    inv H6. inv H1.
-    auto.
-    apply H0. eauto.
-  -  inv H. specialize (Dec x).
-     inv Dec; auto.
-     destruct (var_dec v x).
-     subst. auto.
-     right.
-     intro. inv H0; auto.
-  - inv H.
-    specialize (Dec x).
-    inv Dec; auto.
-    inv H0.
-    specialize (Dec x).
-    inv Dec; auto.
-    right. intro. inv H1; auto.
-  - right. intro. inv H. 
-  -  inv H. specialize (Dec x).
-     inv Dec; auto.
-     destruct (var_dec v x).
-     subst. auto.
-     right.
-     intro. inv H0; auto.
-  - right. intro. inv H.
+    intros Hc. inv Hc; auto.
+  - right; intros Hc; inv Hc; eauto.
+  - destruct H as [Dec1].
+    destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    left. econstructor; eauto. now constructor.
+    destruct (Dec2 x).
+    left. inv b. econstructor. eassumption.
+    econstructor 2. eassumption.
+    right. intros Hc; inv Hc; eauto. 
+    inv H3. congruence. now eauto.
   - inv H. specialize (Dec x).
     inv Dec; auto.
-    inv H0.
-    specialize (Dec x).
-    inv Dec; auto.
-    destruct (var_dec v x); subst; auto.
-    destruct (in_dec var_dec x l); auto.
+    destruct (var_dec v x).
+    subst. auto.
     right.
-    intro. inv H1; auto.
-    inv H8; auto. inv H1. auto.
-  - right. intro. inv H.
+    intros Hc. inv Hc; auto.
+  - destruct H as [Dec1].
+    destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    destruct (Dec2 x); eauto.
+    right; intros Hc; inv Hc; eauto.
+  - right; intros Hc; inv Hc; eauto.
+  - inv H. specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
+  - right. intros Hc. inv Hc; auto.
+  - destruct H as [Dec1].
+    destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    destruct (Dec2 x); eauto.
+    destruct (var_dec v x); subst; eauto.
+    destruct (in_dec var_dec x l); auto.
+    right; intros Hc; inv Hc; eauto.
+    inv H5; eauto. inv H; eauto.
+  - right. intros Hc. inv Hc; auto.
 Qed.
 
-Theorem bound_var_dec :
-  forall e, Decidable (bound_var e).
-Proof.
-  apply bound_var_dec_mut.
-Qed.
-
-Theorem bound_var_fundefs_dec :
+Lemma bound_var_fundefs_dec : 
   forall B, Decidable (bound_var_fundefs B).
 Proof.
-  apply bound_var_dec_mut.
+  eapply fundefs_mut with (P := fun e => Decidable (bound_var e));
+  intros; constructor; intros x.
+  - inv H. specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
+  - right; intros Hc; inv Hc; eauto.
+  - destruct H as [Dec1].
+    destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    left. econstructor; eauto. now constructor.
+    destruct (Dec2 x).
+    left. inv b. econstructor. eassumption.
+    econstructor 2. eassumption.
+    right. intros Hc; inv Hc; eauto. 
+    inv H3. congruence. now eauto.
+  - inv H. specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
+  - destruct H as [Dec1].
+    destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    destruct (Dec2 x); eauto.
+    right; intros Hc; inv Hc; eauto.
+  - right; intros Hc; inv Hc; eauto.
+  - inv H. specialize (Dec x).
+    inv Dec; auto.
+    destruct (var_dec v x).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
+  - right. intros Hc. inv Hc; auto.
+  - destruct H as [Dec1].
+    destruct H0 as [Dec2].
+    destruct (Dec1 x); eauto.
+    destruct (Dec2 x); eauto.
+    destruct (var_dec v x); subst; eauto.
+    destruct (in_dec var_dec x l); auto.
+    right; intros Hc; inv Hc; eauto.
+    inv H5; eauto. inv H; eauto.
+  - right. intros Hc. inv Hc; auto.
 Qed.
+
 
 Local Hint Constructors bound_var_ctx bound_var_fundefs_ctx.
-
-Lemma bound_var_ctx_dec_mut :
-  (forall c, Decidable (bound_var_ctx c)) /\
-  (forall Bc, Decidable (bound_var_fundefs_ctx Bc)).
-Proof.
-  exp_fundefs_ctx_induction IHc IHf; split; intro x; try (inv IHc; specialize (Dec x); inv Dec; auto);
-  try (inv IHf; specialize (Dec x); inv Dec; auto).
-  - right; intro; inv H.
-  - destruct (var_dec v x); subst; auto.
-    right; intro Hbv; inv Hbv; auto.
-  - destruct (var_dec v x); subst; auto.
-    right; intro Hbv; inv Hbv; auto.
-  - destruct (var_dec v x); subst; auto.
-    right; intro Hbv; inv Hbv; auto.
-  - destruct (bound_var_dec (Ecase v l)).
-    specialize (Dec x).
-    inv Dec; auto.
-    left.
-    inv H0.
-    eapply Bound_Case2_c; eauto.
-    destruct (bound_var_dec (Ecase v l0)).
-    specialize (Dec x).
-    inv Dec; auto.
-    left.
-    inv H1.
-    eapply Bound_Case3_c; eauto.
-    right.
-    intro. inv H2; auto.
-    apply H0; eauto.
-    apply H1; eauto.
-  - destruct (bound_var_fundefs_dec f4).
-    specialize (Dec x).
-    inv Dec; auto.
-    right. intro.
-    inv H1; auto.
-  - destruct (bound_var_dec e).
-    specialize (Dec x).
-    inv Dec; auto.
-    right. intro.
-    inv H1; auto. 
-  - destruct (bound_var_fundefs_dec f6).
-    specialize (Dec x).
-    inv Dec; auto.
-    destruct (var_dec v x); subst; auto.
-    destruct (in_dec var_dec x l); auto.
-    right.
-    intro. inv H1; auto.
-  - destruct (bound_var_dec e).
-    specialize (Dec x).
-    inv Dec; auto.
-    destruct (var_dec v x); subst; auto.
-    destruct (in_dec var_dec x l); auto.
-    right.
-    intro. inv H1; auto.
-Qed.
 
 Theorem bound_var_ctx_dec :
   forall c, Decidable (bound_var_ctx c).
 Proof.
-  apply bound_var_ctx_dec_mut.
+  eapply ctx_exp_mut' with (P0 := fun B => Decidable (bound_var_fundefs_ctx B));
+  constructor; intros x.
+  - right; intros Hc; inv Hc.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
+  - destruct (bound_var_dec (Ecase v l)) as [Decl].
+    destruct (Decl x) as [Hb | Hnb].
+    left. now inv Hb; eauto.
+    destruct (bound_var_dec (Ecase v l0)) as [Decl'].
+    destruct (Decl' x) as [Hb' | Hnb'].
+    left. now inv Hb'; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    right. intros Hc. inv Hc; auto.
+    now eapply Hnb; eauto.
+    now eapply Hnb'; eauto.
+  - destruct (bound_var_fundefs_dec f) as [Decf].
+    destruct (Decf x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    right. intros Hc. inv Hc; auto.
+  - destruct (bound_var_dec e) as [Dece].
+    destruct (Dece x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    right. intros Hc. inv Hc; auto.    
+  - destruct (bound_var_fundefs_dec f) as [Decf].
+    destruct (Decf x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    destruct (var_dec v x); subst; auto.
+    destruct (in_dec var_dec x l); auto. 
+    right. intros Hc. inv Hc; auto.
+  - destruct (bound_var_dec e) as [Dece].
+    destruct (Dece x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    destruct (var_dec v x); subst; auto.
+    destruct (in_dec var_dec x l); auto. 
+    right. intros Hc. inv Hc; auto.
 Qed.
-
 
 Theorem bound_var_fundefs_ctx_dec :
   forall Bc, Decidable (bound_var_fundefs_ctx Bc).
 Proof.
-  apply bound_var_ctx_dec_mut.
+  eapply ctx_fundefs_mut' with (P := fun e => Decidable (bound_var_ctx e));
+  constructor; intros x.
+  - right; intros Hc; inv Hc.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
+  - destruct (bound_var_dec (Ecase v l)) as [Decl].
+    destruct (Decl x) as [Hb | Hnb].
+    left. now inv Hb; eauto.
+    destruct (bound_var_dec (Ecase v l0)) as [Decl'].
+    destruct (Decl' x) as [Hb' | Hnb'].
+    left. now inv Hb'; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    right. intros Hc. inv Hc; auto.
+    now eapply Hnb; eauto.
+    now eapply Hnb'; eauto.
+  - destruct (bound_var_fundefs_dec f) as [Decf].
+    destruct (Decf x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    right. intros Hc. inv Hc; auto.
+  - destruct (bound_var_dec e) as [Dece].
+    destruct (Dece x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    right. intros Hc. inv Hc; auto.    
+  - destruct (bound_var_fundefs_dec f) as [Decf].
+    destruct (Decf x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    destruct (var_dec v x); subst; auto.
+    destruct (in_dec var_dec x l); auto. 
+    right. intros Hc. inv Hc; auto.
+  - destruct (bound_var_dec e) as [Dece].
+    destruct (Dece x) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x).
+    left; eauto.
+    destruct (var_dec v x); subst; auto.
+    destruct (in_dec var_dec x l); auto. 
+    right. intros Hc. inv Hc; auto.
 Qed.
+
 
 Fixpoint names_in_fundefs_ctx B:=
   match B with
@@ -3820,10 +3993,6 @@ Proof.
   auto.
 Qed.
 
-SearchAbout Decidable bound_var.
-SearchAbout Decidable.
-
-Require Import Coq.Logic.Decidable.
 Theorem decidable_Disjoint_FromList {A:Type}: 
   forall S, Decidable S ->
        forall (l:list A), decidable (Disjoint A (FromList l) S).
@@ -3831,8 +4000,8 @@ Proof.
   induction l.
   - left. rewrite FromList_nil.  eauto with Ensembles_DB.
   - inv IHl.
-    inv H. specialize (Dec a). inv Dec.
-    right. rewrite FromList_cons. intro.  inv H1. specialize (H2 a). eauto 25 with Ensembles_DB.
+    inv X. destruct (Dec a).
+    right. rewrite FromList_cons. intro.  inv H0. specialize (H1 a). eauto 25 with Ensembles_DB.
     left. rewrite FromList_cons. eauto with Ensembles_DB.
     right. rewrite FromList_cons. eauto with Ensembles_DB.
 Qed.      
@@ -3982,3 +4151,529 @@ Theorem decidable_ub_fundefs:
 Proof.
   intros. apply decidable_ub_mut.
 Qed.
+
+(** * Free variables for expression and function contexts *)
+
+(** set of free variables for an applicative context *)
+Inductive occurs_free_ctx : exp_ctx -> Ensemble var :=
+| Free_ctx_Econstr1 :
+    forall y x t ys e,
+      List.In y ys ->
+      occurs_free_ctx (Econstr_c x t ys e) y
+| Free_ctx_Econstr2 :
+    forall y x t ys e,
+      ~ x = y ->
+      occurs_free_ctx e y ->
+      occurs_free_ctx (Econstr_c x t ys e) y
+| Free_ctx_Ecase1 :
+    forall x cl1 c e cl2, 
+      occurs_free_ctx (Ecase_c x cl1 c e cl2) x
+| Free_ctx_Ecase2 :  
+    forall y x cl1 c e cl2,
+      occurs_free_ctx e y ->
+      occurs_free_ctx (Ecase_c x cl1 c e cl2) y
+| Free_ctx_Ecase3 :  
+    forall y x cl1 c e cl2,
+      occurs_free (Ecase x cl1) y ->
+      occurs_free_ctx (Ecase_c x cl1 c e cl2) y
+| Free_ctx_Ecase4 :  
+    forall y x cl1 c e cl2,
+      occurs_free (Ecase x cl2) y ->
+      occurs_free_ctx (Ecase_c x cl1 c e cl2) y
+| Free_ctx_Eproj1 :
+    forall y x tau n e,
+      occurs_free_ctx (Eproj_c x tau n y e) y
+| Free_ctx_Eproj2 :
+    forall y x tau n y' e,
+      x <> y ->
+      occurs_free_ctx e y ->
+      occurs_free_ctx (Eproj_c x tau n y' e) y
+| Free_ctx_Efun11 :
+    forall y defs e,
+      ~ (name_in_fundefs defs y) -> 
+      occurs_free_ctx e y ->
+      occurs_free_ctx (Efun1_c defs e) y
+| Free_ctx_Efun21 :
+    forall y defs e,
+      ~ (names_in_fundefs_ctx defs y) -> 
+      occurs_free e y ->
+      occurs_free_ctx (Efun2_c defs e) y                             
+| Free_ctx_Efun12 :
+    forall y defs e, 
+      occurs_free_fundefs defs y ->
+      occurs_free_ctx (Efun1_c defs e) y
+| Free_ctx_Efun22 :
+    forall y defs e, 
+      occurs_free_fundefs_ctx defs y ->
+      occurs_free_ctx (Efun2_c defs e) y
+| Free_ctx_Eprim1 :
+    forall y x p ys e,
+      List.In y ys ->
+      occurs_free_ctx (Eprim_c x p ys e) y
+| Free_ctx_Eprim2 :
+    forall y x p ys e,
+      x <> y ->
+      occurs_free_ctx e y ->
+      occurs_free_ctx (Eprim_c x p ys e) y
+with occurs_free_fundefs_ctx : fundefs_ctx -> Ensemble var :=
+      | Free_ctx_Fcons11 :
+          forall x f tau ys e defs,  
+            x <> f ->
+            ~ (List.In x ys) ->
+            ~ (name_in_fundefs defs x) ->
+            occurs_free_ctx e x ->
+            occurs_free_fundefs_ctx (Fcons1_c f tau ys e defs) x
+      | Free_ctx_Fcons12 :
+          forall x f tau ys e defs,
+            occurs_free_fundefs defs x ->
+            x <> f ->
+            occurs_free_fundefs_ctx (Fcons1_c f tau ys e defs) x
+      | Free_ctx_Fcons21 :
+          forall x f tau ys e defs,  
+            x <> f ->
+            ~ (List.In x ys) ->
+            ~ (names_in_fundefs_ctx defs x) ->
+            occurs_free e x ->
+            occurs_free_fundefs_ctx (Fcons2_c f tau ys e defs) x
+      | Free_ctx_Fcons22 :
+          forall x f tau ys e defs,
+            occurs_free_fundefs_ctx defs x ->
+            x <> f ->
+            occurs_free_fundefs_ctx (Fcons2_c f tau ys e defs) x.
+
+Hint Constructors occurs_free_ctx occurs_free_fundefs.
+
+Lemma occurs_free_Econstr_c x t ys e :
+  Same_set var (occurs_free_ctx (Econstr_c x t ys e))
+           (Union _ (FromList ys) (Setminus var (occurs_free_ctx e) (Singleton var x))).
+Proof.
+  split; intros x' H; inv H; eauto.
+  right. constructor; eauto. intros H. inv H; eauto.
+  inv H0.  constructor 2; eauto. intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Eprim_c x f ys e :
+  Same_set var (occurs_free_ctx (Eprim_c x f ys e))
+           (Union _ (FromList ys) (Setminus var (occurs_free_ctx e) (Singleton var x))).
+Proof.
+  split; intros x' H; inv H; eauto.
+  right. constructor; eauto. intros H. inv H; eauto.
+  inv H0. eapply Free_ctx_Eprim2; eauto. intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Eproj_c x tag n y e :
+  Same_set var (occurs_free_ctx (Eproj_c x tag n y e))
+           (Union _ (Singleton var y) (Setminus var (occurs_free_ctx e) (Singleton var x))).
+Proof.
+  split; intros x' H; inv H; eauto. 
+  right. constructor; eauto. intros H. inv H; eauto.
+  inv H0. eauto.
+  inv H0. constructor; eauto.
+  intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Efun1_c B e :
+  Same_set var (occurs_free_ctx (Efun1_c B e))
+           (Union _ (occurs_free_fundefs B)
+                  (Setminus _ (occurs_free_ctx e) (name_in_fundefs B))).
+Proof.
+  split; intros x' H; inv H; eauto.
+  right; eauto. constructor; eauto.
+  inv H0. eauto. 
+Qed.
+
+Lemma occurs_free_Efun2_c B e :
+  Same_set var (occurs_free_ctx (Efun2_c B e))
+           (Union _ (occurs_free_fundefs_ctx B)
+                  (Setminus _ (occurs_free e) (names_in_fundefs_ctx B))).
+Proof.
+  split; intros x' H; inv H; eauto.
+  right; eauto. constructor; eauto.
+  inv H0. eauto. 
+Qed.
+
+
+Lemma occurs_free_Ecase_c x cl1 cl2 c e :
+  Same_set var (occurs_free_ctx (Ecase_c x cl1 c e cl2))
+           (Union _ (Singleton _ x)
+                  (Union _ (occurs_free_ctx e)
+                         (Union _ (occurs_free (Ecase x cl1)) (occurs_free (Ecase x cl2))))).
+Proof.
+  split; intros x' H; inv H; eauto.
+  inv H0; eauto. inv H0; eauto.
+  inv H; eauto.
+Qed.
+
+
+Lemma occurs_free_fundefs_Fcons1_c f t xs e B :
+  Same_set var (occurs_free_fundefs_ctx (Fcons1_c f t xs e B))
+           (Union var (Setminus var (occurs_free_ctx e)
+                                (Union var (Singleton var f)
+                                       (Union var (FromList xs)
+                                              (name_in_fundefs B))))
+                  (Setminus var (occurs_free_fundefs B) (Singleton var f))).
+Proof.
+  split; intros x H; inv H.
+  - left. constructor; eauto. intros Hin. inv Hin; eauto.
+    inv H. congruence. inv H; eauto.
+  - right. constructor; eauto. intros H. inv H. congruence.
+  - inv H0. constructor; eauto. 
+    intros Hc. subst. eauto.
+  - inv H0. constructor 2; eauto. intros Hc; subst; eauto.
+Qed.
+
+Lemma occurs_free_fundefs_Fcons2_c f t xs e B :
+  Same_set var (occurs_free_fundefs_ctx (Fcons2_c f t xs e B))
+           (Union var (Setminus var (occurs_free e)
+                                (Union var (Singleton var f)
+                                       (Union var (FromList xs)
+                                              (names_in_fundefs_ctx B))))
+                  (Setminus var (occurs_free_fundefs_ctx B) (Singleton var f))).
+Proof.
+  split; intros x H; inv H.
+  - left. constructor; eauto. intros Hin. inv Hin; eauto.
+    inv H. congruence. inv H; eauto.
+  - right. constructor; eauto. intros H. inv H. congruence.
+  - inv H0. constructor; eauto. 
+    intros Hc. subst. eauto.
+  - inv H0.
+    constructor 4;  eauto.
+    intros Hc; subst; eauto.
+Qed.
+
+Lemma occurs_free_Hole_c:
+  Same_set var (occurs_free_ctx Hole_c)
+           (Empty_set var).
+Proof.
+  split; intros x H; inv H.
+Qed.
+
+
+Ltac normalize_occurs_free_ctx :=
+  match goal with
+    | [|- context[occurs_free_ctx (Econstr_c _ _ _ _)]] =>
+      rewrite occurs_free_Econstr_c
+    | [|- context[occurs_free_ctx (Eproj_c _ _ _ _ _)]] =>
+      rewrite occurs_free_Eproj_c
+    | [|- context[occurs_free_ctx (Ecase_c _ _ _ _ _ )]] =>
+      rewrite occurs_free_Ecase_c
+    | [|- context[occurs_free_ctx (Efun1_c _ _)]] =>
+      rewrite occurs_free_Efun1_c
+    | [|- context[occurs_free_ctx (Efun2_c _ _)]] =>
+      rewrite occurs_free_Efun2_c
+    | [|- context[occurs_free_ctx (Eprim_c _ _ _ _)]] =>
+      rewrite occurs_free_Eprim_c
+    | [|- context[occurs_free_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
+      rewrite occurs_free_fundefs_Fcons1_c
+    | [|- context[occurs_free_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
+      rewrite occurs_free_fundefs_Fcons2_c
+    | [|- context[occurs_free_ctx (Hole_c)]] =>
+      rewrite occurs_free_Hole_c
+  end.
+
+Ltac normalize_occurs_free_ctx_in_ctx :=
+  match goal with
+    | [ H : context[occurs_free_ctx (Econstr_c _ _ _ _)] |- _ ] =>
+      rewrite occurs_free_Econstr_c
+    | [ H : context[occurs_free_ctx (Eproj_c _ _ _ _ _)] |- _ ] =>
+      rewrite occurs_free_Eproj_c
+    | [ H : context[occurs_free_ctx (Ecase_c _ _ _ _ _ )] |- _ ] =>
+      rewrite occurs_free_Ecase_c
+    | [ H : context[occurs_free_ctx (Efun1_c _ _)] |- _ ] =>
+      rewrite occurs_free_Efun1_c
+    | [ H : context[occurs_free_ctx (Efun2_c _ _)] |- _ ] =>
+      rewrite occurs_free_Efun2_c
+    | [ H : context[occurs_free_ctx (Eprim_c _ _ _ _)] |- _ ] =>
+      rewrite occurs_free_Eprim_c
+    | [ H : context[occurs_free_fundefs_ctx (Fcons1_c _ _ _ _ _)] |- _ ] =>
+      rewrite occurs_free_fundefs_Fcons1_c
+    | [ H : context[occurs_free_fundefs_ctx (Fcons2_c _ _ _ _ _)] |- _ ] =>
+      rewrite occurs_free_fundefs_Fcons2_c
+    | [ H : context[occurs_free_ctx (Hole_c)] |- _ ] =>
+      rewrite occurs_free_Hole_c
+  end.
+
+  Definition closed_ctx :=
+    fun c => Empty_set var <--> occurs_free_ctx c.
+  
+  Definition closed_fundefs_ctx :=
+    fun cf => Empty_set var <--> occurs_free_fundefs_ctx cf.
+
+  Theorem fun_names_not_free_in_fundefs_ctx :
+    forall x f7,
+      names_in_fundefs_ctx f7 x
+      -> ~ occurs_free_fundefs_ctx f7 x.
+  Proof.
+    induction f7; intros; intro.
+    inv H; inv H0; auto.
+    inv H1; auto.
+    inv H1; auto.
+    revert H7.
+    apply fun_names_not_free_in_fundefs.
+    auto.
+    inv H; inv H0; auto.
+    inv H1; auto.
+    inv H1; auto.
+    revert H7.
+    apply IHf7; auto.
+  Qed.
+
+  Lemma occurs_free_included_ctx_mut:
+    forall e,
+      (forall c,
+         Included _ (occurs_free_ctx c) (occurs_free (c|[e]|))) /\
+      (forall fc,
+         Included _ (occurs_free_fundefs_ctx fc) (occurs_free_fundefs (fc <[ e ]>))).
+  Proof.
+    intro e; exp_fundefs_ctx_induction IHc IHf; intros; repeat normalize_occurs_free_ctx; simpl; repeat normalize_occurs_free; eauto with Ensembles_DB.
+    rewrite <- name_in_fundefs_ctx_ctx.
+    eauto with Ensembles_DB.
+    rewrite <- name_in_fundefs_ctx_ctx.
+    eauto with Ensembles_DB.
+  Qed.
+
+  Theorem occurs_free_included_ctx:
+    forall e,
+      (forall c,
+         Included _ (occurs_free_ctx c) (occurs_free (c|[e]|))).
+  Proof.
+    intros; apply occurs_free_included_ctx_mut.
+  Qed.
+
+  Theorem occurs_free_included_fundefs_ctx:
+    forall e,
+      (forall fc,
+         Included _ (occurs_free_fundefs_ctx fc) (occurs_free_fundefs (fc <[ e ]>))).
+  Proof.
+    intros; apply occurs_free_included_ctx_mut.
+  Qed.
+
+
+  Theorem Decidable_occurs_free_ctx :
+    (forall c,
+       Decidable (occurs_free_ctx c)).
+  Proof.
+    eapply ctx_exp_mut' with (P0 := fun B => Decidable (occurs_free_fundefs_ctx B));
+    constructor; intros x; try (inv IHc; specialize (Dec x)); try (inv IHf; specialize (Dec x)).
+    - right; auto.
+      intro. inv H.
+    - assert (Hl := Decidable_FromList l).
+      destruct Hl as [Decl].
+      specialize (Decl x).
+      inv Decl.
+      left; auto.
+      destruct (var_dec  v x).
+      subst.
+      right.
+      intro Hc.
+      inv Hc. auto.
+      now apply H6; auto.
+      destruct H as [Dec].
+      destruct (Dec x).
+      left; auto.
+      right.
+      intro Hc. inv Hc; auto.
+    - destruct (var_dec x v0).
+      now subst; left; auto.
+      destruct (var_dec v x).
+      subst.
+      now right; intro Hc; inv Hc; auto.
+      destruct H as [Dec]; destruct (Dec x).
+      left; auto.
+      right; intro Hc.
+      inv Hc; auto.
+    - assert (Hl := Decidable_FromList l).
+      inv Hl.
+      destruct (Dec x).
+       left; auto.
+      destruct (var_dec  v x).
+      subst.
+      right.
+      intro.
+      inv H0. auto.
+      apply H6; auto.
+      destruct H as [Dece]; destruct (Dece x).
+      now left; auto.
+      right.
+      intro Hc. inv Hc; auto.
+    - assert (Hl := Decidable_occurs_free (Ecase v l)).
+      assert (Hl0 := Decidable_occurs_free (Ecase v l0)).
+      destruct Hl as [Decl].
+      destruct Hl0 as [Decl0].
+      destruct H as [Dec].
+      destruct (Decl x).
+      left. now apply Free_ctx_Ecase3; auto.
+      destruct (Decl0 x).
+      left. now apply Free_ctx_Ecase4; auto.
+      destruct (Dec x). 
+      left. constructor; auto.
+      right. intro Hc.
+      inv Hc; auto.
+    - assert (Hf4 := Decidable_occurs_free_fundefs f).
+      destruct Hf4 as [Decf]. destruct (Decf x). 
+      now left; auto.
+      assert (Hf4n := Decidable_name_in_fundefs f).
+      destruct Hf4n as [Decf0]. destruct (Decf0 x).
+      right.
+      intro Hc.
+      inv Hc; auto.
+      destruct H as [Dec]. destruct (Dec x).
+      left; auto.
+      right; intro Hc. inv Hc; auto.
+    - assert (He := Decidable_occurs_free e).
+      destruct H as [Decf]. destruct He as [Dece].
+      destruct (Decf x); eauto.
+      assert (Hf5 := Decidable_name_in_fundefs_ctx f).
+      inv Hf5. destruct (Dec x); eauto.
+      right. intros Hc; inv Hc; try contradiction.
+      destruct (Dece x); eauto.
+      right. intros Hc; inv Hc; try contradiction.
+    - destruct (var_dec x v).
+      subst. right.
+      now intros Hc; inv Hc; auto.
+      assert (Hf6 := Decidable_name_in_fundefs f).
+      inv Hf6. destruct (Dec x).
+      right. intros Hc. inv Hc; try contradiction.
+      now apply fun_names_not_free_in_fundefs in H6; auto.
+      assert (He := Decidable_occurs_free_fundefs f).
+      destruct He as [Dece]. destruct (Dece x).
+      now left; constructor 2; auto.
+      destruct H as [Dece']. destruct (Dece' x); eauto.
+      assert (Hl := Decidable_FromList l).
+      destruct Hl as [Decl]. destruct (Decl x).
+      now right; intros Hc; inv Hc; auto.
+      now left; constructor; auto.
+      right. intros Hc. inv Hc; auto.
+    - destruct (var_dec x v).
+      right.
+      intros Hc. subst. inv Hc; auto.
+      assert (Hf := Decidable_name_in_fundefs_ctx f).
+      destruct Hf as [Decf]. destruct (Decf x).
+      right. intros Hc. inv Hc.
+      contradiction.
+      now apply fun_names_not_free_in_fundefs_ctx in H6; auto.
+      destruct H as [Dec]. destruct (Dec x).
+      left; constructor 4; auto.
+      assert (Hl := Decidable_FromList l).
+      inv Hl. destruct (Dec0 x).
+      right; intros Hc; inv Hc; auto.
+      assert (He :=  Decidable_occurs_free e).
+      destruct He as [Dece].
+      destruct (Dece x). now left; constructor; auto.
+      now right; intros Hc; inv Hc; auto.
+  Qed.
+
+  
+
+  Theorem Decidable_occurs_free_fundefs_ctx :
+    (forall fc, Decidable (occurs_free_fundefs_ctx fc)).
+  Proof.
+    eapply ctx_fundefs_mut' with (P := fun e => Decidable (occurs_free_ctx e));
+    constructor; intros x; try (inv IHc; specialize (Dec x)); try (inv IHf; specialize (Dec x)).
+    - right; auto.
+      intro. inv H.
+    - assert (Hl := Decidable_FromList l).
+      destruct Hl as [Decl].
+      specialize (Decl x).
+      inv Decl.
+      left; auto.
+      destruct (var_dec  v x).
+      subst.
+      right.
+      intro Hc.
+      inv Hc. auto.
+      now apply H6; auto.
+      destruct H as [Dec].
+      destruct (Dec x).
+      left; auto.
+      right.
+      intro Hc. inv Hc; auto.
+    - destruct (var_dec x v0).
+      now subst; left; auto.
+      destruct (var_dec v x).
+      subst.
+      now right; intro Hc; inv Hc; auto.
+      destruct H as [Dec]; destruct (Dec x).
+      left; auto.
+      right; intro Hc.
+      inv Hc; auto.
+    - assert (Hl := Decidable_FromList l).
+      inv Hl.
+      destruct (Dec x).
+       left; auto.
+      destruct (var_dec  v x).
+      subst.
+      right.
+      intro.
+      inv H0. auto.
+      apply H6; auto.
+      destruct H as [Dece]; destruct (Dece x).
+      now left; auto.
+      right.
+      intro Hc. inv Hc; auto.
+    - assert (Hl := Decidable_occurs_free (Ecase v l)).
+      assert (Hl0 := Decidable_occurs_free (Ecase v l0)).
+      destruct Hl as [Decl].
+      destruct Hl0 as [Decl0].
+      destruct H as [Dec].
+      destruct (Decl x).
+      left. now apply Free_ctx_Ecase3; auto.
+      destruct (Decl0 x).
+      left. now apply Free_ctx_Ecase4; auto.
+      destruct (Dec x). 
+      left. constructor; auto.
+      right. intro Hc.
+      inv Hc; auto.
+    - assert (Hf4 := Decidable_occurs_free_fundefs f).
+      destruct Hf4 as [Decf]. destruct (Decf x). 
+      now left; auto.
+      assert (Hf4n := Decidable_name_in_fundefs f).
+      destruct Hf4n as [Decf0]. destruct (Decf0 x).
+      right.
+      intro Hc.
+      inv Hc; auto.
+      destruct H as [Dec]. destruct (Dec x).
+      left; auto.
+      right; intro Hc. inv Hc; auto.
+    - assert (He := Decidable_occurs_free e).
+      destruct H as [Decf]. destruct He as [Dece].
+      destruct (Decf x); eauto.
+      assert (Hf5 := Decidable_name_in_fundefs_ctx f).
+      inv Hf5. destruct (Dec x); eauto.
+      right. intros Hc; inv Hc; try contradiction.
+      destruct (Dece x); eauto.
+      right. intros Hc; inv Hc; try contradiction.
+    - destruct (var_dec x v).
+      subst. right.
+      now intros Hc; inv Hc; auto.
+      assert (Hf6 := Decidable_name_in_fundefs f).
+      inv Hf6. destruct (Dec x).
+      right. intros Hc. inv Hc; try contradiction.
+      now apply fun_names_not_free_in_fundefs in H6; auto.
+      assert (He := Decidable_occurs_free_fundefs f).
+      destruct He as [Dece]. destruct (Dece x).
+      now left; constructor 2; auto.
+      destruct H as [Dece']. destruct (Dece' x); eauto.
+      assert (Hl := Decidable_FromList l).
+      destruct Hl as [Decl]. destruct (Decl x).
+      now right; intros Hc; inv Hc; auto.
+      now left; constructor; auto.
+      right. intros Hc. inv Hc; auto.
+    - destruct (var_dec x v).
+      right.
+      intros Hc. subst. inv Hc; auto.
+      assert (Hf := Decidable_name_in_fundefs_ctx f).
+      destruct Hf as [Decf]. destruct (Decf x).
+      right. intros Hc. inv Hc.
+      contradiction.
+      now apply fun_names_not_free_in_fundefs_ctx in H6; auto.
+      destruct H as [Dec]. destruct (Dec x).
+      left; constructor 4; auto.
+      assert (Hl := Decidable_FromList l).
+      inv Hl. destruct (Dec0 x).
+      right; intros Hc; inv Hc; auto.
+      assert (He :=  Decidable_occurs_free e).
+      destruct He as [Dece].
+      destruct (Dece x). now left; constructor; auto.
+      now right; intros Hc; inv Hc; auto.
+  Qed. 

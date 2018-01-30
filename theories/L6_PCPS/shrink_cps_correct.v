@@ -996,10 +996,10 @@ Lemma find_def_Same_set_name_in_fundefs f B B' :
   find_def f B = find_def f B'.
 Proof.
   intros Hun1 Hun2 HS.
-  destruct (@Dec _ _ (Decidable_name_in_fundefs B) f).
+  destruct (@Dec _ _ (Decidable_name_in_fundefs B) f) as [Hin | Hnin].
   - inv HS. eapply find_def_Included_name_in_fundefs; eauto.
   - rewrite !name_not_in_fundefs_find_def_None; eauto.
-    intros Hn. apply H.
+    intros Hn. apply Hnin.
     apply name_in_fundefs_big_cup_fun_in_fundefs in Hn.
     destruct Hn as [[[[f' t] xs] e] [H1 H2]]. inv H2.
     eapply fun_in_fundefs_name_in_fundefs. now eapply HS; eauto.
@@ -2030,8 +2030,8 @@ Qed.
     intro; intro.
     clear H0.
     specialize (Dec x).
-    destruct Dec.
-    + apply H in H0. auto.
+    destruct Dec as [Hin | Hnin].
+    + apply H in Hin. auto.
     + apply def_funs_neq.
       auto.
   Qed.      
@@ -5258,14 +5258,13 @@ Proof.
       * intro. intro.
         inv H1.
         assert (Hh := Decidable_name_in_fundefs f2).
-        inv Hh. specialize (Dec x).
-        destruct Dec.
+        inv Hh. destruct (Dec x) as [Hin | Hnin].
         right. apply rename_all_fun_name. auto.       
         left.  left. split. right. split; auto.
         intro; apply H3. 
         apply Dom_map_remove_all.
         split; auto.
-        intro; apply H1.
+        intro; apply Hnin.
         apply name_fds_same. auto.
       * left; right.
         eapply Range_map_remove_all. apply H1.
@@ -5997,23 +5996,23 @@ Proof.
   apply preord_env_P_def_funs_cor with (rho' := rho2).
   intro. intros.
   assert (Hv := Decidable_name_in_fundefs fds).
-  destruct Hv. specialize (Dec x2). destruct Dec.
-  inv H15. inv H17. exfalso. apply H18; auto.
+  destruct Hv. specialize (Dec x2) as [Hin | Hnin].
+  inv H15. inv H16. exfalso. apply H17; auto.
   exfalso. assert (Disjoint var (occurs_free_fundefs fds) (name_in_fundefs fds)) by  apply name_not_free_in_fds.
-  inv H15. specialize (H18 x2). apply H18. split; auto.
+  inv H15. specialize (H17 x2). apply H17. split; auto.
   intro.   intros.
-  rewrite <- H8 in H17.
+  rewrite <- H8 in H16.
   Focus 2. left. inv H15.
-  eapply find_def_free_included. apply H. apply H18.
+  eapply find_def_free_included. apply H. apply H17.
   auto.
-  rewrite def_funs_neq in H17. exists v1. split; auto. apply preord_val_refl. auto.
+  rewrite def_funs_neq in H16. exists v1. split; auto. apply preord_val_refl. auto.
   }
   intros. eapply preord_env_P_antimon. 
   apply eq_env_preord.  apply H8.
   {
     intro. intros.
     assert (Hv := Decidable_name_in_fundefs fds).
-    destruct Hv. specialize (Dec x2). destruct Dec.
+    destruct Hv. destruct (Dec x2).
     right. auto.
     left. eapply find_def_free_included. apply H.
     split; auto.
@@ -6081,30 +6080,27 @@ Proof.
     auto.
   + simpl in H1.
     assert (Hv := Decidable_name_in_fundefs (Fcons v t l (e0 |[ e ]|) f6)).
-    destruct Hv. specialize (Dec x). destruct Dec.
-    inv H2.
-    inv H3. 
+    destruct Hv. destruct (Dec x) as [Hin | Hnin].
+    inv Hin. inv H2. 
     constructor. 
     constructor 4.
     apply name_in_fundefs_bound_var_fundefs. auto.
     assert (Hl := Decidable_FromList l).
-    destruct Hl. specialize (Dec x). destruct Dec.
-    constructor 2. auto.
+    destruct Hl. destruct (Dec0 x) as [Hin | Hnin'].
+    constructor 2; auto.
     constructor 3. apply H0. intro. apply H1. constructor; auto.
-    intro. apply H2. subst. constructor. auto.
-    intro. apply H2. constructor 2. auto.
+    intro. subst. apply Hnin. constructor. auto.
+    intro. apply Hnin. constructor 2. auto.
   + simpl in H1.
     assert (Hv := Decidable_name_in_fundefs (Fcons v t l e0 (f7 <[ e ]>))).
-    destruct Hv. specialize (Dec x). destruct Dec.
-    inv H2.
-    inv H3. 
-    constructor.
+    destruct Hv. destruct (Dec x) as [Hin | Hnin].
+    inv Hin. now inv H2; eauto.
     apply Bound_Fcons24_c.
-    eapply name_boundvar_ctx. apply H3.
+    eapply name_boundvar_ctx. eassumption.
     apply Bound_Fcons24_c.
     apply H0. intro. apply H1.
-    constructor 2. apply H3.
-    intro; apply H2. subst.
+    constructor 2. apply H2.
+    intro; apply Hnin. subst.
     constructor. auto.
 Qed.
 
@@ -7018,13 +7014,12 @@ Proof.
     intro. intro.
     assert (Hh := Decidable_name_in_fundefs fds).
     destruct Hh.
-    specialize (Dec x).
-    destruct Dec.
+    destruct (Dec x) as [Hin | Hnin].
     right; auto.
     left. right.
     split.
     left; auto.
-    apply H2.
+    apply Hnin.
 Qed.
 
 
@@ -7207,7 +7202,7 @@ Proof.
     left; auto.
     apply Decidable_Union.
     apply Decidable_name_in_fundefs.
-    apply occurs_free_dec.    
+    apply occurs_free_dec_fundefs.    
 Qed.
 
 
@@ -7417,7 +7412,7 @@ Lemma occurs_free_ctx_not_bound:
   (forall c : exp_ctx, ~ bound_var_ctx c x ->  occurs_free (c |[ e ]|) x).
 Proof.
   intros.
-  destruct ((proj1 occurs_free_dec) (c |[ e ]|)).
+  destruct (occurs_free_dec_exp (c |[ e ]|)).
   specialize (Dec x).
   inv Dec; auto.
   exfalso.
@@ -7432,7 +7427,7 @@ Theorem occurs_free_fundefs_ctx_not_bound:
    ~ bound_var_fundefs_ctx fds x -> occurs_free_fundefs (fds <[ e ]>) x).
 Proof.
   intros.
-  destruct ((proj2 occurs_free_dec) (fds <[ e ]>)).
+  destruct (occurs_free_dec_fundefs (fds <[ e ]>)).
   specialize (Dec x).
   inv Dec; auto.
   exfalso.
@@ -7450,12 +7445,11 @@ Proof.
   split. intro. intro.
   destruct H1.
   destruct (bound_var_ctx_dec c).
-  specialize (Dec x).
-  destruct Dec.
+  destruct (Dec x) as [Hin | Hnin].
   apply ub_app_ctx_f in H; destructAll.
-  inv H5. specialize (H6 x). auto.
-  inv H0. specialize (H4 x).
-  apply H4.
+  inv H4. specialize (H5 x). auto.
+  inv H0. specialize (H3 x).
+  apply H3.
   split. apply bound_var_app_ctx; auto.
   apply occurs_free_ctx_not_bound; auto.
 Qed.
@@ -8463,28 +8457,32 @@ Proof.
         destruct Dec.
         {
           assert (Hnf:= Decidable_name_in_fundefs  (fundefs_append B1 (Fcons f t xs fb B2))).
-          inv Hnf. specialize (Dec x).
-          inv Dec.
+          inv Hnf. destruct (Dec x) as [Hin | Hnin].
           eapply fundefs_append_unique_bindings_l in H8. 2: reflexivity.
           destructAll.
-          eapply fundefs_append_name_in_fundefs in H10. 2: reflexivity.
-          inv H10. inv H12. specialize (H10 x).
-          apply H10. split.
+          eapply fundefs_append_name_in_fundefs in Hin. 2: reflexivity.
+          inv Hin. inv H10. specialize (H12 x).
+          apply H12. split.
           apply name_in_fundefs_bound_var_fundefs.
           auto.
-          apply bound_var_fundefs_Fcons. inv H5; auto.
-          inv H11.  inv H13. 
+          apply bound_var_fundefs_Fcons. now inv H5; auto.
+          inv H10. inv H11. 
           inv H10.
           inv H5; auto.
+          inv H8; contradiction. inv H8; contradiction.
           apply name_in_fundefs_bound_var_fundefs in H10.
-          inv H5; auto. inv H21. specialize (H5 x). apply H5; auto.
-          inv H22. specialize (H5 x). apply H5; auto.
+          inv H5; auto.
+          inv H8. eapply H20. now constructor; eauto.
+          inv H8. eapply H21. now constructor; eauto.
+          (* now inv H20; contradiction. *)
+          (* inv H8; contradiction. inv H21. specialize (H5 x). apply H5; auto. *)
+          (* inv H22. specialize (H5 x). apply H5; auto. *)
           assert (occurs_free (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c0 |[ Eapp f t vs ]|)) x).
-          apply Free_Efun1; auto.          
+          { apply Free_Efun1; auto. }
           assert (Hc := bound_var_ctx_dec c). inv Hc.
-          specialize (Dec x). inv Dec.
-          inv H4. specialize (H13 x).
-          apply H13. split. auto.
+          destruct (Dec0 x) as [Hin' | Hnin'].
+          inv H4. specialize (H10 x).
+          apply H10. split. eassumption.
           constructor. 
           eapply fundefs_append_bound_vars. reflexivity.
           right.
@@ -8492,8 +8490,8 @@ Proof.
           inv H5; auto.
           assert ((occurs_free (c |[ Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c0 |[ Eapp f t vs ]|) ]|) x)).          
           apply occurs_free_ctx_not_bound; auto.
-          inv H0. specialize (H14 x).
-          apply H14. split; auto.
+          inv H0. specialize (H11 x).
+          apply H11. split; auto.
           apply bound_var_app_ctx. right.
           rewrite bound_var_Efun.
           left.
@@ -8503,9 +8501,9 @@ Proof.
         }
         { assert (bound_var_ctx c0 x).         
           eapply occurs_free_app_bound_var.
-          2: apply H2. constructor. auto.          
-          inv H9. specialize (H11 x).
-          apply H11. split.
+          2: apply n. constructor. auto.          
+          inv H9. specialize (H10 x).
+          apply H10. split.
           rewrite bound_var_app_ctx. left; auto.
           eapply fundefs_append_bound_vars.
           reflexivity. right.
@@ -8996,4 +8994,3 @@ Proof.
 Qed.
 
 End Shrink_Rewrites.
-

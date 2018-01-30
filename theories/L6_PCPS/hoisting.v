@@ -1302,7 +1302,7 @@ Proof.
     + eapply H1. eauto.
   - intros e1 e2 H1 H2 H3.
     intros B HIn. inv HIn.
-    + unfold closed_fundefs. rewrite occurs_free_fundefs_ctx.
+    + unfold closed_fundefs. rewrite occurs_free_fundefs_ctx_c.
       eapply H1. now eauto.
       apply Same_set_sym. eassumption.
     + eapply H1. eauto.

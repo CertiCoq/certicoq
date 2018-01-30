@@ -108,7 +108,7 @@ Hint Immediate Same_set_refl Included_refl : Ensembles_DB.
 (** * Decidability  instances *)
 
 Class Decidable {A} (S : Ensemble A) : Type :=
- { Dec : forall x, S x \/ ~ S x }.
+ { Dec : forall x, { S x } + {~ S x} }.
 
 Instance Decidable_Union {A} (S1 S2 : Ensemble A)
          {H1 : Decidable S1} {H2 : Decidable S2} : Decidable (Union A S1 S2).
@@ -151,9 +151,9 @@ Lemma Decidable_Same_set A (S1 S2 : Ensemble A) :
   Decidable S2.
 Proof.
   intros Heq Hdec. constructor. intros x.
-  destruct Hdec as [Dec]. destruct (Dec x).
+  destruct Hdec as [Dec]. destruct (Dec x) as [Hin | Hnin].
   left; eapply Heq; eauto.
-  right; intros Hc; eapply H; eapply Heq; eauto.
+  right; intros Hc; eapply Hnin; eapply Heq; eauto.
 Qed.
 
 
@@ -1151,10 +1151,10 @@ Instance Decidable_FromList (l : list positive) : Decidable (FromList l).
 Proof. 
   constructor. intros x. induction l. 
   - right. intros H. inv H. 
-  - destruct (peq a x).
+  - destruct (peq a x) as [Hin | Hnin].
     + subst. left. constructor. eauto.
     + destruct IHl. left. now constructor 2.
-      right. intros Hc. eapply H. inv Hc; eauto.
+      right. intros Hc. eapply Hnin. inv Hc; eauto.
       congruence.
 Qed.
 

@@ -346,19 +346,20 @@ Section CC_correct.
       - destruct v; eauto;
         right; intros [y Hc]; congruence. 
       - right. intros [y Hc]; congruence. }
-    destruct Hdec1, Hdec2. destruct (Dec x). 
-    - eapply Hinv1 in H1.
-      unfold In in H1. rewrite Hb in H1; eauto. congruence.
-    - destruct (Dec0 x).
-      + eapply Hinv2 in H2. destruct H2 as [y Heq].
+    destruct Hdec1, Hdec2. destruct (Dec x) as [Hin | Hnin]. 
+    - eapply Hinv1 in Hin.
+      unfold In in Hin. rewrite Hb in Hin; eauto. congruence.
+    - destruct (Dec0 x) as [Hin' | Hnin'].
+      + eapply Hinv2 in Hin'. destruct Hin' as [y Heq].
         rewrite Hb in Heq; eauto. congruence.
       + inv H0; try contradiction.
-        inv H3. eapply H2; constructor; eauto.
+        inv H1. now eapply Hnin'; constructor; eauto.
         unfold In, FromList in H0.        
         edestruct In_nthN as [N Hnth]; [ eassumption |].
-        edestruct Hinv3 as [H' _].
-        assert (H3 : ~ Funs x) by (intros Hc; eapply H2; constructor; eauto).
-        specialize (H' (conj Hnth (conj H1 H3))). rewrite Hb in H'; congruence.
+        destruct (Hinv3 N x) as [Hinv3' _].
+        rewrite Hb in Hinv3'; [| eassumption ].
+        assert (H3 : ~ Funs x) by (intros Hc; eapply Hnin'; constructor; eauto).
+        specialize (Hinv3' (conj Hnth (conj Hnin H3))). congruence.
   Qed.
   
   Lemma binding_not_in_map_antimon (A : Type) (S S' : Ensemble M.elt) (rho : M.t A):
@@ -1648,7 +1649,8 @@ Section CC_correct.
               end) _ _ _ ) as [m1' n].
         eapply bind_triple.
         apply get_vars_bound_var_Included with (S' := Union _ (bound_var (Efun f2 e)) S).
-        rewrite <- fundefs_fv_correct.
+        assert (Heq : (@FromList var (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
+        rewrite Heq, <- fundefs_fv_correct.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
         apply Included_Union_preserv_r. normalize_occurs_free...
@@ -2266,7 +2268,8 @@ Section CC_correct.
           eapply binding_not_in_map_antimon; [| eassumption ]...
           eassumption.
         * eapply make_env_occurs_free_Included. eassumption.
-          rewrite <- fundefs_fv_correct.
+          assert (Heq : (FromList (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
+          rewrite Heq, <- fundefs_fv_correct.
           eapply Disjoint_Included_l. now apply Setminus_Included.
           eapply Disjoint_Included_r; [| eassumption ].
           normalize_occurs_free...
@@ -2335,7 +2338,9 @@ Section CC_correct.
           now apply bound_var_occurs_free_fundefs_Efun_Included.
           intros B' s3. eapply return_triple. simpl in *.
           intros s4 [Hseq [_ Hf4]] Hclo. split. 
-          eapply Included_trans. eapply He. rewrite <- fundefs_fv_correct.
+          eapply Included_trans. eapply He.
+          assert (Heq : (FromList (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
+          rewrite Heq, <- fundefs_fv_correct.
           normalize_occurs_free.
           rewrite Hctx, <- app_ctx_f_fuse in Hclo. simpl in Hclo.
           assert (Hclo' : Same_set _ (occurs_free_fundefs B') (Empty_set _))
@@ -2730,6 +2735,7 @@ Section CC_correct.
         eapply Setminus_Disjoint_preserv_l... 
     - eapply bind_triple. now apply get_name_no_suff_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1. unfold make_env.
+      assert (Heqel : (@FromList var (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
       destruct
         ((fix
             add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
@@ -2744,7 +2750,7 @@ Section CC_correct.
         [ eapply get_vars_unique_bindings | eapply get_vars_bound_var_Included' ];
         eapply Setminus_Disjoint_preserv_l;
         (eapply Disjoint_Included_r; [| eassumption ]);
-        rewrite <- fundefs_fv_correct; rewrite occurs_free_Efun...
+        rewrite Heqel, <- fundefs_fv_correct; rewrite occurs_free_Efun...
       intros [xs f1] s2. eapply pre_strenghtening. intros ? [[Hun1 _] [Hin Hf]].
       exact (conj (conj Hun1 Hin) Hf).
       apply pre_curry_l; intros [Hun1 Hin1]. inv Hun.

@@ -594,6 +594,8 @@ Proof.
   assumption.
 Qed.
 
+Require Import FunInd.
+
 Function string_eq_bool (a1 a2:string) : bool :=
   match a1, a2 with
     | String b1 (String b2 bs), String c1 (String c2 cs) =>

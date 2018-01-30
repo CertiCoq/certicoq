@@ -5,6 +5,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
+Require Import FunInd.
 
 Require Import Common.exceptionMonad.
 Require Import Common.RandyPrelude.
@@ -13,6 +14,8 @@ Require Import Common.classes.
 Open Scope list_scope.
 Set Implicit Arguments.
 
+(** Fix arguments scope for [mkInd]. *)
+Arguments mkInd _%string _%nat.
 
 (** Printing terms in exceptions for debugging purposes **)
 Definition print_name nm : string :=
@@ -33,17 +36,14 @@ induction s1; induction s2; try (solve [right; intros h; discriminate]).
   + right. injection. intuition.
 Defined.
 
-Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
-exact Coq.PArith.BinPos.Pos.eq_dec.
-Defined.
+Lemma level_dec : forall x y : level, {x = y} + {x <> y}.
+Proof. decide equality. apply String.string_dec. apply NPeano.Nat.eq_dec. Defined.
 
-Lemma sort_dec: forall (s1 s2:sort), {s1 = s2}+{s1 <> s2}.
-induction s1; induction s2;
-try (solve [right; intros; discriminate]);
-try (solve [left; reflexivity]).
-destruct (universe_dec u u0).
-- subst. left. reflexivity.
-- right. intros h. injection h. intuition.
+Lemma level_bool_dec : forall x y : level * bool, {x = y} + {x <> y}.
+Proof. intros [l b] [l' b']. decide equality. apply Bool.bool_dec. apply level_dec. Defined.
+
+Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
+  decide equality. apply level_bool_dec.
 Defined.
 
 Lemma cast_kind_dec: forall (c1 c2:cast_kind), {c1 = c2}+{c1 <> c2}.
@@ -54,7 +54,7 @@ Defined.
 
 Lemma inductive_dec: forall (s1 s2:inductive), {s1 = s2}+{s1 <> s2}.
 induction s1; induction s2.
-destruct (string_dec s s0); destruct (eq_nat_dec n n0); subst;
+destruct (string_dec k k0); destruct (eq_nat_dec n n0); subst;
 try (solve [left; reflexivity]); 
 right; intros h; elim n1; injection h; intuition.
 Defined.
@@ -209,21 +209,21 @@ Definition environ := list (string * envClass).
 Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
   mkCnstr (fst (fst c)) (snd c).
 
-Definition ibody_ityp (iib:ident * term * inductive_body) : ityp :=
-  let Ctors := map cnstr_Cnstr (ctors (snd iib))
-  in mkItyp (fst (fst iib)) Ctors.
+Definition ibody_ityp (iib:inductive_body) : ityp :=
+  let Ctors := map cnstr_Cnstr (ind_ctors iib)
+  in mkItyp (ind_name iib) Ctors.
 
-Definition ibodies_itypPack (ibs:list (ident * term * inductive_body)) : itypPack :=
+Definition ibodies_itypPack (ibs:list inductive_body) : itypPack :=
   map ibody_ityp ibs.
 
 Fixpoint program_datatypeEnv (p:program) (e:environ) : environ :=
   match p with
     | PIn _ => e
-    | PConstr _ _ _ p => program_datatypeEnv p e
+    | PConstr _ _ _ _ p => program_datatypeEnv p e
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
       program_datatypeEnv p (cons (pair nm (ecTyp npar Ibs)) e)
-    | PAxiom nm _ p =>
+    | PAxiom nm _ _ p =>
       program_datatypeEnv p (cons (pair nm (ecTyp 0 nil)) e)
   end.
 

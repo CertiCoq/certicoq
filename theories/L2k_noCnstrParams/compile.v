@@ -406,8 +406,8 @@ Function etaExpand_args_Lam'   (* no more parameters expected *)
                    (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
   (* more actual args *)
   end.
-Functional Scheme etaExpand_args_Lam'_ind :=
-  Induction for etaExpand_args_Lam' Sort Prop.
+(* Functional Scheme etaExpand_args_Lam'_ind := *)
+(*   Induction for etaExpand_args_Lam' Sort Prop. *)
 
 Function etaExpand_args_Lam   (* no more parameters expected *)
          (nargs:nat) (actualArgs:Terms)             (* inputs *)
@@ -426,8 +426,8 @@ Function etaExpand_args_Lam   (* no more parameters expected *)
   | S n, tcons u us =>
     etaExpand_args_Lam n us body (tappend computedArgs (tunit u))
   end.
-Functional Scheme etaExpand_args_Lam_ind' :=
-  Induction for etaExpand_args_Lam Sort Prop.
+(* Functional Scheme etaExpand_args_Lam_ind' := *)
+(*   Induction for etaExpand_args_Lam Sort Prop. *)
                                       
 Definition etaExpand_args_Construct   (* no more parameters expected *)
          (nargs:nat) (actualArgs:Terms)             (* inputs *)

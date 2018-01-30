@@ -77,9 +77,9 @@ Fixpoint print_template_term (t:term) : string :=
     | tLetIn _ _ _ _ => " LET "
     | tApp fn args =>
       " (APP" ++ (print_template_term fn) ++ " _ " ++ ") "
-    | tConst s => "[" ++ s ++ "]"
-    | tInd i => ("(IND:" ++ print_inductive i ++ ")")
-    | tConstruct i n =>
+    | tConst s us => "[" ++ s ++ "]"
+    | tInd i us => ("(IND:" ++ print_inductive i ++ ")")
+    | tConstruct i n us =>
       "(CSTR:" ++ print_inductive i ++ ":" ++ (nat_to_string n) ++ ") "
     | tCase n _ mch _ =>
       " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++
@@ -278,9 +278,9 @@ Function term_Term (t:term) : Term :=
     | tRel n => TRel n
     | tSort srt =>
       TSort (match srt with 
-                    | sProp => SProp
-                    | sSet => SSet
-                    | sType _ => SType  (* throwing away sort info *)
+             | (lProp, false) :: nil => SProp
+             | (lSet, false) :: nil => SSet
+             | _ => SType  (* throwing away sort info *)
              end)
     | tCast tm _ (tCast _ _ (tSort sProp)) => mkProof (term_Term tm)
     | tCast tm _ ty => term_Term tm
@@ -289,14 +289,14 @@ Function term_Term (t:term) : Term :=
     | tLetIn nm dfn ty bod =>
       (TLetIn nm (term_Term dfn) (term_Term ty) (term_Term bod))
     | tApp fn us => mkApp (term_Term fn) (terms_Terms term_Term us)
-    | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
+    | tConst pth us =>   (* ref to axioms in environ made into [TAx] *)
       match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
       | Some (ecTyp _ _ _) =>
         TWrong ("term_Term:Const inductive or axiom: " ++ pth)
       | _  => TConst pth
       end
-    | tInd ind => TInd ind
-    | tConstruct ind m =>
+    | tInd ind us => TInd ind
+    | tConstruct ind m us =>
       match cnstrArity datatypeEnv ind m with
         | Ret (npars, nargs) => TConstruct ind m npars nargs
         | Exc s => TWrong ("term_Term;tConstruct:" ++ s)
@@ -320,12 +320,12 @@ Fixpoint program_Pgm
          (e:environ Term) : Program Term :=
   match p with
     | PIn t => {| main:= (term_Term dtEnv t); env:= e |}
-    | PConstr nm ty t p =>
+    | PConstr nm us ty t p =>
       program_Pgm dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv t))) e)
     | PType nm npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
       program_Pgm dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
-    | PAxiom nm _ p =>
+    | PAxiom nm us _ p =>
       program_Pgm dtEnv p (cons (pair nm (ecAx Term)) e)
   end.
 

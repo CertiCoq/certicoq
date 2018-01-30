@@ -1,10 +1,9 @@
--I "$(COQLIB)user-contrib/Template"
 -I plugin
 -R plugin CertiCoq
 
 # extracted compiler
 
-plugin/ast0.mli
+# plugin/ast0.mli
 plugin/basics.mli
 plugin/binInt.mli
 plugin/char0.mli
@@ -79,7 +78,7 @@ plugin/char0.ml
 plugin/binInt.ml
 plugin/basics.ml
 plugin/astCommon.mli
-plugin/ast0.ml
+# plugin/ast0.ml
 plugin/astCommon.ml
 plugin/fcalc_round.mli
 plugin/fcore_FLT.ml

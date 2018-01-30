@@ -1,7 +1,7 @@
 (** An alternative definition of wndEval that is extensionally
 *** equivalent for well-formed programs
 **)
-
+Require Import FunInd.
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.

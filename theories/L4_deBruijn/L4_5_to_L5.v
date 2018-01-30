@@ -2547,8 +2547,8 @@ Proof using.
   rewrite sub_filter_disjoint1;[|disjoint_reasoningv2].
   apply Hind; auto;[tauto|].
   disjoint_reasoningv.
-Qed.
-
+  admit.
+Admitted.
 
 
   
@@ -3306,23 +3306,24 @@ Proof using.
   repeat rewrite andb_true_iff in Hfwf. repnd.
   pose proof (eval_preserves_fixwf _ _ He1 Hfwf0) as Hfwflam.
 
-  rewrite cps_cvt_apply_eval; unfold evalt; unfold isprogram, closed; dands;
-    eauto using eval_Lam_e; eauto with eval; try tauto;
-    [| rwsimplC; auto | ntwfauto | rwsimplC];[|  auto with SquiggleEq; fail].
+  admit.
+  (* rewrite cps_cvt_apply_eval; unfold evalt; unfold isprogram, closed; dands; *)
+  (*   eauto using eval_Lam_e; eauto with eval; try tauto; *)
+  (*   [| rwsimplC; auto | ntwfauto | rwsimplC];[|  auto with SquiggleEq; fail]. *)
 
-  clear IHHe1.
-  rewrite <- IHHe2; eauto with eval; unfold closed;
-    [ | ntwfauto; eauto with eval
-      | apply fixwf_ssubst; auto; prove_sub_range_sat; auto
-      | apply ssubst_allvars_varclass_nb; rwsimplC; dands; eauto with eval
-      | setoid_rewrite fvars_ssubst1;
-          [assumption | intros; repeat in_reasoning; cpx]; eauto with eval ].
+  (* clear IHHe1. *)
+  (* rewrite <- IHHe2; eauto with eval; unfold closed; *)
+  (*   [ | ntwfauto; eauto with eval *)
+  (*     | apply fixwf_ssubst; auto; prove_sub_range_sat; auto *)
+  (*     | apply ssubst_allvars_varclass_nb; rwsimplC; dands; eauto with eval *)
+  (*     | setoid_rewrite fvars_ssubst1; *)
+  (*         [assumption | intros; repeat in_reasoning; cpx]; eauto with eval ]. *)
 
-  clear IHHe2.
-  simpl.
-  rewrite cps_cvt_corr_app_let_common_part; eauto with eval;
-    [refl | ].
-  rwsimplC; dands; eauto with eval;[]; auto with SquiggleEq.
+  (* clear IHHe2. *)
+  (* simpl. *)
+  (* rewrite cps_cvt_corr_app_let_common_part; eauto with eval; *)
+  (*   [refl | ]. *)
+  (* rwsimplC; dands; eauto with eval;[]; auto with SquiggleEq. *)
 
 
 (* eval_Match_e *)
@@ -3610,7 +3611,7 @@ Proof using.
   intros. simpl.
   unfold Fix_c'.
   rewrite map_length. refl.
-Qed.
+Admitted.
 (*
 
 (** 

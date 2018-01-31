@@ -565,7 +565,24 @@ Module SpaceSem (H : Heap).
       | _ => False
     end.
 
-      
+  Definition reach_ans (a : ans) : Ensemble loc :=
+    match a with
+      | Res r => reach_res r
+      | OOT => Empty_set _
+      | OOM => Empty_set _
+    end.
+  
+  Lemma big_step_gc_heap_env_equiv H1 H2 β rho1 rho2 e (r : ans) c m :
+    big_step_GC H1 rho1 e r c m ->
+    (occurs_free e) |- (H1, rho1) ⩪_(β, id) (H2, rho2) ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) β -> 
+    (exists r' m' β', big_step_GC H2 rho2 e r' c m' /\
+                 injective_subdomain (reach_ans r') β' /\
+                 ans_equiv β' r id r').
+  Admitted.
+  
+  
+  (* 
   Lemma big_step_deterministic  H1 H2 rho1 rho2 e r1 r1' c1 m1 r2 r2' c2 m2 :
     well_formed (reach' H1 (env_locs rho1 (occurs_free e))) H1 ->
     well_formed (reach' H2 (env_locs rho2 (occurs_free e))) H2 ->
@@ -575,7 +592,7 @@ Module SpaceSem (H : Heap).
     big_step H2 rho2 e r2 c2 m2 -> (* D2 *)
     r1 = Res r1' -> r2 = Res r2' ->
     (occurs_free e) |- (H1, rho1) ⩪ (H2, rho2) ->
-                      r1' ≈ r2'.
+     r1' ≈ r2'.
   Proof with now eauto with Ensembles_DB.
     (* Lexicographic induction on the size of the first derivation and the size of the second derivation *)
     intros Hwf1 Hwf2 Hwfe1 Hwfe2 Hbs1 Hbs2. remember (size_big_step Hbs1) as n.
@@ -1120,18 +1137,7 @@ Module SpaceSem (H : Heap).
         symmetry. eapply heap_env_equiv_heap_equiv.
         eapply collect_heap_eq. eassumption.
   Qed.
-  
-  Lemma big_step_gc_heap_env_equiv H1 H2 rho1 rho2 e (r : ans) c m :
-    big_step_GC H1 rho1 e r c m ->
-    (occurs_free e) |- (H1, rho1) ⩪ (H2, rho2) ->
-    (exists r' m', big_step_GC H2 rho2 e r' c m' /\
-              ans_equiv r r').
-  Admitted.
 
-  Lemma heap_eq_respects_heap_env_equiv S H1 H2 rho :
-    (env_locs rho S) |- H1 ≡ H2 ->
-    S |- (H1, rho) ⩪ (H2, rho).
-  Proof.
-  Abort.
+  *)
 
 End SpaceSem.

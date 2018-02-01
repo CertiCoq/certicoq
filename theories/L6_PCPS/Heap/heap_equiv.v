@@ -938,6 +938,42 @@ Module HeapEquiv (H : Heap).
     split. intros [Ha1 Ha2]. split; rewrite <- Heq'; eassumption.
     intros [Ha1 Ha2]. split; rewrite Heq'; eassumption.
   Qed.
+
+  (** Horizontal composition of injections *)
+  
+  Lemma res_approx (S : Ensemble loc) (β1 β2 β1' β2' : loc -> loc)
+        (H1 H2 : heap block)
+        (v : value) (n : nat) :
+    S |- H1 ≃_(β1, β2) H2  ->
+    (val_loc v) \subset S -> 
+    res_approx_fuel n (β1, (v, H1)) (β2, (v, H2)).
+  Proof.
+    intros [Heq1 Heq2] Hin.
+    destruct v as [l | B f]; rewrite res_approx_fuel_eq; [| now split; eauto ].
+    simpl; destruct (get l H1) eqn:Hget; eauto.
+    assert (Hget' := Hget). eapply Heq1 in Hget; eauto.
+    destruct Hget as [Heqb [b2 [Hget2 Heq]]].
+    destruct b; destruct b2; try contradiction.
+    - destruct Heq as [Heq Hin2]; subst. split; eauto. eexists; split; eauto. 
+      intros. 
+      eapply Forall2_monotonic; eauto. simpl.
+      intros ? ? [Ha1 Ha2]; eauto.
+    - destruct Heq as [Hv1 Hv2]. split; eauto. eexists. eexists.
+      split; eauto. intros; split; eauto.
+      now eapply Hv1. now eapply Hv2.
+    - split; eauto. eexists; split; eauto.
+      intros x. destruct Heq as [Hal Har].
+      destruct (M.get x e) eqn:Hgetx1; destruct (M.get x e0) eqn:Hgetx2;
+      simpl in *; eauto.
+      + left. repeat eexists; eauto.
+        edestruct Hal as [l' [Hgetx2' Ha]]; eauto.
+        now constructor. subst_exp. intros i Hleq; destruct (Ha i); eassumption.
+      + edestruct Hal as [l' [Hgetx2' Ha]]; eauto.
+        now constructor. congruence.
+      + edestruct Har as [l' [Hgetx2' Ha]]; eauto.
+        now constructor. congruence.
+    - eapply Hin. reflexivity.
+  Qed.
     
   (** Proper instances *)
   

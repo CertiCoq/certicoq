@@ -455,7 +455,6 @@ Module HeapDefs (H : Heap) .
       apply reach'_set_monotonic. eassumption.
   Qed.
   
-
   (** Proper instances and the like *)
 
   Instance Proper_post : Proper (eq ==> Same_set loc ==> Same_set loc) post.
@@ -489,7 +488,23 @@ Module HeapDefs (H : Heap) .
     repeat eexists; eauto; now rewrite <- Heq; eauto.
     repeat eexists; eauto; now rewrite Heq; eauto.
   Qed.
-  
+
+  Lemma post_Empty_set :
+      forall (H : heap block), post H (Empty_set _) <--> Empty_set _.
+  Proof.
+    intros H.
+    unfold post. split; intros l H1; try now inv H1.
+    destruct H1 as [l' [b [Hin _]]]. inv Hin.
+  Qed.
+
+  Lemma post_n_Empty_set n H :
+    (post H ^ n) (Empty_set _) <--> Empty_set _.
+  Proof.
+    induction n; try reflexivity.
+    simpl. rewrite IHn. rewrite post_Empty_set.
+    reflexivity.
+  Qed.
+
   Lemma post_n_heap_eq n P H1 H2 :
     reach' H1 P |- H1 ≡ H2 ->
     (post H1 ^ n) P <--> (post H2 ^ n) P.
@@ -554,13 +569,6 @@ Module HeapDefs (H : Heap) .
     - intros Hin. repeat eexists; eassumption.
   Qed.
 
-  Lemma post_Empty_set :
-    forall (H : heap block), post H (Empty_set _) <--> Empty_set _.
-  Proof.
-    intros H.
-    unfold post. split; intros l H1; try now inv H1.
-    destruct H1 as [l' [b [Hin _]]]. inv Hin.
-  Qed.
 
   Lemma post_Singleton_None (H1 : heap block) (l : loc) :
     get l H1 = None -> post H1 [set l] <--> Empty_set _.
@@ -570,6 +578,16 @@ Module HeapDefs (H : Heap) .
       rewrite Hget in Hget'. inv Hget'; eauto.
     - intros Hin. inv Hin.
   Qed.
+
+  Lemma post_n_Singleton_None H n l :
+    get l H = None ->
+    (post H ^ S n) [set l] <--> Empty_set _.
+  Proof.
+    intros Hnone. induction n.
+    - simpl. rewrite post_Singleton_None. reflexivity. eassumption.
+    - simpl. rewrite IHn. rewrite post_Empty_set. reflexivity.
+  Qed.
+
 
   Lemma post_n_Union n H S1 S2 :
     (post H ^ n) (Union _ S1 S2) <--> Union _ ((post H ^ n) S1) ((post H ^ n) S2).
@@ -846,6 +864,28 @@ Module HeapDefs (H : Heap) .
       + now eapply reach_n_extensive.
       + exists (i+1). split. omega.
         rewrite app_plus. eassumption.
+  Qed.
+
+  Lemma reach_n_Empty_set n H :
+    reach_n H n (Empty_set _) <--> Empty_set _.
+  Proof.
+    split; intros x Hin; try now inv Hin.
+    destruct Hin as [m [Hin1 Hin2]].
+    eapply post_n_Empty_set in Hin2. inv Hin2.
+  Qed.
+
+  Lemma reach_n_Union (H : heap block) (S1 S2 : Ensemble loc) (n : nat) : 
+    reach_n H n (S1 :|: S2) <--> reach_n H n S1 :|: reach_n H n S2.
+  Proof.
+    induction n.
+    - rewrite !reach_0. reflexivity.
+    - replace (S n) with (n + 1) by omega. rewrite !reach_S_n.
+      rewrite post_n_Union, IHn.
+      rewrite <- !Union_assoc.
+      eapply Same_set_Union_compat. reflexivity.
+      rewrite !Union_assoc.
+      eapply Same_set_Union_compat; [| reflexivity].
+      rewrite Union_commut. reflexivity.
   Qed.
 
   Instance Proper_reach_n : Proper (eq ==> eq ==> Same_set _ ==> Same_set _) reach_n.

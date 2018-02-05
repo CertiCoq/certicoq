@@ -1092,6 +1092,14 @@ Module CC_log_rel (H : Heap).
       eassumption.
   Qed.
 
+  Lemma res_equiv_image_post (β1 β2 : loc -> loc)
+        (i : nat) (H1 H2 : heap block)
+        (v1 v2 : value) :
+    res_equiv (β1, (v1, H1)) (β2, (v2, H2)) ->
+    image β1 ((post H1 ^ i) (val_loc v1)) <--> image β2 ((post H2 ^ i) (val_loc v2)).
+  Proof.
+    intros [Heq1 Heq2]. rewrite res_approx_fuel_eq in *. split; eapply res_approx_image_post; eauto.
+  Qed.
 
   Lemma image_id {A : Type} (S : Ensemble A) :
     image id S <--> S.
@@ -1151,7 +1159,15 @@ Module CC_log_rel (H : Heap).
            [| rewrite !Union_Empty_set_neut_l, !Union_Empty_set_neut_r; reflexivity ].
         eapply Him. omega.
   Qed.
-  
+
+  Lemma image_compose {A B C : Type} (f : A -> B) (g : B -> C) (S : Ensemble A):
+    image (g ∘ f) S <--> image g (image f S).
+  Proof.
+    split. now firstorder.
+    intros c [b' [[a [Hin Heqa]] Heqb]]. subst.
+    eexists. split; eauto.
+  Qed.
+    
   Lemma cc_approx_val_res_eq (k j : nat) (b' b1 b2 : Inj)  (H1 H2 H1' H2' : heap block)
         (v1 v2 v1' v2' : value) :
     (Res (v1, H1)) ≺ ^ (k ; j ; GIP ; GP ; b') (Res (v2, H2)) ->
@@ -1237,6 +1253,13 @@ Module CC_log_rel (H : Heap).
       destruct y as [l5' | lf5' f5']; destruct y0 as [l6' | lf6' f6']; try contradiction.
       destruct Hcc as [Him Hcc]. split; eauto.
       
+      rewrite <- res_equiv_eq in *.      
+      intros j' Hlt. rewrite !image_compose.
+      eapply res_equiv_image_post with (i := j') in Henv1. simpl in Henv1.
+      rewrite <- Henv1, image_id, (Him j' Hlt).
+      eapply res_equiv_image_post with (i := j') in H4. simpl in H4.
+      rewrite H4, image_id. reflexivity.
+
       inv H3. inv Hptr1. simpl. 
       intros b1' b2' tc1 tc2 tc3 H3 H3' H4' env_loc1' env_loc2' xs1 ft
              e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hget Hfind Hdef Hset.

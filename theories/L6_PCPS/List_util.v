@@ -136,9 +136,15 @@ Proof.
 Qed.
 
 Lemma Forall2_symm_strong (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) : 
-  (forall l1 l2, R1 l1 l2 -> R2 l2 l1) -> Forall2 R1 l1 l2 -> Forall2 R2 l2 l1.
+  (forall x1 x2, List.In x1 l1 -> List.In x2 l2 ->  R1 x1 x2 -> R2 x2 x1) ->
+  Forall2 R1 l1 l2 -> Forall2 R2 l2 l1.
 Proof.
   intros H Hall; induction Hall; eauto.
+  constructor. eapply H. now constructor. now constructor.
+  eassumption. eapply IHHall.
+  intros y1 y2 Hin1 Hin2 Hr. eapply H; eauto.
+  now constructor 2.
+  now constructor 2.
 Qed.
 
 Lemma Forall2_Forall {A} (P : A -> A -> Prop) l :
@@ -292,6 +298,60 @@ Proof.
     + inv Hnth1. inv Hnth2. eassumption.
     + eapply IHHall; eauto.
 Qed. 
+
+Lemma Forall2_vertical_l {A B} (R1 R1' : A -> B -> Prop) (R2 : A -> A -> Prop) l1 l2 l3 :
+  (forall x y z, R1 x y -> R2 x z -> R1' z y) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l1 l3 ->
+  Forall2 R1' l3 l2.
+Proof.
+  intros Hr Hall1. revert l3. induction Hall1; intros l3 Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor; eauto. 
+Qed.
+
+
+Lemma Forall2_vertical_r {A B} (R1 R1' : A -> B -> Prop) (R2 : B -> B -> Prop) l1 l2 l3 :
+  (forall x y z, R1 x y -> R2 y z -> R1' x z) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l2 l3 ->
+  Forall2 R1' l1 l3.
+Proof.
+  intros Hr Hall1. revert l3. induction Hall1; intros l3 Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor; eauto. 
+Qed.
+
+Lemma Forall2_vertical_l_strong {A B} (R1 R1' : A -> B -> Prop) (R2 : A -> A -> Prop) l1 l2 l3 :
+  (forall x y z, List.In x l1 -> List.In y l2 -> List.In z l3 ->  R1 x y -> R2 x z -> R1' z y) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l1 l3 ->
+  Forall2 R1' l3 l2.
+Proof.
+  intros Hr Hall1. revert l3 Hr. induction Hall1; intros l3 Hr Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor.
+    eapply Hr; try eassumption; try now constructor. 
+    eapply IHHall1; eauto.
+    intros x' y' z' Hin1 Hin2 Hin3 Hr1 Hr2.
+    eapply Hr; eauto; try now constructor 2.
+Qed.
+
+
+Lemma Forall2_vertical_r_strong {A B} (R1 R1' : A -> B -> Prop) (R2 : B -> B -> Prop) l1 l2 l3 :
+  (forall x y z, List.In x l1 -> List.In y l2 -> List.In z l3 -> R1 x y -> R2 y z -> R1' x z) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l2 l3 ->
+  Forall2 R1' l1 l3.
+Proof.
+  intros Hr Hall1. revert l3 Hr. induction Hall1; intros l3 Hr Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor.
+    eapply Hr; try eassumption; try now constructor. 
+    eapply IHHall1; eauto.
+    intros x' y' z' Hin1 Hin2 Hin3 Hr1 Hr2.
+    eapply Hr; eauto; try now constructor 2.
+Qed.
 
 (** Lemmas about [nthN] *)
 

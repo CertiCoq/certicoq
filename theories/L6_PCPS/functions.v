@@ -10,6 +10,8 @@ Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos
 
 Import ListNotations.
 
+Open Scope program_scope.
+
 (** ** Usefull definitions and lemmas about functions. *)
 
 Definition codomain {A B} (f : A -> B) : Ensemble B :=
@@ -172,6 +174,25 @@ Proof.
     right. eexists; eauto.
   - inv Hi; destruct H as [x' [Hin Heq]]; subst;
     eexists; split; eauto.
+Qed.
+
+Lemma image_id {A : Type} (S : Ensemble A) :
+  image id S <--> S.
+Proof.
+  split; intros x.
+  - intros [x' [Hin Heq]]. inv Heq.
+    eassumption.
+  - intros HS. eexists; split; eauto.
+Qed.
+
+Lemma image_compose {A B C : Type} (f : A -> B) (g : B -> C) (S : Ensemble A):
+  image (g ∘ f) S <--> image g (image f S).
+Proof.
+  split.
+  - intros c [a [Hin Heq]].
+    eexists. split; eauto. eexists. split; eauto.
+  - intros c [b' [[a [Hin Heqa]] Heqb]]. subst.
+    eexists. split; eauto.
 Qed.
 
 Lemma image_Singleton {A B} x (g : A -> B) :
@@ -672,6 +693,18 @@ Proof with now eauto with Ensembles_DB.
       now eauto with Ensembles_DB.
       eapply H2; eassumption.
 Qed.
+
+Lemma injective_subdomain_compose {A B C} (S1 : Ensemble A) (f1 : A -> B) (f2 : B -> C) :
+  injective_subdomain S1 f1 ->
+  injective_subdomain (image f1 S1) f2 ->
+  injective_subdomain S1 (f2 ∘ f1).
+Proof.
+  intros Hi1 Hi2 x y Hin1 Hin2 Heq.
+  unfold compose in *. eapply Hi2 in Heq; eauto.
+  eexists; split; [| reflexivity ]; eauto.
+  eexists; split; [| reflexivity ]; eauto.
+Qed.
+
 
 Lemma injective_extend (f : positive -> positive) x y :
   injective f ->

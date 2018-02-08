@@ -816,6 +816,30 @@ Module HeapDefs (H : Heap) .
         econstructor; eauto.
   Qed.
 
+  Lemma post_exists_Singleton S H l :
+    post H S l ->
+    exists l', l' \in S /\ post H [set l'] l.
+  Proof.
+    intros [l' [v [Hin Hp]]]. eexists; split; eauto.
+    eexists. eexists. split; eauto.
+  Qed.
+
+  Lemma post_n_exists_Singleton S1 H n l :
+    (post H ^ n) S1 l ->
+    exists l', l' \in S1 /\ (post H ^ n) [set l'] l.
+  Proof.
+    revert l S1. induction n; intros l S1.
+    - simpl. intros. eexists; split; eauto. reflexivity.
+    - intros Hp.
+      simpl in *. eapply post_exists_Singleton in Hp.
+      destruct Hp as [l' [Hin Hp]].
+      eapply IHn in Hin. destruct Hin as [l'' [Hinl'' Hp'']].
+      eexists. split; eauto.
+      destruct Hp as [l1 [b1 [Heq [Hget Hin]]]]. inv Heq.
+      eexists. eexists. split; eauto.
+  Qed.
+
+
   (** * Lemmas about [reach_n] *)
 
   Lemma reach_0 S H :
@@ -1001,6 +1025,19 @@ Module HeapDefs (H : Heap) .
         replace (size H + 1) with (1 + size H) by omega.
         eapply size_heap_fixed_point.
   Qed.
+
+    Lemma reach_n_Singleton_None H n l :
+    get l H = None ->
+    reach_n H n [set l] <--> [set l].
+  Proof.
+    intros Hget.
+    split; [| now eapply reach_n_extensive ]. 
+    intros x [y [Hleq Hin]].
+    destruct y.
+    - simpl in *. inv Hin. reflexivity.
+    - eapply post_n_Singleton_None in Hin; eauto. inv Hin.
+  Qed.
+
 
   (** * Lemmas about [env_locs] *)
   

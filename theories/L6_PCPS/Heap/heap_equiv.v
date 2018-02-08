@@ -1738,7 +1738,8 @@ Module HeapEquiv (H : Heap).
     rewrite (reach_unfold H2 S). eapply Included_Union_preserv_r.
     eapply reach'_set_monotonic. intros x Hin'. now repeat eexists; eauto.
   Qed. 
-    
+
+  
   (** Allocation lemmas *)
   
   Lemma heap_env_approx_alloc S S1 S2 β1 β2 H1 H2 H1' H2' rho1 rho2 l1 l2 b1 b2 x :
@@ -2151,6 +2152,185 @@ Module HeapEquiv (H : Heap).
   Proof.
     simpl; eauto.
   Qed.
+
+    (** * Image lemmas *)
+
+    Lemma res_approx_image_post (n : nat) (β1 β2 : loc -> loc)
+        (H1 H2 : heap block)
+        (v1 v2 : value) :
+    res_approx_fuel' n (β1, (v1, H1)) (β2, (v2, H2)) ->
+    image β1 ((post H1 ^ n) (val_loc v1)) \subset image β2 ((post H2 ^ n) (val_loc v2)).
+  Proof.
+    revert v1 v2 H1 H2. induction n as [n IHn] using lt_wf_rec1; intros v1 v2 H1 H2 Hres.
+    destruct v1 as [l1 | B1 f1]; destruct v2 as [l2 | B2 f2]; try now firstorder.
+    - simpl in Hres.
+      destruct (get l1 H1) as [b1 |] eqn:Hget1; eauto.
+      destruct b1 as [c1 vs1 | v1 v2 | rho1 ].
+      + destruct Hres as [Hbs1 [vs2 [Hget2 Hi]]].
+        destruct n.
+        * simpl. rewrite !image_Singleton.
+          rewrite Hbs1. reflexivity.
+        * replace (S n) with (n + 1) by omega.
+          rewrite !app_plus. unfold compose. simpl.
+          rewrite (proper_post_n H1);
+            [| rewrite !post_Singleton; try eassumption; reflexivity ].
+          rewrite (proper_post_n H2);
+            [| rewrite !post_Singleton; try eassumption; reflexivity ].
+          specialize (Hi n (NPeano.Nat.lt_succ_diag_r n)).
+          clear Hget1 Hget2. induction Hi; simpl.
+          rewrite !post_n_Empty_set. rewrite !image_Empty_set. reflexivity.
+          rewrite !post_n_Union, !image_Union.
+          eapply Included_Union_compat. eapply IHn. omega.
+          rewrite <- res_approx_fuel_eq. eassumption.
+          eapply IHHi; eauto. 
+      + destruct Hres as [Hbs1 [v1' [v2' [Hget2 Hi]]]].
+        destruct n.
+        * simpl. rewrite !image_Singleton.
+          rewrite Hbs1. reflexivity.
+        * replace (S n) with (n + 1) by omega.
+          rewrite !app_plus. unfold compose. simpl.
+          rewrite (proper_post_n H1);
+            [| rewrite !post_Singleton; try eassumption; reflexivity ].
+          rewrite (proper_post_n H2);
+            [| rewrite !post_Singleton; try eassumption; reflexivity ].
+          simpl. rewrite !post_n_Union, !image_Union.
+          eapply Included_Union_compat.
+          eapply IHn. omega.
+          rewrite <- res_approx_fuel_eq. eapply Hi. omega.
+          eapply IHn. omega.
+          rewrite <- res_approx_fuel_eq. eapply Hi. omega.
+      + destruct Hres as [Hbs1 [rho [Hgetr Hx]]].
+        destruct n.
+        * simpl. rewrite !image_Singleton.
+          rewrite Hbs1. reflexivity.
+        * replace (S n) with (n + 1) by omega.
+          rewrite !app_plus. unfold compose. simpl.
+          rewrite (proper_post_n H1);
+            [| rewrite !post_Singleton; try eassumption; reflexivity ].
+          rewrite (proper_post_n H2);
+            [| rewrite !post_Singleton; try eassumption; reflexivity ].
+          simpl.
+          { clear Hget1 Hgetr.
+            assert (Hlem : forall S1 S2,
+                             (forall l1, l1 \in S1 ->
+                                           exists l2, l2 \in S2 /\ res_approx_fuel n (β1, (Loc l1, H1)) (β2, (Loc l2, H2))) ->
+                             (forall l2, l2 \in S2 ->
+                                           exists l1, l1 \in S1 /\ res_approx_fuel n (β1, (Loc l1, H1)) (β2, (Loc l2, H2))) ->
+                             image β1 ((post H1 ^ n) S1) \subset image β2 ((post H2 ^ n) S2)
+                   ).
+            { clear -IHn. intros S1 S2 HS1 HS2.
+              intros l2' [l1' [Hin Hbeq]]. edestruct post_n_exists_Singleton as [l1 [Hinl1 Hpost1]]; eauto.
+              edestruct HS1 as [l2 [Hinl2 Hres]]; eauto.
+              eapply image_monotonic. eapply post_n_set_monotonic with (S1 := [set l2]). eapply Singleton_Included.
+              eassumption.
+              rewrite res_approx_fuel_eq in Hres.
+              specialize (IHn n (NPeano.Nat.lt_succ_diag_r n) _ _ _ _ Hres).
+              eapply IHn. eexists; split; eauto. }
+            eapply Hlem.
+            - intros l3 [z [_ Hin]].
+              destruct (M.get z rho1) as [v1 | ] eqn:Hgetz; [| now inv Hin ].
+              destruct v1 as [l1' |]; try now inv Hin. inv Hin.
+              destruct (Hx z) as [ [v1' [v2' [Hget1 [Hget2 Hi' ]]]] | [Hn1 Hn2] ]; [| congruence ].
+              subst_exp. specialize (Hi' n (NPeano.Nat.lt_succ_diag_r n)).
+              rewrite res_approx_fuel_eq in Hi'.
+              destruct v2' as [l4 |]; try contradiction. eexists. split.
+              eexists. split. now constructor. rewrite Hget2. reflexivity.
+              rewrite res_approx_fuel_eq. eassumption.
+            - intros l3 [z [_ Hin]].
+              destruct (M.get z rho) as [v1 | ] eqn:Hgetz; [| now inv Hin ].
+              destruct v1 as [l1' |]; try now inv Hin. inv Hin.
+              destruct (Hx z) as [ [v1' [v2' [Hget1 [Hget2 Hi' ]]]] | [Hn1 Hn2] ]; [| congruence ].
+              subst_exp. specialize (Hi' n (NPeano.Nat.lt_succ_diag_r n)).
+              rewrite res_approx_fuel_eq in Hi'.
+              destruct v1' as [l4 |]; try contradiction. eexists. split.
+              eexists. split. now constructor. rewrite Hget1. reflexivity.
+              rewrite res_approx_fuel_eq. eassumption.
+          }
+      + simpl. destruct Hres as [Heqb _].
+        destruct n.
+        * simpl. rewrite !image_Singleton, Heqb. reflexivity.
+        * rewrite post_n_Singleton_None; eauto.
+          rewrite image_Empty_set. now eauto with Ensembles_DB.
+    - simpl. rewrite !post_n_Empty_set, !image_Empty_set. reflexivity.
+  Qed.
+  
+  Lemma res_equiv_image_reach (β1 β2 : loc -> loc)
+        (H1 H2 : heap block)
+        (v1 v2 : value) :
+    res_equiv (β1, (v1, H1)) (β2, (v2, H2)) ->
+    image β1 (reach' H1 (val_loc v1)) <--> image β2 (reach' H2 (val_loc v2)).
+  Proof.
+    intros Heq. split.
+    - intros l' [l [[n [_ Hr]] Hin]].
+      destruct (Heq n) as [Heq1 Heq2].
+      rewrite res_approx_fuel_eq in *. eapply res_approx_image_post in Heq1.
+      edestruct Heq1 as [l1 [Hp1 Hin1]].
+      eexists; split; eauto.
+      eexists; split; eauto. eexists; split. now constructor. 
+      eassumption.
+    - intros l' [l [[n [_ Hr]] Hin]].
+      destruct (Heq n) as [Heq1 Heq2].
+      rewrite res_approx_fuel_eq in *. eapply res_approx_image_post in Heq2.
+      edestruct Heq2 as [l1 [Hp1 Hin1]].
+      eexists; split; eauto.
+      eexists; split; eauto. eexists; split. now constructor. 
+      eassumption.
+  Qed.
+
+  Lemma res_equiv_image_post (β1 β2 : loc -> loc)
+        (i : nat) (H1 H2 : heap block)
+        (v1 v2 : value) :
+    res_equiv (β1, (v1, H1)) (β2, (v2, H2)) ->
+    image β1 ((post H1 ^ i) (val_loc v1)) <--> image β2 ((post H2 ^ i) (val_loc v2)).
+  Proof.
+    intros [Heq1 Heq2]. rewrite res_approx_fuel_eq in *. split; eapply res_approx_image_post; eauto.
+  Qed.
+
+  
+  Lemma heap_env_equiv_image_reach (S : Ensemble var) (β1 β2 : loc -> loc)
+        (H1 H2 : heap block)
+        (rho1 rho2 : env) :
+    S |- (H1, rho1) ⩪_( β1, β2) (H2, rho2) ->
+    image β1 (reach' H1 (env_locs rho1 S)) <--> image β2 (reach' H2 (env_locs rho2 S)).
+  Proof.
+    intros Heq. split.
+    - intros l1 [l2 [[n [_ Him1]] Heq']]. 
+      edestruct post_n_exists_Singleton as [l [Hin Hpost]]; [ eassumption |].
+      destruct Hin as [x [Hin Hget]].
+      destruct (M.get x rho1) as [[l1'|] |] eqn:Hget1; try now inv Hget.
+      inv Hget. 
+      edestruct heap_env_equiv_env_get as [v2 [Hget2 Heqv]]; try eassumption. 
+      destruct v2 as [l2' |].
+      + eapply res_equiv_image_post with (i := n) in Heqv. try contradiction.
+        assert (Him : (image β1 ((post H1 ^ n) (val_loc (Loc l)))) (β1 l2)).
+        { eexists; split; eauto. }
+        eapply Heqv in Him. edestruct Him as [l3 [Hp Heq'']].
+        eexists; split; eauto.
+        eexists; split; eauto. now constructor.
+        eapply post_n_set_monotonic; [| eassumption ].
+        eapply Singleton_Included. eexists; split; eauto. rewrite Hget2.
+        reflexivity. 
+      + rewrite res_equiv_eq in Heqv. contradiction.
+    - intros l1 [l2 [[n [_ Him1]] Heq']]. 
+      edestruct post_n_exists_Singleton as [l [Hin Hpost]]; [ eassumption |].
+      destruct Hin as [x [Hin Hget]].
+      destruct (M.get x rho2) as [[l1'|] |] eqn:Hget1; try now inv Hget.
+      inv Hget. 
+      edestruct heap_env_equiv_env_get as [v2 [Hget2 Heqv]];
+        try (symmetry; eassumption); try eassumption.
+      edestruct v2 as [l2' |].
+      + eapply res_equiv_image_post with (i := n) in Heqv. try contradiction.
+        assert (Him : (image β2 ((post H2 ^ n) (val_loc (Loc l)))) (β2 l2)).
+        { eexists; split; eauto. }
+        eapply Heqv in Him. edestruct Him as [l3 [Hp Heq'']].
+        eexists; split; eauto.
+        eexists; split; eauto. now constructor.
+        eapply post_n_set_monotonic; [| eassumption ].
+        eapply Singleton_Included. eexists; split; eauto. rewrite Hget2.
+        reflexivity. 
+      + rewrite res_equiv_eq in Heqv. contradiction.
+  Qed.
+
   
   (** * Lemmas about [live] *)  
 

@@ -599,21 +599,34 @@ Module HeapDefs (H : Heap).
      - rewrite M.gso in Hget; eauto. 
        eapply alloc_dom_subset; eauto. eapply Hwf; eauto.
        constructor; eauto. intros Hc; inv Hc; congruence.
-   Qed.  
-
-   Lemma Forall2_monotonic_strong (A : Type) (R R' : A -> A -> Prop) (l1 l2 : list A) :
-     (forall x1 x2 : A, List.In x1 l1 -> List.In x2 l2 -> R x1 x2 -> R' x1 x2) ->
-     Forall2 R l1 l2 -> Forall2 R' l1 l2.
-   Proof.
-     revert l2.
-     induction l1 as [| x xs IHxs ]; intros l2 H Hall.
-     - inv Hall; eauto. 
-     - destruct l2; inv Hall. constructor; eauto.
-       eapply H; eauto. now constructor. now constructor.
-       eapply IHxs; eauto. intros. eapply H.
-       now constructor; eauto. now constructor; eauto.
-       eassumption.
    Qed.
+
+   Lemma well_formed_post_n_subheap_same (S : Ensemble loc) (H H' : heap block) n :
+    well_formed (reach' H S) H  ->
+    S \subset dom H ->
+    H ⊑ H' ->
+    (post H ^ n) S <--> (post H' ^ n) S.
+   Proof.
+    intros Hwf Hdom Hal. split; intros l' Hin.
+    - revert l' Hin; induction n; simpl in *; intros l' Hin.
+      + eassumption.
+      + destruct Hin as [l'' [b' [Hin [Hget Hin']]]].
+        eapply IHn in Hin.
+        eexists. eexists. split. eassumption.
+        split; [| eassumption ].
+        eapply Hal. eassumption.
+    - revert l' Hin; induction n; simpl in *; intros l' Hin.
+      + eassumption.
+      + destruct Hin as [l'' [b' [Hin [Hget Hin']]]].
+        eapply IHn in Hin.
+        eexists. eexists. split. eassumption.
+        split; [| eassumption ].
+        eapply reachable_in_dom in Hdom; [| eassumption ].
+        edestruct Hdom as [b'' Hget''].
+        eexists; split; [| exact Hin ]. now constructor. rewrite Hget''.
+        eapply Hal in Hget''. congruence.
+   Qed.
+
 
    Lemma heap_env_approx_set S H1 H2 x l1 l2 rho1 rho2 :
      heap_env_approx (Setminus _ S (Singleton _ x)) (H1, rho1) (H2, rho2) ->
@@ -1213,31 +1226,31 @@ Module HeapDefs (H : Heap).
      eapply post_n_heap_monotonic; eauto.
    Qed.
 
-    Lemma post_alloc S H v l H'  :
+   Lemma post_alloc S H v l H'  :
      alloc v H = (l, H') ->
      post H' S \subset (Union _ (post H S) (locs v)).
-    Proof.
+   Proof.
      intros Ha l' Hp.
      destruct Hp as [l2 [v' [Hin2 [Hget Hin1]]]].
      destruct (loc_dec l l2); subst; eauto.
      + repeat eexists; eauto. erewrite gas in Hget; eauto.
        inv Hget. eauto.
      + left; repeat eexists; eauto. erewrite <-gao; eauto.
-    Qed.
+   Qed.
 
-    Lemma post_n_alloc n S H v l H'  :
-      alloc v H = (l, H') ->
-      locs v \subset reach' H S ->
-      (post H' ^ n) S \subset reach' H S.
-    Proof.
-      revert S.
-      induction n; intros S Ha Hin; simpl; eauto with Ensembles_DB.
-      - now apply reach'_extensive.
-      - eapply Included_trans. eapply post_set_monotonic.
-        now eauto. eapply Included_trans. now eapply post_alloc; eauto.
-        eapply Union_Included. now eapply reach'_post_fixed_point_n with (n := 1).
-        eapply Included_trans; eauto. reflexivity.
-    Qed.
+   Lemma post_n_alloc n S H v l H'  :
+     alloc v H = (l, H') ->
+     locs v \subset reach' H S ->
+     (post H' ^ n) S \subset reach' H S.
+   Proof.
+     revert S.
+     induction n; intros S Ha Hin; simpl; eauto with Ensembles_DB.
+     - now apply reach'_extensive.
+     - eapply Included_trans. eapply post_set_monotonic.
+       now eauto. eapply Included_trans. now eapply post_alloc; eauto.
+       eapply Union_Included. now eapply reach'_post_fixed_point_n with (n := 1).
+       eapply Included_trans; eauto. reflexivity.
+   Qed.
 
    Lemma reach'_alloc S H v l H'  :
      alloc v H = (l, H') ->
@@ -1249,7 +1262,30 @@ Module HeapDefs (H : Heap).
      - intros l' [n [_ Hp]]. eapply post_n_alloc; eauto.
      - eapply reach'_heap_monotonic. now eapply alloc_subheap; eauto.
    Qed.
-
+    
+   Lemma reach'_alloc_set (S : Ensemble var) (H H' : heap block) (rho : env)
+         (x : var) (b : block) (l : loc) :
+     locs b \subset reach' H (env_locs rho S)->
+     alloc b H = (l, H')  ->  
+     reach' H' (env_locs (M.set x (Loc l) rho) (S :|: [set x])) \subset
+            l |: reach' H (env_locs rho S).
+   Proof.
+     intros Hsub Hal.
+     eapply Included_trans. eapply reach'_set_monotonic.
+     eapply env_locs_set_Inlcuded. 
+     rewrite reach'_Union.
+     rewrite (reach'_alloc (env_locs rho S)); try eassumption.
+     eapply Union_Included; [| now eauto with Ensembles_DB ].
+     simpl. rewrite reach_unfold. eapply Included_Union_compat.
+     reflexivity.
+     rewrite post_Singleton; [| erewrite gas; eauto].
+     rewrite (reach'_idempotent _ (env_locs rho S)).
+     rewrite (reach'_alloc (locs b)); eauto.
+     eapply reach'_set_monotonic. eassumption.
+     now apply reach'_extensive. 
+   Qed.      
+   
+   
    Instance Proper_well_formed : Proper (Same_set _ ==> eq ==> iff) well_formed.
    Proof.
      intros s1 s2 hseq H1 h2 Heq; subst. firstorder.

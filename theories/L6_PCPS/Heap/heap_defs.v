@@ -724,7 +724,7 @@ Module HeapDefs (H : Heap) .
     split.
     - intros l' [n [_ Hp]]. eapply post_n_alloc; eauto.
     - eapply reach'_heap_monotonic. now eapply alloc_subheap; eauto.
-  Qed.
+  Qed.   
 
     (** * Lemmas about [path] *)
 
@@ -2011,6 +2011,33 @@ Module HeapDefs (H : Heap) .
       eexists; split; eauto. constructor.
   Qed.
 
+  Lemma well_formed_post_n_subheap_same (S : Ensemble loc) (H H' : heap block) n :
+    well_formed (reach' H S) H  ->
+    S \subset dom H ->
+    H ⊑ H' ->
+    (post H ^ n) S <--> (post H' ^ n) S.
+  Proof.
+    intros Hwf Hdom Hal. split; intros l' Hin.
+    - revert l' Hin; induction n; simpl in *; intros l' Hin.
+      + eassumption.
+      + destruct Hin as [l'' [b' [Hin [Hget Hin']]]].
+        eapply IHn in Hin.
+        eexists. eexists. split. eassumption.
+        split; [| eassumption ].
+        eapply Hal. eassumption.
+    - revert l' Hin; induction n; simpl in *; intros l' Hin.
+      + eassumption.
+      + destruct Hin as [l'' [b' [Hin [Hget Hin']]]].
+        eapply IHn in Hin.
+        eexists. eexists. split. eassumption.
+        split; [| eassumption ].
+        eapply reachable_in_dom in Hdom; [| eassumption ].
+        edestruct Hdom as [b'' Hget''].
+        eexists; split; [| exact Hin ]. now constructor. rewrite Hget''.
+         eapply Hal in Hget''. congruence.
+  Qed.
+
+
   Lemma well_formed_reach_def_closed_same (S : Ensemble loc) (H H' : heap block) B B0 rho rho' l :
     well_formed (reach' H S) H  ->
     In loc (dom H) l ->
@@ -2564,6 +2591,28 @@ Module HeapDefs (H : Heap) .
     erewrite heap_elements_filter_set_Equal.
     reflexivity. rewrite Heq. reflexivity.
   Qed.
+
+  Lemma reach'_alloc_set (S : Ensemble var) (H H' : heap block) (rho : env)
+        (x : var) (b : block) (l : loc) :
+    locs b \subset reach' H (env_locs rho S)->
+    alloc b H = (l, H')  ->  
+    reach' H' (env_locs (M.set x (Loc l) rho) (S :|: [set x])) \subset
+    l |: reach' H (env_locs rho S).
+  Proof.
+    intros Hsub Hal.
+    eapply Included_trans. eapply reach'_set_monotonic.
+    eapply env_locs_set_Inlcuded. 
+    rewrite reach'_Union.
+    rewrite (reach'_alloc (env_locs rho S)); try eassumption.
+    eapply Union_Included; [| now eauto with Ensembles_DB ].
+    simpl. rewrite reach_unfold. eapply Included_Union_compat.
+    reflexivity.
+    rewrite post_Singleton; [| erewrite gas; eauto].
+    rewrite (reach'_idempotent _ (env_locs rho S)).
+    rewrite (reach'_alloc (locs b)); eauto.
+    eapply reach'_set_monotonic. eassumption.
+    now apply reach'_extensive. 
+  Qed.      
 
   (* end move *)
 

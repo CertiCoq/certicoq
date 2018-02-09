@@ -17,11 +17,10 @@ Require L6.L5_to_L6
 
 (* Standard lib *)
 Require Import ExtrOcamlBasic.
-Require Import ExtrOcamlString.
+Require Import ExtrOcamlString ExtrOcamlZInt.
 
 (* Coqlib *)
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
-
 
 (* L6_to_Clight *)
 Extract Constant L6_to_Clight.print_Clight => "PrintClight.print_if".
@@ -52,10 +51,13 @@ Extract Constant Int31.compare31 => "Camlcoq.Int31.compare".
 Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1".
 
+
+
 Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 
 (* Avoid name clashes with OCaml or Coq module names *)
-Extraction Blacklist List String Nat Int Ast Char Instances Classes Term Monad Coqlib Errors Compile.
+Extraction Blacklist List String Nat Int Ast univ uGraph Char
+           Instances Classes Term Monad Coqlib Errors Compile.
 
 (* Cutting the dependency to R. *)
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".

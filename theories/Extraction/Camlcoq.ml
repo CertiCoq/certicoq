@@ -374,6 +374,7 @@ let camlfloat_of_coqfloat32 f =
 
 module Int31 = struct
 
+  type t = int
 (*
 let constr (b30,b29,b28,b27,b26,b25,b24,
             b23,b22,b21,b20,b19,b18,b17,b16,

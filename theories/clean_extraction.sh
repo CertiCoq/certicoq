@@ -17,5 +17,5 @@ cd ..
 
 # Remove extracted modules already linked in template_coq_plugin.
 cd plugin
-rm -f ast0.* specif.* peanoNat.* list0.* datatypes.* ascii.* binPosDef.* binPos.* binNat.* binNums.* bool.* nat0.* string0.*
+rm -f ast0.* specif.* peanoNat.* list0.* datatypes.* ascii.* univ0.* binPosDef.* binPos.* binNat.* binNums.* binInt.* binIntDef.* bool.* nat0.* string0.* basics.*
 cd ..

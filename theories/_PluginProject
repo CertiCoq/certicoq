@@ -5,7 +5,6 @@
 
 # plugin/ast0.mli
 plugin/basics.mli
-plugin/binInt.mli
 plugin/char0.mli
 plugin/decidableClass.mli
 plugin/errors0.mli
@@ -75,7 +74,6 @@ plugin/coqlib0.ml
 plugin/cop.mli
 plugin/cop.ml
 plugin/char0.ml
-plugin/binInt.ml
 plugin/basics.ml
 plugin/astCommon.mli
 # plugin/ast0.ml
@@ -146,8 +144,8 @@ plugin/memdata.mli
 plugin/memdata.ml
 plugin/memory.mli
 plugin/memory.ml
-plugin/floats.mli
 plugin/integers.ml
+plugin/floats.mli
 plugin/maps.ml
 plugin/values.mli
 plugin/compile1.ml

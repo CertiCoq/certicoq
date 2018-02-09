@@ -317,7 +317,7 @@ Module Compat (H : Heap).
     Qed.
     
     (** Projection compatibility *)
-    Lemma cc_approx_exp_proj_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env)
+    Lemma cc_approx_exp_proj_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj)
           (x1 x2 : var) (t : cTag) (n : N) (y1 y2 : var) (e1 e2 : exp) (r1 r2 : nat)
 
           (IInvProjCompat :
@@ -327,22 +327,23 @@ Module Compat (H : Heap).
                val_loc v2 \subset reach' H2 (env_locs rho2 (occurs_free (Eproj x2 t n y2 e2))) ->
                IIL2 (H1, M.set x1 v1 rho1, e1) (H2, M.set x2 v2 rho2, e2)) :
 
-      cc_approx_var_env k IIG IG H1 rho1 H2 rho2 y1 y2 ->
+      (forall j, cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 y1 y2) ->
 
       r1 - r2 <= F*(cost (Eproj x1 t n y1 e1)) ->
 
       (forall i v1 v2,
          i < k ->
-         (Res (v1, H1)) ≺ ^ (i ; IIG ; IG) (Res (v2, H2)) ->
-         (e1, M.set x1 v1 rho1, H1) ⪯ ^ (i ; IIL2 ; IIG ; ILi r2 ; IG) (e2, M.set x2 v2 rho2, H2)) ->
+         (forall j, (Res (v1, H1)) ≺ ^ (i ; j ; IIG ; IG; b) (Res (v2, H2))) ->
+         (forall j, (e1, M.set x1 v1 rho1, H1) ⪯ ^ (i ; j ; IIL2 ; IIG ; ILi r2 ; IG) (e2, M.set x2 v2 rho2, H2))) ->
       
-      (Eproj x1 t n y1 e1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r1 ; IG) (Eproj x2 t n y2 e2, rho2, H2).
-    Proof.
-      intros Hall Hleq Hpre H1' H2' rho1' rho2' v1 c1 m1
-             Heq1' Heq2' HII Hleq1 Hstep1 Hstuck. inv Hstep1.
+      (forall j, (Eproj x1 t n y1 e1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; ILi r1 ; IG) (Eproj x2 t n y2 e2, rho2, H2)).
+    Proof with (now eauto with Ensembles_DB).
+      intros Hall Hleq Hpre j b1 b2 H1' H2' rho1' rho2' v1 c1 m1
+             Heq1' Hinj1 Heq2' Hinj2 HII Hleq1 Hstep1 Hstuck. inv Hstep1.
       (* Timeout! *)
-      - { simpl in Hcost. exists OOT, (c1 - r1). eexists. repeat split. 
-          - econstructor. simpl; omega. reflexivity. 
+      - { simpl in Hcost. exists OOT, (c1 - r1). eexists. exists id. repeat split. 
+          - econstructor. simpl; omega. reflexivity.
+          - eapply injective_subdomain_Empty_set.
           - eapply InvCostTimeout. eassumption.
           - now rewrite cc_approx_val_eq. }
       (* Termination *)
@@ -353,53 +354,101 @@ Module Compat (H : Heap).
           eapply (cc_approx_var_env_heap_env_equiv
                     _ _
                     (occurs_free (Eproj x1 t n y1 e1))
-                    (occurs_free (Eproj x2 t n y2 e2))) in Hall;
-          [| eassumption | eassumption
-           | normalize_occurs_free; now eauto with Ensembles_DB | normalize_occurs_free; now eauto with Ensembles_DB ].
+                    (occurs_free (Eproj x2 t n y2 e2)) _ (S j)) in Hall;
+          [| eassumption | eassumption | eassumption | eassumption
+           | normalize_occurs_free; now eauto with Ensembles_DB
+           | normalize_occurs_free; now eauto with Ensembles_DB ].
           edestruct Hall as [l2 [Hget' Hcc']]; eauto.
           destruct l2 as [l' | l' f]; [| contradiction ].
           simpl in Hcc'. rewrite Hgetl in Hcc'.
-          destruct (get l' H2') as [[ t2 vs' | | ] |] eqn:Hgetl'; try contradiction.
-          destruct Hcc' as [Hteq Hcc']. subst.
+          destruct (get l' H2') as [[ t2 vs' | | ] |] eqn:Hgetl';
+            (try destruct Hcc' as [Hteq Hcc']); try contradiction.
           
           edestruct heap_env_equiv_env_get as [l1 [Hgetl1 Hres1]]; [ now apply Hgety | | | ].
           symmetry. eassumption. now eauto.
           edestruct heap_env_equiv_env_get as [l2 [Hgetl2 Hres2]]; [ now apply Hget' | | | ].
           symmetry. eassumption. now eauto.
 
-          edestruct Hall' as [l2' [Hgetl2'' Hcc]]; eauto. repeat subst_exp. 
+          edestruct (Hall' (S j))  as [l2' [Hgetl2'' Hcc]]; eauto. repeat subst_exp. 
           
-          rewrite res_equiv_eq in Hres1, Hres2.
+          assert (Hres1' := Hres1). assert (Hres2' := Hres2). rewrite res_equiv_eq in Hres1, Hres2.
           destruct l1 as [l1 |]; try contradiction.
           destruct l2' as [l2 |]; try contradiction.
           
           simpl in Hres1, Hres2. rewrite Hgetl in Hres1. rewrite Hgetl' in Hres2.
-          destruct (get l1 H1) as [b1 |] eqn:Hgetl1'; try contradiction.
-          destruct (get l2 H2) as [b2 |] eqn:Hgetl2'; try contradiction.
-          destruct b1 as [t1 vs1 | | ]; try contradiction. destruct Hres1 as [Hteq Hallvs1]; subst.
-          destruct b2 as [t2 vs2 | | ]; try contradiction. destruct Hres2 as [Hteq Hallvs2]; subst.
-
-          simpl in Hcc. rewrite Hgetl1' in Hcc. rewrite Hgetl2' in Hcc.
-          destruct Hcc as [Hteq Hcc]. subst.
-
-          edestruct (Forall2_nthN _ _ _ _ _ Hallvs1 Hnth) as [v1' [Hnth' Hv1]].
-          edestruct (Forall2_nthN (fun l1 l2 => cc_approx_val (k - cost1) IIG IG (Res (l1, H1)) (Res (l2, H2))) vs1)
-            as [l3' [Hnth'' Hval']]; eauto. eapply Hcc. unfold cost1. simpl. simpl in Hcost. omega.
+          destruct (get l1 H1) as [bl1 |] eqn:Hgetl1'; (try destruct Hres1 as [Hb1 Hres1]); try contradiction.
+          destruct (get l2 H2) as [bl2 |] eqn:Hgetl2'; (try destruct Hres2 as [Hb2 Hres2]); try contradiction.
+          destruct bl1 as [t1 vs1 | | ]; try contradiction.
+          destruct bl2 as [t2' vs2 | | ]; try contradiction.
+          destruct Hres1 as [Hteq Hallvs1]; subst. destruct Hres2 as [Hteq' Hallvs2]; subst.
           
-          edestruct (Forall2_nthN (fun v1 v2 : value => (v1, H2) ≈ (v2, H2'))) as [v2' [Hnth2' Hv2]].
+          simpl in Hcc. rewrite Hgetl1' in Hcc. rewrite Hgetl2' in Hcc.
+          destruct Hcc as [Hbeq [Hteq Hcc]]. subst.
+          
+          edestruct (Forall2_nthN _ _ _ _ _ Hallvs1 Hnth) as [v1' [Hnth' Hv1]].
+          edestruct (Forall2_nthN
+                       (fun l1 l2 => cc_approx_val k j IIG IG b (Res (l1, H1)) (Res (l2, H2))) vs1)
+            as [l3' [Hnth'' Hval']]; eauto.
+          (* eapply Hcc. unfold cost1. simpl. simpl in Hcost. omega. *)
+          
+          edestruct (Forall2_nthN (fun v1 v2 : value => (v1, H2) ≈_( b2, id) (v2, H2'))) as [v2' [Hnth2' Hv2]].
           eapply Forall2_symm_strong; [| eassumption ]. intros. now symmetry; eauto. eassumption.
           
-          edestruct Hpre with (i := k - cost1) (c1 := c1 - cost1) as [v2 [c2 [m2 [Hstep [HS Hres]]]]]. 
+          edestruct Hpre with (i := k - cost1) (c1 := c1 - cost1) as [v2 [c2 [m2 [b' [Hstep [Hinj' [HS Hres]]]]]]];
+            [ | | | | | | | omega | eassumption | | ].  
           - unfold cost1. simpl. simpl in Hcost. omega.
-          - rewrite <- cc_approx_val_eq. eassumption.
+          - intros j'.
+            
+            edestruct (Hall' (S j'))  as [l2'' [Hgetl2'' Hcc'']]; eauto. repeat subst_exp. 
+
+            simpl in Hcc''. rewrite Hgetl1' in Hcc''. rewrite Hgetl2' in Hcc''.
+            destruct Hcc'' as [_ [_ Hcc'']].
+            
+            edestruct (Forall2_nthN
+                         (fun l1 l2 => cc_approx_val k j' IIG IG b (Res (l1, H1)) (Res (l2, H2))) vs1)
+              as [v2'' [Hnth2 Hv2']]; eauto.
+
+            eapply cc_approx_val_monotonic.
+            rewrite <- cc_approx_val_eq. 
+            repeat subst_exp. eassumption. omega.
+            
           - eapply heap_env_equiv_set.
             eapply heap_env_equiv_antimon. eassumption.
-            normalize_occurs_free... now eauto with Ensembles_DB.
-            symmetry. eassumption. 
+            normalize_occurs_free... symmetry. eassumption.
+          - eapply injective_subdomain_antimon. eassumption.
+
+            rewrite (reach'_idempotent H1' (env_locs rho1' (occurs_free (Eproj x1 t n y1 e1)))).
+            eapply reach'_set_monotonic.
+            eapply Included_trans.
+            eapply env_locs_set_Inlcuded'.
+            eapply Union_Included.
+
+            eapply Included_trans; [| eapply Included_post_reach' ].
+            normalize_occurs_free. rewrite env_locs_Union, post_Union. eapply Included_Union_preserv_l.
+            rewrite env_locs_Singleton; eauto. simpl. erewrite post_Singleton; eauto.
+            simpl. eapply In_Union_list. eapply in_map. eapply nthN_In. eassumption.
+
+            eapply Included_trans; [| eapply reach'_extensive ].
+            eapply env_locs_monotonic. normalize_occurs_free...
           - eapply heap_env_equiv_set.
             eapply heap_env_equiv_antimon. eassumption.
-            normalize_occurs_free... now eauto with Ensembles_DB.
-            eassumption.
+            normalize_occurs_free...
+            repeat subst_exp. eassumption.
+          - eapply injective_subdomain_antimon. eassumption.
+
+            rewrite (reach'_idempotent H2 (env_locs rho2 (occurs_free (Eproj x2 t n y2 e2)))).
+            eapply reach'_set_monotonic.
+            eapply Included_trans.
+            eapply env_locs_set_Inlcuded'.
+            eapply Union_Included.
+            
+            eapply Included_trans; [| eapply Included_post_reach' ].
+            normalize_occurs_free. rewrite env_locs_Union, post_Union. eapply Included_Union_preserv_l.
+            rewrite env_locs_Singleton; eauto. simpl. erewrite post_Singleton; eauto.
+            simpl. eapply In_Union_list. eapply in_map. eapply nthN_In. eassumption.
+
+            eapply Included_trans; [| eapply reach'_extensive ].
+            eapply env_locs_monotonic. normalize_occurs_free...
           - eapply IInvProjCompat. eassumption.
             eapply Included_trans; [| eapply Included_post_reach' ].
             normalize_occurs_free. rewrite env_locs_Union, post_Union. eapply Included_Union_preserv_l.
@@ -409,8 +458,6 @@ Module Compat (H : Heap).
             normalize_occurs_free. rewrite env_locs_Union, post_Union. eapply Included_Union_preserv_l.
             rewrite env_locs_Singleton; eauto. simpl. erewrite post_Singleton; eauto.
             simpl. eapply In_Union_list. eapply in_map. eapply nthN_In. eassumption.
-          - omega.
-          - eassumption.
           - intros i. edestruct (Hstuck (i + cost1)) as [r' [m' Hstep']].
             inv Hstep'.
             * unfold cost1 in Hcost0. omega.

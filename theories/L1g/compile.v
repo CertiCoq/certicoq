@@ -3,7 +3,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.omega.Omega.
 Require Import Coq.Bool.Bool.
-Require Import Template.Ast.
+Require Import Template.Ast Template.kernel.univ.
 Require Import Common.Common.
 
 Local Open Scope string_scope.
@@ -278,8 +278,8 @@ Function term_Term (t:term) : Term :=
     | tRel n => TRel n
     | tSort srt =>
       TSort (match srt with 
-             | (lProp, false) :: nil => SProp
-             | (lSet, false) :: nil => SSet
+             | (Level.lProp, false) :: nil => SProp
+             | (Level.lSet, false) :: nil => SSet
              | _ => SType  (* throwing away sort info *)
              end)
     | tCast tm _ (tCast _ _ (tSort sProp)) => mkProof (term_Term tm)
@@ -322,7 +322,7 @@ Fixpoint program_Pgm
     | PIn t => {| main:= (term_Term dtEnv t); env:= e |}
     | PConstr nm us ty t p =>
       program_Pgm dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv t))) e)
-    | PType nm npar ibs p =>
+    | PType nm uctx npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
       program_Pgm dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
     | PAxiom nm us _ p =>

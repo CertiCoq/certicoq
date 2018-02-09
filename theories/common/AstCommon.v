@@ -1,4 +1,4 @@
-
+Require Import Template.kernel.univ.
 Require Export Template.Ast.
 Require Import Template.Template.
 Require Import Coq.Strings.String.
@@ -36,10 +36,10 @@ induction s1; induction s2; try (solve [right; intros h; discriminate]).
   + right. injection. intuition.
 Defined.
 
-Lemma level_dec : forall x y : level, {x = y} + {x <> y}.
+Lemma level_dec : forall x y : Level.t, {x = y} + {x <> y}.
 Proof. decide equality. apply String.string_dec. apply NPeano.Nat.eq_dec. Defined.
 
-Lemma level_bool_dec : forall x y : level * bool, {x = y} + {x <> y}.
+Lemma level_bool_dec : forall x y : Level.t * bool, {x = y} + {x <> y}.
 Proof. intros [l b] [l' b']. decide equality. apply Bool.bool_dec. apply level_dec. Defined.
 
 Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
@@ -53,10 +53,11 @@ try (solve [left; reflexivity]).
 Defined.
 
 Lemma inductive_dec: forall (s1 s2:inductive), {s1 = s2}+{s1 <> s2}.
-induction s1; induction s2.
-destruct (string_dec k k0); destruct (eq_nat_dec n n0); subst;
+  intros [mind i] [mind' i'].
+  destruct (string_dec mind mind');
+    destruct (eq_nat_dec i i'); subst;
 try (solve [left; reflexivity]); 
-right; intros h; elim n1; injection h; intuition.
+right; intros h; elim n; injection h; intuition.
 Defined.
 
 Lemma nat_list_dec : forall l1 l2 : list nat, {l1 = l2} + {l1 <> l2}.
@@ -220,7 +221,7 @@ Fixpoint program_datatypeEnv (p:program) (e:environ) : environ :=
   match p with
     | PIn _ => e
     | PConstr _ _ _ _ p => program_datatypeEnv p e
-    | PType nm npar ibs p =>
+    | PType nm uctx npar ibs p =>
       let Ibs := ibodies_itypPack ibs in
       program_datatypeEnv p (cons (pair nm (ecTyp npar Ibs)) e)
     | PAxiom nm _ _ p =>

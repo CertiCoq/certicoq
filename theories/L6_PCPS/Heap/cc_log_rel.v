@@ -79,6 +79,17 @@ Module CC_log_rel (H : Heap).
   Section cc_approx.
     
     Variable (cc_approx_val : nat -> nat -> IInv -> GInv -> Inj -> ans -> ans -> Prop). 
+
+    (* TODO move *)
+    Definition reach_n_res (j : nat) := fun '(v, H) => reach_n H j (val_loc v).
+    
+    Definition reach_n_ans (j : nat) (a : ans) := 
+      match a with
+        | Res r => reach_n_res j r
+        | OOT => Empty_set loc
+        | OOM => Empty_set loc
+      end.
+    
     
     (** * Expression relation *)
     
@@ -102,7 +113,7 @@ Module CC_log_rel (H : Heap).
         not_stuck H1' rho1' e1 ->
         exists (r2 : ans) (c2 m2 : nat) (b : Inj),
           big_step_GC_cc H2' rho2' e2 r2 c2 m2 /\
-          injective_subdomain (reach_ans r1) b /\
+          injective_subdomain (reach_n_ans j r1) b /\
           (* extra invariants for costs *)
           IL (c1, m1) (c2, m2) /\
           cc_approx_val (k - c1) j IIG IG b r1 r2.
@@ -703,6 +714,9 @@ Module CC_log_rel (H : Heap).
     edestruct (Hpre b1 b2 H1' H2' rho1' rho2' v1 c1)
       as [v2 [c2 [m2 [b2' [Hstep2 [Hinj [Hleq2 H3]]]]]]]; eauto.
     do 4 eexists; repeat split; eauto.
+    eapply injective_subdomain_antimon. eassumption.
+    destruct v1 as [[l H] | | ]; simpl; try now reflexivity.
+    now eapply reach_n_monotonic; eauto.
     rewrite cc_approx_val_eq in *.
     eapply cc_approx_val_j_monotonic; eauto.
   Qed.

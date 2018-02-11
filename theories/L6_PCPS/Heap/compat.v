@@ -613,20 +613,103 @@ Module Compat (H : Heap).
                     rewrite Heq. eassumption.
                 } }
     Qed.
-    
+
+    (* TODO move *)
+    Lemma cc_approx_var_env_image_eq
+          (GIP : IInv) (GP : GInv) (k j : nat) (β : Inj) 
+          (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
+      cc_approx_var_env k j GIP GP β H1 rho1 H2 rho2 x y ->
+      M.get x rho1 = Some v -> 
+      image β ((post H1 ^ j) (env_locs rho1 [set x])) <--> (post H2 ^ j) (env_locs rho2 [set y]).
+    Proof.
+      intros Hcc Hget.
+      edestruct Hcc as [v' [Hget' Hv]]; eauto.
+      eapply Same_set_trans. eapply image_Proper_Same_set. reflexivity.
+      eapply proper_post_n.
+      rewrite !env_locs_Singleton; eauto. reflexivity.
+      rewrite cc_approx_val_image_eq; try eassumption.
+      eapply proper_post_n.
+      rewrite !env_locs_Singleton; eauto. reflexivity.
+    Qed.
+
+    Lemma cc_approx_val_image_reach_n_eq (GIP : IInv) (GP : GInv) (k j : nat) (β : Inj)  (H1 H2 : heap block)
+        (v1 v2 : value) :
+      (Res (v1, H1)) ≺ ^ (k ; j ; GIP ; GP ; β) (Res (v2, H2)) ->
+      image β (reach_n H1 j (val_loc v1)) <--> (reach_n H2 j (val_loc v2)).
+    Proof.
+      intros Hres. split.
+      - intros l' [l [[m [Hm Hr]] Hin]].
+        eapply cc_approx_val_j_monotonic in Hres; eauto. 
+        eapply cc_approx_val_image_eq in Hres. eexists m.
+        split; eauto. eapply Hres. eexists. split; eauto.
+      - intros l' [m [Hm Hr]].
+         eapply cc_approx_val_j_monotonic in Hres; eauto. 
+         eapply cc_approx_val_image_eq in Hres. eapply Hres in Hr.
+         destruct Hr as [l [Heql Hin]]. eexists; split; eauto.
+         eexists; split; eauto.
+    Qed.
+
+    Lemma cc_approx_var_env_image_reach_n_eq
+          (GIP : IInv) (GP : GInv) (k j : nat) (β : Inj) 
+          (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
+      cc_approx_var_env k j GIP GP β H1 rho1 H2 rho2 x y ->
+      M.get x rho1 = Some v -> 
+      image β (reach_n H1 j (env_locs rho1 [set x])) <-->
+      reach_n H2 j (env_locs rho2 [set y]).
+    Proof.
+      intros Hcc Hget.
+      edestruct Hcc as [v' [Hget' Hv]]; eauto.
+      rewrite !env_locs_Singleton; eauto.
+      rewrite cc_approx_val_image_reach_n_eq; try eassumption.
+      reflexivity.
+    Qed.
+
+
+    Lemma reach_n_in_reach (H : heap block) (n : nat) (S : Ensemble loc): 
+      reach_n H n S \subset reach' H S.
+    Proof.
+      intros x [n' [_ Hin]]. eexists; split; eauto. constructor.
+    Qed.
+
+    Lemma res_equiv_image_reach_n (n : nat) (β1 β2 : loc -> loc)
+        (H1 H2 : heap block)
+        (v1 v2 : value) :
+        res_equiv (β1, (v1, H1)) (β2, (v2, H2)) ->
+        image β1 (reach_n H1 n (val_loc v1)) <--> image β2 (reach_n H2 n (val_loc v2)).
+    Proof.
+      intros Heq. split.
+      - intros l' [l [[m [Hm Hr]] Hin]].
+        destruct (Heq m) as [Heq1 Heq2].
+        rewrite res_approx_fuel_eq in *.
+        eapply res_approx_image_post in Heq1.
+        edestruct Heq1 as [l1 [Hp1 Hin1]].
+        eexists; split; eauto.
+        eexists; split; eauto. eexists; split; eauto.
+      - intros l' [l [[m [Hm Hr]] Hin]].
+        destruct (Heq m) as [Heq1 Heq2].
+        rewrite res_approx_fuel_eq in *. eapply res_approx_image_post in Heq2.
+        edestruct Heq2 as [l1 [Hp1 Hin1]].
+        eexists; split; eauto.
+        eexists; split; eauto. eexists; split; eauto.
+    Qed.
+
     (** Halt compatibility *)
-    Lemma cc_approx_exp_halt_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (r : nat) :
+    Lemma cc_approx_exp_halt_compat (k j : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj) (x1 x2 : var) (r : nat) :
       r <= F * (cost (Ehalt x1)) -> 
           
-      cc_approx_var_env k IIG IG H1 rho1 H2 rho2 x1 x2 ->
-      
-      (Ehalt x1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r ; IG) (Ehalt x2, rho2, H2).
+      cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 x1 x2 ->
+      injective_subdomain (reach_n H1 j (env_locs rho1 [set x1])) b ->
+
+      (Ehalt x1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; ILi r ; IG) (Ehalt x2, rho2, H2).
     Proof.
-      intros Hleq Hvar H1' H2' rho1' rho2' v1 c1 m1 HII Heq1 Heq2 Hleq1 Hstep1 Hstuck1.
+      intros Hleq Hvar Hinj b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1
+             Heq2 Hinj2 Hleq1 HII Hstep1 Hstuck1.
+      assert (Hvar' := Hvar).
       inv Hstep1.
       - (* Timeout! *)
-        { simpl in Hcost. exists OOT, (c1 - r). eexists. repeat split. 
+        { simpl in Hcost. exists OOT, (c1 - r). eexists. exists id. repeat split. 
           - econstructor; eauto. simpl. omega.
+          - eapply injective_subdomain_Empty_set.
           - rewrite <- plus_n_O. eapply InvCostTimeout.
             eassumption.
           - now rewrite cc_approx_val_eq. }
@@ -636,11 +719,36 @@ Module Compat (H : Heap).
                   _ _
                   (occurs_free (Ehalt x1))
                   (occurs_free (Ehalt x2))) in Hvar;
-          [| eassumption | eassumption | now constructor | now constructor ]. 
+          [| eassumption | eassumption | eassumption | eassumption | now constructor | now constructor ]. 
         edestruct Hvar as [l' [Hgety' Hcc]]; eauto.
-        eexists. exists c1. repeat eexists.
+        eexists. exists c1. eexists. exists (b2 ∘ b ∘ b1). repeat eexists.
         * eapply Eval_halt_per_cc. simpl. simpl in Hcost. omega. eassumption.
           reflexivity.
+        * eapply injective_subdomain_compose. simpl.
+          
+          eapply injective_subdomain_antimon. eassumption.
+          eapply Included_trans. eapply reach_n_in_reach.
+          eapply reach'_set_monotonic. eapply get_In_env_locs; try eassumption.
+          now eauto.
+          
+          destruct Heq1 as [Hl1 Hr1]. simpl in Hl1.
+          edestruct Hr1 as [l1 [Hget1 Hres]]; eauto. 
+          simpl. rewrite res_equiv_image_reach_n; try eassumption.
+          rewrite image_id.
+          
+          eapply injective_subdomain_compose.
+          
+         
+          eapply injective_subdomain_antimon. eassumption.
+          rewrite env_locs_Singleton; eauto. reflexivity.
+
+          eapply cc_approx_var_env_image_reach_n_eq in Hvar'; eauto.
+
+          rewrite env_locs_Singleton in Hvar'; eauto.
+          
+          rewrite Hvar'.
+          eapply injective_subdomain_antimon. eassumption.
+          simpl. rewrite occurs_free_Ehalt. eapply reach_n_in_reach.
         * eapply InvCostBase. eassumption. eassumption.
         * rewrite cc_approx_val_eq in *.
           eapply cc_approx_val_monotonic. eassumption.

@@ -198,8 +198,8 @@ Proof using.
   simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
 Qed.
 
-Let eval42 := @polyEval.eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid).
-Let eval45 := @eval_n (Named.TermAbsImplUnstrict variables.NVar L4_5Opid).
+Definition eval42 := @polyEval.eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid).
+Definition eval45 := @eval_n (Named.TermAbsImplUnstrict variables.NVar L4_5Opid).
 
 
 (**  can be obtained for free using a parametricity plugin 

@@ -427,7 +427,7 @@ Qed.
 
 
 Require Import Common.TermAbs_parametricity.
-Parametricity Recursive eval_n.
+Parametricity Recursive eval_n qualified.
 
 (* should be automatically provalble for all types with decidable equality.
   However, it cannot be internally stated. *)
@@ -435,21 +435,28 @@ Global Instance EqIfRdcon : EqIfR L4_o_polyEval_o_dcon_R.
 Proof using.
 Admitted.
 
-Global Instance EqIfRstring : EqIfR string_R.
+Global Instance EqIfRstring : EqIfR Coq_o_Strings_o_String_o_string_R.
 Proof using.
 Admitted.
 
+Let L4Opid_R := L4_o_polyEval_o_L4Opid_R.
 Global Instance EqIfRL4Opid : EqIfR L4Opid_R.
 Proof using.
   constructor; intros Hyp; subst.
 - inverts Hyp; auto; f_equal; try apply eqIfR; auto.
   unfold dcon in *.
 Admitted.
-  
+
+Let TermAbs_R_NamedDBUnstrict :=
+  (@TermAbs_R_NamedDBUnstrict Ast.name NVar _ L4Opid _ _ _ _  _ _ Ast.nAnon mkNVar getNId getIdMkNVar
+     L4Opid_R EqIfRL4Opid).
+
+(* deprecated. delete *)
 Let TermAbs_R_NamedDB2 :=
   (@TermAbs_R_NamedDB Ast.name NVar _ L4Opid _ _ _ _  _ _ Ast.nAnon mkNVar getNId getIdMkNVar
      L4Opid_R EqIfRL4Opid).
 
+(* deprecated. delete *)
 Lemma L4_1_to_L4_2_free_thm:
   forall (t1 : L4_1_Term) n,
 termsDB.fvars_below 0 t1 (* the undelying free thm also implies that eval_n preserves this *)->
@@ -471,3 +478,106 @@ Proof using.
   - invertsna Hp Hp. setoid_rewrite <- Hp.
     constructor.
 Qed.
+
+Lemma L4_1_to_L4_2_free_thm_unstrict:
+  forall (t1 : L4_1_Term) n,
+termsDB.fvars_below 0 t1 (* the undelying free thm also implies that eval_n preserves this *)->
+(option_R _ _ alpha_eq)
+   (option_map tL4_1_to_L4_2 (@eval_n (TermAbsDBUnstrict Ast.name L4Opid) n t1))
+   (@eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid) n (tL4_1_to_L4_2 t1)).
+Proof using.
+  intros ? ? Hfb.
+  pose proof (L4_o_polyEval_o_eval_n_R 
+    (TermAbsDBUnstrict Ast.name L4Opid) (Named.TermAbsImplUnstrict variables.NVar L4Opid)
+    TermAbs_R_NamedDBUnstrict n n ltac:(apply eqIfR; refl) t1) as Hp.
+  simpl in Hp.
+  unfold Term_R in Hp.
+  specialize (Hp _ (conj Hfb (alpha_eq_refl _))).
+  simpl in Hp.
+  destruct (@eval_n (TermAbsDBUnstrict Ast.name L4Opid) n t1).
+  - invertsna Hp Hp. setoid_rewrite <- Hp0.
+    constructor. tauto.
+  - invertsna Hp Hp. setoid_rewrite <- Hp.
+    constructor.
+Qed.
+
+Definition t4_to_t4_2 v := (tL4_1_to_L4_2 (tL4_to_L4_1 v)).
+
+(*
+Lemma  maxFreeCommutesL4_to_L4_1 :
+  (∀ (e : exp), maxFree (tL4_to_L4_1 e) = expression.maxFree e)
+  /\
+  (∀ (es : exps), ZLmax (map maxFree (ltL4_to_L4_1 es)) (-1) =
+                    maxFreeC es)
+  /\
+  (∀ (es : efnlst), ZLmax (map maxFree (ftL4_to_L4_1 es)) (-1)
+                      = maxFreeF es)
+  /\
+  (∀ (es : branches_e), ZLmax (map (maxFree_bt∘snd) (btL4_to_L4_1 es)) (-1)
+                          = maxFreeB es).
+Proof using.
+  apply my_exp_ind;
+    simpl; unfold compose in *; intros; try rewrite map_map in *; unfold compose;
+      simpl in *; auto.
+  rewrite H.
+Admitted.  
+ *)
+
+Lemma expWfCommutesL4_to_L4_1 :
+  (forall n (t : exp),
+    exp_wf n t
+    -> termsDB.fvars_below n (tL4_to_L4_1 t)) /\
+  (forall n es, exps_wf n es ->
+      lforall (termsDB.fvars_below n) (ltL4_to_L4_1 es)) /\
+  (forall n es, efnlst_wf n es ->
+      lforall (termsDB.fvars_below n) (ftL4_to_L4_1 es)) /\
+  (forall n bs, branches_wf n bs ->
+      lforall (fun b => (termsDB.fvars_below_bt n) (snd b)) (btL4_to_L4_1 bs)).
+Proof using.
+Local Opaque N.add.
+  apply my_exp_wf_ind; crush; repeat constructor; crush; repeat constructor; crush; try firstorder.
+- apply in_map_iff in H0. exrepnd. subst. constructor. auto.
+- apply in_map_iff in H2. exrepnd. subst. auto.
+- apply in_map_iff in H0. exrepnd. subst. constructor. unfold fnames, NLength.
+  autorewrite with list.
+  setoid_rewrite <- EfnListLength.
+  auto.
+- intros ? Hin. simpl in Hin. dorn Hin; subst; auto.
+- intros ? Hin. simpl in Hin. dorn Hin; subst; auto.
+- intros ? Hin. simpl in Hin. dorn Hin; subst; auto. simpl. constructor.
+  rewrite mkNamesLength.
+  assumption.
+Qed.
+
+(*
+Lemma expWfCommutesL4_to_L4_1 :
+  forall (t : exp) n,
+    exp_wf n t
+    -> termsDB.fvars_below n (tL4_to_L4_1 t).
+Proof using.
+  intros ? ? Hwf.
+  apply expression.exp_wf_maxFree in Hwf.
+  rewrite <-  (proj1 maxFreeCommutesL4_to_L4_1) in Hwf.
+  apply exp_wf_maxFree. assumption.
+Qed.
+ *)
+
+Lemma L4_to_L4_2_corr:
+  forall (t v : exp) n,
+    exp_wf 0 t 
+    -> eval_ns n t = Some v
+    -> exists vt,
+        (@eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid) n (tL4_to_L4_2 t)) = Some vt
+        /\ alpha_eq vt (tL4_to_L4_2 v).
+Proof using.
+  intros ? ? ? Hwf Hev.
+  apply expWfCommutesL4_to_L4_1 in Hwf.
+  apply L4_1_to_L4_2_free_thm_unstrict with (n:=n) in Hwf; auto.
+  pose proof (evalCommLemma n t) as H4l.
+  rewrite Hev in H4l.
+  simpl in H4l. unfold eval41 in H4l.
+  rewrite <- H4l in Hwf.
+  inverts Hwf. rename H0 into v2.
+  exists v2. symmetry in H2. dands; auto;[].
+  symmetry. auto.
+Qed.  

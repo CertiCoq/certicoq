@@ -82,12 +82,14 @@ Definition question_head (Q : Question) (ie : ienv) (e : L4.expression.exp) :=
 Global Instance QuestionHeadTermL : QuestionHead (ienv * L4.expression.exp) :=
   fun q t => question_head q (fst t) (snd t).
 
+(* Move to expression.v *)
 Fixpoint exps_nthopt (n:nat) (xs:exps): option exp :=
   match n, xs with 
     | 0%nat, expression.econs h _ => Some h
     | S n, expression.econs _ t => exps_nthopt n t
     | _, _ => None
   end.
+
 
 Definition observe_nth_subterm n (e : exp) :=
   match e with
@@ -203,8 +205,8 @@ Require Import L4.L4_to_L4_1_to_L4_2.
 Require Import L4.L4_2_to_L4_5.
 Require Import DecidableClass.
 
-(** Fix or remove *)
-Global Instance L4_2_eval : BigStepOpSem L4_2_Term L4_2_Term := fun _ _ => True.
+Global Instance L4_2_eval : BigStepOpSem L4_2_Term L4_2_Term := fun t v =>
+exists n, eval42 n t = Some v.
 
 Require Import Common.TermAbs.
 
@@ -216,17 +218,29 @@ Global Instance L4_2_evaln
           end.
 
 
-(** Fix or remove *)
 Global Instance : GoodTerm L4_2_Term :=
-  fun e  => False.
+  fun e  => isprogram e.
 
-(** Fix or remove *)
 Global Instance QuestionHeadTermL42 : QuestionHead (prod ienv L4_2_Term) :=
-fun q t => false.
+fun q t =>
+match q, getOpid (snd t) with
+| Cnstr ind ci, Some (polyEval.NDCon dc _) =>
+  let (ind2, ci2) := dc in
+  (if inductive_dec ind ind2 then N.of_nat ci =? ci2 else false)
+| Abs, Some polyEval.NLambda => true
+| _, _ => false
+end.
 
-(** Fix or remove *)
+
+
 Global Instance ObsSubtermTermL42 : ObserveNthSubterm (prod ienv L4_2_Term) :=
-  fun n t => None.
+  fun n t =>
+    let (env, t) := t in
+    match t with
+    | oterm (polyEval.NDCon dc _) lbt =>
+      List.nth_error  (List.map (fun b => (env, get_nt b)) lbt) n
+    | _ => None
+    end.
 
 (** Fix or remove *)
 Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2_Term) := {}.
@@ -248,7 +262,7 @@ fun q t =>
 match q, snd t with
 | Cnstr ind ci, oterm (NDCon dc _) _ =>
   let (ind2, ci2) := dc in
-  andb (decide (ind=ind2)) (decide (N.of_nat ci =ci2))
+  (if inductive_dec ind ind2 then N.of_nat ci =? ci2 else false)
 | Abs, oterm NLambda _ => true
 | _, _ => false
 end.
@@ -302,7 +316,7 @@ fun q t =>
 match q, snd t with
 | Cnstr ind ci, oterm (CDCon dc _) _ =>
   let (ind2, ci2) := dc in
-  andb (decide (ind=ind2)) (decide (N.of_nat ci =ci2))
+  (if inductive_dec ind ind2 then N.of_nat ci =? ci2 else false)
 | Abs, oterm CLambda _ => true
 | _, _ => false
 end.
@@ -352,7 +366,7 @@ Require Import L4.varInterface.
        yesPreserved questionHead QuestionHeadTermL45 QuestionHeadTermL5
        BigStepOpSem_instance_1  BigStepOpSem_instance_0
        goodTerm dummyEnvWf goodTerm GoodTerm_instance_0
-       GoodTerm_instance_1
+       GoodTerm_instance_1 ObsSubtermTermL ObsSubtermTermL42 QuestionHeadTermL42
        observeNthSubterm : certiclasses.
 
   Require Import Morphisms.
@@ -372,7 +386,159 @@ Qed.
 Global Instance IsValueL45 : IsValue (cTerm certiL4_5) :=
   fun t => L4_5_to_L5.is_value (snd t).
 Require Import Btauto.
+
+  Require Import SquiggleEq.list.
+  Require Import List.
+
+
+(* Move to L4_to_L4_2_correct.v *)
+Lemma  exps_nthopt_translate n es:
+option_map tL4_to_L4_1 (exps_nthopt n es) = nth_error (ltL4_to_L4_1 es) n.
+Proof using.
+ revert es.
+ induction n; simpl; destruct es as [ | he es]; simpl; eauto.
+Qed.
+
+Lemma  exps_nthopt_isval: forall (es : exps) (n : nat) (e : exp),
+    are_values es -> Some e = exps_nthopt n es -> expression.is_value e.
+Proof using.
+  induction es; intros ? ? Hav Heq; destruct n; invertsn Heq; invertsn Hav; eauto.
+Qed.
+
+Require Import L4.L4_to_L4_2_correct.
+
+Lemma alpha_EqObs_L4_2 senv :
+ forall a (b: L4_2_Term), expression.is_value a-> alpha_eq (tL4_to_L4_2 a) b -> (senv, (tL4_to_L4_2 a)) ⊑ (senv, b).
+Proof using.
+  intros ? ? Hisv Hal.
+  apply toCoInd. (* productivity check is too unreliable *)
+  intros ?.
+  revert dependent a.
+  revert dependent b.
+  induction m; [ constructor | ].
+  intros ? ? Hisv Hal. constructor.
+- unfold yesPreserved.
+  intros q.
+  autounfold with certiclasses.
+  simpl. destruct q;
+  rewrite Hal; unfold implb; btauto.
+- autounfold with certiclasses.
+  intros ?.
+  invertsn Hal; [ constructor | ].
+  invertsn  Hisv; invertsn H0; try constructor.
+  repeat rewrite list.map_map in *. unfold Basics.compose in *.
+  simpl in *. do 2 rewrite list.nth_error_map.
+  autorewrite with list in H2.
+  autorewrite with list in Hal.
+  specialize (H2 n).
+  remember  (List.nth_error (ltL4_to_L4_1 es) n) as tl.
+  symmetry in Heqtl.
+  unfold selectbt in H2.
+  pose proof Heqtl as Hl.
+  destruct tl as [tl | ]; try constructor.
+  apply nth_error_length_lt in Hl.
+  set (def:=(termsDB.oterm polyEval.NApply []): L4_1_Term).
+  rewrite map_nth2 with (d:=def)in H2 by assumption.
+  specialize (H2 Hl).
+  pose proof Hl as Hnth.
+  apply nth_select1 with (def0:= def)  in Hnth.
+  setoid_rewrite Heqtl in Hnth.
+  invertsn Hnth.  
+  pose proof (exps_nthopt_translate n es) as He.
+  remember (exps_nthopt n es) as e.
+  setoid_rewrite Heqtl in He.
+  destruct e as [e | ];invertsn He. 
+  clear Heqtl.
+  rewrite <- He in H2.
+  rewrite Hal in Hl.
+  set (def2 := bterm [] ((vterm nvarx):L4_2_Term)).
+  apply nth_select1 with (def0:=def2) in Hl.
+  setoid_rewrite Hl.
+  fold def2 in H2.
+  remember ((nth n lbt2 def2)) as tr.
+  clear Heqtr. clear Hl.
+  constructor.
+  rename H2 into Halb.
+  apply alphaeqbt_nilv in Halb.
+  exrepnd. subst. simpl.
+  apply IHm; [ | assumption].
+  revert Heqe. revert Hisv. clear.
+  apply exps_nthopt_isval.
+Qed.
     
+  
+
+Require Import Basics.
+(*Move to the top *)
+Global Instance isValL4: IsValue (cTerm certiL4) := (expression.is_value ∘ snd).
+
+Lemma obsNthCommuteL4_L4_2:  valuePredTranslateObserveNthCommute (ienv * exp) (cTerm certiL4_2).
+Proof using.
+  intros ? ? ? Hisv.
+  destruct sv as [senv v].
+  hnf in Hisv.
+  simpl in *.
+  intros Hev.
+  invertsn Hev.
+  autounfold with certiclasses.
+  simpl.
+  invertsn Hisv; simpl; try auto.
+  revert n.
+  induction Hisv.
+  + destruct n; simpl; auto.
+  + destruct n; simpl; auto.
+Qed.    
+  
+Lemma yesCommuteL4_L4_2:  valuePredTranslateYesPreserved (ienv * exp) (cTerm certiL4_2).
+Proof using.
+  intros ? ? Hisv.
+  destruct sv as [senv v].
+  hnf in Hisv.
+  simpl in *.
+  intros Hev.
+  invertsn Hev.
+  autounfold with certiclasses.
+  simpl. intros q.
+  invertsn Hisv; simpl; destruct q as [qi qn| ]; try auto.
+  destruct d. simpl.
+  autounfold with certiclasses.
+  simpl. unfold implb.
+  btauto.
+Qed.
+
+Lemma certiL4_to_L4_2Correct:
+  CerticoqTranslationCorrect certiL4 certiL4_2.
+Proof using.
+  split.
+- admit.
+- intros ? ? Hg Hev.
+  destruct s as [? s].
+  destruct sv as [senv sv]. 
+  hnf in Hev. simpl in Hev.
+  repnd. subst.
+  hnf in Hev.
+  pose proof Hev as Hvl.
+  apply expression.eval_yields_value' in Hvl.
+  apply eval_evalns in Hev.
+  exrepnd. hnf in Hg. simpl in Hg.
+  eapply L4_to_L4_2_corr in Hev0; eauto.
+  exrepnd. simpl in vt.
+  fold L4_2_Term in vt.
+  rename vt into v2t.
+  exists (senv, v2t).
+  simpl.
+  dands.
+  + hnf.
+   simpl.
+   dands; try refl;[].
+   hnf. eexists; eauto.
+  + symmetry in Hev1.
+    apply alpha_EqObs_L4_2 with (senv:=senv) in Hev1; auto;[].
+    eapply @obsLeTrns with (InterValue := cTerm certiL4_2);[ | apply Hev1].
+    apply (fun p1 p2 a b v eq => valuePredTranslateLe_suff _ _ p1 p2 a b v eq); auto;[ | ]; clear;
+      [apply obsNthCommuteL4_L4_2 | apply yesCommuteL4_L4_2].
+    Fail idtac. (* this subgoal is done *)
+Abort.
 
 (* this proof, which was developed later, uses lemmas in the certiclasses library *)
 Module SimplerProof.
@@ -433,7 +599,7 @@ Let certiL4_5_to_L5Val:
       repeat rewrite List.map_map.
       repeat rewrite nth_error_map.
       remember (List.nth_error es n) as esso.
-      destruct esso as [ess | ]; auto.
+      destruct esso as [ess | ]; simpl; auto;[].
       simpl. split; auto.
       symmetry in Heqesso.
       apply List.nth_error_In in Heqesso.

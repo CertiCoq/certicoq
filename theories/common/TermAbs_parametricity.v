@@ -9,7 +9,7 @@ https://github.com/aa755/paramcoq/tree/v86
 *)
 Declare ML Module "paramcoq".
 Require Import Common.TermAbs.
-Parametricity Recursive TermAbs.
+Parametricity Recursive TermAbs qualified.
 Require Import SquiggleEq.bin_rels.
 Require Import SquiggleEq.eq_rel.
 Require Import SquiggleEq.universe.
@@ -45,6 +45,10 @@ Inductive list_RP {A₁ A₂ : Type} (A_R : A₁ -> A₂ -> Prop) : list A₁ ->
                     forall (H1 : list A₁) (H2 : list A₂),
                     list_RP  A_R H1 H2 -> list_RP A_R (H :: H1) (H0 :: H2).
 
+Definition list_R := Coq_o_Init_o_Datatypes_o_list_R.
+Definition option_R := Coq_o_Init_o_Datatypes_o_option_R.
+Definition nat_R := Coq_o_Init_o_Datatypes_o_nat_R.
+Definition prod_R := Coq_o_Init_o_Datatypes_o_prod_R.
 Lemma list_RP_same (A₁ A₂ : Type) (A_R : A₁ -> A₂ -> Prop) : forall l1 l2,
   t_iff (list_R _ _ A_R l1 l2) (list_RP A_R l1 l2).
 Proof using.
@@ -180,6 +184,9 @@ Section ParamRels.
 Context {Name NVar VarClass Opid : Type} {deqv vcc fvv}
   `{vartyp: @VarType NVar VarClass deqv vcc fvv}
   `{deqo: Deq Opid} {gts : GenericTermSig Opid} (def:Name).
+
+Let TermAbs_R:= Common_o_TermAbs_o_TermAbs_R.
+Let TermAbs_R_Build_TermAbs_R := Common_o_TermAbs_o_TermAbs_R_Build_TermAbs_R.
 
 Definition TermAbs_R_NamedAlphaClosedWf Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
 TermAbs_R Opid Opid Opid_R

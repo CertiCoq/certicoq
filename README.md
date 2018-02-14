@@ -23,58 +23,81 @@ INSTALLATION INSTRUCTIONS
 Installing dependencies:
 ------------------------
 
-  To install the compiler, you need Coq.8.7.1 along with the Template-Coq
-and ExtLib packages.  One way to get everything is using opam:
+  To install the compiler, you need OCaml, Coq.8.7.1 along with the
+ExtLib, Template-Coq and squiggle-eq packages.  One way to get
+everything is using [`opam`](http://opam.ocaml.org) (current version: `1.2.2`):
 
-  To add the official Coq repositories, you need:
+  To add the official Coq repositories, you need to declare the
+repositories:
 
 # opam repo add coq-released https://coq.inria.fr/opam/released
 # opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev
+
+  Optionally, add the `extra-dev` repository, which contains packages
+for development versions (e.g. `git` branches) and is relatively
+unstable.  It might be needed to compile non-released versions of
+CertiCoq. Beware `opam` will usually select packages from there as they
+have the most permissive dependencies, which might not always be what
+you want.
+
 # opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
 
-  Then to install coq and certicoq's dependencies:
+  Note that supported ocaml version are `4.02.3` to `4.05.0`, avoid
+`4.06.0` which sometimes produces dynamic linking errors. In `opam 1.*`,
+use `opam config var ocaml-version` to confirm you have a compatible
+compiler. If not, you should create a fresh new switch with a specific
+compiler, using:
+
+# opam switch -A 4.05.0 coq87
+# eval `opam config env`
+
+  This will install the 4.05.0 Coq compiler in a new switch and put you
+in the right environment. Then to install Coq and CertiCoq's
+dependencies:
 
 # opam install coq.8.7.1
 # opam pin add coq 8.7.1
-# opam install coq-template-coq coq-ext-lib coq-squiggle-eq
+# opam install coq-template-coq coq-ext-lib coq-squiggle-eq.1.0.3
 
-The package currently builds with the `coq-template-coq.8.7.dev` package, `coq-ext-lib.0.9.7` and
-`coq-squiggle-eq.1.0.3`.
+  The package currently builds with the `coq-template-coq.8.7.dev`
+package, `coq-ext-lib.0.9.7` and `coq-squiggle-eq.1.0.3`.
 
-If you have already installed some package manually, you can choose the --fake keyword for opam to assume that it is installed, e.g.:
+If you have already installed some package manually, you can choose the
+`--fake` keyword for `opam` to assume that it is installed, e.g.:
+
 # opam install --fake coq
-
 
 Alternatively, you can install Coq from source or download a binary from:
 
-https://coq.inria.fr/coq-87
+	https://coq.inria.fr/coq-87
 
 and install the packages from source:
 
-https://github.com/coq-ext-lib/coq-ext-lib
-https://github.com/gmalecha/template-coq (branch : coq-8.7)
-https://github.com/aa755/SquiggleEq
+	https://github.com/coq-ext-lib/coq-ext-lib
+	https://github.com/gmalecha/template-coq (branch : coq-8.7)
+	https://github.com/aa755/SquiggleEq
 
 
 Updating dependencies:
-------------------------
+----------------------
 
 When the above repositories are updated, you may need to update your installation.
 If you chose opam, you can do
+
 # opam update
 # opam upgrade coq-template-coq coq-ext-lib coq-squiggle-eq 
 
 
 Building the compiler:
 ----------------------
-  at `certicoq/`, run
+  At `certicoq/`, run:
 
 # make -j4 -k
 
   This will build the compiler and its proofs.
 
 To build the OCaml version of the compiler and the
-`CertiCoq Compile` plugin, in `theories/`
+`CertiCoq Compile` plugin, in `theories/`, run:
 
 # sh make_plugin.sh
 

@@ -20,9 +20,6 @@ research purposes.
 INSTALLATION INSTRUCTIONS
 =========================
 
-Installing dependencies:
-------------------------
-
   To install the compiler, you need OCaml, Coq.8.7.1 along with the
 ExtLib, Template-Coq and squiggle-eq packages.  One way to get
 everything is using [`opam`](http://opam.ocaml.org) (current version: `1.2.2`):
@@ -42,7 +39,10 @@ you want.
 
 # opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
 
-  Note that supported ocaml version are `4.02.3` to `4.05.0`, avoid
+Setting up a switch with OCaml
+------------------------------
+
+  Note that supported OCaml version are `4.02.3` to `4.05.0`, avoid
 `4.06.0` which sometimes produces dynamic linking errors. In `opam 1.*`,
 use `opam config var ocaml-version` to confirm you have a compatible
 compiler. If not, you should create a fresh new switch with a specific
@@ -51,12 +51,31 @@ compiler, using:
 # opam switch -A 4.05.0 coq87
 # eval `opam config env`
 
-  This will install the 4.05.0 Coq compiler in a new switch and put you
-in the right environment. Then to install Coq and CertiCoq's
-dependencies:
+  This will install the `4.05.0` compiler in a new switch named `coq87`
+and put you in the right environment.
+
+Installing Coq
+--------------
+
+  To install coq in a fresh switch and pin it to a specific version so
+that `opam` doesn't try to upgrade it:
 
 # opam install coq.8.7.1
 # opam pin add coq 8.7.1
+
+  Alternatively, if you can you want to update a pinned Coq:
+
+# opam pin remove coq
+# opam pin add coq 8.7.1
+
+  After this you should have `coqc --version` give you the right version
+number.
+
+Installing dependencies
+-----------------------
+
+Then to install CertiCoq's dependencies:
+
 # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.1.0.3
 
   The package currently builds with the `coq-template-coq.8.7.dev`
@@ -67,6 +86,8 @@ If you have already installed some package manually, you can choose the
 
 # opam install --fake coq
 
+Installing from source
+----------------------
 Alternatively, you can install Coq from source or download a binary from:
 
 	https://coq.inria.fr/coq-87

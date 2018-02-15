@@ -63,7 +63,7 @@ Global Instance L4_evaln : BigStepOpSemExec (ienv * L4.expression.exp)
 
 
 Instance certiL4wf: GoodTerm L4.expression.exp :=
- L4.expression.exp_wf (0%N).
+ L4.expression.exp_wf (0%N). (* add the property that arguments of fix are lambdas ? *)
 
 Definition question_head (Q : Question) (ie : ienv) (e : L4.expression.exp) :=
   match Q with

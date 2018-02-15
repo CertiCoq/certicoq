@@ -543,7 +543,7 @@ Inductive eval: exp -> exp -> Prop :=
                  eval (Let_e na e1 e2) v2
 | eval_Match_e: forall e p bs d vs e' v,
     eval e (Con_e d vs) ->
-    let vs' := exps_skipn p vs in
+    let vs' := exps_skipn p vs in (* remove this skipping? let vs' := vs ? parameters are already gone.*)
     find_branch d (exps_length vs') bs = Some e' ->
     eval (sbst_list e' vs') v ->
     eval (Match_e e p bs) v

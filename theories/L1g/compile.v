@@ -315,20 +315,28 @@ End datatypeEnv_sec.
 *** datatypes of the program: this can be done without a term 
 *** translation function
 **)
-Fixpoint program_Pgm
-         (dtEnv: environ Term) (p:program)
+Fixpoint program_Pgm_aux
+         (dtEnv: environ Term) (g:global_declarations) (t : term)
          (e:environ Term) : Program Term :=
-  match p with
-    | PIn t => {| main:= (term_Term dtEnv t); env:= e |}
-    | PConstr nm us ty t p =>
-      program_Pgm dtEnv p (cons (pair nm (ecTrm (term_Term dtEnv t))) e)
-    | PType nm uctx npar ibs p =>
-      let Ibs := ibodies_itypPack ibs in
-      program_Pgm dtEnv p (cons (pair nm (ecTyp Term npar Ibs)) e)
-    | PAxiom nm us _ p =>
-      program_Pgm dtEnv p (cons (pair nm (ecAx Term)) e)
+  match g with
+  | nil => {| main := (term_Term dtEnv t); env := e |}
+  | ConstantDecl nm cb :: p =>
+    let decl :=
+        match cb.(cst_body) with
+        | Some t => pair nm (ecTrm (term_Term dtEnv t))
+        | None => pair nm (ecAx Term)
+        end
+    in
+    program_Pgm_aux dtEnv p t (cons decl e)
+  | InductiveDecl nm mib :: p =>
+    let Ibs := ibodies_itypPack mib.(ind_bodies) in
+    program_Pgm_aux dtEnv p t (cons (pair nm (ecTyp Term mib.(ind_npars) Ibs)) e)
   end.
 
+Definition program_Pgm (dtEnv: environ Term) (p:program) (e:environ Term) : Program Term :=
+  let '(gctx, t) := p in
+  program_Pgm_aux dtEnv gctx t e.
+
 Definition program_Program (p:program) : Program Term :=
-  let dtEnv := program_datatypeEnv p (nil (A:= (string * envClass Term))) in
+  let dtEnv := program_datatypeEnv (fst p) (nil (A:= (string * envClass Term))) in
   program_Pgm dtEnv p nil.

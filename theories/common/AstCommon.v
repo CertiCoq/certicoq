@@ -210,22 +210,20 @@ Definition environ := list (string * envClass).
 Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
   mkCnstr (fst (fst c)) (snd c).
 
-Definition ibody_ityp (iib:inductive_body) : ityp :=
+Definition ibody_ityp (iib:one_inductive_body) : ityp :=
   let Ctors := map cnstr_Cnstr (ind_ctors iib)
   in mkItyp (ind_name iib) Ctors.
 
-Definition ibodies_itypPack (ibs:list inductive_body) : itypPack :=
+Definition ibodies_itypPack (ibs:list one_inductive_body) : itypPack :=
   map ibody_ityp ibs.
 
-Fixpoint program_datatypeEnv (p:program) (e:environ) : environ :=
+Fixpoint program_datatypeEnv (p:global_declarations) (e:environ) : environ :=
   match p with
-    | PIn _ => e
-    | PConstr _ _ _ _ p => program_datatypeEnv p e
-    | PType nm uctx npar ibs p =>
-      let Ibs := ibodies_itypPack ibs in
-      program_datatypeEnv p (cons (pair nm (ecTyp npar Ibs)) e)
-    | PAxiom nm _ _ p =>
-      program_datatypeEnv p (cons (pair nm (ecTyp 0 nil)) e)
+  | nil => e
+  | ConstantDecl nm cb :: p => program_datatypeEnv p e
+  | InductiveDecl nm mib :: p =>
+    let Ibs := ibodies_itypPack mib.(ind_bodies) in
+    program_datatypeEnv p (cons (pair nm (ecTyp mib.(ind_npars) Ibs)) e)
   end.
 
 Record Program : Type := mkPgm { main:trm; env:environ }.

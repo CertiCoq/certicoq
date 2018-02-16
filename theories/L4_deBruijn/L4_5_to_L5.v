@@ -812,8 +812,6 @@ Definition Match_c (discriminee : CTerm) (brs : list branch) : CTerm :=
 Instance CExpSubstitute : Substitute CTerm CTerm :=
   { substitute := fun rep x t => subst t x rep}.
 
-Print eval.
-
 Definition isValueL5 (t:CTerm) : Prop :=
   option_map valueL5Opid (getOpid t) = Some true.
 
@@ -1182,7 +1180,6 @@ End CPS_CVT.
     let kv := contVar in 
       KLam_c kv (Ret_c (vterm kv) ce).
 
-SearchAbout compose.
 Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
   if is_valueb e 
   then val_outer (cps_cvt_val' cps_cvt e) 

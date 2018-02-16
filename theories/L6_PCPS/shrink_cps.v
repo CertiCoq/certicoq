@@ -667,7 +667,6 @@ with update_census_f (sig:r_map) (fds:fundefs) (fun_delta: var -> c_map -> nat) 
        end
 .
 
-Print c_map.
 Definition init_census (e:exp) := update_census (M.empty var) e (fun v c => get_c v c + 1)%nat (M.empty nat).
 Definition dec_census (sig:r_map) (e:exp) (count:c_map) := update_census sig e (fun v c => get_c v c - 1)%nat  count.
 Definition dec_census_list (sig:r_map) (ys:list var) (count:c_map) := update_census_list sig ys (fun v c => get_c v c - 1)%nat count.
@@ -775,10 +774,6 @@ Section RENAME.
     - reflexivity.
   Defined.
 
-
-
-
-  SearchAbout apply_r M.empty.
 
 
 
@@ -1035,7 +1030,6 @@ Section CONTRACT.
     end.
 
 
-  SearchAbout (_ + 0 = _).
   Theorem precontractfun_size: forall fds sig count sub fds' count' sub',
                                  ((fds', count', sub') =  precontractfun sig count sub fds -> (forall im, sub_inl_size sub' im <= funs_size (fds) + sub_inl_size sub im /\ funs_size fds' <= funs_size fds))%nat.
   Proof.

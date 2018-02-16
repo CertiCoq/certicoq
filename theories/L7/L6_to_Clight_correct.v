@@ -849,8 +849,6 @@ with repr_val_ptr_list_L_L6_L7: (list L6.cps.val) -> mem -> locProp -> block -> 
 
 
 
-SearchAbout get_var_or_funvar.
-
 (* this is the sum of get_var_or_funvar and repr_val_L_L6_L7 (-> and <-\-) *)
 Inductive repr_val_id_L_L6_L7: L6.cps.val -> mem -> locProp -> temp_env -> positive -> Prop := 
 | RVid_F:
@@ -983,7 +981,6 @@ Proof.
     admit.
     unfold int_size. simpl. unfold Int.max_unsigned. simpl. omega. 
 Admitted. *)
-SearchAbout  Mem.unchanged_on.
 
 Theorem repr_val_L_unchanged:
   forall v6 m L v7, 

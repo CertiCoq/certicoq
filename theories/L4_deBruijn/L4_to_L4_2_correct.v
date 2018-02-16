@@ -137,8 +137,6 @@ Qed.
 
 
 Print Assumptions eval_evaln.
-Print evaln_eval.
-Print eval_n_monotone.
 
 Definition  eval41 := @polyEval.eval_n (TermAbsDBUnstrict Ast.name L4Opid).
 
@@ -189,8 +187,6 @@ Definition find_branchb d (b: (expression.dcon * (N * list Ast.name) * exp)) : b
          let (b,_) := b in
          let (db,dn) := b in
          decide ((d) = (db)).
-
-Print find_branch.
 
 Lemma Nateqb_eqdec {A:Type} (t e : A) n1 n2:
   (if (Nat.eqb n1 n2) then t else e)

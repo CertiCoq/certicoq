@@ -44,8 +44,6 @@ Module TagInfo <: Orders.UsualOrderedType.
  Fixpoint compare_pair {A}{B} (f: A -> A -> comparison) (g: B -> B -> comparison)
                      (x: A*B) (y: A*B) : comparison :=
   lexi f (fst x) (fst y) g (snd x) (snd y).
-SearchAbout (bool -> bool -> comparison).
-Print MSetPositive.PositiveSet.compare_bool.
 
 Definition compare_bool (x y: bool) : comparison :=
  match x, y with

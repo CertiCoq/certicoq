@@ -1168,7 +1168,6 @@ Notation five := (SSS $ four).
 Notation six := (SSS $ five).
 
 Example One := Eval compute in (unRet (eval_n 1000 one)).
-Print One.
 Example Two := Eval compute in (unRet (eval_n 100 two)).
 Example Three := Eval vm_compute in (unRet (eval_n 100 three)).
 Example Four := Eval vm_compute in (unRet (eval_n 100 four)).

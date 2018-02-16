@@ -78,8 +78,8 @@ Then to install CertiCoq's dependencies:
 
 # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.1.0.3 coq-paramcoq
 
-  The package currently builds with the `coq-template-coq.8.7.dev`
-package, `coq-ext-lib.0.9.7` and `coq-squiggle-eq.1.0.3`.
+  The package is known to build with `coq-template-coq.2.0~beta`,
+`coq-ext-lib.0.9.7`, `coq-squiggle-eq.1.0.3` and `coq-paramcoq.1.0.5`.
 
 If you have already installed some package manually, you can choose the
 `--fake` keyword for `opam` to assume that it is installed, e.g.:
@@ -95,8 +95,9 @@ Alternatively, you can install Coq from source or download a binary from:
 and install the packages from source:
 
 	https://github.com/coq-ext-lib/coq-ext-lib
-	https://github.com/gmalecha/template-coq (branch : coq-8.7)
+	https://github.com/gmalecha/template-coq (branch: coq-8.7)
 	https://github.com/aa755/SquiggleEq
+	https://github.com/aa755/paramcoq (branch: v8.7)
 
 
 Updating dependencies:

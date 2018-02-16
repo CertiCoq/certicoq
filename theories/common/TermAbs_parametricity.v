@@ -185,8 +185,8 @@ Context {Name NVar VarClass Opid : Type} {deqv vcc fvv}
   `{vartyp: @VarType NVar VarClass deqv vcc fvv}
   `{deqo: Deq Opid} {gts : GenericTermSig Opid} (def:Name).
 
-Let TermAbs_R:= Common_o_TermAbs_o_TermAbs_R.
-Let TermAbs_R_Build_TermAbs_R := Common_o_TermAbs_o_TermAbs_R_Build_TermAbs_R.
+Let TermAbs_R:= CertiCoq_o_Common_o_TermAbs_o_TermAbs_R.
+Let TermAbs_R_Build_TermAbs_R := CertiCoq_o_Common_o_TermAbs_o_TermAbs_R_Build_TermAbs_R.
 
 Definition TermAbs_R_NamedAlphaClosedWf Opid_R {Hoeq: @EqIfR Opid Opid_R}: 
 TermAbs_R Opid Opid Opid_R

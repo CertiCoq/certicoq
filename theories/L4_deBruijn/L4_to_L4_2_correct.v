@@ -427,7 +427,7 @@ Parametricity Recursive eval_n qualified.
 
 (* should be automatically provalble for all types with decidable equality.
   However, it cannot be internally stated. *)
-Global Instance EqIfRdcon : EqIfR L4_o_polyEval_o_dcon_R.
+Global Instance EqIfRdcon : EqIfR CertiCoq_o_L4_o_polyEval_o_dcon_R.
 Proof using.
 Admitted.
 
@@ -435,7 +435,7 @@ Global Instance EqIfRstring : EqIfR Coq_o_Strings_o_String_o_string_R.
 Proof using.
 Admitted.
 
-Let L4Opid_R := L4_o_polyEval_o_L4Opid_R.
+Let L4Opid_R := CertiCoq_o_L4_o_polyEval_o_L4Opid_R.
 Global Instance EqIfRL4Opid : EqIfR L4Opid_R.
 Proof using.
   constructor; intros Hyp; subst.
@@ -461,7 +461,7 @@ termsDB.fvars_below 0 t1 (* the undelying free thm also implies that eval_n pres
    (@eval_n (Named.TermAbsImpl variables.NVar L4Opid) n (tL4_1_to_L4_2 t1)).
 Proof using.
   intros ? ? Hfb.
-  pose proof (L4_o_polyEval_o_eval_n_R 
+  pose proof (CertiCoq_o_L4_o_polyEval_o_eval_n_R
     (TermAbsDB Ast.name L4Opid) (Named.TermAbsImpl variables.NVar L4Opid)
     TermAbs_R_NamedDB2 n n ltac:(apply eqIfR; refl) t1) as Hp.
   simpl in Hp.
@@ -483,7 +483,7 @@ termsDB.fvars_below 0 t1 (* the undelying free thm also implies that eval_n pres
    (@eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid) n (tL4_1_to_L4_2 t1)).
 Proof using.
   intros ? ? Hfb.
-  pose proof (L4_o_polyEval_o_eval_n_R 
+  pose proof (CertiCoq_o_L4_o_polyEval_o_eval_n_R
     (TermAbsDBUnstrict Ast.name L4Opid) (Named.TermAbsImplUnstrict variables.NVar L4Opid)
     TermAbs_R_NamedDBUnstrict n n ltac:(apply eqIfR; refl) t1) as Hp.
   simpl in Hp.

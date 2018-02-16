@@ -4,8 +4,8 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 Import ListNotations.
 Require Import Coq.Strings.String.
-From Common Require Import AstCommon exceptionMonad.
-From L6 Require Import cps List_util size_cps.
+From CertiCoq.Common Require Import AstCommon exceptionMonad.
+From CertiCoq.L6 Require Import cps List_util size_cps.
 
 
 

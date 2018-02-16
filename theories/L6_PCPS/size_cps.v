@@ -4,8 +4,8 @@
 
 From Coq Require Import ZArith List.
 From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
-From Common Require Import AstCommon.
-From L6 Require Import List_util cps ctx.
+From CertiCoq.Common Require Import AstCommon.
+From CertiCoq.L6 Require Import List_util cps ctx.
 
 Require Import compcert.lib.Maps.
 

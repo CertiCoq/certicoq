@@ -1799,7 +1799,7 @@ Admitted.
 
 
 
-Require Import CpdtTactics.
+From CertiCoq Require Import CpdtTactics.
 Lemma exps_as_list_from_list vs:
   exps_from_list (exps_as_list vs) = vs.
 Proof using.

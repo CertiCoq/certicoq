@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
+From CertiCoq.L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions closure_conversion
                        closure_conversion_util eval logical_relations.
 Require Import compcert.lib.Coqlib.

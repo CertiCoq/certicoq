@@ -4,7 +4,7 @@
 
 From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
          Relations.Relations Lists.List Lists.SetoidList.
-From L6 Require Import tactics Ensembles_util.
+From CertiCoq.L6 Require Import tactics Ensembles_util.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 

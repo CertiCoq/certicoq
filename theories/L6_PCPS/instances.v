@@ -3,13 +3,13 @@
 Require Import L4.instances. 
 
 
-From Common Require Import certiClasses certiClassesLinkable Common.
+From CertiCoq.Common Require Import certiClasses certiClassesLinkable Common.
 
 Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
-From L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion hoisting.
-From L7 Require Import L6_to_Clight.
+From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion hoisting.
+From CertiCoq.L7 Require Import L6_to_Clight.
 
 
 

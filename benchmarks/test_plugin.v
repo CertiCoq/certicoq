@@ -1,5 +1,5 @@
 Require Import Arith.
-Require Import CertiCoq.
+From CertiCoq Require Import CertiCoq.
 
 Definition foo := 3 + 4.
 

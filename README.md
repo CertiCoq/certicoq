@@ -21,8 +21,9 @@ INSTALLATION INSTRUCTIONS
 =========================
 
   To install the compiler, you need OCaml, Coq.8.7.1 along with the
-ExtLib, Template-Coq and squiggle-eq packages.  One way to get
-everything is using [`opam`](http://opam.ocaml.org) (current version: `1.2.2`):
+ExtLib, Template-Coq, squiggle-eq and paramcoq packages. One way to get
+everything is using [`opam`](http://opam.ocaml.org) (current version:
+`1.2.2`):
 
   To add the official Coq repositories, you need to declare the
 repositories:
@@ -52,7 +53,7 @@ compiler, using:
 # eval `opam config env`
 
   This will install the `4.05.0` compiler in a new switch named `coq87`
-and put you in the right environment.
+and put you in the right environment (check with `ocamlc --version`).
 
 Installing Coq
 --------------

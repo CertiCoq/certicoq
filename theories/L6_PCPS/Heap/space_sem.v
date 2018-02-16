@@ -16,7 +16,7 @@ Module SpaceSem (H : Heap).
   
   Module Equiv := HeapEquiv H.
   
-  Context (cloTag : cTag).
+  Parameter (cloTag : cTag).
 
   Import H Equiv.Defs Equiv.Defs.HL Equiv.
 
@@ -431,7 +431,7 @@ Module SpaceSem (H : Heap).
   
   (** Deterministic semantics with garbage collection when needed.
    * The execution time cost model accounts for the cost of GC  *)
-  Context (Hmax : nat).
+  Parameter (Hmax : nat).
   
   Inductive big_step_GC_when_needed :
     heap block -> (* The heap. Maps locations to values *)

@@ -543,9 +543,8 @@ Inductive eval: exp -> exp -> Prop :=
                  eval (Let_e na e1 e2) v2
 | eval_Match_e: forall e p bs d vs e' v,
     eval e (Con_e d vs) ->
-    let vs' := exps_skipn p vs in (* remove this skipping? let vs' := vs ? parameters are already gone.*)
-    find_branch d (exps_length vs') bs = Some e' ->
-    eval (sbst_list e' vs') v ->
+    find_branch d (exps_length vs) bs = Some e' ->
+    eval (sbst_list e' vs) v ->
     eval (Match_e e p bs) v
 | eval_Fix_e: forall es k, eval (Fix_e es k) (Fix_e es k)
 | eval_FixApp_e: forall e (es:efnlst) n e2 v2 e' e'',
@@ -594,7 +593,7 @@ Proof.
   - inversion H1. subst.
     assert (j0:v1 = v0). { apply H. assumption. }
     subst. apply H0. assumption.
-  - inversion H1. subst. subst vs'.
+  - inversion H1. subst.
     specialize (H _ H5). injection H; intros h0 h1. subst. clear H.
     rewrite H7 in e1. injection e1; intros h2. subst. clear e1.
     apply H0. assumption.
@@ -693,10 +692,9 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                | Match_e e p bs =>
                  match eval_n n e with
                  | Some (Con_e d vs) =>
-                   let vs' := exps_skipn p vs in
-                   match find_branch d (exps_length vs') bs with
+                   match find_branch d (exps_length vs) bs with
                      | None => None
-                     | Some e' => eval_n n (sbst_list e' vs')
+                     | Some e' => eval_n n (sbst_list e' vs)
                    end
                    | _ => None
                  end
@@ -945,7 +943,7 @@ Proof.
     exists (x+x0)%nat.
     rewrite j.
     replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
-    simpl. rewrite k. subst vs'.
+    simpl. rewrite k.
     replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
     rewrite e1. rewrite k0. reflexivity.
   - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
@@ -1013,37 +1011,36 @@ Definition unsome (x:option exp) : exp :=
     | None => Var_e 9999
   end.
 
-(** natural numbers in Church representation **)
-Section ChurchNaturals.
-Notation ZZ := (Lam_e "x" (Lam_e "y" Ve1)).
-Notation SS := (Lam_e "x" (Lam_e "y" (Lam_e "z" (Ve0 $ (Ve2 $ Ve1 $ Ve0))))).
-Notation one := (SS $ ZZ).
-Notation two := (SS $ one).
-Notation three := (SS $ two).
-Notation four := (SS $ three).
-Notation five := (SS $ four).
-Notation six := (SS $ five).
-Notation add := (Lam_e "x" (Lam_e "y" (Ve1 $ Ve0 $ SS))).
-Notation mul := (Lam_e "x" (Lam_e "y" (Ve1 $ ZZ $ (add $ Ve0)))).
+(* (** natural numbers in Church representation **) *)
+(* Section ChurchNaturals. *)
+(* Notation ZZ := (Lam_e "x" (Lam_e "y" Ve1)). *)
+(* Notation SS := (Lam_e "x" (Lam_e "y" (Lam_e "z" (Ve0 $ (Ve2 $ Ve1 $ Ve0))))). *)
+(* Notation one := (SS $ ZZ). *)
+(* Notation two := (SS $ one). *)
+(* Notation three := (SS $ two). *)
+(* Notation four := (SS $ three). *)
+(* Notation five := (SS $ four). *)
+(* Notation six := (SS $ five). *)
+(* Notation add := (Lam_e "x" (Lam_e "y" (Ve1 $ Ve0 $ SS))). *)
+(* Notation mul := (Lam_e "x" (Lam_e "y" (Ve1 $ ZZ $ (add $ Ve0)))). *)
 
-Example One := Eval compute in (unsome (eval_n 100 one)).
-Example Two := Eval compute in (unsome (eval_n 100 two)).
-Example Three := Eval vm_compute in (unsome (eval_n 100 three)).
-Example Four := Eval vm_compute in (unsome (eval_n 100 four)).
-Example Five := Eval vm_compute in (unsome (eval_n 100 five)).
-Example Six := Eval vm_compute in (unsome (eval_n 100 six)).
+(* Example One := Eval compute in (unsome (eval_n 100 one)). *)
+(* Example Two := Eval compute in (unsome (eval_n 100 two)). *)
+(* Example Three := Eval vm_compute in (unsome (eval_n 100 three)). *)
+(* Example Four := Eval vm_compute in (unsome (eval_n 100 four)). *)
+(* Example Five := Eval vm_compute in (unsome (eval_n 100 five)). *)
+(* Example Six := Eval vm_compute in (unsome (eval_n 100 six)). *)
 
-Goal eval (SS $ ZZ) One. repeat econstructor. Qed.
-Goal eval (add $ ZZ $ one) One. repeat econstructor. Qed.
-Goal eval (add $ one $ ZZ) One. repeat econstructor. Qed.
-Goal (eval_n 1000 (add $ two $ one)) = Some Three.
-vm_compute. reflexivity. Qed.
-Goal (eval_n 1000 (add $ two $ three)) = Some Five.
-vm_compute. reflexivity. Qed.
-Goal (eval_n 1000 (mul $ two $ three)) = Some Six.
-vm_compute. reflexivity. Qed.
-End ChurchNaturals.
-Reset ChurchNaturals.
+(* Goal eval (SS $ ZZ) One. repeat econstructor. Qed. *)
+(* Goal eval (add $ ZZ $ one) One. repeat econstructor. Qed. *)
+(* Goal eval (add $ one $ ZZ) One. repeat econstructor. Qed. *)
+(* Goal (eval_n 1000 (add $ two $ one)) = Some Three. *)
+(* vm_compute. reflexivity. Qed. *)
+(* Goal (eval_n 1000 (add $ two $ three)) = Some Five. *)
+(* vm_compute. reflexivity. Qed. *)
+(* Goal (eval_n 1000 (mul $ two $ three)) = Some Six. *)
+(* vm_compute. reflexivity. Qed. *)
+(* End ChurchNaturals. *)
 
 (** booleans using native data constructors (with no arguments) **)
 Notation boolind := (mkInd "bool" 0).
@@ -1932,9 +1929,8 @@ Proof.
     exists (x+x0)%nat.
     rewrite j.
     replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
-    simpl. rewrite k. subst vs'.
+    simpl. rewrite k.
     replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
-    replace (exps_skipn p vs) with vs in e1, k0 by admit. (* fix eval *)
     rewrite e1. rewrite k0. reflexivity.
   - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
     exists (x+x0+x1)%nat.
@@ -1974,6 +1970,4 @@ Proof.
     rewrite Nat.add_comm.
     apply  eval_ns_monotone.
     auto.
-
-    Fail idtac. (* done except for the admit above *)
-Admitted.
+Qed.

@@ -3,7 +3,7 @@ all: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries
 	$(MAKE) -C theories
 
-plugin/CertiCoq.vo: plugin/Makefile
+plugin/CertiCoq.vo: plugin/Makefile theories/Extraction/extraction.vo all
 	sh ./make_plugin.sh
 
 install: all plugin/CertiCoq.vo

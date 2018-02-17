@@ -2,6 +2,11 @@
 
 echo "Cleaning result of extraction"
 
+if [ ! -d "plugin/extraction" ]
+then
+    mkdir plugin/extraction
+fi
+
 # Move extracted modules to build the certicoq compiler plugin
 cd theories/Extraction
 

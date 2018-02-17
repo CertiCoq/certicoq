@@ -756,10 +756,10 @@ Module Compat (H : Heap).
     Qed.
 
     (** XXX move/name *)
-    Lemma heap_env_equiv_def_funs' (S : Ensemble var) (H1 H2 : heap block) 
+    Lemma heap_env_equiv_def_funs' (S : Ensemble var) (β1 β2 : Inj) (H1 H2 : heap block) 
           (rho1 rho2 : M.t value) (B B' : fundefs) : 
-      S \\ (name_in_fundefs B) |- (H1, rho1) ⩪ (H2, rho2) ->
-      S |- (H1, def_funs B B' rho1) ⩪ (H2, def_funs B B' rho2).
+      S \\ (name_in_fundefs B) |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
+      S |- (H1, def_funs B B' rho1) ⩪_(β1, β2) (H2, def_funs B B' rho2).
     Proof with now eauto with Ensembles_DB.
       revert S. induction B; simpl; intros S Heq.
       - eapply heap_env_equiv_set.
@@ -769,7 +769,7 @@ Module Compat (H : Heap).
     Qed.
 
     (** Abstraction compatibility *)
-    Lemma cc_approx_exp_fun_compat (k : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 r1 r2
+    Lemma cc_approx_exp_fun_compat (k j : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 r1 r2
           (IInvFunCompat :
              forall H1 H1' H1''  H2  rho1 rho1' rho1'' rho2 env_loc, 
                IIL1 (H1, rho1, Efun B1 e1) (H2, rho2, Efun B2 e2) ->
@@ -792,17 +792,18 @@ Module Compat (H : Heap).
 
          def_closures B1 B1 rho1 H1' env_loc = (H1'', rho1') ->
 
-         (e1, rho1', H1'') ⪯ ^ (i; IIL2 ; IIG ; ILi r2 ; IG)
+         (e1, rho1', H1'') ⪯ ^ (i ; j ; IIL2 ; IIG ; ILi r2 ; IG)
          (e2, def_funs B2 B2 rho2, H2)) ->
-      (Efun B1 e1, rho1, H1) ⪯ ^ (k ; IIL1 ; IIG ; ILi r1 ; IG) (Efun B2 e2, rho2, H2).
+      (Efun B1 e1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; ILi r1 ; IG) (Efun B2 e2, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hwf Hdom Hleq Hpre H1' H2' rho1' rho2' v1 c1
-             m1 Heq1 Heq2 HII Hleq1 Hstep1 Hstuck1.
+      intros Hwf Hdom Hleq Hpre b1 b2 H1' H2' rho1' rho2' v1 c1
+             m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
       (* Timeout! *)
       - { simpl in Hcost. exists OOT, (c1 - r1).
-          - eexists. repeat split. econstructor. simpl.
+          - eexists. eexists. repeat split. econstructor. simpl.
             omega. reflexivity.
+            now eapply injective_subdomain_Empty_set.
             eapply InvCostTimeout. eassumption.
             now rewrite cc_approx_val_eq. }
       (* Termination *)
@@ -811,9 +812,10 @@ Module Compat (H : Heap).
           destruct (def_closures B1 B1 rho1 H3 env_loc3)
             as [H3' rho3] eqn:Hdef3.
           edestruct Hpre with (i := k - cost (Efun B1 e1)) as [v2 [c2 [m2 [Hstep [HS Hval]]]]]
-          ; [ | reflexivity | now apply Ha3 | now apply Hdef3 | | | | | eassumption | | ].
+          ; [ | reflexivity | now apply Ha3 | now apply Hdef3 | | | | | | | eassumption | | ].
           - simpl in Hcost. simpl. omega.
-          - assert (Hequiv : occurs_free_fundefs B1 :|: occurs_free e1 \\ name_in_fundefs B1 |- (H', rho1') ⩪ (H3, rho1)).
+          - assert (Hequiv : occurs_free_fundefs B1 :|: occurs_free e1 \\ name_in_fundefs B1
+                    |- (H', rho1') ⩪_(b1, id) (H3, rho1)).
             { eapply heap_env_equiv_weaking_cor.
               * eapply well_formed_antimon;
                 [| eapply well_formed_respects_heap_env_equiv; [ now apply Hwf | eassumption ] ].
@@ -836,10 +838,11 @@ Module Compat (H : Heap).
               * eapply HL.alloc_subheap. eassumption.
               * eapply HL.alloc_subheap. eassumption. }
             eapply heap_env_equiv_antimon with (S1 := occurs_free_fundefs B1 :|: occurs_free e1);
-            [| now eauto with Ensembles_DB ].
+              [| now eauto with Ensembles_DB ].
+            
             setoid_rewrite <- Hdef3. setoid_rewrite <- Hfuns. (* strange *)
             symmetry.
-            eapply heap_env_equiv_def_funs. 
+            eapply heap_env_equiv_def_  funs. 
             + eapply closed_alloc'; [| | eassumption ].
               * eapply reach'_closed.
                 eapply well_formed_respects_heap_env_equiv. now apply Hwf.

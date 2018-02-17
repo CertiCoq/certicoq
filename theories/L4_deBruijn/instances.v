@@ -5,6 +5,8 @@ Require Import L3.compile.
 Require Import L4.L3_to_L4.
 Require Import L4.L3_to_L3_eta.
 Require Import L4.L3_eta_crct.
+Require Import L4.L3_to_L3_eta_correct.
+Require L3.
 Require Import L3.instances.
 
 Require Import BinNat.
@@ -28,15 +30,70 @@ Instance WfL3_etaTerm : GoodTerm L3_eta_Program :=
 
 Global Instance certiL3_eta: CerticoqLanguage L3_eta_Program := {}.
 
-Global  Instance certiL3_to_L3_eta: 
+Global Instance certiL3_to_L3_eta:
   CerticoqTranslation (cTerm certiL3) (cTerm certiL3_eta) :=
   fun p => Ret (L3_to_L3_eta.Program_Program p).
+
+Lemma L3_crctEnv_inv d e : L3.program.crctEnv (d :: e) -> L3.program.crctEnv e.
+Proof.
+  intros. inv H. now apply L3.program.Crct_CrctEnv in H3. easy.
+Qed.
+Hint Resolve L3_crctEnv_inv.
+
+Lemma leb_refl b : Bool.leb b b.
+Proof.
+  now destruct b.
+Qed.
+
+Lemma obs_prevervation : forall p, p ⊑ Program_Program p.
+Proof.
+  intros [m e]; simpl.
+  revert e.
+  apply (TrmTrmsBrsDefs_ind
+           (fun (main : Term) => forall e,
+                {| main := main; AstCommon.env := e |} ⊑ {| main := trans main; AstCommon.env := transEnv e |})
+             (fun ts => forall e i n n0,
+                 obsLeOp (observe_nth_subterm n0 {| main := TConstruct i n ts; AstCommon.env := e |})
+                         (observe_nth_subterm n0 {| main := trans (TConstruct i n ts); AstCommon.env := transEnv e |}))
+             (fun _ => True) (fun _ => True));
+        try constructor;
+        try (match goal with |- yesPreserved _ _ => intros q; destruct q end);
+        intros; try red; trivial; try constructor.
+
+  simpl.
+  - unfold questionHead, QuestionHeadTermL, QuestionHeadTermL3_eta; simpl.
+    apply Bool.leb_implb, leb_refl.
+  - simpl.
+    unfold observeNthSubterm, ObsSubtermL3_eta, ObsSubtermL, observe_nth_subterm. simpl.
+    destruct n0; constructor.
+  - simpl in *. destruct n0; try constructor. simpl.
+    apply H.
+    apply (H0 e i n n0).
+Qed.
 
 Global Instance certiL3_to_L3_eta_correct :
   CerticoqTranslationCorrect certiL3 certiL3_eta.
 Proof.
-  (* WIP *)
-Admitted.
+  split; intros ? *; unfold goodTerm, certiClasses.translate, certiL3_to_L3_eta, goodTerm, WfL3Term, WfL3_etaTerm.
+  - destruct s; simpl in *.
+    now apply trans_pres_Crct.
+
+  - intros Hcrct Hred.
+    exists (L3_to_L3_eta.Program_Program sv). split; auto.
+    destruct s as [main e], sv as [main' e'].
+    simpl in *. hnf in Hred. destruct Hred as [evenv evmain].
+    + hnf.
+      split; [ | apply translate_correct_subst; eauto; apply L3.program.Crct_CrctEnv in Hcrct; auto ].
+      apply L3.program.Crct_CrctEnv in Hcrct.
+      clear evmain main main'.
+      induction evenv in Hcrct.
+      ++ constructor.
+      ++ simpl. constructor. apply IHevenv; eauto.
+         apply translate_correct_subst; eauto.
+         now inv Hcrct.
+      ++ simpl. constructor. apply IHevenv. eauto.
+    + apply obs_prevervation.
+Qed.
 
 Definition dummyEnvBigStep {E T: Type}  (bt : BigStepOpSem T T)
 : BigStepOpSem (E * T) (E * T) :=

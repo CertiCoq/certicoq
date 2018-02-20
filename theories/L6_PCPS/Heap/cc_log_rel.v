@@ -143,7 +143,7 @@ Module CC_log_rel (H : Heap).
                            Forall2 R vs1 vs2
                        end)
               | Some (Clos (FunPtr B1 f1) (Loc env_loc1)), Some (Constr c [FunPtr B2 f2; Loc env_loc2]) =>
-                (forall j', j' < j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
+                (forall j', j' <= j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
                 forall (b1 b2 : Inj)
                   (rho_clo1 rho_clo2 rho_clo3 : env) (H1' H1'' H2' : heap block)
                   (env_loc1' env_loc2' : loc)
@@ -163,7 +163,7 @@ Module CC_log_rel (H : Heap).
                     find_def f2 B2 = Some (ft, xs2, e2) /\
                     Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
                     (forall i j',
-                       (i < k)%nat -> (j' < j)%nat ->
+                       (i < k)%nat -> (j' <= j)%nat ->
                        match k with
                          | 0 => True
                          | S k =>
@@ -200,7 +200,7 @@ Module CC_log_rel (H : Heap).
            let R l1 l2 := cc_approx_val k i IP P b (Res (l1, H1)) (Res (l2, H2)) in
            Forall2 R vs1 vs2)
       | Clos (FunPtr B1 f1) (Loc env_loc1), Constr c [FunPtr B2 f2; Loc env_loc2] =>
-        (forall j', j' < j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
+        (forall j', j' <= j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
         forall (b1 b2 : Inj) (rho_clo1 rho_clo2 rho_clo3 : env) (H1' H1'' H2' : heap block) (env_loc1' env_loc2' : loc)
           (xs1 : list var) (ft : fTag) (e1 : exp) (vs1 vs2 : list value),
           (Loc env_loc1, H1) ≈_(id, b1) (Loc env_loc1', H1') ->
@@ -219,7 +219,7 @@ Module CC_log_rel (H : Heap).
             find_def f2 B2 = Some (ft, xs2, e2) /\
             Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
             (forall i j',
-               (i < k)%nat -> (j' < j)%nat ->
+               (i < k)%nat -> (j' <= j)%nat ->
                let R v1 v2 := cc_approx_val i j' IP P (b2 ∘ b ∘ b1) (Res (v1, H1'')) (Res (v2, H2')) in
                (* env_locs rho_clo3 (occurs_free e1) |- H1' ≃ H1'' -> *)
                (* env_locs rho2' (occurs_free e2) |- H2 ≃ H2' -> *)
@@ -325,11 +325,11 @@ Module CC_log_rel (H : Heap).
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
-          (* simpl. intros i Hleq Hall. *)
-          (* assert (Heqi : k - (k - i) = i) by omega. *)
-          (* setoid_rewrite <- Heqi. eapply Hi; eauto. *)
-          (* eapply Forall2_monotonic; [| now eauto ]. *)
-          (* intros x1 x2 Hap. rewrite Heqi. eassumption. *)
+          simpl. intros i j' Hleq Hleq' Hall.
+          assert (Heqi : k - (k - i) = i) by omega.
+          setoid_rewrite <- Heqi. eapply Hi; eauto.
+          eapply Forall2_monotonic; [| now eauto ].
+          intros x1 x2 Hap. rewrite Heqi. eassumption.
       }
       { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ]; firstorder. }
       { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
@@ -344,11 +344,11 @@ Module CC_log_rel (H : Heap).
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
-          (* intros i Hleq Hall. *)
-          (* assert (Heqi : k - (k - i) = i) by omega. *)
-          (* setoid_rewrite Heqi. eapply Hi; eauto. *)
-          (* eapply Forall2_monotonic; [| now eauto ]. *)
-        (* intros x1 x2 Hap. rewrite <- Heqi. eassumption. *)
+          intros i j Hleq Hleq' Hall.
+          assert (Heqi : k - (k - i) = i) by omega.
+          setoid_rewrite Heqi. eapply Hi; eauto.
+          eapply Forall2_monotonic; [| now eauto ].
+        intros x1 x2 Hap. rewrite <- Heqi. eassumption.
       }
     - split; unfold cc_approx_block; simpl;
       destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now firstorder.

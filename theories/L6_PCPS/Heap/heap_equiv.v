@@ -397,9 +397,15 @@ Module HeapEquiv (H : Heap).
   Definition live (S : Ensemble loc) {_ : ToMSet S} (H1 H2 : heap block) : Prop :=
     size_heap H2 = size_reachable S H1 /\ (* maybe could be derived? *)
     exists β,
+      S |- H1 ≃_(id, β) H2 /\ (* locations outside S might be renamed! *)
+      injective_subdomain (reach' H2 S) β.
+
+  Definition live' (S : Ensemble loc) {_ : ToMSet S} (H1 H2 : heap block) : Prop :=
+    size_heap H2 = size_reachable S H1 /\ (* maybe could be derived? *)
+    exists β,
       S |- H1 ≃_(β, id) H2 /\ (* locations outside S might be renamed! *)
       injective_subdomain (reach' H1 S) β.
-  
+
   (** * Lemmas about [collect] *)
   
   (** The reachable part of the heap before and after collection are the same *)
@@ -2404,31 +2410,25 @@ Module HeapEquiv (H : Heap).
     exists H', live S H H'.
   Proof.
   Admitted.
-  
-(* 
-  Lemma live_deterministic S (_ : ToMSet S) H1 H2 H2' :
-    live S H1 H2 ->
-    live S H1 H2' ->
-    S |- H2 ≃ H2'.
+
+  Lemma live_exists' S H (_ : ToMSet S) :
+    exists H', live' S H H'.
   Proof.
-    intros [Hyp1 Hyp2] [Hyp1' Hyp2'].
-    eapply Equivalence.equiv_transitive; eauto.
-    symmetry. eassumption.
-  Qed.
- *)
+  Admitted.
+ 
 
   Lemma live_collect S (_ : ToMSet S) H1 H2 :
     live S H1 H2 ->
     collect S H1 H2.
   Proof.
-    intros [Hs Hl]. 
+    (* intros [Hs Hl]. *)
   Admitted.
 
   Lemma live_idempotent (S : Ensemble loc) (_ : ToMSet S) (H1 H2 : heap block) :
     live S H1 H2 ->
     live S H2 H2.
   Proof.
-    intros [Hs Heq]. split. rewrite Hs. 
+    (* intros [Hs Heq]. split. rewrite Hs. *)
   Abort.
   
   (* TODO move *)

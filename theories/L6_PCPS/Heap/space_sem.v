@@ -417,7 +417,7 @@ Module SpaceSem (H : Heap).
         (Hset : setlist xs vs (def_funs B B (M.empty _)) = Some rho_clo)
         
         (* collect H' *)
-        (Hgc : live ((env_locs rho_clo) (occurs_free e)) H H')
+        (Hgc : live' ((env_locs rho_clo) (occurs_free e)) H H')
         (Hsize : size_heap H = m')
         
         (Hbs : big_step_GC_cc H' rho_clo e r (c - costCC (Eapp f ct ys)) m),
@@ -580,7 +580,18 @@ Module SpaceSem (H : Heap).
                  injective_subdomain (reach_ans r') β' /\
                  ans_equiv β' r id r').
   Admitted.
-  
+
+  Lemma big_step_gc_heap_env_equiv2 H1 H2 β1 β2 rho1 rho2 e (r : ans) c m :
+    big_step_GC H1 rho1 e r c m ->
+    (occurs_free e) |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) β1 ->
+    injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e))) β2 -> 
+    (exists r' m' β1' β2', big_step_GC H2 rho2 e r' c m' /\
+                      injective_subdomain (reach_ans r) β1' /\
+                      injective_subdomain (reach_ans r') β2' /\
+                      ans_equiv β1' r β2' r').
+  Admitted.
+
   
   (* 
   Lemma big_step_deterministic  H1 H2 rho1 rho2 e r1 r1' c1 m1 r2 r2' c2 m2 :

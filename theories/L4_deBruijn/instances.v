@@ -276,7 +276,9 @@ Global Instance L4_2_evaln
 
 
 Global Instance : GoodTerm L4_2_Term :=
-  fun e  => isprogram e.
+  fun e  => isprogram e
+            /\ L4_2_to_L4_5.fixwf e = true
+            /\ varsOfClass (all_vars e) true.
 
 Global Instance QuestionHeadTermL42 : QuestionHead (prod ienv L4_2_Term) :=
 fun q t =>
@@ -299,7 +301,6 @@ Global Instance ObsSubtermTermL42 : ObserveNthSubterm (prod ienv L4_2_Term) :=
     | _ => None
     end.
 
-(** Fix or remove *)
 Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2_Term) := {}.
 
 Global Instance certiL4_to_L4_2: 
@@ -562,7 +563,9 @@ Proof using.
   btauto.
 Qed.
 
-Lemma certiL4_to_L4_2Correct:
+
+
+Global Instance certiL4_to_L4_2Correct:
   CerticoqTranslationCorrect certiL4 certiL4_2.
 Proof using.
   split.
@@ -600,6 +603,69 @@ Proof using.
     Fail idtac. (* this subgoal is done *)
 Abort.
 
+
+Lemma goodPres4_2_to_4_5 : goodPreserving (ienv * L4_2_Term) (ienv * L4_5_Term).
+Proof using.
+- intros ? Hg. hnf. 
+  destruct s as [? s]. simpl.
+  hnf in Hg. simpl in Hg.
+  unfold isprogram, closed in *. repnd.
+  dands; try rewrite L4_2_to_L4_5_fvars;
+    eauto using L4_2_to_L4_5_ntwf, fixwf_commute.
+  admit. (* need to prove varclass is preserved. *)
+Admitted.
+
+
+Lemma certiL4_2_to_L4_5_evalPres:
+  bigStepPreserving (cTerm certiL4_2) (cTerm certiL4_5).
+Proof using.
+  intros ? ?.
+  destruct s as [? s].
+  destruct sv as [senv sv]. 
+  autounfold with certiclasses. simpl.
+  autounfold with certiclasses. simpl.
+  intros Hgood Heval. repnd. subst.
+  simpl in *. repnd. destruct Hgood1 as [Hclosed Hwf].
+  dands; auto.
+  pose proof L4_2_to_L4_5_correct.
+  hnf in Heval. exrepnd. 
+  eapply H; eauto.
+Qed.
+  
+Require Import SquiggleEq.LibTactics.
+
+Global Instance IsValueL42 : IsValue (cTerm certiL4_2) :=
+  fun t => True. (* suffices for our purposes so far. we only need completeness of IsValue in the proof below (certiL4_2_to_L4_5_Correct)*)
+
+
+Global Instance certiL4_2_to_L4_5_Correct:
+  CerticoqTranslationCorrect certiL4_2 certiL4_5.
+Proof using.
+  apply certicoqTranslationCorrect_suff3; try firstorder.
+  - apply certiL4_2_to_L4_5_evalPres.
+  - apply goodPres4_2_to_4_5.
+  - intros ? ? Hsv Heq. clear Hsv. inverts Heq.
+      destruct sv as [? ev]. hnf.
+      autounfold with certiclasses in *. simpl.
+      destruct ev as [ | o lbt]; simpl; intros q; destruct q; auto;[ | ].
+    +  destruct o; auto;[].
+       destruct dc. simpl. unfold implb. btauto.
+    +  destruct o; auto.
+  - intros ? ? ? Hsv Heq. inverts Heq.
+    destruct sv as [? ev]. hnf.
+    autounfold with certiclasses. clear Hsv.
+    destruct ev as [ | o lbt]; auto;[].
+    destruct o; auto; [].
+    simpl.
+    repeat rewrite List.map_map.
+    repeat rewrite nth_error_map.
+    remember (List.nth_error lbt n) as esso.
+    destruct esso as [ess | ]; simpl; auto;[].
+    simpl. split; hnf; auto.
+    do 2 f_equal.
+    destruct ess; auto.
+Qed.
+
 (* this proof, which was developed later, uses lemmas in the certiclasses library *)
 Module SimplerProof.
 
@@ -633,7 +699,6 @@ Let certiL4_5_to_L5Val:
     apply haltContAp.
   Qed.
 
-  Import SquiggleEq.LibTactics.
 
   Lemma certiL4_5_to_L5Correct:
     CerticoqTranslationCorrect certiL4_5 certiL5.
@@ -821,3 +886,4 @@ Definition print4 (t: cTerm certiL4_5) : string :=
 Definition print5 (t: cTerm certiL5) : string :=
 (tprint "" NVar2string  L4_5_to_L5.L5OpidString  (snd t)).
  *)
+

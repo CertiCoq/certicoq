@@ -611,10 +611,8 @@ Proof using.
   hnf in Hg. simpl in Hg.
   unfold isprogram, closed in *. repnd.
   dands; try rewrite L4_2_to_L4_5_fvars;
-    eauto using L4_2_to_L4_5_ntwf, fixwf_commute.
-  admit. (* need to prove varclass is preserved. *)
-Admitted.
-
+    eauto using L4_2_to_L4_5_ntwf, fixwf_commute, L4_2_to_L4_5_vc.
+Qed.
 
 Lemma certiL4_2_to_L4_5_evalPres:
   bigStepPreserving (cTerm certiL4_2) (cTerm certiL4_5).
@@ -665,6 +663,11 @@ Proof using.
     do 2 f_equal.
     destruct ess; auto.
 Qed.
+
+(*
+Print Assumptions certiL4_2_to_L4_5_Correct.
+Closed under the global context
+ *)
 
 (* this proof, which was developed later, uses lemmas in the certiclasses library *)
 Module SimplerProof.

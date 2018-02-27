@@ -159,6 +159,47 @@ Proof using.
   inverts HntwfSig.
 Qed.
 
+Lemma L4_2_to_L4_5_vc s: varsOfClass (all_vars s) true -> varsOfClass (all_vars (L4_2_to_L4_5 s)) true.
+Proof using.
+  induction s as [x | o lbt Hind] using NTerm_better_ind; intros Hvc; auto;[].
+  autorewrite with SquiggleEq in Hvc.
+  simpl in *.
+  assert (varsOfClass (flat_map all_vars_bt (map (btMapNt L4_2_to_L4_5) lbt)) true).
+  - rewrite flat_map_map. intros ? Hin. apply in_flat_map in Hin. exrepnd.
+    destruct x as [lv nt].
+    unfold compose in *; simpl in *.
+    autorewrite with SquiggleEq in Hin0.
+    rewrite in_app_iff in Hin0.
+    dorn Hin0.
+    + apply Hvc. apply in_flat_map. eexists; dands; eauto.
+      autorewrite with SquiggleEq. rewrite in_app_iff.
+      left; auto.
+    + unfold varsOfClass, lforall in Hind.
+      eapply Hind; eauto.
+      intros aa Hinn.
+      apply Hvc. apply in_flat_map. eexists; dands; eauto.
+      autorewrite with SquiggleEq. rewrite in_app_iff.
+      right; auto.
+   
+- destruct o; unfold Fix_e'; simpl; autorewrite with SquiggleEq; auto;[].
+  simpl. compute. intros. repeat in_reasoning; subst; auto.
+Qed.
+
+(* MOVE to SquiggleEq.terms2 *)
+Lemma  wft_ntwf {Opid V} {gts : GenericTermSig Opid}: forall t: @NTerm V Opid,  wft t =true -> nt_wf t.
+Proof using.
+  induction t as [x | o lbt Hind] using NTerm_better_ind; intros Hwf; try (constructor; fail).
+  simpl in Hwf.
+  apply andb_eq_true in Hwf. repnd.
+  setoid_rewrite assert_beq_list in Hwf0.
+  constructor; auto.
+  rewrite ball_map_true in Hwf.
+  intros l. destruct l. intros. constructor.
+  eapply Hind; eauto.
+  specialize (Hwf _ H).
+  simpl in Hwf. assumption.
+  Qed.  
+  
 
 Lemma L4_2_to_L4_5_ntwf t:
   nt_wf t ->    
@@ -176,12 +217,10 @@ Proof using.
  - 
   destruct o.
   Focus 7.
-  assert (forall t: L4_5_Term,  wft t =true -> nt_wf t) by admit.
-    (* prove generically in the SquiggleEq library *)
-  apply H0. refl.
+  apply wft_ntwf. refl.
   all: constructor; auto; simpl in *; rewrite map_map;
     erewrite map_ext by (intros; rewrite numBvarsBtMapNt; auto); auto.
-Admitted. (* one admit above *)
+Qed.
 
 
 Require Import SquiggleEq.alphaeq.

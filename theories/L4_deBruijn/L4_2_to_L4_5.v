@@ -157,9 +157,51 @@ Proof using.
   destruct o; [ | | | | | | ]; auto;[].
   simpl. ntwfauto. simpl in *. destruct lbt; auto;[].
   inverts HntwfSig.
-Qed.  
+Qed.
+
+
+Lemma L4_2_to_L4_5_ntwf t:
+  nt_wf t ->    
+  nt_wf (L4_2_to_L4_5 t).
+Proof using.
+  induction t as [x | o lbt Hind] using NTerm_better_ind; intros Hwf;
+    [constructor | ].
+  simpl.
+  invertsn Hwf.
+
+  assert (forall l : BTerm, LIn l (map (btMapNt L4_2_to_L4_5) lbt) -> bt_wf l).
+  - intros ? Hin. apply in_map_iff in Hin. exrepnd. subst.
+    destruct x as [lv nt]. constructor. eapply Hind; eauto.
+    apply Hwf in Hin0. inverts Hin0. assumption.
+ - 
+  destruct o.
+  Focus 7.
+  assert (forall t: L4_5_Term,  wft t =true -> nt_wf t) by admit.
+    (* prove generically in the SquiggleEq library *)
+  apply H0. refl.
+  all: constructor; auto; simpl in *; rewrite map_map;
+    erewrite map_ext by (intros; rewrite numBvarsBtMapNt; auto); auto.
+Admitted. (* one admit above *)
+
 
 Require Import SquiggleEq.alphaeq.
+Require Import SquiggleEq.UsefulTypes.
+Require Import DecidableClass.
+
+Definition is_lambdab (n:L4_2_Term) :=
+decide (getOpid n = Some polyEval.NLambda).
+
+Fixpoint fixwf (e:L4_2_Term) : bool :=
+match e with
+| terms.vterm _ => true (* closedness is a the concern of this predicate *) 
+| terms.oterm o lb => 
+    (match o with
+    | polyEval.NFix _ _ => ball (map (is_lambdab ∘ get_nt) lb) && ball (map (fixwf ∘ get_nt) lb)
+    | polyEval.NBox _ => true
+    | _ => ball (map (fixwf ∘ get_nt) lb)
+    end)
+end.
+
 
 Lemma ssubst_aux_commute f sub:
   ssubst_aux (L4_2_to_L4_5 f) (map_sub_range L4_2_to_L4_5 sub) =
@@ -196,6 +238,30 @@ Proof using.
   rewrite (proj2 (@flat_map_empty _ _ _ _)); auto.
   intros s Hin. destruct s as [x t]. specialize (Hs _ _ Hin).
   simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
+Qed.
+
+Lemma fixwf_commute f:
+   L4_5_to_L5.fixwf (L4_2_to_L4_5 f)  = fixwf f.
+Proof using.
+  induction f using NTerm_better_ind;[refl | ].
+  simpl in *.
+  assert(
+  ball
+    (map (fun x : BTerm => L4_5_to_L5.fixwf (get_nt (btMapNt L4_2_to_L4_5 x))) lbt) =
+  ball (map (fun x : BTerm => fixwf (get_nt x)) lbt)).
+  - f_equal. apply eq_maps. intros ? Hin.
+    destruct x as [lv nt]. simpl. eauto.
+
+
+   - destruct o; simpl in *; repeat rewrite map_map; unfold compose; simpl; auto.
+  rewrite H0.
+  f_equal.
+  f_equal.
+  apply eq_maps.
+  intros.
+  destruct x as [lv nt].
+  simpl.
+  destruct nt; try refl. destruct l; try refl.
 Qed.
 
 Definition eval42 := @polyEval.eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid).
@@ -493,4 +559,3 @@ Print Assumptions L4_2_to_L4_5_correct.
 (* Closed under the global context *)
 
 End evaln42_45.
-

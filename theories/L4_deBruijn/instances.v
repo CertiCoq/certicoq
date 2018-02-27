@@ -311,7 +311,7 @@ Global Program Instance : BigStepOpSem L4_5_Term L4_5_Term := eval.
 
 (** all variables must be user variables *)
 Global Program Instance : GoodTerm L4_5_Term :=
-  fun e  => varsOfClass (all_vars e) true /\ isprogram e /\ fixwf e = true.
+  fun e  => varsOfClass (all_vars e) true /\ isprogram e /\  L4_5_to_L5.fixwf e = true.
 
 Require Import DecidableClass.
 Global Instance QuestionHeadTermL45 : QuestionHead (prod ienv L4_5_Term) :=
@@ -465,7 +465,7 @@ Qed.
 Require Import L4.L4_to_L4_2_correct.
 
 Lemma alpha_EqObs_L4_2 senv :
- forall a (b: L4_2_Term), expression.is_value a-> alpha_eq (tL4_to_L4_2 a) b -> (senv, (tL4_to_L4_2 a)) ⊑ (senv, b).
+ forall a (b: L4_2_Term), expression.is_value  a-> alpha_eq (tL4_to_L4_2 a) b -> (senv, (tL4_to_L4_2 a)) ⊑ (senv, b).
 Proof using.
   intros ? ? Hisv Hal.
   apply toCoInd. (* productivity check is too unreliable *)
@@ -523,7 +523,6 @@ Proof using.
   apply exps_nthopt_isval.
 Qed.
     
-  
 
 Require Import Basics.
 (*Move to the top *)
@@ -567,7 +566,11 @@ Lemma certiL4_to_L4_2Correct:
   CerticoqTranslationCorrect certiL4 certiL4_2.
 Proof using.
   split.
-- admit.
+- intros ? Hg. hnf. 
+  destruct s as [? s]. simpl.
+  hnf in Hg. simpl in Hg.
+  clear i.
+  revert_all. admit.
 - intros ? ? Hg Hev.
   destruct s as [? s].
   destruct sv as [senv sv]. 

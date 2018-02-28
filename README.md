@@ -72,10 +72,21 @@ that `opam` doesn't try to upgrade it:
   After this you should have `coqc --version` give you the right version
 number.
 
+Keeping opam up-to-date
+-----------------------
+
+When the above opam repositories are updated, you may need to update your installation.
+
+    # opam update
+
+If the dependencies are already installed then you can skip the following section and just do:
+    
+    # opam upgrade coq-template-coq coq-ext-lib coq-squiggle-eq 
+
 Installing dependencies
 -----------------------
 
-Then to install CertiCoq's dependencies:
+To install CertiCoq's dependencies in the current opam switch:
 
     # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.1.0.3 coq-paramcoq
 
@@ -99,16 +110,6 @@ and install the packages from source:
 	https://github.com/gmalecha/template-coq (branch: coq-8.7)
 	https://github.com/aa755/SquiggleEq
 	https://github.com/aa755/paramcoq (branch: v8.7)
-
-
-Updating dependencies:
-----------------------
-
-When the above repositories are updated, you may need to update your installation.
-If you chose opam, you can do
-
-    # opam update
-    # opam upgrade coq-template-coq coq-ext-lib coq-squiggle-eq 
 
 
 Building the compiler:

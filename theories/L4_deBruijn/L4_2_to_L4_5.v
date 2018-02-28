@@ -227,20 +227,6 @@ Require Import SquiggleEq.alphaeq.
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
 
-Definition is_lambdab (n:L4_2_Term) :=
-decide (getOpid n = Some polyEval.NLambda).
-
-Fixpoint fixwf (e:L4_2_Term) : bool :=
-match e with
-| terms.vterm _ => true (* closedness is a the concern of this predicate *) 
-| terms.oterm o lb => 
-    (match o with
-    | polyEval.NFix _ _ => ball (map (is_lambdab ∘ get_nt) lb) && ball (map (fixwf ∘ get_nt) lb)
-    | polyEval.NBox _ => true
-    | _ => ball (map (fixwf ∘ get_nt) lb)
-    end)
-end.
-
 
 Lemma ssubst_aux_commute f sub:
   ssubst_aux (L4_2_to_L4_5 f) (map_sub_range L4_2_to_L4_5 sub) =
@@ -279,6 +265,8 @@ Proof using.
   simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
 Qed.
 
+Require Import L4_to_L4_2_correct.
+Import L42.
 Lemma fixwf_commute f:
    L4_5_to_L5.fixwf (L4_2_to_L4_5 f)  = fixwf f.
 Proof using.
@@ -287,11 +275,9 @@ Proof using.
   assert(
   ball
     (map (fun x : BTerm => L4_5_to_L5.fixwf (get_nt (btMapNt L4_2_to_L4_5 x))) lbt) =
-  ball (map (fun x : BTerm => fixwf (get_nt x)) lbt)).
+  ball (map (fun x : BTerm => fixwf (terms.get_nt x)) lbt)).
   - f_equal. apply eq_maps. intros ? Hin.
     destruct x as [lv nt]. simpl. eauto.
-
-
    - destruct o; simpl in *; repeat rewrite map_map; unfold compose; simpl; auto.
   rewrite H0.
   f_equal.

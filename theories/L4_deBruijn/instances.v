@@ -274,10 +274,10 @@ Global Instance L4_2_evaln
           | Some v => Result (fst e, v)
           end.
 
-
+Require Import L4_to_L4_2_correct.
 Global Instance : GoodTerm L4_2_Term :=
   fun e  => isprogram e
-            /\ L4_2_to_L4_5.fixwf e = true
+            /\ L42.fixwf e = true
             /\ varsOfClass (all_vars e) true.
 
 Global Instance QuestionHeadTermL42 : QuestionHead (prod ienv L4_2_Term) :=

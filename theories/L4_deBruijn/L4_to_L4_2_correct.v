@@ -651,4 +651,82 @@ Proof using.
   inverts Hwf. rename H0 into v2.
   exists v2. symmetry in H2. dands; auto;[].
   symmetry. auto.
-Qed.  
+Qed. 
+
+Module L42.
+Definition is_lambdab (n:L4_2_Term) :=
+decide (terms.getOpid n = Some polyEval.NLambda).
+
+Fixpoint fixwf (e:L4_2_Term) : bool :=
+match e with
+| terms.vterm _ => true (* closedness is a the concern of this predicate *) 
+| terms.oterm o lb => 
+    (match o with
+    | polyEval.NFix _ _ => ball (map (is_lambdab ∘ terms.get_nt) lb) && ball (map (fixwf ∘ terms.get_nt) lb)
+    | polyEval.NBox _ => true
+    | _ => ball (map (fixwf ∘ terms.get_nt) lb)
+    end)
+end.
+End L42.
+
+Lemma fixwfL41_to_L42:
+  (forall (e:L4_1_Term) names n,
+      fixwf e = L42.fixwf (fromDB Ast.nAnon mkNVar n names e)).
+Proof using.
+  induction e using termsDB.NTerm_better_ind2; auto;[]. intros.
+  assert ( ball (map (λ x : DBTerm, fixwf (get_nt x)) lbt) =
+ ball
+   (map
+      (λ x : DBTerm,
+       L42.fixwf
+         (terms.get_nt (fromDB_bt Ast.nAnon mkNVar n names x))) lbt)).
+- f_equal. apply eq_maps. intros ?  Hin.
+  destruct x. simpl. setoid_rewrite <- H; eauto.
+
+- destruct o; simpl; repeat rewrite map_map; unfold compose; auto;[].
+  f_equal; auto;[].
+  f_equal. apply eq_maps. intros. destruct x.
+  simpl. destruct d; auto.
+Qed.
+
+Lemma vcL41_to_L42:
+  forall (e:L4_1_Term) names n,
+      varsOfClass (all_vars (fromDB Ast.nAnon mkNVar n names e)) true.
+Proof using.
+  intros. apply termsDB.fromDB_varprop.
+  intros. compute. destruct p. refl.
+Qed.
+
+Lemma vcL4_to_L42:
+  forall (e:exp),
+      varsOfClass (all_vars (tL4_to_L4_2 e)) true.
+Proof using.
+  intros. apply vcL41_to_L42.
+Qed.
+
+(** well-formedness lemmas for L4 to L4_2 *)
+Lemma ntwfL4_to_L42:
+  forall (e:exp),
+      terms.nt_wf (tL4_to_L4_2 e).
+Proof using.
+  intros. apply fromDB_nt_wf. apply ntWfCommutesL4_to_L4_1.
+Qed.
+
+Lemma closedL4_to_L42:
+  forall (e:exp),
+      exp_wf 0 e
+      -> closed (tL4_to_L4_2 e).
+Proof using.
+  intros. eapply fromDB_closed;[ apply getIdMkNVar| ].
+  apply expWfCommutesL4_to_L4_1. assumption.
+Qed.
+
+Lemma fixwfL4_to_L42:
+  forall (e:exp) n,
+      exp_wf n e
+      -> L42.fixwf (tL4_to_L4_2 e) = true.
+Proof using.
+  intros. setoid_rewrite <- fixwfL41_to_L42.
+  pose proof fixwfCommutesL4_to_L4_1.
+  firstorder.
+Qed.

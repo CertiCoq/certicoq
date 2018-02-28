@@ -677,7 +677,304 @@ Module HeapEquiv (H : Heap).
     eapply heap_equiv_res_approx; eauto. symmetry.
     eassumption. 
   Qed.
+
+
+  (** Heap equivalences respect function extensionality *)
+
+  Instance Proper_res_approx_f_eq_l : Proper (eq ==> RelProd f_eq eq ==> eq ==> iff) res_approx_fuel.
+  Proof.
+    intros j i Heq1 [b1 [r1 H1]] [b1' [r1' H1']] [Heq2 Heq3] [b2 [r2 H2]] [b2' [r2' H2']] Heq4.
+    inv Heq3; inv Heq4. split.
+    - revert b1 b1' r1' H1' b2' r2' H2' Heq2.
+      induction i as [i IHi] using lt_wf_rec; intros b1 b1' r1 H1 b2 r2 H2 Heq2.
+      rewrite !res_approx_fuel_eq in *.
+      destruct r1 as [ l1 | B1 f1]; destruct r2 as [ l2 | V2 f2]; try contradiction. 
+      + simpl. destruct (get l1 H1) as [b | ] eqn:Hgetl1; eauto. 
+        destruct b as [c vs | vq vw | rho ].
+        * intros [Heqb [vs2 [Hgetl2 Hi]]]. split.
+          rewrite <- Heq2. eassumption.
+          repeat eexists; eauto.
+          intros i' Hlt.
+          eapply Forall2_monotonic; [| eapply Hi; eassumption ].
+          intros. eapply IHi; eassumption.
+        * intros [Heqb [v1 [v2 [Hgetl2 Hi]]]]. split.
+          rewrite <- Heq2. eassumption.
+          repeat eexists; eauto.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+        * intros [Heqb [rho2 [Hgetl2 Hall]]]. split.
+          rewrite <- Heq2. eassumption.
+          eexists; split; eauto. intros x. destruct (Hall x) as [[v1 [v2 [Hget1 [Hget2 Hs]]]] | Hn]; eauto.
+          left. repeat eexists; eauto.
+      + simpl; eauto.
+    -  revert b1 b1' r1' H1' b2' r2' H2' Heq2.
+      induction i as [i IHi] using lt_wf_rec; intros b1 b1' r1 H1 b2 r2 H2 Heq2.
+      rewrite !res_approx_fuel_eq in *.
+      destruct r1 as [ l1 | B1 f1]; destruct r2 as [ l2 | V2 f2]; try contradiction. 
+      + simpl. destruct (get l1 H1) as [b | ] eqn:Hgetl1; eauto. 
+        destruct b as [c vs | vq vw | rho ].
+        * intros [Heqb [vs2 [Hgetl2 Hi]]]. split.
+          rewrite Heq2. eassumption.
+          repeat eexists; eauto.
+          intros i' Hlt.
+          eapply Forall2_monotonic; [| eapply Hi; eassumption ].
+          intros. eapply IHi; eassumption.
+        * intros [Heqb [v1 [v2 [Hgetl2 Hi]]]]. split.
+          rewrite Heq2. eassumption.
+          repeat eexists; eauto.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+        * intros [Heqb [rho2 [Hgetl2 Hall]]]. split.
+          rewrite Heq2. eassumption.
+          eexists; split; eauto. intros x. destruct (Hall x) as [[v1 [v2 [Hget1 [Hget2 Hs]]]] | Hn]; eauto.
+          left. repeat eexists; eauto.
+      + simpl; eauto.
+  Qed.
   
+  Instance Proper_res_approx_f_eq_r : Proper (eq ==> eq ==> RelProd f_eq eq ==> iff) res_approx_fuel.
+  Proof.
+    intros j i Heq1 [b1 [r1 H1]] [b1' [r1' H1']] Heq2 [b2 [r2 H2]] [b2' [r2' H2']] [Heq3 Heq4].
+    inv Heq2; inv Heq4. split.
+    - revert b1' r1' H1' b2 b2' r2' H2' Heq3.
+      induction i as [i IHi] using lt_wf_rec; intros b1 r1 H1 b2 b2' r2 H2 Heq2.
+      rewrite !res_approx_fuel_eq in *.
+      destruct r1 as [ l1 | B1 f1]; destruct r2 as [ l2 | V2 f2]; try contradiction. 
+      + simpl. destruct (get l1 H1) as [b | ] eqn:Hgetl1; eauto. 
+        destruct b as [c vs | vq vw | rho ].
+        * intros [Heqb [vs2 [Hgetl2 Hi]]]. split.
+          rewrite <- Heq2. eassumption.
+          repeat eexists; eauto.
+          intros i' Hlt.
+          eapply Forall2_monotonic; [| eapply Hi; eassumption ].
+          intros. eapply IHi; eassumption.
+        * intros [Heqb [v1 [v2 [Hgetl2 Hi]]]]. split.
+          rewrite <- Heq2. eassumption.
+          repeat eexists; eauto.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+        * intros [Heqb [rho2 [Hgetl2 Hall]]]. split.
+          rewrite <- Heq2. eassumption.
+          eexists; split; eauto. intros x. destruct (Hall x) as [[v1 [v2 [Hget1 [Hget2 Hs]]]] | Hn]; eauto.
+          left. repeat eexists; eauto.
+      + simpl; eauto.
+    - revert b1' r1' H1' b2 b2' r2' H2' Heq3.
+      induction i as [i IHi] using lt_wf_rec; intros b1 r1 H1 b2 b2' r2 H2 Heq2.
+      rewrite !res_approx_fuel_eq in *.
+      destruct r1 as [ l1 | B1 f1]; destruct r2 as [ l2 | V2 f2]; try contradiction. 
+      + simpl. destruct (get l1 H1) as [b | ] eqn:Hgetl1; eauto. 
+        destruct b as [c vs | vq vw | rho ].
+        * intros [Heqb [vs2 [Hgetl2 Hi]]]. split.
+          rewrite Heq2. eassumption.
+          repeat eexists; eauto.
+          intros i' Hlt.
+          eapply Forall2_monotonic; [| eapply Hi; eassumption ].
+          intros. eapply IHi; eassumption.
+        * intros [Heqb [v1 [v2 [Hgetl2 Hi]]]]. split.
+          rewrite Heq2. eassumption.
+          repeat eexists; eauto.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+
+          eapply IHi; try eassumption. eapply Hi. eassumption.
+        * intros [Heqb [rho2 [Hgetl2 Hall]]]. split.
+          rewrite Heq2. eassumption.
+          eexists; split; eauto. intros x. destruct (Hall x) as [[v1 [v2 [Hget1 [Hget2 Hs]]]] | Hn]; eauto.
+          left. repeat eexists; eauto.
+      + simpl; eauto.
+  Qed.
+
+  Instance Proper_res_equiv_f_eq_l : Proper (RelProd f_eq eq ==> eq ==> iff) res_equiv.
+  Proof.
+    intros [b1 [r1 H1]] [b1' [r1' H1']] Heq1 [b2 [r2 H2]] [b2' [r2' H2']] Heq2. inv Heq2.
+    split; intros H n; specialize (H n).
+    rewrite <- !Heq1. eassumption.
+    rewrite !Heq1. eassumption.
+  Qed.
+
+  Instance Proper_res_equiv_f_eq_r : Proper (eq ==> RelProd f_eq eq ==> iff) res_equiv.
+  Proof.
+    intros [b1 [r1 H1]] [b1' [r1' H1']] Heq1 [b2 [r2 H2]] [b2' [r2' H2']] Heq2. inv Heq1.
+    split; intros H n; specialize (H n).
+    rewrite <- !Heq2. eassumption.
+    rewrite !Heq2. eassumption.
+  Qed.
+  
+  Instance Proper_heap_env_approx_f_eq_l : Proper (eq ==> RelProd f_eq eq ==> eq ==> iff) heap_env_approx.
+  Proof. 
+    intros s1 s2 hseq [b1 [H1 rho1]] [b2 [H2 rho2]] [Heq1 Heq2] [b1' [H1' p1']] [b2' [H2' p2']] Heq'.
+    inv Heq2; inv Heq'. 
+    subst; split; intros Ha x v Hin Hget; edestruct Ha as [v' [Hget' Hres]]; eauto; eexists; split; eauto.
+    assert (Heq : (f_eq * eq)%signature (b1, (v, H2)) (b2, (v, H2))) by (split; eauto).
+    rewrite Heq in Hres. eassumption.
+    assert (Heq : (f_eq * eq)%signature (b1, (v, H2)) (b2, (v, H2))) by (split; eauto).
+    rewrite Heq. eassumption.
+  Qed.
+
+  Instance Proper_heap_env_approx_f_eq_r : Proper (eq ==> eq ==> RelProd f_eq eq ==> iff) heap_env_approx.
+  Proof. 
+    intros s1 s2 hseq [b1 [H1 rho1]] [b2 [H2 rho2]] Heq [b1' [H1' p1']] [b2' [H2' p2']] [Heq1 Heq2].
+    inv Heq2; inv Heq. 
+    subst; split; intros Ha x v Hin Hget; edestruct Ha as [v' [Hget' Hres]]; eauto; eexists; split; eauto.
+    assert (Heq : (f_eq * eq)%signature (b1', (v', H2')) (b2', (v', H2'))) by (split; eauto).
+    rewrite <- Heq. eassumption.
+    assert (Heq : (f_eq * eq)%signature (b1', (v', H2')) (b2', (v', H2'))) by (split; eauto).
+    rewrite Heq. eassumption.
+  Qed.
+  
+  Instance Proper_heap_env_equiv_f_eq_l : Proper (eq ==> RelProd f_eq eq ==> eq ==> iff) heap_env_equiv.
+  Proof. 
+    intros s1 s2 hseq [b1 [H1 rho1]] [b2 [H2 rho2]] [Heq1 Heq2] [b1' [H1' p1']] [b2' [H2' p2']] Heq'.
+    inv Heq2; inv Heq'.
+    assert (Heq : (f_eq * eq)%signature (b1, (H2, rho2)) (b2, (H2, rho2))) by (split; eauto).
+    split; intros [Hh1 Hh2]. split; rewrite <- Heq; eassumption.
+    split; rewrite Heq; eassumption.
+  Qed.
+  
+  Instance Proper_heap_env_equiv_f_eq_r : Proper (eq ==> eq ==> RelProd f_eq eq ==> iff) heap_env_equiv.
+  Proof. 
+    intros s1 s2 hseq [b1 [H1 rho1]] [b2 [H2 rho2]] Heq' [b1' [H1' p1']] [b2' [H2' p2']] [Heq1 Heq2].
+    inv Heq2; inv Heq'.
+    assert (Heq : (f_eq * eq)%signature (b1', (H2', p2')) (b2', (H2', p2'))) by (split; eauto).
+    split; intros [Hh1 Hh2]. split; rewrite <- Heq; eassumption.
+    split; rewrite Heq; eassumption.
+  Qed.
+
+  Instance Proper_block_equiv_f_eq_l : Proper (RelProd (RelProd f_eq eq) eq ==> eq ==> iff) block_equiv.
+  Proof. 
+    intros [[b1 H1] bl1] [[b2 H2] bl2] [[Heq1 Heq2] Heq3] [[b1' H1'] bl1'] [[b2' H2'] bl2'] Heq';
+    inv Heq'; inv Heq2; inv Heq3; simpl in *; subst.
+    destruct bl2 as [c vs | vq vw | rho ]; destruct bl2' as [c' vs' | vq' vw' | rho' ];
+    [| now firstorder | now firstorder | now firstorder | | now firstorder | now firstorder | now firstorder | ].
+    - split; intros [Heq1' Hres].
+      split; eauto.
+      eapply Forall2_monotonic; try eassumption. intros v1 v2 Hres'.
+      assert (Heq : (f_eq * eq)%signature (b1, (v1, H2)) (b2, (v1, H2))) by (split; eauto).
+      rewrite <- Heq. eassumption.
+      split; eauto.
+      eapply Forall2_monotonic; try eassumption. intros v1 v2 Hres'.
+      assert (Heq : (f_eq * eq)%signature (b1, (v1, H2)) (b2, (v1, H2))) by (split; eauto).
+      rewrite Heq. eassumption.
+    - assert (Heq : (f_eq * eq)%signature (b1, (vq, H2)) (b2, (vq, H2))) by (split; eauto).
+      rewrite Heq. 
+      assert (Heq' : (f_eq * eq)%signature (b1, (vw, H2)) (b2, (vw, H2))) by (split; eauto).
+      rewrite Heq'. reflexivity.
+    - assert (Heq : (f_eq * eq)%signature (b1, (H2, rho)) (b2, (H2, rho))) by (split; eauto).
+      rewrite Heq. reflexivity.
+  Qed.
+
+  Instance Proper_block_equiv_f_eq_r : Proper (eq ==> RelProd (RelProd f_eq eq) eq ==> iff) block_equiv.
+  Proof. 
+    intros [[b1 H1] bl1] [[b2 H2] bl2] Heq' [[b1' H1'] bl1'] [[b2' H2'] bl2'] [[Heq1 Heq2] Heq3];
+    inv Heq'; inv Heq2; inv Heq3; simpl in *; subst.
+    destruct bl2 as [c vs | vq vw | rho ]; destruct bl2' as [c' vs' | vq' vw' | rho' ];
+    [| now firstorder | now firstorder | now firstorder | | now firstorder | now firstorder | now firstorder | ].
+    - split; intros [Heq1' Hres].
+      split; eauto.
+      eapply Forall2_monotonic; try eassumption. intros v1 v2 Hres'.
+      assert (Heq : (f_eq * eq)%signature (b1', (v2, H2')) (b2', (v2, H2'))) by (split; eauto).
+      rewrite <- Heq. eassumption.
+      split; eauto.
+      eapply Forall2_monotonic; try eassumption. intros v1 v2 Hres'.
+      assert (Heq : (f_eq * eq)%signature (b1', (v2, H2')) (b2', (v2, H2'))) by (split; eauto).
+      rewrite Heq. eassumption.
+    - assert (Heq : (f_eq * eq)%signature (b1', (vq', H2')) (b2', (vq', H2'))) by (split; eauto).
+      rewrite Heq. 
+      assert (Heq' : (f_eq * eq)%signature (b1', (vw', H2')) (b2', (vw', H2'))) by (split; eauto).
+      rewrite Heq'. reflexivity.
+    - assert (Heq : (f_eq * eq)%signature (b1', (H2', rho')) (b2', (H2', rho'))) by (split; eauto).
+      rewrite Heq. reflexivity.
+  Qed.
+  
+  Instance Proper_heap_approx_f_eq_l : Proper (eq ==> RelProd f_eq eq ==> eq ==> iff) heap_approx.
+  Proof. 
+    intros s1 s2 hseq [b1 H1] [b2 H2] [Heq1 Heq2] [b1' H1'] [b2' H2'] Heq'; inv Heq'.
+    compute in Heq2. subst.
+    split.
+    intros Ha bl l Hin Hget. edestruct Ha as [Heqb [bl2 [Hget2 Hbeq]]]; eauto.
+    split; eauto. rewrite <- Heq1. eassumption.
+    eexists; split; eauto.
+    assert (Heq : ((f_eq * eq) * eq)%signature ((b1, H2), bl) ((b2, H2), bl)) by (split; eauto).
+    rewrite <- Heq. eassumption.
+    intros Ha bl l Hin Hget. edestruct Ha as [Heqb [bl2 [Hget2 Hbeq]]]; eauto.
+    split; eauto. rewrite Heq1. eassumption.
+    eexists; split; eauto.
+    assert (Heq : ((f_eq * eq) * eq)%signature ((b1, H2), bl) ((b2, H2), bl)) by (split; eauto).
+    rewrite Heq. eassumption.
+  Qed.
+
+  Instance Proper_heap_approx_f_eq_r : Proper (eq ==> eq ==> RelProd f_eq eq ==> iff) heap_approx.
+  Proof. 
+    intros s1 s2 hseq [b1 H1] [b2 H2] Heq' [b1' H1'] [b2' H2'] [Heq1 Heq2]; inv Heq'.
+    compute in Heq2. subst.
+    split.
+    intros Ha bl l Hin Hget. edestruct Ha as [Heqb [bl2 [Hget2 Hbeq]]]; eauto.
+    split; eauto. rewrite <- Heq1. eassumption.
+    eexists; split; eauto.
+    assert (Heq : ((f_eq * eq) * eq)%signature ((b1', H2'), bl2) ((b2', H2'), bl2)) by (split; eauto).
+    rewrite  <- Heq. eassumption.
+    intros Ha bl l Hin Hget. edestruct Ha as [Heqb [bl2 [Hget2 Hbeq]]]; eauto.
+    split; eauto. rewrite Heq1. eassumption.
+    eexists; split; eauto.
+    assert (Heq : ((f_eq * eq) * eq)%signature ((b1', H2'), bl2) ((b2', H2'), bl2)) by (split; eauto).
+    rewrite Heq. eassumption.
+  Qed.
+
+  Instance Proper_heap_equiv_f_eq_r : Proper (eq ==> eq ==> RelProd f_eq eq ==> iff) heap_equiv.
+  Proof. 
+    intros s1 s2 hseq [b1 H1] [b2 H2] Heq' [b1' H1'] [b2' H2'] Heq. inv Heq'.
+    split. intros [Ha1 Ha2]. split; rewrite <- Heq; eassumption.
+    intros [Ha1 Ha2]. split; rewrite Heq; eassumption.
+  Qed.
+
+  Instance Proper_heap_equiv_f_eq_l : Proper (eq ==> RelProd f_eq eq ==> eq ==> iff) heap_equiv.
+  Proof. 
+    intros s1 s2 hseq [b1 H1] [b2 H2] Heq' [b1' H1'] [b2' H2'] Heq. inv Heq.
+    split. intros [Ha1 Ha2]. split; rewrite <- Heq'; eassumption.
+    intros [Ha1 Ha2]. split; rewrite Heq'; eassumption.
+  Qed.
+
+  (** Horizontal composition of injections *)
+  
+  Lemma res_approx (S : Ensemble loc) (β1 β2 β1' β2' : loc -> loc)
+        (H1 H2 : heap block)
+        (v : value) (n : nat) :
+    S |- H1 ≃_(β1, β2) H2  ->
+    (val_loc v) \subset S -> 
+    res_approx_fuel n (β1, (v, H1)) (β2, (v, H2)).
+  Proof.
+    intros [Heq1 Heq2] Hin.
+    destruct v as [l | B f]; rewrite res_approx_fuel_eq; [| now split; eauto ].
+    simpl; destruct (get l H1) eqn:Hget; eauto.
+    assert (Hget' := Hget). eapply Heq1 in Hget; eauto.
+    destruct Hget as [Heqb [b2 [Hget2 Heq]]].
+    destruct b; destruct b2; try contradiction.
+    - destruct Heq as [Heq Hin2]; subst. split; eauto. eexists; split; eauto. 
+      intros. 
+      eapply Forall2_monotonic; eauto. simpl.
+      intros ? ? [Ha1 Ha2]; eauto.
+    - destruct Heq as [Hv1 Hv2]. split; eauto. eexists. eexists.
+      split; eauto. intros; split; eauto.
+      now eapply Hv1. now eapply Hv2.
+    - split; eauto. eexists; split; eauto.
+      intros x. destruct Heq as [Hal Har].
+      destruct (M.get x e) eqn:Hgetx1; destruct (M.get x e0) eqn:Hgetx2;
+      simpl in *; eauto.
+      + left. repeat eexists; eauto.
+        edestruct Hal as [l' [Hgetx2' Ha]]; eauto.
+        now constructor. subst_exp. intros i Hleq; destruct (Ha i); eassumption.
+      + edestruct Hal as [l' [Hgetx2' Ha]]; eauto.
+        now constructor. congruence.
+      + edestruct Har as [l' [Hgetx2' Ha]]; eauto.
+        now constructor. congruence.
+    - eapply Hin. reflexivity.
+  Qed.
+    
   (** Proper instances *)
   
   Instance Proper_heap_env_approx : Proper (Same_set _ ==> eq ==> eq ==> iff) heap_env_approx.
@@ -686,7 +983,7 @@ Module HeapEquiv (H : Heap).
     inv Heq; inv Heq'. 
     subst; split; intros Ha ? ? ?; firstorder.
   Qed.
-
+  
   Instance Proper_heap_env_equiv : Proper (Same_set _ ==> eq ==> eq ==> iff) heap_env_equiv.
   Proof.
     intros s1 s2 hseq [b1 [H1 rho1]] [b2 [H2 rho2]] Heq [b1' [H1' p1']] [b2' [H2' p2']] Heq';

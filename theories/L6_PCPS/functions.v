@@ -180,7 +180,7 @@ Proof.
   split; intros y Hi.
   - destruct Hi as [x' [Hin Heq]]; subst. inv Hin.
     eauto.
-  - destruct Hi as [x' [Hin Heq]]; subst. eexists; eauto.
+  - destruct Hi. eexists; eauto.
 Qed.
 
 Lemma image_Empty_set {A B} (g : A -> B) :

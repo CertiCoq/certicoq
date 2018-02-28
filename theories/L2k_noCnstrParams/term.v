@@ -1,5 +1,5 @@
 (*** type fields are stripped from term notations ***)
-
+Require Import FunInd.
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.

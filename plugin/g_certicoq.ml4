@@ -2,7 +2,7 @@
 
 DECLARE PLUGIN "certicoq_plugin"
 
-open Constrarg
+open Stdarg
 
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" global(gr) ] -> [

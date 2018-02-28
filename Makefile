@@ -1,14 +1,21 @@
 
-all: theories/Makefile libraries/Makefile theories/Makefile.plugin
+all: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries
-#	$(MAKE) -C libraries/SquiggleEq
 	$(MAKE) -C theories
+
+plugin/CertiCoq.vo: plugin/Makefile theories/Extraction/extraction.vo all
+	sh ./make_plugin.sh
+
+install: all plugin/CertiCoq.vo
+	$(MAKE) -C libraries install
+	$(MAKE) -C theories install
+	$(MAKE) -C plugin install
 
 theories/Makefile:
 	cd theories;coq_makefile -f _CoqProject -o Makefile
 
-theories/Makefile.plugin:
-	cd theories;coq_makefile -f _PluginProject -o Makefile.plugin
+plugin/Makefile:
+	cd plugin;coq_makefile -f _CoqProject -o Makefile
 
 libraries/Makefile:
 	cd libraries;coq_makefile -f _CoqProject -o Makefile

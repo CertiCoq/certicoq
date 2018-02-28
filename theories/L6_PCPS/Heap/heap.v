@@ -6,7 +6,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms Sorting.Permutation.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From L6 Require Import Ensembles_util functions List_util cps set_util.
+From CertiCoq.L6 Require Import Ensembles_util functions List_util cps set_util.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.

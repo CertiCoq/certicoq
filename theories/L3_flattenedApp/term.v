@@ -4,7 +4,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
-Require Import Arith.
+Require Import FunInd Arith.
 Require Import Coq.omega.Omega.
 Require Export Common.Common.  (* shared namespace *)
 Require Import L3.compile.

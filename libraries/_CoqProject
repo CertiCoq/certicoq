@@ -1,4 +1,4 @@
--R . "Libraries" -R ../theories/compcert "compcert"
+-R . "CertiCoq.Libraries" -R ../theories/compcert "compcert"
 
 # Compcert
 ../theories/compcert/lib/Coqlib.v

@@ -265,6 +265,66 @@ Proof.
 Qed.
 
 
+(** Carefully separate various paths to eta expansion of constructors
+*** to keep control of the shape (constructor vs lambda) of the result.
+**)
+Function etaExpand_args_Lam'   (* no more parameters expected *)
+         (nargs:nat)            (* inputs *)
+         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
+          { struct nargs } : Term :=
+  match nargs with
+  (* no more actual args, no more pars or args expected: finished *)
+  | 0 => (fun b => TLambda nAnon (body b)) computedArgs
+  (* more actual args than [npars + nargs]: impossible *)
+  | S n =>
+    etaExpand_args_Lam' n (fun b => TLambda nAnon (TLambda nAnon (body b)))
+                   (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
+  (* more actual args *)
+  end.
+(* Functional Scheme etaExpand_args_Lam'_ind := *)
+(*   Induction for etaExpand_args_Lam' Sort Prop. *)
+
+Function etaExpand_args_Lam   (* no more parameters expected *)
+         (nargs:nat) (actualArgs:Terms)             (* inputs *)
+         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
+          { struct nargs } : Term :=
+  match nargs, actualArgs with
+  (* no more actual args, no more pars or args expected: finished *)
+  | 0, tnil => body computedArgs
+  (* more actual args than [npars + nargs]: impossible *)
+  | 0, tcons _ _ => TDummy "strip; Constructor; too many args"
+  (* no more actual args but more args expected: eta expand *)
+  | S n, tnil =>
+    etaExpand_args_Lam' n body
+                   (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
+  (* more actual args *)
+  | S n, tcons u us =>
+    etaExpand_args_Lam n us body (tappend computedArgs (tunit u))
+  end.
+(* Functional Scheme etaExpand_args_Lam_ind' := *)
+(*   Induction for etaExpand_args_Lam Sort Prop. *)
+                                      
+Definition etaExpand_args_Construct   (* no more parameters expected *)
+         (nargs:nat) (actualArgs:Terms)             (* inputs *)
+         (i:inductive) (m:nat) (* accumulator *)
+  : Term :=
+  match nargs, actualArgs with
+  (* no more actual args, no more pars or args expected: finished *)
+  | 0, tnil => TConstruct i m tnil
+  (* more actual args than [npars + nargs]: impossible *)
+  | 0, tcons u us => TDummy "strip; Constructor; too many args"
+  (* no more actual args but more args expected: eta expand *)
+  | S n, tnil =>
+    etaExpand_args_Lam' n (TConstruct i m ) (tunit (TRel 0))
+  (* more actual args *)
+  | S n, tcons u us => etaExpand_args_Lam n us (TConstruct i m) (tunit u)
+  end.
+(***********************                       
+  | S 0, tcons u tnil => TConstruct i m (tunit u)
+  | S 0, tcons u (tcons _ _) => TWrong "strip; Constructor; too many args"
+  | S (S n), tcons u (tcons w ws) =>
+    etaExpand_args_Lam n us (TConstruct i m) (tunit u) *)
+
 (** wrap a term with n lambdas; used below for missing parameters **)
 Function nLambda (n:nat) (F:Term) : Term :=
   match n with

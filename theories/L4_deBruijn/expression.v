@@ -543,9 +543,8 @@ Inductive eval: exp -> exp -> Prop :=
                  eval (Let_e na e1 e2) v2
 | eval_Match_e: forall e p bs d vs e' v,
     eval e (Con_e d vs) ->
-    let vs' := exps_skipn p vs in
-    find_branch d (exps_length vs') bs = Some e' ->
-    eval (sbst_list e' vs') v ->
+    find_branch d (exps_length vs) bs = Some e' ->
+    eval (sbst_list e' vs) v ->
     eval (Match_e e p bs) v
 | eval_Fix_e: forall es k, eval (Fix_e es k) (Fix_e es k)
 | eval_FixApp_e: forall e (es:efnlst) n e2 v2 e' e'',
@@ -594,7 +593,7 @@ Proof.
   - inversion H1. subst.
     assert (j0:v1 = v0). { apply H. assumption. }
     subst. apply H0. assumption.
-  - inversion H1. subst. subst vs'.
+  - inversion H1. subst.
     specialize (H _ H5). injection H; intros h0 h1. subst. clear H.
     rewrite H7 in e1. injection e1; intros h2. subst. clear e1.
     apply H0. assumption.
@@ -693,10 +692,9 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                | Match_e e p bs =>
                  match eval_n n e with
                  | Some (Con_e d vs) =>
-                   let vs' := exps_skipn p vs in
-                   match find_branch d (exps_length vs') bs with
+                   match find_branch d (exps_length vs) bs with
                      | None => None
-                     | Some e' => eval_n n (sbst_list e' vs')
+                     | Some e' => eval_n n (sbst_list e' vs)
                    end
                    | _ => None
                  end
@@ -729,6 +727,7 @@ Lemma evals_n_monotone:
   forall (n:nat) es fs, evals_n n es = Some fs ->
                       forall (m:nat), evals_n (n + m) es = Some fs.
 Admitted.
+
 
 (***
 Lemma eval_n_weaken:
@@ -944,7 +943,7 @@ Proof.
     exists (x+x0)%nat.
     rewrite j.
     replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
-    simpl. rewrite k. subst vs'.
+    simpl. rewrite k.
     replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
     rewrite e1. rewrite k0. reflexivity.
   - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
@@ -1012,37 +1011,36 @@ Definition unsome (x:option exp) : exp :=
     | None => Var_e 9999
   end.
 
-(** natural numbers in Church representation **)
-Section ChurchNaturals.
-Notation ZZ := (Lam_e "x" (Lam_e "y" Ve1)).
-Notation SS := (Lam_e "x" (Lam_e "y" (Lam_e "z" (Ve0 $ (Ve2 $ Ve1 $ Ve0))))).
-Notation one := (SS $ ZZ).
-Notation two := (SS $ one).
-Notation three := (SS $ two).
-Notation four := (SS $ three).
-Notation five := (SS $ four).
-Notation six := (SS $ five).
-Notation add := (Lam_e "x" (Lam_e "y" (Ve1 $ Ve0 $ SS))).
-Notation mul := (Lam_e "x" (Lam_e "y" (Ve1 $ ZZ $ (add $ Ve0)))).
+(* (** natural numbers in Church representation **) *)
+(* Section ChurchNaturals. *)
+(* Notation ZZ := (Lam_e "x" (Lam_e "y" Ve1)). *)
+(* Notation SS := (Lam_e "x" (Lam_e "y" (Lam_e "z" (Ve0 $ (Ve2 $ Ve1 $ Ve0))))). *)
+(* Notation one := (SS $ ZZ). *)
+(* Notation two := (SS $ one). *)
+(* Notation three := (SS $ two). *)
+(* Notation four := (SS $ three). *)
+(* Notation five := (SS $ four). *)
+(* Notation six := (SS $ five). *)
+(* Notation add := (Lam_e "x" (Lam_e "y" (Ve1 $ Ve0 $ SS))). *)
+(* Notation mul := (Lam_e "x" (Lam_e "y" (Ve1 $ ZZ $ (add $ Ve0)))). *)
 
-Example One := Eval compute in (unsome (eval_n 100 one)).
-Example Two := Eval compute in (unsome (eval_n 100 two)).
-Example Three := Eval vm_compute in (unsome (eval_n 100 three)).
-Example Four := Eval vm_compute in (unsome (eval_n 100 four)).
-Example Five := Eval vm_compute in (unsome (eval_n 100 five)).
-Example Six := Eval vm_compute in (unsome (eval_n 100 six)).
+(* Example One := Eval compute in (unsome (eval_n 100 one)). *)
+(* Example Two := Eval compute in (unsome (eval_n 100 two)). *)
+(* Example Three := Eval vm_compute in (unsome (eval_n 100 three)). *)
+(* Example Four := Eval vm_compute in (unsome (eval_n 100 four)). *)
+(* Example Five := Eval vm_compute in (unsome (eval_n 100 five)). *)
+(* Example Six := Eval vm_compute in (unsome (eval_n 100 six)). *)
 
-Goal eval (SS $ ZZ) One. repeat econstructor. Qed.
-Goal eval (add $ ZZ $ one) One. repeat econstructor. Qed.
-Goal eval (add $ one $ ZZ) One. repeat econstructor. Qed.
-Goal (eval_n 1000 (add $ two $ one)) = Some Three.
-vm_compute. reflexivity. Qed.
-Goal (eval_n 1000 (add $ two $ three)) = Some Five.
-vm_compute. reflexivity. Qed.
-Goal (eval_n 1000 (mul $ two $ three)) = Some Six.
-vm_compute. reflexivity. Qed.
-End ChurchNaturals.
-Reset ChurchNaturals.
+(* Goal eval (SS $ ZZ) One. repeat econstructor. Qed. *)
+(* Goal eval (add $ ZZ $ one) One. repeat econstructor. Qed. *)
+(* Goal eval (add $ one $ ZZ) One. repeat econstructor. Qed. *)
+(* Goal (eval_n 1000 (add $ two $ one)) = Some Three. *)
+(* vm_compute. reflexivity. Qed. *)
+(* Goal (eval_n 1000 (add $ two $ three)) = Some Five. *)
+(* vm_compute. reflexivity. Qed. *)
+(* Goal (eval_n 1000 (mul $ two $ three)) = Some Six. *)
+(* vm_compute. reflexivity. Qed. *)
+(* End ChurchNaturals. *)
 
 (** booleans using native data constructors (with no arguments) **)
 Notation boolind := (mkInd "bool" 0).
@@ -1110,7 +1108,6 @@ Notation five := (SSS $ four).
 Notation six := (SSS $ five).
 
 Example One := Eval compute in (unsome (eval_n 1000 one)).
-Print One.
 Example Two := Eval compute in (unsome (eval_n 100 two)).
 Example Three := Eval vm_compute in (unsome (eval_n 100 three)).
 Example Four := Eval vm_compute in (unsome (eval_n 100 four)).
@@ -1715,8 +1712,8 @@ Proof using.
   apply my_exp_wf_ind; intros; simpl in *; try lia.
 Qed.
 
-Close Scope Z_scope.
 
+Close Scope Z_scope.
 
 Definition fnames (e:efnlst) : list (Ast.name) :=
 map fst (efnlst_as_list e).
@@ -1781,3 +1778,196 @@ Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
                | Var_e e => None
              end
   end.
+
+Lemma eval_ns_Some_Succ:
+  forall e (n:nat) v, eval_ns n e = Some v -> n = (S (n - 1))%nat.
+Proof.
+  induction n; intros.
+  - simpl in H. discriminate.
+  - omega.
+Qed.
+
+
+(* similar to eval_n_monotone *)
+Lemma eval_ns_monotone:
+  forall (n:nat) e f, eval_ns n e = Some f ->
+                      forall (m:nat), eval_ns (n + m) e = Some f.
+Admitted.
+
+
+
+From CertiCoq Require Import CpdtTactics.
+Lemma exps_as_list_from_list vs:
+  exps_from_list (exps_as_list vs) = vs.
+Proof using.
+  induction vs; crush.
+Qed.
+
+Require Import SquiggleEq.UsefulTypes.
+Require Import SquiggleEq.list.
+
+(* Move to SquiggleEq.list
+*)
+Lemma flattenLift {A B:Type} (f: A-> option B) g  l:
+  (forall b, isSome (f b) -> f b = g b)
+  -> (forall b, isSome (g b) -> isSome (f b))
+  -> flatten (map f l) = flatten (map g l).
+Proof using.
+  intros Heq Hn.
+  induction l;crush.
+  specialize (Heq a).
+  specialize (Hn a).
+  destruct (f a).
+- unfold isSome in Heq.
+  specialize (Heq (ltac:(auto))).
+  rewrite <- Heq. congruence.
+- clear Heq. destruct (g a); firstorder.
+Qed.
+
+(* Move to SquiggleEq.list
+*)
+Lemma flattenSomeCons {A:Type} (loa: list (option A)) a:
+  isSome (flatten (a::loa))
+  -> isSome (flatten loa).
+Proof using.
+  intros Hs.
+  simpl in Hs.
+  destruct a; firstorder.
+  destruct (flatten loa); firstorder.
+Qed.
+
+Require Import SquiggleEq.tactics.
+
+(* Move to SquiggleEq.list
+*)
+Lemma flattenSomeIn {A:Type} (loa: list (option A)) a:
+  isSome (flatten loa)
+  -> In a loa -> isSome a.
+Proof using.
+  revert a.
+  induction loa as [ | a loa]; destruct a; intros aa; destruct aa; try (crush; fail).
+  intros Hs Hin. apply False_ind.
+  apply flattenSomeCons in Hs.
+  dorn Hin; firstorder.
+  inversion Hin.
+Qed.  
+  
+
+(* Move to SquiggleEq.list
+*)
+Lemma flattenLift2 {A B:Type} (f: A-> option B) g  l:
+  (forall b, In b l -> f b = g b)
+  -> isSome (flatten (map f l))
+  -> flatten (map f l) = flatten (map g l).
+Proof using.
+  intros Heq Hs.
+  induction l; try (crush; fail).
+  pose proof Heq as Heqb.
+  specialize (Heq a). simpl.
+  pose proof Hs as Hsb.
+  simpl in Hsb.
+  destruct (f a);[ | firstorder].
+  specialize (Heq (ltac:(simpl;auto))).
+  rewrite <- Heq.
+  apply flattenSomeCons in Hs.
+  rewrite IHl;[reflexivity | firstorder| assumption].
+Qed.
+
+(* Move to SquiggleEq.Usefultypes
+*)
+Lemma isSomeIf {A:Type} oa (a: A):
+  oa = Some a -> isSome oa.
+Proof using.
+  crush.
+Qed.
+
+(** [eval_n] is complete w.r.t. [eval] **)
+Lemma eval_evalns:
+  (forall (e v:exp), eval e v -> exists (n:nat), eval_ns n e = Some v) /\
+  (forall (es vs:exps), evals es vs -> exists (n:nat), flatten (map (eval_ns n) (exps_as_list es))
+                                          = Some (exps_as_list vs)).
+Proof.
+  apply my_eval_ind; intros; try (solve [exists 1%nat; reflexivity]).
+  (* prove that if eval_ns becomes Some _, then n>0, similar to eval_n_Some_Succ
+    then prove evan_ns_monotone*)
+  - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
+    exists (x+x0+x1)%nat. simpl in *.
+    assert (j:=eval_ns_Some_Succ _ _ _ h).
+    assert (j0:=eval_ns_Some_Succ _ _ _ h0).
+    assert (j1:=eval_ns_Some_Succ _ _ _ h1).
+    assert (k:= eval_ns_monotone _ _ _ h).
+    assert (k0:= eval_ns_monotone _ _ _ h0).
+    assert (k1:= eval_ns_monotone _ _ _ h1).
+    rewrite j.
+    replace (S (x - 1) + x0 + x1)%nat
+    with (S (x + (x0 + x1 - 1)))%nat; try lia.
+    simpl. rewrite k.
+    replace (x + (x0 + x1 - 1))%nat with (x0 + (x + x1 - 1))%nat; try lia.
+    rewrite k0.
+    replace (x0 + (x + x1 - 1))%nat with (x1 + (x + x0 - 1))%nat; try lia.
+    rewrite k1. reflexivity.
+  - destruct H as [x h]. exists (x+1)%nat.
+    simpl. rewrite Nat.add_comm. simpl.
+    rewrite h. simpl.
+    rewrite exps_as_list_from_list. reflexivity.
+  - destruct H as [x h]. destruct H0 as [x0 h0].
+    assert (j:=eval_ns_Some_Succ _ _ _ h).
+    assert (j0:=eval_ns_Some_Succ _ _ _ h0).
+    assert (k:= eval_ns_monotone _ _ _ h).
+    assert (k0:= eval_ns_monotone _ _ _ h0).
+    exists (x+x0)%nat.
+    rewrite j.
+    replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
+    simpl. rewrite k.
+    replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
+    rewrite k0. reflexivity.
+  - destruct H as [x h]. destruct H0 as [x0 h0].
+    assert (j:=eval_ns_Some_Succ _ _ _ h).
+    assert (j0:=eval_ns_Some_Succ _ _ _ h0).
+    assert (k:= eval_ns_monotone _ _ _ h).
+    assert (k0:= eval_ns_monotone _ _ _ h0).
+    exists (x+x0)%nat.
+    rewrite j.
+    replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
+    simpl. rewrite k.
+    replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
+    rewrite e1. rewrite k0. reflexivity.
+  - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
+    exists (x+x0+x1)%nat.
+    assert (j:=eval_ns_Some_Succ _ _ _ h).
+    assert (j0:=eval_ns_Some_Succ _ _ _ h0).
+    assert (j1:=eval_ns_Some_Succ _ _ _ h1).
+    assert (k:= eval_ns_monotone _ _ _ h).
+    assert (k0:= eval_ns_monotone _ _ _ h0).
+    assert (k1:= eval_ns_monotone _ _ _ h1).
+    rewrite j.
+    replace (S (x - 1) + x0 + x1)%nat
+    with (S (x + (x0 + x1 - 1)))%nat; try lia.
+    simpl. rewrite k.
+    replace (x + (x0 + x1 - 1))%nat with (x0 + (x + x1 - 1))%nat; try lia.
+    rewrite k0.
+    replace (x0 + (x + x1 - 1))%nat with (x1 + (x + x0 - 1))%nat; try lia.
+    rewrite e3, k1. reflexivity.
+  - destruct H as [x h].
+    destruct H0 as [x0 h0].
+    assert (j:=eval_ns_Some_Succ _ _ _ h).
+    assert (j0:=eval_ns_Some_Succ _ _ _ h0).
+    assert (k:= eval_ns_monotone _ _ _ h).
+    assert (k0:= eval_ns_monotone _ _ _ h0).
+    exists (S (x+x0)%nat). simpl. rewrite k.
+    rewrite Nat.add_comm. rewrite k0. reflexivity.
+  - simpl. exrepnd. exists (n0+n)%nat.
+    assert (k:= eval_ns_monotone _ _ _ H0). clear H0.
+    rewrite k.
+    erewrite <- flattenLift2;[ | | rewrite H1; firstorder];[rewrite H1; refl | ].
+    intros.
+    apply in_map with (f:= (eval_ns n))in H.
+    apply isSomeIf in H1.
+    eapply flattenSomeIn in H1; eauto.
+    remember (eval_ns n b) as r.
+    destruct r; [ | firstorder].
+    symmetry.
+    rewrite Nat.add_comm.
+    apply  eval_ns_monotone.
+    auto.
+Qed.

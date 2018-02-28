@@ -6,8 +6,8 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From L6 Require Import cps cps_util eval List_util Ensembles_util functions
-        identifiers Heap.heap Heap.heap_defs Heap.heap_equiv tactics.
+From CertiCoq.L6 Require Import cps cps_util eval List_util Ensembles_util functions
+     identifiers tactics Heap.heap Heap.heap_defs Heap.heap_equiv.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
@@ -16,7 +16,7 @@ Module SpaceSem (H : Heap).
   
   Module Equiv := HeapEquiv H.
   
-  Context (cloTag : cTag).
+  Parameter (cloTag : cTag).
 
   Import H Equiv.Defs Equiv.Defs.HL Equiv.
 
@@ -431,7 +431,7 @@ Module SpaceSem (H : Heap).
   
   (** Deterministic semantics with garbage collection when needed.
    * The execution time cost model accounts for the cost of GC  *)
-  Context (Hmax : nat).
+  Parameter (Hmax : nat).
   
   Inductive big_step_GC_when_needed :
     heap block -> (* The heap. Maps locations to values *)

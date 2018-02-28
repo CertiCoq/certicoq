@@ -6,7 +6,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
+From CertiCoq.L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
         identifiers Heap.heap tactics Heap.heap_defs.
 Require Import compcert.lib.Coqlib.
 

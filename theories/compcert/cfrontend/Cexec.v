@@ -12,6 +12,7 @@
 
 (** Animating the CompCert C semantics *)
 
+Require Import FunInd.
 Require Import String.
 Require Import Axioms.
 Require Import Classical.

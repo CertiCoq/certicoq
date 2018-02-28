@@ -2603,7 +2603,6 @@ Proof with eauto.
 
     econstructor.
     rewrite subst_env_aux_con_e in IHmch. apply IHmch.
-    rewrite exps_skipn0.
     rewrite exps_length_map.
     assert(Hargs':= exps_length_trans (trans e'') 0 args).
     rewrite Hargs'.
@@ -2620,25 +2619,22 @@ Proof with eauto.
     eapply eval_App_e.
 
     - rewrite <- Hargsdef.
-      rewrite exps_skipn0, exps_length_map, exps_length_trans.
+      rewrite exps_length_map, exps_length_trans.
       lia.
     - apply exp_wf_subst_aux; auto.
       now eapply (crctTerm_exp_wf e e'' wfe evenv wfe'' dbody 0).
     - eapply WcbvEval_preserves_crctTerm in evmch; eauto.
-      rewrite exps_skipn0.
       destruct i. eapply Crct_invrt_Construct in evmch as [crctArgs _].
       pose proof (proj1 (proj2 crctTerm_exp_wf_ind) _ _ _ crctArgs e'' wfe evenv wfe'').
       now apply exps_wf_subst.
-    - rewrite exps_skipn0.
-      apply L3eval.WcbvEval_no_further in evmch.
+    - apply L3eval.WcbvEval_no_further in evmch.
       inv evmch.
       apply (proj2 (wcbvEval_values e)) in H2.
       apply (proj2 (pres_value e'')) in H2.
       now apply is_value_subst.
     - apply (is_n_lambda_is_n_lam _ e'' 0) in Hbr.
       now apply is_n_lam_subst_env.
-    - rewrite exps_skipn0.
-      apply IHcs.
+    - apply IHcs.
     - now apply is_n_lambda_is_n_lam.
     - apply WcbvEval_preserves_crctTerm in evmch; auto.
       destruct i as [ind ml].

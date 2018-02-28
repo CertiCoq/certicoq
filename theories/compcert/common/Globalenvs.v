@@ -34,7 +34,7 @@
   system. *)
 
 Require Recdef.
-Require Import Zwf.
+Require Import FunInd Zwf.
 Require Import Axioms Coqlib Errors Maps AST Linking.
 Require Import Integers Floats Values Memory.
 

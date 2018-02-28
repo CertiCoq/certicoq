@@ -4,7 +4,7 @@
   can strip them correctly. *)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
-        Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+        Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz FunInd.
 Require Export Common.Common.  (* shared namespace *)
 Require Import L4.expression.
 Require Import L3_to_L3_eta.

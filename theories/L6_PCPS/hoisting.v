@@ -895,7 +895,7 @@ Proof with now eauto with Ensembles_DB.
   intros Hs HI1 HI2. unfold closed_fundefs.
   rewrite occurs_free_fundefs_big_cup in *.
   rewrite Same_Set_big_cup_l; [| eapply split_fds_fun_in_fundefs; eassumption ].
-  rewrite Setminus_big_cup in *. rewrite Setminus_big_cup in HI1, HI2.
+  rewrite Setminus_big_cup in *.
   rewrite Union_big_cup.
   rewrite split_fds_name_in_fundefs; [| eassumption ].
   rewrite Setminus_Union_distr.

@@ -157,9 +157,76 @@ Proof using.
   destruct o; [ | | | | | | ]; auto;[].
   simpl. ntwfauto. simpl in *. destruct lbt; auto;[].
   inverts HntwfSig.
-Qed.  
+Qed.
+
+Lemma L4_2_to_L4_5_vc s: varsOfClass (all_vars s) true -> varsOfClass (all_vars (L4_2_to_L4_5 s)) true.
+Proof using.
+  induction s as [x | o lbt Hind] using NTerm_better_ind; intros Hvc; auto;[].
+  autorewrite with SquiggleEq in Hvc.
+  simpl in *.
+  assert (varsOfClass (flat_map all_vars_bt (map (btMapNt L4_2_to_L4_5) lbt)) true).
+  - rewrite flat_map_map. intros ? Hin. apply in_flat_map in Hin. exrepnd.
+    destruct x as [lv nt].
+    unfold compose in *; simpl in *.
+    autorewrite with SquiggleEq in Hin0.
+    rewrite in_app_iff in Hin0.
+    dorn Hin0.
+    + apply Hvc. apply in_flat_map. eexists; dands; eauto.
+      autorewrite with SquiggleEq. rewrite in_app_iff.
+      left; auto.
+    + unfold varsOfClass, lforall in Hind.
+      eapply Hind; eauto.
+      intros aa Hinn.
+      apply Hvc. apply in_flat_map. eexists; dands; eauto.
+      autorewrite with SquiggleEq. rewrite in_app_iff.
+      right; auto.
+   
+- destruct o; unfold Fix_e'; simpl; autorewrite with SquiggleEq; auto;[].
+  simpl. compute. intros. repeat in_reasoning; subst; auto.
+Qed.
+
+(* MOVE to SquiggleEq.terms2 *)
+Lemma  wft_ntwf {Opid V} {gts : GenericTermSig Opid}: forall t: @NTerm V Opid,  wft t =true -> nt_wf t.
+Proof using.
+  induction t as [x | o lbt Hind] using NTerm_better_ind; intros Hwf; try (constructor; fail).
+  simpl in Hwf.
+  apply andb_eq_true in Hwf. repnd.
+  setoid_rewrite assert_beq_list in Hwf0.
+  constructor; auto.
+  rewrite ball_map_true in Hwf.
+  intros l. destruct l. intros. constructor.
+  eapply Hind; eauto.
+  specialize (Hwf _ H).
+  simpl in Hwf. assumption.
+  Qed.  
+  
+
+Lemma L4_2_to_L4_5_ntwf t:
+  nt_wf t ->    
+  nt_wf (L4_2_to_L4_5 t).
+Proof using.
+  induction t as [x | o lbt Hind] using NTerm_better_ind; intros Hwf;
+    [constructor | ].
+  simpl.
+  invertsn Hwf.
+
+  assert (forall l : BTerm, LIn l (map (btMapNt L4_2_to_L4_5) lbt) -> bt_wf l).
+  - intros ? Hin. apply in_map_iff in Hin. exrepnd. subst.
+    destruct x as [lv nt]. constructor. eapply Hind; eauto.
+    apply Hwf in Hin0. inverts Hin0. assumption.
+ - 
+  destruct o.
+  Focus 7.
+  apply wft_ntwf. refl.
+  all: constructor; auto; simpl in *; rewrite map_map;
+    erewrite map_ext by (intros; rewrite numBvarsBtMapNt; auto); auto.
+Qed.
+
 
 Require Import SquiggleEq.alphaeq.
+Require Import SquiggleEq.UsefulTypes.
+Require Import DecidableClass.
+
 
 Lemma ssubst_aux_commute f sub:
   ssubst_aux (L4_2_to_L4_5 f) (map_sub_range L4_2_to_L4_5 sub) =
@@ -198,8 +265,32 @@ Proof using.
   simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
 Qed.
 
-Let eval42 := @polyEval.eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid).
-Let eval45 := @eval_n (Named.TermAbsImplUnstrict variables.NVar L4_5Opid).
+Require Import L4_to_L4_2_correct.
+Import L42.
+Lemma fixwf_commute f:
+   L4_5_to_L5.fixwf (L4_2_to_L4_5 f)  = fixwf f.
+Proof using.
+  induction f using NTerm_better_ind;[refl | ].
+  simpl in *.
+  assert(
+  ball
+    (map (fun x : BTerm => L4_5_to_L5.fixwf (get_nt (btMapNt L4_2_to_L4_5 x))) lbt) =
+  ball (map (fun x : BTerm => fixwf (terms.get_nt x)) lbt)).
+  - f_equal. apply eq_maps. intros ? Hin.
+    destruct x as [lv nt]. simpl. eauto.
+   - destruct o; simpl in *; repeat rewrite map_map; unfold compose; simpl; auto.
+  rewrite H0.
+  f_equal.
+  f_equal.
+  apply eq_maps.
+  intros.
+  destruct x as [lv nt].
+  simpl.
+  destruct nt; try refl. destruct l; try refl.
+Qed.
+
+Definition eval42 := @polyEval.eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid).
+Definition eval45 := @eval_n (Named.TermAbsImplUnstrict variables.NVar L4_5Opid).
 
 
 (**  can be obtained for free using a parametricity plugin 
@@ -493,4 +584,3 @@ Print Assumptions L4_2_to_L4_5_correct.
 (* Closed under the global context *)
 
 End evaln42_45.
-

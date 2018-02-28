@@ -18,3 +18,8 @@ Makefile.coq
 /theories/Extraction/*.ml
 /theories/Extraction/*.mli
 
+*.bak
+Makefile.conf
+Makefile.plugin.conf
+/plugin/Makefile
+/plugin/extraction

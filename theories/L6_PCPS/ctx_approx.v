@@ -4,7 +4,7 @@
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega
         Coq.Relations.Relations Coq.Classes.RelationClasses.
-From L6 Require Import cps ctx eval logical_relations identifiers tactics.
+From CertiCoq.L6 Require Import cps ctx eval logical_relations identifiers tactics.
 
 Import ListNotations.
 

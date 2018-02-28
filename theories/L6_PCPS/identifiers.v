@@ -5,7 +5,7 @@
 From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos
          MSets.MSetRBT Lists.List Sets.Ensembles Omega Sorting.Permutation Logic.Decidable.
 Require Import compcert.lib.Coqlib.
-From L6 Require Import cps cps_util ctx set_util Ensembles_util List_util size_cps tactics.
+From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util List_util size_cps tactics.
 
 Import ListNotations.
 

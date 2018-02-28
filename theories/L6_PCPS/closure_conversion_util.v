@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
+From CertiCoq.L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions closure_conversion eval.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory ArithRing Coq.Relations.Relations Coq.Arith.Wf_nat.

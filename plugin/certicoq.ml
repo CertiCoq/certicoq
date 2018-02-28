@@ -17,15 +17,15 @@ let pr_char_list =
 let compile gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let Sigma.Sigma (c, sigma, _) = Evarutil.new_global (Sigma.Unsafe.of_evar_map sigma) gr in
+  let sigma, c = Evarutil.new_global sigma gr in
   let const = match gr with
     | Globnames.ConstRef c -> c
-    | _ -> CErrors.errorlabstrm "template-coq"
+    | _ -> CErrors.user_err ~hdr:"template-coq"
        (Printer.pr_global gr ++ str" is not a constant definition") in
   Feedback.msg_debug (str"Quoting");
-  let term = quote_term_rec env c in
+  let term = quote_term_rec env (EConstr.to_constr sigma c) in
   Feedback.msg_debug (str"Finished quoting.. compiling to L7.");
-  match AllInstances.compile_template_L7 (Obj.magic term) with
+  match AllInstances.compile_template_L7 term with
   | Ret (nenv, prg) ->
      Feedback.msg_debug (str"Finished compiling, printing to file.");
      let str = quote_string (Names.string_of_kn (Names.Constant.canonical const) ^ ".c") in

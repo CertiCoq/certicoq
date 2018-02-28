@@ -2,9 +2,10 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.hoare L6.Ensembles_util
-               L6.List_util L6.closure_conversion L6.closure_conversion_util L6.closure_conversion_correct
-               L6.functions L6.logical_relations L6.eval.
+From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx hoare Ensembles_util
+               List_util closure_conversion closure_conversion_util
+               functions logical_relations eval.
+Require Import CertiCoq.L6.closure_conversion_correct.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums

@@ -545,6 +545,81 @@ Local Opaque N.add.
   assumption.
 Qed.
 
+(* MOVE to SquiggleEq.list *)
+Lemma lforallCons {A} (P:A->Prop) a l: lforall P l -> P a -> lforall P (a::l).
+Proof using.
+  intros.
+  intros ? Hin.
+  dorn Hin; subst; auto.
+Qed.
+  
+Lemma ntWfCommutesL4_to_L4_1 :
+  (forall (t : exp),
+     termsDB.nt_wf (tL4_to_L4_1 t)) /\
+  (forall es, 
+      lforall (termsDB.nt_wf) (ltL4_to_L4_1 es)) /\
+  (forall es, 
+      lforall (termsDB.nt_wf) (ftL4_to_L4_1 es)) /\
+  (forall bs, 
+      lforall (fun b => (termsDB.bt_wf) (snd b)) (btL4_to_L4_1 bs)).
+Proof using.
+  apply my_exp_ind; progress crush; repeat constructor;  crush; repeat constructor; crush;
+    repeat rewrite map_map; unfold compose; simpl;
+      try apply lforallCons; dands; repeat rewrite repeat_map_len; try firstorder.
+- apply in_map_iff in H0. exrepnd. subst. constructor. auto.
+- apply in_map_iff in H2. exrepnd. subst. auto.
+- apply in_map_iff in H0. exrepnd. subst. constructor. unfold fnames, NLength.
+  autorewrite with list.
+  auto; fail.
+- unfold fnames. autorewrite with list. 
+  rewrite <- ftL4_to_L4_1_list. autorewrite with list. rewrite efnlst_as_list_len. refl.
+- simpl. constructor. assumption.
+Qed.
+
+Definition is_lambdab (n:L4_1_Term) :=
+decide (getOpid n = Some polyEval.NLambda).
+
+Fixpoint fixwf (e:L4_1_Term) : bool :=
+match e with
+| vterm _ => true (* closedness is a the concern of this predicate *) 
+| oterm o lb => 
+    (match o with
+    | polyEval.NFix _ _ => ball (map (is_lambdab ∘ get_nt) lb) && ball (map (fixwf ∘ get_nt) lb)
+    | polyEval.NBox _ => true
+    | _ => ball (map (fixwf ∘ get_nt) lb)
+    end)
+end.
+
+Lemma fixwfCommutesL4_to_L4_1 :
+  (forall n (t : exp),
+    exp_wf n t
+    -> fixwf (tL4_to_L4_1 t)= true ) /\
+  (forall n es, exps_wf n es ->
+      lforall (fun t => fixwf t = true) (ltL4_to_L4_1 es)) /\
+  (forall n es, efnlst_wf n es ->
+      lforall (fun t => fixwf t = true /\ is_lambdab t = true) (ftL4_to_L4_1 es)) /\
+  (forall n bs, branches_wf n bs ->
+      lforall (fun t => fixwf (get_nt (snd t)) = true) (btL4_to_L4_1 bs)).
+Proof using.
+Local Opaque N.add.
+apply my_exp_wf_ind; crush; try apply andb_eq_true; dands;
+  try apply ball_map_true; unfold compose; simpl;
+    try firstorder.
+- apply in_map_iff in H0. exrepnd. subst. eauto.
+- apply in_map_iff in H1. exrepnd. subst. eauto.
+- apply in_map_iff in H0. exrepnd. subst. simpl. eauto.
+  apply H. assumption.
+- apply in_map_iff in H0. exrepnd. subst. simpl. eauto.
+  apply H. assumption.
+- intros ? Hin. simpl in Hin. dorn Hin; subst; auto.
+- intros ? Hin. simpl in Hin. dorn Hin; subst; dands; auto.
+  + destruct e; auto.
+  + apply H0. auto.
+  + apply H0. auto.
+- intros ? Hin. simpl in Hin. dorn Hin; subst; auto.
+Qed.
+
+
 (*
 Lemma expWfCommutesL4_to_L4_1 :
   forall (t : exp) n,

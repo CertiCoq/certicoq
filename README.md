@@ -85,7 +85,7 @@ The package is known to build with `coq-template-coq.2.0~beta`,
 If you have already installed some package manually, you can choose the
 `--fake` keyword for `opam` to assume that it is installed, e.g.:
 
-# opam install --fake coq
+    # opam install --fake coq
 
 Installing from source
 ----------------------

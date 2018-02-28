@@ -27,6 +27,23 @@ Quote Recursively Definition p_etaC01 := EtaC01.
 Definition P_etaC01 := Eval cbv in (program_Program p_etaC01).
 Print P_etaC01.
 
+Inductive DD := D2: bool -> bool -> DD.
+Quote Recursively Definition p_etaTst := (D2 true false).
+Print p_etaTst.
+Definition P_etaTst := Eval cbv in (program_Program p_etaTst).
+Print P_etaTst.
+Compute
+  let env := (env P_etaTst) in
+  let main := (main P_etaTst) in
+  wcbvEval (env) 10 (main).
+Quote Recursively Definition p_LetaTst := (fun (x:bool) => (D2 true x)).
+Print p_LetaTst.
+Definition P_LetaTst := Eval cbv in (program_Program p_LetaTst).
+Print P_LetaTst.
+Compute
+  let env := (env P_LetaTst) in
+  let main := (main P_LetaTst) in
+  wcbvEval (env) 10 (main).
 
 (***
 Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
@@ -234,12 +251,18 @@ Print oldP_consbt.
 Definition P_consbt := Eval cbv in (main (program_Program p_consbt)).
 Print P_consbt.
 
+Quote Recursively Definition p_underLam := (fun (x:bool) => (cons x)).
+Definition P_underLam := Eval cbv in (main (program_Program p_underLam)).
+Print P_underLam.
+
+
 Quote Recursively Definition p_consbtbs := (cons true nil).
 Definition oldP_consbtbs :=
   Eval cbv in (main (L2d.compile.program_Program p_consbtbs)).
 Print oldP_consbtbs.
 Definition P_consbtbs := Eval cbv in (main (program_Program p_consbtbs)).
 Print P_consbtbs.
+
 
 
 Fixpoint testEtaNA (l:nat) : nat :=

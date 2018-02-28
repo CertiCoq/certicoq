@@ -77,10 +77,10 @@ Installing dependencies
 
 Then to install CertiCoq's dependencies:
 
-    # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.1.0.3 coq-paramcoq
+    # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.dev coq-paramcoq
 
 The package is known to build with `coq-template-coq.2.0~beta`,
-`coq-ext-lib.0.9.7`, `coq-squiggle-eq.1.0.3` and `coq-paramcoq.1.0.5`.
+`coq-ext-lib.0.9.7`, `coq-squiggle-eq.dev` and `coq-paramcoq.1.0.5`.
 
 If you have already installed some package manually, you can choose the
 `--fake` keyword for `opam` to assume that it is installed, e.g.:
@@ -123,6 +123,10 @@ To build the OCaml version of the compiler and the
 `CertiCoq Compile` plugin, in `theories/`, run:
 
     # sh make_plugin.sh
+
+To install Certicoq, do the following. This steps the above build steps.
+    # make install
+
 
 Troubleshooting:
 ----------------------

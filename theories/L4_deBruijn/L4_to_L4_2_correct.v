@@ -689,7 +689,6 @@ Proof using.
   simpl. destruct d; auto.
 Qed.
 
-(*
 Lemma vcL41_to_L42:
   forall (e:L4_1_Term) names n,
       varsOfClass (all_vars (fromDB Ast.nAnon mkNVar n names e)) true.
@@ -731,4 +730,3 @@ Proof using.
   pose proof fixwfCommutesL4_to_L4_1.
   firstorder.
 Qed.
-*)

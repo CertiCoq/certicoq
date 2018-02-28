@@ -1209,7 +1209,6 @@ Proof.
     pose proof (proj1 (L2.wcbvEval.WcbvEval_pres_WFapp h) _ _ w H6) as k.
     inversion_Clear k. rewrite TApp_hom.
     cbn. rewrite TFix_hom in H.
-    
     assert (j0:L2.term.WFapps (L2.compile.tcons arg args)).
     { constructor; assumption. }
     assert (j1:L2.term.WFapp x).

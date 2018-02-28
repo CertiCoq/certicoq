@@ -27,6 +27,23 @@ Quote Recursively Definition p_etaC01 := EtaC01.
 Definition P_etaC01 := Eval cbv in (program_Program p_etaC01).
 Print P_etaC01.
 
+Inductive DD := D2: bool -> bool -> DD.
+Quote Recursively Definition p_etaTst := (D2 true false).
+Print p_etaTst.
+Definition P_etaTst := Eval cbv in (program_Program p_etaTst).
+Print P_etaTst.
+Compute
+  let env := (env P_etaTst) in
+  let main := (main P_etaTst) in
+  wcbvEval (env) 10 (main).
+Quote Recursively Definition p_LetaTst := (fun (x:bool) => (D2 true x)).
+Print p_LetaTst.
+Definition P_LetaTst := Eval cbv in (program_Program p_LetaTst).
+Print P_LetaTst.
+Compute
+  let env := (env P_LetaTst) in
+  let main := (main P_LetaTst) in
+  wcbvEval (env) 10 (main).
 
 (***
 Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).
@@ -79,18 +96,22 @@ Fixpoint Plus1 (n : nat): nat :=
     | 0 => 1
     | S p => S (Plus1 p)
   end.
-Definition Plus1x := (Plus1 3).
+Definition Plus1x := (Plus1 2).
+Compute Plus1x.
 Quote Recursively Definition cbv_Plus1x :=
   ltac:(let t:=(eval cbv in Plus1x) in exact t).
+Print cbv_Plus1x.
 Definition ans_Plus1x :=
   Eval cbv in (main (program_Program cbv_Plus1x)).
+Print ans_Plus1x.
 (* [program] of the program *)
 Quote Recursively Definition p_Plus1x := Plus1x.
 Definition P_Plus1x := Eval cbv in (program_Program p_Plus1x).
+Print P_Plus1x.
 Goal
   let env := (env P_Plus1x) in
   let main := (main P_Plus1x) in
-  wcbvEval (env) 90 (main) = Ret ans_Plus1x.
+  wcbvEval env 90 main = Ret ans_Plus1x.
   vm_compute. reflexivity.
 Qed.
 
@@ -169,7 +190,7 @@ Goal
 Qed.
 
 
-(*******)
+(*** testing eta and params ****)
 Set Printing Width 80.
 Quote Recursively Definition p_0 := 0.
 Definition oldP_0 := Eval cbv in (main (L2d.compile.program_Program p_0)).
@@ -230,12 +251,18 @@ Print oldP_consbt.
 Definition P_consbt := Eval cbv in (main (program_Program p_consbt)).
 Print P_consbt.
 
+Quote Recursively Definition p_underLam := (fun (x:bool) => (cons x)).
+Definition P_underLam := Eval cbv in (main (program_Program p_underLam)).
+Print P_underLam.
+
+
 Quote Recursively Definition p_consbtbs := (cons true nil).
 Definition oldP_consbtbs :=
   Eval cbv in (main (L2d.compile.program_Program p_consbtbs)).
 Print oldP_consbtbs.
 Definition P_consbtbs := Eval cbv in (main (program_Program p_consbtbs)).
 Print P_consbtbs.
+
 
 
 Fixpoint testEtaNA (l:nat) : nat :=

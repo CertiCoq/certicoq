@@ -156,6 +156,7 @@ Quote Recursively Definition pcopy := copy.
 Definition Pcopy := Eval cbv in (program_Program pcopy).
 Print Pcopy.
 
+  
 (** mutual recursion **)
 Set Implicit Arguments.
 Inductive tree (A:Set) : Set :=
@@ -382,6 +383,26 @@ Fixpoint ack (n m:nat) {struct n} : nat :=
                  end
              in ackn m
   end.
+
+Definition ack11 := (ack 1 1).
+Quote Recursively Definition cbv_ack11 :=
+  ltac:(let t:=(eval cbv in ack11) in exact t).
+Print cbv_ack11.
+Definition ans_ack11 :=
+  Eval cbv in (AstCommon.main (program_Program cbv_ack11)).
+Print ans_ack11.
+(* [program] of the program *)
+Quote Recursively Definition p_ack11 := ack11.
+Print p_ack11.
+Definition P_ack11 := Eval cbv in (program_Program p_ack11).
+Print P_ack11.
+Goal
+  let env := (env P_ack11) in
+  let main := (AstCommon.main P_ack11) in
+  wcbvEval (env) 2000 (main) = Ret ans_ack11.
+  vm_compute. reflexivity.
+Qed.
+
 Definition ack35 := (ack 3 5).
 Quote Recursively Definition cbv_ack35 :=
   ltac:(let t:=(eval cbv in ack35) in exact t).
@@ -604,7 +625,7 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
-(** well-founded def with termonation assumed: fast **)
+(** well-founded def with termination assumed: fast **)
 Function Gcd (a b : nat) {wf lt a} : nat :=
 match a with
  | O => b 

@@ -185,9 +185,6 @@ induction t;
 left. auto.
 Qed.
 
-Definition isOLambda (t:option Term) : Prop :=
-  exists nm bod, t = Some (TLambda nm bod).
-
 Definition isConstruct (t:Term) : Prop :=
   exists i n args, t = TConstruct i n args.
 Lemma IsConstruct: forall i n args, isConstruct (TConstruct i n args).
@@ -201,34 +198,6 @@ Proof.
   - left. auto.
 Qed.
 
-Definition isOConstruct t : Prop :=
-  exists i n args, t = Some (TConstruct i n args).
-Lemma isOConstruct_dec: forall t, (isOConstruct t) \/ (~ isOConstruct t).
-Proof.
-  destruct t;
-    try (right; intros h; destruct h as [x1 [x2 [x3 j]]]; discriminate).
-  destruct (isConstruct_dec t).
-  - destruct i as [x0 [x1 [x2 jx]]]; subst. left. unfold isOConstruct.
-    exists x0, x1, x2. reflexivity.
-  - right. intros h. elim n. destruct h as [x0 [x1 [x2 jx]]].
-    myInjection jx. auto.
-Qed.
-
-Lemma isOConstruct_Some:
-  forall i m npars, isOConstruct (Some (TConstruct i m npars)).
-Proof.
-  intros. unfold isOConstruct. exists i, m, npars. reflexivity.
-Qed.
-
-Lemma isOConstruct_None:
-  ~ isOConstruct None.
-Proof.
-  intros h. destruct h as [x0 [x1 [x2 jx]]]. discriminate.
-Qed.
-             
-
-Definition goodF (F:Terms -> Term) :=
-  forall ts us, isApp (F ts) -> isApp (F us).
 
 (*****
 Lemma etaExpand_args_up:
@@ -397,8 +366,8 @@ Qed.
  ***************)
 
 Lemma pre_isConstruct_etaExpand:
-  forall i m,
-    etaExpand i m tnil 0 0 = TConstruct i m tnil.
+  forall F,
+    etaExpand F tnil 0 0 = F tnil.
 Proof.
   cbn. intuition.
 Qed.
@@ -1933,7 +1902,23 @@ Lemma WFTrm_up:
 Proof.
   apply WFTrmTrmsBrsDefs_ind; cbn; intros; constructor; try assumption; omega.
 Qed.
-  
+
+Lemma WFTrm_Up:
+  forall n m,  n >= m -> forall t, WFTrm t m -> WFTrm t n.
+Proof.
+  induction 1; intros.
+  - assumption.
+  - eapply (proj1 WFTrm_up). intuition.
+Qed.
+
+Lemma WFTrms_Up:
+  forall n m,  n >= m -> forall ts, WFTrms ts m -> WFTrms ts n.
+Proof.
+  induction 1; intros.
+  - assumption.
+  - eapply (proj1 (proj2 WFTrm_up)). intuition.
+Qed.
+
 Lemma tappend_pres_WFTrms:
   forall ts ss m, WFTrms ts m -> WFTrms ss m -> WFTrms (tappend ts ss) m.
 Proof.
@@ -1964,17 +1949,27 @@ Proof.
     constructor. rewrite liftDs_pres_dlength. apply (H0 (n0 + dlength defs)).
 Qed. 
 
-Definition stableF (F:Terms -> Term) :=   (*** HERE ***)
+Definition stableF (F:Terms -> Term) := 
   forall ts n, WFTrms ts (S n) -> WFTrm (F ts) n.
 
 (********
 Lemma etaExpand_args_Lam'_pres_WFTrm:
-  forall nargs cArgs,
+  forall nargs cArgs ,
     WFTrms cArgs 0 ->
     forall (bod:Terms->Term), stableF (fun b => TLambda nAnon (bod b)) ->
     WFTrm (etaExpand_args_Lam' nargs bod cArgs) 0.
 Proof.
   induction nargs; intros.
+  - cbn. intuition. unfold stableF in H0. eapply H0.
+    apply (proj1 (proj2 WFTrm_up)). assumption.
+  - cbn. eapply IHnargs.
+    + eapply tappend_pres_WFTrms.
+      * apply WF_lifts_closed. assumption.
+      * constructor. constructor. omega. constructor.
+    + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
+Qed.
+
+  
   - cbn. intuition. unfold stableF in H0. eapply H0.
     apply (proj1 (proj2 WFTrm_up)). assumption.
   - cbn. eapply IHnargs.
@@ -2026,19 +2021,241 @@ Proof.
   - cbn. unfold stableF in H1. intuition.
   - cbn. constructor.
 Qed.
+ *****)
 
-(** etaExpand_args_Lam preserves closedness **)
-Lemma etaExpand_args_Lam_pres_WFTrm:
-  forall nargs aArgs cArgs n,
-    WFTrms aArgs n ->
-    WFTrms cArgs n ->
-    forall (bod:Terms->Term), stableF bod ->
-    WFTrm (etaExpand_args_Lam nargs aArgs bod cArgs) n.
+(** etaExpand_args preserves closedness **)
+Lemma nlambda_pres_WFTrm:
+  forall nlams t n, WFTrm t n ->  WFTrm (nLambda nlams t) (n + nlams).
 Proof.
-  induction nargs; destruct aArgs; intros.
-  - cbn. unfold stableF in H1. intuition.
+  induction nlams; intros.
+  - cbn. replace (n+0) with n; try omega. assumption.
+  - change (WFTrm (TLambda nAnon (nLambda nlams t)) (n + S nlams)).
+    constructor. apply (proj1 (WFTrm_up)).
+    replace (n + S nlams) with (S n + nlams); try omega.
+    apply IHnlams. apply (proj1 (WFTrm_up)). assumption.
+Qed.                                             
+    
+Lemma WFTrms_eta_args:
+  forall args n,
+    WFTrms args n ->
+    WFTrms (tappend (lifts 0 args) (tunit (TRel 0))) (S n).
+Proof.
+  induction args; intros.
+  - cbn. constructor.  constructor. omega. eapply (proj1 (proj2 WFTrm_up)).
+    assumption.
+  - inversion_Clear H.
+    change
+      (WFTrms (tcons (lift 0 t)
+                     (tappend (lifts 0 args) (tunit (TRel 0)))) (S n)).
+    constructor; intuition. eapply (proj1 lift_pres_WFTrm). assumption.
+Qed.
+
+(** closed preserving **)
+Definition clpres (F:Terms -> Term) :=
+  forall ts n, WFTrms ts n -> WFTrm (F ts) n.
+
+Lemma nLambda_pres_clsd:
+  forall x F, clpres F ->
+    forall cArgs n, WFTrms cArgs (x + n)->
+                      WFTrm (nLambda x (F cArgs)) n.
+Proof.
+  induction x; intros.
+  - cbn. apply H. assumption.
+  - cbn. constructor. eapply IHx; try assumption.
+    replace (S x + n) with (x + S n) in H0; try omega.
+    assumption.
+Qed.
+
+Lemma mkExpand_pres_clsd:
+  forall nlams F, clpres F ->
+  forall cArgs n, WFTrms cArgs n ->
+                  WFTrm (mkExpand nlams F cArgs) n.
+Proof.
+  induction nlams; intros.
+  - cbn. apply H. assumption.
+  - cbn. constructor. eapply IHnlams; try assumption.
+    apply WFTrms_eta_args. assumption.
+Qed.
+
+Lemma mkExpand_pres_clpres:
+  forall nargs F, clpres F -> clpres (mkExpand nargs F).
+Proof.
+  induction nargs; intros.
+  - cbn. assumption.
+  - cbn. unfold clpres; intros. constructor.
+    unfold clpres in IHnargs. eapply IHnargs.
+    + intros. apply H. assumption.
+    + apply WFTrms_eta_args. assumption.
+Qed.
+
+Lemma etaExpand_aArgs_pres_clsd:
+  forall nargs aArgs nlams cArgs F n,
+    clpres F -> WFTrms cArgs n -> WFTrms aArgs n ->
+    WFTrm (etaExpand_aArgs F nargs nlams aArgs cArgs) n.
+Proof.
+  induction nargs; induction aArgs; intros.
+  - cbn. apply nLambda_pres_clsd; try assumption.
+    eapply (@WFTrms_Up _ n). omega. assumption.
   - cbn. constructor.
-  - eapply etaExpand_args_Lam_tnil_pres_WFTrm; try assumption.
+  - cbn. rewrite pre_nLambda_Lambdan. constructor. eapply nLambda_pres_clsd.
+    + apply mkExpand_pres_clpres. assumption.
+    + replace (nlams + S n) with (S (nlams+n)); try omega.
+      apply WFTrms_eta_args. eapply (@WFTrms_Up _ n). omega.
+      assumption.
+  - cbn. eapply IHnargs; try assumption.
+    + inversion_Clear H1. apply tappend_pres_WFTrms; intuition.
+    + inversion_Clear H1. assumption.
+Qed.
+
+Lemma etaExpand_pres_clsd:
+  forall (aArgs:Terms) (npars nargs:nat) F n,
+    clpres F -> WFTrms aArgs n -> 
+    WFTrm (etaExpand F aArgs npars nargs) n.
+Proof.
+  induction aArgs; induction npars; intros.
+  - cbn. apply etaExpand_aArgs_pres_clsd; assumption.
+  - cbn. apply etaExpand_aArgs_pres_clsd; assumption.
+  - cbn. apply etaExpand_aArgs_pres_clsd; try assumption. constructor.
+  - cbn. inversion_Clear H0. eapply IHaArgs; assumption.
+Qed.
+
+
+
+    (**********************   HERE
+Goal
+  forall i m (nargs nlams:nat) (args:Terms) x,
+    WFTrm (etaExpand_args i m nargs nlams args) (S x) ->
+    WFTrm (etaExpand_args i m (S nargs) nlams args) x.
+Proof.
+  induction nargs; intros.
+  - cbn. constructor. cbn in H.
+
+    
+
+Goal
+  forall i m (nargs nlams:nat) (cArgs:Terms),
+    WFTrms cArgs 0 ->
+    WFTrm (etaExpand_args i m nargs (nlams + nargs) cArgs) 0.
+Proof.
+  induction nargs; intros.
+  - cbn. eapply nLambda_pres_clsd.
+    + intros. constructor. assumption.
+    + eapply WFTrms_Up; try eassumption. omega.
+  - cbn.
+    replace (S (nlams + S nargs)) with ((S (S nlams)) + nargs); try omega.
+    eapply IHnargs.
+    pose proof (WFTrms_eta_args H) as k0. Check (IHnargs _ _ _ k0).
+
+    
+Goal
+  forall i m nargs cArgs nlams,
+    WFTrms cArgs 0 ->
+      WFTrm (etaExpand_args i m nargs nlams tnil cArgs) nlams.
+Proof.
+  induction nargs; intros.
+  - cbn. apply nlambda_pres_WFTrm. constructor.
+    eapply WFTrms_Up; try eassumption. omega.
+  - cbn. eapply IHnargs.
+    + cbn. constructor.
+
+    eapply IHnargs.
+  - cbn. 
+    eapply IHnargs. constructor. omega. destruct x.
+    + admit.
+    + eapply WFTrms_eta_args.
+
+
+Goal
+  forall i m nargs aArgs,
+    WFTrms aArgs 0 ->
+    forall cArgs nlams x,
+      x <= (nargs - tlength aArgs) ->
+    WFTrms cArgs x ->
+      WFTrm (etaExpand_args i m nargs nlams aArgs cArgs) x.
+Proof.
+  induction nargs; induction aArgs; intros.
+  - cbn. apply nlambda_pres_WFTrm. constructor. assumption.
+  - cbn. constructor.
+  - cbn. 
+    eapply IHnargs. constructor. omega. destruct x.
+    + admit.
+    + eapply WFTrms_eta_args.
+
+
+
+
+    eapply WFTrms_eta_args. assumption. instantiate (1:=x). omega.
+Check (WFTrms_eta_args H1).
+  - inversion_Clear H. cbn. eapply IHnargs. assumption.
+    apply tappend_pres_WFTrms. assumption. econstructor.
+    + eapply WFTrm_Up; try eassumption. omega.
+    + constructor.
+Qed.
+
+    Goal
+  forall i m x nargs aArgs cArgs,
+    x = (S nargs - tlength aArgs) ->
+    WFTrms aArgs 0 ->
+    WFTrms cArgs x ->
+    forall nlams,
+      WFTrm (etaExpand_args i m nargs nlams aArgs cArgs) 0.
+Proof.
+  induction x; intros.
+  - assert (k0:S nargs <= tlength aArgs). omega.
+    
+  
+Lemma etaExpand_args_pres_WFTrm:
+      forall i m x,
+        forall nargs aArgs, x = (S nargs - tlength aArgs)
+                          nargs aArgs nlams cArgs,
+    (laArgs <= nargs) ->
+    forall aArgs, laArgs = S (tlength aArgs) ->
+    WFTrms aArgs 0 ->
+    WFTrms cArgs (nargs - tlength aArgs) ->
+    WFTrm (etaExpand_args i m nargs nlams aArgs cArgs) nlams.
+Proof.
+  induction 1; intros.
+
+
+  Lemma etaExpand_args_pres_WFTrm:
+  forall i m nargs laArgs nlams cArgs,
+    (laArgs <= nargs) ->
+    forall aArgs, laArgs = S (tlength aArgs) ->
+    WFTrms aArgs 0 ->
+    WFTrms cArgs (nargs - tlength aArgs) ->
+    WFTrm (etaExpand_args i m nargs nlams aArgs cArgs) nlams.
+Proof.
+  induction 1; intros.
+  - cbn. destruct aArgs.
+    + cbn in *. subst. cbn. repeat constructor. eapply nlambda_pres_WFTrm.
+      constructor. replace (1 - 0) with 1 in H1; try omega.
+      eapply tappend_pres_WFTrms.
+      eapply (proj1 (proj2 lift_pres_WFTrm) _ _ H1).
+      * eapply tappend_pres_WFTrms.
+
+
+        
+      apply nlambda_pres_WFTrm. cbn in H0. constructor. assumption.
+  - cbn. cbn  in H0.
+
+
+    Lemma etaExpand_args_pres_WFTrm:
+  forall i m nargs aArgs nlams cArgs,
+    WFTrms aArgs 0 ->
+    WFTrms cArgs (nargs - tlength aArgs) ->
+    WFTrm (etaExpand_args i m nargs nlams aArgs cArgs) 0.
+Proof.
+  induction aArgs; induction nargs; intros.
+  - cbn. apply nlambda_pres_WFTrm. cbn in H0. constructor. assumption.
+  - cbn. cbn in H0.
+
+    constructor.
+  - cbn. cbn in H0. eapply (IHnargs _ (S nlams) _ H).
+    cbn. replace (nargs - 0) with nargs; try omega.
+    Check (WFTrms_eta_args H0).
+    eapply tappend_pres_WFTrms.
+    Check (proj1 (proj2 lift_pres_WFTrm) _ _ H0).
+    cbn. eapply etaExpand_args_Lam_tnil_pres_WFTrm; try assumption.
   - cbn. replace (n + S nargs) with (S n + nargs); try omega.
     eapply IHnargs; try eassumption.
     + inversion_Clear H. apply (proj1 (proj2 WFTrm_up)). assumption.
@@ -3058,11 +3275,11 @@ Qed.
 End PoccTrm_sec.
 End Instantiate_sec.
 
-(** etaExpand cannot be an application **)
-Lemma etaExpand_args_Lam_up:
-  forall nargs aArgs F cArgs u,
-      etaExpand_args_Lam nargs aArgs F (tappend cArgs (tunit u)) =
-      etaExpand_args_Lam (S nargs) (tcons u aArgs) F cArgs.
+(** etaExpand cannot be an application **  FIXME
+Lemma etaExpand_args_up:
+  forall nargs aArgs nlams i m cArgs u,
+      etaExpand_args nargs aArgs nlams i m (tappend cArgs (tunit u)) =
+      etaExpand_args (S nargs) (tcons u aArgs) nlams i m cArgs.
 Proof.
   induction nargs; induction aArgs; cbn; intros; try reflexivity.
 Qed.
@@ -3079,6 +3296,7 @@ Proof.
   - rewrite H. clear. cbn. induction aArgs; cbn; reflexivity.
   - specialize (IHle aArgs H0 i m0). destruct aArgs; cbn; reflexivity.
 Qed.
+ *************)
 
 (***********
 Lemma isLambda_etaExpand_args_Lam_Lam:

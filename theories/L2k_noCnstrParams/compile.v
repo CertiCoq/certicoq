@@ -181,33 +181,6 @@ Fixpoint dlength (ts:Defs) : nat :=
     | dcons _ _ _ ts => S (dlength ts)
   end.
 
-(**********
-Function eatsArgs t : option Term :=
-  match t with
-  | TDummy => Some TDummy
-  | TWrong s => Some (TWrong s)
-  | TApp fn arg => eatsArgs fn
-  | _ => None
-  end.
-                   
-Lemma eatsArgs_None:
-  forall fn arg, eatsArgs (TApp fn arg) = None -> eatsArgs fn = None.
-Proof.eatsArgs
-  induction fn; intros; cbn; try reflexivity.
-  - intuition.
-  - cbn in H. discriminate.
-  - cbn in H. discriminate.
-Qed.
-Lemma None_eatsArgs:
-  forall fn arg, eatsArgs fn = None -> eatsArgs (TApp fn arg) = None.
-Proof.
-  induction fn; intros; cbn; try reflexivity.
-  - intuition.
-  - cbn in H. discriminate.
-  - cbn in H. discriminate.
-Qed.
- *************)
-
 Definition isApp (t:Term) : Prop :=
   exists fn arg, t = TApp fn arg.
 Lemma IsApp: forall fn arg, isApp (TApp fn arg).
@@ -218,104 +191,6 @@ Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
   destruct t; try (right; not_isApp). left. auto.
 Qed.
 
-
-(***************** mkApp not needed in L2k  **********
-Function mkApp (fn:Term) (ts:Terms) : Term :=
-  match eatsArgs fn with
-  | Some tc => tc
-  | None => match ts with
-            | tnil => fn
-            | tcons y ys => mkApp (TApp fn y) ys
-            end
-  end.
-
-Lemma mkApp_Wrong:
-  forall ts s, mkApp (TWrong s) ts = TWrong s.
-Proof.
-  induction ts; intros; reflexivity.
-Qed.
-
-Lemma mkApp_Dummy:
-  forall ts, mkApp TDummy ts = TDummy.
-Proof.
-  induction ts; intros; reflexivity.
-Qed.
-
-Lemma eatsArgs_tnil:
-  forall fn gn, eatsArgs fn = Some gn -> mkApp fn tnil = gn.
-Proof.
-  intros fn gn. functional induction (eatsArgs fn); intros; try reflexivity.
-  - myInjection H. reflexivity.
-  - myInjection H. reflexivity.
-  - cbn. rewrite H. reflexivity.
-  - discriminate.
-Qed.
-
-Lemma mkApp_tnil:
-  forall fn, ~ isApp fn -> mkApp fn tnil = fn.
-Proof.
-  intros fn hfn. case_eq (eatsArgs fn); intros.
-  - functional inversion H; subst; try reflexivity.
-    elim hfn. exists fn0, arg. reflexivity.
-  - functional inversion H; subst.
-    + cbn. rewrite H1. reflexivity.
-    + destruct fn; try reflexivity.
-      elim hfn. exists fn1, fn2. reflexivity.
-Qed.
-
-Lemma eatsArgs_None_tnil:
-  forall fn, eatsArgs fn = None -> (mkApp fn tnil) = fn.
-Proof.
-  intros; cbn. rewrite H. reflexivity.
-Qed.
-
-Lemma mkApp_hd:
-  forall fn,
-    eatsArgs fn = None ->
-    forall t ts, mkApp fn (tcons t ts) = mkApp (TApp fn t) ts.
-Proof.
-  intros. cbn. rewrite H. reflexivity.
-Qed.
-
-Function AppMk (fn:Term) (ts:Terms) : Term :=
-  match eatsArgs fn with
-  | Some tc => tc
-  | None => match treverse ts with
-            | tnil => fn
-            | tcons y ys => TApp (mkApp fn (treverse ys)) y
-            end
-  end.
-
-Lemma mkApp_AppMk:
-  forall ts fn, mkApp fn ts = AppMk fn ts.
-Proof.
-  intros ts fn; functional induction (mkApp fn ts).
-  - unfold AppMk. rewrite e. reflexivity.
-  - unfold AppMk. rewrite e. reflexivity.
-  - rewrite IHt. unfold AppMk.
-    rewrite e. rewrite None_eatsArgs; try assumption.
-    cbn. destruct (treverse ys).
-    + cbn. rewrite e. reflexivity.
-    + cbn. apply f_equal2; try reflexivity. rewrite treverse_tunit.
-      cbn. rewrite e. reflexivity.
-Qed.
-
-Lemma mkApp_isApp:
-  forall fn t ts,
-    eatsArgs fn = None -> isApp (mkApp fn (tcons t ts)).
-Proof.
-  intros. rewrite mkApp_AppMk. unfold AppMk. rewrite H.
-  rewrite <- tunit_treverse.
-  destruct (tappend_mk_canonical (treverse ts) t tnil) as [x0 [x1 jx]].
-  change
-    (isApp
-       match tappend (treverse ts) (tunit t) with
-       | tnil => fn
-       | tcons y ys => TApp (mkApp fn (treverse ys)) y
-       end).
-  rewrite jx. auto.
-Qed.
-**************)
     
 (** lift a Term over a new binding **)
 Function lift (n:nat) (t:Term) : Term :=
@@ -448,42 +323,85 @@ Definition etaExpand_args_Construct   (* no more parameters expected *)
   | S 0, tcons u tnil => TConstruct i m (tunit u)
   | S 0, tcons u (tcons _ _) => TWrong "strip; Constructor; too many args"
   | S (S n), tcons u (tcons w ws) =>
-    etaExpand_args_Lam n us (TConstruct i m) (tunit u)
-  end.
- *********************)
+    etaExpand_args_Lam n us (TConstruct i m) (tunit u) *)
 
-(* strip params, eta expand as required,
-** then call etaExpand_args on remaining args *)
-Function nLambda (n:nat) (F:Terms -> Term) :=
+(** wrap a term with n lambdas; used below for missing parameters **)
+Function nLambda (n:nat) (F:Term) : Term :=
   match n with
   | 0 => F
-  | S m => fun b => TLambda nAnon (F b)
+  | S m => TLambda nAnon (nLambda m F)
   end.
 
-Function etaExpand
-         (i:inductive) (m:nat)
-         (actualArgs:Terms) (npars nargs:nat)  (* inputs *) : Term :=
-  match actualArgs, npars with
-  (* drop an actual arg and reduce param count *)
-  | tcons u us, S n => etaExpand i m us n nargs
-  (* no more actual args, but more params possible *)
-  | tnil, S n =>
-    etaExpand_args_Lam nargs tnil (nLambda (S n) (TConstruct i m)) tnil 
-  (* no more params possible; start on args *)
-  | aa, 0 => etaExpand_args_Construct nargs aa i m
+Function Lambdan (n:nat) (F:Term) : Term :=
+  match n with
+  | 0 => F
+  | S m => Lambdan m (TLambda nAnon F)
   end.
+
+Lemma pre_nLambda_Lambdan:
+  forall (n:nat) (F:Term),
+    nLambda n (TLambda nAnon F) = TLambda nAnon (nLambda n F).
+Proof.
+  induction n; intros.
+  - reflexivity.
+  - cbn. rewrite IHn. reflexivity.
+Qed.
+                          
+Lemma nLambda_Lambdan:
+  forall (n:nat) (F:Term),
+    nLambda n F = Lambdan n F.
+Proof.
+  induction n; intros.
+  - reflexivity.
+  - cbn. rewrite <- pre_nLambda_Lambdan. rewrite IHn. reflexivity.
+Qed.         
+
+Function mkExpand n (F:Terms -> Term) (cArgs:Terms) : Term :=
+  match n with
+  | 0 => F cArgs
+  | S m =>
+    TLambda nAnon (mkExpand m F (tappend (lifts 0 cArgs) (tunit (TRel 0))))
+  end.
+
+Section ee.   (** drop params, eta expand what's left **)
+  Variable (F:Terms -> Term).
+  
+(** move all of aArgs (which are closed) into cArgs **)
+Function etaExpand_aArgs (nargs nlams:nat) (aArgs cArgs:Terms) :=
+  match nargs, aArgs with
+    (* step through nargs expected and actual args found *)
+  | S n, tcons u us => etaExpand_aArgs n nlams us (tappend cArgs (tunit u))
+    (* error: more actual args than expected *)
+  | 0, tcons _ _ => TDummy "strip; Constructor; too many args"
+    (* ran out of actual args; more args expected; finish expanding *)
+  | n, tnil => nLambda nlams (mkExpand n F cArgs)
+  end.
+
+(** drop actually appearing parameters. if not enough actual params,
+    pass a count of the number of non-binding lambdas **)
+Function etaExpand (actualArgs:Terms) (npars nargs:nat)  (* inputs *) : Term :=
+  match actualArgs, npars with
+  (* drop an actual param and reduce param count. keep looking for params *)
+  | tcons u us, S n => etaExpand us n nargs
+  (* ran out of actual args, but n more params expected:
+     need nlams lambdas that don't bind, then eta expand *)
+  | tnil, nlams => etaExpand_aArgs nargs nlams tnil tnil
+  (* no more params expected; start on actual args and nargs *)
+  | aArgs, 0 => etaExpand_aArgs nargs 0 aArgs tnil
+  end.
+End ee.
 
 Section Strip.
   Variable pre_strip: L2dTerm -> Term.
   Function CanonicalP (fn:L2dTerm) (arg:Term) :
-    option (inductive * nat * Terms * nat * nat) :=
+    option ((Terms->Term) * Terms * nat * nat) :=
     match fn with
     | L2d.compile.TConstruct i m np na =>
-      Some (i, m, tunit arg, np, na)
+      Some (TConstruct i m, tunit arg, np, na)
     | L2d.compile.TApp gn brg =>
       match CanonicalP gn (pre_strip brg) with
-      | Some (i, m, brgs, np, na) =>
-        Some (i, m, tappend brgs (tunit arg), np, na)
+      | Some (F, brgs, np, na) =>
+        Some (F, tappend brgs (tunit arg), np, na)
       | None => None
       end
     | _ => None
@@ -500,10 +418,11 @@ Function strip (t:L2dTerm) : Term :=
     let sarg := strip arg in
     match CanonicalP strip fn sarg with
     | None => TApp (strip fn) sarg
-    | Some (i, m, args, npars, nargs) => etaExpand i m args npars nargs
+    | Some (F, args, npars, nargs) => etaExpand F args npars nargs
     end
   | L2d.compile.TConst nm => TConst nm
-  | L2d.compile.TConstruct i m npars nargs => etaExpand i m tnil npars nargs
+  | L2d.compile.TConstruct i m npars nargs =>
+    etaExpand (TConstruct i m) tnil npars nargs
   | L2d.compile.TCase i mch brs => TCase (fst i) (strip mch) (stripBs brs)
   | L2d.compile.TFix ds n => TFix (stripDs ds) n
   | L2d.compile.TWrong str => TWrong str

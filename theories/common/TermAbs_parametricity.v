@@ -489,7 +489,8 @@ Proof using vartyp mkNVar getIdCorr getId deqo def gts.
   apply list_R_map_lforall in Hal.
   pose proof alpha_eq_ot_list_R.
 
-  (* Move to SquiggleEq.tiff *)
+  (* Move to SquiggleEq.tiff. Need to also move the notation <=>.
+   Replace <=> by <-> in SquiggleEq *)
 Ltac dtiffs3 := repeat match goal with
 [ H: forall _ : ?X, _ <=> _ |- _] => 
     let Hl:= fresh H "tl" in

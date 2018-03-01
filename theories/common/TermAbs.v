@@ -111,13 +111,6 @@ Some (oterm o lb).
 Definition mkBTermSafe (lb : list BTerm) (o: Opid) : option (@NTerm NVar Opid) :=
  if (decide ((map num_bvars lb) = OpBindings o))%nat then Some (oterm o lb) else None.
 
-(* move to SquiggleEq.terms? *)
-Definition getOpidBTerms (t: @NTerm NVar Opid) : option (Opid * list BTerm):=
-match t with
-| vterm _ => None
-| oterm o lb => Some (o, lb)
-end.
-
 Definition applyBTermClosed (b : BTerm) (l: list NTerm) : option (@NTerm NVar Opid) :=
 if (num_bvars b =? length l) then Some (apply_bterm b l) else None.
 

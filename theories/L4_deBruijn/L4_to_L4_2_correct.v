@@ -544,14 +544,6 @@ Local Opaque N.add.
   rewrite mkNamesLength.
   assumption.
 Qed.
-
-(* MOVE to SquiggleEq.list *)
-Lemma lforallCons {A} (P:A->Prop) a l: lforall P l -> P a -> lforall P (a::l).
-Proof using.
-  intros.
-  intros ? Hin.
-  dorn Hin; subst; auto.
-Qed.
   
 Lemma ntWfCommutesL4_to_L4_1 :
   (forall (t : exp),

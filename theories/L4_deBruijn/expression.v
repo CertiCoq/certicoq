@@ -1620,27 +1620,9 @@ Qed.
 Eval compute in (list_to_zero 4).
 Eval compute in (seq 0 4).
 
-(* Move to Coq.Lists.List ? *)
-Lemma seq_add : forall n m s,
-  seq s (n+m) = (seq s n)++(seq (s+n) m).
-Proof using.
-  intros ?. induction n; simpl; intros m s;
-    [ rewrite <- plus_n_O; reflexivity | ].
-  f_equal. rewrite IHn. f_equal. simpl.
-  rewrite plus_n_Sm. reflexivity.
-Qed.
 
-(* Move to Coq.Lists.List ? *)
-Lemma fold_right_map {A B C: Type} 
-  (f: B -> C -> C) (m: A->B) (s:C) (l: list A) :
-fold_right f s (map m l)
-= fold_right (fun a c => f (m a) c) s l.
-Proof using.
-  induction l; simpl;congruence.
-Qed.
-
-(* Move to RandyPrelude? *)
-Lemma list_to_zero_rev n: list_to_zero n = rev (seq 0 n).
+Require Import SquiggleEq.list.
+Lemma list_to_zero_rev n: list_to_zero n = rev (List.seq 0 n).
 Proof.
   rewrite <- (rev_involutive (list_to_zero n )).
   f_equal.
@@ -1654,7 +1636,7 @@ Lemma sbst_fix_real (e : exp) (es:efnlst):
   sbst_fix es e = 
     sbst_real_list 
       e 
-      (map (fun ndx => Fix_e es (N.of_nat ndx)) (seq 0 (efnlength es))).
+      (map (fun ndx => Fix_e es (N.of_nat ndx)) (List.seq 0 (efnlength es))).
 Proof using.
   unfold sbst_fix. rewrite list_to_zero_rev.
   rewrite <- fold_left_rev_right.
@@ -1806,80 +1788,12 @@ Qed.
 Require Import SquiggleEq.UsefulTypes.
 Require Import SquiggleEq.list.
 
-(* Move to SquiggleEq.list
-*)
-Lemma flattenLift {A B:Type} (f: A-> option B) g  l:
-  (forall b, isSome (f b) -> f b = g b)
-  -> (forall b, isSome (g b) -> isSome (f b))
-  -> flatten (map f l) = flatten (map g l).
-Proof using.
-  intros Heq Hn.
-  induction l;crush.
-  specialize (Heq a).
-  specialize (Hn a).
-  destruct (f a).
-- unfold isSome in Heq.
-  specialize (Heq (ltac:(auto))).
-  rewrite <- Heq. congruence.
-- clear Heq. destruct (g a); firstorder.
-Qed.
 
-(* Move to SquiggleEq.list
-*)
-Lemma flattenSomeCons {A:Type} (loa: list (option A)) a:
-  isSome (flatten (a::loa))
-  -> isSome (flatten loa).
-Proof using.
-  intros Hs.
-  simpl in Hs.
-  destruct a; firstorder.
-  destruct (flatten loa); firstorder.
-Qed.
+
 
 Require Import SquiggleEq.tactics.
 
-(* Move to SquiggleEq.list
-*)
-Lemma flattenSomeIn {A:Type} (loa: list (option A)) a:
-  isSome (flatten loa)
-  -> In a loa -> isSome a.
-Proof using.
-  revert a.
-  induction loa as [ | a loa]; destruct a; intros aa; destruct aa; try (crush; fail).
-  intros Hs Hin. apply False_ind.
-  apply flattenSomeCons in Hs.
-  dorn Hin; firstorder.
-  inversion Hin.
-Qed.  
-  
 
-(* Move to SquiggleEq.list
-*)
-Lemma flattenLift2 {A B:Type} (f: A-> option B) g  l:
-  (forall b, In b l -> f b = g b)
-  -> isSome (flatten (map f l))
-  -> flatten (map f l) = flatten (map g l).
-Proof using.
-  intros Heq Hs.
-  induction l; try (crush; fail).
-  pose proof Heq as Heqb.
-  specialize (Heq a). simpl.
-  pose proof Hs as Hsb.
-  simpl in Hsb.
-  destruct (f a);[ | firstorder].
-  specialize (Heq (ltac:(simpl;auto))).
-  rewrite <- Heq.
-  apply flattenSomeCons in Hs.
-  rewrite IHl;[reflexivity | firstorder| assumption].
-Qed.
-
-(* Move to SquiggleEq.Usefultypes
-*)
-Lemma isSomeIf {A:Type} oa (a: A):
-  oa = Some a -> isSome oa.
-Proof using.
-  crush.
-Qed.
 
 (** [eval_n] is complete w.r.t. [eval] **)
 Lemma eval_evalns:

@@ -544,14 +544,6 @@ Local Opaque N.add.
   rewrite mkNamesLength.
   assumption.
 Qed.
-
-(* MOVE to SquiggleEq.list *)
-Lemma lforallCons {A} (P:A->Prop) a l: lforall P l -> P a -> lforall P (a::l).
-Proof using.
-  intros.
-  intros ? Hin.
-  dorn Hin; subst; auto.
-Qed.
   
 Lemma ntWfCommutesL4_to_L4_1 :
   (forall (t : exp),
@@ -689,7 +681,6 @@ Proof using.
   simpl. destruct d; auto.
 Qed.
 
-(*
 Lemma vcL41_to_L42:
   forall (e:L4_1_Term) names n,
       varsOfClass (all_vars (fromDB Ast.nAnon mkNVar n names e)) true.
@@ -731,4 +722,3 @@ Proof using.
   pose proof fixwfCommutesL4_to_L4_1.
   firstorder.
 Qed.
-*)

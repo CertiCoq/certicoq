@@ -573,7 +573,8 @@ Proof using.
   destruct s as [? s]. simpl.
   hnf in Hg. simpl in Hg.
   clear i.
-  revert_all. admit.
+  unfold isprogram.
+  dands; eauto using ntwfL4_to_L42, fixwfL4_to_L42, closedL4_to_L42,vcL4_to_L42. 
 - intros ? ? Hg Hev.
   destruct s as [? s].
   destruct sv as [senv sv]. 
@@ -600,9 +601,17 @@ Proof using.
     eapply @obsLeTrns with (InterValue := cTerm certiL4_2);[ | apply Hev1].
     apply (fun p1 p2 a b v eq => valuePredTranslateLe_suff _ _ p1 p2 a b v eq); auto;[ | ]; clear;
       [apply obsNthCommuteL4_L4_2 | apply yesCommuteL4_L4_2].
-    Fail idtac. (* this subgoal is done *)
-Abort.
+Qed.
 
+(*
+Print Assumptions certiL4_to_L4_2Correct.
+
+ProofIrrelevance.proof_irrelevance : forall (P : Prop) (p1 p2 : P), p1 = p2
+eval_ns_monotone : forall (n : nat) (e f : exp),
+                   eval_ns n e = Some f ->
+                   forall m : nat, eval_ns (n + m) e = Some f
+EqIfRL4Opid : TermAbs_parametricity.EqIfR L4_to_L4_2_correct.L4Opid_R
+*)
 
 Lemma goodPres4_2_to_4_5 : goodPreserving (ienv * L4_2_Term) (ienv * L4_5_Term).
 Proof using.

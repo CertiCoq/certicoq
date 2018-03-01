@@ -184,21 +184,6 @@ Proof using.
 - destruct o; unfold Fix_e'; simpl; autorewrite with SquiggleEq; auto;[].
   simpl. compute. intros. repeat in_reasoning; subst; auto.
 Qed.
-
-(* MOVE to SquiggleEq.terms2 *)
-Lemma  wft_ntwf {Opid V} {gts : GenericTermSig Opid}: forall t: @NTerm V Opid,  wft t =true -> nt_wf t.
-Proof using.
-  induction t as [x | o lbt Hind] using NTerm_better_ind; intros Hwf; try (constructor; fail).
-  simpl in Hwf.
-  apply andb_eq_true in Hwf. repnd.
-  setoid_rewrite assert_beq_list in Hwf0.
-  constructor; auto.
-  rewrite ball_map_true in Hwf.
-  intros l. destruct l. intros. constructor.
-  eapply Hind; eauto.
-  specialize (Hwf _ H).
-  simpl in Hwf. assumption.
-  Qed.  
   
 
 Lemma L4_2_to_L4_5_ntwf t:

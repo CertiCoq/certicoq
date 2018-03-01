@@ -31,7 +31,7 @@ repositories:
     # opam repo add coq-released https://coq.inria.fr/opam/released
     # opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev
 
-  Optionally, add the `extra-dev` repository, which contains packages
+  Add the `extra-dev` repository, which contains packages
 for development versions (e.g. `git` branches) and is relatively
 unstable.  It might be needed to compile non-released versions of
 CertiCoq. Beware `opam` will usually select packages from there as they

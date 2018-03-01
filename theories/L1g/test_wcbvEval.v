@@ -9,6 +9,8 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
 Require Import Coq.omega.Omega.
+Require Import Template.Ast.
+Require Import Template.kernel.univ.
 Require Import Template.Template.
 Require Import Common.Common.
 Require Import L1g.compile.
@@ -17,12 +19,31 @@ Require Import L1g.wcbvEval.
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
+
 Set Implicit Arguments.
 
 Set Template Cast Propositions.
 Set Printing Width 100.
 Set Printing Depth 1000.
 Set Implicit Arguments.
+
+Quote Recursively Definition p_I := I.
+Print p_I.
+Definition P_I := Eval cbv in (program_Program p_I).
+Print P_I.
+Quote Recursively Definition p_00 := (eq_refl 0 : (eq 0 0)).
+Print p_00.
+Definition P_00 := Eval cbv in (program_Program p_00).
+Print P_00.
+
+
+
+Definition and0100:= (0 = 1) /\ (0 = 0).
+Quote Recursively Definition p_and0100 := and0100.
+Print p_and0100.
+Definition P_and0100 := Eval cbv in (program_Program p_and0100).
+Print P_and0100.
+
 
 Function deProof (t:Term) : Term :=
   match t with
@@ -69,8 +90,10 @@ Notation Lam := (TLambda).
 Notation tLam := (tLambda).
 Notation Pi := (TProd).
 Notation tPi := (tProd).
+(***
 Notation PROP := (TSort sProp).
 Notation tPROP := (tSort sProp).
+***)
 Notation AND := (mkInd "Coq.Init.Logic.and" 0).
 Notation CONJ := (TConstruct AND 0 4).
 Notation TRUE := (mkInd "Coq.Init.Logic.True" 0).
@@ -141,8 +164,6 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
-
-
 Print and_rect.
 Quote Recursively Definition p_and_rect := and_rect.
 Print p_and_rect.
@@ -152,11 +173,13 @@ Check program_Program.
 Definition and_rect_x :=
   (and_rect (fun (a:1=1) (b:True) => conj b a) (conj (eq_refl 1) I)).
 Quote Recursively Definition p_and_rect_x := and_rect_x.
+Print p_and_rect_x.
 Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).
 Print P_and_rect_x.
 Quote Recursively Definition cbv_and_rect_x :=
   ltac:(let t:=(eval cbv in and_rect_x) in exact t).
 Print cbv_and_rect_x.
+Eval cbv in (main (program_Program cbv_and_rect_x)).
 Definition ans_and_rect_x :=
   Eval cbv in (deProof (main (program_Program cbv_and_rect_x))).
 Print ans_and_rect_x.
@@ -824,6 +847,16 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+Inductive Nn : Prop := Zz:Nn | Ss:Nn->Nn.
+Inductive Bb : Prop := tt:Bb | ff:Bb.
+Fixpoint Nnplus n m :=
+  match n with
+  | Zz => m
+  | Ss q => Ss (Nnplus q m)
+  end.
+Quote Recursively Definition p_Nnplus := Nnplus.
+Print p_Nnplus.
+
 Require Import Benchmarks.vs.
 
 (****** runs out of space **************
@@ -900,15 +933,6 @@ Definition mlzero : nat :=
   end.
 ****)
 
-Inductive NN : Prop := ZZ:NN | SS:NN->NN.
-Inductive BB : Prop := tt:BB | ff:BB.
-
-Definition mlbb : BB :=
-  match mlfeq with
-    | mleqrfl x => match x with O => tt | S _ => ff  end
-  end.
-Quote Definition q_mlbb := mlbb.
-Print q_mlbb.
 
 Axiom feq : 0 = 0.
 Definition zero : nat :=

@@ -383,9 +383,6 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
-
-Print L2d.compile.
-Print L2d.compile.Term.
 Function deProof t := 
   match t with
     | TRel n => TRel n
@@ -634,6 +631,7 @@ Quote Recursively Definition cbv_yyyyX := (* [program] of Coq's answer *)
 Print cbv_yyyyX.
 (* [Term] of Coq's answer *)
 Definition ans_yyyyX := Eval cbv in (main (program_Program cbv_yyyyX)).
+Print ans_yyyyX.
 (* [program] of the program *)
 Quote Recursively Definition p_yyyyX := yyyyX.
 Print p_yyyyX.

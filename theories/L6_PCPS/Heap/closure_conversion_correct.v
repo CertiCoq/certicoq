@@ -1,7 +1,8 @@
-From L6 Require Import cps size_cps cps_util set_util identifiers ctx Ensembles_util
-     List_util functions closure_conversion closure_conversion_util.
+From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
+     List_util functions closure_conversion closure_conversion_util
+     closure_conversion_correct.
 
-From L6.Heap Require Import heap heap_defs heap_equiv space_sem cc_log_rel.
+From L6.Heap Require Import heap heap_defs heap_equiv space_sem cc_log_rel size_cps.
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -17,10 +18,74 @@ Module ClosureConversionCorrect (H : Heap).
 
   (* Module Sem := SpaceSem H. *)
   Module LogRel := CC_log_rel H.
+  Module Size := Size H.
 
-  Import H LogRel.Sem.Equiv LogRel.Sem.Equiv.Defs LogRel.Sem LogRel.
+  Import H LogRel.Sem.Equiv LogRel.Sem.Equiv.Defs LogRel.Sem LogRel Size.
   
   Variable clo_tag : cTag.
+  
+
+  (** *  Useful definitions and lemmas to express the upper bound. TODO move *)
+
+  Definition max_exp_env (k : nat) (H : heap block) (rho : env) (e : exp) :=
+    max (sizeOf_exp e) (sizeOf_env k H rho).
+
+  
+  Lemma max_exp_env_grt_1 k e rho :
+    1 <= max_exp_env k e rho.
+  Proof.
+    unfold max_exp_env.
+    eapply le_trans. now apply sizeOf_exp_grt_1.
+    eapply Max.le_max_l.
+  Qed.
+
+  (** Lemmas used to establish the upper bound given the IH *)
+
+  Lemma max_exp_env_Econstr k x t ys e rho :
+    max_exp_env k e rho <= max_exp_env k (Econstr x t ys e) rho.
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  Lemma max_exp_env_Eproj k x t N y e rho :
+    max_exp_env k e rho <= max_exp_env k (Eproj x t N y e) rho.
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  Lemma max_exp_env_Ecase_cons_hd k x c e l rho :
+    max_exp_env k e rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  Lemma max_exp_env_Ecase_cons_tl k x c e l rho :
+    max_exp_env k (Ecase x l) rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  Lemma max_exp_env_Eprim k x f ys e rho :
+    max_exp_env k e rho <= max_exp_env k (Eprim x f ys e) rho.
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  Lemma max_exp_env_Efun k B e rho :
+    max_exp_env k e (def_funs B B rho rho) <= max_exp_env k (Efun B e) rho.
+  Proof.
+    unfold max_exp_env. eapply le_trans.
+    - eapply NPeano.Nat.max_le_compat_l.
+      now apply sizeOf_env_def_funs.
+    - rewrite (Max.max_comm (sizeOf_env _ _)), Max.max_assoc.
+      eapply NPeano.Nat.max_le_compat_r.
+      eapply Nat.max_lub; simpl; omega.
+  Qed.
 
 
   (* XXX maybe move *)
@@ -57,11 +122,10 @@ Module ClosureConversionCorrect (H : Heap).
       rewrite cost_alloc_comp_f_ctx_f. omega.
   Qed. 
     
-  Definition FP c p1 p2 :=
+  Definition FP i (e1 : exp) (rho1 : env) p1 p2 :=
     match p1, p2 with
       | (c1, m1), (c2, m2) =>
-        c1 <= c2 + c <= 4*c1 /\
-        m1 <= m2 <= 2*m1
+        c1 <= c2 <= 7 * c1 * (max_exp_env i e1 rho1) + 7 * sizeOf_exp e1
     end.
   
   Definition IP C (p1 p2 : heap block * env * exp) :=

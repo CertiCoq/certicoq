@@ -51,17 +51,17 @@ Notation "A \\ B" := (Setminus _ A B) (at level 52, left associativity)
 
 (** * Equivalence and preorder properties *)
 
-Lemma Included_refl {A} s1 :
-  Included A s1 s1.
+Lemma Included_refl {A} (s1 : Ensemble A) :
+  s1 \subset s1.
 Proof.
   intros x Hin; eauto.
 Qed.
 
 
-Lemma Included_trans {A} s1 s2 s3 :
-  Included A s1 s2 ->
-  Included A s2 s3 ->
-  Included A s1 s3.
+Lemma Included_trans {A} (s1 s2 s3 : Ensemble A) :
+  s1 \subset s2 ->
+  s2 \subset s3 ->
+  s1 \subset s3.
 Proof.
   intros H1 H2 x HIn.
   eapply H2. eapply H1; eauto.
@@ -74,23 +74,23 @@ Proof.
   intros ? ? ? ? ?. now eapply Included_trans; eauto.
 Qed.
 
-Lemma Same_set_refl A s :
-  Same_set A s s.
+Lemma Same_set_refl A (s : Ensemble A) :
+  s <--> s.
 Proof.
   split; apply Included_refl.
 Qed.
 
-Lemma Same_set_sym A s1 s2 :
-  Same_set A s1 s2 ->
-  Same_set A s2 s1.
+Lemma Same_set_sym A (s1 s2 : Ensemble A) :
+  s1 <--> s2 ->
+  s2 <--> s1.
 Proof.
   intros [H1 H2]; split; eauto.
 Qed.
 
-Lemma Same_set_trans {A} s1 s2 s3 :
-  Same_set A s1 s2 ->
-  Same_set A s2 s3 ->
-  Same_set A s1 s3.
+Lemma Same_set_trans {A} (s1 s2 s3 : Ensemble A) :
+  s1 <--> s2 ->
+  s2 <--> s3 ->
+  s1 <--> s3.
 Proof.
   intros [H1 H2] [H3 H4]. split; eapply Included_trans; eauto.
 Qed.
@@ -268,13 +268,13 @@ Qed.
 
 (** ** Commutativity properties *)
 
-Lemma Union_commut {A} s1 s2 :
-  Same_set A (Union A s1 s2) (Union A s2 s1).
+Lemma Union_commut {A} (s1 s2 : Ensemble A) :
+  (s1 :|: s2) <--> (s2 :|: s1).
 Proof.
   split; intros x H; inv H; eauto.
 Qed.
 
-Lemma Intersection_commut {A} s1 s2 :
+Lemma Intersection_commut {A} (s1 s2 : Ensemble A) :
   Same_set A (Intersection A s2 s1) (Intersection A s1 s2).
 Proof.
   split; intros x H; inv H; constructor; eauto.

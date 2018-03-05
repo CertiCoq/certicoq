@@ -16,123 +16,27 @@ Close Scope Z_scope.
 
 Module ClosureConversionCorrect (H : Heap).
 
-  (* Module Sem := SpaceSem H. *)
-  Module LogRel := CC_log_rel H.
   Module Size := Size H.
-
-  Import H LogRel.Sem.Equiv LogRel.Sem.Equiv.Defs LogRel.Sem LogRel Size.
+  
+  Import H Size.LogRel.Sem.Equiv Size.LogRel.Sem.Equiv.Defs Size.LogRel.Sem Size.LogRel Size.
   
   Variable clo_tag : cTag.
   
-
-  (** *  Useful definitions and lemmas to express the upper bound. TODO move *)
-
-  Definition max_exp_env (k : nat) (H : heap block) (rho : env) (e : exp) :=
-    max (sizeOf_exp e) (sizeOf_env k H rho).
-
-  
-  Lemma max_exp_env_grt_1 k e rho :
-    1 <= max_exp_env k e rho.
-  Proof.
-    unfold max_exp_env.
-    eapply le_trans. now apply sizeOf_exp_grt_1.
-    eapply Max.le_max_l.
-  Qed.
-
-  (** Lemmas used to establish the upper bound given the IH *)
-
-  Lemma max_exp_env_Econstr k x t ys e rho :
-    max_exp_env k e rho <= max_exp_env k (Econstr x t ys e) rho.
-  Proof.
-    eapply NPeano.Nat.max_le_compat_r.
-    simpl. omega.
-  Qed.
-
-  Lemma max_exp_env_Eproj k x t N y e rho :
-    max_exp_env k e rho <= max_exp_env k (Eproj x t N y e) rho.
-  Proof.
-    eapply NPeano.Nat.max_le_compat_r.
-    simpl. omega.
-  Qed.
-
-  Lemma max_exp_env_Ecase_cons_hd k x c e l rho :
-    max_exp_env k e rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
-  Proof.
-    eapply NPeano.Nat.max_le_compat_r.
-    simpl. omega.
-  Qed.
-
-  Lemma max_exp_env_Ecase_cons_tl k x c e l rho :
-    max_exp_env k (Ecase x l) rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
-  Proof.
-    eapply NPeano.Nat.max_le_compat_r.
-    simpl. omega.
-  Qed.
-
-  Lemma max_exp_env_Eprim k x f ys e rho :
-    max_exp_env k e rho <= max_exp_env k (Eprim x f ys e) rho.
-  Proof.
-    eapply NPeano.Nat.max_le_compat_r.
-    simpl. omega.
-  Qed.
-
-  Lemma max_exp_env_Efun k B e rho :
-    max_exp_env k e (def_funs B B rho rho) <= max_exp_env k (Efun B e) rho.
-  Proof.
-    unfold max_exp_env. eapply le_trans.
-    - eapply NPeano.Nat.max_le_compat_l.
-      now apply sizeOf_env_def_funs.
-    - rewrite (Max.max_comm (sizeOf_env _ _)), Max.max_assoc.
-      eapply NPeano.Nat.max_le_compat_r.
-      eapply Nat.max_lub; simpl; omega.
-  Qed.
-
-
-  (* XXX maybe move *)
-  Fixpoint cost_alloc_ctx (c : exp_ctx) : nat :=
-    match c with
-      | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx c
-      | Eproj_c x t n y c => cost_alloc_ctx c
-      (* not relevant *)
-      | Efun1_c B c => cost_alloc_ctx c
-      | Eprim_c x p ys c => cost_alloc_ctx c
-      | Hole_c => 0
-      | Efun2_c f _ => cost_alloc_f_ctx f
-      | Ecase_c _ _ _ c _ => cost_alloc_ctx c
-    end
-  with
-  cost_alloc_f_ctx (f : fundefs_ctx) : nat :=
-    match f with
-      | Fcons1_c _ _ _ c _ => cost_alloc_ctx c
-      | Fcons2_c _ _ _ _ f => cost_alloc_f_ctx f
-    end.
     
-  Lemma cost_alloc_ctx_comp_ctx_f C C' :
-    cost_alloc_ctx (comp_ctx_f C C') =
-    cost_alloc_ctx C + cost_alloc_ctx C'
-  with cost_alloc_comp_f_ctx_f f C' :
-    cost_alloc_f_ctx (comp_f_ctx_f f C') =
-    cost_alloc_f_ctx f + cost_alloc_ctx C'.
-  Proof.
-    - destruct C; simpl; try reflexivity;
-      try (rewrite cost_alloc_ctx_comp_ctx_f; omega).
-      rewrite cost_alloc_comp_f_ctx_f. omega.
-    - destruct f; simpl; try reflexivity.
-      rewrite cost_alloc_ctx_comp_ctx_f; omega.
-      rewrite cost_alloc_comp_f_ctx_f. omega.
-  Qed. 
-    
-  Definition FP i (e1 : exp) (rho1 : env) p1 p2 :=
+  Definition FP i (H : heap block) (rho1 : env) (e1 : exp)
+             (p1 p2 : nat * nat) :=
     match p1, p2 with
       | (c1, m1), (c2, m2) =>
-        c1 <= c2 <= 7 * c1 * (max_exp_env i e1 rho1) + 7 * sizeOf_exp e1
+        c1 <= c2 <= 7 * c1 * (max_exp_env i H rho1 e1) + 7 * sizeOf_exp e1 /\
+        m1 <= m2 <= 4 * m1 * (max_exp_env i H rho1 e1) + 4 * sizeOf_exp e1
     end.
   
-  Definition IP C (p1 p2 : heap block * env * exp) :=
+  Definition IP i C (p1 p2 : heap block * env * exp) :=
     let m := cost_alloc_ctx C in 
     match p1, p2 with
       | (H1, rho1, e1), (H2, rho2, e2) =>
-        size_heap H1 + m  <= size_heap H2 <= 2*(size_heap H1 + m)
+        size_heap H1 + m  <= size_heap H2 <=
+        4 * (size_heap H1 + m) * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
     end.
   
   Lemma FP_transfer (k c1 c2 c m1 m2 : nat) : 
@@ -155,87 +59,6 @@ Module ClosureConversionCorrect (H : Heap).
   (* Qed. *)
 
 
-  (** * Lemmas about [ctx_to_heap_env] *)
-
-  Lemma ctx_to_heap_env_comp_ctx_f_r C1 C2 rho1 H1 m1 rho2 H2 m2 rho3 H3 :
-    ctx_to_heap_env C1 H1 rho1 H2 rho2 m1 ->
-    ctx_to_heap_env C2 H2 rho2 H3 rho3 m2 ->
-    ctx_to_heap_env (comp_ctx_f C1 C2) H1 rho1 H3 rho3 (m1 + m2).
-  Proof.
-    revert C2 rho1 H1 m1 rho2 H2 m2 rho3 H3.
-    induction C1; intros C2 rho1 H1 m1 rho2 H2 m2 rho3 H3 Hctx1 GHctx2; inv Hctx1.
-    - eassumption.
-    - replace (c0 + costCC_ctx (Econstr_c v c l C1) + m2) with (c0 + m2 + costCC_ctx (Econstr_c v c l C1)) by omega.
-      simpl. econstructor; eauto. 
-    - replace (c0 + costCC_ctx (Eproj_c v c n v0 C1) + m2) with (c0 + m2 + costCC_ctx (Eproj_c v c n v0 C1)) by omega.
-      simpl. econstructor; eauto.
-  Qed.
-
-  Lemma ctx_to_heap_env_comp_ctx_l C C1 C2 H rho H' rho' m :
-    ctx_to_heap_env C H rho H' rho' m ->
-    comp_ctx C1 C2 C ->
-    exists rho'' H'' m1 m2,
-      ctx_to_heap_env C1 H rho H'' rho'' m1 /\
-      ctx_to_heap_env C2 H'' rho'' H' rho' m2 /\
-      m = m1 + m2.
-  Proof.
-    intros Hctx. revert C1 C2.
-    induction Hctx; intros C1 C2 Hcomp.
-    - inv Hcomp. repeat eexists; constructor.
-    - inv Hcomp.
-      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
-        constructor. inv H1.
-        do 4 eexists. split; [ | split ].  econstructor.
-        econstructor; eauto. omega.
-      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
-        eassumption.
-        do 4 eexists. split; [ | split ]. econstructor; eauto.
-        eassumption. simpl. omega.
-    - inv Hcomp.
-      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
-        constructor. inv H1.
-        do 4 eexists; split; [| split ]. constructor.
-        econstructor; eauto. omega.
-      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
-        eassumption.
-        do 4 eexists; split; [| split ]. econstructor; eauto.
-        eassumption. simpl. omega.
-  Qed.
-
-  Lemma ctx_to_heap_env_comp_ctx_f_l C1 C2 H rho H' rho' m :
-    ctx_to_heap_env (comp_ctx_f C1 C2) H rho H' rho' m ->
-    exists rho'' H'' m1 m2,
-      ctx_to_heap_env C1 H rho H'' rho'' m1 /\
-      ctx_to_heap_env C2 H'' rho'' H' rho' m2 /\
-      m = m1 + m2.
-  Proof.
-    intros. eapply ctx_to_heap_env_comp_ctx_l. eassumption.
-    eapply comp_ctx_f_correct. reflexivity.
-  Qed.
-
-  Lemma ctx_to_heap_env_size_heap C rho1 rho2 H1 H2 c :
-    ctx_to_heap_env C H1 rho1 H2 rho2 c ->
-    size_heap H2 = size_heap H1 + cost_alloc_ctx C. 
-  Proof.
-    intros Hctx; induction Hctx; eauto.
-    simpl. rewrite IHHctx.
-    unfold size_heap.
-    erewrite (HL.size_with_measure_alloc _ _ _ H H');
-      [| reflexivity | eassumption ].
-    erewrite getlist_length_eq; [| eassumption ]. 
-    simpl. omega.
-  Qed.
-
-  Lemma ctx_to_heap_env_subheap C H rho H' rho' m :
-    ctx_to_heap_env C H rho H' rho' m ->
-    H ⊑ H'.
-  Proof.
-    intros Hc; induction Hc.
-    - eapply HL.subheap_refl.
-    - eapply HL.subheap_trans.
-      eapply HL.alloc_subheap. eassumption. eassumption.
-    - eassumption.
-  Qed.
   
   Lemma project_var_get Scope Funs σ c Γ FVs S1 x x' C1 S2 rho1 H1 rho2 H2 m y:
     project_var clo_tag Scope Funs σ c Γ FVs S1 x x' C1 S2 ->

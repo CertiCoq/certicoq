@@ -27,7 +27,7 @@ Module CC_log_rel (H : Heap).
 
   (** Global initial condition. Enforced as initial condition for future executions of the result *)
   Definition GIInv := relation (heap block * env * exp).
-
+  
   (** * Final conditions *)
   
   (** Local final conditions. Holds for the result of the execution of the expressions being related. *)
@@ -45,8 +45,7 @@ Module CC_log_rel (H : Heap).
   (** A program will not get stuck for any fuel amount *)
   (* This is used to exclude programs that may timeout for low fuel, but they might get stuck later *)
   Definition not_stuck (H : heap block) (rho : env) (e : exp) :=
-    forall c, exists r m, big_step_GC H rho e r c m.
-  
+    forall c, exists r m, big_step_GC H rho e r c m. 
 
   (** step-indexed relation on cps terms. Relates cps-terms with closure-converted terms  *)
   (* Expression relation : (XXX This comment is not up-to-date)
@@ -71,10 +70,6 @@ Module CC_log_rel (H : Heap).
    * else True (* ? -- not quite sure yet *)
    *)
   
-  Notation "S |- b ::: H1 >->> H2 " := (bijective b (reach' H1 S) (reach' H2 S))
-                                      (at level 70, no associativity).
-  
-
   (** Definitions parametric on the value relation *)
   Section cc_approx.
     
@@ -510,7 +505,7 @@ Module CC_log_rel (H : Heap).
             (b : Inj).
     
   (** * Monotonicity Properties *)
-    
+  
   (** The environment relation is antimonotonic in the set of free variables *) 
   Lemma cc_approx_env_P_antimon (S1 S2 : Ensemble var) (k j : nat)
         (c1 c2 : (heap block) * env) :
@@ -1612,7 +1607,7 @@ Module CC_log_rel (H : Heap).
        * do 3 eexists; split; [ | split ]; try (now eauto).
    Qed.
 
-    
+   
   End LogRelLemmas.
 
 

@@ -26,7 +26,7 @@ Module Size (H : Heap).
   
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on the execution cost of certain transformations *)
-
+  
   (** The size of CPS expressions. Right now we only count the number of
    * variables in a program (free or not), the number of functions and
    * the number of function definition blocks *)
@@ -75,6 +75,7 @@ Module Size (H : Heap).
          end.
 
   (* Compute the maximum of a tree given a measure function *)
+  (* TODO move? *)
   Definition max_ptree_with_measure {A} (f : A -> nat) (i : nat) (rho : M.t A) :=
     M.fold (fun c _ v => max c (f v)) rho i.
 
@@ -107,6 +108,15 @@ Module Size (H : Heap).
       now apply Max.le_max_l.
   Qed.
 
+  Lemma max_list_nat_acc_spec {A} (xs : list A) f acc :
+    max_list_nat_with_measure f acc xs =
+    max acc (max_list_nat_with_measure f 0 xs).
+  Proof.
+    rewrite <- (Max.max_0_r acc) at 1. generalize 0.
+    revert acc. induction xs; intros acc n; simpl; eauto.
+    rewrite <- Max.max_assoc. eauto.
+  Qed.
+
   (** Stratified size for values *)
   Fixpoint sizeOf_val' (i : nat) (H : heap block) (v : value)  : nat :=
     match i with
@@ -130,6 +140,10 @@ Module Size (H : Heap).
   Definition sizeOf_env i (H : heap block) rho :=
     max_ptree_with_measure (sizeOf_val' i H) 0 rho.
 
+  (** Maximum of an expression and an environment. *)
+  Definition max_exp_env (k : nat) (H : heap block) (rho : env) (e : exp) :=
+    max (sizeOf_exp e) (sizeOf_env k H rho).
+  
   (** Equivalent definition *)
   Definition sizeOf_val (i : nat) (H : heap block) (v : value) : nat :=
     match i with
@@ -146,15 +160,17 @@ Module Size (H : Heap).
           | FunPtr B f => sizeOf_fundefs B
         end
     end.
-
+  
   Lemma sizeOf_val_eq i H v :
     sizeOf_val' i H v = sizeOf_val i H v.
   Proof.
     destruct i; eauto.
   Qed.
-
-  Opaque sizeOf_val'.
   
+  Opaque sizeOf_val'.
+
+  (** Monotonicity properties *)
+
   (* TODO move *)
   Lemma max_list_nat_monotonic (A : Type) (f1 f2 : A -> nat) (l : list A) (n1 n2 : nat) :
     (forall (x1 : A), f1 x1 <= f2 x1) ->
@@ -194,7 +210,8 @@ Module Size (H : Heap).
     intros. eapply NPeano.Nat.max_le_compat; eauto.
     rewrite !sizeOf_val_eq. now eapply sizeOf_val_monotic.
   Qed.
-  
+
+  (** Lemmas about [size_of_env] *)
   Lemma sizeOf_env_O H rho :
     sizeOf_env 0 H rho = 0.
   Proof.
@@ -210,15 +227,6 @@ Module Size (H : Heap).
     (* Obvious but seems painful, admitting for now *)
   Admitted.
 
-
-  Lemma max_list_nat_acc_spec {A} (xs : list A) f acc :
-    max_list_nat_with_measure f acc xs =
-    max acc (max_list_nat_with_measure f 0 xs).
-  Proof.
-    rewrite <- (Max.max_0_r acc) at 1. generalize 0.
-    revert acc. induction xs; intros acc n; simpl; eauto.
-    rewrite <- Max.max_assoc. eauto.
-  Qed.
 
   Lemma sizeOf_env_setlist k H rho rho' xs vs :
     setlist xs vs rho = Some rho' ->
@@ -245,5 +253,97 @@ Module Size (H : Heap).
     eapply max_ptree_with_measure_spec1.
     eassumption.
   Qed.
+
+  (** Lemmas about [size_of_exp] *)
+
+  Lemma sizeOf_exp_grt_1 e :
+    1 <= sizeOf_exp e.
+  Proof.
+    induction e using exp_ind'; simpl; eauto; omega.
+  Qed.
+
+  (** Lemmas about [sizeOf_exp_ctx] *)
+  Lemma sizeOf_exp_ctx_comp_ctx_mut :
+    (forall C1 C2,
+       sizeOf_exp_ctx (comp_ctx_f C1 C2) = sizeOf_exp_ctx C1 + sizeOf_exp_ctx C2) /\
+    (forall B e,
+       sizeOf_fundefs_ctx (comp_f_ctx_f B e) = sizeOf_fundefs_ctx B + sizeOf_exp_ctx e).
+  Proof.
+    exp_fundefs_ctx_induction IHe IHB; 
+    try (intros C; simpl; eauto; rewrite IHe; omega);
+    try (intros C; simpl; eauto; rewrite IHB; omega).
+    (* probably tactic misses an intro pattern *)
+    intros l' C. simpl. rewrite IHe; omega.
+  Qed.
+
+  Corollary sizeOf_exp_ctx_comp_ctx :
+    forall C1 C2,
+      sizeOf_exp_ctx (comp_ctx_f C1 C2) = sizeOf_exp_ctx C1 + sizeOf_exp_ctx C2.
+  Proof.
+    eapply sizeOf_exp_ctx_comp_ctx_mut; eauto.
+  Qed.
+
+  Corollary sizeOf_fundefs_ctx_comp_f_ctx :
+    forall B e,
+      sizeOf_fundefs_ctx (comp_f_ctx_f B e) = sizeOf_fundefs_ctx B + sizeOf_exp_ctx e.
+  Proof.
+    eapply sizeOf_exp_ctx_comp_ctx_mut; eauto.
+  Qed.
+  
+  (** Lemmas about [max_exp_env] *)
+
+  Lemma max_exp_env_grt_1 k H rho e :
+    1 <= max_exp_env k H rho e.
+  Proof.
+    unfold max_exp_env.
+    eapply le_trans. now apply sizeOf_exp_grt_1.
+    eapply Max.le_max_l.
+  Qed.
+
+  Lemma max_exp_env_Econstr k H x t ys e rho :
+    max_exp_env k H rho e <= max_exp_env k H rho (Econstr x t ys e).
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+  
+  Lemma max_exp_env_Eproj k x t N y e H rho :
+    max_exp_env k H rho e <= max_exp_env k H rho (Eproj x t N y e).
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  Lemma max_exp_env_Ecase_cons_hd k x c e l H rho :
+    max_exp_env k H rho e <= max_exp_env k H rho (Ecase x ((c, e) :: l)).
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+  
+  Lemma max_exp_env_Ecase_cons_tl k x c e l H rho :
+    max_exp_env k H rho  (Ecase x l) <= max_exp_env k H rho (Ecase x ((c, e) :: l)).
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  Lemma max_exp_env_Eprim k H rho x f ys e :
+    max_exp_env k H rho e <= max_exp_env k H rho (Eprim x f ys e).
+  Proof.
+    eapply NPeano.Nat.max_le_compat_r.
+    simpl. omega.
+  Qed.
+
+  (* Lemma max_exp_env_Efun k B e rho : *)
+  (*   max_exp_env k He (def_funs B B rho rho) <= max_exp_env k (Efun B e) rho. *)
+  (* Proof. *)
+  (*   unfold max_exp_env. eapply le_trans. *)
+  (*   - eapply NPeano.Nat.max_le_compat_l. *)
+  (*     now apply sizeOf_env_def_funs. *)
+  (*   - rewrite (Max.max_comm (sizeOf_env _ _)), Max.max_assoc. *)
+  (*     eapply NPeano.Nat.max_le_compat_r. *)
+  (*     eapply Nat.max_lub; simpl; omega. *)
+  (* Qed. *)
 
 End Size.

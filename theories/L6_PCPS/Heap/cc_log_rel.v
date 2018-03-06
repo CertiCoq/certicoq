@@ -26,7 +26,7 @@ Module CC_log_rel (H : Heap).
   Definition IInv := relation (heap block * env * exp).
 
   (** Global initial condition. Enforced as initial condition for future executions of the result *)
-  Definition GIInv := relation (heap block * env * exp).
+  Definition GIInv := nat -> relation (heap block * env * exp).
   
   (** * Final conditions *)
   
@@ -34,7 +34,7 @@ Module CC_log_rel (H : Heap).
   Definition Inv := relation (nat * nat).
 
   (** Global final conditions. Holds for the result of future execution of the result *)
-  Definition GInv := relation (nat * nat).
+  Definition GInv := nat -> relation (heap block * env * exp * nat * nat).
   
   (** Loc Injection *)
   Definition Inj := loc -> loc.
@@ -46,7 +46,7 @@ Module CC_log_rel (H : Heap).
   (* This is used to exclude programs that may timeout for low fuel, but they might get stuck later *)
   Definition not_stuck (H : heap block) (rho : env) (e : exp) :=
     forall c, exists r m, big_step_GC H rho e r c m. 
-
+  
   (** step-indexed relation on cps terms. Relates cps-terms with closure-converted terms  *)
   (* Expression relation : (XXX This comment is not up-to-date)
    * ---------------------
@@ -73,7 +73,7 @@ Module CC_log_rel (H : Heap).
   (** Definitions parametric on the value relation *)
   Section cc_approx.
     
-    Variable (cc_approx_val : nat -> nat -> IInv -> GInv -> Inj -> ans -> ans -> Prop). 
+    Variable (cc_approx_val : nat -> nat -> GIInv -> GInv -> Inj -> ans -> ans -> Prop). 
 
     (* TODO move *)
     Definition reach_n_res (j : nat) := fun '(v, H) => reach_n H j (val_loc v).
@@ -119,7 +119,7 @@ Module CC_log_rel (H : Heap).
   
   Fixpoint cc_approx_val (k : nat) {struct k} :=
     let fix cc_approx_val_aux 
-           (j : nat) (IP : IInv) (P : GInv) (b : Inj) (r1 r2 : ans) {struct j} : Prop :=
+           (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) {struct j} : Prop :=
     match r1, r2 with
       | OOT, OOT => True (* Both programs timeout *)
       | Res (v1, H1), Res (v2, H2) => (* Both programs terminate *)
@@ -167,7 +167,9 @@ Module CC_log_rel (H : Heap).
                            cc_approx_exp cc_approx_val
                                          (k - (k - i))
                                          j'
-                                         IP IP P P 
+                                         (IP i) IP
+                                         (fun p1 p2 =>
+                                            P i (H1'', rho_clo3, e1, fst p1, snd p1) (H2', rho2', e2, fst p2, snd p2)) P
                                          (e1, rho_clo3, H1'') (e2, rho2', H2')
                        end)
               | _, _ => False
@@ -184,7 +186,7 @@ Module CC_log_rel (H : Heap).
     (cc_approx_exp cc_approx_val k j P1 P2 P3 P4 p1 p2)
       (at level 70, no associativity).
   
-  Definition cc_approx_block (k : nat) (j : nat) (IP : IInv) (P : GInv) (b : Inj)
+  Definition cc_approx_block (k : nat) (j : nat) (IP : GIInv) (P : GInv) (b : Inj)
              (b1 : block) (H1 : heap block)
              (b2 : block) (H2 : heap block) : Prop :=
     match b1, b2 with
@@ -221,13 +223,15 @@ Module CC_log_rel (H : Heap).
                Forall2 R vs1 vs2 ->
                cc_approx_exp cc_approx_val
                              i j'
-                             IP IP P P
+                             (IP i) IP
+                             (fun p1 p2 =>
+                                P i (H1'', rho_clo3, e1, fst p1, snd p1) (H2', rho2', e2, fst p2, snd p2)) P
                              (e1, rho_clo3, H1'') (e2, rho2', H2'))
       | _, _ => False
     end.
   
   (** Unfold the recursion. A more compact definition of the value relation. *)
-  Definition cc_approx_val' (k : nat) (j : nat) (IP : IInv) (P : GInv) (b : Inj) (r1 r2 : ans) : Prop :=
+  Definition cc_approx_val' (k : nat) (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) : Prop :=
     match r1, r2 with
       | OOT, OOT => True (* Both programs timeout *)
       | Res (v1, H1), Res (v2, H2) => (* Both programs terminate *)
@@ -322,7 +326,7 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           simpl. intros i j' Hleq Hleq' Hall.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite <- Heqi. eapply Hi; eauto.
+          setoid_rewrite <-  Heqi at 2 4. eapply Hi; eauto.
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. eassumption.
       }
@@ -364,7 +368,7 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           simpl. intros i j' Hleq Hleq' Hall.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite <- Heqi. eapply Hi; eauto.
+          setoid_rewrite <- Heqi at 2 4. eapply Hi; eauto.
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. eassumption.
       }
@@ -439,7 +443,7 @@ Module CC_log_rel (H : Heap).
      [Γ]     : The formal parameter of the environment after closure conversion. *)
   
   (** Invariant about the free variables *) 
-  Definition FV_inv (k : nat) (IP : IInv) (P : GInv) (b : Inj)
+  Definition FV_inv (k : nat) (IP : GIInv) (P : GInv) (b : Inj)
              (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
              (Scope Funs : Ensemble var) (c : cTag) (Γ : var) (FVs : list var) : Prop :=
     forall (x : var) N (v : value),
@@ -454,7 +458,7 @@ Module CC_log_rel (H : Heap).
         (forall j, Res (v, H1) ≺ ^ ( k ; j ; IP ; P ; b) Res (v', H2)).
   
   (** Invariant about the functions in the current function definition *)
-  Definition Fun_inv (k : nat) (IP : IInv) (P : GInv) (b : Inj)
+  Definition Fun_inv (k : nat) (IP : GIInv) (P : GInv) (b : Inj)
              (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
              (Scope Funs : Ensemble var) (σ : var -> var) (c : cTag) (Γ : var)  : Prop :=
     forall (f : var) (vf1 : value),
@@ -499,7 +503,7 @@ Module CC_log_rel (H : Heap).
   Section LogRelLemmas.
     
     Context (LIP : IInv)
-            (GIP : IInv)
+            (GIP : GIInv)
             (LP : Inv)
             (GP : GInv)
             (b : Inj).
@@ -539,7 +543,7 @@ Module CC_log_rel (H : Heap).
        r1 ≺ ^ (m ; j ; GIP1 ; GP1 ; b) r2 ->
        r1 ≺ ^ (m ; j ; GIP1 ; GP2 ; b) r2) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
-    same_relation _ GP1 GP2 ->
+    (forall i, same_relation _ (GP1 i) (GP2 i)) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP2 ) p2.
   Proof.
     destruct p1 as [[e1 H1] rho1].
@@ -556,7 +560,7 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_val_same_rel (k j : nat) (GP1 GP2 : GInv) (b1 : Inj) r1 r2 :
     r1 ≺ ^ (k ; j ; GIP ; GP1 ; b1) r2 ->
-    same_relation _ GP1 GP2 ->
+    (forall i, same_relation _ (GP1 i) (GP2 i)) ->
     r1 ≺ ^ (k ; j ; GIP ; GP2 ; b1) r2.
   Proof.
     revert j b1 GP1 GP2 r1 r2.
@@ -582,13 +586,13 @@ Module CC_log_rel (H : Heap).
       intros i j' Hleq Hleq'. simpl. intros Hrel'.
       eapply cc_approx_exp_same_rel_IH with (GP1 := GP1); try eassumption.
       + intros; eapply IHk. omega. eassumption. eassumption.
-      + destruct Hrel as [Hrel1 Hrel2].
-        eapply cc_approx_exp_rel_mon; [| eassumption ]. eapply Hi. eassumption.
+      + eapply cc_approx_exp_rel_mon. eapply Hi. eassumption.
         eassumption.
         eapply Forall2_monotonic; [| eassumption ].
         intros. rewrite cc_approx_val_eq.
         eapply IHk; eauto. now rewrite <- cc_approx_val_eq; simpl in *; eauto.
-        now split; eauto.
+        intros. split; now eapply Hrel.
+        intros x y. now eapply Hrel.
   Qed.
   
   Transparent cc_approx_exp.
@@ -596,7 +600,7 @@ Module CC_log_rel (H : Heap).
   Lemma cc_approx_exp_same_rel (P : relation nat) k j (GP' : GInv)
         p1 p2 :
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP ) p2 ->
-    same_relation _ GP GP' ->
+    (forall i, same_relation _ (GP i) (GP' i)) ->
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP' ) p2.
   Proof.
     intros Hcc Hin. eapply cc_approx_exp_same_rel_IH; try eassumption.
@@ -1621,7 +1625,7 @@ Module CC_log_rel (H : Heap).
   Proof.
     intros s1 s2 [H1 H2]; split; intros Hpre;
     subst; eapply cc_approx_env_P_antimon; subst; eauto. 
-  Qed.
+  Qed. 
 
 
 End CC_log_rel.

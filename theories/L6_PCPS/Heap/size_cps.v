@@ -1,7 +1,7 @@
 From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions closure_conversion closure_conversion_util.
 
-From L6.Heap Require Import heap heap_defs cc_log_rel.
+From L6.Heap Require Import heap heap_defs cc_log_rel compat.
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -20,9 +20,9 @@ Module Defs := HeapDefs .
 Module Size (H : Heap).
 
   (* This is stupid. Find out how to use modules correctly. *)
-  Module LogRel := CC_log_rel H.
+  Module Compat := Compat H.
   
-  Import H LogRel.Sem.Equiv.Defs.
+  Import H Compat.LR.Sem.Equiv.Defs.
   
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on the execution cost of certain transformations *)

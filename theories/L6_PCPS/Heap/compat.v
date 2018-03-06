@@ -21,20 +21,24 @@ Module Compat (H : Heap).
   Import H LR LR.Sem LR.Sem.Equiv LR.Sem.Equiv.Defs.
     (** Conditions *)
 
-    Variable (IG : GInv). (* Final global *)
-    Variable (ILi : nat -> Inv). (* Final local indexed by a natural number indicating the amount of time units already spent for evaluation of the RHS program *) 
-    Variable (IIG : GIInv). (* Global initial *)
-    Variable (IIL1 IIL2 : IInv). (* Local initial *)
-    
-    Variable (F : nat). (* A constant factor*)
-    
-    Variable
+  Section LR_Preds.
+
+    Context (IG : GInv) (* Final global *)
+            (ILi : nat -> Inv) (* Final local indexed by a natural number indicating the amount of time units already spent for evaluation of the RHS program *) 
+            (IIG : GIInv) (* Global initial *)
+            (IIL1 IIL2 : IInv) (* Local initial *)
+            (F : nat). (* A constant factor*)
+
+
+    (** Compatibility properties for local invariants to do local reasoning *)
+
+    Context
       (InvCostTimeout :
          forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) (k c : nat),
            IIL1 (H1, rho1, e1) (H2, rho2, e2) ->
            ILi k (c, size_heap H1) (c - k, size_heap H2)).
     
-    Variable
+    Context
       (InvCostBase :
          forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) (k c : nat),
            c >= 1 ->
@@ -44,7 +48,7 @@ Module Compat (H : Heap).
     
     (** * Compatibility properties for local conditions *)
 
-    Variable
+    Context
       (InvCompat_str :
          forall (k1 k2 c1 c2 c1' c2' m1 m2 : nat),
            
@@ -54,7 +58,7 @@ Module Compat (H : Heap).
 
            ILi k1 (c1, m1) (c2, m2)).
     
-    Variable
+    Context
       (InvTransfer :
          forall (k c1 c2 c m1 m2 : nat),
            ILi (k + c) (c1, m1) (c2, m2) ->
@@ -64,7 +68,7 @@ Module Compat (H : Heap).
     (** Constructor compatibility *)
     Lemma cc_approx_exp_constr_compat (k j : nat)
           (b : Inj) (H1 H2 : heap block)  (rho1 rho2 : env)
-          (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp) (r1 r2 : nat) (a1 a2 : nat)
+          (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp) (r1 r2 : nat)
           
           (IInvConstrCompat :
              forall (H1 H2 H1' H2' : heap block) (rho1 rho2 : env)
@@ -616,7 +620,7 @@ Module Compat (H : Heap).
 
     (* TODO move *)
     Lemma cc_approx_var_env_image_eq
-          (GIP : IInv) (GP : GInv) (k j : nat) (β : Inj) 
+          (GIP : GIInv) (GP : GInv) (k j : nat) (β : Inj) 
           (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
       cc_approx_var_env k j GIP GP β H1 rho1 H2 rho2 x y ->
       M.get x rho1 = Some v -> 
@@ -632,7 +636,7 @@ Module Compat (H : Heap).
       rewrite !env_locs_Singleton; eauto. reflexivity.
     Qed.
 
-    Lemma cc_approx_val_image_reach_n_eq (GIP : IInv) (GP : GInv) (k j : nat) (β : Inj)  (H1 H2 : heap block)
+    Lemma cc_approx_val_image_reach_n_eq (GIP : GIInv) (GP : GInv) (k j : nat) (β : Inj)  (H1 H2 : heap block)
         (v1 v2 : value) :
       (Res (v1, H1)) ≺ ^ (k ; j ; GIP ; GP ; β) (Res (v2, H2)) ->
       image β (reach_n H1 j (val_loc v1)) <--> (reach_n H2 j (val_loc v2)).
@@ -650,7 +654,7 @@ Module Compat (H : Heap).
     Qed.
     
     Lemma cc_approx_var_env_image_reach_n_eq
-          (GIP : IInv) (GP : GInv) (k j : nat) (β : Inj) 
+          (GIP : GIInv) (GP : GInv) (k j : nat) (β : Inj) 
           (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
       cc_approx_var_env k j GIP GP β H1 rho1 H2 rho2 x y ->
       M.get x rho1 = Some v -> 
@@ -1027,33 +1031,6 @@ Module Compat (H : Heap).
                eapply cc_approx_val_monotonic. eassumption.
                simpl. simpl in Hcost. omega. }
     Qed.
-    
-    Variable
-      (InvCompat1_str_gc :
-         forall (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp)
-           (k1 k2 c1 c2 c1' c2' m1 m2 : nat),
-
-           IIL2 (H1, rho1, e1) (H2, rho2, e2) ->
-
-           ILi k2 (c1 - c1', m1) (c2 - c2', m2) -> 
-
-           c1' <= c2' + (k1 - k2) <= c1' + F*c1' ->
-
-           ILi k1 (c1, max m1 (size_heap H1)) (c2, max m2 (size_heap H2))).
-    
-    Variable
-      (IGinILi : inclusion _ IG (ILi 0)).
-
-    Variable
-      (IIL2inIIG : inclusion _ IIL2 IIG).
-
-    Variable
-      (II_gc :
-         forall (H1 H2 H1' H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp),
-           IIL2 (H1, rho1, e1) (H2, rho2, e2) ->
-           live (env_locs rho1 (occurs_free e1)) H1 H1' ->
-           live' (env_locs rho2 (occurs_free e2)) H2 H2' ->
-           IIL2 (H1', rho1, e1) (H2', rho2, e2)).
 
     Variable (clo_tag : cTag). 
 
@@ -1181,22 +1158,61 @@ Module Compat (H : Heap).
       split; [| split ]; eauto.
       eapply heap_equiv_f_compose; [| eassumption ]. eassumption.
       
-  Qed.
+   Qed.
 
-   
+   (* Local invariants parameterized by the cost *)
+
+   Context (IIL1i : GIInv)
+           (IIL2i : GIInv)
+           (ILik : nat -> GInv). 
+
+    Context
+      (IL_heap_eq :
+         forall i k (H1 H2 H1' H2' : heap block) (rho1 rho2 rho1' rho2' : env) b1 b2 (e1 e2 : exp)
+           (c1 c2 m1 m2 : nat),
+         ILik k i (H1', rho1', e1, c1, m1) (H2', rho2', e2, c2, m2) ->
+         occurs_free e1 |- (H1, rho1) ⩪_( id, b1) (H1', rho1') ->
+         injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) b1 ->
+         occurs_free e2 |- (H2, rho2) ⩪_( b2, id) (H2', rho2') ->
+         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e2))) b2 ->
+         ILik k i (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2, m2)).
+
+    Context
+      (IL1_mon :
+         forall i i' H1 rho1 e1 H2 rho2 e2,
+           IIL1i i (H1, rho1, e1) (H2, rho2, e2) ->
+           i' < i ->
+           IIL1i i' (H1, rho1, e1) (H2, rho2, e2)).
+    
+    Context
+      (IL2_mon :
+         forall i i' H1 rho1 e1 H2 rho2 e2,
+           IIL2i i (H1, rho1, e1) (H2, rho2, e2) ->
+           i' < i ->
+           IIL2i i' (H1, rho1, e1) (H2, rho2, e2)).
+
+    Context
+      (ILikCostTimeout :
+         forall i (H1 H2 : heap block) (rho1 rho2 : env) 
+           (e1 e2 : exp) (k c : nat),
+       IIL1i i (H1, rho1, e1) (H2, rho2, e2) ->
+       ILik k i (H1, rho1, e1, c, size_heap H1) (H2, rho2, e2, c - k, size_heap H2)).
+    
+    
    (** Application compatibility *)
    Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 : var) (xs1 : list var)
           (f2 f2' Γ : var) (xs2 : list var) (t : fTag) (c : nat)
           (IInvAppCompat :
-             forall (H1 H2 H1' : heap block) (rho1 rho_clo rho_clo1 rho_clo2 rho2 rho2' : env)
+             forall (i i' : nat) (H1 H2 H1' H1'' H2' : heap block) (rho1 rho_clo rho_clo1 rho_clo2 rho2 rho2' : env)
                (B1 : fundefs) (f1 f1' : var) (ct1 : cTag) 
                (xs1 xs1' : list var) (e1 : exp) (l1 env_loc1 : loc)
                (vs1 : list value) 
-
                (B2 : fundefs) (f2 f3 : var) (c ct2 : cTag) (xs2 xs2' : list var) 
                (e2 : exp) (l2 env_loc2 : loc) (vs2 : list value),
-               IIL1 (H1, rho1, Eapp f1 t xs1) (H2, rho2, AppClo f2 t xs2 f2' Γ) ->
+
+               IIL1i i (H1, rho1, Eapp f1 t xs1) (H2, rho2, AppClo f2 t xs2 f2' Γ) ->
+               i' < i ->
                (* not exactly classy.... Can we make it a bit more abstract? *)
                M.get f1 rho1 = Some (Loc l1) ->
                get l1 H1 = Some (Clos (FunPtr B1 f1') (Loc env_loc1)) ->
@@ -1205,6 +1221,7 @@ Module Compat (H : Heap).
                getlist xs1 rho1 = Some vs1 ->
                def_closures B1 B1 rho_clo H1 env_loc1 = (H1', rho_clo1) ->
                setlist xs1' vs1 rho_clo1 = Some rho_clo2 ->
+               live (env_locs rho_clo2 (occurs_free e1)) H1' H1'' ->
 
                M.get f2 rho2 = Some (Loc l2) ->
                getlist xs2 rho2 = Some vs2 ->
@@ -1212,8 +1229,14 @@ Module Compat (H : Heap).
                Some rho2' =
                setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
                find_def f3 B2 = Some (ct2, xs2', e2) ->
+               live' (env_locs rho2' (occurs_free e2)) H2 H2' ->
 
-               IIL2 (H1', rho_clo2, e1) (H2, rho2', e2)) :
+               (IIG i' (H1'', rho_clo2, e1) (H2', rho2', e2)) /\
+               (forall (k c1 c2 m1 m2 c1' c2' : nat),
+                  IG i' (H1', rho_clo2, e1, c1 - c1', m1) (H2, rho2', e2, c2 - c2', m2) ->
+                  c1' <= c2' + k <= c1' + F*c1' ->
+                  ILik k i (H1, rho1, Eapp f1 t xs1, c1, max m1 (size_heap H1'))
+                       (H2, rho2, AppClo f2 t xs2 f2' Γ, c2, max m2 (size_heap H2)))) :
       
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo f2 t xs2 f2' Γ)))) H2 ->
@@ -1230,8 +1253,9 @@ Module Compat (H : Heap).
       cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 f1 f2 ->
       Forall2 (cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2) xs1 xs2 ->
 
-      (* II (H1, rho1, Eapp f1 t xs1) (H2, rho2, AppClo f2 t xs2 f2' Γ)  -> *)
-      (Eapp f1 t xs1, rho1, H1) ⪯ ^ (k ; j; IIL1 ; IIG ; ILi c ; IG) (AppClo f2 t xs2 f2' Γ, rho2, H2).
+      (Eapp f1 t xs1, rho1, H1) ⪯ ^ (k ; j; IIL1i k ; IIG ; (fun p1 p2 => ILik c k (H1, rho1, Eapp f1 t xs1, fst p1, snd p1)
+                                                                            (H2, rho2, AppClo f2 t xs2 f2' Γ, fst p2, snd p2))
+                                                          ; IG) (AppClo f2 t xs2 f2' Γ, rho2, H2).
    Proof with now eauto with Ensembles_DB.
       intros Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq Hleqc Hlen Hvar Hall
              b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2
@@ -1243,14 +1267,15 @@ Module Compat (H : Heap).
           [| eassumption | eassumption | eassumption | eassumption 
            | normalize_occurs_free; now eauto with Ensembles_DB
            | unfold AppClo; normalize_occurs_free; now eauto with Ensembles_DB ].
-      inv Hstep1.
+      inv Hstep1. 
       (* Timeout! *)
       - { edestruct (Hstuck1 (cost H1' rho1' (Eapp f1 t xs1))) as [v1 [m1 Hstep1]].
           inv Hstep1; [ omega | ].
           exists OOT, (c1 - c). destruct (lt_dec (c1 - c) 1).
           - eexists. eexists id. repeat split. now constructor; eauto.
             now eapply injective_subdomain_Empty_set. rewrite <- plus_n_O.
-            eapply InvCostTimeout. eassumption.
+            eapply IL_heap_eq; try eassumption.
+            eapply ILikCostTimeout. eassumption.
             now rewrite cc_approx_val_eq.
           - edestruct Hvar as [l2 [Hget' Hcc]]; eauto.
             simpl in Hcc. rewrite Hgetl in Hcc. destruct l2 as [l2 | ]; [| contradiction ].
@@ -1268,7 +1293,8 @@ Module Compat (H : Heap).
               now econstructor; simpl; eauto.
               eapply injective_subdomain_Empty_set.
               rewrite <- !plus_n_O.
-              eapply InvCostTimeout. eassumption.
+              simpl. eapply IL_heap_eq; try eassumption.
+              eapply ILikCostTimeout. eassumption.
               now rewrite cc_approx_val_eq.
             + eexists. eexists id. repeat split. unfold AppClo.
               eapply Eval_proj_per_cc; eauto.
@@ -1281,8 +1307,9 @@ Module Compat (H : Heap).
               econstructor; try (now simpl; eauto). simpl.
               erewrite <- Forall2_length; [| eassumption ]. simpl in *. omega.
               now eapply injective_subdomain_Empty_set.
-              rewrite <- plus_n_O. 
-              eapply InvCostTimeout. eassumption.
+              rewrite <- plus_n_O.
+              simpl. eapply IL_heap_eq; try eassumption.
+              eapply ILikCostTimeout. eassumption.
               now rewrite cc_approx_val_eq. }
       (* Termination *) 
       - { simpl in Hcost.
@@ -1313,6 +1340,8 @@ Module Compat (H : Heap).
           assert (Hgc1 := Hgc); assert (Hgc2 := Hgc').
           destruct Hgc as [Hseq [bgc [Heqgc Hinjgc]]].
           destruct Hgc' as [Hseq' [bgc' [Heqgc' Hinjgc']]].
+          edestruct IInvAppCompat with (i' := k - cost H1' rho1' (Eapp f1 t xs1)) as [Hinv1 Hinv2]; try eassumption.
+          simpl. omega.
           edestruct Hi' with (i := k - cost H1' rho1' (Eapp f1 t xs1))
                                (j' := j) as [r2 [c2 [m2 [b2' [Hbs2 [Hinj [HIG Hcc2]]]]]]];
             [ | omega | | | | | | | | eassumption | | ].  
@@ -1364,10 +1393,7 @@ Module Compat (H : Heap).
           + eassumption.
           + eapply heap_env_equiv_heap_equiv. eassumption.
           + eassumption.
-          + eapply IIL2inIIG.  
-            eapply II_gc; [| | ].
-            eapply IInvAppCompat; try eassumption. now constructor; eauto.
-            now constructor; eauto.
+          + eassumption.
           + simpl; omega.
           + intros i. edestruct (Hstuck1 (i + cost H1' rho1' (Eapp f1 t xs1))) as [r' [m' Hstep']].
             inv Hstep'.
@@ -1382,7 +1408,9 @@ Module Compat (H : Heap).
               eapply heap_env_equiv_heap_equiv. symmetry. eassumption.
               eassumption. eassumption. do 2 eexists. eassumption.
           + do 3 eexists. exists b2'. repeat split.
-            * eapply Eval_proj_per_cc with (c := c2 + 1 + 1 + cost H2' (M.set Γ (Loc env_loc') (M.set f2' (FunPtr B2 f3) rho2')) (Eapp f2' t (Γ :: xs2))).
+            * eapply Eval_proj_per_cc with
+              (c := c2 + 1 + 1 + cost H2' (M.set Γ (Loc env_loc') (M.set f2' (FunPtr B2 f3) rho2'))
+                                      (Eapp f2' t (Γ :: xs2))).
               simpl; omega.
               eassumption. eassumption. reflexivity.
               eapply Eval_proj_per_cc. simpl; omega.
@@ -1402,22 +1430,19 @@ Module Compat (H : Heap).
               replace (c2 + 1 + 1 + S (S (length xs2)) - 1 - 1 - S (S (length xs2)))  with c2.
               eassumption. omega.
             * eassumption.
-            * eapply InvCompat1_str_gc with
+            * simpl.
+              eapply IL_heap_eq; try eassumption.
+              eapply Hinv2 with
               (c2' := 1 + 1 +
                       cost H2' (M.set Γ (Loc env_loc') (M.set f2' (FunPtr B2 f3) rho2'))
-                           (Eapp f2' t (Γ :: xs2))
-              ).
-              eapply IInvAppCompat; eassumption.
-              replace (c2 + 1 + 1 +
-                       cost H2' (M.set Γ (Loc env_loc') (M.set f2' (FunPtr B2 f3) rho2'))
-                            (Eapp f2' t (Γ :: xs2)) - (1 + 1 +
-                       cost H2' (M.set Γ (Loc env_loc') (M.set f2' (FunPtr B2 f3) rho2'))
-                            (Eapp f2' t (Γ :: xs2)))) with c2 by omega.
-              eapply IGinILi. eassumption.
-              simpl in *. omega. 
+                           (Eapp f2' t (Γ :: xs2))).
+              simpl.
+              replace (c2 + 1 + 1 + S (S (length xs2)) - S (S (S (S (length xs2))))) with c2
+              by omega.
+              eassumption.
+              simpl in *. omega.
             * rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
-              eassumption. simpl. omega. }
-        
+              eassumption. simpl. omega. }        
     Qed.    
    
     (* TODO move *)
@@ -1650,5 +1675,7 @@ Module Compat (H : Heap).
           eapply Included_trans; [| eassumption ].
           eapply env_locs_monotonic. simpl. normalize_occurs_free...
     Qed.
-
+    
+  End LR_Preds.
+  
 End Compat.

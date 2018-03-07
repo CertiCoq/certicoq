@@ -30,6 +30,7 @@ Module Size (H : Heap).
   (** The size of CPS expressions. Right now we only count the number of
    * variables in a program (free or not), the number of functions and
    * the number of function definition blocks *)
+  (* TODO -- max per function block *)
   Fixpoint sizeOf_exp (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => length ys + sizeOf_exp e

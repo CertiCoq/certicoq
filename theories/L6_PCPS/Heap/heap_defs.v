@@ -865,6 +865,12 @@ Module HeapDefs (H : Heap) .
       * eexists. split; [| eassumption ]. omega.
   Qed.
 
+  Lemma reach_n_in_reach (H : heap block) (n : nat) (S : Ensemble loc): 
+    reach_n H n S \subset reach' H S.
+  Proof.
+    intros x [n' [_ Hin]]. eexists; split; eauto. constructor.
+  Qed.
+
   (** [reach_n] is extensive *)
   Lemma reach_n_extensive H n S :
     S \subset reach_n H n S.

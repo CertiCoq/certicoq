@@ -1073,6 +1073,103 @@ Module HeapEquiv (H : Heap).
     eapply res_approx_f_compose_r; eassumption.
   Qed.
 
+      Lemma heap_env_approx_f_compose_l S (β1 β2 β3 β4 : loc -> loc) (H1 H2 H3 : heap block)
+          (rho1 rho2 rho3 : M.t value) :
+      heap_env_approx S (β1, (H1, rho1)) ((β2 ∘ β4), (H2, rho2)) ->
+      heap_env_approx S (β4, (H2, rho2)) (β3, (H3, rho3)) ->
+      heap_env_approx S (β1, (H1, rho1)) (β2 ∘ β3, (H3, rho3)).
+    Proof.
+      intros Heq1 Heq2 x l Hin Hget.
+      edestruct Heq1 as [l1' [Hget1 Hres1]]; eauto.
+      edestruct Heq2 as [l2' [Hget2 Hres2]]; eauto.
+      eexists; split; eauto.
+      eapply res_equiv_f_compose. now apply Hres1.
+      eassumption.
+    Qed.
+
+    Lemma heap_env_approx_f_compose_r
+          S (β1 β2 β3 β4 : loc -> loc) (H1 H2 H3 : heap block)
+          (rho1 rho2 rho3 : M.t value) :
+      heap_env_approx S (β1, (H1, rho1)) (β2, (H2, rho2)) ->
+      heap_env_approx S (β4 ∘ β2, (H2, rho2)) (β3, (H3, rho3)) ->
+      heap_env_approx S (β4 ∘ β1, (H1, rho1)) (β3, (H3, rho3)).
+    Proof.
+      intros Heq1 Heq2 x l Hin Hget.
+      edestruct Heq1 as [l1' [Hget1 Hres1]]; eauto.
+      edestruct Heq2 as [l2' [Hget2 Hres2]]; eauto.
+      eexists; split; eauto.
+      intros n. destruct (Hres1 n); destruct (Hres2 n).
+      split.
+      rewrite res_approx_fuel_eq;
+      eapply res_approx_f_compose_r;
+      rewrite <- res_approx_fuel_eq; eauto.
+      rewrite res_approx_fuel_eq;
+      eapply res_approx_f_compose_l;
+      rewrite <- res_approx_fuel_eq; eauto.
+    Qed.      
+      
+    Lemma heap_env_equiv_f_compose S (β1 β2 β3 β4 : loc -> loc) (H1 H2 H3 : heap block)
+          (rho1 rho2 rho3 : M.t value) :
+      S |- (H1, rho1) ⩪_(β1, β2 ∘ β4) (H2, rho2) ->
+      S |- (H2, rho2) ⩪_(β4, β3) (H3, rho3) ->
+      S |- (H1, rho1) ⩪_(β1, β2 ∘ β3) (H3, rho3).
+    Proof.
+      intros [Hyp1 Hyp2] [Hyp1' Hyp2'].
+      split.
+      eapply heap_env_approx_f_compose_l; try eassumption.
+      eapply heap_env_approx_f_compose_r; try eassumption.
+    Qed.
+    
+    Lemma block_equiv_f_compose (β1 β2 β3 β4 : loc -> loc) (H1 H2 H3 : heap block)
+          (b1 b2 b3 : block) :
+      block_equiv (β1, H1, b1) ((β2 ∘ β4), H2, b2) ->
+      block_equiv (β4, H2, b2) (β3, H3, b3) ->
+      block_equiv (β1, H1, b1) (β2 ∘ β3, H3, b3).
+    Proof.
+      intros Hb1 Hb2.
+      destruct b1; destruct b2; destruct b3;
+      try contradiction; simpl in *.
+      - destruct Hb1 as [Heq Hall].
+        destruct Hb2 as [Heq' Hall'].
+        subst. split; eauto.
+        eapply Forall2_vertical_r_strong;
+          [| now apply Hall | now apply Hall' ].
+        intros x1 x2 x3 Hin1 Hin2 Hin3 Hl1 Hl2.
+        eapply res_equiv_f_compose. now apply Hl1.
+        now apply Hl2.
+      - destruct Hb1 as [Heq1 Heq2].
+        destruct Hb2 as [Heq1' Heq2'].
+        split; eapply res_equiv_f_compose; eauto.
+      - eapply heap_env_equiv_f_compose; eauto.
+    Qed.
+
+    Lemma heap_equiv_f_compose S (β1 β2 β3 β4 : loc -> loc) (H1 H2 H3 : heap block) :
+      S |- H1 ≃_(β1, β2 ∘ β4) H2 ->
+      S |- H2 ≃_(β4, β3) H3 ->
+      S |- H1 ≃_(β1, β2 ∘ β3) H3.
+    Proof.
+      intros [Hyp1 Hyp2] [Hyp1' Hyp2'].
+      split.
+      - intros x Hin.
+        destruct (Hyp1 x Hin) as [Heqb1 Hh1].
+        destruct (Hyp1' x Hin) as [Heqb1' Hh1'].
+        split. unfold compose in *. congruence.
+        intros bl1 Hget.
+        edestruct Hh1 as [bl2 [Hget2 Heq2]]; eauto.
+        edestruct Hh1' as [bl2' [Hget2' Heq2']]; eauto.
+        eexists; split; eauto.
+        eapply block_equiv_f_compose; eauto.
+      - intros x Hin.
+        destruct (Hyp2 x Hin) as [Heqb1 Hh1].
+        destruct (Hyp2' x Hin) as [Heqb1' Hh1'].
+        split. unfold compose in *. congruence.
+        intros bl1 Hget.
+        edestruct Hh1' as [bl2' [Hget2' Heq2']]; eauto.
+        edestruct Hh1 as [bl2 [Hget2 Heq2]]; eauto.
+        eexists; split; eauto.
+        symmetry. eapply block_equiv_f_compose; symmetry; eauto.
+    Qed.
+
   (** Proper instances *)
   
   Instance Proper_heap_env_approx : Proper (Same_set _ ==> eq ==> eq ==> iff) heap_env_approx.
@@ -2347,6 +2444,28 @@ Module HeapEquiv (H : Heap).
       eexists; split; eauto.
       eexists; split; eauto. eexists; split. now constructor. 
       eassumption.
+  Qed.
+
+  Lemma res_equiv_image_reach_n (n : nat) (β1 β2 : loc -> loc)
+        (H1 H2 : heap block)
+        (v1 v2 : value) :
+    res_equiv (β1, (v1, H1)) (β2, (v2, H2)) ->
+    image β1 (reach_n H1 n (val_loc v1)) <--> image β2 (reach_n H2 n (val_loc v2)).
+  Proof.
+    intros Heq. split.
+    - intros l' [l [[m [Hm Hr]] Hin]].
+      destruct (Heq m) as [Heq1 Heq2].
+      rewrite res_approx_fuel_eq in *.
+      eapply res_approx_image_post in Heq1.
+      edestruct Heq1 as [l1 [Hp1 Hin1]].
+      eexists; split; eauto.
+      eexists; split; eauto. eexists; split; eauto.
+    - intros l' [l [[m [Hm Hr]] Hin]].
+      destruct (Heq m) as [Heq1 Heq2].
+      rewrite res_approx_fuel_eq in *. eapply res_approx_image_post in Heq2.
+      edestruct Heq2 as [l1 [Hp1 Hin1]].
+      eexists; split; eauto.
+      eexists; split; eauto. eexists; split; eauto.
   Qed.
 
   Lemma res_equiv_image_post (β1 β2 : loc -> loc)

@@ -19,6 +19,7 @@ Require Import L4.variables.
 (**********************)
 Inductive cps : Type :=
 | Halt_c : val_c -> cps
+| Let_c: NVar -> val_c -> cps -> cps  (* adding this breaks L5 to L6 *)
 | Ret_c : val_c (* cont *) -> val_c (* result *) -> cps
 | Call_c : NVar (* fn *) -> NVar (* cont *) -> NVar (* arg *) -> cps
 | Match_c : val_c -> list  ((dcon * nat) * ((list NVar)* cps)) -> cps
@@ -83,6 +84,10 @@ match c with
       f <- translateVal f ;;
       a <- translateVal a ;;
       ret (Ret_c f a)
+ | terms.oterm CLet [bterm [] vt; bterm [v] f] => 
+      vt <- translateVal vt ;;
+      f <- translateCPS f ;;
+      ret (Let_c v vt f)
  | terms.oterm CCall [bterm [] fn; bterm [] cont; bterm [] arg] => 
  (** we know that the CPS translation only produces Call_c terms that are variables. see 
     [L4_2_to_L5.cps_cvt] and [L4_2_to_L5.cps_cvt_apply]. *)
@@ -219,7 +224,7 @@ Proof using.
   apply in_map_iff in Hin. exrepnd.
   destruct a as [lv nt].
   subst.
-  apply isSomeBindRet. simpl. 
+  apply isSomeBindRet. simpl.
 (*  apply translateVal_cps_cvt_val.
   eapply Hind; eauto.
   ntwfauto. *)

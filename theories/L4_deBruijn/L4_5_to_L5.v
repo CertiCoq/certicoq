@@ -113,6 +113,7 @@ Require Import SquiggleEq.alphaeq.
 Inductive L5Opid : Set :=
  | CLambda 
  | CKLambda
+ | CLet
 (** number of functions that are mutually defined, index of the one which
 is referred to here.*)
  | CFix (nMut index : nat)
@@ -145,6 +146,7 @@ Definition CPSOpBindings (c : L5Opid)
   | CKLambda    => [1] (* continuation lambda  *)
   | CFix nMut _ => repeat nMut nMut
   | CDCon _ nargs    => repeat 0 nargs
+  | CLet => [0,1]
   | CHalt => [0]
   | CRet => [0,0]
   | CCall => [0,0,0]
@@ -156,6 +158,7 @@ Definition L5OpidString (l : L5Opid) : string :=
   match l with
   | CLambda    => "λ"
   | CKLambda    => "λ→" 
+  | CLet => "let"
   | CFix _ _ => "fix"
   | CDCon d _ => dconString d
   | CRet     => "ret"
@@ -779,6 +782,9 @@ Definition KLam_c (v : NVar) (b : CTerm) : CTerm :=
 
 Definition Ret_c (f a : CTerm) :=
   coterm CRet [bterm [] f , bterm [] a].
+
+Definition Let_c (v : NVar) (e1 e2 : CTerm) : CTerm :=
+  coterm CLet [(bterm [] e1);(bterm [v] e2)].
 
 Definition Halt_c (v : CTerm) :=
   coterm CHalt [bterm [] v].

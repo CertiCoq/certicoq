@@ -33,7 +33,7 @@ Local Instance L4_5MkApply : MkApply  (ienv * L4_5_Term) :=
 
   Definition extractL5Core (t:L5Term) :=
     match t with
-      (*  L4_5_to_L5.Ret_c core haltCont => core *)
+      (*  L4_5_to_L5.ContApp_c core haltCont => core *)
       oterm CRet [bterm [] core; _] => core
       | _ => oterm CRet [] (* impossible, hence garbage *)
     end.
@@ -253,7 +253,7 @@ Proof.
     simpl.
     rewrite (fst ssubst_aux_trivial5) at 1; [ | simpl; rewrite Hs; apply list.disjoint_nil_l ].
     rewrite (fst ssubst_aux_trivial5); [ | simpl; rewrite Hsa; apply list.disjoint_nil_l ].
-    unfold cps_cvt_apply_aux,  L4_5_to_L5.Ret_c,  L4_5_to_L5.KLam_c.
+    unfold cps_cvt_apply_aux,  L4_5_to_L5.ContApp_c,  L4_5_to_L5.KLam_c.
     repeat f_equal.
     apply cps_val_outer. apply is_valueb_corr. eapply eval_yields_value'; eauto.
     Fail idtac.

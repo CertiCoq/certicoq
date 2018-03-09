@@ -212,7 +212,7 @@ note : var "1" is taken as error and will be proven not to appear when input is 
     match e with
       | Halt_c v => let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
                     (app_ctx_f ctx_v (Ehalt vn), (Pos.succ n'), tgm)
-      | Ret_c k v => let '(ctx_k, kn, n', tgm) := convert_v k sv sk tgm n in
+      | ContApp_c k v => let '(ctx_k, kn, n', tgm) := convert_v k sv sk tgm n in
                      let '(ctx_v, vn, n'', tgm) := convert_v v sv sk tgm n' in
                      (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp  kn kon_tag (vn::nil)), n'', tgm)
       | Call_c f k v =>
@@ -248,7 +248,7 @@ note : var "1" is taken as error and will be proven not to appear when input is 
     end
   (* returns converted context * new binding (usually n'-1 except for var and kvar) * next fresh 
 
-Ret_c M N -> 
+ContApp_c M N -> 
  let m = [[M]] in
   let n = [[N]] in
    App_e m n

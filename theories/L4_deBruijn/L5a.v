@@ -20,7 +20,7 @@ Require Import L4.variables.
 Inductive cps : Type :=
 | Halt_c : val_c -> cps
 (* | Let_c: NVar -> val_c -> cps -> cps  (* adding this breaks L5 to L6 *) *)
-| Ret_c : val_c (* cont *) -> val_c (* result *) -> cps
+| ContApp_c : val_c (* cont *) -> val_c (* result *) -> cps
 | Call_c : NVar (* fn *) -> NVar (* cont *) -> NVar (* arg *) -> cps
 | Match_c : val_c -> list  ((dcon * nat) * ((list NVar)* cps)) -> cps
 (* | Proj_c : val_c (*arg *) -> nat -> val_c (*cont*) -> cps *)
@@ -50,7 +50,7 @@ Require Import ExtLib.Data.Monads.OptionMonad.
 Fixpoint interp  (c: cps) : CTerm :=
 match c with
 | Halt_c v => coterm CHalt [bterm [] (interpVal v)]
-| Ret_c f a => coterm CRet [bterm [] (interpVal f) , bterm [] (interpVal a)]
+| ContApp_c f a => coterm CRet [bterm [] (interpVal f) , bterm [] (interpVal a)]
 | Call_c f k a => coterm CCall [bterm [] (vterm f) , bterm [] (vterm k) , bterm [] (vterm a)]
 | Match_c discriminee brs => 
     coterm (CMatch (List.map (fun b => (fst (fst (fst b)), length (snd (fst b)))) brs))
@@ -83,7 +83,7 @@ match c with
  | terms.oterm CRet [bterm [] f; bterm [] a] => 
       f <- translateVal f ;;
       a <- translateVal a ;;
-      ret (Ret_c f a)
+      ret (ContApp_c f a)
 (* | terms.oterm CLet [bterm [] vt; bterm [v] f] => 
       vt <- translateVal vt ;;
       f <- translateCPS f ;;
@@ -347,9 +347,9 @@ Eval compute in (L4_to_L5a (Lam_e (Var_e 0))).
 (*
      = Some
          (Cont_c 5%positive
-            (Ret_c (KVar_c 5%positive)
+            (ContApp_c (KVar_c 5%positive)
                (Lam_c 4%positive 5%positive
-                  (Ret_c (Cont_c 5%positive (Ret_c (KVar_c 5%positive) (Var_c 4%positive)))
+                  (ContApp_c (Cont_c 5%positive (ContApp_c (KVar_c 5%positive) (Var_c 4%positive)))
                      (KVar_c 5%positive)))))
      : option val_c
 *)
@@ -387,7 +387,7 @@ Print freshVarsPos.
 Quote Recursively Definition p0L1 := 0.
 Eval compute in compile_L1_to_L5a p0L1.
 (*
-     = Ret (Cont_c 5%positive (Ret_c (KVar_c 5%positive) (Con_c 0 [])))
+     = Ret (Cont_c 5%positive (ContApp_c (KVar_c 5%positive) (Con_c 0 [])))
      : exception val_c
 *)
 *)

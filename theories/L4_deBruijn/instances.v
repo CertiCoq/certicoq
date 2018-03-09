@@ -391,7 +391,7 @@ Global Instance ObsSubtermTermL5 : ObserveNthSubterm (ienv * L5Term) :=
 Global Instance certiL5: CerticoqLanguage (ienv * L5Term) := {}.
 
 
-Lemma haltContAp (t: L5Term):  eval_c (Ret_c haltCont t) t.
+Lemma haltContAp (t: L5Term):  eval_c (ContApp_c haltCont t) t.
 Proof.
   unfold haltCont.
   rewrite eval_ret.
@@ -401,7 +401,7 @@ Qed.
 
 Global Instance certiL4_5_to_L5:
   CerticoqTotalTranslation (cTerm certiL4_5) (cTerm certiL5):=
-  (fun x => (fst x, Ret_c (cps_cvt (snd x)) haltCont)).
+  (fun x => (fst x, ContApp_c (cps_cvt (snd x)) haltCont)).
 
 Definition oldTranslation : (cTerm certiL4_5) -> (cTerm certiL5):=
   (fun x => (fst x, (cps_cvt (snd x)))).

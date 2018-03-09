@@ -780,7 +780,7 @@ Definition Lam_c (v vk : NVar) (b : CTerm) : CTerm :=
 Definition KLam_c (v : NVar) (b : CTerm) : CTerm :=
   coterm CKLambda [bterm [v] b].
 
-Definition Ret_c (f a : CTerm) :=
+Definition ContApp_c (f a : CTerm) :=
   coterm CRet [bterm [] f , bterm [] a].
 
 Definition Let_c (v : NVar) (e1 e2 : CTerm) : CTerm :=
@@ -840,9 +840,9 @@ We can either have separate clauses as in L4_5.eval, or have the following rule
 *)
 | eval_Halt_c : forall v, (* isValueL5 v -> *) eval_c (Halt_c v) v
 | eval_Val_c : forall v, isValueL5 v -> eval_c v v
-| eval_Ret_c : forall x c v v',
+| eval_ContApp_c : forall x c v v',
                  eval_c (c {x := v}) v' -> 
-                 eval_c (Ret_c (KLam_c x c) v) v'
+                 eval_c (ContApp_c (KLam_c x c) v) v'
 
 | eval_Call_c : forall xk x c v1 v2 v',
                   eval_c (ssubst c [(x,v2);(xk,v1)]) v' -> 
@@ -855,8 +855,8 @@ We can either have separate clauses as in L4_5.eval, or have the following rule
 (*
  eval_Proj_c : forall lbt i k v' xf fn kv,  
 (** [kv] must be disjoint from free variables of fn. add it to not break alpha equality *)  
-                  select i lbt = Some (bterm [xf] (KLam_c kv (Ret_c (vterm kv) fn))) ->   
-                  eval_c (Ret_c k (fn{xf:=Fix_c' lbt})) v' ->  
+                  select i lbt = Some (bterm [xf] (KLam_c kv (ContApp_c (vterm kv) fn))) ->   
+                  eval_c (ContApp_c k (fn{xf:=Fix_c' lbt})) v' ->  
                   eval_c (Proj_c (Fix_c' lbt) i k) v'. *)
 
 (* fn is a lambda *)
@@ -892,7 +892,7 @@ Proof using.
   + unfold isValueL5 in H. rename H into Hisv. destruct v; invertsn Hisv.
     rename l into o. exists 1. destruct o; inverts Hisv; reflexivity.
 
-  (** eval_Ret_c *)
+  (** eval_ContApp_c *)
   + destruct IHHev as [n IHHev].
     exists (S n). assumption.
 
@@ -936,7 +936,7 @@ Admitted.
 
 (** Useful for rewriting. *)
 Lemma eval_ret :
-  forall x c v v', eval_c (Ret_c (KLam_c x c) v) v' 
+  forall x c v v', eval_c (ContApp_c (KLam_c x c) v) v' 
   <-> eval_c (c{x := v}) v'.
 Proof using.
   intros. split ; intro. inversion H; try (inverts H0; fail). subst ; auto.
@@ -968,7 +968,7 @@ Lemma eval_proj :
   forall cs i c k v',
     nthopt (N.to_nat i) cs = Some c ->
     (eval_c (Proj_c (Fix_c cs) i k) v' <->
-     eval_c (Ret_c k ((Lam_c c){0:=Fix_c cs})) v').
+     eval_c (ContApp_c k ((Lam_c c){0:=Fix_c cs})) v').
 Proof using..
   intros ; split ; intro. inversion H0 ; subst.
   rewrite H in H5. injection H5 ; intros ; subst.
@@ -1107,8 +1107,8 @@ Section CPS_CVT.
 
 
   Definition cps_cvt_apply_aux ce1 e2 k k1 k2 :=
-        (Ret_c ce1 (* e1 may not already be a lambda *)
-               (KLam_c k1 (Ret_c e2
+        (ContApp_c ce1 (* e1 may not already be a lambda *)
+               (KLam_c k1 (ContApp_c e2
                                   (KLam_c k2 (Call_c (vterm k1) k (vterm k2)))))).
 
       (* cont \k.(ret [e1] (cont \v1.(ret [e2] (cont \v2.call v1 k v2)))) *)
@@ -1131,7 +1131,7 @@ Section CPS_CVT.
 
   Definition cps_cvt_lambda (x : NVar) (b: NTerm) : CTerm :=
           let kv := contVar in
-             (Lam_c x kv (Ret_c (cps_cvt b) (vterm kv))).
+             (Lam_c x kv (ContApp_c (cps_cvt b) (vterm kv))).
 
   (** the KLam_c was manually added. unlike now, Fix_c previously implicitly bound a var*)
   Definition cps_cvt_fn_list' f (es: list BTerm) : list CBTerm :=
@@ -1165,8 +1165,8 @@ Section CPS_CVT.
       | nil => c
       | (bterm _ e)::es =>
         match vs with
-        | [] => Ret_c (cps_cvt e) (KLam_c nvarx (cps_cvts_chain [] es c)) (* impossible *)
-        | kvh :: kvt => Ret_c (cps_cvt e) (KLam_c kvh (cps_cvts_chain kvt es c))
+        | [] => ContApp_c (cps_cvt e) (KLam_c nvarx (cps_cvts_chain [] es c)) (* impossible *)
+        | kvh :: kvt => ContApp_c (cps_cvt e) (KLam_c kvh (cps_cvts_chain kvt es c))
         end
     end.
 
@@ -1174,7 +1174,7 @@ Section CPS_CVT.
   Definition cps_cvt_branch  (kv : CTerm) (bt: BTerm) : CBTerm :=
     match bt with
     | bterm vars nt =>
-        (bterm vars (Ret_c (cps_cvt nt) kv))
+        (bterm vars (ContApp_c (cps_cvt nt) kv))
     end.
 
  Definition cps_cvt_branches  (kv : CTerm) : (list BTerm) -> list CBTerm :=
@@ -1184,7 +1184,7 @@ End CPS_CVT.
 
   Definition val_outer ce :=
     let kv := contVar in 
-      KLam_c kv (Ret_c (vterm kv) ce).
+      KLam_c kv (ContApp_c (vterm kv) ce).
 
 Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
   if is_valueb e 
@@ -1200,7 +1200,7 @@ Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
         let kvars := contVars (S (length es)) ((mkSuggestion "k")::knames)in
         let k := hd nvarx kvars  in
         let tlkv := tail kvars  in
-        KLam_c k (cps_cvts_chain cps_cvt tlkv es (Ret_c (vterm k)
+        KLam_c k (cps_cvts_chain cps_cvt tlkv es (ContApp_c (vterm k)
                                                           (Con_c d (map vterm tlkv))))
     | terms.oterm (NMatch brl) ((bterm [] discriminee)::brr) => 
       let knames := ["k";"kmd"] in
@@ -1208,7 +1208,7 @@ Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
       let k := nth 0 kvars nvarx in
       let kd := nth 1 kvars nvarx in
       let brrc :=  (bterm [] (vterm kd))::(cps_cvt_branches cps_cvt (vterm k) brr) in
-      KLam_c k (Ret_c (cps_cvt discriminee)
+      KLam_c k (ContApp_c (cps_cvt discriminee)
                       (KLam_c kd (coterm (CMatch brl) brrc) ))
 
 
@@ -1222,7 +1222,7 @@ Fixpoint cps_cvt (e:NTerm) {struct e}: CTerm :=
       let kvars := contVars  2 in 
       let k := nth 0 kvars nvarx in  
       let ke := nth 1 kvars nvarx in  
-        KLam_c k (Ret_c (cps_cvt e) 
+        KLam_c k (ContApp_c (cps_cvt e) 
                         (KLam_c ke (Proj_c (vterm ke) i (vterm k)))) *)
     | _ => coterm CLambda (map ((bterm []) ∘ vterm)  (free_vars e))
           (* ill-formed term, which will not arise from the prev. phase.
@@ -1244,7 +1244,7 @@ Definition cps_cvt_fn_list := cps_cvt_fn_list' cps_cvt.
 
 (** The top-level CPS translation.  We use [cont \x.Halt x] as the initial
     continuation. *)
-Definition cps_cvt_prog (e:NTerm) := Ret_c (cps_cvt e) (KLam_c nvarx (Halt_c (vterm nvarx))).
+Definition cps_cvt_prog (e:NTerm) := ContApp_c (cps_cvt e) (KLam_c nvarx (Halt_c (vterm nvarx))).
 
 (*
 (** An optimized translation -- this is more what we want, but still has 
@@ -1252,8 +1252,8 @@ Definition cps_cvt_prog (e:NTerm) := Ret_c (cps_cvt e) (KLam_c nvarx (Halt_c (vt
     it for now.  *)
 Fixpoint opt_cps_cvt (e:exp) (k: val_c) : cps := 
   match e with
-    | Var_e n => Ret_c k (Var_c n)  
-    | Lam_e e => Ret_c k (Lam_c (opt_cps_cvt e (KVar_c 0))) 
+    | Var_e n => ContApp_c k (Var_c n)  
+    | Lam_e e => ContApp_c k (Lam_c (opt_cps_cvt e (KVar_c 0))) 
     | App_e e1 e2 =>
       opt_cps_cvt e1
         (Cont_c 
@@ -1326,7 +1326,7 @@ Lemma cps_val :
   let k := contVar in
   is_value v -> 
   (cps_cvt v) = 
-    KLam_c k (Ret_c (vterm k) (cps_cvt_val' cps_cvt v)).
+    KLam_c k (ContApp_c (vterm k) (cps_cvt_val' cps_cvt v)).
 Proof using.
   simpl. intros ? Hisv.
   apply cps_val_outer.
@@ -1335,8 +1335,8 @@ Qed.
 
 
 
-Lemma ssubstRet_c : forall sub a b, 
-   ssubst (Ret_c a b) sub = Ret_c (ssubst a sub) (ssubst b sub).
+Lemma ssubstContApp_c : forall sub a b, 
+   ssubst (ContApp_c a b) sub = ContApp_c (ssubst a sub) (ssubst b sub).
 Proof using. refl. Qed.
 
 Lemma ssubstKlam_c : forall sub x b, 
@@ -1965,7 +1965,7 @@ disjoint [contVar] (dom_sub sub)
 ->ssubst_aux (val_outer t) sub = val_outer (ssubst_aux t sub).
 Proof using.
   intros ? ? Hdis. unfold val_outer.
-  simpl. unfold KLam_c, Ret_c.
+  simpl. unfold KLam_c, ContApp_c.
   autorewrite with SquiggleEq.
   rewrite sub_filter_disjoint1; [|disjoint_reasoningv2].
   repeat f_equal.
@@ -2002,7 +2002,7 @@ Proof using.
   erewrite sub_find_some_map; eauto.
 (* Lambda case *)
 - dnumvbars Hnb bt. simpl.
-  unfold cps_cvt_lambda, Lam_c, Ret_c.
+  unfold cps_cvt_lambda, Lam_c, ContApp_c.
   do 4 f_equal.
   autorewrite with SquiggleEq.
   rewrite sub_find_sub_filter;[| cpx].
@@ -2024,7 +2024,7 @@ Proof using.
   apply eq_maps.
   intros bt Hin.
   destruct bt as [lv nt].
-  simpl. f_equal. unfold KLam_c, Ret_c.
+  simpl. f_equal. unfold KLam_c, ContApp_c.
   do 4 f_equal.
   autorewrite with SquiggleEq.
   rewrite sub_filter_map_range_comm.
@@ -2076,7 +2076,7 @@ Proof using.
   simpl. unfold cps_cvt_apply, cps_cvt_apply_aux. simpl.
   addContVarsSpec 3 Hs kv. repnd. clear Heqlvcvf.
   simpl in *.
-  unfold KLam_c, Ret_c.
+  unfold KLam_c, ContApp_c.
   do 4 f_equal.
   rwsimplC.
   do 3 (rewrite sub_filter_map_range_comm;
@@ -2122,7 +2122,7 @@ Proof using.
 - rwsimplC.
   repeat progress (autorewrite with SquiggleEq list in *; 
     simpl in * ).
-  unfold Ret_c, KLam_c.
+  unfold ContApp_c, KLam_c.
   do 3 f_equal;[|do 4 f_equal].
 + apply Hyp; auto;[ omega | ntwfauto  | rwsimplC; tauto].
 + rewrite sub_filter_map_range_comm.
@@ -2210,7 +2210,7 @@ Local Transparent is_valueb.
 (* match *)
 - dnumvbars Hnb bt. unfold num_bvars. simpl.
   addContVarsSpec 2 Hs kv. repnd. clear Heqlvcvf.
-  simpl. unfold KLam_c, Ret_c.
+  simpl. unfold KLam_c, ContApp_c.
   do 4 f_equal.
   rwsimplC.
   do 2 (rewrite sub_filter_map_range_comm;
@@ -2235,7 +2235,7 @@ Local Transparent is_valueb.
           [| apply disjoint_singleton_l; 
             rewrite <- dom_sub_sub_filter;
             rwsimplC;apply disjoint_sym, disjoint_remove_nvars2; disjoint_reasoningv2]).
-  unfold Ret_c.
+  unfold ContApp_c.
   do 4 f_equal.
   rewrite sub_filter_map_range_comm.
   repnd.
@@ -2326,14 +2326,14 @@ Lemma val_outer_eval : forall (v1 v2 k:CTerm) ,
 closed v1
 -> closed k
 ->
-  (eval_c (Ret_c (val_outer v1) k ) v2 <->
-   eval_c (Ret_c  k             v1) v2).
+  (eval_c (ContApp_c (val_outer v1) k ) v2 <->
+   eval_c (ContApp_c  k             v1) v2).
 Proof using.
   intros ? ? ? Hcv Hck.
   unfold val_outer.
   rewrite eval_ret.
   simpl. unfold subst.
-  rewrite ssubstRet_c.
+  rewrite ssubstContApp_c.
   rewrite ssubst_vterm.
   simpl. rewrite <- beq_var_refl.
   rewrite ssubst_trivial2_cl; auto;[refl| intros; repeat (in_reasoning); cpx].
@@ -2345,8 +2345,8 @@ Lemma cps_val_ret_flip : forall (v : NTerm) (k v2:CTerm) ,
   -> varsOfClass (all_vars v) USERVAR
   -> isprogram v
   -> closed k
-  -> (eval_c (Ret_c (cps_cvt v) k) v2 <->
-     eval_c (Ret_c  k (cps_cvt_val v)) v2).
+  -> (eval_c (ContApp_c (cps_cvt v) k) v2 <->
+     eval_c (ContApp_c  k (cps_cvt_val v)) v2).
 Proof using.
   intros ? ? ? Hv Hc Hvc Hp.
   apply cps_val in Hv.
@@ -2369,7 +2369,7 @@ Qed.
 
 Ltac prepareForEvalRet Hc Hs :=
   match goal with
-  [|- context [Ret_c (KLam_c ?v _) ?k]] => assert (closed k) as Hc;
+  [|- context [ContApp_c (KLam_c ?v _) ?k]] => assert (closed k) as Hc;
     [|  assert (sub_range_sat [(v , k)] closed) as Hs by
         (intros ? ? ?; in_reasoning; cpx)]
   end.
@@ -2377,8 +2377,8 @@ Ltac prepareForEvalRet Hc Hs :=
 Let  evalt := fun e v =>
 (forall k, closed k ->
     forall v',
-      eval_c (Ret_c (cps_cvt e) k) v' <->
-        eval_c (Ret_c (cps_cvt v) k) v') /\ eval e v.
+      eval_c (ContApp_c (cps_cvt e) k) v' <->
+        eval_c (ContApp_c (cps_cvt v) k) v') /\ eval e v.
 
 Hint Unfold isprogram : eval.
 Hint Resolve eval_yields_value' eval_preseves_varclass 
@@ -2391,7 +2391,7 @@ Lemma cps_cvt_apply_eval : forall e e2 ev2 ev k v
 (Hvc : varsOfClass (all_vars e ++ all_vars e2) USERVAR)
 (H1e : evalt e ev)
 (H2e : evalt e2 ev2),
-(eval_c (Ret_c (cps_cvt_apply cps_cvt (cps_cvt e) e2) k) v
+(eval_c (ContApp_c (cps_cvt_apply cps_cvt (cps_cvt e) e2) k) v
 <->
 eval_c (Call_c (cps_cvt_val ev) k (cps_cvt_val ev2)) v).
 Proof using.
@@ -2403,9 +2403,9 @@ Proof using.
   simpl. unfold subst. 
   assert (sub_range_sat [(kv, k)] closed) as Hcs by
     (intros ? ? ?; in_reasoning; cpx).
-  rewrite ssubstRet_c by assumption.
+  rewrite ssubstContApp_c by assumption.
   rewrite ssubstKlam_c; [| try assumption| noRepDis].
-  rewrite ssubstRet_c by assumption.
+  rewrite ssubstContApp_c by assumption.
   rewrite ssubstKlam_c; [| assumption| noRepDis].
   rewrite ssubstCall_c by assumption.
   do 3 rewrite ssubst_vterm. simpl.
@@ -2419,7 +2419,7 @@ Proof using.
            try rewrite Hp1 ; try rewrite Hp2 ; [ tauto | eauto ] ] ).
   clear Hcs. rename Hclk into Hclkb.
   match goal with
-  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk
+  [|- context [ContApp_c _ ?k]] => assert (closed k) as Hclk
   end.
     unfold closed. simpl. autorewrite with list core SquiggleEq SquiggleEq2.
     symmetry.
@@ -2433,7 +2433,7 @@ Proof using.
   rewrite cps_val_ret_flip; autounfold with eval; eauto with eval;[].
   rewrite eval_ret. simpl.
   unfold subst.
-  rewrite ssubstRet_c by assumption.
+  rewrite ssubstContApp_c by assumption.
   clear Hclk.
   rewrite ssubst_trivial2_cl; auto;
     [ |  (intros ? ? ?; in_reasoning; cpx)| ]; try eauto with eval;[].
@@ -2447,7 +2447,7 @@ Proof using.
   rewrite ssubst_trivial2_cl;
     [| (intros ? ? ?; in_reasoning; cpx); eauto with eval | assumption].
   match goal with
-  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk
+  [|- context [ContApp_c _ ?k]] => assert (closed k) as Hclk
   end.
     unfold closed. symmetry.
     simpl. rewrite Hclkb. rwsimplC.
@@ -2536,7 +2536,7 @@ Proof using.
   induction lbt as [| b lbt Hind]; auto;[]; intros ? ? ? Hwf Hvc Hl Hd.
   simpl. destruct b as [lb nt].
   destruct lkv; simpl in *; inverts Hl.
-  unfold Ret_c, KLam_c.
+  unfold ContApp_c, KLam_c.
   autorewrite with SquiggleEq.
   unfold lforall in Hwf. simpl in *.
   dLin_hyp. ntwfauto.
@@ -2613,7 +2613,7 @@ Proof using.
   destruct bt as [lv nt].
   simpl.
   f_equal.
-  unfold Ret_c.
+  unfold ContApp_c.
   rwsimplAll.
   rewrite sub_filter_disjoint1 at 2;[| disjoint_reasoningv].
   repeat f_equal.
@@ -2712,7 +2712,7 @@ Lemma eval_c_constr_move_in : forall k d v' es vs ws lkv
 (Hind: forall e v : NTerm,
        LIn (e, v) (combine es vs) ->
        forall k : CTerm,
-       closed k -> forall v' : CTerm, eval_c (Ret_c (cps_cvt e) k) v' <-> eval_c (Ret_c (cps_cvt v) k) v')
+       closed k -> forall v' : CTerm, eval_c (ContApp_c (cps_cvt e) k) v' <-> eval_c (ContApp_c (cps_cvt v) k) v')
 (Hcws : (flat_map free_vars es)++(flat_map free_vars ws) = [])
 (Hclkk : closed k)
 (Hwf :  lforall nt_wf  es)
@@ -2722,9 +2722,9 @@ Lemma eval_c_constr_move_in : forall k d v' es vs ws lkv
 ,
 eval_c
   (cps_cvts_chain cps_cvt lkv (map (bterm []) es)
-            (Ret_c k (Con_c d (ws ++ (map vterm lkv)) ) ) ) v' <->
+            (ContApp_c k (Con_c d (ws ++ (map vterm lkv)) ) ) ) v' <->
 eval_c
-  (Ret_c k
+  (ContApp_c k
      (Con_c d 
         (ws ++ (map cps_cvt_val vs)) ) ) v'.
 Proof using.
@@ -2738,7 +2738,7 @@ Proof using.
   apply lforallApp in Hwf. repnd.
   rwsimpl Hvc. repnd.
   match goal with
-  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk;
+  [|- context [ContApp_c _ ?k]] => assert (closed k) as Hclk;
     [|  assert (sub_range_sat [(contVar , k)] closed) as Hcs by
         (intros ? ? ?; in_reasoning; cpx)]
   end.
@@ -2831,7 +2831,7 @@ forall x el v2 k v
 (Hclk : closed k)
 (Hvc : varsOfClass (all_vars el++ all_vars v2 ++ [x]) USERVAR),
 eval_c (Call_c (cps_cvt_lambda cps_cvt x el) k (cps_cvt_val v2)) v <->
-eval_c (Ret_c (cps_cvt (ssubst el [(x, v2)])) k) v.
+eval_c (ContApp_c (cps_cvt (ssubst el [(x, v2)])) k) v.
 Proof using.
   intros. unfold isprogram,  closed, closed_bt in *. repnd.
   pose proof Hvc as Hdis.
@@ -2839,7 +2839,7 @@ Proof using.
   rwsimpl Hvc. simpl in *.
   unfold  val_outer, cps_cvt_lambda.
   rewrite eval_call.
-  rewrite ssubstRet_c. repnd.
+  rewrite ssubstContApp_c. repnd.
   rewrite <- ssubst_sub_filter2 with (l:=[contVar]).
   Focus 3. 
     rewrite cps_cvt_aux_fvars;
@@ -3197,8 +3197,8 @@ Theorem cps_cvt_corr : forall e v,
   closed e ->
   forall k, closed k ->
     forall v',
-      eval_c (Ret_c (cps_cvt e) k) v' <->
-        eval_c (Ret_c (cps_cvt v) k) v'.
+      eval_c (ContApp_c (cps_cvt e) k) v' <->
+        eval_c (ContApp_c (cps_cvt v) k) v'.
 Proof using.
   intros ? ? Hwf Hfwf Hvc He.  induction He; try (simpl ; tauto; fail); [ | | | |].
   (* beta reduction case (eval_App_e) *)
@@ -3259,7 +3259,7 @@ Proof using.
   unfold val_outer.
   do 2 rewrite eval_ret.
   simpl. unfold subst.
-  rewrite ssubstRet_c.
+  rewrite ssubstContApp_c.
   rewrite ssubst_vterm. simpl. rewrite <- beq_var_refl.
   symmetry. symmetry in H.
   rewrite ssubst_trivial2_cl;[ | intros; repeat (in_reasoning); cpx| assumption].
@@ -3399,7 +3399,7 @@ Proof using.
   simpl. unfold subst. 
   assert (sub_range_sat [(kv, k)] closed) as Hcs by
     (intros ? ? ?; in_reasoning; cpx).
-  rewrite ssubstRet_c.
+  rewrite ssubstContApp_c.
   rewrite ssubstKlam_c; [| try assumption| noRepDis].
 
 
@@ -3412,7 +3412,7 @@ Proof using.
   rewrite <- beq_var_refl.
   clear Hcs.
   match goal with
-  [|- context [Ret_c _ ?k]] => assert (closed k) as Hclk;
+  [|- context [ContApp_c _ ?k]] => assert (closed k) as Hclk;
     [|  assert (sub_range_sat [(contVar , k)] closed) as Hcs by
         (intros ? ? ?; in_reasoning; cpx)]
   end.
@@ -3460,7 +3460,7 @@ Proof using.
   fold (@ssubst _ _ _ _ _ L5Opid).
   apply eq_subrelation;[auto with typeclass_instances|].
   repeat rewrite map_map.
-  unfold Ret_c.
+  unfold ContApp_c.
   unfold closed in Hclkk.
   simpl in Hclkk.
   repeat rewrite map_map in Hclkk.
@@ -3711,7 +3711,7 @@ Proof using.
 - inverts Ha as Hl Hb. simpl in *.  repeat alphahypsd3.
   eexists. split;[constructor| assumption].
 
-(* eval_Ret_c*)
+(* eval_ContApp_c*)
 - inverts Ha as Hl Hb. simpl in *.  repeat alphahypsd3.
   clear Hb.
   inverts Hb0bt0. simpl in *. repeat alphahypsd3. 
@@ -3811,8 +3811,8 @@ Proof using.
   end.
   match type of Hbtf with
     alpha_eq ?l ?r=>
-      assert (alpha_eq (Ret_c  l k) (Ret_c r nt2)) as Hal
-        by (unfold Ret_c; repeat prove_alpha_eq4)
+      assert (alpha_eq (ContApp_c  l k) (ContApp_c r nt2)) as Hal
+        by (unfold ContApp_c; repeat prove_alpha_eq4)
   end.
   apply IHHe in Hal. 
   exrepnd.
@@ -3841,7 +3841,7 @@ Qed.
 
 (** Useful for rewriting. *)
 Lemma eval_retα :
-  forall x c v v', eval_cα (Ret_c (KLam_c x c) v) v' 
+  forall x c v v', eval_cα (ContApp_c (KLam_c x c) v) v' 
   <-> eval_cα (c{x := v}) v'.
 Proof using.
   unfold eval_cα; intros; split ; intro; exrepnd; eexists; eauto.
@@ -3857,7 +3857,7 @@ Proof using.
   inversion H1. subst. eexists; eauto.
 Qed.
 
-Global Instance proper_retcα : Proper  (alpha_eq ==> alpha_eq ==> alpha_eq) Ret_c.
+Global Instance proper_retcα : Proper  (alpha_eq ==> alpha_eq ==> alpha_eq) ContApp_c.
 Proof using.
   intros ? ? Hal1 ? ? Hal2.
   constructor; auto. simpl.
@@ -3890,8 +3890,8 @@ Corollary cps_cvt_unique_corr : forall e v,
   closed e ->
   forall k, closed k ->
     forall v',
-      eval_cα (Ret_c (cps_cvt_unique_bvars e) k) v' <->
-        eval_cα (Ret_c (cps_cvt_unique_bvars v) k) v'.
+      eval_cα (ContApp_c (cps_cvt_unique_bvars e) k) v' <->
+        eval_cα (ContApp_c (cps_cvt_unique_bvars v) k) v'.
 Proof using.
   intros.
   do 2 rewrite cps_cvt_unique_alpha.
@@ -3909,7 +3909,7 @@ So, cps_cvt is the realizer of Godel's double negation transformation, at least 
    *)
 Example cps_cvt_var : forall x,
   cps_cvt (vterm x)
-  = KLam_c contVar (Ret_c (vterm contVar) (vterm x)).
+  = KLam_c contVar (ContApp_c (vterm contVar) (vterm x)).
 Proof using. refl. Qed.
 
 Example cps_cvt_lam : forall x b,
@@ -3918,7 +3918,7 @@ Example cps_cvt_lam : forall x b,
  and substitution lemma.
 because cv2 is applied to  [cps_cvt b], the type of [cv2] must be [B->F], and the type of application
 must be [F].
-So, the type of [(Lam_c x cv2 (Ret_c (cps_cvt b) (vterm cv2)))] should then be 
+So, the type of [(Lam_c x cv2 (ContApp_c (cps_cvt b) (vterm cv2)))] should then be 
 [forall {F}, A-> (B->F) -> F].
 By using the above var case and substitution lemma, the type of the whole thing (which prepends va_outer),
 is [forall {F' F}, ((A-> (B->F) -> F) -> F') -> F']
@@ -3931,7 +3931,7 @@ in the application case.
   let cv1 := contVar in
   let cv2 := contVar in
   cps_cvt (Lam_e x b)
-  = KLam_c cv1 (Ret_c (vterm cv1) (Lam_c x cv2 (Ret_c (cps_cvt b) (vterm cv2))) ).
+  = KLam_c cv1 (ContApp_c (vterm cv1) (Lam_c x cv2 (ContApp_c (cps_cvt b) (vterm cv2))) ).
 Proof using. refl. Qed.
 
 (* if [d] is a [bool], and [ct] is of type [A] and [cf] is of type [B], then the result
@@ -3944,7 +3944,7 @@ Example cps_cvt_depmatch : forall (ct cf d : NVar),
 (*
 they are computationally equivalent. see [val_outer_eval] below/
 *)
-  (forall k v, Ret_c (val_outer v) k=  Ret_c k v)
+  (forall k v, ContApp_c (val_outer v) k=  ContApp_c k v)
   ->
   cps_cvt (depMatchExample ct cf d) = vterm d.  
 (* replacing the result of simpl at RHS causes type inference issues *)

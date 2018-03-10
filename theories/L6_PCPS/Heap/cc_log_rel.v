@@ -609,6 +609,7 @@ Module CC_log_rel (H : Heap).
     intros. eapply cc_approx_val_same_rel in Hin; eauto.
   Qed.
   
+
   (** The value relation is monotonic in the step index *)
   Lemma cc_approx_val_monotonic (k m j : nat) (r1 r2 : ans) b' :
     r1 ≺ ^ (k; j; GIP ; GP; b') r2 ->
@@ -638,6 +639,30 @@ Module CC_log_rel (H : Heap).
         do 3 eexists; split; [ | split ]; try (now eauto).
         intros i j' Hleq' Hleq'' R Hfeq Hall. 
         eapply Hi'; try eassumption. omega.
+  Qed.
+
+  Lemma cc_approx_block_monotonic (k m j : nat) (b1 b2 : block) (H1 H2 : heap block) b' :
+    cc_approx_block k j GIP GP b' b1 H1 b2 H2 ->
+    m <= k ->
+    cc_approx_block m j GIP GP b' b1 H1 b2 H2.
+  Proof.
+    intros Hcc.
+    destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
+    destruct b2 as [c2 vs2 | | ]; eauto.
+    + destruct Hcc as [Heq' Hi]; split; [ eassumption |].
+      intros i Hleq'. simpl.
+      eapply Forall2_monotonic; [| now eauto ].
+      intros x1 x2 Hap.
+      rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic; eauto.
+    + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
+      destruct Hcc as [Him Hcc]. split; eauto.
+      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2'
+             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+      edestruct Hcc
+        as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
+      do 3 eexists; split; [ | split ]; try (now eauto).
+      intros i j' Hleq' Hleq'' R Hfeq Hall. 
+      eapply Hi'; try eassumption. omega.
   Qed.
   
   (** The expression relation is anti-monotonic in the step index *)
@@ -703,7 +728,29 @@ Module CC_log_rel (H : Heap).
       intros i' j' Hleq' Hleq'' R Hall. eapply Hi'. eassumption.
       omega.
   Qed.
-  
+
+  Lemma cc_approx_block_j_monotonic (k m j : nat) (b1 b2 : block) (H1 H2 : heap block) b' :
+    cc_approx_block j k GIP GP b' b1 H1 b2 H2 ->
+    m <= k ->
+    cc_approx_block j m GIP GP b' b1 H1 b2 H2.
+  Proof.
+    intros Hcc.
+    destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
+    destruct b2 as [c2 vs2 | | ]; eauto.
+    + destruct Hcc as [Heq' Hi]; split; [ eassumption |].
+      intros i' Hleq'. simpl. eapply (Hi i'); omega.
+    + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
+      destruct Hcc as [Him Hcc]. split; eauto.
+      intros j' Hj'. eapply Him; omega.
+      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2'
+             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+      edestruct Hcc
+        as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
+      do 3 eexists; split; [ | split ]; try (now eauto).
+      intros i' j' Hleq' Hleq'' R Hall. eapply Hi'. eassumption.
+      omega.
+  Qed.
+
   (** The expression relation is anti-monotonic in the step index *)
   Lemma cc_approx_exp_j_monotonic (k j j' : nat) p1 p2 :
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP ) p2 ->
@@ -1725,12 +1772,15 @@ Module CC_log_rel (H : Heap).
          c vs1 vs2 l1 l2  (H1 H2 H1' H2' : heap block)
          (rho1 rho2 : env) x:
 
-     well_formed (reach' H1 (env_locs rho1 S)) H1 ->
-     well_formed (reach' H2 (env_locs rho2 S)) H2 ->
-     env_locs rho1 S \subset dom H1 ->
-     env_locs rho2 S \subset dom H2 ->
-     locs (Constr c vs1) \subset env_locs rho1 S ->
-     locs (Constr c vs2) \subset env_locs rho2 S ->
+     well_formed (reach' H1 (env_locs rho1 (S \\ [set x]))) H1 ->
+     well_formed (reach' H2 (env_locs rho2 (S \\ [set x]))) H2 ->
+     env_locs rho1 (S \\ [set x]) \subset dom H1 ->
+     env_locs rho2 (S \\ [set x])  \subset dom H2 ->
+
+     well_formed (reach' H1 (locs (Constr c vs1))) H1 ->
+     well_formed (reach' H2 (locs (Constr c vs2))) H2 ->
+     locs (Constr c vs1) \subset dom H1 ->
+     locs (Constr c vs2) \subset dom H2 ->
 
      (H1, rho1) ⋞ ^ (S \\ [set x]; k; j; GIP; GP; b) (H2, rho2) ->
      
@@ -1742,15 +1792,9 @@ Module CC_log_rel (H : Heap).
      
      (H1', M.set x (Loc l1) rho1) ⋞ ^ (S; k; j; GIP; GP; b) (H2', M.set x (Loc l2) rho2).
    Proof with (now eauto with Ensembles_DB).
-     intros Hwf1 Hwf2 Hlocs1 Hlocs2 Hl1 Hl2 Henv Ha1 Ha2 Hb Hres.
+     intros Hwf1 Hwf2 Hlocs1 Hlocs2 Hwf3 Hwf4 Hlocs3 Hlocs4 Henv Ha1 Ha2 Hb Hres.
      eapply cc_approx_env_P_set; try eassumption.
      eapply cc_approx_env_heap_monotonic; try eassumption.
-     eapply well_formed_antimon; [| eassumption ].
-     eapply reach'_set_monotonic. eapply env_locs_monotonic...
-     eapply well_formed_antimon; [| eassumption ].
-     eapply reach'_set_monotonic. eapply env_locs_monotonic...
-     eapply Included_trans; [| now apply Hlocs1 ]. eapply env_locs_monotonic...
-     eapply Included_trans; [| now apply Hlocs2 ]. eapply env_locs_monotonic...
      eapply HL.alloc_subheap; eassumption.
      eapply HL.alloc_subheap; eassumption.
      simpl. erewrite !gas; eauto.
@@ -1760,22 +1804,19 @@ Module CC_log_rel (H : Heap).
      eapply Forall2_monotonic_strong; [| eassumption ].
      intros x1 x2 Hin1 Hin2 Heq.
      rewrite cc_approx_val_eq.
-     eapply cc_approx_val_heap_monotonic; try eassumption.
-     eapply well_formed_antimon; [| now eapply Hwf1 ].
-     eapply reach'_set_monotonic. eapply Included_trans; [| eassumption ].
+     eapply cc_approx_val_heap_monotonic; [ | | | | | | now apply Heq ]. try eassumption.
+     eapply well_formed_antimon; [| now eapply Hwf3 ]. 
+     eapply reach'_set_monotonic.
      eapply In_Union_list. eapply in_map. eassumption.
-     eapply well_formed_antimon; [| now eapply Hwf2 ].
-     eapply reach'_set_monotonic. eapply Included_trans; [| eassumption ].
+     eapply well_formed_antimon; [| now eapply Hwf4 ].
+     eapply reach'_set_monotonic.
      eapply In_Union_list. eapply in_map. eassumption.
-     eapply Included_trans; [| now apply Hlocs1 ].
-     eapply Included_trans; [| eassumption ].
+     eapply Included_trans; [| now apply Hlocs3 ].
      eapply In_Union_list. eapply in_map. eassumption.
-     eapply Included_trans; [| now apply Hlocs2 ].
-     eapply Included_trans; [| eassumption ].
+     eapply Included_trans; [| now apply Hlocs4 ].
      eapply In_Union_list. eapply in_map. eassumption.
      eapply HL.alloc_subheap; eassumption.
      eapply HL.alloc_subheap; eassumption.
-     now apply Heq.
    Qed.
 
    Lemma cc_approx_val_rename_ext  β β' k j H1 H2 v1 v2:

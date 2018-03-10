@@ -79,7 +79,7 @@ Proof.
   - inv H. simpl. eapply IHxs in H4. omega.
 Qed.
 
-Lemma Forall2_monotonic {A} (R R' : A -> A -> Prop) (l1 l2 : list A) :
+Lemma Forall2_monotonic {A B} (R R' : A -> B -> Prop) (l1 : list A) (l2 : list B):
   (forall x1 x2, R x1 x2 -> R' x1 x2) ->
   Forall2 R l1 l2 ->
   Forall2 R' l1 l2.
@@ -90,8 +90,8 @@ Proof.
   - destruct l2; inv Hall. constructor; eauto.
 Qed.
 
-Lemma Forall2_monotonic_strong (A : Type) (R R' : A -> A -> Prop) (l1 l2 : list A) :
-  (forall x1 x2 : A, List.In x1 l1 -> List.In x2 l2 -> R x1 x2 -> R' x1 x2) ->
+Lemma Forall2_monotonic_strong (A B : Type) (R R' : A -> B -> Prop) (l1 : list A) (l2 : list B):
+  (forall x1 x2, List.In x1 l1 -> List.In x2 l2 -> R x1 x2 -> R' x1 x2) ->
   Forall2 R l1 l2 -> Forall2 R' l1 l2.
 Proof.
   revert l2.

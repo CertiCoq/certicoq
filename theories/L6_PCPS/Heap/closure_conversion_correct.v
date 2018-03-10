@@ -558,6 +558,42 @@ Module ClosureConversionCorrect (H : Heap).
         eapply nthN_In. eassumption.
   Qed.
 
+  Lemma project_var_reachable Scope Funs σ c Γ FVs x x' C S S' e k rho H rho' H':
+    project_var Scope Funs σ c Γ FVs S x x' C S' ->
+    ctx_to_heap_env C H rho H' rho' k ->
+    reach' H' (env_locs rho' (occurs_free e)) \subset
+           reach' H (env_locs rho (occurs_free (C |[ e ]|))).
+  Proof with (now eauto with Ensembles_DB). 
+    intros Hvar Hctx. inv Hvar; inv Hctx; try reflexivity.
+    - simpl. normalize_occurs_free. inv H18.
+      eapply Included_trans.
+      eapply reach'_set_monotonic. eapply env_locs_set_Inlcuded'. 
+      rewrite !env_locs_Union, !reach'_Union, env_locs_Singleton; eauto.
+      eapply Included_Union_compat; try reflexivity.
+      rewrite (reach_unfold H' (val_loc (Loc l))).
+      eapply Included_Union_preserv_r. 
+      eapply reach'_set_monotonic.
+      simpl. rewrite post_Singleton; eauto.
+      simpl. eapply In_Union_list. eapply in_map.
+      eapply nthN_In. eassumption.
+  Qed.
+
+  Lemma project_vars_reachable Scope Funs σ c Γ FVs xs xs' C S S' e k rho H rho' H':
+    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
+    ctx_to_heap_env C H rho H' rho' k ->
+    reach' H' (env_locs rho' (occurs_free e)) \subset
+           reach' H (env_locs rho (occurs_free (C |[ e ]|))).
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvar. revert rho H rho' H' k e. 
+    induction Hvar; intros rho1 H1 rho2 H2 k e Hctx.
+    - inv Hctx. reflexivity.
+    - edestruct ctx_to_heap_env_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]].
+      eassumption. subst.
+      eapply Included_trans. eapply IHHvar; eauto.
+      eapply Included_trans. eapply project_var_reachable; eauto.
+      rewrite app_ctx_f_fuse. reflexivity. 
+  Qed.
+
   (** [project_var] preserves well-formedness *)
   Lemma project_var_well_formed' Scope Funs σ c Γ FVs x x' C S S' k rho H rho' H':
     project_var Scope Funs σ c Γ FVs S x x' C S' ->
@@ -592,11 +628,10 @@ Module ClosureConversionCorrect (H : Heap).
     project_var Scope Funs σ c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env C H rho H' rho' k ->
     Disjoint _ S1 S ->
-    env_locs rho' S1 \subset env_locs rho S1.
+    env_locs rho' S1 <--> env_locs rho S1.
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar Hctx HD. destruct Hvar; inv Hctx; try reflexivity.
-    - inv H18. rewrite env_locs_set_not_In.
-      eapply env_locs_monotonic...
+    - inv H18. rewrite env_locs_set_not_In. reflexivity. 
       intros Hc; eapply HD; eauto.
   Qed.
 
@@ -604,17 +639,16 @@ Module ClosureConversionCorrect (H : Heap).
     project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env C H rho H' rho' k ->
     Disjoint _ S1 S ->
-    env_locs rho' S1 \subset env_locs rho S1.
+    env_locs rho' S1 <--> env_locs rho S1.
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar. revert rho H rho' H' k. 
     induction Hvar; intros rho1 H1 rho2 H2 k Hctx Hd.
     - inv Hctx. reflexivity.
     - edestruct ctx_to_heap_env_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]].
-      eassumption. subst.
-      eapply Included_trans. eapply IHHvar; eauto.
-      eapply Disjoint_Included_r; try eassumption.
+      eassumption. subst. rewrite IHHvar; eauto.
+      rewrite project_var_env_locs_subset; eauto.
+      reflexivity. eapply Disjoint_Included_r; try eassumption.
       eapply project_var_free_set_Included; eauto.
-      eapply project_var_env_locs_subset; eauto.
   Qed.
 
   Lemma project_var_not_In_free_set' Scope Funs σ c Γ FVs x x' C S S'  :
@@ -686,15 +720,13 @@ Module ClosureConversionCorrect (H : Heap).
       rewrite FromList_cons.
       rewrite <- !Union_assoc. rewrite env_locs_Union.
       eapply Union_Included.
-      eapply Included_trans.
-      eapply project_vars_env_locs_subset. eassumption. eassumption.
+      erewrite <- project_vars_heap with (H := H3) (H' := H2); eauto .
+      eapply project_vars_env_locs_subset in Hvar; eauto.
+      rewrite Hvar. eapply Included_trans; [| eapply project_var_env_locs'; eauto ].
+      eapply env_locs_monotonic...
       eapply Disjoint_Singleton_l. eapply project_var_not_In_free_set'. eassumption.
       eapply Disjoint_Included_r; [| eassumption ]...
-      erewrite <- project_vars_heap with (H := H3) (H' := H2); eauto .
-      eapply Included_trans; [| eapply project_var_env_locs'; eauto ].
-      eapply env_locs_monotonic...
-      rewrite !Union_assoc.
-      eapply IHHvar; eauto.
+      rewrite !Union_assoc. eapply IHHvar; eauto.
       eapply Disjoint_Included_l. eapply project_var_free_set_Included. eassumption.
       eassumption.
       eapply well_formed_antimon; [| eapply project_var_well_formed'; eauto ].
@@ -739,13 +771,14 @@ Module ClosureConversionCorrect (H : Heap).
       rewrite <- !Union_assoc. rewrite env_locs_Union, reach'_Union.
       eapply well_formed_Union.
       erewrite <- project_vars_heap with (H := H3) (H' := H2); eauto .
-      eapply well_formed_antimon. eapply reach'_set_monotonic.
-      eapply project_vars_env_locs_subset. eassumption. eassumption.
-      eapply Disjoint_Singleton_l. eapply project_var_not_In_free_set'. eassumption.
-      eapply Disjoint_Included_r; [| eassumption ]...
+      eapply project_vars_env_locs_subset in Hvar; eauto.
+      rewrite Hvar.
       eapply well_formed_antimon; [| eapply project_var_well_formed' ]; eauto.
       eapply reach'_set_monotonic. eapply env_locs_monotonic...
-      rewrite !Union_assoc. eapply IHHvar; try eassumption.
+      eapply Disjoint_Singleton_l. eapply project_var_not_In_free_set'.
+      eassumption.
+      eapply Disjoint_Included_r; [| eassumption ]...
+      rewrite !Union_assoc. eapply IHHvar; eauto.
       eapply Disjoint_Included_l. eapply project_var_free_set_Included. eassumption.
       eassumption.
       eapply Included_trans; [| eapply project_var_env_locs'; eauto ].
@@ -1167,7 +1200,7 @@ Module ClosureConversionCorrect (H : Heap).
         
         (* Induction hypothesis *)
         { eapply IHk;
-          [ | | | | | | | | | | | | now apply Hinj | | eassumption ]. 
+          [ | | | | | | | | | | | | now apply Hinj | | eassumption ].  
           * simpl in *. omega.
           * { intros j2.  
               eapply cc_approx_env_set_alloc_Constr with (b := β {l1 ~> l2});
@@ -1300,38 +1333,24 @@ Module ClosureConversionCorrect (H : Heap).
           * assert (Hseq : v |: Scope :|: image σ Funs :|: [set Γ] <-->
                              (Scope :|: image σ Funs :|: [set Γ]) :|: [set v]).
             { rewrite (Union_commut _ [set v]). rewrite <- !Union_assoc. reflexivity. }
-            rewrite Hseq. eapply well_formed_reach_set_Loc. 
-            rewrite Hseq. eapply well_formed_reach_alloc'; try eassumption.
-            rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+            rewrite Hseq. eapply well_formed_reach_alloc; eauto.
             eapply well_formed_antimon; [| eassumption ].
             eapply reach'_set_monotonic. eapply env_locs_monotonic...
-            rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
-            eapply Included_trans; [| eassumption ].
+            eapply Included_trans;[| eassumption ].
             eapply env_locs_monotonic...
             eapply Included_trans. eassumption. 
-            eapply Included_trans. eapply project_vars_env_locs. eassumption. eassumption.
-            eapply Included_trans. eapply env_locs_monotonic. eassumption.
-            eassumption.
-            eapply well_formed_antimon; [| eassumption ].
-            eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
-            
-            eapply Closure_conversion_occurs_free_Included. eassumption. eapply reach'_set_monotonic. eapply env_locs_monotonic...
-            [| eassumption ].
-            eapply env_locs_monotonic...
-            Scope :|: image σ Funs :|: [set Γ
-            eapply Included_trans; [| 
-            eassumption. 
-            eapply well_formed_antimon;
-            [| rewrite occurs_free_Econstr in Hwf2;
-               eapply well_formed_reach_alloc'; try eassumption ]. 
-            eapply reach'_set_monotonic. eapply env_locs_monotonic...
-            eapply Included_trans; [| eassumption ]. normalize_occurs_free...
-            eapply Included_trans. eassumption.
-            normalize_occurs_free. eapply reach'_extensive.
+            eapply Included_trans. eapply reach'_extensive.
+            eapply Included_trans. eapply project_vars_reachable; eauto.
+            eapply Included_trans. eapply reach'_set_monotonic. eapply env_locs_monotonic.
+            eassumption. erewrite project_vars_heap with (H := H2) (H' := H2'); eauto.
+            rewrite project_vars_env_locs_subset with (rho := rho2) (rho' := rho2'); eauto.
+            reflexivity.
+            eapply Disjoint_Included_l; [| eapply Disjoint_sym; eassumption ]...
           * eapply Included_trans. now eapply env_locs_set_Inlcuded'.
             rewrite HL.alloc_dom; [| eassumption ].
             eapply Included_Union_compat. reflexivity.
-            eapply Included_trans; [| eassumption ]. normalize_occurs_free...
+            eapply Included_trans; [| eassumption ].
+            eapply env_locs_monotonic. now eauto 20 with Ensembles_DB.
           * now eauto.
           * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
             now eauto 20 with Ensembles_DB.

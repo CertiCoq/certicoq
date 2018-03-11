@@ -823,3 +823,86 @@ Proof.
     * inv Heq. eapply IHls1; eauto.
 Qed.
 
+(** Extra relations on lists *)
+Inductive Filter {A} (P : A -> Prop) : list A -> list A -> Prop :=
+  | Filter_nil : Filter P [] []
+  | Filter_cons_P :
+      forall x l l', ~ P x -> Filter P l l' -> Filter P (x :: l) (x :: l')
+  | Filter_cons_not_P :
+      forall x l l', P x -> Filter P l l' -> Filter P (x :: l) l'.
+  
+  Lemma Filter_FromList {A} (P : A -> Prop) l1 l2 :
+    Filter P l1 l2 ->
+    FromList l1 \\ P <--> FromList l2.
+  Proof. 
+    intros Hf; induction Hf; eauto.
+    - rewrite !FromList_nil, Setminus_Empty_set_abs_r. reflexivity. 
+    - rewrite !FromList_cons, Setminus_Union_distr.
+      rewrite IHHf. rewrite Setminus_Disjoint. reflexivity.
+      eapply Disjoint_Singleton_l. eassumption.
+    - rewrite !FromList_cons, Setminus_Union_distr.
+      rewrite IHHf.
+      rewrite Setminus_Included_Empty_set.
+      rewrite Union_Empty_set_neut_l. reflexivity.
+      eapply Singleton_Included. eassumption.
+  Qed.
+
+  Lemma Filter_Disjoint {A} (P : A -> Prop) l1 l2 :
+    Filter P l1 l2 ->
+    Disjoint _ P (FromList l1) ->
+    l1 = l2.
+  Proof with (now eauto with Ensembles_DB). 
+    intros Hf HD; induction Hf; eauto.
+    - rewrite IHHf; eauto.
+      eapply Disjoint_Included_r; eauto.
+      rewrite FromList_cons...
+    - exfalso. eapply HD; constructor; eauto.
+      constructor; eauto.
+  Qed.
+
+  Lemma Disjoint_Filter {A} (P : A -> Prop) l :
+    Disjoint _ P (FromList l) ->
+    Filter P l l.
+  Proof with (now eauto with Ensembles_DB). 
+    intros HD; induction l; eauto.
+    - constructor.
+    - constructor; eauto.
+      intros Hc. eapply HD; constructor; eauto.
+      constructor; eauto.
+      eapply IHl. eapply Disjoint_Included_r; eauto.
+      rewrite FromList_cons... 
+  Qed.
+
+  Inductive Forall2_P {A B : Type} (P : A -> Prop)
+            (R : A -> B -> Prop) : list A -> list B -> Prop :=
+    Forall2_nil : Forall2_P P R [] []
+  | Forall2_cons_n_P :
+      forall (x : A) (y : B) (l : list A) (l' : list B),
+        ~ P x ->  
+        R x y ->
+        Forall2_P P R l l' ->
+        Forall2_P P R (x :: l) (y :: l')
+  | Forall2_cons_P :
+      forall (x : A) (y : B) (l : list A) (l' : list B),
+        P x ->  
+        Forall2_P P R l l' ->
+        Forall2_P P R (x :: l) (y :: l').
+  
+  Lemma Forall2_P_monotonic_strong {A B} (P : A -> Prop)
+        (R R' : A -> B -> Prop) l1 l2 :
+     (forall x1 x2,
+        List.In x1 l1 ->
+        List.In x2 l2 -> ~ P x1 -> R' x1 x2 -> R x1 x2) -> 
+     Forall2_P P R' l1 l2 ->
+     Forall2_P P R l1 l2.
+  Proof with (now eauto with Ensembles_DB). 
+    intros Hyp Hf. induction Hf; try now constructor.
+    - constructor; eauto. eapply Hyp; eauto. now constructor.
+      now constructor. eapply IHHf.
+      intros. eapply Hyp. now constructor 2.
+      now constructor 2. eassumption. eassumption.
+    - constructor 3; eauto.
+      eapply IHHf.
+      intros. eapply Hyp; try eassumption. now constructor 2.
+      now constructor 2.
+  Qed.

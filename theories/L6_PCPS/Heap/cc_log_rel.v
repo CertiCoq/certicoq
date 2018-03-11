@@ -863,6 +863,18 @@ Module CC_log_rel (H : Heap).
     - apply cc_approx_var_env_set_neq; eauto.
   Qed.
   
+  Lemma cc_approx_var_env_set_neq_r :
+    forall (k j : nat)  (rho1 rho2 : env) (H1 H2 : heap block)
+      (y1 x2 y2 : var) ( v2 : value),
+      cc_approx_var_env k j GIP GP b H1 rho1 H2 rho2 y1 y2 ->
+      y2 <> x2 ->
+      cc_approx_var_env k j GIP GP b H1 rho1 H2 (M.set x2 v2 rho2) y1 y2.
+  Proof. 
+    intros k j rho1 rho2 H1 H2 x2 y1 y2 v2 Hval Hneq x' Hget.
+    rewrite M.gso in *; eauto.
+  Qed.
+
+  
   (** Extend the related environments with a single point *)
   Lemma cc_approx_env_P_set (S : Ensemble var) (k j : nat)
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
@@ -1109,6 +1121,110 @@ Module CC_log_rel (H : Heap).
     rewrite cc_approx_val_image_reach_n_eq; try eassumption.
     reflexivity.
   Qed.
+
+    Lemma cc_approx_val_image_reach_eq  (k : nat) (β : Inj)  (H1 H2 : heap block)
+        (v1 v2 : value) :
+    (forall j, (Res (v1, H1)) ≺ ^ (k ; j ; GIP ; GP ; β) (Res (v2, H2))) ->
+    image β (reach' H1 (val_loc v1)) <--> (reach' H2 (val_loc v2)).
+  Proof.
+    intros Hres. split.
+    - intros l' [l [[m [Hm Hr]] Hin]].
+      eapply cc_approx_val_image_eq in Hres. eexists m.
+      split; eauto. eapply Hres. eexists. split; eauto.
+    - intros l' [m [Hm Hr]].
+      eapply cc_approx_val_image_eq in Hres. eapply Hres in Hr.
+      destruct Hr as [l [Heql Hin]]. eexists; split; eauto.
+      eexists; split; eauto.
+  Qed.
+  
+  Lemma cc_approx_env_image_reach_eq
+        (k : nat) (β : Inj)
+        (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
+    (forall j, cc_approx_var_env k j GIP GP β H1 rho1 H2 rho2 x y) ->
+    M.get x rho1 = Some v -> 
+    image β (reach' H1 (env_locs rho1 [set x])) <-->
+    reach' H2 (env_locs rho2 [set y]).
+  Proof.
+    intros Hcc Hget.
+    edestruct (Hcc 0) as [v' [Hget' Hv]]; eauto.
+    rewrite !env_locs_Singleton; eauto. 
+    rewrite cc_approx_val_image_reach_eq. reflexivity.
+    intros j; eauto.
+    edestruct (Hcc j) as [v'' [Hget'' Hv']]; eauto.
+    repeat subst_exp. eassumption.
+  Qed.
+
+  Lemma cc_approx_env_image_eq  S (k j : nat) (β : Inj)
+        (H1 H2 : heap block) (rho1 rho2 : env) :
+    (H1, rho1) ⋞ ^ (S; k; j; GIP; GP; β) (H2, rho2) ->
+    binding_in_map S rho1 ->
+    image β ((post H1 ^ j) (env_locs rho1 S)) <--> (post H2 ^ j) (env_locs rho2 S).
+  Proof.
+    intros Henv Hbin. split.
+    - intros l1 [l2 [Hin Hbeq]].
+      edestruct post_n_exists_Singleton as [l' [Henv' Hp]]. eassumption.
+      destruct Henv' as [x [Hgetx Hinx]].
+      destruct (M.get x rho1) eqn:Hget1; try now inv Hinx.
+      destruct v; inv Hinx; try contradiction.
+      assert (Hget2 := Hget1).
+      eapply cc_approx_var_env_image_eq in Hget1; eauto.
+      eapply post_n_set_monotonic; [| eapply Hget1 ].
+      eapply env_locs_monotonic. now eapply Singleton_Included; eauto.
+      eexists; split; eauto.
+      eapply proper_post_n. eapply env_locs_Singleton. now eauto.
+      eassumption. 
+    - intros l Hp.
+      edestruct post_n_exists_Singleton as [l' [Henv' Hp']]. eassumption.
+      destruct Henv' as [x [Hgetx Hinx]].
+      destruct (M.get x rho2) eqn:Hget1; try now inv Hinx.
+      destruct v; inv Hinx; try contradiction.
+      eapply image_monotonic. eapply post_n_set_monotonic.
+      eapply env_locs_monotonic. eapply Singleton_Included. eassumption.
+      edestruct Hbin as [v Hget]; eauto.
+      edestruct Henv as [l'' [Hget' Hres]]; eauto. 
+      eapply cc_approx_var_env_image_eq; eauto.
+      eapply proper_post_n. now eapply env_locs_Singleton; eauto.
+      subst_exp. eassumption.
+  Qed.
+
+  Lemma cc_approx_env_image_reach_n S (k j : nat)
+        (H1 H2 : heap block) (rho1 rho2 : env) :
+    (H1, rho1) ⋞ ^ (S; k; j; GIP; GP; b) (H2, rho2) ->
+    binding_in_map S rho1 ->
+    image b ((reach_n H1 j) (env_locs rho1 S)) <--> (reach_n H2 j) (env_locs rho2 S).
+  Proof.
+    intros Hres HB. split.
+    - intros l' [l [[m [Hm Hr]] Hin]].
+      eapply cc_approx_env_P_j_monotonic in Hres; eauto. 
+      eapply cc_approx_env_image_eq in Hres. eexists m.
+      split; eauto. eapply Hres. eexists. split; eauto.
+      eassumption.
+    - intros l' [m [Hm Hr]].
+      eapply cc_approx_env_P_j_monotonic in Hres; eauto. 
+      eapply cc_approx_env_image_eq in Hres. eapply Hres in Hr.
+      destruct Hr as [l [Heql Hin]]. eexists; split; eauto.
+      eexists; split; eauto. eassumption.
+  Qed.
+
+  Lemma cc_approx_env_image_reach S (k : nat)
+        (H1 H2 : heap block) (rho1 rho2 : env) :
+    (forall j, (H1, rho1) ⋞ ^ (S; k; j; GIP; GP; b) (H2, rho2)) ->
+    binding_in_map S rho1 ->
+    image b (reach' H1 (env_locs rho1 S)) <--> reach' H2 (env_locs rho2 S).
+  Proof.
+    intros Hres HB. split.
+    - intros l' [l [[m [Hm Hr]] Hin]].
+      eapply cc_approx_env_P_j_monotonic in Hres; eauto. 
+      eapply cc_approx_env_image_eq in Hres. eexists m.
+      split; eauto. eapply Hres. eexists. split; eauto.
+      eassumption.
+    - intros l' [m [Hm Hr]].
+      eapply cc_approx_env_P_j_monotonic in Hres; eauto. 
+      eapply cc_approx_env_image_eq in Hres. eapply Hres in Hr.
+      destruct Hr as [l [Heql Hin]]. eexists; split; eauto.
+      eexists; split; eauto. eassumption.
+  Qed.
+
   
   Opaque cc_approx_exp.
 

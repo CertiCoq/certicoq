@@ -579,49 +579,45 @@ Fixpoint let_bind (lv : list NVar) (lbt : list L4_5_BTerm) (last: L4_5_Term):=
   | _,_ => last
   end.
 
-Definition L4_5_constr_vars_bt (f: list NVar -> L4_5_Term -> L4_5_Term)
-           (fvars : list NVar) (bt:L4_5_BTerm) :=
-  let (lv,nt) := bt in bterm lv (f (lv++fvars)%list nt).
 
 (** an additional postproc phase to ensure that the args of constructors are
 variables, as needed in L6 *)
-Fixpoint L4_5_constr_vars (fvars : list NVar) (e:L4_5_Term) {struct e}: L4_5_Term :=
+Fixpoint L4_5_constr_vars (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Term :=
   match e with
   | vterm v => vterm v
   | oterm o lbt =>
-    let lbt := map (L4_5_constr_vars_bt L4_5_constr_vars fvars) lbt in
+    let lbt := map (btMapNt (L4_5_constr_vars avoid)) lbt in
     match o with
     | NDCon d n =>
-      let fv : list NVar := freshVars (length lbt) (Some true) fvars [] in
+      let fv : list NVar := freshVars (length lbt) (Some true) avoid [] in
       let_bind fv lbt (oterm o (map (fun v => bterm [] (vterm v)) fv))
     | _ => oterm o lbt
     end
   end.
 
 
-Lemma ssubst_aux_commute :
-  (forall f fv sub,
+Lemma ssubst_aux_commute_L4_5_constr_vars fv:
+  (forall f sub,
       nt_wf f ->
       subset (dom_sub sub) fv ->
   ssubst_aux (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
   L4_5_constr_vars fv (ssubst_aux f sub))*
-  (forall f fv sub,
+  (forall f sub,
       bt_wf f ->
       subset (dom_sub sub) fv->
        ssubst_bterm_aux
-         (L4_5_constr_vars_bt L4_5_constr_vars fv f)
+         (btMapNt (L4_5_constr_vars fv) f)
          (map_sub_range (L4_5_constr_vars fv) sub) =
-  L4_5_constr_vars_bt L4_5_constr_vars fv (ssubst_bterm_aux f sub)).
+  btMapNt (L4_5_constr_vars fv) (ssubst_bterm_aux f sub)).
 Proof using.
   apply NTerm_BTerm_ind; 
     [ intros; simpl; rewrite sub_find_map; dsub_find s; auto| | ].
-- intros ? ? Hind ? ? Hwf.
+- intros ? ? Hind ? Hwf.
   simpl.  rewrite map_map. autorewrite with list. symmetry.
   erewrite <- eq_maps;[ | intros; apply Hind; auto; ntwfauto; fail].
   destruct o; simpl; try rewrite map_map; f_equal.
   invertsna Hwf Hwf. simpl in Hwf0.
   addFreshVarsSpec2 vn pp.
-  setoid_rewrite <- Heqvn.
   clear Heqvn. repnd.
   set (tt:=(oterm (NDCon dc nargs) (map (fun v : NVar => bterm [] (vterm v)) vn))).
   assert (disjoint (free_vars tt) (dom_sub sub)) as Has.
@@ -647,23 +643,59 @@ Proof using.
     rewrite sub_filter_disjoint1;[refl | ].
     autorewrite with SquiggleEq.
     noRepDis2.
-- intros ? ? Hind ? ? Hwf Hsub.
+- intros ? ? Hind ?  Hwf Hsub.
   simpl. f_equal.
   rewrite sub_filter_map_range_comm.
-  Fail rewrite Hind.
-  (* this seems to hold only upto alpha equality. 
-     in LHS, the sub mapping picks vars other than just fv.
-     in RHS, it picks vars other than (lv ++ fv) *)
-Abort.
+  inverts Hwf.
+  rewrite Hind; auto;[].
+  rewrite <- dom_sub_sub_filter.
+  unfold remove_nvars.
+  apply subset_diff.
+  apply subset_app_r. assumption.
+Qed.
+
+Require Import List.
+Lemma L4_5_constr_vars_fvars fv:
+  (forall t, (* nt_wf t -> *)
+        (free_vars (L4_5_constr_vars fv t)) =  free_vars t)
+ * (forall t, (* bt_wf t ->  *)
+        (free_vars_bterm  (btMapNt (L4_5_constr_vars fv) t)) =  free_vars_bterm t)
+.
+Proof using.
+  apply NTerm_BTerm_ind; auto;[ | ].
+- intros ? ? Hind. simpl.
+  erewrite eq_flat_maps;[ | intros; symmetry; apply Hind; auto].
+  destruct o; simpl; try rewrite flat_map_map; auto;[].
+  autorewrite with list.
+  addFreshVarsSpec2 vn pp.
+  clear Heqvn. repnd.
+  assert ( forall t,
+free_vars
+    (let_bind vn (map (btMapNt (L4_5_constr_vars fv)) lbt)
+       t) =
+(flat_map (fun x : BTerm => free_vars_bterm (btMapNt (L4_5_constr_vars fv) x)) lbt)
+         ++ (remove_nvars vn (free_vars t))
+    ).
+    revert dependent vn. revert dependent nargs.
+    induction lbt as [ | bt lbt]; intros;
+    destruct vn as [ | v vn];
+    invertsn pp; auto; simpl;[].
+    autorewrite with list.
+    rewrite IHlbt. repeat rewrite Hind.
+Admitted.
+
+
 
 (*
 Lemma ssubst_commute fv f sub:
-  sub_range_sat sub closed
+  nt_wf f 
+  -> sub_range_sat sub closed
+  -> subset (dom_sub sub) fv
   -> ssubst (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
     L4_5_constr_vars fv (ssubst f sub).
 Proof using.
-  intros Hs.
-  change_to_ssubst_aux8. [ apply ssubst_aux_commute; auto | ].
+  intros Hwf Hs Hss.
+  change_to_ssubst_aux8; [ apply ssubst_aux_commute_L4_5_constr_vars; auto | ].
   unfold range, map_sub_range.
   rewrite map_map, flat_map_map.
   unfold compose. simpl.

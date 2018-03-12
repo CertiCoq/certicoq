@@ -24,6 +24,7 @@ Require Import L4.L4_5_to_L5.
 Require Import SquiggleEq.list.
 
 Definition L4_5_Term :Type := (@NTerm NVar L4_5Opid).
+Definition L4_5_BTerm :Type := (@BTerm NVar L4_5Opid).
 
 Section PolyEval45.
 
@@ -567,5 +568,76 @@ Qed.
 
 Print Assumptions L4_2_to_L4_5_correct.
 (* Closed under the global context *)
+Print L4_5Opid.
 
+Section L4_5_postproc.
+Fixpoint let_bind (lv : list NVar) (lbt : list L4_5_BTerm) (last: L4_5_Term):=
+  match lv, lbt with
+  | [], [] => last
+  | v::lv, bt::lbt =>
+    Let_e v (get_nt bt) (let_bind lv lbt last)
+  | _,_ => last
+  end.
+
+Definition L4_5_constr_vars_bt (f: list NVar -> L4_5_Term -> L4_5_Term)
+           (fvars : list NVar) (bt:L4_5_BTerm) :=
+  let (lv,nt) := bt in bterm lv (f (lv++fvars)%list nt).
+
+(** an additional postproc phase to ensure that the args of constructors are
+variables, as needed in L6 *)
+Fixpoint L4_5_constr_vars (fvars : list NVar) (e:L4_5_Term) {struct e}: L4_5_Term :=
+  match e with
+  | vterm v => vterm v
+  | oterm o lbt =>
+    let lbt := map (L4_5_constr_vars_bt L4_5_constr_vars fvars) lbt in
+    match o with
+    | NDCon d n =>
+      let fv : list NVar := freshVars (length lbt) (Some true) fvars [] in
+      let_bind fv lbt (oterm o (map (fun v => bterm [] (vterm v)) fv))
+    | _ => oterm o lbt
+    end
+  end.
+
+
+Lemma ssubst_aux_commute:
+  (forall f fv sub, (* need to add nt_wf *)
+  ssubst_aux (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
+  L4_5_constr_vars fv (ssubst_aux f sub))*
+  (forall f fv sub,
+       ssubst_bterm_aux
+         (L4_5_constr_vars_bt L4_5_constr_vars fv f)
+         (map_sub_range (L4_5_constr_vars fv) sub) =
+  L4_5_constr_vars_bt L4_5_constr_vars fv (ssubst_bterm_aux f sub)).
+Proof using.
+  apply NTerm_BTerm_ind; intros;
+    [ simpl; rewrite sub_find_map; dsub_find s; auto| | ].
+- simpl.  rewrite map_map. autorewrite with list. symmetry.
+  erewrite <- eq_maps;[ | intros; apply H; auto].
+  destruct o; simpl; try rewrite map_map; f_equal.
+  addFreshVarsSpec2 vn pp.
+  setoid_rewrite <- Heqvn.
+  clear Heqvn. repnd.
+  induction vn as [ | v vn]; destruct lbt as [ | bt lbt]; invertsn pp; auto;[].
+  simpl. unfold Let_e. do 4 f_equal.
+  + destruct bt as [lv nt]. simpl.
+Abort.
+
+(*
+Lemma ssubst_commute fv f sub:
+  sub_range_sat sub closed
+  -> ssubst (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
+    L4_5_constr_vars fv (ssubst f sub).
+Proof using.
+  intros Hs.
+  change_to_ssubst_aux8. [ apply ssubst_aux_commute; auto | ].
+  unfold range, map_sub_range.
+  rewrite map_map, flat_map_map.
+  unfold compose. simpl.
+  rewrite (proj2 (@flat_map_empty _ _ _ _)); auto.
+  intros s Hin. destruct s as [x t]. specialize (Hs _ _ Hin).
+  simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
+Qed.
+ *)
+
+End L4_5_postproc.
 End evaln42_45.

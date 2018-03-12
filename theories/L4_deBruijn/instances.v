@@ -746,6 +746,32 @@ Let certiL4_5_to_L5Val:
    Qed.
 End SimplerProof.
 
+
+Lemma L4_5_constr_vars senv e v lv:
+  subset (free_vars e) lv
+  -> eval e v
+  -> exists vt, eval (L4_5_constr_vars lv e) vt /\ (senv, v) ⊑ (senv, vt).
+Proof using.
+  intros Hs Hev.
+  induction Hev.
+- simpl.
+  eexists.
+  split; [ apply eval_Lam_e | ].
+  constructor;[intros ?; destruct q; cpx; fail|
+               intros ?; destruct n; simpl; cpx].
+- simpl.
+  rwsimpl Hs.
+  apply subset_app in Hs. repnd.
+  specialize (IHHev1 Hs0).
+  specialize (IHHev2 Hs).
+  simpl in *.  
+  assert (subset (free_vars (subst e1' x v2)) lv) by admit.
+  specialize (IHHev3 H).
+  exrepnd.
+  eexists.
+  split; [ eapply eval_App_e; eauto | apply IHHev0].
+Abort.
+
 Global Instance evalPreservesGood :
   Proper (eval ==> Basics.impl) (@goodTerm L4_5_Term _).
 Proof using.

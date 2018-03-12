@@ -656,15 +656,15 @@ Qed.
 
 Require Import List.
 Lemma L4_5_constr_vars_fvars fv:
-  (forall t, (* nt_wf t -> *)
+  (forall t, nt_wf t ->
         (free_vars (L4_5_constr_vars fv t)) =  free_vars t)
- * (forall t, (* bt_wf t ->  *)
+ * (forall t, bt_wf t ->
         (free_vars_bterm  (btMapNt (L4_5_constr_vars fv) t)) =  free_vars_bterm t)
 .
 Proof using.
   apply NTerm_BTerm_ind; auto;[ | ].
-- intros ? ? Hind. simpl.
-  erewrite eq_flat_maps;[ | intros; symmetry; apply Hind; auto].
+- intros ? ? Hind Hwf. simpl.
+  erewrite eq_flat_maps;[ | intros; symmetry; apply Hind; auto; ntwfauto].
   destruct o; simpl; try rewrite flat_map_map; auto;[].
   autorewrite with list.
   addFreshVarsSpec2 vn pp.
@@ -681,7 +681,17 @@ free_vars
     destruct vn as [ | v vn];
     invertsn pp; auto; simpl;[].
     autorewrite with list.
-    rewrite IHlbt. repeat rewrite Hind.
+    ntwfauto.
+    destruct nargs; invertsn HntwfSig.
+    rewrite HntwfSig in H2.
+    erewrite IHlbt; simpl; eauto; simpl; ntwfauto; noRepDis2;[ | simpl; eauto].
+    destruct bt as [lv nt].
+    destruct lv; inverts HntwfSig. simpl.
+    rewrite <- app_assoc.
+    f_equal.
+    rewrite remove_app.
+    f_equal;[ | apply (remove_nvars_comm [v] vn); fail].
+    erewrite eq_flat_maps;[ | intros; apply Hind; cpx; fail].
 Admitted.
 
 

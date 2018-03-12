@@ -599,27 +599,61 @@ Fixpoint L4_5_constr_vars (fvars : list NVar) (e:L4_5_Term) {struct e}: L4_5_Ter
   end.
 
 
-Lemma ssubst_aux_commute:
-  (forall f fv sub, (* need to add nt_wf *)
+Lemma ssubst_aux_commute :
+  (forall f fv sub,
+      nt_wf f ->
+      subset (dom_sub sub) fv ->
   ssubst_aux (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
   L4_5_constr_vars fv (ssubst_aux f sub))*
   (forall f fv sub,
+      bt_wf f ->
+      subset (dom_sub sub) fv->
        ssubst_bterm_aux
          (L4_5_constr_vars_bt L4_5_constr_vars fv f)
          (map_sub_range (L4_5_constr_vars fv) sub) =
   L4_5_constr_vars_bt L4_5_constr_vars fv (ssubst_bterm_aux f sub)).
 Proof using.
-  apply NTerm_BTerm_ind; intros;
-    [ simpl; rewrite sub_find_map; dsub_find s; auto| | ].
-- simpl.  rewrite map_map. autorewrite with list. symmetry.
-  erewrite <- eq_maps;[ | intros; apply H; auto].
+  apply NTerm_BTerm_ind; 
+    [ intros; simpl; rewrite sub_find_map; dsub_find s; auto| | ].
+- intros ? ? Hind ? ? Hwf.
+  simpl.  rewrite map_map. autorewrite with list. symmetry.
+  erewrite <- eq_maps;[ | intros; apply Hind; auto; ntwfauto; fail].
   destruct o; simpl; try rewrite map_map; f_equal.
+  invertsna Hwf Hwf. simpl in Hwf0.
   addFreshVarsSpec2 vn pp.
   setoid_rewrite <- Heqvn.
   clear Heqvn. repnd.
-  induction vn as [ | v vn]; destruct lbt as [ | bt lbt]; invertsn pp; auto;[].
+  set (tt:=(oterm (NDCon dc nargs) (map (fun v : NVar => bterm [] (vterm v)) vn))).
+  assert (disjoint (free_vars tt) (dom_sub sub)) as Has.
+    unfold tt. simpl. setoid_rewrite flat_map_vterm.
+    apply disjoint_sym.
+    eapply subset_disjoint; eauto. disjoint_reasoning.
+
+  remember tt as t.
+  clear Heqt. clear tt.
+  revert dependent vn. revert dependent nargs.
+  induction lbt as [ | bt lbt]; intros;
+    destruct vn as [ | v vn];
+    invertsn pp; auto; simpl;
+      [rewrite ssubst_aux_trivial_disj; autorewrite with SquiggleEq; auto ;fail | ].
+  
   simpl. unfold Let_e. do 4 f_equal.
-  + destruct bt as [lv nt]. simpl.
+  + apply map_eq_repeat_implies with (v:=bt) in Hwf0; [ | cpx; fail].
+    destruct bt as [lv nt]. destruct lv; inverts Hwf0.
+    refl.
+  + simpl in *. destruct nargs; inverts Hwf0.
+    rewrite H1 in H2.
+    erewrite  IHlbt; eauto; try noRepDis2;[].
+    rewrite sub_filter_disjoint1;[refl | ].
+    autorewrite with SquiggleEq.
+    noRepDis2.
+- intros ? ? Hind ? ? Hwf Hsub.
+  simpl. f_equal.
+  rewrite sub_filter_map_range_comm.
+  Fail rewrite Hind.
+  (* this seems to hold only upto alpha equality. 
+     in LHS, the sub mapping picks vars other than just fv.
+     in RHS, it picks vars other than (lv ++ fv) *)
 Abort.
 
 (*

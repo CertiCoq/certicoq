@@ -86,8 +86,7 @@ Module HeapDefs (H : Heap) .
       | Constr t ls => (* The size of the constructor representation *)
         1 + length ls
       | Clos _ _ => 2
-      | Env rho =>
-        1 + size_map rho
+      | Env rho => 0
     end.
   
   (** Size of the heap *)

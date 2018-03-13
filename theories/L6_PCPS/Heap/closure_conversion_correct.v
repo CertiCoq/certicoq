@@ -630,56 +630,7 @@ Module ClosureConversionCorrect (H : Heap).
   Proof.
     now firstorder.
   Qed.
-
-  (** * Postcondition *)
-  (** Enforces that the resource consumption of the target is within certain bounds *)
-  Definition Post
-             k (* time units already spent *)
-             i (* step index *)
-             (p1 p2 : heap block * env * exp * nat * nat) :=
-    match p1, p2 with
-      | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
-        c1 <= c2 + k <= 7 * c1 * (max_exp_env i H1 rho1 e1) + 7 * sizeOf_exp e1 /\
-        m1 <= m2 <= 4 * m1 * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
-    end.
-
-  (** Enforces that the resource consumption of the target is within certain bounds *)
-  Definition PostL
-             k (* time units already spent *)
-             i H1 rho1 e1
-             (p1 p2 : nat * nat) :=
-    match p1, p2 with
-      | (c1, m1), (c2, m2) =>
-        c1 <= c2 + k <= 7 * c1 * (max_exp_env i H1 rho1 e1) + 7 * sizeOf_exp e1 /\
-        m1 <= m2 <= 4 * m1 * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
-    end.
   
-  (** * Precondition *)
-  (** Enforces that the initial heaps have related sizes *)
-  Definition Pre
-             C (* Context already processed *)
-             i (* step index *)
-             (p1 p2 : heap block * env * exp) :=
-    let m := cost_alloc_ctx C in 
-    match p1, p2 with
-      | (H1, rho1, e1), (H2, rho2, e2) =>
-        size_heap H1 + m  <= size_heap H2 <=
-        4 * (size_heap H1 + m) * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
-    end.
-
-  (** * Properties of the cost invariants *)
-
-  (** Transfer units from the accumulator to the cost of e2 *)
-  Lemma Post_transfer i (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp)
-        (k c1 c2 c m1 m2 : nat) : 
-    Post (k + c) i (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2, m2) ->
-    Post k i (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2 + c, m2).
-  Proof.
-    simpl. intros H. omega.
-  Qed.
-  
-  
-  (** TODO move *)
 
   Lemma ctx_to_heap_env_size_heap C rho1 rho2 H1 H2 c :
     ctx_to_heap_env C H1 rho1 H2 rho2 c ->
@@ -1475,10 +1426,12 @@ Module ClosureConversionCorrect (H : Heap).
       (* process Econstr one the right and left *)
       eapply cc_approx_exp_constr_compat 
       with (ILi := fun c => PostL c k H1 rho1 (Econstr v t l e1))
-           (r2 := 0)
            (IIL2 := Pre Hole_c (k - cost H1 rho1 (Econstr v t l e1)));
         [ | | | | | | | eassumption | | ]. 
-      + admit. (* bounds timeout compat *)
+      + intros. eapply Post_timeout.  unfold Pre. unfold PostL.
+        intros. split. admit.
+        split. omega. admit.  
+      (* bounds timeout compat *)
       + admit. (* bounds - pick F *)
       + admit. (* pre - allocation *) (* TODO maybe we need less assumptions *)
       + eapply well_formed_antimon; [| eassumption ].
@@ -1711,7 +1664,7 @@ Module ClosureConversionCorrect (H : Heap).
           * eapply Disjoint_Included_r;
               [| eapply Disjoint_Included_l; [ apply image_monotonic | now apply Hd ]].
             normalize_bound_var... now eauto with Ensembles_DB. }
-        { admit. }        
+        { intros [c1 m1] [c2 m2].  admit. }        
     - (* case Eproj *)
       inv Hcc.
       admit.

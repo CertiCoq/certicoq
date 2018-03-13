@@ -1,7 +1,8 @@
 From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
-     List_util functions closure_conversion closure_conversion_util.
+     List_util functions.
 
-From L6.Heap Require Import heap heap_defs cc_log_rel compat.
+From L6.Heap Require Import heap heap_defs cc_log_rel
+     closure_conversion closure_conversion_util.
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -20,10 +21,9 @@ Module Defs := HeapDefs .
 Module Size (H : Heap).
 
   (* This is stupid. Find out how to use modules correctly. *)
-  Module Compat := Compat H.
-  
-  Import H Compat.LR.Sem.Equiv.Defs.
-  
+  Module LR := CC_log_rel H.
+
+  Import H LR LR.Sem LR.Sem.Equiv LR.Sem.Equiv.Defs.
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on the execution cost of certain transformations *)
   
@@ -336,6 +336,44 @@ Module Size (H : Heap).
     simpl. omega.
   Qed.
 
+  (** Number of function definitions *)
+  Fixpoint numOf_fundefs (B : fundefs) : nat := 
+    match B with
+      | Fcons _ _ xs e B =>
+        1 + numOf_fundefs B
+      | Fnil => 0
+    end.
+
+  (** Number of function definitions in an expression *)
+  Fixpoint numOf_fundefs_in_exp (e : exp) : nat :=
+    match e with
+      | Econstr x _ ys e => numOf_fundefs_in_exp e
+      | Ecase x l =>
+        1  + (fix num l :=
+                match l with
+                  | [] => 0
+                  | (t, e) :: l => numOf_fundefs_in_exp e + num l
+                end) l
+      | Eproj x _ _ y e => 1 + numOf_fundefs_in_exp e
+      | Efun B e => numOf_fundefs_in_fundefs B + numOf_fundefs_in_exp e
+      | Eapp x _ ys => 0
+      | Eprim x _ ys e => numOf_fundefs_in_exp e
+      | Ehalt x => 0
+    end
+  with numOf_fundefs_in_fundefs (B : fundefs) : nat :=
+         match B with
+           | Fcons _ _ xs e B =>
+             1 + numOf_fundefs_in_exp e + numOf_fundefs_in_fundefs B
+           | Fnil => 0
+         end.
+
+  Lemma numOf_fundefs_le_sizeOf_fundefs B :
+    numOf_fundefs B <= sizeOf_fundefs B.
+  Proof.
+    induction B; eauto; simpl; omega.
+  Qed.
+
+
   (* Lemma max_exp_env_Efun k B e rho : *)
   (*   max_exp_env k He (def_funs B B rho rho) <= max_exp_env k (Efun B e) rho. *)
   (* Proof. *)
@@ -347,4 +385,138 @@ Module Size (H : Heap).
   (*     eapply Nat.max_lub; simpl; omega. *)
   (* Qed. *)
 
+    (* Concrete bounds for closure conversion *)
+
+  (** * Postcondition *)
+
+  (** Enforces that the resource consumption of the target is within certain bounds *)
+  Definition Post
+             k (* time units already spent *)
+             i (* step index *)
+             (p1 p2 : heap block * env * exp * nat * nat) :=
+    match p1, p2 with
+      | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
+        c1 <= c2 + k <= 7 * c1 * (max_exp_env i H1 rho1 e1) + 7 * sizeOf_exp e1 /\
+        m1 <= m2 <= 4 * m1 * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
+    end.
+
+  (** Enforces that the resource consumption of the target is within certain bounds *)
+  Definition PostL
+             k (* time units already spent *)
+             i H1 rho1 e1
+             (p1 p2 : nat * nat) :=
+    match p1, p2 with
+      | (c1, m1), (c2, m2) =>
+        c1 <= c2 + k <= 7 * c1 * (max_exp_env i H1 rho1 e1) + 7 * sizeOf_exp e1 /\
+        m1 <= m2 <= 4 * m1 * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
+    end.
+  
+  (** * Precondition *)
+
+  (** Enforces that the initial heaps have related sizes *)
+  Definition Pre
+             C (* Context already processed *)
+             i (* step index *)
+             (p1 p2 : heap block * env * exp) :=
+    let m := cost_alloc_ctx C in 
+    match p1, p2 with
+      | (H1, rho1, e1), (H2, rho2, e2) =>
+        size_heap H1 + m  <= size_heap H2 <=
+        4 * (size_heap H1 + m) * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
+    end.
+
+  (** * Properties of the cost invariants *)
+
+  (** Transfer units from the accumulator to the cost of e2 *)
+  Lemma Post_transfer i (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp)
+        (k c1 c2 c m1 m2 : nat) : 
+    Post (k + c) i (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2, m2) ->
+    Post k i (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2 + c, m2).
+  Proof.
+    simpl. intros H. omega.
+  Qed.
+
+  Lemma Post_timeout i (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp)
+        C (k c  : nat) :
+    Pre C i (H1, rho1, e1) (H2, rho2, e2) ->
+    k <= 7 * sizeOf_exp e1 ->
+    cost_alloc_ctx C = 0 ->
+    PostL k i H1 rho1 e1 (c, size_heap H1) (c, size_heap H2).
+  Proof. 
+    unfold Pre, Post. intros [H1' H2'] Ht Hm.
+    split. split. omega.
+    assert (Hgrt := max_exp_env_grt_1 i H1 rho1 e1).
+    eapply plus_le_compat; try omega.
+    replace c with (1 * c * 1) at 1 by omega. 
+    eapply mult_le_compat. omega. eassumption.
+    rewrite Hm in *. split. omega.
+    rewrite <- plus_n_O in H2'. eassumption.
+  Qed.
+
+  (* Cost for projecting vars *)
+  Lemma project_var_cost 
+        Scope Funs σ c Γ FVs S1 x x' C1 S2 :
+    project_var Scope Funs σ c Γ FVs S1 x x' C1 S2 ->
+    sizeOf_exp_ctx C1 <= 1.
+  Proof.
+    intros Hvar; inv Hvar; eauto.
+  Qed.
+  
+  Lemma project_vars_cost 
+        Scope Funs σ c Γ FVs S1 x x' C1 S2 :
+    project_vars Scope Funs σ c Γ FVs S1 x x' C1 S2 ->
+    sizeOf_exp_ctx C1 <= length x.
+  Proof.
+    intros Hvar. induction Hvar; eauto.
+    rewrite sizeOf_exp_ctx_comp_ctx.
+    simpl. replace (S (length ys)) with (1 + length ys) by omega.
+    eapply plus_le_compat.
+    eapply project_var_cost; eauto.
+    eauto.
+  Qed.
+
+  Lemma project_var_cost_alloc
+        Scope Funs σ c Γ FVs S1 x x' C1 S2 :
+    project_var Scope Funs σ c Γ FVs S1 x x' C1 S2 ->
+    cost_alloc_ctx C1 = 0.
+  Proof.
+    intros Hvar; inv Hvar; eauto.
+  Qed.
+  
+  Lemma project_vars_cost_alloc
+        Scope Funs σ c Γ FVs S1 x x' C1 S2 :
+    project_vars Scope Funs σ c Γ FVs S1 x x' C1 S2 ->
+    cost_alloc_ctx C1 = 0.
+  Proof.
+    intros Hvar. induction Hvar; eauto.
+    simpl. rewrite cost_alloc_ctx_comp_ctx_f.
+    erewrite project_var_cost_alloc; eauto.
+  Qed.
+
+  Lemma make_closures_cost ct B S Γ C g :
+    make_closures ct B S Γ C g S ->
+    sizeOf_exp_ctx C = 3 * (numOf_fundefs B).
+  Proof.
+    intros Hvar. induction Hvar; eauto.
+    simpl. omega.
+  Qed.
+
+  Lemma make_closures_cost_alloc ct B S Γ C g :
+    make_closures ct B S Γ C g S ->
+    cost_alloc_ctx C = 3 * (numOf_fundefs B).
+  Proof.
+    intros Hvar. induction Hvar; eauto.
+    simpl. omega.
+  Qed.
+
+  (* Lemma ctx_to_heap_env_cost C H1 rho1 H2 rho2 m : *)
+  (*   ctx_to_heap_env C H1 rho1 H2 rho2 m -> *)
+  (*   m = sizeOf_exp_ctx C. *)
+  (* Proof. *)
+  (*   intros Hctx; induction Hctx; eauto. *)
+  (*   simpl. omega. *)
+  (*   simpl. omega. *)
+  (*   simpl. omega. *)
+  (* Qed.  *)
+  
 End Size.

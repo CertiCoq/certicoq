@@ -26,12 +26,12 @@ Module CC_log_rel (H : Heap).
   Definition IInv := relation (heap block * env * exp).
 
   (** Global initial condition. Enforced as initial condition for future executions of the result *)
-  Definition GIInv := nat -> relation (heap block * env * exp).
+  Definition GIInv := relation (heap block * env * exp).
   
   (** * Final conditions *)
   
   (** Local final conditions. Holds for the result of the execution of the expressions being related. *)
-  Definition Inv := relation (nat * nat).
+  Definition Inv := relation (heap block * env * exp * nat * nat).
 
   (** Global final conditions. Holds for the result of future execution of the result *)
   Definition GInv := nat -> relation (heap block * env * exp * nat * nat).
@@ -110,7 +110,7 @@ Module CC_log_rel (H : Heap).
           big_step_GC_cc H2' rho2' e2 r2 c2 m2 /\
           injective_subdomain (reach_n_ans j r1) b /\
           (* extra invariants for costs *)
-          IL (c1, m1) (c2, m2) /\
+          IL (H1', rho1', e1, c1, m1) (H2', rho2', e2, c2, m2) /\
           cc_approx_val (k - c1) j IIG IG b r1 r2.
     
   End cc_approx.
@@ -138,7 +138,7 @@ Module CC_log_rel (H : Heap).
                            Forall2 R vs1 vs2
                        end)
               | Some (Clos (FunPtr B1 f1) (Loc env_loc1)), Some (Constr c [FunPtr B2 f2; Loc env_loc2]) =>
-                                (forall j', j' <= j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
+                (forall j', j' <= j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
                 forall (b1 b2 : Inj)
                   (rho_clo1 rho_clo2 rho_clo3 : env) (H1' H1'' H2' : heap block)
                   (env_loc1' env_loc2' : loc)
@@ -150,10 +150,10 @@ Module CC_log_rel (H : Heap).
                   
                   get env_loc1' H1' = Some (Env rho_clo1) ->
                   find_def f1 B1 = Some (ft, xs1, e1) ->
-
+                  
                   def_closures B1 B1 rho_clo1 H1' env_loc1' =  (H1'', rho_clo2) ->
                   setlist xs1 vs1 rho_clo2 = Some rho_clo3 ->
-
+                  
                   exists (xs2 : list var) (e2 : exp) (rho2' : env),
                     find_def f2 B2 = Some (ft, xs2, e2) /\
                     Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
@@ -166,12 +166,12 @@ Module CC_log_rel (H : Heap).
                            let R v1 v2 := cc_approx_val (k - (k - i)) j' IP P b' (Res (v1, H1'')) (Res (v2, H2')) in
                            Forall2 R vs1 vs2 ->
                            f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
+                           IP (H1'', rho_clo3, e1) (H2', rho2', e2) /\
                            cc_approx_exp cc_approx_val
                                          (k - (k - i))
                                          j'
-                                         (IP i) IP
-                                         (fun p1 p2 =>
-                                            P i (H1'', rho_clo3, e1, fst p1, snd p1) (H2', rho2', e2, fst p2, snd p2)) P
+                                         IP IP
+                                         (P (k - (k - i))) P
                                          (e1, rho_clo3, H1'') (e2, rho2', H2')
                        end)
               | _, _ => False
@@ -212,7 +212,6 @@ Module CC_log_rel (H : Heap).
           def_closures B1 B1 rho_clo1 H1' env_loc1' =  (H1'', rho_clo2) ->
           setlist xs1 vs1 rho_clo2 = Some rho_clo3 ->
 
-          (* b env_loc1 = env_loc2 /\ *)
           exists (xs2 : list var) (e2 : exp) (rho2' : env),
             find_def f2 B2 = Some (ft, xs2, e2) /\
             Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
@@ -221,11 +220,11 @@ Module CC_log_rel (H : Heap).
                let R v1 v2 := cc_approx_val i j' IP P b' (Res (v1, H1'')) (Res (v2, H2')) in
                f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
                Forall2 R vs1 vs2 ->
+               IP (H1'', rho_clo3, e1) (H2', rho2', e2) /\
                cc_approx_exp cc_approx_val
                              i j'
-                             (IP i) IP
-                             (fun p1 p2 =>
-                                P i (H1'', rho_clo3, e1, fst p1, snd p1) (H2', rho2', e2, fst p2, snd p2)) P
+                             IP IP
+                             (P i) P
                              (e1, rho_clo3, H1'') (e2, rho2', H2'))
 
       | _, _ => False
@@ -327,7 +326,7 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           simpl. intros i j' b' Hleq Hleq' Hfeq Hall.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite <-  Heqi at 2 4. eapply Hi; eauto.
+          setoid_rewrite <-  Heqi. eapply Hi; eauto.
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. eassumption.
       }
@@ -369,7 +368,7 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           simpl. intros i j' b' Hleq Hleq' Hfeq Hall.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite <- Heqi at 2 4. eapply Hi; eauto.
+          setoid_rewrite <- Heqi. eapply Hi; eauto.
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. eassumption.
       }
@@ -586,17 +585,22 @@ Module CC_log_rel (H : Heap).
         as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
       do 3 eexists; split; [ | split ]; try (now eauto).
       intros i j' b'' Hleq Hleq'. simpl. intros Hfeq Hrel'.
-      eapply cc_approx_exp_same_rel_IH with (GP1 := GP1); try eassumption.
-      + intros; eapply IHk. omega. eassumption. eassumption.
-      + eapply cc_approx_exp_rel_mon. eapply Hi. eassumption.
+      split.
+      edestruct (Hi i j') as [HI Hcc']; eauto.
+      + eapply Forall2_monotonic; [| eassumption ].
+        intros. rewrite cc_approx_val_eq.
+        eapply IHk; eauto. now rewrite <- cc_approx_val_eq; simpl in *; eauto.
+        intros. split; now eapply Hrel.
+      + eapply cc_approx_exp_same_rel_IH with (GP1 := GP1); try eassumption.
+        intros; eapply IHk. omega. eassumption. eassumption.
+        eapply cc_approx_exp_rel_mon. eapply Hi. eassumption.
         eassumption. eassumption.
         eapply Forall2_monotonic; [| eassumption ].
         intros. rewrite cc_approx_val_eq.
         eapply IHk; eauto. now rewrite <- cc_approx_val_eq; simpl in *; eauto.
-        intros. split; now eapply Hrel.
-        intros x y. now eapply Hrel.
+        intros. split; now eapply Hrel. now eapply Hrel.
   Qed.
-  
+
   Transparent cc_approx_exp.
   
   Lemma cc_approx_exp_same_rel (P : relation nat) k j (GP' : GInv)
@@ -675,6 +679,7 @@ Module CC_log_rel (H : Heap).
     intros Hpre Hleq b1 b2 H1' H2' rho1' rho2' v1 c1 m1 HH1 Hr1 HH2 Hr2 HIP Hleq' Hstep Hstuck.
     edestruct (Hpre b1 b2 H1' H2' rho1' rho2' v1 c1)
       as [v2 [c2 [m2 [b2' [Hstep2 [Hinj [Hleq2 H3]]]]]]]; eauto.
+    
     omega. do 4 eexists; repeat split; eauto.
     rewrite cc_approx_val_eq in *.
     eapply cc_approx_val_monotonic; eauto. omega.
@@ -1351,9 +1356,9 @@ Module CC_log_rel (H : Heap).
         simpl. rewrite post_Singleton; eauto. simpl...
         eapply res_equiv_image_reach in H4.
         rewrite image_id in H4. rewrite H4. eassumption.
-      * exists xs2, e2, rho2'. repeat split; eauto.
+      * exists xs2, e2, rho2'. eauto.
   Qed. 
-
+  
 
   Lemma cc_approx_val_heap_eq (k j : nat) (β β1 β2 : Inj)
         (H1 H2 H1' H2' : heap block)
@@ -1975,8 +1980,18 @@ Module CC_log_rel (H : Heap).
              e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hget Hfind Hdef Hset.
       edestruct Hcc as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi)
       ; [| | | | eassumption | eassumption | eassumption | eassumption | ]; try eassumption.
-      exists xs2, e2, rho2'. repeat split; eauto.
-      intros i j' b' Hlt Hleq Hfeq' Hall. eapply Hi; try eassumption.
+      exists xs2, e2, rho2'. split; [| split; [| split ]]; eauto.
+      eapply Hi; try eassumption. 
+      eapply Equivalence_Transitive; [| eassumption ].
+      eapply f_eq_subdomain_compose_compat. reflexivity.
+      eapply f_eq_subdomain_compose_compat; [| reflexivity ].
+      replace ([set env_loc1']) with (val_loc (Loc env_loc1')) by reflexivity.
+      eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
+      rewrite <- res_equiv_image_reach; [| eassumption ].
+      rewrite image_id. rewrite (reach_unfold H1 (val_loc (Loc l1))).
+      eapply Included_Union_preserv_r. eapply reach'_set_monotonic.
+      simpl. rewrite post_Singleton; eauto...
+      eapply Hi; try eassumption.
       eapply Equivalence_Transitive; [| eassumption ].
       eapply f_eq_subdomain_compose_compat. reflexivity.
       eapply f_eq_subdomain_compose_compat; [| reflexivity ].

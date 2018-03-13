@@ -28,41 +28,13 @@ Module SpaceSem (H : Heap).
     end.
 
   (* The cost of evaluating the head constructor before CC *)
-  Definition cost (H : heap block) (rho : env) (e : exp) : nat :=
+  Definition cost (e : exp) : nat :=
     match e with
       | Econstr x t ys e => 1 + length ys
       | Ecase y cl => 1 
       | Eproj x t n y e => 1
       | Efun B e => 1
       | Eapp f t ys => 1 + length ys
-        (* match M.get f rho with *)
-        (*   | Some (Loc l1) => *)
-        (*     match get l1 H with *)
-        (*       | Some (Clos (FunPtr B g) (Loc env_loc)) => *)
-        (*         match get env_loc H, find_def g B, getlist ys rho with *)
-        (*           | Some (Env rho_clo), Some (t, xs, e), Some vs => *)
-        (*             let '(H', rho_clo1) := def_closures B B rho_clo H env_loc in  *)
-        (*             match setlist xs vs rho_clo1 with *)
-        (*               | Some rho_clo2 =>  *)
-        (*                 1 + length ys + size_reachable (env_locs rho_clo2 (occurs_free e)) H *)
-        (*               | _ => 0 *)
-        (*             end *)
-        (*           | _,_ , _  => 0 *)
-        (*         end *)
-        (*       | _ => 0 *)
-        (*     end *)
-        (*   | Some (FunPtr B g) => *)
-        (*     match find_def g B,  getlist ys rho with *)
-        (*       | Some (ct, xs, e), Some vs => *)
-        (*         match setlist xs vs (def_funs B B (M.empty _)) with *)
-        (*           | Some rho_clo =>  *)
-        (*             1 + length ys + size_reachable (env_locs rho_clo (occurs_free e)) H *)
-        (*           | None => 0 *)
-        (*         end *)
-        (*       | _, _ => 0 *)
-        (*     end *)
-        (*   | None => 0 *)
-        (* end *)
       | Eprim x p ys e => 1 + length ys
       | Ehalt x => 1
     end.
@@ -80,47 +52,47 @@ Module SpaceSem (H : Heap).
     Prop :=
   | Eval_oot_gc :
       forall (H : heap block) (rho : env) (e : exp) (c m : nat)
-        (Hcost : c < cost H rho e) 
+        (Hcost : c < cost e) 
         (Hsize : size_heap H = m),
         (big_step_GC H rho e OOT c m)
   | Eval_constr_gc :
       forall (H H' : heap block) (rho rho' : env) (x : var) (t : cTag)
         (ys : list var) (e : exp) (vs : list value) (l : loc) (r : ans)
         (c m : nat)
-        (Hcost :  c >= cost H rho (Econstr x t ys e))
+        (Hcost :  c >= cost (Econstr x t ys e))
         (Hget : getlist ys rho = Some vs)
         (Halloc : alloc (Constr t vs) H = (l, H'))
                 
-        (Hbs : big_step_GC H' (M.set x (Loc l) rho) e r (c - cost H rho (Econstr x t ys e)) m),
+        (Hbs : big_step_GC H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
 
         big_step_GC H rho (Econstr x t ys e) r c m
   | Eval_proj_gc : (* XXX Tag annotation in projections is redundant in this semantics *)
       forall (H : heap block) (rho : env) (x : var) (t t' : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
-        (Hcost : c >= cost H rho (Eproj x t n y e))
+        (Hcost : c >= cost (Eproj x t n y e))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t' vs))
         (Hnth : nthN vs n = Some v)
         
-        (Hbs : big_step_GC H (M.set x v rho) e r (c - cost H rho (Eproj x t n y e)) m),
+        (Hbs : big_step_GC H (M.set x v rho) e r (c - cost (Eproj x t n y e)) m),
         
         big_step_GC H rho (Eproj x t n y e) r c m
   | Eval_case_gc :
       forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
         (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
-        (Hcost : c >= cost H rho (Ecase y cl))
+        (Hcost : c >= cost (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
         (Htag : findtag cl t = Some e)
         
-        (Hbs : big_step_GC H rho e r (c - cost H rho (Ecase y cl)) m),
+        (Hbs : big_step_GC H rho e r (c - cost (Ecase y cl)) m),
         
         big_step_GC H rho (Ecase y cl) r c m
   | Eval_fun_gc :
       forall (H H' H'' : heap block) (rho rho_clo rho' : env) (B : fundefs)
         (env_loc : loc) (e : exp) (r : ans) (c : nat) (m : nat)
-        (Hcost : c >= cost H rho (Efun B e))
+        (Hcost : c >= cost (Efun B e))
         (* find the closure environment *)
         (Hres : restrict_env (fundefs_fv B) rho = rho_clo)
         (* allocate the closure environment *)
@@ -128,7 +100,7 @@ Module SpaceSem (H : Heap).
         (* allocate the closures *)
         (Hfuns : def_closures B B rho H' env_loc = (H'', rho'))
         
-        (Hbs : big_step_GC H'' rho' e r (c - cost H rho (Efun B e)) m),
+        (Hbs : big_step_GC H'' rho' e r (c - cost (Efun B e)) m),
 
         big_step_GC H rho (Efun B e) r c m
     
@@ -136,7 +108,7 @@ Module SpaceSem (H : Heap).
       forall (H H' H'' : heap block) (rho rho_clo rho_clo1 rho_clo2 : env) (B : fundefs)
         (f f' : var) (t : cTag) (xs : list var) (e : exp) (l env_loc: loc)
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
-        (Hcost : c >= cost H rho (Eapp f t ys))
+        (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
         (* Look up the closure *)
         (Hgetl : get l H = Some (Clos (FunPtr B f') (Loc env_loc)))
@@ -154,11 +126,11 @@ Module SpaceSem (H : Heap).
         (Hgc : live ((env_locs rho_clo2) (occurs_free e)) H' H'')
         (Hsize : size_heap H' = m')
         
-        (Hbs : big_step_GC H'' rho_clo2 e r (c - cost H rho (Eapp f t ys)) m),
+        (Hbs : big_step_GC H'' rho_clo2 e r (c - cost (Eapp f t ys)) m),
         big_step_GC H rho (Eapp f t ys) r c (max m m')
   | Eval_halt_gc :
       forall H rho x l c m
-        (Hcost : c >= cost H rho (Ehalt x))
+        (Hcost : c >= cost (Ehalt x))
         (Hget : M.get x rho = Some l)
         (Hsize : size_heap H = m),
         big_step_GC H rho (Ehalt x) (Res (l, H)) c m.
@@ -176,59 +148,59 @@ Module SpaceSem (H : Heap).
     Prop :=
   | Eval_oot_per_cc :
       forall (H : heap block) (rho : env) (e : exp) (c m : nat)
-        (Hcost : c < cost H rho e) 
+        (Hcost : c < cost e) 
         (Hsize : size_heap H = m),
         (big_step_GC_cc H rho e OOT c m)
   | Eval_constr_per_cc :
       forall (H H' : heap block) (rho : env) (x : var) (t : cTag)
         (ys :list var) (e : exp) (vs : list value) (l : loc) (r : ans)
         (c m : nat)
-        (Hcost :  c >= cost H rho (Econstr x t ys e))
+        (Hcost :  c >= cost (Econstr x t ys e))
         (Hget : getlist ys rho = Some vs)
         (Halloc : alloc (Constr t vs) H = (l, H'))
               
-        (Hbs : big_step_GC_cc H' (M.set x (Loc l) rho) e r (c - cost H rho (Econstr x t ys e)) m),
+        (Hbs : big_step_GC_cc H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
 
         big_step_GC_cc H rho (Econstr x t ys e) r c m
   | Eval_proj_per_cc : (* XXX Tag annotation in projections is redundant in this semantics *)
       forall (H : heap block) (rho : env) (x : var) (t t' : cTag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
-        (Hcost : c >= cost H rho (Eproj x t n y e))
+        (Hcost : c >= cost (Eproj x t n y e))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t' vs))
         (Hnth : nthN vs n = Some v)
 
-        (Hbs : big_step_GC_cc H (M.set x v rho) e r (c - cost H rho (Eproj x t n y e)) m),
+        (Hbs : big_step_GC_cc H (M.set x v rho) e r (c - cost (Eproj x t n y e)) m),
         
         big_step_GC_cc H rho (Eproj x t n y e) r c m
   | Eval_case_per_cc :
       forall (H H' : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
         (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
-        (Hcost : c >= cost H rho (Ecase y cl))
+        (Hcost : c >= cost (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
         (Htag : findtag cl t = Some e)
 
 
-        (Hbs : big_step_GC_cc H' rho e r (c - cost H rho (Ecase y cl)) m),
+        (Hbs : big_step_GC_cc H' rho e r (c - cost (Ecase y cl)) m),
         
         big_step_GC_cc H rho (Ecase y cl) r c m
   | Eval_fun_per_cc :
       forall (H : heap block) (rho rho' : env) (B : fundefs)
         (e : exp) (r : ans) (c : nat) (m : nat)
-        (Hcost : c >= cost H rho (Efun B e))
+        (Hcost : c >= cost (Efun B e))
         (* add the functions in the environment *)
         (Hfuns : def_funs B B rho = rho')
         
-        (Hbs : big_step_GC_cc H rho' e r (c - cost H rho (Efun B e)) m),
+        (Hbs : big_step_GC_cc H rho' e r (c - cost (Efun B e)) m),
         
         big_step_GC_cc H rho (Efun B e) r c m
   | Eval_app_per_cc :
       forall (H H' : heap block) (rho rho_clo : env) (B : fundefs)
         (f f' : var) (ct : cTag) (xs : list var) (e : exp)
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
-        (Hcost : c >= cost H rho (Eapp f ct ys))
+        (Hcost : c >= cost (Eapp f ct ys))
         (Hgetf : M.get f rho = Some (FunPtr B f'))
         (* Find the code *)
         (Hfind : find_def f' B = Some (ct, xs, e))
@@ -240,11 +212,11 @@ Module SpaceSem (H : Heap).
         (Hgc : live' ((env_locs rho_clo) (occurs_free e)) H H')
         (Hsize : size_heap H = m')
         
-        (Hbs : big_step_GC_cc H' rho_clo e r (c - cost H rho (Eapp f ct ys)) m),
+        (Hbs : big_step_GC_cc H' rho_clo e r (c - cost (Eapp f ct ys)) m),
         big_step_GC_cc H rho (Eapp f ct ys) r c (max m m')
   | Eval_halt_per_cc :
       forall H rho x l c m
-        (Hcost : c >= cost H rho (Ehalt x))
+        (Hcost : c >= cost (Ehalt x))
         (Hget : M.get x rho = Some l)
         (Hsize : size_heap H = m),
         big_step_GC_cc H rho (Ehalt x) (Res (l, H)) c m.
@@ -283,22 +255,22 @@ Module SpaceSem (H : Heap).
                       injective_subdomain (reach_ans r') β2' /\
                       ans_equiv β1' r β2' r').
   Admitted.
-
+  
 
   (** * Interpretation of a context as a heap and an environment *)
 
-  Fixpoint costCC_ctx_full (c : exp_ctx) : nat :=
+  Fixpoint cost_ctx_full (c : exp_ctx) : nat :=
     match c with
-      | Econstr_c x t ys c => 1 + length ys + costCC_ctx_full c
-      | Eproj_c x t n y c => 1 + costCC_ctx_full c
-      | Efun1_c B c => 1 + costCC_ctx_full c
-      | Eprim_c x p ys c => 1 + length ys + costCC_ctx_full c
+      | Econstr_c x t ys c => 1 + length ys + cost_ctx_full c
+      | Eproj_c x t n y c => 1 + cost_ctx_full c
+      | Efun1_c B c => 1 + cost_ctx_full c
+      | Eprim_c x p ys c => 1 + length ys + cost_ctx_full c
       | Hole_c => 0
       | Efun2_c _ _ => 0 (* maybe fix but not needed for now *)
       | Ecase_c _ _ _ _ _ => 0
     end.
   
-  Fixpoint costCC_ctx (c : exp_ctx) : nat :=
+  Fixpoint cost_ctx (c : exp_ctx) : nat :=
     match c with
       | Econstr_c x t ys c => 1 + length ys
       | Eproj_c x t n y c => 1 
@@ -308,7 +280,7 @@ Module SpaceSem (H : Heap).
       | Efun2_c _ _ => 0 (* maybe fix but not needed for now *)
       | Ecase_c _ _ _ _ _ => 0
     end.
-
+  
   Inductive ctx_to_heap_env : exp_ctx -> heap block -> env -> heap block -> env -> nat -> Prop :=
   | Hole_c_to_heap_env :
       forall H rho,
@@ -320,7 +292,7 @@ Module SpaceSem (H : Heap).
         
         ctx_to_heap_env C H' (M.set x (Loc l) rho)  H'' rho'  c -> 
         
-        ctx_to_heap_env (Econstr_c x t ys C) H rho H'' rho' (c + costCC_ctx (Econstr_c x t ys C))
+        ctx_to_heap_env (Econstr_c x t ys C) H rho H'' rho' (c + cost_ctx (Econstr_c x t ys C))
 
   | Eproj_c_to_rho :
       forall H H' rho rho' x N t y C vs v t' l c,
@@ -331,16 +303,59 @@ Module SpaceSem (H : Heap).
         
         ctx_to_heap_env C H (M.set x v rho)  H' rho'  c -> 
         
-        ctx_to_heap_env (Eproj_c x t N y C) H rho H' rho' (c + costCC_ctx (Eproj_c x t N y C)).
+        ctx_to_heap_env (Eproj_c x t N y C) H rho H' rho' (c + cost_ctx (Eproj_c x t N y C))
+  | Efun_c_to_rho :
+      forall H H' H'' H''' rho rho' rho'' env_loc rho_clo B C c,
+        restrict_env (fundefs_fv B) rho = rho_clo ->
+        alloc (Env rho_clo) H = (env_loc, H') ->
+        def_closures B B rho H' env_loc = (H'', rho') ->
+        ctx_to_heap_env C H'' rho' H''' rho'' c -> 
+        ctx_to_heap_env (Efun1_c B C) H rho H''' rho'' (c + cost_ctx (Efun1_c B C)).
   
+  Inductive ctx_to_heap_env_CC : exp_ctx -> heap block -> env -> heap block -> env -> nat -> Prop :=
+  | Hole_c_to_heap_env_CC :
+      forall H rho,
+        ctx_to_heap_env_CC Hole_c H rho H rho 0
+  | Econstr_c_to_rho_CC :
+      forall H H' H'' rho rho' x t ys C vs l c,
+        getlist ys rho = Some vs ->
+        alloc (Constr t vs) H = (l, H') ->
+        
+        ctx_to_heap_env_CC C H' (M.set x (Loc l) rho)  H'' rho'  c -> 
+        
+        ctx_to_heap_env_CC (Econstr_c x t ys C) H rho H'' rho' (c + cost_ctx (Econstr_c x t ys C))
+
+  | Eproj_c_to_rho_CC :
+      forall H H' rho rho' x N t y C vs v t' l c,
+        
+        M.get y rho = Some (Loc l) ->
+        get l H = Some (Constr t' vs) ->
+        nthN vs N = Some v ->
+        
+        ctx_to_heap_env_CC C H (M.set x v rho)  H' rho'  c -> 
+        
+        ctx_to_heap_env_CC (Eproj_c x t N y C) H rho H' rho' (c + cost_ctx (Eproj_c x t N y C))
+  | Efun_c_to_rho_CC :
+      forall H H' rho rho' B C c,
+        ctx_to_heap_env_CC C H (def_funs B B rho) H' rho' c -> 
+        ctx_to_heap_env_CC (Efun1_c B C) H rho H' rho' (c + cost_ctx (Efun1_c B C)).
+  
+
+  (** Number of function definitions *)
+  Fixpoint numOf_fundefs (B : fundefs) : nat := 
+    match B with
+      | Fcons _ _ xs e B =>
+        1 + numOf_fundefs B
+      | Fnil => 0
+    end.
 
   (** Allocation cost of an evaluation context *)
   Fixpoint cost_alloc_ctx (c : exp_ctx) : nat :=
     match c with
       | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx c
       | Eproj_c x t n y c => cost_alloc_ctx c
+      | Efun1_c B c => 2*(numOf_fundefs B) + cost_alloc_ctx c
       (* not relevant *)
-      | Efun1_c B c => cost_alloc_ctx c
       | Eprim_c x p ys c => cost_alloc_ctx c
       | Hole_c => 0
       | Efun2_c f _ => cost_alloc_f_ctx f
@@ -351,6 +366,25 @@ Module SpaceSem (H : Heap).
     match f with
       | Fcons1_c _ _ _ c _ => cost_alloc_ctx c
       | Fcons2_c _ _ _ _ f => cost_alloc_f_ctx f
+    end.
+ 
+  (** Allocation cost of an evaluation context *)
+  Fixpoint cost_alloc_ctx_CC (c : exp_ctx) : nat :=
+    match c with
+      | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx_CC c
+      | Eproj_c x t n y c => cost_alloc_ctx_CC c
+      | Efun1_c B c =>  cost_alloc_ctx_CC c
+      (* not relevant *)
+      | Eprim_c x p ys c => cost_alloc_ctx_CC c
+      | Hole_c => 0
+      | Efun2_c f _ => cost_alloc_f_ctx_CC f
+      | Ecase_c _ _ _ c _ => cost_alloc_ctx_CC c
+    end
+  with
+  cost_alloc_f_ctx_CC (f : fundefs_ctx) : nat :=
+    match f with
+      | Fcons1_c _ _ _ c _ => cost_alloc_ctx_CC c
+      | Fcons2_c _ _ _ _ f => cost_alloc_f_ctx_CC f
     end.
   
   Lemma cost_alloc_ctx_comp_ctx_f C C' :
@@ -366,10 +400,39 @@ Module SpaceSem (H : Heap).
     - destruct f; simpl; try reflexivity.
       rewrite cost_alloc_ctx_comp_ctx_f; omega.
       rewrite cost_alloc_comp_f_ctx_f. omega.
-  Qed. 
+  Qed.
 
+  Lemma cost_alloc_ctx_CC_comp_ctx_f C C' :
+    cost_alloc_ctx_CC (comp_ctx_f C C') =
+    cost_alloc_ctx_CC C + cost_alloc_ctx_CC C'
+  with cost_alloc_comp_CC_f_ctx_f f C' :
+         cost_alloc_f_ctx_CC (comp_f_ctx_f f C') =
+         cost_alloc_f_ctx_CC f + cost_alloc_ctx_CC C'.
+  Proof.
+    - destruct C; simpl; try reflexivity;
+      try (rewrite cost_alloc_ctx_CC_comp_ctx_f; omega).
+      rewrite cost_alloc_comp_CC_f_ctx_f. omega.
+    - destruct f; simpl; try reflexivity.
+      rewrite cost_alloc_ctx_CC_comp_ctx_f; omega.
+      rewrite cost_alloc_comp_CC_f_ctx_f. omega.
+  Qed.
+
+  Lemma def_closures_size B1 B2 rho H l H' rho' :
+    def_closures B1 B2 rho H l = (H', rho') ->
+    size_heap H' = size_heap H + 2*numOf_fundefs B1.
+  Proof. 
+    revert rho H H' rho'. induction B1; intros rho H H' rho' Hdefs; simpl; eauto.
+    - simpl in Hdefs.
+      destruct (def_closures B1 B2 rho H l) as [H'' rho''] eqn:Hdefs'.
+      destruct (alloc (Clos (FunPtr B2 v) (Loc l))) as [l' H'''] eqn:Hal. inv Hdefs.
+      unfold size_heap.
+      erewrite (HL.size_with_measure_alloc _ _ _ H'' H'); eauto.
+      erewrite IHB1; eauto. simpl. unfold size_heap. omega.
+    - inv Hdefs. omega.
+  Qed.
+    
     (** * Lemmas about [ctx_to_heap_env] *)
-
+  
   Lemma ctx_to_heap_env_comp_ctx_f_r C1 C2 rho1 H1 m1 rho2 H2 m2 rho3 H3 :
     ctx_to_heap_env C1 H1 rho1 H2 rho2 m1 ->
     ctx_to_heap_env C2 H2 rho2 H3 rho3 m2 ->
@@ -378,12 +441,30 @@ Module SpaceSem (H : Heap).
     revert C2 rho1 H1 m1 rho2 H2 m2 rho3 H3.
     induction C1; intros C2 rho1 H1 m1 rho2 H2 m2 rho3 H3 Hctx1 GHctx2; inv Hctx1.
     - eassumption.
-    - replace (c0 + costCC_ctx (Econstr_c v c l C1) + m2) with (c0 + m2 + costCC_ctx (Econstr_c v c l C1)) by omega.
+    - replace (c0 + cost_ctx (Econstr_c v c l C1) + m2) with (c0 + m2 + cost_ctx (Econstr_c v c l C1)) by omega.
       simpl. econstructor; eauto. 
-    - replace (c0 + costCC_ctx (Eproj_c v c n v0 C1) + m2) with (c0 + m2 + costCC_ctx (Eproj_c v c n v0 C1)) by omega.
+    - replace (c0 + cost_ctx (Eproj_c v c n v0 C1) + m2) with (c0 + m2 + cost_ctx (Eproj_c v c n v0 C1)) by omega.
+      simpl. econstructor; eauto.
+    - replace (c + cost_ctx (Efun1_c f C1) + m2) with (c + m2 + cost_ctx (Efun1_c f C1)) by omega.
       simpl. econstructor; eauto.
   Qed.
 
+  Lemma ctx_to_heap_env_CC_comp_ctx_f_r C1 C2 rho1 H1 m1 rho2 H2 m2 rho3 H3 :
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m1 ->
+    ctx_to_heap_env_CC C2 H2 rho2 H3 rho3 m2 ->
+    ctx_to_heap_env_CC (comp_ctx_f C1 C2) H1 rho1 H3 rho3 (m1 + m2).
+  Proof.
+    revert C2 rho1 H1 m1 rho2 H2 m2 rho3 H3.
+    induction C1; intros C2 rho1 H1 m1 rho2 H2 m2 rho3 H3 Hctx1 GHctx2; inv Hctx1.
+    - eassumption.
+    - replace (c0 + cost_ctx (Econstr_c v c l C1) + m2) with (c0 + m2 + cost_ctx (Econstr_c v c l C1)) by omega.
+      simpl. econstructor; eauto. 
+    - replace (c0 + cost_ctx (Eproj_c v c n v0 C1) + m2) with (c0 + m2 + cost_ctx (Eproj_c v c n v0 C1)) by omega.
+      simpl. econstructor; eauto.
+    - replace (c + cost_ctx (Efun1_c f C1) + m2) with (c + m2 + cost_ctx (Efun1_c f C1)) by omega.
+      simpl. econstructor; eauto.
+  Qed.
+  
   Lemma ctx_to_heap_env_comp_ctx_l C C1 C2 H rho H' rho' m :
     ctx_to_heap_env C H rho H' rho' m ->
     comp_ctx C1 C2 C ->
@@ -413,8 +494,57 @@ Module SpaceSem (H : Heap).
         eassumption.
         do 4 eexists; split; [| split ]. econstructor; eauto.
         eassumption. simpl. omega.
+    - inv Hcomp.
+      + edestruct IHHctx as [rho''' [H'''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        constructor. inv H1.
+        do 4 eexists; split; [| split ]. constructor.
+        econstructor; eauto. omega.
+      + edestruct IHHctx as [rho''' [H'''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        eassumption.
+        do 4 eexists; split; [| split ]. econstructor; eauto.
+        eassumption. simpl. omega.
   Qed.
 
+  Lemma ctx_to_heap_env_CC_comp_ctx_l C C1 C2 H rho H' rho' m :
+    ctx_to_heap_env_CC C H rho H' rho' m ->
+    comp_ctx C1 C2 C ->
+    exists rho'' H'' m1 m2,
+      ctx_to_heap_env_CC C1 H rho H'' rho'' m1 /\
+      ctx_to_heap_env_CC C2 H'' rho'' H' rho' m2 /\
+      m = m1 + m2.
+  Proof.
+    intros Hctx. revert C1 C2.
+    induction Hctx; intros C1 C2 Hcomp.
+    - inv Hcomp. repeat eexists; constructor.
+    - inv Hcomp.
+      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        constructor. inv H1.
+        do 4 eexists. split; [ | split ].  econstructor.
+        econstructor; eauto. omega.
+      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        eassumption.
+        do 4 eexists. split; [ | split ]. econstructor; eauto.
+        eassumption. simpl. omega.
+    - inv Hcomp.
+      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        constructor. inv H1.
+        do 4 eexists; split; [| split ]. constructor.
+        econstructor; eauto. omega.
+      + edestruct IHHctx as [rho'' [H''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        eassumption.
+        do 4 eexists; split; [| split ]. econstructor; eauto.
+        eassumption. simpl. omega.
+    - inv Hcomp.
+      + edestruct IHHctx as [rho''' [H'''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        constructor. inv Hc1.
+        do 4 eexists; split; [| split ]. constructor.
+        econstructor; eauto. omega.
+      + edestruct IHHctx as [rho''' [H'''' [m1 [m2 [Hc1 [Hc2 Hadd]]]]]].
+        eassumption.
+        do 4 eexists; split; [| split ]. econstructor; eauto.
+        eassumption. simpl. omega.
+  Qed.
+  
   Lemma ctx_to_heap_env_comp_ctx_f_l C1 C2 H rho H' rho' m :
     ctx_to_heap_env (comp_ctx_f C1 C2) H rho H' rho' m ->
     exists rho'' H'' m1 m2,
@@ -426,9 +556,40 @@ Module SpaceSem (H : Heap).
     eapply comp_ctx_f_correct. reflexivity.
   Qed.
 
+  Lemma ctx_to_heap_env_CC_comp_ctx_f_l C1 C2 H rho H' rho' m :
+    ctx_to_heap_env_CC (comp_ctx_f C1 C2) H rho H' rho' m ->
+    exists rho'' H'' m1 m2,
+      ctx_to_heap_env_CC C1 H rho H'' rho'' m1 /\
+      ctx_to_heap_env_CC C2 H'' rho'' H' rho' m2 /\
+      m = m1 + m2.
+  Proof.
+    intros. eapply ctx_to_heap_env_CC_comp_ctx_l. eassumption.
+    eapply comp_ctx_f_correct. reflexivity.
+  Qed.
+  
   Lemma ctx_to_heap_env_size_heap C rho1 rho2 H1 H2 c :
     ctx_to_heap_env C H1 rho1 H2 rho2 c ->
     size_heap H2 = size_heap H1 + cost_alloc_ctx C. 
+  Proof.
+    intros Hctx; induction Hctx; eauto.
+    simpl. rewrite IHHctx.
+    unfold size_heap.
+    erewrite (HL.size_with_measure_alloc _ _ _ H H');
+      [| reflexivity | eassumption ].
+    erewrite getlist_length_eq; [| eassumption ]. 
+    simpl. omega.
+    simpl.
+    rewrite IHHctx. 
+    erewrite def_closures_size; eauto.
+    unfold size_heap.
+    erewrite (HL.size_with_measure_alloc _ _ _ H H');
+      [| reflexivity | eassumption ].
+    simpl. omega. 
+  Qed.
+
+  Lemma ctx_to_heap_env_CC_size_heap C rho1 rho2 H1 H2 c :
+    ctx_to_heap_env_CC C H1 rho1 H2 rho2 c ->
+    size_heap H2 = size_heap H1 + cost_alloc_ctx_CC C. 
   Proof.
     intros Hctx; induction Hctx; eauto.
     simpl. rewrite IHHctx.
@@ -448,7 +609,22 @@ Module SpaceSem (H : Heap).
     - eapply HL.subheap_trans.
       eapply HL.alloc_subheap. eassumption. eassumption.
     - eassumption.
-  Qed.  
-  
+    - eapply HL.subheap_trans.
+      eapply HL.alloc_subheap. eassumption.
+      eapply HL.subheap_trans.
+      eapply def_funs_subheap. now eauto. eassumption.
+  Qed.
+
+  Lemma ctx_to_heap_env_CC_subheap C H rho H' rho' m :
+    ctx_to_heap_env_CC C H rho H' rho' m ->
+    H ⊑ H'.
+  Proof.
+    intros Hc; induction Hc.
+    - eapply HL.subheap_refl.
+    - eapply HL.subheap_trans.
+      eapply HL.alloc_subheap. eassumption. eassumption.
+    - eassumption.
+    - eassumption.
+  Qed. 
 
 End SpaceSem.

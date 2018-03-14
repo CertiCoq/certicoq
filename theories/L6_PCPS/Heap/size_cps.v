@@ -4,7 +4,7 @@ From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
 From L6.Heap Require Import heap heap_defs cc_log_rel
      closure_conversion closure_conversion_util compat.
 
-From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
+From Coq Require Import ZArith.Znumtheory Relations.Relations Arith Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
                         NArith.BinNat PArith.BinPos Sets.Ensembles Omega.
 
@@ -52,22 +52,22 @@ Module Size (H : Heap).
            | Fnil => 0
          end.
 
-  Fixpoint max_vars_exp (e : exp) : nat :=
+  Fixpoint exp_max_vars (e : exp) : nat :=
     match e with
-      | Econstr x _ ys e => max_vars_exp e
+      | Econstr x _ ys e => exp_max_vars e
       | Ecase x l =>
         1 + (fix sizeOf_l l :=
                match l with
                  | [] => 0
-                 | (t, e) :: l => max_vars_exp e
+                 | (t, e) :: l => exp_max_vars e
                end) l
       | Eproj x _ _ y e => 1 + exp_num_vars e
-      | Efun B e => max (fundefs_num_vars B) (max_vars_exp e)
+      | Efun B e => max (fundefs_num_vars B) (exp_max_vars e)
       | Eapp x _ ys => 0
       | Eprim x _ ys e => exp_num_vars e
       | Ehalt x => 0
     end.
-
+  
   Fixpoint exp_num_vars_out (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => length ys
@@ -79,7 +79,7 @@ Module Size (H : Heap).
       | Ehalt x => 1
     end.
 
-  Fixpoint max_num_vars_out (e : exp) : nat :=
+  Fixpoint exp_max_vars_out (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => 0
       | Ecase x l => 0
@@ -114,12 +114,12 @@ Module Size (H : Heap).
       | Clos v1 v2 => max (max_vars_value v1) (max_vars_value v2)
       | Env x => 0
     end.
-
-  Definition max_vars_heap (S : Ensemble loc) `{ToMSet S} (H : heap block) :=
-    size_with_measure_filter max_vars_block (reach_set H mset) H.
   
-  Definition max_heap_exp (S : Ensemble loc) `{ToMSet S} (H : heap block) (e : exp) :=
-    max (max_vars_heap S H) (max_vars_exp e).
+  Definition max_vars_heap (H : heap block) :=
+    size_with_measure max_vars_block H.
+  
+  Definition max_heap_exp (H : heap block) (e : exp) :=
+    max (max_vars_heap H) (exp_max_vars e).
   
   (** * Postcondition *)
 
@@ -129,10 +129,11 @@ Module Size (H : Heap).
              (p1 p2 : heap block * env * exp * nat * nat) :=
     match p1, p2 with
       | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
-        c1 <= c2 + k <=  c1 * (1 + 2 * max_heap_exp (env_locs rho1 (occurs_free e1)) H1 e1) + (exp_num_vars_out e1) /\
-        m1 <= m2 <= m1 * (4 + max_heap_exp (env_locs rho1 (occurs_free e1)) H1 e1)
+        c1 <= c2 + k <=  c1 * (1 + 2 * max_heap_exp H1 e1) + (exp_num_vars e1) /\
+        m1 <= m2 <= m1 * (4 + max_heap_exp H1 e1)
     end.
-  
+
+
   (** * Precondition *)
 
   (** Enforces that the initial heaps have related sizes *)
@@ -142,27 +143,25 @@ Module Size (H : Heap).
     let m := cost_alloc_ctx C in 
     match p1, p2 with
       | (H1, rho1, e1), (H2, rho2, e2) =>
-        size_heap H1 + m <= size_heap H2 + max_num_vars_out e1 <= (size_heap H1) * (4 + max_heap_exp (env_locs rho1 (occurs_free e1)) H1 e1) + m
+        size_heap H1 <=
+        size_heap H2 <= (size_heap H1) * (4 + max_heap_exp H1 e1)
     end.
   
   (** Compat lemmas *)
 
   Lemma PostBase H1 H2 rho1 rho2 e1 e2 C k :
-    k <= exp_num_vars_out e1 ->
-    cost_alloc_ctx C = max_num_vars_out e1 ->
+    k <= exp_num_vars e1 ->
     InvCostBase (Post k) (Pre C) H1 H2 rho1 rho2 e1 e2.
   Proof.
     unfold InvCostBase, Post, Pre.
-    intros H1' rho1' H2' rho2' c b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hsize.
+    intros Hleq1 H1' H2' rho1' rho2' c b1 b2  Heq1 Hinj1 Heq2 Hinj2 [Hs1 Hs2].
     split.
     + split. omega. eapply plus_le_compat.
       rewrite Nat.mul_add_distr_l, Nat.mul_1_r.
-      now eapply le_plus_l. omega.
-    + split. omega. 
-      omega.
+      eapply le_plus_l. omega.
+    + split. omega. omega.
   Qed.
-
-
+    
   Lemma PostConstrCompat H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 k :
     length ys1 = length ys2 ->
     k <= length ys1 ->
@@ -175,29 +174,71 @@ Module Size (H : Heap).
     inv Hctx1. inv Hctx2. inv H13. inv H16.
     rewrite !plus_O_n in *. simpl (cost_ctx _) in *.
     rewrite !Hlen in *. split.
-    - split. omega. simpl (exp_num_vars_out _).
-      eapply plus_le_compat; [| omega ].
-      simpl (max_heap_exp _ _ _) in *.
+    - split. omega.
+      simpl exp_num_vars. rewrite (plus_comm (length ys1)), plus_assoc. 
+      eapply plus_le_compat; [| simpl; omega ].
+      simpl (max_heap_exp _ _) in *.
       rewrite <- !plus_n_O in *.
       eapply le_trans. 
       eapply plus_le_compat_r. eassumption.
+      rewrite !(plus_comm _ (exp_num_vars e1)).
+      rewrite <- !plus_assoc.
+      eapply plus_le_compat. reflexivity.
+      rewrite NPeano.Nat.mul_add_distr_r.
+      eapply plus_le_compat;
+        [| rewrite NPeano.Nat.mul_add_distr_l, NPeano.Nat.mul_1_r;
+           eapply le_plus_l ].
+      eapply mult_le_compat_l. eapply plus_le_compat_l.
+      eapply mult_le_compat_l.
+      (* max_heap_eq alloc, max_heap_eq compat *)
       admit.
-    - split; eauto.
-      eapply le_trans. eassumption. admit.
+    - split; eauto. 
+      eapply le_trans. eassumption.
+      eapply mult_le_compat_l. eapply plus_le_compat_l.
+      (* max_heap_eq alloc, max_heap_eq compat *)
+      admit.
   Admitted. 
-
+  
   Lemma PreConstrCompat H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 C :
+    cost_alloc_ctx C <= exp_max_vars_out (Econstr x1 c ys1 e1) ->
+    length ys1 = length ys2 ->
     IInvCtxCompat (Pre C) (Pre Hole_c)
                  H1 H2 rho1 rho2 (Econstr_c x1 c ys1 Hole_c) (Econstr_c x2 c ys2 Hole_c) e1 e2.
   Proof.
     unfold IInvCtxCompat, Pre.
-    intros H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1' c2' 
+    intros Hleq Hlen H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1' c2'
            b1 b2 Heq1 Hinj1 Heq2 Hinj2 [Hm1 Hm2] Hctx1 Hctx2.
     inv Hctx1. inv Hctx2. inv H13. inv H16.
     split.
-    - simpl. simpl in Hm1. admit.
-    - omega. 
-    
+    - simpl. simpl in Hm1.
+      unfold size_heap in *.
+      erewrite HL.size_with_measure_alloc; [| reflexivity | eassumption ].
+      erewrite (HL.size_with_measure_alloc _ _ _ _ H2''); [| reflexivity | eassumption ].
+      simpl.
+      erewrite <- (getlist_length_eq _ vs); eauto.
+      erewrite <- (getlist_length_eq _ vs0); eauto.
+      eapply plus_le_compat. omega.
+      replace (@length M.elt ys1) with (@length var ys1) by reflexivity.
+      replace (@length M.elt ys2) with (@length var ys2) by reflexivity.
+      omega. 
+    - unfold size_heap in *.
+      erewrite (HL.size_with_measure_alloc _ _ _ _ H1''); [| reflexivity | eassumption ].
+      erewrite (HL.size_with_measure_alloc _ _ _ _ H2''); [| reflexivity | eassumption ].
+      simpl size_val in *. 
+      assert (Heq0 : cost_alloc_ctx C = 0) by (simpl in Hleq; omega). rewrite Heq0 in *.
+      rewrite NPeano.Nat.mul_add_distr_r. eapply plus_le_compat.
+      eapply le_trans. eassumption.
+      eapply mult_le_compat_l.
+      (* max_heap_eq alloc, max_heap_eq compat *)
+      admit.
+      erewrite <- (getlist_length_eq _ vs); eauto.
+      erewrite <- (getlist_length_eq _ vs0); eauto.
+      replace (@length M.elt ys1) with (@length var ys1) by reflexivity.
+      replace (@length M.elt ys2) with (@length var ys2) by reflexivity.
+      rewrite Hlen. rewrite NPeano.Nat.mul_add_distr_l.
+      eapply le_plus_trans. omega. 
+  Admitted.
+  
   Lemma PostProjCompat H1 H2 rho1 rho2 x1 x2 c n y1 y2 e1 e2 k :
     InvCtxCompat (Post k) (Post 0)
                  H1 H2 rho1 rho2 (Eproj_c x1 c n y1 Hole_c) (Eproj_c x2 c n y2 Hole_c) e1 e2.

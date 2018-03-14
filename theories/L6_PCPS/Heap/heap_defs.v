@@ -227,15 +227,19 @@ Module HeapDefs (H : Heap) .
       | Fnil => (H, rho)
     end.
 
+  Fixpoint def_funs (B B0 : fundefs) rho :=
+    match B with
+      | Fcons f _ _ _ B =>
+        M.set f (FunPtr B0 f) (def_funs B B0 rho)
+      | Fnil => rho
+    end.
+
   (* TODO move *)
   (** A bijection between two sets. *)
   Definition bijective {A B} (β : A -> B) (S1 : Ensemble A) (S2 : Ensemble B) :=
     image β S1 <--> S2 /\ injective_subdomain S1 β. 
   
-  
-  (* Notation "S |- b : H1 >->> H2" := (bijective b (reach' H1 S) (reach' H2 S)) *)
-  (*                                     (at level 70, no associativity). *)
-  
+    
   (* TODO move *)
   (* M utils *)
   Definition key_set {A : Type} (map : M.t A) :=

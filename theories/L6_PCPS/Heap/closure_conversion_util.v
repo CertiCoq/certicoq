@@ -26,10 +26,10 @@ Section Closure_conversion_util.
 
   (** ** Proof that after closure conversion all functions are closed *)
 
-  Lemma project_var_occurs_free_ctx_Included Scope Funs σ c Γ FVs S x x' C S' F e:
-    project_var Scope Funs σ c Γ FVs S x x' C S' ->
+  Lemma project_var_occurs_free_ctx_Included Scope Funs c Γ FVs S x x' C S' F e:
+    project_var Scope Funs c Γ FVs S x x' C S' ->
     Included _ (occurs_free e) (Union _ F (Singleton _ x')) ->
-    Included _ (FV_cc Scope Funs σ Γ) F ->
+    Included _ (FV_cc Scope Funs Γ) F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
   Proof with now eauto with Ensembles_DB functions_BD. 
     intros Hproj Hinc1 Hinc2. inv Hproj.
@@ -40,7 +40,7 @@ Section Closure_conversion_util.
     - simpl. eapply Included_trans. eassumption. 
       apply Union_Included. reflexivity.
       eapply Included_trans; [| eassumption ].
-      eapply Singleton_Included. left. right. eexists; split; eauto.
+      eapply Singleton_Included. left. right.
       constructor; eauto.
     - simpl. rewrite occurs_free_Eproj.
       eapply Union_Included.
@@ -77,11 +77,11 @@ Section Closure_conversion_util.
         rewrite Setminus_Empty_set_neut_r in H
     end.
   
-  Lemma project_vars_occurs_free_ctx_Included Scope Funs σ c Γ
+  Lemma project_vars_occurs_free_ctx_Included Scope Funs c Γ
     FVs S xs xs' C S' F e:
-    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
+    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
     Included _ (occurs_free e)  (Union _ F (FromList xs')) ->
-    Included _ (FV_cc Scope Funs σ Γ) F ->
+    Included _ (FV_cc Scope Funs Γ) F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
   Proof. 
     intros Hproj. revert F.
@@ -93,11 +93,11 @@ Section Closure_conversion_util.
       eapply Included_trans. eassumption. now apply Included_Union_l.
   Qed.
 
-  Lemma make_closures_occurs_free_ctx_Included B S Γ C σ S' F e:
+  Lemma make_closures_occurs_free_ctx_Included B Γ C F S e:
     unique_functions B ->
-    make_closures clo_tag B S Γ C σ S'  ->
+    make_closures clo_tag B S Γ C ->
     Included _ (occurs_free e) (Union _ F (name_in_fundefs B)) ->
-    Included _ (Union _ (image σ (name_in_fundefs B)) (Singleton _ Γ)) F ->
+    Included _ (Union _ (name_in_fundefs B) (Singleton _ Γ)) F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
   Proof with now eauto with Ensembles_DB functions_BD. 
     intros Hun Hmc. revert F.
@@ -106,8 +106,7 @@ Section Closure_conversion_util.
     - eassumption.
     - repeat normalize_sets.
       apply Union_Included. apply Union_Included.
-      eapply Included_trans; [| eassumption ].
-      rewrite <- (extend_gss g f f'), H0...
+      eapply Included_trans; [| eassumption ]...
       eapply Included_trans; [| eassumption ]...
       eapply Setminus_Included_Included_Union.
       inv Hun. eapply IHHmc.
@@ -115,54 +114,59 @@ Section Closure_conversion_util.
       eapply Included_trans; [ eassumption |]...
       eapply Included_Union_preserv_l.
       eapply Included_trans; [| eassumption ].
-      apply Included_Union_compat; [| now apply Included_refl ].
-      rewrite <- H0...
+      apply Included_Union_compat; [| now apply Included_refl ]...
+    - inv Hun. eapply IHHmc.
+      eassumption.
+      eapply Included_trans; [ eassumption |].
+      eapply Union_Included. now eauto with Ensembles_DB.
+      eapply Included_trans; [| eapply Included_Union_compat; [| reflexivity ]; eassumption ]...
+      eapply Included_trans; [| eassumption ]... 
   Qed.
 
-  Lemma project_var_free_funs_in_exp Scope Funs σ c Γ FVs S x x' C S' B e:
-    project_var Scope Funs σ c Γ FVs S x x' C S' ->
+  Lemma project_var_free_funs_in_exp Scope Funs c Γ FVs S x x' C S' B e:
+    project_var Scope Funs c Γ FVs S x x' C S' ->
     (funs_in_exp B (C |[ e ]|) <-> funs_in_exp B e).
   Proof. 
     intros Hvar; inv Hvar; [ split; now eauto | split; now eauto |].
     (split; intros Hf; [ now inv Hf | now constructor ]).
   Qed.
 
-  Lemma project_vars_free_funs_in_exp Scope Funs σ c Γ FVs S xs xs' C S' B e:
-    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_free_funs_in_exp Scope Funs c Γ FVs S xs xs' C S' B e:
+    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
     (funs_in_exp B (C |[ e ]|) <-> funs_in_exp B e).
   Proof. 
     intros Hvar; induction Hvar; [ now eauto |].
     rewrite <- app_ctx_f_fuse, project_var_free_funs_in_exp; eassumption.
   Qed.
 
-  Lemma make_closures_funs_in_exp B S Γ C σ S' B' e:
-    make_closures clo_tag B S Γ C σ S'  ->
+  Lemma make_closures_funs_in_exp B S Γ C B' e:
+    make_closures clo_tag B S Γ C  ->
     (funs_in_exp B' (C |[ e ]|) <-> funs_in_exp B' e).
   Proof.
     intros Hmc; induction Hmc;
-    [ split; now eauto | ].
+    [ split; now eauto | | ].
     rewrite <- IHHmc. split; eauto; intros Hf; [ now inv Hf | now constructor ].
+    eassumption.
   Qed.
 
-  Lemma closure_conversion_fundefs_Same_set_image σ c Funs FVs B1 B2  :
-    Closure_conversion_fundefs clo_tag Funs σ c FVs B1 B2 ->
-    Same_set _ (image σ (name_in_fundefs B1)) (name_in_fundefs B2).
+  Lemma closure_conversion_fundefs_Same_set c Funs FVs B1 B2  :
+    Closure_conversion_fundefs clo_tag Funs c FVs B1 B2 ->
+    Same_set _ (name_in_fundefs B1) (name_in_fundefs B2).
   Proof. 
     intros Hcc. induction Hcc.  
-    - simpl. rewrite image_Union, image_Singleton, IHHcc.
-      apply Same_set_refl.
-    - simpl. rewrite image_Empty_set. apply Same_set_refl.
+    - simpl. rewrite IHHcc. reflexivity.
+    - simpl. reflexivity.
   Qed.
   
   Lemma Closure_conversion_occurs_free_Included_mut :
-    (forall e Scope Funs σ c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs σ c Γ FVs e e' C)
+    (forall e Scope Funs c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
-       occurs_free (C |[ e' ]|) \subset FV_cc Scope Funs σ Γ) /\
-    (forall B Funs σ c FVs B'
-       (Hcc: Closure_conversion_fundefs clo_tag Funs σ c FVs B B')
+       occurs_free (C |[ e' ]|) \subset FV_cc Scope Funs Γ) /\
+    (forall B Funs c FVs B'
+       (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (Hun: fundefs_names_unique_fundefs B) (Hun': fundefs_names_unique_fundefs Funs),
-       (occurs_free_fundefs B') \subset (image σ (name_in_fundefs Funs)) \\ (name_in_fundefs B')).
+       (occurs_free_fundefs B') \subset (name_in_fundefs Funs) \\ (name_in_fundefs B')).
   Proof with now eauto with Ensembles_DB functions_BD.
     exp_defs_induction IHe IHl IHB; intros; inv Hcc.
     - eapply project_vars_occurs_free_ctx_Included;
@@ -174,9 +178,9 @@ Section Closure_conversion_util.
       intros f Hunf. eapply Hun. now constructor.
       unfold FV_cc. now eauto 20 with Ensembles_DB. 
     - eapply project_var_occurs_free_ctx_Included;
-      [ eassumption | | now apply Included_refl ]. inv H11.
+      [ eassumption | | now apply Included_refl ]. inv H10.
       rewrite occurs_free_Ecase_nil. now apply Included_Union_r.
-    - inv H11. destruct y as [c' e'].
+    - inv H10. destruct y as [c' e'].
       inv H2. simpl in H; subst. destruct H0 as [C' [e'' [Heq Hcce]]]. simpl in Heq; subst. 
       eapply Included_trans. now eapply occurs_free_Ecase_ctx_app.
       apply Union_Included. 
@@ -207,12 +211,12 @@ Section Closure_conversion_util.
       eapply IHB. eassumption.
       intros f Hunf. eapply Hun. now inv Hunf; eauto.
       intros f Hunf. eapply Hun. now inv Hunf; eauto.
-      reflexivity. rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]. 
+      reflexivity. rewrite closure_conversion_fundefs_Same_set; [| eassumption ]. 
       now eauto with Ensembles_DB.
       do 2 eapply Setminus_Included_Included_Union.
       eapply make_closures_occurs_free_ctx_Included; [| eassumption | | ].
       eapply Hun. now constructor.
-      rewrite <- closure_conversion_fundefs_Same_set_image; [| eassumption ]. 
+      rewrite <- closure_conversion_fundefs_Same_set; [| eassumption ]. 
       eapply Included_trans. eapply IHe. eassumption.
       intros f Hunf. eapply Hun. now constructor. 
       unfold FV_cc.
@@ -222,9 +226,8 @@ Section Closure_conversion_util.
       now eauto with Ensembles_DB.
       repeat eapply Included_Union_preserv_l. reflexivity.
       do 5 eapply Included_Union_preserv_l. 
-      eapply Included_Union_preserv_r.
-      eapply image_monotonic...
-      rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]...
+      eapply Included_Union_preserv_r...
+      rewrite closure_conversion_fundefs_Same_set; [| eassumption ]...
     - eapply project_vars_occurs_free_ctx_Included;
       [ eassumption | | now apply Included_refl ].
       unfold AppClo. repeat normalize_occurs_free. repeat normalize_sets.
@@ -265,32 +268,32 @@ Section Closure_conversion_util.
         eapply Hun'; eauto. simpl. eapply Setminus_Included_Included_Union...
     - rewrite occurs_free_fundefs_Fnil. now apply Included_Empty_set.
   Qed.
-
+  
   Corollary Closure_conversion_occurs_free_Included :
-    (forall e Scope Funs σ c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs σ c Γ FVs e e' C)
+    (forall e Scope Funs c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
-       occurs_free (C |[ e' ]|) \subset (FV_cc Scope Funs σ Γ)).
+       occurs_free (C |[ e' ]|) \subset (FV_cc Scope Funs Γ)).
   Proof.
     now eapply Closure_conversion_occurs_free_Included_mut.
   Qed.
   
   Corollary Closure_conversion_occurs_free_fundefs_Included :
-    (forall B Funs σ c FVs B'
-       (Hcc: Closure_conversion_fundefs clo_tag Funs σ c FVs B B')
+    (forall B Funs c FVs B'
+       (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (Hun: fundefs_names_unique_fundefs B) (Hun': fundefs_names_unique_fundefs Funs),
-       Included _ (occurs_free_fundefs B') (Setminus _ (image σ (name_in_fundefs Funs)) (name_in_fundefs B'))).
+       Included _ (occurs_free_fundefs B') (Setminus _ (name_in_fundefs Funs) (name_in_fundefs B'))).
   Proof.
     now eapply Closure_conversion_occurs_free_Included_mut.
   Qed.
     
   Lemma Closure_conversion_closed_fundefs_mut :
-    (forall e Scope Funs σ c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs σ c Γ FVs e e' C)
+    (forall e Scope Funs c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
        closed_fundefs_in_exp (C |[ e' ]|)) /\
-    (forall B Funs σ c FVs B'
-       (Hcc: Closure_conversion_fundefs clo_tag Funs σ c FVs B B')
+    (forall B Funs c FVs B'
+       (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (Hun: fundefs_names_unique_fundefs B),
        closed_fundefs_in_fundefs B').
   Proof.
@@ -298,10 +301,10 @@ Section Closure_conversion_util.
     - intros B HB. rewrite project_vars_free_funs_in_exp in HB; [| eassumption ].
       inv HB. eapply IHe; [ eassumption | | eassumption ]. 
       intros B' H. eapply Hun. now constructor. 
-    - inv H11. 
+    - inv H10. 
       intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ].
       inv HB. inv H4.
-    - inv H11. destruct H2 as [Heq [C' [e' [Heq' Hcc']]]]. destruct y as [t e''].
+    - inv H10. destruct H2 as [Heq [C' [e' [Heq' Hcc']]]]. destruct y as [t e''].
       simpl in *; subst.
       intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ].
       inv HB. inv H5.
@@ -317,15 +320,15 @@ Section Closure_conversion_util.
       intros B' H. eapply Hun. now constructor. 
     - rewrite <- app_ctx_f_fuse. intros B HB.
       rewrite project_vars_free_funs_in_exp in HB; [| eassumption ].
-      inv HB. inv H9.
+      simpl in HB. inv HB. inv H8.
       + split; [| now apply Included_Empty_set ].
         eapply Included_trans.
         eapply Closure_conversion_occurs_free_Included_mut. eassumption.
         intros B HB. eapply Hun. inv HB; eauto.
         intros B HB. eapply Hun. inv HB; eauto.
-        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ].
+        rewrite closure_conversion_fundefs_Same_set; [| eassumption ].
         rewrite Setminus_Same_set_Empty_set. now apply Included_Empty_set.
-      + rewrite make_closures_funs_in_exp in H10; [| eassumption ].
+      + rewrite make_closures_funs_in_exp in H9; [| eassumption ].
         eapply IHe; [ eassumption | | eassumption ].
         intros B1 HB1. eapply Hun. now constructor.
       + eapply IHB; [ eassumption | | eassumption ].
@@ -347,185 +350,17 @@ Section Closure_conversion_util.
     - intros B HB. inv HB.
   Qed.
 
-  (** * Interpretation of (certain) evaluation contexts as environments *)
-
-  (* TODO move to more appropriate file *)
-  
-  Inductive ctx_to_rho : exp_ctx -> env -> env -> Prop :=
-  | Hole_c_to_rho :
-      forall rho,
-        ctx_to_rho Hole_c rho rho
-  | Eproj_c_to_rho :
-      forall rho rho' t y N Γ C vs v,
-        M.get Γ rho = Some (Vconstr t vs) ->
-        nthN vs N = Some v ->
-        ctx_to_rho C (M.set y v rho) rho' ->
-        ctx_to_rho (Eproj_c y t N Γ C) rho rho'
-  | Econstr_c_to_rho :
-      forall rho rho' t y  x Γ C v1 v2,
-        M.get Γ rho = Some v1 ->
-        M.get x rho = Some v2 ->
-        ctx_to_rho C (M.set y (Vconstr t [v2; v1]) rho) rho' ->
-        ctx_to_rho (Econstr_c y t [x; Γ] C) rho rho'.
-
-
-  (** * Lemmas about [ctx_to_rho] *)
-
-  Lemma ctx_to_rho_comp_ctx_l C C1 C2 rho rho' :
-    ctx_to_rho C rho rho' ->
-    comp_ctx C1 C2 C ->
-    exists rho'',
-      ctx_to_rho C1 rho rho'' /\
-      ctx_to_rho C2 rho'' rho'.
-  Proof.
-    intros Hctx. revert C1 C2.
-    induction Hctx; intros C1 C2 Hcomp.
-    - inv Hcomp. eexists; split; constructor.
-    - inv Hcomp.
-      + edestruct IHHctx as [rho'' [H1 H2]].
-        constructor. inv H1.
-        eexists; split. constructor.
-        econstructor; eauto.
-      + edestruct IHHctx as [rho'' [H1 H2]]. eassumption.
-        eexists; split. econstructor; eauto.
-        eassumption.
-    - inv Hcomp.
-      + edestruct IHHctx as [rho'' [H1 H2]].
-        constructor. inv H1.
-        eexists; split. constructor.
-        econstructor; eauto.
-      + edestruct IHHctx as [rho'' [H1 H2]]. eassumption.
-        eexists; split. econstructor; eauto.
-        eassumption.
-  Qed.
-
-  Lemma ctx_to_rho_comp_ctx_f_r C1 C2 rho1 rho2 rho3 :
-    ctx_to_rho C1 rho1 rho2 ->
-    ctx_to_rho C2 rho2 rho3 ->
-    ctx_to_rho (comp_ctx_f C1 C2) rho1 rho3.
-  Proof.
-    revert C2 rho1 rho2 rho3.
-    induction C1; intros C2 rho1 rho2 rho3 Hctx1 GHctx2; inv Hctx1.
-    - eassumption.
-    - simpl; econstructor; eauto. 
-    - simpl; econstructor; eauto.
-  Qed.
-
-  (* TODO : move *)
-  Lemma inclusion_trans {A} P1 P2 P3 :
-    inclusion A P1 P2 ->
-    inclusion A P2 P3 ->
-    inclusion A P1 P3.
-  Proof.
-    now firstorder. 
-  Qed.
-
-    (** * Lemmas about [Closure_conversion_fundefs] *)
-  
-  (* Lemma closure_conversion_fundefs_find_def σ c Funs FVs B1 B2 f t1 xs e1 : *)
-  (*   injective_subdomain (name_in_fundefs B1) σ -> *)
-  (*   Closure_conversion_fundefs clo_tag Funs σ c FVs B1 B2 -> *)
-  (*   find_def f B1 = Some (t1, xs, e1) -> *)
-  (*   exists Γ' C e2, *)
-  (*     ~ In var (Union var (image σ (name_in_fundefs Funs)) (Union _ (FromList xs) (bound_var e1))) Γ' /\ *)
-  (*     find_def (σ f) B2 = Some (t1, Γ' :: xs, (C |[ e2 ]|)) /\ *)
-  (*     Closure_conversion clo_tag (FromList xs) (name_in_fundefs Funs) σ c Γ' FVs e1 e2 C. *)
-  (* Proof. *)
-  (*   intros Hinj Hcc Hdef. induction Hcc. *)
-  (*   - simpl in Hdef. destruct (M.elt_eq f f0) eqn:Heq; subst. *)
-  (*     + inv Hdef. repeat eexists. *)
-  (*       intros Hc. eapply H. now eauto. *)
-  (*       simpl. rewrite peq_true. reflexivity. *)
-  (*     + edestruct IHHcc as [Γ'' [C' [e2 [Hnin [Hfind Hcc']]]]]; eauto. *)
-  (*       eapply injective_subdomain_antimon. eassumption. *)
-  (*       now apply Included_Union_r. *)
-  (*       repeat eexists; eauto. simpl. rewrite peq_false. eassumption. *)
-  (*       intros Hc. eapply n. eapply Hinj; eauto. *)
-  (*       right. eapply fun_in_fundefs_name_in_fundefs. *)
-  (*       eapply find_def_correct. now eauto. *)
-  (*       left; eauto. *)
-  (*   - inv Hdef. *)
-  (* Qed. *)
-
-  (** * Lemmas about [make_closures] *)
-
-  Lemma make_closures_image_Included B S Γ C σ S' :
-    make_closures clo_tag B S Γ C σ S' ->
-    Included _ (image σ (name_in_fundefs B)) S.
-  Proof. 
-    intros Hmc. induction Hmc.
-    - rewrite image_Empty_set. apply Included_Empty_set.
-    - simpl. subst. 
-      rewrite image_Union, image_Singleton.
-      apply Union_Included. apply Singleton_Included.
-      rewrite <- H0. rewrite extend_gss. eassumption.
-      eapply Included_trans.
-      rewrite <- H0. now apply image_extend_Included.
-      apply Union_Included.
-      eapply Included_trans. eassumption. now eapply Setminus_Included.
-      now apply Singleton_Included.
-  Qed.
-  
-  Lemma make_closures_free_set_Included B S Γ C σ S' :
-    make_closures clo_tag B S Γ C σ S' ->
-    Included _  S' S.
-  Proof. 
-    intros Hmc. induction Hmc.
-    - now apply Included_refl.
-    - eapply Included_trans. eassumption.
-      now apply Setminus_Included.
-  Qed.
-
-  Lemma make_closures_image_Disjoint B S Γ C σ S' :
-    make_closures clo_tag B S Γ C σ S' ->
-    Disjoint _ (image σ (name_in_fundefs B)) S'.
-  Proof.
-    intros Hmc. induction Hmc.
-    - rewrite image_Empty_set. apply Disjoint_Empty_set_l.
-    - simpl. rewrite image_Union, image_Singleton.
-      rewrite <- H0. rewrite extend_gss. eapply Union_Disjoint_l.
-      + eapply Disjoint_Included_r.
-        now eapply make_closures_free_set_Included; eauto.
-        now eauto with Ensembles_DB.
-      + eapply Disjoint_Included_l. rewrite <- H0.
-        now apply image_extend_Included.
-        apply Union_Disjoint_l. eassumption.
-        eapply Disjoint_Included_r.
-        now eapply make_closures_free_set_Included; eauto.
-        now eauto with Ensembles_DB.
-  Qed.
-
-  Lemma make_closures_injective B S Γ C σ S' :
-    Disjoint _ S (name_in_fundefs B) ->
-    make_closures clo_tag B S Γ C  σ S' ->
-    injective_subdomain (name_in_fundefs B) σ.
-  Proof. 
-    intros Hd Hmc. induction Hmc.
-    - intros x y Hc. inv Hc. 
-    - simpl. rewrite <- H0.
-      eapply injective_subdomain_extend.
-      + eapply IHHmc.
-        eapply Disjoint_Included_r; [
-          | eapply Disjoint_Included_l; [| eassumption ] ];
-        eauto with Ensembles_DB.
-      + eapply make_closures_image_Included in Hmc.
-        intros Hc. 
-        eapply Hmc; [| now apply Included_refl ].
-        eapply image_monotonic; [ | eassumption ].
-        now apply Setminus_Included.
-  Qed.
-
   (** * Lemmas about [project_var] and [project_vars] *)
 
-  Lemma project_var_free_set_Included Scope Funs σ c Γ FVs x x' C S S' :
-    project_var  Scope Funs σ c Γ FVs S x x' C S' ->
+  Lemma project_var_free_set_Included Scope Funs c Γ FVs x x' C S S' :
+    project_var Scope Funs c Γ FVs S x x' C S' ->
     Included _ S' S.
   Proof with now eauto with Ensembles_DB.
     intros Hproj. inv Hproj...
   Qed.
 
-  Lemma project_vars_free_set_Included Scope Funs σ c Γ FVs xs xs' C S S' :
-    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_free_set_Included Scope Funs c Γ FVs xs xs' C S S' :
+    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
     Included _ S' S.
   Proof.
     intros Hproj. induction Hproj.
@@ -534,24 +369,24 @@ Section Closure_conversion_util.
       eapply project_var_free_set_Included. eassumption. 
   Qed.
 
-  Lemma project_var_not_In_free_set Scope Funs σ c Γ FVs x x' C S S'  :
-    project_var Scope Funs σ c Γ FVs S x x' C S' ->
+  Lemma project_var_not_In_free_set Scope Funs c Γ FVs x x' C S S'  :
+    project_var Scope Funs c Γ FVs S x x' C S' ->
     Disjoint _ S (Union var Scope
-                        (Union var (image σ (Setminus _ Funs Scope))
+                        (Union var (Setminus _ Funs Scope)
                                (Union var (FromList FVs) (Singleton var Γ)))) ->
     ~ In _ S' x'.
   Proof.
     intros Hproj Hd. inv Hproj; intros Hc.
     - eapply Hd. eauto.
     - eapply Hd; eauto. constructor; eauto. right. left.
-      eexists; eauto. split; eauto. constructor; eauto.
+      eexists; eauto.
     - inv Hc. exfalso. eauto.    
   Qed.
 
-  Lemma project_vars_not_In_free_set Scope Funs σ c Γ FVs xs xs' C S S'  :
-    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_not_In_free_set Scope Funs c Γ FVs xs xs' C S S'  :
+    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
     Disjoint _ S (Union var Scope
-                        (Union var (image σ (Setminus _ Funs Scope))
+                        (Union var (Setminus _ Funs Scope)
                                (Union var (FromList FVs) (Singleton var Γ)))) ->
     Disjoint _ S' (FromList xs').
   Proof.
@@ -570,75 +405,8 @@ Section Closure_conversion_util.
         eassumption.
   Qed.
 
-  Lemma project_var_get Scope Funs σ c Γ FVs S1 x x' C1 S2 rho1 rho2 y:
-    project_var Scope Funs σ c Γ FVs S1 x x' C1 S2 ->
-    ctx_to_rho C1 rho1 rho2 ->
-    ~ In _ S1 y ->
-    M.get y rho1 = M.get y rho2. 
-  Proof.
-    intros Hvar Hctx Hin. inv Hvar.
-    - inv Hctx. reflexivity.
-    - inv Hctx. reflexivity.
-    - inv Hctx. inv H12.
-      destruct (peq y x'); subst.
-      contradiction.
-      now rewrite M.gso.
-  Qed.    
-
-  Lemma project_vars_get Scope Funs σ c Γ FVs S1 xs xs' C1 S2 rho1 rho2 y:
-    project_vars Scope Funs σ c Γ FVs S1 xs xs' C1 S2 ->
-    ctx_to_rho C1 rho1 rho2 ->
-    ~ In _ S1 y ->
-    M.get y rho1 = M.get y rho2. 
-  Proof.
-    revert Scope Funs Γ FVs S1 xs' C1 S2 rho1 rho2 y.
-    induction xs; intros Scope Funs Γ FVs S1 xs' C1 S2 rho1 rho2 y Hproj Hctx Hnin.
-    - inv Hproj. inv Hctx. reflexivity.
-    - inv Hproj.  
-      edestruct ctx_to_rho_comp_ctx_l as [rho'' [Hctx1 Hctx2]]; eauto.
-      rewrite <- comp_ctx_f_correct. reflexivity.
-      eapply project_var_get in Hctx1; eauto. 
-      eapply IHxs in Hctx2; eauto.
-      rewrite Hctx1, <- Hctx2. reflexivity.
-      intros Hc. eapply Hnin.
-      eapply project_var_free_set_Included; eassumption.
-  Qed.
-
-  Lemma project_var_getlist Scope Funs σ c Γ FVs S1 x x' C1 S2 rho1 rho2 ys :
-    project_var Scope Funs σ c Γ FVs S1 x x' C1 S2 ->
-    ctx_to_rho C1 rho1 rho2 ->
-    Disjoint _ S1 (FromList ys) ->
-    getlist ys rho1 = getlist ys rho2. 
-  Proof.
-    revert rho1 rho2; induction ys; intros rho1 rho2  Hproj Hctx Hnin.
-    - reflexivity. 
-    - simpl.
-      rewrite FromList_cons in Hnin. eapply Disjoint_sym in Hnin. 
-      erewrite project_var_get; eauto.
-      erewrite IHys; eauto.
-      eapply Disjoint_sym. eapply Disjoint_Union_r. eassumption.
-      intros Hc. eapply Hnin. eauto.
-  Qed.        
-
-
-  Lemma project_vars_getlist Scope Funs σ c Γ FVs S1 xs xs' C1 S2 rho1 rho2 ys :
-    project_vars Scope Funs σ c Γ FVs S1 xs xs' C1 S2 ->
-    ctx_to_rho C1 rho1 rho2 ->
-    Disjoint _ S1 (FromList ys) ->
-    getlist ys rho1 = getlist ys rho2. 
-  Proof.
-    revert rho1 rho2; induction ys; intros rho1 rho2  Hproj Hctx Hnin.
-    - reflexivity. 
-    - simpl.
-      rewrite FromList_cons in Hnin. eapply Disjoint_sym in Hnin. 
-      erewrite project_vars_get; eauto.
-      erewrite IHys; eauto.
-      eapply Disjoint_sym. eapply Disjoint_Union_r. eassumption.
-      intros Hc. eapply Hnin. eauto.
-  Qed.        
-
-  Lemma project_var_In_Union Scope Funs σ c Γ FVs S x x' C S' :
-    project_var Scope Funs σ c Γ FVs S x x' C S' ->
+  Lemma project_var_In_Union Scope Funs c Γ FVs S x x' C S' :
+    project_var Scope Funs c Γ FVs S x x' C S' ->
     x \in (FV Scope Funs FVs).
   Proof.
     unfold FV. intros Hvar. inv Hvar; eauto.
@@ -647,8 +415,8 @@ Section Closure_conversion_util.
     intros Hc; inv Hc; eauto. 
   Qed.
 
-  Lemma project_vars_In_Union Scope Funs σ c Γ FVs S xs xs' C S' :
-    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_In_Union Scope Funs c Γ FVs S xs xs' C S' :
+    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
     (FromList xs) \subset (FV Scope Funs FVs).
   Proof.
     intros Hvar. induction Hvar; eauto.
@@ -659,10 +427,10 @@ Section Closure_conversion_util.
       eassumption.
   Qed.
   
-  Lemma project_var_not_In Scope Funs σ c Γ FVs S x x' C S' :
+  Lemma project_var_not_In Scope Funs c Γ FVs S x x' C S' :
     Disjoint _ S (FV Scope Funs FVs) ->
     
-    project_var Scope Funs σ c Γ FVs S x x' C S' ->
+    project_var Scope Funs c Γ FVs S x x' C S' ->
     ~ In _ S x.
   Proof.
     intros Hd Hproj Hin. inv Hproj.
@@ -675,9 +443,9 @@ Section Closure_conversion_util.
       intros Hc; inv Hc; eauto.
   Qed.
 
-  Lemma project_vars_Disjoint Scope Funs σ c Γ FVs S xs xs' C S' :
+  Lemma project_vars_Disjoint Scope Funs c Γ FVs S xs xs' C S' :
     Disjoint _ S (FV Scope Funs FVs) ->      
-    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
+    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
     Disjoint _ S (FromList xs).
   Proof.
     revert xs' C S S'; induction xs; intros xs' C S S' Hd Hproj.
@@ -685,24 +453,24 @@ Section Closure_conversion_util.
     - inv Hproj. rewrite FromList_cons.
       eapply Union_Disjoint_r.
       eapply Disjoint_Singleton_r. eapply project_var_not_In; eauto.
-      inv H8.
+      inv H7.
       + eapply IHxs; [| eassumption ]. eauto.
       + eauto.
       + assert (Hd1 : Disjoint _ (Setminus var S (Singleton var y'))
                                (FromList xs))
           by (eapply IHxs; eauto with Ensembles_DB).
-        eapply project_vars_In_Union in H12.
+        eapply project_vars_In_Union in H11.
         eapply Disjoint_Included_r. eassumption.
         eauto with Ensembles_DB.
   Qed.
 
   Lemma Closure_conversion_pre_occurs_free_Included_mut :
-    (forall e Scope Funs σ c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs σ c Γ FVs e e' C),
+    (forall e Scope Funs c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C),
        (* (Hun: fundefs_names_unique e), *)
        occurs_free e \subset FV Scope Funs FVs) /\
-    (forall B Funs σ c FVs B'
-       (Hcc: Closure_conversion_fundefs clo_tag Funs σ c FVs B B')
+    (forall B Funs c FVs B'
+       (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (HD : FromList FVs <--> occurs_free_fundefs B),
        (* (Hun: fundefs_names_unique_fundefs B) (Hun': fundefs_names_unique_fundefs Funs), *)
        occurs_free_fundefs B \subset FromList FVs).
@@ -718,7 +486,7 @@ Section Closure_conversion_util.
     - normalize_occurs_free. eapply Union_Included.
       + eapply Singleton_Included.
         eapply project_var_In_Union. eassumption.
-      + inv H11. simpl in H2. destruct H2 as (Heq & C' & e' & Heq' & Hcc).
+      + inv H10. simpl in H2. destruct H2 as (Heq & C' & e' & Heq' & Hcc).
         destruct y; simpl in *; subst.
         eapply Union_Included.
         now eapply IHe; eauto.
@@ -751,10 +519,10 @@ Section Closure_conversion_util.
     - rewrite HD; eauto. reflexivity.
     - normalize_occurs_free...
   Qed.
-
+  
   Corollary Closure_conversion_pre_occurs_free_Included :
-    (forall e Scope Funs σ c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs σ c Γ FVs e e' C),
+    (forall e Scope Funs c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C),
        occurs_free e \subset FV Scope Funs FVs).
   Proof.
     now apply Closure_conversion_pre_occurs_free_Included_mut.
@@ -762,8 +530,8 @@ Section Closure_conversion_util.
 
 
   Corollary Closure_conversion_pre_occurs_free_fundefs_Included :
-    (forall B Funs σ c FVs B'
-       (Hcc: Closure_conversion_fundefs clo_tag Funs σ c FVs B B')
+    (forall B Funs c FVs B'
+       (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (HD : FromList FVs <--> occurs_free_fundefs B),
        occurs_free_fundefs B \subset FromList FVs).
   Proof. 
@@ -773,57 +541,35 @@ Section Closure_conversion_util.
   Lemma project_var_sizeOf_ctx_exp (Scope Funs : Ensemble var) (σ : var -> var) 
     (c : cTag) (Γ : var) (FVs : list var) (S : Ensemble var) 
     (x x' : var) (C : exp_ctx) (S' : Ensemble var) :
-    project_var Scope Funs σ c Γ FVs S x x' C S' ->
+    project_var Scope Funs c Γ FVs S x x' C S' ->
     sizeOf_exp_ctx C <= 3. 
   Proof.
     intros Hctx. inv Hctx; eauto.
   Qed.
-  
-  Lemma project_vars_sizeOf_ctx_exp (Scope Funs : Ensemble var) (σ : var -> var) 
-    (c : cTag) (Γ : var) (FVs : list var) (S : Ensemble var) 
-    (xs xs' : list var) (C : exp_ctx) (S' : Ensemble var)  :
-    project_vars  Scope Funs σ c Γ FVs S xs xs' C S' ->
-    sizeOf_exp_ctx C <= 3 * length xs. 
-  Proof.
-    intros Hctx. induction Hctx; eauto.
-    rewrite sizeOf_exp_ctx_comp_ctx. simpl.
-    specialize (project_var_sizeOf_ctx_exp _ _ _ _ _ _ _ _ _ _ _ H).
-    omega.
-  Qed.
-
-  Lemma make_closures_sizeOf_ctx_exp (B : fundefs) (S : Ensemble var) (Γ : var)
-        (C : exp_ctx) (σ : var -> var) (S' : Ensemble var) :
-    make_closures clo_tag B S Γ C σ S' ->
-    sizeOf_exp_ctx C <= 3 * numOf_fundefs B.
-  Proof.
-    induction 1; eauto.
-    simpl. specialize (sizeOf_exp_grt_1 e).
-    omega.
-  Qed.
-
-  Lemma Closure_conversion_fundefs_numOf_fundefs Funs (σ : var -> var) (c : cTag) 
+ 
+  Lemma Closure_conversion_fundefs_numOf_fundefs Funs (c : cTag) 
         (FVs : list var) (B1 B2 : fundefs) :
-    Closure_conversion_fundefs clo_tag Funs σ c FVs B1 B2 ->
+    Closure_conversion_fundefs clo_tag Funs c FVs B1 B2 ->
     numOf_fundefs B1 = numOf_fundefs B2.
   Proof.
     intros Hcc; induction Hcc; eauto; simpl. congruence.
   Qed.
 
-  Lemma project_var_not_In_free_set' Scope Funs σ c Γ FVs x x' C S S'  :
-    project_var Scope Funs σ c Γ FVs S x x' C S' ->
-    Disjoint _ S (Scope :|: (image σ (Funs \\ Scope))) ->
+  Lemma project_var_not_In_free_set' Scope Funs c Γ FVs x x' C S S'  :
+    project_var Scope Funs c Γ FVs S x x' C S' ->
+    Disjoint _ S (Scope :|: (Funs \\ Scope)) ->
     ~ In _ S' x'.
   Proof.
     intros Hproj Hd. inv Hproj; intros Hc.
     - eapply Hd. eauto.
     - eapply Hd; eauto. constructor; eauto. right.
-      eexists; eauto. split; eauto. constructor; eauto.
+      eexists; eauto.
     - inv Hc. exfalso. eauto.    
   Qed.
 
-  Lemma project_vars_not_In_free_set' Scope Funs σ c Γ FVs xs xs' C S S'  :
-    project_vars Scope Funs σ c Γ FVs S xs xs' C S' ->
-    Disjoint _ S (Scope :|: (image σ (Funs \\ Scope))) ->
+  Lemma project_vars_not_In_free_set' Scope Funs c Γ FVs xs xs' C S S' :
+    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+    Disjoint _ S (Scope :|: (Funs \\ Scope)) ->
     Disjoint _ S' (FromList xs').
   Proof.
     intros Hproj Hd. induction Hproj.

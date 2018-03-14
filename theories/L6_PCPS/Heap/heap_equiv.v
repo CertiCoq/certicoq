@@ -3227,4 +3227,28 @@ Module HeapEquiv (H : Heap).
       repeat (split; eauto).
   Qed.
 
+  Lemma heap_env_equiv_def_funs' (S : Ensemble var) (β1 β2 : loc -> loc) (H1 H2 : heap block) 
+        (rho1 rho2 : M.t value) (B B' : fundefs) : 
+    S \\ (name_in_fundefs B) |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
+    S |- (H1, def_funs B B' rho1) ⩪_(β1, β2) (H2, def_funs B B' rho2).
+  Proof with now eauto with Ensembles_DB.
+    revert S. induction B; simpl; intros S Heq.
+    - eapply heap_env_equiv_set.
+      + eapply IHB. eapply heap_env_equiv_antimon...
+      + rewrite res_equiv_eq. simpl. split; eauto.
+    - eapply heap_env_equiv_antimon...
+  Qed.
+  
+  Lemma def_funs_env_loc S rho B B' :
+    env_locs (def_funs B B' rho) S \subset env_locs rho (S \\ name_in_fundefs B).
+  Proof.
+    revert S; induction B; intros S.
+    - simpl. eapply Included_trans.
+      eapply env_locs_set_Inlcuded'.
+      simpl. rewrite Union_Empty_set_neut_l.
+      rewrite <- Setminus_Union.
+      eapply IHB.
+    - simpl. rewrite Setminus_Empty_set_neut_r. reflexivity.
+  Qed.
+
 End HeapEquiv.

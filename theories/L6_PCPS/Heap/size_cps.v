@@ -2,7 +2,7 @@ From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions.
 
 From L6.Heap Require Import heap heap_defs cc_log_rel
-     closure_conversion closure_conversion_util.
+     closure_conversion closure_conversion_util compat.
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -16,218 +16,199 @@ Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
 
-Module Defs := HeapDefs .
-
 Module Size (H : Heap).
 
   (* This is stupid. Find out how to use modules correctly. *)
-  Module LR := CC_log_rel H.
+  Module C := Compat H.
 
-  Import H LR LR.Sem LR.Sem.Equiv LR.Sem.Equiv.Defs.
+  Import H C C.LR C.LR.Sem C.LR.Sem.Equiv C.LR.Sem.Equiv.Defs.
 
-  (** * Size of CPS terms, values and environments, needed to express the upper bound on the execution cost of certain transformations *)
+  (** * Size of CPS terms, values and environments, needed to express the upper bound on
+         the execution cost of certain transformations *)
   
   (** The size of CPS expressions. Right now we only count the number of
    * variables in a program (free or not), the number of functions and
    * the number of function definition blocks *)
   (* TODO -- max per function block *)
-  Fixpoint sizeOf_exp (e : exp) : nat :=
+  Fixpoint exp_num_vars (e : exp) : nat :=
     match e with
-      | Econstr x _ ys e => length ys + sizeOf_exp e
+      | Econstr x _ ys e => length ys + exp_num_vars e
       | Ecase x l =>
         1 + (fix sizeOf_l l :=
                match l with
                  | [] => 0
-                 | (t, e) :: l => sizeOf_exp e + sizeOf_l l
+                 | (t, e) :: l => exp_num_vars e + sizeOf_l l
                end) l
-      | Eproj x _ _ y e => 1 + sizeOf_exp e
-      | Efun B e => 1 + sizeOf_fundefs B + sizeOf_exp e
+      | Eproj x _ _ y e => 1 + exp_num_vars e
+      | Efun B e => 1 + fundefs_num_vars B + 2 * numOf_fundefs B + exp_num_vars e
       | Eapp x _ ys => 1 + length ys
-      | Eprim x _ ys e => length ys + sizeOf_exp e
+      | Eprim x _ ys e => length ys + exp_num_vars e
       | Ehalt x => 1
     end
-  with sizeOf_fundefs (B : fundefs) : nat := 
+  with fundefs_num_vars (B : fundefs) : nat := 
          match B with
            | Fcons _ _ xs e B =>
-             1 + sizeOf_exp e + sizeOf_fundefs B
+             1 + exp_num_vars e + fundefs_num_vars B
            | Fnil => 0
          end.
 
-  (** The size of evaluation contexts *)
-  Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
+  Fixpoint max_vars_exp (e : exp) : nat :=
+    match e with
+      | Econstr x _ ys e => max_vars_exp e
+      | Ecase x l =>
+        1 + (fix sizeOf_l l :=
+               match l with
+                 | [] => 0
+                 | (t, e) :: l => max_vars_exp e
+               end) l
+      | Eproj x _ _ y e => 1 + exp_num_vars e
+      | Efun B e => max (fundefs_num_vars B) (max_vars_exp e)
+      | Eapp x _ ys => 0
+      | Eprim x _ ys e => exp_num_vars e
+      | Ehalt x => 0
+    end.
+
+  Fixpoint exp_num_vars_out (e : exp) : nat :=
+    match e with
+      | Econstr x _ ys e => length ys
+      | Ecase x l => 1
+      | Eproj x _ _ y e => 1  
+      | Efun B e => 1 + fundefs_num_vars B + 3 * numOf_fundefs B
+      | Eapp x _ ys => 1 + length ys
+      | Eprim x _ ys e => length ys 
+      | Ehalt x => 1
+    end.
+
+  Fixpoint max_num_vars_out (e : exp) : nat :=
+    match e with
+      | Econstr x _ ys e => 0
+      | Ecase x l => 0
+      | Eproj x _ _ y e => 0
+      | Efun B e => 1 + fundefs_num_vars B 
+      | Eapp x _ ys => 0
+      | Eprim x _ ys e => 0 
+      | Ehalt x => 0
+    end.
+
+  (** The cost of evaluating a CC evaluation context *)
+  Fixpoint cost_exp_ctx (c : exp_ctx) : nat :=
     match c with
       | Hole_c => 0
-      | Econstr_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
-      | Eproj_c _ _ _ _ c => 1 + sizeOf_exp_ctx c
-      | Eprim_c _ _ ys c => length ys + sizeOf_exp_ctx c
-      | Ecase_c _ l1 _ c l2  =>
-        1 + sizeOf_exp_ctx c
-        + fold_left (fun s p => s + sizeOf_exp (snd p)) l1 0
-        + fold_left (fun s p => s + sizeOf_exp (snd p)) l2 0 
-      | Efun1_c B c => sizeOf_fundefs B + sizeOf_exp_ctx c
-      | Efun2_c B e => sizeOf_fundefs_ctx B + sizeOf_exp e
-    end
-  with sizeOf_fundefs_ctx (B : fundefs_ctx) : nat :=
-         match B with
-           | Fcons1_c _ _ xs c B =>
-             1 + length xs + sizeOf_exp_ctx c + sizeOf_fundefs B
-           | Fcons2_c _ _ xs e B =>
-             1 + length xs + sizeOf_exp e + sizeOf_fundefs_ctx B
-         end.
-
-  (* Compute the maximum of a tree given a measure function *)
-  (* TODO move? *)
-  Definition max_ptree_with_measure {A} (f : A -> nat) (i : nat) (rho : M.t A) :=
-    M.fold (fun c _ v => max c (f v)) rho i.
-
-  Lemma Mfold_monotonic {A} f1 f2 (rho : M.t A) n1 n2 :
-    (forall x1 x1' x2 x3, x1 <= x1' -> f1 x1 x2 x3 <= f2 x1' x2 x3) ->
-    n1 <= n2 ->
-    M.fold f1 rho n1 <= M.fold f2 rho n2.
-  Proof.
-    rewrite !M.fold_spec.
-    intros. eapply fold_left_monotonic; eauto.
-  Qed.
-
-  Lemma max_ptree_with_measure_spec1 {A} (f : A -> nat) i rho x v :
-    M.get x rho = Some v ->
-    f v <= max_ptree_with_measure f i rho. 
-  Proof.
-    intros Hget. unfold max_ptree_with_measure.
-    rewrite M.fold_spec.
-    assert (List.In (x, v) (M.elements rho))
-      by (eapply PTree.elements_correct; eauto).
-    revert H. generalize (M.elements rho).
-    intros l Hin. induction l. now inv Hin.
-    inv Hin.
-    - simpl. eapply le_trans. now apply Max.le_max_r.
-      eapply fold_left_extensive.
-      intros [y u] n; simpl. now apply Max.le_max_l.
-    - simpl. eapply le_trans. now eapply IHl; eauto. 
-      eapply fold_left_monotonic.
-      intros. now eapply NPeano.Nat.max_le_compat_r; eauto.
-      now apply Max.le_max_l.
-  Qed.
-
-  Lemma max_list_nat_acc_spec {A} (xs : list A) f acc :
-    max_list_nat_with_measure f acc xs =
-    max acc (max_list_nat_with_measure f 0 xs).
-  Proof.
-    rewrite <- (Max.max_0_r acc) at 1. generalize 0.
-    revert acc. induction xs; intros acc n; simpl; eauto.
-    rewrite <- Max.max_assoc. eauto.
-  Qed.
-
-  (** Stratified size for values *)
-  Fixpoint sizeOf_val' (i : nat) (H : heap block) (v : value)  : nat :=
-    match i with
-      | 0 => 0
-      | S i' =>
-        match v with
-          | Loc l =>
-            let sizeOf_env rho := max_ptree_with_measure (sizeOf_val' i' H) 0 rho in
-            match get l H with
-              | Some (Constr _ vs) => max_list_nat_with_measure (sizeOf_val' i' H) 0 vs
-              | Some (Clos v1 v2) => max (sizeOf_val' i' H v1) (sizeOf_val' i' H v2)
-              | Some (Env rho) => sizeOf_env rho
-              | None => 0
-            end
-          | FunPtr B f => sizeOf_fundefs B
-        end
+      | Econstr_c _ _ ys c => 1 + length ys + cost_exp_ctx c
+      | Eproj_c _ _ _ _ c => 1 + cost_exp_ctx c
+      | Efun1_c B c => 1 + cost_exp_ctx c 
+      | Eprim_c _ _ ys c => length ys + cost_exp_ctx c
+      | Ecase_c _ l1 _ c l2 => 0
+      | Efun2_c B e => 0
     end.
 
-  (** Size of environments.
-    * The size of an environment is the size of the maximum value stored in it *)
-  Definition sizeOf_env i (H : heap block) rho :=
-    max_ptree_with_measure (sizeOf_val' i H) 0 rho.
+  Definition max_vars_value (v : value) : nat :=
+    match v with
+      | Loc _ => 0
+      | FunPtr B _ => fundefs_num_vars B
+    end.
 
-  (** Maximum of an expression and an environment. *)
-  Definition max_exp_env (k : nat) (H : heap block) (rho : env) (e : exp) :=
-    max (sizeOf_exp e) (sizeOf_env k H rho).
+  Definition max_vars_block (b : block) : nat :=
+    match b with
+      | Constr _ vs => max_list_nat_with_measure max_vars_value 0 vs
+      | Clos v1 v2 => max (max_vars_value v1) (max_vars_value v2)
+      | Env x => 0
+    end.
+
+  Definition max_vars_heap (S : Ensemble loc) `{ToMSet S} (H : heap block) :=
+    size_with_measure_filter max_vars_block (reach_set H mset) H.
   
-  (** Equivalent definition *)
-  Definition sizeOf_val (i : nat) (H : heap block) (v : value) : nat :=
-    match i with
-      | 0 => 0
-      | S i' =>
-        match v with
-          | Loc l =>
-            match get l H with
-              | Some (Constr _ vs) => max_list_nat_with_measure (sizeOf_val' i' H) 0 vs
-              | Some (Clos v1 v2) => max (sizeOf_val' i' H v1) (sizeOf_val' i' H v2)
-              | Some (Env rho) => sizeOf_env i' H rho
-              | None => 0
-            end
-          | FunPtr B f => sizeOf_fundefs B
-        end
+  Definition max_heap_exp (S : Ensemble loc) `{ToMSet S} (H : heap block) (e : exp) :=
+    max (max_vars_heap S H) (max_vars_exp e).
+  
+  (** * Postcondition *)
+
+  (** Enforces that the resource consumption of the target is within certain bounds *)
+  Definition Post
+             k (* time units already spent *)
+             (p1 p2 : heap block * env * exp * nat * nat) :=
+    match p1, p2 with
+      | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
+        c1 <= c2 + k <=  c1 * (1 + 2 * max_heap_exp (env_locs rho1 (occurs_free e1)) H1 e1) + (exp_num_vars_out e1) /\
+        m1 <= m2 <= m1 * (4 + max_heap_exp (env_locs rho1 (occurs_free e1)) H1 e1)
     end.
   
-  Lemma sizeOf_val_eq i H v :
-    sizeOf_val' i H v = sizeOf_val i H v.
-  Proof.
-    destruct i; eauto.
-  Qed.
+  (** * Precondition *)
+
+  (** Enforces that the initial heaps have related sizes *)
+  Definition Pre
+             C (* Context already processed *)
+             (p1 p2 : heap block * env * exp) :=
+    let m := cost_alloc_ctx C in 
+    match p1, p2 with
+      | (H1, rho1, e1), (H2, rho2, e2) =>
+        size_heap H1 + m <= size_heap H2 + max_num_vars_out e1 <= (size_heap H1) * (4 + max_heap_exp (env_locs rho1 (occurs_free e1)) H1 e1) + m
+    end.
   
-  Opaque sizeOf_val'.
+  (** Compat lemmas *)
 
-  (** Monotonicity properties *)
-
-  (* TODO move *)
-  Lemma max_list_nat_monotonic (A : Type) (f1 f2 : A -> nat) (l : list A) (n1 n2 : nat) :
-    (forall (x1 : A), f1 x1 <= f2 x1) ->
-    n1 <= n2 ->
-    max_list_nat_with_measure f1 n1 l <= max_list_nat_with_measure f2 n2 l.
+  Lemma PostBase H1 H2 rho1 rho2 e1 e2 C k :
+    k <= exp_num_vars_out e1 ->
+    cost_alloc_ctx C = max_num_vars_out e1 ->
+    InvCostBase (Post k) (Pre C) H1 H2 rho1 rho2 e1 e2.
   Proof.
-    unfold max_list_nat_with_measure.
-    intros. eapply fold_left_monotonic; eauto.
-    intros. eapply NPeano.Nat.max_le_compat; eauto.
+    unfold InvCostBase, Post, Pre.
+    intros H1' rho1' H2' rho2' c b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hsize.
+    split.
+    + split. omega. eapply plus_le_compat.
+      rewrite Nat.mul_add_distr_l, Nat.mul_1_r.
+      now eapply le_plus_l. omega.
+    + split. omega. 
+      omega.
   Qed.
 
-  Lemma sizeOf_val_monotic i i' H v :
-    i <= i' ->
-    sizeOf_val i H v <= sizeOf_val i' H v.
-  Proof.
-    revert i' v. induction i as [i IHi] using lt_wf_rec1; intros i' v.
-    destruct i; try (simpl; omega). intros Hlt.
-    destruct i'; simpl; try omega.
-    destruct v; simpl; eauto. destruct (get l H); eauto.
-    destruct b; eauto.
-    - eapply max_list_nat_monotonic; eauto. intros.
-      rewrite !sizeOf_val_eq. eapply IHi; omega.
-    - eapply NPeano.Nat.max_le_compat; eauto.
-      rewrite !sizeOf_val_eq. eapply IHi; omega.
-      rewrite !sizeOf_val_eq. eapply IHi; omega.
-    - unfold sizeOf_env. eapply Mfold_monotonic; eauto.
-      intros. eapply NPeano.Nat.max_le_compat; eauto.
-      rewrite !sizeOf_val_eq; eapply IHi; omega.
-  Qed.
 
-  Lemma sizeOf_env_monotonic i i' H rho :
-    i <= i' ->
-    sizeOf_env i H rho <= sizeOf_env i' H rho.
+  Lemma PostConstrCompat H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 k :
+    length ys1 = length ys2 ->
+    k <= length ys1 ->
+    InvCtxCompat (Post k) (Post 0)
+                 H1 H2 rho1 rho2 (Econstr_c x1 c ys1 Hole_c) (Econstr_c x2 c ys2 Hole_c) e1 e2.
   Proof.
-    intros Hi. unfold sizeOf_env.
-    eapply Mfold_monotonic; eauto.
-    intros. eapply NPeano.Nat.max_le_compat; eauto.
-    rewrite !sizeOf_val_eq. now eapply sizeOf_val_monotic.
-  Qed.
+    unfold InvCtxCompat, Post.
+    intros Hlen Hleq H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1 c2 c1' c2'
+           m1 m2 b1 b2 Heq1 Hinj1 Heq2 Hinj2 [[Hc1 Hc2] [Hm1 Hm2]] Hctx1 Hctx2.
+    inv Hctx1. inv Hctx2. inv H13. inv H16.
+    rewrite !plus_O_n in *. simpl (cost_ctx _) in *.
+    rewrite !Hlen in *. split.
+    - split. omega. simpl (exp_num_vars_out _).
+      eapply plus_le_compat; [| omega ].
+      simpl (max_heap_exp _ _ _) in *.
+      rewrite <- !plus_n_O in *.
+      eapply le_trans. 
+      eapply plus_le_compat_r. eassumption.
+      admit.
+    - split; eauto.
+      eapply le_trans. eassumption. admit.
+  Admitted. 
 
-  (** Lemmas about [size_of_env] *)
-  Lemma sizeOf_env_O H rho :
-    sizeOf_env 0 H rho = 0.
+  Lemma PreConstrCompat H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 C :
+    IInvCtxCompat (Pre C) (Pre Hole_c)
+                 H1 H2 rho1 rho2 (Econstr_c x1 c ys1 Hole_c) (Econstr_c x2 c ys2 Hole_c) e1 e2.
   Proof.
-    unfold sizeOf_env, max_ptree_with_measure.
-    rewrite M.fold_spec. generalize (M.elements rho).
-    induction l; eauto.
-  Qed.
+    unfold IInvCtxCompat, Pre.
+    intros H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1' c2' 
+           b1 b2 Heq1 Hinj1 Heq2 Hinj2 [Hm1 Hm2] Hctx1 Hctx2.
+    inv Hctx1. inv Hctx2. inv H13. inv H16.
+    split.
+    - simpl. simpl in Hm1. admit.
+    - omega. 
+    
+  Lemma PostProjCompat H1 H2 rho1 rho2 x1 x2 c n y1 y2 e1 e2 k :
+    InvCtxCompat (Post k) (Post 0)
+                 H1 H2 rho1 rho2 (Eproj_c x1 c n y1 Hole_c) (Eproj_c x2 c n y2 Hole_c) e1 e2.
+
+  Lemma PreProjCompat H1 H2 rho1 rho2 x1 x2 c n y1 y2 e1 e2 C :
+    IInvCtxCompat (Pre C) (Pre Hole_c)
+                  H1 H2 rho1 rho2 (Eproj_c x1 c n y1 Hole_c) (Eproj_c x2 c n y2 Hole_c) e1 e2.
+  
   
 
-  Lemma sizeOf_env_set k H rho x v :
-    sizeOf_env k H (M.set x v rho) = max (sizeOf_val k H v) (sizeOf_env k H rho).
-  Proof.
-    (* Obvious but seems painful, admitting for now *)
-  Admitted.
-
+  
 
   Lemma sizeOf_env_setlist k H rho rho' xs vs :
     setlist xs vs rho = Some rho' ->
@@ -387,43 +368,6 @@ Module Size (H : Heap).
 
     (* Concrete bounds for closure conversion *)
 
-  (** * Postcondition *)
-
-  (** Enforces that the resource consumption of the target is within certain bounds *)
-  Definition Post
-             k (* time units already spent *)
-             i (* step index *)
-             (p1 p2 : heap block * env * exp * nat * nat) :=
-    match p1, p2 with
-      | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
-        c1 <= c2 + k <= 7 * c1 * (max_exp_env i H1 rho1 e1) + 7 * sizeOf_exp e1 /\
-        m1 <= m2 <= 4 * m1 * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
-    end.
-
-  (** Enforces that the resource consumption of the target is within certain bounds *)
-  Definition PostL
-             k (* time units already spent *)
-             i H1 rho1 e1
-             (p1 p2 : nat * nat) :=
-    match p1, p2 with
-      | (c1, m1), (c2, m2) =>
-        c1 <= c2 + k <= 7 * c1 * (max_exp_env i H1 rho1 e1) + 7 * sizeOf_exp e1 /\
-        m1 <= m2 <= 4 * m1 * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
-    end.
-  
-  (** * Precondition *)
-
-  (** Enforces that the initial heaps have related sizes *)
-  Definition Pre
-             C (* Context already processed *)
-             i (* step index *)
-             (p1 p2 : heap block * env * exp) :=
-    let m := cost_alloc_ctx C in 
-    match p1, p2 with
-      | (H1, rho1, e1), (H2, rho2, e2) =>
-        size_heap H1 + m  <= size_heap H2 <=
-        4 * (size_heap H1 + m) * (max_exp_env i H1 rho1 e1) + 4 * sizeOf_exp e1
-    end.
 
   (** * Properties of the cost invariants *)
 

@@ -597,6 +597,20 @@ Fixpoint L4_5_constr_vars (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Ter
     end
   end.
 
+(* doesn't seem useful *)
+Fixpoint L4_5_constr_vars_val (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Term :=
+  match e with
+  | vterm v => vterm v
+  | oterm o lbt =>
+    match o with
+    | NDCon d n => (* eval goes (only) inside constructors *)
+        let lbt := map (btMapNt (L4_5_constr_vars_val avoid)) lbt in
+        oterm o lbt
+    | _ =>
+      let lbt := map (btMapNt (L4_5_constr_vars avoid)) lbt in
+      oterm o lbt
+    end
+  end.
 
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:
   (forall f sub,

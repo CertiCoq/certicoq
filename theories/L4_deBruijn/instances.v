@@ -747,30 +747,73 @@ Let certiL4_5_to_L5Val:
 End SimplerProof.
 
 
+(* counterexample:
+e:= (\x.\y.x) (prod 0 0)
+thus, v must be \y.(prod 0 0)
+
+[e] is (\x.\y.x) (let u:= 0 in let v:=0 in prod u v)
+[e] converges to v. Note that because of CBV, we evaluate args first.
+Howver, [v]val is
+(\y.(let u:= 0 in let v:=0 in prod u v))
+
+If we used CBN evaluation, there would have been no problem *)
+
 Lemma L4_5_constr_vars senv e v lv:
-  subset (free_vars e) lv
+  subset (all_vars e) lv
   -> eval e v
-  -> exists vt, eval (L4_5_constr_vars lv e) vt /\ (senv, v) ⊑ (senv, vt).
+  -> eval (L4_5_constr_vars lv e) (L4_5_constr_vars_val lv v)
+    /\ (senv, v) ⊑ (senv, L4_5_constr_vars_val lv v).
 Proof using.
   intros Hs Hev.
   induction Hev.
 - simpl.
-  eexists.
   split; [ apply eval_Lam_e | ].
   constructor;[intros ?; destruct q; cpx; fail|
                intros ?; destruct n; simpl; cpx].
 - simpl.
-  rwsimpl Hs.
+  rwsimpl Hs. unfold App_e in Hs. rwsimpl Hs.
   apply subset_app in Hs. repnd.
   specialize (IHHev1 Hs0).
   specialize (IHHev2 Hs).
-  simpl in *.  
-  assert (subset (free_vars (subst e1' x v2)) lv) by admit.
+  simpl in *.
+  assert (subset (all_vars (subst e1' x v2)) lv) by admit.
   specialize (IHHev3 H).
-  exrepnd.
-  eexists.
-  split; [ eapply eval_App_e; eauto | apply IHHev0].
+  repnd.
+  split; [ eapply eval_App_e; simpl; unfold subst | ].
+  info_eauto.
+  info_eauto. simpl.
+  Focus 2. eauto.
+  (* not provable. see counterexample above *)
 Abort.
+
+(* probably not true
+Lemma L4_5_constr_vars e v lv:
+  subset (all_vars e) lv
+  -> eval e v
+  -> forall vv,
+      eval (L4_5_constr_vars lv e) vv
+      <-> eval (L4_5_constr_vars lv v) vv.
+Proof using.
+  intros Hs Hev.
+  induction Hev; try tauto;[ | | | | ].
+- simpl.
+  rwsimpl Hs. unfold App_e in Hs. rwsimpl Hs.
+  apply subset_app in Hs. repnd.
+  specialize (IHHev1 Hs0).
+  specialize (IHHev2 Hs).
+  simpl in *.
+  assert (subset (all_vars (subst e1' x v2)) lv) by admit.
+  specialize (IHHev3 H).
+  repnd. intros.
+  split; [ eapply eval_App_e | ].
+  info_eauto.
+  simpl.
+  info_eauto. simpl.
+- admit.
+- admit.
+- 
+Abort.
+*)
 
 Global Instance evalPreservesGood :
   Proper (eval ==> Basics.impl) (@goodTerm L4_5_Term _).

@@ -142,6 +142,9 @@ Module Type Heap.
   Definition size_with_measure {A : Type} (f : A -> nat) (h : heap A) : nat :=
     fold_left (fun acc h => acc + f (snd h)) (heap_elements h) 0%nat.
 
+  Definition max_with_measure {A : Type} (f : A -> nat) (h : heap A) : nat :=
+    fold_left (fun acc h => max acc (f (snd h))) (heap_elements h) 0%nat.
+
   Definition size_with_measure_filter {A : Type}
              (f : A -> nat) (s : PS.t) (h : heap A) : nat :=
     fold_left (fun acc h => acc + f (snd h)) (heap_elements_filter s h) 0%nat.
@@ -163,7 +166,6 @@ Module Type Heap.
       get l H1 = None /\ get l H2 = None.
 
 End Heap.
-
 
 Module HeapLemmas (H : Heap).
 
@@ -478,6 +480,53 @@ Module HeapLemmas (H : Heap).
     now firstorder.
     now firstorder.
     eapply subheap_Subperm. eassumption.
+  Qed.
+
+
+  Lemma max_with_measure_emp (A : Type) f :
+    @max_with_measure A f emp = 0%nat.
+  Proof.
+    unfold max_with_measure.
+    rewrite heap_elements_empty. reflexivity.
+  Qed.
+
+  Lemma max_with_measure_alloc
+        (A : Type) f (x : A) (H : heap A) (H' : heap A) (l : loc) (s : nat) : 
+    max_with_measure f H = s ->
+    alloc x H = (l, H') ->
+    max_with_measure f H' = max s (f x).
+  Proof.
+    intros Hs1 Ha.
+    unfold max_with_measure in *. eapply heap_elements_alloc in Ha.
+    erewrite fold_permutation; [| | eassumption ].
+    simpl.
+    replace (f x) with ((fun acc h => max acc (f (snd h))) 0 (l, x)); [| reflexivity ].  
+    erewrite List_util.fold_left_comm with (f0 := fun acc h => max acc (f (snd h))).
+    rewrite Hs1. reflexivity.
+
+    intros y [l1 x1] [l2 x2]; simpl. 
+    rewrite <- !Max.max_assoc, (Max.max_comm (f x1)). reflexivity.
+
+    intros [l1 x1] [l2 x2] y; simpl. 
+    rewrite <- !Max.max_assoc, (Max.max_comm (f x1)). reflexivity.
+  Qed.
+
+  Lemma max_with_measure_subheap :
+    forall A f (H1 H2 : heap A),
+      H1 ⊑ H2 ->
+      max_with_measure f H1 <= max_with_measure f H2.
+  Proof.
+    intros A f H1 H2 Hsub. unfold max_with_measure.
+    eapply fold_left_subperm; eauto.
+    + now firstorder.
+    + intros x1 x2 [l1 x3] Hleq. simpl.
+      eapply le_trans. eassumption. eapply Max.le_max_l.
+    + intros x1 x2 [l1 x3] Hleq. simpl.
+      eapply NPeano.Nat.max_le_compat_r. eassumption.
+    + intros [l1 x1] [l2 x2] y; simpl. 
+      rewrite <- !Max.max_assoc, (Max.max_comm (f x1)).
+      reflexivity.
+    + eapply subheap_Subperm. eassumption.
   Qed.
 
   Lemma size_with_measure_filter_emp (A : Type) (s : PS.t) f :

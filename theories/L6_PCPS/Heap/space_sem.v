@@ -28,7 +28,7 @@ Module SpaceSem (H : Heap).
       | Eproj x t n y e => 1
       | Efun B e => 1
       | Eapp f t ys => 1 + length ys
-      | Eprim x p ys e => 1 + length ys
+      | Eprim x p ys e => 0
       | Ehalt x => 1
     end.
   
@@ -353,7 +353,7 @@ Module SpaceSem (H : Heap).
     match c with
       | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx c
       | Eproj_c x t n y c => cost_alloc_ctx c
-      | Efun1_c B c => 2*(numOf_fundefs B) + cost_alloc_ctx c
+      | Efun1_c B c => (numOf_fundefs B) + cost_alloc_ctx c
       (* not relevant *)
       | Eprim_c x p ys c => cost_alloc_ctx c
       | Hole_c => 0
@@ -433,7 +433,7 @@ Module SpaceSem (H : Heap).
 
   Lemma def_closures_size B1 B2 rho H l H' rho' :
     def_closures B1 B2 rho H l = (H', rho') ->
-    size_heap H' = size_heap H + 2*numOf_fundefs B1.
+    size_heap H' = size_heap H + numOf_fundefs B1.
   Proof. 
     revert rho H H' rho'. induction B1; intros rho H H' rho' Hdefs; simpl; eauto.
     - simpl in Hdefs.

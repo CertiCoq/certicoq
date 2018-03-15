@@ -81,17 +81,21 @@ Module Size (H : Heap).
       | Ehalt x => 1
     end.
 
-  Fixpoint exp_max_vars_out (e : exp) : nat :=
+  Fixpoint exp_num_fundefs (e : exp) : nat :=
     match e with
-      | Econstr x _ ys e => 0
-      | Ecase x l => 0
-      | Eproj x _ _ y e => 0
-      | Efun B e => 1 + fundefs_num_vars B 
+      | Econstr x _ ys e => exp_num_fundefs e
+      | Ecase x l => 1 + (fix sizeOf_l l :=
+                           match l with
+                             | [] => 0
+                             | (t, e) :: l => exp_num_fundefs e
+                           end) l
+      | Eproj x _ _ y e => exp_num_fundefs e
+      | Efun B e =>  2 * fundefs_num_vars B 
       | Eapp x _ ys => 0
       | Eprim x _ ys e => 0 
       | Ehalt x => 0
     end.
-
+  
   (** The cost of evaluating a CC evaluation context *)
   Fixpoint cost_exp_ctx (c : exp_ctx) : nat :=
     match c with
@@ -107,7 +111,7 @@ Module Size (H : Heap).
   Definition max_vars_value (v : value) : nat :=
     match v with
       | Loc _ => 0
-      | FunPtr B _ => fundefs_num_vars B
+      | FunPtr B _ => 1 + fundefs_num_vars B + 3 * numOf_fundefs B
     end.
 
   Definition max_vars_block (b : block) : nat :=
@@ -122,7 +126,7 @@ Module Size (H : Heap).
   
   Definition max_heap_exp (H : heap block) (e : exp) :=
     max (max_vars_heap H) (exp_max_vars e).
-
+  
   Lemma max_heap_with_measure_get {A} (H1 : heap A) l f b : 
     get l H1 = Some b ->
     f b <= max_with_measure f H1. 
@@ -141,8 +145,15 @@ Module Size (H : Heap).
         intros x1 x2 [l1 y1] Hleq. simpl.
         eapply NPeano.Nat.max_le_compat_r. eassumption.
   Qed.
-    
-  Lemma max_vars_heap_alloc_constr H1 H1' b l :
+
+  Lemma max_vars_heap_get H1 l b :
+    get l H1 = Some b ->
+    max_vars_block b <= max_vars_heap H1. 
+  Proof.
+    eapply max_heap_with_measure_get.
+  Qed.
+
+  Lemma max_vars_heap_alloc_constr H1 H1' l b :
     alloc b H1 = (l, H1') ->
     max_vars_block b = 0 ->
     max_vars_heap H1 = max_vars_heap H1'.
@@ -151,8 +162,45 @@ Module Size (H : Heap).
     erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); [| reflexivity | eassumption ].
     rewrite Hsub. rewrite Max.max_0_r. reflexivity.
   Qed.
-  
-    
+
+  Lemma max_vars_heap_def_closures_le H1 H1' rho1 rho1' B B0 l :
+    def_closures B B0 rho1 H1 l = (H1', rho1') ->
+    max_vars_heap H1 <= max_vars_heap H1'.
+  Proof.
+    revert H1' rho1'. induction B; intros H1' rho1' Hclo.
+    - simpl in Hclo.
+      destruct (def_closures B B0 rho1 H1 l) as [H2 rho2] eqn:Hclo'.
+      destruct (alloc (Clos (FunPtr B0 v) (Loc l)) H2) as [l' rho3] eqn:Hal. inv Hclo.
+      eapply le_trans. eapply IHB; try eassumption. reflexivity.
+      unfold max_vars_heap.  
+      erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); [| reflexivity | eassumption ].
+      eapply Max.le_max_l.
+    - inv Hclo; eauto.
+  Qed.
+      
+  Lemma max_vars_heap_def_closures H1 H1' rho1 rho1' B B0 f l :
+    def_closures B B0 rho1 H1 l = (H1', rho1') ->
+    max_vars_block (Clos (FunPtr B0 f) (Loc l)) <=  max_vars_heap H1 ->
+    max_vars_heap H1 = max_vars_heap H1'.
+  Proof.
+    revert H1' rho1'. induction B; intros H1' rho1' Hclo Hmax.
+    - simpl in Hclo.
+      destruct (def_closures B B0 rho1 H1 l) as [H2 rho2] eqn:Hclo'.
+      destruct (alloc (Clos (FunPtr B0 v) (Loc l)) H2) as [l' rho3] eqn:Hal. inv Hclo.
+      erewrite (IHB H2); try eassumption; try reflexivity.
+      unfold max_vars_heap.
+      erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); [| reflexivity | eassumption ].
+      rewrite Max.max_l. reflexivity. eapply le_trans. eassumption.
+      eapply max_vars_heap_def_closures_le. eassumption.
+    - inv Hclo. reflexivity.
+  Qed.
+
+  Lemma max_heap_GC H1 H2 S `{ToMSet S}: 
+    live S H1 H2 ->
+    max_vars_heap H2 <= max_vars_heap H1.
+  Proof.
+  Admitted.
+
   (** * Postcondition *)
 
   (** Enforces that the resource consumption of the target is within certain bounds *)
@@ -161,8 +209,8 @@ Module Size (H : Heap).
              (p1 p2 : heap block * env * exp * nat * nat) :=
     match p1, p2 with
       | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
-        c1 <= c2 + k <=  c1 * (1 + max_heap_exp H1 e1) + (exp_num_vars e1) /\
-        m1 <= m2 <= m1 * (1 + max_heap_exp H1 e1)
+        c1 <= c2 + k <=  c1 * (4 + max_heap_exp H1 e1) + (exp_num_vars e1) /\
+        m1 <= m2 + max_heap_exp H1 e1 <= m1 * (1 + max_heap_exp H1 e1) + max_heap_exp H1 e1
     end.
 
 
@@ -198,8 +246,8 @@ Module Size (H : Heap).
     intros Hleq1 H1' H2' rho1' rho2' c b1 b2  Heq1 Hinj1 Heq2 Hinj2 [Hs1 Hs2].
     split.
     + split. omega. eapply plus_le_compat.
-      rewrite Nat.mul_add_distr_l, Nat.mul_1_r.
-      eapply le_plus_l. omega.
+      rewrite !Nat.mul_add_distr_l. rewrite mult_comm. simpl.
+      rewrite <- plus_assoc. eapply le_plus_l. omega.
     + split. omega. omega.
   Qed.
 
@@ -250,23 +298,41 @@ Module Size (H : Heap).
         rewrite <- !plus_assoc.
         eapply plus_le_compat. reflexivity.
         rewrite NPeano.Nat.mul_add_distr_r.
-        eapply plus_le_compat;
-          [| rewrite NPeano.Nat.mul_add_distr_l, NPeano.Nat.mul_1_r;
-             eapply le_plus_l ].
+        eapply plus_le_compat.
         eapply mult_le_compat_l. eapply plus_le_compat_l.
         unfold max_heap_exp.
         eapply Nat.max_le_compat; [| simpl; omega ]. 
         erewrite <- max_vars_heap_alloc_constr; try eassumption. reflexivity.
         simpl.       
         eapply cc_approx_val_max_vars_value_list. eassumption.
-      - split; eauto. 
+        rewrite NPeano.Nat.mul_add_distr_l.
+        eapply le_plus_trans. rewrite mult_comm. simpl. omega.
+      - split; eauto.
         eapply le_trans. eassumption.
-        eapply mult_le_compat_l. eapply plus_le_compat_l.
+        eapply plus_le_compat_l.
+        unfold max_heap_exp.
+        eapply Nat.max_le_compat; [| simpl; omega ]. 
+        erewrite <- max_vars_heap_alloc_constr; try eassumption. reflexivity.
+        simpl. 
+        eapply cc_approx_val_max_vars_value_list. eassumption.
+        
+        eapply le_trans.
+        unfold max_heap_exp. simpl. 
+        erewrite max_vars_heap_alloc_constr; try eassumption. simpl.
+        eapply cc_approx_val_max_vars_value_list. eassumption.
+        eapply plus_le_compat.
+        eapply mult_le_compat_l.
+        eapply plus_le_compat_l.
         unfold max_heap_exp.
         eapply Nat.max_le_compat; [| simpl; omega ]. 
         erewrite <- max_vars_heap_alloc_constr; try eassumption. reflexivity.
         simpl.       
-        eapply cc_approx_val_max_vars_value_list. eassumption. }
+        eapply cc_approx_val_max_vars_value_list. eassumption.
+        eapply Nat.max_le_compat; [| simpl; omega ]. 
+        erewrite <- max_vars_heap_alloc_constr; try eassumption. reflexivity.
+        simpl.       
+        eapply cc_approx_val_max_vars_value_list. eassumption.
+    }
     intros y1 y2 Hin1 Hin2 Hcc.
     eapply cc_approx_var_env_heap_env_equiv; try eassumption.
     simpl; normalize_occurs_free...
@@ -345,12 +411,15 @@ Module Size (H : Heap).
                 S (exp_num_vars e1))
       with ((c1 * (1 + max_heap_exp H1'' (Eproj x1 c n y1 e1)) + (exp_num_vars e1)) + 
             (1 * (1 + max_heap_exp H1'' (Eproj x1 c n y1 e1)) + 1)) by ring.
-      rewrite <- (plus_assoc). eapply plus_le_compat; [| simpl; omega ].
-      eapply le_trans. eassumption.
-      eapply plus_le_compat; [| reflexivity ].
-      eapply mult_le_compat_l. eapply plus_le_compat_l.
+      rewrite <- (plus_assoc).
+      eapply le_trans.
+      eapply plus_le_compat; [| reflexivity ]. eassumption.
+      rewrite <- !plus_assoc. 
+      eapply plus_le_compat. eapply mult_le_compat_l. eapply plus_le_compat_l.
       unfold max_heap_exp.
       eapply Nat.max_le_compat. reflexivity. simpl. omega.
+      rewrite Nat.mul_1_l. eapply le_trans. eapply plus_le_compat_l.
+      eapply plus_le_compat_l. eassumption. omega.
     - split; eauto. 
   Qed.
   
@@ -461,7 +530,175 @@ Module Size (H : Heap).
     eapply project_vars_heap in Hctx'; eauto. subst.
     unfold Post in *. omega.
   Qed.
-    
+
+  Lemma PostGC k : (InvGC (fun i => Post k)).
+  Proof.
+    unfold InvGC, Post.
+    intros H1 H1' H2 H2' rho1 rho2 e1 e2 c1 c2 m1 m2 _ (* TODO remove *)
+           [[Hm1 Hm2] [Hc1 Hc2]] Hl1 Hl2.
+    eapply max_heap_GC in Hl1.
+    split.
+    - split. omega.
+      eapply le_trans. eassumption.
+      eapply plus_le_compat_r.
+      eapply mult_le_compat_l.
+      eapply plus_le_compat_l.
+      unfold max_heap_exp.
+      eapply NPeano.Nat.max_le_compat_r. eassumption.
+    - split.
+      eapply le_trans. eassumption.
+      eapply plus_le_compat_l. eapply NPeano.Nat.max_le_compat_r. eassumption.
+      eapply plus_le_compat_r. eapply Nat.add_le_mono_r.
+      eapply le_trans. eassumption.
+      eapply plus_le_compat_r. eapply mult_le_compat_l.
+      eapply plus_le_compat_l.
+      unfold max_heap_exp.
+      eapply NPeano.Nat.max_le_compat_r. eassumption.
+  Qed.
+
+  Lemma fun_in_fundefs_exp_num_vars B f tau xs e: 
+    fun_in_fundefs B (f, tau, xs, e) ->
+    exp_num_vars e <= fundefs_num_vars B.
+  Proof.
+    induction B; intros Hin; inv Hin.
+    - inv H. simpl. omega.
+    - eapply le_trans. eapply IHB. eassumption.
+      simpl. omega. 
+  Qed.
+
+  Opaque max. 
+
+  Lemma exp_max_vars_exp_num_vars e :
+    exp_max_vars e <= exp_num_vars e.
+  Proof.
+    revert e. eapply exp_ind'; intros; try (simpl; omega).
+    simpl. 
+    eapply NPeano.Nat.max_lub.
+    omega. omega. 
+  Qed.
+
+  Lemma PostAppCompat i j IP P b H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ k :
+    Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b H1 rho1 H2 rho2 y1 y2) (f1 :: xs1) (f2 :: xs2) -> 
+    k <= S (length xs1) ->
+    ~ Γ \in FromList xs2 ->
+    ~ f2' \in FromList xs2 ->
+    IInvAppCompat Util.clo_tag (fun i => Post 0) (Post k) Pre
+                  H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ.
+  Proof.
+    unfold IInvAppCompat, Pre, Post.
+    intros Hall Hk Hnin1 Hnin2 _ H1' H1'' H2' rhoc1 rhoc2 rhoc3 rho1' rho2' rho2''
+           b1 b2 B1 f1' ct1 xs1' e1 l1 env_loc1 vs1 B
+           f3 c ct2 xs2' e2 l2 env_loc2 vs2 c1 c2 m1 m2
+           Heq1 Hinj1 Heq2 Hinj2
+           [[Hc1 Hc2] [Hm1 Hm2]] [Hh1 Hh2]
+           Hgetf1 Hgetl1 Hgete1 Hfind1 Hgetxs1 Hclo Hset1
+           Hgetf2 Hgetxs2 Hset2 Hgetl2 Hfind2.
+    eapply Forall2_monotonic_strong
+      with (R' := fun y1 y2 : var =>
+                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' y1 y2) in Hall.
+    assert (Hlen := Forall2_length _ _ _ Hall). inversion Hlen as [Hlen']. 
+    { rewrite <- !plus_n_O in *. 
+      rewrite !Hlen' in *.
+      split.
+      - split.
+        + simpl. omega.
+        + simpl cost in *.
+          rewrite <- !plus_assoc. eapply le_trans.
+          eapply plus_le_compat_r. eassumption.
+          simpl exp_num_vars.
+          replace (c1 * (4 + max_heap_exp H1'' e1) + exp_num_vars e1 +
+                   (1 + (1 + (S (S (length xs2)) + k))))
+          with ((c1 * (4 + max_heap_exp H1'' e1) + (exp_num_vars e1 + 4 + length xs2)) + k) by ring.
+          replace ((c1 + S (length xs1)) * (4 + max_heap_exp H1' (Eapp f1 t xs1)) +
+                   S (length xs1))
+          with ((c1 * (4 + max_heap_exp H1' (Eapp f1 t xs1)) +
+                 (max_heap_exp H1' (Eapp f1 t xs1) + 4 + length xs1) +
+                 S (length xs1)) +
+                (3 * (length xs1) + (length xs1) * (max_heap_exp H1' (Eapp f1 t xs1)))) by ring.
+          eapply le_trans; [| eapply le_plus_l ].
+          eapply plus_le_compat.
+          eapply plus_le_compat. 
+
+          eapply mult_le_compat_l.
+          eapply plus_le_compat_l.
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply Max.max_lub.
+          erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
+          eapply max_vars_heap_get. eassumption.
+          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply le_trans.
+          eapply exp_max_vars_exp_num_vars.
+          eapply le_trans. 
+          eapply fun_in_fundefs_exp_num_vars.
+          eapply find_def_correct. eassumption.
+          simpl. omega.
+          rewrite Hlen'.
+          eapply plus_le_compat_r. eapply plus_le_compat_r. 
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply le_trans. 
+          eapply fun_in_fundefs_exp_num_vars.
+          eapply find_def_correct. eassumption.
+          simpl. omega.
+          omega.
+      - split.
+        + simpl. 
+          rewrite <- Max.plus_max_distr_r. eapply NPeano.Nat.max_le_compat.
+          eapply le_trans. eassumption.
+          eapply plus_le_compat_l.
+          eapply Max.max_lub.
+          eapply le_trans; [| eapply Max.le_max_l ]. 
+          erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
+          eapply max_vars_heap_get. eassumption.
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply le_trans.
+          eapply exp_max_vars_exp_num_vars.
+          eapply le_trans. 
+          eapply fun_in_fundefs_exp_num_vars.
+          eapply find_def_correct. eassumption.
+          simpl. omega.
+          erewrite def_closures_size; try eassumption.
+          eapply plus_le_compat. eassumption.
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
+          eapply le_trans; [| eapply Max.le_max_l].
+          simpl. omega.
+        + eapply plus_le_compat_r. rewrite <- NPeano.Nat.mul_max_distr_r.
+          eapply NPeano.Nat.max_le_compat.
+          eapply le_trans. eapply Nat.add_le_mono_r in Hm2. eassumption.
+          eapply mult_le_compat_l.
+          eapply plus_le_compat_l.
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply Max.max_lub.
+          erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
+          eapply max_vars_heap_get. eassumption.
+          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
+          eapply le_trans; [| eapply Max.le_max_l].
+          eapply le_trans.
+          eapply exp_max_vars_exp_num_vars.
+          eapply le_trans. 
+          eapply fun_in_fundefs_exp_num_vars.
+          eapply find_def_correct. eassumption.
+          simpl. omega.
+          eapply le_trans. eassumption.
+          eapply mult_le_compat_r.
+          erewrite (def_closures_size _ _ _ H1' _ H1''); try eassumption.
+          omega. }
+    { intros y1 y2 Hin1 Hin2 Hcc.
+      eapply cc_approx_var_env_heap_env_equiv; try eassumption.
+      now inv Hin1; eauto.
+      unfold AppClo. repeat normalize_occurs_free.
+      inv Hin2; eauto. 
+      right. constructor. right. constructor.
+      left. rewrite FromList_cons. right. eassumption.
+      intros Hc. eapply Hnin1. inv Hc; eauto.
+      intros Hc. eapply Hnin2. inv Hc; eauto.  }
+  Qed.
+  
   (* Lemma sizeOf_env_setlist k H rho rho' xs vs : *)
   (*   setlist xs vs rho = Some rho' -> *)
   (*   sizeOf_env k H rho' = *)

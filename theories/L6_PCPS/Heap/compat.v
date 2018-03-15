@@ -155,14 +155,7 @@ Module Compat (H : Heap).
            IL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1), c1, m1) (H2', rho2', Ecase x2 ((t, e2) :: Pats2), c2, m2)).
      
     (** * App compatibility *)
-
-    Definition IInvGC :=
-      forall (H1 H1' H2 H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp),
-        IIG (H1, rho1, e1) (H2, rho2, e2) ->
-        live (env_locs rho1 (occurs_free e1)) H1 H1' ->
-        live' (env_locs rho2 (occurs_free e2)) H2 H2' ->
-        IIG (H1', rho1, e1) (H2', rho2, e2).
-
+      
     Definition InvGC :=
       forall (H1 H1' H2 H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp) c1 c2 m1 m2 k,
         IG k (H1', rho1, e1, c1, m1) (H2', rho2, e2, c2, m2) ->
@@ -243,7 +236,7 @@ Module Compat (H : Heap).
           (f2 f2' Γ : var) (xs2 : list var) (t : fTag) :
       IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
       InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
-      IInvGC IIG -> InvGC IG ->
+      InvGC IG ->
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 ->
@@ -262,7 +255,7 @@ Module Compat (H : Heap).
                                      ; IG)
       (AppClo clo_tag f2 t xs2 f2' Γ, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hiinv Hbase Hiigc Higc Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
+      intros Hiinv Hbase Higc Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
              b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2
              HII Hleq1 Hstep1 Hstuck1.
       eapply (cc_approx_var_env_heap_env_equiv
@@ -288,8 +281,8 @@ Module Compat (H : Heap).
             destruct v as [ ? [| [| B2 f3 ] [| [ env_loc' |] [|] ]] | | ]; try contradiction.
             destruct Hcc as [Him Hcc].
             edestruct Hcc with (vs2 := vs) as (xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
-            reflexivity. now firstorder. symmetry.
-            reflexivity. now firstorder.
+            reflexivity. clear. now firstorder. symmetry.
+            reflexivity. clear. now firstorder.
             destruct (lt_dec (c1 - 1) 1).
             + eexists. eexists id. repeat split. unfold AppClo.
               eapply Eval_proj_per_cc; eauto.
@@ -337,7 +330,7 @@ Module Compat (H : Heap).
           destruct Hcc as [Hbeq Hcc]. simpl in Hcc.
           destruct v as [ ? [| [| B2 f3 ] [| [ env_loc' |] [|] ]] | | ]; try contradiction.
           edestruct Hcc as (Him & xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
-          reflexivity. now firstorder. reflexivity. now firstorder.
+          reflexivity. clear; now firstorder. reflexivity. clear; now firstorder.
           edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2') as [H2'' Hgc'].
           assert (Hgc1 := Hgc); assert (Hgc2 := Hgc').
           destruct Hgc as [Hseq [bgc [Heqgc Hinjgc]]].
@@ -394,7 +387,7 @@ Module Compat (H : Heap).
           + eassumption.
           + eapply heap_env_equiv_heap_equiv. eassumption.
           + eassumption.
-          + eapply Hiigc; eassumption.
+          + eapply HG; eassumption.
           + simpl; omega.
           + intros i.
             edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m' Hstep']].

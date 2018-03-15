@@ -591,7 +591,7 @@ Module ClosureConversionCorrect (H : Heap).
     Scope \subset Scope' -> 
     Fun_inv k j GII GI b rho1 H1 rho2 H2 Scope' Funs.
   Proof.
-    now firstorder.
+    intros Hf Hsub. intros x Hin Hin'. eapply Hf; eauto.
   Qed.
   
   
@@ -929,11 +929,10 @@ Module ClosureConversionCorrect (H : Heap).
     induction k as [k IHk] using lt_wf_rec1.
     intros H1 H2 rho1 rho2 e1 e2 C Scope Funs HMSet FVs β c Γ
            Henv Hfun HFVs Hinjb Hwf1 Hlocs1 Hwf2 Hlocs2 Hnin Hbind Hun Hcc.
+    assert (Hfv := Closure_conversion_pre_occurs_free_Included _ _ _ _ _ _ _ _ Hcc).
+    assert (Hfv' := Closure_conversion_occurs_free_Included _ _ _ _ _ _ _ _ Hcc Hun).
     induction e1 using exp_ind'; try clear IHe1.
     - (* case Econstr *)
-      assert (Hfv := Closure_conversion_pre_occurs_free_Included _ _ _ _ _ _ _ _ Hcc).
-      assert (Hfv' := Closure_conversion_occurs_free_Included _ _ _ _ _ _ _ _ Hcc Hun).
-      
       inv Hcc.
 
       edestruct (binding_in_map_getlist _ rho1 l Hbind) as [vl Hgetl].
@@ -1212,18 +1211,168 @@ Module ClosureConversionCorrect (H : Heap).
     - (* case Ecase cons *)
       inv Hcc. (* TODO change compat *) 
       admit.
-    - (* case Eproj *)
-      inv Hcc.
-      admit.
     - (* case Efun *)
       inv Hcc.
+
+      edestruct (binding_in_map_getlist _ rho1 (FVs') Hbind) as [vl Hgetl].
+      eapply Included_trans; [| eassumption ].
+      rewrite <- H3. normalize_occurs_free...
+      
+      edestruct project_vars_ctx_to_heap_env as [H2' [rho2' [m Hct]]]; try eassumption.
+      specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.
+      specialize (HFVs 0); eapply FV_inv_weak_in_FV_inv; eassumption.
+
+      edestruct project_vars_correct as (Hd' & Henv' & Hfun' & HFVs' & Hvars);
+        try eassumption.
+      eapply binding_in_map_antimon; [| eassumption ]...
+      
+      rewrite <- app_ctx_f_fuse in *. intros j.
+
+      (* process right ctx 1 : project fvs *)
+      eapply cc_approx_exp_right_ctx_compat; [ | | | | | | eassumption | ].
+      
+      eapply PostCtxCompat_vars_r. eassumption.
+      
+      eapply PreCtxCompat_vars_r. eassumption.
+      
+      eapply well_formed_antimon. eapply reach'_set_monotonic.
+      now eapply env_locs_monotonic; eauto.
+      eassumption.
+
+      eapply well_formed_antimon. eapply reach'_set_monotonic.
+      now eapply env_locs_monotonic; eauto.
+      eassumption.
+
+      eapply Included_trans; [| eassumption ]. now eapply env_locs_monotonic; eauto.
+      eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic; eauto.
+
+      assert (Hwf2' := Hwf2).
+      assert (Hlocs2' := Hlocs2). 
+      eapply project_vars_well_formed' in Hwf2; try eassumption;
+      [| eapply Disjoint_Included_r; try eassumption; unfold FV_cc; now eauto with Ensembles_DB ].
+      eapply project_vars_env_locs' in Hlocs2; try eassumption;
+      [| eapply Disjoint_Included_r; try eassumption; unfold FV_cc; now eauto with Ensembles_DB ].
+
+      (* process right ctx 2 : make environment *)
+      edestruct cc_approx_var_env_getlist as [vl' [Hgetl2 Hcc]].
+      eapply (Hvars j). eassumption.
+
+      destruct (alloc (Constr c' vl') H2') as [lenv H1'] eqn:Hal.
+      
+      eapply cc_approx_exp_right_ctx_compat; [ | | | | | | | ].
+      
       admit.
+      admit.
+
+      eapply well_formed_antimon. eapply reach'_set_monotonic.
+      now eapply env_locs_monotonic; eauto.
+      eassumption.
+
+      eapply well_formed_antimon; [| eassumption ]. eapply reach'_set_monotonic.
+      eapply env_locs_monotonic; eauto. admit. 
+
+      eapply Included_trans; [| eassumption ]. now eapply env_locs_monotonic; eauto.
+      eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic; eauto. admit.
+      
+      econstructor; eauto. now constructor; eauto.
+      
+
+      assert (Hwf2' := Hwf2).
+      assert (Hlocs2' := Hlocs2). 
+      eapply project_vars_well_formed' in Hwf2; try eassumption;
+      [| eapply Disjoint_Included_r; try eassumption; unfold FV_cc; now eauto with Ensembles_DB ].
+      eapply project_vars_env_locs' in Hlocs2; try eassumption;
+      [| eapply Disjoint_Included_r; try eassumption; unfold FV_cc; now eauto with Ensembles_DB ].
+      
+
+      eapply well_formed_antimon; [| eassumption ]. eapply reach'_set_monotonic.
+      eapply env_locs_monotonic. eapply Included_trans; [| eassumption ]. eauto.
+      eassumption.
+      
     - (* case Eapp *)
       inv Hcc.
-      admit.
+      
+      edestruct (binding_in_map_getlist _ rho1 (v :: l) Hbind) as [vl Hgetl].
+      eapply Included_trans; [| eassumption ].
+      rewrite FromList_cons. normalize_occurs_free...
+      
+      edestruct project_vars_ctx_to_heap_env as [H2' [rho2' [m Hct]]]; try eassumption.
+      specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.
+      specialize (HFVs 0); eapply FV_inv_weak_in_FV_inv; eassumption.
+
+      intros j.
+      (* process right ctx *)
+      eapply cc_approx_exp_right_ctx_compat;
+        [ | | | | | | eassumption | ].
+      
+      eapply PostCtxCompat_vars_r. eassumption.
+      
+      eapply PreCtxCompat_vars_r. eassumption.
+      
+      eapply well_formed_antimon. eapply reach'_set_monotonic. now eapply env_locs_monotonic; eauto.
+      eassumption.
+      
+      eapply well_formed_antimon. eapply reach'_set_monotonic. now eapply env_locs_monotonic; eauto.
+      eassumption.
+      
+      eapply Included_trans; [| eassumption ]. now eapply env_locs_monotonic; eauto.
+      eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic; eauto.
+      simpl in Hgetl. destruct (M.get v rho1) eqn:Hgetv; try congruence. 
+      destruct (getlist l rho1) eqn:Hgetl1; try congruence. inv Hgetl.
+      
+      assert (Hwf2' := Hwf2).
+      assert (Hlocs2' := Hlocs2). 
+      eapply project_vars_well_formed' in Hwf2; try eassumption;
+      [| eapply Disjoint_Included_r; try eassumption; unfold FV_cc; now eauto with Ensembles_DB ].
+      eapply project_vars_env_locs' in Hlocs2; try eassumption;
+      [| eapply Disjoint_Included_r; try eassumption; unfold FV_cc; now eauto with Ensembles_DB ].
+      
+      edestruct project_vars_correct as (Hd' & Henv' & Hfun' & HFVs' & Hvars);
+        try eassumption.
+      eapply binding_in_map_antimon; [| eassumption ]...
+
+      specialize (Hvars j). inv Hvars. 
+      eapply cc_approx_exp_app_compat; [ | | | | | | | | | | eassumption | eassumption ].
+      + eapply PostAppCompat. constructor; eassumption.
+        eapply le_trans. eapply project_vars_cost. eassumption. simpl. omega.
+        intros Hc.
+        eapply project_vars_not_In_free_set'. eassumption.
+        eapply Disjoint_Included_r; [| eassumption ]. unfold FV_cc...
+        constructor. eassumption. rewrite FromList_cons. right. eassumption.
+        intros Hc.
+        eapply project_vars_not_In_free_set'. eassumption.
+        eapply Disjoint_Included_r; [| eassumption ]. unfold FV_cc...
+        constructor; [| rewrite FromList_cons; right; eassumption ].
+        eassumption.
+      + eapply PostBase.
+        eapply le_trans.
+        eapply project_vars_cost. eassumption. simpl. omega.
+      + eapply PostGC.
+      + eapply well_formed_antimon; [| eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic.
+        eassumption. 
+      + eapply well_formed_antimon; [| eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic.
+        unfold AppClo. repeat normalize_occurs_free. rewrite !FromList_cons.
+        eapply Union_Included. now eauto with Ensembles_DB.
+        rewrite !Setminus_Union_distr. eapply Union_Included. now eauto with Ensembles_DB.
+        eapply Union_Included. rewrite Setminus_Same_set_Empty_set. now eauto with Ensembles_DB.
+        now eauto with Ensembles_DB.
+      + eapply Included_trans; [| eassumption ].
+        eapply env_locs_monotonic. eassumption.
+      + eapply Included_trans; [| eassumption ].
+        eapply env_locs_monotonic.
+        unfold AppClo. repeat normalize_occurs_free. rewrite !FromList_cons.
+        eapply Union_Included. now eauto with Ensembles_DB.
+        rewrite !Setminus_Union_distr. eapply Union_Included. now eauto with Ensembles_DB.
+        eapply Union_Included. rewrite Setminus_Same_set_Empty_set. now eauto with Ensembles_DB.
+        now eauto with Ensembles_DB.
+      + intros Hc. eapply Hd'. rewrite FromList_cons. split; eauto.
+      + intros Hc. eapply Hd'. rewrite FromList_cons. split; eauto.
+      + intros Hc; subst; eauto.
     - (* case Eprim *)
-      intros ? ? ? ? ? ? ? ? Hstep. inv Hstep.
+      intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Hstep. inv Hstep. simpl in Hcost. omega. 
     - (* case Ehalt *)
       inv Hcc.
       admit.
-  Abort'
+  Abort.

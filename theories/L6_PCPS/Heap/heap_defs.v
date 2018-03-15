@@ -85,7 +85,7 @@ Module HeapDefs (H : Heap) .
     match v with
       | Constr t ls => (* The size of the constructor representation *)
         1 + length ls
-      | Clos _ _ => 2
+      | Clos _ _ => 1
       | Env rho => 0
     end.
   

@@ -786,33 +786,16 @@ Proof using.
   (* not provable. see counterexample above *)
 Abort.
 
-(* probably not true
-Lemma L4_5_constr_vars e v lv:
-  subset (all_vars e) lv
-  -> eval e v
-  -> forall vv,
-      eval (L4_5_constr_vars lv e) vv
-      <-> eval (L4_5_constr_vars lv v) vv.
-Proof using.
-  intros Hs Hev.
-  induction Hev; try tauto;[ | | | | ].
-- simpl.
-  rwsimpl Hs. unfold App_e in Hs. rwsimpl Hs.
-  apply subset_app in Hs. repnd.
-  specialize (IHHev1 Hs0).
-  specialize (IHHev2 Hs).
-  simpl in *.
-  assert (subset (all_vars (subst e1' x v2)) lv) by admit.
-  specialize (IHHev3 H).
-  repnd. intros.
-  split; [ eapply eval_App_e | ].
-  info_eauto.
-  simpl.
-  info_eauto. simpl.
-- admit.
-- admit.
-- 
-Abort.
+(* Possible fix:
+1) define a relation zetaEquiv which asserts that the two terms are syntactically
+equal when we do full blown zeta reduction (even under binders). This is weaker
+than full blown observational equivalence (perhaps easier to deal with?)
+
+2) prove that zetaEquiv is a congruence.
+
+3) prove that zeta equiv terms compute to zeta equiv values
+
+4) prove that the output of L4_5_constr_vars (L4_5 -> L4_5) is zetaEquiv to its input, for all inputs.
 *)
 
 Global Instance evalPreservesGood :

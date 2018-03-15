@@ -886,7 +886,71 @@ Module ClosureConversionCorrect (H : Heap).
     reflexivity. eapply Proper_reach'. reflexivity.
     eapply Proper_env_locs. reflexivity. eassumption.
     rewrite FV_inv_image_reach_eq; try eassumption. reflexivity.
-  Qed.     
+  Qed.
+
+  Lemma make_closures_env_locs_well_formed B fvset Γ C H rho H' rho' k e:
+    make_closures Size.Util.clo_tag B fvset Γ C ->
+    ctx_to_heap_env_CC C H rho H' rho' k ->
+    env_locs rho (occurs_free (C |[ e ]|)) \subset dom H ->
+    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
+    env_locs rho' (occurs_free e) \subset dom H' /\
+    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hclo. revert H rho H' rho' k.
+    induction Hclo; intros H1 rho1 H2 rho2 k Hctx Henv Hwf.
+    - inv Hctx. split; eassumption.
+    - simpl. inv Hctx.
+      simpl in H12. 
+      destruct (M.get f rho1) eqn:Hgetf; try congruence.
+      destruct (M.get Γ rho1) eqn:Hgetg; try congruence. inv H12.
+      edestruct IHHclo as [Henv' Hclo']; [ eassumption | | | split; eassumption ]. 
+      + eapply Included_trans.
+        eapply env_locs_set_Inlcuded'. simpl.
+        rewrite HL.alloc_dom; [| eassumption ]. 
+        eapply Included_Union_compat. reflexivity.
+        eapply Included_trans; [| eassumption ]. 
+        simpl. normalize_occurs_free.
+        eapply env_locs_monotonic...
+      + simpl in Henv, Hwf.
+        eapply well_formed_antimon with
+        (S2 := reach' H' (env_locs (M.set f (Loc l) rho1) ((FromList [f; Γ]) :|: (occurs_free (C |[ e ]|))))).
+        eapply reach'_set_monotonic. eapply env_locs_monotonic...
+        eapply well_formed_reach_alloc'.
+        * eapply well_formed_antimon; [| eassumption ].
+          eapply reach'_set_monotonic.
+          eapply env_locs_monotonic. simpl. normalize_occurs_free...
+        * eapply Included_trans; [| eassumption ].
+          eapply env_locs_monotonic. simpl. normalize_occurs_free...
+        * eassumption.
+        * simpl. rewrite Union_Empty_set_neut_r. rewrite env_locs_Union.
+          rewrite reach'_Union. eapply Included_Union_preserv_l.
+          rewrite !FromList_cons, FromList_nil, Union_Empty_set_neut_r.
+          rewrite env_locs_Union, !env_locs_Singleton; eauto.
+          eapply reach'_extensive.
+    - eapply IHHclo; eassumption.
+  Qed.
+
+  Corollary make_closures_env_locs B fvset Γ C H rho H' rho' k e:
+    make_closures Size.Util.clo_tag B fvset Γ C ->
+    ctx_to_heap_env_CC C H rho H' rho' k ->
+    env_locs rho (occurs_free (C |[ e ]|)) \subset dom H ->
+    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
+    env_locs rho' (occurs_free e) \subset dom H'.
+  Proof with (now eauto with Ensembles_DB).
+    eapply make_closures_env_locs_well_formed.
+  Qed.
+
+  Corollary make_closures_well_formed B fvset Γ C H rho H' rho' k e:
+    make_closures Size.Util.clo_tag B fvset Γ C ->
+    ctx_to_heap_env_CC C H rho H' rho' k ->
+    env_locs rho (occurs_free (C |[ e ]|)) \subset dom H ->
+    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
+    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H.
+  Proof with (now eauto with Ensembles_DB).
+    eapply make_closures_env_locs_well_formed.
+  Qed.
+
+
   
   (** Correctness of [Closure_conversion] *)
   Lemma Closure_conversion_correct (k : nat) (H1 H2 : heap block)

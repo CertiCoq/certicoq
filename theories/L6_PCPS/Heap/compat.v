@@ -79,21 +79,21 @@ Module Compat (H : Heap).
         IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
 
     Definition InvCtxCompat_r (H1 H2 : heap block) (rho1 rho2 : env) (C : exp_ctx) (e1 e2 : exp) :=
-      forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c' c1 c2 m1 m2 β1 β2,
+      forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c' c1 c2 m1 m2 β1 β2,
         (occurs_free e1) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
         injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) β1 ->
            
         (occurs_free (C |[ e2 ]|)) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) β2 ->
                                       
-        IL2 (H1'', rho1'', e1, c1, m1) (H2'', rho2'', e2, c2, m2) ->
+        IL2 (H1', rho1', e1, c1, m1) (H2'', rho2'', e2, c2, m2) ->
         
         ctx_to_heap_env_CC C H2' rho2' H2'' rho2'' c' ->
         
         IL1 (H1', rho1', e1, c1, m1) (H2', rho2', C |[ e2 ]|, c2 + c', m2).
 
     Definition IInvCtxCompat_r (H1 H2 : heap block) (rho1 rho2 : env) (C : exp_ctx) (e1 e2 : exp) :=
-      forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c' β1 β2,
+      forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c' β1 β2,
         (occurs_free e1) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
         injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) β1 ->
            
@@ -104,7 +104,7 @@ Module Compat (H : Heap).
             
         ctx_to_heap_env_CC C H2' rho2' H2'' rho2'' c' ->
 
-        IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
+        IIL2 (H1', rho1', e1) (H2'', rho2'', e2).
 
 
     (** * Case compatibility *)

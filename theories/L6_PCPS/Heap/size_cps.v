@@ -2,7 +2,7 @@ From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions.
 
 From L6.Heap Require Import heap heap_defs cc_log_rel
-     closure_conversion compat.
+     closure_conversion closure_conversion_util compat.
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -19,9 +19,11 @@ Close Scope Z_scope.
 Module Size (H : Heap).
 
   (* This is stupid. Find out how to use modules correctly. *)
-  Module C := Compat H.
+  Module Util := CCUtil H.
+  
+  Import H Util.C.LR.Sem.Equiv Util.C.LR.Sem.Equiv.Defs Util.C.LR.Sem
+         Util.C.LR Util.C Util.
 
-  Import H C C.LR C.LR.Sem C.LR.Sem.Equiv C.LR.Sem.Equiv.Defs.
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on
          the execution cost of certain transformations *)
@@ -367,10 +369,99 @@ Module Size (H : Heap).
       eapply plus_le_compat_l.
       eapply Nat.max_le_compat. reflexivity. simpl; omega.
   Qed.
-  
 
-  
+  (* Cost for projecting vars *)
+  Lemma project_var_cost 
+        Scope Funs c Γ FVs S1 x x' C1 S2 :
+    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
+    cost_ctx_full C1 <= 1.
+  Proof.
+    intros Hvar; inv Hvar; eauto.
+  Qed.
 
+    
+  Lemma project_vars_cost 
+        Scope Funs c Γ FVs S1 x x' C1 S2 :
+    project_vars Scope Funs c Γ FVs S1 x x' C1 S2 ->
+    cost_ctx_full C1 <= length x.
+  Proof.
+    intros Hvar. induction Hvar; eauto.
+    rewrite cost_ctx_full_ctx_comp_ctx_f. simpl.
+    eapply project_var_cost in H. omega.
+  Qed.
+  
+  Lemma project_var_cost_alloc
+        Scope Funs c Γ FVs S1 x x' C1 S2 :
+    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
+    cost_alloc_ctx C1 = 0.
+  Proof.
+    intros Hvar; inv Hvar; eauto.
+  Qed.
+  
+  Lemma project_vars_cost_alloc
+        Scope Funs c Γ FVs S1 x x' C1 S2 :
+    project_vars Scope Funs c Γ FVs S1 x x' C1 S2 ->
+    cost_alloc_ctx C1 = 0.
+  Proof.
+    intros Hvar. induction Hvar; eauto.
+    simpl. rewrite cost_alloc_ctx_comp_ctx_f.
+    erewrite project_var_cost_alloc; eauto.
+  Qed.
+
+  Lemma PreCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
+        Scope Funs c Γ FVs S x x' S':
+    project_var Scope Funs c Γ FVs S x x' C S' ->
+    IInvCtxCompat_r Pre Pre H1 H2 rho1 rho2 C e1 e2.
+  Proof.
+    intros Hvar.
+    unfold IInvCtxCompat_r, Pre.
+    intros H1' H2' H2'' rho1' rho2' rho2'' c1'
+           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx.
+    eapply project_var_heap in Hctx; eauto. subst. eauto.
+  Qed.
+
+  Lemma PostCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
+        Scope Funs c Γ FVs S x x' S':
+    project_var Scope Funs c Γ FVs S x x' C S' ->
+    InvCtxCompat_r (Post 0) (Post (cost_ctx_full C)) H1 H2 rho1 rho2 C e1 e2.
+  Proof.
+    unfold InvCtxCompat_r, Pre.
+    intros Hvar H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
+           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx'.
+    assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
+    subst. 
+    assert (Heq := project_var_cost _ _ _ _ _ _ _ _ _ _ Hvar).  
+    eapply project_var_heap in Hctx'; eauto. subst.
+    unfold Post in *. omega.
+  Qed.
+
+  Lemma PreCtxCompat_vars_r H1 H2 rho1 rho2 C e1 e2
+        Scope Funs c Γ FVs S x x' S':
+    project_vars Scope Funs c Γ FVs S x x' C S' ->
+    IInvCtxCompat_r Pre Pre H1 H2 rho1 rho2 C e1 e2.
+  Proof.
+    intros Hvar.
+    unfold IInvCtxCompat_r, Pre.
+    intros H1' H2' H2'' rho1' rho2' rho2'' c1'
+           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx.
+    eapply project_vars_heap in Hctx; eauto. subst. eauto.
+  Qed.
+
+  Lemma PostCtxCompat_vars_r H1 H2 rho1 rho2 C e1 e2
+        Scope Funs c Γ FVs S x x' S':
+    project_vars Scope Funs c Γ FVs S x x' C S' ->
+    InvCtxCompat_r (Post 0) (Post (cost_ctx_full C)) H1 H2 rho1 rho2 C e1 e2.
+  Proof.
+    unfold InvCtxCompat_r, Pre.
+    intros Hvar H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
+           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx'.
+    assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
+    subst. 
+    assert (Heq := project_vars_cost _ _ _ _ _ _ _ _ _ _ Hvar).  
+    eapply project_vars_heap in Hctx'; eauto. subst.
+    unfold Post in *. omega.
+  Qed.
+    
   (* Lemma sizeOf_env_setlist k H rho rho' xs vs : *)
   (*   setlist xs vs rho = Some rho' -> *)
   (*   sizeOf_env k H rho' = *)
@@ -527,43 +618,6 @@ Module Size (H : Heap).
   (*     eapply Nat.max_lub; simpl; omega. *)
   (* Qed. *)
 
-  (* Cost for projecting vars *)
-  Lemma project_var_cost 
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
-    cost_ctx_full C1 <= 1.
-  Proof.
-    intros Hvar; inv Hvar; eauto.
-  Qed.
-
-    
-  Lemma project_vars_cost 
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_vars Scope Funs c Γ FVs S1 x x' C1 S2 ->
-    cost_ctx_full C1 <= length x.
-  Proof.
-    intros Hvar. induction Hvar; eauto.
-    rewrite cost_ctx_full_ctx_comp_ctx_f. simpl.
-    eapply project_var_cost in H. omega.
-  Qed.
-  
-  Lemma project_var_cost_alloc
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
-    cost_alloc_ctx C1 = 0.
-  Proof.
-    intros Hvar; inv Hvar; eauto.
-  Qed.
-  
-  Lemma project_vars_cost_alloc
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_vars Scope Funs c Γ FVs S1 x x' C1 S2 ->
-    cost_alloc_ctx C1 = 0.
-  Proof.
-    intros Hvar. induction Hvar; eauto.
-    simpl. rewrite cost_alloc_ctx_comp_ctx_f.
-    erewrite project_var_cost_alloc; eauto.
-  Qed.
   
   (* Lemma make_closures_cost ct B S Γ C g : *)
   (*   make_closures ct B S Γ C g S -> *)

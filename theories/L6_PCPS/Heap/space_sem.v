@@ -865,6 +865,13 @@ Module SpaceSem (H : Heap).
   Proof.
     intros Hctx. induction Hctx; simpl; eauto; omega.
   Qed.
+  
+  Lemma ctx_to_heap_env_CC_cost C H1 rho1 H2 rho2 c :
+    ctx_to_heap_env_CC C H1 rho1 H2 rho2 c ->
+    c = cost_ctx_full C.
+  Proof.
+    intros Hctx. induction Hctx; simpl; eauto; omega.
+  Qed.
 
   
 End SpaceSem.

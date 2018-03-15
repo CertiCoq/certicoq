@@ -16,12 +16,10 @@ Close Scope Z_scope.
 
 Module ClosureConversionCorrect (H : Heap).
 
-  Module Util := CCUtil H.
+   Module Size := Size H.
   
-  Import H Util.Size.C.LR.Sem.Equiv Util.Size.C.LR.Sem.Equiv.Defs UtilSize.C.LR.Sem
-         Util.Size.C.LR Util.Size.C Util.Size.
-  
-  Variable clo_tag : cTag.
+   Import H Size.Util.C.LR.Sem.Equiv Size.Util.C.LR.Sem.Equiv.Defs
+          Size.Util.C.LR.Sem Size.Util.C.LR Size.Util.C Size.Util Size.
   
   (** Invariant about the free variables *) 
   Definition FV_inv (k j : nat) (IP : GIInv) (P : GInv) (b : Inj)
@@ -620,7 +618,7 @@ Module ClosureConversionCorrect (H : Heap).
     Fun_inv_weak rho1 H1 rho2 H2 Scope Funs  ->
     FV_inv_weak rho1 rho2 H2 c Scope Funs Γ FVs ->
     M.get x rho1 = Some v1 ->
-    exists H2' rho2' s, ctx_to_heap_env C H2 rho2 H2' rho2' s.
+    exists H2' rho2' s, ctx_to_heap_env_CC C H2 rho2 H2' rho2' s.
   Proof.
     intros Hproj HFun HFV Hget. inv Hproj.
     - repeat eexists; econstructor; eauto.
@@ -641,7 +639,7 @@ Module ClosureConversionCorrect (H : Heap).
     Fun_inv_weak rho1 H1 rho2 H2 Scope Funs ->
     FV_inv_weak rho1 rho2 H2 c Scope Funs Γ FVs ->
     getlist xs rho1 = Some vs1 ->
-    exists H2' rho2' s, ctx_to_heap_env C H2 rho2 H2' rho2' s.
+    exists H2' rho2' s, ctx_to_heap_env_CC C H2 rho2 H2' rho2' s.
   Proof.
     intros HD Hvars HFun HFV.
     revert Scope Funs Γ FVs xs' C S S' vs1
@@ -669,9 +667,9 @@ Module ClosureConversionCorrect (H : Heap).
         * erewrite <- project_var_get; try eassumption.
           intros Hin'. eapply HD. constructor. now eauto.
           right. reflexivity.
-        * erewrite ctx_to_heap_env_subheap. reflexivity.
-          eassumption. eassumption.
-      + exists H2'', rho2'', (s + s'). eapply ctx_to_heap_env_comp_ctx_f_r; eassumption.
+        * erewrite <- (project_var_heap _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ H9). eassumption.
+          eassumption.
+      + exists H2'', rho2'', (s + s'). eapply ctx_to_heap_env_CC_comp_ctx_f_r; eassumption.
   Qed.
   
 
@@ -679,7 +677,7 @@ Module ClosureConversionCorrect (H : Heap).
         Scope Funs c Γ FVs x x' C S S' m y y' :
     project_var Scope Funs c Γ FVs S x x' C S' ->
     cc_approx_var_env k j GII GI b H1 rho1 H2 rho2 y y' ->
-    ctx_to_heap_env C H2 rho2 H2' rho2' m ->
+    ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
     ~ y' \in S ->
     cc_approx_var_env k j GII GI b H1 rho1 H2' rho2' y y'.
   Proof.     
@@ -693,14 +691,14 @@ Module ClosureConversionCorrect (H : Heap).
         Scope Funs c Γ FVs xs xs' C S S' m y y' :
     project_vars Scope Funs c Γ FVs S xs xs' C S' ->
     cc_approx_var_env k j GII GI b H1 rho1 H2 rho2 y y' ->
-    ctx_to_heap_env C H2 rho2 H2' rho2' m ->
+    ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
     ~ y' \in S ->
     cc_approx_var_env k j GII GI b H1 rho1 H2' rho2' y y'.
   Proof.     
     intros Hvars. revert m H1 rho1 H2 rho2 H2' rho2'.
     induction Hvars; intros m H1 rho1 H2 rho2 H2' rho2' Hcc Hctx Hnin.
     - inv Hctx. eassumption.
-    - edestruct ctx_to_heap_env_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]]; eauto.
+    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]]; eauto.
       subst.
       eapply IHHvars; [| eassumption | ].
       eapply project_var_preserves_cc_approx; try eassumption.
@@ -717,7 +715,7 @@ Module ClosureConversionCorrect (H : Heap).
     (forall j, Fun_inv k j GII GI b rho1 H1 rho2 H2 Scope Funs) ->
     (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
 
-    ctx_to_heap_env C H2 rho2 H2' rho2' m ->
+    ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
     
     binding_in_map Scope rho1 ->
     Disjoint _ S (FV_cc Scope Funs Γ) ->
@@ -789,7 +787,7 @@ Module ClosureConversionCorrect (H : Heap).
     (forall j, Fun_inv k j GII GI b rho1 H1 rho2 H2 Scope Funs) ->
     (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
 
-    ctx_to_heap_env C H2 rho2 H2' rho2' m ->
+    ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
 
     binding_in_map Scope rho1 -> 
     Disjoint _ S (FV_cc Scope Funs Γ) ->
@@ -805,7 +803,7 @@ Module ClosureConversionCorrect (H : Heap).
     - inv Hctx. split; [| split; [| split ; [| split ]]]; eauto.
       rewrite FromList_nil...
     - rewrite FromList_cons in *. 
-      edestruct ctx_to_heap_env_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]].
+      edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]].
       subst.
       eassumption. subst.
       edestruct project_var_correct as (Hd' & Hcc' & Hfun' & Hfv' & Hall');
@@ -893,14 +891,14 @@ Module ClosureConversionCorrect (H : Heap).
   (** Correctness of [Closure_conversion] *)
   Lemma Closure_conversion_correct (k : nat) (H1 H2 : heap block)
         (rho1 rho2 : env) (e1 e2 : exp) (C : exp_ctx)
-        (Scope Funs : Ensemble var) {ToMSet Funs} (FVs : list var)
+        (Scope Funs : Ensemble var) `{ToMSet Funs} (FVs : list var)
         (β : Inj) (c : cTag) (Γ : var) :
     (* [Scope] invariant *)
-    (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; PreG Funs; Post 0 ; β) (H2, rho2)) ->
+    (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; PreG Funs; (fun i => Post 0) ; β) (H2, rho2)) ->
     (* [Fun] invariant *)
-    (forall j, Fun_inv k j (Pre Hole_c) (Post 0) β rho1 H1 rho2 H2 Scope Funs) ->
+    (forall j, Fun_inv k j (PreG Funs) (fun i => Post 0) β rho1 H1 rho2 H2 Scope Funs) ->
     (* Free variables invariant *)
-    (forall j, FV_inv k j (Pre Hole_c) (Post 0) β rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
+    (forall j, FV_inv k j (PreG Funs) (fun i => Post 0) β rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
     (* location renaming is injective *)
     (* only needed to prove the lower bound *)
     injective_subdomain (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) β ->
@@ -923,18 +921,18 @@ Module ClosureConversionCorrect (H : Heap).
 
     
     (* [e'] is the closure conversion of [e] *)
-    Closure_conversion clo_tag Scope Funs c Γ FVs e1 e2 C ->
+    Closure_conversion Size.Util.clo_tag Scope Funs c Γ FVs e1 e2 C ->
     
-    (forall j, (e1, rho1, H1) ⪯ ^ (k ; j ; Pre ; PreG Funs ; PostL k ; PostL 0) (C |[ e2 ]|, rho2, H2)).
+    (forall j, (e1, rho1, H1) ⪯ ^ (k ; j ; Pre ; PreG Funs ; Post 0 ; fun i => Post 0) (C |[ e2 ]|, rho2, H2)).
   Proof with now eauto with Ensembles_DB.
-    revert H1 H2 rho1 rho2 e1 e2 C Scope Funs FVs σ β c Γ.
+    revert H1 H2 rho1 rho2 e1 e2 C Scope Funs H FVs β c Γ.
     induction k as [k IHk] using lt_wf_rec1.
-    intros H1 H2 rho1 rho2 e1 e2 C Scope Funs FVs σ β c Γ
-           Henv Hfun HFVs Hinjb Hwf1 Hlocs1 Hwf2 Hlocs2 Hnin Hbind Hun Hinj Hd Hcc.
+    intros H1 H2 rho1 rho2 e1 e2 C Scope Funs HMSet FVs β c Γ
+           Henv Hfun HFVs Hinjb Hwf1 Hlocs1 Hwf2 Hlocs2 Hnin Hbind Hun Hcc.
     induction e1 using exp_ind'; try clear IHe1.
     - (* case Econstr *)
-      assert (Hfv := Closure_conversion_pre_occurs_free_Included _ _ _ _ _ _ _ _ _ _ Hcc).
-      assert (Hfv' := Closure_conversion_occurs_free_Included _ _ _ _ _ _ _ _ _ _ Hcc Hun).
+      assert (Hfv := Closure_conversion_pre_occurs_free_Included _ _ _ _ _ _ _ _ Hcc).
+      assert (Hfv' := Closure_conversion_occurs_free_Included _ _ _ _ _ _ _ _ Hcc Hun).
       
       inv Hcc.
 
@@ -947,10 +945,12 @@ Module ClosureConversionCorrect (H : Heap).
       
       intros j.
       (* process right ctx *)
-      eapply cc_approx_exp_right_ctx_compat
-      with (ILi := fun c => PostL c k H1 rho1 (Econstr v t l e1)) (II := fun C => Pre C k);
-        [ now intros; eapply Post_transfer; eauto | now intros; eapply IP_ctx_to_heap_env; eauto
-          | | | | | eassumption | ].
+      eapply cc_approx_exp_right_ctx_compat;
+        [ | | | | | | eassumption | ].
+
+      eapply PostCtxCompat_vars_r. eassumption.
+
+      eapply PreCtxCompat_vars_r. eassumption.
       
       eapply well_formed_antimon. eapply reach'_set_monotonic. now eapply env_locs_monotonic; eauto.
       eassumption.
@@ -961,8 +961,6 @@ Module ClosureConversionCorrect (H : Heap).
       eapply Included_trans; [| eassumption ]. now eapply env_locs_monotonic; eauto.
       eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic; eauto.
       
-      rewrite <- plus_n_O.
-      replace (comp_ctx_f Hole_c C) with C by eauto.
       assert (Hwf2' := Hwf2).
       assert (Hlocs2' := Hlocs2). 
       eapply project_vars_well_formed' in Hwf2; try eassumption;
@@ -975,16 +973,13 @@ Module ClosureConversionCorrect (H : Heap).
       eapply binding_in_map_antimon; [| eassumption ]...
       
       (* process Econstr one the right and left *)
-      eapply cc_approx_exp_constr_compat 
-      with (ILi := fun c => PostL c k H rho1 (Econstr v t l e1))
-           (IIL2 := Pre Hole_c (k - cost H1 rho1 (Econstr v t l e1)));
-        [ | | | | | | | eassumption | | ]. 
-      + intros. eapply Post_timeout.  unfold Pre. unfold PostL.
-        intros. split. admit.
-        split. omega. admit.  
-      (* bounds timeout compat *)
-      + admit. (* bounds - pick F *)
-      + admit. (* pre - allocation *) (* TODO maybe we need less assumptions *)
+      eapply cc_approx_exp_constr_compat; [ | | | | | | | eassumption |  ].
+      + eapply PostConstrCompat. eapply (Hvars 0).
+        eapply project_vars_cost. eassumption.
+      + eapply PreConstrCompat. eapply (Hvars 0).
+      + eapply PostBase. simpl.
+        eapply le_trans.
+        eapply project_vars_cost. eassumption. omega.
       + eapply well_formed_antimon; [| eassumption ].
         eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
       + eapply project_vars_well_formed; eauto.
@@ -998,21 +993,17 @@ Module ClosureConversionCorrect (H : Heap).
         eapply well_formed_antimon.
         eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
         eassumption.
-      + admit. (* bounds -- find F *)
       + (* Inductive case *)  
         intros vs1 vs2 l1 l2 H1' H2'' Hleq Ha1 Ha2 Hr1 Hr2 Hall j1.
         (* monotonicity of the local invariant *) 
-        eapply cc_approx_exp_rel_mon
-        with (LP1 := PostL 0 (k - cost H1 rho1 (Econstr v t l e1)) H1' (M.set v (Loc l1) rho1) e1).
-
         assert (Hfeq : f_eq_subdomain (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) β (β {l1 ~> l2})).
-                { eapply f_eq_subdomain_extend_not_In_S_r; [| reflexivity ].
-                  intros Hc. eapply reachable_in_dom in Hc.
-                  edestruct Hc as [vc Hgetc]. erewrite alloc_fresh in Hgetc; eauto. congruence.
-                  eassumption. eassumption. }
+        { eapply f_eq_subdomain_extend_not_In_S_r; [| reflexivity ].
+          intros Hc. eapply reachable_in_dom in Hc.
+          edestruct Hc as [vc Hgetc]. erewrite alloc_fresh in Hgetc; eauto. congruence.
+          eassumption. eassumption. }
         (* Induction hypothesis *)
         { eapply IHk;
-          [ | | | | | | | | | | | | now apply Hinj | | eassumption ].  
+          [ | | | | | | | | | | | | eassumption ].
           * simpl in *. omega.
           * { intros j2.  
               eapply cc_approx_env_set_alloc_Constr with (b := β {l1 ~> l2});
@@ -1093,8 +1084,7 @@ Module ClosureConversionCorrect (H : Heap).
                   symmetry. eapply f_eq_subdomain_antimon; [| eassumption ].
                   eapply reach'_set_monotonic. eapply env_locs_monotonic...
               - intros Hc. inv Hc. eauto.
-              - intros Hc.
-                eapply Hd. constructor; eauto. eapply image_monotonic; eauto... }
+              - intros Hc. eapply Hc... }
           * intros j'.
             { eapply FV_inv_set_not_in_FVs.
               - eapply FV_inv_heap_mon; try (now eapply HL.alloc_subheap; eauto).
@@ -1183,8 +1173,8 @@ Module ClosureConversionCorrect (H : Heap).
             eapply Included_Union_compat. reflexivity.
             eapply Included_trans; [| eassumption ].
             eapply env_locs_monotonic. now eauto 20 with Ensembles_DB.
-          * assert (Hseq : (FV_cc (v |: Scope) Funs σ Γ) \subset
-                                                      (FV_cc Scope Funs σ Γ) :|: [set v]).
+          * assert (Hseq : (FV_cc (v |: Scope) Funs Γ) \subset
+                           (FV_cc Scope Funs Γ) :|: [set v]).
             { unfold FV_cc. eapply Union_Included; [| now eauto with Ensembles_DB ].
               eapply Union_Included; [| now eauto 20 with Ensembles_DB ].
               eapply Union_Included; [| now eauto with Ensembles_DB ]... }
@@ -1211,11 +1201,7 @@ Module ClosureConversionCorrect (H : Heap).
           * now eauto.
           * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
             now eauto 20 with Ensembles_DB.
-          * intros f Hfin. eauto.
-          * eapply Disjoint_Included_r;
-              [| eapply Disjoint_Included_l; [ apply image_monotonic | now apply Hd ]].
-            normalize_bound_var... now eauto with Ensembles_DB. }
-        { intros [c1 m1] [c2 m2].  admit. }        
+          * intros f Hfin. eauto. }
     - (* case Eproj *)
       inv Hcc.
       admit.

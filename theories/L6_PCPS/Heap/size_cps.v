@@ -441,8 +441,8 @@ Module Size (H : Heap).
 
   (* Cost for projecting vars *)
   Lemma project_var_cost 
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
+        Scope c Γ FVs S1 x x' C1 S2 :
+    project_var Scope c Γ FVs S1 x x' C1 S2 ->
     cost_ctx_full C1 <= 1.
   Proof.
     intros Hvar; inv Hvar; eauto.
@@ -450,8 +450,8 @@ Module Size (H : Heap).
 
     
   Lemma project_vars_cost 
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_vars Scope Funs c Γ FVs S1 x x' C1 S2 ->
+        Scope c Γ FVs S1 x x' C1 S2 :
+    project_vars Scope c Γ FVs S1 x x' C1 S2 ->
     cost_ctx_full C1 <= length x.
   Proof.
     intros Hvar. induction Hvar; eauto.
@@ -460,16 +460,16 @@ Module Size (H : Heap).
   Qed.
   
   Lemma project_var_cost_alloc
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
+        Scope c Γ FVs S1 x x' C1 S2 :
+    project_var Scope c Γ FVs S1 x x' C1 S2 ->
     cost_alloc_ctx C1 = 0.
   Proof.
     intros Hvar; inv Hvar; eauto.
   Qed.
   
   Lemma project_vars_cost_alloc
-        Scope Funs c Γ FVs S1 x x' C1 S2 :
-    project_vars Scope Funs c Γ FVs S1 x x' C1 S2 ->
+        Scope c Γ FVs S1 x x' C1 S2 :
+    project_vars Scope c Γ FVs S1 x x' C1 S2 ->
     cost_alloc_ctx C1 = 0.
   Proof.
     intros Hvar. induction Hvar; eauto.
@@ -478,8 +478,8 @@ Module Size (H : Heap).
   Qed.
 
   Lemma PreCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
-        Scope Funs c Γ FVs S x x' S':
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+        Scope c Γ FVs S x x' S':
+    project_var Scope c Γ FVs S x x' C S' ->
     IInvCtxCompat_r Pre Pre H1 H2 rho1 rho2 C e1 e2.
   Proof.
     intros Hvar.
@@ -490,8 +490,8 @@ Module Size (H : Heap).
   Qed.
 
   Lemma PostCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
-        Scope Funs c Γ FVs S x x' S':
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+        Scope c Γ FVs S x x' S':
+    project_var Scope c Γ FVs S x x' C S' ->
     InvCtxCompat_r (Post 0) (Post (cost_ctx_full C)) H1 H2 rho1 rho2 C e1 e2.
   Proof.
     unfold InvCtxCompat_r, Pre.
@@ -499,14 +499,14 @@ Module Size (H : Heap).
            b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx'.
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
     subst. 
-    assert (Heq := project_var_cost _ _ _ _ _ _ _ _ _ _ Hvar).  
+    assert (Heq := project_var_cost _ _ _ _ _ _ _ _ _ Hvar).  
     eapply project_var_heap in Hctx'; eauto. subst.
     unfold Post in *. omega.
   Qed.
 
   Lemma PreCtxCompat_vars_r H1 H2 rho1 rho2 C e1 e2
-        Scope Funs c Γ FVs S x x' S':
-    project_vars Scope Funs c Γ FVs S x x' C S' ->
+        Scope c Γ FVs S x x' S':
+    project_vars Scope c Γ FVs S x x' C S' ->
     IInvCtxCompat_r Pre Pre H1 H2 rho1 rho2 C e1 e2.
   Proof.
     intros Hvar.
@@ -517,8 +517,8 @@ Module Size (H : Heap).
   Qed.
 
   Lemma PostCtxCompat_vars_r H1 H2 rho1 rho2 C e1 e2
-        Scope Funs c Γ FVs S x x' S':
-    project_vars Scope Funs c Γ FVs S x x' C S' ->
+        Funs c Γ FVs S x x' S':
+    project_vars Funs c Γ FVs S x x' C S' ->
     InvCtxCompat_r (Post 0) (Post (cost_ctx_full C)) H1 H2 rho1 rho2 C e1 e2.
   Proof.
     unfold InvCtxCompat_r, Pre.
@@ -526,7 +526,7 @@ Module Size (H : Heap).
            b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx'.
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
     subst. 
-    assert (Heq := project_vars_cost _ _ _ _ _ _ _ _ _ _ Hvar).  
+    assert (Heq := project_vars_cost _ _ _ _ _ _ _ _ _ Hvar).  
     eapply project_vars_heap in Hctx'; eauto. subst.
     unfold Post in *. omega.
   Qed.

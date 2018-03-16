@@ -26,29 +26,24 @@ Module CCUtil (H : Heap).
   Module C := Compat H.
 
   Import H C C.LR C.LR.Sem C.LR.Sem.Equiv C.LR.Sem.Equiv.Defs.
-  
+
   Variable clo_tag : cTag.
 
   (** ** Proof that after closure conversion all functions are closed *)
 
-  Lemma project_var_occurs_free_ctx_Included Scope Funs c Γ FVs S x x' C S' F e:
-    project_var Scope Funs c Γ FVs S x x' C S' ->
-    Included _ (occurs_free e) (Union _ F (Singleton _ x')) ->
-    Included _ (FV_cc Scope Funs Γ) F ->
-    Included _ (occurs_free (C |[ e ]|)) F. 
+  Lemma project_var_occurs_free_ctx_Included Scope c Γ FVs S x x' C S' F e:
+    project_var Scope c Γ FVs S x x' C S' ->
+    (occurs_free e) \subset (Union _ F (Singleton _ x')) ->
+    (FV_cc Scope Γ) \subset F ->
+    (occurs_free (C |[ e ]|)) \subset F. 
   Proof with now eauto with Ensembles_DB functions_BD. 
     intros Hproj Hinc1 Hinc2. inv Hproj.
     - simpl. eapply Included_trans. eassumption. 
       apply Union_Included. now apply Included_refl.
       eapply Included_trans; [| eassumption ].
       eauto with Ensembles_DB.
-    - simpl. eapply Included_trans. eassumption. 
-      apply Union_Included. reflexivity.
-      eapply Included_trans; [| eassumption ].
-      eapply Singleton_Included. left. right.
-      constructor; eauto.
-    - simpl. rewrite occurs_free_Eproj.
-      eapply Union_Included.
+    - simpl. normalize_occurs_free.
+      eapply Union_Included. 
       + eapply Included_trans; [| now apply Hinc2 ]...
       + eauto with Ensembles_DB.
   Qed.
@@ -82,11 +77,11 @@ Module CCUtil (H : Heap).
         rewrite Setminus_Empty_set_neut_r in H
     end.
   
-  Lemma project_vars_occurs_free_ctx_Included Scope Funs c Γ
+  Lemma project_vars_occurs_free_ctx_Included Scope c Γ
     FVs S xs xs' C S' F e:
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     Included _ (occurs_free e)  (Union _ F (FromList xs')) ->
-    Included _ (FV_cc Scope Funs Γ) F ->
+    Included _ (FV_cc Scope Γ) F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
   Proof. 
     intros Hproj. revert F.
@@ -97,7 +92,7 @@ Module CCUtil (H : Heap).
       eapply IHHproj. rewrite <- Union_assoc. eassumption.
       eapply Included_trans. eassumption. now apply Included_Union_l.
   Qed.
-
+  
   Lemma make_closures_occurs_free_ctx_Included B Γ C F S e:
     unique_functions B ->
     make_closures clo_tag B S Γ C ->
@@ -128,16 +123,16 @@ Module CCUtil (H : Heap).
       eapply Included_trans; [| eassumption ]... 
   Qed.
 
-  Lemma project_var_free_funs_in_exp Scope Funs c Γ FVs S x x' C S' B e:
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_free_funs_in_exp Scope c Γ FVs S x x' C S' B e:
+    project_var Scope c Γ FVs S x x' C S' ->
     (funs_in_exp B (C |[ e ]|) <-> funs_in_exp B e).
   Proof. 
-    intros Hvar; inv Hvar; [ split; now eauto | split; now eauto |].
+    intros Hvar; inv Hvar; [ split; now eauto | ].
     (split; intros Hf; [ now inv Hf | now constructor ]).
   Qed.
 
-  Lemma project_vars_free_funs_in_exp Scope Funs c Γ FVs S xs xs' C S' B e:
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_free_funs_in_exp Scope c Γ FVs S xs xs' C S' B e:
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     (funs_in_exp B (C |[ e ]|) <-> funs_in_exp B e).
   Proof. 
     intros Hvar; induction Hvar; [ now eauto |].
@@ -164,11 +159,11 @@ Module CCUtil (H : Heap).
   Qed.
   
   Lemma Closure_conversion_occurs_free_Included_mut :
-    (forall e Scope Funs c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C)
+    (forall e Scope c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope c Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
-       occurs_free (C |[ e' ]|) \subset FV_cc Scope Funs Γ) /\
-    (forall B Funs c FVs B'
+       occurs_free (C |[ e' ]|) \subset FV_cc Scope Γ) /\
+    (forall B c Funs FVs B'
        (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (Hun: fundefs_names_unique_fundefs B) (Hun': fundefs_names_unique_fundefs Funs),
        (occurs_free_fundefs B') \subset (name_in_fundefs Funs) \\ (name_in_fundefs B')).
@@ -183,9 +178,10 @@ Module CCUtil (H : Heap).
       intros f Hunf. eapply Hun. now constructor.
       unfold FV_cc. now eauto 20 with Ensembles_DB. 
     - eapply project_var_occurs_free_ctx_Included;
-      [ eassumption | | now apply Included_refl ]. inv H10.
+      [ eassumption | | now apply Included_refl ].
+      inv H9.
       rewrite occurs_free_Ecase_nil. now apply Included_Union_r.
-    - inv H10. destruct y as [c' e'].
+    - inv H9. destruct y as [c' e'].
       inv H2. simpl in H; subst. destruct H0 as [C' [e'' [Heq Hcce]]]. simpl in Heq; subst. 
       eapply Included_trans. now eapply occurs_free_Ecase_ctx_app.
       apply Union_Included. 
@@ -226,12 +222,10 @@ Module CCUtil (H : Heap).
       intros f Hunf. eapply Hun. now constructor. 
       unfold FV_cc.
       eapply Union_Included; [ | now eauto with Ensembles_DB ].
-      eapply Union_Included.
-      eapply Union_Included.
+      eapply Union_Included ; [ | now eauto with Ensembles_DB ].
+      eapply Included_trans. eapply Included_Intersection_l...
       now eauto with Ensembles_DB.
-      repeat eapply Included_Union_preserv_l. reflexivity.
-      do 5 eapply Included_Union_preserv_l. 
-      eapply Included_Union_preserv_r...
+      eapply Union_Included ; [ | now eauto with Ensembles_DB ].
       rewrite closure_conversion_fundefs_Same_set; [| eassumption ]...
     - eapply project_vars_occurs_free_ctx_Included;
       [ eassumption | | now apply Included_refl ].
@@ -262,8 +256,12 @@ Module CCUtil (H : Heap).
         eapply Hun'. now eauto.
         eapply Included_trans. eapply IHe. eassumption.
         intros f Hunf. eapply Hun. left. now constructor. 
-        simpl.
-        rewrite FromList_cons. now eauto 30 with Ensembles_DB.
+        unfold FV_cc. simpl.
+        rewrite FromList_cons.
+        eapply Union_Included; [ | now eauto with Ensembles_DB ].
+        eapply Union_Included ; [ now eauto with Ensembles_DB | ].
+        eapply Included_trans. eapply Included_Intersection_l...
+        now eauto with Ensembles_DB.
         normalize_sets...
       + apply Setminus_Included_Included_Union.
         eapply Included_trans. eapply IHB. eassumption.
@@ -275,10 +273,10 @@ Module CCUtil (H : Heap).
   Qed.
   
   Corollary Closure_conversion_occurs_free_Included :
-    (forall e Scope Funs c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C)
+    (forall e Scope c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope c Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
-       occurs_free (C |[ e' ]|) \subset (FV_cc Scope Funs Γ)).
+       occurs_free (C |[ e' ]|) \subset (FV_cc Scope Γ)).
   Proof.
     now eapply Closure_conversion_occurs_free_Included_mut.
   Qed.
@@ -289,12 +287,13 @@ Module CCUtil (H : Heap).
        (Hun: fundefs_names_unique_fundefs B) (Hun': fundefs_names_unique_fundefs Funs),
        Included _ (occurs_free_fundefs B') (Setminus _ (name_in_fundefs Funs) (name_in_fundefs B'))).
   Proof.
-    now eapply Closure_conversion_occurs_free_Included_mut.
+    intros. 
+    eapply Closure_conversion_occurs_free_Included_mut; eauto.
   Qed.
-    
+  
   Lemma Closure_conversion_closed_fundefs_mut :
-    (forall e Scope Funs c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C)
+    (forall e Scope c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope c Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
        closed_fundefs_in_exp (C |[ e' ]|)) /\
     (forall B Funs c FVs B'
@@ -306,10 +305,10 @@ Module CCUtil (H : Heap).
     - intros B HB. rewrite project_vars_free_funs_in_exp in HB; [| eassumption ].
       inv HB. eapply IHe; [ eassumption | | eassumption ]. 
       intros B' H. eapply Hun. now constructor. 
-    - inv H10. 
+    - inv H9. 
       intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ].
       inv HB. inv H4.
-    - inv H10. destruct H2 as [Heq [C' [e' [Heq' Hcc']]]]. destruct y as [t e''].
+    - inv H9. destruct H2 as [Heq [C' [e' [Heq' Hcc']]]]. destruct y as [t e''].
       simpl in *; subst.
       intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ].
       inv HB. inv H5.
@@ -325,7 +324,7 @@ Module CCUtil (H : Heap).
       intros B' H. eapply Hun. now constructor. 
     - rewrite <- app_ctx_f_fuse. intros B HB.
       rewrite project_vars_free_funs_in_exp in HB; [| eassumption ].
-      simpl in HB. inv HB. inv H8.
+      simpl in HB. inv HB. inv H7.
       + split; [| now apply Included_Empty_set ].
         eapply Included_trans.
         eapply Closure_conversion_occurs_free_Included_mut. eassumption.
@@ -333,7 +332,7 @@ Module CCUtil (H : Heap).
         intros B HB. eapply Hun. inv HB; eauto.
         rewrite closure_conversion_fundefs_Same_set; [| eassumption ].
         rewrite Setminus_Same_set_Empty_set. now apply Included_Empty_set.
-      + rewrite make_closures_funs_in_exp in H9; [| eassumption ].
+      + rewrite make_closures_funs_in_exp in H8; [| eassumption ].
         eapply IHe; [ eassumption | | eassumption ].
         intros B1 HB1. eapply Hun. now constructor.
       + eapply IHB; [ eassumption | | eassumption ].
@@ -357,15 +356,15 @@ Module CCUtil (H : Heap).
 
   (** * Lemmas about [project_var] and [project_vars] *)
 
-  Lemma project_var_free_set_Included Scope Funs c Γ FVs x x' C S S' :
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_free_set_Included Scope c Γ FVs x x' C S S' :
+    project_var Scope c Γ FVs S x x' C S' ->
     Included _ S' S.
   Proof with now eauto with Ensembles_DB.
     intros Hproj. inv Hproj...
   Qed.
 
-  Lemma project_vars_free_set_Included Scope Funs c Γ FVs xs xs' C S S' :
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_free_set_Included Scope c Γ FVs xs xs' C S S' :
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     Included _ S' S.
   Proof.
     intros Hproj. induction Hproj.
@@ -374,25 +373,19 @@ Module CCUtil (H : Heap).
       eapply project_var_free_set_Included. eassumption. 
   Qed.
 
-  Lemma project_var_not_In_free_set Scope Funs c Γ FVs x x' C S S'  :
-    project_var Scope Funs c Γ FVs S x x' C S' ->
-    Disjoint _ S (Union var Scope
-                        (Union var (Setminus _ Funs Scope)
-                               (Union var (FromList FVs) (Singleton var Γ)))) ->
+  Lemma project_var_not_In_free_set Scope c Γ FVs x x' C S S'  :
+    project_var Scope c Γ FVs S x x' C S' ->
+    Disjoint _ S Scope ->
     ~ In _ S' x'.
   Proof.
     intros Hproj Hd. inv Hproj; intros Hc.
-    - eapply Hd. eauto.
-    - eapply Hd; eauto. constructor; eauto. right. left.
-      eexists; eauto.
+    - eapply Hd. constructor; eauto.
     - inv Hc. exfalso. eauto.    
   Qed.
-
-  Lemma project_vars_not_In_free_set Scope Funs c Γ FVs xs xs' C S S'  :
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
-    Disjoint _ S (Union var Scope
-                        (Union var (Setminus _ Funs Scope)
-                               (Union var (FromList FVs) (Singleton var Γ)))) ->
+  
+  Lemma project_vars_not_In_free_set Scope c Γ FVs xs xs' C S S'  :
+    project_vars Scope c Γ FVs S xs xs' C S' ->
+    Disjoint _ S Scope  ->
     Disjoint _ S' (FromList xs').
   Proof.
     intros Hproj Hd. induction Hproj.
@@ -410,19 +403,17 @@ Module CCUtil (H : Heap).
         eassumption.
   Qed.
 
-  Lemma project_var_In_Union Scope Funs c Γ FVs S x x' C S' :
-    project_var Scope Funs c Γ FVs S x x' C S' ->
-    x \in (FV Scope Funs FVs).
+  Lemma project_var_In_Union Scope c Γ FVs S x x' C S' :
+    project_var Scope c Γ FVs S x x' C S' ->
+    x \in (FV Scope FVs).
   Proof.
     unfold FV. intros Hvar. inv Hvar; eauto.
-    left; right. constructor; eauto.
     right. constructor; eauto. eapply nthN_In. eassumption.
-    intros Hc; inv Hc; eauto. 
   Qed.
 
-  Lemma project_vars_In_Union Scope Funs c Γ FVs S xs xs' C S' :
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
-    (FromList xs) \subset (FV Scope Funs FVs).
+  Lemma project_vars_In_Union Scope c Γ FVs S xs xs' C S' :
+    project_vars Scope c Γ FVs S xs xs' C S' ->
+    (FromList xs) \subset (FV Scope FVs).
   Proof.
     intros Hvar. induction Hvar; eauto.
     - rewrite FromList_nil. now apply Included_Empty_set.
@@ -432,25 +423,21 @@ Module CCUtil (H : Heap).
       eassumption.
   Qed.
   
-  Lemma project_var_not_In Scope Funs c Γ FVs S x x' C S' :
-    Disjoint _ S (FV Scope Funs FVs) ->
-    
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_not_In Scope c Γ FVs S x x' C S' :
+    Disjoint _ S (FV Scope FVs) ->    
+    project_var Scope c Γ FVs S x x' C S' ->
     ~ In _ S x.
   Proof.
     intros Hd Hproj Hin. inv Hproj.
     - eapply Hd. constructor; eauto. left; eauto.
-    - eapply Hd. constructor; eauto. left; eauto.
-      right. constructor; eauto.
     - eapply Hd; eauto. constructor. now apply Hin.
       right. constructor; eauto.
-      eapply nthN_In in H1. eassumption.
-      intros Hc; inv Hc; eauto.
+      eapply nthN_In. eassumption.
   Qed.
 
-  Lemma project_vars_Disjoint Scope Funs c Γ FVs S xs xs' C S' :
-    Disjoint _ S (FV Scope Funs FVs) ->      
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_Disjoint Scope c Γ FVs S xs xs' C S' :
+    Disjoint _ S (FV Scope FVs) ->      
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     Disjoint _ S (FromList xs).
   Proof.
     revert xs' C S S'; induction xs; intros xs' C S S' Hd Hproj.
@@ -458,26 +445,23 @@ Module CCUtil (H : Heap).
     - inv Hproj. rewrite FromList_cons.
       eapply Union_Disjoint_r.
       eapply Disjoint_Singleton_r. eapply project_var_not_In; eauto.
-      inv H7.
+      inv H6.
       + eapply IHxs; [| eassumption ]. eauto.
-      + eauto.
       + assert (Hd1 : Disjoint _ (Setminus var S (Singleton var y'))
                                (FromList xs))
           by (eapply IHxs; eauto with Ensembles_DB).
-        eapply project_vars_In_Union in H11.
+        eapply project_vars_In_Union in H10.
         eapply Disjoint_Included_r. eassumption.
         eauto with Ensembles_DB.
   Qed.
-
+  
   Lemma Closure_conversion_pre_occurs_free_Included_mut :
-    (forall e Scope Funs c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C),
-       (* (Hun: fundefs_names_unique e), *)
-       occurs_free e \subset FV Scope Funs FVs) /\
-    (forall B Funs c FVs B'
+    (forall e Scope c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope c Γ FVs e e' C),
+       occurs_free e \subset FV Scope FVs) /\
+    (forall B c Funs FVs B'
        (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (HD : FromList FVs <--> occurs_free_fundefs B),
-       (* (Hun: fundefs_names_unique_fundefs B) (Hun': fundefs_names_unique_fundefs Funs), *)
        occurs_free_fundefs B \subset FromList FVs).
   Proof with now eauto with Ensembles_DB functions_BD.
     exp_defs_induction IHe IHl IHB; intros; inv Hcc.
@@ -491,7 +475,7 @@ Module CCUtil (H : Heap).
     - normalize_occurs_free. eapply Union_Included.
       + eapply Singleton_Included.
         eapply project_var_In_Union. eassumption.
-      + inv H10. simpl in H2. destruct H2 as (Heq & C' & e' & Heq' & Hcc).
+      + inv H9. simpl in H2. destruct H2 as (Heq & C' & e' & Heq' & Hcc).
         destruct y; simpl in *; subst.
         eapply Union_Included.
         now eapply IHe; eauto.
@@ -508,7 +492,11 @@ Module CCUtil (H : Heap).
         eapply project_vars_In_Union; eauto.
       + eapply Included_trans. eapply Included_Setminus_compat.
         now eapply IHe; eauto. reflexivity.
-        now eauto 20 with Ensembles_DB. 
+        eapply Setminus_Included_Included_Union. unfold FV.
+        eapply Union_Included; [| now eauto with Ensembles_DB ].
+        eapply Union_Included; [| now eauto with Ensembles_DB ].
+        eapply Included_trans. eapply Included_Intersection_l...
+        now eauto with Ensembles_DB. 
     - normalize_occurs_free. inv H3. eapply Union_Included.
       + eapply project_vars_In_Union. eassumption.
       + eapply Singleton_Included.
@@ -526,9 +514,9 @@ Module CCUtil (H : Heap).
   Qed.
   
   Corollary Closure_conversion_pre_occurs_free_Included :
-    (forall e Scope Funs c Γ FVs e' C 
-       (Hcc : Closure_conversion clo_tag Scope Funs c Γ FVs e e' C),
-       occurs_free e \subset FV Scope Funs FVs).
+    (forall e Scope c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope c Γ FVs e e' C),
+       occurs_free e \subset FV Scope FVs).
   Proof.
     now apply Closure_conversion_pre_occurs_free_Included_mut.
   Qed.
@@ -539,8 +527,9 @@ Module CCUtil (H : Heap).
        (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B')
        (HD : FromList FVs <--> occurs_free_fundefs B),
        occurs_free_fundefs B \subset FromList FVs).
-  Proof. 
-     now apply Closure_conversion_pre_occurs_free_Included_mut.
+  Proof.
+    intros. 
+    eapply Closure_conversion_pre_occurs_free_Included_mut; eauto.
   Qed.
   
  
@@ -552,62 +541,28 @@ Module CCUtil (H : Heap).
     intros Hcc; induction Hcc; eauto; simpl. congruence.
   Qed.
 
-  Lemma project_var_not_In_free_set' Scope Funs c Γ FVs x x' C S S'  :
-    project_var Scope Funs c Γ FVs S x x' C S' ->
-    Disjoint _ S (Scope :|: (Funs \\ Scope)) ->
-    ~ In _ S' x'.
-  Proof.
-    intros Hproj Hd. inv Hproj; intros Hc.
-    - eapply Hd. eauto.
-    - eapply Hd; eauto. constructor; eauto. right.
-      eexists; eauto.
-    - inv Hc. exfalso. eauto.    
-  Qed.
-
-  Lemma project_vars_not_In_free_set' Scope Funs c Γ FVs xs xs' C S S' :
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
-    Disjoint _ S (Scope :|: (Funs \\ Scope)) ->
-    Disjoint _ S' (FromList xs').
-  Proof.
-    intros Hproj Hd. induction Hproj.
-    - constructor. intros x Hc. inv Hc. rewrite FromList_nil in H0.
-      eapply not_In_Empty_set. eassumption. 
-    - rewrite FromList_cons. eapply Disjoint_sym.
-      eapply Union_Disjoint_l.
-      + eapply Disjoint_Included_r_sym.
-        eapply project_vars_free_set_Included; eassumption.
-        eapply Disjoint_Singleton_r.
-        eapply project_var_not_In_free_set'; eassumption. 
-      + eapply Disjoint_sym. eapply IHHproj.
-        eapply Disjoint_Included_l.
-        eapply project_var_free_set_Included. eassumption.
-        eassumption.
-  Qed.
-
-
-  Lemma project_var_get Scope Funs c Γ FVs S1 x x' C1 S2 rho1 H1 rho2 H2 m y:
-    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
+  Lemma project_var_get Scope c Γ FVs S1 x x' C1 S2 rho1 H1 rho2 H2 m y:
+    project_var Scope c Γ FVs S1 x x' C1 S2 ->
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     ~ In _ S1 y ->
     M.get y rho1 = M.get y rho2. 
   Proof.
     intros Hvar Hctx Hin. inv Hvar.
     - inv Hctx. reflexivity.
-    - inv Hctx. reflexivity.
-    - inv Hctx. inv H19.
+    - inv Hctx. inv H18.
       destruct (var_dec y x'); subst.
       contradiction.
       now rewrite M.gso.
   Qed.    
   
-  Lemma project_vars_get Scope Funs c Γ FVs S1 xs xs' C1 S2 rho1 H1 rho2 H2 m y:
-    project_vars Scope Funs c Γ FVs S1 xs xs' C1 S2 ->
+  Lemma project_vars_get Scope c Γ FVs S1 xs xs' C1 S2 rho1 H1 rho2 H2 m y:
+    project_vars Scope c Γ FVs S1 xs xs' C1 S2 ->
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     ~ In _ S1 y ->
     M.get y rho1 = M.get y rho2. 
   Proof.
-    revert Scope Funs Γ FVs S1 xs' C1 S2 rho1 H1 rho2 H2 m y.
-    induction xs; intros Scope Funs Γ FVs S1 xs' C1 S2 rho1 H1 rho2 H2 m y Hproj Hctx Hnin.
+    revert Scope Γ FVs S1 xs' C1 S2 rho1 H1 rho2 H2 m y.
+    induction xs; intros Scope Γ FVs S1 xs' C1 S2 rho1 H1 rho2 H2 m y Hproj Hctx Hnin.
     - inv Hproj. inv Hctx. reflexivity.
     - inv Hproj.  
       edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho'' [H'' [m1 [m2  [Hctx1 [Hctx2 Hadd]]]]]]; eauto.
@@ -618,8 +573,8 @@ Module CCUtil (H : Heap).
       eapply project_var_free_set_Included; eassumption.
   Qed.
   
-  Lemma project_var_getlist Scope Funs c Γ FVs S1 x x' C1 S2 rho1 H1 rho2 H2 m ys :
-    project_var Scope Funs c Γ FVs S1 x x' C1 S2 ->
+  Lemma project_var_getlist Scope c Γ FVs S1 x x' C1 S2 rho1 H1 rho2 H2 m ys :
+    project_var Scope c Γ FVs S1 x x' C1 S2 ->
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     Disjoint _ S1 (FromList ys) ->
     getlist ys rho1 = getlist ys rho2. 
@@ -635,8 +590,8 @@ Module CCUtil (H : Heap).
   Qed.        
 
 
-  Lemma project_vars_getlist Scope Funs c Γ FVs S1 xs xs' C1 S2 rho1 H1 rho2 H2 m ys :
-    project_vars Scope Funs c Γ FVs S1 xs xs' C1 S2 ->
+  Lemma project_vars_getlist Scope c Γ FVs S1 xs xs' C1 S2 rho1 H1 rho2 H2 m ys :
+    project_vars Scope c Γ FVs S1 xs xs' C1 S2 ->
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     Disjoint _ S1 (FromList ys) ->
     getlist ys rho1 = getlist ys rho2. 
@@ -652,8 +607,8 @@ Module CCUtil (H : Heap).
   Qed.        
 
   (** [project_var] preserves env_locs in dom *)
-  Lemma project_var_env_locs Scope Funs c Γ FVs x x' C S S' e k rho H rho' H':
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_env_locs Scope c Γ FVs x x' C S S' e k rho H rho' H':
+    project_var Scope c Γ FVs S x x' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
     env_locs rho (occurs_free (C |[ e ]|)) \subset dom H ->
@@ -661,8 +616,7 @@ Module CCUtil (H : Heap).
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar Hctx Hlocs Hwf. inv Hvar; inv Hctx.
     - simpl in *; eauto.
-    - simpl in *; eauto.
-    - inv H18.
+    - inv H17.
       eapply Included_trans. eapply env_locs_set_Inlcuded'.
       simpl. eapply Union_Included.
       + eapply Included_trans; [| eapply reachable_in_dom; eauto ].
@@ -677,25 +631,18 @@ Module CCUtil (H : Heap).
       + eapply Included_trans; [| eassumption ]. simpl. normalize_occurs_free...
   Qed.
   
-  Lemma project_var_env_locs' Scope Funs c Γ FVs x x' C S S' k rho H rho' H':
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_env_locs' Scope c Γ FVs x x' C S S' k rho H rho' H':
+    project_var Scope c Γ FVs S x x' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
-    well_formed (reach' H (env_locs rho (FV_cc Scope Funs Γ))) H ->
-    env_locs rho (FV_cc Scope Funs Γ) \subset dom H ->
-    env_locs rho' (x' |: (FV_cc Scope Funs Γ)) \subset dom  H'.
+    well_formed (reach' H (env_locs rho (FV_cc Scope Γ))) H ->
+    env_locs rho (FV_cc Scope Γ) \subset dom H ->
+    env_locs rho' (x' |: (FV_cc Scope Γ)) \subset dom  H'.
   Proof with (now eauto with Ensembles_DB). 
     unfold FV_cc. rewrite !Union_assoc.
     intros Hvar Hctx Hlocs Hwf. inv Hvar; inv Hctx.
     - repeat rewrite (Union_Same_set [set x']) at 1. eassumption.
       eapply Singleton_Included; eauto.
-    - rewrite (Union_commut [set x']) at 1.
-      rewrite <- (Union_assoc Scope). rewrite (Union_Same_set [set _]).
-      eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic.
-      eapply Included_Union_compat; [| reflexivity ].
-      eapply Included_Union_compat. reflexivity. reflexivity.
-      eapply Singleton_Included; eauto.
-      constructor; eauto.
-    - inv H18.
+    - inv H17.
       eapply Included_trans. eapply env_locs_set_Inlcuded'.
       simpl. eapply Union_Included.
       + eapply Included_trans; [| eapply reachable_in_dom; eauto ].
@@ -713,8 +660,8 @@ Module CCUtil (H : Heap).
   Qed.
 
   (** [project_var] preserves well-formedness *)
-  Lemma project_var_well_formed Scope Funs c Γ FVs x x' C S S' e k rho H rho' H':
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_well_formed Scope c Γ FVs x x' C S S' e k rho H rho' H':
+    project_var Scope c Γ FVs S x x' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     (env_locs rho (occurs_free (C |[ e ]|))) \subset dom H ->
     well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
@@ -722,8 +669,7 @@ Module CCUtil (H : Heap).
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar Hctx Hlocs Hwf. inv Hvar; inv Hctx.
     - simpl; eauto.
-    - simpl; eauto.
-    - inv H18.
+    - inv H17.
       eapply well_formed_antimon; [| eapply well_formed_reach_set; try eassumption ].
       + eapply reach'_set_monotonic. eapply env_locs_monotonic.
         simpl. normalize_occurs_free.
@@ -740,14 +686,14 @@ Module CCUtil (H : Heap).
         eapply nthN_In. eassumption.
   Qed.
   
-  Lemma project_var_reachable Scope Funs c Γ FVs x x' C S S' e k rho H rho' H':
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_reachable Scope c Γ FVs x x' C S S' e k rho H rho' H':
+    project_var Scope c Γ FVs S x x' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     reach' H' (env_locs rho' (occurs_free e)) \subset
     reach' H (env_locs rho (occurs_free (C |[ e ]|))).
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar Hctx. inv Hvar; inv Hctx; try reflexivity.
-    - simpl. normalize_occurs_free. inv H18.
+    - simpl. normalize_occurs_free. inv H17.
       eapply Included_trans.
       eapply reach'_set_monotonic. eapply env_locs_set_Inlcuded'. 
       rewrite !env_locs_Union, !reach'_Union, env_locs_Singleton; eauto.
@@ -760,8 +706,8 @@ Module CCUtil (H : Heap).
       eapply nthN_In. eassumption.
   Qed.
   
-  Lemma project_vars_reachable Scope Funs c Γ FVs xs xs' C S S' e k rho H rho' H':
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_reachable Scope c Γ FVs xs xs' C S S' e k rho H rho' H':
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     reach' H' (env_locs rho' (occurs_free e)) \subset
     reach' H (env_locs rho (occurs_free (C |[ e ]|))).
@@ -777,22 +723,19 @@ Module CCUtil (H : Heap).
   Qed.
 
   (** [project_var] preserves well-formedness *)
-  Lemma project_var_well_formed' Scope Funs c Γ FVs x x' C S S' k rho H rho' H':
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_well_formed' Scope c Γ FVs x x' C S S' k rho H rho' H':
+    project_var Scope c Γ FVs S x x' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
-    (env_locs rho (FV_cc Scope Funs Γ)) \subset dom H ->
-    well_formed (reach' H (env_locs rho (FV_cc Scope Funs Γ))) H ->
-    well_formed (reach' H' (env_locs rho' (x' |: (FV_cc Scope Funs Γ)))) H'.
+    (env_locs rho (FV_cc Scope Γ)) \subset dom H ->
+    well_formed (reach' H (env_locs rho (FV_cc Scope Γ))) H ->
+    well_formed (reach' H' (env_locs rho' (x' |: (FV_cc Scope Γ)))) H'.
   Proof with (now eauto with Ensembles_DB). 
     unfold FV_cc. rewrite !Union_assoc.
     intros Hvar Hctx Hlocs Hwf. inv Hvar; inv Hctx.
     - simpl; eauto. rewrite (Union_Same_set [set x']).
       eassumption.
       eapply Singleton_Included...
-    - rewrite (Union_commut [set x']).
-      rewrite <- (Union_assoc Scope). rewrite (Union_Same_set [set _]). eassumption.
-      eapply Singleton_Included; eauto. constructor; eauto.
-    - inv H18.
+    - inv H17.
       eapply well_formed_antimon; [| eapply well_formed_reach_set; try eassumption ].
       + eapply reach'_set_monotonic. eapply env_locs_monotonic.
         now eauto 20 with Ensembles_DB.
@@ -808,19 +751,19 @@ Module CCUtil (H : Heap).
         eapply nthN_In. eassumption.
   Qed.
   
-  Lemma project_var_env_locs_subset Scope Funs c Γ FVs xs xs' C S S' S1 k rho H rho' H':
-    project_var Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_var_env_locs_subset Scope c Γ FVs xs xs' C S S' S1 k rho H rho' H':
+    project_var Scope c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     Disjoint _ S1 S ->
     env_locs rho' S1 <--> env_locs rho S1.
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar Hctx HD. destruct Hvar; inv Hctx; try reflexivity.
-    - inv H18. rewrite env_locs_set_not_In. reflexivity. 
+    - inv H17. rewrite env_locs_set_not_In. reflexivity. 
       intros Hc; eapply HD; eauto.
   Qed.
   
-   Lemma project_vars_env_locs_subset Scope Funs c Γ FVs xs xs' C S S' S1 k rho H rho' H':
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+   Lemma project_vars_env_locs_subset Scope c Γ FVs xs xs' C S S' S1 k rho H rho' H':
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     Disjoint _ S1 S ->
     env_locs rho' S1 <--> env_locs rho S1.
@@ -835,17 +778,17 @@ Module CCUtil (H : Heap).
       eapply project_var_free_set_Included; eauto.
   Qed.
 
-  Lemma project_var_heap Scope Funs c Γ FVs x x' S S' C H rho H' rho' k :
-    project_var Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_var_heap Scope c Γ FVs x x' S S' C H rho H' rho' k :
+    project_var Scope c Γ FVs S x x' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     H = H'. 
   Proof.
     intros Hvar Hctx; inv Hvar; inv Hctx; eauto.
-    inv H18; eauto.
+    inv H17; eauto.
   Qed.
 
-  Lemma project_vars_heap Scope Funs c Γ FVs x x' S S' C H rho H' rho' k :
-    project_vars Scope Funs c Γ FVs S x x' C S' ->
+  Lemma project_vars_heap Scope c Γ FVs x x' S S' C H rho H' rho' k :
+    project_vars Scope c Γ FVs S x x' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     H = H'. 
   Proof.
@@ -858,8 +801,8 @@ Module CCUtil (H : Heap).
       subst. eapply IHHvar; eauto.
   Qed.
 
-  Lemma project_vars_env_locs Scope Funs c Γ FVs xs xs' C S S' e k rho H rho' H':
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_env_locs Scope c Γ FVs xs xs' C S S' e k rho H rho' H':
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     (env_locs rho (occurs_free (C |[ e ]|))) \subset dom H ->
     well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
@@ -876,13 +819,13 @@ Module CCUtil (H : Heap).
       eapply project_var_well_formed; try eassumption. 
   Qed.
     
-  Lemma project_vars_env_locs' Scope Funs c Γ FVs xs xs' C S S' k rho H rho' H':
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_env_locs' Scope c Γ FVs xs xs' C S S' k rho H rho' H':
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
-    Disjoint _ S (Scope :|: (Funs \\ Scope)) ->
-    well_formed (reach' H (env_locs rho (FV_cc Scope Funs Γ))) H ->
-    env_locs rho (FV_cc Scope Funs Γ) \subset dom H ->
-    env_locs rho' (FromList xs' :|: (FV_cc Scope Funs Γ)) \subset dom  H'.
+    Disjoint _ S Scope  ->
+    well_formed (reach' H (env_locs rho (FV_cc Scope Γ))) H ->
+    env_locs rho (FV_cc Scope Γ) \subset dom H ->
+    env_locs rho' (FromList xs' :|: (FV_cc Scope Γ)) \subset dom  H'.
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar. revert rho H rho' H' k. 
     induction Hvar; intros rho1 H1 rho2 H2 k Hctx Hd Hlocs Hwf.
@@ -896,7 +839,7 @@ Module CCUtil (H : Heap).
       eapply project_vars_env_locs_subset in Hvar; eauto.
       rewrite Hvar. eapply Included_trans; [| eapply project_var_env_locs'; eauto ].
       eapply env_locs_monotonic...
-      eapply Disjoint_Singleton_l. eapply project_var_not_In_free_set'. eassumption.
+      eapply Disjoint_Singleton_l. eapply project_var_not_In_free_set. eassumption.
       eapply Disjoint_Included_r; [| eassumption ]...
       eapply IHHvar; eauto.
       eapply Disjoint_Included_l. eapply project_var_free_set_Included. eassumption.
@@ -907,8 +850,8 @@ Module CCUtil (H : Heap).
       eapply env_locs_monotonic...
   Qed.
   
-  Lemma project_vars_well_formed Scope Funs c Γ FVs xs xs' C S S' e k rho H rho' H':
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_well_formed Scope c Γ FVs xs xs' C S S' e k rho H rho' H':
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
     (env_locs rho (occurs_free (C |[ e ]|))) \subset dom H ->
     well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
@@ -925,13 +868,13 @@ Module CCUtil (H : Heap).
       eapply project_var_well_formed; try eassumption. 
   Qed.
   
-  Lemma project_vars_well_formed' Scope Funs c Γ FVs xs xs' C S S' k rho H rho' H':
-    project_vars Scope Funs c Γ FVs S xs xs' C S' ->
+  Lemma project_vars_well_formed' Scope c Γ FVs xs xs' C S S' k rho H rho' H':
+    project_vars Scope c Γ FVs S xs xs' C S' ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
-    Disjoint _ S (Scope :|: (Funs \\ Scope)) ->
-    (env_locs rho (FV_cc Scope Funs Γ)) \subset dom H ->
-    well_formed (reach' H (env_locs rho (FV_cc Scope Funs Γ))) H ->
-    well_formed (reach' H' (env_locs rho' (FromList xs' :|: (FV_cc Scope Funs Γ)))) H'.
+    Disjoint _ S Scope ->
+    (env_locs rho (FV_cc Scope Γ)) \subset dom H ->
+    well_formed (reach' H (env_locs rho (FV_cc Scope Γ))) H ->
+    well_formed (reach' H' (env_locs rho' (FromList xs' :|: (FV_cc Scope Γ)))) H'.
   Proof with (now eauto with Ensembles_DB). 
     intros Hvar. revert rho H rho' H' k. 
     induction Hvar; intros rho1 H1 rho2 H2 k Hctx HD Hlocs Hwf.
@@ -947,7 +890,7 @@ Module CCUtil (H : Heap).
       rewrite Hvar.
       eapply well_formed_antimon; [| eapply project_var_well_formed' ]; eauto.
       eapply reach'_set_monotonic. eapply env_locs_monotonic...
-      eapply Disjoint_Singleton_l. eapply project_var_not_In_free_set'.
+      eapply Disjoint_Singleton_l. eapply project_var_not_In_free_set.
       eassumption.
       eapply Disjoint_Included_r; [| eassumption ]...
       eapply IHHvar; eauto.

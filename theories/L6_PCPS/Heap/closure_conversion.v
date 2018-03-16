@@ -161,7 +161,7 @@ Section CC.
         In _ S3 Γ' ->
         make_closures B (occurs_free e)  Γ' C ->
         Closure_conversion_fundefs B c' FVs' B B' ->
-        Closure_conversion ((name_in_fundefs B) :|: Scope) Funs c Γ FVs e e' Ce  ->
+        Closure_conversion ((name_in_fundefs B :&: (occurs_free e)) :|: Scope) Funs c Γ FVs e e' Ce  ->
         Closure_conversion Scope Funs c Γ FVs (Efun B e)
                            (Efun B' (C |[ Ce |[ e' ]| ]|)) (comp_ctx_f C' (Econstr_c Γ' c' FVs'' Hole_c))
   | CC_Eapp :
@@ -204,7 +204,8 @@ Section CC.
              In _ S  Γ' ->
              make_closures B ((occurs_free e) \\ FromList ys) Γ' Cf -> 
              Closure_conversion_fundefs B c FVs defs defs' ->
-             Closure_conversion (FromList ys) (name_in_fundefs B) c Γ' FVs e e' C ->
+             Closure_conversion (FromList ys) (name_in_fundefs B :&: ((occurs_free e) \\ FromList ys))
+                                c Γ' FVs e e' C ->
              Closure_conversion_fundefs B c FVs (Fcons f t ys e defs )
                                         (Fcons f t (Γ' :: ys) (Cf |[ (C |[ e' ]|) ]|) defs')
        | CC_Fnil :

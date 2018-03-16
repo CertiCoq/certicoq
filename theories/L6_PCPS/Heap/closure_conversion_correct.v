@@ -937,43 +937,49 @@ Module ClosureConversionCorrect (H : Heap).
       eapply Included_trans; [| eassumption ]...
   Qed.
   
-  Corollary make_closures_env_locs B fvset Γ C H rho H' rho' k e:
-    make_closures Size.Util.clo_tag B fvset Γ C ->
+  Corollary make_closures_env_locs B fvs Γ C H rho H' rho' k S :
+    make_closures Size.Util.clo_tag B fvs Γ C ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
-    env_locs rho (occurs_free (C |[ e ]|)) \subset dom H ->
-    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
-    env_locs rho' (occurs_free e) \subset dom H'.
+    name_in_fundefs B \subset S ->
+    Γ \in S ->
+    env_locs rho S \subset dom H ->
+    well_formed (reach' H (env_locs rho S)) H ->
+    env_locs rho' S \subset dom H'.
   Proof with (now eauto with Ensembles_DB).
     eapply make_closures_env_locs_well_formed.
   Qed.
 
-  Corollary make_closures_well_formed B fvset Γ C H rho H' rho' k e:
-    make_closures Size.Util.clo_tag B fvset Γ C ->
+  Corollary make_closures_well_formed B fvs Γ C H rho H' rho' k S:
+    make_closures Size.Util.clo_tag B fvs Γ C ->
     ctx_to_heap_env_CC C H rho H' rho' k ->
-    env_locs rho (occurs_free (C |[ e ]|)) \subset dom H ->
-    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H ->
-    well_formed (reach' H (env_locs rho (occurs_free (C |[ e ]|)))) H.
+    name_in_fundefs B \subset S ->
+    Γ \in S ->
+    env_locs rho S \subset dom H ->
+    well_formed (reach' H (env_locs rho S)) H ->
+    well_formed (reach' H (env_locs rho S)) H.
   Proof with (now eauto with Ensembles_DB).
     eapply make_closures_env_locs_well_formed.
   Qed.
 
-  Definition pre_Fun_inv k j IP P b rho1 H1 rho2 H2 Funs Γ :=
-    forall f, f \in Funs ->
-         exists l1 v1 v2 b1,
-           M.get f rho1 = Some (Loc l1) /\
-           get l1 H1 = Some b1 /\
-           M.get f rho2 = Some v1 /\
-           M.get Γ rho2 = Some v2 /\
-           cc_approx_block k j IP P b b1 H1 (Constr Size.Util.clo_tag [v1; v2]) H2.     
+  (* Definition pre_Fun_inv k j IP P b rho1 H1 rho2 H2 Funs Γ := *)
+  (*   forall f, f \in Funs -> *)
+  (*        exists l1 v1 v2 b1, *)
+  (*          M.get f rho1 = Some (Loc l1) /\ *)
+  (*          get l1 H1 = Some b1 /\ *)
+  (*          M.get f rho2 = Some v1 /\ *)
+  (*          M.get Γ rho2 = Some v2 /\ *)
+  (*          cc_approx_block k j IP P b b1 H1 (Constr Size.Util.clo_tag [v1; v2]) H2.      *)
 
 
- Lemma make_closures_Fun_inv k j GI GP b C rho1 H1 rho2 H2 rho2' H2' Scope Funs B Γ fvs m :
+  Lemma make_closures_Fun_inv k j GI GP b C rho1 H1 rho2 H1' rho1' H2 rho2'
+        H2' Scope Funs B1 B2 B1' B2'
+        Γ fvs B' fvs' m l1 l2 :
 
-   well_formed (reach' H1 (env_locs rho1 ())) H1 ->
-   env_locs rho1 (Scope :|: (name_in_fundefs B1)) \subset dom H1  ->
-   well_formed (reach' H2 (env_locs rho2 (fvs :|: Funs :|: [set Γ]))) H2 ->
-   env_locs rho2 (fvs :|: Funs :|: [set Γ]) \subset dom H2  ->
-   injective_subdomain (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) b ->
+   (* well_formed (reach' H1 (env_locs rho1 ())) H1 -> *)
+   (* env_locs rho1 (Scope :|: (name_in_fundefs B1)) \subset dom H1  -> *)
+   (* well_formed (reach' H2 (env_locs rho2 (fvs :|: Funs :|: [set Γ]))) H2 -> *)
+   (* env_locs rho2 (fvs :|: Funs :|: [set Γ]) \subset dom H2  -> *)
+   (* injective_subdomain (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) b -> *)
 
    Closure_conversion_fundefs B' Size.Util.clo_tag fvs' B1 B2 ->
    make_closures Size.Util.clo_tag B1 fvs Γ C ->
@@ -985,9 +991,9 @@ Module ClosureConversionCorrect (H : Heap).
       f \in name_in_fundefs B1 ->
       exists B2',
         get f rho2 = Some (FunPtr B2' f) /\
-        cc_approx_block k j IP P b b1
-                        (Clos (FunPtr B1' f') (Loc l1)) H1
-                        (Constr Size.Util.clo_tag [FunPtr B2' f'; Loc l2]) H2) ->
+        cc_approx_block k j GI GP b
+                        (Clos (FunPtr B1' f) (Loc l1)) H1
+                        (Constr Size.Util.clo_tag [FunPtr B2' f; Loc l2]) H2) ->
 
    ctx_to_heap_env C H2 rho2 H2' rho2' m ->
 
@@ -998,7 +1004,7 @@ Module ClosureConversionCorrect (H : Heap).
       Fun_inv k j GI GP b' rho1' H1' rho2' H2'
               Scope (name_in_fundefs B1 :&: fvs) /\
       (* (H1', rho1') ⋞ ^ ((name_in_fundefs B1 :&: fvs) :|: Scope; k; j; GI; GP; b) (H2', rho2')) *)
-      injective_subdomain (reach' H1' (env_locs rho1' (FV Scope Funs FVs))) b').
+      injective_subdomain (reach' H1' (env_locs rho1' (name_in_fundefs B1 :|: Scope))) b').
  Proof with (now eauto with Ensembles_DB).
    intros Hclo.
     revert b Funs H2 rho2 H2' rho2' m.

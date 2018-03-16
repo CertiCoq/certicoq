@@ -100,21 +100,20 @@ Module CCUtil (H : Heap).
     Included _ (Union _ (name_in_fundefs B) (Singleton _ Γ)) F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
   Proof with now eauto with Ensembles_DB functions_BD. 
-    intros Hun Hmc. revert F.
-    induction Hmc; intros F Hinc1 Hinc2;
+    intros Hun Hmc. revert F e.
+    induction Hmc; intros F e' Hinc1 Hinc2;
     simpl in *; repeat normalize_sets; (repeat normalize_occurs_free).
     - eassumption.
     - repeat normalize_sets.
-      apply Union_Included. apply Union_Included.
-      eapply Included_trans; [| eassumption ]...
+      rewrite <- app_ctx_f_fuse. simpl. eapply IHHmc.
+      inv Hun; eassumption.
+      simpl. normalize_occurs_free. repeat normalize_sets.
+      apply Union_Included.
+      eapply Included_Union_preserv_l. 
       eapply Included_trans; [| eassumption ]...
       eapply Setminus_Included_Included_Union.
-      inv Hun. eapply IHHmc.
-      eassumption.
       eapply Included_trans; [ eassumption |]...
-      eapply Included_Union_preserv_l.
-      eapply Included_trans; [| eassumption ].
-      apply Included_Union_compat; [| now apply Included_refl ]...
+      eapply Included_trans; [| eassumption ]...
     - inv Hun. eapply IHHmc.
       eassumption.
       eapply Included_trans; [ eassumption |].
@@ -143,10 +142,11 @@ Module CCUtil (H : Heap).
     make_closures clo_tag B S Γ C  ->
     (funs_in_exp B' (C |[ e ]|) <-> funs_in_exp B' e).
   Proof.
-    intros Hmc; induction Hmc;
+    intros Hmc; revert e; induction Hmc; intros e';
     [ split; now eauto | | ].
-    rewrite <- IHHmc. split; eauto; intros Hf; [ now inv Hf | now constructor ].
-    eassumption.
+    rewrite <- app_ctx_f_fuse.
+    rewrite IHHmc. split; eauto; intros Hf; [ now inv Hf | now constructor ].
+    eapply IHHmc; eauto.
   Qed.
 
   Lemma closure_conversion_fundefs_Same_set c Funs FVs B1 B2  :

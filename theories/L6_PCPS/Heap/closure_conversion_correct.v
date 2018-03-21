@@ -670,6 +670,26 @@ Module ClosureConversionCorrect (H : Heap).
     - intros Hc; inv Hc.
   Qed.
 
+  Lemma make_closures_get C rho1 H1 rho1' H1'
+        Γ fvs B x m :
+    make_closures Size.Util.clo_tag B fvs Γ C ->
+    ctx_to_heap_env_CC C H1 rho1 H1' rho1' m ->
+    ~ x \in name_in_fundefs B ->
+    M.get x rho1 = M.get x rho1'.
+  Proof.
+    intros Hcc. revert rho1 H1 rho1' H1' m.
+    induction Hcc; intros rho1 H1 rho1' H1' m Hctx Hin.
+    - inv Hctx. reflexivity.
+    -  edestruct ctx_to_heap_env_CC_comp_ctx_f_l
+        as (rho3 & H3 & m1 & m2 & Hctx1 & Hctx2 & Hplus); eauto.
+       inv Hctx2. inv H14.
+       rewrite M.gso; eauto. eapply IHHcc. eassumption.
+       intros Hc. eapply Hin; right; eauto.
+       intros Hc. subst; eapply Hin; left; eauto.
+    - eapply IHHcc; eauto.
+      intros Hc. eapply Hin; right; eauto.
+  Qed. 
+    
   Lemma make_closures_correct k j GI GP b C rho1 H1 rho2 H1' rho1' H2 rho2'
         H2' Scope FVs B1 B2 B1'
         c Γ fvs B' fvs' m l1 l2 :
@@ -681,11 +701,15 @@ Module ClosureConversionCorrect (H : Heap).
     env_locs rho2 (FV_cc Scope Γ) \subset dom H2  ->
     
     injective_subdomain (reach' H1 (env_locs rho1 (FV Scope FVs))) b ->
+
+    fvs \subset (FV Scope FVs) ->
+
     
     (H1, rho1) ⋞ ^ (Scope; k; j; GI; GP; b) (H2, rho2) ->
 
     Closure_conversion_fundefs Size.Util.clo_tag B' c fvs' B1 B2 ->
-   
+
+    unique_functions B1 -> ~ Γ \in (name_in_fundefs B1) -> 
    
     def_closures B1 B1' rho1 H1 l1 = (H1', rho1') ->
     
@@ -707,36 +731,112 @@ Module ClosureConversionCorrect (H : Heap).
     intros Hclo.
     revert Scope B2 b H1 rho1 H1' rho1' H2 rho2 H2' rho2' m.
     induction Hclo as [Γ fvs | f xs t e B fvs | f xs t e B fvs ];
-      intros Scope B2 b H1 rho1 H1' rho1' H2 rho2 H2' rho2' m Hwf1 Hlocs1 Hwf2 Hlocs2 Hinj Hrel Hcc Hdef Hget Henv Hctx.
+      intros Scope B2 b H1 rho1 H1' rho1' H2 rho2 H2' rho2' m
+             Hwf1 Hlocs1 Hwf2 Hlocs2 Hinj Hsub Hrel Hcc Hun Hnin Hdef Hget Henv Hctx.
     - inv Hctx. inv Hdef. simpl name_in_fundefs. 
-      eexists. unfold FV. do 2 rewrite Intersection_Empty_set_abs_l at 1. rewrite !Union_Empty_set_neut_l.
+      eexists. unfold FV. do 2 rewrite Intersection_Empty_set_abs_l at 1.
+      rewrite !Union_Empty_set_neut_l.
       split; eauto. eapply injective_subdomain_antimon. eassumption.
       unfold closure_conversion.FV.
       eapply reach'_set_monotonic. eapply env_locs_monotonic... 
-    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l as (rho3 & H3 & m1 & m2 & Hctx1 & Hctx2 & Hplus).
+    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l
+        as (rho3 & H3 & m1 & m2 & Hctx1 & Hctx2 & Hplus).
       eassumption. subst. inv Hctx2. inv H15.
       simpl name_in_fundefs.
       simpl in Hdef.  
       destruct (def_closures B B1' rho1 H1 l1) as [H1'' rho1''] eqn:Hdefc.
       destruct (alloc (Clos (FunPtr B1' f) (Loc l1)) H1'') as [l' H1'''] eqn:Hal.
-      inv Hdef. simpl in H13. rewrite Hget in H13.
+      inv Hdef. simpl in H13.
       edestruct (Henv f) as [B2' [Hgetf Hblock]]. now left.
-      rewrite Hgetf in H12. inv H12.
-
+      assert (Ha1 :  M.get Γ rho3 = Some (Loc l2)).
+      { erewrite <- make_closures_get; [ eassumption | eassumption | eassumption |  ].
+        intros Hin. eapply Hnin; right; eauto. }
+      assert (Ha2 :  M.get f rho3 = Some (FunPtr B2' f)).
+      { erewrite <- make_closures_get; [ eassumption | eassumption | eassumption |  ].
+        inv Hun; eauto. }
+      
+      rewrite Ha1, Ha2 in H13. inv H13.
+      
       assert (Hseq : (f |: name_in_fundefs B) :&: fvs :|: Scope <-->
                                               (name_in_fundefs B :&: fvs :|: (f |: Scope))).
       { rewrite !Intersection_Union_distr. rewrite Intersection_Same_set... }
 
-      inv Hcc. 
-      edestruct (IHHclo (f |: Scope) defs' (b {l' ~> l})) as [b' [Hcc' Hinj']];
-        [ | | | | | | eassumption | eassumption | |  | eassumption | ].
+      inv Hcc. inv Hun. 
+      edestruct (IHHclo Scope defs' b) as [b' [Hcc' Hinj']];
+        [ | | | | | | eassumption | | | |  | |  | eassumption | ]; try eassumption.
+      + intros Hc; eapply Hnin; right; eauto. 
+      + intros f' Hinf. eapply Henv. right; eauto.
+      + eexists (b' {l' ~> l}). split.
+        * { eapply cc_approx_env_P_set.
+            - rewrite Hseq.
+              eapply cc_approx_env_heap_monotonic;
+                [ | | | | | |
+                  eapply cc_approx_env_rename_ext;
+                    [ eapply cc_approx_env_P_antimon ; try eassumption ;
+                      now eauto with Ensembles_DB |
+                    ] ]. 
+              + eapply well_formed_antimon;
+                [| eapply well_formed_reach_alloc_def_funs;
+                   try now eapply Hdefc; try eassumption ].
+                * eapply reach'_set_monotonic. eapply env_locs_monotonic.
+                  unfold FV_cc.
+                  eapply Setminus_Included_Included_Union. 
+                  eapply Union_Included; [ | now eauto with Ensembles_DB ].
+                  eapply Included_trans. eapply Included_Intersection_l.
+                  now eauto with Ensembles_DB.
+                * eapply well_formed_antimon; [| eassumption ].
+                  eapply reach'_set_monotonic. eapply env_locs_monotonic...
+                * eapply Included_trans; [| eassumption ].
+                  eapply env_locs_monotonic...
+                *
+                eapply well_formed_def_funs; try now eauto. 
+                rewrite <- well_formed_reach_def_closed_same; try now eauto.
+                * eapply well_formed_antimon; [| eassumption ].
+                  eapply reach'_set_monotonic. 
+                  make_closures_well_formed.  eassumption.
+                eassumption.
+              Focus 7. 
+              eapply cc_approx_env_rename_ext;
+                [ eapply cc_approx_env_P_antimon ; try eassumption ;
+                  now eauto with Ensembles_DB |
+                ].
+              admit.
+
+          simpl. erewrite !gas; eauto. split.
+          rewrite extend_gss. reflexivity. admit.
+        * eapply injective_subdomain_extend'. admit.
+          admit.
+    - inv Hcc.
+      simpl in Hdef.  
+      destruct (def_closures B B1' rho1 H1 l1) as [H1'' rho1''] eqn:Hdefc.
+      destruct (alloc (Clos (FunPtr B1' f) (Loc l1)) H1'') as [l' H1'''] eqn:Hal.
+      inv Hdef.
+       assert (Hseq : (f |: name_in_fundefs B) :&: fvs :|: Scope <-->
+                                               (name_in_fundefs B :&: fvs :|: Scope)).
+       { rewrite !Intersection_Union_distr. rewrite Intersection_Disjoint.
+         rewrite Union_Empty_set_neut_l. reflexivity.
+         eapply Disjoint_Singleton_l. eassumption. }
+      edestruct (IHHclo Scope defs' b) as [b' [Hcc' Hinj']];
+        [ | | | | | | eassumption | eassumption | |  | eassumption | ]; try eassumption.
+      + intros f' Hinf. eapply Henv. right; eauto.
+      + exists b; split. admit.
+        admit.
+
+        simpl. 
+        destruct eapply IHHclo. eexists. split; eauto.
+          cc_approx_env_P
       + eapply well_formed_antimon; [| eassumption ].
         eapply reach'_set_monotonic. simpl. eapply env_locs_monotonic...
       + eapply Included_trans; [| eassumption ].
         simpl. eapply env_locs_monotonic...
       + eassumption.
       + eassumption.
-      + intros f' Hnin' Hin.
+      + eapply injective_subdomain_antimon. eassumption.
+        eapply reach'_set_monotonic. eapply env_locs_monotonic...
+      + eassumption.
+      + eassumption.
+        eappl
+          intros f' Hnin' Hin.
         destruct (var_dec f f'); subst. 
         * rewrite M.gss.
           do 2 eexists. split; eauto. split; eauto.

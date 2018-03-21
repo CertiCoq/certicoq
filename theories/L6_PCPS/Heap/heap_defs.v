@@ -33,11 +33,7 @@ Module HeapDefs (H : Heap) .
   (* A constructed value *)
   | Constr : cTag -> list value -> block
   (* A closure pair *)
-  | Clos : value -> value -> block 
-  (* The environment of a closure *)
-  (* Decoupled from the closure pair to capture sharing of environment
-     between mutually recursive functions *)
-  | Env : env -> block.
+  | Clos : value -> env -> block .
 
   (** The result of evaluation *)
   Definition res : Type := value * heap block.
@@ -86,7 +82,6 @@ Module HeapDefs (H : Heap) .
       | Constr t ls => (* The size of the constructor representation *)
         1 + length ls
       | Clos _ _ => 1
-      | Env rho => 0
     end.
   
   (** Size of the heap *)
@@ -97,8 +92,7 @@ Module HeapDefs (H : Heap) .
   Definition locs (v : block) : Ensemble loc :=
     match v with
       | Constr t ls => Union_list (map val_loc ls)
-      | Clos v1 v2 => val_loc v1 :|: val_loc v2
-      | Env rho => env_locs rho (Full_set _)
+      | Clos v rho => val_loc v :|: env_locs rho (Full_set _)
     end.
   
   Fixpoint to_locs (vs : list value) : list loc :=
@@ -112,8 +106,8 @@ Module HeapDefs (H : Heap) .
   Definition locs_set (v : block) : PS.t :=
     match v with
       | Constr t ls => union_list PS.empty (to_locs ls)
-      | Clos v1 v2 => union_list PS.empty (to_locs [v1 ; v2])
-      | Env rho => env_locs_set_full rho
+      | Clos (Loc l) rho => PS.add l (env_locs_set_full rho)
+      | Clos (FunPtr _ _) rho => env_locs_set_full rho
     end.
   
   (** The locations that are pointed by the locations in S *)
@@ -213,20 +207,20 @@ Module HeapDefs (H : Heap) .
     forall l, l \in S -> exists v, get l H = Some v /\ locs v \subset S.
 
   (** Add a block of function definitions in the heap and the environment *)
-  Fixpoint def_closures (B B0: fundefs) (rho : env) (H : heap block) (cenv : loc) {struct B}
+  Fixpoint def_closures (B B0: fundefs) (rho : env) (H : heap block) (cenv : env) {struct B}
   : heap block * env :=
     match B with
       | Fcons f _ _ _ B' =>
         let '(H', rho') := def_closures B' B0 rho H cenv in
         (* construct the closure *)
-        let clo := Clos (FunPtr B0 f) (Loc cenv) in
+        let clo := Clos (FunPtr B0 f) cenv in
         (* add it to heap *)
         let '(l, H'') := alloc clo H' in
         (* extend the environment *)
         (H'', M.set f (Loc l) rho') 
       | Fnil => (H, rho)
     end.
-
+  
   Fixpoint def_funs (B B0 : fundefs) rho :=
     match B with
       | Fcons f _ _ _ B =>
@@ -541,7 +535,7 @@ Module HeapDefs (H : Heap) .
   Qed.  
   
   Lemma reach'_post S H : 
-    reach' H S <--> reach' H (Union loc S (post H S)).
+    reach' H S <--> reach' H (S :|: (post H S)).
   Proof.
     rewrite <- reach_spec with (S' := Union loc S (post H S)).
     reflexivity.
@@ -600,7 +594,7 @@ Module HeapDefs (H : Heap) .
   Qed.
   
   Lemma reach'_Union H S1 S2 :
-    reach' H (Union _ S1 S2) <--> Union _ (reach' H S1) (reach' H S2).
+    reach' H (S1 :|: S2) <--> (reach' H S1) :|: (reach' H S2).
   Proof.
     split; intros l Hp.
     - destruct Hp as [n [HT Hp]].
@@ -1035,7 +1029,7 @@ Module HeapDefs (H : Heap) .
         eapply size_heap_fixed_point.
   Qed.
 
-    Lemma reach_n_Singleton_None H n l :
+  Lemma reach_n_Singleton_None H n l :
     get l H = None ->
     reach_n H n [set l] <--> [set l].
   Proof.
@@ -1080,7 +1074,7 @@ Module HeapDefs (H : Heap) .
        destruct (peq z x); subst.
        + contradiction.
        + eexists. rewrite M.gso; eauto.
-   Qed.
+  Qed.
   
   Lemma env_locs_set_In S rho x v :
     x \in S ->
@@ -1155,14 +1149,13 @@ Module HeapDefs (H : Heap) .
     - rewrite Union_Empty_set_neut_r. inv Hdef. eassumption.
   Qed.
 
-  Lemma env_locs_def_funs S S1 H1 H1' rho1 rho1'  B B0 l :
+  Lemma env_locs_def_funs S S1 H1 H1' rho1 rho1'  B B0 cenv :
     env_locs rho1 (Setminus _ S (name_in_fundefs B)) \subset S1 ->
-    l \in S1 ->
-    (H1', rho1') = def_closures B B0 rho1 H1 l ->
+    (H1', rho1') = def_closures B B0 rho1 H1 cenv ->
     env_locs rho1' (Setminus _ S (name_in_fundefs B)) \subset S1.
   Proof.
-    revert S H1' rho1'; induction B; intros S H1' rho1' Hsub1 Hsub2 Heq.
-    - simpl in Heq. destruct (def_closures B B0 rho1 H1 l) as [H'' rho''].
+    revert S H1' rho1'; induction B; intros S H1' rho1' Hsub1 Heq.
+    - simpl in Heq. destruct (def_closures B B0 rho1 H1 cenv) as [H'' rho''].
       destruct (alloc _ H'') as [l' H'''] eqn:Heq'.
       inv Heq. rewrite env_locs_set_not_In.
       simpl; rewrite <- !Setminus_Union.
@@ -1194,7 +1187,7 @@ Module HeapDefs (H : Heap) .
       now eauto with Ensembles_DB. 
   Qed.
 
-    Lemma env_locs_Leaf :
+  Lemma env_locs_Leaf :
     env_locs Maps.PTree.Leaf (Full_set var) <--> Empty_set _.
   Proof.
     unfold env_locs.
@@ -1462,49 +1455,26 @@ Module HeapDefs (H : Heap) .
   Qed.
 
 
-  Lemma def_closures_post_reach
+  Lemma def_closures_env_locs_reach
         (S : Ensemble var) (H H' : heap block) (rho rho' : env)
-        (B B0 : fundefs) (l : loc) :
-    def_closures B B0 rho H l = (H', rho') ->
-    post H [set l] \subset (reach' H (env_locs rho S)) ->
-    post H' [set l] \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
+        (B B0 : fundefs) (cenv : env) :
+    def_closures B B0 rho H cenv = (H', rho') ->
+    env_locs cenv (Full_set _) \subset (reach' H (env_locs rho S)) ->
+    env_locs cenv (Full_set _) \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
   Proof.
     revert S rho rho' H H'; induction B; intros S rho rho' H H' Hdef Hsub; simpl.
     - simpl in Hdef.
-      destruct (def_closures B B0 rho H l) as [H'' rho''] eqn:Hdef'.
+      destruct (def_closures B B0 rho H cenv) as [H'' rho''] eqn:Hdef'.
       destruct (alloc _ H'') as [l' H'''] eqn:Hal. inv Hdef.
-      intros l1 [l2 [b2 [Hin1 [Hget2 Hin2]]]]. inv Hin1. 
-      exists 2. split. constructor.
-      exists l2. eexists. split. simpl.
-      eexists l'. eexists. split. simpl.
-      eexists v. split. right. left. reflexivity.
-      rewrite M.gss. reflexivity.
-      split. eapply gas; eassumption.
-      simpl. right. reflexivity.
-      split; eauto.
+      rewrite env_locs_set_In; [| now eauto ]. rewrite reach'_Union.
+      eapply Included_Union_preserv_l.
+      eapply Included_trans; [| eapply Included_post_reach' ].
+      simpl. rewrite post_Singleton; [| erewrite gas; eauto ].
+      simpl. now eauto with Ensembles_DB. 
     - rewrite Union_Empty_set_neut_r. inv Hdef.
       eassumption.
   Qed.
-
-  Lemma def_closures_env_reach S H H' rho rho' B B0 l :
-    def_closures B B0 rho H l = (H', rho') ->
-    l \in (reach' H (env_locs rho S)) ->
-    l \in (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
-  Proof.
-    revert S rho rho' H H'; induction B; intros S rho rho' H H' Hdef Hin; simpl.
-    - simpl in Hdef.
-      destruct (def_closures B B0 rho H l) as [H'' rho''] eqn:Hdef'.
-      destruct (alloc _ H'') as [l' H'''] eqn:Hal. inv Hdef.
-      exists 1. split. constructor.
-      exists l'. eexists. split. simpl.
-      eexists v. split. right. left. reflexivity.
-      rewrite M.gss. reflexivity.
-      split. eapply gas; eassumption.
-      simpl. right. reflexivity.
-    - rewrite Union_Empty_set_neut_r. inv Hdef.
-      eassumption.
-  Qed.
-  
+    
   (** * Lemmas about locs *)
   
   Instance Decidable_locs v : Decidable (locs v).
@@ -1513,8 +1483,9 @@ Module HeapDefs (H : Heap) .
     destruct v; simpl.
     - eapply Decidable_map_UnionList; eauto with typeclass_instances.
       eapply Decidable_val_loc.
-    - eapply Decidable_Union; eapply Decidable_val_loc. 
-    - eapply Decidable_env_locs. constructor; intros x; left; constructor.
+    - eapply Decidable_Union. eapply Decidable_val_loc. 
+      eapply Decidable_env_locs.
+      constructor; intros x; left; constructor.
   Qed.  
   
 
@@ -1608,50 +1579,44 @@ Module HeapDefs (H : Heap) .
       eexists. erewrite gao; eauto; split; eauto...
   Qed.
 
-  Lemma closed_def_funs S1 H1 H1' rho1 rho1'  B B0 l :
+  Lemma closed_def_funs S1 H1 H1' rho1 rho1' B B0 envc :
     closed S1 H1 ->
-    l \in S1 ->
-    (H1', rho1') = def_closures B B0 rho1 H1 l ->
+    env_locs envc (Full_set _) \subset S1 ->
+    (H1', rho1') = def_closures B B0 rho1 H1 envc ->
     closed S1 H1'.
   Proof.
     revert H1' rho1'; induction B;
     intros H1' rho1' Hc Hsub Heq; [| inv Heq; now eauto ].
-    simpl in Heq. destruct (def_closures B B0 rho1 H1 l) as [H'' rho''].
+    simpl in Heq. destruct (def_closures B B0 rho1 H1 envc) as [H'' rho''].
     destruct (alloc _ H'') as [l' H'''] eqn:Heq'.
     inv Heq. eapply closed_alloc'; [| | eassumption ]; eauto.
     simpl. rewrite Union_Empty_set_neut_l.
-    eapply Singleton_Included. eassumption.
+    eassumption.
   Qed.
   
-  Lemma def_funs_exists_new_set S S1 H1 H1' rho1 rho1' rho_clo B B0 l :
+  Lemma def_funs_exists_new_set S S1 H1 H1' rho1 rho1' envc B B0 :
     closed S1 H1 ->
     env_locs rho1 (Setminus _ S (name_in_fundefs B)) \subset S1 ->
-    get l H1 = Some (Env rho_clo) ->
-    env_locs rho_clo (Full_set _) \subset S1 ->
-    (H1', rho1') = def_closures B B0 rho1 H1 l ->
+    env_locs envc (Full_set _) \subset S1 ->
+    (H1', rho1') = def_closures B B0 rho1 H1 envc ->
     exists S1', S1 \subset S1' /\ closed S1' H1' /\
            env_locs rho1' S \subset S1'.
   Proof with now eauto with Ensembles_DB.
-    revert S H1' rho1'; induction B; intros S H1' rho1' Hc Henv Hget Hsub Heq.
-    - simpl in Heq. destruct (def_closures B B0 rho1 H1 l) as [H'' rho''] eqn:Hdef.
+    revert S H1' rho1'; induction B; intros S H1' rho1' Hc Henv Hsub Heq.
+    - simpl in Heq. destruct (def_closures B B0 rho1 H1 envc) as [H'' rho''] eqn:Hdef.
       destruct (alloc _ H'') as [l' H'''] eqn:Heq'.
       inv Heq.
       edestruct IHB as [S1' [Hsub' [Hc' Henv']]]; eauto.
       eapply Included_trans; [| now apply Henv ].
       eapply env_locs_monotonic. simpl. rewrite <- !Setminus_Union.
       reflexivity.
-      eexists (l' |: (l |: S1')). split. 
+      eexists (l' |: S1'). split. 
       now eauto with Ensembles_DB.
       split.
       + eapply closed_alloc_Union; [| | eassumption ];
         simpl; try now eauto with Ensembles_DB.
-        intros l1 Hin; inv Hin.
-        * inv H. eexists.
-          split. eapply def_funs_subheap; now eauto.
-          eapply Included_trans. eassumption. now eauto with Ensembles_DB.
-        * eapply Hc' in H. destruct H as [v' [Hgetv HsubS]].
-          eexists. split; eauto.
-          eapply Included_trans...
+        rewrite Union_Empty_set_neut_l.
+        eapply Included_trans; eassumption.
       + eapply Included_trans. now eapply env_locs_set_Inlcuded'.
         now eauto with Ensembles_DB.
     - simpl in Henv.
@@ -1917,21 +1882,20 @@ Module HeapDefs (H : Heap) .
     rewrite Setminus_Union_distr. now eauto with Ensembles_DB.
   Qed.
   
-  Lemma well_formed_def_funs S1 H1 H1' rho1 rho1'  B B0 l :
+  Lemma well_formed_def_funs S1 H1 H1' rho1 rho1' B B0 envc :
     well_formed S1 H1 ->
-    l \in dom H1 ->
-    (H1', rho1') = def_closures B B0 rho1 H1 l ->
+    env_locs envc (Full_set _) \subset dom H1 ->
+    (H1', rho1') = def_closures B B0 rho1 H1 envc ->
     well_formed S1 H1'.
   Proof.
     revert H1' rho1'; induction B;
-    intros H1' rho1' Hc Hsub Heq; [| inv Heq; now eauto ].
-    simpl in Heq. destruct (def_closures B B0 rho1 H1 l) as [H'' rho''] eqn:Hdef.
+    intros H1' rho1' Hc Hlocs Heq; [| inv Heq; now eauto ].
+    simpl in Heq. destruct (def_closures B B0 rho1 H1 envc) as [H'' rho''] eqn:Hdef.
     destruct (alloc _ H'') as [l' H'''] eqn:Heq'.
     inv Heq. eapply well_formed_alloc; [| eassumption | ]; eauto.
     simpl. rewrite Union_Empty_set_neut_l.
-    eapply Singleton_Included.
+    eapply Included_trans. eassumption.
     eapply dom_subheap. eapply def_funs_subheap; eauto.
-    eassumption.
   Qed.
 
   Lemma well_formed_reach_setlist  (S : Ensemble M.elt) (H : heap block) 
@@ -2047,22 +2011,24 @@ Module HeapDefs (H : Heap) .
   Qed.
 
 
-  Lemma well_formed_reach_def_closed_same (S : Ensemble loc) (H H' : heap block) B B0 rho rho' l :
+  Lemma well_formed_reach_def_closed_same (S : Ensemble loc) (H H' : heap block)
+        B B0 rho rho' envc :
     well_formed (reach' H S) H  ->
-    In loc (dom H) l ->
     S \subset dom H ->
-    def_closures B B0 rho H l = (H', rho') ->
+    env_locs envc (Full_set _) \subset S ->
+    def_closures B B0 rho H envc = (H', rho') ->
     reach' H S <--> reach' H' S.
   Proof.
     intros Hwf Hdom HS; revert H' rho'; induction B; intros H' rho' Hdef. 
     - simpl in Hdef.
-      destruct (def_closures B B0 rho H l ) as [H'' rho''] eqn:Hdef'.
+      destruct (def_closures B B0 rho H envc) as [H'' rho''] eqn:Hdef'.
       destruct (alloc _ H'') as [l' H'''] eqn:Ha. inv Hdef.
       assert (Heq :reach' H'' S <--> reach' H' S).
       { eapply well_formed_reach_alloc_same; eauto.
         eapply well_formed_def_funs; eauto.
         rewrite <- IHB; [| reflexivity ]. eassumption.
         eapply Included_trans. eassumption.
+        eassumption. eapply Included_trans. eassumption.
         eapply dom_subheap. eapply def_funs_subheap.
         eauto. }
       rewrite <- Heq, IHB; reflexivity.
@@ -2135,37 +2101,25 @@ Module HeapDefs (H : Heap) .
         eapply env_locs_monotonic...
   Qed.
 
-  Lemma well_formed_reach_alloc_def_funs S H H' rho rho' B B0 l rho_clo :
+  Lemma well_formed_reach_alloc_def_funs S H H' rho rho' B B0 envc :
     well_formed (reach' H (env_locs rho S)) H ->
     env_locs rho S \subset dom H ->
-    get l H = Some (Env rho_clo) ->
-    env_locs rho_clo (Full_set _ ) \subset (reach' H (env_locs rho S)) ->
-    def_closures B B0 rho H l  = (H', rho') ->
+    env_locs envc (Full_set _ ) \subset (reach' H (env_locs rho S)) ->
+    def_closures B B0 rho H envc  = (H', rho') ->
     well_formed (reach' H' (env_locs rho' (Union _ S (name_in_fundefs B)))) H'.
   Proof with now eauto with Ensembles_DB.
-    revert rho rho' H H'; induction B; intros rho rho' H H' Hwf Hsub Hget Hlocs Hdef; simpl.
+    revert rho rho' H H'; induction B; intros rho rho' H H' Hwf Hsub Hlocs Hdef; simpl.
     - simpl in Hdef.
-      destruct (def_closures B B0 rho H l) as [H'' rho''] eqn:Hdef'.
+      destruct (def_closures B B0 rho H envc) as [H'' rho''] eqn:Hdef'.
       destruct (alloc _ H'') as [l' H'''] eqn:Hal. inv Hdef.
       rewrite (Union_commut [set v]), Union_assoc.
-      eapply well_formed_reach_alloc_in_dom; [| | | eassumption |].
+      eapply well_formed_reach_alloc; [| | eassumption |].
       + eapply IHB; eassumption.
       + eapply def_closures_env_locs_in_dom; eauto.
       + simpl. rewrite Union_Empty_set_neut_l.
-        rewrite post_Singleton with (b := Env rho_clo).
-        * simpl. intros l1 Hin.
-          eapply def_closures_post_reach. eassumption.
-          rewrite post_Singleton; eauto. simpl. eassumption.
-          rewrite post_Singleton with (b := Env rho_clo).
-          eassumption. eapply def_funs_subheap; eauto.
-        * eapply def_funs_subheap; eauto.
-      +  eapply Included_trans;
-        [| now eapply dom_subheap; eapply def_funs_subheap; eauto ].
-         simpl. rewrite Union_Empty_set_neut_l.
-         eapply Singleton_Included. eexists; eauto.
+        eapply def_closures_env_locs_reach; eassumption.
     - inv Hdef. rewrite Union_Empty_set_neut_r. eassumption.
   Qed.
-
 
   Lemma closed_set_alloc S H H' b l rho x :
     closed (reach' H (locs b :|: (env_locs rho (S \\ [set x])))) H ->

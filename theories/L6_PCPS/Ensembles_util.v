@@ -46,6 +46,9 @@ Notation "a |: A" := ([set a] :|: A) (at level 52, left associativity)
 Notation "A :&: B" := (Intersection _ A B) (at level 48, left associativity)
                       : Ensembles_scope.
 
+Notation "a &: B" := (Intersection _ [set a] B) (at level 48, left associativity)
+                     : Ensembles_scope.
+
 Notation "A \\ B" := (Setminus _ A B) (at level 52, left associativity)
                      : Ensembles_scope.
 

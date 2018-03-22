@@ -2139,7 +2139,8 @@ Module HeapDefs (H : Heap) .
         rewrite post_Singleton; [| now erewrite gas; eauto ].
         rewrite Union_commut, <- Union_assoc.
         eapply well_formed_Union.
-        * intros l1 b1 Hin Hget. inv Hin.
+        * intros l1 b1 Hin Hget.
+          inv Hin.
           erewrite gas in Hget; eauto. inv Hget.
           eapply Included_trans.
           eapply in_dom_closed in Hcl.
@@ -2337,13 +2338,10 @@ Module HeapDefs (H : Heap) .
       + destruct a; simpl.
         * rewrite FromList_cons. now rewrite IHl.
         * rewrite Union_Empty_set_neut_l. eassumption.
-    - rewrite FromSet_union_list, FromSet_empty, Union_Empty_set_neut_l.
-      destruct v; destruct v0; simpl.
-      + rewrite !FromList_cons, FromList_nil...
-      + rewrite FromList_cons, FromList_nil...
-      + rewrite FromList_cons, FromList_nil...
-      + rewrite FromList_nil...
-    - rewrite env_locs_set_full_correct. reflexivity.
+    - rewrite env_locs_set_full_correct.
+      destruct v; simpl.
+      + rewrite FromSet_add. reflexivity.
+      + rewrite Union_Empty_set_neut_l. reflexivity.
   Qed.    
 
 

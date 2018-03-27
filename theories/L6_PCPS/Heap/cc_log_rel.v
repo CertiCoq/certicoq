@@ -5,7 +5,7 @@
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
-From L6 Require Import functions cps eval cps_util identifiers ctx Ensembles_util
+From L6 Require Import functions cps eval cps_util identifiers ctx Ensembles_util set_util
                        List_util Heap.heap Heap.heap_defs Heap.space_sem tactics.
 From compcert Require Import lib.Coqlib.
 
@@ -17,7 +17,6 @@ Module CC_log_rel (H : Heap).
 
   Import H Sem.Equiv Sem.Equiv.Defs Sem.
 
-  
   (** ** Resource conditions  *)
 
   (** * Initial conditions *)
@@ -38,6 +37,9 @@ Module CC_log_rel (H : Heap).
   
   (** Loc Injection *)
   Definition Inj := loc -> loc.
+
+  (** Env Injection *)
+  Definition EInj := loc -> option loc.
   
   (** Tag for closure records *)
   Variable (clo_tag : cTag). 
@@ -69,11 +71,17 @@ Module CC_log_rel (H : Heap).
    *                (e2, [x2 -> l2', f2 -> l_clo, Γ -> l_env], H2)
    * else True (* ? -- not quite sure yet *)
    *)
-  
+
+  Definition bijection
+             (S1 : Ensemble positive) `{ToMSet S1}
+             (S2 : Ensemble positive) `{ToMSet S2} :=
+    PS.cardinal (@mset S1 _) =  PS.cardinal (@mset S1 _) .
+      
+             
   (** Definitions parametric on the value relation *)
   Section cc_approx.
     
-    Variable (cc_approx_val : nat -> nat -> GIInv -> GInv -> Inj -> ans -> ans -> Prop). 
+    Variable (cc_approx_val : nat -> nat -> GIInv -> GInv -> Inj -> EInj -> ans -> ans -> Prop). 
 
     (* TODO move *)
     Definition reach_n_res (j : nat) := fun '(v, H) => reach_n H j (val_loc v).
@@ -106,20 +114,26 @@ Module CC_log_rel (H : Heap).
         c1 <= k ->
         big_step_GC H1' rho1' e1 r1 c1 m1 ->
         not_stuck H1' rho1' e1 ->
-        exists (r2 : ans) (c2 m2 : nat) (b : Inj),
+        exists (r2 : ans) (c2 m2 : nat) (b : Inj) (b' : EInj),
           big_step_GC_cc H2' rho2' e2 r2 c2 m2 /\
-          injective_subdomain (reach_n_ans j r1) b /\
+          (* injective_subdomain (reach_n_ans j r1) b /\ *)
           (* extra invariants for costs *)
           IL (H1', rho1', e1, c1, m1) (H2', rho2', e2, c2, m2) /\
-          cc_approx_val (k - c1) j IIG IG b r1 r2.
+          cc_approx_val (k - c1) j IIG IG b b' r1 r2.
     
   End cc_approx.
   
   (** * Value relation *)
+ 
+  Definition lift {A B} (f : A -> B) : option A -> option B :=
+    fun x => match x with
+            | Some x => Some (f x)
+            | None => None
+          end.
   
   Fixpoint cc_approx_val (k : nat) {struct k} :=
     let fix cc_approx_val_aux 
-           (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) {struct j} : Prop :=
+           (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (d : EInj) (r1 r2 : ans) {struct j} : Prop :=
     match r1, r2 with
       | OOT, OOT => True (* Both programs timeout *)
       | Res (v1, H1), Res (v2, H2) => (* Both programs terminate *)
@@ -134,48 +148,51 @@ Module CC_log_rel (H : Heap).
                        match j with
                          | 0 => True
                          | S j =>
-                           let R l1 l2 := cc_approx_val_aux (j - (j - i)) IP P b (Res (l1, H1)) (Res (l2, H2)) in
+                           let R l1 l2 := cc_approx_val_aux (j - (j - i)) IP P b d (Res (l1, H1)) (Res (l2, H2)) in
                            Forall2 R vs1 vs2
                        end)
-              | Some (Clos (FunPtr B1 f1) (Loc env_loc1)), Some (Constr c [FunPtr B2 f2; Loc env_loc2]) =>
-                (forall j', j' <= j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
+              | Some (Clos (FunPtr B1 f1) rho_clo), Some (Constr c [FunPtr B2 f2; Loc env_loc]) =>
+                d l1 = Some env_loc /\
+                (* (forall j', j' <= j -> image b ((post H1 ^ j') (env_locs rho_clo (Full_set _))) :|: *)
+                (*                 image' d ((post H1 ^ j') (env_locs rho_clo (Full_set _))) <--> *)
+                (*                 ((post H2 ^ j') (post H2 [set env_loc]))) /\ *)
                 forall (b1 b2 : Inj)
-                  (rho_clo1 rho_clo2 rho_clo3 : env) (H1' H1'' H2' : heap block)
-                  (env_loc1' env_loc2' : loc)
+                  (rho_clo' rho_clo1 rho_clo2 : env) (H1' H1'' H2' : heap block)
+                  (env_loc' : loc)
                   (xs1 : list var) (ft : fTag) (e1 : exp) (vs1 vs2 : list value),
-                  (Loc env_loc1, H1) ≈_(id, b1) (Loc env_loc1', H1') ->
-                  injective_subdomain (reach' H1' [set env_loc1']) b1 ->
-                  (Loc env_loc2, H2) ≈_(b2, id) (Loc env_loc2', H2') ->
-                  injective_subdomain (reach' H2 [set env_loc2]) b2 ->
+                  Full_set _ |- (H1, rho_clo) ⩪_(id, b1) (H1', rho_clo') ->
+                  injective_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) b1 ->
+                  (Loc env_loc, H2) ≈_(b2, id) (Loc env_loc', H2') ->
+                  injective_subdomain (reach' H2 [set env_loc]) b2 ->
                   
-                  get env_loc1' H1' = Some (Env rho_clo1) ->
                   find_def f1 B1 = Some (ft, xs1, e1) ->
                   
-                  def_closures B1 B1 rho_clo1 H1' env_loc1' =  (H1'', rho_clo2) ->
-                  setlist xs1 vs1 rho_clo2 = Some rho_clo3 ->
+                  def_closures B1 B1 rho_clo' H1' rho_clo1 =  (H1'', rho_clo1) ->
+                  setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
                   
                   exists (xs2 : list var) (e2 : exp) (rho2' : env),
                     find_def f2 B2 = Some (ft, xs2, e2) /\
-                    Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
+                    Some rho2' = setlist xs2 ((Loc env_loc) :: vs2) (def_funs B2 B2 (M.empty _)) /\
                     (forall i j',
                        (i < k)%nat -> (j' <= j)%nat ->
                        match k with
                          | 0 => True
                          | S k =>
-                           forall b',
-                           let R v1 v2 := cc_approx_val (k - (k - i)) j' IP P b' (Res (v1, H1'')) (Res (v2, H2')) in
+                           forall b' d',
+                           let R v1 v2 := cc_approx_val (k - (k - i)) j' IP P b' d' (Res (v1, H1'')) (Res (v2, H2')) in
                            Forall2 R vs1 vs2 ->
-                           f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
+                           f_eq_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) (b2 ∘ b ∘ b1) b' ->
+                           f_eq_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) ((lift b2) ∘ d ∘ b1) d' ->
                            (forall (H1 H2  : heap block) (e1 e2 : exp),
-                              live (env_locs rho_clo3 (occurs_free e1)) H1'' H1 ->
+                              live (env_locs rho_clo2 (occurs_free e1)) H1'' H1 ->
                               live' (env_locs rho2' (occurs_free e2)) H2' H2 ->
-                              IP (H1, rho_clo3, e1) (H2, rho2', e2)) /\
+                              IP (H1, rho_clo2, e1) (H2, rho2', e2)) /\
                            cc_approx_exp cc_approx_val
                                          (k - (k - i))
                                          j'
                                          IP IP
                                          (P (k - (k - i))) P
-                                         (e1, rho_clo3, H1'') (e2, rho2', H2')
+                                         (e1, rho_clo2, H1'') (e2, rho2', H2')
                        end)
               | _, _ => False
             end
@@ -190,107 +207,151 @@ Module CC_log_rel (H : Heap).
     (cc_approx_exp cc_approx_val k j P1 P2 P3 P4 p1 p2)
       (at level 70, no associativity).
   
-  Definition cc_approx_block (k : nat) (j : nat) (IP : GIInv) (P : GInv) (b : Inj)
-             (b1 : block) (H1 : heap block)
-             (b2 : block) (H2 : heap block) : Prop :=
-    match b1, b2 with
-      | Constr c1 vs1, Constr c2 vs2 =>
-        c1 = c2 /\
-        (forall i,
-           (i < j)%nat ->
-           let R l1 l2 := cc_approx_val k i IP P b (Res (l1, H1)) (Res (l2, H2)) in
-           Forall2 R vs1 vs2)
-      | Clos (FunPtr B1 f1) (Loc env_loc1), Constr c [FunPtr B2 f2; Loc env_loc2] =>
-        (forall j', j' <= j -> (* maybe <= *) image b ((post H1 ^ j') [set env_loc1]) <--> ((post H2 ^ j') [set env_loc2])) /\
-        forall (b1 b2 : Inj) (rho_clo1 rho_clo2 rho_clo3 : env) (H1' H1'' H2' : heap block) (env_loc1' env_loc2' : loc)
-          (xs1 : list var) (ft : fTag) (e1 : exp) (vs1 vs2 : list value),
-          (Loc env_loc1, H1) ≈_(id, b1) (Loc env_loc1', H1') ->
-          injective_subdomain (reach' H1' [set env_loc1']) b1 ->
-          (Loc env_loc2, H2) ≈_(b2, id) (Loc env_loc2', H2') ->
-          injective_subdomain (reach' H2 [set env_loc2]) b2 ->
-                  
-          get env_loc1' H1' = Some (Env rho_clo1) ->
-          find_def f1 B1 = Some (ft, xs1, e1) ->
+  (* Definition cc_approx_block (k : nat) (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (d : EInj) *)
+  (*            (b1 : block) (H1 : heap block) *)
+  (*            (b2 : block) (H2 : heap block) : Prop := *)
+  (*   match b1, b2 with *)
+  (*     | Constr c1 vs1, Constr c2 vs2 => *)
+  (*       c1 = c2 /\ *)
+  (*       (forall i, *)
+  (*          (i < j)%nat -> *)
+  (*          let R l1 l2 := cc_approx_val k i IP P b d (Res (l1, H1)) (Res (l2, H2)) in *)
+  (*          Forall2 R vs1 vs2) *)
+  (*     | (Clos (FunPtr B1 f1) rho_clo), (Constr c [FunPtr B2 f2; Loc env_loc]) => *)
+  (*       (* (forall j', j' <= j -> (* maybe <= *) image b ((post H1 ^ j') (env_locs rho_clo (Full_set _))) <--> *) *)
+  (*       (*                                      ((post H2 ^ j') (post H2 [set env_loc]))) /\ *) *)
+  (*       d l1 = Some env_loc /\ *)
+  (*       forall (b1 b2 : Inj) *)
+  (*         (rho_clo' rho_clo1 rho_clo2 : env) (H1' H1'' H2' : heap block) *)
+  (*         (env_loc' : loc) *)
+  (*         (xs1 : list var) (ft : fTag) (e1 : exp) (vs1 vs2 : list value), *)
+  (*         Full_set _ |- (H1, rho_clo) ⩪_(id, b1) (H1', rho_clo') -> *)
+  (*         injective_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) b1 -> *)
+  (*         (Loc env_loc, H2) ≈_(b2, id) (Loc env_loc', H2') -> *)
+  (*         injective_subdomain (reach' H2 [set env_loc]) b2 -> *)
           
-          def_closures B1 B1 rho_clo1 H1' env_loc1' =  (H1'', rho_clo2) ->
-          setlist xs1 vs1 rho_clo2 = Some rho_clo3 ->
-
-          exists (xs2 : list var) (e2 : exp) (rho2' : env),
-            find_def f2 B2 = Some (ft, xs2, e2) /\
-            Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
-            (forall i j' b',
-               (i < k)%nat -> (j' <= j)%nat ->
-               let R v1 v2 := cc_approx_val i j' IP P b' (Res (v1, H1'')) (Res (v2, H2')) in
-               f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
-               Forall2 R vs1 vs2 ->
-               (forall (H1 H2  : heap block) (e1 e2 : exp),
-                  live (env_locs rho_clo3 (occurs_free e1)) H1'' H1 ->
-                  live' (env_locs rho2' (occurs_free e2)) H2' H2 ->
-                  IP (H1, rho_clo3, e1) (H2, rho2', e2)) /\
-               cc_approx_exp cc_approx_val
-                             i j'
-                             IP IP
-                             (P i) P
-                             (e1, rho_clo3, H1'') (e2, rho2', H2'))
-
-      | _, _ => False
-    end.
+  (*         find_def f1 B1 = Some (ft, xs1, e1) -> *)
+          
+  (*         def_closures B1 B1 rho_clo' H1' rho_clo1 =  (H1'', rho_clo1) -> *)
+  (*         setlist xs1 vs1 rho_clo1 = Some rho_clo2 -> *)
+          
+  (*         exists (xs2 : list var) (e2 : exp) (rho2' : env), *)
+  (*           find_def f2 B2 = Some (ft, xs2, e2) /\ *)
+  (*           Some rho2' = setlist xs2 ((Loc env_loc) :: vs2) (def_funs B2 B2 (M.empty _)) /\ *)
+  (*           (forall i j' b' d', *)
+  (*              (i < k)%nat -> (j' <= j)%nat -> *)
+  (*              let R v1 v2 := cc_approx_val i j' IP P b' d' (Res (v1, H1'')) (Res (v2, H2')) in *)
+  (*              Forall2 R vs1 vs2 -> *)
+  (*              f_eq_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) (b2 ∘ b ∘ b1) b' -> *)
+  (*              f_eq_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) (lift b2 ∘ d ∘ b1) d' -> *)
+  (*              (forall (H1 H2  : heap block) (e1 e2 : exp), *)
+  (*                 live (env_locs rho_clo2 (occurs_free e1)) H1'' H1 -> *)
+  (*                 live' (env_locs rho2' (occurs_free e2)) H2' H2 -> *)
+  (*                 IP (H1, rho_clo2, e1) (H2, rho2', e2)) /\ *)
+  (*              cc_approx_exp cc_approx_val *)
+  (*                                  i j' *)
+  (*                                  IP IP *)
+  (*                                  (P i) P *)
+  (*                                  (e1, rho_clo2, H1'') (e2, rho2', H2')) *)
+  (*     | _, _ => False *)
+  (*   end. *)
   
   (** Unfold the recursion. A more compact definition of the value relation. *)
-  Definition cc_approx_val' (k : nat) (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) : Prop :=
+  Definition cc_approx_val' (k : nat) (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (d : EInj) (r1 r2 : ans) : Prop :=
     match r1, r2 with
       | OOT, OOT => True (* Both programs timeout *)
       | Res (v1, H1), Res (v2, H2) => (* Both programs terminate *)
         match v1, v2 with
           | Loc l1, Loc l2 =>
+            b l1 = l2 /\
             match get l1 H1, get l2 H2 with
-              | Some b1, Some b2 =>
-                b l1 = l2 /\
-                cc_approx_block k j IP P b b1 H1 b2 H2
+              | Some (Constr c1 vs1), Some (Constr c2 vs2) =>
+                    c1 = c2 /\
+                    (forall i, (i < j)%nat ->
+                          let R l1 l2 := cc_approx_val k i IP P b d (Res (l1, H1)) (Res (l2, H2)) in
+                          Forall2 R vs1 vs2)
+              | Some (Clos (FunPtr B1 f1) rho_clo), Some (Constr c [FunPtr B2 f2; Loc env_loc]) =>
+                d l1 = Some env_loc /\
+                (* (forall j', j' <= j -> image b ((post H1 ^ j') (env_locs rho_clo (Full_set _))) :|: *)
+                (*                 image' d ((post H1 ^ j') (env_locs rho_clo (Full_set _))) <--> *)
+                (*                 ((post H2 ^ j') (post H2 [set env_loc]))) /\ *)
+                forall (b1 b2 : Inj)
+                  (rho_clo' rho_clo1 rho_clo2 : env) (H1' H1'' H2' : heap block)
+                  (env_loc' : loc)
+                  (xs1 : list var) (ft : fTag) (e1 : exp) (vs1 vs2 : list value),
+                  Full_set _ |- (H1, rho_clo) ⩪_(id, b1) (H1', rho_clo') ->
+                  injective_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) b1 ->
+                  (Loc env_loc, H2) ≈_(b2, id) (Loc env_loc', H2') ->
+                  injective_subdomain (reach' H2 [set env_loc]) b2 ->
+                  
+                  find_def f1 B1 = Some (ft, xs1, e1) ->
+                  
+                  def_closures B1 B1 rho_clo' H1' rho_clo1 =  (H1'', rho_clo1) ->
+                  setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
+                  
+                  exists (xs2 : list var) (e2 : exp) (rho2' : env),
+                    find_def f2 B2 = Some (ft, xs2, e2) /\
+                    Some rho2' = setlist xs2 ((Loc env_loc) :: vs2) (def_funs B2 B2 (M.empty _)) /\
+                    (forall i j',
+                       (i < k)%nat -> (j' <= j)%nat ->
+                       forall b' d',
+                         let R v1 v2 := cc_approx_val i j' IP P b' d' (Res (v1, H1'')) (Res (v2, H2')) in
+                         Forall2 R vs1 vs2 ->
+                         f_eq_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) (b2 ∘ b ∘ b1) b' ->
+                         f_eq_subdomain (reach' H1' (env_locs rho_clo' (Full_set _))) ((lift b2) ∘ d ∘ b1) d' ->
+                         (forall (H1 H2  : heap block) (e1 e2 : exp),
+                            live (env_locs rho_clo2 (occurs_free e1)) H1'' H1 ->
+                            live' (env_locs rho2' (occurs_free e2)) H2' H2 ->
+                            IP (H1, rho_clo2, e1) (H2, rho2', e2)) /\
+                         cc_approx_exp cc_approx_val
+                                       i j'
+                                       IP IP
+                                       (P i) P
+                                       (e1, rho_clo2, H1'') (e2, rho2', H2'))
               | _, _ => False
             end
           | _, _ => False
         end
       | _, _ => False
     end.
-  
+
   (** Correspondence of the two definitions *)
-  Lemma cc_approx_val_eq (k j : nat) IP P b (v1 v2 : ans) :
-    cc_approx_val k j IP P b v1 v2 <-> cc_approx_val' k j IP P b v1 v2.
+  Lemma cc_approx_val_eq (k j : nat) IP P b d (v1 v2 : ans) :
+    cc_approx_val k j IP P b d v1 v2 <-> cc_approx_val' k j IP P b d v1 v2.
   Proof.
     destruct k as [ | k ]; destruct j as [| j];
     destruct v1 as [[[l1 | lf1 f1] H1] | |]; destruct v2 as [[[l2 | lf2 f2] H2] | |];
     try (now split; intros; contradiction);
     try (now simpl; eauto).  
-    - split; simpl; unfold cc_approx_block; [ intros [Heqb Hc] |];
-      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try contradiction.
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; try contradiction.
+    - split; simpl; [ intros [Heqb Hc] |];
+      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; try contradiction.
         destruct Hc as [Heq' Hyp]. 
         split. eauto. split; eauto. intros. omega.
+
         destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
         destruct Hc as [Hin Hyp]. 
         split; eauto. split; eauto.
-        intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft
-               e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2  Hget Hfind Hdef Hset.
+        intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft
+               e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
         edestruct Hyp
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
         do 3 eexists; split; [ | split ]; try now eauto. }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ]; firstorder. }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; eauto.
         + now firstorder.
         + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
           intros [Heqb [Him Hyp]]. split; eauto. split; eauto.
-          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft
-                 e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft
+                 e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; eauto. }
-    - split; unfold cc_approx_block; simpl; [ intros [Heqb Hc] |];
-      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try contradiction.
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; try contradiction.
+    - split; simpl; [ intros [Heqb Hc] |];
+      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; try contradiction.
         + destruct Hc as [Hin Hyp].
           split; [ eassumption | split; [eassumption |]].
           intros i Hleq. eapply Forall2_monotonic; [| now eauto ].
@@ -301,14 +362,13 @@ Module CC_log_rel (H : Heap).
         + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
           destruct Hc as [Him Hyp].
           subst. split; eauto. split; eauto.
-          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1
-                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2  Hget Hfind Hdef Hset.
+          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1
+                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto). }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ]; firstorder. }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; eauto.
         + intros [Heq1 [Heq2 Hi]].
           subst. split; [ reflexivity | split; [ reflexivity |]].
           intros i Hleq. eapply Forall2_monotonic; [| now eauto ].
@@ -317,22 +377,22 @@ Module CC_log_rel (H : Heap).
           eassumption. 
         + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
           intros [Heqb [Him Hyp]]. split; eauto. split; eauto.
-          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft e1
-                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
+                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto). }
-    - split; unfold cc_approx_block; simpl; [ intros [Heqb Hc] |];
-      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try contradiction.
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; try contradiction.
+    - split; simpl; [ intros [Heqb Hc] |];
+      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; try contradiction.
         + destruct Hc as [Him Hyp].
           split; eauto. split; eauto. intros. omega.
         + simpl. destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
           destruct Hc as [Him Hyp].
           subst. split; eauto. split; eauto.
-          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft e1
-                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.          
+          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
+                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
@@ -340,18 +400,17 @@ Module CC_log_rel (H : Heap).
           assert (Heqi : k - (k - i) = i) by omega.
           setoid_rewrite <-  Heqi. eapply Hi; eauto.
           eapply Forall2_monotonic; [| now eauto ].
-          intros x1 x2 Hap. rewrite Heqi. eassumption.
+          intros x1 x2 Hap. rewrite Heqi. simpl in Hap. eassumption.
       }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ]; firstorder. }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; eauto.
         + intros [Heq1 [Heq2 Hi]].
           subst. split; [ reflexivity | split; [ reflexivity |]]; eauto.
         + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
           intros [Heq1 [Him Hyp]].
           subst. split; eauto. split; eauto.
-          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft
-                 e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft
+                 e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
@@ -361,10 +420,10 @@ Module CC_log_rel (H : Heap).
           eapply Forall2_monotonic; [| now eauto ].
         intros x1 x2 Hap. rewrite <- Heqi. eassumption.
       }
-    - split; unfold cc_approx_block; simpl; [ intros [Heqb Hc] |];
-      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try contradiction.
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; try contradiction.
+    - split; simpl; [ intros [Heqb Hc] |];
+      destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1];
+        destruct b2 as [c2 vs2 | ]; try contradiction.
         + destruct Hc as [Heq2 Hi]; split; [ eassumption | split; [eassumption |]].
           intros i Hleq. eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap.
@@ -373,8 +432,8 @@ Module CC_log_rel (H : Heap).
           eassumption. 
         + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
           destruct Hc as [Heq2 Hyp]; split; eauto. split; eauto.
-          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1
-                 ft e1 vs1 vs2 Heq1 Hr1 Heq2' Hr2 Hget Hfind Hdef Hset.
+          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1
+                 ft e1 vs1 vs2 Heq1 Hr1 Heq2' Hr2 Hfind Hdef Hset.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
@@ -384,9 +443,8 @@ Module CC_log_rel (H : Heap).
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. eassumption.
       }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ]; firstorder. }
-      { destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; eauto.
+      { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; eauto.
         + intros [Heq1 [Heq2 Hi]].
           subst. split; [ reflexivity | split; [ reflexivity |]]; eauto.
           intros i Hleq. eapply Forall2_monotonic; [| now eauto ].
@@ -396,8 +454,8 @@ Module CC_log_rel (H : Heap).
         + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
           intros [Hb [Him Hyp]].
           split; eauto. split; eauto.
-          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1
-                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2  Hget Hfind Hdef Hset.
+          intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1
+                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2  Hfind Hdef Hset.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
@@ -583,16 +641,16 @@ Module CC_log_rel (H : Heap).
     destruct r1 as [[[l1 | lf1 f1] H1] | |]; destruct r2 as [[[l2 | lf2 f2] H2] | |]; simpl;
     try (now intros; contradiction); try (now simpl; eauto).
     destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; eauto.
-    destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-      destruct b2 as [c2 vs2 | | ]; eauto; intros [Heq Hcc] Hrel; split; eauto.
+    destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+      destruct b2 as [c2 vs2 | ]; eauto; intros [Heq Hcc] Hrel; split; eauto.
     - destruct Hcc as [Heq' Hcc]. split; [ eassumption |].
       intros i Hleq. eapply Forall2_monotonic; [| now eauto ].
       intros x1 x2 Hap.
       rewrite cc_approx_val_eq in *. eapply IHj; try eassumption.
     - destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
       destruct Hcc as [Him Hcc]. split; eauto.
-      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft e1
-             vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
+             vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
       edestruct Hcc
         as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
       do 3 eexists; split; [ | split ]; try (now eauto).
@@ -606,11 +664,12 @@ Module CC_log_rel (H : Heap).
       + eapply cc_approx_exp_same_rel_IH with (GP1 := GP1); try eassumption.
         intros; eapply IHk. omega. eassumption. eassumption.
         eapply cc_approx_exp_rel_mon. eapply Hi. eassumption.
-        eassumption. eassumption.
+        eassumption.
         eapply Forall2_monotonic; [| eassumption ].
         intros. rewrite cc_approx_val_eq.
         eapply IHk; eauto. now rewrite <- cc_approx_val_eq; simpl in *; eauto.
-        intros. split; now eapply Hrel. now eapply Hrel.
+        intros. split; now eapply Hrel. eassumption.
+        now eapply Hrel.
   Qed.
 
   Transparent cc_approx_exp.
@@ -639,8 +698,8 @@ Module CC_log_rel (H : Heap).
     try (now intros; contradiction); try (now simpl; eauto).
     - destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; eauto.
       intros [Heq Hcc] Hleq. split; [ eassumption |].
-      destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct b2 as [c2 vs2 | | ]; eauto.
+      destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct b2 as [c2 vs2 | ]; eauto.
       + destruct Hcc as [Heq' Hi]; split; [ eassumption |].
         intros i Hleq'. simpl.
         eapply Forall2_monotonic; [| now eauto ].
@@ -648,8 +707,8 @@ Module CC_log_rel (H : Heap).
         rewrite cc_approx_val_eq in *. eapply IHj; try eassumption.
       + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
         destruct Hcc as [Him Hcc]. split; eauto.
-        intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2'
-               xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+        intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc'
+               xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
         edestruct Hcc
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
         do 3 eexists; split; [ | split ]; try (now eauto).
@@ -663,8 +722,8 @@ Module CC_log_rel (H : Heap).
     cc_approx_block m j GIP GP b' b1 H1 b2 H2.
   Proof.
     intros Hcc.
-    destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-    destruct b2 as [c2 vs2 | | ]; eauto.
+    destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+    destruct b2 as [c2 vs2 | ]; eauto.
     + destruct Hcc as [Heq' Hi]; split; [ eassumption |].
       intros i Hleq'. simpl.
       eapply Forall2_monotonic; [| now eauto ].
@@ -672,8 +731,8 @@ Module CC_log_rel (H : Heap).
       rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic; eauto.
     + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
       destruct Hcc as [Him Hcc]. split; eauto.
-      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2'
-             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc'
+             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
       edestruct Hcc
         as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
       do 3 eexists; split; [ | split ]; try (now eauto).
@@ -730,15 +789,15 @@ Module CC_log_rel (H : Heap).
     try (now intros; contradiction); try (now simpl; eauto).
     destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; eauto.
     intros [Heq Hcc] Hleq. split; [ eassumption |].
-    destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-      destruct b2 as [c2 vs2 | | ]; eauto.
+    destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+      destruct b2 as [c2 vs2 | ]; eauto.
     + destruct Hcc as [Heq' Hi]; split; [ eassumption |].
       intros i' Hleq'. simpl. eapply (Hi i'); omega.
     + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
       destruct Hcc as [Him Hcc]. split; eauto.
       intros j' Hj'. eapply Him; omega.
-      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2'
-             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc'
+             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
       edestruct Hcc
         as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
       do 3 eexists; split; [ | split ]; try (now eauto).
@@ -752,15 +811,15 @@ Module CC_log_rel (H : Heap).
     cc_approx_block j m GIP GP b' b1 H1 b2 H2.
   Proof.
     intros Hcc.
-    destruct b1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-    destruct b2 as [c2 vs2 | | ]; eauto.
+    destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+    destruct b2 as [c2 vs2 | ]; eauto.
     + destruct Hcc as [Heq' Hi]; split; [ eassumption |].
       intros i' Hleq'. simpl. eapply (Hi i'); omega.
     + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
       destruct Hcc as [Him Hcc]. split; eauto.
       intros j' Hj'. eapply Him; omega.
-      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2'
-             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+      intros b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc'
+             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hdef Hset.
       edestruct Hcc
         as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
       do 3 eexists; split; [ | split ]; try (now eauto).
@@ -980,8 +1039,8 @@ Module CC_log_rel (H : Heap).
     split; intros Hres.
     - simpl in *. destruct (get l1 H1) as [bl1 |]; eauto; destruct (get l2 H2) as [bl2 |]; eauto.
       destruct Hres as [Heq Hres]; split; eauto. rewrite <- Heq5; eassumption.
-      destruct bl1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct bl2 as [c2 vs2 | | ]; eauto.
+      destruct bl1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct bl2 as [c2 vs2 | ]; eauto.
       + destruct Hres as [Heq1 Hi]. split; eauto.
         intros i' Hleq.
         eapply Forall2_monotonic; [| now eauto ].
@@ -989,23 +1048,23 @@ Module CC_log_rel (H : Heap).
         rewrite cc_approx_val_eq in *. eapply IHj; eauto. symmetry. eassumption.
       + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
         destruct Hres as [Him Hres]. split. setoid_rewrite <- Heq5. eassumption.
-        intros b1' b2' tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft e1
-               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hget Hfind Hdef Hset.
+        intros b1' b2' tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
+               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hfind Hdef Hset.
         edestruct Hres
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
         do 3 eexists; split; [ | split ]; try (now eauto).
         intros i' j' b' Hleq Hleq' HR Hfeq Hall. eapply Hi. eassumption. eassumption.
-        eapply Equivalence_Transitive; [| eassumption ]. eapply f_eq_subdomain_compose_compat.
-        reflexivity. eapply f_eq_subdomain_compose_compat; [| reflexivity ].
-        rewrite Heq5. reflexivity.
         eapply Forall2_monotonic; [| now eauto ].
         unfold HR. intros x1 x2 Hap.
         rewrite cc_approx_val_eq in *. eassumption.
+        eapply Equivalence_Transitive; [| eassumption ]. eapply f_eq_subdomain_compose_compat.
+        reflexivity. eapply f_eq_subdomain_compose_compat; [| reflexivity ].
+        rewrite Heq5. reflexivity.        
     - simpl in *.
       destruct (get l1 H1) as [bl1 |]; eauto. destruct (get l2 H2) as [bl2 |]; eauto.
       destruct Hres as [Hbeq Hres]; split. rewrite Heq5. eassumption.
-      destruct bl1 as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ];
-        destruct bl2 as [c2 vs2 | | ]; eauto.
+      destruct bl1 as [c1 vs1 | [? | B1 f1] env_loc1 ];
+        destruct bl2 as [c2 vs2 | ]; eauto.
       + destruct Hres as [Heq1 Hi]. split; eauto.
         intros i' Hleq.
         eapply Forall2_monotonic; [| now eauto ].
@@ -1014,17 +1073,18 @@ Module CC_log_rel (H : Heap).
       + destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; eauto.
         destruct Hres as [Him Hres].
         split; eauto. setoid_rewrite Heq5. eassumption.
-        intros b1' b2' tc1 tc2 tc3 H1' H1'' H2' env_loc1' env_loc2' xs1 ft e1
-               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hget Hfind Hdef Hset.
+        intros b1' b2' tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
+               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hfind Hdef Hset.
         edestruct Hres
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
         do 3 eexists; split; [ | split ]; try (now eauto).
         intros i' j' b' Hleq Hleq' HR Hfeq Hall. eapply Hi. eassumption. eassumption.
-        eapply Equivalence_Transitive; [| eassumption ]. eapply f_eq_subdomain_compose_compat.
-        reflexivity. eapply f_eq_subdomain_compose_compat; [| reflexivity ].
-        rewrite Heq5. reflexivity. eapply Forall2_monotonic; [| now eauto ].
+        eapply Forall2_monotonic; [| now eauto ].
         unfold HR. intros x1 x2 Hap.
         rewrite cc_approx_val_eq in *. eassumption.
+        eapply Equivalence_Transitive; [| eassumption ]. eapply f_eq_subdomain_compose_compat.
+        reflexivity. eapply f_eq_subdomain_compose_compat; [| reflexivity ].
+        rewrite Heq5. reflexivity.
   Qed.
 
   Instance Proper_cc_approx_env_P_f_eq :
@@ -1039,7 +1099,7 @@ Module CC_log_rel (H : Heap).
     rewrite Heq5. eassumption.
   Qed.    
 
-    
+  (* 
   Lemma cc_approx_val_image_eq (k j : nat) (β : Inj)  (H1 H2 : heap block)
         (v1 v2 : value) :
     (Res (v1, H1)) ≺ ^ (k ; j ; GIP ; GP ; β) (Res (v2, H2)) ->
@@ -1054,8 +1114,8 @@ Module CC_log_rel (H : Heap).
     intros Hcc.
     destruct (get l1 H1) as [b1'|] eqn:Hget1; destruct (get l2 H2) as [b2'|] eqn:Hget2; try contradiction.
     destruct Hcc as [Hbs Hcc].
-    destruct b1' as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ]; try contradiction;
-    destruct b2' as [c2 vs2 | | ]; try contradiction.
+    destruct b1' as [c1 vs1 | [? | B1 f1] env_loc1 ]; try contradiction;
+    destruct b2' as [c2 vs2 | ]; try contradiction.
     + destruct Hcc as [Heqc Hcc]; subst.
       destruct j.
       * simpl. rewrite !image_Singleton. reflexivity.
@@ -1242,7 +1302,7 @@ Module CC_log_rel (H : Heap).
       eexists; split; eauto. eassumption.
   Qed.
 
-  
+  *)
   Opaque cc_approx_exp.
 
   (** * The logical relation respects heap equivalences *)
@@ -1269,8 +1329,8 @@ Module CC_log_rel (H : Heap).
     destruct (get l1 H1) as [b1'|] eqn:Hget1; destruct (get l2 H2) as [b2'|] eqn:Hget2; try contradiction.
 
     destruct Hcc as [Hbs Hcc].
-    destruct b1' as [c1 vs1 | [? | B1 f1] [env_loc1 |] | ]; try contradiction;
-    destruct b2' as [c2 vs2 | | ]; try contradiction.
+    destruct b1' as [c1 vs1 | [? | B1 f1] env_loc1 ]; try contradiction;
+    destruct b2' as [c2 vs2 | ]; try contradiction.
         + rewrite res_equiv_eq in Hres1, Hres2.
       destruct v1' as [l1' | lf1' f1']; destruct v2' as [l2' | lf2' f2']; try contradiction.
       simpl in Hres1, Hres2. 
@@ -1279,8 +1339,8 @@ Module CC_log_rel (H : Heap).
       destruct Hres2 as [Heqi2 Hres2]. subst.       
       destruct (get l1' H1') as [b1'|] eqn:Hget1'; [| contradiction ].
       destruct (get l2' H2') as [b2'|] eqn:Hget2'; [| contradiction ].
-      destruct b1' as [c1' vs1' | | ]; [| contradiction | contradiction ].
-      destruct b2' as [c2' vs2' | | ]; [| contradiction | contradiction ].
+      destruct b1' as [c1' vs1' | ]; [| contradiction ].
+      destruct b2' as [c2' vs2' | ]; [| contradiction ].
       
       destruct Hres1 as [Heqc1 Heqb1].
       destruct Hres2 as [Heqc2 Heqb2]. subst. 
@@ -1304,7 +1364,7 @@ Module CC_log_rel (H : Heap).
         rewrite <- (compose_id_neut_r (b2 ∘ b')).
         eapply IHj; [ eassumption | | reflexivity | | | ]. 
         now eapply Hin.
-        now firstorder. eapply Hres.
+        clear. now firstorder. eapply Hres.
         eapply injective_subdomain_antimon. eassumption.
         rewrite (reach_unfold _ [set b' l1]).
         eapply Included_Union_preserv_r.
@@ -1325,12 +1385,12 @@ Module CC_log_rel (H : Heap).
       destruct (get (b2 (b' (b1 l1'))) H2') as [b2'|] eqn:Hget2'; try contradiction.
       split. unfold compose. reflexivity.
 
-      destruct b1' as [c1' vs1' | | ]; try contradiction.
-      destruct b2' as [c2' vs2' | | ]; try contradiction.
+      destruct b1' as [c1' vs1' | ]; try contradiction.
+      destruct b2' as [c2' vs2' | ]; try contradiction.
 
       destruct Hall as [Hceq Hall].
       destruct Henv1 as [Hres Hlocs]. subst. rewrite res_equiv_eq in *.
-      destruct v as [l3' | lf3' f3']; destruct v0 as [l4' | lf4' f4']; try contradiction.
+      destruct v as [l3' | lf3' f3']; try contradiction.
       inv Hall. inv H5. inv H7.
       rewrite res_equiv_eq in *. 
       destruct y as [l5' | lf5' f5']; destruct y0 as [l6' | lf6' f6']; try contradiction.

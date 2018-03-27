@@ -83,36 +83,32 @@ Module SpaceSem (H : Heap).
         
         big_step_GC H rho (Ecase y cl) r c m
   | Eval_fun_gc :
-      forall (H H' H'' : heap block) (rho rho_clo rho' : env) (B : fundefs)
-        (env_loc : loc) (e : exp) (r : ans) (c : nat) (m : nat)
+      forall (H H' : heap block) (rho rho_clo rho' : env) (B : fundefs)
+        (e : exp) (r : ans) (c : nat) (m : nat)
         (Hcost : c >= cost (Efun B e))
         (* find the closure environment *)
         (Hres : restrict_env (fundefs_fv B) rho = rho_clo)
-        (* allocate the closure environment *)
-        (Halloc : alloc (Env rho_clo) H = (env_loc, H'))
         (* allocate the closures *)
-        (Hfuns : def_closures B B rho H' env_loc = (H'', rho'))
+        (Hfuns : def_closures B B rho H' rho_clo = (H', rho'))
         
-        (Hbs : big_step_GC H'' rho' e r (c - cost (Efun B e)) m),
+        (Hbs : big_step_GC H' rho' e r (c - cost (Efun B e)) m),
 
         big_step_GC H rho (Efun B e) r c m
     
   | Eval_app_gc :
       forall (H H' H'' : heap block) (rho rho_clo rho_clo1 rho_clo2 : env) (B : fundefs)
-        (f f' : var) (t : cTag) (xs : list var) (e : exp) (l env_loc: loc)
+        (f f' : var) (t : cTag) (xs : list var) (e : exp) (l : loc)
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
         (* Look up the closure *)
-        (Hgetl : get l H = Some (Clos (FunPtr B f') (Loc env_loc)))
-        (* Look up the closure environment *)
-        (Hget_env : get env_loc H = Some (Env rho_clo))
+        (Hgetl : get l H = Some (Clos (FunPtr B f') rho_clo))
         (* Find the code *)
         (Hfind : find_def f' B = Some (t, xs, e))
         (* Look up the actual parameters *)
         (Hargs : getlist ys rho = Some vs)
         (* Allocate mutually defined closures *)
-        (Hredef : def_closures B B rho_clo H env_loc = (H', rho_clo1))
+        (Hredef : def_closures B B rho_clo H rho_clo = (H', rho_clo1))
         (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
         
         (* collect H' *)
@@ -304,12 +300,11 @@ Module SpaceSem (H : Heap).
         
         ctx_to_heap_env (Eproj_c x t N y C) H rho H' rho' (c + cost_ctx (Eproj_c x t N y C))
   | Efun_c_to_rho :
-      forall H H' H'' H''' rho rho' rho'' env_loc rho_clo B C c,
+      forall H H' H''  rho rho' rho'' rho_clo B C c,
         restrict_env (fundefs_fv B) rho = rho_clo ->
-        alloc (Env rho_clo) H = (env_loc, H') ->
-        def_closures B B rho H' env_loc = (H'', rho') ->
-        ctx_to_heap_env C H'' rho' H''' rho'' c -> 
-        ctx_to_heap_env (Efun1_c B C) H rho H''' rho'' (c + cost_ctx (Efun1_c B C)).
+        def_closures B B rho H rho_clo = (H', rho') ->
+        ctx_to_heap_env C H' rho' H'' rho'' c -> 
+        ctx_to_heap_env (Efun1_c B C) H rho H'' rho'' (c + cost_ctx (Efun1_c B C)).
   
   Inductive ctx_to_heap_env_CC : exp_ctx -> heap block -> env -> heap block -> env -> nat -> Prop :=
   | Hole_c_to_heap_env_CC :
@@ -431,14 +426,14 @@ Module SpaceSem (H : Heap).
       + rewrite cost_ctx_full_f_comp_ctx_f. omega.
   Qed.
 
-  Lemma def_closures_size B1 B2 rho H l H' rho' :
-    def_closures B1 B2 rho H l = (H', rho') ->
+  Lemma def_closures_size B1 B2 rho H envc H' rho' :
+    def_closures B1 B2 rho H envc = (H', rho') ->
     size_heap H' = size_heap H + numOf_fundefs B1.
   Proof. 
     revert rho H H' rho'. induction B1; intros rho H H' rho' Hdefs; simpl; eauto.
     - simpl in Hdefs.
-      destruct (def_closures B1 B2 rho H l) as [H'' rho''] eqn:Hdefs'.
-      destruct (alloc (Clos (FunPtr B2 v) (Loc l))) as [l' H'''] eqn:Hal. inv Hdefs.
+      destruct (def_closures B1 B2 rho H envc) as [H'' rho''] eqn:Hdefs'.
+      destruct (alloc (Clos (FunPtr B2 v) envc)) as [l' H'''] eqn:Hal. inv Hdefs.
       unfold size_heap.
       erewrite (HL.size_with_measure_alloc _ _ _ H'' H'); eauto.
       erewrite IHB1; eauto. simpl. unfold size_heap. omega.
@@ -594,11 +589,7 @@ Module SpaceSem (H : Heap).
     simpl. omega.
     simpl.
     rewrite IHHctx. 
-    erewrite def_closures_size; eauto.
-    unfold size_heap.
-    erewrite (HL.size_with_measure_alloc _ _ _ H H');
-      [| reflexivity | eassumption ].
-    simpl. omega. 
+    erewrite def_closures_size; eauto. omega.
   Qed.
 
   Lemma ctx_to_heap_env_CC_size_heap C rho1 rho2 H1 H2 c :
@@ -623,9 +614,7 @@ Module SpaceSem (H : Heap).
     - eapply HL.subheap_trans.
       eapply HL.alloc_subheap. eassumption. eassumption.
     - eassumption.
-    - eapply HL.subheap_trans.
-      eapply HL.alloc_subheap. eassumption.
-      eapply HL.subheap_trans.
+    - eapply HL.subheap_trans. 
       eapply def_funs_subheap. now eauto. eassumption.
   Qed.
 
@@ -786,7 +775,7 @@ Module SpaceSem (H : Heap).
       destruct Heql as [Hbeq Heql]. 
       simpl in Heql. rewrite H1 in Heql.
       destruct (get l' H1') eqn:Hgetl'; try contradiction.
-      destruct b0 as [c' vs'| | ]; try contradiction.
+      destruct b0 as [c' vs'| ]; try contradiction.
       destruct Heql as [Heqt Hall]; subst.
       edestruct (Forall2_nthN _ vs vs' _ _ Hall H2) as [v' [Hnth' Hv]].
       specialize (IHHctx b H1' (M.set x v' rho1') e).

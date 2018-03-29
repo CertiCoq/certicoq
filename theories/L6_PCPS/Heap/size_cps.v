@@ -117,8 +117,7 @@ Module Size (H : Heap).
   Definition max_vars_block (b : block) : nat :=
     match b with
       | Constr _ vs => max_list_nat_with_measure max_vars_value 0 vs
-      | Clos v1 v2 => max (max_vars_value v1) (max_vars_value v2)
-      | Env x => 0
+      | Clos v1 rho => (max_vars_value v1) (* ?? *)
     end.
   
   Definition max_vars_heap (H : heap block) :=
@@ -163,14 +162,14 @@ Module Size (H : Heap).
     rewrite Hsub. rewrite Max.max_0_r. reflexivity.
   Qed.
 
-  Lemma max_vars_heap_def_closures_le H1 H1' rho1 rho1' B B0 l :
-    def_closures B B0 rho1 H1 l = (H1', rho1') ->
+  Lemma max_vars_heap_def_closures_le H1 H1' rho1 rho1' B B0 rho :
+    def_closures B B0 rho1 H1 rho = (H1', rho1') ->
     max_vars_heap H1 <= max_vars_heap H1'.
   Proof.
     revert H1' rho1'. induction B; intros H1' rho1' Hclo.
     - simpl in Hclo.
-      destruct (def_closures B B0 rho1 H1 l) as [H2 rho2] eqn:Hclo'.
-      destruct (alloc (Clos (FunPtr B0 v) (Loc l)) H2) as [l' rho3] eqn:Hal. inv Hclo.
+      destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'.
+      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo.
       eapply le_trans. eapply IHB; try eassumption. reflexivity.
       unfold max_vars_heap.  
       erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); [| reflexivity | eassumption ].
@@ -178,15 +177,15 @@ Module Size (H : Heap).
     - inv Hclo; eauto.
   Qed.
       
-  Lemma max_vars_heap_def_closures H1 H1' rho1 rho1' B B0 f l :
-    def_closures B B0 rho1 H1 l = (H1', rho1') ->
-    max_vars_block (Clos (FunPtr B0 f) (Loc l)) <=  max_vars_heap H1 ->
+  Lemma max_vars_heap_def_closures H1 H1' rho1 rho1' B B0 f rho :
+    def_closures B B0 rho1 H1 rho = (H1', rho1') ->
+    max_vars_block (Clos (FunPtr B0 f) rho) <=  max_vars_heap H1 ->
     max_vars_heap H1 = max_vars_heap H1'.
   Proof.
     revert H1' rho1'. induction B; intros H1' rho1' Hclo Hmax.
     - simpl in Hclo.
-      destruct (def_closures B B0 rho1 H1 l) as [H2 rho2] eqn:Hclo'.
-      destruct (alloc (Clos (FunPtr B0 v) (Loc l)) H2) as [l' rho3] eqn:Hal. inv Hclo.
+      destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'.
+      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo.
       erewrite (IHB H2); try eassumption; try reflexivity.
       unfold max_vars_heap.
       erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); [| reflexivity | eassumption ].
@@ -251,15 +250,15 @@ Module Size (H : Heap).
     + split. omega. omega.
   Qed.
 
-  Lemma cc_approx_val_max_vars_value k j IP P b v1 H1 v2 H2 :
-    (Res (v1, H1)) ≺ ^ (k; j; IP; P; b) (Res (v2, H2)) -> 
+  Lemma cc_approx_val_max_vars_value k j IP P b d v1 H1 v2 H2 :
+    (Res (v1, H1)) ≺ ^ (k; j; IP; P; b; d) (Res (v2, H2)) -> 
     max_vars_value v1 = 0.
   Proof.
     intros Heq. destruct v1; try contradiction. reflexivity.
   Qed.
-
-  Lemma cc_approx_val_max_vars_value_list k j IP P b vs1 H1 vs2 H2 :
-    Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k; j; IP; P; b) (Res (v2, H2))) vs1 vs2 -> 
+  
+  Lemma cc_approx_val_max_vars_value_list k j IP P b d vs1 H1 vs2 H2 :
+    Forall2 (fun v1 v2 => (Res (v1, H1)) ≺ ^ (k; j; IP; P; b; d) (Res (v2, H2))) vs1 vs2 -> 
     max_list_nat_with_measure max_vars_value 0 vs1 = 0.
   Proof.
     intros Heq. induction Heq; eauto.
@@ -267,10 +266,10 @@ Module Size (H : Heap).
     erewrite cc_approx_val_max_vars_value; [| eassumption ].
     eassumption.
   Qed.
+  
 
-
-  Lemma PostConstrCompat i j IP P b H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 k :
-    Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b H1 rho1 H2 rho2 y1 y2) ys1 ys2 -> 
+  Lemma PostConstrCompat i j IP P b d H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 k :
+    Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b d H1 rho1 H2 rho2 y1 y2) ys1 ys2 -> 
     k <= length ys1 ->
     InvCtxCompat (Post k) (Post 0)
                  H1 H2 rho1 rho2 (Econstr_c x1 c ys1 Hole_c) (Econstr_c x2 c ys2 Hole_c) e1 e2.
@@ -284,7 +283,8 @@ Module Size (H : Heap).
     rewrite !Hlen in *.
     eapply Forall2_monotonic_strong
       with (R' := fun y1 y2 : var =>
-                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' y1 y2) in Hall.
+                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) (lift b2 ∘ d ∘ b1)
+                                      H1' rho1' H2' rho2' y1 y2) in Hall.
     {  edestruct cc_approx_var_env_getlist as [vs2' [Hget2' Hcc]]; try eassumption.
        split.
       - split. omega.
@@ -338,9 +338,9 @@ Module Size (H : Heap).
     simpl; normalize_occurs_free...
     simpl; normalize_occurs_free...
   Qed.
-
-  Lemma PreConstrCompat i j IP P b H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 :
-    Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b H1 rho1 H2 rho2 y1 y2) ys1 ys2 -> 
+  
+  Lemma PreConstrCompat i j IP P b d H1 H2 rho1 rho2 x1 x2 c ys1 ys2 e1 e2 :
+    Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b d H1 rho1 H2 rho2 y1 y2) ys1 ys2 -> 
     IInvCtxCompat Pre Pre
                  H1 H2 rho1 rho2 (Econstr_c x1 c ys1 Hole_c) (Econstr_c x2 c ys2 Hole_c) e1 e2.
   Proof with (now eauto with Ensembles_DB).
@@ -351,7 +351,7 @@ Module Size (H : Heap).
     assert (Hlen := Forall2_length _ _ _ Hall).
     eapply Forall2_monotonic_strong
       with (R' := fun y1 y2 : var =>
-                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' y1 y2) in Hall.
+                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) (lift b2 ∘ d ∘ b1) H1' rho1' H2' rho2' y1 y2) in Hall.
     { edestruct cc_approx_var_env_getlist as [vs2' [Hget2' Hcc]]; try eassumption.
       split.
       - simpl. simpl in Hm1.
@@ -577,8 +577,8 @@ Module Size (H : Heap).
     omega. omega. 
   Qed.
 
-  Lemma PostAppCompat i j IP P b H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ k :
-    Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b H1 rho1 H2 rho2 y1 y2) (f1 :: xs1) (f2 :: xs2) -> 
+  Lemma PostAppCompat i j IP P b d H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ k :
+    Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b d H1 rho1 H2 rho2 y1 y2) (f1 :: xs1) (f2 :: xs2) -> 
     k <= S (length xs1) ->
     ~ Γ \in FromList xs2 ->
     ~ f2' \in FromList xs2 ->
@@ -586,16 +586,18 @@ Module Size (H : Heap).
                   H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ.
   Proof.
     unfold IInvAppCompat, Pre, Post.
-    intros Hall Hk Hnin1 Hnin2 _ H1' H1'' H2' rhoc1 rhoc2 rhoc3 rho1' rho2' rho2''
-           b1 b2 B1 f1' ct1 xs1' e1 l1 env_loc1 vs1 B
+    intros Hall Hk Hnin1 Hnin2 _ H1' H1'' H2'
+           rhoc1 rhoc2 rhoc3 rho1' rho2' rho2''
+           b1 b2 B1 f1' ct1 xs1' e1 l1 vs1 B
            f3 c ct2 xs2' e2 l2 env_loc2 vs2 c1 c2 m1 m2
            Heq1 Hinj1 Heq2 Hinj2
            [[Hc1 Hc2] [Hm1 Hm2]] [Hh1 Hh2]
-           Hgetf1 Hgetl1 Hgete1 Hfind1 Hgetxs1 Hclo Hset1
+           Hgetf1 Hgetl1 Hfind1 Hgetxs1 Hclo Hset1
            Hgetf2 Hgetxs2 Hset2 Hgetl2 Hfind2.
     eapply Forall2_monotonic_strong
       with (R' := fun y1 y2 : var =>
-                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' y1 y2) in Hall.
+                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) _
+                                      H1' rho1' H2' rho2' y1 y2) in Hall.
     assert (Hlen := Forall2_length _ _ _ Hall). inversion Hlen as [Hlen']. 
     { rewrite <- !plus_n_O in *. 
       rewrite !Hlen' in *.
@@ -626,7 +628,7 @@ Module Size (H : Heap).
           erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
           eapply max_vars_heap_get. eassumption.
           eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          eapply le_trans; [| eapply Max.le_max_l].
+          simpl.
           eapply le_trans.
           eapply exp_max_vars_exp_num_vars.
           eapply le_trans. 
@@ -637,7 +639,6 @@ Module Size (H : Heap).
           eapply plus_le_compat_r. eapply plus_le_compat_r. 
           eapply le_trans; [| eapply Max.le_max_l].
           eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          eapply le_trans; [| eapply Max.le_max_l].
           eapply le_trans. 
           eapply fun_in_fundefs_exp_num_vars.
           eapply find_def_correct. eassumption.
@@ -654,7 +655,6 @@ Module Size (H : Heap).
           eapply max_vars_heap_get. eassumption.
           eapply le_trans; [| eapply Max.le_max_l].
           eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          eapply le_trans; [| eapply Max.le_max_l].
           eapply le_trans.
           eapply exp_max_vars_exp_num_vars.
           eapply le_trans. 
@@ -665,7 +665,6 @@ Module Size (H : Heap).
           eapply plus_le_compat. eassumption.
           eapply le_trans; [| eapply Max.le_max_l].
           eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          eapply le_trans; [| eapply Max.le_max_l].
           simpl. omega.
         + eapply plus_le_compat_r. rewrite <- NPeano.Nat.mul_max_distr_r.
           eapply NPeano.Nat.max_le_compat.
@@ -677,7 +676,6 @@ Module Size (H : Heap).
           erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
           eapply max_vars_heap_get. eassumption.
           eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          eapply le_trans; [| eapply Max.le_max_l].
           eapply le_trans.
           eapply exp_max_vars_exp_num_vars.
           eapply le_trans. 

@@ -89,7 +89,7 @@ Module SpaceSem (H : Heap).
         (* find the closure environment *)
         (Hres : restrict_env (fundefs_fv B) rho = rho_clo)
         (* allocate the closures *)
-        (Hfuns : def_closures B B rho H' rho_clo = (H', rho'))
+        (Hfuns : def_closures B B rho H rho_clo = (H', rho'))
         
         (Hbs : big_step_GC H' rho' e r (c - cost (Efun B e)) m),
 

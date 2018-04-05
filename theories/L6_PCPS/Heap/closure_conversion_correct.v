@@ -22,7 +22,7 @@ Module ClosureConversionCorrect (H : Heap).
           Size.Util.C.LR.Sem Size.Util.C.LR Size.Util.C Size.Util Size.
   
   (** Invariant about the free variables *) 
-  Definition FV_inv (k j : nat) (IP : GIInv) (P : GInv) (b : Inj)
+  Definition FV_inv (k j : nat) (IP : GIInv) (P : GInv) (b : Inj) (d : EInj)
              (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
              (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
     exists (vs : list value) (l : loc),
@@ -31,7 +31,7 @@ Module ClosureConversionCorrect (H : Heap).
       Forall2_P Scope
                 (fun (x : var) (v2 : value)  =>
                    exists v1, M.get x rho1 = Some v1 /\
-                         Res (v1, H1) ≺ ^ ( k ; j ; IP ; P ; b) Res (v2, H2)) FVs vs.
+                         Res (v1, H1) ≺ ^ ( k ; j ; IP ; P ; b; d) Res (v2, H2)) FVs vs.
 
   
   (** Version without the logical relation. Useful when we're only interested in other invariants. *)
@@ -50,11 +50,12 @@ Module ClosureConversionCorrect (H : Heap).
   (** * Lemmas about [FV_inv] *)
 
   Require Import Logic.ClassicalFacts.
-  
-  Lemma FV_inv_image_post (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+
+(*
+  Lemma FV_inv_image_post (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
              (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
              (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->    
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->    
     image b ((post H1 ^ j) (env_locs rho1 (FromList FVs \\ Scope))) \subset
     (post H2 ^ j) (post H2 (env_locs rho2 ([set Γ]))).
   Proof with (now eauto with Ensembles_DB).
@@ -122,13 +123,14 @@ Module ClosureConversionCorrect (H : Heap).
         eapply IHHall.  eapply Disjoint_Included_l; [| eassumption ].
         rewrite FromList_cons...
   Qed.
-  
-  Lemma FV_inv_j_monotonic (k j' j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+ *)
+
+  Lemma FV_inv_j_monotonic (k j' j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
         (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
     j' <= j ->
-    FV_inv k j' GII GI b rho1 H1 rho2 H2 c Scope Γ FVs.
+    FV_inv k j' GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs.
   Proof.
     intros Hfv Hlt. 
     destruct Hfv as (v & vs & Hget1 & Hget2 & Hall).
@@ -139,12 +141,12 @@ Module ClosureConversionCorrect (H : Heap).
     eapply cc_approx_val_j_monotonic; eauto.
   Qed.
 
-  Lemma FV_inv_monotonic (k k' j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+  Lemma FV_inv_monotonic (k k' j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
         (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
     k' <= k ->
-    FV_inv k' j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs.
+    FV_inv k' j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs.
   Proof.
     intros Hfv Hlt. 
     destruct Hfv as (v & vs & Hget1 & Hget2 & Hall).
@@ -155,73 +157,73 @@ Module ClosureConversionCorrect (H : Heap).
     eapply cc_approx_val_monotonic; eauto.
   Qed.
     
-  Lemma FV_inv_image_reach_n (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
-             (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->    
-    image b (reach_n H1 j (env_locs rho1 (FromList FVs \\ Scope))) \subset
-    (reach_n H2 j (post H2 (env_locs rho2 ([set Γ])))).
-  Proof.
-    intros Hfv. 
-    intros l' [l [[m [Hm Hr]] Hin]].
-    eapply FV_inv_j_monotonic in Hfv; eauto.
-    eexists m. split; eauto. eapply FV_inv_image_post; try eassumption.
-    eexists; split; eauto.
-  Qed.
+  (* Lemma FV_inv_image_reach_n (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj) *)
+  (*            (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block) *)
+  (*            (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) : *)
+  (*   FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->     *)
+  (*   image b (reach_n H1 j (env_locs rho1 (FromList FVs \\ Scope))) \subset *)
+  (*   (reach_n H2 j (post H2 (env_locs rho2 ([set Γ])))). *)
+  (* Proof. *)
+  (*   intros Hfv.  *)
+  (*   intros l' [l [[m [Hm Hr]] Hin]]. *)
+  (*   eapply FV_inv_j_monotonic in Hfv; eauto. *)
+  (*   eexists m. split; eauto. eapply FV_inv_image_post; try eassumption. *)
+  (*   eexists; split; eauto. *)
+  (* Qed. *)
 
-  Lemma FV_inv_image_reach (k : nat) (GII : GIInv) (GI : GInv) (b : Inj)
-             (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) :
-    (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs) ->    
-    image b (reach' H1 (env_locs rho1 (FromList FVs \\ Scope))) \subset
-    (reach' H2 (post H2 (env_locs rho2 ([set Γ])))).
-  Proof.
-    intros Hfv.
-    intros l' [l [[m [Hm Hr]] Heq]].
-    eexists m. split; eauto. eapply FV_inv_image_post; eauto.
-    eexists; split; eauto.
-  Qed.
+  (* Lemma FV_inv_image_reach (k : nat) (GII : GIInv) (GI : GInv) (b : Inj) *)
+  (*            (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block) *)
+  (*            (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) : *)
+  (*   (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs) ->     *)
+  (*   image b (reach' H1 (env_locs rho1 (FromList FVs \\ Scope))) \subset *)
+  (*   (reach' H2 (post H2 (env_locs rho2 ([set Γ])))). *)
+  (* Proof. *)
+  (*   intros Hfv. *)
+  (*   intros l' [l [[m [Hm Hr]] Heq]]. *)
+  (*   eexists m. split; eauto. eapply FV_inv_image_post; eauto. *)
+  (*   eexists; split; eauto. *)
+  (* Qed. *)
 
-  Lemma FV_inv_image_reach_n_eq (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
-             (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
-    Disjoint _ (FromList FVs) Scope ->
-    image b (reach_n H1 j (env_locs rho1 (FromList FVs))) <-->
-    reach_n H2 j (post H2 (env_locs rho2 ([set Γ]))).
-  Proof.
-    intros Hfv. split.
-    - intros l' [l [[m [Hm Hr]] Hin]].
-      eapply FV_inv_j_monotonic in Hfv; eauto.
-      eexists m. split; eauto. eapply FV_inv_image_post_eq; try eassumption.
-      eexists; split; eauto.
-    - intros l' [m [Hm Hr]].
-      eapply FV_inv_j_monotonic in Hfv; eauto.
-      eapply FV_inv_image_post_eq in Hr; eauto.
-      destruct Hr as [l [Heql Hin]]. eexists; split; eauto.
-      eexists; split; eauto.
-  Qed.
+  (* Lemma FV_inv_image_reach_n_eq (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) *)
+  (*            (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block) *)
+  (*            (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) : *)
+  (*   FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs -> *)
+  (*   Disjoint _ (FromList FVs) Scope -> *)
+  (*   image b (reach_n H1 j (env_locs rho1 (FromList FVs))) <--> *)
+  (*   reach_n H2 j (post H2 (env_locs rho2 ([set Γ]))). *)
+  (* Proof. *)
+  (*   intros Hfv. split. *)
+  (*   - intros l' [l [[m [Hm Hr]] Hin]]. *)
+  (*     eapply FV_inv_j_monotonic in Hfv; eauto. *)
+  (*     eexists m. split; eauto. eapply FV_inv_image_post_eq; try eassumption. *)
+  (*     eexists; split; eauto. *)
+  (*   - intros l' [m [Hm Hr]]. *)
+  (*     eapply FV_inv_j_monotonic in Hfv; eauto. *)
+  (*     eapply FV_inv_image_post_eq in Hr; eauto. *)
+  (*     destruct Hr as [l [Heql Hin]]. eexists; split; eauto. *)
+  (*     eexists; split; eauto. *)
+  (* Qed. *)
 
-  Lemma FV_inv_image_reach_eq (k : nat) (GII : GIInv) (GI : GInv) (b : Inj)
-             (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) :
-    (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs) ->
-    Disjoint _ (FromList FVs) Scope ->
-    image b (reach' H1 (env_locs rho1 (FromList FVs))) <-->
-    (reach' H2 (post H2 (env_locs rho2 ([set Γ])))).
-  Proof.
-    intros Hfv. split.
-    - intros l' [l [[m [Hm Hr]] Heq]].
-      eexists m. split; eauto. eapply FV_inv_image_post_eq; eauto.
-      eexists; split; eauto.
-    - intros l' [m [Hm Hr]].
-      eapply FV_inv_image_post_eq in Hr; eauto.
-      destruct Hr as [l [Heql Hin]]. eexists; split; eauto.
-      eexists; split; eauto.
-  Qed.
+  (* Lemma FV_inv_image_reach_eq (k : nat) (GII : GIInv) (GI : GInv) (b : Inj) *)
+  (*            (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block) *)
+  (*            (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) : *)
+  (*   (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs) -> *)
+  (*   Disjoint _ (FromList FVs) Scope -> *)
+  (*   image b (reach' H1 (env_locs rho1 (FromList FVs))) <--> *)
+  (*   (reach' H2 (post H2 (env_locs rho2 ([set Γ])))). *)
+  (* Proof. *)
+  (*   intros Hfv. split. *)
+  (*   - intros l' [l [[m [Hm Hr]] Heq]]. *)
+  (*     eexists m. split; eauto. eapply FV_inv_image_post_eq; eauto. *)
+  (*     eexists; split; eauto. *)
+  (*   - intros l' [m [Hm Hr]]. *)
+  (*     eapply FV_inv_image_post_eq in Hr; eauto. *)
+  (*     destruct Hr as [l [Heql Hin]]. eexists; split; eauto. *)
+  (*     eexists; split; eauto. *)
+  (* Qed. *)
   
-  Lemma FV_inv_weak_in_FV_inv k j P1 P2 rho1 H1 rho2 H2 β c Scope Γ FVs :
-    FV_inv k j P1 P2 β rho1 H1 rho2 H2 c Scope Γ FVs ->
+  Lemma FV_inv_weak_in_FV_inv k j P1 P2 rho1 H1 rho2 H2 β d c Scope Γ FVs :
+    FV_inv k j P1 P2 β d rho1 H1 rho2 H2 c Scope Γ FVs ->
     FV_inv_weak rho1 rho2 H2 c Scope Γ FVs.
   Proof.
     intros (x1 & x2  & Hget1 & Hget2 & Hall).
@@ -230,12 +232,12 @@ Module ClosureConversionCorrect (H : Heap).
     intros ? ? ? ? ? [? [? ? ]]. eexists; eauto.
   Qed.
 
-  Lemma FV_inv_set_not_in_FVs_l (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+  Lemma FV_inv_set_not_in_FVs_l (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
         (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) x v  :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
     ~ x \in (FromList FVs \\ Scope) ->
-    FV_inv k j GII GI b (M.set x v rho1) H1 rho2 H2 c Scope Γ FVs.
+    FV_inv k j GII GI b d (M.set x v rho1) H1 rho2 H2 c Scope Γ FVs.
   Proof.
     intros (x1 & x2 & Hget1 & Hget2 & Hall).
     repeat eexists; eauto.
@@ -246,25 +248,25 @@ Module ClosureConversionCorrect (H : Heap).
     intros Hc; subst. eapply H; constructor; eauto. 
   Qed.
 
-  Lemma FV_inv_set_not_in_FVs_r (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+  Lemma FV_inv_set_not_in_FVs_r (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
         (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) x v  :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
     x <> Γ ->
-    FV_inv k j GII GI b rho1 H1 (M.set x v rho2) H2 c Scope Γ FVs.
+    FV_inv k j GII GI b d rho1 H1 (M.set x v rho2) H2 c Scope Γ FVs.
   Proof.
     intros (x1 & x2 & Hget1 & Hget2 & Hall).
     repeat eexists; eauto.
     rewrite M.gso; eauto.
   Qed. 
   
-  Lemma FV_inv_set_not_in_FVs (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+  Lemma FV_inv_set_not_in_FVs (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
         (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) x y v v'  :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
     ~ x \in (FromList FVs \\ Scope) ->
     y <> Γ ->
-    FV_inv k j GII GI b (M.set x v rho1) H1 (M.set y v' rho2) H2 c Scope Γ FVs.
+    FV_inv k j GII GI b d (M.set x v rho1) H1 (M.set y v' rho2) H2 c Scope Γ FVs.
   Proof.
     intros. eapply FV_inv_set_not_in_FVs_r; eauto.
     eapply FV_inv_set_not_in_FVs_l; eauto.
@@ -272,7 +274,7 @@ Module ClosureConversionCorrect (H : Heap).
   
 
   (** [FV_inv] is heap monotonic  *)
-  Lemma FV_inv_heap_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+  Lemma FV_inv_heap_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 H1' : heap block) (rho2 : env) (H2 H2' : heap block)
         (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) :
     well_formed (reach' H1 (env_locs rho1 (FromList FVs \\ Scope))) H1 ->
@@ -281,8 +283,8 @@ Module ClosureConversionCorrect (H : Heap).
     env_locs rho2 [set Γ] \subset dom H2 ->
     H1 ⊑ H1' ->
     H2 ⊑ H2' ->
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
-    FV_inv k j GII GI b rho1 H1' rho2 H2' c Scope Γ FVs.
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1' rho2 H2' c Scope Γ FVs.
   Proof.
     intros Hw1 Hw2 He1 He2 Hs1 Hs2.
     intros (x1 & x2 & Hget1 & Hget2 & Hall).
@@ -320,12 +322,13 @@ Module ClosureConversionCorrect (H : Heap).
   Qed.
   
   (** [FV_inv] under rename extension  *)
-  Lemma FV_inv_rename_ext (k j : nat) (GII : GIInv) (GI : GInv) (b b' : Inj)
+  Lemma FV_inv_rename_ext (k j : nat) (GII : GIInv) (GI : GInv) (b b' : Inj) (d d' : EInj)
         (rho1 : env) (H1 H2 : heap block) (rho2 : env) 
         (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
     f_eq_subdomain (reach' H1 (env_locs rho1 (FromList FVs \\ Scope))) b' b ->
-    FV_inv k j GII GI b' rho1 H1 rho2 H2 c Scope Γ FVs.
+    f_eq_subdomain (reach' H1 (env_locs rho1 (FromList FVs \\ Scope))) d' d ->
+    FV_inv k j GII GI b' d' rho1 H1 rho2 H2 c Scope Γ FVs.
   Proof.
     intros (x1 & x2 & Hget1 & Hget2 & Hall) Hfeq.
     repeat eexists; eauto.
@@ -337,16 +340,20 @@ Module ClosureConversionCorrect (H : Heap).
     eapply reach'_set_monotonic.
     eapply get_In_env_locs; eauto.
     constructor; eauto.
+    eapply f_eq_subdomain_antimon; try eassumption.
+    eapply reach'_set_monotonic.
+    eapply get_In_env_locs; eauto.
+    constructor; eauto. 
   Qed.
 
 
   (** [FV_inv] monotonic *)
-  Lemma FV_inv_Scope_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
+  Lemma FV_inv_Scope_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 H2 : heap block) (rho2 : env) 
         (c : cTag) (Scope Scope' : Ensemble var) (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
     Scope \subset Scope' -> 
-    FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope' Γ FVs.
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope' Γ FVs.
   Proof.
     intros (x1 & x2 & Hget1 & Hget2 & Hall) Hfeq.
     repeat eexists; eauto. eapply Forall2_P_monotonic. eassumption.
@@ -405,13 +412,13 @@ Module ClosureConversionCorrect (H : Heap).
   Qed.
   
 
-  Lemma project_var_preserves_cc_approx GII GI k j H1 rho1 H2 rho2 H2' rho2' b
+  Lemma project_var_preserves_cc_approx GII GI k j H1 rho1 H2 rho2 H2' rho2' b d
         Scope c Γ FVs x x' C S S' m y y' :
     project_var Scope c Γ FVs S x x' C S' ->
-    cc_approx_var_env k j GII GI b H1 rho1 H2 rho2 y y' ->
+    cc_approx_var_env k j GII GI b d H1 rho1 H2 rho2 y y' ->
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
     ~ y' \in S ->
-    cc_approx_var_env k j GII GI b H1 rho1 H2' rho2' y y'.
+    cc_approx_var_env k j GII GI b d H1 rho1 H2' rho2' y y'.
   Proof.     
     intros Hproj Hcc Hctx Hnin.
     destruct Hproj; inv Hctx; eauto.
@@ -419,14 +426,14 @@ Module ClosureConversionCorrect (H : Heap).
       intros Hc; subst; eauto.
   Qed.
   
-  Lemma project_vars_preserves_cc_approx GII GI k j H1 rho1 H2 rho2 H2' rho2' b
+  Lemma project_vars_preserves_cc_approx GII GI k j H1 rho1 H2 rho2 H2' rho2' b d
         Scope c Γ FVs xs xs' C S S' m y y' :
     project_vars Scope c Γ FVs S xs xs' C S' ->
-    cc_approx_var_env k j GII GI b H1 rho1 H2 rho2 y y' ->
+    cc_approx_var_env k j GII GI b d H1 rho1 H2 rho2 y y' ->
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
     ~ y' \in S ->
-    cc_approx_var_env k j GII GI b H1 rho1 H2' rho2' y y'.
-  Proof.     
+    cc_approx_var_env k j GII GI b d H1 rho1 H2' rho2' y y'.
+  Proof.
     intros Hvars. revert m H1 rho1 H2 rho2 H2' rho2'.
     induction Hvars; intros m H1 rho1 H2 rho2 H2' rho2' Hcc Hctx Hnin.
     - inv Hctx. eassumption.
@@ -439,12 +446,12 @@ Module ClosureConversionCorrect (H : Heap).
   Qed.  
 
   (** Correctness of [project_var] *)
-  Lemma project_var_correct GII GI k  H1 rho1 H2 rho2 H2' rho2' b
+  Lemma project_var_correct GII GI k  H1 rho1 H2 rho2 H2' rho2' b d
         Scope c Γ FVs x x' C S S' m :
     project_var Scope c Γ FVs S x x' C S' ->
     
-    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b) (H2, rho2)) ->
-    (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs) ->
+    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b; d) (H2, rho2)) ->
+    (forall j, FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs) ->
 
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
     
@@ -452,9 +459,9 @@ Module ClosureConversionCorrect (H : Heap).
     Disjoint _ S (FV_cc Scope Γ) ->
 
     ~ In _ S' x' /\
-    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b) (H2', rho2'))  /\
-    (forall j, FV_inv k j GII GI b rho1 H1 rho2' H2' c Scope Γ FVs) /\
-    (forall j, cc_approx_var_env k j GII GI b H1 rho1 H2' rho2' x x').
+    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b; d) (H2', rho2'))  /\
+    (forall j, FV_inv k j GII GI b d rho1 H1 rho2' H2' c Scope Γ FVs) /\
+    (forall j, cc_approx_var_env k j GII GI b d H1 rho1 H2' rho2' x x').
 
   Proof with (now eauto with Ensembles_DB).
     intros Hproj Hcc Henv Hctx Hbin Hd.
@@ -481,12 +488,12 @@ Module ClosureConversionCorrect (H : Heap).
   Qed.
   
   (** Correctness of [project_vars] *)
-  Lemma project_vars_correct GII GI k  H1 rho1 H2 rho2 H2' rho2' b
+  Lemma project_vars_correct GII GI k  H1 rho1 H2 rho2 H2' rho2' b d
         Scope c Γ FVs xs xs' C S S' m :
     project_vars Scope c Γ FVs S xs xs' C S' ->
     
-    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b) (H2, rho2)) ->
-    (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Γ FVs) ->
+    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b; d) (H2, rho2)) ->
+    (forall j, FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs) ->
 
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
 
@@ -494,9 +501,9 @@ Module ClosureConversionCorrect (H : Heap).
     Disjoint _ S (FV_cc Scope Γ) ->
 
     Disjoint _ (FromList xs') S' /\
-    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b) (H2', rho2'))  /\
-    (forall j, FV_inv k j GII GI b rho1 H1 rho2' H2' c Scope Γ FVs) /\
-    (forall j, Forall2 (fun x x' => cc_approx_var_env k j GII GI b H1 rho1 H2' rho2' x x') xs xs').
+    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b; d) (H2', rho2'))  /\
+    (forall j, FV_inv k j GII GI b d rho1 H1 rho2' H2' c Scope Γ FVs) /\
+    (forall j, Forall2 (fun x x' => cc_approx_var_env k j GII GI b d H1 rho1 H2' rho2' x x') xs xs').
   Proof with (now eauto with Ensembles_DB).
     intros Hvars. revert m H1 rho1 H2 rho2 H2' rho2'.
     induction Hvars; intros m H1 rho1 H2 rho2 H2' rho2' Hcc Hfv Hctx Hb Hd. 
@@ -544,36 +551,36 @@ Module ClosureConversionCorrect (H : Heap).
     eassumption.
   Qed.
 
-  Lemma image_FV GI GP k β H1 rho1 H2 rho2 Scope `{Decidable _ Scope} FVs Γ c :
-    (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; GI ; GP ; β) (H2, rho2)) ->
-    (forall j, FV_inv k j GI GP β rho1 H1 rho2 H2 c Scope Γ FVs) ->
-    binding_in_map Scope rho1 ->
+  (* Lemma image_FV GI GP k β H1 rho1 H2 rho2 Scope `{Decidable _ Scope} FVs Γ c : *)
+  (*   (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; GI ; GP ; β; d) (H2, rho2)) -> *)
+  (*   (forall j, FV_inv k j GI GP β d rho1 H1 rho2 H2 c Scope Γ FVs) -> *)
+  (*   binding_in_map Scope rho1 -> *)
 
-    (image β (reach' H1 (env_locs rho1 (FV Scope FVs)))) \subset
-    reach' H2 (env_locs rho2 Scope :|: (post H2 (env_locs rho2 [set Γ]))).
-  Proof.
-    intros. unfold FV, FV_cc.
-    rewrite !env_locs_Union, !reach'_Union, !image_Union.
-    rewrite cc_approx_env_image_reach; try eassumption. 
-    eapply Included_Union_compat. reflexivity.
-    eapply FV_inv_image_reach; try eassumption.
-  Qed.     
+  (*   (image β (reach' H1 (env_locs rho1 (FV Scope FVs)))) \subset *)
+  (*   reach' H2 (env_locs rho2 Scope :|: (post H2 (env_locs rho2 [set Γ]))). *)
+  (* Proof. *)
+  (*   intros. unfold FV, FV_cc. *)
+  (*   rewrite !env_locs_Union, !reach'_Union, !image_Union. *)
+  (*   rewrite cc_approx_env_image_reach; try eassumption.  *)
+  (*   eapply Included_Union_compat. reflexivity. *)
+  (*   eapply FV_inv_image_reach; try eassumption. *)
+  (* Qed.      *)
 
-  Lemma image_FV_eq GI GP k β H1 rho1 H2 rho2 Scope `{Decidable _ Scope} FVs Γ c :
-    (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; GI ; GP ; β) (H2, rho2)) ->
-    (forall j, FV_inv k j GI GP β rho1 H1 rho2 H2 c Scope Γ FVs) ->
-    binding_in_map Scope rho1 ->
-    Disjoint var (FromList FVs) Scope ->
-    (image β (reach' H1 (env_locs rho1 (FV Scope FVs)))) <-->
-    reach' H2 (env_locs rho2 Scope :|: (post H2 (env_locs rho2 [set Γ]))).
-  Proof.
-    intros. unfold FV, FV_cc.
-    rewrite !env_locs_Union, !reach'_Union, !image_Union.
-    rewrite cc_approx_env_image_reach; try eassumption. 
-    eapply Same_set_Union_compat. reflexivity.
-    rewrite Setminus_Disjoint; [| eassumption ].
-    rewrite FV_inv_image_reach_eq; try eassumption. reflexivity.
-  Qed.
+  (* Lemma image_FV_eq GI GP k β H1 rho1 H2 rho2 Scope `{Decidable _ Scope} FVs Γ c : *)
+  (*   (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; GI ; GP ; β) (H2, rho2)) -> *)
+  (*   (forall j, FV_inv k j GI GP β rho1 H1 rho2 H2 c Scope Γ FVs) -> *)
+  (*   binding_in_map Scope rho1 -> *)
+  (*   Disjoint var (FromList FVs) Scope -> *)
+  (*   (image β (reach' H1 (env_locs rho1 (FV Scope FVs)))) <--> *)
+  (*   reach' H2 (env_locs rho2 Scope :|: (post H2 (env_locs rho2 [set Γ]))). *)
+  (* Proof. *)
+  (*   intros. unfold FV, FV_cc. *)
+  (*   rewrite !env_locs_Union, !reach'_Union, !image_Union. *)
+  (*   rewrite cc_approx_env_image_reach; try eassumption.  *)
+  (*   eapply Same_set_Union_compat. reflexivity. *)
+  (*   rewrite Setminus_Disjoint; [| eassumption ]. *)
+  (*   rewrite FV_inv_image_reach_eq; try eassumption. reflexivity. *)
+  (* Qed. *)
 
   Lemma make_closures_env_locs_well_formed B fvs Γ C H rho H' rho' k S :
     make_closures Size.Util.clo_tag B fvs Γ C ->
@@ -688,63 +695,97 @@ Module ClosureConversionCorrect (H : Heap).
        intros Hc. subst; eapply Hin; left; eauto.
     - eapply IHHcc; eauto.
       intros Hc. eapply Hin; right; eauto.
-  Qed. 
-    
-  Lemma make_closures_correct k j GI GP b C rho1 H1 rho2 H1' rho1' H2 rho2'
-        H2' Scope FVs B1 B2 B1'
-        c Γ fvs B' fvs' m l1 l2 :
+  Qed.
+
+  Definition Fun_inv k j GI GP b d rho1 H1 rho2 H2 Funs Γ :=
+    forall f, f \in Funs ->
+         exists l1 lenv B g,
+           M.get f rho1 = Some (Loc l1) /\
+           M.get f rho2 = Some (FunPtr B g) /\
+           M.get Γ rho2 = Some (Loc lenv) /\
+           let '(l2, H2') := alloc (Constr Size.Util.clo_tag [FunPtr B g; Loc lenv]) H2 in
+           Res (Loc l1, H1) ≺ ^ (k; j; GI; GP; b{l1 ~> l2}; d{l1 ~> Some lenv}) Res (Loc l2, H2'). 
+
+  Lemma make_closures_Fun_inv GI GP k j C rho1 H1 rho2 H2 rho2' H2'
+        Γ fvs B m Funs d b :
+    make_closures Size.Util.clo_tag B fvs Γ C ->
+    ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
+    ~ In var (name_in_fundefs B) Γ ->
+    Fun_inv k j GI GP b d rho1 H1 rho2 H2 Funs Γ ->
+    Fun_inv k j GI GP b d rho1 H1 rho2' H2' (Funs \\ name_in_fundefs B) Γ.
+  Proof.
+    intros Hcc Hctx Hnin Hfun x Hin. inv Hin.
+    edestruct Hfun as (l1 & lenv & B1' & g & Hget1 & Hget2 & Hget3 & Heq). eassumption.
+    eexists l1, lenv, B1', g. split; [| split; [ | split ]].
+    + eassumption.
+    + erewrite <- make_closures_get; try eassumption. 
+    + erewrite <- make_closures_get; try eassumption.
+    + destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2) as [l3 H3] eqn:Ha1. 
+      destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2') as [l3' H3'] eqn:Ha2.
+      simpl in Heq. 
+      simpl. intros Hcc. revert rho1 H1 rho2 H2 rho2' H2' m.
+      induction Hcc; intros rho1 H1 rho2 H2 rho2' H2' m Hctx Hinv.
+    - inv Hctx. simpl. intros x Hin. eapply Hinv. eapply Hin.
+    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l
+        as (rho3 & H3 & m1 & m2 & Hctx1 & Hctx2 & Hplus); eauto.
+      subst. intros x Hin. 
+      inv 
+      inv Hctx2. inv H14.
+       rewrite M.gso; eauto. eapply IHHcc. eassumption.
+       intros Hc. eapply Hin; right; eauto.
+       intros Hc. subst; eapply Hin; left; eauto.
+    - eapply IHHcc; eauto.
+      intros Hc. eapply Hin; right; eauto.
+  Qed.
+
+  Lemma make_closures_correct k j GI GP b d C rho1 H1 rho2 H2 rho2'
+        H2' Scope FVs B1 Γ fvs m :
+
     make_closures Size.Util.clo_tag B1 fvs Γ C ->
 
     well_formed (reach' H1 (env_locs rho1 (FV Scope FVs))) H1 ->
     env_locs rho1 (FV Scope FVs) \subset dom H1  ->
     well_formed (reach' H2 (env_locs rho2 (FV_cc Scope Γ))) H2 ->
     env_locs rho2 (FV_cc Scope Γ) \subset dom H2  ->
-    
-    injective_subdomain (reach' H1 (env_locs rho1 (FV Scope FVs))) b ->
 
-    fvs \subset (FV Scope FVs) ->
-
-    
-    (H1, rho1) ⋞ ^ (Scope; k; j; GI; GP; b) (H2, rho2) ->
-
-    Closure_conversion_fundefs Size.Util.clo_tag B' c fvs' B1 B2 ->
-
-    unique_functions B1 -> ~ Γ \in (name_in_fundefs B1) -> 
-   
-    def_closures B1 B1' rho1 H1 l1 = (H1', rho1') ->
-    
-    M.get Γ rho2 = Some (Loc l2) ->
-    (forall f ,
-       f \in name_in_fundefs B1 ->
-       exists B2',
-         M.get f rho2 = Some (FunPtr B2' f) /\
-         cc_approx_block k j GI GP b
-                         (Clos (FunPtr B1' f) (Loc l1)) H1
-                         (Constr Size.Util.clo_tag [FunPtr B2' f; Loc l2]) H2) ->
+    Fun_inv k j GI GP b d rho1 H1 rho2 H2 (name_in_fundefs B1) Γ ->
+    (H1, rho1) ⋞ ^ (Scope; k; j; GI; GP; b; d) (H2, rho2) ->
     
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
+
+    (* Closure_conversion_fundefs Size.Util.clo_tag B' c fvs' B1 B2 -> *)
     
-    (exists b',
-       (H1', rho1') ⋞ ^ ((name_in_fundefs B1 :&: fvs) :|: Scope; k; j; GI; GP; b') (H2', rho2') /\
-       injective_subdomain (reach' H1' (env_locs rho1' (FV (name_in_fundefs B1 :&: fvs :|: Scope) FVs))) b').
+    unique_functions B1 ->
+    ~ Γ \in (name_in_fundefs B1) ->
+    
+    
+    exists b' d',
+      (H1, rho1) ⋞ ^ ((name_in_fundefs B1 :&: fvs) :|: Scope; k; j; GI; GP; b'; d') (H2', rho2').
+  (* injective_subdomain (reach' H1' (env_locs rho1' (FV (name_in_fundefs B1 :&: fvs :|: Scope) FVs))) b' *)
   Proof with (now eauto with Ensembles_DB).
     intros Hclo.
-    revert Scope B2 b H1 rho1 H1' rho1' H2 rho2 H2' rho2' m.
+    revert m rho1 H1 rho2 H2 rho2' H2' Scope.
     induction Hclo as [Γ fvs | f xs t e B fvs | f xs t e B fvs ];
-      intros Scope B2 b H1 rho1 H1' rho1' H2 rho2 H2' rho2' m
-             Hwf1 Hlocs1 Hwf2 Hlocs2 Hinj Hsub Hrel Hcc Hun Hnin Hdef Hget Henv Hctx.
-    - inv Hctx. inv Hdef. simpl name_in_fundefs. 
-      eexists. unfold FV. do 2 rewrite Intersection_Empty_set_abs_l at 1.
-      rewrite !Union_Empty_set_neut_l.
-      split; eauto. eapply injective_subdomain_antimon. eassumption.
-      unfold closure_conversion.FV.
-      eapply reach'_set_monotonic. eapply env_locs_monotonic... 
+      intros m rho1 H1 rho2 H2 rho2' H2' Scope
+             Hwf1 Hlocs1 Hwf2 Hlocs2 Hinv Hrel Hctx Hun Hnin.
+    - inv Hctx. simpl name_in_fundefs. 
+      do 2 eexists. eapply cc_approx_env_P_antimon. eassumption.
+      rewrite Intersection_Empty_set_abs_l at 1...
     - edestruct ctx_to_heap_env_CC_comp_ctx_f_l
         as (rho3 & H3 & m1 & m2 & Hctx1 & Hctx2 & Hplus).
       eassumption. subst. inv Hctx2. inv H15.
       simpl name_in_fundefs.
-      simpl in Hdef.  
-      destruct (def_closures B B1' rho1 H1 l1) as [H1'' rho1''] eqn:Hdefc.
+      simpl in H13.
+      destruct (M.get f rho3) eqn:Hgetf; try congruence.
+      destruct (M.get Γ rho3) eqn:Hgetg; try congruence. inv H13.
+      simpl in IHHclo.
+      edestruct IHHclo as [b1 [d2 Henv]]; [ | | | | | | eassumption | | | ]; try eassumption. 
+      + admit.
+      + inv Hun. eassumption.
+      + intros Hc. eapply Hnin. right. eassumption.
+      + edestruct Hinv as (l1 & lenv & B1' & g & Hget1 & Hget2 & Hget3 & Heq). now left.
+        
+        destruct (def_closures B B1' rho1 H1 l1) as [H1'' rho1''] eqn:Hdefc.
       destruct (alloc (Clos (FunPtr B1' f) (Loc l1)) H1'') as [l' H1'''] eqn:Hal.
       inv Hdef. simpl in H13.
       edestruct (Henv f) as [B2' [Hgetf Hblock]]. now left.
@@ -975,7 +1016,7 @@ Module ClosureConversionCorrect (H : Heap).
       + inv Hun; eauto.
       + intros Hc; eapply Hnin; right; eauto.
 
-
+(*
   Lemma Closure_conversion_fundefs_correct
     (k : nat)
     (* The IH *)
@@ -1106,14 +1147,17 @@ Module ClosureConversionCorrect (H : Heap).
   Lemma Closure_conversion_correct (k : nat) (H1 H2 : heap block)
         (rho1 rho2 : env) (e1 e2 : exp) (C : exp_ctx)
         (Scope Funs : Ensemble var) `{HD: Decidable _ Scope} `{ToMSet Funs} (FVs : list var)
-        (β : Inj) (c : cTag) (Γ : var) :
+        (β : Inj) (δ : EInj) (c : cTag) (Γ : var) :
     (* [Scope] invariant *)
-    (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; PreG Funs; (fun i => Post 0) ; β) (H2, rho2)) ->
-    (* Free variables invariant *)
-    (forall j, FV_inv k j (PreG Funs) (fun i => Post 0) β rho1 H1 rho2 H2 c Scope Γ FVs) ->
-    (* location renaming is injective *)
-    (* only needed to prove the lower bound *)
-    injective_subdomain (reach' H1 (env_locs rho1 (FV Scope FVs))) β ->
+    (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; PreG Funs; (fun i => Post 0) ; β; δ) (H2, rho2)) ->
+    (* Free variable invariant *)
+    (forall j, FV_inv k j (PreG Funs) (fun i => Post 0) β δ rho1 H1 rho2 H2 c Scope Γ FVs) ->
+    (* the reachable parts of the heap are in bijection *)
+    image β (reach' H1 (env_locs rho1 (FV Scope FVs))) :|: image' δ (reach' H1 (env_locs rho1 (FV Scope FVs))) <-->
+    reach' H2 (env_locs rho2 (FV_cc Scope Γ)) ->
+    FV Scope FVs <--> occurs_free e1 ->
+    FV_cc Scope Γ <--> occurs_free e2 ->
+    
     
     (* well-formedness *)
     well_formed (reach' H1 (env_locs rho1 (FV Scope FVs))) H1 ->
@@ -1544,4 +1588,4 @@ Module ClosureConversionCorrect (H : Heap).
     - (* case Ehalt *)
       inv Hcc.
       admit.
-  Abort.
+  

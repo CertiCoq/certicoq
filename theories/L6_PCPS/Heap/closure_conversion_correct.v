@@ -722,7 +722,13 @@ Module ClosureConversionCorrect (H : Heap).
     + erewrite <- make_closures_get; try eassumption.
     + destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2) as [l3 H3] eqn:Ha1. 
       destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2') as [l3' H3'] eqn:Ha2.
-      simpl in Heq. 
+      simpl in Heq. destruct Heq as [_ Hres]. 
+      rewrite (gas _ _ l3 _ H3 Ha1) in Hres. 
+      destruct (get l1 H1) as [ [ | ] |]  eqn:Hgetl1; try contradiction.
+      * admit.
+      * simpl. rewrite (gas _ _ l3' _ H3' Ha2). split.
+        rewrite extend_gss. reflexivity.
+        rewrite Hgetl1. Focus 2. 
       simpl. intros Hcc. revert rho1 H1 rho2 H2 rho2' H2' m.
       induction Hcc; intros rho1 H1 rho2 H2 rho2' H2' m Hctx Hinv.
     - inv Hctx. simpl. intros x Hin. eapply Hinv. eapply Hin.

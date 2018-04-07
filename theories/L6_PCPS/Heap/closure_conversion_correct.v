@@ -722,13 +722,69 @@ Module ClosureConversionCorrect (H : Heap).
     + erewrite <- make_closures_get; try eassumption.
     + destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2) as [l3 H3] eqn:Ha1. 
       destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2') as [l3' H3'] eqn:Ha2.
-      simpl in Heq. destruct Heq as [_ Hres]. 
-      rewrite (gas _ _ l3 _ H3 Ha1) in Hres. 
-      destruct (get l1 H1) as [ [ | ] |]  eqn:Hgetl1; try contradiction.
-      * admit.
-      * simpl. rewrite (gas _ _ l3' _ H3' Ha2). split.
+      eapply cc_approx_val_rename_ext. eapply cc_approx_val_res_eq with (b2 := id {l3 ~> l3'}).
+      * eassumption.
+      * reflexivity.
+      * clear. now firstorder.
+      * rewrite res_equiv_eq. simpl. split.
         rewrite extend_gss. reflexivity.
-        rewrite Hgetl1. Focus 2. 
+        rewrite (gas _ _ l3 _ H3 Ha1).
+        rewrite (gas _ _ l3' _ H3' Ha2).
+        split. reflexivity.
+        constructor.
+        rewrite res_equiv_eq. split; reflexivity.
+        constructor; [| now constructor ].
+        eapply res_equiv_rename_ext.
+        { eapply Equivalence_Transitive; [| eapply Equivalence_Transitive ].
+          - symmetry.
+            eapply subheap_res_equiv with (β := id).
+            
+            admit. admit. admit.
+
+            eapply HL.alloc_subheap. eassumption.
+          - eapply subheap_res_equiv with (β := id).
+            
+            admit. admit. admit.
+
+            eapply ctx_to_heap_env_CC_subheap. eassumption.
+          - eapply subheap_res_equiv with (β := id).
+            
+            admit. admit. admit.
+
+            eapply HL.alloc_subheap. eassumption. }
+        admit.
+        reflexivity.
+      * admit. 
+            reflexivity.
+      simpl in Heq. destruct Heq as [_ Hres].  
+      rewrite (gas _ _ l3 _ H3 Ha1) in Hres.   
+      destruct (get l1 H1) as [ [ | ] |]  eqn:Hgetl1; try contradiction.
+      * simpl. rewrite (gas _ _ l3' _ H3' Ha2). split. 
+        rewrite extend_gss. reflexivity.
+        rewrite Hgetl1. destruct Hres as [Heq1 Hall]. split; eauto.
+        intros i Hlt.
+        eapply Forall2_monotonic_strong; [| now eapply Hall; eauto ].
+        intros x1 x2 Hin1 Hin2 Hval. simpl in Hval.
+        rewrite cc_approx_val_eq in *. eapply cc_approx_val_heap_monotonic.
+        admit. admit. admit. admit. now eapply HL.subheap_refl.
+
+    Lemma cc_approx_val_alloc_subheap GI GP k j C rho1 H1 rho2 H2 rho2' H2' : 
+      Res (x1, H1) ≺ ^ (k; i; GI; GP; b {l1 ~> l3}; d {l1 ~> Some lenv}) Res (x2, H3) ->
+      alloc b H2 = (l1, H2') ->
+      alloc b H3 = (l2, H3') ->
+
+
+        eapply HL.subheap_trans. eapply ctx_to_heap_env_CC_subheap. eassumption.
+        eapply HL.alloc_subheap. eassumption.
+        eapply cc_approx_val_rename_ext. eassumption.
+        with (H1 := H.
+        destruct v; try contradiction. split. 
+        rewrite extend_gss. reflexivity. Focus 2. 
+      siadmit.
+      * simpl. rewrite (gas _ _ l3' _ H3' Ha2). split. 
+        rewrite extend_gss. reflexivity.
+        rewrite Hgetl1. destruct v; try contradiction. split. 
+        rewrite extend_gss. reflexivity. Focus 2. 
       simpl. intros Hcc. revert rho1 H1 rho2 H2 rho2' H2' m.
       induction Hcc; intros rho1 H1 rho2 H2 rho2' H2' m Hctx Hinv.
     - inv Hctx. simpl. intros x Hin. eapply Hinv. eapply Hin.

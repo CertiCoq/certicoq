@@ -93,7 +93,7 @@ Section CC.
         make_closures B FV Γ C ->
         f \in FV ->
         make_closures (Fcons f t xs e B) FV Γ
-                      (comp_ctx_f C (Econstr_c f clo_tag [f ; Γ] Hole_c))
+                      (Econstr_c f clo_tag [f ; Γ] C)
   | closures_Fcons_nin_FV :
       forall f xs t e B FV Γ C,
         make_closures B FV Γ C ->

@@ -105,15 +105,16 @@ Module CCUtil (H : Heap).
     simpl in *; repeat normalize_sets; (repeat normalize_occurs_free).
     - eassumption.
     - repeat normalize_sets.
-      rewrite <- app_ctx_f_fuse. simpl. eapply IHHmc.
+      eapply Union_Included. eapply Included_trans; [| eassumption ]...
+      eapply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply IHHmc with (F := F).
       inv Hun; eassumption.
-      simpl. normalize_occurs_free. repeat normalize_sets.
-      apply Union_Included.
+      eapply Included_trans; [ eassumption |].
+      apply Union_Included. now eauto with Ensembles_DB.  
       eapply Included_Union_preserv_l. 
       eapply Included_trans; [| eassumption ]...
-      eapply Setminus_Included_Included_Union.
-      eapply Included_trans; [ eassumption |]...
       eapply Included_trans; [| eassumption ]...
+      now eauto with Ensembles_DB. 
     - inv Hun. eapply IHHmc.
       eassumption.
       eapply Included_trans; [ eassumption |].
@@ -144,9 +145,10 @@ Module CCUtil (H : Heap).
   Proof.
     intros Hmc; revert e; induction Hmc; intros e';
     [ split; now eauto | | ].
-    rewrite <- app_ctx_f_fuse.
-    rewrite IHHmc. split; eauto; intros Hf; [ now inv Hf | now constructor ].
-    eapply IHHmc; eauto.
+    - simpl.
+      rewrite <- (IHHmc e').
+      split; eauto. intros Hf; now inv Hf.
+    - eapply IHHmc; eauto.
   Qed.
 
   Lemma closure_conversion_fundefs_Same_set c Funs FVs B1 B2  :

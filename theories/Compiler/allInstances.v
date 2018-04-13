@@ -136,7 +136,7 @@ Quote Recursively Definition graph_color := 2.  (*(Color.run G16)*)
 
 
 (* Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5a) binom). *)
-Definition color5 := Eval native_compute in (translateTo (cTerm certiL5a) graph_color).   
+Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).   
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
 
 
@@ -178,11 +178,11 @@ Definition print_BigStepResult_L6 p  n:=
  Definition comp_L6 p := match p
                           with
                             | Exc s => Exc s
-                            | Ret v =>  Ret (L6.instances.certiL5a_t0_L6 v)                                           
+                            | Ret v =>  L6.instances.certiL5_t0_L6 v                                           
                         end.
 
 Definition comp_to_L6:= fun p =>
-                       comp_L6 (translateTo (cTerm certiL5a) p).
+                       comp_L6 (translateTo (cTerm certiL5) p).
 
 
 Definition testL6 := match comp_L6 color5 with

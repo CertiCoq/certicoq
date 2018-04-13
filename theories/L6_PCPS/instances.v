@@ -101,9 +101,9 @@ Definition Γ := 2%positive.
 (*                  (Eproj Γ bogus_clo_tag 1%N f *)
 (*                         (Eapp f' t (Γ :: xs)))). *)
 
-  Require Import ExtLib.Data.Monads.OptionMonad.
+Require Import ExtLib.Data.Monads.OptionMonad.
 
-  Require Import ExtLib.Structures.Monads.
+Require Import ExtLib.Structures.Monads.
   
 
 Instance certiL5_t0_L6: 

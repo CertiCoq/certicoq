@@ -1,5 +1,5 @@
 (* Convertion from 
-       L4.L5A.cps  (L5a)
+       L4.L5A.cps  (L5)
               to
        cps.exp (L6)
     resulting in a term with globally unique names  

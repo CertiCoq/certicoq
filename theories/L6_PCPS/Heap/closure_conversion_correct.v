@@ -51,7 +51,137 @@ Module ClosureConversionCorrect (H : Heap).
 
   Require Import Logic.ClassicalFacts.
 
-(*
+  Lemma PS_nonempty_add (S : PS.t) :
+    PS.cardinal S > 0 ->
+    exists x S', ~ PS.In x S' /\ PS.Equal S (PS.add x S'). 
+  Proof.
+    intros Hsize. destruct (PS.elements S) eqn:Helem. 
+    - rewrite PS.cardinal_spec, Helem in Hsize; eauto. simpl in *. omega.
+    - eexists e, (PS.remove e S). split.
+
+      intros Hin. eapply PS.remove_spec in Hin.
+      inv Hin; eauto.
+      
+      intros x. split; intros Hin.
+      destruct (var_dec x e); subst.
+      + eapply PS.add_spec. now left.
+      + eapply PS.add_spec. right.
+        eapply PS.remove_spec. split; eauto.
+      + eapply PS.add_spec in Hin. inv Hin; subst.
+        eapply PS.elements_spec1. rewrite Helem.
+        now constructor.
+        eapply PS.remove_spec in H. inv H; eauto.
+  Qed.
+
+  Require Import Permutation.
+  
+  Lemma PS_add_elements S x : 
+    ~ PS.In x S ->
+    Permutation (x :: PS.elements S) (PS.elements (PS.add x S)).
+  Proof.
+    intros Hnin. 
+    eapply NoDup_Permutation.
+    - constructor. intros Hin. eapply Hnin.
+      eapply PS.elements_spec1. eapply In_InA; try eassumption.
+      now eauto with typeclass_instances.
+      eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+    - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+    - intros y. split.
+      + intros Hin. inv Hin.
+
+        assert (HinA : InA eq y (PS.elements (PS.add y S))).
+        { eapply PS.elements_spec1. eapply PS.add_spec. now left. }
+        edestruct InA_alt as [[z [Heq1 Hin]] _]. eassumption.
+        subst. eassumption.
+
+        eapply In_InA in H. 
+        assert (HinA : InA eq y (PS.elements (PS.add x S))).
+        { eapply PS.elements_spec1. eapply PS.add_spec. right.
+          eapply PS.elements_spec1 in H. eassumption. }
+
+        edestruct InA_alt as [[z [Heq1 Hin]] _]. eassumption. subst.
+        subst. eassumption.
+
+        now eauto with typeclass_instances.
+      + intros Hin.
+        eapply In_InA in Hin.
+
+        eapply PS.elements_spec1 in Hin. 
+        eapply PS.add_spec in Hin. inv Hin.
+        now constructor.
+        constructor 2.
+
+        assert (HinA : InA eq y (PS.elements S)).
+        { eapply PS.elements_spec1. eassumption. }
+
+        edestruct InA_alt as [[z [Heq1 Hin]] _]. eassumption.
+        subst. eassumption.
+
+        now eauto with typeclass_instances.
+  Qed. 
+
+  Lemma PS_cardinal_add (S : PS.t) x :
+    ~ PS.In x S ->
+    1 + PS.cardinal S = PS.cardinal (PS.add x S).
+  Proof. 
+    intros Hnin. rewrite !PS.cardinal_spec.
+    erewrite (@Permutation_length _ (PS.elements (PS.add x S)));
+      [| symmetry; now apply PS_add_elements ]. 
+    reflexivity.
+  Qed.
+
+  Lemma PS_cardinal_empty S :
+    PS.cardinal S = 0 -> PS.Equal S PS.empty. 
+  Proof.
+    intros Heq x. rewrite PS.cardinal_spec in Heq.
+    split; intros Hin.
+    - eapply PS.elements_spec1 in Hin.
+      destruct (PS.elements S) as [| x1 l1 ]. now inv Hin.
+      now inv Heq.
+    - inv Hin.
+  Qed.
+    
+  Lemma PS_ind (P : PS.t -> Prop) {_ : Proper (PS.Equal ==> iff) P} :
+    P PS.empty ->
+    (forall x S, ~ PS.In x S -> P S -> P (PS.add x S)) ->
+    (forall S, P S).
+  Proof.
+    intros Hemp IH S.
+    assert (Hs: PS.cardinal S = PS.cardinal S) by reflexivity.
+    revert Hs.
+    generalize (PS.cardinal S) at 1. intros n.
+    revert S. induction n; intros S Heq.
+    - eapply H. eapply PS_cardinal_empty. now eauto. eassumption.
+    - edestruct PS_nonempty_add as (e & S' & HninS & HeqS).
+      rewrite <- Heq. omega. 
+      eapply H. eassumption. eapply IH. 
+      eassumption. eapply IHn.
+      rewrite HeqS in Heq. simpl in Heq. 
+      rewrite <- PS_cardinal_add in Heq. omega.
+      eassumption.
+  Qed.
+
+  
+  Lemma FromSet (P : Ensemble var -> Prop) {_ : Proper (Same_set _ ==> iff) P} :
+    P (Empty_set _) ->
+    (forall x S {_ : ToMSet S}, ~ x \in S -> P S -> P (x |: S)) ->
+    (forall S {_ : ToMSet S}, P S).
+  Proof.
+    intros Hbase IH S HS.
+    eapply H. eapply HS.
+    eapply PS_ind with (S := mset).
+    - intros x y Heq. eapply H.
+      unfold FromSet. unfold FromList. admit.
+    - rewrite FromSet_empty. eassumption.
+    - intros z S1 Hnin HP.   
+      rewrite FromSet_add. eapply IH; try eassumption. 
+      econstructor. reflexivity.
+      intros Hc. eapply Hnin. unfold FromSet, FromList, In in Hc.
+      simpl in Hc. eapply In_InA in Hc. eapply PS.elements_spec1 in Hc.
+      eassumption. eauto with typeclass_instances.
+  Admitted. 
+    
+    (*
   Lemma FV_inv_image_post (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
              (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
              (c : cTag) (Scope : Ensemble var) `{Decidable _ Scope} (Γ : var) (FVs : list var) :
@@ -1087,7 +1217,7 @@ Module ClosureConversionCorrect (H : Heap).
     image β (reach' H1 (env_locs rho1 (FV Scope FVs))) :|: image' δ (reach' H1 (env_locs rho1 (FV Scope FVs))) <-->
     reach' H2 (env_locs rho2 (FV_cc Scope Γ)) ->
     FV Scope FVs <--> occurs_free e1 ->
-    FV_cc Scope Γ <--> occurs_free e2 ->
+    FV_cc Scope Γ <--> occurs_free (C |[ e2 ]|) ->
     
     
     (* well-formedness *)
@@ -1107,11 +1237,12 @@ Module ClosureConversionCorrect (H : Heap).
     Closure_conversion Size.Util.clo_tag Scope c Γ FVs e1 e2 C ->
     
     (forall j, (e1, rho1, H1) ⪯ ^ (k ; j ; Pre ; PreG Funs ; Post 0 ; fun i => Post 0) (C |[ e2 ]|, rho2, H2)).
+  
   Proof with now eauto with Ensembles_DB.
-    revert H1 H2 rho1 rho2 e1 e2 C Scope HD Funs H FVs β c Γ.
-    induction k as [k IHk] using lt_wf_rec1.
-    intros H1 H2 rho1 rho2 e1 e2 C Scope HD Funs HMSet FVs β c Γ
-           Henv HFVs Hinjb Hwf1 Hlocs1 Hwf2 Hlocs2 Hnin Hbind Hun Hcc.
+    revert H1 H2 rho1 rho2 e1 e2 C Scope HD Funs H FVs β δ c Γ.
+    induction k as [k IHk] using lt_wf_rec1.  
+    intros H1 H2 rho1 rho2 e1 e2 C Scope HD Funs HMSet FVs b d c Γ
+           Henv HFVs Him Hfv1 Hfv2 Hwf1 Hlocs1 Hwf2 Hlocs2 Hnin Hbind Hun Hcc.
     assert (Hfv := Closure_conversion_pre_occurs_free_Included _ _ _ _ _ _ _ Hcc).
     assert (Hfv' := Closure_conversion_occurs_free_Included _ _ _ _ _ _ _ Hcc Hun).
     induction e1 using exp_ind'; try clear IHe1.
@@ -1177,31 +1308,31 @@ Module ClosureConversionCorrect (H : Heap).
       + (* Inductive case *)  
         intros vs1 vs2 l1 l2 H1' H2'' Hleq Ha1 Ha2 Hr1 Hr2 Hall j1.
         (* monotonicity of the local invariant *) 
-        assert (Hfeq : f_eq_subdomain (reach' H1 (env_locs rho1 (FV Scope FVs))) β (β {l1 ~> l2})).
+        assert (Hfeq : f_eq_subdomain (reach' H1 (env_locs rho1 (FV Scope FVs))) b (b {l1 ~> l2})).
         { eapply f_eq_subdomain_extend_not_In_S_r; [| reflexivity ].
           intros Hc. eapply reachable_in_dom in Hc.
           edestruct Hc as [vc Hgetc]. erewrite alloc_fresh in Hgetc; eauto. congruence.
           eassumption. eassumption. }
         (* Induction hypothesis *)
         { eapply IHk;
-          [ | | | | | | | | | | | | eassumption ].
+          [ | | | | | | | | | | | | | | eassumption ].
           * simpl in *. omega.
           * now eauto with typeclass_instances.
           * { intros j2.  
-              eapply cc_approx_env_set_alloc_Constr with (b := β {l1 ~> l2});
+              eapply cc_approx_env_set_alloc_Constr with (b := b {l1 ~> l2});
                 try eassumption.
-              - eapply well_formed_antimon; [| eassumption ].
+              - eapply well_formed_antimon; [| now apply Hwf1 ].
                 eapply reach'_set_monotonic. eapply env_locs_monotonic.
-                unfold FV...
-              - eapply well_formed_antimon; [| eassumption ].
+                unfold FV. admit. (* easy *)                
+              - eapply well_formed_antimon; [| now apply Hwf2 ].
                 eapply reach'_set_monotonic. eapply env_locs_monotonic.
-                unfold FV_cc.
-                now eauto 20 with Ensembles_DB.
+                unfold FV_cc. admit. (* easy *)                
               - eapply Included_trans; [| eassumption ].
-                eapply env_locs_monotonic. unfold FV...
+                eapply env_locs_monotonic.
+                unfold FV. admit. (* easy *)
               - eapply Included_trans; [| eassumption ].
-                eapply env_locs_monotonic. unfold FV.
-                now eauto 20 with Ensembles_DB.
+                eapply env_locs_monotonic.
+                unfold FV. admit. (* easy *)                
               - eapply well_formed_antimon. eapply reach'_set_monotonic.
                 eassumption.
                 eapply well_formed_antimon; [| eassumption ].
@@ -1224,9 +1355,12 @@ Module ClosureConversionCorrect (H : Heap).
               - eapply cc_approx_env_rename_ext.
                 eapply cc_approx_env_P_antimon.
                 eapply cc_approx_env_P_monotonic. now eauto.
-                simpl in *; omega. now eauto with Ensembles_DB.
+                simpl in *; omega. admit. (* easy *)
+                eauto with Ensembles_DB.
                 eapply f_eq_subdomain_antimon; [| eassumption ].
-                eapply reach'_set_monotonic. eapply env_locs_monotonic...
+                eapply reach'_set_monotonic. eapply env_locs_monotonic.
+                unfold FV. admit. (* easy *)
+                admit. (* same *)
               - rewrite extend_gss. reflexivity.
               - intros j3 Hlt3. eapply Forall2_monotonic_strong; [| now eapply Hall ].
                 intros x1 x2 Hin1 Hin2 Hrel. eapply cc_approx_val_rename_ext. now eapply Hrel.
@@ -1244,8 +1378,9 @@ Module ClosureConversionCorrect (H : Heap).
                 eapply well_formed_antimon; [| eassumption ].
                 eapply reach'_set_monotonic. eassumption.
 
-                eapply Included_trans; eassumption. }
-          * intros j'.
+                eapply Included_trans; eassumption.
+                admit. (* same *) }
+           * intros j'. 
             { eapply FV_inv_set_not_in_FVs.
               - eapply FV_inv_heap_mon; try (now eapply HL.alloc_subheap; eauto).
                 + eapply well_formed_antimon; [| eassumption ].
@@ -1265,7 +1400,13 @@ Module ClosureConversionCorrect (H : Heap).
                   eauto. simpl in *; omega. now eauto with Ensembles_DB.
                   symmetry. eapply f_eq_subdomain_antimon; [| eassumption ].
                   eapply reach'_set_monotonic. eapply env_locs_monotonic...
-              - intros Hc. inv Hc. eauto.
+                  admit. (* same *)
+              - intros Hc. inv Hc.
+                assert (Hsin : v \in (FV Scope FVs)). right. constructor.
+                eassumption. intros Hc. now eapply H0; eauto.
+                eapply Hfv1 in Hsin. inv Hsin. 
+                  by (right; eassumption).
+                eapply H0. eapply Hfv1 in H. eauto.
               - intros Hc.
                 eapply Hnin. subst; eauto. }
           * assert

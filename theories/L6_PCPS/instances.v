@@ -101,26 +101,33 @@ Definition Γ := 2%positive.
 (*                  (Eproj Γ bogus_clo_tag 1%N f *)
 (*                         (Eapp f' t (Γ :: xs)))). *)
 
+  Require Import ExtLib.Data.Monads.OptionMonad.
 
+  Require Import ExtLib.Structures.Monads.
+  
 
-Instance certiL5a_t0_L6: 
-  CerticoqTotalTranslation (cTerm certiL5a) (cTerm certiL6) := 
+Instance certiL5_t0_L6: 
+  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := 
   fun v =>
     match v with
     | pair venv vt =>
-      let '(cenv, nenv, fenv, next_cTag, next_iTag, e) := convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) in
-      let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
-      (* let e := postuncurry_contract e s d in            *)
-      (* let e := shrink_cps.shrink_top e in  *)
-      (* let e :=  inlinesmall_contract e 10 10 in *)
-      let e := inline_uncurry_contract e s 10 10 in  
-      let e := shrink_cps.shrink_top e in
-      let '(cenv',nenv', t') := closure_conversion_hoist
-                                  bogus_cloTag
-                                  e
-                                  next_cTag
-                                  next_iTag
-                                  cenv nenv
-      in
-      ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _,   shrink_top t')) 
+      (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+      | Some r =>         
+        let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
+        let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+        (* let e := postuncurry_contract e s d in            *)
+        (* let e := shrink_cps.shrink_top e in  *)
+        (* let e :=  inlinesmall_contract e 10 10 in *)
+        let e := inline_uncurry_contract e s 10 10 in  
+        let e := shrink_cps.shrink_top e in
+        let '(cenv',nenv', t') := closure_conversion_hoist
+                                    bogus_cloTag
+                                    e
+                                    next_cTag
+                                    next_iTag
+                                    cenv nenv
+        in
+        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _,   shrink_top t'))
+      | None => Exc "failed converting from L5 to L6"
+      end)
     end.

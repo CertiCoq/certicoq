@@ -7,14 +7,25 @@
  *)
 
 
-Require Import Coq.ZArith.ZArith.
-Require Import Coq.ZArith.Znumtheory.
-Require Import Coq.Strings.String.
-Require Import ExtLib.Data.List.
-Require Import ExtLib.Data.Bool.
+Require Import SquiggleEq.export.
+Require Import SquiggleEq.UsefulTypes.
+Require Import L4.polyEval.
+
+Require Import L4.L4_5_to_L5.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
+  Coq.Program.Program Coq.micromega.Psatz.
+
+Set Implicit Arguments.
+
+Require Import SquiggleEq.varImplZ.
+
+Require Import L6.cps.
+Require Import L6.cps_util.
+Require Import L6.ctx.
+
+Require Import L4.variables.
 Require compcert.lib.Maps.
 Require Coq.funind.Recdef.
-Import Nnat.
 Require Import CpdtTactics.
 
 
@@ -28,17 +39,7 @@ Add LoadPath "../L3_flattenedApp" as L3.
 ******)
 
 
-Require Export Common.Common.  (* shared namespace *)
-Require Import ExtLib.Data.List.
-Require Import L4.polyEval.
-Require Import L4.L4_5_to_L5.
-Require Import SquiggleEq.varImplZ.
-Require Import L4.L5a.
-Require Import L4.variables.
-
-Require Import L6.cps.
-Require Import L6.cps_util.
-Require Import L6.ctx.
+(* Require Export Common.Common.  (* shared namespace *) *)
 
 
 Definition tag := positive.
@@ -60,13 +61,13 @@ Section Program.
   Theorem L5_conId_dec: forall x y:L5_conId, {x = y} + {x <> y}.
   Proof.
     intros. destruct x,y.
-    assert (H:=inductive_dec i i0).
+    assert (H:= AstCommon.inductive_dec i i0).
     destruct H.
-    - destruct (eq_dec n n0).
+    - destruct (classes.eq_dec n n0).
       + subst. left. auto.
       + right. intro. apply n1. inversion H. auto.
     - right; intro; apply n1. inversion H; auto.
-  Defined.
+  Defined. 
   
  
 
@@ -187,7 +188,13 @@ Fixpoint get_t (n:var) (sig:t_map): iTag :=
       | n::ns', t::ts' => set_t_f_list ns' ts' (set_nt n (snd t, fun_tag) tgm)
       | _, _ => tgm
     end.
-  
+
+  Definition set_nvar  (xn:NVar)  (tgm:conv_env):conv_env :=
+    let '(t1, t2, t3) := tgm in
+    let (x, n) := xn in 
+    (t1,t2, M.set x n t3).
+
+
 
   (* 
   sv is a map used to convert variable indices to name
@@ -203,49 +210,76 @@ note : var "1" is taken as error and will be proven not to appear when input is 
 
       Mutually recursive function are bound as a single (explicit) record
       Continuation for pattern matching take a single argument whose m projections are bound to unique variables 
-
+w
 
 
    *)
 
-  Fixpoint convert (e:cps) (sv: s_map) (sk:s_map) (tgm:conv_env) (n:var) (*  {struct e } *): exp * var * conv_env :=
+Section Notations.
+  Require Import ExtLib.Data.Monads.OptionMonad.
+
+  Notation CBTerm := (@terms.BTerm NVar L5Opid).
+  Notation CTerm := (@terms.NTerm NVar L5Opid).
+  
+  Require Import ExtLib.Structures.Monads.
+  
+  Import Monad.MonadNotation.
+  Open Scope monad_scope.
+  Require Import SquiggleEq.ExtLibMisc.
+
+
+Fixpoint convert (e:CTerm) (sv: s_map) (sk:s_map) (tgm:conv_env) (n:var) (*  {struct e } *): option (exp * var * conv_env) :=
     match e with
-      | Halt_c v => let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
-                    (app_ctx_f ctx_v (Ehalt vn), (Pos.succ n'), tgm)
-      | ContApp_c k v => let '(ctx_k, kn, n', tgm) := convert_v k sv sk tgm n in
-                     let '(ctx_v, vn, n'', tgm) := convert_v v sv sk tgm n' in
-                     (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp  kn kon_tag (vn::nil)), n'', tgm)
-      | Call_c f k v =>
-        let fv := if (varInterface.varClass f):bool then sv else sk in
-        let kv := if (varInterface.varClass k):bool then sv else sk in
-        let vv := if (varInterface.varClass v):bool then sv else sk in
-        (* flipping around so the continuation comes first *)
-        let f' := get_s f fv in
-        (Eapp f' (get_f f' (snd (fst tgm))) ((get_s k kv)::(get_s v vv)::nil) , n, tgm)
-          
-      | Match_c v bl =>
-        let fix convert_branches (bl:list  ((dcon * nat) * ((list NVar)* cps))) (sv: s_map) (sk:s_map) (tgm:conv_env) (r:var)  (n:var)  (* { struct bl } *): (list (cTag * exp) * var * conv_env)  :=
-            (* {| n -> k, \ n+1 . (let n+2 <- \pi_1 n+1 ... n+m+1 <- \pi_m n+1 in  ce |}  *)
-            match bl with
-              | nil => ( nil, n, tgm)
-              | ((dcn, m),(xs, e))::bl' =>
-                let lxs := List.length xs in 
-                let '(cbl, n', tgm) := convert_branches bl' sv sk tgm r n in
-                let tg := dcon_to_tag dcn (fst (fst tgm)) in
-                (* take the first lxs projections on the scrutiny at the head of each branches
+    | terms.oterm CHalt [bterm nil h] =>
+      r <- convert_v h sv sk tgm n;;
+      (match r with
+      | (ctx_v, vn, n', tgm) => 
+        ret (app_ctx_f ctx_v (Ehalt vn), (Pos.succ n'), tgm)
+       end)
+    | terms.oterm CRet [bterm [] k; bterm [] v]  =>
+      r1 <- convert_v k sv sk tgm n;;
+         let '(ctx_k, kn, n', tgm) := r1 in
+         r2 <-  convert_v v sv sk tgm n';;
+            let '(ctx_v, vn, n'', tgm) := r2 in
+            ret (app_ctx_f (comp_ctx_f ctx_k ctx_v) (Eapp  kn kon_tag (vn::nil)), n'', tgm)
+    | terms.oterm CCall [bterm [] f; bterm [] k; bterm [] v] =>
+                  f <-  getVar f;; 
+                  k <- getVar k;;
+                  v <- getVar v;;
+                  let fv := if (varInterface.varClass f):bool then sv else sk in
+                  let kv := if (varInterface.varClass k):bool then sv else sk in
+                  let vv := if (varInterface.varClass v):bool then sv else sk in
+      (* flipping around so the continuation comes first *)
+                  let f' := get_s f fv in
+                  ret (Eapp f' (get_f f' (snd (fst tgm))) ((get_s k kv)::(get_s v vv)::nil) , n, tgm)
+    | terms.oterm (CMatch ls) ((bterm [] v)::lbt) =>
+      r1 <- convert_v v sv sk tgm n;;
+         let '(ctx_v, vn, n', tgm) :=  r1 in
+         r2 <- (fold_left (fun (co:option _) b =>
+                             c <- co;;
+                               let '(cbl, ls, sv, sk, tgm, r, n') := c in
+                               let '(bterm xs e) := b in
+                               (match ls with
+                                | (dcn, m)::ls'  => 
+                                  let lxs := List.length xs in
+                                  let tg := dcon_to_tag dcn (fst (fst tgm)) in
+                                  (* take the first lxs projections on the scrutiny at the head of each branches
                    02/17 - We now erase parameters as part of this translation s.t. we don't offset those projections 
                    TODO - use the right tag for each projection *)
-                   
-                let (ctx_p, n'') := ctx_bind_proj tg r lxs n' 0 in 
-                let (names, _) := fromN n' lxs in
-                let sv' := set_s_list xs names sv in
-                let '(ce, n''', tgm) :=  convert e sv' sk tgm n'' in
-                ((tg, (app_ctx_f ctx_p ce))::cbl , n''', tgm)
-            end in
-        let '(ctx_v, vn, n', tgm) := convert_v v sv sk tgm n in
-        let '(cbls, n'', tgm) := convert_branches bl sv sk tgm vn n' in
-        (app_ctx_f ctx_v (Ecase vn cbls), n'', tgm)
+                                  
+                                  let (ctx_p, n'') := ctx_bind_proj tg r lxs n' 0 in 
+                                  let (names, _) := fromN n' lxs in
+                                  let sv' := set_s_list xs names sv in
+                                  r2 <- convert e sv' sk tgm n'' ;;
+                                     let '(ce, n''', tgm) :=  r2 in
+                                     ret ((tg, (app_ctx_f ctx_p ce))::cbl , ls', sv, sk, tgm, r, n''') 
+                                |  _ => None
+                                end)) lbt (ret (nil, ls, sv, sk, tgm, vn, n'))) ;;
+            let '(cbls, ls, sv, sk, tgm, vn, n'') := r2 in
+            ret (app_ctx_f ctx_v (Ecase vn cbls), n'', tgm)   
+    | _ => None
     end
+
   (* returns converted context * new binding (usually n'-1 except for var and kvar) * next fresh 
 
 ContApp_c M N -> 
@@ -254,43 +288,48 @@ ContApp_c M N ->
    App_e m n
 
    *)
-  with convert_v (v:val_c) (sv: s_map) (sk: s_map) (tgm:conv_env) (n:var) (* { struct v }  *): (exp_ctx * var * var * conv_env) :=
+  with convert_v (v:CTerm) (sv: s_map) (sk: s_map) (tgm:conv_env) (n:var) (* { struct v }  *): option (exp_ctx * var * var * conv_env) :=
          match v with
-           | Var_c m => (Hole_c, get_s m sv , n, tgm)   (* {| ( Econstr_c n ty var_tag ((nth (N.to_nat m) sv (1%positive))::nil)  Hole_c, Pos.succ n  ) |} *)
-           | KVar_c m => (Hole_c, get_s m sk, n, tgm) (* {| ( Econstr_c n ty kvar_tag ((nth (N.to_nat m) sk (1%positive))::nil) Hole_c, Pos.succ n) |} *)
-           | Lam_c x k e =>
+         | vterm v => if ((varClass v):bool (*== USERVAR*)) then ret (Hole_c, get_s v sv , n, tgm) else ret (Hole_c, get_s v sk, n, tgm)
+         | terms.oterm CLambda [bterm [x; k] e] =>
              let tgm := set_nt (Pos.succ n) (snd k, kon_tag) tgm in
-             let tgm := set_n n (snd x) tgm in (* what about the tag of x? *)     
-             let '(e', n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) tgm (Pos.add n (2%positive)) in
+             let tgm := set_n n (snd x) tgm in (* what about the tag of x? *)
+             r <- convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) tgm (Pos.add n (2%positive));;
+             let '(e', n', tgm) := r in
              let tgm := set_t n' fun_tag tgm in  
              (* flipping around so the continuation comes first *)
              let fds := Fcons n' fun_tag ((Pos.succ n)::n::nil) e' Fnil in                         
-             (Efun1_c fds Hole_c, n' , (Pos.succ n'), tgm) 
-           | Cont_c k e =>
-             let tgm := set_n n (snd k) tgm in (* maybe set the tag? *)
-             let '(e', n', tgm) := convert e sv (M.set (fst k) n sk) tgm (Pos.succ n) in
+             ret (Efun1_c fds Hole_c, n' , (Pos.succ n'), tgm)
+         | terms.oterm CKLambda [bterm [k] e] =>
+           let tgm := set_n n (snd k) tgm in (* maybe set the tag? *)
+           r <- convert e sv (M.set (fst k) n sk) tgm (Pos.succ n) ;;
+             let '(e', n', tgm) := r in
              let fds := Fcons n' kon_tag (n::nil) e' Fnil in
-             (Efun1_c fds Hole_c, n',  Pos.succ n', set_t n' kon_tag tgm )
-           | Con_c dcn lv =>
-             (* Produce an expression context binding to the returned list of variables
+             ret (Efun1_c fds Hole_c, n',  Pos.succ n', set_t n' kon_tag tgm )
+         | terms.oterm  (CDCon dcn _) lv =>
+           (* Produce an expression context binding to the returned list of variables
                 the converted values  *)
-             let fix convert_v_list (lv :list val_c) (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): (exp_ctx * list var * var * conv_env) :=
-                 match lv with
-                 | v::lv' =>
-                   let '(ctx_v, vn , n', tgm) := convert_v v sv sk tgm n in
-                   let '(ctx_lv', ln', n'', tgm) := convert_v_list lv' sv sk tgm n' in
-                   (comp_ctx_f ctx_v ctx_lv', (vn::ln'), n'', tgm)
-                 | _ =>  (Hole_c, nil, n, tgm)
-                       
-                 end in 
-             let ctag := (dcon_to_info dcn (fst (fst tgm))) in
-             let '(lv_ctx, nl, n', tgm) := convert_v_list lv sv sk tgm n in
-             (comp_ctx_f lv_ctx (Econstr_c n' ctag nl Hole_c), n', Pos.succ n', set_t n' ctag tgm)
-           | Fix_c lbt i =>
+           let fix convert_v_list lv  (sv : s_map) (sk: s_map) (tgm:conv_env) (n: var)(* {struct lv} *): option (exp_ctx * list var * var * conv_env) :=
+               match lv with
+               | (bterm _ v)::lv' =>
+                 r1 <- convert_v v sv sk tgm n;;
+                    let '(ctx_v, vn , n', tgm) := r1 in
+                    r2 <- convert_v_list lv' sv sk tgm n';;
+                 let '(ctx_lv', ln', n'', tgm) := r2 in
+                 ret (comp_ctx_f ctx_v ctx_lv', (vn::ln'), n'', tgm)
+               | nil => ret (Hole_c, nil, n, tgm)                         
+               end in 
+           let ctag := (dcon_to_info dcn (fst (fst tgm))) in
+           r <- convert_v_list lv sv sk tgm n ;;
+           let '(lv_ctx, nl, n', tgm) := r in
+           ret (comp_ctx_f lv_ctx (Econstr_c n' ctag nl Hole_c), n', Pos.succ n', set_t n' ctag tgm)
+    | terms.oterm (CFix _ i) lbt =>
+(*
+           | Fix_c lbt i => *)
              (match lbt with
-                | nil => (Hole_c, (1%positive), n, tgm) (* malformed input, should not happen *) 
-                | (fvars, _ )::_ =>          
-                  (* ) convert_fds:
+              | nil => ret (Hole_c, (1%positive), n, tgm) (* malformed input, should not happen *) 
+              | (bterm fvars _ )::_ =>          
+                (* ) convert_fds:
                convert a list of simple_cps cps functions into 
                (1) a set of cps.exp functions (fundefs), each referring to a local variable (n+1), a local continuation variable (n+2) and the functions name (pushed to sv before calling convert_fds
                (2) the next fresh name
@@ -309,29 +348,34 @@ arguments are:
 
  08/27/2016 - updated for directly-named functions in L5a instead of building a record
  09/08/2016 - now passing conv_env, containing a reverse cEnv to populate Econstr with the right cTag
-                   *)
-                  let fix convert_fds (fds : list (list NVar * val_c))  (sv: s_map) (sk : s_map) (tgm:conv_env) (fnames : list var) (n : var) (*{struct fds} *): (fundefs * var * conv_env)  :=
-                      match (fds, fnames) with
-                        | ((_,v)::fds', currn::fnames') =>
-                          (match v with
-                             | Lam_c x k e =>                        
-                               let '(ce, n', tgm) := convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) (set_nt (Pos.succ n) (snd k, kon_tag) (set_n n (snd x)  tgm)) (Pos.add n 2%positive) in
-                               let '(cfds, n'', tgm) := convert_fds fds' sv sk tgm fnames' n' in
-                               (Fcons currn fun_tag ((Pos.succ n)::n::nil) ce cfds, n'', tgm) (* todo: add the tag for x *)
-                             | _ => (Fnil, n, tgm) (* this should not happen *)
-                           end) 
-                        | (_, _) => (Fnil, n, tgm)
-                      end in
-                  let (nfds, newn) := fromN n (length fvars) in
-                  let sv' := set_s_list fvars nfds sv in
-                  let tgm := set_t_f_list nfds fvars tgm in
-                  let '(fds, n', tgm) := convert_fds lbt sv' sk tgm nfds newn in
-                  (Efun1_c fds Hole_c, nth i nfds (1%positive), n', tgm )
+                 *)
+                let fix convert_fds (fds : list CBTerm)  (sv: s_map) (sk : s_map) (tgm:conv_env) (fnames : list var) (n : var) (*{struct fds} *): option (fundefs * var * conv_env)  :=
+                    match (fds, fnames) with
+                    | ((bterm _ v)::fds', currn::fnames') =>
+                      (match v with
+                       | terms.oterm CLambda [bterm [x; k] e] =>
+                         r1 <- convert e (M.set (fst x) n sv) (M.set (fst k) (Pos.succ n) sk) (set_nt (Pos.succ n) (snd k, kon_tag) (set_n n (snd x)  tgm)) (Pos.add n 2%positive) ;;
+                            let '(ce, n', tgm) := r1 in
+                            r2 <- convert_fds fds' sv sk tgm fnames' n' ;;
+                         let '(cfds, n'', tgm) := r2 in
+                         ret (Fcons currn fun_tag ((Pos.succ n)::n::nil) ce cfds, n'', tgm) (* todo: add the tag for x *)
+                       | _ => ret (Fnil, n, tgm) (* this should not happen *)
+                       end) 
+                    | (_, _) => ret (Fnil, n, tgm)
+                    end in
+                let (nfds, newn) := fromN n (length fvars) in
+                let sv' := set_s_list fvars nfds sv in
+                let tgm := set_t_f_list nfds fvars tgm in
+                r <-  convert_fds lbt sv' sk tgm nfds newn;;
+                  let '(fds, n', tgm) := r in
+                  ret (Efun1_c fds Hole_c, nth i nfds (1%positive), n', tgm )
               end)
+             
+           | _ => None                                         
          end.
   
-  
-  Definition ienv := list (string * itypPack).
+
+  Definition ienv := list (string * AstCommon.itypPack).
   
 
   (** process a list of constructors from inductive type ind with iTag niT.  
@@ -339,11 +383,11 @@ arguments are:
     - update the conId_map with a pair relating the nCon'th constructor of ind to the cTag of the current constructor
 
    *)
-  Fixpoint convert_cnstrs (cct:list cTag) (itC:list Cnstr) (ind:inductive) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
+  Fixpoint convert_cnstrs (cct:list cTag) (itC:list AstCommon.Cnstr) (ind:Ast.inductive) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
     match (cct, itC) with  
       | (cn::cct', cst::icT') =>
         let (cname, ccn) := cst in
-        convert_cnstrs cct' icT' ind (nCon+1)%N niT (M.set cn (nNamed cname, niT, N.of_nat (ccn), nCon) ce) (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
+        convert_cnstrs cct' icT' ind (nCon+1)%N niT (M.set cn (Ast.nNamed cname, niT, N.of_nat (ccn), nCon) ce) (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
       | (_, _) => (ce, dcm)
     end.
 
@@ -358,10 +402,10 @@ arguments are:
     let '(ie, ce, ncT, niT, dcm) := ice in 
     match typ with
       | nil => ice
-      | (mkItyp itN itC ) ::typ' => 
+      | (AstCommon.mkItyp itN itC ) ::typ' => 
         let (cct, ncT') := fromN ncT (length itC) in
-        let (ce', dcm') := convert_cnstrs cct itC (mkInd idBundle n) 0 niT ce dcm in
-        let ityi := combine cct (map (fun (c:Cnstr) => let (_, n) := c in N.of_nat n) itC) in
+        let (ce', dcm') := convert_cnstrs cct itC (Ast.mkInd idBundle n) 0 niT ce dcm in
+        let ityi := combine cct (map (fun (c:AstCommon.Cnstr) => let (_, n) := c in N.of_nat n) itC) in
         convert_typack typ' idBundle (n+1) (M.set niT ityi ie, ce', ncT', (Pos.succ niT) , dcm')
     end.
   
@@ -384,17 +428,18 @@ convert_env' is called with the next available constructor tag and the next avai
    *)
   Definition convert_env (g:ienv): (iEnv * cEnv*  cTag * iTag * conId_map) :=
     let default_iEnv := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty iTyInfo) in
-    let default_cEnv := M.set default_tag (nAnon, default_itag, 0%N, 0%N) (M.empty cTyInfo) in
+    let default_cEnv := M.set default_tag (Ast.nAnon, default_itag, 0%N, 0%N) (M.empty cTyInfo) in
     convert_env' g (default_iEnv, default_cEnv, (Pos.succ default_tag:cTag), (Pos.succ default_itag:iTag), nil).
 
 
   (** to convert from L5a to L6, first convert the environment (ienv) into a cEnv (map from constructor to info) and a conId_map (dcm) from L5 tags to L6 tags. Then, use that conId_map in the translation of the L5 term to incorporate the right L6 tag in the L6 term *)
-  Definition convert_top (ee:ienv*cps) : (cEnv*nEnv*fEnv*cTag*iTag * exp) :=
-    let '(_, cG, ctag, itag,  dcm) := convert_env (fst ee) in 
-    let '(er, n, tgm) := convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (100%positive) in
+  Definition convert_top (ee:ienv*CTerm) : option (cEnv*nEnv*fEnv*cTag*iTag * exp) :=
+    let '(_, cG, ctag, itag,  dcm) := convert_env (fst ee) in
+     r <- convert (snd ee) s_empty s_empty (dcm, t_empty, n_empty) (100%positive);;
+    let '(er, n, tgm) := r in
     let '(_, _, nM) := tgm in
     let fenv:fEnv := M.set fun_tag (2%N, (0%N::1%N::nil)) (M.set kon_tag (1%N, (0%N::nil)) (M.empty _) ) in
-    (cG, nM, fenv, ctag, itag, er).
-
+    ret (cG, nM, fenv, ctag, itag, er).
+End Notations.
 
 End Program.

@@ -411,7 +411,7 @@ End Strip.
 Function strip (t:L2dTerm) : Term :=
   match t with
   | L2d.compile.TRel n => TRel n
-  | L2d.compile.TProof t => TProof (strip t)
+  | L2d.compile.TProof t => TProof (TDummy "") (* OS [04/2018]: replace  "TProof (strip t)" to avoid expensive operations on proof terms just before their removal  *)
   | L2d.compile.TLambda nm bod => TLambda nm (strip bod)
   | L2d.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
   | L2d.compile.TApp fn arg =>

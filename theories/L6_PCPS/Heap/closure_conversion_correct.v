@@ -161,7 +161,31 @@ Module ClosureConversionCorrect (H : Heap).
       eassumption.
   Qed.
 
-  
+  Lemma InA_In {A} (x : A) l :
+    InA eq x l -> List.In x l.
+  Proof.
+    intros Hin.
+    eapply InA_alt in Hin. edestruct Hin as [z [Hin1 Hin2]].
+    subst. eauto.
+  Qed.
+    
+  Lemma elements_Same_Set s1 s2 :
+    PS.Equal s1 s2 ->
+    FromList (PS.elements s1) <--> FromList (PS.elements s2). 
+  Proof.
+    intros Heq. split; intros x Hin.
+    - unfold FromList, In in *.
+      eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
+      eapply Heq in Hin. 
+      eapply InA_In. eapply PS.elements_spec1. eassumption.
+      now eauto with typeclass_instances.
+    - unfold FromList, In in *.
+      eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
+      eapply Heq in Hin. 
+      eapply InA_In. eapply PS.elements_spec1. eassumption.
+      now eauto with typeclass_instances.
+  Qed. 
+
   Lemma FromSet (P : Ensemble var -> Prop) {_ : Proper (Same_set _ ==> iff) P} :
     P (Empty_set _) ->
     (forall x S {_ : ToMSet S}, ~ x \in S -> P S -> P (x |: S)) ->
@@ -171,7 +195,7 @@ Module ClosureConversionCorrect (H : Heap).
     eapply H. eapply HS.
     eapply PS_ind with (S := mset).
     - intros x y Heq. eapply H.
-      unfold FromSet. unfold FromList. admit.
+      unfold FromSet. eapply elements_Same_Set. eassumption.
     - rewrite FromSet_empty. eassumption.
     - intros z S1 Hnin HP.   
       rewrite FromSet_add. eapply IH; try eassumption. 
@@ -179,7 +203,10 @@ Module ClosureConversionCorrect (H : Heap).
       intros Hc. eapply Hnin. unfold FromSet, FromList, In in Hc.
       simpl in Hc. eapply In_InA in Hc. eapply PS.elements_spec1 in Hc.
       eassumption. eauto with typeclass_instances.
-  Admitted. 
+  Qed.
+
+
+  Lemma 
     
     (*
   Lemma FV_inv_image_post (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)

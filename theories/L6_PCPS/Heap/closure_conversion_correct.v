@@ -73,6 +73,28 @@ Module ClosureConversionCorrect (H : Heap).
         eapply PS.remove_spec in H. inv H; eauto.
   Qed.
 
+   Lemma PS_nonempty_add' (S : PS.t) :
+    PS.cardinal S > 0 ->
+    exists x S', ~ PS.In x S' /\ PS.Equal S (PS.add x S'). 
+  Proof.
+    intros Hsize. destruct (PS.elements S) eqn:Helem. 
+    - rewrite PS.cardinal_spec, Helem in Hsize; eauto. simpl in *. omega.
+    - eexists e, (PS.remove e S). split.
+
+      intros Hin. eapply PS.remove_spec in Hin.
+      inv Hin; eauto.
+      
+      intros x. split; intros Hin.
+      destruct (var_dec x e); subst.
+      + eapply PS.add_spec. now left.
+      + eapply PS.add_spec. right.
+        eapply PS.remove_spec. split; eauto.
+      + eapply PS.add_spec in Hin. inv Hin; subst.
+        eapply PS.elements_spec1. rewrite Helem.
+        now constructor.
+        eapply PS.remove_spec in H. inv H; eauto.
+  Qed.
+
   Require Import Permutation.
   
   Lemma PS_add_elements S x : 
@@ -186,7 +208,7 @@ Module ClosureConversionCorrect (H : Heap).
       now eauto with typeclass_instances.
   Qed. 
 
-  Lemma FromSet (P : Ensemble var -> Prop) {_ : Proper (Same_set _ ==> iff) P} :
+  Lemma Ensemble_ind (P : Ensemble var -> Prop) {_ : Proper (Same_set _ ==> iff) P} :
     P (Empty_set _) ->
     (forall x S {_ : ToMSet S}, ~ x \in S -> P S -> P (x |: S)) ->
     (forall S {_ : ToMSet S}, P S).
@@ -205,8 +227,6 @@ Module ClosureConversionCorrect (H : Heap).
       eassumption. eauto with typeclass_instances.
   Qed.
 
-
-  Lemma 
     
     (*
   Lemma FV_inv_image_post (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
@@ -707,6 +727,189 @@ Module ClosureConversionCorrect (H : Heap).
     eapply project_vars_In_Union.
     eassumption.
   Qed.
+
+  Definition cc_approx_heap (S : Ensemble loc) k j IP P b d (H1 H2 : heap block) :=
+    forall (l : loc), l \in S ->
+                 Res (Loc l, H1) ≺ ^ (k; j; IP; P; b; d) Res (Loc (b l), H2).
+
+  Notation "S |- H1 ≼ ^ ( k ; j ; IP ; P ; b ; d ) H2" :=
+    (cc_approx_heap S k j IP P b d H1 H2)
+      (at level 70, no associativity).
+
+
+  Lemma Union_Setminus_Same_set {A} (S1 S2 : Ensemble A) {HD : Decidable S2} : 
+    S2 \subset S1 ->
+    S1 <--> S2 :|: (S1 \\ S2).
+  Proof.
+    intros Heq. split; intros x Hin.
+    - destruct HD. destruct (Dec x).
+      + now left.
+      + right. constructor; eauto.
+    - inv Hin; eauto. inv H; eauto. 
+  Qed.
+
+  Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
+  Proof.
+    constructor. intros x.
+    destruct HM as [m Heq].
+    destruct (PS.mem x m) eqn:Hin.
+    - eapply PS.mem_spec in Hin.
+      left. eapply Heq. unfold FromSet, FromList, In.
+      eapply InA_In. eapply PS.elements_spec1. eassumption.
+    - right. intros Hc.
+      eapply Heq in Hc.
+      unfold FromSet, FromList, In in Hc.
+      eapply In_InA with (eqA := eq)in Hc; eauto with typeclass_instances.
+      eapply PS.elements_spec1 in Hc.
+      eapply PS.mem_spec in Hc. congruence.
+  Qed.
+
+ 
+  Lemma image'_Union (A B : Type) (S1 S2 : Ensemble A) (g : A -> option B) :
+    image' g (S1 :|: S2) <--> image' g S1 :|: image' g S2.
+  Proof.
+    split; intros x Hin.
+    - destruct Hin as [y [Hin Heq]]; subst; inv Hin.
+      left; eexists; split; eauto.
+      right; eexists; split; eauto.
+    - inv Hin.
+      + destruct H as [z [Hin Heq]].
+        eexists; split; eauto.
+      + destruct H as [z [Hin Heq]].
+        eexists; split; eauto.
+  Qed.
+  
+  Lemma ToMSet_add x S :
+    ToMSet (x |: S) ->
+    ~ x \in S ->
+    ToMSet S.
+  Proof.
+    intros [m Hm] Hnin.
+    eapply Build_ToMSet with (mset := PS.remove x m).
+    split; intros y Hin.
+    - unfold FromSet, FromList, In in *. simpl.
+      eapply InA_In. eapply PS.elements_spec1.
+      eapply PS.remove_spec. split.
+      + unfold FromSet, FromList, In. simpl.
+        eapply PS.elements_spec1. eapply In_InA.
+        now eauto with typeclass_instances.
+        eapply Hm. now right.
+      + intros Hc; subst; eauto.
+    - unfold FromSet, FromList, In in *. simpl in *.
+      eapply In_InA with (eqA := eq) in Hin; eauto with typeclass_instances.
+      eapply PS.elements_spec1 in Hin. eapply PS.remove_spec in Hin.
+      inv Hin.
+      eapply PS.elements_spec1 in H. eapply InA_In in H.
+      eapply Hm in H. inv H; eauto.
+      inv H1. exfalso; eauto. 
+  Qed.
+
+  Lemma FromSetSingleton x :
+    FromSet (PS.singleton x) <--> [set x].
+  Proof.
+    split; intros z Hin; unfold FromSet, FromList, In in *.
+    - eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
+      eapply PS.singleton_spec in Hin. subst. reflexivity.
+      now eauto with typeclass_instances.
+    - inv Hin. eapply InA_In.  eapply PS.elements_spec1.
+      eapply PS.singleton_spec. reflexivity.
+  Qed.
+
+
+  Lemma image'_Singleton_Some {A B} f (x : A) (y : B) :
+    f x = Some y ->
+    image' f [set x] <--> [set y].
+  Proof.
+    intros Heq. 
+    split; intros z Hin. 
+    - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+      rewrite Heq in Heq'. inv Heq'. reflexivity.
+    - inv Hin. eexists; split; eauto.
+  Qed. 
+
+  Lemma image'_Singleton_None {A B} (f : A -> option B) (x : A) :
+    f x = None ->
+    image' f [set x] <--> Empty_set _.
+  Proof.
+    intros Heq. 
+    split; intros z Hin. 
+    - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+      rewrite Heq in Heq'. congruence.
+    - inv Hin.
+ Qed.
+  
+  Instance ToMSet_Singleton x : ToMSet [set x].
+  Proof.
+    econstructor. 
+    symmetry. eapply FromSetSingleton.
+  Qed.
+
+  Instance ToMSet_image'_Singleton {A} (f : A -> option loc) (x : A) : ToMSet (image' f [set x]).
+  Proof.
+    destruct (f x) eqn:Heq.
+    econstructor. rewrite image'_Singleton_Some; eauto.
+    symmetry. eapply FromSetSingleton.
+    econstructor. rewrite image'_Singleton_None; eauto.
+    symmetry. eapply FromSet_empty.
+  Qed. 
+  
+  Lemma size_reachable_leq S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2}
+        H1 H2 k j GIP GP b d :
+    S1 |- H1 ≼ ^ (k ; j ; GIP ; GP ; b ; d ) H2 ->
+    S2 <--> image b S1 :|: image' d S1 -> 
+    size_with_measure_filter size_val (@mset S1 _) H1 <=
+    size_with_measure_filter size_val (@mset S2 _) H2 <=
+    (size_with_measure_filter size_val (@mset S1 _) H1) * (1 + (max_vars_heap H1)).
+  Proof.
+    revert HS1 S2 HS2.
+    
+    eapply (Ensemble_ind (fun S1 => 
+                            forall (HS1 : ToMSet S1) (S2 : Ensemble positive) (HS2 : ToMSet S2),
+                              S1 |- H1 ≼ ^ (k; j; GIP; GP; b; d) H2 ->
+                              S2 <--> image b S1 :|: image' d S1 ->
+                              size_with_measure_filter size_val (@mset S1 HS1) H1 <=
+                              size_with_measure_filter size_val (@mset S2 HS2) H2 <=
+                              size_with_measure_filter size_val (@mset S1 HS1) H1 * (1 + max_vars_heap H1)
+                         )).
+
+    - admit. (* easy *)
+    - intros x S1' HS Hnin IHS HS1 S2 HS2 Hheap Heq.
+      rewrite image_Union, image'_Union, image_Singleton in Heq.
+      unfold mset.
+      assert (HS1' := HS1). eapply ToMSet_add in HS1'; [| eassumption ].
+      assert (Hseq : S2 <--> b x |: (image' d [set x]) :|: (S2 \\ (b x |: (image' d [set x])))). 
+      { eapply Union_Setminus_Same_set.
+        eapply Decidable_Union. eapply DecidableSingleton_positive.
+        admit. 
+        rewrite Heq. now eauto with Ensembles_DB. }
+      assert (HS2' : ToMSet (S2 \\ (b x |: image' d [set x]))). admit.
+      
+      specialize (IHS HS1' _ HS2').
+      destruct HS1 as [m1 Heq1]. destruct HS2 as [m2 Heq2].
+      destruct HS1' as [m1' Heq1']. destruct HS2' as [m2' Heq2'].
+      rewrite Hseq in Heq2.
+      
+      assert (Hmeq1 : PS.Equal m1 (PS.add x m1')).
+      { eapply Same_set_From_set. rewrite <- Heq1, FromSet_add, <- Heq1'.
+        reflexivity. }
+
+      assert (HMSetd : ToMSet (image' d [set x])).
+      { destruct (d x) as . 
+      assert (Hmeq2 : PS.Equal m2 (PS.add (b x) m2')).
+      { 
+      
+      
+        Decidable_Singleton.  admit.
+        
+        eauto with typeclass_instances. 
+      
+      eauto.
+
+      rewrite image_Singleton. with (S := S1).
+    intros Hleq Heq.
+    unfold size_reachable.
+    revert S H Hleq Heq.
+    
 
   (* Lemma image_FV GI GP k β H1 rho1 H2 rho2 Scope `{Decidable _ Scope} FVs Γ c : *)
   (*   (forall j, (H1, rho1) ⋞ ^ (Scope ; k ; j ; GI ; GP ; β; d) (H2, rho2)) -> *)

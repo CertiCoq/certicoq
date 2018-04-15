@@ -26,7 +26,8 @@ Module Size (H : Heap).
 
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on
-         the execution cost of certain transformations *)
+         the execution cost of certain transformations
+   *)
   
   (** The size of CPS expressions. Right now we only count the number of
    * variables in a program (free or not), the number of functions and
@@ -117,7 +118,7 @@ Module Size (H : Heap).
   Definition max_vars_block (b : block) : nat :=
     match b with
       | Constr _ vs => max_list_nat_with_measure max_vars_value 0 vs
-      | Clos v1 rho => (max_vars_value v1) (* ?? *)
+      | Clos v1 rho => max_vars_value v1 (* ?? *)
     end.
   
   Definition max_vars_heap (H : heap block) :=

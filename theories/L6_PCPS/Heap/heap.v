@@ -395,6 +395,36 @@ Module HeapLemmas (H : Heap).
         erewrite gao; eauto.
         intros Hc; subst; contradiction.
   Qed.
+
+  Lemma heap_elements_filter_add (A : Type) (s : PS.t) (H : heap A) (l : loc) (v : A) :
+    get l H = Some v ->
+    ~ PS.In l s ->
+    Permutation (heap_elements_filter (PS.add l s) H) ((l, v) :: (heap_elements_filter s H)) .
+  Proof.
+    intros Hget Hnin.
+    eapply NoDup_Permutation.
+    - eapply heap_elements_filter_NoDup. 
+    - constructor.
+      intros Hin. eapply Hnin. 
+      edestruct heap_elements_filter_sound as [Hin1 Hin2];
+        eassumption.
+      eapply heap_elements_filter_NoDup. 
+    - intros [l' v']. split.
+      + intros Hin. edestruct heap_elements_filter_sound as [Hin1 Hin2].
+        eassumption.
+        eapply PS.add_spec in Hin2. inv Hin2.
+        * rewrite Hget in Hin1. inv Hin1. now constructor.
+        * constructor 2. eapply heap_elements_filter_complete; eassumption.
+      + intros Hin. inv Hin.
+        * inv H0.
+          eapply heap_elements_filter_complete. eassumption.
+          eapply PS.add_spec. eauto.
+        * edestruct heap_elements_filter_sound as [Hin1 Hin2].
+          eassumption.
+          eapply heap_elements_filter_complete. eassumption.
+          eapply PS.add_spec. now right.
+  Qed.
+
   
   Lemma subheap_Subperm (A : Type) (h1 h2 : heap A) : 
     h1 ⊑ h2 ->

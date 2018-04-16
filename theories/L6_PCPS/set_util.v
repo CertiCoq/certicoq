@@ -563,7 +563,7 @@ Qed.
 Instance ToMSet_Singleton x : ToMSet [set x].
 Proof.
   econstructor. 
-  symmetry. eapply FromSet_Singleton.
+  symmetry. eapply FromSet_singleton.
 Qed.
 
 
@@ -572,7 +572,7 @@ Instance ToMSet_image'_Singleton {A} (f : A -> option positive) (x : A) :
 Proof.
   destruct (f x) eqn:Heq.
   econstructor. rewrite image'_Singleton_Some; eauto.
-  symmetry. eapply FromSet_Singleton.
+  symmetry. eapply FromSet_singleton.
   econstructor. rewrite image'_Singleton_None; eauto.
   symmetry. eapply FromSet_empty.
 Qed.

@@ -333,6 +333,27 @@ Proof.
   now inv H0; inv H1; eauto. 
 Qed.
 
+Lemma Intersection_Union_distr :
+  forall (A : Type) (s1 s2 s3 : Ensemble A),
+    (s1 :|: s2) :&: s3 <--> (s1 :&: s3) :|: (s2 :&: s3).
+Proof.
+  intros A s1 s2 s3.
+  split; intros x. 
+  - intros [H1 H2]. inv H2; eauto.
+  - intros Hin. inv Hin; eauto; inv H; eauto.
+Qed.
+
+Lemma Intersection_Disjoint :
+  forall (A : Type) (s1 s2 : Ensemble A),
+    Disjoint _ s1 s2 ->
+    s1 :&: s2 <--> Empty_set _.
+Proof.
+  intros A s1 s2 Hd.
+  split; intros x. 
+  - intros H1; inv H1. exfalso; eapply Hd; eauto.
+  - intros Hc; inv Hc.
+Qed.
+
 Hint Immediate Setminus_Union_distr Union_Intersection_distr : Ensembles_DB.
 
 (** ** Compatibility properties *)
@@ -785,6 +806,17 @@ Proof.
   split; intros x H'; inv H'. inv H.
   constructor; eauto. intros Hc; inv Hc; eauto.
   constructor; eauto. constructor; eauto.
+Qed.
+
+Lemma Union_Setminus_Same_set {A} (S1 S2 : Ensemble A) {HD : Decidable S2} : 
+  S2 \subset S1 ->
+  S1 <--> S2 :|: (S1 \\ S2).
+Proof.
+  intros Heq. split; intros x Hin.
+  - destruct HD. destruct (Dec0 x).
+    + now left.
+    + right. constructor; eauto.
+  - inv Hin; eauto. inv H; eauto. 
 Qed.
 
 Lemma Union_Setminus_Included {A} s1 s2 s3:

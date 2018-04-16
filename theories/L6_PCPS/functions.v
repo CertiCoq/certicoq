@@ -784,11 +784,48 @@ Proof.
   firstorder.
 Qed.
 
+Lemma image'_Singleton_Some {A B} f (x : A) (y : B) :
+  f x = Some y ->
+  image' f [set x] <--> [set y].
+Proof.
+  intros Heq. 
+  split; intros z Hin. 
+  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+    rewrite Heq in Heq'. inv Heq'. reflexivity.
+  - inv Hin. eexists; split; eauto.
+Qed. 
+
+Lemma image'_Singleton_None {A B} (f : A -> option B) (x : A) :
+  f x = None ->
+  image' f [set x] <--> Empty_set _.
+Proof.
+  intros Heq. 
+  split; intros z Hin. 
+  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+    rewrite Heq in Heq'. congruence.
+  - inv Hin.
+Qed.
+
+
 Lemma image'_monotonic {A B} (S1 S2 : Ensemble A) (f : A -> option B) :
   S1 \subset S2 ->
   image' f S1 \subset image' f S2.
 Proof.
   firstorder.
+Qed.
+
+Lemma image'_Union (A B : Type) (S1 S2 : Ensemble A) (g : A -> option B) :
+  image' g (S1 :|: S2) <--> image' g S1 :|: image' g S2.
+Proof.
+  split; intros x Hin.
+  - destruct Hin as [y [Hin Heq]]; subst; inv Hin.
+    left; eexists; split; eauto.
+    right; eexists; split; eauto.
+  - inv Hin.
+    + destruct H as [z [Hin Heq]].
+      eexists; split; eauto.
+    + destruct H as [z [Hin Heq]].
+      eexists; split; eauto.
 Qed.
 
 

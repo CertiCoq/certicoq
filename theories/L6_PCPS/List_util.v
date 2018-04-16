@@ -922,3 +922,14 @@ Proof.
       eexists. split; simpl; eauto.
     + edestruct IHHall as [v2 [Hnth2 Hr]]; eauto.
 Qed.
+
+
+(** Lemmas abut [InA] *)
+
+Lemma InA_In {A} (x : A) l :
+  InA Logic.eq x l -> List.In x l.
+Proof.
+  intros Hin.
+  eapply InA_alt in Hin. edestruct Hin as [z [Hin1 Hin2]].
+  subst. eauto.
+Qed.

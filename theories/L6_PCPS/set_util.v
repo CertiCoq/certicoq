@@ -3,8 +3,8 @@
  *)
 
 From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
-         Relations.Relations Lists.List Lists.SetoidList.
-From L6 Require Import tactics Ensembles_util functions.
+         Relations.Relations Lists.List Lists.SetoidList Permutation Omega.
+From L6 Require Import tactics Ensembles_util List_util functions.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 
@@ -186,7 +186,7 @@ Proof.
 Qed.
 
 Lemma elements_eq s1 s2 :
-  eq s1 s2 ->
+  Equal s1 s2 ->
   elements s1 = elements s2.
 Proof.
   intros H. apply eq_lists.
@@ -269,15 +269,142 @@ Proof.
   solve [ right; apply_set_specs; eauto | left; apply_set_specs; eauto ].
 Qed.
 
-Instance In_proper x :  Proper (Equal ==> iff) (In x).
+
+(* Equality morphisms *)
+
+Instance Proper_In x :  Proper (Equal ==> iff) (In x).
 Proof.
   constructor; intros Hin; eapply H; eauto.
 Qed.
 
-Instance union_proper_r x :  Proper (Equal ==> Equal) (union x).
+Instance Proper_union_r x :  Proper (Equal ==> Equal) (union x).
 Proof.
   constructor; intros Hin; apply_set_specs_ctx; apply_set_specs; eauto;
   right; apply H; eauto.
+Qed.
+
+Instance Proper_union_l :  Proper (Equal ==> Logic.eq ==> Equal) union.
+Proof.
+  constructor; intros; apply_set_specs_ctx; apply_set_specs; eauto;
+  left; apply H; eauto.
+Qed.
+
+Instance Proper_elements :  Proper (Equal ==> Logic.eq) elements.
+Proof.
+  intros x y Heq; eauto. eapply elements_eq. eassumption.
+Qed.
+
+Instance Proper_carinal :  Proper (Equal ==> Logic.eq) cardinal.
+Proof.
+  intros x y Heq; eauto. rewrite !cardinal_spec, Heq. reflexivity.
+Qed.
+
+Lemma PS_nonempty_add (S : PS.t) :
+  PS.cardinal S > 0 ->
+  exists x S', ~ PS.In x S' /\ PS.Equal S (PS.add x S'). 
+Proof.
+  intros Hsize. destruct (PS.elements S) eqn:Helem. 
+  - rewrite PS.cardinal_spec, Helem in Hsize; eauto. simpl in *. omega.
+  - eexists e, (PS.remove e S). split.
+
+    intros Hin. eapply PS.remove_spec in Hin.
+    inv Hin; eauto.
+    
+    intros x. split; intros Hin.
+    destruct (Coqlib.peq x e); subst.
+    + eapply PS.add_spec. now left.
+    + eapply PS.add_spec. right.
+      eapply PS.remove_spec. split; eauto.
+    + eapply PS.add_spec in Hin. inv Hin; subst.
+      eapply PS.elements_spec1. rewrite Helem.
+      now constructor.
+      eapply PS.remove_spec in H. inv H; eauto.
+Qed.
+
+Lemma PS_add_elements S x : 
+  ~ PS.In x S ->
+  Permutation (x :: PS.elements S) (PS.elements (PS.add x S)).
+Proof.
+  intros Hnin. 
+  eapply NoDup_Permutation.
+  - constructor. intros Hin. eapply Hnin.
+    eapply PS.elements_spec1. eapply In_InA; try eassumption.
+    now eauto with typeclass_instances.
+    eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  - intros y. split.
+    + intros Hin. inv Hin.
+
+      assert (HinA : InA Logic.eq y (PS.elements (PS.add y S))).
+      { eapply PS.elements_spec1. eapply PS.add_spec. now left. }
+      edestruct InA_alt as [[z [Heq1 Hin]] _]. eassumption.
+      subst. eassumption.
+
+      eapply In_InA in H. 
+      assert (HinA : InA Logic.eq y (PS.elements (PS.add x S))).
+      { eapply PS.elements_spec1. eapply PS.add_spec. right.
+        eapply PS.elements_spec1 in H. eassumption. }
+
+      edestruct InA_alt as [[z [Heq1 Hin]] _]. eassumption. subst.
+      subst. eassumption.
+
+      now eauto with typeclass_instances.
+    + intros Hin.
+      eapply In_InA in Hin.
+
+      eapply PS.elements_spec1 in Hin. 
+      eapply PS.add_spec in Hin. inv Hin.
+      now constructor.
+      constructor 2.
+
+      assert (HinA : InA Logic.eq y (PS.elements S)).
+      { eapply PS.elements_spec1. eassumption. }
+
+      edestruct InA_alt as [[z [Heq1 Hin]] _]. eassumption.
+      subst. eassumption.
+
+      now eauto with typeclass_instances.
+Qed. 
+
+Lemma PS_cardinal_empty S :
+  PS.cardinal S = 0 -> PS.Equal S PS.empty. 
+Proof.
+  intros Heq x. rewrite PS.cardinal_spec in Heq.
+  split; intros Hin.
+  - eapply PS.elements_spec1 in Hin.
+    destruct (PS.elements S) as [| x1 l1 ]. now inv Hin.
+    now inv Heq.
+  - inv Hin.
+Qed.
+
+Lemma PS_cardinal_add (S : PS.t) x :
+  ~ PS.In x S ->
+  1 + PS.cardinal S = PS.cardinal (PS.add x S).
+Proof. 
+  intros Hnin. rewrite !PS.cardinal_spec.
+  erewrite (@Permutation_length _ (PS.elements (PS.add x S)));
+    [| symmetry; now apply PS_add_elements ]. 
+  reflexivity.
+Qed.
+
+Lemma PS_ind (P : PS.t -> Prop) {_ : Proper (PS.Equal ==> iff) P} :
+  P PS.empty ->
+  (forall x S, ~ PS.In x S -> P S -> P (PS.add x S)) ->
+  (forall S, P S).
+Proof.
+  intros Hemp IH S.
+  assert (Hs: PS.cardinal S = PS.cardinal S) by reflexivity.
+  revert Hs.
+  generalize (PS.cardinal S) at 1. intros n.
+  revert S. induction n; intros S Heq.
+  - eapply H. eapply PS_cardinal_empty. now eauto. eassumption.
+  - edestruct PS_nonempty_add as (e & S' & HninS & HeqS).
+    rewrite <- Heq. omega. 
+    eapply H. eassumption. eapply IH. 
+    eassumption. eapply IHn.
+    rewrite HeqS in Heq. simpl in Heq. 
+    rewrite <- PS_cardinal_add in Heq. omega.
+    eassumption.
 Qed.
 
 
@@ -390,6 +517,17 @@ Proof.
   split; intros x Hin; now inv Hin.
 Qed.
 
+Lemma FromSet_singleton x :
+  FromSet (PS.singleton x) <--> [set x].
+Proof.
+  split; intros z Hin; unfold FromSet, FromList, Ensembles.In in *.
+  - eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
+    eapply PS.singleton_spec in Hin. subst. reflexivity.
+    now eauto with typeclass_instances.
+  - inv Hin. eapply InA_In.  eapply PS.elements_spec1.
+    eapply PS.singleton_spec. reflexivity.
+Qed.
+
 Lemma FromSet_cardinal_empty s :
   PS.cardinal s = 0 -> FromSet s <--> Empty_set _.
 Proof.
@@ -416,57 +554,41 @@ Class ToMSet (S : Ensemble positive) :=
     mset_eq : S <--> FromSet mset
   }.
 
-(* TODO move *)
-Lemma InA_In {A} (x : A) l :
-  InA Logic.eq x l -> List.In x l.
+Instance ToMSet_EmptySet : ToMSet (Empty_set _).
 Proof.
-  intros Hin.
-  eapply InA_alt in Hin. edestruct Hin as [z [Hin1 Hin2]].
-  subst. eauto.
+  econstructor. 
+  symmetry. eapply FromSet_empty.
 Qed.
 
-Lemma FromSetSingleton x :
-  FromSet (PS.singleton x) <--> [set x].
+Instance ToMSet_Singleton x : ToMSet [set x].
 Proof.
-  split; intros z Hin; unfold FromSet, FromList, Ensembles.In in *.
-  - eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
-    eapply PS.singleton_spec in Hin. subst. reflexivity.
-    now eauto with typeclass_instances.
-  - inv Hin. eapply InA_In.  eapply PS.elements_spec1.
-    eapply PS.singleton_spec. reflexivity.
+  econstructor. 
+  symmetry. eapply FromSet_Singleton.
 Qed.
 
 
-Lemma image'_Singleton_Some {A B} f (x : A) (y : B) :
-  f x = Some y ->
-  image' f [set x] <--> [set y].
-Proof.
-  intros Heq. 
-  split; intros z Hin. 
-  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
-    rewrite Heq in Heq'. inv Heq'. reflexivity.
-  - inv Hin. eexists; split; eauto.
-Qed. 
-
-Lemma image'_Singleton_None {A B} (f : A -> option B) (x : A) :
-  f x = None ->
-  image' f [set x] <--> Empty_set _.
-Proof.
-  intros Heq. 
-  split; intros z Hin. 
-  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
-    rewrite Heq in Heq'. congruence.
-  - inv Hin.
-Qed.
-  
-
-Instance ToMSet_image'_Singleton {A} (f : A -> option loc) (x : A) : ToMSet (image' f [set x]).
+Instance ToMSet_image'_Singleton {A} (f : A -> option positive) (x : A) :
+  ToMSet (image' f [set x]).
 Proof.
   destruct (f x) eqn:Heq.
   econstructor. rewrite image'_Singleton_Some; eauto.
-  symmetry. eapply FromSetSingleton.
+  symmetry. eapply FromSet_Singleton.
   econstructor. rewrite image'_Singleton_None; eauto.
   symmetry. eapply FromSet_empty.
+Qed.
+
+Instance ToMSet_Union S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 :|: S2).
+Proof.
+  destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].  
+  econstructor. symmetry. rewrite FromSet_union.
+  rewrite Heq1, Heq2. reflexivity. 
+Qed.  
+
+Instance ToMSet_Setminus S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 \\ S2).
+Proof.
+  destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].  
+  econstructor. symmetry. rewrite FromSet_diff.
+  rewrite Heq1, Heq2. reflexivity. 
 Qed.
 
 Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
@@ -486,8 +608,28 @@ Proof.
     eapply PS.mem_spec in Hc. congruence.
 Qed.
 
-  Instance ToMSet_Singleton x : ToMSet [set x].
-  Proof.
-    econstructor. 
-    symmetry. eapply FromSetSingleton.
-  Qed.
+Lemma ToMSet_add x S :
+  ToMSet (x |: S) ->
+  ~ x \in S ->
+  ToMSet S.
+Proof.
+  intros [m Hm] Hnin.
+  eapply Build_ToMSet with (mset := PS.remove x m).
+  split; intros y Hin.
+  - unfold FromSet, FromList, In in *. simpl.
+    eapply InA_In. eapply PS.elements_spec1.
+    eapply PS.remove_spec. split.
+    + unfold FromSet, FromList, In. simpl.
+      eapply PS.elements_spec1. eapply In_InA.
+      now eauto with typeclass_instances.
+      eapply Hm. now right.
+    + intros Hc; subst; eauto.
+  - unfold FromSet, FromList, Ensembles.In in *. simpl in *.
+    eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances.
+    eapply PS.elements_spec1 in Hin. eapply PS.remove_spec in Hin.
+    inv Hin.
+    eapply PS.elements_spec1 in H. eapply InA_In in H.
+    eapply Hm in H. inv H; eauto.
+    inv H1. exfalso; eauto. 
+Qed.
+

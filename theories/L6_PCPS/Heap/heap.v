@@ -115,24 +115,24 @@ Module Type Heap.
 
 
   (** Elements filter *)
-  Parameter heap_elements_filter : forall {A}, PS.t -> heap A -> list (loc * A).
-
+  Parameter heap_elements_filter : forall {A} (H : Ensemble loc) {_ : ToMSet H}, heap A -> list (loc * A).
+  
   Parameter heap_elements_filter_sound :
-    forall (A : Type) (s : PS.t) (h : heap A) (l : loc) (v : A),
-      List.In (l, v) (heap_elements_filter s h) -> get l h = Some v /\ PS.In l s.
-
+    forall (A : Type) (S : Ensemble loc) {H : ToMSet S} (h : heap A) (l : loc) (v : A),
+      List.In (l, v) (heap_elements_filter S h) -> get l h = Some v /\ l \in S.
+  
   Parameter heap_elements_filter_complete :
-    forall (A : Type) (s : PS.t) (h : heap A) (l : loc) (v : A),
-      get l h = Some v -> PS.In l s -> List.In (l, v) (heap_elements_filter s h).
+    forall (A : Type) (S : Ensemble loc) {H : ToMSet S} (h : heap A) (l : loc) (v : A),
+      get l h = Some v -> l \in S -> List.In (l, v) (heap_elements_filter S h).
   
   Parameter heap_elements_filter_NoDup :
-    forall (A : Type) (s : PS.t) (h : heap A),
-     NoDup (heap_elements_filter s h).
-
+    forall (A : Type)  (S : Ensemble loc) {H : ToMSet S} (h : heap A),
+     NoDup (heap_elements_filter S h).
+  
   Parameter heap_elements_filter_set_Equal :
-    forall (A : Type) (s1 s2 : PS.t) (h : heap A),
-      PS.Equal s1 s2 ->
-      heap_elements_filter s1 h = heap_elements_filter s2 h.
+    forall (A : Type)  (S1 : Ensemble loc) {H1 : ToMSet S1}  (S2 : Ensemble loc) {H2 : ToMSet S2} (h : heap A),
+      S1 <--> S2 ->
+      heap_elements_filter S1 h = heap_elements_filter S2 h.
 
   (** Size of a heap *)
 
@@ -144,10 +144,10 @@ Module Type Heap.
 
   Definition max_with_measure {A : Type} (f : A -> nat) (h : heap A) : nat :=
     fold_left (fun acc h => max acc (f (snd h))) (heap_elements h) 0%nat.
-
+  
   Definition size_with_measure_filter {A : Type}
-             (f : A -> nat) (s : PS.t) (h : heap A) : nat :=
-    fold_left (fun acc h => acc + f (snd h)) (heap_elements_filter s h) 0%nat.
+             (f : A -> nat) (S : Ensemble loc) {H : ToMSet S}  (h : heap A) : nat :=
+    fold_left (fun acc h => acc + f (snd h)) (heap_elements_filter S h) 0%nat.
 
 
   Parameter splits : forall {A}, heap A -> heap A -> heap A -> Prop. 
@@ -170,7 +170,7 @@ End Heap.
 Module HeapLemmas (H : Heap).
 
   Import H.
-
+  
   Lemma loc_dec : forall (l1 l2 : loc), { l1 = l2 } + { l1 <> l2 }.
   Proof.
     intros l1 l2. 
@@ -328,20 +328,21 @@ Module HeapLemmas (H : Heap).
           congruence.
   Qed.
 
-  Lemma heap_elements_filter_empty (A : Type) (s : PS.t) :
-    @heap_elements_filter A s emp = [].
+  Lemma heap_elements_filter_empty (A : Type) (S : Ensemble loc) {H : ToMSet S}:
+    @heap_elements_filter A S H emp = [].
   Proof.
-    destruct (@heap_elements_filter _ _ emp) as [| [l v] ls] eqn:Hh.
+    destruct (@heap_elements_filter _ _ _ emp) as [| [l v] ls] eqn:Hh.
     reflexivity.
-    assert (Hd : get l emp = Some v).
-    { eapply heap_elements_filter_sound. rewrite Hh. now constructor. }
+    assert (Hd : get l emp = Some v). 
+    { eapply heap_elements_filter_sound with (S := S). rewrite Hh. now constructor. }
     rewrite emp_get in Hd. discriminate.
   Qed.
   
-  Lemma heap_elements_filter_alloc (A : Type) (s : PS.t) (h h' : heap A) (l : loc) (v : A) :
+  Lemma heap_elements_filter_alloc (A : Type) (S : Ensemble loc) {H : ToMSet S}
+        (h h' : heap A) (l : loc) (v : A) :
     alloc v h = (l, h') ->
-    PS.In l s ->
-    Permutation (heap_elements_filter s h') ((l, v) :: (heap_elements_filter s h)) .
+    l \in S ->
+    Permutation (heap_elements_filter S h') ((l, v) :: (heap_elements_filter S h)).
   Proof.
     intros Ha Hin. 
     eapply NoDup_Permutation.
@@ -355,27 +356,29 @@ Module HeapLemmas (H : Heap).
       + eapply heap_elements_filter_sound in Hin'. 
         destruct (loc_dec l l'); subst.
         * erewrite gas in Hin'; [| eassumption ]. 
-          inv Hin'. inv H. now constructor.
+          inv Hin'. inv H0. now constructor.
         * erewrite gao in Hin'; eauto.
           inv Hin'. constructor 2. eapply heap_elements_filter_complete.
           eassumption. eassumption.
       + inv Hin'.
-        * inv H.
+        * inv H0.
           eapply heap_elements_filter_complete.
           erewrite gas; [| eassumption ].
           reflexivity. eassumption.
-        * eapply heap_elements_filter_sound in H. inv H.
+        * eapply heap_elements_filter_sound in H0. inv H0.
           eapply heap_elements_filter_complete.
           erewrite gao; eauto.
           intros Hc. subst.
-          erewrite alloc_fresh in H0; eauto.
+          erewrite alloc_fresh in H1; eauto.
           congruence. eassumption.
   Qed.
 
-  Lemma heap_elements_filter_alloc_nin (A : Type) (s : PS.t) (h h' : heap A) (l : loc) (v : A) :
+  Lemma heap_elements_filter_alloc_nin (A : Type)
+        (S : Ensemble loc) {H : ToMSet S}
+        (h h' : heap A) (l : loc) (v : A) :
     alloc v h = (l, h') ->
-    ~ PS.In l s ->
-    Permutation (heap_elements_filter s h') (heap_elements_filter s h).
+    ~ l \in S ->
+    Permutation (heap_elements_filter S h') (heap_elements_filter S h).
   Proof.
     intros Ha Hin. 
     eapply NoDup_Permutation.
@@ -396,10 +399,11 @@ Module HeapLemmas (H : Heap).
         intros Hc; subst; contradiction.
   Qed.
 
-  Lemma heap_elements_filter_add (A : Type) (s : PS.t) (H : heap A) (l : loc) (v : A) :
+  Lemma heap_elements_filter_add (A : Type) (S : Ensemble loc) {H : ToMSet S}
+        (H : heap A) (l : loc) (v : A) :
     get l H = Some v ->
-    ~ PS.In l s ->
-    Permutation (heap_elements_filter (PS.add l s) H) ((l, v) :: (heap_elements_filter s H)) .
+    ~ l \in S ->
+    Permutation (heap_elements_filter (l |: S) H) ((l, v) :: (heap_elements_filter S H)) .
   Proof.
     intros Hget Hnin.
     eapply NoDup_Permutation.

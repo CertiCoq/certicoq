@@ -4,7 +4,7 @@
 
 From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
          Relations.Relations Lists.List Lists.SetoidList.
-From L6 Require Import tactics Ensembles_util.
+From L6 Require Import tactics Ensembles_util functions.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 
@@ -415,3 +415,79 @@ Class ToMSet (S : Ensemble positive) :=
     mset : PS.t;
     mset_eq : S <--> FromSet mset
   }.
+
+(* TODO move *)
+Lemma InA_In {A} (x : A) l :
+  InA Logic.eq x l -> List.In x l.
+Proof.
+  intros Hin.
+  eapply InA_alt in Hin. edestruct Hin as [z [Hin1 Hin2]].
+  subst. eauto.
+Qed.
+
+Lemma FromSetSingleton x :
+  FromSet (PS.singleton x) <--> [set x].
+Proof.
+  split; intros z Hin; unfold FromSet, FromList, Ensembles.In in *.
+  - eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
+    eapply PS.singleton_spec in Hin. subst. reflexivity.
+    now eauto with typeclass_instances.
+  - inv Hin. eapply InA_In.  eapply PS.elements_spec1.
+    eapply PS.singleton_spec. reflexivity.
+Qed.
+
+
+Lemma image'_Singleton_Some {A B} f (x : A) (y : B) :
+  f x = Some y ->
+  image' f [set x] <--> [set y].
+Proof.
+  intros Heq. 
+  split; intros z Hin. 
+  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+    rewrite Heq in Heq'. inv Heq'. reflexivity.
+  - inv Hin. eexists; split; eauto.
+Qed. 
+
+Lemma image'_Singleton_None {A B} (f : A -> option B) (x : A) :
+  f x = None ->
+  image' f [set x] <--> Empty_set _.
+Proof.
+  intros Heq. 
+  split; intros z Hin. 
+  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+    rewrite Heq in Heq'. congruence.
+  - inv Hin.
+Qed.
+  
+
+Instance ToMSet_image'_Singleton {A} (f : A -> option loc) (x : A) : ToMSet (image' f [set x]).
+Proof.
+  destruct (f x) eqn:Heq.
+  econstructor. rewrite image'_Singleton_Some; eauto.
+  symmetry. eapply FromSetSingleton.
+  econstructor. rewrite image'_Singleton_None; eauto.
+  symmetry. eapply FromSet_empty.
+Qed.
+
+Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
+Proof.
+  constructor. intros x.
+  destruct HM as [m Heq].
+  destruct (PS.mem x m) eqn:Hin.
+  - eapply PS.mem_spec in Hin.
+    left. eapply Heq. unfold FromSet, FromList, In.
+    eapply InA_In. eapply PS.elements_spec1. eassumption.
+  - right. intros Hc.
+    eapply Heq in Hc.
+    unfold FromSet, FromList, Ensembles.In in Hc.
+    eapply In_InA with (eqA := Logic.eq)in Hc;
+      eauto with typeclass_instances.
+    eapply PS.elements_spec1 in Hc.
+    eapply PS.mem_spec in Hc. congruence.
+Qed.
+
+  Instance ToMSet_Singleton x : ToMSet [set x].
+  Proof.
+    econstructor. 
+    symmetry. eapply FromSetSingleton.
+  Qed.

@@ -190,9 +190,6 @@ Module HeapDefs (H : Heap) .
   Proof.
   Abort.
 
-  (** Size of the reachable portion of the heap *)
-  Definition size_reachable (S : Ensemble loc) {Hmset : ToMSet S} (H : heap block) : nat :=
-    size_with_measure_filter size_val (reach_set H mset) H.
     
   (** A heap is well-formed if there are not dangling pointers in the stored values *)
   Definition well_formed (S : Ensemble loc) (H : heap block) :=
@@ -2513,12 +2510,6 @@ Module HeapDefs (H : Heap) .
     inv Hin; eapply PS.diff_spec; now firstorder.
   Qed.
   
-  Instance cardinal_proper : Proper (PS.Equal ==> eq) PS.cardinal.
-  Proof.
-    intros x y Heq. rewrite !PS.cardinal_spec.
-    erewrite elements_eq. reflexivity. assumption.
-  Qed.
-
   Instance Proper_post_set : Proper (eq ==> PS.Equal ==> PS.Equal) post_set.
   Proof.
     intros x y Heq x' y' Heq2; subst. unfold post_set. rewrite !PS.fold_spec.
@@ -2541,16 +2532,26 @@ Module HeapDefs (H : Heap) .
     intros x y Heq1 x' y' Heq2; subst.
     unfold reach_set. rewrite Heq2. reflexivity.
   Qed.
+
+  Instance ToMSet_reach' S {HS : ToMSet S} H : ToMSet (reach' H S).
+  Proof.
+    destruct HS.
+    econstructor. symmetry. eapply reach_set_correct.
+    symmetry. eassumption.
+  Qed.
+
+  (** Size of the reachable portion of the heap *)
+  Definition size_reachable (S : Ensemble loc) {Hmset : ToMSet S} (H : heap block) : nat :=
+    size_with_measure_filter size_val (reach' H S) H.
   
-  Lemma size_reachable_same_set S1 S2 (H1 : ToMSet S1) (H2 : ToMSet S2) H :
+  
+  Lemma size_reachable_same_set S1 S2 {H1 : ToMSet S1} {H2 : ToMSet S2} H :
     S1 <--> S2 ->
     size_reachable S1 H = size_reachable S2 H.
   Proof.
-    unfold size_reachable. intros Heq. destruct H1 as [m1 meq1]; destruct H2 as [m2 meq2].
-    unfold mset. rewrite meq1, meq2 in Heq. eapply Same_set_From_set in Heq.
-    unfold size_with_measure_filter.
-    erewrite heap_elements_filter_set_Equal.
-    reflexivity. rewrite Heq. reflexivity.
+    unfold size_reachable. intros Heq.
+    unfold size_reachable. eapply size_with_measure_Same_set. rewrite Heq.
+    reflexivity. 
   Qed.
 
   Lemma reach'_alloc_set (S : Ensemble var) (H H' : heap block) (rho : env)
@@ -2575,6 +2576,5 @@ Module HeapDefs (H : Heap) .
     now apply reach'_extensive. 
   Qed.      
 
-  (* end move *)
 
 End HeapDefs.

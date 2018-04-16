@@ -113,7 +113,6 @@ Module Type Heap.
     forall (A : Type) (h : heap A),
      NoDup (heap_elements h).
 
-
   (** Elements filter *)
   Parameter heap_elements_filter : forall {A} (H : Ensemble loc) {_ : ToMSet H}, heap A -> list (loc * A).
   
@@ -399,7 +398,7 @@ Module HeapLemmas (H : Heap).
         intros Hc; subst; contradiction.
   Qed.
 
-  Lemma heap_elements_filter_add (A : Type) (S : Ensemble loc) {H : ToMSet S}
+  Lemma heap_elements_filter_add (A : Type) (S : Ensemble loc) {HS : ToMSet S}
         (H : heap A) (l : loc) (v : A) :
     get l H = Some v ->
     ~ l \in S ->
@@ -415,20 +414,42 @@ Module HeapLemmas (H : Heap).
       eapply heap_elements_filter_NoDup. 
     - intros [l' v']. split.
       + intros Hin. edestruct heap_elements_filter_sound as [Hin1 Hin2].
-        eassumption.
-        eapply PS.add_spec in Hin2. inv Hin2.
-        * rewrite Hget in Hin1. inv Hin1. now constructor.
+        eassumption. inv Hin2.
+        * inv H0.
+          rewrite Hget in Hin1. inv Hin1. now constructor.
         * constructor 2. eapply heap_elements_filter_complete; eassumption.
       + intros Hin. inv Hin.
         * inv H0.
-          eapply heap_elements_filter_complete. eassumption.
-          eapply PS.add_spec. eauto.
+          eapply heap_elements_filter_complete. eassumption. now left.
         * edestruct heap_elements_filter_sound as [Hin1 Hin2].
           eassumption.
           eapply heap_elements_filter_complete. eassumption.
-          eapply PS.add_spec. now right.
+          now right.
   Qed.
 
+  Lemma heap_elements_filter_add_not_In (A : Type) (S : Ensemble loc) {HS : ToMSet S}
+        (H : heap A) (l : loc) :
+    get l H = None ->
+    ~ l \in S ->
+    Permutation (heap_elements_filter (l |: S) H) ((heap_elements_filter S H)).
+  Proof.
+    intros Hget Hnin.
+    eapply NoDup_Permutation.
+    - eapply heap_elements_filter_NoDup. 
+    - eapply heap_elements_filter_NoDup. 
+    - intros [l' v']. split.
+      + intros Hin. edestruct heap_elements_filter_sound as [Hin1 Hin2].
+        eassumption. inv Hin2.
+        * inv H0.
+          rewrite Hget in Hin1. inv Hin1.
+        * eapply heap_elements_filter_complete; eassumption.
+      + intros Hin.
+        edestruct heap_elements_filter_sound as [Hin1 Hin2].
+        eassumption.
+        
+        eapply heap_elements_filter_complete. eassumption.
+        now right.
+  Qed.
   
   Lemma subheap_Subperm (A : Type) (h1 h2 : heap A) : 
     h1 ⊑ h2 ->
@@ -442,9 +463,10 @@ Module HeapLemmas (H : Heap).
     eauto.
   Qed.
 
-  Lemma subheap_filter_Subperm (A : Type) (s : PS.t) (h1 h2 : heap A) : 
+  Lemma subheap_filter_Subperm (A : Type) (S : Ensemble loc) {HS : ToMSet S}
+        (h1 h2 : heap A) :
     h1 ⊑ h2 ->
-    Subperm (heap_elements_filter s h1) (heap_elements_filter s h2).
+    Subperm (heap_elements_filter S h1) (heap_elements_filter S h2).
   Proof.
     intros Hsub.
     eapply incl_Subperm.
@@ -563,56 +585,97 @@ Module HeapLemmas (H : Heap).
     + eapply subheap_Subperm. eassumption.
   Qed.
 
-  Lemma size_with_measure_filter_emp (A : Type) (s : PS.t) f :
-    @size_with_measure_filter A f s emp = 0%nat.
+  Lemma size_with_measure_filter_emp (A : Type) (S : Ensemble loc) {HS : ToMSet S} f :
+    @size_with_measure_filter A f S _ emp = 0%nat.
   Proof.
     unfold size_with_measure_filter.
     rewrite heap_elements_filter_empty. reflexivity.
   Qed.
-
+  
   Lemma size_with_measure_filter_alloc
-        (A : Type) f (s : PS.t) (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) : 
-    size_with_measure_filter f s H = m ->
+        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
+        (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) :
+    size_with_measure_filter f S H = m ->
     alloc x H = (l, H') ->
-    PS.In l s ->
-    size_with_measure_filter f s H' = (m + f x)%nat.
+    l \in S ->
+    size_with_measure_filter f S H' = (m + f x)%nat.
   Proof.
     intros Hs1 Ha Hin.
     unfold size_with_measure_filter in *. eapply heap_elements_filter_alloc in Ha; [| eassumption ].
-    erewrite fold_permutation; [| now intros; firstorder | eassumption ].
+    erewrite fold_permutation; [| | eassumption ].
     simpl.
     replace (f x) with ((fun acc h => acc + f (snd h)) 0 (l, x)); [| reflexivity ].
     erewrite List_util.fold_left_comm with (f0 := fun acc h => acc + f (snd h)); [| now firstorder ].
-    omega.
+    omega. intros. omega.
   Qed.
 
   Lemma size_with_measure_filter_alloc_in
-        (A : Type) f (s : PS.t) (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) : 
-    size_with_measure_filter f s H = m ->
+        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
+        (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) :
+    size_with_measure_filter f S H = m ->
     alloc x H = (l, H') ->
-    ~ PS.In l s ->
-    size_with_measure_filter f s H' = m.
+    ~ l \in S ->
+    size_with_measure_filter f S H' = m.
   Proof.
     intros Hs1 Ha Hnin.
     unfold size_with_measure_filter in *. eapply heap_elements_filter_alloc_nin in Ha; [| eassumption ].
-    erewrite fold_permutation; [| now intros; firstorder | eassumption ].
-    eassumption.
+    erewrite fold_permutation; [| | eassumption ].
+    eassumption. intros; omega. 
   Qed.
   
   Lemma size_with_measure_filter_subheap :
-    forall A f (s : PS.t) (H1 H2 : heap A),
+    forall A f (S : Ensemble loc) {HS : ToMSet S} (H1 H2 : heap A),
       H1 ⊑ H2 ->
-      size_with_measure_filter f s H1 <= size_with_measure_filter f s H2.
+      size_with_measure_filter f S H1 <= size_with_measure_filter f S H2.
   Proof.
-    intros A f s H1 H2 Hsub. unfold size_with_measure_filter.
+    intros A f S HS H1 H2 Hsub. unfold size_with_measure_filter.
     eapply fold_left_subperm; eauto.
-    now firstorder.
-    now firstorder.
-    now firstorder.
-    now firstorder.
+    econstructor. now eapply Nat_as_OT.le_preorder.
+    now eapply Nat_as_OT.le_preorder.
+    intros; omega.
+    intros; omega.
+    intros; omega.
     eapply subheap_filter_Subperm. eassumption.
   Qed.
+  
+  Lemma size_with_measure_filter_add_In
+        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
+        (x : loc) (v : A) (H : heap A) :
+    ~ x \in S ->
+    get x H = Some v ->
+    size_with_measure_filter f (x |: S) H = f v + size_with_measure_filter f S H. 
+  Proof.
+    intros Hnin Hget. unfold size_with_measure_filter.
+    erewrite fold_permutation; [| | eapply heap_elements_filter_add; eassumption ].
+    simpl.
+    replace (f v) with ((fun acc h =>  acc + f (snd h)) 0 (x, v)) by (simpl; omega).
+    rewrite fold_left_comm with (f0 := (fun acc h =>  acc + f (snd h))). simpl. omega.
+    intros. omega.
+    intros. omega.
+  Qed.
 
+  Lemma size_with_measure_filter_add_not_In
+        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
+        (x : loc) (v : A) (H : heap A) :
+    ~ x \in S ->
+    get x H = None ->
+    size_with_measure_filter f (x |: S) H = size_with_measure_filter f S H. 
+  Proof.
+    intros Hnin Hget. unfold size_with_measure_filter.
+    erewrite fold_permutation; [| | eapply heap_elements_filter_add_not_In; eassumption ].
+    reflexivity.
+    intros. omega.
+  Qed.
+
+  Lemma size_with_measure_Same_set (A : Type) S {HS : ToMSet S} S' {HS' : ToMSet S'}
+        (f : A -> nat) (H : heap A) :
+    S <--> S' ->
+    size_with_measure_filter f S H = size_with_measure_filter f S' H.
+  Proof.
+    intros Heq. unfold size_with_measure_filter.
+    erewrite heap_elements_filter_set_Equal; eauto. 
+  Qed.
+  
   Lemma splits_subheap_l {A} (H H1 H2 : heap A) : 
     splits H H1 H2 -> H1 ⊑ H.
   Proof.

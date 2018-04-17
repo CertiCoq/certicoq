@@ -633,3 +633,21 @@ Proof.
     inv H1. exfalso; eauto. 
 Qed.
 
+Lemma Ensemble_ind (P : Ensemble positive -> Prop) {_ : Proper (Same_set _ ==> iff) P} :
+  P (Empty_set _) ->
+  (forall x S {_ : ToMSet S}, ~ x \in S -> P S -> P (x |: S)) ->
+  (forall S {_ : ToMSet S}, P S).
+Proof.
+  intros Hbase IH S HS.
+  eapply H. eapply HS.
+  eapply PS_ind with (S := mset).
+  - intros x y Heq. eapply H.
+    unfold FromSet. rewrite Heq. reflexivity.
+  - rewrite FromSet_empty. eassumption.
+  - intros z S1 Hnin HP.
+    rewrite FromSet_add. eapply IH; try eassumption.
+    econstructor. reflexivity.
+    intros Hc. eapply Hnin. unfold FromSet, FromList, Ensembles.In in Hc.
+    simpl in Hc. eapply In_InA in Hc. eapply PS.elements_spec1 in Hc.
+    eassumption. eauto with typeclass_instances.
+Qed.

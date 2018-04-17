@@ -559,65 +559,93 @@ Module ClosureConversionCorrect (H : Heap).
     (cc_approx_heap S k j IP P b d H1 H2)
       (at level 70, no associativity).
 
-  
-
-  
-  Lemma size_reachable_leq S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2}
-        H1 H2 k j GIP GP b d :
-    S1 |- H1 ≼ ^ (k ; j ; GIP ; GP ; b ; d ) H2 ->
-    S2 <--> image b S1 :|: image' d S1 -> 
-    size_with_measure_filter size_val (@mset S1 _) H1 <=
-    size_with_measure_filter size_val (@mset S2 _) H2 <=
-    (size_with_measure_filter size_val (@mset S1 _) H1) * (1 + (max_vars_heap H1)).
+  (* move *)
+  Lemma Ensemble_ind (P : Ensemble var -> Prop) {_ : Proper (Same_set _ ==> iff) P} :
+    P (Empty_set _) ->
+    (forall x S {_ : ToMSet S}, ~ x \in S -> P S -> P (x |: S)) ->
+    (forall S {_ : ToMSet S}, P S).
   Proof.
+    intros Hbase IH S HS.
+    eapply H. eapply HS.
+    eapply PS_ind with (S := mset).
+    - intros x y Heq. eapply H.
+      unfold FromSet. rewrite Heq. reflexivity.
+    - rewrite FromSet_empty. eassumption.
+    - intros z S1 Hnin HP.
+      rewrite FromSet_add. eapply IH; try eassumption.
+      econstructor. reflexivity.
+      intros Hc. eapply Hnin. unfold FromSet, FromList, In in Hc.
+      simpl in Hc. eapply In_InA in Hc. eapply PS.elements_spec1 in Hc.
+      eassumption. eauto with typeclass_instances.
+  Qed.
+
+  Definition injective_subdomain' {A B} P (f : A -> option B) :=
+    forall x x' v, In _ P x -> In _ P x' -> f x = Some v -> f x' = Some v -> x = x'.
+
+  Require Import Permutation.
+
+  (* TODO move *)
+ 
+    
+  Lemma size_reachable_leq S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2}
+        H1 H2 k GIP GP b d :
+    (forall j, S1 |- H1 ≼ ^ (k ; j ; GIP ; GP ; b ; d ) H2) ->
+    S2 <--> image b S1 :|: image' d S1 ->
+    injective_subdomain S1 b ->
+    injective_subdomain' S1 d ->
+    Disjoint _ (image b S1) (image' d S1) -> 
+    size_with_measure_filter size_val S1 H1 <=
+    size_with_measure_filter size_val S2 H2 <=
+    (size_with_measure_filter size_val S1 H1) * (1 + (max_vars_heap H1)).
+  Proof with (now eauto with Ensembles_DB).
+    assert (HS1' := HS1).
     revert HS1 S2 HS2.
     
     eapply (Ensemble_ind (fun S1 => 
                             forall (HS1 : ToMSet S1) (S2 : Ensemble positive) (HS2 : ToMSet S2),
-                              S1 |- H1 ≼ ^ (k; j; GIP; GP; b; d) H2 ->
+                              (forall j, S1 |- H1 ≼ ^ (k; j; GIP; GP; b; d) H2) ->
                               S2 <--> image b S1 :|: image' d S1 ->
-                              size_with_measure_filter size_val (@mset S1 HS1) H1 <=
-                              size_with_measure_filter size_val (@mset S2 HS2) H2 <=
-                              size_with_measure_filter size_val (@mset S1 HS1) H1 * (1 + max_vars_heap H1)
-                         )).
-
-    - admit. (* easy *)
-    - intros x S1' HS Hnin IHS HS1 S2 HS2 Hheap Heq.
+                              injective_subdomain S1 b ->
+                              injective_subdomain' S1 d ->
+                              Disjoint _ (image b S1) (image' d S1) ->
+                              size_with_measure_filter size_val S1 H1 <=
+                              size_with_measure_filter size_val S2 H2 <=
+                              (size_with_measure_filter size_val S1 H1) * (1 + (max_vars_heap H1))
+                         )); [| | eassumption ].
+    - intros HS1 S2 HS2 Hcc Heq Hinj1 Hinj2 HD.
+      rewrite !size_with_measure_filter_Empty_set.
+      rewrite image_Empty_set, image'_Empty_set in Heq.
+      rewrite Union_Empty_set_neut_r in Heq.
+      simpl. erewrite (@HL.size_with_measure_Same_set _ _ _ _ _ _ _ Heq).
+      rewrite size_with_measure_filter_Empty_set. omega.
+    - intros x S1' HS Hnin IHS HS1 S2 HS2 Hheap Heq Hinj1 Hinj2 HD.
       rewrite image_Union, image'_Union, image_Singleton in Heq.
       unfold mset.
-      assert (HS1' := HS1). eapply ToMSet_add in HS1'; [| eassumption ].
+      assert (HS1'' := HS1). eapply ToMSet_add in HS1''; [| eassumption ].
       assert (Hseq : S2 <--> b x |: (image' d [set x]) :|: (S2 \\ (b x |: (image' d [set x])))). 
       { eapply Union_Setminus_Same_set.
         eapply Decidable_Union. eapply DecidableSingleton_positive.
         admit. 
         rewrite Heq. now eauto with Ensembles_DB. }
-      assert (HS2' : ToMSet (S2 \\ (b x |: image' d [set x]))). admit.
+      assert (HS2' : ToMSet (S2 \\ (b x |: image' d [set x]))) by now eauto with typeclass_instances.
       
-      specialize (IHS HS1' _ HS2').
-      destruct HS1 as [m1 Heq1]. destruct HS2 as [m2 Heq2].
-      destruct HS1' as [m1' Heq1']. destruct HS2' as [m2' Heq2'].
-      rewrite Hseq in Heq2.
+      specialize (IHS HS1'' _ HS2').
       
-      assert (Hmeq1 : PS.Equal m1 (PS.add x m1')).
-      { eapply Same_set_From_set. rewrite <- Heq1, FromSet_add, <- Heq1'.
-        reflexivity. }
-
-      assert (HMSetd : ToMSet (image' d [set x])).
-      { destruct (d x) as . 
-      assert (Hmeq2 : PS.Equal m2 (PS.add (b x) m2')).
-      { 
+      assert (Hcc : (forall j, Res (Loc x, H1) ≺ ^ (k ; j ; GIP ; GP ; b ; d) Res (Loc (b x), H2))). 
+      { intros j; eapply Hheap. now left. }
       
+      destruct (get x H1) as [v | ] eqn:Hget1;
+        [| destruct (Hcc 0) as [_ Hcc']; rewrite Hget1 in Hcc'; contradiction ]. 
       
-        Decidable_Singleton.  admit.
+      erewrite (HL.size_with_measure_Same_set _ _ _ _ H2 Heq).
+      erewrite HL.size_with_measure_filter_add_In; try eassumption.
+      erewrite size_with_measure_filter_Union.
+      + admit.
+      + constructor.
+        intros l [l1 Hc1 Hc2]. eapply HD. constructor.
+        rewrite image_Union, image_Singleton. eassumption.
+        rewrite image'_Union. eassumption.
         
-        eauto with typeclass_instances. 
-      
-      eauto.
-
-      rewrite image_Singleton. with (S := S1).
-    intros Hleq Heq.
-    unfold size_reachable.
-    revert S H Hleq Heq.
     
 
   (* Lemma image_FV GI GP k β H1 rho1 H2 rho2 Scope `{Decidable _ Scope} FVs Γ c : *)

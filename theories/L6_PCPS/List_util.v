@@ -593,6 +593,15 @@ Proof.
   rewrite <- IHl; eauto. f_equal. eauto.
 Qed.
 
+Lemma fold_left_acc_plus {A} (f : nat -> A -> nat) l acc v
+      (Hyp : forall v1 v2 v3, f (v1 + v2) v3 = f v1 v3 + v2) : 
+  fold_left f l (acc + v) = fold_left f l acc + v. 
+Proof.
+  revert acc v. induction l; intros acc v; simpl; eauto.
+  rewrite <- IHl. rewrite Hyp. reflexivity.
+Qed.
+
+
 (** Max of list given a measure function and corresponding lemmas *)
 
 Definition max_list_nat_with_measure {A} (f : A -> nat) i (ls : list A) : nat :=

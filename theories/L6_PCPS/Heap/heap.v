@@ -399,10 +399,10 @@ Module HeapLemmas (H : Heap).
   Qed.
 
   Lemma heap_elements_filter_add (A : Type) (S : Ensemble loc) {HS : ToMSet S}
-        (H : heap A) (l : loc) (v : A) :
+        (H : heap A) (l : loc) {HS' : ToMSet (l |: S)}  (v : A) :
     get l H = Some v ->
     ~ l \in S ->
-    Permutation (heap_elements_filter (l |: S) H) ((l, v) :: (heap_elements_filter S H)) .
+    Permutation (@heap_elements_filter _ (l |: S) HS' H) ((l, v) :: (heap_elements_filter S H)) .
   Proof.
     intros Hget Hnin.
     eapply NoDup_Permutation.
@@ -428,10 +428,10 @@ Module HeapLemmas (H : Heap).
   Qed.
 
   Lemma heap_elements_filter_add_not_In (A : Type) (S : Ensemble loc) {HS : ToMSet S}
-        (H : heap A) (l : loc) :
+        (H : heap A) (l : loc)  {HS' : ToMSet (l |: S)}:
     get l H = None ->
     ~ l \in S ->
-    Permutation (heap_elements_filter (l |: S) H) ((heap_elements_filter S H)).
+    Permutation (@heap_elements_filter _ (l |: S) HS' H) ((heap_elements_filter S H)).
   Proof.
     intros Hget Hnin.
     eapply NoDup_Permutation.
@@ -450,7 +450,20 @@ Module HeapLemmas (H : Heap).
         eapply heap_elements_filter_complete. eassumption.
         now right.
   Qed.
-  
+
+  Lemma heap_elements_filter_Empty_set (A : Type) {HS1 : ToMSet (Empty_set _)}
+        (H : heap A) :
+    @heap_elements_filter A (Empty_set _) HS1 H = [].
+  Proof.
+    eapply Permutation_nil. symmetry.
+    eapply NoDup_Permutation.
+    - eapply heap_elements_filter_NoDup.
+    - constructor.
+    - intros [l v]; split; intros Hin; [| now inv Hin ].
+      edestruct heap_elements_filter_sound as [Hin1 Hin2].
+      eassumption. now inv Hin2.
+  Qed.
+
   Lemma subheap_Subperm (A : Type) (h1 h2 : heap A) : 
     h1 ⊑ h2 ->
     Subperm (heap_elements h1) (heap_elements h2).
@@ -461,6 +474,43 @@ Module HeapLemmas (H : Heap).
     intros [l v] Hin. eapply heap_elements_sound in Hin. 
     eapply heap_elements_complete.
     eauto.
+  Qed.
+
+  Lemma heap_elements_filter_Union (A : Type) (S1 : Ensemble loc) {HS1 : ToMSet S1}
+        (S2 : Ensemble loc) {HS2 : ToMSet S2}
+        {HS' : ToMSet (S1 :|: S2)}
+        (H : heap A) :
+    Disjoint _ S1 S2 ->
+    Permutation (@heap_elements_filter A (S1 :|: S2) HS' H)
+                ((heap_elements_filter S1 H) ++ (heap_elements_filter S2 H)) .
+  Proof.
+    intros HD.
+    eapply NoDup_Permutation.
+    - eapply heap_elements_filter_NoDup. 
+    - eapply NoDup_app.
+      + eapply heap_elements_filter_NoDup.
+      + eapply heap_elements_filter_NoDup.
+      + constructor. intros x Hc. destruct Hc as [[l v] H1' H2'].
+        unfold FromList, In in *.
+        edestruct heap_elements_filter_sound with (S := S1) as [Hin1' Hin2'];
+          try eassumption.
+        edestruct heap_elements_filter_sound with (S := S2) as [Hin1'' Hin2''];
+          try eassumption.
+        eapply HD; constructor; eauto.
+    - intros [l' v']. split.
+      + intros Hin. edestruct heap_elements_filter_sound as [Hin1 Hin2].
+        eassumption. inv Hin2.
+        * eapply Coqlib.in_app. left.
+          eapply heap_elements_filter_complete; try eassumption.
+        * eapply Coqlib.in_app. right.
+          eapply heap_elements_filter_complete; try eassumption.
+      + intros Hin. eapply Coqlib.in_app in Hin. inv Hin.
+        * edestruct heap_elements_filter_sound as [Hin1 Hin2].
+          eassumption.
+          eapply heap_elements_filter_complete. eassumption. now left.
+        * edestruct heap_elements_filter_sound as [Hin1 Hin2].
+          eassumption.
+          eapply heap_elements_filter_complete. eassumption. now right.
   Qed.
 
   Lemma subheap_filter_Subperm (A : Type) (S : Ensemble loc) {HS : ToMSet S}
@@ -639,11 +689,12 @@ Module HeapLemmas (H : Heap).
   Qed.
   
   Lemma size_with_measure_filter_add_In
-        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
-        (x : loc) (v : A) (H : heap A) :
+        {A : Type} f (S : Ensemble loc) {HS : ToMSet S}
+        (x : loc) {HS' : ToMSet (x |: S)}
+        (v : A) (H : heap A) :
     ~ x \in S ->
     get x H = Some v ->
-    size_with_measure_filter f (x |: S) H = f v + size_with_measure_filter f S H. 
+    @size_with_measure_filter _ f (x |: S) HS' H = f v + size_with_measure_filter f S H. 
   Proof.
     intros Hnin Hget. unfold size_with_measure_filter.
     erewrite fold_permutation; [| | eapply heap_elements_filter_add; eassumption ].
@@ -656,10 +707,11 @@ Module HeapLemmas (H : Heap).
 
   Lemma size_with_measure_filter_add_not_In
         (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
-        (x : loc) (v : A) (H : heap A) :
+        (x : loc) {HS' : ToMSet (x |: S)}
+        (v : A) (H : heap A) :
     ~ x \in S ->
     get x H = None ->
-    size_with_measure_filter f (x |: S) H = size_with_measure_filter f S H. 
+    @size_with_measure_filter _ f (x |: S) HS' H = size_with_measure_filter f S H. 
   Proof.
     intros Hnin Hget. unfold size_with_measure_filter.
     erewrite fold_permutation; [| | eapply heap_elements_filter_add_not_In; eassumption ].
@@ -675,7 +727,37 @@ Module HeapLemmas (H : Heap).
     intros Heq. unfold size_with_measure_filter.
     erewrite heap_elements_filter_set_Equal; eauto. 
   Qed.
+
+  Lemma size_with_measure_filter_Empty_set
+        {A : Type} f {HS1 : ToMSet (Empty_set _)}
+        (H : heap A) :
+    @size_with_measure_filter _ f (Empty_set _) HS1 H = 0.
+  Proof.
+    unfold size_with_measure_filter. rewrite heap_elements_filter_Empty_set.
+    reflexivity.
+  Qed.
   
+  Lemma size_with_measure_filter_Union
+        {A : Type} f (S1 : Ensemble loc) {HS1 : ToMSet S1}
+        (S2 : Ensemble loc) {HS2 : ToMSet S2}
+        {HS' : ToMSet (S1 :|: S2)}
+        (H : heap A) :
+    Disjoint _ S1 S2 ->
+    @size_with_measure_filter _ f (S1 :|: S2) HS' H =
+    size_with_measure_filter f S1 H + size_with_measure_filter f S2 H.
+  Proof.
+    intros Hd. unfold size_with_measure_filter.
+    erewrite fold_permutation; [| | eapply heap_elements_filter_Union; eassumption ].
+    - rewrite fold_left_app. 
+      replace ((fold_left (fun (acc : nat) (h : loc * A) => acc + f (snd h))
+                          (heap_elements_filter S1 H) 0))
+      with (0 + (fold_left (fun (acc : nat) (h : loc * A) => acc + f (snd h))
+                           (heap_elements_filter S1 H) 0)) by (simpl; omega).
+      rewrite fold_left_acc_plus. omega.
+      intros. omega.
+    - intros. omega.
+  Qed.
+
   Lemma splits_subheap_l {A} (H H1 H2 : heap A) : 
     splits H H1 H2 -> H1 ⊑ H.
   Proof.

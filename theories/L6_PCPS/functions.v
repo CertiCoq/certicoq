@@ -78,6 +78,8 @@ Definition domain {A B} (f : A -> option B) : Ensemble A :=
 Definition image' {A B} (f : A -> option B) S : Ensemble B :=
   fun y => exists x, In _ S x /\ f x = Some y.
 
+Definition injective_subdomain' {A B} P (f : A -> option B) :=
+  forall x x' v, In _ P x -> In _ P x' -> f x = Some v -> f x' = Some v -> x = x'.
 
 (** * Lemmas about [f_eq_subdomain] and [f_eq] *)
 
@@ -828,6 +830,23 @@ Proof.
       eexists; split; eauto.
 Qed.
 
+(** * Lemmas about [injective_subdomain'] *)
+
+Lemma injective_subdomain'_antimon {A B} P1 P2 (f : A -> option B) :
+  injective_subdomain' P2 f ->
+  P1 \subset P2 ->
+  injective_subdomain' P1 f.
+Proof.
+  intros Hinj Hsub x1 x2 v Hin1 Hin2 Heq1 Heq2.
+  eapply Hinj; eauto.
+Qed.
+
+Instance Proper_injective_subdomain' A B :
+  Proper (Same_set A ==> eq ==> iff) (@injective_subdomain' A B).
+Proof.
+  intros s1 s2 Hseq f1 f2 Hfeq; subst; split; intros Hinj x y v Hin1 Hin2 Heq1 Heq2;
+  eapply Hinj; try eassumption; eapply Hseq; eauto. 
+Qed.
 
 (** * Lemmas about [compose] *)
 

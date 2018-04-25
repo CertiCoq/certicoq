@@ -848,7 +848,7 @@ Proof.
       eexists; split; eauto.
 Qed.
 
-Instance Proper_image' {A B} :
+Instance Proper_image'_Same_set {A B} :
   Proper (eq ==> Same_set A ==> Same_set B) image'.
 Proof.
   intros f1 f2 Hfeq s1 s2 Hseq; split; intros x [y [Hin Heq]];
@@ -890,6 +890,18 @@ Proof.
   firstorder.
 Qed.
 
+Instance Proper_compose_l A B C : Proper (f_eq ==> eq ==> f_eq) (@compose A B C).
+Proof.
+  intros f1 f1' Hfeq f2 f2' Hfeq'; subst; firstorder.
+Qed.
+
+Instance Proper_compose_r A B C : Proper (eq ==> f_eq ==> f_eq) (@compose A B C).
+Proof.
+  intros f1 f1' Hfeq f2 f2' Hfeq'; subst. intros x; unfold compose; simpl.
+  rewrite <- Hfeq'. reflexivity.
+Qed.    
+
+
 (** * Lemmas about [app] *)
 
 Lemma app_monotonic {A} (S1 S2 : Ensemble A) f n :
@@ -918,4 +930,9 @@ Proof.
   intros x. destruct x; eauto.
 Qed.
 
+Lemma lift_compose {A B C : Type} (f2 : B -> C) (f1 : A -> B) :
+  f_eq (lift (f2 ∘ f1)) (lift f2 ∘ lift f1).
+Proof.
+  intros [x|]; unfold lift, compose; simpl; reflexivity.
+Qed.
 

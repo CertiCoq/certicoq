@@ -251,7 +251,7 @@ Proof.
   - inv Hall2. constructor; eauto.
 Qed.
 
-Lemma Forall2_forall (A B : Type) (R : A -> B -> B -> Prop) (l1 l2 : list B) :
+Lemma Forall2_forall (A B C : Type) (R : A -> B -> C -> Prop) l1 l2 :
   inhabited A ->
   (forall k, Forall2 (R k) l1 l2) ->
   Forall2 (fun x1 x2 => forall k, R k x1 x2) l1 l2.
@@ -265,6 +265,7 @@ Proof.
     eapply IHl1. intros k.
     specialize (Hyp k). inv Hyp. eassumption.
 Qed.
+
 
 Lemma Forall2_conj (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) :
   Forall2 R1 l1 l2 ->
@@ -379,21 +380,6 @@ Proof.
 
     edestruct IHHall as [y' [Hin HP]]. eassumption.
     eexists. split; eauto. now constructor.
-Qed.
-
-Lemma Forall2_forall (A B C : Type) (R : A -> B -> C -> Prop) l1 l2 :
-  inhabited A ->
-  (forall k, Forall2 (R k) l1 l2) ->
-  Forall2 (fun x1 x2 => forall k, R k x1 x2) l1 l2.
-Proof.
-  intros [w]. revert l2. induction l1; intros l2 Hyp.
-  - specialize (Hyp w).
-    inversion Hyp; subst. now constructor.
-  - assert (Hyp' := Hyp w). inversion Hyp'.
-    subst. constructor. intros k.
-    specialize (Hyp k). inv Hyp. eassumption.
-    eapply IHl1. intros k.
-    specialize (Hyp k). inv Hyp. eassumption.
 Qed.
 
 Lemma Forall2_det_l {A B : Type} (P : A -> B -> Prop) l1 l1' l2 :

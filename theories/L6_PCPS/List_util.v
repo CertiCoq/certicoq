@@ -353,7 +353,63 @@ Proof.
     eapply Hr; eauto; try now constructor 2.
 Qed.
 
-(** Lemmas about [nthN] *)
+Lemma Forall2_exists {A B} (P : A -> B -> Prop) l1 l2 x :
+  List.In x l1 ->
+  Forall2 P l1 l2 ->
+  (exists y, List.In y l2 /\ P x y).
+Proof.
+  intros Hin Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    eexists. split; eauto. now constructor.
+
+    edestruct IHHall as [y' [Hin HP]]. eassumption.
+    eexists. split; eauto. now constructor.
+Qed.
+
+Lemma Forall2_exists_r {A B} (P : A -> B -> Prop) l1 l2 x :
+  List.In x l2 ->
+  Forall2 P l1 l2 ->
+  (exists y, List.In y l1 /\ P y x).
+Proof.
+  intros Hin Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    eexists. split; eauto. now constructor.
+
+    edestruct IHHall as [y' [Hin HP]]. eassumption.
+    eexists. split; eauto. now constructor.
+Qed.
+
+Lemma Forall2_forall (A B C : Type) (R : A -> B -> C -> Prop) l1 l2 :
+  inhabited A ->
+  (forall k, Forall2 (R k) l1 l2) ->
+  Forall2 (fun x1 x2 => forall k, R k x1 x2) l1 l2.
+Proof.
+  intros [w]. revert l2. induction l1; intros l2 Hyp.
+  - specialize (Hyp w).
+    inversion Hyp; subst. now constructor.
+  - assert (Hyp' := Hyp w). inversion Hyp'.
+    subst. constructor. intros k.
+    specialize (Hyp k). inv Hyp. eassumption.
+    eapply IHl1. intros k.
+    specialize (Hyp k). inv Hyp. eassumption.
+Qed.
+
+Lemma Forall2_det_l {A B : Type} (P : A -> B -> Prop) l1 l1' l2 :
+  (forall x1 x2 y, P x1 y -> P x2 y -> x1 = x2) ->
+  Forall2 P l1 l2 ->
+  Forall2 P l1' l2 ->
+  l1 = l1'.
+Proof.
+  intros HP Hall. revert l1'.
+  induction Hall; intros l1' Hall'.
+  - now inv Hall'.
+  - inv Hall'. f_equal; eauto.
+Qed.
+
+
+(** * Lemmas about [nthN] *)
 
 Lemma In_nthN (A : Type) (l : list A) (v : A) :
   List.In v l -> exists n, nthN l n = Some v .

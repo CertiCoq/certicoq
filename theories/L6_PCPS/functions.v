@@ -81,6 +81,12 @@ Definition image' {A B} (f : A -> option B) S : Ensemble B :=
 Definition injective_subdomain' {A B} P (f : A -> option B) :=
   forall x x' v, In _ P x -> In _ P x' -> f x = Some v -> f x' = Some v -> x = x'.
 
+Definition lift {A B} (f : A -> B) : option A -> option B :=
+  fun x => match x with
+          | Some x => Some (f x)
+          | None => None
+        end.
+  
 (** * Lemmas about [f_eq_subdomain] and [f_eq] *)
 
 Instance equivalence_f_eq_subdomain {A B} S : Equivalence (@f_eq_subdomain A B S). 
@@ -151,7 +157,19 @@ Lemma f_eq_subdomain_Union {A B} P1 P2 (f1 f2 : A -> B) :
   f_eq_subdomain (Union _ P1 P2) f1 f2.
 Proof.
   intros H1 H2 x1 HP; inv HP; eauto.
-Qed. 
+Qed.
+
+Lemma f_eq_subdomain_compose_compat {A B C} S (f1 f2: A -> B) (g1 g2 : B -> C) :
+  f_eq_subdomain S f1 f2 ->
+  f_eq_subdomain (image f1 S) g1 g2 ->
+  f_eq_subdomain S (g1 ∘ f1) (g2 ∘ f2).
+Proof.
+  intros Heq1 Heq2 x Hin. unfold compose.
+  rewrite <- Heq1; eauto. rewrite Heq2. reflexivity.
+  eexists; split; eauto.
+   Qed.
+
+
 
 (** * Lemmas about [image] *)
 
@@ -830,6 +848,14 @@ Proof.
       eexists; split; eauto.
 Qed.
 
+Instance Proper_image' {A B} :
+  Proper (eq ==> Same_set A ==> Same_set B) image'.
+Proof.
+  intros f1 f2 Hfeq s1 s2 Hseq; split; intros x [y [Hin Heq]];
+  subst; eexists; split; eauto; eapply Hseq; eauto.
+Qed.
+
+
 (** * Lemmas about [injective_subdomain'] *)
 
 Lemma injective_subdomain'_antimon {A B} P1 P2 (f : A -> option B) :
@@ -883,4 +909,13 @@ Proof.
   - rewrite compose_id_neut_l. reflexivity.
   - intros x. rewrite IHm. reflexivity.
 Qed.
+
+(** * Lemmas about [lift] *)
+
+Lemma lift_id {A : Type} :
+  f_eq (lift (@id A)) id.
+Proof.
+  intros x. destruct x; eauto.
+Qed.
+
 

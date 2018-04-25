@@ -1298,6 +1298,30 @@ Proof.
       inv Hc; contradiction. 
 Qed.
 
+Lemma In_Union_list {A} (l : list (Ensemble A)) s:
+  List.In s l ->
+  s \subset Union_list l.
+Proof.
+  intros Hin. induction l. 
+  - now inv Hin.
+  - inv Hin. now eapply Included_Union_l.
+    simpl. eapply Included_Union_preserv_r.
+    eapply IHl; eauto.
+Qed.
+
+Lemma Union_lists_exists {A} (x : A) ls :
+  x \in Union_list ls ->
+        exists S, List.In S ls /\ x \in S.
+Proof.
+  induction ls; intros Hin; try now inv Hin.
+  inv Hin.
+  - eexists. split; eauto. now left.
+  - edestruct IHls as [S [Hin1 Hin2]].
+    eassumption.
+    eexists. split; eauto. now right.
+Qed.
+
+
 Hint Immediate FromList_nil FromList_cons FromList_app
      FromList_singleton : Ensembles_DB.
 

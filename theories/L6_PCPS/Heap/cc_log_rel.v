@@ -2187,6 +2187,23 @@ Module CC_log_rel (H : Heap).
     eassumption.
   Qed.
 
+
+  Lemma lift_compose {A B C : Type} (f2 : B -> C) (f1 : A -> B) :
+    f_eq (lift (f2 ∘ f1)) (lift f2 ∘ lift f1).
+  Proof.
+    intros [x|]; unfold lift, compose; simpl; reflexivity.
+  Qed.
+
+  Instance Proper_compose_l A B C : Proper (f_eq ==> eq ==> f_eq) (@compose A B C).
+  Proof.
+    intros f1 f1' Hfeq f2 f2' Hfeq'; subst; firstorder.
+  Qed.
+
+  Instance Proper_compose_r A B C : Proper (eq ==> f_eq ==> f_eq) (@compose A B C).
+  Proof.
+    intros f1 f1' Hfeq f2 f2' Hfeq'; subst. intros x; unfold compose; simpl.
+    rewrite <- Hfeq'. reflexivity.
+  Qed.
     
   Lemma cc_approx_val_res_eq (k j : nat) (b' b1 b2 : Inj) d'  (H1 H2 H1' H2' : heap block)
         (v1 v2 v1' v2' : value) :
@@ -2369,9 +2386,20 @@ Module CC_log_rel (H : Heap).
         rewrite image_id in H4. rewrite H4.
         eassumption.
       * exists xs2, e2, rho2'. repeat (split; eauto).
-        eapply Hi; eauto. admit.
-        eapply Hi; eauto. admit.
-  Admitted. 
+    eapply Hi; eauto. eapply Equivalence_Transitive; [| eassumption ].        
+    rewrite <- !Combinators.compose_assoc.  
+    eapply f_eq_subdomain_compose_compat. reflexivity.
+    eapply f_eq_subdomain_compose_compat. reflexivity.
+    eapply f_eq_subdomain_compose_compat. reflexivity.
+    rewrite lift_compose; reflexivity.
+
+    eapply Hi; eauto. eapply Equivalence_Transitive; [| eassumption ].        
+    rewrite <- !Combinators.compose_assoc.  
+    eapply f_eq_subdomain_compose_compat. reflexivity.
+    eapply f_eq_subdomain_compose_compat. reflexivity.
+    eapply f_eq_subdomain_compose_compat. reflexivity.
+    rewrite lift_compose; reflexivity.
+  Qed.
   
 
   Lemma cc_approx_val_heap_eq (k j : nat) (β β1 β2 : Inj) (δ : EInj)

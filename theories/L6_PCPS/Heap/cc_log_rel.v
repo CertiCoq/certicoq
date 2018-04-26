@@ -124,9 +124,8 @@ Module CC_log_rel (H : Heap).
                (b : Inj) (d : EInj)
                (* *)
                (FL : Ensemble loc)
-               (p1 : env * heap block)
+               (H1 : heap block)
                (p2 : loc * heap block) : Prop :=
-      let '(rho, H1) := p1 in
       let '(l, H2) := p2 in
       exists c (vs : list value) FLs,
         get l H2 = Some (Constr c vs) /\
@@ -165,8 +164,8 @@ Module CC_log_rel (H : Heap).
                       match j with
                          | 0 => True
                          | S j =>
-                           cc_approx_clos cc_approx_val_aux (j - (j - i)) IP P b d (env_locs rho_clo (Full_set _))
-                                          (rho_clo, H1) (env_loc, H2)
+                           cc_approx_clos cc_approx_val_aux (j - (j - i)) IP P b d 
+                                          (env_locs rho_clo (Full_set _)) H1 (env_loc, H2)
                       end) /\ 
                 forall (b1 b2 : Inj)
                   (rho_clo' rho_clo1 rho_clo2 : env) (H1' H1'' H2' : heap block)
@@ -219,9 +218,10 @@ Module CC_log_rel (H : Heap).
     (cc_approx_exp cc_approx_val k j P1 P2 P3 P4 p1 p2)
       (at level 70, no associativity).
 
-    Notation "p1 << ^ ( k ; j ; P1 ; P2 ; b ; d ; S ) p2" :=
-    (cc_approx_clos (cc_approx_val k) j P1 P2 b d S p1 p2)
-      (at level 70, no associativity).
+  Notation "p1 << ^ ( k ; j ; P1 ; P2 ; b ; d ; S ) p2" :=
+        (cc_approx_clos (cc_approx_val k) j P1 P2 b d S p1 p2)
+          (at level 70, no associativity).
+
 
     
   (** Unfold the recursion. A more compact definition of the value relation. *)
@@ -240,7 +240,7 @@ Module CC_log_rel (H : Heap).
                           Forall2 R vs1 vs2)
               | Some (Clos (FunPtr B1 f1) rho_clo), Some (Constr c [FunPtr B2 f2; Loc env_loc]) =>
                 d l1 = Some env_loc /\
-                (forall i, (i < j)%nat -> (rho_clo, H1) << ^ ( k ; i ; IP ; P ; b ; d ; (env_locs rho_clo (Full_set _))) (env_loc, H2) ) /\
+                (forall i, (i < j)%nat -> H1 << ^ ( k ; i ; IP ; P ; b ; d ; (env_locs rho_clo (Full_set _))) (env_loc, H2) ) /\
                 forall (b1 b2 : Inj)
                   (rho_clo' rho_clo1 rho_clo2 : env) (H1' H1'' H2' : heap block)
                   (env_loc' : loc)
@@ -710,13 +710,13 @@ Module CC_log_rel (H : Heap).
     intros Hheap Hleq x Hin. eapply cc_approx_val_monotonic; eauto.
   Qed.
 
-  Lemma cc_approx_clos_monotonic S (k m j : nat) (p1 : env * heap block)
+  Lemma cc_approx_clos_monotonic S (k m j : nat) (p1 : heap block)
         (p2 : loc * heap block) b' d' :
     p1 << ^ (k; j; GIP; GP; b'; d'; S) p2 ->
     m <= k ->
     p1 << ^ (m; j; GIP; GP; b'; d'; S) p2.
   Proof.
-    intros Hheap Hleq. destruct p1 as [rho1 H1]; destruct p2 as [l2 H2]. 
+    intros Hheap Hleq. destruct p2 as [l2 H2]. 
     edestruct Hheap as (c & vs & FVs & Hget1 & Heqfv & Hall); try eassumption.
     do 3 eexists. split. eassumption. split. eassumption.
     eapply Forall2_monotonic; [| eassumption ].
@@ -802,13 +802,13 @@ Module CC_log_rel (H : Heap).
     intros Hheap Hleq x Hin. eapply cc_approx_val_j_monotonic; eauto.
   Qed.
 
-  Lemma cc_approx_clos_j_monotonic S (k j i : nat) (p1 : env * heap block)
+  Lemma cc_approx_clos_j_monotonic S (k j i : nat) (p1 : heap block)
         (p2 : loc * heap block) b' d' :
     p1 << ^ (k; j; GIP; GP; b'; d'; S) p2 ->
     i <= j ->
     p1 << ^ (k; i; GIP; GP; b'; d'; S) p2.
   Proof.
-    intros Hheap Hleq. destruct p1 as [rho1 H1]; destruct p2 as [l2 H2]. 
+    intros Hheap Hleq. destruct p2 as [l2 H2]. 
     edestruct Hheap as (c & vs & FVs & Hget1 & Heqfv & Hall); try eassumption.
     do 3 eexists. split. eassumption. split. eassumption.
     eapply Forall2_monotonic; [| eassumption ].
@@ -854,7 +854,7 @@ Module CC_log_rel (H : Heap).
   Proof.
     intros Hleq H. eapply cc_approx_env_P_j_monotonic; eauto.
   Qed.
-
+  
   (** * Set lemmas *)
   
   Lemma cc_approx_env_Empty_set (k j : nat) c1 c2 :
@@ -1220,7 +1220,9 @@ Module CC_log_rel (H : Heap).
     rewrite Heqd. eassumption.
   Qed.    
 
- 
+  (* TODO Maybe add more instances? *)
+
+  (** * Reachable set bijections *)
   Lemma cc_approx_val_image_eq (k : nat) (β : Inj) (δ : EInj) (H1 H2 : heap block)
         (v1 v2 : value) :
     (forall j, (Res (v1, H1)) ≺ ^ (k ; j ; GIP ; GP ; β; δ) (Res (v2, H2))) ->
@@ -1670,8 +1672,8 @@ Module CC_log_rel (H : Heap).
   Qed.
 
   Lemma cc_approx_clos_image_reach S (k : nat)
-        (H1 H2 : heap block) rho1 l2 :
-    (forall j,  (rho1, H1) << ^ (k; j; GIP; GP; b; d; S) (l2, H2) ) ->
+        (H1 H2 : heap block) l2 :
+    (forall j,  H1 << ^ (k; j; GIP; GP; b; d; S) (l2, H2) ) ->
     image b (reach' H1 S) :|: image' d (reach' H1 S) <-->
     reach' H2 (post H2 [set l2]).
   Proof.
@@ -1773,27 +1775,7 @@ Module CC_log_rel (H : Heap).
       eassumption. 
   Qed.
 
-  Opaque cc_approx_exp.
-  
-  
-  (** * The logical relation respects heap equivalences *)
-
-  Lemma Forall2_vertical_strong
-        {A B C D : Type} (R1 : A -> B -> Prop) (R2 : A -> C -> Prop) (R3 : B -> D -> Prop) (R4 : C -> D -> Prop)
-        (l1 : list A) (l2 : list B) (l3 : list C) (l4 : list D):
-  (forall (x : A) (y : B) (z : C) (w : D),
-         List.In x l1 -> List.In y l2 -> List.In z l3 ->  List.In w l4 ->
-         R1 x y -> R2 x z -> R3 y w -> R4 z w) ->
-      Forall2 R1 l1 l2 -> Forall2 R2 l1 l3 -> Forall2 R3 l2 l4 -> Forall2 R4 l3 l4.
-  Proof.
-    intros Hyp Hr1.
-    revert l3 l4 Hyp. induction Hr1; intros l3 l4 Hyp Hr2 Hr3; inv Hr2; inv Hr3. 
-    - now constructor.
-    - constructor; eauto. eapply Hyp; try eassumption; now constructor.
-      eapply IHHr1; try eassumption.
-      intros. eapply Hyp; try eassumption; now constructor.
-  Qed.
-
+  (* TODO move *)
   Lemma heap_env_equiv_image_root (S : Ensemble var) (β1 β2 : loc -> loc)
         (H1 H2 : heap block) (rho1 rho2 : env) :
     S |- (H1, rho1) ⩪_( β1, β2) (H2, rho2) ->
@@ -1819,7 +1801,76 @@ Module CC_log_rel (H : Heap).
       eexists; split; eauto. rewrite Hget2; reflexivity.
   Qed.
 
-    
+
+  Opaque cc_approx_exp.
+  
+  
+  Lemma cc_approx_heap_post (P : Ensemble var) k j (H1 H2 : heap block) : 
+    P |- H1 ≼ ^ (k; 1 + j; GIP; GP; b; d) H2 ->
+    post H1 P |- H1 ≼ ^ (k; j; GIP; GP; b; d) H2.
+  Proof.   
+    intros Hheap x [l [b' [Hin [Hget Hin']]]].
+    specialize (Hheap _ Hin).
+    simpl in Hheap. rewrite Hget in Hheap.
+    destruct Hheap as [_ Hres].
+    destruct b' as [c1 vs1 | [| B1 f1] rhoc ]; try contradiction;
+    destruct (get (b l) H2) as [[c2 vs2 | [| B2 f2] rhoc2 ] |]; try contradiction.
+    - destruct Hres as [Heq1 [Heq2 Hall]].
+      specialize (Hall j (Nat.lt_succ_diag_r j)). subst.
+      simpl in Hin'.
+      edestruct (@Union_lists_exists loc) as [S' [Hin3 Hin2]]. eassumption.
+      edestruct (list_in_map_inv _ _ _ Hin3) as [l3' [Heql Hinl]]; subst.
+      destruct l3' as [l3' |]; inv Hin2.
+      edestruct (Forall2_exists _ vs1 vs2 (Loc x) Hinl Hall)  as [x' [Hin2 Hres']].
+      rewrite cc_approx_val_eq in *. destruct x'; try contradiction.
+      assert (Hres'' := Hres').  destruct Hres'' as [Hbeq _]. subst.
+      eassumption.
+    - destruct vs2 as [| [|] [| [|] [|] ] ]; try contradiction.
+      destruct Hres as [Hd [Henv _]]. subst.
+      specialize (Henv j (Nat.lt_succ_diag_r j)).
+      edestruct Henv as (c & vs & FLS & Hget' & Heq & Hall); try eassumption.
+      simpl in Hin'. inv Hin'; try contradiction. 
+      rewrite <- Heq in H.
+      edestruct (Forall2_exists _ FLS vs x H Hall)  as [x' [Hin2 Hres']].
+      rewrite cc_approx_val_eq in *. destruct x'; try contradiction.
+      assert (Hres'' := Hres').  destruct Hres'' as [Hbeq _]. subst.
+      eassumption.
+  Qed.
+
+  Lemma cc_approx_heap_reach_closed (P : Ensemble var) k j (H1 H2 : heap block) : 
+    (forall j, P |- H1 ≼ ^ (k; j; GIP; GP; b; d) H2) ->
+    reach' H1 P |- H1 ≼ ^ (k; j; GIP; GP; b; d) H2.
+  Proof.
+    intros Hyp j' [n [_ Hp]]. revert P Hyp Hp.
+    induction n; intros P Hyp Hp.
+    - simpl in Hp. eapply Hyp. eassumption.
+    - replace (S n) with (n + 1) in Hp by omega.
+      rewrite app_plus in Hp. unfold compose in Hp. simpl in Hp.
+      eapply IHn in Hp. eassumption.
+      intros i. eapply cc_approx_heap_post; eauto.
+  Qed.
+      
+  (** * The logical relation respects heap equivalences *)
+
+  (* TODO move *)
+  Lemma Forall2_vertical_strong
+        {A B C D : Type} (R1 : A -> B -> Prop) (R2 : A -> C -> Prop) (R3 : B -> D -> Prop) (R4 : C -> D -> Prop)
+        (l1 : list A) (l2 : list B) (l3 : list C) (l4 : list D):
+  (forall (x : A) (y : B) (z : C) (w : D),
+         List.In x l1 -> List.In y l2 -> List.In z l3 ->  List.In w l4 ->
+         R1 x y -> R2 x z -> R3 y w -> R4 z w) ->
+      Forall2 R1 l1 l2 -> Forall2 R2 l1 l3 -> Forall2 R3 l2 l4 -> Forall2 R4 l3 l4.
+  Proof.
+    intros Hyp Hr1.
+    revert l3 l4 Hyp. induction Hr1; intros l3 l4 Hyp Hr2 Hr3; inv Hr2; inv Hr3. 
+    - now constructor.
+    - constructor; eauto. eapply Hyp; try eassumption; now constructor.
+      eapply IHHr1; try eassumption.
+      intros. eapply Hyp; try eassumption; now constructor.
+  Qed.
+  
+
+   (* TODO move *)
   Lemma block_equiv_Constr_r β1 β2 (H1 H2 : heap block) (c1 c2 : cTag)
         (vs vs' : list value) :
     block_equiv (β1, H1, Constr c1 vs) (β2, H2, Constr c2 vs') ->
@@ -1937,6 +1988,7 @@ Module CC_log_rel (H : Heap).
           intros Hc; inv Hc; eauto.
   Qed.
 
+  (* TODO move *)
   Lemma heap_env_approx_res_approx 
         (S : Ensemble var) (β : loc -> loc)
         (H1 H2 : heap block) (rho1 rho2 : M.t value) l :
@@ -2209,21 +2261,105 @@ Module CC_log_rel (H : Heap).
     eapply injective_subdomain_antimon. eassumption.
     eapply reach'_set_monotonic. now eapply get_In_env_locs; eauto.
   Qed.
-  
-  Lemma cc_approx_env_P_heap_eq (S : Ensemble var) (k j : nat) (β β1 β2 : Inj)
-        (δ : EInj)
-        (P : GInv) (H1 H2 H1' H2' : heap block) (rho1 rho2 rho1' rho2' : env) :
-    (H1, rho1) ⋞ ^ (S; k; j; GIP; GP; β ; δ) (H2, rho2) ->
-    S |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-    injective_subdomain (reach' H1' (env_locs rho1' S)) β1 -> 
-    S |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-    injective_subdomain (reach' H2 (env_locs rho2 S)) β2 ->    
-    (H1', rho1') ⋞ ^ (S; k; j; GIP; GP; β2 ∘ β ∘ β1; (lift β2 ∘ δ ∘ β1))
-    (H2', rho2').
+
+  (* TODO move *)
+  Lemma heap_equiv_antimon (S1 S2 : Ensemble var) (H1 H2 : heap block)
+         (b1 b2 : loc -> loc) :
+    S1 |- H1 ≃_( b1, b2) H2 ->
+    S2 \subset S1 ->
+    S2 |- H1 ≃_( b1, b2) H2.
   Proof.
-    intros Henv Heq1 Hinj1 Heq2 Hinj2 x HS.
-    eapply cc_approx_var_env_heap_env_equiv; eauto.
+    intros [Ha1 Ha2] Hsub. split; intros x Hin; eauto.
+  Qed. 
+  
+  Lemma cc_approx_heap_env_equiv (S : Ensemble var) (k j : nat) (β β1 β2 : Inj)
+        (δ : EInj) (H1 H2 H1' H2' : heap block)  :
+    S |- H1 ≼ ^ (k; j; GIP; GP; β ; δ) H2 ->
+    S |- H1 ≃_(id, β1) H1' ->
+    injective_subdomain (reach' H1' S) β1 -> 
+    image β S |- H2 ≃_(β2, id) H2' ->
+    injective_subdomain (reach' H2 (image β S)) β2 ->
+    S |- H1' ≼ ^ (k; j; GIP; GP; β2 ∘ β ∘ β1; (lift β2 ∘ δ ∘ β1)) H2'.
+  Proof.
+    intros Henv [Heq1 Heq1'] Hinj1 [Heq2 Heq2'] Hinj2 x HS.
+    assert (Heqb : (β2 ∘ β ∘ β1) x = β x).
+    { specialize (Henv _ HS).
+      specialize (Heq1 _ HS). destruct Heq1 as [Heq1 _].
+      assert (HS' : image β S (β x)).
+      { eexists; split; eauto. } 
+      specialize (Heq2 _ HS'). destruct Heq2 as [Heq2 _].
+      unfold compose, id in *. rewrite <- Heq1, Heq2.
+      reflexivity. }
+    specialize (Henv _ HS). eapply cc_approx_val_heap_eq.
+    
+    rewrite Heqb. eassumption.
+
+    eapply heap_equiv_antimon. split; eassumption.
+    eapply Singleton_Included. eassumption.
+
+    eapply injective_subdomain_antimon. eassumption.
+    eapply reach'_set_monotonic. eapply Singleton_Included.
+    eassumption.
+    
+    rewrite Heqb.  
+    try eassumption. eapply heap_equiv_antimon. split; eassumption.
+    eapply Singleton_Included. now eexists; split; eauto.
+
+    rewrite Heqb.  
+    eapply injective_subdomain_antimon. eassumption.
+    eapply reach'_set_monotonic. eapply Singleton_Included.
+    now eexists; split; eauto.
   Qed.
+    
+  Lemma cc_approx_clos_heap_env_equiv (S : Ensemble var) (k j : nat) (β β1 β2 : Inj)
+        (δ : EInj) (H1 H2 H1' H2' : heap block) l2 l2' :
+    H1 << ^ (k; j; GIP; GP; β; δ; image β1 S) (l2, H2) ->
+    S |- H1 ≃_(id, β1) H1' ->
+    injective_subdomain (reach' H1' S) β1 -> 
+    (Loc l2, H2) ≈_(β2, id) (Loc l2', H2') ->
+    injective_subdomain (reach' H2 [set l2]) β2 ->
+    H1' << ^ (k; j; GIP; GP; β2 ∘ β ∘ β1; (lift β2 ∘ δ ∘ β1); S) (l2', H2').
+  Proof.
+    intros Henv Heq1 Hin1 Heq2 Hinj2.
+    edestruct Henv as (c & vs & FLS & Hget & Heq & Hall); try eassumption.
+    rewrite res_equiv_eq in Heq2. destruct Heq2 as [Hbeq Heq2]. unfold id in *. subst.
+    rewrite Hget in Heq2.
+    destruct (get (β2 l2) H2') as [[c' vs'|] |] eqn:Hget2; try contradiction.
+    simpl in Heq2.
+    destruct Heq2 as [Heqb' all]. subst.
+    edestruct FromList_image_injective_exists as [FLS' [HeqFL Him]].
+    eassumption. eapply injective_subdomain_antimon. eassumption.
+    eapply reach'_extensive.
+
+    do 2 eexists; exists FLS'. split. now eauto.
+    split. now eauto. 
+    
+    eapply Forall2_vertical_strong; [| eassumption | | eassumption ].
+    
+    intros x y z w Hin1' Hin2 Hin3 Hin4 Hr1' Hr2' Hr3'.
+    simpl in Hr1'. rewrite cc_approx_val_eq in Hr1'.
+    rewrite cc_approx_val_eq.
+    eapply cc_approx_val_res_eq. eassumption. now apply Hr2'.
+
+    eapply injective_subdomain_antimon. eassumption.
+    eapply reach'_set_monotonic. rewrite <- Him. eapply Singleton_Included. eassumption.
+
+    eassumption.
+    eapply injective_subdomain_antimon. eassumption.
+    
+    rewrite (reach_unfold H2 [set l2]). eapply Included_Union_preserv_r.
+    rewrite post_Singleton; eauto. simpl.
+    eapply reach'_set_monotonic. simpl.
+    eapply In_Union_list. eapply in_map. eassumption. 
+
+    subst.
+    eapply Forall2_map_l_strong.
+    intros x Hin. 
+    eapply Him in Hin. edestruct Heq1 as [[Hbeq1 _] _]; eauto.
+    rewrite <- Hbeq1. eapply heap_equiv_res_equiv. eassumption.
+    eapply Singleton_Included. eassumption.
+  Qed.
+
 
   (* Lemma cc_approx_val_res_eq_rev (k j : nat) (b' b1 b2 : Inj)  (H1 H2 H1' H2' : heap block) *)
   (*       (v1 v2 v1' v2' : value) : *)
@@ -2484,23 +2620,7 @@ Module CC_log_rel (H : Heap).
   
 
   (* (** * cc_approx respects heap_eq  *) *)
-
-  (*  Lemma cc_approx_exp_heap_equiv (k : nat) (H1 H2 H1' H2' : heap block) *)
-  (*        (rho1 rho2 : env) (e1 e2 : exp) : *)
-  (*   (e1, rho1, H1) ⪯ ^ (k ; LIP ; GIP ; LP ; GP) (e2, rho2, H2) -> *)
-  (*   (env_locs rho1 (occurs_free e1)) |- H1 ≃ H1' -> *)
-  (*   (env_locs rho2 (occurs_free e2)) |- H2 ≃ H2' -> *)
-  (*   (IP (H1', rho1, e1) (H2', rho2, e2) -> IP (H1, rho1, e1) (H2, rho2, e2)) -> *)
-  (*   (e1, rho1, H1') ⪯ ^ (k ; LIP ; GIP ; LP ; GP) (e2, rho2, H2'). *)
-  (*  Proof with now eauto with Ensembles_DB. *)
-  (*    intros Hexp Heq1 Heq2 H1'' H2'' rho1' rho2' r1 c1 m1 Heq1' Heq2' HIP Hleq Hbs Hns. *)
-  (*    eapply heap_env_equiv_heap_equiv in Heq1. *)
-  (*    eapply heap_env_equiv_heap_equiv in Heq2. *)
-  (*    eapply Hexp; [| | | eassumption | ]; eauto;      *)
-  (*    eapply Equivalence_Transitive; try eassumption. *)
-  (*  Qed. *)
-
-
+  
   Transparent cc_approx_exp.
    
    Lemma cc_approx_exp_heap_monotonic (k j : nat) (H1 H2 H1' H2' : heap block)
@@ -2594,8 +2714,36 @@ Module CC_log_rel (H : Heap).
        split. clear Hcc.
 
        intros i Hlt.
-       admit.
-
+       edestruct (Henv i Hlt) as (c & vs & FVs & Hget3 & Heqfv & Hall); try eassumption.
+       do 3 eexists. split. now erewrite <- Hsub2; eauto.
+       split; eauto.
+       eapply Forall2_monotonic_strong; [| eapply Hall; eassumption ].
+       intros x1 x2 Hinx1 Hinx2 Hr.
+       assert (Hr1 : val_loc (Loc x1) \subset reach' H1 (val_loc (Loc l1))).
+       { intros l Hin. inv Hin. simpl.
+         eapply Included_post_reach'.
+        rewrite post_Singleton; eauto. simpl.
+         rewrite Union_Empty_set_neut_l. rewrite <- Heqfv. 
+         eassumption. }
+       assert (Hr2 : val_loc x2 \subset reach' H2 (val_loc (Loc (β l1)))).
+       { rewrite reach'_idempotent.
+         eapply Included_trans; [| eapply reach'_set_monotonic; eapply Included_post_reach' ].
+         eapply Included_trans; [| eapply Included_post_reach' ]. 
+         simpl. rewrite post_Singleton; eauto. simpl.
+         rewrite Union_Empty_set_neut_l, Union_Empty_set_neut_r, post_Singleton; eauto.
+         simpl. eapply In_Union_list.
+         eapply in_map. eassumption. }
+       rewrite cc_approx_val_eq in *.
+       { eapply IHj; try eassumption.
+         * eapply well_formed_antimon; [| eassumption ].
+           rewrite (reach'_idempotent _ (val_loc (Loc l1))).
+           eapply reach'_set_monotonic. eassumption.
+         * eapply well_formed_antimon; [| eassumption ].
+           rewrite (reach'_idempotent _ (val_loc (Loc (β l1)))).
+           eapply reach'_set_monotonic. eassumption.
+         * eapply Included_trans; [| eapply reachable_in_dom ]; try eassumption.
+         * eapply Included_trans; [| eapply reachable_in_dom ]; try eassumption. }
+       
        
        intros b1 b2 tc1 tc2 tc3  H3 H3' H4' env_loc xs1 ft e1 vs1 vs2
               Heq1 Hinj1 Heq2 Hinj2 Hfind Hdef Hset.
@@ -2622,7 +2770,7 @@ Module CC_log_rel (H : Heap).
        * eassumption.
        * eassumption.
        * do 3 eexists; split; [ | split ]; try (now eauto).
-   Admitted.
+   Qed.
 
    Lemma cc_approx_var_env_heap_monotonic (k j : nat) (β : Inj) (δ : EInj) (H1 H2 H1' H2' : heap block)
        (rho1 rho2 : env) x y:
@@ -2675,6 +2823,72 @@ Module CC_log_rel (H : Heap).
      eapply Singleton_Included. eassumption.
      eapply Hres; eauto.
    Qed.
+
+   Lemma cc_approx_heap_heap_monotonic (S : Ensemble loc) (k j : nat) (β : Inj)
+         (δ : EInj) (H1 H2 H1' H2' : heap block)  :
+     well_formed (reach' H1 S) H1 ->
+     well_formed (reach' H2 (image β S)) H2 ->
+     S \subset dom H1 ->
+     (image β S) \subset dom H2 ->
+     H1 ⊑ H1' -> H2 ⊑ H2' ->
+     S |- H1 ≼ ^ (k; j; GIP; GP; β ; δ) H2 ->
+     S |- H1' ≼ ^ (k; j; GIP; GP; β ; δ) H2'.
+  Proof.
+    intros Hwf1 Hwf2 Hlocs1 Hlocs2 Hs1 Hs2 Hres x HS.
+    eapply cc_approx_val_heap_monotonic; try eassumption.
+
+    eapply well_formed_antimon; [| eassumption ]. eapply reach'_set_monotonic.
+    eapply Singleton_Included. eassumption.
+
+    eapply well_formed_antimon; [| eassumption ]. eapply reach'_set_monotonic.
+    eapply Singleton_Included. eexists; split; now eauto.
+
+    eapply Included_trans; [| eassumption ].
+    eapply Singleton_Included. eassumption.
+
+    eapply Included_trans; [| eassumption ].
+    eapply Singleton_Included. eexists; split; now eauto.
+
+    now eauto.
+  Qed. 
+    
+  Lemma cc_approx_clos_heap_monotonic (S : Ensemble var) (k j : nat) (β β1 β2 : Inj)
+        (δ : EInj) (H1 H2 H1' H2' : heap block) l2 :
+    well_formed (reach' H1 S) H1 ->
+    well_formed (reach' H2 [set l2]) H2 ->
+    S \subset dom H1 ->
+    H1 ⊑ H1' -> H2 ⊑ H2' ->
+    H1 << ^ (k; j; GIP; GP; β; δ; S) (l2, H2) ->
+    H1' << ^ (k; j; GIP; GP; β ; δ ; S) (l2, H2').
+  Proof.
+    intros Hwf1 Hwf2 Hlocs1 Hs1 Hs2 Henv.
+    edestruct Henv as (c & vs & FLS & Hget & Heq & Hall); try eassumption.
+    do 3 eexists. split.
+    erewrite <- Hs2. reflexivity. eassumption. split. eassumption.
+
+    eapply Forall2_monotonic_strong; [| eapply Hall; eassumption ].
+    intros x1 x2 Hinx1 Hinx2 Hr. simpl in Hr.
+    assert (Hr1 : val_loc (Loc x1) \subset reach' H1 S).
+    { intros l Hin. inv Hin. simpl.
+      eapply reach'_extensive. eapply Heq. eassumption. }
+    assert (Hr2 : val_loc x2 \subset reach' H2 [set l2]).
+    { eapply Included_trans; [| eapply Included_post_reach' ]. 
+      simpl. rewrite post_Singleton; eauto. simpl.
+      eapply In_Union_list.
+      eapply in_map. eassumption. }
+    rewrite cc_approx_val_eq in *.
+    eapply cc_approx_val_heap_monotonic; try eassumption.
+    * eapply well_formed_antimon; [| eassumption ].
+      rewrite (reach'_idempotent _ S).
+      eapply reach'_set_monotonic. eassumption.
+    * eapply well_formed_antimon; [| eassumption ].
+      rewrite (reach'_idempotent _ [set l2]). eapply reach'_set_monotonic. eassumption.
+    * eapply Included_trans; [| eapply reachable_in_dom ]; try eassumption.
+    * eapply Included_trans; [| eapply reachable_in_dom ]; try eassumption.
+      eexists; eauto. inv H. eassumption.
+  Qed.
+
+
    
    Lemma cc_approx_env_set_alloc_Constr S (k j : nat)
          c vs1 vs2 l1 l2  (H1 H2 H1' H2' : heap block)
@@ -2767,39 +2981,53 @@ Module CC_log_rel (H : Heap).
       eapply Hi; eauto.
     + simpl in Hbeq'.
       destruct vs2 as [ | [| B2 f2] [| [env_loc2 |] [|]] ]; try contradiction.
-      destruct Hbeq' as [Him Hcc].
+      destruct Hbeq' as [Hd [Henv Hcc]].
       simpl. split.
-      rewrite H. eassumption. eapply reach'_extensive. reflexivity.
-      (* intros j' Hleq. rewrite <- Him; eauto. *)
-      (* eapply image_f_eq_subdomain. eapply f_eq_subdomain_antimon; [| eassumption ]. *)
-      (* rewrite reach_unfold. eapply Included_Union_preserv_r. *)
-      (* eapply Included_trans. eapply Included_post_n_reach'. *)
-      (* eapply reach'_set_monotonic. simpl. rewrite post_Singleton; eauto... *)
-      split.
-      admit.
-      intros b1' b2' tc1 tc2 tc3 H3 H3' H4' env_loc' xs1 ft
-             e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hfind Hdef Hset.
-      edestruct Hcc as (Hd' & xs2 & e2 & rho2' & Hfind' & Hset' & Hi)
-      ; [| | | | eassumption | eassumption | eassumption | ]; try eassumption.
-      exists xs2, e2, rho2'. split; [| split ]; eauto. intros. 
-      eapply Hi; try eassumption.
-      eapply Equivalence_Transitive; [| eassumption ].
-      eapply f_eq_subdomain_compose_compat. reflexivity.
-      eapply f_eq_subdomain_compose_compat; [| reflexivity ].
-      eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
-      rewrite <- heap_env_equiv_image_reach; [| eassumption ].
-      rewrite image_id. rewrite (reach_unfold H1 (val_loc (Loc l1))).
-      eapply Included_Union_preserv_r. eapply reach'_set_monotonic.
-      simpl. rewrite post_Singleton; eauto...
-      eapply Equivalence_Transitive; [| eassumption ].      
-      eapply f_eq_subdomain_compose_compat. reflexivity.
-      eapply f_eq_subdomain_compose_compat; [| reflexivity ].
-      eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
-      rewrite <- heap_env_equiv_image_reach; [| eassumption ].
-      rewrite image_id. rewrite (reach_unfold H1 (val_loc (Loc l1))).
-      eapply Included_Union_preserv_r. eapply reach'_set_monotonic.
-      simpl. rewrite post_Singleton; eauto...
-  Admitted.
+      rewrite H. eassumption. eapply reach'_extensive. reflexivity. split.
+
+      intros i Hlt.
+      edestruct (Henv i Hlt) as (c & vs & FVs & Hget3 & Heqfv & Hall); try eassumption.
+      do 3 eexists. split. eassumption. split. eassumption.
+      eapply Forall2_monotonic_strong; [| eapply Hall; eassumption ].
+      intros x1 x2 Hinx1 Hinx2 Hr.
+      assert (Hr1 : val_loc (Loc x1) \subset reach' H1 (val_loc (Loc l1))).
+      { intros l Hin. inv Hin. simpl.
+        eapply Included_post_reach'.
+        rewrite post_Singleton; eauto. simpl.
+        rewrite Union_Empty_set_neut_l. rewrite <- Heqfv.
+        eassumption. }
+       rewrite cc_approx_val_eq in *.
+       { eapply IHj; try eassumption.
+         * eapply f_eq_subdomain_antimon; [| eassumption ].
+           rewrite (reach'_idempotent _ (val_loc (Loc l1))).
+           eapply reach'_set_monotonic. eassumption.
+         * eapply f_eq_subdomain_antimon; [| eassumption ].
+           rewrite (reach'_idempotent _ (val_loc (Loc l1))).
+           eapply reach'_set_monotonic. eassumption. }
+
+       intros b1' b2' tc1 tc2 tc3 H3 H3' H4' env_loc' xs1 ft
+       e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hfind Hdef Hset.
+       edestruct Hcc as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi)
+       ; [| | | | eassumption | eassumption | eassumption | ]; try eassumption.
+       exists xs2, e2, rho2'. split; [| split ]; eauto. intros. 
+       eapply Hi; try eassumption.
+       eapply Equivalence_Transitive; [| eassumption ].
+       eapply f_eq_subdomain_compose_compat. reflexivity.
+       eapply f_eq_subdomain_compose_compat; [| reflexivity ].
+       eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
+       rewrite <- heap_env_equiv_image_reach; [| eassumption ].
+       rewrite image_id. rewrite (reach_unfold H1 (val_loc (Loc l1))).
+       eapply Included_Union_preserv_r. eapply reach'_set_monotonic.
+       simpl. rewrite post_Singleton; eauto...
+       eapply Equivalence_Transitive; [| eassumption ].      
+       eapply f_eq_subdomain_compose_compat. reflexivity.
+       eapply f_eq_subdomain_compose_compat; [| reflexivity ].
+       eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
+       rewrite <- heap_env_equiv_image_reach; [| eassumption ].
+       rewrite image_id. rewrite (reach_unfold H1 (val_loc (Loc l1))).
+       eapply Included_Union_preserv_r. eapply reach'_set_monotonic.
+       simpl. rewrite post_Singleton; eauto...
+  Qed.
   
   Lemma cc_approx_var_env_rename_ext  (k j : nat) (β β': Inj) (δ δ' : EInj) (H1 H2 : heap block) 
          (rho1 rho2 : env) (x y : var) :
@@ -2833,6 +3061,55 @@ Module CC_log_rel (H : Heap).
     eapply Singleton_Included. eassumption.
   Qed.
 
+  Lemma cc_approx_heap_rename_ext (S : Ensemble loc) (k j : nat) (β β' : Inj)
+        (δ δ' : EInj) (H1 H2 : heap block)  :
+     S |- H1 ≼ ^ (k; j; GIP; GP; β ; δ) H2 ->
+     f_eq_subdomain (reach' H1 S) β β' ->
+     f_eq_subdomain (reach' H1 S) δ δ' ->
+     S |- H1 ≼ ^ (k; j; GIP; GP; β' ; δ') H2.
+  Proof.
+    intros Hres Hfeq1 Hfeq2 x HS.
+    eapply cc_approx_val_rename_ext; eauto.
+    
+    rewrite <- Hfeq1. now eauto.
+    eapply reach'_extensive. eassumption.
+
+    symmetry; eapply f_eq_subdomain_antimon; [| eassumption ].
+    eapply reach'_set_monotonic.
+    eapply Singleton_Included. eassumption.
+
+    symmetry; eapply f_eq_subdomain_antimon; [| eassumption ].
+    eapply reach'_set_monotonic.
+    eapply Singleton_Included. eassumption.
+  Qed. 
+    
+  Lemma cc_approx_clos_rename_ext (S : Ensemble var) (k j : nat) (β β': Inj)
+        (δ δ' : EInj) (H1 H2 : heap block) l2 :
+    H1 << ^ (k; j; GIP; GP; β; δ; S) (l2, H2) ->
+    f_eq_subdomain (reach' H1 S) β β' ->
+    f_eq_subdomain (reach' H1 S) δ δ' ->
+    H1 << ^ (k; j; GIP; GP; β' ; δ' ; S) (l2, H2).
+  Proof.
+    intros Henv Hfeq1 Hfeq2.
+    edestruct Henv as (c & vs & FLS & Hget & Heq & Hall); try eassumption.
+    do 3 eexists. split. eassumption.
+    split. eassumption. 
+    
+    eapply Forall2_monotonic_strong; [| eapply Hall; eassumption ].
+    intros x1 x2 Hinx1 Hinx2 Hr. simpl in Hr.
+    assert (Hr1 : val_loc (Loc x1) \subset reach' H1 S).
+    { intros l Hin. inv Hin. simpl.
+      eapply reach'_extensive. eapply Heq. eassumption. }
+    rewrite cc_approx_val_eq in *.
+    eapply cc_approx_val_rename_ext; try eassumption.
+    * eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
+      rewrite (reach'_idempotent _ S).
+      eapply reach'_set_monotonic. eassumption.
+    * eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
+      rewrite (reach'_idempotent _ S).
+      eapply reach'_set_monotonic. eassumption.
+  Qed.
+
   End LogRelLemmas.
 
 
@@ -2845,7 +3122,7 @@ Module CC_log_rel (H : Heap).
            cc_approx_env_P.
   Proof.
     intros s1 s2 [H1 H2]; split; intros Hpre;
-    Subst; eapply cc_approx_env_P_antimon; subst; eauto. 
+    subst; eapply cc_approx_env_P_antimon; subst; eauto. 
   Qed.
 
   Global Instance Proper_cc_approx_heap :

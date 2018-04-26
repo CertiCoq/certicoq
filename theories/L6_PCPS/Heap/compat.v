@@ -289,7 +289,7 @@ Module Compat (H : Heap).
             destruct Hcc as [Hbeq Hcc]; simpl in Hcc.
             destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction.
             destruct v as [ c [| [| B2 f3 ] [| [ env_loc |] [|] ] ] | ]; try contradiction.
-            destruct Hcc as [Him Hcc].  
+            destruct Hcc as [Hd [Henv Hcc]].  
             edestruct Hcc with (vs2 := vs) as (xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption. 
             reflexivity. clear. now firstorder. symmetry.
             reflexivity. clear. now firstorder. 
@@ -337,7 +337,7 @@ Module Compat (H : Heap).
           destruct Hcc as [Hbeq Hcc]. simpl in Hcc.
           destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction.          
           destruct v as [ ? [| [| B2 f3 ] [| [ env_loc' |] [|] ]] | ]; try contradiction.
-          edestruct Hcc as (Him & xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
+          edestruct Hcc as (Hd & Henv & xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
           reflexivity. clear; now firstorder. reflexivity. clear; now firstorder.
           edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2') as [H2'' Hgc'].
           assert (Hgc1 := Hgc); assert (Hgc2 := Hgc').
@@ -768,14 +768,14 @@ Module Compat (H : Heap).
           destruct Hres1 as [Hteq Hallvs1]; subst. destruct Hres2 as [Hteq' Hallvs2]; subst.
           
           simpl in Hcc. rewrite Hgetl1' in Hcc. rewrite Hgetl2' in Hcc.
-          destruct Hcc as [Hbeq [Hteq Hcc]]. subst.
+          destruct Hcc as [Hbeq [Hdeq [Henv Hcc]]]. subst.
           
           edestruct (Forall2_nthN _ _ _ _ _ Hallvs1 Hnth) as [v1' [Hnth' Hv1]].
           edestruct (Forall2_nthN
                        (fun l1 l2 => cc_approx_val k j IIG IG b d (Res (l1, H1)) (Res (l2, H2))) vs1)
             as [l3' [Hnth'' Hval']]; eauto.
           (* eapply Hcc. unfold cost1. simpl. simpl in Hcost. omega. *)
-          
+           
           edestruct (Forall2_nthN (fun v1 v2 : value => (v1, H2) ≈_( b2, id) (v2, H2'))) as [v2' [Hnth2' Hv2]].
           eapply Forall2_symm_strong; [| eassumption ]. intros. now symmetry; eauto. eassumption.
           
@@ -786,7 +786,7 @@ Module Compat (H : Heap).
             edestruct (Hall' (S j'))  as [l2'' [Hgetl2'' Hcc'']]; eauto. repeat subst_exp. 
 
             simpl in Hcc''. rewrite Hgetl1' in Hcc''. rewrite Hgetl2' in Hcc''.
-            destruct Hcc'' as [_ [_ Hcc'']].
+            destruct Hcc'' as [_ [_ [Henv' Hcc'']]].
             
             edestruct (Forall2_nthN
                          (fun l1 l2 => cc_approx_val k j' IIG IG b d (Res (l1, H1)) (Res (l2, H2))) vs1)

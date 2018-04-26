@@ -571,6 +571,15 @@ Print Assumptions L4_2_to_L4_5_correct.
 Print L4_5Opid.
 
 Section L4_5_postproc.
+Fixpoint let_bindn (lv : list NVar) (lbt : list L4_5_Term) (last: L4_5_Term):=
+  match lv, lbt with
+  | [], [] => last
+  | v::lv, bt::lbt =>
+    Let_e v bt (let_bindn lv lbt last)
+  | _,_ => last
+  end.
+
+(* use let_bindn above? *)
 Fixpoint let_bind (lv : list NVar) (lbt : list L4_5_BTerm) (last: L4_5_Term):=
   match lv, lbt with
   | [], [] => last
@@ -579,6 +588,9 @@ Fixpoint let_bind (lv : list NVar) (lbt : list L4_5_BTerm) (last: L4_5_Term):=
   | _,_ => last
   end.
 
+Definition let_bindc o avoid (cargs : list L4_5_Term) :=
+      let fv : list NVar := freshVars (length cargs) (Some true) avoid [] in
+      let_bindn fv cargs (oterm o (map (fun v => bterm [] (vterm v)) fv)).
 
 (** an additional postproc phase to ensure that the args of constructors are
 variables, as needed in L6.
@@ -590,76 +602,37 @@ Fixpoint L4_5_constr_vars (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Ter
   | oterm o lbt =>
     let lbt := map (btMapNt (L4_5_constr_vars avoid)) lbt in
     match o with
-    | NDCon d n =>
+    | NDCon d n => (* use let_bindc ? *)
       let fv : list NVar := freshVars (length lbt) (Some true) avoid [] in
       let_bind fv lbt (oterm o (map (fun v => bterm [] (vterm v)) fv))
     | _ => oterm o lbt
     end
   end.
 
+(* move to SquiggleEq *)
+Inductive liftRBt {V O} (R : (@NTerm V O) -> (@NTerm V O) -> Prop)
+  : (@BTerm V O) -> (@BTerm V O) -> Prop :=
+  liftRbt : forall lv ntl ntr, R ntl ntr
+                          -> liftRBt R
+                              (bterm lv ntl)
+                              (bterm lv ntr).
 
-Fixpoint zetaNormalize (e:L4_5_Term):  L4_5_Term :=
-  match e with
-  | vterm v => vterm v
-  | oterm o lbt =>
-    let lbt := map (btMapNt zetaNormalize) lbt in
-    match o with
-    | NLet =>
-      match lbt with
-      | [bterm [] a; bterm [x] b] => ssubst_aux b [(x,a)]
-      | _ => oterm o lbt
-      end
-    | _ => oterm o lbt
-    end
-  end.
-  
+(* zetaCLe t1 t2=> t2 is obtained by eta expanding some constructors in t1 *)
+Inductive zetaCLe (avoid : list NVar): L4_5_Term -> L4_5_Term -> Prop :=
+| zetav : forall v, zetaCLe avoid (vterm v) (vterm v)
+| zetao : forall lbt1 lbt2 o,
+    (SetoidList.eqlistA (liftRBt (zetaCLe avoid)) lbt1 lbt2)
+    -> zetaCLe avoid (oterm o lbt1) (oterm o lbt2)
+| zetaoe : forall d n cargs1 cargs2,
+    let o :=  NDCon d n in
+    (SetoidList.eqlistA (zetaCLe avoid) cargs1 cargs2)
+    -> zetaCLe
+        avoid
+        (oterm o (map (bterm []) cargs1))
+        (let_bindc o avoid cargs2).
+              
 
-Definition  zetaConstrNormalize :L4_5_Term -> L4_5_Term := zetaNormalize.
-
-Lemma zetaConstrNormalizeSubst f sub:
-  ssubst (zetaConstrNormalize f) (map_sub_range zetaConstrNormalize sub) =
-  zetaConstrNormalize (ssubst f sub).
-Admitted.
-
-Definition zetaCEquiv (a b: L4_5_Term) := zetaConstrNormalize a = zetaConstrNormalize b.
-
-Notation "a =z= b" := (zetaCEquiv a b) (at level 50).
-
-Lemma properSubstZ f1 f2 x t1 t2:
-  f1 =z= f2
-  -> t1 =z= t2
-  -> ssubst f1 [(x,t1)] =z= ssubst f2 [(x,t2)].
-Proof using.
-  intros Hf Ht.
-  unfold zetaCEquiv in *.
-  do 2 rewrite <- zetaConstrNormalizeSubst.
-  simpl. congruence.
-Qed.
-
-
-Lemma L4_5_constr_vars_zc e lv:
-  subset (all_vars e) lv
-  -> (L4_5_constr_vars lv e) =z= e.
-Admitted.
-
-(* Inductive zetaConstrEquiv : L4_5_Term -> L4_5_Term -> Prop := *)
-  
-(* doesn't seem useful 
-Fixpoint L4_5_constr_vars_val (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Term :=
-  match e with
-  | vterm v => vterm v
-  | oterm o lbt =>
-    match o with
-    | NDCon d n => (* eval goes (only) inside constructors *)
-        let lbt := map (btMapNt (L4_5_constr_vars_val avoid)) lbt in
-        oterm o lbt
-    | _ =>
-      let lbt := map (btMapNt (L4_5_constr_vars avoid)) lbt in
-      oterm o lbt
-    end
-  end.
- *)
-
+(* TODO: generalize it to zetaCle *)
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:
   (forall f sub,
       nt_wf f ->

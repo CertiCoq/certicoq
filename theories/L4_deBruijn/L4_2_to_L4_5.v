@@ -630,13 +630,50 @@ Inductive zetaCLe (avoid : list NVar): L4_5_Term -> L4_5_Term -> Prop :=
         avoid
         (oterm o (map (bterm []) cargs1))
         (let_bindc o avoid cargs2).
-              
 
-(* TODO: generalize it to zetaCle *)
+SearchAbout @alpha_eq.
+
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:
-  (forall f sub,
+  (forall f1 f2 sub1 sub2,
+      nt_wf f1 ->
+      zetaCLe fv f1 f2 ->
+      sub_range_rel (zetaCLe fv) sub1 sub2 ->
+      zetaCLe fv
+        (ssubst_aux f1 sub1)
+        (ssubst_aux f2 sub2))*
+  forall f1 f2 sub1 sub2,
+      bt_wf f1 ->
+      liftRBt (zetaCLe fv) f1 f2 ->
+      sub_range_rel (zetaCLe fv) sub1 sub2 ->
+      liftRBt (zetaCLe fv)
+        (ssubst_bterm_aux f1 sub1)
+        (ssubst_bterm_aux f2 sub2).
+Proof using.
+  apply NTerm_BTerm_ind.
+- intros x ? ? ? Hwf Hsal Hsub.
+  invertsn Hsal. simpl.
+  dsub_find ss; symmetry in Heqss;
+    [eapply sub_range_rel_sub_find in Heqss |
+     eapply sub_range_rel_sub_none in Heqss] ; eauto;
+      exrepnd; rwHyps; eauto. constructor.
+- intros ? ? Hind ? ? ? Hwf Hal Hsal.
+  invertsn Hal.
+  + simpl. apply zetao.
+    ntwfauto. clear HntwfSig.
+    induction Hal; simpl; constructor;
+      [ apply Hind; cpx; try ntwfauto; fail| ].
+    apply IHHal; firstorder.
+  + simpl. admit.
+- intros ? ? Hind ? ? ? Hwf Hbal Hsal. intros.
+  inverts Hbal. simpl. constructor.
+  apply Hind; eauto;[ntwfauto | (* easy *)].
+Admitted.
+
+  (* TODO: generalize it to zetaCle *)
+Lemma ssubst_aux_commute_L4_5_constr_vars fv:
+  (forall f1 f2 sub1 sub2,
       nt_wf f ->
-      subset (dom_sub sub) fv ->
+      zetaCLe fv ->
   ssubst_aux (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
   L4_5_constr_vars fv (ssubst_aux f sub))*
   (forall f sub,

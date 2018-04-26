@@ -690,60 +690,86 @@ Proof using.
   apply subset_app_r. assumption.
 Qed.
 
+Lemma sub_letbindc fv sub o cargs:
+   subset (dom_sub sub) fv -> 
+  (ssubst_aux (let_bindc o fv cargs) sub)
+  = let_bindc o fv (map (fun t => ssubst_aux t sub) cargs).
+Proof using.
+  intros Hs.
+  unfold let_bindc. simpl. autorewrite with list.
+  addFreshVarsSpec2 vn pp. simpl.
+  setoid_rewrite <- Heqvn.
+  clear Heqvn. repnd.
+  set (tt:=(oterm o (map (fun v : NVar => bterm [] (vterm v)) vn))).
+  assert (disjoint (free_vars tt) (dom_sub sub)) as Has.
+    unfold tt. simpl. setoid_rewrite flat_map_vterm.
+    apply disjoint_sym.
+    eapply subset_disjoint; eauto. disjoint_reasoning; fail.
+
+  remember tt as t.
+  clear Heqt. clear tt.
+  revert dependent vn.
+  induction cargs  as [  | carg1 cargs1]; intros;
+  destruct vn as [ | v vn];
+    invertsn pp; auto; simpl;
+      [rewrite ssubst_aux_trivial_disj; autorewrite with SquiggleEq; auto | ].
+  autorewrite with SquiggleEq. 
+  simpl. unfold Let_e. do 4 f_equal.
+  rewrite sub_filter_disjoint1;[ | noRepDis2].
+  erewrite  IHcargs1; eauto; try noRepDis2.
+Qed.
+
 Lemma ssubst_aux_commute_L4_5_zeta fv:
   (forall f1 f2 sub1 sub2,
-      nt_wf f1 ->
       zetaCLe fv f1 f2 ->
+      subset (dom_sub sub1) fv->
       sub_range_rel (zetaCLe fv) sub1 sub2 ->
       zetaCLe fv
         (ssubst_aux f1 sub1)
         (ssubst_aux f2 sub2))*
   forall f1 f2 sub1 sub2,
-      bt_wf f1 ->
       liftRBt (zetaCLe fv) f1 f2 ->
+      subset (dom_sub sub1) fv->
       sub_range_rel (zetaCLe fv) sub1 sub2 ->
       liftRBt (zetaCLe fv)
         (ssubst_bterm_aux f1 sub1)
         (ssubst_bterm_aux f2 sub2).
 Proof using.
   apply NTerm_BTerm_ind.
-- intros x ? ? ? Hwf Hsal Hsub.
+- intros x ? ? ? Hsal Hs Hsub.
   invertsn Hsal. simpl.
   dsub_find ss; symmetry in Heqss;
     [eapply sub_range_rel_sub_find in Heqss |
      eapply sub_range_rel_sub_none in Heqss] ; eauto;
       exrepnd; rwHyps; eauto. constructor.
-- intros ? ? Hind ? ? ? Hwf Hal Hsal.
+- intros ? ? Hind ? ? ? Hal Hsub Hsal.
   invertsn Hal.
   + simpl. apply zetao.
-    ntwfauto. clear HntwfSig.
     induction Hal; simpl; constructor;
       [ apply Hind; cpx; try ntwfauto; fail| ].
     apply IHHal; firstorder.
-  + simpl. unfold let_bindc. simpl.
-    invertsna Hwf Hwf. simpl in Hwf0. rename d into dc. rename n into nargs.
-    addFreshVarsSpec2 vn pp.
-    clear Heqvn. repnd.
-    set (tt:=(oterm (NDCon dc nargs) (map (fun v : NVar => bterm [] (vterm v)) vn))).
-  assert (disjoint (free_vars tt) (dom_sub sub1)) as Has.
-    unfold tt. simpl. setoid_rewrite flat_map_vterm.
-    apply disjoint_sym.
-    (* eapply subset_disjoint; eauto. disjoint_reasoning. *) admit.
-
-  remember tt as t.
-  clear Heqt. clear tt.
-  revert dependent vn. revert dependent nargs.
-  induction lbt as [ | bt lbt]; intros;
-    destruct vn as [ | v vn];
-    invertsn pp; auto; simpl;
-      [rewrite ssubst_aux_trivial_disj; autorewrite with SquiggleEq; auto ;fail | ].
-  
-
-    
-- intros ? ? Hind ? ? ? Hwf Hbal Hsal. intros.
+  + simpl.
+    rewrite sub_letbindc;[ | admit (*easy*)]. simpl.
+    rewrite map_map. simpl.
+    rewrite <- map_map.
+    autorewrite with SquiggleEq.
+    constructor.
+    induction Hal; simpl; constructor;[ | apply IHHal; firstorder].
+    specialize (Hind (bterm [] x)).
+    specialize (Hind ltac:(cpx)). simpl in Hind.
+    specialize (Hind (bterm [] x') sub1 sub2). simpl in Hind.
+    autorewrite with SquiggleEq in Hind.
+    dimp Hind; auto;[constructor; auto | ].
+    clear Hind.
+    inverts hyp. assumption.
+- intros ? ? Hind ? ? ? Hbal Hsal. intros.
   inverts Hbal. simpl. constructor.
-  apply Hind; eauto;[ntwfauto | (* easy *)].
-Admitted.
+  apply Hind; eauto with SquiggleEq.
+  + rewrite <- dom_sub_sub_filter.
+    apply subset_diff. apply subset_app_r.
+    assumption.
+  + apply sub_range_rel_sub_filter. assumption.
+Qed.
 
   (* TODO: generalize it to zetaCle *)
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:

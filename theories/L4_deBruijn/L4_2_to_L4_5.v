@@ -597,7 +597,54 @@ Fixpoint L4_5_constr_vars (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Ter
     end
   end.
 
-(* doesn't seem useful *)
+
+Fixpoint zetaNormalize (e:L4_5_Term):  L4_5_Term :=
+  match e with
+  | vterm v => vterm v
+  | oterm o lbt =>
+    let lbt := map (btMapNt zetaNormalize) lbt in
+    match o with
+    | NLet =>
+      match lbt with
+      | [bterm [] a; bterm [x] b] => ssubst_aux b [(x,a)]
+      | _ => oterm o lbt
+      end
+    | _ => oterm o lbt
+    end
+  end.
+  
+
+Definition  zetaConstrNormalize :L4_5_Term -> L4_5_Term := zetaNormalize.
+
+Lemma zetaConstrNormalizeSubst f sub:
+  ssubst (zetaConstrNormalize f) (map_sub_range zetaConstrNormalize sub) =
+  zetaConstrNormalize (ssubst f sub).
+Admitted.
+
+Definition zetaCEquiv (a b: L4_5_Term) := zetaConstrNormalize a = zetaConstrNormalize b.
+
+Notation "a =z= b" := (zetaCEquiv a b) (at level 50).
+
+Lemma properSubstZ f1 f2 x t1 t2:
+  f1 =z= f2
+  -> t1 =z= t2
+  -> ssubst f1 [(x,t1)] =z= ssubst f2 [(x,t2)].
+Proof using.
+  intros Hf Ht.
+  unfold zetaCEquiv in *.
+  do 2 rewrite <- zetaConstrNormalizeSubst.
+  simpl. congruence.
+Qed.
+
+
+Lemma L4_5_constr_vars_zc e lv:
+  subset (all_vars e) lv
+  -> (L4_5_constr_vars lv e) =z= e.
+Admitted.
+
+(* Inductive zetaConstrEquiv : L4_5_Term -> L4_5_Term -> Prop := *)
+  
+(* doesn't seem useful 
 Fixpoint L4_5_constr_vars_val (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Term :=
   match e with
   | vterm v => vterm v
@@ -611,6 +658,7 @@ Fixpoint L4_5_constr_vars_val (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5
       oterm o lbt
     end
   end.
+ *)
 
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:
   (forall f sub,

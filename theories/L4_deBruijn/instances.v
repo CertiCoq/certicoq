@@ -746,7 +746,11 @@ Let certiL4_5_to_L5Val:
    Qed.
 End SimplerProof.
 
-
+Global Instance pp1: Proper (zetaCEquiv ==> eq ==>  zetaCEquiv ==> zetaCEquiv) subst.
+intros ? ? ? ? ? ? ? ?. subst.
+apply properSubstZ.
+auto.
+Qed.
 (* counterexample:
 e:= (\x.\y.x) (prod 0 0)
 thus, v must be \y.(prod 0 0)
@@ -758,32 +762,62 @@ Howver, [v]val is
 
 If we used CBN evaluation, there would have been no problem *)
 
-Lemma L4_5_constr_vars senv e v lv:
-  subset (all_vars e) lv
-  -> eval e v
-  -> eval (L4_5_constr_vars lv e) (L4_5_constr_vars_val lv v)
-    /\ (senv, v) ⊑ (senv, L4_5_constr_vars_val lv v).
+Notation "a =z= b" := (zetaCEquiv a b) (at level 50).
+
+(*
+Lemma L4_5_constr_vars e e' v:
+   eval e v
+  -> e =z= e'
+  -> exists v', eval e' v'
+      /\ (v' =z= v).
 Proof using.
-  intros Hs Hev.
+  intros  Hev He.
   induction Hev.
+- simpl. eexists.
+  split; [ apply eval_Lam_e | ]. refl.
 - simpl.
-  split; [ apply eval_Lam_e | ].
-  constructor;[intros ?; destruct q; cpx; fail|
-               intros ?; destruct n; simpl; cpx].
-- simpl.
-  rwsimpl Hs. unfold App_e in Hs. rwsimpl Hs.
+  unfold App_e in Hs. rwsimpl Hs.
   apply subset_app in Hs. repnd.
   specialize (IHHev1 Hs0).
   specialize (IHHev2 Hs).
   simpl in *.
   assert (subset (all_vars (subst e1' x v2)) lv) by admit.
   specialize (IHHev3 H).
-  repnd.
-  split; [ eapply eval_App_e; simpl; unfold subst | ].
-  info_eauto.
-  info_eauto. simpl.
-  Focus 2. eauto.
-  (* not provable. see counterexample above *)
+  repnd. exrepnd.
+  rename v'1 into v1p.
+  rename v'0 into v2p.
+  assert (exists e1b', v1p= Lam_e x e1b') by admit.
+  exrepnd. subst.  eexists. 
+  split.
+  + eapply eval_App_e; eauto. subst. simpl.
+ *)
+
+Lemma L4_5_constr_vars e v lv:
+  subset (all_vars e) lv
+  -> eval e v
+  -> exists v', eval (L4_5_constr_vars lv e) v'
+      /\ (v' =z= (L4_5_constr_vars lv v)).
+Proof using.
+  intros Hs Hev.
+  induction Hev.
+- simpl. eexists.
+  split; [ apply eval_Lam_e | ]. refl.
+- simpl.
+  unfold App_e in Hs. rwsimpl Hs.
+  apply subset_app in Hs. repnd.
+  specialize (IHHev1 Hs0).
+  specialize (IHHev2 Hs).
+  simpl in *.
+  assert (subset (all_vars (subst e1' x v2)) lv) by admit.
+  specialize (IHHev3 H).
+  repnd. exrepnd.
+  rename v'1 into v1p.
+  rename v'0 into v2p.
+  assert (exists e1b', v1p= Lam_e x e1b') by admit.
+  exrepnd. subst.  eexists. 
+  split.
+  + eapply eval_App_e; eauto. subst. simpl.
+    (* seems doable. but need to generalize this lemma. *)
 Abort.
 
 (* Possible fix:
@@ -791,7 +825,7 @@ Abort.
 equal when we do full blown zeta reduction (even under binders). This is weaker
 than full blown observational equivalence (perhaps easier to deal with?)
 
-2) prove that zetaEquiv is a congruence.
+2) prove that zetaEquiv is a congruence. as a part, prove that it commutes with substitution.
 
 3) prove that zeta equiv terms compute to zeta equiv values
 

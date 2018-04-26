@@ -624,16 +624,73 @@ Inductive zetaCLe (avoid : list NVar): L4_5_Term -> L4_5_Term -> Prop :=
     (SetoidList.eqlistA (liftRBt (zetaCLe avoid)) lbt1 lbt2)
     -> zetaCLe avoid (oterm o lbt1) (oterm o lbt2)
 | zetaoe : forall d n cargs1 cargs2,
-    let o :=  NDCon d n in
     (SetoidList.eqlistA (zetaCLe avoid) cargs1 cargs2)
     -> zetaCLe
         avoid
-        (oterm o (map (bterm []) cargs1))
-        (let_bindc o avoid cargs2).
+        (oterm (NDCon d n) (map (bterm []) cargs1))
+        (let_bindc (NDCon d n) avoid cargs2).
 
 SearchAbout @alpha_eq.
 
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:
+  (forall f sub,
+      nt_wf f ->
+      subset (dom_sub sub) fv->
+  ssubst_aux (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
+  L4_5_constr_vars fv (ssubst_aux f sub))*
+  (forall f sub,
+      bt_wf f ->
+      subset (dom_sub sub) fv->
+       ssubst_bterm_aux
+         (btMapNt (L4_5_constr_vars fv) f)
+         (map_sub_range (L4_5_constr_vars fv) sub) =
+  btMapNt (L4_5_constr_vars fv) (ssubst_bterm_aux f sub)).
+Proof using.
+  apply NTerm_BTerm_ind; 
+    [ intros; simpl; rewrite sub_find_map; dsub_find s; auto| | ].
+- intros ? ? Hind ? Hwf.
+  simpl.  rewrite map_map. autorewrite with list. symmetry.
+  erewrite <- eq_maps;[ | intros; apply Hind; auto; ntwfauto; fail].
+  destruct o; simpl; try rewrite map_map; f_equal.
+  invertsna Hwf Hwf. simpl in Hwf0.
+  addFreshVarsSpec2 vn pp.
+  clear Heqvn. repnd.
+  set (tt:=(oterm (NDCon dc nargs) (map (fun v : NVar => bterm [] (vterm v)) vn))).
+  assert (disjoint (free_vars tt) (dom_sub sub)) as Has.
+    unfold tt. simpl. setoid_rewrite flat_map_vterm.
+    apply disjoint_sym.
+    eapply subset_disjoint; eauto. disjoint_reasoning.
+
+  remember tt as t.
+  clear Heqt. clear tt.
+  revert dependent vn. revert dependent nargs.
+  induction lbt as [ | bt lbt]; intros;
+    destruct vn as [ | v vn];
+    invertsn pp; auto; simpl;
+      [rewrite ssubst_aux_trivial_disj; autorewrite with SquiggleEq; auto ;fail | ].
+  
+  simpl. unfold Let_e. do 4 f_equal.
+  + apply map_eq_repeat_implies with (v:=bt) in Hwf0; [ | cpx; fail].
+    destruct bt as [lv nt]. destruct lv; inverts Hwf0.
+    refl.
+  + simpl in *. destruct nargs; inverts Hwf0.
+    rewrite H1 in H2.
+    erewrite  IHlbt; eauto; try noRepDis2;[].
+    rewrite sub_filter_disjoint1;[refl | ].
+    autorewrite with SquiggleEq.
+    noRepDis2.
+- intros ? ? Hind ?  Hwf Hsub.
+  simpl. f_equal.
+  rewrite sub_filter_map_range_comm.
+  inverts Hwf.
+  rewrite Hind; auto;[].
+  rewrite <- dom_sub_sub_filter.
+  unfold remove_nvars.
+  apply subset_diff.
+  apply subset_app_r. assumption.
+Qed.
+
+Lemma ssubst_aux_commute_L4_5_zeta fv:
   (forall f1 f2 sub1 sub2,
       nt_wf f1 ->
       zetaCLe fv f1 f2 ->
@@ -663,7 +720,26 @@ Proof using.
     induction Hal; simpl; constructor;
       [ apply Hind; cpx; try ntwfauto; fail| ].
     apply IHHal; firstorder.
-  + simpl. admit.
+  + simpl. unfold let_bindc. simpl.
+    invertsna Hwf Hwf. simpl in Hwf0. rename d into dc. rename n into nargs.
+    addFreshVarsSpec2 vn pp.
+    clear Heqvn. repnd.
+    set (tt:=(oterm (NDCon dc nargs) (map (fun v : NVar => bterm [] (vterm v)) vn))).
+  assert (disjoint (free_vars tt) (dom_sub sub1)) as Has.
+    unfold tt. simpl. setoid_rewrite flat_map_vterm.
+    apply disjoint_sym.
+    (* eapply subset_disjoint; eauto. disjoint_reasoning. *) admit.
+
+  remember tt as t.
+  clear Heqt. clear tt.
+  revert dependent vn. revert dependent nargs.
+  induction lbt as [ | bt lbt]; intros;
+    destruct vn as [ | v vn];
+    invertsn pp; auto; simpl;
+      [rewrite ssubst_aux_trivial_disj; autorewrite with SquiggleEq; auto ;fail | ].
+  
+
+    
 - intros ? ? Hind ? ? ? Hwf Hbal Hsal. intros.
   inverts Hbal. simpl. constructor.
   apply Hind; eauto;[ntwfauto | (* easy *)].
@@ -671,9 +747,9 @@ Admitted.
 
   (* TODO: generalize it to zetaCle *)
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:
-  (forall f1 f2 sub1 sub2,
+  (forall f sub,
       nt_wf f ->
-      zetaCLe fv ->
+      subset (dom_sub sub) fv->
   ssubst_aux (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
   L4_5_constr_vars fv (ssubst_aux f sub))*
   (forall f sub,

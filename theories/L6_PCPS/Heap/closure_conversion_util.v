@@ -484,10 +484,7 @@ Module CCUtil (H : Heap).
         eapply IHe; eauto. reflexivity.
         eapply Setminus_Included_Included_Union.
         unfold FV.
-        eapply Union_Included; [ | now eauto with Ensembles_DB ].
-        eapply Union_Included; [ | now eauto with Ensembles_DB ].
-        eapply Included_trans. eapply Included_Intersection_l.
-        now eauto with Ensembles_DB.
+        eapply Union_Included; [ | now eauto with Ensembles_DB ]...
     - normalize_occurs_free. eapply Singleton_Included.
       eapply project_var_In_Union. eassumption.
     - normalize_occurs_free. eapply Union_Included.
@@ -507,10 +504,7 @@ Module CCUtil (H : Heap).
         eapply IHe; eauto. reflexivity.
         eapply Setminus_Included_Included_Union.
         unfold FV.
-        eapply Union_Included; [ | now eauto with Ensembles_DB ].
-        eapply Union_Included; [ | now eauto with Ensembles_DB ].
-        eapply Included_trans. eapply Included_Intersection_l.
-        now eauto with Ensembles_DB.
+        eapply Union_Included; [ | now eauto with Ensembles_DB ]...
     - normalize_occurs_free. eapply Union_Included.
       + eapply Included_trans. eapply IHB; eauto.
         rewrite <- H1. reflexivity.
@@ -518,10 +512,7 @@ Module CCUtil (H : Heap).
       + eapply Included_trans. eapply Included_Setminus_compat.
         now eapply IHe; eauto. reflexivity.
         eapply Setminus_Included_Included_Union. unfold FV.
-        eapply Union_Included; [| now eauto with Ensembles_DB ].
-        eapply Union_Included; [| now eauto with Ensembles_DB ].
-        eapply Included_trans. eapply Included_Intersection_l...
-        now eauto with Ensembles_DB. 
+        eapply Union_Included; [| now eauto with Ensembles_DB ]...
     - normalize_occurs_free. inv H3. eapply Union_Included.
       + eapply project_vars_In_Union. eassumption.
       + eapply Singleton_Included.
@@ -533,10 +524,7 @@ Module CCUtil (H : Heap).
         eapply IHe; eauto. reflexivity.
         eapply Setminus_Included_Included_Union.
         unfold FV.
-        eapply Union_Included; [ | now eauto with Ensembles_DB ].
-        eapply Union_Included; [ | now eauto with Ensembles_DB ].
-        eapply Included_trans. eapply Included_Intersection_l.
-        now eauto with Ensembles_DB.
+        eapply Union_Included; [ | now eauto with Ensembles_DB ]...
     - rewrite occurs_free_Ehalt.
       eapply Singleton_Included.
       eapply project_var_In_Union. eassumption.

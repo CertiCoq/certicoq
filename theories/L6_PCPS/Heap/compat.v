@@ -33,7 +33,7 @@ Module Compat (H : Heap).
 
 
     (** * Base case and timout compatibility *)
-
+    
     Definition InvCostBase (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) :=
       forall (H1' H2' : heap block) (rho1' rho2' : env) (c : nat) β1 β2,
         (occurs_free e1) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
@@ -344,7 +344,7 @@ Module Compat (H : Heap).
           destruct Hgc as [Hseq [bgc [Heqgc Hinjgc]]].
           destruct Hgc' as [Hseq' [bgc' [Heqgc' Hinjgc']]].
           edestruct Hi' with (i := k - cost  (Eapp f1 t xs1))
-                               (j' := j) as [HG [r2 [c2 [m2 [b2' [Hbs2 [Hinj [HIG Hcc2]]]]]]]];
+                               (j' := j) as [HG [r2 [c2 [m2 [b2' [Hbs2 [Hinj [HIG  Hcc2]]]]]]]];
             [ | omega | | | | | | | eassumption | | | eassumption | | ].   
           + simpl. omega.
           (* + rewrite compose_id_neut_r. rewrite compose_id_neut_l. reflexivity. *)
@@ -651,7 +651,7 @@ Module Compat (H : Heap).
               rewrite env_locs_FromList; eauto. reflexivity.
 
               eapply Included_trans; [| eassumption ].
-              normalize_occurs_free. rewrite env_locs_Union.
+              normalize_occurs_free. rewrite env_locs_Union. 
               eapply Included_Union_preserv_l. 
               rewrite env_locs_FromList; eauto. reflexivity.
 

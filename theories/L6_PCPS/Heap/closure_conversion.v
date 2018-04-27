@@ -121,7 +121,7 @@ Section CC.
         project_vars Scope c Γ FVs S ys ys' C S' ->
         (* We do not care about ys'. Should never be accessed again so do not
          add them aτ the current scope *)
-        Closure_conversion (x &: occurs_free e :|: Scope) c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) c Γ FVs e e' C' ->
         Closure_conversion Scope c Γ FVs (Econstr x t ys e)
                            (Econstr x t ys' (C' |[ e' ]|)) C
   | CC_Ecase :
@@ -139,7 +139,7 @@ Section CC.
       forall Scope c Γ FVs S S' x y y' C C' t N e e',
         Disjoint _ S (FV_cc Scope Γ) ->
         project_var Scope c Γ FVs S y y' C S' ->
-        Closure_conversion (x &: occurs_free e :|: Scope) c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) c Γ FVs e e' C' ->
         Closure_conversion Scope c Γ FVs (Eproj x t N y e)
                            (Eproj x t N y' (C' |[ e' ]|)) C
   | CC_Efun :
@@ -153,11 +153,11 @@ Section CC.
         project_vars Scope c Γ FVs S1 FVs' FVs'' C' S1' ->
         (* Γ' is the variable that will hold the record of the environment *)
         ~ Γ' \in ((name_in_fundefs B) :|: (FV_cc Scope Γ)) ->
-        make_closures B (occurs_free e)  Γ' C ->
+        make_closures B (occurs_free e) Γ' C ->
         (* closure convert function blocks *)
         Closure_conversion_fundefs B c' FVs' B B' ->
         (* closure convert the rest of the program *)
-        Closure_conversion ((name_in_fundefs B :&: (occurs_free e)) :|: Scope) c Γ FVs e e' Ce  ->
+        Closure_conversion (name_in_fundefs B :|: Scope) c Γ FVs e e' Ce  ->
         Closure_conversion Scope c Γ FVs (Efun B e)
                            (Efun B' (C |[ Ce |[ e' ]| ]|)) (comp_ctx_f C' (Econstr_c Γ' c' FVs'' Hole_c))
   | CC_Eapp :
@@ -176,7 +176,7 @@ Section CC.
       forall Scope c Γ FVs S S' x ys ys' C C' f e e',
         Disjoint _ S (FV_cc Scope Γ) ->
         project_vars Scope c Γ FVs S ys ys' C S' ->
-        Closure_conversion (x &: occurs_free e :|: Scope) c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) c Γ FVs e e' C' ->
         Closure_conversion Scope c Γ FVs (Eprim x f ys e)
                            (Eprim x f ys' (C' |[ e' ]|)) C
   | CC_Ehalt :
@@ -201,7 +201,7 @@ Section CC.
              In _ S  Γ' ->
              make_closures B ((occurs_free e) \\ FromList ys) Γ' Cf -> 
              Closure_conversion_fundefs B c FVs defs defs' ->
-             Closure_conversion ((FromList ys :|: name_in_fundefs B) :&: (occurs_free e))
+             Closure_conversion (FromList ys :|: name_in_fundefs B)
                                 c Γ' FVs e e' C ->
              Closure_conversion_fundefs B c FVs (Fcons f t ys e defs )
                                         (Fcons f t (Γ' :: ys) (Cf |[ (C |[ e' ]|) ]|) defs')

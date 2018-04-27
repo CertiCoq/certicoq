@@ -746,11 +746,12 @@ Let certiL4_5_to_L5Val:
    Qed.
 End SimplerProof.
 
+(*
 Global Instance pp1: Proper (zetaCEquiv ==> eq ==>  zetaCEquiv ==> zetaCEquiv) subst.
 intros ? ? ? ? ? ? ? ?. subst.
 apply properSubstZ.
 auto.
-Qed.
+Qed. *)
 (* counterexample:
 e:= (\x.\y.x) (prod 0 0)
 thus, v must be \y.(prod 0 0)
@@ -762,7 +763,9 @@ Howver, [v]val is
 
 If we used CBN evaluation, there would have been no problem *)
 
+(*
 Notation "a =z= b" := (zetaCEquiv a b) (at level 50).
+ *)
 
 (*
 Lemma L4_5_constr_vars e e' v:
@@ -792,6 +795,7 @@ Proof using.
   + eapply eval_App_e; eauto. subst. simpl.
  *)
 
+(*
 Lemma L4_5_constr_vars e v lv:
   subset (all_vars e) lv
   -> eval e v
@@ -819,7 +823,7 @@ Proof using.
   + eapply eval_App_e; eauto. subst. simpl.
     (* seems doable. but need to generalize this lemma. *)
 Abort.
-
+*)
 (* Possible fix:
 1) define a relation zetaEquiv which asserts that the two terms are syntactically
 equal when we do full blown zeta reduction (even under binders). This is weaker

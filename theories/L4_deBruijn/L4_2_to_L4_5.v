@@ -749,7 +749,11 @@ Proof using.
       [ apply Hind; cpx; try ntwfauto; fail| ].
     apply IHHal; firstorder.
   + simpl.
-    rewrite sub_letbindc;[ | admit (*easy*)]. simpl.
+    pose proof Hsal as Hsalb.
+    unfold sub_range_rel in Hsalb.
+    apply ALRangeRelSameDom in Hsalb.
+    rewrite sub_letbindc; [ | setoid_rewrite <- Hsalb]; auto.
+    simpl.
     rewrite map_map. simpl.
     rewrite <- map_map.
     autorewrite with SquiggleEq.
@@ -771,64 +775,6 @@ Proof using.
   + apply sub_range_rel_sub_filter. assumption.
 Qed.
 
-  (* TODO: generalize it to zetaCle *)
-Lemma ssubst_aux_commute_L4_5_constr_vars fv:
-  (forall f sub,
-      nt_wf f ->
-      subset (dom_sub sub) fv->
-  ssubst_aux (L4_5_constr_vars fv f) (map_sub_range (L4_5_constr_vars fv) sub) =
-  L4_5_constr_vars fv (ssubst_aux f sub))*
-  (forall f sub,
-      bt_wf f ->
-      subset (dom_sub sub) fv->
-       ssubst_bterm_aux
-         (btMapNt (L4_5_constr_vars fv) f)
-         (map_sub_range (L4_5_constr_vars fv) sub) =
-  btMapNt (L4_5_constr_vars fv) (ssubst_bterm_aux f sub)).
-Proof using.
-  apply NTerm_BTerm_ind; 
-    [ intros; simpl; rewrite sub_find_map; dsub_find s; auto| | ].
-- intros ? ? Hind ? Hwf.
-  simpl.  rewrite map_map. autorewrite with list. symmetry.
-  erewrite <- eq_maps;[ | intros; apply Hind; auto; ntwfauto; fail].
-  destruct o; simpl; try rewrite map_map; f_equal.
-  invertsna Hwf Hwf. simpl in Hwf0.
-  addFreshVarsSpec2 vn pp.
-  clear Heqvn. repnd.
-  set (tt:=(oterm (NDCon dc nargs) (map (fun v : NVar => bterm [] (vterm v)) vn))).
-  assert (disjoint (free_vars tt) (dom_sub sub)) as Has.
-    unfold tt. simpl. setoid_rewrite flat_map_vterm.
-    apply disjoint_sym.
-    eapply subset_disjoint; eauto. disjoint_reasoning.
-
-  remember tt as t.
-  clear Heqt. clear tt.
-  revert dependent vn. revert dependent nargs.
-  induction lbt as [ | bt lbt]; intros;
-    destruct vn as [ | v vn];
-    invertsn pp; auto; simpl;
-      [rewrite ssubst_aux_trivial_disj; autorewrite with SquiggleEq; auto ;fail | ].
-  
-  simpl. unfold Let_e. do 4 f_equal.
-  + apply map_eq_repeat_implies with (v:=bt) in Hwf0; [ | cpx; fail].
-    destruct bt as [lv nt]. destruct lv; inverts Hwf0.
-    refl.
-  + simpl in *. destruct nargs; inverts Hwf0.
-    rewrite H1 in H2.
-    erewrite  IHlbt; eauto; try noRepDis2;[].
-    rewrite sub_filter_disjoint1;[refl | ].
-    autorewrite with SquiggleEq.
-    noRepDis2.
-- intros ? ? Hind ?  Hwf Hsub.
-  simpl. f_equal.
-  rewrite sub_filter_map_range_comm.
-  inverts Hwf.
-  rewrite Hind; auto;[].
-  rewrite <- dom_sub_sub_filter.
-  unfold remove_nvars.
-  apply subset_diff.
-  apply subset_app_r. assumption.
-Qed.
 
 Require Import List.
 Lemma L4_5_constr_vars_fvars fv:

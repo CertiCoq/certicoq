@@ -630,8 +630,8 @@ Inductive zetaCLe (avoid : list NVar): L4_5_Term -> L4_5_Term -> Prop :=
         (oterm (NDCon d n) (map (bterm []) cargs1))
         (let_bindc (NDCon d n) avoid cargs2).
 
-SearchAbout @alpha_eq.
 
+(* delete *)
 Lemma ssubst_aux_commute_L4_5_constr_vars fv:
   (forall f sub,
       nt_wf f ->
@@ -777,6 +777,8 @@ Qed.
 
 
 Require Import List.
+
+(* delete *)
 Lemma L4_5_constr_vars_fvars fv:
   (forall t, nt_wf t -> subset (all_vars t) fv ->
         (free_vars (L4_5_constr_vars fv t)) =  free_vars t)
@@ -877,6 +879,9 @@ Qed.
 
 (* Move to SquiggleEq.terms2 *)
 Hint Rewrite @flat_map_bterm_nil_allvars: SquiggleEq.
+
+(* see the failed attempt below to understand why 
+all_vars cannot be replaced with free_vars *)
 Lemma L4_5_zeta fv:
   (forall t u,  subset (all_vars t) fv -> zetaCLe fv t u
         -> free_vars t = free_vars u)
@@ -932,7 +937,23 @@ Proof using.
   eapply Hind; eauto.
 Qed.
 
+Lemma L4_5_zeta2 fv:
+  (forall t u,  subset (free_vars t) fv -> zetaCLe fv t u
+        -> free_vars t = free_vars u)
+ * (forall t u,  subset (free_vars_bterm t) fv -> liftRBt (zetaCLe fv) t u
+        -> free_vars_bterm t = free_vars_bterm u).
+Proof using.
+  apply NTerm_BTerm_ind.
+- admit.
+- admit.
+- intros ? ? Hind ? Hsub Hal. invertsn Hal.
+  simpl. f_equal.
+  autorewrite with SquiggleEq in Hsub.
+  simpl in Hsub.
+  eapply Hind; eauto.
+Abort.
 
+(* delete *)
 Lemma ssubst_commute_L4_5_constr_vars fv f sub:
   nt_wf f 
   -> sub_range_sat sub isprogram
@@ -956,6 +977,38 @@ Proof using.
   eapply subset_trans;[ | apply Hss].
   eauto with subset.
 Qed.
+
+
+Lemma sub_range_rel_zeta_fvars fv sub1 sub2:
+      subset ((flat_map all_vars (range sub1))) fv->
+      sub_range_rel (zetaCLe fv) sub1 sub2 ->
+      flat_map free_vars (range sub1)
+      = flat_map free_vars (range sub2).
+Proof using.
+  intros Hs. revert dependent sub2.
+  induction sub1; destruct sub2; intros; repnd; simpl in *; auto; try contradiction.
+  repnd. subst.
+  apply subset_app in Hs. repnd.
+  erewrite (fst (L4_5_zeta fv)); eauto;[ f_equal; eauto].
+Qed.
+
+Lemma ssubst_commute_L4_5_zeta fv f1 f2 sub1 sub2:
+      sub_range_sat sub1 isprogram ->
+      zetaCLe fv f1 f2 ->
+      subset (dom_sub sub1 ++ (flat_map all_vars (range sub1))) fv->
+      sub_range_rel (zetaCLe fv) sub1 sub2 ->
+      zetaCLe fv
+        (ssubst f1 sub1)
+        (ssubst f2 sub2).
+Proof using.
+  intros  Hs Hal Hss Hsr.
+  apply subset_app in Hss. repnd.
+  change_to_ssubst_aux8;
+    [ apply ssubst_aux_commute_L4_5_zeta; auto; fail | ].
+  erewrite <- sub_range_rel_zeta_fvars; eauto.
+  change_to_ssubst_aux8.
+  disjoint_reasoning.
+Qed.  
   
 
 End L4_5_postproc.

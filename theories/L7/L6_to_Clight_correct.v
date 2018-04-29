@@ -769,23 +769,553 @@ Proof.
       rewrite Nat2Z.inj_succ in H0. intros. apply H0. int_red.
       omega. 
 Qed.
-   
-       
-(* trunkated headers at 32 bits (or at size_of_int) *)
-Definition repr_unboxed_L7: N -> Z -> Prop :=
- fun t => fun h => Int.eqm h (Z.of_N ((N.shiftl t 1) + 1)).
+ 
+SearchAbout Int.modulus.
 
+
+(* keep around the fact that t is no bigger than 2^(int_size-1) [which we know by correct_crep] *)
+ Definition repr_unboxed_L7: N -> Z -> Prop :=
+   fun t => fun h =>
+              (h = (Z.shiftl (Z.of_N t) 1) + 1)%Z /\
+              (0 <= (Z.of_N t)  <  Int.half_modulus )%Z.
+
+ Theorem repr_unboxed_eqm: forall h t,
+     repr_unboxed_L7 t h -> 
+   Int.eqm h (Z.of_N ((N.shiftl t 1) + 1)).
+ Proof.
+   intros. inv H.
+   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try omega.
+   simpl.
+   rewrite N.shiftl_mul_pow2.
+   rewrite N2Z.inj_add.
+   rewrite N2Z.inj_mul.
+   simpl.
+   rewrite Z.pow_pos_fold.
+   rewrite Pos2Z.inj_pow.  apply Int.eqm_refl.
+ Qed.   
+
+ Theorem repr_unboxed_header_range:
+   forall t h,
+     repr_unboxed_L7 t h ->
+     (0 <= h <= Int.max_unsigned)%Z.
+ Proof.
+   intros. inv H.   
+   unfold Int.max_unsigned. 
+   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try omega.
+   rewrite Z.pow_1_r.
+   rewrite Z.add_1_r.
+   split; try omega.
+   apply Zlt_le_succ.
+   unfold Int.half_modulus in *.
+   rewrite Int.modulus_power in *.
+   unfold Int.zwordsize in *.
+   simpl.   
+   replace (Zpower.two_p (Z.of_nat Int.wordsize)) with 4294967296%Z in *.
+   unfold Z.div in H1. simpl in H1.
+   omega.
+   reflexivity.   
+ Qed.
+
+ Theorem repr_unboxed_shiftr:
+   forall t h, 
+   repr_unboxed_L7 t h ->
+   Z.shiftr h 1 =  Z.of_N t.
+ Proof.
+   intros.
+   inv H.
+   rewrite Int.Zshiftl_mul_two_p by omega.
+   unfold Z.shiftr. 
+   simpl Z.shiftl.
+   unfold Zpower.two_power_pos. simpl.
+   rewrite Zdiv.Zdiv2_div. 
+   replace (Z.of_N t * 2 + 1)%Z with (OrdersEx.Z_as_OT.b2z true + 2 * (Z.of_N t))%Z by (simpl OrdersEx.Z_as_OT.b2z; omega).
+   apply OrdersEx.Z_as_OT.add_b2z_double_div2.
+Qed.
+ 
 
 Definition boxed_header: N -> N -> Z -> Prop :=
-  fun t => fun a =>  fun h => Int.eqm h (Z.of_N ((N.shiftl a 10) + t)).
+  fun t => fun a =>  fun h =>
+                       (h =  (Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z /\
+                       (0 <= Z.of_N t <  Zpower.two_power_pos 8)%Z /\
+                       (0 <= Z.of_N a <  Zpower.two_power_nat (Int.wordsize - 10))%Z.
+
+Theorem repr_boxed_header_range:
+   forall t a h,
+     boxed_header t a h ->
+     (0 <= h <= Int.max_unsigned)%Z.
+ Proof.
+   intros. inv H.
+   unfold Int.max_unsigned.
+   rewrite  OrdersEx.Z_as_DT.shiftl_mul_pow2.
+   destruct H1.
+   rewrite Zpower.two_power_pos_correct in *.
+   rewrite Zpower.two_power_nat_correct in *.
+   simpl in *.
+   unfold Z.pow_pos in *.
+   simpl in *.
+   omega.
+   omega.
+ Qed.
+ 
+Theorem div2_iter_pos:
+  forall p0 a, 
+    (0 <= a -> 0 <= Pos.iter Z.div2 a p0)%Z.
+Proof.
+  induction p0; intros.
+  - simpl.
+    rewrite OrdersEx.Z_as_OT.div2_nonneg.
+    apply IHp0. apply IHp0. auto.
+  - simpl. apply IHp0. apply IHp0.
+    auto.
+  - simpl; rewrite OrdersEx.Z_as_OT.div2_nonneg; auto.
+Qed.
+
+
+Theorem mul2_iter_pos:
+  forall p0 a, 
+    (0 <= a -> 0 <= Pos.iter (Z.mul 2) a p0)%Z.
+Proof.
+  induction p0; intros.
+  - simpl. destruct (Pos.iter (Z.mul 2) (Pos.iter (Z.mul 2) a p0) p0) eqn:Hp.
+    * reflexivity.
+    * apply Pos2Z.is_nonneg.
+    * exfalso.
+      assert (0 <=  Pos.iter (Z.mul 2) (Pos.iter (Z.mul 2) a p0) p0)%Z.
+      apply IHp0. apply IHp0. auto.
+      rewrite Hp in H0.
+      assert (Hneg := Pos2Z.neg_is_neg p1).
+      omega.
+  - simpl. apply IHp0. apply IHp0. auto.
+  - simpl. destruct a; try omega.
+    apply Pos2Z.is_nonneg.
+    exfalso.
+    assert (Hneg := Pos2Z.neg_is_neg p0).
+    omega.
+Qed.
+
+
+Theorem pos_iter_xI: forall A f (a:A) p,
+  Pos.iter f (a)%Z p~1 = f (Pos.iter f (Pos.iter f a p)%Z p).
+Proof.
+  intros. simpl. reflexivity.
+Qed.
+
+Theorem pos_iter_xH: forall A f (a:A),
+  Pos.iter f (a)%Z 1 = f a.
+Proof.
+  intros. simpl. reflexivity.
+Qed.
+ 
+Theorem pos_iter_xO: forall A f (a:A) p,
+  Pos.iter f (a)%Z p~0 = (Pos.iter f (Pos.iter f a p)%Z p).
+Proof.
+  intros. simpl. reflexivity.
+Qed.
+
+SearchAbout Z.div2 Z.add.
+
+
+Theorem div2_even_add:
+  forall a b,
+    (Z.odd a = false ->
+   Z.div2 (a + b) = Z.div2 a + Z.div2 b)%Z.
+Proof.
+  intros.
+  repeat (rewrite Z.div2_div).
+  rewrite Z.div2_odd with (a := b).
+  rewrite Z.add_assoc.
+  rewrite Z.add_carry_div2.
+  rewrite <- Z.div2_odd with (a := b).
+  repeat (rewrite Z.bit0_odd).
+  rewrite H.
+  rewrite <- Z.bit0_odd.
+  rewrite Z.testbit_even_0.
+  replace  (Z.b2z (false && false || Z.odd b && (false || false))) with 0%Z.
+  rewrite Z.mul_comm.
+  rewrite Zdiv.Z_div_mult. 
+  rewrite Z.add_0_r.
+  rewrite Z.div2_div. reflexivity.
+  omega.
+  destruct (Z.odd b); simpl; reflexivity.
+Qed.
+
+
+
+Theorem shiftl_add_nonneg:
+  forall c a b,
+   ( 0 <= a ->
+    0 <= b ->
+     0 <= c ->
+    Z.shiftl (a + b) c = Z.shiftl a c + Z.shiftl b c)%Z.
+Proof. 
+  destruct c; intros.
+  reflexivity.
+  - simpl.
+    revert dependent a. revert dependent b.
+    clear H1. revert p0.
+    induction p0; intros. 
+    + do 3 (rewrite pos_iter_xI).
+      rewrite <- Z.mul_add_distr_l.
+      rewrite <- IHp0.
+      rewrite <- IHp0.
+      reflexivity.
+      auto. auto.
+      apply mul2_iter_pos; auto.
+      apply mul2_iter_pos; auto.
+    + simpl. rewrite IHp0.
+      rewrite IHp0.
+      reflexivity.
+      apply mul2_iter_pos; auto.
+      apply mul2_iter_pos; auto.
+      auto. auto.
+    + do 3 (rewrite pos_iter_xH).
+      apply Z.mul_add_distr_l.
+  - simpl.
+    exfalso.
+    assert (Hneg := Pos2Z.neg_is_neg p0). omega.
+Qed.
+
+
+
+Theorem iter_div_testbit_decompose:
+  (forall c a b,
+      (forall d, (0 <= d < (Z.pos c))%Z ->
+                 Z.testbit a d = false) ->
+      Pos.iter Z.div2 (a + b) c =
+      Pos.iter Z.div2 a c + Pos.iter Z.div2 b c)%Z.
+Proof.
+  induction c; intros.
+  - do 3 (rewrite pos_iter_xI).
+    assert (Hrw := Z.shiftr_spec).
+    rewrite IHc.
+    rewrite IHc.
+    rewrite div2_even_add. reflexivity.
+    rewrite <- Z.bit0_odd. 
+    assert (Hrw' := Hrw).
+    specialize (Hrw (Pos.iter Z.div2 a c) (Z.pos c)).
+    unfold Z.shiftr in Hrw. simpl in Hrw.
+    rewrite Hrw by omega.
+    specialize (Hrw' a (Z.pos c)). rewrite Hrw'.
+    simpl Z.add.
+    apply H. split.
+    apply Pos2Z.pos_is_nonneg.
+    rewrite Pos.add_diag.
+    rewrite Pos2Z.inj_xI.
+    rewrite Pos2Z.inj_xO. omega.
+    simpl.
+    apply Pos2Z.pos_is_nonneg.
+    specialize (Hrw a (Z.pos c)).
+    unfold Z.shiftr in Hrw. simpl in Hrw.
+    intros. 
+    rewrite Hrw. apply H.
+    rewrite Pos2Z.inj_xI.
+    omega. omega.
+    intros. apply H.
+    rewrite Pos2Z.inj_xI. omega.
+  - rewrite pos_iter_xO.    
+    rewrite IHc.
+    rewrite pos_iter_xO.
+    rewrite pos_iter_xO.
+    Focus 2. intros. apply H.
+    rewrite Pos2Z.inj_xO.
+    assert (0 < Z.pos c)%Z by apply Pos2Z.is_pos.
+    omega.     
+    rewrite IHc. reflexivity.
+    intros.
+    assert (Hrw := Z.shiftr_spec).
+    specialize (Hrw a (Z.pos c)). unfold Z.shiftr in Hrw.
+    simpl in Hrw.  rewrite Hrw. 
+    Focus 2. destruct H0. auto.
+    apply H.
+    rewrite Pos2Z.inj_xO. omega.
+  - repeat (rewrite pos_iter_xH).
+    rewrite div2_even_add. reflexivity.
+    rewrite <- Z.bit0_odd.
+    apply H. omega.
+Qed.
+
+Corollary shiftr_testbit_decompose:
+  (forall c a b,
+      (forall d, (0 <= d < (Z.pos c))%Z ->
+                 Z.testbit a d = false) ->
+      Z.shiftr (a + b) (Z.pos c) =
+      Z.shiftr a (Z.pos c) + Z.shiftr b (Z.pos c))%Z.
+Proof.
+  intros. unfold Z.shiftr. simpl.
+  apply iter_div_testbit_decompose; auto.
+Qed.
+
+ 
+Theorem shiftr_bounded_decompose:
+  forall a b c,
+  (0 <= a ->
+  0 < c ->
+  (0 <= b < Zpower.two_p c) ->
+  Z.shiftr ((Z.shiftl a c) + b) c = a)%Z.
+Proof.
+  intros.
+  destruct c.
+  (* impossible cases *)
+  inv H0.
+  Focus 2. exfalso.
+  assert (Hneg:= Pos2Z.neg_is_neg p0). omega.
+  rewrite shiftr_testbit_decompose.
+  rewrite Z.shiftr_shiftl_l.
+  rewrite Z.sub_diag. simpl.
+  
+  rewrite Int.Zshiftr_div_two_p.
+  rewrite Zdiv.Zdiv_small. omega.
+  auto.
+  omega.
+  omega.
+  intros.
+  apply Z.shiftl_spec_low. destruct H2. auto.
+Qed.
+
+Theorem repr_boxed_a:
+   forall a t h, 
+     boxed_header t a h ->
+   Z.shiftr h 10 =  Z.of_N a.
+Proof.
+  intros.
+  inv H.
+  destructAll.
+  rewrite shiftr_bounded_decompose; auto.
+  omega. simpl.
+  split; auto.  
+  rewrite Zpower.two_power_pos_equiv in *.
+  simpl in *. unfold Z.pow_pos in *. simpl in *.
+  omega.
+Qed.
+
+Theorem pos_testbit_impossible:
+  forall b, 
+  ~ (forall d : N, (0 <= d)%N -> Pos.testbit b d = false).
+Proof.
+  induction b; intro.
+  - apply IHb; intros.
+    assert ( 0 <= 0)%N by reflexivity.
+    apply H in H1. inv H1.
+  - apply IHb.
+    intros.    
+    simpl in H.    
+    assert (0 <= (N.pos (N.succ_pos d)))%N.
+    apply N.lt_le_incl.
+    unfold N.lt. reflexivity. 
+    apply H in H1.
+    rewrite N.pos_pred_succ in H1.
+    auto.
+  - assert (0 <= 0)%N.
+    reflexivity.
+    apply H in H0. inv H0.    
+Qed.
+
+Theorem pos_testbit_nat_impossible:
+  forall b,
+  ~(forall d : nat, 0 <= d -> Pos.testbit_nat b d = false).
+Proof.
+  induction b; intro.
+  - apply IHb; intros.
+    assert ( 0 <= 0) by reflexivity.
+    apply H in H1. inv H1.
+  - apply IHb.
+    intros.    
+    simpl in H.    
+    assert (0 <= S d) by omega.
+    apply H in H1.
+    auto.
+  - assert (0 <= 0).
+    reflexivity.
+    apply H in H0. inv H0.    
+Qed.
+
+Theorem N_lt_pos:  
+  forall p, (0 < N.pos p)%N.
+Proof.
+  intro.
+  apply N2Z.inj_lt.
+  simpl.
+  apply Pos2Z.is_pos.
+Qed.
+     
+Theorem pos_testbit_false_xI:
+  forall b, 
+  (forall d : N, (1 <= d)%N -> Pos.testbit b~1 d = false) ->
+  (forall d : N, (0 <= d)%N -> Pos.testbit b d = false).
+Proof.
+  intros.
+  assert (1 <= (N.pos (N.succ_pos d)))%N.
+  apply N2Z.inj_le.
+  apply Z.lt_pred_le.
+  simpl.
+  apply Pos2Z.is_pos.   
+  apply H in H1.
+  simpl in H1.
+  rewrite N.pos_pred_succ in H1.
+  auto.
+Qed.  
+ 
+Theorem pos_testbit_false_xO:
+  forall b, 
+  (forall d : N, (1 <= d)%N -> Pos.testbit b~0 d = false) ->
+  (forall d : N, (0 <= d)%N -> Pos.testbit b d = false).
+Proof.
+  intros.
+  assert (1 <= (N.pos (N.succ_pos d)))%N.
+  apply N2Z.inj_le.
+  apply Z.lt_pred_le.
+  simpl.
+  apply Pos2Z.is_pos.   
+  apply H in H1.
+  simpl in H1.
+  rewrite N.pos_pred_succ in H1.
+  auto.
+Qed.
+
+SearchAbout Pos.testbit Pos.testbit_nat. 
+
+Theorem pland_split_nat:
+  forall c a b,
+  (forall d, d < c -> Pos.testbit_nat a d = false) -> 
+  (forall d, c <= d -> Pos.testbit_nat b d = false) ->
+                Pos.land a b = 0%N.
+Proof.
+  induction c; intros.
+  - apply pos_testbit_nat_impossible in H0.
+    inv H0.
+  - destruct a.
+    + (* impossible: a needs to be 0 on lower bits *)
+      assert (0 < S c) by omega.
+      apply H in H1.
+      inv H1.
+    + destruct b.
+      * simpl.
+        rewrite IHc; intros.
+        reflexivity.
+        simpl in H.
+        assert (S d < S c) by omega.
+        apply H in H2. auto.
+        assert (S c <= S d) by omega.
+        apply H0 in H2.
+        simpl in H2. auto.
+      * simpl.
+        rewrite IHc; intros.
+        reflexivity.
+        simpl in H.
+        assert (S d < S c) by omega.
+        apply H in H2. auto.
+        assert (S c <= S d) by omega.
+        apply H0 in H2.
+        simpl in H2. auto.
+      * reflexivity.
+    + (* impossible: a needs to be 0 on lower bits *)
+      assert (0 < S c) by omega.
+      apply H in H1.
+      inv H1.
+Qed.
+
+
+
+
+Theorem repr_boxed_t:
+   forall a t h, 
+     boxed_header t a h ->
+   Z.land h 255 =  Z.of_N t.
+Proof.
+  intros. inv H.
+  apply Z.bits_inj.
+  unfold Z.eqf.
+  intro.
+  destruct H1.
+  rewrite Z.land_spec.
+  assert (Hcase_z:= Z.lt_ge_cases n 0%Z).
+  destruct Hcase_z as [Hnz | Hnz].
+  { (* testbit = false *)
+    destruct n. exfalso; omega.
+    exfalso. assert (0 < Z.pos p0)%Z by apply Pos2Z.pos_is_pos. omega.
+    reflexivity.
+  }    
+  
+  assert (Hcase := Z.lt_ge_cases n 8%Z).
+
+  destruct Hcase.
+  - replace 255%Z with (Z.pred (2^8))%Z.
+    rewrite <- Z.ones_equiv. 
+    rewrite Z.ones_spec_low.
+    rewrite Bool.andb_true_r.
+    rewrite Z.add_nocarry_lxor.
+    rewrite Z.lxor_spec.
+    rewrite OrdersEx.Z_as_OT.shiftl_spec_low.
+    rewrite Bool.xorb_false_l.
+    reflexivity. omega.
+    (* multiple cases depending of if one is 0 or not *)
+    {
+      destruct (Z.shiftl (Z.of_N a) 10) eqn:Ha.
+      - reflexivity.
+      - destruct (Z.of_N t) eqn:Hb.
+        + reflexivity.
+        + simpl.
+          rewrite pland_split_nat with (c := 8). reflexivity.
+          * intros.
+            rewrite <- Ndigits.Ptestbit_Pbit.            
+            destruct d. simpl.
+            destruct (Z.of_N a). simpl in Ha.
+            assert (0 < Z.pos p0)%Z by apply Pos2Z.pos_is_pos. omega.
+            simpl in Ha. inv Ha. reflexivity.
+            inv Ha. 
+            replace false with
+                (Z.testbit (Z.pos p0)  (Z.of_nat (S d))).
+            reflexivity.
+            rewrite <- Ha.
+            apply Z.shiftl_spec_low.
+            apply Nat2Z.inj_lt in H2.
+            simpl Z.of_nat in *. omega.
+          * intros.
+            rewrite Zpower.two_power_pos_nat in H.
+            rewrite <- Ndigits.Ptestbit_Pbit.            
+            destruct d. exfalso; omega.
+            replace false with
+                (Z.testbit (Z.pos p1)  (Z.of_nat (S d))). reflexivity.
+            eapply Int.Ztestbit_above.
+            apply H.
+            apply Nat2Z.inj_le in H2.
+            replace (Pos.to_nat 8) with 8.
+            omega. reflexivity.
+        + destruct t; inv Hb.
+      - exfalso.
+        destruct H0.
+        rewrite <- Z.shiftl_nonneg with (n := 10%Z) in H0.
+        rewrite Ha in H0.       
+        assert (Hnn := Zlt_neg_0 p0). omega.
+    }
+    
+    
+    omega.
+    simpl. reflexivity.
+  - (* always false *)
+    rewrite Bool.andb_false_intro2.
+    symmetry.
+    eapply Byte.Ztestbit_above with (n := 8).
+    rewrite Zpower.two_power_nat_correct. 
+    rewrite Zpower.two_power_pos_correct in *.
+    unfold Z.pow_pos in H. simpl in *.
+    omega.
+    simpl. omega.
+    eapply Byte.Ztestbit_above with (n := 8).
+    rewrite Zpower.two_power_nat_correct. simpl. omega.
+    simpl. omega.
+Qed.    
+  
+
+  
+  
 
 Definition arity_of_header (h:Z): N :=
-  let n := Z.to_N h in
-  N.shiftr n 10.
+  Z.to_N (Z.shiftr h 10).
 
 Definition tag_of_header (h:Z): N :=
-  let n := Z.to_N h in
-  n.
+    Z.to_N (Z.land h 255).
+
 
 
 Inductive repr_asgn_constr: positive -> cTag -> list positive -> statement -> Prop :=
@@ -818,7 +1348,7 @@ Inductive repr_switch_L6_L7: positive -> labeled_statements -> labeled_statement
 (* relate a L6.exp -| cEnv, fEnv to a series of statements in a clight program (passed as parameter) -- syntactic relation that shows the right instructions have been generated for functions body. There should not be function definitions (Efun), or primitive operations (they are not supported by our backend) in this 
 TODO: maybe this should be related to a state instead? 
  *)
- 
+  
 Inductive repr_expr_L6_L7: L6.cps.exp -> statement -> Prop :=
 | Rconstr_e:
     forall x t vs  s s' e, 
@@ -849,9 +1379,11 @@ Inductive repr_expr_L6_L7: L6.cps.exp -> statement -> Prop :=
                         OS: perhaps want to include a *)
 with repr_branches_L6_L7: list (cTag * exp) -> labeled_statements -> labeled_statements -> Prop :=
      | Rempty_br : repr_branches_L6_L7 nil LSnil LSnil
-     | Runboxed_default_br: forall t e cl ls n s, repr_branches_L6_L7 cl ls LSnil ->
-                            M.get t rep_env  = Some (enum n) ->
-                            repr_branches_L6_L7 ((t, e) ::cl) ls (LScons None s LSnil)
+     | Runboxed_default_br: forall t e cl ls n s,
+         repr_expr_L6_L7 e s ->
+         M.get t rep_env  = Some (enum n) ->
+         repr_branches_L6_L7 cl ls LSnil ->
+                            repr_branches_L6_L7 ((t, e) ::cl) ls (LScons None  (Ssequence s Sbreak) LSnil)
      | Runboxed_br: forall cl ls lsa' lsb' lsc' t n tag e s, repr_branches_L6_L7 cl ls (LScons lsa' lsb' lsc') ->
                                                 repr_expr_L6_L7 e s ->
                                                 M.get t rep_env  = Some (enum n) ->
@@ -860,7 +1392,7 @@ with repr_branches_L6_L7: list (cTag * exp) -> labeled_statements -> labeled_sta
      | Rboxed_default_br : forall cl  ls' t a n e s, repr_branches_L6_L7 cl LSnil ls' ->
                                            repr_expr_L6_L7 e s ->
                                            M.get t rep_env = Some (boxed n a) ->
-                                           repr_branches_L6_L7 ((t, e)::cl) (LScons None s  LSnil) ls'
+                                           repr_branches_L6_L7 ((t, e)::cl) (LScons None  (Ssequence s Sbreak) LSnil) ls'
      | Rboxed_br : forall cl lsa lsb lsc ls' t a n tag e s, repr_branches_L6_L7 cl (LScons lsa lsb lsc) ls' ->
                                            repr_expr_L6_L7 e s ->
                                            M.get t rep_env = Some (boxed n a) ->
@@ -868,9 +1400,38 @@ with repr_branches_L6_L7: list (cTag * exp) -> labeled_statements -> labeled_sta
                                            repr_branches_L6_L7 ((t, e)::cl) (LScons (Some (Z.land tag 255)) (Ssequence s Sbreak)  (LScons lsa lsb lsc)) ls'.
 
                     
+Theorem repr_branches_LSnil_no_unboxed:
+  forall t e cl  ls,
+    findtag cl t = Some e ->
+    repr_branches_L6_L7 cl ls LSnil  -> 
+    ~ (exists arr, M.get t rep_env = Some (enum arr)).
+Proof.
+  induction cl; intros.
+  - inv H.
+  - simpl in H. destruct a.
+    destruct (M.elt_eq c t).
+    + subst. inv H0; intro; destruct H0; rewrite H0 in H8; inv H8.
+    + inv H0. inv H4. inv H.
+      eapply IHcl; eauto.
+Qed.
+
+Theorem repr_branches_LSnil_no_boxed:
+  forall t e cl  ls,
+    findtag cl t = Some e ->
+    repr_branches_L6_L7 cl LSnil ls  -> 
+    ~ (exists arr s, M.get t rep_env = Some (boxed arr s)).
+Proof.
+  induction cl; intros.
+  - inv H.
+  - simpl in H. destruct a.
+    destruct (M.elt_eq c t).
+    + subst. inv H0; intro; destruct H0; destruct H0. rewrite H0 in H7; inv H7. rewrite H0 in H8; inv H8.
+    + inv H0. inv H8. inv H.
+      eapply IHcl; eauto.
+Qed.
 
 
-
+      
 Definition gc_vars := ((allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, val) ::nil).
 
 Definition gc_set := (allocIdent ::= Efield tinfd allocIdent valPtr ;
@@ -967,7 +1528,8 @@ with repr_val_L6_L7:  L6.cps.val -> mem -> Values.val -> Prop :=
 
 
 Definition locProp := block -> Z -> Prop.
-About Mem.load.
+
+
 (* m and m' are the _same_ over subheap L *)
 
 Definition sub_locProp: locProp -> locProp -> Prop :=
@@ -2136,21 +2698,27 @@ Section THEOREM.
   Definition correct_ienv_of_cenv: L6.cps.cEnv -> iEnv -> Prop :=
     fun cenv ienv =>
       forall x, forall i n t name, M.get x cenv = Some (name, i, n, t) ->
-                                   exists cl, M.get i ienv = Some cl /\ List.In (x, n) cl /\ ~ (exists n', List.In (x, n') cl).
-  
+                                   exists cl, M.get i ienv = Some cl /\ List.In (x, n) cl /\ ~ (exists n', n' <> n /\ List.In (x, n') cl).
 
+
+
+  (* OS 04/24: added in bound on n includes in this *)
   Inductive correct_crep (cenv:cEnv) (ienv:iEnv) : cTag -> cRep -> Prop :=
   | rep_enum :
       forall c name it n' n cl,
         M.get c cenv = Some (name, it, 0%N, n') ->
         M.get it ienv = Some cl ->
         getEnumOrdinal c cl = Some n ->
+        (* there should not be more than 2^(intsize - 1) unboxed constructors *)
+        (0 <= (Z.of_N n) <  Zpower.two_p  (Int.zwordsize - 1))%Z ->
       correct_crep cenv ienv c (enum n)
   | rep_boxed:
       forall c name it a n' n cl,
         M.get c cenv = Some (name, it, (Npos a), n') ->
         M.get it ienv = Some cl ->
         getBoxedOrdinal c cl = Some n ->
+        (* there should not be more than 2^8 boxed constructors *)
+        (0 <= (Z.of_N n) <  Zpower.two_p 8)%Z ->
       correct_crep cenv ienv c (boxed n (Npos a)).
 
   (* also need to go the other way around: if in crep, then in cenv*) 
@@ -2529,8 +3097,9 @@ Proof.
   intros. simpl. destruct y; inv H; auto.
 Qed.
 
- 
 
+ 
+ 
 Theorem mem_after_n_proj_rev_unchanged:
   forall b  vs ofs m m',
     mem_after_n_proj_store_rev b ofs vs m m' ->
@@ -2583,7 +3152,22 @@ Definition arg_val_L6_L7 (fenv:fEnv) (finfo_env:M.t positive) (p:program) (rep_e
                                   Mem.load Mint32 m args_b (Int.unsigned (Int.add args_ofs (Int.repr int_size))) = Some L7v /\
                                   repr_val_L_L6_L7_id fenv finfo_env p rep_env v m L L7v.
  
-
+Theorem max_allocs_case:
+  forall c e y cl, 
+  List.In (c, e) cl ->
+  max_allocs e <= max_allocs (Ecase y cl).
+Proof.
+  induction cl; intros.
+  inv H.
+  simpl. destruct a. inv H.
+  - inv H0.
+    apply Nat.le_max_l.
+  - apply IHcl in H0. simpl in H0.
+    etransitivity. apply H0.
+    apply Nat.le_max_r.
+Qed.
+  
+  
 Theorem getlist_cons :
   forall A rho v ys vs,
     @getlist A ys rho = Some (v :: vs) ->
@@ -2643,8 +3227,8 @@ Proof.
     inv H0.
 Qed.     
 
-
-
+ 
+  
 Theorem store_unchanged_on' :
         forall m m'' m' L v b chunk ofs,
           Mem.unchanged_on L m m'' ->
@@ -2701,8 +3285,307 @@ Proof.
   admit.
   split. auto.
   auto.
-Qed.  *)  
-             
+Qed.  *)
+
+(* TODO: maybe change repr_unboxed to return an int instead, makes it easier to shift back afterward *)
+(*  (Z.shiftr tag 1)) *)
+
+  
+  
+Theorem sem_shr_unboxed:
+  forall n,
+    sem_shr (Vint n) uintTy (Vint (Int.repr 1)) uintTy = Some (Vint (Int.repr (Z.shiftr (Int.unsigned n) 1))).
+Proof.  
+  intros. 
+  unfold sem_shr. unfold sem_shift. simpl.
+  rewrite Int.shru_div_two_p.
+  rewrite Int.Zshiftr_div_two_p by omega.
+  rewrite Int.unsigned_repr by (solve_uint_range; omega).
+  unfold Int.iwordsize. unfold Int.zwordsize. simpl.
+  unfold Int.ltu.
+  rewrite Int.unsigned_repr by (solve_uint_range; omega).
+  rewrite Int.unsigned_repr by (solve_uint_range; omega).
+  reflexivity.
+Qed. 
+
+
+Theorem getEnumOrdinal'_disjoint:
+        forall t c cl arr_t arr_c,
+        getEnumOrdinal' t cl = Some arr_t ->
+        getEnumOrdinal' c cl = Some arr_c ->
+        c <> t <-> arr_t <> arr_c.
+Proof.
+  induction cl; intros.
+  inv H.
+  simpl in *. destruct a.
+  destruct (n =? 0)%N eqn:H_eq_n.
+  - destruct (t =? c0)%positive eqn: H_eq_t;
+      destruct (c =? c0)%positive eqn:H_eq_c.
+    +  split; intro; intro; subst.
+       * apply Peqb_true_eq in H_eq_t.
+         apply Peqb_true_eq in H_eq_c; subst. auto.
+       * rewrite H in H0. inv H0. auto.
+    +  destruct (getEnumOrdinal' c cl) eqn: H_ord.
+       * split; intro.
+         intro. subst. rewrite <- H in H0. inv H0.
+         rewrite N.add_1_r in H3.
+         revert H3; apply N.neq_succ_0.
+        intro; subst. rewrite H_eq_t in H_eq_c. inv H_eq_c.
+       * split; intro; intro; subst.
+         rewrite <- H in H0; inv H0.
+         rewrite H_eq_t in H_eq_c; inv H_eq_c.
+    + split; intro; intro; subst.
+      destruct (getEnumOrdinal' t cl ); rewrite <- H in H0; inv H0.
+      rewrite N.add_1_r in H3. symmetry in H3.
+      revert H3; apply N.neq_succ_0.
+      rewrite  H_eq_t in H_eq_c. inv H_eq_c.
+    + destruct (getEnumOrdinal' t cl) eqn:H_g_t.
+      destruct (getEnumOrdinal' c cl) eqn:H_g_c.
+      * inv H. inv H0. specialize (IHcl n0 n1 eq_refl eq_refl).
+        split; intro; intro; subst. apply IHcl in H. apply H. apply N.succ_inj.
+        do 2 (rewrite N.add_1_r in H0). auto.
+        apply IHcl. intro. apply H; subst; auto. auto.
+      * inv H0.
+      * inv H.
+  - eapply IHcl; eauto.
+Qed.
+ 
+Theorem getBoxedOrdinal'_disjoint:
+        forall t c cl arr_t arr_c,
+        getBoxedOrdinal' t cl = Some arr_t ->
+        getBoxedOrdinal' c cl = Some arr_c ->
+        c <> t <-> arr_t <> arr_c.
+Proof.
+  induction cl; intros.
+  inv H.
+  simpl in *. destruct a.
+  destruct (n =? 0)%N eqn:H_eq_n.
+  - apply IHcl; auto.
+  - destruct (t =? c0)%positive eqn: H_eq_t;
+      destruct (c =? c0)%positive eqn:H_eq_c.
+    +  apply Peqb_true_eq in H_eq_t.
+       apply Peqb_true_eq in H_eq_c; subst.
+       inv H; inv H0. split; intro; auto.
+    + destruct (getBoxedOrdinal' c cl) eqn: H_ord.
+      * apply Peqb_true_eq in H_eq_t.
+        apply Pos.eqb_neq in H_eq_c.
+        inv H; inv H0.
+        split; auto.
+        intro. intro.
+        SearchAbout (_ + 1)%N.
+        rewrite N.add_1_r in H0.
+        apply N.neq_0_succ in H0. auto.
+      * inv H0.
+    + apply Peqb_true_eq in H_eq_c.
+        apply Pos.eqb_neq in H_eq_t. subst.
+      destruct (getBoxedOrdinal' t cl) eqn: H_ord.
+      * inv H; inv H0. split; auto.
+        intro; intro. 
+        rewrite N.add_1_r in H0.
+        symmetry in H0.
+        apply N.neq_0_succ in H0. auto.
+      * inv H.
+    + destruct (getBoxedOrdinal' t cl) eqn:H_g_t. destruct (getBoxedOrdinal' c cl) eqn:H_g_c.
+      * inv H. inv H0.
+        apply Pos.eqb_neq in H_eq_t.
+        apply Pos.eqb_neq in H_eq_c.
+        specialize (IHcl n0 n1 eq_refl eq_refl). split; auto. intro. intro.
+        apply IHcl in H.
+        apply H.
+        apply N.succ_inj.
+        do 2 (rewrite <- N.add_1_r).
+        auto.
+        intro. apply IHcl. intro.
+        apply H.
+        subst. auto.
+      * inv H0.
+      * inv H.
+Qed.
+
+
+
+Theorem pos_iter_injective:
+  forall A f,
+         (forall a b, f a = f b -> a = b) ->
+         forall p (a b:A),
+  Pos.iter f a p = Pos.iter f b p ->
+  a = b.
+Proof.
+  induction p; intros.
+  simpl in H0.
+  apply H in H0.
+  apply IHp in H0. apply IHp in H0. auto.
+  simpl in H0. apply IHp in H0. apply IHp; auto.
+  simpl in H0. apply H; auto.
+Qed.  
+  
+  
+Theorem shiftl_injective:
+  forall c a b,
+    (0 <= c)%Z ->
+  Z.shiftl a c = Z.shiftl b c ->
+  a = b.
+Proof.
+  induction c; intros.
+  simpl in *. auto.
+  simpl in H0.
+  apply pos_iter_injective in H0. auto.
+  intros. omega.
+  simpl in H0. exfalso.
+  assert (Z.neg p < 0)%Z by apply Pos2Z.neg_is_neg.
+  omega.
+Qed.
+
+
+Theorem case_of_labeled_stm_unboxed:
+  forall rep_env arr t  n0 e p fenv ienv cenv ,
+    M.get t rep_env = Some (enum arr) ->
+    correct_crep_of_env cenv ienv rep_env ->
+(*   M.get t cenv = Some (a, ty, n, i) ->  *)
+    repr_unboxed_L7 arr (Int.unsigned n0) ->
+    forall cl ls ls',
+      caseConsistent cenv cl t ->
+  findtag cl t = Some e ->
+  repr_branches_L6_L7 argsIdent allocIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv p rep_env cl ls ls' ->
+  exists s s', 
+                       seq_of_labeled_statement (select_switch (Z.shiftr (Int.unsigned n0) 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s.
+Proof.
+  induction cl; intros ls ls' Hcc; intros.
+  (* impossible empty cl *)  inv H2.
+  simpl in H2. destruct a. destruct (M.elt_eq c t).
+  - (* is-case *)
+    inv H2. inv H3.
+    (* remove impossible boxed cases *)
+    Focus 3.  rewrite H10 in H. inv H.
+    Focus 3. rewrite H10 in H. inv H.
+    + (* default *)
+      simpl. exists s, Sskip.
+      split. reflexivity.
+      auto.
+    + rewrite H10 in H. inv H.
+      exists s, (seq_of_labeled_statement ( (LScons lsa' lsb' lsc'))). split; auto.
+      simpl. unfold select_switch. simpl.
+      
+      assert (tag = Int.unsigned n0).
+      inv H11; inv H1. auto.
+      subst.
+      rewrite Coqlib.zeq_true.
+      simpl. reflexivity.
+  - (*is not case -- IH *)
+    inv H3.
+    + (* impossible because rep_env is correct, t is in cl but cl -unboxed-> LSnil *)
+      exfalso.
+      assert (Hn_repr := repr_branches_LSnil_no_unboxed _ _ _ _ _ _ _ _ _ _ _ _ _ H2 H11). apply Hn_repr.
+      eauto.
+     + simpl. (* c <> t so arr <> n1 and the headers are different *)
+       unfold select_switch.
+       simpl select_switch_case. 
+       rewrite Coqlib.zeq_false.
+       inv Hcc. 
+       specialize (IHcl _ _ H14 H2 H7). apply IHcl.
+       inv H0. apply H4 in H11.
+       apply H4 in H. inv H. inv H11.
+       
+       inv Hcc. rewrite H5 in H17; inv H17. rewrite H0 in H18; inv H18.
+       rewrite H6 in H10; inv H10.
+       unfold getEnumOrdinal in *.
+       assert (n1 <> arr) by (eapply getEnumOrdinal'_disjoint; eauto).
+       intro. do 2 (erewrite repr_unboxed_shiftr in H10 by eauto).
+       apply H. apply N2Z.inj. auto.
+     + inv Hcc; eapply IHcl; eauto.       
+     + inv Hcc; eapply IHcl; eauto.
+Qed.
+  
+     
+Theorem case_of_labeled_stm_boxed:
+  forall rep_env n arr t  h e p fenv ienv cenv ,
+     M.get t rep_env = Some (boxed n arr)  ->
+    correct_crep_of_env cenv ienv rep_env ->
+    boxed_header n arr (Int.unsigned h) ->
+    forall cl ls ls',
+      caseConsistent cenv cl t ->
+  findtag cl t = Some e ->
+  repr_branches_L6_L7 argsIdent allocIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv p rep_env cl ls ls' ->
+  exists s s', 
+                       (seq_of_labeled_statement (select_switch (Int.unsigned (Int.and h (Int.repr 255))) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s.
+Proof.
+  induction cl; intros ls ls' Hcc; intros.
+  (* impossible empty cl *) inv H2.
+  simpl in H2. destruct a. destruct (M.elt_eq c t).
+  - (* is case *)
+    inv H2. inv H3. rewrite H9 in H; inv H.
+    rewrite H10 in H; inv H.
+    + (* default *)
+      simpl. exists s, Sskip.
+      split; auto.
+    + rewrite H10 in H. inv H.
+      unfold Int.and.
+      assert (tag = Int.unsigned h). {
+        inv H1; inv H11. auto.
+      }
+      rewrite <- H in *. clear H. clear H11.
+      unfold select_switch. simpl.
+      rewrite Int.unsigned_repr with (z := 255%Z). 
+      rewrite Int.unsigned_repr.
+      rewrite Coqlib.zeq_true. simpl.
+      do 2 eexists.
+      split. reflexivity.
+      auto.
+      unfold Int.max_unsigned. simpl.
+      split.
+      eapply Z.land_nonneg. right. omega.
+      replace 255%Z with (Z.ones 8).      
+      rewrite Z.land_ones.
+      simpl. unfold Z.pow_pos. simpl.
+      assert (tag mod 256 < 256)%Z.
+      apply Z.mod_pos_bound. omega.
+      omega.
+      omega. compute. reflexivity.
+      unfold Int.max_unsigned. simpl.
+      omega.
+  - (* is-not-case -- IH *)    
+    inv H3.
+    + (* enum default *)
+      inv Hcc; eapply IHcl; eauto.       
+    + inv Hcc; eapply IHcl; eauto.            
+    + exfalso.
+      eapply repr_branches_LSnil_no_boxed; eauto.
+    + (* c <> t so arr <> n1 and the header are different *)
+      unfold select_switch.
+      simpl select_switch_case. 
+      rewrite Coqlib.zeq_false.
+      inv Hcc. 
+      specialize (IHcl _ _ H14 H2 H7). apply IHcl.
+      unfold Int.and.
+      rewrite Int.unsigned_repr with (z := 255%Z).
+      rewrite Int.unsigned_repr.
+      do 2 (erewrite  repr_boxed_t; eauto).
+      inv H0. apply H4 in H11.
+      apply H4 in H. inv H. inv H11.          
+      inv Hcc.
+      
+
+      rewrite H5 in H18; inv H18. rewrite H6 in H15; inv H15. 
+       rewrite H9 in H10; inv H10.
+
+       unfold getBoxedOrdinal in *.
+       assert (n1 <> n) by (eapply getBoxedOrdinal'_disjoint; eauto). 
+       intro. apply H.
+       apply N2Z.inj. auto.
+      unfold Int.max_unsigned. simpl.
+      split.
+      eapply Z.land_nonneg. right. omega.
+      replace 255%Z with (Z.ones 8).      
+      rewrite Z.land_ones.
+      simpl. unfold Z.pow_pos. simpl.
+      assert ((Int.unsigned h)  mod 256 < 256)%Z.
+      apply Z.mod_pos_bound. omega.
+      omega. omega.
+      compute; omega.
+      unfold Int.max_unsigned. simpl. omega.
+Qed.
+
+
 Theorem repr_bs_L6_L7_related:
   forall p rep_env cenv fenv finfo_env ienv,
   forall rho v e n, bstep_e (M.empty _) cenv rho e v n ->                    
@@ -3364,13 +4247,10 @@ Proof.
                 apply Int.unsigned_range_2.
                 unfold Int.max_unsigned.                
                 simpl. omega.
-              * unfold boxed_header.
-                eapply Int.eqm_trans.
-                Focus 2.
-                apply H1.
-                apply Int.eqm_unsigned_repr_l.
-                apply Int.eqm_refl.
-                              * (* todo: theorem linking repr_val_ptr_list and mem_after_n_proj_store *)
+              * rewrite Int.unsigned_repr.
+                auto.
+                eapply repr_boxed_header_range; eauto.
+              * (* todo: theorem linking repr_val_ptr_list and mem_after_n_proj_store *)
                 (* need to clear a few things here before inducting on vs *)
                 { clear IHHev.
                   assert (H_alloc4 :(Int.unsigned (Int.add alloc_ofs (Int.mul (Int.repr (sizeof (globalenv p) uintTy)) (Int.repr Z.one)))
@@ -3469,7 +4349,6 @@ Proof.
 
                   
                   (* IH needs to walk on the total (a) size of ys *)
-                  (* TODO: update the walk! show that this works with intermediate mem *)
                   assert (Hays: (Z.of_N a - Z.of_nat (length ys) = 0)%Z).
                   destruct Ha_l; subst. rewrite nat_N_Z.
                   omega.
@@ -3917,9 +4796,8 @@ Forall2
             rewrite M.gss. reflexivity.
             simpl in H. inv H.
             econstructor; eauto.
-            eapply Int.eqm_trans.
-            apply Int.eqm_sym. apply Int.eqm_unsigned_repr.
-            auto.
+            rewrite Int.unsigned_repr. auto.
+            eapply repr_unboxed_header_range; eauto.
           * assert (occurs_free (Econstr x t [] e) x0).
             constructor 2; auto.
             specialize (Hrepr_m _ H3).
@@ -3998,7 +4876,7 @@ Forall2
     }
     (* get the value on the nth of vs in memory *)
     
-    assert (Hvn := repr_val_ptr_list_L_nth argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent  threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent  cenv _ _ _ _ H12  H0).
+    assert (Hvn := repr_val_ptr_list_L_nth argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent   _ _ _ _ H12  H0).
  
     (* done setting up, taking the proj step *)
     destruct Hvn as [v7' [Hv7'_l Hv7'_rep]]. 
@@ -4098,7 +4976,7 @@ Forall2
     split; auto.
     eapply t_trans; eauto.    
   - (* Ecase *)    
-
+    
     (* get the representation of y *)
     assert (Hrel_m' := Hrel_m).
     destruct Hrel_m' as [L [Hmem_p Hmem_rel]].
@@ -4115,17 +4993,221 @@ Forall2
 
     (* step through the assignment and the isptr check *)
     inv H6.
-    
-    
-    
-    (* break into boxed and unboxed cases *)
-    inv Hrepr_y.
-    + (* y is unboxed *)
-      admit.
 
-    + (* y is boxed *)
-      admit.
+    (* current assumptions needed for is_Ptr...TODO: make these into global assumption *)
+    assert (exists b_isPtr, Genv.find_symbol (globalenv p) isptrIdent = Some b_isPtr) by admit.
+    destruct H as [b_isPtr H_isPtr].
+    assert (H_isPtr_ff:  exists name sg, Genv.find_funct (globalenv p) (Vptr  b_isPtr Int.zero) = Some (External (EF_external name sg) (Tcons (Tint I32 Unsigned noattr) Tnil)  (Tint IBool Unsigned noattr)   {| cc_vararg := false; cc_unproto := false; cc_structret := false |})) by admit.
+    destruct H_isPtr_ff as [isPtr_name [is_Ptr_sg H_isPtr_ff]].
 
+    assert (Hstep_case:
+        exists vbool s s', 
+          m_tstep2 (globalenv p)                   
+         (State fu
+         (Ssequence (isPtr isptrIdent caseIdent y)
+            (Sifthenelse (Etempvar caseIdent uintTy)
+               (Sswitch
+                  (Ebinop Oand
+                     (Ederef
+                        (add
+                           (Ecast (Etempvar y uintTy)
+                              (Tpointer uintTy
+                                 {| attr_volatile := false; attr_alignas := None |}))
+                           (c_int' (-1) intTy)) uintTy) (Econst_int (Int.repr 255) uintTy)
+                     uintTy) ls)
+               (Sswitch
+                  (Ebinop Oshr (Etempvar y uintTy) (Econst_int (Int.repr 1) uintTy) uintTy) ls')))
+         k empty_env lenv m)
+         (State fu s (Kseq Sbreak (Kseq s' (Kswitch k))) empty_env
+                (Maps.PTree.set caseIdent vbool lenv) m) /\
+         repr_expr_L6_L7_id fenv p rep_env e s).
+    {
+      inv Hrepr_y.
+      - (* unboxed *)
+        exists (Vfalse).
+        assert (exists s s', seq_of_labeled_statement (select_switch (Z.shiftr (Int.unsigned n0) 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s).
+        eapply case_of_labeled_stm_unboxed; eauto. inv Hc_env; destruct H2; eauto.
+        destruct H as [s [s' [Hseq Hrepr_es]]].
+        exists s, s'.
+        split; auto.
+        
+        eapply t_trans. constructor.
+        constructor. eapply t_trans.
+        constructor. unfold isPtr. 
+        econstructor.
+        simpl. constructor. 
+        econstructor.  apply eval_Evar_global. apply Maps.PTree.gempty. (* assumption 1 *) eauto. 
+        constructor. constructor. econstructor. econstructor. constructor. apply Hlenv_y. simpl. constructor. simpl. constructor.
+        constructor. (* assumption 2 *) eauto. reflexivity.
+        eapply t_trans. constructor.
+        
+        eapply step_external_function.
+        assert (H_isPtr_int:Events.external_functions_sem isPtr_name is_Ptr_sg (Genv.globalenv p) [Vint n0] m [] Vfalse m) by admit.
+        apply H_isPtr_int.
+        
+        (* return *)
+        eapply t_trans. constructor. constructor. eapply t_trans. constructor. constructor.
+        eapply t_trans. constructor. econstructor. constructor. unfold set_opttemp. rewrite M.gss. reflexivity. constructor. 
+        rewrite Int.eq_true. simpl. 
+
+         (* switch to the right case *)
+        eapply t_trans. constructor. econstructor. simpl. econstructor. constructor.
+        rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *)  admit.
+        constructor. simpl.
+        apply sem_shr_unboxed.
+        simpl. constructor.
+        rewrite Int.unsigned_repr.
+        Focus 2. apply repr_unboxed_header_range in H8.
+        unfold Z.shiftr.  simpl.
+        rewrite Zdiv.Zdiv2_div. destruct H8.
+        split. apply Z.div_pos; omega.
+        apply Zdiv.Zdiv_le_upper_bound; omega.
+        rewrite Hseq. eapply t_trans.
+        constructor. constructor.
+        constructor. constructor.
+      - exists Vtrue.
+
+        assert ( exists s s', 
+                   (seq_of_labeled_statement (select_switch (Int.unsigned (Int.and h (Int.repr 255))) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s).
+        inv Hc_env. inv H2.
+        eapply case_of_labeled_stm_boxed; eauto.
+        destruct H as [s [s' [H_seq H_repr_es]]].
+        exists s, s'.
+        split; auto.
+        eapply t_trans. constructor.
+        constructor. eapply t_trans.
+        constructor. unfold isPtr. 
+        econstructor.
+        simpl. constructor. 
+        econstructor.  apply eval_Evar_global. apply Maps.PTree.gempty. (* assumption 1 *) eauto. 
+        constructor. constructor. econstructor. econstructor. constructor. apply Hlenv_y. simpl. constructor. simpl. constructor.
+        constructor. (* assumption 2 *) eauto. reflexivity.
+        eapply t_trans. constructor.
+        
+        eapply step_external_function.      
+        assert (H_isPtr_ptr:Events.external_functions_sem isPtr_name is_Ptr_sg (Genv.globalenv p) [Vptr b i0] m [] Vtrue m) by admit.
+        apply H_isPtr_ptr.
+
+        (* return *)
+        eapply t_trans. constructor. constructor. eapply t_trans. constructor. constructor.
+
+        (* if-then-else *)
+        eapply t_trans. constructor. econstructor. constructor. unfold set_opttemp. rewrite M.gss. reflexivity. simpl. constructor.
+        simpl. rewrite Int.eq_false. simpl.
+
+      (* switch to the right case *)
+      eapply t_trans. constructor. econstructor. simpl. econstructor. econstructor. constructor.
+      econstructor. econstructor. constructor. 
+      rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *) admit.
+      constructor. constructor.  constructor. eapply  deref_loc_value. simpl. reflexivity.
+      simpl. rewrite Int.sub_add_opp in H6.
+      rewrite Int.mul_mone.
+      unfold int_size in H6. simpl in H6.
+      apply H6.
+
+      constructor. constructor. constructor.      
+      rewrite H_seq.
+      eapply t_trans.
+      constructor.  constructor.
+      constructor. constructor.
+      intro. inv H.        
+    }
+    destruct Hstep_case as [vbool [s [s' [Hstep_case H_repr_es]]]].
+
+    (* building up the IHHev to use after Hstep_case *)
+    assert (H_cenv_e: correct_envs cenv ienv rep_env e).
+    {
+      eapply correct_envs_subterm; eauto.
+      constructor. eapply dsubterm_case.
+      apply findtag_In. eauto.
+    }
+    assert (Hp_id_e: protected_id_not_bound_id rho e).
+    {
+      inv Hp_id. 
+      split; intros.
+      apply H; eauto.
+      intro.
+      eapply H2. apply H3.
+      econstructor. apply H5.
+      apply findtag_In. eauto.
+    }
+    assert (H_rho_id_e:  unique_bindings_env rho e).
+    { inv Hrho_id.
+      split.
+      - assert (Hcase := shrink_cps_correct.ub_case_inl).
+        specialize (Hcase ctx.Hole_c). simpl in Hcase.
+        eapply Hcase; eauto.
+      - intros; intro.
+        destruct H3.
+        eapply H2.
+        exists x0; eauto.
+        eapply Bound_Ecase; eauto.
+        eapply findtag_In; eauto.
+    }
+    assert (Hf_id_e: functions_not_bound p e).
+    {
+      eapply functions_not_bound_subterm.
+      eauto.
+      econstructor.
+      econstructor. apply findtag_In; eauto.
+    }
+    assert (Hca_e : correct_alloc e (Z.of_nat (max_allocs e))).
+    unfold correct_alloc. reflexivity.
+    assert (Hmem_e : rel_mem_L6_L7_id fenv finfo_env p rep_env e rho m  (Maps.PTree.set caseIdent vbool lenv)).
+    {
+      inv Hc_tinfo; destructAll. 
+      exists L.
+      split.      
+      - apply protected_not_in_L_set.
+        inv Hc_alloc.
+        eapply protected_not_in_L_mono; eauto.
+        split. omega.
+        apply inj_le.
+        eapply max_allocs_case.
+        apply findtag_In. eauto.        
+        admit.
+      - intros.
+        assert (occurs_free (Ecase y cl) x4).
+        eapply occurs_free_Ecase_Included.
+        apply findtag_In. eauto. apply H10.        
+        apply Hmem_rel in H11.
+        destruct H11 as [v6 [Hx4v6 Hrepr_v6]].
+        exists v6. split; auto.
+        apply repr_val_id_set. auto.
+        admit.        
+    }
+    assert (H_tinfo_e: correct_tinfo allocIdent limitIdent argsIdent (Z.of_nat (max_allocs e))
+                           (Maps.PTree.set caseIdent vbool lenv) m ).
+    {
+      apply correct_tinfo_not_protected.
+      eapply correct_tinfo_mono; eauto.
+      split. omega.
+      inv Hc_alloc.
+      apply inj_le.
+      eapply max_allocs_case.
+      apply findtag_In. eauto.        
+      admit.      
+    }
+
+    specialize (IHHev H_cenv_e Hp_id_e H_rho_id_e Hf_id_e _ _ _ (Kseq Sbreak (Kseq s' (Kswitch k))) _ fu H_repr_es Hmem_e Hca_e H_tinfo_e).
+
+    destruct IHHev as [m' [lenv' [Hstep_end Hrel_end]]].
+    exists m', lenv'.
+    split; auto.
+
+    (* step to e, then IH *)
+    eapply t_trans.
+    apply Hstep_case.
+    eapply t_trans.
+    apply Hstep_end.
+
+    (* break back to k *)
+    eapply t_trans.
+    constructor. constructor.
+    eapply t_trans.
+    constructor. constructor.
+    constructor.
+    constructor. auto.        
   - (* Eapp *)
     
     admit.

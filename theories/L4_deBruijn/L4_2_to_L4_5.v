@@ -834,62 +834,105 @@ free_vars
   apply Hind; tauto.
 Qed.
 
-(* failed proof. to show why just ensuring that fv includes fvars doesnt suffice
-Lemma L4_5_constr_vars_fvars2 fv:
-  (forall t, nt_wf t -> subset (free_vars t) fv ->
-        (free_vars (L4_5_constr_vars fv t)) =  free_vars t)
- * (forall t, bt_wf t -> subset (free_vars_bterm t) fv ->
-        (free_vars_bterm  (btMapNt (L4_5_constr_vars fv) t)) =  free_vars_bterm t)
-.
+Lemma fvars_letbindn t cargs2 vn:
+  disjoint vn (flat_map free_vars cargs2) ->
+  length vn= length cargs2 ->
+             free_vars (let_bindn vn cargs2 t) =
+             flat_map free_vars cargs2
+             ++ (remove_nvars vn (free_vars t)).
 Proof using.
-  apply NTerm_BTerm_ind; auto;[ | ].
-- intros ? ? Hind Hwf Hsub. simpl.
-  autorewrite with SquiggleEq in Hsub.
-  erewrite eq_flat_maps;
-    [ | intros; symmetry; apply Hind;auto; try (ntwfauto; fail);[];
-        eapply subset_flat_map; eauto; fail].
-  destruct o; simpl; try rewrite flat_map_map; auto;[].
-  autorewrite with list.
-  addFreshVarsSpec2 vn pp.
-  clear Heqvn. repnd.
-  assert ( forall t,
-free_vars
-    (let_bind vn (map (btMapNt (L4_5_constr_vars fv)) lbt)
-       t) =
-(flat_map (fun x : BTerm => free_vars_bterm (btMapNt (L4_5_constr_vars fv) x)) lbt)
-         ++ (remove_nvars vn (free_vars t))
-    ) as Hl.
-  + revert dependent vn. revert dependent nargs.
-    induction lbt as [ | bt lbt]; intros;
-    destruct vn as [ | v vn];
-    invertsn pp; auto; simpl;[].
-    autorewrite with list.
-    ntwfauto.
-    destruct nargs; invertsn HntwfSig.
-    rewrite HntwfSig in H2.
-    simpl in Hsub.
-    apply subset_app in Hsub.
-    erewrite IHlbt; simpl; eauto; simpl; ntwfauto; noRepDis2;
-      [ | simpl; eauto; fail].
-    destruct bt as [lv nt].
-    destruct lv; inverts HntwfSig. simpl.
-    rewrite <- app_assoc.
-    f_equal.
-    rewrite remove_app.
-    f_equal;[ | apply (remove_nvars_comm [v] vn); fail].
-    erewrite eq_flat_maps;[ | intros; apply Hind; cpx;[];
-                              eapply subset_flat_map; eauto; fail].
-    apply remove_trivial.
-    intros Hin. apply pp1.
-    apply Hsub. auto.
-  + rewrite Hl. simpl. setoid_rewrite flat_map_vterm.
-    autorewrite with SquiggleEq list. refl.
-- intros ? ? Hind Hwf Hsub. simpl.
-  f_equal. invertsn Hwf. autorewrite with SquiggleEq in Hsub.
-  simpl in Hsub.
-  apply Hind; auto.
+  revert vn.
+  rename cargs2 into cargs.
+  induction cargs; simpl; auto;
+  intros ? Hdis Hlen;
+  destruct vn as [ | v vn]; inverts Hlen; auto; [].
+  simpl. autorewrite with list.
+  rewrite IHcargs; auto;[ | noRepDis2].
+  rewrite <- app_assoc.
+  f_equal.
+  rewrite remove_app.
+  f_equal;[ | apply (remove_nvars_comm [v] vn); fail].
+  rewrite remove_trivial; auto.
+  noRepDis2.
 Qed.
-*)
+
+(* Move to SquiggleEq.list. make it hetero? *)
+Lemma eqListA_map {A B} (f: A->B)
+      (Ra : A -> A -> Prop) (Rb : B -> B -> Prop) l1 l2
+  (feq : forall a1 a2, In a1 l1 -> In a2 l2 -> Ra a1 a2 -> Rb (f a1) (f a2)):
+  SetoidList.eqlistA Ra l1 l2
+  -> SetoidList.eqlistA Rb (map f l1) (map f l2).
+Proof using.
+  intros Hp.
+  induction Hp; auto; cpx; constructor; eauto.
+Qed.
+
+Lemma eqListA_eq {A} l1 l2:
+  SetoidList.eqlistA (@eq A) l1 l2
+  -> l1 = l2.
+Proof using.
+  intros Hp.
+  induction Hp; auto; subst; auto.
+Qed.
+
+(* Move to SquiggleEq.terms2 *)
+Hint Rewrite @flat_map_bterm_nil_allvars: SquiggleEq.
+Lemma L4_5_zeta fv:
+  (forall t u,  subset (all_vars t) fv -> zetaCLe fv t u
+        -> free_vars t = free_vars u)
+ * (forall t u,  subset (all_vars_bt t) fv -> liftRBt (zetaCLe fv) t u
+        -> free_vars_bterm t = free_vars_bterm u).
+Proof using.
+  apply NTerm_BTerm_ind.
+- intros ? ?  Hsub Hal.
+  inverts Hal. refl. 
+- intros ? ? Hind ? Hsub Hal. simpl.
+  autorewrite with SquiggleEq in Hsub.
+  invertsn Hal.
+  + simpl.
+    do 2 rewrite flat_map_as_appl_map.
+    f_equal.
+    apply eqListA_eq. revert Hal.
+    apply eqListA_map.
+    intros. apply Hind; auto.
+    rewrite subset_flat_map in Hsub. eauto.
+  + rewrite flat_map_map. unfold compose. simpl.
+    unfold let_bindc.
+    autorewrite with SquiggleEq in Hsub.
+    addFreshVarsSpec2 vn pp.
+    clear Heqvn. repnd.
+    assert (flat_map free_vars cargs1 = flat_map free_vars cargs2) as Hx.
+    * do 2 rewrite flat_map_as_appl_map.
+      f_equal.
+      apply eqListA_eq. revert Hal.
+      apply eqListA_map.
+      intros.
+      specialize (Hind (bterm [] a1)
+                       ltac:(apply in_map_iff; eauto)
+                       (bterm [] a2)
+                 ).
+      autorewrite with SquiggleEq in Hind.
+      simpl in Hind.
+      rewrite subset_flat_map in Hsub.
+      apply Hind; auto;[]. constructor; auto; fail.
+    * setoid_rewrite flat_map_fapp in Hsub.
+      apply subset_app in Hsub. repnd.
+      rewrite  Hx in Hsub0.
+      apply disjoint_sym in pp1.
+      rewrite fvars_letbindn; auto;
+        [ | apply disjoint_sym; eapply subset_disjoint; eauto; fail].
+      simpl. rewrite flat_map_map. unfold compose.
+      simpl. rewrite flat_map_single, map_id.
+      autorewrite with SquiggleEq list.
+      auto.
+- intros ? ? Hind ? Hsub Hal. invertsn Hal.
+  simpl. f_equal.
+  autorewrite with SquiggleEq in Hsub.
+  apply subset_app in Hsub. repnd.
+  eapply Hind; eauto.
+Qed.
+
+
 Lemma ssubst_commute_L4_5_constr_vars fv f sub:
   nt_wf f 
   -> sub_range_sat sub isprogram

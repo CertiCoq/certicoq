@@ -112,7 +112,7 @@ Module Size (H : Heap).
   Definition max_vars_value (v : value) : nat :=
     match v with
       | Loc _ => 0
-      | FunPtr B _ => 1 + fundefs_num_vars B + 3 * numOf_fundefs B
+      | FunPtr B _ => 1 + fundefs_num_vars B + 3
     end.
 
   Definition max_vars_block (b : block) : nat :=
@@ -578,6 +578,12 @@ Module Size (H : Heap).
     omega. omega. 
   Qed.
 
+  Lemma numOf_fundefs_fundefs_num_vars_le B1 :
+    numOf_fundefs B1 <= fundefs_num_vars B1.
+  Proof.
+    induction B1; eauto. simpl. omega.
+  Qed.
+  
   Lemma PostAppCompat i j IP P b d H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ k :
     Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b d H1 rho1 H2 rho2 y1 y2) (f1 :: xs1) (f2 :: xs2) -> 
     k <= S (length xs1) ->
@@ -662,11 +668,13 @@ Module Size (H : Heap).
           eapply fun_in_fundefs_exp_num_vars.
           eapply find_def_correct. eassumption.
           simpl. omega.
-          erewrite def_closures_size; try eassumption.
+          erewrite def_closures_size; try eassumption. 
           eapply plus_le_compat. eassumption.
           eapply le_trans; [| eapply Max.le_max_l].
           eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          simpl. omega.
+          simpl.
+          eapply le_trans. eapply  numOf_fundefs_fundefs_num_vars_le.
+          omega. 
         + eapply plus_le_compat_r. rewrite <- NPeano.Nat.mul_max_distr_r.
           eapply NPeano.Nat.max_le_compat.
           eapply le_trans. eapply Nat.add_le_mono_r in Hm2. eassumption.

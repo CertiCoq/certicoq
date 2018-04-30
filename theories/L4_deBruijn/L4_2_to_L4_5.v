@@ -871,7 +871,30 @@ Proof using.
   erewrite <- sub_range_rel_zeta_fvars; eauto.
   change_to_ssubst_aux8.
   disjoint_reasoning.
+Qed.
+
+(* Move *)
+Lemma eqListA_refl {A} (R : A-> A-> Prop) lbt:
+  (forall l, In l lbt -> R l l) ->
+  SetoidList.eqlistA R lbt lbt.
+Proof using.
+  intros.
+  induction lbt; auto; constructor; firstorder.
+Qed.
+
+Lemma zetaRefl fv:
+  (forall f, zetaCLe fv f f) *
+  (forall f, liftRBt (zetaCLe fv) f f).
+Proof using.
+  apply NTerm_BTerm_ind; try constructor; eauto.
+  apply eqListA_refl. assumption.
 Qed.  
+  
+Global Instance ReflZeta lv: RelationClasses.Reflexive (zetaCLe lv).
+Proof using.
+  intros t. apply zetaRefl.
+Qed.  
+
   
 Lemma L4_5_constr_vars_zeta fv:
   (forall f, nt_wf f -> zetaCLe fv f (L4_5_constr_vars fv f)) *
@@ -906,3 +929,14 @@ Qed.
 
 End L4_5_postproc.
 End evaln42_45.
+
+Ltac dZeta := match goal with
+  [H:  SetoidList.eqlistA (liftRBt (zetaCLe _)) (cons _ _) _ |- _ ]
+   =>  let Hr := fresh H "r" in inverts H as H Hr
+| [H:  SetoidList.eqlistA (liftRBt (zetaCLe _)) [] _ |- _ ]
+   =>  invertsn H
+| [H:  liftRBt (zetaCLe _) (bterm _ _) _ |- _ ]
+   =>  invertsn H
+| [H:  zetaCLe _ (oterm _ _) _ |- _ ]
+   =>  invertsn H
+    end.

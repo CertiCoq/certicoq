@@ -752,89 +752,50 @@ intros ? ? ? ? ? ? ? ?. subst.
 apply properSubstZ.
 auto.
 Qed. *)
-(* counterexample:
-e:= (\x.\y.x) (prod 0 0)
-thus, v must be \y.(prod 0 0)
 
-[e] is (\x.\y.x) (let u:= 0 in let v:=0 in prod u v)
-[e] converges to v. Note that because of CBV, we evaluate args first.
-Howver, [v]val is
-(\y.(let u:= 0 in let v:=0 in prod u v))
-
-If we used CBN evaluation, there would have been no problem *)
-
-(*
-Notation "a =z= b" := (zetaCEquiv a b) (at level 50).
- *)
-
-(*
-Lemma L4_5_constr_vars e e' v:
-   eval e v
-  -> e =z= e'
-  -> exists v', eval e' v'
-      /\ (v' =z= v).
-Proof using.
-  intros  Hev He.
-  induction Hev.
-- simpl. eexists.
-  split; [ apply eval_Lam_e | ]. refl.
-- simpl.
-  unfold App_e in Hs. rwsimpl Hs.
-  apply subset_app in Hs. repnd.
-  specialize (IHHev1 Hs0).
-  specialize (IHHev2 Hs).
-  simpl in *.
-  assert (subset (all_vars (subst e1' x v2)) lv) by admit.
-  specialize (IHHev3 H).
-  repnd. exrepnd.
-  rename v'1 into v1p.
-  rename v'0 into v2p.
-  assert (exists e1b', v1p= Lam_e x e1b') by admit.
-  exrepnd. subst.  eexists. 
-  split.
-  + eapply eval_App_e; eauto. subst. simpl.
- *)
-
-(*
-Lemma L4_5_constr_vars e v lv:
+Lemma L4_5_constr_vars_zeta lv e e' v:
   subset (all_vars e) lv
   -> eval e v
-  -> exists v', eval (L4_5_constr_vars lv e) v'
-      /\ (v' =z= (L4_5_constr_vars lv v)).
+  -> zetaCLe lv e e'
+  -> exists v', eval e' v'
+      /\ (zetaCLe lv v v').
 Proof using.
-  intros Hs Hev.
+  intros Hs Hev He.
+  revert dependent e'.
   induction Hev.
-- simpl. eexists.
-  split; [ apply eval_Lam_e | ]. refl.
+- simpl. intros ? He. unfold Lam_e in He.
+  repeat dZeta.  eexists.
+  split; [ apply eval_Lam_e | ].
+  do 3 constructor. assumption.
 - simpl.
   unfold App_e in Hs. rwsimpl Hs.
   apply subset_app in Hs. repnd.
   specialize (IHHev1 Hs0).
   specialize (IHHev2 Hs).
   simpl in *.
-  assert (subset (all_vars (subst e1' x v2)) lv) by admit.
-  specialize (IHHev3 H).
-  repnd. exrepnd.
-  rename v'1 into v1p.
-  rename v'0 into v2p.
-  assert (exists e1b', v1p= Lam_e x e1b') by admit.
-  exrepnd. subst.  eexists. 
-  split.
-  + eapply eval_App_e; eauto. subst. simpl.
-    (* seems doable. but need to generalize this lemma. *)
+  rename e1' into vfb.
+  rename v2 into varg.
+  assert (subset (all_vars (subst vfb x varg)) lv) as hx by admit.
+  specialize (IHHev3 hx).
+  intros vapp Hz. unfold App_e in Hz.
+  repeat dZeta.
+  rename ntr0 into e1z.
+  rename ntr into e2z.
+  specialize (IHHev1 _ Hz).
+  specialize (IHHev2 _ Hzr).
+  exrepnd.
+  unfold Lam_e in IHHev4.
+  repeat dZeta.
+  rename ntr into vfbz.
+  rename v' into vargz.
+  specialize (IHHev3 (subst vfbz x vargz)).
+  dimp IHHev3;
+    [ apply ssubst_commute_L4_5_zeta; simpl; eauto; [ admit| admit] | ].
+  exrepnd.
+  eexists; split; [ eapply eval_App_e ;eauto | ] ; eauto.
+
+  Fail idtac. (* done with app *)
 Abort.
-*)
-(* Possible fix:
-1) define a relation zetaEquiv which asserts that the two terms are syntactically
-equal when we do full blown zeta reduction (even under binders). This is weaker
-than full blown observational equivalence (perhaps easier to deal with?)
-
-2) prove that zetaEquiv is a congruence. as a part, prove that it commutes with substitution.
-
-3) prove that zeta equiv terms compute to zeta equiv values
-
-4) prove that the output of L4_5_constr_vars (L4_5 -> L4_5) is zetaEquiv to its input, for all inputs.
-*)
 
 Global Instance evalPreservesGood :
   Proper (eval ==> Basics.impl) (@goodTerm L4_5_Term _).

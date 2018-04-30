@@ -165,7 +165,7 @@ Module CC_log_rel (H : Heap).
                          | 0 => True
                          | S j =>
                            cc_approx_clos cc_approx_val_aux (j - (j - i)) IP P b d 
-                                          (env_locs rho_clo (Full_set _)) H1 (env_loc, H2)
+                                          (env_locs rho_clo (occurs_free_fundefs B1)) H1 (env_loc, H2)
                       end) /\ 
                 forall (b1 b2 : Inj)
                   (rho_clo' rho_clo1 rho_clo2 : env) (H1' H1'' H2' : heap block)
@@ -240,7 +240,7 @@ Module CC_log_rel (H : Heap).
                           Forall2 R vs1 vs2)
               | Some (Clos (FunPtr B1 f1) rho_clo), Some (Constr c [FunPtr B2 f2; Loc env_loc]) =>
                 d l1 = Some env_loc /\
-                (forall i, (i < j)%nat -> H1 << ^ ( k ; i ; IP ; P ; b ; d ; (env_locs rho_clo (Full_set _))) (env_loc, H2) ) /\
+                (forall i, (i < j)%nat -> H1 << ^ ( k ; i ; IP ; P ; b ; d ; (env_locs rho_clo (occurs_free_fundefs B1))) (env_loc, H2) ) /\
                 forall (b1 b2 : Inj)
                   (rho_clo' rho_clo1 rho_clo2 : env) (H1' H1'' H2' : heap block)
                   (env_loc' : loc)

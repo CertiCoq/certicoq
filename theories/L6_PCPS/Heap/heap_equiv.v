@@ -38,23 +38,20 @@ Module HeapEquiv (H : Heap).
                        Forall2
                          (fun l1 l2 => res_approx_fuel (n'-(n'-i)) (b1, (l1, H1)) (b2, (l2, H2))) vs1 vs2
                    end
-          | Some (Clos v1 rho1) =>
-            exists v2 rho2,
-              get l2 H2 = Some (Clos v2 rho2) /\
-              (forall i, (i < n)%nat ->
-                   match n with
-                     | 0%nat => True
-                     | S n' =>
-                       res_approx_fuel (n' - (n'-i)) (b1, (v1, H1)) (b2, (v2, H2))
-                   end) /\
-              (forall x,  (exists v1 v2, M.get x rho1 = Some v1 /\
-                               M.get x rho2 = Some v2 /\
-                               (forall i, (i < n)%nat ->
-                                     match n with
-                                       | 0%nat => True
-                                       | S n' => res_approx_fuel (n'-(n'-i)) (b1, (v1, H1)) (b2, (v2, H2))
-                                     end)) \/
-                     (M.get x rho1 = None /\ M.get x rho2 = None))
+          | Some (Clos (FunPtr B f) rho1) =>
+            exists rho2,
+              get l2 H2 = Some (Clos (FunPtr B f) rho2) /\
+              (forall x, x \in occurs_free_fundefs B ->
+                          (exists v1 v2, M.get x rho1 = Some v1 /\
+                                    M.get x rho2 = Some v2 /\
+                                    (forall i, (i < n)%nat ->
+                                          match n with
+                                            | 0%nat => True
+                                            | S n' => res_approx_fuel (n'-(n'-i)) (b1, (v1, H1)) (b2, (v2, H2))
+                                          end)) \/
+                          (M.get x rho1 = None /\ M.get x rho2 = None))
+          | Some (Clos (Loc l1) rho1) =>
+            exists l2' rho2, get l2 H2 = Some (Clos (Loc l2') rho2)
           | None => True
         end
       | FunPtr B1 f1, FunPtr B2 f2 => f1 = f2 /\ B1 = B2
@@ -97,8 +94,9 @@ Module HeapEquiv (H : Heap).
     match bl1, bl2 with
       | Constr c1 vs1, Constr c2 vs2 =>
         c1 = c2 /\ Forall2 (fun v1 v2 => (v1, H1) ≈_(b1, b2) (v2, H2)) vs1 vs2
-      | Clos v1 rho1, Clos v2 rho2 =>
-        (v1, H1) ≈_(b1, b2) (v2, H2) /\ Full_set _ |- (H1, rho1) ⩪_(b1, b2) (H2, rho2)
+      | Clos (FunPtr B1 f1) rho1, Clos (FunPtr B2 f2) rho2 =>
+        B1 = B2 /\ f1 = f2 /\ occurs_free_fundefs B1 |- (H1, rho1) ⩪_(b1, b2) (H2, rho2)
+      | Clos (Loc _) _, Clos (Loc _) _ => True
       | _, _ => False
     end.
   
@@ -129,16 +127,17 @@ Module HeapEquiv (H : Heap).
               get l2 H2 = Some (Constr c vs2) /\
               forall i, (i < n)%nat ->
                    Forall2 (fun l1 l2 => res_approx_fuel i (b1, (l1, H1)) (b2, (l2, H2))) vs1 vs2
-          | Some (Clos v1 rho1) =>
-            exists v2 rho2,
-              get l2 H2 = Some (Clos v2 rho2) /\
-              (forall i, (i < n)%nat ->
-                   res_approx_fuel i (b1, (v1, H1)) (b2, (v2, H2))) /\
-              (forall x, (exists v1 v2, M.get x rho1 = Some v1 /\
-                              M.get x rho2 = Some v2 /\
-                              (forall i, (i < n)%nat ->
-                                    res_approx_fuel i (b1, (v1, H1)) (b2, (v2, H2)))) \/
-                    (M.get x rho1 = None /\ M.get x rho2 = None))
+          | Some (Clos (FunPtr B f) rho1) =>
+            exists rho2,
+              get l2 H2 = Some (Clos (FunPtr B f) rho2) /\
+              (forall x, x \in occurs_free_fundefs B ->
+                          (exists v1 v2, M.get x rho1 = Some v1 /\
+                                    M.get x rho2 = Some v2 /\
+                                    (forall i, (i < n)%nat ->
+                                          res_approx_fuel i (b1, (v1, H1)) (b2, (v2, H2)))) \/
+                          (M.get x rho1 = None /\ M.get x rho2 = None))
+          | Some (Clos (Loc l1) rho1) =>
+            exists l2' rho2, get l2 H2 = Some (Clos (Loc l2') rho2)
           | None => True
         end
       | FunPtr B1 f1, FunPtr B2 f2 => f1 = f2 /\ B1 = B2
@@ -156,16 +155,18 @@ Module HeapEquiv (H : Heap).
           intros; omega.
         * intros [Heq1 [vs [H _ ]]]. split; eauto.
       + split.
-        * intros [Heq1 [v1' [v2' [H [_ Hb]]]]]. split; eauto.
-          eexists. eexists. split; eauto.
-          split; eauto. intros; omega.
-          intros x. destruct (Hb x) as [Hb1 | Hb1]; eauto. 
+        * intros [Heq1 H]. split; eauto.
+          destruct v1; eauto.
+          destruct H as [rho2 [Hget Hrho]].
+          eexists. split; eauto.
+          intros x Hin. destruct (Hrho x Hin) as [Hb1 | Hb1]; eauto. 
           destruct Hb1 as [v1'' [v2 [Hget1 [Hget2 Ht]]]].
           left. repeat eexists; eauto. intros; omega.
-        * intros [Heq1 [v1' [v2' [H [_ Hb]]]]]. split; eauto.
-          eexists. eexists. split; eauto.
-          split; eauto.
-          intros x. destruct (Hb x) as [Hb1 | Hb1]; eauto. 
+        * intros [Heq1 H]. split; eauto.
+          destruct v1; eauto.
+          destruct H as [rho2 [Hget Hrho]].
+          eexists. split; eauto.
+          intros x Hin. destruct (Hrho x Hin) as [Hb1 | Hb1]; eauto. 
           destruct Hb1 as [v1'' [v2 [Hget1 [Hget2 Ht]]]].
           left. repeat eexists; eauto.
     - split; eauto.
@@ -182,29 +183,26 @@ Module HeapEquiv (H : Heap).
           assert (Heq : (i =  n - (n - i))%nat) by omega. rewrite <- Heq.
           eauto.
       + split.
-        * intros [Heq1 [v1' [v2' [H [Hi Hb]]]]]. split; eauto.
-          eexists. eexists. split; eauto. split. 
-
-          intros i Hlt.
-          assert (Heq : (i =  n - (n - i))%nat) by omega. rewrite Heq.
-          eauto.
-
-          intros x. destruct (Hb x) as [Hb1 | Hb1]; eauto. 
+        * intros [Heq1 H]. split; eauto.
+          destruct v1; eauto.
+          destruct H as [rho2 [Hget Hrho]].
+          eexists. split; eauto.
+          intros x Hin. destruct (Hrho x Hin) as [Hb1 | Hb1]; eauto. 
           destruct Hb1 as [v1'' [v2 [Hget1 [Hget2 Ht]]]].
           left. repeat eexists; eauto.
+
           intros i Hlt.
           assert (Heq : (i =  n - (n - i))%nat) by omega. rewrite Heq.
           eauto.
-        * intros [Ηeq1 [v1' [v2' [H [Hin Hb]]]]]. split; eauto. eexists. eexists. split; eauto.
-          split.
           
-          intros i Hlt.
-          assert (Heq : (i =  n - (n - i))%nat) by omega. rewrite <- Heq.
-          eauto.
-
-          intros x. destruct (Hb x) as [Hb1 | Hb1]; eauto. 
+        * intros [Heq1 H]. split; eauto.
+          destruct v1; eauto.
+          destruct H as [rho2 [Hget Hrho]].
+          eexists. split; eauto.
+          intros x Hin. destruct (Hrho x Hin) as [Hb1 | Hb1]; eauto. 
           destruct Hb1 as [v1'' [v2 [Hget1 [Hget2 Ht]]]].
           left. repeat eexists; eauto.
+
           intros i Hlt.
           assert (Heq : (i =  n - (n - i))%nat) by omega. rewrite <- Heq.
           eauto.
@@ -212,7 +210,7 @@ Module HeapEquiv (H : Heap).
     - split; eauto.   
     - now firstorder.
   Qed.
-
+  
   Opaque res_approx_fuel.
   
  (** Equivalent definition for [res_equiv] *)
@@ -241,7 +239,7 @@ Module HeapEquiv (H : Heap).
       rewrite !res_approx_fuel_eq in H0.
       destruct H0 as [Hal Har]. 
       simpl in *. destruct (get l1 H1) as [ v |] eqn:Hget1.
-      + destruct v as [c1 vs1 | v1  rho1 ].
+      + destruct v as [c1 vs1 |  [ lc | B f ]  rho1 ].
         * destruct Hal as [Heq1 [vs2 [Hget2 Hi]]].
           rewrite Hget2 in Har.
           destruct Har as [Heq2 [vs1' [Hget1' Hi']]]. inv Hget1'. 
@@ -255,48 +253,55 @@ Module HeapEquiv (H : Heap).
           eapply Forall2_conj.
           eapply Hi2. omega.
           eapply Forall2_flip. eapply Hi1. omega.
-        * destruct Hal as [Heq1 [v1' [v2' [Hget2 [Hi Hb]]]]].
-          rewrite Hget2 in Har.
-          destruct Har as [Heq2 [v1'' [v2'' [Hget1' [Hi' Hb']]]]]. inv Hget1'. 
-          rewrite Hget2. 
-          split; eauto. split.
+        * destruct Hal as [Heq1 Hal]. split; eauto.
+          destruct Har as [Heq2 Har].
+          destruct (get l2 H2) as [ [| [| ] ] | ] eqn:Hget2; eauto.
+          destruct Har as [? [? _]]. congruence.
+          destruct Har as [? [? _]]. congruence.
+
+          destruct Hal as [? [? ?]]. congruence.
           
+          
+
+        * destruct Hal as [Heq1 [rho2 [Hget2 Hal]]]. rewrite Hget2 in *.
+          split; eauto. split; eauto. split; eauto.
+          destruct Har as [Heq2 [rho3 [Hget3 Har]]]. inv Hget3.
+          split; intros x v Hin Hget.
+
+          edestruct Hal as [[v1 [v2 [Hgetv1 [Hgetv2 Hb'']]]] | [Hn1 Hn2]]; eauto; try congruence.
+          eexists; split; eauto.
+
           intros n. specialize (H (S n)). rewrite !res_approx_fuel_eq in H.
           edestruct H as [Hal' Har']. simpl in Hal', Har'.
           rewrite Hget1 in Hal'. rewrite Hget2 in Har'. 
-          destruct Hal' as [Heq1' [v3 [rho3 [Hget2' [Hi2 Hb2]]]]]. subst_exp.
-          destruct Har' as [Heq2' [v3' [rho3' [Hget1' [Hi1 Hb1]]]]]. repeat subst_exp.
-          split. eapply Hi2. omega. eapply Hi1. omega.
-          
-          split; eauto; intros x l _ Hget.
-          { destruct (Hb x) as [[v1 [v2 [Hgetv1 [Hgetv2 Hb'']]]] | [Hn1 Hn2]]; try congruence.
-            repeat subst_exp. eexists; split; eauto.
-            intros n.
-            specialize (H (S n)). rewrite !res_approx_fuel_eq in H. 
-            edestruct H as [Hal' Har']. simpl in Hal', Har'.
-            rewrite Hget1 in Hal'. rewrite Hget2 in Har'. 
-            destruct Hal' as [Heq1' [v3 [rho2' [Hget2' [Hi2 Hb2]]]]]. subst_exp.
-            destruct Har' as [Heq2' [v4 [rho1 [Hget1'[ Hin1 Hb1]]]]]. repeat subst_exp.
-            destruct (Hb1 x) as [[v3' [v4' [Hgetv1' [Hgetv2' Hbx]]]] | [Hn1 Hn2]]; try congruence.
-            repeat subst_exp.
-            destruct (Hb2 x) as [[v1'' [v2'' [Hgetv1' [Hgetv2' Hi2']]]] | [Hn1 Hn2]]; try congruence.
-            repeat subst_exp. split; eauto. }
-          { destruct (Hb' x) as [[v1 [v2 [Hgetv1 [Hgetv2 Hb'']]]] | [Hn1 Hn2]]; try congruence.
-            repeat subst_exp. eexists; split; eauto.
-            intros n.
-            specialize (H (S n)). rewrite !res_approx_fuel_eq in H. 
-            edestruct H as [Hal' Har']. simpl in Hal', Har'.
-            rewrite Hget1 in Hal'. rewrite Hget2 in Har'. 
-            destruct Hal' as [Heq1' [v3 [rho2' [Hget2' [Hi2 Hb2]]]]]. subst_exp.
-            destruct Har' as [Heq2' [v4 [rho1 [Hget1'[ Hin1 Hb1]]]]]. repeat subst_exp.
-            destruct (Hb1 x) as [[v3' [v4' [Hgetv1' [Hgetv2' Hbx]]]] | [Hn1 Hn2]]; try congruence.
-            repeat subst_exp.
-            destruct (Hb2 x) as [[v1'' [v2'' [Hgetv1' [Hgetv2' Hi2']]]] | [Hn1 Hn2]]; try congruence.
-            repeat subst_exp. split; eauto. }
-      + destruct (get l2 H2); eauto. 
-        destruct b.
-        destruct Har as [Heq1 [vs2 [Heq _]]]; discriminate.
-        destruct Har as [Heq2 [v1' [v2' [Heq _]]]]; discriminate.
+          destruct Hal' as [_ [rho2' [Hget2' Hal']]].
+          destruct Har' as [_ [rho3' [Hget3' Har']]].
+          repeat subst_exp.
+
+          edestruct Hal' as [[v1' [v2' [Hgetv1' [Hgetv2' Hb']]]] | [Hn1 Hn2]]; eauto; try congruence.
+          edestruct Har' as [[v3' [v4' [Hgetv3' [Hgetv4' Hb]]]] | [Hn1 Hn2]]; eauto; try congruence.
+          repeat subst_exp. now split; eauto.
+
+
+          edestruct Hal as [[v1 [v2 [Hgetv1 [Hgetv2 Hb'']]]] | [Hn1 Hn2]]; eauto; try congruence.
+          eexists; split; eauto.
+
+          intros n. specialize (H (S n)). rewrite !res_approx_fuel_eq in H.
+          edestruct H as [Hal' Har']. simpl in Hal', Har'.
+          rewrite Hget1 in Hal'. rewrite Hget2 in Har'. 
+          destruct Hal' as [_ [rho2' [Hget2' Hal']]].
+          destruct Har' as [_ [rho3' [Hget3' Har']]].
+          repeat subst_exp.
+
+          edestruct Hal' as [[v1' [v2' [Hgetv1' [Hgetv2' Hb']]]] | [Hn1 Hn2]]; eauto; try congruence.
+          edestruct Har' as [[v3' [v4' [Hgetv3' [Hgetv4' Hb]]]] | [Hn1 Hn2]]; eauto; try congruence.
+          repeat subst_exp. now split; eauto.
+      + destruct Har as [Heq Har].
+        destruct (get l2 H2); eauto.
+        destruct b as [ | [| ] ].
+        destruct Har as [vs2 [Hget _]]; discriminate.
+        destruct Har as [? [? Hget']]; discriminate.
+        destruct Har as [? [Hget _]]; discriminate.
     - destruct (get l1 H1) eqn:Hget1.
       + destruct b as [ c vs1 | v1 rho1 ].
         * destruct (get l2 H2) eqn:Hget2; try now firstorder.
@@ -314,35 +319,45 @@ Module HeapEquiv (H : Heap).
           now intros v1 v2 [Hl Hr]; eauto.
 
         * destruct (get l2 H2) eqn:Hget2; try now firstorder.
-          destruct b as [ | v2 rho2]; try now firstorder.
-          intros [Heq1 [H1' H2']] n. rewrite !res_approx_fuel_eq.
-          simpl. rewrite Hget1, Hget2. split.
+
+          destruct v1.
           
-          split; eauto.
-          eexists. eexists. split. reflexivity.
-          split. intros. now eapply H1'.
-
-          intros x.
-          destruct (M.get x rho1) as [v3|] eqn:Hgetv1.
-          eapply H2' in Hgetv1. edestruct Hgetv1 as [v3' [Hgetv2 Hi]]; try eassumption.
-          left; repeat eexists; eauto. intros. now eapply Hi. now constructor.
-
-          destruct (M.get x rho2) as [v2'|] eqn:Hgetv2; eauto.
-          eapply H2' in Hgetv2. edestruct Hgetv2 as [v2'' [Hgetv1' Hi']]; try eassumption.
-          congruence. now constructor.
-
-
-          split; eauto. do 3 eexists. reflexivity.
-          split. intros. now eapply H1'.
-
-          intros x.
-          destruct (M.get x rho1) as [v3|] eqn:Hgetv1.
-          eapply H2' in Hgetv1. edestruct Hgetv1 as [v3' [Hgetv2 Hi]]; try eassumption.
-          left; repeat eexists; eauto. intros. now eapply Hi. now constructor.
+          { destruct b as [ | [l2' |] rho2]; try now firstorder.
+            intros [Heq1 _] n. rewrite !res_approx_fuel_eq.
+            simpl. rewrite Hget1, Hget2. split.
+             
+            split; eauto. split; eauto. }
           
-          destruct (M.get x rho2) as [v2'|] eqn:Hgetv2; eauto.
-          eapply H2' in Hgetv2. edestruct Hgetv2 as [v2'' [Hgetv1' Hi']]; try eassumption.
-          congruence. now constructor.
+          { destruct b as [ | [l2' |] rho2]; try now firstorder.
+            intros [Heq1 [Heq2 [Heq3 Heq]]] n; subst.
+            rewrite !res_approx_fuel_eq.
+            simpl. rewrite Hget1, Hget2. split.
+
+            - split; eauto. eexists. split. reflexivity.
+
+              intros x Hin.
+              destruct (M.get x rho1) as [v3|] eqn:Hgetv1.
+              eapply Heq in Hgetv1; eauto.
+              edestruct Hgetv1 as [v3' [Hgetv2 Hi]]; try eassumption.
+              left; repeat eexists; eauto. intros. now eapply Hi.
+
+              right. split; eauto. 
+              destruct (M.get x rho2) as [v2'|] eqn:Hgetv2; eauto.
+              eapply Heq in Hgetv2. edestruct Hgetv2 as [v2'' [Hgetv1' Hi']]; try eassumption.
+              congruence. eassumption.
+
+            - split; eauto. eexists. split. reflexivity.
+
+              intros x Hin.
+              destruct (M.get x rho1) as [v3|] eqn:Hgetv1.
+              eapply Heq in Hgetv1; eauto.
+              edestruct Hgetv1 as [v3' [Hgetv2 Hi]]; try eassumption.
+              left; repeat eexists; eauto. intros. now eapply Hi.
+
+              right. split; eauto. 
+              destruct (M.get x rho2) as [v2'|] eqn:Hgetv2; eauto.
+              eapply Heq in Hgetv2. edestruct Hgetv2 as [v2'' [Hgetv1' Hi']]; try eassumption.
+              congruence. eassumption. }
       + intros [Hyp1 Hyp2]. destruct (get l2 H2) eqn:Hget2; try now firstorder.
         intros. rewrite !res_approx_fuel_eq. simpl.
         rewrite Hget1, Hget2; eauto.
@@ -358,7 +373,7 @@ Module HeapEquiv (H : Heap).
       + intros [Hl1 Hr2]; subst.
         split; eauto; rewrite res_approx_fuel_eq; simpl; split; eauto.  
   Qed.
-
+  
 
   (** Using S as the set of roots, garbage collect H1 *) 
   Definition collect (S : Ensemble loc) (H1 H2 : heap block) : Prop :=
@@ -1144,18 +1159,6 @@ Module HeapEquiv (H : Heap).
   
   (** Weakening lemmas *)
 
-  (* TODO move *)
-  Lemma In_Union_list {A} (l : list (Ensemble A)) s:
-    List.In s l ->
-    s \subset Union_list l.
-  Proof.
-    intros Hin. induction l. 
-    - now inv Hin.
-    - inv Hin. now eapply Included_Union_l.
-      simpl. eapply Included_Union_preserv_r.
-      eapply IHl; eauto.
-  Qed.
-
       
   Lemma res_approx_weakening (S1 S2 : Ensemble loc) β1 β2 (H1 H2 H1' H2' : heap block)
         (v1 v2 : value) (i : nat) :
@@ -1210,9 +1213,12 @@ Module HeapEquiv (H : Heap).
         rewrite !res_approx_fuel_eq.
         eapply H; eauto. rewrite <- res_approx_fuel_eq.
         now eapply Hi; eauto.
-        simpl in Hsub1'. eapply Included_trans; [| eassumption]...
-        simpl in Hsub1'. eapply Included_trans; [| eassumption]...
-
+        
+        simpl in Hsub1'. eapply Included_trans; [| eassumption].
+        destruct v...
+        simpl in Hsub2'. eapply Included_trans; [| eassumption].
+        destruct v1'...
+        
         intros x.
         edestruct Hall as [[v1 [v2 [Hs1 [Hs2 Hi']]]] | Hnone]; eauto.
         left. repeat eexists; eauto. intros i' Hlt.

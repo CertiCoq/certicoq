@@ -466,6 +466,148 @@ Module ClosureConversionCorrect (H : Heap).
     eapply heap_elements_filter_monotonic. eassumption.
   Qed.
 
+  Lemma cc_approx_val_size k j GIP GP b d H1 H2 x y v v' :
+    Res (Loc x, H1) ≺ ^ (k; S j; GIP; GP; b; d) Res (Loc y, H2) ->
+    get x H1 = Some v ->
+    get y H2 = Some v' ->
+    size_val v <= size_val v' <= (size_val v) *  (1 + max_vars_heap H1).
+  Proof.
+    intros Hres Hget1 Hget2. simpl in Hres. rewrite Hget1, Hget2 in Hres.
+    destruct Hres as [Hbeq Hres]; subst.
+    destruct v as [c1 vs1 | [| B1 f1] rho_clo ]; try contradiction;
+    destruct v' as [c2 vs2 | ]; try contradiction.
+    - destruct Hres as [Heq1 [Heq2 Hall]]; subst.
+      simpl. specialize (Hall 0 (NPeano.Nat.lt_0_succ _)).
+      erewrite (Forall2_length _ _ _ Hall).
+      simpl.
+      replace (length vs2 * S (max_vars_heap H1)) with
+      (length vs2 + length vs2 * (max_vars_heap H1)).
+      split. omega.
+      eapply le_n_S.
+      rewrite plus_comm. apply le_plus_trans. apply le_plus_trans.
+      omega.
+      
+      replace (S (max_vars_heap H1)) with (1 + max_vars_heap H1) by omega.
+      rewrite NPeano.Nat.mul_add_distr_l. omega.
+
+    - simpl. split. omega.
+
+      destruct vs2 as [| [|] [| [|] [|] ]]; try contradiction.
+
+      destruct Hres as [Hdeq Hall].
+      eapply le_n_S.
+      rewrite <- plus_n_O. 
+      eapply le_trans; [| eapply  max_vars_heap_get ]; eauto. simpl.
+      omega.
+  Qed.
+
+  Lemma cc_approx_val_size_env k j GIP GP b d H1 H2 x y v v' :
+    Res (Loc x, H1) ≺ ^ (k; S j; GIP; GP; b; d) Res (Loc y, H2) ->
+    get x H1 = Some v ->
+    get y H2 = Some v' ->
+    size_val v <=
+    size_val v' + size_with_measure_filter size_val (image' d [set x]) H2 <=
+    (size_val v) * (1 + max_vars_heap H1).
+  Proof.
+    intros Hres Hget1 Hget2. simpl in Hres. rewrite Hget1, Hget2 in Hres.
+    destruct Hres as [Hbeq Hres]; subst.
+    destruct v as [c1 vs1 | [| B1 f1] rho_clo ]; try contradiction;
+    destruct v' as [c2 vs2 | ]; try contradiction.
+    - destruct Hres as [Heq1 [Heq2 Hall]]; subst.
+      simpl. specialize (Hall 0 (NPeano.Nat.lt_0_succ _)).
+      erewrite (Forall2_length _ _ _ Hall).
+      simpl.
+      replace (length vs2 * S (max_vars_heap H1)) with
+      (length vs2 + length vs2 * (max_vars_heap H1)).
+      split. omega. 
+      erewrite HL.size_with_measure_Same_set with (S' := Empty_set _);
+        [| erewrite image'_Singleton_None; try eassumption; reflexivity ].
+      rewrite HL.size_with_measure_filter_Empty_set. rewrite <- !plus_n_O.
+      
+      eapply le_n_S.  
+      rewrite plus_comm. apply le_plus_trans.
+      apply le_plus_trans.
+      omega.
+      
+      replace (S (max_vars_heap H1)) with (1 + max_vars_heap H1) by omega.
+      rewrite NPeano.Nat.mul_add_distr_l. omega.
+
+    - simpl. split. omega.
+
+      destruct vs2 as [| [|] [| [|] [|] ]]; try contradiction.
+      
+      destruct Hres as [Hdeq [Henv _]].
+      eapply le_n_S.
+      rewrite <- plus_n_O. simpl. 
+      eapply le_trans; [| eapply  max_vars_heap_get ]; eauto. simpl.
+
+      erewrite HL.size_with_measure_Same_set with (S' :=[set l] :|: Empty_set _);
+        [| erewrite image'_Singleton_Some; try eassumption; now eauto with Ensembles_DB ].
+      
+      rewrite plus_comm. simpl.
+
+      specialize (Henv 0 (NPeano.Nat.lt_0_succ _)).
+      destruct Henv as (c & vs' & FLs & Hget & Heq & Hall).
+      
+      do 2 eapply le_n_S.
+      erewrite HL.size_with_measure_filter_add_In; try eassumption; [| intros Hc; now inv Hc ].
+      rewrite HL.size_with_measure_filter_Empty_set. rewrite <- !plus_n_O.
+      simpl. eapply le_n_S.
+      
+erewrite HL.size_with_measure_filter_add_In; try eassumption.
+
+      
+      speci 
+
+      [| now  eauto with Ensembles_DB ].
+
+      
+      do 2 eapply le_S.
+      
+
+      . 
+      
+      omega.
+  Qed.
+
+  Lemma cc_approx_val_size k j GIP GP b d H1 H2 x y v v' :
+    Res (Loc x, H1) ≺ ^ (k; S j; GIP; GP; b; d) Res (Loc y, H2) ->
+    get x H1 = Some v ->
+    get y H2 = Some v' ->
+    size_val v <=
+    size_val v' + size_with_measure_filter size_val (image' [set x] d) H2 <=
+    (size_val v) * (1 + max_vars_heap H1).
+  Proof.
+    intros Hres Hget1 Hget2. simpl in Hres. rewrite Hget1, Hget2 in Hres.
+    destruct Hres as [Hbeq Hres]; subst.
+    destruct v as [c1 vs1 | [| B1 f1] rho_clo ]; try contradiction;
+    destruct v' as [c2 vs2 | ]; try contradiction.
+    - destruct Hres as [Heq1 [Heq2 Hall]]; subst.
+      simpl. specialize (Hall 0 (NPeano.Nat.lt_0_succ _)).
+      erewrite (Forall2_length _ _ _ Hall).
+      simpl.
+      replace (length vs2 * S (max_vars_heap H1)) with
+      (length vs2 + length vs2 * (max_vars_heap H1)).
+      split. omega.
+      eapply le_n_S.
+      rewrite plus_comm. apply le_plus_trans. apply le_plus_trans.
+      omega.
+      
+      replace (S (max_vars_heap H1)) with (1 + max_vars_heap H1) by omega.
+      rewrite NPeano.Nat.mul_add_distr_l. omega.
+
+    - simpl. split. omega.
+
+      destruct vs2 as [| [|] [| [|] [|] ]]; try contradiction.
+
+      destruct Hres as [Hdeq Hall].
+      eapply le_n_S.
+      rewrite <- plus_n_O. 
+      eapply le_trans; [| eapply  max_vars_heap_get ]; eauto. simpl.
+      omega.
+  Qed.
+
+  
   Lemma size_reachable_leq S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2}
         H1 H2 k GIP GP b d :
     (forall j, S1 |- H1 ≼ ^ (k ; j ; GIP ; GP ; b ; d ) H2) ->
@@ -567,39 +709,10 @@ Module ClosureConversionCorrect (H : Heap).
               eapply image'_monotonic...
               eapply image_monotonic...
           }
-
-          Lemma cc_approx_heap_size k j GIP GP b d H1 H2 x y v v' :
-            Res (Loc x, H1) ≺ ^ (k; S j; GIP; GP; b; d) Res (Loc y, H2) ->
-            get x H1 = Some v ->
-            get y H2 = Some v' ->
-            size_val v <= size_val v' <= (size_val v) *  (1 + max_vars_heap H1).
-          Proof.
-            intros Hres Hget1 Hget2. simpl in Hres. rewrite Hget1, Hget2 in Hres.
-            destruct Hres as [Hbeq Hres]; subst.
-            destruct v as [c1 vs1 | [| B1 f1] rho_clo ]; try contradiction;
-            destruct v' as [c2 vs2 | ]; try contradiction.
-            - destruct Hres as [Heq1 [Heq2 Hall]]; subst.
-              simpl. specialize (Hall 0 (NPeano.Nat.lt_0_succ _)).
-              erewrite (Forall2_length _ _ _ Hall).
-              simpl.
-              replace (length vs2 * S (max_vars_heap H1)) with
-              (length vs2 + length vs2 * (max_vars_heap H1)).
-              split. omega.
-              eapply le_n_S.
-              rewrite plus_comm. apply le_plus_trans. apply le_plus_trans.
-              omega.
-
-              replace (S (max_vars_heap H1)) with (1 + max_vars_heap H1) by omega.
-              rewrite NPeano.Nat.mul_add_distr_l. omega.
-
-            - simpl. split. omega.
-
-              destruct vs2 as [| [|] [| [|] [|] ]]; try contradiction.
-
-              destruct Hres as [Hdeq Hall].
-              eapply le_n_S.
-              rewrite <- plus_n_O. simpl. 
-
+ 
+           s
+                                                                               impl.
+              
               simpl. 
               NPeano.Nat.lt_0_1).
             

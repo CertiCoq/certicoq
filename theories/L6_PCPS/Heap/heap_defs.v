@@ -92,7 +92,8 @@ Module HeapDefs (H : Heap) .
   Definition locs (v : block) : Ensemble loc :=
     match v with
       | Constr t ls => Union_list (map val_loc ls)
-      | Clos v rho => val_loc v :|: env_locs rho (Full_set _)
+      | Clos (Loc l) rho => Empty_set _
+      | Clos (FunPtr B _) rho => env_locs rho (occurs_free_fundefs B)
     end.
   
   Fixpoint to_locs (vs : list value) : list loc :=
@@ -106,8 +107,8 @@ Module HeapDefs (H : Heap) .
   Definition locs_set (v : block) : PS.t :=
     match v with
       | Constr t ls => union_list PS.empty (to_locs ls)
-      | Clos (Loc l) rho => PS.add l (env_locs_set_full rho)
-      | Clos (FunPtr _ _) rho => env_locs_set_full rho
+      | Clos (Loc l) rho => PS.empty
+      | Clos (FunPtr B _) rho => env_locs_set rho (fundefs_fv B)
     end.
   
   (** The locations that are pointed by the locations in S *)
@@ -115,7 +116,7 @@ Module HeapDefs (H : Heap) .
     [ set l : loc | exists l' v, l' \in S /\ get l' H = Some v /\ l \in locs v].  
   
   Close Scope Z_scope.
-
+  
   (** Least fixed point *)
   Definition lfp {A} (f : Ensemble A -> Ensemble A) :=
     \bigcup_( n : nat ) ((f ^ n) (Empty_set A)).
@@ -229,7 +230,6 @@ Module HeapDefs (H : Heap) .
   (** A bijection between two sets. *)
   Definition bijective {A B} (β : A -> B) (S1 : Ensemble A) (S2 : Ensemble B) :=
     image β S1 <--> S2 /\ injective_subdomain S1 β. 
-  
     
   (* TODO move *)
   (* M utils *)
@@ -1456,8 +1456,8 @@ Module HeapDefs (H : Heap) .
         (S : Ensemble var) (H H' : heap block) (rho rho' : env)
         (B B0 : fundefs) (cenv : env) :
     def_closures B B0 rho H cenv = (H', rho') ->
-    env_locs cenv (Full_set _) \subset (reach' H (env_locs rho S)) ->
-    env_locs cenv (Full_set _) \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
+    env_locs cenv (occurs_free_fundefs B0) \subset (reach' H (env_locs rho S)) ->
+    env_locs cenv  (occurs_free_fundefs B0) \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
   Proof.
     revert S rho rho' H H'; induction B; intros S rho rho' H H' Hdef Hsub; simpl.
     - simpl in Hdef.
@@ -1480,9 +1480,10 @@ Module HeapDefs (H : Heap) .
     destruct v; simpl.
     - eapply Decidable_map_UnionList; eauto with typeclass_instances.
       eapply Decidable_val_loc.
-    - eapply Decidable_Union. eapply Decidable_val_loc. 
+    - destruct v.
+      now right; eauto.
       eapply Decidable_env_locs.
-      constructor; intros x; left; constructor.
+      now tci.
   Qed.  
   
 
@@ -1578,7 +1579,7 @@ Module HeapDefs (H : Heap) .
 
   Lemma closed_def_funs S1 H1 H1' rho1 rho1' B B0 envc :
     closed S1 H1 ->
-    env_locs envc (Full_set _) \subset S1 ->
+    env_locs envc (occurs_free_fundefs B0) \subset S1 ->
     (H1', rho1') = def_closures B B0 rho1 H1 envc ->
     closed S1 H1'.
   Proof.
@@ -1587,14 +1588,12 @@ Module HeapDefs (H : Heap) .
     simpl in Heq. destruct (def_closures B B0 rho1 H1 envc) as [H'' rho''].
     destruct (alloc _ H'') as [l' H'''] eqn:Heq'.
     inv Heq. eapply closed_alloc'; [| | eassumption ]; eauto.
-    simpl. rewrite Union_Empty_set_neut_l.
-    eassumption.
   Qed.
   
   Lemma def_funs_exists_new_set S S1 H1 H1' rho1 rho1' envc B B0 :
     closed S1 H1 ->
     env_locs rho1 (Setminus _ S (name_in_fundefs B)) \subset S1 ->
-    env_locs envc (Full_set _) \subset S1 ->
+    env_locs envc (occurs_free_fundefs B0) \subset S1 ->
     (H1', rho1') = def_closures B B0 rho1 H1 envc ->
     exists S1', S1 \subset S1' /\ closed S1' H1' /\
            env_locs rho1' S \subset S1'.
@@ -1612,7 +1611,6 @@ Module HeapDefs (H : Heap) .
       split.
       + eapply closed_alloc_Union; [| | eassumption ];
         simpl; try now eauto with Ensembles_DB.
-        rewrite Union_Empty_set_neut_l.
         eapply Included_trans; eassumption.
       + eapply Included_trans. now eapply env_locs_set_Inlcuded'.
         now eauto with Ensembles_DB.
@@ -1881,7 +1879,7 @@ Module HeapDefs (H : Heap) .
   
   Lemma well_formed_def_funs S1 H1 H1' rho1 rho1' B B0 envc :
     well_formed S1 H1 ->
-    env_locs envc (Full_set _) \subset dom H1 ->
+    env_locs envc (occurs_free_fundefs B0) \subset dom H1 ->
     (H1', rho1') = def_closures B B0 rho1 H1 envc ->
     well_formed S1 H1'.
   Proof.
@@ -1890,7 +1888,7 @@ Module HeapDefs (H : Heap) .
     simpl in Heq. destruct (def_closures B B0 rho1 H1 envc) as [H'' rho''] eqn:Hdef.
     destruct (alloc _ H'') as [l' H'''] eqn:Heq'.
     inv Heq. eapply well_formed_alloc; [| eassumption | ]; eauto.
-    simpl. rewrite Union_Empty_set_neut_l.
+    simpl.
     eapply Included_trans. eassumption.
     eapply dom_subheap. eapply def_funs_subheap; eauto.
   Qed.
@@ -2012,7 +2010,7 @@ Module HeapDefs (H : Heap) .
         B B0 rho rho' envc :
     well_formed (reach' H S) H  ->
     S \subset dom H ->
-    env_locs envc (Full_set _) \subset S ->
+    env_locs envc (occurs_free_fundefs B0) \subset S ->
     def_closures B B0 rho H envc = (H', rho') ->
     reach' H S <--> reach' H' S.
   Proof.
@@ -2101,7 +2099,7 @@ Module HeapDefs (H : Heap) .
   Lemma well_formed_reach_alloc_def_funs S H H' rho rho' B B0 envc :
     well_formed (reach' H (env_locs rho S)) H ->
     env_locs rho S \subset dom H ->
-    env_locs envc (Full_set _ ) \subset (reach' H (env_locs rho S)) ->
+    env_locs envc (occurs_free_fundefs B0) \subset (reach' H (env_locs rho S)) ->
     def_closures B B0 rho H envc  = (H', rho') ->
     well_formed (reach' H' (env_locs rho' (Union _ S (name_in_fundefs B)))) H'.
   Proof with now eauto with Ensembles_DB.
@@ -2113,7 +2111,7 @@ Module HeapDefs (H : Heap) .
       eapply well_formed_reach_alloc; [| | eassumption |].
       + eapply IHB; eassumption.
       + eapply def_closures_env_locs_in_dom; eauto.
-      + simpl. rewrite Union_Empty_set_neut_l.
+      + simpl.
         eapply def_closures_env_locs_reach; eassumption.
     - inv Hdef. rewrite Union_Empty_set_neut_r. eassumption.
   Qed.
@@ -2335,10 +2333,10 @@ Module HeapDefs (H : Heap) .
       + destruct a; simpl.
         * rewrite FromList_cons. now rewrite IHl.
         * rewrite Union_Empty_set_neut_l. eassumption.
-    - rewrite env_locs_set_full_correct.
-      destruct v; simpl.
-      + rewrite FromSet_add. reflexivity.
-      + rewrite Union_Empty_set_neut_l. reflexivity.
+    - destruct v.
+      + rewrite FromSet_empty. reflexivity.
+      + rewrite env_locs_set_correct. reflexivity.
+        apply fundefs_fv_correct.
   Qed.    
 
 

@@ -81,24 +81,17 @@ Section CC.
 
   Inductive make_closures :
     fundefs -> (* The function block *)
-    Ensemble var -> (* The FVS of the rest of the program *)
     var -> (* The environment variable *)
     exp_ctx -> (* The context that constructs the closures *)
     Prop :=
   | closures_Fnil :
-      forall Γ FV,
-        make_closures Fnil FV Γ Hole_c
-  | closures_Fcons_in_FV :
-      forall f xs t e B FV Γ C,
-        make_closures B FV Γ C ->
-        f \in FV ->
-        make_closures (Fcons f t xs e B) FV Γ
-                      (Econstr_c f clo_tag [f ; Γ] C)
-  | closures_Fcons_nin_FV :
-      forall f xs t e B FV Γ C,
-        make_closures B FV Γ C ->
-        ~ f \in FV ->
-        make_closures (Fcons f t xs e B) FV Γ C.
+      forall Γ,
+        make_closures Fnil Γ Hole_c
+  | closures_Fcons :
+      forall f xs t e B Γ C,
+        make_closures B Γ C ->
+        make_closures (Fcons f t xs e B) Γ
+                      (Econstr_c f clo_tag [f ; Γ] C).
 
   (* TODO delete after comp *)
   Notation "a &: B" := (Intersection _ [set a] B) (at level 48, left associativity)
@@ -153,7 +146,7 @@ Section CC.
         project_vars Scope c Γ FVs S1 FVs' FVs'' C' S1' ->
         (* Γ' is the variable that will hold the record of the environment *)
         ~ Γ' \in ((name_in_fundefs B) :|: (FV_cc Scope Γ)) ->
-        make_closures B (occurs_free e) Γ' C ->
+        make_closures B Γ' C ->
         (* closure convert function blocks *)
         Closure_conversion_fundefs B c' FVs' B B' ->
         (* closure convert the rest of the program *)
@@ -199,7 +192,7 @@ Section CC.
              Disjoint _ S ((name_in_fundefs B) :|: (FromList ys) :|: (bound_var e)) ->
              (* new argument *)
              In _ S  Γ' ->
-             make_closures B ((occurs_free e) \\ FromList ys) Γ' Cf -> 
+             make_closures B  Γ' Cf -> 
              Closure_conversion_fundefs B c FVs defs defs' ->
              Closure_conversion (FromList ys :|: name_in_fundefs B)
                                 c Γ' FVs e e' C ->

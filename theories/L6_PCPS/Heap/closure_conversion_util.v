@@ -93,9 +93,9 @@ Module CCUtil (H : Heap).
       eapply Included_trans. eassumption. now apply Included_Union_l.
   Qed.
   
-  Lemma make_closures_occurs_free_ctx_Included B Γ C F S e:
+  Lemma make_closures_occurs_free_ctx_Included B Γ C F e:
     unique_functions B ->
-    make_closures clo_tag B S Γ C ->
+    make_closures clo_tag B Γ C ->
     Included _ (occurs_free e) (Union _ F (name_in_fundefs B)) ->
     Included _ (Union _ (name_in_fundefs B) (Singleton _ Γ)) F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
@@ -115,12 +115,12 @@ Module CCUtil (H : Heap).
       eapply Included_trans; [| eassumption ]...
       eapply Included_trans; [| eassumption ]...
       now eauto with Ensembles_DB. 
-    - inv Hun. eapply IHHmc.
-      eassumption.
-      eapply Included_trans; [ eassumption |].
-      eapply Union_Included. now eauto with Ensembles_DB.
-      eapply Included_trans; [| eapply Included_Union_compat; [| reflexivity ]; eassumption ]...
-      eapply Included_trans; [| eassumption ]... 
+    (* - inv Hun. eapply IHHmc. *)
+    (*   eassumption. *)
+    (*   eapply Included_trans; [ eassumption |]. *)
+    (*   eapply Union_Included. now eauto with Ensembles_DB. *)
+    (*   eapply Included_trans; [| eapply Included_Union_compat; [| reflexivity ]; eassumption ]... *)
+    (*   eapply Included_trans; [| eassumption ]...  *)
   Qed.
 
   Lemma project_var_free_funs_in_exp Scope c Γ FVs S x x' C S' B e:
@@ -139,16 +139,16 @@ Module CCUtil (H : Heap).
     rewrite <- app_ctx_f_fuse, project_var_free_funs_in_exp; eassumption.
   Qed.
 
-  Lemma make_closures_funs_in_exp B S Γ C B' e:
-    make_closures clo_tag B S Γ C  ->
+  Lemma make_closures_funs_in_exp B Γ C B' e:
+    make_closures clo_tag B Γ C  ->
     (funs_in_exp B' (C |[ e ]|) <-> funs_in_exp B' e).
   Proof.
     intros Hmc; revert e; induction Hmc; intros e';
-    [ split; now eauto | | ].
+    [ split; now eauto | ].
     - simpl.
       rewrite <- (IHHmc e').
       split; eauto. intros Hf; now inv Hf.
-    - eapply IHHmc; eauto.
+    (* - eapply IHHmc; eauto. *)
   Qed.
 
   Lemma closure_conversion_fundefs_Same_set c Funs FVs B1 B2  :

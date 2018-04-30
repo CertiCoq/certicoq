@@ -1051,7 +1051,7 @@ Module Compat (H : Heap).
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1)))) H1 ->
       (env_locs rho1 (occurs_free (Efun B1 e1))) \subset dom H1 ->
       
-      (forall H1 H1' rho1' rho_clo,
+      (forall H1' rho1' rho_clo,
 
          restrict_env (fundefs_fv B1) rho1 = rho_clo ->
 

@@ -614,14 +614,6 @@ Fixpoint L4_5_constr_vars (avoid : list NVar) (e:L4_5_Term) {struct e}: L4_5_Ter
       oterm o lbt
   end.
 
-(* move to SquiggleEq *)
-Inductive liftRBt {V O} (R : (@NTerm V O) -> (@NTerm V O) -> Prop)
-  : (@BTerm V O) -> (@BTerm V O) -> Prop :=
-  liftRbt : forall lv ntl ntr, R ntl ntr
-                          -> liftRBt R
-                              (bterm lv ntl)
-                              (bterm lv ntr).
-
 (* zetaCLe t1 t2=> t2 is obtained by eta expanding some constructors in t1 *)
 Inductive zetaCLe (avoid : list NVar): L4_5_Term -> L4_5_Term -> Prop :=
 | zetav : forall v, zetaCLe avoid (vterm v) (vterm v)
@@ -746,28 +738,6 @@ Proof using.
   noRepDis2.
 Qed.
 
-(* Move to SquiggleEq.list. make it hetero? *)
-Lemma eqListA_map {A B} (f g: A->B)
-      (Ra : A -> A -> Prop) (Rb : B -> B -> Prop) l1 l2
-  (feq : forall a1 a2, In a1 l1 -> In a2 l2 -> Ra a1 a2 -> Rb (f a1) (g a2)):
-  SetoidList.eqlistA Ra l1 l2
-  -> SetoidList.eqlistA Rb (map f l1) (map g l2).
-Proof using.
-  intros Hp.
-  induction Hp; auto; cpx; constructor; eauto.
-Qed.
-
-Lemma eqListA_eq {A} l1 l2:
-  SetoidList.eqlistA (@eq A) l1 l2
-  -> l1 = l2.
-Proof using.
-  intros Hp.
-  induction Hp; auto; subst; auto.
-Qed.
-
-(* Move to SquiggleEq.terms2 *)
-Hint Rewrite @flat_map_bterm_nil_allvars: SquiggleEq.
-
 (* see the failed attempt below to understand why 
 all_vars cannot be replaced with free_vars *)
 Lemma L4_5_zeta fv:
@@ -873,14 +843,6 @@ Proof using.
   disjoint_reasoning.
 Qed.
 
-(* Move *)
-Lemma eqListA_refl {A} (R : A-> A-> Prop) lbt:
-  (forall l, In l lbt -> R l l) ->
-  SetoidList.eqlistA R lbt lbt.
-Proof using.
-  intros.
-  induction lbt; auto; constructor; firstorder.
-Qed.
 
 Lemma zetaRefl fv:
   (forall f, zetaCLe fv f f) *

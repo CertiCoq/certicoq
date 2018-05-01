@@ -296,14 +296,15 @@ Fixpoint find_def (f: var) (fl:  fundefs) :=
 (* Need to wrap in module with proofs of freshness etc...for various functions *)
 
 (* info of a constructor. Includes: the name of the constructor
+                                    the name of its inductive type
                                     iTag of corresponding inductive type
                                     the constructor's arity
                                     the cTags ordinal in inductive defn starting at zero *)
-Definition cTyInfo : Type := Ast.name * iTag * N * N.
+Definition cTyInfo : Type := Ast.name * Ast.name * iTag * N * N.
 
 Definition iTyInfo : Type := list (cTag * N). 
 
-Definition unkown_cTyInfo : cTyInfo := (nAnon, 1%positive, 0%N, 0%N).
+Definition unkown_cTyInfo : cTyInfo := (nAnon, nAnon, 1%positive, 0%N, 0%N).
 
 Definition unkown_iTyInfo : iTyInfo := nil.
 
@@ -313,7 +314,7 @@ Definition iEnv := M.t iTyInfo. (* An inductive type environment maps [iTag]s to
 
 (****** TEMPORARY JUNK: MUST DELETE *****)
 Definition add_cloTag (c i : positive) (cenv : cEnv) : cEnv :=
-  M.set c (nAnon, i, 2%N, 0%N) cenv.
+  M.set c (nAnon, nAnon, i, 2%N, 0%N) cenv.
 
 (* TODO : this state and the getters and setters will be used by a particular
    translation so move them to the appropriate file? *)
@@ -372,7 +373,7 @@ Definition get_iTyInfo (i : cTag) : cState iTyInfo :=
 Definition makeRecord (n : nat) : cState (iTag * cTag) :=
   ct <- get_cTag ;;
      it <- get_iTag ;;
-     _ <- set_cTyInfo ct (nAnon, it, N.of_nat n, 0%N) ;;
+     _ <- set_cTyInfo ct (nAnon, nAnon, it, N.of_nat n, 0%N) ;;
      _ <- set_iTyInfo it ((ct, N.of_nat n) :: nil) ;;
      ret (it, ct).
 
@@ -389,7 +390,7 @@ Fixpoint makeDataType (l : list nat) : cState (iTag * list cTag) :=
       let '(it, cl) := x in
       ct <- get_cTag ;;
          iinf <- get_iTyInfo it ;;
-         _ <- set_cTyInfo ct (nAnon, it, N.of_nat n, N.of_nat (length iinf)) ;;
+         _ <- set_cTyInfo ct (nAnon, nAnon, it, N.of_nat n, N.of_nat (length iinf)) ;;
          _ <- set_iTyInfo it ((ct , N.of_nat n) :: iinf) ;;
          ret (it, ct :: cl)
   end.

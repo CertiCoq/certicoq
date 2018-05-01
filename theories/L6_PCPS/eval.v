@@ -30,10 +30,10 @@ Section EVAL.
       forall (t : cTag),
         caseConsistent nil t
   | CCcons :
-      forall (a a':name) (l : list (cTag * exp)) (t t' : cTag) (ty ty' : iTag)
+      forall (a a' b b':name) (l : list (cTag * exp)) (t t' : cTag) (ty ty' : iTag)
         (n n' : N) (i i' : N) (e : exp),
-        M.get t cenv  = Some (a, ty, n, i) ->
-        M.get t' cenv = Some (a', ty', n', i') ->
+        M.get t cenv  = Some (a, b, ty, n, i) ->
+        M.get t' cenv = Some (a', b', ty', n', i') ->
         ty = ty' ->
         caseConsistent l t ->
         caseConsistent ((t', e) :: l) t.
@@ -92,7 +92,7 @@ Section EVAL.
         M.get x rho = Some v ->
         bstep_e rho (Ehalt x) v 0.
 
-
+ 
   Require Import ExtLib.Structures.Monad.
 
 
@@ -104,9 +104,9 @@ Section EVAL.
       | (t', e)::l' =>
         caseConsistent_f l' t &&
         match (M.get t cenv) with
-          | Some (a, ty, n, i) =>
+          | Some (a, _, ty, n, i) =>
             (match (M.get t' cenv) with
-               | Some (a', ty', n', i') =>
+               | Some (a', _, ty', n', i') =>
                  Pos.eqb ty  ty'
                | _ => false
              end)
@@ -134,8 +134,9 @@ Section EVAL.
       destruct (M.get t cenv) eqn:tc.
       destruct c0. destruct p. destruct p.
       destruct (M.get c cenv) eqn:cc.
-      destruct c0. destruct p. destruct p. apply andb_true_iff in H1.
+      destruct c0. destruct p. destruct p0. destruct p. destruct p. apply andb_true_iff in H1.
       inv H1. econstructor; eauto. apply Peqb_true_eq in H0. auto. apply IHl. auto.
+      destruct p.
       apply andb_true_iff in H1. inv H1. inv H0.
       apply andb_true_iff in H1. inv H1. inv H0.
   Qed.

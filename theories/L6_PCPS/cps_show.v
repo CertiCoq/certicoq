@@ -71,7 +71,7 @@ Definition show_name (no:Ast.name) (d:string) :=
                  
 Definition show_con (tg:cTag) :=
   match M.get tg cenv with
-    | Some (nNamed s, i, t, n) => s
+    | Some (nNamed s, _, i, t, n) => s
     | _ => ("con_"+++(show_pos tg))%string
   end.
 
@@ -197,7 +197,7 @@ Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)):M unit :=
 
 Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*cTyInfo)):M unit :=
   match cenvl with
-    | cons (p, (name, it, arr, ord)) cenvl' =>
+    | cons (p, (name, _, it, arr, ord)) cenvl' =>
       emit "| "%string;;emit (show_pos p);;emit " |-> ("%string;;
            emit (show_name name ("cons_"++(show_pos p)));; emit " "%string;; emit (show_pos it);; emit " "%string;;emit (show_binnat arr);;
            emit " "%string;;emit (show_binnat ord);;emit " )"%string

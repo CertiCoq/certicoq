@@ -379,3 +379,41 @@ void free_heap (struct heap *h) {
   }
   free (h);
 }
+
+int garbage_collect_all(fun_info fi, struct thread_info *ti) {
+    struct heap *h = ti->heap;
+    if (h==NULL) {
+        h = create_heap();
+        ti->heap = h;
+    }
+    int i;
+    assert (h->spaces[0].limit == ti->limit);  
+    for (i=0; i < MAX_SPACES - 1 && h->spaces[i+1].start != NULL; i++) {
+        if(0)
+            fprintf(stderr, "Generation %d:  ", i);
+        do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+    }
+    return i;
+}
+
+uintnat const fake_fi[3] = {0, 1, 1};
+
+void* export(struct thread_info *ti) {
+    int gen_level = garbage_collect_all(fake_fi, ti);
+    struct space* sp = ti->heap->spaces+gen_level;
+
+    struct space* fake_sp = (struct space*)malloc(sizeof(struct space));
+    create_space(fake_sp, sp->next - sp->start);
+    do_generation(sp, fake_sp, fake_fi, ti);
+
+    struct space* value_sp = (struct space*)malloc(sizeof(struct space));
+    create_space(value_sp, fake_sp->next - fake_sp->start);
+    do_generation(fake_sp, value_sp, fake_fi, ti);
+    
+    void* result_block = (void *)value_sp->start;
+
+    free(fake_sp->start);
+    free(fake_sp);
+    free(value_sp);
+    return result_block;
+}

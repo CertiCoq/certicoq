@@ -92,7 +92,7 @@ Module HeapDefs (H : Heap) .
   Definition locs (v : block) : Ensemble loc :=
     match v with
       | Constr t ls => Union_list (map val_loc ls)
-      | Clos (Loc l) rho => Empty_set _
+      | Clos (Loc l) rho => [set l]
       | Clos (FunPtr B _) rho => env_locs rho (occurs_free_fundefs B)
     end.
   
@@ -107,7 +107,7 @@ Module HeapDefs (H : Heap) .
   Definition locs_set (v : block) : PS.t :=
     match v with
       | Constr t ls => union_list PS.empty (to_locs ls)
-      | Clos (Loc l) rho => PS.empty
+      | Clos (Loc l) rho => PS.singleton l
       | Clos (FunPtr B _) rho => env_locs_set rho (fundefs_fv B)
     end.
   
@@ -1481,7 +1481,9 @@ Module HeapDefs (H : Heap) .
     - eapply Decidable_map_UnionList; eauto with typeclass_instances.
       eapply Decidable_val_loc.
     - destruct v.
-      now right; eauto.
+      destruct (loc_dec l l1); subst.
+      now left.
+      now right; intros Hc; inv Hc; eauto.
       eapply Decidable_env_locs.
       now tci.
   Qed.  
@@ -2334,7 +2336,7 @@ Module HeapDefs (H : Heap) .
         * rewrite FromList_cons. now rewrite IHl.
         * rewrite Union_Empty_set_neut_l. eassumption.
     - destruct v.
-      + rewrite FromSet_empty. reflexivity.
+      + rewrite FromSet_singleton. reflexivity.
       + rewrite env_locs_set_correct. reflexivity.
         apply fundefs_fv_correct.
   Qed.    

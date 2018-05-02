@@ -1051,7 +1051,7 @@ Module Compat (H : Heap).
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1)))) H1 ->
       (env_locs rho1 (occurs_free (Efun B1 e1))) \subset dom H1 ->
       
-      (forall H1' rho1' rho_clo,
+      (forall H1 H1' rho1' rho_clo,
 
          restrict_env (fundefs_fv B1) rho1 = rho_clo ->
 
@@ -1105,7 +1105,8 @@ Module Compat (H : Heap).
             eapply env_locs_monotonic...
           - eapply Included_trans; [| eassumption ].
             eapply env_locs_monotonic... 
-          - eapply Included_trans.
+          - eapply Included_trans. eapply Included_trans. 
+            eapply env_locs_monotonic with (S2 := Full_set _)...
             eapply restrict_env_env_locs. eapply restrict_env_correct.
             now eapply fundefs_fv_correct.
             eapply Included_trans; [| now apply reach'_extensive ].
@@ -1114,7 +1115,8 @@ Module Compat (H : Heap).
             eapply Included_Union_preserv_l. rewrite Setminus_Disjoint. reflexivity.
             eapply Disjoint_sym.
             eapply occurs_free_fundefs_name_in_fundefs_Disjoint.
-          - eapply Included_trans.
+          - eapply Included_trans. eapply Included_trans. 
+            eapply env_locs_monotonic with (S2 := Full_set _)...
             eapply restrict_env_env_locs. eapply restrict_env_correct.
             now eapply fundefs_fv_correct.
             eapply Included_trans; [| now apply reach'_extensive ].
@@ -1130,22 +1132,13 @@ Module Compat (H : Heap).
           - (* rewrite res_equiv_eq. simpl. split. *)
             (* rewrite extend_gss. reflexivity. *)
             (* erewrite !gas; try eassumption. simpl.  *)
+            eapply heap_env_equiv_antimon.
             eapply heap_env_equiv_restrict_env with (S' := occurs_free_fundefs B1).
-            * eassumption.
-              (* eapply heap_env_equiv_weaking_cor with (H1 := H1) (H2 := H1'); try eassumption. *)
-              (* eapply well_formed_respects_heap_env_equiv; try now apply Hwf. *)
-              (* eassumption. *)
-              (* eapply heap_env_equiv_rename_ext. eassumption. *)
-              (* reflexivity. eapply f_eq_subdomain_extend_not_In_S_r. *)
-              (* intros Hc. eapply reachable_in_dom in Hc.  destruct Hc as [x1 Hx1]. *)
-              (* erewrite alloc_fresh in Hx1; try eassumption. congruence. *)
-              (* eapply well_formed_respects_heap_env_equiv. now apply Hwf. *)
-              (* eassumption. eassumption. reflexivity. *)
-              (* eapply HL.alloc_subheap. eassumption. *)
-              (* eapply HL.alloc_subheap. eassumption. *)
-            * normalize_occurs_free...
-            * eapply restrict_env_correct. now eapply fundefs_fv_correct.
-            * eapply restrict_env_correct. now eapply fundefs_fv_correct.
+            eassumption.
+            normalize_occurs_free...
+            eapply restrict_env_correct. now eapply fundefs_fv_correct.
+            eapply restrict_env_correct. now eapply fundefs_fv_correct.
+            now eauto with Ensembles_DB.
           - eapply injective_subdomain_antimon. eassumption.
             eapply reach'_set_monotonic. eapply env_locs_monotonic...
           - rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.

@@ -501,6 +501,15 @@ Module ClosureConversionCorrect (H : Heap).
       omega.
   Qed.
 
+  Lemma Forall2_length {A B} (R : A -> B -> Prop) l1 l2 :
+    Forall2 R l1 l2 -> length l1 = length l2. 
+  Proof.
+    revert l2. induction l1 as [| x xs IHxs ]; intros l2 H.
+    - inv H; eauto.
+    - inv H. simpl. f_equal. eauto.
+  Qed.
+
+
   Lemma cc_approx_val_size_env k j GIP GP b d H1 H2 x y v v' :
     Res (Loc x, H1) ≺ ^ (k; S j; GIP; GP; b; d) Res (Loc y, H2) ->
     get x H1 = Some v ->
@@ -553,10 +562,17 @@ Module ClosureConversionCorrect (H : Heap).
       erewrite HL.size_with_measure_filter_add_In; try eassumption; [| intros Hc; now inv Hc ].
       rewrite HL.size_with_measure_filter_Empty_set. rewrite <- !plus_n_O.
       simpl. eapply le_n_S.
-      
-erewrite HL.size_with_measure_filter_add_In; try eassumption.
+      erewrite <- Forall2_length; try eassumption.
 
-      
+    Lemma FromList_card_length :
+      FromList l <--> mset.
+
+      FLS <= FV B <= fundefs_num_vars B1
+      erewrite <- Forall2_length; try eassumption.
+      erewrite HL.size_with_measure_filter_add_In; try eassumption.
+
+
+
       speci 
 
       [| now  eauto with Ensembles_DB ].

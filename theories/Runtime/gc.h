@@ -152,3 +152,4 @@ value* extract_answer(struct thread_info *ti);
   can be treated uniformly by the caller of extract_answer().
 */
 
+void* export(struct thread_info *ti);

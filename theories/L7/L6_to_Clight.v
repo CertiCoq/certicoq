@@ -51,6 +51,8 @@ Section TRANSLATION.
   Variable (numArgsIdent : ident).  
   Variable (isptrIdent: ident). (* ident for the is_ptr external function *)
   Variable (caseIdent:ident). (* ident for the case variable , TODO: generate that automatically and only when needed *)
+
+
   
   Definition maxArgs := 1024%Z.
 
@@ -191,20 +193,34 @@ with max_args_fundefs (fnd : fundefs) :=
                                    (max_allocs_fundefs fnd')
        end.
 
-Definition update_iEnv (ienv : iEnv) (p : positive) (cInf : cTyInfo) : iEnv :=
-  let '(name, t, arity, ord) := cInf in
+(* named ienv *)
+(* TODO: move this to cps and replace the current definition of iTyInfo *)
+(* 1) name of inductive type
+   2) list containing
+      2.1 name of the constructor
+      2.2 tag of the contructor (in cEnv)
+      2.3 arrity of the constructor
+      2.4 ordinal of the constructor *)
+Definition n_iTyInfo:Type := Ast.name * list (Ast.name * cTag * N * N).
+
+Definition n_iEnv := M.t n_iTyInfo.
+
+
+
+Definition update_iEnv (ienv : n_iEnv) (p : positive) (cInf : cTyInfo) : n_iEnv :=
+  let '(name, nameTy, t, arity, ord) := cInf in
   match (M.get t ienv) with
-  | None => M.set t ((p, arity) :: nil) ienv
-  | Some iInf => M.set t ((p, arity) :: iInf) ienv
+  | None => M.set t (nameTy, ((name, p, arity, ord) :: nil)) ienv
+  | Some (nameTy, iInf) => M.set t (nameTy, (name, p, arity, ord) :: iInf) ienv
   end.
 
-Definition compute_iEnv (cenv : cEnv) : iEnv :=
+Definition compute_iEnv (cenv : cEnv) : n_iEnv :=
   M.fold update_iEnv cenv (M.empty _).
 
-Fixpoint getEnumOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
+Fixpoint getEnumOrdinal' (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
   match l with
   | nil => None
-  | cons (ct' , n) l' =>
+  | cons (_, ct' , n) l' =>
     match (n =? 0)%N with
     | true => 
       match (ct =? ct')%positive with
@@ -217,13 +233,13 @@ Fixpoint getEnumOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
     end
   end.
 
-Definition getEnumOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
+Definition getEnumOrdinal (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
   getEnumOrdinal' ct (rev l).
 
-Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
+Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
   match l with
   | nil => None
-  | cons (ct' , n) l' =>
+  | cons (_, ct' , n) l' =>
     match (n =? 0)%N with
     | true => getBoxedOrdinal' ct l'
     | false => 
@@ -236,7 +252,7 @@ Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
     end
   end.
 
-Definition getBoxedOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
+Definition getBoxedOrdinal (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
   getBoxedOrdinal' ct (rev l).
 
 Inductive cRep : Type :=
@@ -247,17 +263,20 @@ Inductive cRep : Type :=
 
 
 
-Definition make_cRep (cenv:cEnv) (ienv : iEnv) (ct : cTag) : option cRep :=
+Definition make_cRep (cenv:cEnv) (ct : cTag) : option cRep :=
   p <- M.get ct cenv ;;
-    let '(name, it , a , n) := p in
-    l <- M.get it ienv ;;
+    let '(name, _, it , a , n) := p in
+(*    l <- M.get it ienv ;;
+      let '(nameTy, l) := l in *)
       match (a =? 0)%N with
       | true =>
-        n' <- getEnumOrdinal ct l ;;
-           ret (enum n')
+        ret (enum n)
+(*        n' <- getEnumOrdinal ct l ;;
+           ret (enum n') *)
       | false =>
-        n' <- getBoxedOrdinal ct l ;;
-           ret (boxed n' a)
+        ret (boxed n a)
+(*        n' <- getBoxedOrdinal ct l ;;
+           ret (boxed n' a) *)
       end.
 
 Notation threadStructInf := (Tstruct threadInfIdent noattr).
@@ -304,6 +323,9 @@ Notation uval := uintTy.
 
 Notation valPtr := (Tpointer val
                             {| attr_volatile := false; attr_alignas := None |}).
+
+Notation argvTy :=
+  (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
 
 Notation boolTy := (Tint IBool Unsigned noattr).
 
@@ -379,15 +401,15 @@ Definition reserve (funInf : positive) (l : Z) : statement :=
 
 
 (* Don't shift the tag for boxed, make sure it is under 255 *)
-Fixpoint makeTagZ (cenv:cEnv) (ienv : iEnv) (ct : cTag) : option Z :=
-  rep <- make_cRep cenv ienv ct ;;
+Fixpoint makeTagZ (cenv:cEnv) (ct : cTag) : option Z :=
+  rep <- make_cRep cenv ct ;;
       match rep with
       | enum t => ret (Z.of_N ((N.shiftl t 1) + 1))
       | boxed t a => ret (Z.of_N ((N.shiftl a 10) + t))
       end.
 
-Definition makeTag (cenv: cEnv) (ienv : iEnv) (ct : cTag) : option expr :=
-  t <- makeTagZ cenv ienv ct ;;
+Definition makeTag (cenv: cEnv) (ct : cTag) : option expr :=
+  t <- makeTagZ cenv ct ;;
     ret (c_int t val).
 
 (* If x is a in our global map, then Evar, otherwise Etempvar *)
@@ -398,11 +420,11 @@ Definition makeVar (x:positive) (m:M.t positive) :=
   end.   
 
 (* map is here to identify which value represents function  *)
-Fixpoint assignConstructor' (cenv:cEnv) (ienv : iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
+Fixpoint assignConstructor' (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
   match vs with
   | nil =>
-    tag <- makeTag cenv ienv t;;
-        rep <- make_cRep cenv ienv t ;;
+    tag <- makeTag cenv t;;
+        rep <- make_cRep cenv t ;;
         match rep with
         | enum _ =>           
           ret (x ::= tag)
@@ -420,7 +442,7 @@ Fixpoint assignConstructor' (cenv:cEnv) (ienv : iEnv) (map:M.t positive) (x : po
                    Field(var x, Z.of_nat (length vs')) :::= (*[val]*) vv)                                 
   end.
 
-Definition assignConstructor (cenv:cEnv) (ienv : iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv ienv map x t (rev vs).
+Definition assignConstructor (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv ienv map x t (rev vs).
 
 
 (* This is not valid in Clight if x is a Vptr, implementing instead as an external function
@@ -436,8 +458,8 @@ Definition isPtr (x : positive) :=
 Definition isPtr (retId:positive) (v:positive) :=
   Scall (Some retId) ptr ([val](var v) :: nil).
 
-Definition isBoxed (cenv:cEnv) (ienv : iEnv) (ct : cTag) : bool :=
-  match make_cRep cenv ienv ct with
+Definition isBoxed (cenv:cEnv) (ienv : n_iEnv) (ct : cTag) : bool :=
+  match make_cRep cenv  ct with
   | None => false
   | Some rep => match rep with
                | enum t => false
@@ -491,9 +513,17 @@ Definition asgnAppVars vs ind :=
     | None => None 
   end.
 
+Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_statements):=
+      (isPtr caseIdent x;
+             Sifthenelse
+               (var caseIdent)
+               (Sswitch (Ebinop Oand (Field(var x, -1)) (Econst_int (Int.repr 255) val) val) ls)
+             (
+               Sswitch (Ebinop Oshr (var x) (Econst_int (Int.repr 1) val) val)
+                      ls')).
 
 
-Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : iEnv) (map : M.t positive) : option statement :=
+Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map : M.t positive) : option statement :=
   match e with
   | Econstr x t vs e' =>
     prog <- assignConstructor cenv ienv map x t vs ;;
@@ -507,7 +537,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : iEnv) (map :
             | cons p l' =>
               prog <- translate_body (snd p) fenv cenv ienv map ;;
                    p' <- makeCases l' ;;
-                   tag <- makeTagZ cenv ienv (fst p) ;;
+                   tag <- makeTagZ cenv (fst p) ;;
                    let '(ls , ls') := p' in
                    match isBoxed cenv ienv (fst p) with
                    | true =>
@@ -535,13 +565,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : iEnv) (map :
                    end
             end) cs) ;;
       let '(ls , ls') := p in
-      ret (isPtr caseIdent x;
-             Sifthenelse
-               (var caseIdent)
-               (Sswitch (Ebinop Oand (Field(var x, -1)) (Econst_int (Int.repr 255) val) val) ls)
-             (
-               Sswitch (Ebinop Oshr (var x) (Econst_int (Int.repr 1) val) val)
-                      ls'))
+      ret (make_case_switch x ls ls')
   | Eproj x t n v e' =>
     prog <- translate_body e' fenv cenv ienv map ;;
          ret (x ::= Field(var v, Z.of_N n) ;
@@ -568,7 +592,7 @@ Definition mkFun (vs : list positive) (body : statement) : function :=
              nil
              body.
 
-Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : iEnv) (map : M.t positive) : 
+Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (map : M.t positive) : 
   option (list (positive * globdef Clight.fundef type)) :=
   match fnd with
   | Fnil => ret nil
@@ -608,7 +632,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : iE
 
 
 
-Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : iEnv) (m : M.t positive) :
+Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (m : M.t positive) :
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
@@ -756,7 +780,7 @@ Definition global_defs (e : exp)
       ))
     :: nil.
 
-Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : iEnv) (nenv : M.t Ast.name) :
+Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (nenv : M.t Ast.name) :
   nState (option (M.t Ast.name * (list (positive * globdef Clight.fundef type)))) :=
   fun_inf' <- make_funinfo e fenv nenv ;;
            match fun_inf' with
@@ -824,21 +848,251 @@ Definition ensure_unique : M.t name -> M.t name :=
                     | nAnon =>  nAnon
                     | nNamed s => nNamed (append s (append "_"%string (show_pos x)))
                   end) l.
+ 
 
 
+Fixpoint make_proj (recExpr:expr) (start:nat) (left:nat): list expr  :=
+  match left with
+  | 0 => nil
+  | S n =>
+    let s := make_proj recExpr (S start) n in
+    (Field(recExpr, Z.of_nat start))::s
+  end.
+
+Fixpoint make_Asgn (les:list expr) (res:list expr) :=
+  match les, res with
+  | (hl::les), (hr:: res) =>
+    Ssequence (Sassign hl hr) (make_Asgn les res)
+  | _, _ => Sskip
+  end.
+
+
+Fixpoint make_argList' (n:nat) (nenv:M.t Ast.name) : nState (M.t Ast.name * list (ident * type)) :=
+  match n with
+  | 0 => ret (nenv, nil)
+  | (S n') =>
+    new_id <- getName;;
+           let new_name := append "arg" (nat2string10 n') in
+           let nenv := M.set new_id (nNamed new_name) nenv in
+           rest <- make_argList' n' nenv;;
+                let (nenv, rest_id) := rest in                        
+                ret (nenv, (new_id,val)::rest_id)
+  end.
+
+Fixpoint make_argList (n:nat) (nenv:M.t Ast.name) : nState (M.t Ast.name * list (ident * type)) :=
+  rest <- make_argList' n nenv;;
+       let (nenv, rest_l) := rest in
+       ret (nenv, rev rest_l).
+
+Fixpoint make_constrAsgn' (argv:ident) (argList:list (ident * type)) (n:nat) :=
+  match argList with
+  | nil => Sskip
+  | (id, ty)::argList' =>
+    let s' := make_constrAsgn' argv argList' (S n) in
+    (Sassign (Field(var argv, Z.of_nat n)) (Evar id ty) ; s')
+  end.
+
+Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
+    make_constrAsgn' argv argList 1.
+            
+(* Compute the  header file comprising of:
+ 1 ) Constructors and eliminators for every inductive types in the n_iEnv
+2 ) Direct style calling functions for the original (named) functions 
+ *)
+ 
+Fixpoint make_constructors (cenv:cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * cTag * N * N)) (nenv : M.t Ast.name): nState (M.t Ast.name * (list (positive * globdef Clight.fundef type))) :=
+  match ctrs with
+  | nil => ret (nenv, nil)
+  | (nAnon, tag, 0%N, ord)::ctrs =>
+    make_constructors cenv nTy ctrs nenv
+  | (nAnon, ctag, Npos _ , _)::ctrs =>
+    make_constructors cenv nTy ctrs nenv
+  | (nNamed nCtr, ctag, 0%N, ord)::ctrs => (* unboxed *)
+    constr_fun_id <- getName;;
+                let constr_body := Sreturn (Some (Econst_int (Int.repr (Z.add (Z.shiftl (Z.of_N ord) 1) 1)) val)) in
+                let constr_fun := Internal (mkfunction
+                                      val
+                                      cc_default
+                                      nil
+                                      nil
+                                      nil
+                                      constr_body
+                                           ) in
+                let nenv := M.set constr_fun_id (nNamed (append "make_" (append nTy (append "_" nCtr)))) nenv in
+    (* elet cFun :=  (Internal (mkFun )) *)
+                l <- make_constructors cenv nTy ctrs nenv;;
+                  let (nenv, funs) := l in                  
+              ret (nenv, (constr_fun_id ,(Gfun constr_fun))::funs)
+  | (nNamed nCtr, ctag, Npos arr, ord)::ctrs => (* boxed *)
+    constr_fun_id <- getName;;
+                  argcIdent <- getName;;
+                  argvIdent <- getName;;
+                  argList <- make_argList (Pos.to_nat arr) nenv;;
+                  let (nenv, argList) := argList in
+                  let asgn_s := make_constrAsgn argvIdent argList in
+                  let header := c_int (Z.of_N ((N.shiftl (Npos arr) 10) + ord)) val in
+                  let constr_body := Ssequence (Sassign (Field(var argvIdent, 0%Z)) header)
+                                               (Ssequence asgn_s (Sreturn (Some (add (Evar argvIdent argvTy) (c_int 1%Z intTy))))) in
+                  let constr_fun := Internal (mkfunction
+                                                val
+                                                cc_default
+                                                (argList ++ ((argcIdent, intTy)::(argvIdent, argvTy)::nil))
+                                                nil
+                                                nil
+                                                constr_body
+                                             ) in
+                  let nenv :=
+                      M.set argcIdent (nNamed "argc"%string) (
+                              M.set argvIdent (nNamed "argv"%string) (
+                                      M.set constr_fun_id (nNamed (append "make_" (append nTy (append "_" nCtr)))) nenv)) in
+                  (* elet cFun :=  (Internal (mkFun )) *)
+                  l <- make_constructors cenv nTy ctrs nenv;;
+                    let (nenv, funs) := l in                  
+                    ret (nenv, (constr_fun_id ,(Gfun constr_fun))::funs)
+  end.
+
+
+(* make a function discriminating over the different constructors of an inductive type *)
+
+Notation charTy :=
+  (Tint I8 Unsigned noattr).
+
+Notation charPtrTy :=
+  (Tpointer
+     charTy
+        noattr).
+    
+Notation nameTy :=
+  (Tpointer charPtrTy
+      noattr).
+
+Notation arityTy :=
+  (Tpointer intTy noattr).
+
+
+
+Fixpoint make_elim_Asgn (argv:ident) (valIdent:ident) (arr:nat): statement :=
+  let argv_proj := make_proj (var argv) 0%nat arr in
+  let val_proj := make_proj (var valIdent) 0%nat arr in
+  make_Asgn argv_proj val_proj.
+
+
+About ascii.
+
+SearchAbout (ascii -> _).
+
+SearchAbout EmptyString.
+
+Fixpoint asgn_string' (charPtr:ident) (s:string) (curr:Z): statement :=
+  match s with
+  | EmptyString =>
+       Sassign (Field(Etempvar charPtr charPtrTy,  curr)) (Econst_int (Int.repr 0%Z) charTy) 
+  | String c s' =>
+    let seq := asgn_string' charPtr s' (Z.succ curr) in
+    Ssequence
+      (Sassign (Field(Etempvar charPtr charPtrTy,  curr)) (Econst_int (Int.repr (Z.of_N (N_of_ascii c))) charTy))
+      seq
+  end.
+
+Definition asgn_string (charPtr:ident) (n:name):statement :=
+  match n with
+  | nAnon => 
+    asgn_string' charPtr ("unknown"%string) 0%Z
+  | nNamed s => 
+    asgn_string' charPtr s 0%Z
+  end.
+  
+  
+Definition make_eliminator (cenv: cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * cTag * N * N)) (nenv:M.t Ast.name): nState (M.t Ast.name * (list (ident * globdef Clight.fundef type))) :=
+  valIdent <- getName;;
+  nameIdent <- getName;;
+  arityIdent <- getName;;         
+  argcIdent <- getName;;
+  argvIdent <- getName;;
+  elim_fun_id <- getName;;
+  let (ls, ls') := (fix make_elim_cases (ctrs: list (Ast.name * cTag * N * N)) :=
+                       match ctrs with
+                       | nil => (LSnil, LSnil)
+                       | (nName, ctag, n, ord)::ctrs =>
+                         let (ls, ls') := make_elim_cases ctrs in
+                         let name_s := asgn_string nameIdent nName in
+                         let curr_s := Ssequence
+                                         name_s
+                                         (Ssequence                                          
+                                            (Sassign (Field(var arityIdent, 0%Z)) (c_int (Z.of_N n) intTy))
+                                            (Ssequence (make_elim_Asgn argvIdent valIdent (N.to_nat n))
+                                                       Sbreak)) in
+                         (match n with
+                         | 0%N => (ls, LScons (Some (Z.of_N ord)) curr_s ls')
+                         | Npos p => (LScons (Some (Z.of_N ord)) curr_s ls, ls')
+                          end)
+                       end) ctrs   in                 
+  let elim_body := (make_case_switch valIdent ls  ls') in
+  let elim_fun :=
+      Internal (mkfunction
+                  val
+                  cc_default
+                  ((valIdent, val)::(nameIdent, nameTy)::(arityIdent, arityTy)::(argcIdent, intTy)::(argvIdent, argvTy)::nil)
+                  ((caseIdent, val)::nil)
+                  nil
+                  elim_body
+               ) in
+  let nenv :=
+      M.set arityIdent (nNamed "arity"%string) (
+      M.set nameIdent (nNamed "name"%string) (
+              M.set valIdent (nNamed "val"%string) (
+        M.set argcIdent (nNamed "argc"%string) (
+              M.set argvIdent (nNamed "argv"%string) (
+                      M.set elim_fun_id (nNamed (append "elim_" nTy)) nenv))))) in
+  
+    ret (nenv, (elim_fun_id ,(Gfun elim_fun))::nil).
+  
+
+Fixpoint make_interface (cenv: cEnv)(ienv_list:list (positive * n_iTyInfo)) (nenv : M.t Ast.name):  nState (M.t Ast.name * (list (ident * globdef Clight.fundef type))) :=
+  match ienv_list with
+  | nil => ret (nenv, nil)
+  | (_, (nAnon, _))::ienv_list' =>
+  (* skip anon-types *)
+    make_interface cenv ienv_list' nenv
+  | (_, (nNamed nTy, lCtr))::ienv_list' =>    
+    l1 <- make_constructors cenv nTy lCtr nenv;;
+       let (nenv, def1) := l1 in
+       l2 <- make_eliminator cenv nTy lCtr nenv;;
+      let (nenv, def2) := l2 in
+      l3 <- make_interface cenv ienv_list' nenv;;
+         let (nenv, def3) := l3 in
+         ret (nenv, (def1++def2++def3))
+  end.
+    
+
+
+
+Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t Ast.name):  nState (option (M.t Ast.name  * (list (ident * globdef Clight.fundef type)))) :=
+  l <- make_interface cenv (M.elements ienv) nenv;;
+  ret (Some l). 
+
+(* end of header file *)
+                              
 Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
-  M.t Ast.name * option Clight.program :=
+  (M.t Ast.name * option Clight.program * option Clight.program) :=
   let e := wrap_in_fun e in 
   let fenv := compute_fEnv e in
-  let ienv := compute_iEnv cenv in 
+  let ienv := compute_iEnv cenv in
   let p'' := make_defs e fenv cenv ienv nenv in
   let n := ((max_var e 100) + 1)%positive in
-  let p' := fst (p''.(runState) n) in
-  match p' with
-  | None => (nenv, None)
+  let p' :=  (p''.(runState) n) in
+  match fst p' with
+  | None => (nenv, None, None)
   | Some p =>
-    let '(nenv', defs) := p in
-    (add_inf_vars (ensure_unique nenv'), (mk_prog_opt defs mainIdent))
+    let '(nenv, defs) := p in
+    let nenv := (add_inf_vars (ensure_unique nenv)) in
+    let header_pre := make_header cenv ienv e nenv in
+    let header_p := (header_pre.(runState) (snd p')) in
+    (match fst header_p with
+     | None => (nenv, None, None)
+     | Some (nenv, hdefs) =>
+       (nenv, mk_prog_opt hdefs mainIdent, mk_prog_opt defs mainIdent)
+     end)
   end.
 
 

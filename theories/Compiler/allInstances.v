@@ -68,7 +68,9 @@ Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
                    prog cenv nenv in
-  (fst p, stripOption mainIdent (snd p)).
+  (fst (fst p), stripOption mainIdent (snd p)).
+
+
 
 
 Definition compile_opt_L7 p  :=

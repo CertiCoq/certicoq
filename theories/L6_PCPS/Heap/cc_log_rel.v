@@ -1640,6 +1640,38 @@ Module CC_log_rel (H : Heap).
       eexists; split; eauto.
   Qed. 
 
+  Lemma cc_approx_env_image_reach_included S (k : nat)
+        (H1 H2 : heap block) (rho1 rho2 : env) :
+    (forall j, (H1, rho1) ⋞ ^ (S; k; j; GIP; GP; b; d) (H2, rho2)) ->
+    image b (reach' H1 (env_locs rho1 S)) :|: image' d (reach' H1 (env_locs rho1 S)) \subset
+    reach' H2 (env_locs rho2 S).
+  Proof.
+    intros Hres l' [l'' [l [Hin Heq]] | l'' [l [Hin Heq]]]; subst.
+    + destruct Hin as [n [_ Hp]].
+      edestruct post_n_exists_Singleton as [l1 [Hin Hp']]; try eassumption.
+      destruct Hin as [x [Hin Heq]]. 
+      destruct (M.get x rho1) as[[l1' |] | ] eqn:Hgetx1; inv Heq.
+      eapply reach'_set_monotonic.
+      eapply env_locs_monotonic. eapply Singleton_Included. eassumption.
+      eapply cc_approx_var_env_image_reach; try eassumption.
+      intros j. eapply Hres. eassumption.
+      left. eexists. split; eauto.
+      rewrite !env_locs_Singleton at 1; try eassumption.
+      eexists; split; eauto. now constructor.
+    + destruct Hin as [n [_ Hp]].
+      edestruct post_n_exists_Singleton as [l1 [Hin Hp']]; try eassumption.
+      destruct Hin as [x [Hin Heq']]. 
+      destruct (M.get x rho1) as[[l1' |] | ] eqn:Hgetx1; inv Heq'.
+      eapply reach'_set_monotonic.
+      eapply env_locs_monotonic. eapply Singleton_Included. eassumption.
+      eapply cc_approx_var_env_image_reach; try eassumption.
+      intros j. eapply Hres. eassumption.
+      right. eexists. split; eauto.
+      rewrite !env_locs_Singleton at 1; try eassumption.
+      eexists; split; eauto. now constructor.
+  Qed.
+
+  
   Lemma cc_approx_env_image_eq S (k : nat)
         (H1 H2 : heap block) (rho1 rho2 : env) :
     (forall j, (H1, rho1) ⋞ ^ (S; k; j; GIP; GP; b; d) (H2, rho2)) ->

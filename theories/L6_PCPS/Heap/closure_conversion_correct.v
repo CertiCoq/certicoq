@@ -179,20 +179,22 @@ Module ClosureConversionCorrect (H : Heap).
       assert (Heq2 : l2' = b l1).
       { destruct Hv as [Heqv _]. subst. reflexivity. }
       subst. repeat subst_exp. eassumption.
-      
+
     + destruct Hin as [n [_ Hp]].
       edestruct post_n_exists_Singleton as [l1 [Hin Hp']]; try eassumption.
       
-      edestruct (Hheap 0) as (c & vs & FLS & Heq' & Hnd & Hget' & Hall). 
-      rewrite post_Singleton; eauto. simpl. 
-
-      edestruct Hin as [y [Hgety Hiny]].
-      destruct (M.get y rho1) as [ [|] |]  eqn:Hgety'; inv Hiny.
-
-      edestruct (@Forall2_exists loc) with (x := y) as [v2 [Hin' Hv]]; try eassumption.
-      eapply Heq'; try eassumption.
-      destruct Hv as [l1' [Hgetl1 Hv]].
-      rewrite cc_approx_val_eq in Hv.
+      edestruct (Hres n) as (vs1 & loc_env & Hget1 & Hget2 & Hall).
+    
+      rewrite env_locs_Singleton; eauto.
+      simpl. rewrite post_Singleton; eauto. simpl. subst.
+      
+      destruct Hin as [y [Hin' Hall']].
+      destruct (M.get y rho1) as [ [|] | ] eqn:Hgety; try inv Hall'. 
+      
+      inv Hin'.
+      edestruct (@Forall2_P_exists loc) with (x := y) as [v2 [Hin'' Hv]]; try eassumption.
+      
+      destruct Hv as [v1' [Hgety' Hv]]. repeat subst_exp.
       edestruct v2 as [ l2' |]; try contradiction.
       
       eapply reach'_set_monotonic. 
@@ -201,49 +203,22 @@ Module ClosureConversionCorrect (H : Heap).
       [| right; eexists; split; eauto; eexists; split; eauto; now constructor ].
 
       intros j.
-      edestruct (Hheap j) as (c' & vs' & FLS' & Heq'' & Hnd' & Hget1'  & Hall').
+      
+      edestruct (Hres j) as (vs1' & loc_env' & Hget1' & Hget2' & Hall').
       repeat subst_exp.
 
-        edestruct (@Forall2_exists loc) with (x := y) as [v2' [Hin'' Hv']]; try eassumption.
-        eapply Heq''. eassumption.
-        destruct Hv as [Heqb _]. subst.
-        destruct Hv' as [l1 [Hgety'' Hv']]. repeat subst_exp.
-        rewrite cc_approx_val_eq in Hv'.
-        assert (Heq1 : v2' = Loc (b l1)).
-        { destruct v2'; try contradiction.
-          destruct Hv' as [Heqv _]. subst. reflexivity. }
-        subst. eassumption.
+      edestruct (@Forall2_P_exists loc) with (x := y) as [v2' [Hin2' Hv']]; [| | now apply Hall' |]; try eassumption.
+      
+      destruct Hv' as [v1' [Hgety' Hv']]. repeat subst_exp.
 
-    destruct (Hres 
-    
-    [l'' [l [Hin Heq]] | l'' [l [Hin Heq]]]; subst.
-    +
+      assert (Heq1 : v2' = Loc (b l1)).
+      { destruct v2'; try contradiction.
+        destruct Hv' as [Heqv _]. subst. reflexivity. }
 
-      destruct Hin as [n [_ Hp]].
-      edestruct post_n_exists_Singleton as [l1 [Hin Hp']]; try eassumption.
-      destruct Hin as [x [Hin Heq]]. 
-      destruct (M.get x rho1) as[[l1' |] | ] eqn:Hgetx1; inv Heq.
-      eapply reach'_set_monotonic.
-      eapply env_locs_monotonic. eapply Singleton_Included. eassumption.
-      eapply cc_approx_var_env_image_reach; try eassumption.
-      intros j. eapply Hres. eassumption.
-      left. eexists. split; eauto.
-      rewrite !env_locs_Singleton at 1; try eassumption.
-      eexists; split; eauto. now constructor.
-    + destruct Hin as [n [_ Hp]].
-      edestruct post_n_exists_Singleton as [l1 [Hin Hp']]; try eassumption.
-      destruct Hin as [x [Hin Heq']]. 
-      destruct (M.get x rho1) as[[l1' |] | ] eqn:Hgetx1; inv Heq'.
-      eapply reach'_set_monotonic.
-      eapply env_locs_monotonic. eapply Singleton_Included. eassumption.
-      eapply cc_approx_var_env_image_reach; try eassumption.
-      intros j. eapply Hres. eassumption.
-      right. eexists. split; eauto.
-      rewrite !env_locs_Singleton at 1; try eassumption.
-      eexists; split; eauto. now constructor.
-
-  Admitted. 
- 
+      assert (Heq2 : l2' = b l1).
+      { destruct Hv as [Heqv _]. subst. reflexivity. }
+      subst. repeat subst_exp. eassumption.
+  Qed. 
 
   Lemma FV_inv_set_not_in_FVs_l (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)

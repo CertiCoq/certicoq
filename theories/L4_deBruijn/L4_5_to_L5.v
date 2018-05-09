@@ -615,7 +615,25 @@ Proof using varclass.
   apply subsetv_nil_r in He. assumption.
 Qed.
 
+(** Induction principle *)
+
+Definition substPreservedProp (P: NTerm -> Prop) : Prop :=
+  forall t sub, P t -> sub_range_sat sub P -> P (ssubst t sub).
+
+Lemma eval_ind2 Pre (ppre: substPreservedProp Pre) (P: NTerm -> NTerm -> Prop)
+      (Hlamv: forall (x : NVar) (e : NTerm), Pre (Lam_e x e) -> P (Lam_e x e) (Lam_e x e))
+  : forall e v, Pre e -> eval e v -> (P e v).
+Proof using.
+  intros ?  ? Hpre Hev.
+  induction Hev.
+- eauto. (* lambda value *)
+-  (* beta *)
+   
+  revert x  e Hpre.
+  Print eval_ind.
 (** Characterize values *)
+
+
 
 
 (** Show that evaluation always yields a value. *)

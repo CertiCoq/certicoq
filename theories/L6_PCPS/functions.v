@@ -848,6 +848,30 @@ Proof.
       eexists; split; eauto.
 Qed.
 
+Lemma image'_extend_Included_Some (A : Type) (f : positive -> option A) (x : positive) 
+      (x' : A) (S : Ensemble positive):
+  image' (f {x ~> Some x'}) S \subset image' f (S \\ [set x]) :|: [set x'].
+Proof. 
+  intros z [y [Heq Hin]].
+  destruct (peq x y); subst.
+  - rewrite extend_gss in Hin. inv Hin; eauto.
+  - rewrite extend_gso in Hin; eauto.
+    left. eexists; split; eauto.
+    constructor; eauto. intros Hc; inv Hc; eauto.
+Qed.
+
+Lemma image'_extend_Included_None (A : Type) (f : positive -> option A) (x : positive) 
+      (S : Ensemble positive):
+  image' (f {x ~> None}) S \subset image' f (S \\ [set x]).
+Proof. 
+  intros z [y [Heq Hin]].
+  destruct (peq x y); subst.
+  - rewrite extend_gss in Hin. inv Hin; eauto.
+  - rewrite extend_gso in Hin; eauto.
+    eexists; split; eauto.
+    constructor; eauto. intros Hc; inv Hc; eauto.
+Qed.
+
 Instance Proper_image'_Same_set {A B} :
   Proper (eq ==> Same_set A ==> Same_set B) image'.
 Proof.

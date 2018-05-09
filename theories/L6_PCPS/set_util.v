@@ -651,3 +651,89 @@ Proof.
     simpl in Hc. eapply In_InA in Hc. eapply PS.elements_spec1 in Hc.
     eassumption. eauto with typeclass_instances.
 Qed.
+
+    
+Definition PS_map f s :=
+  PS.fold (fun x s => PS.add (f x) s) s PS.empty.
+
+Definition PS_map_opt f s :=
+  PS.fold (fun x s => match f x with
+                     | Some y => PS.add y s
+                     | None => s
+                   end) s PS.empty.
+
+Lemma FromSet_elements m :
+  FromSet m <--> FromList (PS.elements m).
+Proof.
+  split.
+  - intros x H.
+    eapply FromSet_sound in H; try eassumption; [| reflexivity ].
+    unfold In, FromList.
+    eapply InA_In. eapply PS.elements_spec1. eassumption.
+  - intros x H.
+    unfold Ensembles.In, FromList in H.
+    eapply In_InA in H. eapply PS.elements_spec1 in H.
+    eapply FromSet_complete. reflexivity. eassumption.
+    tci.
+Qed.
+
+Lemma PS_fold_left_map s l b : 
+  image b (FromList l) :|: FromSet s <-->
+        FromSet
+        (fold_left (fun (a : PS.t) (e : PS.elt) => PS.add (b e) a) l s).
+Proof with (now eauto with Ensembles_DB).
+  revert s; induction l; intros s; eauto.
+  - rewrite FromList_nil, image_Empty_set...
+  - rewrite FromList_cons. simpl.
+    rewrite image_Union, (Union_commut (image _ _ )), <- Union_assoc.
+    rewrite image_Singleton. rewrite <- FromSet_add.
+    now apply IHl.
+Qed.
+
+Lemma PS_fold_left_map_opt s l (b : positive -> option positive) : 
+  image' b (FromList l) :|: FromSet s <-->
+         FromSet
+         (fold_left (fun s x  => match b x with
+                                | Some y => PS.add y s
+                                | None => s
+                              end)  l s).
+Proof with (now eauto with Ensembles_DB).
+  revert s; induction l; intros s; eauto.
+  - rewrite FromList_nil, image'_Empty_set...
+  - rewrite FromList_cons. simpl.
+    rewrite image'_Union, (Union_commut (image' _ _ )), <- Union_assoc.
+    destruct (b a) eqn:Hbs.
+    + rewrite image'_Singleton_Some; eauto.
+      rewrite <- FromSet_add.
+      now apply IHl.
+    + rewrite image'_Singleton_None; eauto.
+      rewrite Union_Empty_set_neut_l.
+      eapply IHl. 
+Qed.
+
+  
+Instance ImageToMSet b S `{_: ToMSet S} : ToMSet (image b S).
+Proof.
+  destruct H as [m Hm].
+  exists (PS_map b m).  rewrite Hm. unfold PS_map.
+  rewrite FromSet_elements.
+  rewrite PS.fold_spec. 
+  rewrite FromSet_elements in Hm.
+  generalize (PS.elements m) Hm. clear Hm.
+  intros l Heq.
+  rewrite <- PS_fold_left_map. rewrite FromSet_empty.
+  now eauto with Ensembles_DB.
+Qed.
+
+Instance Image'ToMSet b S `{_: ToMSet S} : ToMSet (image' b S).
+Proof.
+  destruct H as [m Hm].
+  exists (PS_map_opt b m).  rewrite Hm. unfold PS_map_opt.
+  rewrite FromSet_elements.
+  rewrite PS.fold_spec. 
+  rewrite FromSet_elements in Hm.
+  generalize (PS.elements m) Hm. clear Hm.
+  intros l Heq.
+  rewrite <- PS_fold_left_map_opt. rewrite FromSet_empty.
+  now eauto with Ensembles_DB.
+Qed.

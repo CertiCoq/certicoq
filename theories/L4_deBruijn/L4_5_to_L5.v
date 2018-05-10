@@ -650,8 +650,15 @@ Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Pr
   eval e2 v2 ->
   eval (e1' {x := v2}) v ->
   (P e1 (Lam_e x e1')) ->
+  (Pre e1) ->
+  (Pre (Lam_e x e1')) ->
   (P e2 v2) ->
-  (P (e1' {x := v2}) v) -> P (App_e e1 e2) v)
+  (Pre e2) ->
+  (Pre v2) ->
+  (P (e1' {x := v2}) v) ->
+  (Pre (e1' {x := v2}))->
+  (Pre v)
+  -> P (App_e e1 e2) v)
   : forall e v, Pre e -> eval e v -> (P e v).
 Proof using.
   assert ( forall e v : NTerm, Pre e -> eval e v -> (Pre v /\P e v)).
@@ -664,15 +671,14 @@ Proof using.
    apply subtermPresb in Hyp0.
    specialize (IHHev1 ltac:(assumption)).
    specialize (IHHev2 ltac:(assumption)).
-   repnd.
+   repnd. pose proof IHHev4 as preLam.
    apply subtermPres in IHHev4. unfold lforall in IHHev4. simpl in IHHev4. dLin_hyp.
-   dimp IHHev3.
-   apply  (substPres (bterm [x] e1') [v2]); unfold lforall; simpl in *; auto; intros. in_reasoning; subst; cpx.
-   clear IHHev3. repnd.
+   assert (Pre (e1' {x := v2})) by
+  ( apply  (substPres (bterm [x] e1') [v2]); unfold lforall; simpl in *; auto; intros; in_reasoning; subst; cpx).
+   specialize (IHHev3 ltac:(assumption)).
+   repnd.
    dands; auto. eapply Hbeta; eauto.
 - 
-  
-   apply 
   
    apply 
   revert x  e Hpre.

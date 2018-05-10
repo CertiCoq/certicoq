@@ -617,18 +617,64 @@ Qed.
 
 (** Induction principle *)
 
-Definition substPreservedProp (P: NTerm -> Prop) : Prop :=
-  forall t sub, P t -> sub_range_sat sub P -> P (ssubst t sub).
+(* move to SquiggleEq *)
+Class evalPresProps (P: NTerm -> Prop) (PB: BTerm ->Prop) : Prop :=
+  {
+    substPres: forall t sub, PB t -> lforall P sub -> P (apply_bterm t sub);
+    subtermPres: forall o lbt, P (oterm o lbt) -> lforall PB lbt;
+    subtermPresb: forall t, PB (bterm [] t) -> P t
+  }.
 
-Lemma eval_ind2 Pre (ppre: substPreservedProp Pre) (P: NTerm -> NTerm -> Prop)
+Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Prop)
       (Hlamv: forall (x : NVar) (e : NTerm), Pre (Lam_e x e) -> P (Lam_e x e) (Lam_e x e))
+      (Hbeta :
+          forall (e1 e2 e1' : NTerm) (x : NVar) (v2 v : NTerm),
+  eval e1 (Lam_e x e1') ->
+  eval e2 v2 ->
+  eval (e1' {x := v2}) v ->
+  (P e1 (Lam_e x e1')) ->
+  (P e2 v2) ->
+  (P (e1' {x := v2}) v) -> P (App_e e1 e2) v)
+      
   : forall e v, Pre e -> eval e v -> (P e v).
 Proof using.
   intros ?  ? Hpre Hev.
   induction Hev.
 - eauto. (* lambda value *)
--  (* beta *)
-   
+-  revert_all.
+Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Prop)
+      (Hlamv: forall (x : NVar) (e : NTerm), Pre (Lam_e x e) -> P (Lam_e x e) (Lam_e x e))
+      (Hbeta :
+          forall (e1 e2 e1' : NTerm) (x : NVar) (v2 v : NTerm),
+  eval e1 (Lam_e x e1') ->
+  eval e2 v2 ->
+  eval (e1' {x := v2}) v ->
+  (P e1 (Lam_e x e1')) ->
+  (P e2 v2) ->
+  (P (e1' {x := v2}) v) -> P (App_e e1 e2) v)
+  : forall e v, Pre e -> eval e v -> (P e v).
+Proof using.
+  assert ( forall e v : NTerm, Pre e -> eval e v -> (Pre v /\P e v)).
+  intros ?  ? Hpre Hev.
+  induction Hev.
+- eauto. (* lambda value *)
+- apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
+   simpl in Hpre. dLin_hyp.
+   apply subtermPresb in Hyp.
+   apply subtermPresb in Hyp0.
+   specialize (IHHev1 ltac:(assumption)).
+   specialize (IHHev2 ltac:(assumption)).
+   repnd.
+   apply subtermPres in IHHev4. unfold lforall in IHHev4. simpl in IHHev4. dLin_hyp.
+   dimp IHHev3.
+   apply  (substPres (bterm [x] e1') [v2]); unfold lforall; simpl in *; auto; intros. in_reasoning; subst; cpx.
+   clear IHHev3. repnd.
+   dands; auto. eapply Hbeta; eauto.
+- 
+  
+   apply 
+  
+   apply 
   revert x  e Hpre.
   Print eval_ind.
 (** Characterize values *)

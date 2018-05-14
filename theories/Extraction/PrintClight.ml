@@ -285,7 +285,7 @@ let print_program p prog =
   fprintf p "@[<v 0>";
   List.iter (declare_composite p) prog.prog_types;
   List.iter (define_composite p) prog.prog_types;
-  List.iter (print_forwardref p) prog.prog_defs;
+  (*   List.iter (print_forwardref p) prog.prog_defs; *)
   List.iter (print_globdef p) prog.prog_defs;
   fprintf p "@]@."
 

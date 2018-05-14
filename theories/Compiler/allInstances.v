@@ -64,11 +64,11 @@ Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
 
-Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program :=
+Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
                    prog cenv nenv in
-  (fst (fst p), stripOption mainIdent (snd p)).
+  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
 
 
@@ -82,7 +82,7 @@ Definition compile_opt_L7 p  :=
 Definition compile_template_L4 (p : program) : exception (cTerm certiL4) :=
   translateTo (cTerm certiL4) p.
 
-Definition compile_template_L7 (p : program) : exception (L5_to_L6.nEnv * Clight.program)  :=
+Definition compile_template_L7 (p : program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
   compile_opt_L7 (translateTo (cTerm certiL6) p).
 
 Open Scope positive_scope.
@@ -147,7 +147,7 @@ Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_c
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 
 (* Definition test := printProg (compile_L7 (ext_comp vs)) "output/vs_h.c".      *)
- Definition test := printProg (compile_L7 (ext_comp graph_color)) "output/color.c".   
+(*  Definition test := printProg (compile_L7 (ext_comp graph_color)) "output/color.c".    *)
 
 
 

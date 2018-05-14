@@ -26,9 +26,11 @@ let compile gr =
   let term = quote_term_rec env (EConstr.to_constr sigma c) in
   Feedback.msg_debug (str"Finished quoting.. compiling to L7.");
   match AllInstances.compile_template_L7 term with
-  | Ret (nenv, prg) ->
+  | Ret ((nenv, header), prg) ->
      Feedback.msg_debug (str"Finished compiling, printing to file.");
      let str = quote_string (Names.string_of_kn (Names.Constant.canonical const) ^ ".c") in
-     AllInstances.printProg (nenv,prg) str
+     let hstr = quote_string (Names.string_of_kn (Names.Constant.canonical const) ^ ".h") in
+     AllInstances.printProg (nenv,prg) str;
+     AllInstances.printProg (nenv,header) hstr
   | Exc s ->
      CErrors.errorlabstrm "template-coq" (str "Could not compile: " ++ pr_char_list s)

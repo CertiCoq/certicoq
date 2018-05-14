@@ -642,30 +642,32 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_
       end
     end
   end.
-SearchAbout signature.
 
-SearchAbout typelist.
 
-Definition make_fun_extern_decl (nenv:M.t Ast.name) (fundef:(positive * globdef Clight.fundef type)): option (positive * globdef Clight.fundef type) :=
-  match fundef with
+Definition make_extern_decl (nenv:M.t Ast.name) (def:(positive * globdef Clight.fundef type)) (gv:bool): option (positive * globdef Clight.fundef type) :=
+  match def with
   | (fIdent, Gfun (Internal f)) =>
     (match M.get fIdent nenv with
      | Some (nNamed f_string) => 
        Some (fIdent, Gfun (External (EF_external f_string (signature_of_type (type_of_params (fn_params f)) (fn_return f) (fn_callconv f))) (type_of_params (fn_params f)) (fn_return f) (fn_callconv f)))
      | _ => None
      end)
+  | (vIdent, Gvar (mkglobvar v_info v_init v_r v_v)) =>
+     if gv then
+         Some (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
+     else None       
     | _ => None 
   end.
 
               
-Fixpoint make_funs_extern_decls (nenv:M.t Ast.name) (fundefs:list (positive * globdef Clight.fundef type)) : (list (positive * globdef Clight.fundef type)) :=
-  match fundefs with
-  | fdefs::fundefs' =>
-    let fundecls := make_funs_extern_decls nenv fundefs' in
-    (match make_fun_extern_decl nenv fdefs with
+Fixpoint make_extern_decls (nenv:M.t Ast.name) (defs:list (positive * globdef Clight.fundef type)) (gv:bool): (list (positive * globdef Clight.fundef type)) :=
+  match defs with
+  | fdefs::defs' =>
+    let decls := make_extern_decls nenv defs' gv in
+    (match make_extern_decl nenv fdefs gv with
     | Some decl =>
-      decl :: fundecls
-    | None => fundecls
+      decl :: decls
+    | None => decls
     end)
   | nil => nil
   end.
@@ -1327,13 +1329,13 @@ Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
   | Some p =>
     let '(nenv, defs) := p in
     let nenv := (add_inf_vars (ensure_unique nenv)) in
-    let forward_defs := make_funs_extern_decls nenv defs in
+    let forward_defs := make_extern_decls nenv defs false in
     let header_pre := make_header cenv ienv e nenv in
     let header_p := (header_pre.(runState) (snd p')) in
     (match fst header_p with
      | None => (nenv, None, None)
      | Some (nenv, hdefs) =>
-       (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_funs_extern_decls nenv hdefs)) mainIdent, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent)
+       (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent)
      end)
   end.
 

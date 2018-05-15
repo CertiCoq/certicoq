@@ -854,13 +854,12 @@ Definition composites : list composite_definition :=
    noattr ::  nil).
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
-           (main : ident) : option Clight.program :=
+           (main : ident): option Clight.program :=
   let res := Ctypes.make_program composites defs (bodyIdent :: nil) main in
   match res with
   | Error e => None
   | OK p => Some p
   end.
-
 
 
 
@@ -1248,8 +1247,31 @@ env is placed in args[0]
 if b, then export the resulting value
 
 TODO: fix the access to threadInf with Ederef 
-OS: note 05/11/2018 : this is not in used right now, call is provided directly in c.
+TODO: make a global threadinfo variable, make_tinfo if NULL, use it otherwise
+
+
  *)
+
+Definition make_call (closExpr:expr) (fIdent:ident) (envIdent:ident) (argsExpr:expr) (argIdent:ident) (haltIdent:ident) :=
+  
+  (fIdent ::=  (Field(closExpr , Z.of_nat 0));
+                                      envIdent ::= (Field(closExpr, Z.of_nat 1));
+
+                    (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar envIdent val));
+                    (Sassign (Field(argsExpr, Z.of_nat 1)) (Evar haltIdent val));
+                    (Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar argIdent val))).
+
+Fixpoint make_n_calls (n:nat) (closIdent:ident) (fIdent:ident) (envIdent:ident) (argsExpr:expr) (argPairs:list (ident * type)) (retIdent:ident) (haltIdent:ident) :=
+  match n, argPairs with
+  | S 0, ((argIdent, argTy)::tl) =>
+    make_call (Etempvar closIdent valPtr) fIdent envIdent argsExpr argIdent haltIdent
+  | S (S n), ((argIdent, _)::tl) =>
+    let s := make_n_calls (S n) closIdent  fIdent envIdent argsExpr tl retIdent haltIdent in
+    Ssequence s
+              (retIdent ::= (Field(argsExpr, Z.of_nat 1)); make_call (Etempvar retIdent valPtr) fIdent envIdent argsExpr argIdent haltIdent)
+  | _, _ => Sskip
+  end.
+    
 
 Definition make_call_n_export_b (nenv:M.t Ast.name) (n:nat) (export:bool) (haltIdent:ident): nState (M.t Ast.name * (ident * globdef Clight.fundef type)) :=
     callIdent <- getName;;
@@ -1258,19 +1280,21 @@ Definition make_call_n_export_b (nenv:M.t Ast.name) (n:nat) (export:bool) (haltI
     f_ident <- getName;;
     env_ident <- getName;;
     t <- make_argList n nenv;;
-    let tinfo_s := if export then (Scall (Some tinfIdent) (Evar make_tinfoIdent make_tinfoTy) nil) else Sskip in
+    (*    let tinfo_s := if export then (Scall (Some tinfIdent) (Evar make_tinfoIdent make_tinfoTy) nil) else Sskip in *)
+    let tinfo_s := Sifthenelse (Ebinop Oeq (Evar tinfIdent threadInf)
+                 (Ecast (Econst_int (Int.repr 0) tint) (tptr tvoid)) tint) (Scall (Some tinfIdent) (Evar make_tinfoIdent make_tinfoTy) nil) Sskip in
     let (nenv, argsL) := t in
-    let argsS :=  (Efield tinf argsIdent valPtr) in
+    let argsS :=  (Efield tinfd argsIdent valPtr) in
     let left_args := make_proj argsS 2 n in
-
-    let asgn_s := ( f_ident ::=  (Field(Etempvar clo_ident valPtr , Z.of_nat 0));
+    let asgn_s := make_n_calls n clo_ident f_ident env_ident argsS (rev argsL) retIdent haltIdent in
+(*     let asgn_s := ( f_ident ::=  (Field(Etempvar clo_ident valPtr , Z.of_nat 0));
                                       env_ident ::= (Field(Etempvar clo_ident valPtr, Z.of_nat 1));
 
                     (Sassign (Field(argsS, Z.of_nat 0)) (Etempvar env_ident val));
                     (Sassign (Field(argsS, Z.of_nat 1)) (Evar haltIdent val));
                        (make_Asgn left_args (List.map (fun (s:ident*type) => let (i, t) := s in
                                                                 Etempvar i t
-                                                      ) argsL))) in
+                                                      ) argsL))) in *)
     let export_s := (if export then
                       (Scall (Some retIdent) (Evar exportIdent exportTy) (cons tinf nil))
                     else
@@ -1288,8 +1312,8 @@ Definition make_call_n_export_b (nenv:M.t Ast.name) (n:nat) (export:bool) (haltI
     let nenv :=
         M.set env_ident (nNamed "env"%string) (M.set clo_ident (nNamed "clos"%string) (M.set callIdent (nNamed callStr)  (M.set f_ident (nNamed "f"%string) (M.set retIdent (nNamed "ret"%string) nenv)))) in
     (* if export, tinf is local, otherwise is a param *)
-    let params := if export then ((clo_ident, val)::argsL) else ((tinfIdent, threadInf)::(clo_ident, val)::argsL) in
-    let vars := if export then ((f_ident, valPtr)::(env_ident, valPtr)::(retIdent, valPtr)::(tinfIdent, threadInf)::nil) else ((f_ident, valPtr)::(env_ident, valPtr)::(retIdent, valPtr)::nil) in
+    let params := ((clo_ident, val)::argsL) in
+    let vars := ((f_ident, valPtr)::(env_ident, valPtr)::(retIdent, valPtr)::nil) in
   ret (nenv, (callIdent, Gfun (Internal
                                       (mkfunction
                                          (Tpointer Tvoid noattr)
@@ -1300,17 +1324,23 @@ Definition make_call_n_export_b (nenv:M.t Ast.name) (n:nat) (export:bool) (haltI
                                          body_s)))).
 
 
+Definition tinf_def:globdef Clight.fundef type :=
+  Gvar (mkglobvar threadInf ((Init_space 4%Z)::nil) false false).
 
 Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t Ast.name):  nState (option (M.t Ast.name  * (list (ident * globdef Clight.fundef type)))) :=
   l <- make_interface cenv (M.elements ienv) nenv;;
     let (nenv, inter_l) := l in
     l <- make_halt nenv;;
       let  '(nenv, (haltIdent, halt_def)) := l in
-(*      l <- make_call_n_export_b nenv 2 true haltIdent;;
-        let  '(nenv, call_1) := l in
-        l <- make_call_n_export_b nenv 1 false haltIdent;;
-          let  '(nenv, call_2) := l in *)
-  ret (Some (nenv, ((haltIdent, halt_def)(*::call_1::call_2*)::inter_l))). 
+      l <- make_call_n_export_b nenv 1 false haltIdent;;
+        let  '(nenv, call_0) := l in
+     l <- make_call_n_export_b nenv 2 true haltIdent;;
+        let  '(nenv, call_2) := l in
+        l <- make_call_n_export_b nenv 1 true haltIdent;;
+          let  '(nenv, call_1) := l in
+        l <- make_call_n_export_b nenv 3 true haltIdent;;
+          let  '(nenv, call_3) := l in
+  ret (Some (nenv, ((haltIdent, halt_def)::(tinfIdent, tinf_def)::call_0::call_1::call_2::call_3::inter_l))). 
 
 
 (* end of header file *)

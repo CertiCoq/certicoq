@@ -854,7 +854,8 @@ Definition composites : list composite_definition :=
    noattr ::  nil).
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
-           (main : ident): option Clight.program :=
+           (main : ident) (add_comp:bool): option Clight.program :=
+  let composites := if add_comp then composites else nil in
   let res := Ctypes.make_program composites defs (bodyIdent :: nil) main in
   match res with
   | Error e => None
@@ -1220,10 +1221,12 @@ Definition make_direct (f_name:string) (f_ident: ident) (f_ar:nat) (nenv:M.t Ast
                                          body_s)))).
 
 
-(* generate a function equivalent to halt, received a tinfo, desired results is already in tinfo.args[1] *)
-Definition make_halt (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globdef Clight.fundef type)) :=
+(* generate a function equivalent to halt, received a tinfo, desired results is already in tinfo.args[1], and
+ a halting continuation closure *)
+Definition make_halt (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globdef Clight.fundef type) * (ident * globdef Clight.fundef type)) :=
   haltIdent <- getName;;
-            let nenv := M.set haltIdent (nNamed "halt"%string) nenv in            
+            halt_cloIdent <- getName;;
+            let nenv := M.set halt_cloIdent (nNamed "halt_clo"%string) (M.set haltIdent (nNamed "halt"%string) nenv) in            
   ret (nenv, (haltIdent, Gfun (Internal
                                       (mkfunction
                                          Tvoid
@@ -1231,7 +1234,8 @@ Definition make_halt (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globde
                                          ((tinfIdent, threadInf)::nil)
                                          nil
                                          nil
-                                         (Sreturn None))))).          
+                                         (Sreturn None)))), (halt_cloIdent, Gvar (mkglobvar  (tarray tuint 2) ((Init_addrof haltIdent Int.zero) ::
+                Init_int32 (Int.repr 1) :: nil) true false))).
 
 
 (* make b? call^n_export; call^n  
@@ -1331,16 +1335,16 @@ Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t Ast.name): 
   l <- make_interface cenv (M.elements ienv) nenv;;
     let (nenv, inter_l) := l in
     l <- make_halt nenv;;
-      let  '(nenv, (haltIdent, halt_def)) := l in
-      l <- make_call_n_export_b nenv 1 false haltIdent;;
+      let  '(nenv, halt_f, (halt_cloIdent, halt_clo_def)) := l in
+      l <- make_call_n_export_b nenv 1 false halt_cloIdent;;
         let  '(nenv, call_0) := l in
-     l <- make_call_n_export_b nenv 2 true haltIdent;;
+     l <- make_call_n_export_b nenv 2 true halt_cloIdent;;
         let  '(nenv, call_2) := l in
-        l <- make_call_n_export_b nenv 1 true haltIdent;;
+        l <- make_call_n_export_b nenv 1 true halt_cloIdent;;
           let  '(nenv, call_1) := l in
-        l <- make_call_n_export_b nenv 3 true haltIdent;;
+        l <- make_call_n_export_b nenv 3 true halt_cloIdent;;
           let  '(nenv, call_3) := l in
-  ret (Some (nenv, ((haltIdent, halt_def)::(tinfIdent, tinf_def)::call_0::call_1::call_2::call_3::inter_l))). 
+  ret (Some (nenv, (halt_f::(halt_cloIdent, halt_clo_def)::(tinfIdent, tinf_def)::call_0::call_1::call_2::call_3::inter_l))). 
 
 
 (* end of header file *)
@@ -1365,7 +1369,7 @@ Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
     (match fst header_p with
      | None => (nenv, None, None)
      | Some (nenv, hdefs) =>
-       (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent)
+       (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent false, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent true)
      end)
   end.
 

@@ -2247,37 +2247,31 @@ Module ClosureConversionCorrect (H : Heap).
                       eapply env_locs_monotonic. admit.
                     - eassumption.
                     - (*  IH *)
-                      eapply IHk with (Scope := (name_in_fundefs f2 :|: Scope)).
+                      eapply IHk with (Scope := (name_in_fundefs f2 :|: Scope));
+                      [ | | | | | | | | | | | | | | eassumption ].
                       + (* add assumption in compat *)
                         admit. (* simpl in *. omega. *)
                       + tci.
                       + eassumption.
-                      + eassumption.
+                      + admit. (* G G'? *)
                       + eassumption.
                       + admit. (* ? *)
                       + eassumption.
                       + admit. (* already proven *)
                       + admit. (* already proven *)
                       + eapply make_closures_well_formed. eassumption. eassumption.
-                        unfold FV_cc... unfold FV_cc...
-                        admit. admit. 
-                        eassumption.
-                      dom_al
-                        well_formed_alloc; try eassumption.
-                      rewrite <- well_formed_reach_alloc_same; try eassumption.
-                      eassumption.
-                * eapply well_formed_antimon; [| eassumption ]. eapply reach'_set_monotonic.
-                  eapply env_locs_monotonic; eauto. simpl. normalize_occurs_free.
-                  admit. (* sets *)
-                *  now eapply env_locs_monotonic; eauto.
-                * eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic; eauto. admit.
-                * econstructor; eauto. now constructor; eauto.
-
-                eassumption.
-              eassumption. 
-              eassumption.
-      admit. 
-      
+                        unfold FV_cc... (* ???? *) admit.
+                        eapply Included_trans. eapply def_funs_env_loc.
+                        eapply Included_trans. eapply env_locs_set_Inlcuded'.
+                        rewrite HL.alloc_dom; eauto.
+                        eapply Included_Union_compat. reflexivity.
+                        admit. admit.
+                      + eapply make_closures_env_locs; [ eassumption | eassumption | | | | ].
+                        unfold FV_cc... (* ??? *) admit.
+                        admit. admit.
+                      + admit.
+                      + admit. 
+                      + intros x Hin. eapply Hun. now constructor. } } }      
     - (* case Eapp *)
       inv Hcc.
       
@@ -2363,6 +2357,6 @@ Module ClosureConversionCorrect (H : Heap).
     - (* case Eprim *)
       intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Hstep. inv Hstep. simpl in Hcost. omega. 
     - (* case Ehalt *)
-      inv Hcc.
+      inv Hcc.y
       admit.
   

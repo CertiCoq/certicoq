@@ -757,6 +757,14 @@ unfold subst in *;
 | [ H: isprogram_bt (bterm [] _) |- _ ] => apply isprogram_bt_nobnd in H
 end
 ).
+Ltac isclosedD :=
+unfold apply_bterm in *;
+unfold subst in *;
+(repeat match goal with
+| [ H: closed (vterm _) |- _ ] => apply proj2 in H; inverts H
+| [ H: closed _ |- _ ] => setoid_rewrite closed_nt in H; simpl in H; repnd; dLin_hyp
+end
+).
 
 (*
 Global Instance pp1: Proper (zetaCEquiv ==> eq ==>  zetaCEquiv ==> zetaCEquiv) subst.
@@ -770,52 +778,12 @@ Lemma eval_preserves_isprog :
   forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
 Proof using.
   unfold isprogram. split.  repnd. eauto with eval.
-  
-Lemma L4_5_constr_vars_zeta lv e e' v:
-  isprogram e
-  -> subset (all_vars e) lv
-  -> eval e v
-  -> zetaCLe lv e e'
-  -> exists v', eval e' v'
-      /\ (zetaCLe lv v v').
-Proof using.
-  intros Hisp Hs Hev He.
-  revert dependent e'.
-  induction Hev.
-- simpl. intros ? He. unfold Lam_e in He.
-  repeat dZeta.  eexists.
-  split; [ apply eval_Lam_e | ].
-  do 3 constructor. assumption.
--  isprogd.
-  unfold App_e in Hs. rwsimpl Hs.
-  apply subset_app in Hs. repnd.
-  specialize (IHHev1 ltac:(assumption) ltac:(assumption)) .
-  specialize (IHHev2 ltac:(assumption) ltac:(assumption)).
-  simpl in *.
-  rename e1' into vfb.
-  rename v2 into varg.
-  SearchAbout eval isprogram.
-  Print Hint isprogram.
-  assert (subset (all_vars (subst vfb x varg)) lv) as hx by admit.
-  specialize (IHHev3 hx).
-  intros vapp Hz. unfold App_e in Hz.
-  repeat dZeta.
-  rename ntr0 into e1z.
-  rename ntr into e2z.
-  specialize (IHHev1 _ Hz).
-  specialize (IHHev2 _ Hzr).
-  exrepnd.
-  unfold Lam_e in IHHev4.
-  repeat dZeta.
-  rename ntr into vfbz.
-  rename v' into vargz.
-  specialize (IHHev3 (subst vfbz x vargz)).
-  dimp IHHev3;
-    [ apply ssubst_commute_L4_5_zeta; simpl; eauto; [ | ] | ].
-  exrepnd.
-  eexists; split; [ eapply eval_App_e ;eauto | ] ; eauto.
 
-  Fail idtac. (* done with app *)
+  (* Move to L4_5_to_L5 *)
+Lemma eval_preserves_isprog :
+  forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
+Proof using.
+  unfold isprogram. split.  repnd. eauto with eval.
 Abort.
 
 Global Instance evalPreservesGood :

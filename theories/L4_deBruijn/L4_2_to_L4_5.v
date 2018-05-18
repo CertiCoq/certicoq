@@ -826,7 +826,7 @@ Proof using.
 Qed.
 
 Lemma ssubst_commute_L4_5_zeta fv f1 f2 sub1 sub2:
-      sub_range_sat sub1 isprogram ->
+      sub_range_sat sub1 closed ->
       zetaCLe fv f1 f2 ->
       subset (dom_sub sub1 ++ (flat_map all_vars (range sub1))) fv->
       sub_range_rel (zetaCLe fv) sub1 sub2 ->
@@ -851,13 +851,73 @@ Proof using.
   apply NTerm_BTerm_ind; try constructor; eauto.
   apply eqListA_refl. assumption.
 Qed.  
-  
+
+
 Global Instance ReflZeta lv: RelationClasses.Reflexive (zetaCLe lv).
 Proof using.
   intros t. apply zetaRefl.
 Qed.  
+Ltac dZeta := match goal with
+  [H:  SetoidList.eqlistA (liftRBt (zetaCLe _)) (cons _ _) _ |- _ ]
+   =>  let Hr := fresh H "r" in inverts H as H Hr
+| [H:  SetoidList.eqlistA (liftRBt (zetaCLe _)) [] _ |- _ ]
+   =>  invertsn H
+| [H:  liftRBt (zetaCLe _) (bterm _ _) _ |- _ ]
+   =>  invertsn H
+| [H:  zetaCLe _ (oterm _ _) _ |- _ ]
+   =>  invertsn H
+    end.
 
-  
+Definition constr_vars_precond lv (e : L4_5_Term) :=
+  closed e /\ subset (all_vars e) lv.
+
+Definition constr_vars_precond_bt lv (e : L4_5_BTerm) :=
+  closed_bt e /\ subset (all_vars_bt e) lv.
+
+(* Move to SquiggleEq *)
+Global Instance pre lv :  evalPresProps (constr_vars_precond lv)
+                                        (constr_vars_precond_bt lv).
+Admitted.
+Lemma L4_5_constr_vars_zeta lv (e  v: L4_5_Term):
+  constr_vars_precond lv e
+  -> eval e v
+  -> forall e', zetaCLe lv e e'
+  -> exists v', eval e' v'
+      /\ (zetaCLe lv v v').
+Proof using.
+  revert e v.
+  pose proof
+       (eval_ind2  (constr_vars_precond lv) (constr_vars_precond_bt lv)) as Hx.
+  unfold L4_5_Term.
+  specialize (Hx (fun e v => forall e', zetaCLe lv e e'
+  -> exists v', eval e' v'
+      /\ (zetaCLe lv v v'))).
+  apply Hx.
+- simpl. intros ? ? ? ? He. unfold Lam_e in He.
+  repeat dZeta.  eexists.
+  split; [ apply eval_Lam_e | ].
+  do 3 constructor. assumption.
+- intros ? ? vfb ? varg ? Hevf Heva Hevs Hindf _ Hpref Hinda _ Hprea Hinds _ _ ? Hz.
+  unfold App_e in Hz.
+  repeat dZeta.
+  rename ntr0 into e1z, ntr into e2z.
+  specialize (Hinda _ Hzr).
+  specialize (Hindf _ Hz).
+  exrepnd.
+  unfold Lam_e in *.
+  repeat dZeta.
+  rename ntr into vfbz, v' into vargz.
+  hnf in Hprea, Hpref.
+  rwsimpl Hpref.
+  repnd. 
+  eapply  ssubst_commute_L4_5_zeta with (sub2 := [(x,vargz)])in Hindf0;
+    [specialize (Hinds _ Hindf0) | | | ]; simpl; auto;
+      [ | prove_sub_range_sat | autorewrite with list;  firstorder].
+  exrepnd.
+  eexists; split; [ eapply eval_App_e ;eauto | ] ; eauto; fail.
+  Fail idtac. (* done with beta case*)
+Abort.
+
 Lemma L4_5_constr_vars_zeta fv:
   (forall f, nt_wf f -> zetaCLe fv f (L4_5_constr_vars fv f)) *
   (forall f, bt_wf f -> liftRBt (zetaCLe fv) f (btMapNt (L4_5_constr_vars fv) f)).

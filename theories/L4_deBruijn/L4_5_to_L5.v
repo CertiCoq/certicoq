@@ -636,12 +636,14 @@ Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Pr
   (P e2 v2) ->
   (P (e1' {x := v2}) v) -> P (App_e e1 e2) v)
       
-  : forall e v, Pre e -> eval e v -> (P e v).
+  : forall e v,  eval e v -> Pre e -> (P e v).
 Proof using.
-  intros ?  ? Hpre Hev.
+  intros ?  ? Hev Hpre.
   induction Hev.
 - eauto. (* lambda value *)
--  revert_all.
+-  revert_all. intros ?  ? ? ? ? ? ? ?. admit.
+- revert_all.
+Abort.  
 Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Prop)
       (Hlamv: forall (x : NVar) (e : NTerm), Pre (Lam_e x e) -> P (Lam_e x e) (Lam_e x e))
       (Hbeta :
@@ -679,12 +681,7 @@ Proof using.
    repnd.
    dands; auto. eapply Hbeta; eauto.
 - 
-  
-   apply 
-  revert x  e Hpre.
-  Print eval_ind.
-(** Characterize values *)
-
+Admitted.  
 
 
 

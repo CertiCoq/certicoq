@@ -696,8 +696,9 @@ Proof using.
 -  revert_all. intros ?  ? ? ? ? ? ? ?. admit.
 -  revert_all. intros ?  ? ? ? ? ?. admit.
 -  revert_all. intros ?  ? ? ? ? ?. admit.
-- admit.
+- revert_all. intros ?  ? ? ? ? ?. admit.
 -  revert_all. intros ?  ? ? ? ? ?. admit.
+- revert_all. intros ?  ? ? ? ? ?. admit.
 Abort.  
 Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Prop)
       (Hlamv: forall (x : NVar) (e : NTerm), Pre (Lam_e x e) -> P (Lam_e x e) (Lam_e x e))
@@ -727,9 +728,33 @@ Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Pr
   eval (e2 {x := v1}) v2 ->
   Pre e1 -> Pre v1 ->P e1 v1 ->
   Pre (e2 {x := v1}) -> Pre v2 -> P (e2 {x := v1}) v2
-  -> P (Let_e x e1 e2) v2) 
-  (Hfix :  forall (es : list BTerm) (n : nat),
-  Pre (Fix_e' es n) -> P (Fix_e' es n) (Fix_e' es n))
+  -> P (Let_e x e1 e2) v2)
+   (Hiota:  forall (e : NTerm) (bs : list branch) (d : dcon) 
+    (vs : list NTerm) (e' : BTerm) (v : NTerm),
+  eval e (Con_e d vs) ->
+  find_branch d (Datatypes.length vs) bs = Some e' ->
+  eval (apply_bterm e' vs) v ->
+  Pre e -> Pre (Con_e d vs) -> P e (Con_e d vs) ->
+  Pre (apply_bterm e' vs) -> Pre v -> P (apply_bterm e' vs) v ->
+  P (Match_e e bs) v)
+  (Hfixv :  forall (es : list BTerm) (n : nat),
+      Pre (Fix_e' es n) -> P (Fix_e' es n) (Fix_e' es n))
+  (Hfixapp: forall (e : NTerm) (lbt : list BTerm) (n : nat) 
+    (e2 v2 : NTerm) (bt : BTerm) (ev2 : NTerm),
+  let len := Datatypes.length lbt in
+  let pinds := seq 0 len in
+  let sub := map (Fix_e' lbt) pinds in
+  eval e (Fix_e' lbt n) ->
+  eval e2 v2 ->
+  select n lbt = Some bt ->
+  eval (App_e (apply_bterm bt sub) v2) ev2 ->
+  num_bvars bt = len ->
+  Pre e -> Pre (Fix_e' lbt n) -> P e (Fix_e' lbt n) ->
+  Pre e2 -> Pre v2 -> P e2 v2 ->
+  Pre (App_e (apply_bterm bt sub) v2) ->
+  Pre ev2 ->
+   P (App_e (apply_bterm bt sub) v2) ev2
+  -> P (App_e e e2) ev2)
   : forall e v, Pre e -> eval e v -> (P e v).
 Proof using.
   assert ( forall e v : NTerm, Pre e -> eval e v -> (Pre v /\P e v));[| firstorder].

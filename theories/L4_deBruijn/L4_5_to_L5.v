@@ -659,16 +659,22 @@ Class evalPresProps (P: NTerm -> Prop) (PB: BTerm ->Prop) : Prop :=
   {
     substPres: forall t sub, PB t -> lforall P sub -> P (apply_bterm t sub);
     subtermPres: forall o lbt, P (oterm o lbt) -> lforall PB lbt;
-    subtermPresb: forall t, PB (bterm [] t) -> P t
+    subtermPresb: forall t, PB (bterm [] t) <-> P t;
+    otermCongr: forall o1 o2 lbt1 lbt2,
+        OpBindings o1 = OpBindings o2
+        -> map num_bvars lbt1 = map num_bvars lbt2
+        -> P (oterm o1 lbt1)
+        -> lforall PB lbt2
+        -> P (oterm o2 lbt2)
   }.
 
 (* move to SquiggleEq *)
 Lemma preBNilBTerm Pre PreB  {Hpre: evalPresProps Pre PreB} es :
-  (forall a : BTerm, LIn a (map (bterm []) es) -> PreB a) ->
+  (forall a : BTerm, LIn a (map (bterm []) es) -> PreB a) <->
       (forall a : NTerm, LIn a es -> Pre a).
 Proof using. revert Hpre.
   clear. intros Hpre.
-  setoid_rewrite in_map_iff. destruct Hpre. firstorder.
+  setoid_rewrite in_map_iff. destruct Hpre. firstorder. subst. firstorder.
 Qed.
 
 (* Move to SquiggleEq *)
@@ -757,6 +763,7 @@ Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Pr
   -> P (App_e e e2) ev2)
   : forall e v, Pre e -> eval e v -> (P e v).
 Proof using.
+  clear varclass upnm.
   assert ( forall e v : NTerm, Pre e -> eval e v -> (Pre v /\P e v));[| firstorder].
   intros ?  ? Hpre Hev.
   induction Hev; [ | | | | | | ] ; eauto ; [ | | | |  ].
@@ -777,9 +784,15 @@ Proof using.
    dands; auto. eapply Hbeta; eauto.
 - clear Hbeta Hlamv Hzeta Hiota Hfixv Hfixapp. rename H1 into IHHev. pose proof Hpre as Hpreb.
   apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
-  apply' preBNilBTerm  Hpre.
+  rewrite (@preBNilBTerm Pre PreB _)  in Hpre.
   split.
-  + admit. (* need to add more constraints to evalPresProps. That only provides preservation on suberms, not superterms, or even changing subterms *)
+  + eapply (@otermCongr Pre PreB _); [ |  | apply Hpreb |]; simpl; auto.
+    *  do 2 rewrite map_map. unfold num_bvars. simpl.
+         repeat rewrite repeat_map_len. congruence.
+    *  setoid_rewrite  (@preBNilBTerm Pre PreB _). intros ? Hin.
+       apply combine_in_right with (l1:=es) in Hin;[ | omega]. exrepnd.
+       applydup in_combine_l in Hin0. 
+       apply IHHev in Hin0; repnd; eauto.             
   + apply Hcons; auto.
       intros ? ? Hin.
       specialize (IHHev _ _ Hin).
@@ -803,7 +816,7 @@ Proof using.
    specialize (IHHev1 ltac:(assumption)).
    repnd. pose proof IHHev0 as preConv.
    apply subtermPres in IHHev0. unfold lforall in IHHev0.
-   apply' preBNilBTerm  IHHev0.
+   rewrite (@preBNilBTerm Pre PreB _)  in IHHev0.
    pose proof H as Hfind.
    apply find_branch_some in Hfind. repnd.
    dimpr IHHev2; [
@@ -821,14 +834,18 @@ Proof using.
    specialize (IHHev2 ltac:(assumption)).
    repnd. pose proof IHHev4 as preLam.
    apply subtermPres in IHHev4. unfold lforall in IHHev4. simpl in IHHev4. dLin_hyp.
-   assert (forall f1 f2 a1 a2, Pre (App_e f1 a1) -> Pre f2 -> Pre a2  -> Pre (App_e f2 a2) ) as Hc by admit.
-   applydup @select_in  in H.
+   assert (forall f1 f2 a1 a2, Pre (App_e f1 a1) -> Pre f2 -> Pre a2  -> Pre (App_e f2 a2) ) as Hc.
+      intros. eapply otermCongr; [ | | apply H1| ]; auto.
+      intros ? Hin.
+      repeat in_reasoning; subst; cpx; apply subtermPresb; auto.
+
+    applydup @select_in  in H.
    dimpr IHHev3; [eapply Hc; eauto; apply substPres; eauto| ].
   + intros ? Hin. subst sub. apply in_map_iff in Hin. exrepnd. subst.
-    assert (forall lbt n1 n2, Pre (Fix_e' lbt n1) -> Pre (Fix_e' lbt n2)) as Hb by admit.
-    eauto.
+      assert (forall lbt n1 n2, Pre (Fix_e' lbt n1) -> Pre (Fix_e' lbt n2)) as Hb;[ | eauto].
+      intros. eapply otermCongr; [ | | apply H2| ]; auto. apply subtermPres in H2. assumption.
    + repnd. dands; auto. eapply Hfixapp; eauto.
-Admitted.  
+Qed.  
 
 
 (** Show that evaluation always yields a value. *)

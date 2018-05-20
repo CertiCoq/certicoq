@@ -760,7 +760,7 @@ Proof using.
   assert ( forall e v : NTerm, Pre e -> eval e v -> (Pre v /\P e v));[| firstorder].
   intros ?  ? Hpre Hev.
   induction Hev; [ | | | | | | ] ; eauto ; [ | | | |  ].
-- clear Hlamv Hcons.
+- clear Hlamv Hcons Hzeta Hiota Hfixv Hfixapp.
   apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
    simpl in Hpre. dLin_hyp.
    apply subtermPresb in Hyp.
@@ -769,12 +769,13 @@ Proof using.
    specialize (IHHev2 ltac:(assumption)).
    repnd. pose proof IHHev4 as preLam.
    apply subtermPres in IHHev4. unfold lforall in IHHev4. simpl in IHHev4. dLin_hyp.
-   assert (Pre (e1' {x := v2})) by
-  ( apply  (substPres (bterm [x] e1') [v2]); unfold lforall; simpl in *; auto; intros; in_reasoning; subst; cpx).
-   specialize (IHHev3 ltac:(assumption)).
+   dimpr IHHev3; [
+     simpl; unfold subst;
+      fold_applybt;
+     apply substPres; auto; in_reasoning2; fail | ].
    repnd.
    dands; auto. eapply Hbeta; eauto.
-- clear Hbeta Hlamv. rename H1 into IHHev. pose proof Hpre as Hpreb.
+- clear Hbeta Hlamv Hzeta Hiota Hfixv Hfixapp. rename H1 into IHHev. pose proof Hpre as Hpreb.
   apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
   apply' preBNilBTerm  Hpre.
   split.
@@ -795,8 +796,38 @@ Proof using.
      apply substPres; auto; in_reasoning2.
    repnd.
    dands; auto. eapply Hzeta; eauto.
-- admit.
-- admit.
+- clear Hbeta Hlamv Hcons Hzeta Hfixv Hfixapp.
+   apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
+   simpl in Hpre. dLin_hyp.
+   apply subtermPresb in Hyp.
+   specialize (IHHev1 ltac:(assumption)).
+   repnd. pose proof IHHev0 as preConv.
+   apply subtermPres in IHHev0. unfold lforall in IHHev0.
+   apply' preBNilBTerm  IHHev0.
+   pose proof H as Hfind.
+   apply find_branch_some in Hfind. repnd.
+   dimpr IHHev2; [
+     simpl; unfold subst;
+     apply substPres; auto| ].
+   repnd.
+   dands; auto;[]. eapply Hiota; eauto.
+- clear Hbeta Hlamv Hzeta Hiota Hfixv Hcons.
+  pose proof Hpre as Hpreb.
+   apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
+   simpl in Hpre. dLin_hyp.
+   apply subtermPresb in Hyp.
+   apply subtermPresb in Hyp0.
+   specialize (IHHev1 ltac:(assumption)).
+   specialize (IHHev2 ltac:(assumption)).
+   repnd. pose proof IHHev4 as preLam.
+   apply subtermPres in IHHev4. unfold lforall in IHHev4. simpl in IHHev4. dLin_hyp.
+   assert (forall f1 f2 a1 a2, Pre (App_e f1 a1) -> Pre f2 -> Pre a2  -> Pre (App_e f2 a2) ) as Hc by admit.
+   applydup @select_in  in H.
+   dimpr IHHev3; [eapply Hc; eauto; apply substPres; eauto| ].
+  + intros ? Hin. subst sub. apply in_map_iff in Hin. exrepnd. subst.
+    assert (forall lbt n1 n2, Pre (Fix_e' lbt n1) -> Pre (Fix_e' lbt n2)) as Hb by admit.
+    eauto.
+   + repnd. dands; auto. eapply Hfixapp; eauto.
 Admitted.  
 
 

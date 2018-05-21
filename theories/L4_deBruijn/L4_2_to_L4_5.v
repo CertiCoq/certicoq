@@ -936,21 +936,32 @@ Proof using.
   intros. unfold Con_e. subst. auto.
 Qed.
 
+(* Move to SquiggleEq *)
+Lemma in_combine_same {A:Type} (e v: A) pvs: LIn (e, v) (combine pvs pvs)
+                                             -> e =v /\ In e pvs.
+Proof using.
+  induction pvs; cpx. simpl. 
+  firstorder; inverts H ;auto.
+Qed.
+
 Require Import Datatypes.
   Require Import SetoidList.
   Lemma eval_letbindc d lv  v cargs:
-  eval (Con_e d cargs) v
+    closed v
+  ->   flat_map free_vars cargs = []
+  -> eval (Con_e d cargs) v
   -> eval (let_bindc (NDCon d (length cargs)) lv cargs) v.
 Proof using.
-  intros Hev. invertsna Hev Hev.
+  intros Hcv Hcc Hev. invertsna Hev Hev.
   unfold let_bindc.
   apply (f_equal (map get_nt)) in Hev2.
   repeat rewrite map_map in Hev2. simpl in Hev2.
   repeat rewrite map_id in Hev2.
   repnd. subst. clear Hev1.
   addFreshVarsSpec2 vn pp. simpl. simpl.
+  hnf in Hcv. rwsimpl Hcv.
   clear Heqvn. repnd.
-  assert (forall pvs, (forall t, In t pvs -> eval t t) ->
+  assert (forall pvs, (forall t, In t pvs -> eval t t) -> (flat_map free_vars pvs = []) ->
              eval
     (let_bindn vn cargs
        (Con_e d
@@ -958,17 +969,21 @@ Proof using.
     (Con_e d (pvs++vs))) as Hx; [ | specialize (Hx []); unfold Con_e in Hx; simpl in Hx;
   rewrite map_map in *; autorewrite with list in Hx;  
   setoid_rewrite  <-  pp; apply Hx; cpx].
-- revert dependent vs.
+  revert dependent vs.
   revert dependent vn.
   induction cargs; intros; simpl in *;  dlist_len vn; simpl in *; dlist_len vs.
-  + autorewrite with list. apply eval_Con_e; auto. admit.
-  + simpl. simpl in *. dLin_hyp. eapply eval_Let_e; eauto. simpl.
+  - autorewrite with list. apply eval_Con_e; auto.
+    intros ? ? Hin. apply  in_combine_same in Hin. repnd.  subst. firstorder.
+  - simpl. simpl in *. dLin_hyp. eapply eval_Let_e; eauto. simpl.
     unfold subst.
-    rewrite ssubst_ssubst_aux by admit. (* vs closed *)
-    erewrite sub_letbindn2; simpl; eauto; try noRepDis;[ | (* es closed or weaker *) admit].
+    apply app_eq_nil in Hcv.  apply app_eq_nil in Hcc. repnd.
+    rewrite ssubst_ssubst_aux
+      by (simpl; autorewrite with list; rwHyps; disjoint_reasoning).
+    erewrite sub_letbindn2; simpl; eauto;
+      try noRepDis;[ | rwHyps; repeat disjoint_reasoning].
     repeat rewrite map_map. simpl. rewrite map_app. simpl.
     autorewrite with SquiggleEq.
-    rewrite map_ssubst_aux by admit (* pvs closed *).
+    rewrite map_ssubst_aux; [ | rwHyps; disjoint_reasoning; fail].
     rewrite map_ssubst_aux;[ | simpl; rwsimplC; noRepDis; fail].
     repeat rewrite <- map_cons.
     rewrite <- map_app.
@@ -976,11 +991,80 @@ rewrite unify_Con_e; [ | repeat (autorewrite with list; simpl); refl].
     do 2  rewrite <- snoc_append_r.
     rewrite snoc_as_append.
     apply IHcargs; auto; try noRepDis.
-Admitted.  
+    + revert Hyp H. clear.
+      setoid_rewrite in_app_iff. firstorder. subst. eapply eval_end; eauto.
+    + rewrite flat_map_app. simpl. rwHyps. refl.
+Qed.
+
+(* Move to SquiggleEq *)
+Tactic Notation "forder" ident_list (idl) :=
+  revert idl; clear; firstorder.
   
-  
-  
-  
+(* Move to SquiggleEq and heterogenize *)
+Lemma liftRBTeqlist (R : L4_5_Term ->  L4_5_Term -> Prop) es lbt:
+  eqlistA (liftRBt R) (map (bterm []) es) lbt
+  -> exists esp, eqlistA R es esp /\ lbt = map (bterm []) esp.
+Proof using.
+  revert es lbt.
+  induction es; intros ? Heq; inverts Heq.
+  + eexists. split. constructor. refl.
+  + inverts H1. apply IHes in H3. exrepnd. eexists. split. econstructor; eauto.
+      subst. auto.
+Qed.
+
+Lemma eval_Con_e_zeta :
+  forall (lv : list NVar) (es vs : list NTerm) (esp : list L4_5_Term),
+  length vs = length es ->    
+  eqlistA (zetaCLe lv) es esp ->
+  (forall e v : NTerm,
+   LIn (e, v) (combine es vs) ->
+   (forall e' : L4_5_Term,
+    zetaCLe lv e e' -> exists v', eval e' v' /\ zetaCLe lv v v') /\
+   closedSubsetVars lv e /\ closedSubsetVars lv v) ->
+  exists vsp,
+  eqlistA (zetaCLe lv) vs vsp /\
+  length esp = length vsp /\
+  (forall e0 v0 : NTerm, LIn (e0, v0) (combine esp vsp) -> eval e0 v0).
+Proof using.
+  intros ? ? ? ? ? Heq. revert dependent vs. induction Heq;
+     [intros; simpl in *; dlist_len vs; eexists []; cpx | ].
+  intros ? Hlen Hind. simpl in *. dlist_len vs. symmetry in H1.
+  eapply IHHeq in H1; [ | intros; apply Hind; cpx].
+  exrepnd. specialize (Hind _ _ ltac:(left; refl)).
+  repnd. specialize (Hind0 _ H). exrepnd.
+  exists (v'::vsp).  simpl. dands; auto.
+  intros. in_reasoning; cpx.
+Qed.  
+(* Move to SquiggleEq *)
+Lemma liftRbt_eqlista   (R : L4_5_Term ->  L4_5_Term -> Prop)  vs vsp:
+  eqlistA R vs vsp ->
+  eqlistA (liftRBt R) (map (bterm []) vs) (map (bterm []) vsp).
+Proof using.
+  intros H. induction H; constructor; auto.
+  constructor; auto.
+Qed.
+
+Lemma zetalFvars fv:
+  (forall (t : list NTerm) (u : list L4_5_Term),
+      eqlistA (zetaCLe fv) t u -> subset (flat_map all_vars t) fv -> 
+      flat_map free_vars t = flat_map free_vars u).
+Proof using.
+  intros ? ? Heq Hs. induction Heq; auto.
+  simpl in *. apply subset_app in Hs. repnd.
+  f_equal; eauto;[].
+  apply  (fst (L4_5_zeta fv)); auto.
+Qed.  
+
+Lemma zetalFvarsNil fv:
+  (forall (t : list NTerm) (u : list L4_5_Term),
+      eqlistA (zetaCLe fv) t u -> lforall (closedSubsetVars fv) t -> 
+      flat_map free_vars u = []).
+Proof using.
+  intros ? ? Heq Hs. erewrite <- zetalFvars; eauto.
+-  apply flat_map_empty. intros ? Hin. apply Hs in Hin. apply Hin.
+- apply subset_flat_map.  intros ? Hin. apply Hs in Hin. apply Hin. 
+Qed.  
+
 Lemma L4_5_constr_vars_zeta lv (e  v: L4_5_Term):
   closedSubsetVars lv e
   -> eval e v
@@ -994,7 +1078,7 @@ Proof using.
   specialize (Hx (fun e v => forall e', zetaCLe lv e e'
   -> exists v', eval e' v'
       /\ (zetaCLe lv v v'))).
-  apply Hx. clear Hx.
+  apply Hx; clear Hx.
 - simpl. intros ? ? ? ? He. unfold Lam_e in He.
   repeat dZeta.  eexists.
   split; [ apply eval_Lam_e | ].
@@ -1014,22 +1098,34 @@ Proof using.
   repnd. 
   eapply  ssubst_commute_L4_5_zeta with (sub2 := [(x,vargz)])in Hindf0;
     [specialize (Hinds _ Hindf0) | | | ]; simpl; auto;
-      [ | prove_sub_range_sat | autorewrite with list;  firstorder].
+      [ | prove_sub_range_sat | autorewrite with list; forder Hprea Hpref].
   exrepnd.
   eexists; split; [ eapply eval_App_e ;eauto | ] ; eauto; fail.
 - intros ? ? ? Hlen Hsev Hind ? Hz. unfold Con_e in Hz.
   repeat dZeta.
   + (* no expansion *)
     applydup eqlistA_length in Hz. autorewrite with list in Hz0.
-    assert (exists esp vsp, lbt2 = map (bterm []) esp /\ eqlistA (zetaCLe lv) es esp
-                       /\ eqlistA (zetaCLe lv) vs vsp /\ length esp= length vsp /\
- forall e0 v0 : NTerm, LIn (e0, v0) (combine esp vsp) -> eval e0 v0 ) as Hxx by admit.
+    apply liftRBTeqlist in Hz.
+    exrepnd. subst. autorewrite with list in Hz0.
+    eapply eval_Con_e_zeta in Hind; eauto.
     exrepnd. subst. rewrite Hz0. autorewrite with list.
-    eexists. split; [eapply eval_Con_e; eauto | ].
-    admit (* easy *).
-  +  exrepnd.  assert (length es = length cargs2) by admit.
-     rewrite H. eexists. split.
-     apply eval_letbindc.
+    unfold  L4_5_Term in *.
+    exists (Con_e d vsp). split; [eapply eval_Con_e; eauto | ];[].
+    unfold Con_e. replace  (length vs) with  (length vsp) by congruence.
+    apply zetao. apply liftRbt_eqlista. assumption.
+  + apply (f_equal (map (get_nt))) in H3. repeat rewrite map_map in H3.
+    simpl in H3. repeat rewrite map_id in H3. subst.
+    applydup eqlistA_length in Hz. setoid_rewrite  Hz0. pose proof Hind as Hindb.
+    eapply eval_Con_e_zeta in Hind; eauto.
+    exrepnd. subst.  unfold  L4_5_Term in *.
+    exists (Con_e d vsp). split;
+                       [ |     unfold Con_e; replace  (length vs) with  (length vsp) by congruence;
+                               apply zetao; apply liftRbt_eqlista; assumption].
+    apply eval_letbindc;[ | | constructor; auto];[ | ]; hnf;[ rwsimplC | ];
+      eapply zetalFvarsNil; eauto; intros ? Hin;
+        [eapply (combine_in_right _ _ vs es) in Hin
+        |eapply (combine_in_left  _ _ es vs) in Hin]; try omega;
+    exrepnd; apply Hindb in Hin0; tauto.
 Abort.
 
 Lemma L4_5_constr_vars_zeta fv:

@@ -627,6 +627,66 @@ Inductive zetaCLe (avoid : list NVar): L4_5_Term -> L4_5_Term -> Prop :=
         (oterm (NDCon d n) (map (bterm []) cargs1))
         (let_bindc (NDCon d n) avoid cargs2).
 
+Lemma sub_letbindng:
+   forall (fv : list NVar) (sub : Substitution) ( cargs : list L4_5_Term),
+  subset (dom_sub sub) fv ->
+  forall t : NTerm,
+  forall vn : list NVar,
+  NoDup vn ->
+  disjoint vn fv ->
+  Datatypes.length vn = Datatypes.length cargs ->
+  ssubst_aux (let_bindn vn cargs t) sub =
+  let_bindn vn (map (fun t0 : NTerm => ssubst_aux t0 sub) cargs) (ssubst_aux t sub).
+Proof using.
+  intros ? ? ?.
+  induction cargs  as [  | carg1 cargs1]; 
+  intros Hs t  vn pp0 pp1 pp;
+  destruct vn as [ | v vn];
+    invertsn pp; auto; simpl.
+  autorewrite with SquiggleEq. 
+  simpl. unfold Let_e. do 4 f_equal.
+  rewrite sub_filter_disjoint1;[ | noRepDis2].
+  erewrite  IHcargs1; eauto; try noRepDis2.
+Qed.
+
+Lemma sub_letbindn:
+   forall (fv : list NVar) (sub : Substitution) ( cargs : list L4_5_Term),
+  subset (dom_sub sub) fv ->
+  forall t : NTerm,
+  disjoint (free_vars t) (dom_sub sub) ->
+  forall vn : list NVar,
+  NoDup vn ->
+  disjoint vn fv ->
+  Datatypes.length vn = Datatypes.length cargs ->
+  ssubst_aux (let_bindn vn cargs t) sub =
+  let_bindn vn (map (fun t0 : NTerm => ssubst_aux t0 sub) cargs) t.
+Proof using.
+  intros.
+  erewrite sub_letbindng; eauto.
+  f_equal.
+  rewrite ssubst_aux_trivial_disj; auto.
+Qed.
+
+Lemma sub_letbindn2:
+  forall (fv : list NVar) (sub : Substitution) ( cargs : list L4_5_Term),
+    disjoint (flat_map free_vars cargs) (dom_sub sub)
+  -> subset (dom_sub sub) fv ->
+  forall t : NTerm,
+  forall vn : list NVar,
+  NoDup vn ->
+  disjoint vn fv ->
+  Datatypes.length vn = Datatypes.length cargs ->
+  ssubst_aux (let_bindn vn cargs t) sub =
+  let_bindn vn cargs (ssubst_aux t sub).
+Proof using.
+  intros.
+  erewrite sub_letbindng; eauto.
+  f_equal.
+  rewrite <- (map_id cargs) at 2.
+  apply eq_maps. intros.
+  rewrite ssubst_aux_trivial_disj; [ refl | ].
+  eapply disjoint_flat_map_l; eauto.
+Qed.
 
 Lemma sub_letbindc fv sub o cargs:
    subset (dom_sub sub) fv -> 
@@ -646,7 +706,7 @@ Proof using.
 
   remember tt as t.
   clear Heqt. clear tt.
-  revert dependent vn.
+  revert dependent vn. revert_all.
   induction cargs  as [  | carg1 cargs1]; intros;
   destruct vn as [ | v vn];
     invertsn pp; auto; simpl;
@@ -868,60 +928,28 @@ Ltac dZeta := match goal with
    =>  invertsn H
     end.
 
-(*
-Definition constr_vars_precond lv (e : L4_5_Term) :=
-  closed e /\ subset (all_vars e) lv.
+    (* Move to L4_5_to_L5.v *)
+Lemma unify_Con_e (cargs : list L4_5_Term) len d:
+      len= length cargs ->
+      oterm (NDCon d len) (map (bterm []) cargs) = Con_e d cargs.
+Proof using.
+  intros. unfold Con_e. subst. auto.
+Qed.
 
-Definition constr_vars_precond_bt lv (e : L4_5_BTerm) :=
-  closed_bt e /\ subset (all_vars_bt e) lv.
-
-(* Move to SquiggleEq *)
-Global Instance pre lv :  evalPresProps (constr_vars_precond lv)
-                                        (constr_vars_precond_bt lv).
-Admitted.
- *)
-  Require Import Datatypes.
+Require Import Datatypes.
   Require Import SetoidList.
-  (*
-Lemma eval_letbindc_aux d  v cargs vn:
-  eval (Con_e d cargs) v
-  -> eval
-    (let_bindn vn cargs
-       (oterm (NDCon d (length cargs))
-          (map (fun v : NVar => bterm [] (vterm v)) vn))) 
-    v.
-   *)
-(*
-  (* move to SquiggleEq *)
-  Lemma skipnSub {A:Type} l a cargs (es:  list A):
-    a :: cargs = skipn (Nat.pred l ) es
-    -> cargs = skipn l es
-  /\ Some a= nth_error  es (Nat.pred l).
-  Proof using.
-    intros Hin. 
-   destruct (decideP  (length es > length cargs))%nat.
- - admit.
- -  replace (Nat.pred(length es - length cargs))%nat with 0%nat in Hin by omega.
-    simpl in Hin.
-    apply (f_equal   (@length _)) in Hin. simpl in *.   omega.
-Admitted.    
-  (* rewrite Nat.sub_succ_r in Hin. *)
-  SearchAbout *)
   Lemma eval_letbindc d lv  v cargs:
   eval (Con_e d cargs) v
   -> eval (let_bindc (NDCon d (length cargs)) lv cargs) v.
 Proof using.
   intros Hev. invertsna Hev Hev.
   unfold let_bindc.
-  addFreshVarsSpec2 vn pp. simpl. simpl.
-  clear Heqvn.
   apply (f_equal (map get_nt)) in Hev2.
   repeat rewrite map_map in Hev2. simpl in Hev2.
   repeat rewrite map_id in Hev2.
   repnd. subst. clear Hev1.
-  (*
-  assert (cargs = skipn (length es - length cargs) es) as Hc;
-    [replace (length es - length cargs)%nat with O%nat by omega; auto | ]. *)
+  addFreshVarsSpec2 vn pp. simpl. simpl.
+  clear Heqvn. repnd.
   assert (forall pvs, (forall t, In t pvs -> eval t t) ->
              eval
     (let_bindn vn cargs
@@ -935,35 +963,19 @@ Proof using.
   induction cargs; intros; simpl in *;  dlist_len vn; simpl in *; dlist_len vs.
   + autorewrite with list. apply eval_Con_e; auto. admit.
   + simpl. simpl in *. dLin_hyp. eapply eval_Let_e; eauto. simpl.
-    intros ? ? Hin. apply in_combine in Hin. repnd.
-    
-  congruence.
-  rewrite  pp in Hx.
-subst; rewrite Hev, Nat.sub_diag in Hx; simpl in Hx; auto;
-                             rewrite map_map in Hx; congruence
-
-  assert (eval
-    (let_bindn vn cargs
-       (oterm (NDCon d (length vs))
-          ((map (bterm []) ((firstn (length vs - length cargs) vs) ++ (map vterm vn)) )) )) 
-    (Con_e d vs)) as Hx; [ | subst; rewrite Hev, Nat.sub_diag in Hx; simpl in Hx; auto;
-                             rewrite map_map in Hx; congruence].
-  clear Hev2 Hev1.
-  repnd. revert dependent vn.
-  induction cargs.
-  - simpl. intros.  dlist_len vn. simpl. autorewrite with list. admit.
-  - simpl. intros. dlist_len vn. simpl. econstructor. 
-    simpl in *.
-  Focus 2.   assumption.
-  autorewrite with  SquiggleEq in Hev2.
-  repnd. Print eval.
-  pose proof Hev2 as Hlen.
-   apply (f_equal (@length _)) in Hlen. autorewrite with list in Hlen.
-  revert dependent cargs.
-  induction vn.
-  - simpl. intros. simpl in *. dlist_len cargs. simpl in *. dlist_len es.
-    simpl in *. dlist_len vs. admit.
-  -  intros. simpl.
+    unfold subst.
+    rewrite ssubst_ssubst_aux by admit. (* vs closed *)
+    erewrite sub_letbindn2; simpl; eauto; try noRepDis;[ | (* es closed or weaker *) admit].
+    repeat rewrite map_map. simpl. rewrite map_app. simpl.
+    autorewrite with SquiggleEq.
+    rewrite map_ssubst_aux by admit (* pvs closed *).
+    rewrite map_ssubst_aux;[ | simpl; rwsimplC; noRepDis; fail].
+    repeat rewrite <- map_cons.
+    rewrite <- map_app.
+rewrite unify_Con_e; [ | repeat (autorewrite with list; simpl); refl].
+    do 2  rewrite <- snoc_append_r.
+    rewrite snoc_as_append.
+    apply IHcargs; auto; try noRepDis.
 Admitted.  
   
   

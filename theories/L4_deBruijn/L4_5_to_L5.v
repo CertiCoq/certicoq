@@ -654,59 +654,8 @@ Qed.
 
 (** Induction principle *)
 
-(* move to SquiggleEq *)
-Class evalPresProps (P: NTerm -> Prop) (PB: BTerm ->Prop) : Prop :=
-  {
-    substPres: forall t sub, PB t -> lforall P sub -> P (apply_bterm t sub);
-    subtermPres: forall o lbt, P (oterm o lbt) -> lforall PB lbt;
-    subtermPresb: forall t, PB (bterm [] t) <-> P t;
-    otermCongr: forall o1 o2 lbt1 lbt2,
-        OpBindings o1 = OpBindings o2
-        -> map num_bvars lbt1 = map num_bvars lbt2
-        -> P (oterm o1 lbt1)
-        -> lforall PB lbt2
-        -> P (oterm o2 lbt2)
-  }.
-
-(* move to SquiggleEq *)
-Lemma preBNilBTerm Pre PreB  {Hpre: evalPresProps Pre PreB} es :
-  (forall a : BTerm, LIn a (map (bterm []) es) -> PreB a) <->
-      (forall a : NTerm, LIn a es -> Pre a).
-Proof using. revert Hpre.
-  clear. intros Hpre.
-  setoid_rewrite in_map_iff. destruct Hpre. firstorder. subst. firstorder.
-Qed.
-
-(* Move to SquiggleEq *)
-Ltac dimpr H :=
-  match type of H with
-    | ?T1 -> ?T2 =>
-      let name := fresh H "hyp" in
-      assert T1 as name; auto; [ | specialize (H name)]
-  end.
-
-(* Move to SquiggleEq *)
-Ltac in_reasoning2 := unfold lforall;
-  match goal with
-    [ |- forall _:_, In _ _  -> _] => intros ? ?;
-                                     in_reasoning;subst; auto
-    end.
-
-
-Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Prop)
-  : forall e v,  eval e v -> Pre e -> (P e v).
-Proof using.
-  intros ?  ? Hev Hpre.
-  induction Hev.
-- admit.
--  revert_all. intros ?  ? ? ? ? ? ? ?. admit.
--  revert_all. intros ?  ? ? ? ? ?. admit.
--  revert_all. intros ?  ? ? ? ? ?. admit.
-- revert_all. intros ?  ? ? ? ? ?. admit.
--  revert_all. intros ?  ? ? ? ? ?. admit.
-- revert_all. intros ?  ? ? ? ? ?. admit.
-Abort.  
-Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Prop)
+Lemma eval_ind2 Pre PreB
+      {ppre: @evalPresProps _ _ _ _ _ L4_5Opid _ Pre PreB} (P: NTerm -> NTerm -> Prop)
       (Hlamv: forall (x : NVar) (e : NTerm), Pre (Lam_e x e) -> P (Lam_e x e) (Lam_e x e))
       (Hbeta :
           forall (e1 e2 e1' : NTerm) (x : NVar) (v2 v : NTerm),
@@ -761,10 +710,9 @@ Lemma eval_ind2 Pre PreB {ppre: evalPresProps Pre PreB} (P: NTerm -> NTerm -> Pr
   Pre ev2 ->
    P (App_e (apply_bterm bt sub) v2) ev2
   -> P (App_e e e2) ev2)
-  : forall e v, Pre e -> eval e v -> (P e v).
+  : forall e v, Pre e -> eval e v -> (Pre v /\ P e v).
 Proof using.
   clear varclass upnm.
-  assert ( forall e v : NTerm, Pre e -> eval e v -> (Pre v /\P e v));[| firstorder].
   intros ?  ? Hpre Hev.
   induction Hev; [ | | | | | | ] ; eauto ; [ | | | |  ].
 - clear Hlamv Hcons Hzeta Hiota Hfixv Hfixapp.
@@ -784,12 +732,12 @@ Proof using.
    dands; auto. eapply Hbeta; eauto.
 - clear Hbeta Hlamv Hzeta Hiota Hfixv Hfixapp. rename H1 into IHHev. pose proof Hpre as Hpreb.
   apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
-  rewrite (@preBNilBTerm Pre PreB _)  in Hpre.
+  rewrite (preBNilBTerm Pre PreB)  in Hpre.
   split.
-  + eapply (@otermCongr Pre PreB _); [ |  | apply Hpreb |]; simpl; auto.
+  + eapply (otermCongr _); [ |  | apply Hpreb |]; simpl; auto.
     *  do 2 rewrite map_map. unfold num_bvars. simpl.
          repeat rewrite repeat_map_len. congruence.
-    *  setoid_rewrite  (@preBNilBTerm Pre PreB _). intros ? Hin.
+    *  setoid_rewrite  (preBNilBTerm Pre PreB). intros ? Hin.
        apply combine_in_right with (l1:=es) in Hin;[ | omega]. exrepnd.
        applydup in_combine_l in Hin0. 
        apply IHHev in Hin0; repnd; eauto.             
@@ -816,7 +764,7 @@ Proof using.
    specialize (IHHev1 ltac:(assumption)).
    repnd. pose proof IHHev0 as preConv.
    apply subtermPres in IHHev0. unfold lforall in IHHev0.
-   rewrite (@preBNilBTerm Pre PreB _)  in IHHev0.
+   rewrite (preBNilBTerm Pre PreB)  in IHHev0.
    pose proof H as Hfind.
    apply find_branch_some in Hfind. repnd.
    dimpr IHHev2; [
@@ -844,9 +792,70 @@ Proof using.
   + intros ? Hin. subst sub. apply in_map_iff in Hin. exrepnd. subst.
       assert (forall lbt n1 n2, Pre (Fix_e' lbt n1) -> Pre (Fix_e' lbt n2)) as Hb;[ | eauto].
       intros. eapply otermCongr; [ | | apply H2| ]; auto. apply subtermPres in H2. assumption.
+   + unfold sub, pinds. autorewrite with list. auto.
    + repnd. dands; auto. eapply Hfixapp; eauto.
 Qed.  
 
+Lemma eval_ind3 Pre PreB
+      {ppre: @evalPresProps _ _ _ _ _ L4_5Opid _ Pre PreB} (P: NTerm -> NTerm -> Prop)
+      (Hlamv: forall (x : NVar) (e : NTerm), Pre (Lam_e x e) -> P (Lam_e x e) (Lam_e x e))
+      (Hbeta :
+          forall (e1 e2 e1' : NTerm) (x : NVar) (v2 v : NTerm),
+  eval e1 (Lam_e x e1') ->
+  eval e2 v2 ->
+  eval (e1' {x := v2}) v ->
+  (P e1 (Lam_e x e1')) ->
+  (Pre e1) ->
+  (Pre (Lam_e x e1')) ->
+  (P e2 v2) ->
+  (Pre e2) ->
+  (Pre v2) ->
+  (P (e1' {x := v2}) v) ->
+  (Pre (e1' {x := v2}))->
+  (Pre v)
+  -> P (App_e e1 e2) v)
+   (Hcons :
+           forall (d : dcon) (es vs : list NTerm),
+  Datatypes.length es = Datatypes.length vs ->
+  (forall e v : NTerm, LIn (e, v) (combine es vs) -> eval e v) ->
+  (forall e v : NTerm, LIn (e, v) (combine es vs) ->  (P e v /\ Pre e /\ Pre v)) ->
+   P (Con_e d es) (Con_e d vs))
+   (Hzeta:   forall (x : NVar) (e1 v1 e2 v2 : NTerm),
+  eval e1 v1 ->
+  eval (e2 {x := v1}) v2 ->
+  Pre e1 -> Pre v1 ->P e1 v1 ->
+  Pre (e2 {x := v1}) -> Pre v2 -> P (e2 {x := v1}) v2
+  -> P (Let_e x e1 e2) v2)
+   (Hiota:  forall (e : NTerm) (bs : list branch) (d : dcon) 
+    (vs : list NTerm) (e' : BTerm) (v : NTerm),
+  eval e (Con_e d vs) ->
+  find_branch d (Datatypes.length vs) bs = Some e' ->
+  eval (apply_bterm e' vs) v ->
+  Pre e -> Pre (Con_e d vs) -> P e (Con_e d vs) ->
+  Pre (apply_bterm e' vs) -> Pre v -> P (apply_bterm e' vs) v ->
+  P (Match_e e bs) v)
+  (Hfixv :  forall (es : list BTerm) (n : nat),
+      Pre (Fix_e' es n) -> P (Fix_e' es n) (Fix_e' es n))
+  (Hfixapp: forall (e : NTerm) (lbt : list BTerm) (n : nat) 
+    (e2 v2 : NTerm) (bt : BTerm) (ev2 : NTerm),
+  let len := Datatypes.length lbt in
+  let pinds := seq 0 len in
+  let sub := map (Fix_e' lbt) pinds in
+  eval e (Fix_e' lbt n) ->
+  eval e2 v2 ->
+  select n lbt = Some bt ->
+  eval (App_e (apply_bterm bt sub) v2) ev2 ->
+  num_bvars bt = len ->
+  Pre e -> Pre (Fix_e' lbt n) -> P e (Fix_e' lbt n) ->
+  Pre e2 -> Pre v2 -> P e2 v2 ->
+  Pre (App_e (apply_bterm bt sub) v2) ->
+  Pre ev2 ->
+   P (App_e (apply_bterm bt sub) v2) ev2
+  -> P (App_e e e2) ev2)
+  : forall e v, Pre e -> eval e v -> P e v.
+Proof using.
+    intros; eapply eval_ind2 ; eauto.
+Qed.
 
 (** Show that evaluation always yields a value. *)
 Lemma eval_yields_value' :

@@ -713,13 +713,19 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | n :: l' => (Init_int32 (Int.repr (Z.of_N n))) :: (make_ind_array l')
   end.
 
-(* representation of pos as string (in reverse order) *)
-Fixpoint pos2string p :=
+
+
+
+(* representation of pos as string *)
+Fixpoint pos2string' p s :=
   match p with
-  | xI p' => String "1" (pos2string p')
-  | xO p' => String "0" (pos2string p')
-  | xH => String "1" EmptyString
+  | xI p' => pos2string' p' (String "1" s)
+  | xO p' => pos2string' p' (String "0" s)
+  | xH => String "1" s
   end.
+
+Definition pos2string p :=
+ pos2string' p "".
 
 
 Definition show_pos x := pos2string x. (* nat2string10 (Pos.to_nat x). *) 
@@ -1184,7 +1190,7 @@ Definition export_rec: (positive * globdef Clight.fundef type) := (exportIdent ,
  The generated function expects that the first f_ar+1 projections of argv are its environment and the expected arguments to f
 
 OS note 09/05/18, this is deprecated, we instead generate special eliminators for closures
-*)
+
 Definition make_direct (f_name:string) (f_ident: ident) (f_ar:nat) (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globdef Clight.fundef type)) :=
     directFunIdent <- getName;;
     argcIdent <- getName;;
@@ -1219,7 +1225,7 @@ Definition make_direct (f_name:string) (f_ident: ident) (f_ar:nat) (nenv:M.t Ast
                                          nil
                                          ((retIdent, valPtr)::(tinfoIdent, threadInf)::nil)
                                          body_s)))).
-
+*)
 
 (* generate a function equivalent to halt, received a tinfo, desired results is already in tinfo.args[1], and
  a halting continuation closure *)
@@ -1263,7 +1269,8 @@ Definition make_call (closExpr:expr) (fIdent:ident) (envIdent:ident) (argsExpr:e
 
                     (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar envIdent val));
                     (Sassign (Field(argsExpr, Z.of_nat 1)) (Evar haltIdent val));
-                    (Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar argIdent val))).
+                    (Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar argIdent val));
+                    (call ([pfunTy] (funVar fIdent)))).
 
 Fixpoint make_n_calls (n:nat) (closIdent:ident) (fIdent:ident) (envIdent:ident) (argsExpr:expr) (argPairs:list (ident * type)) (retIdent:ident) (haltIdent:ident) :=
   match n, argPairs with
@@ -1272,7 +1279,7 @@ Fixpoint make_n_calls (n:nat) (closIdent:ident) (fIdent:ident) (envIdent:ident) 
   | S (S n), ((argIdent, _)::tl) =>
     let s := make_n_calls (S n) closIdent  fIdent envIdent argsExpr tl retIdent haltIdent in
     Ssequence s
-              (retIdent ::= (Field(argsExpr, Z.of_nat 1)); make_call (Etempvar retIdent valPtr) fIdent envIdent argsExpr argIdent haltIdent)
+              ( retIdent ::= (Field(argsExpr, Z.of_nat 1)); make_call (Etempvar retIdent valPtr) fIdent envIdent argsExpr argIdent haltIdent)
   | _, _ => Sskip
   end.
     
@@ -1292,29 +1299,27 @@ Definition make_call_n_export_b (nenv:M.t Ast.name) (n:nat) (export:bool) (haltI
     let left_args := make_proj argsS 2 n in
     let asgn_s := make_n_calls n clo_ident f_ident env_ident argsS (rev argsL) retIdent haltIdent in
 (*     let asgn_s := ( f_ident ::=  (Field(Etempvar clo_ident valPtr , Z.of_nat 0));
-                                      env_ident ::= (Field(Etempvar clo_ident valPtr, Z.of_nat 1));
+                                 2     env_ident ::= (Field(Etempvar clo_ident valPtr, Z.of_nat 1));
 
                     (Sassign (Field(argsS, Z.of_nat 0)) (Etempvar env_ident val));
                     (Sassign (Field(argsS, Z.of_nat 1)) (Evar haltIdent val));
                        (make_Asgn left_args (List.map (fun (s:ident*type) => let (i, t) := s in
                                                                 Etempvar i t
-                                                      ) argsL))) in *)
+                                                     ) argsL))) in *)
     let export_s := (if export then
                       (Scall (Some retIdent) (Evar exportIdent exportTy) (cons tinf nil))
                     else
                       (retIdent ::= (Field(argsS, Z.of_nat 1)))) in
     let body_s := Ssequence                    
                     (tinfo_s; asgn_s)
-                    (Ssequence
-                       (call ([pfunTy] (funVar f_ident)))
-                       (export_s; Sreturn  (Some (Etempvar retIdent valPtr))))
+                    (export_s; Sreturn  (Some (Etempvar retIdent valPtr)))
                     
                     
     in
     let callStr := append "call_" (nat2string10 n) in
     let callStr := if export then append callStr "_export" else callStr in
     let nenv :=
-        M.set env_ident (nNamed "env"%string) (M.set clo_ident (nNamed "clos"%string) (M.set callIdent (nNamed callStr)  (M.set f_ident (nNamed "f"%string) (M.set retIdent (nNamed "ret"%string) nenv)))) in
+        M.set env_ident (nNamed "envi"%string) (M.set clo_ident (nNamed "clos"%string) (M.set callIdent (nNamed callStr)  (M.set f_ident (nNamed "f"%string) (M.set retIdent (nNamed "ret"%string) nenv)))) in
     (* if export, tinf is local, otherwise is a param *)
     let params := ((clo_ident, val)::argsL) in
     let vars := ((f_ident, valPtr)::(env_ident, valPtr)::(retIdent, valPtr)::nil) in
@@ -1338,7 +1343,7 @@ Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t Ast.name): 
       let  '(nenv, halt_f, (halt_cloIdent, halt_clo_def)) := l in
       l <- make_call_n_export_b nenv 1 false halt_cloIdent;;
         let  '(nenv, call_0) := l in
-     l <- make_call_n_export_b nenv 2 true halt_cloIdent;;
+     l <- make_call_n_export_b nenv 2 false halt_cloIdent;;
         let  '(nenv, call_2) := l in
         l <- make_call_n_export_b nenv 1 true halt_cloIdent;;
           let  '(nenv, call_1) := l in
@@ -1358,14 +1363,16 @@ Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
   let p'' := make_defs e fenv cenv ienv nenv in
   let n := ((max_var e 100) + 1)%positive in
   let p' :=  (p''.(runState) n) in
+  let m := snd p' in
   match fst p' with
   | None => (nenv, None, None)
   | Some p =>
     let '(nenv, defs) := p in
-    let nenv := (add_inf_vars (ensure_unique nenv)) in
+    let nenv := (add_inf_vars (ensure_unique nenv)) in 
     let forward_defs := make_extern_decls nenv defs false in
     let header_pre := make_header cenv ienv e nenv in
-    let header_p := (header_pre.(runState) (snd p')) in
+    (*     let header_p := (header_pre.(runState) m%positive) in *)
+    let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
     (match fst header_p with
      | None => (nenv, None, None)
      | Some (nenv, hdefs) =>

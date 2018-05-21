@@ -891,20 +891,22 @@ Lemma eval_letbindc_aux d  v cargs vn:
           (map (fun v : NVar => bterm [] (vterm v)) vn))) 
     v.
    *)
-
+(*
   (* move to SquiggleEq *)
-  Lemma skipnSub {A:Type} a cargs (es:  list A):
-    a :: cargs = skipn (length es - S (length cargs)) es
-    -> cargs = skipn (length es - length cargs) es.
+  Lemma skipnSub {A:Type} l a cargs (es:  list A):
+    a :: cargs = skipn (Nat.pred l ) es
+    -> cargs = skipn l es
+  /\ Some a= nth_error  es (Nat.pred l).
   Proof using.
-    intros Hin. rewrite Nat.sub_succ_r in Hin.
+    intros Hin. 
    destruct (decideP  (length es > length cargs))%nat.
  - admit.
  -  replace (Nat.pred(length es - length cargs))%nat with 0%nat in Hin by omega.
     simpl in Hin.
     apply (f_equal   (@length _)) in Hin. simpl in *.   omega.
 Admitted.    
-
+  (* rewrite Nat.sub_succ_r in Hin. *)
+  SearchAbout *)
   Lemma eval_letbindc d lv  v cargs:
   eval (Con_e d cargs) v
   -> eval (let_bindc (NDCon d (length cargs)) lv cargs) v.
@@ -916,8 +918,30 @@ Proof using.
   apply (f_equal (map get_nt)) in Hev2.
   repeat rewrite map_map in Hev2. simpl in Hev2.
   repeat rewrite map_id in Hev2.
+  repnd. subst. clear Hev1.
+  (*
   assert (cargs = skipn (length es - length cargs) es) as Hc;
-    [replace (length es - length cargs)%nat with O%nat by omega; auto | ].
+    [replace (length es - length cargs)%nat with O%nat by omega; auto | ]. *)
+  assert (forall pvs, (forall t, In t pvs -> eval t t) ->
+             eval
+    (let_bindn vn cargs
+       (Con_e d
+          (((pvs ++ (map vterm vn)) )) )) 
+    (Con_e d (pvs++vs))) as Hx; [ | specialize (Hx []); unfold Con_e in Hx; simpl in Hx;
+  rewrite map_map in *; autorewrite with list in Hx;  
+  setoid_rewrite  <-  pp; apply Hx; cpx].
+- revert dependent vs.
+  revert dependent vn.
+  induction cargs; intros; simpl in *;  dlist_len vn; simpl in *; dlist_len vs.
+  + autorewrite with list. apply eval_Con_e; auto. admit.
+  + simpl. simpl in *. dLin_hyp. eapply eval_Let_e; eauto. simpl.
+    intros ? ? Hin. apply in_combine in Hin. repnd.
+    
+  congruence.
+  rewrite  pp in Hx.
+subst; rewrite Hev, Nat.sub_diag in Hx; simpl in Hx; auto;
+                             rewrite map_map in Hx; congruence
+
   assert (eval
     (let_bindn vn cargs
        (oterm (NDCon d (length vs))

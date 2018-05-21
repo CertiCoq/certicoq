@@ -868,6 +868,7 @@ Ltac dZeta := match goal with
    =>  invertsn H
     end.
 
+(*
 Definition constr_vars_precond lv (e : L4_5_Term) :=
   closed e /\ subset (all_vars e) lv.
 
@@ -878,21 +879,86 @@ Definition constr_vars_precond_bt lv (e : L4_5_BTerm) :=
 Global Instance pre lv :  evalPresProps (constr_vars_precond lv)
                                         (constr_vars_precond_bt lv).
 Admitted.
+ *)
+  Require Import Datatypes.
+  Require Import SetoidList.
+  (*
+Lemma eval_letbindc_aux d  v cargs vn:
+  eval (Con_e d cargs) v
+  -> eval
+    (let_bindn vn cargs
+       (oterm (NDCon d (length cargs))
+          (map (fun v : NVar => bterm [] (vterm v)) vn))) 
+    v.
+   *)
+
+  (* move to SquiggleEq *)
+  Lemma skipnSub {A:Type} a cargs (es:  list A):
+    a :: cargs = skipn (length es - S (length cargs)) es
+    -> cargs = skipn (length es - length cargs) es.
+  Proof using.
+    intros Hin. rewrite Nat.sub_succ_r in Hin.
+   destruct (decideP  (length es > length cargs))%nat.
+ - admit.
+ -  replace (Nat.pred(length es - length cargs))%nat with 0%nat in Hin by omega.
+    simpl in Hin.
+    apply (f_equal   (@length _)) in Hin. simpl in *.   omega.
+Admitted.    
+
+  Lemma eval_letbindc d lv  v cargs:
+  eval (Con_e d cargs) v
+  -> eval (let_bindc (NDCon d (length cargs)) lv cargs) v.
+Proof using.
+  intros Hev. invertsna Hev Hev.
+  unfold let_bindc.
+  addFreshVarsSpec2 vn pp. simpl. simpl.
+  clear Heqvn.
+  apply (f_equal (map get_nt)) in Hev2.
+  repeat rewrite map_map in Hev2. simpl in Hev2.
+  repeat rewrite map_id in Hev2.
+  assert (cargs = skipn (length es - length cargs) es) as Hc;
+    [replace (length es - length cargs)%nat with O%nat by omega; auto | ].
+  assert (eval
+    (let_bindn vn cargs
+       (oterm (NDCon d (length vs))
+          ((map (bterm []) ((firstn (length vs - length cargs) vs) ++ (map vterm vn)) )) )) 
+    (Con_e d vs)) as Hx; [ | subst; rewrite Hev, Nat.sub_diag in Hx; simpl in Hx; auto;
+                             rewrite map_map in Hx; congruence].
+  clear Hev2 Hev1.
+  repnd. revert dependent vn.
+  induction cargs.
+  - simpl. intros.  dlist_len vn. simpl. autorewrite with list. admit.
+  - simpl. intros. dlist_len vn. simpl. econstructor. 
+    simpl in *.
+  Focus 2.   assumption.
+  autorewrite with  SquiggleEq in Hev2.
+  repnd. Print eval.
+  pose proof Hev2 as Hlen.
+   apply (f_equal (@length _)) in Hlen. autorewrite with list in Hlen.
+  revert dependent cargs.
+  induction vn.
+  - simpl. intros. simpl in *. dlist_len cargs. simpl in *. dlist_len es.
+    simpl in *. dlist_len vs. admit.
+  -  intros. simpl.
+Admitted.  
+  
+  
+  
+  
 Lemma L4_5_constr_vars_zeta lv (e  v: L4_5_Term):
-  constr_vars_precond lv e
+  closedSubsetVars lv e
   -> eval e v
   -> forall e', zetaCLe lv e e'
   -> exists v', eval e' v'
       /\ (zetaCLe lv v v').
 Proof using.
-  revert e v.
   pose proof
-       (eval_ind2  (constr_vars_precond lv) (constr_vars_precond_bt lv)) as Hx.
+       (eval_ind2  (closedSubsetVars lv) (closedSubsetVars_bt lv)) as Hx.
   unfold L4_5_Term.
   specialize (Hx (fun e v => forall e', zetaCLe lv e e'
   -> exists v', eval e' v'
       /\ (zetaCLe lv v v'))).
-  apply Hx.
+  apply Hx. clear Hx.
 - simpl. intros ? ? ? ? He. unfold Lam_e in He.
   repeat dZeta.  eexists.
   split; [ apply eval_Lam_e | ].
@@ -915,7 +981,19 @@ Proof using.
       [ | prove_sub_range_sat | autorewrite with list;  firstorder].
   exrepnd.
   eexists; split; [ eapply eval_App_e ;eauto | ] ; eauto; fail.
-  Fail idtac. (* done with beta case*)
+- intros ? ? ? Hlen Hsev Hind ? Hz. unfold Con_e in Hz.
+  repeat dZeta.
+  + (* no expansion *)
+    applydup eqlistA_length in Hz. autorewrite with list in Hz0.
+    assert (exists esp vsp, lbt2 = map (bterm []) esp /\ eqlistA (zetaCLe lv) es esp
+                       /\ eqlistA (zetaCLe lv) vs vsp /\ length esp= length vsp /\
+ forall e0 v0 : NTerm, LIn (e0, v0) (combine esp vsp) -> eval e0 v0 ) as Hxx by admit.
+    exrepnd. subst. rewrite Hz0. autorewrite with list.
+    eexists. split; [eapply eval_Con_e; eauto | ].
+    admit (* easy *).
+  +  exrepnd.  assert (length es = length cargs2) by admit.
+     rewrite H. eexists. split.
+     apply eval_letbindc.
 Abort.
 
 Lemma L4_5_constr_vars_zeta fv:

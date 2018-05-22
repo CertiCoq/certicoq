@@ -1281,7 +1281,13 @@ Proof using.
    replace (length vs) with (length vsp) in Hfs by congruence.
    replace (length vs) with (length vsp) in Hindev by congruence.
    eexists; split; [ eapply eval_Match_e; eauto| ] ; eauto.
--   
+- simpl. intros ? ? ? ? He. unfold Fix_e' in He.
+  repeat dZeta.  eexists.
+  applydup eqlistA_length in He. rwHyps.
+  split; [ apply eval_Fix_e | ]; eauto. unfold Fix_e'.
+  rwHyps.
+  constructor. auto.
+- 
 Abort.
 
 Lemma L4_5_constr_vars_zeta fv:

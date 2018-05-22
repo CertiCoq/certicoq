@@ -1135,6 +1135,18 @@ Proof using.
 Qed.  
 
 (* move to SquiggleEq *)
+Lemma   select_Rl {A:Type} lbt lbtp n (bt:A) R:
+  select n lbt = Some bt ->
+  eqlistA R lbt lbtp ->
+  exists btp, select n lbtp = Some btp /\ R bt btp.
+Proof using.
+  intros Hs Heq. revert dependent n.
+  induction Heq; intros; destruct n;  inverts Hs; simpl.
+- eexists; eauto.
+- eauto.
+Qed.  
+
+(* move to SquiggleEq *)
   Ltac simpl_combine := unfold dom_sub , range, ALDom, ALRange;
                         (
 match goal with
@@ -1169,7 +1181,7 @@ Proof using.
   specialize (Hx (fun e v => forall e', zetaCLe lv e e'
   -> exists v', eval e' v'
       /\ (zetaCLe lv v v'))).
-  apply Hx; clear Hx.
+  apply Hx; clear Hx; clear e v. 
 - simpl. intros ? ? ? ? He. unfold Lam_e in He.
   repeat dZeta.  eexists.
   split; [ apply eval_Lam_e | ].
@@ -1276,18 +1288,42 @@ Proof using.
     repeat rewrite <- combine_of_map_snd.
     rewrite <- (combine_eta (map (fun b : dcon * BTerm => (fst b, num_bvars (snd b))) bs)).
     f_equal; rewrite map_map; simpl; auto; fail.
-    exrepnd. unfold L4_5_Term in *.
-    apply eqlistA_length in Hindd0.
-   replace (length vs) with (length vsp) in Hfs by congruence.
-   replace (length vs) with (length vsp) in Hindev by congruence.
-   eexists; split; [ eapply eval_Match_e; eauto| ] ; eauto.
+  exrepnd. unfold L4_5_Term in *.
+  apply eqlistA_length in Hindd0.
+ replace (length vs) with (length vsp) in Hfs by congruence.
+ replace (length vs) with (length vsp) in Hindev by congruence.
+ eexists; split; [ eapply eval_Match_e; eauto| ] ; eauto.
 - simpl. intros ? ? ? ? He. unfold Fix_e' in He.
   repeat dZeta.  eexists.
   applydup eqlistA_length in He. rwHyps.
   split; [ apply eval_Fix_e | ]; eauto. unfold Fix_e'.
   rwHyps.
   constructor. auto.
-- 
+- intros f ? ? arg varg bt vfinal _ _ Hsel _ Hnum _ _ Hpref Hindf _ Hprea
+    Hinda _ _ Hinds ? Hz.
+  unfold App_e in Hz.
+  repeat dZeta.
+  rename ntr0 into fp, ntr into argp.
+  specialize (Hinda _ Hzr).
+  specialize (Hindf _ Hz).
+  exrepnd. rename v' into vargp.
+  unfold Fix_e' in *.
+  repeat dZeta.
+  rename lbt2 into lbtp.
+  hnf in Hprea, Hpref.
+  rwsimpl Hpref.
+  applydup eqlistA_length in Hindf0.
+  rewrite Hindf2 in Hindf1.
+  eapply select_Rl in Hsel; eauto. exrepnd.
+  invertsn Hsel0.
+  specialize (Hinds (App_e
+               (apply_bterm (bterm lv0 ntr)
+                  (map (fun n : nat => oterm (NFix (length lbtp) n) lbtp)
+                       (seq 0 (length lbtp)))) vargp)).
+  dimpr Hinds.
+  + admit.
+  + exrepnd. eexists. split;
+  [ eapply eval_FixApp_e| ]; eauto. unfold num_bvars in *. simpl in *. congruence.
 Abort.
 
 Lemma L4_5_constr_vars_zeta fv:

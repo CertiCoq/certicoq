@@ -662,6 +662,7 @@ Lemma eval_ind2 Pre PreB
   eval e1 (Lam_e x e1') ->
   eval e2 v2 ->
   eval (e1' {x := v2}) v ->
+  Pre (App_e e1 e2) ->
   (P e1 (Lam_e x e1')) ->
   (Pre e1) ->
   (Pre (Lam_e x e1')) ->
@@ -681,6 +682,7 @@ Lemma eval_ind2 Pre PreB
    (Hzeta:   forall (x : NVar) (e1 v1 e2 v2 : NTerm),
   eval e1 v1 ->
   eval (e2 {x := v1}) v2 ->
+  Pre (Let_e x e1 e2) ->
   Pre e1 -> Pre v1 ->P e1 v1 ->
   Pre (e2 {x := v1}) -> Pre v2 -> P (e2 {x := v1}) v2
   -> P (Let_e x e1 e2) v2)
@@ -689,6 +691,7 @@ Lemma eval_ind2 Pre PreB
   eval e (Con_e d vs) ->
   find_branch d (Datatypes.length vs) bs = Some e' ->
   eval (apply_bterm e' vs) v ->
+  Pre (Match_e e bs) ->
   Pre e -> Pre (Con_e d vs) -> P e (Con_e d vs) ->
   Pre (apply_bterm e' vs) -> Pre v -> P (apply_bterm e' vs) v ->
   P (Match_e e bs) v)
@@ -704,6 +707,7 @@ Lemma eval_ind2 Pre PreB
   select n lbt = Some bt ->
   eval (App_e (apply_bterm bt sub) v2) ev2 ->
   num_bvars bt = len ->
+  Pre (App_e e e2)->
   Pre e -> Pre (Fix_e' lbt n) -> P e (Fix_e' lbt n) ->
   Pre e2 -> Pre v2 -> P e2 v2 ->
   Pre (App_e (apply_bterm bt sub) v2) ->
@@ -715,7 +719,7 @@ Proof using.
   clear varclass upnm.
   intros ?  ? Hpre Hev.
   induction Hev; [ | | | | | | ] ; eauto ; [ | | | |  ].
-- clear Hlamv Hcons Hzeta Hiota Hfixv Hfixapp.
+- clear Hlamv Hcons Hzeta Hiota Hfixv Hfixapp. pose proof Hpre as Hprebb.
   apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
    simpl in Hpre. dLin_hyp.
    apply subtermPresb in Hyp.
@@ -746,7 +750,7 @@ Proof using.
       specialize (IHHev _ _ Hin).
       assert (Pre e); [ | tauto].
       apply in_combine_l in Hin. eauto.
-- clear Hbeta Hlamv Hcons.
+- clear Hbeta Hlamv Hcons. pose proof Hpre as Hprebb.
    apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
    simpl in Hpre. dLin_hyp.
    apply subtermPresb in Hyp.
@@ -757,7 +761,7 @@ Proof using.
      apply substPres; auto; in_reasoning2.
    repnd.
    dands; auto. eapply Hzeta; eauto.
-- clear Hbeta Hlamv Hcons Hzeta Hfixv Hfixapp.
+- clear Hbeta Hlamv Hcons Hzeta Hfixv Hfixapp. pose proof Hpre as Hprebb.
    apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
    simpl in Hpre. dLin_hyp.
    apply subtermPresb in Hyp.
@@ -772,7 +776,7 @@ Proof using.
      apply substPres; auto| ].
    repnd.
    dands; auto;[]. eapply Hiota; eauto.
-- clear Hbeta Hlamv Hzeta Hiota Hfixv Hcons.
+- clear Hbeta Hlamv Hzeta Hiota Hfixv Hcons. pose proof Hpre as Hprebb.
   pose proof Hpre as Hpreb.
    apply subtermPres in Hpre. simpl in Hpre. unfold lforall in Hpre.
    simpl in Hpre. dLin_hyp.

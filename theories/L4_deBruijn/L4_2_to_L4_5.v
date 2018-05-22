@@ -1074,7 +1074,7 @@ Lemma L4_5_constr_vars_zeta lv (e  v: L4_5_Term):
 Proof using.
   pose proof
        (eval_ind2  (closedSubsetVars lv) (closedSubsetVars_bt lv)) as Hx.
-  unfold L4_5_Term.
+  unfold L4_5_Term in *.
   specialize (Hx (fun e v => forall e', zetaCLe lv e e'
   -> exists v', eval e' v'
       /\ (zetaCLe lv v v'))).
@@ -1083,7 +1083,7 @@ Proof using.
   repeat dZeta.  eexists.
   split; [ apply eval_Lam_e | ].
   do 3 constructor. assumption.
-- intros ? ? vfb ? varg ? Hevf Heva Hevs Hindf _ Hpref Hinda _ Hprea Hinds _ _ ? Hz.
+- intros ? ? vfb ? varg ? Hevf Heva Hevs _ Hindf _ Hpref Hinda _ Hprea Hinds _ _ ? Hz.
   unfold App_e in Hz.
   repeat dZeta.
   rename ntr0 into e1z, ntr into e2z.
@@ -1125,7 +1125,21 @@ Proof using.
       eapply zetalFvarsNil; eauto; intros ? Hin;
         [eapply (combine_in_right _ _ vs es) in Hin
         |eapply (combine_in_left  _ _ es vs) in Hin]; try omega;
-    exrepnd; apply Hindb in Hin0; tauto.
+          exrepnd; apply Hindb in Hin0; tauto.
+- intros ? ? varg  vfb ? Heva Hevs Hpref Hpre Hprea Hinda Hpres Hprev Hinds ? Hz.
+  unfold Let_e in Hz.
+  repeat dZeta.
+  rename ntr0 into e1p, ntr into vfbz.
+  specialize (Hinda _ Hz).
+  exrepnd. rename v' into vargz.
+  hnf in Hprea, Hpref, Hpres.
+  repnd. unfold Let_e in Hpref. rwsimpl  Hpref.
+  simpl in Hinds. unfold subst in Hinds.
+  eapply  ssubst_commute_L4_5_zeta with (sub2 := [(x,vargz)])in Hzr;
+    [specialize (Hinds _ Hzr) | | | ]; simpl; auto; cpx;
+      [ | prove_sub_range_sat | autorewrite with list; forder Hprea Hpref].
+  exrepnd.
+  eexists; split; [ eapply eval_Let_e ;eauto | ] ; eauto; fail.
 Abort.
 
 Lemma L4_5_constr_vars_zeta fv:

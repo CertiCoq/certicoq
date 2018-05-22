@@ -126,7 +126,9 @@ void forward (value *from_start,  /* beginning of from-space */
  {
   value v = *p;
   if(Is_block(v)) {
+
     if(Is_from(from_start, from_limit, v)) {
+
       header_t hd = Hd_val(v); 
       if(hd == 0) { /* already forwarded */
 	*p = Field(v,0);
@@ -387,33 +389,51 @@ int garbage_collect_all(fun_info fi, struct thread_info *ti) {
         ti->heap = h;
     }
     int i;
+
     assert (h->spaces[0].limit == ti->limit);  
     for (i=0; i < MAX_SPACES - 1 && h->spaces[i+1].start != NULL; i++) {
-        if(0)
-            fprintf(stderr, "Generation %d:  ", i);
+      
         do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+    }
+    
+    /* If i is the nursery, its next won't be tracked, so need to be set to alloc */
+    if(i == 0){
+      h->spaces[i].next = ti->alloc;
     }
     return i;
 }
 
 uintnat const fake_fi[3] = {0, 1, 1};
 
+
+
+/* export (deep copy if boxed) the first field of args */ 
 void* export(struct thread_info *ti) {
+
+  /* if args[1] is unboxed, return it */
+  if(!Is_block(ti->args[1])){
+    return ti->args[1];
+  }
+
+  /* otherwise collect all that is reachable from it to the last generation, then compact it into value_sp */
     int gen_level = garbage_collect_all(fake_fi, ti);
     struct space* sp = ti->heap->spaces+gen_level;
-
     struct space* fake_sp = (struct space*)malloc(sizeof(struct space));
+    
     create_space(fake_sp, sp->next - sp->start);
     do_generation(sp, fake_sp, fake_fi, ti);
-
+   
     struct space* value_sp = (struct space*)malloc(sizeof(struct space));
     create_space(value_sp, fake_sp->next - fake_sp->start);
     do_generation(fake_sp, value_sp, fake_fi, ti);
-    
-    void* result_block = (void *)value_sp->start;
+
+    /* offset start by the header */
+    void* result_block = (void *)(value_sp->start +1);   
 
     free(fake_sp->start);
     free(fake_sp);
-    free(value_sp);
+    free(value_sp);       
+    
+
     return result_block;
 }

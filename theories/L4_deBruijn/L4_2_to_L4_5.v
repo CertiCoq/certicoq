@@ -933,7 +933,20 @@ Lemma unify_Con_e (cargs : list L4_5_Term) len d:
       len= length cargs ->
       oterm (NDCon d len) (map (bterm []) cargs) = Con_e d cargs.
 Proof using.
-  intros. unfold Con_e. subst. auto.
+  intros. subst. auto.
+Qed.
+
+Print Match_e.
+    (* Move to L4_5_to_L5.v *)
+Lemma unify_Match_e d brs lbt sig:
+  (sig = map (fun b : dcon * BTerm => (fst b, num_bvars (snd b))) brs) ->
+  (lbt = map snd brs) ->
+  (oterm
+  (NMatch sig)
+  (bterm [] d :: lbt))
+  = ((Match_e d brs):L4_5_Term).
+Proof using.
+  intros. subst. auto.
 Qed.
 
 (* Move to SquiggleEq *)
@@ -1063,7 +1076,85 @@ Proof using.
   intros ? ? Heq Hs. erewrite <- zetalFvars; eauto.
 -  apply flat_map_empty. intros ? Hin. apply Hs in Hin. apply Hin.
 - apply subset_flat_map.  intros ? Hin. apply Hs in Hin. apply Hin. 
+Qed.
+
+(* Move to SquiggleEq *)
+  Definition Rpair {A1 A2 B1 B2 : Type} (R1 : A1 -> A2 -> Prop) (R2 : B1 -> B2 -> Prop)
+             (p1: A1*B1) (p2: A2*B2) :=
+    let (d1, b1) := p1 in let (d2,b2) := p2 in R1 d1 d2 /\ R2 b1 b2.
+
+(* Move to SquiggleEq *)
+  Lemma liftRbtsiglist {dcon:Type} (R: L4_5_Term -> L4_5_Term -> Prop):
+    forall  (bs : list (dcon * L4_5_BTerm)) (lbtp : list BTerm),
+  eqlistA (liftRBt R) (map snd bs) lbtp ->
+  map (fun x : dcon * BTerm => num_bvars (snd x)) bs = map num_bvars lbtp.
+Proof using.
+  intros ? ? Heq. remember (map snd bs) as msb. revert dependent bs.
+  induction Heq; intros; destruct bs; invertsn Heqmsb; auto.
+  simpl. f_equal; eauto. unfold L4_5_Term  in *.
+  inverts H; auto. setoid_rewrite <- H0. refl.
+Qed.
+
+Lemma findBranchMapBtCommute {O V} deqv vc vcf fr (R : @BTerm V O -> @BTerm V O -> Prop)
+      n d (lbt1 lbt2 : list (@branch V O)) b1
+  (Hr: forall b1 b2, (R b1 b2) -> (@num_bvars V O) b1 = (@num_bvars V O b2) ):
+  eqlistA R (map snd lbt1) (map snd lbt2) ->
+  map fst lbt1 = map fst lbt2 ->
+  @polyEval.find_branch _ (@Named.TermAbsImplUnstrict V O vc deqv vcf fr) d n
+                         lbt1= Some b1 ->
+  exists b2, 
+  (@polyEval.find_branch _ (@Named.TermAbsImplUnstrict V O vc deqv vcf fr)  d n (lbt2)) = Some b2 /\ R b1 b2.
+Proof using.
+  unfold polyEval.find_branch. intros Heq Hm.
+  assert ((Roption (Rpair eq R) (find (fun a : @polyEval.branch O
+                                       (@Named.TermAbsImplUnstrict V O vc deqv vcf fr) => decide (d = fst a)) lbt1)
+                                          (find (fun a : @polyEval.branch O (@Named.TermAbsImplUnstrict V O vc deqv vcf fr) => decide (d = fst a)) lbt2))).
+- revert dependent lbt2. induction lbt1; intros; invertsn Heq; simpl in *;destruct lbt2; invertsn Hm;[  constructor | ].
+  rename H2 into Hseq. invertsn Hseq.
+  simpl. rwHyps. cases_if; auto. simpl.
+  destruct a,b; simpl; auto.
+- intros Heqs. 
+  destruct (find (fun a : @polyEval.branch O (@Named.TermAbsImplUnstrict V O vc deqv vcf fr) => decide (d = fst a)) lbt1),
+  (find (fun a : @polyEval.branch O (@Named.TermAbsImplUnstrict V O vc deqv vcf fr) => decide (d = fst a)) lbt2); simpl in H; cpx.
+  setoid_rewrite decide_decideP.
+  setoid_rewrite decide_decideP in Heqs.
+  destruct b, b0. simpl in *. repnd. pose proof H as Hrb. apply Hr in H.
+  rewrite <- H. cases_if;subst; cpx; eexists; dands; eauto.
+  inverts Heqs. auto.
+Qed.
+
+  Lemma zetavvv  (lbt1 : list BTerm) (o : L4_5Opid) t avoid:
+    zetaCLe avoid (oterm o lbt1) t ->
+    is_value t ->
+    exists lbt2, eqlistA (liftRBt (zetaCLe avoid)) lbt1 lbt2 /\ t=(oterm o lbt2).
+Proof using.
+  intros Hz Hisv.
+  dZeta;[eexists; eauto | ].
+  inverts Hz; [exists (@nil L4_5_BTerm); simpl; split; auto | provefalse].
+  inverts Hisv.
 Qed.  
+
+(* move to SquiggleEq *)
+  Ltac simpl_combine := unfold dom_sub , range, ALDom, ALRange;
+                        (
+match goal with
+| [ H : context[map snd (combine _ _)] |- _] =>rewrite <- combine_map_snd  in H; [ |try(simpl_list);spc;idtac "check lengths in combine";fail]
+| [ |- context[map snd (combine _ _)] ] =>rewrite <- combine_map_snd ;[ |try(simpl_list);spc;idtac "check lengths in combine";fail]
+| [ H : context[map fst (combine _ _)] |- _] =>rewrite <- combine_map_fst  in H; [ |try(simpl_list);spc;idtac "check lengths in combine";fail]
+| [  |- context[map fst (combine _ _)] ] =>rewrite <- combine_map_fst ;[ |try(simpl_list);spc;idtac "check lengths in combine";fail]
+end).
+(* move to SquiggleEq *)
+  Ltac simplCombine := unfold dom_sub , range, ALDom, ALRange;
+                       try rewrite <- combine_map_snd ; autorewrite with list; auto; try congruence;
+                       try rewrite <- combine_map_fst ; autorewrite with list; auto; try congruence.
+
+(* move to SquiggleEq.AssocList *)
+   Lemma ALRangeRelCombine {V T:Type} (lv:list V) lt1 lt2  (R: T-> T-> Prop):
+    eqlistA R lt1 lt2 -> ALRangeRel R (combine lv lt1) (combine lv lt2).
+ Proof using.
+   intros Heq. revert lv.
+   induction Heq;destruct lv; simpl; eauto.
+ Qed.
 
 Lemma L4_5_constr_vars_zeta lv (e  v: L4_5_Term):
   closedSubsetVars lv e
@@ -1126,13 +1217,13 @@ Proof using.
         [eapply (combine_in_right _ _ vs es) in Hin
         |eapply (combine_in_left  _ _ es vs) in Hin]; try omega;
           exrepnd; apply Hindb in Hin0; tauto.
-- intros ? ? varg  vfb ? Heva Hevs Hpref Hpre Hprea Hinda Hpres Hprev Hinds ? Hz.
+- intros ? ? varg  vfb ? _ _ Hpref _ Hprea Hinda _ _ Hinds ? Hz.
   unfold Let_e in Hz.
   repeat dZeta.
   rename ntr0 into e1p, ntr into vfbz.
   specialize (Hinda _ Hz).
   exrepnd. rename v' into vargz.
-  hnf in Hprea, Hpref, Hpres.
+  hnf in Hprea, Hpref.
   repnd. unfold Let_e in Hpref. rwsimpl  Hpref.
   simpl in Hinds. unfold subst in Hinds.
   eapply  ssubst_commute_L4_5_zeta with (sub2 := [(x,vargz)])in Hzr;
@@ -1140,6 +1231,57 @@ Proof using.
       [ | prove_sub_range_sat | autorewrite with list; forder Hprea Hpref].
   exrepnd.
   eexists; split; [ eapply eval_Let_e ;eauto | ] ; eauto; fail.
+- intros d ? ? ? b vv Hevd Hf Hevs Hprem Hpred Hpredv Hindd _ _ Hinds ? Hz.
+  unfold Match_e in Hz. 
+  repeat dZeta. rename l' into lbtp.
+  rename  ntr into dp.
+  specialize (Hindd _ Hz).
+  exrepnd. pose proof Hindd1 as Hindev. 
+  apply  L4_5_to_L5.eval_yields_value' in Hindd1.
+  apply zetavvv in Hindd0;[ |  assumption ].
+  exrepnd. subst.
+  apply liftRBTeqlist in Hindd0. exrepnd. subst.
+  rename esp into vsp. 
+  hnf in Hprem, Hpredv. unfold closed in *.
+  unfold Con_e in Hpredv.
+  unfold Match_e in Hprem.
+  rwsimpl  Hpredv. 
+  rwsimpl  Hprem. repeat rewrite subset_app in Hprem.
+  repeat rewrite app_eq_nil_iff in Hprem. repnd.
+  set (bsp:= combine (map fst bs) lbtp).
+  unfold L4_5_Term in *.
+  applydup eqlistA_length in Hzr.
+  autorewrite with list in Hzr0. pose proof Hf as Hfb.            
+  apply findBranchMapBtCommute with (R:=(liftRBt (zetaCLe lv))) (lbt2:=bsp) in Hf;
+    unfold bsp; simplCombine;
+      [ | intros ? ? Hb; inverts Hb; refl].
+  exrepnd.
+  rename b2 into bp. unfold apply_bterm in Hinds.
+  invertsn Hf0. pose proof Hf1 as Hfs.
+  apply find_branch_some in Hf1. rewrite num_bvars_on_bterm in Hf1. repnd.
+  apply find_branch_some in Hfb. rewrite num_bvars_on_bterm in Hfb. repnd.
+  repnd.
+   rewrite subset_flat_map in Hprem.
+   apply Hprem in Hfb1.  rwsimpl Hfb1.
+   rewrite flat_map_empty in  Hpredv0 .
+  eapply  ssubst_commute_L4_5_zeta with (sub2 := combine lv0 vsp)in Hf0;
+    [specialize (Hinds _ Hf0) | | | ]; simpl; cpx; simplCombine; try
+                                                                   apply sub_range_sat_range;  simplCombine;
+      [ | rewrite subset_app in *;  forder Hfb1 Hpredv
+        | apply ALRangeRelCombine; auto
+      ]; [].
+  apply liftRbtsiglist in Hzr.
+  rewrite unify_Match_e with (brs := bsp); unfold bsp; repeat simplCombine.
+  Focus 2.
+    repeat rewrite <- combine_of_map_snd.
+    rewrite <- (combine_eta (map (fun b : dcon * BTerm => (fst b, num_bvars (snd b))) bs)).
+    f_equal; rewrite map_map; simpl; auto; fail.
+    exrepnd. unfold L4_5_Term in *.
+    apply eqlistA_length in Hindd0.
+   replace (length vs) with (length vsp) in Hfs by congruence.
+   replace (length vs) with (length vsp) in Hindev by congruence.
+   eexists; split; [ eapply eval_Match_e; eauto| ] ; eauto.
+-   
 Abort.
 
 Lemma L4_5_constr_vars_zeta fv:

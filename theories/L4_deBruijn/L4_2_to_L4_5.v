@@ -935,6 +935,7 @@ Lemma unify_Con_e (cargs : list L4_5_Term) len d:
 Proof using.
   intros. subst. auto.
 Qed.
+Locate liftRbt.
 
 Print Match_e.
     (* Move to L4_5_to_L5.v *)
@@ -947,14 +948,6 @@ Lemma unify_Match_e d brs lbt sig:
   = ((Match_e d brs):L4_5_Term).
 Proof using.
   intros. subst. auto.
-Qed.
-
-(* Move to SquiggleEq *)
-Lemma in_combine_same {A:Type} (e v: A) pvs: LIn (e, v) (combine pvs pvs)
-                                             -> e =v /\ In e pvs.
-Proof using.
-  induction pvs; cpx. simpl. 
-  firstorder; inverts H ;auto.
 Qed.
 
 Require Import Datatypes.
@@ -1009,22 +1002,6 @@ rewrite unify_Con_e; [ | repeat (autorewrite with list; simpl); refl].
     + rewrite flat_map_app. simpl. rwHyps. refl.
 Qed.
 
-(* Move to SquiggleEq *)
-Tactic Notation "forder" ident_list (idl) :=
-  revert idl; clear; firstorder.
-  
-(* Move to SquiggleEq and heterogenize *)
-Lemma liftRBTeqlist (R : L4_5_Term ->  L4_5_Term -> Prop) es lbt:
-  eqlistA (liftRBt R) (map (bterm []) es) lbt
-  -> exists esp, eqlistA R es esp /\ lbt = map (bterm []) esp.
-Proof using.
-  revert es lbt.
-  induction es; intros ? Heq; inverts Heq.
-  + eexists. split. constructor. refl.
-  + inverts H1. apply IHes in H3. exrepnd. eexists. split. econstructor; eauto.
-      subst. auto.
-Qed.
-
 Lemma eval_Con_e_zeta :
   forall (lv : list NVar) (es vs : list NTerm) (esp : list L4_5_Term),
   length vs = length es ->    
@@ -1048,14 +1025,6 @@ Proof using.
   exists (v'::vsp).  simpl. dands; auto.
   intros. in_reasoning; cpx.
 Qed.  
-(* Move to SquiggleEq *)
-Lemma liftRbt_eqlista   (R : L4_5_Term ->  L4_5_Term -> Prop)  vs vsp:
-  eqlistA R vs vsp ->
-  eqlistA (liftRBt R) (map (bterm []) vs) (map (bterm []) vsp).
-Proof using.
-  intros H. induction H; constructor; auto.
-  constructor; auto.
-Qed.
 
 Lemma zetalFvars fv:
   (forall (t : list NTerm) (u : list L4_5_Term),
@@ -1078,22 +1047,7 @@ Proof using.
 - apply subset_flat_map.  intros ? Hin. apply Hs in Hin. apply Hin. 
 Qed.
 
-(* Move to SquiggleEq *)
-  Definition Rpair {A1 A2 B1 B2 : Type} (R1 : A1 -> A2 -> Prop) (R2 : B1 -> B2 -> Prop)
-             (p1: A1*B1) (p2: A2*B2) :=
-    let (d1, b1) := p1 in let (d2,b2) := p2 in R1 d1 d2 /\ R2 b1 b2.
 
-(* Move to SquiggleEq *)
-  Lemma liftRbtsiglist {dcon:Type} (R: L4_5_Term -> L4_5_Term -> Prop):
-    forall  (bs : list (dcon * L4_5_BTerm)) (lbtp : list BTerm),
-  eqlistA (liftRBt R) (map snd bs) lbtp ->
-  map (fun x : dcon * BTerm => num_bvars (snd x)) bs = map num_bvars lbtp.
-Proof using.
-  intros ? ? Heq. remember (map snd bs) as msb. revert dependent bs.
-  induction Heq; intros; destruct bs; invertsn Heqmsb; auto.
-  simpl. f_equal; eauto. unfold L4_5_Term  in *.
-  inverts H; auto. setoid_rewrite <- H0. refl.
-Qed.
 
 Lemma findBranchMapBtCommute {O V} deqv vc vcf fr (R : @BTerm V O -> @BTerm V O -> Prop)
       n d (lbt1 lbt2 : list (@branch V O)) b1
@@ -1134,46 +1088,6 @@ Proof using.
   inverts Hisv.
 Qed.  
 
-(* move to SquiggleEq *)
-Lemma   select_Rl {A:Type} lbt lbtp n (bt:A) R:
-  select n lbt = Some bt ->
-  eqlistA R lbt lbtp ->
-  exists btp, select n lbtp = Some btp /\ R bt btp.
-Proof using.
-  intros Hs Heq. revert dependent n.
-  induction Heq; intros; destruct n;  inverts Hs; simpl.
-- eexists; eauto.
-- eauto.
-Qed.  
-
-(* move to SquiggleEq *)
-  Ltac simpl_combine := unfold dom_sub , range, ALDom, ALRange;
-                        (
-match goal with
-| [ H : context[map snd (combine _ _)] |- _] =>rewrite <- combine_map_snd  in H; [ |try(simpl_list);spc;idtac "check lengths in combine";fail]
-| [ |- context[map snd (combine _ _)] ] =>rewrite <- combine_map_snd ;[ |try(simpl_list);spc;idtac "check lengths in combine";fail]
-| [ H : context[map fst (combine _ _)] |- _] =>rewrite <- combine_map_fst  in H; [ |try(simpl_list);spc;idtac "check lengths in combine";fail]
-| [  |- context[map fst (combine _ _)] ] =>rewrite <- combine_map_fst ;[ |try(simpl_list);spc;idtac "check lengths in combine";fail]
-end).
-(* move to SquiggleEq *)
-  Ltac simplCombine := unfold dom_sub , range, ALDom, ALRange;
-                       try rewrite <- combine_map_snd ; autorewrite with list; auto; try congruence;
-                       try rewrite <- combine_map_fst ; autorewrite with list; auto; try congruence.
-
-(* move to SquiggleEq.AssocList *)
-   Lemma ALRangeRelCombine {V T:Type} (lv:list V) lt1 lt2  (R: T-> T-> Prop):
-    eqlistA R lt1 lt2 -> ALRangeRel R (combine lv lt1) (combine lv lt2).
- Proof using.
-   intros Heq. revert lv.
-   induction Heq;destruct lv; simpl; eauto.
- Qed.
-
- (* Move to SquiggleEq *)
- Lemma eq_eqListA {A} l1 l2:
-  l1 = l2 -> SetoidList.eqlistA (@eq A) l1 l2.
-Proof using.
-  intros. subst. induction l2; auto.
-Qed.
 
  (* Move to L4_5_to *)
  Lemma fVarsFix2 : forall (lbt: list (@BTerm NVar L4_5Opid)),
@@ -1190,7 +1104,7 @@ Proof using.
   apply eqset_repeat. simpl. discriminate.
 Qed.
 
-Lemma L4_5_constr_vars_zeta lv (e  v: L4_5_Term):
+Lemma L4_5_eval_zeta_commute lv (e  v: L4_5_Term):
   closedSubsetVars lv e
   -> eval e v
   -> forall e', zetaCLe lv e e'

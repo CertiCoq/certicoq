@@ -1168,6 +1168,28 @@ end).
    induction Heq;destruct lv; simpl; eauto.
  Qed.
 
+ (* Move to SquiggleEq *)
+ Lemma eq_eqListA {A} l1 l2:
+  l1 = l2 -> SetoidList.eqlistA (@eq A) l1 l2.
+Proof using.
+  intros. subst. induction l2; auto.
+Qed.
+
+ (* Move to L4_5_to *)
+ Lemma fVarsFix2 : forall (lbt: list (@BTerm NVar L4_5Opid)),
+eq_set
+  (flat_map free_vars (map (Fix_e' lbt) (seq 0 (Datatypes.length lbt))))
+  (flat_map free_vars_bterm lbt).
+Proof using.
+  intros. rewrite flat_map_map.
+  unfold compose.
+  unfold Fix_e'.
+  rewrite eqset_flat_maps with (g:= fun x => (flat_map free_vars_bterm lbt));
+    [ | intros ? ?;  refl].
+  destruct lbt;[refl | ].
+  apply eqset_repeat. simpl. discriminate.
+Qed.
+
 Lemma L4_5_constr_vars_zeta lv (e  v: L4_5_Term):
   closedSubsetVars lv e
   -> eval e v
@@ -1299,7 +1321,7 @@ Proof using.
   split; [ apply eval_Fix_e | ]; eauto. unfold Fix_e'.
   rwHyps.
   constructor. auto.
-- intros f ? ? arg varg bt vfinal _ _ Hsel _ Hnum _ _ Hpref Hindf _ Hprea
+- intros f ? ? arg varg bt vfinal _ _ Hsel _ Hnum _ _ Hpref Hindf _ _
     Hinda _ _ Hinds ? Hz.
   unfold App_e in Hz.
   repeat dZeta.
@@ -1310,21 +1332,33 @@ Proof using.
   unfold Fix_e' in *.
   repeat dZeta.
   rename lbt2 into lbtp.
-  hnf in Hprea, Hpref.
-  rwsimpl Hpref.
+  hnf in  Hpref. unfold closed in Hpref.
+  rwsimpl Hpref. repnd.
+  pose proof Hpref as Hprefb. rewrite subset_flat_map in Hpref.
   applydup eqlistA_length in Hindf0.
-  rewrite Hindf2 in Hindf1.
+  rewrite Hindf2 in Hindf1. pose proof Hsel as Hselb.
   eapply select_Rl in Hsel; eauto. exrepnd.
   invertsn Hsel0.
   specialize (Hinds (App_e
                (apply_bterm (bterm lv0 ntr)
                   (map (fun n : nat => oterm (NFix (length lbtp) n) lbtp)
                        (seq 0 (length lbtp)))) vargp)).
+  apply @select_in in Hselb.
+  apply Hpref in Hselb. rwsimpl Hselb.
   dimpr Hinds.
-  + admit.
+  + do 3 constructor; auto;[ | constructor; auto].
+    apply ssubst_commute_L4_5_zeta; simpl; auto; repeat simplCombine
+      ; try apply sub_range_sat_range;  simplCombine;
+      [ setoid_rewrite <- flat_map_empty; symmetry;
+        setoid_rewrite fVarsFix2; auto
+      | rewrite subset_app in *; setoid_rewrite fVarsFix'; tauto
+        | apply ALRangeRelCombine; auto
+      ]; [].
+    rwHyps.  apply eqListA_map with (Ra := eq); [ | apply eq_eqListA; refl].
+    intros ? ? _ _ ?. subst. constructor. assumption.
   + exrepnd. eexists. split;
   [ eapply eval_FixApp_e| ]; eauto. unfold num_bvars in *. simpl in *. congruence.
-Abort.
+Qed.
 
 Lemma L4_5_constr_vars_zeta fv:
   (forall f, nt_wf f -> zetaCLe fv f (L4_5_constr_vars fv f)) *

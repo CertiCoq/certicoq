@@ -413,7 +413,8 @@ Require Import ExtLib.Data.ListNth.
 Hint Unfold isprogram : eval.
 Hint Resolve @eval_yields_value' @eval_preseves_varclass 
   @eval_preseves_wf @eval_preserves_closed conj
-  @cps_cvt_val_closed @cps_cvt_closed @eval_preserves_fixwf @eval_end: eval.
+  @cps_cvt_val_closed @cps_cvt_closed @eval_preserves_fixwf @eval_end
+  @eval_preserves_closed : eval.
 
 Require Import L4.variables.
 Require Import L4.varInterface.
@@ -746,6 +747,25 @@ Let certiL4_5_to_L5Val:
    Qed.
 End SimplerProof.
 
+SearchAbout isprogram (bterm []).
+Ltac isprogd :=
+unfold apply_bterm in *;
+unfold subst in *;
+(repeat match goal with
+| [ H: isprogram (vterm _) |- _ ] => apply proj2 in H; inverts H
+| [ H: isprogram _ |- _ ] => apply isprogram_ot_iff in H; simpl in H; repnd; dLin_hyp
+| [ H: isprogram_bt (bterm [] _) |- _ ] => apply isprogram_bt_nobnd in H
+end
+).
+Ltac isclosedD :=
+unfold apply_bterm in *;
+unfold subst in *;
+(repeat match goal with
+| [ H: closed (vterm _) |- _ ] => apply proj2 in H; inverts H
+| [ H: closed _ |- _ ] => setoid_rewrite closed_nt in H; simpl in H; repnd; dLin_hyp
+end
+).
+
 (*
 Global Instance pp1: Proper (zetaCEquiv ==> eq ==>  zetaCEquiv ==> zetaCEquiv) subst.
 intros ? ? ? ? ? ? ? ?. subst.
@@ -753,48 +773,17 @@ apply properSubstZ.
 auto.
 Qed. *)
 
-Lemma L4_5_constr_vars_zeta lv e e' v:
-  subset (all_vars e) lv
-  -> eval e v
-  -> zetaCLe lv e e'
-  -> exists v', eval e' v'
-      /\ (zetaCLe lv v v').
+(* Move to L4_5_to_L5 *)
+Lemma eval_preserves_isprog :
+  forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
 Proof using.
-  intros Hs Hev He.
-  revert dependent e'.
-  induction Hev.
-- simpl. intros ? He. unfold Lam_e in He.
-  repeat dZeta.  eexists.
-  split; [ apply eval_Lam_e | ].
-  do 3 constructor. assumption.
-- simpl.
-  unfold App_e in Hs. rwsimpl Hs.
-  apply subset_app in Hs. repnd.
-  specialize (IHHev1 Hs0).
-  specialize (IHHev2 Hs).
-  simpl in *.
-  rename e1' into vfb.
-  rename v2 into varg.
-  assert (subset (all_vars (subst vfb x varg)) lv) as hx by admit.
-  specialize (IHHev3 hx).
-  intros vapp Hz. unfold App_e in Hz.
-  repeat dZeta.
-  rename ntr0 into e1z.
-  rename ntr into e2z.
-  specialize (IHHev1 _ Hz).
-  specialize (IHHev2 _ Hzr).
-  exrepnd.
-  unfold Lam_e in IHHev4.
-  repeat dZeta.
-  rename ntr into vfbz.
-  rename v' into vargz.
-  specialize (IHHev3 (subst vfbz x vargz)).
-  dimp IHHev3;
-    [ apply ssubst_commute_L4_5_zeta; simpl; eauto; [ admit| admit] | ].
-  exrepnd.
-  eexists; split; [ eapply eval_App_e ;eauto | ] ; eauto.
+  unfold isprogram. split.  repnd. eauto with eval.
 
-  Fail idtac. (* done with app *)
+  (* Move to L4_5_to_L5 *)
+Lemma eval_preserves_isprog :
+  forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
+Proof using.
+  unfold isprogram. split.  repnd. eauto with eval.
 Abort.
 
 Global Instance evalPreservesGood :

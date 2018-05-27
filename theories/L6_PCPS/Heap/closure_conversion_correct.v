@@ -1532,8 +1532,115 @@ Module ClosureConversionCorrect (H : Heap).
           destruct Hdom as [b1 Hgetl].
           erewrite alloc_fresh in Hgetl; eauto. congruence. 
   Qed.
+
+
+  Lemma reach'_subheap H H' S : 
+    well_formed (reach' H S) H ->
+    S \subset dom H ->
+    H ⊑ H' ->
+    reach' H S <-->reach' H' S.
+  Proof. 
+    intros Hwf Hsub Hsub'. split.
+    - intros x [n [_ Hin]].
+      eexists. split. now constructor.
+      eapply (well_formed_post_n_subheap_same S H H') in Hin; eassumption.
+    - intros x [n [_ Hin]].
+      eexists. split. now constructor.
+      eapply (well_formed_post_n_subheap_same S H H') in Hin; eassumption.
+  Qed.
+
+  Lemma well_formed_subheap H H' S :
+    well_formed S H ->
+    S \subset dom H ->
+    H ⊑ H' ->
+    well_formed S H'.
+  Proof. 
+    intros Hwf Henv Hsub x b Hget Hin.
+    eapply Included_trans.
+    eapply Hwf; eauto.
+    eapply Henv in Hget.
+    destruct Hget as [b' Hget]. rewrite Hget.
+    now erewrite Hsub in Hin; eauto.
+
+    eapply HL.dom_subheap. eassumption.
+  Qed.
+    
+  Lemma def_closures_cc_approx_env Scope k j GIP GP b d B1 B2 envc rho1 H1 rho1' H1' rho2 H2 :
+    well_formed (reach' H1 (env_locs rho1 Scope)) H1 ->
+    (env_locs rho1 Scope) \subset dom H1 ->
+    well_formed (reach' H2 (env_locs rho2 Scope)) H2 ->
+    (env_locs rho2 Scope) \subset dom H2 ->
+
+    (H1, rho1) ⋞ ^ (Scope; k; j; GIP; GP; b; d) (H2, rho2) ->
+
+    def_closures B1 B2 rho1 H1 envc = (H1', rho1') ->
+    (H1', rho1') ⋞ ^ (Scope \\ name_in_fundefs B1; k; j; GIP; GP; b; d) (H2, rho2).
+  Proof with (now eauto with Ensembles_DB).
+    revert H1 rho1 H1' rho1'.
+    induction B1; intros H1 rho1 H1' rho1' Hwf1 Henv1 Hwf2 Henv2 Hcc Hdef.
+    - simpl in Hdef.
+      destruct (def_closures B1 B2 rho1 H1) as (H1'', rho1'') eqn:Hdef'.
+      destruct (alloc (Clos _ _) H1'') as [la H1a] eqn:Hal.
+      inv Hdef.
+      eapply cc_approx_env_P_set_not_in_P_l.
+      assert (Hdef := Hdef').
+      eapply IHB1 in Hdef'.
+      + eapply cc_approx_env_P_antimon. 
+        eapply cc_approx_env_heap_monotonic; [ | | | | | | eassumption ].
+        * eapply well_formed_antimon.
+          eapply reach'_set_monotonic.
+          eapply env_locs_def_funs; eauto.
+          eapply env_locs_monotonic... 
+          rewrite <- reach'_subheap; try eassumption.
+
+          eapply well_formed_subheap. eassumption.
+
+          eapply reachable_in_dom. eassumption. eassumption.
+
+          now eapply def_funs_subheap; eauto.
+          now eapply def_funs_subheap; eauto.
+        * eapply well_formed_antimon; [| eassumption ].
+          eapply reach'_set_monotonic.
+          eapply env_locs_monotonic...
+        * eapply Included_trans. 
+          eapply env_locs_def_funs; eauto.
+          eapply Included_trans.
+          eapply env_locs_monotonic. now apply Setminus_Included.
+          eassumption.
+          eapply HL.dom_subheap.
+          now eapply def_funs_subheap; eauto.
+        * eapply Included_trans; [| eassumption ].
+          eapply env_locs_monotonic...
+        * eapply HL.alloc_subheap. eassumption.
+        * eapply HL.subheap_refl.
+        * simpl...
+      + eassumption.
+      + eassumption.
+      + eassumption.
+      + eassumption.
+      + eassumption.
+      + intros Hc; inv Hc. eapply H0; now left.
+    - rewrite Setminus_Empty_set_neut_r.
+      inv Hdef. eassumption.
+  Qed.
+
+  Lemma def_funs_cc_approx_env Scope k j GIP GP b d B1 B2 rho1 H1 rho2 H2 :
+    (H1, rho1) ⋞ ^ (Scope; k; j; GIP; GP; b; d) (H2, rho2) ->
+
+    (H1, rho1) ⋞ ^ (Scope \\ name_in_fundefs B1; k; j; GIP; GP; b; d) (H2, def_funs B1 B2 rho2).
+  Proof with (now eauto with Ensembles_DB).
+    induction B1; intros Hcc.
+    - simpl def_funs.
+      eapply cc_approx_env_P_set_not_in_P_r.
+      eapply cc_approx_env_P_antimon.
+      eapply IHB1. eassumption.
+      now eauto with Ensembles_DB.
+      intros Hc; inv Hc. eapply H0; now left.
+    - simpl name_in_fundefs.
+      rewrite Setminus_Empty_set_neut_r. eassumption.
+  Qed.
   
-(*
+    (*
   Lemma Closure_conversion_fundefs_correct
     (k : nat)
     (* The IH *)
@@ -1665,8 +1772,7 @@ Module ClosureConversionCorrect (H : Heap).
     make_closures clo_tag B Γ C ->
     binding_in_map (Γ |: name_in_fundefs B) rho ->  
     exists H' rho' m,
-      ctx_to_heap_env_CC C H rho H' rho' m.
-  Proof with (now eauto with Ensembles_DB).
+      ctx_to_heap_env_CC C H rho H' rho' m.  Proof with (now eauto with Ensembles_DB).
     intros Hclo. revert H rho. induction Hclo; intros H rho Hin.
     - do 3 eexists. econstructor.
     - edestruct (Hin f) as [l Hget]. now right; left.

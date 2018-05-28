@@ -1018,8 +1018,8 @@ Module ClosureConversionCorrect (H : Heap).
     well_formed (reach' H2 (env_locs rho2 [set Γ])) H2 ->
     env_locs rho2 [set Γ] \subset dom H2 ->
 
-    image b (reach' H1 (env_locs rho1 funs)) :|: image' d (reach' H1 (env_locs rho1 funs)) \subset
-    reach' H2 (env_locs rho2 [set Γ]) ->
+    image b (reach' H1 (post H1 (env_locs rho1 funs))) :|:
+    image' d (reach' H1 (post H1 (env_locs rho1 funs))) \subset dom H2 ->
     
     Fun_inv k j GI GP b d rho1 H1 rho2 H2 funs Γ ->
     H2 ⊑ H2' ->
@@ -1038,59 +1038,57 @@ Module ClosureConversionCorrect (H : Heap).
     - eapply cc_approx_val_res_eq.
       eassumption. reflexivity. now firstorder. 
 
-      Focus 2. 
+      * rewrite res_equiv_eq. simpl. split.
+        rewrite extend_gss; reflexivity.
 
-      eapply injective_subdomain_extend'. now firstorder.
-      rewrite image_id.
-      rewrite reach_unfold. rewrite Setminus_Union_distr.
-      rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l.
-      simpl. rewrite post_Singleton; [| erewrite gas; eauto ]. simpl.
-      rewrite Union_Empty_set_neut_l, Union_Empty_set_neut_r.
-      intros Hc. destruct Hc as [Hc1 Hc2].
+        do 2 (erewrite gas; eauto). simpl. split.
+        reflexivity.
+        constructor.
+        rewrite res_equiv_eq. split; reflexivity.
 
-      rewrite <- env_locs_Singleton with (v := Loc lenv) in Hc1; try eassumption. 
-      
-      rewrite <- well_formed_reach_alloc_same in Hc1;
-        [| eassumption | eassumption | eassumption ].
-      
-      eapply reachable_in_dom in Hc1; try eassumption. destruct Hc1 as [b' Hget].
-      eapply Hsub in Hget.  
-      erewrite alloc_fresh in Hget; eauto. congruence.
+        constructor; [| now constructor ].
+        
+        eapply res_equiv_rename_ext;
+          [| eapply f_eq_subdomain_extend_not_In_S_r; [| reflexivity ] | reflexivity ].
+        
+        eapply res_equiv_weakening;
+          [| | reflexivity | now eapply HL.alloc_subheap; eauto
+           | eapply HL.subheap_trans; [| eapply HL.alloc_subheap]; eassumption | | ].
+        
+        now eapply reach'_closed; eauto.
+        now eapply reach'_closed; eauto.
 
-      rewrite res_equiv_eq. simpl. split.
-      rewrite extend_gss; reflexivity.
+        eapply Included_trans; [| eapply reach'_extensive ].
+        eapply get_In_env_locs; now eauto.
 
-      do 2 (erewrite gas; eauto). simpl. split.
-      reflexivity.
-      constructor.
-      rewrite res_equiv_eq. split; reflexivity.
+        eapply Included_trans; [| eapply reach'_extensive ].
+        eapply get_In_env_locs; now eauto.
 
-      constructor; [| now constructor ].
-      
-      eapply res_equiv_rename_ext;
-        [| eapply f_eq_subdomain_extend_not_In_S_r; [| reflexivity ] | reflexivity ].
- 
-      eapply res_equiv_weakening;
-        [| | reflexivity | now eapply HL.alloc_subheap; eauto
-         | eapply HL.subheap_trans; [| eapply HL.alloc_subheap]; eassumption | | ].
-      
-      now eapply reach'_closed; eauto.
-      now eapply reach'_closed; eauto.
+        intros Hc1.
+        rewrite <- env_locs_Singleton with (v := Loc lenv) in Hc1; try eassumption. 
+        rewrite <- well_formed_reach_alloc_same in Hc1;
+          [| eassumption | eassumption | eassumption ].
 
-      eapply Included_trans; [| eapply reach'_extensive ].
-      eapply get_In_env_locs; now eauto.
+        eapply reachable_in_dom in Hc1; try eassumption. destruct Hc1 as [b' Hget].
+        erewrite alloc_fresh in Hget; eauto. congruence.
 
-      eapply Included_trans; [| eapply reach'_extensive ].
-      eapply get_In_env_locs; now eauto.
-
-      intros Hc1.
-      rewrite <- env_locs_Singleton with (v := Loc lenv) in Hc1; try eassumption. 
-      rewrite <- well_formed_reach_alloc_same in Hc1;
-        [| eassumption | eassumption | eassumption ].
-      
-      eapply reachable_in_dom in Hc1; try eassumption. destruct Hc1 as [b' Hget].
-      erewrite alloc_fresh in Hget; eauto. congruence.
-     
+      * eapply injective_subdomain_extend'. now firstorder.
+        rewrite image_id.
+        rewrite reach_unfold. rewrite Setminus_Union_distr.
+        rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l.
+        simpl. rewrite post_Singleton; [| erewrite gas; eauto ]. simpl.
+        rewrite Union_Empty_set_neut_l, Union_Empty_set_neut_r.
+        intros Hc. destruct Hc as [Hc1 Hc2].
+        
+        rewrite <- env_locs_Singleton with (v := Loc lenv) in Hc1; try eassumption. 
+        
+        rewrite <- well_formed_reach_alloc_same in Hc1;
+          [| eassumption | eassumption | eassumption ].
+        
+        eapply reachable_in_dom in Hc1; try eassumption. destruct Hc1 as [b' Hget].
+        eapply Hsub in Hget.  
+        erewrite alloc_fresh in Hget; eauto. congruence.
+        
     - rewrite Combinators.compose_id_right. 
       rewrite compose_extend. rewrite extend_gss.
       eapply f_eq_subdomain_antimon.
@@ -1100,18 +1098,20 @@ Module ClosureConversionCorrect (H : Heap).
       symmetry. eapply compose_id_extend.
 
       intros Hc.
-
-      assert (Hin2 : l2 \in  reach' H2 (env_locs rho2 [set Γ])).
+      rewrite reach_unfold, Setminus_Union_distr,
+      Setminus_Same_set_Empty_set, Union_Empty_set_neut_l in Hc.
+      
+      assert (Hin2 : l2 \in dom H2).
       { eapply Him. left. 
         eapply image_monotonic; [| eassumption ].
         eapply Included_trans. eapply Setminus_Included.
-        eapply reach'_set_monotonic.
+        eapply reach'_set_monotonic. eapply post_set_monotonic.
         eapply get_In_env_locs; eassumption. }
 
-      eapply reachable_in_dom in Hin2; [| eassumption |  eassumption ].
       destruct Hin2 as [b' Hget].
       erewrite alloc_fresh in Hget; eauto. congruence. 
-    - rewrite Combinators.compose_id_right. 
+
+    - rewrite Combinators.compose_id_right.
       rewrite compose_extend. simpl. rewrite extend_gso.
 
       simpl. 
@@ -1122,22 +1122,23 @@ Module ClosureConversionCorrect (H : Heap).
       symmetry. eapply compose_lift_id_extend.
 
       intros Hc.
+      rewrite reach_unfold, Setminus_Union_distr,
+      Setminus_Same_set_Empty_set, Union_Empty_set_neut_l in Hc.
 
-      assert (Hin2 : l2 \in reach' H2 (env_locs rho2 [set Γ])).
+      assert (Hin2 : l2 \in dom H2).
       { eapply Him. right. 
-        eapply image'_monotonic; [| eassumption ].
+        eapply image_monotonic; [| eassumption ].
         eapply Included_trans. eapply Setminus_Included.
-        eapply reach'_set_monotonic.
-        eapply Included_trans; [| eapply get_In_env_locs; try eassumption ].
+        eapply reach'_set_monotonic. eapply post_set_monotonic. 
+        eapply Included_trans; [| eapply get_In_env_locs; eassumption ].
         reflexivity.
       }
-      
-      eapply reachable_in_dom in Hin2; [| eassumption |  eassumption ].
+
       destruct Hin2 as [b' Hget].
       erewrite alloc_fresh in Hget; eauto. congruence.
 
       intros Hc. subst. 
-
+      
       assert (Hd : l2 \in dom H2).
       { eapply reachable_in_dom; try eassumption.
         eapply reach'_extensive. eapply get_In_env_locs; eauto.
@@ -1172,8 +1173,9 @@ Module ClosureConversionCorrect (H : Heap).
   Qed.
   
 
-  Instance Proper_FV_inv k j GI GP b d rho1 H1 rho2 H2 c : Proper (Same_set _ ==> eq ==> eq ==> iff)
-                                                                (FV_inv k j GI GP b d rho1 H1 rho2 H2 c). 
+  Instance Proper_FV_inv k j GI GP b d rho1 H1 rho2 H2 c :
+    Proper (Same_set _ ==> eq ==> eq ==> iff)
+           (FV_inv k j GI GP b d rho1 H1 rho2 H2 c). 
   Proof.
     intros S1 S2 Hseq x1 x2 Heq1 y1 y2 Heq2; subst.
     split; intros (vs & l & Hget1 & Hget2 & Hall1).
@@ -1349,7 +1351,7 @@ Module ClosureConversionCorrect (H : Heap).
       
       simpl in H11. rewrite Hget2, Hget3 in H11. inv H11.
 
-      specialize (Heq H2 (HL.subheap_refl H2)). rewrite H12 in Heq.
+      rewrite H12 in Heq.
 
       assert (Hsub : reach' H1 (env_locs rho1 (FV (f |: Scope) FVs)) \\ [set l1] \subset
                      reach' H1 (env_locs rho1 (FV Scope FVs))).
@@ -1503,7 +1505,7 @@ Module ClosureConversionCorrect (H : Heap).
         edestruct (Hfun j) as (l1' & lenv' & B2 & g' & Hget1' & Hget2' & Hget3' & Heq').
         now left. repeat subst_exp.
         
-        specialize (Heq' H2 (HL.subheap_refl H2)). rewrite H12 in Heq'.
+        rewrite H12 in Heq'.
         
         eapply cc_approx_env_P_antimon; [| eassumption ].
         eapply cc_approx_env_P_union. 
@@ -1538,30 +1540,72 @@ Module ClosureConversionCorrect (H : Heap).
             - intros Hc; inv Hc; eauto. eapply H0; now left. }
       + intros j.
         
-        eapply Fun_inv_set_r. eapply Fun_inv_subheap. eapply Fun_inv_rename_ext.
-        intros x Hin. eapply Hfun. now right.
-        
-        eapply f_eq_subdomain_extend_not_In_S_r.
-        intros Hc. eapply Hdis. now left.
-        constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-        eapply reach'_set_monotonic; [| eassumption ].
-        eapply env_locs_monotonic. simpl. rewrite !Setminus_Union_distr.
-        rewrite (Setminus_Disjoint (name_in_fundefs B) [set f]).
-        now eauto with Ensembles_DB. eapply Disjoint_Singleton_r.
-        eassumption. reflexivity. 
+        eapply Fun_inv_set_r; [ eapply Fun_inv_rename_ext | | ].
+        * eapply Fun_inv_subheap;
+          [ | | | | | intros x Hin; eapply Hfun; now right | ].
 
-        eapply f_eq_subdomain_extend_not_In_S_r.
-        intros Hc. eapply Hdis. now left.
-        constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-        eapply reach'_set_monotonic; [| eassumption ].
-        eapply env_locs_monotonic. simpl. rewrite !Setminus_Union_distr.
-        rewrite (Setminus_Disjoint (name_in_fundefs B) [set f]).
-        now eauto with Ensembles_DB. eapply Disjoint_Singleton_r.
-        eassumption. reflexivity. 
-        
-        eapply HL.alloc_subheap. eassumption.
+          eapply well_formed_antimon; [| eassumption ].
+          eapply reach'_set_monotonic. eapply env_locs_monotonic...
 
-        eassumption. intros Hc. eapply Hnin'. subst. now left.
+          eapply Included_trans; [| eassumption ].
+          eapply env_locs_monotonic...
+
+          eapply well_formed_antimon; [| eassumption ].
+          eapply reach'_set_monotonic. eapply env_locs_monotonic...
+
+          eapply Included_trans; [| eassumption ].
+          eapply env_locs_monotonic...
+
+          intros lc Hin. eapply reachable_in_dom. eassumption. eassumption.
+
+          rewrite !env_locs_Union, !reach'_Union. right.
+          
+          eapply Included_Union_compat in Hin;
+            [| eapply image_monotonic; eapply reach'_set_monotonic;
+               eapply Included_trans; [| now apply Hrsub ]
+             | eapply image'_monotonic; eapply reach'_set_monotonic;
+               eapply Included_trans; [| now apply Hrsub ] ].
+          unfold FV in Hin. rewrite <- !reach'_idempotent, !Setminus_Union_distr in Hin at 1.
+          rewrite !env_locs_Union, !reach'_Union, image_Union, image'_Union in Hin at 1.
+          rewrite <- Union_assoc, (Union_assoc (image _ _) (image' _ _)) in Hin. 
+          rewrite (Union_commut (image _ _) (image' _ _)) in Hin.
+          rewrite <- (Union_assoc (image' _ _) (image _ _)) in Hin. 
+          rewrite (Union_assoc (image _ _) (image' _ _)) in Hin. 
+          
+          unfold FV_cc. rewrite env_locs_Union, reach'_Union.
+          { inv Hin.
+            - left.
+              eapply reach'_set_monotonic; [| eapply cc_approx_env_image_reach_included; try eassumption ].
+              eapply env_locs_monotonic...
+            - right. rewrite reach_unfold. right. 
+              eapply FV_inv_image_reach. eassumption.
+              rewrite !(Union_commut _ Scope) at 1. rewrite <- !Setminus_Union at 1.
+              eassumption. }
+
+          eapply post_set_monotonic. eapply env_locs_monotonic...
+          eapply post_set_monotonic. eapply env_locs_monotonic...
+
+          eapply HL.alloc_subheap. eassumption. 
+        * eapply f_eq_subdomain_extend_not_In_S_r.
+          intros Hc. eapply Hdis. now left.
+          constructor. rewrite env_locs_Singleton; eauto. reflexivity.
+          eapply reach'_set_monotonic; [| eassumption ].
+          eapply env_locs_monotonic. simpl. rewrite !Setminus_Union_distr.
+          rewrite (Setminus_Disjoint (name_in_fundefs B) [set f]).
+          now eauto with Ensembles_DB. eapply Disjoint_Singleton_r.
+          eassumption. reflexivity. 
+
+        * eapply f_eq_subdomain_extend_not_In_S_r.
+          intros Hc. eapply Hdis. now left.
+          constructor. rewrite env_locs_Singleton; eauto. reflexivity.
+          eapply reach'_set_monotonic; [| eassumption ].
+          eapply env_locs_monotonic. simpl. rewrite !Setminus_Union_distr.
+          rewrite (Setminus_Disjoint (name_in_fundefs B) [set f]).
+          now eauto with Ensembles_DB. eapply Disjoint_Singleton_r.
+          eassumption. reflexivity. 
+
+        * eassumption.
+        * intros hc. eapply Hnin'. subst. now left.
       + intros j. eapply FV_inv_set_not_in_FVs_r.
         eapply FV_inv_Scope_mon with (Scope := f |: name_in_fundefs B :|: Scope);
           try eauto with Ensembles_DB.

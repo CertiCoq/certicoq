@@ -604,6 +604,14 @@ Proof using.
       [apply obsNthCommuteL4_L4_2 | apply yesCommuteL4_L4_2].
 Qed.
 
+
+Section DemoDelete.
+  Definition composeDemo:
+    CerticoqTranslationCorrect certiL3_eta certiL4_2.
+  Proof using.
+    eauto with typeclass_instances.
+  Qed.
+End DemoDelete.
 (*
 Print Assumptions certiL4_to_L4_2Correct.
 

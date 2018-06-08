@@ -23,12 +23,12 @@ Section CC.
   Variable (clo_tag : cTag). (* Tag for closure records *)
  
   (* The free-variable set of a source program *)
-  Definition FV (Scope : Ensemble var) (FVs : list var) :=
-    Scope :|: (FromList FVs \\ Scope).
+  Definition FV (Scope Funs : Ensemble var) (FVs : list var) :=
+    Scope :|: (Funs \\ Scope) :|: (FromList FVs \\ (Scope :|: Funs)).
 
   (* The free-variable set of a closure converted *)
-  Definition FV_cc (Scope : Ensemble var) (Γ : var) :=
-    Scope :|: [set Γ].
+  Definition FV_cc (Scope Funs : Ensemble var) (Γ : var) :=
+    Scope :|: (Funs \\ Scope) :|: [set Γ].
 
   (* Closure application *)
   Definition AppClo f t xs f' Γ :=
@@ -140,7 +140,7 @@ Section CC.
         NoDup FVs' ->
         project_vars Scope Funs c Γ FVs FVs' C Scope' ->
         (* Γ' is the variable that will hold the record of the environment *)
-        ~ Γ' \in ((name_in_fundefs B) :|: (FV_cc Scope Γ)) ->
+        ~ Γ' \in ((name_in_fundefs B) :|: (FV_cc Scope Funs Γ)) ->
         (* closure convert function blocks *)
         Closure_conversion_fundefs B c' FVs' B B' ->
         (* closure convert the rest of the program *)
@@ -149,7 +149,7 @@ Section CC.
                            (Efun B' (Ce |[ e' ]|)) (comp_ctx_f C (Econstr_c Γ' c' FVs' Hole_c))
   | CC_Eapp :
       forall Scope Scope' Funs c Γ FVs f f' ft env' ys C S S',
-        Disjoint _ S (FV_cc Scope Γ) ->
+        Disjoint _ S (FV_cc Scope Funs Γ) ->
         (* Project the function name and the actual parameter *)
         project_vars Scope Funs c Γ FVs (f :: ys) C Scope' ->
         (* The name of the function pointer and the name of the environment

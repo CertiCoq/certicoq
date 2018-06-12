@@ -561,7 +561,7 @@ Module Size (H : Heap).
       eapply FromSet_complete; [| eassumption ].
       reflexivity.
   Qed.
-  
+
   Lemma PS_union_elements s1 s2 :
     disjoint s1 s2 -> 
     Permutation (PS.elements s1 ++ PS.elements s2) (PS.elements (PS.union s1 s2)).
@@ -606,43 +606,76 @@ Module Size (H : Heap).
     rewrite !PS.cardinal_spec.
     erewrite (@Permutation_length _ (PS.elements (PS.union s1 s2))).
     rewrite <- app_length. reflexivity.
-    length [| symmetry; now apply PS_add_elements ].
-  reflexivity.
-      
+    symmetry. eapply PS_union_elements. eassumption.
+  Qed.
+
+  Lemma Same_set_Intersection_compat {A : Type} (s1 s2 s3 s4 : Ensemble A):
+    s1 <--> s2 -> s3 <--> s4 -> s1 :&: s3 <--> s2 :&: s4.
+  Proof.
+    intros H1 H2; split; eapply Included_Intersection_compat;
+    (try now apply H1); try now apply H2.
+  Qed.  
+
+  Lemma Disjoint_Intersection_r {A} (s1 s2 s3 : Ensemble A) :
+    Disjoint _ s2 s3 -> 
+    Disjoint _ (s1 :&: s2) (s1 :&: s3).
+  Proof with (now eauto with Ensembles_DB).
+    intros Hd. 
+    eapply Disjoint_Included; [| | eassumption ];
+    now eapply Included_Intersection_r.
+  Qed. 
+
+  Lemma Setminus_compose {A} (s1 s2 s3 : Ensemble A) `{Decidable _ s2} :
+    s1 \subset s2 ->
+    s2 \subset s3 ->
+    s2 \\ s1 :|: (s3 \\ s2) <--> s3 \\ s1.
+  Proof.
+    intros H1 H2; split; intros x Hin.
+    - inv Hin.
+      + inv H0. constructor; eauto.
+      + inv H0. constructor; eauto.
+    - inv Hin. destruct H as [Hdec].
+      destruct (Hdec x).
+      + left. constructor; eauto.
+      + right. constructor; eauto.
+  Qed. 
+    
   Lemma project_vars_cost_alloc_eq
         Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
         c Γ FVs xs C1 :
     project_vars Util.clo_tag Scope Funs c Γ FVs xs C1 Scope' ->
     cost_alloc_ctx C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
-  Proof.
+  Proof with (now eauto with Ensembles_DB).
     intros Hvar; induction Hvar; eauto.
     - rewrite (Proper_carinal _ PS.empty).
       reflexivity.
       eapply Same_set_From_set.
       rewrite <- mset_eq, Setminus_Same_set_Empty_set, Intersection_Empty_set_abs_r.
       rewrite FromSet_empty. reflexivity.
-    - rewrite cost_alloc_ctx_comp_ctx_f. 
+    - assert (Hvar' := H2).
+      rewrite cost_alloc_ctx_comp_ctx_f. 
       eapply project_var_cost_alloc_eq in H2. 
       erewrite H2. erewrite IHHvar; eauto.
       rewrite <- NPeano.Nat.mul_add_distr_l.
       eapply Nat_as_OT.mul_cancel_l. omega.
-      unfold mset.
+      rewrite PS_cardinal_union. 
+      eapply Proper_carinal.  
+      eapply Same_set_From_set. setoid_rewrite <- mset_eq.
+      rewrite FromSet_union.
+      do 2 setoid_rewrite <- mset_eq at 1.
+      rewrite !(Intersection_commut _ Funs).
+      rewrite <- Intersection_Union_distr.
+      eapply Same_set_Intersection_compat; [| reflexivity ].
+      eapply Setminus_compose.
+      admit.
+      eapply project_var_Scope_l. eassumption.
+      eapply project_vars_Scope_l. eassumption.
+      eapply FromSet_disjoint.
+      do 2 setoid_rewrite <- mset_eq at 1.
+      eapply Disjoint_Intersection_r.
+      eapply Disjoint_Setminus_r...
       
-      Disjoint 
-      (Funs :&: (S3 \\ S2)) 
-      (Funs :&: (S2 \\ S1)) 
-      
-      (Funs :&: (S3 \\ S2)) :|: (Funs :&: (S2 \\ S1)) <-->
-      (Funs :&: (S3 \\ S2) :|: (S2 \\ S1)) <-->
-      
-
-
-      (Funs :&: (S3 \\ S1)) <-->
-      
-
-      
-
-      IHHvar. .
+   
       
   Lemma project_vars_cost 
        Scope Scope' Funs c Γ FVs xs C1 :

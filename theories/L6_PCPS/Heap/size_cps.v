@@ -232,10 +232,12 @@ Module Size (H : Heap).
              (p1 p2 : heap block * env * exp) :=
     match p1, p2 with
       | (H1, rho1, e1), (H2, rho2, e2) =>
-        let funs := PS.cardinal (PS.inter (@mset Funs _) (exp_fv e1)) in
+        let funs := PS.cardinal (@mset Funs _) in
         size_heap H1 <=
-        size_heap H2 + funs <= (size_heap H1) * (1 + max_heap_exp H1 e1)
+        size_heap H2 + 3 * funs <= (size_heap H1) * (1 + max_heap_exp H1 e1)
     end.
+  
+
   (** Compat lemmas *)
 
   Lemma PostBase H1 H2 rho1 rho2 e1 e2 k :
@@ -442,51 +444,246 @@ Module Size (H : Heap).
 
   (* Cost for projecting vars *)
   Lemma project_var_cost 
-        Scope c Γ FVs S1 x x' C1 S2 :
-    project_var Scope c Γ FVs S1 x x' C1 S2 ->
-    cost_ctx_full C1 <= 1.
+        Scope Scope' Funs c Γ FVs x C1 :
+    project_var Util.clo_tag Scope Funs c Γ FVs x C1 Scope' ->
+    cost_ctx_full C1 <= 3.
   Proof.
     intros Hvar; inv Hvar; eauto.
   Qed.
 
-    
-  Lemma project_vars_cost 
-        Scope c Γ FVs S1 x x' C1 S2 :
-    project_vars Scope c Γ FVs S1 x x' C1 S2 ->
-    cost_ctx_full C1 <= length x.
+  Instance ToMSet_Intersection (S1 : Ensemble positive) `{ToMSet S1}
+           (S2 : Ensemble positive) `{ToMSet S2} : ToMSet (S1 :&: S2).
   Proof.
-    intros Hvar. induction Hvar; eauto.
-    rewrite cost_ctx_full_ctx_comp_ctx_f. simpl.
+    destruct H as [m1 Hm1]; destruct H0 as [m2 Hm2].
+    eexists (PS.inter m1 m2).
+    split.
+    - intros x H. destruct H as [y Hs1 Hs2].  
+      eapply FromSet_complete. reflexivity.
+      eapply PS.inter_spec. split.
+      eapply FromSet_sound. eapply Hm1; eauto. eassumption. 
+      eapply FromSet_sound. eapply Hm2; eauto. eassumption. 
+    - intros x H.
+      eapply FromSet_sound in H; [| reflexivity ].
+      eapply PS.inter_spec in H. inv H. constructor.
+      eapply FromSet_complete. eapply Hm1; eauto. eassumption. 
+      eapply FromSet_complete. eapply Hm2; eauto. eassumption. 
+  Qed.
+
+
+  Lemma project_var_cost_alloc_eq
+        Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
+        c Γ FVs x C1 :
+    project_var Util.clo_tag Scope Funs c Γ FVs x C1 Scope' ->
+    cost_alloc_ctx C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
+  Proof.
+    intros Hvar; inv Hvar; eauto.
+    - rewrite (Proper_carinal _ PS.empty).
+      reflexivity.
+      eapply Same_set_From_set.
+      rewrite <- mset_eq, Setminus_Same_set_Empty_set, Intersection_Empty_set_abs_r.
+      rewrite FromSet_empty. reflexivity.
+    - simpl cost_ctx_full.
+      rewrite (Proper_carinal _ (PS.singleton x)).
+      reflexivity.
+      eapply Same_set_From_set.
+      rewrite FromSet_singleton.
+      rewrite <- mset_eq. rewrite Setminus_Union_distr.
+      rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+      rewrite Setminus_Disjoint, Intersection_commut, Intersection_Same_set.
+      reflexivity.
+      eapply Singleton_Included. eassumption. 
+      eapply Disjoint_Singleton_l; eassumption.
+    - rewrite (Proper_carinal _ PS.empty).
+      simpl. reflexivity.
+      eapply Same_set_From_set.
+      rewrite FromSet_empty.
+      rewrite <- mset_eq.
+      rewrite Setminus_Union_distr.
+      rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+      rewrite Setminus_Disjoint, Intersection_Disjoint.
+      reflexivity.
+      eapply Disjoint_Singleton_r. eassumption. 
+      eapply Disjoint_Singleton_l. eassumption. 
+  Qed.
+
+  Definition disjoint (s1 s2 : PS.t) : Prop :=
+    PS.Equal (PS.inter s1 s2) PS.empty.
+
+  Lemma disjoint_spec (s1 s2 : PS.t) x :
+    disjoint s1 s2 ->
+    PS.In x s1->
+    ~ PS.In x s2.
+  Proof.
+    intros Hd Hin1 Hin2.
+    assert (Hin3 : PS.In x (PS.inter s1 s2)).
+    { eapply PS.inter_spec; eauto. }
+    unfold disjoint in Hd. rewrite Hd in Hin3.
+    inv Hin3.
+  Qed.
+
+  Lemma disjoint_spec' (s1 s2 : PS.t) x :
+    disjoint s1 s2 ->
+    PS.In x s2 ->
+    ~ PS.In x s1.
+  Proof.
+    intros Hd Hin1 Hin2.
+    assert (Hin3 : PS.In x (PS.inter s1 s2)).
+    { eapply PS.inter_spec; eauto. }
+    unfold disjoint in Hd. rewrite Hd in Hin3.
+    inv Hin3.
+  Qed.
+
+  Lemma FromSet_intersection (s1 s2 : PS.t) : 
+    FromSet (PS.inter s1 s2) <--> FromSet s1 :&: FromSet s2. 
+  Proof.
+    split; intros x Hin.
+    eapply FromSet_sound in Hin; [| reflexivity ].
+    eapply PS.inter_spec in Hin. destruct Hin as [Hin1 Hin2].
+    constructor; (eapply FromSet_complete; [ reflexivity | eassumption ]). 
+    inv Hin.
+    eapply FromSet_complete. reflexivity.
+    eapply PS.inter_spec.
+    split; (eapply FromSet_sound; [ reflexivity | eassumption ]).
+  Qed. 
+    
+  Lemma FromSet_disjoint (s1 s2 : PS.t) : 
+    disjoint s1 s2 <-> Disjoint _ (FromSet s1) (FromSet s2). 
+  Proof.
+    split; intros Hd.
+    - constructor. intros x Hin.
+      eapply FromSet_intersection in Hin.
+      unfold disjoint in Hd. rewrite Hd in Hin.
+      eapply FromSet_empty in Hin. inv Hin.
+    - inv Hd. unfold disjoint. intros y.
+      specialize (H y). split; intros Hin; [| now inv Hin ].
+      exfalso. eapply H.
+      eapply FromSet_intersection.
+      eapply FromSet_complete; [| eassumption ].
+      reflexivity.
+  Qed.
+  
+  Lemma PS_union_elements s1 s2 :
+    disjoint s1 s2 -> 
+    Permutation (PS.elements s1 ++ PS.elements s2) (PS.elements (PS.union s1 s2)).
+  Proof.
+    intros Hnin. 
+    eapply NoDup_Permutation.
+    - eapply NoDup_app.
+      eapply NoDupA_NoDup. now eapply PS.elements_spec2w.
+      eapply NoDupA_NoDup. now eapply PS.elements_spec2w.
+      eapply FromSet_disjoint. eassumption.      
+    - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+    - intros y. split.
+      + intros Hin.
+        eapply InA_In.
+        eapply PS.elements_spec1. eapply PS.union_spec. 
+        eapply Coqlib.in_app in Hin. 
+        inv Hin.
+        * left. eapply PS.elements_spec1.
+          eapply In_InA. eauto with typeclass_instances.
+          eassumption.
+        * right. eapply PS.elements_spec1.
+          eapply In_InA. eauto with typeclass_instances.
+          eassumption.
+      + intros HIn.
+        eapply In_InA in HIn. 
+        eapply PS.elements_spec1 in HIn. 
+        eapply PS.union_spec in HIn.
+        eapply Coqlib.in_app.
+        inv HIn.
+        * left. eapply InA_In. eapply PS.elements_spec1.
+          eassumption. 
+        * right. eapply InA_In. eapply PS.elements_spec1.
+          eassumption.
+        * eauto with typeclass_instances.
+  Qed. 
+  
+  Lemma PS_cardinal_union s1 s2 :
+    disjoint s1 s2 -> 
+    PS.cardinal s1 + PS.cardinal s2 = PS.cardinal (PS.union s1 s2).
+  Proof.
+    intros Hd.
+    rewrite !PS.cardinal_spec.
+    erewrite (@Permutation_length _ (PS.elements (PS.union s1 s2))).
+    rewrite <- app_length. reflexivity.
+    length [| symmetry; now apply PS_add_elements ].
+  reflexivity.
+      
+  Lemma project_vars_cost_alloc_eq
+        Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
+        c Γ FVs xs C1 :
+    project_vars Util.clo_tag Scope Funs c Γ FVs xs C1 Scope' ->
+    cost_alloc_ctx C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
+  Proof.
+    intros Hvar; induction Hvar; eauto.
+    - rewrite (Proper_carinal _ PS.empty).
+      reflexivity.
+      eapply Same_set_From_set.
+      rewrite <- mset_eq, Setminus_Same_set_Empty_set, Intersection_Empty_set_abs_r.
+      rewrite FromSet_empty. reflexivity.
+    - rewrite cost_alloc_ctx_comp_ctx_f. 
+      eapply project_var_cost_alloc_eq in H2. 
+      erewrite H2. erewrite IHHvar; eauto.
+      rewrite <- NPeano.Nat.mul_add_distr_l.
+      eapply Nat_as_OT.mul_cancel_l. omega.
+      unfold mset.
+      
+      Disjoint 
+      (Funs :&: (S3 \\ S2)) 
+      (Funs :&: (S2 \\ S1)) 
+      
+      (Funs :&: (S3 \\ S2)) :|: (Funs :&: (S2 \\ S1)) <-->
+      (Funs :&: (S3 \\ S2) :|: (S2 \\ S1)) <-->
+      
+
+
+      (Funs :&: (S3 \\ S1)) <-->
+      
+
+      
+
+      IHHvar. .
+      
+  Lemma project_vars_cost 
+       Scope Scope' Funs c Γ FVs xs C1 :
+    project_vars Util.clo_tag Scope Funs c Γ FVs xs C1 Scope' ->
+    cost_ctx_full C1 <= 3 * length xs.
+  Proof.
+    intros Hvar. induction Hvar; simpl; eauto.
+    rewrite cost_ctx_full_ctx_comp_ctx_f.
     eapply project_var_cost in H. omega.
   Qed.
   
   Lemma project_var_cost_alloc
-        Scope c Γ FVs S1 x x' C1 S2 :
-    project_var Scope c Γ FVs S1 x x' C1 S2 ->
-    cost_alloc_ctx C1 = 0.
+        Scope Scope' Funs c Γ FVs x C1 :
+    project_var Util.clo_tag Scope Funs c Γ FVs x C1 Scope' ->
+    cost_alloc_ctx C1 <= 3.
   Proof.
     intros Hvar; inv Hvar; eauto.
   Qed.
   
   Lemma project_vars_cost_alloc
-        Scope c Γ FVs S1 x x' C1 S2 :
-    project_vars Scope c Γ FVs S1 x x' C1 S2 ->
-    cost_alloc_ctx C1 = 0.
+        Scope Scope' Funs c Γ FVs xs C1 :
+    project_vars Util.clo_tag Scope Funs c Γ FVs xs C1 Scope' ->
+    cost_alloc_ctx C1 <= 3 * length xs.
   Proof.
     intros Hvar. induction Hvar; eauto.
     simpl. rewrite cost_alloc_ctx_comp_ctx_f.
-    erewrite project_var_cost_alloc; eauto.
+    eapply project_var_cost_alloc in H. omega. 
   Qed.
 
   Lemma PreCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
-        Scope c Γ FVs S x x' S':
-    project_var Scope c Γ FVs S x x' C S' ->
-    IInvCtxCompat_r Pre Pre H1 H2 rho1 rho2 C e1 e2.
+        Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
+        c Γ FVs x :
+    project_var Util.clo_tag Scope Funs c Γ FVs x C Scope' ->
+    IInvCtxCompat_r (PreG (Funs \\ Scope)) (PreG (Funs \\ Scope')) H1 H2 rho1 rho2 C e1 e2.
   Proof.
     intros Hvar.
-    unfold IInvCtxCompat_r, Pre.
+    unfold IInvCtxCompat_r, PreG.
     intros H1' H2' H2'' rho1' rho2' rho2'' c1'
            b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx.
+    erewrite (ctx_to_heap_env_CC_size_heap _ _ _ H2' H2''); [| eassumption ].
+
     eapply project_var_heap in Hctx; eauto. subst. eauto.
   Qed.
 

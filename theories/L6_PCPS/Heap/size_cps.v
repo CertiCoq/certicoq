@@ -471,7 +471,7 @@ Module Size (H : Heap).
 
 
   Lemma project_var_cost_alloc_eq
-        Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
+        Scope {_ : ToMSet Scope} Scope' {_ : ToMSet Scope'} Funs `{ToMSet Funs}
         c Γ FVs x C1 :
     project_var Util.clo_tag Scope Funs c Γ FVs x C1 Scope' ->
     cost_alloc_ctx C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
@@ -638,6 +638,27 @@ Module Size (H : Heap).
       destruct (Hdec x).
       + left. constructor; eauto.
       + right. constructor; eauto.
+  Qed.
+
+            
+  Lemma project_var_ToMSet Scope1 Scope2 `{ToMSet Scope1} Funs
+        c Γ FVs y C1 :
+    project_var Util.clo_tag Scope1 Funs c Γ FVs y C1 Scope2 ->
+    ToMSet Scope2.
+  Proof.
+    intros Hvar.
+    assert (Hd1 := H).  eapply Decidable_ToMSet in Hd1. 
+    destruct Hd1 as [Hdec1].
+    destruct (Hdec1 y).
+    - assert (Scope1 <--> Scope2).
+      { inv Hvar; eauto; try reflexivity.
+        now exfalso; eauto. now exfalso; eauto. }
+      eapply ToMSet_Same_set; eassumption.
+    - assert (y |: Scope1 <--> Scope2).
+      { inv Hvar; try reflexivity.
+        exfalso; eauto. }
+      eapply ToMSet_Same_set; try eassumption.
+      eauto with typeclass_instances.
   Qed. 
     
   Lemma project_vars_cost_alloc_eq
@@ -652,9 +673,10 @@ Module Size (H : Heap).
       eapply Same_set_From_set.
       rewrite <- mset_eq, Setminus_Same_set_Empty_set, Intersection_Empty_set_abs_r.
       rewrite FromSet_empty. reflexivity.
-    - assert (Hvar' := H2).
+    - assert (Hvar' := H2). assert (Hvar'' := H2).
+      eapply project_var_ToMSet in Hvar''; eauto. 
       rewrite cost_alloc_ctx_comp_ctx_f. 
-      eapply project_var_cost_alloc_eq in H2. 
+      eapply (@project_var_cost_alloc_eq Scope1 H Scope2 Hvar'' Funs H1) in H2.
       erewrite H2. erewrite IHHvar; eauto.
       rewrite <- NPeano.Nat.mul_add_distr_l.
       eapply Nat_as_OT.mul_cancel_l. omega.
@@ -666,16 +688,14 @@ Module Size (H : Heap).
       rewrite !(Intersection_commut _ Funs).
       rewrite <- Intersection_Union_distr.
       eapply Same_set_Intersection_compat; [| reflexivity ].
-      eapply Setminus_compose.
-      admit.
+      eapply Setminus_compose. now eauto with typeclass_instances. 
       eapply project_var_Scope_l. eassumption.
       eapply project_vars_Scope_l. eassumption.
       eapply FromSet_disjoint.
       do 2 setoid_rewrite <- mset_eq at 1.
       eapply Disjoint_Intersection_r.
       eapply Disjoint_Setminus_r...
-      
-   
+  Qed.          
       
   Lemma project_vars_cost 
        Scope Scope' Funs c Γ FVs xs C1 :

@@ -777,34 +777,51 @@ Module Size (H : Heap).
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
     subst.  
     assert (Heq := project_var_cost _ _ _ _ _ _ _ _ Hvar).  
-    eapply project_var_heap in Hctx'; eauto. subst.
     unfold Post in *. omega.
   Qed.
 
-  Lemma PreCtxCompat_vars_r H1 H2 rho1 rho2 C e1 e2
-        Scope c Γ FVs S x x' S':
-    project_vars Scope c Γ FVs S x x' C S' ->
-    IInvCtxCompat_r Pre Pre H1 H2 rho1 rho2 C e1 e2.
+  Lemma PreCtxCompat_vars_r  H1 H2 rho1 rho2 C e1 e2
+        Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
+        c Γ FVs xs :
+    project_vars Util.clo_tag Scope Funs c Γ FVs xs C Scope' ->
+    IInvCtxCompat_r (PreG (Funs \\ Scope)) (PreG (Funs \\ Scope')) H1 H2 rho1 rho2 C e1 e2.
   Proof.
     intros Hvar.
-    unfold IInvCtxCompat_r, Pre.
+    unfold IInvCtxCompat_r, PreG.
     intros H1' H2' H2'' rho1' rho2' rho2'' c1'
-           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx.
-    eapply project_vars_heap in Hctx; eauto. subst. eauto.
+           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx. subst. eauto. 
+    assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx).
+    subst.  
+    assert (Heq := project_vars_cost _ _ _ _ _ _ _ _ Hvar).  
+    erewrite (ctx_to_heap_env_CC_size_heap _ _ _ H2' H2''); [| eassumption ].
+    erewrite (project_vars_cost_alloc_eq Scope Scope'); [| eassumption ].
+    rewrite <- plus_assoc, <- NPeano.Nat.mul_add_distr_l.
+    rewrite PS_cardinal_union. 
+    rewrite Proper_carinal. eassumption. 
+    eapply Same_set_From_set. setoid_rewrite <- mset_eq.
+    rewrite FromSet_union. rewrite <- !mset_eq at 1.
+    eapply Same_set_Intersection_Setminus. eapply Decidable_ToMSet. eassumption.
+    eapply project_vars_Scope_l. eassumption.
+    eapply FromSet_disjoint.
+    do 2 setoid_rewrite <- mset_eq at 1.
+    eapply Disjoint_Setminus_r.
+    eapply Included_trans. eapply Included_Intersection_r.
+    now eauto with Ensembles_DB.
   Qed.
 
   Lemma PostCtxCompat_vars_r H1 H2 rho1 rho2 C e1 e2
-        Funs c Γ FVs S x x' S':
-    project_vars Funs c Γ FVs S x x' C S' ->
+        Scope Scope' Funs c Γ FVs xs :
+    project_vars Util.clo_tag Scope Funs c Γ FVs xs C Scope' ->
     InvCtxCompat_r (Post 0) (Post (cost_ctx_full C)) H1 H2 rho1 rho2 C e1 e2.
   Proof.
     unfold InvCtxCompat_r, Pre.
     intros Hvar H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
            b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx'.
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
-    subst. 
-    assert (Heq := project_vars_cost _ _ _ _ _ _ _ _ _ Hvar).  
-    eapply project_vars_heap in Hctx'; eauto. subst.
+    subst.
+    assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
+    subst.  
+    assert (Heq := project_vars_cost _ _ _ _ _ _ _ _ Hvar).  
     unfold Post in *. omega.
   Qed.
 

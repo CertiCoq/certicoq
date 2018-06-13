@@ -474,7 +474,7 @@ Module Size (H : Heap).
         Scope {_ : ToMSet Scope} Scope' {_ : ToMSet Scope'} Funs `{ToMSet Funs}
         c Γ FVs x C1 :
     project_var Util.clo_tag Scope Funs c Γ FVs x C1 Scope' ->
-    cost_alloc_ctx C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
+    cost_alloc_ctx_CC C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
   Proof.
     intros Hvar; inv Hvar; eauto.
     - rewrite (Proper_carinal _ PS.empty).
@@ -640,7 +640,7 @@ Module Size (H : Heap).
       + right. constructor; eauto.
   Qed.
 
-            
+  
   Lemma project_var_ToMSet Scope1 Scope2 `{ToMSet Scope1} Funs
         c Γ FVs y C1 :
     project_var Util.clo_tag Scope1 Funs c Γ FVs y C1 Scope2 ->
@@ -665,7 +665,7 @@ Module Size (H : Heap).
         Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
         c Γ FVs xs C1 :
     project_vars Util.clo_tag Scope Funs c Γ FVs xs C1 Scope' ->
-    cost_alloc_ctx C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
+    cost_alloc_ctx_CC C1 = 3 * PS.cardinal (@mset (Funs :&: (Scope' \\ Scope)) _).
   Proof with (now eauto with Ensembles_DB).
     intros Hvar; induction Hvar; eauto.
     - rewrite (Proper_carinal _ PS.empty).
@@ -675,7 +675,7 @@ Module Size (H : Heap).
       rewrite FromSet_empty. reflexivity.
     - assert (Hvar' := H2). assert (Hvar'' := H2).
       eapply project_var_ToMSet in Hvar''; eauto. 
-      rewrite cost_alloc_ctx_comp_ctx_f. 
+      rewrite cost_alloc_ctx_CC_comp_ctx_f. 
       eapply (@project_var_cost_alloc_eq Scope1 H Scope2 Hvar'' Funs H1) in H2.
       erewrite H2. erewrite IHHvar; eauto.
       rewrite <- NPeano.Nat.mul_add_distr_l.
@@ -725,6 +725,20 @@ Module Size (H : Heap).
     eapply project_var_cost_alloc in H. omega. 
   Qed.
 
+  Lemma Same_set_Intersection_Setminus {A: Type} (S1 S2 S3 : Ensemble A)
+        {_ : Decidable S3}:
+    S2 \subset S3 ->
+    S1 :&: (S3 \\ S2) :|: (S1 \\ S3) <--> S1 \\ S2.
+  Proof.
+    intros Hsub; split; intros x Hin; inv Hin.
+    - inv H. inv H1. constructor; eauto.
+    - inv H; constructor; eauto.
+    - destruct X as [Hdec]. destruct (Hdec x).
+      + left. constructor; eauto.
+        constructor; eauto.
+      + right. constructor; eauto.
+  Qed.
+
   Lemma PreCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
         Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
         c Γ FVs x :
@@ -736,21 +750,33 @@ Module Size (H : Heap).
     intros H1' H2' H2'' rho1' rho2' rho2'' c1'
            b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx.
     erewrite (ctx_to_heap_env_CC_size_heap _ _ _ H2' H2''); [| eassumption ].
-
-    eapply project_var_heap in Hctx; eauto. subst. eauto.
+    erewrite (project_var_cost_alloc_eq Scope Scope'); [| eassumption ].
+    rewrite <- plus_assoc, <- NPeano.Nat.mul_add_distr_l.
+    rewrite PS_cardinal_union. 
+    rewrite Proper_carinal. eassumption. 
+    eapply Same_set_From_set. setoid_rewrite <- mset_eq.
+    rewrite FromSet_union. rewrite <- !mset_eq at 1.
+    eapply Same_set_Intersection_Setminus. eapply Decidable_ToMSet. eassumption.
+    eapply project_var_Scope_l. eassumption.
+    eapply FromSet_disjoint.
+    do 2 setoid_rewrite <- mset_eq at 1.
+    eapply Disjoint_Setminus_r.
+    eapply Included_trans. eapply Included_Intersection_r.
+    now eauto with Ensembles_DB.
   Qed.
 
+  
   Lemma PostCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
-        Scope c Γ FVs S x x' S':
-    project_var Scope c Γ FVs S x x' C S' ->
+        Scope Scope' Funs c Γ FVs x :
+    project_var Util.clo_tag Scope Funs c Γ FVs x C Scope' ->
     InvCtxCompat_r (Post 0) (Post (cost_ctx_full C)) H1 H2 rho1 rho2 C e1 e2.
   Proof.
     unfold InvCtxCompat_r, Pre.
     intros Hvar H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
            b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx'.
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
-    subst. 
-    assert (Heq := project_var_cost _ _ _ _ _ _ _ _ _ Hvar).  
+    subst.  
+    assert (Heq := project_var_cost _ _ _ _ _ _ _ _ Hvar).  
     eapply project_var_heap in Hctx'; eauto. subst.
     unfold Post in *. omega.
   Qed.

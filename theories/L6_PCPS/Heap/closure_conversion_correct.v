@@ -24,64 +24,83 @@ Module ClosureConversionCorrect (H : Heap).
   (** Invariant about the free variables *) 
   Definition FV_inv (k j : nat) (IP : GIInv) (P : GInv) (b : Inj) (d : EInj)
              (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
+             (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
     exists (vs : list value) (l : loc),
       M.get Γ rho2 = Some (Loc l) /\
       get l H2 = Some (Constr c vs) /\
-      Forall2_P Scope
+      Forall2_P (Scope :|: Funs)
                 (fun (x : var) (v2 : value)  =>
                    exists v1, M.get x rho1 = Some v1 /\
                          Res (v1, H1) ≺ ^ ( k ; j ; IP ; P ; b; d) Res (v2, H2)) FVs vs.
+
+  Definition Fun_inv k j GI GP b d rho1 H1 rho2 H2 Scope Funs Γ :=
+    forall f, ~ f \in Scope -> f \in Funs ->
+         exists l1 lenv B g,
+           M.get f rho1 = Some (Loc l1) /\
+           M.get f rho2 = Some (FunPtr B g) /\
+           M.get Γ rho2 = Some (Loc lenv) /\
+           let '(l2, H2') := alloc (Constr Size.Util.clo_tag [FunPtr B g; Loc lenv]) H2 in
+           Res (Loc l1, H1) ≺ ^ (k; j; GI; GP; b{l1 ~> l2}; d{l1 ~> Some lenv}) Res (Loc l2, H2'). 
 
   
   (** Version without the logical relation. Useful when we're only interested in other invariants. *)
   
   (** Invariant about the free variables *) 
   Definition FV_inv_weak (rho1 : env) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
+             (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
     exists (vs : list value) (l : loc),
       M.get Γ rho2 = Some (Loc l) /\
       get l H2 = Some (Constr c vs) /\
-      Forall2_P Scope
+      Forall2_P (Scope :|: Funs)
                 (fun (x : var) (v2 : value)  =>
                    exists v1, M.get x rho1 = Some v1) FVs vs.
   
+  Definition Fun_inv_weak rho1 rho2 Scope Funs Γ :=
+    forall f, ~ f \in Scope -> f \in Funs ->
+         exists l1 lenv B g,
+           M.get f rho1 = Some (Loc l1) /\
+           M.get f rho2 = Some (FunPtr B g) /\
+           M.get Γ rho2 = Some (Loc lenv). 
+  
   
   (** * Lemmas about [FV_inv] *)
-  Lemma FV_inv_cc_approx_clos  (k j : nat) (IP : GIInv) (P : GInv) (b : Inj) (d : EInj)
+  
+(* 
+  Lemma FV_inv_cc_approx_clos  (k j : nat) (IP : GIInv) (P : GInv) Funs (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
         (c : cTag) (Γ : var) (FVs : list var) l : 
-    FV_inv k j IP P b d rho1 H1 rho2 H2 c (Empty_set _) Γ FVs ->
+    FV_inv k j IP P b d rho1 H1 rho2 H2 c (Empty_set _) Funs Γ FVs ->
+    NoDup FVs ->
     M.get Γ rho2 = Some (Loc l) ->
     (rho1, H1) << ^ (k; j; IP; P; b; d; (FromList FVs)) (l, H2).
   Proof.
-    intros (vs & l' & Hget1 & Hget2 & Hall) Hget1'. subst_exp.
+    intros (vs & l' & Hget1 & Hget2 & Hall) Hnd Hget1'. subst_exp.
     clear Hget1. eexists c, vs. setoid_rewrite Hget2. clear Hget2. 
     induction Hall.
     - eexists []. split. rewrite !FromList_nil. reflexivity.
       split. now constructor. split. reflexivity.
       constructor.
+      
     - edestruct H as [v1 [Hget1 Hres1]]. intros Hc; now inv Hc.
-      edestruct IHHall as (FLs & Heq & Hnd & Hget' & Hal').
-      destruct v1 as [l1|]; try contradiction.
+      edestruct IHHall as (FLs & Heq & Hnd' & Hget' & Hal').
+      now inv Hnd. destruct v1 as [l1|]; try contradiction.
       destruct y as [l2|]; try contradiction.  
       eexists (x :: FLs). split. rewrite !FromList_cons, Heq. reflexivity.
-      split.
-      admit. (* extra assumption *)
+      split. inv Hnd. constructor; eauto. intros Hc. eapply H4; eapply Heq. eassumption. 
       split. reflexivity.
       econstructor.
 
       eexists; split. eassumption. rewrite cc_approx_val_eq. eassumption.
 
-      eassumption. 
-  Admitted.
-
+      eassumption.
+  Qed.
+*)  
   Lemma FV_inv_j_monotonic (k j' j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
+        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     j' <= j ->
-    FV_inv k j' GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs.
+    FV_inv k j' GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs.
   Proof.
     intros Hfv Hlt. 
     destruct Hfv as (v & vs & Hget1 & Hget2 & Hall).
@@ -94,10 +113,10 @@ Module ClosureConversionCorrect (H : Heap).
 
   Lemma FV_inv_monotonic (k k' j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) :
-    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
+        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     k' <= k ->
-    FV_inv k' j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs.
+    FV_inv k' j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs.
   Proof.
     intros Hfv Hlt. 
     destruct Hfv as (v & vs & Hget1 & Hget2 & Hall).
@@ -108,9 +127,9 @@ Module ClosureConversionCorrect (H : Heap).
     eapply cc_approx_val_monotonic; eauto.
   Qed.
       
-  Lemma FV_inv_weak_in_FV_inv k j P1 P2 rho1 H1 rho2 H2 β d c Scope Γ FVs :
-    FV_inv k j P1 P2 β d rho1 H1 rho2 H2 c Scope Γ FVs ->
-    FV_inv_weak rho1 rho2 H2 c Scope Γ FVs.
+  Lemma FV_inv_weak_in_FV_inv k j P1 P2 rho1 H1 rho2 H2 β d c Scope Funs Γ FVs :
+    FV_inv k j P1 P2 β d rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+    FV_inv_weak rho1 rho2 H2 c Scope Funs  Γ FVs.
   Proof.
     intros (x1 & x2  & Hget1 & Hget2 & Hall).
     repeat eexists; eauto.
@@ -135,10 +154,10 @@ Module ClosureConversionCorrect (H : Heap).
   Qed.
 
   Lemma FV_inv_image_reach k P1 P2 rho1 H1 rho2 H2 b d c
-        Scope Γ FVs :
-    (forall j, FV_inv k j P1 P2 b d rho1 H1 rho2 H2 c Scope Γ FVs) ->
-    image b (reach' H1 (env_locs rho1 (FromList FVs \\ Scope)))
-    :|: image' d (reach' H1 (env_locs rho1 (FromList FVs \\ Scope))) \subset
+        Scope Funs Γ FVs :
+    (forall j, FV_inv k j P1 P2 b d rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
+    image b (reach' H1 (env_locs rho1 (FromList FVs \\ (Scope :|: Funs))))
+    :|: image' d (reach' H1 (env_locs rho1 (FromList FVs \\ (Scope :|: Funs)))) \subset
     reach' H2 (post H2 (env_locs rho2 [set Γ])).
   Proof.
     intros Hres l' [l'' [l [Hin Heq]] | l'' [l [Hin Heq]]].
@@ -222,10 +241,10 @@ Module ClosureConversionCorrect (H : Heap).
 
   Lemma FV_inv_set_not_in_FVs_l (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) x v  :
-    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
-    ~ x \in (FromList FVs \\ Scope) ->
-    FV_inv k j GII GI b d (M.set x v rho1) H1 rho2 H2 c Scope Γ FVs.
+        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x v  :
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+    ~ x \in (FromList FVs \\ (Scope :|: Funs)) ->
+    FV_inv k j GII GI b d (M.set x v rho1) H1 rho2 H2 c Scope Funs Γ FVs.
   Proof.
     intros (x1 & x2 & Hget1 & Hget2 & Hall).
     repeat eexists; eauto.
@@ -238,10 +257,10 @@ Module ClosureConversionCorrect (H : Heap).
 
   Lemma FV_inv_set_not_in_FVs_r (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) x v  :
-    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
+        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x v  :
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     x <> Γ ->
-    FV_inv k j GII GI b d rho1 H1 (M.set x v rho2) H2 c Scope Γ FVs.
+    FV_inv k j GII GI b d rho1 H1 (M.set x v rho2) H2 c Scope Funs Γ FVs.
   Proof.
     intros (x1 & x2 & Hget1 & Hget2 & Hall).
     repeat eexists; eauto.
@@ -250,11 +269,11 @@ Module ClosureConversionCorrect (H : Heap).
   
   Lemma FV_inv_set_not_in_FVs (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) (d : EInj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope : Ensemble var) (Γ : var) (FVs : list var) x y v v'  :
-    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
-    ~ x \in (FromList FVs \\ Scope) ->
+        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x y v v'  :
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+    ~ x \in (FromList FVs \\ (Scope :|: Funs)) ->
     y <> Γ ->
-    FV_inv k j GII GI b d (M.set x v rho1) H1 (M.set y v' rho2) H2 c Scope Γ FVs.
+    FV_inv k j GII GI b d (M.set x v rho1) H1 (M.set y v' rho2) H2 c Scope Funs Γ FVs.
   Proof.
     intros. eapply FV_inv_set_not_in_FVs_r; eauto.
     eapply FV_inv_set_not_in_FVs_l; eauto.
@@ -271,8 +290,8 @@ Module ClosureConversionCorrect (H : Heap).
     env_locs rho2 [set Γ] \subset dom H2 ->
     H1 ⊑ H1' ->
     H2 ⊑ H2' ->
-    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs ->
-    FV_inv k j GII GI b d rho1 H1' rho2 H2' c Scope Γ FVs.
+    FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+    FV_inv k j GII GI b d rho1 H1' rho2 H2' c Scope Funs Γ FVs.
   Proof.
     intros Hw1 Hw2 He1 He2 Hs1 Hs2.
     intros (x1 & x2 & Hget1 & Hget2 & Hall).
@@ -352,25 +371,31 @@ Module ClosureConversionCorrect (H : Heap).
   (** * Lemmas about [project_var] and [project_vars] *)
   
     
-  Lemma project_var_ctx_to_heap_env Scope c Γ FVs x x' C S S' v1 rho1 rho2 H2:
-    project_var Scope c Γ FVs S x x' C S' ->
+  Lemma project_var_ctx_to_heap_env Scope Scope' Funs c Γ FVs x C v1 rho1 rho2 H2:
+    project_var Size.Util.clo_tag Scope Funs c Γ FVs x C Scope' ->
+    Fun_inv_weak rho1 rho2 Scope Funs Γ ->
     FV_inv_weak rho1 rho2 H2 c Scope Γ FVs ->
     M.get x rho1 = Some v1 ->
     exists H2' rho2' s, ctx_to_heap_env_CC C H2 rho2 H2' rho2' s.
   Proof.
-    intros Hproj HFV Hget. inv Hproj.
+    intros Hproj Hfun HFV Hget. inv Hproj.
     - repeat eexists; econstructor; eauto.
-    - edestruct HFV as (v & vs  & Hget1 & Hget2 & Hall).
+    - edestruct Hfun as (l1 & lenv & B & f' & Hget1 & Hget2 & Hget3); try eassumption.
+      edestruct (alloc (Constr Size.Util.clo_tag [FunPtr B f'; Loc lenv]) H2) as [l' H2'] eqn:Ha. 
+      do 3 eexists.
+      econstructor; [ | | now econstructor ].
+      + simpl. rewrite Hget2, Hget3. reflexivity.
+      + eassumption. 
+    - edestruct HFV as (v & vs  & Hget1 & Hget2 & Hall).   
       edestruct Forall2_P_nthN as [v2 [Hnth Hr]]; eauto.
       repeat eexists. econstructor; eauto.
       constructor.
   Qed.
   
-  Lemma project_vars_ctx_to_heap_env Scope c Γ FVs xs xs' C S S' vs1 rho1 rho2 H2:
-    Disjoint _ S (FV_cc Scope Γ) ->
-    
-    project_vars Scope c Γ FVs S xs xs' C S' ->
-    FV_inv_weak rho1 rho2 H2 c Scope Γ FVs ->
+  Lemma project_vars_ctx_to_heap_env Scope Scope' Funs c Γ FVs xs C vs1 rho1 rho2 H2:
+    project_vars Size.Util.clo_tag Scope Funs c Γ FVs xs C Scope' ->
+    FV_inv_weak rho1 rho2 H2 c Scope Γ ->
+    FV_inv_weak rho1 rho2 c Scope Γ FVs ->
     getlist xs rho1 = Some vs1 ->
     exists H2' rho2' s, ctx_to_heap_env_CC C H2 rho2 H2' rho2' s.
   Proof.
@@ -957,14 +982,6 @@ Module ClosureConversionCorrect (H : Heap).
       intros Hc. eapply Hin; right; eauto.      
   Qed.
 
-  Definition Fun_inv k j GI GP b d rho1 H1 rho2 H2 Funs Γ :=
-    forall f, f \in Funs ->
-         exists l1 lenv B g,
-           M.get f rho1 = Some (Loc l1) /\
-           M.get f rho2 = Some (FunPtr B g) /\
-           M.get Γ rho2 = Some (Loc lenv) /\
-           let '(l2, H2') := alloc (Constr Size.Util.clo_tag [FunPtr B g; Loc lenv]) H2 in
-           Res (Loc l1, H1) ≺ ^ (k; j; GI; GP; b{l1 ~> l2}; d{l1 ~> Some lenv}) Res (Loc l2, H2'). 
   
 
   Lemma Fun_inv_set_r k j GI GP b d rho1 H1 rho2 H2 funs Γ f v : 

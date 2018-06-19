@@ -926,11 +926,15 @@ Module ClosureConversionCorrect (H : Heap).
              (image' d (reach' H1 (env_locs rho1 (FV Scope Funs FVs)))) ->
 
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
+    
+    (forall f, f \in Funs ->
+          Disjoint _ (env_locs rho1 [set f])
+                   (reach' H1 (env_locs rho1 (FV Scope Funs FVs \\ [set f])))) ->
 
-    Disjoint _ (env_locs rho1 (Funs \\ Scope))
-             (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs))))) ->
     reach' H1 (post H1 (env_locs rho1 (Funs \\ Scope))) \subset
     reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs)))) ->
+
+    Γ <> x ->
     binding_in_map Scope rho1 ->
 
     exists b' d', 
@@ -941,7 +945,7 @@ Module ClosureConversionCorrect (H : Heap).
       Disjoint _ (image b (reach' H1 (env_locs rho1 (FV Scope' Funs FVs))))
                (image' d (reach' H1 (env_locs rho1 (FV Scope' Funs FVs)))).
   Proof with (now eauto with Ensembles_DB).
-    intros Hwf1 Henv1 Hwf2 Henv2 Hproj Hcc Hfun Hfv Hinj Hd Hctx Hdis Hbin.
+    intros Hwf1 Henv1 Hwf2 Henv2 Hproj Hcc Hfun Hfv Hinj Hd Hctx Hdis Hbin Hnin Hbind.
     inv Hproj.
     - inv Hctx. do 2 eexists. split. eassumption. split. eassumption.
       split. eassumption. split. eassumption. eassumption.
@@ -978,20 +982,20 @@ Module ClosureConversionCorrect (H : Heap).
 
           eapply cc_approx_env_rename_ext. now eapply Hcc.
           eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc. eapply Hdis. constructor; try eassumption.
+          intros Hc. eapply Hdis. eassumption. constructor; try eassumption.
           eapply get_In_env_locs. now constructor; eauto. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ].
           eapply env_locs_monotonic... reflexivity.
           
           eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc. eapply Hdis. constructor; try eassumption.
+          intros Hc. eapply Hdis. eassumption. constructor; try eassumption.
           eapply get_In_env_locs. now constructor; eauto. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ].
           eapply env_locs_monotonic... reflexivity.
       + intros j.
         eapply Fun_inv_set_r; [ eapply Fun_inv_rename_ext | | ].
         * eapply Fun_inv_subheap;
-          [ | | | | | now intros y Hin Hnin; eapply Hfun; eauto | | ].
+          [ | | | | | now intros y Hin Hnin'; eapply Hfun; eauto | | ].
           eapply well_formed_antimon; [| now apply Hwf1 ].
           eapply reach'_set_monotonic. eapply env_locs_monotonic.
           unfold FV...
@@ -1024,10 +1028,20 @@ Module ClosureConversionCorrect (H : Heap).
 
           eapply HL.alloc_subheap. eassumption.
           
-        * admit. 
-        * admit.
+        * eapply f_eq_subdomain_extend_not_In_S_r. 
+          intros Hc. eapply Hdis. eassumption. constructor; eauto.
+          eapply get_In_env_locs. reflexivity. eassumption. reflexivity.
+          eapply reach'_set_monotonic; [| eassumption ]. eapply env_locs_monotonic.
+          unfold FV. rewrite !Setminus_Union_distr. eapply Included_Union_preserv_l...
+          reflexivity.
+        * eapply f_eq_subdomain_extend_not_In_S_r. 
+          intros Hc. eapply Hdis. eassumption. constructor; eauto.
+          eapply get_In_env_locs. reflexivity. eassumption. reflexivity.
+          eapply reach'_set_monotonic; [| eassumption ]. eapply env_locs_monotonic.
+          unfold FV. rewrite !Setminus_Union_distr. eapply Included_Union_preserv_l...
+          reflexivity.
         * intros Hc. inv Hc. eauto.
-        * admit. 
+        * eauto.
       + intros j.
         eapply FV_inv_set_not_in_FVs_r.
         eapply FV_inv_Scope_mon; [| now eapply Included_Union_r ].
@@ -1054,7 +1068,7 @@ Module ClosureConversionCorrect (H : Heap).
           eapply get_In_env_locs. constructor; eauto. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ].
           eapply env_locs_monotonic... reflexivity. 
-        * admit. 
+        * eauto.
       + eapply injective_subdomain_antimon. eassumption.
         eapply reach'_set_monotonic. eapply env_locs_monotonic.
         eapply Included_trans. eapply FV_Union1. eapply Union_Included; [| reflexivity ].
@@ -1079,13 +1093,14 @@ Module ClosureConversionCorrect (H : Heap).
         *  eapply cc_approx_env_P_set_not_in_P_r; try eassumption.
            now eauto.
       + intros j. eapply Fun_inv_set_r.
-        intros y Hin Hnin. eapply Hfun; try eassumption.
+        intros y Hin Hnin'. eapply Hfun; try eassumption.
         intros Hc; eapply Hin; now right.
-        eassumption. admit.
+        now intros Hc; inv Hc; eauto.
+        eauto.
       + intros h. 
         edestruct Hfv as (v1 & vs1 & Hget1 & Hget2 & Hall).
         repeat eexists; eauto. 
-        rewrite M.gso; eauto. admit.
+        rewrite M.gso; eauto.
         eapply Forall2_P_monotonic; [ eassumption | ]...
       + assert (Hseq : (x |: FV Scope Funs FVs) <--> FV Scope Funs FVs).
         { rewrite Union_Same_set. reflexivity. eapply Singleton_Included.

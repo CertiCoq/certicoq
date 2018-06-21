@@ -974,6 +974,21 @@ Proof.
     + edestruct IHHall as [v2 [Hnth2 Hr]]; eauto.
 Qed.
 
+Lemma Forall2_P_exists {A B : Type} (P1 : A -> Prop) (P2 : A -> B -> Prop)
+      (l1 : list A) (l2 : list B) (x : A) :
+  List.In x l1 ->
+  ~ P1 x ->
+  Forall2_P P1 P2 l1 l2 ->
+  exists y : B, List.In y l2 /\ P2 x y.
+Proof.
+  intros Hin HP1 Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    + eexists; split; eauto. now left.
+    + edestruct IHHall as [z [Hinz Hp2]]; eauto.
+      eexists. split. right. eassumption. 
+      eassumption.
+Qed.
 
 (** Lemmas abut [InA] *)
 

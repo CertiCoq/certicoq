@@ -1130,7 +1130,7 @@ Module ClosureConversionCorrect (H : Heap).
 
     injective_subdomain (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs))))) b ->
     Disjoint _ (image b (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs))))))
-             (image' d (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs)))))) ->
+             (env_locs rho2 [set Γ] :|: image' d (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs)))))) ->
 
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
 
@@ -1143,7 +1143,7 @@ Module ClosureConversionCorrect (H : Heap).
       (forall j, FV_inv k j GII GI b' d' rho1 H1 rho2' H2' c Scope' Funs Γ FVs) /\
       injective_subdomain (reach' H1 (env_locs rho1 (Scope' :|: (FromList FVs \\ (Scope' :|: Funs))))) b' /\
       Disjoint _ (image b' (reach' H1 (env_locs rho1 (Scope' :|: (FromList FVs \\ (Scope' :|: Funs))))))
-               (image' d' (reach' H1 (env_locs rho1 (Scope' :|: (FromList FVs \\ (Scope' :|: Funs)))))).
+               (env_locs rho2' [set Γ] :|: image' d' (reach' H1 (env_locs rho1 (Scope' :|: (FromList FVs \\ (Scope' :|: Funs)))))).
   Proof with (now eauto with Ensembles_DB).
     intros Hwf1 Henv1 Hwf2 Henv2 Hproj Hcc Hfun Hfv Hinj Hd Hctx Hneq Hbind.
     inv Hproj.
@@ -1190,17 +1190,18 @@ Module ClosureConversionCorrect (H : Heap).
           eapply env_locs_monotonic. unfold FV...
           eapply HL.subheap_refl.
           eapply HL.alloc_subheap. eassumption.
-          
-          eapply cc_approx_env_rename_ext. now eapply Hcc.
+            
+          eapply cc_approx_env_rename_ext with (β := b) (δ := d).
+          now eapply Hcc.
           eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc. eapply Fun_inv_locs_Disjoint. eapply Hfun. now constructor; eauto.
+          intros Hc. eapply Fun_inv_locs_Disjoint. eapply (Hfun 0). now constructor; eauto.
           constructor; try eassumption.
-          eapply get_In_env_locs. now constructor; eauto. eassumption. reflexivity.
+          eapply get_In_env_locs. now constructor; eauto. eassumption. reflexivity. 
           eapply reach'_set_monotonic; [| eassumption ].
           eapply env_locs_monotonic... reflexivity.
-          
+           
           eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc.  eapply Fun_inv_locs_Disjoint. eapply Hfun. now constructor; eauto.
+          intros Hc.  eapply Fun_inv_locs_Disjoint. eapply (Hfun 0). now constructor; eauto.
           constructor; try eassumption.
           eapply get_In_env_locs. now constructor; eauto. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ].
@@ -1220,12 +1221,12 @@ Module ClosureConversionCorrect (H : Heap).
           eapply Included_trans. eapply Included_Union_compat.
           eapply image_monotonic.
           eapply reach'_set_monotonic.
-          eapply Included_trans; [| eapply Fun_inv_post_Included; try now apply Hfun ].
+          eapply Included_trans; [| eapply Fun_inv_post_Included; try now apply (Hfun 0) ].
           eapply post_set_monotonic. eapply env_locs_monotonic...
 
           eapply image'_monotonic.
           eapply reach'_set_monotonic.
-          eapply Included_trans; [| eapply Fun_inv_post_Included; try now apply Hfun ].
+          eapply Included_trans; [| eapply Fun_inv_post_Included; try now apply (Hfun 0) ].
           eapply post_set_monotonic. eapply env_locs_monotonic...
           rewrite <- !reach'_idempotent at 1.
            
@@ -1241,14 +1242,14 @@ Module ClosureConversionCorrect (H : Heap).
           eapply HL.alloc_subheap. eassumption.
           
         * eapply f_eq_subdomain_extend_not_In_S_r. 
-          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply Hfun. now constructor; eauto.
+          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply (Hfun 0). now constructor; eauto.
           constructor; eauto.
           eapply get_In_env_locs. reflexivity. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ]. eapply env_locs_monotonic.
           unfold FV. rewrite !Setminus_Union_distr. eapply Included_Union_preserv_l...
           reflexivity.
         * eapply f_eq_subdomain_extend_not_In_S_r. 
-          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply Hfun. now constructor; eauto.
+          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply (Hfun 0). now constructor; eauto.
           constructor; eauto.
           eapply get_In_env_locs. reflexivity. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ]. eapply env_locs_monotonic.
@@ -1272,7 +1273,7 @@ Module ClosureConversionCorrect (H : Heap).
         * eapply HL.alloc_subheap. eassumption.
         * eapply FV_inv_rename_ext. now eapply Hfv.
           eapply f_eq_subdomain_extend_not_In_S_l.
-          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply Hfun. now constructor; eauto.
+          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply (Hfun 0). now constructor; eauto.
           constructor; eauto.
           eapply get_In_env_locs. constructor; eauto. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ].
@@ -1281,10 +1282,10 @@ Module ClosureConversionCorrect (H : Heap).
           eapply Included_Union_preserv_r. rewrite Setminus_Union.
           rewrite (Union_commut _ [set x]).
           rewrite (Union_Same_set [set x])...
-          reflexivity. 
+          reflexivity.  
 
           eapply f_eq_subdomain_extend_not_In_S_l.
-          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply Hfun. now constructor; eauto.
+          intros Hc. eapply Fun_inv_locs_Disjoint. now eapply (Hfun 0). now constructor; eauto.
           constructor; eauto.
           eapply get_In_env_locs. constructor; eauto. eassumption. reflexivity.
           eapply reach'_set_monotonic; [| eassumption ].
@@ -1305,7 +1306,7 @@ Module ClosureConversionCorrect (H : Heap).
         { rewrite <- Union_assoc, env_locs_Union, env_locs_Singleton; eauto.
           rewrite reach'_Union, reach_unfold, <- Union_assoc. rewrite Setminus_Union_distr.
           rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l.
-          rewrite Union_Same_set.
+          rewrite Union_Same_set. 
           eapply Included_trans. eapply Setminus_Included.
           eapply reach'_set_monotonic; eapply env_locs_monotonic...
           rewrite <- (Union_assoc [set x] Scope), (Union_Same_set [set x]).
@@ -1313,8 +1314,8 @@ Module ClosureConversionCorrect (H : Heap).
           eapply reach'_set_monotonic.
           eapply Included_trans; [| eapply Fun_inv_post_Included ].
           eapply post_set_monotonic. eapply get_In_env_locs. constructor; eauto.
-          eassumption. now eauto. eapply Singleton_Included... }
-
+          eassumption. now eapply (Hfun 0).  eapply Singleton_Included... }
+ 
         eapply injective_subdomain_extend'.
         * eapply injective_subdomain_antimon; eassumption.  
         * intros Hc.
@@ -1345,20 +1346,32 @@ Module ClosureConversionCorrect (H : Heap).
           eapply reach'_set_monotonic.
           eapply Included_trans; [| eapply Fun_inv_post_Included ].
           eapply post_set_monotonic. eapply get_In_env_locs. constructor; eauto.
-          eassumption. now eauto. eapply Singleton_Included... }
-
+          eassumption. now eapply (Hfun 0).  eapply Singleton_Included... }
+ 
          assert (Hcn : ~ l \in dom H2).
          { intros [v Hget]. erewrite alloc_fresh in Hget; eauto. congruence. }
 
-        eapply Disjoint_Included;
-        [ eapply image'_extend_Included_Some | eapply image_extend_Included' | ].
+        eapply Disjoint_Included; 
+           [ eapply Included_Union_compat; [ reflexivity |  eapply image'_extend_Included_Some ]
+           | eapply image_extend_Included' | ].
         eapply Union_Disjoint_l; eapply Union_Disjoint_r.
-        * eapply Disjoint_Included; [| | now apply Hd ].
-          eapply image'_monotonic. eassumption.
-          eapply image_monotonic. eassumption.
-        * eapply Disjoint_Included_l. eapply image_monotonic. eassumption.
-          admit. 
-        * eapply Disjoint_Included_r. eapply image'_monotonic. eassumption.
+        * eapply Disjoint_Included; [| eapply image_monotonic; eassumption | now apply Hd ].
+          rewrite env_locs_set_not_In; [| intros Hc; inv Hc; eauto ]...
+        * eapply Union_Disjoint_r.
+
+          eapply Disjoint_Included; [| | now apply Hd ]...
+          
+          eapply Disjoint_Singleton_r. intros Hc.
+          eapply Hd. constructor. eapply image_monotonic; eassumption.
+          left. eapply get_In_env_locs. reflexivity. eassumption. reflexivity. 
+        * constructor. intros l2 Hc. inv Hc. inv H3. eapply Hcn.
+          eapply reachable_in_dom. eassumption. eassumption.
+          eapply reach'_extensive. rewrite env_locs_Singleton in H4; [| rewrite M.gso; eauto ].
+          inv H4.
+          eapply get_In_env_locs; eauto.
+          unfold FV_cc... reflexivity. 
+        * eapply Union_Disjoint_r.
+
           eapply Disjoint_Singleton_l. intros Hc.
           
           eapply Hcn.
@@ -1366,13 +1379,11 @@ Module ClosureConversionCorrect (H : Heap).
           eapply well_formed_antimon; [| eassumption ].
           eapply reach'_set_monotonic. eapply env_locs_monotonic...
           eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic...
-          right. eassumption.
-        * eapply Disjoint_Singleton_l. intros Hc. inv Hc. 
-          
-          eapply Hcn. 
-          eapply reachable_in_dom; [ eassumption | eassumption | ].
-          eapply reach'_extensive. eapply get_In_env_locs. right. reflexivity.
-          eassumption. reflexivity.
+          right. eapply image'_monotonic; eassumption.
+
+          constructor. intros l2 Hc. inv Hc. inv H3; inv H4. eapply Hcn.
+          eapply reachable_in_dom. eassumption. eassumption.
+          eapply reach'_extensive. eapply get_In_env_locs; unfold FV_cc; try eassumption...
     - inv Hctx. inv H18.
       assert (Hseq : FV (x |: Scope) Funs FVs <--> FV Scope Funs FVs).
       { unfold FV. rewrite <- (Union_assoc [set x] Scope Funs) at 1.
@@ -1415,76 +1426,145 @@ Module ClosureConversionCorrect (H : Heap).
           rewrite (Union_Same_set [set x]). reflexivity. eapply Singleton_Included.
           right. constructor; eauto. constructor; eauto. eapply nthN_In. eassumption. }
 
-        rewrite !Hseq' at 1. 
-        split; eassumption.
-  Admitted.
+        rewrite !Hseq' at 1.
+        rewrite env_locs_set_not_In. split; eassumption.
+        intros Hc; inv Hc; eauto.
+  Qed.
 
-  (*
+  (* TODO move *)
+  Lemma project_var_get'
+        (Scope Scope' Funs : Ensemble var) (c : cTag) 
+        (Γ : var) (FVs : list var) (x : var) (C1 : exp_ctx) 
+        (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block) 
+        (m : nat) (y : var) :
+    project_var Size.Util.clo_tag Scope Funs c Γ FVs x C1 Scope' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    y <> x -> M.get y rho1 = M.get y rho2.
+  Proof.
+    intros Hvar Hctx Hnin. inv Hvar; inv Hctx; eauto.
+    - inv H15. rewrite M.gso; eauto.
+    - inv H18. rewrite M.gso; eauto.
+  Qed. 
+  
+  Lemma project_vars_get' Scope Scope' Funs c Γ FVs xs C1 rho1 H1 rho2 H2 m y:
+    project_vars Size.Util.clo_tag Scope Funs c Γ FVs xs C1 Scope' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    ~ y \in FromList xs ->
+    M.get y rho1 = M.get y rho2.
+  Proof.
+    intros Hvar; revert rho1 H1 rho2 H2 m; induction Hvar; intros rho1 H1 rho2 H2 m Hctx Hnin. 
+    - inv Hctx. reflexivity.
+    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho'' [H'' [m1 [m2  [Hctx1 [Hctx2 Hadd]]]]]]; eauto.
+      subst. eapply project_var_get' in Hctx1; eauto.
+      rewrite Hctx1. eapply IHHvar. eassumption.
+      intros Hc. eapply Hnin. now right.
+      intros Hc; eapply Hnin. subst; now left.
+  Qed.
+
+    Lemma binding_in_map_Union {A} S1 S2 (rho : M.t A) :
+    binding_in_map S1 rho ->
+    binding_in_map S2 rho ->
+    binding_in_map (S1 :|: S2) rho.
+  Proof.
+    intros Hin1 Hin2 x Hin. inv Hin; eauto.
+  Qed.
+
+   Lemma binding_in_map_Singleton {A}  (rho : M.t A) x v :
+     M.get x rho = Some v ->
+     binding_in_map [set x] rho.
+  Proof.
+    intros Hget; intros v2 Heq. inv Heq. eexists; eauto.
+  Qed.
+
+  Lemma project_var_binding_in_map Scope Scope' Funs c Γ FVs x C1 rho1 H1 rho2 H2 m :
+    project_var Size.Util.clo_tag Scope Funs c Γ FVs x C1 Scope' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    binding_in_map Scope rho1 ->
+    binding_in_map Scope' rho2. 
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvar Hctx Hnin. inv Hvar; inv Hctx; eauto.
+    - inv H15.
+      eapply binding_in_map_antimon;
+        [| eapply binding_in_map_set; eassumption ]...
+    - inv H18; eauto. 
+      eapply binding_in_map_antimon;
+        [| eapply binding_in_map_set; eassumption ]...
+  Qed.
+
+  Lemma project_vars_binding_in_map Scope Scope' Funs c Γ FVs xs C1 rho1 H1 rho2 H2 m :
+    project_vars Size.Util.clo_tag Scope Funs c Γ FVs xs C1 Scope' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    binding_in_map Scope rho1 ->
+    binding_in_map Scope' rho2. 
+  Proof.
+    intros Hvar; revert rho1 H1 rho2 H2 m; induction Hvar; intros rho1 H1 rho2 H2 m Hctx Hbin. 
+    - inv Hctx. eassumption.
+    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho'' [H'' [m1 [m2  [Hctx1 [Hctx2 Hadd]]]]]]; eauto.
+      subst. eapply IHHvar. eassumption.
+      eapply project_var_binding_in_map; eassumption.
+  Qed.
+
+  Instance Proper_binding_in_map (A : Type) : Proper (Same_set _ ==> eq ==> iff) (@binding_in_map A). 
+  Proof.
+    intros s1 s2 Hseq x1 x2 Heq; subst; split; intros Hbin x Hin;
+    eapply Hbin; eapply Hseq; eauto.
+  Qed.
+ 
   (** Correctness of [project_vars] *)
   Lemma project_vars_correct GII GI k  H1 rho1 H2 rho2 H2' rho2' b d
-        Scope c Γ FVs xs xs' C S S' m :
+        Scope Scope' Funs c Γ FVs xs C m :
+    (* well-formedness *)
+    well_formed (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) H1 ->
+    env_locs rho1 (FV Scope Funs FVs)  \subset dom H1  ->
+    well_formed (reach' H2 (env_locs rho2 (FV_cc Scope Funs Γ))) H2 ->
+    env_locs rho2 (FV_cc Scope Funs Γ) \subset dom H2  ->
+
+    
     project_vars Size.Util.clo_tag Scope Funs c Γ FVs xs C Scope' ->
     
     (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b; d) (H2, rho2)) ->
-    (forall j, FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Γ FVs) ->
+    (forall j, Fun_inv k j GII GI b d rho1 H1 rho2 H2 Scope Funs Γ FVs) ->
+    (forall j, FV_inv k j GII GI b d rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
+
+    injective_subdomain (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs))))) b ->
+    Disjoint _ (image b (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs))))))
+             (env_locs rho2 [set Γ] :|: image' d (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs)))))) ->
 
     ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
 
-    binding_in_map Scope rho1 -> 
-    Disjoint _ S (FV_cc Scope Γ) ->
+    ~ Γ \in FromList xs ->
+    binding_in_map (FV Scope Funs FVs) rho1 ->
 
-    Disjoint _ (FromList xs') S' /\
-    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GII; GI; b; d) (H2', rho2'))  /\
-    (forall j, FV_inv k j GII GI b d rho1 H1 rho2' H2' c Scope Γ FVs) /\
-    (forall j, Forall2 (fun x x' => cc_approx_var_env k j GII GI b d H1 rho1 H2' rho2' x x') xs xs').
+    exists b' d', 
+      (forall j, (H1, rho1) ⋞ ^ (Scope'; k; j; GII; GI; b'; d') (H2', rho2'))  /\
+      (forall j, Fun_inv k j GII GI b' d' rho1 H1 rho2' H2' Scope' Funs Γ FVs) /\
+      (forall j, FV_inv k j GII GI b' d' rho1 H1 rho2' H2' c Scope' Funs Γ FVs) /\
+      injective_subdomain (reach' H1 (env_locs rho1 (Scope' :|: (FromList FVs \\ (Scope' :|: Funs))))) b' /\
+      Disjoint _ (image b' (reach' H1 (env_locs rho1 (Scope' :|: (FromList FVs \\ (Scope' :|: Funs))))))
+               (env_locs rho2' [set Γ] :|: image' d' (reach' H1 (env_locs rho1 (Scope' :|: (FromList FVs \\ (Scope' :|: Funs)))))).
   Proof with (now eauto with Ensembles_DB).
-    intros Hvars. revert m H1 rho1 H2 rho2 H2' rho2'.
-    induction Hvars; intros m H1 rho1 H2 rho2 H2' rho2' Hcc Hfv Hctx Hb Hd. 
-    - inv Hctx. split; [| split; [| split ]]; eauto.
-      rewrite FromList_nil...
-    - rewrite FromList_cons in *. 
-      edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]].
-      subst.
+    intros Hwf1 Hlocs1 Hwf2 Hlocs2 Hvars.
+    revert b d m H1 rho1 H2 rho2 H2' rho2' Hwf1 Hlocs1 Hwf2 Hlocs2.
+    induction Hvars;
+      intros b d m H1 rho1 H2 rho2 H2' rho2' Hwf1 Hlocs1 Hwf2 Hlocs2 Hcc Hfun Hfv
+             Hinj Hd Hctx Hnin Hbin.
+    - inv Hctx. do 2 eexists. split; [| split; [| split ]]; eauto.
+    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho3 [H3 [m1 [m2 [Hctx2 [Hctx3 Heq]]]]]].
       eassumption. subst.
-      edestruct project_var_correct as (Hd' & Hcc' & Hfv' & Hall');
+      edestruct project_var_correct as (b' & d' & Hcc' & Hfun' & Hfv' & Hinj' & Hd');
         try eassumption.
-      edestruct IHHvars as (Hd'' & Hcc'' & Hfv'' & Hall'');
-      try eassumption.
-      eapply Disjoint_Included_l; [| eassumption ].
-      eapply project_var_free_set_Included. eassumption.
-      split; [| split; [| split ]]; eauto.
-      * eapply Union_Disjoint_l. 
-        eapply Disjoint_Included_r.
-        eapply project_vars_free_set_Included. eassumption.
-        eapply Disjoint_Singleton_l. eassumption.
-        eapply Disjoint_Included_r; [| eassumption ].
-        unfold FV_cc...
-      * intros j. constructor; eauto.
-        eapply project_vars_preserves_cc_approx; eauto.
+      intros Hc; eapply Hnin. subst. rewrite FromList_cons...
+      eapply binding_in_map_antimon; [| eassumption ]...
+      eapply IHHvars; try eassumption.
+      + rewrite <- project_var_FV_eq; eassumption.
+      + rewrite <- project_var_FV_eq; eassumption.
+      + eapply project_var_well_formed'; try eassumption.
+      + eapply project_var_env_locs'; eassumption.
+      + intros Hc; eapply Hnin. subst. rewrite FromList_cons...
+      + erewrite <- project_var_FV_eq; try eassumption.
   Qed.
   
-  
-  (** [project_var] preserves injectiveness *)
-  Lemma project_var_same_set
-        Scope c Γ FVs x x' C S S'  :
-    project_var Scope c Γ FVs S x x' C S' ->
-    x |: (FV Scope FVs) <--> FV Scope FVs.
-  Proof with (now eauto with Ensembles_DB).
-    intros Hvar. rewrite Union_Same_set. reflexivity.
-    eapply Singleton_Included. eapply project_var_In_Union.
-    eassumption.
-  Qed.
-
-  Lemma project_vars_same_set
-        Scope c Γ FVs x x' C S S'  :
-    project_vars Scope c Γ FVs S x x' C S' ->
-    (FromList x) :|: (FV Scope FVs) <--> FV Scope FVs.
-  Proof with (now eauto with Ensembles_DB).
-    intros Hvar. rewrite Union_Same_set. reflexivity.
-    eapply project_vars_In_Union.
-    eassumption.
-  Qed. 
-  *)
+   
 
   Lemma heap_elements_filter_monotonic {A} S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2} (H : heap A):  
     S1 \subset S2 ->
@@ -1655,7 +1735,7 @@ Module ClosureConversionCorrect (H : Heap).
       eapply H; try eassumption; repeat setoid_rewrite <- Hseq at 1; try eassumption. }
     
     eapply (@Ensemble_ind P HP); [| | eassumption ].
-    - intros HS1 S2 HS2 Hcc Heq1 Hinj1 _.
+    - intros HS1 S2 HS2 Hcc Heq1 Hinj1 Hd.
       rewrite !HL.size_with_measure_filter_Empty_set.
       rewrite image_Empty_set, image'_Empty_set in Heq1.
       rewrite Union_Empty_set_neut_r in Heq1.
@@ -1663,7 +1743,7 @@ Module ClosureConversionCorrect (H : Heap).
       (* eapply Included_Empty_set_l in Hsub2. symmetry in Hsub2. *)
       erewrite (@HL.size_with_measure_Same_set _ _ _ _ _ _ _ Heq1).
       rewrite HL.size_with_measure_filter_Empty_set. omega.
-    - intros x S1' HS Hnin IHS HS1 S2 HS2 Hheap Heq1 Hinj1 _.
+    - intros x S1' HS Hnin IHS HS1 S2 HS2 Hheap Heq1 Hinj1 Hd.
       rewrite !image_Union, !image'_Union, !image_Singleton in Heq1.
       
       assert (Hseq : S2 <--> b x |: (S2 \\ [set b x])).
@@ -1709,14 +1789,13 @@ Module ClosureConversionCorrect (H : Heap).
               rewrite Setminus_Disjoint. rewrite image'_Singleton_Some; eauto.
               rewrite (Union_Same_set [set env_loc]); [| now eauto with Ensembles_DB ]. reflexivity.
               rewrite <- image'_Union. 
-              admit. (* IH eapply Disjoint_sym. eapply Disjoint_Included; [ | | eassumption ].
+              eapply Disjoint_sym. eapply Disjoint_Included; [ | | eassumption ].
               eapply image'_monotonic...
-              rewrite <- image_Singleton. eapply image_monotonic... *)
+              rewrite <- image_Singleton. eapply image_monotonic...
             - eapply injective_subdomain_antimon; [ eassumption |]...
-            - admit.
-              (* eapply Disjoint_Included; [ | | eassumption ]. *)
-              (* eapply image'_monotonic... *)
-              (* eapply image_monotonic... *)
+            - eapply Disjoint_Included; [ | | eassumption ].
+              eapply image'_monotonic...
+              eapply image_monotonic...
           }
   
           assert (Hleqv : size_val v <= size_val v' <= (size_val v) *  (1 + max_vars_heap H1)).
@@ -1814,62 +1893,6 @@ Module ClosureConversionCorrect (H : Heap).
     
   
 
-  Lemma make_closures_env_locs_well_formed B Γ C H rho H' rho' k S :
-    make_closures Size.Util.clo_tag B Γ C ->
-    ctx_to_heap_env_CC C H rho H' rho' k ->
-    name_in_fundefs B \subset S ->
-    Γ \in S ->
-    env_locs rho S \subset dom H ->
-    well_formed (reach' H (env_locs rho S)) H ->
-    env_locs rho' S \subset dom H' /\
-    well_formed (reach' H' (env_locs rho' S)) H'.
-  Proof with (now eauto with Ensembles_DB).
-    intros Hclo. revert S H rho H' rho' k.
-    induction Hclo; intros S H1 rho1 H2 rho2 k Hctx Hin1 Hin2 Henv Hwf.
-    - inv Hctx. simpl.
-      split; eassumption.
-    - inv Hctx. 
-      (* edestruct ctx_to_heap_env_CC_comp_ctx_f_l *)
-      (*   as (rho3 & H3 & m1 & m2 & Hctx1 & Hctx2 & Hplus). *)
-      (* eassumption. subst. *)
-      (* inv Hctx2. *)
-      simpl in H11. 
-      destruct (M.get f rho1) eqn:Hgetf; try congruence.
-      destruct (M.get Γ rho1) eqn:Hgetg; try congruence. inv H12.
-      eapply IHHclo.
-      + eassumption.
-      + eapply Included_trans; [| eassumption ].
-        simpl...
-      + eassumption.
-      + eapply Included_trans. eapply env_locs_set_Inlcuded'.
-        rewrite HL.alloc_dom; try eassumption.
-        eapply Included_Union_compat. reflexivity.
-        eapply Included_trans; [| eassumption ].
-        eapply env_locs_monotonic...
-      + rewrite <- (Union_Same_set S S); [| reflexivity ].
-        eapply well_formed_reach_alloc'; try eassumption.
-        * eapply well_formed_antimon; [| eassumption ].
-          eapply reach'_set_monotonic.
-          eapply env_locs_monotonic...
-        * eapply Included_trans; [| eassumption ].
-          eapply env_locs_monotonic...
-        * rewrite (Union_commut S). rewrite (Union_Same_set (S \\ _) S); try now eauto with Ensembles_DB.
-          simpl. 
-          eapply Included_trans; [| eapply reach'_extensive ].
-          inv H11.
-          simpl in Hin1.
-          eapply Union_Included. eapply  get_In_env_locs; [| eassumption ]...
-          rewrite Union_Empty_set_neut_r. 
-          eapply  get_In_env_locs; [| eassumption ]...
-  Qed.
-  
- 
-  
-
-
-
-  Qed.
-
 
   Lemma def_closures_post B1 B2 rho H rho' H' rc :
     def_closures B1 B2 rho H rc = (H', rho') ->
@@ -1909,479 +1932,7 @@ Module ClosureConversionCorrect (H : Heap).
         reflexivity.
     - rewrite env_locs_Empty_set, post_Empty_set...
   Qed.
-
  
-  Lemma make_closures_correct k GI GP b d C c rho1 H1 rho2 H2 rho2'
-        H2' Scope Funs FVs B1 Γ Γ' m :
-    (* make closures *)
-    make_closures Size.Util.clo_tag B1 Γ' C ->
-
-    (* well-formedness *)
-    well_formed (reach' H1 (env_locs rho1 (FV Scope FVs))) H1 ->
-    env_locs rho1 (FV Scope FVs)  \subset dom H1  ->
-    well_formed (reach' H2 (env_locs rho2 (Γ' |: FV_cc Scope Γ))) H2 ->
-    env_locs rho2 (Γ' |: FV_cc Scope Γ) \subset dom H2  ->
-
-    (* Closure pointers are fresh locations *)
-    (forall f, f \in Funs ->
-          Disjoint _ (env_locs rho1 [set f])
-                   (reach' H1 (env_locs rho1 (FV Scope FVs :|: (Funs \\ [set f]))))) ->
- 
-    post H1 (env_locs rho1 Funs) \subset reach' H1 (env_locs rho1 ((FV Scope FVs \\ Funs))) ->
-    
-    Disjoint _ (env_locs rho2 ([set Γ'])) (image b (reach' H1 (env_locs rho1 (FV Scope FVs)))) ->
-    
-    (* Environment relations *)
-    (forall j, (H1, rho1) ⋞ ^ (Scope \\ Funs; k; j; GI; GP; b; d) (H2, rho2)) ->
-    (forall j, Fun_inv k j GI GP b d rho1 H1  rho2 H2 Funs Γ') ->
-    (forall j, FV_inv k j GI GP b d rho1 H1 rho2 H2 c Scope Γ FVs) ->
-
-    (* Context interpretation *)
-    ctx_to_heap_env_CC C H2 rho2 H2' rho2' m ->
-
-    (* names *)
-    unique_functions B1 ->
-    ~ Γ \in (name_in_fundefs B1) ->
-    ~ Γ' \in (name_in_fundefs B1) ->
-    Funs \subset (name_in_fundefs B1) ->
-
-    (* Injectivity  *)
-    injective_subdomain (reach' H1 (env_locs rho1 ((FV Scope FVs) \\ Funs))) b ->
-    Disjoint _ (image b (reach' H1 (env_locs rho1 ((FV Scope FVs) \\ Funs))))
-             (image' d (reach' H1 (env_locs rho1 ((FV Scope FVs) \\ Funs)) )) ->
-
-    
-    exists b' d',
-      (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GI; GP; b'; d') (H2', rho2')) /\
-      (forall j, FV_inv k j GI GP b' d' rho1 H1 rho2' H2' c Scope Γ FVs) /\ 
-      injective_subdomain (reach' H1 (env_locs rho1 (FV Scope FVs))) b' /\
-      Disjoint _ (image b' (reach' H1 (env_locs rho1 (FV Scope FVs))))
-               (image' d'  (reach' H1 (env_locs rho1 (FV Scope FVs)))).
-  Proof with (now eauto with Ensembles_DB).
-    intros Hclo.
-    revert m rho1 H1 rho2 H2 rho2' H2' Scope Funs b d.
-    induction Hclo as [Γ'' | f xs t e B ];
-      intros m rho1 H1 rho2 H2 rho2' H2' Scope Funs b d
-             Hwf1 Hlocs1 Hwf2 Hlocs2 Hdis Hrsub Henvim
-             Hlr Hfun Hfv Hctx Hun Hnin Hnin' Hsubf Hin1 Hdinj.
-    - inv Hctx. simpl name_in_fundefs.
-      assert (Hseq : Funs <--> Empty_set _).
-      { simpl in Hsubf...  }
-      repeat setoid_rewrite Hseq at 1. 
-      repeat setoid_rewrite Union_Empty_set_neut_l at 1.
-      simpl in *.
-      rewrite !Hseq in Hdinj at 1.
-      rewrite !Hseq in Hin1 at 1.
-      setoid_rewrite Hseq in Hfv. 
-      rewrite !Setminus_Empty_set_neut_r in Hdinj at 1.
-      rewrite !Setminus_Empty_set_neut_r in Hin1.
-      setoid_rewrite Union_Empty_set_neut_l in Hfv.
-      
-      do 2 eexists.
-      split; [| split; [| split ]]; try eassumption.
-      intros. eapply Hlr. constructor; eauto.
-      intros Hc; rewrite Hseq in Hc; now inv Hc.
-      
-    - inv Hctx.
-      simpl name_in_fundefs in Hsubf.
-      simpl in H11.
-       
-      assert (Hseq : Funs :|: Scope \subset
-                          (Funs \\ [set f]) :|: (f |: Scope)).
-      { rewrite <- Union_Included_Union_Setminus;
-        try now eauto with Ensembles_DB. tci. }
-
-      edestruct (Hfun 0) as (l1 & lenv & B1' & g & Hget1 & Hget2 & Hget3 & Heq).
-      now left.
-      
-      repeat setoid_rewrite Hseq at 1.
-      
-      simpl in H11. rewrite Hget2, Hget3 in H11. inv H11.
-
-      rewrite H12 in Heq.
-
-      assert (Hsub : reach' H1 (env_locs rho1 (FV (f |: Scope) FVs)) \\ [set l1] \subset
-                     reach' H1 (env_locs rho1 (FV Scope FVs))).
-      { eapply Setminus_Included_Included_Union. unfold FV.
-        rewrite <- Union_assoc. 
-        rewrite env_locs_Union, reach'_Union, env_locs_Singleton; eauto. simpl.
-        rewrite reach_unfold.
-        rewrite <- !Union_assoc. rewrite (Union_commut [set l1]).
-        eapply Included_Union_compat; [| reflexivity ].
-        
-        eapply Union_Included;
-          [|  eapply reach'_set_monotonic; eapply env_locs_monotonic;
-              unfold FV; now eauto with Ensembles_DB ].
-
-        rewrite (reach'_idempotent H1 (env_locs rho1 _)).
-        eapply reach'_set_monotonic.
-        eapply Included_trans;
-          [| eapply Included_trans; [ now apply Hrsub |]].
-
-        eapply post_set_monotonic. 
-        simpl.
-        rewrite env_locs_Union, env_locs_Singleton; eauto...
-
-        eapply reach'_set_monotonic. eapply env_locs_monotonic.
-        unfold FV... }
-
-      assert (Hsub' : reach' H1 (env_locs rho1 ((FV (f |: Scope) FVs) \\ name_in_fundefs B)) \\
-                             [set l1] \subset
-                      reach' H1 (env_locs rho1 ((FV Scope FVs) \\ name_in_fundefs (Fcons f t xs e B)))).
-      { rewrite <- (Union_Setminus_Included [set f] Scope); [| | reflexivity ]; tci.
-        eapply Setminus_Included_Included_Union. unfold FV.
-        rewrite <- Union_assoc. rewrite Setminus_Union_distr.
-        rewrite Setminus_Disjoint; [| now inv Hun; eapply Disjoint_Singleton_l; eauto ].
-        rewrite env_locs_Union, reach'_Union, env_locs_Singleton; eauto. simpl.
-        rewrite reach_unfold.
-        rewrite <- !Union_assoc. rewrite (Union_commut [set l1]).
-        eapply Included_Union_compat; [| reflexivity ].
-        
-        eapply Union_Included.
-
-        rewrite (reach'_idempotent H1 (env_locs rho1 _)).
-        eapply reach'_set_monotonic.
-        eapply Included_trans;
-          [| eapply Included_trans; [ now apply Hrsub |]].
-        
-        eapply post_set_monotonic. 
-        simpl.
-        rewrite env_locs_Union, env_locs_Singleton; eauto...
-        
-        eapply reach'_set_monotonic. eapply env_locs_monotonic.
-        unfold FV...
-
-        eapply reach'_set_monotonic. eapply env_locs_monotonic.
-
-        rewrite !Setminus_Union_distr, !Setminus_Union.
-        unfold FV.
-        eapply Included_Union_compat. reflexivity.
-        
-        eapply Included_Setminus_compat. reflexivity.
-
-        rewrite (Union_Setminus_Included [set f] Scope); [| | reflexivity ]; tci...        
-      }
-      
-      inv Hun.
-
-      eapply IHHclo with (b := b {l1 ~> l}) (d := d{l1 ~> Some lenv});
-        [ | | | | | | | | | | eassumption | eassumption | | | | ].
-      + unfold FV. eapply well_formed_antimon; [| eassumption ].
-        eapply reach'_set_monotonic. eapply env_locs_monotonic. simpl.
-        unfold FV. eapply Union_Included.
-        eapply Union_Included...
-        now eauto with Ensembles_DB.
-      + eapply Included_trans; [| eassumption ]. 
-        eapply env_locs_monotonic. unfold FV.
-        eapply Union_Included.
-        eapply Union_Included...
-        now eauto with Ensembles_DB.
-      + unfold FV_cc. 
-        assert (Hseq1 : (Γ0 |: (f |: Scope :|: [set Γ])) <--> (Γ0 |: (Scope :|: [set Γ])) :|: [set f]).
-        { rewrite <- (Union_assoc [set f]), (Union_commut [set f])... }
-        rewrite Hseq1.
-        eapply well_formed_reach_alloc'; try eassumption.
-        * rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r. eassumption.
-        * rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r. eassumption.
-        * simpl. rewrite Union_Empty_set_neut_l, Union_Empty_set_neut_r.
-          eapply Singleton_Included.
-          rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
-          eapply reach'_extensive. eapply get_In_env_locs; [| eassumption |].
-          now left. reflexivity.
-      + eapply Included_trans. eapply env_locs_set_Inlcuded'.
-        rewrite HL.alloc_dom; try eassumption.
-        eapply Included_Union_compat. reflexivity.
-        eapply Included_trans; [| eassumption ].
-        unfold FV_cc; eapply env_locs_monotonic.
-        rewrite !Setminus_Union_distr...
-      + intros f1 Hinf1. eapply Disjoint_Included_r; [ | eapply Hdis; right; eassumption ].
-        simpl. eapply reach'_set_monotonic. eapply env_locs_monotonic.
-        unfold FV.
-        rewrite Setminus_Union_distr. rewrite (Setminus_Disjoint [set f] [set f1]).
-        eapply Union_Included; try eauto with Ensembles_DB.
-        now eapply Union_Included; try eauto with Ensembles_DB.
-
-        eapply Disjoint_Singleton_l. intros Hc; inv Hc; eauto.
-      + eapply Included_trans. eapply Included_trans; [| now eapply Hrsub ].
-        eapply post_set_monotonic.
-        eapply env_locs_monotonic...
-        eapply reach'_set_monotonic. unfold FV.
-        eapply env_locs_monotonic.
-        rewrite (Union_commut [set f]) at 2. rewrite <- Setminus_Union.
-        rewrite (Union_Setminus_Included _ _ [set f]); eauto with typeclass_instances.
-        now eauto with Ensembles_DB.
-        now eauto with Ensembles_DB.
-      + rewrite env_locs_set_not_In.
-        eapply Disjoint_Included_r.
-
-        eapply image_extend_Included'.
-
-        eapply Union_Disjoint_r.
-
-        eapply Disjoint_Included_r.
-        eapply image_monotonic.
-        eapply Included_trans; [| now apply Hsub ].
-        eapply Included_Setminus_compat; [| reflexivity ].
-        eapply reach'_set_monotonic.
-        unfold FV. eapply env_locs_monotonic...
-
-        eassumption.
-        
-        rewrite env_locs_Singleton; eauto. simpl. 
-
-        eapply Disjoint_Singleton_l. intros Hc; inv Hc.
-        assert (Hninl : ~ lenv \in dom H2).
-        { intros [b1 Hc]. erewrite alloc_fresh in Hc; eauto.
-          congruence. }
-
-        exfalso. eapply Hninl. eapply reachable_in_dom; try eassumption.
-
-        eapply reach'_extensive. eapply get_In_env_locs; eauto.
-        unfold FV_cc...
-        
-        intros Hc; inv Hc; eapply Hnin'; now left.
-        
-      + assert (Hsub'' : f |: Scope \\ name_in_fundefs B \subset f |: (Scope \\ name_in_fundefs (Fcons f t xs e B))).
-        { intros x Hin.
-          destruct (var_dec x f); subst; eauto.  
-          inv Hin; eauto. inv H; eauto. right; constructor; eauto.
-          intros Hc; inv Hc; eauto. inv H; eauto. }
-        
-        intros j.
-
-        edestruct (Hfun j) as (l1' & lenv' & B2 & g' & Hget1' & Hget2' & Hget3' & Heq').
-        now left. repeat subst_exp.
-        
-        rewrite H12 in Heq'.
-        
-        eapply cc_approx_env_P_antimon; [| eassumption ].
-        eapply cc_approx_env_P_union. 
-        * intros x Hin v Hget. inv Hin. subst_exp. eexists. rewrite M.gss. split.
-          reflexivity. eassumption.
-        * { eapply cc_approx_env_P_set_not_in_P_r.
-            eapply cc_approx_env_heap_monotonic.
-            - eapply well_formed_antimon; try now apply Hwf1.
-              eapply reach'_set_monotonic.
-              eapply env_locs_monotonic...
-            - eapply well_formed_antimon; try now apply Hwf2.
-              eapply reach'_set_monotonic.
-              eapply env_locs_monotonic...
-            - eapply Included_trans; [| eassumption ].
-              eapply env_locs_monotonic...
-            - eapply Included_trans; [| eassumption ].
-              eapply env_locs_monotonic...
-            - eapply HL.subheap_refl.
-            - eapply HL.alloc_subheap. eassumption.
-            - eapply cc_approx_env_rename_ext.
-              eapply cc_approx_env_P_antimon; [ now apply Hlr |]...
-              + eapply f_eq_subdomain_extend_not_In_S_r.
-                intros Hc. eapply Hdis. now left.
-                constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-                eapply reach'_set_monotonic; [| eassumption ].
-                eapply env_locs_monotonic. simpl... reflexivity. 
-              + eapply f_eq_subdomain_extend_not_In_S_r.
-                intros Hc. eapply Hdis. now left.
-                constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-                eapply reach'_set_monotonic; [| eassumption ].
-                eapply env_locs_monotonic. simpl... reflexivity. 
-            - intros Hc; inv Hc; eauto. eapply H0; now left. }
-      + intros j.
-        
-        eapply Fun_inv_set_r; [ eapply Fun_inv_rename_ext | | ].
-        * eapply Fun_inv_subheap;
-          [ | | | | | intros x Hin; eapply Hfun; now right | | ].
-          
-          eapply well_formed_antimon; [| eassumption ].
-          eapply reach'_set_monotonic. eapply env_locs_monotonic...
-
-          eapply Included_trans; [| eassumption ].
-          eapply env_locs_monotonic...
-
-          eapply well_formed_antimon; [| eassumption ].
-          eapply reach'_set_monotonic. eapply env_locs_monotonic...
-
-          eapply Included_trans; [| eassumption ].
-          eapply env_locs_monotonic...
-
-          intros lc Hin. eapply reachable_in_dom. eassumption. eassumption.
-          
-          rewrite !env_locs_Union, !reach'_Union. right.
-          
-          eapply Included_Union_compat in Hin;
-            [| eapply image_monotonic; eapply reach'_set_monotonic;
-               eapply Included_trans; [| now apply Hrsub ]
-             | eapply image'_monotonic; eapply reach'_set_monotonic;
-               eapply Included_trans; [| now apply Hrsub ] ].
-          unfold FV in Hin. rewrite <- !reach'_idempotent, !Setminus_Union_distr in Hin at 1.
-          rewrite !env_locs_Union, !reach'_Union, image_Union, image'_Union in Hin at 1.
-          rewrite <- Union_assoc, (Union_assoc (image _ _) (image' _ _)) in Hin. 
-          rewrite (Union_commut (image _ _) (image' _ _)) in Hin.
-          rewrite <- (Union_assoc (image' _ _) (image _ _)) in Hin. 
-          rewrite (Union_assoc (image _ _) (image' _ _)) in Hin. 
-          
-          unfold FV_cc. rewrite env_locs_Union, reach'_Union.
-          { inv Hin.
-            - left.
-              eapply reach'_set_monotonic; [| eapply cc_approx_env_image_reach_included; try eassumption ].
-              eapply env_locs_monotonic...
-            - right. rewrite reach_unfold. right. 
-              eapply FV_inv_image_reach. eassumption.
-              rewrite !(Union_commut _ Scope) at 1. rewrite <- !Setminus_Union at 1.
-              eassumption. }
-
-          eapply post_set_monotonic. eapply env_locs_monotonic...
-          eapply post_set_monotonic. eapply env_locs_monotonic...
-
-          eapply HL.subheap_refl. eapply HL.alloc_subheap. eassumption. 
-        * eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc. eapply Hdis. now left.
-          constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-          eapply reach'_set_monotonic; [| eassumption ].
-          eapply env_locs_monotonic. simpl. rewrite !Setminus_Union_distr.
-          rewrite (Setminus_Disjoint (name_in_fundefs B) [set f]).
-          now eauto with Ensembles_DB. eapply Disjoint_Singleton_r.
-          eassumption. reflexivity. 
-
-        * eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc. eapply Hdis. now left.
-          constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-          eapply reach'_set_monotonic; [| eassumption ].
-          eapply env_locs_monotonic. simpl. rewrite !Setminus_Union_distr.
-          rewrite (Setminus_Disjoint (name_in_fundefs B) [set f]).
-          now eauto with Ensembles_DB. eapply Disjoint_Singleton_r.
-          eassumption. reflexivity. 
-
-        * eassumption.
-        * intros hc. eapply Hnin'. subst. now left.
-      + intros j. eapply FV_inv_set_not_in_FVs_r.
-        eapply FV_inv_Scope_mon with (Scope := f |: name_in_fundefs B :|: Scope);
-          try eauto with Ensembles_DB.
-        
-        eapply FV_inv_heap_mon;
-          [ | | | | now eapply HL.subheap_refl | now eapply HL.alloc_subheap; eauto | ].
-        * eapply well_formed_antimon; [| eassumption ].
-          eapply reach'_set_monotonic. eapply env_locs_monotonic. unfold FV...
-        * eapply well_formed_antimon; [| eassumption ].
-          eapply reach'_set_monotonic. eapply env_locs_monotonic. unfold FV_cc...
-        * eapply Included_trans; [| eassumption ].
-          eapply env_locs_monotonic. unfold FV...
-        * eapply Included_trans; [| eassumption ].
-          eapply env_locs_monotonic. unfold FV_cc...
-        * eapply FV_inv_rename_ext. now eauto.
-
-          symmetry.
-          eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc. eapply Hdis. now left.
-          constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-          eapply reach'_set_monotonic; [| eassumption ]. 
-          eapply env_locs_monotonic. simpl. unfold FV...
-          reflexivity.
-          
-          symmetry.
-          eapply f_eq_subdomain_extend_not_In_S_r.
-          intros Hc. eapply Hdis. now left.
-          constructor. rewrite env_locs_Singleton; eauto. reflexivity.
-          eapply reach'_set_monotonic; [| eassumption ]. 
-          eapply env_locs_monotonic. simpl. unfold FV...
-          reflexivity.
-
-        * intros Hc. subst. eapply Hnin. now left.
-      + intros Hc. subst. eapply Hnin. now right.
-      + intros Hc. subst. eapply Hnin'. now right.
-      + eapply injective_subdomain_extend'. 
-        eapply injective_subdomain_antimon; [ eassumption |].
-        now apply Hsub'. 
-         
-        intros Him. eapply image_monotonic in Him; [| eassumption ].
-        unfold FV in Him. rewrite Setminus_Union_distr, env_locs_Union, reach'_Union, image_Union in Him.
-        
-
-        assert (Hinr2 : In loc (reach' H2 (env_locs rho2 (FV_cc Scope Γ))) l).
-        { unfold FV_cc. rewrite env_locs_Union, reach'_Union.
-          inv Him.
-          - left.
-            eapply reach'_set_monotonic; [| eapply cc_approx_env_image_reach_included; try eassumption ].
-            eapply env_locs_monotonic...
-            now left.
-          - right. rewrite reach_unfold. right. 
-            eapply FV_inv_image_reach. eassumption.
-            left. eapply image_monotonic; [| eassumption ].
-            eapply reach'_set_monotonic. eapply env_locs_monotonic... }
-        
-        eapply reachable_in_dom in Hinr2. destruct Hinr2 as [b1 Hgetl].
-        erewrite alloc_fresh in Hgetl; eauto. congruence. 
-        
-        eapply well_formed_antimon; [| eassumption ].
-        eapply reach'_set_monotonic. eapply env_locs_monotonic...
-        
-        eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic...
-      + eapply Disjoint_Included_l.
-        eapply image_extend_Included'.
-        eapply Disjoint_Included_r.
-        eapply image'_extend_Included_Some.
-
-        eapply Union_Disjoint_l.
-        eapply Union_Disjoint_r.
-        
-        eapply Disjoint_Included; [| | eassumption ].
-        
-        eapply image'_monotonic.
-        
-        eapply Included_trans; [| eassumption ].
-        eapply Included_Setminus_compat; [| reflexivity ]. 
-        eapply reach'_set_monotonic; eapply env_locs_monotonic; unfold FV...
-
-        eapply image_monotonic.
-
-        eapply Included_trans; [| eassumption ].
-        eapply Included_Setminus_compat; [| reflexivity ]. 
-        eapply reach'_set_monotonic; eapply env_locs_monotonic; unfold FV...
-        
-        eapply Disjoint_sym.
-        eapply Disjoint_Included; [| | now apply Henvim ].
-        eapply image_monotonic. eapply Included_trans. eassumption.
-        eapply reach'_set_monotonic. eapply env_locs_monotonic...
-
-        rewrite env_locs_Singleton; eauto...
-        
-        eapply Disjoint_Singleton_l.
-        
-        intros Hc. inv Hc.
-        
-        eapply image'_monotonic in H; [| eassumption ].
-        
-        * unfold FV in H.
-          rewrite Setminus_Union_distr, env_locs_Union, reach'_Union, image'_Union in H.
-          
-          assert (Hinr2 : In loc (reach' H2 (env_locs rho2 (FV_cc Scope Γ))) l).
-          { unfold FV_cc. rewrite env_locs_Union, reach'_Union.
-            inv H.
-            - left.
-              eapply reach'_set_monotonic; [| eapply cc_approx_env_image_reach_included; try eassumption ].
-              eapply env_locs_monotonic...
-              now right.
-            - right. rewrite reach_unfold. right. 
-              eapply FV_inv_image_reach; try eassumption.
-              right. eapply image'_monotonic; [| eassumption ].
-              eapply reach'_set_monotonic. eapply env_locs_monotonic... }
-
-          eapply reachable_in_dom in Hinr2. destruct Hinr2 as [b1 Hgetl].
-          erewrite alloc_fresh in Hgetl; eauto. congruence. 
-        
-          eapply well_formed_antimon; [| eassumption ].
-          eapply reach'_set_monotonic. eapply env_locs_monotonic...
-          
-          eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic...
-        * inv H.
-          assert (Hdom : l \in dom H2).
-          { eapply reachable_in_dom. eassumption. eassumption.
-            eapply reach'_extensive.
-            eapply get_In_env_locs; [| eassumption |].
-            now left. reflexivity. }
-          destruct Hdom as [b1 Hgetl].
-          erewrite alloc_fresh in Hgetl; eauto. congruence. 
-  Qed.
-  
 
     
   Lemma def_closures_cc_approx_env Scope k j GIP GP b d B1 B2 envc rho1 H1 rho1' H1' rho2 H2 :
@@ -2463,26 +2014,23 @@ Module ClosureConversionCorrect (H : Heap).
   Lemma Closure_conversion_fundefs_find_def B1' B1 B2 c FVs f e1 ft xs:
       Closure_conversion_fundefs Size.Util.clo_tag B1' c FVs B1 B2 ->
       find_def f B1 = Some (ft, xs, e1) ->
-      exists Γ e2 C Cf,
-        find_def f B2 = Some (ft, Γ :: xs, Cf |[ C |[ e2 ]| ]|) /\
-        make_closures Size.Util.clo_tag B1' Γ Cf /\
-        Closure_conversion Size.Util.clo_tag (FromList xs :|: name_in_fundefs B1') c Γ FVs e1 e2 C.
+      exists Γ e2 C,
+        find_def f B2 = Some (ft, Γ :: xs, C |[ e2 ]|) /\
+        Closure_conversion Size.Util.clo_tag (FromList xs) (name_in_fundefs B1') c Γ FVs e1 e2 C.
   Proof.
     intros Hc Hdef; induction Hc.
     - simpl in Hdef.
       destruct (M.elt_eq f f0); subst.
-      + inv Hdef. do 4 eexists. split; [| split ].
+      + inv Hdef. do 3 eexists. split.
         * simpl. rewrite Coqlib.peq_true. reflexivity.
         * eassumption.
+      + edestruct IHHc as (Γ & e2 & C'  & Hfind & Hclo).
         * eassumption.
-      + edestruct IHHc as (Γ & e2 & C' & Cf' & Hfind & Hmake & Hclo).
-        * eassumption.
-        * do 4 eexists. split; [| split ].
+        * do 3 eexists. split.
           simpl. rewrite Coqlib.peq_false; now eauto. eassumption.
-          eassumption.
     - inv Hdef.
   Qed.
-
+  
   Lemma make_closures_ctx_to_heap_env clo_tag B Γ C H rho :
     make_closures clo_tag B Γ C ->
     binding_in_map (Γ |: name_in_fundefs B) rho ->  
@@ -2757,13 +2305,6 @@ Module ClosureConversionCorrect (H : Heap).
     intros x Hin; inv Hin; eauto.
   Qed.
 
-  Lemma binding_in_map_Union {A} S1 S2 (rho : M.t A) :
-    binding_in_map S1 rho ->
-    binding_in_map S2 rho ->
-    binding_in_map (S1 :|: S2) rho.
-  Proof.
-    intros Hin1 Hin2 x Hin. inv Hin; eauto.
-  Qed.
 
   Lemma cc_approx_env_binding_in_map Scope k j P Q b d rho1 H1 rho2 H2 :
     (H1, rho1) ⋞ ^ (Scope; k; j; P; Q; b; d) (H2, rho2) ->

@@ -21,46 +21,48 @@ Open Scope string.
 Section CC.
 
   Variable (clo_tag : cTag). (* Tag for closure records *)
- 
-  (* The free-variable set of a source program *)
-  Definition FV (Scope Funs : Ensemble var) (FVs : list var) :=
-    Scope :|: (Funs \\ Scope) :|: (FromList FVs \\ (Scope :|: Funs)).
 
+
+  (* The free-variable set of a source program *)
+  Definition FV (Scope : Ensemble var) (Funs : Ensemble (var * var)) (FVs : list var) :=
+    Scope :|: ((Proj1 Funs) \\ Scope) :|: (FromList FVs \\ (Scope :|: (Proj1 Funs))).
+  
   (* The free-variable set of a closure converted *)
-  Definition FV_cc (Scope Funs : Ensemble var) (Γ : var) :=
-    Scope :|: (Funs \\ Scope) :|: [set Γ].
+  Definition FV_cc (Scope : Ensemble var) (Funs : Ensemble (var * var)) (Γ : var) :=
+    Scope :|: ((Proj1 Funs) \\ Scope) :|: (Proj2 Funs) :|: [set Γ].
 
   (* Closure application *)
   Definition AppClo f t xs f' Γ :=
     Eproj f' clo_tag 0%N f
           (Eproj Γ clo_tag 1%N f
                  (Eapp f' t (Γ :: xs))).
+  
 
   Inductive project_var :
     Ensemble var -> (* Variables in the current scope *)
-    Ensemble var -> (* Functions not yet constructed *)
+    Ensemble (var * var) -> (* Functions not yet constructed *)
     cTag -> (* tag of the current environment constructor *)
-    var -> (* The environment argument *)
+    var -> (* Current environment *)
     list var -> (* The environment *)
     var -> (* Before projection *)
     exp_ctx -> (* Context that will perform the projection *)
     Ensemble var -> (* New current scope *)
     Prop :=
   | Var_in_Scope :
-      forall Scope Funs c Γ FVs x,
+      forall Scope Funs c FVs x Γ,
         x \in Scope ->
         project_var Scope Funs c Γ FVs x Hole_c Scope
   | Var_in_Funs :
-      forall Scope Funs c Γ FVs f,
+      forall Scope Funs c FVs f Γ Γ',
         ~ f \in Scope ->
-        f \in Funs ->                      
+        (f, Γ') \in Funs ->                      
         (* adds the function in scope so that it's not constructed again *)
         project_var Scope Funs c Γ FVs f
-                    (Econstr_c f clo_tag [f ; Γ] Hole_c) (f |: Scope)
+                    (Econstr_c f clo_tag [f ; Γ'] Hole_c) (f |: Scope)
   | Var_in_FVs :
-      forall Scope Funs c Γ FVs x N,
+      forall Scope Funs c FVs x N Γ,
         ~ x \in Scope ->
-        ~ x \in Funs ->
+        ~ x \in Proj1 Funs ->
         nthN FVs N = Some x ->
         (* adds the var in scope so that it's not projected again *)
         project_var Scope Funs c Γ FVs x
@@ -68,7 +70,7 @@ Section CC.
   
   Inductive project_vars :
     Ensemble var -> (* Variables in the current scope *)
-    Ensemble var -> (* Functions not yet constructed *)
+    Ensemble (var * var) -> (* Functions not yet constructed *)
     cTag -> (* tag of the current environment constructor *)
     var -> (* The environment argument *)
     list var -> (* The free variables *)
@@ -84,25 +86,10 @@ Section CC.
         project_var Scope1 Funs c Γ FVs y C1 Scope2 ->
         project_vars Scope2 Funs c Γ FVs ys C2 Scope3 ->
         project_vars Scope1 Funs c Γ FVs (y :: ys) (comp_ctx_f C1 C2) Scope3.
-
-  (* Not needed anymore *)
-  (* Inductive make_closures : *)
-  (*   fundefs -> (* The function block *) *)
-  (*   var -> (* The environment variable *) *)
-  (*   exp_ctx -> (* The context that constructs the closures *) *)
-  (*   Prop := *)
-  (* | closures_Fnil : *)
-  (*     forall Γ, *)
-  (*       make_closures Fnil Γ Hole_c *)
-  (* | closures_Fcons : *)
-  (*     forall f xs t e B Γ C, *)
-  (*       make_closures B Γ C -> *)
-  (*       make_closures (Fcons f t xs e B) Γ *)
-  (*                     (Econstr_c f clo_tag [f ; Γ] C). *)
   
   Inductive Closure_conversion :
     Ensemble var -> (* Variables in the current scope *)
-    Ensemble var -> (* Functions that are not yet constructed *)
+    Ensemble (var * var) -> (* Functions that are not yet constructed *)
     cTag -> (* tag of the current environment constructor *)
     var -> (* The environment argument *)
     list var -> (* The free variables - need to be ordered *)
@@ -144,7 +131,8 @@ Section CC.
         (* closure convert function blocks *)
         Closure_conversion_fundefs B c' FVs' B B' ->
         (* closure convert the rest of the program *)
-        Closure_conversion Scope' (name_in_fundefs B :|: Funs) c Γ FVs e e' Ce  ->
+        Closure_conversion (Scope' \\ name_in_fundefs B)
+                           ((Prod (name_in_fundefs B) [set Γ']) :|: Funs) c Γ FVs e e' Ce  ->
         Closure_conversion Scope Funs c Γ FVs (Efun B e)
                            (Efun B' (Ce |[ e' ]|)) (comp_ctx_f C (Econstr_c Γ' c' FVs' Hole_c))
   | CC_Eapp :
@@ -183,7 +171,8 @@ Section CC.
              (* new argument *)
              In _ S  Γ' ->
              Closure_conversion_fundefs B c FVs defs defs' ->
-             Closure_conversion (FromList ys) (name_in_fundefs B) c Γ' FVs e e' C ->
+             Closure_conversion (FromList ys) (Prod (name_in_fundefs B) [set Γ'])
+                                c Γ' FVs e e' C ->
              Closure_conversion_fundefs B c FVs (Fcons f t ys e defs )
                                         (Fcons f t (Γ' :: ys) (C |[ e' ]|) defs')
        | CC_Fnil :

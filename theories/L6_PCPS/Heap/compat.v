@@ -157,11 +157,12 @@ Module Compat (H : Heap).
     (** * App compatibility *)
       
     Definition InvGC :=
-      forall (H1 H1' H2 H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp) c1 c2 m1 m2 k,
-        IG k (H1', rho1, e1, c1, m1) (H2', rho2, e2, c2, m2) ->
+      forall (H1 H1' H2 H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp)
+        B {Hf : ToMSet B} c1 c2 m1 m2 k,
+        IG k B  _ (H1', rho1, e1, c1, m1) (H2', rho2, e2, c2, m2) ->
         live (env_locs rho1 (occurs_free e1)) H1 H1' ->
         live' (env_locs rho2 (occurs_free e2)) H2 H2' ->
-        IG k (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2, m2).
+        IG k B _ (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2, m2).
 
     Definition IInvAppCompat (H1 H2 : heap block) (rho1 rho2 : env) f1 t xs1 f2 xs2 f2' Γ :=   
       forall (i  : nat) (H1' H1'' H2' : heap block)
@@ -178,7 +179,7 @@ Module Compat (H : Heap).
         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) β2 ->
 
         
-        IG i (H1'', rho_clo2, e1, c1, m1) (H2', rho2'', e2, c2, m2) ->
+        IG i (name_in_fundefs B1) _ (H1'', rho_clo2, e1, c1, m1) (H2', rho2'', e2, c2, m2) ->
         IIL1 (H1', rho1', Eapp f1 t xs1) (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ) ->
         
         M.get f1 rho1' = Some (Loc l1) ->
@@ -441,7 +442,7 @@ Module Compat (H : Heap).
               eassumption. omega.
             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
               eapply Hiinv; try eassumption.
-              eapply Higc; eassumption.
+              eapply Higc; eauto with typeclass_instances. 
             * rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
               eassumption. simpl. omega. }        
     Qed.

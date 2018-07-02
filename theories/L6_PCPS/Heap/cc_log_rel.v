@@ -25,7 +25,8 @@ Module CC_log_rel (H : Heap).
   Definition IInv := relation (heap block * env * exp).
 
   (** Global initial condition. Enforced as initial condition for future executions of the result *)
-  Definition GIInv := relation (heap block * env * exp).
+  Definition GIInv :=
+    forall (B : Ensemble var) {H : ToMSet B}, relation (heap block * env * exp).
   
   (** * Final conditions *)
   
@@ -33,7 +34,8 @@ Module CC_log_rel (H : Heap).
   Definition Inv := relation (heap block * env * exp * nat * nat).
 
   (** Global final conditions. Holds for the result of future execution of the result *)
-  Definition GInv := nat -> relation (heap block * env * exp * nat * nat).
+  Definition GInv :=
+    nat -> forall (B : Ensemble var) {H : ToMSet B}, relation (heap block * env * exp * nat * nat).
   
   (** Loc Injection *)
   Definition Inj := loc -> loc.
@@ -71,8 +73,21 @@ Module CC_log_rel (H : Heap).
    *                (e2, [x2 -> l2', f2 -> l_clo, Γ -> l_env], H2)
    * else True (* ? -- not quite sure yet *)
    *)
-      
-             
+
+  (* TODO move *)
+
+  Instance ToMSet_name_in_fundefs B : ToMSet (name_in_fundefs B).
+  Proof.
+    eexists (fundefs_names B).
+    split; intros f Hin.
+    eapply fundefs_names_correct in Hin.
+    eapply FromSet_complete. reflexivity. eassumption.
+    eapply fundefs_names_correct.
+    eapply FromSet_sound. reflexivity. eassumption.
+  Qed.
+
+  
+
   (** Definitions parametric on the value relation *)
   Section cc_approx.
     
@@ -200,12 +215,13 @@ Module CC_log_rel (H : Heap).
                            (forall (H1 H2  : heap block) (e1 e2 : exp),
                               live (env_locs rho_clo2 (occurs_free e1)) H1'' H1 ->
                               live' (env_locs rho2' (occurs_free e2)) H2' H2 ->
-                              IP (H1, rho_clo2, e1) (H2, rho2', e2)) /\
+                              IP (name_in_fundefs B1) _
+                                 (H1, rho_clo2, e1) (H2, rho2', e2)) /\
                            cc_approx_exp cc_approx_val
                                          (k - (k - i))
                                          j'
-                                         IP IP
-                                         (P (k - (k - i))) P
+                                         (IP (name_in_fundefs B1) _) IP
+                                         (P (k - (k - i)) (name_in_fundefs B1) _) P
                                          (e1, rho_clo2, H1'') (e2, rho2', H2')
                        end)
               | _, _ => False
@@ -271,11 +287,11 @@ Module CC_log_rel (H : Heap).
                          (forall (H1 H2  : heap block) (e1 e2 : exp),
                             live (env_locs rho_clo2 (occurs_free e1)) H1'' H1 ->
                             live' (env_locs rho2' (occurs_free e2)) H2' H2 ->
-                            IP (H1, rho_clo2, e1) (H2, rho2', e2)) /\
+                            IP (name_in_fundefs B1) _ (H1, rho_clo2, e1) (H2, rho2', e2)) /\
                          cc_approx_exp cc_approx_val
                                        i j'
-                                       IP IP
-                                       (P i) P
+                                       (IP (name_in_fundefs B1) _) IP
+                                       (P i (name_in_fundefs B1) _) P
                                        (e1, rho_clo2, H1'') (e2, rho2', H2'))
               | _, _ => False
             end
@@ -392,7 +408,8 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           simpl. intros i j' b' Hleq Hleq' Hfeq Hall.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite <-  Heqi. eapply Hi; eauto.
+          replace i with (k - (k - i)) by eassumption. 
+          eapply Hi; eauto.
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. simpl in Hap. eassumption.
       }
@@ -413,10 +430,11 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           intros i j b' Hleq Hleq' Hall Hfeq.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite Heqi. eapply Hi; eauto.
-          eapply Forall2_monotonic; [| now eauto ].
-        intros x1 x2 Hap. rewrite <- Heqi. eassumption.
-      }
+          replace i with (k - (k - i)) in Hi by eassumption. 
+          eapply Hi; eauto. omega. }
+      (*     eapply Forall2_monotonic; [| now eauto ]. *)
+      (*   intros x1 x2 Hap. rewrite <- Heqi. eassumption. *)
+      (* } *)
     - split; simpl; [ intros [Heqb Hc] |];
       destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto.
       { destruct b1 as [c1 vs1 | [? | B1 f1] env_loc1];
@@ -443,7 +461,8 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           simpl. intros i j' b' Hleq Hleq' Hfeq Hall.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite <- Heqi. eapply Hi; eauto.
+          replace i with (k - (k - i)) by eassumption. 
+          eapply Hi; eauto.
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. eassumption.
       }
@@ -472,9 +491,8 @@ Module CC_log_rel (H : Heap).
           do 3 eexists; split; [ | split ]; try (now eauto).
           intros i j' b' Hleq Hall Hfeq Hall'.
           assert (Heqi : k - (k - i) = i) by omega.
-          setoid_rewrite Heqi. eapply Hi; eauto.
-          eapply Forall2_monotonic; [| now eauto ].
-          intros x1 x2 Hap. rewrite <- Heqi. eassumption. }
+          replace i with (k - (k - i)) in Hi by eassumption. 
+          eapply Hi; eauto. omega. }
   Qed.
   
   Opaque cc_approx_val.
@@ -582,7 +600,7 @@ Module CC_log_rel (H : Heap).
        r1 ≺ ^ (m ; j ; GIP1 ; GP1 ; b; d) r2 ->
        r1 ≺ ^ (m ; j ; GIP1 ; GP2 ; b; d) r2) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
-    (forall i, same_relation _ (GP1 i) (GP2 i)) ->
+    (forall i B {Hv : ToMSet B}, same_relation _ (GP1 i B _) (GP2 i B _)) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP2 ) p2.
   Proof.
     destruct p1 as [[e1 H1] rho1].
@@ -600,7 +618,7 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_val_same_rel (k j : nat) (GP1 GP2 : GInv) (b1 : Inj) (d1 : EInj) r1 r2 :
     r1 ≺ ^ (k ; j ; GIP ; GP1 ; b1 ; d1 ) r2 ->
-    (forall i, same_relation _ (GP1 i) (GP2 i)) ->
+    (forall i B {Hv}, same_relation _ (GP1 i B Hv) (GP2 i B Hv)) ->
     r1 ≺ ^ (k ; j ; GIP ; GP2 ; b1 ; d1 ) r2.
   Proof.
     revert j b1 d1 GP1 GP2 r1 r2.
@@ -658,7 +676,7 @@ Module CC_log_rel (H : Heap).
   Lemma cc_approx_exp_same_rel (P : relation nat) k j (GP' : GInv)
         p1 p2 :
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP ) p2 ->
-    (forall i, same_relation _ (GP i) (GP' i)) ->
+    (forall i B {Hv}, same_relation _ (GP i B Hv) (GP' i B Hv)) ->
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP' ) p2.
   Proof.
     intros Hcc Hin. eapply cc_approx_exp_same_rel_IH; try eassumption.

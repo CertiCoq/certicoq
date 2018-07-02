@@ -1595,3 +1595,138 @@ Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_r_sym; [| eassumption ] : Ensembles_DB.
 Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_l_sym; [| eassumption ] : Ensembles_DB.
+
+
+Definition Proj1 {A B} (S : Ensemble (A * B)) : Ensemble A :=
+  [ set x | exists y, (x, y) \in S ].
+
+Definition Proj2 {A B} (S : Ensemble (A * B)) : Ensemble B :=
+  [ set x | exists y, (y, x) \in S ]. 
+
+Definition Prod {A B} (S : Ensemble A) (S' : Ensemble B) : Ensemble (A * B) :=
+  [ set z | let '(x, y) := z in  x \in S /\ y \in S' ].
+
+Instance Proj1_Proper A B : Proper (Same_set (A * B) ==> Same_set A) Proj1.
+Proof.
+  firstorder.
+Qed. 
+
+Instance Proj2_Proper A B : Proper (Same_set (A * B) ==> Same_set B) Proj2.
+Proof.
+  firstorder.
+Qed.
+
+Instance Prod_Proper1 A B : Proper (Same_set A ==> eq ==> Same_set (A * B)) Prod.
+Proof.
+  intros s1 s2 Hseq x1 x2 Heq; subst.
+  unfold Prod; split; intros [x y]; firstorder.
+Qed. 
+
+Instance Proj_Proper2 A B S : Proper (Same_set B  ==> Same_set (A * B)) (Prod S).
+Proof.
+  intros s1 s2 Hseq; subst.
+  unfold Prod; split;
+  intros [x y]; firstorder.
+Qed. 
+
+Lemma Proj1_Union A B (S1 : Ensemble (A * B)) (S2 : Ensemble (A * B)) :
+  Proj1 (S1 :|: S2) <--> Proj1 S1 :|: Proj1 S2.
+Proof.
+  split; intros x Hin. destruct Hin as [y Hin]. inv Hin.
+  left. eexists. eassumption.
+  right. eexists. eassumption.
+  destruct Hin; inv H.
+  eexists. left. eassumption.
+  eexists. right. eassumption.
+Qed.
+
+Lemma Proj2_Union A B (S1 : Ensemble (A * B)) (S2 : Ensemble (A * B)) :
+  Proj2 (S1 :|: S2) <--> Proj2 S1 :|: Proj2 S2.
+Proof.
+  split; intros x Hin. destruct Hin as [y Hin]. inv Hin.
+  left. eexists. eassumption.
+  right. eexists. eassumption.
+  destruct Hin; inv H.
+  eexists. left. eassumption.
+  eexists. right. eassumption.
+Qed.
+
+Lemma Prod_Union1 A B (S1 S2 : Ensemble A) (S3 : Ensemble B) :
+  Prod (S1 :|: S2) S3 <--> Prod S1 S3 :|: Prod S2 S3.
+Proof.
+  split; intros [x y] Hin. destruct Hin as [Hin1 Hin2].
+  inv Hin1. now left; firstorder.
+  now right; firstorder.
+  destruct Hin as [[Hin1 Hin2] | [Hin1 Hin2]];
+    now firstorder.
+Qed.
+
+Lemma Prod_Union2 A B (S1 : Ensemble A) (S2 S3 : Ensemble B) :
+  Prod S1 (S2 :|: S3) <--> Prod S1 S2 :|: Prod S1 S3.
+Proof.
+  split; intros [x y] Hin.
+  destruct Hin as [Hin1 Hin2].
+  inv Hin2. now left; firstorder.
+  now right; firstorder.
+  destruct Hin as [[Hin1 Hin2] | [Hin1 Hin2]];
+    now firstorder.
+Qed.
+
+Lemma Proj1_Prod A B (S1 : Ensemble A) (S2 : Ensemble B) { HI : Inhabited B S2} :
+  Proj1 (Prod S1 S2) <--> S1.
+Proof.
+  split; intros x; intros Hin.
+  destruct Hin as [y [Hin1 Hin2]]. eassumption.
+  destruct HI. eexists; split; eauto.
+Qed.
+
+Lemma Proj1_Prod_Included A B (S1 : Ensemble A) (S2 : Ensemble B) :
+  Proj1 (Prod S1 S2) \subset S1.
+Proof.
+  intros x; intros Hin.
+  destruct Hin as [y [Hin1 Hin2]]. eassumption.
+Qed.
+
+Lemma Proj2_Prod_Included A B (S1 : Ensemble A) (S2 : Ensemble B) :
+  Proj2 (Prod S1 S2) \subset S2.
+Proof.
+  intros x; intros Hin.
+  destruct Hin as [y [Hin1 Hin2]]. eassumption.
+Qed.
+
+
+Lemma Included_Union_Setminus_Included {A} (S1 S2 S3 : Ensemble A)
+      {Hd : Decidable S2}:
+  S1 \\ S2 \subset S3 ->
+  S1 \subset S2 :|: S3.
+Proof.
+  intros Hsub x Hin. destruct Hd as [Hd].
+  destruct (Hd x); eauto.
+  right.
+  eapply Hsub. constructor; eauto.
+Qed.
+
+Lemma Setminus_Setminus_Included {A}
+      (S1 S2 S3 : Ensemble A) {Hd : Decidable S3}:
+  S1 \\ (S2 \\ S3) \subset S1 \\ S2 :|: S3.
+Proof.
+  intros x Hin. inv Hin.
+  destruct Hd as [Hd].
+  destruct (Hd x); eauto.
+  left; constructor; eauto.
+  intros Hc; eapply H0; constructor; eauto.
+Qed.
+
+Lemma Same_set_Intersection_Setminus {A: Type} (S1 S2 S3 : Ensemble A)
+        {_ : Decidable S3}:
+    S2 \subset S3 ->
+    S1 :&: (S3 \\ S2) :|: (S1 \\ S3) <--> S1 \\ S2.
+  Proof.
+    intros Hsub; split; intros x Hin; inv Hin.
+    - inv H. inv H1. constructor; eauto.
+    - inv H; constructor; eauto.
+    - destruct X as [Hdec]. destruct (Hdec x).
+      + left. constructor; eauto.
+        constructor; eauto.
+      + right. constructor; eauto.
+  Qed.

@@ -244,9 +244,9 @@ Module Compat (H : Heap).
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (d : EInj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 : var) (xs1 : list var)
           (f2 f2' Γ : var) (xs2 : list var) (t : fTag) :
-      IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
+      (* IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ -> *)
       InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
-      InvGC IG ->
+      (* InvGC IG -> *)
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 ->
@@ -265,7 +265,7 @@ Module Compat (H : Heap).
                                      ; IG)
       (AppClo clo_tag f2 t xs2 f2' Γ, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hiinv Hbase Higc Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
+      intros Hbase Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
              b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2
              HII Hleq1 Hstep1 Hstuck1.
       eapply (cc_approx_var_env_heap_env_equiv
@@ -342,11 +342,11 @@ Module Compat (H : Heap).
           reflexivity. clear; now firstorder. reflexivity. clear; now firstorder.
           edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2') as [H2'' Hgc'].
           assert (Hgc1 := Hgc); assert (Hgc2 := Hgc').
-          destruct Hgc as [Hseq [bgc [Heqgc Hinjgc]]].
-          destruct Hgc' as [Hseq' [bgc' [Heqgc' Hinjgc']]].
+          destruct Hgc as [Hseq [bgc [Heqgc Hinjgc]]]. 
+          destruct Hgc' as [Hseq' [bgc' [Heqgc' Hinjgc']]]. 
           edestruct Hi' with (i := k - cost  (Eapp f1 t xs1))
                                (j' := j) as [HG [r2 [c2 [m2 [b2' [Hbs2 [Hinj [HIG  Hcc2]]]]]]]];
-            [ | omega | | | | | | | eassumption | | | eassumption | | ].   
+            [ | omega | | | | | | | eassumption | | | eassumption | | ].    
           + simpl. omega.
           (* + rewrite compose_id_neut_r. rewrite compose_id_neut_l. reflexivity. *)
           + eapply Forall2_monotonic_strong; [| eassumption ].

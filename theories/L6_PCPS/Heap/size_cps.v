@@ -28,32 +28,87 @@ Module Size (H : Heap).
   (** * Size of CPS terms, values and environments, needed to express the upper bound on
          the execution cost of certain transformations
    *)
-  
-  (** The size of CPS expressions. Right now we only count the number of
-   * variables in a program (free or not), the number of functions and
-   * the number of function definition blocks *)
-  (* TODO -- max per function block *)
-  Fixpoint exp_num_vars (e : exp) : nat :=
+
+  (** Cost associated with each source program *)
+  Fixpoint cost_exp (e : exp) : nat :=
     match e with
-      | Econstr x _ ys e => length ys + exp_num_vars e
+      | Econstr x _ ys e => length ys + cost_exp e
       | Ecase x l =>
         1 + (fix sizeOf_l l :=
                match l with
                  | [] => 0
-                 | (t, e) :: l => exp_num_vars e + sizeOf_l l
+                 | (t, e) :: l => cost_exp e + sizeOf_l l
                end) l
-      | Eproj x _ _ y e => 1 + exp_num_vars e
-      | Efun B e => 1 + fundefs_num_vars B + 3 * numOf_fundefs B + exp_num_vars e
+      | Eproj x _ _ y e => 1 + cost_exp e
+      | Efun B e => 1 + PS.cardinal (fundefs_fv B) 
       | Eapp x _ ys => 1 + length ys
-      | Eprim x _ ys e => length ys + exp_num_vars e
+      | Eprim x _ ys e => length ys + cost_exp e
       | Ehalt x => 1
-    end
-  with fundefs_num_vars (B : fundefs) : nat := 
-         match B with
-           | Fcons _ _ xs e B =>
-             1 + exp_num_vars e + fundefs_num_vars B
-           | Fnil => 0
-         end.
+    end.
+
+  (** Fundef definitions for the heaps *)
+  Fixpoint cost_fundefs (f : fundefs) : nat :=
+    match f with
+      | Fcons _ _ _ e f => max (cost_exp e) (cost_fundefs f)
+      | Fnil => 0
+    end.
+  
+  Fixpoint size_fundefs (f : fundefs) : nat :=
+    match f with
+      | Fcons _ _ _ e f => 3 + PS.cardinal (fundefs_fv f)
+      | fnil => 0
+    end.
+
+
+  Definition cost_value (v : value) : nat :=
+    match v with
+      | Loc _ => 0
+      | FunPtr B _ => cost_fundefs B
+    end.
+
+  Definition cost_block (b : block) : nat :=
+    match b with
+      | Constr _ vs => 0
+      | Clos v1 rho => cost_value v1 
+    end.
+  
+  Definition cost_heap (H : heap block) :=
+    size_with_measure cost_block H.
+  
+  Definition cc_size_value (v : value) : nat :=
+    match v with
+      | Loc _ => 0
+      | FunPtr B _ => size_fundefs B
+    end.
+
+  Definition cc_size_block (b : block) : nat :=
+    match b with
+      | Constr _ vs => 0
+      | Clos v1 rho => cc_size_value v1 
+    end.
+
+  Definition cc_size_heap (H : heap block) :=
+    size_with_measure cc_size_block H.
+  
+  Definition numOf_fundefs_value (v : value) : nat :=
+    match v with
+      | Loc _ => 0
+      | FunPtr B _ => 1 + numOf_fundefs B
+    end.
+  
+  Definition numOf_fundefs_block (b : block) : nat :=
+    match b with
+      | Constr _ vs => max_list_nat_with_measure numOf_fundefs_value 0 vs
+      | Clos v1 rho => numOf_fundefs_value v1 
+    end.
+  
+  
+  Definition numOf_fundefs_heap (H : heap block) :=
+    max_with_measure numOf_fundefs_block H.
+  
+  Definition max_heap_exp (H : heap block) (e : exp) :=
+    max (max_vars_heap H) (exp_max_vars e).
+  
 
   Fixpoint exp_max_vars (e : exp) : nat :=
     match e with
@@ -900,7 +955,9 @@ Module Size (H : Heap).
   Proof.
     induction B1; eauto. simpl. omega.
   Qed.
-  
+
+
+
   Lemma PostAppCompat i j IP P Funs {_ : ToMSet Funs}
         b d H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ k :
     Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b d H1 rho1 H2 rho2 y1 y2) (f1 :: xs1) (f2 :: xs2) -> 
@@ -971,7 +1028,7 @@ Module Size (H : Heap).
           omega.
       - erewrite def_closures_size; try eassumption.
         unfold mset in *.
-        destruct (ToMSet_name_in_fundefs B1) as [funsB HeqB].
+        destruct (ToMSet_name_in_fundefs B1) as [funsB HeqB]. fold mset in *. 
         split.
         + rewrite <- !Max.plus_max_distr_r.
           eapply NPeano.Nat.max_le_compat.

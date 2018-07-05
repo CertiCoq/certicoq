@@ -35,7 +35,9 @@ Module CC_log_rel (H : Heap).
 
   (** Global final conditions. Holds for the result of future execution of the result *)
   Definition GInv :=
-    nat -> forall (B : Ensemble var) {H : ToMSet B}, relation (heap block * env * exp * nat * nat).
+    forall (S : Ensemble var) {H : ToMSet S}
+      (B : Ensemble var) {H : ToMSet B},
+      relation (heap block * env * exp * nat * nat).
   
   (** Loc Injection *)
   Definition Inj := loc -> loc.
@@ -86,7 +88,11 @@ Module CC_log_rel (H : Heap).
     eapply FromSet_sound. reflexivity. eassumption.
   Qed.
 
-  
+  (* TODO move *)
+  Instance ToMSetFromList l : ToMSet (FromList l).
+  Proof.
+  Admitted.
+
 
   (** Definitions parametric on the value relation *)
   Section cc_approx.
@@ -221,7 +227,7 @@ Module CC_log_rel (H : Heap).
                                          (k - (k - i))
                                          j'
                                          (IP (name_in_fundefs B1) _) IP
-                                         (P (k - (k - i)) (name_in_fundefs B1) _) P
+                                         (P (name_in_fundefs B1) _ (FromList xs1) _) P
                                          (e1, rho_clo2, H1'') (e2, rho2', H2')
                        end)
               | _, _ => False
@@ -291,7 +297,7 @@ Module CC_log_rel (H : Heap).
                          cc_approx_exp cc_approx_val
                                        i j'
                                        (IP (name_in_fundefs B1) _) IP
-                                       (P i (name_in_fundefs B1) _) P
+                                       (P (name_in_fundefs B1) _ (FromList xs1) _) P
                                        (e1, rho_clo2, H1'') (e2, rho2', H2'))
               | _, _ => False
             end
@@ -600,7 +606,7 @@ Module CC_log_rel (H : Heap).
        r1 ≺ ^ (m ; j ; GIP1 ; GP1 ; b; d) r2 ->
        r1 ≺ ^ (m ; j ; GIP1 ; GP2 ; b; d) r2) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
-    (forall i B {Hv : ToMSet B}, same_relation _ (GP1 i B _) (GP2 i B _)) ->
+    (forall S {Hs : ToMSet S} B {Hv : ToMSet B}, same_relation _ (GP1 S _ B _) (GP2 S _ B _)) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP2 ) p2.
   Proof.
     destruct p1 as [[e1 H1] rho1].
@@ -611,14 +617,14 @@ Module CC_log_rel (H : Heap).
     repeat eexists; eauto.
     rewrite cc_approx_val_eq.
     eapply IH; eauto. omega.
-    rewrite <- cc_approx_val_eq; eauto.    
+    rewrite <- cc_approx_val_eq; eauto.
   Qed.
   
   Opaque cc_approx_exp.
   
   Lemma cc_approx_val_same_rel (k j : nat) (GP1 GP2 : GInv) (b1 : Inj) (d1 : EInj) r1 r2 :
     r1 ≺ ^ (k ; j ; GIP ; GP1 ; b1 ; d1 ) r2 ->
-    (forall i B {Hv}, same_relation _ (GP1 i B Hv) (GP2 i B Hv)) ->
+    (forall S {Hs : ToMSet S} B {Hv : ToMSet B}, same_relation _ (GP1 S _ B _) (GP2 S _ B _)) ->
     r1 ≺ ^ (k ; j ; GIP ; GP2 ; b1 ; d1 ) r2.
   Proof.
     revert j b1 d1 GP1 GP2 r1 r2.
@@ -676,7 +682,7 @@ Module CC_log_rel (H : Heap).
   Lemma cc_approx_exp_same_rel (P : relation nat) k j (GP' : GInv)
         p1 p2 :
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP ) p2 ->
-    (forall i B {Hv}, same_relation _ (GP i B Hv) (GP' i B Hv)) ->
+    (forall S {Hs : ToMSet S} B {Hv : ToMSet B}, same_relation _ (GP S _ B _) (GP' S _ B _)) ->    
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP' ) p2.
   Proof.
     intros Hcc Hin. eapply cc_approx_exp_same_rel_IH; try eassumption.
@@ -3256,11 +3262,11 @@ Module CC_log_rel (H : Heap).
   Qed.
 
   Global Instance Proper_cc_approx_heap :
-    Proper (Same_set _ ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff) cc_approx_heap.
+    Proper (Same_set _ ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff)
+           cc_approx_heap.
   Proof.
     intros s1 s2 Hseq; constructor; subst;
     intros Hcc z Hin; eapply Hcc; eapply Hseq; eauto.
   Qed.
-  
-
+ 
 End CC_log_rel.

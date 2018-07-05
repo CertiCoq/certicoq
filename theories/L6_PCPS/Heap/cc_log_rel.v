@@ -227,7 +227,7 @@ Module CC_log_rel (H : Heap).
                                          (k - (k - i))
                                          j'
                                          (IP (name_in_fundefs B1) _) IP
-                                         (P (name_in_fundefs B1) _ (FromList xs1) _) P
+                                         (P (FromList xs1) _ (name_in_fundefs B1) _) P
                                          (e1, rho_clo2, H1'') (e2, rho2', H2')
                        end)
               | _, _ => False
@@ -297,7 +297,7 @@ Module CC_log_rel (H : Heap).
                          cc_approx_exp cc_approx_val
                                        i j'
                                        (IP (name_in_fundefs B1) _) IP
-                                       (P (name_in_fundefs B1) _ (FromList xs1) _) P
+                                       (P (FromList xs1) _ (name_in_fundefs B1) _) P
                                        (e1, rho_clo2, H1'') (e2, rho2', H2'))
               | _, _ => False
             end

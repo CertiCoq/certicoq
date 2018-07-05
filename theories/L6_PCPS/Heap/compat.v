@@ -179,7 +179,7 @@ Module Compat (H : Heap).
         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) β2 ->
 
         
-        IG (FromList xs1) _ (name_in_fundefs B1) _
+        IG (FromList xs1') _ (name_in_fundefs B1) _
            (H1'', rho_clo2, e1, c1, m1) (H2', rho2'', e2, c2, m2) ->
         IIL1 (H1', rho1', Eapp f1 t xs1) (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ) ->
         
@@ -245,9 +245,9 @@ Module Compat (H : Heap).
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (d : EInj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 : var) (xs1 : list var)
           (f2 f2' Γ : var) (xs2 : list var) (t : fTag) :
-      (* IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ -> *)
+      IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
       InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
-      (* InvGC IG -> *)
+      InvGC IG ->
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 ->
@@ -266,7 +266,7 @@ Module Compat (H : Heap).
                                      ; IG)
       (AppClo clo_tag f2 t xs2 f2' Γ, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hbase Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
+      intros Hiinv Hbase HGC Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
              b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2
              HII Hleq1 Hstep1 Hstuck1.
       eapply (cc_approx_var_env_heap_env_equiv
@@ -367,8 +367,8 @@ Module Compat (H : Heap).
               rewrite !Setminus_Disjoint.
               rewrite env_locs_FromList.
               simpl. eapply In_Union_list.
-              eapply in_map. eassumption. eassumption. 
-              now eapply Disjoint_Singleton_r; intros Hc; eapply Hnin1; eauto.
+              eapply in_map. eassumption.
+              eassumption. now eapply Disjoint_Singleton_r; intros Hc; eapply Hnin1; eauto.
               now eapply Disjoint_Singleton_r; intros Hc; inv Hc; eapply Hnin2; eauto. }
             eapply cc_approx_val_heap_monotonic;
               [ | | | | | now eapply HL.subheap_refl | ].
@@ -443,7 +443,7 @@ Module Compat (H : Heap).
               eassumption. omega.
             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
               eapply Hiinv; try eassumption.
-              eapply Higc; eauto with typeclass_instances. 
+              eapply HGC; eauto with typeclass_instances. 
             * rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
               eassumption. simpl. omega. }        
     Qed.

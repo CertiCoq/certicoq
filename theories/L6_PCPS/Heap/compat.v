@@ -367,8 +367,8 @@ Module Compat (H : Heap).
               rewrite !Setminus_Disjoint.
               rewrite env_locs_FromList.
               simpl. eapply In_Union_list.
-              eapply in_map. eassumption.
-              eassumption. now eapply Disjoint_Singleton_r; intros Hc; eapply Hnin1; eauto.
+              eapply in_map. eassumption. eassumption.
+              now eapply Disjoint_Singleton_r; intros Hc; eapply Hnin1; eauto.
               now eapply Disjoint_Singleton_r; intros Hc; inv Hc; eapply Hnin2; eauto. }
             eapply cc_approx_val_heap_monotonic;
               [ | | | | | now eapply HL.subheap_refl | ].

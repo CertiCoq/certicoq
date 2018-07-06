@@ -134,9 +134,9 @@ Module Size (H : Heap).
     (* l ~> Contr env [l1; .... ; l_fvno] *)
     PS.cardinal (fundefs_fv f) (* over-approximating the environment associated to each B by a factor of |B| *).
 
-  (** The heap overheap of closure conversion *)
-  Definition size_cc_heap (H : heap block) :=
-    size_with_measure (cost_block size_fundefs) H.
+  (** The heap overheap of closure conversion -- remove functions not yet projected *)
+  Definition size_cc_heap (Funs : Ensemble loc) {_ : ToMSet Funs} (H : heap block) :=
+    size_with_measure_minus (cost_block size_fundefs) Funs H.
 
 
   (** * Postcondition *)
@@ -155,7 +155,7 @@ Module Size (H : Heap).
         (* time bound *)
         c1 + k <= c2 + k <= c1 * (1 + max (cost_time_exp e1) (cost_time_heap H1)) /\
         (* memory bound *)
-        m2 <= m1 + max (cost_mem_exp Scope Funs e1) (cost_mem_heap H1) + size_cc_heap H1
+        m2 <= m1 + max (cost_mem_exp Scope Funs e1) (cost_mem_heap H1) + size_cc_heap (env_locs rho1 (Funs \\ Scope)) H1
     end.
 
 
@@ -163,13 +163,15 @@ Module Size (H : Heap).
 
   (** Enforces that the initial heaps have related sizes *)  
   Definition Pre
+             (Scope : Ensemble var)
+             `{ToMSet Scope}
              (Funs : Ensemble var)
              `{ToMSet Funs}
              (p1 p2 : heap block * env * exp) :=
     match p1, p2 with
       | (H1, rho1, e1), (H2, rho2, e2) =>
         let funs := PS.cardinal (@mset Funs _) in (* cost of already allocated closures in H1*)
-        size_heap H2 + 3 * funs <= size_heap H1 + size_cc_heap H1
+        size_heap H2 <= size_heap H1 + size_cc_heap (env_locs rho1 (Funs \\ Scope)) H1
     end.
   
   (* TODO move *)
@@ -211,7 +213,8 @@ Module Size (H : Heap).
         intros x1 x2 [l1 y1] Hleq. simpl.
         omega.
   Qed.
-
+  
+  (* end move *)
 
   Lemma cost_heap_block_get H1 c l b :
     get l H1 = Some b ->
@@ -281,22 +284,43 @@ Module Size (H : Heap).
   Qed.
 
 
-  Lemma size_cc_heap_block_get H1 l b :
-    get l H1 = Some b ->
-    cost_block size_fundefs b <= size_cc_heap H1. 
-  Proof.
-    eapply size_with_measure_get.
-  Qed.
+  (* Lemma size_cc_heap_block_get H1 l S b : *)
+  (*   get l H1 = Some b -> *)
+  (*   ~  *)
+  (*   cost_block size_fundefs b <= size_cc_heap S H1.  *)
+  (* Proof. *)
+  (*   eapply size_with_measure_get. *)
+  (* Qed. *)
   
-  Lemma size_cc_heap_alloc H1 H1' l b :
+  Lemma size_cc_heap_alloc S {_ : ToMSet S} H1 H1' l b :
     alloc b H1 = (l, H1') ->
-    size_cc_heap H1' = cost_block size_fundefs b + size_cc_heap H1.
+    ~ l \in S -> 
+    size_cc_heap S H1' = cost_block size_fundefs b + size_cc_heap S H1.
   Proof.
-    intros Hal. unfold size_cc_heap.
-    erewrite (HL.size_with_measure_alloc _ _ _ _ H1'); eauto.
+    intros Hal Hnin. unfold size_cc_heap.
+    erewrite (HL.size_with_measure_minus_alloc _ _ _ _ _ H1'); eauto.
     omega.
   Qed.
-  
+
+
+  Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho :
+    def_closures B B0 rho1 H1 rho = (H1', rho1') ->
+    size_cc_heap S H1' = size_cc_heap S H1.
+    (PS.cardinal (fundefs_names B))*(size_fundefs B0) (* because of overapproximation  of env *)
+                       + size_cc_heap H1.
+  Proof.
+    revert H1' rho1'. induction B; intros H1' rho1' Hun Hclo.
+    - simpl in Hclo.
+      destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'.
+      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo.
+      erewrite size_cc_heap_alloc; [| eassumption ].
+      inv Hun. simpl. rewrite <- PS_cardinal_add.
+      + erewrite (IHB H2);[ | eassumption | reflexivity ].
+        rewrite NPeano.Nat.mul_add_distr_r. omega.
+      + intros Hin. eapply H7. eapply fundefs_names_correct. eassumption.
+    - simpl in *. inv Hclo; eauto.
+  Qed.
+
   Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho :
     unique_functions B ->
     def_closures B B0 rho1 H1 rho = (H1', rho1') ->
@@ -1192,8 +1216,8 @@ Module Size (H : Heap).
         eapply NPeano.Nat.max_lub_iff. split.
         + eapply le_trans. eassumption.
           rewrite <- !Max.plus_max_distr_r.
-          erewrite (size_cc_heap_def_closures H1' H1''); [| eassumption ].
-
+          erewrite (size_cc_heap_def_closures H1' H1''); [ | admit | eassumption ].
+          
 (        rewrite <- Max.plus_max_distr_r. eapply NPeano.Nat.max_le_compat. Max.max_le_compat. NPeano.Nat.max_le_compat_l. Max.max_le_compat. destruct (ToMSet_name_in_fundefs B1) as [funsB HeqB]. fold mset in *. 
         split.
 

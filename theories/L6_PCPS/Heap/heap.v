@@ -133,6 +133,25 @@ Module Type Heap.
       S1 <--> S2 ->
       heap_elements_filter S1 h = heap_elements_filter S2 h.
 
+  Parameter heap_elements_minus : forall {A} (H : Ensemble loc) {_ : ToMSet H}, heap A -> list (loc * A).
+  
+  Parameter heap_elements_minus_sound :
+    forall (A : Type) (S : Ensemble loc) {H : ToMSet S} (h : heap A) (l : loc) (v : A),
+      List.In (l, v) (heap_elements_minus S h) -> get l h = Some v /\ ~ l \in S.
+  
+  Parameter heap_elements_minus_complete :
+    forall (A : Type) (S : Ensemble loc) {H : ToMSet S} (h : heap A) (l : loc) (v : A),
+      get l h = Some v -> ~ l \in S -> List.In (l, v) (heap_elements_minus S h).
+  
+  Parameter heap_elements_minus_NoDup :
+    forall (A : Type)  (S : Ensemble loc) {H : ToMSet S} (h : heap A),
+     NoDup (heap_elements_minus S h).
+  
+  Parameter heap_elements_minus_set_Equal :
+    forall (A : Type)  (S1 : Ensemble loc) {H1 : ToMSet S1}  (S2 : Ensemble loc) {H2 : ToMSet S2} (h : heap A),
+      S1 <--> S2 ->
+      heap_elements_minus S1 h = heap_elements_minus S2 h.
+
   (** Size of a heap *)
 
   (** The cardinality of the domain *)
@@ -147,6 +166,10 @@ Module Type Heap.
   Definition size_with_measure_filter {A : Type}
              (f : A -> nat) (S : Ensemble loc) {H : ToMSet S}  (h : heap A) : nat :=
     fold_left (fun acc h => acc + f (snd h)) (heap_elements_filter S h) 0%nat.
+
+  Definition size_with_measure_minus {A : Type}
+             (f : A -> nat) (S : Ensemble loc) {H : ToMSet S}  (h : heap A) : nat :=
+    fold_left (fun acc h => acc + f (snd h)) (heap_elements_minus S h) 0%nat.
 
 
   Parameter splits : forall {A}, heap A -> heap A -> heap A -> Prop. 
@@ -524,6 +547,132 @@ Module HeapLemmas (H : Heap).
     intros [l v] Hin. eapply heap_elements_filter_sound in Hin. 
     inv Hin. eapply heap_elements_filter_complete; eauto.
   Qed.
+
+  Lemma heap_elements_minus_empty (A : Type) (S : Ensemble loc) {H : ToMSet S}:
+    @heap_elements_minus A S H emp = [].
+  Proof.
+    destruct (@heap_elements_minus _ _ _ emp) as [| [l v] ls] eqn:Hh.
+    reflexivity.
+    assert (Hd : get l emp = Some v). 
+    { eapply heap_elements_minus_sound with (S := S). rewrite Hh. now constructor. }
+    rewrite emp_get in Hd. discriminate.
+  Qed.
+  
+  Lemma heap_elements_minus_alloc (A : Type) (S : Ensemble loc) {H : ToMSet S}
+        (h h' : heap A) (l : loc) (v : A) :
+    alloc v h = (l, h') ->
+    ~ l \in S ->
+    Permutation (heap_elements_minus S h') ((l, v) :: (heap_elements_minus S h)).
+  Proof.
+    intros Ha Hin. 
+    eapply NoDup_Permutation.
+    - eapply heap_elements_minus_NoDup. 
+    - constructor.
+      intros Hin'. eapply heap_elements_minus_sound in Hin'.
+      inv Hin'.
+      eapply alloc_fresh in Ha. congruence.
+      eapply heap_elements_minus_NoDup.
+    - intros [l' v']; split; intros Hin'.
+      + eapply heap_elements_minus_sound in Hin'. 
+        destruct (loc_dec l l'); subst.
+        * erewrite gas in Hin'; [| eassumption ]. 
+          inv Hin'. inv H0. now constructor.
+        * erewrite gao in Hin'; eauto.
+          inv Hin'. constructor 2. eapply heap_elements_minus_complete.
+          eassumption. eassumption.
+      + inv Hin'.
+        * inv H0.
+          eapply heap_elements_minus_complete.
+          erewrite gas; [| eassumption ].
+          reflexivity. eassumption.
+        * eapply heap_elements_minus_sound in H0. inv H0.
+          eapply heap_elements_minus_complete.
+          erewrite gao; eauto.
+          intros Hc. subst.
+          erewrite alloc_fresh in H1; eauto.
+          congruence. eassumption.
+  Qed.
+
+  Lemma heap_elements_minus_alloc_in (A : Type)
+        (S : Ensemble loc) {H : ToMSet S}
+        (h h' : heap A) (l : loc) (v : A) :
+    alloc v h = (l, h') ->
+    l \in S ->
+    Permutation (heap_elements_minus S h') (heap_elements_minus S h).
+  Proof.
+    intros Ha Hin. 
+    eapply NoDup_Permutation.
+    - eapply heap_elements_minus_NoDup. 
+    - eapply heap_elements_minus_NoDup. 
+    - intros [l' v']; split; intros Hin'.
+      + eapply heap_elements_minus_sound in Hin'. 
+        destruct (loc_dec l l'); subst.
+        * erewrite gas in Hin'; [| eassumption ]. 
+          inv Hin'. contradiction.
+        * erewrite gao in Hin'; eauto.
+          inv Hin'. eapply heap_elements_minus_complete.
+          eassumption. eassumption.
+      + eapply heap_elements_minus_sound in Hin'. 
+        inv Hin'. 
+        eapply heap_elements_minus_complete; eauto.
+        erewrite gao; eauto.
+        intros Hc; subst; contradiction.
+  Qed.
+
+  Lemma heap_elements_minus_add (A : Type) (S : Ensemble loc) {HS : ToMSet S}
+        (H : heap A) (l : loc) {HS' : ToMSet S}  (v : A) :
+    get l H = Some v ->
+    ~ l \in S ->
+    Permutation (@heap_elements_minus _ S _ H) ((l, v) :: (heap_elements_minus (l |: S) H)) .
+  Proof.
+    intros Hget Hnin.
+    eapply NoDup_Permutation.
+    - eapply heap_elements_minus_NoDup. 
+    - constructor.
+      intros Hin. eapply Hnin. 
+      edestruct heap_elements_minus_sound as [Hin1 Hin2];
+        try eassumption.
+      exfalso. eapply Hin2; eauto.
+      eapply heap_elements_minus_NoDup. 
+    - intros [l' v']. split.
+      + intros Hin. edestruct heap_elements_minus_sound as [Hin1 Hin2].
+        eassumption.
+        destruct (peq l' l). subst.
+        * rewrite Hget in Hin1; inv Hin1. now constructor.
+        * constructor 2. eapply heap_elements_minus_complete; try eassumption.
+          intros Hc. inv Hc; eauto. inv H0; eauto.
+      + intros Hin. inv Hin.
+        * inv H0.
+          eapply heap_elements_minus_complete; eassumption.
+        * edestruct heap_elements_minus_sound as [Hin1 Hin2];
+          try eassumption.
+          eapply heap_elements_minus_complete; try eassumption.
+          intros Hc. eauto.
+  Qed.
+
+  Lemma heap_elements_minus_add_not_In (A : Type) (S : Ensemble loc) {HS : ToMSet S}
+        (H : heap A) (l : loc):
+    get l H = None ->
+    l \in S ->
+    Permutation (@heap_elements_minus _ S _ H) ((heap_elements_minus S H)).
+  Proof.
+    intros Hget Hnin.
+    eapply NoDup_Permutation.
+    - eapply heap_elements_minus_NoDup. 
+    - eapply heap_elements_minus_NoDup. 
+    - intros [l' v']. split.
+      + intros Hin. edestruct heap_elements_minus_sound as [Hin1 Hin2].
+        eassumption.
+        eapply heap_elements_minus_complete; try eassumption.
+      + intros Hin.
+        destruct (peq l' l); subst. 
+        * edestruct heap_elements_minus_sound as [Hin1 Hin2].
+          eassumption. exfalso; eauto.
+        * edestruct heap_elements_minus_sound as [Hin1 Hin2].
+          eassumption.
+          eapply heap_elements_minus_complete; eassumption.
+  Qed.
+
   
   Lemma size_emp :
     forall (A : Type), @size A emp = 0%nat.
@@ -757,6 +906,112 @@ Module HeapLemmas (H : Heap).
       intros. omega.
     - intros. omega.
   Qed.
+
+  Lemma size_with_measure_minus_emp (A : Type) (S : Ensemble loc) {HS : ToMSet S} f :
+    @size_with_measure_minus A f S _ emp = 0%nat.
+  Proof.
+    unfold size_with_measure_minus.
+    rewrite heap_elements_minus_empty. reflexivity.
+  Qed.
+  
+  Lemma size_with_measure_minus_alloc
+        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
+        (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) :
+    size_with_measure_minus f S H = m ->
+    alloc x H = (l, H') ->
+    ~ l \in S ->
+    size_with_measure_minus f S H' = (m + f x)%nat.
+  Proof.
+    intros Hs1 Ha Hin.
+    unfold size_with_measure_minus in *. eapply heap_elements_minus_alloc in Ha; [| eassumption ].
+    erewrite fold_permutation; [| | eassumption ].
+    simpl.
+    replace (f x) with ((fun acc h => acc + f (snd h)) 0 (l, x)); [| reflexivity ].
+    erewrite List_util.fold_left_comm with (f0 := fun acc h => acc + f (snd h)); [| now firstorder ].
+    omega. intros. omega.
+  Qed.
+
+  Lemma size_with_measure_minus_alloc_not_In
+        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
+        (x : A) (H : heap A) (H' : heap A) (l : loc) (m : nat) :
+    size_with_measure_minus f S H = m ->
+    alloc x H = (l, H') ->
+    l \in S ->
+    size_with_measure_minus f S H' = m.
+  Proof.
+    intros Hs1 Ha Hnin.
+    unfold size_with_measure_minus in *. eapply heap_elements_minus_alloc_in in Ha; [| eassumption ].
+    erewrite fold_permutation; [| | eassumption ].
+    eassumption. intros; omega. 
+  Qed.
+
+  Lemma subheap_minus_Subperm (A : Type) (S : Ensemble loc) {HS : ToMSet S}
+        (h1 h2 : heap A) :
+    h1 ⊑ h2 ->
+    Subperm (heap_elements_minus S h1) (heap_elements_minus S h2).
+  Proof.
+    intros Hsub.
+    eapply incl_Subperm.
+    now eapply heap_elements_minus_NoDup.
+    intros [l v] Hin. eapply heap_elements_minus_sound in Hin. 
+    inv Hin. eapply heap_elements_minus_complete; eauto.
+  Qed.
+
+  Lemma size_with_measure_minus_subheap :
+    forall A f (S : Ensemble loc) {HS : ToMSet S} (H1 H2 : heap A),
+      H1 ⊑ H2 ->
+      size_with_measure_minus f S H1 <= size_with_measure_minus f S H2.
+  Proof.
+    intros A f S HS H1 H2 Hsub. unfold size_with_measure_minus.
+    eapply fold_left_subperm; eauto.
+    econstructor. now eapply Nat_as_OT.le_preorder.
+    now eapply Nat_as_OT.le_preorder.
+    intros; omega.
+    intros; omega.
+    intros; omega.
+    eapply subheap_minus_Subperm. eassumption.
+  Qed.
+  
+  Lemma size_with_measure_minus_add_In
+        {A : Type} f (S : Ensemble loc) {HS : ToMSet S}
+        (x : loc)
+        (v : A) (H : heap A) :
+    ~ x \in S ->
+    get x H = Some v ->
+    @size_with_measure_minus _ f S _ H = f v + size_with_measure_minus f (x |: S) H. 
+  Proof.
+    intros Hnin Hget. unfold size_with_measure_minus.
+    erewrite fold_permutation; [| | eapply heap_elements_minus_add; eassumption ].
+    simpl.
+    replace (f v) with ((fun acc h =>  acc + f (snd h)) 0 (x, v)) by (simpl; omega).
+    rewrite fold_left_comm with (f0 := (fun acc h =>  acc + f (snd h))). simpl. omega.
+    intros. omega.
+    intros. omega.
+  Qed.
+
+  Lemma size_with_measure_minus_add_not_In
+        (A : Type) f (S : Ensemble loc) {HS : ToMSet S}
+        (x : loc)
+        (v : A) (H : heap A) :
+    x \in S ->
+    get x H = None ->
+    @size_with_measure_minus _ f S _ H = size_with_measure_minus f S H. 
+  Proof.
+    intros Hnin Hget. unfold size_with_measure_minus.
+    erewrite fold_permutation; [| | eapply heap_elements_minus_add_not_In; eassumption ].
+    reflexivity.
+    intros. omega.
+  Qed.
+
+  Lemma size_with_measure_minus_Same_set (A : Type) S {HS : ToMSet S} S' {HS' : ToMSet S'}
+        (f : A -> nat) (H : heap A) :
+    S <--> S' ->
+    size_with_measure_minus f S H = size_with_measure_minus f S' H.
+  Proof.
+    intros Heq. unfold size_with_measure_minus.
+    erewrite heap_elements_minus_set_Equal; eauto. 
+  Qed.
+  
 
   Lemma splits_subheap_l {A} (H H1 H2 : heap A) : 
     splits H H1 H2 -> H1 ⊑ H.

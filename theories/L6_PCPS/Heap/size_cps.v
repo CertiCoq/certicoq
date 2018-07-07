@@ -290,7 +290,42 @@ Module Size (H : Heap).
   (* Proof. *)
   (*   eapply size_with_measure_get. *)
   (* Qed. *)
+
+  (** Proper instances for invriants *)
+  Lemma size_cc_heap_Same_Set_compat
+        (Funs : Ensemble var) { Hf : ToMSet Funs}
+        (Funs' : Ensemble var) { Hf' : ToMSet Funs'} H1 :
+    (Funs <--> Funs') ->
+    size_cc_heap Funs H1 = size_cc_heap Funs' H1.
+  Proof.
+    unfold size_cc_heap.
+    eapply HL.size_with_measure_minus_Same_set.
+  Qed.
+
   
+  Lemma PostSame_Set_compat Scope { Hs : ToMSet Scope}
+        (Funs : Ensemble var) { Hf : ToMSet Funs}
+        Scope' { Hs' : ToMSet Scope'}
+        (Funs' : Ensemble var) { Hf' : ToMSet Funs'} c1 c2 k :
+    Funs <--> Funs' ->
+    Post k Scope' Funs' c1 c2 -> 
+    Post k Scope Funs c1 c2.
+  Proof.
+    destruct c1 as [[[[H1 rho1] e1] c1] m1].
+    destruct c2 as [[[[H2 rho2] e2] c2] m2]. simpl.
+    intros Heq1 [Hc Hm]. split. eassumption.
+    eapply le_trans. eassumption.
+    eapply plus_le_compat. eapply plus_le_compat_l.
+    eapply NPeano.Nat.max_le_compat; [| reflexivity ].
+    unfold cost_mem_exp. eapply plus_le_compat_r.
+    eapply mult_le_compat. reflexivity.
+    rewrite Proper_carinal. reflexivity.
+    eapply Same_set_From_set. rewrite <- !mset_eq at 1.
+    rewrite Heq1. reflexivity.
+    erewrite size_cc_heap_Same_Set_compat with (Funs' := env_locs rho1 Funs).
+    reflexivity. rewrite Heq1. reflexivity.
+  Qed.
+
   Lemma size_cc_heap_alloc S {_ : ToMSet S} H1 H1' l b :
     alloc b H1 = (l, H1') ->
     ~ l \in S -> 
@@ -337,6 +372,32 @@ Module Size (H : Heap).
     - inv Hclo. reflexivity.
   Qed.
 
+  Lemma size_cc_heap_def_closures_Union S {_ : ToMSet S} H1 H1' rho1 rho1' B B0 rho :
+    unique_functions B ->
+    def_closures B B0 rho1 H1 rho = (H1', rho1') ->
+    size_cc_heap (env_locs rho1' (name_in_fundefs B) :|: S) H1' = size_cc_heap S H1.
+  Proof.
+    revert H1 H1' rho1'.
+    induction B; intros H1 H1' rho1' Hun Hclo.
+    - simpl in Hclo.
+      destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'.
+      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' H3] eqn:Hal.
+      inv Hun.
+      inv Hclo.
+      erewrite <- (IHB H1 H2 _ H4 Hclo'). 
+      erewrite (size_cc_heap_alloc_In _ H2 H1'); [ | eassumption |  ].
+      erewrite size_cc_heap_Same_Set_compat with (Funs' := l' |: ((env_locs rho2 (name_in_fundefs B)) :|: S)).
+      unfold size_cc_heap. erewrite <- HL.size_with_measure_Disjoint_dom. reflexivity.
+      eapply Disjoint_Singleton_l. intros [v' Hc]. erewrite alloc_fresh in Hc; try eassumption.
+      congruence. rewrite env_locs_set_In. simpl. rewrite Setminus_Union_distr.
+      rewrite Setminus_Same_set_Empty_set. rewrite Setminus_Disjoint.
+      now eauto with Ensembles_DB.
+      eapply Disjoint_Singleton_r. eassumption. now left.
+      left. rewrite env_locs_set_In. simpl. now left. now left.
+    - inv Hclo. simpl.
+      erewrite size_cc_heap_Same_Set_compat with (Funs' := S).
+      reflexivity. rewrite env_locs_Empty_set, Union_Empty_set_neut_l; reflexivity.
+  Qed.
   (* Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho : *)
   (*   unique_functions B -> *)
   (*   def_closures B B0 rho1 H1 rho = (H1', rho1') -> *)
@@ -364,40 +425,6 @@ Module Size (H : Heap).
     simpl. omega.
   Qed.
 
-  (** Proper instances for invriants *)
-  Lemma size_cc_heap_Same_Set_compat
-        (Funs : Ensemble var) { Hf : ToMSet Funs}
-        (Funs' : Ensemble var) { Hf' : ToMSet Funs'} H1 :
-    (Funs <--> Funs') ->
-    size_cc_heap Funs H1 = size_cc_heap Funs' H1.
-  Proof.
-    unfold size_cc_heap.
-    eapply HL.size_with_measure_minus_Same_set.
-  Qed.
-
-  
-  Lemma PostSame_Set_compat Scope { Hs : ToMSet Scope}
-        (Funs : Ensemble var) { Hf : ToMSet Funs}
-        Scope' { Hs' : ToMSet Scope'}
-        (Funs' : Ensemble var) { Hf' : ToMSet Funs'} c1 c2 k :
-    Funs <--> Funs' ->
-    Post k Scope' Funs' c1 c2 -> 
-    Post k Scope Funs c1 c2.
-  Proof.
-    destruct c1 as [[[[H1 rho1] e1] c1] m1].
-    destruct c2 as [[[[H2 rho2] e2] c2] m2]. simpl.
-    intros Heq1 [Hc Hm]. split. eassumption.
-    eapply le_trans. eassumption.
-    eapply plus_le_compat. eapply plus_le_compat_l.
-    eapply NPeano.Nat.max_le_compat; [| reflexivity ].
-    unfold cost_mem_exp. eapply plus_le_compat_r.
-    eapply mult_le_compat. reflexivity.
-    rewrite Proper_carinal. reflexivity.
-    eapply Same_set_From_set. rewrite <- !mset_eq at 1.
-    rewrite Heq1. reflexivity.
-    erewrite size_cc_heap_Same_Set_compat with (Funs' := env_locs rho1 Funs).
-    reflexivity. rewrite Heq1. reflexivity.
-  Qed.
   
   (** * Compat lemmas *)
   
@@ -465,6 +492,20 @@ Module Size (H : Heap).
     eapply PS_elements_subset...
   Qed.
 
+  Lemma cost_mem_exp_Fun_mon
+        (Scope : Ensemble var) `{ToMSet Scope}
+        (Funs : Ensemble var) `{ToMSet Funs}
+        (Funs' : Ensemble var) `{ToMSet Funs'}
+        e :
+    Funs \subset Funs' ->
+    cost_mem_exp Scope Funs e <= cost_mem_exp Scope Funs' e.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hleq. unfold cost_mem_exp.
+    eapply plus_le_compat_r.
+    eapply mult_le_compat_l.
+    eapply PS_elements_subset. eassumption.
+  Qed.
+
   (* Lemma cost_time_exp_inv_exp *)
   (*       (Scope : Ensemble var) `{ToMSet Scope} *)
   (*       (Funs : Ensemble var) `{ToMSet Funs} *)
@@ -486,19 +527,19 @@ Module Size (H : Heap).
     rewrite Heq. reflexivity.
   Qed.
 
-  
 
   Lemma PostConstrCompat i j IP P
         (Scope : Ensemble var) {Hs : ToMSet Scope}
         (Funs : Ensemble var) {Hf : ToMSet Funs}
         b d H1 H2 rho1 rho2 x c ys1 ys2 e1 e2 :
-    Forall2 (cc_approx_var_env i j IP P b d H1 rho1 H2 rho2) ys1 ys2 -> 
+    Forall2 (cc_approx_var_env i j IP P b d H1 rho1 H2 rho2) ys1 ys2 ->
+    ~ x \in Funs -> (* because we take intersection with occurs_free e *)  
     InvCtxCompat (Post (cost_env_app_exp_out (Econstr x c ys1 e1)) Scope Funs)
-                 (Post 0 (x |: Scope) Funs)
+                 (Post 0 (x |: Scope) (Funs \\ [set x]))
                  H1 H2 rho1 rho2 (Econstr_c x c ys1 Hole_c) (Econstr_c x c ys2 Hole_c) e1 e2.
   Proof with (now eauto with Ensembles_DB).
     unfold InvCtxCompat, Post.
-    intros Hall H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1 c2 c1' c2'
+    intros Hall Hnin H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1 c2 c1' c2'
            m1 m2 b1 b2 Heq1 Hinj1 Heq2 Hinj2 [[Hc1 Hc2] Hm] Hctx1 Hctx2.
     assert (Hlen := Forall2_length _ _ _ Hall). 
     inv Hctx1. inv Hctx2. inv H13. inv H16.
@@ -536,32 +577,34 @@ Module Size (H : Heap).
           eapply le_trans; [| eapply Max.le_max_l ].
           eapply cost_env_app_exp_out_le.
       - eapply le_trans. eassumption.
-        simpl. erewrite size_cc_heap_alloc; [| eassumption | ].
-
+         
         rewrite <- !plus_assoc.
-        eapply plus_le_compat_l. eapply plus_le_compat.
-
+        eapply plus_le_compat_l. simpl. eapply plus_le_compat.
+ 
         eapply Nat.max_le_compat.
-        erewrite cost_mem_exp_inv_exp.
-        eapply le_trans. eapply (cost_mem_exp_Scope_antimon (x |: Scope) Scope)...
-        reflexivity. simpl. reflexivity.
-
-        erewrite cost_mem_heap_alloc; [| eassumption ]...
-        
-        simpl. subst_exp.
-        erewrite <- size_cc_heap_alloc_In; [| eassumption |].
-        unfold size_cc_heap.
-        erewrite HL.size_with_measure_minus_alloc; [| reflexivity | eassumption | ].
-        simpl. rewrite <- plus_n_O.
-        erewrite size_cc_heap_Same_Set_compat. rewrite env_locs_set_not_In.
-
-        now eauto with Ensembles_DB.
-        
-        eapply plus_le_compat_l.
-        eapply Nat.max_le_compat; [| simpl; omega ].
+        erewrite cost_mem_exp_inv_exp; [| reflexivity ].
         eapply le_trans.
-        eapply cost_mem_exp_inv_exp. simpl. reflexivity.
-    }
+        eapply (cost_mem_exp_Scope_antimon (x |: Scope) Scope).
+        now eauto with Ensembles_DB.
+        eapply le_trans. 
+        eapply (cost_mem_exp_Fun_mon _ _ Funs)...
+        now eauto with Ensembles_DB.
+         
+        erewrite cost_mem_heap_alloc; [| eassumption ]...
+        unfold size_cc_heap.
+
+        erewrite HL.size_with_measure_minus_Same_set with (S' := env_locs rho1' (Funs \\ [set x])).
+        eapply le_trans. eapply HL.size_with_measure_minus_alloc_leq. eassumption.
+        simpl. rewrite <- HL.size_with_measure_Disjoint_dom.
+
+        eapply HL.size_with_measure_minus_Included.
+        eapply env_locs_monotonic. rewrite Setminus_Disjoint. reflexivity. 
+        eapply Disjoint_Singleton_r. eassumption.
+
+        eapply Disjoint_Singleton_l. intros [v Hc].
+        erewrite alloc_fresh in Hc; eauto; congruence.
+
+        rewrite env_locs_set_not_In. reflexivity. intros Hc; inv Hc; eauto. }
     intros y1 y2 Hin1 Hin2 Hcc.
     eapply cc_approx_var_env_heap_env_equiv; try eassumption.
     simpl; normalize_occurs_free...

@@ -336,17 +336,25 @@ Module Size (H : Heap).
     omega.
   Qed.
 
-  Lemma size_cc_heap_alloc_In S {_ : ToMSet S} H1 H1' l b :
-    alloc b H1 = (l, H1') ->
-    l \in S -> 
-    size_cc_heap S H1' = size_cc_heap S H1.
-  Proof.
-    intros Hal Hnin. unfold size_cc_heap.
-    erewrite (HL.size_with_measure_minus_alloc_not_In _ _ _ _ _ H1'); eauto.
-  Qed.
-  
+  (* Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho : *)
+  (*   def_closures B B0 rho1 H1 rho = (H1', rho1') -> *)
+  (*   size_cc_heap S H1' = size_cc_heap S H1. *)
+  (*   (PS.cardinal (fundefs_names B))*(size_fundefs B0) (* because of overapproximation  of env *) *)
+  (*                      + size_cc_heap H1. *)
+  (* Proof. *)
+  (*   revert H1' rho1'. induction B; intros H1' rho1' Hun Hclo. *)
+  (*   - simpl in Hclo. *)
+  (*     destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'. *)
+  (*     destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo. *)
+  (*     erewrite size_cc_heap_alloc; [| eassumption ]. *)
+  (*     inv Hun. simpl. rewrite <- PS_cardinal_add. *)
+  (*     + erewrite (IHB H2);[ | eassumption | reflexivity ]. *)
+  (*       rewrite NPeano.Nat.mul_add_distr_r. omega. *)
+  (*     + intros Hin. eapply H7. eapply fundefs_names_correct. eassumption. *)
+  (*   - simpl in *. inv Hclo; eauto. *)
+  (* Qed. *)
 
-  Lemma size_cc_heap_def_closures S {_ : ToMSet S} H1 H1' rho1 rho1' B B0 rho :
+  Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho :
     unique_functions B ->
     def_closures B B0 rho1 H1 rho = (H1', rho1') ->
     (env_locs rho1' (name_in_fundefs B)) \subset S ->

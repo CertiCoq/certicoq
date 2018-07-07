@@ -80,7 +80,7 @@ Module Size (H : Heap).
   Definition cost_mem_exp
              (Scope : Ensemble var) {_ : ToMSet Scope} (Funs : Ensemble var) {_ : ToMSet Funs}
              (e : exp) :=
-    let funs := PS.cardinal (@mset (Funs \\ Scope) _) in
+    let funs := PS.cardinal (@mset Funs  _) in
     3 * funs + cost_env_exp e.
   
   
@@ -124,7 +124,7 @@ Module Size (H : Heap).
 
   (** time cost of heap *)
   Definition cost_time_heap := cost_heap cost_time_fundefs.
-
+  
 
 
   (** The size of a closure after closure conversion including the closure environment *)
@@ -134,9 +134,9 @@ Module Size (H : Heap).
     (* l ~> Contr env [l1; .... ; l_fvno] *)
     PS.cardinal (fundefs_fv f) (* over-approximating the environment associated to each B by a factor of |B| *).
 
-  (** The heap overheap of closure conversion *)
-  Definition size_cc_heap (H : heap block) :=
-    size_with_measure (cost_block size_fundefs) H.
+  (** The heap overheap of closure conversion -- remove functions not yet projected *)
+  Definition size_cc_heap (Funs : Ensemble loc) {_ : ToMSet Funs} (H : heap block) :=
+    size_with_measure_minus (cost_block size_fundefs) Funs H.
 
 
   (** * Postcondition *)
@@ -151,11 +151,10 @@ Module Size (H : Heap).
              (p1 p2 : heap block * env * exp * nat * nat) :=
     match p1, p2 with
       | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
-        let funs := PS.cardinal (@mset Funs _) in
         (* time bound *)
         c1 + k <= c2 + k <= c1 * (1 + max (cost_time_exp e1) (cost_time_heap H1)) /\
         (* memory bound *)
-        m2 <= m1 + max (cost_mem_exp Scope Funs e1) (cost_mem_heap H1) + size_cc_heap H1
+        m2 <= m1 + max (cost_mem_exp Scope Funs e1) (cost_mem_heap H1) + size_cc_heap (env_locs rho1 Funs) H1
     end.
 
 
@@ -163,13 +162,15 @@ Module Size (H : Heap).
 
   (** Enforces that the initial heaps have related sizes *)  
   Definition Pre
+             (Scope : Ensemble var)
+             `{ToMSet Scope}
              (Funs : Ensemble var)
              `{ToMSet Funs}
              (p1 p2 : heap block * env * exp) :=
     match p1, p2 with
       | (H1, rho1, e1), (H2, rho2, e2) =>
-        let funs := PS.cardinal (@mset Funs _) in (* cost of already allocated closures in H1*)
-        size_heap H2 + 3 * funs <= size_heap H1 + size_cc_heap H1
+        (* Sizes of the initial heaps *)
+        size_heap H2 <= size_heap H1 + size_cc_heap (env_locs rho1 Funs) H1
     end.
   
   (* TODO move *)
@@ -211,7 +212,8 @@ Module Size (H : Heap).
         intros x1 x2 [l1 y1] Hleq. simpl.
         omega.
   Qed.
-
+  
+  (* end move *)
 
   Lemma cost_heap_block_get H1 c l b :
     get l H1 = Some b ->
@@ -281,39 +283,77 @@ Module Size (H : Heap).
   Qed.
 
 
-  Lemma size_cc_heap_block_get H1 l b :
-    get l H1 = Some b ->
-    cost_block size_fundefs b <= size_cc_heap H1. 
-  Proof.
-    eapply size_with_measure_get.
-  Qed.
+  (* Lemma size_cc_heap_block_get H1 l S b : *)
+  (*   get l H1 = Some b -> *)
+  (*   ~  *)
+  (*   cost_block size_fundefs b <= size_cc_heap S H1.  *)
+  (* Proof. *)
+  (*   eapply size_with_measure_get. *)
+  (* Qed. *)
   
-  Lemma size_cc_heap_alloc H1 H1' l b :
+  Lemma size_cc_heap_alloc S {_ : ToMSet S} H1 H1' l b :
     alloc b H1 = (l, H1') ->
-    size_cc_heap H1' = cost_block size_fundefs b + size_cc_heap H1.
+    ~ l \in S -> 
+    size_cc_heap S H1' = cost_block size_fundefs b + size_cc_heap S H1.
   Proof.
-    intros Hal. unfold size_cc_heap.
-    erewrite (HL.size_with_measure_alloc _ _ _ _ H1'); eauto.
+    intros Hal Hnin. unfold size_cc_heap.
+    erewrite (HL.size_with_measure_minus_alloc _ _ _ _ _ H1'); eauto.
     omega.
   Qed.
+
+  Lemma size_cc_heap_alloc_In S {_ : ToMSet S} H1 H1' l b :
+    alloc b H1 = (l, H1') ->
+    l \in S -> 
+    size_cc_heap S H1' = size_cc_heap S H1.
+  Proof.
+    intros Hal Hnin. unfold size_cc_heap.
+    erewrite (HL.size_with_measure_minus_alloc_not_In _ _ _ _ _ H1'); eauto.
+  Qed.
   
-  Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho :
+
+  Lemma size_cc_heap_def_closures S {_ : ToMSet S} H1 H1' rho1 rho1' B B0 rho :
     unique_functions B ->
     def_closures B B0 rho1 H1 rho = (H1', rho1') ->
-    size_cc_heap H1' = (PS.cardinal (fundefs_names B))*(size_fundefs B0) (* because of overapproximation  of env *)
-                       + size_cc_heap H1.
+    (env_locs rho1' (name_in_fundefs B)) \subset S ->
+    size_cc_heap S H1' = size_cc_heap S H1.
   Proof.
-    revert H1' rho1'. induction B; intros H1' rho1' Hun Hclo.
+    revert H1 H1' rho1'. induction B; intros H1 H1' rho1' Hun Hclo Hsub.
     - simpl in Hclo.
       destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'.
-      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo.
-      erewrite size_cc_heap_alloc; [| eassumption ].
-      inv Hun. simpl. rewrite <- PS_cardinal_add.
-      + erewrite (IHB H2);[ | eassumption | reflexivity ].
-        rewrite NPeano.Nat.mul_add_distr_r. omega.
-      + intros Hin. eapply H7. eapply fundefs_names_correct. eassumption.
-    - simpl in *. inv Hclo; eauto.
+      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' H3] eqn:Hal.
+      inv Hun.
+      inv Hclo. erewrite <- (IHB H1 H2 _ H4 Hclo').
+      erewrite <- (size_cc_heap_alloc_In _ H2 H1'); [ reflexivity | eassumption |  ].
+      eapply Hsub.
+      
+      eapply env_locs_set_In. now left. now left.
+
+      eapply Included_trans; [| eassumption ]. 
+      rewrite env_locs_set_In; [| now left ].
+      eapply Included_Union_preserv_r. simpl.
+      rewrite Setminus_Union_distr. rewrite env_locs_Union.
+      eapply Included_Union_preserv_r. rewrite Setminus_Disjoint.
+      reflexivity. eapply Disjoint_Singleton_r. eassumption.
+    - inv Hclo. reflexivity.
   Qed.
+
+  (* Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho : *)
+  (*   unique_functions B -> *)
+  (*   def_closures B B0 rho1 H1 rho = (H1', rho1') -> *)
+  (*   size_cc_heap H1' = (PS.cardinal (fundefs_names B))*(size_fundefs B0) (* because of overapproximation  of env *) *)
+  (*                      + size_cc_heap H1. *)
+  (* Proof. *)
+  (*   revert H1' rho1'. induction B; intros H1' rho1' Hun Hclo. *)
+  (*   - simpl in Hclo. *)
+  (*     destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'. *)
+  (*     destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo. *)
+  (*     erewrite size_cc_heap_alloc; [| eassumption ]. *)
+  (*     inv Hun. simpl. rewrite <- PS_cardinal_add. *)
+  (*     + erewrite (IHB H2);[ | eassumption | reflexivity ]. *)
+  (*       rewrite NPeano.Nat.mul_add_distr_r. omega. *)
+  (*     + intros Hin. eapply H7. eapply fundefs_names_correct. eassumption. *)
+  (*   - simpl in *. inv Hclo; eauto. *)
+  (* Qed. *)
   
 
   Lemma cost_env_app_exp_out_le e :
@@ -323,14 +363,49 @@ Module Size (H : Heap).
     simpl. omega.
     simpl. omega.
   Qed.
-  
-  (** Compat lemmas *)
 
+  (** Proper instances for invriants *)
+  Lemma size_cc_heap_Same_Set_compat
+        (Funs : Ensemble var) { Hf : ToMSet Funs}
+        (Funs' : Ensemble var) { Hf' : ToMSet Funs'} H1 :
+    (Funs <--> Funs') ->
+    size_cc_heap Funs H1 = size_cc_heap Funs' H1.
+  Proof.
+    unfold size_cc_heap.
+    eapply HL.size_with_measure_minus_Same_set.
+  Qed.
+
+  
+  Lemma PostSame_Set_compat Scope { Hs : ToMSet Scope}
+        (Funs : Ensemble var) { Hf : ToMSet Funs}
+        Scope' { Hs' : ToMSet Scope'}
+        (Funs' : Ensemble var) { Hf' : ToMSet Funs'} c1 c2 k :
+    Funs <--> Funs' ->
+    Post k Scope' Funs' c1 c2 -> 
+    Post k Scope Funs c1 c2.
+  Proof.
+    destruct c1 as [[[[H1 rho1] e1] c1] m1].
+    destruct c2 as [[[[H2 rho2] e2] c2] m2]. simpl.
+    intros Heq1 [Hc Hm]. split. eassumption.
+    eapply le_trans. eassumption.
+    eapply plus_le_compat. eapply plus_le_compat_l.
+    eapply NPeano.Nat.max_le_compat; [| reflexivity ].
+    unfold cost_mem_exp. eapply plus_le_compat_r.
+    eapply mult_le_compat. reflexivity.
+    rewrite Proper_carinal. reflexivity.
+    eapply Same_set_From_set. rewrite <- !mset_eq at 1.
+    rewrite Heq1. reflexivity.
+    erewrite size_cc_heap_Same_Set_compat with (Funs' := env_locs rho1 Funs).
+    reflexivity. rewrite Heq1. reflexivity.
+  Qed.
+  
+  (** * Compat lemmas *)
+  
   Lemma PostBase H1 H2 rho1 rho2 e1 e2 k
-        (Scope : Ensemble var) `{ToMSet Scope}
-        (Funs : Ensemble var) `{ToMSet Funs} :
+        (Scope : Ensemble var) { _ : ToMSet Scope}
+        (Funs : Ensemble var) { _ : ToMSet Funs} :
     k <= cost_env_app_exp_out e1 ->
-    InvCostBase (Post k Scope Funs) (Pre Funs) H1 H2 rho1 rho2 e1 e2.
+    InvCostBase (Post k Scope Funs) (Pre Scope Funs) H1 H2 rho1 rho2 e1 e2.
   Proof.
     unfold InvCostBase, Post, Pre.
     intros Hleq H1' H2' rho1' rho2' c b1 b2  Heq1 Hinj1 Heq2 Hinj2 Hm.
@@ -342,8 +417,7 @@ Module Size (H : Heap).
       eapply le_trans. eapply cost_env_app_exp_out_le.
       rewrite <- (Nat.mul_1_l (cost_env_app_exp _)). eapply mult_le_compat.
       admit. eapply Nat.le_max_l. 
-    + simpl. eapply le_trans. eapply le_plus_l. 
-      eapply le_trans. eassumption. omega.
+    + simpl. eapply le_trans. eassumption. omega.
   Admitted. 
   
 
@@ -406,7 +480,7 @@ Module Size (H : Heap).
         (Scope : Ensemble var) `{ToMSet Scope}
         (Funs : Ensemble var) `{ToMSet Funs} e e' :
     cost_env_exp e = cost_env_exp e' ->
-    cost_mem_exp Scope Funs e <= cost_mem_exp Scope Funs e'.
+    cost_mem_exp Scope Funs e = cost_mem_exp Scope Funs e'.
   Proof with (now eauto with Ensembles_DB).
     intros Heq. unfold cost_mem_exp.
     rewrite Heq. reflexivity.
@@ -462,14 +536,30 @@ Module Size (H : Heap).
           eapply le_trans; [| eapply Max.le_max_l ].
           eapply cost_env_app_exp_out_le.
       - eapply le_trans. eassumption.
-        simpl. erewrite size_cc_heap_alloc; [| eassumption ]. simpl.
-        eapply plus_le_compat_r.
+        simpl. erewrite size_cc_heap_alloc; [| eassumption | ].
+
+        rewrite <- !plus_assoc.
+        eapply plus_le_compat_l. eapply plus_le_compat.
+
+        eapply Nat.max_le_compat.
+        erewrite cost_mem_exp_inv_exp.
+        eapply le_trans. eapply (cost_mem_exp_Scope_antimon (x |: Scope) Scope)...
+        reflexivity. simpl. reflexivity.
+
+        erewrite cost_mem_heap_alloc; [| eassumption ]...
+        
+        simpl. subst_exp.
+        erewrite <- size_cc_heap_alloc_In; [| eassumption |].
+        unfold size_cc_heap.
+        erewrite HL.size_with_measure_minus_alloc; [| reflexivity | eassumption | ].
+        simpl. rewrite <- plus_n_O.
+        erewrite size_cc_heap_Same_Set_compat. rewrite env_locs_set_not_In.
+
+        now eauto with Ensembles_DB.
+        
         eapply plus_le_compat_l.
-        erewrite cost_mem_heap_alloc; [| eassumption ]. simpl.
         eapply Nat.max_le_compat; [| simpl; omega ].
         eapply le_trans.
-        eapply (cost_mem_exp_Scope_antimon (x |: Scope) Scope).
-        now eauto with Ensembles_DB.
         eapply cost_mem_exp_inv_exp. simpl. reflexivity.
     }
     intros y1 y2 Hin1 Hin2 Hcc.
@@ -1192,8 +1282,8 @@ Module Size (H : Heap).
         eapply NPeano.Nat.max_lub_iff. split.
         + eapply le_trans. eassumption.
           rewrite <- !Max.plus_max_distr_r.
-          erewrite (size_cc_heap_def_closures H1' H1''); [| eassumption ].
-
+          erewrite (size_cc_heap_def_closures H1' H1''); [ | admit | eassumption ].
+          
 (        rewrite <- Max.plus_max_distr_r. eapply NPeano.Nat.max_le_compat. Max.max_le_compat. NPeano.Nat.max_le_compat_l. Max.max_le_compat. destruct (ToMSet_name_in_fundefs B1) as [funsB HeqB]. fold mset in *. 
         split.
 

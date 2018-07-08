@@ -336,6 +336,15 @@ Module Size (H : Heap).
     omega.
   Qed.
 
+  Lemma size_cc_heap_alloc_In S {_ : ToMSet S} H1 H1' l b :
+    alloc b H1 = (l, H1') ->
+    l \in S -> 
+    size_cc_heap S H1' =  size_cc_heap S H1.
+  Proof.
+    intros Hal Hnin. unfold size_cc_heap.
+    erewrite (HL.size_with_measure_minus_alloc_not_In _ _ _ _ _ H1'); eauto.
+  Qed.
+
   (* Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho : *)
   (*   def_closures B B0 rho1 H1 rho = (H1', rho1') -> *)
   (*   size_cc_heap S H1' = size_cc_heap S H1. *)
@@ -354,7 +363,7 @@ Module Size (H : Heap).
   (*   - simpl in *. inv Hclo; eauto. *)
   (* Qed. *)
 
-  Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho :
+  Lemma size_cc_heap_def_closures S {Hs : ToMSet S} H1 H1' rho1 rho1' B B0 rho :
     unique_functions B ->
     def_closures B B0 rho1 H1 rho = (H1', rho1') ->
     (env_locs rho1' (name_in_fundefs B)) \subset S ->
@@ -406,6 +415,8 @@ Module Size (H : Heap).
       erewrite size_cc_heap_Same_Set_compat with (Funs' := S).
       reflexivity. rewrite env_locs_Empty_set, Union_Empty_set_neut_l; reflexivity.
   Qed.
+
+
   (* Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho : *)
   (*   unique_functions B -> *)
   (*   def_closures B B0 rho1 H1 rho = (H1', rho1') -> *)
@@ -514,16 +525,6 @@ Module Size (H : Heap).
     eapply PS_elements_subset. eassumption.
   Qed.
 
-  (* Lemma cost_time_exp_inv_exp *)
-  (*       (Scope : Ensemble var) `{ToMSet Scope} *)
-  (*       (Funs : Ensemble var) `{ToMSet Funs} *)
-  (*       (FVs : Ensemble var) `{ToMSet FVs} e e' : *)
-  (*   cost_env_app_exp e = cost_env_app_exp e' -> *)
-  (*   cost_time_exp Scope Funs FVs e <= cost_time_exp Scope Funs FVs e'. *)
-  (* Proof with (now eauto with Ensembles_DB). *)
-  (*   intros Heq. unfold cost_time_exp. *)
-  (*   rewrite Heq. reflexivity. *)
-  (* Qed. *)
 
   Lemma cost_mem_exp_inv_exp
         (Scope : Ensemble var) `{ToMSet Scope}

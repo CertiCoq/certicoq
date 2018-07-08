@@ -1,16 +1,9 @@
-<<<<<<< HEAD
 From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions tactics.
 
 From L6.Heap Require Import heap heap_defs heap_equiv space_sem
      cc_log_rel size_cps closure_conversion
      closure_conversion_util.
-=======
-From CertiCoq.L6 Require Import cps size_cps cps_util set_util identifiers ctx Ensembles_util
-     List_util functions closure_conversion closure_conversion_util.
-
-From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv space_sem cc_log_rel.
->>>>>>> 2a16e45e44aeb3acad389f282112e7c4acae95bf
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums

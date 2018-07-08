@@ -1428,7 +1428,7 @@ Module Size (H : Heap).
             eapply le_trans; [| eapply Max.le_max_l ]. reflexivity.
             simpl. omega.
       - erewrite def_closures_size with (H := H1') (H' := H1''); [| eassumption ].
-        unfold mset in *.
+        unfold mset in *. 
         eapply NPeano.Nat.max_lub_iff. split.
         + eapply le_trans. eassumption.
           rewrite <- !Max.plus_max_distr_r.

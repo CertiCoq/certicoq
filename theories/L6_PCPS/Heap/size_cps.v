@@ -1428,22 +1428,54 @@ Module Size (H : Heap).
             eapply le_trans; [| eapply Max.le_max_l ]. reflexivity.
             simpl. omega.
       - erewrite def_closures_size with (H := H1') (H' := H1''); [| eassumption ].
-        unfold mset in *. 
+        unfold mset in *. rewrite <- !Max.plus_max_distr_r. eapply NPeano.Nat.max_le_compat.
+
+        + eapply le_trans. eassumption. 
+          rewrite <- !plus_assoc. eapply plus_le_compat_l.
+          
+          eapply plus_le_compat.
+
+          (* euality of cost terms *)
+          * erewrite (cost_mem_heap_def_closures H1' H1''); [| eassumption ].
+            eapply le_trans; [| eapply Max.le_max_r ].
+            rewrite Max.max_r.
+            
+            eapply NPeano.Nat.max_lub.
+            unfold cost_mem_heap. eapply le_trans; [| eapply cost_heap_block_get; now apply Hgetl1  ].
+            reflexivity. reflexivity.
+
+            eapply le_trans. 
+            eapply fun_in_fundefs_cost_mem_fundefs.
+            eapply find_def_correct. eassumption.
+            simpl. now eapply Max.le_max_l.
+
+          * 
+            simpl. 
+
+            
+            reflexivity.
+unfold cost_mem_exp. unfold mset. simpl. 
+            
+          admit.
+          
+        + eapply le_trans. eassumption. omega.
+
+
         eapply NPeano.Nat.max_lub_iff. split.
         + eapply le_trans. eassumption.
-          rewrite <- !Max.plus_max_distr_r.
-          erewrite (size_cc_heap_def_closures H1' H1''); [ | admit | eassumption ].
+          rewrite <- !Max.plus_max_distr_r. 
+          erewrite (size_cc_heap_def_closures _ H1' H1''); [ | | eassumption | ].
+          eapply le_trans; [| now eapply Max.le_max_l ].
           
-(        rewrite <- Max.plus_max_distr_r. eapply NPeano.Nat.max_le_compat. Max.max_le_compat. NPeano.Nat.max_le_compat_l. Max.max_le_compat. destruct (ToMSet_name_in_fundefs B1) as [funsB HeqB]. fold mset in *. 
-        split.
+          
 
-        + rewrite <- !Max.plus_max_distr_r.
+
+          * rewrite <- !Max.plus_max_distr_r.
           * eapply le_trans. eassumption.
             unfold mset at 1. 
             
             eapply plus_le_compat_r. eapply plus_le_compat_r. eapply plus_le_compat_l.
           eapply Max.max_lub.
-          eapply le_trans; [| eapply Max.le_max_l ]. 
           erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
           eapply max_vars_heap_get. eassumption.
           eapply le_trans; [| eapply Max.le_max_l].

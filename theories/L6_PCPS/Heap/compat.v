@@ -165,7 +165,7 @@ Module Compat (H : Heap).
         IG S _ B _ (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2, m2).
 
     Definition IInvAppCompat (H1 H2 : heap block) (rho1 rho2 : env) f1 t xs1 f2 xs2 f2' Γ :=   
-      forall (i  : nat) (H1' H1'' H2' : heap block)
+      forall (i  : nat) (H1' H1'' Hgc1 H2' Hgc2: heap block)
         (rho_clo rho_clo1 rho_clo2 rho1' rho2' rho2'' : env) β1 β2 
         (B1 : fundefs) (f1' : var) (ct1 : cTag)
         (xs1' : list var) (e1 : exp) (l1 : loc)
@@ -180,7 +180,7 @@ Module Compat (H : Heap).
 
         
         IG (FromList xs1') _ (name_in_fundefs B1) _
-           (H1'', rho_clo2, e1, c1, m1) (H2', rho2'', e2, c2, m2) ->
+           (Hgc1, rho_clo2, e1, c1, m1) (Hgc2, rho2'', e2, c2, m2) ->
         IIL1 (H1', rho1', Eapp f1 t xs1) (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ) ->
         
         M.get f1 rho1' = Some (Loc l1) ->
@@ -189,7 +189,7 @@ Module Compat (H : Heap).
         getlist xs1 rho1' = Some vs1 ->
         def_closures B1 B1 rho_clo H1' rho_clo = (H1'', rho_clo1) ->
         setlist xs1' vs1 rho_clo1 = Some rho_clo2 ->
-        
+        live ((env_locs rho_clo2) (occurs_free e1)) H1'' Hgc1 ->
         
         M.get f2 rho2' = Some (Loc l2) ->
         getlist xs2 rho2' = Some vs2 ->
@@ -197,6 +197,7 @@ Module Compat (H : Heap).
         Some rho2'' =
         setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
         find_def f3 B2 = Some (ct2, xs2', e2) ->
+        live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 ->
         
         IL1 (H1', rho1', Eapp f1 t xs1, c1 + cost (Eapp f1 t xs1), max m1 (size_heap H1''))
            (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ, c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2)), max m2 (size_heap H2')).
@@ -247,7 +248,6 @@ Module Compat (H : Heap).
           (f2 f2' Γ : var) (xs2 : list var) (t : fTag) :
       IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
       InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
-      InvGC IG ->
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 ->
@@ -266,7 +266,7 @@ Module Compat (H : Heap).
                                      ; IG)
       (AppClo clo_tag f2 t xs2 f2' Γ, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hiinv Hbase HGC Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
+      intros Hiinv Hbase Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
              b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2
              HII Hleq1 Hstep1 Hstuck1.
       eapply (cc_approx_var_env_heap_env_equiv
@@ -443,7 +443,6 @@ Module Compat (H : Heap).
               eassumption. omega.
             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
               eapply Hiinv; try eassumption.
-              eapply HGC; eauto with typeclass_instances. 
             * rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
               eassumption. simpl. omega. }        
     Qed.

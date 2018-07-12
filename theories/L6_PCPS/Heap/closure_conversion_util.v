@@ -533,10 +533,8 @@ Module CCUtil (H : Heap).
       apply Union_Included. now eauto with Ensembles_DB.
       apply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption.
-      eapply Included_trans. eapply Included_trans.
-      eapply FV_cc_Union1. eapply Included_Union_compat.
-      reflexivity. eapply FV_cc_Funs_monotonic. now eapply Setminus_Included.
-      eapply Union_Included. now eauto with Ensembles_DB.
+      eapply Included_trans.
+      eapply FV_cc_Union1. rewrite Union_commut. eapply Included_Union_compat; [| reflexivity ].
       eapply Included_trans. eapply project_vars_FV_cc. eassumption. 
       now eauto with Ensembles_DB. 
     - eapply project_var_occurs_free_ctx_Included;
@@ -559,10 +557,9 @@ Module CCUtil (H : Heap).
       eapply Union_Included. now eauto with Ensembles_DB. 
       apply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption.
-      eapply Included_trans. eapply FV_cc_Union1.
-      eapply Union_Included. now eauto with Ensembles_DB.
-      eapply Included_trans. eapply FV_cc_Funs_monotonic. now eapply Setminus_Included.
-      eapply Included_trans. eapply project_var_FV_cc. eassumption.
+      eapply Included_trans.
+      eapply FV_cc_Union1. rewrite Union_commut. eapply Included_Union_compat; [| reflexivity ].
+      eapply Included_trans. eapply project_var_FV_cc. eassumption. 
       now eauto with Ensembles_DB. 
     - rewrite <- app_ctx_f_fuse. simpl. 
       eapply project_vars_occurs_free_ctx_Included;
@@ -614,13 +611,11 @@ Module CCUtil (H : Heap).
       apply Union_Included; [ now eauto with Ensembles_DB |]. 
       apply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption.
-      eapply Included_trans. eapply FV_cc_Union1.
-      eapply Union_Included. now eauto with Ensembles_DB.
       eapply Included_trans.
-      eapply FV_cc_Funs_monotonic. eapply Setminus_Included.
-      eapply Included_trans. eapply project_vars_FV_cc. eassumption.
-      now eauto with Ensembles_DB...
-       - eapply project_var_occurs_free_ctx_Included;
+      eapply FV_cc_Union1. rewrite Union_commut. eapply Included_Union_compat; [| reflexivity ].
+      eapply Included_trans. eapply project_vars_FV_cc. eassumption. 
+      now eauto with Ensembles_DB. 
+    - eapply project_var_occurs_free_ctx_Included;
       [ eassumption | | now apply Included_refl ].
       rewrite occurs_free_Ehalt...
     - eapply Included_Setminus.
@@ -835,10 +830,8 @@ Module CCUtil (H : Heap).
       + eapply Included_trans. eapply Included_Setminus_compat.
         eapply IHe; eauto. reflexivity.
         eapply Setminus_Included_Included_Union.
-        eapply Included_trans. eapply FV_Union1.
-        eapply Included_trans. eapply Included_Union_compat.
-        reflexivity.
-        eapply FV_Setminus2; eauto with typeclass_instances.        
+        eapply Included_trans.
+        eapply FV_Union1. rewrite Union_commut. eapply Included_Union_compat; [| reflexivity ].
         rewrite <- project_vars_FV_eq; [| eassumption ]...
     - normalize_occurs_free. eapply Singleton_Included.
       eapply project_var_In_Union. eassumption.
@@ -859,9 +852,6 @@ Module CCUtil (H : Heap).
         eapply IHe; eauto. reflexivity.
         eapply Setminus_Included_Included_Union.
         eapply Included_trans. eapply FV_Union1.
-        eapply Included_trans. eapply Included_Union_compat.
-        reflexivity.
-        eapply FV_Setminus2; eauto with typeclass_instances.
         rewrite <- project_var_FV_eq; [| eassumption ]...
     - normalize_occurs_free. eapply Union_Included.
       + eapply Included_trans. eapply IHB; eauto.
@@ -881,16 +871,14 @@ Module CCUtil (H : Heap).
         eapply project_vars_In_Union. eassumption.
       + eapply Singleton_Included.
         eapply project_var_In_Union. eassumption.
-    - normalize_occurs_free.
+    - normalize_occurs_free. 
       eapply Union_Included.
       + eapply project_vars_In_Union. eassumption.
       + eapply Included_trans. eapply Included_Setminus_compat.
         eapply IHe; eauto. reflexivity.
         eapply Setminus_Included_Included_Union.
-        eapply Included_trans. eapply FV_Union1.
-        eapply Included_trans. eapply Included_Union_compat.
-        reflexivity.
-        eapply FV_Setminus2; eauto with typeclass_instances.        
+        eapply Included_trans.
+        eapply FV_Union1. rewrite Union_commut. eapply Included_Union_compat; [| reflexivity ].
         rewrite <- project_vars_FV_eq; [| eassumption ]...
     - rewrite occurs_free_Ehalt.
       eapply Singleton_Included.

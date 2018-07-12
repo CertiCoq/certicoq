@@ -109,7 +109,7 @@ Section CC.
   | CC_Econstr :
       forall Scope Scope' Funs Funs' fenv c Γ FVs x ys C C' t e e',
         project_vars Scope Funs fenv c Γ FVs ys C Scope' Funs' ->
-        Closure_conversion (x |: Scope') (Funs' \\ [set x]) fenv c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope') Funs' fenv c Γ FVs e e' C' ->
         Closure_conversion Scope Funs fenv c Γ FVs (Econstr x t ys e) 
                            (Econstr x t ys (C' |[ e' ]|)) C
   | CC_Ecase :
@@ -125,7 +125,7 @@ Section CC.
   | CC_Eproj :
       forall Scope Scope' Funs Funs' fenv c Γ FVs x y C C' t N e e',
         project_var Scope Funs fenv c Γ FVs y C Scope' Funs' ->
-        Closure_conversion (x |: Scope') (Funs' \\ [set x]) fenv c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope') Funs' fenv c Γ FVs e e' C' ->
         Closure_conversion Scope Funs fenv c Γ FVs (Eproj x t N y e)
                            (Eproj x t N y (C' |[ e' ]|)) C
   | CC_Efun :
@@ -157,7 +157,7 @@ Section CC.
   | CC_Eprim :
       forall Scope Scope' Funs Funs' fenv c Γ FVs x ys C C' f e e',
         project_vars Scope Funs fenv c Γ FVs ys C Scope' Funs' ->
-        Closure_conversion (x |: Scope') (Funs' \\ [set x]) fenv c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope') Funs' fenv c Γ FVs e e' C' ->
         Closure_conversion Scope Funs fenv c Γ FVs (Eprim x f ys e)
                            (Eprim x f ys (C' |[ e' ]|)) C
   | CC_Ehalt :

@@ -31,6 +31,7 @@ Module SpaceSem (H : Heap).
       | Eprim x p ys e => 0
       | Ehalt x => 1
     end.
+    
   
   (** Deterministic semantics with garbage collection upon function entry.
     * We will show that it takes asymptotically the same amount of space as perfect
@@ -97,7 +98,7 @@ Module SpaceSem (H : Heap).
     
   | Eval_app_gc :
       forall (H H' H'' : heap block) (rho rho_clo rho_clo1 rho_clo2 : env) (B : fundefs)
-        (f f' : var) (t : cTag) (xs : list var) (e : exp) (l : loc)
+        (f f' : var) (t : cTag) (xs : list var) (e : exp) (l : loc) b
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
@@ -112,10 +113,11 @@ Module SpaceSem (H : Heap).
         (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
         
         (* collect H' *)
-        (Hgc : live ((env_locs rho_clo2) (occurs_free e)) H' H'')
+        (Hgc : live' ((env_locs rho_clo2) (occurs_free e)) H' H'' b)
         (Hsize : size_heap H' = m')
         
-        (Hbs : big_step_GC H'' rho_clo2 e r (c - cost (Eapp f t ys)) m),
+        (Hbs : big_step_GC H'' (subst_env b rho_clo2)
+                           e r (c - cost (Eapp f t ys)) m),
         big_step_GC H rho (Eapp f t ys) r c (max m m')
   | Eval_halt_gc :
       forall H rho x l c m
@@ -187,7 +189,7 @@ Module SpaceSem (H : Heap).
         big_step_GC_cc H rho (Efun B e) r c m
   | Eval_app_per_cc :
       forall (H H' : heap block) (rho rho_clo : env) (B : fundefs)
-        (f f' : var) (ct : cTag) (xs : list var) (e : exp)
+        (f f' : var) (ct : cTag) (xs : list var) (e : exp) b
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost (Eapp f ct ys))
         (Hgetf : M.get f rho = Some (FunPtr B f'))
@@ -198,10 +200,10 @@ Module SpaceSem (H : Heap).
         (Hset : setlist xs vs (def_funs B B (M.empty _)) = Some rho_clo)
         
         (* collect H' *)
-        (Hgc : live' ((env_locs rho_clo) (occurs_free e)) H H')
+        (Hgc : live' ((env_locs rho_clo) (occurs_free e)) H H' b)
         (Hsize : size_heap H = m')
         
-        (Hbs : big_step_GC_cc H' rho_clo e r (c - cost (Eapp f ct ys)) m),
+        (Hbs : big_step_GC_cc H' (subst_env b rho_clo) e r (c - cost (Eapp f ct ys)) m),
         big_step_GC_cc H rho (Eapp f ct ys) r c (max m m')
   | Eval_halt_per_cc :
       forall H rho x l c m

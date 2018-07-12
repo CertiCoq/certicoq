@@ -292,7 +292,15 @@ Module HeapDefs (H : Heap) .
   Qed.
   
   (* XXX end move *)
+
+  Definition subst_val b (v : value) : value :=
+    match v with
+      | Loc l => Loc (b l)
+      | FunPtr _ _ => v
+    end.
   
+  Definition subst_env b rho := M.map (fun _ => subst_val b) rho.
+
   Definition restrict_env (s : PS.t) (rho : env) : env :=
     filter (fun i _ => PS.mem i s) rho.
   

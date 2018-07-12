@@ -59,23 +59,24 @@ Module Size (H : Heap).
                     | (t, e) :: l => max (cost_env_app_exp e) (sizeOf_l l)
                   end) l)
       | Eproj x _ _ y e => max 3 (cost_env_app_exp e)
-      | Efun B e => max (1 + PS.cardinal (fundefs_fv B)) (cost_env_app_exp e)
+      | Efun B e => max (4 + 4 * PS.cardinal (fundefs_fv B)) (cost_env_app_exp e)
       | Eapp x _ ys => 3 + 3 * length ys
       | Eprim x _ ys e => max (length ys) (cost_env_app_exp e)
-      | Ehalt x => 1
+      | Ehalt x => 3
     end.
+
 
   Definition cost_env_app_exp_out (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => 3 * length ys
       | Ecase x l => 3
       | Eproj x _ _ y e => 3
-      | Efun B e => 1 + PS.cardinal (fundefs_fv B)
+      | Efun B e => 3 * PS.cardinal (fundefs_fv B)
       | Eapp x _ ys => 3 * length ys
       | Eprim x _ ys e => length ys
-      | Ehalt x => 1
+      | Ehalt x => 3
     end.
-
+  
   (** The extra cost incurred by evaluating an expression up to the next call *)
   Definition cost_mem_exp
              (Funs : Ensemble var) {_ : ToMSet Funs}
@@ -456,20 +457,21 @@ Module Size (H : Heap).
     cost_env_app_exp_out e <= cost_env_app_exp e.
   Proof.
     induction e; try eapply Max.le_max_l.
-    simpl. omega.
+    eapply le_trans; [| eapply Max.le_max_l ]. simpl. omega.
+    simpl. omega. 
     simpl. omega.
   Qed.
 
   
   (** * Compat lemmas *)
   
-  Lemma PostBase H1 H2 rho1 rho2 e1 e2 k m
+  Lemma PostBase e1 e2 k m
         (Funs : Ensemble var) { _ : ToMSet Funs} :
     k <= cost_env_app_exp_out e1 ->
-    InvCostBase (Post k m Funs) (Pre m) H1 H2 rho1 rho2 e1 e2.
+    InvCostBase (Post k m Funs) (Pre m) e1 e2.
   Proof.
     unfold InvCostBase, Post, Pre.
-    intros Hleq H1' H2' rho1' rho2' c b1 b2  Heq1 Hinj1 Heq2 Hinj2 Hm.
+    intros Hleq H1' H2' rho1' rho2' c  Hm.
     split.
     + split. omega.
       rewrite NPeano.Nat.mul_add_distr_l, Nat.mul_1_r.
@@ -477,6 +479,7 @@ Module Size (H : Heap).
       eapply le_trans. eassumption.
       eapply le_trans. eapply cost_env_app_exp_out_le.
       rewrite <- (Nat.mul_1_l (cost_env_app_exp _)). eapply mult_le_compat.
+      (* Add precondition to compat lemma *)
       admit. eapply Nat.le_max_l. 
     + simpl. eapply le_trans. eassumption. omega.
   Admitted. 
@@ -543,107 +546,92 @@ Module Size (H : Heap).
         b d H1 H2 rho1 rho2 x c ys1 ys2 e1 e2 :
     Forall2 (cc_approx_var_env i j IP P b d H1 rho1 H2 rho2) ys1 ys2 ->
     InvCtxCompat (Post (cost_env_app_exp_out (Econstr x c ys1 e1)) m Funs)
-                 (Post 0 m Funs)
-                 H1 H2 rho1 rho2 (Econstr_c x c ys1 Hole_c) (Econstr_c x c ys2 Hole_c) e1 e2.
+                 (Post 0 m Funs) (Econstr_c x c ys1 Hole_c) (Econstr_c x c ys2 Hole_c) e1 e2.
   Proof with (now eauto with Ensembles_DB).
     unfold InvCtxCompat, Post.
     intros Hall H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1 c2 c1' c2'
-           m1 m2 b1 b2 Heq1 Hinj1 Heq2 Hinj2 [[Hc1 Hc2] Hm] Hctx1 Hctx2.
+           m1 m2 [[Hc1 Hc2] Hm] Hctx1 Hctx2.
     assert (Hlen := Forall2_length _ _ _ Hall). 
     inv Hctx1. inv Hctx2. inv H13. inv H16.
     rewrite !plus_O_n in *. simpl cost_ctx in *.
     rewrite !Hlen in *.
-    eapply Forall2_monotonic_strong
-      with (R' := fun y1 y2 : var =>
-                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) (lift b2 ∘ d ∘ b1)
-                                      H1' rho1' H2' rho2' y1 y2) in Hall.
-    { edestruct cc_approx_var_env_getlist as [vs2' [Hget2' Hcc]]; try eassumption.
-      split.
-      - split.
-        + rewrite !(plus_comm _ (S (length _))). rewrite <- !plus_assoc.
-          assert (Hleq : c1 <= c2).
-          { omega. }
-          eapply plus_le_compat_l. eapply le_trans.
-          eapply plus_le_compat_r. eassumption. reflexivity.
-          (* eapply plus_le_compat_l. *)
-          (* simpl. eapply Max.le_max_r. *)
-        + rewrite NPeano.Nat.mul_add_distr_r.
-          rewrite <- plus_assoc, (plus_comm (S (length _))). 
-          eapply plus_le_compat.
-          eapply le_trans; [ | eapply le_trans; [ now apply Hc2 |] ].
-          omega.
-          eapply mult_le_compat_l.
-          erewrite cost_time_heap_alloc; [| eassumption ]. simpl cost_block.
-          rewrite Max.max_0_l.
-          eapply plus_le_compat_l. eapply NPeano.Nat.max_le_compat_r.
-          now eapply Max.le_max_r.
-          
-          rewrite NPeano.Nat.mul_add_distr_l, Nat.mul_1_r.
-          rewrite plus_comm. eapply plus_le_compat_l.
-          rewrite <- (Nat.mul_1_l (cost_env_app_exp_out _)).
-          eapply mult_le_compat. omega.
-          eapply le_trans; [| eapply Max.le_max_l ].
-          eapply cost_env_app_exp_out_le.
-      - eapply le_trans. eassumption.
-         
-        rewrite <- !plus_assoc.
-        eapply plus_le_compat_l. simpl. eapply plus_le_compat_r.
- 
-        eapply Nat.max_le_compat_l.
-        erewrite cost_mem_heap_alloc; [| eassumption ].
-        reflexivity.  }
-    intros y1 y2 Hin1 Hin2 Hcc.
-    eapply cc_approx_var_env_heap_env_equiv; try eassumption.
-    simpl; normalize_occurs_free...
-    simpl; normalize_occurs_free...
+    split.
+    - split.
+      + rewrite !(plus_comm _ (S (length _))). rewrite <- !plus_assoc.
+        assert (Hleq : c1 <= c2).
+        { omega. }
+        eapply plus_le_compat_l. eapply le_trans.
+        eapply plus_le_compat_r. eassumption. reflexivity.
+      + rewrite NPeano.Nat.mul_add_distr_r.
+        rewrite <- plus_assoc, (plus_comm (S (length _))). 
+        eapply plus_le_compat.
+        eapply le_trans; [ | eapply le_trans; [ now apply Hc2 |] ].
+        omega.
+        eapply mult_le_compat_l.
+        erewrite cost_time_heap_alloc; [| eassumption ]. simpl cost_block.
+        rewrite Max.max_0_l.
+        eapply plus_le_compat_l. eapply NPeano.Nat.max_le_compat_r.
+        now eapply Max.le_max_r.
+        
+        rewrite NPeano.Nat.mul_add_distr_l, Nat.mul_1_r.
+        rewrite plus_comm. eapply plus_le_compat_l.
+        rewrite <- (Nat.mul_1_l (cost_env_app_exp_out _)).
+        eapply mult_le_compat. omega.
+        eapply le_trans; [| eapply Max.le_max_l ].
+        eapply cost_env_app_exp_out_le.
+    - eapply le_trans. eassumption.
+      
+      rewrite <- !plus_assoc.
+      eapply plus_le_compat_l. simpl. eapply plus_le_compat_r.
+      
+      eapply Nat.max_le_compat_l.
+      erewrite cost_mem_heap_alloc; [| eassumption ].
+      reflexivity.
   Qed.
   
   Lemma PreConstrCompat i j IP P
         m b d H1 H2 rho1 rho2 x c ys1 ys2 e1 e2 :
     Forall2 (fun y1 y2 => cc_approx_var_env i j IP P b d H1 rho1 H2 rho2 y1 y2) ys1 ys2 -> 
     IInvCtxCompat (Pre m) (Pre m )
-                  H1 H2 rho1 rho2 (Econstr_c x c ys1 Hole_c) (Econstr_c x c ys2 Hole_c) e1 e2.
+                  (Econstr_c x c ys1 Hole_c) (Econstr_c x c ys2 Hole_c) e1 e2.
   Proof with (now eauto with Ensembles_DB).
     unfold IInvCtxCompat, Pre.
     intros Hall H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1' c2'
-           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx1 Hctx2.
+           Hm Hctx1 Hctx2.
     inv Hctx1. inv Hctx2. inv H13. inv H16.
-    assert (Hlen := Forall2_length _ _ _ Hall).
-    eapply Forall2_monotonic_strong
-      with (R' := fun y1 y2 : var =>
-                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) (lift b2 ∘ d ∘ b1) H1' rho1' H2' rho2' y1 y2) in Hall.
-    { edestruct cc_approx_var_env_getlist as [vs2' [Hget2' Hcc]]; try eassumption.
-      unfold size_heap in *.
-      erewrite HL.size_with_measure_alloc; [| reflexivity | eassumption ].
-      erewrite (HL.size_with_measure_alloc _ _ _ _ H1''); [| reflexivity | eassumption ].
-      simpl size_val. rewrite !(plus_comm _ (S (length _))), <- !plus_assoc.
-      eapply plus_le_compat.
-      repeat subst_exp. eapply Forall2_length in Hcc. omega.
-      eassumption. }
-    intros y1 y2 Hin1 Hin2 Hcc.
-    eapply cc_approx_var_env_heap_env_equiv; try eassumption.
-    simpl; normalize_occurs_free...
-    simpl; normalize_occurs_free...
+    
+    unfold size_heap in *.
+    erewrite HL.size_with_measure_alloc; [| reflexivity | eassumption ].
+    erewrite (HL.size_with_measure_alloc _ _ _ _ H1''); [| reflexivity | eassumption ].
+    simpl size_val. rewrite !(plus_comm _ (S (length _))), <- !plus_assoc.
+    eapply plus_le_compat.
+    repeat subst_exp. eapply Forall2_length in Hall.
+    eapply (@getlist_length_eq value) in H11; try eassumption.
+    eapply (@getlist_length_eq value) in H14; try eassumption.
+    subst. rewrite <- H14, <- H11.
+    replace (@length var ys1) with (@length M.elt ys1) in *. rewrite  Hall.
+    reflexivity. 
+    reflexivity.
+    omega. 
   Qed.
   
 
   Lemma PostProjCompat
-        m (Funs : Ensemble var) {Hf : ToMSet Funs}
-        H1 H2 rho1 rho2 x c y1 y2 e1 e2 n :
+        m (Funs : Ensemble var) {Hf : ToMSet Funs} x c y1 y2 e1 e2 n :
     InvCtxCompat (Post (cost_env_app_exp_out (Eproj x c n y1 e1)) m Funs)
                  (Post 0 m Funs)
-                 H1 H2 rho1 rho2 (Eproj_c x c n y1 Hole_c) (Eproj_c x c n y2 Hole_c) e1 e2.
+                 (Eproj_c x c n y1 Hole_c) (Eproj_c x c n y2 Hole_c) e1 e2.
   Proof with (now eauto with Ensembles_DB).
     unfold InvCtxCompat, Post.
     intros H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1 c2 c1' c2'
-           m1 m2 b d Heq1 Hinj1 Heq2 Hinj2 [[Hc1 Hc2] Hm] Hctx1 Hctx2.
-    inv Hctx1. inv Hctx2. inv H15. inv H19.
+           m1 m2 [[Hc1 Hc2] Hm] Hctx1 Hctx2.
+    inv Hctx1. inv Hctx2. inv H17. inv H13.
     split.
     - split.
-      + assert (Hleq : c1 <= c2).
+      + assert (Hleq : c1 <= c2). 
         { omega. }
         simpl cost_ctx. eapply le_trans. eapply plus_le_compat_r.
-        eapply plus_le_compat_r. eassumption. omega.
+        eapply plus_le_compat_r. eassumption. simpl. omega.
       + rewrite !plus_O_n.  
         rewrite NPeano.Nat.mul_add_distr_r.
         rewrite <- plus_assoc, (plus_comm (cost_ctx _)). 
@@ -660,38 +648,19 @@ Module Size (H : Heap).
         eapply mult_le_compat. simpl. omega.
         eapply le_trans. eapply cost_env_app_exp_out_le. eapply Max.le_max_l.
     - eassumption.
-      (* eapply le_trans. eassumption. reflexivity. *)
-      (* rewrite <- !plus_assoc. *)
-      (* eapply plus_le_compat_l. simpl.  *)
-      (* reflexivity. eapply plus_le_compat_l. *)
-      (* eapply Nat.max_le_compat; [| simpl; omega ]. *)
-      (* eapply le_trans. *)
-      (* eapply (cost_mem_exp_Scope_antimon (x |: Scope) Scope). *)
-      (* now eauto with Ensembles_DB. *)
-      (* rewrite cost_mem_exp_inv_exp with (e := (Eproj x c n y1 e1)) (e' := e1); [| reflexivity ]. *)
-      (* eapply cost_mem_exp_Fun_mon... *)
-      (* eapply NPeano.Nat.eq_le_incl. *)
-      (* eapply size_cc_heap_Same_Set_compat. rewrite env_locs_set_not_In. *)
-      (* rewrite Setminus_Disjoint.  reflexivity. *)
-      (* eapply Disjoint_Singleton_r. eassumption. *)
-      (* intros Hc; inv Hc; eauto. *)
   Qed.
   
-  Lemma PreProjCompat H1 H2 rho1 rho2 x1 x2 c n y1 y2 e1 e2 
+  Lemma PreProjCompat x1 x2 c n y1 y2 e1 e2 
     m (Funs : Ensemble var) {Hf : ToMSet Funs} :
     IInvCtxCompat (Pre m) (Pre m)
-                  H1 H2 rho1 rho2 (Eproj_c x1 c n y1 Hole_c) (Eproj_c x2 c n y2 Hole_c) e1 e2.
+                  (Eproj_c x1 c n y1 Hole_c) (Eproj_c x2 c n y2 Hole_c) e1 e2.
   Proof with (now eauto with Ensembles_DB).
     unfold IInvCtxCompat, Pre.
     intros H1' H2' H1'' H2'' rho1' rho2' rho1'' rho2'' c1' c2'
-           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm1 Hctx1 Hctx2.
-    inv Hctx1. inv Hctx2. inv H15. inv H19.
-    eapply le_trans. eassumption. eapply plus_le_compat_l.
+           Hm1 Hctx1 Hctx2.
+    inv Hctx1. inv Hctx2. inv H13. inv H17. 
+    eapply le_trans. eassumption. eapply plus_le_compat_r.
     reflexivity.
-    (* unfold size_cc_heap. *)
-    (* eapply HL.size_with_measure_minus_Included. *)
-    (* rewrite env_locs_set_not_In. eapply env_locs_monotonic... *)
-    (* intros Hc; inv Hc; eauto. *)
   Qed.
   
 
@@ -1116,7 +1085,7 @@ Module Size (H : Heap).
         do 2 setoid_rewrite <- mset_eq at 1.
         rewrite !(Intersection_commut _ (FromList FVs \\ _)).
         eapply project_var_Scope_Funs_eq in Hvar'''. 
-        rewrite Hvar'''.
+        rewrite Hvar'''. 
         admit. (* sets... *)
         (* rewrite <- Intersection_Union_distr. *)
         (* eapply Same_set_Intersection_compat; [| reflexivity ]. *)
@@ -1194,48 +1163,35 @@ Module Size (H : Heap).
   Qed.
    *)
   
-  Lemma PreCtxCompat_var_r H1 H2 rho1 rho2 C e1 e2
+  Lemma PreCtxCompat_var_r C e1 e2
         Scope Scope' Funs {_ : ToMSet Funs} Funs' {_ : ToMSet Funs'}
         fenv c Γ FVs x m :
     project_var Util.clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
-    IInvCtxCompat_r (Pre m) (Pre (m + 3 * PS.cardinal (@mset (Funs \\ Funs') _))) H1 H2 rho1 rho2 C e1 e2.
+    IInvCtxCompat_r (Pre m) (Pre (m + 3 * PS.cardinal (@mset (Funs \\ Funs') _))) C e1 e2.
   Proof.
     intros Hvar.
     unfold IInvCtxCompat_r, Pre.
-    intros H1' H2' H2'' rho1' rho2' rho2'' c1'
-           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx.
+    intros H1' H2' H2'' rho1' rho2' rho2'' c1' Hm Hctx.
     erewrite (ctx_to_heap_env_CC_size_heap _ _ _ H2' H2''); [| eassumption ].
     erewrite (project_var_cost_alloc_eq Scope Scope' Funs Funs'); [| eassumption ].
     eapply le_trans. eapply plus_le_compat_r. eassumption.
     rewrite <- plus_assoc. eapply plus_le_compat_l.
     omega.
-    (* unfold mset. rewrite <- plus_assoc, <- NPeano.Nat.mul_add_distr_l. *)
-    (* rewrite PS_cardinal_union.  *)
-    (* rewrite Proper_carinal. eassumption.  *)
-    (* eapply Same_set_From_set. setoid_rewrite <- mset_eq. *)
-    (* rewrite FromSet_union. rewrite <- !mset_eq at 1. *)
-    (* eapply Same_set_Intersection_Setminus. eapply Decidable_ToMSet. eassumption. *)
-    (* eapply project_var_Scope_l. eassumption. *)
-    (* eapply FromSet_disjoint. *)
-    (* do 2 setoid_rewrite <- mset_eq at 1. *)
-    (* eapply Disjoint_Setminus_r. *)
-    (* eapply Included_trans. eapply Included_Intersection_r. *)
-    (* now eauto with Ensembles_DB. *)
   Qed.
 
   
   Lemma PostCtxCompat_var_r
         Scope {Hs : ToMSet Scope} Scope' {Hs' : ToMSet Scope'} Funs {Hf : ToMSet Funs}
         Funs' {Hf' : ToMSet Funs'} fenv
-        H1 H2 rho1 rho2 C e1 e2 c Γ FVs x k m s :
+        C e1 e2 c Γ FVs x k m s :
     project_var Util.clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
     cost_ctx_full C + m <= k ->
     InvCtxCompat_r (Post m (s + 3 * PS.cardinal (@mset (Funs \\ Funs') _)) (Funs \\ Scope))
-                   (Post k s (Funs' \\ Scope')) H1 H2 rho1 rho2 C e1 e2.
+                   (Post k s (Funs' \\ Scope')) C e1 e2.
   Proof.
     unfold InvCtxCompat_r, Post.
     intros Hvar Hleq H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
-           b1 b2 Heq1 Hinj1 Heq2 Hinj2 [[Hs1 Hs2] Hm] Hctx'.   
+           [[Hs1 Hs2] Hm] Hctx'.   
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
     subst.  
     assert (Heq := project_var_cost_eq _ _ _ _ _ _ _ _ _ _ Hvar). rewrite !Heq.
@@ -1259,14 +1215,13 @@ Module Size (H : Heap).
  Lemma PreCtxCompat_vars_r
        Scope {Hs : ToMSet Scope} Scope' {Hs' : ToMSet Scope'} Funs {Hf : ToMSet Funs}
        Funs' {Hf' : ToMSet Funs'} fenv
-       H1 H2 rho1 rho2 C e1 e2 c Γ FVs x m :
+       C e1 e2 c Γ FVs x m :
    project_vars Util.clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
-   IInvCtxCompat_r (Pre m) (Pre (m + 3 * PS.cardinal (@mset (Funs \\ Funs') _))) H1 H2 rho1 rho2 C e1 e2.
+   IInvCtxCompat_r (Pre m) (Pre (m + 3 * PS.cardinal (@mset (Funs \\ Funs') _))) C e1 e2.
   Proof.
     intros Hvar.
     unfold IInvCtxCompat_r, Pre.
-    intros H1' H2' H2'' rho1' rho2' rho2'' k
-           b1 b2 Heq1 Hinj1 Heq2 Hinj2 Hm Hctx. subst. eauto. 
+    intros H1' H2' H2'' rho1' rho2' rho2'' k Hm Hctx. subst. eauto. 
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx).
     subst.  
     assert (Heq := project_vars_cost_eq _ _ _ _ _ _ _ _ _ _ Hvar).  
@@ -1279,15 +1234,15 @@ Module Size (H : Heap).
    Lemma PostCtxCompat_vars_r
        Scope {Hs : ToMSet Scope} Scope' {Hs' : ToMSet Scope'} Funs {Hf : ToMSet Funs}
        Funs' {Hf' : ToMSet Funs'} fenv
-       H1 H2 rho1 rho2 C e1 e2 c Γ FVs x k m s :
+       C e1 e2 c Γ FVs x k m s :
    project_vars Util.clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
    cost_ctx_full C + m <= k ->
    InvCtxCompat_r (Post m (s + 3 * PS.cardinal (@mset (Funs \\ Funs') _)) (Funs \\ Scope))
-                  (Post k s (Funs' \\ Scope')) H1 H2 rho1 rho2 C e1 e2.
+                  (Post k s (Funs' \\ Scope')) C e1 e2.
    Proof.
     unfold InvCtxCompat_r, Pre.
     intros Hvar Hleq H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
-           b1 b2 Heq1 Hinj1 Heq2 Hinj2 [[Hs1 Hs2] Hm] Hctx'.
+           [[Hs1 Hs2] Hm] Hctx'.
     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
     assert (Heq := project_vars_cost_eq _ _ _ _ _ _ _ _ _ _ Hvar). subst.
     rewrite !Heq.
@@ -1303,39 +1258,38 @@ Module Size (H : Heap).
     eapply project_vars_Scope_l. eassumption.
    Qed.
 
-  Lemma cost_heap_GC H1 H2 S `{ToMSet S} c: 
-    live S H1 H2 ->
+  Lemma cost_heap_GC H1 H2 S `{ToMSet S} c b : 
+    live' S H1 H2 b ->
     cost_heap c H2 <= cost_heap c H1.
   Proof.
   Admitted.
   
-  Lemma cost_time_heap_GC H1 H2 S `{ToMSet S} : 
-    live S H1 H2 ->
+  Lemma cost_time_heap_GC H1 H2 S `{ToMSet S} b : 
+    live' S H1 H2 b ->
     cost_time_heap H2 <= cost_time_heap H1.
   Proof.
     intros. eapply cost_heap_GC.
-    eassumption.
+    eassumption. eassumption.
   Qed.
 
-  Lemma cost_mem_heap_GC H1 H2 S `{ToMSet S} : 
-    live S H1 H2 ->
+  Lemma cost_mem_heap_GC H1 H2 S `{ToMSet S} b : 
+    live' S H1 H2 b ->
     cost_mem_heap H2 <= cost_mem_heap H1.
   Proof.
-    intros. eapply cost_heap_GC.
-    eassumption.
+    intros. eapply cost_heap_GC; eassumption.
   Qed.
 
-  Lemma size_cc_heap_GC H1 H2 S `{ToMSet S} F `{ToMSet F}:
-    live S H1 H2 ->
-    size_cc_heap F H2 <= size_cc_heap F H1.
+  Lemma size_cc_heap_GC H1 H2 S `{ToMSet S} F `{ToMSet F} b :
+    live' S H1 H2 b ->
+    size_cc_heap (image b F) H2 <= size_cc_heap F H1.
   Proof.
   Admitted.
 
   Lemma PostGC : (InvGC PostG).
   Proof.
     unfold InvGC, PostG. 
-    intros H1 H1' H2 H2' rho1 rho2 e1 e2 Scopes Hs Funs Hf c1 c2 m1 m2
-           [[Hc1 Hc2] Hm] Hl1 Hl2.
+    intros H1 H1' H2 H2' rho1 rho2 e1 e2 Scopes Hs
+           Funs Hf c1 c2 m1 m2 b1 b2 [[Hc1 Hc2] Hm] Hl1 Hl2.
     split.
     - eapply cost_time_heap_GC in Hl1.
       
@@ -1344,15 +1298,16 @@ Module Size (H : Heap).
       eapply mult_le_compat_l.
       eapply plus_le_compat_l.
       eapply NPeano.Nat.max_le_compat_l. eassumption.
-      
+      tci. 
     - eapply le_trans. eassumption.
       eapply plus_le_compat.
       eapply plus_le_compat_l.
       eapply NPeano.Nat.max_le_compat_l.
       eapply cost_mem_heap_GC in Hl1. eassumption.
-      eapply size_cc_heap_GC in Hl1. eassumption.
-  Qed.
-  
+      tci. tci.
+      eapply size_cc_heap_GC in Hl1; tci.
+  Abort.
+
   Lemma fun_in_fundefs_cost_mem_fundefs Funs {Hf : ToMSet Funs} B f tau xs e: 
     fun_in_fundefs B (f, tau, xs, e) ->
     cost_mem_exp (Funs \\ (FromList xs)) e <= cost_mem_fundefs Funs B.
@@ -1387,15 +1342,11 @@ Module Size (H : Heap).
     intros Hall Hk Hnin1 Hnin2 _ H1' H1'' H2'
            rhoc1 rhoc2 rhoc3 rho1' rho2' rho2''
            b1 b2 B1 f1' ct1 xs1' e1 l1 vs1 B
-           f3 c ct2 xs2' e2 l2 env_loc2 vs2 c1 c2 m1 m2
+           f3 c ct2 xs2' e2 l2 env_loc2 vs2 c1 c2 m1 m2 k1 k2 d3 d4
            Heq1 Hinj1 Heq2 Hinj2
-           [[Hc1 Hc2] Hm1] Hh1
-           Hgetf1 Hgetl1 Hfind1 Hgetxs1 Hclo Hset1
-           Hgetf2 Hgetxs2 Hset2 Hgetl2 Hfind2.
-    eapply Forall2_monotonic_strong
-      with (R' := fun y1 y2 : var =>
-                    cc_approx_var_env i j IP P (b2 ∘ b ∘ b1) _
-                                      H1' rho1' H2' rho2' y1 y2) in Hall.
+           [[Hc1 Hc2] Hm1] Hh1 
+           Hgetf1 Hgetl1 Hfind1 Hgetxs1 Hclo Hset1 Hgc1
+           Hgetf2 Hgetxs2 Hset2 Hgetl2 Hfind2 Hgc2. 
     assert (Hlen := Forall2_length _ _ _ Hall). inversion Hlen as [Hlen']. 
     { rewrite <- !plus_n_O in *. 
       rewrite !Hlen' in *.
@@ -1413,13 +1364,14 @@ Module Size (H : Heap).
             eapply find_def_correct. eassumption.
             eapply max_heap_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1.
             eassumption.
-            erewrite cost_time_heap_def_closures; [| eassumption ].
+            eapply le_trans. eapply cost_time_heap_GC; [ | eassumption ]. tci.
+            erewrite cost_time_heap_def_closures with (H1 := H1') (H1' := H1''); [| eassumption ].
             eapply Max.max_lub.
             eapply max_heap_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1.
             eassumption.
             reflexivity.
           * rewrite Nat.mul_add_distr_l, Nat.mul_1_r.
-            rewrite !plus_assoc.
+            rewrite !plus_assoc. 
             replace (1 + 1 + (cost (Eapp f2' t (Γ :: xs2)))) with (cost (Eapp f1 t xs1) + 3)
               by (simpl; omega).
             rewrite <- plus_assoc. eapply plus_le_compat_l.
@@ -1436,7 +1388,10 @@ Module Size (H : Heap).
           eapply plus_le_compat.
 
           (* euality of cost terms *)
-          * erewrite (cost_mem_heap_def_closures H1' H1''); [| eassumption ].
+          * eapply le_trans.
+            eapply NPeano.Nat.max_le_compat_l.
+            eapply cost_mem_heap_GC; [| eassumption ]. tci.
+            erewrite (cost_mem_heap_def_closures H1' H1''); [| eassumption ].
             eapply le_trans; [| eapply Max.le_max_r ].
             rewrite Max.max_r.
             
@@ -1449,99 +1404,10 @@ Module Size (H : Heap).
             eapply find_def_correct. eassumption.
             simpl. now eapply Max.le_max_l.
 
-          * 
-            simpl. 
+          * admit. (* additional invariant on cost *)
 
-            
-            reflexivity.
-unfold cost_mem_exp. unfold mset. simpl. 
-            
-          admit.
-          
         + eapply le_trans. eassumption. omega.
-
-
-        eapply NPeano.Nat.max_lub_iff. split.
-        + eapply le_trans. eassumption.
-          rewrite <- !Max.plus_max_distr_r. 
-          erewrite (size_cc_heap_def_closures _ H1' H1''); [ | | eassumption | ].
-          eapply le_trans; [| now eapply Max.le_max_l ].
-          
-          
-
-
-          * rewrite <- !Max.plus_max_distr_r.
-          * eapply le_trans. eassumption.
-            unfold mset at 1. 
-            
-            eapply plus_le_compat_r. eapply plus_le_compat_r. eapply plus_le_compat_l.
-          eapply Max.max_lub.
-          erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
-          eapply max_vars_heap_get. eassumption.
-          eapply le_trans; [| eapply Max.le_max_l].
-          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          eapply le_trans.
-          eapply exp_max_vars_exp_num_vars.
-          eapply le_trans. 
-          eapply fun_in_fundefs_exp_num_vars.
-          eapply find_def_correct. eassumption.
-          simpl. omega.
-          rewrite <- !plus_assoc, (plus_comm (max_heap_exp _ _)), !plus_assoc. 
-          eapply plus_le_compat. eassumption.
-          eapply le_trans; [| eapply Max.le_max_l].
-          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          simpl.
-          eapply le_trans. eapply  numOf_fundefs_fundefs_num_vars_le.
-          omega. 
-        + rewrite <- !plus_assoc, (plus_comm (max_heap_exp _ _)), !plus_assoc. 
-          eapply plus_le_compat_r. rewrite <- !NPeano.Nat.mul_max_distr_r.
-          rewrite <- !Max.plus_max_distr_r.
-          eapply NPeano.Nat.max_le_compat.
-          eapply le_trans. eapply Nat.add_le_mono_r in Hm2. eassumption.
-          eapply mult_le_compat_l.
-          eapply plus_le_compat_l.
-          eapply le_trans; [| eapply Max.le_max_l].
-          eapply Max.max_lub.
-          erewrite <- max_vars_heap_def_closures; try eassumption. reflexivity.
-          eapply max_vars_heap_get. eassumption.
-          eapply le_trans; [| eapply max_vars_heap_get; now apply Hgetl1 ].
-          eapply le_trans.
-          eapply exp_max_vars_exp_num_vars.
-          eapply le_trans. 
-          eapply fun_in_fundefs_exp_num_vars.
-          eapply find_def_correct. eassumption.
-          simpl. omega.
-          eapply le_trans. eassumption.
-          eapply mult_le_compat_r.
-          erewrite (def_closures_size _ _ _ H1' _ H1''); try eassumption.
-          omega. }
-    { intros y1 y2 Hin1 Hin2 Hcc.
-      eapply cc_approx_var_env_heap_env_equiv; try eassumption.
-      now inv Hin1; eauto.
-      unfold AppClo. repeat normalize_occurs_free.
-      inv Hin2; eauto. 
-      right. constructor. right. constructor.
-      left. rewrite FromList_cons. right. eassumption.
-      intros Hc. eapply Hnin1. inv Hc; eauto.
-      intros Hc. eapply Hnin2. inv Hc; eauto.  }
-  Qed.
-
-
-  Lemma exp_max_vars_exp_num_vars e :
-    exp_max_vars e <= exp_num_vars e.
-  Proof.
-    revert e. eapply exp_ind'; intros; try (simpl; omega).
-    simpl. 
-    eapply NPeano.Nat.max_lub.
-    omega. omega. 
-  Qed.
-
-  Lemma numOf_fundefs_fundefs_num_vars_le B1 :
-    numOf_fundefs B1 <= fundefs_num_vars B1.
-  Proof.
-    induction B1; eauto. simpl. omega.
-  Qed.
-
+  Admitted. 
 
   (* Lemma sizeOf_env_setlist k H rho rho' xs vs : *)
   (*   setlist xs vs rho = Some rho' -> *)
@@ -1750,124 +1616,124 @@ unfold cost_mem_exp. unfold mset. simpl.
   (* Qed. *)
   
 
-  Lemma occurs_free_cardinality_mut :
-    (forall e FVs,
-       FromList FVs \subset occurs_free e ->
-       NoDup FVs ->
-       length FVs <= exp_num_vars e) /\
-    (forall B FVs,
-       FromList FVs \subset occurs_free_fundefs B ->
-       NoDup FVs ->
-       length FVs <= fundefs_num_vars B).
-  Proof.
-    exp_defs_induction IHe IHl IHb; intros FVs Heq Hnd;
-    try repeat normalize_occurs_free_in_ctx; simpl.
-    - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-      eassumption.
-      rewrite <- HP in Hnd.
-      eapply Permutation_length in HP. rewrite <- HP.
-      rewrite app_length.
-      eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
-        [| now apply Setminus_Included ].
-      eapply Same_set_FromList_length in Hin1.
-      eapply IHe in Hin2. omega.
-      eapply NoDup_cons_r; eauto. 
-      eapply NoDup_cons_l; eauto.
-    - rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
-      rewrite <- FromList_nil, <- FromList_cons in Heq.
-      eapply Same_set_FromList_length in Heq; eauto.
-    - rewrite Union_commut, <- Union_assoc, (Union_commut (occurs_free (Ecase v l))),
-      (Union_Same_set [set v]) in Heq.
-      edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-      eassumption.
-      rewrite <- HP in Hnd.
-      eapply Permutation_length in HP. rewrite <- HP.
-      rewrite !app_length.
-      eapply IHe in Hin1. eapply IHl in Hin2. simpl in *. omega.
-      eapply NoDup_cons_r; eauto. 
-      eapply NoDup_cons_l; eauto.
-      eapply Singleton_Included. eauto.
-    - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-      eassumption.
-      rewrite <- HP in Hnd.
-      eapply Permutation_length in HP. rewrite <- HP.
-      rewrite app_length.
-      eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
-        [| now apply Setminus_Included ].
-      rewrite <- (Union_Empty_set_neut_r [set v0]) in Hin1.
-      rewrite <- FromList_nil, <- FromList_cons in Hin1.
-      eapply Same_set_FromList_length in Hin1.
-      eapply IHe in Hin2. simpl in *. omega.
-      eapply NoDup_cons_r; eauto. 
-      eapply NoDup_cons_l; eauto.
-    - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-      eassumption.
-      rewrite <- HP in Hnd.
-      eapply Permutation_length in HP. rewrite <- HP.
-      rewrite app_length.
-      eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) _)) in Hin2;
-        [| now apply Setminus_Included ].
-      eapply IHb in Hin1. eapply IHe in Hin2. omega.
-      eapply NoDup_cons_r; eauto. 
-      eapply NoDup_cons_l; eauto.
-    - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-      eassumption. rewrite <- HP in Hnd.
-      eapply Same_set_FromList_length in Hin1; eauto.
-      eapply Permutation_length in HP. rewrite <- HP.
-      rewrite app_length.
-      rewrite <- (Union_Empty_set_neut_r [set v]) in Hin2.
-      rewrite <- FromList_nil, <- FromList_cons in Hin2.
-      eapply Same_set_FromList_length in Hin2.
-      simpl in *. omega.
-      eapply NoDup_cons_r; eauto. 
-      eapply NoDup_cons_l; eauto.
-    - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-      eassumption.
-      rewrite <- HP in Hnd.
-      eapply Permutation_length in HP. rewrite <- HP.
-      rewrite app_length.
-      eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
-        [| now apply Setminus_Included ].
-      eapply Same_set_FromList_length in Hin1.
-      eapply IHe in Hin2. omega.
-      eapply NoDup_cons_r; eauto. 
-      eapply NoDup_cons_l; eauto.
-    - rewrite occurs_free_Ehalt in Heq.
-      rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
-      rewrite <- FromList_nil, <- FromList_cons in Heq.
-      eapply Same_set_FromList_length in Heq; eauto.
-    - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-      eassumption. rewrite <- HP in Hnd.
-      eapply Permutation_length in HP. rewrite <- HP.
-      rewrite app_length.
-      eapply (Included_trans (FromList l2) (Setminus var _ [set v])) in Hin2;
-        [| now apply Setminus_Included ].
-      eapply (Included_trans (FromList l1) (Setminus var _ _)) in Hin1;
-        [| now apply Setminus_Included ]. 
-      eapply IHe in Hin1. eapply IHb in Hin2. omega.
-      eapply NoDup_cons_r; eauto. 
-      eapply NoDup_cons_l; eauto.
-    - rewrite <- FromList_nil in Heq.
-      apply Same_set_FromList_length in Heq; eauto.
-  Qed.
+  (* Lemma occurs_free_cardinality_mut : *)
+  (*   (forall e FVs, *)
+  (*      FromList FVs \subset occurs_free e -> *)
+  (*      NoDup FVs -> *)
+  (*      length FVs <= exp_num_vars e) /\ *)
+  (*   (forall B FVs, *)
+  (*      FromList FVs \subset occurs_free_fundefs B -> *)
+  (*      NoDup FVs -> *)
+  (*      length FVs <= fundefs_num_vars B). *)
+  (* Proof. *)
+  (*   exp_defs_induction IHe IHl IHb; intros FVs Heq Hnd; *)
+  (*   try repeat normalize_occurs_free_in_ctx; simpl. *)
+  (*   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]]. *)
+  (*     eassumption. *)
+  (*     rewrite <- HP in Hnd. *)
+  (*     eapply Permutation_length in HP. rewrite <- HP. *)
+  (*     rewrite app_length. *)
+  (*     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2; *)
+  (*       [| now apply Setminus_Included ]. *)
+  (*     eapply Same_set_FromList_length in Hin1. *)
+  (*     eapply IHe in Hin2. omega. *)
+  (*     eapply NoDup_cons_r; eauto.  *)
+  (*     eapply NoDup_cons_l; eauto. *)
+  (*   - rewrite <- (Union_Empty_set_neut_r [set v]) in Heq. *)
+  (*     rewrite <- FromList_nil, <- FromList_cons in Heq. *)
+  (*     eapply Same_set_FromList_length in Heq; eauto. *)
+  (*   - rewrite Union_commut, <- Union_assoc, (Union_commut (occurs_free (Ecase v l))), *)
+  (*     (Union_Same_set [set v]) in Heq. *)
+  (*     edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]]. *)
+  (*     eassumption. *)
+  (*     rewrite <- HP in Hnd. *)
+  (*     eapply Permutation_length in HP. rewrite <- HP. *)
+  (*     rewrite !app_length. *)
+  (*     eapply IHe in Hin1. eapply IHl in Hin2. simpl in *. omega. *)
+  (*     eapply NoDup_cons_r; eauto.  *)
+  (*     eapply NoDup_cons_l; eauto. *)
+  (*     eapply Singleton_Included. eauto. *)
+  (*   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]]. *)
+  (*     eassumption. *)
+  (*     rewrite <- HP in Hnd. *)
+  (*     eapply Permutation_length in HP. rewrite <- HP. *)
+  (*     rewrite app_length. *)
+  (*     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2; *)
+  (*       [| now apply Setminus_Included ]. *)
+  (*     rewrite <- (Union_Empty_set_neut_r [set v0]) in Hin1. *)
+  (*     rewrite <- FromList_nil, <- FromList_cons in Hin1. *)
+  (*     eapply Same_set_FromList_length in Hin1. *)
+  (*     eapply IHe in Hin2. simpl in *. omega. *)
+  (*     eapply NoDup_cons_r; eauto.  *)
+  (*     eapply NoDup_cons_l; eauto. *)
+  (*   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]]. *)
+  (*     eassumption. *)
+  (*     rewrite <- HP in Hnd. *)
+  (*     eapply Permutation_length in HP. rewrite <- HP. *)
+  (*     rewrite app_length. *)
+  (*     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) _)) in Hin2; *)
+  (*       [| now apply Setminus_Included ]. *)
+  (*     eapply IHb in Hin1. eapply IHe in Hin2. omega. *)
+  (*     eapply NoDup_cons_r; eauto.  *)
+  (*     eapply NoDup_cons_l; eauto. *)
+  (*   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]]. *)
+  (*     eassumption. rewrite <- HP in Hnd. *)
+  (*     eapply Same_set_FromList_length in Hin1; eauto. *)
+  (*     eapply Permutation_length in HP. rewrite <- HP. *)
+  (*     rewrite app_length. *)
+  (*     rewrite <- (Union_Empty_set_neut_r [set v]) in Hin2. *)
+  (*     rewrite <- FromList_nil, <- FromList_cons in Hin2. *)
+  (*     eapply Same_set_FromList_length in Hin2. *)
+  (*     simpl in *. omega. *)
+  (*     eapply NoDup_cons_r; eauto.  *)
+  (*     eapply NoDup_cons_l; eauto. *)
+  (*   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]]. *)
+  (*     eassumption. *)
+  (*     rewrite <- HP in Hnd. *)
+  (*     eapply Permutation_length in HP. rewrite <- HP. *)
+  (*     rewrite app_length. *)
+  (*     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2; *)
+  (*       [| now apply Setminus_Included ]. *)
+  (*     eapply Same_set_FromList_length in Hin1. *)
+  (*     eapply IHe in Hin2. omega. *)
+  (*     eapply NoDup_cons_r; eauto.  *)
+  (*     eapply NoDup_cons_l; eauto. *)
+  (*   - rewrite occurs_free_Ehalt in Heq. *)
+  (*     rewrite <- (Union_Empty_set_neut_r [set v]) in Heq. *)
+  (*     rewrite <- FromList_nil, <- FromList_cons in Heq. *)
+  (*     eapply Same_set_FromList_length in Heq; eauto. *)
+  (*   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]]. *)
+  (*     eassumption. rewrite <- HP in Hnd. *)
+  (*     eapply Permutation_length in HP. rewrite <- HP. *)
+  (*     rewrite app_length. *)
+  (*     eapply (Included_trans (FromList l2) (Setminus var _ [set v])) in Hin2; *)
+  (*       [| now apply Setminus_Included ]. *)
+  (*     eapply (Included_trans (FromList l1) (Setminus var _ _)) in Hin1; *)
+  (*       [| now apply Setminus_Included ].  *)
+  (*     eapply IHe in Hin1. eapply IHb in Hin2. omega. *)
+  (*     eapply NoDup_cons_r; eauto.  *)
+  (*     eapply NoDup_cons_l; eauto. *)
+  (*   - rewrite <- FromList_nil in Heq. *)
+  (*     apply Same_set_FromList_length in Heq; eauto. *)
+  (* Qed. *)
 
 
-  Corollary occurs_free_cardinality :
-    (forall e FVs,
-       FromList FVs \subset occurs_free e ->
-       NoDup FVs ->
-       length FVs <= exp_num_vars e).
-  Proof.
-    eapply occurs_free_cardinality_mut.
-  Qed.
+  (* Corollary occurs_free_cardinality : *)
+  (*   (forall e FVs, *)
+  (*      FromList FVs \subset occurs_free e -> *)
+  (*      NoDup FVs -> *)
+  (*      length FVs <= exp_num_vars e). *)
+  (* Proof. *)
+  (*   eapply occurs_free_cardinality_mut. *)
+  (* Qed. *)
 
-  Corollary occurs_free_fundefs_cardinality :
-    (forall B FVs,
-       FromList FVs \subset occurs_free_fundefs B ->
-       NoDup FVs ->
-       length FVs <= fundefs_num_vars B).
-  Proof.
-    eapply occurs_free_cardinality_mut.
-  Qed.
+  (* Corollary occurs_free_fundefs_cardinality : *)
+  (*   (forall B FVs, *)
+  (*      FromList FVs \subset occurs_free_fundefs B -> *)
+  (*      NoDup FVs -> *)
+  (*      length FVs <= fundefs_num_vars B). *)
+  (* Proof. *)
+  (*   eapply occurs_free_cardinality_mut. *)
+  (* Qed. *)
 
 End Size.

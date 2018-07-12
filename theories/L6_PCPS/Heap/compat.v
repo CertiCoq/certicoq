@@ -24,7 +24,7 @@ Module Compat (H : Heap).
 
     Context (IG : GInv) (* Final global *)
             (IL1 IL2: Inv) (* Final local *)
-
+ 
             (IIG : GIInv) (* Global initial *)
             (IIL1 IIL2 : IInv) (* Local initial *)
 
@@ -34,27 +34,16 @@ Module Compat (H : Heap).
 
     (** * Base case and timout compatibility *)
     
-    Definition InvCostBase (H1 H2 : heap block) (rho1 rho2 : env) (e1 e2 : exp) :=
-      forall (H1' H2' : heap block) (rho1' rho2' : env) (c : nat) β1 β2,
-        (occurs_free e1) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-        injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) β1 ->
-           
-        (occurs_free e2) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-        injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e2))) β2 ->
-                           
+    Definition InvCostBase (e1 e2 : exp) :=
+      forall (H1' H2' : heap block) (rho1' rho2' : env) (c : nat),                           
         IIL1 (H1', rho1', e1) (H2', rho2', e2) ->
                            
         IL1 (H1', rho1', e1, c, size_heap H1') (H2', rho2', e2, c, size_heap H2').
 
     (** * Constructor application compatibility *) 
 
-    Definition InvCtxCompat (H1 H2 : heap block) (rho1 rho2 : env) (C1 C2 : exp_ctx) (e1 e2 : exp)  :=
-      forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1 c2 c1' c2' m1 m2  β1 β2,
-        (occurs_free (C1 |[ e1 ]|)) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-        injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (C1 |[ e1 ]|)))) β1 ->
-           
-        (occurs_free (C2 |[ e2 ]|)) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-        injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (C2 |[ e2 ]|)))) β2 ->
+    Definition InvCtxCompat (C1 C2 : exp_ctx) (e1 e2 : exp)  :=
+      forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1 c2 c1' c2' m1 m2,
 
         IL2 (H1'', rho1'', e1, c1, m1) (H2'', rho2'', e2, c2, m2) ->
         
@@ -63,14 +52,8 @@ Module Compat (H : Heap).
         
         IL1 (H1', rho1', C1 |[ e1 ]|, c1 + c1', m1) (H2', rho2', C2 |[ e2 ]|, c2 + c2', m2).
     
-    Definition IInvCtxCompat (H1 H2 : heap block) (rho1 rho2 : env) (C1 C2 : exp_ctx) (e1 e2 : exp)  :=
-      forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1' c2' β1 β2,
-        (occurs_free (C1 |[ e1 ]|)) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-        injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (C1 |[ e1 ]|)))) β1 ->
-           
-        (occurs_free (C2 |[ e2 ]|)) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-        injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (C2 |[ e2 ]|)))) β2 ->                           
-
+    Definition IInvCtxCompat (C1 C2 : exp_ctx) (e1 e2 : exp)  :=
+      forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1' c2',                         
         IIL1 (H1', rho1', C1 |[ e1 ]|) (H2', rho2', C2 |[ e2 ]|) ->
             
         ctx_to_heap_env C1 H1' rho1' H1'' rho1'' c1' ->
@@ -78,28 +61,16 @@ Module Compat (H : Heap).
 
         IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
 
-    Definition InvCtxCompat_r (H1 H2 : heap block) (rho1 rho2 : env) (C : exp_ctx) (e1 e2 : exp) :=
-      forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c' c1 c2 m1 m2 β1 β2,
-        (occurs_free e1) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-        injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) β1 ->
-           
-        (occurs_free (C |[ e2 ]|)) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-        injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) β2 ->
-                                      
+    Definition InvCtxCompat_r (C : exp_ctx) (e1 e2 : exp) :=
+      forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c' c1 c2 m1 m2,
         IL2 (H1', rho1', e1, c1, m1) (H2'', rho2'', e2, c2, m2) ->
         
         ctx_to_heap_env_CC C H2' rho2' H2'' rho2'' c' ->
         
         IL1 (H1', rho1', e1, c1, m1) (H2', rho2', C |[ e2 ]|, c2 + c', m2).
 
-    Definition IInvCtxCompat_r (H1 H2 : heap block) (rho1 rho2 : env) (C : exp_ctx) (e1 e2 : exp) :=
-      forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c' β1 β2,
-        (occurs_free e1) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-        injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) β1 ->
-           
-        (occurs_free (C |[ e2 ]|)) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-        injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) β2 ->
-                                   
+    Definition IInvCtxCompat_r (C : exp_ctx) (e1 e2 : exp) :=
+      forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c',                                   
         IIL1 (H1', rho1', e1) (H2', rho2', C |[ e2 ]|) ->
             
         ctx_to_heap_env_CC C H2' rho2' H2'' rho2'' c' ->
@@ -109,48 +80,24 @@ Module Compat (H : Heap).
 
     (** * Case compatibility *)
     
-    Definition IInvCaseHdCompat (H1 H2 : heap block) (rho1 rho2 : env) x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-      (forall H1' rho1' H2' rho2' β1 β2,
-         (occurs_free (Ecase x1 ((t, e1) :: Pats1))) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-         injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (Ecase x1 ((t, e1) :: Pats1))))) β1 ->
-           
-         (occurs_free (Ecase x2 ((t, e2) :: Pats2))) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (Ecase x2 ((t, e2) :: Pats2))))) β2 ->
-
+    Definition IInvCaseHdCompat x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
+      (forall H1' rho1' H2' rho2',
          IIL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1)) (H2', rho2', Ecase x2 ((t, e2) :: Pats2)) ->
          IIL2 (H1', rho1', e1) (H2', rho2', e2)).
 
-      Definition IInvCaseTlCompat (H1 H2 : heap block) (rho1 rho2 : env)  x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-        (forall H1' rho1' H2' rho2' β1 β2,
-         (occurs_free (Ecase x1 ((t, e1) :: Pats1))) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-         injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (Ecase x1 ((t, e1) :: Pats1))))) β1 ->
-           
-         (occurs_free (Ecase x2 ((t, e2) :: Pats2))) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (Ecase x2 ((t, e2) :: Pats2))))) β2 ->
-                                                       
+      Definition IInvCaseTlCompat x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
+        (forall H1' rho1' H2' rho2',
          IIL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1)) (H2', rho2', Ecase x2 ((t, e2) :: Pats2)) ->
          IIL1 (H1', rho1', Ecase x1 Pats1) (H2', rho2', Ecase x2 Pats2)).
 
-      Definition InvCaseHdCompat (H1 H2 : heap block) (rho1 rho2 : env) x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-        (forall H1' rho1' H2' rho2' β1 β2 c1 c2 m1 m2,
-           (occurs_free (Ecase x1 ((t, e1) :: Pats1))) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-           injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (Ecase x1 ((t, e1) :: Pats1))))) β1 ->
-           
-           (occurs_free (Ecase x2 ((t, e2) :: Pats2))) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-           injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (Ecase x2 ((t, e2) :: Pats2))))) β2 ->
-
+      Definition InvCaseHdCompat  x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
+        (forall H1' rho1' H2' rho2' c1 c2 m1 m2,
            IL2 (H1', rho1', e1, c1, m1) (H2', rho2', e2, c2, m2)  ->
            IL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1), c1 + cost (Ecase x1 ((t, e1) :: Pats1)), m1)
                (H2', rho2', Ecase x2 ((t, e2) :: Pats2), c2 + cost (Ecase x2 ((t, e2) :: Pats2)), m2)).
 
       Definition InvCaseTlCompat (H1 H2 : heap block) (rho1 rho2 : env) x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-        (forall H1' rho1' H2' rho2' β1 β2 c1 c2 m1 m2,
-           (occurs_free (Ecase x1 ((t, e1) :: Pats1))) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
-           injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (Ecase x1 ((t, e1) :: Pats1))))) β1 ->
-           
-           (occurs_free (Ecase x2 ((t, e2) :: Pats2))) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
-           injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (Ecase x2 ((t, e2) :: Pats2))))) β2 ->
-
+        (forall H1' rho1' H2' rho2' c1 c2 m1 m2,
            IL1 (H1', rho1', Ecase x1 Pats1, c1, m1) (H2', rho2', Ecase x2 Pats2, c2, m2) ->
            IL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1), c1, m1) (H2', rho2', Ecase x2 ((t, e2) :: Pats2), c2, m2)).
      
@@ -158,11 +105,11 @@ Module Compat (H : Heap).
       
     Definition InvGC :=
       forall (H1 H1' H2 H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp)
-        S {Hs : ToMSet S} B {Hf : ToMSet B} c1 c2 m1 m2,
-        IG S _  B  _ (H1', rho1, e1, c1, m1) (H2', rho2, e2, c2, m2) ->
-        live (env_locs rho1 (occurs_free e1)) H1 H1' ->
-        live' (env_locs rho2 (occurs_free e2)) H2 H2' ->
-        IG S _ B _ (H1, rho1, e1, c1, m1) (H2, rho2, e2, c2, m2).
+        S {Hs : ToMSet S} B {Hf : ToMSet B} c1 c2 m1 m2 b d,
+        IG S _  B  _ (H1', rho1, e1, c1, m1) (H2', rho1, e2, c2, m2) ->
+        live' (env_locs rho1 (occurs_free e1)) H1 H1' b ->
+        live' (env_locs rho2 (occurs_free e2)) H2 H2' d ->
+        IG S _ B _ (H1, (subst_env b rho1), e1, c1, m1) (H2, subst_env d rho1, e2, c2, m2).
 
     Definition IInvAppCompat (H1 H2 : heap block) (rho1 rho2 : env) f1 t xs1 f2 xs2 f2' Γ :=   
       forall (i  : nat) (H1' H1'' Hgc1 H2' Hgc2: heap block)
@@ -171,7 +118,7 @@ Module Compat (H : Heap).
         (xs1' : list var) (e1 : exp) (l1 : loc)
         (vs1 : list value) 
         (B2 : fundefs) (f3 : var) (c ct2 : cTag) (xs2' : list var) 
-        (e2 : exp) (l2 env_loc2 : loc) (vs2 : list value) c1 c2 m1 m2,
+        (e2 : exp) (l2 env_loc2 : loc) (vs2 : list value) c1 c2 m1 m2 b d,
         (occurs_free (Eapp f1 t xs1)) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
         injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (Eapp f1 t xs1)))) β1 ->
            
@@ -180,7 +127,7 @@ Module Compat (H : Heap).
 
         
         IG (FromList xs1') _ (name_in_fundefs B1) _
-           (Hgc1, rho_clo2, e1, c1, m1) (Hgc2, rho2'', e2, c2, m2) ->
+           (Hgc1, subst_env b rho_clo2, e1, c1, m1) (Hgc2, subst_env d rho2'', e2, c2, m2) ->
         IIL1 (H1', rho1', Eapp f1 t xs1) (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ) ->
         
         M.get f1 rho1' = Some (Loc l1) ->
@@ -189,7 +136,7 @@ Module Compat (H : Heap).
         getlist xs1 rho1' = Some vs1 ->
         def_closures B1 B1 rho_clo H1' rho_clo = (H1'', rho_clo1) ->
         setlist xs1' vs1 rho_clo1 = Some rho_clo2 ->
-        live ((env_locs rho_clo2) (occurs_free e1)) H1'' Hgc1 ->
+        live' ((env_locs rho_clo2) (occurs_free e1)) H1'' Hgc1 b ->
         
         M.get f2 rho2' = Some (Loc l2) ->
         getlist xs2 rho2' = Some vs2 ->
@@ -197,7 +144,7 @@ Module Compat (H : Heap).
         Some rho2'' =
         setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
         find_def f3 B2 = Some (ct2, xs2', e2) ->
-        live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 ->
+        live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d ->
         
         IL1 (H1', rho1', Eapp f1 t xs1, c1 + cost (Eapp f1 t xs1), max m1 (size_heap H1''))
            (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ, c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2)), max m2 (size_heap H2')).
@@ -215,39 +162,25 @@ Module Compat (H : Heap).
             (IIL1 IIL2 : IInv). (* Local initial *)
 
     (* TODO move *)
-    Lemma live_deterministic S (_ : set_util.ToMSet S) H1 H2 H2' :
-      live S H1 H2 ->
-      live S H1 H2' ->
-      (exists b1 b2, S |- H2 ≃_(b1, b2) H2' /\
-      injective_subdomain (reach' H2 S) b1 /\
-      injective_subdomain (reach' H2' S) b2).
-    Proof.
-      intros [Hyp1 [b1 [Hyp2 Hinj1]]] [Hyp1' [b2 [Hyp2' Hinj2]]].
-      eexists b1, b2. symmetry in Hyp2. 
-      rewrite <- (Combinators.compose_id_right _ _ id) in Hyp2.
-      rewrite <- (Combinators.compose_id_left _ _ b2).
-      split; [| split ]; eauto.
-      eapply heap_equiv_f_compose; [| eassumption ]. eassumption.
-    Qed.
-
-    (* TODO move *)
-    Lemma Proper_compose_l (A B C: Type) : Proper (@f_eq B C ==> eq ==> @f_eq A C) compose.
+    Lemma Proper_compose_l (A B C: Type) :
+      Proper (@f_eq B C ==> eq ==> @f_eq A C) compose.
     Proof.
       intros f1 f2 Hfeq h1 h2 Heq; subst. firstorder.
     Qed.
 
-    Lemma Proper_compose_r (A B C: Type) : Proper (eq ==> @f_eq A B ==> @f_eq A C) compose.
+    Lemma Proper_compose_r (A B C: Type) :
+      Proper (eq ==> @f_eq A B ==> @f_eq A C) compose.
     Proof.
       intros f1 f2 Hfeq h1 h2 Heq; subst. intros x. unfold compose.
       rewrite Heq. reflexivity. 
     Qed.
-
+    
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (d : EInj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 : var) (xs1 : list var)
           (f2 f2' Γ : var) (xs2 : list var) (t : fTag) :
       IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
-      InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
+      InvCostBase IL1 IIL1 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 ->
@@ -341,13 +274,16 @@ Module Compat (H : Heap).
           destruct v as [ ? [| [| B2 f3 ] [| [ env_loc' |] [|] ]] | ]; try contradiction.
           edestruct Hcc as (Hd & Henv & xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
           reflexivity. clear; now firstorder. reflexivity. clear; now firstorder.
-          edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2') as [H2'' Hgc'].
-          assert (Hgc1 := Hgc); assert (Hgc2 := Hgc').
-          destruct Hgc as [Hseq [bgc [Heqgc Hinjgc]]]. 
-          destruct Hgc' as [Hseq' [bgc' [Heqgc' Hinjgc']]]. 
+          edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2') as [H2'' [b' Hgc']].
+          tci.
+          edestruct (live'_live_inv (env_locs rho_clo2 (occurs_free e)) b0 H' H'')
+            as [b'' [Hgc1' [Hfe1 Hfe2]]]; try eassumption.
+          assert (Hgc1 := Hgc1'); assert (Hgc2 := Hgc').
+          destruct Hgc1' as [Hseq [Heqgc Hinjgc]]. 
+          destruct Hgc' as  [Hseq' [Heqgc' Hinjgc']]. 
           edestruct Hi' with (i := k - cost  (Eapp f1 t xs1))
                                (j' := j) as [HG [r2 [c2 [m2 [b2' [Hbs2 [Hinj [HIG  Hcc2]]]]]]]];
-            [ | omega | | | | | | | eassumption | | | eassumption | | ].    
+            [ | omega | | | | | | |  | | | eassumption | | ].    
           + simpl. omega.
           (* + rewrite compose_id_neut_r. rewrite compose_id_neut_l. reflexivity. *)
           + eapply Forall2_monotonic_strong; [| eassumption ].
@@ -402,27 +338,67 @@ Module Compat (H : Heap).
               eapply Equivalence_Transitive. eapply Proper_compose_l. eapply lift_id.
               reflexivity. rewrite Combinators.compose_id_left. reflexivity. }
             rewrite Hfeq. reflexivity.
-          + eapply heap_env_equiv_heap_equiv. eassumption.
+          + rewrite <- subst_env_image in Heqgc.
+            eapply heap_equiv_symm in Heqgc. eapply heap_env_equiv_heap_equiv_l in Heqgc. 
+            symmetry in Heqgc. eapply heap_env_equiv_respects_compose in Heqgc.
+            eapply heap_env_equiv_respects_f_eq_l in Heqgc.
+            eapply heap_env_equiv_respects_id in Heqgc. eassumption.
+            eapply f_eq_subdomain_antimon; [| eassumption ].
+            eapply reach'_extensive.
+          + rewrite subst_env_image. eassumption.
+          + eapply heap_env_equiv_heap_equiv_l. eassumption.
           + eassumption.
-          + eapply heap_env_equiv_heap_equiv. eassumption.
           + eapply HG; eassumption.
           + omega.
-          + intros i.
+          + intros i. 
             edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m' Hstep']].
             inv Hstep'.
             * omega.
             * rewrite NPeano.Nat.add_sub in Hbs0.
-              repeat subst_exp. 
-              edestruct live_deterministic as [b1' [b2' [Heq [Hinj1' Hinj2']]]].
-              now apply Hgc1. now apply Hgc. try eassumption.
+              repeat subst_exp.
+              edestruct (live'_live_inv (env_locs rho_clo4 (occurs_free e0)) b3 H'0 H''0)
+                as [o [Hgcb [Hfe1b Hfe2b]]]; try eassumption.
+              edestruct Hgc1 as [_ [ hgcB hinjB ]].
+              edestruct Hgcb as [_ [ hgcA hinjA ]].
+              
+
               edestruct big_step_gc_heap_env_equiv_r
-                as [r1 [m1 [b1'' [b2''[Hgc'' _]]]]].
+                as [r1 [m1 [b1'' [b2''[Hgc'' _]]]]]; [| | | | do 2 eexists; eassumption ]. 
               eassumption.
-              eapply heap_env_equiv_heap_equiv. symmetry. eassumption.
-              eassumption. eassumption. do 2 eexists. eassumption.
+              eapply Equivalence_Transitive.
+              eapply heap_env_equiv_heap_equiv_l. 
+              rewrite subst_env_image. eapply heap_equiv_symm.
+              now eapply hgcA.
+              
+              
+              symmetry. 
+              eapply Equivalence_Transitive;
+                [ | eapply heap_env_equiv_respects_compose; reflexivity ].
+              rewrite <- subst_env_image in hgcB.
+              symmetry. eapply heap_env_equiv_respects_f_eq_l.
+              eapply heap_env_equiv_respects_id_r. 
+              rewrite subst_env_image in hgcB.
+
+
+              apply heap_env_equiv_respects_id.
+              eapply heap_env_equiv_respects_f_eq_l.
+              symmetry. eapply heap_env_equiv_heap_equiv_r.
+              eapply heap_equiv_symm. eassumption.
+
+              eapply f_eq_subdomain_antimon; [| eassumption ].
+              eapply reach'_extensive.
+              symmetry. eapply f_eq_subdomain_antimon; [| eassumption ].
+              eapply reach'_extensive.
+
+              eapply injective_subdomain_antimon. eassumption.
+              rewrite subst_env_image. reflexivity.
+
+              
+              eapply injective_subdomain_antimon. eassumption.
+              rewrite subst_env_image. reflexivity.
+              
           + do 3 eexists. exists b2'. eexists. repeat split.
-            * eapply Eval_proj_per_cc with
-              (c := c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2))).
+            * eapply Eval_proj_per_cc with   (c := c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2))).
               simpl; omega.
               eassumption. eassumption. reflexivity.
               eapply Eval_proj_per_cc. simpl; omega.
@@ -457,9 +433,9 @@ Module Compat (H : Heap).
     Lemma cc_approx_exp_constr_compat (k j : nat)
           (b : Inj) (d : EInj) (H1 H2 : heap block)  (rho1 rho2 : env)
           (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp)  : 
-      InvCtxCompat IL1 IL2 H1 H2 rho1 rho2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
-      IInvCtxCompat IIL1 IIL2 H1 H2 rho1 rho2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
-      InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Econstr x1 t ys1 e1) (Econstr x2 t ys2 e2)  ->
+      InvCtxCompat IL1 IL2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
+      IInvCtxCompat IIL1 IIL2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
+      InvCostBase IL1 IIL1 (Econstr x1 t ys1 e1) (Econstr x2 t ys2 e2)  ->
       
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Econstr x1 t ys1 e1)))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (Econstr x2 t ys2 e2)))) H2 ->
@@ -711,9 +687,9 @@ Module Compat (H : Heap).
     Lemma cc_approx_exp_proj_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj) (d : EInj)
           (x1 x2 : var) (t : cTag) (n : N) (y1 y2 : var) (e1 e2 : exp) :
 
-      InvCtxCompat IL1 IL2 H1 H2 rho1 rho2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
-      IInvCtxCompat IIL1 IIL2 H1 H2 rho1 rho2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
-      InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Eproj x1 t n y1 e1) (Eproj x2 t n y2 e2) ->
+      InvCtxCompat IL1 IL2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
+      IInvCtxCompat IIL1 IIL2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
+      InvCostBase IL1 IIL1 (Eproj x1 t n y1 e1) (Eproj x2 t n y2 e2) ->
       
       (forall j, cc_approx_var_env k j IIG IG b d H1 rho1 H2 rho2 y1 y2) ->
 
@@ -862,7 +838,7 @@ Module Compat (H : Heap).
     
     (** Case compatibility *)
     Lemma cc_approx_exp_case_nil_compat (k j : nat) (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) :
-      InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Ecase x1 []) (Ecase x2 []) ->
+      InvCostBase IL1 IIL1 (Ecase x1 []) (Ecase x2 []) ->
       (Ecase x1 [], rho1, H1) ⪯ ^ (k ; j ; IIL1; IIG ; IL1 ; IG) (Ecase x2 [], rho2, H2).
     Proof.
       intros Hbase b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hns. inv Hstep1.
@@ -878,10 +854,10 @@ Module Compat (H : Heap).
     Lemma cc_approx_exp_case_compat (k j : nat) (b : Inj) (d : EInj)
           (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (t : cTag)
           (e1 e2 : exp) (Pats1 Pats2 : list (cTag * exp)) :
-      InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Ecase x1 ((t, e1) :: Pats1)) (Ecase x2 ((t, e2) :: Pats2)) -> 
-      IInvCaseHdCompat IIL1 IIL2 H1 H2 rho1 rho2 x1 x2 t Pats1 Pats2 e1 e2 ->
-      InvCaseHdCompat IL1 IL2 H1 H2 rho1 rho2 x1 x2 t Pats1 Pats2 e1 e2 ->
-      IInvCaseTlCompat IIL1 H1 H2 rho1 rho2 x1 x2 t Pats1 Pats2 e1 e2 -> 
+      InvCostBase IL1 IIL1 (Ecase x1 ((t, e1) :: Pats1)) (Ecase x2 ((t, e2) :: Pats2)) -> 
+      IInvCaseHdCompat IIL1 IIL2 x1 x2 t Pats1 Pats2 e1 e2 ->
+      InvCaseHdCompat IL1 IL2 x1 x2 t Pats1 Pats2 e1 e2 ->
+      IInvCaseTlCompat IIL1 x1 x2 t Pats1 Pats2 e1 e2 -> 
       InvCaseTlCompat IL1 H1 H2 rho1 rho2 x1 x2 t Pats1 Pats2 e1 e2  ->
       
       cc_approx_var_env k j IIG IG b d H1 rho1 H2 rho2 x1 x2 ->
@@ -986,7 +962,7 @@ Module Compat (H : Heap).
     (** Halt compatibility *)
     Lemma cc_approx_exp_halt_compat (k j : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj) (d : EInj)
           (x1 x2 : var) :
-      InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Ehalt x1) (Ehalt x2) ->
+      InvCostBase IL1 IIL1  (Ehalt x1) (Ehalt x2) ->
       
       cc_approx_var_env k j IIG IG b d H1 rho1 H2 rho2 x1 x2 ->
 
@@ -1045,9 +1021,9 @@ Module Compat (H : Heap).
    
     (** Abstraction compatibility *)
     Lemma cc_approx_exp_fun_compat (k j : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 :
-      InvCtxCompat IL1 IL2 H1 H2 rho1 rho2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
-      IInvCtxCompat IIL1 IIL2 H1 H2 rho1 rho2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
-      InvCostBase IL1 IIL1 H1 H2 rho1 rho2 (Efun B1 e1) (Efun B2 e2) ->
+      InvCtxCompat IL1 IL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
+      IInvCtxCompat IIL1 IIL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
+      InvCostBase IL1 IIL1 (Efun B1 e1) (Efun B2 e2) ->
 
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1)))) H1 ->
       (env_locs rho1 (occurs_free (Efun B1 e1))) \subset dom H1 ->
@@ -1077,17 +1053,6 @@ Module Compat (H : Heap).
             as [H3' rho3] eqn:Hdef3.
           assert (Hlocs : env_locs rho1' (occurs_free (Efun B1 e1)) \subset dom H1').
           { eapply env_locs_in_dom. eassumption. eassumption. }
-          (* assert (Hwf1' : well_formed (reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1)))) H1). *)
-          (* { eassumption. *)
-          (*   eapply well_formed_alloc; try eassumption. *)
-          (*   rewrite <- well_formed_reach_alloc_same; eassumption. *)
-          (*   eapply Included_trans. apply restrict_env_env_locs. *)
-          (*   eapply restrict_env_correct. *)
-          (*   replace (FromList (set_util.PS.elements (fundefs_fv B1))) *)
-          (*   with (set_util.FromSet (fundefs_fv B1)) by reflexivity. *)
-          (*   rewrite <- fundefs_fv_correct. reflexivity. *)
-          (*   eapply Included_trans; try eassumption. *)
-          (*   normalize_occurs_free. eapply env_locs_monotonic... } *)
           assert (Hwf2' : well_formed (reach' H1' (env_locs rho1' (occurs_free (Efun B1 e1)))) H1').
           { eapply well_formed_respects_heap_env_equiv. eassumption.
             eassumption. }
@@ -1212,8 +1177,8 @@ Module Compat (H : Heap).
           
     Lemma cc_approx_exp_right_ctx_compat 
           (k j : nat) rho1 rho2 rho2' H1 H2 H2' e1 C e2 c' :
-      InvCtxCompat_r IL1 IL2 H1 H2 rho1 rho2 C e1 e2 ->
-      IInvCtxCompat_r IIL1 IIL2 H1 H2 rho1 rho2 C e1 e2 ->
+      InvCtxCompat_r IL1 IL2 C e1 e2 ->
+      IInvCtxCompat_r IIL1 IIL2 C e1 e2 ->
       
       well_formed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
       well_formed (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) H2 ->

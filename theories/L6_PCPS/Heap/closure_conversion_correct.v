@@ -34,7 +34,7 @@ Module ClosureConversionCorrect (H : Heap).
                    exists v1, M.get x rho1 = Some v1 /\
                          Res (v1, H1) ≺ ^ ( k ; j ; IP ; P ; b; d) Res (v2, H2)) FVs vs.
 
-  Definition Fun_inv k j GI GP b d rho1 H1 rho2 H2 Scope Funs Γ FVs :=
+  Definition Fun_inv k j GI GP b d rho1 H1 rho2 H2 Scope Funs fenv FVs :=
     forall f, ~ f \in Scope -> f \in Funs ->
          exists l1 lenv B g,
            M.get f rho1 = Some (Loc l1) /\
@@ -43,7 +43,7 @@ Module ClosureConversionCorrect (H : Heap).
            (* post is already reachable *)
            post H1 [set l1] \subset (reach' H1 (env_locs rho1 (Scope :|: (FromList FVs \\ (Scope :|: Funs))))) /\
            M.get f rho2 = Some (FunPtr B g) /\
-           M.get Γ rho2 = Some (Loc lenv) /\
+           M.get (fenv f) rho2 = Some (Loc lenv) /\
            let '(l2, H2') := alloc (Constr Size.Util.clo_tag [FunPtr B g; Loc lenv]) H2 in
            Res (Loc l1, H1) ≺ ^ (k; j; GI; GP; b{l1 ~> l2}; d{l1 ~> Some lenv}) Res (Loc l2, H2'). 
 
@@ -59,12 +59,12 @@ Module ClosureConversionCorrect (H : Heap).
                 (fun (x : var) (v2 : value)  =>
                    exists v1, M.get x rho1 = Some v1) FVs vs.
   
-  Definition Fun_inv_weak rho1 rho2 Scope Funs Γ :=
+  Definition Fun_inv_weak rho1 rho2 Scope Funs fenv :=
     forall f, ~ f \in Scope -> f \in Funs ->
          exists l1 lenv B g,
            M.get f rho1 = Some (Loc l1) /\
            M.get f rho2 = Some (FunPtr B g) /\
-           M.get Γ rho2 = Some (Loc lenv). 
+           M.get (fenv f) rho2 = Some (Loc lenv). 
 
   (* TODO move *)
   Lemma reach'_subheap H H' S : 
@@ -175,22 +175,6 @@ Module ClosureConversionCorrect (H : Heap).
     intros ? ? ? ? ? [? [? ? ]]. eexists; eauto.
   Qed.
 
-  (* TODO delete after compile *)
-  Lemma Forall2_P_exists
-        {A B : Type} (P1 : A -> Prop) (P2 : A -> B -> Prop) (l1 : list A) (l2 : list B) (x : A) :
-    List.In x l1 ->
-    ~ P1 x ->
-    Forall2_P P1 P2 l1 l2 ->
-    exists y : B, List.In y l2 /\ P2 x y.
-  Proof.
-    intros Hin HP1 Hall. induction Hall.
-    - inv Hin.
-    - inv Hin.
-      + eexists; split; eauto. now left.
-      + edestruct IHHall as [z [Hinz Hp2]]; eauto.
-        eexists. split. right. eassumption. 
-        eassumption.
-  Qed.
 
   Lemma FV_inv_image_reach k P1 P2 rho1 H1 rho2 H2 b d c
         Scope Funs Γ FVs :
@@ -535,17 +519,18 @@ Module ClosureConversionCorrect (H : Heap).
   
   (** * Lemmas about [Fun_inv] *)
 
-  Lemma Fun_inv_set_r k j GI GP b d rho1 H1 rho2 H2 Scope Funs Γ FVs f v :
-    Fun_inv k j GI GP b d rho1 H1 rho2 H2 Scope Funs Γ FVs ->
-    ~ f \in (Funs \\ Scope) -> f <> Γ ->
-    Fun_inv k j GI GP b d rho1 H1 (M.set f v rho2) H2 Scope Funs Γ FVs.
+  Lemma Fun_inv_set_r k j GI GP b d rho1 H1 rho2 H2 Scope Funs fenv FVs f v :
+    Fun_inv k j GI GP b d rho1 H1 rho2 H2 Scope Funs fenv FVs ->
+    ~ f \in (Funs \\ Scope) -> ~ f \in (image fenv Funs) ->
+    Fun_inv k j GI GP b d rho1 H1 (M.set f v rho2) H2 Scope Funs fenv FVs.
   Proof.
     intros Hfun Hnin1 Hnin2 x Hnin Hin.
     edestruct Hfun as (l1 & lenv & B1' & g & Hget1 & Hsub & Hdis & Hget2 & Hget3 & Heq).
     eassumption. eassumption.  
     do 4 eexists. repeat split; try eassumption. rewrite M.gso. eassumption.
     intros Hc. subst. eapply Hnin1; constructor; eauto.
-    rewrite M.gso. eassumption. intros Hc. now subst.
+    rewrite M.gso. eassumption. intros Hc. subst.
+    eapply Hnin2. eexists; split; eauto. 
   Qed.
 
   (* Lemma Setminus_Subset_Inclduded {A} (S1 S2 S3 : Ensemble A) : *)
@@ -644,20 +629,20 @@ Module ClosureConversionCorrect (H : Heap).
     eapply well_formed_post_n_subheap_same with (n := 1); eassumption.
   Qed.
 
-  Lemma Fun_inv_subheap k j GI GP b d rho1 H1 H1' rho2 H2 H2' Scope Funs Γ FVs :
+  Lemma Fun_inv_subheap k j GI GP b d rho1 H1 H1' rho2 H2 H2' Scope Funs fenv FVs :
     well_formed (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) H1 ->
     env_locs rho1 (FV Scope Funs FVs) \subset dom H1 ->
     
-    well_formed (reach' H2 (env_locs rho2 [set Γ])) H2 ->
-    env_locs rho2 [set Γ] \subset dom H2 ->
+    well_formed (reach' H2 (env_locs rho2 (image fenv Funs))) H2 ->
+    env_locs rho2 (image fenv Funs) \subset dom H2 ->
     
     image b (reach' H1 (post H1 (env_locs rho1 (Funs \\ Scope)))) :|:
     image' d (reach' H1 (post H1 (env_locs rho1 (Funs \\ Scope)))) \subset dom H2 ->
     
-    Fun_inv k j GI GP b d rho1 H1 rho2 H2 Scope Funs Γ FVs ->
+    Fun_inv k j GI GP b d rho1 H1 rho2 H2 Scope Funs fenv FVs ->
     H1 ⊑ H1' ->
     H2 ⊑ H2' ->
-    Fun_inv k j GI GP b d rho1 H1' rho2 H2' Scope Funs Γ FVs.
+    Fun_inv k j GI GP b d rho1 H1' rho2 H2' Scope Funs fenv FVs.
   Proof with (now eauto with Ensembles_DB).
     intros Hwf1 Henv1 hwf2 Henv2 Him Hfun Hsub1 Hsub2 x Hin Hnin.
     edestruct Hfun as (l1 & lenv & B1' & g & Hget1 & Hdis & Hsub & Hget2 & Hget3 & Heq); try eassumption.
@@ -672,9 +657,10 @@ Module ClosureConversionCorrect (H : Heap).
     eapply Included_trans. eassumption. eapply reach'_heap_monotonic. eassumption.
     eapply well_formed_antimon; [| now apply Hwf1 ]. 
     eapply reach'_set_monotonic. eapply get_In_env_locs with (v := Loc l1); try eassumption.
-    left. right. now constructor. eapply Included_trans; [| eassumption ].
+    left. right. eassumption.
+    eapply Included_trans; [| eassumption ].
     eapply get_In_env_locs with (v := Loc l1); try eassumption.
-    left. right. now constructor.
+    left. right. eassumption. 
 
     destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2) as [l2 H4] eqn:Ha. 
     destruct (alloc (Constr Size.Util.clo_tag [FunPtr B1' g; Loc lenv]) H2') as [l2' H4'] eqn:Ha'.
@@ -687,7 +673,7 @@ Module ClosureConversionCorrect (H : Heap).
       eassumption. eapply res_equiv_subheap; try eassumption.
       eapply Included_trans; [| eapply reach'_extensive ].
       eapply get_In_env_locs; try eassumption. left; right.
-      now constructor; eauto.
+      eassumption. 
       
       now firstorder.
 
@@ -710,20 +696,36 @@ Module ClosureConversionCorrect (H : Heap).
         
         now eapply reach'_closed; eauto.
         now eapply reach'_closed; eauto.
+        
+        eapply Included_trans; [| eapply reach'_extensive ].
+        eapply get_In_env_locs; [| eassumption ].
+        now eexists; split; eauto. 
 
         eapply Included_trans; [| eapply reach'_extensive ].
-        eapply get_In_env_locs; now eauto.
-
-        eapply Included_trans; [| eapply reach'_extensive ].
-        eapply get_In_env_locs; now eauto.
+        eapply get_In_env_locs; eauto.
+        now eexists; split; eauto. 
 
         intros Hc1.
         rewrite <- env_locs_Singleton with (v := Loc lenv) in Hc1; try eassumption. 
         rewrite <- well_formed_reach_alloc_same in Hc1;
-          [| eassumption | eassumption | eassumption ].
-
+          [| | | eassumption ].
+        
         eapply reachable_in_dom in Hc1; try eassumption. destruct Hc1 as [b' Hget].
         erewrite alloc_fresh in Hget; eauto. congruence.
+
+        eapply well_formed_antimon; [| eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto. 
+        eapply Included_trans; [| now eapply Henv2 ].
+        eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto.
+
+        eapply well_formed_antimon; [| eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto. 
+        eapply Included_trans; [| now eapply Henv2 ].
+        eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto.
         
       * eapply injective_subdomain_extend'. now firstorder.
         rewrite image_id.
@@ -736,11 +738,25 @@ Module ClosureConversionCorrect (H : Heap).
         rewrite <- env_locs_Singleton with (v := Loc lenv) in Hc1; try eassumption. 
         
         rewrite <- well_formed_reach_alloc_same in Hc1;
-          [| eassumption | eassumption | eassumption ].
+          [| | | eassumption ].
         
         eapply reachable_in_dom in Hc1; try eassumption. destruct Hc1 as [b' Hget].
         eapply Hsub2 in Hget.  
         erewrite alloc_fresh in Hget; eauto. congruence.
+
+        eapply well_formed_antimon; [| eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto. 
+        eapply Included_trans; [| now eapply Henv2 ].
+        eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto.
+
+        eapply well_formed_antimon; [| eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto. 
+        eapply Included_trans; [| now eapply Henv2 ].
+        eapply env_locs_monotonic.
+        eapply Singleton_Included. eexists; split; now eauto.
         
     - rewrite Combinators.compose_id_right. 
       rewrite compose_extend. rewrite extend_gss.
@@ -783,12 +799,12 @@ Module ClosureConversionCorrect (H : Heap).
         eapply well_formed_antimon; [| eassumption ].
         eapply reach'_set_monotonic.
         eapply get_In_env_locs; try eassumption.
-        now left; right; constructor; eauto.
+        now left; right; eassumption. 
         
         eapply Included_trans; [| eassumption ]. 
         
         eapply get_In_env_locs; try eassumption.
-        now left; right; constructor; eauto.
+        now left; right; eassumption.
         
       }
       
@@ -836,12 +852,12 @@ Module ClosureConversionCorrect (H : Heap).
         eapply well_formed_antimon; [| eassumption ].
         eapply reach'_set_monotonic.
         eapply get_In_env_locs; try eassumption.
-        now left; right; constructor; eauto.
+        now left; right; eassumption.
         
         eapply Included_trans; [| eassumption ]. 
         
         eapply get_In_env_locs; try eassumption.
-        now left; right; constructor; eauto.
+        now left; right; eassumption.
       }
      
       destruct Hin2 as [b' Hget].
@@ -852,7 +868,7 @@ Module ClosureConversionCorrect (H : Heap).
       assert (Hd : l2 \in dom H2).
       { eapply reachable_in_dom; try eassumption.
         eapply reach'_extensive. eapply get_In_env_locs; eauto.
-        reflexivity. }
+        eexists; split; eauto. reflexivity. }
 
       destruct Hd as [b' Hget].
       erewrite alloc_fresh in Hget; eauto. congruence.
@@ -973,9 +989,9 @@ Module ClosureConversionCorrect (H : Heap).
   (** * Lemmas about [project_var] and [project_vars] *)
   
     
-  Lemma project_var_ctx_to_heap_env Scope Scope' Funs c Γ FVs x C v1 rho1 rho2 H2:
-    project_var Size.Util.clo_tag Scope Funs c Γ FVs x C Scope' ->
-    Fun_inv_weak rho1 rho2 Scope Funs Γ ->
+  Lemma project_var_ctx_to_heap_env Scope Scope' Funs Funs'  c fenv FVs x C v1 rho1 rho2 H2 Γ:
+    project_var Size.Util.clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
+    Fun_inv_weak rho1 rho2 Scope Funs fenv ->
     FV_inv_weak rho1 rho2 H2 c Scope Funs Γ FVs ->
     M.get x rho1 = Some v1 ->
     exists H2' rho2' s, ctx_to_heap_env_CC C H2 rho2 H2' rho2' s.
@@ -994,10 +1010,10 @@ Module ClosureConversionCorrect (H : Heap).
       do 3 eexists. econstructor; try eassumption. constructor.
   Qed.
   
-  Lemma project_vars_ctx_to_heap_env Scope Scope' Funs c Γ FVs xs C vs1 rho1 rho2 H2:
+  Lemma project_vars_ctx_to_heap_env Scope Scope' Funs Funs' c Γ FVs xs C vs1 rho1 rho2 H2 fenv :
     ~ Γ \in FV Scope Funs FVs ->
-    project_vars Size.Util.clo_tag Scope Funs c Γ FVs xs C Scope' ->
-    Fun_inv_weak rho1 rho2 Scope Funs Γ ->
+    project_vars Size.Util.clo_tag Scope Funs fenv c Γ FVs xs C Scope' Funs'  ->
+    Fun_inv_weak rho1 rho2 Scope Funs fenv ->
     FV_inv_weak rho1 rho2 H2 c Scope Funs Γ FVs ->
     getlist xs rho1 = Some vs1 ->
     exists H2' rho2' s, ctx_to_heap_env_CC C H2 rho2 H2' rho2' s.

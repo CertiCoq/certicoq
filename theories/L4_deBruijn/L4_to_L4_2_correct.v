@@ -136,8 +136,6 @@ Proof using.
 Qed.
 
 
-Print Assumptions eval_evaln.
-
 Definition  eval41 := @polyEval.eval_n (TermAbsDBUnstrict Ast.name L4Opid).
 
 
@@ -423,7 +421,7 @@ Qed.
 
 
 Require Import Common.TermAbs_parametricity.
-Parametricity Recursive eval_n qualified.
+Parametricity Recursive eval_n.
 
 (* should be automatically provalble for all types with decidable equality.
   However, it cannot be internally stated. *)
@@ -431,11 +429,10 @@ Global Instance EqIfRdcon : EqIfR CertiCoq_o_L4_o_polyEval_o_dcon_R.
 Proof using.
 Admitted.
 
-Global Instance EqIfRstring : EqIfR Coq_o_Strings_o_String_o_string_R.
+Global Instance EqIfRstring : EqIfR string_R.
 Proof using.
 Admitted.
 
-Let L4Opid_R := CertiCoq_o_L4_o_polyEval_o_L4Opid_R.
 Global Instance EqIfRL4Opid : EqIfR L4Opid_R.
 Proof using.
   constructor; intros Hyp; subst.

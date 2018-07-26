@@ -258,8 +258,8 @@ Section term_Term_sec.
    match ds with
      | nil => dnil
      | cons d ds =>
-       dcons (dname _ d) (term_Term (dtype _ d))
-             (term_Term (dbody _ d))  (rarg _ d) (defs_Defs ds )
+       dcons (dname d) (term_Term (dtype d))
+             (term_Term (dbody d))  (rarg d) (defs_Defs ds )
    end.
   (* Case branches *)
   Fixpoint natterms_Brs (nts: list (nat * term)) : Brs :=

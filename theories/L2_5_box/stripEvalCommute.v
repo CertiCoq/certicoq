@@ -212,15 +212,15 @@ Lemma isApp_hom:
   forall t,
     isApp (strip t) ->
     L2k.compile.isApp t \/
-    exists x n u br,
-      t = L2k.compile.TCase x (L2k.compile.TProof u) (L2k.compile.bunit br n).
+    exists x n br,
+      t = L2k.compile.TCase x L2k.compile.TProof (L2k.compile.bunit br n).
 Proof.
   destruct t; cbn; intros h;
   destruct h as [x0 [x1 h]]; try discriminate. 
   - left. auto. 
   - destruct t; try discriminate. destruct b.
     + discriminate.
-    + right. exists i, t0, t, n. destruct b.
+    + right. exists i, t, n. destruct b.
       * reflexivity.
       * discriminate.
 Qed.

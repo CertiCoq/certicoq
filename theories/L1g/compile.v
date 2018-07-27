@@ -3,14 +3,19 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.omega.Omega.
 Require Import Coq.Bool.Bool.
-Require Import Template.Ast Template.kernel.univ.
 Require Import Common.Common.
+Require Import TemplateExtraction.Ast Template.kernel.univ.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+(** TODO move to TemplateExtraction.Ast *)
+Arguments dname {term} _.
+Arguments dbody {term} _.
+Arguments dtype {term} _.
+Arguments rarg {term} _.
   
 (** A slightly cleaned up notion of object term.
 *** The simultaneous definitions of [Terms] and [Defs] make
@@ -26,7 +31,7 @@ Set Implicit Arguments.
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TSort      : Srt -> Term
-| TProof     : Term -> Term
+| TProof     : Term
 | TProd      : name -> Term (* type *) -> Term -> Term
 | TLambda    : name -> Term (* type *) -> Term -> Term
 | TLetIn     : name ->
@@ -71,7 +76,6 @@ Fixpoint print_template_term (t:term) : string :=
   match t with
     | tRel n => " (" ++ (nat_to_string n) ++ ") "
     | tSort _ => " SRT "
-    | tCast _ _ _ => " CAST "
     | tProd _ _ _ => " PROD "
     | tLambda _ _ _ => " LAM "
     | tLetIn _ _ _ _ => " LET "
@@ -95,12 +99,6 @@ Function tappend (ts1 ts2:Terms) : Terms :=
     | tcons t ts => tcons t (tappend ts ts2)
   end.
 
-(** No nested "TProof" ***)
-Function mkProof (t:Term) : Term :=
-  match t with
-    | (TProof u) as x => x
-    | u => TProof u
-  end.
 (***  test **
 Eval cbv in mkProof prop.
 Eval cbv in mkProof (TProof (TProof (TProof prop))).
@@ -282,8 +280,7 @@ Function term_Term (t:term) : Term :=
              | (Level.lSet, false) :: nil => SSet
              | _ => SType  (* throwing away sort info *)
              end)
-    | tCast tm _ (tCast _ _ (tSort sProp)) => mkProof (term_Term tm)
-    | tCast tm _ ty => term_Term tm
+    | tBox => TProof
     | tProd nm ty bod => (TProd nm (term_Term ty) (term_Term bod))
     | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))
     | tLetIn nm dfn ty bod =>
@@ -337,6 +334,20 @@ Definition program_Pgm (dtEnv: environ Term) (p:program) (e:environ Term) : Prog
   let '(gctx, t) := p in
   program_Pgm_aux dtEnv gctx t e.
 
-Definition program_Program (p:program) : Program Term :=
+Definition program_Program_ext (p:program) : Program Term :=
   let dtEnv := program_datatypeEnv (fst p) (nil (A:= (string * envClass Term))) in
   program_Pgm dtEnv p nil.
+
+Require Template.Ast.
+Require Import TemplateExtraction.Extract.
+
+Definition program_Program (p:Template.Ast.program) : option (Program Term) :=
+  let '(genv, t) := p in
+  let gc := (genv, uGraph.init_graph) in
+  let genv' := extract_global gc in
+  let t' := extract gc nil t in
+  match genv', t' with
+  | Checker.Checked (genv', _ugraph), Checker.Checked t' =>
+    Some (program_Program_ext (genv', t'))
+  | _, _ => None
+  end.

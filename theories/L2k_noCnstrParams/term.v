@@ -66,7 +66,7 @@ Qed.
 Fixpoint print_term (t:Term) : string :=
   match t with
     | TRel n => "(Rel " ++ (nat_to_string n) ++ ")"
-    | TProof t => "(PRF " ++ print_term t ++ ")"
+    | TProof => "(PRF)"
     | TLambda nm t => "(LAM "++ (print_name nm) ++ " [" ++ print_term t ++ "])"
     | TLetIn nm _ _ => "(LET " ++ (print_name nm) ++ ")"
     | TApp fn arg =>
@@ -94,8 +94,7 @@ Lemma TermTerms_dec:
 Proof.
   apply TrmTrmsBrsDefs_ind; intros.
   - destruct t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-  - destruct t0; cross.
-    destruct (H t0); [lft | rght ..].
+  - destruct t; cross. lft.
   - destruct t0; cross.
     destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
   - destruct t1; cross.
@@ -922,15 +921,15 @@ Proof.
   left. auto.
 Qed.
 
-Definition isProof (t:Term) : Prop := exists s, t = TProof s.
-Lemma IsProof: forall t, isProof (TProof t).
-intros. exists t. reflexivity.
+Definition isProof (t:Term) : Prop := t = TProof.
+Lemma IsProof: isProof TProof.
+intros. reflexivity.
 Qed.
 Hint Resolve IsProof.
 Lemma isProof_dec: forall t, {isProof t}+{~ isProof t}.
 Proof.
   destruct t;
-  try (right; intros h; destruct h as [x jx]; discriminate).
+  try (right; intros h; red in h; discriminate).
   - left. auto.
 Defined.
 
@@ -948,23 +947,21 @@ Defined.
 
 Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n:nat) args, isCanonical (TConstruct i n args)
-| canP: forall t, isCanonical t -> isCanonical (TProof t).
+| canP: isCanonical TProof.
 Hint Constructors isCanonical.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
 Proof.
   induction t; try (solve [right; intros h; inversion h; inversion H;
                            destruct H1; discriminate]).
-  - destruct IHt.
-    + left. constructor. assumption.
-    + right. intros h. inversion_clear h. contradiction.
+  - left. constructor.
   - left. constructor.
 Qed.
      
 Function canonicalP (t:Term) : option  (nat * Terms) :=
   match t with
     | TConstruct _ r args => Some (r, args)
-    | TProof t => canonicalP t
+    | TProof => Some (0, tnil)
     | _ => None
   end.
 
@@ -972,7 +969,7 @@ Lemma canonicalP_isCanonical:
   forall t x, canonicalP t = Some x -> isCanonical t.
 Proof.
   induction t; simpl; intros; try discriminate.
-  - constructor. eapply IHt. eassumption.
+  - constructor.
   - constructor.
 Qed.
 
@@ -981,7 +978,7 @@ Lemma isCanonical_canonicalP:
 Proof.
   induction 1; simpl.
   - exists (n, args). reflexivity.
-  - assumption.
+  - eexists; reflexivity.
 Qed.
 
 
@@ -1531,7 +1528,7 @@ Qed.
 (** well-formed terms: TApp well-formed all the way down **)
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
-| wfaProof: forall tm, WFapp tm -> WFapp (TProof tm)
+| wfaProof: WFapp TProof
 | wfaLambda: forall nm bod, WFapp bod -> WFapp (TLambda nm bod)
 | wfaLetIn: forall nm dfn bod,
     WFapp dfn -> WFapp bod -> WFapp (TLetIn nm dfn bod)
@@ -1802,7 +1799,7 @@ Qed.
 (*** not used essentially at the moment **)
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
-| wfProof: forall n t, WFTrm t n -> WFTrm (TProof t) n
+| wfProof: forall n, WFTrm TProof n
 | wfLambda: forall n nm bod,
     WFTrm bod (S n) -> WFTrm (TLambda nm bod) n
 | wfLetIn: forall n nm dfn bod,
@@ -2336,8 +2333,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelEq: forall n, Instantiate n (TRel n) tin
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
-| IProof: forall n t it,
-           Instantiate n t it -> Instantiate n (TProof t) (TProof it)
+| IProof: forall n, Instantiate n TProof TProof
 | ILambda: forall n nm bod ibod,
              Instantiate (S n) bod ibod -> 
              Instantiate n (TLambda nm bod) (TLambda nm ibod)
@@ -2424,7 +2420,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TProof t => TProof (instantiate n t)
+    | TProof => TProof
     | TConstruct i m args => TConstruct i m (instantiates n args)
     | x => x
   end
@@ -2574,9 +2570,6 @@ Proof.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - cbn. constructor. apply H0. assumption.
-  - change (WFapp (TLambda nm (instantiate (S n) bod))).
-    constructor.
-    + apply H0. assumption.
   - change (WFapp (TLetIn nm (instantiate n dfn) (instantiate (S n) bod))).
     constructor.
     + apply H0. assumption.
@@ -2900,7 +2893,6 @@ Variable nm: string.
 
 Inductive PoccTrm : Term -> Prop :=
 | PoLambdaBod: forall s bod, PoccTrm bod -> PoccTrm (TLambda s bod)
-| PoProof: forall t, PoccTrm t -> PoccTrm (TProof t)
 | PoLetInDfn: forall s dfn bod,
                 PoccTrm dfn -> PoccTrm (TLetIn s dfn bod)
 | PoLetInBod: forall s dfn bod,
@@ -3239,8 +3231,6 @@ Proof.
   - inversion H.
   - inversion_Clear H0.
     + constructor. intuition.
-  - inversion_Clear H0.
-    + constructor. intuition. 
   - inversion_Clear H1.
     + constructor. intuition. 
     + apply PoLetInBod. intuition.

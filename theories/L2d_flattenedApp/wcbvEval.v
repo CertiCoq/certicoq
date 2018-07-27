@@ -18,7 +18,10 @@ Set Implicit Arguments.
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
-| wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) s
+| wProof: WcbvEval p TProof TProof
+| wAppProof fn arg :
+    WcbvEval p fn TProof ->
+    WcbvEval p (TApp fn arg) TProof
 | wConstruct: forall i r np na,
     WcbvEval p (TConstruct i r np na) (TConstruct i r np na)
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
@@ -95,6 +98,13 @@ Proof.
   intros p.
   apply WcbvEvalEvals_ind; intros; try (inversion_Clear H; reflexivity).
   - eapply H. inversion_Clear H0. assumption.
+    apply H in H3; discriminate.
+    apply H in H3; discriminate.
+    apply H in H3. subst fn'.
+    destruct H4 as [H4|[H4|H4]]; red in H4.
+    destruct H4 as (?&?&?&?&H4); discriminate.
+    destruct H4 as (?&?&H4); discriminate.
+    destruct H4 as (?&H4). discriminate.
   - eapply H. inversion_Clear H0. rewrite e in H2.
     myInjection H2. assumption.
   - inversion_Clear H2;
@@ -115,7 +125,8 @@ Proof.
       intuition.
     + specialize (H _ H4). subst. destruct H5; try is_inv H.
       destruct H; try is_inv H.
-  - inversion_Clear H1; specialize (H _ H4); subst.
+  - inversion_Clear H1; (specialize (H _ H4) || specialize (H _ H5)); subst.
+    + destruct o; try is_inv H. destruct H; try is_inv H.
     + destruct o; try is_inv H. destruct H; try is_inv H.
     + destruct o; try is_inv H. destruct H; try is_inv H.
     + specialize (H0 _ H7). subst. reflexivity.
@@ -400,11 +411,7 @@ Function wcbvEval
       | Some (ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
-    | TProof t =>
-      match wcbvEval n t with
-      | Ret et => Ret et
-      | Exc s => raise ("wcbvEval: TProof: " ++ s)
-      end
+    | TProof => Ret TProof
     | TApp fn a1 =>
       match wcbvEval n fn with
       | Ret (TLambda _ bod) =>
@@ -426,6 +433,7 @@ Function wcbvEval
         | Exc s => raise ("wcbvEval;TApp:arg doesn't eval: "
                    ++ print_term a1 ++ "; " ++ s)
         end
+      | Ret TProof => Ret TProof
       | Ret tc => raise ("wcbvEval:TApp:fn cannot be applied: "
                            ++ print_term tc ++ ")")
       | Exc s =>

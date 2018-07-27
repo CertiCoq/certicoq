@@ -95,10 +95,12 @@ Instance certiL1g: CerticoqLanguage (Program L1g.compile.Term):= {}.
 Local Generalizable Variable Lj.
 
 Definition translateTo `{CerticoqTranslation (Program L1g.compile.Term) Lj}
-  (p:program): exception Lj :=
+  (p:Template.Ast.program): exception Lj :=
   let l1g:= L1g.compile.program_Program p in
-  translate (Program L1g.compile.Term) Lj l1g.
-
+  match l1g with
+  | Some t => translate (Program L1g.compile.Term) Lj t
+  | None => Exc "Could not translate from Ast to L1g"
+  end.
 
 Arguments translateTo Lj {H} p.
 
@@ -107,7 +109,7 @@ Require Import certiClasses.
 Definition ctranslateTo {Term Value BigStep WF QH ObsS } 
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
-  : program -> exception (cTerm Lj) :=
+  : Template.Ast.program -> exception (cTerm Lj) :=
   translateTo (cTerm Lj).
 
 Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
@@ -117,7 +119,7 @@ Definition ctranslateEval {Term Value BigStep WF QH ObsS }
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
    `{BigStepOpSemExec (cTerm Lj) (cValue Lj)}
-  (p: program) (n:nat) : bigStepResult (cTerm Lj) (cValue Lj) :=
+  (p: Template.Ast.program) (n:nat) : bigStepResult (cTerm Lj) (cValue Lj) :=
   match translateTo (cTerm Lj) p with
   | Ret e => bigStepEvaln n e
   | Exc s => Error s None 

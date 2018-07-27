@@ -19,7 +19,10 @@ Set Implicit Arguments.
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
-| wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) s
+| wProof: WcbvEval p TProof TProof
+| wAppProof : forall fn arg,
+    WcbvEval p fn TProof ->
+    WcbvEval p (TApp fn arg) TProof
 | wConstruct: forall i r args args',
     WcbvEvals p args args' ->
     WcbvEval p (TConstruct i r args) (TConstruct i r args')
@@ -91,11 +94,16 @@ Proof.
   intros p.
   apply WcbvEvalEvals_ind; intros; try (inversion_Clear H; reflexivity).
   - inversion_Clear H0. intuition.
+    specialize (H _ H3); discriminate.
+    specialize (H _ H3); discriminate.
+    specialize (H _ H3); subst.
+    destruct H4. is_inv H. destruct H. is_inv H. is_inv H.
   - inversion_Clear H0. apply f_equal3; try reflexivity.
     eapply H. assumption.
   - inversion_Clear H0. rewrite H2 in e. myInjection e.
     eapply H. assumption.
   - inversion_Clear H2.
+    + specialize (H _ H6). discriminate.
     + specialize (H _ H5). myInjection H.
       specialize (H0 _ H6). subst.
       eapply H1. assumption.
@@ -106,6 +114,7 @@ Proof.
   - inversion_Clear H1. specialize (H _ H6). subst.
     eapply H0. assumption.
   - inversion_Clear H1.
+    + specialize (H _ H5). discriminate.
     + specialize (H _ H4). discriminate.
     + specialize (H _ H4). myInjection H. rewrite H5 in e. myInjection e.
       intuition.
@@ -113,6 +122,8 @@ Proof.
       * dstrctn H. discriminate.
       * destruct H. dstrctn H. discriminate. dstrctn H. discriminate.
   - inversion_Clear H1.
+    + specialize (H _ H5). subst. destruct o. is_inv H.
+      destruct H; is_inv H.
     + specialize (H _ H4). subst. destruct o.
       * dstrctn H. discriminate.
       * destruct H. dstrctn H. discriminate. dstrctn H. discriminate.
@@ -274,11 +285,7 @@ Function wcbvEval
       | Some (ecTyp _ _ _) => raise ("wcbvEval;TConst;ecTyp: " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
-    | TProof t =>
-      match wcbvEval n t with
-      | Ret et => Ret et
-      | Exc s => raise ("wcbvEval,TProof: " ++ s)
-      end
+    | TProof => Ret TProof
     | TApp fn a1 =>
       match wcbvEval n fn with
       | Ret (TLambda _ bod) =>
@@ -298,6 +305,7 @@ Function wcbvEval
             | Ret ea1 => ret (TApp u ea1)
             | Exc s => raise ("(wcbvEval;TAppCong: " ++ s ++ ")")
         end
+      | Ret TProof => Ret TProof
       | Ret s => raise ("(wcbvEval;TApp:fn:" ++ print_term s ++ ")")
       | Exc str =>  raise ("(wcbvEval;TApp:fnExc:" ++ str ++ ")")
       end

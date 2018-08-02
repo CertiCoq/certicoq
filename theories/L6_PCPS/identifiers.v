@@ -253,6 +253,16 @@ Proof.
     simpl. omega.
 Qed.
 
+Instance ToMSet_name_in_fundefs B : ToMSet (name_in_fundefs B).
+Proof.
+  induction B.
+  - destruct IHB as [s1 Hseq1].
+    eexists (PS.add v s1).
+    simpl. erewrite FromSet_add, Hseq1. reflexivity.
+  - eexists PS.empty. rewrite FromSet_empty. reflexivity.
+Qed.
+
+
 (** * Free variables, inductive definitions *)
 
 (** [occurs_free e] is the set of free variables of [e] *)

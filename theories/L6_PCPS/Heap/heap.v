@@ -1134,4 +1134,72 @@ Module HeapLemmas (H : Heap).
        destruct Heq'; congruence.
   Qed.
 
+
+  Lemma max_heap_with_measure_get {A} (H1 : heap A) l f b : 
+    get l H1 = Some b ->
+    f b <= max_with_measure f H1. 
+  Proof.
+    intros Hget. unfold max_with_measure. 
+    eapply heap_elements_complete in Hget.
+    generalize (heap_elements H1), Hget. clear Hget.
+    intros ls Hin. induction ls.
+    + inv Hin.
+    + simpl.
+      inv Hin.
+      * simpl. eapply fold_left_extensive.
+        intros [l1 x1] x2. eapply Max.le_max_l. 
+      * eapply le_trans. eapply IHls. eassumption.
+        eapply fold_left_monotonic; [| omega ].
+        intros x1 x2 [l1 y1] Hleq. simpl.
+        eapply NPeano.Nat.max_le_compat_r. eassumption.
+  Qed.
+
+  Lemma size_with_measure_get {A} (H1 : heap A) l f b : 
+    get l H1 = Some b ->
+    f b <= size_with_measure f H1. 
+  Proof.
+    intros Hget. unfold size_with_measure. 
+    eapply heap_elements_complete in Hget.
+    generalize (heap_elements H1), Hget. clear Hget.
+    intros ls Hin. induction ls.
+    + inv Hin.
+    + simpl.
+      inv Hin.
+      * simpl. eapply fold_left_extensive.
+        intros [l1 x1] x2. omega.
+      * eapply le_trans. eapply IHls. eassumption.
+        eapply fold_left_monotonic; [| omega ].
+        intros x1 x2 [l1 y1] Hleq. simpl.
+        omega.
+  Qed.
+
+  Lemma heap_elements_filter_monotonic {A} S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2} (H : heap A):  
+    S1 \subset S2 ->
+    Subperm (heap_elements_filter S1 H) (heap_elements_filter S2 H).
+  Proof.
+    intros Hsub. eapply incl_Subperm.
+    eapply heap_elements_filter_NoDup.
+    intros [l1 b] Hin. eapply heap_elements_filter_sound in Hin.
+    destruct Hin as [Hget Hin].
+    eapply heap_elements_filter_complete; eauto.
+  Qed.
+  
+  Lemma size_wirh_measure_filter_monotonic {A} S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2}
+        (f : A -> nat) H :
+    S1 \subset S2 ->
+    size_with_measure_filter f S1 H <=
+    size_with_measure_filter f S2 H.
+  Proof.
+    intros Hseq. 
+    unfold size_with_measure_filter.
+    eapply fold_left_subperm.
+    constructor.
+    now econstructor.
+    intros ? ? ?. omega.
+    intros. omega.
+    intros. omega.
+    intros. omega.
+    eapply heap_elements_filter_monotonic. eassumption.
+  Qed.
+
 End HeapLemmas.

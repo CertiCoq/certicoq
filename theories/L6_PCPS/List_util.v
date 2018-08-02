@@ -354,6 +354,24 @@ Proof.
     eapply Hr; eauto; try now constructor 2.
 Qed.
 
+Lemma Forall2_vertical_strong
+      {A B C D : Type} (R1 : A -> B -> Prop) (R2 : A -> C -> Prop) (R3 : B -> D -> Prop) (R4 : C -> D -> Prop)
+      (l1 : list A) (l2 : list B) (l3 : list C) (l4 : list D):
+  (forall (x : A) (y : B) (z : C) (w : D),
+     List.In x l1 -> List.In y l2 -> List.In z l3 ->  List.In w l4 ->
+     R1 x y -> R2 x z -> R3 y w -> R4 z w) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l1 l3 -> Forall2 R3 l2 l4 ->
+  Forall2 R4 l3 l4.
+Proof.
+  intros Hyp Hr1.
+  revert l3 l4 Hyp. induction Hr1; intros l3 l4 Hyp Hr2 Hr3; inv Hr2; inv Hr3. 
+  - now constructor.
+  - constructor; eauto. eapply Hyp; try eassumption; now constructor.
+    eapply IHHr1; try eassumption.
+    intros. eapply Hyp; try eassumption; now constructor.
+Qed.
+
 Lemma Forall2_exists {A B} (P : A -> B -> Prop) l1 l2 x :
   List.In x l1 ->
   Forall2 P l1 l2 ->
@@ -999,3 +1017,19 @@ Proof.
   eapply InA_alt in Hin. edestruct Hin as [z [Hin1 Hin2]].
   subst. eauto.
 Qed.
+
+Lemma Forall2_P_exists_r {A B : Type} (P1 : A -> Prop) (P2 : A -> B -> Prop)
+      (l1 : list A) (l2 : list B) (y : B) :
+  List.In y l2 ->
+  Forall2_P P1 P2 l1 l2 ->
+  exists x : A, List.In x l1 /\ (~ P1 x -> P2 x y).
+Proof.
+  intros Hin Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    + eexists; split; eauto. now left.
+    + edestruct IHHall as [z [Hinz Hp2]]; eauto.
+      eexists. split. right. eassumption. 
+      eassumption.
+Qed.
+

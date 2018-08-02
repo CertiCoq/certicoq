@@ -25,11 +25,11 @@ Section CC.
 
   (* The free-variable set of a source program *)
   Definition FV (Scope : Ensemble var) (Funs : Ensemble var) (FVs : list var) :=
-    Scope :|: Funs :|: (FromList FVs \\ (Scope :|: Funs)).
+    Scope :|: (Funs \\ Scope) :|: (FromList FVs \\ (Scope :|: Funs)).
   
   (* The free-variable set of a closure converted *)
   Definition FV_cc (Scope : Ensemble var) (Funs : Ensemble var) (γ : var  -> var) (Γ : var) :=
-    Scope :|: Funs :|: image γ Funs :|: [set Γ].
+    Scope :|: (Funs \\ Scope) :|: image γ (Funs \\ Scope) :|: [set Γ].
 
   (* Closure application *)
   Definition AppClo f t xs f' Γ :=
@@ -57,7 +57,7 @@ Section CC.
   | Var_in_Funs :
       forall Scope Funs fenv c FVs f Γ,
         ~ f \in Scope ->
-        f \in Funs ->                      
+        f \in Funs ->
         (* adds the function in scope so that it's not constructed again *)
         project_var Scope Funs fenv c Γ FVs f
                     (Econstr_c f clo_tag [f ; (fenv f)] Hole_c) (f |: Scope) (Funs \\ [set f])

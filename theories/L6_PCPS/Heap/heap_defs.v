@@ -226,13 +226,8 @@ Module HeapDefs (H : Heap) .
       | Fnil => rho
     end.
 
-  (* TODO move *)
-  (** A bijection between two sets. *)
-  Definition bijective {A B} (β : A -> B) (S1 : Ensemble A) (S2 : Ensemble B) :=
-    image β S1 <--> S2 /\ injective_subdomain S1 β. 
-    
-  (* TODO move *)
-  (* M utils *)
+  
+  (* TODO move *)  (* M utils *)
   Definition key_set {A : Type} (map : M.t A) :=
     [ set x : positive | match M.get x map with
                            | Some x => True
@@ -244,6 +239,7 @@ Module HeapDefs (H : Heap) .
            M.get x map2 = Some v.
 
   (* XXX move *)
+
   Fixpoint xfilter {A : Type} (pred : positive -> A -> bool) (m : M.t A) 
            (i : positive) {struct m} : M.t A :=
     match m with
@@ -1331,6 +1327,18 @@ Module HeapDefs (H : Heap) .
       reflexivity. rewrite Hget; eauto.
   Qed.
 
+  Lemma env_locs_Singleton_None x rho :
+    M.get x rho = None ->
+    env_locs rho [set x] <--> Empty_set _.
+  Proof.
+    intros Hget; split; intros l.
+    - intros [y [Hin Hget']]. inv Hin.
+      rewrite Hget in Hget'. eassumption.
+    - intros Hin. eexists; split.
+      reflexivity. rewrite Hget; eauto.
+  Qed.
+
+
   (* TODO change name *)
   Lemma env_locs_singleton_env (x : var) (v : value) :
     (val_loc v) <--> env_locs (M.set x v (M.empty _)) [set x].
@@ -2015,6 +2023,61 @@ Module HeapDefs (H : Heap) .
          eapply Hal in Hget''. congruence.
   Qed.
 
+  Lemma well_formed_reach_subheap_same 
+        (S : Ensemble loc) (H H' : heap block) : 
+    well_formed (reach' H S) H ->
+    S \subset dom H -> H ⊑ H' ->
+    reach' H S <--> reach' H' S.
+  Proof.
+    intros Hwf Hsub Hsub'; split; intros l [n1 [_ Hr]]. 
+    - eexists; split.
+      now constructor.
+      eapply (well_formed_post_n_subheap_same _ H H') in Hr; try eassumption.
+    - eexists; split.
+      now constructor.
+      eapply (well_formed_post_n_subheap_same _ H H') in Hr; try eassumption.
+  Qed.
+
+  Lemma well_formed_post_subheap_same 
+        (S : Ensemble loc) (H H' : heap block) : 
+    well_formed (reach' H S) H ->
+    S \subset dom H -> H ⊑ H' ->
+    post H S <--> post H' S.
+  Proof.
+    intros Hwf Hsub Hsub'.
+    eapply well_formed_post_n_subheap_same with (n := 1); eassumption.
+  Qed.
+
+  Lemma reach'_subheap H H' S : 
+    well_formed (reach' H S) H ->
+    S \subset dom H ->
+    H ⊑ H' ->
+    reach' H S <--> reach' H' S.
+  Proof. 
+    intros Hwf Hsub Hsub'. split.
+    - intros x [n [_ Hin]].
+      eexists. split. now constructor.
+      eapply (well_formed_post_n_subheap_same S H H') in Hin; eassumption.
+    - intros x [n [_ Hin]].
+      eexists. split. now constructor.
+      eapply (well_formed_post_n_subheap_same S H H') in Hin; eassumption.
+  Qed.
+
+  Lemma well_formed_subheap H H' S :
+    well_formed S H ->
+    S \subset dom H ->
+    H ⊑ H' ->
+    well_formed S H'.
+  Proof. 
+    intros Hwf Henv Hsub x b Hget Hin.
+    eapply Included_trans.
+    eapply Hwf; eauto.
+    eapply Henv in Hget.
+    destruct Hget as [b' Hget]. rewrite Hget.
+    now erewrite Hsub in Hin; eauto.
+
+    eapply HL.dom_subheap. eassumption.
+  Qed.
 
   Lemma well_formed_reach_def_closed_same (S : Ensemble loc) (H H' : heap block)
         B B0 rho rho' envc :
@@ -2276,18 +2339,6 @@ Module HeapDefs (H : Heap) .
       + rewrite env_locs_Node_None.
         rewrite FromSet_union, IHrho1, IHrho2. reflexivity.
   Qed.
-
-  (* TODO move *)
-  Lemma env_locs_Singleton_None x rho :
-    M.get x rho = None ->
-    env_locs rho [set x] <--> Empty_set _.
-  Proof.
-    intros Hget; split; intros l.
-    - intros [y [Hin Hget']]. inv Hin.
-      rewrite Hget in Hget'. eassumption.
-    - intros Hin. eexists; split.
-      reflexivity. rewrite Hget; eauto.
-  Qed.
   
   Lemma env_locs_set_correct_aux S s s' (rho : env) :
     S <--> FromSet s ->
@@ -2477,46 +2528,6 @@ Module HeapDefs (H : Heap) .
 
   (** Lemmas about dfs *)
 
-  (* TODO move *)
-  Instance Proper_From_set : Proper (PS.Equal ==> Same_set _) FromSet.
-  Proof.
-    constructor.
-    - intros z Hin. eapply FromSet_sound in Hin; [| reflexivity ].
-      eapply FromSet_complete. reflexivity. eapply H. eassumption.
-    - intros z Hin. eapply FromSet_sound in Hin; [| reflexivity ].
-      eapply FromSet_complete. reflexivity. eapply H. eassumption.
-  Qed.
-
-  Lemma Same_set_From_set (s1 s2 : PS.t) :
-    FromSet s1 <--> FromSet s2 -> PS.Equal s1 s2.
-  Proof.
-    intros Heq z. split.
-    - intros Hin. eapply FromSet_complete in Hin; [| reflexivity ].
-      eapply FromSet_sound. reflexivity. eapply Heq. eassumption.
-    - intros Hin. eapply FromSet_complete in Hin; [| reflexivity ].
-      eapply FromSet_sound. reflexivity. eapply Heq. eassumption.
-  Qed.
-
-  Instance union_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.union.
-  Proof.
-    intros x y Heq1 x' y' Heq2; subst.
-    intros z; split; intros Hin; eapply PS.union_spec in Hin;
-    inv Hin; eapply PS.union_spec; now firstorder.
-  Qed.
-
-  Instance diff_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.diff.
-  Proof.
-    intros x y Heq1 x' y' Heq2; subst.
-    intros z; split; intros Hin; eapply PS.diff_spec in Hin;
-    inv Hin; eapply PS.diff_spec; now firstorder.
-  Qed.
-
-  Instance diff_proper_r :  Proper (eq ==> PS.Equal ==> PS.Equal) PS.diff.
-  Proof.
-    intros x y Heq1 x' y' Heq2; subst.
-    intros z; split; intros Hin; eapply PS.diff_spec in Hin;
-    inv Hin; eapply PS.diff_spec; now firstorder.
-  Qed.
   
   Instance Proper_post_set : Proper (eq ==> PS.Equal ==> PS.Equal) post_set.
   Proof.

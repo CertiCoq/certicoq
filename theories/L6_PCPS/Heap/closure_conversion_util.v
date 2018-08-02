@@ -82,35 +82,48 @@ Module CCUtil (H : Heap).
   Proof with (now eauto with Ensembles_DB).   
     unfold FV.
     eapply Union_Included.
-    eapply Union_Included...    
+    eapply Union_Included.
+    now eauto with Ensembles_DB.
+    rewrite Setminus_Union_distr. 
+    now eauto with Ensembles_DB.
     now eauto with Ensembles_DB.
   Qed.
-  
+   
   Lemma FV_cc_Union2 Scope Funs fenv Γ S :
     FV_cc Scope (S :|: Funs) fenv Γ \subset 
     S :|: (image fenv S) :|: FV_cc Scope Funs fenv Γ.
   Proof with (now eauto with Ensembles_DB).   
     unfold FV_cc.
+    rewrite !Setminus_Union_distr at 1. 
     rewrite !image_Union.
     eapply Union_Included.
     eapply Union_Included.
     eapply Union_Included...    
-    now eauto with Ensembles_DB.
+    eapply Union_Included...    
     now eauto with Ensembles_DB.
   Qed.
   
   Lemma FV_cc_Setminus1 Scope Funs fenv Γ S {Hd : Decidable S} : 
     FV_cc (Scope \\ S) Funs fenv Γ \subset
-    S :|: FV_cc Scope Funs fenv Γ.
+    S :|: (image fenv S) :|: FV_cc Scope Funs fenv Γ.
   Proof.
     unfold FV_cc.
     eapply Union_Included;
       [| now eauto with Ensembles_DB ]...
     eapply Union_Included.
     eapply Union_Included;
-      [ now eauto with Ensembles_DB |]; now eauto with Ensembles_DB.
+      [ now eauto with Ensembles_DB |].
+    eapply Included_trans. 
+    eapply Setminus_Setminus_Included. eassumption.    
+    eapply Union_Included;
     now eauto with Ensembles_DB.
-  Qed.
+    eapply Included_trans.
+    eapply image_monotonic. 
+    eapply Setminus_Setminus_Included. eassumption.    
+    rewrite image_Union. 
+    eapply Union_Included;
+    now eauto with Ensembles_DB.
+  Qed. 
 
   Lemma FV_Setminus1 Scope Funs FVs S {Hd : Decidable S} : 
     FV (Scope \\ S) Funs FVs \subset
@@ -120,6 +133,9 @@ Module CCUtil (H : Heap).
     eapply Union_Included.
     eapply Union_Included;
       [ now eauto with Ensembles_DB |].
+    eapply Included_trans. 
+    eapply Setminus_Setminus_Included. eassumption.    
+    eapply Union_Included;
     now eauto with Ensembles_DB.
     eapply Included_trans.
     rewrite Union_commut. rewrite <- !Setminus_Union.
@@ -136,8 +152,8 @@ Module CCUtil (H : Heap).
     eapply Included_Union_compat; [| reflexivity ].
     eapply Included_Union_compat.
     eapply Included_Union_compat. reflexivity.
-    eassumption.
-    eapply image_monotonic; eassumption.
+    now eauto with Ensembles_DB.
+    eapply image_monotonic. now eauto with Ensembles_DB.
   Qed.
 
 
@@ -296,34 +312,6 @@ Module CCUtil (H : Heap).
       eapply project_var_Funs_l; eassumption.
   Qed.
 
-  (* TODO move *)
-  Lemma prod_Proj1 A B (S : Ensemble (A * B)) x y :
-    (x, y) \in S -> x \in Proj1 S.
-  Proof.
-    firstorder.
-  Qed.
-
-  Lemma prod_Proj2 A B (S : Ensemble (A * B)) x y :
-    (x, y) \in S -> y \in Proj2 S.
-  Proof.
-    firstorder.
-  Qed.
-  
-  Lemma Prod_proj A B (S1 : Ensemble A) (S2 : Ensemble B) z :
-    z \in Prod S1 S2 -> 
-    fst z \in S1 /\ snd z \in S2.
-  Proof.
-    destruct z. firstorder.
-  Qed.
-
-  Lemma proj_Prod A B (S1 : Ensemble A) (S2 : Ensemble B) z :
-    fst z \in S1 -> snd z \in S2 -> z \in Prod S1 S2.
-  Proof.
-    destruct z. firstorder.
-  Qed.
-
-  (* end move *)
-  
   Lemma project_var_occurs_free_ctx_Included Scope Scope' Funs Funs' fenv c Γ FVs x C e F:
     project_var clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
     occurs_free e \subset x |: F ->
@@ -339,7 +327,7 @@ Module CCUtil (H : Heap).
       eapply Union_Included.
       + eapply Singleton_Included.
         eapply Hsub'.
-        left. left. right. eassumption.
+        left. left. right. constructor; eassumption.
       + eapply Included_trans; [| eassumption ].
         eapply Included_Union_preserv_l.
         eapply Included_Union_preserv_r.
@@ -456,9 +444,14 @@ Module CCUtil (H : Heap).
       eapply Included_Union_compat.
       eapply Included_Union_compat. 
       eapply project_var_Scope. eassumption.
+      eapply Included_Setminus_compat. 
       eapply project_var_Funs_l. eassumption.
+      eapply project_var_Scope_l. eassumption.
+      
       eapply image_monotonic.
-      eapply project_var_Funs_l. eassumption.      
+      eapply Included_Setminus_compat. 
+      eapply project_var_Funs_l. eassumption.
+      eapply project_var_Scope_l. eassumption.
       reflexivity.
       rewrite <- !(Union_assoc [set y]).
       eapply Included_Union_compat. reflexivity. eassumption.
@@ -493,7 +486,16 @@ Module CCUtil (H : Heap).
       eapply Included_Union_compat; [| reflexivity ].
       eapply image_monotonic. now eauto with Ensembles_DB.
     - unfold FV_cc. rewrite <- !Union_assoc.
-      eapply Included_Union_compat...
+      eapply Included_Union_compat.
+      reflexivity.
+      eapply Included_Union_compat.
+      reflexivity.
+      eapply Included_Union_compat.
+      now eauto with Ensembles_DB.
+      eapply Included_Union_compat.
+      eapply image_monotonic. 
+      now eauto with Ensembles_DB.
+      reflexivity.      
   Qed.
 
   Lemma project_vars_FV_cc Scope Scope' Funs Funs' c Γ FVs xs C fenv :
@@ -588,8 +590,11 @@ Module CCUtil (H : Heap).
 
       eapply Included_trans. eapply FV_cc_Setminus1. now eauto with typeclass_instances.
       eapply Union_Included.
+      eapply Union_Included.
       now eauto with Ensembles_DB.
 
+      rewrite <- (closure_conversion_fundefs_Same_set) at 1 ; [| eassumption ].
+      eapply Included_trans. eapply extend_fundefs'_image. now eauto with Ensembles_DB. 
       eapply Included_trans. eapply FV_cc_extend_fundefs.
       eapply Union_Included.
       now eauto with Ensembles_DB.
@@ -630,8 +635,10 @@ Module CCUtil (H : Heap).
         eapply Union_Included; [ | now eauto with Ensembles_DB ].
         rewrite <- (Union_assoc (FromList l)). eapply Union_Included.
         now eauto with Ensembles_DB.
-        eapply Included_Union_compat. reflexivity.
-        eapply Included_trans. eapply extend_fundefs'_image...
+        eapply Union_Included. now eauto with Ensembles_DB.
+        
+        eapply Included_trans. eapply image_monotonic. now eapply Setminus_Included.
+        eapply Included_trans. eapply extend_fundefs'_image.
         now eauto with Ensembles_DB.
       + apply Setminus_Included_Included_Union.
         eapply Included_trans. eapply IHB. eassumption.
@@ -760,13 +767,16 @@ Module CCUtil (H : Heap).
     - reflexivity.
     - rewrite !(Union_commut [set x] Scope) at 2.
       rewrite (Union_Setminus_Included _ _ [set x]); eauto with Ensembles_DB typeclass_instances.
+      rewrite Setminus_Union.
+      rewrite (Union_Same_set [set x] (Scope :|: [set x])); eauto with Ensembles_DB typeclass_instances.
+      rewrite <- (Setminus_Union Funs ). 
       rewrite (Union_Setminus_Included _ _ [set x]); eauto with Ensembles_DB typeclass_instances.
-
+      
       rewrite <- (Union_assoc Scope [set x] Funs).
       rewrite (Union_Same_set [set x]  Funs); eauto with Ensembles_DB typeclass_instances.
 
-      rewrite (Union_commut [set x]). rewrite <- (Union_assoc _ [set x] Funs).
-      rewrite (Union_Same_set [set x]  Funs); eauto with Ensembles_DB typeclass_instances.
+      rewrite (Union_commut [set x]). rewrite <- (Union_assoc _ [set x] (Funs \\ Scope)).
+      rewrite (Union_Same_set [set x] (Funs \\ Scope)); eauto with Ensembles_DB typeclass_instances.
     - rewrite !(Union_commut [set x] Scope) at 2.
       rewrite <- (Union_assoc Scope [set x] Funs').
       rewrite !(Union_commut [set x] Funs') at 1.
@@ -774,6 +784,9 @@ Module CCUtil (H : Heap).
       rewrite <- (Setminus_Union (FromList FVs) (Scope :|: Funs')).
       rewrite (Union_Setminus_Included _ _ [set x]);
         eauto with Ensembles_DB typeclass_instances.
+      rewrite <- (Setminus_Union Funs' ). 
+      rewrite (Union_Setminus_Included _ _ [set x]); eauto with Ensembles_DB typeclass_instances.
+
       rewrite <- !(Union_assoc [set x]).
       rewrite (Union_Same_set [set x] _). reflexivity.
       eapply Singleton_Included. right. 
@@ -797,6 +810,7 @@ Module CCUtil (H : Heap).
     x \in (FV Scope Funs FVs).
   Proof.
     unfold FV. intros Hvar. inv Hvar; eauto.
+    - left. right. constructor; eauto. 
     - right. constructor; eauto. eapply nthN_In. eassumption.
       intros Hc; inv Hc; eauto. 
   Qed.
@@ -1049,6 +1063,9 @@ Module CCUtil (H : Heap).
         eapply nthN_In. eassumption.
       + eapply Included_trans; [| eassumption ].
         eapply env_locs_monotonic.
+        eapply Included_trans.
+        eapply Included_Setminus_compat.
+        eapply FV_cc_Union1. reflexivity.
         now eauto 20 with Ensembles_DB.
   Qed.
   
@@ -1168,13 +1185,13 @@ Module CCUtil (H : Heap).
       + simpl. simpl in H13.
         destruct (M.get x rho1) as [v1 |] eqn:Hget1; try congruence. 
         destruct (M.get (fenv x) rho1) as [v2 |] eqn:Hget2; try congruence. 
-        inv H13.
+        inv H13. 
         eapply Included_trans; [| eapply reach'_extensive ].
         simpl. eapply Union_Included. eapply get_In_env_locs; [| eassumption ].
-        left; left; right. eassumption.
+        left; left; right. now constructor; eauto.
         rewrite Union_Empty_set_neut_r.
         eapply get_In_env_locs; [| eassumption ]. left; right.
-        eapply In_image. eassumption.
+        eapply In_image. now constructor; eauto.
     - inv H18.
       eapply well_formed_antimon; [| eapply well_formed_reach_set; try eassumption ].
       + eapply reach'_set_monotonic. eapply env_locs_monotonic.
@@ -1320,6 +1337,40 @@ Module CCUtil (H : Heap).
       eapply IHHvar.  eassumption. 
       eapply project_var_well_formed'; eassumption.
       eapply project_var_env_locs'; eassumption.
+  Qed.
+
+  Lemma project_var_binding_in_map Scope Scope' Funs Funs' fenv c Γ FVs x C1 rho1 H1 rho2 H2 m :
+    project_var clo_tag Scope Funs fenv c Γ FVs x C1 Scope' Funs' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    binding_in_map Scope rho1 ->
+    binding_in_map Scope' rho2. 
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvar Hctx Hnin. inv Hvar; inv Hctx; eauto.
+    - inv H15.
+      eapply binding_in_map_antimon;
+        [| eapply binding_in_map_set; eassumption ]...
+    - inv H18; eauto. 
+      eapply binding_in_map_antimon;
+        [| eapply binding_in_map_set; eassumption ]...
+  Qed.
+
+  Lemma project_vars_binding_in_map Scope Scope' Funs Funs' fenv c Γ FVs xs C1 rho1 H1 rho2 H2 m :
+    project_vars clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    binding_in_map Scope rho1 ->
+    binding_in_map Scope' rho2. 
+  Proof.
+    intros Hvar; revert rho1 H1 rho2 H2 m; induction Hvar; intros rho1 H1 rho2 H2 m Hctx Hbin. 
+    - inv Hctx. eassumption.
+    - edestruct ctx_to_heap_env_CC_comp_ctx_f_l as [rho'' [H'' [m1 [m2  [Hctx1 [Hctx2 Hadd]]]]]]; eauto.
+      subst. eapply IHHvar. eassumption.
+      eapply project_var_binding_in_map; eassumption.
+  Qed.
+
+  Instance Proper_binding_in_map (A : Type) : Proper (Same_set _ ==> eq ==> iff) (@binding_in_map A). 
+  Proof.
+    intros s1 s2 Hseq x1 x2 Heq; subst; split; intros Hbin x Hin;
+    eapply Hbin; eapply Hseq; eauto.
   Qed.
 
 End CCUtil. 

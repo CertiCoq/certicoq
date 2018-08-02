@@ -872,6 +872,28 @@ Proof.
     constructor; eauto. intros Hc; inv Hc; eauto.
 Qed.
 
+Lemma image'_extend_In_S (f : positive -> option positive) (x x' : positive)
+      (S : Ensemble positive) :
+  In positive S x ->
+  image' (f {x ~> Some x'}) S <--> image' f (S \\ [set x]) :|: [set x'].
+Proof.
+  intros Hin; split; intros y Him.
+  - destruct Him as [y' [Heq Him]].
+    destruct (peq x y'); subst.
+    + rewrite extend_gss in Him. inv Him.
+      right. reflexivity.
+    + rewrite extend_gso in Him.
+      left. eexists; split; eauto. constructor; eauto.
+      intros Hc; inv Hc; eauto. 
+      intros Hc; inv Hc; eauto. 
+  - destruct Him as [z [y' [Heq Him]] | z Heq ].
+    + eexists. split. now eapply Heq.
+      rewrite extend_gso. eassumption. intros Hc.
+      subst. inv Heq; eauto.
+    + eexists; split; eauto. inv Heq.
+      rewrite extend_gss. reflexivity.
+Qed.
+
 Instance Proper_image'_Same_set {A B} :
   Proper (eq ==> Same_set A ==> Same_set B) image'.
 Proof.
@@ -913,6 +935,37 @@ Lemma compose_id_neut_r {A B} (f : A -> B) :
 Proof.
   firstorder.
 Qed.
+
+Lemma compose_extend {B C} (f : B -> C) (g : positive -> B) x y :
+  f_eq (f ∘ g {x ~> y}) ((f ∘ g) {x ~> f y}).
+Proof.
+  intros z. unfold compose. simpl. 
+  destruct (peq x z); subst. simpl.
+  - rewrite !extend_gss. reflexivity.
+  - rewrite !extend_gso. reflexivity.
+    now eauto. now eauto.
+Qed.
+
+Lemma compose_id_extend {B} S (f : B -> positive)  x y :
+  ~ x \in image f S ->
+          f_eq_subdomain S (id {x ~> y} ∘ f) f.
+Proof.
+  intros Hneq z Hin. unfold compose.
+  rewrite extend_gso. reflexivity.
+  intros Hc; eapply Hneq.
+  eexists; split; eauto.
+Qed.    
+
+Lemma compose_lift_id_extend {B} S (f : B -> option positive)  x y :
+  ~ x \in image' f S ->
+          f_eq_subdomain S (lift (id {x ~> y}) ∘ f) f.
+Proof.
+  intros Hneq z Hin. unfold compose, lift.
+  destruct (f z) eqn:Heq; eauto.
+  rewrite extend_gso. reflexivity.
+  intros Hc; eapply Hneq.
+  eexists; split; subst; eauto.
+Qed.  
 
 Instance Proper_compose_l A B C : Proper (f_eq ==> eq ==> f_eq) (@compose A B C).
 Proof.

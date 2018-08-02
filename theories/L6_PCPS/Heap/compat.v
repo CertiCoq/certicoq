@@ -160,20 +160,6 @@ Module Compat (H : Heap).
 
             (IIG : GIInv) (* Global initial *)
             (IIL1 IIL2 : IInv). (* Local initial *)
-
-    (* TODO move *)
-    Lemma Proper_compose_l (A B C: Type) :
-      Proper (@f_eq B C ==> eq ==> @f_eq A C) compose.
-    Proof.
-      intros f1 f2 Hfeq h1 h2 Heq; subst. firstorder.
-    Qed.
-
-    Lemma Proper_compose_r (A B C: Type) :
-      Proper (eq ==> @f_eq A B ==> @f_eq A C) compose.
-    Proof.
-      intros f1 f2 Hfeq h1 h2 Heq; subst. intros x. unfold compose.
-      rewrite Heq. reflexivity. 
-    Qed.
     
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (d : EInj) (H1 H2 : heap block)
@@ -182,24 +168,26 @@ Module Compat (H : Heap).
       IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
       InvCostBase IL1 IIL1 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
 
-      well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 ->
-      well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 ->
-      (env_locs rho1 (occurs_free (Eapp f1 t xs1))) \subset dom H1 ->
-      (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))) \subset dom H2 ->
+      (* well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 -> *)
+      (* well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 -> *)
+      (* (env_locs rho1 (occurs_free (Eapp f1 t xs1))) \subset dom H1 -> *)
+      (* (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))) \subset dom H2 -> *)
       
       ~ Γ \in (f2 |: FromList xs2) ->
       ~ f2' \in (f2 |: FromList xs2) ->
       Γ <> f2' ->
                 
       cc_approx_var_env k j IIG IG b d H1 rho1 H2 rho2 f1 f2 ->
-      Forall2 (cc_approx_var_env k j IIG IG b d H1 rho1 H2 rho2) xs1 xs2 ->
+      Forall2 (fun x1 x2 =>
+                 forall j, cc_approx_var_env k j IIG IG b d H1 rho1 H2 rho2 x1 x2)
+              xs1 xs2 ->
 
       (Eapp f1 t xs1, rho1, H1) ⪯ ^ (k ; j; IIL1 ; IIG
                                      ; IL1
                                      ; IG)
       (AppClo clo_tag f2 t xs2 f2' Γ, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hiinv Hbase Hwf1 Hwf2 Hs1 Hs2 Hnin1 Hnin2 Hneq  Hvar Hall
+      intros Hiinv Hbase Hnin1 Hnin2 Hneq  Hvar Hall
              b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2
              HII Hleq1 Hstep1 Hstuck1.
       eapply (cc_approx_var_env_heap_env_equiv
@@ -214,13 +202,15 @@ Module Compat (H : Heap).
       - { edestruct (Hstuck1 (cost (Eapp f1 t xs1))) as [v1 [m1 Hstep1]].
           inv Hstep1; [ omega | ].
           exists OOT, c1. destruct (lt_dec c1 1).
-          - eexists. eexists id. eexists Some. repeat split. now constructor; eauto.
+          - eexists. eexists id. eexists Some. repeat split.
+            now constructor; eauto.
             (* now eapply injective_subdomain_Empty_set. *)
             rewrite <- plus_n_O.
             eapply Hbase; try eassumption.
             now rewrite cc_approx_val_eq.
           - edestruct Hvar as [l2 [Hget' Hcc]]; eauto. 
-            simpl in Hcc. rewrite Hgetl in Hcc. destruct l2 as [l2 | ]; [| contradiction ].
+            simpl in Hcc. rewrite Hgetl in Hcc.
+            destruct l2 as [l2 | ]; [| contradiction ].
             destruct Hcc as [Hbeq Hcc]; simpl in Hcc.
             destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction.
             destruct v as [ c [| [| B2 f3 ] [| [ env_loc |] [|] ] ] | ]; try contradiction.
@@ -251,30 +241,46 @@ Module Compat (H : Heap).
               now rewrite cc_approx_val_eq. }
       (* Termination *) 
       - { simpl in Hcost.
-          eapply Forall2_monotonic_strong in Hall; (* yiiiiiikes *)
-            [| intros x1 x2 Hin1 Hin2 Hyp;
-               eapply (cc_approx_var_env_heap_env_equiv
-                         _ _
-                         (occurs_free (Eapp f1 t xs1))
-                         (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))) in Hyp;
-               [ now eapply Hyp | eassumption | eassumption | eassumption | eassumption
-                 | normalize_occurs_free; now eauto with Ensembles_DB
-                 | unfold AppClo; repeat normalize_occurs_free; rewrite FromList_cons ];
-               right; constructor;
-               [ right; constructor;
-               [ now eauto with Ensembles_DB
-               | now intros Hc; inv Hc; eapply Hnin1; eauto ]
-               | now intros Hc; inv Hc; eapply Hnin2; eauto ] ].
-          edestruct (cc_approx_var_env_getlist IIG IG  k j rho1' rho2') as [vs2 [Hgetl' Hcc']];
-            [ eassumption | now eauto |].
+          assert (Hall1 := Hall).
+          eapply Forall2_monotonic_strong
+                 with (R' := (fun x1 x2 : var =>
+                                forall j : nat,
+                                  cc_approx_var_env
+                                    k j IIG IG (b2 ∘ b ∘ b1) (lift b2 ∘ d ∘ b1)
+                                    H1' rho1' H2' rho2' x1 x2))
+            in Hall; (* yiiiiiikes *)
+            [
+            | intros x1 x2 Hin1 Hin2 Hyp j';
+              eapply (cc_approx_var_env_heap_env_equiv
+                        _ _
+                        (occurs_free (Eapp f1 t xs1))
+                        (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))) in Hyp;
+              [ now eapply Hyp | eassumption | eassumption | eassumption | eassumption
+                | normalize_occurs_free; now eauto with Ensembles_DB
+                | unfold AppClo; repeat normalize_occurs_free; rewrite FromList_cons ];
+              right; constructor;
+              [ right; constructor;
+                [ now eauto with Ensembles_DB
+                | now intros Hc; inv Hc; eapply Hnin1; eauto ]
+              | now intros Hc; inv Hc; eapply Hnin2; eauto ]
+            ].
+          edestruct (cc_approx_var_env_getlist IIG IG  k j rho1' rho2')
+            as [vs2 [Hgetl' Hcc']];
+            [ | now eauto |].
+
+          eapply Forall2_monotonic; [| now apply Hall ].
+          intros x1 x2 Hcc1. now eapply Hcc1. 
+
           edestruct Hvar as [l2 [Hget' Hcc]]; eauto.
           simpl in Hcc. rewrite Hgetl in Hcc. destruct l2 as [l2 | ]; [| contradiction ]. 
           destruct Hcc as [Hbeq Hcc]. simpl in Hcc.
           destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction.          
           destruct v as [ ? [| [| B2 f3 ] [| [ env_loc' |] [|] ]] | ]; try contradiction.
-          edestruct Hcc as (Hd & Henv & xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); try eassumption.
+          edestruct Hcc as (Hd & Henv & xs2' & e2 & rho2'' & Hfind' & Hset' & Hi');
+            try eassumption.
           reflexivity. clear; now firstorder. reflexivity. clear; now firstorder.
-          edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2') as [H2'' [b' Hgc']].
+          edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2')
+            as [H2'' [b' Hgc']].
           tci.
           edestruct (live'_live_inv (env_locs rho_clo2 (occurs_free e)) b0 H' H'')
             as [b'' [Hgc1' [Hfe1 Hfe2]]]; try eassumption.
@@ -282,7 +288,8 @@ Module Compat (H : Heap).
           destruct Hgc1' as [Hseq [Heqgc Hinjgc]]. 
           destruct Hgc' as  [Hseq' [Heqgc' Hinjgc']]. 
           edestruct Hi' with (i := k - cost  (Eapp f1 t xs1))
-                               (j' := j) as [HG [r2 [c2 [m2 [b2' [Hbs2 [Hinj [HIG  Hcc2]]]]]]]];
+                               (j' := j)
+            as [HG [r2 [c2 [m2 [b2' [Hbs2 [Hinj [HIG  Hcc2]]]]]]]];
             [ | omega | | | | | | |  | | | eassumption | | ].    
           + simpl. omega.
           (* + rewrite compose_id_neut_r. rewrite compose_id_neut_l. reflexivity. *)
@@ -295,7 +302,7 @@ Module Compat (H : Heap).
               simpl. eapply In_Union_list.
               eapply in_map. eassumption. eassumption. }
             assert (Hrv' : val_loc v' \subset
-                                   env_locs rho2' (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))).
+                           env_locs rho2' (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))).
             { unfold AppClo. repeat normalize_occurs_free.
               rewrite FromList_cons, !Setminus_Union_distr, !env_locs_Union.
               do 2 eapply Included_Union_preserv_r.
@@ -306,28 +313,24 @@ Module Compat (H : Heap).
               eapply in_map. eassumption. eassumption.
               now eapply Disjoint_Singleton_r; intros Hc; eapply Hnin1; eauto.
               now eapply Disjoint_Singleton_r; intros Hc; inv Hc; eapply Hnin2; eauto. }
-            eapply cc_approx_val_heap_monotonic;
-              [ | | | | | now eapply HL.subheap_refl | ].
-            * eapply well_formed_respects_heap_env_equiv in Hwf1; [| eassumption ].
-              eapply well_formed_antimon; [| now apply Hwf1 ].
-              now eapply reach'_set_monotonic.
-            * eapply well_formed_respects_heap_env_equiv in Hwf2; [| eassumption ].
-              eapply well_formed_antimon; [| now apply Hwf2 ].
-              now eapply reach'_set_monotonic.
-            * eapply Included_trans; [| eapply reachable_in_dom; try eassumption ].
-              eapply Included_trans; [| now eapply reach'_extensive ].
-              eassumption.
-              eapply well_formed_respects_heap_env_equiv in Hwf1; [| eassumption ].
-              eassumption.
-              eapply env_locs_in_dom; eassumption.
-            * eapply Included_trans; [| eapply reachable_in_dom; try eassumption ].
-              eapply Included_trans; [| now eapply reach'_extensive ].
-              eassumption.
-              eapply well_formed_respects_heap_env_equiv in Hwf2; [| eassumption ].
-              eassumption.
-              eapply env_locs_in_dom; eassumption.
+            eapply cc_approx_val_heap_monotonic; try eassumption;
+            (* TODO remove redundant params *)
+            [ | now eapply HL.subheap_refl | ]. 
             * eapply def_funs_subheap. eauto.
-            * eapply Heq.
+            * intros j'.
+              edestruct (cc_approx_var_env_getlist IIG IG  k j' rho1' rho2')
+                as [vs2' [Hgetl'' Hcc'']];
+                [ | now eauto |].
+              eapply Forall2_monotonic; [| now apply Hall ].
+              now intros x1 x2 Heq12; eapply Heq12.
+              rewrite Hgetl' in Hgetl''. inv Hgetl''.
+              edestruct (Forall2_exists _ vs vs2' v Hinv1 Hcc'')
+                as [x' [Hinx2 Hr']].
+              destruct v; try contradiction.
+              apply cc_approx_val_loc_eq in Heq. subst.
+              assert (Hr := Hr').
+              eapply cc_approx_val_loc_eq in Hr. subst.
+              eassumption.
             * simpl; omega.
           + rewrite Combinators.compose_id_left, Combinators.compose_id_right.
             reflexivity.
@@ -426,10 +429,7 @@ Module Compat (H : Heap).
     
     (** * Heap allocation and environment extension properties *)
 
-    
 
-      
-    (** Constructor compatibility *)
     Lemma cc_approx_exp_constr_compat (k j : nat)
           (b : Inj) (d : EInj) (H1 H2 : heap block)  (rho1 rho2 : env)
           (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp)  : 
@@ -449,10 +449,7 @@ Module Compat (H : Heap).
          (* allocate a new location for the constructed value *)
          alloc (Constr t vs1) H1 = (l1, H1') ->
          alloc (Constr t vs2) H2 = (l2, H2') ->
-         (* new values already reachable *)
-         locs (Constr t vs1) \subset env_locs rho1 (occurs_free (Econstr x1 t ys1 e1)) ->
-         locs (Constr t vs2) \subset env_locs rho2 (occurs_free (Econstr x2 t ys2 e2)) ->
-         (* and related *)
+         (* values are related *)
          (forall j, Forall2 (fun l1 l2 => (Res (l1, H1)) ≺ ^ (k - cost (Econstr x1 t ys1 e1) ; j ; IIG ; IG ; b; d) (Res (l2, H2))) vs1 vs2) ->
          (forall j, (e1, M.set x1 (Loc l1) rho1, H1') ⪯ ^ (k - cost (Econstr x1 t ys1 e1) ; j ; IIL2 ; IIG ; IL2 ; IG)
                (e2, M.set x2 (Loc l2) rho2, H2'))) ->
@@ -498,14 +495,8 @@ Module Compat (H : Heap).
           edestruct Hpre with (b1 := extend b1 l l1)
                               (b2 := extend b2 l2' l2)
             as [v2 [c2 [m2 [b' [Hstep [HS [Hinj Hval]]]]]]]; 
-            [ | eassumption | eassumption | | | | | | | | | |  eassumption | | ].
+            [ | eassumption | eassumption | | | | | | | |  eassumption | | ]. 
           - simpl in *. omega.
-          - normalize_occurs_free. rewrite env_locs_Union.
-            eapply Included_Union_preserv_l. simpl.
-            rewrite env_locs_FromList; eauto. reflexivity.
-          - normalize_occurs_free. rewrite env_locs_Union.
-            eapply Included_Union_preserv_l. simpl.
-            rewrite env_locs_FromList; eauto. reflexivity.
           - intros j'.
             edestruct (cc_approx_var_env_getlist IIG IG k j' rho1 rho2) as [vs2'' [Hget'' Hall'']];
               [| eauto |]; eauto. subst_exp.
@@ -682,7 +673,8 @@ Module Compat (H : Heap).
             + rewrite cc_approx_val_eq. eapply cc_approx_val_monotonic.
               rewrite <- cc_approx_val_eq. eassumption. simpl in *. omega. }
     Qed.
-    
+
+
     (** Projection compatibility *)
     Lemma cc_approx_exp_proj_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj) (d : EInj)
           (x1 x2 : var) (t : cTag) (n : N) (y1 y2 : var) (e1 e2 : exp) :
@@ -988,31 +980,6 @@ Module Compat (H : Heap).
         eexists. exists c1. eexists. exists (b2 ∘ b ∘ b1). exists (lift b2 ∘ d ∘ b1).  repeat eexists.
         * eapply Eval_halt_per_cc. simpl. simpl in Hcost. omega. eassumption.
           reflexivity.
-        (* * eapply injective_subdomain_compose. simpl. *)
-          
-        (*   eapply injective_subdomain_antimon. eassumption. *)
-        (*   eapply Included_trans. eapply reach_n_in_reach. *)
-        (*   eapply reach'_set_monotonic. eapply get_In_env_locs; try eassumption. *)
-        (*   now eauto. *)
-          
-        (*   destruct Heq1 as [Hl1 Hr1]. simpl in Hl1. *)
-        (*   edestruct Hr1 as [l1 [Hget1 Hres]]; eauto.  *)
-        (*   simpl. rewrite res_equiv_image_reach_n; try eassumption. *)
-        (*   rewrite image_id. *)
-          
-        (*   eapply injective_subdomain_compose. *)
-          
-         
-        (*   eapply injective_subdomain_antimon. eassumption. *)
-        (*   rewrite env_locs_Singleton; eauto. reflexivity. *)
-
-        (*   eapply cc_approx_var_env_image_reach_n_eq in Hvar'; eauto. *)
-
-        (*   rewrite env_locs_Singleton in Hvar'; eauto. *)
-          
-        (*   rewrite Hvar'. *)
-        (*   eapply injective_subdomain_antimon. eassumption. *)
-        (*   simpl. rewrite occurs_free_Ehalt. eapply reach_n_in_reach. *)
         * eapply Hbase; try eassumption.
         * rewrite cc_approx_val_eq in *.
           eapply cc_approx_val_monotonic. eassumption.
@@ -1095,10 +1062,7 @@ Module Compat (H : Heap).
             do 2 eapply Included_Union_preserv_l.
             rewrite Setminus_Disjoint. reflexivity. eapply Disjoint_sym.
             eapply occurs_free_fundefs_name_in_fundefs_Disjoint.
-          - (* rewrite res_equiv_eq. simpl. split. *)
-            (* rewrite extend_gss. reflexivity. *)
-            (* erewrite !gas; try eassumption. simpl.  *)
-            eapply heap_env_equiv_antimon.
+          - eapply heap_env_equiv_antimon.
             eapply heap_env_equiv_restrict_env with (S' := occurs_free_fundefs B1).
             eassumption.
             normalize_occurs_free...
@@ -1154,23 +1118,7 @@ Module Compat (H : Heap).
                eapply cc_approx_val_monotonic. eassumption.
                simpl. simpl in Hcost. omega. }
     Qed.    
-
-   
-    (* TODO move *)
-    Lemma comp_ctx_f_Hole_c C :
-      comp_ctx_f C Hole_c = C
-    with comp_f_ctx_f_Hole_c f : 
-     comp_f_ctx_f f Hole_c = f.
-    Proof.
-      - destruct C; simpl; eauto;
-        try (rewrite comp_ctx_f_Hole_c; reflexivity). 
-        rewrite comp_f_ctx_f_Hole_c. reflexivity.
-      - destruct f; simpl; eauto.
-        rewrite comp_ctx_f_Hole_c; reflexivity.
-        rewrite comp_f_ctx_f_Hole_c. reflexivity.
-    Qed.
     
-
     Context (ILC : exp_ctx -> Inv).
     Context (IILC : exp_ctx -> IInv).
 

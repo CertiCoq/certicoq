@@ -218,15 +218,7 @@ Module SpaceSem (H : Heap).
       | Res _ =>  True
       | _ => False
     end.
-  
-  (* TODO move *)
-  Definition reach_ans (a : ans) : Ensemble loc :=
-    match a with
-      | Res r => reach_res r
-      | OOT => Empty_set _
-      | OOM => Empty_set _
-    end.
-  
+
   Lemma big_step_gc_heap_env_equiv_l H1 H2 β rho1 rho2 e (r : ans) c m :
     big_step_GC H1 rho1 e r c m ->
     (occurs_free e) |- (H1, rho1) ⩪_(β, id) (H2, rho2) ->

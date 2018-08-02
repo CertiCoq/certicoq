@@ -1615,26 +1615,6 @@ Module HeapEquiv (H : Heap).
 
   (** Renaming extensions *)
 
-  Lemma Included_Intersection_compat {A : Type} (s1 s2 s3 s4 : Ensemble A) :
-    s1 \subset s2 ->
-    s3 \subset s4 ->
-    s1 :&: s3 \subset s2 :&: s4.
-  Proof.
-    intros H1 H2 x [Hin1 Hin2]. firstorder.
-  Qed.
-
-  Lemma Included_Intersection_l {A : Type} (s1 s2 : Ensemble A) :
-    s1 :&: s2 \subset s1.
-  Proof.
-    intros x [Hin1 Hin2]; eauto.
-  Qed.
-
-  Lemma Included_Intersection_r {A : Type} (s1 s2 : Ensemble A) :
-    s1 :&: s2 \subset s2.
-  Proof.
-    intros x [Hin1 Hin2]; eauto.
-  Qed.
-
   Lemma res_approx_rename_ext i β1 β1' β2 β2' H1 H2 v1 v2: 
     res_approx_fuel' i (β1, (v1, H1)) (β2, (v2, H2)) ->
     f_eq_subdomain (reach' H1 (val_loc v1)) β1 β1' ->
@@ -2628,18 +2608,7 @@ Module HeapEquiv (H : Heap).
     exists H' b, live' S H H' b.
   Proof.
   Admitted.
-  
     
-  (* TODO move *)
-  Instance ToMSet_Same_set (S1 S2 : Ensemble loc) :
-    S1 <--> S2 ->
-    ToMSet S1 ->
-    ToMSet S2.
-  Proof.
-    intros Heq [mset mset_eq]. rewrite Heq in mset_eq.
-    econstructor. eassumption.
-  Qed.
-  
   Lemma Proper_live S1 S2 (HS1 : ToMSet S1) (HS2 : ToMSet S2) H1 H2 b1 :
     S1 <--> S2 ->
     live S1 H1 H2 b1 ->
@@ -2648,9 +2617,7 @@ Module HeapEquiv (H : Heap).
     intros Heq Hl; unfold live in *. rewrite <- !Heq at 1. 
     eassumption.
   Qed.
-
-  
-
+ 
   Definition inverse_subdomain {A B: Type} S (f : A -> B) g :=
     f_eq_subdomain (image f S) (f ∘ g) id /\
     f_eq_subdomain S (g ∘ f) id.
@@ -3620,6 +3587,20 @@ Module HeapEquiv (H : Heap).
         rewrite res_equiv_eq. split; eauto.
     Qed.
 
-  
+    Lemma res_equiv_subheap S H1 H1' v :
+      well_formed (reach' H1 S) H1 ->
+      S \subset dom H1 ->
+      val_loc v \subset reach' H1 S ->
+      H1 ⊑ H1' ->
+      (v, H1) ≈_(id, id) (v, H1').
+    Proof.
+      intros Hwf Hsub1 Hsub2 Hsub3.
+      eapply res_equiv_weakening; try eassumption.
+      eapply reach'_closed; eassumption.
+      eapply reach'_closed; eassumption.
+      reflexivity.
+      eapply HL.subheap_refl.
+    Qed.
+
   
 End HeapEquiv.

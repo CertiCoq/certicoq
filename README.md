@@ -90,8 +90,8 @@ To install CertiCoq's dependencies in the current opam switch:
 
     # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.dev coq-paramcoq
 
-The package is known to build with `coq-template-coq.2.1~beta`,
-`coq-ext-lib.0.9.8`, `coq-squiggle-eq.1.0.4` and `coq-paramcoq.1.0.6`.
+The package is known to build with `coq-template-coq.2.1~beta2`,
+`coq-ext-lib.0.9.8`, `coq-squiggle-eq.1.0.4` and `coq-paramcoq.1.0.8`.
 
 If you have already installed some package manually, you can choose the
 `--fake` keyword for `opam` to assume that it is installed, e.g.:

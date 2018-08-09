@@ -74,6 +74,7 @@ Proof.
   revert e. induction P as [| [c' e'] P IHp]; intros x H; try now inv H.
   simpl in H. inv H.
   destruct (M.elt_eq c' c); inv H1; try now constructor.
+  constructor 2. now eapply IHp.
 Qed.
 
 (** [split_fds B1 B2 B] iff B is an interleaving of the definitions in B1 and B2 *)

@@ -8,3 +8,7 @@ CertiCoq Compile foo.
 Require Import Binom.
 
 CertiCoq Compile main.
+
+Require Import CertiCoq.Benchmarks.vs.
+
+CertiCoq Compile main.

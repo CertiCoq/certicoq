@@ -43,16 +43,16 @@ you want.
 Setting up a switch with OCaml
 ------------------------------
 
-  Note that supported OCaml version are `4.02.3` to `4.05.0`, avoid
+  Note that supported OCaml version are `4.06.1` and upwards, avoid
 `4.06.0` which sometimes produces dynamic linking errors. In `opam 1.*`,
 use `opam config var ocaml-version` to confirm you have a compatible
 compiler. If not, you should create a fresh new switch with a specific
 compiler, using:
 
-    # opam switch -A 4.05.0 coq87
+    # opam switch -A 4.06.1 coq88
     # eval `opam config env`
 
-  This will install the `4.05.0` compiler in a new switch named `coq87`
+  This will install the `4.06.1` compiler in a new switch named `coq88`
 and put you in the right environment (check with `ocamlc --version`).
 
 Installing Coq
@@ -90,7 +90,7 @@ To install CertiCoq's dependencies in the current opam switch:
 
     # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.dev coq-paramcoq
 
-The package is known to build with `coq-template-coq.2.1~beta2`,
+The package is known to build with `coq-template-coq.2.1~beta3`,
 `coq-ext-lib.0.9.8`, `coq-squiggle-eq.1.0.4` and `coq-paramcoq.1.0.8`.
 
 If you have already installed some package manually, you can choose the

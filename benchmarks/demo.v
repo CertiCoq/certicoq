@@ -1,5 +1,6 @@
 Require Import Arith.
   
+Unset Template Cast Propositions.
 
 From CertiCoq.Plugin Require Import CertiCoq.
 

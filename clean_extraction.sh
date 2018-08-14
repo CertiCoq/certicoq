@@ -24,5 +24,7 @@ cd ../..
 cd plugin/extraction
 rm -f ast0.* ast1.* specif.* peanoNat.* list0.* datatypes.* decimal.* ascii.* univ0.* binPosDef.*
 rm -f binPos.* binNat.* binNums.* binInt.* binIntDef.* bool.* nat0.* string0.* basics.*
-rm -f checker0.* typing.* retyping.* uGraph0.* extract.* stringMap.*
+rm -f checker0.* typing.* retyping.* uGraph0.* univSubst.* extract.* stringMap.*
+# Work around a compiler bug in module name resolution
+sed -f ../extraction.sed -i bak compile0.ml
 cd ../..

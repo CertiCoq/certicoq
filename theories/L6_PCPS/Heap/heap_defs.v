@@ -1467,7 +1467,6 @@ Module HeapDefs (H : Heap) .
     now eapply alloc_subheap; eauto.
   Qed.
 
-
   Lemma def_closures_env_locs_reach
         (S : Ensemble var) (H H' : heap block) (rho rho' : env)
         (B B0 : fundefs) (cenv : env) :
@@ -1487,7 +1486,8 @@ Module HeapDefs (H : Heap) .
     - rewrite Union_Empty_set_neut_r. inv Hdef.
       eassumption.
   Qed.
-    
+
+  
   (** * Lemmas about locs *)
   
   Instance Decidable_locs v : Decidable (locs v).
@@ -2595,5 +2595,293 @@ Module HeapDefs (H : Heap) .
     now apply reach'_extensive. 
   Qed.      
 
+  (** * Lemmas about [def_closures] *)
+
+  
+  Lemma def_closures_post B1 B2 rho H rho' H' rc :
+    def_closures B1 B2 rho H rc = (H', rho') ->
+    post H' (env_locs rho' (name_in_fundefs B1)) \subset
+    env_locs rc (occurs_free_fundefs B2).
+  Proof with  (now eauto with Ensembles_DB).
+    revert rho rho' H H'. induction B1; intros rho rho' H H' Hdef; simpl.
+    - simpl in Hdef.
+      destruct (def_closures B1 B2 _ _ _) as [H'' rho''] eqn:Hclo.
+      destruct (alloc _ H'') as [l1 H'''] eqn:Ha.
+      inv Hdef. 
+      rewrite env_locs_Union, post_Union, env_locs_Singleton;
+      [| now rewrite M.gss; eauto ].
+
+      eapply Union_Included.
+
+      + simpl. rewrite post_Singleton; [| now erewrite gas; eauto ].
+        reflexivity.
+
+      + assert (Hclo' := Hclo). eapply IHB1 in Hclo.
+
+        eapply Included_trans.
+        eapply post_set_monotonic. eapply env_locs_set_Inlcuded'.
+
+        rewrite post_Union. 
+        simpl. rewrite post_Singleton; [| now erewrite gas; eauto ].
+
+        eapply Union_Included; [ reflexivity |].
+        eapply Included_trans. eapply post_alloc. eassumption.
+
+        eapply Union_Included.
+
+        eapply Included_trans; [| eassumption ].
+        eapply post_set_monotonic.
+        eapply env_locs_monotonic...
+
+        reflexivity.
+    - rewrite env_locs_Empty_set, post_Empty_set...
+  Qed.
+
+
+  Lemma def_closures_exists (H1 H1' : heap block)
+    (rho1 rho1' envc : env) (B B0 : fundefs) f :
+    def_closures B B0 rho1 H1 envc = (H1', rho1') ->
+    f \in name_in_fundefs B ->
+    exists l, M.get f rho1' = Some (Loc l) /\ get l H1' = Some (Clos (FunPtr B0 f) envc) /\ ~ l \in dom H1.
+  Proof.
+    revert H1 H1' rho1 rho1'; induction B; intros H1 H1' rho1 rho1' Hdef Hin. 
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho1 H1 envc) as [H' rho'] eqn:Hdef'.
+      destruct (alloc (Clos (FunPtr B0 v) envc) H') as [lf H''] eqn:Ha. inv Hdef.
+      destruct (var_dec v f); subst. 
+      + rewrite M.gss. eexists; split. reflexivity. split. 
+        erewrite gas; [| eassumption ]. reflexivity.
+        intros [b Hgetl]. eapply def_funs_subheap in Hgetl; eauto.
+        erewrite alloc_fresh in Hgetl; eauto. congruence. 
+      + rewrite M.gso; [| now eauto ].
+        edestruct IHB as [lf' [Hgetf [Hgetlf Hdom]]]. eassumption.
+        inv Hin; eauto. now inv H.
+        eexists; split; eauto.
+        
+        erewrite HL.alloc_subheap; try eassumption. split. reflexivity.
+        eassumption. 
+    - inv Hin.
+  Qed.
+
+  Lemma def_closures_get_neq (H1 H1' : heap block)
+    (rho1 rho1' envc : env) (B B0 : fundefs) f :
+    def_closures B B0 rho1 H1 envc = (H1', rho1') ->
+    ~ f \in name_in_fundefs B ->
+    M.get f rho1' = M.get f rho1.
+  Proof.
+    revert H1 H1' rho1 rho1'; induction B; intros H1 H1' rho1 rho1' Hdef Hnin. 
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho1 H1 envc) as [H' rho'] eqn:Hdef'.
+      destruct (alloc (Clos (FunPtr B0 v) envc) H') as [lf H''] eqn:Ha. inv Hdef.
+      rewrite M.gso. eapply IHB; eauto.
+      intros Hc; eapply Hnin; now right.
+      intros Hc; subst; eapply Hnin; now left.
+
+    - inv Hdef. reflexivity. 
+  Qed.
+
+  Lemma def_funs_neq
+    (rho1 rho1' : env) (B B0 : fundefs) f :
+    def_funs B B0 rho1 = rho1' ->
+    ~ f \in name_in_fundefs B ->
+    M.get f rho1' = M.get f rho1.
+  Proof.
+    revert rho1 rho1'; induction B; intros rho1 rho1' Hdef Hnin. 
+    - simpl in Hdef. subst. 
+      rewrite M.gso. eapply IHB; eauto.
+      intros Hc; eapply Hnin; now right.
+      intros Hc; subst; eapply Hnin; now left.
+
+    - inv Hdef. reflexivity. 
+  Qed.
+
+  Lemma def_funs_eq
+    (rho1 rho1' : env) (B B0 : fundefs) f :
+    def_funs B B0 rho1 = rho1' ->
+    f \in name_in_fundefs B ->
+    M.get f rho1' = Some (FunPtr B0 f).
+  Proof.
+    revert rho1 rho1'; induction B; intros rho1 rho1' Hdef Hnin. 
+    - simpl in Hdef. subst. 
+      destruct (var_dec f v); subst.
+      + rewrite M.gss. reflexivity.
+      + rewrite M.gso. eapply IHB; eauto. inv Hnin; eauto.
+        inv H; contradiction. eassumption.
+    - inv Hnin. 
+  Qed.
+
+
+  Lemma def_closures_env_locs  (H1 H1' : heap block)
+    (rho1 rho1' envc : env) (B B0 : fundefs) S :
+    def_closures B B0 rho1 H1 envc = (H1', rho1') ->
+    unique_functions B ->
+    env_locs rho1' S \subset env_locs rho1 (S \\ name_in_fundefs B) :|: env_locs rho1' (name_in_fundefs B). 
+  Proof.
+    revert S H1 H1' rho1 rho1'; induction B; intros S H1 H1' rho1 rho1' Hdef Hun. 
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho1 H1 envc) as [H' rho'] eqn:Hdef'.
+      destruct (alloc (Clos (FunPtr B0 v) envc) H') as [lf H''] eqn:Ha. inv Hdef.
+      eapply Included_trans.
+      eapply env_locs_set_Inlcuded'.
+      eapply Union_Included.
+      + eapply Included_Union_preserv_r.
+        rewrite env_locs_set_In. now eauto with Ensembles_DB.
+        now left.
+      + eapply Included_trans.
+        
+        eapply IHB. eassumption. now inv Hun.
+        eapply Included_Union_compat.
+        
+        simpl. rewrite Setminus_Union. reflexivity.
+        
+        rewrite env_locs_set_In. simpl.
+        rewrite Setminus_Union_distr. rewrite (Setminus_Disjoint (name_in_fundefs B)).
+        rewrite env_locs_Union. now eauto with Ensembles_DB.
+        eapply Disjoint_Singleton_r. inv Hun. eassumption.
+        now left.
+    - inv Hdef. simpl. rewrite Setminus_Empty_set_neut_r.
+      now eauto with Ensembles_DB.
+  Qed.
+
+  Lemma def_closures_env_locs'  (H1 H1' : heap block)
+    (rho1 rho1' envc : env) (B B0 : fundefs) S :
+    def_closures B B0 rho1 H1 envc = (H1', rho1') ->
+    Disjoint _ S (name_in_fundefs B) ->
+    env_locs rho1' S <--> env_locs rho1 S.
+  Proof with (now eauto with Ensembles_DB).
+    revert H1 H1' rho1 rho1'; induction B; intros H1 H1' rho1 rho1' Hdef Hun.
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho1 H1 envc) as [H' rho'] eqn:Hdef'.
+      destruct (alloc (Clos (FunPtr B0 v) envc) H') as [lf H''] eqn:Ha. inv Hdef.
+      rewrite env_locs_set_not_In. eapply IHB. eassumption.
+      eapply Disjoint_Included_r; [| eassumption ]...
+      intros Hc.  eapply Hun. constructor; eauto. now left.
+    - inv Hdef...
+  Qed.       
+
+  Lemma def_closures_reach  (H1 H1' : heap block)
+        (rho1 rho1' envc : env) (B B0 : fundefs) S :
+    well_formed (reach' H1 (env_locs rho1 (S \\ name_in_fundefs B))) H1 ->
+    env_locs rho1 (S \\ name_in_fundefs B) \subset dom H1 ->
+
+    def_closures B B0 rho1 H1 envc = (H1', rho1') ->
+    unique_functions B ->
+    env_locs envc (occurs_free_fundefs B0) \subset reach' H1 (env_locs rho1 (S \\ name_in_fundefs B)) ->
+    reach' H1' (env_locs rho1' S) \subset
+    reach' H1 (env_locs rho1 (S \\ name_in_fundefs B)) :|: env_locs rho1' (name_in_fundefs B). 
+  Proof.
+    intros Hwf Hlocs Hdef Hun Henv. eapply Included_trans. eapply reach'_set_monotonic.
+    
+    eapply def_closures_env_locs. eassumption. eassumption.
+    
+    rewrite reach'_Union. eapply Union_Included.
+    
+    rewrite <- well_formed_reach_subheap_same; [| eassumption | eassumption | ].
+    now eauto with Ensembles_DB.
+
+    eapply def_funs_subheap. now eauto.
+
+    rewrite reach_unfold. eapply Union_Included. now eauto with Ensembles_DB.
+    
+    eapply Included_trans. eapply reach'_set_monotonic.
+    eapply Included_trans. eapply def_closures_post. eassumption.
+    eassumption.
+    
+    rewrite <- well_formed_reach_subheap_same.
+    rewrite <- reach'_idempotent. now eauto with Ensembles_DB.
+    rewrite <- reach'_idempotent. eassumption.
+    eapply reachable_in_dom. eassumption. eassumption.
+    eapply def_funs_subheap. now eauto.
+
+  Qed. 
+    
+
+  Lemma def_closures_env_locs_Disjoint  (H1 H1' : heap block)
+    (rho1 rho1' envc : env) (B B0 : fundefs) :
+    def_closures B B0 rho1 H1 envc = (H1', rho1') ->
+    Disjoint _ (env_locs rho1' (name_in_fundefs B)) (dom H1). 
+  Proof.
+    revert H1 H1' rho1 rho1'; induction B; intros H1 H1' rho1 rho1' Hdef. 
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho1 H1 envc) as [H' rho'] eqn:Hdef'.
+      destruct (alloc (Clos (FunPtr B0 v) envc) H') as [lf H''] eqn:Ha. inv Hdef.
+      rewrite env_locs_set_In. simpl.
+      eapply Union_Disjoint_l. eapply Disjoint_Singleton_l.
+
+      intros [vl Hgetvl]. eapply def_funs_subheap in Hgetvl; [| now eauto ].
+      erewrite alloc_fresh in Hgetvl; eauto.
+      congruence.
+      
+      eapply Disjoint_Included_l; [| eapply IHB; eauto ].
+      eapply env_locs_monotonic. now eauto with Ensembles_DB.
+
+      now left.
+
+    - simpl. rewrite env_locs_Empty_set.
+      now eauto with Ensembles_DB. 
+  Qed. 
+
+  Lemma def_closures_env_locs_fresh (H1 H1' : heap block)
+    (rho1 rho1' envc : env) (B B0 : fundefs) f :
+    def_closures B B0 rho1 H1 envc = (H1', rho1') ->
+    unique_functions B ->
+    f \in name_in_fundefs B ->
+    Disjoint _ (env_locs rho1' [set f]) (env_locs rho1' (name_in_fundefs B \\ [set f])).
+  Proof. 
+    revert H1 H1' rho1 rho1'; induction B; intros H1 H1' rho1 rho1' Hdef Hun Hin. 
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho1 H1 envc) as [H' rho'] eqn:Hdef'.
+      destruct (alloc (Clos (FunPtr B0 v) envc) H') as [lf H''] eqn:Ha. inv Hdef.
+      assert (Hdef'' := Hdef').
+      eapply def_closures_env_locs_in_dom with (S := Empty_set _) in Hdef'';
+        [| rewrite env_locs_Empty_set; now eauto with Ensembles_DB ].
+      
+      destruct (var_dec v f); subst.
+      + rewrite env_locs_set_In; [| reflexivity ].
+        rewrite Setminus_Same_set_Empty_set, env_locs_Empty_set, Union_Empty_set_neut_r. 
+
+        rewrite env_locs_set_not_In; [ | now intros Hc; inv Hc; eauto ]. 
+
+        eapply Disjoint_Singleton_l.
+
+        intros Hc. 
+        eapply env_locs_monotonic in Hc. eapply Hdef'' in Hc.
+        
+        destruct Hc as [b Hget]. erewrite alloc_fresh in Hget; try eassumption.
+        congruence.
+        
+        simpl. now eauto with Ensembles_DB.
+
+      + inv Hin. now inv H; contradiction.
+
+        rewrite env_locs_set_not_In; [ | intros Hc; inv Hc; contradiction ]. 
+
+        rewrite env_locs_set_In.
+
+        eapply Union_Disjoint_r. 
+
+        eapply Disjoint_Singleton_r. intros Hc.
+
+        eapply env_locs_monotonic in Hc. eapply Hdef'' in Hc.
+        
+        destruct Hc as [b Hget]. erewrite alloc_fresh in Hget; try eassumption.
+        congruence.
+        
+        now eauto with Ensembles_DB.
+
+        eapply Disjoint_Included_r; [| eapply IHB; try eassumption ].
+
+        eapply env_locs_monotonic. simpl.
+
+        rewrite !Setminus_Union_distr. now eauto with Ensembles_DB.
+
+        inv Hun. eassumption.
+
+        constructor; eauto. left. reflexivity.
+
+        intros Hc. inv Hc. eauto.
+
+    - inv Hin. 
+  Qed. 
 
 End HeapDefs.

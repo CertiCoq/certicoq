@@ -1373,4 +1373,26 @@ Module CCUtil (H : Heap).
     eapply Hbin; eapply Hseq; eauto.
   Qed.
 
+
+  Lemma Closure_conversion_fundefs_find_def B1' B1 B2 c FVs f e1 ft xs:
+      Closure_conversion_fundefs clo_tag B1' c FVs B1 B2 ->
+      find_def f B1 = Some (ft, xs, e1) ->
+      exists Γ e2 C,
+        find_def f B2 = Some (ft, Γ :: xs, C |[ e2 ]|) /\
+        Closure_conversion clo_tag (FromList xs) (name_in_fundefs B1')
+                           (extend_fundefs' id B1' Γ) c Γ FVs e1 e2 C.
+  Proof.
+    intros Hc Hdef; induction Hc.
+    - simpl in Hdef.
+      destruct (M.elt_eq f f0); subst.
+      + inv Hdef. do 3 eexists. split.
+        * simpl. rewrite Coqlib.peq_true. reflexivity.
+        * eassumption.
+      + edestruct IHHc as (Γ & e2 & C'  & Hfind & Hclo).
+        * eassumption.
+        * do 3 eexists. split.
+          simpl. rewrite Coqlib.peq_false; now eauto. eassumption.
+    - inv Hdef.
+  Qed.
+
 End CCUtil. 

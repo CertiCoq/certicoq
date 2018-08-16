@@ -63,13 +63,14 @@ Definition Subperm {A : Type} (l1 l2 : list A) :=
 Hint Constructors Forall2_asym.
 
 (** Lemmas about [Forall2] and [Forall2_asym] *)
-Lemma Forall2_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
+Lemma Forall2_length {A B} (R : A -> B -> Prop) l1 l2 :
   Forall2 R l1 l2 -> length l1 = length l2. 
 Proof.
   revert l2. induction l1 as [| x xs IHxs ]; intros l2 H.
   - inv H; eauto.
   - inv H. simpl. f_equal. eauto.
 Qed.
+
 
 Lemma Forall2_asym_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
   Forall2_asym R l1 l2 -> length l1 <= length l2. 

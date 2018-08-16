@@ -3694,5 +3694,56 @@ Module CC_log_rel (H : Heap).
     intros s1 s2 Hseq; constructor; subst;
     intros Hcc z Hin; eapply Hcc; eapply Hseq; eauto.
   Qed.
+
+    Lemma def_closures_cc_approx_env Scope k GIP GP b d B1 B2 envc rho1 H1 rho1' H1' rho2 H2 :
+    (forall j, (H1, rho1) ⋞ ^ (Scope; k; j; GIP; GP; b; d) (H2, rho2)) ->
+    def_closures B1 B2 rho1 H1 envc = (H1', rho1') ->
+    (forall j, (H1', rho1') ⋞ ^ (Scope \\ name_in_fundefs B1; k; j; GIP; GP; b; d) (H2, rho2)).
+  Proof with (now eauto with Ensembles_DB).
+    revert H1 rho1 H1' rho1'.
+    induction B1; intros H1 rho1 H1' rho1' Hcc Hdef j.
+    - simpl in Hdef.
+      destruct (def_closures B1 B2 rho1 H1) as (H1'', rho1'') eqn:Hdef'.
+      destruct (alloc (Clos _ _) H1'') as [la H1a] eqn:Hal.
+      inv Hdef. 
+      eapply cc_approx_env_P_set_not_in_P_l.
+      assert (Hdef := Hdef').
+      + eapply cc_approx_env_P_antimon. 
+        eapply cc_approx_env_heap_monotonic; [ | | eapply IHB1 ].
+        * eapply HL.alloc_subheap. eassumption.
+        * eapply HL.subheap_refl.
+        * eassumption.
+        * eassumption.
+        * now eauto with Ensembles_DB.
+      + intros Hc; inv Hc. eapply H0; now left.
+    - rewrite Setminus_Empty_set_neut_r.
+      inv Hdef. now eauto.
+  Qed.
+
+
+  Lemma def_funs_cc_approx_env Scope k j GIP GP b d B1 B2 rho1 H1 rho2 H2 :
+    (H1, rho1) ⋞ ^ (Scope; k; j; GIP; GP; b; d) (H2, rho2) ->
+    (H1, rho1) ⋞ ^ (Scope \\ name_in_fundefs B1; k; j; GIP; GP; b; d) (H2, def_funs B1 B2 rho2).
+  Proof with (now eauto with Ensembles_DB).
+    induction B1; intros Hcc.
+    - simpl def_funs.
+      eapply cc_approx_env_P_set_not_in_P_r.
+      eapply cc_approx_env_P_antimon.
+      eapply IHB1. eassumption.
+      now eauto with Ensembles_DB.
+      intros Hc; inv Hc. eapply H0; now left.
+    - simpl name_in_fundefs.
+      rewrite Setminus_Empty_set_neut_r. eassumption.
+  Qed.
+
+  Transparent cc_approx_clos.
+  
+  Instance Proper_cc_approx_clos R j P Q b d :
+    Proper (Same_set _ ==> eq ==> eq ==> iff) (cc_approx_clos R j P Q b d).
+  Proof.
+    intros s1 s2 Hseq [rho1 H1] [rho2 H2] Heq1 [l1 b1] [l2 b2] Heq2. inv Heq1. inv Heq2.
+    unfold cc_approx_clos.
+    setoid_rewrite Hseq. reflexivity.
+  Qed. 
  
 End CC_log_rel.

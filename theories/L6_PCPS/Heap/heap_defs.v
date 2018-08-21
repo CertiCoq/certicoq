@@ -33,7 +33,10 @@ Module HeapDefs (H : Heap) .
   (* A constructed value *)
   | Constr : cTag -> list value -> block
   (* A closure pair *)
-  | Clos : value -> env -> block .
+  | Clos : value -> value -> block
+  (* Env -- heap allocated to account for environment sharing between mutually rec. functions *)
+  | Env : env -> block.
+  
 
   (** The result of evaluation *)
   Definition res : Type := value * heap block.
@@ -82,18 +85,19 @@ Module HeapDefs (H : Heap) .
       | Constr t ls => (* The size of the constructor representation *)
         1 + length ls
       | Clos _ _ => 1
+      | Env _ => 0     (* Do not count the cost of closure environments in the source *)
     end.
   
   (** Size of the heap *)
   Definition size_heap (H : heap block) : nat :=
     size_with_measure size_val H.
-
+  
   (** The locations that appear on a block *)
   Definition locs (v : block) : Ensemble loc :=
     match v with
       | Constr t ls => Union_list (map val_loc ls)
       | Clos (Loc l) rho => [set l]
-      | Clos (FunPtr B _) rho => env_locs rho (occurs_free_fundefs B)
+      | Clos (FunPtr B _) v => => val_loc [] env_locs rho (occurs_free_fundefs B)
     end.
   
   Fixpoint to_locs (vs : list value) : list loc :=

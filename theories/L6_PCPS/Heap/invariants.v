@@ -158,6 +158,17 @@ Module Invariants (H : Heap).
     intros ? ? ? ? ? [? [? ? ]]. eexists; eauto.
   Qed.
 
+  Lemma Fun_inv_weak_in_Fun_inv k j P1 P2 rho1 H1 rho2 H2 β d
+        Scope Funs fenv FVs :
+    Fun_inv k j P1 P2 β d rho1 H1 rho2 H2 Scope Funs fenv FVs ->
+    Fun_inv_weak rho1 rho2 Scope Funs fenv.
+  Proof.
+    intros Hfun x Hin Hnin.
+    edestruct Hfun as (l1 & lenv & B1 & g1 & rhoc & B2 & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq); try eassumption.
+    repeat eexists; eauto.
+  Qed.
+
   Lemma FV_inv_dom1 k P1 P2 rho1 H1 rho2 H2 b d c
         Scope Funs Γ FVs :
     (forall j, FV_inv k j P1 P2 b d rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->

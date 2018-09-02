@@ -84,32 +84,34 @@ Module SpaceSem (H : Heap).
         
         big_step_GC H rho (Ecase y cl) r c m
   | Eval_fun_gc :
-      forall (H H' : heap block) (rho rho_clo rho' : env) (B : fundefs)
+      forall (H H' H'' : heap block) (rho rho_clo rho' : env) lenv (B : fundefs)
         (e : exp) (r : ans) (c : nat) (m : nat)
         (Hcost : c >= cost (Efun B e))
         (* find the closure environment *)
         (Hres : restrict_env (fundefs_fv B) rho = rho_clo)
+        (Ha : alloc (Env rho_clo) H = (lenv, H'))
         (* allocate the closures *)
-        (Hfuns : def_closures B B rho H rho_clo = (H', rho'))
+        (Hfuns : def_closures B B rho H' (Loc lenv) = (H'', rho'))
         
-        (Hbs : big_step_GC H' rho' e r (c - cost (Efun B e)) m),
+        (Hbs : big_step_GC H'' rho' e r (c - cost (Efun B e)) m),
 
         big_step_GC H rho (Efun B e) r c m
     
   | Eval_app_gc :
-      forall (H H' H'' : heap block) (rho rho_clo rho_clo1 rho_clo2 : env) (B : fundefs)
+      forall (H H' H'' : heap block) lenv (rho_clo rho rho_clo1 rho_clo2 : env) (B : fundefs)
         (f f' : var) (t : cTag) (xs : list var) (e : exp) (l : loc) b
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
         (* Look up the closure *)
-        (Hgetl : get l H = Some (Clos (FunPtr B f') rho_clo))
+        (Hgetl : get l H = Some (Clos (FunPtr B f') (Loc lenv)))
         (* Find the code *)
         (Hfind : find_def f' B = Some (t, xs, e))
+        (Hgetenv : get lenv H = Some (Env rho_clo))
         (* Look up the actual parameters *)
         (Hargs : getlist ys rho = Some vs)
         (* Allocate mutually defined closures *)
-        (Hredef : def_closures B B rho_clo H rho_clo = (H', rho_clo1))
+        (Hredef : def_closures B B rho_clo H (Loc lenv) = (H', rho_clo1))
         (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
         
         (* collect H' *)
@@ -294,11 +296,12 @@ Module SpaceSem (H : Heap).
         
         ctx_to_heap_env (Eproj_c x t N y C) H rho H' rho' (c + cost_ctx (Eproj_c x t N y C))
   | Efun_c_to_rho :
-      forall H H' H''  rho rho' rho'' rho_clo B C c,
+      forall H H' H'' H''' rho rho' rho'' rho_clo lenv B C c,
         restrict_env (fundefs_fv B) rho = rho_clo ->
-        def_closures B B rho H rho_clo = (H', rho') ->
-        ctx_to_heap_env C H' rho' H'' rho'' c -> 
-        ctx_to_heap_env (Efun1_c B C) H rho H'' rho'' (c + cost_ctx (Efun1_c B C)).
+        alloc (Env rho_clo) H = (lenv, H') ->
+        def_closures B B rho H' (Loc lenv) = (H'', rho') ->
+        ctx_to_heap_env C H'' rho' H''' rho'' c -> 
+        ctx_to_heap_env (Efun1_c B C) H rho H''' rho'' (c + cost_ctx (Efun1_c B C)).
   
   Inductive ctx_to_heap_env_CC : exp_ctx -> heap block -> env -> heap block -> env -> nat -> Prop :=
   | Hole_c_to_heap_env_CC :
@@ -583,7 +586,8 @@ Module SpaceSem (H : Heap).
     simpl. omega.
     simpl.
     rewrite IHHctx. 
-    erewrite def_closures_size; eauto. omega.
+    erewrite def_closures_size; eauto. unfold size_heap. 
+    erewrite size_with_measure_alloc; [| reflexivity | eassumption ]. simpl. omega.
   Qed.
 
   Lemma ctx_to_heap_env_CC_size_heap C rho1 rho2 H1 H2 c :
@@ -608,7 +612,8 @@ Module SpaceSem (H : Heap).
     - eapply HL.subheap_trans.
       eapply HL.alloc_subheap. eassumption. eassumption.
     - eassumption.
-    - eapply HL.subheap_trans. 
+    - eapply HL.subheap_trans. eapply alloc_subheap. eassumption. 
+      eapply HL.subheap_trans.
       eapply def_funs_subheap. now eauto. eassumption.
   Qed.
 
@@ -769,7 +774,7 @@ Module SpaceSem (H : Heap).
       destruct Heql as [Hbeq Heql]. 
       simpl in Heql. rewrite H1 in Heql.
       destruct (get l' H1') eqn:Hgetl'; try contradiction.
-      destruct b0 as [c' vs'| ]; try contradiction.
+      destruct b0 as [c' vs'| | ]; try contradiction.
       destruct Heql as [Heqt Hall]; subst.
       edestruct (Forall2_nthN _ vs vs' _ _ Hall H2) as [v' [Hnth' Hv]].
       specialize (IHHctx b H1' (M.set x v' rho1') e).

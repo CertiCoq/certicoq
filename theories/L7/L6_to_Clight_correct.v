@@ -2705,16 +2705,16 @@ Section THEOREM.
   (* OS 04/24: added in bound on n includes in this *)
   Inductive correct_crep (cenv:cEnv) (ienv:iEnv) : cTag -> cRep -> Prop :=
   | rep_enum :
-      forall c name it n' n cl,
-        M.get c cenv = Some (name, it, 0%N, n') ->
+      forall c name it  n cl,
+        M.get c cenv = Some (name, it, 0%N, n) ->
         M.get it ienv = Some cl ->
         getEnumOrdinal c cl = Some n ->
         (* there should not be more than 2^(intsize - 1) unboxed constructors *)
         (0 <= (Z.of_N n) <  Zpower.two_p  (Int.zwordsize - 1))%Z ->
       correct_crep cenv ienv c (enum n)
   | rep_boxed:
-      forall c name it a n' n cl,
-        M.get c cenv = Some (name, it, (Npos a), n') ->
+      forall c name it a n cl,
+        M.get c cenv = Some (name, it, (Npos a), n) ->
         M.get it ienv = Some cl ->
         getBoxedOrdinal c cl = Some n ->
         (* there should not be more than 2^8 boxed constructors *)
@@ -2945,12 +2945,12 @@ Theorem caseConsistent_findtag_In_cenv:
   forall cenv t e l,
     caseConsistent cenv l t ->
     findtag l t = Some e ->
-    exists (a:Ast.name) (ty:iTag) (n:N) (i:N), M.get t cenv = Some (a, ty, n, i). 
+    exists (a aty:Ast.name) (ty:iTag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i). 
 Proof.
   destruct l; intros.
   - inv H0.
   - inv H. 
-    exists a, ty', n, i; auto.
+    exists a, b, ty', n, i; auto.    
 Qed.
  
 
@@ -3489,7 +3489,7 @@ Proof.
        inv Hcc. rewrite H5 in H17; inv H17. rewrite H0 in H18; inv H18.
        rewrite H6 in H10; inv H10.
        unfold getEnumOrdinal in *.
-       assert (n1 <> arr) by (eapply getEnumOrdinal'_disjoint; eauto).
+       assert (i <> i') by (eapply getEnumOrdinal'_disjoint; eauto).
        intro. do 2 (erewrite repr_unboxed_shiftr in H10 by eauto).
        apply H. apply N2Z.inj. auto.
      + inv Hcc; eapply IHcl; eauto.       
@@ -3569,7 +3569,8 @@ Proof.
        rewrite H9 in H10; inv H10.
 
        unfold getBoxedOrdinal in *.
-       assert (n1 <> n) by (eapply getBoxedOrdinal'_disjoint; eauto). 
+       
+       assert (i <> i') by (eapply getBoxedOrdinal'_disjoint; eauto). 
        intro. apply H.
        apply N2Z.inj. auto.
       unfold Int.max_unsigned. simpl.
@@ -5167,14 +5168,17 @@ Forall2
         apply findtag_In. eauto.        
         admit.
       - intros.
-        assert (occurs_free (Ecase y cl) x4).
+        assert (occurs_free (Ecase y cl) x5).
         eapply occurs_free_Ecase_Included.
-        apply findtag_In. eauto. apply H10.        
-        apply Hmem_rel in H11.
-        destruct H11 as [v6 [Hx4v6 Hrepr_v6]].
+        apply findtag_In. eauto. apply H11.        
+        apply Hmem_rel in H12.
+        destruct H12 as [v6 [Hx4v6 Hrepr_v6]].
         exists v6. split; auto.
         apply repr_val_id_set. auto.
-        admit.        
+        inv Hp_id_e.
+        eapply H12 in Hx4v6.
+        admit.
+        admit.
     }
     assert (H_tinfo_e: correct_tinfo allocIdent limitIdent argsIdent (Z.of_nat (max_allocs e))
                            (Maps.PTree.set caseIdent vbool lenv) m ).
@@ -5185,8 +5189,20 @@ Forall2
       inv Hc_alloc.
       apply inj_le.
       eapply max_allocs_case.
-      apply findtag_In. eauto.        
-      admit.      
+      apply findtag_In. eauto.
+      intro.
+      assert (Hdj:=disjointIdent). inv H.
+      clear H2.
+      inv Hdj. inv H5.
+      apply H6.
+      repeat (try (left; reflexivity); right).
+      destruct H2; subst.
+      clear H. inv Hdj. inv H5. inv H7.
+      apply H5.
+      repeat (try (left; reflexivity); right).
+      clear H.
+      inv Hdj. apply H3.
+      repeat (try (left; reflexivity); right).
     }
 
     specialize (IHHev H_cenv_e Hp_id_e H_rho_id_e Hf_id_e _ _ _ (Kseq Sbreak (Kseq s' (Kswitch k))) _ fu H_repr_es Hmem_e Hca_e H_tinfo_e).

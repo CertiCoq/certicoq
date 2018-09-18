@@ -279,6 +279,14 @@ Module HeapLemmas (H : Heap).
     intros. eexists. erewrite gas; eauto.
   Qed.
 
+  Lemma alloc_not_In_dom A {b : A} H1 l1 H1' :
+    alloc b H1 = (l1, H1') ->
+    ~ l1 \in dom H1. 
+  Proof.
+    intros Ha [v1 Hget1]. erewrite alloc_fresh in Hget1; eauto.
+    congruence. 
+  Qed.
+
   Lemma heap_eq_dom {A} S (H1 H2 : heap A) S' :
     S |- H1 ≡ H2 ->
     S' \subset dom H1 ->

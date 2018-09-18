@@ -196,30 +196,31 @@ Module CC_log_rel (H : Heap).
                   
                   def_closures B1 B1 rho_clo H1' (Loc env_loc1') =  (H1'', rho_clo1) ->
                   setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
-                  
+                  length vs1 = length vs2 ->
+
                   exists (xs2 : list var) (e2 : exp) (rho2' : env),
                     find_def f2 B2 = Some (ft, xs2, e2) /\
                     Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
-                    (forall i j',
-                       (i < k)%nat -> (j' <= j)%nat ->
+                    (forall i,
+                       (i < k)%nat ->
                        match k with
                          | 0 => True
                          | S k =>
                            forall b',
-                             let R v1 v2 := cc_approx_val (k - (k - i)) j' IP P b' (Res (v1, H1'')) (Res (v2, H2')) in
-                             Forall2 R vs1 vs2 ->
+                             let R j v1 v2 := cc_approx_val (k - (k - i)) j IP P b' (Res (v1, H1')) (Res (v2, H2')) in
+                             (forall j, Forall2 (R j) vs1 vs2) ->
                              f_eq_subdomain (reach' H1' (env_locs rho_clo (occurs_free_fundefs B1))) (b2 ∘ b ∘ b1) b' ->
                              (forall (H1 H2  : heap block) (e1 e2 : exp) b1 b2, (* redundant *)
                                 live' (env_locs rho_clo2 (occurs_free e1)) H1'' H1 b1  ->
                                 live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
                                 IP (name_in_fundefs B1) _
                                    (H1, subst_env b1 rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
-                             cc_approx_exp cc_approx_val
-                                           (k - (k - i))
-                                           j'
-                                           (IP (name_in_fundefs B1) _) IP
-                                           (P (FromList xs1) _ (name_in_fundefs B1) _) P
-                                           (e1, rho_clo2, H1'') (e2, rho2', H2')
+                             (forall j, cc_approx_exp cc_approx_val
+                                                 (k - (k - i))
+                                                 j
+                                                 (IP (name_in_fundefs B1) _) IP
+                                                 (P (FromList xs1) _ (name_in_fundefs B1) _) P
+                                                 (e1, rho_clo2, H1'') (e2, rho2', H2'))
                        end)
               | _, _ => False
             end
@@ -269,26 +270,27 @@ Module CC_log_rel (H : Heap).
 
                   def_closures B1 B1 rho_clo H1' (Loc env_loc1') =  (H1'', rho_clo1) ->
                   setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
-                  
+                  length vs1 = length vs2 ->
+
                   exists (xs2 : list var) (e2 : exp) (rho2' : env),
                     find_def f2 B2 = Some (ft, xs2, e2) /\
                     Some rho2' = setlist xs2 ((Loc env_loc2') :: vs2) (def_funs B2 B2 (M.empty _)) /\
-                    (forall i j',
-                       (i < k)%nat -> (j' <= j)%nat ->
+                    (forall i ,
+                       (i < k)%nat  ->
                        forall b',
-                         let R v1 v2 := cc_approx_val i j' IP P b'(Res (v1, H1'')) (Res (v2, H2')) in
-                         Forall2 R vs1 vs2 ->
+                         let R j v1 v2 := cc_approx_val i j IP P b'(Res (v1, H1')) (Res (v2, H2')) in
+                         (forall j, Forall2 (R j) vs1 vs2) ->
                          f_eq_subdomain (reach' H1' (env_locs rho_clo (occurs_free_fundefs B1))) (b2 ∘ b ∘ b1) b' ->
                          (forall (H1 H2  : heap block) (e1 e2 : exp) b1 b2, (* redundant *)
                             live' (env_locs rho_clo2 (occurs_free e1)) H1'' H1 b1  ->
                             live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
                             IP (name_in_fundefs B1) _
                                (H1, subst_env b1 rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
-                         cc_approx_exp cc_approx_val
-                                       i j'
+                         (forall j, cc_approx_exp cc_approx_val
+                                       i j
                                        (IP (name_in_fundefs B1) _) IP
                                        (P (FromList xs1) _ (name_in_fundefs B1) _) P
-                                       (e1, rho_clo2, H1'') (e2, rho2', H2'))
+                                       (e1, rho_clo2, H1'') (e2, rho2', H2')))
               | _, _ => False
             end
           | _, _ => False
@@ -319,7 +321,7 @@ Module CC_log_rel (H : Heap).
         split; eauto. split; eauto. split; eauto. omega. omega. 
         
         intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft
-               e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hget Hdef Hset.
+               e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hfind Hget Hdef Hset Hlen.
         edestruct Hyp
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
         do 3 eexists; split; [ | split ]; try now eauto. }
@@ -330,7 +332,7 @@ Module CC_log_rel (H : Heap).
           intros [Heqb [Him Hyp]]. split; eauto. split; eauto.
           
           intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft
-                 e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+                 e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; eauto. } 
@@ -354,7 +356,7 @@ Module CC_log_rel (H : Heap).
           rewrite <- Heqi. now eapply Henv; eauto.
           
           intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1
-                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto). }
@@ -374,7 +376,7 @@ Module CC_log_rel (H : Heap).
           rewrite Heqi. now eapply Henv; eauto.
           
           intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
-                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto). }
@@ -391,14 +393,14 @@ Module CC_log_rel (H : Heap).
           intros; omega.
           
           intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
-                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+                 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
-          simpl. intros i j' b' Hleq Hleq' Hfeq Hall.
+          simpl. intros i b' Hleq Hfeq Hall.
           assert (Heqi : k - (k - i) = i) by omega.
           replace i with (k - (k - i)) by eassumption. 
-          eapply Hi; eauto.
+          eapply Hi; eauto. intros j'.
           eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hap. rewrite Heqi. simpl in Hap. eassumption.
       }
@@ -413,11 +415,11 @@ Module CC_log_rel (H : Heap).
           intros i Hlt; omega.
           
           intros le b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft
-                 e1 vs1 vs2 Heq1 Hr1 Heq2' Hr2 Hget Hfind Hdef Hset.
+                 e1 vs1 vs2 Heq1 Hr1 Heq2' Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
-          intros i j b' Hleq Hleq' Hall Hfeq.
+          intros i b' Hleq Hall Hfeq.
           assert (Heqi : k - (k - i) = i) by omega.
           replace i with (k - (k - i)) in Hi by eassumption. 
           eapply Hi; eauto. omega. }
@@ -442,16 +444,16 @@ Module CC_log_rel (H : Heap).
           rewrite <- Heqi. now eapply Henv; eauto.
           
           intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1
-                 ft e1 vs1 vs2 Heq1 Hr1 Heq2' Hr2 Hget Hfind Hdef Hset.
+                 ft e1 vs1 vs2 Heq1 Hr1 Heq2' Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
-          simpl. intros i j' b' Hleq Hleq' Hfeq Hall.
+          simpl. intros i b' Hleq Hfeq Hall.
           assert (Heqi : k - (k - i) = i) by omega.
           replace i with (k - (k - i)) by eassumption. 
-          eapply Hi; eauto.
+          eapply Hi; eauto. intros j'.
           eapply Forall2_monotonic; [| now eauto ].
-          intros x1 x2 Hap. rewrite Heqi. eassumption.
+          intros x1 x2 Hap. rewrite Heqi. eapply Hap.
       }
       { destruct b1 as [c1 vs1 | [? | B1 f1] [ env_loc1 |] | ];
         destruct b2 as [c2 vs2 | | ]; eauto.
@@ -471,11 +473,11 @@ Module CC_log_rel (H : Heap).
           rewrite Heqi. now eapply Henv; eauto.
           
           intros el b1 b2 tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1
-                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+                 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
             as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
           do 3 eexists; split; [ | split ]; try (now eauto).
-          intros i j' b' Hleq Hall Hfeq Hall'.
+          intros i b' Hleq Hfeq Hall'.
           assert (Heqi : k - (k - i) = i) by omega.
           replace i with (k - (k - i)) in Hi by eassumption. 
           eapply Hi; eauto. omega. }
@@ -632,22 +634,22 @@ Module CC_log_rel (H : Heap).
       eapply IHj; eassumption.
       
       intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
-             vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+             vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
       edestruct Hcc
         as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
       do 3 eexists; split; [ | split ]; try (now eauto).
-      intros i j'  Hleq Hleq' b''. simpl. intros Hrel' Hfeq1.
+      intros i Hleq b''. simpl. intros Hrel' Hfeq1.
       split.
-      edestruct (Hi i j') as [HI Hcc']; eauto.
-      + eapply Forall2_monotonic; [| eassumption ].
+      edestruct (Hi i) as [HI Hcc']; eauto.
+      + intros j'. eapply Forall2_monotonic; [| now eapply Hrel' ].
         intros. rewrite cc_approx_val_eq.
         eapply IHk; eauto. now rewrite <- cc_approx_val_eq; simpl in *; eauto.
         intros. split; now eapply Hrel.
-      + eapply cc_approx_exp_same_rel_IH with (GP1 := GP1); try eassumption.
+      + intros j'. eapply cc_approx_exp_same_rel_IH with (GP1 := GP1); try eassumption.
         intros; eapply IHk. omega. eassumption. eassumption.
         eapply cc_approx_exp_rel_mon. eapply Hi. eassumption.
-        eassumption.
-        eapply Forall2_monotonic; [| eassumption ].
+        intros j''. 
+        eapply Forall2_monotonic; [| now eapply Hrel' ].
         intros. rewrite cc_approx_val_eq.
         eapply IHk; eauto. now rewrite <- cc_approx_val_eq; simpl in *; eauto.
         intros. split; now eapply Hrel. eassumption.
@@ -698,11 +700,11 @@ Module CC_log_rel (H : Heap).
         rewrite cc_approx_val_eq in *. eapply IHj; eassumption.
 
         intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc'
-               xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
+               xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
         edestruct Hcc
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
         do 3 eexists; split; [ | split ]; try (now eauto).
-        intros i j' Hleq' Hleq'' R Hfeq Hall. 
+        intros i Hleq' R Hfeq Hall. 
         eapply Hi'; try eassumption. omega.
   Qed.
 
@@ -790,13 +792,13 @@ Module CC_log_rel (H : Heap).
 
       intros j' Hlt. eapply Henv. omega.
       
-      intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc'
-             xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset.
-      edestruct Hcc
-        as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto.
-      do 3 eexists; split; [ | split ]; try (now eauto).
-      intros i' j' Hleq' Hleq'' R Hall. eapply Hi'. eassumption.
-      omega. eassumption. 
+      (* intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' *)
+      (*        xs1 ft e1 vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset. *)
+      (* edestruct Hcc *)
+      (*   as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi'); eauto. *)
+      (* do 3 eexists; split; [ | split ]; try (now eauto). *)
+      (* intros i' j' Hleq' Hleq'' R Hall. eapply Hi'. eassumption. *)
+      (* omega. eassumption.  *)
   Qed.
 
    Lemma cc_approx_heap_j_monotonic S (k j i : nat) (H1 H2 : heap block) b' :
@@ -1036,6 +1038,31 @@ Module CC_log_rel (H : Heap).
     - eauto.
   Qed. 
 
+  Lemma cc_approx_env_P_setlist_not_in_P_l (S : Ensemble var) (k j : nat) 
+        (rho1 rho1' rho2 : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
+    (H1, rho1) ⋞ ^ ( S ; k ; j ; GIP ; GP ; b ) (H2, rho2) ->
+    Disjoint _ (FromList xs) S ->
+    setlist xs vs rho1 = Some rho1' -> 
+    (H1, rho1') ⋞ ^ ( S ; k ; j ; GIP ; GP ; b ) (H2, rho2).
+  Proof. 
+    intros Hcc Hnin Hset y Py v' Hget.
+    edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
+    erewrite setlist_not_In. eassumption. eassumption.
+    intros Hc. eapply Hnin. constructor; eauto.
+  Qed.
+
+  Lemma cc_approx_env_P_setlist_not_in_P_r (S : Ensemble var) (k j : nat) 
+        (rho1 rho2 rho2' : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
+    (H1, rho1) ⋞ ^ ( S ; k ; j ; GIP ; GP ; b ) (H2, rho2) ->
+    Disjoint _ (FromList xs) S ->
+    setlist xs vs rho2 = Some rho2' -> 
+    (H1, rho1) ⋞ ^ ( S ; k ; j ; GIP ; GP ; b ) (H2, rho2').
+  Proof. 
+    intros Hcc Hnin Hset y Py v' Hget.
+    edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
+    eexists; split; eauto. erewrite <- setlist_not_In. eassumption. eassumption.
+    intros Hc. eapply Hnin. constructor; eauto.
+  Qed.
   (** * Related values are well-defined in the heap *)
 
   Lemma cc_approx_val_dom1 (k j : nat) v1 v2 H1 H2 :
@@ -1389,14 +1416,11 @@ Module CC_log_rel (H : Heap).
         eassumption. 
         
         intros b1' b2' el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
-               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hgetl Hfind Hdef Hset.
+               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hgetl Hfind Hdef Hset Hlen.
         edestruct Hres
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
         do 3 eexists; split; [ | split ]; try (now eauto).
-        intros i' j' b' Hleq Hleq' Hall Hfeq. eapply Hi. eassumption. eassumption.
-        eapply Forall2_monotonic; [| now eauto ].
-        intros x1 x2 Hap.
-        rewrite cc_approx_val_eq in *. eassumption.
+        intros i' b' Hleq Hall Hfeq. eapply Hi. eassumption. eassumption.
         eapply Equivalence_Transitive; [| eassumption ]. eapply f_eq_subdomain_compose_compat.
         reflexivity. eapply f_eq_subdomain_compose_compat; [| reflexivity ].
         rewrite Heq5. reflexivity.
@@ -1433,14 +1457,11 @@ Module CC_log_rel (H : Heap).
         eassumption. 
         
         intros b1' b2' el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
-               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hget Hfind Hdef Hset.
+               vs1 vs2 Heq1' Hr1' Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
         edestruct Hres
           as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
         do 3 eexists; split; [ | split ]; try (now eauto).
-        intros i' j' b' Hleq Hleq' Hfeq Hall. eapply Hi. eassumption. eassumption.
-        eapply Forall2_monotonic; [| now eauto ].
-        intros x1 x2 Hap.
-        rewrite cc_approx_val_eq in *. eassumption.
+        intros i' b' Hleq Hfeq Hall. eapply Hi. eassumption. eassumption.
         eapply Equivalence_Transitive; [| eassumption ]. eapply f_eq_subdomain_compose_compat.
         reflexivity. eapply f_eq_subdomain_compose_compat; [| reflexivity ].
         rewrite Heq5. reflexivity.
@@ -2341,12 +2362,12 @@ Module CC_log_rel (H : Heap).
         eapply block_equiv_Constr_r with (c2 := c2'). simpl. split; [| eassumption ].
         reflexivity.
       * intros b1' b2' el tc1 tc2 tc3 H3' H3'' H4'' env_loc1' xs1 ft
-             e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hgetl Hfind Hdef Hset.
+             e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hgetl Hfind Hdef Hset Hlen.
        repeat subst_exp. 
        
        { edestruct Hcc with (env_loc1' := el)
            as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi)                 
-         ; [| | | | eassumption |  | eassumption | eassumption | ].
+         ; [| | | | eassumption |  | eassumption | eassumption | eassumption |  ].
          * eapply res_equiv_f_compose; [| eassumption ].
            rewrite compose_id_neut_r.
            rewrite res_equiv_eq.  split. reflexivity. eassumption. 
@@ -2996,7 +3017,7 @@ Module CC_log_rel (H : Heap).
        
          
        intros b1 b2 el tc1 tc2 tc3  H3 H3' H4' env_loc xs1 ft e1 vs1 vs2
-              Heq1 Hinj1 Heq2 Hinj2 Hget Hfind Hdef Hset. 
+              Heq1 Hinj1 Heq2 Hinj2 Hget Hfind Hdef Hset Hlen. 
        edestruct Hcc
          as (xs2 & e2 & rho2' & Hget' & Hfind' & Hset').
        * eapply Equivalence_Transitive; [| now apply Heq1 ].
@@ -3020,6 +3041,7 @@ Module CC_log_rel (H : Heap).
        * eassumption.
        * eassumption.
        * eassumption.
+       * eassumption. 
        * do 3 eexists; split; [ | split ]; try (now eauto).
      + destruct b1; try contradiction.
        destruct v; try contradiction.
@@ -3198,9 +3220,10 @@ Module CC_log_rel (H : Heap).
            eapply reach'_set_monotonic. eassumption. }
 
        intros b1' b2' el tc1 tc2 tc3 H3 H3' H4' env_loc' xs1 ft
-       e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hget Hfind Hdef Hset.
+       e1 vs1 vs2 Hres1 Hinj1 Hres2 hinj2 Hget Hfind Hdef Hset Hlen.
        edestruct Hcc as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi)
-       ; [| |  | | | eassumption | eassumption | eassumption | ]; try eassumption.
+       ; [| |  | | | eassumption | eassumption | eassumption | eassumption | ];
+       try eassumption.
        exists xs2, e2, rho2'. split; [| split ]; eauto. intros. 
        eapply Hi; try eassumption. 
        eapply Equivalence_Transitive; [| eassumption ].

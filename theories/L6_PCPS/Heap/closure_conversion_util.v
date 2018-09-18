@@ -3,7 +3,7 @@
  *)
 
 From L6 Require Import cps cps_util set_util hoisting identifiers ctx
-                       Ensembles_util List_util functions eval.
+                       Ensembles_util List_util functions eval tactics.
 From L6.Heap Require Import closure_conversion compat heap.
 
 Require Import compcert.lib.Coqlib.
@@ -75,7 +75,7 @@ Module CCUtil (H : Heap).
     unfold FV_cc.
     now eauto 20 with Ensembles_DB. 
   Qed.
-  
+
   Lemma FV_Union2 Scope Funs FVs S :
     FV Scope (S :|: Funs) FVs \subset 
     S :|: FV Scope Funs FVs.
@@ -124,6 +124,18 @@ Module CCUtil (H : Heap).
     eapply Union_Included;
     now eauto with Ensembles_DB.
   Qed. 
+
+    Lemma FV_cc_Setminus2 Scope Funs fenv Γ S {Hd : Decidable S} : 
+    FV_cc Scope (Funs \\ S) fenv Γ \subset
+    FV_cc Scope Funs fenv Γ.
+  Proof.
+    unfold FV_cc.
+    eapply Union_Included;
+      [| now eauto with Ensembles_DB ]...
+    eapply Union_Included. now eauto with Ensembles_DB.
+    eapply Included_Union_preserv_l. eapply Included_Union_preserv_r.
+    now eauto with Ensembles_DB.
+  Qed.
 
   Lemma FV_Setminus1 Scope Funs FVs S {Hd : Decidable S} : 
     FV (Scope \\ S) Funs FVs \subset
@@ -479,23 +491,11 @@ Module CCUtil (H : Heap).
   Proof with (now eauto with Ensembles_DB).  
     intros Hvar; induction Hvar.
     - simpl...
-    - unfold FV_cc. rewrite <- !Union_assoc.
-      eapply Included_Union_compat. reflexivity.
-      eapply Included_Union_compat. reflexivity.
-      eapply Included_Union_compat. now eauto with Ensembles_DB.
-      eapply Included_Union_compat; [| reflexivity ].
-      eapply image_monotonic. now eauto with Ensembles_DB.
-    - unfold FV_cc. rewrite <- !Union_assoc.
-      eapply Included_Union_compat.
-      reflexivity.
-      eapply Included_Union_compat.
-      reflexivity.
-      eapply Included_Union_compat.
-      now eauto with Ensembles_DB.
-      eapply Included_Union_compat.
-      eapply image_monotonic. 
-      now eauto with Ensembles_DB.
-      reflexivity.      
+    - eapply Included_trans. eapply FV_cc_Union1.
+      eapply Included_trans. eapply Included_Union_compat. reflexivity.
+      eapply FV_cc_Setminus2. 
+      eauto with Ensembles_DB typeclass_instances. reflexivity.
+    - eapply Included_trans. eapply FV_cc_Union1. reflexivity. 
   Qed.
 
   Lemma project_vars_FV_cc Scope Scope' Funs Funs' c Γ FVs xs C fenv :
@@ -1379,14 +1379,17 @@ Module CCUtil (H : Heap).
       find_def f B1 = Some (ft, xs, e1) ->
       exists Γ e2 C,
         find_def f B2 = Some (ft, Γ :: xs, C |[ e2 ]|) /\
+        ~ Γ \in (name_in_fundefs B1':|: FromList xs :|: bound_var e1
+                                 :|: FromList FVs) /\
         Closure_conversion clo_tag (FromList xs) (name_in_fundefs B1')
                            (extend_fundefs' id B1' Γ) c Γ FVs e1 e2 C.
   Proof.
     intros Hc Hdef; induction Hc.
     - simpl in Hdef.
       destruct (M.elt_eq f f0); subst.
-      + inv Hdef. do 3 eexists. split.
+      + inv Hdef. do 3 eexists. split; [| split ].
         * simpl. rewrite Coqlib.peq_true. reflexivity.
+        * intros Hc'. eapply H. constructor; eauto. 
         * eassumption.
       + edestruct IHHc as (Γ & e2 & C'  & Hfind & Hclo).
         * eassumption.
@@ -1395,4 +1398,168 @@ Module CCUtil (H : Heap).
     - inv Hdef.
   Qed.
 
+  Lemma project_var_Scope_Funs_eq Scope Scope' Funs Funs'
+        fenv c Γ FVs xs C1 :
+    project_var clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
+    Funs' <--> Funs \\ (Scope' \\ Scope).
+  Proof.
+    intros hvar; inv hvar; eauto.
+    - rewrite Setminus_Same_set_Empty_set, Setminus_Empty_set_neut_r. reflexivity.
+    - rewrite Setminus_Union_distr.
+      rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+      rewrite (Setminus_Disjoint _ Scope). reflexivity.
+      eapply Disjoint_Singleton_l. eassumption.
+    - rewrite Setminus_Union_distr.
+      rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+      rewrite (Setminus_Disjoint _ Scope).
+      rewrite (Setminus_Disjoint Funs').
+      reflexivity.
+      eapply Disjoint_Singleton_r. eassumption.
+      eapply Disjoint_Singleton_l. eassumption.
+  Qed.
+
+  Lemma project_var_size_ps_cardinal Scope Funs {Hf : ToMSet Funs} Scope' Funs' {Hf' : ToMSet Funs'}
+        fenv c x FVs Γ C :
+    project_var clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
+    PS.cardinal (@mset Funs Hf)  =
+    PS.cardinal (@mset Funs' Hf') + PS.cardinal (@mset (Funs \\ Funs') _).
+  Proof.
+    intros Hvar. assert (Hvar' := Hvar). 
+    rewrite PS_cardinal_union. 
+    eapply Proper_carinal. eapply Same_set_From_set.
+    rewrite FromSet_union.
+    do 3 setoid_rewrite <- mset_eq at 1.
+    eapply project_var_Scope_Funs_eq in Hvar.
+    eapply Union_Setminus_Same_set. now tci.
+    eapply project_var_Funs_l. eassumption.
+    eapply FromSet_disjoint.
+    do 2 setoid_rewrite <- mset_eq at 1.
+    eapply Disjoint_Setminus_r. reflexivity. 
+  Qed.
+
+  Lemma project_vars_size_ps_cardinal Scope Funs {Hf : ToMSet Funs} Scope' Funs' {Hf' : ToMSet Funs'}
+        fenv c xs FVs Γ C :
+    project_vars clo_tag Scope Funs fenv c Γ FVs xs C Scope' Funs' ->
+    PS.cardinal (@mset Funs Hf)  =
+    PS.cardinal (@mset Funs' Hf') + PS.cardinal (@mset (Funs \\ Funs') _).
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvars. induction Hvars.
+    - rewrite PS_cardinal_union. 
+      eapply Proper_carinal. eapply Same_set_From_set.
+      rewrite FromSet_union.
+      do 3 setoid_rewrite <- mset_eq at 1.
+      rewrite Setminus_Same_set_Empty_set...
+      eapply FromSet_disjoint.
+      do 2 setoid_rewrite <- mset_eq at 1.
+      eapply Disjoint_Setminus_r. reflexivity. 
+    - rewrite PS_cardinal_union. 
+      eapply Proper_carinal. eapply Same_set_From_set.
+      rewrite FromSet_union.
+      do 3 setoid_rewrite <- mset_eq at 1.
+      rewrite <- Union_Setminus_Same_set. reflexivity.
+      now tci.
+      eapply Included_trans.
+
+      eapply project_vars_Funs_l. eassumption.
+      eapply project_var_Funs_l. eassumption.
+
+      eapply FromSet_disjoint.
+      do 2 setoid_rewrite <- mset_eq at 1.
+      eapply Disjoint_Setminus_r. reflexivity. 
+  Qed.
+
+  Lemma project_vars_ToMSet (Scope1 : Ensemble positive) (Scope2 : Ensemble var)
+        { Hs : ToMSet Scope1 } (Funs1 Funs2 : Ensemble var) (fenv : var -> var) 
+        (c : cTag) (Γ : var) (FVs : list var) (ys : list var) 
+        (C1 : exp_ctx) :
+    project_vars clo_tag Scope1 Funs1 fenv c Γ FVs ys C1 Scope2 Funs2 -> ToMSet Scope2.
+  Proof.
+  Admitted.
+
+  Lemma project_vars_ToMSet_Funs (Scope1 : Ensemble positive) (Scope2 : Ensemble var)
+        (Funs1 Funs2 : Ensemble var)  { Hf : ToMSet Funs1 } (fenv : var -> var) 
+        (c : cTag) (Γ : var) (FVs : list var) (ys : list var) 
+        (C1 : exp_ctx) :
+    project_vars clo_tag Scope1 Funs1 fenv c Γ FVs ys C1 Scope2 Funs2 -> ToMSet Funs2.
+  Proof.
+  Admitted.
+
+    Lemma project_var_Setminus_eq (Scope Scope' Funs Funs' : Ensemble var) 
+        (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
+        (xs : var) (C1 : exp_ctx) :
+    project_var clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
+    Funs' \\ Scope' \subset Funs \\ Scope.
+  Proof.
+    intros Hv. assert (Hv' := Hv). 
+    eapply project_var_Scope_Funs_eq in Hv. rewrite Hv.
+    rewrite Setminus_Union.
+    eapply Included_Setminus_compat. reflexivity.
+    eapply Included_trans. eapply project_var_Scope_l. eassumption. 
+    now eauto with Ensembles_DB.
+  Qed.
+
+  Lemma project_vars_Setminus_eq (Scope Scope' Funs Funs' : Ensemble var) 
+        (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
+        (xs : list var) (C1 : exp_ctx) :
+    project_vars clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
+    Funs' \\ Scope' \subset Funs \\ Scope.
+  Proof.
+    intros Hv. assert (Hv' := Hv). 
+    eapply Included_Setminus_compat.
+    eapply project_vars_Funs_l. eassumption. 
+    eapply project_vars_Scope_l. eassumption. 
+  Qed.
+
+
+  Lemma project_var_cost_eq'
+        Scope Scope'  Funs Funs' fenv
+        c Γ FVs x C1 :
+    project_var clo_tag Scope Funs fenv c Γ FVs x C1 Scope' Funs' ->
+    cost_ctx_full C1 <= 3.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvar; inv Hvar; eauto.
+  Qed.
+
+  Lemma project_vars_cost_eq'
+        Scope Scope'  Funs Funs' fenv
+        c Γ FVs xs C1 :
+    project_vars clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
+    cost_ctx_full C1 <= 3 * length xs.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvar; induction Hvar; eauto.
+    rewrite cost_ctx_full_ctx_comp_ctx_f. simpl.
+    eapply le_trans. eapply plus_le_compat.
+    eapply project_var_cost_eq'. eassumption. eassumption.
+    omega.
+  Qed.
+
+  Lemma binding_in_map_key_set {A} (rho : M.t A) : 
+    binding_in_map (key_set rho) rho.
+  Proof.
+    unfold binding_in_map. intros x Hget.
+    unfold key_set, In in *.
+    destruct (M.get x rho); eauto.
+    exfalso; eauto.
+  Qed.
+
+  Lemma project_var_env_locs_dis (Scope Scope' Funs Funs' : Ensemble var) 
+        (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
+        (x : var) (C1 : exp_ctx) (rho1 : env) (H1 : heap block) 
+        (rho2 : env) (H2 : heap block) (m : nat) S :
+    project_var clo_tag Scope Funs fenv c Γ FVs x C1 Scope' Funs' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    Disjoint _ S (Scope' \\ Scope) ->
+    env_locs rho1 S <--> env_locs rho2 S.
+  Admitted.
+
+  Lemma project_vars_env_locs_dis (Scope Scope' Funs Funs' : Ensemble var) 
+        (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
+        (x : list var) (C1 : exp_ctx) (rho1 : env) (H1 : heap block) 
+        (rho2 : env) (H2 : heap block) (m : nat) S :
+    project_vars clo_tag Scope Funs fenv c Γ FVs x C1 Scope' Funs' ->
+    ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
+    Disjoint _ S (Scope' \\ Scope) ->
+    env_locs rho1 S <--> env_locs rho2 S.
+  Admitted.  
+      
 End CCUtil. 

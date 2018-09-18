@@ -345,7 +345,7 @@ Module SpaceSem (H : Heap).
     match c with
       | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx c
       | Eproj_c x t n y c => cost_alloc_ctx c
-      | Efun1_c B c => (numOf_fundefs B) + cost_alloc_ctx c
+      | Efun1_c B c => 1 + (numOf_fundefs B) + cost_alloc_ctx c
       (* not relevant *)
       | Eprim_c x p ys c => cost_alloc_ctx c
       | Hole_c => 0

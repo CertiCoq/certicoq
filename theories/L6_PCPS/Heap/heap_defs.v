@@ -91,7 +91,8 @@ Module HeapDefs (H : Heap) .
       | Constr t ls => (* The size of the constructor representation *)
         1 + length ls
       | Clos _ _ => 1
-      | Env _ => 0     (* Do not count the cost of closure environments in the source *)
+      | Env _ => 1
+        (* Do not count the cost of closure environments in the source *)
     end.
   
   (** Size of the heap *)
@@ -1713,6 +1714,14 @@ Module HeapDefs (H : Heap) .
     rewrite Hget in Hget'. inv Hget'.
     eapply Included_trans. eassumption.
     eapply in_dom_closed; eauto.
+  Qed.
+
+  Lemma env_locs_closed (S : Ensemble loc) (H : heap block) :
+    closed S H ->
+    S \subset dom H. 
+  Proof.
+    intros Hc l Sin. edestruct Hc as [b' [Heq1 Heq2]]. eassumption.
+    eexists; eauto.
   Qed.
 
   (** Proper instances *)

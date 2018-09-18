@@ -145,14 +145,14 @@ Section CC.
         Closure_conversion Scope Funs fenv c Γ FVs (Efun B e)
                            (Efun B' (Ce |[ e' ]|)) (comp_ctx_f C (Econstr_c Γ' c' FVs' Hole_c))
   | CC_Eapp :
-      forall Scope Scope' Funs Funs' fenv c Γ FVs f f' ft env' ys C S S',
-        Disjoint _ S (FV_cc Scope Funs fenv Γ) ->
+      forall Scope Scope' Funs Funs' fenv c Γ FVs f f' ft env' ys C S,
+        Disjoint _ S (FV_cc Scope' Funs' fenv Γ) ->
         (* Project the function name and the actual parameter *)
         project_vars Scope Funs fenv c Γ FVs (f :: ys) C Scope' Funs' ->
         (* The name of the function pointer and the name of the environment
          should not shadow the variables in the current scope and the
          variables that where used in the projections *)
-        f' \in S' -> env' \in S' -> f' <> env' ->
+        f' \in S -> env' \in S -> f' <> env' ->
         Closure_conversion Scope Funs fenv c Γ FVs (Eapp f ft ys) (AppClo f ft ys f' env') C
   | CC_Eprim :
       forall Scope Scope' Funs Funs' fenv c Γ FVs x ys C C' f e e',
@@ -176,7 +176,7 @@ Section CC.
            forall B c Γ' FVs S f t ys e e' C defs defs',
              (* The environment binding should not shadow the current scope
                (i.e. the names of the mut. rec. functions and the other arguments) *)
-             Disjoint _ S ((name_in_fundefs B) :|: (FromList ys) :|: (bound_var e)) ->
+             Disjoint _ S ((name_in_fundefs B) :|: (FromList ys) :|: (bound_var e) :|: FromList FVs) ->
              (* new argument *)
              In _ S  Γ' ->
              Closure_conversion_fundefs B c FVs defs defs' ->

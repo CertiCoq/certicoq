@@ -17,6 +17,8 @@ Section Uncurry_correct.
     
   Transparent bind ret.
 
+  Print st_eq.
+
   (* This identity is useful for the Ecase case -- see below *)
   Lemma st_eq_Ecase {S} (m1 : state S (list (cTag * exp))) (x : var) y :
     st_eq
@@ -137,6 +139,19 @@ Section Uncurry_correct.
   
   Transparent uncurry_exp uncurry_fundefs.
 
+  Print triple.
+  Print fresh.
+  Print Ensemble.
+  Print preord_env_P. (* two environments agree up to k-betareductions *)
+  Print preord_var_env.
+  Print preord_exp. (* contextual equivalent *)
+  Check lt_wf_rec1.
+  Check exp_ind'.
+  Check assoc.
+  Check bind_triple.
+  Check st_eq_Ecase.
+  Search preord_exp.
+
   Lemma uncurry_exp_correct (k : nat) (e : exp) (S : Ensemble var) :
     (* S is the set that contains all the fresh variables we can generate. This
        is denoted by the precondition [fresh S (fst s)]. S is disjoint from all
@@ -146,18 +161,53 @@ Section Uncurry_correct.
       uncurry_exp e
     {{ fun s e' s' =>
          (forall rho rho',
+            (* if rho and rho' agree on the free variables of e, *)
             preord_env_P pr cenv (occurs_free e) k rho rho' ->
+            (* then e and e' are contextually equivalent *) 
             preord_exp pr cenv k (e, rho) (e', rho')) /\
+         (* Q: can't s' have increased due to uncurrying? *)
+         (* A: sure, but S still contains all the free variables we can generate.
+               just some extras too that we can't.
+               we want to make sure that the fresh variable counter has not decreased
+               *)
          fresh S (fst (fst (fst (fst (fst  (fst s'))))))
     }}.
   Proof with now eauto with Ensembles_DB.
-    revert e; induction k as [k IHk] using lt_wf_rec1.
+    revert e; induction k as [k IHk] using lt_wf_rec1. (* strong induction on step index *)
     induction e using exp_ind'; intros HD; simpl.
     Opaque uncurry_exp uncurry_fundefs.
     - (* Case Econstr -- directly from compatibility lemma *)
-      admit.
+      eapply bind_triple. apply IHe.
+      eapply Disjoint_Included_r; [| eassumption ].
+      eapply bound_var_occurs_free_Econstr_Included.
+      intros e' s1. apply return_triple. intros. destruct H. split; [| assumption].
+      intros rho rho' H1.
+      apply preord_exp_const_compat.
+      + induction l; try constructor. apply H1. constructor. now constructor.
+        apply IHl. apply Disjoint_Included_r
+          with (bound_var (Econstr v t (a :: l) e) :|: occurs_free (Econstr v t (a :: l) e)).
+        unfold Included. intros. destruct H2.
+        apply Union_introl. inversion H2; subst. constructor. now constructor.
+        apply Union_intror. inversion H2; subst. constructor. now apply in_cons.
+        apply Free_Econstr2; eauto.
+        assumption.
+        unfold preord_env_P. intros.
+        apply H1. inversion H2; subst.
+        * constructor. now apply in_cons.
+        * now apply Free_Econstr2.
+      + intros. apply H. unfold preord_env_P. intros.
+        unfold preord_env_P in H1.
+        destruct (Positive_as_OT.eq_dec x v).
+        * subst x. apply preord_var_env_extend_eq. rewrite preord_val_eq.
+          unfold preord_val'. split; try trivial.
+          now apply Forall2_Forall2_asym_included.
+        * apply preord_var_env_extend. auto. rewrite preord_val_eq.
+          unfold preord_val'. split; try trivial.
+          now apply Forall2_Forall2_asym_included.
     - (* Case Ecase x [] -- directly from compatibility lemma *)
-      admit.
+      setoid_rewrite left_id. apply return_triple. intros s H. split; [|assumption].
+      intros rho rho' Henv.
+      apply preord_exp_case_nil_compat.
     - (* Case Ecase x ((c, e) :: l) *)
       (* This one is trickier because the computation of IHl is not
          a subcomputation of the goal. We can make it a subcomputation
@@ -187,15 +237,60 @@ Section Uncurry_correct.
           simpl; eapply Hl. eapply preord_env_P_antimon. eassumption.
           rewrite occurs_free_Ecase_cons...
     - (* Case Eproj -- directly from compatibility lemma *)
-      admit.
+      eapply bind_triple. apply IHe.
+      eapply Disjoint_Included_r; [| eassumption ].
+      eapply bound_var_occurs_free_Eproj_Included. intros e' s1. apply pre_curry_l.
+      intros. apply return_triple. intros s2 Hs. split; [| assumption].
+      intros rho rho' Henv.
+      apply preord_exp_proj_compat; [auto|].
+      intros v1 v2 Hval. apply H. intros x Hocc.
+      destruct (Positive_as_OT.eq_dec x v).
+      + subst x. now apply preord_var_env_extend_eq.
+      + apply preord_var_env_extend; [| assumption].
+        apply Henv. apply Free_Eproj2; auto.
     - (* Using [uncurry_fundefs_correct] *)
       admit.
-    - (* Case Eproj -- directly from compatibility lemma *)
-      admit.
-    - (* Case Eproj -- directly from compatibility lemma *)
-      admit.
+    - (* Case Eapp -- directly from compatibility lemma *)
+      apply return_triple. intros s Hs. split; [| assumption].
+      intros rho rho' Henv.
+      apply preord_exp_app_compat. auto.
+      induction l; constructor. apply Henv. apply Free_Eapp2. simpl. auto. apply IHl.
+      + eapply Disjoint_Included_r; [| eassumption ].
+        intros x Hin. inversion Hin; subst.
+        * apply Union_introl. inversion H.
+        * apply Union_intror. destruct (Positive_as_OT.eq_dec x v).
+          ** subst x. auto.
+          ** inversion H; subst; try contradiction. apply Free_Eapp2. simpl. auto.
+      + intros x Hocc. apply Henv.
+        destruct (Positive_as_OT.eq_dec x v).
+        * subst x. constructor.
+        * apply Free_Eapp2. inversion Hocc; subst; try contradiction.
+          simpl. auto.
+    - (* Case Eprim -- directly from compatibility lemma *)
+      eapply bind_triple. apply IHe.
+      eapply Disjoint_Included_r; [| eassumption].
+      apply bound_var_occurs_free_Eprim_Included. intros e' s1. apply pre_curry_l.
+      intros. apply return_triple. intros s2 Hs. split; [| assumption].
+      intros rho rho' Henv.
+      apply preord_exp_prim_compat.
+      + induction l; constructor. apply Henv. apply Free_Eprim1. simpl. auto. apply IHl.
+        * eapply Disjoint_Included_r; [| eassumption].
+          intros x Hin. inversion Hin; subst.
+          ** apply Union_introl. inversion H0; subst; constructor; auto.
+          ** apply Union_intror. inversion H0; subst.
+             *** apply Free_Eprim1. simpl. auto.
+             *** apply Free_Eprim2; assumption.
+        * intros x Hocc. apply Henv. inversion Hocc; subst.
+          ** apply Free_Eprim1. simpl. auto.
+          ** apply Free_Eprim2; assumption.
+      + intros. apply H. intros x Hocc.
+        destruct (Positive_as_OT.eq_dec x v).
+        * subst x. now apply preord_var_env_extend_eq.
+        * apply preord_var_env_extend; [| assumption].
+          apply Henv. apply Free_Eprim2; auto.
     - (* Case Ehalt -- directly from compatibility lemma *)
-      admit. 
+      apply return_triple. intros s H. split; [| assumption].
+      intros rho rho' Henv. apply preord_exp_halt_compat. auto.
   Admitted.
 
   

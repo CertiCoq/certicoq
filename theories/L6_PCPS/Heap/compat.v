@@ -998,7 +998,7 @@ Module Compat (H : Heap).
       (env_locs rho1 (occurs_free (Efun B1 e1))) \subset dom H1 ->
       
       (forall H1' H1'' rho1' rho_clo env_loc,
-
+         k >= cost (Efun B1 e1) ->
          restrict_env (fundefs_fv B1) rho1 = rho_clo ->
          alloc (Env rho_clo) H1 = (env_loc, H1') ->
 
@@ -1171,15 +1171,16 @@ Module Compat (H : Heap).
 
             eassumption.
             eassumption. reflexivity.
-
+            
             eapply HL.alloc_subheap. eassumption.
             eapply HL.alloc_subheap. eassumption.
             now eauto with Ensembles_DB. 
           - rewrite Hfuns, Hdef3 in Hs.
             destruct Hs as [Heq [Hfeq' [Hwf1 [Hwf2 [Henv1 [Henv2 Hinj]]]]]].
             edestruct Hpre as [v2 [c2 [m2 [b2' [Hstep [HS Hval]]]]]]
-            ; [ | | now apply Hdef3 | |
+            ; [ | | | now apply Hdef3 | |
                 | | | | | eassumption | | ].
+            + simpl in *. omega. 
             + reflexivity.
             + eassumption. 
             + eapply heap_env_equiv_antimon. eassumption.

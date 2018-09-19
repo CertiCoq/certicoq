@@ -209,7 +209,7 @@ Module CC_log_rel (H : Heap).
                            forall b',
                              let R j v1 v2 := cc_approx_val (k - (k - i)) j IP P b' (Res (v1, H1')) (Res (v2, H2')) in
                              (forall j, Forall2 (R j) vs1 vs2) ->
-                             f_eq_subdomain (reach' H1' (env_locs rho_clo (occurs_free_fundefs B1))) (b2 ∘ b ∘ b1) b' ->
+                             f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
                              (forall (H1 H2  : heap block) (e1 e2 : exp) b1 b2, (* redundant *)
                                 live' (env_locs rho_clo2 (occurs_free e1)) H1'' H1 b1  ->
                                 live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
@@ -280,7 +280,7 @@ Module CC_log_rel (H : Heap).
                        forall b',
                          let R j v1 v2 := cc_approx_val i j IP P b'(Res (v1, H1')) (Res (v2, H2')) in
                          (forall j, Forall2 (R j) vs1 vs2) ->
-                         f_eq_subdomain (reach' H1' (env_locs rho_clo (occurs_free_fundefs B1))) (b2 ∘ b ∘ b1) b' ->
+                         f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
                          (forall (H1 H2  : heap block) (e1 e2 : exp) b1 b2, (* redundant *)
                             live' (env_locs rho_clo2 (occurs_free e1)) H1'' H1 b1  ->
                             live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
@@ -3232,9 +3232,7 @@ Module CC_log_rel (H : Heap).
        eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
 
        eapply Included_trans. eapply image_monotonic with (S' := (reach' H3 (val_loc (Loc el)))).
-       rewrite (reach_unfold H3 (val_loc _)). eapply Included_Union_preserv_r.
-       simpl. rewrite post_Singleton; eauto. simpl.
-       eapply reach'_set_monotonic. eapply env_locs_monotonic...
+       reflexivity.
        rewrite res_equiv_image_reach; [| symmetry; eassumption ].
        rewrite image_id.
        rewrite (reach_unfold H1 (val_loc (Loc l1))). eapply Included_Union_preserv_r.

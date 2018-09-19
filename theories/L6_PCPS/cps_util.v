@@ -708,7 +708,7 @@ Proof.
 Qed.
 
 (** Extend the environment with a list of variables and put them in the set *)
-Lemma binding_in_map_setlist xs vs S (rho rho' : env) :
+Lemma binding_in_map_setlist {A : Type} xs vs S (rho rho' : M.t A) :
   binding_in_map S rho ->
   setlist xs vs rho = Some rho' ->
   binding_in_map (Union _ (FromList xs) S) rho'.

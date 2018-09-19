@@ -136,7 +136,7 @@ Section CC.
         NoDup FVs' ->
         project_vars Scope Funs fenv c Γ FVs FVs' C Scope' Funs' ->
         (* Γ' is the variable that will hold the record of the environment *)
-        ~ Γ' \in ((name_in_fundefs B) :|: (FV_cc Scope Funs fenv Γ)) ->
+        ~ Γ' \in (bound_var (Efun B e) :|: FV Scope Funs FVs :|: FV_cc Scope Funs fenv Γ) ->
         (* closure convert function blocks *)
         Closure_conversion_fundefs B c' FVs' B B' ->
         (* closure convert the rest of the program *)

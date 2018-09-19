@@ -667,7 +667,7 @@ Module Invariants (H : Heap).
 
   Lemma def_funs_FV_inv Scope Funs Γ FVs c k j GIP GP b B1 B2 rho1 H1 rho2 H2 :
     FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
-    name_in_fundefs B1 \subset Scope ->
+    name_in_fundefs B1 \subset Scope :|: Funs ->
     ~ Γ \in name_in_fundefs B1 ->
     FV_inv k j GIP GP b rho1 H1 (def_funs B1 B2 rho2) H2 c Scope Funs Γ FVs.
   Proof with (now eauto with Ensembles_DB).

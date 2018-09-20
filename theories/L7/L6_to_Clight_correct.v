@@ -136,6 +136,7 @@ Inductive bound_var_val: L6.cps.val -> Ensemble var :=
     bound_var_fundefs fds x ->
     bound_var_val (Vfun rho fds f) x.
 
+Ltac inList := repeat (try (left; reflexivity); right).
 
 (**** Representation relation for L6 values, expressions and functions ****)
 Section RELATION.
@@ -153,6 +154,9 @@ Section RELATION.
   Variable (numArgsIdent : ident).  
   Variable (isptrIdent: ident). (* ident for the isPtr external function *)
   Variable (caseIdent:ident).
+
+  Definition protectedIdent: list ident := (argsIdent::allocIdent::limitIdent::gcIdent::mainIdent::bodyIdent::threadInfIdent::tinfIdent::heapInfIdent::numArgsIdent::numArgsIdent::isptrIdent::caseIdent::[]).
+
 
   
 
@@ -2223,9 +2227,21 @@ Definition is_protected_loc lenv b ofs : Prop  :=
    Int.ltu i (Int.repr max_args) = true /\
   Int.eq (Int.add args_ofs (Int.mul (Int.repr (sizeof (M.empty composite) uintTy)) i))  ofs = true ).
 
-Definition is_protected_id id  : Prop :=
-  id = allocIdent \/ id = limitIdent \/ id = argsIdent.
+Definition is_protected_id  (id:positive)  : Prop :=
+  List.In id protectedIdent.
 
+Definition is_protected_tinfo_id (id:positive) : Prop :=
+    id = allocIdent \/ id = limitIdent \/ id = argsIdent.
+
+Theorem is_protected_tinfo_weak:
+  forall x, is_protected_tinfo_id x ->
+            is_protected_id x.
+Proof.
+  intros. repeat destruct H; subst; inList. 
+Qed.
+
+
+ 
 Definition functions_not_bound (e:exp): Prop :=
   forall x,
     bound_var e x ->
@@ -2251,11 +2267,11 @@ Proof.
   eapply bound_var_subterm_e; eauto.
 Qed.  
 
-Definition protected_id_not_bound (rho:L6.eval.env) (e:exp) : Prop :=
+Definition protected_id_not_bound  (rho:L6.eval.env) (e:exp) : Prop :=
   (forall x y v, M.get x rho = Some v ->
-                 is_protected_id y ->
+                 is_protected_id  y ->
                  ~ (x = y \/ bound_var_val v y) )/\
-  (forall y, is_protected_id y ->
+  (forall y, is_protected_id  y ->
              ~ bound_var e y).
 
 
@@ -2313,11 +2329,11 @@ Proof.
   inv H0. destructAll. rewrite H in *.
   do 5 eexists. repeat split; eauto.
 Qed.
-
+ 
 Theorem protected_not_in_L_set:
   forall lenv z L x v ,
   protected_not_in_L lenv z L ->
-  ~ is_protected_id x ->
+  ~ is_protected_tinfo_id x ->
   protected_not_in_L (M.set x v lenv) z L.
 Proof.
   intros.
@@ -2327,18 +2343,21 @@ Proof.
   repeat split;auto.
   - destruct (var_dec allocIdent x).
     + exfalso; apply H0.
+      rewrite <- e.
       unfold is_protected_id.
-      auto.
+      left; auto.
     +  rewrite M.gso by auto. auto.
   - destruct (var_dec limitIdent x).
     + exfalso; apply H0.
+      rewrite <- e.
       unfold is_protected_id.
-      auto.
+      right; auto.
     +  rewrite M.gso by auto. auto.
   - destruct (var_dec argsIdent x).
     + exfalso; apply H0.
+      rewrite <- e.
       unfold is_protected_id.
-      auto.
+      right; auto.
     +  rewrite M.gso by auto. auto.
 Qed.
 
@@ -2627,9 +2646,33 @@ Section THEOREM.
   Variable (isptrIdent: ident). (* ident for the isPtr external function *)
   Variable (caseIdent:ident).
 
-  Axiom disjointIdent: NoDup (argsIdent::allocIdent::limitIdent::gcIdent::mainIdent::bodyIdent::threadInfIdent::tinfIdent::heapInfIdent::numArgsIdent::numArgsIdent::isptrIdent::caseIdent::[]).
-  
+  Definition protectedIdent_thm := protectedIdent argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent.
 
+  Definition protectedNotTinfoIdent_thm: list ident := (gcIdent::mainIdent::bodyIdent::threadInfIdent::tinfIdent::heapInfIdent::numArgsIdent::numArgsIdent::isptrIdent::caseIdent::[]).
+
+  
+  Definition is_protected_id_thm := is_protected_id argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent. 
+
+  Definition is_protected_tinfo_id_thm := is_protected_tinfo_id argsIdent allocIdent limitIdent.
+  
+  Axiom disjointIdent: NoDup protectedIdent_thm.
+
+
+Theorem is_protected_not_tinfo:
+  forall x, List.In x protectedNotTinfoIdent_thm ->
+            ~ is_protected_tinfo_id_thm x.
+Proof.
+ intros.  
+ intro.
+ assert (H_dj := disjointIdent).
+ inv H_dj. inv H4. inv H6. 
+ inv H0.
+ apply H5. right; auto.
+ inv H1.
+ apply H4; auto.
+ apply H3. right; right; auto.
+Qed.
+ 
 (*
     Variable cenv:L6.cps.cEnv.
   Variable fenv:L6.cps.fEnv.
@@ -2681,7 +2724,7 @@ Section THEOREM.
     eapply rt_trans; eauto.
   Qed.
  
-  
+   
   (* END TODO move *)
 
   (* all constructors in the exp exists in cenv and are applied to the right number of arguments 
@@ -2705,16 +2748,16 @@ Section THEOREM.
   (* OS 04/24: added in bound on n includes in this *)
   Inductive correct_crep (cenv:cEnv) (ienv:iEnv) : cTag -> cRep -> Prop :=
   | rep_enum :
-      forall c name it n' n cl,
-        M.get c cenv = Some (name, it, 0%N, n') ->
+      forall c name it  n cl,
+        M.get c cenv = Some (name, it, 0%N, n) ->
         M.get it ienv = Some cl ->
         getEnumOrdinal c cl = Some n ->
         (* there should not be more than 2^(intsize - 1) unboxed constructors *)
         (0 <= (Z.of_N n) <  Zpower.two_p  (Int.zwordsize - 1))%Z ->
       correct_crep cenv ienv c (enum n)
   | rep_boxed:
-      forall c name it a n' n cl,
-        M.get c cenv = Some (name, it, (Npos a), n') ->
+      forall c name it a n cl,
+        M.get c cenv = Some (name, it, (Npos a), n) ->
         M.get it ienv = Some cl ->
         getBoxedOrdinal c cl = Some n ->
         (* there should not be more than 2^8 boxed constructors *)
@@ -2761,17 +2804,17 @@ limit might be on the edge of current memory so weak_valid, alloc and args are p
    *)
   
 
-Definition correct_tinfo: positive -> positive -> positive -> Z -> temp_env ->  mem  -> Prop :=
-  fun alloc_p limit_p args_p max_alloc lenv m  =>
+Definition correct_tinfo:  Z -> temp_env ->  mem  -> Prop :=
+  fun max_alloc lenv m  =>
     exists alloc_b alloc_ofs limit_ofs args_b args_ofs,
-      M.get alloc_p lenv = Some (Vptr alloc_b alloc_ofs) /\
+      M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
 
       (* the max int blocks after alloc are Writable *)
       (forall i, 0 <= i < max_alloc  ->   Mem.valid_access m Mint32 alloc_b (Int.unsigned (Int.add alloc_ofs (Int.repr (int_size *  i)))) Writable )%Z /\
-      M.get limit_p lenv = Some (Vptr alloc_b limit_ofs) /\
+      M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) /\
       (* alloc is at least max blocks from limit *)
       ((Int.unsigned alloc_ofs) + int_size * max_alloc <=  Int.unsigned limit_ofs)%Z /\
-      M.get args_p lenv = Some (Vptr args_b args_ofs) /\
+      M.get argsIdent lenv = Some (Vptr args_b args_ofs) /\
       (* args is in a different block from alloc *) 
       args_b <> alloc_b /\
       (* the max_args int blocks after args are Writable *)
@@ -2781,11 +2824,11 @@ Definition correct_tinfo: positive -> positive -> positive -> Z -> temp_env ->  
     
    
 Theorem correct_tinfo_mono:
-  forall  alloc limit args z lenv m,
-    correct_tinfo alloc limit args z lenv m ->
+  forall z lenv m,
+    correct_tinfo z lenv m ->
     forall z', 
       (0 <= z' <= z)%Z ->
-    correct_tinfo alloc limit args z' lenv m. 
+    correct_tinfo z' lenv m. 
 Proof.
   intros.
   inv H; destructAll.
@@ -2808,17 +2851,17 @@ Qed.
 
     
 Theorem correct_tinfo_not_protected:
-  forall alloc limit args z lenv m,
-  correct_tinfo alloc limit args z lenv m ->
+  forall z lenv m,
+  correct_tinfo  z lenv m ->
   forall x v, 
-  ~ is_protected_id args alloc limit x ->
-  correct_tinfo alloc limit args z (M.set x v lenv) m. 
+  ~ is_protected_tinfo_id_thm x ->
+  correct_tinfo z (M.set x v lenv) m. 
 Proof.
   intros.
   destruct H as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs H]]]]].
   exists alloc_b, alloc_ofs, limit_ofs, args_b, args_ofs.
   destructAll.
-  repeat (split; auto).  
+  repeat (split; auto).
   rewrite M.gso; auto. intro. apply H0. left; auto. 
   rewrite M.gso; auto. intro. apply H0. right; auto. 
   rewrite M.gso; auto. intro. apply H0. right; auto.
@@ -2827,11 +2870,11 @@ Qed.
 
  
 Theorem correct_tinfo_valid_access:
-  forall  alloc limit args z lenv m,
-    correct_tinfo alloc limit args z lenv m ->
+  forall  z lenv m,
+    correct_tinfo  z lenv m ->
     forall m',
     (forall chunk b ofs p, Mem.valid_access m chunk b ofs p -> Mem.valid_access m' chunk b ofs p) -> 
-    correct_tinfo alloc limit args z lenv m'. 
+    correct_tinfo z lenv m'. 
 Proof.
   intros.
   unfold correct_tinfo in H.
@@ -2852,11 +2895,11 @@ Proof.
 Qed.
 
 Corollary correct_tinfo_after_store:
-  forall  alloc limit args z lenv m,
-    correct_tinfo alloc limit args z lenv m ->
+  forall z lenv m,
+    correct_tinfo  z lenv m ->
     forall m' chunk b ofs v,
       Mem.store chunk m b ofs v = Some m' ->
-    correct_tinfo alloc limit args z lenv m'. 
+    correct_tinfo z lenv m'. 
 Proof. 
   intros. 
   eapply correct_tinfo_valid_access.
@@ -2881,10 +2924,10 @@ Qed.
       
 
 Corollary correct_tinfo_after_nstore:
-  forall  vs alloc limit args z lenv m m' b ofs i,
-    correct_tinfo alloc limit args z lenv m ->
+  forall  vs  z lenv m m' b ofs i,
+    correct_tinfo  z lenv m ->
       mem_after_n_proj_store b ofs vs i m m' ->
-      correct_tinfo alloc limit args z lenv m'. 
+      correct_tinfo  z lenv m'. 
 Proof.
   induction vs; intros.
   - inv H0.
@@ -2913,7 +2956,8 @@ Definition rel_mem_L6_L7_id := rel_mem_L6_L7 argsIdent allocIdent limitIdent gcI
 Definition repr_val_L_L6_L7_id := repr_val_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent.
 
  
-Definition protected_id_not_bound_id := protected_id_not_bound argsIdent allocIdent limitIdent.
+Definition protected_id_not_bound_id := protected_id_not_bound argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent
+   caseIdent.
 
 
 Theorem Z_non_neg_add:
@@ -2945,12 +2989,12 @@ Theorem caseConsistent_findtag_In_cenv:
   forall cenv t e l,
     caseConsistent cenv l t ->
     findtag l t = Some e ->
-    exists (a:Ast.name) (ty:iTag) (n:N) (i:N), M.get t cenv = Some (a, ty, n, i). 
+    exists (a aty:Ast.name) (ty:iTag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i). 
 Proof.
   destruct l; intros.
   - inv H0.
   - inv H. 
-    exists a, ty', n, i; auto.
+    exists a, b, ty', n, i; auto.    
 Qed.
  
 
@@ -3489,7 +3533,7 @@ Proof.
        inv Hcc. rewrite H5 in H17; inv H17. rewrite H0 in H18; inv H18.
        rewrite H6 in H10; inv H10.
        unfold getEnumOrdinal in *.
-       assert (n1 <> arr) by (eapply getEnumOrdinal'_disjoint; eauto).
+       assert (i <> i') by (eapply getEnumOrdinal'_disjoint; eauto).
        intro. do 2 (erewrite repr_unboxed_shiftr in H10 by eauto).
        apply H. apply N2Z.inj. auto.
      + inv Hcc; eapply IHcl; eauto.       
@@ -3569,7 +3613,8 @@ Proof.
        rewrite H9 in H10; inv H10.
 
        unfold getBoxedOrdinal in *.
-       assert (n1 <> n) by (eapply getBoxedOrdinal'_disjoint; eauto). 
+       
+       assert (i <> i') by (eapply getBoxedOrdinal'_disjoint; eauto). 
        intro. apply H.
        apply N2Z.inj. auto.
       unfold Int.max_unsigned. simpl.
@@ -3585,7 +3630,7 @@ Proof.
       unfold Int.max_unsigned. simpl. omega.
 Qed.
 
-
+ 
 Theorem repr_bs_L6_L7_related:
   forall p rep_env cenv fenv finfo_env ienv,
   forall rho v e n, bstep_e (M.empty _) cenv rho e v n ->                    
@@ -3596,7 +3641,7 @@ Theorem repr_bs_L6_L7_related:
                     forall stm lenv m k max_alloc fu, repr_expr_L6_L7_id fenv p rep_env e stm ->
                                               rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho m lenv ->
                                               correct_alloc e max_alloc -> 
-                                              correct_tinfo allocIdent limitIdent argsIdent max_alloc lenv m ->
+                                              correct_tinfo max_alloc lenv m ->
                                               exists m' lenv',  m_tstep2 (globalenv p) (State fu stm k empty_env lenv m) (State fu Sskip k empty_env lenv' m') /\
                                                                 arg_val_L6_L7 fenv finfo_env p rep_env v m' lenv'.
 Proof.
@@ -3604,7 +3649,7 @@ Proof.
   induction Hev; intros Hc_env Hp_id Hrho_id Hf_id stm lenv m k max_alloc fu Hrepr_e Hrel_m Hc_alloc Hc_tinfo; inv Hrepr_e.
   - (* Econstr *)
 
-    assert (Hx_not:  ~ is_protected_id argsIdent allocIdent limitIdent x). {
+    assert (Hx_not:  ~ is_protected_id_thm  x). {
           intro. inv Hp_id. eapply H2; eauto.    
     }
 
@@ -3615,7 +3660,7 @@ Proof.
                                      (State fu s (Kseq s' k) empty_env lenv m)  
                                      (State fu Sskip (Kseq s' k) empty_env lenv' m') )
                /\  rel_mem_L6_L7_id fenv finfo_env p rep_env e (M.set x (Vconstr t vs) rho) m' lenv'
-               /\ correct_tinfo allocIdent limitIdent argsIdent (Z.of_nat (max_allocs e)) lenv' m').
+               /\ correct_tinfo  (Z.of_nat (max_allocs e)) lenv' m').
     {
       inv H6.
       - (* boxed *)
@@ -3641,7 +3686,7 @@ Proof.
         unfold correct_tinfo in Hc_tinfo.
         destruct Hc_tinfo as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [Hget_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args Hrange_args]]]]]]]]]]]].
 
-        assert (~ is_protected_id argsIdent allocIdent limitIdent x).
+        assert (~ is_protected_id_thm x).
         { intro. inv Hp_id. eapply H5; eauto. }
 
         assert (Hx_loc_eq : (Int.add (Int.add alloc_ofs (Int.mul (Int.repr 4) (Int.repr Z.one))) (Int.mul (Int.repr 4) (Int.repr (-1)))) = alloc_ofs). {
@@ -3697,12 +3742,12 @@ Proof.
           eapply t_trans. constructor. constructor.
           eapply t_trans. constructor. constructor.
           econstructor. constructor. rewrite M.gso. 
-          eauto. intro. apply H3. left; auto.
+          eauto. intro. apply H3. rewrite <- H4. inList. 
           constructor. constructor.
           eapply t_trans. constructor. constructor.
           eapply t_trans. constructor. econstructor. constructor. simpl. econstructor.
           econstructor. constructor. rewrite M.gso. rewrite M.gss. reflexivity.
-          intro. apply H3. left; auto.
+          intro. apply H3. rewrite  H4. inList.
           constructor. constructor. constructor. constructor. constructor. simpl.
           econstructor. constructor. simpl.  rewrite Hx_loc_eq.
           apply Hm2.
@@ -3730,7 +3775,7 @@ Proof.
                   (Maps.PTree.set x
                      (Vptr alloc_b (Int.add alloc_ofs (Int.mul (Int.repr (sizeof (globalenv p) uintTy)) (Int.repr Z.one)))) lenv)) =
              Some (Vptr alloc_b (Int.add alloc_ofs (Int.mul (Int.repr (sizeof (globalenv p) uintTy)) (Int.repr Z.one))))).
-        rewrite M.gso. rewrite M.gss. reflexivity. intro; apply Hx_not. left; auto.
+        rewrite M.gso. rewrite M.gss. reflexivity. intro; apply Hx_not. rewrite H4.  inList. 
         specialize (Hstep_m3 Htemp ys s0 0%Z m2 (Kseq s' k)). clear Htemp.
         assert (Htemp : (0 <= 0)%Z /\ (0 + Z.of_nat (length ys) <= Int.max_unsigned)%Z ).
         {
@@ -3846,6 +3891,7 @@ Proof.
           
           assert (Hgl := getlist_In _ _ _ _ H H4). destruct Hgl.          
           specialize (H5 _ allocIdent _ H8). apply H5.
+          right. 
           left. auto. left; auto.          
         } 
         destruct Htemp as [vs7 Hvs7].
@@ -4169,16 +4215,14 @@ Proof.
               auto.
               intro.
               apply H3.
-              subst. right. auto.
-              intro. subst.
-              clear H4. inv H_dj.
-              inv H8.
-              apply H9. constructor.
-              auto.
+              subst. rewrite <- H4. inList. 
+              intro. inv H_dj. rewrite <- H4 in *.
+              inv H9.
+              apply H10. constructor; auto. 
             + rewrite M.gso. rewrite M.gso.
               auto. intro.
-              apply H3. subst. right; auto.
-              intro; subst. clear H4. inv H_dj. apply H6; constructor; auto.
+              apply H3. rewrite <- H4.  inList.
+              intro; inv H_dj. apply H8. left. auto.
             + intros.
               inv Hrel_pL.
               destructAll. 
@@ -4196,7 +4240,7 @@ Proof.
               eapply RVid_V.
               apply Hf_id. constructor. (* x is not global *)
               rewrite M.gso. rewrite M.gss. reflexivity.
-              intro. apply H3. subst. left. auto.
+              intro. apply H3. subst. inList.
               eapply RSconstr_boxed_v.
               *  eauto.
               *  rewrite Int.sub_add_opp.                 
@@ -4433,7 +4477,7 @@ Proof.
                     - (* j is both in and after vs1 so impossible *)
                       int_red. omega.
                     }
-
+                   
                   clear H_eql'.
                   
                   rewrite get_var_or_funvar_list_correct in Hvs7. rewrite <- get_var_or_funvar_list_set in Hvs7.
@@ -4443,14 +4487,15 @@ Proof.
                   constructor.
                   Focus 2. intro.
                   inv Hp_id.
-                  eapply getlist_In in H.
+                  
+                  eapply getlist_In in H; eauto. 
                   destruct H. 
                   eapply H8. apply H.
+                  right. 
                   left. reflexivity.
                   left. reflexivity.
-                  auto.
                   rewrite <- get_var_or_funvar_list_correct in Hvs7. 
-                  
+                    
                   clear Hrel_mL.
                   clear Hev.  clear Hc_env. revert H. clear Hp_id. clear Hf_id. revert H5.  clear Hrel_m. clear Hc_alloc.
                   clear H2. 
@@ -4608,12 +4653,12 @@ Forall2
               inv Hp_id.
               intro.
               eapply H6. apply Hx0_v6.
-              left. reflexivity. auto.
+              right. left. reflexivity. auto.
         }        
         { (* correct_tinfo after adding the constructor *)
 
 
-          assert (correct_tinfo allocIdent limitIdent argsIdent (Z.of_nat (max_allocs e))
+          assert (correct_tinfo (Z.of_nat (max_allocs e))
                                 (Maps.PTree.set x (Vptr alloc_b (Int.add alloc_ofs (Int.mul (Int.repr (sizeof (globalenv p) uintTy)) (Int.repr Z.one))))
                                                 lenv) m3).
           
@@ -4621,6 +4666,7 @@ Forall2
           eapply correct_tinfo_mono.                    
           destruct Hstep_m3.          
           eapply correct_tinfo_after_nstore.
+          
           Focus 2. eauto.
           
           eapply correct_tinfo_after_store; eauto.
@@ -4629,7 +4675,8 @@ Forall2
           rewrite Nat2Z.inj_succ.
           rewrite Nat2Z.inj_add.
           omega.
-          auto.
+          intro; apply H3.
+          apply is_protected_tinfo_weak. auto.
           (* alloc is moved to an OK location *)
           {
 
@@ -4637,13 +4684,13 @@ Forall2
             
             destruct H4 as [alloc_b' [alloc_ofs' [limit_ofs' [args_b' [args_ofs' [Hget_alloc' [Hrange_alloc' [Hget_limit' [Hbound_limit' [Hget_args' [Hdj_args' [Hbound_args' Hrange_args']]]]]]]]]]]].
             assert (alloc_b' = alloc_b /\ alloc_ofs' = alloc_ofs').  rewrite M.gso in Hget_alloc'. rewrite Hget_alloc' in Hget_alloc. inv Hget_alloc. auto.            
-            intro.  apply H3. subst. left. auto.
+            intro.  apply H3. subst. rewrite <- H4. inList.
             destruct H4; subst. clear H5.
             assert (args_b' = args_b /\ args_ofs' = args_ofs').  rewrite M.gso in Hget_args'. rewrite Hget_args' in Hget_args. inv Hget_args. auto.            
-            intro.  apply H3. subst. right. auto. 
+            intro.  apply H3. subst. rewrite <- H4; inList. 
             destruct H4; subst. clear H5.
             assert (limit_ofs = limit_ofs'). rewrite M.gso in Hget_limit'. rewrite Hget_limit' in Hget_limit. inv Hget_limit. auto.
-            intro.  apply H3. subst. right. auto. 
+            intro.  apply H3. rewrite <- H4; inList.
             subst.
             do 5 eexists. split.
             rewrite M.gss. reflexivity.
@@ -4786,6 +4833,7 @@ Forall2
           destruct Hrel_m as [L  [Hnot_in_L Hrepr_m]].
           exists L. split.
           eapply protected_not_in_L_set; eauto.
+          intro; apply Hx_not; apply is_protected_tinfo_weak; eauto.
           intros.
           destruct (var_dec x0 x).
           * subst.
@@ -4812,7 +4860,7 @@ Forall2
           inv Hc_alloc. simpl. omega.
           intro.
           inv Hp_id.
-          eapply H4; eauto.
+          eapply H4. apply is_protected_tinfo_weak. eauto. eauto.
     }   
     destruct H0 as [lenv' [m' [Hstep [Hrel_m' Htinfo_e]]]].
     
@@ -4939,14 +4987,15 @@ Forall2
         eapply Hrho_id. exists x1. apply H2. constructor; auto.
     }
     specialize (IHHev Hrho_id_e Hf_id_e _ (Maps.PTree.set x v7' lenv) m k max_alloc fu H7).    
-    assert (Hx_not:  ~ is_protected_id argsIdent allocIdent limitIdent x). {
+    assert (Hx_not:  ~ is_protected_id_thm x). {
       intro. inv Hp_id. eapply H9; eauto.    
     }
     assert (rel_mem_L6_L7_id fenv finfo_env p rep_env e (cps.M.set x v rho) m (Maps.PTree.set x v7' lenv)).
     { exists L.
       
       split.
-      -   apply protected_not_in_L_set; auto.
+      -  eapply protected_not_in_L_set; eauto.
+         intro; apply Hx_not; apply is_protected_tinfo_weak; auto.
       - intros.
         destruct (var_dec x0 x).
         + subst. exists v. split.
@@ -4967,9 +5016,10 @@ Forall2
     } 
     assert ( correct_alloc e max_alloc). inv Hc_alloc.
     simpl. constructor.
-    assert ( correct_tinfo allocIdent limitIdent argsIdent max_alloc
+    assert ( correct_tinfo max_alloc
             (Maps.PTree.set x v7' lenv) m ).
     apply correct_tinfo_not_protected; auto.
+    intro; apply Hx_not; apply is_protected_tinfo_weak; auto.
     specialize (IHHev H2 H3 H9).
     destruct IHHev as [m' [lenv' [Hstep Hargs]]].
     exists m', lenv'.
@@ -4993,7 +5043,7 @@ Forall2
 
     (* step through the assignment and the isptr check *)
     inv H6.
-
+ 
     (* current assumptions needed for is_Ptr...TODO: make these into global assumption *)
     assert (exists b_isPtr, Genv.find_symbol (globalenv p) isptrIdent = Some b_isPtr) by admit.
     destruct H as [b_isPtr H_isPtr].
@@ -5052,7 +5102,12 @@ Forall2
 
          (* switch to the right case *)
         eapply t_trans. constructor. econstructor. simpl. econstructor. constructor.
-        rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *)  admit.
+        rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *)
+        {
+          destruct Hp_id as [Hp_1 Hp_2].
+          intro; eapply Hp_1; eauto.
+          inList.
+        }
         constructor. simpl.
         apply sem_shr_unboxed.
         simpl. constructor.
@@ -5098,7 +5153,13 @@ Forall2
       (* switch to the right case *)
       eapply t_trans. constructor. econstructor. simpl. econstructor. econstructor. constructor.
       econstructor. econstructor. constructor. 
-      rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *) admit.
+      rewrite M.gso. apply Hlenv_y.
+      (* caseIdent is protected *)
+      {                
+        destruct Hp_id as [Hp_id1 Hp_id2].
+        intro; eapply Hp_id1; eauto.
+        inList.
+      }
       constructor. constructor.  constructor. eapply  deref_loc_value. simpl. reflexivity.
       simpl. rewrite Int.sub_add_opp in H6.
       rewrite Int.mul_mone.
@@ -5158,25 +5219,28 @@ Forall2
       inv Hc_tinfo; destructAll. 
       exists L.
       split.      
-      - apply protected_not_in_L_set.
+      -  eapply protected_not_in_L_set.
         inv Hc_alloc.
         eapply protected_not_in_L_mono; eauto.
         split. omega.
         apply inj_le.
         eapply max_allocs_case.
-        apply findtag_In. eauto.        
-        admit.
+        apply findtag_In. eauto.
+        apply is_protected_not_tinfo. inList.
       - intros.
-        assert (occurs_free (Ecase y cl) x4).
+        assert (occurs_free (Ecase y cl) x5).
         eapply occurs_free_Ecase_Included.
-        apply findtag_In. eauto. apply H10.        
-        apply Hmem_rel in H11.
-        destruct H11 as [v6 [Hx4v6 Hrepr_v6]].
+        apply findtag_In. eauto. apply H11.        
+        apply Hmem_rel in H12.
+        destruct H12 as [v6 [Hx4v6 Hrepr_v6]].
         exists v6. split; auto.
         apply repr_val_id_set. auto.
-        admit.        
+        inv Hp_id_e.
+        eapply H12 in Hx4v6.
+        intro. apply Hx4v6. left. apply H14.
+        inList.
     }
-    assert (H_tinfo_e: correct_tinfo allocIdent limitIdent argsIdent (Z.of_nat (max_allocs e))
+    assert (H_tinfo_e: correct_tinfo  (Z.of_nat (max_allocs e))
                            (Maps.PTree.set caseIdent vbool lenv) m ).
     {
       apply correct_tinfo_not_protected.
@@ -5185,8 +5249,16 @@ Forall2
       inv Hc_alloc.
       apply inj_le.
       eapply max_allocs_case.
-      apply findtag_In. eauto.        
-      admit.      
+      apply findtag_In. eauto.
+      intro. 
+      assert (Hdj:=disjointIdent).
+      inv Hdj.
+      inv H. clear H2.
+      inv H6. apply H3; inList.      
+      destruct H2; subst.
+      clear H. inv H6. inv H7. apply H6; inList.
+      clear H.
+      apply H5; inList.
     }
 
     specialize (IHHev H_cenv_e Hp_id_e H_rho_id_e Hf_id_e _ _ _ (Kseq Sbreak (Kseq s' (Kswitch k))) _ fu H_repr_es Hmem_e Hca_e H_tinfo_e).

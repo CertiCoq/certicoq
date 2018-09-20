@@ -217,10 +217,11 @@ Definition update_iEnv (ienv : n_iEnv) (p : positive) (cInf : cTyInfo) : n_iEnv 
 Definition compute_iEnv (cenv : cEnv) : n_iEnv :=
   M.fold update_iEnv cenv (M.empty _).
 
-Fixpoint getEnumOrdinal' (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
+(* OS: getEnumOrdinal and getBoxedOrdinal are only used in the proof to should that the ordinal is unique (within an ind) within a given tag *)
+Fixpoint getEnumOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
   match l with
   | nil => None
-  | cons (_, ct' , n) l' =>
+  | cons (ct' , n) l' =>
     match (n =? 0)%N with
     | true => 
       match (ct =? ct')%positive with
@@ -233,13 +234,13 @@ Fixpoint getEnumOrdinal' (ct : cTag) (l : list (Ast.name * cTag * N)) : option N
     end
   end.
 
-Definition getEnumOrdinal (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
+Definition getEnumOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
   getEnumOrdinal' ct (rev l).
 
-Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
+Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
   match l with
   | nil => None
-  | cons (_, ct' , n) l' =>
+  | cons (ct' , n) l' =>
     match (n =? 0)%N with
     | true => getBoxedOrdinal' ct l'
     | false => 
@@ -252,7 +253,7 @@ Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (Ast.name * cTag * N)) : option 
     end
   end.
 
-Definition getBoxedOrdinal (ct : cTag) (l : list (Ast.name * cTag * N)) : option N :=
+Definition getBoxedOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
   getBoxedOrdinal' ct (rev l).
 
 Inductive cRep : Type :=

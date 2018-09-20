@@ -2240,6 +2240,8 @@ Proof.
   intros. repeat destruct H; subst; inList. 
 Qed.
 
+
+ 
 Definition functions_not_bound (e:exp): Prop :=
   forall x,
     bound_var e x ->
@@ -2327,11 +2329,11 @@ Proof.
   inv H0. destructAll. rewrite H in *.
   do 5 eexists. repeat split; eauto.
 Qed.
-
+ 
 Theorem protected_not_in_L_set:
   forall lenv z L x v ,
   protected_not_in_L lenv z L ->
-  ~ is_protected_id x ->
+  ~ is_protected_tinfo_id x ->
   protected_not_in_L (M.set x v lenv) z L.
 Proof.
   intros.
@@ -2342,20 +2344,20 @@ Proof.
   - destruct (var_dec allocIdent x).
     + exfalso; apply H0.
       rewrite <- e.
-      unfold is_protected_id.      
-      inList.
+      unfold is_protected_id.
+      left; auto.
     +  rewrite M.gso by auto. auto.
   - destruct (var_dec limitIdent x).
     + exfalso; apply H0.
       rewrite <- e.
       unfold is_protected_id.
-      inList.
+      right; auto.
     +  rewrite M.gso by auto. auto.
   - destruct (var_dec argsIdent x).
     + exfalso; apply H0.
       rewrite <- e.
       unfold is_protected_id.
-      inList.
+      right; auto.
     +  rewrite M.gso by auto. auto.
 Qed.
 
@@ -2646,6 +2648,9 @@ Section THEOREM.
 
   Definition protectedIdent_thm := protectedIdent argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent.
 
+  Definition protectedNotTinfoIdent_thm: list ident := (gcIdent::mainIdent::bodyIdent::threadInfIdent::tinfIdent::heapInfIdent::numArgsIdent::numArgsIdent::isptrIdent::caseIdent::[]).
+
+  
   Definition is_protected_id_thm := is_protected_id argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent. 
 
   Definition is_protected_tinfo_id_thm := is_protected_tinfo_id argsIdent allocIdent limitIdent.
@@ -2653,8 +2658,21 @@ Section THEOREM.
   Axiom disjointIdent: NoDup protectedIdent_thm.
 
 
-
-
+Theorem is_protected_not_tinfo:
+  forall x, List.In x protectedNotTinfoIdent_thm ->
+            ~ is_protected_tinfo_id_thm x.
+Proof.
+ intros.  
+ intro.
+ assert (H_dj := disjointIdent).
+ inv H_dj. inv H4. inv H6. 
+ inv H0.
+ apply H5. right; auto.
+ inv H1.
+ apply H4; auto.
+ apply H3. right; right; auto.
+Qed.
+ 
 (*
     Variable cenv:L6.cps.cEnv.
   Variable fenv:L6.cps.fEnv.
@@ -2706,7 +2724,7 @@ Section THEOREM.
     eapply rt_trans; eauto.
   Qed.
  
-  
+   
   (* END TODO move *)
 
   (* all constructors in the exp exists in cenv and are applied to the right number of arguments 
@@ -4815,6 +4833,7 @@ Forall2
           destruct Hrel_m as [L  [Hnot_in_L Hrepr_m]].
           exists L. split.
           eapply protected_not_in_L_set; eauto.
+          intro; apply Hx_not; apply is_protected_tinfo_weak; eauto.
           intros.
           destruct (var_dec x0 x).
           * subst.
@@ -4976,6 +4995,7 @@ Forall2
       
       split.
       -  eapply protected_not_in_L_set; eauto.
+         intro; apply Hx_not; apply is_protected_tinfo_weak; auto.
       - intros.
         destruct (var_dec x0 x).
         + subst. exists v. split.
@@ -5023,7 +5043,7 @@ Forall2
 
     (* step through the assignment and the isptr check *)
     inv H6.
-
+ 
     (* current assumptions needed for is_Ptr...TODO: make these into global assumption *)
     assert (exists b_isPtr, Genv.find_symbol (globalenv p) isptrIdent = Some b_isPtr) by admit.
     destruct H as [b_isPtr H_isPtr].
@@ -5082,7 +5102,12 @@ Forall2
 
          (* switch to the right case *)
         eapply t_trans. constructor. econstructor. simpl. econstructor. constructor.
-        rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *)  admit.
+        rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *)
+        {
+          destruct Hp_id as [Hp_1 Hp_2].
+          intro; eapply Hp_1; eauto.
+          inList.
+        }
         constructor. simpl.
         apply sem_shr_unboxed.
         simpl. constructor.
@@ -5128,7 +5153,13 @@ Forall2
       (* switch to the right case *)
       eapply t_trans. constructor. econstructor. simpl. econstructor. econstructor. constructor.
       econstructor. econstructor. constructor. 
-      rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *) admit.
+      rewrite M.gso. apply Hlenv_y.
+      (* caseIdent is protected *)
+      {                
+        destruct Hp_id as [Hp_id1 Hp_id2].
+        intro; eapply Hp_id1; eauto.
+        inList.
+      }
       constructor. constructor.  constructor. eapply  deref_loc_value. simpl. reflexivity.
       simpl. rewrite Int.sub_add_opp in H6.
       rewrite Int.mul_mone.
@@ -5188,14 +5219,14 @@ Forall2
       inv Hc_tinfo; destructAll. 
       exists L.
       split.      
-      - eapply protected_not_in_L_set.
+      -  eapply protected_not_in_L_set.
         inv Hc_alloc.
         eapply protected_not_in_L_mono; eauto.
         split. omega.
         apply inj_le.
         eapply max_allocs_case.
-        apply findtag_In. eauto.        
-        admit.
+        apply findtag_In. eauto.
+        apply is_protected_not_tinfo. inList.
       - intros.
         assert (occurs_free (Ecase y cl) x5).
         eapply occurs_free_Ecase_Included.
@@ -5206,8 +5237,8 @@ Forall2
         apply repr_val_id_set. auto.
         inv Hp_id_e.
         eapply H12 in Hx4v6.
-        admit.
-        admit.
+        intro. apply Hx4v6. left. apply H14.
+        inList.
     }
     assert (H_tinfo_e: correct_tinfo  (Z.of_nat (max_allocs e))
                            (Maps.PTree.set caseIdent vbool lenv) m ).

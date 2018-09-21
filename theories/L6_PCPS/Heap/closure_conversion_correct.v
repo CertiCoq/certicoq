@@ -1953,8 +1953,9 @@ Module ClosureConversionCorrect (H : Heap).
         * eapply Forall2_refl_strong. intros x Hin j'. eapply Henv'.
           eapply project_vars_In. eassumption. now right.
     - (* case Eprim *)
-      admit. 
+      intros j. Transparent cc_approx_exp. intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Hstep Hns.
+      edestruct (Hns (cost (Eprim v p l e1))) as [res [m2 Hstep']]. inv Hstep'. omega.
     - (* case Ehalt *)
       inv Hcc.
       admit.
-  
+  Qed. 

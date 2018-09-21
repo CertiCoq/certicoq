@@ -7,18 +7,18 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From L6 Require Import cps ctx cps_util eval List_util Ensembles_util functions
-        identifiers Heap.heap Heap.heap_defs Heap.heap_equiv tactics.
+        identifiers Heap.heap Heap.heap_defs Heap.heap_equiv Heap.GC tactics.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
 
 Module SpaceSem (H : Heap).
   
-  Module Equiv := HeapEquiv H.
+  Module GC := GC H.
   
   Context (cloTag : cTag).
 
-  Import H Equiv.Defs Equiv.Defs.HL Equiv.
+  Import H GC.Equiv.Defs GC.Equiv.Defs.HL GC.Equiv GC.
 
   (* The cost of evaluating the head constructor before CC *)
   Definition cost (e : exp) : nat :=

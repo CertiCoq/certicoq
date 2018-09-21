@@ -915,6 +915,29 @@ Module HeapLemmas (H : Heap).
     - intros. omega.
   Qed.
 
+  Lemma size_with_measure_filter_subheap_eq :
+    forall A f (S : Ensemble loc) {HS : ToMSet S} (H1 H2 : heap A),
+      H1 ⊑ H2 ->
+      S \subset dom H1 ->
+      size_with_measure_filter f S H1 = size_with_measure_filter f S H2.
+  Proof.
+    intros A f S HS H1 H2 Hsub Hin. unfold size_with_measure_filter.
+    eapply fold_permutation; eauto.
+    intros; omega.
+    eapply NoDup_Permutation. 
+    eapply heap_elements_filter_NoDup.
+    eapply heap_elements_filter_NoDup.
+    intros [x1 x2]. split; intros Hin'.
+    
+    eapply heap_elements_filter_sound in Hin'. destruct Hin' as [Hin1 Hin2].  
+    eapply heap_elements_filter_complete. eapply Hsub. eassumption. 
+    eassumption.
+
+    eapply heap_elements_filter_sound in Hin'. destruct Hin' as [Hin1 Hin2].  
+    eapply heap_elements_filter_complete. edestruct Hin as [x3 Hget3]. eassumption.
+    rewrite Hget3. eapply Hsub in Hget3. congruence.
+    eassumption.  Qed.
+  
   Lemma size_with_measure_minus_emp (A : Type) (S : Ensemble loc) {HS : ToMSet S} f :
     @size_with_measure_minus A f S _ emp = 0%nat.
   Proof.

@@ -36,7 +36,11 @@ Section CC.
     Eproj f' clo_tag 0%N f
           (Eproj Γ clo_tag 1%N f
                  (Eapp f' t (Γ :: xs))).
-  
+
+  Definition true_mut B :=
+    forall f ct xs e, fun_in_fundefs B (f, ct, xs, e) ->
+                 occurs_free_fundefs B \subset occurs_free e \/
+                 (exists f, f \in name_in_fundefs B :&: occurs_free e). 
 
   Inductive project_var :
     Ensemble var -> (* Variables in the current scope *)
@@ -132,11 +136,13 @@ Section CC.
       forall Scope Scope' Funs Funs' fenv c Γ c' Γ' FVs FVs' B B' e e' C Ce,
         (* The environment contains all the variables that are free in B *)
         (occurs_free_fundefs B) <--> (FromList FVs') ->
+        true_mut B -> 
         (* needed for cost preservation *)
         NoDup FVs' ->
         project_vars Scope Funs fenv c Γ FVs FVs' C Scope' Funs' ->
         (* Γ' is the variable that will hold the record of the environment *)
-        ~ Γ' \in (bound_var (Efun B e) :|: FV Scope Funs FVs :|: FV_cc Scope Funs fenv Γ) ->
+        ~ Γ' \in (bound_var (Efun B e) :|: FromList FVs' :|: FV Scope Funs FVs :|:
+                  FV_cc Scope Funs fenv Γ) ->
         (* closure convert function blocks *)
         Closure_conversion_fundefs B c' FVs' B B' ->
         (* closure convert the rest of the program *)

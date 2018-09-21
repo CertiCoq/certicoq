@@ -11,6 +11,34 @@ From L6 Require Import cps cps_util eval List_util Ensembles_util functions
 Require Import compcert.lib.Coqlib.
 Import ListNotations.
 
+(* TODO : MOVE do this with autorewrites *)
+Ltac normalize_sets :=
+  match goal with
+    | [|- context[FromList []]] => rewrite FromList_nil
+    | [|- context[FromList(_ :: _)]] => rewrite FromList_cons
+    | [|- context[FromList(_ ++ _)]] => rewrite FromList_app
+    | [|- context[FromList [_ ; _]]] => rewrite FromList_cons
+    | [|- context[Union _ _ (Empty_set _)]] =>
+      rewrite Union_Empty_set_neut_r
+    | [|- context[Union _ (Empty_set _) _]] =>
+      rewrite Union_Empty_set_neut_l
+    | [|- context[Setminus _ (Empty_set _) _]] =>
+      rewrite Setminus_Empty_set_abs_r
+    | [|- context[Setminus _ _ (Empty_set _)]] =>
+      rewrite Setminus_Empty_set_neut_r
+    | [ H : context[FromList []] |- _] => rewrite FromList_nil in H
+    | [ H : context[FromList(_ :: _)] |- _] => rewrite FromList_cons in H
+    | [ H : context[FromList(_ ++ _)] |- _] => rewrite FromList_app in H
+    | [ H : context[FromList [_ ; _]] |- _] => rewrite FromList_cons in H
+    | [ H : context[Union _ _ (Empty_set _)] |- _ ] =>
+      rewrite Union_Empty_set_neut_r in H
+    | [ H : context[Union _ (Empty_set _) _] |- _] =>
+      rewrite Union_Empty_set_neut_l in H
+    | [ H : context[Setminus _ (Empty_set _) _] |- _] =>
+      rewrite Setminus_Empty_set_abs_r in H
+    | [ H : context[Setminus _ _ (Empty_set _)] |- _] =>
+      rewrite Setminus_Empty_set_neut_r in H
+  end.
 
 Open Scope Ensembles_scope.
 Module HeapDefs (H : Heap) .
@@ -1465,7 +1493,41 @@ Module HeapDefs (H : Heap) .
     exists x. split.
     eapply H3. unfold key_set, In. now rewrite Hget.
     eapply H2 in Hget. now rewrite Hget.
-  Qed.    
+  Qed.
+
+  Lemma env_locs_setlist_Disjoint ys ls rho rho' S :
+    setlist ys ls rho = Some rho'  ->
+    Disjoint _ S (FromList ys) ->
+    env_locs rho S <--> env_locs rho' S. 
+  Proof with now eauto with Ensembles_DB.
+    revert rho' S ls; induction ys; intros rho' S ls Hset Hd.
+    - destruct ls; inv Hset. reflexivity.
+    - destruct ls; try discriminate. simpl in *.
+      destruct (setlist ys ls rho) eqn:Hset'; try discriminate.
+      inv Hset. rewrite env_locs_set_not_In. eapply IHys.
+      eassumption.
+      eapply Disjoint_Included_r; [| eassumption ].
+      normalize_sets...
+      intros Hc; eapply Hd. constructor; eauto.
+      normalize_sets. now left. 
+  Qed.
+
+  Lemma env_locs_setlist_In ys ls rho rho' :
+    setlist ys ls rho = Some rho'  ->
+    env_locs rho' (FromList ys) \subset Union_list (map val_loc ls). 
+  Proof with now eauto with Ensembles_DB.
+    revert rho' ls; induction ys; intros rho' ls Hset.
+    - destruct ls; inv Hset. normalize_sets. rewrite env_locs_Empty_set...
+    - destruct ls; try discriminate. simpl in *. 
+      destruct (setlist ys ls rho) eqn:Hset'; try discriminate.
+      inv Hset. normalize_sets. rewrite env_locs_Union.
+      rewrite env_locs_Singleton; [| rewrite M.gss; reflexivity ].
+      eapply Union_Included. now eapply Included_Union_preserv_l. 
+      eapply Included_trans. eapply env_locs_set_Inlcuded'. eapply Included_Union_compat.
+      reflexivity. eapply Included_trans; [| eapply IHys; eassumption ].
+      eapply env_locs_monotonic...
+  Qed.
+
 
 
   (** * Lemmas about [def_closures] *)

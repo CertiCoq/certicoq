@@ -2,7 +2,7 @@ From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions tactics.
 
 From L6.Heap Require Import heap heap_defs heap_equiv space_sem
-     cc_log_rel closure_conversion closure_conversion_util bounds.
+     cc_log_rel closure_conversion closure_conversion_util bounds GC.
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -19,8 +19,9 @@ Module Invariants (H : Heap).
 
   Module Size := Size H.
 
-  Import H Size.Util.C.LR.Sem.Equiv Size.Util.C.LR.Sem.Equiv.Defs
-         Size.Util.C.LR.Sem Size.Util.C.LR Size.Util.C Size.Util Size.
+  Import H Size.Util.C.LR.Sem.GC.Equiv Size.Util.C.LR.Sem.GC.Equiv.Defs
+         Size.Util.C.LR.Sem.GC Size.Util.C.LR.Sem Size.Util.C.LR Size.Util.C
+         Size.Util Size.
 
   (** Invariant about the free variables *) 
   Definition FV_inv (k j : nat) (IP : GIInv) (P : GInv) (b : Inj)
@@ -110,7 +111,7 @@ Module Invariants (H : Heap).
   Proof. 
     intros Hbin.
     split.
-    eapply key_set_Restrict_enc. eapply restrict_env_correct. 
+    eapply key_set_Restrict_env. eapply restrict_env_correct. 
     now eapply H.
 
     intros x Hin. edestruct Hbin as [v Hget]. eassumption.
@@ -326,6 +327,69 @@ Module Invariants (H : Heap).
     subst. repeat subst_exp. eassumption.
   Qed.
 
+  Lemma FV_inv_image_reach_eq k P1 P2 rho1 H1 rho2 H2 b c
+         Γ FVs :
+    (forall j, FV_inv k j P1 P2 b rho1 H1 rho2 H2 c (Empty_set _) (Empty_set _) Γ FVs) ->
+    image b (reach' H1 (env_locs rho1 (FromList FVs))) <-->
+    reach' H2 (post H2 (env_locs rho2 [set Γ])).
+  Proof with (now eauto with Ensembles_DB).
+    intros Hres. 
+    edestruct (Hres 0) as (Hwf & Hkey & vs1 & loc_env & Hget1 & Hget2 & Hall).
+    rewrite env_locs_Singleton; eauto. simpl. rewrite post_Singleton; eauto.
+    simpl. 
+    
+    eapply Forall2_P_Forall2 in Hall.
+    assert (Hallj : forall j, Forall2
+                           (fun (x : var) (v2 : value) =>
+                              exists v1 : value,
+                                M.get x rho1 = Some v1 /\
+                                Res (v1, H1) ≺ ^ (k; j; P1; P2; b) Res (v2, H2)) FVs vs1).
+    { intros j'.
+      edestruct (Hres j') as (Hwf' & Hkey' & vs1' & loc_env' & Hget1' & Hget2' & Hall').
+      repeat subst_exp. eapply Forall2_P_Forall2. eassumption.
+      now eauto with Ensembles_DB. } 
+    eapply Forall2_forall in Hallj.
+    clear Hget1 Hget2 Hall Hres Hkey. induction Hallj.
+    - normalize_sets. rewrite !env_locs_Empty_set, !reach'_Empty_set, image_Empty_set...
+    - simpl. normalize_sets. rewrite !env_locs_Union, !reach'_Union, !image_Union.
+      eapply Same_set_Union_compat.
+      destruct (H 0) as [v1 [Hgetx _]]. 
+      rewrite env_locs_Singleton; eauto.
+      eapply cc_approx_val_image_eq. 
+      intros j. 
+      destruct (H j) as [v1' [Hgetx' Hij]]. repeat subst_exp. eassumption.
+
+      eassumption. 
+    - tci.
+    - now eauto with Ensembles_DB.
+  Qed.
+
+  Lemma FV_inv_heap_equiv k Scope Funs P1 P2 rho1 H1 rho2 H2 b c
+        Γ FVs j :
+    (forall j, FV_inv k j P1 P2 b rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
+    reach' H1 (env_locs rho1 (FromList FVs \\ (Scope :|: Funs))) |- H1 ≼ ^ (k; j; P1; P2; b) H2.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hres. 
+    edestruct (Hres 0) as (Hwf & Hkey & vs1 & loc_env & Hget1 & Hget2 & Hall).
+    intros l [m [_ Hp]].
+    edestruct post_n_exists_Singleton as [l' [Hpl Hrl]]; try eassumption.
+    edestruct Hpl as [x1 [Hgetx2 Hinx]].
+    destruct (M.get x1 rho1) as [[ l1 | ] | ] eqn:Hgetx1; try contradiction.
+    inv Hinx.
+
+    edestruct (Hres (m + j)) as (Hwf'' & Hkey'' & vs1'' & loc_env'' & Hget1'' & Hget2'' & Hall'').
+    repeat subst_exp.
+
+    inv Hgetx2.
+    eapply Forall2_P_exists in Hall''; try eassumption.
+
+    edestruct Hall'' as [y1 [Hnin [v1 [Hgetv1 Hcc1]]]].
+    repeat subst_exp. 
+    
+    eapply cc_approx_val_post_n_cc; eassumption.
+  Qed.
+
+  
   (* TODO move *)
   Lemma FV_Union1_eq Scope Funs FVs S {_ : Decidable S}:
     FV (S :|: Scope) Funs FVs <-->
@@ -639,7 +703,7 @@ Module Invariants (H : Heap).
   Qed.
 
 
-  Lemma def_closures_FV_inv Scope Funs FVs Γ k j GIP GP b B1 B2 envc c rho1 H1 rho1' H1' rho2 H2 :
+  Lemma def_closures_FV_inv' Scope Funs FVs Γ k j GIP GP b B1 B2 envc c rho1 H1 rho1' H1' rho2 H2 :
     (forall j, FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
     def_closures B1 B2 rho1 H1 envc = (H1', rho1') ->
     FV_inv k j GIP GP b rho1' H1' rho2 H2 c (name_in_fundefs B1 :|: Scope) Funs Γ FVs.
@@ -679,6 +743,43 @@ Module Invariants (H : Heap).
       intros Hc. eapply Hnin; now right.
       intros Hc; inv Hc. eapply Hnin; now left.
     - simpl. eassumption.
+  Qed.
+
+  Lemma FV_inv_env_constr k j PG QG b rho1 H1 rho2 H2 c FVs Γ lenv vs1 vs2 :
+    key_set rho1 <--> FromList FVs ->
+    M.get Γ rho2 = Some (Loc lenv) ->
+    get lenv H2 = Some (Constr c vs2) ->
+    getlist FVs rho1 = Some vs1 ->
+    (forall j,  Forall2
+             (fun v1 v2 : value =>
+                Res (v1, H1) ≺ ^ (k; j; PG; QG; b) Res (v2, H2)) vs1 vs2) ->
+    FV_inv k j PG QG b rho1 H1 rho2 H2 c (Empty_set _) (Empty_set _) Γ FVs. 
+  Proof.
+    intros Hkey Hget1 Hget2 Hgl Hall.
+    split; [| split ].
+    - rewrite env_locs_Singleton; [| eassumption ]. simpl.
+      rewrite reach_unfold. eapply well_formed_Union.
+      + intros x bl Hinx Hget. inv Hinx. repeat subst_exp. simpl.
+        eapply Forall2_dom2. exact 0. eassumption. eassumption. (* XXX redundant params *)
+        eapply Forall2_forall. tci. eassumption.
+      + rewrite post_Singleton; [| eassumption ]. simpl. 
+        eapply Forall2_reach2. eassumption. exact Some.  (* XXX redundant params *)
+        eapply Forall2_forall. tci. eassumption.
+    - rewrite Hkey. 
+      + unfold FV. rewrite !Union_Empty_set_neut_l, !Setminus_Empty_set_neut_r, Union_Empty_set_neut_l. 
+        reflexivity.
+    - do 2 eexists. split; [| split ]; try eassumption.
+      specialize (Hall j). revert Hgl Hall. clear.
+      intros Hgl Hall. revert FVs Hgl.
+      induction Hall; intros FVs Hgl.
+      + destruct FVs as [| x FVs ]; try inv Hgl.
+        now constructor.
+        destruct (M.get x rho1) eqn:Hgetx; try congruence.
+        destruct (getlist FVs rho1) eqn:Hgetlst; try congruence. 
+      + destruct FVs as [| z FVs ]; try inv Hgl.
+        destruct (M.get z rho1) eqn:Hgetx; try congruence.
+        destruct (getlist FVs rho1) eqn:Hgetlst; try congruence. 
+        inv H3. constructor; eauto.
   Qed.
 
   
@@ -1386,6 +1487,156 @@ Module Invariants (H : Heap).
     eassumption.
   Qed.
 
+    Lemma def_closures_FV_inv Scope {Hc : ToMSet Scope} Funs FVs Γ k j GIP GP b B1 B2 envc c rho1 H1 rho1' H1' rho2 H2 :
+    (forall j, FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
+    def_closures B1 B2 rho1 H1 envc = (H1', rho1') ->
+    FV_inv k j GIP GP b rho1' H1' rho2 H2 c Scope (name_in_fundefs B1 :|: Funs) Γ FVs.
+  Proof with (now eauto with Ensembles_DB).
+    revert H1 rho1 H1' rho1' j.
+    induction B1; intros H1 rho1 H1' rho1' j Hfv Hdef.
+    - simpl in Hdef.
+      destruct (def_closures B1 B2 rho1 H1) as (H1'', rho1'') eqn:Hdef'.
+      destruct (alloc (Clos _ _) H1'') as [la H1a] eqn:Hal.
+      inv Hdef. 
+      simpl. eapply Proper_FV_inv_Funs. rewrite <- Union_assoc. reflexivity. reflexivity. reflexivity.
+      eapply FV_inv_FV_eq with (Scope := v |: Scope) (Funs := name_in_fundefs B1 :|: Funs). 
+      tci. tci.
+      eapply FV_inv_set_not_in_FVs_l.
+      eapply FV_inv_heap_mon; [ | | ].
+      * eapply HL.alloc_subheap. eassumption.
+      * eapply HL.subheap_refl.
+      * intros j'.
+        eapply IHB1 in Hdef'.
+        eassumption.
+        eassumption.
+      * now eauto with Ensembles_DB. 
+    - inv Hdef. simpl.
+      eapply Proper_FV_inv_Funs. rewrite Union_Empty_set_neut_l. reflexivity. 
+      reflexivity. reflexivity. eauto.
+  Qed.
+
+  Lemma setlist_FV_inv Scope {Hc : ToMSet Scope} Funs FVs Γ k j GIP GP b c rho1 H1 rho1' rho2 H2
+        xs vs :
+    FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+    setlist xs vs rho1 = Some rho1' ->
+    FV_inv k j GIP GP b rho1' H1 rho2 H2 c (FromList xs :|: Scope) Funs Γ FVs.
+  Proof with (now eauto with Ensembles_DB).
+    revert vs H1 rho1 rho1' j.
+    induction xs; intros vs H1 rho1 rho1' j Hfv Hdef.
+    - destruct vs; try inv Hdef.
+      eapply Proper_FV_inv_Scope. normalize_sets. rewrite Union_Empty_set_neut_l. reflexivity. 
+      reflexivity. reflexivity. reflexivity. eauto.
+    - simpl in Hdef.
+      eapply Proper_FV_inv_Scope. normalize_sets. rewrite <- Union_assoc. reflexivity.
+      reflexivity. reflexivity. reflexivity.
+      destruct vs; try congruence. 
+      destruct (setlist xs vs rho1) as [rho1''| ] eqn:Hset; try congruence.
+      inv Hdef. 
+      eapply FV_inv_set_not_in_FVs_l.
+      eapply IHxs. eassumption. eassumption.
+  Qed.
+
+  Lemma FV_inv_rho_swap Scope {Hc : ToMSet Scope} Funs FVs Γ Γ' k j GIP GP b c rho1 H1 rho2 rho2' H2 :
+    FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+    M.get Γ rho2 = M.get Γ' rho2' ->
+    FV_inv k j GIP GP b rho1 H1 rho2' H2 c Scope Funs Γ' FVs.
+  Proof.
+    intros Hfvs Heq. 
+    destruct Hfvs as (Hwf & Hkey & vs & lenv'' & Hgetlenv & Hget' & HallP).
+    split; [| split ]; try eassumption.
+    - rewrite env_locs_Singleton in *; eauto.
+      rewrite <- Heq. eassumption.
+    - do 2 eexists. split.
+      rewrite <- Heq. eassumption.
+      split; eassumption.
+  Qed.
+
+  Lemma FV_inv_heap_env_equiv Scope Funs FVs Γ k j GIP GP b c rho1 H1 rho1' H1' rho2 H2 rho2' H2' 
+        (β1 β2 : Inj) :
+    FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+
+    Full_set _ |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
+    injective_subdomain (reach' H1' (env_locs rho1' (Full_set _))) β1 -> 
+    [set Γ] |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
+    injective_subdomain (reach' H2 (env_locs rho2 (Full_set _))) β2 ->
+
+    FV_inv k j GIP GP (β2 ∘ b ∘ β1) rho1' H1' rho2' H2' c Scope Funs Γ FVs.
+  Proof.
+    intros Hfvs Heq1 Hinj1 Heq2 Hinj2. 
+    destruct Hfvs as (Hwf & Hkey & vs & lenv'' & Hgetlenv & Hget' & HallP).
+    split; [| split ]; try eassumption.
+    - eapply well_formed_respects_heap_env_equiv. eassumption.
+      eapply heap_env_equiv_antimon. eassumption. reflexivity.
+    - rewrite <- heap_env_equiv_key_set. eassumption. eassumption.
+    - edestruct heap_env_equiv_env_get as [lenv' [Hget Hres]]. eassumption.
+      eapply heap_env_equiv_antimon. eassumption. reflexivity. reflexivity.
+      rewrite res_equiv_eq in *. destruct lenv'; try contradiction. 
+      rewrite <- res_equiv_eq in *.
+      edestruct res_equiv_get_Constr as [vs' [Hhget Hres']]; eauto.
+      
+      do 2 eexists. split; eauto. split; eauto. 
+      assert (Hinj2' : injective_subdomain (reach' H2 (Union_list (map val_loc vs))) β2).
+      { eapply injective_subdomain_antimon. eassumption. 
+        rewrite (reach'_idempotent H2 (env_locs _ _)). 
+        eapply reach'_set_monotonic. eapply Included_trans; [| eapply Included_post_reach' ].
+        eapply Included_trans; [| eapply post_set_monotonic; eapply get_In_env_locs; eauto; now constructor ].
+        simpl. rewrite post_Singleton; eauto. reflexivity. }
+
+      clear Hhget. 
+      revert HallP vs' Hres' Heq1 Hinj1 Hinj2'; clear.
+      intros Hall1.
+      induction Hall1; intros vs' Hall2 Heq1 Hinj1 Hinj2.
+      + inv Hall2.
+        now constructor. 
+      + inv Hall2. eapply IHHall1 in H6; eauto. constructor; [| eassumption ].
+        intros Hnin.
+        edestruct H as [v1 [Hgetx1 Hres1]]. eassumption.        
+        edestruct heap_env_equiv_env_get as [lenv' [Hget Hres]]. eassumption.
+        eassumption. now constructor. 
+        eexists; split; eauto. 
+        eapply cc_approx_val_res_eq.
+
+        eassumption. eassumption.
+        eapply injective_subdomain_antimon. eassumption.
+        eapply reach'_set_monotonic. eapply get_In_env_locs. now constructor.
+        eassumption.
+        
+        eassumption.
+        eapply injective_subdomain_antimon. eassumption.
+        eapply reach'_set_monotonic. simpl. now eauto with Ensembles_DB.
+
+        eapply injective_subdomain_antimon. eassumption.
+        eapply reach'_set_monotonic. simpl. now eauto with Ensembles_DB.
+  Qed.     
+
+  Lemma FV_inv_heap_f_eq_subdomain Scope Funs FVs Γ k j GIP GP b c rho1 H1 rho2 H2 b':
+    FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
+    f_eq_subdomain (reach' H1 (env_locs rho1 (FromList FVs))) b b' ->
+    FV_inv k j GIP GP b' rho1 H1 rho2 H2 c Scope Funs Γ FVs.
+  Proof. 
+    intros Hfvs Heq1. 
+    destruct Hfvs as (Hwf & Hkey & vs & lenv'' & Hgetlenv & Hget' & HallP).
+    split; [| split ]; try eassumption.
+    do 2 eexists. split; eauto. split; eauto.
+    revert HallP Heq1; clear.
+    intros Hall1. induction Hall1; intros Heq.
+    + now constructor.
+    + constructor; eauto.
+      intros Hc.
+      edestruct H as [v1 [Hgetx1 Hcc]]. eassumption.
+      eexists; split; eauto.
+      eapply cc_approx_val_rename_ext. eassumption.
+
+      eapply f_eq_subdomain_antimon; [| symmetry; eassumption ].
+      normalize_sets. rewrite env_locs_Union, reach'_Union. eapply Included_Union_preserv_l.
+      eapply reach'_set_monotonic. eapply get_In_env_locs; try eassumption. reflexivity.
+
+      eapply IHHall1. 
+      eapply f_eq_subdomain_antimon; [| eassumption ].
+      normalize_sets. rewrite env_locs_Union, reach'_Union. eapply Included_Union_preserv_r.
+      reflexivity.
+  Qed. 
+
   (** * Lemmas about [project_var] and [project_vars] *)
   
     
@@ -1688,5 +1939,223 @@ Module Invariants (H : Heap).
         erewrite alloc_fresh in Hget; eauto. congruence. 
         
   Qed.
+
+    Lemma Fun_inv_setlist_l k j GI GP b rho1 rho1' H1 rho2 H2 Scope Funs fenv FVs xs vs :
+    Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs ->
+    Disjoint _ (FromList xs) (Funs \\ Scope) ->
+    Disjoint _ (reach' H1 (Union_list (map val_loc vs))) (env_locs rho1 (Funs \\ Scope)) ->
+    setlist xs vs rho1 = Some rho1' ->
+    Fun_inv k j GI GP b rho1' H1 rho2 H2 Scope Funs fenv FVs.
+  Proof.
+    intros Hfun Hnin1 Hnin2 Hset x Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1 & g1 & rhoc & B2 & g2 & Hget1 & Hsub (* & Hdis *)
+                      & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption.
+    erewrite <- setlist_not_In; eauto.
+    intros Hc. eapply Hnin1. constructor; eauto. now constructor; eauto.
+    rewrite reach'_Union in *. intros Hc. eapply Hsub.
+    inv Hc; [| now right ].
+    eapply reach'_set_monotonic in H;
+      [| eapply env_locs_monotonic; eapply Included_Union_preserv_l; reflexivity ].
+    eapply reach'_set_monotonic in H; [| eapply env_locs_setlist_Included; eassumption ]. 
+    rewrite reach'_Union in H. inv H. now left.
+    exfalso. eapply Hnin2. constructor; eauto.
+    eexists; split; eauto. now constructor; eauto.
+    rewrite Hget1. reflexivity. 
+  Qed.
+
+  Lemma Fun_inv_setlist_r k j GI GP b rho1 H1 rho2 rho2' H2 Scope Funs fenv FVs xs vs :
+    Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs ->
+    Disjoint _ (FromList xs) (Funs \\ Scope) ->
+    Disjoint _ (FromList xs) (image fenv (Funs \\ Scope)) ->
+    setlist xs vs rho2 = Some rho2' ->
+    Fun_inv k j GI GP b rho1 H1 rho2' H2 Scope Funs fenv FVs.
+  Proof.
+    intros Hfun Hnin1 Hnin2 Hset x Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1 & g1 & rhoc & B2 & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption.
+    erewrite <- setlist_not_In; eauto.
+    intros Hc. eapply Hnin1. constructor; eauto. now constructor; eauto.
+    erewrite <- setlist_not_In; eauto.    
+    intros Hc. eapply Hnin2. constructor; eauto.
+    eexists; split; eauto. now constructor; eauto.
+  Qed.
+
+  Lemma Fun_inv_suffle_setlist k j GI GP b rho1 H1 rho2 rho2' rho2'' H2 Scope Funs fenv FVs
+        x v xs vs:
+    Fun_inv k j GI GP b rho1 H1 (M.set x v rho2') H2 Scope Funs fenv FVs ->
+    setlist xs vs rho2 = Some rho2' ->
+    setlist xs vs (M.set x v rho2) = Some rho2'' ->
+    ~ x \in FromList xs ->
+    Fun_inv k j GI GP b rho1 H1 rho2'' H2 Scope Funs fenv FVs.
+  Proof. 
+    intros Hfun Hset1 Hset2 Hninx y Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1 & g1 & rhoc & B2 & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption.
+    - destruct (var_dec x y); subst.
+      + rewrite M.gss in *.  inv Hget2.
+        erewrite <- setlist_not_In; eauto.
+        rewrite M.gss. reflexivity.
+      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+        eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
+        rewrite <- Heqr. eassumption.
+    - destruct (var_dec x (fenv y)); subst.
+      + rewrite M.gss in *. inv Hget4.
+        erewrite <- setlist_not_In; eauto.
+        rewrite M.gss. reflexivity.
+      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+        eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
+        rewrite <- Heqr. eassumption.
+  Qed.
+
+  Lemma Fun_inv_suffle_def_funs k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs
+        x v B1 B2:
+    Fun_inv k j GI GP b rho1 H1 (M.set x v (def_funs B1 B2 rho2)) H2 Scope Funs fenv FVs ->
+    ~ x \in (name_in_fundefs B1) ->
+    Fun_inv k j GI GP b rho1 H1 (def_funs B1 B2 (M.set x v rho2)) H2 Scope Funs fenv FVs.
+  Proof.
+    intros Hfun Hninx y Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1' & g1 & rhoc & B2' & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption.
+    - destruct (var_dec y x); subst.
+      + rewrite M.gss in *. inv Hget2.
+        erewrite def_funs_neq; [| reflexivity | eassumption ].
+        rewrite M.gss. reflexivity.
+      + rewrite M.gso in Hget2; [| eassumption ].
+        destruct (@Dec _ (name_in_fundefs B1) _ y).
+        * erewrite def_funs_eq in Hget2; [| reflexivity | eassumption ].
+          inv Hget2.
+          erewrite def_funs_eq; [| reflexivity | eassumption ].
+          reflexivity.
+        * erewrite def_funs_neq in Hget2; [| reflexivity | eassumption ].
+          erewrite def_funs_neq; [| reflexivity | eassumption ].
+          rewrite M.gso; eassumption.
+    - destruct (var_dec (fenv y) x); subst.
+      + rewrite M.gss in *. inv Hget4.
+        erewrite def_funs_neq; [| reflexivity | eassumption ].
+        rewrite M.gss. reflexivity.
+      + rewrite M.gso in Hget4; [| eassumption ].
+        destruct (@Dec _ (name_in_fundefs B1) _ (fenv y)).
+        * erewrite def_funs_eq in Hget4; [| reflexivity |  eassumption ].
+          inv Hget4.
+        * erewrite def_funs_neq in Hget4; [| reflexivity | eassumption ].
+          erewrite def_funs_neq; [| reflexivity | eassumption ].
+          rewrite M.gso; eassumption.
+  Qed.
+
+  Lemma Fun_inv_suffle_setlist_l k j GI GP b rho1 H1 rho2 rho2' rho2'' H2 Scope Funs fenv FVs
+        x v xs vs:
+    Fun_inv k j GI GP b rho1 H1 rho2'' H2 Scope Funs fenv FVs ->
+    setlist xs vs rho2 = Some rho2' ->
+    setlist xs vs (M.set x v rho2) = Some rho2'' ->
+    ~ x \in FromList xs ->
+            Fun_inv k j GI GP b rho1 H1 (M.set x v rho2') H2 Scope Funs fenv FVs.
+  Proof. 
+    intros Hfun Hset1 Hset2 Hninx y Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1 & g1 & rhoc & B2 & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption.
+    - destruct (var_dec x y); subst.
+      + rewrite M.gss in *.  inv Hget2.
+        erewrite <- setlist_not_In; eauto.
+        rewrite M.gss. reflexivity.
+      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+        eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
+        rewrite Heqr. eassumption.
+    - destruct (var_dec x (fenv y)); subst.
+      + rewrite M.gss in *. inv Hget4.
+        erewrite <- setlist_not_In; eauto.
+        rewrite M.gss. reflexivity.
+      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+        eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
+        rewrite Heqr. eassumption.
+  Qed.
+
+  Lemma Fun_inv_suffle_def_funs_l k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs
+        x v B1 B2:
+    Fun_inv k j GI GP b rho1 H1 (def_funs B1 B2 (M.set x v rho2)) H2 Scope Funs fenv FVs ->
+    ~ x \in (name_in_fundefs B1) ->
+    Fun_inv k j GI GP b rho1 H1 (M.set x v (def_funs B1 B2 rho2)) H2 Scope Funs fenv FVs.
+  Proof.
+    intros Hfun Hninx y Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1' & g1 & rhoc & B2' & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption.
+    - destruct (var_dec y x); subst.
+      + rewrite M.gss in *. inv Hget2.
+        erewrite def_funs_neq; [| reflexivity | eassumption ].
+        rewrite M.gss. reflexivity.
+      + rewrite M.gso; [| eassumption ].
+        destruct (@Dec _ (name_in_fundefs B1) _ y).
+        * erewrite def_funs_eq in Hget2; [| reflexivity | eassumption ].
+          inv Hget2.
+          erewrite def_funs_eq; [| reflexivity | eassumption ].
+          reflexivity.
+        * erewrite def_funs_neq in Hget2; [| reflexivity | eassumption ].
+          erewrite def_funs_neq; [| reflexivity | eassumption ].
+          rewrite M.gso in Hget2; eassumption.
+    - destruct (var_dec (fenv y) x); subst.
+      + rewrite M.gss in *. inv Hget4.
+        erewrite def_funs_neq; [| reflexivity | eassumption ].
+        rewrite M.gss. reflexivity.
+      + rewrite M.gso; [| eassumption ].
+        destruct (@Dec _ (name_in_fundefs B1) _ (fenv y)).
+        * erewrite def_funs_eq in Hget4; [| reflexivity |  eassumption ].
+          inv Hget4.
+        * erewrite def_funs_neq in Hget4; [| reflexivity | eassumption ].
+          erewrite def_funs_neq; [| reflexivity | eassumption ].
+          rewrite M.gso in Hget4; eassumption.
+  Qed.
+
+  Lemma Fun_inv_Scope_Disjoint k j GI GP b rho1 H1 rho2 H2 Scope Scope' Funs fenv FVs :
+    Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs ->
+    Disjoint _ (env_locs rho1 Funs) (reach' H1 (env_locs rho1 Scope')) ->
+    Fun_inv k j GI GP b rho1 H1 rho2 H2 (Scope' :|: Scope) Funs fenv FVs.
+  Proof.
+    intros Hfun Hdis1 x Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1' & g1 & rhoc & B2' & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    intros Hc. eapply Hnin. right. eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+
+    do 7 eexists. repeat split; try eassumption.
+
+
+    intros Hc. eapply Hsub. rewrite reach'_Union in *.
+    inv Hc; [| now right ].
+    left.
+    eapply reach'_set_monotonic in H; [| eapply env_locs_monotonic;
+                                         eapply Included_Setminus_compat;
+                                         [ eapply FV_Union1 | reflexivity ] ].
+    rewrite Setminus_Union_distr in H.
+    rewrite env_locs_Union, reach'_Union in H.
+    inv H; [| eassumption ].
+    exfalso. eapply Hdis1. constructor.
+    eexists; split; eauto. rewrite Hget1. reflexivity.
+    eapply reach'_set_monotonic; [| eassumption ].
+    eapply env_locs_monotonic. now eauto with Ensembles_DB.
+  Qed.
+
 
 End Invariants.

@@ -6,7 +6,7 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
 From L6 Require Import functions cps ctx eval cps_util identifiers ctx Ensembles_util
-     List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.closure_conversion
+     List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.closure_conversion Heap.GC
      Heap.cc_log_rel tactics set_util.
 From compcert Require Import lib.Coqlib.
 
@@ -16,7 +16,7 @@ Module Compat (H : Heap).
 
   Module LR := CC_log_rel H.
   
-  Import H LR LR.Sem LR.Sem.Equiv LR.Sem.Equiv.Defs LR.Sem.Equiv.Defs.HL.
+  Import H LR LR.Sem LR.Sem.GC LR.Sem.GC.Equiv LR.Sem.GC.Equiv.Defs LR.Sem.GC.Equiv.Defs.HL.
 
   Section CompatDefs.
     
@@ -60,6 +60,16 @@ Module Compat (H : Heap).
 
         IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
 
+    Definition IInvCtxCompat_Funs (B1 B2 : fundefs) (e1 e2 : exp)  :=
+      forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1' c2',                         
+        IIL1 (H1', rho1', Efun B1 e1) (H2', rho2', Efun B2 e2) ->
+        binding_in_map (occurs_free_fundefs B1) rho1' ->
+
+        ctx_to_heap_env (Efun1_c B1 Hole_c) H1' rho1' H1'' rho1'' c1' ->
+        ctx_to_heap_env_CC (Efun1_c B2 Hole_c) H2' rho2' H2'' rho2'' c2' ->
+
+        IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
+
     Definition InvCtxCompat_r (C : exp_ctx) (e1 e2 : exp) :=
       forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c' c1 c2 m1 m2,
         IL2 (H1', rho1', e1, c1, m1) (H2'', rho2'', e2, c2, m2) ->
@@ -95,20 +105,13 @@ Module Compat (H : Heap).
            IL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1), c1 + cost (Ecase x1 ((t, e1) :: Pats1)), m1)
                (H2', rho2', Ecase x2 ((t, e2) :: Pats2), c2 + cost (Ecase x2 ((t, e2) :: Pats2)), m2)).
 
-      Definition InvCaseTlCompat (H1 H2 : heap block) (rho1 rho2 : env) x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
+      Definition InvCaseTlCompat x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
         (forall H1' rho1' H2' rho2' c1 c2 m1 m2,
            IL1 (H1', rho1', Ecase x1 Pats1, c1, m1) (H2', rho2', Ecase x2 Pats2, c2, m2) ->
            IL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1), c1, m1) (H2', rho2', Ecase x2 ((t, e2) :: Pats2), c2, m2)).
      
     (** * App compatibility *)
       
-    Definition InvGC :=
-      forall (H1 H1' H2 H2' : heap block) (rho1 rho2 : env) (e1 e2 : exp)
-        S {Hs : ToMSet S} B {Hf : ToMSet B} c1 c2 m1 m2 b d,
-        IG S _  B  _ (H1', rho1, e1, c1, m1) (H2', rho1, e2, c2, m2) ->
-        live' (env_locs rho1 (occurs_free e1)) H1 H1' b ->
-        live' (env_locs rho2 (occurs_free e2)) H2 H2' d ->
-        IG S _ B _ (H1, (subst_env b rho1), e1, c1, m1) (H2, subst_env d rho1, e2, c2, m2).
 
     Definition IInvAppCompat (H1 H2 : heap block) (rho1 rho2 : env) f1 t xs1 f2 xs2 f2' Γ :=   
       forall (i  : nat) (H1' H1'' Hgc1 H2' Hgc2: heap block)
@@ -124,9 +127,10 @@ Module Compat (H : Heap).
         (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)) |- (H2, rho2) ⩪_(β2, id) (H2', rho2') ->
         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) β2 ->
 
-        
-        IG (FromList xs1') _ (name_in_fundefs B1) _
+        (* Post on the function result  *)
+        IG (1 + (PS.cardinal (@mset (key_set rho_clo) _)))
            (Hgc1, subst_env b rho_clo2, e1, c1, m1) (Hgc2, subst_env d rho2'', e2, c2, m2) ->
+        (* Pre before APP *)
         IIL1 (H1', rho1', Eapp f1 t xs1) (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ) ->
         
         M.get f1 rho1' = Some (Loc l1) ->
@@ -145,10 +149,56 @@ Module Compat (H : Heap).
         setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
         find_def f3 B2 = Some (ct2, xs2', e2) ->
         live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d ->
-        
+
+        (* Post on result of APP *)
         IL1 (H1', rho1', Eapp f1 t xs1, c1 + cost (Eapp f1 t xs1), max m1 (size_heap H1''))
            (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ, c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2)), max m2 (size_heap H2')).
-    
+
+
+
+    (* Definition IInvAppGCCompat   :=    *)
+    (*   forall f1 xs1 f2 xs2  (H1' H1'' Hgc1 H2' Hgc2: heap block) *)
+    (*     env_loc (rho_clo rho_clo1 rho_clo2 rho1' rho2' rho2'' : env)  *)
+    (*     (B1 : fundefs) (f1' : var) (ct1 : cTag) *)
+    (*     (xs1' : list var) (e1 : exp) (l1 : loc) *)
+    (*     (vs1 : list value)  *)
+    (*     (B2 : fundefs) (f3 : var) (c ct2 : cTag) (xs2' : list var)  *)
+    (*     (e2 : exp) (l2 env_loc2 : loc) (vs2 : list value) b d *)
+    (*     Scope β k, (* existentials *)  *)
+        
+    (*     M.get f1 rho1' = Some (Loc l1) -> *)
+    (*     get l1 H1' = Some (Clos (FunPtr B1 f1') (Loc env_loc)) -> *)
+    (*     get env_loc H1' = Some (Env rho_clo) -> *)
+    (*     find_def f1' B1 = Some (ct1, xs1', e1) -> *)
+    (*     getlist xs1 rho1' = Some vs1 -> *)
+    (*     def_closures B1 B1 rho_clo H1' (Loc env_loc) = (H1'', rho_clo1) -> *)
+    (*     setlist xs1' vs1 rho_clo1 = Some rho_clo2 -> *)
+    (*     live' ((env_locs rho_clo2) (occurs_free e1)) H1'' Hgc1 b -> *)
+        
+    (*     M.get f2 rho2' = Some (Loc l2) -> *)
+    (*     getlist xs2 rho2' = Some vs2 -> *)
+    (*     get l2 H2' = Some (Constr c [FunPtr B2 f3; Loc env_loc2]) -> *)
+    (*     Some rho2'' = *)
+    (*     setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) -> *)
+    (*     find_def f3 B2 = Some (ct2, xs2', e2) -> *)
+    (*     live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d -> *)
+
+    (*     (forall j, Scope |- H1' ≼ ^ ( k ; j ; IIG ; IG ; β ) H2') -> *)
+        
+    (*     (** To show size relation  **) *)
+
+    (*     (* Scope <--> vs :&: FVs *) *)
+    (*     Scope :|: (* reachable from xs or FVs of post name :&: FV(e1) *) *)
+    (*     env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1) (* closures *) \subset *)
+    (*     reach' H1'' ((env_locs rho_clo2) (occurs_free e1)) -> *)
+        
+    (*     reach' H2' ((env_locs rho2'') (occurs_free e2)) \subset *)
+    (*     env_loc |: image β Scope  (* reachable from xs or Γ *) -> *)
+
+    (*     IIG (name_in_fundefs B1 \\ FromList xs1 :&: occurs_free e1) _ *)
+    (*         (Hgc1, subst_env b rho_clo2, e1) (Hgc2, subst_env d rho2'', e2). *)
+
+
   End CompatDefs.
 
   Section CompatLemmas.
@@ -168,11 +218,6 @@ Module Compat (H : Heap).
       IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
       InvCostBase IL1 IIL1 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
 
-      (* well_formed (reach' H1 (env_locs rho1 (occurs_free (Eapp f1 t xs1)))) H1 -> *)
-      (* well_formed (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) H2 -> *)
-      (* (env_locs rho1 (occurs_free (Eapp f1 t xs1))) \subset dom H1 -> *)
-      (* (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))) \subset dom H2 -> *)
-      
       ~ Γ \in (f2 |: FromList xs2) ->
       ~ f2' \in (f2 |: FromList xs2) ->
       Γ <> f2' ->
@@ -348,7 +393,8 @@ Module Compat (H : Heap).
             eapply reach'_extensive.
           + rewrite subst_env_image. eassumption.
           + eapply heap_env_equiv_heap_equiv_l. eassumption.
-          + eapply HG; eassumption.
+          + (* initial after GC *)
+            eapply HG; eassumption.
           + simpl. omega.
           + intros i. 
             edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m' Hstep']].
@@ -852,7 +898,7 @@ Module Compat (H : Heap).
       IInvCaseHdCompat IIL1 IIL2 x1 x2 t Pats1 Pats2 e1 e2 ->
       InvCaseHdCompat IL1 IL2 x1 x2 t Pats1 Pats2 e1 e2 ->
       IInvCaseTlCompat IIL1 x1 x2 t Pats1 Pats2 e1 e2 -> 
-      InvCaseTlCompat IL1 H1 H2 rho1 rho2 x1 x2 t Pats1 Pats2 e1 e2  ->
+      InvCaseTlCompat IL1 x1 x2 t Pats1 Pats2 e1 e2  ->
       
       cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 x1 x2 ->
 
@@ -987,16 +1033,47 @@ Module Compat (H : Heap).
           eapply cc_approx_val_monotonic. eassumption.
           omega.
     Qed.
-   
+
+    (* TODO move *)
+    Lemma binding_in_map_key_set {A} (rho : M.t A) : 
+      binding_in_map (key_set rho) rho.
+    Proof.
+      unfold binding_in_map. intros x Hget.
+      unfold key_set, In in *.
+      destruct (M.get x rho); eauto.
+      exfalso; eauto.
+    Qed.
+
+
+    Lemma heap_env_approx_binding_in_map S S' b1 H1 rho1 b2 H2 rho2 : 
+      heap_env_approx S' (b1, (H1, rho1)) (b2, (H2, rho2)) ->
+      S \subset S' ->
+      binding_in_map S rho1 -> binding_in_map S rho2.
+    Proof.
+      intros Hap Hsub Hbin x Hiny. edestruct Hbin as [v1 Hgetx]; eauto. 
+      edestruct Hap as [l1' [Hr2 Hres1]]; eauto.
+    Qed.
+
+  Lemma heap_env_equiv_binding_in_map S S' b1 H1 rho1 b2 H2 rho2 : 
+    S' |- (H1, rho1) ⩪_( b1, b2) (H2, rho2) ->
+    S \subset S' ->
+    binding_in_map S rho1 -> binding_in_map S rho2.
+  Proof.
+    intros [Henv1 Henn2] Hin Hbin; eapply heap_env_approx_binding_in_map; eauto.
+  Qed. 
+  
+
     (** Abstraction compatibility *)
     Lemma cc_approx_exp_fun_compat (k j : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 :
       InvCtxCompat IL1 IL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
-      IInvCtxCompat IIL1 IIL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
+      IInvCtxCompat_Funs IIL1 IIL2 B1 B2 e1 e2 ->
       InvCostBase IL1 IIL1 (Efun B1 e1) (Efun B2 e2) ->
-
+      
       well_formed (reach' H1 (env_locs rho1 (occurs_free (Efun B1 e1)))) H1 ->
       (env_locs rho1 (occurs_free (Efun B1 e1))) \subset dom H1 ->
-      
+
+      binding_in_map (occurs_free_fundefs B1) rho1 ->
+
       (forall H1' H1'' rho1' rho_clo env_loc,
          k >= cost (Efun B1 e1) ->
          restrict_env (fundefs_fv B1) rho1 = rho_clo ->
@@ -1009,7 +1086,7 @@ Module Compat (H : Heap).
       
       (Efun B1 e1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (Efun B2 e2, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hinv Hiinv Hbase Hwf Hdom Hpre b1 b2 H1' H2' rho1' rho2' v1 c1
+      intros Hinv Hiinv Hbase Hwf Hdom Hbin Hpre b1 b2 H1' H2' rho1' rho2' v1 c1
              m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
       (* Timeout! *)
@@ -1198,8 +1275,10 @@ Module Compat (H : Heap).
               eapply reach'_set_monotonic.
               eapply Included_trans. eapply def_funs_env_loc.
               eapply env_locs_monotonic. normalize_occurs_free...
-            + eapply Hiinv; try eassumption.
-              econstructor; eauto. now econstructor. 
+            + eapply Hiinv; try eassumption. subst. 
+              eapply heap_env_equiv_binding_in_map. eassumption. normalize_occurs_free...
+              eassumption.  
+              econstructor; eauto. now econstructor.
               econstructor; eauto. now econstructor.
            + simpl; omega.
            + intros i. edestruct (Hstuck1 (i + cost (Efun B1 e1))) as [r' [m' Hstep']].

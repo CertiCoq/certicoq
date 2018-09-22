@@ -936,7 +936,8 @@ Module HeapLemmas (H : Heap).
     eapply heap_elements_filter_sound in Hin'. destruct Hin' as [Hin1 Hin2].  
     eapply heap_elements_filter_complete. edestruct Hin as [x3 Hget3]. eassumption.
     rewrite Hget3. eapply Hsub in Hget3. congruence.
-    eassumption.  Qed.
+    eassumption.
+  Qed.
   
   Lemma size_with_measure_minus_emp (A : Type) (S : Ensemble loc) {HS : ToMSet S} f :
     @size_with_measure_minus A f S _ emp = 0%nat.

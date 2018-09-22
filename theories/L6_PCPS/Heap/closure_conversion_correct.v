@@ -336,6 +336,43 @@ Module ClosureConversionCorrect (H : Heap).
     - intros Hin; inv Hin. simpl. rewrite Setminus_Empty_set_neut_r. reflexivity. 
   Qed.
 
+  Lemma Fun_inv_set_l_alt k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs f v :
+    Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs ->
+    val_loc v \subset reach' H1 (env_locs rho1 Scope) ->
+    (* f \in Scope -> *)
+    Fun_inv k j GI GP b  (M.set f v rho1) H1 rho2 H2 (f |: Scope) Funs fenv FVs.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hfun Hnin1  x Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1 & g1 & rhoc & B2 & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    intros Hc. eapply Hnin. right. eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption. rewrite M.gso. eassumption.
+    
+    intros Hc. subst. eapply Hnin; now eauto.
+    repeat subst_exp. 
+    
+    intros Hc; subst. eapply Hsub.
+    rewrite reach'_Union in *. inv Hc; [| now eauto ].
+    left. 
+    eapply reach'_set_monotonic in H; [| eapply env_locs_set_Inlcuded' ].
+    rewrite reach'_Union in H. inv H. 
+    - rewrite reach'_idempotent. eapply reach'_set_monotonic; [| eassumption ].
+      eapply Included_trans. eassumption.
+      eapply reach'_set_monotonic. eapply env_locs_monotonic.
+      unfold FV. rewrite !Setminus_Union_distr. do 2 eapply Included_Union_preserv_l. 
+      rewrite Setminus_Disjoint. reflexivity. eapply Disjoint_Singleton_r. eauto.
+    - eapply reach'_set_monotonic; [| eassumption ].
+      eapply env_locs_monotonic.
+      eapply Included_trans. eapply Included_Setminus_compat.
+      eapply Included_Setminus_compat. eapply FV_Union1. 
+      reflexivity. reflexivity.
+      rewrite Setminus_Union. rewrite (Union_commut [set x] [set f]), <- Setminus_Union.
+
+      rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l...
+  Qed.
+
   Lemma Closure_conversion_fundefs_correct
     (k : nat)
     (* The IH *)
@@ -1212,8 +1249,9 @@ Module ClosureConversionCorrect (H : Heap).
       eapply Included_trans; [| eapply FV_dom2 with (Scope := Scope); try eassumption ].
       eapply env_locs_monotonic. reflexivity.
       eapply binding_in_map_antimon; [| eassumption ]... }
-    
-    induction e1 using exp_ind'; try clear IHe1.
+
+    revert e2 Hcc Hfv'. 
+    induction e1 using exp_ind'; intros e2 Hcc Hfv'; try clear IHe1.
     - (* case Econstr *) 
       inv Hcc.
       assert (Hf' : ToMSet Funs').
@@ -1244,10 +1282,10 @@ Module ClosureConversionCorrect (H : Heap).
         eassumption. }
         
       intros j.
-      
+
       (* process right ctx *)
       eapply cc_approx_exp_right_ctx_compat
-      with (IL2 := (Post (cost_ctx_full C) A)); [ | | | | | | now eapply Hct | ].
+      with (IL2 := (Post (cost_ctx_full C) A)); [ | | | | now eapply Hct | ].
       
       + eapply PostCtxCompat_vars_r; [| | | | eassumption |  ]; try eassumption.
         omega. 
@@ -1257,13 +1295,6 @@ Module ClosureConversionCorrect (H : Heap).
       + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
         eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
         
-      + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
-        eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
-        
-      + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
-        eapply Included_trans; [| eapply reach'_extensive ]. 
-        eapply env_locs_monotonic. eassumption.
-
       + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
         eapply Included_trans; [| eapply reach'_extensive ]. 
         eapply env_locs_monotonic. eassumption.
@@ -1298,9 +1329,9 @@ Module ClosureConversionCorrect (H : Heap).
           now eauto with Ensembles_DB. 
           tci. reflexivity. 
           eapply Singleton_Included...
-        * eapply PostBase. (* XXX Base *)
+        * eapply PostBase.  (* XXX Base *)
           unfold cost_env_app_exp_out. eapply project_vars_cost_eq'. eassumption.
-       
+          omega.
         * eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
           eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
           
@@ -1447,16 +1478,246 @@ Module ClosureConversionCorrect (H : Heap).
                 eapply Disjoint_Included_l; [| eassumption ]. normalize_bound_var...                
             } }
 
-    - (* case Eproj *)
-      inv Hcc.
-      admit.
-      
     - (* case Ecase nil *)
       inv Hcc.
-      admit.
+      assert (Hf' : ToMSet Funs').
+      eapply project_var_ToMSet_Funs. eassumption. now eapply H9.
+      assert (Hs' : ToMSet Scope').
+      eapply (project_var_ToMSet Scope Scope' Funs). eassumption.
+      
+      edestruct (Hbind v) as [l Hgetvl].
+      rewrite project_var_FV_eq; [| eassumption ]. left. left. 
+      eapply project_var_In. eassumption.
+      
+      edestruct project_var_ctx_to_heap_env with (Scope := Scope) as [H2' [rho2' [m Hct]]];
+        try eassumption.
+      (* intros Hc. eapply Hdis. constructor. now left. right. eassumption. *)
+      (* eapply Disjoint_Included; [ | | now eapply Hdis ]... *)
+      specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.
+      specialize (HFVs 0); eapply FV_inv_weak_in_FV_inv; eassumption.
+      
+      assert (Hwf2' : closed (reach' H2' (env_locs rho2' (FV_cc Scope' Funs' fenv Γ))) H2'). 
+      { eapply reach'_closed. 
+        eapply project_var_well_formed'. eassumption. eassumption.
+        eapply Included_trans. eapply reach'_extensive. 
+        eapply env_locs_closed. eassumption. 
+        eapply well_formed'_closed. eassumption.
+        eapply project_var_env_locs'. eassumption. eassumption.
+        eapply well_formed'_closed. eassumption.
+        eapply Included_trans. eapply reach'_extensive. eapply env_locs_closed.
+        eassumption. }
+        
+      intros j.
+      
+      (* process right ctx *)
+      eapply cc_approx_exp_right_ctx_compat
+      with (IL2 := (Post (cost_ctx_full C) A)); [ | | | | now eapply Hct | ].
+      
+      + idtac. eapply PostCtxCompat_ctx_r. omega.
+      + eapply (PreCtxCompat_var_r _ _ _ _ Scope Scope' Funs Funs'). eassumption. normalize_occurs_free.
+        reflexivity.
+      + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
+        
+      + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
+        eapply Included_trans; [| eapply reach'_extensive ]. 
+        eapply env_locs_monotonic. eassumption.
+
+      + edestruct project_var_correct with (Scope := Scope) as
+            (b' & Henv' & Hfun' & HFVs');
+        try eassumption.
+        eapply Disjoint_Included; [ | | now apply Hdis ]...
+        eapply binding_in_map_antimon; [| eassumption ]...
+        inv H12. eapply cc_approx_exp_case_nil_compat.
+        eapply PostBase. simpl. 
+        eapply project_var_cost_eq'. eassumption. omega.
+
     - (* case Ecase cons *)
+      inv Hcc.
+      assert (Hf' : ToMSet Funs').
+      eapply project_var_ToMSet_Funs. eassumption. now eapply H9.
+      assert (Hs' : ToMSet Scope').
+      eapply (project_var_ToMSet Scope Scope' Funs). eassumption.
+      
+      edestruct (Hbind v) as [lv Hgetvl].
+      rewrite project_var_FV_eq; [| eassumption ]. left. left. 
+      eapply project_var_In. eassumption.
+      inv H12. destruct y as [c1 e2]. destruct H3 as [Heqc Hex]. simpl in Heqc; subst.
+      destruct Hex as [C2 [ecc2 [Heqc2 Hcchead]]]. simpl in Heqc2; subst.
+
+      edestruct project_var_ctx_to_heap_env with (Scope := Scope) as [H2' [rho2' [m Hct]]];
+        try eassumption.
+      (* intros Hc. eapply Hdis. constructor. now left. right. eassumption. *)
+      (* eapply Disjoint_Included; [ | | now eapply Hdis ]... *)
+      specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.
+      specialize (HFVs 0); eapply FV_inv_weak_in_FV_inv; eassumption.
+      
+      assert (Hwf2' : closed (reach' H2' (env_locs rho2' (FV_cc Scope' Funs' fenv Γ))) H2'). 
+      { eapply reach'_closed. 
+        eapply project_var_well_formed'. eassumption. eassumption.
+        eapply Included_trans. eapply reach'_extensive. 
+        eapply env_locs_closed. eassumption. 
+        eapply well_formed'_closed. eassumption.
+        eapply project_var_env_locs'. eassumption. eassumption.
+        eapply well_formed'_closed. eassumption.
+        eapply Included_trans. eapply reach'_extensive. eapply env_locs_closed.
+        eassumption. }
+      admit. 
+      (* intros j. *)
+      (* edestruct project_var_correct with (Scope := Scope) as *)
+      (*     (b' & Henv' & Hfun' & HFVs'); *)
+      (*   try eassumption. *)
+      (* eapply Disjoint_Included; [ | | now apply Hdis ]... *)
+      (* eapply binding_in_map_antimon; [| eassumption ]... *)
+      
+      (* eapply cc_approx_exp_case_compat_ctx with (IL2 := (Post (cost_ctx_full C) A)) *)
+      (*                                             (IIL2 := (Pre (Funs' :&: occurs_free (Ecase v ((c1, e1) :: l)) \\ Scope') A)).  *)
+      (* + eapply PostBase. simpl. *)
+      (*   eapply project_var_cost_eq'. eassumption. eapply le_plus_l. *)
+      (* + admit. (* Pre CaseHdCompat *) *)
+      (* + admit. (* Post CaseHdCompat *) *)
+      (* + admit. (* Pre CaseTlCompat *) *)
+      (* + admit. (* Post CaseTlCompat *) *)
+      (* + eapply PostCtxCompat_ctx_r. omega. *)
+      (* + eapply (PreCtxCompat_var_r _ _ _ _ Scope Scope' Funs Funs'). eassumption. normalize_occurs_free. *)
+      (*   now left. *)
+      (* + admit. *)
+      (* + admit. (* inv easy *)  *)
+      (* + intros j1. eapply Henv'. eapply project_var_In. eassumption. *)
+      (* + eassumption. *)
+    - (* case Eproj *)
       inv Hcc. (* TODO change compat *) 
-      admit.
+      assert (Hf' : ToMSet Funs').
+      eapply project_var_ToMSet_Funs. eassumption. now eapply H14.
+      assert (Hs' : ToMSet Scope').
+      eapply (project_var_ToMSet Scope Scope' Funs). eassumption.
+
+      edestruct (Hbind v0) as [lv Hgetvl].
+      rewrite project_var_FV_eq; [| eassumption ]. left. left. 
+      eapply project_var_In. eassumption.
+
+      edestruct project_var_ctx_to_heap_env with (Scope := Scope) as [H2' [rho2' [m Hct]]];
+        try eassumption.
+      (* intros Hc. eapply Hdis. constructor. now left. right. eassumption. *)
+      (* eapply Disjoint_Included; [ | | now eapply Hdis ]... *)
+      specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.
+      specialize (HFVs 0); eapply FV_inv_weak_in_FV_inv; eassumption.
+      
+      assert (Hwf2' : closed (reach' H2' (env_locs rho2' (FV_cc Scope' Funs' fenv Γ))) H2'). 
+      { eapply reach'_closed. 
+        eapply project_var_well_formed'. eassumption. eassumption.
+        eapply Included_trans. eapply reach'_extensive. 
+        eapply env_locs_closed. eassumption. 
+        eapply well_formed'_closed. eassumption.
+        eapply project_var_env_locs'. eassumption. eassumption.
+        eapply well_formed'_closed. eassumption.
+        eapply Included_trans. eapply reach'_extensive. eapply env_locs_closed.
+        eassumption. }
+        
+      intros j.
+
+      (* process right ctx *)
+      eapply cc_approx_exp_right_ctx_compat
+      with (IL2 := (Post (cost_ctx_full C) A)); [ | | | | now eapply Hct | ].
+      
+      + eapply PostCtxCompat_ctx_r. omega.
+      + eapply (PreCtxCompat_var_r _ _ _ _ Scope Scope' Funs Funs'). eassumption.
+        normalize_occurs_free...
+      + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
+        
+      + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
+        eapply Included_trans; [| eapply reach'_extensive ]. 
+        eapply env_locs_monotonic. eassumption.
+
+      + edestruct project_var_correct with (Scope := Scope) as
+            (b' & Henv' & Hfun' & HFVs');
+        try eassumption.
+        eapply Disjoint_Included; [ | | now apply Hdis ]...
+        eapply binding_in_map_antimon; [| eassumption ]... 
+        (* process Econstr one the right and left *) 
+        eapply cc_approx_exp_proj_compat
+        with (IIL2 := Pre (Funs' :&: occurs_free e1 \\ (v |: Scope')) A) (IL2 := Post 0 A);
+          [ | | | | ].
+        * eapply PostProjCompat.
+          unfold cost_env_app_exp_out.
+          eapply project_var_cost_eq'. eassumption.
+        * eapply PreProjCompat.
+          normalize_occurs_free.
+          rewrite <- Setminus_Union. eapply Included_Setminus_compat; [| reflexivity ]. 
+          eapply Included_trans. eapply Setminus_Included. 
+          rewrite (Intersection_commut (_ :|: _)), Intersection_Union_distr.
+          eapply Included_Union_preserv_r. 
+          rewrite Intersection_Setmius_Disjoint.
+          rewrite Intersection_commut. reflexivity.
+          eapply Disjoint_Included; [| | eapply Hfresh ].
+          rewrite project_var_FV_eq; [| eassumption ].
+          unfold FV. rewrite (Union_Setminus_Included Scope').
+          now eauto with Ensembles_DB. 
+          tci. reflexivity. 
+          eapply Singleton_Included...
+        * eapply PostBase.  (* XXX Base *)
+          unfold cost_env_app_exp_out. eapply project_var_cost_eq'. eassumption.
+          omega.
+        * intros j'.
+          eapply Henv'. eapply project_var_In. eassumption.
+        * (* Inductive case *)  
+          { intros v1 v2 Hleqk Hr1 Hr2 Hrel. 
+            intros j0. 
+            eapply IHk with (Scope := v |: Scope');
+              [ | | | | | | | | | eassumption (* CC *) ].
+            * simpl in *. omega. 
+            * now eauto with typeclass_instances.
+            * intros j1. eapply cc_approx_env_P_set.
+              eapply cc_approx_env_P_monotonic.
+              eapply cc_approx_env_P_antimon. eapply Henv'.
+              now eauto with Ensembles_DB.
+              omega.
+              eapply Hrel.
+            * (* FV_inv preservation *)
+              intros j1.
+              eapply FV_inv_set_not_in_FVs.
+              eapply FV_inv_monotonic.
+              eapply HFVs'. omega.
+              intros Hc. eapply Hdis. now subst; eauto.
+            *  (* Fun_inv preservation *)
+              intros j1.
+              eapply Fun_inv_set_r. eapply Fun_inv_set_l_alt.
+              eapply Fun_inv_monotonic. eapply Hfun'. omega. 
+              eapply Included_trans. eassumption.
+              eapply reach'_set_monotonic. eapply env_locs_monotonic.
+              eapply Singleton_Included.
+              eapply project_var_In. eassumption. 
+               
+              intros Hc. inv Hc. now eauto.
+              intros Hc.
+              eapply Hdis. constructor. right.
+              eapply image_monotonic; [| eassumption ].
+              eapply Included_Setminus_compat. eapply project_var_Funs_l. eassumption.
+              eapply Included_trans. eapply project_var_Scope_l. eassumption.
+              now eauto with Ensembles_DB. normalize_bound_var. left. right. reflexivity.
+            * eapply Disjoint_Included; [| | now eapply Hdis ]. 
+              normalize_bound_var. rewrite <- Union_assoc. eapply Included_Union_compat.
+              reflexivity. eapply Included_trans.
+              eapply FV_Union1. erewrite <- project_var_FV_eq. reflexivity. 
+              eassumption.
+              eapply Included_Union_compat. reflexivity.
+              eapply image_monotonic. eapply Included_Setminus_compat.
+              eapply project_var_Funs_l. eassumption.
+              eapply Included_trans; [ eapply project_var_Scope_l; eassumption |]...
+            * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
+              eapply Included_trans. eapply FV_Union1.
+              erewrite <- project_var_FV_eq; [| eassumption ]...
+            * inv Hunb. eassumption.
+            * inv Hunb.
+              eapply Disjoint_Included_r.
+              eapply FV_Union1.
+              eapply Union_Disjoint_r.
+              eapply Disjoint_Singleton_r. eassumption.
+              rewrite <- project_var_FV_eq; [| eassumption ].
+              eapply Disjoint_Included_l; [| eassumption ]. normalize_bound_var...                
+          } 
+
     - (* case Efun *)
       inv Hcc. 
       
@@ -1531,48 +1792,40 @@ Module ClosureConversionCorrect (H : Heap).
       { rewrite PS.cardinal_spec. eapply Same_set_FromList_length'.
         eassumption. eapply NoDupA_NoDup. eapply PS.elements_spec2w.
         rewrite <- (fundefs_fv_correct f2). symmetry. eassumption. }
-      
+       
       (* process right ctx 1 : projec-t fvs *)
-      eapply cc_approx_exp_right_ctx_compat; [ | | | | | | eassumption | ].
+      eapply cc_approx_exp_right_ctx_compat; [ | | | | eassumption | ].
       
-      + eapply PostCtxCompat_ctx_r with (k := 3 * PS.cardinal (fundefs_fv f2)).
+      + eapply PostCtxCompat_ctx_r with (k := 3 * PS.cardinal(fundefs_fv f2)).
         rewrite <- plus_n_O. eapply le_trans. eapply project_vars_cost_eq'.
-        eassumption. eapply mult_le_compat_l.
-        rewrite PS.cardinal_spec. eapply Same_set_FromList_length. eassumption.
-        rewrite <- FromSet_elements. rewrite <- H3, <- fundefs_fv_correct. reflexivity.
+        eassumption. omega. 
+        (* eapply le_trans. eapply Max.le_max_r. eapply Nat.max_le_compat_l. omega. *)
+        (* eapply le_trans; [| eapply le_plus_l ]. eapply mult_le_compat_l. *)
+        (* rewrite PS.cardinal_spec. eapply Same_set_FromList_length. eassumption. *)
+        (* rewrite <- FromSet_elements. rewrite <- H3, <- fundefs_fv_correct. reflexivity. *)
       + eapply (PreCtxCompat_vars_r); [ | | | eassumption ]; try eassumption.
         rewrite <- H3. normalize_occurs_free...
       + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
         eapply reach'_set_monotonic. now eapply env_locs_monotonic; eauto.
-      + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
-        eapply reach'_set_monotonic. now eapply env_locs_monotonic; eauto.
       + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
         eapply Included_trans. now eapply env_locs_monotonic; eauto.
-        eapply reach'_extensive. 
-      + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
-        eapply Included_trans. now eapply env_locs_monotonic; eauto.
-        eapply reach'_extensive.  
+        eapply reach'_extensive.   
       + eapply cc_approx_exp_right_ctx_compat;
-        [ | | | | | | econstructor; try eassumption; now constructor | ].
+        [ | | | | econstructor; try eassumption; now constructor | ].
         * eapply PostCtxCompat_ctx_r with (k := 1 + 4 * PS.cardinal (fundefs_fv f2)).
           unfold cost_ctx_full. omega.  
-        * eapply PreCtxCompat_ctx_to_heap_env with (m := 1 + PS.cardinal (fundefs_fv f2) + A)
+        * eapply PreCtxCompat_ctx_to_heap_env with (m := A + (1 + PS.cardinal (fundefs_fv f2)))
                                                      (Funs' := (Funs' :&: occurs_free (Efun f2 e1) \\ Scope')).
           simpl. reflexivity. simpl. omega. 
         * eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
           eapply reach'_set_monotonic. now eapply env_locs_monotonic; eauto.
-        * eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
-          eapply reach'_set_monotonic. eapply env_locs_monotonic... 
-        * eapply Included_trans; [| eapply env_locs_closed; eassumption ].
-          eapply Included_trans. now eapply env_locs_monotonic; eauto.
-          eapply reach'_extensive.
         * eapply Included_trans; [| eapply env_locs_closed; eassumption ].
           eapply Included_trans; [| eapply reach'_extensive ].
           eapply env_locs_monotonic...
         * { eapply cc_approx_exp_fun_compat.
             - eapply PostFunsCompat with (m := 0). simpl. omega.
             - eapply PreFunsCompat with (m := A) (S' := occurs_free e1).
-              tci. tci. tci. eapply plus_le_compat_r. eapply plus_le_compat_l.
+              tci. tci. tci. rewrite plus_comm, <- !plus_assoc. eapply plus_le_compat_l. eapply plus_le_compat_r.
               rewrite !PS.cardinal_spec. erewrite Same_set_FromList_length'. reflexivity. 
               eapply NoDupA_NoDup. eapply PS.elements_spec2w.
               eapply NoDupA_NoDup. eapply PS.elements_spec2w.
@@ -1604,7 +1857,9 @@ Module ClosureConversionCorrect (H : Heap).
               inv Hunb.
               eapply unique_bindings_fundefs_unique_functions.
               eassumption.
-            - admit. (* XXX Base *) 
+            - eapply PostBase. simpl. omega. do 2 eapply plus_le_compat_l.
+              eapply le_trans; [| eapply Max.le_max_r ]. simpl.
+              eapply Max.le_max_l. 
             - eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
               eapply reach'_set_monotonic. eapply env_locs_monotonic...
             - eapply Included_trans; [| eapply env_locs_closed; eassumption ].
@@ -1886,7 +2141,7 @@ Module ClosureConversionCorrect (H : Heap).
       intros j.
       (* process right ctx *)
       eapply cc_approx_exp_right_ctx_compat;
-        [ | | | | | | eassumption | ].
+        [ | | | | eassumption | ].
       
       + eapply (PostCtxCompat_vars_r Scope Scope' Funs Funs').
         now eapply H5. rewrite <- plus_n_O.
@@ -1896,13 +2151,6 @@ Module ClosureConversionCorrect (H : Heap).
       + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
         eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
         
-      + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
-        eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
-
-      + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
-        eapply Included_trans; [| eapply reach'_extensive ]. 
-        eapply env_locs_monotonic. eassumption.
-
       + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
         eapply Included_trans; [| eapply reach'_extensive ]. 
         eapply env_locs_monotonic. eassumption.
@@ -1935,7 +2183,7 @@ Module ClosureConversionCorrect (H : Heap).
           eapply project_vars_In. eassumption. now right.
           
         * eapply PostBase. simpl. omega. 
-          
+          omega. 
         * intros Hc. eapply H4. constructor. now apply H15.
           left. left. left.
           eapply project_vars_In. eassumption.
@@ -1957,5 +2205,70 @@ Module ClosureConversionCorrect (H : Heap).
       edestruct (Hns (cost (Eprim v p l e1))) as [res [m2 Hstep']]. inv Hstep'. omega.
     - (* case Ehalt *)
       inv Hcc.
-      admit.
-  Qed. 
+      assert (Hf' : ToMSet Funs').
+      eapply project_var_ToMSet_Funs. eassumption. now eapply H8.
+      assert (Hs' : ToMSet Scope').
+      eapply (project_var_ToMSet Scope Scope' Funs). eassumption.
+
+      edestruct (Hbind v) as [lv Hgetvl].
+      rewrite project_var_FV_eq; [| eassumption ]. left. left. 
+      eapply project_var_In. eassumption.
+
+      edestruct project_var_ctx_to_heap_env with (Scope := Scope) as [H2' [rho2' [m Hct]]];
+        try eassumption.
+      (* intros Hc. eapply Hdis. constructor. now left. right. eassumption. *)
+      (* eapply Disjoint_Included; [ | | now eapply Hdis ]... *)
+      specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.
+      specialize (HFVs 0); eapply FV_inv_weak_in_FV_inv; eassumption.
+      
+      assert (Hwf2' : closed (reach' H2' (env_locs rho2' (FV_cc Scope' Funs' fenv Γ))) H2'). 
+      { eapply reach'_closed. 
+        eapply project_var_well_formed'. eassumption. eassumption.
+        eapply Included_trans. eapply reach'_extensive. 
+        eapply env_locs_closed. eassumption. 
+        eapply well_formed'_closed. eassumption.
+        eapply project_var_env_locs'. eassumption. eassumption.
+        eapply well_formed'_closed. eassumption.
+        eapply Included_trans. eapply reach'_extensive. eapply env_locs_closed.
+        eassumption. }
+        
+      intros j.
+
+      (* process right ctx *)
+      eapply cc_approx_exp_right_ctx_compat
+      with (IL2 := (Post (cost_ctx_full C) A)); [ | | | | now eapply Hct | ].
+      
+      + eapply PostCtxCompat_ctx_r. omega.
+      + eapply (PreCtxCompat_var_r _ _ _ _ Scope Scope' Funs Funs'). eassumption.
+        rewrite occurs_free_Ehalt. reflexivity. 
+      + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
+        eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
+        
+      + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
+        eapply Included_trans; [| eapply reach'_extensive ]. 
+        eapply env_locs_monotonic. eassumption.
+
+      + edestruct project_var_correct with (Scope := Scope) as
+            (b' & Henv' & Hfun' & HFVs');
+        try eassumption.
+        eapply Disjoint_Included; [ | | now apply Hdis ]...
+        eapply binding_in_map_antimon; [| eassumption ]...
+        eapply cc_approx_exp_halt_compat.
+        eapply PostBase. simpl.
+        eapply project_var_cost_eq'. eassumption. omega.
+        eapply Henv'. eapply project_var_In. eassumption. 
+        Grab Existential Variables.
+        exact 0. exact 0. tci. tci.
+        eapply project_vars_ToMSet_Funs; [| eassumption ]. 
+        eassumption.
+        eapply project_vars_ToMSet; [| eassumption ]. 
+        eassumption.
+        eapply project_vars_ToMSet_Funs; [| eassumption ]. 
+        eassumption.
+        eapply project_vars_ToMSet; [| eassumption ]. 
+        eassumption.
+        admit. (* previous admit *)
+        exact 0. exact 0.
+  Admitted.
+
+End ClosureConversionCorrect.  

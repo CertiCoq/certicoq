@@ -250,21 +250,6 @@ Section Uncurry_correct.
         now constructor.
       + intros e' s1. rewrite st_eq_Ecase.
         eapply pre_curry_l. intros He.
-        Transparent uncurry_exp uncurry_fundefs.
-        assert (hack : forall v l, 
-                 (ys <-
-                  (fix uncurry_list (arms : list (cTag * exp)) :
-                     uncurryM (list (cTag * exp)) :=
-                     match arms with
-                     | [] => ret []
-                     | (s, e0) :: t =>
-                         bind (uncurry_exp e0)
-                           (fun e'0 : exp =>
-                            bind (uncurry_list t)
-                              (fun t' : list (cTag * exp) =>
-                               ret ((s, e'0) :: t')))
-                     end) l;; ret (Ecase v ys)) = uncurry_exp (Ecase v l)) by auto.
-        rewrite hack. clear hack.
         eapply bind_triple. eapply post_conj.
         * eapply IHe0.
           eapply Disjoint_Included_r; [| eassumption ].

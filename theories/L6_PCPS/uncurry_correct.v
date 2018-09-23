@@ -19,6 +19,9 @@ Section Uncurry_correct.
 
   Print st_eq.
 
+  (* Helper function to extract next free variable from state *)
+  Definition next_free_of (s : stateType) := fst (fst (fst (fst (fst (fst s))))).
+
   (* This identity is useful for the Ecase case -- see below *)
   Lemma st_eq_Ecase {S} (m1 : state S (list (cTag * exp))) (x : var) y :
     st_eq
@@ -35,16 +38,44 @@ Section Uncurry_correct.
     intros s. simpl. destruct (runState m1 s). reflexivity.
   Qed.
 
-  Global Opaque bind ret.
-
+  (* an important property about the arms of a case block preserved *)
   Lemma uncurry_exp_Ecase x l :
     {{ fun _ => True }}
       uncurry_exp (Ecase x l)
-    {{ fun _ e' _ => exists l', e' = Ecase x l' }}.
+    {{ fun _ e' _ => exists l',
+         e' = Ecase x l' /\ Forall2 (fun p p' => fst p = fst p') l l'
+    }}.
   Proof.
-    eapply bind_triple. now apply post_trivial.
-    intros l' s'. apply return_triple. eauto.
+    Opaque bind ret.
+    induction l.
+    - simpl. eapply bind_triple with (fun _ x0 _ => x0 = []).
+      + apply return_triple. auto.
+      + intros. apply return_triple. intros. subst.
+        exists []. split; auto.
+    - destruct a. simpl. setoid_rewrite assoc. eapply bind_triple.
+      + apply post_trivial.
+      + intros e' s. rewrite st_eq_Ecase.
+        eapply bind_triple.
+        * apply IHl.
+        * unfold triple. intros. destruct H as [l' [HL HR]]. subst.
+          Transparent ret. simpl.
+          exists ((c, e') :: l'). split. reflexivity.
+          auto.
   Qed.
+
+  Global Opaque bind ret.
+
+  (* Used in Ecase_cons case *)
+  Lemma preord_exp_eq_tags (k : nat) (v : var) (l l' : list (cTag * exp)) :
+    (forall rho rho' : env,
+        preord_env_P pr cenv (occurs_free (Ecase v l)) k rho rho' ->
+        preord_exp pr cenv k (Ecase v l, rho) (Ecase v l', rho')) ->
+    Forall2 (fun p p' : cTag * exp => fst p = fst p') l l'.
+  Proof.
+    intros H.
+    Check preord_exp_case_cons_compat.
+    Print bstep_e. Print caseConsistent.
+  Abort.
 
 
   (* Un-nesting the Efun case from the main proof *) 
@@ -62,7 +93,7 @@ Section Uncurry_correct.
                 preord_exp pr cenv m (e, rho) (e', rho')) /\ fresh S (fst (fst (fst (fst (fst (fst s')))))) }}) ->
     (* Assumption about the set [S]  *)
     Disjoint _ S (Union _ (bound_var_fundefs B2) (occurs_free_fundefs B2)) ->
-    {{ fun s =>  fresh S (fst (fst (fst (fst (fst (fst s)))))) }}
+    {{ fun s =>  fresh S (next_free_of s) }}
       uncurry_fundefs B2
     {{ fun s B2' s' =>
          (forall rho rho',
@@ -157,7 +188,7 @@ Section Uncurry_correct.
        is denoted by the precondition [fresh S (fst s)]. S is disjoint from all
        the free or bound identifiers in the term *)
     Disjoint _ S (Union _ (bound_var e) (occurs_free e)) ->
-    {{ fun s => fresh S (fst (fst (fst (fst (fst (fst s)))))) }}
+    {{ fun s => fresh S (next_free_of s) }}
       uncurry_exp e
     {{ fun s e' s' =>
          (forall rho rho',
@@ -170,7 +201,7 @@ Section Uncurry_correct.
                just some extras too that we can't.
                we want to make sure that the fresh variable counter has not decreased
                *)
-         fresh S (fst (fst (fst (fst (fst  (fst s'))))))
+         fresh S (next_free_of s')
     }}.
   Proof with now eauto with Ensembles_DB.
     revert e; induction k as [k IHk] using lt_wf_rec1. (* strong induction on step index *)
@@ -219,18 +250,33 @@ Section Uncurry_correct.
         now constructor.
       + intros e' s1. rewrite st_eq_Ecase.
         eapply pre_curry_l. intros He.
+        Transparent uncurry_exp uncurry_fundefs.
+        assert (hack : forall v l, 
+                 (ys <-
+                  (fix uncurry_list (arms : list (cTag * exp)) :
+                     uncurryM (list (cTag * exp)) :=
+                     match arms with
+                     | [] => ret []
+                     | (s, e0) :: t =>
+                         bind (uncurry_exp e0)
+                           (fun e'0 : exp =>
+                            bind (uncurry_list t)
+                              (fun t' : list (cTag * exp) =>
+                               ret ((s, e'0) :: t')))
+                     end) l;; ret (Ecase v ys)) = uncurry_exp (Ecase v l)) by auto.
+        rewrite hack. clear hack.
         eapply bind_triple. eapply post_conj.
         * eapply IHe0.
           eapply Disjoint_Included_r; [| eassumption ].
           eapply bound_var_occurs_free_Ecase_cons_Included.
         * eapply pre_strenghtening; [| now apply uncurry_exp_Ecase ].
           now intros; simpl; eauto.
-        * intros e'' s2. simpl. apply pre_curry_r. intros [l' Heq].
-          subst. apply pre_curry_l. intros Hl. apply return_triple.
+        * intros e'' s2. simpl. apply pre_curry_r. intros [l' [Heq Hctrs]].
+          rewrite Heq in *. apply pre_curry_l. intros Hl. apply return_triple.
           intros s3 Hf. split; [| eassumption ]. intros rho rho' Henv. 
           (* now we can apply the compatibility lemma *)
           eapply preord_exp_case_cons_compat.
-          admit. (* the two lists have the same tags -- should be easy *)
+          assumption.
           eapply Henv. apply occurs_free_Ecase_cons...
           apply He. eapply preord_env_P_antimon. eassumption.
           rewrite occurs_free_Ecase_cons...

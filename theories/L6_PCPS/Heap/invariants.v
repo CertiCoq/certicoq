@@ -842,6 +842,44 @@ Module Invariants (H : Heap).
       rewrite Setminus_Same_set_Empty_set. rewrite Setminus_Empty_set_abs_r... 
   Qed.
 
+  Lemma Fun_inv_set_l_alt k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs f v :
+    Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs ->
+    val_loc v \subset reach' H1 (env_locs rho1 Scope) ->
+    (* f \in Scope -> *)
+    Fun_inv k j GI GP b  (M.set f v rho1) H1 rho2 H2 (f |: Scope) Funs fenv FVs.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hfun Hnin1  x Hnin Hin.
+    edestruct Hfun as (l1 & lenv & B1 & g1 & rhoc & B2 & g2 & Hget1 & Hsub (* & Hdis *)
+                          & Hget2 & Hget3 & Hget4 & Henv & Heq).
+    intros Hc. eapply Hnin. right. eassumption. eassumption.
+    destruct Henv as [Hbeq Henv]. subst.
+    
+    do 7 eexists. repeat split; try eassumption. rewrite M.gso. eassumption.
+    
+    intros Hc. subst. eapply Hnin; now eauto.
+    repeat subst_exp. 
+    
+    intros Hc; subst. eapply Hsub.
+    rewrite reach'_Union in *. inv Hc; [| now eauto ].
+    left. 
+    eapply reach'_set_monotonic in H; [| eapply env_locs_set_Inlcuded' ].
+    rewrite reach'_Union in H. inv H. 
+    - rewrite reach'_idempotent. eapply reach'_set_monotonic; [| eassumption ].
+      eapply Included_trans. eassumption.
+      eapply reach'_set_monotonic. eapply env_locs_monotonic.
+      unfold FV. rewrite !Setminus_Union_distr. do 2 eapply Included_Union_preserv_l. 
+      rewrite Setminus_Disjoint. reflexivity. eapply Disjoint_Singleton_r. eauto.
+    - eapply reach'_set_monotonic; [| eassumption ].
+      eapply env_locs_monotonic.
+      eapply Included_trans. eapply Included_Setminus_compat.
+      eapply Included_Setminus_compat. eapply FV_Union1. 
+      reflexivity. reflexivity.
+      rewrite Setminus_Union. rewrite (Union_commut [set x] [set f]), <- Setminus_Union.
+
+      rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l...
+  Qed.
+
+
   Lemma Fun_inv_Scope_monotonic k j GI GP b rho1 H1 rho2 H2 Scope S Funs Γ FVs {_ : Decidable S}:
     Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs Γ FVs ->
     FV (S :|: Scope) Funs FVs <--> FV Scope Funs FVs ->

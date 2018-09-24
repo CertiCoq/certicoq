@@ -40,7 +40,7 @@ Module Top (H : Heap).
     edestruct Hcc as [v2 [c2 [m2 [b' [Hstep' [HInv Hval]]]]]]; eauto.
   Qed.
 
-  Definition instal_env Γ :=
+  Definition install_env Γ :=
     let (lenv, H1) := alloc (Constr ct []) emp in
     (M.set Γ (Loc lenv) (M.empty _), H1).
 
@@ -53,7 +53,7 @@ Module Top (H : Heap).
   Qed.
 
   Lemma closure_conversion_correct_lr_closed (k : nat) (e1 e2 : exp) (C : exp_ctx) (Γ : var) K rho2 H2 :
-    (rho2, H2) = instal_env Γ ->
+    (rho2, H2) = install_env Γ ->
     ~ Γ \in bound_var e1 ->
     unique_bindings e1 ->
     
@@ -64,15 +64,16 @@ Module Top (H : Heap).
                               Post 0 K; Post 0)
           (C |[ e2 ]|, rho2, H2)).
   Proof with (now eauto with Ensembles_DB).
-    unfold instal_env.
+    unfold install_env.
     destruct (alloc (Constr ct []) emp) as [lenv Η2] eqn:Ha. 
     intros Ha' Hnin Hun Hcc. inv Ha'. 
     intros j.
     eapply Closure_conversion_correct in Hcc.
     eapply cc_approx_exp_rel_mon.
     - eassumption. 
-    - eapply Pre_subset_compat.
-      rewrite Intersection_Empty_set_abs_l...
+    - intros [[H1 rho1] e1'] [[H2 rho2] e2'] Hpre.
+      eapply PreSubsetCompat with (Funs := Empty_set var).
+      eassumption. rewrite Intersection_Empty_set_abs_l...
     - tci.
     - intros j1. eapply cc_approx_env_Empty_set.
     - intros j2. split.
@@ -122,7 +123,7 @@ Module Top (H : Heap).
         (k : nat) (j : nat) (e1 e2 : exp) (C : exp_ctx) (Γ : var) (* dummy varaiable for environment *)
         H2 rho2 r1 c1 m1 :
     
-    (rho2, H2) = instal_env Γ ->
+    (rho2, H2) = install_env Γ ->
     ~ Γ \in bound_var e1 ->
     (* The source program has unique binders *)
     unique_bindings e1 ->
@@ -145,7 +146,7 @@ Module Top (H : Heap).
       (* the results are related *)
       r1 ≺ ^ (k ; j ; Pre ; Post 0 ; b ) r2.  
   Proof with (now eauto with Ensembles_DB).
-    unfold instal_env.
+    unfold install_env.
     destruct (alloc (Constr ct []) emp) as [lenv H2'] eqn:Ha. 
     intros Ha' Hnin Hun Hcc Hbs Hns. inv Ha'. 
     assert (Heq : (e1, M.empty _, emp) ⪯ ^ (k + c1 ; j ;
@@ -153,7 +154,7 @@ Module Top (H : Heap).
                                             Post 0 1; Post 0)
                   (C |[ e2 ]|, (M.set Γ (Loc lenv) (M.empty value)), H2')).
     { eapply closure_conversion_correct_lr_closed; try eassumption.
-      unfold instal_env. rewrite Ha. reflexivity. }
+      unfold install_env. rewrite Ha. reflexivity. }
 
     edestruct Heq as (r2 & c2 & m2 & b & Hbs2 & Hin & Hres).
     - reflexivity.
@@ -162,7 +163,7 @@ Module Top (H : Heap).
     - clear; now firstorder.
     - unfold Pre. unfold size_heap, size_cc_heap.
       rewrite !HL.size_with_measure_emp. rewrite !plus_O_n at 1.
-      rewrite PS_cardingal_empty.
+      rewrite PS_cardinal_empty.
       simpl. rewrite <- plus_n_O.
       erewrite HL.size_with_measure_alloc with (s := 0); try eassumption. 
       simpl. omega.

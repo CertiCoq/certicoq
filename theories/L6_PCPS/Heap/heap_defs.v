@@ -1212,6 +1212,23 @@ Module HeapDefs (H : Heap) .
       rewrite Setminus_Empty_set_neut_r; eauto.
   Qed.
 
+  Lemma env_locs_def_funs' S {_ : ToMSet S} B B0 rho1 rho1' : 
+    def_funs B B0 rho1 = rho1' ->
+    env_locs rho1' S <--> env_locs rho1 (S \\ name_in_fundefs B). 
+  Proof with (now eauto with Ensembles_DB).
+    revert S X rho1 rho1'; induction B; intros S HS rho1 rho1'. 
+    - simpl. intros Hdef. subst.
+      destruct (@Dec _ S _ v). 
+      + rewrite env_locs_set_In. 
+        rewrite <- Setminus_Union. simpl.
+        rewrite <- IHB; tci... eassumption.
+      + rewrite env_locs_set_not_In; [| eassumption ].
+        rewrite <- Setminus_Union, (Setminus_Disjoint S). now eauto.  
+        eapply Disjoint_Singleton_r. 
+        eassumption. 
+    - intros Hin; inv Hin. simpl. rewrite Setminus_Empty_set_neut_r. reflexivity. 
+  Qed.
+
   
   Lemma env_locs_setlist_Included ys ls rho rho' S :
     setlist ys ls rho = Some rho'  ->

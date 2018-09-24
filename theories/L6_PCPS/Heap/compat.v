@@ -24,9 +24,11 @@ Module Compat (H : Heap).
 
     Context (IG : GInv) (* Final global *)
             (IL1 IL2: Inv) (* Final local *)
- 
+            (ILe : exp -> exp -> Inv)
+
             (IIG : GIInv) (* Global initial *)
             (IIL1 IIL2 : IInv) (* Local initial *)
+            (IILe : exp -> exp -> IInv) (* Local initial *)
 
             (M : nat) (* memory cost factor *)
             (F : nat) (* time cost factor *).
@@ -100,7 +102,7 @@ Module Compat (H : Heap).
     Definition IInvCtxCompat_r_inv (C : exp_ctx) (e1 e2 : exp) :=
       forall (H1' H2' H2'' : heap block) (rho1' rho2' rho2'' : env) c',                                   
         IIL2 (H1', rho1', e1) (H2'', rho2'', e2) ->
-            
+           
         ctx_to_heap_env_CC C H2' rho2' H2'' rho2'' c' ->
 
         IIL1 (H1', rho1', e1) (H2', rho2', C |[ e2 ]|).
@@ -108,29 +110,23 @@ Module Compat (H : Heap).
 
     (** * Case compatibility *)
     
-    Definition IInvCaseHdCompat x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-      (forall H1' rho1' H2' rho2',
-         IIL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1)) (H2', rho2', Ecase x2 ((t, e2) :: Pats2)) ->
-         IIL2 (H1', rho1', e1) (H2', rho2', e2)).
+    Definition IInvCaseCompat x1 x2 Pats1 Pats2 :=
+      forall H1' rho1' H2' rho2' c1 c2 e1 e2,
+        List.In (c1, e1) Pats1 ->
+        List.In (c2, e2) Pats2 -> 
+        IIL1 (H1', rho1', Ecase x1 Pats1) (H2', rho2', Ecase x2 Pats2) ->
+        IILe e1 e2 (H1', rho1', e1) (H2', rho2', e2).
 
-      Definition IInvCaseTlCompat x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-        (forall H1' rho1' H2' rho2',
-         IIL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1)) (H2', rho2', Ecase x2 ((t, e2) :: Pats2)) ->
-         IIL1 (H1', rho1', Ecase x1 Pats1) (H2', rho2', Ecase x2 Pats2)).
+    Definition InvCaseCompat x1 x2 Pats1 Pats2 :=
+      forall H1' rho1' H2' rho2' m1 m2 c1 c2 c e1 e2 tc1 tc2,
+        List.In (tc1, e1) Pats1 ->
+        List.In (tc2, e2) Pats2 ->
+        c >= 1 ->
+        ILe e1 e2 (H1', rho1', e1, c1, m1) (H2', rho2', e2, c2, m2) ->
+        IL1 (H1', rho1', Ecase x1 Pats1, c1 + c, m1) (H2', rho2', Ecase x2 Pats2, c2 + c, m2).
 
-      Definition InvCaseHdCompat  x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-        (forall H1' rho1' H2' rho2' c1 c2 m1 m2,
-           IL2 (H1', rho1', e1, c1, m1) (H2', rho2', e2, c2, m2)  ->
-           IL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1), c1 + cost (Ecase x1 ((t, e1) :: Pats1)), m1)
-               (H2', rho2', Ecase x2 ((t, e2) :: Pats2), c2 + cost (Ecase x2 ((t, e2) :: Pats2)), m2)).
-
-      Definition InvCaseTlCompat x1 x2 t Pats1 Pats2 (e1 e2 : exp) :=
-        (forall H1' rho1' H2' rho2' c1 c2 m1 m2,
-           IL1 (H1', rho1', Ecase x1 Pats1, c1, m1) (H2', rho2', Ecase x2 Pats2, c2, m2) ->
-           IL1 (H1', rho1', Ecase x1 ((t, e1) :: Pats1), c1, m1) (H2', rho2', Ecase x2 ((t, e2) :: Pats2), c2, m2)).
-     
-    (** * App compatibility *)
-      
+    
+    (** * App compatibility *)      
 
     Definition IInvAppCompat (H1 H2 : heap block) (rho1 rho2 : env) f1 t xs1 f2 xs2 f2' Γ :=   
       forall (i  : nat) (H1' H1'' Hgc1 H2' Hgc2: heap block)
@@ -174,50 +170,6 @@ Module Compat (H : Heap).
            (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ, c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2)), max m2 (size_heap H2')).
 
 
-
-    (* Definition IInvAppGCCompat   :=    *)
-    (*   forall f1 xs1 f2 xs2  (H1' H1'' Hgc1 H2' Hgc2: heap block) *)
-    (*     env_loc (rho_clo rho_clo1 rho_clo2 rho1' rho2' rho2'' : env)  *)
-    (*     (B1 : fundefs) (f1' : var) (ct1 : cTag) *)
-    (*     (xs1' : list var) (e1 : exp) (l1 : loc) *)
-    (*     (vs1 : list value)  *)
-    (*     (B2 : fundefs) (f3 : var) (c ct2 : cTag) (xs2' : list var)  *)
-    (*     (e2 : exp) (l2 env_loc2 : loc) (vs2 : list value) b d *)
-    (*     Scope β k, (* existentials *)  *)
-        
-    (*     M.get f1 rho1' = Some (Loc l1) -> *)
-    (*     get l1 H1' = Some (Clos (FunPtr B1 f1') (Loc env_loc)) -> *)
-    (*     get env_loc H1' = Some (Env rho_clo) -> *)
-    (*     find_def f1' B1 = Some (ct1, xs1', e1) -> *)
-    (*     getlist xs1 rho1' = Some vs1 -> *)
-    (*     def_closures B1 B1 rho_clo H1' (Loc env_loc) = (H1'', rho_clo1) -> *)
-    (*     setlist xs1' vs1 rho_clo1 = Some rho_clo2 -> *)
-    (*     live' ((env_locs rho_clo2) (occurs_free e1)) H1'' Hgc1 b -> *)
-        
-    (*     M.get f2 rho2' = Some (Loc l2) -> *)
-    (*     getlist xs2 rho2' = Some vs2 -> *)
-    (*     get l2 H2' = Some (Constr c [FunPtr B2 f3; Loc env_loc2]) -> *)
-    (*     Some rho2'' = *)
-    (*     setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) -> *)
-    (*     find_def f3 B2 = Some (ct2, xs2', e2) -> *)
-    (*     live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d -> *)
-
-    (*     (forall j, Scope |- H1' ≼ ^ ( k ; j ; IIG ; IG ; β ) H2') -> *)
-        
-    (*     (** To show size relation  **) *)
-
-    (*     (* Scope <--> vs :&: FVs *) *)
-    (*     Scope :|: (* reachable from xs or FVs of post name :&: FV(e1) *) *)
-    (*     env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1) (* closures *) \subset *)
-    (*     reach' H1'' ((env_locs rho_clo2) (occurs_free e1)) -> *)
-        
-    (*     reach' H2' ((env_locs rho2'') (occurs_free e2)) \subset *)
-    (*     env_loc |: image β Scope  (* reachable from xs or Γ *) -> *)
-
-    (*     IIG (name_in_fundefs B1 \\ FromList xs1 :&: occurs_free e1) _ *)
-    (*         (Hgc1, subst_env b rho_clo2, e1) (Hgc2, subst_env d rho2'', e2). *)
-
-
   End CompatDefs.
 
   Section CompatLemmas.
@@ -226,9 +178,11 @@ Module Compat (H : Heap).
 
     Context (IG : GInv) (* Final global *)
             (IL1 IL2: Inv) (* Final local *)
+            (ILe : exp -> exp -> Inv)
 
             (IIG : GIInv) (* Global initial *)
-            (IIL1 IIL2 : IInv). (* Local initial *)
+            (IIL1 IIL2 : IInv)
+            (IILe : exp -> exp -> IInv) . (* Local initial *)
     
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
@@ -923,27 +877,43 @@ Module Compat (H : Heap).
       (* Termination *) 
       - { simpl in Htag. discriminate. }
     Qed.
-    
-    
+
+
+    Lemma Forall2_findtag {A B} c Pats1 Pats2 (e : A) (P : A -> B  -> Prop) :
+      findtag Pats1 c = Some e ->
+      Forall2 (fun ce1 ce2 =>
+                 let '(c1, e1) := ce1 in
+                 let '(c2, e2) := ce2 in
+                 c1 = c2 /\ P e1 e2) Pats1 Pats2 ->
+      exists e', findtag Pats2 c = Some e' /\ P e e'.
+    Proof.
+      intros Hf Hall. revert e Hf. induction Hall; intros e Hf.
+      - inv Hf.
+      - destruct x as [c1 e1]. destruct y as [c2 e2]. simpl in *.
+        destruct H as [Heq1 HP]; subst.
+        destruct (M.elt_eq c2 c); eauto. inv Hf.
+        eexists; split; eauto. 
+    Qed. 
+
     Lemma cc_approx_exp_case_compat (k j : nat) (b : Inj)
-          (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (t : cTag)
-          (e1 e2 : exp) (Pats1 Pats2 : list (cTag * exp)) :
-      InvCostBase IL1 IIL1 (Ecase x1 ((t, e1) :: Pats1)) (Ecase x2 ((t, e2) :: Pats2)) -> 
-      IInvCaseHdCompat IIL1 IIL2 x1 x2 t Pats1 Pats2 e1 e2 ->
-      InvCaseHdCompat IL1 IL2 x1 x2 t Pats1 Pats2 e1 e2 ->
-      IInvCaseTlCompat IIL1 x1 x2 t Pats1 Pats2 e1 e2 -> 
-      InvCaseTlCompat IL1 x1 x2 t Pats1 Pats2 e1 e2  ->
+          (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (Pats1 Pats2 : list (cTag * exp)) :
+      InvCostBase IL1 IIL1 (Ecase x1 Pats1) (Ecase x2 Pats2) ->
+      IInvCaseCompat IIL1 IILe x1 x2 Pats1 Pats2 ->
+      InvCaseCompat IL1 ILe x1 x2 Pats1 Pats2 ->
       
       cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 x1 x2 ->
 
-      (k >= cost (Ecase x1 Pats1) ->
-       (e1, rho1, H1) ⪯ ^ (k - cost (Ecase x1 Pats1); j; IIL2 ; IIG ; IL2 ; IG) (e2, rho2, H2)) ->
-
-      (Ecase x1 Pats1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (Ecase x2 Pats2, rho2, H2) ->
-
-      (Ecase x1 ((t, e1) :: Pats1), rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (Ecase x2 ((t, e2) :: Pats2), rho2, H2).
+      Forall2 (fun ce1 ce2 =>
+                 let '(c1, e1) := ce1 in
+                 let '(c2, e2) := ce2 in
+                 c1 = c2 /\
+                 (k >= cost (Ecase x1 Pats1) ->
+                 (e1, rho1, H1) ⪯ ^ (k - cost (Ecase x1 Pats1); j; IILe e1 e2 ; IIG ; ILe e1 e2 ; IG)
+                 (e2, rho2, H2))) Pats1 Pats2 ->
+                 
+      (Ecase x1 Pats1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (Ecase x2 Pats2, rho2, H2).
     Proof with now eauto with Ensembles_DB.
-      intros Hbase Hiinvh Hinvh Hiinvt Hinvt Hvar Hexp_hd Hexp_tl b1 b2 H1' H2' rho1' rho2'
+      intros Hbase Hiinvh Hinvh Hvar Hall b1 b2 H1' H2' rho1' rho2'
              v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
       (* Timeout! *)
@@ -951,35 +921,41 @@ Module Compat (H : Heap).
           - econstructor. simpl; omega. reflexivity. 
           - eapply Hbase; eassumption.
           - now rewrite cc_approx_val_eq. }
-      - { pose (cost1 := cost (Ecase x1 ((t, e1) :: Pats1))).
-          pose (cost2 := cost (Ecase x2 ((t, e2) :: Pats2))).
+      - { pose (cost1 := cost (Ecase x1 Pats1)).
+          pose (cost2 := cost (Ecase x2 Pats2)).
           eapply (cc_approx_var_env_heap_env_equiv
                     _ _
-                    (occurs_free (Ecase x1 ((t, e1) :: Pats1)))
-                    (occurs_free (Ecase x2 ((t, e2) :: Pats2)))) in Hvar;
+                    (occurs_free (Ecase x1 Pats1))
+                    (occurs_free (Ecase x2 Pats2))) in Hvar;
           [| eassumption | eassumption | eassumption | eassumption
-           | normalize_occurs_free; now eauto with Ensembles_DB | normalize_occurs_free; now eauto with Ensembles_DB ].
+           | | ].
           edestruct Hvar as [l' [Hgety' Hcc]]; eauto.
           destruct l' as [l' |l' f ]; [| contradiction ].
           simpl in Hcc. rewrite Hgetl in Hcc. 
           destruct (get l' H2') as [[ t' vs' | | ] |] eqn:Hgetl';
             (try destruct Hcc as [Hbeq Hcc]); try contradiction.
           destruct Hcc as [Heq Hall']; subst. simpl in Hall', Hcost.
-          simpl in Htag. destruct (M.elt_eq t t') eqn:Heq; subst.
-          - inv Htag.
-            edestruct Hexp_hd with (c1 := c1 - cost1) as [v2 [c2 [m2 [b' [Hstep [HS Hres]]]]]].
+          edestruct (@Forall2_findtag exp exp) with
+          (P := fun e1 e2 => k >= cost (Ecase x1 Pats1) ->
+                          (e1, rho1, H1) ⪯ ^ (k - cost (Ecase x1 Pats1); j; IILe e1 e2 ; IIG ; ILe e1 e2; IG)
+                          (e2, rho2, H2)) as [e2 Hcc]. 
+          - eassumption.
+          - eapply Forall2_monotonic; [| eassumption ]. intros [c e1] [c' e2] H. eassumption.
+          - destruct Hcc as [Hf2 Hcc]. 
+            edestruct Hcc with (c1 := c1 - cost1) as [v2 [c2 [m2 [b' [Hstep [HS Hres]]]]]].
             + simpl in *. omega.
             + eapply heap_env_equiv_antimon. now eapply Heq1.
-              normalize_occurs_free...
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
             + eapply injective_subdomain_antimon. eassumption.
               eapply reach'_set_monotonic. eapply env_locs_monotonic.
-              normalize_occurs_free...
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
             + eapply heap_env_equiv_antimon. now eapply Heq2.
-              normalize_occurs_free...
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
             + eapply injective_subdomain_antimon. eassumption.
               eapply reach'_set_monotonic. eapply env_locs_monotonic.
-              normalize_occurs_free...
-            + eapply Hiinvh; try eassumption.
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
+            + eapply Hiinvh. eapply findtag_In. eassumption.
+              eapply findtag_In. eassumption. eassumption.
             + unfold cost1. simpl; omega.
             + eassumption.
             + intros i. edestruct (Hstuck1 (i + cost1)) as [r' [m'' Hstep']].
@@ -987,53 +963,131 @@ Module Compat (H : Heap).
               * exists OOT. eexists. econstructor; eauto. unfold cost1 in Hcost0.
                omega. 
               * repeat subst_exp.
-                simpl in Htag; rewrite Heq in Htag; inv Htag.
                 simpl in Hbs0. rewrite NPeano.Nat.add_sub in Hbs0.
                 do 2 eexists. eassumption.
             + repeat eexists; eauto. 
               * eapply Eval_case_per_cc with (c := c2 + cost2)
                 ; [ | | | | rewrite NPeano.Nat.add_sub ]; try eassumption.
-                unfold cost2. omega. now simpl; rewrite Heq. 
+                unfold cost2. omega.  
               * replace c1 with (c1 - cost1 + cost1) by (unfold cost1; simpl in *; omega).
-                eapply Hinvh; try eassumption.
+                eapply Hinvh. eapply findtag_In. eassumption.
+                eapply findtag_In. eassumption. unfold cost2; simpl in *; omega. eassumption.
               * rewrite cc_approx_val_eq. eapply cc_approx_val_monotonic.
                 rewrite <- cc_approx_val_eq. eassumption. unfold cost1. simpl. omega.
-          - edestruct Hexp_tl as [v2 [c2 [m2 [b' [Hstep2 [HS Hpre2]]]]]];
-               [ | | | | | | now econstructor; eauto | | ].
-            + eapply heap_env_equiv_antimon; [ eassumption |].
-              normalize_occurs_free...
-            + eapply injective_subdomain_antimon. eassumption.
-              eapply reach'_set_monotonic. eapply env_locs_monotonic.
-              normalize_occurs_free...
-            + eapply heap_env_equiv_antimon; [ eassumption |].
-              normalize_occurs_free...
-            + eapply injective_subdomain_antimon. eassumption.
-              eapply reach'_set_monotonic. eapply env_locs_monotonic.
-              normalize_occurs_free...
-            + eapply Hiinvt; try eassumption. 
-            + simpl in Hcost. omega.
-            + intros i. edestruct (Hstuck1 i) as [r' [m'' Hstep']].
-              inv Hstep'.
-              * exists OOT. eexists. econstructor; eauto.
-              * repeat subst_exp.
-                simpl in Htag0; rewrite Heq in Htag0. repeat subst_exp.
-                simpl in Hbs0.
-                do 2 eexists. eapply Eval_case_gc.
-                simpl in Hcost0. simpl. omega.
-                eassumption. eassumption. eassumption. eassumption.
-            + inv Hstep2.
-              * (* Timeout! *)
-                { simpl in Hcost0. exists OOT, c2. eexists. exists b'. repeat split.
-                  - econstructor. simpl. eassumption. reflexivity. 
-                  - eapply Hinvt; try eassumption.
-                  - eassumption. }
-              * (* termination *)
-                { repeat eexists; eauto.
-                  - eapply Eval_case_per_cc with (c := c2); eauto.
-                    simpl. repeat subst_exp.
-                    rewrite Heq. eassumption.
-                } }
+          - now constructor.
+          - now constructor. }
     Qed.
+
+    
+    (* Lemma cc_approx_exp_case_compat (k j : nat) (b : Inj) *)
+    (*       (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (t : cTag) *)
+    (*       (e1 e2 : exp) (Pats1 Pats2 : list (cTag * exp)) : *)
+    (*   InvCostBase IL1 IIL1 (Ecase x1 ((t, e1) :: Pats1)) (Ecase x2 ((t, e2) :: Pats2)) ->  *)
+    (*   IInvCaseHdCompat IIL1 IIL2 x1 x2 t Pats1 Pats2 e1 e2 -> *)
+    (*   InvCaseHdCompat IL1 IL2 x1 x2 t Pats1 Pats2 e1 e2 -> *)
+    (*   IInvCaseTlCompat IIL1 x1 x2 t Pats1 Pats2 e1 e2 ->  *)
+    (*   InvCaseTlCompat IL1 x1 x2 t Pats1 Pats2 e1 e2  -> *)
+      
+    (*   cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 x1 x2 -> *)
+
+    (*   (k >= cost (Ecase x1 Pats1) -> *)
+    (*    (e1, rho1, H1) ⪯ ^ (k - cost (Ecase x1 Pats1); j; IIL2 ; IIG ; IL2 ; IG) (e2, rho2, H2)) -> *)
+
+    (*   (Ecase x1 Pats1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (Ecase x2 Pats2, rho2, H2) -> *)
+
+    (*   (Ecase x1 ((t, e1) :: Pats1), rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (Ecase x2 ((t, e2) :: Pats2), rho2, H2). *)
+    (* Proof with now eauto with Ensembles_DB. *)
+    (*   intros Hbase Hiinvh Hinvh Hiinvt Hinvt Hvar Hexp_hd Hexp_tl b1 b2 H1' H2' rho1' rho2' *)
+    (*          v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1. *)
+    (*   inv Hstep1. *)
+    (*   (* Timeout! *) *)
+    (*   - { simpl in Hcost. exists OOT, c1. eexists. exists id. repeat split.  *)
+    (*       - econstructor. simpl; omega. reflexivity.  *)
+    (*       - eapply Hbase; eassumption. *)
+    (*       - now rewrite cc_approx_val_eq. } *)
+    (*   - { pose (cost1 := cost (Ecase x1 ((t, e1) :: Pats1))). *)
+    (*       pose (cost2 := cost (Ecase x2 ((t, e2) :: Pats2))). *)
+    (*       eapply (cc_approx_var_env_heap_env_equiv *)
+    (*                 _ _ *)
+    (*                 (occurs_free (Ecase x1 ((t, e1) :: Pats1))) *)
+    (*                 (occurs_free (Ecase x2 ((t, e2) :: Pats2)))) in Hvar; *)
+    (*       [| eassumption | eassumption | eassumption | eassumption *)
+    (*        | normalize_occurs_free; now eauto with Ensembles_DB | normalize_occurs_free; now eauto with Ensembles_DB ]. *)
+    (*       edestruct Hvar as [l' [Hgety' Hcc]]; eauto. *)
+    (*       destruct l' as [l' |l' f ]; [| contradiction ]. *)
+    (*       simpl in Hcc. rewrite Hgetl in Hcc.  *)
+    (*       destruct (get l' H2') as [[ t' vs' | | ] |] eqn:Hgetl'; *)
+    (*         (try destruct Hcc as [Hbeq Hcc]); try contradiction. *)
+    (*       destruct Hcc as [Heq Hall']; subst. simpl in Hall', Hcost. *)
+    (*       simpl in Htag. destruct (M.elt_eq t t') eqn:Heq; subst. *)
+    (*       - inv Htag. *)
+    (*         edestruct Hexp_hd with (c1 := c1 - cost1) as [v2 [c2 [m2 [b' [Hstep [HS Hres]]]]]]. *)
+    (*         + simpl in *. omega. *)
+    (*         + eapply heap_env_equiv_antimon. now eapply Heq1. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply injective_subdomain_antimon. eassumption. *)
+    (*           eapply reach'_set_monotonic. eapply env_locs_monotonic. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply heap_env_equiv_antimon. now eapply Heq2. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply injective_subdomain_antimon. eassumption. *)
+    (*           eapply reach'_set_monotonic. eapply env_locs_monotonic. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply Hiinvh; try eassumption. *)
+    (*         + unfold cost1. simpl; omega. *)
+    (*         + eassumption. *)
+    (*         + intros i. edestruct (Hstuck1 (i + cost1)) as [r' [m'' Hstep']]. *)
+    (*           inv Hstep'. *)
+    (*           * exists OOT. eexists. econstructor; eauto. unfold cost1 in Hcost0. *)
+    (*            omega.  *)
+    (*           * repeat subst_exp. *)
+    (*             simpl in Htag; rewrite Heq in Htag; inv Htag. *)
+    (*             simpl in Hbs0. rewrite NPeano.Nat.add_sub in Hbs0. *)
+    (*             do 2 eexists. eassumption. *)
+    (*         + repeat eexists; eauto.  *)
+    (*           * eapply Eval_case_per_cc with (c := c2 + cost2) *)
+    (*             ; [ | | | | rewrite NPeano.Nat.add_sub ]; try eassumption. *)
+    (*             unfold cost2. omega. now simpl; rewrite Heq.  *)
+    (*           * replace c1 with (c1 - cost1 + cost1) by (unfold cost1; simpl in *; omega). *)
+    (*             eapply Hinvh; try eassumption. *)
+    (*           * rewrite cc_approx_val_eq. eapply cc_approx_val_monotonic. *)
+    (*             rewrite <- cc_approx_val_eq. eassumption. unfold cost1. simpl. omega. *)
+    (*       - edestruct Hexp_tl as [v2 [c2 [m2 [b' [Hstep2 [HS Hpre2]]]]]]; *)
+    (*            [ | | | | | | now econstructor; eauto | | ]. *)
+    (*         + eapply heap_env_equiv_antimon; [ eassumption |]. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply injective_subdomain_antimon. eassumption. *)
+    (*           eapply reach'_set_monotonic. eapply env_locs_monotonic. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply heap_env_equiv_antimon; [ eassumption |]. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply injective_subdomain_antimon. eassumption. *)
+    (*           eapply reach'_set_monotonic. eapply env_locs_monotonic. *)
+    (*           normalize_occurs_free... *)
+    (*         + eapply Hiinvt; try eassumption.  *)
+    (*         + simpl in Hcost. omega. *)
+    (*         + intros i. edestruct (Hstuck1 i) as [r' [m'' Hstep']]. *)
+    (*           inv Hstep'. *)
+    (*           * exists OOT. eexists. econstructor; eauto. *)
+    (*           * repeat subst_exp. *)
+    (*             simpl in Htag0; rewrite Heq in Htag0. repeat subst_exp. *)
+    (*             simpl in Hbs0. *)
+    (*             do 2 eexists. eapply Eval_case_gc. *)
+    (*             simpl in Hcost0. simpl. omega. *)
+    (*             eassumption. eassumption. eassumption. eassumption. *)
+    (*         + inv Hstep2. *)
+    (*           * (* Timeout! *) *)
+    (*             { simpl in Hcost0. exists OOT, c2. eexists. exists b'. repeat split. *)
+    (*               - econstructor. simpl. eassumption. reflexivity.  *)
+    (*               - eapply Hinvt; try eassumption. *)
+    (*               - eassumption. } *)
+    (*           * (* termination *) *)
+    (*             { repeat eexists; eauto. *)
+    (*               - eapply Eval_case_per_cc with (c := c2); eauto. *)
+    (*                 simpl. repeat subst_exp. *)
+    (*                 rewrite Heq. eassumption. *)
+    (*             } } *)
+    (* Qed. *)
 
     (** Halt compatibility *)
     Lemma cc_approx_exp_halt_compat (k j : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj)
@@ -1365,77 +1419,7 @@ Module Compat (H : Heap).
         * eapply Hinv with (c' := c'); eauto.
     Qed.
 
-    Lemma cc_approx_exp_right_ctx_compat_inv
-          (k j : nat) rho1 rho2 rho2' H1 H2 H2' e1 C e2 c' :
-      InvCtxCompat_r_inv IL2 IL1 C e1 e2 ->
-      IInvCtxCompat_r_inv IIL2 IIL1 C e1 e2 ->
-      
-      well_formed (reach' H2 (env_locs rho2 (occurs_free (C |[ e2 ]|)))) H2 ->
-      (env_locs rho2 (occurs_free (C |[ e2 ]|))) \subset dom H2 ->
-
-      ctx_to_heap_env_CC C H2 rho2 H2' rho2' c' ->
-      (e1, rho1, H1) ⪯ ^ (k; j; IIL1 ; IIG ; IL1 ; IG) (C |[ e2 ]|, rho2, H2) ->
-      (e1, rho1, H1) ⪯ ^ (k; j; IIL2 ; IIG ; IL2 ; IG) (e2, rho2', H2').
-    Proof with now eauto with Ensembles_DB.
-      intros Hinv Hiinv Hwf2  Henv2 Hctx Hpre.
-      intros b1 b2 H1' H3 rho1' rho3 v1 k1 m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1. 
-      (* edestruct ctx_to_heap_env_determistic as [H3' [rho3' [b' [Heq' [Hinj Heval]]]]]; try eassumption.  *)
-    (*   edestruct Hpre as [r1 [c3 [m2 [b'' [Hstep2 [Hinv' Hccr]]]]]]; try eassumption.  *)
-    (*   + eapply Hiinv; try eassumption. *)
-    (*   + eexists r1, (c3 + c'), m2, b''. split; [| split ]; try eassumption. *)
-    (*     * eapply ctx_to_heap_env_big_step_compose; try eassumption. *)
-    (*     * eapply Hinv with (c' := c'); eauto. *)
-    (* Qed. *) (* WF assumptions easy *)
-    Admitted. 
-
 
   End CompatLemmas.
-
-  Lemma cc_approx_exp_case_compat_ctx IIG IG IL1 IIL1 IL2 IIL2 
-        (k j : nat) (b : Inj)
-        (H1 H2 : heap block) (rho1 rho2 : env) rho2' H2' (x1 x2 : var) (t : cTag)
-        (e1 e2 : exp) (Pats1 Pats2 : list (cTag * exp)) C c' :
-      InvCostBase IL2 IIL2 (Ecase x1 ((t, e1) :: Pats1)) (Ecase x2 ((t, e2) :: Pats2)) -> 
-
-      IInvCaseHdCompat IIL2 IIL2 x1 x2 t Pats1 Pats2 e1 e2 ->
-      InvCaseHdCompat IL2 IL2 x1 x2 t Pats1 Pats2 e1 e2 ->
-      IInvCaseTlCompat IIL2 x1 x2 t Pats1 Pats2 e1 e2 -> 
-      InvCaseTlCompat IL2 x1 x2 t Pats1 Pats2 e1 e2  ->
-
-      InvCtxCompat_r IL1 IL2 C (Ecase x1 ((t, e1) :: Pats1)) (Ecase x2 ((t, e2) :: Pats2)) ->
-      IInvCtxCompat_r IIL1 IIL2 C (Ecase x1 ((t, e1) :: Pats1)) (Ecase x2 ((t, e2) :: Pats2)) ->
-      InvCtxCompat_r_inv IL2 IL1 C (Ecase x1 Pats1) (Ecase x2 Pats2) ->
-      IInvCtxCompat_r_inv IIL2 IIL1 C  (Ecase x1 Pats1) (Ecase x2 Pats2) ->
-      
-      (forall j, cc_approx_var_env k j IIG IG b H1 rho1 H2' rho2' x1 x2) ->
-      ctx_to_heap_env_CC C H2 rho2 H2' rho2' c' ->
-      
-      (k >= cost (Ecase x1 Pats1) -> (e1, rho1, H1) ⪯ ^ (k - cost (Ecase x1 Pats1); j; IIL2 ; IIG ; IL2 ; IG) (e2, rho2', H2')) ->
-
-      (Ecase x1 Pats1, rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (C|[ Ecase x2 Pats2 ]|, rho2, H2) ->
-
-      (Ecase x1 ((t, e1) :: Pats1), rho1, H1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG)
-                                                    (C |[ Ecase x2 ((t, e2) :: Pats2) ]|, rho2, H2).
-    Proof with now eauto with Ensembles_DB.
-      intros Hbase Hiinvh Hinvh Hiinvt Hinvt Hr1 Hr2 Hr3 Hr4 Hvar Hctx Hexp_hd Hexp_tl.
-      eapply cc_approx_exp_right_ctx_compat. eapply Hr1. eapply Hr2. 
-      admit. admit. eassumption. 
-      eapply cc_approx_exp_case_compat.
-      - eassumption.
-      - eassumption.
-      - eassumption.
-      - eassumption.
-      - eassumption.
-      - eapply cc_approx_var_env_heap_monotonic. eapply HL.subheap_refl.
-        eapply ctx_to_heap_env_CC_subheap.
-        eassumption. admit.
-      - eassumption.
-      - eapply cc_approx_exp_right_ctx_compat_inv; [ | | | | | | | | eassumption ]. exact (1%positive).
-        admit. admit. (* XX remove reduntant params *)
-        eassumption.
-        eassumption. 
-        admit. admit. (* WF easy *) eassumption.
-    Admitted.
-   
 
 End Compat.

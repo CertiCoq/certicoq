@@ -1747,6 +1747,16 @@ Proof with eauto with Ensembles_DB.
     * repeat normalize_bound_var... 
 Qed.
 
+Lemma unique_bindings_Ecase_In x c e Pats :
+  unique_bindings (Ecase x Pats) ->
+    List.In (c, e) Pats ->
+    unique_bindings e.
+Proof. 
+  intros Hun HIn. induction Pats; inv HIn.
+  - inv Hun; eauto.
+  - inv Hun; eauto.
+Qed.
+
 Lemma unique_bindings_ctx_app_Ecase_cons_mut :
   (forall C x c e P
      (Hun1 : unique_bindings e)

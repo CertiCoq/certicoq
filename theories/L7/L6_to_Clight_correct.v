@@ -2245,12 +2245,16 @@ Qed.
 
 
 (* Domain of find_symbol (globalenv p) is disjoint from bound_var e /\ \sum bound_var_val x *)
-Definition functions_not_bound (e:exp): Prop :=
-  forall x,
+Definition functions_not_bound (rho:L6.eval.env) (e:exp): Prop :=
+  (forall x,
     bound_var e x ->
-    Genv.find_symbol (globalenv p) x = None.
+    Genv.find_symbol (globalenv p) x = None)/\
+  (forall x y v,
+      M.get y rho = Some v ->
+      bound_var_val v x ->
+      Genv.find_symbol (globalenv p) x = None).
 
-SearchAbout unique_bindings fundefs.
+
 
 Inductive unique_bindings_val: L6.cps.val -> Prop :=
 | UB_Vfun: forall rho fds f,
@@ -2292,17 +2296,30 @@ unique_bindings_env rho e *)
 
   
 Theorem functions_not_bound_subterm:
-  forall e,
-    functions_not_bound e ->
+  forall rho e,
+    functions_not_bound rho e ->
     forall e',
     subterm_e e' e ->
-    functions_not_bound e'.
+    functions_not_bound rho e'.
 Proof.
-  intros. intro; intros.
+  intros. split. intro; intros. 
   apply H.
   eapply bound_var_subterm_e; eauto.
+  apply H.
 Qed.  
 
+Theorem functions_not_bound_set:
+    forall rho e y v,
+      functions_not_bound rho e ->
+      (forall x, bound_var_val v x -> Genv.find_symbol (globalenv p) x = None) ->
+      functions_not_bound (M.set y v rho) e.
+Proof.
+  intros. split. apply H.
+  intros. destruct (var_dec y0 y).
+  - subst. rewrite M.gss in H1. inv H1. destruct H. apply H0. auto.
+  - rewrite M.gso in H1 by auto. inv H. eapply H4; eauto.
+Qed.
+    
 Definition protected_id_not_bound  (rho:L6.eval.env) (e:exp) : Prop :=
   (forall x y v, M.get x rho = Some v ->
                  is_protected_id  y ->
@@ -3702,7 +3719,7 @@ Theorem repr_bs_L6_L7_related:
                     correct_envs cenv ienv rep_env e ->
                     protected_id_not_bound_id rho e ->
                     unique_bindings_env rho e ->
-                    functions_not_bound p e -> 
+                    functions_not_bound p rho e -> 
                     forall stm lenv m k max_alloc fu, repr_expr_L6_L7_id fenv p rep_env e stm ->
                                               rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho m lenv ->
                                               correct_alloc e max_alloc -> 
@@ -4949,7 +4966,18 @@ Forall2
       - inv Hp_id.
         intro. eapply H2; eauto.
     }
-    assert (Hf_id_e:  functions_not_bound p e). eapply functions_not_bound_subterm; eauto. constructor. constructor.
+    assert (Hf_id_e:  functions_not_bound p (cps.M.set x (Vconstr t vs) rho) e). {
+      eapply functions_not_bound_subterm.
+      eapply functions_not_bound_set;
+        eauto.
+      - intros.
+        inv H0.
+        inv Hf_id.
+        assert (Hx0rho := getlist_In_val _ _ _ _ H H5).
+        destruct Hx0rho. destruct H2.       
+        eapply H1; eauto.        
+      - constructor. constructor.
+    }
     assert (H_rho_e:  unique_bindings_env (cps.M.set x (Vconstr t vs) rho) e ).
     {  destruct Hrho_id as [Hub Hrho_id].
       split.
@@ -5047,7 +5075,16 @@ Forall2
         constructor; auto.
     }
     specialize (IHHev Hp_id_e).
-    assert (Hf_id_e: functions_not_bound p e). eapply functions_not_bound_subterm; eauto. constructor. constructor.
+    assert (Hf_id_e: functions_not_bound p (cps.M.set x v rho) e). {
+      eapply functions_not_bound_subterm.
+      eapply functions_not_bound_set; eauto.
+      - intros.
+        inv Hf_id. eapply H9. apply Hyv6.
+        econstructor. apply H2.
+        eapply nthN_In; eauto.
+      - constructor. constructor.
+    }
+      
     assert (Hrho_id_e: unique_bindings_env (cps.M.set x v rho) e). {
       destruct Hrho_id as [Hub Hrho_id].
       split.
@@ -5280,7 +5317,7 @@ Forall2
         eapply Bound_Ecase; eauto.
         eapply findtag_In; eauto.
     }
-    assert (Hf_id_e: functions_not_bound p e).
+    assert (Hf_id_e: functions_not_bound p rho e).
     {
       eapply functions_not_bound_subterm.
       eauto.
@@ -5357,7 +5394,7 @@ Forall2
     constructor. auto.    
   - (* Eapp *)
     
-    (* need assumption that unique_binding_env -> done! and functions_not_bound is preserved by all closures (rho', e) in rho *)
+    (* need assumption that unique_binding_env -> done! and functions_not_bound is preserved by all closures (rho', e) in rho - DONE *)
     (* Should and protected_id_not_bound_id is preserved by prefixes *)
     (* also need to should that correct_cenv_of_exp is respected for all constructors found *)
     (* > new max_alloc is correct_alloc for e *)

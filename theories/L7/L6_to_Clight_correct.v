@@ -774,7 +774,10 @@ Proof.
       omega. 
 Qed.
  
-SearchAbout Int.modulus.
+
+Definition prefix_ctx {A:Type} rho' rho :=
+  forall x v, M.get x rho' = Some v -> @M.get A x rho = Some v.
+
 
 
 (* keep around the fact that t is no bigger than 2^(int_size-1) [which we know by correct_crep] *)
@@ -2241,19 +2244,52 @@ Proof.
 Qed.
 
 
- 
+(* Domain of find_symbol (globalenv p) is disjoint from bound_var e /\ \sum bound_var_val x *)
 Definition functions_not_bound (e:exp): Prop :=
   forall x,
     bound_var e x ->
     Genv.find_symbol (globalenv p) x = None.
 
+SearchAbout unique_bindings fundefs.
 
+Inductive unique_bindings_val: L6.cps.val -> Prop :=
+| UB_Vfun: forall rho fds f,
+    unique_bindings_fundefs fds ->
+    unique_bindings_val (Vfun rho fds f)
+| UB_Vconstr: forall c vs,
+    Forall unique_bindings_val vs ->
+    unique_bindings_val (Vconstr c vs)
+|UB_VInt: forall z,
+    unique_bindings_val (cps.Vint z)
+.
+
+      
 (* UB + disjoint bound and in env *)
 Definition unique_bindings_env (rho:L6.eval.env) (e:exp) : Prop :=
       unique_bindings e  /\ 
-      forall x,
-    (exists v, M.get x rho = Some v) ->
-    ~ bound_var e x.
+      (forall x v,
+        M.get x rho = Some v ->
+    ~ bound_var e x /\ unique_bindings_val v). 
+
+Theorem unique_bindings_env_prefix:
+  forall e rho,
+    unique_bindings_env rho e ->
+    forall rho',
+  prefix_ctx rho' rho ->
+  unique_bindings_env rho' e.
+Proof.
+  intros.
+  inv H.
+  split; auto.
+Qed.  
+
+
+(* TODO: also need UB for the functions in rho
+Theorem unique_bindings_env_weaken :
+  unique_bindings_env rho e ->
+  rho' subseteq rho
+unique_bindings_env rho e *)
+
   
 Theorem functions_not_bound_subterm:
   forall e,
@@ -2274,6 +2310,35 @@ Definition protected_id_not_bound  (rho:L6.eval.env) (e:exp) : Prop :=
   (forall y, is_protected_id  y ->
              ~ bound_var e y).
 
+Theorem find_def_bound_in_bundle:
+  forall e y t xs f fds,
+  bound_var e y ->
+  find_def f fds = Some (t, xs, e) ->            
+  bound_var_fundefs fds y.
+Proof.
+  induction fds; intros.
+  simpl in H0. destruct (cps.M.elt_eq f v). inv H0. constructor 3; auto.
+  constructor 2. apply IHfds; auto.
+  inv H0.
+Qed.
+  
+Theorem protected_id_not_bound_closure:
+  forall rho e e' f' f fds rho' t xs,
+    protected_id_not_bound rho e ->
+    M.get f rho = Some (Vfun rho' fds f') ->
+    find_def f' fds = Some (t, xs, e') ->
+   protected_id_not_bound rho e'.
+Proof.
+  intros.
+  inv H.
+  split. auto.
+  intros.
+  intro.
+  specialize (H2 _ _ _ H0 H).
+  apply H2. right.
+  constructor. 
+  eapply find_def_bound_in_bundle; eauto.
+Qed.  
 
 Inductive empty_cont: cont -> Prop :=
 | Kempty_stop: empty_cont Kstop
@@ -3881,9 +3946,9 @@ Proof.
           auto.
 
           intro.
-          eapply Hrho_id.
-          eapply getlist_In; eauto.
-          constructor.
+          eassert (Hxrho := getlist_In _ _ _ _ H H4).
+          destruct Hxrho as [vv Hxrho].
+          eapply Hrho_id; eauto.
           
           
           intro.
@@ -4482,9 +4547,10 @@ Proof.
                   
                   rewrite get_var_or_funvar_list_correct in Hvs7. rewrite <- get_var_or_funvar_list_set in Hvs7.
                   rewrite <- get_var_or_funvar_list_set in Hvs7.
-                  Focus 2. intro. eapply Hrho_id.
-                  eapply getlist_In; eauto.
-                  constructor.
+                  Focus 2. intro.
+                  assert (Hxrho := getlist_In _ _ _ _ H H6).
+                  destruct Hxrho as [vv Hxrho].
+                  eapply Hrho_id; eauto.
                   Focus 2. intro.
                   inv Hp_id.
                   
@@ -4885,16 +4951,21 @@ Forall2
     }
     assert (Hf_id_e:  functions_not_bound p e). eapply functions_not_bound_subterm; eauto. constructor. constructor.
     assert (H_rho_e:  unique_bindings_env (cps.M.set x (Vconstr t vs) rho) e ).
-    { destruct Hrho_id as [Hub Hrho_id].
+    {  destruct Hrho_id as [Hub Hrho_id].
       split.
       inv Hub; auto.
-      intro. intros. destruct H0.
+      intro. intros.
       destruct (var_dec x0 x).
-      - subst. (* need unique binding *)
+      - subst. (* need unique binding *)        
         inv Hub. auto.
+        rewrite M.gss in H0. inv H0.
+        split; auto. constructor.
+        apply Forall_forall. intros.         
+        assert (Hx0rho := getlist_In_val _ _ _ _ H H0). destruct Hx0rho as [xx0 [Hinys Hxx0rho]].
+        apply Hrho_id in Hxx0rho. destruct Hxx0rho. auto.
       -  rewrite M.gso in H0 by auto.
-         intro.
-         eapply Hrho_id. exists x1. eauto. constructor 2. auto.
+         apply Hrho_id in H0.
+         destruct H0. split; auto.
     }
     specialize (IHHev Hc_env_e Hp_id_e H_rho_e Hf_id_e).
     assert (Hca_e : correct_alloc e (Z.of_nat (max_allocs e))).
@@ -4980,11 +5051,15 @@ Forall2
     assert (Hrho_id_e: unique_bindings_env (cps.M.set x v rho) e). {
       destruct Hrho_id as [Hub Hrho_id].
       split.
-      inv Hub; auto.
-      intros. destruct H2. destruct (var_dec x0 x).
-      - subst. inv Hub; auto.
-      - rewrite M.gso in H2 by auto. intro.
-        eapply Hrho_id. exists x1. apply H2. constructor; auto.
+      inv Hub; auto. 
+      intros. destruct (var_dec x0 x).
+      - subst. rewrite M.gss in H2. inv H2. inv Hub; auto.
+        split; auto.
+        apply Hrho_id in Hyv6.
+        destruct Hyv6. inv H3. rewrite Forall_forall in H11.
+        apply H11; auto. eapply nthN_In. eauto.
+      - rewrite M.gso in H2 by auto. apply Hrho_id in H2.
+        destruct H2. split; auto.
     }
     specialize (IHHev Hrho_id_e Hf_id_e _ (Maps.PTree.set x v7' lenv) m k max_alloc fu H7).    
     assert (Hx_not:  ~ is_protected_id_thm x). {
@@ -5198,10 +5273,10 @@ Forall2
       - assert (Hcase := shrink_cps_correct.ub_case_inl).
         specialize (Hcase ctx.Hole_c). simpl in Hcase.
         eapply Hcase; eauto.
-      - intros; intro.
-        destruct H3.
-        eapply H2.
-        exists x0; eauto.
+      - intros. apply H2 in H3.
+        destruct H3; split; auto.
+        intro.
+        apply H3.        
         eapply Bound_Ecase; eauto.
         eapply findtag_In; eauto.
     }
@@ -5279,9 +5354,28 @@ Forall2
     eapply t_trans.
     constructor. constructor.
     constructor.
-    constructor. auto.        
+    constructor. auto.    
   - (* Eapp *)
     
+    (* need assumption that unique_binding_env -> done! and functions_not_bound is preserved by all closures (rho', e) in rho *)
+    (* Should and protected_id_not_bound_id is preserved by prefixes *)
+    (* also need to should that correct_cenv_of_exp is respected for all constructors found *)
+    (* > new max_alloc is correct_alloc for e *)
+    (* > tinfo is updated to reflect the max_alloc of e *)
+    (* IH will be on Hev with rho'' |- e -> v. Need to show that rho' is a sufficient prefix of rho, and create a related mem *)
+
+    
+    
+    eexists. eexists.
+    split.
+
+    (* step through s*) 
+    eapply t_trans.
+    constructor. constructor.
+    
+
+    
+    admit.
     admit.
   - (* Ehalt *)
 

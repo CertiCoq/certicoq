@@ -2819,6 +2819,34 @@ Qed.
                                     N.of_nat (length ys) = a
                                   | None => False
                                   end) e.
+
+
+  Theorem Forall_constructors_in_constr:
+  forall P x t ys e,
+  Forall_constructors_in_e P (Econstr x t ys e) ->
+  P x t ys.
+  Proof.
+    intros.
+    unfold Forall_constructors_in_e in *.
+    eapply H.
+    apply rt_refl.
+  Qed.
+
+
+  
+Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
+| CCV_constr:forall cenv c vs a name it n,
+    Forall (correct_cenv_of_val cenv) vs ->
+    M.get c cenv = Some (name, it, a, n) ->
+    N.of_nat (length vs) = a ->
+    correct_cenv_of_val cenv (Vconstr c vs)
+| CCV_fun: forall cenv rho fds f,
+    Forall_fundefs (fun v t xs e => correct_cenv_of_exp cenv e) fds ->
+    correct_cenv_of_val cenv (Vfun rho fds f)
+| CCV_int: forall cenv z,
+    correct_cenv_of_val cenv (cps.Vint z).
+                          
+  
   
   Definition correct_ienv_of_cenv: L6.cps.cEnv -> iEnv -> Prop :=
     fun cenv ienv =>
@@ -2857,24 +2885,48 @@ Qed.
                      correct_crep cenv ienv c crep).
 
 
-  Definition correct_envs: cEnv -> iEnv -> M.t cRep -> exp -> Prop :=
-    fun cenv ienv crep_env e =>
+  Definition correct_cenv_of_env: cEnv -> cps.M.t cps.val -> Prop :=
+    fun cenv rho =>
+      forall x v,
+        M.get x rho = Some v ->
+        correct_cenv_of_val cenv v.
+  
+  Definition correct_envs: cEnv -> iEnv -> M.t cRep ->  cps.M.t cps.val ->  exp -> Prop :=
+    fun cenv ienv crep_env rho e =>
       correct_ienv_of_cenv cenv ienv /\
+      correct_cenv_of_env cenv rho /\
       correct_cenv_of_exp cenv e /\
       correct_crep_of_env cenv ienv crep_env. 
    
   Theorem correct_envs_subterm:
-    forall cenv ienv crep e,
-           correct_envs cenv ienv crep e ->
+    forall cenv ienv crep rho e,
+           correct_envs cenv ienv crep rho e ->
     forall e', subterm_e e' e ->
-               correct_envs cenv ienv crep e'.
+               correct_envs cenv ienv crep rho e'.
   Proof.
     intros.
-    inv H. inv H2. split; auto.
-    split; auto.
+    inv H. inv H2. inv H3. split; auto.
+    split; auto. split; auto.
     eapply Forall_constructors_subterm; eauto.
   Qed.    
-     
+
+
+  Theorem correct_envs_set:
+    forall cenv ienv crep rho x v e,
+    correct_envs cenv ienv crep rho e ->
+    correct_cenv_of_val cenv v ->
+    correct_envs cenv ienv crep (M.set x v rho) e. 
+  Proof.
+    intros.
+    inv H. inv H2. inv H3.
+    split; auto. split; auto.
+    intro; intros. destruct (var_dec x0 x).
+    - subst. rewrite M.gss in H3; inv H3; auto.
+    - rewrite M.gso in H3 by auto.
+      eapply H; eauto.
+  Qed.
+
+  
   (* 
    correct_tinfo alloc_id limit_id args_id alloc_max le m
   > alloc and limit are respectively valid and weak-valid pointers in memory, alloc is at least max before limit_id
@@ -3712,11 +3764,11 @@ Proof.
       unfold Int.max_unsigned. simpl. omega.
 Qed.
 
- 
+  
 Theorem repr_bs_L6_L7_related:
   forall p rep_env cenv fenv finfo_env ienv,
   forall rho v e n, bstep_e (M.empty _) cenv rho e v n ->                    
-                    correct_envs cenv ienv rep_env e ->
+                    correct_envs cenv ienv rep_env rho e ->
                     protected_id_not_bound_id rho e ->
                     unique_bindings_env rho e ->
                     functions_not_bound p rho e -> 
@@ -3748,18 +3800,11 @@ Proof.
       - (* boxed *)
 
         assert (Ha_l : a = N.of_nat (length ys) /\ ys <> []). {          
-          assert (subterm_or_eq (Econstr x t ys e) (Econstr x t ys e)) by constructor 2.
-          inv Hc_env. destruct H5.
-          apply H5 in H3.   destruct (M.get t cenv) eqn:Hmc. destruct c0. destruct p0. destruct p0.
-          subst.
-          
-          inv H6.
-          assert (Hmc' := Hmc). apply H3 in Hmc. destructAll.
-          rewrite H6 in H0. inv H0.
-          inv H9. rewrite Hmc' in H11. inv H11. split. reflexivity.
-          destruct ys. inv H2.
-          intro. inv H0.
-          inv H3.
+          assert (subterm_or_eq (Econstr x t ys e) (Econstr x t ys e)) by constructor 2.  
+          inv Hc_env. destruct H5 as [H5' H5]. destruct H5 as [H5 H6].
+          apply H5 in H3.   destruct (M.get t cenv) eqn:Hmc. destruct c0. destruct p0. destruct p0. inv H6.
+          apply H9 in H0. inv H0. rewrite H10 in Hmc. inv Hmc.
+          split; auto. destruct ys. inv H2. intro. inv H0. inv H3.
         }
 
         
@@ -4948,8 +4993,20 @@ Forall2
     destruct H0 as [lenv' [m' [Hstep [Hrel_m' Htinfo_e]]]].
     
     (* set up the with the recursive call *)
-    assert (Hc_env_e: correct_envs cenv ienv rep_env e). {
-      eapply correct_envs_subterm; eauto. constructor. constructor.
+    assert (Hc_env_e: correct_envs cenv ienv rep_env (cps.M.set x (Vconstr t vs) rho) e). {
+      eapply correct_envs_subterm.
+      eapply correct_envs_set.
+      eauto.
+      - inv Hc_env.
+        destructAll.
+        apply Forall_constructors_in_constr in H2. destruct (M.get t cenv) eqn:Mtcenv. Focus 2. inv H2. destruct c0. destruct p. destruct p0. destruct p.
+        econstructor; eauto.        
+        Focus 2. apply getlist_length_eq in H. subst. auto.
+        apply Forall_forall. intros.
+        assert (Hgiv := getlist_In_val _ _ _ _ H H4).
+        destruct Hgiv. destruct H5.
+        eapply H1. eauto.
+      - constructor. constructor.
     }
     assert (Hp_id_e: protected_id_not_bound_id (cps.M.set x (Vconstr t vs) rho) e).
     { split; intros.
@@ -5055,8 +5112,17 @@ Forall2
     }
 
     simpl in Hc_alloc.
-    assert (Hc_env_e: correct_envs cenv ienv rep_env e). {
-      eapply correct_envs_subterm; eauto. constructor. constructor.
+    assert (Hc_env_e: correct_envs cenv ienv rep_env (cps.M.set x v rho) e). {
+      eapply correct_envs_subterm.
+      eapply correct_envs_set.
+      eauto.
+      - inv Hc_env. destructAll.
+        apply nthN_In in H0.
+        apply H3 in Hyv6. inv Hyv6.
+        
+        rewrite Forall_forall in H14.
+        apply H14; auto.
+      - constructor. constructor.
     }
     specialize (IHHev Hc_env_e).
     assert (Hp_id_e: protected_id_not_bound_id (cps.M.set x v rho) e).
@@ -5188,7 +5254,7 @@ Forall2
       - (* unboxed *)
         exists (Vfalse).
         assert (exists s s', seq_of_labeled_statement (select_switch (Z.shiftr (Int.unsigned n0) 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s).
-        eapply case_of_labeled_stm_unboxed; eauto. inv Hc_env; destruct H2; eauto.
+        eapply case_of_labeled_stm_unboxed; eauto. inv Hc_env; destruct H2; destruct H5; eauto.
         destruct H as [s [s' [Hseq Hrepr_es]]].
         exists s, s'.
         split; auto.
@@ -5236,7 +5302,7 @@ Forall2
 
         assert ( exists s s', 
                    (seq_of_labeled_statement (select_switch (Int.unsigned (Int.and h (Int.repr 255))) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s).
-        inv Hc_env. inv H2.
+        inv Hc_env. inv H2. destruct H9.
         eapply case_of_labeled_stm_boxed; eauto.
         destruct H as [s [s' [H_seq H_repr_es]]].
         exists s, s'.
@@ -5288,7 +5354,7 @@ Forall2
     destruct Hstep_case as [vbool [s [s' [Hstep_case H_repr_es]]]].
 
     (* building up the IHHev to use after Hstep_case *)
-    assert (H_cenv_e: correct_envs cenv ienv rep_env e).
+    assert (H_cenv_e: correct_envs cenv ienv rep_env rho e).
     {
       eapply correct_envs_subterm; eauto.
       constructor. eapply dsubterm_case.
@@ -5393,10 +5459,10 @@ Forall2
     constructor.
     constructor. auto.    
   - (* Eapp *)
-    
+     
     (* need assumption that unique_binding_env -> done! and functions_not_bound is preserved by all closures (rho', e) in rho - DONE *)
     (* Should and protected_id_not_bound_id is preserved by prefixes *)
-    (* also need to should that correct_cenv_of_exp is respected for all constructors found *)
+    (* also need to should that correct_cenv_of_exp is respected for all constructors found DONE! *)
     (* > new max_alloc is correct_alloc for e *)
     (* > tinfo is updated to reflect the max_alloc of e *)
     (* IH will be on Hev with rho'' |- e -> v. Need to show that rho' is a sufficient prefix of rho, and create a related mem *)

@@ -998,7 +998,7 @@ Module ClosureConversionCorrect (H : Heap).
         eapply Included_Union_compat in Hc;
           [
           | eapply reach'_set_monotonic ;
-            eapply def_closures_env_locs; try eapply Hclo 
+            eapply Defs.def_closures_env_locs; try eapply Hclo 
           | reflexivity ].
         simpl in Hc.
         rewrite !reach'_Union in Hc. 

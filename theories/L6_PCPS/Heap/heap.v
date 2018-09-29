@@ -13,6 +13,10 @@ Import ListNotations.
 
 Close Scope Z_scope.
 
+
+(** ** Heap module type **) 
+(** The memory model used in the L6 heap semantics *)
+
 Module Type Heap.
 
   Definition loc := positive.
@@ -72,7 +76,7 @@ Module Type Heap.
     domain (fun l => get l H).
   
   (** The restriction of a heap in a given domain *)
-  Parameter restrict : forall {A}, Ensemble loc -> heap A -> heap A -> Prop.  
+  Parameter restrict : forall {A}, Ensemble loc -> heap A -> heap A -> Prop.
 
   Parameter restrict_subheap :
     forall A S (H1 H2 : heap A),
@@ -82,13 +86,13 @@ Module Type Heap.
   Parameter restrict_In :
     forall A (l : loc) (S : Ensemble loc) (H H' : heap A),
       restrict S H H' ->
-      l \in S -> 
-      get l H' = get l H. 
+      l \in S ->
+      get l H' = get l H.
   
   Parameter restrict_notIn :
     forall A (l : loc) (S : Ensemble loc) (H H' : heap A),
       restrict S H H' ->
-      ~ l \in S -> 
+      ~ l \in S ->
       get l H' = None.
 
   (** Restriction in a decidable domain exists. Useful for garbage collection *)
@@ -114,7 +118,8 @@ Module Type Heap.
      NoDup (heap_elements h).
 
   (** Elements filter *)
-  Parameter heap_elements_filter : forall {A} (H : Ensemble loc) {_ : ToMSet H}, heap A -> list (loc * A).
+  Parameter heap_elements_filter :
+    forall {A} (H : Ensemble loc) {_ : ToMSet H}, heap A -> list (loc * A).
   
   Parameter heap_elements_filter_sound :
     forall (A : Type) (S : Ensemble loc) {H : ToMSet S} (h : heap A) (l : loc) (v : A),
@@ -157,6 +162,7 @@ Module Type Heap.
   (** The cardinality of the domain *)
   Definition size {A : Type} (h : heap A) : nat := List.length (heap_elements h).
   
+  
   Definition size_with_measure {A : Type} (f : A -> nat) (h : heap A) : nat :=
     fold_left (fun acc h => acc + f (snd h)) (heap_elements h) 0%nat.
 
@@ -171,22 +177,6 @@ Module Type Heap.
              (f : A -> nat) (S : Ensemble loc) {H : ToMSet S}  (h : heap A) : nat :=
     fold_left (fun acc h => acc + f (snd h)) (heap_elements_minus S h) 0%nat.
 
-
-  Parameter splits : forall {A}, heap A -> heap A -> heap A -> Prop. 
-
-  Parameter splits_spec_Some :
-    forall {A} (H1 H2 H : heap A) (l : loc) (v : A),
-      splits H H1 H2 ->
-      get l H = Some v ->
-      (get l H1 = Some v /\ get l H2 = None) \/
-      (get l H2 = None /\ get l H2 = Some v).
-
-  Parameter splits_spec_None :
-    forall {A} (H1 H2 H : heap A) (l : loc),
-      splits H H1 H2 ->
-      get l H = None ->
-      get l H1 = None /\ get l H2 = None.
-
 End Heap.
 
 Module HeapLemmas (H : Heap).
@@ -199,6 +189,23 @@ Module HeapLemmas (H : Heap).
     eapply Pos.eq_dec.
   Qed.
 
+  (** Allocation lemmas *)
+
+  Lemma alloc_In_dom {A} H1 (v :A) l H2 :
+    alloc v H1 = (l, H2) ->
+    l \in dom H2.
+  Proof.
+    intros. eexists. erewrite gas; eauto.
+  Qed.
+  
+  Lemma alloc_not_In_dom A {b : A} H1 l1 H1' :
+    alloc b H1 = (l1, H1') ->
+    ~ l1 \in dom H1. 
+  Proof.
+    intros Ha [v1 Hget1]. erewrite alloc_fresh in Hget1; eauto.
+    congruence. 
+  Qed.
+  
   Lemma alloc_subheap {A} (H1 H1' : heap A) l v :
     alloc v H1 = (l, H1') ->
     H1 ⊑ H1'.
@@ -207,6 +214,26 @@ Module HeapLemmas (H : Heap).
     + erewrite alloc_fresh in Hget; eauto; congruence.
     + erewrite gao; eauto.
   Qed.
+
+
+  Lemma alloc_dom {A} H (v : A) l H' :
+    alloc v H = (l, H') ->
+    dom H' <--> Union _ [set l] (dom H).
+  Proof. 
+    intros Ha; split; intros l' Hl'. 
+    - destruct Hl' as [v' Hget].
+      destruct (loc_dec l l'); subst; eauto.
+      right. eexists. erewrite <- gao; eauto.
+    - inv Hl'.
+      + inv H0. eexists; erewrite gas; eauto.
+      + destruct H0 as [v' Hget].
+        eexists v'. erewrite gao; eauto.
+        intros Hc; subst. erewrite alloc_fresh in Hget; eauto.
+        discriminate.
+  Qed.
+
+
+  (** [subheap] lemmas *)
 
   Lemma subheap_refl {A} (H : heap A) :
     H ⊑ H.
@@ -221,7 +248,31 @@ Module HeapLemmas (H : Heap).
   Proof.
     firstorder.
   Qed.
+  
+  Lemma subheap_heap_eq {A} (H1 H2 : heap A) :
+    H1 ⊑ H2 ->
+    dom H1 |- H1 ≡ H2.
+  Proof.
+    intros Hsub l [v Hget]. rewrite Hget.
+    eapply Hsub in Hget. congruence.
+  Qed.
 
+  Lemma dom_subheap {A} (H1 H2 : heap A) :
+    H1 ⊑ H2 ->
+    dom H1 \subset dom H2. 
+  Proof.
+    firstorder.
+  Qed.
+
+  Instance Preorder_subheap A : @PreOrder (heap A) subheap. 
+  Proof.
+    constructor. 
+    - intros x. eapply subheap_refl.
+    - intros x y z. eapply subheap_trans.
+  Qed.
+
+  (** [heap_eq] lemmas *)
+  
   Instance Equivalence_heap_eq {A} S : Equivalence (@heap_eq A S).
   Proof.
     constructor. now firstorder. now firstorder.
@@ -241,52 +292,6 @@ Module HeapLemmas (H : Heap).
     firstorder.
   Qed.
 
-  Lemma dom_subheap {A} (H1 H2 : heap A) :
-    H1 ⊑ H2 ->
-    dom H1 \subset dom H2. 
-  Proof.
-    firstorder.
-  Qed.
-
-  Lemma subheap_heap_eq {A} (H1 H2 : heap A) :
-    H1 ⊑ H2 ->
-    dom H1 |- H1 ≡ H2.
-  Proof.
-    intros Hsub l [v Hget]. rewrite Hget.
-    eapply Hsub in Hget. congruence.
-  Qed.
-
-  Lemma alloc_dom {A} H (v : A) l H' :
-    alloc v H = (l, H') ->
-    dom H' <--> Union _ [set l] (dom H).
-  Proof. 
-    intros Ha; split; intros l' Hl'. 
-    - destruct Hl' as [v' Hget].
-      destruct (loc_dec l l'); subst; eauto.
-      right. eexists. erewrite <- gao; eauto.
-    - inv Hl'.
-      + inv H0. eexists; erewrite gas; eauto.
-      + destruct H0 as [v' Hget].
-        eexists v'. erewrite gao; eauto.
-        intros Hc; subst. erewrite alloc_fresh in Hget; eauto.
-        discriminate.
-  Qed.
-
-  Lemma alloc_In_dom {A} H1 (v :A) l H2 :
-    alloc v H1 = (l, H2) ->
-    l \in dom H2.
-  Proof.
-    intros. eexists. erewrite gas; eauto.
-  Qed.
-
-  Lemma alloc_not_In_dom A {b : A} H1 l1 H1' :
-    alloc b H1 = (l1, H1') ->
-    ~ l1 \in dom H1. 
-  Proof.
-    intros Ha [v1 Hget1]. erewrite alloc_fresh in Hget1; eauto.
-    congruence. 
-  Qed.
-
   Lemma heap_eq_dom {A} S (H1 H2 : heap A) S' :
     S |- H1 ≡ H2 ->
     S' \subset dom H1 ->
@@ -297,6 +302,9 @@ Module HeapLemmas (H : Heap).
     specialize (Hsub1 l Hin). destruct Hsub1 as [v Hget].
     rewrite Heq in Hget; eauto.  eexists; eauto.
   Qed.
+
+
+  (** Lemmas about [restrict] *)
 
   Lemma restrict_domain :
     forall A S (H1 H2 : heap A),
@@ -314,8 +322,11 @@ Module HeapLemmas (H : Heap).
     - intros l Hi. inv Hi.
       eapply restrict_In in H0; [| eassumption ].
       destruct H as [v Hget]. exists v. congruence.
-  Qed.      
-  
+  Qed.
+
+
+  (** [heap_elements] lemmas *)
+
   Lemma heap_elements_empty (A : Type) :
     @heap_elements A emp = [].
   Proof.
@@ -357,7 +368,21 @@ Module HeapLemmas (H : Heap).
           erewrite alloc_fresh in H; eauto.
           congruence.
   Qed.
+  
+  Lemma subheap_Subperm (A : Type) (h1 h2 : heap A) : 
+    h1 ⊑ h2 ->
+    Subperm (heap_elements h1) (heap_elements h2).
+  Proof.
+    intros Hsub.
+    eapply incl_Subperm.
+    now eapply heap_elements_NoDup.
+    intros [l v] Hin. eapply heap_elements_sound in Hin. 
+    eapply heap_elements_complete.
+    eauto.
+  Qed.
 
+  (** [heap_elements_filter] lemmas *)
+  
   Lemma heap_elements_filter_empty (A : Type) (S : Ensemble loc) {H : ToMSet S}:
     @heap_elements_filter A S H emp = [].
   Proof.
@@ -495,17 +520,6 @@ Module HeapLemmas (H : Heap).
       eassumption. now inv Hin2.
   Qed.
 
-  Lemma subheap_Subperm (A : Type) (h1 h2 : heap A) : 
-    h1 ⊑ h2 ->
-    Subperm (heap_elements h1) (heap_elements h2).
-  Proof.
-    intros Hsub.
-    eapply incl_Subperm.
-    now eapply heap_elements_NoDup.
-    intros [l v] Hin. eapply heap_elements_sound in Hin. 
-    eapply heap_elements_complete.
-    eauto.
-  Qed.
 
   Lemma heap_elements_filter_Union (A : Type) (S1 : Ensemble loc) {HS1 : ToMSet S1}
         (S2 : Ensemble loc) {HS2 : ToMSet S2}
@@ -556,6 +570,19 @@ Module HeapLemmas (H : Heap).
     inv Hin. eapply heap_elements_filter_complete; eauto.
   Qed.
 
+  Lemma heap_elements_filter_monotonic {A} S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2} (H : heap A):  
+    S1 \subset S2 ->
+    Subperm (heap_elements_filter S1 H) (heap_elements_filter S2 H).
+  Proof.
+    intros Hsub. eapply incl_Subperm.
+    eapply heap_elements_filter_NoDup.
+    intros [l1 b] Hin. eapply heap_elements_filter_sound in Hin.
+    destruct Hin as [Hget Hin].
+    eapply heap_elements_filter_complete; eauto.
+  Qed.
+
+  (** [heap_elements_minus] lemmas *)
+  
   Lemma heap_elements_minus_empty (A : Type) (S : Ensemble loc) {H : ToMSet S}:
     @heap_elements_minus A S H emp = [].
   Proof.
@@ -681,6 +708,8 @@ Module HeapLemmas (H : Heap).
           eapply heap_elements_minus_complete; eassumption.
   Qed.
 
+
+  (** [size] lemmas *)
   
   Lemma size_emp :
     forall (A : Type), @size A emp = 0%nat.
@@ -708,6 +737,8 @@ Module HeapLemmas (H : Heap).
     eapply subheap_Subperm.
     eassumption.
   Qed.
+
+   (** [size_with_measure] lemmas *)
 
   Lemma size_with_measure_emp (A : Type) f :
     @size_with_measure A f emp = 0%nat.
@@ -746,6 +777,27 @@ Module HeapLemmas (H : Heap).
   Qed.
 
 
+  Lemma size_with_measure_get {A} (H1 : heap A) l f b : 
+    get l H1 = Some b ->
+    f b <= size_with_measure f H1. 
+  Proof.
+    intros Hget. unfold size_with_measure. 
+    eapply heap_elements_complete in Hget.
+    generalize (heap_elements H1), Hget. clear Hget.
+    intros ls Hin. induction ls.
+    + inv Hin.
+    + simpl.
+      inv Hin.
+      * simpl. eapply fold_left_extensive.
+        intros [l1 x1] x2. omega.
+      * eapply le_trans. eapply IHls. eassumption.
+        eapply fold_left_monotonic; [| omega ].
+        intros x1 x2 [l1 y1] Hleq. simpl.
+        omega.
+  Qed.
+
+  (** [max_with_measure] lemmas *)
+  
   Lemma max_with_measure_emp (A : Type) f :
     @max_with_measure A f emp = 0%nat.
   Proof.
@@ -792,6 +844,27 @@ Module HeapLemmas (H : Heap).
     + eapply subheap_Subperm. eassumption.
   Qed.
 
+  Lemma max_with_measure_get {A} (H1 : heap A) l f b : 
+    get l H1 = Some b ->
+    f b <= max_with_measure f H1. 
+  Proof.
+    intros Hget. unfold max_with_measure. 
+    eapply heap_elements_complete in Hget.
+    generalize (heap_elements H1), Hget. clear Hget.
+    intros ls Hin. induction ls.
+    + inv Hin.
+    + simpl.
+      inv Hin.
+      * simpl. eapply fold_left_extensive.
+        intros [l1 x1] x2. eapply Max.le_max_l. 
+      * eapply le_trans. eapply IHls. eassumption.
+        eapply fold_left_monotonic; [| omega ].
+        intros x1 x2 [l1 y1] Hleq. simpl.
+        eapply NPeano.Nat.max_le_compat_r. eassumption.
+  Qed.
+
+  (** [size_with_measure_filter] lemmas *)
+ 
   Lemma size_with_measure_filter_emp (A : Type) (S : Ensemble loc) {HS : ToMSet S} f :
     @size_with_measure_filter A f S _ emp = 0%nat.
   Proof.
@@ -938,6 +1011,26 @@ Module HeapLemmas (H : Heap).
     rewrite Hget3. eapply Hsub in Hget3. congruence.
     eassumption.
   Qed.
+
+  Lemma size_with_measure_filter_monotonic {A} S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2}
+        (f : A -> nat) H :
+    S1 \subset S2 ->
+    size_with_measure_filter f S1 H <=
+    size_with_measure_filter f S2 H.
+  Proof.
+    intros Hseq. 
+    unfold size_with_measure_filter.
+    eapply fold_left_subperm.
+    constructor.
+    now econstructor.
+    intros ? ? ?. omega.
+    intros. omega.
+    intros. omega.
+    intros. omega.
+    eapply heap_elements_filter_monotonic. eassumption.
+  Qed.
+
+  (** [size_with_measure_minus] lemmas *)
   
   Lemma size_with_measure_minus_emp (A : Type) (S : Ensemble loc) {HS : ToMSet S} f :
     @size_with_measure_minus A f S _ emp = 0%nat.
@@ -1146,92 +1239,37 @@ Module HeapLemmas (H : Heap).
     erewrite alloc_fresh in Hc; eauto. congruence.
   Qed.
 
-  Lemma splits_subheap_l {A} (H H1 H2 : heap A) : 
-    splits H H1 H2 -> H1 ⊑ H.
-  Proof.
-    intros Hs l v Hget. destruct (get l H) eqn:Heq'.
-    - eapply splits_spec_Some in Heq'; eauto.
-      destruct Heq' as [[Heq1 Heq22] | [Heq1 Heq2]]; congruence.
-    -  eapply splits_spec_None in Heq'; eauto.
-       destruct Heq'; congruence.
-  Qed.
 
-  Lemma splits_subheap_r {A} (H H1 H2 : heap A) : 
-    splits H H1 H2 -> H2 ⊑ H.
-  Proof.
-    intros Hs l v Hget. destruct (get l H) eqn:Heq'.
-    - eapply splits_spec_Some in Heq'; eauto.
-      destruct Heq' as [[Heq1 Heq22] | [Heq1 Heq2]]; congruence.
-    -  eapply splits_spec_None in Heq'; eauto.
-       destruct Heq'; congruence.
-  Qed.
-
-
-  Lemma max_heap_with_measure_get {A} (H1 : heap A) l f b : 
-    get l H1 = Some b ->
-    f b <= max_with_measure f H1. 
-  Proof.
-    intros Hget. unfold max_with_measure. 
-    eapply heap_elements_complete in Hget.
-    generalize (heap_elements H1), Hget. clear Hget.
-    intros ls Hin. induction ls.
-    + inv Hin.
-    + simpl.
-      inv Hin.
-      * simpl. eapply fold_left_extensive.
-        intros [l1 x1] x2. eapply Max.le_max_l. 
-      * eapply le_trans. eapply IHls. eassumption.
-        eapply fold_left_monotonic; [| omega ].
-        intros x1 x2 [l1 y1] Hleq. simpl.
-        eapply NPeano.Nat.max_le_compat_r. eassumption.
-  Qed.
-
-  Lemma size_with_measure_get {A} (H1 : heap A) l f b : 
-    get l H1 = Some b ->
-    f b <= size_with_measure f H1. 
-  Proof.
-    intros Hget. unfold size_with_measure. 
-    eapply heap_elements_complete in Hget.
-    generalize (heap_elements H1), Hget. clear Hget.
-    intros ls Hin. induction ls.
-    + inv Hin.
-    + simpl.
-      inv Hin.
-      * simpl. eapply fold_left_extensive.
-        intros [l1 x1] x2. omega.
-      * eapply le_trans. eapply IHls. eassumption.
-        eapply fold_left_monotonic; [| omega ].
-        intros x1 x2 [l1 y1] Hleq. simpl.
-        omega.
-  Qed.
-
-  Lemma heap_elements_filter_monotonic {A} S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2} (H : heap A):  
-    S1 \subset S2 ->
-    Subperm (heap_elements_filter S1 H) (heap_elements_filter S2 H).
-  Proof.
-    intros Hsub. eapply incl_Subperm.
-    eapply heap_elements_filter_NoDup.
-    intros [l1 b] Hin. eapply heap_elements_filter_sound in Hin.
-    destruct Hin as [Hget Hin].
-    eapply heap_elements_filter_complete; eauto.
+  Lemma heap_elements_filter_subheap_dom {A} S {Hs : ToMSet S} (H1 H2 : heap A) :
+    S \subset dom H1 ->
+    H1 ⊑ H2 ->
+    Permutation (heap_elements_filter S H1) (heap_elements_filter S H2). 
+  Proof.   
+    intros Ha Hin. 
+    eapply NoDup_Permutation.
+    - eapply heap_elements_filter_NoDup. 
+    - eapply heap_elements_filter_NoDup. 
+    - intros [l' v']; split; intros Hin'.
+      + eapply heap_elements_filter_sound in Hin'.
+        destruct Hin' as [Hin1 Hin2]. 
+        eapply heap_elements_filter_complete.
+        eapply Hin. eassumption. eassumption.
+      + eapply heap_elements_filter_sound in Hin'.
+        destruct Hin' as [Hin1 Hin2]. 
+        eapply heap_elements_filter_complete; [| eassumption ].
+        eapply Ha in Hin2. edestruct Hin2 as [v Hget1].
+        rewrite Hget1. eapply Hin in Hget1. congruence. 
   Qed.
   
-  Lemma size_wirh_measure_filter_monotonic {A} S1 `{HS1 : ToMSet S1}  S2 `{HS2 : ToMSet S2}
-        (f : A -> nat) H :
-    S1 \subset S2 ->
-    size_with_measure_filter f S1 H <=
-    size_with_measure_filter f S2 H.
+  Lemma size_with_measure_filter_dom {A} S {Hs : ToMSet S} f (H1 H2 : heap A) :
+    S \subset dom H1 ->
+    H1 ⊑ H2 ->
+    size_with_measure_filter f S H1 = size_with_measure_filter f S H2.
   Proof.
-    intros Hseq. 
-    unfold size_with_measure_filter.
-    eapply fold_left_subperm.
-    constructor.
-    now econstructor.
-    intros ? ? ?. omega.
+    intros Hinc Hsub.
+    eapply fold_permutation; eauto.
     intros. omega.
-    intros. omega.
-    intros. omega.
-    eapply heap_elements_filter_monotonic. eassumption.
+    eapply heap_elements_filter_subheap_dom; eauto. 
   Qed.
-
+  
 End HeapLemmas.

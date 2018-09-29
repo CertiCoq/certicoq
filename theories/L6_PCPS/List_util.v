@@ -5,7 +5,7 @@
 
 From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
          omega.Omega Numbers.BinNums Structures.OrdersEx Sets.Ensembles
-         Lists.SetoidList ZArith Arith Sorting.Permutation.
+         Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation.
 
 From L6 Require Import Ensembles_util tactics.
 
@@ -727,6 +727,20 @@ Proof.
   intros Hassoc Hp. revert acc. induction Hp; intros acc.
   - reflexivity.
   - simpl. rewrite IHHp. reflexivity.
+  - simpl. rewrite Hassoc. reflexivity.
+  - rewrite IHHp1. eapply IHHp2.
+Qed.
+
+Definition fold_permutationA (A B : Type) (R : relation A)
+           (l1 l2 : list A) (f : B -> A -> B) acc :
+  (forall x y z, f (f z y) x = f (f z x) y) ->
+  (forall x y1 y2, R y1 y2 -> f x y1 = f x y2) -> 
+  PermutationA R l1 l2 ->
+  fold_left f l1 acc = fold_left f l2 acc. 
+Proof.
+  intros Hassoc Hr Hp. revert acc. induction Hp; intros acc.
+  - reflexivity.
+  - simpl. rewrite IHHp. erewrite Hr; [| eassumption ]. reflexivity.
   - simpl. rewrite Hassoc. reflexivity.
   - rewrite IHHp1. eapply IHHp2.
 Qed.

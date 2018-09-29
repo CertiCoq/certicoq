@@ -2225,23 +2225,7 @@ Module CC_log_rel (H : Heap).
     eassumption.
   Qed.
 
-  Lemma heap_env_approx_key_set b1 H1 rho1 b2 H2 rho2 : 
-    heap_env_approx (Full_set _) (b1, (H1, rho1)) (b2, (H2, rho2)) ->
-    key_set rho1 \subset key_set rho2.
-  Proof.
-    intros Hap x Hiny. unfold key_set in *.
-    unfold In in *. simpl in *. destruct (M.get x rho1) eqn:Hget1; try contradiction.
-    edestruct Hap as [l1' [Hr2 Hres1]]; eauto. now constructor.
-    now rewrite Hr2.
-  Qed.
-
-  Lemma heap_env_equiv_key_set b1 H1 rho1 b2 H2 rho2 : 
-    Full_set _ |- (H1, rho1) ⩪_( b1, b2) (H2, rho2) ->
-    key_set rho1 <--> key_set rho2.
-  Proof.
-    intros [Henv1 Henn2]; split; eapply heap_env_approx_key_set; eauto.
-  Qed. 
-
+  
 
   Lemma cc_approx_val_res_eq (k j : nat) (b' b1 b2 : Inj) (H1 H2 H1' H2' : heap block)
         (v1 v2 v1' v2' : value) :

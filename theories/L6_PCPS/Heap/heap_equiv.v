@@ -390,7 +390,6 @@ Module HeapEquiv (H : Heap).
   Qed. 
 
 
-  (** * Lemmas about [reach_size] *)
 
   (** * Lemmas about [res_approx] and [res_equiv] *)
 

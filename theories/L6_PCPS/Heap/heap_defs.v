@@ -338,6 +338,14 @@ Module HeapDefs (H : Heap) .
   
   Definition subst_env b rho := M.map (fun _ => subst_val b) rho.
 
+  Definition subst_block f b : block :=
+    match b with
+      | Constr c vs => Constr c (map (subst_val f) vs)
+      | Clos v1 v2 => Clos (subst_val f v1) (subst_val f v2)
+      | Env rho => Env (subst_env f rho)
+    end.
+
+
   (** * Restriction of environments *)
 
   Definition restrict_env (s : PS.t) (rho : env) : env :=

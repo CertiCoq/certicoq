@@ -257,32 +257,32 @@ Module Size (H : Heap).
     simpl. omega.
   Qed.
 
-
-  Lemma cost_heap_GC H1 H2 S `{ToMSet S} c b : 
-    live' S H1 H2 b ->
-    cost_heap c H2 <= cost_heap c H1.
-  Proof.
-  Admitted.
-
   Lemma size_cc_heap_GC H1 H2 S `{ToMSet S} b : 
     live' S H1 H2 b ->
     size_cc_heap H2 <= size_cc_heap H1.
   Proof.
-  Admitted.
+    intros. eapply live_size_with_measure_leq; [| eassumption | ].
+    eassumption.
+    intros. eapply block_equiv_size_cc_block. eassumption.
+  Qed. 
   
   Lemma cost_time_heap_GC H1 H2 S `{ToMSet S} b : 
     live' S H1 H2 b ->
     cost_time_heap H2 <= cost_time_heap H1.
   Proof.
-    intros. eapply cost_heap_GC.
-    eassumption. eassumption.
+    intros. eapply live_max_with_measure_leq; [| eassumption | ].
+    eassumption.
+    intros. eapply block_equiv_cost_time_block. eassumption.
   Qed.
-
+  
   Lemma cost_mem_heap_GC H1 H2 S `{ToMSet S} b : 
     live' S H1 H2 b ->
     cost_mem_heap H2 <= cost_mem_heap H1.
   Proof.
-  Admitted.
+    intros. eapply live_max_with_measure_leq; [| eassumption | ].
+    eassumption.
+    intros. eapply block_equiv_cost_mem_block. eassumption.
+  Qed.
 
   Lemma fun_in_fundefs_cost_mem_fundefs Funs {Hf : ToMSet Funs} B f tau xs e: 
     fun_in_fundefs B (f, tau, xs, e) ->
@@ -877,7 +877,7 @@ Module Size (H : Heap).
         (Funs : Ensemble var) {Hf : ToMSet Funs}
         (* (Funs' : Ensemble var) {Hf' : ToMSet Funs'} *)
         (S : Ensemble var) {Hst : ToMSet S}
-        (S' : Ensemble var) {Hst' : ToMSet S}
+        (S' : Ensemble var) {Hst' : ToMSet S'}
         B1 B2 e1 e2 k m:
     k <= (1 + (PS.cardinal (@mset (occurs_free_fundefs B1) _))) + m ->
     Funs :&: S' \subset Funs :&: S ->
@@ -1247,7 +1247,8 @@ Module Size (H : Heap).
   
 
   Lemma PreCtxCompat_var_r C e1 e2 i
-        Scope Scope' {_ : ToMSet Scope} {_ : ToMSet Scope'} Funs {_ : ToMSet Funs} Funs' {_ : ToMSet Funs'} S
+        Scope Scope' {_ : ToMSet Scope} {_ : ToMSet Scope'}
+        Funs {_ : ToMSet Funs} Funs' {_ : ToMSet Funs'} S {_ : ToMSet S} 
         fenv c Γ FVs x :
     project_var Util.clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
     x \in S ->
@@ -1328,7 +1329,8 @@ Module Size (H : Heap).
 
 
   Lemma PreCtxCompat_vars_r
-        Scope {Hs : ToMSet Scope} Scope' {Hs' : ToMSet Scope'} Funs {Hf : ToMSet Funs} S
+        Scope {Hs : ToMSet Scope} Scope' {Hs' : ToMSet Scope'} Funs {Hf : ToMSet Funs}
+        S {HS : ToMSet S}
         Funs' {Hf' : ToMSet Funs'} fenv
         C e1 e2 c Γ FVs x i :
     FromList x \subset S ->
@@ -1864,13 +1866,15 @@ Module Size (H : Heap).
         eapply HL.size_with_measure_filter_monotonic. now eauto with Ensembles_DB.
         intros Hc; inv Hc. eauto. } 
       (* reachable part *)
-      assert (Hsize2 : size_with_measure_filter size_val (image β Scope) H2' <= size_with_measure_filter size_val Scope H1'
-                                                                               + size_with_measure_filter size_cc_block Scope H1').
+      assert (Hsize2 : size_with_measure_filter size_val (image β Scope) H2' <=
+                       size_with_measure_filter size_val Scope H1'
+                       + size_with_measure_filter size_cc_block Scope H1').
       { eapply size_reachable_leq. eassumption. reflexivity. }
       
       assert (Hlem : forall f, size_with_measure_filter f Scope H1' = size_with_measure_filter f Scope H1''). 
-      { intros f. eapply HL.size_with_measure_filter_dom.
-        eapply cc_approx_heap_dom1 with (j := 0). now eauto. eapply def_funs_subheap; eauto. }
+      { intros f. eapply HL.size_with_measure_filter_subheap_eq.
+        now eapply def_funs_subheap; eauto. 
+        eapply cc_approx_heap_dom1 with (j := 0). now eauto.  }
       
       rewrite <- !Hlem.
       (* def_closure *)

@@ -74,7 +74,6 @@ Module Top (H : Heap).
     - intros [[H1 rho1] e1'] [[H2 rho2] e2'] Hpre.
       eapply PreSubsetCompat with (Funs := Empty_set var).
       eassumption. rewrite Intersection_Empty_set_abs_l...
-    - tci.
     - intros j1. eapply cc_approx_env_Empty_set.
     - intros j2. split.
       + rewrite env_locs_set_In, <- env_locs_Empty; [| reflexivity ].
@@ -114,7 +113,7 @@ Module Top (H : Heap).
       now eauto with Ensembles_DB.
 
       Grab Existential Variables.
-      tci. exact id.
+      tci. tci. exact id.
   Qed.
 
   (** ** Top-level theorem *) 

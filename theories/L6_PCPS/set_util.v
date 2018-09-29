@@ -659,7 +659,13 @@ Proof.
     eapply FromSet_complete. eapply Hm2; eauto. eassumption. 
 Qed.
 
-
+Instance ToMSetFromList l : ToMSet (FromList l).
+Proof.
+  eexists (union_list PS.empty l).
+  rewrite FromSet_union_list. rewrite FromSet_empty.
+  rewrite Union_Empty_set_neut_l. reflexivity.
+Qed.
+  
 Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
 Proof.
   constructor. intros x.

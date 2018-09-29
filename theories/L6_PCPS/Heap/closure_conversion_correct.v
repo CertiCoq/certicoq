@@ -661,7 +661,7 @@ Module ClosureConversionCorrect (H : Heap).
                   { eapply GC_pre with (Scope := reach' H3 (env_locs rhoc2 (occurs_free ef :&: FromList xs1) :|:
                                                                      (env_locs rhoc' (FromList FVs'))))
                                          (xs2' := Γ'' :: xs1) (β := b').
-                    - tci. 
+                    - eauto 20 with typeclass_instances.
                     - eassumption.
                     - eassumption.
                     - eassumption.
@@ -787,9 +787,8 @@ Module ClosureConversionCorrect (H : Heap).
                 + eapply IHexp with (Scope := (FromList xs1)) (Funs := name_in_fundefs B1)
                                                               (fenv := extend_fundefs' id B1 Γ'')
                                                               (β := b');
-                    [ | | | | | | | | | eassumption ].
+                    [ | | | | | | | | eassumption ].
                   * eassumption.
-                  * tci.
                   * intros j1.
                     eapply cc_approx_env_P_set_not_in_P_r.
                     eapply cc_approx_env_heap_monotonic; [| | ].
@@ -1304,9 +1303,8 @@ Module ClosureConversionCorrect (H : Heap).
 
             (* Induction hypothesis *)
             { eapply IHk with (Scope := v |: Scope');
-              [ | | | | | | | | | eassumption (* CC *) ].
+              [ | | | | | | | | eassumption (* CC *) ].
               * simpl in *. omega.
-              * now eauto with typeclass_instances.
               * { intros j2.  
                   eapply cc_approx_env_set_alloc_Constr with (b := b' {l1 ~> l2});
                     try eassumption.
@@ -1469,9 +1467,8 @@ Module ClosureConversionCorrect (H : Heap).
           { intros [c1 e1] [c2 e2] Hin1 Hin2 [Heq [C2' [e2cc [Heq2 Hcc]]]]. simpl in Heq, Heq2; subst.
             split. reflexivity. intros Hleq. 
             eapply IHk with (Scope := Scope');
-              [ | | | | | | | | | eassumption (* CC *) ].
+              [ | | | | | | | | eassumption (* CC *) ].
             * simpl in *. omega. 
-            * now eauto with typeclass_instances.
             * intros j1. eapply cc_approx_env_P_monotonic.
               eapply Henv'. omega. 
             * (* FV_inv preservation *)
@@ -1572,9 +1569,8 @@ Module ClosureConversionCorrect (H : Heap).
           { intros v1 v2 Hleqk Hr1 Hr2 Hrel. 
             intros j0. 
             eapply IHk with (Scope := v |: Scope');
-              [ | | | | | | | | | eassumption (* CC *) ].
+              [ | | | | | | | | eassumption (* CC *) ].
             * simpl in *. omega. 
-            * now eauto with typeclass_instances.
             * intros j1. eapply cc_approx_env_P_set.
               eapply cc_approx_env_P_monotonic.
               eapply cc_approx_env_P_antimon. eapply Henv'.
@@ -1707,7 +1703,7 @@ Module ClosureConversionCorrect (H : Heap).
         rewrite <- plus_n_O. eapply le_trans. eapply project_vars_cost_eq'.
         eassumption. omega. 
       
-      + eapply (PreCtxCompat_vars_r); [ | | | eassumption ]; try eassumption.
+      + eapply (PreCtxCompat_vars_r Scope Scope' Funs _ Funs'); [| eassumption ].
         rewrite <- H3. normalize_occurs_free...
       + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
         eapply reach'_set_monotonic. now eapply env_locs_monotonic; eauto.
@@ -1786,9 +1782,8 @@ Module ClosureConversionCorrect (H : Heap).
                 reflexivity. }
               
               eapply IHk with (Scope := Scope' \\ name_in_fundefs f) (β :=  b' {el ~> lenv});
-                [| | | | | | | | | (* CC *) eassumption ].
+                [| | | | | | | | (* CC *) eassumption ].
               + simpl in *. omega. 
-              + tci.
               + intros j1.
                 rewrite <- Setminus_Disjoint with (s2 := name_in_fundefs f);
                   [| now eauto with Ensembles_DB ].
@@ -1835,7 +1830,7 @@ Module ClosureConversionCorrect (H : Heap).
               + (* Fun_inv : IH fundefs *)
                 eapply Closure_conversion_fundefs_correct with (b :=  b' {el ~> lenv})
                                                                  (H1 := H1') (Γ' := Γ').
-                * intros. eapply IHk; [| | | | | | | | | eassumption ]; try eassumption.
+                * intros. eapply IHk; [| | | | | | | | eassumption ]; try eassumption.
                   omega.
                 * tci.
                 * tci.

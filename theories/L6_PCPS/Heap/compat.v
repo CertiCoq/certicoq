@@ -370,7 +370,7 @@ Module Compat (H : Heap).
           + (* initial after GC *)
             eapply HG; eassumption.
           + simpl. omega.
-          + intros i. 
+          + intros i.
             edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m' Hstep']].
             inv Hstep'.
             * omega.

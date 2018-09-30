@@ -186,4 +186,19 @@ Module Top (H : Heap).
 
   Print Assumptions closure_conversion_correct_top.
 
+
+  (* *** Remaining admits as of 09/27 *** *) 
+  (* 1.) The Heap module type (in Heap.v) that we have as parameter in our definitions
+         and proofs.
+
+     2.) big_step_gc_heap_env_equiv_r 
+         -> big_step_GC commutes with heap equivalence 
+
+     3.) live'_live_inv 
+         -> lemma about two equivalent definitions of GC. (* TODO remove this depndency *)
+
+     4.) FunctionalExtensionality.functional_extensionality_dep 
+         
+   *)
+  
 End Top. 

@@ -195,7 +195,7 @@ Module Top (H : Heap).
          -> big_step_GC commutes with heap equivalence 
 
      3.) live'_live_inv 
-         -> lemma about two equivalent definitions of GC. (* TODO remove this depndency *)
+         -> lemma about two equivalent definitions of GC. (* TODO remove this dependency *)
 
      4.) FunctionalExtensionality.functional_extensionality_dep 
          

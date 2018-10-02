@@ -5,7 +5,7 @@
 
 open Pp
 open Printer
-open Template_coq
+open Term_quoter
 open ExceptionMonad   
 open AstCommon
 
@@ -33,4 +33,4 @@ let compile gr =
      AllInstances.printProg (nenv,prg) str;
      AllInstances.printProg (nenv,header) hstr
   | Exc s ->
-     CErrors.errorlabstrm "template-coq" (str "Could not compile: " ++ pr_char_list s)
+     CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s)

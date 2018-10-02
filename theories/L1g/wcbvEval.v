@@ -21,7 +21,11 @@ Set Implicit Arguments.
 (** Big step relation of weak cbv evaluation  **)
 (** every field must evaluate **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
-| wProof: forall t et, WcbvEval p t et -> WcbvEval p (TProof t) et
+| wProof: WcbvEval p TProof TProof
+| wAppProof fn arg args e :
+    WcbvEval p fn TProof ->
+    WcbvEval p (mkApp TProof args) e ->
+    WcbvEval p (TApp fn arg args) e
 | wLam: forall nm ty ty' bod,
     WcbvEval p ty ty' ->
     WcbvEval p (TLambda nm ty bod) (TLambda nm ty' bod)
@@ -141,6 +145,7 @@ Proof.
   try (solve[inversion_Clear H0; intuition]);
   try (solve[inversion_Clear H1; intuition]);
   try (solve[inversion_Clear H2; intuition]).
+  - apply H0. inversion_Clear H1. apply mkApp_pres_WFapp; try assumption. constructor.
   - apply H. unfold lookupDfn in e. case_eq (lookup nm p); intros xc.
     + intros k. assert (j:= lookup_pres_WFapp hp _ k)
       . rewrite k in e. destruct xc. 
@@ -204,8 +209,12 @@ Lemma WcbvEval_wndEvalRTC:
     (forall ts ss, WcbvEvals p ts ss -> WFapps ts -> wndEvalsRTC p ts ss).
 Proof.
   intros p hp. apply WcbvEvalEvals_ind; intros; try (solve [constructor]).
-  - inversion_Clear H0. eapply wndEvalRTC_Proof. intuition. 
-  - inversion_Clear H0. eapply wERTCtrn. 
+  - inversion_Clear H1. eapply wERTCtrn. eapply wERTCtrn.
+    pose (wndEvalRTC_App_fn hp (H H6) H6 H7 H8). simpl in w1.
+    rewrite <- mkApp_goodFn. apply w1. auto.
+    eapply wERTCstep. constructor.
+    apply H0. apply mkApp_pres_WFapp. assumption. constructor.
+  - inversion_Clear H0. eapply wERTCtrn.
     + apply wndEvalRTC_Lam_typ. eapply H. assumption.
     + constructor. 
   - inversion_Clear H0. 
@@ -331,11 +340,7 @@ Function wcbvEval
   | 0 => raise ("out of time: " ++ print_term topt)
   | S n =>
     match topt with      (** look for a redex **)
-    | TProof t =>
-      match wcbvEval n t with
-      | Ret et => Ret et
-      | Exc s => raise ("wcbvEval: TProof; " ++ print_term topt ++ s)
-      end
+    | TProof => Ret TProof
     | TConst nm =>
       match (lookup nm p) with
       | Some (AstCommon.ecTrm t) => wcbvEval n t
@@ -366,6 +371,11 @@ Function wcbvEval
           | Ret (tcons a1' args') => ret (TApp tc a1' args')
           | _ => raise ("wcbvEval TApp: fn, Ret: " ++ print_term tc)
           end
+      | Ret TProof =>
+        match wcbvEval n (mkApp TProof args) with
+        | Ret et => Ret et
+        | Exc s => raise ("wcbvEval: TApp: TProof; " ++ print_term topt ++ s)
+        end
       | Ret tc =>   (* cannot be applied *)
         raise ("wcbvEval TApp: fn cannot be applied: " ++ print_term tc)
       | Exc s => raise ("wcbvEval TApp: fn, Exc: " ++ print_term topt ++ s)
@@ -474,7 +484,7 @@ Proof.
   functional induction (wcbvEvals m args); intros; try discriminate.
   myInjection H0. myInjection H. assumption.
 Qed.
-
+Require Import Lia.
 (** need strengthening to large-enough fuel to make the induction
  *** go through **)
 Lemma pre_WcbvEval_wcbvEval:
@@ -486,12 +496,16 @@ Proof.
   assert (j:forall m, m > 0 -> m = S (m - 1)).
   { induction m; intuition. }
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
-  - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
-    + rewrite (H (m - 1)); try omega. reflexivity. 
+  - destruct H, H0. exists (S (max x x0)). intros m hm.
+    assert(m - 1 >= x) by lia. specialize (H _ H1).
+    assert(m - 1 >= x0) by lia. specialize (H0 _ H2).
+    rewrite <- j in H by lia.
+    rewrite <- j in H0 by lia.
+    simpl. rewrite H. simpl in H0. rewrite H0. reflexivity.
   - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
     + rewrite (H (m - 1)); try omega. reflexivity.
-  - destruct H.  exists (S x). intros m h. simpl.
-    rewrite (j m); try omega. rewrite H; try omega. reflexivity.
+  - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
+    + rewrite (H (m - 1)); try omega. reflexivity. 
   - destruct H. exists (S x). intros mm h. cbn.
     rewrite (j mm); try omega.
     unfold lookupDfn in e. destruct (lookup nm p); try discriminate.

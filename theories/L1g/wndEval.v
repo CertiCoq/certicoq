@@ -45,7 +45,7 @@ Inductive wndEval : Term -> Term -> Prop :=
           dnthBody m dts = Some (x, ix) ->
           wndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
-| sProof: forall t, wndEval (TProof t) t
+| sProofApp arg args : wndEval (TApp TProof arg args) (mkApp TProof args)
 (*** congruence steps ***)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
 *** no congruence on Case branches 
@@ -251,6 +251,10 @@ Proof.
     + apply sProof. assumption.
     + not_isApp.
 ****)
+  (* - apply (@sAppFn TProof TProof a1 args). constructor. *)
+  - destruct args; simpl.
+    + constructor.
+    + constructor.
   - rewrite mkApp_idempotent. constructor. assumption.
   - inversion_Clear H; eapply sAppArgs. 
     + constructor. eassumption.
@@ -601,17 +605,17 @@ Proof.
   - apply mkApp_pres_WFapp; try constructor; assumption.
 Qed.
 
-Lemma wndEvalRTC_Proof:
-  forall t t',
-    wndEvalRTC t t' -> wndEvalRTC (TProof t) t'.
+Lemma wndEvalRTC_Proof: wndEvalRTC TProof TProof.
 Proof.
-  induction 1; intros.
-  - constructor. constructor.
-  - eapply wERTCtrn.
-    + eapply wERTCstep. constructor.
-    + eapply wERTCstep. assumption.
-  - eapply wERTCtrn. apply IHwndEvalRTC1. assumption.
+  constructor.
 Qed.
+(*   induction 1; intros. *)
+(*   - constructor. constructor. *)
+(*   - eapply wERTCtrn. *)
+(*     + eapply wERTCstep. constructor. *)
+(*     + eapply wERTCstep. assumption. *)
+(*   - eapply wERTCtrn. apply IHwndEvalRTC1. assumption. *)
+(* Qed. *)
 
 Lemma wndEvalsRTC_left_nil_nil:
       forall vs us, wndEvalsRTC vs us -> vs = tnil -> us = tnil.

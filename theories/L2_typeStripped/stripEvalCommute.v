@@ -519,7 +519,6 @@ Proof.
       * rewrite (proj1 (nat_compare_gt n0 n)); try omega. cbn. reflexivity.
       * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial.
     + rewrite (proj1 (nat_compare_lt n0 n)); trivial.
-  - cbn. rewrite H. reflexivity.
   - change (TLambda n (strip (L1g.term.instantiate arg (S n0) t0)) =
             (TLambda n (instantiate (strip arg) (S n0) (strip t0)))).
     rewrite H0. reflexivity.
@@ -769,8 +768,12 @@ Proof.
   intros p h.
   apply L1g.wcbvEval.WcbvEvalEvals_ind; intros;
     try (solve[constructor; trivial]).
-  - cbn. econstructor; try eassumption. eapply H.
-    inversion_Clear H0. assumption.
+  - inversion_Clear H1.
+    rewrite TApp_hom. rewrite mkApp_goodFn. constructor.
+    simpl in *. auto.
+    rewrite mkApp_hom in H0.
+    apply H0. apply L1g.term.mkApp_pres_WFapp; auto.
+    intro. apply H5. now apply isApp_hom in H1.
   - cbn. econstructor; try eassumption.
     + apply lookupDfn_hom. eassumption.
     + eapply H. apply (L1g.program.lookupDfn_pres_WFapp h _ e).

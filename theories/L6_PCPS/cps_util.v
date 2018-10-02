@@ -74,7 +74,7 @@ Proof.
   revert e. induction P as [| [c' e'] P IHp]; intros x H; try now inv H.
   simpl in H. inv H.
   destruct (M.elt_eq c' c); inv H1; try now constructor.
-  constructor 2. apply IHp; eauto.
+  constructor 2. now eapply IHp.
 Qed.
 
 (** [split_fds B1 B2 B] iff B is an interleaving of the definitions in B1 and B2 *)
@@ -1416,7 +1416,7 @@ Theorem num_occur_ec_det:
 Proof.
   intros.
   assert (num_occur (Ehalt v) v 1).
-  eapply num_occur_n. constructor. simpl. destruct (cps_util.var_dec v v). auto. exfalso; auto.
+  eapply num_occur_n. constructor. simpl. destruct (var_dec v v). auto. exfalso; auto.
   assert (num_occur (c |[ Ehalt v ]|)  v (n +1)).
   apply num_occur_app_ctx. exists n, 1; auto.
   assert (num_occur (c |[ Ehalt v ]|)  v (m +1)).

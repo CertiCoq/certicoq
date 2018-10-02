@@ -115,57 +115,58 @@ Require Import certiClasses2.
 Require Import Coq.btauto.Btauto.
 Require Import SquiggleEq.list.
 
+Require Import Template.Loader.
 (** funny behavior of yesPreserved and ⊑ **)
-Quote Recursively Definition p_true := (fun (x:True) => true).
-Definition P_true := Eval cbv in (program_Program p_true).
+(* Quote Recursively Definition p_true := (fun (x:True) => true). *)
+(* Definition P_true := Eval cbv in (program_Program p_true). *)
 
-Quote Recursively Definition p_false := (fun (x:True) => false).
-Definition P_false := Eval cbv in (program_Program p_false).
+(* Quote Recursively Definition p_false := (fun (x:True) => false). *)
+(* Definition P_false := Eval cbv in (program_Program p_false). *)
 
-Lemma foo1:
-  yesPreserved P_true P_false.
-Proof.
-  unfold P_true, P_false, yesPreserved, questionHead, QuestionHeadL2Term; cbn.
-  unfold implb. destruct q; reflexivity.
-Qed.
+(* Lemma foo1: *)
+(*   yesPreserved P_true P_false. *)
+(* Proof. *)
+(*   unfold P_true, P_false, yesPreserved, questionHead, QuestionHeadL2Term; cbn. *)
+(*   unfold implb. destruct q; reflexivity. *)
+(* Qed. *)
 
-(**  This seems wrong! **)
-Goal P_true ⊑ P_false.
-Proof.
-  unfold P_true, P_false. constructor.
-  - apply foo1.
-  - intros. unfold observeNthSubterm, ObsSubtermL2Term. cbn. constructor.
-Qed.
+(* (**  This seems wrong! **) *)
+(* Goal P_true ⊑ P_false. *)
+(* Proof. *)
+(*   unfold P_true, P_false. constructor. *)
+(*   - apply foo1. *)
+(*   - intros. unfold observeNthSubterm, ObsSubtermL2Term. cbn. constructor. *)
+(* Qed. *)
 
 (** yesPreserved and proofs **)
-Inductive NN: Prop := NN0: NN | NNS: NN -> NN.
-Quote Recursively Definition p_NN0 := NN0.
-Definition P_NN0 := Eval cbv in (program_Program p_NN0).
+(* Inductive NN: Prop := NN0: NN | NNS: NN -> NN. *)
+(* Quote Recursively Definition p_NN0 := NN0. *)
+(* Definition P_NN0 := Eval cbv in (program_Program p_NN0). *)
 
-Quote Recursively Definition p_NN1:= (NNS NN0).
-Definition P_NN1 := Eval cbv in (program_Program p_NN1).
+(* Quote Recursively Definition p_NN1:= (NNS NN0). *)
+(* Definition P_NN1 := Eval cbv in (program_Program p_NN1). *)
 
-Goal
-  yesPreserved P_NN0 P_NN1.
-Proof.
-  unfold P_NN0, P_NN1, yesPreserved, questionHead, QuestionHeadL2Term.
-  cbn. unfold implb. destruct q; try reflexivity.
-Qed.
-Goal
-  yesPreserved P_NN1 P_NN0.
-Proof.
-  unfold P_NN0, P_NN1, yesPreserved, questionHead, QuestionHeadL2Term.
-  cbn. unfold implb. destruct q; try reflexivity.
-Qed.
-Goal
-  forall (p:Program Term), yesPreserved p p.
-Proof.
-  destruct p. unfold yesPreserved, questionHead, QuestionHeadL2Term; cbn.
-  destruct q.
-  - destruct (fst (flattenApp main)); unfold implb; try reflexivity.
-    btauto.
-  - destruct (fst (flattenApp main)); unfold implb; try reflexivity.
-Qed.
+(* Goal *)
+(*   yesPreserved P_NN0 P_NN1. *)
+(* Proof. *)
+(*   unfold P_NN0, P_NN1, yesPreserved, questionHead, QuestionHeadL2Term. *)
+(*   cbn. unfold implb. destruct q; try reflexivity. *)
+(* Qed. *)
+(* Goal *)
+(*   yesPreserved P_NN1 P_NN0. *)
+(* Proof. *)
+(*   unfold P_NN0, P_NN1, yesPreserved, questionHead, QuestionHeadL2Term. *)
+(*   cbn. unfold implb. destruct q; try reflexivity. *)
+(* Qed. *)
+(* Goal *)
+(*   forall (p:Program Term), yesPreserved p p. *)
+(* Proof. *)
+(*   destruct p. unfold yesPreserved, questionHead, QuestionHeadL2Term; cbn. *)
+(*   destruct q. *)
+(*   - destruct (fst (flattenApp main)); unfold implb; try reflexivity. *)
+(*     btauto. *)
+(*   - destruct (fst (flattenApp main)); unfold implb; try reflexivity. *)
+(* Qed. *)
 
 Lemma stripProgram_pres_yes:
   forall (p:Program L1g.compile.Term),

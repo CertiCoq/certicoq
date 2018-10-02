@@ -174,7 +174,7 @@ Fixpoint applyBranchToProof nargs (br:Term) : Term :=
 Function L2kTerm_Term (t:L2kTerm) : Term :=
   match t with
     | L2k.compile.TRel n => TRel n
-    | L2k.compile.TProof t => TProof
+    | L2k.compile.TProof => TProof
     | L2k.compile.TLambda nm bod => TLambda nm (L2kTerm_Term bod)
     | L2k.compile.TLetIn nm dfn bod =>
       TLetIn nm (L2kTerm_Term dfn) (L2kTerm_Term bod)

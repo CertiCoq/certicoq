@@ -469,9 +469,9 @@ Proof using.
   specialize (Hp _ (conj Hfb (alpha_eq_refl _))).
   simpl in Hp.
   destruct (@eval_n (TermAbsDB Ast.name L4Opid) n t1).
-  - invertsna Hp Hp. setoid_rewrite <- Hp0.
+  - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp0.
     constructor. tauto.
-  - invertsna Hp Hp. setoid_rewrite <- Hp.
+  - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp.
     constructor.
 Qed.
 
@@ -491,9 +491,9 @@ Proof using.
   specialize (Hp _ (conj Hfb (alpha_eq_refl _))).
   simpl in Hp.
   destruct (@eval_n (TermAbsDBUnstrict Ast.name L4Opid) n t1).
-  - invertsna Hp Hp. setoid_rewrite <- Hp0.
+  - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp0.
     constructor. tauto.
-  - invertsna Hp Hp. setoid_rewrite <- Hp.
+  - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp.
     constructor.
 Qed.
 

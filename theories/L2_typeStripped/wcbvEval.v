@@ -9,6 +9,8 @@ Require Import Common.Common.
 Require Import L2.compile.
 Require Import L2.term.
 Require Import L2.program.
+Require Import Lia.
+
         
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -19,7 +21,11 @@ Set Implicit Arguments.
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
-| wProof: forall t s, WcbvEval p t s -> WcbvEval p (TProof t) s
+| wProof: WcbvEval p TProof TProof
+| wAppProof : forall fn arg args e,
+    WcbvEval p fn TProof ->
+    WcbvEval p (mkApp TProof args) e ->
+    WcbvEval p (TApp fn arg args) e
 | wConstruct: forall i r np na,
     WcbvEval p (TConstruct i r np na) (TConstruct i r np na)
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
@@ -132,6 +138,7 @@ Proof.
   apply WcbvEvalEvals_ind; intros; try assumption;
   try (solve[inversion_Clear H0; intuition]);
   try (solve[inversion_Clear H1; intuition]).
+  - apply H0. inversion_Clear H1. apply mkApp_pres_WFapp; try assumption. constructor.
   - apply H. unfold lookupDfn in e. case_eq (lookup nm p); intros xc.
     + intros k. assert (j:= lookup_pres_WFapp hp _ k)
       . rewrite k in e. destruct xc. 
@@ -296,11 +303,7 @@ Function wcbvEval
       | Some (ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
-    | TProof t =>
-      match wcbvEval n t with
-      | Ret et => Ret et
-      | Exc s => raise ("wcbvEval: TProof: " ++ s)
-      end
+    | TProof => Ret TProof
     | TApp fn a1 args =>
       match wcbvEval n fn with
       | Ret (TLambda _ bod) =>
@@ -320,6 +323,11 @@ Function wcbvEval
           | Ret tnil => Exc "IMPOSSIBLE"
           | Exc s => raise ("wcbvEval;TAppCong:args don't eval: " ++ s)
           end
+      | Ret TProof =>
+        match wcbvEval n (mkApp TProof args) with
+        | Ret et => Ret et
+        | Exc s => raise ("wcbvEval: TApp: TProof, Exc: " ++ s)
+        end
       | Ret tc =>   (* cannot be applied *)
         raise ("wcbvEval TApp: fn cannot be applied: " ++ print_term tc)
       | Exc s => raise ("wcbvEval TApp: fn, Exc: " ++ print_term t ++ s)
@@ -426,8 +434,12 @@ Lemma pre_WcbvEval_wcbvEval:
   assert (j:forall m, m > 0 -> m = S (m - 1)).
   { induction m; intuition. }
   apply WcbvEvalEvals_ind; intros; try (exists 0; intros mx h; reflexivity).
-  - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
-    + rewrite (H (m - 1)); try omega. reflexivity.
+  - destruct H, H0. exists (S (max x x0)). intros m hm.
+    assert(m - 1 >= x) by lia. specialize (H _ H1).
+    assert(m - 1 >= x0) by lia. specialize (H0 _ H2).
+    rewrite <- j in H by lia.
+    rewrite <- j in H0 by lia.
+    simpl. rewrite H. simpl in H0. rewrite H0. reflexivity.
   - destruct H. exists (S x). intros mm h. simpl.
     rewrite (j mm); try omega.
     unfold lookupDfn in e. destruct (lookup nm p). destruct e0. myInjection e.

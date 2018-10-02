@@ -1492,7 +1492,7 @@ Qed.
 
 Lemma dnth_WFTrmDs_WFTrm:
   forall m dts fs, dnth m dts = Some fs ->
-                   forall n, WFTrmDs dts n -> WFTrm (dbody _ fs) n.
+                   forall n, WFTrmDs dts n -> WFTrm (dbody fs) n.
 Proof.
   intros m dts fs.
   functional induction (dnth m dts); intros; try discriminate.

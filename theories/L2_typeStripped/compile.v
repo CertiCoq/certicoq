@@ -23,7 +23,7 @@ Definition L1gEnv := environ L1gTerm.
 
 Inductive Term : Type :=
 | TRel       : nat -> Term
-| TProof     : Term -> Term
+| TProof     : Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
@@ -78,7 +78,7 @@ Function strip (t:L1gTerm) : Term :=
   match t with
     | L1g.compile.TRel n => TRel n
     | L1g.compile.TSort s => TDummy "Srt"
-    | L1g.compile.TProof t => TProof (strip t)
+    | L1g.compile.TProof => TProof
     | L1g.compile.TProd nm _ _ => TDummy ("Prod:"++ print_name nm)
     | L1g.compile.TLambda nm _ bod => TLambda nm (strip bod)
     | L1g.compile.TLetIn nm dfn _ bod => TLetIn nm (strip dfn) (strip bod)
@@ -199,7 +199,7 @@ Definition stripProgram (p:L1gPgm) : Program Term :=
 
 (*** from L1 to L2 ***) 
 Definition program_Program (p:program) : Program Term :=
-  stripProgram (L1g.compile.program_Program p).
+  stripProgram (L1g.compile.program_Program_ext p).
 
 Definition term_Term (e:AstCommon.environ L1gTerm) (t:term) : Term :=
   strip (L1g.compile.term_Term e t).

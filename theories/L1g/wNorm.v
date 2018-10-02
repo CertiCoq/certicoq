@@ -30,9 +30,10 @@ Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm ty bod, WNorm ty -> WNorm (TLambda nm ty bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNConstruct: forall i n np na, WNorm (TConstruct i n np na)
+| WNProof: WNorm TProof
 | WNApp: forall fn t ts,
            WNorm fn -> WNorms (tcons t ts) ->
-           ~ isLambda fn -> ~ isFix fn -> ~ isApp fn ->
+           ~ isLambda fn -> ~ isFix fn -> ~ isApp fn -> ~ isProof fn ->
            WNorm (TApp fn t ts)
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
@@ -247,6 +248,7 @@ Proof.
   try (solve[inversion h; subst; contradiction]).
   - inversion h. subst. elim H4. exists nm, ty, bod. reflexivity.
   - inversion_Clear h. elim H5. auto.
+  - inversion_Clear h. elim H7. auto.
 Qed.
 
 Lemma wNorm_no_wndStep:

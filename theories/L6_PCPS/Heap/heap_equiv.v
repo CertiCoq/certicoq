@@ -1442,7 +1442,7 @@ Module HeapEquiv (H : Heap).
   Proof with (now eauto with Ensembles_DB).
     revert v1 v2.
     induction i as [i IHk] using lt_wf_rec1; intros v1 v2 Hres Hfeq Hfeq'.
-    destruct v1 as [l1 | B1 f1]; destruct v2 as [l2 | B2 f2]; try now firstorder.
+    destruct v1 as [l1 | B1 f1]; destruct v2 as [l2 | B2 f2].
     simpl in Hres; simpl; destruct (get l1 H1) as [b1 |] eqn:Hget; eauto.
     destruct b1.
     - destruct Hres as [Heqb [vs2 [Hget2 Hi]]].
@@ -1540,6 +1540,9 @@ Module HeapEquiv (H : Heap).
         eapply Included_Union_preserv_r. eapply reach'_set_monotonic.
         simpl; rewrite post_Singleton; [| eassumption ]. simpl.
         eapply get_In_env_locs; eauto. constructor.
+    - firstorder.
+    - firstorder.
+    - firstorder.
   Qed. 
 
 

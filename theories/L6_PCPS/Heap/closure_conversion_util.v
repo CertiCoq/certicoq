@@ -2,9 +2,9 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From L6 Require Import cps cps_util set_util hoisting identifiers ctx
-                       Ensembles_util List_util functions eval tactics.
-From L6.Heap Require Import closure_conversion compat heap GC.
+From CertiCoq.L6 Require Import cps cps_util set_util hoisting identifiers ctx
+                         Ensembles_util List_util functions eval tactics.
+From CertiCoq.L6.Heap Require Import closure_conversion compat heap GC.
 
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory ArithRing Coq.Relations.Relations Coq.Arith.Wf_nat.

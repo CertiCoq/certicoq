@@ -1,7 +1,7 @@
-From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
+From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions tactics.
 
-From L6.Heap Require Import heap heap_defs heap_equiv space_sem
+From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv space_sem
      cc_log_rel closure_conversion closure_conversion_util bounds
      invariants GC closure_conversion_correct.
 
@@ -184,8 +184,7 @@ Module Top (H : Heap).
         eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.
 
-  Print Assumptions closure_conversion_correct_top.
-
+  (* Print Assumptions closure_conversion_correct_top. (* XXX this fails in Coq 8.8 *) *)
 
   (* *** Remaining admits as of 09/27 *** *) 
   (* 1.) The Heap module type (in Heap.v) that we have as parameter in our definitions

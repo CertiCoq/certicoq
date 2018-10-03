@@ -5,7 +5,7 @@
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
-From L6 Require Import functions cps ctx eval cps_util identifiers ctx Ensembles_util
+From CertiCoq.L6 Require Import functions cps ctx eval cps_util identifiers ctx Ensembles_util
      List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.closure_conversion Heap.GC
      Heap.cc_log_rel tactics set_util.
 From compcert Require Import lib.Coqlib.
@@ -224,7 +224,7 @@ Module Compat (H : Heap).
           - eexists. eexists id. repeat split.
             now constructor; eauto.
             (* now eapply injective_subdomain_Empty_set. *)
-            rewrite <- plus_n_O.
+            (* rewrite <- plus_n_O. *)
             eapply Hbase; try eassumption.
             now rewrite cc_approx_val_eq.
           - edestruct Hvar as [l2 [Hget' Hcc]]; eauto. 
@@ -244,7 +244,7 @@ Module Compat (H : Heap).
               eapply Eval_proj_per_cc; eauto.
               simpl. omega. reflexivity.
               now econstructor; simpl; eauto.
-              rewrite <- !plus_n_O.
+              (* rewrite <- !plus_n_O. *)
               eapply Hbase; try eassumption.
               rewrite cc_approx_val_eq. now eauto.
             + eexists. eexists id. repeat split. unfold AppClo.
@@ -257,7 +257,7 @@ Module Compat (H : Heap).
               reflexivity. 
               econstructor; try (now simpl; eauto). simpl.
               erewrite <- Forall2_length; [| eassumption ]. simpl in *. omega.
-              rewrite <- plus_n_O.
+              (* rewrite <- plus_n_O. *)
               eapply Hbase; try eassumption.
               now rewrite cc_approx_val_eq. }
       (* Termination *)  
@@ -1105,7 +1105,7 @@ Module Compat (H : Heap).
       - (* Timeout! *)
         { simpl in Hcost. exists OOT, c1. eexists. exists id. repeat split. 
           - econstructor; eauto.
-          - rewrite <- plus_n_O. eapply Hbase; try eassumption.
+          - eapply Hbase; try eassumption.
           - now rewrite cc_approx_val_eq. }
       - pose (cost1 := cost (Ehalt x1)).
         pose (cost2 := cost (Ehalt x2)).
@@ -1418,7 +1418,6 @@ Module Compat (H : Heap).
         * eapply ctx_to_heap_env_big_step_compose; try eassumption.
         * eapply Hinv with (c' := c'); eauto.
     Qed.
-
 
   End CompatLemmas.
 

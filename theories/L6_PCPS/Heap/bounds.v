@@ -1,7 +1,7 @@
-From L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
+From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions tactics.
 
-From L6.Heap Require Import heap heap_defs 
+From CertiCoq.L6.Heap Require Import heap heap_defs 
      cc_log_rel compat closure_conversion closure_conversion_util GC.
 
 From Coq Require Import ZArith.Znumtheory Arith Arith.Wf_nat Relations.Relations
@@ -128,7 +128,7 @@ Module Size (H : Heap).
       destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo.
       unfold cost_mem_heap in *.
       erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); eauto.
-      rewrite <- plus_n_O. unfold cost_mem_block at 2. unfold cost_value.
+      unfold cost_mem_block at 2. unfold cost_value.
       destruct B.
       + erewrite (IHB H2); [| reflexivity ].
         rewrite (Max.max_l _ (cost_mem_fundefs B0)).

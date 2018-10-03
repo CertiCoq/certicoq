@@ -203,11 +203,11 @@ Fixpoint numOf_fundefs_in_exp (e : exp) : nat :=
   match e with
     | Econstr x _ ys e => numOf_fundefs_in_exp e
     | Ecase x l =>
-      1  + (fix num l :=
-              match l with
-                | [] => 0
-                | (t, e) :: l => numOf_fundefs_in_exp e + num l
-              end) l
+      1 + (fix num l :=
+             match l with
+               | [] => 0
+               | (t, e) :: l => numOf_fundefs_in_exp e + num l
+             end) l
     | Eproj x _ _ y e => 1 + numOf_fundefs_in_exp e
     | Efun B e => numOf_fundefs_in_fundefs B + numOf_fundefs_in_exp e
     | Eapp x _ ys => 0

@@ -439,3 +439,17 @@ Fixpoint app_fundefs_ctx (f:fundefs) (fc:fundefs_ctx): fundefs_ctx:=
     | Fcons x t xs e f' =>
       Fcons2_c x t xs e (app_fundefs_ctx f' fc)
   end.
+
+
+Lemma comp_ctx_f_Hole_c C :
+  comp_ctx_f C Hole_c = C
+with comp_f_ctx_f_Hole_c f : 
+       comp_f_ctx_f f Hole_c = f.
+Proof.
+  - destruct C; simpl; eauto;
+    try (rewrite comp_ctx_f_Hole_c; reflexivity). 
+    rewrite comp_f_ctx_f_Hole_c. reflexivity.
+  - destruct f; simpl; eauto.
+    rewrite comp_ctx_f_Hole_c; reflexivity.
+    rewrite comp_f_ctx_f_Hole_c. reflexivity.
+Qed.

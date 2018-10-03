@@ -668,6 +668,22 @@ Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) :=
 
 (** * Lemmas about [binding_in_map] *)
 
+
+Lemma binding_in_map_Union {A} S1 S2 (rho : M.t A) :
+  binding_in_map S1 rho ->
+  binding_in_map S2 rho ->
+  binding_in_map (S1 :|: S2) rho.
+Proof.
+  intros Hin1 Hin2 x Hin. inv Hin; eauto.
+Qed.
+
+Lemma binding_in_map_Singleton {A}  (rho : M.t A) x v :
+  M.get x rho = Some v ->
+  binding_in_map [set x] rho.
+Proof.
+  intros Hget; intros v2 Heq. inv Heq. eexists; eauto.
+Qed.
+
 (** [binding_in_map] is anti-monotonic on its first argument *)
 Lemma binding_in_map_antimon {A} S S' (rho : M.t A) :
   Included _ S' S ->
@@ -692,7 +708,7 @@ Proof.
 Qed.
 
 (** Extend the environment with a list of variables and put them in the set *)
-Lemma binding_in_map_setlist xs vs S (rho rho' : env) :
+Lemma binding_in_map_setlist {A : Type} xs vs S (rho rho' : M.t A) :
   binding_in_map S rho ->
   setlist xs vs rho = Some rho' ->
   binding_in_map (Union _ (FromList xs) S) rho'.

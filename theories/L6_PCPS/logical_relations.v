@@ -864,8 +864,16 @@ Section Log_rel.
       + induction f.
         { simpl. apply preord_env_P_extend.
           - eapply preord_env_P_antimon; [ eassumption |].
-            rewrite Setminus_Union.
-            eauto 15 with Ensembles_DB typeclass_instances.
+            rewrite !Setminus_Union_distr. eapply Union_Included.
+            now eauto with Ensembles_DB.
+            eapply Union_Included.
+            now eauto with Ensembles_DB.
+            eapply Union_Included.
+            now eauto with Ensembles_DB.
+            rewrite Setminus_Union. rewrite (Union_commut [set v] [set v0]). 
+            rewrite <- Setminus_Union.
+            rewrite Setminus_Same_set_Empty_set.
+            now eauto with Ensembles_DB.
           - eapply Hval. }
         { simpl. eapply preord_env_P_antimon ; [ eassumption |].
           eauto with Ensembles_DB. }

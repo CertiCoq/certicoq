@@ -20,7 +20,7 @@ research purposes.
 INSTALLATION INSTRUCTIONS
 =========================
 
-  To install the compiler, you need OCaml, Coq.8.7.1 along with the
+  To install the compiler, you need OCaml, Coq.8.8.1 along with the
 ExtLib, Template-Coq, squiggle-eq and paramcoq packages. One way to get
 everything is using [`opam`](http://opam.ocaml.org) (current version:
 `1.2.2`):
@@ -43,16 +43,16 @@ you want.
 Setting up a switch with OCaml
 ------------------------------
 
-  Note that supported OCaml version are `4.02.3` to `4.05.0`, avoid
+  Note that supported OCaml version are `4.06.1` and upwards, avoid
 `4.06.0` which sometimes produces dynamic linking errors. In `opam 1.*`,
 use `opam config var ocaml-version` to confirm you have a compatible
 compiler. If not, you should create a fresh new switch with a specific
 compiler, using:
 
-    # opam switch -A 4.05.0 coq87
+    # opam switch -A 4.06.1 coq88
     # eval `opam config env`
 
-  This will install the `4.05.0` compiler in a new switch named `coq87`
+  This will install the `4.06.1` compiler in a new switch named `coq88`
 and put you in the right environment (check with `ocamlc --version`).
 
 Installing Coq
@@ -61,13 +61,13 @@ Installing Coq
   To install coq in a fresh switch and pin it to a specific version so
 that `opam` doesn't try to upgrade it:
 
-    # opam install coq.8.7.1
-    # opam pin add coq 8.7.1
+    # opam install coq.8.8.1
+    # opam pin add coq 8.8.1
 
   Alternatively, if you can you want to update a pinned Coq:
 
     # opam pin remove coq
-    # opam pin add coq 8.7.1
+    # opam pin add coq 8.8.1
 
   After this you should have `coqc --version` give you the right version
 number.
@@ -81,7 +81,7 @@ When the above opam repositories are updated, you may need to update your instal
 
 If the dependencies are already installed then you can skip the following section and just do:
     
-    # opam upgrade coq-template-coq coq-ext-lib coq-squiggle-eq 
+    # opam upgrade coq-template-coq coq-ext-lib coq-paramcoq coq-squiggle-eq 
 
 Installing dependencies
 -----------------------
@@ -90,8 +90,8 @@ To install CertiCoq's dependencies in the current opam switch:
 
     # opam install coq-template-coq coq-ext-lib coq-squiggle-eq.dev coq-paramcoq
 
-The package is known to build with `coq-template-coq.2.0~beta`,
-`coq-ext-lib.0.9.7`, `coq-squiggle-eq.dev` and `coq-paramcoq.1.0.5`.
+The package is known to build with `coq-template-coq.2.1~beta3`,
+`coq-ext-lib.0.9.8`, `coq-squiggle-eq.1.0.4` and `coq-paramcoq.1.0.8`.
 
 If you have already installed some package manually, you can choose the
 `--fake` keyword for `opam` to assume that it is installed, e.g.:
@@ -102,14 +102,14 @@ Installing from source
 ----------------------
 Alternatively, you can install Coq from source or download a binary from:
 
-	https://coq.inria.fr/coq-87
+	https://coq.inria.fr/coq-88
 
 and install the packages from source:
 
 	https://github.com/coq-ext-lib/coq-ext-lib
-	https://github.com/gmalecha/template-coq (branch: coq-8.7)
-	https://github.com/aa755/SquiggleEq
-	https://github.com/aa755/paramcoq (branch: v8.7)
+	https://github.com/gmalecha/template-coq (branch: coq-8.8)
+	https://github.com/aa755/SquiggleEq  (branch: vcoq87)
+	https://github.com/aa755/paramcoq (branch: v8.8)
 
 
 Building the compiler:

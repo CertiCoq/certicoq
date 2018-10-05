@@ -7,11 +7,11 @@ Require Import Coq.Logic.JMeq.
 Require Import Omega.
 Require Import L2_5.compile.
 Require Import L2_5.stripEvalCommute.
-Require Import L3.compile.
 Require Import L3.term.
 Require Import L3.program.
 Require Import L3.wcbvEval.
 Require Import L3.wNorm.
+Require Import L3.compile.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

@@ -70,11 +70,11 @@ Require Import Coq.btauto.Btauto.
 Require Import SquiggleEq.list.
 
 (** funny behavior of yesPreserved and ⊑ **)
-Quote Recursively Definition p_true := (fun (x:True) => true).
-Definition P_true := Eval cbv in (program_Program p_true).
+(* Quote Recursively Definition p_true := (fun (x:True) => true). *)
+(* Definition P_true := Eval cbv in (program_Program p_true). *)
 
-Quote Recursively Definition p_false := (fun (x:True) => false).
-Definition P_false := Eval cbv in (program_Program p_false).
+(* Quote Recursively Definition p_false := (fun (x:True) => false). *)
+(* Definition P_false := Eval cbv in (program_Program p_false). *)
 
 (*********
 Lemma foo:

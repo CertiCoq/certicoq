@@ -24,7 +24,7 @@ Definition L2dEnv := environ L2dTerm.
 
 Inductive Term : Type :=
 | TRel       : nat -> Term
-| TProof     : Term -> Term
+| TProof     : Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term -> Term
@@ -199,7 +199,7 @@ Function lift (n:nat) (t:Term) : Term :=
                         | Lt => m
                         | _ => S m
                       end)
-    | TProof t => TProof (lift n t)
+    | TProof => TProof
     | TLambda nm bod => TLambda nm (lift (S n) bod)
     | TLetIn nm df bod => TLetIn nm (lift n df) (lift (S n) bod)
     | TApp fn arg => TApp (lift n fn) (lift n arg)
@@ -411,7 +411,7 @@ End Strip.
 Function strip (t:L2dTerm) : Term :=
   match t with
   | L2d.compile.TRel n => TRel n
-  | L2d.compile.TProof t => TProof (TDummy "") (* OS [04/2018]: replace  "TProof (strip t)" to avoid expensive operations on proof terms just before their removal  *)
+  | L2d.compile.TProof => TProof
   | L2d.compile.TLambda nm bod => TLambda nm (strip bod)
   | L2d.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
   | L2d.compile.TApp fn arg =>

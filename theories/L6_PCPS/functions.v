@@ -10,6 +10,8 @@ Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos
 
 Import ListNotations.
 
+Open Scope program_scope.
+
 (** ** Usefull definitions and lemmas about functions. *)
 
 Definition codomain {A B} (f : A -> B) : Ensemble B :=
@@ -76,7 +78,15 @@ Definition domain {A B} (f : A -> option B) : Ensemble A :=
 Definition image' {A B} (f : A -> option B) S : Ensemble B :=
   fun y => exists x, In _ S x /\ f x = Some y.
 
+Definition injective_subdomain' {A B} P (f : A -> option B) :=
+  forall x x' v, In _ P x -> In _ P x' -> f x = Some v -> f x' = Some v -> x = x'.
 
+Definition lift {A B} (f : A -> B) : option A -> option B :=
+  fun x => match x with
+          | Some x => Some (f x)
+          | None => None
+        end.
+  
 (** * Lemmas about [f_eq_subdomain] and [f_eq] *)
 
 Instance equivalence_f_eq_subdomain {A B} S : Equivalence (@f_eq_subdomain A B S). 
@@ -147,7 +157,19 @@ Lemma f_eq_subdomain_Union {A B} P1 P2 (f1 f2 : A -> B) :
   f_eq_subdomain (Union _ P1 P2) f1 f2.
 Proof.
   intros H1 H2 x1 HP; inv HP; eauto.
-Qed. 
+Qed.
+
+Lemma f_eq_subdomain_compose_compat {A B C} S (f1 f2: A -> B) (g1 g2 : B -> C) :
+  f_eq_subdomain S f1 f2 ->
+  f_eq_subdomain (image f1 S) g1 g2 ->
+  f_eq_subdomain S (g1 ∘ f1) (g2 ∘ f2).
+Proof.
+  intros Heq1 Heq2 x Hin. unfold compose.
+  rewrite <- Heq1; eauto. rewrite Heq2. reflexivity.
+  eexists; split; eauto.
+   Qed.
+
+
 
 (** * Lemmas about [image] *)
 
@@ -172,6 +194,25 @@ Proof.
     right. eexists; eauto.
   - inv Hi; destruct H as [x' [Hin Heq]]; subst;
     eexists; split; eauto.
+Qed.
+
+Lemma image_id {A : Type} (S : Ensemble A) :
+  image id S <--> S.
+Proof.
+  split; intros x.
+  - intros [x' [Hin Heq]]. inv Heq.
+    eassumption.
+  - intros HS. eexists; split; eauto.
+Qed.
+
+Lemma image_compose {A B C : Type} (f : A -> B) (g : B -> C) (S : Ensemble A):
+  image (g ∘ f) S <--> image g (image f S).
+Proof.
+  split.
+  - intros c [a [Hin Heq]].
+    eexists. split; eauto. eexists. split; eauto.
+  - intros c [b' [[a [Hin Heqa]] Heqb]]. subst.
+    eexists. split; eauto.
 Qed.
 
 Lemma image_Singleton {A B} x (g : A -> B) :
@@ -673,6 +714,18 @@ Proof with now eauto with Ensembles_DB.
       eapply H2; eassumption.
 Qed.
 
+Lemma injective_subdomain_compose {A B C} (S1 : Ensemble A) (f1 : A -> B) (f2 : B -> C) :
+  injective_subdomain S1 f1 ->
+  injective_subdomain (image f1 S1) f2 ->
+  injective_subdomain S1 (f2 ∘ f1).
+Proof.
+  intros Hi1 Hi2 x y Hin1 Hin2 Heq.
+  unfold compose in *. eapply Hi2 in Heq; eauto.
+  eexists; split; [| reflexivity ]; eauto.
+  eexists; split; [| reflexivity ]; eauto.
+Qed.
+
+
 Lemma injective_extend (f : positive -> positive) x y :
   injective f ->
   ~ In _ (codomain f) y ->
@@ -751,6 +804,29 @@ Proof.
   firstorder.
 Qed.
 
+Lemma image'_Singleton_Some {A B} f (x : A) (y : B) :
+  f x = Some y ->
+  image' f [set x] <--> [set y].
+Proof.
+  intros Heq. 
+  split; intros z Hin. 
+  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+    rewrite Heq in Heq'. inv Heq'. reflexivity.
+  - inv Hin. eexists; split; eauto.
+Qed. 
+
+Lemma image'_Singleton_None {A B} (f : A -> option B) (x : A) :
+  f x = None ->
+  image' f [set x] <--> Empty_set _.
+Proof.
+  intros Heq. 
+  split; intros z Hin. 
+  - destruct Hin as [z' [Hin Heq']]. inv Hin. 
+    rewrite Heq in Heq'. congruence.
+  - inv Hin.
+Qed.
+
+
 Lemma image'_monotonic {A B} (S1 S2 : Ensemble A) (f : A -> option B) :
   S1 \subset S2 ->
   image' f S1 \subset image' f S2.
@@ -758,6 +834,91 @@ Proof.
   firstorder.
 Qed.
 
+Lemma image'_Union (A B : Type) (S1 S2 : Ensemble A) (g : A -> option B) :
+  image' g (S1 :|: S2) <--> image' g S1 :|: image' g S2.
+Proof.
+  split; intros x Hin.
+  - destruct Hin as [y [Hin Heq]]; subst; inv Hin.
+    left; eexists; split; eauto.
+    right; eexists; split; eauto.
+  - inv Hin.
+    + destruct H as [z [Hin Heq]].
+      eexists; split; eauto.
+    + destruct H as [z [Hin Heq]].
+      eexists; split; eauto.
+Qed.
+
+Lemma image'_extend_Included_Some (A : Type) (f : positive -> option A) (x : positive) 
+      (x' : A) (S : Ensemble positive):
+  image' (f {x ~> Some x'}) S \subset image' f (S \\ [set x]) :|: [set x'].
+Proof. 
+  intros z [y [Heq Hin]].
+  destruct (peq x y); subst.
+  - rewrite extend_gss in Hin. inv Hin; eauto.
+  - rewrite extend_gso in Hin; eauto.
+    left. eexists; split; eauto.
+    constructor; eauto. intros Hc; inv Hc; eauto.
+Qed.
+
+Lemma image'_extend_Included_None (A : Type) (f : positive -> option A) (x : positive) 
+      (S : Ensemble positive):
+  image' (f {x ~> None}) S \subset image' f (S \\ [set x]).
+Proof. 
+  intros z [y [Heq Hin]].
+  destruct (peq x y); subst.
+  - rewrite extend_gss in Hin. inv Hin; eauto.
+  - rewrite extend_gso in Hin; eauto.
+    eexists; split; eauto.
+    constructor; eauto. intros Hc; inv Hc; eauto.
+Qed.
+
+Lemma image'_extend_In_S (f : positive -> option positive) (x x' : positive)
+      (S : Ensemble positive) :
+  In positive S x ->
+  image' (f {x ~> Some x'}) S <--> image' f (S \\ [set x]) :|: [set x'].
+Proof.
+  intros Hin; split; intros y Him.
+  - destruct Him as [y' [Heq Him]].
+    destruct (peq x y'); subst.
+    + rewrite extend_gss in Him. inv Him.
+      right. reflexivity.
+    + rewrite extend_gso in Him.
+      left. eexists; split; eauto. constructor; eauto.
+      intros Hc; inv Hc; eauto. 
+      intros Hc; inv Hc; eauto. 
+  - destruct Him as [z [y' [Heq Him]] | z Heq ].
+    + eexists. split. now eapply Heq.
+      rewrite extend_gso. eassumption. intros Hc.
+      subst. inv Heq; eauto.
+    + eexists; split; eauto. inv Heq.
+      rewrite extend_gss. reflexivity.
+Qed.
+
+Instance Proper_image'_Same_set {A B} :
+  Proper (eq ==> Same_set A ==> Same_set B) image'.
+Proof.
+  intros f1 f2 Hfeq s1 s2 Hseq; split; intros x [y [Hin Heq]];
+  subst; eexists; split; eauto; eapply Hseq; eauto.
+Qed.
+
+
+(** * Lemmas about [injective_subdomain'] *)
+
+Lemma injective_subdomain'_antimon {A B} P1 P2 (f : A -> option B) :
+  injective_subdomain' P2 f ->
+  P1 \subset P2 ->
+  injective_subdomain' P1 f.
+Proof.
+  intros Hinj Hsub x1 x2 v Hin1 Hin2 Heq1 Heq2.
+  eapply Hinj; eauto.
+Qed.
+
+Instance Proper_injective_subdomain' A B :
+  Proper (Same_set A ==> eq ==> iff) (@injective_subdomain' A B).
+Proof.
+  intros s1 s2 Hseq f1 f2 Hfeq; subst; split; intros Hinj x y v Hin1 Hin2 Heq1 Heq2;
+  eapply Hinj; try eassumption; eapply Hseq; eauto. 
+Qed.
 
 (** * Lemmas about [compose] *)
 
@@ -774,6 +935,49 @@ Lemma compose_id_neut_r {A B} (f : A -> B) :
 Proof.
   firstorder.
 Qed.
+
+Lemma compose_extend {B C} (f : B -> C) (g : positive -> B) x y :
+  f_eq (f ∘ g {x ~> y}) ((f ∘ g) {x ~> f y}).
+Proof.
+  intros z. unfold compose. simpl. 
+  destruct (peq x z); subst. simpl.
+  - rewrite !extend_gss. reflexivity.
+  - rewrite !extend_gso. reflexivity.
+    now eauto. now eauto.
+Qed.
+
+Lemma compose_id_extend {B} S (f : B -> positive)  x y :
+  ~ x \in image f S ->
+          f_eq_subdomain S (id {x ~> y} ∘ f) f.
+Proof.
+  intros Hneq z Hin. unfold compose.
+  rewrite extend_gso. reflexivity.
+  intros Hc; eapply Hneq.
+  eexists; split; eauto.
+Qed.    
+
+Lemma compose_lift_id_extend {B} S (f : B -> option positive)  x y :
+  ~ x \in image' f S ->
+          f_eq_subdomain S (lift (id {x ~> y}) ∘ f) f.
+Proof.
+  intros Hneq z Hin. unfold compose, lift.
+  destruct (f z) eqn:Heq; eauto.
+  rewrite extend_gso. reflexivity.
+  intros Hc; eapply Hneq.
+  eexists; split; subst; eauto.
+Qed.  
+
+Instance Proper_compose_l A B C : Proper (f_eq ==> eq ==> f_eq) (@compose A B C).
+Proof.
+  intros f1 f1' Hfeq f2 f2' Hfeq'; subst; firstorder.
+Qed.
+
+Instance Proper_compose_r A B C : Proper (eq ==> f_eq ==> f_eq) (@compose A B C).
+Proof.
+  intros f1 f1' Hfeq f2 f2' Hfeq'; subst. intros x; unfold compose; simpl.
+  rewrite <- Hfeq'. reflexivity.
+Qed.    
+
 
 (** * Lemmas about [app] *)
 
@@ -793,5 +997,19 @@ Proof.
   revert n; induction m; intros n; simpl.
   - rewrite compose_id_neut_l. reflexivity.
   - intros x. rewrite IHm. reflexivity.
+Qed.
+
+(** * Lemmas about [lift] *)
+
+Lemma lift_id {A : Type} :
+  f_eq (lift (@id A)) id.
+Proof.
+  intros x. destruct x; eauto.
+Qed.
+
+Lemma lift_compose {A B C : Type} (f2 : B -> C) (f1 : A -> B) :
+  f_eq (lift (f2 ∘ f1)) (lift f2 ∘ lift f1).
+Proof.
+  intros [x|]; unfold lift, compose; simpl; reflexivity.
 Qed.
 

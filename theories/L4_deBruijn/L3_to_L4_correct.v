@@ -1303,7 +1303,7 @@ Lemma eval_lets e e' t t' :
   eval (subst_env e' t) t' ->
   eval (mkLets e t) t'.
 Proof.
-  revert t t' e'. pattern e. refine (wf_ind (@length _) _ _ e). clear.
+  revert t t' e'. pattern e. refine (RandyPrelude.wf_ind (@length _) _ _ e). clear.
   simpl. intros k IHk ? ?. destruct k using rev_ind; intros; simpl in *.
   + inv H; simpl. trivial.
   + simpl. clear IHk0.
@@ -1488,7 +1488,7 @@ Lemma subst_env_aux_sbst_fix_aux e dts e1 :
      (subst_env_aux e (1 + efnlst_length dts) e1) 1.
 Proof.
   revert dts e1.
-  pattern e. refine (wf_ind (@length _) _ _ e). clear. intros.
+  pattern e. refine (RandyPrelude.wf_ind (@length _) _ _ e). clear. intros.
   destruct t.
   - simpl. intros.
     unfold subst_env_aux. simpl.
@@ -1784,7 +1784,8 @@ Qed.
 Lemma Crct_invrt_wrong p n str : crctTerm p n (TWrong str) -> False.
 Proof. intros; eapply Crct_invrt_wrong_aux; eauto. Qed.
 
-Lemma dnthBody_dnth n brs t : dnthBody n brs = Some t -> exists d, dnth n brs = Some d /\ dbody _ d = t.
+Lemma dnthBody_dnth n brs t : dnthBody n brs = Some t ->
+                              exists d, dnth n brs = Some d /\ dbody d = t.
 Proof.
   revert brs; induction n; destruct brs; simpl; intros; auto. discriminate.
   injection H. intros ->. eexists; intuition eauto.

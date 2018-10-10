@@ -27,21 +27,23 @@ Module Type Heap.
   
   Parameter get : forall {A : Type}, loc -> heap A -> option A.
   
-  Parameter set : forall {A : Type}, A -> loc -> heap A -> heap A.
+  Parameter set : forall {A : Type}, A -> loc -> heap A -> option (heap A).
   
   Parameter alloc : forall {A : Type}, A -> heap A -> loc * heap A.
   
   Parameter emp_get :
     forall (A : Type) (l : loc), get l (@emp A) = None. 
-
+  
   Parameter gss :
-    forall A (x : A) (l : loc) (H : heap A),
-      get l (set x l H) = Some x. 
-
+    forall A (x : A) (l : loc) (H H' : heap A),
+      set x l H = Some H' ->
+      get l H' = Some x.  
+  
   Parameter gso :
-    forall A (x : A) (l1 l2 : loc) (H : heap A),
-      l1 <> l2 ->
-      get l1 (set x l2 H) = get l1 H. 
+    forall A (x : A) (l l' : loc) (H H' : heap A),
+      set x l H = Some H' ->
+      l <> l' ->
+      get l' H' = get l' H. 
 
   Parameter gas :
     forall A (x : A) (l : loc) (H H' : heap A),
@@ -120,7 +122,7 @@ Module Type Heap.
   (** Elements filter *)
   Parameter heap_elements_filter :
     forall {A} (H : Ensemble loc) {_ : ToMSet H}, heap A -> list (loc * A).
-  
+   
   Parameter heap_elements_filter_sound :
     forall (A : Type) (S : Ensemble loc) {H : ToMSet S} (h : heap A) (l : loc) (v : A),
       List.In (l, v) (heap_elements_filter S h) -> get l h = Some v /\ l \in S.

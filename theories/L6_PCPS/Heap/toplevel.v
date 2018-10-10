@@ -1,7 +1,7 @@
 From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions tactics.
 
-From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv space_sem
+From CertiCoq.L6.Heap Require Import heap heap_impl heap_defs heap_equiv space_sem
      cc_log_rel closure_conversion closure_conversion_util bounds
      invariants GC closure_conversion_correct.
 
@@ -15,11 +15,11 @@ Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
 
-Module Top (H : Heap).
+Module Top.
 
-  Module CC := ClosureConversionCorrect H.
+  Module CC := ClosureConversionCorrect MHeap.
   
-  Import H CC.Inv.Size.Util.C.LR.Sem.GC.Equiv
+  Import MHeap CC.Inv.Size.Util.C.LR.Sem.GC.Equiv
          CC.Inv.Size.Util.C.LR.Sem.GC.Equiv.Defs
          CC.Inv.Size.Util.C.LR.Sem.GC CC.Inv.Size.Util.C.LR.Sem
          CC.Inv.Size.Util.C.LR CC.Inv.Size.Util.C CC.Inv.Size.Util
@@ -183,21 +183,20 @@ Module Top (H : Heap).
       + rewrite cc_approx_val_eq in Hres.
         eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.
+  
+  
+End Top.
 
-  (* Print Assumptions closure_conversion_correct_top. (* XXX this fails in Coq 8.8 *) *)
+Print Assumptions Top.closure_conversion_correct_top.
+(* XXX why does MHeap definitions still appear as axioms here? *)
 
-  (* *** Remaining admits as of 09/27 *** *) 
-  (* 1.) The Heap module type (in Heap.v) that we have as parameter in our definitions
-         and proofs.
-
-     2.) big_step_gc_heap_env_equiv_r 
+  (* *** Remaining admits *** *) 
+  (* 1.) big_step_gc_heap_env_equiv_r 
          -> big_step_GC commutes with heap equivalence 
 
-     3.) live'_live_inv 
+     2.) live'_live_inv 
          -> lemma about two equivalent definitions of GC. (* TODO remove this dependency *)
 
-     4.) FunctionalExtensionality.functional_extensionality_dep 
+     3.) FunctionalExtensionality.functional_extensionality_dep 
          
    *)
-  
-End Top. 

@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
 From CertiCoq.L6 Require Import functions cps ctx eval cps_util identifiers ctx Ensembles_util
      List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.closure_conversion Heap.GC
-     Heap.cc_log_rel tactics set_util.
+     Heap.cc_log_rel tactics set_util map_util.
 From compcert Require Import lib.Coqlib.
 
 Import ListNotations.

@@ -1,7 +1,7 @@
 (* Heaps for L6 semantics. Part of the CertiCoq project.
  * Author: Zoe Paraskevopoulou, 2016
  *)
-
+ 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms Sorting.Permutation.
@@ -333,6 +333,12 @@ Module HeapLemmas (H : Heap).
       destruct H as [v Hget]. exists v. congruence.
   Qed.
 
+  Lemma restrict_heap_eq A S (H1 H2 : heap A) :
+    restrict S H1 H2 ->
+    S |- H1 ≡ H2.
+  Proof.
+    intros Hr x Hin. symmetry. eapply restrict_In; eauto. 
+  Qed.  
 
   (** [heap_elements] lemmas *)
 

@@ -371,8 +371,8 @@ Module MHeap : Heap.
             eassumption.
             
             split. eassumption. split. eassumption. 
-            destruct (@Dec _ S _ l1); [ eassumption | ]. rewrite M.gro; eassumption. } 
 
+            destruct (@Dec _ S _ l1); [ eassumption | ]. rewrite M.gro; eassumption. } 
 
     split; intros H; eapply Hsuf.
     - split; eauto.

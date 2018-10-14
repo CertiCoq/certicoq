@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms Sorting.Permutation Lists.SetoidPermutation.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From CertiCoq.L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
-     identifiers Heap.heap tactics Heap.heap_defs Heap.heap_equiv.
+     identifiers Heap.heap tactics Heap.heap_defs Heap.heap_equiv map_util.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
@@ -22,92 +22,9 @@ Module GC (H : Heap).
 
   Import H Equiv.Defs Equiv.
 
-  (* TODO move *)
-
-  Instance ToMSet_name_in_fundefs B : ToMSet (name_in_fundefs B).
-  Proof.
-    eexists (fundefs_names B).
-    split; intros f Hin.
-    eapply fundefs_names_correct in Hin.
-    eapply FromSet_complete. reflexivity. eassumption.
-    eapply fundefs_names_correct.
-    eapply FromSet_sound. reflexivity. eassumption.
-  Qed.
-
-  (* TODO move key set *)
-
-  Instance ToMSet_key_set {A} (rho : M.t A) : ToMSet (key_set rho).
-  Proof. 
-    eexists (@mset (FromList (map fst (M.elements rho))) _).
-    rewrite <- mset_eq, FromList_map_image_FromList.
-    split; intros x Hin.
-    - unfold In, key_set in *.
-      destruct (M.get x rho) eqn:Hget. 
-      eexists (x, a). split; eauto.
-      eapply M.elements_correct. eassumption. 
-
-      exfalso; eauto.
-    - destruct Hin as [[z a] [Hin Hget]]; subst.
-      unfold In, FromList in Hin. eapply M.elements_complete in Hin.
-      simpl. unfold key_set, In. now rewrite Hin.
-  Qed. 
-
-  Lemma key_set_Restrict_env S rho rho' :
-    Restrict_env S rho rho' ->
-    key_set rho' \subset S.
-  Proof.
-    now intros [_ [_ R]].
-  Qed.
-
-  Lemma key_set_binding_in_map_alt (S : PS.t) (rho : env) :
-    binding_in_map (FromSet S) rho ->
-    key_set (restrict_env S rho) <--> FromSet S.
-  Proof.
-    intros Hbin.
-    assert (HR : Restrict_env (FromSet S) rho (restrict_env S rho)). 
-    { eapply restrict_env_correct. reflexivity. }
-    split. 
-    eapply key_set_Restrict_env. eassumption.
-
-    intros x Hin. edestruct Hbin as [v Hget1]. eassumption.
-    destruct HR as [Hs1 Hr]. 
-    unfold key_set, In. rewrite <- Hs1, Hget1; eauto.
-  Qed.
-
-
-  Lemma fold_left_distr { A : Type} (l : list A) (acc : A)
-        (f : A -> A -> A) (g : A -> A) :
-    (forall x y, g (f x y) = f (g x) (g y)) -> 
-    g (fold_left f l acc) = fold_left (fun acc x => f acc (g x)) l (g acc).  
-  Proof.
-    intros Hyp. revert acc. induction l; intros acc; simpl.
-    - reflexivity. 
-    - rewrite IHl. rewrite Hyp. reflexivity.
-  Qed.   
-
-  Lemma fold_left_mult { A : Type} (l : list A) (acc1 acc2 : nat) f h :
-    fold_left (fun acc x => acc + (f x)*(h x)) l (acc1 * acc2) <=
-    (fold_left (fun acc x => acc + (f x)) l acc1) * (fold_left (fun acc x => max acc (h x)) l acc2).
-  Proof.
-    revert acc1 acc2. induction l; intros acc1 acc2; simpl.
-    - reflexivity.
-    - simpl. eapply le_trans; [| eapply IHl ].
-      eapply fold_left_monotonic.
-      + intros. omega.
-      + rewrite NPeano.Nat.mul_add_distr_r.
-        eapply plus_le_compat.
-        eapply mult_le_compat_l.
-        eapply Max.le_max_l.
-        eapply mult_le_compat_l.
-        eapply Max.le_max_r.
-  Qed.
-
-
-  (* end MOVE *)
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on
-         the execution cost of certain transformations
-   *)
+         the execution cost of certain transformations *)
 
   (** The cost of constructing environments when evaluating e *)
   Fixpoint cost_env_exp (e : exp) : nat :=
@@ -249,7 +166,7 @@ Module GC (H : Heap).
     S |- H1 ≃_(β, id) H2 /\
     injective_subdomain (reach' H1 S) β.
 
-  (** * Lemmas about [collect] *)
+  (** * Lemmas about [collect] -- DEPRICATED *)
   
   (** The reachable part of the heap before and after collection are the same *)
   Lemma collect_heap_eq S H1 H2 :
@@ -271,15 +188,6 @@ Module GC (H : Heap).
 
   
   (** * Lemmas about [live] *)  
-
-
-  Lemma restrict_heap_eq A S (H1 H2 : heap A) :
-    restrict S H1 H2 ->
-    S |- H1 ≡ H2.
-  Proof.
-    intros Hr x Hin. symmetry. eapply restrict_In; eauto. 
-  Qed.
-
   
   Lemma heap_eq_res_approx_l P (k : nat) (H1 H2 : heap block) (v : value) :
     P |- H1 ≡ H2 ->
@@ -488,7 +396,7 @@ Module GC (H : Heap).
     eapply reach'_extensive. 
   Qed.
 
-    Lemma res_equiv_subst_val (S : Ensemble var) (b1 b2 : loc -> loc) (H1 H2 : heap block)
+  Lemma res_equiv_subst_val (S : Ensemble var) (b1 b2 : loc -> loc) (H1 H2 : heap block)
         (v1 v2 : value):
     (v1, H1) ≈_( b1, b2) (v2, H2) ->
     subst_val b1 v1 = subst_val b2 v2. 
@@ -500,6 +408,7 @@ Module GC (H : Heap).
     - simpl. inv Heq. reflexivity. 
   Qed. 
 
+  (** Aux relation for showing the size lemmas *)
 
   Definition subst_block_rel b1 b2 (bl1 bl2 : block) : Prop :=
     match bl1, bl2 with
@@ -510,25 +419,6 @@ Module GC (H : Heap).
       | Env rho1, Env rho2 => key_set rho1 <--> key_set rho2
       | _, _ => False
     end. 
-
-  (* TODO move *)
-  Lemma heap_env_approx_key_set b1 H1 rho1 b2 H2 rho2 : 
-    heap_env_approx (Full_set _) (b1, (H1, rho1)) (b2, (H2, rho2)) ->
-    key_set rho1 \subset key_set rho2.
-  Proof.
-    intros Hap x Hiny. unfold key_set in *.
-    unfold In in *. simpl in *. destruct (M.get x rho1) eqn:Hget1; try contradiction.
-    edestruct Hap as [l1' [Hr2 Hres1]]; eauto. now constructor.
-    now rewrite Hr2.
-  Qed.
-
-  Lemma heap_env_equiv_key_set b1 H1 rho1 b2 H2 rho2 : 
-    Full_set _ |- (H1, rho1) ⩪_( b1, b2) (H2, rho2) ->
-    key_set rho1 <--> key_set rho2.
-  Proof.
-    intros [Henv1 Henn2]; split; eapply heap_env_approx_key_set; eauto.
-  Qed. 
-
     
   Lemma block_equiv_subst_block b1 b2 H1 H2 bl1 bl2 :
     block_equiv ((b1, H1), bl1) ((b2, H2), bl2) ->
@@ -550,42 +440,6 @@ Module GC (H : Heap).
       eassumption. 
   Qed.
   
-
-  Lemma PermutationA_Permutation_refl A (l1 l2 : list A) R {_ : Reflexive R } :
-    Permutation l1 l2 ->
-    PermutationA R l1 l2.
-  Proof.
-    intros Hp. induction Hp; eauto.
-    - now constructor.
-    - eapply permA_skip. reflexivity. easy.
-    - eapply permA_swap.
-    - eapply permA_trans. eassumption. eassumption.
-  Qed. 
-    
-  Lemma PermutationA_respects_Permutation_l A (l1 l1' l2 : list A) R {_ : PreOrder R } :
-    PermutationA R l1 l2 ->
-    Permutation l1 l1' ->
-    PermutationA R l1' l2.
-  Proof.
-    intros Hpa Hp.
-    destruct H. eapply permA_trans.
-
-    eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
-    symmetry. eassumption. 
-    eassumption.    
-  Qed.
-
-  Lemma PermutationA_respects_Permutation_r A (l1 l2 l2' : list A) R {_ : PreOrder R } :
-    PermutationA R l1 l2 ->
-    Permutation l2 l2' ->
-    PermutationA R l1 l2'.
-  Proof.
-    intros Hpa Hp.
-    destruct H. eapply permA_trans.
-    eassumption. 
-    eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
-    eassumption. 
-  Qed. 
       
   Lemma heap_elements_filter_PermutationA S {Hs : ToMSet S} (R : relation block) {_ : PreOrder R} H1 H2 b1 :
     S |- H1 ≃_(b1, id) H2 ->
@@ -669,7 +523,8 @@ Module GC (H : Heap).
         (S2 := (b1 l) |: image b1 S0).
         
         eapply PermutationA_respects_Permutation_r; [ eassumption |
-                                                    | symmetry; eapply heap_elements_filter_add_not_In; try eassumption ].
+                                                    | symmetry; eapply heap_elements_filter_add_not_In;
+                                                      try eassumption ].
 
         eapply IH. eapply heap_equiv_antimon. eassumption. now eauto with Ensembles_DB.
         
@@ -722,8 +577,8 @@ Module GC (H : Heap).
     eapply in_dom_closed. eapply heap_equiv_preserves_closed.
     eassumption. eassumption.
   Qed.
+ 
   
-
   Lemma GC_dom_subset S H1 H2 b :
     live' S H1 H2 b ->
     dom H2 \subset reach' H2 (image b S).  
@@ -731,21 +586,10 @@ Module GC (H : Heap).
     intros [Hsub [Heq Hinj]].
     eassumption.
   Qed.
-  
 
-  Require Import Coq.Classes.RelationClasses. 
-  
-  Instance PermutationA_symm A (eqA : relation A) { _ : Symmetric eqA}
-  : Symmetric (PermutationA eqA).
-  Proof.
-    intros x1 x2 Hperm. induction Hperm. 
-    - constructor.
-    - eapply permA_skip; eauto.
-    - eapply permA_swap.
-    - eapply permA_trans; eauto.
-  Qed.
 
-  
+  (** Size after GC *)
+   
   Lemma live_size_with_measure S {_ : ToMSet S} H1 H2 b f : 
     live' S H1 H2 b ->
     (forall bl1 bl2, block_equiv (b, H1, bl1) (id, H2, bl2) -> f bl1 = f bl2) ->
@@ -826,6 +670,9 @@ Module GC (H : Heap).
     rewrite HL.max_with_measure_filter_dom.
     eapply HL.max_with_measure_filter_dom_sup. 
   Qed.
+
+
+  (** Sizes of equivalent blocks *)
 
   Lemma block_equiv_size_cc_block b bl1 bl2 H1 H2 :
     block_equiv (b, H1, bl1) (id, H2, bl2) ->

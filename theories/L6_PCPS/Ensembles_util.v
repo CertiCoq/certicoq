@@ -1807,3 +1807,30 @@ Proof.
     + right. constructor; eauto.
 Qed.
 
+Ltac normalize_sets :=
+  match goal with
+  | [|- context[FromList []]] => rewrite FromList_nil
+  | [|- context[FromList(_ :: _)]] => rewrite FromList_cons
+  | [|- context[FromList(_ ++ _)]] => rewrite FromList_app
+  | [|- context[FromList [_ ; _]]] => rewrite FromList_cons
+  | [|- context[Union _ _ (Empty_set _)]] =>
+    rewrite Union_Empty_set_neut_r
+  | [|- context[Union _ (Empty_set _) _]] =>
+    rewrite Union_Empty_set_neut_l
+  | [|- context[Setminus _ (Empty_set _) _]] =>
+    rewrite Setminus_Empty_set_abs_r
+  | [|- context[Setminus _ _ (Empty_set _)]] =>
+    rewrite Setminus_Empty_set_neut_r
+  | [ H : context[FromList []] |- _] => rewrite FromList_nil in H
+  | [ H : context[FromList(_ :: _)] |- _] => rewrite FromList_cons in H
+  | [ H : context[FromList(_ ++ _)] |- _] => rewrite FromList_app in H
+  | [ H : context[FromList [_ ; _]] |- _] => rewrite FromList_cons in H
+  | [ H : context[Union _ _ (Empty_set _)] |- _ ] =>
+    rewrite Union_Empty_set_neut_r in H
+  | [ H : context[Union _ (Empty_set _) _] |- _] =>
+    rewrite Union_Empty_set_neut_l in H
+  | [ H : context[Setminus _ (Empty_set _) _] |- _] =>
+    rewrite Setminus_Empty_set_abs_r in H
+  | [ H : context[Setminus _ _ (Empty_set _)] |- _] =>
+    rewrite Setminus_Empty_set_neut_r in H
+  end.

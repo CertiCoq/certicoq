@@ -6,7 +6,7 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
 From CertiCoq.L6 Require Import functions cps eval cps_util identifiers ctx Ensembles_util set_util
-                 List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.GC tactics.
+                 List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.GC tactics map_util.
 From compcert Require Import lib.Coqlib.
 
 Import ListNotations.
@@ -295,9 +295,9 @@ Module CC_log_rel (H : Heap).
     cc_approx_val k j IP P b v1 v2 <-> cc_approx_val' k j IP P b v1 v2.
   Proof.
     destruct k as [ | k ]; destruct j as [| j];
-    destruct v1 as [[[l1 | lf1 f1] H1] | |]; destruct v2 as [[[l2 | lf2 f2] H2] | |];
+    destruct v1 as [[[l1 | lf1 f1] H1] |]; destruct v2 as [[[l2 | lf2 f2] H2] |];
     try (now split; intros; contradiction);
-    try (now simpl; eauto).  
+    try (now simpl; eauto).   
     - split; simpl; [ intros [Heqb Hc] |];
       destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto. 
       { destruct b1 as [c1 vs1 | [? | B1 f1] [ env_loc1 | ] | ];
@@ -603,8 +603,8 @@ Module CC_log_rel (H : Heap).
     induction k as [k IHk] using lt_wf_rec1. intros j.
     induction j as [j IHj] using lt_wf_rec1.
     intros b' GP1 GP2 r1 r2.
-    destruct r1 as [[[l1 | lf1 f1] H1] | |];
-      destruct r2 as [[[l2 | lf2 f2] H2] | |]; simpl;
+    destruct r1 as [[[l1 | lf1 f1] H1] |];
+      destruct r2 as [[[l2 | lf2 f2] H2] |]; simpl;
     try (now intros; contradiction); try (now simpl; eauto).
     destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; eauto.
     destruct b1 as [c1 vs1 | [? | B1 f1] [ env_loc1 |] | ];
@@ -669,7 +669,7 @@ Module CC_log_rel (H : Heap).
     revert j k r1 r2. induction m as [m IHk] using lt_wf_rec1.
     intros j. induction j as [j IHj] using lt_wf_rec1.
     intros k r1 r2.
-    destruct r1 as [[[l1 | lf1 f1] H1] | |]; destruct r2 as [[[l2 | lf2 f2] H2] | |]; simpl;
+    destruct r1 as [[[l1 | lf1 f1] H1] |]; destruct r2 as [[[l2 | lf2 f2] H2] |]; simpl;
     try (now intros; contradiction); try (now simpl; eauto).
     - destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; eauto.
       intros [Heq Hcc] Hleq. split; [ eassumption |].
@@ -773,7 +773,7 @@ Module CC_log_rel (H : Heap).
     i <= j ->
     r1 ≺ ^ (k; i; GIP' ; GP' ; b' ) r2.
   Proof.
-    destruct r1 as [[[l1 | lf1 f1] H1] | |]; destruct r2 as [[[l2 | lf2 f2] H2] | |]; simpl;
+    destruct r1 as [[[l1 | lf1 f1] H1] |]; destruct r2 as [[[l2 | lf2 f2] H2] |]; simpl;
     try (now intros; contradiction); try (now simpl; eauto).
     destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; eauto.
     intros [Heq Hcc] Hleq. split; [ eassumption |].
@@ -1390,9 +1390,6 @@ Module CC_log_rel (H : Heap).
       edestruct H as (Hleq & rho1 & c & vs & FLS & Hget1 & Hnd & Heq & Hget2 & Hall). 
       erewrite Heq in H0. now destruct H0. 
   Qed. 
-  
-
- 
       
   (** * The logical relation respects functional extensionality *)
 
@@ -1405,7 +1402,7 @@ Module CC_log_rel (H : Heap).
     revert j b1 b2 Heq5 r1 r2. induction k as [k IHk] using lt_wf_rec1. intros j.
     induction j as [j IHj] using lt_wf_rec1. intros b1 b2 Heq5 r1 r2.
     simpl. 
-    destruct r1 as [[v1 H1] | |];  destruct r2 as [[v2 H2] | |]; try now eauto.
+    destruct r1 as [[v1 H1] |];  destruct r2 as [[v2 H2] |]; try now eauto.
     destruct v1 as [l1 | ? ? ]; destruct v2 as [l2 | ? ?]; try now eauto.
     split; intros Hres.
     - simpl in *. destruct (get l1 H1) as [bl1 |]; eauto; destruct (get l2 H2) as [bl2 |]; eauto.

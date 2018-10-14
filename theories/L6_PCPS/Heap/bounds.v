@@ -1,5 +1,5 @@
 From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
-     List_util functions tactics.
+     List_util functions tactics map_util.
 
 From CertiCoq.L6.Heap Require Import heap heap_defs 
      cc_log_rel compat closure_conversion closure_conversion_util GC.

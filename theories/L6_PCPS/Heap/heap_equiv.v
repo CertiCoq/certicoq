@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From CertiCoq.L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
-        identifiers Heap.heap tactics Heap.heap_defs.
+        identifiers Heap.heap tactics Heap.heap_defs map_util.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
@@ -19,7 +19,9 @@ Module HeapEquiv (H : Heap).
   Module Defs := HeapDefs H.
 
   Import H Defs.HL Defs.
-    
+
+  (** Formalization of heap equivalence *) 
+  
   (** Syntactic approximation of results with fuel *)
   Fixpoint res_approx_fuel (n : nat) (r1 : (loc -> loc) * res) (r2 : (loc -> loc) * res) : Prop :=
     let '(b1, (v1, H1)) := r1 in
@@ -2184,7 +2186,10 @@ Module HeapEquiv (H : Heap).
   
   (** * Image lemmas *)
 
-    Lemma res_approx_image_post (n : nat) (β1 β2 : loc -> loc)
+  Close Scope Z_scope.
+
+
+  Lemma res_approx_image_post (n : nat) (β1 β2 : loc -> loc)
         (H1 H2 : heap block)
         (v1 v2 : value) :
     res_approx_fuel' n (β1, (v1, H1)) (β2, (v2, H2)) ->
@@ -2755,65 +2760,6 @@ Module HeapEquiv (H : Heap).
     eapply Hwf in Hget1; [| eexists; split; [ now constructor | now eauto ]].
     eapply locs_in_dom; eauto. symmetry; eassumption.
   Qed.
-
-  (*
-  Lemma heap_equiv_respects_well_formedc S β1 β2 H1 H2 :
-    S |- H1 ≃_(β1, β2) H2 ->
-    well_formed (reach' H1 S) H1 ->
-    well_formed (reach' H2 S) H2.
-  Proof.
-    intros Heq Hwf l2 b2 [n [_ Hin]] Heq2.
-    symmetry in Heq. 
-    edestruct heap_equiv_post as [l1 [b1 [Hpost1 [Hget1 Heq1]]]]; eauto.
-    eapply Hwf in Hget1; [| eexists; split; [ now constructor | now eauto ]].
-    eapply locs_in_dom; eauto. symmetry; eassumption.
-  Qed.
-   *)
-
-  (* Lemma heap_equiv_post S β1 β2 H1 H2 l1 n b1 : *)
-  (*   S |- H1 ≃_(β1, β2) H2 -> *)
-  (*   In _ ((post H1 ^ n) S) l1 -> *)
-  (*   get l1 H1 = Some b1 -> *)
-  (*   exists l2 b2, In _ ((post H2 ^ n) S) l2 /\ get l2 H2 = Some b2 /\ *)
-  (*            block_equiv (β1, H1, b1) (β2, H2, b2). *)
-  (* Proof. *)
-  (*   intros Heq. *)
-  (*   revert l1 b1. induction n as [| n IHn]; intros l1 b1 Hin Hget. *)
-  (*   - edestruct Heq as [[Heq1' [le Heq']] _]; eauto. *)
-  (*   - simpl in Hin. simpl. *)
-  (*     destruct Hin as [l1' [b1' [Hin [Hget' Hin']]]].  *)
-  (*     edestruct IHn as [l2' [b2' [Hpost [Hget2 Heqb]]]]; eauto. *)
-  (*     simpl in Heqb. *)
-  (*     edestruct block_equiv_exists_loc as [l2 [Hl2in Hleq]]; eauto. *)
-  (*     rewrite res_equiv_eq in Hleq. simpl in Hleq. rewrite Hget in Hleq. *)
-  (*     destruct Hleq as [Hbs Hleq]. *)
-  (*     destruct (get l2 H2) as [b2 |] eqn:Hgetl2; try contradiction. *)
-  (*     exists l2, b2. split; [| split; now eauto ]. *)
-  (*     eexists. eexists. split; eauto. *)
-  (* Qed. *)
-
-  (* Lemma heap_equiv_respects_well_formed S β1 β2 H1 H2 : *)
-  (*   S |- H1 ≃_(β1, β2) H2 -> *)
-  (*   well_formed (reach' H1 S) H1 -> *)
-  (*   well_formed (reach' H2 S) H2. *)
-  (* Proof. *)
-  (*   intros Heq Hwf l2 b2 [n [_ Hin]] Heq2. *)
-  (*   symmetry in Heq.  *)
-  (*   edestruct heap_equiv_post as [l1 [b1 [Hpost1 [Hget1 Heq1]]]]; eauto. *)
-  (*   eapply Hwf in Hget1; [| eexists; split; [ now constructor | now eauto ]]. *)
-  (*   eapply locs_in_dom; eauto. symmetry; eassumption. *)
-  
-  (* Lemma heap_equiv_in_dom S S' β1 β2 H1 H2 : *)
-  (*   S |- H1 ≃_(β1, β2) H2 -> *)
-  (*   S' \subset S -> *)
-  (*   S' \subset dom H1 -> *)
-  (*   S' \subset dom H2. *)
-  (* Proof. *)
-  (*   intros Heq Hsub Hsub1 l Hin. *)
-  (*   edestruct Hsub1 as [b Hget]; eauto. *)
-  (*   edestruct Heq as [[Hbs [b' [Hget' _]]] _]; eauto. *)
-  (*   eexists; eauto. *)
-  (* Qed. *)
   
   Lemma heap_env_approx_restrict_env S S' β1 β2 H1 H2 rho1 rho1' rho2 rho2' :
     heap_env_approx S (β1, (H1, rho1)) (β2, (H2, rho2)) ->
@@ -3510,6 +3456,24 @@ Module HeapEquiv (H : Heap).
       reflexivity.
       eapply HL.subheap_refl.
     Qed.
+
+    Lemma heap_env_approx_key_set b1 H1 rho1 b2 H2 rho2 : 
+      heap_env_approx (Full_set _) (b1, (H1, rho1)) (b2, (H2, rho2)) ->
+      key_set rho1 \subset key_set rho2.
+    Proof.
+      intros Hap x Hiny. unfold key_set in *.
+      unfold In in *. simpl in *. destruct (M.get x rho1) eqn:Hget1; try contradiction.
+      edestruct Hap as [l1' [Hr2 Hres1]]; eauto. now constructor.
+      now rewrite Hr2.
+    Qed.
+
+    Lemma heap_env_equiv_key_set b1 H1 rho1 b2 H2 rho2 : 
+      Full_set _ |- (H1, rho1) ⩪_( b1, b2) (H2, rho2) ->
+                   key_set rho1 <--> key_set rho2.
+    Proof.
+      intros [Henv1 Henn2]; split;
+        eapply heap_env_approx_key_set; eauto.
+    Qed. 
 
 
 End HeapEquiv.

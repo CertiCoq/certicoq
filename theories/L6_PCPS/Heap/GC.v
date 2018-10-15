@@ -286,11 +286,181 @@ Module GC (H : Heap).
     intros Heq Hl; unfold live in *. rewrite <- !Heq at 1. 
     eassumption.
   Qed.
- 
+
+
+  (** Properties of inverses *)
+
   Definition inverse_subdomain {A B: Type} S (f : A -> B) g :=
     f_eq_subdomain (image f S) (f ∘ g) id /\
     f_eq_subdomain S (g ∘ f) id.
 
+
+  Lemma inverse_subdomain_antimon {A B: Type} S S' (f : A -> B) g : 
+    inverse_subdomain S f g ->
+    S' \subset S ->
+    inverse_subdomain S' f g.
+  Proof.
+    intros [Heq1 Heq2] Hsub.
+    split; eapply f_eq_subdomain_antimon; eauto.
+    eapply image_monotonic; eauto. 
+  Qed.       
+        
+  Lemma res_approx_inverse_subdomain_l H1 H2 b1 b2 b1' v1 v2 n :
+    inverse_subdomain (reach' H1 (val_loc v1)) b1 b1' ->
+    res_approx_fuel n (b1, (v1, H1)) (b2, (v2, H2)) ->
+    res_approx_fuel n (id, (v1, H1)) (b1' ∘ b2, (v2, H2)).
+  Proof.
+    revert v1 v2. 
+    induction n as [n IHn] using lt_wf_rec1; intros v1 v2 Hinv Heq1.
+    destruct n. 
+    - destruct v1 as [l1 | f1 B1]; destruct v2 as [l2 | f2 B2 ];
+        simpl in *; eauto.
+      destruct Heq1 as [Heq1 Heq2]. split.
+      + unfold id, compose. rewrite Heq1.
+        replace (b1' (b1 l1)) with ((b1' ∘ b1) l1) by (unfold compose; reflexivity). 
+        destruct Hinv as [Heql Heqr]. rewrite Heqr. reflexivity.
+        eapply reach'_extensive. reflexivity.
+      + destruct (get l1 H1) eqn:Hget1; eauto. 
+    - destruct v1 as [l1 | f1 B1]; destruct v2 as [l2 | f2 B2 ]; simpl in *; eauto.
+      destruct Heq1 as [Heq1 Heq2]. simpl. split.
+      + unfold id, compose. rewrite Heq1.
+        replace (b1' (b1 l1)) with ((b1' ∘ b1) l1) by (unfold compose; reflexivity). 
+        destruct Hinv as [Heql Heqr]. rewrite Heqr. reflexivity.
+        eapply reach'_extensive. reflexivity.
+      + destruct (get l1 H1) eqn:Hget1; eauto. 
+        destruct b as [ c1 vs1 | v1 v1' | rho1 ]; simpl.
+        * edestruct Heq2 as [vs2 [Hget2 Hi]].
+          eexists; split; eauto. intros i Hlt. 
+
+          eapply Forall2_monotonic_strong; [| eapply Hi; eassumption ]. 
+          intros x1 x2 Hin1 Hin2. simpl. intros. eapply IHn. omega.
+
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H1 [set l1]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          eapply In_Union_list. eapply in_map. eassumption.
+
+          eassumption. 
+
+        * edestruct Heq2 as (v3 & v4 & Hget3 & Hi).
+          do 2 eexists; split; eauto.
+
+          intros i Hlt; split; eapply IHn.
+
+          omega.
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H1 [set l1]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          now eauto with Ensembles_DB.
+          now eapply Hi; eauto.
+
+          omega.
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H1 [set l1]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          now eauto with Ensembles_DB.
+          now eapply Hi; eauto.
+
+        * edestruct Heq2 as (rho2 & Hgetl2 & Henv). 
+          eexists; split; eauto. 
+
+          intros x. edestruct (Henv x); eauto.
+          left. edestruct H as (v3 & v4 & Hget3 & Hget4 & Hi). 
+          do 2 eexists; repeat split; eauto.
+          intros i Hlt. eapply IHn.
+          omega.
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H1 [set l1]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          eapply get_In_env_locs. now constructor. eassumption. 
+          now eauto with Ensembles_DB.
+  Qed.       
+
+
+  Lemma res_approx_inverse_subdomain_r H1 H2 b1 b2 b2' v1 v2 n :
+    inverse_subdomain (reach' H2 (val_loc v2)) b2 b2' ->
+    res_approx_fuel n (b1, (v1, H1)) (b2, (v2, H2)) ->
+    res_approx_fuel n (b2' ∘ b1, (v1, H1)) (id, (v2, H2)).
+  Proof.
+    revert v1 v2. 
+    induction n as [n IHn] using lt_wf_rec1; intros v1 v2 Hinv Heq1.
+    destruct n. 
+    - destruct v1 as [l1 | f1 B1]; destruct v2 as [l2 | f2 B2 ];
+        simpl in *; eauto.
+      destruct Heq1 as [Heq1 Heq2]. split.
+      + unfold id, compose. rewrite <- Heq1.
+        replace (b2' (b2 l2)) with ((b2' ∘ b2) l2) by (unfold compose; reflexivity). 
+        destruct Hinv as [Heql Heqr]. rewrite Heqr. reflexivity.
+        eapply reach'_extensive. reflexivity.
+      + destruct (get l1 H1) eqn:Hget1; eauto. 
+    - destruct v1 as [l1 | f1 B1]; destruct v2 as [l2 | f2 B2 ]; simpl in *; eauto.
+      destruct Heq1 as [Heq1 Heq2]. simpl. split.
+      + unfold id, compose. rewrite <- Heq1.
+        replace (b2' (b2 l2)) with ((b2' ∘ b2) l2) by (unfold compose; reflexivity). 
+        destruct Hinv as [Heql Heqr]. rewrite Heqr. reflexivity.
+        eapply reach'_extensive. reflexivity.
+      + destruct (get l1 H1) eqn:Hget1; eauto. 
+        destruct b as [ c1 vs1 | v1 v1' | rho1 ]; simpl.
+        * edestruct Heq2 as [vs2 [Hget2 Hi]].
+          eexists; split; eauto. intros i Hlt. 
+
+          eapply Forall2_monotonic_strong; [| eapply Hi; eassumption ]. 
+          intros x1 x2 Hin1 Hin2. simpl. intros. eapply IHn. omega.
+
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H2 [set l2]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          eapply In_Union_list. eapply in_map. eassumption.
+
+          eassumption. 
+
+        * edestruct Heq2 as (v3 & v4 & Hget3 & Hi).
+          do 2 eexists; split; eauto.
+
+          intros i Hlt; split; eapply IHn.
+
+          omega.
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H2 [set l2]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          now eauto with Ensembles_DB.
+          now eapply Hi; eauto.
+
+          omega.
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H2 [set l2]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          now eauto with Ensembles_DB.
+          now eapply Hi; eauto.
+
+        * edestruct Heq2 as (rho2 & Hgetl2 & Henv). 
+          eexists; split; eauto. 
+
+          intros x. edestruct (Henv x); eauto.
+          left. edestruct H as (v3 & v4 & Hget3 & Hget4 & Hi). 
+          do 2 eexists; repeat split; eauto.
+          intros i Hlt. eapply IHn.
+          omega.
+          eapply inverse_subdomain_antimon. eassumption.
+          rewrite (reach_unfold H2 [set l2]). eapply Included_Union_preserv_r.
+          eapply reach'_set_monotonic. rewrite post_Singleton; eauto.
+          eapply get_In_env_locs. now constructor. eassumption. 
+          now eauto with Ensembles_DB.
+  Qed.       
+
+  Lemma res_equiv_inverse_subdomain H1 H2 v1 v2 b1 b2 b1' :
+    inverse_subdomain (reach' H1 (val_loc v1)) b1 b1' ->
+    (v1, H1) ≈_(b1, b2) (v2, H2) ->
+    (v1, H1) ≈_(id, b1' ∘ b2) (v2, H2).
+  Proof.
+    intros Hinv Heq n. edestruct (Heq n) as [Hl Hr].  
+    split. 
+    eapply res_approx_inverse_subdomain_l. eassumption.
+    eassumption. 
+    eapply res_approx_inverse_subdomain_r. eassumption.
+    eassumption. 
+  Qed.
+  
 
   (* Admitted for now *)
   Lemma live_live'_inv S b  H1 H2 :
@@ -316,7 +486,8 @@ Module GC (H : Heap).
     unfold live. rewrite !Hseq. reflexivity.
   Qed.
 
-  
+
+  (* XXX unused *)
   Lemma live_respects_heap_equiv S
         b b' (H1 H2 H3 : heap block) (rho1 rho2 : env) : 
     S |- (H1, rho1) ⩪_(id, b) (H2, rho2) ->
@@ -369,7 +540,7 @@ Module GC (H : Heap).
     (exists b1, image b S |- H2 ≃_(b1, id) H2' /\
            injective_subdomain (reach' H2 (image b S)) b1).
   Proof.
-    intros Hl1 Hl2.
+    intros [Hsub1 [Heq1 Hinj1]] [Hsub2 [Heq2 Hinj2]]. Hl1 Hl2].
     edestruct (live'_live_inv S b H1 H2) as [d [Hld [Heq1 Heq2]]].
     eassumption.
     revert Hl2 Hld .

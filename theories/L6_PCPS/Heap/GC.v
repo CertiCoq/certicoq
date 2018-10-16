@@ -460,19 +460,139 @@ Module GC (H : Heap).
     eapply res_approx_inverse_subdomain_r. eassumption.
     eassumption. 
   Qed.
-  
 
-  (* Admitted for now *)
+  Lemma heap_equiv_inverse_subdomain S H1 H2 b1 b1' :
+    inverse_subdomain (reach' H1 S) b1 b1' ->
+    S |- H1 ≃_(b1, id) H2  ->
+    image b1 S |- H1 ≃_(id, b1') H2.
+  Proof.
+    intros Hinv Heq l [l' [Hin Heq']]; subst.
+    replace (b1' (b1 l')) with l' in *.
+
+    assert (Hin' := Hin). 
+    eapply Heq in Hin. unfold id in *.
+
+    eapply res_equiv_inverse_subdomain.  
+
+    + simpl. eapply inverse_subdomain_antimon. eassumption.
+      eapply reach'_set_monotonic. eapply Singleton_Included. 
+      eassumption.
+
+    + eassumption.
+
+    + destruct Hinv as [Hinv1 Hinv2]. 
+      replace (b1' (b1 l')) with ((b1' ∘ b1) l') by reflexivity.
+      rewrite Hinv2. reflexivity. eapply reach'_extensive. eassumption. 
+  Qed.
+
+
+  Instance Proper_inverse_subdomain {A B} : Proper (Same_set A ==> eq ==> eq ==> iff) (@inverse_subdomain A B).
+  Proof. 
+    intros s1 s2 Hseq f1 f2 Hfeq g1 g2 Hgeq; subst.
+    unfold inverse_subdomain. rewrite Hseq. reflexivity.
+  Qed.
+
+  Lemma compose_extend_l S (C : Type) f (g : positive -> positive) (x : positive) (y : C) :
+    injective_subdomain S g ->
+    x \in S -> 
+    f_eq_subdomain S (f {g x ~> y} ∘ g) ((f ∘ g) {x ~> y}).
+  Proof.
+    intros Hinj Hin z Hinz. unfold compose. simpl. compute.
+
+    destruct (peq z x); subst; eauto.
+    - rewrite peq_true. reflexivity.
+    - rewrite peq_false. reflexivity.  intros Hc.
+      eapply n. eapply Hinj; eassumption.
+  Qed. 
+    
+  Lemma inverse_exists S {Hs : ToMSet S} (b : positive -> positive) :
+    injective_subdomain S b ->
+    exists b', injective_subdomain (image b S) b' /\
+          inverse_subdomain S b b'.
+  Proof. 
+    pose (P := fun S => forall {Hs : ToMSet S},
+                   injective_subdomain S b ->
+                   exists b', injective_subdomain (image b S) b' /\
+                         inverse_subdomain S b b').
+    assert (Hs' := Hs). revert Hs. 
+    eapply Ensemble_ind with (P := P).
+    - intros S1 S2 Heq. unfold P; split.
+      intros Hs1 Hinj. setoid_rewrite <- Heq.  
+      eapply Hs1. eapply ToMSet_Same_set. symmetry. eassumption. 
+      eassumption.
+      intros Hs1 Hinj. setoid_rewrite Heq.  
+      eapply Hs1. eapply ToMSet_Same_set. eassumption. 
+      eassumption.
+    - unfold P. intros _.
+      intros _. eexists id.
+      split.
+      
+      rewrite image_Empty_set. clear. now firstorder.
+
+      split.
+      rewrite image_Empty_set. clear. now firstorder.
+      clear; now firstorder.
+      
+    - intros x S0 Hs0 Hnin IH Hs Hinj. edestruct IH as [b' [Hinj' [Hfeq1 Hfeq2]]].  
+      eassumption. eapply injective_subdomain_antimon. eassumption. now eauto with Ensembles_DB.
+
+      eexists (b' {(b x) ~> x}). split.
+
+      + rewrite image_Union, image_Singleton.
+        eapply injective_subdomain_extend. eassumption.
+        intros [y [Hc Heqcy]]; subst. inv Hc.  
+        destruct H as [z [Hc Heqcz]]. subst. 
+        eapply H0.
+
+        replace (b' (b z)) with z. reflexivity.
+
+        replace (b' (b z)) with ((b' ∘ b) z) by reflexivity.
+        rewrite Hfeq2. reflexivity. eassumption.
+      + assert (Hfeq : f_eq id (id { b x ~> b x } )).
+        { clear. intros y.
+          destruct (peq y (b x)).
+          - subst. rewrite extend_gss. reflexivity.
+          - rewrite extend_gso; eauto. }
+
+        assert (Hfeq' : f_eq id (id { x ~> x } )).
+        { clear. intros y.
+          destruct (peq y x).
+          - subst. rewrite extend_gss. reflexivity.
+          - rewrite extend_gso; eauto. }
+        split.
+        * rewrite compose_extend.
+          rewrite Hfeq.
+          rewrite image_Union, image_Singleton.
+          eapply f_eq_subdomain_extend. eassumption.
+        * eapply transitivity.
+          eapply compose_extend_l. eassumption. now left.
+          rewrite Hfeq'.
+          eapply f_eq_subdomain_extend. eassumption.
+    - eassumption. 
+  Qed.
+
+  
+  (* Admitted for now -- Not a dependency *)
   Lemma live_live'_inv S b  H1 H2 :
     live S H1 H2 b ->
     exists b', live' (image b S) H1 H2 b' /\ inverse_subdomain (reach' H2 S) b b'.
   Admitted.
 
   (* Admitted for now *)
-  Lemma live'_live_inv S b H1 H2 :
+  Lemma live'_live_inv S { _ : ToMSet S} b H1 H2 :
     live' S H1 H2 b ->
     exists b', live (image b S) H1 H2 b' /\ inverse_subdomain (reach' H1 S) b b'.
-  Admitted.
+  Proof.
+    intros [Hl1 [Hl2 Hl3]].
+    edestruct inverse_exists as [b' [Hinv Hinj']]; [| eassumption | ].
+    now tci.
+    eexists b'. split; [| eassumption ].
+    split; [| split ].
+    + eassumption.
+    + eapply heap_equiv_inverse_subdomain; eassumption. 
+    + rewrite <- heap_equiv_reach_eq. eassumption. eassumption.
+  Qed.
+  
   
   Instance Proper_live' : Proper (Same_set _ ==> eq ==> eq ==> eq ==> iff) live'. 
   Proof. 
@@ -487,51 +607,51 @@ Module GC (H : Heap).
   Qed.
 
 
-  (* XXX unused *)
-  Lemma live_respects_heap_equiv S
-        b b' (H1 H2 H3 : heap block) (rho1 rho2 : env) : 
-    S |- (H1, rho1) ⩪_(id, b) (H2, rho2) ->
-    injective_subdomain (reach' H2 (env_locs rho2 S)) b ->
-    live' (env_locs rho2 S) H2 H3 b' ->
-    (exists b'', live' (env_locs rho1 S) H1 H3 b'').
-  Proof.
-    intros Heq Hinj Hlive. edestruct live'_live_inv as [d [Hlive' [Heq1 Heq22]]].
-    eassumption.
-    assert (Hl : live (image b' (env_locs rho2 S)) H1 H3 (b ∘ d)).
-    { destruct Hlive' as [Hsub [Hheq Hin]].
-      split. 
-      - assumption.
-      - split. 
-        eapply heap_env_approx_heap_equiv in Heq.
-        eapply heap_equiv_compose_r. (* TODO remove parameters *)
-        rewrite <- image_compose.
-        rewrite (image_f_eq_subdomain (compose d b'));
-          [| eapply f_eq_subdomain_antimon; try eassumption;
-             eapply reach'_extensive ].
-        rewrite image_id. eassumption.
-        eassumption. 
-        eapply injective_subdomain_compose. eassumption.
-        destruct Hlive as [Hsub' [Hheq' Hin']]. 
-        (* heap takes image outside  *) 
-        rewrite <- heap_equiv_reach_eq; [| eassumption ].
-        eapply injective_subdomain_antimon. eassumption.
-        rewrite <- image_compose.
-        rewrite image_f_eq_subdomain; try eassumption.
-        rewrite image_id. reflexivity.
-    }
-    edestruct live_live'_inv as [d' [Hlive'' [Heq1' Heq22']]].
-    eassumption. eexists.
-    eapply Proper_live'; try eassumption; try reflexivity.
-    rewrite <- image_compose, Combinators.compose_assoc.
-    rewrite image_compose.
-    rewrite (image_f_eq_subdomain (compose d b'));
-      [| eapply f_eq_subdomain_antimon; try eassumption;
-         eapply reach'_extensive ].
-    rewrite image_id.
-    rewrite <-(image_id (env_locs rho1 S)).
-    eapply heap_env_equiv_image_post_n with (n := 0).
-    eassumption. 
-  Qed.
+  (* (* XXX unused *) *)
+  (* Lemma live_respects_heap_equiv S {_ : ToMSet S}  *)
+  (*       b b' (H1 H2 H3 : heap block) (rho1 rho2 : env) :  *)
+  (*   S |- (H1, rho1) ⩪_(id, b) (H2, rho2) -> *)
+  (*   injective_subdomain (reach' H2 (env_locs rho2 S)) b -> *)
+  (*   live' (env_locs rho2 S) H2 H3 b' -> *)
+  (*   (exists b'', live' (env_locs rho1 S) H1 H3 b''). *)
+  (* Proof. *)
+  (*   intros Heq Hinj Hlive. edestruct live'_live_inv as [d [Hlive' [Heq1 Heq22]]]. *)
+  (*   eassumption. *)
+  (*   assert (Hl : live (image b' (env_locs rho2 S)) H1 H3 (b ∘ d)). *)
+  (*   { destruct Hlive' as [Hsub [Hheq Hin]]. *)
+  (*     split.  *)
+  (*     - assumption. *)
+  (*     - split.  *)
+  (*       eapply heap_env_approx_heap_equiv in Heq. *)
+  (*       eapply heap_equiv_compose_r. (* TODO remove parameters *) *)
+  (*       rewrite <- image_compose. *)
+  (*       rewrite (image_f_eq_subdomain (compose d b')); *)
+  (*         [| eapply f_eq_subdomain_antimon; try eassumption; *)
+  (*            eapply reach'_extensive ]. *)
+  (*       rewrite image_id. eassumption. *)
+  (*       eassumption.  *)
+  (*       eapply injective_subdomain_compose. eassumption. *)
+  (*       destruct Hlive as [Hsub' [Hheq' Hin']].  *)
+  (*       (* heap takes image outside  *)  *)
+  (*       rewrite <- heap_equiv_reach_eq; [| eassumption ]. *)
+  (*       eapply injective_subdomain_antimon. eassumption. *)
+  (*       rewrite <- image_compose. *)
+  (*       rewrite image_f_eq_subdomain; try eassumption. *)
+  (*       rewrite image_id. reflexivity. *)
+  (*   } *)
+  (*   edestruct live_live'_inv as [d' [Hlive'' [Heq1' Heq22']]]. *)
+  (*   eassumption. eexists. *)
+  (*   eapply Proper_live'; try eassumption; try reflexivity. *)
+  (*   rewrite <- image_compose, Combinators.compose_assoc. *)
+  (*   rewrite image_compose. *)
+  (*   rewrite (image_f_eq_subdomain (compose d b')); *)
+  (*     [| eapply f_eq_subdomain_antimon; try eassumption; *)
+  (*        eapply reach'_extensive ]. *)
+  (*   rewrite image_id. *)
+  (*   rewrite <-(image_id (env_locs rho1 S)). *)
+  (*   eapply heap_env_equiv_image_post_n with (n := 0). *)
+  (*   eassumption.  *)
+  (* Qed. *)
 
   
   Lemma live_deterministic S (_ : set_util.ToMSet S) H1 H2 H2' b b' :
@@ -540,7 +660,7 @@ Module GC (H : Heap).
     (exists b1, image b S |- H2 ≃_(b1, id) H2' /\
            injective_subdomain (reach' H2 (image b S)) b1).
   Proof.
-    intros [Hsub1 [Heq1 Hinj1]] [Hsub2 [Heq2 Hinj2]]. Hl1 Hl2].
+    intros Hl1 Hl2.
     edestruct (live'_live_inv S b H1 H2) as [d [Hld [Heq1 Heq2]]].
     eassumption.
     revert Hl2 Hld .

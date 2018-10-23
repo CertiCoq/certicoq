@@ -4,7 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.omega.Omega.
 Require Import Coq.Bool.Bool.
 Require Import Common.Common.
-Require Import TemplateExtraction.Ast Template.kernel.univ.
+Require Import TemplateExtraction.EAst Template.kernel.univ.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -30,19 +30,16 @@ Arguments rarg {term} _.
 **)
 Inductive Term : Type :=
 | TRel       : nat -> Term
-| TSort      : Srt -> Term
 | TProof     : Term
-| TProd      : name -> Term (* type *) -> Term -> Term
-| TLambda    : name -> Term (* type *) -> Term -> Term
+| TLambda    : name -> Term -> Term
 | TLetIn     : name ->
-               Term (* dfn *) -> Term (* type *) -> Term (* body *) -> Term
-| TApp       : Term -> Term (* first arg must exist *) -> Terms -> Term
+               Term (* dfn *) -> Term (* body *) -> Term
+| TApp       : Term -> Term (* first arg must exist *) -> Term
 | TConst     : string -> Term
-| TInd       : inductive -> Term
 | TConstruct : inductive -> nat (* constructor # *) ->
                nat (* # pars *) -> nat (* # args *) -> Term
                        (* use Defs to code case branches *)
-| TCase      : (inductive * nat) (* # of pars *) -> Term (* type *) ->
+| TCase      : (inductive * nat) (* # of pars *) ->
                Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs (* all mutual bodies *)->
                nat (* indx of this body *) -> Term
@@ -55,7 +52,7 @@ with Brs: Type :=
      | bcons: nat -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
-| dcons : name -> Term -> Term -> nat -> Defs -> Defs.
+| dcons : name -> Term -> nat -> Defs -> Defs.
 Hint Constructors Term Terms Brs Defs.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
@@ -63,9 +60,6 @@ Scheme Trm_ind' := Induction for Term Sort Prop
   with Defs_ind' := Induction for Defs Sort Prop.
 Combined Scheme TrmTrmsBrsDefs_ind
          from Trm_ind', Trms_ind', Brs_ind', Defs_ind'.
-Notation prop := (TSort SProp).
-Notation set_ := (TSort SSet).
-Notation type_ := (TSort SType).
 Notation tunit t := (tcons t tnil).
 Notation btunit n t := (bcons n t bnil).
 Notation dunit nm t m := (dcons nm t m dnil).
@@ -75,17 +69,14 @@ Notation dunit nm t m := (dcons nm t m dnil).
 Fixpoint print_template_term (t:term) : string :=
   match t with
     | tRel n => " (" ++ (nat_to_string n) ++ ") "
-    | tSort _ => " SRT "
-    | tProd _ _ _ => " PROD "
-    | tLambda _ _ _ => " LAM "
-    | tLetIn _ _ _ _ => " LET "
+    | tLambda _ _ => " LAM "
+    | tLetIn _ _ _ => " LET "
     | tApp fn args =>
       " (APP" ++ (print_template_term fn) ++ " _ " ++ ") "
     | tConst s us => "[" ++ s ++ "]"
-    | tInd i us => ("(IND:" ++ print_inductive i ++ ")")
     | tConstruct i n us =>
       "(CSTR:" ++ print_inductive i ++ ":" ++ (nat_to_string n) ++ ") "
-    | tCase n _ mch _ =>
+    | tCase n mch _ =>
       " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++
                 (print_template_term mch) ++ " _ " ++") "
     | tFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
@@ -192,13 +183,13 @@ Fixpoint blength (ts:Brs) : nat :=
 Fixpoint dlength (ts:Defs) : nat :=
   match ts with 
     | dnil => 0
-    | dcons _ _ _ _ ts => S (dlength ts)
+    | dcons _ _ _ ts => S (dlength ts)
   end.
 
 Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
   match l with
     | dnil => None
-    | dcons _ _ x ix t => match n with
+    | dcons _ x ix t => match n with
                            | 0 => Some (x, ix)
                            | S m => dnthBody m t
                          end
@@ -222,22 +213,19 @@ Fixpoint
   dnth_lt (ds:Defs) : forall (n:nat), (n < dlength ds) -> Term * nat :=
   match ds return forall n, (n < dlength ds) -> Term * nat with
   | dnil => n_lt_0
-  | dcons nm ty bod ri es =>
+  | dcons nm bod ri es =>
     fun n =>
-      match n return (n < dlength (dcons nm ty bod ri es)) -> Term * nat with
+      match n return (n < dlength (dcons nm bod ri es)) -> Term * nat with
         | 0 => fun _ => (bod, ri)
         | S m => fun H => dnth_lt es (lt_S_n _ _ H)
       end
   end.
 
 (** syntactic control of "TApp": no nested apps, app must have an argument **)
-Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
-  match t with
-    | TApp fn b bs => TApp fn b (tappend bs args)
-    | fn => match args with
-              | tnil => fn
-              | tcons c cs => TApp fn c cs
-            end
+Function mkApp (t:Term) (args:Terms) {struct args} : Term :=
+  match args with
+  | tnil => t
+  | tcons c cs => mkApp (TApp t c) cs
   end.
 
 (** translate Gregory Malecha's [term] into my [Term] **)
@@ -256,7 +244,7 @@ Section term_Term_sec.
    match ds with
      | nil => dnil
      | cons d ds =>
-       dcons (dname d) (term_Term (dtype d))
+       dcons (dname d)
              (term_Term (dbody d))  (rarg d) (defs_Defs ds )
    end.
   (* Case branches *)
@@ -274,32 +262,24 @@ End term_Term_sec.
 Function term_Term (t:term) : Term :=
   match t with
     | tRel n => TRel n
-    | tSort srt =>
-      TSort (match srt with 
-             | (Level.lProp, false) :: nil => SProp
-             | (Level.lSet, false) :: nil => SSet
-             | _ => SType  (* throwing away sort info *)
-             end)
     | tBox => TProof
-    | tProd nm ty bod => (TProd nm (term_Term ty) (term_Term bod))
-    | tLambda nm ty bod => (TLambda nm (term_Term ty) (term_Term bod))
-    | tLetIn nm dfn ty bod =>
-      (TLetIn nm (term_Term dfn) (term_Term ty) (term_Term bod))
-    | tApp fn us => mkApp (term_Term fn) (terms_Terms term_Term us)
+    | tLambda nm bod => (TLambda nm (term_Term bod))
+    | tLetIn nm dfn bod =>
+      (TLetIn nm (term_Term dfn) (term_Term bod))
+    | tApp fn us => TApp (term_Term fn) (term_Term us)
     | tConst pth us =>   (* ref to axioms in environ made into [TAx] *)
       match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
       | Some (ecTyp _ _ _) =>
         TWrong ("term_Term:Const inductive or axiom: " ++ pth)
       | _  => TConst pth
       end
-    | tInd ind us => TInd ind
     | tConstruct ind m us =>
       match cnstrArity datatypeEnv ind m with
         | Ret (npars, nargs) => TConstruct ind m npars nargs
         | Exc s => TWrong ("term_Term;tConstruct:" ++ s)
       end
-    | tCase npars ty mch brs =>
-      TCase npars (term_Term ty) (term_Term mch)
+    | tCase npars mch brs =>
+      TCase npars (term_Term mch)
             (natterms_Brs term_Term brs)
     | tFix defs m => TFix (defs_Defs term_Term defs) m
     | _ => TWrong "(term_Term:Unknown)"
@@ -339,15 +319,17 @@ Definition program_Program_ext (p:program) : Program Term :=
   program_Pgm dtEnv p nil.
 
 Require Template.Ast.
+Require Import PCUIC.TemplateToPCUIC.
 Require Import TemplateExtraction.Extract.
 
 Definition program_Program (p:Template.Ast.program) : option (Program Term) :=
   let '(genv, t) := p in
   let gc := (genv, uGraph.init_graph) in
-  let genv' := extract_global gc in
-  let t' := extract gc nil t in
-  match genv', t' with
-  | Checker.Checked (genv', _ugraph), Checker.Checked t' =>
+  let genv' := trans_global gc in
+  let genv'' := extract_global genv' in
+  let t' := extract genv' nil (trans t) in
+  match genv'', t' with
+  | PCUICChecker.Checked (genv', _ugraph), PCUICChecker.Checked t' =>
     Some (program_Program_ext (genv', t'))
   | _, _ => None
   end.

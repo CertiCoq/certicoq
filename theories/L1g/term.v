@@ -29,20 +29,16 @@ Fixpoint tlength (ts:Terms) : nat :=
 Fixpoint print_term (t:Term) : string :=
   match t with
     | TRel n => "(REL " ++ (nat_to_string n) ++ ")"
-    | TSort _ => " SRT "
     | TProof => " PRF "
-    | TProd _ _ _ => " PROD "
-    | TLambda _ _ _ => " LAM "
-    | TLetIn nm _ dfn bod =>
+    | TLambda _ _ => " LAM "
+    | TLetIn nm dfn bod =>
       (" LET " ++ (print_name nm) ++ (print_term dfn) ++ (print_term bod))
-    | TApp fn arg args =>
-      "(APP" ++ (print_term fn) ++ (print_term arg) ++ " "
-             ++ nat_to_string (tlength args) ++ ")"
+    | TApp fn arg =>
+      "(APP" ++ (print_term fn) ++ (print_term arg) ++ ")"
     | TConst s => "[" ++ s ++ "]"
-    | TInd i => "(TIND" ++ print_inductive i ++ ")"
     | TConstruct i ix _ _ =>
       "(CSTR" ++ (print_inductive i) ++ nat_to_string ix ++ ")"
-    | TCase n _ mch _ =>
+    | TCase n mch _ =>
       "(CASE " ++ (nat_to_string (snd n)) ++ " _ " ++ (print_term mch) ++
                  " _ " ++")"
     | TFix _ n => "(FIX " ++ (nat_to_string n) ++ ")"
@@ -62,28 +58,23 @@ Lemma TermTerms_dec:
 Proof.
   apply TrmTrmsBrsDefs_ind; intros.
   - Case "TRel". destruct t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-  - Case "TSort". destruct t; cross. destruct (Srt_dec s s0); [lft | rght].
   - destruct t; cross; lft.
+  - destruct t0; cross.
+    destruct (name_dec n n0);
+      destruct (H t0); [lft | rght ..].
   - destruct t1; cross.
     destruct (name_dec n n0);
       destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
   - destruct t1; cross.
-    destruct (name_dec n n0);
-      destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..]. 
-  - destruct t2; cross.
-    destruct (name_dec n n0);
-      destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2_3); 
+    destruct (H t1_1); destruct (H0 t1_2);
       [lft | rght ..]. 
-  - destruct t2; cross.
-    destruct (H t2_1); destruct (H0 t2_2); destruct (H1 t2); [lft | rght ..].
   - destruct t; cross. destruct (string_dec s s0); [lft | rght].
-  - destruct t; cross. destruct (inductive_dec i i0); [lft | rght].
   - destruct t; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n2),
     (eq_nat_dec n0 n3), (eq_nat_dec n1 n4); [lft | rght .. ].
-  - destruct t1; cross.
+  - destruct t0; cross.
     destruct p as [i n], p0 as [i0 n0].
-    destruct (eq_dec n n0), (inductive_dec i i0);
+    destruct (eq_dec n n0), (inductive_dec i i0); subst.
     destruct (H t1_1), (H0 t1_2), (H1 b0); [lft | rght .. ].
   - destruct t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].

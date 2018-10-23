@@ -1,5 +1,5 @@
 Require Import Template.kernel.univ.
-Require Export TemplateExtraction.Ast.
+Require Export TemplateExtraction.EAst.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.

@@ -2880,6 +2880,11 @@ End RELATION.
 
 Section THEOREM.
 
+Notation vval := uintTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *)
+Notation uval := uintTy.
+
+Notation valPtr := (Tpointer vval
+                            {| attr_volatile := false; attr_alignas := None |}).
 
 
   (* same as L6_to_Clight *)
@@ -3110,7 +3115,6 @@ Definition correct_tinfo:  Z -> temp_env ->  mem  -> Prop :=
   fun max_alloc lenv m  =>
     exists alloc_b alloc_ofs limit_ofs args_b args_ofs,
       M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
-
       (* the max int blocks after alloc are Writable *)
       (forall i, 0 <= i < max_alloc  ->   Mem.valid_access m Mint32 alloc_b (Int.unsigned (Int.add alloc_ofs (Int.repr (int_size *  i)))) Writable )%Z /\
       M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) /\
@@ -5785,11 +5789,36 @@ Forall2
     eapply t_trans.
     constructor. constructor. econstructor.
     econstructor. econstructor. constructor.
-    constructor. 
+    constructor.
+    (* tinfIdent is in lenv *)
+      admit.
+ 
+      constructor 3.  simpl. reflexivity. simpl. reflexivity.
+      (* threadInfIdent "thread_info" is a defined structure in global_env, 
+         and one of its field is argsIdent *)
+      
+      SearchAbout composite_definition composite. 
+
+(*  need to make this into a composite instead of composite_definition
+      assert (  Maps.PTree.get threadInfIdent (genv_cenv (globalenv p)) = Some (Build_composite threadInfIdent Struct
+   ((allocIdent, valPtr) ::
+                         (limitIdent, valPtr) :: (heapInfIdent, (Clightdefs.tptr (Tstruct heapInfIdent noattr))) ::
+                         (argsIdent, (Tarray uintTy maxArgs noattr))::nil)
+   noattr)) by admit. *)
+ 
+      admit.
+     simpl.  admit.
+    simpl. constructor.
+    constructor.
+
+    
+    
 
     
 
 
+
+    
  
     
     admit.

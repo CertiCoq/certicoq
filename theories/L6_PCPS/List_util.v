@@ -5,7 +5,7 @@
 
 From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
          omega.Omega Numbers.BinNums Structures.OrdersEx Sets.Ensembles
-         Lists.SetoidList ZArith Arith Sorting.Permutation FunInd.
+         Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation FunInd.
 
 From CertiCoq.L6 Require Import Ensembles_util tactics.
 
@@ -63,13 +63,14 @@ Definition Subperm {A : Type} (l1 l2 : list A) :=
 Hint Constructors Forall2_asym.
 
 (** Lemmas about [Forall2] and [Forall2_asym] *)
-Lemma Forall2_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
+Lemma Forall2_length {A B} (R : A -> B -> Prop) l1 l2 :
   Forall2 R l1 l2 -> length l1 = length l2. 
 Proof.
   revert l2. induction l1 as [| x xs IHxs ]; intros l2 H.
   - inv H; eauto.
   - inv H. simpl. f_equal. eauto.
 Qed.
+
 
 Lemma Forall2_asym_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
   Forall2_asym R l1 l2 -> length l1 <= length l2. 
@@ -79,7 +80,7 @@ Proof.
   - inv H. simpl. eapply IHxs in H4. omega.
 Qed.
 
-Lemma Forall2_monotonic {A} (R R' : A -> A -> Prop) (l1 l2 : list A) :
+Lemma Forall2_monotonic {A B} (R R' : A -> B -> Prop) (l1 : list A) (l2 : list B):
   (forall x1 x2, R x1 x2 -> R' x1 x2) ->
   Forall2 R l1 l2 ->
   Forall2 R' l1 l2.
@@ -90,8 +91,8 @@ Proof.
   - destruct l2; inv Hall. constructor; eauto.
 Qed.
 
-Lemma Forall2_monotonic_strong (A : Type) (R R' : A -> A -> Prop) (l1 l2 : list A) :
-  (forall x1 x2 : A, List.In x1 l1 -> List.In x2 l2 -> R x1 x2 -> R' x1 x2) ->
+Lemma Forall2_monotonic_strong (A B : Type) (R R' : A -> B -> Prop) (l1 : list A) (l2 : list B):
+  (forall x1 x2, List.In x1 l1 -> List.In x2 l2 -> R x1 x2 -> R' x1 x2) ->
   Forall2 R l1 l2 -> Forall2 R' l1 l2.
 Proof.
   revert l2.
@@ -136,9 +137,15 @@ Proof.
 Qed.
 
 Lemma Forall2_symm_strong (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) : 
-  (forall l1 l2, R1 l1 l2 -> R2 l2 l1) -> Forall2 R1 l1 l2 -> Forall2 R2 l2 l1.
+  (forall x1 x2, List.In x1 l1 -> List.In x2 l2 ->  R1 x1 x2 -> R2 x2 x1) ->
+  Forall2 R1 l1 l2 -> Forall2 R2 l2 l1.
 Proof.
   intros H Hall; induction Hall; eauto.
+  constructor. eapply H. now constructor. now constructor.
+  eassumption. eapply IHHall.
+  intros y1 y2 Hin1 Hin2 Hr. eapply H; eauto.
+  now constructor 2.
+  now constructor 2.
 Qed.
 
 Lemma Forall2_Forall {A} (P : A -> A -> Prop) l :
@@ -245,7 +252,7 @@ Proof.
   - inv Hall2. constructor; eauto.
 Qed.
 
-Lemma Forall2_forall (A B : Type) (R : A -> B -> B -> Prop) (l1 l2 : list B) :
+Lemma Forall2_forall (A B C : Type) (R : A -> B -> C -> Prop) l1 l2 :
   inhabited A ->
   (forall k, Forall2 (R k) l1 l2) ->
   Forall2 (fun x1 x2 => forall k, R k x1 x2) l1 l2.
@@ -259,6 +266,7 @@ Proof.
     eapply IHl1. intros k.
     specialize (Hyp k). inv Hyp. eassumption.
 Qed.
+
 
 Lemma Forall2_conj (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) :
   Forall2 R1 l1 l2 ->
@@ -293,7 +301,120 @@ Proof.
     + eapply IHHall; eauto.
 Qed. 
 
-(** Lemmas about [nthN] *)
+Lemma Forall2_vertical_l {A B} (R1 R1' : A -> B -> Prop) (R2 : A -> A -> Prop) l1 l2 l3 :
+  (forall x y z, R1 x y -> R2 x z -> R1' z y) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l1 l3 ->
+  Forall2 R1' l3 l2.
+Proof.
+  intros Hr Hall1. revert l3. induction Hall1; intros l3 Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor; eauto. 
+Qed.
+
+
+Lemma Forall2_vertical_r {A B} (R1 R1' : A -> B -> Prop) (R2 : B -> B -> Prop) l1 l2 l3 :
+  (forall x y z, R1 x y -> R2 y z -> R1' x z) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l2 l3 ->
+  Forall2 R1' l1 l3.
+Proof.
+  intros Hr Hall1. revert l3. induction Hall1; intros l3 Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor; eauto. 
+Qed.
+
+Lemma Forall2_vertical_l_strong {A B} (R1 R1' : A -> B -> Prop) (R2 : A -> A -> Prop) l1 l2 l3 :
+  (forall x y z, List.In x l1 -> List.In y l2 -> List.In z l3 ->  R1 x y -> R2 x z -> R1' z y) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l1 l3 ->
+  Forall2 R1' l3 l2.
+Proof.
+  intros Hr Hall1. revert l3 Hr. induction Hall1; intros l3 Hr Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor.
+    eapply Hr; try eassumption; try now constructor. 
+    eapply IHHall1; eauto.
+    intros x' y' z' Hin1 Hin2 Hin3 Hr1 Hr2.
+    eapply Hr; eauto; try now constructor 2.
+Qed.
+
+
+Lemma Forall2_vertical_r_strong {A B} (R1 R1' : A -> B -> Prop) (R2 : B -> B -> Prop) l1 l2 l3 :
+  (forall x y z, List.In x l1 -> List.In y l2 -> List.In z l3 -> R1 x y -> R2 y z -> R1' x z) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l2 l3 ->
+  Forall2 R1' l1 l3.
+Proof.
+  intros Hr Hall1. revert l3 Hr. induction Hall1; intros l3 Hr Hall2.
+  - inv Hall2. constructor.
+  - inv Hall2. constructor.
+    eapply Hr; try eassumption; try now constructor. 
+    eapply IHHall1; eauto.
+    intros x' y' z' Hin1 Hin2 Hin3 Hr1 Hr2.
+    eapply Hr; eauto; try now constructor 2.
+Qed.
+
+Lemma Forall2_vertical_strong
+      {A B C D : Type} (R1 : A -> B -> Prop) (R2 : A -> C -> Prop) (R3 : B -> D -> Prop) (R4 : C -> D -> Prop)
+      (l1 : list A) (l2 : list B) (l3 : list C) (l4 : list D):
+  (forall (x : A) (y : B) (z : C) (w : D),
+     List.In x l1 -> List.In y l2 -> List.In z l3 ->  List.In w l4 ->
+     R1 x y -> R2 x z -> R3 y w -> R4 z w) ->
+  Forall2 R1 l1 l2 ->
+  Forall2 R2 l1 l3 -> Forall2 R3 l2 l4 ->
+  Forall2 R4 l3 l4.
+Proof.
+  intros Hyp Hr1.
+  revert l3 l4 Hyp. induction Hr1; intros l3 l4 Hyp Hr2 Hr3; inv Hr2; inv Hr3. 
+  - now constructor.
+  - constructor; eauto. eapply Hyp; try eassumption; now constructor.
+    eapply IHHr1; try eassumption.
+    intros. eapply Hyp; try eassumption; now constructor.
+Qed.
+
+Lemma Forall2_exists {A B} (P : A -> B -> Prop) l1 l2 x :
+  List.In x l1 ->
+  Forall2 P l1 l2 ->
+  (exists y, List.In y l2 /\ P x y).
+Proof.
+  intros Hin Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    eexists. split; eauto. now constructor.
+
+    edestruct IHHall as [y' [Hin HP]]. eassumption.
+    eexists. split; eauto. now constructor.
+Qed.
+
+Lemma Forall2_exists_r {A B} (P : A -> B -> Prop) l1 l2 x :
+  List.In x l2 ->
+  Forall2 P l1 l2 ->
+  (exists y, List.In y l1 /\ P y x).
+Proof.
+  intros Hin Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    eexists. split; eauto. now constructor.
+
+    edestruct IHHall as [y' [Hin HP]]. eassumption.
+    eexists. split; eauto. now constructor.
+Qed.
+
+Lemma Forall2_det_l {A B : Type} (P : A -> B -> Prop) l1 l1' l2 :
+  (forall x1 x2 y, P x1 y -> P x2 y -> x1 = x2) ->
+  Forall2 P l1 l2 ->
+  Forall2 P l1' l2 ->
+  l1 = l1'.
+Proof.
+  intros HP Hall. revert l1'.
+  induction Hall; intros l1' Hall'.
+  - now inv Hall'.
+  - inv Hall'. f_equal; eauto.
+Qed.
+
+
+(** * Lemmas about [nthN] *)
 
 Lemma In_nthN (A : Type) (l : list A) (v : A) :
   List.In v l -> exists n, nthN l n = Some v .
@@ -533,6 +654,15 @@ Proof.
   rewrite <- IHl; eauto. f_equal. eauto.
 Qed.
 
+Lemma fold_left_acc_plus {A} (f : nat -> A -> nat) l acc v
+      (Hyp : forall v1 v2 v3, f (v1 + v2) v3 = f v1 v3 + v2) : 
+  fold_left f l (acc + v) = fold_left f l acc + v. 
+Proof.
+  revert acc v. induction l; intros acc v; simpl; eauto.
+  rewrite <- IHl. rewrite Hyp. reflexivity.
+Qed.
+
+
 (** Max of list given a measure function and corresponding lemmas *)
 
 Definition max_list_nat_with_measure {A} (f : A -> nat) i (ls : list A) : nat :=
@@ -597,6 +727,20 @@ Proof.
   intros Hassoc Hp. revert acc. induction Hp; intros acc.
   - reflexivity.
   - simpl. rewrite IHHp. reflexivity.
+  - simpl. rewrite Hassoc. reflexivity.
+  - rewrite IHHp1. eapply IHHp2.
+Qed.
+
+Definition fold_permutationA (A B : Type) (R : relation A)
+           (l1 l2 : list A) (f : B -> A -> B) acc :
+  (forall x y z, f (f z y) x = f (f z x) y) ->
+  (forall x y1 y2, R y1 y2 -> f x y1 = f x y2) -> 
+  PermutationA R l1 l2 ->
+  fold_left f l1 acc = fold_left f l2 acc. 
+Proof.
+  intros Hassoc Hr Hp. revert acc. induction Hp; intros acc.
+  - reflexivity.
+  - simpl. rewrite IHHp. erewrite Hr; [| eassumption ]. reflexivity.
   - simpl. rewrite Hassoc. reflexivity.
   - rewrite IHHp1. eapply IHHp2.
 Qed.
@@ -761,5 +905,146 @@ Proof.
       destruct ls1.
       now inv Heq. now inv Heq.
     * inv Heq. eapply IHls1; eauto.
+Qed.
+
+(** Extra relations on lists *)
+Inductive Filter {A} (P : A -> Prop) : list A -> list A -> Prop :=
+| Filter_nil : Filter P [] []
+| Filter_cons_P :
+    forall x l l', ~ P x -> Filter P l l' -> Filter P (x :: l) (x :: l')
+| Filter_cons_not_P :
+    forall x l l', P x -> Filter P l l' -> Filter P (x :: l) l'.
+
+Lemma Filter_FromList {A} (P : A -> Prop) l1 l2 :
+  Filter P l1 l2 ->
+  FromList l1 \\ P <--> FromList l2.
+Proof. 
+  intros Hf; induction Hf; eauto.
+  - rewrite !FromList_nil, Setminus_Empty_set_abs_r. reflexivity. 
+  - rewrite !FromList_cons, Setminus_Union_distr.
+    rewrite IHHf. rewrite Setminus_Disjoint. reflexivity.
+    eapply Disjoint_Singleton_l. eassumption.
+  - rewrite !FromList_cons, Setminus_Union_distr.
+    rewrite IHHf.
+    rewrite Setminus_Included_Empty_set.
+    rewrite Union_Empty_set_neut_l. reflexivity.
+    eapply Singleton_Included. eassumption.
+Qed.
+
+Lemma Filter_Disjoint {A} (P : A -> Prop) l1 l2 :
+  Filter P l1 l2 ->
+  Disjoint _ P (FromList l1) ->
+  l1 = l2.
+Proof with (now eauto with Ensembles_DB). 
+  intros Hf HD; induction Hf; eauto.
+  - rewrite IHHf; eauto.
+    eapply Disjoint_Included_r; eauto.
+    rewrite FromList_cons...
+  - exfalso. eapply HD; constructor; eauto.
+    constructor; eauto.
+Qed.
+
+Lemma Disjoint_Filter {A} (P : A -> Prop) l :
+  Disjoint _ P (FromList l) ->
+  Filter P l l.
+Proof with (now eauto with Ensembles_DB). 
+  intros HD; induction l; eauto.
+  - constructor.
+  - constructor; eauto.
+    intros Hc. eapply HD; constructor; eauto.
+    constructor; eauto.
+    eapply IHl. eapply Disjoint_Included_r; eauto.
+    rewrite FromList_cons... 
+Qed.
+
+Inductive Forall2_P {A B : Type} (P : A -> Prop)
+          (R : A -> B -> Prop) : list A -> list B -> Prop :=
+  Forall2_nil : Forall2_P P R [] []
+| Forall2_cons_P :
+    forall (x : A) (y : B) (l : list A) (l' : list B),
+      (~ P x ->  R x y) -> 
+      Forall2_P P R l l' ->
+      Forall2_P P R (x :: l) (y :: l').
+
+Lemma Forall2_P_monotonic_strong {A B} (P : A -> Prop)
+      (R R' : A -> B -> Prop) l1 l2 :
+  (forall x1 x2,
+     List.In x1 l1 ->
+     List.In x2 l2 -> ~ P x1 -> R' x1 x2 -> R x1 x2) -> 
+  Forall2_P P R' l1 l2 ->
+  Forall2_P P R l1 l2.
+Proof with (now eauto with Ensembles_DB). 
+  intros Hyp Hf. induction Hf; try now constructor.
+  - constructor; eauto. intros. eapply Hyp; eauto. now constructor.
+    now constructor. eapply IHHf.
+    intros. eapply Hyp. now constructor 2.
+    now constructor 2. eassumption. eassumption.
+Qed.
+
+Lemma Forall2_P_monotonic {A B} (P P' : A -> Prop) (R : A -> B -> Prop) l1 l2 :
+  Forall2_P P' R l1 l2 ->
+  P' \subset P -> 
+  Forall2_P P R l1 l2.
+Proof.
+  intros Hall Hs. induction Hall; eauto.
+  - constructor.
+  - constructor 2; eauto.
+    firstorder.
+Qed.
+
+Lemma Forall2_P_nthN (A B : Type) P (R : A -> B -> Prop) (l1 : list A) 
+      (l2 : list B) (n : N) (v1 : A): 
+  Forall2_P P R l1 l2 ->
+  nthN l1 n = Some v1 ->
+  ~ P v1 ->
+  exists v2 : B, nthN l2 n = Some v2 /\ R v1 v2.
+Proof.
+  intros Hall; revert v1 n. induction Hall; intros v1 n Hnth Hall'.
+  - inv Hnth.
+  - destruct n.
+    + simpl in Hnth. inv Hnth.
+      eexists. split; simpl; eauto.
+    + edestruct IHHall as [v2 [Hnth2 Hr]]; eauto.
+Qed.
+
+Lemma Forall2_P_exists {A B : Type} (P1 : A -> Prop) (P2 : A -> B -> Prop)
+      (l1 : list A) (l2 : list B) (x : A) :
+  List.In x l1 ->
+  ~ P1 x ->
+  Forall2_P P1 P2 l1 l2 ->
+  exists y : B, List.In y l2 /\ P2 x y.
+Proof.
+  intros Hin HP1 Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    + eexists; split; eauto. now left.
+    + edestruct IHHall as [z [Hinz Hp2]]; eauto.
+      eexists. split. right. eassumption. 
+      eassumption.
+Qed.
+
+(** Lemmas abut [InA] *)
+
+Lemma InA_In {A} (x : A) l :
+  InA Logic.eq x l -> List.In x l.
+Proof.
+  intros Hin.
+  eapply InA_alt in Hin. edestruct Hin as [z [Hin1 Hin2]].
+  subst. eauto.
+Qed.
+
+Lemma Forall2_P_exists_r {A B : Type} (P1 : A -> Prop) (P2 : A -> B -> Prop)
+      (l1 : list A) (l2 : list B) (y : B) :
+  List.In y l2 ->
+  Forall2_P P1 P2 l1 l2 ->
+  exists x : A, List.In x l1 /\ (~ P1 x -> P2 x y).
+Proof.
+  intros Hin Hall. induction Hall.
+  - inv Hin.
+  - inv Hin.
+    + eexists; split; eauto. now left.
+    + edestruct IHHall as [z [Hinz Hp2]]; eauto.
+      eexists. split. right. eassumption. 
+      eassumption.
 Qed.
 

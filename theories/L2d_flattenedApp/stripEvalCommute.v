@@ -537,6 +537,7 @@ Proof.
   - rewrite mkApp_tnil in H. exists t. assumption.
   - cbn in *. specialize (IHargs _ _ H). destruct IHargs as [x jx].
     inversion_clear jx.
+    + exists TProof. assumption.
     + exists (TLambda nm bod). assumption.
     + exists (TFix dts m). assumption.
     + destruct H1; exists fn'; assumption.
@@ -553,6 +554,7 @@ Proof.
     eapply WcbvEval_no_further. eassumption.
   - rewrite mkApp_tl. rewrite mkApp_tl in H0.
     inversion_clear H0.
+    + eapply wAppProof; try eassumption. eapply IHargs. eassumption.
     + eapply wAppLam; try eassumption. eapply IHargs. eassumption.
     + eapply wAppFix; try eassumption. eapply IHargs. eassumption.
     + eapply wAppCong; try eassumption. eapply IHargs. eassumption.
@@ -582,6 +584,7 @@ Proof.
     pose proof (proj1 (WcbvEval_no_further _) _ _ h0) as k.
     rewrite <- (proj1 (WcbvEval_single_valued _) _ _ k _ H). assumption.
   - rewrite mkApp_tl. rewrite mkApp_tl in H. inversion_clear H.
+    + eapply wAppProof; try eassumption. eapply IHargs. eassumption.
     + eapply wAppLam; try eassumption. eapply IHargs. eassumption.
     + eapply wAppFix; try eassumption. eapply IHargs. eassumption.
     + eapply wAppCong; try eassumption. eapply IHargs. eassumption.
@@ -593,6 +596,7 @@ Lemma WcbvEval_arg_trn:
     forall arg', WcbvEval p arg arg' -> WcbvEval p (TApp fn arg') s'.
 Proof.
   induction 1; intros; try discriminate.
+  - myInjection H0. eapply wAppProof; try eassumption.
   - myInjection H2. eapply wAppLam; try eassumption.
     rewrite (proj1 (WcbvEval_single_valued p) _ _ H3 _ H0).
     apply (proj1 (WcbvEval_no_further p) _ _ H0).
@@ -613,6 +617,16 @@ Proof.
   induction args; intros.
   - cbn in *. eapply WcbvEval_arg_trn; try eassumption. reflexivity.
   - cbn in *. eapply IHargs; eassumption. 
+Qed.
+
+Lemma wmkAppProof :
+  forall p args (fn arg:Term),
+    WcbvEval p (mkApp fn args) TProof ->
+    WcbvEval p (mkApp fn (tappend args (tunit arg))) TProof.
+Proof.
+  induction args using treverse_ind; intros.
+  - cbn in *. eapply wAppProof; eassumption.
+  - rewrite mkApp_tl. eapply wAppProof; try eassumption.
 Qed.
 
 Lemma wmkAppLam:
@@ -702,7 +716,14 @@ Proof.
   - rewrite mkApp_tl in H0. inversion_Clear H0.
     + case_eq args'; intros. subst.
       * inversion H. dstrctn (tappend_mk_canonical args x tnil).
-        rewrite j in H1. discriminate. 
+        rewrite j in H1. discriminate.
+      *{ subst. dstrctn (WcbvEvals_tappend _ _ H).
+         inversion_Clear j. inversion_Clear H5. rewrite z.
+         eapply wmkAppProof.
+         - eapply IHargs; eassumption. }
+    + case_eq args'; intros. subst.
+      * inversion H. dstrctn (tappend_mk_canonical args x tnil).
+        rewrite j in H1. discriminate.
       *{ subst. dstrctn (WcbvEvals_tappend _ _ H).
          inversion_Clear j. inversion_Clear H7. rewrite z.
          eapply wmkAppLam.
@@ -1126,7 +1147,7 @@ Lemma WcbvEval_pres_isCanonical:
 Proof.
   induction 1; intros; try eassumption; try econstructor;
     try (solve[inversion_Clear H1]).
-  - inversion_Clear H0. 
+  - inversion_Clear H0. now specialize (IHWcbvEval H2).
   - inversion_Clear H2. specialize (IHWcbvEval1 H4).
     inversion IHWcbvEval1.
   - inversion_Clear H2. specialize (IHWcbvEval1 H4). inversion IHWcbvEval1.
@@ -1176,8 +1197,16 @@ Proof.
   intros p h.
   apply L2.wcbvEval.WcbvEvalEvals_ind; intros; try reflexivity;
   try (solve[constructor; trivial]).
-  - cbn. econstructor; try eassumption. eapply H.
-    inversion_Clear H0. assumption.
+  - inversion_Clear H1.
+    rewrite TApp_hom.
+    rewrite mkApp_hom in H0.
+    specialize (H H6).
+    eapply WcbvEval_mkApp_step.
+    apply H. simpl.
+    eapply WcbvEval_mkApp_step.
+    constructor. constructor.
+    apply H0.
+    apply L2.term.mkApp_pres_WFapp; auto.
   - cbn. econstructor; try eassumption.
     + apply lookupDfn_hom. eassumption.
     + eapply H. apply (L2.program.lookupDfn_pres_WFapp h _ e).

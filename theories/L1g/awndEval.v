@@ -46,7 +46,7 @@ Inductive awndEval : Term -> Term -> Prop :=
           dnthBody m dts = Some (x, ix) ->
           awndEval (TApp (TFix dts m) arg args)
                   (pre_whFixStep x dts (tcons arg args))
-| aProof: forall t, awndEval (TProof t) t
+| aAppProof arg args: awndEval (TApp TProof arg args) (mkApp TProof args)
 (** congruence steps **)
 (** no xi rules: sLambdaR, sProdR, sLetInR,
  *** no congruence on Case branches or Fix ***)
@@ -131,14 +131,6 @@ Proof.
   - exists t2. split; [assumption | reflexivity].
 Qed.
 
-Lemma WFapp_mkProof_WFapp:
-  forall t, WFapp (mkProof t) -> WFapp t.
-Proof. 
-  intros t. functional induction (mkProof t); intros.
-  - assumption.
-  - inversion_Clear H. assumption.
-Qed.
-
 Lemma awndEval_pres_WFapp:
   WFaEnv p ->
   (forall t s, awndEval t s -> WFapp t -> WFapp s) /\
@@ -161,7 +153,7 @@ Proof.
     apply pre_whFixStep_pres_WFapp; try assumption.
     + eapply j. eassumption.
     + constructor; assumption.
-  - inversion_Clear H. assumption.
+  - inversion_Clear H. apply mkApp_pres_WFapp; assumption.
   - destruct (WFapp_mkApp_WFapp H0 _ _ eq_refl). inversion_Clear H2.
     apply mkApp_pres_WFapp.
     + constructor; assumption.

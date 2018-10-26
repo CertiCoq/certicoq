@@ -92,7 +92,7 @@ Ltac isApp :=
 Fixpoint print_term (t:Term) : string :=
   match t with
     | TRel n => "(Rel " ++ (nat_to_string n) ++ ")"
-    | TProof t => "(PRF " ++ print_term t ++ ")"
+    | TProof => "(PRF)"
     | TLambda nm t => "(LAM "++ (print_name nm) ++ " [" ++ print_term t ++ "])"
     | TLetIn nm _ _ => "(LET " ++ (print_name nm) ++ ")"
     | TApp fn arg args =>
@@ -114,7 +114,7 @@ Inductive shape : Set :=
 Definition Term_shape (t:Term) : shape :=
   match t with
     | TRel _ => sRel
-    | TProof _ => sProof
+    | TProof => sProof
     | TLambda _ _ => sLambda
     | TLetIn _ _ _ => sLetIn
     | TApp _ _ _ => sApp
@@ -138,7 +138,7 @@ Lemma TermTerms_dec:
 Proof.
   apply TrmTrmsBrsDefs_ind; intros.
   - induction t; cross. destruct (eq_nat_dec n n0); [lft | rght].
-  - induction t0; cross. destruct (H t0); [lft | rght ..].
+  - induction t; cross; lft.
   - induction t0; cross.
     destruct (name_dec n n0); destruct (H t0); [lft | rght ..]. 
   - induction t1; cross.
@@ -285,15 +285,15 @@ Proof.
   left. auto.
 Qed.
 
-Definition isProof (t:Term) : Prop := exists s, t = TProof s.
-Lemma IsProof: forall t, isProof (TProof t).
-intros. exists t. reflexivity.
+Definition isProof (t:Term) : Prop := t = TProof.
+Lemma IsProof: isProof TProof.
+intros. reflexivity.
 Qed.
 Hint Resolve IsProof.
 Lemma isProof_dec: forall t, {isProof t}+{~ isProof t}.
 Proof.
   destruct t;
-  try (right; intros h; destruct h as [x jx]; discriminate).
+  try (right; intros h; red in h; discriminate).
   - left. auto.
 Defined.
 
@@ -951,7 +951,7 @@ Qed.
 (** well-formed terms: TApp well-formed all the way down **)
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
-| wfaProof: forall tm, WFapp tm -> WFapp (TProof tm)
+| wfaProof: WFapp TProof
 | wfaLambda: forall nm bod, WFapp bod -> WFapp (TLambda nm bod)
 | wfaLetIn: forall nm dfn bod,
              WFapp dfn -> WFapp bod -> WFapp (TLetIn nm dfn bod)
@@ -1098,7 +1098,7 @@ Qed.
 (*** not used essentially at the moment **)
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
-| wfProof: forall n t, WFTrm t n -> WFTrm (TProof t) n
+| wfProof: forall n, WFTrm TProof n
 | wfLambda: forall n nm bod,
     WFTrm bod (S n) -> WFTrm (TLambda nm bod) n
 | wfLetIn: forall n nm dfn bod,
@@ -1160,7 +1160,6 @@ Variable nm:string.
 
 Inductive PoccTrm : Term -> Prop :=
 | PoLambdaBod: forall s bod, PoccTrm bod -> PoccTrm (TLambda s bod)
-| PoProof: forall t, PoccTrm t -> PoccTrm (TProof t)
 | PoLetInDfn: forall s dfn bod,
                 PoccTrm dfn -> PoccTrm (TLetIn s dfn bod)
 | PoLetInBod: forall s dfn bod,
@@ -1398,8 +1397,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IRelEq: forall n, Instantiate n (TRel n) tin
 | IRelGt: forall n m, n > m -> Instantiate n (TRel m) (TRel m)
 | IRelLt: forall n m, n < m -> Instantiate n (TRel m) (TRel (pred m))
-| IProof: forall n t it,
-           Instantiate n t it -> Instantiate n (TProof t) (TProof it)
+| IProof: forall n, Instantiate n TProof TProof
 | ILambda: forall n nm bod ibod,
              Instantiate (S n) bod ibod -> 
              Instantiate n (TLambda nm bod) (TLambda nm ibod)
@@ -1501,8 +1499,6 @@ Proof.
   - inversion H.
   - inversion_Clear H0.
     + constructor. intuition.
-  - inversion_Clear H0.
-    + constructor. intuition.
   - inversion_Clear H1.
     + constructor. intuition. 
     + apply PoLetInBod. intuition.
@@ -1540,7 +1536,7 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TLetIn nm tdef bod =>
       TLetIn nm (instantiate n tdef) (instantiate (S n) bod)
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
-    | TProof t => TProof (instantiate n t)
+    | TProof => TProof
     | x => x
   end
 with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
@@ -1701,9 +1697,6 @@ Proof.
     + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - cbn. constructor. apply H0. assumption.
-  - change (WFapp (TLambda nm (instantiate t (S n) bod))).
-    constructor.
-    + apply H0. assumption.
   - change (WFapp (TLetIn nm (instantiate t n dfn) (instantiate t (S n) bod))).
     constructor.
     + apply H0. assumption.

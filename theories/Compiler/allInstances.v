@@ -79,10 +79,10 @@ Definition compile_opt_L7 p  :=
   | Exc s => Exc s
   end.
 
-Definition compile_template_L4 (p : program) : exception (cTerm certiL4) :=
+Definition compile_template_L4 (p : Template.Ast.program) : exception (cTerm certiL4) :=
   translateTo (cTerm certiL4) p.
 
-Definition compile_template_L7 (p : program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
+Definition compile_template_L7 (p : Template.Ast.program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
   compile_opt_L7 (translateTo (cTerm certiL6) p).
 
 Open Scope positive_scope.

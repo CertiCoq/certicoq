@@ -23,7 +23,7 @@ Definition L2Env := environ L2Term.
 
 Inductive Term : Type :=
 | TRel       : nat -> Term
-| TProof     : Term -> Term
+| TProof     : Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term -> Term
@@ -165,7 +165,7 @@ Qed.
 Function strip (t:L2Term) : Term :=
   match t with
     | L2.compile.TRel n => TRel n
-    | L2.compile.TProof t => TProof (strip t)
+    | L2.compile.TProof => TProof
     | L2.compile.TLambda nm bod => TLambda nm (strip bod)
     | L2.compile.TLetIn nm dfn bod =>
       TLetIn nm (strip dfn) (strip bod)

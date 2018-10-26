@@ -74,7 +74,7 @@ Proof.
   revert e. induction P as [| [c' e'] P IHp]; intros x H; try now inv H.
   simpl in H. inv H.
   destruct (M.elt_eq c' c); inv H1; try now constructor.
-  constructor 2. apply IHp; eauto.
+  constructor 2. now eapply IHp.
 Qed.
 
 (** [split_fds B1 B2 B] iff B is an interleaving of the definitions in B1 and B2 *)
@@ -668,6 +668,22 @@ Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) :=
 
 (** * Lemmas about [binding_in_map] *)
 
+
+Lemma binding_in_map_Union {A} S1 S2 (rho : M.t A) :
+  binding_in_map S1 rho ->
+  binding_in_map S2 rho ->
+  binding_in_map (S1 :|: S2) rho.
+Proof.
+  intros Hin1 Hin2 x Hin. inv Hin; eauto.
+Qed.
+
+Lemma binding_in_map_Singleton {A}  (rho : M.t A) x v :
+  M.get x rho = Some v ->
+  binding_in_map [set x] rho.
+Proof.
+  intros Hget; intros v2 Heq. inv Heq. eexists; eauto.
+Qed.
+
 (** [binding_in_map] is anti-monotonic on its first argument *)
 Lemma binding_in_map_antimon {A} S S' (rho : M.t A) :
   Included _ S' S ->
@@ -692,7 +708,7 @@ Proof.
 Qed.
 
 (** Extend the environment with a list of variables and put them in the set *)
-Lemma binding_in_map_setlist xs vs S (rho rho' : env) :
+Lemma binding_in_map_setlist {A : Type} xs vs S (rho rho' : M.t A) :
   binding_in_map S rho ->
   setlist xs vs rho = Some rho' ->
   binding_in_map (Union _ (FromList xs) S) rho'.
@@ -1416,7 +1432,7 @@ Theorem num_occur_ec_det:
 Proof.
   intros.
   assert (num_occur (Ehalt v) v 1).
-  eapply num_occur_n. constructor. simpl. destruct (cps_util.var_dec v v). auto. exfalso; auto.
+  eapply num_occur_n. constructor. simpl. destruct (var_dec v v). auto. exfalso; auto.
   assert (num_occur (c |[ Ehalt v ]|)  v (n +1)).
   apply num_occur_app_ctx. exists n, 1; auto.
   assert (num_occur (c |[ Ehalt v ]|)  v (m +1)).

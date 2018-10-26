@@ -46,22 +46,25 @@ Notation "a |: A" := ([set a] :|: A) (at level 52, left associativity)
 Notation "A :&: B" := (Intersection _ A B) (at level 48, left associativity)
                       : Ensembles_scope.
 
+Notation "a &: B" := (Intersection _ [set a] B) (at level 48, left associativity)
+                     : Ensembles_scope.
+
 Notation "A \\ B" := (Setminus _ A B) (at level 52, left associativity)
                      : Ensembles_scope.
 
 (** * Equivalence and preorder properties *)
 
-Lemma Included_refl {A} s1 :
-  Included A s1 s1.
+Lemma Included_refl {A} (s1 : Ensemble A) :
+  s1 \subset s1.
 Proof.
   intros x Hin; eauto.
 Qed.
 
 
-Lemma Included_trans {A} s1 s2 s3 :
-  Included A s1 s2 ->
-  Included A s2 s3 ->
-  Included A s1 s3.
+Lemma Included_trans {A} (s1 s2 s3 : Ensemble A) :
+  s1 \subset s2 ->
+  s2 \subset s3 ->
+  s1 \subset s3.
 Proof.
   intros H1 H2 x HIn.
   eapply H2. eapply H1; eauto.
@@ -74,23 +77,23 @@ Proof.
   intros ? ? ? ? ?. now eapply Included_trans; eauto.
 Qed.
 
-Lemma Same_set_refl A s :
-  Same_set A s s.
+Lemma Same_set_refl A (s : Ensemble A) :
+  s <--> s.
 Proof.
   split; apply Included_refl.
 Qed.
 
-Lemma Same_set_sym A s1 s2 :
-  Same_set A s1 s2 ->
-  Same_set A s2 s1.
+Lemma Same_set_sym A (s1 s2 : Ensemble A) :
+  s1 <--> s2 ->
+  s2 <--> s1.
 Proof.
   intros [H1 H2]; split; eauto.
 Qed.
 
-Lemma Same_set_trans {A} s1 s2 s3 :
-  Same_set A s1 s2 ->
-  Same_set A s2 s3 ->
-  Same_set A s1 s3.
+Lemma Same_set_trans {A} (s1 s2 s3 : Ensemble A) :
+  s1 <--> s2 ->
+  s2 <--> s3 ->
+  s1 <--> s3.
 Proof.
   intros [H1 H2] [H3 H4]. split; eapply Included_trans; eauto.
 Qed.
@@ -268,13 +271,13 @@ Qed.
 
 (** ** Commutativity properties *)
 
-Lemma Union_commut {A} s1 s2 :
-  Same_set A (Union A s1 s2) (Union A s2 s1).
+Lemma Union_commut {A} (s1 s2 : Ensemble A) :
+  (s1 :|: s2) <--> (s2 :|: s1).
 Proof.
   split; intros x H; inv H; eauto.
 Qed.
 
-Lemma Intersection_commut {A} s1 s2 :
+Lemma Intersection_commut {A} (s1 s2 : Ensemble A) :
   Same_set A (Intersection A s2 s1) (Intersection A s1 s2).
 Proof.
   split; intros x H; inv H; constructor; eauto.
@@ -328,6 +331,27 @@ Proof.
   split; intros x H; inv H; eauto.
   inv H0. now eauto.
   now inv H0; inv H1; eauto. 
+Qed.
+
+Lemma Intersection_Union_distr :
+  forall (A : Type) (s1 s2 s3 : Ensemble A),
+    (s1 :|: s2) :&: s3 <--> (s1 :&: s3) :|: (s2 :&: s3).
+Proof.
+  intros A s1 s2 s3.
+  split; intros x. 
+  - intros [H1 H2]. inv H2; eauto.
+  - intros Hin. inv Hin; eauto; inv H; eauto.
+Qed.
+
+Lemma Intersection_Disjoint :
+  forall (A : Type) (s1 s2 : Ensemble A),
+    Disjoint _ s1 s2 -> 
+    s1 :&: s2 <--> Empty_set _.
+Proof.
+  intros A s1 s2 Hd.
+  split; intros x. 
+  - intros H1; inv H1. exfalso; eapply Hd; eauto.
+  - intros Hc; inv Hc.
 Qed.
 
 Hint Immediate Setminus_Union_distr Union_Intersection_distr : Ensembles_DB.
@@ -782,6 +806,17 @@ Proof.
   split; intros x H'; inv H'. inv H.
   constructor; eauto. intros Hc; inv Hc; eauto.
   constructor; eauto. constructor; eauto.
+Qed.
+
+Lemma Union_Setminus_Same_set {A} (S1 S2 : Ensemble A) {HD : Decidable S2} : 
+  S2 \subset S1 ->
+  S1 <--> S2 :|: (S1 \\ S2).
+Proof.
+  intros Heq. split; intros x Hin.
+  - destruct HD. destruct (Dec0 x).
+    + now left.
+    + right. constructor; eauto.
+  - inv Hin; eauto. inv H; eauto. 
 Qed.
 
 Lemma Union_Setminus_Included {A} s1 s2 s3:
@@ -1263,6 +1298,30 @@ Proof.
       inv Hc; contradiction. 
 Qed.
 
+Lemma In_Union_list {A} (l : list (Ensemble A)) s:
+  List.In s l ->
+  s \subset Union_list l.
+Proof.
+  intros Hin. induction l. 
+  - now inv Hin.
+  - inv Hin. now eapply Included_Union_l.
+    simpl. eapply Included_Union_preserv_r.
+    eapply IHl; eauto.
+Qed.
+
+Lemma Union_lists_exists {A} (x : A) ls :
+  x \in Union_list ls ->
+        exists S, List.In S ls /\ x \in S.
+Proof.
+  induction ls; intros Hin; try now inv Hin.
+  inv Hin.
+  - eexists. split; eauto. now left.
+  - edestruct IHls as [S [Hin1 Hin2]].
+    eassumption.
+    eexists. split; eauto. now right.
+Qed.
+
+
 Hint Immediate FromList_nil FromList_cons FromList_app
      FromList_singleton : Ensembles_DB.
 
@@ -1536,3 +1595,215 @@ Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_r_sym; [| eassumption ] : Ensembles_DB.
 Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_l_sym; [| eassumption ] : Ensembles_DB.
+
+
+Definition Proj1 {A B} (S : Ensemble (A * B)) : Ensemble A :=
+  [ set x | exists y, (x, y) \in S ].
+
+Definition Proj2 {A B} (S : Ensemble (A * B)) : Ensemble B :=
+  [ set x | exists y, (y, x) \in S ]. 
+
+Definition Prod {A B} (S : Ensemble A) (S' : Ensemble B) : Ensemble (A * B) :=
+  [ set z | let '(x, y) := z in  x \in S /\ y \in S' ].
+
+Instance Proj1_Proper A B : Proper (Same_set (A * B) ==> Same_set A) Proj1.
+Proof.
+  firstorder.
+Qed. 
+
+Instance Proj2_Proper A B : Proper (Same_set (A * B) ==> Same_set B) Proj2.
+Proof.
+  firstorder.
+Qed.
+
+Instance Prod_Proper1 A B : Proper (Same_set A ==> eq ==> Same_set (A * B)) Prod.
+Proof.
+  intros s1 s2 Hseq x1 x2 Heq; subst.
+  unfold Prod; split; intros [x y]; firstorder.
+Qed. 
+
+Instance Proj_Proper2 A B S : Proper (Same_set B  ==> Same_set (A * B)) (Prod S).
+Proof.
+  intros s1 s2 Hseq; subst.
+  unfold Prod; split;
+  intros [x y]; firstorder.
+Qed. 
+
+Lemma Proj1_Union A B (S1 : Ensemble (A * B)) (S2 : Ensemble (A * B)) :
+  Proj1 (S1 :|: S2) <--> Proj1 S1 :|: Proj1 S2.
+Proof.
+  split; intros x Hin. destruct Hin as [y Hin]. inv Hin.
+  left. eexists. eassumption.
+  right. eexists. eassumption.
+  destruct Hin; inv H.
+  eexists. left. eassumption.
+  eexists. right. eassumption.
+Qed.
+
+Lemma Proj2_Union A B (S1 : Ensemble (A * B)) (S2 : Ensemble (A * B)) :
+  Proj2 (S1 :|: S2) <--> Proj2 S1 :|: Proj2 S2.
+Proof.
+  split; intros x Hin. destruct Hin as [y Hin]. inv Hin.
+  left. eexists. eassumption.
+  right. eexists. eassumption.
+  destruct Hin; inv H.
+  eexists. left. eassumption.
+  eexists. right. eassumption.
+Qed.
+
+Lemma Prod_Union1 A B (S1 S2 : Ensemble A) (S3 : Ensemble B) :
+  Prod (S1 :|: S2) S3 <--> Prod S1 S3 :|: Prod S2 S3.
+Proof.
+  split; intros [x y] Hin. destruct Hin as [Hin1 Hin2].
+  inv Hin1. now left; firstorder.
+  now right; firstorder.
+  destruct Hin as [[Hin1 Hin2] | [Hin1 Hin2]];
+    now firstorder.
+Qed.
+
+Lemma Prod_Union2 A B (S1 : Ensemble A) (S2 S3 : Ensemble B) :
+  Prod S1 (S2 :|: S3) <--> Prod S1 S2 :|: Prod S1 S3.
+Proof.
+  split; intros [x y] Hin.
+  destruct Hin as [Hin1 Hin2].
+  inv Hin2. now left; firstorder.
+  now right; firstorder.
+  destruct Hin as [[Hin1 Hin2] | [Hin1 Hin2]];
+    now firstorder.
+Qed.
+
+Lemma Proj1_Prod A B (S1 : Ensemble A) (S2 : Ensemble B) { HI : Inhabited B S2} :
+  Proj1 (Prod S1 S2) <--> S1.
+Proof.
+  split; intros x; intros Hin.
+  destruct Hin as [y [Hin1 Hin2]]. eassumption.
+  destruct HI. eexists; split; eauto.
+Qed.
+
+Lemma Proj1_Prod_Included A B (S1 : Ensemble A) (S2 : Ensemble B) :
+  Proj1 (Prod S1 S2) \subset S1.
+Proof.
+  intros x; intros Hin.
+  destruct Hin as [y [Hin1 Hin2]]. eassumption.
+Qed.
+
+Lemma Proj2_Prod_Included A B (S1 : Ensemble A) (S2 : Ensemble B) :
+  Proj2 (Prod S1 S2) \subset S2.
+Proof.
+  intros x; intros Hin.
+  destruct Hin as [y [Hin1 Hin2]]. eassumption.
+Qed.
+
+Lemma prod_Proj1 A B (S : Ensemble (A * B)) x y :
+  (x, y) \in S -> x \in Proj1 S.
+Proof.
+  firstorder.
+Qed.
+
+Lemma prod_Proj2 A B (S : Ensemble (A * B)) x y :
+  (x, y) \in S -> y \in Proj2 S.
+Proof.
+  firstorder.
+Qed.
+
+Lemma Prod_proj A B (S1 : Ensemble A) (S2 : Ensemble B) z :
+  z \in Prod S1 S2 -> 
+        fst z \in S1 /\ snd z \in S2.
+Proof.
+  destruct z. firstorder.
+Qed.
+
+Lemma proj_Prod A B (S1 : Ensemble A) (S2 : Ensemble B) z :
+  fst z \in S1 -> snd z \in S2 -> z \in Prod S1 S2.
+Proof.
+  destruct z. firstorder.
+Qed.
+
+
+Lemma Included_Union_Setminus_Included {A} (S1 S2 S3 : Ensemble A)
+      {Hd : Decidable S2}:
+  S1 \\ S2 \subset S3 ->
+  S1 \subset S2 :|: S3.
+Proof.
+  intros Hsub x Hin. destruct Hd as [Hd].
+  destruct (Hd x); eauto.
+  right.
+  eapply Hsub. constructor; eauto.
+Qed.
+
+Lemma Setminus_Setminus_Included {A}
+      (S1 S2 S3 : Ensemble A) {Hd : Decidable S3}:
+  S1 \\ (S2 \\ S3) \subset S1 \\ S2 :|: S3.
+Proof.
+  intros x Hin. inv Hin.
+  destruct Hd as [Hd].
+  destruct (Hd x); eauto.
+  left; constructor; eauto.
+  intros Hc; eapply H0; constructor; eauto.
+Qed.
+
+Lemma Same_set_Intersection_Setminus {A: Type} (S1 S2 S3 : Ensemble A)
+      {_ : Decidable S3}:
+  S2 \subset S3 ->
+  S1 :&: (S3 \\ S2) :|: (S1 \\ S3) <--> S1 \\ S2.
+Proof.
+  intros Hsub; split; intros x Hin; inv Hin.
+  - inv H. inv H1. constructor; eauto.
+  - inv H; constructor; eauto.
+  - destruct X as [Hdec]. destruct (Hdec x).
+    + left. constructor; eauto.
+      constructor; eauto.
+    + right. constructor; eauto.
+Qed.
+
+Lemma Included_Intersection_compat {A : Type} (s1 s2 s3 s4 : Ensemble A) :
+  s1 \subset s2 ->
+  s3 \subset s4 ->
+  s1 :&: s3 \subset s2 :&: s4.
+Proof.
+  intros H1 H2 x [Hin1 Hin2]. firstorder.
+Qed.
+
+Lemma Included_Intersection_l {A : Type} (s1 s2 : Ensemble A) :
+  s1 :&: s2 \subset s1.
+Proof.
+  intros x [Hin1 Hin2]; eauto.
+Qed.
+
+Lemma Included_Intersection_r {A : Type} (s1 s2 : Ensemble A) :
+  s1 :&: s2 \subset s2.
+Proof.
+  intros x [Hin1 Hin2]; eauto.
+Qed.
+
+Lemma Same_set_Intersection_compat {A : Type} (s1 s2 s3 s4 : Ensemble A):
+  s1 <--> s2 -> s3 <--> s4 -> s1 :&: s3 <--> s2 :&: s4.
+Proof.
+  intros H1 H2; split; eapply Included_Intersection_compat;
+  (try now apply H1); try now apply H2.
+Qed.  
+
+Lemma Disjoint_Intersection_r {A} (s1 s2 s3 : Ensemble A) :
+  Disjoint _ s2 s3 -> 
+  Disjoint _ (s1 :&: s2) (s1 :&: s3).
+Proof with (now eauto with Ensembles_DB).
+  intros Hd. 
+  eapply Disjoint_Included; [| | eassumption ];
+  now eapply Included_Intersection_r.
+Qed. 
+
+Lemma Setminus_compose {A} (s1 s2 s3 : Ensemble A) `{Decidable _ s2} :
+  s1 \subset s2 ->
+  s2 \subset s3 ->
+  s2 \\ s1 :|: (s3 \\ s2) <--> s3 \\ s1.
+Proof.
+  intros H1 H2; split; intros x Hin.
+  - inv Hin.
+    + inv H0. constructor; eauto.
+    + inv H0. constructor; eauto.
+  - inv Hin. destruct H as [Hdec].
+    destruct (Hdec x).
+    + left. constructor; eauto.
+    + right. constructor; eauto.
+Qed.
+

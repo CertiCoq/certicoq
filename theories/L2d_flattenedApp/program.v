@@ -17,7 +17,7 @@ Definition WFaEnv: environ Term -> Prop := AstCommon.WFaEnv WFapp.
 
 Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctRel: forall p n m, crctEnv p -> m < n -> crctTerm p n (TRel m)
-| ctProof: forall p n t, crctTerm p n t -> crctTerm p n (TProof t)
+| ctProof: forall p n, crctEnv p -> crctTerm p n TProof
 | ctLam: forall p n nm bod,
            crctTerm p (S n) bod -> crctTerm p n (TLambda nm bod)
 | ctLetIn: forall p n nm dfn bod,
@@ -211,8 +211,6 @@ Proof.
     try (econstructor; eassumption).
   - constructor. eapply H0. reflexivity. intros h. elim H2.
     constructor. assumption.
-  - constructor. eapply H0. reflexivity. intros h. elim H2.
-    constructor. assumption.
   - constructor. eapply H0. reflexivity.
     + intros h. elim H4. apply PoLetInDfn. assumption.
     + eapply H2. reflexivity. intros h. elim H4. eapply PoLetInBod.
@@ -316,7 +314,7 @@ Proof.
 Qed.
 
 Lemma Crct_invrt_Proof:
-  forall p n t, crctTerm p n (TProof t) -> crctTerm p n t.
+  forall p n, crctTerm p n TProof -> crctEnv p.
 Proof.
    intros. inversion_Clear H. intuition.
 Qed.

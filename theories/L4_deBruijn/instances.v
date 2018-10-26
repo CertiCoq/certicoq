@@ -908,7 +908,7 @@ Require Import Program.
 
 Definition ctranslateEvalL5a
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm certiL5)}
-   (p: program) (n:nat) : bigStepResult (option L5a.cps)  (option L5a.val_c) :=
+   (p: Template.Ast.program) (n:nat) : bigStepResult (option L5a.cps)  (option L5a.val_c) :=
   mapBigStepRes (L5a.translateCPS ∘ snd) (L5a.translateVal ∘ snd) (ctranslateEval certiL5 p n).
 
 (*

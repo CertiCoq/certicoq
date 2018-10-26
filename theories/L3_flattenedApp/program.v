@@ -474,7 +474,7 @@ Qed.
 Lemma pre_CrctDs_invrt:
   forall m dts x, dnth m dts = Some x ->
      forall p n, crctDs p n dts ->
-                 crctTerm p n (dbody _ x).
+                 crctTerm p n (dbody x).
 Proof.
     intros m dts. functional induction (dnth m dts); intros.
   - discriminate.
@@ -707,7 +707,7 @@ Qed.
 
 Lemma dnth_crctDs_crctTerm:
   forall m dts fs, dnth m dts = Some fs ->
-                   forall p n, crctDs p n dts -> crctTerm p n (dbody _ fs).
+                   forall p n, crctDs p n dts -> crctTerm p n (dbody fs).
 Proof.
   intros m dts fs.
   functional induction (dnth m dts); intros; try discriminate.

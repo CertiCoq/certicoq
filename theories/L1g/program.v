@@ -51,7 +51,7 @@ Inductive Crct: environ Term -> nat -> Term -> Prop :=
 | CrctWkTrmTyp: forall n p t s nm,
     Crct p n t -> fresh nm p -> forall m, Crct ((nm,ecTyp m s)::p) n t
 | CrctRel: forall n m p, m < n -> Crct p n prop -> Crct p n (TRel m)
-| CrctPrf: forall n p t, Crct p n t -> Crct p n (TProof t)
+| CrctPrf: forall n p, Crct p n prop -> Crct p n TProof
 | CrctProd: forall n p nm ty bod,
     Crct p (S n) bod -> Crct p n ty -> Crct p n (TProd nm ty bod)
 | CrctLam: forall n p nm ty bod,
@@ -331,7 +331,7 @@ Proof.
   - apply CrctPrf; try assumption.
     + eapply H0.
       * eassumption.
-      * intros h. elim H2. apply PoProof. assumption.
+      * intros h. inversion h.
   - apply CrctProd.
     + eapply H0. eassumption.
       intros h. elim H4. apply PoProdBod. assumption.
@@ -583,16 +583,6 @@ Proof.
   - myInjection H3. intuition. exists pack. assumption.
 Qed.
 
-Lemma Crct_invrt_Proof:
-  forall p n prf,
-    Crct p n prf -> forall t, prf = TProof t -> Crct p n t.
-Proof.
-  induction 1; intros; try discriminate.
-  - assert (j:= IHCrct1 _ H2). intuition.
-  - assert (j:= IHCrct _ H1). intuition.
-  - myInjection H0. assumption.
-Qed.
-
 Lemma Crct_invrt_Fix:
   forall p n gix, Crct p n gix ->
   forall ds m, gix = (TFix ds m) -> CrctDs p (n + dlength ds) ds.
@@ -692,8 +682,7 @@ Proof.
     + omega.
     + eapply Crct_Sort. eassumption.
   - eapply Crct_Sort; eassumption.
-  - specialize (H m p H0 (Crct_invrt_Proof H1 eq_refl) H2).
-    constructor. assumption.
+  - constructor. eapply Crct_invrt_any. eassumption.
   - destruct (Crct_invrt_Prod H2 eq_refl). apply CrctProd.
     + apply H; trivial. omega. apply (proj1 Crct_up). assumption.
     + apply H0; trivial.

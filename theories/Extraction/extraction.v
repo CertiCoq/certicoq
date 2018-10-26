@@ -51,13 +51,13 @@ Extract Constant Int31.compare31 => "Camlcoq.Int31.compare".
 Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1".
 
-
+Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
 
 Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 
 (* Avoid name clashes with OCaml or Coq module names *)
-Extraction Blacklist List String Nat Int Ast univ uGraph Char
-           Instances Classes Term Monad Coqlib Errors Compile.
+Extraction Blacklist List String Nat Int Ast univ uGraph Char OrderedType
+           Instances Classes Term Monad Coqlib Errors Compile Checker.
 
 (* Cutting the dependency to R. *)
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".

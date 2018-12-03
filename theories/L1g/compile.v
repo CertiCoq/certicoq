@@ -4,7 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.omega.Omega.
 Require Import Coq.Bool.Bool.
 Require Import Common.Common.
-Require Import TemplateExtraction.EAst Template.kernel.univ.
+Require Import TemplateExtraction.EAst.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -73,8 +73,8 @@ Fixpoint print_template_term (t:term) : string :=
     | tLetIn _ _ _ => " LET "
     | tApp fn args =>
       " (APP" ++ (print_template_term fn) ++ " _ " ++ ") "
-    | tConst s us => "[" ++ s ++ "]"
-    | tConstruct i n us =>
+    | tConst s => "[" ++ s ++ "]"
+    | tConstruct i n =>
       "(CSTR:" ++ print_inductive i ++ ":" ++ (nat_to_string n) ++ ") "
     | tCase n mch _ =>
       " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++
@@ -267,13 +267,13 @@ Function term_Term (t:term) : Term :=
     | tLetIn nm dfn bod =>
       (TLetIn nm (term_Term dfn) (term_Term bod))
     | tApp fn us => TApp (term_Term fn) (term_Term us)
-    | tConst pth us =>   (* ref to axioms in environ made into [TAx] *)
+    | tConst pth =>   (* ref to axioms in environ made into [TAx] *)
       match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
       | Some (ecTyp _ _ _) =>
         TWrong ("term_Term:Const inductive or axiom: " ++ pth)
       | _  => TConst pth
       end
-    | tConstruct ind m us =>
+    | tConstruct ind m =>
       match cnstrArity datatypeEnv ind m with
         | Ret (npars, nargs) => TConstruct ind m npars nargs
         | Exc s => TWrong ("term_Term;tConstruct:" ++ s)
@@ -322,14 +322,14 @@ Require Template.Ast.
 Require Import PCUIC.TemplateToPCUIC.
 Require Import TemplateExtraction.Extract.
 
-Definition program_Program (p:Template.Ast.program) : option (Program Term) :=
+Definition program_Program `{F:utils.Fuel} (p:Template.Ast.program) : option (Program Term) :=
   let '(genv, t) := p in
   let gc := (genv, uGraph.init_graph) in
   let genv' := trans_global gc in
   let genv'' := extract_global genv' in
   let t' := extract genv' nil (trans t) in
   match genv'', t' with
-  | PCUICChecker.Checked (genv', _ugraph), PCUICChecker.Checked t' =>
+  | PCUICChecker.Checked genv', PCUICChecker.Checked t' =>
     Some (program_Program_ext (genv', t'))
   | _, _ => None
   end.

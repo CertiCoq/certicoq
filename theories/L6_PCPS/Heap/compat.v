@@ -184,6 +184,7 @@ Module Compat (H : Heap).
             (IIL1 IIL2 : IInv)
             (IILe : exp -> exp -> IInv) . (* Local initial *)
     
+    
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 : var) (xs1 : list var) 
@@ -380,69 +381,84 @@ Module Compat (H : Heap).
                 as [o [Hgcb [Hfe1b Hfe2b]]]; try eassumption.
               edestruct Hgc1 as [_ [ hgcB hinjB ]].
               edestruct Hgcb as [_ [ hgcA hinjA ]].
+
+              assert (Hequiv: occurs_free e0 |-
+                      (H''0, subst_env b3 rho_clo4) ⩪_( o, b'') (H'', subst_env b0 rho_clo4)). 
+              { eapply Equivalence_Transitive.
+                eapply heap_env_equiv_heap_equiv_l. 
+                rewrite subst_env_image. eapply heap_equiv_symm.
+                now eapply hgcA.
+                
+                
+                symmetry. 
+                eapply Equivalence_Transitive;
+                  [ | eapply heap_env_equiv_respects_compose; reflexivity ].
+                rewrite <- subst_env_image in hgcB.
+                symmetry. eapply heap_env_equiv_respects_f_eq_l.
+                eapply heap_env_equiv_respects_id_r. 
+                rewrite subst_env_image in hgcB.
+                
+                apply heap_env_equiv_respects_id.
+                eapply heap_env_equiv_respects_f_eq_l.
+                symmetry. eapply heap_env_equiv_heap_equiv_r.
+                eapply heap_equiv_symm. eassumption.
+                
+                eapply f_eq_subdomain_antimon; [| eassumption ].
+                eapply reach'_extensive.
+                symmetry. eapply f_eq_subdomain_antimon; [| eassumption ].
+                eapply reach'_extensive. } 
+
+              edestruct inverse_exists with (b := b'') as [d [Hinji Hinvi]]; [| eassumption |]. 
+              tci. 
               
+              eapply heap_env_equiv_inverse_subdomain in Hequiv; [| rewrite subst_env_image; eassumption ].
 
-              edestruct big_step_gc_heap_env_equiv_r
-                as [r1 [m1 [b1'' [b2''[Hgc'' _]]]]]; [| | | | do 2 eexists; eassumption ]. 
-              eassumption.
-              eapply Equivalence_Transitive.
-              eapply heap_env_equiv_heap_equiv_l. 
-              rewrite subst_env_image. eapply heap_equiv_symm.
-              now eapply hgcA.
+              edestruct big_step_gc_heap_env_equiv_r with (b1 := d ∘ o ) 
+                as [r1 [m1 [b1'' [b2''[Hgc'' _]]]]];
+                [| eassumption | | | do 2 eexists; eassumption ]. 
+              clear. admit. (* form env relation on f + relation on args +
+                        closedness lemmas *) 
               
-              
-              symmetry. 
-              eapply Equivalence_Transitive;
-                [ | eapply heap_env_equiv_respects_compose; reflexivity ].
-              rewrite <- subst_env_image in hgcB.
-              symmetry. eapply heap_env_equiv_respects_f_eq_l.
-              eapply heap_env_equiv_respects_id_r. 
-              rewrite subst_env_image in hgcB.
-
-
-              apply heap_env_equiv_respects_id.
-              eapply heap_env_equiv_respects_f_eq_l.
-              symmetry. eapply heap_env_equiv_heap_equiv_r.
-              eapply heap_equiv_symm. eassumption.
-
-              eapply f_eq_subdomain_antimon; [| eassumption ].
-              eapply reach'_extensive.
-              symmetry. eapply f_eq_subdomain_antimon; [| eassumption ].
-              eapply reach'_extensive.
-
+              eassumption. 
+              eapply injective_subdomain_compose.
+              rewrite subst_env_image. eassumption.
+              eapply heap_env_equiv_image_reach in Hequiv.
+              eapply heap_equiv_symm in hgcA. eapply heap_equiv_reach_eq in hgcA.
+              rewrite subst_env_image, hgcA.
+              eapply heap_equiv_symm in Heqgc.
+              eapply heap_equiv_reach_eq in Heqgc. rewrite Heqgc in Hinji. 
               eapply injective_subdomain_antimon. eassumption.
-              rewrite subst_env_image. reflexivity.
-
-              
-              eapply injective_subdomain_antimon. eassumption.
-              rewrite subst_env_image. reflexivity.
-              
+              eapply reach'_set_monotonic. rewrite <- !image_compose. 
+              rewrite image_f_eq_subdomain; [| eapply f_eq_subdomain_antimon; try eassumption ].
+              rewrite image_id.
+              rewrite image_f_eq_subdomain; [| eapply f_eq_subdomain_antimon; try eassumption ].
+              rewrite image_id. reflexivity. eapply reach'_extensive.
+              eapply reach'_extensive. 
           +  do 3 eexists. exists b2'. eexists. repeat split.
-            * eapply Eval_proj_per_cc with   (c := c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2))).
-              simpl; omega.
-              eassumption. eassumption. reflexivity.
-              eapply Eval_proj_per_cc. simpl; omega.
-              rewrite M.gso. eassumption.
-              intros Hc. subst. eapply Hnin2. now left; eauto.
-              eassumption. reflexivity. simpl.
-              eapply Eval_app_per_cc.
-              simpl. omega.
-              rewrite M.gso. rewrite M.gss. reflexivity.
-              now intros Hc; subst; eauto.
-              eassumption.
-              simpl. rewrite M.gss.
-              rewrite !getlist_set_neq. now rewrite Hgetl'.
-              intros Hc. eapply Hnin2. now eauto.
-              intros Hc. eapply Hnin1. now eauto.
-              now eauto. eassumption. reflexivity. simpl.
-              replace (c2 + 1 + 1 + S (S (length xs2)) - 1 - 1 - S (S (length xs2)))  with c2.
-              eassumption. omega.
-            * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
-              split. eapply Hiinv; try eassumption.
-              rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
-              eassumption. simpl. omega. }
-    Qed.
-    
+             * eapply Eval_proj_per_cc with   (c := c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2))).
+               simpl; omega.
+               eassumption. eassumption. reflexivity.
+               eapply Eval_proj_per_cc. simpl; omega.
+               rewrite M.gso. eassumption.
+               intros Hc. subst. eapply Hnin2. now left; eauto.
+               eassumption. reflexivity. simpl.
+               eapply Eval_app_per_cc.
+               simpl. omega.
+               rewrite M.gso. rewrite M.gss. reflexivity.
+               now intros Hc; subst; eauto.
+               eassumption.
+               simpl. rewrite M.gss.
+               rewrite !getlist_set_neq. now rewrite Hgetl'.
+               intros Hc. eapply Hnin2. now eauto.
+               intros Hc. eapply Hnin1. now eauto.
+               now eauto. eassumption. reflexivity. simpl.
+               replace (c2 + 1 + 1 + S (S (length xs2)) - 1 - 1 - S (S (length xs2)))  with c2.
+               eassumption. omega.
+             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
+               split. eapply Hiinv; try eassumption.
+               rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
+               eassumption. simpl. omega. }
+    Admitted.
     
     (** * Heap allocation and environment extension properties *)
 
@@ -1409,14 +1425,19 @@ Module Compat (H : Heap).
       (e1, rho1, H1) ⪯ ^ (k; j; IIL1 ; IIG ; IL1 ; IG) (C |[ e2 ]|, rho2, H2).
     Proof with now eauto with Ensembles_DB.
       intros Hinv Hiinv Hwf2 Henv2 Hctx Hpre.
-      intros b1 b2 H1' H3 rho1' rho3 v1 k1 m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
-
-      edestruct ctx_to_heap_env_determistic as [H3' [rho3' [b' [Heq' [Hinj Heval]]]]]; try eassumption.
-      edestruct Hpre as [r1 [c3 [m2 [b'' [Hstep2 [Hinv' Hccr]]]]]]; try eassumption. 
-      + eapply Hiinv; try eassumption.
+      intros b1 b2 H1' H3 rho1' rho3 v1 k1 m1 Heq1 Hinj1 Heq2 Hinj2
+             HII Hleq1 Hstep1 Hstuck1.
+      edestruct ctx_to_heap_env_determistic
+        as [H3' [rho3' [b' [Heq' [Hinj Heval]]]]];
+        try eassumption.
+      
+      eapply Hpre in Hstep1; try eassumption.  
+      edestruct Hstep1 as [r1 [c3 [m2 [b'' [Hstep2 [Hinv' Hccr]]]]]];
+        try eassumption. 
       + eexists r1, (c3 + c'), m2, b''. split; [| split ]; try eassumption.
         * eapply ctx_to_heap_env_big_step_compose; try eassumption.
         * eapply Hinv with (c' := c'); eauto.
+      + eapply Hiinv. eassumption. eassumption.
     Qed.
 
   End CompatLemmas.

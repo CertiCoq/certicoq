@@ -169,7 +169,6 @@ Module Size (H : Heap).
     eapply Same_set_FromList_length; eauto. eapply Heq.
   Qed. 
 
-
   (* TODO move *)
 
   Lemma PS_cardinal_singleton s x :
@@ -338,7 +337,7 @@ Module Size (H : Heap).
     InvCostBase (Post k A) (Pre Funs A') e1 e2.
   Proof.
     unfold InvCostBase, Post, Pre.
-    intros Hleq H1' H2' rho1' rho2' c  Hm.
+    intros Hleq H1' H2' rho1' rho2' c m.
     split.
     + split. omega. 
       rewrite NPeano.Nat.mul_add_distr_l, Nat.mul_1_r.
@@ -353,7 +352,7 @@ Module Size (H : Heap).
       rewrite NPeano.Nat.mul_1_r.
       rewrite <- !plus_assoc. eapply plus_le_compat_l. 
       eapply plus_le_compat. eapply le_trans; [| eapply mult_le_compat_l; eapply Max.le_max_r ].
-      eapply size_cc_heap_leq.
+      eapply size_cc_heap_leq. 
       eapply le_trans. eassumption. simpl.
       rewrite <- plus_n_O. eapply plus_le_compat.
       eapply Nat.le_max_l.

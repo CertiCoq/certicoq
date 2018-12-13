@@ -3071,7 +3071,7 @@ Theorem caseConsistent_findtag_In_cenv:
   forall cenv t e l,
     caseConsistent cenv l t ->
     findtag l t = Some e ->
-    exists (a aty:Ast.name) (ty:iTag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i). 
+    exists (a aty:BasicAst.name) (ty:iTag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i).
 Proof.
   destruct l; intros.
   - inv H0.

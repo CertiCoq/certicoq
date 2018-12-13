@@ -219,7 +219,7 @@ Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 
 Extract Constant L7.L6_to_Clight.print => "print_string".
 
-Definition print_BigStepResult_L7 (p:cps.M.t Ast.name*Clight.program) (n:nat):=
+Definition print_BigStepResult_L7 (p:cps.M.t BasicAst.name*Clight.program) (n:nat):=
   L7.L6_to_Clight.print (
       match (L7.Clightexec.run_wo_main threadInfIdent bodyIdent p n) with
       | Error s _ => s
@@ -233,7 +233,7 @@ Definition print_BigStepResult_L7 (p:cps.M.t Ast.name*Clight.program) (n:nat):=
 
  
 
- Definition print_opt_BigStepResult_L7 (po:exception (cps.M.t Ast.name*Clight.program)) n :=
+ Definition print_opt_BigStepResult_L7 (po:exception (cps.M.t BasicAst.name*Clight.program)) n :=
    match po with
    | Ret ( nenv, p) => print_BigStepResult_L7 (nenv, p) n
    | _ => tt

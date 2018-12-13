@@ -14,7 +14,7 @@ Require Import ExtLib.Data.Monads.StateMonad.
 
 
 Require Import Common.AstCommon. 
-Definition nEnv := M.t Ast.name.
+Definition nEnv := M.t BasicAst.name.
 
 Section PP.
 
@@ -63,7 +63,7 @@ Definition show_var (x:positive) :=
     | _ => ("x" +++ (show_pos x))%string
   end.
 
-Definition show_name (no:Ast.name) (d:string) :=
+Definition show_name (no:BasicAst.name) (d:string) :=
   match no with
     | nNamed s => s
     | nAnon => d

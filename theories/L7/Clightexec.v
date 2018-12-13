@@ -60,12 +60,12 @@ Definition show_positive (p:positive) : string :=
 (* Variables are shown using "x" as a prefix if their original name is not known*)
 Definition show_var (x:positive) nenv :=
   match M.get x nenv with
-    | Some (Ast.nNamed s) => (s++("_")++(show_positive x))%string
+    | Some (BasicAst.nNamed s) => (s++("_")++(show_positive x))%string
     | _ => ("x" ++ (show_positive x))%string
   end.
 
 
-Definition print_errcode (on: option (M.t Ast.name)) (e:errcode): string :=
+Definition print_errcode (on: option (M.t BasicAst.name)) (e:errcode): string :=
   match e  with
   | MSG err => err
   | POS p => show_positive p
@@ -79,7 +79,7 @@ Definition print_errcode (on: option (M.t Ast.name)) (e:errcode): string :=
 
 (* Returns the concatenation of all error codes in errs. 
 s is passed for when I figure out how to pretty-print id from the state *)
-Fixpoint print_error (errs:errmsg) (os:option (M.t Ast.name)): string :=
+Fixpoint print_error (errs:errmsg) (os:option (M.t BasicAst.name)): string :=
   let errstr := map (print_errcode os) errs in
   fold_left append errstr "". 
 
@@ -530,7 +530,7 @@ Definition at_final_state (S: state): res int :=
 Definition is_stopped s :=
   match s with Returnstate _ Kstop _ => true | _ => false end.
 
-Function stepstar (ge: genv) (s: state) (nenv:M.t Ast.name) (fuel: Z)  {measure Z.to_nat fuel}: (bigStepResult state state) :=
+Function stepstar (ge: genv) (s: state) (nenv:M.t BasicAst.name) (fuel: Z)  {measure Z.to_nat fuel}: (bigStepResult state state) :=
   if Z.leb fuel Z0 
   then OutOfTime s
   else match step ge s with OK s' =>
@@ -545,17 +545,17 @@ rewrite Z2Nat.inj_succ; omega.
 Defined.
 
 (* stepstar with fuel in nat *)
-Fixpoint stepstar_n (ge:genv) (s:state) (nenv:M.t Ast.name) (fuel:nat): (bigStepResult state state) :=
+Fixpoint stepstar_n (ge:genv) (s:state) (nenv:M.t BasicAst.name) (fuel:nat): (bigStepResult state state) :=
   match fuel with
   | O => OutOfTime s
   | S n =>match step ge s with OK s' =>
-                               if is_stopped s' then Result s' else stepstar_n ge s' (nenv:M.t Ast.name) n
+                               if is_stopped s' then Result s' else stepstar_n ge s' (nenv:M.t BasicAst.name) n
                           | Error err => certiClasses.Error (print_error err (Some nenv)) (Some s)
           end
   end.
 
 
-Definition run (e: (M.t Ast.name)* program) (fuel: Z) : bigStepResult state int :=
+Definition run (e: (M.t BasicAst.name)* program) (fuel: Z) : bigStepResult state int :=
   let (nenv, p) := e in
   match ( do_initial_state p) with
     | OK (ge,s) =>
@@ -601,7 +601,7 @@ Definition at_final_state_wo_main (S:state):res unit :=
 
 
 (* run w/o main *)
-Definition run_wo_main (e: (M.t Ast.name)*program) (fuel: nat) : bigStepResult state int :=
+Definition run_wo_main (e: (M.t BasicAst.name)*program) (fuel: nat) : bigStepResult state int :=
   let (nenv, p) := e in
   match ( do_initial_state_wo_main p) with
     | OK (ge,s, b) =>

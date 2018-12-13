@@ -16,7 +16,7 @@ Require Import ExtLib.Structures.Monads
 Import MonadNotation.
 Open Scope monad_scope.
 
-Require Import Template.Ast.
+Require Import Template.BasicAst.
 
 Require Import compcert.common.AST
         compcert.common.Errors
@@ -201,7 +201,7 @@ with max_args_fundefs (fnd : fundefs) :=
       2.2 tag of the contructor (in cEnv)
       2.3 arrity of the constructor
       2.4 ordinal of the constructor *)
-Definition n_iTyInfo:Type := Ast.name * list (Ast.name * cTag * N * N).
+Definition n_iTyInfo:Type := BasicAst.name * list (BasicAst.name * cTag * N * N).
 
 Definition n_iEnv := M.t n_iTyInfo.
 
@@ -645,7 +645,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_
   end.
 
 
-Definition make_extern_decl (nenv:M.t Ast.name) (def:(positive * globdef Clight.fundef type)) (gv:bool): option (positive * globdef Clight.fundef type) :=
+Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Clight.fundef type)) (gv:bool): option (positive * globdef Clight.fundef type) :=
   match def with
   | (fIdent, Gfun (Internal f)) =>
     (match M.get fIdent nenv with
@@ -661,7 +661,7 @@ Definition make_extern_decl (nenv:M.t Ast.name) (def:(positive * globdef Clight.
   end.
 
               
-Fixpoint make_extern_decls (nenv:M.t Ast.name) (defs:list (positive * globdef Clight.fundef type)) (gv:bool): (list (positive * globdef Clight.fundef type)) :=
+Fixpoint make_extern_decls (nenv:M.t BasicAst.name) (defs:list (positive * globdef Clight.fundef type)) (gv:bool): (list (positive * globdef Clight.fundef type)) :=
   match defs with
   | fdefs::defs' =>
     let decls := make_extern_decls nenv defs' gv in
@@ -731,7 +731,7 @@ Definition pos2string p :=
 
 Definition show_pos x := pos2string x. (* nat2string10 (Pos.to_nat x). *) 
 
-Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t Ast.name) : M.t Ast.name :=
+Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t BasicAst.name) : M.t BasicAst.name :=
   match M.get f nenv with
   | None => M.set f_inf (nNamed (append (show_pos f) "_info")) nenv
   | Some n => match n with
@@ -747,8 +747,8 @@ Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t Ast.name) : M.t
   rest = indices of live roots in args array
 *)
 
-Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t Ast.name)
-  : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t Ast.name)) :=
+Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t BasicAst.name)
+  : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t BasicAst.name)) :=
   match fnd with
   | Fnil => ret (Some (nil, M.empty positive, nenv))
   | Fcons x t vs e fnd' =>
@@ -779,7 +779,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t Ast.name)
 
                 
 
-Fixpoint add_bodyinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name) (map: M.t positive) (defs:list (positive * globdef Clight.fundef type)) :=
+Fixpoint add_bodyinfo (e : exp) (fenv : fEnv) (nenv : M.t BasicAst.name) (map: M.t positive) (defs:list (positive * globdef Clight.fundef type)) :=
             info_name <- getName ;;
             let ind :=
                 mkglobvar
@@ -795,8 +795,8 @@ Fixpoint add_bodyinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name) (map: M.t po
                 
 
 (* Make fundef_info for functions in fnd (if any), and for the body of the program *)
-Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name)
-  : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t Ast.name)) :=
+Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t BasicAst.name)
+  : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t BasicAst.name)) :=
   match e with
   | Efun fnd e' =>
     p <- make_fundef_info fnd fenv nenv;;
@@ -832,8 +832,8 @@ Definition global_defs (e : exp)
       ))
     :: nil.
 
-Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (nenv : M.t Ast.name) :
-  nState (option (M.t Ast.name * (list (positive * globdef Clight.fundef type)))) :=
+Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (nenv : M.t BasicAst.name) :
+  nState (option (M.t BasicAst.name * (list (positive * globdef Clight.fundef type)))) :=
   fun_inf' <- make_funinfo e fenv nenv ;;
            match fun_inf' with
            | Some p =>
@@ -879,7 +879,7 @@ Definition wrap_in_fun (e:exp) :=
   | _ => Efun Fnil e
   end. 
 
-Definition add_inf_vars (nenv: M.t Ast.name): M.t Ast.name :=
+Definition add_inf_vars (nenv: M.t BasicAst.name): M.t BasicAst.name :=
   M.set isptrIdent (nNamed "is_ptr"%string) (
   M.set argsIdent (nNamed "args"%string) (
           M.set allocIdent (nNamed "alloc"%string) (
@@ -919,7 +919,7 @@ Fixpoint make_Asgn (les:list expr) (res:list expr) :=
   end.
 
 
-Fixpoint make_argList' (n:nat) (nenv:M.t Ast.name) : nState (M.t Ast.name * list (ident * type)) :=
+Fixpoint make_argList' (n:nat) (nenv:M.t BasicAst.name) : nState (M.t BasicAst.name * list (ident * type)) :=
   match n with
   | 0 => ret (nenv, nil)
   | (S n') =>
@@ -931,7 +931,7 @@ Fixpoint make_argList' (n:nat) (nenv:M.t Ast.name) : nState (M.t Ast.name * list
                 ret (nenv, (new_id,val)::rest_id)
   end.
 
-Fixpoint make_argList (n:nat) (nenv:M.t Ast.name) : nState (M.t Ast.name * list (ident * type)) :=
+Fixpoint make_argList (n:nat) (nenv:M.t BasicAst.name) : nState (M.t BasicAst.name * list (ident * type)) :=
   rest <- make_argList' n nenv;;
        let (nenv, rest_l) := rest in
        ret (nenv, rev rest_l).
@@ -952,7 +952,7 @@ Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
 2 ) Direct style calling functions for the original (named) functions 
  *)
  
-Fixpoint make_constructors (cenv:cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * cTag * N * N)) (nenv : M.t Ast.name): nState (M.t Ast.name * (list (positive * globdef Clight.fundef type))) :=
+Fixpoint make_constructors (cenv:cEnv) (nTy:BasicAst.ident) (ctrs: list (BasicAst.name * cTag * N * N)) (nenv : M.t BasicAst.name): nState (M.t BasicAst.name * (list (positive * globdef Clight.fundef type))) :=
   match ctrs with
   | nil => ret (nenv, nil)
   | (nAnon, tag, 0%N, ord)::ctrs =>
@@ -1069,7 +1069,7 @@ Definition pad_char_init (l: list init_data) (n:nat) :=
   let m := n - (length l) in
   l++(List.repeat (Init_int8 Int.zero) m).
 
-Fixpoint make_names_init (nameList:list Ast.name) (n:nat) :=
+Fixpoint make_names_init (nameList:list BasicAst.name) (n:nat) :=
   match nameList with
   | nil =>
     (n, nil)
@@ -1084,7 +1084,7 @@ Fixpoint make_names_init (nameList:list Ast.name) (n:nat) :=
   end.
     
 
-Definition make_namesGV (nameList:list Ast.name ): (globdef Clight.fundef type) :=
+Definition make_namesGV (nameList:list BasicAst.name ): (globdef Clight.fundef type) :=
   let (max_len, init_l) := make_names_init nameList 1 in
   Gvar (mkglobvar (tarray (tarray tschar (Z.of_nat max_len)) (Z.of_nat (length nameList)))
                      init_l
@@ -1092,7 +1092,7 @@ Definition make_namesGV (nameList:list Ast.name ): (globdef Clight.fundef type) 
                      false).
 
   
-Definition make_eliminator (cenv: cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * cTag * N * N)) (nenv:M.t Ast.name): nState (M.t Ast.name * (list (ident * globdef Clight.fundef type))) :=
+Definition make_eliminator (cenv: cEnv) (nTy:BasicAst.ident) (ctrs: list (BasicAst.name * cTag * N * N)) (nenv:M.t BasicAst.name): nState (M.t BasicAst.name * (list (ident * globdef Clight.fundef type))) :=
   valIdent <- getName;;
   ordIdent <- getName;;         
   argvIdent <- getName;;
@@ -1100,7 +1100,7 @@ Definition make_eliminator (cenv: cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * 
   nameIdent <- getName;;
   gv_arrIdent <- getName;;
   gv_namesIdent <- getName;;
- temp <- (fix make_elim_cases (ctrs: list (Ast.name * cTag * N * N)) (currOrd:nat) :=
+ temp <- (fix make_elim_cases (ctrs: list (BasicAst.name * cTag * N * N)) (currOrd:nat) :=
                        match ctrs with
                        | nil => ret (LSnil, LSnil, nil, nil)
                        | (nName, ctag, n, ord)::ctrs =>
@@ -1143,7 +1143,7 @@ Definition make_eliminator (cenv: cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * 
     ret (nenv, (gv_namesIdent, gv_names)::(gv_arrIdent, gv_arr)::(elim_fun_id ,Gfun elim_fun)::nil).
   
 
-Fixpoint make_interface (cenv: cEnv)(ienv_list:list (positive * n_iTyInfo)) (nenv : M.t Ast.name):  nState (M.t Ast.name * (list (ident * globdef Clight.fundef type))) :=
+Fixpoint make_interface (cenv: cEnv)(ienv_list:list (positive * n_iTyInfo)) (nenv : M.t BasicAst.name):  nState (M.t BasicAst.name * (list (ident * globdef Clight.fundef type))) :=
   match ienv_list with
   | nil => ret (nenv, nil)
   | (_, (nAnon, _))::ienv_list' =>
@@ -1192,7 +1192,7 @@ Definition export_rec: (positive * globdef Clight.fundef type) := (exportIdent ,
 
 OS note 09/05/18, this is deprecated, we instead generate special eliminators for closures
 
-Definition make_direct (f_name:string) (f_ident: ident) (f_ar:nat) (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globdef Clight.fundef type)) :=
+Definition make_direct (f_name:string) (f_ident: ident) (f_ar:nat) (nenv:M.t BasicAst.name): nState (M.t BasicAst.name * (ident * globdef Clight.fundef type)) :=
     directFunIdent <- getName;;
     argcIdent <- getName;;
     argvIdent <- getName;;
@@ -1230,7 +1230,7 @@ Definition make_direct (f_name:string) (f_ident: ident) (f_ar:nat) (nenv:M.t Ast
 
 (* generate a function equivalent to halt, received a tinfo, desired results is already in tinfo.args[1], and
  a halting continuation closure *)
-Definition make_halt (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globdef Clight.fundef type) * (ident * globdef Clight.fundef type)) :=
+Definition make_halt (nenv:M.t BasicAst.name): nState (M.t BasicAst.name * (ident * globdef Clight.fundef type) * (ident * globdef Clight.fundef type)) :=
   haltIdent <- getName;;
             halt_cloIdent <- getName;;
             let nenv := M.set halt_cloIdent (nNamed "halt_clo"%string) (M.set haltIdent (nNamed "halt"%string) nenv) in            
@@ -1285,7 +1285,7 @@ Fixpoint make_n_calls (n:nat) (closIdent:ident) (fIdent:ident) (envIdent:ident) 
   end.
     
 
-Definition make_call_n_export_b (nenv:M.t Ast.name) (n:nat) (export:bool) (haltIdent:ident): nState (M.t Ast.name * (ident * globdef Clight.fundef type)) :=
+Definition make_call_n_export_b (nenv:M.t BasicAst.name) (n:nat) (export:bool) (haltIdent:ident): nState (M.t BasicAst.name * (ident * globdef Clight.fundef type)) :=
     callIdent <- getName;;
     retIdent <- getName;;
     clo_ident <- getName;;
@@ -1337,7 +1337,7 @@ Definition make_call_n_export_b (nenv:M.t Ast.name) (n:nat) (export:bool) (haltI
 Definition tinf_def:globdef Clight.fundef type :=
   Gvar (mkglobvar threadInf ((Init_space 4%Z)::nil) false false).
 
-Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t Ast.name):  nState (option (M.t Ast.name  * (list (ident * globdef Clight.fundef type)))) :=
+Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t BasicAst.name):  nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
   l <- make_interface cenv (M.elements ienv) nenv;;
     let (nenv, inter_l) := l in
     l <- make_halt nenv;;
@@ -1356,8 +1356,8 @@ Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t Ast.name): 
 (* end of header file *)
 
 
-Definition compile (e : exp) (cenv : cEnv) (nenv : M.t Ast.name) :
-  (M.t Ast.name * option Clight.program * option Clight.program) :=
+Definition compile (e : exp) (cenv : cEnv) (nenv : M.t BasicAst.name) :
+  (M.t BasicAst.name * option Clight.program * option Clight.program) :=
   let e := wrap_in_fun e in 
   let fenv := compute_fEnv e in
   let ienv := compute_iEnv cenv in

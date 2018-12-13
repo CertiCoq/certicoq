@@ -10,7 +10,7 @@ Require Import Common.RandyPrelude.
 
 Require Import Common.Common.
 
-Definition NVar : Set := (positive * Ast.name).
+Definition NVar : Set := (positive * BasicAst.name).
 
 Global Instance deqnname : Deq name.
 Proof.
@@ -38,7 +38,7 @@ Global Instance NVUpdateName : UpdateName NVar :=
   fun p => let (v,name) := p in (fst v, name).
 
 
-Definition name2string (n:Ast.name): string :=
+Definition name2string (n:BasicAst.name): string :=
 match n with
 | nAnon => "_"
 | nNamed s => s

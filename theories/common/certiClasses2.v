@@ -26,7 +26,7 @@ Section YesNoQuestions.
 
 (* Zoe's suggestion for Question *)
 Inductive Question : Set  := 
-| Cnstr : Ast.inductive -> nat -> Question 
+| Cnstr : BasicAst.inductive -> nat -> Question
 | Abs : Question.
 
 
@@ -274,7 +274,7 @@ if it says "yes" to some constructor of an inductive type, it must say
 
 Definition nonTrivialQuestionHead (Value : Type)
   `{@QuestionHead Value} : Prop:=
-forall (v:Value) (i: Ast.inductive) n, 
+forall (v:Value) (i: BasicAst.inductive) n,
   (questionHead (Cnstr i n) v = true)
   -> forall m, m<>n ->  questionHead (Cnstr i m) v = false.
   

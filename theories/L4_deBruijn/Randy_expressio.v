@@ -1788,5 +1788,5 @@ Qed.
 Close Scope Z_scope.
 
 
-Definition fnames (e:efnlst) : list (Ast.name) :=
+Definition fnames (e:efnlst) : list (BasicAst.name) :=
 map fst (efnlst_as_list e).

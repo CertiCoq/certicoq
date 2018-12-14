@@ -56,7 +56,8 @@ Module Compat (H : Heap).
         ctx_to_heap_env C1 H1' rho1' H1'' rho1'' c1' ->
         ctx_to_heap_env_CC C2 H2' rho2' H2'' rho2'' c2' ->
         
-        IL1 (H1', rho1', C1 |[ e1 ]|, c1 + c1', m1) (H2', rho2', C2 |[ e2 ]|, c2 + c2', m2).
+        IL1 (H1', rho1', C1 |[ e1 ]|, c1 + c1', (max (reach_size H1' rho1' (C1 |[ e1 ]|)) m1))
+            (H2', rho2', C2 |[ e2 ]|, c2 + c2', m2).
     
     Definition IInvCtxCompat (C1 C2 : exp_ctx) (e1 e2 : exp)  :=
       forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1' c2',                         
@@ -437,6 +438,7 @@ Module Compat (H : Heap).
                rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
                eassumption. simpl. omega. }
     Admitted.
+
     
     (** * Heap allocation and environment extension properties *)
 
@@ -505,11 +507,11 @@ Module Compat (H : Heap).
           { erewrite (@getlist_length_eq value ys1 vs); [| eassumption ].
             erewrite (@getlist_length_eq value ys2 vs2); [| eassumption ].
             eapply Forall2_length. eassumption. }
-
+          
           edestruct Hpre with (b1 := extend b1 l l1)
                               (b2 := extend b2 l2' l2)
-            as [v2 [c2 [m2 [b' [Hstep [HS Hval]]]]]]; 
-            [ | | | eassumption | eassumption | | | | | | | |  eassumption | | ]. 
+            as [v2 [c2 [m2 [b' [Hstep [HS Hval]]]]]];
+            [ | | | eassumption | eassumption | | | | | | | |  eassumption | | ].
           - simpl in *. omega.
           - simpl. eapply FromList_env_locs. eassumption. reflexivity.
           - simpl. eapply FromList_env_locs. eassumption. reflexivity.
@@ -552,7 +554,7 @@ Module Compat (H : Heap).
             + rewrite extend_gss. reflexivity.
             + simpl. split. reflexivity.
 
-              eapply Forall2_symm_strong; [| eassumption ].
+              eapply Forall2_symm_strong; [| eassumption ]. 
               intros l3 l4 Hin1 Hin2 Hin. simpl in Hin. symmetry in Hin.
               eapply res_equiv_rename_ext. eassumption.
               reflexivity.
@@ -680,9 +682,10 @@ Module Compat (H : Heap).
               ; [ | | | rewrite NPeano.Nat.add_sub ]; try eassumption.
               simpl. omega. 
             + replace c1 with (c1 - cost (Econstr x1 t ys1 e1) + cost (Econstr x1 t ys1 e1))
-                by ( simpl in *; omega). 
+                by ( simpl in *; omega).  
               eapply Hinv; try eassumption.
-              replace (cost (Econstr x1 t ys1 e1)) with (0 + cost_ctx (Econstr_c x1 t ys1 Hole_c)) by (simpl; omega).
+              replace (cost (Econstr x1 t ys1 e1))
+                with (0 + cost_ctx (Econstr_c x1 t ys1 Hole_c)) by (simpl; omega).
               econstructor; eauto. now econstructor; eauto.
               replace (cost (Econstr x2 t ys2 e2)) with (0 + cost_ctx (Econstr_c x2 t ys2  Hole_c)) by (simpl; omega).
               econstructor; eauto. now econstructor; eauto.

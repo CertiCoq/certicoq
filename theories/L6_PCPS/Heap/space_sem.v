@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
      Classes.Morphisms.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From CertiCoq.L6 Require Import cps ctx cps_util eval List_util Ensembles_util functions
-     identifiers Heap.heap Heap.heap_defs Heap.heap_equiv Heap.GC tactics set_util.
+     identifiers Heap.heap Heap.heap_defs Heap.heap_equiv Heap.GC tactics set_util map_util.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.

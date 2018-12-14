@@ -196,15 +196,16 @@ Module HeapDefs (H : Heap) .
   Proof.
   Abort.
 
+  Definition size_env {a} (rho : M.t a) : nat :=
+    PS.cardinal (@mset (key_set rho) _).
 
   (** Size of heap blocks *)
   Definition size_val (v : block) : nat :=
     match v with
       | Constr t ls => (* The size of the constructor representation *)
         1 + length ls
-      | Clos _ _ => 1
-      | Env _ => 1
-        (* Do not count the cost of closure environments in the source *)
+      | Clos _ _ => 3
+      | Env rho => 1 + size_env rho
     end.
   
   (** Size of the heap *)

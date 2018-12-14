@@ -910,7 +910,7 @@ Module GC (H : Heap).
     - symmetry. eapply heap_equiv_reach_eq. eassumption. 
   Qed. 
 
-  Lemma live_max_with_measure S {_ : ToMSet S} H1 H2 b f : 
+  Lemma live_max_with_measure S {_ : ToMSet S} H1 H2 b f :
     live' S H1 H2 b ->
     (forall bl1 bl2, block_equiv (b, H1, bl1) (id, H2, bl2) -> f bl1 = f bl2) ->
     max_with_measure f H2 = max_with_measure_filter f (reach' H1 S) H1.
@@ -987,7 +987,10 @@ Module GC (H : Heap).
     destruct bl1; destruct bl2; try contradiction.
     - simpl in *. f_equal. eapply Forall2_length. eassumption.
     - reflexivity.
-    - reflexivity.
+    - simpl in Hbl. simpl.
+      unfold size_env. rewrite !PS.cardinal_spec.
+      do 2 f_equal. eapply elements_eq.
+      eapply Same_set_From_set. rewrite <- !mset_eq. eassumption. 
   Qed.
 
   Lemma block_equiv_cost_mem_block b bl1 bl2 H1 H2 :

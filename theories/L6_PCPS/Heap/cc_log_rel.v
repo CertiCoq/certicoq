@@ -105,7 +105,7 @@ Module CC_log_rel (H : Heap).
         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e2))) b2 ->
         IIL (H1', rho1', e1) (H2', rho2', e2) ->
         c1 <= k ->
-        big_step_GC H1' rho1' e1 r1 c1 m1 ->
+        big_step H1' rho1' e1 r1 c1 m1 ->
         not_stuck H1' rho1' e1 ->
         exists (r2 : ans) (c2 m2 : nat) (b : Inj),
           big_step_GC_cc H2' rho2' e2 r2 c2 m2 /\
@@ -195,12 +195,11 @@ Module CC_log_rel (H : Heap).
                              let R j v1 v2 := cc_approx_val (k - (k - i)) j IP P b' (Res (v1, H1')) (Res (v2, H2')) in
                              (forall j, Forall2 (R j) vs1 vs2) ->
                              f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
-                             (forall (H1 H2  : heap block) b1 b2, (* redundant *)
-                                live' (env_locs rho_clo2 (occurs_free e1)) H1'' H1 b1  ->
+                             (forall (H2  : heap block) b2,
                                 live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
                                 IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
                                    (1 + (PS.cardinal (@mset (key_set rho_clo) _)))
-                                   (H1, subst_env b1 rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
+                                   (H1'', rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
                              (forall j, cc_approx_exp cc_approx_val
                                                  (k - (k - i))
                                                  j
@@ -226,7 +225,7 @@ Module CC_log_rel (H : Heap).
         (cc_approx_clos (cc_approx_val k) j P1 P2 b p1 p2)
           (at level 70, no associativity).
   
-    
+   
   (** Unfold the recursion. A more compact definition of the value relation. *)
   Definition cc_approx_val' (k : nat) (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) : Prop :=
     match r1, r2 with
@@ -268,12 +267,11 @@ Module CC_log_rel (H : Heap).
                          let R j v1 v2 := cc_approx_val i j IP P b'(Res (v1, H1')) (Res (v2, H2')) in
                          (forall j, Forall2 (R j) vs1 vs2) ->
                          f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
-                         (forall (H1 H2  : heap block) b1 b2, (* redundant *)
-                            live' (env_locs rho_clo2 (occurs_free e1)) H1'' H1 b1  ->
-                            live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
-                            IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
-                               (1 + (PS.cardinal (@mset (key_set rho_clo) _)))
-                               (H1, subst_env b1 rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
+                         (forall (H2 : heap block) b2, (* redundant *)
+                             live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
+                             IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
+                                (1 + (PS.cardinal (@mset (key_set rho_clo) _)))
+                                (H1'', rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
                          (forall j, cc_approx_exp cc_approx_val
                                              i j
                                              (IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
@@ -384,9 +382,9 @@ Module CC_log_rel (H : Heap).
           intros b1 b2 el tc1 tc2 tc3 H1' H1'' H2' env_loc' xs1 ft e1
                  vs1 vs2 Heq1 Hr1 Heq2 Hr2 Hget Hfind Hdef Hset Hlen.
           edestruct Hyp
-            as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto.
+            as (xs2 & e2 & rho2' & Hfind' & Hset' & Hi); eauto. 
           do 3 eexists; split; [ | split ]; try (now eauto).
-          simpl. intros i b' Hleq Hfeq Hall.
+          simpl. intros i Hleq b' Hall Hfeq.
           assert (Heqi : k - (k - i) = i) by omega.
           replace i with (k - (k - i)) by eassumption. 
           eapply Hi; eauto. intros j'.
@@ -1390,7 +1388,8 @@ Module CC_log_rel (H : Heap).
       edestruct H as (Hleq & rho1 & c & vs & FLS & Hget1 & Hnd & Heq & Hget2 & Hall). 
       erewrite Heq in H0. now destruct H0. 
   Qed. 
-      
+
+  
   (** * The logical relation respects functional extensionality *)
 
   Instance Proper_cc_approx_val_f_eq :
@@ -1609,7 +1608,6 @@ Module CC_log_rel (H : Heap).
       exact (1%positive).  
       exact (1%positive).
   Qed.
-
 
   Lemma cc_approx_clos_image_eq (k : nat) (H1 H2 : heap block)
         l1 l2 :
@@ -2032,6 +2030,7 @@ Module CC_log_rel (H : Heap).
     eassumption. 
   Qed.
 
+  
   Lemma Forall2_reach1 (k : nat) (H1 H2 : heap block)
         vs1 vs2 :
     Forall2 (fun v1 v2 => forall j, (Res (v1, H1)) ≺ ^ (k; j; GIP ; GP ; b)
@@ -2045,6 +2044,7 @@ Module CC_log_rel (H : Heap).
       eapply cc_approx_val_well_formed_reach1; eauto.
   Qed.
 
+   
   Lemma Forall2_reach2 (k : nat) (β : Inj) (δ : EInj) (H1 H2 : heap block)
         vs1 vs2 :
     Forall2 (fun v1 v2 => forall j, (Res (v1, H1)) ≺ ^ (k; j; GIP ; GP ; b)

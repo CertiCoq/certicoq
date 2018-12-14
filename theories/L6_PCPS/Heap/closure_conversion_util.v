@@ -1809,21 +1809,22 @@ Module CCUtil (H : Heap).
     omega.
   Qed.
 
-  Lemma binding_in_map_def_closures (S : Ensemble M.elt) (rho1 rho1' : env) H1 H1' B1 B1' v :
-    binding_in_map S rho1 ->
-    def_closures B1 B1' rho1 H1 v = (H1', rho1') ->
-    binding_in_map (name_in_fundefs B1 :|: S) rho1'.
-  Proof. 
-    revert H1' rho1'. induction B1; intros H2 rho2 Hbin Hclo.
-    - simpl in *.
-      destruct (def_closures B1 B1' rho1 H1 v) as [H' rho'] eqn:Hd.
-      destruct (alloc (Clos (FunPtr B1' v0) v) H')as [l' H''] eqn:Ha. 
-      inv Hclo.
-      rewrite <- Union_assoc. rewrite Union_commut. eapply binding_in_map_set.
-      eauto.
-    - inv Hclo. simpl. eapply binding_in_map_antimon; [| eassumption ].
-      eauto with Ensembles_DB.
-  Qed.
+  (* TODO move *)
+  (* Lemma binding_in_map_def_closures (S : Ensemble M.elt) (rho1 rho1' : env) H1 H1' B1 B1' v : *)
+  (*   binding_in_map S rho1 -> *)
+  (*   def_closures B1 B1' rho1 H1 v = (H1', rho1') -> *)
+  (*   binding_in_map (name_in_fundefs B1 :|: S) rho1'. *)
+  (* Proof.  *)
+  (*   revert H1' rho1'. induction B1; intros H2 rho2 Hbin Hclo. *)
+  (*   - simpl in *. *)
+  (*     destruct (def_closures B1 B1' rho1 H1 v) as [H' rho'] eqn:Hd. *)
+  (*     destruct (alloc (Clos (FunPtr B1' v0) v) H')as [l' H''] eqn:Ha.  *)
+  (*     inv Hclo. *)
+  (*     rewrite <- Union_assoc. rewrite Union_commut. eapply binding_in_map_set. *)
+  (*     eauto. *)
+  (*   - inv Hclo. simpl. eapply binding_in_map_antimon; [| eassumption ]. *)
+  (*     eauto with Ensembles_DB. *)
+  (* Qed. *)
 
   Lemma restrict_env_getlist S rho rho' xs vs :
     Restrict_env S rho rho' -> 

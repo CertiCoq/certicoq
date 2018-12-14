@@ -402,7 +402,6 @@ Module Compat (H : Heap).
                 as [r1 [m1 [b1'' [b2''[Hgc'' _]]]]];
                 [| eassumption | | | do 2 eexists; eassumption ]. 
               
-              eassumption. 
               clear. admit. (* form env relation on f + relation on args +
                         closedness lemmas *) 
               

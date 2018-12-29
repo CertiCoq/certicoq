@@ -295,7 +295,7 @@ Section uncurry_correct.
       end (* match fl *)
     end (* match a *).
   Proof.
-    all: intros; simpl; try omega.
+    all: intros; simpl; omega.
   Qed.
 
   Corollary uncurry_mut : forall (P : _ -> _ -> Prop) (Q : _ -> _ -> Prop),
@@ -4914,431 +4914,43 @@ Section uncurry_correct.
         eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
         eapply Included_trans; eauto; rewrite used_vars_Fcons...
       + destruct e.
-        * apply pre_eq_state_lr; intros st [Huniq Hused].
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHf].
-          intros st' Hst'; split; subst st'; [now inv Huniq|].
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          intros fds' st'; apply pre_eq_state_lr.
-          intros st0 [Hst' [n_fds Hfds]]; subst st'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHe].
-          intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-          apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          intros e' st0'; apply return_triple.
-          intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
+        4: destruct f0; try destruct f1; try destruct e; try destruct l0; try destruct l0.
+        all: try solve [
+          apply pre_eq_state_lr; intros st [Huniq Hused];
+          eapply bind_triple';
+            [rewrite pre_post_copy;
+             eapply pre_strenghtening; [|apply IHf];
+             intros st' Hst'; split; subst st'; [now inv Huniq|];
+             eapply Included_trans; eauto; rewrite used_vars_Fcons;
+             eauto with Ensembles_DB
+            |];
+          intros fds' st'; apply pre_eq_state_lr;
+          intros st0 [Hst' [n_fds Hfds]]; subst st';
+          eapply bind_triple';
+            [rewrite pre_post_copy;
+             eapply pre_strenghtening; [|apply IHe];
+             intros st0' Hst0; subst st0'; split; [now inv Huniq|];
+             apply Included_trans with (s2 := from_fresh st);
+             [eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB
+             |eapply uncurry_fundefs_rel_s_nondecreasing; eauto]
+            |];
+          intros e' st0'; apply return_triple;
+          intros st1 [Hst0' [n_e He]] _ _; subst st0';
+          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose;
+            [apply uncurry_rel_fundefs_Fcons; eauto|];
           apply app_ctx_uncurry_rel_fundefs
-            with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-          simpl; rewrite used_vars_Fcons.
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-        * apply pre_eq_state_lr; intros st [Huniq Hused].
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHf].
-          intros st' Hst'; split; subst st'; [now inv Huniq|].
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          intros fds' st'; apply pre_eq_state_lr.
-          intros st0 [Hst' [n_fds Hfds]]; subst st'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHe].
-          intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-          apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          intros e' st0'; apply return_triple.
-          intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
-          apply app_ctx_uncurry_rel_fundefs
-            with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-          simpl; rewrite used_vars_Fcons.
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-        * apply pre_eq_state_lr; intros st [Huniq Hused].
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHf].
-          intros st' Hst'; split; subst st'; [now inv Huniq|].
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          intros fds' st'; apply pre_eq_state_lr.
-          intros st0 [Hst' [n_fds Hfds]]; subst st'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHe].
-          intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-          apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          intros e' st0'; apply return_triple.
-          intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
-          apply app_ctx_uncurry_rel_fundefs
-            with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-          simpl; rewrite used_vars_Fcons.
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-        * destruct f0.
-          ** destruct f1.
-             *** apply pre_eq_state_lr; intros st [Huniq Hused].
-                 eapply bind_triple'. rewrite pre_post_copy.
-                 eapply pre_strenghtening; [|apply IHf].
-                 intros st' Hst'; split; subst st'; [now inv Huniq|].
-                 eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 intros fds' st'; apply pre_eq_state_lr.
-                 intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                 eapply bind_triple'. rewrite pre_post_copy.
-                 eapply pre_strenghtening; [|apply IHe].
-                 intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                 apply Included_trans with (s2 := from_fresh st).
-                 eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                 intros e' st0'; apply return_triple.
-                 intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                 exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                 apply uncurry_rel_fundefs_Fcons; eauto.
-                 apply app_ctx_uncurry_rel_fundefs
-                   with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                 simpl; rewrite used_vars_Fcons.
-                 intros a Ha; inv Ha.
-                 revert H; apply Included_trans with (s2 := from_fresh st).
-                 eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                 eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                 eapply Included_trans; eauto; rewrite used_vars_Fcons...
-             *** destruct e.
-                 **** apply pre_eq_state_lr; intros st [Huniq Hused].
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHf].
-                      intros st' Hst'; split; subst st'; [now inv Huniq|].
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      intros fds' st'; apply pre_eq_state_lr.
-                      intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHe].
-                      intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                      apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      intros e' st0'; apply return_triple.
-                      intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                      exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                      apply uncurry_rel_fundefs_Fcons; eauto.
-                      apply app_ctx_uncurry_rel_fundefs
-                        with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                      simpl; rewrite used_vars_Fcons.
-                      intros a Ha; inv Ha.
-                      revert H; apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 **** apply pre_eq_state_lr; intros st [Huniq Hused].
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHf].
-                      intros st' Hst'; split; subst st'; [now inv Huniq|].
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      intros fds' st'; apply pre_eq_state_lr.
-                      intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHe].
-                      intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                      apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      intros e' st0'; apply return_triple.
-                      intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                      exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                      apply uncurry_rel_fundefs_Fcons; eauto.
-                      apply app_ctx_uncurry_rel_fundefs
-                        with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                      simpl; rewrite used_vars_Fcons.
-                      intros a Ha; inv Ha.
-                      revert H; apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 **** apply pre_eq_state_lr; intros st [Huniq Hused].
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHf].
-                      intros st' Hst'; split; subst st'; [now inv Huniq|].
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      intros fds' st'; apply pre_eq_state_lr.
-                      intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHe].
-                      intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                      apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      intros e' st0'; apply return_triple.
-                      intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                      exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                      apply uncurry_rel_fundefs_Fcons; eauto.
-                      apply app_ctx_uncurry_rel_fundefs
-                        with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                      simpl; rewrite used_vars_Fcons.
-                      intros a Ha; inv Ha.
-                      revert H; apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 **** apply pre_eq_state_lr; intros st [Huniq Hused].
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHf].
-                      intros st' Hst'; split; subst st'; [now inv Huniq|].
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      intros fds' st'; apply pre_eq_state_lr.
-                      intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHe].
-                      intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                      apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      intros e' st0'; apply return_triple.
-                      intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                      exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                      apply uncurry_rel_fundefs_Fcons; eauto.
-                      apply app_ctx_uncurry_rel_fundefs
-                        with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                      simpl; rewrite used_vars_Fcons.
-                      intros a Ha; inv Ha.
-                      revert H; apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 **** destruct l0.
-                      ***** apply pre_eq_state_lr; intros st [Huniq Hused].
-                            eapply bind_triple'. rewrite pre_post_copy.
-                            eapply pre_strenghtening; [|apply IHf].
-                            intros st' Hst'; split; subst st'; [now inv Huniq|].
-                            eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                            intros fds' st'; apply pre_eq_state_lr.
-                            intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                            eapply bind_triple'. rewrite pre_post_copy.
-                            eapply pre_strenghtening; [|apply IHe].
-                            intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                            apply Included_trans with (s2 := from_fresh st).
-                            eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                            eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                            intros e' st0'; apply return_triple.
-                            intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                            exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                            apply uncurry_rel_fundefs_Fcons; eauto.
-                            apply app_ctx_uncurry_rel_fundefs
-                              with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                            simpl; rewrite used_vars_Fcons.
-                            intros a Ha; inv Ha.
-                            revert H; apply Included_trans with (s2 := from_fresh st).
-                            eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                            eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                            eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                            eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      ***** destruct l0.
-                            ****** contradiction IHeq; do 9 eexists; eauto.
-                            ****** apply pre_eq_state_lr; intros st [Huniq Hused].
-                                   eapply bind_triple'. rewrite pre_post_copy.
-                                   eapply pre_strenghtening; [|apply IHf].
-                                   intros st' Hst'; split; subst st'; [now inv Huniq|].
-                                   eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                                   intros fds' st'; apply pre_eq_state_lr.
-                                   intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                                   eapply bind_triple'. rewrite pre_post_copy.
-                                   eapply pre_strenghtening; [|apply IHe].
-                                   intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                                   apply Included_trans with (s2 := from_fresh st).
-                                   eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                                   eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                                   intros e' st0'; apply return_triple.
-                                   intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                                   exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                                   apply uncurry_rel_fundefs_Fcons; eauto.
-                                   apply app_ctx_uncurry_rel_fundefs
-                                     with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                                   simpl; rewrite used_vars_Fcons.
-                                   intros a Ha; inv Ha.
-                                   revert H; apply Included_trans with (s2 := from_fresh st).
-                                   eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                                   eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                                   eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                                   eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 **** apply pre_eq_state_lr; intros st [Huniq Hused].
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHf].
-                      intros st' Hst'; split; subst st'; [now inv Huniq|].
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      intros fds' st'; apply pre_eq_state_lr.
-                      intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHe].
-                      intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                      apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      intros e' st0'; apply return_triple.
-                      intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                      exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                      apply uncurry_rel_fundefs_Fcons; eauto.
-                      apply app_ctx_uncurry_rel_fundefs
-                        with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                      simpl; rewrite used_vars_Fcons.
-                      intros a Ha; inv Ha.
-                      revert H; apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                 **** apply pre_eq_state_lr; intros st [Huniq Hused].
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHf].
-                      intros st' Hst'; split; subst st'; [now inv Huniq|].
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      intros fds' st'; apply pre_eq_state_lr.
-                      intros st0 [Hst' [n_fds Hfds]]; subst st'.
-                      eapply bind_triple'. rewrite pre_post_copy.
-                      eapply pre_strenghtening; [|apply IHe].
-                      intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-                      apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      intros e' st0'; apply return_triple.
-                      intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-                      exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-                      apply uncurry_rel_fundefs_Fcons; eauto.
-                      apply app_ctx_uncurry_rel_fundefs
-                        with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-                      simpl; rewrite used_vars_Fcons.
-                      intros a Ha; inv Ha.
-                      revert H; apply Included_trans with (s2 := from_fresh st).
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-                      eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-                      eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-                      eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          ** apply pre_eq_state_lr; intros st [Huniq Hused].
-             eapply bind_triple'. rewrite pre_post_copy.
-             eapply pre_strenghtening; [|apply IHf].
-             intros st' Hst'; split; subst st'; [now inv Huniq|].
-             eapply Included_trans; eauto; rewrite used_vars_Fcons...
-             intros fds' st'; apply pre_eq_state_lr.
-             intros st0 [Hst' [n_fds Hfds]]; subst st'.
-             eapply bind_triple'. rewrite pre_post_copy.
-             eapply pre_strenghtening; [|apply IHe].
-             intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-             apply Included_trans with (s2 := from_fresh st).
-             eapply Included_trans; eauto; rewrite used_vars_Fcons...
-             eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-             intros e' st0'; apply return_triple.
-             intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-             exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-             apply uncurry_rel_fundefs_Fcons; eauto.
-             apply app_ctx_uncurry_rel_fundefs
-               with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-             simpl; rewrite used_vars_Fcons.
-             intros a Ha; inv Ha.
-             revert H; apply Included_trans with (s2 := from_fresh st).
-             eapply Included_trans; eauto; rewrite used_vars_Fcons...
-             eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-             eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-             eapply Included_trans; eauto; rewrite used_vars_Fcons...
-        * apply pre_eq_state_lr; intros st [Huniq Hused].
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHf].
-          intros st' Hst'; split; subst st'; [now inv Huniq|].
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          intros fds' st'; apply pre_eq_state_lr.
-          intros st0 [Hst' [n_fds Hfds]]; subst st'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHe].
-          intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-          apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          intros e' st0'; apply return_triple.
-          intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
-          apply app_ctx_uncurry_rel_fundefs
-            with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-          simpl; rewrite used_vars_Fcons.
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-        * apply pre_eq_state_lr; intros st [Huniq Hused].
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHf].
-          intros st' Hst'; split; subst st'; [now inv Huniq|].
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          intros fds' st'; apply pre_eq_state_lr.
-          intros st0 [Hst' [n_fds Hfds]]; subst st'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHe].
-          intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-          apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          intros e' st0'; apply return_triple.
-          intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
-          apply app_ctx_uncurry_rel_fundefs
-            with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-          simpl; rewrite used_vars_Fcons.
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-        * apply pre_eq_state_lr; intros st [Huniq Hused].
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHf].
-          intros st' Hst'; split; subst st'; [now inv Huniq|].
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          intros fds' st'; apply pre_eq_state_lr.
-          intros st0 [Hst' [n_fds Hfds]]; subst st'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHe].
-          intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-          apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          intros e' st0'; apply return_triple.
-          intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
-          apply app_ctx_uncurry_rel_fundefs
-            with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto.
-          simpl; rewrite used_vars_Fcons.
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          Grab Existential Variables.
-          exact M.Leaf.
-          exact M.Leaf.
+            with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto;
+          simpl; rewrite used_vars_Fcons;
+          intros a Ha; inv Ha;
+          [revert H; apply Included_trans with (s2 := from_fresh st);
+           [eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB
+           |eapply uncurry_fundefs_rel_s_nondecreasing; eauto]
+          |eapply uncurry_fundefs_rel_preserves_used_vars; eauto;
+           eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB]].
+        contradiction IHeq; do 9 eexists; eauto.
+        Grab Existential Variables.
+        exact M.Leaf.
+        exact M.Leaf.
   Qed.
 
   Corollary uncurry_exp_corresp : forall e,

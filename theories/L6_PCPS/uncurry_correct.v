@@ -10,6 +10,191 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Import ListNotations MonadNotation.
 
+Section list_lemmas.
+  Lemma setlist_length : forall {A} (l : list M.elt) (l1 : list A) (rho rho1 : M.t A),
+    Some rho1 = setlist l l1 rho -> length l = length l1.
+  Proof.
+    induction l; intros.
+    - (* [] *) destruct l1; [easy|now simpl in H].
+    - (* :: *) destruct l1; [now simpl in H|].
+      simpl. apply f_equal.
+      remember (setlist l l1 rho).
+      destruct o.
+      + eapply IHl. simpl in H. eapply Heqo.
+      + simpl in H. now rewrite <- Heqo in H.
+  Qed.
+
+  Lemma exists_setlist_iff_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
+    (exists rho1, Some rho1 = setlist l l1 rho) <-> length l = length l1.
+  Proof.
+    induction l; split; intros.
+    - (* [] -> *) destruct H. destruct l1; [easy|now simpl in H].
+    - (* [] <- *) destruct l1; [now exists rho|easy].
+    - (* :: -> *) destruct H. destruct l1; [now simpl in H|].
+      simpl. apply f_equal.
+      simpl in H. remember (setlist l l1 rho).
+      destruct o; [|congruence].
+      rewrite <- IHl with (rho := rho). now exists t. 
+    - (* :: <- *) destruct l1; [easy|]. simpl in H. apply Nat.succ_inj in H.
+      rewrite <- IHl with (rho := rho) in H. destruct H.
+      simpl. rewrite <- H. now exists (M.set a a0 x).
+  Qed.
+
+  Corollary exists_setlist_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
+    (exists rho1, Some rho1 = setlist l l1 rho) -> length l = length l1.
+  Proof. intros; now rewrite <- exists_setlist_iff_length with (rho0 := rho). Qed.
+
+  Corollary length_exists_setlist : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
+     length l = length l1 -> (exists rho1, Some rho1 = setlist l l1 rho).
+  Proof. intros; now rewrite exists_setlist_iff_length with (rho0 := rho). Qed.
+
+  (* nesting setlists (TODO: move to cps.v?) *)
+  Lemma setlist_setlist : forall {A} (l l1 : list M.elt) (v v1 : list A) (rho rho1 rho2 : M.t A),
+    Some rho1 = setlist l v rho ->
+    Some rho2 = setlist l1 v1 rho1 ->
+    Some rho2 = setlist (l1 ++ l) (v1 ++ v) rho.
+  Proof.
+    induction l1.
+    - (* [] *)
+      intros. assert (v1 = []) by (apply setlist_length in H0; now destruct v1). subst.
+      inversion H0. now subst.
+    - (* :: *)
+      intros. destruct v1; [apply setlist_length in H0; inversion H0|].
+      simpl in *. remember (setlist l1 v1 rho1). destruct o; [|congruence].
+      now rewrite <- (IHl1 _ _ _ _ _ H Heqo).
+  Qed.
+
+  (* expose an M.set from a successful setlist *)
+  Lemma set_setlist : forall {A} h h1 (t : list M.elt) (t1 : list A) (rho rho2 : M.t A),
+    Some rho2 = setlist (h :: t) (h1 :: t1) rho -> exists rho1,
+    rho2 = M.set h h1 rho1 /\ Some rho1 = setlist t t1 rho.
+  Proof.
+    simpl. intros. remember (setlist t t1 rho). destruct o; [|congruence].
+    inversion H. inversion H. subst. eauto.
+  Qed.
+
+  Lemma setlist_set : forall {A} a b (l : list M.elt) (v : list A) (rho : M.t A),
+    setlist l v (M.set a b rho) = setlist (l ++ [a]) (v ++ [b]) rho.
+  Proof.
+    induction l; intros.
+    - (* [] *) destruct v; [easy|destruct v; easy].
+    - (* :: *) destruct v. simpl.
+      assert (setlist (l ++ [a]) [] rho = None) by (now destruct l). now rewrite H.
+      simpl in *.
+      remember (setlist l v (M.set a b rho)).
+      remember (setlist (l ++ [a]) (v ++ [b]) rho).
+      destruct o, o0; [| | |auto].
+      + rewrite <- IHl in Heqo0. rewrite <- Heqo in Heqo0. inversion Heqo0; now subst.
+      + apply setlist_length in Heqo.
+        assert (length (l ++ [a]) = length (v ++ [b]))
+          by (repeat rewrite app_length; now rewrite Heqo).
+        apply length_exists_setlist with (rho0 := rho) in H. destruct H. congruence.
+      + assert (length l = length v). {
+          apply setlist_length in Heqo0. 
+          repeat rewrite app_length in Heqo0. simpl in Heqo0. omega.
+        }
+        apply length_exists_setlist with (rho0 := (M.set a b rho)) in H. destruct H. congruence.
+  Qed.
+
+  Lemma list_length_cons : forall {A} {B} h (l : list A) (t : list B),
+    length l = length (h :: t) -> exists h1 t1, l = h1 :: t1.
+  Proof. intros. destruct l; [easy|now exists a, l]. Qed.
+
+  Lemma list_length_snoc : forall {A} {B} (l : list A) (a : list B) b,
+    length l = length (a ++ [b]) -> exists a1 b1, l = a1 ++ [b1].
+  Proof.
+    induction l; intros.
+    - rewrite app_length in H. inversion H. rewrite plus_comm in H1. inversion H1.
+    - destruct a0.
+      + assert (l = []) by (destruct l; [easy|inversion H]). subst.
+        now exists [], a.
+      + inversion H. destruct (IHl _ _ H1) as [a1 [b1 Hab1]].
+        exists (a :: a1), b1. simpl. now apply f_equal.
+  Qed.
+
+  Lemma setlist_fresh : forall {A} v1 v v2 w1 w w2 (rho rho1 : M.t A),
+    length v1 = length w1 ->
+    ~ List.In v v1 ->
+    Some rho1 = setlist (v1 ++ [v] ++ v2) (w1 ++ [w] ++ w2) rho ->
+    M.get v rho1 = Some w.
+  Proof.
+    induction v1.
+    - intros. assert (w1 = []) by (destruct w1; easy; inversion H). subst.
+      simpl in H1. remember (setlist v2 w2 rho).
+      destruct o; [|congruence]. inversion H1. now rewrite M.gss.
+    - intros. symmetry in H.
+      destruct (list_length_cons _ _ _ H) as [w1h [w1t Hw1]]. subst.
+      inversion H.
+      simpl in H1. remember (setlist (v1 ++ v :: v2) (w1t ++ w :: w2) rho).
+      destruct o; [|congruence]. inversion H1; subst.
+      rewrite not_in_cons in H0. destruct H0.
+      rewrite M.gso; [|assumption].
+      eapply IHv1; [symmetry; eassumption|assumption|simpl; eassumption].
+  Qed.
+
+  Lemma getlist_setlist_app : forall {A} v v1 w w1 (rho rho1 : M.t A),
+    length v = length w ->
+    NoDup v ->
+    Some rho1 = setlist (v ++ v1) (w ++ w1) rho ->
+    getlist v rho1 = Some w.
+  Proof.
+    induction v; intros.
+    - assert (w = []) by (destruct w; easy; inversion H). now subst.
+    - inversion H0; subst. destruct w; [inversion H|].
+      simpl in H1. remember (setlist (v ++ v1) (w ++ w1) rho).
+      destruct o; [|congruence]. inversion H1; subst.
+      simpl. rewrite getlist_set_neq; [|assumption].
+      erewrite IHv; [now rewrite M.gss|now inversion H|assumption|eassumption].
+  Qed.
+
+  Lemma Disjoint_FromList_cons_right : forall {A} (a : list A) h t,
+    Disjoint _ (FromList a) (FromList (h :: t)) ->
+    Disjoint _ (FromList a) (FromList t).
+  Proof.
+    intros. constructor. intros x contra.
+    inv contra. inv H.
+    contradiction (H2 x).
+    constructor; [|right]; assumption.
+  Qed.
+
+  Lemma getlist_setlist_disjoint_app : forall {A} u v w v1 w1 (rho rho1 : M.t A),
+    Disjoint _ (FromList u) (FromList v) ->
+    length v = length w ->
+    Some rho1 = setlist (v ++ v1) (w ++ w1) rho ->
+    exists rho2, Some rho2 = setlist v1 w1 rho /\ getlist u rho1 = getlist u rho2.
+  Proof.
+    induction v; intros.
+    - assert (w = []) by (destruct w; easy; inversion H). subst. now exists rho1.
+    - destruct w; inversion H0.
+      simpl in H1. remember (setlist (v ++ v1) (w ++ w1) rho).
+      destruct o; [inversion H1; subst|congruence].
+      replace (getlist u (M.set a a0 t)) with (getlist u t).
+      eapply IHv; [|eassumption|assumption].
+      eapply Disjoint_FromList_cons_right. eassumption.
+      symmetry. apply getlist_set_neq.
+      intros contra. inversion H. contradiction (H2 a).
+      split; [assumption|now left].
+  Qed.
+
+  Lemma list_in_iff_Included : forall {A} a (l : list A),
+    List.In a l <-> In _ (FromList l) a.
+  Proof. split; intros; auto. Qed.
+
+  Lemma not_list_in_app : forall {A} a (l r : list A),
+    ~ List.In a (l ++ r) <-> ~ List.In a l /\ ~ List.In a r.
+  Proof.
+    split; intros.
+    - induction l. split; [auto|]. assumption.
+      apply not_in_cons in H. destruct H.
+      destruct (IHl H0) as [H1 H2].
+      split; [|assumption].
+      intros [HL|HR]; congruence.
+    - destruct H. induction l. simpl. assumption.
+      apply not_in_cons in H. destruct H.
+      simpl. intros [HL|HR]; [congruence|now apply IHl in H1].
+  Qed.
+End list_lemmas.
+
 Section uncurry_correct.
   Lemma Fcons_eq_v_eq : forall {f t v e fds f1 t1 v1 e1 fds1},
     Fcons f t v e fds = Fcons f1 t1 v1 e1 fds1 -> v = v1.
@@ -410,11 +595,6 @@ Section uncurry_correct.
     apply Decidable_occurs_free_fundefs_ctx.
   Qed.
 
-  (* Search bound_var bound_var_ctx.
-  Lemma used_vars_app_ctx : forall e c, used_vars (c |[ e ]|) <--> used_vars_ctx c :|: used_vars e.
-  Proof.
-  Abort. *)
-
   Lemma Decidable_not_not : forall {A} (S : Ensemble A),
     Decidable S -> forall a,
     ~ ~ In _ S a <-> In _ S a.
@@ -435,7 +615,7 @@ Section uncurry_correct.
   Ltac split_var_in_fundefs a fds Hfds :=
     destruct (Decidable_name_in_fundefs fds) as [Hfds]; destruct (Hfds a).
 
-  Ltac solve_bound_cases a v l := 
+  Local Ltac solve_bound_cases a v l := 
     split_var_eq a v; split_var_in_list a l;
     [ right; now constructor
     | left; subst a; constructor
@@ -915,6 +1095,30 @@ Section uncurry_correct.
   Lemma used_vars_Fnil : used_vars_fundefs Fnil <--> Empty_set _.
   Proof. solve_used_vars_lemma. Qed.
 
+  Ltac normalize_used_vars := 
+    match goal with
+    | |- context [ used_vars (Econstr _ _ _ _) ] => rewrite used_vars_Econstr
+    | |- context [ used_vars (Eproj _ _ _ _ _) ] => rewrite used_vars_Eproj
+    | |- context [ used_vars (Ecase _ []) ] => rewrite used_vars_Ecase_nil
+    | |- context [ used_vars (Ecase _ (_ :: _)) ] => rewrite used_vars_Ecase_cons
+    | |- context [ used_vars (Efun _ _) ] => rewrite used_vars_Efun
+    | |- context [ used_vars (Eapp _ _ _) ] => rewrite used_vars_Eapp
+    | |- context [ used_vars (Eprim _ _ _ _) ] => rewrite used_vars_Eprim
+    | |- context [ used_vars (Ehalt _) ] => rewrite used_vars_Ehalt
+    | |- context [ used_vars_fundefs (Fcons _ _ _ _ _) ] => rewrite used_vars_Fcons
+    | |- context [ used_vars_fundefs Fnil ] => rewrite used_vars_Fnil
+    | [ H : context [ used_vars (Econstr _ _ _ _)         ] |- _ ] => rewrite used_vars_Econstr in H
+    | [ H : context [ used_vars (Eproj _ _ _ _ _)         ] |- _ ] => rewrite used_vars_Eproj in H
+    | [ H : context [ used_vars (Ecase _ [])              ] |- _ ] => rewrite used_vars_Ecase_nil in H
+    | [ H : context [ used_vars (Ecase _ (_ :: _))        ] |- _ ] => rewrite used_vars_Ecase_cons in H
+    | [ H : context [ used_vars (Efun _ _)                ] |- _ ] => rewrite used_vars_Efun in H
+    | [ H : context [ used_vars (Eapp _ _ _)              ] |- _ ] => rewrite used_vars_Eapp in H
+    | [ H : context [ used_vars (Eprim _ _ _ _)           ] |- _ ] => rewrite used_vars_Eprim in H
+    | [ H : context [ used_vars (Ehalt _)                 ] |- _ ] => rewrite used_vars_Ehalt in H
+    | [ H : context [ used_vars_fundefs (Fcons _ _ _ _ _) ] |- _ ] => rewrite used_vars_Fcons in H
+    | [ H : context [ used_vars_fundefs Fnil              ] |- _ ] => rewrite used_vars_Fnil in H
+    end.
+
   (* "a small step" of uncurrying *)
   Inductive uncurry_step :
     exp -> (* original expression *)
@@ -983,7 +1187,7 @@ Section uncurry_correct.
            (Fcons f1 ft1 (gv ++ fv) ge fds))
         s' 
         (M.set g true m).
-        (* TODO: restrict ft1? TODO: add unique_bindings & used_vars_fundefs for result? *)
+        (* TODO: restrict ft1? *)
 
   Hint Constructors uncurry_step.
   Hint Constructors uncurry_fundefs_step.
@@ -1108,189 +1312,6 @@ Section uncurry_correct.
     | intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros
     ].
-
-  Lemma setlist_length : forall {A} (l : list M.elt) (l1 : list A) (rho rho1 : M.t A),
-    Some rho1 = setlist l l1 rho -> length l = length l1.
-  Proof.
-    induction l; intros.
-    - (* [] *) destruct l1; [easy|now simpl in H].
-    - (* :: *) destruct l1; [now simpl in H|].
-      simpl. apply f_equal.
-      remember (setlist l l1 rho).
-      destruct o.
-      + eapply IHl. simpl in H. eapply Heqo.
-      + simpl in H. now rewrite <- Heqo in H.
-  Qed.
-
-  Lemma exists_setlist_iff_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
-    (exists rho1, Some rho1 = setlist l l1 rho) <-> length l = length l1.
-  Proof.
-    induction l; split; intros.
-    - (* [] -> *) destruct H. destruct l1; [easy|now simpl in H].
-    - (* [] <- *) destruct l1; [now exists rho|easy].
-    - (* :: -> *) destruct H. destruct l1; [now simpl in H|].
-      simpl. apply f_equal.
-      simpl in H. remember (setlist l l1 rho).
-      destruct o; [|congruence].
-      rewrite <- IHl with (rho := rho). now exists t. 
-    - (* :: <- *) destruct l1; [easy|]. simpl in H. apply Nat.succ_inj in H.
-      rewrite <- IHl with (rho := rho) in H. destruct H.
-      simpl. rewrite <- H. now exists (M.set a a0 x).
-  Qed.
-
-  Corollary exists_setlist_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
-    (exists rho1, Some rho1 = setlist l l1 rho) -> length l = length l1.
-  Proof. intros; now rewrite <- exists_setlist_iff_length with (rho0 := rho). Qed.
-
-  Corollary length_exists_setlist : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
-     length l = length l1 -> (exists rho1, Some rho1 = setlist l l1 rho).
-  Proof. intros; now rewrite exists_setlist_iff_length with (rho0 := rho). Qed.
-
-  (* nesting setlists (TODO: move to cps.v?) *)
-  Lemma setlist_setlist : forall {A} (l l1 : list M.elt) (v v1 : list A) (rho rho1 rho2 : M.t A),
-    Some rho1 = setlist l v rho ->
-    Some rho2 = setlist l1 v1 rho1 ->
-    Some rho2 = setlist (l1 ++ l) (v1 ++ v) rho.
-  Proof.
-    induction l1.
-    - (* [] *)
-      intros. assert (v1 = []) by (apply setlist_length in H0; now destruct v1). subst.
-      inversion H0. now subst.
-    - (* :: *)
-      intros. destruct v1; [apply setlist_length in H0; inversion H0|].
-      simpl in *. remember (setlist l1 v1 rho1). destruct o; [|congruence].
-      now rewrite <- (IHl1 _ _ _ _ _ H Heqo).
-  Qed.
-
-  (* expose an M.set from a successful setlist *)
-  Lemma set_setlist : forall {A} h h1 (t : list M.elt) (t1 : list A) (rho rho2 : M.t A),
-    Some rho2 = setlist (h :: t) (h1 :: t1) rho -> exists rho1,
-    rho2 = M.set h h1 rho1 /\ Some rho1 = setlist t t1 rho.
-  Proof.
-    simpl. intros. remember (setlist t t1 rho). destruct o; [|congruence].
-    inversion H. inversion H. subst. eauto.
-  Qed.
-
-  Lemma setlist_set : forall {A} a b (l : list M.elt) (v : list A) (rho : M.t A),
-    setlist l v (M.set a b rho) = setlist (l ++ [a]) (v ++ [b]) rho.
-  Proof.
-    induction l; intros.
-    - (* [] *) destruct v; [easy|destruct v; easy].
-    - (* :: *) destruct v. simpl.
-      assert (setlist (l ++ [a]) [] rho = None) by (now destruct l). now rewrite H.
-      simpl in *.
-      remember (setlist l v (M.set a b rho)).
-      remember (setlist (l ++ [a]) (v ++ [b]) rho).
-      destruct o, o0; [| | |auto].
-      + rewrite <- IHl in Heqo0. rewrite <- Heqo in Heqo0. inversion Heqo0; now subst.
-      + apply setlist_length in Heqo.
-        assert (length (l ++ [a]) = length (v ++ [b]))
-          by (repeat rewrite app_length; now rewrite Heqo).
-        apply length_exists_setlist with (rho0 := rho) in H. destruct H. congruence.
-      + assert (length l = length v). {
-          apply setlist_length in Heqo0. 
-          repeat rewrite app_length in Heqo0. simpl in Heqo0. omega.
-        }
-        apply length_exists_setlist with (rho0 := (M.set a b rho)) in H. destruct H. congruence.
-  Qed.
-
-  Lemma list_length_cons : forall {A} {B} h (l : list A) (t : list B),
-    length l = length (h :: t) -> exists h1 t1, l = h1 :: t1.
-  Proof. intros. destruct l; [easy|now exists a, l]. Qed.
-
-  Lemma list_length_snoc : forall {A} {B} (l : list A) (a : list B) b,
-    length l = length (a ++ [b]) -> exists a1 b1, l = a1 ++ [b1].
-  Proof.
-    induction l; intros.
-    - rewrite app_length in H. inversion H. rewrite plus_comm in H1. inversion H1.
-    - destruct a0.
-      + assert (l = []) by (destruct l; [easy|inversion H]). subst.
-        now exists [], a.
-      + inversion H. destruct (IHl _ _ H1) as [a1 [b1 Hab1]].
-        exists (a :: a1), b1. simpl. now apply f_equal.
-  Qed.
-
-  Lemma setlist_fresh : forall {A} v1 v v2 w1 w w2 (rho rho1 : M.t A),
-    length v1 = length w1 ->
-    ~ List.In v v1 ->
-    Some rho1 = setlist (v1 ++ [v] ++ v2) (w1 ++ [w] ++ w2) rho ->
-    M.get v rho1 = Some w.
-  Proof.
-    induction v1.
-    - intros. assert (w1 = []) by (destruct w1; easy; inversion H). subst.
-      simpl in H1. remember (setlist v2 w2 rho).
-      destruct o; [|congruence]. inversion H1. now rewrite M.gss.
-    - intros. symmetry in H.
-      destruct (list_length_cons _ _ _ H) as [w1h [w1t Hw1]]. subst.
-      inversion H.
-      simpl in H1. remember (setlist (v1 ++ v :: v2) (w1t ++ w :: w2) rho).
-      destruct o; [|congruence]. inversion H1; subst.
-      rewrite not_in_cons in H0. destruct H0.
-      rewrite M.gso; [|assumption].
-      eapply IHv1; [symmetry; eassumption|assumption|simpl; eassumption].
-  Qed.
-
-  Lemma getlist_setlist_app : forall {A} v v1 w w1 (rho rho1 : M.t A),
-    length v = length w ->
-    NoDup v ->
-    Some rho1 = setlist (v ++ v1) (w ++ w1) rho ->
-    getlist v rho1 = Some w.
-  Proof.
-    induction v; intros.
-    - assert (w = []) by (destruct w; easy; inversion H). now subst.
-    - inversion H0; subst. destruct w; [inversion H|].
-      simpl in H1. remember (setlist (v ++ v1) (w ++ w1) rho).
-      destruct o; [|congruence]. inversion H1; subst.
-      simpl. rewrite getlist_set_neq; [|assumption].
-      erewrite IHv; [now rewrite M.gss|now inversion H|assumption|eassumption].
-  Qed.
-
-  Lemma Disjoint_FromList_cons_right : forall {A} (a : list A) h t,
-    Disjoint _ (FromList a) (FromList (h :: t)) ->
-    Disjoint _ (FromList a) (FromList t).
-  Proof.
-    intros. constructor. intros x contra.
-    inv contra. inv H.
-    contradiction (H2 x).
-    constructor; [|right]; assumption.
-  Qed.
-
-  Lemma getlist_setlist_disjoint_app : forall {A} u v w v1 w1 (rho rho1 : M.t A),
-    Disjoint _ (FromList u) (FromList v) ->
-    length v = length w ->
-    Some rho1 = setlist (v ++ v1) (w ++ w1) rho ->
-    exists rho2, Some rho2 = setlist v1 w1 rho /\ getlist u rho1 = getlist u rho2.
-  Proof.
-    induction v; intros.
-    - assert (w = []) by (destruct w; easy; inversion H). subst. now exists rho1.
-    - destruct w; inversion H0.
-      simpl in H1. remember (setlist (v ++ v1) (w ++ w1) rho).
-      destruct o; [inversion H1; subst|congruence].
-      replace (getlist u (M.set a a0 t)) with (getlist u t).
-      eapply IHv; [|eassumption|assumption].
-      eapply Disjoint_FromList_cons_right. eassumption.
-      symmetry. apply getlist_set_neq.
-      intros contra. inversion H. contradiction (H2 a).
-      split; [assumption|now left].
-  Qed.
-
-  Lemma list_in_iff_Included : forall {A} a (l : list A),
-    List.In a l <-> In _ (FromList l) a.
-  Proof. split; intros; auto. Qed.
-
-  Lemma not_list_in_app : forall {A} a (l r : list A),
-    ~ List.In a (l ++ r) <-> ~ List.In a l /\ ~ List.In a r.
-  Proof.
-    split; intros.
-    - induction l. split; [auto|]. assumption.
-      apply not_in_cons in H. destruct H.
-      destruct (IHl H0) as [H1 H2].
-      split; [|assumption].
-      intros [HL|HR]; congruence.
-    - destruct H. induction l. simpl. assumption.
-      apply not_in_cons in H. destruct H.
-      simpl. intros [HL|HR]; [congruence|now apply IHl in H1].
-  Qed.
 
   Lemma preord_val_fundefs : forall pr cenv k rho rho1 fds f, 
     preord_env_P pr cenv (occurs_free_fundefs fds) k rho rho1 ->
@@ -2425,76 +2446,38 @@ Section uncurry_correct.
     (forall f s m f1 s1 m1, uncurry_fundefs_step f s m f1 s1 m1 -> Q f s m f1 s1 m1).
   Proof with eauto with Ensembles_DB.
     intros P Q.
-    uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *; intros He.
-    - (* Econstr *)
-      apply uncurry_step_s_nondecreasing in IHstep.
-      rewrite used_vars_Econstr in *.
-      destruct_Union_Included.
-      apply Union_Included; [apply Union_Included|]...
-      eapply Included_trans; [|eassumption]...
-    - (* Ecase arm *)
-      apply uncurry_step_s_nondecreasing in IHstep.
-      rewrite used_vars_Ecase_cons in *.
-      destruct_Union_Included.
-      apply Union_Included...
-      eapply Included_trans; [|eassumption]...
-    - (* Ecase arms *)
-      destruct arm.
-      apply uncurry_step_s_nondecreasing in IHstep.
-      rewrite used_vars_Ecase_cons in *.
-      destruct_Union_Included.
-      apply Union_Included...
-      eapply Included_trans; [|eassumption]...
+    uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *; intros He;
+    try destruct arm;
+    try solve [
+      (apply uncurry_step_s_nondecreasing in IHstep
+         || apply uncurry_fundefs_step_s_nondecreasing in IHstep);
+      repeat normalize_used_vars;
+      destruct_Union_Included;
+      try solve [eapply Included_trans; [|eauto]; eauto with Ensembles_DB];
+      apply Union_Included; eauto with Ensembles_DB;
+      eapply Included_trans; [|eauto]; eauto with Ensembles_DB].
     - (* Eproj *)
       apply uncurry_step_s_nondecreasing in IHstep.
       rewrite used_vars_Eproj in *.
       destruct_Union_Included.
       apply Union_Included; [|apply Union_Included]...
-    - (* Eprim *)
-      apply uncurry_step_s_nondecreasing in IHstep.
-      rewrite used_vars_Eprim in *.
-      destruct_Union_Included.
-      apply Union_Included...
-      eapply Included_trans; [|eassumption]...
-    - (* Efun e *)
-      apply uncurry_step_s_nondecreasing in IHstep.
-      rewrite used_vars_Efun in *.
-      destruct_Union_Included.
-      apply Union_Included...
-      eapply Included_trans; [|eassumption]...
-    - (* Efun fds *)
-      apply uncurry_fundefs_step_s_nondecreasing in IHstep.
-      rewrite used_vars_Efun in *.
-      destruct_Union_Included.
-      apply Union_Included...
-      eapply Included_trans; [|eassumption]...
-    - (* Fcons fds *)
-      apply uncurry_fundefs_step_s_nondecreasing in IHstep.
-      rewrite used_vars_Fcons in *.
-      destruct_Union_Included.
-      apply Union_Included; [apply Union_Included|]...
-      eapply Included_trans; [|eassumption]...
-      eapply Included_trans; [|eassumption]...
     - (* Fcons e *)
       apply uncurry_step_s_nondecreasing in IHstep.
       rewrite used_vars_Fcons in *.
       destruct_Union_Included.
       apply Union_Included; [apply Union_Included|]...
-      eapply Included_trans; [|eassumption]...
-      eapply Included_trans; [|eassumption]...
+      all: eapply Included_trans; [|eassumption]...
     - (* Fcons ge *)
       apply uncurry_step_s_nondecreasing in IHstep.
       repeat (rewrite used_vars_Fcons in * + rewrite used_vars_Efun in *).
       destruct_Union_Included.
       repeat rewrite Union_assoc.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      all: try solve [eapply Included_trans; [|eassumption]; eauto with Ensembles_DB].
+      do 7 (
+        match goal with
+          [ _ : _ |- used_vars _ \subset _ ] => idtac
+        | _ => try apply Union_Included
+        end;
+        try solve [eapply Included_trans; [|eassumption]; eauto with Ensembles_DB]).
       now apply IH.
     - (* Fcons curried *)
       rewrite H7.
@@ -2502,18 +2485,11 @@ Section uncurry_correct.
       destruct_Union_Included.
       repeat rewrite Union_assoc.
       repeat rewrite used_vars_Eapp.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
-      apply Union_Included.
+      apply Union_Included. apply Union_Included. apply Union_Included. apply Union_Included.
+      apply Union_Included. apply Union_Included. apply Union_Included. apply Union_Included.
+      apply Union_Included. apply Union_Included.
       all: eauto with Ensembles_DB.
-      + intros a Ha; inv Ha.
+      + intros a Ha; inv Ha. (* admit: this sort of stuff should be automated away *)
         do 3 left; apply H15; now left.
         left; now right.
       + intros a Ha; inv_all.
@@ -2558,69 +2534,13 @@ Section uncurry_correct.
     (forall f s m f1 s1 m1, uncurry_fundefs_step f s m f1 s1 m1 -> Q f s m f1 s1 m1).
   Proof with eauto with Ensembles_DB.
     intros P Q.
-    uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *; intros.
-    - (* Econstr *)
-      repeat rewrite bound_var_Econstr.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set.
-      reflexivity.
-      all: rewrite used_vars_Econstr in H...
-      eapply Union_Included_r...
-    - (* Ecase exp *)
-      repeat rewrite bound_var_Ecase_cons.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set.
-      reflexivity.
-      all: rewrite used_vars_Ecase_cons in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_l...
-    - (* Ecase arms *)
-      destruct arm.
-      repeat rewrite bound_var_Ecase_cons.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set.
-      reflexivity.
-      all: rewrite used_vars_Ecase_cons in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_r...
-    - (* Eproj *)
-      repeat rewrite bound_var_Eproj.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set.
-      reflexivity.
-      all: rewrite used_vars_Eproj in H...
-      eapply Union_Included_r.
-      eapply Union_Included_r...
-    - (* Eprim *)
-      repeat rewrite bound_var_Eprim.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set.
-      reflexivity.
-      all: rewrite used_vars_Eprim in H...
-      eapply Union_Included_r...
-    - (* Efun exp *)
-      repeat rewrite bound_var_Efun.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set.
-      reflexivity.
-      all: rewrite used_vars_Efun in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_r...
-    - (* Efun fds *)
-      repeat rewrite bound_var_Efun.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set.
-      reflexivity.
-      all: rewrite used_vars_Efun in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_l...
+    uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *; intros;
+    try destruct arm;
+    try (
+      repeat normalize_bound_var; repeat normalize_used_vars;
+      rewrite Intersection_Union_distr;
+      rewrite IH; [rewrite Intersection_Same_set; [reflexivity| ] |];
+      eapply Included_trans; [|eauto| |eauto]; eauto with Ensembles_DB).
     - (* Fcons fds *)
       repeat rewrite bound_var_fundefs_Fcons.
       repeat rewrite Intersection_Union_distr.
@@ -2742,32 +2662,13 @@ Section uncurry_correct.
     (forall f s m f1 s1 m1, uncurry_fundefs_step f s m f1 s1 m1 -> Q f s m f1 s1 m1).
   Proof with eauto with Ensembles_DB.
     intros P Q.
-    uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *; intros.
-    - (* Econstr *)
-      repeat rewrite used_vars_Econstr.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set...
-      all: rewrite used_vars_Econstr in H...
-      eapply Included_trans; eauto...
-      eapply Union_Included_r...
-    - (* Ecase exp *)
-      repeat rewrite used_vars_Ecase_cons.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set...
-      all: rewrite used_vars_Ecase_cons in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_l...
-    - (* Ecase arms *)
-      destruct arm.
-      repeat rewrite used_vars_Ecase_cons.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set...
-      all: rewrite used_vars_Ecase_cons in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_r...
+    uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *; intros;
+    try destruct arm;
+    try (
+      repeat normalize_used_vars;
+      rewrite Intersection_Union_distr;
+      rewrite IH; [rewrite Intersection_Same_set; eauto with Ensembles_DB|];
+      eapply Included_trans; [|eauto| |eauto]; eauto with Ensembles_DB).
     - (* Eproj *)
       repeat rewrite used_vars_Eproj.
       do 2 rewrite Intersection_Union_distr.
@@ -2776,40 +2677,7 @@ Section uncurry_correct.
       rewrite Intersection_Same_set...
       all: rewrite used_vars_Eproj in H...
       eapply Included_trans; eauto...
-    - (* Eprim *)
-      repeat rewrite used_vars_Eprim.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set...
-      all: rewrite used_vars_Eprim in H; eapply Included_trans; eauto...
-    - (* Efun exp *)
-      repeat rewrite used_vars_Efun.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set...
-      all: rewrite used_vars_Efun in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_r...
-    - (* Efun fds *)
-      repeat rewrite used_vars_Efun.
-      rewrite Intersection_Union_distr.
-      rewrite IH.
-      rewrite Intersection_Same_set...
-      all: rewrite used_vars_Efun in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_l...
     - (* Fcons fds *)
-      repeat rewrite used_vars_Fcons.
-      repeat rewrite Intersection_Union_distr.
-      rewrite IH.
-      repeat rewrite Intersection_Same_set...
-      all: rewrite used_vars_Fcons in H.
-      eapply Included_trans; [|eassumption]...
-      eapply Union_Included_r.
-      do 2 eapply Union_Included_l...
-      do 3 eapply Union_Included_l...
-      eapply Included_trans; [|eassumption]...
-    - (* Fcons e *)
       repeat rewrite used_vars_Fcons.
       repeat rewrite Intersection_Union_distr.
       rewrite IH.
@@ -3738,18 +3606,13 @@ Section uncurry_correct.
     exp_fundefs_ctx_induction IHe IHf; simpl;
       try rename e into c;
       try intros arms e s m e1 s1 m1 Hused Hstep (* Huniq*);
-      try intros e s m e1 s1 m1 Hused Hstep (* Huniq*).
-    - assumption.
-    - constructor. rewrite used_vars_Econstr in Hused.
-      apply IHe; auto.
-      eapply Included_trans...
-    - constructor; rewrite used_vars_Eproj in Hused.
-      apply IHe; auto.
-      rewrite Union_assoc in Hused.
-      eapply Included_trans...
-    - constructor; rewrite used_vars_Eprim in Hused.
-      apply IHe; auto.
-      eapply Included_trans...
+      try intros e s m e1 s1 m1 Hused Hstep (* Huniq*);
+      try assumption;
+      try (
+        constructor;
+        repeat normalize_used_vars;
+        ((apply IHe; auto) || (apply IHf; auto));
+        eapply Included_trans; [|eauto]; eauto with Ensembles_DB).
     - induction l; simpl in *.
       + constructor; rewrite used_vars_Ecase_cons in Hused.
         apply IHe; auto.
@@ -3759,20 +3622,6 @@ Section uncurry_correct.
         rewrite used_vars_Ecase_cons in Hused.
         apply IHl; auto.
         eapply Included_trans...
-    - constructor; rewrite used_vars_Efun in Hused.
-      apply IHe; auto.
-      eapply Included_trans...
-    - constructor; rewrite used_vars_Efun in Hused.
-      apply IHf; auto.
-      rewrite Union_commut in Hused.
-      eapply Included_trans...
-    - constructor; rewrite used_vars_Fcons in Hused.
-      apply IHe; auto.
-      eapply Included_trans; eauto.
-      intros a Ha; left; now right.
-    - constructor; rewrite used_vars_Fcons in Hused.
-      apply IHf; auto.
-      eapply Included_trans...
   Qed.
 
   Corollary app_ctx_uncurry_step : forall c e s m e1 s1 m1,
@@ -3833,6 +3682,134 @@ Section uncurry_correct.
         H1 : uncurry_fundefs_step ?b _ _ ?a _ _ |- _ ] =>
       destruct (uncurry_fundefs_step_acyclic _ _ _ _ _ _ _ _ H H1)
     end.
+
+  Lemma uncurry_step_preserves_occurs_free_mut :
+    let P := (fun e s m e1 s1 m1 =>
+                used_vars e \subset s ->
+                unique_bindings e ->
+                occurs_free e <--> occurs_free e1) in
+    let Q := (fun f s m f1 s1 m1 =>
+                used_vars_fundefs f \subset s ->
+                unique_bindings_fundefs f ->
+                occurs_free_fundefs f <--> occurs_free_fundefs f1) in
+    (forall e s m e1 s1 m1, uncurry_step e s m e1 s1 m1 -> P e s m e1 s1 m1) /\
+    (forall f s m f1 s1 m1, uncurry_fundefs_step f s m f1 s1 m1 -> Q f s m f1 s1 m1).
+  Proof with eauto with Ensembles_DB.
+    intros P Q.
+    uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *;
+    try destruct arm;
+    try (
+      repeat normalize_occurs_free;
+      repeat normalize_used_vars; intros Hused Huniq; inv Huniq;
+      destruct IH as [HL HR]; eauto; [eapply Included_trans; [|eauto]; eauto with Ensembles_DB|];
+      rewrite (conj HL HR : _ <--> _));
+    try reflexivity.
+    - (* Efun *)
+      admit.
+    - (* Fcons e *)
+      split.
+      + admit.
+      + apply Included_Union_compat...
+        apply Included_Setminus_compat...
+        apply Included_Union_compat...
+        apply Included_Union_compat...
+        intros a Ha; eapply uncurry_fundefs_step_preserves_names; eauto.
+    - (* Fcons ge *)
+      admit.
+    - (* Fcons ge *)
+      intros Hused Huniq.
+      do 2 rewrite occurs_free_fundefs_Fcons.
+      do 2 rewrite occurs_free_Efun; simpl; repeat rewrite Union_Empty_set_neut_r.
+      rewrite occurs_free_Eapp.
+      assert (Hrw : FromList [g] :|: [set k] \\ [set g] <--> [set k]). {
+        split; intros a Ha; inv Ha.
+        - inv H8. inv H10. now contradiction H9. inv H8. auto.
+        - constructor; [now right|].
+          intros contra; inv contra.
+          inv Huniq.
+          inv H15; contradiction (H8 a).
+          split; [|now left].
+          constructor; constructor; now left.
+      }
+      rewrite Hrw.
+      repeat normalize_occurs_free.
+      repeat (rewrite Union_Empty_set_neut_r + rewrite Setminus_Empty_set_abs_r).
+      assert (Hrw1 :
+        occurs_free ge \\ (g |: FromList gv) :|: [set k] \\
+          (f9 |: (FromList (k :: fv) :|: name_in_fundefs fds)) <-->
+        occurs_free ge \\ (f9 |: FromList gv :|: FromList fv :|: name_in_fundefs fds)).
+      admit.
+      rewrite Hrw1.
+      assert (Hrw2 : occurs_free_fundefs fds \\ [set f10] <--> occurs_free_fundefs fds). {
+        split...
+        intros a Ha; constructor...
+        intros contra; inv contra.
+        contradiction H6; do 2 left; apply Hused.
+        normalize_used_vars; right; now right.
+      }
+      rewrite Hrw2.
+      assert (Hrw3 :
+        occurs_free ge \\ (f10 |: (FromList (gv ++ fv) :|: name_in_fundefs fds)) <-->
+        occurs_free ge \\ (FromList gv :|: FromList fv :|: name_in_fundefs fds)). {
+        rewrite Union_commut.
+        rewrite <- Setminus_Union.
+        symmetry.
+        rewrite FromList_app.
+        apply Included_Setminus_Disjoint.
+        constructor; intros a contra; inv contra; inv H9.
+        contradiction H6; do 2 left; apply Hused.
+        inv H8.
+        normalize_used_vars; left; right.
+        normalize_used_vars; left; normalize_used_vars.
+        left; right; now right.
+      }
+      rewrite Hrw3.
+      assert (Hrw4 : FromList (gv1 ++ fv1) :|: [set f10] \\ (g |: FromList gv1) <-->
+                              f10 |: FromList fv1). {
+        rewrite Setminus_Union_distr.
+        assert (Hrw5 : [set f10] \\ (g |: FromList gv1) <--> [set f10]). {
+          symmetry.
+          apply Included_Setminus_Disjoint.
+          constructor; intros a contra; inv contra; inv H8.
+          inv H9; [inv H8|]; contradiction H6.
+          do 2 left; apply Hused; normalize_used_vars; left; right.
+          normalize_used_vars; left; normalize_used_vars; now do 3 left.
+          left; now right.
+        }
+        rewrite Hrw5.
+        rewrite Union_commut; apply Same_set_Union_compat...
+        rewrite FromList_app, Setminus_Union_distr.
+        assert (Hrw6 : FromList gv1 \\ (g |: FromList gv1) <--> Empty_set _).
+        apply Setminus_Included_Empty_set...
+        rewrite Hrw6; rewrite Union_Empty_set_neut_l.
+        symmetry.
+        apply Included_Setminus_Disjoint.
+        constructor; intros a contra; inv contra.
+        destruct H4 as [HL HR].
+        inv H9; [inv H4|].
+        inv HL; contradiction (H4 a).
+        split; auto.
+        left; apply Hused; normalize_used_vars; left; right.
+        normalize_used_vars; left; normalize_used_vars; now do 3 left.
+        inv HL; contradiction (H9 a); split; auto.
+      }
+      rewrite Hrw4.
+      assert (Hrw5 :
+        (f10 |: FromList fv1 :|: [set k]) \\
+          (f9 |: (FromList (k :: fv1) :|: (f10 |: name_in_fundefs fds))) <-->
+          Empty_set _). {
+        apply Setminus_Included_Empty_set.
+        intros a Ha; inv Ha; inv H8; [inv H9| |].
+        do 2 right; now left.
+        right; left; now right.
+        right; left; now left.
+      }
+      rewrite Hrw5; rewrite Union_Empty_set_neut_l.
+      rewrite Setminus_Union_distr.
+      rewrite Setminus_Union.
+      rewrite Union_commut with (s2 := [set f9]).
+      now repeat rewrite Union_assoc.
+  Admitted.
 
   Inductive uncurry_rel :
     nat ->
@@ -3931,6 +3908,10 @@ Section uncurry_correct.
     eapply Sn_uncurry_rel_fundefs; eauto.
   Qed.
 
+  (* write a lemma that says P uncurry_step e s m e1 s1 m1 -> P (uncurry_rel n) e s m e1 s1 m1
+     for all n
+     { admit. } *)
+  
   Lemma uncurry_rel_preserves_unique_bindings : forall n e s m e1 s1 m1,
     used_vars e \subset s ->
     unique_bindings e ->
@@ -4215,23 +4196,6 @@ Section uncurry_correct.
     {{pre}} bind m f {{post}}.
   Proof. intros; eapply bind_triple; eauto. Qed.
 
-  (* Lemma bind_triple_eq : forall (A B S : Type) (m : state S A) (f : A -> state S B) (pre : S -> Prop)
-    (post : S -> B -> S -> Prop) (post' : S -> A -> S -> Prop) (i i1 : S) (a1 : A),
-    {{fun s => s = i /\ pre s}} m {{fun s a s' => s = i /\ a = a1 /\ post' s a s'}} ->
-    {{fun s => s = i1 /\ post' i a1 i1}} f a1 {{fun s a s' => s = i1 /\ post i a s'}} ->
-    {{fun s => s = i /\ pre s}} bind m f {{fun s a s' => s = i /\ post s a s'}}.
-  Proof.
-     unfold triple; intros.
-     apply H in H1.
-     remember (runState m i0) as pair.
-     destruct (runState m i0).
-     rewrite Heqpair in H1.
-     destruct H1; try destruct H2; subst.
-     specialize H0 with (i0 := i).
-
-
-     apply H0 in H3. *)
-
   Check bind_triple.
 
   Lemma triple_consequence : forall (A S : Type) (P P' : S -> Prop) (Q Q' : S -> A -> S -> Prop) (e : state S A),
@@ -4286,16 +4250,6 @@ Section uncurry_correct.
     eapply IHn in H2.
     econstructor; eauto.
   Qed.
-
-  (* Lemma uncurry_rel_step_assoc : forall n e s m e1 s1 m1 e2 s2 m2,
-    uncurry_rel (S n) e s m e1 s1 m1 ->
-    uncurry_step e1 s1 m1 e2 s2 m2 -> exists e3 s3 m3,
-    uncurry_step e s m e3 s3 m3 /\ uncurry_rel (S n) e3 s3 m3 e2 s2 m2.
-  Proof.
-    induction n; intros.
-    - inv H; inv H3.
-      do 3 eexists; split; eauto.
-    -  *)
 
   Lemma uncurry_rel_case : forall n v l s m e s1 m1,
     uncurry_rel n (Ecase v l) s m e s1 m1 -> exists l', e = Ecase v l'.

@@ -3074,6 +3074,27 @@ Section uncurry_correct.
 
   Hint Constructors unique_bindings.
 
+  Lemma uncurry_fundefs_step_unique_names : forall a f s m f1 s1 m1,
+    used_vars_fundefs f \subset s ->
+    uncurry_fundefs_step f s m f1 s1 m1 ->
+    name_in_fundefs f1 a ->
+    ~ name_in_fundefs f a ->
+    ~ In var s a.
+  Proof with eauto with Ensembles_DB.
+    intros a f s m f1 s1 m1 Hused Hstep Hf1 Hf.
+    induction Hstep; try solve [inv Hf1; [inv H0|]; contradiction Hf; [now left|now right]].
+    - apply IHHstep.
+      eapply Included_trans; [|eauto]; repeat normalize_used_vars...
+      inv Hf1; auto.
+      inv H; contradiction Hf; now left.
+      intros contra; contradiction Hf; now right.
+    - simpl in *.
+      inv Hf1; inv H0; inv H8.
+      + contradiction Hf; now left.
+      + inv H0. intros contra; contradiction H6; now do 2 left.
+      + contradiction Hf; now right.
+  Qed.
+
   Lemma uncurry_fundefs_step_preserves_names : forall a f s m f1 s1 m1,
     name_in_fundefs f a ->
     uncurry_fundefs_step f s m f1 s1 m1 ->
@@ -3575,32 +3596,14 @@ Section uncurry_correct.
     uncurry_step e s m e1 s1 m1.
   Proof. apply uncurry_step_subterm_invariant_mut. Qed.
 
-  Locate "_ ==> _".
-  Print respectful.
-  Check uncurry_step.
-
-  (* Global Instance uncurry_step_proper :
-    Proper (eq ==> Same_set var ==> eq ==> eq ==> Same_set var ==> eq ==> iff)
-           uncurry_step.
-  Proof.
-    intros e e1 He s s1 Hs m m1 Hm.
-    split; subst.
-    - pose (P := fun e (_ : Ensemble var) m e1 (_ : Ensemble var) m1 => uncurry_step e s1 m e1 y0 m1).
-      pose (Q := fun f (_ : Ensemble var) m f1 (_ : Ensemble var) m1 =>
-                   uncurry_fundefs_step f s1 m f1 y0 m1).
-      uncurry_step_induction P Q IHuncurry IH; try now (subst P; subst Q; simpl in *; constructor).
-  *)
-
   Lemma app_ctx_uncurry_step_mut : 
     (forall c, (fun c => forall e s m e1 s1 m1,
       used_vars (c |[ e ]|) \subset s ->
       uncurry_step e s m e1 s1 m1 ->
-      (* unique_bindings (c |[ e ]|) ->*)
       uncurry_step (c |[ e ]|) s m (c |[ e1 ]|) s1 m1) c) /\
     (forall f, (fun f => forall e s m e1 s1 m1,
       used_vars_fundefs (f <[ e ]>) \subset s ->
       uncurry_step e s m e1 s1 m1 ->
-      (* unique_bindings_fundefs (f <[ e ]>) ->*)
       uncurry_fundefs_step (f <[ e ]>) s m (f <[ e1 ]>) s1 m1) f).
   Proof with eauto with Ensembles_DB.
     exp_fundefs_ctx_induction IHe IHf; simpl;
@@ -3695,6 +3698,16 @@ Section uncurry_correct.
     (forall e s m e1 s1 m1, uncurry_step e s m e1 s1 m1 -> P e s m e1 s1 m1) /\
     (forall f s m f1 s1 m1, uncurry_fundefs_step f s m f1 s1 m1 -> Q f s m f1 s1 m1).
   Proof with eauto with Ensembles_DB.
+    Local Ltac ensemble_compat_simpl := match goal with
+      [ _ : _ |- ?a :|: ?b \subset ?a :|: ?c ] => apply Included_Union_compat; eauto with Ensembles_DB
+    | [ _ : _ |- ?a \\ ?b \subset ?a \\ ?c ] => apply Included_Setminus_compat; eauto with Ensembles_DB
+    | [ _ : _ |- ?a :|: ?c \subset ?b :|: ?c ] => apply Included_Union_compat; eauto with Ensembles_DB
+    | [ _ : _ |- ?a \\ ?c \subset ?b \\ ?c ] => apply Included_Setminus_compat; eauto with Ensembles_DB
+    | [ _ : _ |- ?a :|: ?b <--> ?a :|: ?c ] => apply Same_set_Union_compat; eauto with Ensembles_DB
+    | [ _ : _ |- ?a \\ ?b <--> ?a \\ ?c ] => apply Same_set_Setminus_compat; eauto with Ensembles_DB
+    | [ _ : _ |- ?a :|: ?c <--> ?b :|: ?c ] => apply Same_set_Union_compat; eauto with Ensembles_DB
+    | [ _ : _ |- ?a \\ ?c <--> ?b \\ ?c ] => apply Same_set_Setminus_compat; eauto with Ensembles_DB
+    end.
     intros P Q.
     uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *;
     try destruct arm;
@@ -3705,17 +3718,33 @@ Section uncurry_correct.
       rewrite (conj HL HR : _ <--> _));
     try reflexivity.
     - (* Efun *)
-      admit.
+      ensemble_compat_simpl; split.
+      + intros a Ha; inv Ha; split; auto; intros contra.
+        assert (~ In var s a). {
+          eapply uncurry_fundefs_step_unique_names; eauto.
+          eapply Included_trans; [|eauto]...
+        }
+        contradiction H4; apply Hused; right; now right.
+      + ensemble_compat_simpl.
+        intros a Ha; eapply uncurry_fundefs_step_preserves_names; eauto.
     - (* Fcons e *)
       split.
-      + admit.
-      + apply Included_Union_compat...
-        apply Included_Setminus_compat...
-        apply Included_Union_compat...
-        apply Included_Union_compat...
-        intros a Ha; eapply uncurry_fundefs_step_preserves_names; eauto.
+      + ensemble_compat_simpl.
+        intros a Ha; inv Ha.
+        repeat rewrite Union_demorgan in H0; destruct H0 as [Hf6 [Hargs Hfds]].
+        split; auto; intros contra; inv contra; inv H0; auto.
+        assert (~ In var s a). {
+          eapply uncurry_fundefs_step_unique_names; eauto.
+          eapply Included_trans; [|eauto]...
+        }
+        contradiction H0; apply Hused; left; right; now right.
+      + repeat ensemble_compat_simpl; intros a Ha; eapply uncurry_fundefs_step_preserves_names; eauto.
     - (* Fcons ge *)
-      admit.
+      intros Hused Huniq.
+      repeat normalize_occurs_free; simpl.
+      repeat ensemble_compat_simpl; apply IH.
+      eapply Included_trans; [|eauto]; repeat normalize_used_vars...
+      inv Huniq; inv H11; now inv H2. (* admit: automate something like this? basically keep inverting stuff until you find unique_bindings e *)
     - (* Fcons ge *)
       intros Hused Huniq.
       do 2 rewrite occurs_free_fundefs_Fcons.
@@ -3737,8 +3766,25 @@ Section uncurry_correct.
       assert (Hrw1 :
         occurs_free ge \\ (g |: FromList gv) :|: [set k] \\
           (f9 |: (FromList (k :: fv) :|: name_in_fundefs fds)) <-->
-        occurs_free ge \\ (f9 |: FromList gv :|: FromList fv :|: name_in_fundefs fds)).
-      admit.
+        occurs_free ge \\ (f9 |: FromList gv :|: FromList fv :|: name_in_fundefs fds)). {
+        rewrite Setminus_Union_Included; [|rewrite FromList_cons; eauto with Ensembles_DB].
+        repeat rewrite <- Setminus_Union.
+        rewrite <- Included_Setminus_Disjoint with (s2 := [set g]).
+        repeat rewrite Setminus_Union.
+        rewrite Union_assoc, FromList_cons.
+        rewrite Union_commut.
+        repeat rewrite <- Setminus_Union.
+        rewrite <- Included_Setminus_Disjoint with (s2 := [set k]).
+        repeat rewrite Setminus_Union.
+        repeat rewrite Union_assoc.
+        rewrite Union_commut.
+        rewrite Union_commut with (s2 := FromList gv).
+        repeat rewrite Union_assoc...
+        apply Disjoint_Singleton_r; intros contra.
+        rewrite not_occurs_in_exp_iff_used_vars in H1; contradiction H1; now right.
+        apply Disjoint_Singleton_r; intros contra.
+        rewrite not_occurs_in_exp_iff_used_vars in H0; contradiction H0; now right.
+      }
       rewrite Hrw1.
       assert (Hrw2 : occurs_free_fundefs fds \\ [set f10] <--> occurs_free_fundefs fds). {
         split...
@@ -3809,7 +3855,17 @@ Section uncurry_correct.
       rewrite Setminus_Union.
       rewrite Union_commut with (s2 := [set f9]).
       now repeat rewrite Union_assoc.
-  Admitted.
+  Qed.
+
+  Lemma uncurry_step_preserves_closed : forall e s m e1 s1 m1,
+    used_vars e \subset s ->
+    unique_bindings e ->
+    uncurry_step e s m e1 s1 m1 -> closed_exp e -> closed_exp e1.
+  Proof with eauto with Ensembles_DB.
+    unfold closed_exp; intros.
+    destruct uncurry_step_preserves_occurs_free_mut.
+    rewrite <- H3; eauto.
+  Qed.
 
   Inductive uncurry_rel :
     nat ->
@@ -3907,10 +3963,6 @@ Section uncurry_correct.
     destruct H0 as [e3 [s3 [m3 [Hrel Hstep]]]].
     eapply Sn_uncurry_rel_fundefs; eauto.
   Qed.
-
-  (* write a lemma that says P uncurry_step e s m e1 s1 m1 -> P (uncurry_rel n) e s m e1 s1 m1
-     for all n
-     { admit. } *)
   
   Lemma uncurry_rel_preserves_unique_bindings : forall n e s m e1 s1 m1,
     used_vars e \subset s ->
@@ -3924,6 +3976,22 @@ Section uncurry_correct.
     eapply IHn; [| |eassumption].
     eapply uncurry_step_preserves_used_vars; eauto.
     eapply uncurry_step_preserves_unique_bindings; eauto.
+  Qed.
+  
+  Lemma uncurry_rel_preserves_closed : forall n e s m e1 s1 m1,
+    used_vars e \subset s ->
+    unique_bindings e ->
+    closed_exp e ->
+    uncurry_rel n e s m e1 s1 m1 ->
+    closed_exp e1.
+  Proof.
+    induction n; [inversion 4; subst; auto|].
+    intros.
+    inv H2.
+    eapply IHn; [| | |eassumption].
+    eapply uncurry_step_preserves_used_vars; eauto.
+    eapply uncurry_step_preserves_unique_bindings; eauto.
+    eapply uncurry_step_preserves_closed; eauto.
   Qed.
 
   Lemma uncurry_rel_preserves_used_vars : forall n e s m e1 s1 m1,
@@ -4078,10 +4146,6 @@ Section uncurry_correct.
     eapply uncurry_step_correct; [| | | |apply H5|apply Henv]; auto.
     intros; eapply IHn; [| | | |apply H6|apply preord_env_P_refl]; auto.
   Qed.
-
-  (* (* Parameters of the big step evaluation relation *)
-  Variable (pr : prims).
-  Variable (cenv : cEnv). *)
     
   Transparent bind ret.
 
@@ -4416,7 +4480,7 @@ Section uncurry_correct.
     simpl; intros; subst; split; auto.
   Qed.
 
-  Lemma get_fTag_triple : forall s n, (* TODO may need more assumptions from here *)
+  Lemma get_fTag_triple : forall s n,
     {{fun s' => s = s'}} uncurry.get_fTag n
     {{fun s _ s1 =>
         from_fresh s1 = from_fresh s /\
@@ -4590,11 +4654,6 @@ Section uncurry_correct.
       eapply bind_triple'. 
       rewrite pre_post_copy.
       eapply pre_strenghtening; [|apply IHf].
-      (* ^ this is trick to collect all the state info:
-         pre_eq_state_lr to grab from the precondition,
-         bind_triple' to copy into remainder of computation,
-         pre_post_copy to erase state info from postcondition,
-         then proceed *)
       intros i Hi; subst.
       split; [now inv Huniq|].
       eapply Included_trans; eauto.
@@ -4940,6 +4999,22 @@ Section uncurry_correct.
       intros; eapply uncurry_rel_correct; eauto.
       eapply uncurry_rel_preserves_unique_bindings; eauto.
       eapply uncurry_rel_preserves_used_vars; eauto.
+  Qed.
+
+  Lemma uncurry_exp_good_preserving : forall e,
+    {{ fun st => closed_exp e /\ unique_bindings e /\ used_vars e \subset from_fresh st }}
+      uncurry_exp e
+    {{ fun _ e1 _ => closed_exp e1 /\ unique_bindings e1 }}.
+  Proof.
+    intros.
+    apply pre_eq_state_lr; intros s [Hclosed [Huniq Hused]].
+    eapply triple_consequence.
+    apply uncurry_exp_corresp.
+    - intros; subst; split; auto.
+    - simpl; intros; subst.
+      destruct H; destruct H0; split.
+      eapply uncurry_rel_preserves_closed; eauto.
+      eapply uncurry_rel_preserves_unique_bindings; eauto.
   Qed.
 
 End uncurry_correct.

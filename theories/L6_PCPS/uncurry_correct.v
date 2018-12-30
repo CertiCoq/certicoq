@@ -4228,7 +4228,8 @@ Section uncurry_correct.
   Corollary app_f_ctx_f_injective : forall f e e1, f <[ e ]> = f <[ e1 ]> -> e = e1.
   Proof. apply app_ctx_f_injective_mut. Qed.
 
-  Definition from_fresh st := fun a => (a < next_free st)%positive.
+  Definition from_maxvar v := fun a => (a < v)%positive.
+  Definition from_fresh st := from_maxvar (next_free st).
 
   Lemma pre_eq_state_lr : forall (A S : Type) (P : S -> Prop) (Q : S -> A -> S -> Prop) (e : state S A),
     (forall s : S, P s -> {{fun s' : S => s = s'}} e {{fun s' a s1 => s = s' -> Q s' a s1}}) ->
@@ -4367,12 +4368,13 @@ Section uncurry_correct.
     - destruct (Pos.eqb x v) eqn:Hxv.
       apply Peqb_true_eq in Hxv; subst; now left.
       right; unfold In.
+      unfold from_maxvar in *.
       rewrite <- Pplus_one_succ_r in H.
       rewrite Pos.lt_succ_r in H.
       rewrite Pos.le_lteq in H; destruct H; auto; subst.
       now rewrite Pos.eqb_neq in Hxv.
     - inv H; [inv H0|].
-      all: rewrite <- Pplus_one_succ_r; rewrite Pos.lt_succ_r; rewrite Pos.le_lteq; auto.
+      all: unfold from_maxvar; rewrite <- Pplus_one_succ_r; rewrite Pos.lt_succ_r; rewrite Pos.le_lteq; auto.
   Qed.
 
   Lemma copyVars_triple : forall l s,
@@ -4985,36 +4987,160 @@ Section uncurry_correct.
                              f1 (from_fresh st1) (already_uncurried st1)
     }}.
   Proof. intros; eapply uncurry_corresp_mut; eauto. Qed.
-  
-  Lemma uncurry_exp_correct : forall e,
-    {{ fun st => unique_bindings e /\ used_vars e \subset from_fresh st }}
+
+  Definition uncurry_triple e P Q :=
+    {{ fun st => unique_bindings e /\ used_vars e \subset from_fresh st /\ P st }}
       uncurry_exp e
-    {{ fun st e1 st1 => forall k, ctx_preord_exp k e e1 }}.
+    {{ Q e }}.
+
+  Lemma uncurry_rel_to_triple : forall e (P : _ -> Prop) (Q : _ -> _ -> _ -> _ -> Prop),
+    (forall n e1 st st1,
+        uncurry_rel n e (from_fresh st) (already_uncurried st)
+                    e1 (from_fresh st1) (already_uncurried st1) ->
+        unique_bindings e -> used_vars e \subset from_fresh st ->
+        P st ->
+        Q e st e1 st1) -> uncurry_triple e P Q.
   Proof.
     intros.
+    apply pre_eq_state_lr; intros s [Huniq [Hused He]].
     eapply triple_consequence.
     apply uncurry_exp_corresp.
-    - intros st [Huniq Hused]; now split.
-    - intros st e' st' [Huniq Hused] [n Hrel].
-      intros; eapply uncurry_rel_correct; eauto.
-      eapply uncurry_rel_preserves_unique_bindings; eauto.
-      eapply uncurry_rel_preserves_used_vars; eauto.
+    - intros; subst; auto.
+    - simpl; intros; subst; destruct H1.
+      eapply H; eauto.
+  Qed.
+  
+  Lemma uncurry_exp_correct : forall e,
+    uncurry_triple e (fun _ => True) (fun e _ e1 _ => forall k, ctx_preord_exp k e e1).
+  Proof.
+    intros.
+    apply uncurry_rel_to_triple; simpl; intros.
+    eapply uncurry_rel_correct; eauto.
+    eapply uncurry_rel_preserves_unique_bindings; eauto.
+    eapply uncurry_rel_preserves_used_vars; eauto.
   Qed.
 
   Lemma uncurry_exp_good_preserving : forall e,
-    {{ fun st => closed_exp e /\ unique_bindings e /\ used_vars e \subset from_fresh st }}
-      uncurry_exp e
-    {{ fun _ e1 _ => closed_exp e1 /\ unique_bindings e1 }}.
+    uncurry_triple e (fun _ => closed_exp e) (fun _ _ e1 _ => closed_exp e1).
+  Proof.
+    intros; apply uncurry_rel_to_triple; simpl; intros.
+    eapply uncurry_rel_preserves_closed; eauto.
+  Qed.
+
+  Lemma uncurry_corresp : forall e aenv fenv ft lm maxvar s,
+    unique_bindings e ->
+    used_vars e \subset from_maxvar maxvar ->
+    match uncurry e aenv fenv ft lm maxvar s with
+      Some (e1, aenv1, fenv1, ft1, lm1, maxvar1, s1) =>
+        exists n, uncurry_rel n e (from_maxvar maxvar) lm e1 (from_maxvar maxvar1) lm1
+    | _ => True
+    end.
+  Proof.
+    intros; unfold uncurry.
+    destruct (runState _ _) eqn:HrunState.
+    destruct s0, p, p, p, p, p; destruct b; auto.
+    Print triple.
+    assert (
+      {{ fun st => next_free st = maxvar /\ already_uncurried st = lm }}
+        uncurry_exp e
+      {{ fun st e1 st1 => exists n, uncurry_rel n e (from_fresh st) (already_uncurried st)
+                                         e1 (from_fresh st1) (already_uncurried st1)
+      }}). {
+      apply pre_eq_state_lr; intros.
+      eapply triple_consequence.
+      apply uncurry_exp_corresp.
+      - intros; destruct H1; subst; auto.
+      - auto.
+    }
+    unfold triple in H1.
+    specialize H1 with (i := (maxvar, false, aenv, fenv, ft, lm, s)).
+    unfold from_fresh, next_free, already_uncurried in H1; simpl in H1; rewrite HrunState in H1.
+    auto.
+  Qed.
+
+  Lemma uncurry_fuel'_corresp : forall fuel e aenv fenv ft lm maxvar s,
+    unique_bindings e ->
+    used_vars e \subset from_maxvar maxvar ->
+    let '(e1, _, _) := uncurry_fuel' fuel e aenv fenv ft lm maxvar s in
+    exists n s1 m1, uncurry_rel n e (from_maxvar maxvar) lm e1 s1 m1.
+  Proof.
+    induction fuel; intros; simpl.
+    - exists 0; do 2 eexists; constructor.
+    - destruct (uncurry _ _ _ _ _ _ _) eqn:Huncurry; [|exists 0; do 2 eexists; constructor].
+      destruct p, p, p, p, p, p.
+      assert (
+        match uncurry e aenv fenv ft lm maxvar s with
+          Some (e0, _, _, _, l, v, _) =>
+            exists n, uncurry_rel n e (from_maxvar maxvar) lm e0 (from_maxvar v) l
+        | _ => True
+        end) by (apply uncurry_corresp; auto).
+      rewrite Huncurry in H1; simpl in H1; destruct H1.
+      specialize IHfuel with
+          (e := e0) (lm := l) (maxvar := v) (aenv := a) (fenv := f0) (ft := f) (s := s0).
+      destruct (uncurry_fuel' _ _ _ _ _ _ _ _) eqn:Hfuel; destruct p.
+      edestruct IHfuel as [x1 [s' [m1 Hrel1]]].
+      eapply uncurry_rel_preserves_unique_bindings; eauto.
+      eapply uncurry_rel_preserves_used_vars; eauto.
+      exists (x1 + x); do 2 eexists; eapply uncurry_rel_compose; eauto.
+  Qed.
+
+  Lemma succ_max_var_Included : forall e, used_vars e \subset from_maxvar (max_var e 1 + 1).
+  Proof.
+    intros e a Ha; inv Ha;
+    unfold from_maxvar; unfold In; simpl;
+    rewrite Pos.add_1_r;
+    rewrite Pos.lt_succ_r;
+    [now apply bound_var_leq_max_var
+    |now apply occurs_free_leq_max_var].
+  Qed.
+      
+  Lemma uncurry_fuel_corresp : forall n e fenv,
+    unique_bindings e ->
+    let '(e1, _, _) := uncurry_fuel n e fenv in
+    exists n' s m s1 m1, used_vars e \subset s /\ uncurry_rel n' e s m e1 s1 m1.
   Proof.
     intros.
-    apply pre_eq_state_lr; intros s [Hclosed [Huniq Hused]].
-    eapply triple_consequence.
-    apply uncurry_exp_corresp.
-    - intros; subst; split; auto.
-    - simpl; intros; subst.
-      destruct H; destruct H0; split.
-      eapply uncurry_rel_preserves_closed; eauto.
-      eapply uncurry_rel_preserves_unique_bindings; eauto.
+    pose uncurry_fuel'_corresp as Hfuel.
+    unfold uncurry_fuel.
+    specialize Hfuel with
+        (fuel := n) (e := e) (aenv := M.empty _) (fenv := fenv)
+        (ft := Pos.succ (M.fold (fun cm ft _ => Pos.max cm ft) fenv 1%positive))
+        (lm := M.empty _) (maxvar := (max_var e 1 + 1) % positive)
+        (s := (0, M.empty _)).
+    destruct (uncurry_fuel' _ _ _ _ _ _ _ _) eqn:Huncurry; destruct p.
+    assert (used_vars e \subset from_maxvar (max_var e 1 + 1))
+      by apply succ_max_var_Included.
+    destruct Hfuel as [n1 [s1 [m1 Hrel]]]; auto.
+    do 5 eexists; eauto.
+  Qed.
+      
+  Lemma uncurry_fuel_obs_preserving : forall n e fenv,
+    unique_bindings e ->
+    let '(e1, _, _) := uncurry_fuel n e fenv in
+    forall k, ctx_preord_exp k e e1.
+  Proof.
+    intros.
+    destruct (uncurry_fuel n e fenv) eqn:Hfuel; destruct p.
+    pose (uncurry_fuel_corresp n e fenv H) as Hcorresp; rewrite Hfuel in Hcorresp.
+    destruct Hcorresp as [n' [s' [m [s1 [m1 [Hused Hrel]]]]]].
+    intros k.
+    eapply uncurry_rel_correct; [auto| |eauto| |eauto].
+    eapply uncurry_rel_preserves_unique_bindings; eauto.
+    eapply uncurry_rel_preserves_used_vars; eauto.
+  Qed.
+
+  Lemma uncurry_fuel_good_preserving : forall n e fenv,
+    unique_bindings e ->
+    closed_exp e ->
+    let '(e1, _, _) := uncurry_fuel n e fenv in
+    unique_bindings e1 /\ closed_exp e1.
+  Proof.
+    intros; destruct (uncurry_fuel n e fenv) eqn:Hfuel; destruct p.
+    pose (uncurry_fuel_corresp n e fenv H) as Hcorresp; rewrite Hfuel in Hcorresp.
+    destruct Hcorresp as [n' [s' [m [s1 [m1 [Hused Hrel]]]]]].
+    split.
+    eapply uncurry_rel_preserves_unique_bindings; eauto.
+    eapply uncurry_rel_preserves_closed; eauto.
   Qed.
 
 End uncurry_correct.

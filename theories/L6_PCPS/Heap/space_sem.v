@@ -330,6 +330,13 @@ Module SpaceSem (H : Heap).
                  ans_equiv β' r id r').
   Abort.
 
+  Lemma big_step_reach_leq H1 rho1 e1 res c m :
+    big_step H1 rho1 e1 res c m ->
+    reach_size H1 rho1 e1 <= m.
+  Proof.
+    intros Hbs. inversion Hbs; eauto; try now eapply Nat_as_OT.le_max_l.
+  Qed.
+  
   Lemma heap_env_equiv_preserves_closed S H1 H2 rho1 rho2 b1 b2 :
     S |- (H1, rho1) ⩪_(b1, b2) (H2, rho2) ->
         closed (reach' H1 (env_locs rho1 S)) H1 ->

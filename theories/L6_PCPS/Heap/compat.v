@@ -177,14 +177,14 @@ Module Compat (H : Heap).
         find_def f3 B2 = Some (ct2, xs2', e2) ->
         live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d ->
 
+        reach_size H1'' rho_clo2 e1 <= m1 -> 
         (* Post on result of APP *)
         IL1 (H1', rho1', Eapp f1 t xs1, c1 + cost (Eapp f1 t xs1), max (reach_size H1' rho1' (Eapp f1 t xs1)) m1)
             (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ, c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2)), max m2 (size_heap H2')).
     
-
-
   End CompatDefs.
 
+  
   Section CompatLemmas.
     
     Variable (clo_tag : cTag).
@@ -442,6 +442,7 @@ Module Compat (H : Heap).
                eassumption. omega.
              * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
                split. eapply Hiinv; try eassumption.
+               eapply big_step_reach_leq. eassumption. 
                rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
                eassumption. simpl. omega. }
     Admitted.

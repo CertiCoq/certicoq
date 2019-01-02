@@ -27,6 +27,8 @@ Module GC (H : Heap).
          the execution cost of certain transformations *)
 
   (** The cost of constructing environments when evaluating e *)
+
+  (* TODO remove *)
   Fixpoint cost_env_exp (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => cost_env_exp e
@@ -48,7 +50,7 @@ Module GC (H : Heap).
            | Fnil => 0
          end.  
 
-  (** The cost of evaluating e *)
+  (** The extra cost of evaluating CCed e *)
   Fixpoint cost_time_exp (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => max (3 * length ys) (cost_time_exp e)
@@ -59,7 +61,9 @@ Module GC (H : Heap).
                     | (t, e) :: l => max (cost_time_exp e) (sizeOf_l l)
                   end) l)
       | Eproj x _ _ y e => max 3 (cost_time_exp e)
-      | Efun B e => max (1 + 4 * PS.cardinal (fundefs_fv B)) (max (cost_time_fundefs B) (cost_time_exp e))
+      | Efun B e =>
+        max (1 + 4 * PS.cardinal (fundefs_fv B))
+            (max (cost_time_fundefs B) (cost_time_exp e))
       | Eapp x _ ys => 6 + 3 * length ys
       | Eprim x _ ys e => max (length ys) (cost_time_exp e)
       | Ehalt x => 3

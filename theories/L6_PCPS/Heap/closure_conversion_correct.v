@@ -316,13 +316,13 @@ Module ClosureConversionCorrect (H : Heap).
            {Hs : ToMSet Scope}
            (Funs : Ensemble var) (Hf : ToMSet Funs) 
            (FVs : list var) (fenv : positive -> positive) 
-           (β : Inj) (c : cTag) (Γ : var) A,
+           (β : Inj) (c : cTag) (Γ : var) A δ,
            (forall j : nat,
-              (H1, rho1) ⋞ ^ (Scope; m; j; Pre; Post 0; β) (H2, rho2)) ->
+              (H1, rho1) ⋞ ^ (Scope; m; j; PreG; PostG; β) (H2, rho2)) ->
            (forall j : nat,
-              FV_inv m j Pre (Post 0) β rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
+              FV_inv m j PreG PostG β rho1 H1 rho2 H2 c Scope Funs Γ FVs) ->
            (forall j : nat,
-              Fun_inv m j Pre (Post 0) β rho1 H1 rho2 H2 Scope Funs fenv FVs) ->
+              Fun_inv m j PreG PostG β rho1 H1 rho2 H2 Scope Funs fenv FVs) ->
            
            Disjoint var (Γ |: image fenv (Funs \\ Scope))
                     (bound_var e1 :|: FV Scope Funs FVs) ->
@@ -331,7 +331,7 @@ Module ClosureConversionCorrect (H : Heap).
            Disjoint var (bound_var e1) (FV Scope Funs FVs) ->
            Closure_conversion ct Scope Funs fenv c Γ FVs e1 e2 C ->
            forall j : nat,
-             (e1, rho1, H1) ⪯ ^ (m; j; Pre (Funs :&: occurs_free e1 \\ Scope) A; Pre; Post 0 A; Post 0) (C |[ e2 ]|, rho2, H2)) :
+             (e1, rho1, H1) ⪯ ^ (m; j; Pre (Funs :&: occurs_free e1 \\ Scope) A δ; PreG; Post 0 A δ; PostG) (C |[ e2 ]|, rho2, H2)) :
     (* ************************************************ *)
     forall B1 B2
       (H1 H1' H2 : heap block) lenv (rho1 rho1c rho1' rho2 : env) b
@@ -343,9 +343,9 @@ Module ClosureConversionCorrect (H : Heap).
       closed (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) H1 ->
       closed (reach' H2 (env_locs rho2 (FV_cc Scope Funs fenv Γ'))) H2 -> 
 
-      (forall j, Fun_inv k j Pre (Post 0) b rho1 H1 rho2 H2 Scope Funs fenv FVs) ->
+      (forall j, Fun_inv k j PreG PostG b rho1 H1 rho2 H2 Scope Funs fenv FVs) ->
       (* Free variables invariant for new fundefs *)
-      (forall j, FV_inv k j Pre (Post 0) b rho1c H1 rho2 H2 c (Empty_set _) (Empty_set _) Γ' FVs') -> (* no scope, no funs yet *)     
+      (forall j, FV_inv k j PreG PostG b rho1c H1 rho2 H2 c (Empty_set _) (Empty_set _) Γ' FVs') -> (* no scope, no funs yet *)     
       
 
       FromList FVs' <--> occurs_free_fundefs B1 ->
@@ -367,7 +367,7 @@ Module ClosureConversionCorrect (H : Heap).
       
       def_closures B1 B1 rho1 H1 (Loc lenv)  = (H1', rho1') -> 
       
-      (forall j, Fun_inv k j Pre (Post 0) b
+      (forall j, Fun_inv k j PreG PostG b
                     rho1' H1' (def_funs B2 B2 rho2) H2
                     (Scope \\ name_in_fundefs B1) (name_in_fundefs B1 :|: Funs) (extend_fundefs' fenv B1 Γ') FVs).
   Proof with (now eauto with Ensembles_DB).
@@ -598,7 +598,7 @@ Module ClosureConversionCorrect (H : Heap).
                     eapply IHvs1. intros j. specialize (Hall j). inv Hall.
                     rewrite cc_approx_val_eq in H2. eassumption. }
 
-                  assert (Hfvs'' : forall j2, FV_inv i j2 Pre (Post 0) b' rhoc' H3 (M.set Γ'' (Loc lr) (M.empty value)) H4
+                  assert (Hfvs'' : forall j2, FV_inv i j2 PreG PostG b' rhoc' H3 (M.set Γ'' (Loc lr) (M.empty value)) H4
                                                  c (Empty_set var) (Empty_set var) Γ'' FVs'). 
                   { intros j2'. 
                     eapply FV_inv_heap_f_eq_subdomain; [| eapply f_eq_subdomain_antimon; try eassumption ].
@@ -655,14 +655,13 @@ Module ClosureConversionCorrect (H : Heap).
                   edestruct (Hfvs'' j) as (Hwf'' & Hkey'' & vs1'' & loc_env'' & Hget1'' & Hget2'' & Hall'').
                   repeat subst_exp. 
                   split.
-                + intros Hgc1 Hgc2 g1 g2 Hl1 Hl2. 
+                + intros Hgc2 g2 Hl2. 
                   eapply PreSubsetCompat 
                   with (Funs := name_in_fundefs B1 :&: occurs_free ef).
                   { eapply GC_pre with (Scope := reach' H3 (env_locs rhoc2 (occurs_free ef :&: FromList xs1) :|:
                                                                      (env_locs rhoc' (FromList FVs'))))
                                          (xs2' := Γ'' :: xs1) (β := b').
                     - eauto 20 with typeclass_instances.
-                    - eassumption.
                     - eassumption.
                     - eassumption.
                     - eassumption.
@@ -676,7 +675,7 @@ Module ClosureConversionCorrect (H : Heap).
                       rewrite !PS.cardinal_spec. erewrite Same_set_FromList_length'. reflexivity. 
                       eassumption. eapply NoDupA_NoDup. eapply PS.elements_spec2w.
                       rewrite <- !FromSet_elements.
-                      rewrite <- mset_eq, Ha. symmetry. eassumption.
+                      rewrite Hfveq. now eapply fundefs_fv_correct. 
                       now eauto with Ensembles_DB.
                     - intros j1.
                       rewrite reach'_Union. eapply cc_approx_heap_union.
@@ -784,7 +783,9 @@ Module ClosureConversionCorrect (H : Heap).
                       + eapply Disjoint_sym. eapply unique_bindings_fun_in_fundefs.
                         eapply find_def_correct. eassumption. eassumption. } 
                   now eauto with Ensembles_DB.
-                + eapply IHexp with (Scope := (FromList xs1)) (Funs := name_in_fundefs B1)
+                + intros j0. eapply cc_approx_exp_rel_mon_post.
+                  eapply cc_approx_exp_rel_mon_pre.
+                  eapply IHexp with (Scope := (FromList xs1)) (Funs := name_in_fundefs B1)
                                                               (fenv := extend_fundefs' id B1 Γ'')
                                                               (β := b');
                     [ | | | | | | | | eassumption ].
@@ -981,7 +982,12 @@ Module ClosureConversionCorrect (H : Heap).
                     eapply Disjoint_Included; [| | eapply Hfresh ].
                     now eauto with Ensembles_DB.
                     eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs;
-                                              eapply find_def_correct; eassumption ]... } }
+                                              eapply find_def_correct; eassumption ]...
+                  * intros [[H0 rho0] e0] [[H00 rho00] e00]. unfold PreG.
+                    intros Hyp. eapply Hyp.
+                  * intros [[[[H0 rho0] e0] c0] m0] [[[[H00 rho00] e00] c00] m00]. unfold PreG.
+                    intros Hyp. eapply Hyp.
+        } }
         
     - inv Hnin. contradiction. 
       edestruct (Hfun j) as

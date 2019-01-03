@@ -27,19 +27,6 @@ Module Top.
 
   Definition ct := CC.Inv.Size.Util.clo_tag. 
 
-  (** The expression relation is monotonic in the local invariant *)
-  Lemma cc_approx_exp_rel_mon k j LIP1 LIP2 GIP1 (LP1 : Inv) (GP1 : GInv)
-        (p1 p2 : exp * env * heap block) :
-    p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
-    inclusion _ LIP2 LIP1 ->
-    p1 ⪯ ^ ( k ; j ; LIP2 ; GIP1 ; LP1 ; GP1 ) p2.
-  Proof.
-    destruct p1 as [[e1 H1] rho1].
-    destruct p2 as [[e2 H2] rho2]. 
-    intros Hcc Hin b1 b2 H1' H2' rho1' rho2' v1 c1 m1 HH1 Hr1 HH2 Hr2 Hip Hleq Hstep Hstuck.
-    edestruct Hcc as [v2 [c2 [m2 [b' [Hstep' [HInv Hval]]]]]]; eauto.
-  Qed.
-
   Definition install_env Γ :=
     let (lenv, H1) := alloc (Constr ct []) emp in
     (M.set Γ (Loc lenv) (M.empty _), H1).

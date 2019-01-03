@@ -156,7 +156,7 @@ Module Compat (H : Heap).
         injective_subdomain (reach' H2 (env_locs rho2 (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)))) β2 ->
 
         (* Post on the function result  *)
-        IG (1 + (PS.cardinal (@mset (key_set rho_clo) _)))
+        IG (reach_size H1'' rho_clo2 e1) (1 + (PS.cardinal (fundefs_fv B1)))
            (H1'', rho_clo2, e1, c1, m1) (Hgc2, subst_env d rho2'', e2, c2, m2) ->
         (* Pre before APP *)
         IIL1 (H1', rho1', Eapp f1 t xs1) (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ) ->

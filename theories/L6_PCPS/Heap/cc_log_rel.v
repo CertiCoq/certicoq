@@ -28,7 +28,7 @@ Module CC_log_rel (H : Heap).
       Enforced as initial condition for future executions of the result *)
   Definition GIInv :=
     forall (B : Ensemble var) {H : ToMSet B},
-      nat -> relation (heap block * env * exp).
+      nat -> nat -> relation (heap block * env * exp).
   
   (** * Postconditions *)
   
@@ -39,7 +39,7 @@ Module CC_log_rel (H : Heap).
   (** Global posconditions. Holds for the result of future execution of the result *)
   Definition GInv :=
     (* forall (B : Ensemble var) {H : ToMSet B}, nat -> *)
-      nat -> relation (heap block * env * exp * nat * nat).
+      nat -> nat -> relation (heap block * env * exp * nat * nat).
   
   (** Loc Injection *)
   Definition Inj := loc -> loc.
@@ -198,14 +198,17 @@ Module CC_log_rel (H : Heap).
                              (forall (H2  : heap block) b2,
                                 live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
                                 IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
-                                   (1 + (PS.cardinal (@mset (key_set rho_clo) _)))
+                                   (reach_size H1'' rho_clo2 e1)
+                                   (1 + (PS.cardinal (fundefs_fv B1)))
                                    (H1'', rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
                              (forall j, cc_approx_exp cc_approx_val
                                                  (k - (k - i))
                                                  j
                                                  (IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
-                                                     (1 + (PS.cardinal (@mset (key_set rho_clo) _)))) IP
-                                                 (P (1 + (PS.cardinal (@mset (key_set rho_clo) _)))) P
+                                                     (reach_size H1'' rho_clo2 e1)
+                                                     (1 + (PS.cardinal (fundefs_fv B1)))) IP
+                                                 (P (reach_size H1'' rho_clo2 e1)
+                                                    (1 + (PS.cardinal (fundefs_fv B1)))) P
                                                  (e1, rho_clo2, H1'') (e2, rho2', H2'))
                        end)
               | _, _ => False
@@ -270,13 +273,16 @@ Module CC_log_rel (H : Heap).
                          (forall (H2 : heap block) b2, (* redundant *)
                              live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
                              IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
-                                (1 + (PS.cardinal (@mset (key_set rho_clo) _)))
+                                (reach_size H1'' rho_clo2 e1)
+                                (1 + (PS.cardinal (fundefs_fv B1)))
                                 (H1'', rho_clo2, e1) (H2, subst_env b2 rho2', e2)) /\
                          (forall j, cc_approx_exp cc_approx_val
                                              i j
                                              (IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
-                                                 (1 + (PS.cardinal (@mset (key_set rho_clo) _)))) IP
-                                             (P (1 + (PS.cardinal (@mset (key_set rho_clo) _)))) P
+                                                 (reach_size H1'' rho_clo2 e1)
+                                                 (1 + (PS.cardinal (fundefs_fv B1)))) IP
+                                             (P (reach_size H1'' rho_clo2 e1)
+                                                (1 + (PS.cardinal (fundefs_fv B1)))) P
                                              (e1, rho_clo2, H1'') (e2, rho2', H2')))
               | _, _ => False
             end
@@ -555,7 +561,7 @@ Module CC_log_rel (H : Heap).
   Qed.
 
   (** The expression relation is monotonic in the local invariant *)
-  Lemma cc_approx_exp_rel_mon k j LIP1 GIP1 (LP1 LP2 : Inv) (GP1 : GInv)
+  Lemma cc_approx_exp_rel_mon_post k j LIP1 GIP1 (LP1 LP2 : Inv) (GP1 : GInv)
         (p1 p2 : exp * env * heap block) :
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
     inclusion _ LP1 LP2 ->
@@ -567,6 +573,20 @@ Module CC_log_rel (H : Heap).
     edestruct Hcc as [v2 [c2 [m2 [b' [Hstep' [HInv Hval]]]]]]; eauto.
     repeat eexists; eauto.
   Qed.
+
+  (** The expression relation is monotonic in the local invariant *)
+  Lemma cc_approx_exp_rel_mon_pre k j LIP1 LIP2 GIP1 (LP1 : Inv) (GP1 : GInv)
+        (p1 p2 : exp * env * heap block) :
+    p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
+    inclusion _ LIP2 LIP1 ->
+    p1 ⪯ ^ ( k ; j ; LIP2 ; GIP1 ; LP1 ; GP1 ) p2.
+  Proof.
+    destruct p1 as [[e1 H1] rho1].
+    destruct p2 as [[e2 H2] rho2]. 
+    intros Hcc Hin b1 b2 H1' H2' rho1' rho2' v1 c1 m1 HH1 Hr1 HH2 Hr2 Hip Hleq Hstep Hstuck.
+    edestruct Hcc as [v2 [c2 [m2 [b' [Hstep' [HInv Hval]]]]]]; eauto.
+  Qed.
+
   
   (** The logical relation respects equivalence of the global invariant *)
   
@@ -576,7 +596,7 @@ Module CC_log_rel (H : Heap).
        r1 ≺ ^ (m ; j ; GIP1 ; GP1 ; b ) r2 ->
        r1 ≺ ^ (m ; j ; GIP1 ; GP2 ; b ) r2) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP1 ) p2 ->
-    (forall k1 k2, same_relation _ (GP1 k1) (GP2 k2)) ->
+    (forall k1 k2, same_relation _ (GP1 k1 k2) (GP2 k1 k2)) ->
     p1 ⪯ ^ ( k ; j ; LIP1 ; GIP1 ; LP1 ; GP2 ) p2.
   Proof.
     destruct p1 as [[e1 H1] rho1].
@@ -594,7 +614,7 @@ Module CC_log_rel (H : Heap).
   
   Lemma cc_approx_val_same_rel (k j : nat) (GP1 GP2 : GInv) (b1 : Inj) r1 r2 :
     r1 ≺ ^ (k ; j ; GIP ; GP1 ; b1 ) r2 ->
-    (forall k1 k2, same_relation _ (GP1 k1) (GP2 k2)) ->
+    (forall k1 k2, same_relation _ (GP1 k1 k2) (GP2 k1 k2)) ->
     r1 ≺ ^ (k ; j ; GIP ; GP2 ; b1 ) r2.
   Proof.
     revert j b1 GP1 GP2 r1 r2.
@@ -636,7 +656,7 @@ Module CC_log_rel (H : Heap).
         intros. split; now eapply Hrel.
       + intros j'. eapply cc_approx_exp_same_rel_IH with (GP1 := GP1); try eassumption.
         intros; eapply IHk. omega. eassumption. eassumption.
-        eapply cc_approx_exp_rel_mon. eapply Hi. eassumption.
+        eapply cc_approx_exp_rel_mon_post. eapply Hi. eassumption.
         intros j''. 
         eapply Forall2_monotonic; [| now eapply Hrel' ].
         intros. rewrite cc_approx_val_eq.
@@ -650,7 +670,7 @@ Module CC_log_rel (H : Heap).
   Lemma cc_approx_exp_same_rel (P : relation nat) k j (GP' : GInv)
         p1 p2 :
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP ) p2 ->
-    (forall k1 k2, same_relation _ (GP k1) (GP' k2)) ->
+    (forall k1 k2, same_relation _ (GP k1 k2) (GP' k1 k2)) ->
     p1 ⪯ ^ ( k ; j ; LIP ; GIP ; LP ; GP' ) p2.
   Proof.
     intros Hcc Hin. eapply cc_approx_exp_same_rel_IH; try eassumption.

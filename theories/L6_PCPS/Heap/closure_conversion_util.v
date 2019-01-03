@@ -1786,12 +1786,28 @@ Module CCUtil (H : Heap).
     eapply project_vars_Scope_l. eassumption. 
   Qed.
 
+  (* TODO move *)
+  Lemma cost_ctx_full_cc_ctx_comp_ctx_f (C : exp_ctx) :
+    (forall C', cost_ctx_full_cc (comp_ctx_f C C') =
+           cost_ctx_full_cc C + cost_ctx_full_cc C')
+  with cost_ctx_full_cc_f_comp_ctx_f f :
+         (forall C', cost_ctx_full_f_cc (comp_f_ctx_f f C') =
+                cost_ctx_full_f_cc  f + cost_ctx_full_cc C').
+  Proof.
+    - destruct C; intros C'; simpl; eauto.
+      + rewrite (cost_ctx_full_cc_ctx_comp_ctx_f C C'). omega.
+      + rewrite (cost_ctx_full_cc_ctx_comp_ctx_f C C'). omega.
+    - destruct f; intros C'; simpl.
+      + rewrite cost_ctx_full_cc_ctx_comp_ctx_f. omega.
+      + rewrite cost_ctx_full_cc_f_comp_ctx_f. omega.
+  Qed.
+
 
   Lemma project_var_cost_eq'
         Scope Scope'  Funs Funs' fenv
         c Γ FVs x C1 :
     project_var clo_tag Scope Funs fenv c Γ FVs x C1 Scope' Funs' ->
-    cost_ctx_full C1 <= 3.
+    cost_ctx_full_cc C1 <= 3.
   Proof with (now eauto with Ensembles_DB).
     intros Hvar; inv Hvar; eauto.
   Qed.
@@ -1800,10 +1816,10 @@ Module CCUtil (H : Heap).
         Scope Scope'  Funs Funs' fenv
         c Γ FVs xs C1 :
     project_vars clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
-    cost_ctx_full C1 <= 3 * length xs.
+    cost_ctx_full_cc C1 <= 3 * length xs.
   Proof with (now eauto with Ensembles_DB).
     intros Hvar; induction Hvar; eauto.
-    rewrite cost_ctx_full_ctx_comp_ctx_f. simpl.
+    rewrite cost_ctx_full_cc_ctx_comp_ctx_f. simpl.
     eapply le_trans. eapply plus_le_compat.
     eapply project_var_cost_eq'. eassumption. eassumption.
     omega.

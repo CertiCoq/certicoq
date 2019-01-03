@@ -43,10 +43,11 @@ Module Compat (H : Heap).
             (H2', rho2', e2, c, size_heap H2').
 
     Definition InvCostBase_Funs B1 (e1 : exp) B2 e2 :=
-      forall (H1' H2' : heap block) (rho1' rho2' : env) (c : nat),                           
+      forall (H1' H2' : heap block) (rho1' rho2' : env) (c : nat),
+        c < 1 + PS.cardinal (fundefs_fv B1) -> 
         IIL1 (H1', rho1', Efun B1 e1) (H2', rho2', Efun B2 e2) ->
         IL1 (H1', rho1', Efun B1 e1, c, reach_size H1' rho1' (Efun B1 e1))
-            (H2', rho2', Efun B2 e2, c - PS.cardinal (fundefs_fv B1), size_heap H2').
+            (H2', rho2', Efun B2 e2, 0, size_heap H2').
 
     (* Definition InvCostTO (e1 e2 : exp) := *)
     (*   forall (H1' H2' : heap block) (rho1' rho2' : env) c,    *)
@@ -1185,10 +1186,10 @@ Module Compat (H : Heap).
              m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
       (* Timeout! *)
-      - { simpl in Hcost. exists OOT, (c1 - (PS.cardinal (fundefs_fv B1))). 
+      - { simpl in Hcost. exists OOT, 0. 
           - eexists. eexists id. repeat split. econstructor. simpl.
             omega. reflexivity.
-            eapply Hbase; eassumption.
+            eapply Hbase; eassumption. 
             now rewrite cc_approx_val_eq. }
       (* Termination *)
       - { destruct (alloc (Env (restrict_env (fundefs_fv B1) rho1)) H1) as [env_loc H1''] eqn:Ha'. 

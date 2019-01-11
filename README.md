@@ -86,14 +86,14 @@ submodules, you should do:
 
 # git submodule update
   
-  This will fetch the appropriate branch from Template-Coq in directory Template-Coq
+  This will fetch the appropriate branch from the submodule (e.g. Template-Coq) in the appropriate directory in submodules (e.g. submobules/Template-Coq)
 
-# cd Template-Coq; make; make install
+# cd submodules/Template-Coq; make; make install
 
   This will make and install the branch of Template-Coq. Now when you
 compile certicoq it will use the appropriate version of Template-Coq.
 
-  When one modifies the Template-Coq reference (by adding commits for
+  When one modifies a submodule (e.g. Template-Coq) (by adding commits for
 example), all users of the branch have to do *by themselves* a:
 
 # git submodule update

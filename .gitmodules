@@ -1,3 +1,15 @@
 [submodule "Template-Coq"]
 	path = submodules/Template-Coq
 	url = https://github.com/Template-Coq/Template-Coq
+[submodule "submodules/coq-ext-lib"]
+	path = submodules/coq-ext-lib
+	url = https://github.com/coq-ext-lib/coq-ext-lib.git
+	branch = v8.8
+[submodule "submodules/SquiggleEq"]
+	path = submodules/SquiggleEq
+	url = https://github.com/aa755/SquiggleEq.git
+	branch = vcoq87
+[submodule "submodules/paramcoq"]
+	path = submodules/paramcoq
+	url = https://github.com/aa755/paramcoq.git
+	branch = v8.8

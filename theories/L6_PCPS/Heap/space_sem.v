@@ -562,7 +562,7 @@ Module SpaceSem (H : Heap).
 
 
   (** Semantics commutes with heap equivalence *)
-  Lemma big_step_gc_heap_env_equiv_r H1 H2 b1 rho1 rho2 e (r : ans) c m :
+  Lemma big_step_heap_env_equiv_r H1 H2 b1 rho1 rho2 e (r : ans) c m :
     closed (reach' H1 (env_locs rho1 (occurs_free e))) H1 ->
     big_step H1 rho1 e r c m ->
     (occurs_free e) |- (H1, rho1) ⩪_(b1, id) (H2, rho2) ->
@@ -1200,10 +1200,28 @@ Module SpaceSem (H : Heap).
       clear; now firstorder.
   Qed.      
       
-
-
-
-
+  (** Semantics commutes with heap equivalence *)
+  Corollary big_step_heap_env_equiv_l H1 H2 b1 rho1 rho2 e (r : ans) c m :
+    closed (reach' H1 (env_locs rho1 (occurs_free e))) H1 ->
+    big_step H1 rho1 e r c m ->
+    (occurs_free e) |- (H1, rho1) ⩪_(id, b1) (H2, rho2) ->
+    injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e))) b1 ->
+    (exists r' b1' b2', big_step H2 rho2 e r' c m /\
+                   injective_subdomain (reach_ans r) b1' /\
+                   injective_subdomain (reach_ans r') b2' /\
+                   ans_equiv b1' r b2' r').
+  Proof with (now eauto with Ensembles_DB).
+    intros Hc Hbs Hheq Hinj. 
+    edestruct inverse_exists as [b1' [Hinj' Hinv]]; [| eassumption | ]. 
+    now tci. 
+    assert (Hheq' := Hheq). eapply heap_env_equiv_inverse_subdomain in Hheq; [| eassumption ].
+    eapply big_step_heap_env_equiv_r; try eassumption.
+    eapply injective_subdomain_compose.
+    clear. now firstorder.
+    rewrite heap_env_equiv_image_reach. eassumption.
+    eassumption. 
+  Qed. 
+    
   (** * Interpretation of a context as a heap and an environment *)
 
   Fixpoint cost_ctx_full (c : exp_ctx) : nat :=

@@ -211,7 +211,7 @@ Module Compat (H : Heap).
       ~ f2' \in (f2 |: FromList xs2) ->
       Γ <> f2' ->
                 
-      cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 f1 f2 ->
+      (forall j, cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 f1 f2) ->
       Forall2 (fun x1 x2 =>
                  forall j, cc_approx_var_env k j IIG IG b H1 rho1 H2 rho2 x1 x2)
               xs1 xs2 ->
@@ -243,7 +243,7 @@ Module Compat (H : Heap).
             eapply Hbase; try eassumption.
             now rewrite cc_approx_val_eq.
           - edestruct Hvar as [l2 [Hget' Hcc]]; eauto. 
-            simpl in Hcc. rewrite Hgetl in Hcc.
+            simpl cc_approx_val' in Hcc. rewrite Hgetl in Hcc.
             destruct l2 as [l2 | ]; [| contradiction ].
             destruct Hcc as [Hbeq Hcc]; simpl in Hcc.
             destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction.
@@ -305,7 +305,7 @@ Module Compat (H : Heap).
             [ | now eauto |].
           eapply Forall2_monotonic; [| now apply Hall ].
           intros x1 x2 Hcc1. now eapply Hcc1. 
-          
+           
           edestruct Hvar as [l2 [Hget' Hcc]]; eauto.
           simpl in Hcc. rewrite Hgetl in Hcc. destruct l2 as [l2 | ]; [| contradiction ]. 
           destruct Hcc as [Hbeq Hcc]. simpl in Hcc.
@@ -385,7 +385,7 @@ Module Compat (H : Heap).
               edestruct (live'_live_inv (env_locs rho_clo4 (occurs_free e0)) b0 H'0 H'')
                 as [o [Hgcb [Hfe1b Hfe2b]]]; try eassumption.
               edestruct Hgcb as [_ [ hgcA hinjA ]].
-
+ 
               assert (Hequiv: occurs_free e0 |-
                       (H'', subst_env b0 rho_clo4) ⩪_( o, id) (H'0, rho_clo4)). 
               { eapply Equivalence_Transitive.
@@ -406,15 +406,32 @@ Module Compat (H : Heap).
                 symmetry. eapply f_eq_subdomain_antimon; [| eassumption ].
                 eapply reach'_extensive. } 
 
-
+              
               edestruct big_step_gc_heap_env_equiv_r with (b1 := o ) 
                 as [r1 [m1 [b1'' [b2''[Hgc'' _]]]]];
                 [| eassumption | | | do 2 eexists; eassumption ]. 
-              
-              clear. admit. (* form env relation on f + relation on args +
+
+              { rewrite subst_env_image.
+                destruct Hgc as [_ [Hequivb0 _]]. 
+                eapply heap_equiv_preserves_closed. eassumption.
+                
+                eapply reach'_closed. 
+                - eapply well_formed_antimon; [| eapply well_formed_reach_setlist; try eassumption ].
+                  eapply reach'_set_monotonic. eapply env_locs_monotonic.
+                  eapply Included_Union_preserv_l. reflexivity.
+                                    
+                  eapply well_formed_antimon; [| eapply well_formed_reach_alloc_def_funs;
+                                                 try eassumption ].
+                  
+                  eapply reach'_set_monotonic. eapply env_locs_monotonic.
+                  eapply Included_Union_preserv_l. reflexivity.
+
+
+                  
+                  clear. admit. (* form env relation on f + relation on args +
                         closedness lemmas *) 
               
-              eassumption. 
+                  eassumption. 
               eapply injective_subdomain_compose.
               clear. now firstorder.
 

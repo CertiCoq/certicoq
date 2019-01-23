@@ -49,12 +49,6 @@ Module CC_log_rel (H : Heap).
   
   (** Tag for closure records *)
   Variable (clo_tag : cTag). 
-
-  (** A program will not get stuck for any fuel amount *)
-  (* This is used to exclude programs that may timeout for low fuel,
-      but they might get stuck later *)
-  Definition not_stuck (H : heap block) (rho : env) (e : exp) :=
-    forall c, exists r m, big_step_GC H rho e r c m. 
   
   (** step-indexed relation on cps terms. Relates cps-terms with closure-converted terms  *)
   (* Expression relation : (XXX This comment is not up-to-date)

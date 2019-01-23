@@ -1029,5 +1029,48 @@ Module GC (H : Heap).
       + destruct v; destruct v1; simpl in *; congruence.
     - reflexivity.
    Qed.
-  
+
+  Lemma heap_equiv_size_reachable S {_ : ToMSet S} H1 H2 b1 :
+    reach' H1 S |- H1 ≃_(b1, id) H2 ->
+    injective_subdomain (reach' H1 S) b1 ->
+    size_reachable S H1 = size_reachable (image b1 S) H2. 
+  Proof.
+    intros Heq Hinj. unfold size_reachable, size_with_measure_filter.
+    erewrite heap_elements_filter_set_Equal with (S1 := reach' H2 (image b1 S))
+                                                 (S2 := image b1 (reach' H1 S)). 
+    - eapply fold_permutationA; [ | | eapply heap_elements_filter_PermutationA; eauto;
+                                      [| intros bl1 bl2 Hbl; eapply block_equiv_size_val; eassumption ]].
+      + intros [x1 x2] [y1 y2] z. firstorder.
+      + intros z [x1 x2] [y1 y2] Heqf. firstorder.
+      + constructor.
+        intros x1. reflexivity.
+        intros x1 x2 x3 Hr1 Hr2; congruence.
+    - symmetry. eapply heap_equiv_reach_eq.
+      eapply heap_equiv_antimon. eassumption.
+      now eapply reach'_extensive. 
+  Qed.
+
+
+  (* TODO move *)
+  Definition reach_size (H : heap block) (rho : env) (e : exp) :=
+    size_reachable (env_locs rho (occurs_free e)) H. 
+
+   
+  Corollary heap_env_equiv_reach_size e  H1 H2 rho1 rho2 b1 :
+    occurs_free e |- (H1, rho1) ⩪_( b1, id) (H2, rho2) ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) b1 ->
+    reach_size H1 rho1 e = reach_size H2 rho2 e. 
+  Proof.
+    intros Heq Hinj. unfold reach_size.
+    erewrite size_reachable_same_set with (S1 := (env_locs rho2 (occurs_free e)))
+                                          (S2 := image b1 (env_locs rho1 (occurs_free e))). 
+    eapply heap_equiv_size_reachable.
+    eapply heap_equiv_reach.
+    eapply heap_env_approx_heap_equiv_r. eassumption.
+    eassumption. 
+
+    eapply heap_env_equiv_image_post_n with (n := 0) in Heq. 
+    simpl in Heq. rewrite image_id in Heq. symmetry. eassumption. 
+  Qed.       
+
 End GC.

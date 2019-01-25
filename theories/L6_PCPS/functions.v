@@ -1048,3 +1048,21 @@ Proof.
 Qed.
 
 
+Lemma inverse_subdomain_symm A B S (f1 : A -> B) (f2 : B -> A) :
+  inverse_subdomain S f1 f2 ->
+  inverse_subdomain (image f1 S) f2 f1. 
+Proof.
+  intros [Hin1 Hin2]. split. 
+  rewrite <- image_compose.
+  rewrite image_f_eq_subdomain; [| eassumption ].
+  rewrite image_id. eassumption. eassumption.
+Qed.
+
+Lemma injective_subdomain_f_eq_subdomain {A B} S (f1 f2 : A -> B ) : 
+  injective_subdomain S f1 ->
+  f_eq_subdomain S f1 f2 ->
+  injective_subdomain S f2.
+Proof.
+  intros Hin1 Hsub x1 x2 H1 H2 Heq. eapply Hin1; eauto.
+  rewrite !Hsub; eassumption.
+Qed.

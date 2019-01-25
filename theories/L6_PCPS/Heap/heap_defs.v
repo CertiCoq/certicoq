@@ -2939,4 +2939,46 @@ Module HeapDefs (H : Heap) .
     - inv Hin. 
   Qed. 
 
+  Lemma def_closures_env_locs_post_reach
+        (S : Ensemble var) (H H' : heap block) (rho rho' : env)
+        (B B0 : fundefs) (cenv : value) :
+    def_closures B B0 rho H cenv = (H', rho') ->
+    post H (val_loc cenv) \subset (reach' H (env_locs rho S)) ->
+    post H' (val_loc cenv) \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
+  Proof.
+    revert S rho rho' H H'; induction B; intros S rho rho' H H' Hdef Hsub; simpl.
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho H cenv) as [H'' rho''] eqn:Hdef'.
+      destruct (alloc _ H'') as [l' H'''] eqn:Hal. inv Hdef.
+      rewrite env_locs_set_In; [| now eauto ]. rewrite reach'_Union.
+      eapply Included_Union_preserv_l.
+      eapply Included_trans; [| eapply Included_post_n_reach' with (n := 2) ].
+      simpl. rewrite post_Singleton; [| erewrite gas; eauto ].
+      simpl. eapply post_set_monotonic. now eauto with Ensembles_DB.
+    - rewrite Union_Empty_set_neut_r. inv Hdef.
+      eassumption.
+  Qed.
+
+  Lemma def_closures_env_locs_reach_reach
+        (S : Ensemble var) (H H' : heap block) (rho rho' : env)
+        (B B0 : fundefs) (cenv : value) :
+    def_closures B B0 rho H cenv = (H', rho') ->
+    reach' H (val_loc cenv) \subset (reach' H (env_locs rho S)) ->
+    reach' H' (val_loc cenv) \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
+  Proof.
+    revert S rho rho' H H'; induction B; intros S rho rho' H H' Hdef Hsub; simpl.
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho H cenv) as [H'' rho''] eqn:Hdef'.
+      destruct (alloc _ H'') as [l' H'''] eqn:Hal. inv Hdef.
+      rewrite env_locs_set_In; [| now eauto ]. rewrite reach'_Union.
+      eapply Included_Union_preserv_l.
+      rewrite (reach_unfold H' (val_loc (Loc l'))). 
+      simpl. rewrite post_Singleton; [| erewrite gas; eauto ]. simpl.
+      eapply Included_Union_preserv_r. rewrite Union_Empty_set_neut_l.
+      reflexivity. 
+    - rewrite Union_Empty_set_neut_r. inv Hdef.
+      eassumption.
+  Qed.
+
+  
 End HeapDefs.

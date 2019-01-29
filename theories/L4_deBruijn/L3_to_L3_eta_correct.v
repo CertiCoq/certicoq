@@ -3,20 +3,21 @@
   Enforce eta-expanded branches in match, so that the following L3-L4 phase
   can strip them correctly. *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
-        Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import FunInd.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
 Require Import L4.expression.
-Require Import L3_to_L3_eta.
-
-Require Import L3.term L3.program L3.compile L3.wcbvEval.
-Require L3_eta_crct.
+Require Import L3_to_L3_eta L3_eta_crct.
+Require Import L2k.term L2k.program L2k.compile L2k.wcbvEval.
+Require Import L3_eta_crct.
 Module L3C := L3_eta_crct.
 
-Lemma Lookup_trans_env e nm t : LookupDfn nm e t -> LookupDfn nm (transEnv e) (trans t).
+Lemma Lookup_trans_env e nm t :
+  LookupDfn nm e t -> LookupDfn nm (transEnv e) (trans t).
 Proof.
   red. intros H. red in H.
   dependent induction H. simpl. constructor.
@@ -26,23 +27,17 @@ Qed.
 Lemma wcbvEval_pres_Crct e t t' :
   crctTerm e 0 t -> WcbvEval e t t' -> crctTerm e 0 t'.
 Proof.
-  intros.
-  destruct (WcbvEval_pres_Crct e).
-  now apply (H1 t).
+  intros. eapply (proj1 (WcbvEval_pres_Crct e)); try eassumption.
 Qed.
 
-Lemma Crct_invrt_Case e n ann mch brs :
+Lemma Crct_invrt_Case e n ann mch brs:
   crctTerm e n (TCase ann mch brs) ->
   crctTerm e n mch /\ crctBs e n brs /\
   crctAnnot e ann brs /\
-  (forall i t, bnth i brs = Some t -> crctTerm e n (fst t)).
+  (forall i t, bnth i brs = Some t -> crctTerm e n (snd t)).
 Proof.
-  intros.
-  apply Crct_invrt_Case in H. intuition. clear H2.
-  revert H i t H1.
-  induction 1; simpl; intros; try discriminate.
-  destruct i. injection H2 as <-; auto.
-  eapply IHcrctBs; eauto.
+  intros. pose proof (Crct_invrt_Case H). intuition.
+  destruct t. cbn. apply (bnth_pres_Crct H0 _ H2).
 Qed.
 
 Lemma L3C_Crct_invrt_Case e n ann mch brs :
@@ -50,8 +45,8 @@ Lemma L3C_Crct_invrt_Case e n ann mch brs :
   L3C.crctTerm e n mch /\ L3C.crctBs e n brs /\
   crctAnnot e ann brs /\
   (forall i t, bnth i brs = Some t ->
-               is_n_lambda (snd t) (fst t) = true /\
-               L3C.crctTerm e n (fst t)).
+               is_n_lambda (fst t) (snd t) = true /\
+               L3C.crctTerm e n (snd t)).
 Proof.
   intros.
   apply L3C.Crct_invrt_Case in H.
@@ -59,8 +54,9 @@ Proof.
   split; [ | split]; auto. split; auto.
   clear H H''.
   induction H'; simpl; intros; try discriminate.
-  destruct i. injection H1 as <-; auto.
-  eapply IHH'; eauto.
+  destruct i, m; try injection H1 as <-; auto.
+  - eapply IHH'; eauto.
+  - eapply IHH'; eauto.
 Qed.
 
 Lemma L3C_Crct_construct {e : environ Term} {i n args} : L3C.crctEnv e ->
@@ -69,7 +65,8 @@ Lemma L3C_Crct_construct {e : environ Term} {i n args} : L3C.crctEnv e ->
 Proof.
   intros.
   destruct i.
-  apply L3C.Crct_invrt_Construct in H0 as (crctArgs&itypk&Hlook&ip&Hip&ctr&Hctr&Hargs).
+  apply L3C.Crct_invrt_Construct in H0 as
+      (crctArgs&itypk&Hlook&ip&Hip&ctr&Hctr&Hargs).
   unfold cnstrArity.
   destruct Hlook as [Hlook Hne].
   apply Lookup_lookup in Hlook.
@@ -84,7 +81,8 @@ Lemma Crct_construct {e : environ Term} {i n args} :
 Proof.
   intros.
   destruct i.
-  apply Crct_invrt_Construct in H0 as (crctArgs&itypk&Hlook&ip&Hip&ctr&Hctr&Hargs).
+  apply Crct_invrt_Construct in H0 as
+      (crctArgs&itypk&Hlook&ip&Hip&ctr&Hctr&Hargs).
   unfold cnstrArity.
   destruct Hlook as [Hlook Hne].
   apply Lookup_lookup in Hlook.
@@ -95,55 +93,135 @@ Qed.
 Lemma bnth_trans n t i brs :
   bnth n brs = Some t -> exists t',
     bnth n (trans_brs i brs) = Some t' /\
-    fst t' = eta_expand (snd t) (trans (fst t)).
+    snd t' = eta_expand (fst t) (trans (snd t)).
 Proof.
-  revert n t i; induction brs; intros *.
-  simpl; intros. discriminate.
-  
-  simpl. destruct n0. simpl.
-  intros [= <-].
-  eexists; split; eauto.
-  simpl.
-  
-  intros. now eapply IHbrs.
+  revert n t i. induction brs; intros *; simpl.
+  - intros. discriminate.
+  - destruct n.
+    + simpl. intros. myInjection H. exists (0, trans t). eauto.
+    + intros. now eapply IHbrs.
 Qed.
       
 Arguments raise : simpl never.
 Arguments String.append : simpl never.
 
+(************
+Lemma match_annot_n:
+  forall cnstrs brs, match_annot cnstrs brs ->
+  forall n c, exnNth cnstrs n = Ret c ->
+  forall t, bnth n brs = Some t -> CnstrArity c = fst t.
+Proof.
+  induction 1; intros.
+  - inversion H0.
+  - case_eq n; intros.
+    + subst. myInjection H1. cbn in H2. case_eq (CnstrArity c0); intros.
+      * rewrite H in H2. myInjection H2. reflexivity.
+      * rewrite H in H2. rewrite <- H. eapply IHmatch_annot; try eassumption.
+
+
+
+  - inversion_Clear H0.
+    + simpl in H2. case_eq (CnstrArity c); intros.
+      * rewrite H in *. destruct t0. myInjection H2. destruct n.
+        -- cbn in H1. myInjection H1. assumption.
+        -- change (exnNth [] n = Ret c0) in H1. discriminate.
+      * rewrite H in H2. discriminate.
+    + eapply IHmatch_annot.
+
+
+    + case_eq n; intros.
+      * subst. cbn in H1. myInjection H1. cbn in H2.
+        case_eq (CnstrArity c0); intros; rewrite H in H2.
+        -- myInjection H2. reflexivity.
+        -- case_eq (CnstrArity c1); intros.
+           ++ rewrite H0 in H2. myInjection H2.
+
+        eapply IHmatch_annot.
+    
+  - case_eq n; intros.
+    + subst.  simpl in H1, H2. destruct (CnstrArity c).
+      * eapply IHmatch_annot. Print match_annot.
+      * destruct t0. myInjection H1. myInjection H2.
+
+
+      eapply IHmatch_annot; try eassumption.
+  intros H; revert n c t; induction H; intros; simpl; auto.
+  - discriminate.
+  - destruct n.
+    + injection H1; intros ->. cbn in H2.
+      destruct args.
+      * myInjection H2. assumption. 
+      * simpl in H1. eapply IHmatch_annot; try eassumption. simpl in H1, H2. specialize (IHmatch_annot _ _ _ _ H2).
+Qed.
+*******************)
+
 Lemma match_annot_n {cnstrs brs n c t} :
   match_annot cnstrs brs ->
   exnNth cnstrs n = Ret c ->
-  bnth n brs = Some t -> CnstrArity c = snd t.
+  bnth n brs = Some t -> CnstrArity c = fst t.
 Proof.
+Admitted.
+  (**************
   intros H; revert n c t; induction H; intros; simpl; auto.
   - discriminate.
-  - destruct n. injection H1; intros ->. injection H2; intros <-.
-    simpl; auto.
+  - destruct n.
+    + injection H1; intros ->. cbn in H2.
+      destruct args.
+      * myInjection H2. assumption. 
+      * simpl in H1. eapply IHmatch_annot; try eassumption. inversion_Clear H0.
+        -- inversion H2.
+        -- erewrite (IHmatch_annot _ c0 _ _ H2) in H. inversion_Clear H4.
+           unfold bnth in H2. case_eq (CnstrArity c); intros.
+           ++ rewrite H0 in *. myInjection H2. discriminate.
+           ++ rewrite H0 in *. discriminate.
+           ++ admit.
+    + simpl in H2. case_eq args; intros.
+      * subst. rewrite H3 in *. myInjection H2. simpl in H1.
+        eapply IHmatch_annot. eassumption. inversion_Clear H0.
+        -- inversion H1.
+        -- simpl. case_eq (CnstrArity c1); intros.
+           ++ rewrite H in *. case_eq n; intros.
+              ** subst.
 
-    simpl in H1, H2.
-    now specialize (IHmatch_annot _ _ _ H1 H2).
+              
+      assert (j:exists x, t0 = (S args, x)). admit.
+           dstrctn j. subst. cbn in H2. case_eq (CnstrArity c); intros.
+           ++ rewrite H0 in *. myInjection H2. discriminate.
+           ++ rewrite H0 in *. myInjection H2.
+        Print exnNth.
 Qed.
+******************)
 
-Lemma WcbvEval_mkApp_einv {e f a s} : WcbvEval e (mkApp f a) s ->
-                                      exists s', WcbvEval e f s'.
+Lemma WcbvEval_mkApp_einv:
+  forall a e f s, WcbvEval e (mkApp f a) s -> exists s', WcbvEval e f s'.
 Proof.
-  revert f; induction a; simpl; intros.
+  induction a; simpl; intros.
   - exists s. intuition. 
-  - specialize (IHa (TApp f t) H).
+  - specialize (IHa _ (TApp f t) _ H).
     destruct IHa. inv H0.
+    * now exists TProof.
     * now exists (TLambda nm bod).
     * now exists (TFix dts m).
-    * now exists TProof.
+                 * destruct H4 as [H4|[H4|H4]]; now exists fn'.
 Qed.
 
-Lemma WcbvEval_is_n_lam e n t t' : is_n_lambda n t = true -> WcbvEval e t t' -> is_n_lambda n t' = true.
+Lemma WcbvEval_is_n_lam e n t t' :
+  is_n_lambda n t = true -> WcbvEval e t t' -> is_n_lambda n t' = true.
 Proof.
   induction n; simpl; intros Hlam; auto.
   
   destruct t; try discriminate.
   intros. inv H.
   auto.
+Qed.
+
+Lemma WcbvEval_no_further:
+  forall p,
+  (forall t s, WcbvEval p t s -> WcbvEval p s s) /\
+  (forall ts ss, WcbvEvals p ts ss -> WcbvEvals p ss ss).
+Proof.
+  intros p.
+  apply WcbvEvalEvals_ind; cbn; intros; auto.
 Qed.
 
 Lemma wcbvEval_no_step e s t : WcbvEval e s t -> WcbvEval e t t.
@@ -160,38 +238,48 @@ Lemma WcbvEval_mkApp_inner e f s' a s :
   
 Proof.
   revert f s' s; induction a; intros *; split; intros evf evapp; simpl in *.
-  - pose (wcbvEval_no_step _ _ _ evf). rewrite <- (WcbvEval_single_valued w evapp). eauto.
+  - pose (wcbvEval_no_step _ _ _ evf).
+    rewrite <- (WcbvEval_single_valued w evapp). eauto.
   - rewrite <- (WcbvEval_single_valued evf evapp). eauto.
     
   - simpl in *.
-    destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
+    destruct (WcbvEval_mkApp_einv _ _ _ _ evapp) as [s'' evs''].
     assert(WcbvEval e (TApp f t) s'').
     { pose (wcbvEval_no_step _ _ _ evf). inv evs''. 
-      pose proof (WcbvEval_single_valued w H1). subst s'.
+      pose proof (WcbvEval_single_valued w H2). subst s'.
       econstructor; eauto.
       pose proof (WcbvEval_single_valued w H1). subst s'.
+      eapply wAppLam; try eassumption.
       eapply wAppFix; eauto.
-      pose proof (WcbvEval_single_valued w H1). subst s'.
-      eapply wAppProof; eauto. }
+      pose proof (WcbvEval_single_valued w H1). subst s'. assumption.
+      apply wAppCong; try assumption.
+      pose proof (WcbvEval_single_valued H1 (wcbvEval_no_step _ _ _ evf)).
+      subst. assumption. }
     eapply (proj1 (IHa (TApp f t) s'' s)); eauto.
     eapply (proj2 (IHa (TApp s' t) s'' s)); eauto.
 
   - simpl in *.
-    destruct (WcbvEval_mkApp_einv evapp) as [s'' evs''].
+    destruct (WcbvEval_mkApp_einv _ _ _ _ evapp) as [s'' evs''].
     assert(WcbvEval e (TApp s' t) s'').
     { inv evs''. 
-      pose proof (WcbvEval_single_valued evf H1). subst s'.
+      pose proof (WcbvEval_single_valued evf H2). subst s'.
       econstructor; eauto.
       pose proof (WcbvEval_single_valued evf H1). subst s'.
+      eapply wAppLam; try eassumption.
+      econstructor.
       eapply wAppFix; eauto.
       pose proof (WcbvEval_single_valued evf H1). subst s'.
-      eapply wAppProof; eauto. }
+      econstructor.
+      eapply wAppCong; try assumption.
+      pose proof (WcbvEval_single_valued H1 evf).
+      subst. eapply wcbvEval_no_step. eassumption. }
     eapply (proj1 (IHa _ _ s)). eauto.
     eapply (proj2 (IHa _ _ s)). eapply evs''. apply evapp.
 Qed.
 
-Lemma instantiate_eta t k n u : WFTrm t 0 -> instantiate t k (eta_expand n u) =
-                                            eta_expand n (instantiate t k u).
+Lemma instantiate_eta t k n u :
+  WFTrm t 0 ->
+  instantiate t k (eta_expand n u) = eta_expand n (instantiate t k u).
 Proof.
   revert k u; induction n; intros. simpl. auto.
   simpl. rewrite instantiate_TLambda.
@@ -201,7 +289,8 @@ Proof.
   lia.
 Qed.
   
-Lemma wcbvEval_eta e t s n : WcbvEval e t s -> exists s', WcbvEval e (eta_expand n t) s'.
+Lemma wcbvEval_eta e t s n :
+  WcbvEval e t s -> exists s', WcbvEval e (eta_expand n t) s'.
 Proof.
   induction n; intros.
   simpl.
@@ -230,7 +319,7 @@ Proof.
   intros wfargs nosteps.
   revert e f s wfargs nosteps; induction args; intros.
   { simpl; trivial. }
-  simpl in *; pose proof (WcbvEval_mkApp_einv H).
+  simpl in *; pose proof (WcbvEval_mkApp_einv _ _ _ _ H).
   destruct H0 as [s' evft].
   destruct (wcbvEval_eta _ _ _ (tlength args) evft).
 
@@ -304,12 +393,85 @@ Qed.
 
 Lemma trans_instantiate_any  a k :
   WFTrm (trans a) 0 ->
-  forall b, trans (L3.term.instantiate a k b) =
+  forall b, trans (L2k.term.instantiate a k b) =
             instantiate (trans a) k (trans b).
 Proof.
   intros. destruct instantiate_hom. now apply H0.
 Qed.
 
+Lemma trans_instantiate_fix:
+  forall ds x, (pre_whFixStep (trans x) (trans_fixes ds)) =
+               trans (pre_whFixStep x ds).
+Proof.
+  induction ds; intros.
+  - cbn. reflexivity.
+  - eapply IHds.
+    + subst. cbn in H. discriminate.
+    + rewrite H0 in *. cbn in H. injection H; intros. subst ltz. subst a.
+      Eval cbn in (IHltz (dcons n t n0 d)).
+      cbn.
+
+      
+Lemma trans_instantiate_fix:
+  forall ltz ds, ltz = (list_to_zero (dlength ds)) ->
+    forall x, (pre_whFixStep (trans x) (trans_fixes ds)) =
+              trans (pre_whFixStep x ds).
+Proof.
+  induction ltz; intros.
+  - destruct ds.
+    + cbn. reflexivity.
+    + cbn in H. discriminate.
+  - case_eq ds; intros.
+    + subst. cbn in H. discriminate.
+    + rewrite H0 in *. cbn in H. injection H; intros. subst ltz. subst a.
+      Eval cbn in (IHltz (dcons n t n0 d)).
+      cbn.
+
+        Lemma trans_instantiate_fix:
+  forall ltz ds, ltz = (list_to_zero (dlength ds)) ->
+    WFTrmDs (trans_fixes ds) (dlength ds) ->
+    forall x, (pre_whFixStep (trans x) (trans_fixes ds)) =
+              trans (pre_whFixStep x ds).
+Proof.
+  induction ltz; intros.
+  - destruct ds.
+    + cbn. reflexivity.
+    + cbn in H. discriminate.
+  - case_eq ds; intros.
+    + subst. cbn in H. discriminate.
+    + rewrite H1 in *. cbn in H. injection H; intros. subst ltz. subst a.
+      apply IHltz.
+      * cbn.
+
+
+    intros. unfold pre_whFixStep. rewrite trans_fixes_pres_dlength.
+  set (foo:= TFix (trans_fixes ds)).
+  functional induction (list_to_zero (dlength ds)).
+
+  set(bar:= TFix ds).
+  rewrite trans_fixes_pres_dlength. induction (list_to_zero (dlength ds)).
+  - simpl. reflexivity.
+  -  simpl.
+     subst foo. subst bar. rewrite <- (trans_instantiate_any (TFix ds a)).
+     rewrite (proj1 instantiate_hom ).
+  rewrite IHl. f_equal. auto. simpl. constructor.
+  rewrite trans_fixes_pres_dlength. apply H.
+Qed.
+
+  
+  simpl. unfold pre_whFixStep. intros. f_equal.
+  revert x.
+  set(foo:= TFix (trans_fixes ds)).
+  set(bar:= TFix ds).
+  rewrite trans_fixes_pres_dlength. induction (list_to_zero (dlength ds)).
+  simpl. reflexivity.
+  simpl. intros.
+  subst foo. rewrite <- (trans_instantiate_any (TFix ds a)).
+  rewrite IHl. f_equal. auto. simpl. constructor.
+  rewrite trans_fixes_pres_dlength. apply H.
+Qed.
+
+(************************
 Lemma trans_instantiate_fix x ds arg :
   WFTrmDs (trans_fixes ds) (dlength ds) ->
   pre_whFixStep (trans x) (trans_fixes ds) (trans arg) =
@@ -326,6 +488,7 @@ Proof.
   rewrite IHl. f_equal. auto. simpl. constructor.
   rewrite trans_fixes_pres_dlength. apply H.
 Qed.
+**********************)
 
 Lemma Lookup_hom:
   forall p (s:string) ec,

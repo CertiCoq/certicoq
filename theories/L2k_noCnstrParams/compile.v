@@ -5,22 +5,31 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Common.Common.
 Require Import Omega.
-Require Import L2d.compile.
-Require Import L2d.term.
+Require Import L1g.compile.
+Require Import L1g.term.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition L2dTerm := L2d.compile.Term.
-Definition L2dTerms := L2d.compile.Terms.
-Definition L2dBrs := L2d.compile.Brs.
-Definition L2dDefs := L2d.compile.Defs.
-Definition L2dPgm := Program L2dTerm.
-Definition L2dEC := envClass L2dTerm.
-Definition L2dEnv := environ L2dTerm.
+Definition L1gTerm := L1g.compile.Term.
+Definition L1gTerms := L1g.compile.Terms.
+Definition L1gBrs := L1g.compile.Brs.
+Definition L1gDefs := L1g.compile.Defs.
+Definition L1gPgm := Program L1gTerm.
+Definition L1gEC := envClass L1gTerm.
+Definition L1gEnv := environ L1gTerm.
 
+(** no longer need npars to compute projections **)
+Definition projection := (inductive * nat)%type.
+Lemma project_dec: forall (s1 s2:projection), {s1 = s2}+{s1 <> s2}.
+Proof.
+  intros s1 s2. destruct s1, s2. 
+  destruct (inductive_dec i i0), (eq_nat_dec n n0);
+    subst; try (solve [left; reflexivity]);
+  right; intros h; elim n1; injection h; intuition.
+Qed.
 
 Inductive Term : Type :=
 | TRel       : nat -> Term
@@ -34,8 +43,8 @@ Inductive Term : Type :=
 | TCase      : inductive ->
                Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
+| TProj      : projection -> Term -> Term
 | TWrong     : string -> Term
-| TDummy     : string -> Term
 with Terms : Type :=
 | tnil : Terms
 | tcons : Term -> Terms -> Terms
@@ -206,6 +215,7 @@ Function lift (n:nat) (t:Term) : Term :=
     | TConstruct i x args => TConstruct i x (lifts n args)
     | TCase i mch brs => TCase i (lift n mch) (liftBs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
+    | TProj prj bod => TProj prj (lift n bod)
     | _ => t
   end
 with lifts (n:nat) (ts:Terms) : Terms :=
@@ -229,7 +239,6 @@ with liftBs_ind' := Induction for liftBs Sort Prop
 with liftDs_ind' := Induction for liftDs Sort Prop.
 Combined Scheme liftLiftsliftBsLiftDs_ind
          from lift_ind', lifts_ind', liftBs_ind', liftDs_ind'.
-
 
 Lemma lifts_pres_tlength:
   forall n ts, tlength (lifts n ts) = tlength ts.
@@ -292,7 +301,7 @@ Function etaExpand_args_Lam   (* no more parameters expected *)
   (* no more actual args, no more pars or args expected: finished *)
   | 0, tnil => body computedArgs
   (* more actual args than [npars + nargs]: impossible *)
-  | 0, tcons _ _ => TDummy "strip; Constructor; too many args"
+  | 0, tcons _ _ => TWrong "strip; Constructor; too many args"
   (* no more actual args but more args expected: eta expand *)
   | S n, tnil =>
     etaExpand_args_Lam' n body
@@ -312,7 +321,7 @@ Definition etaExpand_args_Construct   (* no more parameters expected *)
   (* no more actual args, no more pars or args expected: finished *)
   | 0, tnil => TConstruct i m tnil
   (* more actual args than [npars + nargs]: impossible *)
-  | 0, tcons u us => TDummy "strip; Constructor; too many args"
+  | 0, tcons u us => TWrong "strip; Constructor; too many args"
   (* no more actual args but more args expected: eta expand *)
   | S n, tnil =>
     etaExpand_args_Lam' n (TConstruct i m ) (tunit (TRel 0))
@@ -372,7 +381,7 @@ Function etaExpand_aArgs (nargs nlams:nat) (aArgs cArgs:Terms) :=
     (* step through nargs expected and actual args found *)
   | S n, tcons u us => etaExpand_aArgs n nlams us (tappend cArgs (tunit u))
     (* error: more actual args than expected *)
-  | 0, tcons _ _ => TDummy "strip; Constructor; too many args"
+  | 0, tcons _ _ => TWrong "strip; Constructor; too many args"
     (* ran out of actual args; more args expected; finish expanding *)
   | n, tnil => nLambda nlams (mkExpand n F cArgs)
   end.
@@ -392,60 +401,60 @@ Function etaExpand (actualArgs:Terms) (npars nargs:nat)  (* inputs *) : Term :=
 End ee.
 
 Section Strip.
-  Variable pre_strip: L2dTerm -> Term.
-  Function CanonicalP (fn:L2dTerm) (arg:Term) :
+  Variable pre_strip: L1gTerm -> Term.
+  Function CanonicalP (fn:L1gTerm) (arg:Term) :
     option ((Terms->Term) * Terms * nat * nat) :=
     match fn with
-    | L2d.compile.TConstruct i m np na =>
+    | L1g.compile.TConstruct i m np na =>
       Some (TConstruct i m, tunit arg, np, na)
-    | L2d.compile.TApp gn brg =>
+    | L1g.compile.TApp gn brg =>
       match CanonicalP gn (pre_strip brg) with
       | Some (F, brgs, np, na) =>
         Some (F, tappend brgs (tunit arg), np, na)
       | None => None
       end
     | _ => None
-  end.
+    end.
+  Function strips (ts:L1gTerms) {struct ts} : Terms :=
+    match ts with
+    | nil => tnil
+    | cons u us => tcons (pre_strip u) (strips us)
+    end.
 End Strip.
 
-Function strip (t:L2dTerm) : Term :=
+Function strip (t:L1gTerm) : Term :=
   match t with
-  | L2d.compile.TRel n => TRel n
-  | L2d.compile.TProof => TProof
-  | L2d.compile.TLambda nm bod => TLambda nm (strip bod)
-  | L2d.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
-  | L2d.compile.TApp fn arg =>
+  | L1g.compile.TRel n => TRel n
+  | L1g.compile.TProof => TProof
+  | L1g.compile.TLambda nm bod => TLambda nm (strip bod)
+  | L1g.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
+  | L1g.compile.TApp fn arg =>
     let sarg := strip arg in
     match CanonicalP strip fn sarg with
     | None => TApp (strip fn) sarg
     | Some (F, args, npars, nargs) => etaExpand F args npars nargs
     end
-  | L2d.compile.TConst nm => TConst nm
-  | L2d.compile.TConstruct i m npars nargs =>
+  | L1g.compile.TConst nm => TConst nm
+  | L1g.compile.TConstruct i m npars nargs =>
     etaExpand (TConstruct i m) tnil npars nargs
-  | L2d.compile.TCase i mch brs => TCase (fst i) (strip mch) (stripBs brs)
-  | L2d.compile.TFix ds n => TFix (stripDs ds) n
-  | L2d.compile.TWrong str => TWrong str
-  | L2d.compile.TDummy str => TDummy str
+  | L1g.compile.TCase i mch brs => TCase (fst i) (strip mch) (stripBs brs)
+  | L1g.compile.TFix ds n => TFix (stripDs ds) n
+  | L1g.compile.TProj (ind, _, nargs) bod => TProj (ind, nargs) (strip bod)
+  | L1g.compile.TWrong str => TWrong str
   end
-with strips (ts:L2dTerms) : Terms :=
-    match ts with
-    | L2d.compile.tnil => tnil
-    | L2d.compile.tcons u us => tcons (strip u) (strips us)
-    end
-with stripBs (bs:L2dBrs) : Brs := 
+with stripBs (bs:L1gBrs) : Brs := 
        match bs with
-       | L2d.compile.bnil => bnil
-       | L2d.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
+       | L1g.compile.bnil => bnil
+       | L1g.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
        end
-with stripDs (ts:L2dDefs) : Defs := 
+with stripDs (ts:L1gDefs) : Defs := 
        match ts with
-       | L2d.compile.dnil => dnil
-       | L2d.compile.dcons nm t m ds => dcons nm (strip t) m (stripDs ds)
+       | L1g.compile.dnil => dnil
+       | L1g.compile.dcons nm t m ds => dcons nm (strip t) m (stripDs ds)
        end.
 
 Lemma strip_pres_dlength:
-  forall ds:L2dDefs, L2d.term.dlength ds = dlength (stripDs ds).
+  forall ds:L1gDefs, L1g.compile.dlength ds = dlength (stripDs ds).
 Proof.
   induction ds; intros.
   - reflexivity.
@@ -453,7 +462,7 @@ Proof.
 Qed.
                   
 Lemma strips_pres_tlength:
-  forall ts:L2dTerms, L2d.term.tlength ts = tlength (strips ts).
+  forall ts:L1gTerms, List.length ts = tlength (strips strip ts).
 Proof.
   induction ts; intros.
   - reflexivity.
@@ -462,7 +471,7 @@ Qed.
 
   
 (** environments and programs **)
-Function stripEC (ec:L2dEC) : AstCommon.envClass Term :=
+Function stripEC (ec:L1gEC) : AstCommon.envClass Term :=
   match ec with
   | ecTrm t => ecTrm (strip t)
   | ecTyp _ n itp =>
@@ -470,8 +479,8 @@ Function stripEC (ec:L2dEC) : AstCommon.envClass Term :=
     ecTyp Term 0 itp
   end.
 
-Definition  stripEnv : L2dEnv -> AstCommon.environ Term :=
-  List.map (fun nmec : string * L2dEC => (fst nmec, stripEC (snd nmec))).
+Definition  stripEnv : L1gEnv -> AstCommon.environ Term :=
+  List.map (fun nmec : string * L1gEC => (fst nmec, stripEC (snd nmec))).
 
 Lemma stripEcTrm_hom:
   forall t, stripEC (ecTrm t) = ecTrm (strip t).
@@ -495,10 +504,10 @@ Proof.
   exists (snd p0), gp. intuition.
 Qed.
 
-Definition stripProgram (p:L2dPgm) : Program Term :=
+Definition stripProgram (p:L1gPgm) : Program Term :=
   {| env:= stripEnv (env p);
      main:= strip (main p) |}.
 
 (*** from L2 to L2k ***)
-Definition program_Program (p:program) : Program Term :=
-  stripProgram (L2d.compile.program_Program p).
+Definition program_Program `{F:utils.Fuel} (p:Ast.program) : Program Term :=
+  stripProgram (L1g.compile.program_Program p).

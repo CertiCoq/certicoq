@@ -1,4 +1,7 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program
+        Coq.micromega.Psatz.
+Require Import FunInd.
 Require Import Common.Common.
 Open Scope N_scope.
 Opaque N.add.
@@ -128,29 +131,38 @@ Definition isLambda (e : exp) :=
 (** [exp_wf i e] ensures there is no free variable above [i]. *)
 Inductive exp_wf: N -> exp -> Prop :=
 | var_e_wf: forall i j, j < i -> exp_wf i (Var_e j)
-| lam_e_wf: forall i n e, exp_wf (1 + i) e -> exp_wf i (Lam_e n e)
-| app_e_wf: forall i e1 e2, exp_wf i e1 -> exp_wf i e2 ->
-                             exp_wf i (App_e e1 e2)
-| con_e_wf: forall i d es, exps_wf i es -> exp_wf i (Con_e d es)
-| match_e_wf: forall i e n bs, exp_wf i e -> branches_wf i bs ->
-                              exp_wf i (Match_e e n bs)
-| let_e_wf: forall i n e1 e2, exp_wf i e1 -> exp_wf (1 + i) e2 ->
-                             exp_wf i (Let_e n e1 e2)
-| fix_e_wf: forall i (es:efnlst) k, efnlst_wf (efnlst_length es + i) es ->
-                                     exp_wf i (Fix_e es k)
+| lam_e_wf: forall i n e,
+    exp_wf (1 + i) e -> exp_wf i (Lam_e n e)
+| app_e_wf: forall i e1 e2,
+    exp_wf i e1 -> exp_wf i e2 ->
+    exp_wf i (App_e e1 e2)
+| con_e_wf: forall i d es,
+    exps_wf i es -> exp_wf i (Con_e d es)
+| match_e_wf: forall i e n bs,
+    exp_wf i e -> branches_wf i bs ->
+    exp_wf i (Match_e e n bs)
+| let_e_wf: forall i n e1 e2,
+    exp_wf i e1 -> exp_wf (1 + i) e2 ->
+    exp_wf i (Let_e n e1 e2)
+| fix_e_wf: forall i (es:efnlst) k,
+    efnlst_wf (efnlst_length es + i) es ->
+    exp_wf i (Fix_e es k)
 (* Fix?: Axiom applied to anything should reduce to Axiom *)
 | prf_e_wf : forall i, exp_wf i Prf_e
 with exps_wf: N -> exps -> Prop :=
 | enil_wf: forall i, exps_wf i enil
-| econs_wf: forall i e es, exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
+| econs_wf: forall i e es,
+    exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
 with efnlst_wf: N -> efnlst -> Prop :=
 | flnil_wf_e: forall i, efnlst_wf i eflnil
-| flcons_wf_e: forall i f e es, exp_wf i e -> isLambda e -> efnlst_wf i es ->
-                           efnlst_wf i (eflcons f e es)
+| flcons_wf_e: forall i f e es,
+    exp_wf i e -> isLambda e -> efnlst_wf i es ->
+    efnlst_wf i (eflcons f e es)
 with branches_wf: N -> branches_e -> Prop :=
 | brnil_wf: forall i, branches_wf i brnil_e
-| brcons_wf: forall i d n e bs, exp_wf (nargs n + i) e -> branches_wf i bs ->
-                                branches_wf i (brcons_e d n e bs).
+| brcons_wf: forall i d n e bs,
+    exp_wf (nargs n + i) e -> branches_wf i bs ->
+    branches_wf i (brcons_e d n e bs).
 Hint Constructors exp_wf exps_wf branches_wf.
 Scheme exp_wf_ind2 := Induction for exp_wf Sort Prop
 with exps_wf_ind2 := Induction for exps_wf Sort Prop
@@ -461,8 +473,9 @@ Proof.
   tauto.
 Qed.
 
-(** According to Berghofer and Urban, this is a critical property of substitution, *)
-(*     though we don't use it here. *)
+(** According to Berghofer and Urban, this is a critical property of
+    substitution, though we don't use it here. 
+**)
 Lemma substitution :
   forall (M N L:exp) i j, i <= j ->
     M{i := N}{j := L} = M{1+j := L}{i := N{ j-i := L}}.
@@ -532,15 +545,17 @@ Definition sbst_fix (es:efnlst) (e : exp) : exp :=
 Inductive eval: exp -> exp -> Prop :=
 | eval_Lam_e: forall na e, eval (Lam_e na e) (Lam_e na e)
 | eval_App_e: forall e1 na e1' e2 v2 v,
-                 eval e1 (Lam_e na e1') ->
-                 eval e2 v2 ->
-                 eval (e1'{0 ::= v2}) v -> 
-                 eval (App_e e1 e2) v
-| eval_Con_e: forall d es vs, evals es vs -> eval (Con_e d es) (Con_e d vs)
+    eval e1 (Lam_e na e1') ->
+    eval e2 v2 ->
+    eval (e1'{0 ::= v2}) v -> 
+    eval (App_e e1 e2) v
+| eval_Con_e: forall d es vs,
+    evals es vs ->
+    eval (Con_e d es) (Con_e d vs)
 | eval_Let_e: forall na e1 v1 e2 v2,
-                 eval e1 v1 ->
-                 eval (e2{0::=v1}) v2 ->
-                 eval (Let_e na e1 e2) v2
+    eval e1 v1 ->
+    eval (e2{0::=v1}) v2 ->
+    eval (Let_e na e1 e2) v2
 | eval_Match_e: forall e p bs d vs e' v,
     eval e (Con_e d vs) ->
     find_branch d (exps_length vs) bs = Some e' ->
@@ -560,8 +575,10 @@ Inductive eval: exp -> exp -> Prop :=
 | eval_Prf_e : eval Prf_e Prf_e
 with evals: exps -> exps -> Prop :=
      | evals_nil: evals enil enil
-     | evals_cons: forall e es v vs, eval e v -> evals es vs ->
-                                        evals (econs e es) (econs v vs).
+     | evals_cons: forall e es v vs,
+         eval e v ->
+         evals es vs ->
+         evals (econs e es) (econs v vs).
 Scheme eval_ind2 := Induction for eval Sort Prop
 with evals_ind2 := Induction for evals Sort Prop.
 Combined Scheme my_eval_ind from eval_ind2, evals_ind2.
@@ -582,8 +599,9 @@ Proof.
   apply my_eval_ind; simpl; intros.
   - inversion H. reflexivity.
   - inversion H2; subst.
-    * assert (j0:Lam_e na e1' = Lam_e na0 e1'0). { apply H. assumption. }
-                                          injection j0; intros h0 h1. subst.
+    * assert (j0:Lam_e na e1' = Lam_e na0 e1'0).
+      { apply H. assumption. }
+      injection j0; intros h0 h1. subst.
       assert (j1:v2 = v0). { apply H0. assumption. } subst.
       apply H1. assumption.
     * specialize (H _ H5); discriminate.
@@ -717,6 +735,93 @@ with evals_n n (es:exps) : option exps :=
 Functional Scheme eval_n_ind2 := Induction for eval_n Sort Prop
 with evals_n_ind2 := Induction for evals_n Sort Prop.
 Combined Scheme eval_evals_n_ind from eval_n_ind2, evals_n_ind2.
+
+
+(***************************    
+(** For testing: a fuel-based interpreter for partial big-step on [exp]. *)
+Function reval_n (n:nat) (e:exp) {struct n}: option exp := 
+  match n with
+    | 0%nat => None
+    | S n => match e with
+               | Lam_e na d => Some (Lam_e na d)
+               | Fix_e es k => Some (Fix_e es k)
+               | Prf_e => Some Prf_e
+               | Con_e d es => 
+                 match evals_n n es with
+                     | None => None
+                     | Some vs => Some (Con_e d vs)
+                 end
+               | App_e e1 e2 =>
+                 match reval_n n e1 with
+                   | Some (Lam_e _ e1') => 
+                     match reval_n n e2 with
+                       | None => None
+                       | Some e2' => reval_n n (e1'{0 ::= e2'})
+                     end
+                   | Some (Fix_e es k) =>
+                     match reval_n n e2 with
+                     | None => None
+                     | Some e2' =>
+                       match enthopt (N.to_nat k) es with
+                       | Some e' =>
+                         let t' := sbst_fix es e' in
+                         reval_n n (App_e t' e2')
+                       | _ => None
+                       end
+                     end
+                   | Some Prf_e =>
+                     match reval_n n e2 with
+                     | None => None
+                     | Some _ => Some Prf_e
+                     end
+                   | _ => None
+                  end
+               | Let_e _ e1 e2 =>
+                 match reval_n n e1 with
+                   | None => None
+                   | Some v1 => reval_n n (e2{0::=v1})
+                 end
+               | Match_e e p bs =>
+                 match reval_n n e with
+                 | Some (Con_e d vs) =>
+                   match find_branch d (exps_length vs) bs with
+                     | None => None
+                     | Some e' => reval_n n (sbst_list e' vs)
+                   end
+                   | _ => None
+                 end
+               | Var_e e => None
+             end
+  end
+with revals_n n (es:exps) : option exps :=
+       match n with
+         | 0%nat => None
+         | S n => 
+           match es with
+             | enil => Some enil
+             | econs e es => 
+               match (reval_n n e, revals_n n es) with
+                 | (Some v, Some vs) => Some (econs v vs)
+                 | (_, _) => None
+               end
+           end
+       end.
+**********************)
+
+(***********
+Lemma pre_eval_n_monotone:
+  forall n:nat,
+  (forall e f, eval_n n e = Some f -> eval_n (S n) e = Some f) /\
+  (forall e f, evals_n n e = Some f -> evals_n (S n) e = Some f).
+Proof.
+  intros n.
+  apply
+    (eval_evals_n_ind
+       (fun n e sf => forall f (p1:sf = Some f), eval_n (S n) e = Some f)
+       (fun n e sf => forall f (p1:sf = Some f), evals_n (S n) e = Some f));
+    intros; try discriminate; try (injection p1; intros; subst; reflexivity).
+  - injection p1; intros. subst. cbn.
+*****************)
 
 Lemma eval_n_monotone:
   forall (n:nat) e f, eval_n n e = Some f ->
@@ -1702,63 +1807,66 @@ map fst (efnlst_as_list e).
 
 
 Require Import SquiggleEq.ExtLibMisc.
-(* the suffix s stands for "simpler". Unlike eval_n, this is not a mutual fixpoint.
-In he Con_e cases, we convert [exps] to [list exp] and use list functions.
-An advantage is that when evaluating constructor argument, the fuel stays constant,
-and does not need to be threaded through (as decrements) the arguments. *)
+(* the suffix s stands for "simpler".
+ Unlike eval_n, this is not a mutual fixpoint.
+ In the Con_e cases, we convert [exps] to [list exp] and use list functions.
+ An advantage is that when evaluating constructor argument,
+ the fuel stays constant, and does not need to be threaded through
+ (as decrements) the arguments. *)
 Function eval_ns (n:nat) (e:exp) {struct n}: option exp := 
   match n with
-    | 0%nat => None
-    | S n => match e with
-               | Lam_e na d => Some (Lam_e na d)
-               | Fix_e es k => Some (Fix_e es k)
-               | Prf_e => Some Prf_e
-               | Con_e d es =>
-                 match ExtLibMisc.flatten (map (eval_ns n) (exps_as_list es)) with
-                     | None => None
-                     | Some vs => Some (Con_e d (exps_from_list vs))
-                 end
-               | App_e e1 e2 =>
-                 match eval_ns n e1 with
-                   | Some (Lam_e _ e1') => 
-                     match eval_ns n e2 with
-                       | None => None
-                       | Some e2' => eval_ns n (e1'{0 ::= e2'})
-                     end
-                   | Some (Fix_e es k) =>
-                     match eval_ns n e2 with
-                     | None => None
-                     | Some e2' =>
-                       match enthopt (N.to_nat k) es with
-                       | Some e' =>
-                         let t' := sbst_fix es e' in
-                         eval_ns n (App_e t' e2')
-                       | _ => None
-                       end
-                     end
-                   | Some Prf_e => (* Some Prf_e *)
-                     match eval_ns n e2 with
-                       | None => None
-                       | Some e2' => Some Prf_e
-                     end                     
-                   | _ => None
-                  end
-               | Let_e _ e1 e2 =>
-                 match eval_ns n e1 with
-                   | None => None
-                   | Some v1 => eval_ns n (e2{0::=v1})
-                 end
-               | Match_e e p bs =>
-                 match eval_ns n e with
-                 | Some (Con_e d vs) =>
-                   match find_branch d (exps_length vs) bs with
-                     | None => None
-                     | Some e' => eval_ns n (sbst_list e' vs)
-                   end
-                   | _ => None
-                 end
-               | Var_e e => None
-             end
+  | 0%nat => None
+  | S n =>
+    match e with
+    | Lam_e na d => Some (Lam_e na d)
+    | Fix_e es k => Some (Fix_e es k)
+    | Prf_e => Some Prf_e
+    | Con_e d es =>
+      match ExtLibMisc.flatten (map (eval_ns n) (exps_as_list es)) with
+      | None => None
+      | Some vs => Some (Con_e d (exps_from_list vs))
+      end
+    | App_e e1 e2 =>
+      match eval_ns n e1 with
+      | Some (Lam_e _ e1') => 
+        match eval_ns n e2 with
+        | None => None
+        | Some e2' => eval_ns n (e1'{0 ::= e2'})
+        end
+      | Some (Fix_e es k) =>
+        match eval_ns n e2 with
+        | None => None
+        | Some e2' =>
+          match enthopt (N.to_nat k) es with
+          | Some e' =>
+            let t' := sbst_fix es e' in
+            eval_ns n (App_e t' e2')
+          | _ => None
+          end
+        end
+      | Some Prf_e => (* Some Prf_e *)
+        match eval_ns n e2 with
+        | None => None
+        | Some e2' => Some Prf_e
+        end                     
+      | _ => None
+      end
+    | Let_e _ e1 e2 =>
+      match eval_ns n e1 with
+      | None => None
+      | Some v1 => eval_ns n (e2{0::=v1})
+      end
+    | Match_e e p bs =>
+      match eval_ns n e with
+      | Some (Con_e d vs) =>
+        match find_branch d (exps_length vs) bs with
+        | None => None
+        | Some e' => eval_ns n (sbst_list e' vs)
+        end
+      | _ => None
+      end
+    | Var_e e => None
+    end
   end.
 
 Lemma eval_ns_Some_Succ:

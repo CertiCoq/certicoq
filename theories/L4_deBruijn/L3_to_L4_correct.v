@@ -6,8 +6,8 @@
   + move to an enriched Crct_Term predicate after L3_eta for is_n_lambda of branches (last 2 admits here)
 *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
-  Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.
 (* shared namespace *)
 Open Scope N_scope.
@@ -15,16 +15,16 @@ Opaque N.add.
 Opaque N.sub.
 
 Require Import Common.AstCommon.
-Require Import L3.program.
-Require Import L3.term.
-Require Import L3.compile.
+Require Import L2k.term L2k.program L2k.compile L2k.wcbvEval.
 
-Require L3.L3.
-Module L3eval := L3.wcbvEval.
-Module L3t := L3.term.
+(*******
+Require L3.L2k.
+***********)
+Module L3eval := L2k.wcbvEval.
+Module L3t := L2k.term.
 Require Import L3_to_L3_eta.
 Require Import L3_eta_crct.
-Require Import L3_to_L3_eta_correct.
+(* Require Import L3_to_L3_eta_correct. *)
 
 Require Import L4.expression.
 Require Import L4.L3_to_L4.
@@ -41,7 +41,7 @@ Ltac equaln := repeat (f_equal; try lia); auto.
 
 Lemma crctTerm_fix e dts m t n :
   crctTerm e n (TFix dts m) ->
-  L3.term.dnthBody m dts = Some t -> L3t.isLambda t.
+  L2k.term.dnthBody m dts = Some t -> L3t.isLambda t.
 Proof.
   intros. inv H.
   revert m H6 H0. induction H5; intros.
@@ -57,10 +57,15 @@ Lemma whFixStep_preserves_crctTerm e dts m fs :
   whFixStep dts m = Some fs ->
   crctTerm e 0 fs /\ L3t.isLambda fs.
 Proof.
+Admitted.
+(****************
   intros.
-  split. eapply whFixStep_pres_Crct in H0; eauto.
-  apply Crct_invrt_Fix in H. eauto.
-  unfold whFixStep in H0.
+  split.
+  - eapply whFixStep_pres_Crct in H0; eauto.
+    apply Crct_invrt_Fix in H. eauto.
+  - rewrite whFixStep_whFixStep' in H0. inversion_Clear H. cbn in H5.
+    inversion_Clear H5.
+ 
   case_eq (dnthBody m dts).
   intros. rewrite H1 in H0.
   injection H0; intros <-. clear H0.
@@ -76,6 +81,7 @@ Proof.
     eexists. reflexivity. }
   intros He; rewrite He in H0. discriminate.
 Qed.
+ *****************)
 
 Lemma whBetaStep_preserves_crctTerm e bod a :
   crctTerm e 1 bod -> crctTerm e 0 a ->
@@ -97,7 +103,7 @@ Qed.
 Lemma instantiate_preserves_crctTerm e t k k' a : (k' <= k)%nat ->
   crctTerm e 0 a ->
   crctTerm e (S k) t ->
-  crctTerm e k (L3.term.instantiate a k' t).
+  crctTerm e k (L2k.term.instantiate a k' t).
 Proof.
   intros.
   eapply instantiate_pres_Crct; eauto.
@@ -116,23 +122,27 @@ Qed.
 Inductive wcbv_value : Term -> Prop :=
     var_wcbv_value : forall i : nat, wcbv_value (TRel i)
   | lam_wcbv_value : forall (na : name) (e : Term), wcbv_value (TLambda na e)
-  | con_wcbv_value : forall (d : inductive) (n : nat) (es : Terms), wcbv_values es -> wcbv_value (TConstruct d n es)
+  | con_wcbv_value : forall (d : inductive) (n : nat) (es : Terms),
+      wcbv_values es -> wcbv_value (TConstruct d n es)
   | fix_wcbv_value : forall (es : Defs) (k : nat), wcbv_value (TFix es k)
   | prf_wcbv_value : wcbv_value TProof
   | wrong_wcbv_value : forall str, wcbv_value (TWrong str)
 with wcbv_values : Terms -> Prop :=
     enil_wcbv_values : wcbv_values tnil
   | econs_wcbv_values : forall (e : Term) (es : Terms),
-                       wcbv_value e -> wcbv_values es -> wcbv_values (tcons e es).
+      wcbv_value e -> wcbv_values es -> wcbv_values (tcons e es).
 Scheme wcbv_value_ind' := Induction for wcbv_value Sort Prop
      with wcbv_values_ind' := Induction for wcbv_values Sort Prop.
-Combined Scheme wcbv_value_wcbv_values_ind from wcbv_value_ind', wcbv_values_ind'.
+Combined Scheme wcbv_value_wcbv_values_ind
+         from wcbv_value_ind', wcbv_values_ind'.
 
 Lemma wcbvEval_values e :
   (forall t u, L3eval.WcbvEval e t u -> wcbv_value u) /\
   (forall ts ts', L3eval.WcbvEvals e ts ts' -> wcbv_values ts').
 Proof.
-  apply L3eval.WcbvEvalEvals_ind; try constructor; eauto.
+  apply L3eval.WcbvEvalEvals_ind; intros; try constructor; eauto.
+  destruct a as [a [b c]]. econstructor.
+  destruct o as [o|[o|o]].
 Qed.
 
 (** Observations *)
@@ -263,7 +273,7 @@ Qed.
 
 (** Looking up in the evaluated environment *)
 Lemma lookup_eval_env:
-  forall e : environ L3.compile.Term,
+  forall e : environ L2k.compile.Term,
     crctEnv e ->
     forall (nm : string) t, LookupDfn nm e t ->
     forall (e'' : env),
@@ -990,29 +1000,29 @@ Qed.
 
 Lemma trans_instantiate_any e a k (k' : nat) :
   crctTerm e 0 a -> forall b, crctTerm e (S k) b -> (k' <= k)%nat ->
-                   trans (translate_env e) (N.of_nat k) (L3.term.instantiate a k' b) =
+                   trans (translate_env e) (N.of_nat k) (L2k.term.instantiate a k' b) =
                    (trans (translate_env e) (1 + N.of_nat k) b)
                      {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans (translate_env e) 0 a)}.
 Proof.
   intros wfa b. revert b k k'.
   assert (
       (forall b k k', crctTerm e (S k) b -> (k' <= k)%nat ->
-            (trans (translate_env e) (N.of_nat k) (L3.term.instantiate a k' b)) =
+            (trans (translate_env e) (N.of_nat k) (L2k.term.instantiate a k' b)) =
             (trans (translate_env e) (1 + N.of_nat k) b)
               {N.of_nat k' := shift (N.of_nat (k - k')) 0
                                     (trans (translate_env e) 0 a)}) /\
     (forall b k k', crctTerms e (S k) b -> (k' <= k)%nat ->
-         (trans_args (trans (translate_env e)) (N.of_nat k) (L3.term.instantiates a k' b) =
+         (trans_args (trans (translate_env e)) (N.of_nat k) (L2k.term.instantiates a k' b) =
           (trans_args (trans (translate_env e)) (1 + N.of_nat k) b)
             {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans (translate_env e) 0 a)})) /\
     (forall b k k', crctBs e (S k) b -> (k' <= k)%nat ->
         (forall i l,
-        trans_brs (trans (translate_env e)) i (N.of_nat k) l (L3.term.instantiateBrs a k' b) =
+        trans_brs (trans (translate_env e)) i (N.of_nat k) l (L2k.term.instantiateBrs a k' b) =
         (trans_brs (trans (translate_env e)) i (1 + N.of_nat k) l b)
           {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans (translate_env e) 0 a)})) /\
 
     (forall b k k', crctDs e (S k) b -> (k' <= k)%nat ->
-        trans_fixes (trans (translate_env e)) (N.of_nat k) (L3.term.instantiateDefs a k' b) =
+        trans_fixes (trans (translate_env e)) (N.of_nat k) (L2k.term.instantiateDefs a k' b) =
         (trans_fixes (trans (translate_env e)) (1 + N.of_nat k) b)
           {N.of_nat k' := shift (N.of_nat (k - k')) 0 (trans (translate_env e) 0 a)})).
   apply TrmTrmsBrsDefs_ind; try reflexivity.
@@ -1155,7 +1165,7 @@ Lemma trans_instantiate e e' a k :
   eval_env (translate_env e) e' ->
   wf_tr_environ e' -> crctTerm e 0 a ->
   forall b, crctTerm e (S k) b ->
-  trans e' (N.of_nat k) (L3.term.instantiate a k b) =
+  trans e' (N.of_nat k) (L2k.term.instantiate a k b) =
   (trans e' (1 + N.of_nat k) b) {N.of_nat k := trans e' 0 a}.
 Proof.
   intros.
@@ -1369,7 +1379,7 @@ Proof.
 Qed.
 
 Lemma dnthbody m dts f e k g :
-  L3.term.dnthBody m dts = Some f ->
+  L2k.term.dnthBody m dts = Some f ->
   enthopt m (map_efnlst g (trans_fixes (trans e) k dts)) =
   Some (g (trans e k f)).
 Proof.
@@ -1385,16 +1395,16 @@ Qed.
 Lemma L3sbst_fix_preserves_lam dts nm bod :
   fold_left
     (fun (bod : Term) (ndx : nat) =>
-       L3.term.instantiate (TFix dts ndx) 0 bod)
+       L2k.term.instantiate (TFix dts ndx) 0 bod)
     (list_to_zero (dlength dts)) (TLambda nm bod) =
   TLambda nm (fold_left
                 (fun (bod : Term) (ndx : nat) =>
-                   L3.term.instantiate (TFix dts ndx) 1 bod)
+                   L2k.term.instantiate (TFix dts ndx) 1 bod)
                 (list_to_zero (dlength dts)) bod).
 Proof.
   revert nm bod; induction (list_to_zero (dlength dts)); simpl; intros.
   reflexivity.
-  simpl. rewrite L3.term.instantiate_TLambda. 
+  simpl. rewrite L2k.term.instantiate_TLambda. 
   simpl. rewrite IHl. reflexivity.
 Qed.
 
@@ -2439,7 +2449,7 @@ Proof with eauto.
     rewrite subst_env_lambda in IHWcbvEval1.
     apply IHWcbvEval1; auto.
     clear IHWcbvEval1 IHWcbvEval2.
-    unfold L3.term.whBetaStep in IHWcbvEval3.
+    unfold L2k.term.whBetaStep in IHWcbvEval3.
     unfold subst_env in IHWcbvEval3.
     unfold translate in IHWcbvEval3.
     assert(H1:=proj1 (WcbvEval_preserves_crctTerm _ wfe) _ _ eva1 H0).
@@ -2494,8 +2504,8 @@ Proof with eauto.
     unfold translate, subst_env in IHevfix.
     simpl in IHevfix.
     rewrite subst_env_application in IHevfix.
-    unfold L3.term.whFixStep in fixstep.
-    case_eq (L3.term.dnthBody m dts); intros t'.
+    unfold L2k.term.whFixStep in fixstep.
+    case_eq (L2k.term.dnthBody m dts); intros t'.
 
     - intros eqt'.
       rewrite eqt' in fixstep. injection fixstep.
@@ -2525,7 +2535,7 @@ Proof with eauto.
              (trans e'' (1 + 0)
                 (fold_left
                    (fun (bod : Term) (ndx : nat) =>
-                    L3.term.instantiate (TFix dts ndx) 1 bod)
+                    L2k.term.instantiate (TFix dts ndx) 1 bod)
                    (list_to_zero (dlength dts)) bod))))
          with
          (subst_env_aux e'' (1 + 0)
@@ -2588,7 +2598,7 @@ Proof with eauto.
     apply L3C_Crct_construct in Har; auto.
     specialize (IHmch Hmch).
     unfold subst_env in *; rewrite subst_env_aux_match.
-    unfold L3.term.whCaseStep in Hcasestep.
+    unfold L2k.term.whCaseStep in Hcasestep.
     case_eq (bnth n brs); [intros t H | intros H];
       rewrite H in Hcasestep; try easy.
     assert(Hargsdef:tlength args = snd t).

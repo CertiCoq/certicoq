@@ -26,6 +26,12 @@ Definition print_inductive (i:inductive) : string :=
   match i with
   | mkInd str n => ("(inductive:" ++ str ++ ":" ++ nat_to_string n ++ ")")
   end.
+Definition print_projection (p:projection) : string :=
+  match p with
+  | (i, n, m) =>
+    ("(project:" ++ (print_inductive i) ++ ":" ++
+                 (nat_to_string n) ++ ":" ++ (nat_to_string m) ++")")
+  end.
 
 Lemma name_dec: forall (s1 s2:name), {s1 = s2}+{s1 <> s2}.
 induction s1; induction s2; try (solve [right; intros h; discriminate]).
@@ -36,10 +42,16 @@ induction s1; induction s2; try (solve [right; intros h; discriminate]).
 Defined.
 
 Lemma level_dec : forall x y : Level.t, {x = y} + {x <> y}.
-Proof. decide equality. apply String.string_dec. apply NPeano.Nat.eq_dec. Defined.
+Proof.
+  decide equality. apply String.string_dec.
+  apply NPeano.Nat.eq_dec.
+Defined.
 
 Lemma level_bool_dec : forall x y : Level.t * bool, {x = y} + {x <> y}.
-Proof. intros [l b] [l' b']. decide equality. apply Bool.bool_dec. apply level_dec. Defined.
+Proof.
+  intros [l b] [l' b']. decide equality.
+  apply Bool.bool_dec. apply level_dec.
+Defined.
 
 Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
   decide equality. apply level_bool_dec.
@@ -52,12 +64,21 @@ try (solve [left; reflexivity]).
 Defined.
 
 Lemma inductive_dec: forall (s1 s2:inductive), {s1 = s2}+{s1 <> s2}.
+Proof.
   intros [mind i] [mind' i'].
   destruct (string_dec mind mind');
     destruct (eq_nat_dec i i'); subst;
-try (solve [left; reflexivity]); 
-right; intros h; elim n; injection h; intuition.
+      try (solve [left; reflexivity]); 
+      right; intros h; elim n; injection h; intuition.
 Defined.
+
+Lemma project_dec: forall (s1 s2:projection), {s1 = s2}+{s1 <> s2}.
+Proof.
+  intros s1 s2. destruct s1, s2. destruct p, p0.
+  destruct (inductive_dec i i0), (eq_nat_dec n1 n2), (eq_nat_dec n n0);
+    subst; try (solve [left; reflexivity]);
+  right; intros h; elim n3; injection h; intuition.
+Qed.
 
 Lemma nat_list_dec : forall l1 l2 : list nat, {l1 = l2} + {l1 <> l2}.
 Proof.
@@ -500,6 +521,20 @@ Proof.
   - rewrite H in ht. discriminate.
 Qed.
 
+(* index of a name in an environ *)
+Function Lkup_index (nm:string) (env:environ) : nat :=
+  match env with
+  | nil => 0
+  | ((s,t)::p) => match string_eq_bool nm s with
+                  | true => 1
+                  | false => match Lkup_index nm p with
+                             | 0 => 0
+                             | S n => S (S n)
+                             end
+                  end
+  end.
+
+  
 
 (** find an ityp in an itypPack **)
 Definition getInd (ipkg:itypPack) (inum:nat) : exception ityp :=

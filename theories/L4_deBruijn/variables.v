@@ -3,8 +3,8 @@ Require Import SquiggleEq.UsefulTypes.
 Require Import SquiggleEq.varImplZ.
 Require Import SquiggleEq.varImplDummyPair.
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
-  Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 
 Require Import Common.RandyPrelude.
 

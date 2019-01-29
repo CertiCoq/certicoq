@@ -19,8 +19,8 @@ Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
-Require Import L3.compile.
-Module L3t := L3.compile.
+Require Import L2k.compile.
+Module L3t := L2k.compile.
 Require Import L4.expression.
 
 (** Tactics *)
@@ -78,6 +78,7 @@ Section TermTranslation.
     | TFix d n =>
       let defs' := trans_fixes d in
       TFix defs' n
+    | TProj _ _ => TWrong "TProj"
     end
 
   with trans_terms (ts : Terms) : Terms :=
@@ -114,15 +115,17 @@ Fixpoint transEnv (p:environ Term) : environ Term :=
   end.
 
 (** start-to-L4 translations **)
-Definition myprogram_Program : program -> Program Term :=
+Definition myprogram_Program `{F:utils.Fuel}: Ast.program -> Program Term :=
   L3t.program_Program.
 
-Definition translate_program (e : environ L3.compile.Term) (t : L3t.Term) : L3t.Term :=
+Definition translate_program
+           (e : environ L3t.Term) (t : L3t.Term) : L3t.Term :=
   trans t.
 
 Definition Program_Program (pgm : Program L3t.Term) : Program L3t.Term :=
   let 'mkPgm main env := pgm in
   {| main := trans main; env := transEnv env |}.
 
-Definition program_L3_eta (pgm:program) : Program L3t.Term :=
+Definition program_L3_eta
+           `{F:utils.Fuel} (pgm:Ast.program): Program L3t.Term :=
   Program_Program (myprogram_Program pgm).

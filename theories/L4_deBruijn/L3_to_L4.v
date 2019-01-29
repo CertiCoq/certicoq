@@ -1,15 +1,16 @@
-(** Naive conversion to a deBruijn-only expression language for a core calculus including
-    mutually recursive functions, data constructors, and pattern matching.
+(** Naive conversion to a deBruijn-only expression language for a core
+    calculus including mutually recursive functions, data constructors,
+    and pattern matching.
  *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
-        Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
-Require Import L3.compile.
-Module L3t := L3.compile.
+Require Import L2k.compile.
+Module L3t := L2k.compile.
 Require Import L4.expression.
 
 (** Tactics *)
@@ -99,6 +100,7 @@ Section TermTranslation.
       let len := L3t.dlength d in
       let defs' := trans_fixes trans (N.of_nat len + k) d in
       Fix_e defs' (N.of_nat n)
+    | L3t.TProj proj t => Prf_e     (****  FIX  ****)
     end.
 
 End TermTranslation.
@@ -122,10 +124,10 @@ Definition translate_entry_aux x acc : option (string * exp) :=
   | (s, ecTyp _ _ _) => None
   end.
 
-Definition translate_env_aux (e : environ L3.compile.Term) (k : env) : env :=
+Definition translate_env_aux (e : environ L2k.compile.Term) (k : env) : env :=
   fold_right translate_entry k e.
 
-Definition translate_env (e : environ L3.compile.Term) : env :=
+Definition translate_env (e : environ L2k.compile.Term) : env :=
   translate_env_aux e [].
 
 Definition inductive_entry_aux {A} (x : string * envClass A) acc : ienv :=
@@ -136,7 +138,7 @@ Definition inductive_entry_aux {A} (x : string * envClass A) acc : ienv :=
     (s, pack) :: acc
   end.
 
-Definition inductive_env (e : environ L3.compile.Term) : ienv :=
+Definition inductive_env (e : environ L2k.compile.Term) : ienv :=
   fold_right inductive_entry_aux [] e.
 
 Definition mkLets (e : env) (t : exp) :=
@@ -145,7 +147,7 @@ Definition mkLets (e : env) (t : exp) :=
 Require Import L3_to_L3_eta.
 
 (** start-to-L4 translations **)
-Definition myprogram_Program : program -> Program Term :=
+Definition myprogram_Program `{F:utils.Fuel}: Ast.program -> Program Term :=
   program_L3_eta.
 (*************
   do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
@@ -153,17 +155,18 @@ Definition myprogram_Program : program -> Program Term :=
     match L3U.stripEnv e' with
     | Ret senv => 
       match L3U.strip e' (stripEvalCommute.strip (program.main pgm0)) with
-      | Ret smain => Ret {| main := smain; L3.program.env := senv |}
+      | Ret smain => Ret {| main := smain; L2k.program.env := senv |}
       | Exc s => Exc ("Error in stripping: " ++ s)
       end
-    | Exc s => Exc ("Error while stripping environ L3.compile.Termment: " ++ s)
+    | Exc s => Exc ("Error while stripping environ L2k.compile.Termment: " ++ s)
     end.
  *************)
 
-Definition translate_program (e : environ L3.compile.Term) (t : L3t.Term) : exp :=
+Definition translate_program
+           (e: environ L2k.compile.Term) (t: L3t.Term) : exp :=
   let e' := translate_env e in
-    mkLets e' (translate e' t).
+  mkLets e' (translate e' t).
 
-Definition program_exp (pgm:program) : exp :=
+Definition program_exp `{F:utils.Fuel} (pgm:Ast.program) : exp :=
   let (main, env) := myprogram_Program pgm in
   translate_program env main.

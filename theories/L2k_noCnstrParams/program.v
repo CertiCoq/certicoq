@@ -4,6 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
+Require Import FunInd.
 Require Import Common.Common.
 Require Import L2k.term.
 Require Import L2k.compile.
@@ -75,52 +76,68 @@ try discriminate; try (inversion h); try reflexivity.
 Qed.
  ***)
 
+(** pick inductive type out of a mutual package **)
+Inductive crctInd: (environ Term) -> inductive -> ityp -> Prop :=
+| ci: forall p ind itp pack,
+    LookupTyp (inductive_mind ind) p 0 pack ->
+    getInd pack (inductive_ind ind) = Ret itp ->
+    crctInd p ind itp.
+Hint Constructors crctInd.
+
+(** pick a constructor of an inductive type **)
+Inductive crctCnstr: (environ Term) -> inductive -> nat -> Terms -> Prop :=
+| cc: forall p ind cnum args itp cstr,
+    crctInd p ind itp ->
+    getCnstr itp cnum = Ret cstr ->
+    CnstrArity cstr = tlength args ->
+    crctCnstr p ind cnum args.
+Hint Constructors crctCnstr.
+
 Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctRel: forall p n m, crctEnv p -> m < n -> crctTerm p n (TRel m)
 | ctProof: forall p n, crctEnv p -> crctTerm p n TProof
 | ctLam: forall p n nm bod,
-           crctTerm p (S n) bod -> crctTerm p n (TLambda nm bod)
+    crctTerm p (S n) bod -> crctTerm p n (TLambda nm bod)
 | ctLetIn: forall p n nm dfn bod,
-             crctTerm p n dfn -> crctTerm p (S n) bod ->
-             crctTerm p n (TLetIn nm dfn bod)
+    crctTerm p n dfn -> crctTerm p (S n) bod ->
+    crctTerm p n (TLetIn nm dfn bod)
 | ctApp: forall p n fn arg,
-           crctTerm p n fn -> crctTerm p n arg -> crctTerm p n (TApp fn arg)
+    crctTerm p n fn -> crctTerm p n arg -> crctTerm p n (TApp fn arg)
 | ctConst: forall p n pd nm,
     crctEnv p -> LookupDfn nm p pd -> crctTerm p n (TConst nm)
-| ctDummy: forall n p str, crctEnv p -> crctTerm p n (TDummy str)
-| ctConstructor: forall p n ipkgNm inum cnum args ipkg itp cstr pars,
-                   LookupTyp ipkgNm p pars ipkg ->
-                   getInd ipkg inum = Ret itp ->
-                   getCnstr itp cnum = Ret cstr ->
-                   crctTerms p n args ->
-                   crctTerm p n (TConstruct (mkInd ipkgNm inum) cnum args)
-| ctCase: forall p n i mch brs,
-            crctTerm p n mch -> crctBs p n brs ->
-            crctTerm p n (TCase i mch brs)
+| ctConstructor: forall p n ind cnum args,
+    crctCnstr p ind cnum args ->
+    crctTerms p n args ->
+    crctTerm p n (TConstruct ind cnum args)
+| ctCase: forall p n ind cnum args mch brs,
+    crctCnstr p ind cnum args ->
+    crctTerm p n mch -> crctBs p n brs ->
+    crctTerm p n (TCase ind mch brs)
 | ctFix: forall p n ds m,
-           crctDs p (n + dlength ds) ds -> m < dlength ds ->
-           crctTerm p n (TFix ds m)
+    crctDs p (n + dlength ds) ds -> m < dlength ds ->
+    crctTerm p n (TFix ds m)
+| ctProj: forall p n prj t, crctTerm p n t -> crctTerm p n (TProj prj t)
 (* crctEnvs are closed in both ways *)
 with crctEnv: environ Term -> Prop :=
-| ceNil: crctEnv nil
-| ceTrmCons: forall nm s p,
-    crctEnv p -> fresh nm p -> crctTerm p 0 s -> crctEnv ((nm, ecTrm s)::p)
-| ceTypCons: forall nm s p,
-    crctEnv p -> fresh nm p -> crctEnv ((nm, ecTyp Term 0 s)::p)
+     | ceNil: crctEnv nil
+     | ceTrmCons: forall nm s p,
+         crctEnv p -> fresh nm p -> crctTerm p 0 s -> crctEnv ((nm, ecTrm s)::p)
+     | ceTypCons: forall nm s p,
+         crctEnv p -> fresh nm p -> crctEnv ((nm, ecTyp Term 0 s)::p)
 with crctTerms: environ Term -> nat -> Terms -> Prop :=
-| ctsNil: forall p n, crctEnv p -> crctTerms p n tnil
-| ctsCons: forall p n t ts,
-             crctTerm p n t -> crctTerms p n ts ->
-             crctTerms p n (tcons t ts)
+     | ctsNil: forall p n, crctEnv p -> crctTerms p n tnil
+     | ctsCons: forall p n t ts,
+         crctTerm p n t -> crctTerms p n ts ->
+         crctTerms p n (tcons t ts)
 with crctBs: environ Term -> nat -> Brs -> Prop :=
-| cbsNil: forall p n, crctEnv p -> crctBs p n bnil
-| cbsCons: forall p n m t ts,
-    crctTerm p n t -> crctBs p n ts ->  crctBs p n (bcons m t ts)
+     | cbsNil: forall p n, crctEnv p -> crctBs p n bnil
+     | cbsCons: forall p n m t ts,
+         crctTerm p n t -> crctBs p n ts ->  crctBs p n (bcons m t ts)
 with crctDs: environ Term -> nat -> Defs -> Prop :=
-| cdsNil: forall p n, crctEnv p -> crctDs p n dnil
-| cdsCons: forall p n nm bod ix ds,
-             isLambda bod -> crctTerm p n bod -> crctDs p n ds ->
-             crctDs p n (dcons nm bod ix ds).
+     | cdsNil: forall p n, crctEnv p -> crctDs p n dnil
+     | cdsCons: forall p n nm bod ix ds,
+         isLambda bod -> crctTerm p n bod -> crctDs p n ds ->
+         crctDs p n (dcons nm bod ix ds).
 Hint Constructors crctTerm crctTerms crctBs crctDs crctEnv.
 Scheme crct_ind' := Minimality for crctTerm Sort Prop
   with crcts_ind' := Minimality for crctTerms Sort Prop
@@ -136,7 +153,7 @@ Lemma Crct_WFTrm:
   (forall p n bs, crctBs p n bs -> WFTrmBs bs n) /\
   (forall p n (ds:Defs), crctDs p n ds -> WFTrmDs ds n) /\
   (forall p, crctEnv p -> True).
-apply crctCrctsCrctBsDsEnv_ind; intros; auto. 
+  apply crctCrctsCrctBsDsEnv_ind; intros; auto.
 Qed.
 
 Lemma Crct_CrctEnv:
@@ -164,7 +181,7 @@ Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros; try (solve [constructor; assumption]).
   - apply ctRel; try assumption. omega.
   - eapply ctConst; eassumption.
-  - eapply ctConstructor; eassumption.
+  - eapply ctCase; eassumption.
 Qed.
 
 Lemma Crct_UP:
@@ -180,6 +197,13 @@ Proof.
 Qed.
 Hint Resolve Crct_Up Crct_UP.
   
+Lemma CrctDs_Up:
+  forall n p ds, crctDs p n ds -> forall m, n <= m -> crctDs p m ds.
+Proof.
+  intros n p ds h. induction 1. assumption.
+  apply (proj1 (proj2 (proj2 (proj2 Crct_up)))). assumption.
+Qed.
+
 Lemma Crct_fresh_Pocc:
   (forall p n t, crctTerm p n t -> forall nm, fresh nm p -> ~ PoccTrm nm t) /\
   (forall p n ts, crctTerms p n ts ->
@@ -191,20 +215,31 @@ Lemma Crct_fresh_Pocc:
   (forall (p:environ Term), crctEnv p -> True).
 Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros; try intros j; auto;
-  inversion_Clear j;
-  try (specialize (H2 _ H3); contradiction);
-  try (specialize (H5 _ H6); contradiction);
-  try (specialize (H0 _ H3); contradiction);
-  try (specialize (H0 _ H1); contradiction);
-  try (specialize (H0 _ H4); contradiction);
-  try (specialize (H1 _ H4); contradiction);
-  try (specialize (H3 _ H4); contradiction);
-  try (specialize (H3 _ H6); contradiction).
+    inversion_Clear j.
+  - eelim H0; eassumption.
+  - eelim H0; eassumption.
+  - eelim H2; eassumption.
+  - eelim H0; eassumption.
+  - eelim H2; eassumption.
   - unfold LookupDfn in H1. elim (Lookup_fresh_neq H1 H2). reflexivity.
-  - unfold LookupTyp in H. destruct H.
-    elim (Lookup_fresh_neq H H4). reflexivity.
-  - specialize (H0 _ H2). contradiction.
-Qed.    
+  - inversion_Clear H. inversion_Clear H3. cbn in H. cbn in H6.
+    unfold LookupTyp in H. destruct H.
+    elim (Lookup_fresh_neq H H2). reflexivity.
+  - inversion_Clear H. inversion_Clear H3. 
+    unfold LookupTyp in H. destruct H. eelim H1; eassumption.
+  - eelim H1; eassumption.
+  - eelim H3; eassumption.
+  - inversion_Clear H. inversion_Clear H5. unfold LookupTyp in H.
+    cbn in H. destruct H. elim (Lookup_fresh_neq H H4). reflexivity.
+  - eelim H0; eassumption.
+  - eelim H0; eassumption.
+  - eelim H0; eassumption.
+  - eelim H2; eassumption.
+  - eelim H0; eassumption.
+  - eelim H2; eassumption.
+  - eelim H1; eassumption.
+  - eelim H3; eassumption.
+Qed.
 
 Lemma Crct_weaken:
   (forall p n t, crctTerm p n t -> 
@@ -228,9 +263,20 @@ Proof.
   try (econstructor; intuition); try eassumption.
   - unfold LookupDfn in *. constructor.
     apply neq_sym. apply (Lookup_fresh_neq H1 H2). eassumption.
-  - unfold LookupTyp in *. destruct H. split; try assumption.
-    constructor; try eassumption.
-    apply neq_sym. eapply Lookup_fresh_neq; eassumption.
+  - inversion_Clear H. inversion_Clear H4.
+    unfold LookupTyp in H. destruct H.
+    econstructor; try eassumption.
+    econstructor; try eassumption. unfold LookupTyp. intuition.
+    destruct (string_dec (inductive_mind ind) nm).
+    + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
+    + apply LMiss; assumption.
+  - inversion_Clear H. inversion_Clear H6.
+    unfold LookupTyp in H. destruct H.
+    econstructor; try eassumption. econstructor; try eassumption.
+    unfold LookupTyp. split; try assumption.
+    case_eq (string_dec (inductive_mind ind) nm); intros.
+    + rewrite e in H. elim (Lookup_fresh_neq H H4). reflexivity.
+    + apply LMiss; assumption.
 Qed.
 
 Lemma Crct_weaken_Typ:
@@ -253,9 +299,19 @@ Proof.
   try (econstructor; intuition); try eassumption.
   - unfold LookupDfn in *. constructor.
     apply neq_sym. apply (Lookup_fresh_neq H1 H2). eassumption.
-  - unfold LookupTyp in *. destruct H. split; try eassumption.
-    constructor; try eassumption.
-    apply neq_sym. apply (Lookup_fresh_neq l). assumption.
+  - inversion_Clear H. inversion_Clear H3.
+    econstructor; try eassumption. econstructor; try eassumption.
+    + unfold LookupTyp in *. destruct H. split; try eassumption.
+      destruct (string_dec (inductive_mind ind) nm).
+      * subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
+      * apply LMiss; assumption.
+  - inversion_Clear H. inversion_Clear H5.
+    unfold LookupTyp in H. destruct H. econstructor; try eassumption.
+    econstructor; try eassumption.
+    unfold LookupTyp. split; try assumption.
+    destruct (string_dec (inductive_mind ind) nm).
+    + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
+    + apply LMiss; assumption.
 Qed.
 
 
@@ -288,19 +344,34 @@ Proof.
     + elim H3. constructor.
     + eassumption.
   - econstructor; try eassumption.
-    + unfold LookupTyp in *. split; intuition.
-      eapply Lookup_strengthen. eassumption. reflexivity.
-      inversion_Clear H4.
-      * elim H5. constructor.
-      * assumption.
-    + eapply H3. reflexivity. intros h. elim H5. apply PoCnstrargs.
-      assumption.
-  - econstructor; try eassumption.
-    + eapply H0. reflexivity. intros h. elim H4. constructor. assumption.
-    + eapply H2. reflexivity. intros h. elim H4.
-      apply PoCaseR. assumption.
+    + inversion_Clear H. inversion_Clear H2.
+      unfold LookupTyp in H. destruct H. econstructor; try eassumption.
+      econstructor; try eassumption. unfold LookupTyp. split; intuition.
+      destruct (string_dec (inductive_mind ind) nm).
+      * subst. elim H3. destruct ind. cbn. apply PoCnstri.
+      * inversion_Clear H.
+        -- elim n0. reflexivity.
+        -- assumption.
+    + eapply H1. reflexivity. intros j. elim H3.
+      apply PoCnstrargs. assumption.
+  - inversion_Clear H. inversion_Clear H4. unfold LookupTyp in H. destruct H.
+    case_eq (string_dec (inductive_mind ind) nm); intros.
+    + subst. inversion_Clear H.
+      * elim H5. destruct ind. cbn. apply PoCaseAnn.
+      * elim H15. reflexivity.
+    + pose proof (Lookup_strengthen H eq_refl n0) as j.
+      eapply ctCase.
+      * econstructor; try eassumption.
+        econstructor; try eassumption.
+        unfold LookupTyp. split; try assumption.
+      * eapply H1. reflexivity.
+        intros j0. elim H5. apply PoCaseL. assumption.
+      * eapply H3. reflexivity.
+        intros j0. elim H5. apply PoCaseR. assumption.
   - econstructor; try eassumption. eapply H0. reflexivity. intros h.
     elim H3. constructor. assumption.
+  - constructor. eapply H0. reflexivity. intros h.
+    elim H2. constructor. assumption.
   - constructor.
     + eapply H0. reflexivity. intros h. elim H4. constructor. assumption.
     + eapply H2. reflexivity. intros h. elim H4. apply PoTtl. assumption.
@@ -331,26 +402,27 @@ Proof.
   intros. inversion_Clear H. assumption.
 Qed.
 
-Lemma Crct_LookupDfn_Crct:
-  forall p, crctEnv p -> forall nm t, LookupDfn nm p t -> crctTerm p 0 t.
+Lemma LookupDfn_pres_Crct:
+  forall p, crctEnv p ->
+            forall nm t, LookupDfn nm p t -> forall n, crctTerm p n t.
 Proof.
   unfold LookupDfn. induction 1; intros.
   - inversion H.
   - inversion_Clear H2.
-    + apply Crct_weaken; try assumption.
+    + apply Crct_weaken; try assumption. eapply Crct_UP. eassumption. omega.
     + apply Crct_weaken; try assumption.
       eapply IHcrctEnv. eassumption.
   - inversion_Clear H1. apply (proj1 Crct_weaken_Typ); try assumption.
     eapply IHcrctEnv. eassumption.
 Qed.    
-      
+
 Lemma Crct_invrt_Const:
   forall p n const, crctTerm p n const ->
   forall nm, const = TConst nm ->
        exists pd, (LookupDfn nm p pd /\ crctTerm p 0 pd).
 Proof.
   induction 1; intros; try discriminate. myInjection H1. 
-  pose proof (Crct_LookupDfn_Crct H H0). exists pd. intuition.
+  pose proof (LookupDfn_pres_Crct H H0). exists pd. intuition.
 Qed.
 
 Lemma Crct_invrt_Lam:
@@ -401,8 +473,8 @@ Lemma Crct_invrt_Construct:
       exists (ip:ityp), getInd itypk inum = Ret ip /\
                         exists (ctr:Cnstr), getCnstr ip cnum = Ret ctr.
 Proof.
-  intros. inversion_Clear H. exists pars, ipkg. intuition.
-  exists itp. intuition. exists cstr. intuition.
+  intros. inversion_Clear H. exists 0. inversion_Clear H4. inversion_Clear H.
+  exists pack. intuition. exists itp. intuition. exists cstr. assumption.
 Qed.
 
 Lemma CrctDs_invrt:
@@ -425,14 +497,43 @@ Proof.
   - constructor; intuition.
 Qed.
 
+Lemma dnth_pres_Crct:
+  forall m dts dfn, dnth m dts = Some dfn ->
+                   forall p n, crctDs p n dts -> crctTerm p n (dbody dfn).
+Proof.
+  intros m dts dfn.
+  functional induction (dnth m dts); intros; try discriminate.
+  - myInjection H. inversion_Clear H0; try assumption.
+  - inversion_Clear H0.
+    + intuition.
+Qed.
+
+Lemma dnthBody_pres_Crct:
+  forall m dts fs, dnthBody m dts = Some fs ->
+                   forall p n, crctDs p n dts -> crctTerm p n fs.
+Proof.
+  intros m dts fs. unfold dnthBody.
+  functional induction (dnth m dts); intros; try discriminate.
+  - myInjection H. inversion_Clear H0; try assumption.
+  - inversion_Clear H0. intuition.
+Qed.
+
 Lemma mkApp_pres_Crct:
   forall p n args,
-    crctTerms p n args ->
-    forall fn, crctTerm p n fn -> crctTerm p n (mkApp fn args).
+    crctTerms p n args -> 
+    forall fn, crctTerm p n fn -> forall x, mkApp fn args = Some x -> crctTerm p n x.
 Proof.
   induction 1; intros.
-  - cbn. assumption.
-  - cbn. eapply IHcrctTerms. constructor; assumption.
+  - destruct (isConstruct_dec fn).
+    + dstrctn i. subst. cbn in H1. myInjection H1. assumption.
+    + destruct fn; inversion_Clear H0; cbn in H1; try myInjection H1; auto.
+      * eapply ctConst; eassumption.
+      * eapply ctCase; eassumption.
+  - assert (j:~ isConstruct fn).
+    { intros h. dstrctn h. subst fn. cbn in H2. discriminate. }
+    eapply (IHcrctTerms (TApp fn t)).
+    + constructor; assumption.
+    + rewrite mkApp_tcons in H2; assumption.
 Qed.
 
 Lemma Instantiate_pres_Crct:
@@ -470,11 +571,17 @@ Proof.
   - inversion_Clear H2. constructor.
     + apply H; assumption.
     + apply H0; assumption.
-  - inversion_Clear H1. econstructor; try eassumption.
+  - inversion_Clear H1. inversion_Clear H7. inversion_Clear H1.
+    econstructor; try eassumption.
+    + econstructor; try eassumption.
+      * econstructor; try eassumption.
+      *rewrite <- (Instantiates_pres_tlength i). assumption.
     + apply H; try eassumption.
-  - inversion_Clear H2. constructor; try assumption.
-    + apply H; try eassumption.
-    + apply H0; try eassumption.
+  - inversion_Clear H2. inversion_Clear H9. inversion_Clear H2.
+    econstructor.
+    + econstructor; try eassumption. econstructor; try eassumption.
+    + apply H; try assumption.
+    + apply H0; try assumption.
   - pose proof (InstantiateDefs_pres_dlength i) as k.
     inversion_Clear H1. econstructor; try omega.
     + eapply H; try omega.
@@ -505,6 +612,106 @@ Proof.
   omega.
 Qed.
 
+Lemma bnth_pres_Crct:
+  forall p n (brs:Brs), crctBs p n brs ->
+    forall m x ix, bnth m brs = Some (ix, x) -> crctTerm p n x.
+Proof.
+  intros p n brs h m ix x.
+  functional induction (bnth m brs); intros; auto.
+  - discriminate.
+  - myInjection H. inversion h. assumption.
+  - apply IHo; inversion h; assumption.
+Qed.
+
+Lemma whCaseStep_pres_Crct:
+  forall p n ts, crctTerms p n ts -> forall brs, crctBs p n brs ->
+  forall m s, whCaseStep m ts brs = Some s -> crctTerm p n s.
+Proof.
+  intros p n ts h1 brs h2 m s h3. pose proof (whCaseStep_Some _ _ _ h3).
+  dstrctn H. destruct ts.
+  - cbn in j. myInjection j. eapply (bnth_pres_Crct); eassumption. 
+  - assert (j0: crctTerm p n y).
+    { eapply (bnth_pres_Crct); eassumption. }
+    eapply mkApp_pres_Crct; eassumption. 
+Qed.
+  
+Lemma canonicalP_pres_crctTerms:
+  forall p m t, crctTerm p m t ->
+                forall n args, canonicalP t = Some (n, args) ->
+                               crctTerms p m args.
+Proof.
+  induction 1; intros; try (cbn in H1; discriminate).
+  - cbn in H0. myInjection H0. constructor. intuition.
+  - cbn in H0. discriminate.
+  - inversion_Clear H. inversion_Clear H2. cbn in H1. myInjection H1.
+    assumption.
+  - cbn in H0. discriminate.
+Qed.
+
+Lemma tnth_pres_Crct:
+  forall p m ts, crctTerms p m ts ->
+                 forall n x, tnth n ts = Some x -> crctTerm p m x.
+Proof.
+  induction 1; intros. discriminate. destruct n0.
+  - cbn in H1. myInjection H1. assumption.
+  - cbn in H1. eapply IHcrctTerms. eassumption.
+Qed.
+
+Lemma fold_left_pres_Crct:
+  forall (f:Term -> nat -> Term) (ns:list nat) p (a:nat),
+    (forall u m, m >= a -> crctTerm p (S m) u ->
+               forall n, In n ns -> crctTerm p m (f u n)) ->
+    forall t, crctTerm p (a + List.length ns) t ->
+              crctTerm p a (fold_left f ns t).
+Proof.
+  intros f. induction ns; cbn; intros.
+  - replace (a + 0) with a in H0. assumption. omega.
+  - apply IHns.
+    + intros. apply H; try assumption. apply (or_intror H3).
+    + replace (a0 + S (Datatypes.length ns))
+        with (S (a0 + (Datatypes.length ns))) in H0.
+      assert (j: a0 + Datatypes.length ns >= a0). omega.
+      specialize (H t _ j H0).
+      apply H. apply (or_introl eq_refl). omega.
+Qed.
+
+Lemma whFixStep_pres_Crct:
+  forall (dts:Defs) p n,
+    crctDs p (n + dlength dts) dts ->
+    forall m s, whFixStep dts m = Some s -> crctTerm p n s.
+Proof.
+  unfold whFixStep. intros. case_eq (dnth m dts); intros.
+  - assert (j: m < dlength dts).
+    { eapply dnth_lt. eassumption. }
+    rewrite H1 in H0. destruct d. myInjection H0. apply fold_left_pres_Crct.
+    + intros. apply instantiate_pres_Crct; try omega. assumption.
+      * pose proof (In_list_to_zero _ _ H3) as j0.
+        constructor; try assumption.
+        pose proof (dnth_pres_Crct _ H1 H) as k2.
+        eapply CrctDs_Up. eassumption. omega.
+    + rewrite list_to_zero_length.
+      eapply (dnth_pres_Crct _ H1 H).
+  - rewrite H1 in H0. discriminate.
+Qed.
+
+(***********
+Lemma pre_whFixStep_pres_Crct:
+  forall (dts:Defs) p n a m x,
+    crctDs p (n + dlength dts) dts -> crctTerm p n a ->
+    dnth m dts = Some x ->
+    crctTerm p n (pre_whFixStep (dbody x) dts a).
+Proof.
+  intros. unfold pre_whFixStep.
+  assert (c:= TApp (whFixStep_pres_Crct n H m _ a)). destruct x.
+  unfold whFixStep in c. rewrite H1 in c. apply c. apply f_equal.
+
+  destruct x.
+  specialize (c _ eq_refl).
+  constructor. apply c. apply H0.
+Qed.
+ ************)
+
+(*****
 Lemma fold_left_pres_Crct:
   forall p m (f:Term -> nat -> Term) (ns:list nat) (t:Term),
     (forall u, crctTerm p m u -> forall n, crctTerm p m (f u n)) ->
@@ -516,4 +723,4 @@ Proof.
     + intros. apply H. assumption.
     + apply H. assumption.
 Qed.
-
+***************)

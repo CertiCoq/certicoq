@@ -22,17 +22,18 @@ Set Implicit Arguments.
 **)
 Section Sec_environ.
 Variable p:environ Term.
-  
+
+Check TConstruct.
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNCase: forall i mch brs,
-    WNorm mch -> ~ isCanonical mch -> WNorm (TCase i mch brs)
-| WNConstruct: forall i n arty, WNorm (TConstruct i n arty)
+| WNConstruct: forall i n args, WNorms args -> WNorm (TConstruct i n args)
+| WNProof: WNorm TProof
 | WNApp: forall fn t,
-    WNorm fn -> ~ (isLambda fn) -> ~ (isFix fn) -> WNorm t ->
+    WNorm fn ->
+    ~ isLambda fn -> ~ isFix fn -> ~ isConstruct fn -> fn <> TProof ->
+    WNorm t ->
     WNorm (TApp fn t)
-| WNDummy: forall str, WNorm (TDummy str)
 with WNorms: Terms -> Prop :=
      | WNtnil: WNorms tnil
      | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
@@ -50,5 +51,31 @@ Proof.
     + assumption.
     + eapply IHts. eassumption.
 Qed.
+
+(** Wcbv reaches weak normal form **)
+Lemma Wcbv_WNorm:
+  (forall t s, WcbvEval p t s -> WNorm s) /\
+  (forall t ts, WcbvEvals p t ts -> WNorms ts).  
+Proof.
+  apply WcbvEvalEvals_ind; intros;
+    try (solve[constructor; try assumption]); try assumption.
+  - destruct a as [a [b [c d]]]. constructor; try assumption.  
+Qed.
+
+(** every normal form is hit **)
+Lemma WNorm_Wcbv:
+  (forall s, WNorm s -> exists t, WcbvEval p t s) /\
+  (forall ts, WNorms ts -> exists us, WcbvEvals p us ts).  
+Proof.
+  apply WNormWNorms_ind; intros.
+  - exists (TLambda nm bod). constructor.
+  - exists (TFix ds br). constructor.
+  - dstrctn H. exists (TConstruct i n x). now constructor.
+  - exists TProof. constructor.
+  - dstrctn H. dstrctn H0. exists (TApp x x0). now apply wAppCong. 
+  - exists tnil. constructor.
+  - dstrctn H. dstrctn H0. exists (tcons x x0). now constructor.
+Qed.
+ 
 
 End Sec_environ.

@@ -283,26 +283,6 @@ Definition make_cRep (cenv:cEnv) (ct : cTag) : option cRep :=
 Notation threadStructInf := (Tstruct threadInfIdent noattr).
 Notation threadInf := (Tpointer threadStructInf noattr).
 
-Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid
-                            {|
-                              cc_vararg := false;
-                              cc_unproto := false;
-                              cc_structret := false |}).
-
-Notation pfunTy := (Tpointer funTy noattr).
-
-Notation gcTy := (Tfunction (Tcons (Tpointer (Tint I32 Unsigned noattr) noattr) (Tcons threadInf Tnil)) Tvoid
-                            {|
-                              cc_vararg := false;
-                              cc_unproto := false;
-                              cc_structret := false |}).
-
-Notation isptrTy := (Tfunction (Tcons (Tint I32 Unsigned noattr) Tnil) (Tint IBool Unsigned noattr)
-                               {|
-                                 cc_vararg := false;
-                                 cc_unproto := false;
-                                 cc_structret := false |}).
-
 
 
 
@@ -318,9 +298,37 @@ Notation longTy := (Tlong Signed
 Notation ulongTy := (Tlong Unsigned
                         {| attr_volatile := false; attr_alignas := None |}).
 
+(* CHANGE THIS FOR 32-bit or 64-bit mode *)
+Notation val := ulongTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *)
+Notation uval := ulongTy.
+Notation val_typ := (AST.Tlong:typ).
+Notation Init_int x := (Init_int64 (Int64.repr x)).
 
-Notation val := uintTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *)
-Notation uval := uintTy.
+
+Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid
+                            {|
+                              cc_vararg := false;
+                              cc_unproto := false;
+                              cc_structret := false |}).
+
+Notation pfunTy := (Tpointer funTy noattr).
+
+Notation gcTy := (Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid
+                            {|
+                              cc_vararg := false;
+                              cc_unproto := false;
+                              cc_structret := false |}).
+
+Notation isptrTy := (Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr)
+                               {|
+                                 cc_vararg := false;
+                                 cc_unproto := false;
+                                 cc_structret := false |}).
+
+
+
+
+
 
 Notation valPtr := (Tpointer val
                             {| attr_volatile := false; attr_alignas := None |}).
@@ -711,7 +719,7 @@ Definition getName : nState positive :=
 Fixpoint make_ind_array (l : list N) : list init_data :=
   match l with
   | nil => nil
-  | n :: l' => (Init_int32 (Int.repr (Z.of_N n))) :: (make_ind_array l')
+  | n :: l' => (Init_int (Z.of_N n)) :: (make_ind_array l')
   end.
 
 
@@ -769,7 +777,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t Ast.name)
                              (Tarray uintTy
                                      (len + 2%Z)
                                      noattr)
-                            ((Init_int32 (Int.repr (Z.of_nat (max_allocs e)))) :: (Init_int32 (Int.repr len)) :: (make_ind_array l)) true false in
+                            ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int len) :: (make_ind_array l)) true false in
                        ret (Some (((info_name , Gvar ind) :: defs) ,
                                   M.set x info_name map ,
                                   update_nEnv_fun_info x info_name nenv'))
@@ -786,7 +794,7 @@ Fixpoint add_bodyinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name) (map: M.t po
                   (Tarray uintTy
                           2%Z
                           noattr)
-                  ((Init_int32 (Int.repr (Z.of_nat (max_allocs e)))) :: (Init_int32 Int.zero) :: nil) true false in
+                  ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int 0%Z) :: nil) true false in
             ret (Some (
                      ((info_name , Gvar ind) :: defs),
                      (M.set mainIdent info_name map),
@@ -813,21 +821,21 @@ Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name)
 Definition global_defs (e : exp)
   : list (positive * globdef Clight.fundef type) :=
 (*  let maxArgs := (Z.of_nat (max_args e)) in
-  (allocIdent, Gvar (mkglobvar valPtr ((Init_int32 (Int.zero)) :: nil) false false))
-    :: (limitIdent , Gvar (mkglobvar valPtr  ((Init_int32 (Int.zero)) :: nil) false false))
+  (allocIdent, Gvar (mkglobvar valPtr ((Init_int(Int.zero)) :: nil) false false))
+    :: (limitIdent , Gvar (mkglobvar valPtr  ((Init_int(Int.zero)) :: nil) false false))
     :: (argsIdent , Gvar (mkglobvar (Tarray val maxArgs noattr)
-                                    ((Init_int32 (Int.zero)) :: nil)
+                                    ((Init_int(Int.zero)) :: nil)
                                     false false))
     :: *)
     (gcIdent , Gfun (External (EF_external "gc"
-                                              (mksignature (Tany32 :: nil) None cc_default))
-                                 (Tcons (Tpointer (Tint I32 Unsigned noattr) noattr) (Tcons threadInf Tnil))
+                                              (mksignature (val_typ :: nil) None cc_default))
+                                 (Tcons (Tpointer val noattr) (Tcons threadInf Tnil))
                                  Tvoid
                                  cc_default
     ))::
       (isptrIdent , Gfun (External (EF_external "is_ptr"
-                                             (mksignature (Tany32 :: nil) None cc_default))
-                                (Tcons (Tint I32 Unsigned noattr) Tnil) (Tint IBool Unsigned noattr)
+                                             (mksignature (val_typ :: nil) None cc_default))
+                                (Tcons val Tnil) (Tint IBool Unsigned noattr)
                                 cc_default
       ))
     :: nil.
@@ -1060,7 +1068,7 @@ Definition asgn_string (charPtr:ident) (n:name): nState (statement *  list (iden
 
 Definition make_arrGV (arrList:list N): (globdef Clight.fundef type) :=
   Gvar (mkglobvar (tarray tint (Z.of_nat (length arrList)))
-                     (List.map (fun n => Init_int32 (Int.repr (Z.of_N n))) arrList)
+                     (List.map (fun n => Init_int (Z.of_N n)) arrList)
                      true
                      false).
 
@@ -1168,14 +1176,14 @@ Definition exportIdent := 21%positive.
 
 
 Definition make_tinfo_rec: (positive * globdef Clight.fundef type) := (make_tinfoIdent , Gfun (External (EF_external "make_tinfo"
-                                              (mksignature (nil) (Some Tany32) cc_default))
+                                              (mksignature (nil) (Some val_typ) cc_default))
                                  Tnil
                                  threadInf
                                  cc_default
     )).
 
 Definition export_rec: (positive * globdef Clight.fundef type) := (exportIdent , Gfun (External (EF_external "export"
-                                              (mksignature (cons Tany32 nil) (Some Tany32) cc_default))
+                                              (mksignature (cons val_typ nil) (Some val_typ) cc_default))
                                  (Tcons threadInf Tnil)
                                  valPtr
                                  cc_default
@@ -1242,7 +1250,7 @@ Definition make_halt (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globde
                                          nil
                                          nil
                                          (Sreturn None)))), (halt_cloIdent, Gvar (mkglobvar  (tarray tuint 2) ((Init_addrof haltIdent Int.zero) ::
-                Init_int32 (Int.repr 1) :: nil) true false))).
+                Init_int 1 :: nil) true false))).
 
 
 (* make b? call^n_export; call^n  

@@ -737,102 +737,6 @@ with evals_n_ind2 := Induction for evals_n Sort Prop.
 Combined Scheme eval_evals_n_ind from eval_n_ind2, evals_n_ind2.
 
 
-(***************************    
-(** For testing: a fuel-based interpreter for partial big-step on [exp]. *)
-Function reval_n (n:nat) (e:exp) {struct n}: option exp := 
-  match n with
-    | 0%nat => None
-    | S n => match e with
-               | Lam_e na d => Some (Lam_e na d)
-               | Fix_e es k => Some (Fix_e es k)
-               | Prf_e => Some Prf_e
-               | Con_e d es => 
-                 match evals_n n es with
-                     | None => None
-                     | Some vs => Some (Con_e d vs)
-                 end
-               | App_e e1 e2 =>
-                 match reval_n n e1 with
-                   | Some (Lam_e _ e1') => 
-                     match reval_n n e2 with
-                       | None => None
-                       | Some e2' => reval_n n (e1'{0 ::= e2'})
-                     end
-                   | Some (Fix_e es k) =>
-                     match reval_n n e2 with
-                     | None => None
-                     | Some e2' =>
-                       match enthopt (N.to_nat k) es with
-                       | Some e' =>
-                         let t' := sbst_fix es e' in
-                         reval_n n (App_e t' e2')
-                       | _ => None
-                       end
-                     end
-                   | Some Prf_e =>
-                     match reval_n n e2 with
-                     | None => None
-                     | Some _ => Some Prf_e
-                     end
-                   | _ => None
-                  end
-               | Let_e _ e1 e2 =>
-                 match reval_n n e1 with
-                   | None => None
-                   | Some v1 => reval_n n (e2{0::=v1})
-                 end
-               | Match_e e p bs =>
-                 match reval_n n e with
-                 | Some (Con_e d vs) =>
-                   match find_branch d (exps_length vs) bs with
-                     | None => None
-                     | Some e' => reval_n n (sbst_list e' vs)
-                   end
-                   | _ => None
-                 end
-               | Var_e e => None
-             end
-  end
-with revals_n n (es:exps) : option exps :=
-       match n with
-         | 0%nat => None
-         | S n => 
-           match es with
-             | enil => Some enil
-             | econs e es => 
-               match (reval_n n e, revals_n n es) with
-                 | (Some v, Some vs) => Some (econs v vs)
-                 | (_, _) => None
-               end
-           end
-       end.
-**********************)
-
-(***********
-Lemma pre_eval_n_monotone:
-  forall n:nat,
-  (forall e f, eval_n n e = Some f -> eval_n (S n) e = Some f) /\
-  (forall e f, evals_n n e = Some f -> evals_n (S n) e = Some f).
-Proof.
-  intros n.
-  apply
-    (eval_evals_n_ind
-       (fun n e sf => forall f (p1:sf = Some f), eval_n (S n) e = Some f)
-       (fun n e sf => forall f (p1:sf = Some f), evals_n (S n) e = Some f));
-    intros; try discriminate; try (injection p1; intros; subst; reflexivity).
-  - injection p1; intros. subst. cbn.
-*****************)
-
-Lemma eval_n_monotone:
-  forall (n:nat) e f, eval_n n e = Some f ->
-                      forall (m:nat), eval_n (n + m) e = Some f.
-Admitted.
-
-Lemma evals_n_monotone:
-  forall (n:nat) es fs, evals_n n es = Some fs ->
-                      forall (m:nat), evals_n (n + m) es = Some fs.
-Admitted.
-
 
 (***
 Lemma eval_n_weaken:
@@ -845,99 +749,6 @@ Lemma eval_n_weaken:
                    forall m, evals_n (n+m) es = Some fs). /\
 .
 Proof.
-
-Lemma eval_n_monotone:
-  (forall (n:nat) e f, eval_n n e = Some f -> eval_n (S n) e = Some f).
-Proof.
-  induction n; intros.
-  - simpl; discriminate.
-  - destruct e; simpl; try discriminate; try assumption.
-    destruct (eval_n n e1).
-
-
-
-
-(***
-Lemma eval_n_monotone:
-  forall n:nat,
-  (forall e sf, eval_n n e = sf -> forall f, sf = Some f ->
-                 eval_n (S n) e = Some f) /\
-  (forall es sfs, evals_n n es = sfs -> forall fs, sfs = Some fs ->
-                   evals_n (S n) es = Some fs).
-Proof.
-  intros n.
-  Check (eval_evals_n_ind). 
-           (fun e f =>
-              eval_n n e = Some f -> forall m : nat, eval_n (n + m) e = Some f)).
-***)
-
-Lemma eval_n_monotone:
-  (forall (n:nat) e sf, eval_n n e = sf -> forall f, sf = Some f ->
-                 eval_n (S n) e = Some f).
-Proof.
-  intros n e.
-  functional induction (eval_n n e); intros;
-  try solve [simpl; rewrite <- H0; assumption].
-  - admit.
-  - admit.
-  - 
-
-
-  try discriminate; try assumption.
-  - destruct n0; destruct es.
-    + simpl in e2. discriminate.
-    + simpl in e2. discriminate.
-    + simpl in e2. injection e2; intros h. rewrite h. assumption.
-    + simpl in e2. destruct (eval_n n0 e); destruct (evals_n n0 es).
-
-
-
-Lemma eval_n_monotone:
-  (forall (m n:nat) e f, eval_n n e = Some f ->
-                 eval_n (n+m) e = Some f).
-Proof.
-  induction m; intros n e f h.
-  - replace (n + 0)%nat with n; try omega. assumption.
-  - specialize (IHm (S n)).
-    replace (n + S m)%nat with (S n + m)%nat; try omega.
-    apply IHm.
-
-  functional induction (eval_n n e); simpl; intros;
-  try discriminate; try assumption.
-  - 
-
-
-Lemma eval_n_monotone:
-  (forall n e f, eval_n n e = Some f ->
-                 forall m, (n < m)%nat -> eval_n m e = Some f).
-Proof.
-  intros n e f.
-  functional induction (eval_n n e); intros; try discriminate;
-  assert (h:m = S (m - 1)); try omega; rewrite h; clear h; try assumption.
-  - rewrite <- H.
-    change (evals_n (m - 1) es = Some vs).
-  simpl. injection H; intros h0. rewrite <- h0. 
-
- simpl. reflexivity.
-
-
-Lemma eval_n_monotone:
-  (forall n e f, eval_n n e = Some f ->
-                 forall m, eval_n (n+m) e = Some f).
-Proof.
-  intros n e f.
-  functional induction (eval_n n e); simpl; intros;
-  try discriminate; try assumption.
-  - 
-
-
-
-  apply (eval_n_ind
-           (fun n e oe =>
-              forall (f:exp), oe = Some f ->
-                              forall m : nat, eval_n (n + m) e = Some f));
-    simpl; intros; try discriminate; try assumption.
-  - 
 
 Lemma eval_n_weaken:
   (forall n e f, eval_n n e = Some f ->
@@ -953,21 +764,6 @@ Proof.
 
 
 (** [eval_n] is sound w.r.t. [eval] **)
-Lemma eval_n_Some_Succ:
-  forall e (n:nat) v, eval_n n e = Some v -> n = (S (n - 1))%nat.
-Proof.
-  induction n; intros.
-  - simpl in H. discriminate.
-  - omega.
-Qed.
-Lemma evals_n_Some_Succ:
-  forall es (n:nat) vs, evals_n n es = Some vs -> n = (S (n - 1))%nat.
-Proof.
-  induction n; intros.
-  - simpl in H. discriminate.
-  - omega.
-Qed.
-
 Lemma evaln_eval: 
   forall (n:nat),
   (forall (e:exp) v, eval_n n e = Some v -> eval e v) /\
@@ -1000,95 +796,102 @@ Proof.
     * apply H. assumption.
     * apply H0. assumption.
 Qed.
+Print Assumptions evaln_eval.
 
 (** [eval_n] is complete w.r.t. [eval] **)
-Lemma eval_evaln:
-  (forall (e v:exp), eval e v -> exists (n:nat), eval_n n e = Some v) /\
-  (forall (es vs:exps), evals es vs -> exists (n:nat), evals_n n es = Some vs).
+Lemma eval_n_Some_Succ:
+  forall e (n:nat) v, eval_n n e = Some v -> n = (S (n - 1))%nat.
 Proof.
-  apply my_eval_ind; intros; try (solve [exists 1%nat; reflexivity]).
-  - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
-    exists (x+x0+x1)%nat.
-    assert (j:=eval_n_Some_Succ _ _ _ h).
-    assert (j0:=eval_n_Some_Succ _ _ _ h0).
-    assert (j1:=eval_n_Some_Succ _ _ _ h1).
-    assert (k:= eval_n_monotone _ _ _ h).
-    assert (k0:= eval_n_monotone _ _ _ h0).
-    assert (k1:= eval_n_monotone _ _ _ h1).
-    rewrite j.
-    replace (S (x - 1) + x0 + x1)%nat
-    with (S (x + (x0 + x1 - 1)))%nat; try lia.
-    simpl. rewrite k.
-    replace (x + (x0 + x1 - 1))%nat with (x0 + (x + x1 - 1))%nat; try lia.
-    rewrite k0.
-    replace (x0 + (x + x1 - 1))%nat with (x1 + (x + x0 - 1))%nat; try lia.
-    rewrite k1. reflexivity.
-  - destruct H as [x h]. exists (x+1)%nat.
-    assert (j:=evals_n_Some_Succ _ _ _ h).
-    assert (k:= evals_n_monotone _ _ _ h).
-    rewrite j.
-    replace (S (x - 1) + 1)%nat with (S (x + 0))%nat; try lia.
-    simpl. rewrite k. reflexivity.
-  - destruct H as [x h]. destruct H0 as [x0 h0].
-    assert (j:=eval_n_Some_Succ _ _ _ h).
-    assert (j0:=eval_n_Some_Succ _ _ _ h0).
-    assert (k:= eval_n_monotone _ _ _ h).
-    assert (k0:= eval_n_monotone _ _ _ h0).
-    exists (x+x0)%nat.
-    rewrite j.
-    replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
-    simpl. rewrite k.
-    replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
-    rewrite k0. reflexivity.
-  - destruct H as [x h]. destruct H0 as [x0 h0].
-    assert (j:=eval_n_Some_Succ _ _ _ h).
-    assert (j0:=eval_n_Some_Succ _ _ _ h0).
-    assert (k:= eval_n_monotone _ _ _ h).
-    assert (k0:= eval_n_monotone _ _ _ h0).
-    exists (x+x0)%nat.
-    rewrite j.
-    replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
-    simpl. rewrite k.
-    replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
-    rewrite e1. rewrite k0. reflexivity.
-  - destruct H as [x h]. destruct H0 as [x0 h0]. destruct H1 as [x1 h1].
-    exists (x+x0+x1)%nat.
-    assert (j:=eval_n_Some_Succ _ _ _ h).
-    assert (j0:=eval_n_Some_Succ _ _ _ h0).
-    assert (j1:=eval_n_Some_Succ _ _ _ h1).
-    assert (k:= eval_n_monotone _ _ _ h).
-    assert (k0:= eval_n_monotone _ _ _ h0).
-    assert (k1:= eval_n_monotone _ _ _ h1).
-    rewrite j.
-    replace (S (x - 1) + x0 + x1)%nat
-    with (S (x + (x0 + x1 - 1)))%nat; try lia.
-    simpl. rewrite k.
-    replace (x + (x0 + x1 - 1))%nat with (x0 + (x + x1 - 1))%nat; try lia.
-    rewrite k0.
-    replace (x0 + (x + x1 - 1))%nat with (x1 + (x + x0 - 1))%nat; try lia.
-    rewrite e3, k1. reflexivity.
-  - destruct H as [x h].
-    destruct H0 as [x0 h0].
-    assert (j:=eval_n_Some_Succ _ _ _ h).
-    assert (j0:=eval_n_Some_Succ _ _ _ h0).
-    assert (k:= eval_n_monotone _ _ _ h).
-    assert (k0:= eval_n_monotone _ _ _ h0).
-    exists (S (x+x0)%nat). simpl. rewrite k.
-    rewrite Nat.add_comm. rewrite k0. reflexivity.
-  - destruct H as [x h]. destruct H0 as [x0 h0].
-    assert (j:=eval_n_Some_Succ _ _ _ h).
-    assert (j0:=evals_n_Some_Succ _ _ _ h0).
-    assert (k:= eval_n_monotone _ _ _ h).
-    assert (k0:= evals_n_monotone _ _ _ h0).
-    exists (x+x0)%nat.
-    rewrite j.
-    replace (S (x - 1) + x0)%nat with (S (x + (x0 - 1)))%nat; try lia.
-    simpl. rewrite k.
-    replace (x + (x0 - 1))%nat with (x0 + (x - 1))%nat; try lia.
-    rewrite k0. reflexivity.
+  induction n; intros.
+  - simpl in H. discriminate.
+  - omega.
+Qed.
+Lemma evals_n_Some_Succ:
+  forall es (n:nat) vs, evals_n n es = Some vs -> n = (S (n - 1))%nat.
+Proof.
+  induction n; intros.
+  - simpl in H. discriminate.
+  - omega.
 Qed.
 
+Open Scope nat_scope.
+Lemma pre_eval_evaln:
+  (forall (e v:exp),
+      eval e v -> exists (n:nat),
+        forall m, m >= n -> eval_n (S m) e = Some v) /\
+  (forall (es vs:exps),
+      evals es vs -> exists (n:nat),
+        forall m, m >= n -> evals_n (S m) es = Some vs).
+Proof.
+  assert (j:forall m, m > 0 -> m = S (m - 1)).
+  { induction m; intuition. }
+  apply my_eval_ind; intros; try (exists 0; intros mx h; reflexivity).
+  - destruct H, H0, H1. exists (S (max x (max x0 x3))). intros m h.
+    assert (j1:= max_fst x (max x0 x3)). 
+    assert (lx: m > x). omega.
+    assert (j2:= max_snd x (max x0 x3)).
+    assert (j3:= max_fst x0 x3).
+    assert (lx0: m > x0). omega.
+    assert (j4:= max_snd x0 x3).
+    assert (j5:= max_fst x0 x3).
+    assert (lx1: m > x3). omega.
+    simpl. rewrite (j m); try omega. rewrite H; try omega.
+    rewrite H0; try omega. rewrite H1; try omega. reflexivity.
+  - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
+    rewrite H; try omega. reflexivity.
+  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    simpl. rewrite (j mx); try omega. rewrite H; try omega.
+    rewrite H0; try omega. reflexivity.
+  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    simpl. rewrite (j mx); try omega. rewrite H; try omega.
+    rewrite e1. rewrite H0; try omega. reflexivity.
+  - destruct H, H0, H1. exists (S (max x (max x0 x3))). intros m h.
+    assert (j1:= max_fst x (max x0 x3)). 
+    assert (lx: m > x). omega.
+    assert (j2:= max_snd x (max x0 x3)).
+    assert (j3:= max_fst x0 x3).
+    assert (lx0: m > x0). omega.
+    assert (j4:= max_snd x0 x3).
+    assert (j5:= max_fst x0 x3).
+    assert (lx1: m > x3). omega.
+    simpl. rewrite (j m); try omega. rewrite H; try omega.
+    rewrite H0; try omega. rewrite e3. apply H1. try omega.
+  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    simpl. rewrite (j mx); try omega. rewrite H; try omega.
+    rewrite H0; try omega. reflexivity.
+  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    simpl. rewrite (j mx); try omega. rewrite H; try omega.
+    rewrite H0; try omega. reflexivity.
+Qed.
+
+Lemma eval_evaln:
+  forall t s,
+    eval t s -> exists n, forall m, m >= n -> eval_n m t = Some s.
+Proof.
+  intros t s h.
+  destruct (proj1 pre_eval_evaln _ _ h).
+  exists (S x). intros m hm. specialize (H (m - 1)).
+  assert (k: m = S (m - 1)). { omega. }
+  rewrite k. apply H. omega.
+Qed.
+Print Assumptions eval_evaln.
+  
+Lemma eval_n_up:
+ forall t s tmr,
+   eval_n tmr t = Some s -> exists n, forall m, m >= n -> eval_n m t = Some s.
+Proof.
+  intros. Check (eval_evaln _ _ (proj1 (evaln_eval tmr) _ _ H)).
+  destruct (eval_evaln _ _ (proj1 (evaln_eval tmr) _ _ H)).
+  exists x. apply H0.
+Qed.
+
+
 (** some concrete examples **)
+Open Scope N_scope.
 Example Ke: exp := Lam_e "x" (Lam_e "y" (Var_e 1)).
 Example Se: exp := Lam_e "x" (Lam_e "y" (Lam_e "z"
             (App_e (App_e (Var_e 2) (Var_e 0)) (App_e (Var_e 1) (Var_e 0))))).
@@ -1895,10 +1698,6 @@ Qed.
 
 Require Import SquiggleEq.UsefulTypes.
 Require Import SquiggleEq.list.
-
-
-
-
 Require Import SquiggleEq.tactics.
 
 
@@ -1981,7 +1780,8 @@ Proof.
   - simpl. exrepnd. exists (n0+n)%nat.
     assert (k:= eval_ns_monotone _ _ _ H0). clear H0.
     rewrite k.
-    erewrite <- flattenLift2;[ | | rewrite H1; firstorder];[rewrite H1; refl | ].
+    erewrite <- flattenLift2;
+      [ | | rewrite H1; firstorder];[rewrite H1; refl | ].
     intros.
     apply in_map with (f:= (eval_ns n))in H.
     apply isSomeIf in H1.

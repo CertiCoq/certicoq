@@ -94,18 +94,6 @@ Proof.
   - cbn. change (WcbvEval nil xxxx xxxx).
 Abort.
              
-(********
-  Lemma WcbvEvals_tappend:
-  forall ts ets p us eus,
-    WcbvEvals p ts ets -> WcbvEvals p us eus ->
-    WcbvEvals p (tappend ts us) (tappend ets eus).
-Proof.
-  induction ts; intros.
-  - inversion_Clear H. cbn. assumption.
-  - inversion_Clear H. cbn. constructor; intuition.
-Qed.
- **************)
-
 Lemma WcbvEval_pres_WFapp:
   forall p t s, WcbvEval p t s -> WFaEnv p -> WFapp t -> WFapp s.
 Proof.

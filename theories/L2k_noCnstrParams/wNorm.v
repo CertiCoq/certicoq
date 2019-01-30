@@ -23,7 +23,6 @@ Set Implicit Arguments.
 Section Sec_environ.
 Variable p:environ Term.
 
-Check TConstruct.
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)

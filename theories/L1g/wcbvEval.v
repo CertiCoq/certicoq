@@ -17,21 +17,21 @@ Open Scope bool.
 Open Scope list.
 Set Implicit Arguments.
 
-Inductive nonRedex : Term -> Prop :=
-| nrApp: forall fn arg, nonRedex fn -> nonRedex (TApp fn arg)
-| nrCstr: forall i r np na, nonRedex (TConstruct i r np na)
-| nrCase: forall ml mch brs, nonRedex (TCase ml mch brs).
 
 (** Big step relation of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProof: WcbvEval p TProof TProof
-| wAppProof fn arg: WcbvEval p fn TProof -> WcbvEval p (TApp fn arg) TProof
+| wAppProof fn arg arg':
+    WcbvEval p fn TProof ->
+    WcbvEval p arg arg' ->
+    WcbvEval p (TApp fn arg) TProof
 | wConstruct: forall i r np na,
     WcbvEval p (TConstruct i r np na) (TConstruct i r np na)
 | wFix: forall dts m, WcbvEval p (TFix dts m) (TFix dts m)
 | wConst: forall nm (t s:Term),
-    lookupDfn nm p = Ret t -> WcbvEval p t s ->
+    lookupDfn nm p = Ret t ->
+    WcbvEval p t s ->
     WcbvEval p (TConst nm) s
 | wAppLam: forall (fn bod a1 a1' s:Term) (nm:name),
     WcbvEval p fn (TLambda nm bod) ->
@@ -48,7 +48,8 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p (pre_whFixStep x dts arg) s ->
     WcbvEval p (TApp fn arg) s 
 | wAppCong: forall fn fn' arg arg', 
-    WcbvEval p fn fn' -> (isApp fn' \/ isConstruct fn' \/ isCase fn') ->
+    WcbvEval p fn fn' ->
+    (~ isLambda fn' /\ ~ isFix fn' /\ fn' <> TProof) ->
     WcbvEval p arg arg' ->
     WcbvEval p (TApp fn arg) (TApp fn' arg')
 | wCase: forall mch Mch n args ml ts brs cs s npars nargs,
@@ -132,62 +133,34 @@ Lemma WcbvEval_single_valued:
   forall p t s, WcbvEval p t s -> forall u, WcbvEval p t u -> s = u.
 Proof.
   induction 1; intros; try (inversion_Clear H; reflexivity).
-  - inversion_Clear H0.
-    + reflexivity.
-    + specialize (IHWcbvEval _ H3). discriminate.
-    + specialize (IHWcbvEval _ H3). discriminate.
-    + destruct H4 as [H4 | [H4 | H4]];
-        (dstrctn H4; subst; specialize (IHWcbvEval _ H3); discriminate).
+  - inversion_Clear H1; trivial.
+    + specialize (IHWcbvEval1 _ H4). discriminate.
+    + specialize (IHWcbvEval1 _ H4). discriminate.
+    + destruct H5 as [a [b c]]. elim c.
+      symmetry. apply IHWcbvEval1. assumption.
   - inversion_Clear H1. rewrite H in H3. myInjection H3. intuition.
   - inversion_Clear H2.
-    + specialize (IHWcbvEval1 _ H6). discriminate.
+    + specialize (IHWcbvEval1 _ H5). discriminate.
     + specialize (IHWcbvEval1 _ H5). myInjection IHWcbvEval1.
       specialize (IHWcbvEval2 _ H6). subst. intuition.
     + specialize (IHWcbvEval1 _ H5). discriminate.
-    + destruct H6 as [H6 | [H6 | H6]];
-        (dstrctn H6; subst; specialize (IHWcbvEval1 _ H5); discriminate).
+    + destruct H6 as [a [b c]]. specialize (IHWcbvEval1 _ H5).
+      elim a. subst. auto.
   - inversion_Clear H1. specialize (IHWcbvEval1 _ H6). subst. intuition.
   - inversion_Clear H2.
-    + specialize (IHWcbvEval1 _ H6). discriminate.
+    + specialize (IHWcbvEval1 _ H5). discriminate.
     + specialize (IHWcbvEval1 _ H5). discriminate.
     + specialize (IHWcbvEval1 _ H5). myInjection IHWcbvEval1.
       rewrite H0 in H6. myInjection H6. intuition.
-    + destruct H6 as [H6 | [H6 | H6]];
-        (dstrctn H6; subst; specialize (IHWcbvEval1 _ H5); discriminate).
-  - destruct H0 as [H0 | [H0 | H0]].
-    + dstrctn H0. subst. inversion_Clear H2.
-      * specialize (IHWcbvEval1 _ H5). discriminate.
-      * specialize (IHWcbvEval1 _ H4). discriminate.
-      * specialize (IHWcbvEval1 _ H4). discriminate.
-      * destruct H5 as [H5 | [H5 | H5]].
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-    + dstrctn H0. subst. inversion_Clear H2.
-      * specialize (IHWcbvEval1 _ H5). discriminate.
-      * specialize (IHWcbvEval1 _ H4). discriminate.
-      * specialize (IHWcbvEval1 _ H4). discriminate.
-      * destruct H5 as [H5 | [H5 | H5]].
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-    + dstrctn H0. subst. inversion_Clear H2.
-      * specialize (IHWcbvEval1 _ H5). discriminate.
-      * specialize (IHWcbvEval1 _ H4). discriminate.
-      * specialize (IHWcbvEval1 _ H4). discriminate.
-      * destruct H5 as [H5 | [H5 | H5]].
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
-        -- specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
-           subst. reflexivity.
+    + destruct H6 as [a [b c]]. specialize (IHWcbvEval1 _ H5). subst fn'.
+      destruct b. auto.
+  - destruct H0 as [a [b c]]. inversion_Clear H2.
+      * specialize (IHWcbvEval1 _ H4). subst. elim c. reflexivity.
+      * specialize (IHWcbvEval1 _ H4). subst. elim a. auto. 
+      * specialize (IHWcbvEval1 _ H4). subst. elim b. auto. 
+      * destruct H5 as [e [f g]].
+        specialize (IHWcbvEval1 _ H4). specialize (IHWcbvEval2 _ H7).
+        subst. reflexivity.
   - inversion_Clear H4. specialize (IHWcbvEval1 _ H8). subst.
     rewrite H0 in H9. myInjection H9. rewrite H1 in H10. myInjection H10.
     rewrite H2 in H12. myInjection H12. intuition.
@@ -227,9 +200,10 @@ Lemma WcbvEval_weaken:
                  forall nm ec, fresh nm p -> WcbvEval ((nm,ec)::p) t s.
 Proof.
   induction 1; intros; auto.
+  - specialize (IHWcbvEval1 _ ec H1). specialize (IHWcbvEval2 _ ec H1).
+    econstructor; eassumption.
   - destruct (string_dec nm nm0).
-    + subst. 
-      unfold lookupDfn in H.
+    + subst. unfold lookupDfn in H.
       rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _) H1) in H.
       discriminate.
     + eapply wConst.
@@ -250,19 +224,9 @@ Lemma WcbvEval_wndEvalRTC:
     forall t s, WcbvEval p t s -> WFapp t -> wndEvalRTC p t s.
 Proof.
   intros p hp. induction 1; intros; try (solve [constructor]).
-  - inversion_Clear H0. specialize (IHWcbvEval H3). inversion_Clear IHWcbvEval.
-    + constructor. constructor.
-    + eapply wndEvalRTC_App_Proof; try eassumption.
-      instantiate (1:= TProof). constructor. assumption. reflexivity.
-    + eapply wERTCtrn. instantiate (1:= (TApp s arg)).
-      apply wndEvalRTC_App_fn; try eassumption.
-      eapply wERTCtrn. instantiate (1:= (TApp TProof arg)).
-      apply wndEvalRTC_App_fn; try eassumption.
-      eapply wndEvalRTC_pres_WFapp; try eassumption.
-      eapply wndEvalRTC_App_Proof; try eassumption; try reflexivity.
-      constructor. constructor.
-  - eapply wERTCtrn; intuition.
-    eapply wERTCtrn.
+  - inversion_Clear H1. intuition.
+    eapply wndEvalRTC_App_Proof; try eassumption. reflexivity.
+  - eapply wERTCtrn; intuition. eapply wERTCtrn.
     + apply wERTCstep. apply sConst. apply lookupDfn_LookupDfn. eassumption.
     + apply IHWcbvEval. eapply (lookupDfn_pres_WFapp hp).  eassumption. 
   - inversion_Clear H2. intuition.
@@ -351,9 +315,15 @@ Function wcbvEval
     | TProof => Ret TProof
     | TApp fn a1 =>
       match wcbvEval n fn with
+      | Exc str =>  raise ("(wcbvEval;TApp:fn" ++ str ++ ")")
+      | Ret TProof =>          (* Proof redex *)
+        match wcbvEval n a1 with
+        | Exc s =>  raise ("wcbvEval,ProofRedex,arg: " ++ s)
+        | Ret _ => Ret TProof 
+        end
       | Ret (TLambda _ bod) =>
         match wcbvEval n a1 with
-        | Exc s =>  raise ("wcbvEval beta: arg doesn't eval: "
+        | Exc s =>  raise ("wcbvEval beta:arg: "
                              ++ print_term a1 ++ ";" ++ s)
         | Ret b1 => wcbvEval n (whBetaStep bod b1)
         end
@@ -362,20 +332,11 @@ Function wcbvEval
         | None => raise ("wcbvEval TApp: dnthBody doesn't eval: ")
         | Some (x,_) => wcbvEval n (pre_whFixStep x dts a1)
         end
-      | Ret ((TConstruct _ _ _ _) as tc)   (* applied constructor *)
-      | Ret ((TCase _ _ _) as tc)
-      | Ret ((TApp _ _) as tc) =>    (** congruence **)
+      | Ret (_ as u) =>
         match wcbvEval n a1 with
-        | Ret a1' => ret (TApp tc a1')
-        | Exc s => raise ("wcbvEval;TApp:arg doesn't eval: "
-                   ++ print_term a1 ++ "; " ++ s)
+        | Exc s =>  raise ("wcbvEval,Cong,arg: " ++ s)
+        | Ret b1 => ret (TApp u b1)  (* congruence *)
         end
-      | Ret TProof => Ret TProof
-      | Ret tc => raise ("wcbvEval:TApp:fn cannot be applied: "
-                           ++ print_term tc ++ ")")
-      | Exc s =>
-        raise ("wcbvEval:TApp:fn doesn't eval: "
-                 ++ print_term fn ++ "; " ++ s)
       end
     | TCase (ind,m) mch brs =>
       match wcbvEval n mch with
@@ -460,13 +421,17 @@ Proof.
   try (myInjection H); try(solve[constructor]); intuition.
   - eapply wConst; intuition.
     + unfold lookupDfn. rewrite e1. reflexivity.
+  - specialize (IHe _ e1). specialize (IHe0 _ e2).
+    eapply wAppProof; eassumption.
   - specialize (IHe _ e1). specialize (IHe0 _ e2). specialize (IHe1 _ H).
     eapply wAppLam; eassumption.
   - specialize (IHe _ e1). specialize (IHe0 _ H).
     eapply wAppFix; try eassumption.
   - specialize (IHe _ e1). specialize (IHe0 _ e2).
-    eapply wAppCong; try assumption.
-    + right. right. exists _x, _x0, _x1. reflexivity.
+    eapply wAppCong; try assumption. repeat split; intros h.
+    + dstrctn h. subst. contradiction.
+    + dstrctn h. subst. contradiction. 
+    + subst. contradiction. 
   - specialize (IHe _ e1). specialize (IHe0 _ H).
     eapply wCase; try eassumption.
   - specialize (IHe _ e1). specialize (IHe0 _ H).
@@ -484,9 +449,10 @@ Proof.
   assert (j:forall m, m > 0 -> m = S (m - 1)).
   { induction m; intuition. }
   induction 1; intros; try (exists 0; intros mx h; reflexivity).
-  - dstrctn IHWcbvEval.
-    exists (S x). intros m hm. simpl. rewrite (j m); try omega.
-    rewrite j0; try omega. reflexivity.
+  - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x x0)). intros mx h.
+    assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    simpl. rewrite (j mx); try omega. rewrite H1; try omega.
+    rewrite H2; try omega. reflexivity.
   - dstrctn IHWcbvEval.
     exists (S x). intros m hm. simpl. rewrite (j m); try omega.
     unfold lookupDfn in H.
@@ -523,15 +489,15 @@ Proof.
    rewrite H0; try omega. rewrite H3; try omega. reflexivity.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
+    destruct H0 as [a [b c]].
     simpl. rewrite (j mx); try omega. rewrite H2; try omega.
-    destruct H0 as [H0|[H0|H0]];
-    unfold isApp, isConstruct, isCase in H0; dstrctn H0; subst.
-    + rewrite H3; try omega. reflexivity.
-    + rewrite H3; try omega. reflexivity.
-    + rewrite H3; try omega. reflexivity.
+    destruct fn'; try rewrite H3; try omega; try reflexivity.
+    + elim c. reflexivity.
+    + elim a. auto.
+    + elim b. auto.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. destruct ml. rewrite (j mx); try omega. rewrite H4; try omega.    
+    simpl. destruct ml. rewrite (j mx); try omega. rewrite H4; try omega.  
     rewrite H0. unfold snd in H1. rewrite H1. rewrite H2.
     rewrite H5; try omega. reflexivity.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x0 x1)). intros mx h.

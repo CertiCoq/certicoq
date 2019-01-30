@@ -6,10 +6,10 @@ Require Import Coq.Arith.EqNat.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.omega.Omega.
 Require Import Common.Common.
-Require Import L2d.compile.
-Require Import L2d.term.
-Require Import L2d.program.
-Require Import L2d.wcbvEval.
+Require Import L1g.compile.
+Require Import L1g.term.
+Require Import L1g.program.
+Require Import L1g.wcbvEval.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

@@ -28,20 +28,20 @@ Variable p: environ Term.
 Inductive WNorm: Term -> Prop :=
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
-| WNCase: forall i mch brs,
-    WNorm mch -> ~ isCanonical mch -> WNorm (TCase i mch brs)
 | WNConstruct: forall i n np na, WNorm (TConstruct i n np na)
 | WNProof: WNorm TProof
 | WNApp: forall fn t,
-    WNorm fn -> ~ isLambda fn -> ~ isFix fn -> ~ isProof fn -> WNorm t ->
+    WNorm fn ->
+    ~ isLambda fn -> ~ isFix fn -> fn <> TProof ->
+    WNorm t ->
     WNorm (TApp fn t).
 Hint Constructors WNorm.
 
+(** WNorm is decidable **
 Ltac rght := solve [right; intros h; inversion_Clear h;
                     first [contradiction | isLam_inv | isApp_inv]].
 Ltac lft := solve [left; constructor; assumption].
 
-(** WNorm is decidable **
 Lemma WNorm_dec:
   (forall t, WNorm t \/ ~ WNorm t) /\
   (forall ts, WNorms ts \/ ~ WNorms ts) /\
@@ -114,37 +114,24 @@ Lemma Wcbv_WNorm:
 Proof.
   induction 1; simpl; intros;
     try (solve[constructor; try assumption]); try assumption.
-  - destruct H0 as [H0|[H0|H0]]; dstrctn H0; subst.
-    + inversion_Clear IHWcbvEval1. inversion_Clear H3.
-      * elim H4. auto.
-      * elim H5. auto.
-      * apply WNApp; try assumption. 
-        -- apply WNApp; try assumption. constructor; assumption.
-        -- intros h; dstrctn h; discriminate.
-        -- intros h; dstrctn h; discriminate.
-        -- intros h. unfold isProof in h. discriminate.
-      * constructor; try assumption.
-        -- constructor; try assumption. constructor; assumption.
-        -- intros h; dstrctn h; discriminate.
-        -- intros h; dstrctn h; discriminate.
-        -- intros h. unfold isProof in h. discriminate.
-      * elim H6. auto.
-      * apply WNApp; try assumption.
-        -- apply WNApp; try assumption. constructor; assumption.
-        -- intros h; dstrctn h; discriminate.
-        -- intros h; dstrctn h; discriminate.
-        -- intros h. unfold isProof in h. discriminate.
-    + apply WNApp; try assumption.
-      * intros h; dstrctn h; discriminate.
-      * intros h; dstrctn h; discriminate.
-      * intros h; unfold isProof in h; discriminate.
-    + constructor; try assumption.
-      * intros h; dstrctn h; discriminate.
-      * intros h; dstrctn h; discriminate.
-      * intros h; unfold isProof in h; discriminate.
+  - destruct H0 as [a[b c]]. constructor; try assumption.
 Qed.
 
-(** If a program is in weak normal form, it has no wndEval step **
+(** every normal form is hit **)
+Lemma WNorm_Wcbv:
+  forall s, WNorm s -> exists t, WcbvEval p t s.  
+Proof.
+  induction 1.
+  - exists (TLambda nm bod). constructor.
+  - exists (TFix ds br). constructor.
+  - exists (TConstruct i n np na). constructor.
+  - exists TProof. constructor.
+  - dstrctn IHWNorm1. dstrctn IHWNorm2. exists (TApp x x0).
+    now apply wAppCong. 
+Qed.
+
+
+(** If a program is in weak normal form, it has no wndEval step **)
 Lemma wNorm_no_wndStep_lem:
   forall t s, wndEval p t s -> ~ WNorm t.
 Proof.
@@ -156,24 +143,16 @@ Proof.
   - inversion_Clear H2.
     + elim H3. auto.
     + elim H4. auto.
-    + admit.
+    + contradiction.
     + elim H5. auto.
-    +
-      
-    apply wndEvalEvals_ind; intros; intros h;
-      try (solve[inversion h]);
-      try (solve[inversion h; subst; contradiction]).
-  - inversion h. subst. elim H4. exists nm, ty, bod. reflexivity.
-  - inversion_Clear h. elim H5. auto.
-  - inversion_Clear h. elim H7. auto.
+    + contradiction.
 Qed.
 
 Lemma wNorm_no_wndStep:
   forall t, WNorm t -> no_wnd_step p t.
 Proof.
-  unfold no_wnd_step, no_wnds_step, no_step. intros t h0 b h1.
-  elim (proj1 (wNorm_no_wndStep_lem) _ _ h1). assumption.
+  unfold no_wnd_step, no_step. intros t h0 b h1.
+  eelim (wNorm_no_wndStep_lem); eassumption.
 Qed.
-*********************)
 
 End Sec_environ.

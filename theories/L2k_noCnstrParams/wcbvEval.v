@@ -438,12 +438,12 @@ Proof.
     eapply wAppFix; eassumption.
   - specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ p1). 
     eapply wAppLam; eassumption.
-  - specialize (H _ e1). specialize (H0 _ e2). apply wAppCong; try assumption.
-    + repeat split; intros h.
-      * dstrctn h. subst. contradiction. 
-      * dstrctn h. subst. contradiction. 
-      * dstrctn h. subst. contradiction. 
-      * subst. contradiction.
+  - specialize (H _ e1). specialize (H0 _ e2).
+    apply wAppCong; try assumption. repeat split; intros h.
+    + dstrctn h. subst. contradiction. 
+    + dstrctn h. subst. contradiction. 
+    + dstrctn h. subst. contradiction. 
+    + subst. contradiction.
   - eapply wCase; subst; try eassumption.
     + now apply H. 
     + intuition.

@@ -6,7 +6,6 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import FunInd Coq.omega.Omega.
 Require Import Common.Common.  (* shared namespace *)
-Require Import L2.L2.
 Require Import L2d.compile.
 
 Open Scope string_scope.
@@ -31,12 +30,11 @@ Fixpoint print_term (t:Term) : string :=
       "(CASE:" ++ (print_inductive (fst i)) ++ " " ++ (print_term mch) ++ ")"
     | TFix _ n => "(FIX " ++ (nat_to_string n) ++ ") "
     | TWrong str => ("(TWrong:" ++ str ++ ")")
-    | TDummy str => ("(Dummy:" ++ str ++ ")")
   end.
 
 Inductive shape : Set :=
   | sRel | sProof | sLambda | sLetIn | sApp | sConst | sInd | sConstruct
-  | sCase | sFix | sWrong | sDummy.
+  | sCase | sFix | sWrong.
 
 Definition Term_shape (t:Term) : shape :=
   match t with
@@ -50,7 +48,6 @@ Definition Term_shape (t:Term) : shape :=
     | TCase _ _ _ => sCase
     | TFix _ _ => sFix
     | TWrong _ => sWrong
-    | TDummy _ => sDummy
   end.
 
 Section TermTerms_dec. (** to make Ltac definitions local **)
@@ -59,7 +56,6 @@ Local Ltac lft := left; subst; reflexivity.
 Local Ltac cross := try (solve [right; intros h; discriminate]).
 Lemma TermTerms_dec: 
   (forall (s t:Term), s = t \/ s <> t) /\
-  (forall (ss tt:Terms), ss = tt \/ ss <> tt) /\
   (forall (ss tt:Brs), ss = tt \/ ss <> tt) /\
   (forall (dd ee:Defs), dd = ee \/ dd <> ee).
 Proof.
@@ -84,11 +80,6 @@ Proof.
   - induction t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
   - destruct t; cross. destruct (string_dec s s0); [lft | rght .. ].
-  - induction t; cross.
-    destruct (string_dec s s0); [lft | rght].
-  - destruct tt; cross; lft.
-  - destruct tt; cross.
-    destruct (H t1), (H0 tt); [lft | rght .. ].
   - destruct tt; cross; lft.
   - destruct tt; cross.
     destruct (eq_nat_dec n n0), (H t0), (H0 tt); [lft | rght .. ].
@@ -100,8 +91,6 @@ Qed.
 End TermTerms_dec.
 
 Definition Term_dec := proj1 TermTerms_dec.
-Definition Terms_dec := proj1 (proj2 TermTerms_dec).
-
 
 Fixpoint TrmSize (t:Term) {struct t} : nat :=
   match t with
@@ -199,14 +188,6 @@ Proof.
   - left. exists s. reflexivity.
 Defined.
 
-Definition isDummy t : Prop := exists s, t = TDummy s.
-Lemma isDummy_dec: forall t, {isDummy t}+{~ isDummy t}.
-Proof.
-  destruct t;
-  try (right; intros h; destruct h as [x jx]; discriminate).
-  - left. exists s. reflexivity.
-Defined.
-
 Definition isConstruct (t:Term) : Prop :=
   exists i n np na, t = TConstruct i n np na.
 Lemma isConstruct_dec: forall t, {isConstruct t}+{~ isConstruct t}.
@@ -233,10 +214,10 @@ Qed.
           
 Function canonicalP (t:Term) : option (nat * Terms) :=
   match t with
-    | TConstruct _ r _ _ => Some (r, tnil)
+    | TConstruct _ r _ _ => Some (r, nil)
     | TApp fn arg =>
       match canonicalP fn with
-      | Some (r, args) => Some (r, tappend args (tunit arg))
+      | Some (r, args) => Some (r, app args (unit arg))
       | None => None
       end
     | _ => None
@@ -256,24 +237,24 @@ Lemma isCanonical_canonicalP:
   forall t, isCanonical t -> exists x args, canonicalP t = Some (x, args).
 Proof.
   induction 1; simpl.
-  - exists n, tnil. reflexivity.
+  - exists n, nil. reflexivity.
   - destruct IHisCanonical as [x0 [x1 jx]].
-    exists x0, (tappend x1 (tunit t)). rewrite jx. reflexivity.
+    exists x0, (app x1 (unit t)). rewrite jx. reflexivity.
 Qed.
 
 Function CanonicalP (t:Term): option (inductive * nat * nat * nat * Terms) :=
   match t with
-    | TConstruct i r np na => Some (i, r, np, na, tnil)
+    | TConstruct i r np na => Some (i, r, np, na, nil)
     | TApp fn arg =>
       match CanonicalP fn with
       | Some (i, r, np, na, args) =>
-        Some (i, r, np, na, tappend args (tunit arg))
+        Some (i, r, np, na, app args (unit arg))
       | None => None
       end
     | _ => None
   end.
 
-(** some utility operations on [Terms] ("lists" of Term) **)
+(** some utility operations on [Terms] ("lists" of Term) **
 Fixpoint tlength (ts:Terms) : nat :=
   match ts with 
     | tnil => 0
@@ -497,6 +478,7 @@ Proof.
   - reflexivity.
   - cbn. rewrite IHts. repeat (apply f_equal2; try reflexivity). 
 Qed.
+ **************************)
 
 (*************************
 Lemma AppMk_tunit:
@@ -709,6 +691,7 @@ Proof.
 Qed.
  *********************)
 
+(**********
 Lemma tnth_tlength_sanity:
   forall fsts t lsts,
     tnth (tlength fsts) (tappend fsts (tcons t lsts)) = Some t.
@@ -741,6 +724,7 @@ Proof.
   induction n; induction args; simpl; intros; try discriminate; try assumption.
   - apply IHn. assumption.
 Qed.
+ ***************)
 
 (** operations on Defs and branches **)
 Fixpoint blength (ts:Brs) : nat :=
@@ -812,8 +796,8 @@ Function mkApp (t:Term) (args:Terms) {struct t} : Term :=
   end.
  ****************)
 
-Lemma mkApp_tnil_ident: forall t, mkApp t tnil = t.
-  destruct t; simpl; try rewrite tappend_tnil; try reflexivity.
+Lemma mkApp_nil_ident: forall t, mkApp t nil = t.
+  destruct t; simpl; try reflexivity.
 Qed.
 
 (**
@@ -1060,7 +1044,7 @@ Qed.
 
 Lemma mkApp_idempotent:
   forall ts (fn:Term) (ss:Terms),
-    mkApp (mkApp fn ts) ss = mkApp fn (tappend ts ss).
+    mkApp (mkApp fn ts) ss = mkApp fn (app ts ss).
 Proof.
   induction ts; destruct fn; intros; cbn; try reflexivity;
     try rewrite <- IHts; try reflexivity.
@@ -1164,10 +1148,6 @@ Inductive WFapp: Term -> Prop :=
 | wfaCase: forall m mch brs,
             WFapp mch -> WFappBs brs -> WFapp (TCase m mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
-| wfaDummy: forall str, WFapp (TDummy str)
-with WFapps: Terms -> Prop :=
-| wfanil: WFapps tnil
-| wfacons: forall t ts, WFapp t -> WFapps ts -> WFapps (tcons t ts)
 with WFappBs: Brs -> Prop :=
 | wfabnil: WFappBs bnil
 | wfabcons: forall n b bs, WFapp b -> WFappBs bs ->  WFappBs (bcons n b bs)
@@ -1176,13 +1156,18 @@ with WFappDs: Defs -> Prop :=
 | wfadcons: forall nm bod arg ds,
              WFapp bod -> WFappDs ds ->
              WFappDs (dcons nm bod arg ds).
-Hint Constructors WFapp WFapps WFappBs WFappDs.
+Hint Constructors WFapp WFappBs WFappDs.
 Scheme WFapp_ind' := Minimality for WFapp Sort Prop
-  with WFapps_ind' := Minimality for WFapps Sort Prop
   with WFappBs_ind' := Minimality for WFappBs Sort Prop
   with WFappDs_ind' := Minimality for WFappDs Sort Prop.
 Combined Scheme WFappTrmsBrsDefs_ind
-         from WFapp_ind', WFapps_ind', WFappBs_ind', WFappDs_ind'.
+         from WFapp_ind', WFappBs_ind', WFappDs_ind'.
+
+
+(*********************
+with WFapps: Terms -> Prop :=
+| wfanil: WFapps tnil
+| wfacons: forall t ts, WFapp t -> WFapps ts -> WFapps (tcons t ts)
 
 Lemma tappend_pres_WFapps:
   forall ts, WFapps ts -> forall us, WFapps us -> WFapps (tappend ts us).
@@ -1243,7 +1228,6 @@ Proof.
   - constructor; try assumption.
     + apply tappend_pres_WFapps. assumption. constructor; assumption.
 Qed.
- ************)
 
 Lemma tnth_pres_WFapp:
   forall (brs:Terms), WFapps brs -> forall n t, tnth n brs = Some t -> WFapp t.
@@ -1253,6 +1237,18 @@ Proof.
   - injection H; intros; subst. inversion h. assumption.
   - apply IHo; inversion h; assumption.
 Qed.
+ ************)
+
+Lemma tskipn_pres_WFapp:
+  forall args, WFapps args -> forall np ts, tskipn np args = Some ts ->
+   WFapps ts.
+  intros args hargs np ts h.
+  functional induction (tskipn np args).
+  - injection h. intros. subst. assumption.
+  - inversion_Clear hargs. apply IHo; try assumption.
+  - discriminate.
+Qed.
+ *******************)
 
 Lemma dnthBody_pres_WFapp:
   forall (ds:Defs), WFappDs ds ->
@@ -1263,16 +1259,6 @@ Proof.
   - discriminate.
   - myInjection H. inversion h. assumption.
   - apply IHo; inversion h; assumption.
-Qed.
-
-Lemma tskipn_pres_WFapp:
-  forall args, WFapps args -> forall np ts, tskipn np args = Some ts ->
-   WFapps ts.
-  intros args hargs np ts h.
-  functional induction (tskipn np args).
-  - injection h. intros. subst. assumption.
-  - inversion_Clear hargs. apply IHo; try assumption.
-  - discriminate.
 Qed.
 
 Lemma bnth_pres_WFapp:
@@ -1305,10 +1291,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
     WFTrm (TCase m mch brs) n
 | wfFix: forall n defs m,
     WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
-| wfDummy: forall n str, WFTrm (TDummy str) n
-with WFTrms: Terms -> nat -> Prop :=
-     | wfnil: forall n, WFTrms tnil n
-     | wfcons: forall n t ts, WFTrm t n -> WFTrms ts n -> WFTrms (tcons t ts) n
 with WFTrmBs: Brs -> nat -> Prop :=
      | wfbnil: forall n, WFTrmBs bnil n
      | wfbcons: forall n m b bs,
@@ -1318,13 +1300,18 @@ with WFTrmDs: Defs -> nat -> Prop :=
      | wfdcons: forall n nm bod arg ds,
          WFTrm bod n -> WFTrmDs ds n ->
          WFTrmDs (dcons nm bod arg ds) n.
-Hint Constructors WFTrm WFTrms WFTrmBs WFTrmDs.
+Hint Constructors WFTrm WFTrmBs WFTrmDs.
 Scheme WFTrm_ind' := Minimality for WFTrm Sort Prop
-  with WFTrms_ind' := Minimality for WFTrms Sort Prop                   
   with WFTrmBs_ind' := Minimality for WFTrmBs Sort Prop
   with WFTrmDs_ind' := Minimality for WFTrmDs Sort Prop.
 Combined Scheme WFTrmTrmsBrsDefs_ind
-         from WFTrm_ind', WFTrms_ind', WFTrmBs_ind', WFTrmDs_ind'.
+         from WFTrm_ind', WFTrmBs_ind', WFTrmDs_ind'.
+
+(************
+with WFTrms: Terms -> nat -> Prop :=
+     | wfnil: forall n, WFTrms tnil n
+     | wfcons: forall n t ts, WFTrm t n -> WFTrms ts n -> WFTrms (tcons t ts) n
+ ***************)
 
 Lemma WFTrm_shape:
   forall t n, WFTrm t n -> t <> TRel n.
@@ -1335,7 +1322,6 @@ Qed.
     
 Lemma WFTrm_up:
   (forall t m, WFTrm t m -> WFTrm t (S m)) /\
-  (forall ts m, WFTrms ts m -> WFTrms ts (S m)) /\
   (forall ts m, WFTrmBs ts m -> WFTrmBs ts (S m)) /\
   (forall ds m, WFTrmDs ds m -> WFTrmDs ds (S m)).
 Proof.
@@ -1358,7 +1344,6 @@ Qed.
 
 Lemma WFTrm_WFapp:
   (forall t n, WFTrm t n -> WFapp t) /\
-  (forall ts n, WFTrms ts n -> WFapps ts) /\
   (forall bs n, WFTrmBs bs n -> WFappBs bs) /\
   (forall ds n, WFTrmDs ds n -> WFappDs ds).
 Proof.

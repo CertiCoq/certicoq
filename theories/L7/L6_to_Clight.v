@@ -407,7 +407,7 @@ Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z intTy))) (at level 36). (* what is the type of int being added? *)
+  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
 
 Notation "'args[' n ']'" :=
   ( *(add args (c_int n%Z val))) (at level 36).
@@ -415,9 +415,9 @@ Notation "'args[' n ']'" :=
 
 
 Definition reserve (funInf : positive) (l : Z) : statement :=
-  let arr := (Evar funInf (Tarray uintTy l noattr)) in
+  let arr := (Evar funInf (Tarray uval l noattr)) in
   Sifthenelse
-    (!(Ebinop Ole (Ederef arr uintTy) (limitPtr -' allocPtr) type_bool))
+    (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
     (Scall None gc (arr :: tinf :: nil) ; allocIdent ::= Efield tinfd allocIdent valPtr)
     Sskip.
 
@@ -531,7 +531,7 @@ Fixpoint asgnAppVars' (vs : list positive) (ind : list N) :
 Definition asgnAppVars vs ind :=
   match asgnAppVars' vs ind with
     | Some s =>
-     ret (argsIdent ::= Efield tinfd argsIdent (Tarray uintTy maxArgs noattr);s)
+     ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
     | None => None 
   end.
 
@@ -640,7 +640,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_
                                            (mkFun localVars
                                                   ((allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                     limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                    argsIdent ::= Efield tinfd argsIdent (Tarray uintTy maxArgs noattr);
+                                                    argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
                                                     (reserve gcArrIdent
                                                             (Z.of_N (l + 2)))) ;
                                                     asgn ;
@@ -702,7 +702,7 @@ Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (m 
                                                     nil
                                                     ( allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                       limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                      argsIdent ::= Efield tinfd argsIdent (Tarray uintTy maxArgs noattr);
+                                                      argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
                                                       reserve gcArrIdent 2%Z ;
                                                       body))))
                      :: funs)
@@ -774,7 +774,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t Ast.name)
                        (* it should be the case that n (computed arrity from tag) = len (actual arrity) *)
                        let ind :=
                            mkglobvar
-                             (Tarray uintTy
+                             (Tarray uval
                                      (len + 2%Z)
                                      noattr)
                             ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int len) :: (make_ind_array l)) true false in
@@ -791,7 +791,7 @@ Fixpoint add_bodyinfo (e : exp) (fenv : fEnv) (nenv : M.t Ast.name) (map: M.t po
             info_name <- getName ;;
             let ind :=
                 mkglobvar
-                  (Tarray uintTy
+                  (Tarray uval
                           2%Z
                           noattr)
                   ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int 0%Z) :: nil) true false in
@@ -865,7 +865,7 @@ Definition composites : list composite_definition :=
  (Composite threadInfIdent Struct
    ((allocIdent, valPtr) ::
                          (limitIdent, valPtr) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
-                         (argsIdent, (Tarray uintTy maxArgs noattr))::nil)
+                         (argsIdent, (Tarray uval maxArgs noattr))::nil)
    noattr ::  nil).
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
@@ -991,7 +991,7 @@ Fixpoint make_constructors (cenv:cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * c
                   let asgn_s := make_constrAsgn argvIdent argList in
                   let header := c_int (Z.of_N ((N.shiftl (Npos arr) 10) + ord)) val in
                   let constr_body := Ssequence (Sassign (Field(var argvIdent, 0%Z)) header)
-                                               (Ssequence asgn_s (Sreturn (Some (add (Evar argvIdent argvTy) (c_int 1%Z intTy))))) in
+                                               (Ssequence asgn_s (Sreturn (Some (add (Evar argvIdent argvTy) (c_int 1%Z val))))) in
                   let constr_fun := Internal (mkfunction
                                                 val
                                                 cc_default
@@ -1023,7 +1023,7 @@ Notation nameTy :=
       noattr).
 
 Notation arityTy :=
-  (Tpointer intTy noattr).
+  (Tpointer val noattr).
 
 
 
@@ -1119,7 +1119,7 @@ Definition make_eliminator (cenv: cEnv) (nTy:Ast.ident) (ctrs: list (Ast.name * 
                          let curr_s := Ssequence
                                          (* name_s *) Sskip
                                          (Ssequence                                          
-                                            (Sassign (Field(var ordIdent, 0%Z)) (c_int (Z.of_nat currOrd) intTy))
+                                            (Sassign (Field(var ordIdent, 0%Z)) (c_int (Z.of_nat currOrd) val))
                                             (Ssequence (make_elim_Asgn argvIdent valIdent (N.to_nat n))
                                                        Sbreak)) in
                          (match n with
@@ -1249,7 +1249,7 @@ Definition make_halt (nenv:M.t Ast.name): nState (M.t Ast.name * (ident * globde
                                          ((tinfIdent, threadInf)::nil)
                                          nil
                                          nil
-                                         (Sreturn None)))), (halt_cloIdent, Gvar (mkglobvar  (tarray tuint 2) ((Init_addrof haltIdent Int.zero) ::
+                                         (Sreturn None)))), (halt_cloIdent, Gvar (mkglobvar  (tarray uval 2) ((Init_addrof haltIdent Int.zero) ::
                 Init_int 1 :: nil) true false))).
 
 

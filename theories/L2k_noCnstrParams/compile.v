@@ -123,6 +123,26 @@ Proof.
   intros. rewrite <- tappend_assoc. apply f_equal2; reflexivity.
 Qed.
 
+Lemma tappend_mk_canonical:
+  forall ts s ss, exists u us, (tappend ts (tcons s ss)) = tcons u us.
+Proof.
+  destruct ts; intros s ss; simpl.
+  - exists s, ss. reflexivity.
+  - exists t, (tappend ts (tcons s ss)). reflexivity.
+Qed.
+
+Lemma tappend_last:
+  forall us u, exists ts t, tcons u us = tappend ts (tunit t).
+Proof.
+  intros.
+  induction us; intros.
+  - exists tnil, u. reflexivity.
+  - dstrctn IHus. destruct x.
+    + cbn in j. myInjection j. exists (tunit y), t. reflexivity.
+    + cbn in j. myInjection j. exists (tcons t0 (tcons t x)), y.
+      reflexivity.
+Qed.
+
 Lemma tappend_pres_tlength:
   forall ts us, tlength (tappend ts us) = (tlength ts) + (tlength us).
 Proof.
@@ -131,6 +151,22 @@ Proof.
   - cbn. rewrite IHts. reflexivity.
 Qed.
 
+Lemma tappend_tunit_inject:
+  forall ts us t u, tappend ts (tunit t) = tappend us (tunit u) ->
+                    ts = us /\ t = u.
+Proof.
+  induction ts; induction us; intros.
+  - cbn in H.  myInjection H. intuition.
+  - cbn in H. myInjection H. destruct us.
+    + cbn in H0. discriminate.
+    + cbn in H0. discriminate.
+  - cbn in H. myInjection H. destruct ts.
+    + cbn in H0. discriminate.
+    + cbn in H0. discriminate.
+  - cbn in H. myInjection H. specialize (IHts _ _ _ H0).
+    destruct IHts. subst. intuition.
+Qed.
+    
 Fixpoint tdrop n ts : Terms :=
   match n, ts with
   | 0, us => us

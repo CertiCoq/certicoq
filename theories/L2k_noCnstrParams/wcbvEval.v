@@ -137,34 +137,18 @@ Proof.
   intros. eapply (proj1 (pre_WcbvEval_single_valued p)); eassumption.
 Qed.
 
-(**********
 Lemma Construct_not_applied:
-  forall p t s,
-    WcbvEval p t s -> forall fn b bs, t = TApp fn b bs ->
-    forall i r args, ~ WcbvEval p fn (TConstruct i r args).
+  forall p t x, WcbvEval p t x -> forall f a, t = TApp f a ->
+                forall i r args, f <> TConstruct i r args.
 Proof.
   induction 1; intros; try discriminate.
-  - myInjection H2. intros h. pose proof (WcbvEval_single_valued H h).
-    discriminate.
-  - myInjection H2. intros h. pose proof (WcbvEval_single_valued H h).
-    discriminate.
-  - myInjection H2. intros h. pose proof (WcbvEval_single_valued H h).
-    discriminate.
+  - myInjection H1. intros h. subst. inversion H.
+  - myInjection H2. intros h. subst. inversion H.
+  - myInjection H2. intros h. subst. inversion H.
+  - myInjection H2. intros h. subst. destruct H0 as [e [b [c d]]].
+    inversion_Clear H. elim c. auto.
 Qed.
-****************)
-    
-(*******  move to somewhere  ********)
-Lemma lookup_pres_WFapp:
-    forall p, WFaEnv p -> forall nm ec, lookup nm p = Some ec -> WFaEc ec.
-Proof.
-  induction 1; intros nn ed h.
-  - inversion_Clear h.
-  - case_eq (string_eq_bool nn nm); intros j.
-    + cbn in h. rewrite j in h. myInjection h. assumption.
-    + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
-Qed.
-(**************************************************)
-
+   
 Lemma WcbvEvals_tcons_tcons:
   forall p arg args brgs, WcbvEvals p (tcons arg args) brgs ->
                           exists crg crgs, brgs = (tcons crg crgs).

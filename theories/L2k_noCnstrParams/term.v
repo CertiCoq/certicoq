@@ -24,6 +24,10 @@ Function mkApp (fn:Term) (ts:Terms) : option Term :=
     end
   end.
 
+Lemma mkApp_tnil: forall fn, mkApp fn tnil = Some fn.
+  intros. reflexivity.
+Qed.
+
 Definition isConstruct (t:Term) : Prop :=
   exists i n args, t = TConstruct i n args.
 Lemma IsConstruct: forall i n args, isConstruct (TConstruct i n args).
@@ -37,14 +41,39 @@ Proof.
   - left. auto.
 Qed.
 
-(*********
-Lemma mkApp_Some:
-  forall fn ts x, mkApp fn ts = Some x -> ~ isConstruct fn.
+Lemma mkApp_Some_invrt:
+  forall f ts x,
+    mkApp f ts = Some x ->
+    ts = tnil \/
+    (exists u y, x = TApp y u /\
+                 exists us, ts = tappend us (tunit u) /\ mkApp f us = Some y).
 Proof.
-  destruct fn; intros; intros h; dstrctn h; try discriminate.
-  destruct ts; cbn in H; try discriminate.
+  intros f ts. functional induction (mkApp f ts); intros.
+  - left. reflexivity.
+  - discriminate.
+  - right. specialize (IHo _ H). destruct IHo.
+    + subst. cbn in H. myInjection H. exists y, fn. intuition.
+      exists tnil. intuition.
+    + dstrctn H0. subst. exists x0, y1. intuition.
+      exists (tcons y w). cbn. split.
+      * reflexivity.
+      * destruct fn; try assumption. contradiction.
 Qed.
- *************)
+    
+Lemma  mkApp_Some:
+  forall fn t ts x, mkApp fn (tcons t ts) = Some x -> ~ isConstruct fn.
+Proof.
+  intros. destruct fn; intros h; dstrctn h; discriminate.
+Qed.
+
+Lemma mkApp_Some':
+  forall f ts x,
+    mkApp f ts = Some x ->
+    forall u us, ts = tcons u us -> mkApp (TApp f u) us = Some x.
+Proof.
+  intros. subst. pose proof (mkApp_Some _ _ H). rewrite <- H.
+    destruct f; try reflexivity. elim H0. auto.
+Qed.
 
 Lemma mkApp_tcons:
   forall fn, ~ isConstruct fn ->
@@ -54,10 +83,17 @@ Proof.
   elim H. auto.
 Qed.
 
-Lemma mkApp_tcons1:
-  forall fn t ts x, mkApp fn (tcons t ts) = Some x -> ~ isConstruct fn.
+Lemma mkApp_out:
+  forall fn us x, 
+    mkApp fn us = Some x -> ~ isConstruct fn ->
+    forall u, mkApp fn (tappend us (tunit u)) = Some (TApp x u).
 Proof.
-  intros. destruct fn; intros h; dstrctn h; discriminate.
+  intros fn us. functional induction (mkApp fn us); intros.
+  - myInjection H. cbn. destruct x; try reflexivity. elim H0. auto.
+  - discriminate.
+  - assert (j0:~ isConstruct (TApp fn y)).
+    { intros h. unfold isConstruct in h. dstrctn h. discriminate. }
+    specialize (IHo _ H j0). cbn. destruct fn; cbn in IHo; intuition.
 Qed.
 
 Lemma mkApp_idempotent:
@@ -76,24 +112,6 @@ Proof.
 Qed.                                                       
 
 (*****
-Lemma mkApp_tnil: forall fn, mkApp fn tnil = Some fn.
-  intros. reflexivity.
-Qed.
-
-Lemma mkApp_cons:
-  forall fn u us, mkApp fn (tcons u us) = mkApp (TApp fn u) us.
-Proof.
-  intros. reflexivity.
-Qed.
-
-Lemma mkApp_out:
-  forall ts fn u,
-    mkApp fn (tappend ts (tunit u)) = TApp (mkApp fn ts) u.
-Proof.
-  induction ts; intros. reflexivity.
-  - cbn. rewrite IHts. reflexivity.
-Qed.
-
 Lemma mkApp_tl:
   forall bs fn b, mkApp fn (tappend bs (tunit b)) = TApp (mkApp fn bs) b.
 Proof.

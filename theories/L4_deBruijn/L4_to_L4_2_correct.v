@@ -136,8 +136,6 @@ Proof using.
 Qed.
 
 
-Print Assumptions eval_evaln.
-
 Definition  eval41 := @polyEval.eval_n (TermAbsDBUnstrict BasicAst.name L4Opid).
 
 

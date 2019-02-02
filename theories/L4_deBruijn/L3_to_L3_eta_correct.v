@@ -91,21 +91,21 @@ Proof.
 Qed.
 
 Lemma bnth_trans n t i brs :
-  bnth n brs = Some t -> exists t',
-    bnth n (trans_brs i brs) = Some t' /\
-    snd t' = eta_expand (fst t) (trans (snd t)).
+  bnth n brs = Some t ->
+  exists t', bnth n (trans_brs i brs) = Some t' /\
+             snd t' = eta_expand (fst t) (trans (snd t)).
 Proof.
   revert n t i. induction brs; intros *; simpl.
   - intros. discriminate.
-  - destruct n.
-    + simpl. intros. myInjection H. exists (0, trans t). eauto.
-    + intros. now eapply IHbrs.
+  - destruct n0; intros.
+    + myInjection H. exists (n, eta_expand n (trans t)). eauto. 
+    + specialize (IHbrs n0 t0 i H). dstrctn IHbrs.
+      exists x. eauto.
 Qed.
       
 Arguments raise : simpl never.
 Arguments String.append : simpl never.
 
-(************
 Lemma match_annot_n:
   forall cnstrs brs, match_annot cnstrs brs ->
   forall n c, exnNth cnstrs n = Ret c ->
@@ -113,96 +113,26 @@ Lemma match_annot_n:
 Proof.
   induction 1; intros.
   - inversion H0.
-  - case_eq n; intros.
-    + subst. myInjection H1. cbn in H2. case_eq (CnstrArity c0); intros.
-      * rewrite H in H2. myInjection H2. reflexivity.
-      * rewrite H in H2. rewrite <- H. eapply IHmatch_annot; try eassumption.
-
-
-
-  - inversion_Clear H0.
-    + simpl in H2. case_eq (CnstrArity c); intros.
-      * rewrite H in *. destruct t0. myInjection H2. destruct n.
-        -- cbn in H1. myInjection H1. assumption.
-        -- change (exnNth [] n = Ret c0) in H1. discriminate.
-      * rewrite H in H2. discriminate.
-    + eapply IHmatch_annot.
-
-
-    + case_eq n; intros.
-      * subst. cbn in H1. myInjection H1. cbn in H2.
-        case_eq (CnstrArity c0); intros; rewrite H in H2.
-        -- myInjection H2. reflexivity.
-        -- case_eq (CnstrArity c1); intros.
-           ++ rewrite H0 in H2. myInjection H2.
-
-        eapply IHmatch_annot.
-    
-  - case_eq n; intros.
-    + subst.  simpl in H1, H2. destruct (CnstrArity c).
-      * eapply IHmatch_annot. Print match_annot.
-      * destruct t0. myInjection H1. myInjection H2.
-
-
-      eapply IHmatch_annot; try eassumption.
-  intros H; revert n c t; induction H; intros; simpl; auto.
-  - discriminate.
-  - destruct n.
-    + injection H1; intros ->. cbn in H2.
-      destruct args.
-      * myInjection H2. assumption. 
-      * simpl in H1. eapply IHmatch_annot; try eassumption. simpl in H1, H2. specialize (IHmatch_annot _ _ _ _ H2).
+  - subst. case_eq n; intros.
+    + subst. cbn in H1. myInjection H1. cbn in H2. myInjection H2.
+      inversion_Clear H0.
+      * reflexivity.
+      * reflexivity.
+    + subst. cbn in H1. cbn in H2. eapply IHmatch_annot; eassumption.
 Qed.
-*******************)
-
-Lemma match_annot_n {cnstrs brs n c t} :
-  match_annot cnstrs brs ->
-  exnNth cnstrs n = Ret c ->
-  bnth n brs = Some t -> CnstrArity c = fst t.
-Proof.
-Admitted.
-  (**************
-  intros H; revert n c t; induction H; intros; simpl; auto.
-  - discriminate.
-  - destruct n.
-    + injection H1; intros ->. cbn in H2.
-      destruct args.
-      * myInjection H2. assumption. 
-      * simpl in H1. eapply IHmatch_annot; try eassumption. inversion_Clear H0.
-        -- inversion H2.
-        -- erewrite (IHmatch_annot _ c0 _ _ H2) in H. inversion_Clear H4.
-           unfold bnth in H2. case_eq (CnstrArity c); intros.
-           ++ rewrite H0 in *. myInjection H2. discriminate.
-           ++ rewrite H0 in *. discriminate.
-           ++ admit.
-    + simpl in H2. case_eq args; intros.
-      * subst. rewrite H3 in *. myInjection H2. simpl in H1.
-        eapply IHmatch_annot. eassumption. inversion_Clear H0.
-        -- inversion H1.
-        -- simpl. case_eq (CnstrArity c1); intros.
-           ++ rewrite H in *. case_eq n; intros.
-              ** subst.
-
-              
-      assert (j:exists x, t0 = (S args, x)). admit.
-           dstrctn j. subst. cbn in H2. case_eq (CnstrArity c); intros.
-           ++ rewrite H0 in *. myInjection H2. discriminate.
-           ++ rewrite H0 in *. myInjection H2.
-        Print exnNth.
-Qed.
-******************)
 
 Lemma WcbvEval_mkApp_einv:
-  forall a e f s, WcbvEval e (mkApp f a) s -> exists s', WcbvEval e f s'.
+  forall f a x, (mkApp f a) = Some x ->
+                forall e s, WcbvEval e x s -> exists s', WcbvEval e f s'.
 Proof.
-  induction a; simpl; intros.
-  - exists s. intuition. 
-  - specialize (IHa _ (TApp f t) _ H).
-    destruct IHa. inv H0.
-    * now exists TProof.
-    * now exists (TLambda nm bod).
-    * now exists (TFix dts m).
-                 * destruct H4 as [H4|[H4|H4]]; now exists fn'.
+  intros f a. functional induction (mkApp f a); intros.
+  - myInjection H. exists s. assumption.
+  - discriminate.
+  - specialize (IHo _ H _ _ H0). dstrctn IHo. inversion_Clear j.
+    + exists TProof. assumption.
+    + exists (TLambda nm bod). assumption.
+    + exists (TFix dts m). assumption.
+    + destruct H4 as [a [b [c d]]]. destruct fn; try (exists fn'; assumption).
 Qed.
 
 Lemma WcbvEval_is_n_lam e n t t' :
@@ -229,8 +159,93 @@ Proof.
   apply WcbvEval_no_further.
 Qed.
 Hint Resolve wcbvEval_no_step.
+ 
+(******   HERE  **)
+Lemma WcbvEval_mkApp_inner a e f s' :
+  WcbvEval e f s' ->
+  forall x y, mkApp s' a = Some x -> mkApp f a = Some y ->
+              forall s, WcbvEval e x s -> WcbvEval e y s.
+Proof.
+Admitted.
+(**********
+  induction a; intros;
+    try myInjection H; try myInjection H0; try myInjection H1;
+      try myInjection H2; try eassumption.
+  - pose proof (wcbvEval_no_step _ _ _ H).
+    erewrite (WcbvEval_single_valued H2); eassumption.
+  - specialize (IHa H).
+    pose proof (mkApp_Some_invrt _ _ H0). destruct H3. discriminate.
+    dstrctn H3. subst.
+    pose proof (mkApp_Some_invrt _ _ H1). destruct H3. discriminate.
+    dstrctn H3. subst.
+    rewrite u in u0. pose proof (tappend_tunit_inject _ _ _ _ u0).
+    destruct H3. subst. Check (IHa _ _ _ _ _ H2).
 
-Lemma WcbvEval_mkApp_inner e f s' a s :
+
+
+    
+    assert (j0: ~ isConstruct s').
+    { eapply mkApp_Some. eassumption. }
+    assert (j1: ~ isConstruct f).
+    { eapply mkApp_Some. eassumption. }
+    destruct (mkApp_Some_invrt _ _ H0).
+    + discriminate.
+    +
+    destruct s';
+    cbn in H0.
+
+
+
+    destruct s', f. cbn in *. inversion_Clear H.
+
+
+   eapply IHa; try eassumption.
+
+
+
+    specialize (IHa H).
+    
+  forall s, WcbvEval e x s -> WcbvEval e y s) /\
+            (forall y, (mkApp f a) = Some y ->
+                      forall s, (WcbvEval e x s -> WcbvEval e y s) /\
+                                (WcbvEval e y s -> WcbvEval e x s).
+Proof.
+  induction a; intros *; split.
+  - cbn in H0. myInjection H0. cbn in H1. myInjection H1.
+    pose proof (wcbvEval_no_step _ _ _ H).
+    erewrite (WcbvEval_single_valued H3); eassumption.
+  - cbn in H0. myInjection H0. cbn in H1. myInjection H1.
+    erewrite (WcbvEval_single_valued H H3).
+    eapply wcbvEval_no_step. eassumption.
+  - intros. specialize (IHa H).
+    assert (j0: ~ isConstruct s').
+    { eapply mkApp_Some. eassumption. }
+    assert (j1: ~ isConstruct f).
+    { eapply mkApp_Some. eassumption. }
+    pose proof (mkApp_Some' _ H0 eq_refl).
+    rewrite <- mkApp_tcons in H3; try assumption.
+
+    
+    
+    Check (mkApp_tcons j0).
+    Check (IHa 
+    specialize (IHa _ (H3 _)).
+rewrite <- (mkApp_tcons (H3 _)).
+    Check (mkApp_tcons (H3 _)). _ _ _ mkApp_Some).
+    pose proof (mkApp_Some' _ H0). pose proof (mkApp_Some' _ H1).
+    specialize (IHa _ (H3 t a eq_refl)).
+
+    apply IHa; try assumption.
+
+
+    intros evf evapp; simpl in *.
+
+
+
+
+
+
+  Lemma WcbvEval_mkApp_inner e f s' a s :
   (WcbvEval e f s' ->
    WcbvEval e (mkApp s' a) s -> WcbvEval e (mkApp f a) s) /\
   (WcbvEval e f s' ->
@@ -276,6 +291,7 @@ Proof.
     eapply (proj1 (IHa _ _ s)). eauto.
     eapply (proj2 (IHa _ _ s)). eapply evs''. apply evapp.
 Qed.
+ ************************)
 
 Lemma instantiate_eta t k n u :
   WFTrm t 0 ->
@@ -304,17 +320,41 @@ Proof.
   simpl. now rewrite IHn.
 Qed.
 
-Lemma is_n_lambda_lift n t : is_n_lambda n t = true -> forall k, is_n_lambda n (lift k t) = true.
+Lemma is_n_lambda_lift n t :
+  is_n_lambda n t = true -> forall k, is_n_lambda n (lift k t) = true.
 Proof.
   revert t; induction n; intros; trivial.
   destruct t; simpl in *; try discriminate.
   simpl. now apply IHn.
 Qed.
 
-Lemma eval_app_terms e f args s :
+Lemma eval_app_terms args e f s :
   WFTrms args 0 -> WcbvEvals e args args ->
-  WcbvEval e (mkApp f args) s ->
-  WcbvEval e (mkApp (eta_expand (tlength args) f) args) s.
+  forall x, (mkApp f args) = Some x -> WcbvEval e x s ->
+            forall y, (mkApp (eta_expand (tlength args) f) args) = Some y ->
+                      WcbvEval e y s.
+Proof.
+  induction args; intros.
+  - cbn in H3. myInjection H3. cbn in H1. myInjection H1. assumption.
+  - inversion_Clear H. inversion_Clear H0. specialize (IHargs H8 H10).
+    pose proof (mkApp_Some_invrt _ _ H1). destruct H.
+    + discriminate.
+    + dstrctn H. subst. destruct w.
+      * cbn in u. myInjection u. cbn in j. myInjection j.
+        destruct (isConstruct_dec y0).
+        -- dstrctn i. subst. pose proof (Construct_not_applied H2).
+           specialize (H (TConstruct x y1 z) x0 eq_refl x y1 z).
+           elim H. auto.
+        -- Check (mkApp_Some_invrt _ _ H1).
+      * cbn in u. myInjection u. cbn in H1.
+
+
+      eapply IHargs.
+    eassumption. eassumption.
+    + admit.
+    + admit.
+    + rewrite <- H3. apply f_equal2.
+
 Proof.
   intros wfargs nosteps.
   revert e f s wfargs nosteps; induction args; intros.

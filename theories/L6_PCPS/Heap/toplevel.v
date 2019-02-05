@@ -180,12 +180,7 @@ Print Assumptions Top.closure_conversion_correct_top.
 (* XXX why does MHeap definitions still appear as axioms here? *)
 
   (* *** Remaining admits *** *) 
-  (* 1.) big_step_gc_heap_env_equiv_r 
-         -> big_step_GC commutes with heap equivalence 
-
-     2.) live'_live_inv 
-         -> lemma about two equivalent definitions of GC. (* TODO remove this dependency *)
-
-     3.) FunctionalExtensionality.functional_extensionality_dep 
-         
+  (* 1.) Top.CC.Inv.Size.Util.project_vars_ToMSet_Funs
+         Top.CC.Inv.Size.Util.project_vars_ToMSet
+     2.) MHeap definitions appear as axioms. Why?         
    *)

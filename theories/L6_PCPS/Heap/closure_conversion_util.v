@@ -1744,23 +1744,124 @@ Module CCUtil (H : Heap).
       eapply Disjoint_Setminus_r. reflexivity. 
   Qed.
 
-  Lemma project_vars_ToMSet (Scope1 : Ensemble positive) (Scope2 : Ensemble var)
-        { Hs : ToMSet Scope1 } (Funs1 Funs2 : Ensemble var) (fenv : var -> var) 
+  Lemma project_var_ToMSet Scope1 Scope2 `{ToMSet Scope1} Funs1 Funs2
+        fenv c Γ FVs y C1 :
+    project_var clo_tag Scope1 Funs1 fenv c Γ FVs y C1 Scope2 Funs2 ->
+    ToMSet Scope2.
+  Proof.
+    intros Hvar.
+    assert (Hd1 := H).  eapply Decidable_ToMSet in Hd1. 
+    destruct Hd1 as [Hdec1]. 
+    destruct (Hdec1 y).
+    - assert (Scope1 <--> Scope2).
+      { inv Hvar; eauto; try reflexivity.
+        now exfalso; eauto. now exfalso; eauto. }
+      eapply ToMSet_Same_set; eassumption.
+    - assert (y |: Scope1 <--> Scope2).
+      { inv Hvar; try reflexivity.
+        exfalso; eauto. }
+      eapply ToMSet_Same_set; try eassumption.
+      eauto with typeclass_instances.
+  Qed.
+
+  Lemma project_var_ToMSet_Funs Scope1 `{ToMSet Scope1} Scope2 Funs1 Funs2 `{ToMSet Funs1}
+        fenv c Γ FVs y C1 :
+    project_var clo_tag Scope1 Funs1 fenv c Γ FVs y C1 Scope2 Funs2 ->
+    ToMSet Funs2.
+  Proof. 
+    intros Hvar.
+    assert (Hd1 := H). eapply Decidable_ToMSet in Hd1. 
+    destruct Hd1 as [Hdec1]. 
+    destruct (Hdec1 y).
+    - assert (Funs1 <--> Funs2).
+      { inv Hvar; eauto; try reflexivity.
+        now exfalso; eauto. }
+      tci.
+    - destruct (@Dec _ Funs1 _ y).
+      + assert (Funs1 \\ [set y] <--> Funs2).
+        { inv Hvar; try reflexivity.
+          exfalso; eauto. exfalso; eauto. }
+        eapply ToMSet_Same_set; try eassumption.
+        tci.
+      + assert (Funs1 <--> Funs2).
+        { inv Hvar; try reflexivity.
+          exfalso; eauto. }
+        eapply ToMSet_Same_set; try eassumption.
+  Qed.   
+  
+  Lemma project_vars_ToMSet (Scope1 Scope2 : Ensemble var)
+        { Hs : ToMSet Scope1 } (Funs1 Funs2 : Ensemble var) { Hf : ToMSet Funs1 } (fenv : var -> var) 
         (c : cTag) (Γ : var) (FVs : list var) (ys : list var) 
         (C1 : exp_ctx) :
     project_vars clo_tag Scope1 Funs1 fenv c Γ FVs ys C1 Scope2 Funs2 -> ToMSet Scope2.
   Proof.
-  Admitted.
+    revert Scope1 Funs1 Hs Hf Funs2 Scope2 C1. induction ys; intros Scope1 Funs1 Hs Hf Funs2 Scope2 C1 Hvars. 
+    - assert (Heq : Scope1 <--> Scope2).
+      { inv Hvars. reflexivity. }
+      tci.
+    - assert (Hd1 := Hs). eapply Decidable_ToMSet in Hd1. destruct Hd1 as [Hdec1].  
+      assert (Hd2 := Hf). eapply Decidable_ToMSet in Hd2. destruct Hd2 as [Hdec2].       
+      destruct (Hdec1 a).
+      + eapply (IHys Scope1 Funs1) with (C1 := C1). eassumption. eassumption. 
+        inv Hvars. inv H7. eassumption.
+        contradiction. contradiction.
+      + destruct (Hdec2 a). 
+        * destruct C1;
+            try (exfalso; inv Hvars; inv H8; try contradiction;
+                 discriminate).
+            eapply (IHys (a |: Scope1) (Funs1 \\ [set a])) with (C1 := C1).
+            tci. tci.
+            inv Hvars. 
+            inv H8. contradiction. simpl in H7. inv H7. eassumption.
+            contradiction.
+        * destruct C1;
+            try (exfalso; inv Hvars; inv H8; try contradiction;
+                 discriminate).
+          eapply (IHys (a |: Scope1) Funs1) with (C1 := C1).
+          tci. tci.
+          inv Hvars. 
+          inv H8. contradiction. contradiction.
+          simpl in H7. inv H7. eassumption.
+  Qed.
 
+ 
   Lemma project_vars_ToMSet_Funs (Scope1 : Ensemble positive) (Scope2 : Ensemble var)
+        { Hs : ToMSet Scope1 } 
         (Funs1 Funs2 : Ensemble var)  { Hf : ToMSet Funs1 } (fenv : var -> var) 
         (c : cTag) (Γ : var) (FVs : list var) (ys : list var) 
         (C1 : exp_ctx) :
     project_vars clo_tag Scope1 Funs1 fenv c Γ FVs ys C1 Scope2 Funs2 -> ToMSet Funs2.
   Proof.
-  Admitted.
-
-    Lemma project_var_Setminus_eq (Scope Scope' Funs Funs' : Ensemble var) 
+    revert Scope1 Funs1 Hs Hf Funs2 Scope2 C1. induction ys; intros Scope1 Funs1 Hs Hf Funs2 Scope2 C1 Hvars. 
+    - assert (Heq : Funs1 <--> Funs2).
+      { inv Hvars. reflexivity. }
+      tci.
+    - assert (Hd1 := Hs). eapply Decidable_ToMSet in Hd1. destruct Hd1 as [Hdec1].  
+      assert (Hd2 := Hf). eapply Decidable_ToMSet in Hd2. destruct Hd2 as [Hdec2].       
+      destruct (Hdec1 a).
+      + eapply (IHys Scope1 Funs1) with (C1 := C1). eassumption. eassumption. 
+        inv Hvars. inv H7. eassumption.
+        contradiction. contradiction.
+      + destruct (Hdec2 a). 
+        * destruct C1;
+            try (exfalso; inv Hvars; inv H8; try contradiction;
+                 discriminate).
+          eapply (IHys (a |: Scope1) (Funs1 \\ [set a])) with (C1 := C1).
+          tci. tci.
+          inv Hvars. 
+          inv H8. contradiction. simpl in H7. inv H7. eassumption.
+          contradiction.
+        * destruct C1;
+            try (exfalso; inv Hvars; inv H8; try contradiction;
+                 discriminate).
+          eapply (IHys (a |: Scope1) Funs1) with (C1 := C1).
+          tci. tci.
+          inv Hvars. 
+          inv H8. contradiction. contradiction.
+          simpl in H7. inv H7. eassumption.
+  Qed.
+  
+  Lemma project_var_Setminus_eq (Scope Scope' Funs Funs' : Ensemble var) 
         (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
         (xs : var) (C1 : exp_ctx) :
     project_var clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
@@ -1868,7 +1969,7 @@ Module CCUtil (H : Heap).
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     Disjoint _ S (Scope' \\ Scope) ->
     env_locs rho1 S <--> env_locs rho2 S.
-  Admitted.
+  Abort.
 
   Lemma project_vars_env_locs_dis (Scope Scope' Funs Funs' : Ensemble var) 
         (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
@@ -1878,6 +1979,6 @@ Module CCUtil (H : Heap).
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     Disjoint _ S (Scope' \\ Scope) ->
     env_locs rho1 S <--> env_locs rho2 S.
-  Admitted.  
+  Abort.  
        
 End CCUtil. 

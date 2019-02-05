@@ -1177,14 +1177,12 @@ Module ClosureConversionCorrect (H : Heap).
       eapply binding_in_map_antimon; [| eassumption ]... }
 
     destruct e1.
-    (* revert e2 Hcc Hfv'.  *)
-    (* induction e1 using exp_ind'; intros e2 Hcc Hfv'; try clear IHe1. *)
     - (****************************** case Econstr ******************************) 
       inv Hcc.
       assert (Hf' : ToMSet Funs').
-      eapply project_vars_ToMSet_Funs. eassumption. now eapply H13.
+      eapply project_vars_ToMSet_Funs; [| | now eapply H13]; tci.
       assert (Hs' : ToMSet Scope').
-      eapply (project_vars_ToMSet Scope Scope' Funs). eassumption.
+      eapply (project_vars_ToMSet Scope Scope' Funs); [| now eapply H13]; tci.
         
       edestruct (binding_in_map_getlist _ rho1 l Hbind) as [vl Hgetl].
       eapply project_vars_In_Union. eassumption.
@@ -1635,9 +1633,9 @@ Module ClosureConversionCorrect (H : Heap).
       inv Hcc. 
       
       assert (Hf' : ToMSet Funs').
-      eapply project_vars_ToMSet_Funs; [| eassumption]; tci.
+      eapply project_vars_ToMSet_Funs; [| | eassumption]; tci.
       assert (Hs' : ToMSet Scope').     
-      { eapply (project_vars_ToMSet Scope Scope' Funs). eassumption. }
+      { eapply (project_vars_ToMSet Scope Scope' Funs); eassumption. }
       
       assert (Hfveq : occurs_free (Econstr_c Γ' c' FVs' Hole_c |[ Efun B' (Ce |[ e' ]|) ]|) \subset
                                   FV_cc Scope' Funs' fenv Γ). 
@@ -2051,9 +2049,9 @@ Module ClosureConversionCorrect (H : Heap).
       inv Hcc.
  
       assert (Hf' : ToMSet Funs').
-      eapply project_vars_ToMSet_Funs; [| eassumption]; tci.
+      eapply project_vars_ToMSet_Funs; [| | eassumption]; tci.
       assert (Hs' : ToMSet Scope').     
-      { eapply (project_vars_ToMSet Scope Scope' Funs). eassumption. }
+      { eapply (project_vars_ToMSet Scope Scope' Funs); eassumption. }
 
       edestruct (binding_in_map_getlist _ rho1 (v :: l) Hbind) as [vl Hgetl].
       eapply Included_trans; [| eassumption ].

@@ -1004,7 +1004,20 @@ Module SpaceSem (H : Heap).
     rewrite heap_env_equiv_image_reach. eassumption.
     eassumption. 
   Qed. 
-    
+
+(* 
+  (** Semantics commutes with heap equivalence *)
+  Lemma big_step_GC_cc_heap_env_equiv_r H1 H2 b1 rho1 rho2 e (r : ans) c m :
+    closed (reach' H1 (env_locs rho1 (occurs_free e))) H1 ->
+    big_step_GC_cc H1 rho1 e r c m ->
+    (occurs_free e) |- (H1, rho1) ⩪_(b1, id) (H2, rho2) ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) b1 ->
+    (exists r' b1' b2', big_step_GC_cc H2 rho2 e r' c m /\
+                   injective_subdomain (reach_ans r) b1' /\
+                   injective_subdomain (reach_ans r') b2' /\
+                   ans_equiv b1' r b2' r').
+*)
+
   (** * Interpretation of a context as a heap and an environment *)
 
   Fixpoint cost_ctx_full (c : exp_ctx) : nat :=
@@ -1491,11 +1504,11 @@ Module SpaceSem (H : Heap).
 
     ctx_to_heap_env_CC C H1 rho1 H2 rho2 c ->
     occurs_free (C |[ e ]|) |- (H1, rho1) ⩪_(b, id) (H1', rho1') ->
-                              injective_subdomain (reach' H1 (env_locs rho1 (occurs_free (C |[ e ]|)))) b ->
-                              exists H2' rho2' b',
-                                occurs_free e |- (H2, rho2) ⩪_(b', id) (H2', rho2') /\
-                                                injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e))) b' /\
-                                                ctx_to_heap_env_CC C H1' rho1' H2' rho2' c.
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free (C |[ e ]|)))) b ->
+    exists H2' rho2' b',
+      occurs_free e |- (H2, rho2) ⩪_(b', id) (H2', rho2') /\
+      injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e))) b' /\
+      ctx_to_heap_env_CC C H1' rho1' H2' rho2' c.
   Proof with (now eauto with Ensembles_DB).
     intros Hwf Hlocs Hctx. revert b H1' rho1' e Hwf Hlocs. induction Hctx; intros b H1' rho1' e Hwf Hlocs Heq Hinj.
     - do 3 eexists. repeat (split; eauto). now constructor.

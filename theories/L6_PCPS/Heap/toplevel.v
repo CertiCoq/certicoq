@@ -47,8 +47,8 @@ Module Top.
     Closure_conversion ct (Empty_set _) (Empty_set _) id ct Γ [] e1 e2 C ->
     
     (forall j, (e1, M.empty _, emp) ⪯ ^ (k ; j ;
-                              Pre (Empty_set _) K; Pre;
-                              Post 0 K; Post 0)
+                              Pre (Empty_set _) 0 K; PreG;
+                              Post 0 0 K; PostG)
           (C |[ e2 ]|, rho2, H2)).
   Proof with (now eauto with Ensembles_DB).
     unfold install_env.
@@ -56,8 +56,8 @@ Module Top.
     intros Ha' Hnin Hun Hcc. inv Ha'. 
     intros j.
     eapply Closure_conversion_correct in Hcc.
-    eapply cc_approx_exp_rel_mon.
-    - eassumption. 
+    eapply cc_approx_exp_rel_mon_pre.
+    - eassumption.
     - intros [[H1 rho1] e1'] [[H2 rho2] e2'] Hpre.
       eapply PreSubsetCompat with (Funs := Empty_set var).
       eassumption. rewrite Intersection_Empty_set_abs_l...
@@ -118,7 +118,7 @@ Module Top.
     Closure_conversion ct (Empty_set _) (Empty_set _) id ct Γ [] e1 e2 C ->
 
     (* the source evaluates *)
-    big_step_GC emp (M.empty _) e1 r1 c1 m1 ->
+    big_step emp (M.empty _) e1 r1 c1 m1 ->
     (* and it is not a stuck program *)
     not_stuck emp (M.empty _) e1 ->
     
@@ -126,18 +126,18 @@ Module Top.
       (* the target evaluates *)
       big_step_GC_cc H2 rho2 (C |[ e2 ]|) r2 c2 m2 /\
       (* time bounds *)
-      c1 <= c2 <= c1 * (1 + cost_time_exp e1) + (cost_time_exp e1) /\
+      c1 <= c2 <= Ktime * c1 + cost_time_exp e1 /\
       (* space bounds *)
-      m2 <= m1 * (1 + (cost_mem_exp e1)) + 2 * (1 + (cost_mem_exp e1)) /\
+      m2 <= m1 + (cost_space_exp e1) + 1 /\
       (* the results are related *)
-      r1 ≺ ^ (k ; j ; Pre ; Post 0 ; b ) r2.  
+      r1 ≺ ^ (k ; j ; PreG ; PostG ; b ) r2.  
   Proof with (now eauto with Ensembles_DB).
     unfold install_env.
     destruct (alloc (Constr ct []) emp) as [lenv H2'] eqn:Ha. 
     intros Ha' Hnin Hun Hcc Hbs Hns. inv Ha'. 
     assert (Heq : (e1, M.empty _, emp) ⪯ ^ (k + c1 ; j ;
-                                            Pre (Empty_set _) 1; Pre;
-                                            Post 0 1; Post 0)
+                                            Pre (Empty_set _) 0 1; PreG;
+                                            Post 0 0 1; PostG)
                   (C |[ e2 ]|, (M.set Γ (Loc lenv) (M.empty value)), H2')).
     { eapply closure_conversion_correct_lr_closed; try eassumption.
       unfold install_env. rewrite Ha. reflexivity. }
@@ -148,7 +148,7 @@ Module Top.
     - reflexivity.
     - clear; now firstorder.
     - unfold Pre. unfold size_heap, size_cc_heap.
-      rewrite !HL.size_with_measure_emp. rewrite !plus_O_n at 1.
+      rewrite !plus_O_n at 1.
       rewrite PS_cardinal_empty.
       simpl. rewrite <- plus_n_O.
       erewrite HL.size_with_measure_alloc with (s := 0); try eassumption. 
@@ -163,10 +163,10 @@ Module Top.
       + split. omega. unfold cost_time_heap, cost_heap in *.
         rewrite HL.max_with_measure_emp in *. rewrite <- !plus_n_O, !Max.max_0_r in *.
         omega.
-      + unfold cost_mem_heap, cost_heap in *.
+      + rewrite Max.max_0_l in Hm. 
+        unfold cost_space_heap, cost_heap in *.
         rewrite HL.max_with_measure_emp in *. rewrite <- !plus_n_O, !Max.max_0_r in *.
-        eapply le_trans. eassumption. eapply plus_le_compat_l.
-        eapply mult_le_compat_l. eapply Max.max_lub. omega. omega. 
+        omega.
       + rewrite cc_approx_val_eq in Hres.
         eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.

@@ -2049,7 +2049,7 @@ Module ClosureConversionCorrect (H : Heap).
         } 
     - (****************************** case Eapp ******************************)       
       inv Hcc.
-
+ 
       assert (Hf' : ToMSet Funs').
       eapply project_vars_ToMSet_Funs; [| eassumption]; tci.
       assert (Hs' : ToMSet Scope').     
@@ -2064,7 +2064,7 @@ Module ClosureConversionCorrect (H : Heap).
       eapply Disjoint_Included; [| | eapply Hdis ]...
       specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.      
       specialize (HFVs 0); eapply FV_inv_weak_in_FV_inv; eassumption.
-
+      
       intros j.
       (* process right ctx *)
       eapply cc_approx_exp_right_ctx_compat;
@@ -2081,13 +2081,13 @@ Module ClosureConversionCorrect (H : Heap).
       + eapply Included_trans; [| eapply env_locs_closed; eassumption ].
         eapply Included_trans; [| eapply reach'_extensive ]. 
         eapply env_locs_monotonic. eassumption.
-
+        
       + edestruct project_vars_correct with (Scope := Scope) as
             (b' & Henv' & Hfun' & HFVs' & Hinj');
         try eassumption.
         eapply Disjoint_Included; [ | | now apply Hdis ]...
         
-        eapply cc_approx_exp_app_compat; [ | | | | | | ].
+        eapply cc_approx_exp_app_compat; [ | | | | | | ]. 
         * eapply PostAppCompat; try eassumption.
           constructor.
           eapply Henv'.
@@ -2123,7 +2123,7 @@ Module ClosureConversionCorrect (H : Heap).
           inv H. now left. now right.
 
         * eauto.
-        * eapply Henv'. eapply project_vars_In. eassumption.
+        * intros j'. eapply Henv'. eapply project_vars_In. eassumption.
           now left.
         * eapply Forall2_refl_strong. intros x Hin j'. eapply Henv'.
           eapply project_vars_In. eassumption. now right.

@@ -115,6 +115,8 @@ Module Size (H : Heap).
       Pre Funs size_heap size_env p1 p2 
     end.
 
+
+ 
   Lemma cost_heap_block_get H1 c l b :
     get l H1 = Some b ->
     cost_block c b <= cost_heap c H1. 
@@ -527,7 +529,7 @@ Module Size (H : Heap).
       eapply Max.max_lub.
       eapply HL.max_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1.
       eassumption. reflexivity. reflexivity. }
-
+    
     { rewrite <- !plus_n_O in *. split.
       - split.
         + simpl. omega.
@@ -1816,12 +1818,12 @@ Module Size (H : Heap).
              (reach_size H1'' rho_clo2 e1)
              (1 + PS.cardinal (fundefs_fv B1))
             (H1'', rho_clo2, e1) (Hgc2, subst_env d rho2'', e2).
-  Proof with (now eauto with Ensembles_DB). 
+  Proof with (now eauto with Ensembles_DB).
     intros Hgetenv1 Hfd1 Hst1 Hl1 Hs2 Hdf2 Hl2 Hget Hlen Hreach Hdis Hun Heq1 Heq2. 
     unfold PreG, Pre.
     unfold reach_size, size_reachable, size_heap, size_cc_heap.
     assert (Hdis' : Disjoint loc Scope
-                            (env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1))). 
+                             (env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1))). 
     { eapply Disjoint_Included_r.
       rewrite <- env_locs_setlist_Disjoint; try eassumption.
       eapply env_locs_monotonic. eapply Included_Intersection_l.
@@ -1889,5 +1891,5 @@ Module Size (H : Heap).
     rewrite Hl2. now eapply Hsize. 
     intros. eapply block_equiv_size_val. eassumption. 
   Qed.   
-    
+
 End Size.

@@ -264,7 +264,7 @@ Module CC_log_rel (H : Heap).
                          let R j v1 v2 := cc_approx_val i j IP P b'(Res (v1, H1')) (Res (v2, H2')) in
                          (forall j, Forall2 (R j) vs1 vs2) ->
                          f_eq_subdomain (reach' H1' [set env_loc1']) (b2 ∘ b ∘ b1) b' ->
-                         (forall (H2 : heap block) b2, (* redundant *)
+                         (forall (H2 : heap block) b2,
                              live' (env_locs rho2' (occurs_free e2)) H2' H2 b2 ->
                              IP (name_in_fundefs B1 :&: occurs_free e1 \\ FromList xs1) _
                                 (reach_size H1'' rho_clo2 e1)

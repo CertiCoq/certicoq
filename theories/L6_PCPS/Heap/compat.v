@@ -227,11 +227,11 @@ Module Compat (H : Heap).
       eapply (cc_approx_var_env_heap_env_equiv
                 _ _ 
                 (occurs_free (Eapp f1 t xs1))
-                (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ))) in Hvar;
+                (occurs_free (AppClo clo_tag f2 t xs2 f2' Γ)) k j) in Hvar;
           [| eassumption | eassumption | eassumption | eassumption 
            | normalize_occurs_free; now eauto with Ensembles_DB
            | unfold AppClo; normalize_occurs_free; now eauto with Ensembles_DB ].
-      inv Hstep1.  
+      inv Hstep1.
       (* Timeout! *)
       - { edestruct (Hstuck1 (cost (Eapp f1 t xs1))) as [v1 [m1 Hstep1]].
           inv Hstep1; [ omega | ].
@@ -299,7 +299,7 @@ Module Compat (H : Heap).
                 [ now eauto with Ensembles_DB
                 | now intros Hc; inv Hc; eapply Hnin1; eauto ]
               | now intros Hc; inv Hc; eapply Hnin2; eauto ]
-            ]. 
+            ].  
           edestruct (cc_approx_var_env_getlist IIG IG  k j rho1' rho2')
             as [vs2 [Hgetl' Hcc']];
             [ | now eauto |].
@@ -366,13 +366,13 @@ Module Compat (H : Heap).
             now eauto. 
             simpl. omega. 
 
-            (* * simpl; omega. *)
           + rewrite Combinators.compose_id_left, Combinators.compose_id_right.
-            reflexivity. 
+            reflexivity.
+
           + clear; now firstorder.
 
           + eapply heap_env_equiv_heap_equiv_l. eassumption.
-           
+            
           + (* initial after GC *)
             eapply HG; eassumption.
           + simpl. omega.
@@ -380,63 +380,9 @@ Module Compat (H : Heap).
             edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m'' Hstep']].
             inv Hstep'.
             * omega.
-            * rewrite NPeano.Nat.add_sub in Hbs0.
+            * rewrite NPeano.Nat.add_sub in Hbs0. 
               repeat subst_exp.
-              edestruct (live'_live_inv (env_locs rho_clo4 (occurs_free e0)) b0 H'0 H'')
-                as [o [Hgcb [Hfe1b Hfe2b]]]; try eassumption.
-              edestruct Hgcb as [_ [ hgcA hinjA ]].
- 
-              assert (Hequiv: occurs_free e0 |-
-                      (H'', subst_env b0 rho_clo4) ⩪_( o, id) (H'0, rho_clo4)). 
-              { eapply Equivalence_Transitive.
-                eapply heap_env_equiv_heap_equiv_l. 
-                rewrite subst_env_image. eapply heap_equiv_symm.
-                now eapply hgcA.
-                
-                
-                symmetry. 
-                eapply Equivalence_Transitive;
-                  [ | eapply heap_env_equiv_respects_compose; reflexivity ].
-                rewrite <- subst_env_image in Hgcb.
-                symmetry. eapply heap_env_equiv_respects_f_eq_l.
-                eapply heap_env_equiv_respects_id_r. 
-                rewrite subst_env_image in Hgcb.
-                reflexivity. 
-                
-                symmetry. eapply f_eq_subdomain_antimon; [| eassumption ].
-                eapply reach'_extensive. } 
-
-              
-              edestruct big_step_gc_heap_env_equiv_r with (b1 := o ) 
-                as [r1 [m1 [b1'' [b2''[Hgc'' _]]]]];
-                [| eassumption | | | do 2 eexists; eassumption ]. 
-
-              { rewrite subst_env_image.
-                destruct Hgc as [_ [Hequivb0 _]]. 
-                eapply heap_equiv_preserves_closed. eassumption.
-                
-                eapply reach'_closed. 
-                - eapply well_formed_antimon; [| eapply well_formed_reach_setlist; try eassumption ].
-                  eapply reach'_set_monotonic. eapply env_locs_monotonic.
-                  eapply Included_Union_preserv_l. reflexivity.
-                                    
-                  eapply well_formed_antimon; [| eapply well_formed_reach_alloc_def_funs;
-                                                 try eassumption ].
-                  
-                  eapply reach'_set_monotonic. eapply env_locs_monotonic.
-                  eapply Included_Union_preserv_l. reflexivity.
-
-
-                  
-                  clear. admit. (* form env relation on f + relation on args +
-                        closedness lemmas *) 
-              
-                  eassumption. 
-              eapply injective_subdomain_compose.
-              clear. now firstorder.
-
-              
-              rewrite subst_env_image. rewrite image_id. eassumption.
+              do 2 eexists. eassumption.
 
           +  do 3 eexists. exists b2'. eexists. repeat split.
              * eapply Eval_proj_per_cc with   (c := c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2))).
@@ -463,7 +409,7 @@ Module Compat (H : Heap).
                eapply big_step_reach_leq. eassumption. 
                rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
                eassumption. simpl. omega. }
-    Admitted.
+    Qed.
 
     
     (** * Heap allocation and environment extension properties *)

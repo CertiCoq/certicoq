@@ -28,7 +28,7 @@ Module SpaceSem (H : Heap).
     | Eproj x t n y e => 1
     | Efun B e => 1 + PS.cardinal (fundefs_fv B)
     | Eapp f t ys => 1 + length ys
-    | Eprim x p ys e => 0
+    | Eprim x p ys e => 1 + length ys
     | Ehalt x => 1
     end.
 
@@ -40,7 +40,7 @@ Module SpaceSem (H : Heap).
     | Eproj x t n y e => 1
     | Efun B e => 1
     | Eapp f t ys => 1 + length ys
-    | Eprim x p ys e => 0
+    | Eprim x p ys e => 1 + length ys
     | Ehalt x => 1
     end.
 
@@ -332,8 +332,8 @@ Module SpaceSem (H : Heap).
     inv Hbs; eauto;
     now eapply Nat_as_OT.le_max_l. 
   Qed.
-  
-  (* not used *) 
+
+  (* not used *)
   Lemma big_step_gc_heap_env_equiv_l H1 H2 β rho1 rho2 e (r : ans) c m :
     big_step_GC H1 rho1 e r c m ->
     (occurs_free e) |- (H1, rho1) ⩪_(β, id) (H2, rho2) ->
@@ -349,7 +349,6 @@ Module SpaceSem (H : Heap).
   Proof.
     intros Hbs. inversion Hbs; eauto; try now eapply Nat_as_OT.le_max_l.
   Qed.
-
 
  
   (** Semantics commutes with heap equivalence *)
@@ -1710,5 +1709,42 @@ Module SpaceSem (H : Heap).
     intros Hctx. induction Hctx; simpl; eauto; omega.
   Qed.
 
-  
+  Lemma big_step_GC_cc_OOT_leq C e H rho c H' rho' c':
+    ctx_to_heap_env_CC C H rho H' rho' c' ->
+    c < c' ->
+    exists m, m <= size_heap H + cost_alloc_ctx_CC C /\
+         big_step_GC_cc H rho (C |[ e ]|) OOT c m.
+  Proof.
+    intros Hctx. revert c. induction Hctx; intros c1 Hlt.
+    - omega. 
+    - destruct (lt_dec c1 (cost_cc (Econstr_c x t ys C |[ e ]|))). 
+      + simpl in *. eexists. split; [| constructor; try reflexivity ].
+        simpl in *. omega.  
+        simpl in *. omega.  
+      + edestruct IHHctx as [m' [Hleq' Hbs]].
+        2:{ eexists. simpl. split ; [| eapply Eval_constr_per_cc; try eassumption ].
+
+            unfold size_heap in *.
+            erewrite size_with_measure_alloc in Hleq'; try eassumption; try reflexivity.
+            erewrite getlist_length_eq; try eassumption. simpl in *; omega. 
+            simpl in *; omega. }
+        simpl in *. omega.
+    - destruct (lt_dec c1 (cost_cc (Eproj_c x t N y C |[ e ]|))). 
+      + simpl in *. eexists. split; [| constructor; try reflexivity ].
+        omega. 
+        simpl in *. omega.  
+      + edestruct IHHctx as [m' [Hleq Hbs]].
+        2:{ eexists. split; [| simpl; eapply Eval_proj_per_cc; try eassumption ]. simpl in *. omega. 
+            simpl in *. omega. }
+        simpl in *; omega. 
+    - destruct (lt_dec c1 (cost_cc (Efun1_c B C |[ e ]|))). 
+      + simpl in *. eexists. split; [| constructor; try reflexivity ].
+        omega. simpl. omega. 
+      + edestruct IHHctx as [m' [Hleq Hbs]].
+        2:{ eexists. simpl. split; [| eapply Eval_fun_per_cc; try reflexivity; try eassumption ].
+            omega. simpl in *. omega. }
+        simpl in *. omega.
+  Qed.           
+
+
 End SpaceSem.

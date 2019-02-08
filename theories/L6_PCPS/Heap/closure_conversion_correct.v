@@ -305,6 +305,15 @@ Module ClosureConversionCorrect (H : Heap).
 
   Opaque Pre.
 
+
+  Lemma Setminus_Intersection_distr {A} (S1 S2 S3 : Ensemble A) :
+    (S1 :&: S2) \\ S3 <--> (S1 \\ S3) :&: (S2 \\ S3).
+  Proof.
+    split; intros x H1.
+    inv H1. inv H. constructor; constructor; eauto. 
+    inv H1. inv H; inv H0. constructor; eauto. 
+  Qed.     
+      
   Lemma Closure_conversion_fundefs_correct
     (k : nat)
     (* The IH *)
@@ -1189,6 +1198,7 @@ Module ClosureConversionCorrect (H : Heap).
       
       edestruct project_vars_ctx_to_heap_env with (Scope := Scope) as [H2' [rho2' [m Hct]]];
         try eassumption.
+
       intros Hc. eapply Hdis. constructor. now left. right. eassumption.
       eapply Disjoint_Included; [ | | now eapply Hdis ]...
       specialize (Hfun 0); eapply Fun_inv_weak_in_Fun_inv; eassumption.
@@ -1210,13 +1220,30 @@ Module ClosureConversionCorrect (H : Heap).
 
       (* process right ctx *)
       eapply cc_approx_exp_right_ctx_compat
-      with (IL2 := (Post (cost_ctx_full_cc C) A δ)); [ | | | | now eapply Hct | ].
+        with (IL2 := (Post_weak (cost_ctx_full_cc C) A δ)); [ | | | | | |  now eapply Hct | ].
       
-      + eapply PostCtxCompat_vars_r; [| | | | eassumption |  ]; try eassumption.
-        simpl. omega. 
+      + eapply PostTimeOut'. 
+        erewrite (project_vars_cost_alloc_eq Scope Scope' Funs Funs'); [| eassumption ].
+        eapply mult_le_compat_l. eapply PS_elements_subset.
+
+        eapply Included_Setminus. 
+
+        eapply Disjoint_Included_l. eapply project_vars_Scope_Funs_subset; [| | eassumption ]; tci. 
+        now eauto with Ensembles_DB. 
+
+        rewrite <- (Intersection_idempotent Funs) at 1. 
+        eapply Included_trans. eapply Included_Setminus_compat. eapply Included_Intersection_compat.
+        reflexivity.
+        eapply project_vars_Funs. eassumption.  
+        reflexivity.
+        rewrite Setminus_Intersection_distr, Setminus_Union_distr, Setminus_Same_set_Empty_set, Union_Empty_set_neut_r. 
+        normalize_occurs_free. eapply Included_Intersection_compat... 
+      +  eapply PostCtxCompat_vars_r; [| | | | eassumption |  ]; try eassumption.
+         omega.
       + eapply (PreCtxCompat_vars_r Scope Scope' Funs _ Funs'). normalize_occurs_free.
         now eapply Included_Union_preserv_l. 
         eassumption.
+      + simpl. eapply Nat_as_OT.le_max_r. 
       + eapply well_formed_antimon; [| eapply well_formed'_closed; eassumption ].
         eapply reach'_set_monotonic. eapply env_locs_monotonic. eassumption.
         
@@ -1254,7 +1281,7 @@ Module ClosureConversionCorrect (H : Heap).
           now eauto with Ensembles_DB. 
           tci. reflexivity. 
           eapply Singleton_Included...
-        * eapply PostBase.  (* XXX Base *)
+        * eapply PostTimeOut_weak.
           unfold cost_env_app_exp_out.
           eapply project_vars_cost_eq'. eassumption.
           omega.
@@ -1456,7 +1483,7 @@ Module ClosureConversionCorrect (H : Heap).
                (ILe := fun e1 e2 => Post 0 A δ);
           [ | | | | ].
         * eapply PostBase.  (* XXX Base *)
-          unfold cost_env_app_exp_out.
+          unfold cost_env_app_exp_out.y
           eapply project_var_cost_eq'. eassumption.
           omega. 
         * eapply PreCaseCompat. intros e1 e2 HIn.  

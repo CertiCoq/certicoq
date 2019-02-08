@@ -20,8 +20,8 @@ Module GC (H : Heap).
 
   Module Equiv := HeapEquiv H.
 
-  Import H Equiv.Defs Equiv.
-
+  Import H Equiv.Defs.HL Equiv.Defs Equiv.
+  
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on
          the execution cost of certain transformations *)
@@ -65,7 +65,7 @@ Module GC (H : Heap).
         max (1 + 4 * PS.cardinal (fundefs_fv B))
             (max (cost_time_fundefs B) (cost_time_exp e))
       | Eapp x _ ys => 6 + 3 * length ys
-      | Eprim x _ ys e => max (length ys) (cost_time_exp e)
+      | Eprim x _ ys e => max (3 * length ys) (cost_time_exp e)
       | Ehalt x => 3
     end
   with cost_time_fundefs (B : fundefs) : nat :=
@@ -82,7 +82,7 @@ Module GC (H : Heap).
       | Eproj x _ _ y e => 3
       | Efun B e => 1 + 4 * PS.cardinal (fundefs_fv B)
       | Eapp x _ ys => 3 + 3 * length ys
-      | Eprim x _ ys e => length ys
+      | Eprim x _ ys e => 3 * length ys
       | Ehalt x => 3
     end.
       
@@ -150,7 +150,7 @@ Module GC (H : Heap).
     PS.cardinal (fundefs_fv f) (* over-approximating the environment associated to each B by a factor of |B| *).
 
 
-  Import H Equiv.Defs.HL Equiv.Defs Equiv.
+  
 
   (** Using S as the set of roots, garbage collect H1 *) 
   Definition collect (S : Ensemble loc) (H1 H2 : heap block) : Prop :=
@@ -169,6 +169,9 @@ Module GC (H : Heap).
     dom H2 \subset reach' H2 (image β S) /\   
     S |- H1 ≃_(β, id) H2 /\
     injective_subdomain (reach' H1 S) β.
+
+
+
 
   (** * Lemmas about [collect] -- DEPRICATED *)
   

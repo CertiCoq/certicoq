@@ -11,7 +11,7 @@ Require Import L2k.stripEvalCommute.
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)
 Instance WfL2Term: GoodTerm (Program L2k.compile.Term) :=
-  fun _  => True.
+  fun p : Program Term => L2k.program.crctTerm (AstCommon.env p) 0 (main p).
 
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.

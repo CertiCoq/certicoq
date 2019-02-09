@@ -30,7 +30,7 @@ let compile gr =
   Feedback.msg_debug (str"Quoting");
   let term = quote_term_rec env (EConstr.to_constr sigma c) in
   Feedback.msg_debug (str"Finished quoting.. compiling to L7.");
-  let fuel = coq_nat_of_int 10000000 in
+  let fuel = coq_nat_of_int 10000 in
   match AllInstances.compile_template_L7 fuel term with
   | Ret ((nenv, header), prg) ->
      Feedback.msg_debug (str"Finished compiling, printing to file.");

@@ -1695,6 +1695,22 @@ Module SpaceSem (H : Heap).
         econstructor; eauto.
   Qed. 
 
+  Lemma ctx_to_heap_env_determistic_strong C H1 rho1 H2 rho2 H1' rho1' e c b :
+    well_formed (reach' H1 (env_locs rho1 (occurs_free (C |[ e ]|)))) H1 ->
+    (env_locs rho1 (occurs_free (C |[ e ]|))) \subset dom H1 ->
+
+    ctx_to_heap_env_CC C H1 rho1 H2 rho2 c ->
+    occurs_free (C |[ e ]|) |- (H1, rho1) ⩪_(b, id) (H1', rho1') ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free (C |[ e ]|)))) b ->
+    exists H2' rho2' b',
+      occurs_free e |- (H2, rho2) ⩪_(b', id) (H2', rho2') /\
+      well_formed (reach' H2 (env_locs rho2 (occurs_free e))) H2 /\
+      ((env_locs rho2 (occurs_free e)) \subset dom H2) /\
+      injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e))) b' /\
+      ctx_to_heap_env_CC C H1' rho1' H2' rho2' c.
+  Proof with (now eauto with Ensembles_DB).
+  Admitted. 
+  
   Lemma ctx_to_heap_env_cost C H1 rho1 H2 rho2 c :
     ctx_to_heap_env C H1 rho1 H2 rho2 c ->
     c = cost_ctx_full C.

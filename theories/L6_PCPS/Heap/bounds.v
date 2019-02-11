@@ -529,7 +529,23 @@ Module Size (H : Heap).
     InvCostTimeOut' (Post 0 A δ) (Pre Funs A δ) l e1 e2.
   Proof.
     unfold InvCostTimeOut', Post, Pre.
-    intros Hleq  H1' H2' rho1' rho2' c m Hs Hc Hleq'.
+    intros Hleq H1' H2' rho1' rho2' c m Hs Hc Hleq'.
+    unfold Ktime. split.
+    + omega.
+    + eapply le_trans. eassumption.
+      eapply le_trans; [| eapply plus_le_compat; [ eapply Nat.le_max_l | eapply Nat.le_max_l ] ].
+      omega. 
+  Qed.
+    
+
+  Lemma PostTimeOut'_weak e1 e2 l k
+        (Funs : Ensemble var) { _ : ToMSet Funs} A δ :
+    l <= cost_space_exp e1 ->
+    k <= cost_env_app_exp_out e1 ->
+    InvCostTimeOut' (Post_weak k A δ) (Pre Funs A δ) l e1 e2.
+  Proof.
+    unfold InvCostTimeOut', Post_weak, Pre.
+    intros Hleq Hleq2 H1' H2' rho1' rho2' c m Hs Hc Hleq'.
     unfold Ktime. split.
     + omega.
     + eapply le_trans. eassumption.
@@ -1378,7 +1394,36 @@ Module Size (H : Heap).
     omega.
   Qed.
   
+  Lemma PostCtxCompat_ctx_r_weak
+        C e1 e2 k m A δ :
+    cost_ctx_full_cc C + m = k ->
+    InvCtxCompat_r (Post_weak m A δ)
+                   (Post_weak k A δ) C e1 e2.
+  Proof. 
+    unfold InvCtxCompat_r, Post_weak.
+    intros Hleq H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
+           Hcost Hleq1 Hctx'.
+    edestruct Hcost as [[Hs1 Hs2] Hm]. eassumption. 
+    assert (Hcost' := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx'). subst. 
+    omega.
+  Qed.
 
+
+  Lemma PostCtxCompat_ctx_r_weak'
+        C e1 e2 k m A δ :
+    cost_ctx_full_cc C + m = k ->
+    InvCtxCompat_r_strong (Post_weak m A δ)
+                   (Post_weak k A δ) C e1 e2.
+  Proof. 
+    unfold InvCtxCompat_r, Post_weak.
+    intros Hew H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
+           Hcost Hctx'. split; try omega.
+    intros Hw.
+    edestruct Hcost as [[Hs1 Hs2] Hm]. eassumption. 
+    assert (Hcost' := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx'). subst. 
+    omega.
+  Qed.
+  
   Lemma PreCtxCompat_vars_r
         Scope {Hs : ToMSet Scope} Scope' {Hs' : ToMSet Scope'} Funs {Hf : ToMSet Funs}
         S {HS : ToMSet S}
@@ -1456,6 +1501,25 @@ Module Size (H : Heap).
     unfold Post in *. omega.
    Qed.
    
+   Lemma PostCtxCompat_vars_r'
+         Scope {Hs : ToMSet Scope} Scope' {Hs' : ToMSet Scope'} Funs {Hf : ToMSet Funs}
+         Funs' {Hf' : ToMSet Funs'} fenv
+         C e1 e2 c Γ FVs x k m A δ :
+     project_vars Util.clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
+     cost_ctx_full_cc C + m = k ->
+     InvCtxCompat_r (Post m A δ)
+                    (Post k A δ) C e1 e2.
+   Proof.
+     unfold InvCtxCompat_r, Post.
+     intros Hvar Hleq H1' H2' H2'' rho1' rho2' rho2'' c' c1 c2 m1 m2 
+            Hc Hleq2 Hctx'.
+     edestruct Hc as  [[Hs1 Hs2] Hm]; eauto. 
+     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
+     assert (Heq := project_vars_cost_eq _ _ _ _ _ _ _ _ _ _ Hvar). subst.
+     assert (Hcost := ctx_to_heap_env_CC_cost _ _ _ _ _ _ Hctx').
+     subst.  
+     unfold Post in *. omega.
+   Qed.
 
   (* Lemma cc_approx_val_size' k j GIP GP b H1 H2 x y v v' : *)
   (*   Res (Loc x, H1) ≺ ^ (k; S j; GIP; GP; b) Res (Loc y, H2) -> *)

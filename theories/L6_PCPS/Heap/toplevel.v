@@ -126,7 +126,7 @@ Module Top.
       (* the target evaluates *)
       big_step_GC_cc H2 rho2 (C |[ e2 ]|) r2 c2 m2 /\
       (* time bounds *)
-      c1 <= c2 <= Ktime * c1 + cost_time_exp e1 /\
+      c1 <= c2 <= Ktime * c1 /\
       (* space bounds *)
       m2 <= m1 + (cost_space_exp e1) + 1 /\
       (* the results are related *)
@@ -160,9 +160,7 @@ Module Top.
     - eassumption.
     - unfold Post in Hin. destruct Hin as [[Ht1 Ht2] Hm]. do 4 eexists. split. eassumption.
       split; [| split ].
-      + split. omega. unfold cost_time_heap, cost_heap in *.
-        rewrite HL.max_with_measure_emp in *. rewrite <- !plus_n_O, !Max.max_0_r in *.
-        omega.
+      + omega.
       + rewrite Max.max_0_l in Hm. 
         unfold cost_space_heap, cost_heap in *.
         rewrite HL.max_with_measure_emp in *. rewrite <- !plus_n_O, !Max.max_0_r in *.

@@ -112,6 +112,30 @@ and install the packages from source:
 	https://github.com/aa755/paramcoq (branch: v8.8)
 
 
+Choose the architecture:
+----------------------
+By default, Certicoq will be built for x86_64. 
+However, it can be configured for x86_32 by:
+1) In theory/_CoqProject, replace the line
+   	   compcert/x86_64/Archi.v	
+   by
+	  compcert/x86_32/Archi.v	
+
+2) In theory/L7/L6_to_Clight.v, replace the lines
+         Notation val := ulongTy.
+	 Notation uval := ulongTy.
+	 Notation val_typ := (AST.Tlong:typ).
+	 Notation Init_int x := (Init_int64 (Int64.repr x)).
+
+   by
+         Notation val := uintTy.
+	 Notation uval := uintTy.
+         Notation val_typ := (Tany32:typ).
+         Notation Init_int x := (Init_int32 (Int.repr x)).
+
+
+
+
 Building the compiler:
 ----------------------
   At `certicoq/`, run:

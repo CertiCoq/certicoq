@@ -422,6 +422,16 @@ Definition reserve (funInf : positive) (l : Z) : statement :=
     Sskip.
 
 
+Definition reserve' (funInf : positive) (l : Z) : statement :=
+  let arr := (Evar funInf (Tarray uval l noattr)) in
+  let allocF := Efield tinfd allocIdent valPtr in
+  let limitF := Efield tinfd allocIdent valPtr in
+  Sifthenelse
+    (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
+    (Scall None gc (arr :: tinf :: nil))
+    Sskip.
+
+
 (* Don't shift the tag for boxed, make sure it is under 255 *)
 Fixpoint makeTagZ (cenv:cEnv) (ct : cTag) : option Z :=
   rep <- make_cRep cenv ct ;;

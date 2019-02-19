@@ -8,6 +8,7 @@
 
 
 TODO: change L6_to_Clight's fn_vars into fn_temps
+TODO: change L6_to_Clight's reserve into reserve', update proof with new order 
  *)
 
 Require Import L6.cps L6.eval L6.cps_util L6.List_util L6.Ensembles_util L6.identifiers L6.tactics L6.shrink_cps_corresp. 
@@ -1788,7 +1789,12 @@ Qed.
 | RPfun_v :
     forall  vars fds f m b i  t vs e asgn body l locs finfo,
       let F := mkfunction (Tvoid)
-                          ((mkcallconv false false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})*)
+                          ((mkcallconv false false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})
+
+
+TODO: entry should be gc_test (with reserve'), gc_set, asgn, body 
+
+*)
                           (((tinfIdent, threadInf)::nil))
                           (nil)
                           (List.app vars gc_vars)

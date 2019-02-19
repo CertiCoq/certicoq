@@ -5,6 +5,7 @@
 ** because of types like Sort, ...
 *)
 
+Require Import FunInd.
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
@@ -168,6 +169,21 @@ Ltac not_isInd := not_isn.
 Ltac not_isWrong := not_isn.
 Ltac not_isConstruct := not_isn.
 
+Lemma Nat_eqb_rfl: forall n m, Nat.eqb n m = true -> n = m.
+Proof.
+  induction n; induction m; intros.
+  - reflexivity.
+  - cbn in H. discriminate.
+  - cbn in H. discriminate.
+  - cbn in H. erewrite IHn. reflexivity. assumption.
+Qed.
+
+Lemma rfl_Nat_eqb: forall n, Nat.eqb n n = true.
+Proof.
+  induction n; intros; cbn.
+  - reflexivity.
+  - assumption.
+Qed.
 
 Lemma triv_exists:
   forall (A B:Type) (C:A -> B) (a:A), exists (aa:A), C a = C aa.
@@ -377,7 +393,7 @@ Lemma neq_sym: forall (A:Type) (a b:A), a <> b -> b <> a.
   intuition.
 Qed.
 
-Fixpoint list_to_zero (n:nat) : list nat :=
+Function list_to_zero (n:nat) : list nat :=
   match n with
     | 0 => nil
     | S n => n :: (list_to_zero n)

@@ -1,20 +1,23 @@
 
 Require Import Recdef.
 Require Import omega.Omega.
-Require Import Template.Template.
+Require Import Coq.Arith.PeanoNat.
 Require Import Common.Common.
 Require Import L2k.compile.
 Require Import L2k.term.
 Require Import L2k.wcbvEval.
+
+Require Import TemplateExtraction.EAst Template.kernel.univ.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Set Template Cast Propositions.
 Set Printing Width 80.
 Set Printing Depth 1000.
+
+Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
 Quote Recursively Definition p_Type := Type.
 Print p_Type.
@@ -44,6 +47,693 @@ Compute
   let env := (env P_LetaTst) in
   let main := (main P_LetaTst) in
   wcbvEval (env) 10 (main).
+
+(** trivial example **)
+Definition one := 1.
+Quote Recursively Definition cbv_one := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (one)) in exact t).
+Print cbv_one.
+(* [Term] of Coq's answer *)
+Definition ans_one := Eval cbv in (main (program_Program cbv_one)).
+Print ans_one.
+(* [program] of the program *)
+Quote Recursively Definition p_one := one.
+Print p_one.
+Definition P_one := Eval cbv in (program_Program p_one).
+Print P_one.
+Goal
+  let env := (env P_one) in
+  let main := (main P_one) in
+  wcbvEval (env) 100 (main) = Ret ans_one.
+  vm_compute. reflexivity.
+Qed.
+
+Definition ten := 10.
+Quote Recursively Definition cbv_ten := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (ten)) in exact t).
+Print cbv_ten.
+(* [Term] of Coq's answer *)
+Definition ans_ten := Eval cbv in (main (program_Program cbv_ten)).
+Print ans_ten.
+(* [program] of the program *)
+Quote Recursively Definition p_ten := ten.
+Print p_ten.
+Definition P_ten := Eval cbv in (program_Program p_ten).
+Print P_ten.
+Goal
+  let env := (env P_ten) in
+  let main := (main P_ten) in
+  wcbvEval (env) 100 (main) = Ret ans_ten.
+  vm_compute. reflexivity.
+Qed.
+
+Definition plus01 := (plus 0 1).
+Quote Recursively Definition cbv_plus01 := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (plus01)) in exact t).
+Print cbv_plus01.
+(* [Term] of Coq's answer *)
+Definition ans_plus01 := Eval cbv in (main (program_Program cbv_plus01)).
+Print ans_plus01.
+(* [program] of the program *)
+Quote Recursively Definition p_plus01 := plus01.
+Print p_plus01.
+Definition P_plus01 := Eval cbv in (program_Program p_plus01).
+Print P_plus01.
+Goal
+  let env := (env P_plus01) in
+  let main := (main P_plus01) in
+  wcbvEval (env) 10 (main) = Ret ans_plus01.
+Proof.
+  cbv. reflexivity.
+Qed.
+
+Definition plus10 := (plus 1 0).
+Quote Recursively Definition cbv_plus10 := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (plus10)) in exact t).
+Print cbv_plus10.
+(* [Term] of Coq's answer *)
+Definition ans_plus10 := Eval cbv in (main (program_Program cbv_plus10)).
+Print ans_plus10.
+(* [program] of the program *)
+Quote Recursively Definition p_plus10 := plus10.
+Print p_plus10.
+Definition P_plus10 := Eval cbv in (program_Program p_plus10).
+Print P_plus10.
+Goal
+  let env := (env P_plus10) in
+  let main := (main P_plus10) in
+  wcbvEval (env) 100 (main) = Ret ans_plus10.
+Proof.
+  cbv. reflexivity.
+Qed.
+
+(**********
+Goal
+  let env := (env P_plus10) in
+  let main := (main P_plus10) in
+  WcbvEval (env) (main) ans_plus10.
+Proof.
+  intros. unfold main, AstCommon.env, AstCommon.main, P_plus10, ans_plus10.
+  eapply wConst.
+  - unfold lookupDfn. cbn. reflexivity.
+  - eapply wAppLam.
+    + eapply wAppFix.
+      * eapply wConst.
+        -- unfold lookupDfn. cbn. reflexivity.
+        -- apply wFix.
+      * cbn. reflexivity.
+      * eapply wAppLam.
+        -- eapply wLam.
+        -- eapply wConstruct. eapply wCons.
+           ++ eapply wConstruct. eapply wNil.
+           ++ eapply wNil.
+        -- cbn. eapply wLam.
+    + eapply wConstruct. eapply wNil.
+    + cbn. eapply wCase.
+      * eapply wConstruct. eapply wCons.
+        -- eapply wConstruct. eapply wNil.
+        -- eapply wNil.
+      * unfold whCaseStep.Print bnth. unfold bnth.
+      * cbn. reflexivity.
+
+        
+
+          
+    + eapply wAppFix.
+      * eapply wConst.
+        -- unfold lookupDfn. cbn. reflexivity.
+        -- apply wFix.
+      * cbn. reflexivity.
+      * eapply wAppLam.
+        -- eapply wLam.
+        -- eapply wConstruct. eapply wCons.
+           ++ eapply wConstruct. eapply wNil.
+           ++ eapply wNil.
+        -- unfold whBetaStep, instantiate. eapply wLam.
+    + eapply wConstruct. eapply wNil.
+    + unfold whBetaStep, instantiate. unfold ans_plus10. eapply wCase.
+      * cbn. eapply wConstruct. eapply wCons.
+        -- eapply wConstruct. eapply wNil.
+        -- eapply wNil.
+      * cbn. reflexivity.
+      *
+
+        
+Goal
+  let env := (env P_plus10) in
+  let main := (main P_plus10) in
+  wcbvEval (env) 100 (main) = Ret ans_plus10.
+Proof.
+  cbv. reflexivity.
+Qed.
+ ********************)
+
+Definition plus98 := (plus 9 8).
+Quote Recursively Definition cbv_plus98 := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (plus98)) in exact t).
+Print cbv_plus98.
+(* [Term] of Coq's answer *)
+Definition ans_plus98 := Eval cbv in (main (program_Program cbv_plus98)).
+Print ans_plus98.
+(* [program] of the program *)
+Quote Recursively Definition p_plus98 := plus98.
+Print p_plus98.
+Definition P_plus98 := Eval cbv in (program_Program p_plus98).
+Print P_plus98.
+Goal
+  let env := (env P_plus98) in
+  let main := (main P_plus98) in
+  wcbvEval (env) 100 (main) = Ret ans_plus98.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+
+(** nested Let **)
+Definition nestedLet := let x := 0 in let y := 1 in x.
+Quote Recursively Definition cbv_nestedLet := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in nestedLet) in exact t).
+Print cbv_nestedLet.
+(* [Term] of Coq's answer *)
+Definition ans_nestedLet := Eval cbv in (main (program_Program cbv_nestedLet)).
+Print ans_nestedLet.
+(* [program] of the program *)
+Quote Recursively Definition p_nestedLet := nestedLet.
+Print p_nestedLet.
+Definition P_nestedLet := Eval cbv in (program_Program p_nestedLet).
+Print P_nestedLet.
+Goal
+  let env := (env P_nestedLet) in
+  let main := (main P_nestedLet) in
+  wcbvEval (env) 100 (main) = Ret ans_nestedLet.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+Goal  (* Why does this work? *)
+  let env := (env P_nestedLet) in
+  let main := (main P_nestedLet) in
+  WcbvEval env main ans_nestedLet.
+Proof.
+  intros. unfold main, AstCommon.main, P_nestedLet.
+  eapply wConst.
+  - reflexivity.
+  - eapply wLetIn.
+    + eapply wConstruct. eapply wNil.
+    + cbn. eapply wLetIn.
+      * eapply wConstruct. eapply wCons.
+        -- eapply wConstruct. eapply wNil.
+        -- eapply wNil.
+      * cbn. eapply wConstruct. eapply wNil.
+Qed.
+
+(** vector addition **)
+Require Coq.Vectors.Vector.
+Print Fin.t.
+Print Vector.t.
+
+Definition vplus (n:nat) :
+  Vector.t nat n -> Vector.t nat n -> Vector.t nat n := (Vector.map2 plus).
+Definition v01 : Vector.t nat 2 :=
+  (Vector.cons nat 0 1 (Vector.cons nat 1 0 (Vector.nil nat))).
+Definition v23 : Vector.t nat 2 :=
+  (Vector.cons nat 2 1 (Vector.cons nat 3 0 (Vector.nil nat))).
+Definition vplus0123 := (vplus v01 v23).
+Quote Recursively Definition cbv_vplus0123 := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (vplus0123)) in exact t).
+Print cbv_vplus0123.
+(* [Term] of Coq's answer *)
+Definition ans_vplus0123 := Eval cbv in (main (program_Program cbv_vplus0123)).
+(* [program] of the program *)
+Quote Recursively Definition p_vplus0123 := vplus0123.
+Print p_vplus0123.
+Definition P_vplus0123 := Eval cbv in (program_Program p_vplus0123).
+Print P_vplus0123.
+Goal
+  let env := (env P_vplus0123) in
+  let main := (main P_vplus0123) in
+  wcbvEval (env) 100 (main) = Ret ans_vplus0123.
+  vm_compute. reflexivity.
+Qed.
+
+(** Ackermann **)
+Fixpoint ack (n m:nat) {struct n} : nat :=
+  match n with
+    | 0 => S m
+    | S p => let fix ackn (m:nat) {struct m} :=
+                 match m with
+                   | 0 => ack p 1
+                   | S q => ack p (ackn q)
+                 end
+             in ackn m
+  end.
+Definition ack35 := (ack 3 5).
+Quote Recursively Definition cbv_ack35 :=
+  ltac:(let t:=(eval cbv in ack35) in exact t).
+Print cbv_ack35.
+Definition ans_ack35 :=
+  Eval cbv in (main (program_Program cbv_ack35)).
+Print ans_ack35.
+(* [program] of the program *)
+Quote Recursively Definition p_ack35 := ack35.
+Print p_ack35.
+Definition P_ack35 := Eval cbv in (program_Program p_ack35).
+Print P_ack35.
+Goal
+  let env := (env P_ack35) in
+  let main := (main P_ack35) in
+  wcbvEval (env) 2000 (main) = Ret ans_ack35.
+  vm_compute. reflexivity.
+Qed.
+
+(** mutual recursion **)
+Inductive tree (A:Set) : Set :=
+  node : A -> forest A -> tree A
+with forest (A:Set) : Set :=
+     | leaf : A -> forest A
+     | fcons : tree A -> forest A -> forest A.
+
+Definition sf: forest bool := (fcons (node true (leaf false)) (leaf true)).
+Quote Recursively Definition p_sf := sf.
+Eval cbv in (program_Program p_sf).
+
+Fixpoint tree_size (t:tree bool) : nat :=
+  match t with
+    | node a f => S (forest_size f)
+  end
+with forest_size (f:forest bool) : nat :=
+       match f with
+         | leaf b => 1
+         | fcons t f1 => (tree_size t + forest_size f1)
+       end.
+
+Definition arden: forest bool :=
+  fcons (node true (fcons (node true (leaf false)) (leaf true)))
+        (fcons (node true (fcons (node true (leaf false)) (leaf true)))
+               (leaf false)).
+Quote Recursively Definition p_arden := arden.
+Definition arden_size := (forest_size arden).
+Quote Recursively Definition cbv_arden_size :=
+  ltac:(let t:=(eval cbv in arden_size) in exact t).
+Definition ans_arden_size :=
+  Eval cbv in (main (program_Program cbv_arden_size)).
+(* [program] of the program *)
+Quote Recursively Definition p_arden_size := arden_size.
+Print p_arden_size.
+Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
+Print P_arden_size.
+Eval cbv in (env P_arden_size).
+Goal
+  let env := (env P_arden_size) in
+  let main := (main P_arden_size) in
+  wcbvEval env 50 main = Ret ans_arden_size.
+  vm_compute. reflexivity.
+Qed.
+
+(** SASL tautology function: variable arity **)
+Fixpoint tautArg (n:nat) : Type :=
+  match n with
+    | 0 => bool
+    | S n => bool -> tautArg n
+  end.
+Fixpoint taut (n:nat) : tautArg n -> bool :=
+  match n with
+    | 0 => (fun x => x)
+    | S n => fun x => taut n (x true) && taut n (x false)
+  end.
+(* Pierce *)
+Definition pierce := taut 2 (fun x y => implb (implb (implb x y) x) x).
+Quote Recursively Definition cbv_pierce :=
+  ltac:(let t:=(eval cbv in pierce) in exact t).
+Print cbv_pierce.
+Definition ans_pierce :=
+  Eval cbv in (main (program_Program cbv_pierce)).
+Print ans_pierce.
+(* [program] of the program *)
+Quote Recursively Definition p_pierce := pierce.
+Print p_pierce.
+Definition P_pierce := Eval cbv in (program_Program p_pierce).
+Print P_pierce.
+Goal
+  let env := (env P_pierce) in
+  let main := (main P_pierce) in
+  wcbvEval (env) 200 (main) = Ret ans_pierce.
+  vm_compute. reflexivity.
+Qed.
+(* S combinator *)
+Definition Scomb := taut 3
+         (fun x y z => implb (implb x (implb y z))
+                             (implb (implb x y) (implb x z))).
+Quote Recursively Definition cbv_Scomb :=
+  ltac:(let t:=(eval cbv in Scomb) in exact t).
+Print cbv_Scomb.
+Definition ans_Scomb :=
+  Eval cbv in (main (program_Program cbv_Scomb)).
+Print ans_Scomb.
+(* [program] of the program *)
+Quote Recursively Definition p_Scomb := Scomb.
+Print p_Scomb.
+Definition P_Scomb := Eval cbv in (program_Program p_Scomb).
+Print P_Scomb.
+Goal
+  let env := (env P_Scomb) in
+  let main := (main P_Scomb) in
+  wcbvEval (env) 200 (main) = Ret ans_pierce.
+  vm_compute. reflexivity.
+Qed.
+
+(** Fibonacci **)
+Fixpoint slowFib (n:nat) : nat :=
+  match n with
+    | 0 => 0
+    | S m => match m with
+               | 0 => 1
+               | S p => slowFib p + slowFib m
+             end
+  end.
+Definition slowFib3 := (slowFib 3).
+Quote Recursively Definition cbv_slowFib3 :=
+  ltac:(let t:=(eval cbv in slowFib3) in exact t).
+Definition ans_slowFib3 :=
+  Eval cbv in (main (program_Program cbv_slowFib3)).
+(* [program] of the program *)
+Quote Recursively Definition p_slowFib3 := slowFib3.
+Definition P_slowFib3 := Eval cbv in (program_Program p_slowFib3).
+Goal
+  let env := (env P_slowFib3) in
+  let main := (main P_slowFib3) in
+  wcbvEval (env) 30 (main) = Ret ans_slowFib3.
+  vm_compute. reflexivity.
+Qed.
+
+(* fast Fib *)
+Fixpoint fibrec (n:nat) (fs:nat * nat) {struct n} : nat :=
+  match n with
+    | 0 => fst fs
+    | (S n) => fibrec n (pair ((fst fs) + (snd fs)) (fst fs))
+  end.
+Definition fib : nat -> nat := fun n => fibrec n (pair 0 1).
+Definition fib9 := fib 9.
+Quote Recursively Definition cbv_fib9 :=
+  ltac:(let t:=(eval cbv in fib9) in exact t).
+Definition ans_fib9 :=
+  Eval cbv in (main (program_Program cbv_fib9)).
+(* [program] of the program *)
+Quote Recursively Definition p_fib9 := fib9.
+Definition P_fib9 := Eval cbv in (program_Program p_fib9).
+Goal
+  let env := (env P_fib9) in
+  let main := (main P_fib9) in
+  wcbvEval (env) 1000 (main) = Ret ans_fib9.
+  vm_compute. reflexivity.
+Qed.
+
+(** Heterogenous datatypes, a la Matthes **)
+Inductive PList : Set->Type:=  (* powerlists *)
+| zero : forall A:Set, A -> PList A
+| succ : forall A:Set, PList (A * A)%type -> PList A.
+
+Definition myPList : PList nat :=
+  succ (succ (succ (zero (((1,2),(3,4)),((5,6),(7,8)))))).
+
+Fixpoint unzip (A:Set) (l:list (A*A)) {struct l} : list A :=
+  match l return list A with
+    | nil => nil
+    | cons (a1,a2) l' => cons a1 (cons a2 (unzip l'))
+  end.
+Fixpoint PListToList (A:Set) (l:PList A) {struct l} : list A :=
+  match l in PList A return list A with
+    | zero a => cons a (nil )
+    | succ l' => unzip (PListToList l')
+  end.
+
+Eval compute in PListToList myPList.
+
+Fixpoint gen_sumPList (A:Set) (l:PList A) {struct l} : (A->nat)->nat :=
+  match l in PList A return (A->nat)->nat with
+    | zero a => fun f => f a
+    | succ l' =>
+      fun f => gen_sumPList l' (fun a => let (a1,a2) := a in f a1 + f a2)
+  end.
+Definition sumPList l := gen_sumPList l (fun x => x).
+Definition sumPL_myPL := (sumPList myPList).
+Quote Recursively Definition cbv_sumPL_myPL :=
+  ltac:(let t:=(eval cbv in sumPL_myPL) in exact t).
+Definition ans_sumPL_myPL :=
+  Eval cbv in (main (program_Program cbv_sumPL_myPL)).
+(* [program] of the program *)
+Quote Recursively Definition p_sumPL_myPL := sumPL_myPL.
+Definition P_sumPL_myPL := Eval cbv in (program_Program p_sumPL_myPL).
+Goal
+  let env := (env P_sumPL_myPL) in
+  let main := (main P_sumPL_myPL) in
+  wcbvEval (env) 1000 (main) = Ret ans_sumPL_myPL.
+  vm_compute. reflexivity.
+Qed.
+
+Set Implicit Arguments.
+Section List.
+Variables X Y : Type.
+Variable f : X -> Y -> Y.
+Fixpoint fold (y : Y) (xs : list X) : Y :=
+  match xs with
+    | nil => y
+    | cons x xr => fold (f x y) xr
+  end.
+End List.
+Inductive Tree := T : list Tree -> Tree.
+Fixpoint size (t : Tree) : nat :=
+  match t with
+    | T ts => S (fold (fun t a => size t + a) 0 ts)
+  end.
+Definition myTree :=
+  (T (cons (T (unit (T nil))) (cons (T (unit (T nil))) nil))).
+Eval cbv in size myTree.
+Definition size_myTree := size myTree.
+Quote Recursively Definition cbv_size_myTree :=
+  ltac:(let t:=(eval cbv in size_myTree) in exact t).
+Definition ans_size_myTree :=
+  Eval cbv in (main (program_Program cbv_size_myTree)).
+(* [program] of the program *)
+Quote Recursively Definition p_size_myTree := size_myTree.
+Definition P_size_myTree := Eval cbv in (program_Program p_size_myTree).
+Goal
+  let env := (env P_size_myTree) in
+  let main := (main P_size_myTree) in
+  wcbvEval (env) 100 (main) = Ret ans_size_myTree.
+  vm_compute. reflexivity.
+Qed.
+
+
+Function provedCopy (n:nat) {wf lt n} :=
+  match n with 0 => 0 | S k => S (provedCopy k) end.
+Proof.
+  - intros. constructor.
+  - apply lt_wf.
+Defined.
+Print Assumptions provedCopy_tcc.
+Quote Recursively Definition pCopy := provedCopy. (* program *)
+Print provedCopy_tcc.
+Definition x := 3.
+Definition provedCopyx := provedCopy x.
+Compute provedCopyx.  (** evals correctly in Coq **)
+Quote Recursively Definition cbv_provedCopyx :=
+  ltac:(let t:=(eval cbv in provedCopyx) in exact t).
+Definition ans_provedCopyx :=
+  Eval cbv in (main (program_Program cbv_provedCopyx)).
+Quote Recursively Definition p_provedCopyx := provedCopyx. (* program *)
+Definition P_provedCopyx :=                            (* Program *)
+  Eval cbv in (program_Program p_provedCopyx).
+Goal
+  let env := (env P_provedCopyx) in
+  let main := (main P_provedCopyx) in
+  wcbvEval (env) 100 (main) = Ret ans_provedCopyx.
+  vm_compute. reflexivity.
+Qed.
+
+
+Definition plusx := (plus 0).
+Compute plusx.
+Quote Recursively Definition cbv_plusx :=
+  ltac:(let t:=(eval cbv in plusx) in exact t).
+Definition ans_plusx :=
+  Eval cbv in (main (program_Program cbv_plusx)).
+Print ans_plusx.
+(* [program] of the program *)
+Quote Recursively Definition p_plusx := plusx.
+Print plusx.
+Definition P_plusx := Eval cbv in (program_Program p_plusx).
+Goal
+  let env := (env P_plusx) in
+  let main := (main P_plusx) in
+  wcbvEval (env) 90 (main) = Ret ans_plusx.
+Proof.
+  cbv. (** Coq cbv goes under lambda, but we don't **)
+Admitted.
+
+
+Section myplus.
+  Variables (A:Type).
+  Inductive myNat : Type :=
+  | myZ: forall a:A, myNat.
+  Definition myplus (m n: myNat) : A :=
+    match m with
+    | myZ a => a
+    end.
+End myplus.
+Print myplus.
+Definition myplusx := (myplus (myZ 0) (myZ 0)).
+Compute myplusx.
+Quote Recursively Definition cbv_myplusx :=
+  ltac:(let t:=(eval cbv in myplusx) in exact t).
+Definition ans_myplusx :=
+  Eval cbv in (main (program_Program cbv_myplusx)).
+Print ans_myplusx.
+(* [program] of the program *)
+Quote Recursively Definition p_myplusx := myplusx.
+Print myplusx.
+Definition P_myplusx := Eval cbv in (program_Program p_myplusx).
+Goal  (** works in L1g **)
+  let env := (env P_myplusx) in
+  let main := (main P_myplusx) in
+  wcbvEval (env) 90 (main) = Ret ans_myplusx.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+
+Quote Recursively Definition p_and_rect := and_rect.
+Eval cbv in (program_Program p_and_rect).
+Definition and_rect_x :=
+  (and_rect (fun (a:1=1) (b:True) => conj b a) (conj (eq_refl 1) I)).
+Quote Recursively Definition p_and_rect_x := and_rect_x.
+Print p_and_rect_x.
+Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).
+Print P_and_rect_x.
+Quote Recursively Definition cbv_and_rect_x :=
+  ltac:(let t:=(eval cbv in and_rect_x) in exact t).
+Print cbv_and_rect_x.
+Eval cbv in (main (program_Program cbv_and_rect_x)).
+Definition ans_and_rect_x :=
+  Eval cbv in (main (program_Program cbv_and_rect_x)).
+Print ans_and_rect_x.
+Goal
+  let envx := env P_and_rect_x in
+  let mainx := main P_and_rect_x in
+  wcbvEval envx 25 mainx = Ret ans_and_rect_x.
+  vm_compute. reflexivity. 
+Qed.
+
+(****** veriStar benchmark **************)
+Require Import Benchmarks.vs.
+Quote Recursively Definition p_Valid := vs.VeriStar.Valid.
+Definition valid := (AstCommon.main (program_Program p_Valid)).
+
+Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
+Time Definition P_ce_example_myent :=
+  Eval vm_compute in (program_Program p_ce_example_myent).
+Definition P_env_ce_example_myent :=
+  Eval vm_compute in (env P_ce_example_myent).
+Definition P_main_ce_example_myent :=
+  Eval vm_compute in (AstCommon.main P_ce_example_myent).
+Time Definition eval_ce_example_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_myent 400 P_main_ce_example_myent).
+Print eval_ce_example_myent.
+Goal eval_ce_example_myent = ret valid.
+  vm_compute. reflexivity. 
+Qed.
+
+Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
+Time Definition P_ce_example_ent :=
+  Eval vm_compute in (program_Program p_ce_example_ent).
+Definition P_env_ce_example_ent :=
+  Eval vm_compute in (env P_ce_example_ent).
+Definition P_main_ce_example_ent :=
+  Eval vm_compute in (AstCommon.main P_ce_example_ent).
+Time Definition eval_ce_example_ent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example_ent 2000 P_main_ce_example_ent).
+Print eval_ce_example_ent.
+Goal eval_ce_example_ent = ret valid.
+  vm_compute. reflexivity. 
+Qed.
+
+Time Quote Recursively Definition p_ce_example1_myent := vs.ce_example1_myent.
+Time Definition P_ce_example1_myent :=
+  Eval vm_compute in (program_Program p_ce_example1_myent).
+Definition P_env_ce_example1_myent :=
+  Eval vm_compute in (env P_ce_example1_myent).
+Definition P_main_ce_example1_myent :=
+  Eval vm_compute in (AstCommon.main P_ce_example1_myent).
+Time Definition eval_ce_example1_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example1_myent 400 P_main_ce_example1_myent).
+Print eval_ce_example1_myent.
+Goal eval_ce_example1_myent = ret valid.
+  vm_compute. reflexivity. 
+Qed.
+
+Time Quote Recursively Definition p_ce_example2_myent := vs.ce_example2_myent.
+Time Definition P_ce_example2_myent :=
+  Eval vm_compute in (program_Program p_ce_example2_myent).
+Definition P_env_ce_example2_myent :=
+  Eval vm_compute in (env P_ce_example2_myent).
+Definition P_main_ce_example2_myent :=
+  Eval vm_compute in (AstCommon.main P_ce_example2_myent).
+Time Definition eval_ce_example2_myent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example2_myent 1000 P_main_ce_example2_myent).
+Print eval_ce_example2_myent.
+Goal eval_ce_example2_myent = ret valid.
+  vm_compute. reflexivity. 
+Qed.
+
+Time Quote Recursively Definition p_ce_example1_myfail := vs.ce_example1_myfail.
+Time Definition P_ce_example1_myfail :=
+  Eval vm_compute in (program_Program p_ce_example1_myfail).
+Definition P_env_ce_example1_myfail :=
+  Eval vm_compute in (env P_ce_example1_myfail).
+Definition P_main_ce_example1_myfail :=
+  Eval vm_compute in (AstCommon.main P_ce_example1_myfail).
+Time Definition eval_ce_example1_myfail :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example1_myfail 400 P_main_ce_example1_myfail).
+Print eval_ce_example1_myfail.
+
+Time Quote Recursively Definition p_ce_example2_myfail := vs.ce_example2_myfail.
+Time Definition P_ce_example2_myfail :=
+  Eval vm_compute in (program_Program p_ce_example2_myfail).
+Definition P_env_ce_example2_myfail :=
+  Eval vm_compute in (env P_ce_example2_myfail).
+Definition P_main_ce_example2_myfail :=
+  Eval vm_compute in (AstCommon.main P_ce_example2_myfail).
+Time Definition eval_ce_example2_myfail :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_example2_myfail 1000 P_main_ce_example2_myfail).
+Print eval_ce_example1_myfail.
+
+(**** cannot do in memory and time *****
+Time Quote Recursively Definition p_ce_harder_ent := vs.ce_harder_ent.
+Time Definition P_ce_harder_ent :=
+  Eval vm_compute in (program_Program p_ce_harder_ent).
+Definition P_env_ce_harder_ent :=
+  Eval vm_compute in (env P_ce_harder_ent).
+Definition P_main_ce_harder_ent :=
+  Eval vm_compute in (AstCommon.main P_ce_harder_ent).
+Time Definition eval_ce_harder_ent :=
+  Eval vm_compute in
+    (wcbvEval P_env_ce_harder_ent 5000 P_main_ce_harder_ent).
+Print eval_ce_harder_ent.
+
+Time Quote Recursively Definition p_myMain := vs.myMain.
+Time Definition P_myMain :=
+  Eval vm_compute in (program_Program p_myMain).
+Definition P_env_myMain := env P_myMain.
+Definition P_main_myMain := (AstCommon.main P_myMain).
+Time Definition eval_myMain :=
+  Eval vm_compute in (wcbvEval P_env_myMain 5000 P_main_myMain).
+Print eval_myMain.
+*************)
+
+
 
 (***
 Notation NN := (mkInd "Coq.Init.Datatypes.nat" 0).

@@ -1,18 +1,12 @@
 Require Export Common.certiClasses.
 Require Export Common.certiClasses2.
-Require Export L2.instances.
 Require Export L1g.instances.
-Require Export L2_5.instances.
-Require Export L2d.instances.
 Require Export L2k.instances.
-Require Export L3.instances.
 Require Export L4.instances.
 Require Export L6.instances.
 Require Export L7.Clightexec.
 
-Set Template Cast Propositions.
 
-                
 Open Scope Z_scope.
 Require Import ZArith.
 
@@ -40,7 +34,7 @@ end).
 Defined. *)
 
 
-Definition ext_comp := fun prog =>
+Definition ext_comp `{F:utils.Fuel} := fun prog =>
   let t := (translateTo (cTerm certiL6) prog) in
   match t with
   | Ret xx => xx
@@ -79,10 +73,10 @@ Definition compile_opt_L7 p  :=
   | Exc s => Exc s
   end.
 
-Definition compile_template_L4 (p : Template.Ast.program) : exception (cTerm certiL4) :=
+Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
   translateTo (cTerm certiL4) p.
 
-Definition compile_template_L7 (p : Template.Ast.program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
+Definition compile_template_L7 `{F:utils.Fuel} (p : Template.Ast.program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
   compile_opt_L7 (translateTo (cTerm certiL6) p).
 
 Open Scope positive_scope.
@@ -122,6 +116,8 @@ Require Import Benchmarks.Binom
         Benchmarks.Color
         Benchmarks.vs.
 
+
+Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
 
 
@@ -219,7 +215,7 @@ Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 
 Extract Constant L7.L6_to_Clight.print => "print_string".
 
-Definition print_BigStepResult_L7 (p:cps.M.t Ast.name*Clight.program) (n:nat):=
+Definition print_BigStepResult_L7 (p:cps.M.t BasicAst.name*Clight.program) (n:nat):=
   L7.L6_to_Clight.print (
       match (L7.Clightexec.run_wo_main threadInfIdent bodyIdent p n) with
       | Error s _ => s
@@ -233,7 +229,7 @@ Definition print_BigStepResult_L7 (p:cps.M.t Ast.name*Clight.program) (n:nat):=
 
  
 
- Definition print_opt_BigStepResult_L7 (po:exception (cps.M.t Ast.name*Clight.program)) n :=
+ Definition print_opt_BigStepResult_L7 (po:exception (cps.M.t BasicAst.name*Clight.program)) n :=
    match po with
    | Ret ( nenv, p) => print_BigStepResult_L7 (nenv, p) n
    | _ => tt

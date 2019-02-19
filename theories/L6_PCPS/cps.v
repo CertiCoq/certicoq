@@ -300,7 +300,7 @@ Fixpoint find_def (f: var) (fl:  fundefs) :=
                                     iTag of corresponding inductive type
                                     the constructor's arity
                                     the cTags ordinal in inductive defn starting at zero *)
-Definition cTyInfo : Type := Ast.name * Ast.name * iTag * N * N.
+Definition cTyInfo : Type := name * name * iTag * N * N.
 
 Definition iTyInfo : Type := list (cTag * N). 
 

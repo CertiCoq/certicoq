@@ -72,6 +72,35 @@ that `opam` doesn't try to upgrade it:
   After this you should have `coqc --version` give you the right version
 number.
 
+Git submodules of dependencies:
+-------------------------------
+
+In the branch template-pcuic-extraction we are using git submodules 
+instead of opam packages to keep in sync with upstream. To work with 
+submodules, follow these steps. At the first checkout of a branch using
+submodules, you should do:
+
+# git submodule init
+
+  this should tell you that it registered e.g. the Template-Coq module. Then
+
+# git submodule update
+  
+  This will fetch the appropriate branch from the submodule (e.g. Template-Coq) in the appropriate directory in submodules (e.g. submobules/Template-Coq)
+
+# cd submodules/Template-Coq; make; make install
+
+  This will make and install the branch of Template-Coq. Now when you
+compile certicoq it will use the appropriate version of Template-Coq.
+
+  When one modifies a submodule (e.g. Template-Coq) (by adding commits for
+example), all users of the branch have to do *by themselves* a:
+
+# git submodule update
+# cd Template-Coq; make; make install
+
+To get the updated version of the submodule.
+
 Keeping opam up-to-date
 -----------------------
 

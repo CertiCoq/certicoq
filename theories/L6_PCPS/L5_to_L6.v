@@ -114,7 +114,7 @@ Section Program.
     end.
 
 
-  Definition nEnv := M.t Ast.name.
+  Definition nEnv := M.t BasicAst.name.
   Definition n_empty:nEnv := M.empty _.
 
   Definition t_info:Type := fTag.
@@ -169,7 +169,7 @@ Fixpoint get_t (n:var) (sig:t_map): iTag :=
    *)
   Definition conv_env:Type := conId_map *  t_map * nEnv.
 
-  Definition set_nt (x:var) (tn: (Ast.name * t_info))  (tgm:conv_env):conv_env :=
+  Definition set_nt (x:var) (tn: (BasicAst.name * t_info))  (tgm:conv_env):conv_env :=
     let '(t1, t2, t3) := tgm in
     (t1, M.set x (snd tn) t2, M.set x (fst tn) t3).
 
@@ -178,7 +178,7 @@ Fixpoint get_t (n:var) (sig:t_map): iTag :=
     let '(t1, t2, t3) := tgm in
     (t1, M.set x ti t2, t3).
 
-  Definition set_n (x:var) (n:Ast.name) (tgm:conv_env):conv_env :=
+  Definition set_n (x:var) (n:BasicAst.name) (tgm:conv_env):conv_env :=
     let '(t1,t2,t3) := tgm in
     (t1, t2, M.set x n t3).
 
@@ -383,11 +383,11 @@ arguments are:
     - update the conId_map with a pair relating the nCon'th constructor of ind to the cTag of the current constructor
 
    *)
-  Fixpoint convert_cnstrs (tyname:string) (cct:list cTag) (itC:list AstCommon.Cnstr) (ind:Ast.inductive) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
+  Fixpoint convert_cnstrs (tyname:string) (cct:list cTag) (itC:list AstCommon.Cnstr) (ind:BasicAst.inductive) (nCon:N) (niT:iTag) (ce:cEnv) (dcm:conId_map) :=
     match (cct, itC) with  
       | (cn::cct', cst::icT') =>
         let (cname, ccn) := cst in
-        convert_cnstrs tyname cct' icT' ind (nCon+1)%N niT (M.set cn (Ast.nNamed cname, Ast.nNamed tyname, niT, N.of_nat (ccn), nCon) ce) (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
+        convert_cnstrs tyname cct' icT' ind (nCon+1)%N niT (M.set cn (BasicAst.nNamed cname, BasicAst.nNamed tyname, niT, N.of_nat (ccn), nCon) ce) (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
       | (_, _) => (ce, dcm)
     end.
 
@@ -404,7 +404,7 @@ arguments are:
       | nil => ice
       | (AstCommon.mkItyp itN itC ) ::typ' => 
         let (cct, ncT') := fromN ncT (length itC) in
-        let (ce', dcm') := convert_cnstrs itN cct itC (Ast.mkInd idBundle n) 0 niT ce dcm in
+        let (ce', dcm') := convert_cnstrs itN cct itC (BasicAst.mkInd idBundle n) 0 niT ce dcm in
         let ityi := combine cct (map (fun (c:AstCommon.Cnstr) => let (_, n) := c in N.of_nat n) itC) in
         convert_typack typ' idBundle (n+1) (M.set niT ityi ie, ce', ncT', (Pos.succ niT) , dcm')
     end.
@@ -428,7 +428,7 @@ convert_env' is called with the next available constructor tag and the next avai
    *)
   Definition convert_env (g:ienv): (iEnv * cEnv*  cTag * iTag * conId_map) :=
     let default_iEnv := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty iTyInfo) in
-    let default_cEnv := M.set default_tag (Ast.nAnon, Ast.nAnon, default_itag, 0%N, 0%N) (M.empty cTyInfo) in
+    let default_cEnv := M.set default_tag (BasicAst.nAnon, BasicAst.nAnon, default_itag, 0%N, 0%N) (M.empty cTyInfo) in
     convert_env' g (default_iEnv, default_cEnv, (Pos.succ default_tag:cTag), (Pos.succ default_itag:iTag), nil).
 
 

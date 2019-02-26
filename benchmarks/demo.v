@@ -13,7 +13,7 @@ Definition demo2 := (negb, List.hd_error).
 
 CertiCoq Compile demo2.
 
-Require Import vs.
+From CertiCoq.Benchmarks Require Import vs.
 Import VeriStar.
 Definition is_valid :=
   match main with

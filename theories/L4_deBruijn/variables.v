@@ -3,14 +3,14 @@ Require Import SquiggleEq.UsefulTypes.
 Require Import SquiggleEq.varImplZ.
 Require Import SquiggleEq.varImplDummyPair.
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
-  Coq.Program.Program Coq.micromega.Psatz.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 
 Require Import Common.RandyPrelude.
 
 Require Import Common.Common.
 
-Definition NVar : Set := (positive * Ast.name).
+Definition NVar : Set := (positive * BasicAst.name).
 
 Global Instance deqnname : Deq name.
 Proof.
@@ -38,7 +38,7 @@ Global Instance NVUpdateName : UpdateName NVar :=
   fun p => let (v,name) := p in (fst v, name).
 
 
-Definition name2string (n:Ast.name): string :=
+Definition name2string (n:BasicAst.name): string :=
 match n with
 | nAnon => "_"
 | nNamed s => s

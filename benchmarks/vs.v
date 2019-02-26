@@ -2209,7 +2209,7 @@ Definition c := Var 3%positive.
 Definition d := Var 4%positive.
 Definition e := Var 5%positive. 
 
-Definition example_ent := Entailment
+Definition example_ent : entailment := Entailment
   (Assertion [Nequ c e] [Lseg a b ; Lseg a c ; Next c d ; Lseg d e])
   (Assertion nil [Lseg b c ; Lseg c e]).
 
@@ -2319,13 +2319,12 @@ Definition example_myent := Entailment
   (Assertion [Equ a a] nil).
 Definition ce_example_myent := check_entailment example_myent.
 Eval vm_compute in ce_example_myent.
-Extraction "ce_example_myent" ce_example_myent.
-
 
 Definition example1_myent := Entailment
   (Assertion [Equ a b] nil)
   (Assertion [Equ b a] nil).
 Definition ce_example1_myent := check_entailment example1_myent.
+Eval vm_compute in ce_example1_myent.
 
 Definition example2_myent := Entailment
   (Assertion [Equ a b; Equ b c] nil)
@@ -2344,11 +2343,14 @@ Definition ce_example2_myfail := check_entailment example2_myfail.
 
 Definition ce_example_ent := check_entailment example_ent.
 
-Definition myMain := [ce_example_myent; ce_example1_myent;
-                        ce_example2_myent;
-                        ce_example1_myfail; ce_example1_myfail;
-                          ce_example_ent].
-                        
+Definition myMain :=
+  map check_entailment
+      [example_myent; example1_myent;
+                        example2_myent;
+                        example1_myfail; example1_myfail;
+                          example_ent; harder_ent;
+                            harder_ent2; harder_ent3].
+Extraction "myMain" myMain.                        
 
 Definition ce_harder_ent := check_entailment harder_ent.
 Definition ce_harder_ent2 := check_entailment harder_ent.

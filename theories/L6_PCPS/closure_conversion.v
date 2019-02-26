@@ -243,14 +243,14 @@ Section CC.
 
   Record state_contents :=
     mkCont { next_var : var ; nect_cTag : cTag ; next_iTag : iTag; cenv : cEnv;
-             name_env : M.t Ast.name }.
+             name_env : M.t BasicAst.name }.
   
   (** The state is the next available free variable, cTag and iTag and the tag environment *)
   Definition ccstate :=
     state state_contents.
   
   (** Get a the name entry of a variable *)
-  Definition get_name_entry (x : var) : ccstate Ast.name :=
+  Definition get_name_entry (x : var) : ccstate BasicAst.name :=
     p <- get ;;
     let '(mkCont n c i e names) := p in
     match names ! x with
@@ -259,7 +259,7 @@ Section CC.
     end.
 
   (** Set a the name entry of a variable *)
-  Definition set_name_entry (x : var) (name : Ast.name) : ccstate unit :=
+  Definition set_name_entry (x : var) (name : BasicAst.name) : ccstate unit :=
     p <- get ;;
     let '(mkCont n c i e names) := p in
     put (mkCont n c i e (M.set x name names)) ;;
@@ -481,7 +481,7 @@ Section CC.
            | Fnil => ret Fnil
          end.
 
-  Definition closure_conversion_hoist (e : exp) ctag itag cenv' nmap : cEnv * M.t Ast.name * exp :=
+  Definition closure_conversion_hoist (e : exp) ctag itag cenv' nmap : cEnv * M.t BasicAst.name * exp :=
     let Γ := ((max_var e 1%positive) + 1)%positive in
     let next := (Γ + 1)%positive in
     let state := mkCont next ctag itag cenv' nmap in

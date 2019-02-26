@@ -1,1 +1,1 @@
-s/extract default_fuel gc/extract default_fuel (Obj.magic gc)/g
+s/trans_global gc/trans_global (Obj.magic gc)/g

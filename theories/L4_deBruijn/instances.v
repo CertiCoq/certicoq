@@ -1,13 +1,14 @@
 Require Import L4.expression.
 Require Import certiClasses.
 Require Import Common.Common.
-Require Import L3.compile.
+Require Import L2k.compile.
 Require Import L4.L3_to_L4.
 Require Import L4.L3_to_L3_eta.
 Require Import L4.L3_eta_crct.
 Require Import L4.L3_to_L3_eta_correct.
-Require L3.
-Require Import L3.instances.
+Require Import L4.L3_to_L4_correct.
+Require L2k.
+Require Import L2k.instances.
 
 Require Import BinNat.
 Require Import certiClasses2.
@@ -16,14 +17,17 @@ Definition L3_eta_Program := Program Term.
 Typeclasses Opaque L3_eta_Program.
 
 Instance bigStepOpSemL3_etaTerm:
-  BigStepOpSem L3_eta_Program L3_eta_Program :=
-  bigStepOpSemL3Term.
+  BigStepOpSem L3_eta_Program L3_eta_Program.
+Proof.
+  intros s sv. destruct s, sv. exact (L2k.wcbvEval.WcbvEval env main main0 /\ env = env0).
+                                      (* L3_to_L4_correct.WcbvEval_env env env0). *)
+Defined.
 
 Global Instance ObsSubtermL3_eta : ObserveNthSubterm L3_eta_Program :=
-  L3.instances.ObsSubtermL.
+  L2k.instances.ObsSubtermL2kTerm.
 
 Global Instance QuestionHeadTermL3_eta : QuestionHead L3_eta_Program :=
-  L3.instances.QuestionHeadTermL.
+  L2k.instances.QuestionHeadL2kTerm.
 
 Instance WfL3_etaTerm : GoodTerm L3_eta_Program :=
   fun p : Program Term => L4.L3_eta_crct.crctTerm (AstCommon.env p) 0 (main p).
@@ -31,12 +35,12 @@ Instance WfL3_etaTerm : GoodTerm L3_eta_Program :=
 Global Instance certiL3_eta: CerticoqLanguage L3_eta_Program := {}.
 
 Global Instance certiL3_to_L3_eta:
-  CerticoqTranslation (cTerm certiL3) (cTerm certiL3_eta) :=
+  CerticoqTranslation (cTerm certiL2k) (cTerm certiL3_eta) :=
   fun p => Ret (L3_to_L3_eta.Program_Program p).
 
-Lemma L3_crctEnv_inv d e : L3.program.crctEnv (d :: e) -> L3.program.crctEnv e.
+Lemma L3_crctEnv_inv d e : L2k.program.crctEnv (d :: e) -> L2k.program.crctEnv e.
 Proof.
-  intros. inv H. now apply L3.program.Crct_CrctEnv in H3. easy.
+  intros. inv H. apply L2k.program.Crct_CrctEnv in H4. easy. auto.
 Qed.
 Hint Resolve L3_crctEnv_inv.
 
@@ -53,45 +57,64 @@ Proof.
            (fun (main : Term) => forall e,
                 {| main := main; AstCommon.env := e |} ⊑ {| main := trans main; AstCommon.env := transEnv e |})
              (fun ts => forall e i n n0,
-                 obsLeOp (observe_nth_subterm n0 {| main := TConstruct i n ts; AstCommon.env := e |})
-                         (observe_nth_subterm n0 {| main := trans (TConstruct i n ts); AstCommon.env := transEnv e |}))
+                 obsLeOp (observeNthSubterm n0 {| main := TConstruct i n ts; AstCommon.env := e |})
+                         (observeNthSubterm n0 {| main := trans (TConstruct i n ts);
+                                                    AstCommon.env := transEnv e |}))
              (fun _ => True) (fun _ => True));
         try constructor;
         try (match goal with |- yesPreserved _ _ => intros q; destruct q end);
         intros; try red; trivial; try constructor.
 
   simpl.
-  - unfold questionHead, QuestionHeadTermL, QuestionHeadTermL3_eta; simpl.
+  - unfold questionHead, observeNthSubterm, QuestionHeadL2kTerm, QuestionHeadTermL3_eta; simpl.
     apply Bool.leb_implb, leb_refl.
   - simpl.
-    unfold observeNthSubterm, ObsSubtermL3_eta, ObsSubtermL, observe_nth_subterm. simpl.
-    destruct n0; constructor.
-  - simpl in *. destruct n0; try constructor. simpl.
-    apply H.
-    apply (H0 e i n n0).
+    unfold observeNthSubterm, ObsSubtermL3_eta, ObsSubtermL2kTerm. simpl.
+    destruct n0. constructor. apply H. apply (H0 e i n0).
+Qed.
+
+Lemma trans_pres_Crct env main :
+  L2k.program.crctTerm env 0 main -> crctTerm env 0 main.
+Proof.
+  (* TODO *)
+Admitted.
+
+Lemma trans_pres_Crct_env env :
+  L2k.program.crctEnv env -> crctEnv env.
+Proof.
+  intros Henv. induction Henv; constructor; auto.
+  now apply trans_pres_Crct.
 Qed.
 
 Global Instance certiL3_to_L3_eta_correct :
-  CerticoqTranslationCorrect certiL3 certiL3_eta.
+  CerticoqTranslationCorrect certiL2k certiL3_eta.
 Proof.
-  split; intros ? *; unfold goodTerm, certiClasses.translate, certiL3_to_L3_eta, goodTerm, WfL3Term, WfL3_etaTerm.
+  split; intros ? *; unfold goodTerm, certiClasses.translate, certiL3_to_L3_eta, goodTerm, WfL2Term, WfL3_etaTerm.
   - destruct s; simpl in *.
-    now apply trans_pres_Crct.
+    intros H. apply trans_pres_Crct in H.
+    now apply L3_to_L3_eta_correct.trans_pres_Crct.
 
   - intros Hcrct Hred.
     exists (L3_to_L3_eta.Program_Program sv). split; auto.
     destruct s as [main e], sv as [main' e'].
     simpl in *. hnf in Hred. destruct Hred as [evenv evmain].
     + hnf.
-      split; [ | apply translate_correct_subst; eauto; apply L3.program.Crct_CrctEnv in Hcrct; auto ].
-      apply L3.program.Crct_CrctEnv in Hcrct.
-      clear evmain main main'.
-      induction evenv in Hcrct.
-      ++ constructor.
-      ++ simpl. constructor. apply IHevenv; eauto.
-         apply translate_correct_subst; eauto.
-         now inv Hcrct.
-      ++ simpl. constructor. apply IHevenv. eauto.
+      split; subst; auto.
+      apply L3_to_L3_eta_correct.translate_correct_subst; eauto.
+      apply L2k.program.Crct_CrctEnv in Hcrct; auto.
+      now apply trans_pres_Crct_env.
+      now eapply trans_pres_Crct.
+      (* apply L2k.program.Crct_CrctEnv in Hcrct. *)
+      (* clear evenv main main'. *)
+      (* induction e' in Hcrct |- *. *)
+      (* ++ constructor. *)
+      (* ++ simpl. destruct a. destruct e. *)
+      (*    econstructor. apply IHe'; eauto. *)
+      (*    apply L3_to_L3_eta_correct.translate_correct_subst; eauto. *)
+      (*    now inv Hcrct. *)
+
+      (* constructor. constructor. *)
+
     + apply obs_prevervation.
 Qed.
 
@@ -136,7 +159,7 @@ Definition question_head (Q : Question) (ie : ienv) (e : L4.expression.exp) :=
     end
   end.
 
-Global Instance QuestionHeadTermL : QuestionHead (ienv * L4.expression.exp) :=
+Global Instance QuestionHeadTermL4 : QuestionHead (ienv * L4.expression.exp) :=
   fun q t => question_head q (fst t) (snd t).
 
 (* Move to expression.v *)
@@ -154,7 +177,7 @@ Definition observe_nth_subterm n (e : exp) :=
   | _ => None
   end.
 
-Global Instance ObsSubtermTermL : ObserveNthSubterm (ienv * L4.expression.exp) :=
+Global Instance ObsSubtermTermL4 : ObserveNthSubterm (ienv * L4.expression.exp) :=
   fun n t => match observe_nth_subterm n (snd t) with
           | None => None
           | Some e => Some (fst t, e)
@@ -171,7 +194,7 @@ Global  Instance certiL3_eta_to_L4:
 Require Import L4.L3_to_L4_correct.
 
 Lemma same_args_same_obs n t e t' :
-  same_args same_obs t e = true -> tnth n t = Some t' ->
+  same_args same_obs t e = true -> L2k.term.tnth n t = Some t' ->
   exists e', exps_nthopt n e = Some e' /\ same_obs t' e' = true.
 Proof.
   clear.
@@ -188,8 +211,8 @@ Global Instance certiL3_eta_to_L4_correct :
   CerticoqTranslationCorrect certiL3_eta certiL4.
 Proof.
   split.
-{ red; unfold certiClasses.translate, goodTerm, WfL3Term.
-  intros. red in H. 
+{ red; unfold certiClasses.translate, goodTerm, WfL3_etaTerm.
+  intros.
   pose proof (proj1 Crct_CrctEnv _ _ _ H).
   unfold certiL3_eta_to_L4. hnf.
   simpl. destruct s. simpl in *.
@@ -197,24 +220,26 @@ Proof.
   unfold translate. simpl.
   now apply exp_wf_lets. }
 
-{ red; unfold certiClasses.translate, goodTerm, WfL3Term. intros.
+{ red; unfold certiClasses.translate, goodTerm, WfL3_etaTerm. intros.
   assert(He:=proj1 Crct_CrctEnv _ _ _ H).
   repeat red in H0.
   destruct s. destruct sv.
-  destruct H0. 
-  pose proof (L3_to_L4_correct.translate_correct' env _ _ _ He H H0 H1). 
-  simpl in H2. unfold certiL3_eta_to_L4. 
-  destruct H2 as [sv' [evsv obs]].
+  destruct H0; subst env0.
+  pose proof (L3_to_L4_correct.translate_correct' env env _ main0 He H).
+  simpl in H1. unfold certiL3_eta_to_L4.
+  forward H1. (* TODO: need WcbvEval_env env env' assumption *)
+  specialize (H1 H0).
+  destruct H1 as [sv' [evsv obs]].
   eexists (inductive_env env, sv');
     split. repeat red. split. simpl; auto. simpl.
   { apply evsv. }
-  clear evsv He H1 H0 H. revert main0 sv' obs. clear.
+  clear evsv He H0 H. revert main0 sv' obs. clear.
   apply (TrmTrmsBrsDefs_ind
              (fun (main : Term) => forall (sv' : exp),
                   same_obs main sv' = true ->
-                  {| main := main; AstCommon.env := env0 |} ⊑ (inductive_env env, sv'))
+                  {| main := main; AstCommon.env := env |} ⊑ (inductive_env env, sv'))
              (fun ts => forall d i n n0 es, same_args same_obs ts es = true ->
-                 obsLeOp (observeNthSubterm n0 {| main := TConstruct i n ts; AstCommon.env := env0 |})
+                 obsLeOp (observeNthSubterm n0 {| main := TConstruct i n ts; AstCommon.env := env |})
                          (observeNthSubterm n0 (inductive_env env, Con_e d es)))
              (fun _ => True) (fun _ => True));
         try constructor;
@@ -223,37 +248,32 @@ Proof.
   rename H0 into obs.
   simpl in *; unfold questionHead. simpl.
   destruct sv'; trivial; intros; simpl in *; try discriminate.
-  destruct d; simpl in *.
-  destruct inductive_dec; simpl; trivial. subst.
-  destruct PeanoNat.Nat.eq_dec; simpl; trivial. subst. simpl.
-  unfold eq_decb in obs. unfold eq_dec in obs. simpl in obs. 
-  destruct inductive_dec; simpl in *; subst; try contradiction || discriminate.
-  destruct PeanoNat.Nat.eq_dec; simpl in *; try discriminate. subst n.
-  rewrite Nnat.N2Nat.id. apply N.eqb_refl.
-  
-  destruct sv'; intros; try discriminate.
-  simpl in H0. apply andb_prop in H0.
-  destruct H0 as [_ obs]. now apply H.
-  
-  destruct es; simpl in *.
-  unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
-  simpl. 
-  unfold instances.observe_nth_subterm. simpl. destruct n0; simpl; constructor.
-  discriminate.
+  apply andb_prop in obs. destruct d; simpl in *.
+  destruct obs. apply andb_prop in H0. destruct H0.
+  unfold eq_decb in *. repeat destruct eq_dec; destruct inductive_dec; simpl; subst; auto;
+  unfold DecidableClass.Decidable_witness. simpl.
+  destruct (UsefulTypes.deceq i1 i1); simpl; trivial.
+  destruct Decidable_witness. simpl.
+  destruct (PeanoNat.Nat.eqb_spec n0 (N.to_nat n1)); subst. simpl. subst.
+  rewrite Nnat.N2Nat.id. apply N.eqb_refl. auto. auto.
+  destruct (UsefulTypes.deceq i0 i1); simpl; trivial.
+  destruct Decidable_witness. simpl.
+  destruct (PeanoNat.Nat.eqb_spec n0 (N.to_nat n1)); subst. simpl. subst.
+  intuition auto. auto. auto.
 
-  unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL.
-  unfold instances.observe_nth_subterm.
-  simpl. 
+  destruct sv'; try discriminate. apply H. simpl in H0.
+  apply andb_prop in H0. destruct d; simpl in *.
+  destruct H0. apply andb_prop in H0. destruct H0. apply H1.
+
   destruct es; simpl in H1; try discriminate.
   apply andb_prop in H1 as [Ht Ht0].
   destruct n0; simpl.
   constructor. apply (H _ Ht).
 
   specialize (H0 d i n n0 es Ht0).
-  unfold observeNthSubterm, ObsSubtermTermL, ObsSubtermL in *.
-  unfold instances.observe_nth_subterm in *. simpl in H0. apply H0. }
-Qed.
-
+  unfold observeNthSubterm in *.
+  unfold observe_nth_subterm in *. simpl in H0. apply H0.
+Admitted.
 
 Require Import L4.L4_5_to_L5.
 Require Import SquiggleEq.export.
@@ -425,7 +445,7 @@ Require Import L4.varInterface.
        yesPreserved questionHead QuestionHeadTermL45 QuestionHeadTermL5
        BigStepOpSem_instance_1  BigStepOpSem_instance_0
        goodTerm dummyEnvWf goodTerm GoodTerm_instance_0
-       GoodTerm_instance_1 ObsSubtermTermL ObsSubtermTermL42 QuestionHeadTermL42
+       GoodTerm_instance_1 ObsSubtermTermL4 ObsSubtermTermL42 QuestionHeadTermL42
        observeNthSubterm : certiclasses.
 
   Require Import Morphisms.
@@ -657,7 +677,7 @@ Global Instance IsValueL42 : IsValue (cTerm certiL4_2) :=
 Global Instance certiL4_2_to_L4_5_Correct:
   CerticoqTranslationCorrect certiL4_2 certiL4_5.
 Proof using.
-  apply certicoqTranslationCorrect_suff3; try firstorder.
+  apply certicoqTranslationCorrect_suff3; try firstorder auto.
   - apply certiL4_2_to_L4_5_evalPres.
   - apply goodPres4_2_to_4_5.
   - intros ? ? Hsv Heq. clear Hsv. inverts Heq.
@@ -906,7 +926,7 @@ Definition certiL5_to_L5aOld :
 Require Import L1g.instances.
 Require Import Program.
 
-Definition ctranslateEvalL5a
+Definition ctranslateEvalL5a `{F:utils.Fuel}
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm certiL5)}
    (p: Template.Ast.program) (n:nat) : bigStepResult (option L5a.cps)  (option L5a.val_c) :=
   mapBigStepRes (L5a.translateCPS ∘ snd) (L5a.translateVal ∘ snd) (ctranslateEval certiL5 p n).

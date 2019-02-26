@@ -3,7 +3,7 @@ Require Import L2k.wcbvEval.
 Require Import L2k.term.
 Require Import certiClasses.
 Require Import Common.Common.
-Require Import L2.instances.
+Require Import L1g.instances.
 Require Import certiClasses2.
 Require Import L2k.stripEvalCommute.
 
@@ -11,7 +11,7 @@ Require Import L2k.stripEvalCommute.
 (** If the compiler only correctly compiles terms with some properties,
  add them here. *)
 Instance WfL2Term: GoodTerm (Program L2k.compile.Term) :=
-  fun _  => True.
+  fun p : Program Term => L2k.program.crctTerm (AstCommon.env p) 0 (main p).
 
 Require Import SquiggleEq.UsefulTypes.
 Require Import DecidableClass.
@@ -47,7 +47,7 @@ Defined.
 Global Instance certiL2k: CerticoqLanguage (Program L2k.compile.Term).
 
 Instance certiL2_to_L2k: 
-  CerticoqTotalTranslation (Program L2d.compile.Term)
+  CerticoqTotalTranslation (Program L1g.compile.Term)
                            (Program L2k.compile.Term) :=
   stripProgram.
 

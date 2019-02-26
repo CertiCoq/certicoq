@@ -306,19 +306,19 @@ let print_dest prog dest =
 
 let add_name (a, n) =
   match n with
-  | Ast0.Coq_nAnon -> () 
-  | Ast0.Coq_nNamed s ->
+  | BasicAst.Coq_nAnon -> ()
+  | BasicAst.Coq_nNamed s ->
       Hashtbl.add atom_of_string (camlstring_of_coqstring s) a;
       Hashtbl.add string_of_atom a (camlstring_of_coqstring s);
       ()
 
 let remove_primes (a, n) =
   match n with
-  | Ast0.Coq_nAnon -> (a,n)
-  | Ast0.Coq_nNamed s ->
+  | BasicAst.Coq_nAnon -> (a,n)
+  | BasicAst.Coq_nNamed s ->
      let s' = Str.global_replace (Str.regexp "'") "p" (camlstring_of_coqstring s)  in
      let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
-     (a, Ast0.Coq_nNamed (coqstring_of_camlstring s''))
+     (a, BasicAst.Coq_nNamed (coqstring_of_camlstring s''))
 	
 let print_dest_names prog names dest =
   let oc = open_out (camlstring_of_coqstring dest) in

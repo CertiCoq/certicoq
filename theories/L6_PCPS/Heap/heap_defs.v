@@ -17,7 +17,7 @@ Close Scope Z_scope.
 Create HintDb Heap_sets_DB.
 
 Ltac solve_sets := eauto with Ensembles_DB Heap_sets_DB typeclass_instances. 
-                              
+
 Module HeapDefs (H : Heap) .
 
   Module HL := HeapLemmas H.

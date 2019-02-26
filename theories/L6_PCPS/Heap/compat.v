@@ -1460,7 +1460,7 @@ Module Compat (H : Heap).
                 eapply Hbase. eassumption. simpl in *. omega. 
                 erewrite ctx_to_heap_env_CC_size_heap. reflexivity. eassumption.
                 now rewrite cc_approx_val_eq. }
-        
+       
       (* Termination *)  
       - { simpl in Hcost. 
           assert (Hall1 := Hall).

@@ -1,17 +1,77 @@
 
-Require Import Template.Template.
-Require Import Coq.Relations.Relation_Operators.
-Require Import Common.Common.
-Require Import L1.L1.
-Require Import L1g.term L1g.program L1g.wndEval.
-Require Import Omega.
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Arith.PeanoNat.
+Require Import Coq.Arith.Peano_dec.
+Require Import Recdef.
+Require Import Coq.Lists.List.
+Require Import Coq.Lists.ListSet.
+Require Import Coq.Strings.String.
+Require Import Coq.Strings.Ascii.
+Require Import Coq.Bool.Bool.
+Require Import Coq.omega.Omega.
 
+Require Import TemplateExtraction.EAst Template.kernel.univ.
+Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
+
+Require Import Common.Common.
+Require Import L1g.compile.
+Require Import L1g.term.
+Require Import L1g.wcbvEval.
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 
-Set Printing Width 150.
+
+Set Printing Width 100.
 Set Printing Depth 100.
+
+(** trivial example **)
+Definition tru := true.
+Quote Recursively Definition cbv_tru := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (tru)) in exact t).
+Print cbv_tru.
+(* [Term] of Coq's answer *)
+Definition ans_tru := Eval cbv in (main (program_Program cbv_tru)).
+Print ans_tru.
+(* [program] of the program *)
+Quote Recursively Definition p_tru := tru.
+Print p_tru.
+Definition P_tru := Eval cbv in (program_Program p_tru).
+Print P_tru.
+
+Goal
+  let env := (env (program_Program p_tru)) in
+  let main := (main P_tru) in
+  wcbvEval (env) 100 (main) = Ret ans_tru.
+Proof.
+  intros.
+  unfold ans_tru. cbn in main.
+  unfold p_tru in env. , Extract.extract_global,
+  TemplateToPCUIC.trans_global, monad_utils.bind, PCUICChecker.typing_monad,
+  Extract.extract_global_decls, fuel
+    in env.
+  cbv in env.
+
+
+
+  Definition P_tru := Eval cbv zeta delta in (program_Program p_tru).
+Print P_tru.
+
+
+Definition P_tru := Eval cbv in (program_Program p_tru).
+Print P_tru.
+Goal
+  let env := (env P_tru) in
+  let main := (main P_tru) in
+  wcbvEval (env) 100 (main) = Ret ans_tru.
+Proof.
+  intros.
+  unfold ans_tru.
+  unfold env, AstCommon.env.  Print P_tru.
+  vm_compute. reflexivity.
+Qed.
+
+
 
 (** simple example **)
 Definition plus01 := (plus 1 0).

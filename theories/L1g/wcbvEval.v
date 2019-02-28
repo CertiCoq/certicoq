@@ -4,14 +4,12 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.omega.Omega.
-Require Import Coq.Logic.JMeq.
 Require Import Common.AstCommon.
 Require Import L1g.term.
 Require Import L1g.program.
 Require Import L1g.wndEval.
 
 Delimit Scope string_scope with string.
-Open Scope string_scope.
 Open Scope string_scope.
 Open Scope bool.
 Open Scope list.

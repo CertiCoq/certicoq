@@ -237,15 +237,6 @@ Definition ibody_ityp (iib:one_inductive_body) : ityp :=
 Definition ibodies_itypPack (ibs:list one_inductive_body) : itypPack :=
   map ibody_ityp ibs.
 
-Fixpoint program_datatypeEnv (p:global_declarations) (e:environ) : environ :=
-  match p with
-  | nil => e
-  | ConstantDecl nm cb :: p => program_datatypeEnv p e
-  | InductiveDecl nm mib :: p =>
-    let Ibs := ibodies_itypPack mib.(ind_bodies) in
-    program_datatypeEnv p (cons (pair nm (ecTyp mib.(ind_npars) Ibs)) e)
-  end.
-
 Record Program : Type := mkPgm { main:trm; env:environ }.
 
 (** for debugging **)

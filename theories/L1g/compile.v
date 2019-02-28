@@ -6,7 +6,10 @@ Require Import Coq.Bool.Bool.
 Require Import FunInd.
 Require Import Common.Common.
 
-Require Import TemplateExtraction.EAst Template.kernel.univ.
+Require Import
+        TemplateExtraction.EAst
+        TemplateExtraction.ETyping
+        Template.kernel.univ.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -190,11 +193,9 @@ Qed.
  
       
 (** translate Gregory Malecha's [term] into my [Term] **)
-Section datatypeEnv_sec.
-  Variable datatypeEnv : environ Term.
-  
 Section term_Term_sec.
   Variable term_Term: term -> Term.
+  
   (* Fixpoint defs *)
   Fixpoint defs_Defs (ds: list (def term)) : Defs :=
    match ds with
@@ -211,67 +212,86 @@ Section term_Term_sec.
    end.
 End term_Term_sec.
 
-Function term_Term (t:term) : Term :=
+(** for debuggung **)
+Fixpoint print_global_declarations (g:global_declarations) : string :=
+  match g with
+  | cons (ConstantDecl knm _) p => knm ++ print_global_declarations p
+  | cons (InductiveDecl knm _) p => knm ++ print_global_declarations p
+  | nil => "!"
+  end.
+
+(** can compile terms using global_declarations from EAst.v **)
+Definition Cstr_npars_nargs
+  (g:global_declarations) (ind:inductive) (ncst:nat): exception (nat * nat) :=
+  match ind with
+  | {| inductive_mind:= knm;  inductive_ind:= nbod |} =>
+    match lookup_env g knm with
+    | Some (ConstantDecl _ _) =>
+      raise ("Cstr_npars_nargs:lookup_env ConstantDecl")
+    | None =>
+      raise ("Cstr_npars_nargs:lookup_env; "
+               ++ knm ++ "," ++ (nat_to_string nbod) ++
+               "," ++ (nat_to_string ncst) ++
+               "/" ++ print_global_declarations g)
+    | Some (InductiveDecl _ {| ind_npars:= npars; ind_bodies:= bodies |}) =>
+      match List.nth_error bodies nbod with
+      | None => raise ("Cstr_npars_nargs:nth_error bodies")
+      | Some  {| ind_ctors := ctors |} =>
+        match List.nth_error ctors ncst with
+        | Some (_, _, nargs) => ret (npars, nargs)
+        | None => raise ("Cstr_npars_nargs:nth_error ctors")
+        end
+      end
+    end
+  end.
+
+Function term_Term (g:global_declarations) (t:term) : Term :=
   match t with
     | tRel n => TRel n
     | tBox => TProof
-    | tLambda nm bod => (TLambda nm (term_Term bod))
-    | tLetIn nm dfn bod => (TLetIn nm (term_Term dfn) (term_Term bod))
-    | tApp fn arg => TApp (term_Term fn) (term_Term arg)
-    | tConst pth => (* ref to axioms in environ made into [TAx] *)
-      match lookup pth datatypeEnv with  (* only lookup ecTyp at this point! *)
-      | Some (ecTyp _ _ _) =>
-        TWrong ("term_Term:Const inductive or axiom: " ++ pth)
-      | _  => TConst pth
+    | tLambda nm bod => (TLambda nm (term_Term g bod))
+    | tLetIn nm dfn bod => (TLetIn nm (term_Term g dfn) (term_Term g bod))
+    | tApp fn arg => TApp (term_Term g fn) (term_Term g arg)
+    | tConst pth =>
+      match lookup_env g pth with
+      | Some (ConstantDecl _ _) => TConst pth
+      | _ => TWrong ("term_Term:Const inductive or axiom: " ++ pth)
       end
-    | tConstruct ind m =>
-      match cnstrArity datatypeEnv ind m with
-        | Ret (npars, nargs) => TConstruct ind m npars nargs
-        | Exc s => TWrong ("term_Term;tConstruct:" ++ s)
+    | tConstruct ind ncst =>
+      match Cstr_npars_nargs g ind ncst with
+      | Ret (npars, nargs) => TConstruct ind ncst npars nargs
+      | Exc s => TWrong ("term_Term;tConstruct:" ++ s)
       end
     | tCase npars mch brs =>
-      TCase npars (term_Term mch) (natterms_Brs term_Term brs)
-    | tFix defs m => TFix (defs_Defs term_Term defs) m
-    | tProj prj bod => TProj prj (term_Term bod)
+      TCase npars (term_Term g mch) (natterms_Brs (term_Term g) brs)
+    | tFix defs m => TFix (defs_Defs (term_Term g) defs) m
+    | tProj prj bod => TProj prj (term_Term g bod)
     | _ => TWrong "(term_Term:Unknown)"
   end.
-
-End datatypeEnv_sec.
     
-(** environments and programs **)
-(** given an L0 program, return an L1g environment containing the
-*** datatypes of the program: this can be done without a term 
-*** translation function
-**)
-Fixpoint program_Pgm_aux
-         (dtEnv: environ Term) (g:global_declarations) (t : term)
-         (e:environ Term) : Program Term :=
-  match g with
-  | nil => {| main := (term_Term dtEnv t); env := e |}
-  | ConstantDecl nm cb :: p =>
-    let decl :=
-        match cb.(cst_body) with
-        | Some t => pair nm (ecTrm (term_Term dtEnv t))
-        | None => pair nm (ecAx Term)
-        end
-    in
-    program_Pgm_aux dtEnv p t (cons decl e)
-  | InductiveDecl nm mib :: p =>
-    let Ibs := ibodies_itypPack mib.(ind_bodies) in
-    program_Pgm_aux
-      dtEnv p t (cons (pair nm (ecTyp Term mib.(ind_npars) Ibs)) e)
-  end.
+(*** environments and programs ***)
+Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
+  (string * envClass Term) :=
+  match dcl with
+    | ConstantDecl nm cb =>
+      match cb.(cst_body) with
+      | Some t => pair nm (ecTrm (term_Term g t))
+      | None => pair nm (ecAx Term)
+      end
+    | InductiveDecl nm mib =>
+        let Ibs := ibodies_itypPack mib.(ind_bodies) in
+        pair nm (ecTyp Term mib.(ind_npars) Ibs)
+  end.  
 
-Definition program_Pgm
-           (dtEnv: environ Term)
-           (p:program) (e:environ Term) : Program Term :=
-  let '(gctx, t) := p in
-  program_Pgm_aux dtEnv gctx t e.
-
-Definition program_Program_ext (p:program) : Program Term :=
-  let dtEnv := program_datatypeEnv
-                 (fst p) (nil (A:= (string * envClass Term))) in
-  program_Pgm dtEnv p nil.
+  
+(** given global_declarations (from EAst), return an L1g environment **)
+Definition program_Pgm_aux (g:global_declarations) : environ Term :=
+  let fix pPa_rec (gs:global_declarations) {struct gs} :=
+      match gs with
+      | nil => nil
+      | gd :: p => cons (trans_global_decl g gd) (pPa_rec p)
+      end in
+  pPa_rec g.
 
 Require Template.Ast.
 Require Import PCUIC.TemplateToPCUIC.
@@ -285,7 +305,8 @@ Definition program_Program
   let genv'' := extract_global genv' in
   let t' := extract genv' nil (trans t) in
   match genv'', t' with
-  | PCUICChecker.Checked genv', PCUICChecker.Checked t' =>
-    (program_Program_ext (genv', t'))
+  | PCUICChecker.Checked genv''', PCUICChecker.Checked t''' =>
+    {| main := term_Term genv''' t''';
+       env := program_Pgm_aux genv''' |}
   | _, _ => {| main := TWrong "program_Program"; env := nil |}
   end.

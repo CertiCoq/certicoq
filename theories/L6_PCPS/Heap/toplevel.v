@@ -161,10 +161,11 @@ Module Top.
     - unfold Post in Hin. destruct Hin as [[Ht1 Ht2] Hm]. do 4 eexists. split. eassumption.
       split; [| split ].
       + omega.
-      + rewrite Max.max_0_l in Hm. 
+      + rewrite !plus_O_n in *. eapply le_trans. eassumption.
+        eapply Nat.max_lub. omega.
         unfold cost_space_heap, cost_heap in *.
-        rewrite HL.max_with_measure_emp in *. rewrite <- !plus_n_O, !Max.max_0_r in *.
-        omega.
+        rewrite HL.max_with_measure_emp in *. 
+        rewrite Nat_as_OT.max_0_r. omega.
       + rewrite cc_approx_val_eq in Hres.
         eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.

@@ -1225,6 +1225,21 @@ Module SpaceSem (H : Heap).
       + rewrite cost_ctx_full_f_comp_ctx_f. omega.
   Qed.
 
+  Lemma cost_ctx_full_cc_ctx_comp_ctx_f (C : exp_ctx) :
+    (forall C', cost_ctx_full_cc (comp_ctx_f C C') =
+           cost_ctx_full_cc C + cost_ctx_full_cc C')
+  with cost_ctx_full_cc_f_comp_ctx_f f :
+         (forall C', cost_ctx_full_f_cc (comp_f_ctx_f f C') =
+                cost_ctx_full_f_cc  f + cost_ctx_full_cc C').
+  Proof.
+    - destruct C; intros C'; simpl; eauto.
+      + rewrite (cost_ctx_full_cc_ctx_comp_ctx_f C C'). omega.
+      + rewrite (cost_ctx_full_cc_ctx_comp_ctx_f C C'). omega.
+    - destruct f; intros C'; simpl.
+      + rewrite cost_ctx_full_cc_ctx_comp_ctx_f. omega.
+      + rewrite cost_ctx_full_cc_f_comp_ctx_f. omega.
+  Qed.
+
   Lemma def_closures_size B1 B2 rho H envc H' rho' :
     def_closures B1 B2 rho H envc = (H', rho') ->
     size_heap H' = size_heap H + 3 * numOf_fundefs B1.
@@ -1709,7 +1724,7 @@ Module SpaceSem (H : Heap).
       injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e))) b' /\
       ctx_to_heap_env_CC C H1' rho1' H2' rho2' c.
   Proof with (now eauto with Ensembles_DB).
-  Admitted. 
+  Abort. 
   
   Lemma ctx_to_heap_env_cost C H1 rho1 H2 rho2 c :
     ctx_to_heap_env C H1 rho1 H2 rho2 c ->

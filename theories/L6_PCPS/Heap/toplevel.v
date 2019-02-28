@@ -152,8 +152,9 @@ Module Top.
       rewrite PS_cardinal_empty.
       simpl. rewrite <- plus_n_O.
       erewrite HL.size_with_measure_alloc with (s := 0); try eassumption. 
-      simpl. omega.
-      eapply HL.size_with_measure_emp. 
+      simpl. omega. 
+      now eapply HL.size_with_measure_emp.
+      eapply PS_cardinal_empty_l. 
       rewrite <- mset_eq. reflexivity. 
     - eapply le_plus_r.
     - eassumption.
@@ -174,12 +175,3 @@ Module Top.
 End Top.
 
 Print Assumptions Top.closure_conversion_correct_top.
-
-
-(* XXX why does MHeap definitions still appear as axioms here? *)
-
-  (* *** Remaining admits *** *) 
-  (* 1.) Top.CC.Inv.Size.Util.project_vars_ToMSet_Funs
-         Top.CC.Inv.Size.Util.project_vars_ToMSet
-     2.) MHeap definitions appear as axioms. Why?         
-   *)

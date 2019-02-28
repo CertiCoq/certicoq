@@ -433,7 +433,6 @@ Module CCUtil (H : Heap).
       intros Hc; eapply Hnin. subst; now left.
   Qed.
 
-  (* TODO : do this with autorewrites *)
   Ltac normalize_sets :=
     match goal with
       | [|- context[FromList []]] => rewrite FromList_nil
@@ -877,14 +876,6 @@ Module CCUtil (H : Heap).
       eassumption. rewrite !occurs_free_Ehalt at 1...
   Qed. 
 
-  (* TODO move *)
-  Lemma Included_Intersection {A : Type} (s1 s2 s3 : Ensemble A) :
-    s1 \subset s2 ->
-    s1 \subset s3 ->
-    s1 \subset s2 :&: s3. 
-  Proof.
-    now firstorder.
-  Qed. 
   
   Corollary Closure_conversion_cc_fv_cor e Scope c Γ FVs e' C B 
             (Hcc : Closure_conversion clo_tag Scope (name_in_fundefs B)
@@ -1887,22 +1878,6 @@ Module CCUtil (H : Heap).
     eapply project_vars_Scope_l. eassumption. 
   Qed.
 
-  (* TODO move *)
-  Lemma cost_ctx_full_cc_ctx_comp_ctx_f (C : exp_ctx) :
-    (forall C', cost_ctx_full_cc (comp_ctx_f C C') =
-           cost_ctx_full_cc C + cost_ctx_full_cc C')
-  with cost_ctx_full_cc_f_comp_ctx_f f :
-         (forall C', cost_ctx_full_f_cc (comp_f_ctx_f f C') =
-                cost_ctx_full_f_cc  f + cost_ctx_full_cc C').
-  Proof.
-    - destruct C; intros C'; simpl; eauto.
-      + rewrite (cost_ctx_full_cc_ctx_comp_ctx_f C C'). omega.
-      + rewrite (cost_ctx_full_cc_ctx_comp_ctx_f C C'). omega.
-    - destruct f; intros C'; simpl.
-      + rewrite cost_ctx_full_cc_ctx_comp_ctx_f. omega.
-      + rewrite cost_ctx_full_cc_f_comp_ctx_f. omega.
-  Qed.
-
 
   Lemma project_var_cost_eq'
         Scope Scope'  Funs Funs' fenv
@@ -1925,23 +1900,6 @@ Module CCUtil (H : Heap).
     eapply project_var_cost_eq'. eassumption. eassumption.
     omega.
   Qed.
-
-  (* TODO move *)
-  (* Lemma binding_in_map_def_closures (S : Ensemble M.elt) (rho1 rho1' : env) H1 H1' B1 B1' v : *)
-  (*   binding_in_map S rho1 -> *)
-  (*   def_closures B1 B1' rho1 H1 v = (H1', rho1') -> *)
-  (*   binding_in_map (name_in_fundefs B1 :|: S) rho1'. *)
-  (* Proof.  *)
-  (*   revert H1' rho1'. induction B1; intros H2 rho2 Hbin Hclo. *)
-  (*   - simpl in *. *)
-  (*     destruct (def_closures B1 B1' rho1 H1 v) as [H' rho'] eqn:Hd. *)
-  (*     destruct (alloc (Clos (FunPtr B1' v0) v) H')as [l' H''] eqn:Ha.  *)
-  (*     inv Hclo. *)
-  (*     rewrite <- Union_assoc. rewrite Union_commut. eapply binding_in_map_set. *)
-  (*     eauto. *)
-  (*   - inv Hclo. simpl. eapply binding_in_map_antimon; [| eassumption ]. *)
-  (*     eauto with Ensembles_DB. *)
-  (* Qed. *)
 
   Lemma restrict_env_getlist S rho rho' xs vs :
     Restrict_env S rho rho' -> 

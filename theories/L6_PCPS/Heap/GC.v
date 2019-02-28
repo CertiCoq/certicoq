@@ -28,28 +28,6 @@ Module GC (H : Heap).
 
   (** The cost of constructing environments when evaluating e *)
 
-  (* TODO remove *)
-  Fixpoint cost_env_exp (e : exp) : nat :=
-    match e with
-      | Econstr x _ ys e => cost_env_exp e
-      | Ecase x l =>
-        1 + (fix sizeOf_l l :=
-               match l with
-                 | [] => 0
-                 | (t, e) :: l => max (cost_env_exp e) (sizeOf_l l)
-               end) l
-      | Eproj x _ _ y e => cost_env_exp e
-      | Efun B e => max (PS.cardinal (fundefs_fv B)) (max (cost_env_funs B) (cost_env_exp e))
-      | Eapp x _ ys => 0
-      | Eprim x _ ys e => cost_env_exp e
-      | Ehalt x => 0
-    end
-  with cost_env_funs (f : fundefs) : nat :=
-         match f with
-           | Fcons _ _ _ e B => max (cost_env_exp e) (cost_env_funs B) 
-           | Fnil => 0
-         end.  
-
   (** The extra cost of evaluating CCed e *)
   Fixpoint cost_time_exp (e : exp) : nat :=
     match e with
@@ -104,12 +82,6 @@ Module GC (H : Heap).
 
   Definition size_cc_heap (H : heap block) :=
     size_with_measure size_cc_block H.
-
-  Definition cost_mem_exp (e : exp) :=
-    max 2 (cost_env_exp e).
-
-  Definition cost_mem_fundefs (B : fundefs) :=
-    max 2 (cost_env_funs B).
   
   Definition cost_value (c : fundefs -> nat) (v : value) : nat :=
     match v with
@@ -124,20 +96,10 @@ Module GC (H : Heap).
       | Env rho => 0
     end.
 
-  Definition cost_mem_block (b : block) : nat :=
-    match b with
-      | Constr _ vs => 0
-      | Clos v1 rho => max 2 (cost_value cost_env_funs v1)
-      | Env rho => PS.cardinal (@mset (key_set rho) _)
-    end.
-  
   (** The maximum cost of evaluating any function in the heap *)
   Definition cost_heap (c : fundefs -> nat) (H : heap block) :=
     max_with_measure (cost_block c) H.
   
-  (** memory cost of heap *)
-  Definition cost_mem_heap H1 := max_with_measure cost_mem_block H1.
-
   (** time cost of heap *)
   Definition cost_time_heap := cost_heap cost_time_fundefs.
   
@@ -328,53 +290,6 @@ Module GC (H : Heap).
     intros s1 s2 Hseq x1 x2 Hxeq y1 y2 Hyeq z1 z2 Hzeq; subst.
     unfold live. rewrite !Hseq. reflexivity.
   Qed.
-
-
-  (* (* XXX unused *) *)
-  (* Lemma live_respects_heap_equiv S {_ : ToMSet S}  *)
-  (*       b b' (H1 H2 H3 : heap block) (rho1 rho2 : env) :  *)
-  (*   S |- (H1, rho1) ⩪_(id, b) (H2, rho2) -> *)
-  (*   injective_subdomain (reach' H2 (env_locs rho2 S)) b -> *)
-  (*   live' (env_locs rho2 S) H2 H3 b' -> *)
-  (*   (exists b'', live' (env_locs rho1 S) H1 H3 b''). *)
-  (* Proof. *)
-  (*   intros Heq Hinj Hlive. edestruct live'_live_inv as [d [Hlive' [Heq1 Heq22]]]. *)
-  (*   eassumption. *)
-  (*   assert (Hl : live (image b' (env_locs rho2 S)) H1 H3 (b ∘ d)). *)
-  (*   { destruct Hlive' as [Hsub [Hheq Hin]]. *)
-  (*     split.  *)
-  (*     - assumption. *)
-  (*     - split.  *)
-  (*       eapply heap_env_approx_heap_equiv in Heq. *)
-  (*       eapply heap_equiv_compose_r. (* TODO remove parameters *) *)
-  (*       rewrite <- image_compose. *)
-  (*       rewrite (image_f_eq_subdomain (compose d b')); *)
-  (*         [| eapply f_eq_subdomain_antimon; try eassumption; *)
-  (*            eapply reach'_extensive ]. *)
-  (*       rewrite image_id. eassumption. *)
-  (*       eassumption.  *)
-  (*       eapply injective_subdomain_compose. eassumption. *)
-  (*       destruct Hlive as [Hsub' [Hheq' Hin']].  *)
-  (*       (* heap takes image outside  *)  *)
-  (*       rewrite <- heap_equiv_reach_eq; [| eassumption ]. *)
-  (*       eapply injective_subdomain_antimon. eassumption. *)
-  (*       rewrite <- image_compose. *)
-  (*       rewrite image_f_eq_subdomain; try eassumption. *)
-  (*       rewrite image_id. reflexivity. *)
-  (*   } *)
-  (*   edestruct live_live'_inv as [d' [Hlive'' [Heq1' Heq22']]]. *)
-  (*   eassumption. eexists. *)
-  (*   eapply Proper_live'; try eassumption; try reflexivity. *)
-  (*   rewrite <- image_compose, Combinators.compose_assoc. *)
-  (*   rewrite image_compose. *)
-  (*   rewrite (image_f_eq_subdomain (compose d b')); *)
-  (*     [| eapply f_eq_subdomain_antimon; try eassumption; *)
-  (*        eapply reach'_extensive ]. *)
-  (*   rewrite image_id. *)
-  (*   rewrite <-(image_id (env_locs rho1 S)). *)
-  (*   eapply heap_env_equiv_image_post_n with (n := 0). *)
-  (*   eassumption.  *)
-  (* Qed. *)
 
   
   Lemma live_deterministic S (_ : set_util.ToMSet S) H1 H2 H2' b b' :
@@ -716,23 +631,6 @@ Module GC (H : Heap).
       eapply Same_set_From_set. rewrite <- !mset_eq. eassumption. 
   Qed.
 
-  Lemma block_equiv_cost_mem_block b bl1 bl2 H1 H2 :
-    block_equiv (b, H1, bl1) (id, H2, bl2) ->
-    cost_mem_block bl1 = cost_mem_block bl2.
-  Proof. 
-    intros Hbl. eapply block_equiv_subst_block in Hbl.
-    destruct bl1; destruct bl2; try contradiction.
-    - reflexivity.
-    - unfold cost_mem_block. f_equal.
-      simpl in Hbl. destruct Hbl as [Hh1 Hh2].
-      destruct v0; destruct v2; try (simpl in *; congruence).
-      + destruct v; destruct v1; simpl in *; congruence.
-      + destruct v; destruct v1; simpl in *; congruence.
-    - simpl in *.
-      rewrite !PS.cardinal_spec. erewrite elements_eq. reflexivity.
-      eapply Same_set_From_set.
-      rewrite <- !mset_eq. eassumption.
-  Qed.
 
   Lemma block_equiv_cost_time_block b bl1 bl2 H1 H2 :
     block_equiv (b, H1, bl1) (id, H2, bl2) ->

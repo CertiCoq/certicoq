@@ -1010,14 +1010,6 @@ Module Compat (H : Heap).
     Qed.
 
     (* TODO move *)
-    Lemma binding_in_map_key_set {A} (rho : M.t A) : 
-      binding_in_map (key_set rho) rho.
-    Proof.
-      unfold binding_in_map. intros x Hget.
-      unfold key_set, In in *.
-      destruct (M.get x rho); eauto.
-      exfalso; eauto.
-    Qed.
 
 
     Lemma heap_env_approx_binding_in_map S S' b1 H1 rho1 b2 H2 rho2 : 
@@ -1028,6 +1020,7 @@ Module Compat (H : Heap).
       intros Hap Hsub Hbin x Hiny. edestruct Hbin as [v1 Hgetx]; eauto. 
       edestruct Hap as [l1' [Hr2 Hres1]]; eauto.
     Qed.
+
 
   Lemma heap_env_equiv_binding_in_map S S' b1 H1 rho1 b2 H2 rho2 : 
     S' |- (H1, rho1) ⩪_( b1, b2) (H2, rho2) ->

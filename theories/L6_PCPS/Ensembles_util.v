@@ -354,6 +354,30 @@ Proof.
   - intros Hc; inv Hc.
 Qed.
 
+Lemma Intersection_Setmius_Disjoint {A} (S1 S2 S3 : Ensemble A) :
+  Disjoint _ S2 S3 ->
+  (S1 \\ S2) :&: S3 <--> S1 :&: S3.
+Proof.
+  intros Hd. split.
+  - intros x Hin. inv Hin. inv H. constructor; eauto.
+  - intros x Hin. inv Hin. constructor; eauto.
+    constructor. eassumption. intros Hc. eapply Hd; constructor; eauto. 
+Qed.
+
+Lemma Intersection_Setmius_Setminus_Disjoint {A} (S1 S2 S3 S4 : Ensemble A) :
+  Disjoint _ S3 S4 ->
+  (S1 \\ (S2 \\ S4)) :&: S3 <--> (S1 \\ S2) :&: S3.
+Proof.
+  intros Hd. split.
+  - intros x Hin. inv Hin. inv H. constructor; eauto. constructor; eauto.
+    intros Hc. eapply H2; eauto. constructor. eassumption.
+    intros Hc'. eapply Hd; constructor; eauto.
+  - intros x Hin. inv Hin. constructor; eauto. inv H. 
+    constructor. eassumption. intros Hc. eapply Hd; constructor; eauto.
+    inv Hc. exfalso; eauto.
+Qed.
+
+
 Hint Immediate Setminus_Union_distr Union_Intersection_distr : Ensembles_DB.
 
 (** ** Compatibility properties *)
@@ -1763,6 +1787,15 @@ Lemma Included_Intersection_compat {A : Type} (s1 s2 s3 s4 : Ensemble A) :
 Proof.
   intros H1 H2 x [Hin1 Hin2]. firstorder.
 Qed.
+
+Lemma Included_Intersection {A : Type} (s1 s2 s3 : Ensemble A) :
+  s1 \subset s2 ->
+  s1 \subset s3 ->
+  s1 \subset s2 :&: s3. 
+Proof.
+  now firstorder.
+Qed. 
+
 
 Lemma Included_Intersection_l {A : Type} (s1 s2 : Ensemble A) :
   s1 :&: s2 \subset s1.

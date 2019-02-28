@@ -551,6 +551,7 @@ Proof.
     eapply PS.singleton_spec. reflexivity.
 Qed.
 
+
 Lemma FromSet_cardinal_empty s :
   PS.cardinal s = 0 -> FromSet s <--> Empty_set _.
 Proof.
@@ -751,6 +752,32 @@ Proof.
     eapply In_InA in H. eapply PS.elements_spec1 in H.
     eapply FromSet_complete. reflexivity. eassumption.
     tci.
+Qed.
+
+Lemma PS_cardinal_empty_l s :
+  FromSet s <--> Empty_set _ ->
+  PS.cardinal s = 0. 
+Proof.
+  intros Heq.
+  replace 0 with (@length elt nil) by reflexivity.
+  rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
+  eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  constructor; eauto.
+  rewrite <- !FromSet_elements. rewrite Heq. repeat normalize_sets.
+  reflexivity.
+Qed. 
+
+Lemma PS_cardinal_singleton s x :
+  FromSet s <--> [set x] ->
+  PS.cardinal s = 1. 
+Proof.
+  intros Heq.
+  replace 1 with (length (cons x nil)) by reflexivity.
+  rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
+  eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  constructor; eauto. now constructor.
+  rewrite <- !FromSet_elements. rewrite Heq. repeat normalize_sets.
+  reflexivity.
 Qed.
 
 Lemma PS_fold_left_map s l b : 

@@ -82,4 +82,3 @@ Proof.
     simpl. unfold key_set, In. now rewrite Hin.
 Qed. 
 
-

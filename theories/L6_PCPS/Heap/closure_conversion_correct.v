@@ -25,11 +25,6 @@ Module ClosureConversionCorrect (H : Heap).
 
   Definition ct := Inv.Size.Util.clo_tag. 
     
-  (* TODO move *)
-  Instance ToMSet_Union_list_map {A} (f : A -> Ensemble var)
-           l {_ : forall x, ToMSet (f x)} : ToMSet (Union_list (map f l)).
-  Admitted.
-
   (** * Lemmas about [project_var] and [project_vars] *)
 
   (** Correctness of [project_var] *)
@@ -1541,7 +1536,7 @@ Module ClosureConversionCorrect (H : Heap).
               eapply Disjoint_Included_l; [| eassumption ].
               intros z Hin. eapply Bound_Ecase; eassumption. }
     - (****************************** case Eproj ******************************) 
-      inv Hcc. (* TODO change compat *) 
+      inv Hcc. 
       assert (Hf' : ToMSet Funs').
       eapply project_var_ToMSet_Funs; [| | eassumption]; tci.
       assert (Hs' : ToMSet Scope').

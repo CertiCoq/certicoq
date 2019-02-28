@@ -1,6 +1,6 @@
 Require Import Libraries.CpdtTactics.
 Require Import compcert.lib.Coqlib.
-Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util L6.functions L6.tactics.
+Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util L6.functions L6.tactics L6.map_util.
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
         Coq.omega.Omega Coq.Sets.Ensembles Coq.Relations.Relation_Operators.
@@ -760,6 +760,15 @@ Proof with now eauto with Ensembles_DB.
     edestruct IHxs as [vs' Hgetl].
     eapply Included_trans...
     eexists; simpl. rewrite Hget, Hgetl. reflexivity.
+Qed.
+
+Lemma binding_in_map_key_set {A} (rho : M.t A) : 
+  binding_in_map (key_set rho) rho.
+Proof.
+  unfold binding_in_map. intros x Hget.
+  unfold key_set, In in *.
+  destruct (M.get x rho); eauto.
+  exfalso; eauto.
 Qed.
 
 Inductive dsubterm_e:exp -> exp -> Prop :=

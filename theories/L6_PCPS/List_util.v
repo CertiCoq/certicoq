@@ -627,6 +627,15 @@ Proof.
   inv H; eauto.
 Qed.
 
+Lemma Same_set_FromList_length' (A : Type) (l1 l2 : list A):
+  NoDup l1 -> NoDup l2 -> FromList l1 <--> FromList l2 -> length l1 = length l2.
+Proof.
+  intros Hnd Hnd2 Heq. eapply Nat.le_antisymm.
+  eapply Same_set_FromList_length; eauto. eapply Heq. 
+  eapply Same_set_FromList_length; eauto. eapply Heq.
+Qed. 
+
+
 (** Lemmas about [fold_left] *)
 
 Lemma fold_left_monotonic {A} f1 f2 (l : list A) n1 n2 :

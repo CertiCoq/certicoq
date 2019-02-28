@@ -190,7 +190,7 @@ Module HeapDefs (H : Heap) .
         ld \in locs b ->
         path H (l :: ls) ld (S n).
 
-  (* The to definitions should be equivalent. TODO: Do the proof *)
+  (* The two definitions should be equivalent. *)
   Lemma reach_equiv H Si :
     reach H Si <--> reach' H Si.
   Proof.
@@ -423,8 +423,6 @@ Module HeapDefs (H : Heap) .
       exists 0. split; eauto. now constructor.
   Qed.
 
-
-  (* TODO better name for this? *)
   Lemma reach_spec H S S' :
     S \subset S' ->
     S' \subset reach' H S ->
@@ -1363,7 +1361,6 @@ Module HeapDefs (H : Heap) .
   Qed.
 
 
-  (* TODO change name *)
   Lemma env_locs_singleton_env (x : var) (v : value) :
     (val_loc v) <--> env_locs (M.set x v (M.empty _)) [set x].
   Proof.

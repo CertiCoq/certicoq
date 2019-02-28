@@ -75,8 +75,7 @@ Module Size (H : Heap).
     match p1, p2 with
       | (H1, rho1, e1, c1, m1), (H2, rho2, e2, c2, m2) =>
         (* time bound *)
-        c1 <= c2 + k <= Ktime * c1 (* + max (cost_time_exp e1) (cost_time_heap H1) *)
-        (* TODO remove additive factor *) /\
+        c1 <= c2 + k <= Ktime * c1 /\
         (* memory bound *)
         m2 <= max (A + cost_space_exp e1 + δ) (m1 + max (cost_space_exp e1) (cost_space_heap H1))
     end.
@@ -118,7 +117,7 @@ Module Size (H : Heap).
       | (H1, rho1, e1), (H2, rho2, e2) =>
         (* Sizes of the initial heaps *)
         size_heap H2 + funs (* not yet projected funs *)
-        <= (* reach_size H1 rho1 e1 *) A  + δ (* initial delta of heaps *)
+        <=  A + δ (* initial delta of heaps *)
     end.
 
   Definition PreG
@@ -155,16 +154,6 @@ Module Size (H : Heap).
                              (cost_time_heap H1).
   Proof.
     intros. eapply cost_heap_alloc. eassumption.
-  Qed.
-
-  Lemma cost_mem_heap_alloc H1 H1' l b :
-    alloc b H1 = (l, H1') ->
-    cost_mem_heap H1' = max (cost_mem_block b)
-                             (cost_mem_heap H1).
-  Proof.
-    intros. unfold cost_mem_heap.
-    erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); eauto.
-    rewrite Max.max_comm. eapply NPeano.Nat.max_compat; omega.
   Qed.
 
   Lemma cost_space_heap_alloc H1 H1' l b :
@@ -204,41 +193,6 @@ Module Size (H : Heap).
     eapply cost_heap_def_closures. 
   Qed.     
 
-  Lemma cost_mem_heap_def_closures H1 H1' rho1 rho1' B B0 rho :
-    def_closures B B0 rho1 H1 rho = (H1', rho1') ->
-    cost_mem_heap H1' = match B with
-                        | Fnil => cost_mem_heap H1
-                        |  _ => max (cost_mem_fundefs B0) (cost_mem_heap H1)
-                        end.
-  Proof.
-    revert H1' rho1'. induction B; intros H1' rho1' Hclo.
-    - simpl in Hclo.
-      destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'.
-      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' rho3] eqn:Hal. inv Hclo.
-      unfold cost_mem_heap in *.
-      erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); eauto.
-      unfold cost_mem_block at 2. unfold cost_value.
-      destruct B.
-      + erewrite (IHB H2); [| reflexivity ].
-        rewrite (Max.max_l _ (cost_mem_fundefs B0)).
-        reflexivity. eapply Max.le_max_l.
-      + erewrite (IHB H2); [| reflexivity ].
-        rewrite Max.max_comm.
-        reflexivity.
-    - inv Hclo; eauto.
-  Qed.
-
-
-  Lemma cost_mem_heap_def_closures_cons H1 H1' rho1 rho1' B B0 rho :
-    B <> Fnil ->
-    def_closures B B0 rho1 H1 rho = (H1', rho1') ->
-    cost_mem_heap H1' = max (cost_mem_fundefs B0) (cost_mem_heap H1).
-  Proof.
-    intros. erewrite cost_mem_heap_def_closures; [| eassumption ].
-    destruct B. reflexivity.
-    congruence.
-  Qed.
-
   Lemma cost_space_heap_def_closures_cons H1 H1' rho1 rho1' B B0 rho :
     B <> Fnil ->
     def_closures B B0 rho1 H1 rho = (H1', rho1') ->
@@ -258,45 +212,6 @@ Module Size (H : Heap).
     intros Hdef. unfold cost_time_heap. erewrite cost_heap_def_closures; [| eassumption ].
     destruct B; eauto.
   Qed.
-
-
-  (* TODO move *)
-
-  Lemma Same_set_FromList_length' (A : Type) (l1 l2 : list A):
-    NoDup l1 -> NoDup l2 -> FromList l1 <--> FromList l2 -> length l1 = length l2.
-  Proof.
-    intros Hnd Hnd2 Heq. eapply NPeano.Nat.le_antisymm.
-    eapply Same_set_FromList_length; eauto. eapply Heq. 
-    eapply Same_set_FromList_length; eauto. eapply Heq.
-  Qed. 
-
-  (* TODO move *)
-
-  Lemma PS_cardinal_singleton s x :
-    FromSet s <--> [set x] ->
-    PS.cardinal s = 1. 
-  Proof.
-    intros Heq.
-    replace 1 with (length [x]) by reflexivity.
-    rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
-    eapply NoDupA_NoDup. eapply PS.elements_spec2w.
-    constructor; eauto. now constructor.
-    rewrite <- !FromSet_elements. rewrite Heq. repeat normalize_sets.
-    reflexivity.
-  Qed.
-
-  Lemma PS_cardinal_empty s :
-    FromSet s <--> Empty_set _ ->
-    PS.cardinal s = 0. 
-  Proof.
-    intros Heq.
-    replace 0 with (@length var []) by reflexivity.
-    rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
-    eapply NoDupA_NoDup. eapply PS.elements_spec2w.
-    constructor; eauto.
-    rewrite <- !FromSet_elements. rewrite Heq. repeat normalize_sets.
-    reflexivity.
-  Qed. 
 
   Lemma cardinal_name_in_fundefs B :
     unique_functions B ->
@@ -381,33 +296,8 @@ Module Size (H : Heap).
     intros. eapply block_equiv_cost_time_block. eassumption.
   Qed.
   
-  Lemma cost_mem_heap_GC H1 H2 S `{ToMSet S} b : 
-    live' S H1 H2 b ->
-    cost_mem_heap H2 <= cost_mem_heap H1.
-  Proof.
-    intros. eapply live_max_with_measure_leq; [| eassumption | ].
-    eassumption.
-    intros. eapply block_equiv_cost_mem_block. eassumption.
-  Qed.
 
-  Lemma fun_in_fundefs_cost_mem_fundefs Funs {Hf : ToMSet Funs} B f tau xs e: 
-    fun_in_fundefs B (f, tau, xs, e) ->
-    cost_mem_exp e <= cost_mem_fundefs B.
-  Proof. 
-    induction B; intros Hin; inv Hin.
-    - inv H. eapply le_trans.
-      eapply NPeano.Nat.le_max_l.
-      unfold cost_mem_exp, cost_mem_fundefs.
-      rewrite <- Max.max_assoc.
-      unfold cost_env_funs.
-      reflexivity.
-    - eapply le_trans. eapply IHB. eassumption.
-      unfold cost_mem_fundefs.
-      eapply NPeano.Nat.max_le_compat_l. 
-      eapply NPeano.Nat.le_max_r.
-  Qed.
-
-    Lemma fun_in_fundefs_cost_space_fundefs Funs {Hf : ToMSet Funs} B f tau xs e: 
+  Lemma fun_in_fundefs_cost_space_fundefs Funs {Hf : ToMSet Funs} B f tau xs e: 
     fun_in_fundefs B (f, tau, xs, e) ->
     cost_space_exp e <= cost_space_funs B.
   Proof. 
@@ -415,7 +305,6 @@ Module Size (H : Heap).
     - simpl. inv H.
       eapply NPeano.Nat.le_max_l.
     - eapply le_trans. eapply IHB. eassumption.
-      unfold cost_mem_fundefs.
       simpl. eapply NPeano.Nat.le_max_r.
   Qed.
 
@@ -731,22 +620,6 @@ Module Size (H : Heap).
     eapply Max.le_max_r.
   Qed.
 
-  Lemma cost_mem_exp_case_hd x1 c1 e1 P1 :
-    cost_mem_exp e1 <= cost_mem_exp (Ecase x1 ((c1, e1) :: P1)).
-  Proof.
-    eapply Nat.max_le_compat_l.
-    eapply le_trans; [| eapply le_plus_r ].
-    eapply Max.le_max_l. 
-  Qed.
-  
-  Lemma cost_mem_exp_case_tl x1 c1 e1 P1 :
-    cost_mem_exp (Ecase x1 P1) <= cost_mem_exp (Ecase x1 ((c1, e1) :: P1)).
-  Proof.
-    eapply Nat.max_le_compat_l. 
-    eapply plus_le_compat_l. 
-    eapply Max.le_max_r.
-  Qed.
-  
   Lemma cost_time_exp_case_In x1 c1 e1 P1 :
     List.In (c1, e1) P1 ->
     cost_time_exp e1 <= cost_time_exp (Ecase x1 P1).
@@ -758,22 +631,6 @@ Module Size (H : Heap).
         eapply Max.le_max_l.
       + eapply le_trans. eapply IHP1. eassumption.
         eapply Nat.max_le_compat_l. destruct a as [c' e']. 
-        eapply Max.le_max_r.
-  Qed.
-
-  Lemma cost_mem_exp_case_In x1 c1 e1 P1 :
-    List.In (c1, e1) P1 ->
-    cost_mem_exp e1 <= cost_mem_exp (Ecase x1 P1).
-  Proof.
-    induction P1; intros Hin.
-    - now inv Hin.
-    - inv Hin.
-      + eapply Nat.max_le_compat_l.
-        eapply le_trans; [| eapply le_plus_r ].
-        eapply Max.le_max_l.
-      + eapply le_trans. eapply IHP1. eassumption.
-        eapply Nat.max_le_compat_l.
-        eapply plus_le_compat_l. destruct a as [c' e'].
         eapply Max.le_max_r.
   Qed.
 
@@ -1018,7 +875,7 @@ Module Size (H : Heap).
       reflexivity...
       eapply Singleton_Included. constructor; eauto.
       intros Hc. inv Hc. eauto.
-    - rewrite PS_cardinal_empty. reflexivity. 
+    - rewrite PS_cardinal_empty_l. reflexivity. 
       rewrite <- mset_eq. rewrite Setminus_Same_set_Empty_set. reflexivity. 
   Qed.
   
@@ -1031,7 +888,7 @@ Module Size (H : Heap).
     cost_alloc_ctx_CC C1 = 3 * PS.cardinal (@mset (Funs \\ Funs') _).
   Proof with (now eauto with Ensembles_DB).
     intros Hvar; induction Hvar; eauto.
-    - rewrite PS_cardinal_empty. reflexivity. 
+    - rewrite PS_cardinal_empty_l. reflexivity. 
       rewrite <- mset_eq, Setminus_Same_set_Empty_set.
       reflexivity.
     - assert (Hvar' := H2); assert (Hvar'' := H2).
@@ -1064,7 +921,7 @@ Module Size (H : Heap).
                        PS.cardinal (@mset ((FromList FVs \\ Funs) :&: (Scope' \\ Scope)) _).
   Proof with (now eauto with Ensembles_DB).
     intros Hvar; inv Hvar; eauto.
-    - rewrite !PS_cardinal_empty.
+    - rewrite !PS_cardinal_empty_l.
       reflexivity.
       rewrite <- mset_eq, Setminus_Same_set_Empty_set, Intersection_Empty_set_abs_r.
       reflexivity.
@@ -1073,7 +930,7 @@ Module Size (H : Heap).
     - simpl cost_ctx_full.
 
       erewrite PS_cardinal_singleton. 
-      erewrite PS_cardinal_empty. omega.
+      erewrite PS_cardinal_empty_l. omega.
       rewrite <- mset_eq. 
       rewrite Setminus_Union_distr, (Setminus_Disjoint [set x]).
       rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
@@ -1088,7 +945,7 @@ Module Size (H : Heap).
       
       eapply Singleton_Included. constructor; eauto.
       intros Hc. inv Hc; eauto. 
-    - rewrite PS_cardinal_empty.
+    - rewrite PS_cardinal_empty_l.
       erewrite PS_cardinal_singleton.
       simpl. reflexivity.
       + rewrite <- mset_eq.
@@ -1104,29 +961,6 @@ Module Size (H : Heap).
         rewrite Setminus_Same_set_Empty_set. reflexivity. 
   Qed.
 
-  (* TODO move *) 
-  Lemma Intersection_Setmius_Disjoint {A} (S1 S2 S3 : Ensemble A) :
-    Disjoint _ S2 S3 ->
-    (S1 \\ S2) :&: S3 <--> S1 :&: S3.
-  Proof.
-    intros Hd. split.
-    - intros x Hin. inv Hin. inv H. constructor; eauto.
-    - intros x Hin. inv Hin. constructor; eauto.
-      constructor. eassumption. intros Hc. eapply Hd; constructor; eauto. 
-  Qed.
-
-  Lemma Intersection_Setmius_Setminus_Disjoint {A} (S1 S2 S3 S4 : Ensemble A) :
-    Disjoint _ S3 S4 ->
-    (S1 \\ (S2 \\ S4)) :&: S3 <--> (S1 \\ S2) :&: S3.
-  Proof.
-    intros Hd. split.
-    - intros x Hin. inv Hin. inv H. constructor; eauto. constructor; eauto.
-      intros Hc. eapply H2; eauto. constructor. eassumption.
-      intros Hc'. eapply Hd; constructor; eauto.
-    - intros x Hin. inv Hin. constructor; eauto. inv H. 
-      constructor. eassumption. intros Hc. eapply Hd; constructor; eauto.
-      inv Hc. exfalso; eauto.
-  Qed.
 
   Lemma project_vars_cost_eq
         Scope `{ToMSet Scope} Scope' `{ToMSet Scope'} Funs `{ToMSet Funs}
@@ -1137,7 +971,7 @@ Module Size (H : Heap).
                        PS.cardinal (@mset ((FromList FVs \\ Funs) :&: (Scope' \\ Scope)) _).
   Proof with (now eauto with Ensembles_DB).
     intros Hvar; induction Hvar; eauto.
-    - rewrite !PS_cardinal_empty.
+    - rewrite !PS_cardinal_empty_l.
 
       reflexivity.
       rewrite <- mset_eq, Setminus_Same_set_Empty_set, Intersection_Empty_set_abs_r.
@@ -1594,7 +1428,7 @@ Module Size (H : Heap).
     
     eapply (@Ensemble_ind P HP); [| | eassumption ]; unfold P; [ intros HS Hyp | intros x S1 HS1 ].
     
-    - rewrite !PS_cardinal_empty. reflexivity.
+    - rewrite !PS_cardinal_empty_l. reflexivity.
       rewrite <- mset_eq. eapply env_locs_Empty_set.
       rewrite <- mset_eq. reflexivity.
 
@@ -1766,7 +1600,7 @@ Module Size (H : Heap).
         
         eapply Disjoint_Singleton_r. eassumption. 
     - inv Hclo. simpl. 
-      rewrite PS_cardinal_empty. rewrite <- mult_n_O.
+      rewrite PS_cardinal_empty_l. rewrite <- mult_n_O.
       erewrite (HL.size_with_measure_Same_set _ S (Empty_set _)).
       rewrite HL.size_with_measure_filter_Empty_set. reflexivity.
       rewrite env_locs_Empty_set in Hin. now eauto with Ensembles_DB. 

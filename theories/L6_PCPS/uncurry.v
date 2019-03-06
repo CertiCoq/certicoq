@@ -1,11 +1,8 @@
 (** Implements an uncurrying pass for the L6 CPS language, based on the same
     approach used in SML/NJ.  The following issues need to be addressed:
-
     * This doesn't do all of the uncurrying at once -- you have to iterate until
       there's no change.  But...
-
     * DONE - We need to tag the eta-expansions so that they don't get uncurried again, and
-
     * We need to tag the uncurried function so that it doesn't get inlined into
       the eta expansion (thereby undoing the uncurrying.)
 *)
@@ -111,15 +108,12 @@ Section UNCURRY.
       end.
 
 
-  (* Like copyVar but mark the new variable as uncurried *)
-  Definition copyVarC (x:var): uncurryM var :=
-    y <- copyVar x;;
-      s <- get ;;
-      match (s:stateType%type) with
-      | (y',b, aenv, fenv, ft, lm, s) => 
-        _ <- put (y',b, aenv, fenv, ft, (M.set y true lm), s) ;;
-          ret y
-      end.
+  (* Mark variable as uncurried *)
+  Definition mark_as_uncurried (x:var): uncurryM unit :=
+    s <- get ;;
+    match (s:stateType%type) with
+    | (y, b, aenv, fenv, ft, lm, s) => put (y, b, aenv, fenv, ft, (M.set x true lm), s)
+    end.
     
     
   Fixpoint copyVars (xs:list var) : uncurryM (list var) :=
@@ -128,6 +122,11 @@ Section UNCURRY.
     | x::xs' => y <- copyVar x ;; ys <- copyVars xs' ;; ret (y::ys)
     end.
 
+  (* Like copyVar but mark the new variable as uncurried *)
+  Definition copyVarC (x:var): uncurryM var :=
+    y <- copyVar x;;
+    _ <- mark_as_uncurried y;;
+    ret y.
 
   Definition click : uncurryM unit :=
     s <- get ;;
@@ -165,20 +164,15 @@ Section UNCURRY.
   (* I'm following the same algorithm as in Andrew's book, or more 
      appropriately, in the SML/NJ code base.  In essence, we look for
      code that looks like this:
-
      let rec f (k,v1,...,vn) = 
            let rec g (u1,...,um) = e in k(g)
       in ...
-
      and replace it with:
-
      let rec f (k',v1',...,vn') = 
            let rec g' (u1',...,um') = f'(u1',...,um',v1',...,vn') in k'(g')
          and f' (k,u1,...,um,v1,...,vn) = e
      in ...
-
      where all of the primed variables are fresh. 
-
      One difference with SML/NJ is that this won't get all of the uncurrying
      done in a single pass.  In particular, if f gets uncurried, but the 
      resulting function can be further uncurried, we won't pick this up.  So
@@ -187,7 +181,6 @@ Section UNCURRY.
      we tag f as something that should no longer be uncurried, or else 
      do all of the uncurrying in one pass.  The latter would be preferable
      but makes a structural termination argument harder.  
-
    *)
 
   Fixpoint uncurry_exp (e:exp) : uncurryM exp :=
@@ -232,7 +225,6 @@ Section UNCURRY.
            | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
                            (Eapp fk' fk_ft (g'::nil)) =>
              ge' <- uncurry_exp ge ;;
-             gt_n <- get_fTag (BinNat.N.of_nat (length gvs));;
              g_unc <- (already_uncurried g) ;;
              if eq_var fk fk' && eq_var g g' &&
                         negb (occurs_in_exp g ge) &&
@@ -240,19 +232,18 @@ Section UNCURRY.
                         negb g_unc then 
                gvs' <- copyVars gvs ;;
                fvs' <- copyVars fvs ;;
-               fk'' <- copyVar fk ;;
-               g'' <- copyVarC g ;;
                f' <- copyVar f ;;
+               _ <- mark_as_uncurried g ;;
 
                _ <- click ;;
                let fp_numargs := length (gvs' ++ fvs')  in
-               _ <- markToInline fp_numargs f g'';;
+               _ <- markToInline fp_numargs f g;;
                fp_ft <- get_fTag (BinNat.N.of_nat fp_numargs);;
-               ret (Fcons f f_ft (fk''::fvs')
+               ret (Fcons f f_ft (fk::fvs')
                           (* Note: tag given for arrity |fvs| + |gvs|  *)
-                          (Efun (Fcons g'' gt gvs' (Eapp f' fp_ft (gvs' ++ (fvs'))) Fnil)
-                                (Eapp fk'' fk_ft (g''::nil)))
-                          (Fcons f' fp_ft (gvs ++ (fvs)) ge' fds1'))
+                          (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
+                                (Eapp fk fk_ft (g::nil)))
+                          (Fcons f' fp_ft (gvs ++ fvs) ge' fds1'))
              else
                ret (Fcons f f_ft (fk::fvs) (Efun (Fcons g gt gvs ge' Fnil)
                                                (Eapp fk' fk_ft (g'::nil))) fds1')

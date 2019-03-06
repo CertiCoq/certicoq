@@ -6,11 +6,11 @@ Require Import Common.RandyPrelude.
 
 Require Import Common.Common.
 
-(* [mkNVar] need NOT be an injection from [positive * Ast.name] to [T]. 
+(* [mkNVar] need NOT be an injection from [positive * BasicAst.name] to [T].
 In particular, for efficiency,
 we may provide an instance where names are discarded *)
 Class MakeNamedVar (T:Type)
-  := mkNVar : positive -> Ast.name -> T.
+  := mkNVar : positive -> BasicAst.name -> T.
 
 Class NVarGetId (T:Type)
   := getId :  T -> positive.
@@ -20,7 +20,7 @@ Class NVarGetId (T:Type)
   names.
 
 Class NVarGetName (T:Type)
-  := getName :  T -> Ast.name.
+  := getName :  T -> BasicAst.name.
 *)
 
 Class CertiVarType (T :Type) {mn : MakeNamedVar T}
@@ -30,4 +30,4 @@ Class CertiVarType (T :Type) {mn : MakeNamedVar T}
 }.
 
 Class UpdateName (T:Type)
-  := updateName : T * Ast.name -> T.
+  := updateName : T * BasicAst.name -> T.

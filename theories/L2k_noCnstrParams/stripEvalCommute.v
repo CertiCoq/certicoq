@@ -8,7 +8,7 @@ Require Import Coq.Setoids.Setoid.
 Require Import Omega.
 
 Require Import Common.Common.
-Require Import L2d.L2d.
+Require Import L1g.L1g.
 Require Import L2k.compile.
 Require Import L2k.term.
 Require Import L2k.program.
@@ -19,11 +19,12 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition L2dTerm := L2d.compile.Term.
-Definition L2dTerms := L2d.compile.Terms.
-Definition L2dBrs := L2d.compile.Brs.
-Definition L2dDefs := L2d.compile.Defs.
+Definition L2dTerm := L1g.compile.Term.
+Definition L2dTerms := L1g.compile.Terms.
+Definition L2dBrs := L1g.compile.Brs.
+Definition L2dDefs := L1g.compile.Defs.
 
+Notation strips := (strips strip).
 
 Definition optStrip (t:option L2dTerm) : option Term :=
   match t with
@@ -59,7 +60,7 @@ Definition optStrip_split
 Lemma optStrip_hom: forall y, optStrip (Some y) = Some (strip y).
 induction y; simpl; reflexivity.
 Qed.
-Lemma optStrip_hom_None: optStrip (@None L2d.compile.Term) = @None (Term).
+Lemma optStrip_hom_None: optStrip (@None L2dTerm) = @None (Term).
   reflexivity.
 Qed.
 
@@ -85,7 +86,7 @@ Qed.
  ***********************)
 
 Lemma tlength_hom:
-  forall ts, tlength (strips ts) = L2d.term.tlength ts.
+  forall ts, tlength (strips ts) = List.length ts.
 Proof.
   induction ts; intros; try reflexivity.
   - cbn. apply f_equal. assumption.
@@ -152,50 +153,50 @@ Proof.
 Qed.
 
 Lemma dlength_hom:
-  forall ds, L2d.term.dlength ds = dlength (stripDs ds).
+  forall ds, L1g.compile.dlength ds = dlength (stripDs ds).
 induction ds. intuition. simpl. rewrite IHds. reflexivity.
 Qed.
 
 Lemma tcons_hom:
-  forall t ts, strips (L2d.compile.tcons t ts) = tcons (strip t) (strips ts).
+  forall t ts, strips (cons t ts) = tcons (strip t) (strips ts).
 reflexivity.
 Qed.
 
-Lemma tnil_hom: strips L2d.compile.tnil = tnil.
+Lemma tnil_hom: strips nil = tnil.
 reflexivity.
 Qed.
 
 Lemma dcons_hom:
   forall nm bod rarg ds,
-    stripDs (L2d.compile.dcons nm bod rarg ds) =
+    stripDs (L1g.compile.dcons nm bod rarg ds) =
     dcons nm (strip bod) rarg (stripDs ds).
 reflexivity.
 Qed.
 
-Lemma dnil_hom: stripDs L2d.compile.dnil = dnil.
+Lemma dnil_hom: stripDs L1g.compile.dnil = dnil.
 reflexivity.
 Qed.
 
 Lemma dnthBody_hom: 
-  forall m ds, optStripDnth (L2d.term.dnthBody m ds) =
+  forall m ds, optStripDnth (option_map fst (L1g.compile.dnthBody m ds)) =
                dnthBody m (stripDs ds).
-induction m; induction ds; try intuition.
-- simpl. intuition.
+induction m; induction ds; try intuition auto.
+- simpl. unfold dnthBody. simpl. apply IHm.
 Qed.
 
 Lemma tnth_hom:
- forall ts n, optStrip (L2d.term.tnth n ts) = tnth n (strips ts).
+ forall ts n, optStrip (List.nth_error ts n) = tnth n (strips ts).
 induction ts; simpl; intros n; case n; try reflexivity; trivial.
 Qed. 
 
-Lemma tskipn_hom:
-  forall ts n, optStrips (L2d.term.tskipn n ts) = tskipn n (strips ts).
-induction ts; simpl; intros n; case n; try reflexivity; trivial.
-Qed.
+(* Lemma tskipn_hom: *)
+(*   forall ts n, optStrips (List.skipn n ts) = tskipn n (strips ts). *)
+(* induction ts; simpl; intros n; case n; try reflexivity; trivial. *)
+(* Qed. *)
 
 Lemma tappend_hom:
-  forall ts us,
-    strips (L2d.compile.tappend ts us) = tappend (strips ts) (strips us).
+  forall ts us : list L1gTerm,
+    strips (List.app ts us) = tappend (strips ts) (strips us).
 Proof.
   induction ts; intros us; simpl. reflexivity.
   rewrite IHts. reflexivity.
@@ -203,7 +204,7 @@ Qed.
 
 Lemma TApp_hom:
   forall fn arg,
-    strip (L2d.compile.TApp fn arg) =
+    strip (L1g.compile.TApp fn arg) =
     match CanonicalP strip fn (strip arg) with
     | None => TApp (strip fn) (strip arg)
     | Some (F, args, npars, nargs) => etaExpand F args npars nargs
@@ -390,7 +391,7 @@ Qed.
 
 Lemma mkApp_tcons_lem1:
   forall fn arg args,
-    mkApp (mkApp fn (tcons arg args)) tnil = mkApp fn (tcons arg args).
+    L1g.compile.mkApp (L1g.compile.mkApp fn (cons arg args)) nil = L1g.compile.mkApp fn (cons arg args).
 Proof.
   destruct fn; intros arg args; simpl;
   try rewrite tappend_tnil; try reflexivity.
@@ -601,7 +602,7 @@ Definition notApp (F:Terms -> Term) :=
 
 Lemma isApp_fn_not_isConstruct:
   forall fn arg,
-    isApp (strip (L2d.compile.TApp fn arg)) -> ~ L2d.term.isConstruct fn.
+    isApp (strip (L1g.compile.TApp fn arg)) -> ~ L1g.term.isConstruct fn.
 Proof.
 Admitted.
 (*******************
@@ -1242,13 +1243,13 @@ Qed.
 
 Lemma TLambda_hom:
   forall nm bod,
-    strip (L2d.compile.TLambda nm bod) = TLambda nm (strip bod).
+    strip (L1g.compile.TLambda nm bod) = TLambda nm (strip bod).
 reflexivity.
 Qed.
 
 Lemma whBetaStep_hom:
   forall bod arg,
-    strip (L2d.term.whBetaStep bod arg) =
+    strip (L1g.term.whBetaStep bod arg) =
     whBetaStep (strip bod) (strip arg).
 Proof.
 Admitted.

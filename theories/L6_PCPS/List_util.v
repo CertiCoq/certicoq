@@ -5,7 +5,8 @@
 
 From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
          omega.Omega Numbers.BinNums Structures.OrdersEx Sets.Ensembles
-         Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation FunInd.
+         Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
+         FunInd.
 
 From CertiCoq.L6 Require Import Ensembles_util tactics.
 
@@ -626,6 +627,15 @@ Proof.
   inv H; eauto.
 Qed.
 
+Lemma Same_set_FromList_length' (A : Type) (l1 l2 : list A):
+  NoDup l1 -> NoDup l2 -> FromList l1 <--> FromList l2 -> length l1 = length l2.
+Proof.
+  intros Hnd Hnd2 Heq. eapply Nat.le_antisymm.
+  eapply Same_set_FromList_length; eauto. eapply Heq. 
+  eapply Same_set_FromList_length; eauto. eapply Heq.
+Qed. 
+
+
 (** Lemmas about [fold_left] *)
 
 Lemma fold_left_monotonic {A} f1 f2 (l : list A) n1 n2 :
@@ -716,6 +726,33 @@ Proof.
     eapply in_or_app. now right.
 Qed.
 
+Lemma fold_left_distr { A : Type} (l : list A) (acc : A)
+      (f : A -> A -> A) (g : A -> A) :
+  (forall x y, g (f x y) = f (g x) (g y)) -> 
+  g (fold_left f l acc) = fold_left (fun acc x => f acc (g x)) l (g acc).  
+Proof.
+  intros Hyp. revert acc. induction l; intros acc; simpl.
+  - reflexivity. 
+  - rewrite IHl. rewrite Hyp. reflexivity.
+Qed.   
+
+Lemma fold_left_mult { A : Type} (l : list A) (acc1 acc2 : nat) f h :
+  fold_left (fun acc x => acc + (f x)*(h x)) l (acc1 * acc2) <=
+  (fold_left (fun acc x => acc + (f x)) l acc1) * (fold_left (fun acc x => max acc (h x)) l acc2).
+Proof.
+  revert acc1 acc2. induction l; intros acc1 acc2; simpl.
+  - reflexivity.
+  - simpl. eapply le_trans; [| eapply IHl ].
+    eapply fold_left_monotonic.
+    + intros. omega.
+    + rewrite Nat.mul_add_distr_r.
+      eapply plus_le_compat.
+      eapply mult_le_compat_l.
+      eapply Max.le_max_l.
+      eapply mult_le_compat_l.
+      eapply Max.le_max_r.
+Qed.
+
 
 (** Lemmas about [Permutation] *)
 
@@ -744,6 +781,54 @@ Proof.
   - simpl. rewrite Hassoc. reflexivity.
   - rewrite IHHp1. eapply IHHp2.
 Qed.
+
+
+Lemma PermutationA_Permutation_refl A (l1 l2 : list A) R {_ : Reflexive R } :
+  Permutation l1 l2 ->
+  PermutationA R l1 l2.
+Proof.
+  intros Hp. induction Hp; eauto.
+  - now constructor.
+  - eapply permA_skip. reflexivity. easy.
+  - eapply permA_swap.
+  - eapply permA_trans. eassumption. eassumption.
+Qed. 
+
+Lemma PermutationA_respects_Permutation_l A (l1 l1' l2 : list A) R {_ : PreOrder R } :
+  PermutationA R l1 l2 ->
+  Permutation l1 l1' ->
+  PermutationA R l1' l2.
+Proof.
+  intros Hpa Hp.
+  destruct H. eapply permA_trans.
+
+  eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
+  symmetry. eassumption. 
+  eassumption.    
+Qed.
+
+Lemma PermutationA_respects_Permutation_r A (l1 l2 l2' : list A) R {_ : PreOrder R } :
+  PermutationA R l1 l2 ->
+  Permutation l2 l2' ->
+  PermutationA R l1 l2'.
+Proof.
+  intros Hpa Hp.
+  destruct H. eapply permA_trans.
+  eassumption. 
+  eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
+  eassumption. 
+Qed. 
+
+Instance PermutationA_symm A (eqA : relation A) { _ : Symmetric eqA}
+  : Symmetric (PermutationA eqA).
+Proof.
+  intros x1 x2 Hperm. induction Hperm. 
+  - constructor.
+  - eapply permA_skip; eauto.
+  - eapply permA_swap.
+  - eapply permA_trans; eauto.
+Qed.
+
 
 (** Lemmas about [Sublist] *)
 

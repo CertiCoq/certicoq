@@ -16,7 +16,7 @@ Require Import Coq.Arith.Arith
 Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program 
 Coq.micromega.Psatz.
 
-Definition dummyind := Ast.mkInd "" 0%nat.
+Definition dummyind := BasicAst.mkInd "" 0%nat.
 
 Require Import Common.RandyPrelude.
 Open Scope N_scope.
@@ -28,14 +28,14 @@ Require Import SquiggleEq.termsDB.
 (** It is the id function if fst p = (length (snd p)). Otherwise, the list of names
 is truncated or padded to make the length right. If we can guarantee the equality, 
 we can replace this function with the identity function *)
-Definition mkNames (p: N*list Ast.name) :=
+Definition mkNames (p: N*list BasicAst.name) :=
   let (n,vnames) := p in
   let vnames := firstn  (N.to_nat n) vnames in
-  list.listPad Ast.nAnon vnames  (N.to_nat n).
+  list.listPad BasicAst.nAnon vnames  (N.to_nat n).
 
 
 
-Fixpoint tL4_to_L4_1 (e:exp) {struct e}: (@DTerm Ast.name L4Opid):=
+Fixpoint tL4_to_L4_1 (e:exp) {struct e}: (@DTerm BasicAst.name L4Opid):=
 match e with
 | Var_e n => vterm n
 
@@ -65,14 +65,14 @@ match e with
 
 | Prf_e => oterm (NBox "proof") []
 end
-with ltL4_to_L4_1  (e:exps) {struct e}: list (@DTerm Ast.name L4Opid) :=
+with ltL4_to_L4_1  (e:exps) {struct e}: list (@DTerm BasicAst.name L4Opid) :=
 match e with
 | enil => []
 | econs h tl => 
     (tL4_to_L4_1 h)
      ::(ltL4_to_L4_1 tl)
 end
-with ftL4_to_L4_1  (e:efnlst) {struct e}: list (@DTerm Ast.name L4Opid) :=
+with ftL4_to_L4_1  (e:efnlst) {struct e}: list (@DTerm BasicAst.name L4Opid) :=
 match e with
 | eflnil => []
 | eflcons f h tl => 
@@ -91,7 +91,7 @@ end.
 
 Definition mkVar (n:N) : positive :=  (xO (N.succ_pos n)).
 
-Definition mkNVar (p: N*Ast.name) : NVar := 
+Definition mkNVar (p: N*BasicAst.name) : NVar :=
   let (n, name) := p in (mkVar n, name).
 
 Definition getId (i:positive): N := (N.pred (N.pos (Pos.div2 i))).
@@ -120,15 +120,15 @@ Require Import L6.cps.
 
 
 
-Definition L4_1_Term :Type := (@DTerm Ast.name L4Opid).
+Definition L4_1_Term :Type := (@DTerm BasicAst.name L4Opid).
 Definition L4_2_Term :Type := (@NTerm NVar L4Opid).
 
 (* may be useful in some proofs *)
 Definition tL4_1_to_L4_2_aux (n:N) (e:L4_1_Term) : L4_2_Term :=
-  fromDB Ast.nAnon mkNVar n Empty e.
+  fromDB BasicAst.nAnon mkNVar n Empty e.
 
 Definition tL4_1_to_L4_2 (e:L4_1_Term) : L4_2_Term :=
-  fromDB Ast.nAnon mkNVar 0 Empty e.
+  fromDB BasicAst.nAnon mkNVar 0 Empty e.
 
 (* L4_1 is not intended to be visible to the rest of certicoq *)
 Definition tL4_to_L4_2 : L4.expression.exp -> L4_2_Term :=

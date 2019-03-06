@@ -11,16 +11,16 @@ extern value args[];
 
 
 
-_Bool is_ptr(unsigned int s) {
+_Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
 } 
 
 /* OS: not generated */	       
 void nat_elim(value nat){
-    unsigned int prod_arr[1]; 
-    unsigned int ordinal;
+    value prod_arr[1]; 
+    value ordinal;
  
-    unsigned int curr = nat;
+    value curr = nat;
 
     while(1){
     
@@ -39,7 +39,7 @@ void nat_elim(value nat){
 
 /* OS: not generated */
 void bool_elim(value bool){
-    unsigned int ordinal;
+    value ordinal;
  
 
     elim_bool(bool, &ordinal, NULL);
@@ -52,11 +52,11 @@ void bool_elim(value bool){
 
 /* OS: not generated */
 void alpha_list_elim(value list, void* f_ptr){
-  unsigned int prod_arr[2]; 
-  unsigned int ordinal;
+  value prod_arr[2]; 
+  value ordinal;
   void *v;
  
-  unsigned int curr = list;
+  value curr = list;
   printf("(");
   while(1){
     
@@ -77,11 +77,11 @@ void alpha_list_elim(value list, void* f_ptr){
 
 /* OS: not generated */
 void list_bool_print(value list){
-  unsigned int prod_arr[2]; 
-  unsigned int ordinal;
+  value prod_arr[2]; 
+  value ordinal;
   void *v_bool;
  
-  unsigned int curr = list;
+  value curr = list;
   printf("(");
   while(1){
     
@@ -103,7 +103,7 @@ void list_bool_print(value list){
 
 
 int main(int argc, char *argv[]) {
-  unsigned int val; 
+  value val; 
 
   struct thread_info* tinfo;
   tinfo = make_tinfo();

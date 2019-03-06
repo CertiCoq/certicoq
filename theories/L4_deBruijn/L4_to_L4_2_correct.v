@@ -89,7 +89,7 @@ Lemma  substCommutesL4_to_L4_1 (a:exp) :
                       = map (subst_aux (tL4_to_L4_1 a) m) (ftL4_to_L4_1 es))
   /\
   (∀ (es : branches_e) m, btL4_to_L4_1 (sbst_branches a m es)
-                          = map (fun b: (@branch L4Opid (TermAbsDBUnstrict Ast.name L4Opid))
+                          = map (fun b: (@branch L4Opid (TermAbsDBUnstrict BasicAst.name L4Opid))
                                  => let (d,bt) := b in
                                    (d, subst_aux_bt (tL4_to_L4_1 a) m bt)) (btL4_to_L4_1 es)).
 Proof using.
@@ -136,9 +136,7 @@ Proof using.
 Qed.
 
 
-Print Assumptions eval_evaln.
-
-Definition  eval41 := @polyEval.eval_n (TermAbsDBUnstrict Ast.name L4Opid).
+Definition  eval41 := @polyEval.eval_n (TermAbsDBUnstrict BasicAst.name L4Opid).
 
 
 (* Move to expression.v *)
@@ -157,7 +155,7 @@ Qed.
 
 (* Move to expression.v *)
 Lemma bL4_to_L4_1_list es:
-  map (fun b:(expression.dcon * (N * list Ast.name) * exp) =>
+  map (fun b:(expression.dcon * (N * list BasicAst.name) * exp) =>
          let (b,e) := b in
          let (d,n) := b in
          (d, bterm (mkNames n) (tL4_to_L4_1 e)))
@@ -168,8 +166,8 @@ Proof using.
 Qed.
 
 (*
-Definition find_branch_as_find (lb: list (expression.dcon * (N * list Ast.name) * exp)) d m:=
-  find (fun b:(expression.dcon * (N * list Ast.name) * exp) =>
+Definition find_branch_as_find (lb: list (expression.dcon * (N * list BasicAst.name) * exp)) d m:=
+  find (fun b:(expression.dcon * (N * list BasicAst.name) * exp) =>
          let (b,_) := b in
          let (db,dn) := b in
          decide ((d,m) = (db, fst dn))) lb.
@@ -183,7 +181,7 @@ Proof using.
   destruct (Nat.eqb a b),(N.of_nat a =? N.of_nat b); inverts H; inverts Hh; try lia; refl.
 Qed.  
 
-Definition find_branchb d (b: (expression.dcon * (N * list Ast.name) * exp)) : bool :=
+Definition find_branchb d (b: (expression.dcon * (N * list BasicAst.name) * exp)) : bool :=
          let (b,_) := b in
          let (db,dn) := b in
          decide ((d) = (db)).
@@ -444,12 +442,12 @@ Proof using.
 Admitted.
 
 Let TermAbs_R_NamedDBUnstrict :=
-  (@TermAbs_R_NamedDBUnstrict Ast.name NVar _ L4Opid _ _ _ _  _ _ Ast.nAnon mkNVar getNId getIdMkNVar
+  (@TermAbs_R_NamedDBUnstrict BasicAst.name NVar _ L4Opid _ _ _ _  _ _ BasicAst.nAnon mkNVar getNId getIdMkNVar
      L4Opid_R EqIfRL4Opid).
 
 (* deprecated. delete *)
 Let TermAbs_R_NamedDB2 :=
-  (@TermAbs_R_NamedDB Ast.name NVar _ L4Opid _ _ _ _  _ _ Ast.nAnon mkNVar getNId getIdMkNVar
+  (@TermAbs_R_NamedDB BasicAst.name NVar _ L4Opid _ _ _ _  _ _ BasicAst.nAnon mkNVar getNId getIdMkNVar
      L4Opid_R EqIfRL4Opid).
 
 (* deprecated. delete *)
@@ -457,18 +455,18 @@ Lemma L4_1_to_L4_2_free_thm:
   forall (t1 : L4_1_Term) n,
 termsDB.fvars_below 0 t1 (* the undelying free thm also implies that eval_n preserves this *)->
 (option_R _ _ alpha_eq)
-   (option_map tL4_1_to_L4_2 (@eval_n (TermAbsDB Ast.name L4Opid) n t1))
+   (option_map tL4_1_to_L4_2 (@eval_n (TermAbsDB BasicAst.name L4Opid) n t1))
    (@eval_n (Named.TermAbsImpl variables.NVar L4Opid) n (tL4_1_to_L4_2 t1)).
 Proof using.
   intros ? ? Hfb.
   pose proof (CertiCoq_o_L4_o_polyEval_o_eval_n_R
-    (TermAbsDB Ast.name L4Opid) (Named.TermAbsImpl variables.NVar L4Opid)
+    (TermAbsDB BasicAst.name L4Opid) (Named.TermAbsImpl variables.NVar L4Opid)
     TermAbs_R_NamedDB2 n n ltac:(apply eqIfR; refl) t1) as Hp.
   simpl in Hp.
   unfold Term_R in Hp.
   specialize (Hp _ (conj Hfb (alpha_eq_refl _))).
   simpl in Hp.
-  destruct (@eval_n (TermAbsDB Ast.name L4Opid) n t1).
+  destruct (@eval_n (TermAbsDB BasicAst.name L4Opid) n t1).
   - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp0.
     constructor. tauto.
   - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp.
@@ -479,18 +477,18 @@ Lemma L4_1_to_L4_2_free_thm_unstrict:
   forall (t1 : L4_1_Term) n,
 termsDB.fvars_below 0 t1 (* the undelying free thm also implies that eval_n preserves this *)->
 (option_R _ _ alpha_eq)
-   (option_map tL4_1_to_L4_2 (@eval_n (TermAbsDBUnstrict Ast.name L4Opid) n t1))
+   (option_map tL4_1_to_L4_2 (@eval_n (TermAbsDBUnstrict BasicAst.name L4Opid) n t1))
    (@eval_n (Named.TermAbsImplUnstrict variables.NVar L4Opid) n (tL4_1_to_L4_2 t1)).
 Proof using.
   intros ? ? Hfb.
   pose proof (CertiCoq_o_L4_o_polyEval_o_eval_n_R
-    (TermAbsDBUnstrict Ast.name L4Opid) (Named.TermAbsImplUnstrict variables.NVar L4Opid)
+    (TermAbsDBUnstrict BasicAst.name L4Opid) (Named.TermAbsImplUnstrict variables.NVar L4Opid)
     TermAbs_R_NamedDBUnstrict n n ltac:(apply eqIfR; refl) t1) as Hp.
   simpl in Hp.
   unfold Term_R in Hp.
   specialize (Hp _ (conj Hfb (alpha_eq_refl _))).
   simpl in Hp.
-  destruct (@eval_n (TermAbsDBUnstrict Ast.name L4Opid) n t1).
+  destruct (@eval_n (TermAbsDBUnstrict BasicAst.name L4Opid) n t1).
   - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp0.
     constructor. tauto.
   - invertsna Hp Hp.  unfold tL4_1_to_L4_2. rewrite <- Hp.
@@ -663,7 +661,7 @@ End L42.
 
 Lemma fixwfL41_to_L42:
   (forall (e:L4_1_Term) names n,
-      fixwf e = L42.fixwf (fromDB Ast.nAnon mkNVar n names e)).
+      fixwf e = L42.fixwf (fromDB BasicAst.nAnon mkNVar n names e)).
 Proof using.
   induction e using termsDB.NTerm_better_ind2; auto;[]. intros.
   assert ( ball (map (λ x : DBTerm, fixwf (get_nt x)) lbt) =
@@ -671,7 +669,7 @@ Proof using.
    (map
       (λ x : DBTerm,
        L42.fixwf
-         (terms.get_nt (fromDB_bt Ast.nAnon mkNVar n names x))) lbt)).
+         (terms.get_nt (fromDB_bt BasicAst.nAnon mkNVar n names x))) lbt)).
 - f_equal. apply eq_maps. intros ?  Hin.
   destruct x. simpl. setoid_rewrite <- H; eauto.
 
@@ -683,7 +681,7 @@ Qed.
 
 Lemma vcL41_to_L42:
   forall (e:L4_1_Term) names n,
-      varsOfClass (all_vars (fromDB Ast.nAnon mkNVar n names e)) true.
+      varsOfClass (all_vars (fromDB BasicAst.nAnon mkNVar n names e)) true.
 Proof using.
   intros. apply termsDB.fromDB_varprop.
   intros. compute. destruct p. refl.

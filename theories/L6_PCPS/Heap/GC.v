@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms Sorting.Permutation Lists.SetoidPermutation.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From CertiCoq.L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
-     identifiers Heap.heap tactics Heap.heap_defs Heap.heap_equiv.
+     identifiers Heap.heap tactics Heap.heap_defs Heap.heap_equiv map_util.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
@@ -20,118 +20,15 @@ Module GC (H : Heap).
 
   Module Equiv := HeapEquiv H.
 
-  Import H Equiv.Defs Equiv.
-
-  (* TODO move *)
-
-  Instance ToMSet_name_in_fundefs B : ToMSet (name_in_fundefs B).
-  Proof.
-    eexists (fundefs_names B).
-    split; intros f Hin.
-    eapply fundefs_names_correct in Hin.
-    eapply FromSet_complete. reflexivity. eassumption.
-    eapply fundefs_names_correct.
-    eapply FromSet_sound. reflexivity. eassumption.
-  Qed.
-
-  (* TODO move key set *)
-
-  Instance ToMSet_key_set {A} (rho : M.t A) : ToMSet (key_set rho).
-  Proof. 
-    eexists (@mset (FromList (map fst (M.elements rho))) _).
-    rewrite <- mset_eq, FromList_map_image_FromList.
-    split; intros x Hin.
-    - unfold In, key_set in *.
-      destruct (M.get x rho) eqn:Hget. 
-      eexists (x, a). split; eauto.
-      eapply M.elements_correct. eassumption. 
-
-      exfalso; eauto.
-    - destruct Hin as [[z a] [Hin Hget]]; subst.
-      unfold In, FromList in Hin. eapply M.elements_complete in Hin.
-      simpl. unfold key_set, In. now rewrite Hin.
-  Qed. 
-
-  Lemma key_set_Restrict_env S rho rho' :
-    Restrict_env S rho rho' ->
-    key_set rho' \subset S.
-  Proof.
-    now intros [_ [_ R]].
-  Qed.
-
-  Lemma key_set_binding_in_map_alt (S : PS.t) (rho : env) :
-    binding_in_map (FromSet S) rho ->
-    key_set (restrict_env S rho) <--> FromSet S.
-  Proof.
-    intros Hbin.
-    assert (HR : Restrict_env (FromSet S) rho (restrict_env S rho)). 
-    { eapply restrict_env_correct. reflexivity. }
-    split. 
-    eapply key_set_Restrict_env. eassumption.
-
-    intros x Hin. edestruct Hbin as [v Hget1]. eassumption.
-    destruct HR as [Hs1 Hr]. 
-    unfold key_set, In. rewrite <- Hs1, Hget1; eauto.
-  Qed.
-
-
-  Lemma fold_left_distr { A : Type} (l : list A) (acc : A)
-        (f : A -> A -> A) (g : A -> A) :
-    (forall x y, g (f x y) = f (g x) (g y)) -> 
-    g (fold_left f l acc) = fold_left (fun acc x => f acc (g x)) l (g acc).  
-  Proof.
-    intros Hyp. revert acc. induction l; intros acc; simpl.
-    - reflexivity. 
-    - rewrite IHl. rewrite Hyp. reflexivity.
-  Qed.   
-
-  Lemma fold_left_mult { A : Type} (l : list A) (acc1 acc2 : nat) f h :
-    fold_left (fun acc x => acc + (f x)*(h x)) l (acc1 * acc2) <=
-    (fold_left (fun acc x => acc + (f x)) l acc1) * (fold_left (fun acc x => max acc (h x)) l acc2).
-  Proof.
-    revert acc1 acc2. induction l; intros acc1 acc2; simpl.
-    - reflexivity.
-    - simpl. eapply le_trans; [| eapply IHl ].
-      eapply fold_left_monotonic.
-      + intros. omega.
-      + rewrite NPeano.Nat.mul_add_distr_r.
-        eapply plus_le_compat.
-        eapply mult_le_compat_l.
-        eapply Max.le_max_l.
-        eapply mult_le_compat_l.
-        eapply Max.le_max_r.
-  Qed.
-
-
-  (* end MOVE *)
+  Import H Equiv.Defs.HL Equiv.Defs Equiv.
+  
 
   (** * Size of CPS terms, values and environments, needed to express the upper bound on
-         the execution cost of certain transformations
-   *)
+         the execution cost of certain transformations *)
 
   (** The cost of constructing environments when evaluating e *)
-  Fixpoint cost_env_exp (e : exp) : nat :=
-    match e with
-      | Econstr x _ ys e => cost_env_exp e
-      | Ecase x l =>
-        1 + (fix sizeOf_l l :=
-               match l with
-                 | [] => 0
-                 | (t, e) :: l => max (cost_env_exp e) (sizeOf_l l)
-               end) l
-      | Eproj x _ _ y e => cost_env_exp e
-      | Efun B e => max (PS.cardinal (fundefs_fv B)) (max (cost_env_funs B) (cost_env_exp e))
-      | Eapp x _ ys => 0
-      | Eprim x _ ys e => cost_env_exp e
-      | Ehalt x => 0
-    end
-  with cost_env_funs (f : fundefs) : nat :=
-         match f with
-           | Fcons _ _ _ e B => max (cost_env_exp e) (cost_env_funs B) 
-           | Fnil => 0
-         end.  
 
-  (** The cost of evaluating e *)
+  (** The extra cost of evaluating CCed e *)
   Fixpoint cost_time_exp (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => max (3 * length ys) (cost_time_exp e)
@@ -142,9 +39,11 @@ Module GC (H : Heap).
                     | (t, e) :: l => max (cost_time_exp e) (sizeOf_l l)
                   end) l)
       | Eproj x _ _ y e => max 3 (cost_time_exp e)
-      | Efun B e => max (1 + 4 * PS.cardinal (fundefs_fv B)) (max (cost_time_fundefs B) (cost_time_exp e))
+      | Efun B e =>
+        max (1 + 4 * PS.cardinal (fundefs_fv B))
+            (max (cost_time_fundefs B) (cost_time_exp e))
       | Eapp x _ ys => 6 + 3 * length ys
-      | Eprim x _ ys e => max (length ys) (cost_time_exp e)
+      | Eprim x _ ys e => max (3 * length ys) (cost_time_exp e)
       | Ehalt x => 3
     end
   with cost_time_fundefs (B : fundefs) : nat :=
@@ -161,7 +60,7 @@ Module GC (H : Heap).
       | Eproj x _ _ y e => 3
       | Efun B e => 1 + 4 * PS.cardinal (fundefs_fv B)
       | Eapp x _ ys => 3 + 3 * length ys
-      | Eprim x _ ys e => length ys
+      | Eprim x _ ys e => 3 * length ys
       | Ehalt x => 3
     end.
       
@@ -183,12 +82,6 @@ Module GC (H : Heap).
 
   Definition size_cc_heap (H : heap block) :=
     size_with_measure size_cc_block H.
-
-  Definition cost_mem_exp (e : exp) :=
-    max 2 (cost_env_exp e).
-
-  Definition cost_mem_fundefs (B : fundefs) :=
-    max 2 (cost_env_funs B).
   
   Definition cost_value (c : fundefs -> nat) (v : value) : nat :=
     match v with
@@ -203,20 +96,10 @@ Module GC (H : Heap).
       | Env rho => 0
     end.
 
-  Definition cost_mem_block (b : block) : nat :=
-    match b with
-      | Constr _ vs => 0
-      | Clos v1 rho => max 2 (cost_value cost_env_funs v1)
-      | Env rho => PS.cardinal (@mset (key_set rho) _)
-    end.
-  
   (** The maximum cost of evaluating any function in the heap *)
   Definition cost_heap (c : fundefs -> nat) (H : heap block) :=
     max_with_measure (cost_block c) H.
   
-  (** memory cost of heap *)
-  Definition cost_mem_heap H1 := max_with_measure cost_mem_block H1.
-
   (** time cost of heap *)
   Definition cost_time_heap := cost_heap cost_time_fundefs.
   
@@ -229,7 +112,7 @@ Module GC (H : Heap).
     PS.cardinal (fundefs_fv f) (* over-approximating the environment associated to each B by a factor of |B| *).
 
 
-  Import H Equiv.Defs.HL Equiv.Defs Equiv.
+  
 
   (** Using S as the set of roots, garbage collect H1 *) 
   Definition collect (S : Ensemble loc) (H1 H2 : heap block) : Prop :=
@@ -249,7 +132,10 @@ Module GC (H : Heap).
     S |- H1 ≃_(β, id) H2 /\
     injective_subdomain (reach' H1 S) β.
 
-  (** * Lemmas about [collect] *)
+
+
+
+  (** * Lemmas about [collect] -- DEPRICATED *)
   
   (** The reachable part of the heap before and after collection are the same *)
   Lemma collect_heap_eq S H1 H2 :
@@ -271,15 +157,6 @@ Module GC (H : Heap).
 
   
   (** * Lemmas about [live] *)  
-
-
-  Lemma restrict_heap_eq A S (H1 H2 : heap A) :
-    restrict S H1 H2 ->
-    S |- H1 ≡ H2.
-  Proof.
-    intros Hr x Hin. symmetry. eapply restrict_In; eauto. 
-  Qed.
-
   
   Lemma heap_eq_res_approx_l P (k : nat) (H1 H2 : heap block) (v : value) :
     P |- H1 ≡ H2 ->
@@ -378,23 +255,29 @@ Module GC (H : Heap).
     intros Heq Hl; unfold live in *. rewrite <- !Heq at 1. 
     eassumption.
   Qed.
- 
-  Definition inverse_subdomain {A B: Type} S (f : A -> B) g :=
-    f_eq_subdomain (image f S) (f ∘ g) id /\
-    f_eq_subdomain S (g ∘ f) id.
 
 
-  (* Admitted for now *)
+        
+  
   Lemma live_live'_inv S b  H1 H2 :
     live S H1 H2 b ->
     exists b', live' (image b S) H1 H2 b' /\ inverse_subdomain (reach' H2 S) b b'.
-  Admitted.
+  Abort.
 
-  (* Admitted for now *)
-  Lemma live'_live_inv S b H1 H2 :
+  Lemma live'_live_inv S { _ : ToMSet S} b H1 H2 :
     live' S H1 H2 b ->
     exists b', live (image b S) H1 H2 b' /\ inverse_subdomain (reach' H1 S) b b'.
-  Admitted.
+  Proof.
+    intros [Hl1 [Hl2 Hl3]].
+    edestruct inverse_exists as [b' [Hinv Hinj']]; [| eassumption | ].
+    now tci.
+    eexists b'. split; [| eassumption ].
+    split; [| split ].
+    + eassumption.
+    + eapply heap_equiv_inverse_subdomain; eassumption. 
+    + rewrite <- heap_equiv_reach_eq. eassumption. eassumption.
+  Qed.
+  
   
   Instance Proper_live' : Proper (Same_set _ ==> eq ==> eq ==> eq ==> iff) live'. 
   Proof. 
@@ -406,52 +289,6 @@ Module GC (H : Heap).
   Proof. 
     intros s1 s2 Hseq x1 x2 Hxeq y1 y2 Hyeq z1 z2 Hzeq; subst.
     unfold live. rewrite !Hseq. reflexivity.
-  Qed.
-
-  
-  Lemma live_respects_heap_equiv S
-        b b' (H1 H2 H3 : heap block) (rho1 rho2 : env) : 
-    S |- (H1, rho1) ⩪_(id, b) (H2, rho2) ->
-    injective_subdomain (reach' H2 (env_locs rho2 S)) b ->
-    live' (env_locs rho2 S) H2 H3 b' ->
-    (exists b'', live' (env_locs rho1 S) H1 H3 b'').
-  Proof.
-    intros Heq Hinj Hlive. edestruct live'_live_inv as [d [Hlive' [Heq1 Heq22]]].
-    eassumption.
-    assert (Hl : live (image b' (env_locs rho2 S)) H1 H3 (b ∘ d)).
-    { destruct Hlive' as [Hsub [Hheq Hin]].
-      split. 
-      - assumption.
-      - split. 
-        eapply heap_env_approx_heap_equiv in Heq.
-        eapply heap_equiv_compose_r. (* TODO remove parameters *)
-        rewrite <- image_compose.
-        rewrite (image_f_eq_subdomain (compose d b'));
-          [| eapply f_eq_subdomain_antimon; try eassumption;
-             eapply reach'_extensive ].
-        rewrite image_id. eassumption.
-        eassumption. 
-        eapply injective_subdomain_compose. eassumption.
-        destruct Hlive as [Hsub' [Hheq' Hin']]. 
-        (* heap takes image outside  *) 
-        rewrite <- heap_equiv_reach_eq; [| eassumption ].
-        eapply injective_subdomain_antimon. eassumption.
-        rewrite <- image_compose.
-        rewrite image_f_eq_subdomain; try eassumption.
-        rewrite image_id. reflexivity.
-    }
-    edestruct live_live'_inv as [d' [Hlive'' [Heq1' Heq22']]].
-    eassumption. eexists.
-    eapply Proper_live'; try eassumption; try reflexivity.
-    rewrite <- image_compose, Combinators.compose_assoc.
-    rewrite image_compose.
-    rewrite (image_f_eq_subdomain (compose d b'));
-      [| eapply f_eq_subdomain_antimon; try eassumption;
-         eapply reach'_extensive ].
-    rewrite image_id.
-    rewrite <-(image_id (env_locs rho1 S)).
-    eapply heap_env_equiv_image_post_n with (n := 0).
-    eassumption. 
   Qed.
 
   
@@ -488,7 +325,7 @@ Module GC (H : Heap).
     eapply reach'_extensive. 
   Qed.
 
-    Lemma res_equiv_subst_val (S : Ensemble var) (b1 b2 : loc -> loc) (H1 H2 : heap block)
+  Lemma res_equiv_subst_val (S : Ensemble var) (b1 b2 : loc -> loc) (H1 H2 : heap block)
         (v1 v2 : value):
     (v1, H1) ≈_( b1, b2) (v2, H2) ->
     subst_val b1 v1 = subst_val b2 v2. 
@@ -500,6 +337,7 @@ Module GC (H : Heap).
     - simpl. inv Heq. reflexivity. 
   Qed. 
 
+  (** Aux relation for showing the size lemmas *)
 
   Definition subst_block_rel b1 b2 (bl1 bl2 : block) : Prop :=
     match bl1, bl2 with
@@ -510,25 +348,6 @@ Module GC (H : Heap).
       | Env rho1, Env rho2 => key_set rho1 <--> key_set rho2
       | _, _ => False
     end. 
-
-  (* TODO move *)
-  Lemma heap_env_approx_key_set b1 H1 rho1 b2 H2 rho2 : 
-    heap_env_approx (Full_set _) (b1, (H1, rho1)) (b2, (H2, rho2)) ->
-    key_set rho1 \subset key_set rho2.
-  Proof.
-    intros Hap x Hiny. unfold key_set in *.
-    unfold In in *. simpl in *. destruct (M.get x rho1) eqn:Hget1; try contradiction.
-    edestruct Hap as [l1' [Hr2 Hres1]]; eauto. now constructor.
-    now rewrite Hr2.
-  Qed.
-
-  Lemma heap_env_equiv_key_set b1 H1 rho1 b2 H2 rho2 : 
-    Full_set _ |- (H1, rho1) ⩪_( b1, b2) (H2, rho2) ->
-    key_set rho1 <--> key_set rho2.
-  Proof.
-    intros [Henv1 Henn2]; split; eapply heap_env_approx_key_set; eauto.
-  Qed. 
-
     
   Lemma block_equiv_subst_block b1 b2 H1 H2 bl1 bl2 :
     block_equiv ((b1, H1), bl1) ((b2, H2), bl2) ->
@@ -550,42 +369,6 @@ Module GC (H : Heap).
       eassumption. 
   Qed.
   
-
-  Lemma PermutationA_Permutation_refl A (l1 l2 : list A) R {_ : Reflexive R } :
-    Permutation l1 l2 ->
-    PermutationA R l1 l2.
-  Proof.
-    intros Hp. induction Hp; eauto.
-    - now constructor.
-    - eapply permA_skip. reflexivity. easy.
-    - eapply permA_swap.
-    - eapply permA_trans. eassumption. eassumption.
-  Qed. 
-    
-  Lemma PermutationA_respects_Permutation_l A (l1 l1' l2 : list A) R {_ : PreOrder R } :
-    PermutationA R l1 l2 ->
-    Permutation l1 l1' ->
-    PermutationA R l1' l2.
-  Proof.
-    intros Hpa Hp.
-    destruct H. eapply permA_trans.
-
-    eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
-    symmetry. eassumption. 
-    eassumption.    
-  Qed.
-
-  Lemma PermutationA_respects_Permutation_r A (l1 l2 l2' : list A) R {_ : PreOrder R } :
-    PermutationA R l1 l2 ->
-    Permutation l2 l2' ->
-    PermutationA R l1 l2'.
-  Proof.
-    intros Hpa Hp.
-    destruct H. eapply permA_trans.
-    eassumption. 
-    eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
-    eassumption. 
-  Qed. 
       
   Lemma heap_elements_filter_PermutationA S {Hs : ToMSet S} (R : relation block) {_ : PreOrder R} H1 H2 b1 :
     S |- H1 ≃_(b1, id) H2 ->
@@ -669,7 +452,8 @@ Module GC (H : Heap).
         (S2 := (b1 l) |: image b1 S0).
         
         eapply PermutationA_respects_Permutation_r; [ eassumption |
-                                                    | symmetry; eapply heap_elements_filter_add_not_In; try eassumption ].
+                                                    | symmetry; eapply heap_elements_filter_add_not_In;
+                                                      try eassumption ].
 
         eapply IH. eapply heap_equiv_antimon. eassumption. now eauto with Ensembles_DB.
         
@@ -722,8 +506,8 @@ Module GC (H : Heap).
     eapply in_dom_closed. eapply heap_equiv_preserves_closed.
     eassumption. eassumption.
   Qed.
+ 
   
-
   Lemma GC_dom_subset S H1 H2 b :
     live' S H1 H2 b ->
     dom H2 \subset reach' H2 (image b S).  
@@ -731,21 +515,10 @@ Module GC (H : Heap).
     intros [Hsub [Heq Hinj]].
     eassumption.
   Qed.
-  
 
-  Require Import Coq.Classes.RelationClasses. 
-  
-  Instance PermutationA_symm A (eqA : relation A) { _ : Symmetric eqA}
-  : Symmetric (PermutationA eqA).
-  Proof.
-    intros x1 x2 Hperm. induction Hperm. 
-    - constructor.
-    - eapply permA_skip; eauto.
-    - eapply permA_swap.
-    - eapply permA_trans; eauto.
-  Qed.
 
-  
+  (** Size after GC *)
+   
   Lemma live_size_with_measure S {_ : ToMSet S} H1 H2 b f : 
     live' S H1 H2 b ->
     (forall bl1 bl2, block_equiv (b, H1, bl1) (id, H2, bl2) -> f bl1 = f bl2) ->
@@ -775,7 +548,7 @@ Module GC (H : Heap).
     - symmetry. eapply heap_equiv_reach_eq. eassumption. 
   Qed. 
 
-  Lemma live_max_with_measure S {_ : ToMSet S} H1 H2 b f : 
+  Lemma live_max_with_measure S {_ : ToMSet S} H1 H2 b f :
     live' S H1 H2 b ->
     (forall bl1 bl2, block_equiv (b, H1, bl1) (id, H2, bl2) -> f bl1 = f bl2) ->
     max_with_measure f H2 = max_with_measure_filter f (reach' H1 S) H1.
@@ -827,6 +600,9 @@ Module GC (H : Heap).
     eapply HL.max_with_measure_filter_dom_sup. 
   Qed.
 
+
+  (** Sizes of equivalent blocks *)
+
   Lemma block_equiv_size_cc_block b bl1 bl2 H1 H2 :
     block_equiv (b, H1, bl1) (id, H2, bl2) ->
     size_cc_block bl1 = size_cc_block bl2.
@@ -849,26 +625,12 @@ Module GC (H : Heap).
     destruct bl1; destruct bl2; try contradiction.
     - simpl in *. f_equal. eapply Forall2_length. eassumption.
     - reflexivity.
-    - reflexivity.
+    - simpl in Hbl. simpl.
+      unfold size_env. rewrite !PS.cardinal_spec.
+      do 2 f_equal. eapply elements_eq.
+      eapply Same_set_From_set. rewrite <- !mset_eq. eassumption. 
   Qed.
 
-  Lemma block_equiv_cost_mem_block b bl1 bl2 H1 H2 :
-    block_equiv (b, H1, bl1) (id, H2, bl2) ->
-    cost_mem_block bl1 = cost_mem_block bl2.
-  Proof. 
-    intros Hbl. eapply block_equiv_subst_block in Hbl.
-    destruct bl1; destruct bl2; try contradiction.
-    - reflexivity.
-    - unfold cost_mem_block. f_equal.
-      simpl in Hbl. destruct Hbl as [Hh1 Hh2].
-      destruct v0; destruct v2; try (simpl in *; congruence).
-      + destruct v; destruct v1; simpl in *; congruence.
-      + destruct v; destruct v1; simpl in *; congruence.
-    - simpl in *.
-      rewrite !PS.cardinal_spec. erewrite elements_eq. reflexivity.
-      eapply Same_set_From_set.
-      rewrite <- !mset_eq. eassumption.
-  Qed.
 
   Lemma block_equiv_cost_time_block b bl1 bl2 H1 H2 :
     block_equiv (b, H1, bl1) (id, H2, bl2) ->
@@ -884,5 +646,48 @@ Module GC (H : Heap).
       + destruct v; destruct v1; simpl in *; congruence.
     - reflexivity.
    Qed.
-  
+
+  Lemma heap_equiv_size_reachable S {_ : ToMSet S} H1 H2 b1 :
+    reach' H1 S |- H1 ≃_(b1, id) H2 ->
+    injective_subdomain (reach' H1 S) b1 ->
+    size_reachable S H1 = size_reachable (image b1 S) H2. 
+  Proof.
+    intros Heq Hinj. unfold size_reachable, size_with_measure_filter.
+    erewrite heap_elements_filter_set_Equal with (S1 := reach' H2 (image b1 S))
+                                                 (S2 := image b1 (reach' H1 S)). 
+    - eapply fold_permutationA; [ | | eapply heap_elements_filter_PermutationA; eauto;
+                                      [| intros bl1 bl2 Hbl; eapply block_equiv_size_val; eassumption ]].
+      + intros [x1 x2] [y1 y2] z. firstorder.
+      + intros z [x1 x2] [y1 y2] Heqf. firstorder.
+      + constructor.
+        intros x1. reflexivity.
+        intros x1 x2 x3 Hr1 Hr2; congruence.
+    - symmetry. eapply heap_equiv_reach_eq.
+      eapply heap_equiv_antimon. eassumption.
+      now eapply reach'_extensive. 
+  Qed.
+
+
+  (* TODO move *)
+  Definition reach_size (H : heap block) (rho : env) (e : exp) :=
+    size_reachable (env_locs rho (occurs_free e)) H. 
+
+   
+  Corollary heap_env_equiv_reach_size e  H1 H2 rho1 rho2 b1 :
+    occurs_free e |- (H1, rho1) ⩪_( b1, id) (H2, rho2) ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) b1 ->
+    reach_size H1 rho1 e = reach_size H2 rho2 e. 
+  Proof.
+    intros Heq Hinj. unfold reach_size.
+    erewrite size_reachable_same_set with (S1 := (env_locs rho2 (occurs_free e)))
+                                          (S2 := image b1 (env_locs rho1 (occurs_free e))). 
+    eapply heap_equiv_size_reachable.
+    eapply heap_equiv_reach.
+    eapply heap_env_approx_heap_equiv_r. eassumption.
+    eassumption. 
+
+    eapply heap_env_equiv_image_post_n with (n := 0) in Heq. 
+    simpl in Heq. rewrite image_id in Heq. symmetry. eassumption. 
+  Qed.       
+
 End GC.

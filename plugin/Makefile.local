@@ -1,3 +1,3 @@
-COQ_SRC_SUBDIRS+=user-contrib/TemplateChecker user-contrib/TemplateExtraction
-CAMLFLAGS+=-open Template_coq_checker_plugin -open Template_coq_extraction_plugin
+COQ_SRC_SUBDIRS+=user-contrib/TemplateChecker user-contrib/PCUIC user-contrib/TemplateExtraction
+CAMLFLAGS+=-open Template_coq_checker_plugin -open Template_coq_pcuic_plugin -open Template_coq_extraction_plugin
 CAMLFLAGS+=-w -33 # Unused opens

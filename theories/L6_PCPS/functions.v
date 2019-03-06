@@ -86,7 +86,11 @@ Definition lift {A B} (f : A -> B) : option A -> option B :=
           | Some x => Some (f x)
           | None => None
         end.
-  
+
+Definition inverse_subdomain {A B: Type} S (f : A -> B) g :=
+  f_eq_subdomain (image f S) (f ∘ g) id /\
+  f_eq_subdomain S (g ∘ f) id.
+
 (** * Lemmas about [f_eq_subdomain] and [f_eq] *)
 
 Instance equivalence_f_eq_subdomain {A B} S : Equivalence (@f_eq_subdomain A B S). 
@@ -167,9 +171,21 @@ Proof.
   intros Heq1 Heq2 x Hin. unfold compose.
   rewrite <- Heq1; eauto. rewrite Heq2. reflexivity.
   eexists; split; eauto.
-   Qed.
+Qed.
 
 
+Lemma compose_extend_l S (C : Type) f (g : positive -> positive) (x : positive) (y : C) :
+  injective_subdomain S g ->
+  x \in S -> 
+  f_eq_subdomain S (f {g x ~> y} ∘ g) ((f ∘ g) {x ~> y}).
+Proof.
+  intros Hinj Hin z Hinz. unfold compose. simpl. compute.
+
+  destruct (peq z x); subst; eauto.
+  - rewrite peq_true. reflexivity.
+  - rewrite peq_false. reflexivity.  intros Hc.
+    eapply n. eapply Hinj; eassumption.
+Qed. 
 
 (** * Lemmas about [image] *)
 
@@ -1013,3 +1029,40 @@ Proof.
   intros [x|]; unfold lift, compose; simpl; reflexivity.
 Qed.
 
+(** * Properties of [inverse_subdomain] *)
+
+Lemma inverse_subdomain_antimon {A B: Type} S S' (f : A -> B) g : 
+  inverse_subdomain S f g ->
+  S' \subset S ->
+  inverse_subdomain S' f g.
+Proof.
+  intros [Heq1 Heq2] Hsub.
+  split; eapply f_eq_subdomain_antimon; eauto.
+  eapply image_monotonic; eauto. 
+Qed.       
+
+Instance Proper_inverse_subdomain {A B} : Proper (Same_set A ==> eq ==> eq ==> iff) (@inverse_subdomain A B).
+Proof. 
+  intros s1 s2 Hseq f1 f2 Hfeq g1 g2 Hgeq; subst.
+  unfold inverse_subdomain. rewrite Hseq. reflexivity.
+Qed.
+
+
+Lemma inverse_subdomain_symm A B S (f1 : A -> B) (f2 : B -> A) :
+  inverse_subdomain S f1 f2 ->
+  inverse_subdomain (image f1 S) f2 f1. 
+Proof.
+  intros [Hin1 Hin2]. split. 
+  rewrite <- image_compose.
+  rewrite image_f_eq_subdomain; [| eassumption ].
+  rewrite image_id. eassumption. eassumption.
+Qed.
+
+Lemma injective_subdomain_f_eq_subdomain {A B} S (f1 f2 : A -> B ) : 
+  injective_subdomain S f1 ->
+  f_eq_subdomain S f1 f2 ->
+  injective_subdomain S f2.
+Proof.
+  intros Hin1 Hsub x1 x2 H1 H2 Heq. eapply Hin1; eauto.
+  rewrite !Hsub; eassumption.
+Qed.

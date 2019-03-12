@@ -1,5 +1,11 @@
-all: demo demo1 demo2
+all: copy demo demo1 demo2
 
+copy:
+	cp ../theories/Runtime/gc.c ./
+	cp ../theories/Runtime/gc.h ./
+	cp ../theories/Runtime/values.h ./
+	cp ../theories/Runtime/main.c ./
+	cp ../theories/Runtime/config.h ./
 demo: demo.v
 	coqc demo.v
 

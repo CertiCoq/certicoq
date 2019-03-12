@@ -116,13 +116,13 @@ Require Import Benchmarks.Binom
         Benchmarks.Color
         Benchmarks.vs.
 
-
+ 
 Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
 
 
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
-(* Quote Recursively Definition binom := Binom.main.    *)
+ Quote Recursively Definition binom := Binom.main.    
 (* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
 Quote Recursively Definition graph_color := 2.  (*(Color.run G16)*)   
 
@@ -133,8 +133,8 @@ Quote Recursively Definition graph_color := 2.  (*(Color.run G16)*)
 
 
 
-(* Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5a) binom). *)
-Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).   
+ Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) binom). 
+(*Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).    *)
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
 
 
@@ -148,8 +148,10 @@ Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (s
 
 
 
- Section TEST_L6.
+
 (*  This can be used to test L6 (using an L5 program, extract to ML and run in ocaml to translate to L6 and then run using L6 executable semantics : *)
+
+(*
 Require Import  ExtLib.Data.String. 
 (* Multistep *)
 Fixpoint mstep_L6  (x : (cTerm certiL6)) (n:nat) :=
@@ -182,15 +184,25 @@ Definition print_BigStepResult_L6 p  n:=
 Definition comp_to_L6:= fun p =>
                        comp_L6 (translateTo (cTerm certiL5) p).
 
-
-Definition testL6 := match comp_L6 color5 with
+Definition testL6 := match comp_L6 binom5 with
                    | Ret ((pr,cenv,nenv), (env, t)) => print_BigStepResult_L6 ((pr,cenv,nenv), (env, t)) 30%nat 
                    | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
-                   end.
+                     end.
 
-(*Extraction "test_color_eg2.ml" testL6.  *)
+Require Import ExtrOcamlBasic.
+Require Import ExtrOcamlString.
+Require Import ExtrOcamlZInt.
+Require Import ExtrOcamlNatInt.
 
- End TEST_L6.
+Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
+
+Extract Constant L6_to_Clight.print => "(fun s-> print_string (String.concat """" (List.map (String.make 1) s)))".
+
+
+ Extract Constant   varImplDummyPair.varClassNVar => " (fun f (p:int*bool) -> varClass0 (f (fst p)))".
+Extraction "test_color_eg2.ml" testL6.  
+*)
+
 
 
 

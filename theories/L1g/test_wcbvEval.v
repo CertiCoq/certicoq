@@ -28,6 +28,101 @@ Check program_Program.
 Print program.
 
 (** trivial example **)
+Definition bol := bool.
+Quote Recursively Definition cbv_bol := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (bol)) in exact t).
+Print cbv_bol.
+(* [Term] of Coq's answer *)
+Definition ans_bol := Eval cbv in (main (program_Program cbv_bol)).
+Print ans_bol.
+(* [program] of the program *)
+Quote Recursively Definition p_bol := bol.
+Print p_bol.
+Definition P_bol := Eval cbv in (program_Program p_bol).
+Print P_bol.
+Goal
+  let env := (env (program_Program p_bol)) in
+  let main := (main P_bol) in
+  wcbvEval (env) 100 (main) = Ret ans_bol.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+
+Definition lstNat := list nat.
+Quote Recursively Definition cbv_lstNat := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (lstNat)) in exact t).
+Print cbv_lstNat.
+(* [Term] of Coq's answer *)
+Definition ans_lstNat := Eval cbv in (main (program_Program cbv_lstNat)).
+Print ans_lstNat.
+(* [program] of the program *)
+Quote Recursively Definition p_lstNat := lstNat.
+Print p_lstNat.
+Definition P_lstNat := Eval cbv in (program_Program p_lstNat).
+Print P_lstNat.
+Goal
+  let env := (env (program_Program p_lstNat)) in
+  let main := (main P_lstNat) in
+  wcbvEval (env) 100 (main) = Ret ans_lstNat.
+Proof.
+  vm_compute. reflexivity.
+Qed.
+
+Require Template.Ast.
+Require Import PCUIC.TemplateToPCUIC.
+Require Import TemplateExtraction.Extract.
+
+Definition tru := true.
+Quote Recursively Definition cbv_tru := (* [program] of Coq's answer *)
+  ltac:(let t:=(eval cbv in (tru)) in exact t).
+Print cbv_tru.
+(* [Term] of Coq's answer *)
+Definition ans_tru := Eval cbv in (main (program_Program cbv_tru)).
+Print ans_tru.
+(* [program] of the program *)
+Quote Recursively Definition p_tru := tru.
+Print p_tru.
+Definition P_tru := Eval cbv in (program_Program p_tru).
+Print P_tru.
+
+Definition genv := fst p_tru.
+Eval cbn in genv.
+Definition t := snd p_tru.
+Eval cbn in t.
+Definition gc := (genv, uGraph.init_graph).
+Definition genv' := trans_global gc.
+Definition genv'' := Eval cbn in extract_global genv'.
+Print genv''.
+Definition t' := Eval cbn in (extract genv' nil (trans t)).
+Print t'.
+Definition genv''': list E.global_decl :=
+  (E.InductiveDecl "Coq.Init.Datatypes.bool"
+            {|
+            E.ind_npars := 0;
+            E.ind_bodies := {|
+                            E.ind_name := "bool";
+                            E.ind_type := E.tBox;
+                            E.ind_kelim := InProp :: InSet :: InType :: nil;
+                            E.ind_ctors :=
+                              ("true", E.tBox, 0) :: ("false", E.tBox, 0) :: nil;
+                            E.ind_projs := nil |} :: nil |}
+          :: E.ConstantDecl "Top.tru"
+          {| E.cst_type := E.tBox;
+             E.cst_body :=
+               Some (E.tConstruct
+                       {| inductive_mind := "Coq.Init.Datatypes.bool";
+                          inductive_ind := 0 |} 0) |}
+          :: nil).
+Definition t''': E.term := (E.tConst "Top.tru").
+Eval cbn in (program_Pgm_aux genv''').  (* ecTrm tru is right now! *)
+Goal
+  let env := (env P_tru) in
+  let main := (main P_tru) in
+  wcbvEval (env) 100 (main) = Ret ans_tru.
+Proof.
+  compute. reflexivity.
+Qed.
+
 Definition one := 1.
 Quote Recursively Definition cbv_one := (* [program] of Coq's answer *)
   ltac:(let t:=(eval cbv in (one)) in exact t).

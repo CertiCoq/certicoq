@@ -219,7 +219,7 @@ Definition out2 := compL6_and_print test2_L5.
 End TEST_L6. 
 
 Extraction "test1_dead_param.ml" out1. 
-Extraction "test1_dead_param.ml" out2. 
+Extraction "test2_dead_param.ml" out2. 
 
 
 (*  Section TEST_L7. *)

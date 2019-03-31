@@ -95,7 +95,7 @@ Inductive Drop (S : Ensemble var) : fundefs -> exp -> fundefs -> exp -> Prop :=
   (f : var) (xs : list var) (xs' : list var) (bs : list bool) 
   (ef : exp) (ef' : exp) (ft : fTag), 
   Drop S F e F' e' -> 
-  Filter S xs xs' bs ->
+  Filter S xs xs' ->
   Drop_body f bs ef ef' ->
   Drop_body f bs e' e'' ->
   Drop_body_fundefs f bs F' F'' ->

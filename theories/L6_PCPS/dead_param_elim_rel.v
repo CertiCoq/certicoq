@@ -15,7 +15,26 @@ Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
 
-Inductive Drop_args (ys : list var) (bs : list bool) (ys' : list var) : Prop := True. 
+Fixpoint check_list_equality (l1 : list var) (l2 : list var) : bool := 
+match (l1, l2) with 
+| ([], []) => true
+| (hd1 :: tl1, hd2 :: tl2) => if (peq hd1 hd2) then check_list_equality tl1 tl2 else false 
+| _ => false
+end. 
+
+Fixpoint drop_args (ys : list var) (bs : list bool) : list var := 
+match ys, bs with 
+| [], [] => ys
+|y :: ys', b :: bs' => 
+  if (eqb b true) then y :: (drop_args ys' bs')
+  else drop_args ys' bs'
+| _, _ => ys
+end. 
+
+Fixpoint Drop_args (ys : list var) (bs : list bool) (ys' : list var) : Prop := 
+let xs' := drop_args ys bs in
+if check_list_equality xs' ys' then True
+else False. 
 
 Inductive Drop_body (f : var) (bs : list bool) : exp -> exp -> Prop := 
 | BDrop_Constr : 

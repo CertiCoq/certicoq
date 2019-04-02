@@ -65,8 +65,6 @@ Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program * Cli
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
 
-
-
 Definition compile_opt_L7 p  :=
   match p with
   | Ret p => Ret (compile_L7 p)
@@ -146,8 +144,6 @@ Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (s
 (*  Definition test := printProg (compile_L7 (ext_comp graph_color)) "output/color.c".    *)
 
 
-
-
  Section TEST_L6.
 (*  This can be used to test L6 (using an L5 program, extract to ML and run in ocaml to translate to L6 and then run using L6 executable semantics : *)
 Require Import  ExtLib.Data.String. 
@@ -179,6 +175,7 @@ Definition print_BigStepResult_L6 p  n:=
                             | Ret v =>  L6.instances.certiL5_t0_L6 v                                           
                         end.
 
+(* Compiles AST program all the way to L6 *)
 Definition comp_to_L6:= fun p =>
                        comp_L6 (translateTo (cTerm certiL5) p).
 
@@ -188,11 +185,41 @@ Definition testL6 := match comp_L6 color5 with
                    | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
                    end.
 
-(*Extraction "test_color_eg2.ml" testL6.  *)
+(* test dead parameter elimination *)
 
- End TEST_L6.
+Definition simple_test (x : nat) (y : nat) := (x + 1)%nat. 
 
+Fixpoint even (x : nat) (y : Datatypes.unit) :=
+  match x with
+  | O => true
+  | S x' => odd x' y
+  end
+with odd (x: nat) (y : Datatypes.unit) :=
+    match x with      
+    | O => false
+    | S x' => even x' y
+    end. 
 
+Quote Recursively Definition test1 := simple_test. 
+Quote Recursively Definition test2 := even. 
+
+Definition test1_L5 := Eval native_compute in translateTo (cTerm certiL5) test1.
+Definition test2_L5 := Eval native_compute in translateTo (cTerm certiL5) test2.
+
+Definition compL6_and_print testL5 :=
+  match comp_L6 testL5 with
+  | Ret (((pr, cenv'),cenv,nenv), (env, t)) =>
+    L7.L6_to_Clight.print (show_exp cenv cenv' true t) 
+  | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
+  end.
+
+Definition out1 := compL6_and_print test1_L5.
+Definition out2 := compL6_and_print test2_L5.
+
+End TEST_L6. 
+
+Extraction "test1_dead_param.ml" out1. 
+Extraction "test2_dead_param.ml" out2. 
 
 
 (*  Section TEST_L7. *)

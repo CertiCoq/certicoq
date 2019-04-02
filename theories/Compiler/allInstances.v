@@ -209,13 +209,13 @@ Extraction "test_color_eg2.ml" testL6.
 
 (*  Section TEST_L7. *)
 (* This can be used to test Clight (using an L5 program, extract to ocaml and run to translate to Clight and then run using Clightexec: *)
-
+(*
 (*  Definition binom7 :=  compile_opt_L7 (comp_L6 binom5). *)
 (* Definition vs7 :=  compile_opt_L7 (comp_L6 vs5).  *)
  Definition color7 :=  compile_opt_L7 (comp_L6 color5).  
 
 
- (*
+ 
 
  Extraction Language Ocaml.
 (* Standard lib -- Comment out if extracting full Compiler using build.sh *)

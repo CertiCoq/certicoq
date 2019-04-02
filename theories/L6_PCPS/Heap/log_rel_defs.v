@@ -412,7 +412,8 @@ Module Log_rel (H : Heap).
     Definition exp_log_rel' := exp_log_rel val_log_rel' eval_src eval_trg. 
     Definition env_log_rel_P' := env_log_rel_P val_log_rel'.
     Definition heap_log_rel' := heap_log_rel val_log_rel'.
-    
+    Definition var_log_rel' := var_log_rel val_log_rel'. 
+        
     (** * Generic Properties of the logical relation *)
 
     Context (LP : IInv)
@@ -610,4 +611,93 @@ Module Log_rel (H : Heap).
     Qed. 
 
     
+    (** * Environment extension lemmas *)
     
+    Lemma var_log_rel_env_set_eq (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+          (x y : var) (v1 v2 : value) :
+      val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+      var_log_rel' k j GP GQ b H1 (M.set x v1 rho1) H2 (M.set y v2 rho2) x y.
+    Proof.
+      intros Hval x' Hget.
+      rewrite M.gss in Hget. inv Hget. eexists.
+      rewrite M.gss. split; eauto.
+    Qed.
+    
+    Lemma var_log_rel_env_set_neq (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+          (x1 y1 x2 y2 : var) (v1 v2 : value) :
+      var_log_rel' k j GP GQ b H1 rho1 H2 rho2 x1 y1 ->
+      x1 <> x2 -> y1 <> y2 ->
+      var_log_rel' k j GP GQ b H1 (M.set x2 v1 rho1) H2 (M.set y2 v2 rho2) x1 y1.
+    Proof.
+      intros Hval Hneq1 Hneq2 x' Hget.
+      rewrite M.gso in Hget; eauto.      
+      rewrite M.gso; eauto.
+    Qed.
+  
+  Lemma var_log_rel_env_set (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+        (x y : var) (v1 v2 : value):
+    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y y ->
+    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+    var_log_rel' k j GP GQ b H1 (M.set x v1 rho1) H2 (M.set x v2 rho2) y y.
+  Proof.
+    intros Hvar Hval.
+    destruct (peq y x); subst.
+    - apply var_log_rel_env_set_eq; eauto.
+    - apply var_log_rel_env_set_neq; eauto.
+  Qed.
+  
+  Lemma var_log_rel_env_set_neq_l (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+        (y1 x1 y2 : var) (v1 : value) :
+    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y1 y2 ->
+    y1 <> x1 ->
+    var_log_rel' k j GP GQ b H1 (M.set x1 v1 rho1) H2 rho2 y1 y2.
+  Proof. 
+    intros Hval Hneq x' Hget.
+    rewrite M.gso in *; eauto.
+  Qed.
+  
+  Lemma var_log_rel_env_set_neq_r (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+        (y1 x2 y2 : var) ( v2 : value) :
+    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y1 y2 ->
+    y2 <> x2 ->
+    var_log_rel' k j GP GQ b H1 rho1 H2 (M.set x2 v2 rho2) y1 y2.
+  Proof. 
+    intros Hval Hneq x' Hget.
+    rewrite M.gso in *; eauto.
+  Qed.
+
+  (** Extend the related environments with a single point *)
+  Lemma cc_approx_env_P_set (S : Ensemble var) (k j : nat) (b : Inj)
+        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+    env_log_rel_P' S k j GP GQ b (H1, M.set x v1 rho1) (H2, M.set x v2 rho2).
+  Proof.
+    intros Henv Hval x' HP. eapply var_log_rel_env_set; eauto. 
+    eapply Henv. eassumption. 
+  Qed.
+
+  
+  Lemma cc_approx_env_P_set_not_in_S_l (S : Ensemble var) (k j : nat) (b : Inj)
+        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 : value) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    ~ x \in S -> 
+    env_log_rel_P' S k j GP GQ b (H1, M.set x v1 rho1) (H2, rho2).
+  Proof.
+    intros Henv Hval x' HP. eapply var_log_rel_env_set_neq_l; eauto.
+    eapply Henv; eauto.
+    intros Hc; subst; contradiction.
+  Qed.
+
+  Lemma cc_approx_env_P_set_not_in_S_r (S : Ensemble var) (k j : nat) (b : Inj)
+        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    ~ x \in S -> 
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, M.set x v1 rho2).
+  Proof.
+    intros Henv Hval x' HP. eapply var_log_rel_env_set_neq_r; eauto.
+    eapply Henv; eauto.
+    intros Hc; subst; contradiction.
+  Qed.
+  
+  

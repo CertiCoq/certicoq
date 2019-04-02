@@ -1041,6 +1041,7 @@ Module CC_log_rel (H : Heap).
     eexists; split; eauto. erewrite <- setlist_not_In. eassumption. eassumption.
     intros Hc. eapply Hnin. constructor; eauto.
   Qed.
+  
   (** * Related values are well-defined in the heap *)
 
   Lemma cc_approx_val_dom1 (k j : nat) v1 v2 H1 H2 :

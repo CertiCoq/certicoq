@@ -82,6 +82,10 @@ extraction/string1.ml
 extraction/usefulTypes.ml
 extraction/zArith_dec.ml
 extraction/zbool.ml
+extraction/astUtils.ml
+extraction/astUtils.mli
+extraction/eTyping.ml
+extraction/eTyping.mli
 extraction/compile0.mli
 extraction/compile1.mli
 extraction/compile2.mli

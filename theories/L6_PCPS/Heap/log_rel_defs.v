@@ -10,7 +10,7 @@ From CertiCoq.L6 Require Import functions cps eval cps_util identifiers ctx Ense
 From compcert Require Import lib.Coqlib.
 
 
-Module Log_rel (H : Heap).
+Module LogRelDefs (H : Heap).
 
   Module Sem := SpaceSem H.
 
@@ -667,7 +667,7 @@ Module Log_rel (H : Heap).
   Qed.
 
   (** Extend the related environments with a single point *)
-  Lemma cc_approx_env_P_set (S : Ensemble var) (k j : nat) (b : Inj)
+  Lemma env_log_rel_P_set (S : Ensemble var) (k j : nat) (b : Inj)
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
     env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
     val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
@@ -678,7 +678,7 @@ Module Log_rel (H : Heap).
   Qed.
 
   
-  Lemma cc_approx_env_P_set_not_in_S_l (S : Ensemble var) (k j : nat) (b : Inj)
+  Lemma  env_log_rel_P_set_not_in_S_l (S : Ensemble var) (k j : nat) (b : Inj)
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 : value) :
     env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
     ~ x \in S -> 
@@ -689,7 +689,7 @@ Module Log_rel (H : Heap).
     intros Hc; subst; contradiction.
   Qed.
 
-  Lemma cc_approx_env_P_set_not_in_S_r (S : Ensemble var) (k j : nat) (b : Inj)
+  Lemma env_log_rel_P_set_not_in_S_r (S : Ensemble var) (k j : nat) (b : Inj)
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
     env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
     ~ x \in S -> 
@@ -699,5 +699,334 @@ Module Log_rel (H : Heap).
     eapply Henv; eauto.
     intros Hc; subst; contradiction.
   Qed.
+  
+  (** Extend the related environments with a list *)
+  Lemma env_log_rel_P_setlist_l (S : Ensemble var) (k j : nat) b
+        (rho1 rho2 rho1' rho2' : env) (H1 H2 : heap block) xs (vs1 vs2 : list value) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
+    setlist xs vs1 rho1 = Some rho1' ->
+    setlist xs vs2 rho2 = Some rho2' ->
+    env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2').
+  Proof.
+    intros Hcc Hall Hset1 Hset2 x HP v Hget.
+    destruct (in_dec var_dec x xs).
+    - edestruct (@setlist_Forall2_get value) as [v1 [v2 [Hget1 [Hget2 HP']]]];
+        try eassumption. subst_exp. repeat eexists; eauto.
+    - erewrite <- setlist_not_In in Hget; eauto.
+      edestruct Hcc as [v2 [Hget' Hpre']]; eauto.
+      repeat eexists; eauto.
+      erewrite <- setlist_not_In; eauto.
+  Qed.
+  
+  Lemma env_log_rel_P_setlist_not_in_P_l (S : Ensemble var) (k j : nat) b
+        (rho1 rho1' rho2 : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    Disjoint _ (FromList xs) S ->
+    setlist xs vs rho1 = Some rho1' ->
+    env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2).
+  Proof. 
+    intros Hcc Hnin Hset y Py v' Hget.
+    edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
+    erewrite setlist_not_In. eassumption. eassumption.
+    intros Hc. eapply Hnin. constructor; eauto.
+  Qed.
+
+  Lemma env_log_rel_P_setlist_not_in_P_r (S : Ensemble var) (k j : nat) b
+        (rho1 rho2 rho2' : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    Disjoint _ (FromList xs) S ->
+    setlist xs vs rho2 = Some rho2' ->
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2').
+  Proof.
+    intros Hcc Hnin Hset y Py v' Hget.
+    edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
+    eexists; split; eauto. erewrite <- setlist_not_In. eassumption. eassumption.
+    intros Hc. eapply Hnin. constructor; eauto.
+  Qed.
+
+  (** * Related values are well-defined in the heap *)
+
+  Lemma val_log_rel_in_dom1 (k j : nat) b v1 v2 H1 H2 :
+    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+    val_loc v1 \subset dom H1.
+  Proof.
+    intros Hcc h Hin; destruct v1 as [l1|]; inv Hin.
+    destruct v2  as [l2|]; try contradiction.
+    simpl in Hcc.
+    destruct (get h H1) eqn:Hget; [| destruct Hcc; contradiction ].
+    clear LP LQ .
+    now firstorder.
+  Qed.
+  
+  Lemma val_log_rel_in_dom2 (k j : nat) b v1 v2 H1 H2 :
+    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+    val_loc v2 \subset dom H2.
+  Proof.
+    clear LP LQ.
+    intros Hcc l2 Hin; destruct v2 as [l2'|]; inv Hin.
+    destruct v1 as [l1|]; try contradiction.
+    simpl in Hcc.
+    destruct (get l1 H1) as [b1 | ] eqn:Hget; [| destruct Hcc; contradiction ].
+    destruct Hcc as [Heq1 Hcc].
+    destruct b1 as [c1 vs1 | v1 v2 | ]; try contradiction.
+    
+    destruct (get l2 H2) as [b2 | ] eqn:Hget'; [| contradiction ].
+    now eexists; eauto.
+    
+    destruct (get l2 H2) as [b2 | ] eqn:Hget'; [| contradiction ].
+    now eexists; eauto.
+  Qed.
+
+  
+  Lemma val_log_rel_Forall2_dom1 (k j : nat) b (H1 H2 : heap block)
+        vs1 vs2 :
+    Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
+    Union_list (map val_loc vs1) \subset dom H1.  
+  Proof.
+    intros Hall. induction Hall; simpl.
+    - now eauto with Ensembles_DB.
+    - eapply Union_Included; [| eassumption ].
+      eapply val_log_rel_in_dom1; eauto.
+  Qed.
+
+  Lemma val_log_rel_Forall2_dom2 (k j : nat) b (rho1 rho2 : env) (H1 H2 : heap block) vs1 vs2 :
+    Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
+    Union_list (map val_loc vs2) \subset dom H2.  
+  Proof.
+    intros Hall. induction Hall; simpl.
+    - now eauto with Ensembles_DB.
+    - eapply Union_Included; [| eassumption ].
+      eapply val_log_rel_in_dom2; eauto.
+  Qed.
+  
+
+  Lemma env_log_rel_P_in_dom1 (R : Ensemble var) (k j : nat) b
+        rho1 rho2 H1 H2 :
+    env_log_rel_P' R k j GP GQ b (H1, rho1) (H2, rho2) ->
+    env_locs rho1 R \subset dom H1.  
+  Proof. 
+    intros Hcc x [y [Hget Hin]].
+    destruct (M.get y rho1) as [ [l1 |] | ] eqn:Hgetl; [| now inv Hin | now inv Hin ].
+    inv Hin. edestruct Hcc as [v2 [Hget' Hcc']]; eauto.
+    eapply val_log_rel_in_dom1. eassumption. reflexivity.
+  Qed.
+  
+  Lemma env_log_rel_P_in_dom2 (R : Ensemble var) (k j : nat) b
+        rho1 rho2 H1 H2 :
+    env_log_rel_P' R k j GP GQ b (H1, rho1) (H2, rho2) ->
+    binding_in_map R rho1 ->
+    env_locs rho2 R \subset dom H2.  
+  Proof. 
+    intros Hcc Hbin x [y [Hget Hin]].
+    edestruct Hbin as [v1 Hget1]. eassumption.
+    destruct (M.get y rho2) as [ [l1 |] | ] eqn:Hgetl; [| now inv Hin | now inv Hin ].
+    inv Hin. edestruct Hcc as [v2 [Hget' Hcc']]; eauto.
+    eapply val_log_rel_in_dom2. eassumption. subst_exp. reflexivity.
+  Qed.
+
+  Lemma heap_log_rel_in_dom1 (k j : nat) S b H1 H2 : 
+    heap_log_rel' S k j GP GQ b H1 H2 ->
+    S \subset dom H1.
+  Proof.
+    intros Hh x Hin. eapply Hh in Hin.
+    eapply val_log_rel_in_dom1. eassumption. reflexivity. 
+  Qed.
+
+  Lemma heap_log_rel_in_dom2 (k j : nat) S b H1 H2 : 
+    heap_log_rel' S k j GP GQ b H1 H2 ->
+    image b S \subset dom H2.
+  Proof.
+    intros Hh x [y [Hin Heq]]. subst. eapply Hh in Hin.
+    eapply val_log_rel_in_dom2. eassumption. reflexivity.
+  Qed.
+
+  (** Properties of the renaming *)
+  
+  Lemma val_log_rel_loc_eq (k j : nat) b H1 H2 l v2 :
+    val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (v2, H2)) ->
+    v2 = Loc (b l).
+  Proof.
+    intros Hcc. destruct v2; [| now inv Hcc ].
+    destruct Hcc as [Heq _].
+    congruence.
+  Qed.
+  
+  Lemma var_log_rel_env_image_reach
+        (k : nat) j b (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
+    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 x y ->
+    M.get x rho1 = Some v ->
+    image b (env_locs rho1 [set x]) <--> (env_locs rho2 [set y]). 
+  Proof.
+    intros Hcc Hget.
+    edestruct Hcc as [v' [Hget' Hv]]; eauto.
+    rewrite !env_locs_Singleton at 1; eauto.
+    destruct v; destruct v'; try contradiction; simpl.
+    eapply val_log_rel_loc_eq in Hv. inv Hv.
+    now rewrite image_Singleton. 
+    now rewrite image_Empty_set.
+  Qed.
+  
+
+  Lemma env_log_rel_locs_image S (k j : nat) b
+        (H1 H2 : heap block) (rho1 rho2 : env) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    binding_in_map S rho1 ->
+    image b (env_locs rho1 S) <--> (env_locs rho2 S).
+  Proof.
+    intros Hres HB. split.
+    - intros l' [l [Hin Heq]]; subst.
+      destruct Hin as [x [Hin Hp]].
+      destruct (M.get x rho1) as[[l1' |] | ] eqn:Hgetx1; try now inv Hp.
+      inv Hp. eapply Hres in Hgetx1.
+      edestruct Hgetx1 as [l2 [Hget2 Hval]].
+      eapply val_log_rel_loc_eq in Hval. subst.
+      eexists; split; eauto. rewrite Hget2. reflexivity. eassumption.
+    - intros l [x [Hin Hr]].
+      destruct (M.get x rho2) as[[l1' |] | ] eqn:Hgetx1; inv Hr. 
+      edestruct HB as [[l1| ] Hget1]. eassumption.
+      assert (Hget1' := Hget1). 
+      edestruct Hres as [l2 [Hget2 Hval]].
+      eassumption. eassumption.
+      repeat subst_exp. 
+      eapply val_log_rel_loc_eq in Hval. inv Hval. 
+      eexists; split; eauto.
+      eexists; split; eauto.
+      rewrite Hget1. reflexivity.
+
+      edestruct Hres as [l2 [Hget2 Hval]]; try eassumption.
+      repeat subst_exp. contradiction.
+  Qed. 
+
+  
+  Lemma env_log_rel_val_log_rel S (k j : nat) b
+        (H1 H2 : heap block) (rho1 rho2 : env) l :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    l \in env_locs rho1 S ->
+    val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (Loc (b l), H2)).
+  Proof.
+    intros Henv [x [Hin Hget]].
+    edestruct (M.get x rho1) as [[l'|] | ] eqn:Hget1; inv Hget.  
+    edestruct Henv as [[l2 |] [Hget2 Hv]].
+    eassumption. eassumption.
+    assert (Hleq : l2 = b l). 
+    { eapply val_log_rel_loc_eq in Hv. now inv Hv. }
+    subst. eassumption.
+
+    now inv Hv. 
+  Qed.
+
+  Lemma heap_log_rel_val_log_rel S (k j : nat) b
+        (H1 H2 : heap block) l :
+    heap_log_rel' S k j GP GQ b H1 H2 ->
+    l \in S ->
+    val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (Loc (b l), H2)).
+  Proof. eauto. Qed.
+
+
+  (** * Getlist lemmas *)
+
+  Lemma var_log_rel_getlist (k j : nat)
+        (rho1 rho2 : env) (b : Inj) (H1 H2 : heap block) xs ys vs1 :
+    Forall2 (var_log_rel' k j GP GQ b H1 rho1 H2 rho2) xs ys ->
+    getlist xs rho1 = Some vs1 ->
+    exists vs2,
+      getlist ys rho2 = Some vs2 /\
+      Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
+  Proof.
+    revert ys vs1. induction xs as [| x xs IHxs]; intros ys vs1 Hall Hget.
+    - destruct ys; inv Hall. inv Hget. eexists. split; simpl; eauto.
+    - simpl in Hget.
+      destruct (M.get x rho1) eqn:Heq1; try discriminate.
+      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      destruct ys as [| y ys]; inv Hall. 
+      destruct (IHxs ys l H6 eq_refl) as [vs2 [Hget HAll]].
+      destruct (H4 _ Heq1) as [v2 [Heq Hpre]].
+      eexists. split; simpl; eauto. rewrite Hget. rewrite Heq. reflexivity.
+  Qed.
+  
+  Lemma env_log_rel_P_getlist_l (S : Ensemble var) (k j : nat) b
+        (rho1 rho2 : env) (β : Inj) (H1 H2 : heap block)
+        (xs : list var) (vs1 : list value) :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2)  ->
+    (FromList xs) \subset S ->
+    getlist xs rho1 = Some vs1 ->
+    exists vs2,
+      getlist xs rho2 = Some vs2 /\
+      Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
+  Proof.
+    intros Henv. revert vs1.
+    induction xs as [| x xs IHxs]; intros ls1 Hp Hget.
+    - inv Hget. eexists. split; simpl; eauto.
+    - simpl in Hget. destruct (M.get x rho1) eqn:Heq1; try discriminate.
+      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      edestruct (IHxs l) as  [vs2 [Hget HAll]]; eauto.
+      + intros x' Hin. eapply Hp. constructor 2; eauto.
+      + eapply Henv in Heq1. destruct Heq1 as [v2 [Hyp1 Hyp2]].
+        eexists. split; simpl; eauto. rewrite Hyp1. rewrite Hget.
+        constructor. apply Hp. now constructor.
+  Qed.
+  
+  Lemma env_log_rel_P_getlist_all (k : nat) b
+        (rho1 rho2 : env) (H1 H2 : heap block)
+        xs ys vs1 :
+    Forall2 (fun x1 x2 =>
+               forall j, var_log_rel' k j GP GQ b H1 rho1 H2 rho2 x1 x2
+            ) xs ys ->
+    getlist xs rho1 = Some vs1 ->
+    exists vs2,
+      getlist ys rho2 = Some vs2 /\
+      Forall2 (fun v1 v2 => forall j, val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)))
+              vs1 vs2.
+  Proof.
+    revert ys vs1. induction xs as [| x xs IHxs]; intros ys vs1 Hall Hget.
+    - destruct ys; inv Hall. inv Hget. eexists. split; simpl; eauto.
+    - simpl in Hget.
+      destruct (M.get x rho1) eqn:Heq1; try discriminate.
+      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      destruct ys as [| y ys]; inv Hall. 
+      destruct (IHxs ys l H6 eq_refl) as [vs2 [Hget Hall]].
+      destruct (H4 0 _ Heq1) as [v2 [Heq Hpre]].
+      eexists (v2 :: vs2). split. simpl. 
+      rewrite Hget. rewrite Heq.
+      reflexivity.
+      constructor; [| eassumption ].
+      intros j'. 
+      destruct (H4 j' _ Heq1) as [v2' [Heq' Hpre']].
+      repeat subst_exp. eassumption.
+  Qed.
+  
+  Lemma env_log_rel_P_getlist_l_all (S : Ensemble var) (k : nat) b
+        (rho1 rho2 : env)
+        (H1 H2 : heap block) (xs : list var) (vs1 : list value) :
+    (forall j, env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2))  ->
+    (FromList xs) \subset S ->
+    getlist xs rho1 = Some vs1 ->
+    exists vs2,
+      getlist xs rho2 = Some vs2 /\
+      Forall2 (fun v1 v2 => forall j, val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
+  Proof.
+    intros Henv. revert vs1.
+    induction xs as [| x xs IHxs]; intros ls1 Hp Hget.
+    - inv Hget. eexists. split; simpl; eauto.
+    - simpl in Hget. destruct (M.get x rho1) eqn:Heq1; try discriminate.
+      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      edestruct (IHxs l) as  [vs2 [Hget HAll]]; eauto.
+      + intros x' Hin. eapply Hp. constructor 2; eauto.
+      + edestruct (Henv 0) as [v2 [Hyp1 Hyp2]].
+        eapply Hp. now left.  eassumption.
+        
+        eexists. split; eauto. simpl. rewrite Hyp1. rewrite Hget. reflexivity.
+        
+        constructor. intros j.
+        edestruct (Henv j) as [v2' [Hyp1' Hyp2']].
+        eapply Hp. now left.  eassumption.
+        repeat subst_exp. eassumption. 
+        eassumption.
+  Qed.
+
+  End ValRelDef.
+
+End LogRelDefs. 
   
   

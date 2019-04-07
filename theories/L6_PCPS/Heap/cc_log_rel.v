@@ -2142,7 +2142,7 @@ Module CC_log_rel (H : Heap).
     eassumption.
   Qed.
 
-  
+  (* Logical relation respects heap equivalence *)
 
   Lemma cc_approx_val_res_eq (k j : nat) (b' b1 b2 : Inj) (H1 H2 H1' H2' : heap block)
         (v1 v2 v1' v2' : value) :
@@ -2459,6 +2459,7 @@ Module CC_log_rel (H : Heap).
 
   
   (** * Getlist lemmas *)
+  
     Lemma cc_approx_var_env_getlist (k j : nat)
         (rho1 rho2 : env) (β : Inj) (H1 H2 : heap block) xs ys vs1 :
     Forall2 (cc_approx_var_env k j GIP GP β H1 rho1 H2 rho2) xs ys ->

@@ -112,7 +112,10 @@ Module LogRelDefs (H : Heap).
 
     (* Passed to the caller *)
     Definition fun_body_rel : Type :=
-      IInv -> Inv -> Inj -> list value -> heap block -> list value -> heap block -> Conf -> Conf -> Prop.  
+      IInv -> IInv -> Inv -> Inj -> list value -> heap block -> list value -> heap block -> Conf -> Conf -> Prop.  
+
+    (* NOTE : We are passing two preconditions. The first one is enforced at the configurations right after function entry.
+              The second one is passed along with the postcondition to the extression relation.  *)
     
     Definition val_rel : Type :=
       res -> res -> Prop. 
@@ -126,7 +129,7 @@ Module LogRelDefs (H : Heap).
     Require Import Coq.Classes.Morphisms Coq.Classes.RelationClasses.
     
     Definition fun_body_args : Tlist :=      
-      Tcons IInv (Tcons Inv (Tcons Inj (Tcons (list value) (Tcons (heap block) (Tcons (list value) (Tcons (heap block) (Tcons Conf (Tcons Conf Tnil)))))))).
+      Tcons IInv (Tcons IInv (Tcons Inv (Tcons Inj (Tcons (list value) (Tcons (heap block) (Tcons (list value) (Tcons (heap block) (Tcons Conf (Tcons Conf Tnil))))))))).
     
     
     Definition val_rel_args : Tlist :=
@@ -149,7 +152,7 @@ Module LogRelDefs (H : Heap).
       let fix val_log_rel_aux 
               (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) {struct j} : Prop :=
           (* Function relation *)
-          let fun_body_rel PL QL b (* local pre and post, picked by the caller *)
+          let fun_body_rel PL' PL QL b (* local pre and post, picked by the caller *)
                            (vs1 : list value) (H1 : heap block) 
                            (vs2 : list value) (H2 : heap block) 
                            (c1 c2 : Conf) :=
@@ -162,7 +165,7 @@ Module LogRelDefs (H : Heap).
                   | S k =>
                     let R j v1 v2 := val_log_rel (k - (k - i)) j IP P b (Res (v1, H1)) (Res (v2, H2)) in
                     (forall j, Forall2 (R j) vs1 vs2) ->
-                    (PL (H1', rho1, e1) (H2, rho2, e2)) /\
+                    (PL' (H1', rho1, e1) (H2, rho2, e2)) /\
                     (forall j, exp_log_rel val_log_rel eval_src eval_trg
                                       (k - (k - i))
                                       j
@@ -210,7 +213,7 @@ Module LogRelDefs (H : Heap).
     (* Unfolding one step of the recursion *)
     Definition val_log_rel' (k : nat)  (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) : Prop :=
       (* Function relation *)
-      let fun_body_rel PL QL b (* local pre and post, picked by the caller *)
+      let fun_body_rel PL' PL QL b (* local pre and post, picked by the caller *)
                        (vs1 : list value) (H1 : heap block) 
                        (vs2 : list value) (H2 : heap block) 
                        (c1 c2 : Conf) :=
@@ -219,7 +222,7 @@ Module LogRelDefs (H : Heap).
           forall i, (i < k)%nat ->
                let R j v1 v2 := val_log_rel i j IP P b (Res (v1, H1)) (Res (v2, H2)) in
                (forall j, Forall2 (R j) vs1 vs2) ->
-               (PL (H1', rho1, e1) (H2, rho2, e2)) /\
+               (PL' (H1', rho1, e1) (H2, rho2, e2)) /\
                (forall j, exp_log_rel val_log_rel eval_src eval_trg
                                  i
                                  j
@@ -271,7 +274,7 @@ Module LogRelDefs (H : Heap).
             destruct Hyp2 as [Hyp2 Hyp3]. split; eauto.
             eapply Forall2_monotonic; [| eassumption ]. intros. omega.
           * eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto. exfalso. omega. }
             { simpl. intros [r1 Hv1] [r2 Hv2].  
               split; intros; eauto. exfalso. omega. }
@@ -282,12 +285,12 @@ Module LogRelDefs (H : Heap).
             destruct Hyp2 as [Hyp2 Hyp3]. split; eauto.
             eapply Forall2_monotonic; [| eassumption ]. intros. omega.
           * eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto. exfalso. omega. }
             { simpl. intros [r1 Hv1] [r2 Hv2].  
               split; intros; eauto. exfalso. omega. }
       - simpl. eapply Proper_fun_rel.
-        simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+        simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
         split; intros; eauto. exfalso. omega.
       - simpl. split. 
         + intros [Hyp1 Hyp2]. split; eauto. 
@@ -299,7 +302,7 @@ Module LogRelDefs (H : Heap).
             simpl in *. intros v1 v2 Hyp i Hlt.
             replace i with (j - (j - i)) by omega. eapply Hyp. omega.
           * eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto. exfalso. omega. }
             { simpl. intros [r1 Hv1] [r2 Hv2].  
               split; intros; eauto.
@@ -313,14 +316,14 @@ Module LogRelDefs (H : Heap).
             eapply Forall2_monotonic; [| eassumption ]. intros v1 v2 Hyp i Hlt.
             replace (j - (j - i)) with i by omega. eapply Hyp. omega.
           * eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto. exfalso. omega. }
             { simpl. intros [r1 Hv1] [r2 Hv2].  
               split; intros; eauto.
               replace i with (j - (j - i)) by omega. eapply H. omega.
               replace (j - (j - i)) with i by omega. eapply H. omega. }
       - simpl. eapply Proper_fun_rel.
-        simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+        simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
         split; intros; eauto. exfalso. omega.
       - simpl. split. 
         + intros [Hyp1 Hyp2]. split; eauto. 
@@ -330,7 +333,7 @@ Module LogRelDefs (H : Heap).
             destruct Hyp2 as [Hyp2 Hyp3]. split; eauto. 
             eapply Forall2_monotonic; [| eassumption ]. intros; omega.
           * eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto.
               replace (k - (k - i)) with i by omega. eapply H. omega.
               replace i with (k - (k - i)) by omega. eassumption.
@@ -347,7 +350,7 @@ Module LogRelDefs (H : Heap).
             eapply Forall2_monotonic; [| eassumption ].
             intros; eauto.
           *  eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto.
               replace i with  (k - (k - i)) by omega. eapply H. omega.
               replace (k - (k - i)) with i by omega. eassumption.
@@ -356,7 +359,7 @@ Module LogRelDefs (H : Heap).
             { simpl. intros [r1 Hv1] [r2 Hv2].  
               split; intros; eauto. omega. }
       - simpl. eapply Proper_fun_rel.
-        simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+        simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
         split; intros; eauto.
         replace i with  (k - (k - i)) by omega. eapply H. omega.
         replace (k - (k - i)) with i by omega. eassumption.
@@ -372,7 +375,7 @@ Module LogRelDefs (H : Heap).
             intros v1 v2 Hyp i Hlt.
             replace i with (j - (j - i)) by omega. eapply Hyp. omega.
           * eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto.
               replace (k - (k - i)) with i by omega. eapply H. omega.
               replace i with  (k - (k - i)) by omega. eassumption.
@@ -390,7 +393,7 @@ Module LogRelDefs (H : Heap).
             eapply Forall2_monotonic; [| eassumption ]. intros v1 v2 Hyp i Hlt.
             replace (j - (j - i)) with i by omega. eapply Hyp. omega.
           * eapply Proper_clos_rel; [| | eassumption ].
-            { simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+            { simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
               split; intros; eauto.
               replace i with  (k - (k - i)) by omega. eapply H. omega.
               replace (k - (k - i)) with i by omega. eassumption.
@@ -401,7 +404,7 @@ Module LogRelDefs (H : Heap).
               replace i with (j - (j - i)) by omega. eapply H. omega.
               replace (j - (j - i)) with i by omega. eapply H. omega. }
       - simpl. eapply Proper_fun_rel.
-        simpl. intros P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
+        simpl. intros P1' P1 Q1 d ls1 Hl1 ls2 Hl2 [[H11 rho11] e11] [[H12 rho12] e12]. 
         split; intros; eauto.
         replace i with  (k - (k - i)) by omega. eapply H. omega.
         replace (k - (k - i)) with i by omega. eassumption.
@@ -452,7 +455,7 @@ Module LogRelDefs (H : Heap).
         setoid_rewrite val_log_rel_eq.  intros i Hlt. eapply IHj; try eassumption.
         setoid_rewrite <- val_log_rel_eq. eauto.
       + eapply Proper_clos_rel_cov; [| | eassumption ].
-        * simpl. intros P Q b' vs1' H1' vs2' H2' [[H1'' rho1'] e1'] [[H2'' rho2'] e2'] Hyp.
+        * simpl. intros P' P Q b' vs1' H1' vs2' H2' [[H1'' rho1'] e1'] [[H2'' rho2'] e2'] Hyp.
           intros i Hlt Hall. eapply Hyp. omega.
           intros j'. eapply Forall2_monotonic; [| now eauto ].
           intros x1 x2 Hyp1. eapply Hyp1.
@@ -461,7 +464,7 @@ Module LogRelDefs (H : Heap).
           setoid_rewrite <- val_log_rel_eq. now eauto. omega.
       + eassumption.
     - intros Hyp Hleq. eapply Proper_fun_rel_cov; [| eassumption ]. 
-      simpl. intros P Q b' vs1' H1' vs2' H2' [[H1'' rho1'] e1'] [[H2'' rho2'] e2'] Hyp1.
+      simpl. intros P' P Q b' vs1' H1' vs2' H2' [[H1'' rho1'] e1'] [[H2'' rho2'] e2'] Hyp1.
       intros i Hlt Hall. eapply Hyp1. omega.
       intros j'. eapply Forall2_monotonic; [| now eauto ].
       intros x1 x2 Hyp2. eapply Hyp2.
@@ -502,7 +505,7 @@ Module LogRelDefs (H : Heap).
           setoid_rewrite val_log_rel_eq.  intros i' Hlt. eapply IHk with (j := i'); try eassumption.
           setoid_rewrite <- val_log_rel_eq. eapply Hap. omega. omega.
         + eapply Proper_clos_rel_cov; [| | eassumption ].
-          * simpl. intros P Q b' vs1' H1' vs2' H2' [[H1'' rho1'] e1'] [[H2'' rho2'] e2'] Hyp.
+          * simpl. intros P' P Q b' vs1' H1' vs2' H2' [[H1'' rho1'] e1'] [[H2'' rho2'] e2'] Hyp.
             intros i' Hlt Hall. eapply Hyp. omega.
             intros j'. eapply Forall2_monotonic; [| now eauto ].
             intros x1 x2 Hyp1. eapply Hyp1.
@@ -528,23 +531,23 @@ Module LogRelDefs (H : Heap).
 
     (* Index-set monotonicity *)
     
-    Lemma env_log_rel_P_antimon S1 S2 k j b c1 c2 :
-      env_log_rel_P' S1 k j GP GQ b c1 c2 ->
+    Lemma env_log_rel_P_antimon GP' GQ' S1 S2 k j b c1 c2 :
+      env_log_rel_P' S1 k j GP' GQ' b c1 c2 ->
       S2 \subset S1 -> 
-      env_log_rel_P' S2 k j GP GQ b c1 c2.
+      env_log_rel_P' S2 k j GP' GQ' b c1 c2.
     Proof.
       destruct c1 as [H1 rho1]; destruct c2 as [H2 rho2].
       intros Hpre Hin x Hin'. eapply Hpre; eapply Hin; eauto.
     Qed.
     
-    Lemma heap_log_rel_P_antimon S1 S2 k j b H1 H2 :
-      heap_log_rel' S1 k j GP GQ b H1 H2 ->
+    Lemma heap_log_rel_P_antimon GP' GQ' S1 S2 k j b H1 H2 :
+      heap_log_rel' S1 k j GP' GQ' b H1 H2 ->
       S2 \subset S1 -> 
-      heap_log_rel' S2 k j GP GQ b H1 H2.
+      heap_log_rel' S2 k j GP' GQ' b H1 H2.
     Proof.
       intros Hpre Hin x Hin'. eapply Hpre; eapply Hin; eauto.
     Qed.
-
+    
     (* TODO pre and post monotonicity *)
     
     (** * Set lemmas *)
@@ -1024,9 +1027,89 @@ Module LogRelDefs (H : Heap).
         repeat subst_exp. eassumption. 
         eassumption.
   Qed.
+  
+  (** * Logical relation respects heap_equivalence *)
+
+  Lemma exp_log_rel_heap_env_equiv k i P Q b1 b2
+        H1 rho1 H1' rho1' e1 H2 rho2 H2' rho2' e2 :
+    exp_log_rel' k i P GP Q GQ (H1, rho1, e1) (H2, rho2, e2) ->
+    
+    occurs_free e1 |- (H1, rho1) ⩪_( id, b1) (H1', rho1') ->
+    injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) b1 ->
+    occurs_free e2 |- (H2, rho2) ⩪_( b2, id) (H2', rho2') ->
+    injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e2))) b2 ->
+
+    exp_log_rel' k i P GP Q GQ (H1', rho1', e1) (H2', rho2', e2).
+  Proof.
+
+    intros Hexp Heq1 Hinj1 Heq2 Hinj2 b1' b2' H1'' H2'' rho1'' rho2''
+           r1 c1 m1 Heq1' Hinj1' Heq2' Hinj2' Hpre Hleq Hstep Hns. 
+ 
+    eapply Hexp.
+    
+    + eapply heap_env_equiv_f_compose; [| eassumption ].
+      rewrite compose_id_neut_r. eassumption.
+    + eapply injective_subdomain_compose. eassumption.
+      rewrite <- heap_env_equiv_image_reach; try eassumption. 
+      rewrite image_id. eassumption.
+    + symmetry. 
+      eapply heap_env_equiv_f_compose; symmetry; [| eassumption ].
+      rewrite compose_id_neut_r. eassumption.
+    + eapply injective_subdomain_compose. eassumption.
+      rewrite <- heap_env_equiv_image_reach; try eassumption. 
+      rewrite image_id. eassumption. symmetry. eassumption.
+    + eassumption.
+    + eassumption.
+    + eassumption.
+    + eassumption.
+  Qed.
+
+  (** * Heap monotonicity *)
+  Lemma exp_log_rel_heap_monotonic (k j : nat) P Q (H1 H2 H1' H2' : heap block)
+        (rho1 rho2 : env) (e1 e2 : exp) :
+    exp_log_rel' k j P GP Q GQ (H1, rho1, e1) (H2, rho2, e2) ->
+    
+    well_formed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
+    well_formed (reach' H2 (env_locs rho2 (occurs_free e2))) H2 ->
+    (env_locs rho1 (occurs_free e1)) \subset dom H1 ->
+    (env_locs rho2 (occurs_free e2)) \subset dom H2 ->
+    
+    H1 ⊑ H1' -> H2 ⊑ H2' ->
+
+    exp_log_rel' k j P GP Q GQ (H1', rho1, e1) (H2', rho2, e2).
+  Proof.
+    intros Hyp Hwf1 Hwf22 Hs1 Hs2 Hsub1 Hsub2 b1 b2 H3 H4 rho1' rho2' r1 c1 m1
+           Heq1 Hinj1 Heq2 Hinj2 HIP Hleq Hstep Hns.
+    eapply Hyp; [ | | | | eassumption | eassumption | eassumption | eassumption ].
+    edestruct Equivalence_heap_env_equiv with (S := (occurs_free e1)). (* ? *)
+    eapply Equivalence_Transitive.
+    eapply subheap_heap_env_equiv; try eassumption. now eapply reach'_extensive.
+    eassumption. eassumption.
+    edestruct Equivalence_heap_env_equiv with (S := (occurs_free e2)). (* ? *)
+    eapply Equivalence_Transitive.
+    eapply subheap_heap_env_equiv; try eassumption. now eapply reach'_extensive.
+    eassumption.
+    eapply injective_subdomain_antimon. eassumption.
+    eapply reach'_heap_monotonic. eassumption.
+  Qed.
+  
+  Global Instance env_log_rel_P_proper_set :
+    Proper (Same_set var ==> Logic.eq ==>  Logic.eq ==> Logic.eq ==> Logic.eq ==>
+            Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+           env_log_rel_P'.
+  Proof.
+    intros s1 s2 [H1 H2]; split; intros Hpre; subst;
+    eapply env_log_rel_P_antimon; subst; eauto. 
+  Qed.
+
+  Global Instance heap_log_rel_proper_set :
+    Proper (Same_set _ ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff)
+           heap_log_rel'.
+  Proof.
+    intros s1 s2 Hseq; constructor; subst;
+    intros Hcc z Hin; eapply Hcc; eapply Hseq; eauto.
+  Qed.
 
   End ValRelDef.
 
 End LogRelDefs. 
-  
-  

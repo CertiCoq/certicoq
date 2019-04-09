@@ -412,6 +412,8 @@ Module LogRelDefs (H : Heap).
         replace i with  (k - (k - i)) by omega. eassumption.
     Qed. 
 
+    Opaque val_log_rel.
+    
     Definition exp_log_rel' := exp_log_rel val_log_rel' eval_src eval_trg. 
     Definition env_log_rel_P' := env_log_rel_P val_log_rel'.
     Definition heap_log_rel' := heap_log_rel val_log_rel'.

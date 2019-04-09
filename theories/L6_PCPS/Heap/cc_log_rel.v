@@ -1282,7 +1282,7 @@ Module CC_log_rel (H : Heap).
       simpl plus in Hres1.
       eapply cc_approx_val_post_cc in Hin1; [| eassumption ]. inv Hin1. 
       eapply IHn; try eassumption. omega.
-
+ 
       destruct n. inv Hinp. now right. 
       edestruct H as (Hleq & rho1 & c & vs & FLS & Hget1 & Hnd & Heq & Hget2 & Hall). 
       replace (S n) with (n + 1) in Hinp by omega.
@@ -1805,7 +1805,7 @@ Module CC_log_rel (H : Heap).
   Qed.
 
   Lemma cc_approx_val_well_formed_reach1 (k : nat) v1 v2 H1 H2 :
-    (forall j, Res (v1, H1) ≺ ^ (k; j; GIP ; GP; b) Res (v2, H2)) ->
+    (forall j, Res (v1, H1) ≺ ^ (k; j; GIP ; GP; b) eapplRes (v2, H2)) ->
     well_formed (reach' H1 (val_loc v1)) H1.
   Proof.
     intros Hcc l1 b1 [n [_ Hin]] Hget l Hdom.

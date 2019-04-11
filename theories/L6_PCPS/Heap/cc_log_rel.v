@@ -1481,6 +1481,7 @@ Module CC_log_rel (H : Heap).
     
     
   (** * Reachable set bijections *)
+  
   Lemma cc_approx_val_image_eq_mut (k : nat) j (H1 H2 : heap block)
         (v1 v2 : value) l1 l2 :
     ((Res (v1, H1)) ≺ ^ (k ; j ; GIP ; GP ; b) (Res (v2, H2)) ->

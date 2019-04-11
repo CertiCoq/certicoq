@@ -1805,7 +1805,7 @@ Module CC_log_rel (H : Heap).
   Qed.
 
   Lemma cc_approx_val_well_formed_reach1 (k : nat) v1 v2 H1 H2 :
-    (forall j, Res (v1, H1) ≺ ^ (k; j; GIP ; GP; b) eapplRes (v2, H2)) ->
+    (forall j, Res (v1, H1) ≺ ^ (k; j; GIP ; GP; b) Res (v2, H2)) ->
     well_formed (reach' H1 (val_loc v1)) H1.
   Proof.
     intros Hcc l1 b1 [n [_ Hin]] Hget l Hdom.

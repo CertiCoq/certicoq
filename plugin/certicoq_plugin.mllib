@@ -52,7 +52,6 @@ MSetRBT
 Maps
 Compile0
 Compile1
-Compile2
 Cps
 Ctx
 Eval
@@ -67,7 +66,6 @@ Shrink_cps
 Term0
 TermsDB
 Variables
-Compile3
 Closure_conversion
 L5a
 L5_to_L6
@@ -82,10 +80,8 @@ Values
 Memtype
 Memdata
 Memory
-Compile4
 L3_to_L3_eta
 L3_to_L4
-Compile5
 Camlcoq
 AST
 Ctypes

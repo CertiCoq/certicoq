@@ -88,7 +88,6 @@ extraction/eTyping.ml
 extraction/eTyping.mli
 extraction/compile0.mli
 extraction/compile1.mli
-extraction/compile2.mli
 extraction/cps.mli
 extraction/ctx.mli
 extraction/eval.mli
@@ -142,8 +141,6 @@ extraction/floats.mli
 extraction/maps.ml
 extraction/values.mli
 extraction/compile1.ml
-extraction/compile2.ml
-extraction/compile4.mli
 extraction/cps.ml
 extraction/ctx.ml
 extraction/eval.ml
@@ -159,13 +156,10 @@ extraction/term0.ml
 extraction/termsDB.ml
 extraction/variables.ml
 extraction/identifiers.ml
-extraction/compile3.ml
 extraction/closure_conversion.ml
 extraction/l5_to_L6.ml
 extraction/l4_to_L4_1_to_L4_2.ml
 extraction/l4_2_to_L4_5.ml
-extraction/compile5.mli
-extraction/compile5.ml
 extraction/l3_to_L3_eta.mli
 extraction/fappli_IEEE.ml
 extraction/clightexec.ml
@@ -176,7 +170,6 @@ extraction/fappli_IEEE_extra.ml
 extraction/floats.ml
 extraction/l3_to_L4.mli
 extraction/values.ml
-extraction/compile4.ml
 extraction/instances2.ml
 extraction/instances4.ml
 extraction/instances5.mli

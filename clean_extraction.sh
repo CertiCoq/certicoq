@@ -25,7 +25,7 @@ cd plugin/extraction
 rm -f basicAst.* ast0.* ast1.* eAst.* specif.* peanoNat.* utils.* list0.* datatypes.* decimal.* ascii.* univ0.* binPosDef.*
 rm -f binPos.* binNat.* binNums.* binInt.* binIntDef.* bool.* nat0.* string0.* basics.*
 rm -f checker0.* typing.* retyping.* uGraph0.* univSubst.* extract.* stringMap.*
-rm -f templateToPCUIC.* pCUIC*
+rm -f templateToPCUIC.* pCUIC*  eTyping.*
 # Work around a compiler bug in module name resolution
 sed -f ../extraction.sed -i bak compile0.ml
 cd ../..

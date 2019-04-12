@@ -1,4 +1,5 @@
-Require Import String Template.Ast Template.TemplateMonad.
+Require Import String Template.Ast Template.TemplateMonad Template.TemplateMonad.Extractable.
+
 
 Declare ML Module "template_coq".
 Declare ML Module "template_coq_checker_plugin".

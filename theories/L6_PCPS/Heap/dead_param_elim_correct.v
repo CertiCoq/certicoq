@@ -21,7 +21,7 @@ Module DeadParamCorrect (H : Heap).
   Import H LR LR.LRDefs LR.LRDefs.Sem.GC LR.LRDefs.Sem.GC.Equiv
          LR.LRDefs.Sem.GC.Equiv.Defs LR.LRDefs.Sem.
 
-
+  
   Definition Pre : IInv :=
     fun c1 c2 => 
       let '(H1, rho1, e1) := c1 in
@@ -46,7 +46,6 @@ Module DeadParamCorrect (H : Heap).
       let '(c2, m2) := p1 in
       c2 <= c1 /\ m2 <= m1. 
 
-
   Definition drop_invariant (drop : var -> option (list bool)) rho1 rho2 :=
     forall f bs, drop f = Some bs ->
             exists B1 f1 B2 f2 ft1 xs1 e1 ft2 xs2 e2 S,
@@ -56,7 +55,21 @@ Module DeadParamCorrect (H : Heap).
               find_def f2 B2 = Some (ft2, xs2, e2) /\
               Drop_params xs1 bs xs2 S /\
               Drop_body drop S e1 e2.
-  
+
+  Lemma drop_invariant_extend drop rho1 rho2 x v1 v2 :
+    ~ x \in domain drop ->
+    drop_invariant drop rho1 rho2 ->
+    drop_invariant drop (M.set x v1 rho1) (M.set x v2 rho2).
+  Proof.
+    intros Hnin Hinv f bs Hf.
+    setoid_rewrite M.gso. eapply Hinv. eassumption.
+
+    intros Hc; subst.
+    eapply Hnin. exists bs. eassumption.
+    intros Hc; subst.
+    eapply Hnin. exists bs. eassumption.
+  Qed. 
+    
   Lemma dead_param_elim_correct
         k j (* step and heap indices *)
         H1 rho1 e1 H2 rho2 e2 (* source and target conf *)
@@ -64,20 +77,80 @@ Module DeadParamCorrect (H : Heap).
         drop (* dropper function *)
         S (* dropped variables *) :
 
-    (forall j, (H1, rho1) ⋞ ^ (occurs_free e1 \\ S (* \\ dropped_funs drop *) ; k ; j; PreG ; PostG ; b) (H2, rho2)) ->
+    (forall j, (H1, rho1) ⋞ ^ (occurs_free e1 \\ S \\ dropped_funs drop ; k ; j; PreG ; PostG ; b) (H2, rho2)) ->
 
     (* invariant about dropped function names *)
     drop_invariant drop rho1 rho2 -> 
     
     (* Assumptions about variable names *)
-    unique_bindings e1 -> 
+    unique_bindings e1 ->
+    Disjoint _ (domain drop) (bound_var e1) ->
     Disjoint _ (occurs_free e1) (bound_var e1) -> 
     
     (* e2 is the dropping of e1 *)
     Drop_body drop S e1 e2 ->
     (* The source and target are related *)
     (H1, rho1, e1) ⪯ ^ ( k ; j ; Pre ; PreG ; Post ; PostG ) (H2, rho2, e2).
-  Proof.
+  Proof with now eauto with Ensembles_DB.
+    revert j H1 rho1 e1 H2 rho2 e2 b drop S;
+      induction k as [k IHk] using lt_wf_rec1;
+      intros j H1 rho1 e1 H2 rho2 e2 b drop S Hrel Hdinv Hun Hdis1 Hdis2 Hdrop.
+    inv Hdrop. 
+    - (* ----------- Econstr ----------- (3) *)
+      admit. 
+    - (* ----------- Eprim ----------- *)
+      admit. 
+    - (* ----------- Eproj ----------- (1) *)
+      eapply exp_rel_proj_compat.
+      + admit. (* precondition preservation *) 
+      + admit. (* postcondition preservation *)
+      + admit. (* base case for post *)
+      + intros j'. setoid_rewrite Setminus_Union in Hrel.
+        eapply Hrel. 
+        split; [| eassumption ].
+        normalize_occurs_free...
+      + intros v1 v2 Hleq Hv1 Hv2 Hrelv j'.
+        eapply IHk with (S := S) (drop := drop).
+        * simpl in *. omega. 
+        * intros j''. 
+          eapply env_log_rel_P_set.
+
+          eapply env_log_rel_i_monotonic with (i := k); tci.
+          (* Note: These generates a bunch of goals of the form [Proper ... ]. Should be solvable
+             with the tactic [tci] (shorthand for [eauto with typeclass_instances]. *)
+          eapply env_log_rel_P_antimon. eapply Hrel. 
+          
+          normalize_occurs_free. 
+          rewrite !Setminus_Union.
+          rewrite !Union_assoc. rewrite (Union_commut _ ([set x])).
+          rewrite <- Setminus_Union...
+          omega. 
+
+          eapply Hrelv. 
+        * eapply drop_invariant_extend; [| eassumption ].
+          intros Hcontra.
+          eapply Hdis1. 
+          normalize_bound_var. split. eassumption. eauto with Ensembles_DB. 
+        * inv Hun. eassumption.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var...
+        * eapply Disjoint_Included_l.
+          eapply occurs_free_Eproj_Included.
+          eapply Union_Disjoint_l.
+
+          eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var...
+
+          inv Hun. eapply Disjoint_Singleton_l. eassumption.
+        * eassumption. 
+    - (* ----------- Ecase ----------- *)
+      admit. 
+    - (* ----------- Ehalt ----------- (2) *)
+      admit.
+    - (* ----------- Eapp (unknown) ----------- *)
+      admit. 
+    - (* ----------- Eapp (known) ----------- *)
+      admit. 
   Abort. 
 
 End DeadParamCorrect.

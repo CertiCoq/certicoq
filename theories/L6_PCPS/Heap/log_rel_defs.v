@@ -484,8 +484,32 @@ Module LogRelDefs (H : Heap).
       omega.
       repeat eexists; try eassumption. apply val_rel_i_monotonic with (i := i - c1).
       eassumption. omega. 
-    Qed.       
-
+    Qed.
+    
+    Lemma var_log_rel_i_monotonic
+          (i i' j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+          (x y : var)  :
+      var_log_rel' i j GP GQ b H1 rho1 H2 rho2 x y ->
+      i' <= i ->
+      var_log_rel' i' j GP GQ b H1 rho1 H2 rho2 x y.
+    Proof.
+      intros Hvar Hleq v1 Hget.
+      edestruct Hvar as [v2 [Hgetv2 Hrel]]. eassumption.
+      eexists v2. split. eassumption.
+      eapply val_rel_i_monotonic; tci. 
+    Qed.
+    
+ 
+    Lemma env_log_rel_i_monotonic S (i i' j : nat) (b : Inj) c1 c2 :
+      env_log_rel_P' S i j GP GQ b c1 c2 ->
+      i' <= i ->  
+      env_log_rel_P' S i' j GP GQ b c1 c2.
+    Proof. 
+      destruct c1; destruct c2. intros Hrel Hleq x Hin.
+      eapply var_log_rel_i_monotonic. eapply Hrel. eassumption. 
+      eassumption.
+    Qed.
+    
     (* Lookup-index *)
     Lemma val_rel_j_monotonic i j j' r1 r2 b :
       val_log_rel' i j GP GQ b r1 r2 ->
@@ -530,6 +554,30 @@ Module LogRelDefs (H : Heap).
       eassumption. omega. 
     Qed.       
 
+    Lemma var_log_rel_j_monotonic
+          (i j j' : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+          (x y : var)  :
+      var_log_rel' i j GP GQ b H1 rho1 H2 rho2 x y ->
+      j' <= j ->
+      var_log_rel' i j' GP GQ b H1 rho1 H2 rho2 x y.
+    Proof.
+      intros Hvar Hleq v1 Hget.
+      edestruct Hvar as [v2 [Hgetv2 Hrel]]. eassumption.
+      eexists v2. split. eassumption.
+      eapply val_rel_j_monotonic; tci. 
+    Qed.
+    
+ 
+    Lemma env_log_rel_j_monotonic S (i j j' : nat) (b : Inj) c1 c2 :
+      env_log_rel_P' S i j GP GQ b c1 c2 ->
+      j' <= j ->  
+      env_log_rel_P' S i j' GP GQ b c1 c2.
+    Proof. 
+      destruct c1; destruct c2. intros Hrel Hleq x Hin.
+      eapply var_log_rel_j_monotonic. eapply Hrel. eassumption. 
+      eassumption.
+    Qed.
+    
 
     (* Index-set monotonicity *)
     
@@ -674,12 +722,15 @@ Module LogRelDefs (H : Heap).
   (** Extend the related environments with a single point *)
   Lemma env_log_rel_P_set (S : Ensemble var) (k j : nat) (b : Inj)
         (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    env_log_rel_P' (S \\ [set x]) k j GP GQ b (H1, rho1) (H2, rho2) ->
     val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
     env_log_rel_P' S k j GP GQ b (H1, M.set x v1 rho1) (H2, M.set x v2 rho2).
   Proof.
-    intros Henv Hval x' HP. eapply var_log_rel_env_set; eauto. 
-    eapply Henv. eassumption. 
+    intros Henv Hval x' HP. destruct (peq x x'); subst.
+    - eapply var_log_rel_env_set_eq; eauto.
+    - eapply var_log_rel_env_set_neq_l; eauto.
+      eapply var_log_rel_env_set_neq_r; eauto.
+      eapply Henv. constructor; eauto. intros Hc; inv Hc. contradiction.
   Qed.
 
   

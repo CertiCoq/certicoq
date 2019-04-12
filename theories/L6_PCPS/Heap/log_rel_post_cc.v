@@ -24,15 +24,15 @@ Module LogRelPostCC (H : Heap).
              (fR : fun_body_rel) : Prop :=
     match v1, v2 with
     | FunPtr B1 f1, FunPtr B2 f2 =>
-      forall H1 H2 rho1 ft1 xs1 e1 vs1 vs2 b,        
-        find_def f1 B1 = Some (ft1, xs1, e1) ->
+      forall H1 H2 rho1 ft xs1 e1 vs1 vs2 b,        
+        find_def f1 B1 = Some (ft, xs1, e1) ->
         setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
 
         length vs1 = length vs2 ->
         
-        exists ft2 xs2 e2 rho2,
-          find_def f1 B1 = Some (ft2, xs2, e2) /\
-          setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho2 /\
+        exists xs2 e2 rho2,
+          find_def f2 B2 = Some (ft, xs2, e2) /\
+          setlist xs2 vs2 (def_funs B2 B2 (M.empty _)) = Some rho2 /\
           let GP' c1 c2 :=
               let '(H1, rho1, c1) := c1 in
               let '(H2, rho2, c2) := c2 in              
@@ -59,11 +59,11 @@ Module LogRelPostCC (H : Heap).
     intros. intros P1 P2 Hyp. split. 
     - unfold fun_ptr_rel. destruct v1; destruct v2; eauto.
       intros Hfun. intros.
-      edestruct Hfun as [ft2 [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
+      edestruct Hfun as [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
       repeat eexists; eauto. eapply Hyp. eassumption.
     - unfold fun_ptr_rel. destruct v1; destruct v2; eauto.
       intros Hfun. intros.
-      edestruct Hfun as [ft2 [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
+      edestruct Hfun as [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
       repeat eexists; eauto. eapply Hyp. eassumption.
   Qed. 
 
@@ -78,7 +78,7 @@ Module LogRelPostCC (H : Heap).
     intros. intros P1 P2 Hyp.
     unfold fun_ptr_rel. destruct v1; destruct v2; unfold impl; eauto.
     intros Hfun. intros.
-    edestruct Hfun as [ft2 [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
+    edestruct Hfun as [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
     repeat eexists; eauto. eapply Hyp. eassumption.
   Qed. 
 
@@ -103,15 +103,15 @@ Module LogRelPostCC (H : Heap).
         | _, _ => False
         end
       | FunPtr B1 f1, FunPtr B2 f2 =>
-        forall H1 H2 rho1 ft1 xs1 e1 vs1 vs2 b,        
-          find_def f1 B1 = Some (ft1, xs1, e1) ->
+        forall H1 H2 rho1 ft xs1 e1 vs1 vs2 b,        
+          find_def f1 B1 = Some (ft, xs1, e1) ->
           setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
 
           length vs1 = length vs2 ->
           
-          exists ft2 xs2 e2 rho2,
-            find_def f1 B1 = Some (ft2, xs2, e2) /\
-            setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho2 /\
+          exists xs2 e2 rho2,
+            find_def f2 B2 = Some (ft, xs2, e2) /\
+            setlist xs2 vs2 (def_funs B2 B2 (M.empty _)) = Some rho2 /\
             forall i, (i < k)%nat ->
                  (forall j, Forall2 (fun v1 v2 => val_rel i j IP P b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2) ->
                  (forall H1' H2' b1 b2,
@@ -165,13 +165,13 @@ Module LogRelPostCC (H : Heap).
         eapply Forall2_monotonic; [| eassumption ]. intros. omega.
     - simpl. split. 
       intros Hyp. intros.
-      edestruct Hyp as [ft2 [xs2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
-      do 4 eexists; repeat split; eauto. exfalso. omega. 
+      edestruct Hyp as [rho2 [xs2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
+      do 3 eexists; repeat split; eauto. exfalso. omega. 
       exfalso; omega.
       
       intros Hyp. intros.
-      edestruct Hyp as [ft2 [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
-      do 4 eexists; repeat split; eauto. exfalso; omega. exfalso; omega. 
+      edestruct Hyp as [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
+      do 3 eexists; repeat split; eauto. exfalso; omega. exfalso; omega. 
     - split.
       + intros [Hyp1 Hyp2]. split; eauto. 
         destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto. 
@@ -192,13 +192,13 @@ Module LogRelPostCC (H : Heap).
         rewrite val_log_rel_eq; tci.
         eapply Hyp. omega.
     - split. intros Hyp. simpl. intros.
-      edestruct Hyp as [ft2 [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
+      edestruct Hyp as [xs2 [e2 [rho2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
       do 4 eexists; repeat split; eauto. exfalso. omega. 
       exfalso; omega.
       
       intros Hyp. simpl. intros.
-      edestruct Hyp as [ft2 [xs2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
-      do 4 eexists; repeat split; eauto; exfalso; omega.
+      edestruct Hyp as [rho2 [xs2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
+      do 3 eexists; repeat split; eauto; exfalso; omega.
     - split.
       + intros [Hyp1 Hyp2]. split; eauto. 
         destruct (get l1 H1) as [b1|]; destruct (get l2 H2) as [b2|]; try now eauto. 
@@ -214,8 +214,8 @@ Module LogRelPostCC (H : Heap).
         eapply Forall2_monotonic; [| eassumption ]. intros. omega.
     - split. 
       + intros Hyp. simpl; intros.  
-        edestruct Hyp as [ft2 [xs2 [rho2 [e2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
-        do 4 eexists; split; [| split ]; eauto. intros i Hlt Hall.
+        edestruct Hyp as [ft2 [xs2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
+        do 3 eexists; split; [| split ]; eauto. intros i Hlt Hall.
         assert (Hieq : k - (k - i) = i) by omega. 
         split.  
         eapply Hrel; eauto. intros j.   
@@ -227,8 +227,8 @@ Module LogRelPostCC (H : Heap).
         intros j. eapply Forall2_monotonic; [| now eapply (Hall j) ].
         intros v1 v2 Hyp'. rewrite Hieq. rewrite val_log_rel_eq; tci.
       + intros Hyp. simpl. intros. 
-        edestruct Hyp as [ft2 [xs2 [rho2 [e2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
-        do 4 eexists; split; [| split ]; eauto. intros i Hlt Hall.
+        edestruct Hyp as [ft2 [xs2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
+        do 3 eexists; split; [| split ]; eauto. intros i Hlt Hall.
         assert (Hieq : k - (k - i) = i) by omega. 
         split. 
         eapply Hrel; eauto. intros j.  
@@ -261,8 +261,8 @@ Module LogRelPostCC (H : Heap).
         eapply Hyp; eauto.        
     - split. 
       + intros Hyp. simpl. intros. 
-        edestruct Hyp as [ft2 [xs2 [rho2 [e2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
-        do 4 eexists; split; [| split ]; eauto. intros i Hlt Hall.
+        edestruct Hyp as [xs2 [rho2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
+        do 3 eexists; split; [| split ]; eauto. intros i Hlt Hall.
         split. 
         eapply Hrel; eauto. intros j'.  
         eapply Forall2_monotonic; [| now eapply (Hall j')  ].
@@ -274,8 +274,8 @@ Module LogRelPostCC (H : Heap).
         intros j'. eapply Forall2_monotonic; [| now eapply (Hall j')  ].
         intros v1 v2 Hyp'. rewrite val_log_rel_eq; tci.
       + intros Hyp. simpl. intros. 
-        edestruct Hyp as [ft2 [xs2 [rho2 [e2 [Hdef2 [Hset2 Hrel]]]]]]; try eassumption.
-        do 4 eexists; split; [| split ]; eauto. intros i Hlt Hall.
+        edestruct Hyp as [xs2 [rho2 [e2 [Hdef2 [Hset2 Hrel]]]]]; try eassumption.
+        do 3 eexists; split; [| split ]; eauto. intros i Hlt Hall.
         assert (Hieq : k - (k - i) = i) by omega. 
         split. 
         eapply Hrel; eauto. intros j'.  
@@ -1629,7 +1629,7 @@ Module LogRelPostCC (H : Heap).
             destruct l2; try contradiction.
             rewrite val_rel_eq in Hval. unfold val_rel' in Hval. 
             edestruct (Hval H1' H2')  with (vs2 := vs2)
-              as (ft2 & xs2' & e2 & rho2'' & Hfind' & Hset' & Hi');
+              as (xs2' & e2 & rho2'' & Hfind' & Hset' & Hi');
               try eassumption.
             eapply Forall2_length. eassumption. 
             
@@ -1675,37 +1675,20 @@ Module LogRelPostCC (H : Heap).
               * omega.
               * rewrite NPeano.Nat.add_sub in Hbs0. 
                 repeat subst_exp.
-            + do 3 eexists. exists b2'. eexists. repeat split.
-              * repeat subst_exp.
-                
-                eapply Eval_app_per_cc with (c := c2 + cost_cc (Eapp f2 ft2 xs2)); try eassumption.
-                omega.
-                
-                simpl; omega.
-                eassumption. eassumption. reflexivity.
-               eapply Eval_proj_per_cc. simpl; omega.
-               rewrite M.gso. eassumption.
-               intros Hc. subst. eapply Hnin2. now left; eauto.
-               eassumption. reflexivity. simpl.
-               eapply Eval_app_per_cc.
-               simpl. omega.
-               rewrite M.gso. rewrite M.gss. reflexivity.
-               now intros Hc; subst; eauto.
-               eassumption.
-               simpl. rewrite M.gss.
-               rewrite !getlist_set_neq. now rewrite Hgetl'.
-               intros Hc. eapply Hnin2. now eauto.
-               intros Hc. eapply Hnin1. now eauto.
-               now eauto. eassumption. reflexivity. simpl.
-               replace (c2 + 1 + 1 + S (S (length xs2)) - 1 - 1 - S (S (length xs2)))  with c2.
-               eassumption. omega.
-             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
-               split. eapply Hiinv; try eassumption.
-               eapply big_step_reach_leq. eassumption. 
-               rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
-               eassumption. simpl. omega. }
-    Qed.
+            + do 3 eexists. exists b2'. repeat split.
+              * repeat subst_exp.                
+                eapply Eval_app_per_cc
+                  with (c := c2 + cost_cc (Eapp f2 t xs2)); try eassumption.
+                simpl in *; omega. reflexivity.
 
+                replace (c2 + cost_cc (Eapp f2 t xs2) - cost_cc (Eapp f2 t xs2)) with c2.
+                eassumption. omega.
+             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
+               (* split. eapply Hiinv; try eassumption. *)
+               (* eapply big_step_reach_leq. eassumption.  *)
+               (* rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic. *)
+               (* eassumption. simpl. omega. } *)
+    Admitted.
 
     
   End CompatLemmas.

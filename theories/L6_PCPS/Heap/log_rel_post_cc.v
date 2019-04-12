@@ -1104,6 +1104,39 @@ Module LogRelPostCC (H : Heap).
 
         IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
 
+    Definition IInvAppCompat  f1 t xs1 f2 xs2 :=   
+      forall (i  : nat) (H1 Hgc1 H2 Hgc2: heap block)
+        (rho1 rho1' rho2 rho2' : env) b1 b2 
+        (B1 B2 : fundefs) (f1' f2' : var) (e1 e2 : exp) (l1 : loc)
+        (vs1 vs2 : list value) c1 c2 m1 m2 d1 d2,
+        
+        (* Post on the function result  *)
+        IG 0 0 (Hgc1, subst_env d1 rho1, e1) (c1, m1) (c2, m2) ->
+        (* Pre before APP *)
+        IIL1 (H1, rho1, Eapp f1 t xs1) (H2, rho2, Eapp f2 t xs2) ->
+        
+        M.get f1 rho1' = Some (Loc l1) ->
+        get l1 H1' = Some (Clos (FunPtr B1 f1') (Loc env_loc)) ->
+        get env_loc H1' = Some (Env rho_clo) ->
+        find_def f1' B1 = Some (ct1, xs1', e1) ->
+        getlist xs1 rho1' = Some vs1 ->
+        def_closures B1 B1 rho_clo H1' (Loc env_loc) = (H1'', rho_clo1) ->
+        setlist xs1' vs1 rho_clo1 = Some rho_clo2 ->
+        
+        M.get f2 rho2' = Some (Loc l2) ->
+        getlist xs2 rho2' = Some vs2 ->
+        get l2 H2' = Some (Constr c [FunPtr B2 f3; Loc env_loc2]) ->
+        Some rho2'' =
+        setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
+        find_def f3 B2 = Some (ct2, xs2', e2) ->
+        live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d ->
+
+        reach_size H1'' rho_clo2 e1 <= m1 -> 
+        (* Post on result of APP *)
+        IL1 (H1', rho1', Eapp f1 t xs1, c1 + cost (Eapp f1 t xs1), max (reach_size H1' rho1' (Eapp f1 t xs1)) m1)
+            (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ, c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2)), max m2 (size_heap H2')).
+
+    
   End CompatDefs.
   
   Section CompatLemmas.

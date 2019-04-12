@@ -109,7 +109,6 @@ extraction/varImplZ.ml
 extraction/varImplDummyPair.ml
 extraction/terms.ml
 extraction/identifiers.mli
-extraction/compile3.mli
 extraction/compile0.ml
 extraction/closure_conversion.mli
 extraction/ordersFacts.ml

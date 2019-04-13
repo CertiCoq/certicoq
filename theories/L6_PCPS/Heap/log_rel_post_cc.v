@@ -1608,7 +1608,6 @@ Module LogRelPostCC (H : Heap).
           (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
       IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
       InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) ->
-      (* InvCostTO IL2 -> *)
 
       (forall j, var_rel k j IIG IG b H1 rho1 H2 rho2 f1 f2) ->
       
@@ -1648,7 +1647,7 @@ Module LogRelPostCC (H : Heap).
       - { eapply Forall2_monotonic_strong with
               (R' := (fun x1 x2 : var => forall j, var_rel k j IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2)) in Hall.
           - assert (Hall' :
-                      Forall2 (fun x1 x2 : var => var_rel k j IIG IG b H1' rho1' H2' rho2' x1 x2) xs1 xs2).
+                      Forall2 (fun x1 x2 : var => var_rel k j IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2) xs1 xs2).
             { eapply Forall2_monotonic; [| eapply Hall ]; eauto. }
 
             eapply var_log_rel_getlist in Hall'; [| now eauto ]. 
@@ -1677,7 +1676,7 @@ Module LogRelPostCC (H : Heap).
             + simpl in *. omega. 
             + intros j'.
               assert (Hall' :
-                      Forall2 (fun x1 x2 : var => var_rel k j' IIG IG b H1' rho1' H2' rho2' x1 x2) xs1 xs2).
+                      Forall2 (fun x1 x2 : var => var_rel k j' IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2) xs1 xs2).
             { eapply Forall2_monotonic; [| eapply Hall ]; eauto. }
             
             eapply var_log_rel_getlist in Hall'; [| now eauto ]. 
@@ -1715,11 +1714,11 @@ Module LogRelPostCC (H : Heap).
                unfold cost, cost_cc in *. 
                eapply Hiinv; try eassumption.
              * eapply val_rel_i_monotonic; tci. simpl in *; omega.
-          - intros. eapply var_rel_heap_env_equiv. eapply H3. now eauto. res_eq. 
-               eapply big_step_reach_leq. eassumption.
-               rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
-               eassumption. simpl. omega. }
-    Admitted.
+          - intros. eapply var_rel_heap_env_equiv. eapply H3.
+            eassumption. eassumption. eassumption. eassumption.
+            normalize_occurs_free. left. eassumption.
+            normalize_occurs_free. left. eassumption. }
+    Qed.
 
     
   End CompatLemmas.

@@ -1080,6 +1080,19 @@ Module LogRelDefs (H : Heap).
         repeat subst_exp. eassumption. 
         eassumption.
   Qed.
+
+  Lemma var_log_rel_Forall2 S k j b H1 rho1 H2 rho2 xs :
+    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+    FromList xs \subset S ->
+    Forall2 (fun x1 x2 => var_log_rel' k j GP GQ b H1 rho1 H2 rho2 x1 x2) xs xs.
+  Proof with (now eauto with Ensembles_DB).
+    intros Henv Hin. induction xs.
+    - now constructor.
+    - constructor.
+      + eapply Henv. eapply Hin. normalize_sets. now left.  
+      + eapply IHxs. eapply Included_trans; [| eassumption ].
+        normalize_sets...
+  Qed.
   
   (** * Logical relation respects heap_equivalence *)
 

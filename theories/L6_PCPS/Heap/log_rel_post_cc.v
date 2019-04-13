@@ -1106,35 +1106,30 @@ Module LogRelPostCC (H : Heap).
 
     Definition IInvAppCompat  f1 t xs1 f2 xs2 :=   
       forall (i  : nat) (H1 Hgc1 H2 Hgc2: heap block)
-        (rho1 rho1' rho2 rho2' : env) b1 b2 
-        (B1 B2 : fundefs) (f1' f2' : var) (e1 e2 : exp) (l1 : loc)
-        (vs1 vs2 : list value) c1 c2 m1 m2 d1 d2,
+        (rho1 rho1' rho2 rho2' : env)  
+        (B1 B2 : fundefs) (f1' f2' : var) (e1 e2 : exp)
+        ys1 ys2 (vs1 vs2 : list value) c1 c2 m1 m2 d1 d2,
         
         (* Post on the function result  *)
-        IG 0 0 (Hgc1, subst_env d1 rho1, e1) (c1, m1) (c2, m2) ->
+        IG 0 0 (Hgc1, subst_env d1 rho1', e1) (c1, m1) (c2, m2) ->
         (* Pre before APP *)
         IIL1 (H1, rho1, Eapp f1 t xs1) (H2, rho2, Eapp f2 t xs2) ->
         
-        M.get f1 rho1' = Some (Loc l1) ->
-        get l1 H1' = Some (Clos (FunPtr B1 f1') (Loc env_loc)) ->
-        get env_loc H1' = Some (Env rho_clo) ->
-        find_def f1' B1 = Some (ct1, xs1', e1) ->
-        getlist xs1 rho1' = Some vs1 ->
-        def_closures B1 B1 rho_clo H1' (Loc env_loc) = (H1'', rho_clo1) ->
-        setlist xs1' vs1 rho_clo1 = Some rho_clo2 ->
-        
-        M.get f2 rho2' = Some (Loc l2) ->
-        getlist xs2 rho2' = Some vs2 ->
-        get l2 H2' = Some (Constr c [FunPtr B2 f3; Loc env_loc2]) ->
-        Some rho2'' =
-        setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
-        find_def f3 B2 = Some (ct2, xs2', e2) ->
-        live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d ->
+        M.get f1 rho1 = Some (FunPtr B1 f1') ->
+        find_def f1' B1 = Some (t, ys1, e1) ->
+        getlist xs1 rho1 = Some vs1 ->
+        setlist ys1 vs1 (def_funs B1 B1 (M.empty value)) = Some rho1' ->
+        live' (env_locs rho1' (occurs_free e1)) H1 Hgc1 d1 ->
 
-        reach_size H1'' rho_clo2 e1 <= m1 -> 
+        M.get f2 rho2 = Some (FunPtr B2 f2') ->
+        find_def f2' B2 = Some (t, ys2, e2) ->
+        getlist xs2 rho2 = Some vs2 ->
+        setlist ys2 vs2 (def_funs B2 B2 (M.empty value)) = Some rho2' ->
+        live' (env_locs rho2' (occurs_free e2)) H2 Hgc2 d2 ->
+
         (* Post on result of APP *)
-        IL1 (H1', rho1', Eapp f1 t xs1, c1 + cost (Eapp f1 t xs1), max (reach_size H1' rho1' (Eapp f1 t xs1)) m1)
-            (H2', rho2', AppClo clo_tag f2 t xs2 f2' Γ, c2 + 1 + 1 + cost (Eapp f2' t (Γ :: xs2)), max m2 (size_heap H2')).
+        IL1 (H1, rho1, Eapp f1 t xs1) (c1 + cost (Eapp f1 t xs1), max m1 (size_heap H1))
+            (c2 + cost (Eapp f2 t xs2), max m2 (size_heap H2)).
 
     
   End CompatDefs.
@@ -1606,12 +1601,12 @@ Module LogRelPostCC (H : Heap).
         * eapply val_rel_i_monotonic; tci. omega. 
     Qed.
 
-
     
-        (** Application compatibility *)
+    
+    (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
-      (* IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ -> *)
+      IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
       InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) ->
       (* InvCostTO IL2 -> *)
 
@@ -1626,7 +1621,7 @@ Module LogRelPostCC (H : Heap).
                                      ; IG)
       (H2, rho2, Eapp f2 t xs2).
     Proof with now eauto with Ensembles_DB.
-      intros (* Hiinv *) Hbase Hvar Hall
+      intros Hiinv Hbase Hvar Hall
              b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2
              HII Hleq1 Hstep1 Hstuck1.
       eapply (var_rel_heap_env_equiv
@@ -1651,7 +1646,7 @@ Module LogRelPostCC (H : Heap).
             destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction. } 
       (* Termination *)  
       - { eapply Forall2_monotonic_strong with
-              (R' := (fun x1 x2 : var => forall j, var_rel k j IIG IG b H1' rho1' H2' rho2' x1 x2)) in Hall.
+              (R' := (fun x1 x2 : var => forall j, var_rel k j IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2)) in Hall.
           - assert (Hall' :
                       Forall2 (fun x1 x2 : var => var_rel k j IIG IG b H1' rho1' H2' rho2' x1 x2) xs1 xs2).
             { eapply Forall2_monotonic; [| eapply Hall ]; eauto. }
@@ -1717,10 +1712,13 @@ Module LogRelPostCC (H : Heap).
                 replace (c2 + cost_cc (Eapp f2 t xs2) - cost_cc (Eapp f2 t xs2)) with c2.
                 eassumption. omega.
              * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
-               (* split. eapply Hiinv; try eassumption. *)
-               (* eapply big_step_reach_leq. eassumption.  *)
-               (* rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic. *)
-               (* eassumption. simpl. omega. } *)
+               unfold cost, cost_cc in *. 
+               eapply Hiinv; try eassumption.
+             * eapply val_rel_i_monotonic; tci. simpl in *; omega.
+          - intros. eapply var_rel_heap_env_equiv. eapply H3. now eauto. res_eq. 
+               eapply big_step_reach_leq. eassumption.
+               rewrite cc_approx_val_eq in *. eapply cc_approx_val_monotonic.
+               eassumption. simpl. omega. }
     Admitted.
 
     

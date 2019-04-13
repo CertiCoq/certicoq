@@ -1604,7 +1604,7 @@ Module LogRelPostCC (H : Heap).
     
     
     (** Application compatibility *)
-    Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
+    Lemma exp_rel_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
       IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
       InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) ->

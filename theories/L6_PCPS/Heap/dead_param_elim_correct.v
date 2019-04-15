@@ -97,7 +97,47 @@ Module DeadParamCorrect (H : Heap).
       intros j H1 rho1 e1 H2 rho2 e2 b drop S Hrel Hdinv Hun Hdis1 Hdis2 Hdrop.
     inv Hdrop. 
     - (* ----------- Econstr ----------- (3) *)
-      admit. 
+      eapply exp_rel_constr_compat. 
+      + admit. 
+      + admit. 
+      + admit. 
+      + intros l Hloc. admit.      
+      + admit. 
+      + intros j'. setoid_rewrite Setminus_Union in Hrel. 
+        eapply var_log_rel_Forall2.   
+        * admit. 
+        * admit. 
+      + intros vs1 vs2 l1 l2 H1' H2' Hleq Hloc1 Hloc2 Halloc1 Halloc2 HForall2 j'. 
+        eapply IHk with (S := S) (drop := drop). 
+        * simpl in *. omega. 
+        * intros j''. 
+          eapply env_log_rel_P_set. 
+
+          eapply env_log_rel_i_monotonic with (i := k); tci. 
+
+          eapply env_log_rel_P_antimon with (S1 := (occurs_free (Econstr x ct ys e) \\ S \\ dropped_funs drop)). 
+          admit. 
+          
+          normalize_occurs_free. 
+          rewrite !Setminus_Union. 
+          rewrite !Union_assoc. rewrite (Union_commut _ ([set x])). 
+          rewrite <- Setminus_Union... 
+          omega.
+          
+          admit. 
+        * eapply drop_invariant_extend; [|eassumption]. 
+          intros Hcontra. eapply Hdis1. 
+          normalize_bound_var. split. eassumption. eauto with Ensembles_DB. 
+        * inv Hun. eassumption. 
+        * eapply Disjoint_Included_r; [|eassumption]. 
+          normalize_bound_var... 
+        * eapply Disjoint_Included_l. 
+          eapply occurs_free_Econstr_Included. 
+          eapply Union_Disjoint_l. 
+          eapply Disjoint_Included_r; [|eassumption]. 
+          normalize_bound_var... 
+          inv Hun. eapply Disjoint_Singleton_l. eassumption. 
+        * eassumption. 
     - (* ----------- Eprim ----------- *)
       admit. 
     - (* ----------- Eproj ----------- (1) *)
@@ -109,11 +149,11 @@ Module DeadParamCorrect (H : Heap).
         eapply Hrel. 
         split; [| eassumption ].
         normalize_occurs_free...
-      + intros v1 v2 Hleq Hv1 Hv2 Hrelv j'.
+      + intros v1 v2 Hleq Hv1 Hv2 Hrelv j'. 
         eapply IHk with (S := S) (drop := drop).
         * simpl in *. omega. 
         * intros j''. 
-          eapply env_log_rel_P_set.
+          eapply env_log_rel_P_set. 
 
           eapply env_log_rel_i_monotonic with (i := k); tci.
           (* Note: These generates a bunch of goals of the form [Proper ... ]. Should be solvable
@@ -146,9 +186,24 @@ Module DeadParamCorrect (H : Heap).
     - (* ----------- Ecase ----------- *)
       admit. 
     - (* ----------- Ehalt ----------- (2) *)
-      admit.
+      eapply exp_rel_halt_compat.
+      + admit. 
+      + admit. (* base case for post *)
+      + setoid_rewrite Setminus_Union in Hrel.
+        eapply Hrel. 
+        split; [| eassumption ]. 
+        rewrite occurs_free_Ehalt... 
     - (* ----------- Eapp (unknown) ----------- *)
-      admit. 
+      eapply exp_rel_app_compat. 
+      + admit. 
+      + admit. 
+      + intros j'. setoid_rewrite Setminus_Union in Hrel. 
+        eapply Hrel.
+        split; [|eassumption]. 
+        normalize_occurs_free... 
+      + eapply Forall2_same. intros x Hin j'. 
+        setoid_rewrite Setminus_Union in Hrel. eapply Hrel. 
+        admit. 
     - (* ----------- Eapp (known) ----------- *)
       admit. 
   Abort. 

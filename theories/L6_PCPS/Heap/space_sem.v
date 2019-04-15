@@ -4,11 +4,12 @@
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
      MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
-     Classes.Morphisms.
+     Classes.Morphisms NArith.Ndist.
 From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From CertiCoq.L6 Require Import cps ctx cps_util eval List_util Ensembles_util functions
      identifiers Heap.heap Heap.heap_defs Heap.heap_equiv Heap.GC tactics set_util map_util.
 Require Import compcert.lib.Coqlib.
+
 
 Import ListNotations.
 
@@ -231,7 +232,22 @@ Module SpaceSem (H : Heap).
       but they might get stuck later *)
   Definition not_stuck (H : heap block) (rho : env) (e : exp) :=
     forall c, exists r m, big_step H rho e r c m. 
+  
+  (* Diverging programs *)
 
+  (* Least upper bound for sets of natural numbers *)
+  Definition lub (m : natinf) (S : Ensemble nat) : Prop :=
+    (forall x, x \in S -> ni_le (ni x) m) /\ 
+    (forall y, (forall x, x \in S -> ni_le (ni x) y) -> ni_le m y). 
+
+  Definition div_src (H : heap block) (rho : env) (e : exp) (m : natinf) :=
+    (forall i, exists m', big_step H rho e OOT i m' /\ ni_le (ni m') m).
+
+  
+  Definition div_src' (H : heap block) (rho : env) (e : exp) (m : natinf) :=
+    (forall i, exists m, big_step H rho e OOT i m) /\
+    lub m [ set m : nat | exists r c, big_step H rho e r c m ]. 
+                            
   (** Deterministic semantics with garbage collection, for closure converted code
    * The execution time cost model does not account for the cost of GC  *)
   Inductive big_step_GC_cc :
@@ -271,7 +287,7 @@ Module SpaceSem (H : Heap).
         
         big_step_GC_cc H rho (Eproj x t n y e) r c m
   | Eval_case_per_cc :
-      forall (H H' : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
+      forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
         (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
         (Hcost : c >= cost_cc (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
@@ -279,7 +295,7 @@ Module SpaceSem (H : Heap).
         (Htag : findtag cl t = Some e)
 
 
-        (Hbs : big_step_GC_cc H' rho e r (c - cost_cc (Ecase y cl)) m),
+        (Hbs : big_step_GC_cc H rho e r (c - cost_cc (Ecase y cl)) m),
         
         big_step_GC_cc H rho (Ecase y cl) r c m
   | Eval_fun_per_cc :
@@ -316,13 +332,19 @@ Module SpaceSem (H : Heap).
         (Hget : M.get x rho = Some l)
         (Hsize : size_heap H = m),
         big_step_GC_cc H rho (Ehalt x) (Res (l, H)) c m.
-
+  
+  Definition div_trg (H : heap block) (rho : env) (e : exp) (m : natinf) :=
+    (forall i, exists m', big_step_GC_cc H rho e OOT i m' /\ ni_le (ni m') m).
+  
+  Definition div_trg' (H : heap block) (rho : env) (e : exp) (m : natinf) :=
+    (forall i, exists m, big_step_GC_cc H rho e OOT i m) /\
+    lub m [ set m : nat | exists r c, big_step_GC_cc H rho e r c m ]. 
+  
   Definition is_res (r : ans) : Prop :=
     match r with
     | Res _ =>  True
     | _ => False
     end.
-
 
   Lemma big_step_mem_cost_leq H rho e r c m :
     big_step H rho e r c m ->
@@ -1777,5 +1799,126 @@ Module SpaceSem (H : Heap).
         simpl in *. omega.
   Qed.           
 
+  (* Lemmas about the semantics of the target *)
+  
+  Lemma big_step_GC_cc_size H rho e i m :
+    big_step_GC_cc H rho e OOT i m ->
+    size_heap H <= m.
+  Proof. 
+    intros Hbs; induction Hbs; subst; try omega.
+    - eapply le_trans; [| eassumption ]. 
+      unfold size_heap.
+      erewrite HL.size_with_measure_alloc with (H' := H'); [| reflexivity | eassumption ].
+      omega.
+    - eapply Nat_as_OT.le_max_r.
+  Qed. 
+
+  Lemma big_step_GC_cc_OOT_mon H rho e i i' m :
+    big_step_GC_cc H rho e OOT i m ->
+    i' <= i ->
+    exists m', m' <= m /\ big_step_GC_cc H rho e OOT i' m'.
+  Proof.
+    revert H rho e i' m. 
+    induction i using lt_wf_rec1; intros H1 rho e i' m Hbs Hleq.
+    inv Hbs. 
+    - eexists; split; eauto. econstructor; eauto. omega.
+    - destruct (lt_dec i' (cost_cc (Econstr x t ys e0))).
+      + exists (size_heap H1). split.
+        eapply big_step_GC_cc_size with (e := (Econstr x t ys e0)).
+        now eapply Eval_constr_per_cc; eauto. 
+        econstructor. eassumption. reflexivity.
+      + edestruct H with (i' := i' - cost_cc (Econstr x t ys e0)) as [m' [Hmlew Hbs2]]; [| eassumption | | ].
+        simpl in *. omega.
+        omega.
+        eexists. split. eassumption.
+        eapply Eval_constr_per_cc; eauto. omega.
+    - destruct (lt_dec i' (cost_cc (Eproj x t n y e0))).
+      + exists (size_heap H1). split.
+        eapply big_step_GC_cc_size with (e := (Eproj x t n y e0)).
+        now eapply Eval_proj_per_cc; eauto. 
+        econstructor. eassumption. reflexivity.
+      + edestruct H with (i' := i' - cost_cc (Eproj x t n y e0)) as [m' [Hmlew Hbs2]]; [| eassumption | | ].
+        simpl in *. omega.
+        omega.
+        eexists. split. eassumption.
+        eapply Eval_proj_per_cc; eauto. omega.
+    - destruct (lt_dec i' (cost_cc (Ecase y cl))).
+      + exists (size_heap H1). split.
+        eapply big_step_GC_cc_size with (e := (Ecase y cl)).
+        now eapply Eval_case_per_cc; eauto. 
+        econstructor. eassumption. reflexivity.
+      + edestruct H with (i' := i' - cost_cc (Ecase y cl)) as [m' [Hmlew Hbs2]]; [| eassumption | | ].
+        simpl in *. omega.
+        omega.
+        eexists. split. eassumption.
+        eapply Eval_case_per_cc; eauto. omega.
+    - destruct (lt_dec i' (cost_cc (Efun B e0))).
+      + exists (size_heap H1). split.
+        eapply big_step_GC_cc_size with (e := (Efun B e0)).
+        now eapply Eval_fun_per_cc; eauto. 
+        econstructor. eassumption. reflexivity.
+      + edestruct H with (i' := i' - cost_cc (Efun B e0)) as [m' [Hmlew Hbs2]]; [| eassumption | | ].
+        simpl in *. omega.
+        omega.
+        eexists. split. eassumption.
+        eapply Eval_fun_per_cc; eauto. omega.
+    - destruct (lt_dec i' (cost_cc (Eapp f ct ys))).
+      + exists (size_heap H1). split.
+        apply Nat_as_OT.le_max_r.
+        econstructor. eassumption. reflexivity.
+      + edestruct H with (i' := i' - cost_cc (Eapp f ct ys)) as [m' [Hmlew Hbs2]]; [| eassumption | | ].
+        simpl in *. omega.
+        omega.
+        exists (Init.Nat.max m' (size_heap H1)). split.
+        eapply Nat_as_OT.max_le_compat_r. eassumption.
+        eapply Eval_app_per_cc; eauto. omega.
+  Qed.
+
+  Lemma big_step_GC_cc_det H1 H2 b1 rho1 rho2 e (r1 r2 : ans) c m1 m2 :
+    closed (reach' H1 (env_locs rho1 (occurs_free e))) H1 ->
+    big_step_GC_cc H1 rho1 e r1 c m1 ->
+    big_step_GC_cc H2 rho2 e r2 c m2 ->                  
+    (occurs_free e) |- (H1, rho1) ⩪_(b1, id) (H2, rho2) ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) b1 ->
+    size_heap H1 = size_heap H2 ->                  
+    m1 = m2 /\
+    (exists b1' b2', injective_subdomain (reach_ans r1) b1' /\
+                injective_subdomain (reach_ans r2) b2' /\
+                ans_equiv b1' r1 b2' r2).
+  Proof with (now eauto with Ensembles_DB).
+  Admitted. 
+
+  Lemma big_step_GC_cc_mem_mon H rho e i i' m m' :
+    closed (reach' H (env_locs rho (occurs_free e))) H ->
+    big_step_GC_cc H rho e OOT i m ->
+    big_step_GC_cc H rho e OOT i' m' ->
+    i <= i' ->
+    m <= m'.
+  Proof.
+    intros Hc Hbs1 Hbs2 Hleq.
+    eapply big_step_GC_cc_OOT_mon in Hbs2; [| eassumption ].
+    edestruct Hbs2 as [m1 [Hleqm Hbs1']]. 
+    edestruct big_step_GC_cc_det as [ Hbseq _];
+    [ eassumption | eapply Hbs1 | eapply Hbs1' | | | | ] .
+    reflexivity.
+    clear. now firstorder.
+    reflexivity. omega.
+  Qed. 
+
+  Lemma big_step_GC_cc_mem_eq H rho e i m m' r :
+    closed (reach' H (env_locs rho (occurs_free e))) H ->
+    big_step_GC_cc H rho e OOT i m ->
+    big_step_GC_cc H rho e r i m' ->
+    m = m' /\ r = OOT.
+  Proof.
+    intros Hc Hbs1 Hbs2.
+    edestruct big_step_GC_cc_det as [Hmeq [b1 [b2 [Hi1 [Hi2 Heq]]]]];
+      [ eassumption | eapply Hbs1 | eapply Hbs2 | | | | ] .
+    reflexivity.
+    clear. now firstorder.
+    reflexivity.
+    split; eauto. destruct r; eauto. contradiction.
+  Qed. 
+  
 
 End SpaceSem.

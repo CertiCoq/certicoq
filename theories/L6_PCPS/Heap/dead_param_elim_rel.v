@@ -81,7 +81,7 @@ Inductive Drop_body (drop : var -> option (list bool)) (S : Ensemble var) :  exp
 | BDrop_Case: 
   forall (x : var) (ce : list (cTag * exp)) (ce' : list (cTag * exp)),
     ~ x \in (S :|: dropped_funs drop) ->
-    Forall2 (fun p1 p2 => Drop_body drop S (snd p1) (snd p2)) ce ce' -> 
+    Forall2 (fun p1 p2 => fst p1 = fst p2 /\ Drop_body drop S (snd p1) (snd p2)) ce ce' -> 
     Drop_body drop S (Ecase x ce) (Ecase x ce')
 | BDrop_Halt : 
     forall (x : var),
@@ -92,12 +92,14 @@ Inductive Drop_body (drop : var -> option (list bool)) (S : Ensemble var) :  exp
       (* Unknown function application, f is not in the list of top-level
          function definitions. Therefore, it must be a parameter of the current
          function *)
-      ~ f \in (S :|: dropped_funs drop) -> 
+      ~ f \in (S :|: dropped_funs drop) ->
+      Disjoint _ (FromList ys) (S :|: dropped_funs drop) -> 
       drop f = None -> 
       Drop_body drop S (Eapp f ft ys) (Eapp f ft ys)
 | BDrop_App_Known :
     forall (f : var) (ys : list var) (ys' : list var) (ft : fTag) (bs : list bool),
       drop f = Some bs ->
+      ~ f \in S ->
       Drop_args (S :|: dropped_funs drop) ys bs ys' ->
       Drop_body drop S (Eapp f ft ys) (Eapp f ft ys').
 
@@ -127,9 +129,9 @@ Inductive Drop_body_fundefs (drop : var -> option (list bool)) : fundefs -> fund
     Drop_body_fundefs drop (Fcons g ft xs e F) (Fcons g ft ys e' F'). 
 
 
-Inductive Drop  : fundefs -> exp -> fundefs -> exp -> Prop := 
+Inductive Drop (drop : var -> option (list bool)) : fundefs -> exp -> fundefs -> exp -> Prop := 
 | Drop_toplevel :
-    forall drop B e B' e',
+    forall B e B' e',
       Drop_body_fundefs drop B B' ->
       Drop_body drop (Empty_set _) e e' -> 
-      Drop B e B' e. 
+      Drop drop B e B' e. 

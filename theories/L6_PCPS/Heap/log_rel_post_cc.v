@@ -782,7 +782,21 @@ Module LogRelPostCC (H : Heap).
     eapply val_log_rel_in_dom1. eapply (Hyp 0). 
   Qed.
 
+  Lemma val_rel_Forall2_reach GIP GP (k : nat) b (H1 H2 : heap block)
+        vs1 vs2 :
+    Forall2 (fun v1 v2 => forall j, (Res (v1, H1)) ≺ ^ (k; j; GIP ; GP ; b)
+                                                 (Res (v2, H2)))
+            vs1 vs2 ->
+    closed (reach' H1 (Union_list (map val_loc vs1))) H1.  
+  Proof.
+    intros Hall. induction Hall; simpl.
+    - rewrite reach'_Empty_set.
+      intros x Hin. inv Hin.
+    - rewrite reach'_Union. eapply closed_Union; [| eassumption ].
+      eapply val_rel_closed; eauto.
+  Qed.
 
+   
   Lemma var_rel_well_formed_reach GP GIP (k : nat)
         (b : Inj) (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) :
     (forall j, var_rel k j GIP GP b H1 rho1 H2 rho2 x1 x2) ->
@@ -899,6 +913,18 @@ Module LogRelPostCC (H : Heap).
     eapply val_log_rel_in_dom2. eapply (Hyp 0). 
   Qed.
 
+  Lemma val_rel_Forall2_reach2 GIP GP (k : nat) (b : Inj) (H1 H2 : heap block)
+        vs1 vs2 :
+    Forall2 (fun v1 v2 => forall j, (Res (v1, H1)) ≺ ^ (k; j; GIP ; GP ; b)
+                            (Res (v2, H2)))
+            vs1 vs2 ->
+    closed (reach' H2 (Union_list (map val_loc vs2))) H2.  
+  Proof.
+    intros Hall. induction Hall; simpl.
+    - rewrite reach'_Empty_set. intros x Hin. inv Hin.
+    - rewrite reach'_Union. eapply closed_Union; [| eassumption ].
+      eapply val_rel_closed2; eauto.
+  Qed.
 
   Lemma var_rel_well_formed_reach2 GP GIP (k : nat)
         (b : Inj) (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) :
@@ -1130,6 +1156,20 @@ Module LogRelPostCC (H : Heap).
         (* Post on result of APP *)
         IL1 (H1, rho1, Eapp f1 t xs1) (c1 + cost (Eapp f1 t xs1), max m1 (size_heap H1))
             (c2 + cost (Eapp f2 t xs2), max m2 (size_heap H2)).
+    
+    Definition IInvCaseCompat x1 x2 Pats1 Pats2 :=
+      forall H1' rho1' H2' rho2' c1 c2 e1 e2,
+        List.In (c1, e1) Pats1 ->
+        List.In (c2, e2) Pats2 -> 
+        IIL1 (H1', rho1', Ecase x1 Pats1) (H2', rho2', Ecase x2 Pats2) ->
+        IIL2 (H1', rho1', e1) (H2', rho2', e2).
+ 
+    Definition InvCaseCompat x1 Pats1 :=
+      forall H1' rho1' m1 m2 c1 c2 c e1 tc1,
+        List.In (tc1, e1) Pats1 ->
+        cost (Ecase x1 Pats1) <= c -> 
+        IL2 (H1', rho1', e1) (c1, m1) (c2, m2) ->
+        IL1 (H1', rho1', Ecase x1 Pats1) (c1 + c, m1) (c2 + c, m2).
 
     
   End CompatDefs.
@@ -1167,7 +1207,7 @@ Module LogRelPostCC (H : Heap).
       
       (H1, rho1, Econstr x1 t ys1 e1) ⪯ ^ (k ; j ; IIL1; IIG ; IL1 ; IG) (H2, rho2, Econstr x2 t ys2 e2).
     Proof with now eauto with Ensembles_DB.
-      intros Hinv Hiinv Hbase Hwf1 Hwf2 Hall Hpre b1 b2 H1' H2' rho1' rho2' v1 c1 m1
+      intros Hinv Hiinv Hbase Hwf1 Hwf2  Hall Hpre b1 b2 H1' H2' rho1' rho2' v1 c1 m1
              Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1. 
       assert (Hall' := Hall).
       inv Hstep1.
@@ -1175,7 +1215,6 @@ Module LogRelPostCC (H : Heap).
       - { exists OOT, c1. eexists. exists id. repeat split. 
           - econstructor. simpl. specialize (Hall 0). erewrite <- Forall2_length; [| eassumption ].
             simpl in Hcost. omega. reflexivity.
-          (* - simpl. eapply injective_subdomain_Empty_set.  *)
           - eapply Hbase; try eassumption. }
       (* Termination *)
       - { assert (Hall_eq:
@@ -1199,14 +1238,20 @@ Module LogRelPostCC (H : Heap).
           destruct (alloc (Constr t vs1') H1) as [l1 H1''] eqn:Hal1.
           destruct (alloc (Constr t vs2) H2') as [l2 H''] eqn:Hal2'.
           destruct (alloc (Constr t vs2') H2) as [l2' H2''] eqn:Hal2.
-          
+          repeat subst_exp. 
           assert (Hval_rel :
                     forall j, Forall2 (fun v1 v2 => Res (v1, H1) ≺ ^ (k; j; IIG; IG; b) Res (v2, H2)) vs1' vs2').
           { intros j'. assert (Hall'' := Hall j'). 
             eapply var_log_rel_getlist in Hall''; [| now eauto ].
             destruct Hall'' as [vs2'' [Hget'' Hvrel]]. repeat subst_exp. 
             eassumption. }
-          
+          assert (Hval_rel' :
+                    Forall2 (fun v1 v2 => forall j, Res (v1, H1') ≺ ^ (k; j; IIG; IG; (b2 ∘ b ∘ b1))
+                                                                Res (v2, H2')) vs vs2).
+          { eapply Forall2_forall. tci. intros j'. assert (Hall'' := Hall_eq j'). 
+            eapply var_log_rel_getlist in Hall''; [| now eauto ].
+            destruct Hall'' as [vs2'' [Hget'' Hvrel]]. repeat subst_exp. 
+            eassumption. }          
           
           edestruct Hpre with (b1 := extend b1 l l1)
                               (b2 := extend b2 l2' l2)
@@ -1217,10 +1262,10 @@ Module LogRelPostCC (H : Heap).
           - simpl. eapply FromList_env_locs. eassumption. reflexivity.
           - intros j'; eapply Forall2_monotonic; [| now eapply (Hval_rel j') ].
             intros ? ? H. eapply val_rel_i_monotonic; [| | | | now eapply H | ]; tci.
-            omega.
+            omega. 
           - eapply heap_env_equiv_alloc;
-              [ | | | | | | | eassumption | eassumption | | ]. 
-            + eassumption. 
+              [ | | | | | | | eassumption | eassumption | | ].
+            + eassumption.
             + eapply heap_env_equiv_preserves_closed; [| eapply Hwf1 ].
               eassumption.
             + eapply Included_trans; [ | now eapply reach'_extensive ].
@@ -1238,11 +1283,11 @@ Module LogRelPostCC (H : Heap).
             + eapply heap_env_equiv_antimon. eapply heap_env_equiv_rename_ext. 
               eassumption.
               reflexivity.
-
+              
               eapply f_eq_subdomain_extend_not_In_S_r.
               intros Hr. eapply reachable_in_dom in Hr.
               eapply alloc_fresh in Halloc. destruct Hr as [s Hgetl]. congruence.
-
+              
               eapply well_formed_respects_heap_env_equiv.
               eapply well_formed'_closed. eassumption. eassumption.
               
@@ -1260,27 +1305,20 @@ Module LogRelPostCC (H : Heap).
               eapply res_equiv_rename_ext. eassumption.
               reflexivity.
 
-              assert (Hsub : val_loc l3 \subset env_locs rho1' (occurs_free (Econstr x1 t ys1 e1))).
-              { normalize_occurs_free. rewrite env_locs_Union.
-                eapply Included_Union_preserv_l.
-                
-                rewrite env_locs_FromList; try eassumption. 
-                eapply In_Union_list. eapply in_map. eassumption. }
-
               eapply f_eq_subdomain_extend_not_In_S_r.
               
               
               intros Hr. eapply reachable_in_dom in Hr.
               eapply alloc_fresh in Halloc. destruct Hr as [s Hgetl]. congruence. 
+ 
+              eapply well_formed_antimon;
+                [| eapply well_formed'_closed; eapply val_rel_Forall2_reach with (vs1 := vs); eassumption ]. 
+              eapply reach'_set_monotonic. eapply In_Union_list. 
+              eapply in_map. eassumption.
               
-              eapply well_formed_antimon. eapply reach'_set_monotonic. eassumption.
-              eapply well_formed'_closed.
-              eapply heap_env_equiv_preserves_closed; [| eapply Hwf1 ]. eassumption.
-
-              eapply Included_trans; [| eapply env_locs_closed ]. 
-              eapply Included_trans. eassumption.  eapply reach'_extensive.
-              eapply heap_env_equiv_preserves_closed; [| eapply Hwf1 ]. eassumption.
-
+              eapply Included_trans; [| eapply env_locs_closed; eapply val_rel_Forall2_reach with (vs1 := vs); eassumption ]. 
+              eapply Included_trans; [| eapply reach'_extensive ].
+              eapply In_Union_list. eapply in_map. eassumption.
               reflexivity. 
           - eapply injective_subdomain_antimon.
             eapply injective_subdomain_extend. eassumption.
@@ -1289,8 +1327,10 @@ Module LogRelPostCC (H : Heap).
             eapply heap_env_equiv_image_reach in Hc; try eassumption.
             eapply (image_id (reach' H1 (env_locs rho1 (occurs_free (Econstr x1 t ys1 e1)))))
               in Hc.
+            
             eapply reachable_in_dom in Hc; try eassumption. destruct Hc as [v1' Hgetv1'].
             erewrite alloc_fresh in Hgetv1'; try eassumption. congruence.
+            
             eapply well_formed'_closed. eassumption. 
             eapply Included_trans. eapply reach'_extensive.
             eapply env_locs_closed. eassumption. 
@@ -1566,7 +1606,110 @@ Module LogRelPostCC (H : Heap).
             econstructor; eauto. now econstructor; eauto.
             eapply val_rel_i_monotonic; tci. simpl in *. omega. }
     Qed.
+
+    (* TODO move *)
+    Lemma Forall2_findtag {A B} c Pats1 Pats2 (e : A) (P : A -> B  -> Prop) :
+      findtag Pats1 c = Some e ->
+      Forall2 (fun ce1 ce2 =>
+                 let '(c1, e1) := ce1 in
+                 let '(c2, e2) := ce2 in
+                 c1 = c2 /\ P e1 e2) Pats1 Pats2 ->
+      exists e', findtag Pats2 c = Some e' /\ P e e'.
+    Proof.
+      intros Hf Hall. revert e Hf. induction Hall; intros e Hf.
+      - inv Hf.
+      - destruct x as [c1 e1]. destruct y as [c2 e2]. simpl in *.
+        destruct H as [Heq1 HP]; subst.
+        destruct (M.elt_eq c2 c); eauto. inv Hf.
+        eexists; split; eauto. 
+    Qed. 
+
+
     
+    Lemma exp_rel_case_compat (k j : nat) (b : Inj)
+          (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (Pats1 Pats2 : list (cTag * exp)) :
+      InvCostBase_w IL1 IIL1 (Ecase x1 Pats1) (Ecase x2 Pats2) ->
+      IInvCaseCompat IIL1 IIL2 x1 x2 Pats1 Pats2 ->
+      InvCaseCompat IL1 IL2 x1 Pats1 ->
+      
+      var_rel k j IIG IG b H1 rho1 H2 rho2 x1 x2 ->
+
+      Forall2 (fun ce1 ce2 =>
+                 let '(c1, e1) := ce1 in
+                 let '(c2, e2) := ce2 in
+                 c1 = c2 /\
+                 (k >= cost (Ecase x1 Pats1) ->
+                 (H1, rho1, e1) ⪯ ^ (k - cost (Ecase x1 Pats1); j; IIL2 ; IIG ; IL2 ; IG)
+                 (H2, rho2, e2))) Pats1 Pats2 ->
+                 
+      (H1, rho1, Ecase x1 Pats1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (H2, rho2, Ecase x2 Pats2).
+    Proof with now eauto with Ensembles_DB.
+      intros Hbase Hiinvh Hinvh Hvar Hall b1 b2 H1' H2' rho1' rho2'
+             v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1. (* XXX fix semantics *)
+      inv Hstep1.
+      (* Timeout! *)
+      - { simpl in Hcost. exists OOT, c1. eexists. exists id. repeat split. 
+          - econstructor. simpl; omega. reflexivity. 
+          - eapply Hbase; eassumption. }
+      - { pose (cost1 := cost_cc (Ecase x1 Pats1)).
+          pose (cost2 := cost_cc (Ecase x2 Pats2)).
+          eapply (var_rel_heap_env_equiv
+                    _ _ 
+                    (occurs_free (Ecase x1 Pats1))
+                    (occurs_free (Ecase x2 Pats2))) in Hvar;
+          [| eassumption | eassumption | eassumption | eassumption
+           | | ].
+          edestruct Hvar as [l' [Hgety' Hcc]]; eauto.
+          destruct l' as [l' |l' f ]; [| contradiction ].
+          simpl in Hcc. rewrite Hgetl in Hcc. 
+          destruct (get l' H2') as [[ t' vs' | | ] |] eqn:Hgetl';
+            (try destruct Hcc as [Hbeq Hcc]); try contradiction.
+          destruct Hcc as [Heq Hall']; subst. simpl in Hall', Hcost.
+          repeat subst_exp. 
+          edestruct (@Forall2_findtag exp exp) with
+          (P := fun e1 e2 => k >= cost (Ecase x1 Pats1) ->
+                          (H1, rho1, e1) ⪯ ^ (k - cost (Ecase x1 Pats1); j; IIL2 ; IIG ; IL2; IG)
+                          (H2, rho2, e2)) as [e2 Hcc].  
+          - eassumption.
+          - eapply Forall2_monotonic; [| eassumption ]. intros [c e1] [c' e2] H. eassumption.
+          - destruct Hcc as [Hf2 Hcc]. repeat subst_exp. 
+            edestruct Hcc with (c1 := c1 - cost1) as [v2 [c2 [m2 [b' [Hstep [HS Hres]]]]]];
+            [ | | | | | | | eassumption | | ].
+            + simpl in *. omega.
+            + eapply heap_env_equiv_antimon. now eapply Heq1.
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
+            + eapply injective_subdomain_antimon. eassumption.
+              eapply reach'_set_monotonic. eapply env_locs_monotonic.
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
+            + eapply heap_env_equiv_antimon. now eapply Heq2.
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
+            + eapply injective_subdomain_antimon. eassumption.
+              eapply reach'_set_monotonic. eapply env_locs_monotonic.
+              eapply occurs_free_Ecase_Included. eapply findtag_In. eassumption.
+            + eapply Hiinvh. eapply findtag_In. eassumption.
+              eapply findtag_In. eassumption. eassumption.
+            + unfold cost1. simpl; omega.
+            + intros i. edestruct (Hstuck1 (i + cost1)) as [r' [m'' Hstep']].
+              inv Hstep'.
+              * exists OOT. eexists. econstructor; eauto. unfold cost1, cost_cc in Hcost0.
+                simpl in *; omega. 
+              * repeat subst_exp.
+                simpl in Hbs0. rewrite NPeano.Nat.add_sub in Hbs0.
+                do 2 eexists. eassumption.
+            + repeat eexists; eauto. 
+              * eapply Eval_case_per_cc with (c := c2 + cost2)
+                ; [ | | | | rewrite NPeano.Nat.add_sub ]; try eassumption.
+                simpl in *. omega.  
+              * replace c1 with (c1 - cost1 + cost1) by (unfold cost1; simpl in *; omega).
+                eapply Hinvh. eapply findtag_In. eassumption.
+                simpl in *. omega.
+                eassumption.
+              * eapply val_rel_i_monotonic; tci.
+                simpl in *; omega.
+          - now constructor.
+          - now constructor. }
+    Qed.
+
     (** Halt compatibility *)
     Lemma exp_rel_halt_compat (k j : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj)
           (x1 x2 : var) :

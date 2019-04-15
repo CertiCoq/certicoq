@@ -6,7 +6,7 @@ From CertiCoq.L6.Heap Require Import heap heap_impl heap_defs heap_equiv space_s
      invariants GC closure_conversion_correct.
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
-                        Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+                        Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums NArith.Ndist
                         NArith.BinNat PArith.BinPos Sets.Ensembles Omega Permutation.
 
 Import ListNotations.
@@ -170,8 +170,88 @@ Module Top.
       + rewrite cc_approx_val_eq in Hres.
         eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.
-  
-  
+
+
+  Lemma closure_conversion_correct_top_div
+        (k : nat) (j : nat) (e1 e2 : exp) (C : exp_ctx) (Γ : var) (* dummy varaiable for environment *)
+        H2 rho2 m1 :
+    
+    (rho2, H2) = install_env Γ ->
+    ~ Γ \in bound_var e1 ->
+            (* The source program has unique binders *)
+            unique_bindings e1 ->
+            
+    (* C[e2] is the closure converted program *)
+    Closure_conversion ct (Empty_set _) (Empty_set _) id ct Γ [] e1 e2 C ->
+            
+    (* the source diverges *)
+    div_src emp (M.empty _) e1 m1 ->
+    
+    exists (m2 : natinf),
+      (* the target diverges *)
+      div_trg H2 rho2 (C |[ e2 ]|) m2 /\
+      match m1, m2 with
+      | ni m1, ni m2 => m2 <= m1 + (cost_space_exp e1) + 1
+      | ni _, inf => False                                                          
+      | inf, _ => True
+      end.
+  Proof with (now eauto with Ensembles_DB).
+    unfold install_env.
+    destruct (alloc (Constr ct []) emp) as [lenv H2'] eqn:Ha. 
+    intros Ha' Hnin Hun Hcc Hdiv. inv Ha'.
+
+    assert (Hns: not_stuck emp (M.empty _)  e1).
+    { intros j'. eexists OOT. edestruct (Hdiv j') as [m' [Hbs Hleq]].
+      eexists. eassumption. }
+
+    eexists (match m1 with
+             | infty => infty
+             | ni m0 => ni (m0 + cost_space_exp e1 + 1)
+             end).
+
+    split; [| now  destruct m1; eauto ]. 
+
+    intros i. destruct (Hdiv i) as [m1' [Hbs Hleq]].  
+    assert (Heq : (e1, M.empty _, emp) ⪯ ^ (i ; j ;
+                                              Pre (Empty_set _) 0 1; PreG;
+                                              Post 0 0 1; PostG)
+                                               (C |[ e2 ]|, (M.set Γ (Loc lenv) (M.empty value)), H2')).
+      { eapply closure_conversion_correct_lr_closed; try eassumption.
+        unfold install_env. rewrite Ha. reflexivity. }
+      edestruct Heq as (r2 & c2 & m2 & b & Hbs2 & Hin & Hres).
+      - reflexivity.
+      - clear; now firstorder.
+      - reflexivity.
+      - clear; now firstorder.
+      - unfold Pre. unfold size_heap, size_cc_heap.
+        rewrite !plus_O_n at 1.
+        rewrite PS_cardinal_empty.
+        simpl. rewrite <- plus_n_O.
+        erewrite HL.size_with_measure_alloc with (s := 0); try eassumption. 
+        simpl. omega. 
+        now eapply HL.size_with_measure_emp.
+        eapply PS_cardinal_empty_l. 
+        rewrite <- mset_eq. reflexivity. 
+      - reflexivity.
+      - eassumption.
+      - eassumption.
+      - rewrite cc_approx_val_eq in Hres. simpl in Hres.
+        destruct r2; try contradiction.
+       
+        assert (Hmon : exists m2', m2' <= m2 /\ big_step_GC_cc H2' (M.set Γ (Loc lenv) (M.empty value)) (C |[ e2 ]|) OOT i m2' ).
+        { eapply big_step_GC_cc_OOT_mon. eassumption.
+          unfold Post in *. omega. }
+        edestruct Hmon as [m2' [Hm1 Hm2]]. eexists. split. eassumption.
+        destruct m1; eauto. now constructor.
+        destruct Hin as [_ Hmem]. eapply le_ni_le. eapply le_trans. eassumption.
+        eapply le_trans. eassumption. simpl.
+        eapply Nat_as_DT.max_lub. omega.
+        unfold cost_space_heap, cost_heap in *.
+        rewrite HL.max_with_measure_emp in *. 
+        rewrite Nat_as_OT.max_0_r.
+        eapply ni_le_le in Hleq. omega.
+  Qed. 
+
 End Top.
 
 Print Assumptions Top.closure_conversion_correct_top.

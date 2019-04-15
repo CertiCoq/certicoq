@@ -5,7 +5,7 @@ Require Export L2k.instances.
 Require Export L4.instances.
 Require Export L6.instances.
 Require Export L7.Clightexec.
-
+From CertiCoq.L6.Heap Require Import dead_param_elim. 
 
 Open Scope Z_scope.
 Require Import ZArith.
@@ -143,13 +143,14 @@ Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (s
 (* Definition test := printProg (compile_L7 (ext_comp vs)) "output/vs_h.c".      *)
 (*  Definition test := printProg (compile_L7 (ext_comp graph_color)) "output/color.c".    *)
 
+Variable ignore : forall {a}, a -> Coq.Init.Datatypes.unit. 
 
- Section TEST_L6.
+Section TEST_L6.
 (*  This can be used to test L6 (using an L5 program, extract to ML and run in ocaml to translate to L6 and then run using L6 executable semantics : *)
-Require Import  ExtLib.Data.String. 
-(* Multistep *)
-Fixpoint mstep_L6  (x : (cTerm certiL6)) (n:nat) :=
-  match n with
+  Require Import  ExtLib.Data.String. 
+  (* Multistep *)
+  Fixpoint mstep_L6  (x : (cTerm certiL6)) (n:nat) :=
+    match n with
     | O =>
       Ret x
     | S n' =>
@@ -160,68 +161,83 @@ Fixpoint mstep_L6  (x : (cTerm certiL6)) (n:nat) :=
        end)
   end.
 
-Definition print_BigStepResult_L6 p  n:=
-  let '((prim,cenv, nenv, fenv), (rho, e)) := p in
-  L7.L6_to_Clight.print (
-      match (L6_evaln n p) with
-      | Error s _ => s
-      | OutOfTime (_, (rho', e')) => "Out of time:"++ (show_env nenv cenv false rho')++ (show_exp nenv cenv false e')
-      | Result v => show_val nenv cenv false v
-      end).
+  Definition print_BigStepResult_L6 p  n:=
+    let '((prim,cenv, nenv, fenv), (rho, e)) := p in
+    L7.L6_to_Clight.print (
+        match (L6_evaln n p) with
+        | Error s _ => s
+        | OutOfTime (_, (rho', e')) => "Out of time:"++ (show_env nenv cenv false rho')++ (show_exp nenv cenv false e')
+        | Result v => show_val nenv cenv false v
+        end).
 
- Definition comp_L6 p := match p
+  Definition comp_L6 p := match p
                           with
-                            | Exc s => Exc s
-                            | Ret v =>  L6.instances.certiL5_t0_L6 v                                           
-                        end.
+                          | Exc s => Exc s
+                          | Ret v =>  L6.instances.certiL5_t0_L6 v                                           
+                          end.
 
-(* Compiles AST program all the way to L6 *)
-Definition comp_to_L6:= fun p =>
-                       comp_L6 (translateTo (cTerm certiL5) p).
+  (* Compiles AST program all the way to L6 *)
+  Definition comp_to_L6:= fun p =>
+                            comp_L6 (translateTo (cTerm certiL5) p).
 
 
-Definition testL6 := match comp_L6 color5 with
-                   | Ret ((pr,cenv,nenv), (env, t)) => print_BigStepResult_L6 ((pr,cenv,nenv), (env, t)) 30%nat 
-                   | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
-                   end.
+  Definition testL6 := match comp_L6 color5 with
+                       | Ret ((pr,cenv,nenv), (env, t)) => print_BigStepResult_L6 ((pr,cenv,nenv), (env, t)) 30%nat 
+                       | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
+                       end.
 
-(* test dead parameter elimination *)
+  (* test dead parameter elimination *)
 
-Definition simple_test (x : nat) (y : nat) := (x + 1)%nat. 
+  Definition simple_test (x : nat) (y : nat) := (x + 1)%nat. 
 
-Fixpoint even (x : nat) (y : Datatypes.unit) :=
-  match x with
-  | O => true
-  | S x' => odd x' y
-  end
-with odd (x: nat) (y : Datatypes.unit) :=
-    match x with      
-    | O => false
-    | S x' => even x' y
-    end. 
+  Fixpoint even (x : nat) (y : Datatypes.unit) :=
+    match x with
+    | O => true
+    | S x' => odd x' y
+    end
+  with odd (x: nat) (y : Datatypes.unit) :=
+         match x with      
+         | O => false
+         | S x' => even x' y
+         end. 
 
-Quote Recursively Definition test1 := simple_test. 
-Quote Recursively Definition test2 := even. 
+  Quote Recursively Definition test1 := simple_test. 
+  Quote Recursively Definition test2 := even. 
 
-Definition test1_L5 := Eval native_compute in translateTo (cTerm certiL5) test1.
-Definition test2_L5 := Eval native_compute in translateTo (cTerm certiL5) test2.
+  Definition test1_L5 := Eval native_compute in translateTo (cTerm certiL5) test1.
+  Definition test2_L5 := Eval native_compute in translateTo (cTerm certiL5) test2.
 
-Definition compL6_and_print testL5 :=
-  match comp_L6 testL5 with
-  | Ret (((pr, cenv'),cenv,nenv), (env, t)) =>
-    L7.L6_to_Clight.print (show_exp cenv cenv' true t) 
-  | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
-  end.
 
-Definition out1 := compL6_and_print test1_L5.
-Definition out2 := compL6_and_print test2_L5.
+  Definition compL6_and_print_twice testL5 :=
+    match comp_L6 testL5 with
+    | Ret (((pr, cenv'),cenv,nenv), (env, t)) =>
+      let x := L7.L6_to_Clight.print ("Before dropping\n") in
+      let y := L7.L6_to_Clight.print (show_exp cenv cenv' true t) in
+      let z := L7.L6_to_Clight.print ("After dropping\n") in
+      let _ := ignore x in
+      L7.L6_to_Clight.print (show_exp cenv cenv' true (dropper t))
+    | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
+    end.
+
+  Definition out1 := compL6_and_print_twice test1_L5.
+  Definition out2 := compL6_and_print_twice test2_L5.
 
 End TEST_L6. 
 
-Extraction "test1_dead_param.ml" out1. 
-Extraction "test2_dead_param.ml" out2. 
+ Require Import ExtrOcamlBasic.
+ Require Import ExtrOcamlString.
+ Require Import ExtrOcamlZInt.
+ Require Import ExtrOcamlNatInt.
+ 
+ Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
+ Extract Constant L6_to_Clight.print => "(fun s-> print_string (String.concat """" (List.map (String.make 1) s)))".
+ Extract Constant varImplDummyPair.varClassNVar => " (fun f (p:int*bool) -> varClass0 (f (fst p)))".
+ Extract Constant ignore => "ignore".
 
-
+ Extraction "test1_drop_param.ml" out1. 
+ Extraction "test2_drop_param.ml" out2. 
+ 
+ 
 (*  Section TEST_L7. *)
 (* This can be used to test Clight (using an L5 program, extract to ocaml and run to translate to Clight and then run using Clightexec: *)
 

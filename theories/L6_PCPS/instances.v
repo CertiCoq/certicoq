@@ -128,7 +128,7 @@ Instance certiL5_t0_L6:
                                     next_iTag
                                     cenv nenv
         in
-        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _,   dropper (shrink_top t')))
+        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
       | None => Exc "failed converting from L5 to L6"
       end)
     end.

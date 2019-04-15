@@ -271,7 +271,7 @@ Module SpaceSem (H : Heap).
         
         big_step_GC_cc H rho (Eproj x t n y e) r c m
   | Eval_case_per_cc :
-      forall (H H' : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
+      forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
         (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
         (Hcost : c >= cost_cc (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
@@ -279,7 +279,7 @@ Module SpaceSem (H : Heap).
         (Htag : findtag cl t = Some e)
 
 
-        (Hbs : big_step_GC_cc H' rho e r (c - cost_cc (Ecase y cl)) m),
+        (Hbs : big_step_GC_cc H rho e r (c - cost_cc (Ecase y cl)) m),
         
         big_step_GC_cc H rho (Ecase y cl) r c m
   | Eval_fun_per_cc :

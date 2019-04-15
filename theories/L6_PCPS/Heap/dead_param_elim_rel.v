@@ -67,7 +67,7 @@ Inductive Drop_body (drop : var -> option (list bool)) (S : Ensemble var) :  exp
   forall (x : var) (ys : list var) (ct : cTag) (e : exp) (e' : exp), 
     Disjoint _ (FromList ys) (S :|: dropped_funs drop) -> 
     Drop_body drop S e e' ->
-    Drop_body drop S (Econstr x ct ys e') (Econstr x ct ys e')
+    Drop_body drop S (Econstr x ct ys e) (Econstr x ct ys e')
 | BDrop_Prim : 
   forall (x : var) (g : prim) (ys : list var) (e : exp) (e' : exp), 
     Disjoint _ (FromList ys) (S :|: dropped_funs drop) -> 

@@ -1626,7 +1626,7 @@ Module LogRelPostCC (H : Heap).
 
 
     
-    Lemma cc_approx_exp_case_compat (k j : nat) (b : Inj)
+    Lemma exp_rel_case_compat (k j : nat) (b : Inj)
           (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (Pats1 Pats2 : list (cTag * exp)) :
       InvCostBase_w IL1 IIL1 (Ecase x1 Pats1) (Ecase x2 Pats2) ->
       IInvCaseCompat IIL1 IIL2 x1 x2 Pats1 Pats2 ->

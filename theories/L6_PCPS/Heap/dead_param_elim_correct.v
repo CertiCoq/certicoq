@@ -69,6 +69,25 @@ Module DeadParamCorrect (H : Heap).
     intros Hc; subst.
     eapply Hnin. exists bs. eassumption.
   Qed. 
+
+  Lemma drop_body_occurs_free S drop e1 e2 : (* Katja TODO *)
+    Drop_body drop S e1 e2 ->
+    occurs_free e2 \subset occurs_free e1 \\ S.
+  Proof.
+  Admitted.
+
+  Lemma drop_invariant_reach1 drop rho1 rho2 : (* Zoe TODO *)
+    drop_invariant drop rho1 rho2 -> 
+    env_locs rho1 (domain drop) <--> Empty_set _. 
+  Proof.
+  Admitted. 
+
+  Lemma drop_invariant_reach2 drop rho1 rho2 : (* Zoe TODO *)
+    drop_invariant drop rho1 rho2 -> 
+    env_locs rho2 (domain drop) <--> Empty_set _. 
+  Proof.
+  Admitted. 
+
     
   Lemma dead_param_elim_correct
         k j (* step and heap indices *)
@@ -78,7 +97,9 @@ Module DeadParamCorrect (H : Heap).
         S (* dropped variables *) :
 
     (forall j, (H1, rho1) ⋞ ^ (occurs_free e1 \\ S \\ dropped_funs drop ; k ; j; PreG ; PostG ; b) (H2, rho2)) ->
-
+    (* heap is well-formed in S *)
+    closed (reach' H1 (env_locs rho1 (occurs_free e1))) H1 ->
+    
     (* invariant about dropped function names *)
     drop_invariant drop rho1 rho2 -> 
     
@@ -94,37 +115,26 @@ Module DeadParamCorrect (H : Heap).
   Proof with now eauto with Ensembles_DB.
     revert j H1 rho1 e1 H2 rho2 e2 b drop S;
       induction k as [k IHk] using lt_wf_rec1;
-      intros j H1 rho1 e1 H2 rho2 e2 b drop S Hrel Hdinv Hun Hdis1 Hdis2 Hdrop.
+      intros j H1 rho1 e1 H2 rho2 e2 b drop S Hrel Hclos Hdinv Hun Hdis1 Hdis2 Hdrop.
     inv Hdrop. 
     - (* ----------- Econstr ----------- (3) *)
       eapply exp_rel_constr_compat. 
       + admit. 
       + admit. 
       + admit. 
-      + intros l Hloc. admit.      
-      + admit. 
+      + eassumption.
+      + admit. (* Zoe TODO *) 
       + intros j'. setoid_rewrite Setminus_Union in Hrel. 
         eapply var_log_rel_Forall2.   
-        * admit. 
-        * admit. 
+        * eapply Hrel.
+        * normalize_occurs_free. eapply Included_Setminus.
+          eassumption. now eauto with Ensembles_DB. 
       + intros vs1 vs2 l1 l2 H1' H2' Hleq Hloc1 Hloc2 Halloc1 Halloc2 HForall2 j'. 
-        eapply IHk with (S := S) (drop := drop). 
+        eapply IHk with (S := S) (drop := drop) (b :=  b { l1 ~> l2 }).
         * simpl in *. omega. 
-        * intros j''. 
-          eapply env_log_rel_P_set. 
-
-          eapply env_log_rel_i_monotonic with (i := k); tci. 
-
-          eapply env_log_rel_P_antimon with (S1 := (occurs_free (Econstr x ct ys e) \\ S \\ dropped_funs drop)). 
-          admit. 
-          
-          normalize_occurs_free. 
-          rewrite !Setminus_Union. 
-          rewrite !Union_assoc. rewrite (Union_commut _ ([set x])). 
-          rewrite <- Setminus_Union... 
-          omega.
-          
-          admit. 
+        * intros j''.
+          admit. (* Katja TODO *)
+        * admit. (* Zoe TODO *)
         * eapply drop_invariant_extend; [|eassumption]. 
           intros Hcontra. eapply Hdis1. 
           normalize_bound_var. split. eassumption. eauto with Ensembles_DB. 
@@ -166,7 +176,8 @@ Module DeadParamCorrect (H : Heap).
           rewrite <- Setminus_Union...
           omega. 
 
-          eapply Hrelv. 
+          eapply Hrelv.
+        * admit. (* Zoe TODO *)
         * eapply drop_invariant_extend; [| eassumption ].
           intros Hcontra.
           eapply Hdis1. 
@@ -184,28 +195,63 @@ Module DeadParamCorrect (H : Heap).
           inv Hun. eapply Disjoint_Singleton_l. eassumption.
         * eassumption. 
     - (* ----------- Ecase ----------- *)
-      admit. 
-    - (* ----------- Ehalt ----------- (2) *)
-      eapply exp_rel_halt_compat.
+      eapply exp_rel_case_compat.
+      + admit.
+      + admit.
       + admit. 
+      + setoid_rewrite Setminus_Union in Hrel. 
+        eapply Hrel. constructor; eauto.
+      + eapply Forall2_monotonic_strong; [| eassumption ].
+        intros [t1 e1] [t2 e2] Hin1 Hin2 [Hteq Hdrop]. simpl in Hteq, Hdrop.
+        split. eassumption.
+        intros Hleq.
+        eapply IHk; [| | | | | | | eassumption ].
+        * admit. (* Katja TODO *)
+        * admit.
+        * admit. 
+        * admit.
+        * eapply unique_bindings_Ecase_In. eassumption. eassumption.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          intros y Hin. econstructor; eassumption.
+        * eapply Disjoint_Included; [| | eapply Hdis2 ] . 
+          intros y Hin. econstructor; eassumption.
+          eapply occurs_free_Ecase_Included. eassumption. 
+    - (* ----------- Ehalt ----------- (2) *)
+      eapply exp_rel_halt_compat. 
+      + admit. (* TODO Zoe : remove from compat lemma *) 
       + admit. (* base case for post *)
       + setoid_rewrite Setminus_Union in Hrel.
         eapply Hrel. 
         split; [| eassumption ]. 
         rewrite occurs_free_Ehalt... 
     - (* ----------- Eapp (unknown) ----------- *)
-      eapply exp_rel_app_compat. 
+      eapply exp_rel_app_compat.  
       + admit. 
       + admit. 
       + intros j'. setoid_rewrite Setminus_Union in Hrel. 
         eapply Hrel.
         split; [|eassumption]. 
         normalize_occurs_free... 
-      + eapply Forall2_same. intros x Hin j'. 
-        setoid_rewrite Setminus_Union in Hrel. eapply Hrel. 
-        admit. 
+      + eapply Forall2_forall. tci. 
+        intros j'. setoid_rewrite Setminus_Union in Hrel. 
+        eapply var_log_rel_Forall2.   
+        * eapply Hrel.
+        * normalize_occurs_free. eapply Included_Setminus.
+          eassumption.
+          now eauto with Ensembles_DB.
     - (* ----------- Eapp (known) ----------- *)
       admit. 
-  Abort. 
+  Abort.
+
+
+  (* Zoe TODO :
+     - Constructor alloc lemma
+     - Prim compat
+     - App known compat  
+     - closed motonicity 
+     - Invariant preservation
+     - known functions compat
+     - closed S H1 as premise 
+   *) 
 
 End DeadParamCorrect.

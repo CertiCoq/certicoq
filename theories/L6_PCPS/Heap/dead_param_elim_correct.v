@@ -214,7 +214,6 @@ Module DeadParamCorrect (H : Heap).
           eapply Included_Setminus_compat. 
           eapply Included_Setminus_compat. 
           eapply occurs_free_Ecase_Included. eassumption. 
-          SearchAbout (_ \subset _). 
           eapply Included_refl. 
           eapply Included_refl. 
       

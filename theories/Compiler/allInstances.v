@@ -143,7 +143,7 @@ Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (s
 (* Definition test := printProg (compile_L7 (ext_comp vs)) "output/vs_h.c".      *)
 (*  Definition test := printProg (compile_L7 (ext_comp graph_color)) "output/color.c".    *)
 
-Variable ignore : forall {a}, a -> Coq.Init.Datatypes.unit. 
+Variable concat : string -> string -> string.
 
 Section TEST_L6.
 (*  This can be used to test L6 (using an L5 program, extract to ML and run in ocaml to translate to L6 and then run using L6 executable semantics : *)
@@ -207,16 +207,15 @@ Section TEST_L6.
   Definition test1_L5 := Eval native_compute in translateTo (cTerm certiL5) test1.
   Definition test2_L5 := Eval native_compute in translateTo (cTerm certiL5) test2.
 
-
   Definition compL6_and_print_twice testL5 :=
     match comp_L6 testL5 with
     | Ret (((pr, cenv'),cenv,nenv), (env, t)) =>
-      let x := L7.L6_to_Clight.print ("Before dropping\n") in
-      let y := L7.L6_to_Clight.print (show_exp cenv cenv' true t) in
-      let z := L7.L6_to_Clight.print ("After dropping\n") in
-      let _ := ignore x in
-      L7.L6_to_Clight.print (show_exp cenv cenv' true (dropper t))
-    | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
+      let x := "Before dropping\n" in
+      let y := concat x (show_exp cenv cenv' true t) in
+      let z := concat y ("After dropping\n") in
+      let w := concat z (show_exp cenv cenv' true (dropper t)) in
+      L7.L6_to_Clight.print w
+    | _ =>   L7.L6_to_Clight.print "Failed during comp_L6"
     end.
 
   Definition out1 := compL6_and_print_twice test1_L5.
@@ -232,7 +231,7 @@ End TEST_L6.
  Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
  Extract Constant L6_to_Clight.print => "(fun s-> print_string (String.concat """" (List.map (String.make 1) s)))".
  Extract Constant varImplDummyPair.varClassNVar => " (fun f (p:int*bool) -> varClass0 (f (fst p)))".
- Extract Constant ignore => "ignore".
+ Extract Constant concat => "List.append".
 
  Extraction "test1_drop_param.ml" out1. 
  Extraction "test2_drop_param.ml" out2. 

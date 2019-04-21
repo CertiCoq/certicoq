@@ -1610,31 +1610,31 @@ Module Size (H : Heap).
 
     
   Lemma GC_pre 
-        (H1' H1'' H2' Hgc2: heap block)
-        env_loc (rho_clo rho_clo1 rho_clo2 rho2'' : env) 
-        (B1 : fundefs) (f1' : var) (ct1 : cTag)
-        (xs1' : list var) (e1 : exp)
-        (vs1 : list value) 
-        (B2 : fundefs) (f3 : var) (c ct2 : cTag) (xs2' : list var) 
-        (e2 : exp) (env_loc2 : loc) (vs2 : list value) fls d
+        (H1 H1' H2 Hgc2: heap block)
+        env_loc1 env_loc2
+        (rho_clo rho_clo1 rho_clo2 rho2 rho2' : env)
+        (B1 B2 : fundefs) (f1 f2 : var) (ct1 ct2 : cTag)
+        (xs1 xs2 : list var) (e1 e2 : exp) c
+        (vs1 vs2 : list value) 
+        fls d
         Scope {Hs : ToMSet Scope} β k : (* existentials *) 
         
-        get env_loc H1' = Some (Env rho_clo) ->
-        find_def f1' B1 = Some (ct1, xs1', e1) ->
-        def_closures B1 B1 rho_clo H1' (Loc env_loc) = (H1'', rho_clo1) ->
-        setlist xs1' vs1 rho_clo1 = Some rho_clo2 ->
+        get env_loc1 H1 = Some (Env rho_clo) ->
+        find_def f1 B1 = Some (ct1, xs1, e1) ->
+        def_closures B1 B1 rho_clo H1 (Loc env_loc1) = (H1', rho_clo1) ->
+        setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
         
-        Some rho2'' =
-        setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
-        find_def f3 B2 = Some (ct2, xs2', e2) ->
-        live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d ->
+        Some rho2' =
+        setlist xs2 (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
+        find_def f2 B2 = Some (ct2, xs2, e2) ->
+        live' ((env_locs rho2') (occurs_free e2)) H2 Hgc2 d ->
 
-        get env_loc2 H2' = Some (Constr c fls) ->
+        get env_loc2 H2 = Some (Constr c fls) ->
         length fls = PS.cardinal (fundefs_fv B1) ->
+        
+        (forall j, Scope |- H1 ≼ ^ ( k ; j ; PreG ; PostG ; β ) H2) ->
 
-        (forall j, Scope |- H1' ≼ ^ ( k ; j ; PreG ; PostG ; β ) H2') ->
-
-        Disjoint M.elt (name_in_fundefs B1 :&: occurs_free e1) (FromList xs1') ->
+        Disjoint M.elt (name_in_fundefs B1 :&: occurs_free e1) (FromList xs1) ->
         unique_functions B1 ->
 
         (** To show size relation  **)
@@ -1642,15 +1642,15 @@ Module Size (H : Heap).
         (* Scope <--> vs :&: FVs *)
         Scope :|: (* reachable from xs or FVs of post name :&: FV(e1) *)
         env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1) (* closures *) \subset
-        reach' H1'' ((env_locs rho_clo2) (occurs_free e1)) ->
+        reach' H1' ((env_locs rho_clo2) (occurs_free e1)) ->
         
-        reach' H2' ((env_locs rho2'') (occurs_free e2)) \subset
+        reach' H2 ((env_locs rho2') (occurs_free e2)) \subset
         env_loc2 |: image β Scope  (* reachable from xs or Γ *) ->
         
         PreG (name_in_fundefs B1 :&: occurs_free e1)
-             (reach_size H1'' rho_clo2 e1)
+             (reach_size H1' rho_clo2 e1)
              (1 + PS.cardinal (fundefs_fv B1))
-            (H1'', rho_clo2, e1) (Hgc2, subst_env d rho2'', e2).
+             (H1', rho_clo2, e1) (Hgc2, subst_env d rho2', e2).
   Proof with (now eauto with Ensembles_DB).
     intros Hgetenv1 Hfd1 Hst1 Hl1 Hs2 Hdf2 Hl2 Hget Hlen Hreach Hdis Hun Heq1 Heq2. 
     unfold PreG, Pre.
@@ -1667,10 +1667,10 @@ Module Size (H : Heap).
     assert (Hseq : (env_loc2 |: image β Scope) <--> (env_loc2 |: (image β Scope \\ [set env_loc2]))). 
     { rewrite Union_Setminus_Included. reflexivity. tci. reflexivity. }
  
-    assert (Hsize : size_with_measure_filter size_val (reach' H2' (env_locs rho2'' (occurs_free e2))) H2'
+    assert (Hsize : size_with_measure_filter size_val (reach' H2 (env_locs rho2' (occurs_free e2))) H2
                     + 3 * PS.cardinal (@mset (name_in_fundefs B1 :&: occurs_free e1) _) <=
-                    size_with_measure_filter size_val (reach' H1'' (env_locs rho_clo2 (occurs_free e1))) H1''
-                    + (1 + PS.cardinal (fundefs_fv B1))). 
+                    size_with_measure_filter size_val (reach' H1' (env_locs rho_clo2 (occurs_free e1))) H1'
+                    + (1 + PS.cardinal (fundefs_fv B1))).
     { eapply le_trans. 
       eapply plus_le_compat_r. 
       eapply (@HL.size_with_measure_filter_monotonic _ _ _ _ _ _ ) in Heq2. eassumption.
@@ -1680,20 +1680,20 @@ Module Size (H : Heap).
       
       erewrite !HL.size_with_measure_filter_Union with (S1 := Scope). 
       (* Closure env size *)
-      assert (Hsize1 : size_with_measure_filter size_val (env_loc2 |: image β Scope) H2' <=
+      assert (Hsize1 : size_with_measure_filter size_val (env_loc2 |: image β Scope) H2 <=
                        1 + PS.cardinal (fundefs_fv B1)
-                       + size_with_measure_filter size_val (image β Scope) H2'). 
+                       + size_with_measure_filter size_val (image β Scope) H2). 
       { erewrite (HL.size_with_measure_Same_set _ _ _ _ _ Hseq).
         erewrite HL.size_with_measure_filter_add_In; try eassumption.
         eapply plus_le_compat. simpl. omega.
         eapply HL.size_with_measure_filter_monotonic. now eauto with Ensembles_DB.
         intros Hc; inv Hc. eauto. } 
       (* reachable part *)
-      assert (Hsize2 : size_with_measure_filter size_val (image β Scope) H2' <=
-                       size_with_measure_filter size_val Scope H1').
+      assert (Hsize2 : size_with_measure_filter size_val (image β Scope) H2 <=
+                       size_with_measure_filter size_val Scope H1).
       { eapply size_reachable_leq. eassumption. reflexivity. }
       
-      assert (Hlem : forall f, size_with_measure_filter f Scope H1' = size_with_measure_filter f Scope H1''). 
+      assert (Hlem : forall f, size_with_measure_filter f Scope H1 = size_with_measure_filter f Scope H1'). 
       { intros f. eapply HL.size_with_measure_filter_subheap_eq.
         now eapply def_funs_subheap; eauto. 
         eapply cc_approx_heap_dom1 with (j := 0). now eauto.  }
@@ -1701,8 +1701,8 @@ Module Size (H : Heap).
       rewrite <- !Hlem.
       (* def_closure *)
       assert (Hclos : 3 * PS.cardinal (@mset (name_in_fundefs B1 :&: occurs_free e1) _) <=
-                      size_with_measure_filter size_val (env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1)) H1'').
-      { erewrite size_with_measure_filter_def_closures with (f := f1'); try eassumption.
+                      size_with_measure_filter size_val (env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1)) H1').
+      { erewrite size_with_measure_filter_def_closures with (f := f1); try eassumption.
         simpl size_val. eapply mult_le_compat_l.
          
         eapply cardinal_env_locs. intros.

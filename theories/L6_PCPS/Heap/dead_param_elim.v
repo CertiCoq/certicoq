@@ -26,7 +26,7 @@ end.
 (* list of list of variables corresponding to list of fundefs *)
 Fixpoint get_vars (B : fundefs) : list (list var) := 
 match B with 
-| Fcons f ft xs e B' => xs :: get_vars B'
+| Fcons f ft xs e B' => xs :: (get_vars B')
 | Fnil => []
 end. 
 
@@ -61,11 +61,17 @@ let yss := get_vars B  in
 let bss := get_bools B  in 
 (Dropping yss bss). 
 
+Fixpoint contains (xs : list var) (y : var) : bool := 
+match xs with 
+| [] => false
+| x :: xs' => if (peq x y) then true else contains xs' y
+end. 
+
 (* Replace nth variable of list*)
 Fixpoint replace_nth (X : Type) (n : nat) (ys : list X) (x : X) : list X := 
 match n, ys with
 | 0, y :: ys' => x :: ys'
-| S n', y :: ys' => replace_nth X n' ys' x
+| S n', y :: ys' => y :: (replace_nth X n' ys' x)
 | _, _ => ys
 end. 
 Arguments replace_nth {X}. 
@@ -76,7 +82,7 @@ match funs with
 | f :: funs' => if (peq f x) then (true, n) else find_fun x funs' (n+1)
 end. 
 
-Fixpoint add_escaping (x : var) (drop : dropping_fun) (funs : list var)  : dropping_fun :=
+Fixpoint add_escaping (x : var) (drop : dropping_fun) (funs : list var) : dropping_fun :=
 let (b, n) := find_fun x funs 0 in
 if b then 
   match drop with 
@@ -88,16 +94,24 @@ if b then
   end
 else drop. 
 
-Fixpoint add_escapings (xs : list var) (drop : dropping_fun) (funs : list var) : dropping_fun :=
+Fixpoint add_escapings (xs : list var) (drop : dropping_fun) (funs : list var) (f : var) : dropping_fun :=
+if contains funs f then 
 match xs with 
-| x :: xs' => add_escapings xs' (add_escaping x drop funs) funs
+| x :: xs' => add_escapings xs' (add_escaping x drop funs) funs f
+| [] => drop
+end
+else drop. 
+
+Fixpoint add_escapings' (xs : list var) (drop : dropping_fun) (funs : list var) : dropping_fun :=
+match xs with 
+| x :: xs' => add_escapings' xs' (add_escaping x drop funs) funs
 | [] => drop
 end. 
 
 (* Find the relevant variable and undrop it if necessary *)
 Fixpoint add_var_helper (x : var) (ys : list var) (bs : list bool) : list bool := 
 match ys, bs with 
-| y :: ys', b :: bs' => if (peq x y) then true :: bs' else add_var_helper x ys' bs'
+| y :: ys', b :: bs' => if (peq x y) then (true :: bs') else (b :: (add_var_helper x ys' bs'))
 | _, _ => bs
 end. 
 
@@ -115,30 +129,33 @@ end.
 (* Undrop a list of variables *)
 Fixpoint add_vars (xs : list var) (drop : dropping_fun) (n : nat) : dropping_fun := 
 match xs with 
+| [] => drop
 | x :: xs' => add_vars xs' (add_var x drop n) n
-| [] => drop 
 end. 
 
-Fixpoint add_fun_args (dropFun : nat) (xs : list var) (bs : list bool) (drop : dropping_fun) : dropping_fun :=
+Fixpoint add_fun_args (n : nat) (xs : list var) (bs : list bool) (drop : dropping_fun) : dropping_fun :=
 match (xs, bs) with 
 | ([], []) => drop
 | (x :: xs', b :: bs') => 
-  if (eqb b true) then let drop' := add_var x drop dropFun in add_fun_args dropFun xs' bs' drop'
-  else add_fun_args dropFun xs' bs' drop
+  if (eqb b true) then let drop' := add_var x drop n in add_fun_args n xs' bs' drop'
+  else add_fun_args n xs' bs' drop
 | _ => drop
 end. 
 
 Fixpoint add_fun_vars (f : var) (funs : list var) (xs : list var) (drop : dropping_fun) (m : nat) : dropping_fun :=
 let (b, n) := find_fun f funs 0 in
-let bss := bool_drop drop in
-let bs := nth n bss [] in
-add_fun_args m xs bs drop. 
+if b then (
+  let bss := bool_drop drop in
+  let bs := nth n bss [] in
+  add_fun_args m xs bs drop
+)
+else add_vars xs drop m. 
 
 Fixpoint escaping_fun_exp (e : exp) (drop : dropping_fun) (funs : list var) := 
 match e with 
 | Eapp f t ys =>
-  add_escapings ys drop funs
-| Econstr x t ys e' => escaping_fun_exp e' (add_escapings ys drop funs) funs
+  add_escapings' ys drop funs 
+| Econstr x t ys e' => escaping_fun_exp e' (add_escapings' ys drop funs) funs 
 | Eproj x t n y e' => escaping_fun_exp e' drop funs
 | Ecase x P => 
   (fix mapM_LD (l : list (cTag * exp)) (drop : dropping_fun) := 
@@ -160,8 +177,7 @@ match B with
 | Fnil => drop
 end. 
 
-Fixpoint live_expr (B : fundefs) (drop : dropping_fun) (funs : list var) (n : nat)
-                   (e : exp) : dropping_fun := 
+Fixpoint live_expr (B : fundefs) (drop : dropping_fun) (funs : list var) (n : nat) (e : exp) : dropping_fun := 
 match e with 
 | Econstr x t ys e' => 
   let drop' := add_vars ys drop n in
@@ -170,21 +186,21 @@ match e with
   let drop' := add_var y drop n in
   live_expr B drop' funs n e'
 | Ecase x P => 
+  let drop' := add_var x drop n in
   (fix mapM_LD  (l : list (cTag * exp))  (drop : dropping_fun) := 
   match l with 
   | [] => drop
   | (c', e') :: l'=>
     let drop' := live_expr B drop funs n e' in
     mapM_LD l' drop'
-  end) P drop 
-| Ehalt x =>
-  add_var x drop n 
+  end) P drop'
+| Ehalt x => add_var x drop n 
 | Eapp f t ys =>  
   let drop' := add_var f drop n in
   let drop'' := add_fun_vars f funs ys drop' n in
   drop''
 | Efun fl e' => drop
-| Eprim x f ys e' => 
+| Eprim x f ys e' =>  
   let drop' := add_var f drop n in
   let drop'' := add_vars ys drop' n in
   live_expr B drop'' funs n e'
@@ -235,7 +251,7 @@ match n with
   let curr_drop := live B prev_drop funs 0 in 
   if (drop_equality prev_drop curr_drop) then prev_drop
   else find_drop_helper B curr_drop funs n'
-end. 
+end.
 
 Fixpoint find_drop (e : exp) : dropping_fun := 
 match e with 
@@ -244,14 +260,16 @@ match e with
   let initial_drop := get_drop_initial B in
   let drop' := escaping_fun_exp e' (escaping_fun_fundefs B initial_drop funs) funs in
   let n := num_vars B 0 in
-  find_drop_helper B initial_drop funs n
+  (* initial_drop *)
+  (* drop' *)
+  find_drop_helper B drop' funs n
 | _ => Dropping [[]] [[]]
 end. 
 
 Fixpoint drop_args (ys : list var) (bs : list bool) : list var := 
 match ys, bs with 
 | [], [] => ys
-|y :: ys', b :: bs' => 
+| y :: ys', b :: bs' => 
   if (eqb b true) then y :: (drop_args ys' bs')
   else drop_args ys' bs'
 | _, _ => ys
@@ -273,9 +291,11 @@ match e with
 | Eprim x f ys e' => Eprim x f ys (dropper_expr drop funs e')
 | Eapp f t ys => 
   let (b, n) := find_fun f funs 0 in
-  let bss := bool_drop drop in
-  let ys' := drop_args ys (nth n bss []) in
-  Eapp f t ys'
+  if b then (
+    let bss := bool_drop drop in
+    let ys' := drop_args ys (nth n bss []) in
+    Eapp f t ys')
+  else Eapp f t ys
 end. 
 
 Fixpoint dropper_fundefs (B : fundefs) (drop : dropping_fun) (funs : list var) (n : nat) := 

@@ -41,7 +41,6 @@ else False.
 (* S is the set of the dropped parameters of the function we're in. We need it
    to make sure that these are not used anywhere in the program, and so the proof will go through.
    Everything that we want to keep we want to make sure that is not in S.
-
    the list of booleans is the drop parameters of the function we are calling and we need it so that
    the application has the right arity.
  *)
@@ -58,7 +57,7 @@ Inductive Drop_args (S : Ensemble var) : list var -> list bool -> list var -> Pr
       Drop_args S (x :: xs) (true :: bs) (x :: ys).
 
 Definition dropped_funs drop : Ensemble var :=
-  [set f | exists bs, drop f = Some bs /\ Exists (fun x => x = true) bs]. 
+  [set f | exists bs, drop f = Some bs /\ Exists (fun x => x = false) bs]. 
 
 (* S is the set of formal parameters that have been dropped from the *current* function.
    That is, whatever is in S, is undefined in the environment when we execute the code. *)

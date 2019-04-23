@@ -74,7 +74,52 @@ Module DeadParamCorrect (H : Heap).
     Drop_body drop S e1 e2 ->
     occurs_free e2 \subset occurs_free e1 \\ S.
   Proof.
-  Admitted.
+  induction 1; 
+  try normalize_occurs_free; try normalize_occurs_free;
+  try rewrite Setminus_Union_distr. 
+  - (* Econstr *)
+    eapply Included_Union_compat. 
+    + eapply Included_Setminus. 
+      eapply Disjoint_sym. eapply Disjoint_sym in H. 
+      eapply Disjoint_Union_l. eassumption. 
+      eapply Included_refl. 
+    + rewrite Setminus_Union. 
+      rewrite Union_commut. rewrite <- Setminus_Union. 
+      eapply Included_Setminus_compat. eassumption. 
+      eapply Included_refl. 
+  - (* Eprim *)
+    eapply Included_Union_compat. 
+    + eapply Included_Setminus. 
+      eapply Disjoint_sym. eapply Disjoint_sym in H. 
+      eapply Disjoint_Union_l. eassumption. 
+      eapply Included_refl. 
+    + rewrite Setminus_Union. 
+      rewrite Union_commut. rewrite <- Setminus_Union. 
+      eapply Included_Setminus_compat. eassumption. 
+      eapply Included_refl. 
+  - (* Eproj *)
+    eapply Included_Union_compat. 
+    + eapply Included_Setminus. 
+      eapply Disjoint_sym.  
+      apply Disjoint_Singleton_r in H. 
+      eapply Disjoint_Union_l. eassumption. 
+      eapply Included_refl. 
+    + rewrite Setminus_Union. 
+      rewrite Union_commut. rewrite <- Setminus_Union. 
+      eapply Included_Setminus_compat. eassumption. 
+      eapply Included_refl. 
+  - (* ECase *)
+    admit. 
+  - (* Ehalt *)
+    admit. 
+  - (* Eapp unknown *)
+    admit. 
+  - (* Eapp known *)
+    inversion H1. 
+    + SearchAbout (FromList []). admit. 
+    + admit. 
+    + admit.    
+  Admitted. 
 
   Lemma drop_invariant_reach1 drop rho1 rho2 : (* Zoe TODO *)
     drop_invariant drop rho1 rho2 -> 
@@ -132,8 +177,35 @@ Module DeadParamCorrect (H : Heap).
       + intros vs1 vs2 l1 l2 H1' H2' Hleq Hloc1 Hloc2 Halloc1 Halloc2 HForall2 j'. 
         eapply IHk with (S := S) (drop := drop) (b :=  b { l1 ~> l2 }).
         * simpl in *. omega. 
-        * intros j''.
-          admit. (* Katja TODO *)
+        * intros j''. (* KATJA TODO *)
+          eapply env_rel_heap_monotonic. 
+          eapply HL.alloc_subheap. eassumption. 
+          eapply HL.alloc_subheap. eassumption. 
+          intros j'''. 
+
+          eapply env_log_rel_P_set. 
+
+          eapply env_log_rel_i_monotonic with (i := k); tci. 
+          
+          eapply env_log_rel_P_antimon. 
+          eapply env_rel_rename_ext. apply Hrel. 
+          
+          (* Extending environment *)
+          SearchAbout (f_eq_subdomain). eapply f_eq_subdomain_extend_not_In_S_r. 
+          admit. admit. 
+
+          (* Occurs free *)
+          normalize_occurs_free. 
+          rewrite !Setminus_Union.
+          rewrite !Union_assoc. rewrite (Union_commut _ ([set x])).
+          rewrite <- Setminus_Union...
+
+          (* cost *)
+          omega. 
+
+          (* Value Relation *)
+          admit. 
+
         * admit. (* Zoe TODO *)
         * eapply drop_invariant_extend; [|eassumption]. 
           intros Hcontra. eapply Hdis1. 
@@ -160,12 +232,12 @@ Module DeadParamCorrect (H : Heap).
         split; [| eassumption ].
         normalize_occurs_free...
       + intros v1 v2 Hleq Hv1 Hv2 Hrelv j'. 
-        eapply IHk with (S := S) (drop := drop).
+        eapply IHk with (S := S) (drop := drop). 
         * simpl in *. omega. 
         * intros j''. 
           eapply env_log_rel_P_set. 
 
-          eapply env_log_rel_i_monotonic with (i := k); tci.
+          eapply env_log_rel_i_monotonic with (i := k); tci. 
           (* Note: These generates a bunch of goals of the form [Proper ... ]. Should be solvable
              with the tactic [tci] (shorthand for [eauto with typeclass_instances]. *)
           eapply env_log_rel_P_antimon. eapply Hrel. 
@@ -218,7 +290,10 @@ Module DeadParamCorrect (H : Heap).
           eapply Included_refl. 
       
           simpl in *. omega. 
-        * admit. 
+        * (* Katja TODO - closed *)
+          SearchAbout (_ \subset _ -> closed _ _). 
+          eapply reach'_closed. admit. 
+          admit. 
         * eassumption. 
         * eapply unique_bindings_Ecase_In. eassumption. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].

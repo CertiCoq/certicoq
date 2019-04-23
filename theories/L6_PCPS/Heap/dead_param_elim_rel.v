@@ -115,7 +115,7 @@ Inductive Drop_params : list var -> list bool -> list var -> Ensemble var -> Pro
       Drop_params (x :: xs) (true :: bs) (x :: ys) S.
 
 
-Inductive Drop_body_fundefs (drop : var -> option (list bool)) : fundefs -> fundefs -> Prop := 
+Inductive Drop_fundefs (drop : var -> option (list bool)) : fundefs -> fundefs -> Prop := 
 | FDrop_nil : 
   Drop_body_fundefs drop Fnil Fnil
 | FDrop_cons : 
@@ -124,13 +124,13 @@ Inductive Drop_body_fundefs (drop : var -> option (list bool)) : fundefs -> fund
     drop g = Some bs ->  
     Drop_params xs bs ys S -> 
     Drop_body drop S e e' ->
-    Drop_body_fundefs drop F F' ->
-    Drop_body_fundefs drop (Fcons g ft xs e F) (Fcons g ft ys e' F'). 
+    Drop_fundefs drop F F' ->
+    Drop_fundefs drop (Fcons g ft xs e F) (Fcons g ft ys e' F'). 
 
 
 Inductive Drop (drop : var -> option (list bool)) : fundefs -> exp -> fundefs -> exp -> Prop := 
 | Drop_toplevel :
     forall B e B' e',
-      Drop_body_fundefs drop B B' ->
+      Drop_fundefs drop B B' ->
       Drop_body drop (Empty_set _) e e' -> 
       Drop drop B e B' e. 

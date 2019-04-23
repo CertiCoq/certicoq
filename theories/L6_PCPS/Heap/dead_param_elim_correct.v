@@ -50,9 +50,10 @@ Module DeadParamCorrect (H : Heap).
     forall f bs, drop f = Some bs ->
             exists B1 f1 B2 f2 ft1 xs1 e1 ft2 xs2 e2 S,
               M.get f rho1 = Some (FunPtr B1 f1) /\
-              M.get f rho2 = Some (FunPtr B1 f2) /\
+              M.get f rho2 = Some (FunPtr B2 f2) /\
               find_def f1 B1 = Some (ft1, xs1, e1) /\
               find_def f2 B2 = Some (ft2, xs2, e2) /\
+              Drop_fundefs drop B1 B2 /\
               Drop_params xs1 bs xs2 S /\
               Drop_body drop S e1 e2.
 

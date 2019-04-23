@@ -1786,21 +1786,20 @@ Module LogRelPostCC (H : Heap).
     (** Halt compatibility *)
     Lemma exp_rel_halt_compat (k j : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj)
           (x1 x2 : var) :
-      InvCostTimeOut IL1 IIL1 (Ehalt x1) (Ehalt x2) ->
       InvCostBase_w IL1 IIL1 (Ehalt x1) (Ehalt x2) ->
       
       var_rel k j IIG IG b H1 rho1 H2 rho2 x1 x2 ->
 
       (H1, rho1, Ehalt x1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1; IG) (H2, rho2, Ehalt x2).
     Proof.
-      intros Hoot Hbase Hvar b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1
+      intros Hbase Hvar b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1
              Heq2 Hinj2 Hleq1 HII Hstep1 Hstuck1.
       assert (Hvar' := Hvar).
       inv Hstep1.
       - (* Timeout! *)
         { simpl in Hcost. exists OOT, c1. eexists. exists id. repeat split. 
           - econstructor; eauto.
-          - eapply Hoot; try eassumption. }
+          - eapply Hbase; try eassumption. }
       - pose (cost1 := cost_cc (Ehalt x1)).
         pose (cost2 := cost_cc (Ehalt x2)).
         eapply (var_rel_heap_env_equiv
@@ -1935,6 +1934,133 @@ Module LogRelPostCC (H : Heap).
             normalize_occurs_free. left. eassumption.
             normalize_occurs_free. left. eassumption. }
     Qed.
+
+    (** Application compatibility *)
+    (* Lemma exp_rel_app_compat_known (k j : nat) (b : Inj) (H1 H2 : heap block) *)
+    (*       (rho1 rho2 : env) (f1 f2 : var) S (xs1 xs2 : list var) (t : fTag) : *)
+    (*   IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 -> *)
+    (*   InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) -> *)
+             
+    (*   (forall (rho1' rho2' : env) (B1 B2 : fundefs) (f1' f2' : var)  *)
+    (*      (e1 e2 : exp) (ys1 ys2 : list var) (vs1 vs2 : list value) (c1 c2 m1 m2 : nat) (d1 d2 : loc -> loc), *)
+    (*       M.get f1 rho1 = Some (FunPtr B1 f1') -> *)
+    (*       find_def f1' B1 = Some (t, ys1, e1) -> *)
+    (*       getlist xs1 rho1 = Some vs1 -> *)
+    (*       setlist ys1 vs1 (def_funs B1 B1 (M.empty value)) = Some rho1' -> *)
+          
+    (*       exists B2 f2' ys2 e2 vs2, *)
+    (*         M.get f2 rho2 = Some (FunPtr B2 f2') /\ *)
+    (*         find_def f2' B2 = Some (t, ys2, e2) /\ *)
+    (*         getlist xs2 rho2 = Some vs2 /\ *)
+    (*         setlist ys2 vs2 (def_funs B2 B2 (M.empty value)) = Some rho2' /\ *)
+            
+    (*         (forall j, (H1, rho1', e1) ⪯ ^ (k ; j; IIG 0 0; IIG ; IG 0 0 ; IG) (H2, rho2', e1))) -> *)
+        
+        
+    (*   (H1, rho1, Eapp f1 t xs1) ⪯ ^ (k ; j; IIL1 ; IIG *)
+    (*                                  ; IL1 *)
+    (*                                  ; IG) *)
+    (*   (H2, rho2, Eapp f2 t xs2). *)
+    (* Proof with now eauto with Ensembles_DB. *)
+    (*   intros Hiinv Hbase Hvar Hall *)
+    (*          b1 b2 H1' H2' rho1' rho2' v1 c1 m1 Heq1 Hinj1 Heq2 Hinj2 *)
+    (*          HII Hleq1 Hstep1 Hstuck1. *)
+    (*   eapply (var_rel_heap_env_equiv *)
+    (*             _ _  *)
+    (*             (occurs_free (Eapp f1 t xs1)) *)
+    (*             (occurs_free (Eapp f2 t xs2)) k j) in Hvar; *)
+    (*       [| eassumption | eassumption | eassumption | eassumption  *)
+    (*        | normalize_occurs_free; now eauto with Ensembles_DB *)
+    (*        | normalize_occurs_free; now eauto with Ensembles_DB ]. *)
+    (*   inv Hstep1. *)
+    (*   (* Timeout! *) *)
+    (*   - { edestruct (Hstuck1 (cost (Eapp f1 t xs1))) as [v1 [m1 Hstep1]]. *)
+    (*       inv Hstep1; [ omega | ]. *)
+    (*       exists OOT, c1. destruct (lt_dec c1 1). *)
+    (*       - eexists. eexists id. repeat split. *)
+    (*         constructor; eauto. simpl; omega.  *)
+    (*         eapply Hbase; try eassumption. *)
+    (*       - edestruct Hvar as [l2 [Hget' Hcc]]; eauto.  *)
+    (*         simpl val_log_rel' in Hcc. rewrite Hgetl in Hcc. *)
+    (*         destruct l2 as [l2 | ]; [| contradiction ]. *)
+    (*         destruct Hcc as [Hbeq Hcc]; simpl in Hcc. *)
+    (*         destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction. }  *)
+    (*   (* Termination *)   *)
+    (*   - { eapply Forall2_monotonic_strong with *)
+    (*           (R' := (fun x1 x2 : var => forall j, var_rel k j IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2)) in Hall. *)
+    (*       - assert (Hall' : *)
+    (*                   Forall2 (fun x1 x2 : var => var_rel k j IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2) xs1 xs2). *)
+    (*         { eapply Forall2_monotonic; [| eapply Hall ]; eauto. } *)
+
+    (*         eapply var_log_rel_getlist in Hall'; [| now eauto ].  *)
+    (*         destruct Hall' as [vs2 [Hgetl' Hcc']].  *)
+    (*         edestruct Hvar as [l2 [Hget' Hval]]; eauto. *)
+    (*         destruct l2; try contradiction. *)
+    (*         rewrite val_rel_eq in Hval. unfold val_rel' in Hval.  *)
+    (*         edestruct (Hval H1' H2')  with (vs2 := vs2) *)
+    (*           as (xs2' & e2 & rho2'' & Hfind' & Hset' & Hi'); *)
+    (*           try eassumption. *)
+    (*         eapply Forall2_length. eassumption.  *)
+            
+    (*       edestruct (live_exists' (env_locs rho2'' (occurs_free e2)) H2') *)
+    (*         as [H2'' [b' Hgc']]. *)
+    (*       tci. *)
+    (*       assert (Hgc2 := Hgc').  *)
+    (*       edestruct live'_live_inv with (H1 := H1') as [d' [Hgc1 Hinj]]; try eassumption. *)
+    (*       tci.  *)
+    (*       destruct Hgc1 as  [Hseq [Heqgc Hinjgc]].                *)
+    (*       destruct Hgc2 as  [Hseq' [Heqgc' Hinjgc']]. *)
+    (*       rewrite <- subst_env_image in Hinjgc.  *)
+          
+    (*       edestruct Hi' with (i := k - cost  (Eapp f1 t xs1)) *)
+    (*         as [HG [r2 [c2 [m2 [b2' [Hbs2 [HIG  Hcc2]]]]]]]; *)
+    (*         [ | | | | |  | | | eassumption | | ]; try eassumption.      *)
+    (*         + simpl in *. omega.  *)
+    (*         + intros j'. *)
+    (*           assert (Hall' : *)
+    (*                   Forall2 (fun x1 x2 : var => var_rel k j' IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2) xs1 xs2). *)
+    (*         { eapply Forall2_monotonic; [| eapply Hall ]; eauto. } *)
+            
+    (*         eapply var_log_rel_getlist in Hall'; [| now eauto ].  *)
+    (*         destruct Hall' as [vs2' [Hgetl'' Hcc'']]. repeat subst_exp.  *)
+    (*         eapply Forall2_monotonic_strong; [| eapply Hcc'' ].  *)
+            
+    (*         intros v1' v2' Hinv1 Hinv2 Heq.   *)
+    (*         eapply val_rel_i_monotonic with (i := k); tci.  *)
+    (*         eapply Heq. simpl in *; omega.  *)
+    (*         + eapply heap_equiv_symm in Heqgc. *)
+    (*           eapply heap_env_equiv_heap_equiv_r in Heqgc. *)
+    (*           symmetry in Heqgc.  *)
+    (*           eapply heap_env_equiv_respects_f_eq_l with (d := id) in Heqgc.  *)
+    (*           eapply heap_env_equiv_respects_id. eassumption. *)
+    (*           destruct Hinj. eapply f_eq_subdomain_antimon; [| eassumption ]. *)
+    (*           eapply reach'_extensive. *)
+    (*         + eapply heap_env_equiv_heap_equiv_l. eassumption. *)
+    (*         + eapply HG; eassumption. *)
+    (*         + simpl in *; omega. *)
+    (*         + intros i. *)
+    (*           edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m'' Hstep']]. *)
+    (*           inv Hstep'. *)
+    (*           * omega. *)
+    (*           * rewrite NPeano.Nat.add_sub in Hbs0.  *)
+    (*             repeat subst_exp. *)
+    (*         + do 3 eexists. exists b2'. repeat split. *)
+    (*           * repeat subst_exp.                 *)
+    (*             eapply Eval_app_per_cc *)
+    (*               with (c := c2 + cost_cc (Eapp f2 t xs2)); try eassumption. *)
+    (*             simpl in *; omega. reflexivity. *)
+
+    (*             replace (c2 + cost_cc (Eapp f2 t xs2) - cost_cc (Eapp f2 t xs2)) with c2. *)
+    (*             eassumption. omega. *)
+    (*          * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega). *)
+    (*            unfold cost, cost_cc in *.  *)
+    (*            eapply Hiinv; try eassumption. *)
+    (*          * eapply val_rel_i_monotonic; tci. simpl in *; omega. *)
+    (*       - intros. eapply var_rel_heap_env_equiv. eapply H3. *)
+    (*         eassumption. eassumption. eassumption. eassumption. *)
+    (*         normalize_occurs_free. left. eassumption. *)
+    (*         normalize_occurs_free. left. eassumption. } *)
+    (* Qed. *)
 
     
   End CompatLemmas.

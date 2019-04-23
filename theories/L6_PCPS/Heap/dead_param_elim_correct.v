@@ -330,7 +330,7 @@ Module DeadParamCorrect (H : Heap).
 
 
   (* Zoe TODO :
-     - Constructor alloc lemma
+     - Constructor alloc lemma DONE
      - Prim compat
      - App known compat  
      - closed motonicity 

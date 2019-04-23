@@ -940,7 +940,7 @@ Module CCUtil (H : Heap).
       inv HB. eapply IHe; eassumption. 
     - rewrite <- app_ctx_f_fuse. intros B HB.
       rewrite project_vars_free_funs_in_exp in HB; [| eassumption ].
-      simpl in HB. inv HB. inv H6.
+      simpl in HB. inv HB. inv H5.
       + split; [| now apply Included_Empty_set ].
         eapply Included_trans.
         eapply Closure_conversion_occurs_free_Included_mut. eassumption.

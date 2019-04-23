@@ -43,6 +43,7 @@ Module Top.
     (rho2, H2) = install_env Γ ->
     ~ Γ \in bound_var e1 ->
     unique_bindings e1 ->
+    has_true_mut e1 ->
     
     Closure_conversion ct (Empty_set _) (Empty_set _) id ct Γ [] e1 e2 C ->
     
@@ -53,7 +54,7 @@ Module Top.
   Proof with (now eauto with Ensembles_DB).
     unfold install_env.
     destruct (alloc (Constr ct []) emp) as [lenv Η2] eqn:Ha. 
-    intros Ha' Hnin Hun Hcc. inv Ha'. 
+    intros Ha' Hnin Hun Htm Hcc. inv Ha'. 
     intros j.
     eapply Closure_conversion_correct in Hcc.
     eapply cc_approx_exp_rel_mon_pre.
@@ -93,6 +94,7 @@ Module Top.
       rewrite Setminus_Empty_set_neut_r, !Union_Empty_set_neut_r.
       intros x Hin. inv Hin.
     - eassumption.
+    - eassumption.
     - unfold FV.
       rewrite FromList_nil, !Setminus_Empty_set_neut_r. 
       rewrite !Union_Empty_set_neut_r at 1.
@@ -102,7 +104,7 @@ Module Top.
       Grab Existential Variables.
       tci. tci. exact id.
   Qed.
-
+  
   (** ** Top-level theorem *) 
   
   Lemma closure_conversion_correct_top
@@ -113,7 +115,8 @@ Module Top.
     ~ Γ \in bound_var e1 ->
     (* The source program has unique binders *)
     unique_bindings e1 ->
-
+    has_true_mut e1 ->
+    
     (* C[e2] is the closure converted program *)
     Closure_conversion ct (Empty_set _) (Empty_set _) id ct Γ [] e1 e2 C ->
 
@@ -134,7 +137,7 @@ Module Top.
   Proof with (now eauto with Ensembles_DB).
     unfold install_env.
     destruct (alloc (Constr ct []) emp) as [lenv H2'] eqn:Ha. 
-    intros Ha' Hnin Hun Hcc Hbs Hns. inv Ha'. 
+    intros Ha' Hnin Hun Htm Hcc Hbs Hns. inv Ha'. 
     assert (Heq : (e1, M.empty _, emp) ⪯ ^ (k + c1 ; j ;
                                             Pre (Empty_set _) 0 1; PreG;
                                             Post 0 0 1; PostG)
@@ -178,9 +181,10 @@ Module Top.
     
     (rho2, H2) = install_env Γ ->
     ~ Γ \in bound_var e1 ->
-            (* The source program has unique binders *)
-            unique_bindings e1 ->
-            
+     (* The source program has unique binders *)
+     unique_bindings e1 ->
+     has_true_mut e1 ->
+     
     (* C[e2] is the closure converted program *)
     Closure_conversion ct (Empty_set _) (Empty_set _) id ct Γ [] e1 e2 C ->
             
@@ -198,7 +202,7 @@ Module Top.
   Proof with (now eauto with Ensembles_DB).
     unfold install_env.
     destruct (alloc (Constr ct []) emp) as [lenv H2'] eqn:Ha. 
-    intros Ha' Hnin Hun Hcc Hdiv. inv Ha'.
+    intros Ha' Hnin Hun Htm Hcc Hdiv. inv Ha'.
 
     assert (Hns: not_stuck emp (M.empty _)  e1).
     { intros j'. eexists OOT. edestruct (Hdiv j') as [m' [Hbs Hleq]].

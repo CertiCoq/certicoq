@@ -401,7 +401,8 @@ Module LogRelPostCC (H : Heap).
     rewrite H. reflexivity.
     eassumption.
     rewrite H. reflexivity.
-  Qed. 
+  Qed.
+
     
   (** * Logical relation respects heap_equivalence *)  
 
@@ -1077,7 +1078,79 @@ Module LogRelPostCC (H : Heap).
     intros Hsub1 Hsub2 Hrel j l Hin.
     eapply val_rel_heap_monotonic; eauto.
     intros j'. eapply Hrel. eassumption.
-  Qed. 
+  Qed.
+
+    (** * Allocate a constructor *)
+  
+  Lemma env_rel_set_alloc_Constr S GIP GP (k j : nat) b
+        c vs1 vs2 l1 l2  (H1 H2 H1' H2' : heap block)
+        (rho1 rho2 : env) x:
+    
+    (forall j, (H1, rho1) ⋞ ^ (S \\ [set x]; k; j; GIP; GP; b) (H2, rho2)) ->
+    
+     alloc (Constr c vs1) H1 = (l1, H1') ->
+     alloc (Constr c vs2) H2 = (l2, H2') ->  
+
+     (forall j, Forall2 (fun v1 v2 => Res (v1, H1) ≺ ^ (k; j; GIP; GP; b) Res (v2, H2)) vs1 vs2) ->
+     
+     (H1', M.set x (Loc l1) rho1) ⋞ ^ (S; k; j; GIP; GP; b {l1 ~> l2}) (H2', M.set x (Loc l2) rho2).
+   Proof with (now eauto with Ensembles_DB).
+     intros Henv Ha1 Ha2 Hres. assert (Hres' := Hres). 
+     eapply env_log_rel_P_set.
+     - eapply env_rel_heap_monotonic.
+       eapply HL.alloc_subheap. eassumption.
+       eapply HL.alloc_subheap. eassumption.
+       intros j'. eapply env_rel_rename_ext. 
+       eauto. 
+       eapply f_eq_subdomain_extend_not_In_S_r; [| reflexivity ].
+       intros H. eapply env_locs_closed with (H := H1) in H.
+       eapply HL.alloc_not_In_dom. eapply Ha1. eassumption.
+       eapply env_rel_closed_reach. eassumption.
+     - split.
+       + rewrite extend_gss; reflexivity. 
+       + erewrite gas; [| eassumption ].
+         erewrite gas; [| eassumption ].
+         simpl. split. reflexivity. eapply Forall2_forall.
+         tci. 
+         intros j'. 
+         eapply Forall2_monotonic_strong; [| now eauto ].
+         intros x1 x2 Hin1 Hin2 Heq Hlt.
+         rewrite val_log_rel_eq; tci. eapply val_rel_heap_monotonic.
+
+         eapply HL.alloc_subheap; eassumption.
+         eapply HL.alloc_subheap; eassumption.
+          
+         intros j''. 
+         specialize (Hres' j'').
+         edestruct (Forall2_exists _ vs1 vs2 x1 Hin1 Hres')  as [x' [Hinx2 Hr']].
+
+         destruct x1; destruct x2; try contradiction. 
+         * eapply val_log_rel_loc_eq in Heq. inv Heq.
+           assert (Hr := Hr').
+           eapply val_log_rel_loc_eq in Hr. subst.
+           eapply val_rel_rename_ext. eassumption.
+
+           eapply f_eq_subdomain_extend_not_In_S_r; [| reflexivity ].
+           intros H. eapply env_locs_closed with (H := H1) in H.
+           eapply HL.alloc_not_In_dom. eapply Ha1. eassumption.
+           assert (Hall : forall j, Res (Loc l, H1) ≺ ^ (k; j; GIP; GP; b) Res (Loc (b l), H2)).
+           { intros j'''. specialize (Hres j''').
+             edestruct (Forall2_exists _ vs1 vs2 _ Hin1 Hres)  as [x' [Hinx3 Hr'']].
+             assert (Hr := Hr'').
+             eapply val_log_rel_loc_eq in Hr. subst.
+             eassumption. }
+           eapply val_rel_closed. eassumption.
+         * eapply val_rel_rename_ext.
+           rewrite val_rel_eq in *. 
+           intros H3 H4 rhoc ft xs1 xs2 vs3 vs4 b' Hf Hset Hlen.
+           eapply Heq; eassumption.
+
+           simpl. rewrite reach'_Empty_set.
+           intros z Hin. inv Hin.
+
+           Grab Existential Variables. exact b. exact 0. 
+   Qed.
+
 
   (** * Reachable locations image *)
 

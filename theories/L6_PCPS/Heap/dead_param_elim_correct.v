@@ -206,10 +206,20 @@ Module DeadParamCorrect (H : Heap).
         split. eassumption.
         intros Hleq.
         eapply IHk; [| | | | | | | eassumption ].
-        * admit. (* Katja TODO *)
-        * admit.
+        * simpl in *. omega. 
+        * intros j''.  
+          eapply env_log_rel_i_monotonic with (i := k); tci. 
+          eapply env_log_rel_P_antimon. eapply Hrel. 
+
+          eapply Included_Setminus_compat. 
+          eapply Included_Setminus_compat. 
+          eapply occurs_free_Ecase_Included. eassumption. 
+          eapply Included_refl. 
+          eapply Included_refl. 
+      
+          simpl in *. omega. 
         * admit. 
-        * admit.
+        * eassumption. 
         * eapply unique_bindings_Ecase_In. eassumption. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
           intros y Hin. econstructor; eassumption.

@@ -50,9 +50,10 @@ Module DeadParamCorrect (H : Heap).
     forall f bs, drop f = Some bs ->
             exists B1 f1 B2 f2 ft1 xs1 e1 ft2 xs2 e2 S,
               M.get f rho1 = Some (FunPtr B1 f1) /\
-              M.get f rho2 = Some (FunPtr B1 f2) /\
+              M.get f rho2 = Some (FunPtr B2 f2) /\
               find_def f1 B1 = Some (ft1, xs1, e1) /\
               find_def f2 B2 = Some (ft2, xs2, e2) /\
+              Drop_fundefs drop B1 B2 /\
               Drop_params xs1 bs xs2 S /\
               Drop_body drop S e1 e2.
 
@@ -73,53 +74,99 @@ Module DeadParamCorrect (H : Heap).
   Lemma drop_body_occurs_free S drop e1 e2 : (* Katja TODO *)
     Drop_body drop S e1 e2 ->
     occurs_free e2 \subset occurs_free e1 \\ S.
-  Proof.
-  induction 1; 
-  try normalize_occurs_free; try normalize_occurs_free;
-  try rewrite Setminus_Union_distr. 
-  - (* Econstr *)
+  Proof with (now eauto with Ensembles_DB).
+    revert e2.
+    induction e1 using exp_ind'; intros e2 Hdrop; inv Hdrop;
+      try normalize_occurs_free; try normalize_occurs_free;
+        try rewrite Setminus_Union_distr.
+    - (* Econstr *)
     eapply Included_Union_compat. 
     + eapply Included_Setminus. 
-      eapply Disjoint_sym. eapply Disjoint_sym in H. 
+      eapply Disjoint_sym. eapply Disjoint_sym in H4. 
       eapply Disjoint_Union_l. eassumption. 
       eapply Included_refl. 
-    + rewrite Setminus_Union. 
+    + rewrite Setminus_Union.  
       rewrite Union_commut. rewrite <- Setminus_Union. 
-      eapply Included_Setminus_compat. eassumption. 
-      eapply Included_refl. 
-  - (* Eprim *)
-    eapply Included_Union_compat. 
-    + eapply Included_Setminus. 
-      eapply Disjoint_sym. eapply Disjoint_sym in H. 
-      eapply Disjoint_Union_l. eassumption. 
-      eapply Included_refl. 
-    + rewrite Setminus_Union. 
-      rewrite Union_commut. rewrite <- Setminus_Union. 
-      eapply Included_Setminus_compat. eassumption. 
-      eapply Included_refl. 
-  - (* Eproj *)
-    eapply Included_Union_compat. 
-    + eapply Included_Setminus. 
+      eapply Included_Setminus_compat.
+      eapply IHe1. eassumption. 
+      eapply Included_refl.
+    - inv H3. normalize_occurs_free.
+      eapply Included_Setminus. 
       eapply Disjoint_sym.  
-      apply Disjoint_Singleton_r in H. 
+      apply Disjoint_Singleton_r in H1. 
       eapply Disjoint_Union_l. eassumption. 
-      eapply Included_refl. 
-    + rewrite Setminus_Union. 
-      rewrite Union_commut. rewrite <- Setminus_Union. 
-      eapply Included_Setminus_compat. eassumption. 
-      eapply Included_refl. 
-  - (* ECase *)
-    admit. 
-  - (* Ehalt *)
-    admit. 
-  - (* Eapp unknown *)
-    admit. 
-  - (* Eapp known *)
-    inversion H1. 
-    + SearchAbout (FromList []). admit. 
-    + admit. 
-    + admit.    
-  Admitted. 
+      eapply Included_refl.
+    - inv H3. destruct y as [c' e2]. destruct H2 as [Heq1 Hdrop]. simpl in Heq1; subst.
+      simpl in *. normalize_occurs_free.
+      eapply Union_Included; [| eapply Union_Included ].
+      + eapply Included_Union_preserv_l.
+        eapply Included_Setminus.  
+        apply Disjoint_Singleton_l. intros Hc. eapply H1; now left.
+        reflexivity.
+      + eapply Included_trans. eapply IHe1. eassumption.
+        rewrite Setminus_Union_distr...
+      + eapply Included_trans. eapply IHe0.
+        constructor; eassumption.
+        rewrite Setminus_Union_distr...
+    - (* Eproj *)
+      eapply Included_Union_compat. 
+      + eapply Included_Setminus. 
+        eapply Disjoint_sym.  
+        apply Disjoint_Singleton_r in H5. 
+        eapply Disjoint_Union_l. eassumption. 
+        eapply Included_refl. 
+      + rewrite Setminus_Union. 
+        rewrite Union_commut. rewrite <- Setminus_Union. 
+        eapply Included_Setminus_compat. eapply IHe1. eassumption. 
+        eapply Included_refl. 
+    - (* Eapp unknown *)
+      rewrite !occurs_free_Eapp at 1.
+      rewrite Setminus_Union_distr.
+      eapply Included_Union_compat. 
+      + eapply Included_Setminus; [| reflexivity ].
+        eapply Disjoint_Included_r; [| eassumption ]...
+      + eapply Included_Setminus; [| reflexivity ].
+        apply Disjoint_Singleton_r in H2. 
+        eapply Disjoint_sym. eapply Disjoint_Union_l. eassumption.
+    - (* Eapp known *)
+      eapply Included_Union_compat. 
+      + clear H2. induction H5.
+        rewrite !FromList_nil at 1.
+        rewrite Setminus_Empty_set_abs_r. reflexivity.
+        
+        normalize_sets. eapply Included_trans. eapply IHDrop_args.
+        now eauto with Ensembles_DB.
+
+        rewrite !FromList_cons at 1.
+        rewrite Setminus_Union_distr. eapply Included_Union_compat.
+        * eapply Included_Setminus. 
+          eapply Disjoint_sym.  
+          apply Disjoint_Singleton_r in H. 
+          eapply Disjoint_Union_l. eassumption. 
+          eapply Included_refl.
+        * eassumption.
+      + eapply Included_Setminus. 
+        eapply Disjoint_sym.  
+        apply Disjoint_Singleton_r in H4. 
+        eassumption. reflexivity.
+    - (* Eprim *)
+      eapply Included_Union_compat. 
+      + eapply Included_Setminus. 
+        eapply Disjoint_sym. eapply Disjoint_sym in H4. 
+        eapply Disjoint_Union_l. eassumption. 
+        eapply Included_refl. 
+      + rewrite Setminus_Union. 
+        rewrite Union_commut. rewrite <- Setminus_Union. 
+        eapply Included_Setminus_compat. eapply IHe1. eassumption.
+        reflexivity.
+    - (* Ehalt *)
+      rewrite !occurs_free_Ehalt at 1.
+      eapply Included_Setminus. 
+      eapply Disjoint_sym.  
+      apply Disjoint_Singleton_r in H0. 
+      eapply Disjoint_Union_l. eassumption. 
+      eapply Included_refl.
+  Qed. 
 
   Lemma drop_invariant_reach1 drop rho1 rho2 : (* Zoe TODO *)
     drop_invariant drop rho1 rho2 -> 
@@ -177,35 +224,19 @@ Module DeadParamCorrect (H : Heap).
       + intros vs1 vs2 l1 l2 H1' H2' Hleq Hloc1 Hloc2 Halloc1 Halloc2 HForall2 j'. 
         eapply IHk with (S := S) (drop := drop) (b :=  b { l1 ~> l2 }).
         * simpl in *. omega. 
-        * intros j''. (* KATJA TODO *)
-          eapply env_rel_heap_monotonic. 
-          eapply HL.alloc_subheap. eassumption. 
-          eapply HL.alloc_subheap. eassumption. 
-          intros j'''. 
+        * intros j''.
+          eapply env_rel_set_alloc_Constr; [| eapply Halloc1 | eapply Halloc2 | ].
 
-          eapply env_log_rel_P_set. 
-
+          intros j1. 
           eapply env_log_rel_i_monotonic with (i := k); tci. 
           
-          eapply env_log_rel_P_antimon. 
-          eapply env_rel_rename_ext. apply Hrel. 
-          
-          (* Extending environment *)
-          SearchAbout (f_eq_subdomain). eapply f_eq_subdomain_extend_not_In_S_r. 
-          admit. admit. 
+          eapply env_log_rel_P_antimon.  
+          eapply Hrel.
 
-          (* Occurs free *)
-          normalize_occurs_free. 
-          rewrite !Setminus_Union.
-          rewrite !Union_assoc. rewrite (Union_commut _ ([set x])).
-          rewrite <- Setminus_Union...
-
-          (* cost *)
-          omega. 
-
-          (* Value Relation *)
-          admit. 
-
+          normalize_occurs_free. rewrite !Setminus_Union_distr, !Setminus_Union.
+          eapply Included_Union_preserv_r... 
+          omega.
+          eassumption.
         * admit. (* Zoe TODO *)
         * eapply drop_invariant_extend; [|eassumption]. 
           intros Hcontra. eapply Hdis1. 
@@ -290,9 +321,7 @@ Module DeadParamCorrect (H : Heap).
           eapply Included_refl. 
       
           simpl in *. omega. 
-        * (* Katja TODO - closed *)
-          SearchAbout (_ \subset _ -> closed _ _). 
-          eapply reach'_closed. admit. 
+        * (* Zoe TODO - closed *)
           admit. 
         * eassumption. 
         * eapply unique_bindings_Ecase_In. eassumption. eassumption.
@@ -303,7 +332,6 @@ Module DeadParamCorrect (H : Heap).
           eapply occurs_free_Ecase_Included. eassumption. 
     - (* ----------- Ehalt ----------- (2) *)
       eapply exp_rel_halt_compat. 
-      + admit. (* TODO Zoe : remove from compat lemma *) 
       + admit. (* base case for post *)
       + setoid_rewrite Setminus_Union in Hrel.
         eapply Hrel. 
@@ -330,13 +358,10 @@ Module DeadParamCorrect (H : Heap).
 
 
   (* Zoe TODO :
-     - Constructor alloc lemma DONE
-     - Prim compat
-     - App known compat  
-     - closed motonicity 
-     - Invariant preservation
-     - known functions compat
-     - closed S H1 as premise 
+     - Prim compat (Low priority)
+     - App known (HIGH priority)
+     - closed motonicity (high priority, Zoe)
+     - Invariant preservation 
    *) 
 
 End DeadParamCorrect.

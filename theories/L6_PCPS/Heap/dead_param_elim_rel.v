@@ -117,7 +117,7 @@ Inductive Drop_params : list var -> list bool -> list var -> Ensemble var -> Pro
 
 Inductive Drop_fundefs (drop : var -> option (list bool)) : fundefs -> fundefs -> Prop := 
 | FDrop_nil : 
-  Drop_body_fundefs drop Fnil Fnil
+  Drop_fundefs drop Fnil Fnil
 | FDrop_cons : 
   forall (F : fundefs) (F' : fundefs) (e : exp) (e' : exp) (xs ys : list var) (bs : list bool)
     (g : var) (ft : fTag) (S : Ensemble var), 

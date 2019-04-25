@@ -1190,7 +1190,7 @@ Module LogRelPostCC (H : Heap).
         IL2 (H1'', rho1'', e1) (c1, m1) ( c2, m2) ->
         cost (C1 |[ e1 ]|) <= c1' ->
 
-        ctx_to_heap_env C1 H1' rho1' H1'' rho1'' c1' ->
+        ctx_to_heap_env_CC C1 H1' rho1' H1'' rho1'' c1' ->
         ctx_to_heap_env_CC C2 H2' rho2' H2'' rho2'' c2' ->
         
         IL1 (H1', rho1', C1 |[ e1 ]|) (c1 + c1', m1) (c2 + c2', m2).
@@ -1199,7 +1199,7 @@ Module LogRelPostCC (H : Heap).
       forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1' c2',                         
         IIL1 (H1', rho1', C1 |[ e1 ]|) (H2', rho2', C2 |[ e2 ]|) ->
         
-        ctx_to_heap_env C1 H1' rho1' H1'' rho1'' c1' ->
+        ctx_to_heap_env_CC C1 H1' rho1' H1'' rho1'' c1' ->
         ctx_to_heap_env_CC C2 H2' rho2' H2'' rho2'' c2' ->
 
         IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).

@@ -77,6 +77,23 @@ Proof.
   constructor 2. now eapply IHp.
 Qed.
 
+Lemma Forall2_findtag {A B} c Pats1 Pats2 (e : A) (P : A -> B  -> Prop) :
+  findtag Pats1 c = Some e ->
+  Forall2 (fun ce1 ce2 =>
+             let '(c1, e1) := ce1 in
+             let '(c2, e2) := ce2 in
+             c1 = c2 /\ P e1 e2) Pats1 Pats2 ->
+  exists e', findtag Pats2 c = Some e' /\ P e e'.
+Proof.
+  intros Hf Hall. revert e Hf. induction Hall; intros e Hf.
+  - inv Hf.
+  - destruct x as [c1 e1]. destruct y as [c2 e2]. simpl in *.
+    destruct H as [Heq1 HP]; subst.
+    destruct (M.elt_eq c2 c); eauto. inv Hf.
+    eexists; split; eauto. 
+Qed. 
+
+
 (** [split_fds B1 B2 B] iff B is an interleaving of the definitions in B1 and B2 *)
 Inductive split_fds: fundefs -> fundefs -> fundefs -> Prop :=
 | Left_f:

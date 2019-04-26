@@ -9,7 +9,7 @@ Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
 From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion
-                                hoisting dead_param_elim.
+                                hoisting Heap.dead_param_elim.
 From CertiCoq.L7 Require Import L6_to_Clight.
 
 

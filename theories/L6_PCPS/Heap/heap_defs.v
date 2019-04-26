@@ -1541,7 +1541,22 @@ Module HeapDefs (H : Heap) .
       [| now eapply reach'_post_fixed_point_n with (n := 1)]; simpl.
     intros l' Hin'. do 2 eexists. split. eassumption. now split; eauto.
   Qed.
-  
+
+
+  Lemma closed_reach_monotonic S1 S2 H :
+    closed (reach' H S1) H ->
+    S2 \subset S1 -> 
+    closed (reach' H S2) H.
+  Proof. 
+    intros Hc sub l Hin.
+    edestruct Hc as [v [Hget Hinv]].
+    eapply reach'_set_monotonic; eassumption.
+    eexists v; split; eauto.
+    eapply Included_trans; [| eapply reach'_post_fixed_point ].
+    eapply Included_trans. eapply post_Singleton. eassumption.
+    eapply post_set_monotonic. eapply Singleton_Included. eassumption.
+  Qed.     
+      
   Lemma closed_alloc H H' l v :
     closed (dom H) H ->
     locs v \subset dom H ->

@@ -44,8 +44,37 @@ Module DeadParamCorrect (H : Heap).
     fun _ _ c p1 p2 =>
       let '(c1, m1) := p1 in
       let '(c2, m2) := p1 in
-      c2 <= c1 /\ m2 <= m1. 
+      c2 <= c1 /\ m2 <= m1.
 
+
+  (** * Lemmas about space bound preservation *)
+
+  Lemma InvBase e1 e2 :
+    InvCostBase_w Post Pre e1 e2. 
+  Proof.
+    intros H1 H2 rho1 rho2 c1 c2 Hpre Hleq. unfold Pre, Post in *.
+    split; omega.
+  Qed.
+  
+  Lemma InvCtx C e1 e2 :
+    InvCtxCompat Post Post C C e1 e2. 
+  Proof.
+    intros H1 H2 H1' H2' rho1 rho2 rho1' rho2' c1 c2 c1' c2' m1 m2 Hpost Hleq Hctx1 Hctx2.    
+    unfold Pre, Post in *. omega. 
+  Qed. 
+
+  Lemma IInvCtx C e1 e2 :
+    IInvCtxCompat Pre Pre C C e1 e2. 
+  Proof.
+    intros H1 H2 H1' H2' rho1 rho2 rho1' rho2' c1 c2 Hpre Hctx1 Hctx2.    
+    unfold Pre, Post in *. erewrite ctx_to_heap_env_CC_size_heap at 1; try eassumption.
+    erewrite ctx_to_heap_env_CC_size_heap with (H1 := H1) (H2 := H1'); try eassumption.
+    omega. 
+  Qed. 
+
+
+  (** * Drop invariant and lemmas *)
+  
   Definition drop_invariant (drop : var -> option (list bool)) rho1 rho2 :=
     forall f bs, drop f = Some bs ->
             exists B1 f1 B2 f2 ft1 xs1 e1 ft2 xs2 e2 S,
@@ -178,6 +207,12 @@ Module DeadParamCorrect (H : Heap).
     drop_invariant drop rho1 rho2 -> 
     env_locs rho2 (domain drop) <--> Empty_set _. 
   Proof.
+  Admitted.
+  
+  Lemma drop_invariant_reach2_setminus S drop rho1 rho2 : (* Zoe TODO *)
+    drop_invariant drop rho1 rho2 -> 
+    env_locs rho2 (S \\ dropped_funs drop) <--> env_locs rho2 S. 
+  Proof.
   Admitted. 
 
     
@@ -208,14 +243,19 @@ Module DeadParamCorrect (H : Heap).
     revert j H1 rho1 e1 H2 rho2 e2 b drop S;
       induction k as [k IHk] using lt_wf_rec1;
       intros j H1 rho1 e1 H2 rho2 e2 b drop S Hrel Hclos Hdinv Hun Hdis1 Hdis2 Hdrop.
+
+    assert (Hfv_sub : occurs_free e2 \subset occurs_free e1 \\ S) by (eapply drop_body_occurs_free; eauto).
+    
     inv Hdrop. 
     - (* ----------- Econstr ----------- (3) *)
       eapply exp_rel_constr_compat. 
-      + admit. 
-      + admit. 
-      + admit. 
+      + eapply InvCtx.
+      + eapply IInvCtx.
+      + eapply InvBase.
       + eassumption.
-      + admit. (* Zoe TODO *) 
+      + eapply closed_reach_monotonic. eapply env_rel_closed_reach2.
+        eassumption. admit. (* XXX new assumption *)
+        rewrite drop_invariant_reach2_setminus; [| eassumption ]. eapply env_locs_monotonic. eassumption. 
       + intros j'. setoid_rewrite Setminus_Union in Hrel. 
         eapply var_log_rel_Forall2.   
         * eapply Hrel.
@@ -237,7 +277,9 @@ Module DeadParamCorrect (H : Heap).
           eapply Included_Union_preserv_r... 
           omega.
           eassumption.
-        * admit. (* Zoe TODO *)
+        * eapply closed_set_alloc; [| eassumption ].
+          eapply closed_reach_monotonic. eassumption.  
+          normalize_occurs_free. rewrite env_locs_Union...
         * eapply drop_invariant_extend; [|eassumption]. 
           intros Hcontra. eapply Hdis1. 
           normalize_bound_var. split. eassumption. eauto with Ensembles_DB. 
@@ -252,12 +294,12 @@ Module DeadParamCorrect (H : Heap).
           inv Hun. eapply Disjoint_Singleton_l. eassumption. 
         * eassumption. 
     - (* ----------- Eprim ----------- *)
-      admit. 
+      eapply exp_rel_prim_compat. eassumption. (* XXX Zoe remove redundant argument from compat lemma *)
     - (* ----------- Eproj ----------- (1) *)
       eapply exp_rel_proj_compat.
-      + admit. (* precondition preservation *) 
-      + admit. (* postcondition preservation *)
-      + admit. (* base case for post *)
+      + eapply InvCtx.
+      + eapply IInvCtx.
+      + eapply InvBase.
       + intros j'. setoid_rewrite Setminus_Union in Hrel.
         eapply Hrel. 
         split; [| eassumption ].
@@ -280,7 +322,11 @@ Module DeadParamCorrect (H : Heap).
           omega. 
 
           eapply Hrelv.
-        * admit. (* Zoe TODO *)
+        * rewrite reach'_idempotent in Hclos. eapply closed_reach_monotonic. eassumption.
+          eapply Included_trans. eapply env_locs_set_Inlcuded'.
+          normalize_occurs_free. rewrite env_locs_Union, reach'_Union.
+          eapply Included_Union_compat. eassumption.
+          eapply reach'_extensive. 
         * eapply drop_invariant_extend; [| eassumption ].
           intros Hcontra.
           eapply Hdis1. 
@@ -299,7 +345,7 @@ Module DeadParamCorrect (H : Heap).
         * eassumption. 
     - (* ----------- Ecase ----------- *)
       eapply exp_rel_case_compat.
-      + admit.
+      + eapply InvBase.
       + admit.
       + admit. 
       + setoid_rewrite Setminus_Union in Hrel. 
@@ -321,8 +367,9 @@ Module DeadParamCorrect (H : Heap).
           eapply Included_refl. 
       
           simpl in *. omega. 
-        * (* Zoe TODO - closed *)
-          admit. 
+        * eapply closed_reach_monotonic. eassumption.
+          eapply env_locs_monotonic.
+          eapply occurs_free_Ecase_Included. eassumption. 
         * eassumption. 
         * eapply unique_bindings_Ecase_In. eassumption. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
@@ -332,7 +379,7 @@ Module DeadParamCorrect (H : Heap).
           eapply occurs_free_Ecase_Included. eassumption. 
     - (* ----------- Ehalt ----------- (2) *)
       eapply exp_rel_halt_compat. 
-      + admit. (* base case for post *)
+      + eapply InvBase.
       + setoid_rewrite Setminus_Union in Hrel.
         eapply Hrel. 
         split; [| eassumption ]. 
@@ -340,7 +387,7 @@ Module DeadParamCorrect (H : Heap).
     - (* ----------- Eapp (unknown) ----------- *)
       eapply exp_rel_app_compat.  
       + admit. 
-      + admit. 
+      + eapply InvBase.
       + intros j'. setoid_rewrite Setminus_Union in Hrel. 
         eapply Hrel.
         split; [|eassumption]. 

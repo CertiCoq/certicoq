@@ -644,6 +644,18 @@ Module HeapEquiv (H : Heap).
   Qed.
 
    *)
+  Lemma heap_env_approx_empty S H1 H2 rho2 b1 b2 :
+    heap_env_approx S (b1, (H1, M.empty _)) (b2, (H2, rho2)).
+  Proof. 
+    intros x Hin v Hget. 
+    rewrite M.gempty in Hget. congruence. 
+  Qed.
+
+  Lemma heap_env_equiv_empty S H1 H2 b1 b2 :
+    S |- (H1, M.empty _) ⩪_(b1, b2) (H2, M.empty _).
+  Proof. 
+    split; eapply heap_env_approx_empty.
+  Qed.
 
   (** Heap equivalences respect functional extensionality *)
 

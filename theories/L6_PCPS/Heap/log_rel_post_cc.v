@@ -1190,7 +1190,7 @@ Module LogRelPostCC (H : Heap).
         IL2 (H1'', rho1'', e1) (c1, m1) ( c2, m2) ->
         cost (C1 |[ e1 ]|) <= c1' ->
 
-        ctx_to_heap_env C1 H1' rho1' H1'' rho1'' c1' ->
+        ctx_to_heap_env_CC C1 H1' rho1' H1'' rho1'' c1' ->
         ctx_to_heap_env_CC C2 H2' rho2' H2'' rho2'' c2' ->
         
         IL1 (H1', rho1', C1 |[ e1 ]|) (c1 + c1', m1) (c2 + c2', m2).
@@ -1199,7 +1199,7 @@ Module LogRelPostCC (H : Heap).
       forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1' c2',                         
         IIL1 (H1', rho1', C1 |[ e1 ]|) (H2', rho2', C2 |[ e2 ]|) ->
         
-        ctx_to_heap_env C1 H1' rho1' H1'' rho1'' c1' ->
+        ctx_to_heap_env_CC C1 H1' rho1' H1'' rho1'' c1' ->
         ctx_to_heap_env_CC C2 H2' rho2' H2'' rho2'' c2' ->
 
         IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
@@ -1254,7 +1254,7 @@ Module LogRelPostCC (H : Heap).
 
           live' (env_locs rho1' (occurs_free e1)) H1' H1gc d1 ->
           live' (env_locs rho2' (occurs_free e2)) H2' H2gc d2 ->
-          IIG (Empty_set _) _ 0 0 (H1', subst_env d1 rho1', e1) (H2', subst_env d2 rho2', e2)).
+          IIG (Empty_set _) _ 0 0 (H1gc, subst_env d1 rho1', e1) (H2gc, subst_env d2 rho2', e2)).
            
     
   End CompatDefs.
@@ -1522,6 +1522,21 @@ Module LogRelPostCC (H : Heap).
             + eapply val_rel_i_monotonic; tci.
               simpl in *; omega. }
     Qed.
+
+
+
+    Lemma exp_rel_prim_compat (k j : nat)
+          (b : Inj) (H1 H2 : heap block) (rho1 rho2 : env)
+          (x1 x2 : var) (t : prim) (ys1 ys2 : list var) (e1 e2 : exp)  :
+      (H1, rho1, Eprim x1 t ys1 e1) ⪯ ^ (k ; j ; IIL1; IIG ; IL1 ; IG) (H2, rho2, Eprim x2 t ys2 e2).
+    Proof with now eauto with Ensembles_DB.
+      intros b1 b2 H1' H2' rho1' rho2' v1 c1 m1
+             Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
+      specialize (Hstuck1 (length ys1 + 2)).
+      destruct Hstuck1 as [r2 [m2 Hstep]].  inv  Hstep. exfalso.
+      simpl in *. 
+      omega. 
+    Qed. 
     
     (** Projection compatibility *)
     Lemma exp_rel_proj_compat
@@ -1691,24 +1706,6 @@ Module LogRelPostCC (H : Heap).
             econstructor; eauto. now econstructor; eauto.
             eapply val_rel_i_monotonic; tci. simpl in *. omega. }
     Qed.
-
-    (* TODO move *)
-    Lemma Forall2_findtag {A B} c Pats1 Pats2 (e : A) (P : A -> B  -> Prop) :
-      findtag Pats1 c = Some e ->
-      Forall2 (fun ce1 ce2 =>
-                 let '(c1, e1) := ce1 in
-                 let '(c2, e2) := ce2 in
-                 c1 = c2 /\ P e1 e2) Pats1 Pats2 ->
-      exists e', findtag Pats2 c = Some e' /\ P e e'.
-    Proof.
-      intros Hf Hall. revert e Hf. induction Hall; intros e Hf.
-      - inv Hf.
-      - destruct x as [c1 e1]. destruct y as [c2 e2]. simpl in *.
-        destruct H as [Heq1 HP]; subst.
-        destruct (M.elt_eq c2 c); eauto. inv Hf.
-        eexists; split; eauto. 
-    Qed. 
-
 
     
     Lemma exp_rel_case_compat (k j : nat) (b : Inj)
@@ -1947,13 +1944,15 @@ Module LogRelPostCC (H : Heap).
             normalize_occurs_free. left. eassumption. }
     Qed.
     
+    
     Lemma exp_rel_app_compat_known (k j : nat) (b : Inj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
       IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
       InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) ->
              
-      (forall (rho1' : env) (B1 : fundefs) (f1' : var)
+      (forall i (rho1' : env) (B1 : fundefs) (f1' : var)
          (e1 : exp) (ys1 : list var) (vs1 : list value),
+          i < k ->
           M.get f1 rho1 = Some (FunPtr B1 f1') ->
           find_def f1' B1 = Some (t, ys1, e1) ->
           getlist xs1 rho1 = Some vs1 ->
@@ -1997,9 +1996,11 @@ Module LogRelPostCC (H : Heap).
           symmetry. eassumption. normalize_occurs_free...
           rewrite res_equiv_eq in Hrelf. destruct v2; try contradiction. inv Hrelf. 
           
-          edestruct Hyp as (rho2_s & B2 & f2' & ys2 & e2 & vs2 & Hgetf2 & Hfind2 & Hget2 & Hset2 & Hlive & Hexp);
-            try eassumption. 
-          edestruct heap_env_equiv_env_getlist with (rho1 := rho2) as [vs2' [Hget2' Hall2]]. eassumption.
+          edestruct Hyp with (i := k - cost_cc (Eapp f1 t xs1)) as (rho2_s & B2 & f2' & ys2 & e2 & vs2 & Hgetf2 & Hfind2 & Hget2 & Hset2 & Hlive & Hexp);
+            try eassumption.
+          simpl in *; omega. 
+          edestruct heap_env_equiv_env_getlist with (rho1 := rho2)
+           as [vs2' [Hget2' Hall2]]. eassumption.
           eassumption. normalize_occurs_free...
           edestruct (@setlist_length value) as [rho2'' Hset2''].  eapply Forall2_length. exact Hall2. eassumption.
           assert (Heq2' := Hset2'').
@@ -2062,7 +2063,14 @@ Module LogRelPostCC (H : Heap).
             eapply reach'_set_monotonic. eassumption. 
             rewrite heap_env_equiv_image_reach; [| eassumption ]. rewrite image_id.
             eassumption.
-          + admit.
+          +  eapply Hlive.
+             symmetry. eassumption.
+             eapply injective_subdomain_antimon. eassumption.
+             eapply reach'_set_monotonic. eassumption.
+             eassumption.
+             eapply injective_subdomain_antimon. eassumption.
+             eapply reach'_set_monotonic. eassumption.
+             eassumption. eassumption. 
           + omega.
           + eassumption. 
           + intros i.
@@ -2083,10 +2091,11 @@ Module LogRelPostCC (H : Heap).
               eapply Hiinv; try eassumption.
             * eapply val_rel_i_monotonic; tci. simpl in *; omega.
 
-          + admit.
-          + admit.
-    Admitted. 
-    
+          + eapply heap_env_equiv_empty.
+          + eapply heap_env_equiv_empty. }
+    Qed.     
+
+
   End CompatLemmas.
   
   End LogRelPostCC. 

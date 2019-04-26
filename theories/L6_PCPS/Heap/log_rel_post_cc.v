@@ -1964,7 +1964,7 @@ Module LogRelPostCC (H : Heap).
             getlist xs2 rho2 = Some vs2 /\
             setlist ys2 vs2 (def_funs B2 B2 (M.empty value)) = Some rho2' /\
             IInvGC IIG H1 rho1' e1 H2 rho2' e2 /\  
-            (forall j, (H1, rho1', e1) ⪯ ^ (k ; j; IIG (Empty_set _) _ 0 0; IIG ; IG 0 0 ; IG) (H2, rho2', e2))) ->
+            (forall j, (H1, rho1', e1) ⪯ ^ (i ; j; IIG (Empty_set _) _ 0 0; IIG ; IG 0 0 ; IG) (H2, rho2', e2))) ->
         
         
       (H1, rho1, Eapp f1 t xs1) ⪯ ^ (k ; j; IIL1 ; IIG

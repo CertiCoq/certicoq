@@ -100,7 +100,7 @@ Module DeadParamCorrect (H : Heap).
     eapply Hnin. exists bs. eassumption.
   Qed. 
 
-  Lemma drop_body_occurs_free S drop e1 e2 : (* Katja TODO *)
+  Lemma drop_body_occurs_free S drop e1 e2 : 
     Drop_body drop S e1 e2 ->
     occurs_free e2 \subset occurs_free e1 \\ S.
   Proof with (now eauto with Ensembles_DB).
@@ -405,7 +405,7 @@ Module DeadParamCorrect (H : Heap).
           intros Hcontra. eapply Hdis1. 
           normalize_bound_var. split. eassumption. eauto with Ensembles_DB.
         * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
-          normalize_occurs_free.
+          normalize_occurs_free. 
           rewrite <- Union_assoc. 
           rewrite <- (Union_Setminus (occurs_free e) [set x])...
         * inv Hun. eassumption. 
@@ -456,7 +456,10 @@ Module DeadParamCorrect (H : Heap).
           intros Hcontra.
           eapply Hdis1. 
           normalize_bound_var. split. eassumption. eauto with Ensembles_DB. 
-        * admit. (* TODO Katja *)
+        * eapply binding_in_map_antimon; [ | eapply binding_in_map_set; eassumption]. 
+          normalize_occurs_free. 
+          rewrite <- Union_assoc. 
+          rewrite <- (Union_Setminus (occurs_free e) [set x])... 
         * inv Hun. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
           normalize_bound_var...
@@ -497,7 +500,8 @@ Module DeadParamCorrect (H : Heap).
           eapply env_locs_monotonic.
           eapply occurs_free_Ecase_Included. eassumption. 
         * eassumption.
-        * admit. (* TODO Katja *)
+        * eapply binding_in_map_antimon; [|eassumption]. 
+          eapply occurs_free_Ecase_Included. eassumption. 
         * eapply unique_bindings_Ecase_In. eassumption. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
           intros y Hin. econstructor; eassumption.
@@ -541,8 +545,10 @@ Module DeadParamCorrect (H : Heap).
         edestruct env_rel_add_args_dropped as [vs2 [Hgetvs2 Hall]]; [| eassumption | eassumption | ].
         
         intros j'. eapply env_log_rel_P_antimon. eapply Hrel.
-        normalize_occurs_free. admit. (* TODO Katja *)
-        
+        normalize_occurs_free. 
+        rewrite Setminus_Union. 
+        eapply Included_Setminus_compat. 
+        eapply Included_Union_l. reflexivity. 
 
         edestruct env_rel_set_params_dropped as [rho2' [Hset2 Henv]]; [ | eassumption | eassumption | eassumption | ].
         admit. (* TODO Zoe *) 

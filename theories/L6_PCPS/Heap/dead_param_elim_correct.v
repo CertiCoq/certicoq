@@ -331,9 +331,69 @@ Module DeadParamCorrect (H : Heap).
       
       rewrite (Setminus_Included_Empty_set [set x] (S :|: [set x]))...
       eapply H6. 
-  Qed. 
+  Qed.
 
-    
+  (** Lemma about defining a block of dropped functions in the environment (correctness of Drop_fundefs relation) *)
+  
+  (*  This lemma will be used for the toplevel correctness theorem, when we first define the toplevel functions and
+      also when we redefine them in the environment in the known function application case.
+      we assume that the theorem for Drop_body fold for smaller step-indices
+      (These two proofs are by mutual induction, since the two definitions are mutually recursive ). 
+   *)
+ 
+  (* This only talks about the functions that are related by Drop_funs but are  not in dropped_funs drop, i.e. they
+     do not have any parameters dropped. For these we have two show that they are related by the environment relation.
+     To cover for the case of functions that have parameters dropped we have to show that def_funs of Drop_fundefs
+     satisfy the drop_invariant (ignore for now I'm planning to change this in the next couple of days.) 
+   *)
+  
+  Lemma dead_param_elim_fundefs_correct k
+        (** We assume the IH of the main proof. *)
+        (IHexp : forall m : nat,
+            m < k ->
+            forall (j : nat) (H1 : heap block)
+              (rho1 : env) (e1 : exp) (H2 : heap block)
+              (rho2 : env) (e2 : exp) (b : Inj)
+              (drop : var -> option (list bool))
+              (S : Ensemble var),
+              (forall j0 : nat,
+                  (H1, rho1) ⋞ ^ (occurs_free e1 \\ S \\ dropped_funs drop; m; j0; PreG; PostG; b) (H2, rho2)) ->
+              closed (reach' H1 (env_locs rho1 (occurs_free e1)))
+                     H1 ->
+              drop_invariant drop rho1 rho2 ->
+              binding_in_map (occurs_free e1) rho1 ->
+              unique_bindings e1 ->
+              Disjoint var (domain drop) (bound_var e1) ->
+              Disjoint var (occurs_free e1) (bound_var e1) ->
+              Drop_body drop S e1 e2 ->
+              (H1, rho1, e1) ⪯ ^ (m; j; Pre; PreG; Post; PostG) (H2, rho2, e2)) :
+    forall B1 B1' B2 B2' P
+      H1 rho1  H2 rho2 (* source and target conf *)
+      b (* location renaming *)
+      drop, (* dropper function *)
+      (* assume that two environments where initially related *)
+      (forall j, (H1, rho1) ⋞ ^ (P \\ name_in_fundefs B1; k ; j; PreG ; PostG ; b) (H2, rho2)) ->
+      (* free variable assumptions *)
+      closed_fundefs B1' ->
+      unique_bindings_fundefs B1'  ->
+      Disjoint var (occurs_free_fundefs B1') (bound_var_fundefs B1') ->
+      (* Drop_fundefs relation *)
+      Drop_fundefs drop B1' B2' ->
+      (* Because of the way def_funs is defined we need to generalize over both of its two first arguments
+       the be able to do the proof. We might need more *)
+      Drop_fundefs drop B1 B2 -> (* this is useful to relate the names of the functions *)
+      (forall j, (H1, def_funs B1' B1 rho1) ⋞ ^ (P \\ dropped_funs drop ; k ; j; PreG ; PostG ; b) (H2, def_funs B2' B2 rho2)).
+  Proof with now eauto with Ensembles_DB.
+    (* induction at the step index we will used it when redefining functions in the environment after upon function entry *)
+    induction k as [k IHk] using lt_wf_rec1; 
+      (* induction at the mut. functions block *)
+      intros B1;
+      induction B1; intros B1' B2 B2' P H1 rho1  H2 rho2 b drop Hrel Hclos Hun Hdis Hdrop' Hdrop; inv Hdrop.
+    - (* Cons case - Hard *) admit. 
+    - (* Nil case - Easy *) admit. 
+  Abort. 
+
+  (** Correctness of drop_body relation *)  
   Lemma dead_param_elim_correct
         k j (* step and heap indices *)
         H1 rho1 e1 H2 rho2 e2 (* source and target conf *)

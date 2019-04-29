@@ -74,32 +74,66 @@ Module DeadParamCorrect (H : Heap).
 
 
   (** * Drop invariant and lemmas *)
+
   
   Definition drop_invariant (drop : var -> option (list bool)) rho1 rho2 :=
-    forall f bs, drop f = Some bs ->
-            exists B1 f1 B2 f2 t xs1 e1 xs2 e2 S,
-              M.get f rho1 = Some (FunPtr B1 f1) /\
-              M.get f rho2 = Some (FunPtr B2 f2) /\
-              find_def f1 B1 = Some (t, xs1, e1) /\
-              find_def f2 B2 = Some (t, xs2, e2) /\
-              Drop_fundefs drop B1 B2 /\
-              Drop_params xs1 bs xs2 S /\
-              Drop_body drop S e1 e2.
+    exists B1 B2, (* There exists function blocks B1 B2 -- i.e. the functions defined at the beginning of the programs *)
+      unique_bindings_fundefs B1 /\ (* that have unique binders *)
+      closed_fundefs B1 /\ (* are closed *) 
+      Drop_fundefs drop B1 B2 /\ (* are in Drop_fundefs relation *)
+      domain drop <--> name_in_fundefs B1 /\ (* The domain of drop contains exactly the names of the functions in map *)
+      forall f bs, drop f = Some bs -> (* and all the variables in the domain of drop. TODO write with domain *)
+              M.get f rho1 = Some (FunPtr B1 f) /\
+              M.get f rho2 = Some (FunPtr B2 f).
 
+  (* This is the old definition, keeping it for reference *)
+  (* exists B1 f1 B2 f2 t xs1 e1 xs2 e2 S, *)
+  (*   find_def f1 B1 = Some (t, xs1, e1) /\ *)
+  (*   find_def f2 B2 = Some (t, xs2, e2) /\ *)
+  (*   Drop_fundefs drop B1 B2 /\ *)
+  (*   Drop_params xs1 bs xs2 S /\ *)
+  (*   Drop_body drop S e1 e2. *)
+
+  (* Instead of the old drop_invariant, we can prove this lemma *)
+  Lemma Drop_fundefs_fun_in_fundef drop B1 B2 f ft xs1 e1 :
+    Drop_fundefs drop B1 B2 ->
+    find_def f B1 = Some (ft, xs1, e1) ->
+    exists bs S xs2 e2,
+      find_def f B2 = Some (ft, xs2, e2) /\
+      drop f = Some bs /\
+      Drop_params xs1 bs xs2 S /\
+      Drop_body drop S e1 e2.
+  Proof.
+    intros Hdrop.
+    revert f ft xs1 e1; induction Hdrop; intros f ft' xs1 e1 Hin; inv Hin. 
+    destruct (cps.M.elt_eq f g); subst. 
+    + inv H3. 
+      do 4 eexists. split.
+      simpl. rewrite Coqlib.peq_true. reflexivity.
+      repeat split; eassumption. 
+    + edestruct IHHdrop as (b1 & S1 & xs2 & e2 & Hin & Hand). eassumption.
+      do 4 eexists. split.
+      simpl. rewrite Coqlib.peq_false; eassumption.
+      eassumption.
+  Qed. 
+    
+      
   Lemma drop_invariant_extend drop rho1 rho2 x v1 v2 :
     ~ x \in domain drop ->
     drop_invariant drop rho1 rho2 ->
     drop_invariant drop (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
-    intros Hnin Hinv f bs Hf.
-    setoid_rewrite M.gso. eapply Hinv. eassumption.
-
+    intros Hnin Hinv. unfold drop_invariant.
+    destruct Hinv as (B1 & B2 & Hun & Hclo & Hdrop & Hdom & Hyp).
+    do 2 eexists. do 4 (split; [ eassumption |]). intros f bs Hget.
+    setoid_rewrite M.gso. eapply Hyp. eassumption. 
+    
     intros Hc; subst.
-    eapply Hnin. exists bs. eassumption.
+    eapply Hnin. eexists bs. eassumption.
     intros Hc; subst.
     eapply Hnin. exists bs. eassumption.
   Qed. 
-
+  
   Lemma drop_body_occurs_free S drop e1 e2 : 
     Drop_body drop S e1 e2 ->
     occurs_free e2 \subset occurs_free e1 \\ S.
@@ -201,20 +235,32 @@ Module DeadParamCorrect (H : Heap).
     drop_invariant drop rho1 rho2 -> 
     env_locs rho1 (domain drop) <--> Empty_set _. 
   Proof.
-  Admitted. 
+  Abort. 
 
   Lemma drop_invariant_reach2 drop rho1 rho2 : (* Zoe TODO *)
     drop_invariant drop rho1 rho2 -> 
     env_locs rho2 (domain drop) <--> Empty_set _. 
   Proof.
-  Admitted.
+  Abort.
   
   Lemma drop_invariant_reach2_setminus S drop rho1 rho2 : (* Zoe TODO *)
     drop_invariant drop rho1 rho2 -> 
     env_locs rho2 (S \\ dropped_funs drop) <--> env_locs rho2 S. 
-  Proof.
-  Admitted.
+  Proof with (now eauto with Ensembles_DB).
+    intros (B1 & B2 & Hun & Hclo & Hdrop & Hyp).
+    split.
+    eapply env_locs_monotonic...
 
+    intros l [x [Hin Hget]].
+    destruct (M.get x rho2) eqn:Hgetx; try contradiction.
+
+    assert (Hnin : ~ x \in dropped_funs drop). 
+    { intros [bs [Hc _]]. eapply Hyp in Hc. inv Hc. 
+      repeat subst_exp. inv Hget. }
+    eapply get_In_env_locs; try eassumption.
+    split; eauto.
+  Qed.
+  
   Inductive Forall2_assym {A B : Type} (P : A -> B -> Prop) :
     list A -> list B -> list bool -> Prop :=
   | Forall2_assym_nil : Forall2_assym P [] [] []
@@ -331,8 +377,35 @@ Module DeadParamCorrect (H : Heap).
       
       rewrite (Setminus_Included_Empty_set [set x] (S :|: [set x]))...
       eapply H6. 
-  Qed.
+  Qed.                
+    
 
+  (* Easy lemma about Drop_fundefs *)
+  Lemma Drop_fundefs_name_in_fundefs drop B1 B2 : 
+    Drop_fundefs drop B1 B2 ->
+    name_in_fundefs B1 <--> name_in_fundefs B2.
+  Proof.
+  Admitted. 
+
+  Lemma Drop_fundefs_drop_invariant B1 B2 drop rho1 rho2:
+    unique_bindings_fundefs B1 ->
+    closed_fundefs B1 ->
+    Drop_fundefs drop B1 B2 ->
+    domain drop <--> name_in_fundefs B1 -> 
+    drop_invariant drop (def_funs B1 B1 rho1) (def_funs B2 B2 rho2).  
+  Proof.
+    intros Hyp Hclo Hdrop Heq.
+    eexists B1, B2.  repeat (split; [ eassumption |]).
+    intros f1 bs1 Hd. split; eapply def_funs_eq; try reflexivity.
+    eapply Heq. eexists; eauto. 
+    rewrite <- Drop_fundefs_name_in_fundefs; [| eassumption  ]. 
+    eapply Heq. eexists; eauto. 
+  Qed. 
+
+
+  Instance Decidable_dropped_funs drop :
+    Decidable (dropped_funs drop).
+  Admitted. 
   (** Lemma about defining a block of dropped functions in the environment (correctness of Drop_fundefs relation) *)
   
   (*  This lemma will be used for the toplevel correctness theorem, when we first define the toplevel functions and
@@ -346,6 +419,28 @@ Module DeadParamCorrect (H : Heap).
      To cover for the case of functions that have parameters dropped we have to show that def_funs of Drop_fundefs
      satisfy the drop_invariant (ignore for now I'm planning to change this in the next couple of days.) 
    *)
+
+
+  Lemma Drop_params_all_true xs1 bs xs2 S :
+    Drop_params xs1 bs xs2 S -> 
+    Forall (fun x => x = true) bs ->
+    xs1 = xs2 /\ S <--> Empty_set _.
+  Proof. (* TODO Katja *) 
+  Admitted.
+
+  Lemma def_funs_binding_in_map S B1' B1 rho1 :
+    binding_in_map S rho1 ->
+    binding_in_map (name_in_fundefs B1' :|: S) (def_funs B1' B1 rho1).
+  Proof.
+    intros Hin. induction B1'; simpl. 
+    - eapply binding_in_map_antimon.
+      rewrite <- Union_assoc, Union_commut. reflexivity.  
+      eapply binding_in_map_set.
+      eassumption. 
+    - eapply binding_in_map_antimon.
+      rewrite Union_Empty_set_neut_l. 
+      reflexivity. eassumption.
+  Qed.
   
   Lemma dead_param_elim_fundefs_correct k
         (** We assume the IH of the main proof. *)
@@ -377,21 +472,141 @@ Module DeadParamCorrect (H : Heap).
       closed_fundefs B1' ->
       unique_bindings_fundefs B1'  ->
       Disjoint var (occurs_free_fundefs B1') (bound_var_fundefs B1') ->
+      (* The drop invariant holds *)
+      domain drop <--> name_in_fundefs B1' -> 
       (* Drop_fundefs relation *)
       Drop_fundefs drop B1' B2' ->
       (* Because of the way def_funs is defined we need to generalize over both of its two first arguments
        the be able to do the proof. We might need more *)
-      Drop_fundefs drop B1 B2 -> (* this is useful to relate the names of the functions *)
-      (forall j, (H1, def_funs B1' B1 rho1) ⋞ ^ (P \\ dropped_funs drop ; k ; j; PreG ; PostG ; b) (H2, def_funs B2' B2 rho2)).
+      Drop_fundefs drop B1 B2 ->
+      (* this is useful to relate the names of the functions. Could have : name_in_fundefs B1 <--> name_fundefs B2 *)
+
+      (forall j, (H1, def_funs B1 B1' rho1) ⋞ ^ (P \\ dropped_funs drop ; k ; j; PreG ; PostG ; b) (H2, def_funs B2 B2' rho2)).
   Proof with now eauto with Ensembles_DB.
-    (* induction at the step index we will used it when redefining functions in the environment after upon function entry *)
+    (* induction at the step index we will used it when redefining
+       functions in the environment after upon function entry *)
     induction k as [k IHk] using lt_wf_rec1; 
       (* induction at the mut. functions block *)
       intros B1;
-      induction B1; intros B1' B2 B2' P H1 rho1  H2 rho2 b drop Hrel Hclos Hun Hdis Hdrop' Hdrop; inv Hdrop.
-    - (* Cons case - Hard *) admit. 
-    - (* Nil case - Easy *) admit. 
-  Abort. 
+      induction B1;
+      intros B1' B2 B2' P H1 rho1  H2 rho2 b drop Hrel Hclos Hun
+             Hdis Hdinv Hdrop' Hdrop; inv Hdrop.
+    - (* Cons case - Hard *)
+      simpl def_funs.
+
+      (* Check whether v belongs to (dropped_funs drop).*)
+      edestruct (Decidable_dropped_funs drop).
+      destruct (Dec v) as [Hdin | Hdnin ]. 
+      + (* Case 1 : it is dropped *)
+        intros j.
+        eapply env_log_rel_P_set_not_in_S_l. 
+        eapply env_log_rel_P_set_not_in_S_r. 
+        admit. (* XXX Zoe arg *)
+        eapply env_log_rel_P_antimon.
+        eapply IHB1 with (P := P \\ [set v]).
+        setoid_rewrite Setminus_Union. eassumption.
+        eassumption. eassumption. eassumption.
+        eassumption. eassumption. eassumption.
+        rewrite !Setminus_Union...
+        intros Hc. inv Hc. contradiction.
+        intros Hc. inv Hc. contradiction.
+      + (* Case 2 : it's not dropped *)
+        intros j. eapply env_log_rel_P_set.
+        * eapply env_log_rel_P_antimon.
+          eapply IHB1 with (P := P \\ [set v]).
+          setoid_rewrite Setminus_Union. eassumption.
+          eassumption. eassumption. eassumption.
+          eassumption. eassumption. eassumption.
+          rewrite !Setminus_Union...
+        * rewrite val_rel_eq.
+          intros H1' H2' rho1' ft xs1 e1 vs1 vs2 b'
+                 Hfind1 Hset1 Hlen.
+          edestruct Drop_fundefs_fun_in_fundef
+            as [bs' [S' [xs2 [e2 [Hfind2 [Hdeq' [Hdparm Hdbody]]]]]]].
+          eapply Hdrop'. eassumption. 
+          repeat subst_exp.
+          
+          assert (Hall : Forall (fun x => x = true) bs'). 
+          { eapply Forall_impl with (P := fun x => ~ x = false).
+            intros a Heq. now destruct a; eauto.
+            eapply Forall_Exists_neg.
+            intros Hc. eapply Hdnin.
+            exists bs'. split; eassumption. }
+          
+          edestruct Drop_params_all_true; try eassumption.
+          subst.
+          
+          exists xs2, e2.  
+
+          edestruct
+            (setlist_length3 (def_funs B2' B2' (M.empty _)) xs2 vs2) as [rho2' Hset2].
+          rewrite <- Hlen. eapply setlist_length_eq. 
+          eassumption.
+
+          exists rho2'. split. 
+          eassumption. split. eassumption.
+
+          { intros i Hlt Hallv.
+            split.
+            - (* bounds TODO Zoe *)
+              admit. 
+            - intros j'.
+              eapply IHexp.
+              + eassumption.
+              + intros j''.
+                eapply env_log_rel_P_setlist_l;
+                  [ | | eassumption | eassumption ].
+                * (* Apply IHk *)
+                  { eapply IHk.
+                    - eassumption.
+                    - intros m Hlt'.
+                      eapply IHexp. omega. 
+                    - admit. (* TODO Zoe *)
+                    - eassumption.
+                    - eassumption.
+                    - eassumption.
+                    - eassumption.
+                    - eassumption.
+                    - eassumption. } 
+                * eapply Hallv.
+              + admit. (* TODO Zoe *)
+              + admit. (* drop_invariant preserved by setlist. Zoe add lemma *)
+              + eapply binding_in_map_antimon.
+                eapply logical_relations.occurs_free_closed_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+                eapply binding_in_map_setlist; [| eassumption ].
+                eapply binding_in_map_antimon; [| eapply def_funs_binding_in_map ].
+                rewrite Union_Empty_set_neut_r. reflexivity. 
+                intros x Hin. inv Hin. 
+              + eapply unique_bindings_fun_in_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+              + rewrite Hdinv.
+                eapply Disjoint_sym.
+                eapply unique_bindings_fun_in_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+              + eapply Disjoint_Included_l.
+                eapply logical_relations.occurs_free_closed_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+                eapply Disjoint_sym.
+                eapply Union_Disjoint_r.
+
+                eapply unique_bindings_fun_in_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+
+                eapply unique_bindings_fun_in_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+              + eassumption. }
+    - simpl def_funs.
+      intros j. eapply env_log_rel_P_antimon.
+      eapply Hrel.
+      simpl... 
+  Admitted. 
 
   (** Correctness of drop_body relation *)  
   Lemma dead_param_elim_correct
@@ -596,57 +811,72 @@ Module DeadParamCorrect (H : Heap).
       + admit. (* XXX update lemma *)
       + admit.
       + intros i rho1' B1 f1' e1 ys1 vs1 Hlt Hgetf1 Hfind1 Hgetys1 Hset1.
+        
         edestruct Hdinv
-          as (B1' & f1'' & B2 & f2' & t' & xs1' & e1' & xs2 & e2 & S2 & Hget1' & Hget2 & Hfind1' & Hfind2
-              & HdropB & Hdrop_par & Hdrope).
-        eassumption.
+          as (B1' & B2' & Hun' & Hclo' & Hdrop' & Hdom & Hyp).
+        edestruct Hyp as [Hget1 Hget2]. eassumption.
         repeat subst_exp.
-        
-        edestruct env_rel_add_args_dropped as [vs2 [Hgetvs2 Hall]]; [| eassumption | eassumption | ].
-        
-        intros j'. eapply env_log_rel_P_antimon. eapply Hrel.
-        normalize_occurs_free. 
-        rewrite Setminus_Union. 
-        eapply Included_Setminus_compat. 
-        eapply Included_Union_l. reflexivity. 
+      
+        edestruct Drop_fundefs_fun_in_fundef as
+            [bs' [S' [xs2' [e2 [Hfind2 [Hdrop2 [Hparam2 Hdbody]]]]]]].
+        eassumption. eassumption. repeat subst_exp. 
 
-        edestruct env_rel_set_params_dropped as [rho2' [Hset2 Henv]]; [ | eassumption | eassumption | eassumption | ].
-        admit. (* TODO Zoe *) 
+        edestruct env_rel_add_args_dropped as [vs2 [Hgetvs2 Hall]];
+          [| eassumption | eassumption | ].
         
-        do 6 eexists. repeat split; eauto. 
-        
-        admit. (* TODO Zoe *)
-        
-        intros j'. eapply IHk.
-        * omega. 
-        * intros j''. eapply env_log_rel_P_antimon.
-          eapply env_log_rel_i_monotonic with (i := k); tci. eapply Henv.  
-          omega. rewrite Setminus_Union.
-          eapply Included_Setminus_compat. eapply Included_Union_preserv_l. reflexivity. 
-          eapply Included_Union_preserv_l. reflexivity. 
-        * eapply closed_reach_monotonic. eassumption.
-          eapply Included_trans. eapply Included_trans; [| eapply env_locs_setlist_Included; try now eapply Hset1 ].
-          eapply env_locs_monotonic. eapply Included_Union_preserv_l. reflexivity.
-          normalize_occurs_free. rewrite env_locs_Union, env_locs_FromList, env_locs_Singleton; eauto.
-          rewrite Union_commut. eapply Included_Union_compat. reflexivity.
-          simpl. eapply Included_trans. eapply env_locs_def_funs'; tci.
-          rewrite env_locs_Empty. reflexivity.
-          (* TODO zoe *)
-        * (* TODO zoe -- Drop_inv after setlist/def_funs*) admit. 
-        * (* TODO zoe -- binding in map,  maybe remove *) admit.
-        * (* TODO add this to the drop inv *) admit.
-        * (* TODO add this to the drop inv *) admit.
-        * (* TODO add this to the drop inv *) admit.
-        * eassumption.
+        * intros j'. eapply env_log_rel_P_antimon. eapply Hrel.
+          normalize_occurs_free. 
+          rewrite Setminus_Union. 
+          eapply Included_Setminus_compat. 
+          eapply Included_Union_l. reflexivity. 
+
+        * edestruct env_rel_set_params_dropped as [rho2' [Hset2 Henv]]; 
+            [ | eassumption | eassumption | eassumption | ].
+          
+          eapply dead_param_elim_fundefs_correct with
+              (P := occurs_free e1 \\ S').
+          eassumption.
+          admit. (* TODO Zoe *) 
+          eassumption.
+          eassumption.
+          unfold closed_fundefs in Hclo'. rewrite Hclo'...
+          eassumption.
+          eassumption. 
+          eassumption. 
+
+          do 6 eexists. repeat split; eauto. 
+          
+          admit. (* TODO Zoe *)
+          { intros j'. eapply IHk; [| | | | | | |  | eassumption ].
+            - omega. 
+            - intros j''. eapply env_log_rel_P_antimon.
+              eapply env_log_rel_i_monotonic with (i := k); tci. eapply Henv.  
+              omega.
+              
+              do 2 rewrite Setminus_Union at 1.
+              rewrite Setminus_Union_distr. 
+              eapply Included_Union_preserv_l.
+              rewrite Setminus_Union at 1.
+              eapply Included_Setminus_compat. 
+              reflexivity.
+              now eauto with Ensembles_DB.
+              
+            - eapply closed_reach_monotonic. eassumption.
+              eapply Included_trans.
+              eapply Included_trans;
+                [| eapply env_locs_setlist_Included; try now eapply Hset1 ].
+              eapply env_locs_monotonic. eapply Included_Union_preserv_l. reflexivity.
+              normalize_occurs_free. rewrite env_locs_Union, env_locs_FromList, env_locs_Singleton; eauto.
+              rewrite Union_commut. eapply Included_Union_compat. reflexivity.
+              simpl. eapply Included_trans. eapply env_locs_def_funs'; tci.
+              rewrite env_locs_Empty. reflexivity.
+            - admit. (* TODO zoe -- Drop_inv after setlist *)
+            - (* TODO Katja -- binding in map *) admit.
+            - eapply unique_bindings_fun_in_fundefs.
+              eapply find_def_correct. eassumption.
+              eassumption.
+            - (* TODO zoe emove *) admit.
+            - (* TODO Katja *) admit.
   Admitted. 
   
-
-
-  (* Zoe TODO :
-     - Edit drop invariant
-     - Add def funs inv
-     - Def funs lemma : log related, and drop_inv
-     - Top level lemma
-   *) 
-
 End DeadParamCorrect.

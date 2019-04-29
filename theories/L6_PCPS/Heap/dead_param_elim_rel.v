@@ -131,6 +131,7 @@ Inductive Drop_fundefs (drop : var -> option (list bool)) : fundefs -> fundefs -
 Inductive Drop (drop : var -> option (list bool)) : fundefs -> exp -> fundefs -> exp -> Prop := 
 | Drop_toplevel :
     forall B e B' e',
+      domain drop <--> name_in_fundefs B -> (* XXX New *)
       Drop_fundefs drop B B' ->
       Drop_body drop (Empty_set _) e e' -> 
       Drop drop B e B' e. 

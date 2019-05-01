@@ -134,4 +134,4 @@ Inductive Drop (drop : var -> option (list bool)) : fundefs -> exp -> fundefs ->
       domain drop <--> name_in_fundefs B -> (* XXX New *)
       Drop_fundefs drop B B' ->
       Drop_body drop (Empty_set _) e e' -> 
-      Drop drop B e B' e. 
+      Drop drop B e B' e'. 

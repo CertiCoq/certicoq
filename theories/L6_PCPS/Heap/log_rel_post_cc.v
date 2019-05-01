@@ -1524,7 +1524,20 @@ Module LogRelPostCC (H : Heap).
     Qed.
 
 
-
+    Lemma cc_approx_exp_fun_compat (k j : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 :
+      InvCtxCompat IL1 IL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
+      IInvCtxCompat IIL1 IIL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
+      InvCostBase_w IL1 IIL1 (Efun B1 e1) (Efun B2 e2) ->
+      
+      (k >= cost (Efun B1 e1) ->
+       (H1, def_funs B1 B1 rho1, e1) ⪯ ^ (k - cost (Efun B1 e1) ; j ; IIL2 ; IIG ; IL2 ; IG)
+       (H2, def_funs B2 B2 rho2, e2)) ->
+      
+      (H1, rho1, Efun B1 e1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (H2, rho2, Efun B2 e2).
+    Proof with now eauto with Ensembles_DB.
+    Admitted.
+    
+      
     Lemma exp_rel_prim_compat (k j : nat)
           (b : Inj) (H1 H2 : heap block) (rho1 rho2 : env)
           (x1 x2 : var) (t : prim) (ys1 ys2 : list var) (e1 e2 : exp)  :
@@ -1536,7 +1549,8 @@ Module LogRelPostCC (H : Heap).
       destruct Hstuck1 as [r2 [m2 Hstep]].  inv  Hstep. exfalso.
       simpl in *. 
       omega. 
-    Qed. 
+    Qed.
+    
     
     (** Projection compatibility *)
     Lemma exp_rel_proj_compat
@@ -1945,7 +1959,7 @@ Module LogRelPostCC (H : Heap).
     Qed.
     
     
-    Lemma exp_rel_app_compat_known (k j : nat) (b : Inj) (H1 H2 : heap block)
+    Lemma exp_rel_app_compat_known (k j : nat) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
       IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
       InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) ->

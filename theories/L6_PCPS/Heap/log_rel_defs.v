@@ -746,7 +746,7 @@ Module LogRelDefs (H : Heap).
   Qed.
 
   Lemma env_log_rel_P_set_not_in_S_r (S : Ensemble var) (k j : nat) (b : Inj)
-        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
+        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 : value) :
     env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
     ~ x \in S -> 
     env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, M.set x v1 rho2).
@@ -755,7 +755,17 @@ Module LogRelDefs (H : Heap).
     eapply Henv; eauto.
     intros Hc; subst; contradiction.
   Qed.
-  
+
+
+    Lemma env_log_rel_P_empty (S : Ensemble var) (k j : nat) (b : Inj)
+        ( rho2 : env) (H1 H2 : heap block) :
+      env_log_rel_P' S k j GP GQ b (H1, M.empty _) (H2, rho2).
+    Proof. 
+      intros x Hin v Hget.
+      rewrite M.gempty in Hget. 
+      congruence.
+    Qed.
+    
   (** Extend the related environments with a list *)
   Lemma env_log_rel_P_setlist_l (S : Ensemble var) (k j : nat) b
         (rho1 rho2 rho1' rho2' : env) (H1 H2 : heap block) xs (vs1 vs2 : list value) :

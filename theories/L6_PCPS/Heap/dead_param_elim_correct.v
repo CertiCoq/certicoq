@@ -875,7 +875,7 @@ Module DeadParamCorrect (H : Heap).
             - eapply unique_bindings_fun_in_fundefs.
               eapply find_def_correct. eassumption.
               eassumption.
-            - (* TODO zoe emove *) admit.
+            - (* TODO zoe remove *) admit.
             - (* TODO Katja *) admit.
   Admitted. 
   

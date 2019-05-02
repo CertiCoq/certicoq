@@ -56,8 +56,8 @@ Module DeadParamCorrect (H : Heap).
     split; omega.
   Qed.
   
-  Lemma InvCtx C e1 e2 :
-    InvCtxCompat Post Post C C e1 e2. 
+  Lemma InvCtx C C' e1 e2 :
+    InvCtxCompat Post Post C C' e1 e2. 
   Proof.
     intros H1 H2 H1' H2' rho1 rho2 rho1' rho2' c1 c2 c1' c2' m1 m2 Hpost Hleq Hctx1 Hctx2.    
     unfold Pre, Post in *. omega. 
@@ -70,10 +70,37 @@ Module DeadParamCorrect (H : Heap).
     unfold Pre, Post in *. erewrite ctx_to_heap_env_CC_size_heap at 1; try eassumption.
     erewrite ctx_to_heap_env_CC_size_heap with (H1 := H1) (H2 := H1'); try eassumption.
     omega. 
+  Qed.
+
+  Lemma IInvCtxFuns B1 e1 B2 e2 :
+    IInvCtxCompat Pre Pre (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2.
+  Proof.
+    intros H1 H2 H1' H2' rho1 rho2 rho1' rho2' c1 c2 Hpre Hctx1 Hctx2.    
+    unfold Pre, Post in *. erewrite ctx_to_heap_env_CC_size_heap at 1; try eassumption.
+    erewrite ctx_to_heap_env_CC_size_heap with (H1 := H1) (H2 := H1'); try eassumption.
+    simpl; omega. 
+  Qed.
+
+  Lemma IInvCase x Pats Pats' : IInvCaseCompat Pre Pre x x Pats Pats'.
+  Proof.
+    unfold IInvCaseCompat. intros.
+    unfold Pre in *; omega.
   Qed. 
 
+  Lemma InvCase x Pats : InvCaseCompat Post Post x Pats.
+  Proof.
+    unfold InvCaseCompat. intros.
+    unfold Post in *; omega.
+  Qed.
 
-  (** * Drop invariant and lemmas *)
+  Lemma IInvApp f1 t xs1 f2 xs2 :
+    IInvAppCompat PostG Post Pre f1 t xs1 f2 xs2.
+  Proof. 
+    unfold IInvAppCompat. intros.
+    unfold Post, PostG, Pre. split; omega. 
+  Qed.
+  
+(** * Drop invariant and lemmas *)
 
   
   Definition drop_invariant (drop : var -> option (list bool)) rho1 rho2 :=
@@ -89,6 +116,7 @@ Module DeadParamCorrect (H : Heap).
   (* This is the old definition, keeping it for reference *)
   (* exists B1 f1 B2 f2 t xs1 e1 xs2 e2 S, *)
   (*   find_def f1 B1 = Some (t, xs1, e1) /\ *)
+
   (*   find_def f2 B2 = Some (t, xs2, e2) /\ *)
   (*   Drop_fundefs drop B1 B2 /\ *)
   (*   Drop_params xs1 bs xs2 S /\ *)
@@ -864,8 +892,8 @@ Module DeadParamCorrect (H : Heap).
     - (* ----------- Ecase ----------- *)
       eapply exp_rel_case_compat.
       + eapply InvBase.
-      + admit.
-      + admit. 
+      + eapply IInvCase.
+      + eapply InvCase.
       + setoid_rewrite Setminus_Union in Hrel. 
         eapply Hrel. constructor; eauto.
       + eapply Forall2_monotonic_strong; [| eassumption ].
@@ -894,7 +922,7 @@ Module DeadParamCorrect (H : Heap).
         * eapply unique_bindings_Ecase_In. eassumption. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
           intros y Hin. econstructor; eassumption.
-        * eapply Disjoint_Included; [| | eapply Hdis2 ] . 
+        * eapply Disjoint_Included; [| | eapply Hdis2 ]. 
           intros y Hin. econstructor; eassumption.
           eapply occurs_free_Ecase_Included. eassumption. 
     - (* ----------- Ehalt ----------- (2) *)
@@ -906,7 +934,7 @@ Module DeadParamCorrect (H : Heap).
         rewrite occurs_free_Ehalt... 
     - (* ----------- Eapp (unknown) ----------- *)
       eapply exp_rel_app_compat.  
-      + admit. 
+      + eapply IInvApp. 
       + eapply InvBase.
       + intros j'. setoid_rewrite Setminus_Union in Hrel. 
         eapply Hrel.
@@ -921,7 +949,7 @@ Module DeadParamCorrect (H : Heap).
           now eauto with Ensembles_DB.
     - (* ----------- Eapp (known) ----------- *)
       eapply exp_rel_app_compat_known.
-      + admit.
+      + eapply IInvApp.
       + eapply InvBase.
       + intros i rho1' B1 f1' e1 ys1 vs1 Hlt Hgetf1 Hfind1 Hgetys1 Hset1.
         
@@ -1023,7 +1051,7 @@ Module DeadParamCorrect (H : Heap).
               eapply find_def_correct. eassumption.
               eassumption.
   Admitted. 
-
+  
   
   Lemma dead_param_elim_correct_toplevel k j drop B1 e1 B2 e2 :
     Drop drop B1 e1 B2 e2 ->
@@ -1033,8 +1061,8 @@ Module DeadParamCorrect (H : Heap).
   Proof with (now eauto with Ensembles_DB). 
     intros Hd Hclo Hun. 
     eapply cc_approx_exp_fun_compat.
-    - admit. (* Zoe *)
-    - admit. 
+    - eapply InvCtx.
+    - eapply IInvCtxFuns.
     - eapply InvBase.
     - intros Hlt.
 
@@ -1099,7 +1127,8 @@ Module DeadParamCorrect (H : Heap).
         eassumption.
 
         Grab Existential Variables. exact id. (* remove *)
-        admit. admit. 
-  Admitted. 
+  Qed.
 
+  (* Print Assumptions dead_param_elim_correct_toplevel.  *)
+  
 End DeadParamCorrect.

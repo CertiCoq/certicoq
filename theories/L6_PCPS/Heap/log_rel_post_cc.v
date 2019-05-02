@@ -1205,7 +1205,7 @@ Module LogRelPostCC (H : Heap).
         IIL2 (H1'', rho1'', e1) (H2'', rho2'', e2).
 
     Definition IInvAppCompat  f1 t xs1 f2 xs2 :=   
-      forall (i  : nat) (H1 Hgc1 H2 Hgc2: heap block)
+      forall (H1 Hgc1 H2 Hgc2: heap block)
         (rho1 rho1' rho2 rho2' : env)  
         (B1 B2 : fundefs) (f1' f2' : var) (e1 e2 : exp)
         ys1 ys2 (vs1 vs2 : list value) c1 c2 m1 m2 d1 d2,
@@ -1524,7 +1524,7 @@ Module LogRelPostCC (H : Heap).
     Qed.
 
 
-    Lemma cc_approx_exp_fun_compat (k j : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 :
+    Lemma exp_rel_fun_compat (k j : nat) rho1 rho2 H1 H2 B1 e1 B2 e2 :
       InvCtxCompat IL1 IL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
       IInvCtxCompat IIL1 IIL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
       InvCostBase_w IL1 IIL1 (Efun B1 e1) (Efun B2 e2) ->
@@ -1535,6 +1535,17 @@ Module LogRelPostCC (H : Heap).
       
       (H1, rho1, Efun B1 e1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (H2, rho2, Efun B2 e2).
     Proof with now eauto with Ensembles_DB.
+      (* intros Hinv Hiinv Hbase Hwf Hdom Hbin Hpre b1 b2 H1' H2' rho1' rho2' v1 c1 *)
+      (*        m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1. *)
+      (* inv Hstep1. *)
+      (* (* Timeout! *) *)
+      (* - { simpl in Hcost. exists OOT, 0.  *)
+      (*     - eexists. eexists id. repeat split. econstructor. simpl. *)
+      (*       omega. reflexivity. *)
+      (*       eapply Hbase; eassumption.  *)
+      (*       now rewrite cc_approx_val_eq. } *)
+      (*   (* Termination *) *)
+
     Admitted.
     
       

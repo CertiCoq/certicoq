@@ -9,7 +9,7 @@ Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
 From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion
-                                hoisting Heap.dead_param_elim.
+     hoisting Heap.dead_param_elim lambda_lifting.
 From CertiCoq.L7 Require Import L6_to_Clight.
 
 
@@ -121,6 +121,7 @@ Instance certiL5_t0_L6:
         (* let e :=  inlinesmall_contract e 10 10 in *)
         let e := inline_uncurry_contract e s 10 10 in  
         let e := shrink_cps.shrink_top e in
+        let e := lambda_lift e next_iTag in
         let '(cenv',nenv', t') := closure_conversion_hoist
                                     bogus_cloTag
                                     e

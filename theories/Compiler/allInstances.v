@@ -213,7 +213,7 @@ Section TEST_L6.
       let x := "Before dropping\n" in
       let y := concat x (show_exp cenv cenv' true t) in
       let z := concat y ("After dropping\n") in
-      let w := concat z (show_exp cenv cenv' true (dropper t)) in
+      let w := concat z (show_exp cenv cenv' true (eliminate t)) in
       L7.L6_to_Clight.print w
     | _ =>   L7.L6_to_Clight.print "Failed during comp_L6"
     end.

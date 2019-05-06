@@ -1150,10 +1150,102 @@ Module LogRelPostCC (H : Heap).
 
            Grab Existential Variables. exact b. exact 0. 
    Qed.
+   
 
+   (** * heap_rel lemmas *)
+   Lemma rel_env_rel_heap (S : Ensemble var) GIP GP b
+         (H1 H2 : heap block) (rho1 rho2 : env) k :
+      (forall j, (H1, rho1) ⋞ ^ ( S ; k ; j ; GIP ; GP ; b ) (H2, rho2)) ->
+      (forall j, (reach' H1 (env_locs rho1 S)) |- H1 ≼ ^ (k; j; GIP; GP; b) H2 ).
+  Proof.     
+    intros Heq j x [m [_ Hin]].
+    edestruct post_n_exists_Singleton as [l3' [Hin1 Hinp3]]; try eassumption.
+    destruct Hin1 as [y [Hin1 Hgetx]]. edestruct (M.get y rho1) as [[l1 | ] | ] eqn:Hgety; try inv Hgetx.
+    edestruct (Heq (m + j)) as [v' [Hgety' Hcc]]; try eassumption.
+    eapply val_rel_post_n. eassumption.
+    eassumption. 
+  Qed.
 
-  (** * Reachable locations image *)
+   Lemma size_reachable_leq S1 `{HS1 : ToMSet S1}
+        H1 H2 k GIP GP b :
+    (forall j, S1 |- H1 ≼ ^ (k ; j ; GIP ; GP ; b ) H2) ->
+    size_with_measure_filter size_val (image b S1) H2 <= size_with_measure_filter size_val S1 H1.
+  Proof with (now eauto with Ensembles_DB).
+    assert (HS1' := HS1).
+    revert HS1.
+    set (P := (fun S1 => 
+                 forall (HS1 : ToMSet S1),
+                   (forall j, S1 |- H1 ≼ ^ (k ; j ; GIP ; GP ; b ) H2) ->
+                   size_with_measure_filter size_val (image b S1) H2 <=
+                   size_with_measure_filter size_val S1 H1)). 
+    assert (HP : Proper (Same_set var ==> iff) P).
+    { intros S1'. unfold P.
+      intros S2 Hseq; split; intros Hyp ? Hrel.      
+      
+      assert (HMS1' : ToMSet S1').
+      { eapply ToMSet_Same_set. symmetry. eassumption. eassumption. }
+      
+      erewrite <- !(@HL.size_with_measure_Same_set _ _ _ _ _ _ _ Hseq).
+      erewrite !(@HL.size_with_measure_Same_set) with (S' := image b S1'). eapply Hyp.
+      setoid_rewrite Hseq. eassumption.
+      setoid_rewrite Hseq. reflexivity.
+      
+      erewrite !(@HL.size_with_measure_Same_set _ _ _ _ _ _ _ Hseq).
+      erewrite  !(@HL.size_with_measure_Same_set) with (S := image b S1') (S' := image b S2). eapply Hyp.
+      setoid_rewrite <- Hseq. eassumption.
+      setoid_rewrite Hseq. reflexivity. }
+      
+    eapply (@Ensemble_ind P HP); [| | eassumption ].
+    - unfold P. intros HS1 Hcc.
+      rewrite !HL.size_with_measure_filter_Empty_set.
+      erewrite (@HL.size_with_measure_Same_set )with (S := image b (Empty_set _)) (S' := Empty_set _).
+      rewrite HL.size_with_measure_filter_Empty_set. omega.
+      rewrite image_Empty_set. reflexivity. 
+    - intros x S1' HS Hnin IHS HS2 Hheap.
 
+      assert (Hbeq : (image b (x |: S1')) <--> b x |: (image b (S1') \\ [set b x])).
+      { rewrite Union_Setminus_Included. rewrite image_Union, image_Singleton. reflexivity.
+        tci. reflexivity. }
+
+      erewrite !(@HL.size_with_measure_Same_set _ _ _ _ _ _ _ Hbeq).
+      
+      erewrite !HL.size_with_measure_filter_Union; try now eauto with Ensembles_DB. 
+      
+      + unfold P in IHS. 
+        
+        
+        assert (Hyp' : size_with_measure_filter size_val [set b x] H2 =
+                       size_with_measure_filter size_val [set x] H1).
+        { erewrite !HL.size_with_measure_Same_set with (S' := x |: Empty_set _) (H := H1);
+            [| now eauto with Ensembles_DB ].
+          erewrite !HL.size_with_measure_Same_set with (S' := (b x) |: Empty_set _) (H := H2);
+            [| now eauto with Ensembles_DB ].
+          
+          edestruct (Hheap 1) as [_ Hcc]. now left. 
+          destruct (get x H1) as [ [c vs1 | | ] | ] eqn:Hgetl1; try contradiction. 
+          + destruct (get (b x) H2 ) as [ [c' vss |  | ] | ] eqn:Hgetl2; try contradiction.
+            destruct Hcc as [Heq Hall]. 
+            erewrite HL.size_with_measure_filter_add_In;
+              [| intros Hc; now inv Hc | eassumption ]. simpl.
+            erewrite HL.size_with_measure_filter_add_In;
+              [| intros Hc; now inv Hc | eassumption ]. simpl.
+            erewrite <- Forall2_length; try eassumption.
+            rewrite !HL.size_with_measure_filter_Empty_set. 
+            omega.
+          + destruct ( get (b x) H2 ) as [ | ] eqn:Hgetl2; try contradiction. }
+        
+        eapply plus_le_compat. omega.
+        eapply le_trans; [| eapply IHS ].
+
+        eapply HL.size_with_measure_filter_monotonic...
+        
+        intros j'.  eapply heap_log_rel_P_antimon; [ eapply Hheap | ]...
+
+  Grab Existential Variables.  tci.
+
+  Qed.
+  
+   
   
   (*** Compatibility lemmas *)
 
@@ -1169,13 +1261,13 @@ Module LogRelPostCC (H : Heap).
     Definition InvCostBase (e1 e2 : exp) :=
       forall (H1' H2' : heap block) (rho1' rho2' : env) (c : nat),                           
         IIL1 (H1', rho1', e1) (H2', rho2', e2) ->
-        cost e1 <= c -> 
+        cost_cc e1 <= c -> 
         IL1 (H1', rho1', e1) (c, size_heap H1') (c, size_heap H2').
     
     Definition InvCostTimeOut (e1 e2 : exp) :=
       forall (H1' H2' : heap block) (rho1' rho2' : env) (c : nat),                           
         IIL1 (H1', rho1', e1) (H2', rho2', e2) ->
-        c < cost e1 -> 
+        c < cost_cc e1 -> 
         IL1 (H1', rho1', e1) (c, size_heap H1') (c, size_heap H2').
     
     Definition InvCostBase_w (e1 e2 : exp) :=
@@ -1188,7 +1280,7 @@ Module LogRelPostCC (H : Heap).
       forall (H1' H2' H1'' H2'' : heap block) (rho1' rho2' rho1'' rho2'' : env) c1 c2 c1' c2' m1 m2,
 
         IL2 (H1'', rho1'', e1) (c1, m1) ( c2, m2) ->
-        cost (C1 |[ e1 ]|) <= c1' ->
+        cost_cc (C1 |[ e1 ]|) <= c1' ->
 
         ctx_to_heap_env_CC C1 H1' rho1' H1'' rho1'' c1' ->
         ctx_to_heap_env_CC C2 H2' rho2' H2'' rho2'' c2' ->
@@ -1501,7 +1593,7 @@ Module LogRelPostCC (H : Heap).
             econstructor; eauto.
             now econstructor; eauto.
           - simpl. simpl in Hcost. omega.
-          - intros i. edestruct (Hstuck1 (i + cost (Econstr x1 t ys1 e1))) as [r' [m' Hstep']].
+          - intros i. edestruct (Hstuck1 (i + cost_cc (Econstr x1 t ys1 e1))) as [r' [m' Hstep']].
             inv Hstep'.
             * omega.
             * rewrite NPeano.Nat.add_sub in Hbs0. repeat subst_exp.
@@ -1529,26 +1621,65 @@ Module LogRelPostCC (H : Heap).
       IInvCtxCompat IIL1 IIL2 (Efun1_c B1 Hole_c) (Efun1_c B2 Hole_c) e1 e2 ->
       InvCostBase_w IL1 IIL1 (Efun B1 e1) (Efun B2 e2) ->
       
-      (k >= cost (Efun B1 e1) ->
-       (H1, def_funs B1 B1 rho1, e1) ⪯ ^ (k - cost (Efun B1 e1) ; j ; IIL2 ; IIG ; IL2 ; IG)
-       (H2, def_funs B2 B2 rho2, e2)) ->
+      (forall i, i < k ->
+            (H1, def_funs B1 B1 rho1, e1) ⪯ ^ (i ; j ; IIL2 ; IIG ; IL2 ; IG)
+            (H2, def_funs B2 B2 rho2, e2)) ->
       
       (H1, rho1, Efun B1 e1) ⪯ ^ (k ; j ; IIL1 ; IIG ; IL1 ; IG) (H2, rho2, Efun B2 e2).
     Proof with now eauto with Ensembles_DB.
-      (* intros Hinv Hiinv Hbase Hwf Hdom Hbin Hpre b1 b2 H1' H2' rho1' rho2' v1 c1 *)
-      (*        m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1. *)
-      (* inv Hstep1. *)
-      (* (* Timeout! *) *)
-      (* - { simpl in Hcost. exists OOT, 0.  *)
-      (*     - eexists. eexists id. repeat split. econstructor. simpl. *)
-      (*       omega. reflexivity. *)
-      (*       eapply Hbase; eassumption.  *)
-      (*       now rewrite cc_approx_val_eq. } *)
-      (*   (* Termination *) *)
+      intros Hinv Hiinv Hbase Hpre b1 b2 H1' H2' rho1' rho2' v1 c1
+             m1 Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
+      inv Hstep1.
+      (* Timeout! *)
+      - { simpl in Hcost. exists OOT, 0.
+          - eexists. eexists id. repeat split. econstructor. simpl.
+            omega. reflexivity.
+            eapply Hbase. eassumption. omega. } 
+      - (* Termination *)
+        edestruct (Hpre (k - cost_cc (Efun B1 e1)))
+                    as [r2 [c2 [m2 [b [Hbs' [Hil1 Hvrel]]]]]]; try eassumption.
+        + simpl in *; omega. 
+        + eapply heap_env_equiv_def_funs'.
+          eapply heap_env_equiv_antimon. eassumption. 
+          normalize_occurs_free...
+        + eapply injective_subdomain_antimon. eassumption.
+          eapply reach'_set_monotonic.
+          rewrite env_locs_def_funs'; [| | reflexivity ]; tci.
+          eapply env_locs_monotonic. normalize_occurs_free...
+        + eapply heap_env_equiv_def_funs'.
+          eapply heap_env_equiv_antimon. eassumption. 
+          normalize_occurs_free...
+        + eapply injective_subdomain_antimon. eassumption.
+          eapply reach'_set_monotonic.
+          rewrite env_locs_def_funs'; [| | reflexivity ]; tci.
+          eapply env_locs_monotonic. normalize_occurs_free...
+        + eapply Hiinv. eassumption.
+          constructor. now constructor.
+          constructor. now constructor.
+        + simpl in *. omega.  
+        + intros i.
+          edestruct (Hstuck1 (i + cost_cc (Efun B1 e1))) as [r' [m' Hstep']].
+          inv Hstep'.
+          * omega.
+          * rewrite NPeano.Nat.add_sub in Hbs0. repeat subst_exp.
+            repeat eexists; eauto.
+        + do 4 eexists. split; [| split ].
+          * eapply Eval_fun_per_cc with (c := c2 + cost_cc (Efun B2 e2)).
+            omega. reflexivity. rewrite Nat.add_sub. eassumption.
+          * replace c1 with (c1 - cost_cc (Efun B1 e1) + cost_cc (Efun B1 e1))
+            by (simpl in *; omega). 
+            eapply Hinv. eassumption. simpl. omega. 
+            rewrite <- Nat.add_0_l. econstructor.
+            now constructor.
+            rewrite <- Nat.add_0_l. econstructor.
+            now constructor.
+          * eapply val_rel_i_monotonic; tci. omega.
 
-    Admitted.
+            Grab Existential Variables. 
+            eassumption. eassumption.
+    Qed.
+
     
-      
     Lemma exp_rel_prim_compat (k j : nat)
           (b : Inj) (H1 H2 : heap block) (rho1 rho2 : env)
           (x1 x2 : var) (t : prim) (ys1 ys2 : list var) (e1 e2 : exp)  :
@@ -1881,17 +2012,13 @@ Module LogRelPostCC (H : Heap).
            | normalize_occurs_free; now eauto with Ensembles_DB ].
       inv Hstep1.
       (* Timeout! *)
-      - { edestruct (Hstuck1 (cost (Eapp f1 t xs1))) as [v1 [m1 Hstep1]].
-          inv Hstep1; [ omega | ].
-          exists OOT, c1. destruct (lt_dec c1 1).
+      - { exists OOT, c1.
           - eexists. eexists id. repeat split.
-            constructor; eauto. simpl; omega. 
-            eapply Hbase; try eassumption; eauto.
-          - edestruct Hvar as [l2 [Hget' Hcc]]; eauto. 
-            simpl val_log_rel' in Hcc. rewrite Hgetl in Hcc.
-            destruct l2 as [l2 | ]; [| contradiction ].
-            destruct Hcc as [Hbeq Hcc]; simpl in Hcc.
-            destruct (get l2 H2') as [v |] eqn:Hget2; try contradiction. } 
+            constructor; eauto.
+            unfold cost_cc in *.
+            erewrite <- Forall2_length; eassumption.
+
+            eapply Hbase; try eassumption; eauto. } 
       (* Termination *)  
       - { eapply Forall2_monotonic_strong with
               (R' := (fun x1 x2 : var => forall j, var_rel k j IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2)) in Hall.
@@ -1919,7 +2046,7 @@ Module LogRelPostCC (H : Heap).
           destruct Hgc2 as  [Hseq' [Heqgc' Hinjgc']].
           rewrite <- subst_env_image in Hinjgc. 
           
-          edestruct Hi' with (i := k - cost  (Eapp f1 t xs1))
+          edestruct Hi' with (i := k - cost_cc  (Eapp f1 t xs1))
             as [HG [r2 [c2 [m2 [b2' [Hbs2 [HIG  Hcc2]]]]]]];
             [ | | | | |  | | | eassumption | | ]; try eassumption.     
             + simpl in *. omega. 
@@ -1945,12 +2072,14 @@ Module LogRelPostCC (H : Heap).
             + eapply heap_env_equiv_heap_equiv_l. eassumption.
             + eapply HG; eassumption.
             + simpl in *; omega.
-            + intros i.
-              edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m'' Hstep']].
-              inv Hstep'.
-              * omega.
-              * rewrite NPeano.Nat.add_sub in Hbs0. 
-                repeat subst_exp.
+            + admit.
+              (* intros i. *)
+              (* edestruct (Hstuck1 (i + cost_cc (Eapp f1 t xs1))) as [r' [m'' Hstep']]. *)
+              (* inv Hstep'. *)
+              (* * omega. *)
+              (* * rewrite NPeano.Nat.add_sub in Hbs0.  *)
+              (*   repeat subst_exp. do 2 eexists. *)
+              (*   eassumption.  *)
             + do 3 eexists. exists b2'. repeat split.
               * repeat subst_exp.                
                 eapply Eval_app_per_cc
@@ -1959,7 +2088,7 @@ Module LogRelPostCC (H : Heap).
 
                 replace (c2 + cost_cc (Eapp f2 t xs2) - cost_cc (Eapp f2 t xs2)) with c2.
                 eassumption. omega.
-             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
+             * replace c1 with (c1 - cost_cc (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
                unfold cost, cost_cc in *. 
                eapply Hiinv; try eassumption.
              * eapply val_rel_i_monotonic; tci. simpl in *; omega.
@@ -1967,9 +2096,9 @@ Module LogRelPostCC (H : Heap).
             eassumption. eassumption. eassumption. eassumption.
             normalize_occurs_free. left. eassumption.
             normalize_occurs_free. left. eassumption. }
-    Qed.
-    
-    
+    Admitted.
+
+        
     Lemma exp_rel_app_compat_known (k j : nat) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
       IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
@@ -2002,12 +2131,12 @@ Module LogRelPostCC (H : Heap).
              HII Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
       (* Timeout! *)
-      - { edestruct (Hstuck1 (cost (Eapp f1 t xs1))) as [v1 [m1 Hstep1]].
-          inv Hstep1; [ omega | ].
-          exists OOT, (c1 - length xs1).
-          eexists. eexists id. repeat split.
-          constructor; eauto. simpl in *; omega.
-          eapply Hbase; try eassumption. omega. }
+      - { exists OOT, (c1 - length xs1).
+          - eexists. eexists id. repeat split.
+            constructor; eauto.
+            unfold cost_cc in *. omega. 
+            
+            eapply Hbase; try eassumption; eauto. omega. }
       (* Termination *)
       - { edestruct heap_env_equiv_env_getlist as [vs1' [Hget1' Hall]]. eassumption.
           symmetry. eassumption. normalize_occurs_free... 
@@ -2098,16 +2227,17 @@ Module LogRelPostCC (H : Heap).
              eassumption. eassumption. 
           + omega.
           + eassumption. 
-          + intros i.
-            edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m'' Hstep']].
-            inv Hstep'.
-            * omega.
-            * rewrite NPeano.Nat.add_sub in Hbs0.
-              repeat subst_exp.
+          + admit.
+          (*   intros i. *)
+          (*   edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m'' Hstep']]. *)
+          (*   inv Hstep'. *)
+          (*   * omega. *)
+          (*   * rewrite NPeano.Nat.add_sub in Hbs0. *)
+          (*     repeat subst_exp. *)
           + do 3 eexists. exists d. repeat split.
             * eapply Eval_app_per_cc
                 with (c := c2 + cost_cc (Eapp f2 t xs2)); try eassumption.
-              simpl in *; omega. reflexivity. 
+              simpl in *; omega. reflexivity.
               
               replace (c2 + cost_cc (Eapp f2 t xs2) - cost_cc (Eapp f2 t xs2)) with c2.
               eassumption. omega.
@@ -2115,10 +2245,9 @@ Module LogRelPostCC (H : Heap).
               unfold cost, cost_cc in *.
               eapply Hiinv; try eassumption.
             * eapply val_rel_i_monotonic; tci. simpl in *; omega.
-
           + eapply heap_env_equiv_empty.
           + eapply heap_env_equiv_empty. }
-    Qed.     
+    Admitted.     
 
 
   End CompatLemmas.

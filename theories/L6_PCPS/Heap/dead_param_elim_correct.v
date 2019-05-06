@@ -99,6 +99,125 @@ Module DeadParamCorrect (H : Heap).
     unfold IInvAppCompat. intros.
     unfold Post, PostG, Pre. split; omega. 
   Qed.
+
+  Lemma IInvGC_rel k S H1 H2 rho1 rho2 e1 e2 b {_ : ToMSet S} :
+    (forall j : nat, S |- H1 ≼ ^ (k; j; PreG; PostG; b) H2) ->
+    
+    reach' H2 (env_locs rho2 (occurs_free e2)) \subset image b S ->
+    S \subset reach' H1 (env_locs rho1 (occurs_free e1))  ->
+
+    IInvGC PreG H1 rho1 e1 H2 rho2 e2. 
+  Proof.
+    intros Hrel Hs1 Hs2 H1' Hl1 H2' Hl2 rho1' rho2' b1 b2 d1 d2 Heq1 Hinj1 Heq2 Hinj2 Hgc1 Hgc2.
+    unfold PreG.
+
+    unfold size_heap.
+
+    erewrite live_size_with_measure with (S := (env_locs rho2' (occurs_free e2))); [| eassumption |].
+
+    erewrite live_size_with_measure with (S := (env_locs rho1' (occurs_free e1))); [| eassumption |].
+
+    + replace (size_with_measure_filter size_val (reach' H1' (env_locs rho1' (occurs_free e1))) H1')
+        with (reach_size H1' rho1' e1) by reflexivity. 
+      
+      erewrite  heap_env_equiv_reach_size.
+      
+      2:{ symmetry. eassumption. }
+      2:{ eassumption. }
+      
+      edestruct inverse_exists with (b := b2) as [b2' [Hinj2' Hinv]]; [| eassumption |].
+      now tci. 
+      
+      rewrite heap_env_equiv_image_reach in Hinj2'; [| eassumption ]. 
+      
+      symmetry in Heq2. eapply heap_env_equiv_inverse_subdomain in Heq2; try eassumption. 
+      
+      replace (size_with_measure_filter size_val (reach' H2' (env_locs rho2' (occurs_free e2))) H2')
+        with (reach_size H2' rho2' e2) by reflexivity.
+      rewrite image_id in Hinj2'. 
+      erewrite  heap_env_equiv_reach_size; [| eassumption | rewrite compose_id_neut_r; eassumption ].
+
+      unfold reach_size, size_reachable.
+      
+      eapply le_trans.
+
+      eapply HL.size_with_measure_filter_monotonic with (S2 := image b S).
+      eassumption.            
+      
+      eapply le_trans.
+      
+      eapply size_reachable_leq. eassumption. 
+      
+      eapply HL.size_with_measure_filter_monotonic. eassumption. 
+    + intros. eapply block_equiv_size_val. eassumption.
+    + intros. eapply block_equiv_size_val. eassumption.
+  Qed.
+
+(* 
+  Lemma IInvGC_rel k S D H1 H2 rho1 rho2 e1 e2 b {_ : ToMSet S} {_ : ToMSet D} :
+    (forall j : nat, (H1, rho1) ⋞ ^ (S \\ D ; k; j; PreG; PostG; b) (H2, rho2)) ->
+    binding_in_map (S \\ D) rho1 ->
+    
+    occurs_free e2 \subset S ->
+    S \subset occurs_free e1 ->
+
+    env_locs rho1 (S \\ D) <--> env_locs rho1 S ->
+    env_locs rho2 (S \\ D) <--> env_locs rho2 S ->
+
+    IInvGC PreG H1 rho1 e1 H2 rho2 e2. 
+  Proof.
+    intros Hrel Hbin Hs1 Hs2 Heql1 Heql2 H1' Hl1 H2' Hl2 rho1' rho2' b1 b2 d1 d2 Heq1 Hinj1 Heq2 Hinj2 Hgc1 Hgc2.
+    unfold PreG.
+
+    unfold size_heap.
+
+    erewrite live_size_with_measure with (S := (env_locs rho2' (occurs_free e2))); [| eassumption |].
+
+    erewrite live_size_with_measure with (S := (env_locs rho1' (occurs_free e1))); [| eassumption |].
+
+    + replace (size_with_measure_filter size_val (reach' H1' (env_locs rho1' (occurs_free e1))) H1')
+        with (reach_size H1' rho1' e1) by reflexivity. 
+      
+      erewrite  heap_env_equiv_reach_size.
+      
+      2:{ symmetry. eassumption. }
+      2:{ eassumption. }
+      
+      edestruct inverse_exists with (b := b2) as [b2' [Hinj2' Hinv]]; [| eassumption |].
+      now tci. 
+      
+      rewrite heap_env_equiv_image_reach in Hinj2'; [| eassumption ]. 
+      
+      symmetry in Heq2. eapply heap_env_equiv_inverse_subdomain in Heq2; try eassumption. 
+      
+      replace (size_with_measure_filter size_val (reach' H2' (env_locs rho2' (occurs_free e2))) H2')
+        with (reach_size H2' rho2' e2) by reflexivity.
+      rewrite image_id in Hinj2'. 
+      erewrite  heap_env_equiv_reach_size; [| eassumption | rewrite compose_id_neut_r; eassumption ].
+
+      unfold reach_size, size_reachable.
+
+      eapply le_trans.
+
+      eapply HL.size_with_measure_filter_monotonic with (S2 := (reach' H2 (env_locs rho2 (S \\ D)))).
+      eapply reach'_set_monotonic.  rewrite Heql2. eapply env_locs_monotonic. eassumption.
+      
+      assert (Hseq : (reach' H2 (env_locs rho2 (S \\ D))) <--> image b (reach' H1 (env_locs rho1 (S \\ D)))).
+      { symmetry. eapply env_rel_image_reach. eassumption. eassumption. }
+
+      erewrite (HL.size_with_measure_Same_set _ _ _ _ _ Hseq).
+      eapply le_trans.
+      
+      eapply size_reachable_leq.
+
+      intros j. eapply rel_env_rel_heap. eassumption.
+
+      eapply HL.size_with_measure_filter_monotonic.
+      eapply reach'_set_monotonic. rewrite Heql1. eapply env_locs_monotonic. eassumption. 
+    + intros. eapply block_equiv_size_val. eassumption.
+    + intros. eapply block_equiv_size_val. eassumption.
+  Qed.
+*)
   
 (** * Drop invariant and lemmas *)
 
@@ -337,19 +456,25 @@ Module DeadParamCorrect (H : Heap).
       eapply Included_refl.
   Qed. 
 
-  Lemma drop_invariant_reach1 drop rho1 rho2 : (* Zoe TODO *)
+  Lemma drop_invariant_reach_setminus S drop rho1 rho2 :
     drop_invariant drop rho1 rho2 -> 
-    env_locs rho1 (domain drop) <--> Empty_set _. 
-  Proof.
-  Abort. 
+    env_locs rho1 (S \\ dropped_funs drop) <--> env_locs rho1 S. 
+  Proof with (now eauto with Ensembles_DB).
+    intros (B1 & B2 & Hun & Hclo & Hdrop & Hyp).
+    split.
+    eapply env_locs_monotonic...
 
-  Lemma drop_invariant_reach2 drop rho1 rho2 : (* Zoe TODO *)
-    drop_invariant drop rho1 rho2 -> 
-    env_locs rho2 (domain drop) <--> Empty_set _. 
-  Proof.
-  Abort.
+    intros l [x [Hin Hget]].
+    destruct (M.get x rho1) eqn:Hgetx; try contradiction.
+    
+    assert (Hnin : ~ x \in dropped_funs drop). 
+    { intros [bs [Hc _]]. eapply Hyp in Hc. inv Hc. 
+      repeat subst_exp. inv Hget. }
+    eapply get_In_env_locs; try eassumption.
+    split; eauto.
+  Qed.
   
-  Lemma drop_invariant_reach2_setminus S drop rho1 rho2 : (* Zoe TODO *)
+  Lemma drop_invariant_reach2_setminus S drop rho1 rho2 :
     drop_invariant drop rho1 rho2 -> 
     env_locs rho2 (S \\ dropped_funs drop) <--> env_locs rho2 S. 
   Proof with (now eauto with Ensembles_DB).
@@ -527,6 +652,17 @@ Module DeadParamCorrect (H : Heap).
       * right. intros [bs' [Hget Hex]]. subst_exp. contradiction.
     + right. intros [bs' [Hget Hex]]. congruence.
   Qed.
+
+
+  Instance ToMSet_dropped_funs drop :
+    ToMSet (dropped_funs drop). 
+  Admitted.
+
+  Instance ToMSet_drop_params xs bs ys S :
+    Drop_params xs bs ys S ->
+    ToMSet S. 
+  Admitted.
+
   
   (** Lemma about defining a block of dropped functions in the environment (correctness of Drop_fundefs relation) *)
   
@@ -673,23 +809,63 @@ Module DeadParamCorrect (H : Heap).
 
           exists rho2'. split. 
           eassumption. split. eassumption.
-
+          
           { intros i Hlt Hallv.
+
+            assert (Hrelenv :
+                      forall j0 : nat,
+                        (H1', rho1') ⋞ ^ (occurs_free e1 \\ dropped_funs drop; i; j0; PreG; PostG; b') (H2', rho2')). 
+            { intros j''.
+              eapply env_log_rel_P_setlist_l;
+                [ | | eassumption | eassumption ].
+              * (* Apply IHk *)
+                { eapply IHk; try eassumption.
+                  - intros m Hlt'.
+                    eapply IHexp. omega. 
+                  - intros j1. eapply env_log_rel_P_empty. } 
+              * eapply Hallv. }
+            
+            assert (Hdinv' :  drop_invariant drop rho1' rho2').
+            { eapply drop_invariant_setlist_l; try eassumption.
+              eapply drop_invariant_setlist_r; try eassumption.
+              * eapply Drop_fundefs_drop_invariant; eassumption.
+              * rewrite Hdinv.
+                eapply unique_bindings_fun_in_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+              * rewrite Hdinv.
+              eapply unique_bindings_fun_in_fundefs.
+              eapply find_def_correct. eassumption.
+              eassumption. }
+            
             split.
-            - (* bounds TODO Zoe *)
-              admit. 
+            - intros.
+              eapply IInvGC_rel with (S := reach' H1' (env_locs rho1' (occurs_free e1 \\ dropped_funs drop)));
+                                         try reflexivity; try eassumption; tci. 
+              + intros j'. eapply rel_env_rel_heap. eassumption.
+              + eapply Included_trans.
+                eapply reach'_set_monotonic. eapply env_locs_monotonic.
+                eapply drop_body_occurs_free. eassumption.
+                rewrite H0. rewrite Setminus_Empty_set_neut_r.
+                rewrite env_rel_image_reach; try eassumption.
+                rewrite drop_invariant_reach2_setminus; try eassumption.
+                reflexivity. 
+                eapply binding_in_map_antimon.
+                eapply Included_trans. eapply Setminus_Included. 
+                eapply logical_relations.occurs_free_closed_fundefs.
+                eapply find_def_correct. eassumption.
+                eassumption.
+                eapply binding_in_map_setlist; [| eassumption ].
+                eapply binding_in_map_antimon; [| eapply def_funs_binding_in_map ].
+                rewrite Union_Empty_set_neut_r. reflexivity. 
+                intros x Hin. inv Hin.
+              + eapply reach'_set_monotonic. eapply env_locs_monotonic...
+              + clear. now firstorder. 
+              + clear. now firstorder. 
             - intros j'.
-              eapply IHexp.
+              eapply IHexp with (S := S').
               + eassumption.
-              + intros j''.
-                eapply env_log_rel_P_setlist_l;
-                  [ | | eassumption | eassumption ].
-                * (* Apply IHk *)
-                  { eapply IHk; try eassumption.
-                    - intros m Hlt'.
-                      eapply IHexp. omega. 
-                    - intros j1. eapply env_log_rel_P_empty. } 
-                * eapply Hallv.
+              + setoid_rewrite H0; setoid_rewrite Setminus_Empty_set_neut_r. eassumption.
               + eapply closed_reach_monotonic.
                 2:{ eapply Included_trans. eapply env_locs_monotonic.
                     eapply logical_relations.occurs_free_closed_fundefs.
@@ -702,17 +878,7 @@ Module DeadParamCorrect (H : Heap).
                 rewrite <- env_locs_Empty, Union_Empty_set_neut_l.
                 eapply val_rel_Forall2_reach.
                 eapply Forall2_forall. tci. eassumption. 
-              + eapply drop_invariant_setlist_l; try eassumption.
-                eapply drop_invariant_setlist_r; try eassumption.
-                * eapply Drop_fundefs_drop_invariant; eassumption.
-                * rewrite Hdinv.
-                  eapply unique_bindings_fun_in_fundefs.
-                  eapply find_def_correct. eassumption.
-                  eassumption.
-                * rewrite Hdinv.
-                  eapply unique_bindings_fun_in_fundefs.
-                  eapply find_def_correct. eassumption.
-                  eassumption.
+              + eassumption. 
               + eapply binding_in_map_antimon.
                 eapply logical_relations.occurs_free_closed_fundefs.
                 eapply find_def_correct. eassumption.
@@ -748,7 +914,7 @@ Module DeadParamCorrect (H : Heap).
       intros j. eapply env_log_rel_P_antimon.
       eapply Hrel.
       simpl... 
-  Admitted. 
+  Qed. 
 
   (** Correctness of drop_body relation *)  
   Lemma dead_param_elim_correct
@@ -756,7 +922,7 @@ Module DeadParamCorrect (H : Heap).
         H1 rho1 e1 H2 rho2 e2 (* source and target conf *)
         b (* location renaming *)
         drop (* dropper function *)
-        S (* dropped variables *) :
+        S (* dropped variables *):
 
     (forall j, (H1, rho1) ⋞ ^ (occurs_free e1 \\ S \\ dropped_funs drop ; k ; j; PreG ; PostG ; b) (H2, rho2)) ->
     (* heap is well-formed in S *)
@@ -801,7 +967,7 @@ Module DeadParamCorrect (H : Heap).
           eassumption. now eauto with Ensembles_DB. 
       + intros vs1 vs2 l1 l2 H1' H2' Hleq Hloc1 Hloc2 Halloc1 Halloc2 HForall2 j'. 
         eapply IHk with (S := S) (drop := drop) (b :=  b { l1 ~> l2 }).
-        * simpl in *. omega. 
+        * simpl in *. omega.
         * intros j''.
           eapply env_rel_set_alloc_Constr; [| eapply Halloc1 | eapply Halloc2 | ].
 
@@ -848,7 +1014,7 @@ Module DeadParamCorrect (H : Heap).
         normalize_occurs_free...
       + intros v1 v2 Hleq Hv1 Hv2 Hrelv j'. 
         eapply IHk with (S := S) (drop := drop). 
-        * simpl in *. omega. 
+        * simpl in *. omega.
         * intros j''. 
           eapply env_log_rel_P_set. 
 
@@ -933,7 +1099,9 @@ Module DeadParamCorrect (H : Heap).
         split; [| eassumption ]. 
         rewrite occurs_free_Ehalt... 
     - (* ----------- Eapp (unknown) ----------- *)
-      eapply exp_rel_app_compat.  
+      eapply exp_rel_app_compat.
+      + exact Post. (* TODO remove redundant args *)
+      + exact Pre. 
       + eapply IInvApp. 
       + eapply InvBase.
       + intros j'. setoid_rewrite Setminus_Union in Hrel. 
@@ -949,6 +1117,8 @@ Module DeadParamCorrect (H : Heap).
           now eauto with Ensembles_DB.
     - (* ----------- Eapp (known) ----------- *)
       eapply exp_rel_app_compat_known.
+      + exact Post. (* TODO remove redundant args *)
+      + exact Pre. 
       + eapply IInvApp.
       + eapply InvBase.
       + intros i rho1' B1 f1' e1 ys1 vs1 Hlt Hgetf1 Hfind1 Hgetys1 Hset1.
@@ -981,10 +1151,52 @@ Module DeadParamCorrect (H : Heap).
 
           unfold closed_fundefs in Hclo'. rewrite Hclo'...
           
-          do 6 eexists. repeat split; eauto. 
+          assert (Hdinv' : drop_invariant drop rho1' rho2').
+          { eapply drop_invariant_setlist_l; try eassumption.
+            eapply drop_invariant_setlist_r; try eassumption.
+            * eapply Drop_fundefs_drop_invariant; eassumption.
+            * eapply Disjoint_Included_l.
+              eapply Drop_params_subset. eassumption.
+              rewrite Hdom. 
+              eapply unique_bindings_fun_in_fundefs.
+              eapply find_def_correct. eassumption.
+              eassumption.
+            * rewrite Hdom. 
+              eapply unique_bindings_fun_in_fundefs.
+              eapply find_def_correct. eassumption.
+              eassumption. }
           
-          admit. (* TODO Zoe InvGC *)
-          { intros j'. eapply IHk; [| | | | | | |  | eassumption ].
+          assert (IHbin' : binding_in_map (occurs_free e1) rho1'). 
+          { eapply binding_in_map_antimon.
+            eapply logical_relations.occurs_free_closed_fundefs.
+            eapply find_def_correct. eassumption.
+            eassumption.
+            eapply binding_in_map_setlist; [| eassumption ].
+            eapply binding_in_map_antimon; [| eapply def_funs_binding_in_map ].
+            rewrite Union_Empty_set_neut_r. reflexivity. 
+            intros x Hin. inv Hin. }
+          
+          assert (Hs' : ToMSet S').
+          { eapply ToMSet_drop_params. eassumption. }
+
+          do 6 eexists. repeat split; eauto.
+
+          { eapply IInvGC_rel with (S := reach' H1 (env_locs rho1' (occurs_free e1 \\ S' \\ dropped_funs drop)));
+              try reflexivity; try eassumption; tci.
+            + intros j'. eapply rel_env_rel_heap.
+              intros j1. eapply env_log_rel_P_antimon. eapply Henv. now eauto with Ensembles_DB.
+            + eapply Included_trans.
+              eapply reach'_set_monotonic. eapply env_locs_monotonic.
+              eapply drop_body_occurs_free. eassumption.
+              rewrite env_rel_image_reach.
+              rewrite drop_invariant_reach2_setminus; try eassumption.
+              reflexivity.
+
+              intros j1. eapply env_log_rel_P_antimon. eapply Henv. now eauto with Ensembles_DB.
+
+              eapply binding_in_map_antimon; [| eassumption ]...
+            + eapply reach'_set_monotonic. eapply env_locs_monotonic... }
+          { intros j'. eapply IHk; [|  | | | | | |  | eassumption ].
             - omega. 
             - intros j''. eapply env_log_rel_P_antimon.
               eapply env_log_rel_i_monotonic with (i := k); tci. eapply Henv.  
@@ -1008,27 +1220,8 @@ Module DeadParamCorrect (H : Heap).
               rewrite Union_commut. eapply Included_Union_compat. reflexivity.
               simpl. eapply Included_trans. eapply env_locs_def_funs'; tci.
               rewrite env_locs_Empty. reflexivity.
-            - eapply drop_invariant_setlist_l; try eassumption.
-              eapply drop_invariant_setlist_r; try eassumption.
-              * eapply Drop_fundefs_drop_invariant; eassumption.
-              * eapply Disjoint_Included_l.
-                eapply Drop_params_subset. eassumption.
-                rewrite Hdom. 
-                eapply unique_bindings_fun_in_fundefs.
-                eapply find_def_correct. eassumption.
-                eassumption.
-              * rewrite Hdom. 
-                eapply unique_bindings_fun_in_fundefs.
-                eapply find_def_correct. eassumption.
-                eassumption.
-            - eapply binding_in_map_antimon.
-              eapply logical_relations.occurs_free_closed_fundefs.
-              eapply find_def_correct. eassumption.
-              eassumption.
-              eapply binding_in_map_setlist; [| eassumption ].
-              eapply binding_in_map_antimon; [| eapply def_funs_binding_in_map ].
-              rewrite Union_Empty_set_neut_r. reflexivity. 
-              intros x Hin. inv Hin. 
+            - eassumption. 
+            - eassumption.  
             - eapply unique_bindings_fun_in_fundefs.
               eapply find_def_correct. eassumption.
               eassumption.
@@ -1049,8 +1242,8 @@ Module DeadParamCorrect (H : Heap).
               
               eapply unique_bindings_fun_in_fundefs.
               eapply find_def_correct. eassumption.
-              eassumption.
-  Admitted. 
+              eassumption. }
+  Qed. 
   
   
   Lemma dead_param_elim_correct_toplevel k j drop B1 e1 B2 e2 :
@@ -1060,12 +1253,12 @@ Module DeadParamCorrect (H : Heap).
     (H.emp, M.empty _, Efun B1 e1) ⪯ ^ (k ; j ; Pre ; PreG ; Post ; PostG ) (H.emp, M.empty _, Efun B2 e2).     
   Proof with (now eauto with Ensembles_DB). 
     intros Hd Hclo Hun. 
-    eapply cc_approx_exp_fun_compat.
+    eapply exp_rel_fun_compat.
     - eapply InvCtx.
     - eapply IInvCtxFuns.
     - eapply InvBase.
-    - intros Hlt.
-
+    - intros i Hlt.
+      
       assert (Hemp : occurs_free_fundefs B1 <--> Empty_set var). 
       { unfold closed_fundefs, closed_exp in *.
         rewrite occurs_free_Efun in Hclo.
@@ -1079,7 +1272,7 @@ Module DeadParamCorrect (H : Heap).
         rewrite <- (Union_Empty_set_neut_r (name_in_fundefs B1)). 
         eapply Included_Union_Setminus_Included; [| eapply Hclo ]. 
         tci. } 
-
+      
       inv Hd. 
       eapply dead_param_elim_correct; [| | | | | | | eassumption ].
       + intros j1.

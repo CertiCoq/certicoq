@@ -2,7 +2,7 @@ From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_
      List_util functions tactics map_util.
 
 From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv space_sem
-     cc_log_rel dead_param_elim_rel GC log_rel_defs log_rel_post_cc.
+     cc_log_rel dead_param_elim_rel GC log_rel_defs log_rel_post_cc. 
 
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
@@ -151,7 +151,7 @@ Module DeadParamCorrect (H : Heap).
       eapply HL.size_with_measure_filter_monotonic. eassumption. 
     + intros. eapply block_equiv_size_val. eassumption.
     + intros. eapply block_equiv_size_val. eassumption.
-  Qed.
+  Qed. 
 
   
   (** * Live invariant and lemmas *)
@@ -160,9 +160,9 @@ Module DeadParamCorrect (H : Heap).
     exists B1 B2, (* There exists function blocks B1 B2 -- i.e. the functions defined at the beginning of the programs *)
       unique_bindings_fundefs B1 /\ (* that have unique binders *)
       closed_fundefs B1 /\ (* are closed *) 
-      Live_fundefs L B1 B2 /\ (* are in Drop_fundefs relation *)
-      domain L <--> name_in_fundefs B1 /\ (* The domain of drop contains exactly the names of the functions in map *)
-      forall f bs, L f = Some bs -> (* and all the variables in the domain of drop. TODO write with domain *)
+      Live_fundefs L B1 B2 /\ (* are in Live_fundefs relation *)
+      domain L <--> name_in_fundefs B1 /\ (* The domain of L contains exactly the names of the functions in map *)
+      forall f bs, L f = Some bs -> (* and all the variables in the domain of drop.  *)
               M.get f rho1 = Some (FunPtr B1 f) /\
               M.get f rho2 = Some (FunPtr B2 f). 
 
@@ -176,7 +176,7 @@ Module DeadParamCorrect (H : Heap).
   (*   Drop_params xs1 bs xs2 S /\ *)
   (*   Drop_body drop S e1 e2. *)
 
-  (* Instead of the old drop_invariant, we can prove this lemma *)
+  (* Instead of the old live_invariant, we can prove this lemma *)
   Lemma Live_fundefs_fun_in_fundef L B1 B2 f ft xs1 e1 :
     Live_fundefs L B1 B2 ->
     find_def f B1 = Some (ft, xs1, e1) ->
@@ -198,6 +198,8 @@ Module DeadParamCorrect (H : Heap).
       simpl. rewrite Coqlib.peq_false; eassumption.
       eassumption. 
   Qed.
+
+  (* Lemmas about live invariant under environment extension *)
 
   Lemma live_invariant_extend_l L rho1 rho2 x v1 :
     ~ x \in domain L ->
@@ -283,6 +285,7 @@ Module DeadParamCorrect (H : Heap).
       normalize_sets...
   Qed.
 
+
   Lemma Live_params_subset xs1 bs xs2 S :
     Live_params xs1 bs xs2 S ->
     FromList xs2 \subset FromList xs1. 
@@ -294,6 +297,7 @@ Module DeadParamCorrect (H : Heap).
       eapply Included_Union_compat. reflexivity. eassumption. 
   Qed. 
 
+ (* relates free variables of source and target *)
   Lemma live_body_occurs_free S L e1 e2 : 
     Live_body L S e1 e2 ->
     occurs_free e2 \subset occurs_free e1 \\ S.
@@ -409,7 +413,7 @@ Module DeadParamCorrect (H : Heap).
     split; eauto.
   Qed.
 
-  Lemma live_invariant_reach2_setminus S L rho1 rho2 : (* Zoe TODO *)
+  Lemma live_invariant_reach2_setminus S L rho1 rho2 : 
     live_invariant L rho1 rho2 -> 
     env_locs rho2 (S \\ eliminated_funs L) <--> env_locs rho2 S. 
   Proof with (now eauto with Ensembles_DB).
@@ -438,7 +442,7 @@ Module DeadParamCorrect (H : Heap).
       forall x xs bs y ys,
         Forall2_assym P xs ys bs ->
         P x y -> 
-        Forall2_assym P (x :: xs) (y :: ys) (true :: bs).
+        Forall2_assym P (x :: xs) (y :: ys) (true :: bs). 
   
 
   Lemma env_rel_add_args_live Pre Post k H1 rho1 H2 rho2 b xs1 xs2 bs S vs1 :
@@ -639,26 +643,26 @@ Module DeadParamCorrect (H : Heap).
     destruct ys; tci.
   Qed.
   
-  (** Lemma about defining a block of dropped functions in the environment (correctness of Drop_fundefs relation) *)
+  (** Lemma about defining a block of eliminated functions in the environment (correctness of Live_fundefs relation) *)
   
   (*  This lemma will be used for the toplevel correctness theorem, when we first define the toplevel functions and
       also when we redefine them in the environment in the known function application case.
-      we assume that the theorem for Drop_body fold for smaller step-indices
+      we assume that the theorem for Live_body fold for smaller step-indices
       (These two proofs are by mutual induction, since the two definitions are mutually recursive ). 
    *)
                                         
-  (* This only talks about the functions that are related by Drop_funs but are  not in dropped_funs drop, i.e. they
-     do not have any parameters dropped. For these we have two show that they are related by the environment relation.
-     To cover for the case of functions that have parameters dropped we have to show that def_funs of Drop_fundefs
-     satisfy the drop_invariant (ignore for now I'm planning to change this in the next couple of days.) 
-   *)
+  (* This only talks about the functions that are related by Live_funs but are  not in eliminated_funs drop, i.e. they
+     do not have any parameters eliminated. For these we have two show that they are related by the environment relation.
+     To cover for the case of functions that have parameters dropped we have to show that def_funs of Live_fundefs
+     satisfy the live_invariant 
+  *)
 
 
   Lemma Live_params_all_true xs1 bs xs2 S :
     Live_params xs1 bs xs2 S -> 
     Forall (fun x => x = true) bs ->
     xs1 = xs2 /\ S <--> Empty_set _.
-  Proof. (* TODO Katja *) 
+  Proof. 
     intros Hd Hall. induction Hd.
     - split; eauto. reflexivity.
     - inv Hall. congruence.
@@ -1300,9 +1304,6 @@ Module DeadParamCorrect (H : Heap).
         Grab Existential Variables. exact id. (* remove *)
   Qed.
 
-  
-<<<<<<< HEAD
-End DeadParamCorrect.
-=======
-End DeadParamCorrect.
->>>>>>> 4b64f89aad9e6810a76c672bc4ccf8e76784737a
+ 
+End DeadParamCorrect. 
+

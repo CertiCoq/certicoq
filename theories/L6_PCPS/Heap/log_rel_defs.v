@@ -77,7 +77,7 @@ Module LogRelDefs (H : Heap).
         IIL (H1', rho1', e1) (H2', rho2', e2) ->
         c1 <= k ->
         eval_src H1' rho1' e1 r1 c1 m1 ->
-        not_stuck H1' rho1' e1 ->
+        not_stuck_cc H1' rho1' e1 ->
         exists (r2 : ans) (c2 m2 : nat) (b : Inj),
           eval_trg H2' rho2' e2 r2 c2 m2 /\
           (* extra invariants for costs *)

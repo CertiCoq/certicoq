@@ -1301,4 +1301,8 @@ Module DeadParamCorrect (H : Heap).
   Qed.
 
   
+<<<<<<< HEAD
 End DeadParamCorrect.
+=======
+End DeadParamCorrect.
+>>>>>>> 4b64f89aad9e6810a76c672bc4ccf8e76784737a

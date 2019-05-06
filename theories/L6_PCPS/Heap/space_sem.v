@@ -232,7 +232,7 @@ Module SpaceSem (H : Heap).
       but they might get stuck later *)
   Definition not_stuck (H : heap block) (rho : env) (e : exp) :=
     forall c, exists r m, big_step H rho e r c m. 
-  
+
   (* Diverging programs *)
 
   (* Least upper bound for sets of natural numbers *)
@@ -332,7 +332,10 @@ Module SpaceSem (H : Heap).
         (Hget : M.get x rho = Some l)
         (Hsize : size_heap H = m),
         big_step_GC_cc H rho (Ehalt x) (Res (l, H)) c m.
-  
+
+  Definition not_stuck_cc (H : heap block) (rho : env) (e : exp) :=
+    forall c, exists r m, big_step_GC_cc H rho e r c m. 
+
   Definition div_trg (H : heap block) (rho : env) (e : exp) (m : natinf) :=
     (forall i, exists m', big_step_GC_cc H rho e OOT i m' /\ ni_le (ni m') m).
   

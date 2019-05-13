@@ -300,15 +300,6 @@ Module ClosureConversionCorrect (H : Heap).
 
   Opaque Pre.
 
-
-  Lemma Setminus_Intersection_distr {A} (S1 S2 S3 : Ensemble A) :
-    (S1 :&: S2) \\ S3 <--> (S1 \\ S3) :&: (S2 \\ S3).
-  Proof.
-    split; intros x H1.
-    inv H1. inv H. constructor; constructor; eauto. 
-    inv H1. inv H; inv H0. constructor; eauto. 
-  Qed.     
-
   Lemma has_true_mut_fun_in_fundefs B f xs ft e :
     has_true_mut_funs B ->
     fun_in_fundefs B (f, ft, xs, e) ->

@@ -417,6 +417,15 @@ Proof.
   split; apply Included_Setminus_compat; eauto.
 Qed.
 
+Lemma Setminus_Intersection_distr {A} (S1 S2 S3 : Ensemble A) :
+  (S1 :&: S2) \\ S3 <--> (S1 \\ S3) :&: (S2 \\ S3).
+Proof.
+  split; intros x H1.
+  inv H1. inv H. constructor; constructor; eauto. 
+  inv H1. inv H; inv H0. constructor; eauto. 
+Qed.     
+
+
 Hint Resolve Included_Union_compat Same_set_Union_compat
      Included_Setminus_compat Same_set_Setminus_compat : Ensembles_DB.
 

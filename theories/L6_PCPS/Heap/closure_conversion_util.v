@@ -696,7 +696,8 @@ Module CCUtil (H : Heap).
 
   Lemma project_var_occurs_free_eq Scope Scope' Funs Funs' fenv c Γ FVs x C e:
     project_var clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
-    occurs_free (C |[ e ]|) \subset x |: occurs_free e :|: image fenv (Funs \\ Scope) :|: [set Γ]. 
+    occurs_free (C |[ e ]|) \subset x |: occurs_free e :|: image fenv (Funs \\ Scope) :|:
+                                    (match FVs with [] => Empty_set _ | _ =>  [set Γ] end). 
   Proof with now eauto with Ensembles_DB functions_BD. 
     intros Hvar. inv Hvar.
     - simpl. now eauto with Ensembles_DB.
@@ -707,12 +708,13 @@ Module CCUtil (H : Heap).
       eapply Singleton_Included. left. right. eexists; split; eauto.
       now constructor; eauto.
       now eauto with Ensembles_DB. 
-    - simpl. normalize_occurs_free...
+    - simpl. destruct FVs. simpl in H1. congruence. normalize_occurs_free...
   Qed.
 
   Lemma project_vars_occurs_free_eq Scope Scope' Funs Funs' fenv c Γ FVs xs C e:
     project_vars clo_tag Scope Funs fenv c Γ FVs xs C Scope' Funs' ->
-    occurs_free (C |[ e ]|) \subset FromList xs :|: occurs_free e :|: image fenv (Funs \\ Scope) :|: [set Γ].
+    occurs_free (C |[ e ]|) \subset FromList xs :|: occurs_free e :|: image fenv (Funs \\ Scope) :|:
+                                    (match FVs with [] => Empty_set _ | _ =>  [set Γ] end).
   Proof with (now eauto with Ensembles_DB).
     intros Hvars; induction Hvars. simpl...
     simpl. rewrite <- app_ctx_f_fuse.
@@ -733,7 +735,8 @@ Module CCUtil (H : Heap).
 
   Lemma Closure_conversion_fv_sub e Scope Funs fenv c Γ FVs e' C 
         (Hcc : Closure_conversion clo_tag Scope Funs fenv c Γ FVs e e' C) :
-    occurs_free (C |[ e' ]|) \subset (occurs_free e) :|: image fenv (Funs \\ Scope) :|: [set Γ]. 
+    occurs_free (C |[ e' ]|) \subset (occurs_free e) :|: image fenv (Funs \\ Scope) :|:
+                (match FVs with [] => Empty_set _ | _ =>  [set Γ] end). 
   Proof with (now eauto with Ensembles_DB).
     revert Scope Funs fenv c Γ FVs e' C Hcc; induction e using exp_ind';
     intros Scope Funs fenv c' Γ FVs e' C Hcc; inv Hcc.
@@ -890,7 +893,7 @@ Module CCUtil (H : Heap).
     assert (Hsub1 : occurs_free (C |[ e' ]|) \subset
                                 occurs_free e :|: [set Γ]).
     { eapply Included_trans. eassumption.
-      eapply Union_Included; [| now eauto with Ensembles_DB ]. 
+      eapply Union_Included; [| destruct FVs; now eauto with Ensembles_DB ]. 
       eapply Union_Included; [ now eauto with Ensembles_DB | ]. 
       eapply Included_trans. eapply image_monotonic. eapply Setminus_Included.
       eapply Included_trans. eapply extend_fundefs'_image. 
@@ -912,13 +915,13 @@ Module CCUtil (H : Heap).
     rewrite !(Intersection_commut _ (occurs_free e)). reflexivity.
     
     rewrite Intersection_commut. eapply Included_Intersection_compat...
-  Qed.
-
- Lemma Closure_conversion_closed_fundefs_mut :
-   (forall e Scope Funs fenv c Γ FVs e' C 
-      (Hcc : Closure_conversion clo_tag Scope Funs fenv c Γ FVs e e' C),
-      closed_fundefs_in_exp (C |[ e' ]|)) /\
-   (forall B Funs c FVs B'
+  Qed.    
+    
+  Lemma Closure_conversion_closed_fundefs_mut :
+    (forall e Scope Funs fenv c Γ FVs e' C 
+       (Hcc : Closure_conversion clo_tag Scope Funs fenv c Γ FVs e e' C),
+        closed_fundefs_in_exp (C |[ e' ]|)) /\
+    (forall B Funs c FVs B'
        (Hcc: Closure_conversion_fundefs clo_tag Funs c FVs B B'),
        closed_fundefs_in_fundefs B').
   Proof.
@@ -1185,8 +1188,31 @@ Module CCUtil (H : Heap).
     rewrite Intersection_commut. rewrite !Intersection_Union_distr.
     rewrite !(Intersection_commut (occurs_free e)). reflexivity.
   Qed.
-    
 
+  Lemma Closure_conversion_toplevel_closed c Γ e1 e2 C : 
+    Closure_conversion clo_tag (Empty_set _) (Empty_set _) id c Γ [] e1 e2 C ->
+    closed_exp e1. 
+  Proof with (now eauto with Ensembles_DB).
+    intros Hclo. assert (Hclo' := Hclo). unfold closed_exp. 
+    eapply Closure_conversion_fv_sub in Hclo'.
+    eapply Included_Empty_set_r. eapply Included_trans.
+    eapply Closure_conversion_pre_occurs_free_Included. eassumption. 
+    unfold FV. normalize_sets...
+  Qed. 
+    
+  Lemma Closure_conversion_toplevel_closed_cc c Γ e1 e2 C : 
+    Closure_conversion clo_tag (Empty_set _) (Empty_set _) id c Γ [] e1 e2 C ->
+    closed_exp (C |[ e2 ]|). 
+  Proof with (now eauto with Ensembles_DB).
+    intros Hclo. assert (Hclo' := Hclo). unfold closed_exp. 
+    eapply Closure_conversion_fv_sub in Hclo'.
+    eapply Included_Empty_set_r. eapply Included_trans.
+    eassumption. 
+    rewrite image_id. rewrite Setminus_Empty_set_neut_r, !Union_Empty_set_neut_r. 
+    eapply Included_trans.
+    eapply Closure_conversion_pre_occurs_free_Included. eassumption. 
+    unfold FV. normalize_sets...
+  Qed. 
     
   Lemma Closure_conversion_fundefs_numOf_fundefs Funs (c : cTag) 
         (FVs : list var) (B1 B2 : fundefs) :

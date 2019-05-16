@@ -18,8 +18,7 @@
 Require Import Coqlib.
 Require Import Zwf.
 Require Coq.Program.Wf.
-Require Recdef.
-Require Import FunInd.
+Require Import Recdef.
 
 Definition interv : Type := (Z * Z)%type.
 

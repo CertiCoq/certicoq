@@ -1235,7 +1235,7 @@ Qed.
 Lemma Same_set_FromList_length {A} (l1 l2 : list A) :
   NoDup l1 ->
   FromList l1 \subset FromList l2 ->
-  length l1 <= length l2.
+  List.length l1 <= List.length l2.
 Proof.
   eapply NoDup_incl_length.
 Qed.

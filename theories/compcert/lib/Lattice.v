@@ -6,7 +6,6 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  Automatique.  All rights reserved.  This file is distributed       *)
 (*  under the terms of the GNU General Public License as published by  *)
 (*  the Free Software Foundation, either version 2 of the License, or  *)
 (*  (at your option) any later version.  This file is also distributed *)
@@ -56,7 +55,7 @@ End SEMILATTICE.
 
 Module Type SEMILATTICE_WITH_TOP.
 
-  Include Type SEMILATTICE.
+  Include SEMILATTICE.
   Parameter top: t.
   Axiom ge_top: forall x, ge top x.
 
@@ -662,9 +661,9 @@ Inductive t' : Type :=
 Definition t : Type := t'.
 
 Definition eq (x y: t) := (x = y).
-Definition eq_refl: forall x, eq x x := (@refl_equal t).
-Definition eq_sym: forall x y, eq x y -> eq y x := (@sym_equal t).
-Definition eq_trans: forall x y z, eq x y -> eq y z -> eq x z := (@trans_equal t).
+Definition eq_refl: forall x, eq x x := (@eq_refl t).
+Definition eq_sym: forall x y, eq x y -> eq y x := (@eq_sym t).
+Definition eq_trans: forall x y z, eq x y -> eq y z -> eq x z := (@eq_trans t).
 
 Definition beq (x y: t) : bool :=
   match x, y with
@@ -746,9 +745,9 @@ Module LBoolean <: SEMILATTICE_WITH_TOP.
 Definition t := bool.
 
 Definition eq (x y: t) := (x = y).
-Definition eq_refl: forall x, eq x x := (@refl_equal t).
-Definition eq_sym: forall x y, eq x y -> eq y x := (@sym_equal t).
-Definition eq_trans: forall x y z, eq x y -> eq y z -> eq x z := (@trans_equal t).
+Definition eq_refl: forall x, eq x x := (@eq_refl t).
+Definition eq_sym: forall x y, eq x y -> eq y x := (@eq_sym t).
+Definition eq_trans: forall x y z, eq x y -> eq y z -> eq x z := (@eq_trans t).
 
 Definition beq : t -> t -> bool := eqb.
 

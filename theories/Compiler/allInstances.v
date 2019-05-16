@@ -4,7 +4,7 @@ Require Export L1g.instances.
 Require Export L2k.instances.
 Require Export L4.instances.
 Require Export L6.instances.
-Require Export L7.Clightexec.
+(* Require Export L7.Clightexec. *)
 
 
 Open Scope Z_scope.
@@ -14,7 +14,7 @@ Require Import ZArith.
 Require Import Common.Common.
 Require Import String.
 Open Scope string_scope.
-
+Require Import  maps_util.
 
 Ltac computeExtract certiL4 f:=
 (let t:= eval compute in (translateTo (cTerm certiL4) f) in 
@@ -25,8 +25,13 @@ Ltac computeExtract certiL4 f:=
 
 
 Quote Recursively Definition One := 1%positive.
-(*
-Definition One6 : cTerm certiL6.
+
+
+Quote Recursively Definition Demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
+
+
+(* 
+Definition One6 : cTerm certiL6.                                                        
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in 
 match t with
 |Ret ?xx => exact xx
@@ -42,7 +47,7 @@ Definition ext_comp `{F:utils.Fuel} := fun prog =>
   end.
  
 Require Import L6_to_Clight.
-Require Import Clightexec.
+(* Require Import Clightexec.*)
 Require Import compcert.lib.Maps.
 Definition argsIdent:positive := 26.
 Definition allocIdent:positive := 28.
@@ -124,19 +129,55 @@ Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
  Quote Recursively Definition binom := Binom.main.    
 (* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
-Quote Recursively Definition graph_color := 2.  (*(Color.run G16)*)   
+Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)   
 
 
 
 
   
+ Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color). 
 
-
-
+ Print demo4.
+ Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) Demo1).
+ Set Printing Depth 1000.
+ Print demo5.
+ Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) binom). 
  Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) binom). 
-(*Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).    *)
-(* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
 
+Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).
+ 
+Print color5.
+
+
+
+Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) binom). 
+Definition eval_c2 := match binom2 with
+                      | Ret (mkPgm p env) =>
+                        Ret (L2k.wcbvEval.wcbvEval env 1000%nat p)
+                        | Exc s => Exc "foo"
+                      end.
+
+Definition eval_c2' := Eval native_compute in eval_c2.
+Print eval_c2'. 
+
+
+Definition binom3 := Eval native_compute in (translateTo (cTerm certiL3_eta) binom). 
+
+
+Require Export L4.expression.
+Print binom4. 
+Definition eval_c4 := match binom5 with
+                      | Ret p =>
+                        Ret (L5_evaln 20%nat p)
+                        | Exc s => Exc "foo"
+                      end.
+
+  Definition eval_c4' := Eval vm_compute in eval_c4.
+ Print eval_c4'. 
+
+
+(* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
+Print color5. 
 
  
 
@@ -171,7 +212,7 @@ Definition print_BigStepResult_L6 p  n:=
   L7.L6_to_Clight.print (
       match (L6_evaln n p) with
       | Error s _ => s
-      | OutOfTime (_, (rho', e')) => "Out of time:"++ (show_env nenv cenv false rho')++ (show_exp nenv cenv false e')
+      | OutOfTime (_, (rho', e')) => "Out of time:"++ (show_cenv cenv)++(show_env nenv cenv false rho')++ (show_exp nenv cenv false e')
       | Result v => show_val nenv cenv false v
       end).
 
@@ -184,7 +225,7 @@ Definition print_BigStepResult_L6 p  n:=
 Definition comp_to_L6:= fun p =>
                        comp_L6 (translateTo (cTerm certiL5) p).
 
-Definition testL6 := match comp_L6 binom5 with
+Definition testL6 := match comp_L6 demo5 with
                    | Ret ((pr,cenv,nenv), (env, t)) => print_BigStepResult_L6 ((pr,cenv,nenv), (env, t)) 30%nat 
                    | _ =>   L7.L6_to_Clight.print ("Failed during comp_L6")
                      end.
@@ -200,10 +241,13 @@ Extract Constant L6_to_Clight.print => "(fun s-> print_string (String.concat """
 
 
  Extract Constant   varImplDummyPair.varClassNVar => " (fun f (p:int*bool) -> varClass0 (f (fst p)))".
-Extraction "test_color_eg2.ml" testL6.  
+Extraction "test_demo1.ml" testL6.  
+Definition demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
+From CertiCoq Require Import CertiCoq.
+Definition foo := 2+ 3.
+
+CertiCoq Compile demo1.
 *)
-
-
 
 
 

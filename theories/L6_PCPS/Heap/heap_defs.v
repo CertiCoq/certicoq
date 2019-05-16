@@ -117,7 +117,7 @@ Module HeapDefs (H : Heap) .
   Definition size_val (v : block) : nat :=
     match v with
       | Constr t ls => (* The size of the constructor representation *)
-        1 + length ls
+        1 + List.length ls
       | Clos _ _ => 1
       | Env _ => 1
         (* Do not count the cost of closure environments in the source *)
@@ -784,7 +784,7 @@ Module HeapDefs (H : Heap) .
   Qed.
 
   Lemma path_length H ls ld n :
-    path H ls ld n -> length ls = n.
+    path H ls ld n -> List.length ls = n.
   Proof.
     intros Hp; induction Hp; eauto.
     simpl. congruence.
@@ -823,7 +823,7 @@ Module HeapDefs (H : Heap) .
 
   Lemma path_prev H l1 l2 l l' m:
     path H (l1 ++ l :: l2) l' m ->
-    path H l2 l (length l2) /\ ~ List.In l l2.
+    path H l2 l (List.length l2) /\ ~ List.In l l2.
   Proof.
     revert l' m; induction l1; simpl; intros l' m Hpath; inv Hpath.
     - erewrite <- path_length in H2; eauto.
@@ -854,7 +854,7 @@ Module HeapDefs (H : Heap) .
           subst. rewrite Happ in Hpath.
           erewrite <- path_length with (n := m) in Hleq, Hpath; eauto.
           eapply path_prev in Hpath; destruct Hpath as [Hpath Hnin].
-          exists r, (l' :: lr'), (length (l' :: lr' ++ [r])).
+          exists r, (l' :: lr'), (List.length (l' :: lr' ++ [r])).
           repeat split; eauto. 
           simpl. rewrite !app_length.
           repeat (simpl in Hleq; rewrite !app_length in Hleq).

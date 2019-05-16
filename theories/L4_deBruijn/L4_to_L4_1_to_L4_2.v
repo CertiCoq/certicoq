@@ -116,7 +116,7 @@ Proof using Type.
 Qed.
 
 
-Require Import L6.cps.
+(* Require Import L6.cps. *)
 
 
 

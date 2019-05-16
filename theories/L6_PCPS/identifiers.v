@@ -1511,11 +1511,11 @@ Lemma occurs_free_cardinality_mut :
   (forall e FVs,
      FromList FVs \subset occurs_free e ->
      NoDup FVs ->
-     length FVs <= sizeOf_exp e) /\
+     List.length FVs <= sizeOf_exp e) /\
   (forall B FVs,
      FromList FVs \subset occurs_free_fundefs B ->
      NoDup FVs ->
-     length FVs <= sizeOf_fundefs B).
+     List.length FVs <= sizeOf_fundefs B).
 Proof.
   exp_defs_induction IHe IHl IHb; intros FVs Heq Hnd;
   try repeat normalize_occurs_free_in_ctx; simpl.
@@ -1612,7 +1612,7 @@ Corollary occurs_free_cardinality :
   (forall e FVs,
      FromList FVs \subset occurs_free e ->
      NoDup FVs ->
-     length FVs <= sizeOf_exp e).
+     List.length FVs <= sizeOf_exp e).
 Proof.
   eapply occurs_free_cardinality_mut.
 Qed.
@@ -1621,7 +1621,7 @@ Corollary occurs_free_fundefs_cardinality :
   (forall B FVs,
      FromList FVs \subset occurs_free_fundefs B ->
      NoDup FVs ->
-     length FVs <= sizeOf_fundefs B).
+     List.length FVs <= sizeOf_fundefs B).
 Proof.
   eapply occurs_free_cardinality_mut.
 Qed.

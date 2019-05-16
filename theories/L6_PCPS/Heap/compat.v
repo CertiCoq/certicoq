@@ -435,7 +435,7 @@ Module Compat (H : Heap).
               intros Hc. eapply Hnin2. now eauto.
               intros Hc. eapply Hnin1. now eauto.
               now eauto. eassumption. reflexivity. simpl.
-              replace (c2 + 1 + 1 + S (S (length xs2)) - 1 - 1 - S (S (length xs2)))  with c2.
+              replace (c2 + 1 + 1 + S (S (List.length xs2)) - 1 - 1 - S (S (List.length xs2)))  with c2.
               eassumption. omega.
             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
               split. eapply Hiinv; try eassumption.
@@ -507,7 +507,7 @@ Module Compat (H : Heap).
           destruct (alloc (Constr t vs2) H2') as [l2 H''] eqn:Hal2'.
           destruct (alloc (Constr t vs2') H2) as [l2' H2''] eqn:Hal2.
           assert (Halli := Hall). specialize (Hall j). eapply Forall2_length in Hall.
-          assert (Hlen : @length M.elt ys1 = @length M.elt ys2).
+          assert (Hlen : @List.length M.elt ys1 = @List.length M.elt ys2).
           { erewrite (@getlist_length_eq value ys1 vs); [| eassumption ].
             erewrite (@getlist_length_eq value ys2 vs2); [| eassumption ].
             eapply Forall2_length. eassumption. }

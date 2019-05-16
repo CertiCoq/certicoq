@@ -2,8 +2,8 @@
 (*                                                                     *)
 (*              The Compcert verified compiler                         *)
 (*                                                                     *)
-(*          Xavier Leroy, INRIA Paris-Rocquencourt                     *)
-(*          Jacques-Henri Jourdan, INRIA Paris-Rocquencourt            *)
+(*                Xavier Leroy, INRIA Paris                            *)
+(*                Jacques-Henri Jourdan, INRIA Paris                   *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
@@ -14,32 +14,44 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(** Architecture-dependent parameters for IA32 *)
+(** Architecture-dependent parameters for x86 in 32-bit mode *)
 
 Require Import ZArith.
-Require Import Fappli_IEEE.
-Require Import Fappli_IEEE_bits.
+(*From Flocq*)
+Require Import Binary Bits.
+
+Definition ptr64 := false.
 
 Definition big_endian := false.
 
-Notation align_int64 := 4%Z (only parsing).
-Notation align_float64 := 4%Z (only parsing).
+Definition align_int64 := 4%Z.
+Definition align_float64 := 4%Z.
 
-Program Definition default_pl_64 : bool * nan_pl 53 :=
-  (true, iter_nat 51 _ xO xH).
+Definition splitlong := negb ptr64.
 
-Definition choose_binop_pl_64 (s1: bool) (pl1: nan_pl 53) (s2: bool) (pl2: nan_pl 53) :=
+Lemma splitlong_ptr32: splitlong = true -> ptr64 = false.
+Proof.
+  unfold splitlong. destruct ptr64; simpl; congruence.
+Qed.
+
+Definition default_nan_64 : { x : binary64 | is_nan _ _ x = true } :=
+  exist _ (B754_nan 53 1024 true (iter_nat 51 _ xO xH) (eq_refl true)) (eq_refl true).
+
+Definition choose_binop_pl_64 (pl1 pl2 : positive) :=
   false.                        (**r always choose first NaN *)
 
-Program Definition default_pl_32 : bool * nan_pl 24 :=
-  (true, iter_nat 22 _ xO xH).
+Definition default_nan_32 : { x : binary32 | is_nan _ _ x = true } :=
+  exist _ (B754_nan 24 128 true (iter_nat 22 _ xO xH) (eq_refl true)) (eq_refl true).
 
-Definition choose_binop_pl_32 (s1: bool) (pl1: nan_pl 24) (s2: bool) (pl2: nan_pl 24) :=
+Definition choose_binop_pl_32 (pl1 pl2 : positive) :=
   false.                        (**r always choose first NaN *)
+
+Definition fpu_returns_default_qNaN := false.
 
 Definition float_of_single_preserves_sNaN := false.
 
-Global Opaque big_endian
-              default_pl_64 choose_binop_pl_64
-              default_pl_32 choose_binop_pl_32
+Global Opaque ptr64 big_endian splitlong
+              default_nan_64 choose_binop_pl_64
+              default_nan_32 choose_binop_pl_32
+              fpu_returns_default_qNaN
               float_of_single_preserves_sNaN.

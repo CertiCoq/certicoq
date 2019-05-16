@@ -28,7 +28,7 @@ Require Import Events.
 Require Import Globalenvs.
 Require Import Ctypes.
 Require Import Cop.
-Require compcert.cfrontend.Cexec.  
+(* Require compcert.cfrontend.Cexec.   *)
 Require Import Clight.
 Require Import compcert.lib.Maps.
 
@@ -91,7 +91,7 @@ Definition force_val (v: option val) : val :=
 
 Definition offset_val (ofs: Z) (v: val) : res val :=
   match v with
-  | Vptr b z => OK (Vptr b (Int.add z (Int.repr ofs)))
+  | Vptr b z => OK (Vptr b (Ptrofs.add z (Ptrofs.repr ofs)))
   | _ => Error [MSG "Expected a pointer"]
  end.
 
@@ -130,14 +130,14 @@ Definition geterr {A} id (rho: PTree.tree A) : res A :=
  | None => Error [MSG "Variable "; CTX id; MSG " not in scope"]
  end.
 
-Definition eval_field  (ty: type) (fld: ident) (v: val) : res (block*int) :=
+Definition eval_field  (ty: type) (fld: ident) (v: val) : res (block*ptrofs) :=
   match v with
   | Vptr l ofs => 
     ( match ty with
              | Tstruct id att =>
                 do co <- compos id;
                 do delta <- field_offset ge.(genv_cenv) fld (co_members co);
-                OK (l, (Int.add ofs (Int.repr delta)))
+                OK (l, (Ptrofs.add ofs (Ptrofs.repr delta)))
              | Tunion id att =>
                 do co <- compos id;
                   OK (l, ofs)
@@ -146,20 +146,20 @@ Definition eval_field  (ty: type) (fld: ident) (v: val) : res (block*int) :=
   | _ => Error [MSG "Unexpected field access on a non-pointer"]
   end.
 
-Definition eval_var (id:ident) (ty: type) : res (block * int) :=
+Definition eval_var (id:ident) (ty: type) : res (block * ptrofs) :=
             match PTree.get  id ve with
             | Some (b,ty') =>
                    check (type_eq ty ty') , [MSG "Type-check failure in eval_var"];
-                   OK (b, Int.zero)
+                   OK (b, Ptrofs.zero)
             | None =>
                    match Genv.find_symbol ge id  with
-                   | Some b => OK (b, Int.zero)
+                   | Some b => OK (b, Ptrofs.zero)
                    | None => Error [MSG "Variable "; CTX id; MSG " not in scope"]
                    end
              end.
 
 (* Return the val at loc (b,ofs) in memory *)
-Fixpoint deref_loc (ty:type) (b:block) (ofs:int): res val :=
+Fixpoint deref_loc (ty:type) (b:block) (ofs:ptrofs): res val :=
   match access_mode ty with
   | By_value chunk =>
     match Mem.loadv chunk m (Vptr b ofs) with
@@ -213,7 +213,7 @@ Fixpoint eval_expr (a0: expr) : res val :=
    do (l, ofs) <- eval_field (typeof a) i v;
    deref_loc (typeof a0) l ofs
  end
- with eval_lvalue (a0: expr) : res (block*int) :=
+ with eval_lvalue (a0: expr) : res (block*ptrofs) :=
  match a0 with
  | Evar id ty => eval_var id ty
  | Ederef a ty =>
@@ -242,7 +242,7 @@ Definition do_ef_malloc
   | Vint n :: nil =>
       let (m', b) := Mem.alloc m (-4) (Int.unsigned n) in
       do m'' <- force_opt (Mem.store Mint32 m' b (-4) (Vint n)) [MSG "malloc store failed"];
-      OK (Vptr b Int.zero, m'')
+      OK (Vptr b Ptrofs.zero, m'')
   | _ => Error [MSG "malloc bad args"]
   end.
 
@@ -264,7 +264,7 @@ First argument is a pointer to the number of blocks to allocate (unsigned int32)
 second arg is pointer to tinfo
 
 Mem_alloc n blocks , updates alloc and limit in tinfo, returns void *)
-
+SearchAbout (ptrofs -> Z).
 
 Definition do_ef_gcmalloc
        (vargs: list val) (m: mem) : res (val * mem) :=
@@ -276,9 +276,9 @@ Definition do_ef_gcmalloc
         let balloc := bsrc in
         let blimit := bsrc in
         let oalloc := osrc in
-        let olimit := Int.repr ((Int.unsigned osrc) + size_chunk Mint32) in
-             do m'' <- force_opt (Mem.store Mint32 m' balloc (Int.unsigned oalloc) (Vptr b (Int.repr 0))) [MSG "malloc store failed"];
-               do m''' <- force_opt (Mem.store Mint32 m'' blimit (Int.unsigned olimit) (Vptr b (Int.repr ((Int.unsigned n)* 4)))) [MSG "malloc store failed"];
+        let olimit := Ptrofs.unsigned osrc + size_chunk Mint32 in
+             do m'' <- force_opt (Mem.store Mint32 m' balloc (Ptrofs.unsigned oalloc) (Vptr b (Ptrofs.repr 0))) [MSG "malloc store failed"];
+               do m''' <- force_opt (Mem.store Mint32 m'' blimit olimit (Vptr b (Ptrofs.repr ((Int.unsigned n)* 4)))) [MSG "malloc store failed"];
                OK (Vundef, m''')
 (*           | _ , _ => Error [MSG "gcmalloc: alloc or limit ptr corrupted"]
            end) *)
@@ -292,11 +292,11 @@ Definition do_ef_free
        (vargs: list val) (m: mem) : res (val * mem) :=
   match vargs with
   | Vptr b lo :: nil =>
-      do vsz <- force_opt (Mem.load Mint32 m b (Int.unsigned lo - 4)) [MSG "free: load failed"];
+      do vsz <- force_opt (Mem.load Mint32 m b (Ptrofs.unsigned lo - 4)) [MSG "free: load failed"];
       match vsz with
       | Vint sz =>
           check (zlt 0 (Int.unsigned sz)), [MSG "free: header corrupted"];
-          do m' <- force_opt (Mem.free m b (Int.unsigned lo - 4) (Int.unsigned lo + Int.unsigned sz)) [MSG "free failed"];
+          do m' <- force_opt (Mem.free m b (Ptrofs.unsigned lo - 4) (Ptrofs.unsigned lo + Int.unsigned sz)) [MSG "free failed"];
           OK (Vundef, m')
       | _ => Error [MSG "free: header corrupted"]
       end

@@ -298,12 +298,34 @@ Notation longTy := (Tlong Signed
 Notation ulongTy := (Tlong Unsigned
                         {| attr_volatile := false; attr_alignas := None |}).
 
-(* CHANGE THIS FOR 32-bit or 64-bit mode *)
+Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
+Definition val := if Archi.ptr64 then ulongTy else uintTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *) 
+Definition uval := if Archi.ptr64 then ulongTy else uintTy.
+Definition sval := if Archi.ptr64 then longTy else intTy.
+Definition val_typ := if Archi.ptr64 then  (AST.Tlong:typ) else (Tany32:typ).
+Definition Init_int x := if Archi.ptr64 then (Init_int64 (Int64.repr x)) else (Init_int32 (Int.repr x)).
+Definition make_vint z := if Archi.ptr64 then Vlong (Int64.repr z) else Values.Vint (Int.repr z).
+Transparent val.
+Transparent uval.
+Transparent val_typ.
+Transparent Init_int.
+Transparent make_vint.                                                                   
+
+
+(* CHANGE THIS FOR 32-bit or 64-bit mode  *)
+
+(*
 Notation val := ulongTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *)
 Notation uval := ulongTy.
 Notation val_typ := (AST.Tlong:typ).
-Notation Init_int x := (Init_int64 (Int64.repr x)).
+Notation Init_int x := (Init_int64 (Int64.repr x)).   
 
+
+Notation val := uintTy.
+Notation uval := uintTy.
+Notation val_typ := (Tany32:typ).
+Notation Init_int x := (Init_int32 (Int.repr x)).  
+*)
 
 Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid
                             {|
@@ -395,7 +417,7 @@ Notation "'*' p " := (Ederef p val) (at level 40).
 
 Notation "'&' p " := (Eaddrof p valPtr) (at level 40).
 
-Definition c_int' n t := Econst_int (Int.repr n%Z) t.
+Definition c_int' n t := if Archi.ptr64 then Econst_long (Int64.repr n) t else Econst_int (Int.repr n%Z) t. 
 
 Notation c_int := c_int'.
 
@@ -425,7 +447,7 @@ Definition reserve (funInf : positive) (l : Z) : statement :=
 Definition reserve' (funInf : positive) (l : Z) : statement :=
   let arr := (Evar funInf (Tarray uval l noattr)) in
   let allocF := Efield tinfd allocIdent valPtr in
-  let limitF := Efield tinfd allocIdent valPtr in
+  let limitF := Efield tinfd limitIdent valPtr in
   Sifthenelse
     (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
     (Scall None gc (arr :: tinf :: nil))
@@ -451,7 +473,9 @@ Definition makeVar (x:positive) (m:M.t positive) :=
   | Some _ => funVar x
   end.   
 
-(* map is here to identify which value represents function  *)
+
+
+(* DEPRECATED: map is here to identify which value represents function  *)
 Fixpoint assignConstructor' (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
   match vs with
   | nil =>
@@ -473,8 +497,39 @@ Fixpoint assignConstructor' (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : 
             ret (prog ;
                    Field(var x, Z.of_nat (length vs')) :::= (*[val]*) vv)                                 
   end.
-
+(* DEPRECATED *)
 Definition assignConstructor (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv ienv map x t (rev vs).
+
+
+(* OS: assignConstructor' without the rev *)
+Fixpoint assignConstructorS' (map:M.t positive) (x : positive) (cur:nat) (vs : list positive): statement :=
+  match vs with
+  | nil => (* shouldn't be reached *)
+       Sskip
+  | cons v nil =>
+    let vv := makeVar v map in
+    (Field(var x, Z.of_nat cur) :::= (*[val]*) vv)
+  | cons v vs' =>
+    let vv := makeVar v map in  
+    let prog := assignConstructorS' map x (cur+1)  vs'  in
+         (* if v is a function name, funVar, otherwise lvar *)
+             (Field(var x, Z.of_nat cur) :::= (*[val]*) vv; prog)
+  end.
+
+
+Definition assignConstructorS (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
+      tag <- makeTag cenv t;;
+        rep <- make_cRep cenv t ;;
+        match rep with
+        | enum _ =>           
+          ret (x ::= tag)
+        | boxed _ a =>
+          let stm := assignConstructorS' map x 0 vs in 
+          ret (x ::= [val] (allocPtr +' (c_int Z.one val));
+                 allocIdent ::= allocPtr +'
+                                           (c_int (Z.of_N (a + 1)) val) ;
+                 Field(var x, -1) :::= tag; stm)
+        end.
 
 
 (* This is not valid in Clight if x is a Vptr, implementing instead as an external function
@@ -548,17 +603,19 @@ Definition asgnAppVars vs ind :=
 Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_statements):=
       (isPtr caseIdent x;
              Sifthenelse
-               (var caseIdent)
+               (bvar caseIdent)
                (Sswitch (Ebinop Oand (Field(var x, -1)) (Econst_int (Int.repr 255) val) val) ls)
              (
                Sswitch (Ebinop Oshr (var x) (Econst_int (Int.repr 1) val) val)
                       ls')).
 
 
+
+
 Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map : M.t positive) : option statement :=
   match e with
   | Econstr x t vs e' =>
-    prog <- assignConstructor cenv ienv map x t vs ;;
+    prog <- assignConstructorS cenv ienv map x t vs ;;
          prog' <- translate_body e' fenv cenv ienv map ;;
          ret (prog ; prog')
   | Ecase x cs =>
@@ -620,7 +677,7 @@ Definition mkFun (vs : list positive) (body : statement) : function :=
   mkfunction Tvoid
              cc_default
              ((tinfIdent , threadInf) :: nil)
-             ((map (fun x => (x , val)) vs)++(allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, val) ::nil)
+             ((map (fun x => (x , val)) vs)++(allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) ::nil)
              nil
              body.
 
@@ -747,7 +804,7 @@ Definition pos2string p :=
  pos2string' p "".
 
 
-Definition show_pos x := pos2string x. (* nat2string10 (Pos.to_nat x). *) 
+Definition show_pos x :=  pos2string x. (*nat2string10 (Pos.to_nat x). *)
 
 Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t BasicAst.name) : M.t BasicAst.name :=
   match M.get f nenv with
@@ -1146,7 +1203,7 @@ Definition make_eliminator (cenv: cEnv) (nTy:BasicAst.ident) (ctrs: list (BasicA
                   Tvoid
                   cc_default
                   ((valIdent, val)::(ordIdent, valPtr)::(argvIdent, argvTy)::nil)
-                  ((caseIdent, val)::nil)
+                  ((caseIdent, boolTy)::nil)
                   nil
                   elim_body
                ) in
@@ -1259,7 +1316,7 @@ Definition make_halt (nenv:M.t BasicAst.name): nState (M.t BasicAst.name * (iden
                                          ((tinfIdent, threadInf)::nil)
                                          nil
                                          nil
-                                         (Sreturn None)))), (halt_cloIdent, Gvar (mkglobvar  (tarray uval 2) ((Init_addrof haltIdent Int.zero) ::
+                                         (Sreturn None)))), (halt_cloIdent, Gvar (mkglobvar  (tarray uval 2) ((Init_addrof haltIdent Ptrofs.zero) ::
                 Init_int 1 :: nil) true false))).
 
 

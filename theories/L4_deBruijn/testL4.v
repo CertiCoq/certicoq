@@ -86,6 +86,9 @@ Print ans_plus01.
 (* [program] of the program *)
 Quote Recursively Definition p_plus01 := plus01.
 Print p_plus01.
+Require Import L3_to_L3_eta.
+Eval compute in program_L3_eta p_plus01.
+
 Definition P_plus01 := Eval cbv in (program_exp p_plus01).
 Print P_plus01.
 Goal
@@ -432,6 +435,20 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
+(****** Binomial ******)
+Require Import Benchmarks.Binom.
+
+Quote Recursively Definition binom := Binom.main.
+Definition binom_exp := Eval native_compute in (program_exp binom).
+
+Definition eval_c5 := eval_n 2000%nat binom_exp.
+Definition value_binom := Eval native_compute in Binom.main.
+Quote Recursively Definition reified_value_binom := value_binom.
+Definition ans_binom5 := Eval cbv in (eval_n 1000%nat (program_exp reified_value_binom)).
+Goal eval_n 1000%nat binom_exp = ans_binom5.
+Proof.
+  vm_compute. reflexivity.
+Qed.
 
 (****** veriStar benchmark **************)
 Require Import Benchmarks.vs.
@@ -440,14 +457,14 @@ Definition valid : option exp :=
   Eval vm_compute in (eval_n 100 (program_exp p_Valid)).
 Print valid.
 
-Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent.
-Time Definition P_ce_example_myent :=
-  Eval vm_compute in (program_exp p_ce_example_myent).
-Time Definition eval_ce_example_myent :=
-  Eval vm_compute in (eval_n 1000 P_ce_example_myent).
-Goal eval_ce_example_myent = valid.
-  vm_compute. reflexivity. 
-Qed.
+(* Time Quote Recursively Definition p_ce_example_myent := vs.ce_example_myent. *)
+(* Time Definition P_ce_example_myent := *)
+(*   Eval vm_compute in (program_exp p_ce_example_myent). *)
+(* Time Definition eval_ce_example_myent := *)
+(*   Eval native_compute in (eval_n 1000 P_ce_example_myent). *)
+(* Goal eval_ce_example_myent = valid. *)
+(*   vm_compute. reflexivity.  *)
+(* Qed. *)
 
 Time Quote Recursively Definition p_ce_example_ent := vs.ce_example_ent.
 Time Definition P_ce_example_ent :=

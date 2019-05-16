@@ -285,13 +285,11 @@ Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
 
   
 (** given global_declarations (from EAst), return an L1g environment **)
-Definition program_Pgm_aux (g:global_declarations) : environ Term :=
-  let fix pPa_rec (gs:global_declarations) {struct gs} :=
-      match gs with
-      | nil => nil
-      | gd :: p => cons (trans_global_decl g gd) (pPa_rec p)
-      end in
-  pPa_rec g.
+Fixpoint program_Pgm_aux (g:global_declarations) : environ Term :=
+  match g with
+  | nil => nil
+  | gd :: g => cons (trans_global_decl g gd) (program_Pgm_aux g)
+  end.
 
 Require Template.Ast.
 Require Import PCUIC.TemplateToPCUIC.
@@ -307,6 +305,6 @@ Definition program_Program
   match genv'', t' with
   | PCUICChecker.Checked genv''', PCUICChecker.Checked t''' =>
     {| main := term_Term genv''' t''';
-       env := program_Pgm_aux genv''' |}
+       env := program_Pgm_aux (rev genv''') |}
   | _, _ => {| main := TWrong "program_Program"; env := nil |}
   end.

@@ -1167,8 +1167,8 @@ Module ClosureConversionCorrect (H : Heap).
     induction k as [k IHk] using lt_wf_rec1.  
     intros A δ H1 H2 rho1 rho2 e1 e2 C Scope Hs Funs Hf FVs fenv β c Γ
            Henv HFVs Hfun Hdis Hbind Htm Hunb Hfresh Hcc. 
-    assert (Hfv := Closure_conversion_pre_occurs_free_Included _ _ _ _ _ _ _ _ _ Hcc).
-    assert (Hfv' := Closure_conversion_occurs_free_Included _ _ _ _ _ _ _ _ _ Hcc).
+    assert (Hfv := Closure_conversion_pre_occurs_free_Included _ _ _ _ _ _ _ _ _ _ Hcc).
+    assert (Hfv' := Closure_conversion_occurs_free_Included _ _ _ _ _ _ _ _ _ _ Hcc).
  
     (* Well formedness *)
     assert (Hwf1 : closed (reach' H1 (env_locs rho1 (FV Scope Funs FVs))) H1). 
@@ -1195,7 +1195,7 @@ Module ClosureConversionCorrect (H : Heap).
       assert (Hf' : ToMSet Funs').
       eapply project_vars_ToMSet_Funs; [| | now eapply H13]; tci.
       assert (Hs' : ToMSet Scope').
-      eapply (project_vars_ToMSet Scope Scope' Funs); [| now eapply H13]; tci.
+      eapply (project_vars_ToMSet _ Scope Scope' Funs); [| now eapply H13]; tci.
         
       edestruct (binding_in_map_getlist _ rho1 l Hbind) as [vl Hgetl].
       eapply project_vars_In_Union. eassumption.
@@ -1703,7 +1703,7 @@ Module ClosureConversionCorrect (H : Heap).
       assert (Hf' : ToMSet Funs').
       eapply project_vars_ToMSet_Funs; [| | eassumption]; tci.
       assert (Hs' : ToMSet Scope').     
-      { eapply (project_vars_ToMSet Scope Scope' Funs); eassumption. }
+      { eapply (project_vars_ToMSet _ Scope Scope' Funs); eassumption. }
       
       assert (Hfveq : occurs_free (Econstr_c Γ' c' FVs' Hole_c |[ Efun B' (Ce |[ e' ]|) ]|) \subset
                                   FV_cc Scope' Funs' fenv Γ). 
@@ -2091,7 +2091,7 @@ Module ClosureConversionCorrect (H : Heap).
                   eapply Union_Included. 
                   eapply Included_trans; [ eapply name_in_fundefs_bound_var_fundefs |]...
                   eapply Included_trans. eapply FV_Union2.
-                  rewrite <- (project_vars_FV_eq Scope Scope' Funs Funs'); [| eassumption ].
+                  rewrite <- (project_vars_FV_eq ct Scope Scope' Funs Funs'); [| eassumption ].
                   eapply Included_Union_compat.
                   eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs.
                   now eauto with Ensembles_DB.  reflexivity.
@@ -2120,7 +2120,7 @@ Module ClosureConversionCorrect (H : Heap).
                   normalize_bound_var...
                   eapply project_vars_Scope_l. eassumption. 
               + eapply binding_in_map_antimon; [| eapply binding_in_map_def_closures; eassumption ].
-                rewrite (project_vars_FV_eq Scope Scope' Funs Funs'); [| eassumption ].
+                rewrite (project_vars_FV_eq ct Scope Scope' Funs Funs'); [| eassumption ].
                 eapply Included_trans. eapply FV_Setminus1. tci.
                 eapply Union_Included. now eapply Included_Union_preserv_l.
                 eapply Included_trans. eapply FV_Union2. reflexivity. 
@@ -2132,7 +2132,7 @@ Module ClosureConversionCorrect (H : Heap).
                 eapply Included_trans. eapply FV_Union2. reflexivity.
                 eapply Union_Disjoint_r. inv Hunb.
                 eapply Disjoint_Included_r; [| eassumption ]. now eapply name_in_fundefs_bound_var_fundefs. 
-                rewrite <- (project_vars_FV_eq Scope Scope' Funs Funs'); [| eassumption ].
+                rewrite <- (project_vars_FV_eq ct Scope Scope' Funs Funs'); [| eassumption ].
                 eapply Disjoint_Included_l; [ | eapply Hfresh ]. normalize_bound_var...
               + rewrite !plus_assoc.
                 replace (δ + 1 + PS.cardinal (fundefs_fv f) + 3 * numOf_fundefs f) with
@@ -2150,7 +2150,7 @@ Module ClosureConversionCorrect (H : Heap).
       assert (Hf' : ToMSet Funs').
       eapply project_vars_ToMSet_Funs; [| | eassumption]; tci.
       assert (Hs' : ToMSet Scope').     
-      { eapply (project_vars_ToMSet Scope Scope' Funs); eassumption. }
+      { eapply (project_vars_ToMSet _ Scope Scope' Funs); eassumption. }
 
       edestruct (binding_in_map_getlist _ rho1 (v :: l) Hbind) as [vl Hgetl].
       eapply Included_trans; [| eassumption ].

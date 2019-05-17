@@ -809,6 +809,24 @@ Proof.
 Qed.
 
 
+Lemma Union_Same_set_Disjoint {A} (S1 S2 S3 : Ensemble A) :
+  S1 :|: S2 <--> S1 :|: S3 ->
+  Disjoint _ S1 S2 ->
+  Disjoint _ S1 S3 ->
+  S2 <--> S3.
+Proof.
+  intros Heq HD HD'. split; intros x Hin.
+  - assert (Hin' : (S1 :|: S3) x).
+    { eapply Heq. now right. }
+    inv Hin'; eauto.
+    exfalso. eapply HD; eauto.
+  - assert (Hin' : (S1 :|: S2) x).
+    { eapply Heq. now right. }
+    inv Hin'; eauto.
+    exfalso. eapply HD'; eauto.
+Qed.
+
+
 Hint Resolve Disjoint_Setminus_l Disjoint_Setminus_r Union_Disjoint_l
      Union_Disjoint_r Disjoint_Singleton_l Disjoint_Singleton_r
      Setminus_Disjoint_preserv_l Setminus_Disjoint_preserv_r  : Ensembles_DB.

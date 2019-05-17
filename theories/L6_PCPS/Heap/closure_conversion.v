@@ -417,16 +417,18 @@ Section CC.
       let (e_cc, C) := ef in 
       ret (Econstr x tag ys (C |[ e_cc ]|), C1)
     | Ecase x pats =>
+      C1 <- get_var x c Γ ;;
       pats' <-
       (fix mapM_cc l :=
          match l with
          | [] => ret []
          | (y, e) :: xs =>
+           var_map <- peak_var_map tt ;;
            ef <- exp_closure_conv e c Γ ;;
+           push_var_map var_map ;;
            xs' <- mapM_cc xs ;;
            ret ((y, ((snd ef) |[ fst ef ]|)) :: xs')
          end) pats;;
-        C1 <- get_var x c Γ ;;
         ret (Ecase x pats', C1)
       | Eproj x tag n y e' =>
         C1 <- get_var y c Γ ;;
@@ -444,10 +446,10 @@ Section CC.
         (* fundefs *)
         var_map <- pop_var_map tt ;;
         add_fvs fvs 0%N ;;
-        add_funs defs Γ' ;;
-        defs' <- fundefs_closure_conv defs c' ;;
+        defs' <- fundefs_closure_conv defs defs c' ;;
         push_var_map var_map ;;
         (* end fundefs *)
+        add_funs defs Γ' ;;
         ef <- exp_closure_conv e c Γ ;;
         let (e_cc, C) := ef in 
         ret (Efun defs' (C |[ e_cc ]|), Cenv)
@@ -468,21 +470,34 @@ Section CC.
       C1 <- get_var x c Γ ;;
       ret (Ehalt x, C1)
     end
-  with fundefs_closure_conv (defs : fundefs) (c : cTag)
+  with fundefs_closure_conv B (defs : fundefs) (c : cTag)
        : ccstate fundefs  :=
          match defs with
            | Fcons f tag ys e defs' =>
-             (* Add arguments to the map *)
              var_map <- peak_var_map tt ;;
-             add_params ys ;;
              (* formal parameter for the environment pointer *)
              Γ <- get_name f clo_env_suffix ;;
+             add_funs B Γ ;;
+             (* Add arguments to the map *)
+             add_params ys ;;
              ef <- exp_closure_conv e c Γ ;;
              let (e_cc, C) := ef in 
              push_var_map var_map ;;
-             defs'' <- fundefs_closure_conv defs' c ;;
+             defs'' <- fundefs_closure_conv B defs' c ;;
              ret (Fcons f tag (Γ :: ys) (C |[ e_cc ]|) defs'')
            | Fnil => ret Fnil
          end.
-  
+
+
+
+  Definition closure_conversion_top
+             (e : exp) (c : cTag) (Γ : var) (i : iTag) (cenv : cEnv) (nmap:M.t BasicAst.name) : exp * exp_ctx :=
+    let next := ((Pos.max (max_var e 1%positive) Γ) + 1)%positive in
+    let state := mkSt (Maps.PTree.empty VarInfo) next c i cenv nmap in
+    let '(e, C, s) := runState
+                        (exp_closure_conv e 1%positive Γ)
+                        state in
+    
+    (e, C).
+
 End CC.

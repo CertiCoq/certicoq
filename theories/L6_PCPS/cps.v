@@ -210,6 +210,56 @@ Proof.
     eapply fundefs_mut; eauto.
 Qed.
 
+
+Lemma exp_mut_alt :
+  forall (P : exp -> Prop) (P0 : fundefs -> Prop),
+    (forall (v : var) (t : cTag) (l : list var) (e : exp),
+        P e -> P (Econstr v t l e)) ->
+    (forall (v : var) (l : list (cTag * exp)),
+       Forall (fun x => P (snd x)) l -> P (Ecase v l)) ->
+    (forall (v : var) (t : cTag) (n : N) (v0 : var) (e : exp),
+        P e -> P (Eproj v t n v0 e)) ->
+    (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
+    (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
+    (forall (v : var) (p : prim) (l : list var) (e : exp),
+        P e -> P (Eprim v p l e)) ->
+    (forall (v : var), P (Ehalt v)) ->
+    (forall (v : var) (t : fTag) (l : list var) (e : exp),
+        P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
+    P0 Fnil -> forall e : exp, P e                                 
+with fundefs_mut_alt :
+       forall (P : exp -> Prop) (P0 : fundefs -> Prop),
+         (forall (v : var) (t : cTag) (l : list var) (e : exp),
+             P e -> P (Econstr v t l e)) ->
+         (forall (v : var) (l : list (cTag * exp)),
+             Forall (fun x => P (snd x)) l -> P (Ecase v l)) ->
+         (forall (v : var) (t : cTag) (n : N) (v0 : var) (e : exp),
+             P e -> P (Eproj v t n v0 e)) ->
+         (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
+         (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
+         (forall (v : var) (p : prim) (l : list var) (e : exp),
+             P e -> P (Eprim v p l e)) ->
+         (forall (v : var), P (Ehalt v)) ->
+         (forall (v : var) (t : fTag) (l : list var) (e : exp),
+             P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
+         P0 Fnil -> forall f7 : fundefs, P0 f7.
+Proof.
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9. 
+    destruct e; eauto.
+    + eapply H1. eapply exp_mut_alt; eauto.
+    + eapply H2. induction l as [ | [c e] xs IHxs].
+      now constructor.
+      constructor; [| eassumption ]. eapply exp_mut_alt; eauto.
+    + eapply H3. eapply exp_mut_alt; eauto.
+    + eapply H4. eapply fundefs_mut_alt; eauto.
+      eapply exp_mut_alt; eauto.
+    + eapply H6. eapply exp_mut_alt; eauto.
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 defs. 
+    destruct defs; eauto.
+    eapply H8. eapply exp_mut_alt; eauto.
+    eapply fundefs_mut_alt; eauto.
+Qed.
+
 (* to do proofs simultaneously. *)
 Lemma exp_def_mutual_ind :
   forall (P : exp -> Prop) (P0 : fundefs -> Prop),
@@ -232,6 +282,28 @@ Proof.
   intros. split.
   apply (exp_mut P P0); assumption.
   apply (fundefs_mut P P0); assumption.
+Qed.
+
+Lemma exp_def_mutual_ind' :
+  forall (P : exp -> Prop) (P0 : fundefs -> Prop),
+    (forall (v : var) (t : cTag) (l : list var) (e : exp),
+        P e -> P (Econstr v t l e)) ->
+    (forall (v : var) (l : list (cTag * exp)),
+        Forall (fun x => P (snd x)) l -> P (Ecase v l)) ->
+    (forall (v : var) (t : cTag) (n : N) (v0 : var) (e : exp),
+        P e -> P (Eproj v t n v0 e)) ->
+    (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
+    (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
+    (forall (v : var) (p : prim) (l : list var) (e : exp),
+        P e -> P (Eprim v p l e)) ->
+    (forall (v : var), P (Ehalt v)) ->
+    (forall (v : var) (t : fTag) (l : list var) (e : exp),
+        P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
+    P0 Fnil -> (forall e : exp, P e) /\ (forall f : fundefs, P0 f).
+Proof.
+  intros. split.
+  apply (exp_mut_alt P P0); assumption.
+  apply (fundefs_mut_alt P P0); assumption.
 Qed.
 
 

@@ -3,7 +3,7 @@ Require Import compcert.lib.Coqlib.
 Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util L6.functions L6.tactics L6.map_util.
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
-        Coq.omega.Omega Coq.Sets.Ensembles Coq.Relations.Relation_Operators.
+        Coq.omega.Omega Coq.Sets.Ensembles Coq.Relations.Relation_Operators Classes.Morphisms.
 
 Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util.
 
@@ -685,6 +685,12 @@ Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) :=
 
 (** * Lemmas about [binding_in_map] *)
 
+Instance Proper_binding_in_map (A : Type) : Proper (Same_set _ ==> eq ==> iff) (@binding_in_map A). 
+Proof.
+  intros s1 s2 Hseq x1 x2 Heq; subst; split; intros Hbin x Hin;
+    eapply Hbin; eapply Hseq; eauto.
+Qed.
+
 
 Lemma binding_in_map_Union {A} S1 S2 (rho : M.t A) :
   binding_in_map S1 rho ->
@@ -876,6 +882,13 @@ Proof.
   - inversion H. 
 Qed.
 
+(** Number of function definitions *)
+Fixpoint numOf_fundefs (B : fundefs) : nat := 
+  match B with
+  | Fcons _ _ xs e B =>
+    1 + numOf_fundefs B
+  | Fnil => 0
+  end.
 
 Definition num_occur_list (lv:list var) (v:var) : nat :=
   fold_right (fun v' n => if (var_dec v v') then 1 + n

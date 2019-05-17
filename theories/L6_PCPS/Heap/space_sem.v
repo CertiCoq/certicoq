@@ -1157,15 +1157,6 @@ Module SpaceSem (H : Heap).
         ctx_to_heap_env_CC C H (def_funs B B rho) H' rho' c -> 
         ctx_to_heap_env_CC (Efun1_c B C) H rho H' rho' (c + cost_ctx_cc (Efun1_c B C)).
   
-
-  (** Number of function definitions *)
-  Fixpoint numOf_fundefs (B : fundefs) : nat := 
-    match B with
-    | Fcons _ _ xs e B =>
-      1 + numOf_fundefs B
-    | Fnil => 0
-    end.
-
   (** Allocation cost of an evaluation context *)
   Fixpoint cost_alloc_ctx (c : exp_ctx) : nat :=
     match c with

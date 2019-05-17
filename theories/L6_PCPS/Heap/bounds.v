@@ -910,7 +910,30 @@ Module Size (H : Heap).
       do 2 setoid_rewrite <- mset_eq at 1.
       eapply Disjoint_Setminus_l... tci.
       eapply project_var_ToMSet in Hvar'; tci.
-  Qed.          
+  Qed.
+
+    Lemma project_var_cost_eq'
+        Scope Scope'  Funs Funs' fenv
+        c Γ FVs x C1 :
+    project_var Util.clo_tag Scope Funs fenv c Γ FVs x C1 Scope' Funs' ->
+    cost_ctx_full_cc C1 <= 3.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvar; inv Hvar; eauto.
+  Qed.
+
+  Lemma project_vars_cost_eq'
+        Scope Scope'  Funs Funs' fenv
+        c Γ FVs xs C1 :
+    project_vars Util.clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
+    cost_ctx_full_cc C1 <= 3 * length xs.
+  Proof with (now eauto with Ensembles_DB).
+    intros Hvar; induction Hvar; eauto.
+    rewrite cost_ctx_full_cc_ctx_comp_ctx_f. simpl.
+    eapply le_trans. eapply plus_le_compat.
+    eapply project_var_cost_eq'. eassumption. eassumption.
+    omega.
+  Qed.
+
 
   Lemma project_var_cost_eq
         Scope {_ : ToMSet Scope} Scope' {_ : ToMSet Scope'} Funs `{ToMSet Funs}

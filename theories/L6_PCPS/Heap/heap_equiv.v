@@ -930,7 +930,38 @@ Module HeapEquiv (H : Heap).
     assert (Heqp : (f_eq * eq)%signature (b1, (Loc (b1' x), H2)) (b2, (Loc (b1' x), H2)))
       by (split; eauto).
     simpl. rewrite Heqp, H. simpl. eapply Heqh. eassumption.
-  Qed. 
+  Qed.
+
+
+  Lemma heap_env_approx_res_approx 
+        (S : Ensemble var) (β : loc -> loc)
+        (H1 H2 : heap block) (rho1 rho2 : M.t value) l :
+    heap_env_approx S (β, (H1, rho1)) (id, (H2, rho2)) ->
+    l \in env_locs rho1 S ->
+    (Loc l, H1) ≈_(β, id) (Loc (β l), H2).
+  Proof.
+    intros Henv [x [Heq1 Heq2]].
+    destruct (M.get x rho1) as [[l1|] |] eqn:Hget; inv Heq2.
+    edestruct Henv as [v2 [Hget2 Hres]]; eauto.
+    assert (Hres' := Hres). rewrite res_equiv_eq in Hres.
+    destruct v2 as [l2|]; try contradiction. simpl in Hres.
+    destruct Hres as [Hres'' _]. unfold id in *; subst.
+    eassumption.
+  Qed.
+
+  Lemma heap_env_equiv_res_equiv
+        (S : Ensemble var) (β : loc -> loc)
+        (H1 H2 : heap block) (rho1 rho2 : M.t value) l :
+    S |- (H1, rho1) ⩪_(id, β) (H2, rho2) ->
+    l \in env_locs rho2 S ->
+    (Loc (β l), H1) ≈_(id, β) (Loc l, H2).
+  Proof.
+    intros Henv Hin.
+    symmetry. eapply heap_env_approx_res_approx.
+    destruct Henv. eassumption.
+    eassumption.
+  Qed.
+
  
   (** Horizontal composition of injections *)
 
@@ -2214,6 +2245,17 @@ Module HeapEquiv (H : Heap).
   Proof.
     simpl; split; eauto.
   Qed.
+
+  Lemma block_equiv_Constr_r β1 β2 (H1 H2 : heap block) (c1 c2 : cTag)
+        (vs vs' : list value) :
+    block_equiv (β1, H1, Constr c1 vs) (β2, H2, Constr c2 vs') ->
+    Forall2 (fun l1 l2 => (l1, H1) ≈_(β1, β2) (l2, H2)) vs vs'.
+  Proof.
+    intros [Heq Hall]; eauto.
+  Qed.
+  
+
+
   
   Lemma block_equiv_Fun β1 β2 (H1 H2 : heap block) (rho1 rho2 : env) :
     Full_set _ |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
@@ -2467,6 +2509,32 @@ Module HeapEquiv (H : Heap).
         reflexivity. 
       + rewrite res_equiv_eq in Heqv. contradiction.
   Qed.
+
+    Lemma heap_env_equiv_image_root (S : Ensemble var) (β1 β2 : loc -> loc)
+        (H1 H2 : heap block) (rho1 rho2 : env) :
+    S |- (H1, rho1) ⩪_( β1, β2) (H2, rho2) ->
+    image β1 (env_locs rho1 S) <--> image β2 (env_locs rho2 S).
+  Proof.     
+    intros Heq. split.
+    - intros l1 [l2 [[x [Hin1 Hin2]] Heq']]. 
+      destruct (M.get x rho1) as [[ l1' |] |] eqn:Hget1; try now inv Hin2.
+      inv Hin2.
+      edestruct heap_env_equiv_env_get as [v2 [Hget2 Heqv]]; try eassumption. 
+      rewrite res_equiv_eq in Heqv. destruct v2 as [l2' |]; try contradiction.
+      destruct Heqv as [Heq1 _]. rewrite Heq1.
+      eexists; split; eauto.
+      eexists; split; eauto. rewrite Hget2; reflexivity.
+    - intros l1 [l2 [[x [Hin1 Hin2]] Heq']]. 
+      destruct (M.get x rho2) as [[ l1' |] |] eqn:Hget1; try now inv Hin2.
+      inv Hin2.
+      edestruct heap_env_equiv_env_get as [v2 [Hget2 Heqv]]; try eassumption.
+      symmetry. eassumption.
+      rewrite res_equiv_eq in Heqv. destruct v2 as [l2' |]; try contradiction.
+      destruct Heqv as [Heq1 _]. rewrite Heq1.
+      eexists; split; eauto.
+      eexists; split; eauto. rewrite Hget2; reflexivity.
+  Qed.
+
 
   Lemma heap_env_approx_heap_equiv (S : Ensemble var) (H1 H2 : heap block)
         (b2 : loc -> loc) (rho1 rho2 : env) :

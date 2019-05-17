@@ -414,6 +414,28 @@ Proof.
   - inv Hall'. f_equal; eauto.
 Qed.
 
+Lemma Forall2_map_r_strong {A B} (P : A -> B -> Prop) (f : A -> B) (l : list A) :
+  (forall x, List.In x l -> P x (f x)) ->
+  Forall2 P l (map f l).
+Proof.
+  intros Hyp. induction l; try now constructor.
+  simpl. constructor.
+  eapply Hyp; eauto; try now constructor.
+  eapply IHl; intros; eauto. eapply Hyp.
+  now constructor 2.
+Qed.
+
+Lemma Forall2_map_l_strong {A B} (P : B -> A -> Prop) (f : A -> B) (l : list A) :
+  (forall x, List.In x l -> P (f x) x) ->
+  Forall2 P (map f l) l.
+Proof.
+  intros Hyp. induction l; try now constructor.
+  simpl. constructor.
+  eapply Hyp; eauto; try now constructor.
+  eapply IHl; intros; eauto. eapply Hyp.
+  now constructor 2.
+Qed.
+
 
 (** * Lemmas about [nthN] *)
 

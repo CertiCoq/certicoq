@@ -526,6 +526,19 @@ Proof with now eauto with Ensembles_DB.
     now eauto with Ensembles_DB.
 Qed.
 
+Lemma FromList_image_exists {A B} (f : A -> B) l S :
+  FromList l \subset image f S ->
+  exists l', l = map f l'.
+Proof with (now eauto with Ensembles_DB).
+  revert S; induction l; intros S Heq; eauto.
+  - eexists []. reflexivity.
+  - rewrite FromList_cons in Heq.
+    edestruct IHl as [l' Heql'].
+    + eapply Included_trans; try eassumption...
+    + edestruct Heq as [a' [Heqa Hina]]. now left.
+      eexists (a' :: l'). simpl; f_equal; eauto.
+Qed.
+
 Lemma extend_extend_lst_commut {A} f ys xs x (y : A) :
   ~ List.In x xs ->
   ~ List.In y ys ->
@@ -768,6 +781,57 @@ Proof.
   destruct H0 as [y [Hin Heq]]. destruct H1 as [y' [Hin' Heq']].
   subst. eapply Hinj in Heq'; eauto. eapply H. subst; eauto.
 Qed.
+
+Lemma FromList_image_injective_exists (f : positive -> positive) l S :
+  FromList l <--> image f S ->
+  injective_subdomain S f ->
+  exists l', l = map f l' /\ FromList l' <--> S.
+Proof with (now eauto with Ensembles_DB).
+  revert S; induction l; intros S Heq Hinj; eauto.
+  - eexists []. split; eauto.
+    rewrite !FromList_nil in Heq.
+    rewrite FromList_nil.
+    split; intros x Hin; try now inv Hin.
+    assert (Hc : Empty_set _ (f x)). 
+    { eapply Heq. eexists; split; eauto. }
+    inv Hc. 
+  - rewrite FromList_cons in Heq.
+    assert (Ha : image f S a).
+    { eapply Heq; now left. }
+    destruct Ha as [a' [Heqa Hina]]. subst.
+    
+    destruct (Decidable_FromList l) as [Decl].
+    destruct (Decl (f a')).
+    + rewrite Union_Same_set in Heq; 
+        [| eapply Singleton_Included; now eauto ].  
+      edestruct IHl as [l' [Heql Heqs]]; eauto.
+      subst.
+      eexists (a' :: l'). split. now simpl; f_equal; eauto.
+      rewrite FromList_cons.
+      rewrite Union_Same_set. eassumption.
+      rewrite Heqs. eapply Singleton_Included. eassumption.
+    + assert (Heq' := Heq).
+      rewrite (Union_Setminus_Same_set S [set a']) in Heq;
+        [| eapply Singleton_Included; now eauto ].  
+      rewrite image_Union, image_Singleton in Heq.
+      eapply Union_Same_set_Disjoint in Heq.
+      * edestruct IHl as [l' [Heql Heqs]]; try now apply Heq; eauto; subst.
+        eapply injective_subdomain_antimon; try eassumption...
+        
+        eexists (a' :: l'). split. now simpl; f_equal; eauto.
+        rewrite FromList_cons.
+        rewrite Heqs.
+        rewrite <- (Union_Setminus_Same_set S [set a']);
+          [| eapply Singleton_Included; now eauto ].
+        reflexivity.
+      * eapply Disjoint_Singleton_l. eauto.
+      * rewrite <- image_Singleton.
+        eapply injective_subdomain_Union_not_In_image.
+        eapply injective_subdomain_antimon; try eassumption...
+        eapply Disjoint_Singleton_l.
+        intros Hc; inv Hc; eauto.
+Qed.
+
 
 (** * Lemmas about [domain] *)
 

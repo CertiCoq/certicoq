@@ -5,7 +5,7 @@
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
-From CertiCoq.L6 Require Import functions cps ctx eval cps_util identifiers ctx Ensembles_util
+From CertiCoq.L6 Require Import functions cps ctx cps_util identifiers ctx Ensembles_util
      List_util tactics set_util map_util.
 
 From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv GC space_sem cc_log_rel closure_conversion.
@@ -409,7 +409,7 @@ Module Compat (H : Heap).
             edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m'' Hstep']].
             inv Hstep'.
             * omega.
-            * rewrite NPeano.Nat.add_sub in Hbs0. 
+            * rewrite Nat.add_sub in Hbs0. 
               repeat subst_exp.
               do 2 eexists. eassumption.
 
@@ -674,11 +674,11 @@ Module Compat (H : Heap).
           - intros i. edestruct (Hstuck1 (i + cost (Econstr x1 t ys1 e1))) as [r' [m' Hstep']].
             inv Hstep'.
             * omega.
-            * rewrite NPeano.Nat.add_sub in Hbs0. repeat subst_exp.
+            * rewrite Nat.add_sub in Hbs0. repeat subst_exp.
               repeat eexists; eauto.  
           - repeat eexists; eauto.
             + eapply Eval_constr_per_cc with (c := c2 + cost (Econstr x2 t ys2 e2))
-              ; [ | | | rewrite NPeano.Nat.add_sub ]; try eassumption.
+              ; [ | | | rewrite Nat.add_sub ]; try eassumption.
               simpl. omega. 
             + replace c1 with (c1 - cost (Econstr x1 t ys1 e1) + cost (Econstr x1 t ys1 e1))
                 by ( simpl in *; omega).   
@@ -842,11 +842,11 @@ Module Compat (H : Heap).
           - intros i. edestruct (Hstuck (i + cost1)) as [r' [m' Hstep']].
             inv Hstep'.
             * unfold cost1 in Hcost0. omega.
-            * simpl in Hbs0. rewrite NPeano.Nat.add_sub in Hbs0.
+            * simpl in Hbs0. rewrite Nat.add_sub in Hbs0.
               repeat subst_exp.
               do 2 eexists. eassumption.
           - repeat eexists; eauto. eapply Eval_proj_per_cc with (c := c2 + cost2); try eassumption.
-            unfold cost2. simpl; omega. simpl. rewrite NPeano.Nat.add_sub.
+            unfold cost2. simpl; omega. simpl. rewrite Nat.add_sub.
             eassumption.
             replace c1 with (c1 - cost1 + cost1) by (unfold cost1; simpl in *; omega).
             eapply Hinv; try eassumption. simpl in *. omega. 
@@ -959,11 +959,11 @@ Module Compat (H : Heap).
               * exists OOT. eexists. econstructor; eauto. unfold cost1 in Hcost0.
                omega. 
               * repeat subst_exp.
-                simpl in Hbs0. rewrite NPeano.Nat.add_sub in Hbs0.
+                simpl in Hbs0. rewrite Nat.add_sub in Hbs0.
                 do 2 eexists. eassumption.
             + repeat eexists; eauto. 
               * eapply Eval_case_per_cc with (c := c2 + cost2)
-                ; [ | | | | rewrite NPeano.Nat.add_sub ]; try eassumption.
+                ; [ | | | | rewrite Nat.add_sub ]; try eassumption.
                 simpl in *. omega.  
               * replace c1 with (c1 - cost1 + cost1) by (unfold cost1; simpl in *; omega).
                 eapply Hinvh. eapply findtag_In. eassumption.
@@ -1253,13 +1253,13 @@ Module Compat (H : Heap).
            + intros i. edestruct (Hstuck1 (i + cost (Efun B1 e1))) as [r' [m' Hstep']].
              inv Hstep'.
              * omega.
-             * rewrite NPeano.Nat.add_sub in Hbs0. repeat subst_exp.
+             * rewrite Nat.add_sub in Hbs0. repeat subst_exp.
                repeat eexists. eassumption.
            + repeat eexists.
              * eapply Eval_fun_per_cc with (c := c2 + cost_cc (Efun B2 e2));
                  try eassumption.
                simpl. omega. reflexivity. simpl.
-               rewrite NPeano.Nat.add_sub. eassumption.
+               rewrite Nat.add_sub. eassumption.
              * simpl.
                replace c1 with (c1 - (cost (Efun B1 e1)) + (cost (Efun B1 e1)))
                  by (simpl in *; omega).
@@ -1560,7 +1560,7 @@ Module Compat (H : Heap).
             edestruct (Hstuck1 (i + cost (Eapp f1 t xs1))) as [r' [m'' Hstep']].
             inv Hstep'.
             * omega.
-            * rewrite NPeano.Nat.add_sub in Hbs0. 
+            * rewrite Nat.add_sub in Hbs0. 
               repeat subst_exp.
               do 2 eexists. eassumption.
 

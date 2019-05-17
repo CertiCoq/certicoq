@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From CertiCoq.L6 Require Import cps cps_util set_util hoisting identifiers ctx
+From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx
      Ensembles_util List_util functions.
 
 From Coq Require Import ZArith.Znumtheory

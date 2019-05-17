@@ -5,7 +5,7 @@
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
-From CertiCoq.L6 Require Import functions cps eval cps_util identifiers ctx Ensembles_util set_util
+From CertiCoq.L6 Require Import functions cps cps_util identifiers ctx Ensembles_util set_util
      List_util tactics map_util.
 
 From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv GC space_sem.
@@ -1224,7 +1224,7 @@ Module CC_log_rel (H : Heap).
 
     - simpl in  Hin'.      
       destruct Hcc as [Heq1 Hrel]. subst.
-      specialize (Hrel j (NPeano.Nat.lt_succ_diag_r j)).
+      specialize (Hrel j (Nat.lt_succ_diag_r j)).
       edestruct (@Union_lists_exists loc) as [S' [Hin3 Hin2]]. eassumption.
       edestruct (list_in_map_inv _ _ _ Hin3) as [l3' [Heql Hinl]]; subst.
       destruct l3' as [l3' |]; inv Hin2.
@@ -1238,7 +1238,7 @@ Module CC_log_rel (H : Heap).
       destruct v0 as [|]; try contradiction. 
       destruct l0 as [| [|] [ | [|] [|] ] ]; try contradiction. 
       simpl in Hin'. destruct Hcc as [ Henv _ ].
-      specialize (Henv j (NPeano.Nat.lt_succ_diag_r j)).
+      specialize (Henv j (Nat.lt_succ_diag_r j)).
       edestruct Henv as (le & rho1 & c' & vs & FLS & Hseq & Hget1 & Hnd & Heq' & Hget2 ).
       rewrite Union_Empty_set_neut_l in Hin'. inv Hin'. right. eassumption.
     - destruct v; destruct v0; try contradiction.

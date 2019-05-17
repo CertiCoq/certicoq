@@ -8,7 +8,7 @@ From CertiCoq.L6.Heap Require Import closure_conversion closure_conversion_util.
 
 From compcert.lib Require Import Coqlib.
 
-From Coq Require Import ZArith.Znumtheory ArithRing Relations.Relations Arith.Wf_nat.
+From Coq Require Import ZArith.Znumtheory ArithRing Relations.Relations Arith.Wf_nat
         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
         NArith.BinNat PArith.BinPos Sets.Ensembles Omega.
 

@@ -251,82 +251,12 @@ Module Size (H : Heap).
       rewrite <- FromSet_elements. rewrite <- mset_eq, FromList_nil. reflexivity. 
   Qed.
 
-  (** The extra cost of evaluating CCed e TODO *)
-  Fixpoint cost_time_exp (e : exp) : nat :=
-    match e with
-      | Econstr x _ ys e => max (3 * length ys) (cost_time_exp e)
-      | Ecase x l =>
-        max 3 ((fix sizeOf_l l :=
-                  match l with
-                    | [] => 0
-                    | (t, e) :: l => max (cost_time_exp e) (sizeOf_l l)
-                  end) l)
-      | Eproj x _ _ y e => max 3 (cost_time_exp e)
-      | Efun B e =>
-        max (1 + 4 * PS.cardinal (fundefs_fv B))
-            (max (cost_time_fundefs B) (cost_time_exp e))
-      | Eapp x _ ys => 6 + 3 * length ys
-      | Eprim x _ ys e => max (3 * length ys) (cost_time_exp e)
-      | Ehalt x => 3
-    end
-  with cost_time_fundefs (B : fundefs) : nat :=
-    match B with
-      | Fcons _ _ xs e B => max (cost_time_exp e) (cost_time_fundefs B)
-      | Fnil => 0
-    end.
-
-  (** time cost of heap *)
-  Definition cost_time_heap := cost_heap cost_time_fundefs.
-
-
-  Lemma cost_env_app_exp_out_le e :
-    cost_env_app_exp_out e <= cost_time_exp e.
-  Proof.
-    induction e; try eapply Max.le_max_l.
-    simpl. omega.
-    simpl. omega.
-  Qed.
 
   Lemma cost_env_app_exp_out_le_cost e :
     cost_env_app_exp_out e <= 4 * (cost e).
   Proof.
     induction e; simpl; omega.
-  Qed.
-
-  (* Lemma size_cc_heap_GC H1 H2 S `{ToMSet S} b :  *)
-  (*   live' S H1 H2 b -> *)
-  (*   size_cc_heap H2 <= size_cc_heap H1. *)
-  (* Proof. *)
-  (*   intros. eapply live_size_with_measure_leq; [| eassumption | ]. *)
-  (*   eassumption. *)
-  (*   intros. eapply block_equiv_size_cc_block. eassumption. *)
-  (* Qed.  *)
-
-  Lemma block_equiv_cost_time_block b bl1 bl2 H1 H2 :
-    block_equiv (b, H1, bl1) (id, H2, bl2) ->
-    cost_block cost_time_fundefs bl1 = cost_block cost_time_fundefs bl2.
-  Proof. 
-    intros Hbl. eapply block_equiv_subst_block in Hbl.
-    destruct bl1; destruct bl2; try contradiction.
-    - reflexivity.
-    - simpl.
-      simpl in Hbl. destruct Hbl as [Hh1 Hh2].
-      destruct v0; destruct v2; try (simpl in *; congruence).
-      + destruct v; destruct v1; simpl in *; congruence.
-      + destruct v; destruct v1; simpl in *; congruence.
-    - reflexivity.
-  Qed.
-
-  
-  Lemma cost_time_heap_GC H1 H2 S `{ToMSet S} b : 
-    live' S H1 H2 b ->
-    cost_time_heap H2 <= cost_time_heap H1.
-  Proof.
-    intros. eapply live_max_with_measure_leq; [| eassumption | ].
-    eassumption.
-    intros. eapply block_equiv_cost_time_block. eassumption.
-  Qed.
-  
+  Qed.  
 
   Lemma fun_in_fundefs_cost_space_fundefs Funs {Hf : ToMSet Funs} B f tau xs e: 
     fun_in_fundefs B (f, tau, xs, e) ->
@@ -338,17 +268,6 @@ Module Size (H : Heap).
     - eapply le_trans. eapply IHB. eassumption.
       simpl. eapply NPeano.Nat.le_max_r.
   Qed.
-
-  Lemma fun_in_fundefs_cost_time_fundefs B f tau xs e: 
-    fun_in_fundefs B (f, tau, xs, e) ->
-    cost_time_exp e <= cost_time_fundefs B.
-  Proof.
-    induction B; intros Hin; inv Hin.
-    - inv H. simpl. eapply NPeano.Nat.le_max_l.
-    - eapply le_trans. eapply IHB. eassumption.
-      simpl. eapply NPeano.Nat.le_max_r.
-  Qed.
-
 
   (** * Compat lemmas *)
  
@@ -487,21 +406,7 @@ Module Size (H : Heap).
            [[Hc1 Hc2] Hm1] Hh1
            Hgetf1 Hgetl1 Hgetecl Hfind1 Hgetxs1 Hclo Hset1
            Hgetf2 Hgetxs2 Hset2 Hgetl2 Hfind2 Gc2. 
-    assert (Hlen := Forall2_length _ _ _ Hall). inversion Hlen as [Hlen'].
-    (* assert (Hleq : Init.Nat.max (cost_time_exp e1) (cost_time_heap H1'') <= *)
-    (*                Init.Nat.max (cost_time_exp (Eapp f1 t xs1)) (cost_time_heap H1')).  *)
-    (* { eapply le_trans; [| now eapply Max.le_max_r ]. *)
-    (*   eapply Nat.max_lub. eapply le_trans. *)
-    (*   eapply fun_in_fundefs_cost_time_fundefs. *)
-    (*   eapply find_def_correct. eassumption. *)
-    (*   eapply HL.max_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1. *)
-    (*   eassumption. *)
-    (*   eapply le_trans. *)
-    (*   erewrite cost_time_heap_def_closures with (H1 := H1') (H1' := H1''); [| eassumption ]. *)
-    (*   eapply Max.max_lub. *)
-    (*   eapply HL.max_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1. *)
-    (*   eassumption. reflexivity. reflexivity. } *)
-    
+    assert (Hlen := Forall2_length _ _ _ Hall). inversion Hlen as [Hlen'].    
     { rewrite <- !plus_n_O in *. split.
       - split.
         + simpl. omega.
@@ -637,34 +542,6 @@ Module Size (H : Heap).
     eapply mult_le_compat_l. eapply PS_elements_subset. eassumption. 
   Qed.
   
-  Lemma cost_time_exp_case_hd x1 c1 e1 P1 :
-    cost_time_exp e1 <= cost_time_exp (Ecase x1 ((c1, e1) :: P1)).
-  Proof.
-    eapply le_trans; [| eapply Max.le_max_r ].
-    eapply Max.le_max_l. 
-  Qed.
-
-  Lemma cost_time_exp_case_tl x1 c1 e1 P1 :
-    cost_time_exp (Ecase x1 P1) <= cost_time_exp (Ecase x1 ((c1, e1) :: P1)).
-  Proof.
-    eapply Nat.max_le_compat_l. 
-    eapply Max.le_max_r.
-  Qed.
-
-  Lemma cost_time_exp_case_In x1 c1 e1 P1 :
-    List.In (c1, e1) P1 ->
-    cost_time_exp e1 <= cost_time_exp (Ecase x1 P1).
-  Proof.
-    induction P1; intros Hin.
-    - now inv Hin.
-    - inv Hin.
-      + eapply le_trans; [| eapply Max.le_max_r ].
-        eapply Max.le_max_l.
-      + eapply le_trans. eapply IHP1. eassumption.
-        eapply Nat.max_le_compat_l. destruct a as [c' e']. 
-        eapply Max.le_max_r.
-  Qed.
-
   Lemma cost_space_exp_case_In x1 c1 e1 P1 :
     List.In (c1, e1) P1 ->
     cost_space_exp e1 <= cost_space_exp (Ecase x1 P1).

@@ -1,11 +1,10 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles
          Relations.Relations.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 Import ListNotations.
 Require Import Coq.Strings.String.
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
-From CertiCoq.L6 Require Import cps List_util size_cps.
+From CertiCoq.L6 Require Import cps cps_util List_util size_cps.
 
 
 
@@ -24,20 +23,6 @@ Section EVAL.
   
   Variable (cenv : cEnv).
 
-  (** A case statement only pattern matches constructors from the same inductive type *)
-  Inductive caseConsistent : list (cTag * exp) -> cTag -> Prop :=
-  | CCnil  :
-      forall (t : cTag),
-        caseConsistent nil t
-  | CCcons :
-      forall (a a' b b':name) (l : list (cTag * exp)) (t t' : cTag) (ty ty' : iTag)
-        (n n' : N) (i i' : N) (e : exp),
-        M.get t cenv  = Some (a, b, ty, n, i) ->
-        M.get t' cenv = Some (a', b', ty', n', i') ->
-        ty = ty' ->
-        caseConsistent l t ->
-        caseConsistent ((t', e) :: l) t.
-  
   (** Big step semantics with cost counting *)
   Inductive bstep_e : env -> exp -> val -> nat -> Prop :=
   | BStep_constr :
@@ -59,7 +44,7 @@ Section EVAL.
       forall (y : var) (v : val) (e : exp) (t : cTag) (cl : list (cTag * exp))
         (vl : list val) (rho : env) (c : nat),
         M.get y rho = Some (Vconstr t vl) ->
-        caseConsistent cl t -> (* NEW *)
+        caseConsistent cenv cl t -> (* NEW *)
         findtag cl t = Some e ->
         bstep_e rho e v c ->
         bstep_e rho (Ecase y cl) v c
@@ -97,49 +82,6 @@ Section EVAL.
 
 
   (* fuel-based evaluator, could also use n from bstep_e with a termination lex (n, e) *)
-
-  Fixpoint caseConsistent_f (l:list (cTag * exp)) (t:cTag): bool :=
-    match l with
-      | nil => true
-      | (t', e)::l' =>
-        caseConsistent_f l' t &&
-        match (M.get t cenv) with
-          | Some (a, _, ty, n, i) =>
-            (match (M.get t' cenv) with
-               | Some (a', _, ty', n', i') =>
-                 Pos.eqb ty  ty'
-               | _ => false
-             end)
-          | _ => false
-        end
-    end.
-
-
-  Theorem caseConsistent_c:
-    forall l t,
-      caseConsistent l t <-> caseConsistent_f l t = true.
-  Proof.
-    induction l; split; intros.
-    - reflexivity.
-    - constructor.
-    - inv H. simpl.
-      rewrite H3. rewrite H2.
-      apply andb_true_iff.
-      split.
-      apply IHl; auto.
-      apply Pos.eqb_refl. 
-    - simpl in H.
-      destruct a.
-      inv H.
-      destruct (M.get t cenv) eqn:tc.
-      destruct c0. destruct p. destruct p.
-      destruct (M.get c cenv) eqn:cc.
-      destruct c0. destruct p. destruct p0. destruct p. destruct p. apply andb_true_iff in H1.
-      inv H1. econstructor; eauto. apply Peqb_true_eq in H0. auto. apply IHl. auto.
-      destruct p.
-      apply andb_true_iff in H1. inv H1. inv H0.
-      apply andb_true_iff in H1. inv H1. inv H0.
-  Qed.
 
 
   Definition l_opt {A} (e:option A) (s:string):exception A :=
@@ -181,7 +123,7 @@ Section EVAL.
         match M.get y rho with
           | Some (Vconstr t vs) =>
             do e <- l_opt (findtag cl t) ("Case: branch not found");
-              if caseConsistent_f cl t then 
+              if caseConsistent_f cenv cl t then 
                 Ret (rho, e)
               else     (exceptionMonad.Exc "Case: consistency failure")
           | Some _ =>  (exceptionMonad.Exc "Case: arg is not a constructor")
@@ -241,7 +183,7 @@ Section EVAL.
               match M.get y rho with
                 | Some (Vconstr t vs) =>
                   do e <- l_opt (findtag cl t) ("Case: branch not found");
-                if caseConsistent_f cl t then
+                if caseConsistent_f cenv cl t then
                   bstep_f rho e n'
                 else (exceptionMonad.Exc "Case: consistency failure")
                 | _ => (exceptionMonad.Exc "Case: branch not found")
@@ -276,7 +218,7 @@ Section EVAL.
        exists x. econstructor; eauto.
     - destruct (M.get v0 rho) eqn:gv0r.
       destruct v1. destruct (findtag l c) eqn:flc.
-      destruct (caseConsistent_f l c) eqn:clc.
+      destruct (caseConsistent_f cenv l c) eqn:clc.
       apply caseConsistent_c in clc.
       apply IHn in H. inv H. exists x.
       econstructor; eauto.
@@ -364,7 +306,7 @@ Theorem bstep_f_complete:
       forall (y : var) (v : val) (e : exp) (t : cTag) (cl : list (cTag * exp))
         (vl : list val) (rho : env) (n c : nat),
         M.get y rho = Some (Vconstr t vl) ->
-        caseConsistent cl t ->
+        caseConsistent cenv cl t ->
         find_tag_nth cl t e n ->
         bstep_cost rho e v c ->
         bstep_cost rho (Ecase y cl) v (c + n)
@@ -444,7 +386,7 @@ Theorem bstep_f_complete:
                  step (rho, Eproj x t n y e) (M.set x v rho, e)
   | Step_case: forall t vl e' rho y cl,
                  M.get y rho = Some (Vconstr t vl) ->
-                 caseConsistent cl t ->
+                 caseConsistent cenv cl t ->
                  findtag cl t = Some e' -> 
                  step (rho, Ecase y cl) (rho, e')
   | Step_fun: forall rho fl e,

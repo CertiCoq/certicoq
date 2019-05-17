@@ -11,9 +11,14 @@ Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
+From Template Require Import BasicAst. (* For identifier names *)
 
+Import MonadNotation. 
 
-Require Import Common.AstCommon. 
+Open Scope monad_scope.
+
+Require Import Common.AstCommon.
+
 Definition nEnv := M.t BasicAst.name.
 
 Section PP.

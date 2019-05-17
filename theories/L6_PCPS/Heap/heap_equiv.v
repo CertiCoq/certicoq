@@ -5,10 +5,12 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From CertiCoq.L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
-        identifiers Heap.heap tactics Heap.heap_defs map_util.
-Require Import compcert.lib.Coqlib.
+From CertiCoq.L6 Require Import cps cps_util set_util List_util Ensembles_util functions
+        identifiers tactics map_util.
+
+From CertiCoq.L6.Heap Require Import heap heap_defs.
+
+From compcert.lib Require Import Coqlib.
 
 Import ListNotations.
 
@@ -140,11 +142,11 @@ Module HeapEquiv (H : Heap).
           | Some (Env rho1) =>
             exists rho2,
               get l2 H2 = Some (Env rho2) /\
-               (forall x, (exists v1 v2, M.get x rho1 = Some v1 /\
-                               M.get x rho2 = Some v2 /\
-                               (forall i, (i < n)%nat ->
-                                     res_approx_fuel i (b1, (v1, H1)) (b2, (v2, H2)))) \/
-                     (M.get x rho1 = None /\ M.get x rho2 = None))
+              (forall x, (exists v1 v2, M.get x rho1 = Some v1 /\
+                              M.get x rho2 = Some v2 /\
+                              (forall i, (i < n)%nat ->
+                                    res_approx_fuel i (b1, (v1, H1)) (b2, (v2, H2)))) \/
+                    (M.get x rho1 = None /\ M.get x rho2 = None))
           | None => True
         end
       | FunPtr B1 f1, FunPtr B2 f2 => f1 = f2 /\ B1 = B2
@@ -2290,7 +2292,7 @@ Module HeapEquiv (H : Heap).
             [| rewrite !post_Singleton; try eassumption; reflexivity ].
           rewrite (proper_post_n H2);
             [| rewrite !post_Singleton; try eassumption; reflexivity ].
-          specialize (Hi n (NPeano.Nat.lt_succ_diag_r n)).
+          specialize (Hi n (Nat.lt_succ_diag_r n)).
           clear Hget1 Hget2. induction Hi; simpl.
           rewrite !post_n_Empty_set. rewrite !image_Empty_set. reflexivity.
           rewrite !post_n_Union, !image_Union.
@@ -2338,14 +2340,14 @@ Module HeapEquiv (H : Heap).
               eapply image_monotonic. eapply post_n_set_monotonic with (S1 := [set l2]). eapply Singleton_Included.
               eassumption.
               rewrite res_approx_fuel_eq in Hres.
-              specialize (IHn n (NPeano.Nat.lt_succ_diag_r n) _ _ _ _ Hres).
+              specialize (IHn n (Nat.lt_succ_diag_r n) _ _ _ _ Hres).
               eapply IHn. eexists; split; eauto. }
             eapply Hlem.
             - intros l3 [z [_ Hin]].
               destruct (M.get z rho1) as [v1 | ] eqn:Hgetz; [| now inv Hin ].
               destruct v1 as [l1' |]; try now inv Hin. inv Hin.
               destruct (Hx z) as [ [v1' [v2' [Hget1 [Hget2 Hi' ]]]] | [Hn1 Hn2] ]; [| congruence ].
-              subst_exp. specialize (Hi' n (NPeano.Nat.lt_succ_diag_r n)).
+              subst_exp. specialize (Hi' n (Nat.lt_succ_diag_r n)).
               rewrite res_approx_fuel_eq in Hi'.
               destruct v2' as [l4 |]; try contradiction. eexists. split.
               eexists. split. now constructor. rewrite Hget2. reflexivity.
@@ -2354,7 +2356,7 @@ Module HeapEquiv (H : Heap).
               destruct (M.get z rho) as [v1 | ] eqn:Hgetz; [| now inv Hin ].
               destruct v1 as [l1' |]; try now inv Hin. inv Hin.
               destruct (Hx z) as [ [v1' [v2' [Hget1 [Hget2 Hi' ]]]] | [Hn1 Hn2] ]; [| congruence ].
-              subst_exp. specialize (Hi' n (NPeano.Nat.lt_succ_diag_r n)).
+              subst_exp. specialize (Hi' n (Nat.lt_succ_diag_r n)).
               rewrite res_approx_fuel_eq in Hi'.
               destruct v1' as [l4 |]; try contradiction. eexists. split.
               eexists. split. now constructor. rewrite Hget1. reflexivity.
@@ -4158,5 +4160,5 @@ Module HeapEquiv (H : Heap).
         eapply heap_env_approx_key_set; eauto.
     Qed. 
 
-
+    
 End HeapEquiv.

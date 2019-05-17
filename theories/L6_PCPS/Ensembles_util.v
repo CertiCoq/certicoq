@@ -2,9 +2,9 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles
-Sorting.Permutation.
-Require Import compcert.lib.Coqlib.
+From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles Sorting.Permutation.
+From compcert.lib Require Import Coqlib.
+
 Import ListNotations.
 
 Close Scope Z_scope.
@@ -107,6 +107,8 @@ Proof.
 Qed.
 
 Hint Immediate Same_set_refl Included_refl : Ensembles_DB.
+
+Ltac edb := eauto with Ensembles_DB.
 
 (** * Decidability  instances *)
 

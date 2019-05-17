@@ -5,10 +5,11 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms Sorting.Permutation Lists.SetoidPermutation.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From CertiCoq.L6 Require Import cps cps_util set_util eval List_util Ensembles_util functions
-     identifiers Heap.heap tactics Heap.heap_defs Heap.heap_equiv map_util.
-Require Import compcert.lib.Coqlib.
+From CertiCoq.L6 Require Import cps cps_util set_util List_util Ensembles_util functions
+     identifiers tactics map_util.
+From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv.
+
+From compcert.lib Require Import Coqlib.
 
 Import ListNotations.
 
@@ -21,98 +22,8 @@ Module GC (H : Heap).
   Module Equiv := HeapEquiv H.
 
   Import H Equiv.Defs.HL Equiv.Defs Equiv.
-  
 
-  (** * Size of CPS terms, values and environments, needed to express the upper bound on
-         the execution cost of certain transformations *)
-
-  (** The cost of constructing environments when evaluating e *)
-
-  (** The extra cost of evaluating CCed e *)
-  Fixpoint cost_time_exp (e : exp) : nat :=
-    match e with
-      | Econstr x _ ys e => max (3 * length ys) (cost_time_exp e)
-      | Ecase x l =>
-        max 3 ((fix sizeOf_l l :=
-                  match l with
-                    | [] => 0
-                    | (t, e) :: l => max (cost_time_exp e) (sizeOf_l l)
-                  end) l)
-      | Eproj x _ _ y e => max 3 (cost_time_exp e)
-      | Efun B e =>
-        max (1 + 4 * PS.cardinal (fundefs_fv B))
-            (max (cost_time_fundefs B) (cost_time_exp e))
-      | Eapp x _ ys => 6 + 3 * length ys
-      | Eprim x _ ys e => max (3 * length ys) (cost_time_exp e)
-      | Ehalt x => 3
-    end
-  with cost_time_fundefs (B : fundefs) : nat :=
-    match B with
-      | Fcons _ _ xs e B => max (cost_time_exp e) (cost_time_fundefs B)
-      | Fnil => 0
-    end.
-
-
-  Definition cost_env_app_exp_out (e : exp) : nat :=
-    match e with
-      | Econstr x _ ys e => 3 * length ys
-      | Ecase x l => 3
-      | Eproj x _ _ y e => 3
-      | Efun B e => 1 + 4 * PS.cardinal (fundefs_fv B)
-      | Eapp x _ ys => 3 + 3 * length ys
-      | Eprim x _ ys e => 3 * length ys
-      | Ehalt x => 3
-    end.
-      
-  (** Heap delta *)
-  Definition size_cc_block (b : block) : nat :=
-    match b with
-      | Constr _ vs => 0
-      | Clos v1 rho => 2
-      | Env rho => PS.cardinal (@mset (key_set rho) _)
-    end.
-
-  Definition size_cc_loc (l : loc) H1 :=
-  match get l H1 with
-    | Some b => size_val b
-    | None => 0
-  end.
-
-  (** The heap overheap of closure conversion -- remove functions not yet projected *)
-
-  Definition size_cc_heap (H : heap block) :=
-    size_with_measure size_cc_block H.
-  
-  Definition cost_value (c : fundefs -> nat) (v : value) : nat :=
-    match v with
-      | Loc _ => 0
-      | FunPtr B _ => c B
-    end.
-
-  Definition cost_block (c : fundefs -> nat) (b : block) : nat :=
-    match b with
-      | Constr _ vs => 0
-      | Clos v1 rho => cost_value c v1
-      | Env rho => 0
-    end.
-
-  (** The maximum cost of evaluating any function in the heap *)
-  Definition cost_heap (c : fundefs -> nat) (H : heap block) :=
-    max_with_measure (cost_block c) H.
-  
-  (** time cost of heap *)
-  Definition cost_time_heap := cost_heap cost_time_fundefs.
-  
-
-  (** The size of a closure after closure conversion including the closure environment *)
-  Definition size_fundefs (f : fundefs) : nat :=
-    (* Clos (FunPtr B f) rho ~ Constr f_clo [(Funtr B' f); Loc l]  *) 
-    3 + (* 3 words for each closure constructor *)
-    (* l ~> Contr env [l1; .... ; l_fvno] *)
-    PS.cardinal (fundefs_fv f) (* over-approximating the environment associated to each B by a factor of |B| *).
-
-
-  
+  (** GC specs **)
 
   (** Using S as the set of roots, garbage collect H1 *) 
   Definition collect (S : Ensemble loc) (H1 H2 : heap block) : Prop :=
@@ -133,8 +44,6 @@ Module GC (H : Heap).
     injective_subdomain (reach' H1 S) β.
 
 
-
-
   (** * Lemmas about [collect] -- DEPRICATED *)
   
   (** The reachable part of the heap before and after collection are the same *)
@@ -153,7 +62,6 @@ Module GC (H : Heap).
   Proof.
     now firstorder.
   Qed.
-
 
   
   (** * Lemmas about [live] *)  
@@ -257,8 +165,6 @@ Module GC (H : Heap).
   Qed.
 
 
-        
-  
   Lemma live_live'_inv S b  H1 H2 :
     live S H1 H2 b ->
     exists b', live' (image b S) H1 H2 b' /\ inverse_subdomain (reach' H2 S) b b'.
@@ -472,6 +378,56 @@ Module GC (H : Heap).
       eapply ToMSet_Same_set. symmetry. eassumption. tci. 
   Qed.
 
+  Lemma block_equiv_size_val b bl1 bl2 H1 H2 :
+    block_equiv (b, H1, bl1) (id, H2, bl2) ->
+    size_val bl1 = size_val bl2.
+  Proof. 
+    intros Hbl. eapply block_equiv_subst_block in Hbl.
+    destruct bl1; destruct bl2; try contradiction.
+    - simpl in *. f_equal. eapply Forall2_length. eassumption.
+    - reflexivity.
+    - simpl in Hbl. simpl.
+      unfold size_env. rewrite !PS.cardinal_spec.
+      do 2 f_equal. eapply elements_eq.
+      eapply Same_set_From_set. rewrite <- !mset_eq. eassumption. 
+  Qed.
+
+  Lemma heap_equiv_size_reachable S {_ : ToMSet S} H1 H2 b1 :
+    reach' H1 S |- H1 ≃_(b1, id) H2 ->
+    injective_subdomain (reach' H1 S) b1 ->
+    size_reachable S H1 = size_reachable (image b1 S) H2. 
+  Proof.
+    intros Heq Hinj. unfold size_reachable, size_with_measure_filter.
+    erewrite heap_elements_filter_set_Equal with (S1 := reach' H2 (image b1 S))
+                                                 (S2 := image b1 (reach' H1 S)). 
+    - eapply fold_permutationA; [ | | eapply heap_elements_filter_PermutationA; eauto;
+                                      [| intros bl1 bl2 Hbl; eapply block_equiv_size_val; eassumption ]].
+      + intros [x1 x2] [y1 y2] z. firstorder.
+      + intros z [x1 x2] [y1 y2] Heqf. firstorder.
+      + constructor.
+        intros x1. reflexivity.
+        intros x1 x2 x3 Hr1 Hr2; congruence.
+    - symmetry. eapply heap_equiv_reach_eq.
+      eapply heap_equiv_antimon. eassumption.
+      now eapply reach'_extensive. 
+  Qed.
+  
+  Corollary heap_env_equiv_reach_size e  H1 H2 rho1 rho2 b1 :
+    occurs_free e |- (H1, rho1) ⩪_( b1, id) (H2, rho2) ->
+    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) b1 ->
+    reach_size H1 rho1 e = reach_size H2 rho2 e. 
+  Proof.
+    intros Heq Hinj. unfold reach_size.
+    erewrite size_reachable_same_set with (S1 := (env_locs rho2 (occurs_free e)))
+                                          (S2 := image b1 (env_locs rho1 (occurs_free e))). 
+    eapply heap_equiv_size_reachable.
+    eapply heap_equiv_reach.
+    eapply heap_env_approx_heap_equiv_r. eassumption.
+    eassumption. 
+
+    eapply heap_env_equiv_image_post_n with (n := 0) in Heq. 
+    simpl in Heq. rewrite image_id in Heq. symmetry. eassumption. 
+  Qed.       
 
   Lemma heap_equiv_preserves_closed S β1 H1 H2 :
     S |- H1 ≃_(β1, id) H2 ->
@@ -600,94 +556,5 @@ Module GC (H : Heap).
     eapply HL.max_with_measure_filter_dom_sup. 
   Qed.
 
-
-  (** Sizes of equivalent blocks *)
-
-  Lemma block_equiv_size_cc_block b bl1 bl2 H1 H2 :
-    block_equiv (b, H1, bl1) (id, H2, bl2) ->
-    size_cc_block bl1 = size_cc_block bl2.
-  Proof. 
-    intros Hbl. eapply block_equiv_subst_block in Hbl.
-    destruct bl1; destruct bl2; try contradiction.
-    - reflexivity.
-    - reflexivity.
-    - simpl in *.
-      rewrite !PS.cardinal_spec. erewrite elements_eq. reflexivity.
-      eapply Same_set_From_set.
-      rewrite <- !mset_eq. eassumption.
-  Qed.
-
-  Lemma block_equiv_size_val b bl1 bl2 H1 H2 :
-    block_equiv (b, H1, bl1) (id, H2, bl2) ->
-    size_val bl1 = size_val bl2.
-  Proof. 
-    intros Hbl. eapply block_equiv_subst_block in Hbl.
-    destruct bl1; destruct bl2; try contradiction.
-    - simpl in *. f_equal. eapply Forall2_length. eassumption.
-    - reflexivity.
-    - simpl in Hbl. simpl.
-      unfold size_env. rewrite !PS.cardinal_spec.
-      do 2 f_equal. eapply elements_eq.
-      eapply Same_set_From_set. rewrite <- !mset_eq. eassumption. 
-  Qed.
-
-
-  Lemma block_equiv_cost_time_block b bl1 bl2 H1 H2 :
-    block_equiv (b, H1, bl1) (id, H2, bl2) ->
-    cost_block cost_time_fundefs bl1 = cost_block cost_time_fundefs bl2.
-  Proof. 
-    intros Hbl. eapply block_equiv_subst_block in Hbl.
-    destruct bl1; destruct bl2; try contradiction.
-    - reflexivity.
-    - simpl.
-      simpl in Hbl. destruct Hbl as [Hh1 Hh2].
-      destruct v0; destruct v2; try (simpl in *; congruence).
-      + destruct v; destruct v1; simpl in *; congruence.
-      + destruct v; destruct v1; simpl in *; congruence.
-    - reflexivity.
-   Qed.
-
-  Lemma heap_equiv_size_reachable S {_ : ToMSet S} H1 H2 b1 :
-    reach' H1 S |- H1 ≃_(b1, id) H2 ->
-    injective_subdomain (reach' H1 S) b1 ->
-    size_reachable S H1 = size_reachable (image b1 S) H2. 
-  Proof.
-    intros Heq Hinj. unfold size_reachable, size_with_measure_filter.
-    erewrite heap_elements_filter_set_Equal with (S1 := reach' H2 (image b1 S))
-                                                 (S2 := image b1 (reach' H1 S)). 
-    - eapply fold_permutationA; [ | | eapply heap_elements_filter_PermutationA; eauto;
-                                      [| intros bl1 bl2 Hbl; eapply block_equiv_size_val; eassumption ]].
-      + intros [x1 x2] [y1 y2] z. firstorder.
-      + intros z [x1 x2] [y1 y2] Heqf. firstorder.
-      + constructor.
-        intros x1. reflexivity.
-        intros x1 x2 x3 Hr1 Hr2; congruence.
-    - symmetry. eapply heap_equiv_reach_eq.
-      eapply heap_equiv_antimon. eassumption.
-      now eapply reach'_extensive. 
-  Qed.
-
-
-  (* TODO move *)
-  Definition reach_size (H : heap block) (rho : env) (e : exp) :=
-    size_reachable (env_locs rho (occurs_free e)) H. 
-
-   
-  Corollary heap_env_equiv_reach_size e  H1 H2 rho1 rho2 b1 :
-    occurs_free e |- (H1, rho1) ⩪_( b1, id) (H2, rho2) ->
-    injective_subdomain (reach' H1 (env_locs rho1 (occurs_free e))) b1 ->
-    reach_size H1 rho1 e = reach_size H2 rho2 e. 
-  Proof.
-    intros Heq Hinj. unfold reach_size.
-    erewrite size_reachable_same_set with (S1 := (env_locs rho2 (occurs_free e)))
-                                          (S2 := image b1 (env_locs rho1 (occurs_free e))). 
-    eapply heap_equiv_size_reachable.
-    eapply heap_equiv_reach.
-    eapply heap_env_approx_heap_equiv_r. eassumption.
-    eassumption. 
-
-    eapply heap_env_equiv_image_post_n with (n := 0) in Heq. 
-    simpl in Heq. rewrite image_id in Heq. symmetry. eassumption. 
-  Qed.       
 
 End GC.

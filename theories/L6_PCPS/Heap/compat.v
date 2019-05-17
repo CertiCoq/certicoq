@@ -6,9 +6,11 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
 From CertiCoq.L6 Require Import functions cps ctx eval cps_util identifiers ctx Ensembles_util
-     List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.closure_conversion Heap.GC
-     Heap.cc_log_rel tactics set_util map_util.
-From compcert Require Import lib.Coqlib.
+     List_util tactics set_util map_util.
+
+From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv GC space_sem cc_log_rel closure_conversion.
+
+From compcert.lib Require Import Coqlib.
 
 Import ListNotations.
 
@@ -1010,7 +1012,6 @@ Module Compat (H : Heap).
     Qed.
 
     (* TODO move *)
-
 
     Lemma heap_env_approx_binding_in_map S S' b1 H1 rho1 b2 H2 rho2 : 
       heap_env_approx S' (b1, (H1, rho1)) (b2, (H2, rho2)) ->

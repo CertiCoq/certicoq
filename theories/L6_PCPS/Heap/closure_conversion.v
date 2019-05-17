@@ -2,16 +2,21 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From CertiCoq.L6 Require Import cps cps_util set_util relations hoisting identifiers ctx
-                         Ensembles_util List_util alpha_conv functions.
-Require Import Coq.ZArith.Znumtheory.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String.
-Require Import Common.AstCommon.
-Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
-Import ListNotations Nnat MonadNotation.
-Require Import compcert.lib.Maps. 
+From CertiCoq.L6 Require Import cps cps_util set_util hoisting identifiers ctx
+     Ensembles_util List_util functions.
 
+From Coq Require Import ZArith.Znumtheory
+     Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+     NArith.BinNat PArith.BinPos Sets.Ensembles Strings.String.
+
+From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
+From Template Require Import BasicAst. (* For identifier names *)
+
+Import ListNotations Nnat MonadNotation.
+
+From compcert.lib Require Import Coqlib Maps. 
+
+Open Scope monad_scope.
 Open Scope ctx_scope.
 Open Scope fun_scope.
 Open Scope string.
@@ -36,43 +41,6 @@ Section CC.
     Eproj f' clo_tag 0%N f
           (Eproj Γ clo_tag 1%N f
                  (Eapp f' t (Γ :: xs))).
-
-  (* TODO move *)
-  Definition true_mut B :=
-    forall f ct xs e, fun_in_fundefs B (f, ct, xs, e) ->
-                 occurs_free_fundefs B \subset occurs_free e \/
-                 (exists f, f \in name_in_fundefs B :&: occurs_free e). 
-
-  (* No bogus mutual definitions --  *)
-  Inductive has_true_mut : exp -> Prop :=
-  | Tm_Econstr x c ys e :
-      has_true_mut e ->
-      has_true_mut (Econstr x c ys e)
-  | Tm_Ecase x pats :
-    Forall (fun ce => has_true_mut (snd ce)) pats ->
-    has_true_mut (Ecase x pats)
-  | Tm_Eproj x c n y e :
-      has_true_mut e ->
-      has_true_mut (Eproj x c n y e)
-  | Tm_Efun B e :
-      true_mut B ->
-      has_true_mut_funs B ->
-      has_true_mut e ->
-      has_true_mut (Efun B e)
-  | Tm_Eapp f ft xs :
-      has_true_mut (Eapp f ft xs)
-  | Tm_Eprim x f ys e :
-      has_true_mut e ->
-      has_true_mut (Eprim x f ys e)
-  | Tm_Ehalt x :
-      has_true_mut (Ehalt x)
-  with has_true_mut_funs : fundefs -> Prop :=
-       | Tm_Fcons f ft xs e B :  
-           has_true_mut e ->
-           has_true_mut_funs B ->
-           has_true_mut_funs (Fcons f ft xs e B)
-       | Tm_Fnil :
-           has_true_mut_funs Fnil.    
   
   Inductive project_var :
     Ensemble var -> (* Variables in the current scope *)
@@ -226,7 +194,7 @@ Section CC.
              Closure_conversion_fundefs B c FVs Fnil Fnil.
   
 
-  (** * Computational defintion of closure conversion *)
+  (** * Computational definition of closure conversion *)
   
   Inductive VarInfo : Type :=
   (* A free variable, i.e. a variable outside the scope of the current function.
@@ -489,7 +457,7 @@ Section CC.
          end.
 
 
-
+  (* Toplevel closure conversion program *)
   Definition closure_conversion_top
              (e : exp) (c : cTag) (Γ : var) (i : iTag) (cenv : cEnv) (nmap:M.t BasicAst.name) : exp * exp_ctx :=
     let next := ((Pos.max (max_var e 1%positive) Γ) + 1)%positive in

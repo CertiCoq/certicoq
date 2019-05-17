@@ -1,13 +1,12 @@
-(* Heaps for L6 semantics. Part of the CertiCoq project.
+(* Heaps for L6 space semantics. Part of the CertiCoq project.
  * Author: Zoe Paraskevopoulou, 2016
  *)
  
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms Sorting.Permutation.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From CertiCoq.L6 Require Import Ensembles_util functions List_util cps set_util.
-Require Import compcert.lib.Coqlib.
+From compcert.lib Require Import Coqlib.
 
 Import ListNotations.
 
@@ -16,6 +15,8 @@ Close Scope Z_scope.
 
 (** ** Heap module type **) 
 (** The memory model used in the L6 heap semantics *)
+
+(** In heap_impl.v we provide a concrete implementation that inhabits the module type **)
 
 Module Type Heap.
 
@@ -930,7 +931,7 @@ Module HeapLemmas (H : Heap).
     + intros x1 x2 [l1 x3] Hleq. simpl.
       eapply le_trans. eassumption. eapply Max.le_max_l.
     + intros x1 x2 [l1 x3] Hleq. simpl.
-      eapply NPeano.Nat.max_le_compat_r. eassumption.
+      eapply Nat.max_le_compat_r. eassumption.
     + intros [l1 x1] [l2 x2] y; simpl. 
       rewrite <- !Max.max_assoc, (Max.max_comm (f x1)).
       reflexivity.
@@ -953,7 +954,7 @@ Module HeapLemmas (H : Heap).
       * eapply le_trans. eapply IHls. eassumption.
         eapply fold_left_monotonic; [| omega ].
         intros x1 x2 [l1 y1] Hleq. simpl.
-        eapply NPeano.Nat.max_le_compat_r. eassumption.
+        eapply Nat.max_le_compat_r. eassumption.
   Qed.
 
   (** [size_with_measure_filter] lemmas *)

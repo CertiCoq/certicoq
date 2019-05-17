@@ -2,11 +2,10 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.Ensembles_util.
-Require Import compcert.lib.Coqlib.
-Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos
-        Coq.Relations.Relations Coq.Classes.Morphisms Coq.Lists.List
-        Coq.Sets.Ensembles Coq.Program.Basics.
+From CertiCoq.L6 Require Import Ensembles_util.
+From compcert.lib Require Import Coqlib.
+From Coq Require Import Numbers.BinNums NArith.BinNat PArith.BinPos Relations.Relations
+     Classes.Morphisms Lists.List Sets.Ensembles Program.Basics.
 
 Import ListNotations.
 

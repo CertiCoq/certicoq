@@ -1,6 +1,10 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega.
-Require Import L6.cps L6.tactics.
-Require Import Libraries.CpdtTactics L6.set_util.
+(* Evaluation contexts of the L6 CPS language
+ * Part of the CertiCoq project
+ *)
+
+From Coq Require Import Arith.Arith NArith.BinNat Lists.List omega.Omega.
+From CertiCoq.L6 Require Import cps tactics set_util.
+
 Import ListNotations.
 
 (** Expression evaluation contexts *)

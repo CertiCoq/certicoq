@@ -1,8 +1,12 @@
+(* M.t utilities. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016
+ *)
+
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
-Require Import L6.Ensembles_util L6.set_util L6.functions
-        compcert.lib.Maps.
+From CertiCoq.L6 Require Import Ensembles_util set_util functions.
+From compcert.lib Require Import Maps.
 
 Module M := Maps.PTree. 
 

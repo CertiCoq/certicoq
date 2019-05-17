@@ -7,11 +7,13 @@ Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.List_util
 Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
-Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
+Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Import ListNotations Nnat MonadNotation PS.
 Require Import compcert.lib.Maps.
 
 Close Scope Z_scope.
+Open Scope monad_scope.
+
 
 (** * Lambda lifting *)
 

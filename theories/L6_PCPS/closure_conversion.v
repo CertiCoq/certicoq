@@ -9,10 +9,13 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
+
 Import ListNotations Nnat MonadNotation.
-Require Import compcert.lib.Maps. 
+
+Require Import compcert.lib.Maps.
 
 Open Scope ctx_scope.
+Open Scope monad_scope.
 Open Scope fun_scope.
 Open Scope string.
 
@@ -248,7 +251,9 @@ Section CC.
   (** The state is the next available free variable, cTag and iTag and the tag environment *)
   Definition ccstate :=
     state state_contents.
-  
+
+  Import MonadNotation.
+
   (** Get a the name entry of a variable *)
   Definition get_name_entry (x : var) : ccstate BasicAst.name :=
     p <- get ;;

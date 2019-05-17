@@ -3,9 +3,10 @@
  *)
 
 From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos
-         MSets.MSetRBT Lists.List Sets.Ensembles Omega Sorting.Permutation Logic.Decidable.
-Require Import compcert.lib.Coqlib.
-From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util List_util size_cps tactics.
+     MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation Logic.Decidable.
+
+From compcert.lib Require Import Coqlib.
+From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util List_util tactics.
 
 Import ListNotations.
 
@@ -241,16 +242,6 @@ Proof.
   - destruct Hs; try contradiction. 
     edestruct H; eauto.
     eexists. erewrite def_funs_neq; eauto.
-Qed.
-
-Lemma fun_in_fundefs_sizeOf_exp B f tau xs e :
-  fun_in_fundefs B (f, tau, xs, e) ->
-  sizeOf_exp e <= sizeOf_fundefs B.
-Proof.
-  intros Hin. induction B; inv Hin.
-  - inv H. simpl; omega.
-  - eapply le_trans. eapply IHB; eauto.
-    simpl. omega.
 Qed.
 
 Instance ToMSet_name_in_fundefs B : ToMSet (name_in_fundefs B).
@@ -1057,6 +1048,44 @@ Proof.
     + destruct IHsplit_fds; eauto.
 Qed.
 
+(* Discards programs that have "bogus" mutual definitions (assumes unique bindings)*)
+Definition true_mut B :=
+  forall f ct xs e, fun_in_fundefs B (f, ct, xs, e) ->
+               occurs_free_fundefs B \subset occurs_free e \/
+               (exists f, f \in name_in_fundefs B :&: occurs_free e). 
+
+
+(* No bogus mutual definitions --  *)
+Inductive has_true_mut : exp -> Prop :=
+| Tm_Econstr x c ys e :
+    has_true_mut e ->
+    has_true_mut (Econstr x c ys e)
+| Tm_Ecase x pats :
+    Forall (fun ce => has_true_mut (snd ce)) pats ->
+    has_true_mut (Ecase x pats)
+| Tm_Eproj x c n y e :
+    has_true_mut e ->
+    has_true_mut (Eproj x c n y e)
+| Tm_Efun B e :
+    true_mut B ->
+    has_true_mut_funs B ->
+    has_true_mut e ->
+    has_true_mut (Efun B e)
+| Tm_Eapp f ft xs :
+    has_true_mut (Eapp f ft xs)
+| Tm_Eprim x f ys e :
+    has_true_mut e ->
+    has_true_mut (Eprim x f ys e)
+| Tm_Ehalt x :
+    has_true_mut (Ehalt x)
+with has_true_mut_funs : fundefs -> Prop :=
+     | Tm_Fcons f ft xs e B :  
+         has_true_mut e ->
+         has_true_mut_funs B ->
+         has_true_mut_funs (Fcons f ft xs e B)
+     | Tm_Fnil :
+         has_true_mut_funs Fnil.    
+
 (** ** Closed functions in expressions *)
 
 (** All functions defined in an expression are closed *)
@@ -1504,126 +1533,6 @@ Proof with now eauto with Ensembles_DB.
     eapply Union_Included. now eauto with Ensembles_DB.
     rewrite Union_assoc.
     rewrite Union_Setminus_Included; eauto with Ensembles_DB typeclass_instances.
-Qed.
-
-(* Lemma about the number of free variables *)
-Lemma occurs_free_cardinality_mut :
-  (forall e FVs,
-     FromList FVs \subset occurs_free e ->
-     NoDup FVs ->
-     length FVs <= sizeOf_exp e) /\
-  (forall B FVs,
-     FromList FVs \subset occurs_free_fundefs B ->
-     NoDup FVs ->
-     length FVs <= sizeOf_fundefs B).
-Proof.
-  exp_defs_induction IHe IHl IHb; intros FVs Heq Hnd;
-  try repeat normalize_occurs_free_in_ctx; simpl.
-  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-    eassumption.
-    rewrite <- HP in Hnd.
-    eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
-    eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
-      [| now apply Setminus_Included ].
-    eapply Same_set_FromList_length in Hin1.
-    eapply IHe in Hin2. omega.
-    eapply NoDup_cons_r; eauto. 
-    eapply NoDup_cons_l; eauto.
-  - rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
-    rewrite <- FromList_nil, <- FromList_cons in Heq.
-    eapply Same_set_FromList_length in Heq; eauto.
-  - rewrite Union_commut, <- Union_assoc, (Union_commut (occurs_free (Ecase v l))),
-    (Union_Same_set [set v]) in Heq.
-    edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-    eassumption.
-    rewrite <- HP in Hnd.
-    eapply Permutation_length in HP. rewrite <- HP.
-    rewrite !app_length.
-    eapply IHe in Hin1. eapply IHl in Hin2. simpl in *. omega.
-    eapply NoDup_cons_r; eauto. 
-    eapply NoDup_cons_l; eauto.
-    eapply Singleton_Included. eauto.
-  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-    eassumption.
-    rewrite <- HP in Hnd.
-    eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
-    eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
-      [| now apply Setminus_Included ].
-    rewrite <- (Union_Empty_set_neut_r [set v0]) in Hin1.
-    rewrite <- FromList_nil, <- FromList_cons in Hin1.
-    eapply Same_set_FromList_length in Hin1.
-    eapply IHe in Hin2. simpl in *. omega.
-    eapply NoDup_cons_r; eauto. 
-    eapply NoDup_cons_l; eauto.
-  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-    eassumption.
-    rewrite <- HP in Hnd.
-    eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
-    eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) _)) in Hin2;
-      [| now apply Setminus_Included ].
-    eapply IHb in Hin1. eapply IHe in Hin2. omega.
-    eapply NoDup_cons_r; eauto. 
-    eapply NoDup_cons_l; eauto.
-  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-    eassumption. rewrite <- HP in Hnd.
-    eapply Same_set_FromList_length in Hin1; eauto.
-    eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
-    rewrite <- (Union_Empty_set_neut_r [set v]) in Hin2.
-    rewrite <- FromList_nil, <- FromList_cons in Hin2.
-    eapply Same_set_FromList_length in Hin2.
-    simpl in *. omega.
-    eapply NoDup_cons_r; eauto. 
-    eapply NoDup_cons_l; eauto.
-  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-    eassumption.
-    rewrite <- HP in Hnd.
-    eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
-    eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
-      [| now apply Setminus_Included ].
-    eapply Same_set_FromList_length in Hin1.
-    eapply IHe in Hin2. omega.
-    eapply NoDup_cons_r; eauto. 
-    eapply NoDup_cons_l; eauto.
-  - rewrite occurs_free_Ehalt in Heq.
-    rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
-    rewrite <- FromList_nil, <- FromList_cons in Heq.
-    eapply Same_set_FromList_length in Heq; eauto.
-  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
-    eassumption. rewrite <- HP in Hnd.
-    eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
-    eapply (Included_trans (FromList l2) (Setminus var _ [set v])) in Hin2;
-      [| now apply Setminus_Included ].
-    eapply (Included_trans (FromList l1) (Setminus var _ _)) in Hin1;
-      [| now apply Setminus_Included ]. 
-    eapply IHe in Hin1. eapply IHb in Hin2. omega.
-    eapply NoDup_cons_r; eauto. 
-    eapply NoDup_cons_l; eauto.
-  - rewrite <- FromList_nil in Heq.
-    apply Same_set_FromList_length in Heq; eauto.
-Qed.
-
-Corollary occurs_free_cardinality :
-  (forall e FVs,
-     FromList FVs \subset occurs_free e ->
-     NoDup FVs ->
-     length FVs <= sizeOf_exp e).
-Proof.
-  eapply occurs_free_cardinality_mut.
-Qed.
-
-Corollary occurs_free_fundefs_cardinality :
-  (forall B FVs,
-     FromList FVs \subset occurs_free_fundefs B ->
-     NoDup FVs ->
-     length FVs <= sizeOf_fundefs B).
-Proof.
-  eapply occurs_free_cardinality_mut.
 Qed.
 
 (** Unique bindings - alternative definition without lists *)

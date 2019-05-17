@@ -18,6 +18,9 @@ Require Import ExtLib.Data.Positive.
 Require Import Coq.Bool.Bool.
 Require Import identifiers.  (* for max_var *)
 Require Import L6.List_util.
+
+Open Scope monad_scope. 
+
 Section UNCURRY.
   Import MonadNotation.
 

@@ -1,14 +1,15 @@
-(* Heap definitions for L6. Part of the CertiCoq project.
+(* Heap definitions for L6 intermediate language. Part of the CertiCoq project.
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From CertiCoq.L6 Require Import cps cps_util eval List_util Ensembles_util functions
-        identifiers Heap.heap tactics set_util map_util.
-Require Import compcert.lib.Coqlib.
+From CertiCoq.L6 Require Import cps cps_util List_util Ensembles_util functions
+        identifiers tactics set_util map_util.
+From CertiCoq.L6.Heap Require Import heap.
+From compcert.lib Require Import Coqlib.
+
 Import ListNotations.
 
 Open Scope Ensembles_scope.
@@ -211,7 +212,9 @@ Module HeapDefs (H : Heap) .
   (** Size of the heap *)
   Definition size_heap (H : heap block) : nat :=
     size_with_measure size_val H.
-  
+
+
+
   (** * Wel-formedness definitions *)
   
   (** A heap is well-formed if there are not dangling pointers in the stored values *)
@@ -834,7 +837,7 @@ Module HeapDefs (H : Heap) .
   Proof.
     split.
     + intros x Hin. destruct Hin as [k [Hleq Hin]].
-      destruct (NPeano.Nat.eq_dec k (m + 1)); subst.
+      destruct (Nat.eq_dec k (m + 1)); subst.
       * now right.
       * left. eexists. split; [| eassumption ]. omega.
     + intros x Hin. destruct Hin as [ x Hin | x Hin].
@@ -956,7 +959,7 @@ Module HeapDefs (H : Heap) .
     (post H ^ n) S \subset reach_n H m S.  
   Proof.
     intros Hsub1 Hleq.
-    edestruct NPeano.Nat.le_exists_sub as [n' [Hsum Hleq']]; subst.
+    edestruct Nat.le_exists_sub as [n' [Hsum Hleq']]; subst.
     eassumption.
     subst.
     destruct n'.
@@ -2632,7 +2635,9 @@ Module HeapDefs (H : Heap) .
   (** Size of the reachable portion of the heap *)
   Definition size_reachable (S : Ensemble loc) {Hmset : ToMSet S} (H : heap block) : nat :=
     size_with_measure_filter size_val (reach' H S) H.
-  
+
+  Definition reach_size (H : heap block) (rho : env) (e : exp) :=
+    size_reachable (env_locs rho (occurs_free e)) H. 
   
   Lemma size_reachable_same_set S1 S2 {H1 : ToMSet S1} {H2 : ToMSet S2} H :
     S1 <--> S2 ->

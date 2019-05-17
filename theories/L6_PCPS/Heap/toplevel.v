@@ -177,7 +177,7 @@ Module Top.
     - eapply Closure_conversion_toplevel_closed_cc in Hcc. unfold closed_exp in *.
       rewrite Hcc. split; intros x v Hin; inv Hin.
     - clear; now firstorder.
-    - unfold Pre. unfold size_heap, size_cc_heap.
+    - unfold Pre. unfold size_heap.
       rewrite !plus_O_n at 1.
       rewrite PS_cardinal_empty.
       simpl. rewrite <- plus_n_O.
@@ -251,7 +251,7 @@ Module Top.
     - eapply Closure_conversion_toplevel_closed_cc in Hcc. unfold closed_exp in *.
       rewrite Hcc. split; intros x v Hin; inv Hin.
     - clear; now firstorder.
-    - unfold Pre. unfold size_heap, size_cc_heap.
+    - unfold Pre. unfold size_heap.
       rewrite !plus_O_n at 1.
       rewrite PS_cardinal_empty.
       simpl. rewrite HL.size_with_measure_emp. omega.
@@ -279,3 +279,4 @@ Module Top.
 End Top.
 
 Print Assumptions Top.closure_conversion_correct_top.
+Print Assumptions Top.closure_conversion_correct_top_div.

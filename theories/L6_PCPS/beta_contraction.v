@@ -24,6 +24,7 @@ Record InlineHeuristic (St:Type) := {
   
 Section Beta.
   Import MonadNotation.
+  Open Scope monad_scope.
 
   Definition freshM := state positive.
 

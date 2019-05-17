@@ -6,12 +6,13 @@ From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx
                          Ensembles_util List_util hoare functions tactics.
 From CertiCoq.L6.Heap Require Import closure_conversion closure_conversion_util.
 
-Require Import compcert.lib.Coqlib.
-Require Import Coq.ZArith.Znumtheory ArithRing Coq.Relations.Relations Coq.Arith.Wf_nat.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+From compcert.lib Require Import Coqlib.
 
-Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
+From Coq Require Import ZArith.Znumtheory ArithRing Relations.Relations Arith.Wf_nat.
+        Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+        NArith.BinNat PArith.BinPos Sets.Ensembles Omega.
+
+From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
 
 Import ListNotations.
 Import MonadNotation.
@@ -19,10 +20,6 @@ Import MonadNotation.
 Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
-
-
-
-
 
 (** * Correspondence of the relational and the computational definitions of closure conversion *)
 
@@ -123,8 +120,6 @@ Section CC_sound.
     intros. eapply CCState_Funs_setminus in H.
     eapply H; eauto.
   Qed.
-
-  Ltac edb := eauto with Ensembles_DB.
   
   Lemma CCState_Funs_Union_Setminus_l Scope Funs FVs fenv s x :
     CCState (x |: Scope) (Funs \\ [set x]) fenv FVs s ->
@@ -735,29 +730,6 @@ Section CC_sound.
       subst. split; eauto. 
   Qed.
 
-  (* TODO move *)
-  Lemma pre_transfer_r :
-    forall (A S : Type) (Pre : S -> Prop) (Post : S -> A -> S -> Prop)
-      (e : state S A),
-      {{ Pre }} e {{ fun i x i' => Post i x i' }} -> 
-      {{ Pre }} e {{ fun i x i' => Pre i /\ Post i x i' }}.
-  Proof. 
-    intros.
-    eapply pre_strenghtening with (P := fun i => Pre i /\ Pre i). 
-    now firstorder. eapply frame_rule. eassumption.
-  Qed.
-  
-  Lemma pre_strenghtening_true :
-    forall (A S : Type) (Pre : S -> Prop) (Post : S -> A -> S -> Prop) e,
-      {{ fun _ => True }} e {{ Post }} -> 
-      {{ Pre }} e {{ Post }}.
-  Proof. 
-    intros.
-    eapply pre_strenghtening; [| eassumption ].
-    now firstorder.
-  Qed.
-
-  
   (** VarInfoMap properties *)
   
   Lemma var_map_emtpy :

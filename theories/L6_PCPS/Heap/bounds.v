@@ -26,10 +26,12 @@ Module Size (H : Heap).
          Util.C.LR.Sem.GC.Equiv.Defs Util.C.LR.Sem.GC
          Util.C.LR Util.C Util.
 
-  
-  (** * Postcondition *)
 
-  (** The cost of constructing environments when evaluating e *)
+
+  (** * Size of CPS terms and heaps, needed to express the upper bound on the execution cost of certain transformations *)
+
+
+  (** The extra cost incurred by closure conversion when evaluating *)
   Fixpoint cost_space_exp (e : exp) : nat :=
     match e with
       | Econstr x _ ys e => 1 + length ys + cost_space_exp e
@@ -55,6 +57,35 @@ Module Size (H : Heap).
            max (cost_space_exp e) (cost_space_funs B) 
          | Fnil => 0
          end.
+
+  Definition cost_value (c : fundefs -> nat) (v : value) : nat :=
+    match v with
+    | Loc _ => 0
+    | FunPtr B _ => c B
+    end.
+
+  Definition cost_block (c : fundefs -> nat) (b : block) : nat :=
+    match b with
+    | Constr _ vs => 0
+    | Clos v1 rho => cost_value c v1
+    | Env rho => 0
+    end.
+
+  (** The maximum cost of evaluating any function in the heap *)
+  Definition cost_heap (c : fundefs -> nat) (H : heap block) :=
+    max_with_measure (cost_block c) H.
+
+
+  Definition cost_env_app_exp_out (e : exp) : nat :=
+    match e with
+    | Econstr x _ ys e => 3 * length ys
+    | Ecase x l => 3
+    | Eproj x _ _ y e => 3
+    | Efun B e => 1 + 4 * PS.cardinal (fundefs_fv B)
+    | Eapp x _ ys => 3 + 3 * length ys
+    | Eprim x _ ys e => 3 * length ys
+    | Ehalt x => 3
+    end.
 
   
   Definition cost_space_heap H1 := cost_heap (fun B => cost_space_funs B + (1 + PS.cardinal (fundefs_fv B))) H1.
@@ -148,14 +179,6 @@ Module Size (H : Heap).
     rewrite Max.max_comm. eapply NPeano.Nat.max_compat; omega.
   Qed.
 
-  Lemma cost_time_heap_alloc H1 H1' l b :
-    alloc b H1 = (l, H1') ->
-    cost_time_heap H1' = max (cost_block cost_time_fundefs b)
-                             (cost_time_heap H1).
-  Proof.
-    intros. eapply cost_heap_alloc. eassumption.
-  Qed.
-
   Lemma cost_space_heap_alloc H1 H1' l b :
     alloc b H1 = (l, H1') ->
     cost_space_heap H1' = max (cost_block (fun B => cost_space_funs B + (1 + PS.cardinal (fundefs_fv B))) b)
@@ -202,17 +225,7 @@ Module Size (H : Heap).
     destruct B. reflexivity.
     congruence.
   Qed.
-
-
   
-  Lemma cost_time_heap_def_closures H1 H1' rho1 rho1' B rho :
-    def_closures B B rho1 H1 rho = (H1', rho1') ->
-    cost_time_heap H1' = max (cost_time_fundefs B) (cost_time_heap H1).
-  Proof.
-    intros Hdef. unfold cost_time_heap. erewrite cost_heap_def_closures; [| eassumption ].
-    destruct B; eauto.
-  Qed.
-
   Lemma cardinal_name_in_fundefs B :
     unique_functions B ->
     PS.cardinal (@mset (name_in_fundefs B) _) = numOf_fundefs B.
@@ -238,31 +251,33 @@ Module Size (H : Heap).
       rewrite <- FromSet_elements. rewrite <- mset_eq, FromList_nil. reflexivity. 
   Qed.
 
+  (** The extra cost of evaluating CCed e TODO *)
+  Fixpoint cost_time_exp (e : exp) : nat :=
+    match e with
+      | Econstr x _ ys e => max (3 * length ys) (cost_time_exp e)
+      | Ecase x l =>
+        max 3 ((fix sizeOf_l l :=
+                  match l with
+                    | [] => 0
+                    | (t, e) :: l => max (cost_time_exp e) (sizeOf_l l)
+                  end) l)
+      | Eproj x _ _ y e => max 3 (cost_time_exp e)
+      | Efun B e =>
+        max (1 + 4 * PS.cardinal (fundefs_fv B))
+            (max (cost_time_fundefs B) (cost_time_exp e))
+      | Eapp x _ ys => 6 + 3 * length ys
+      | Eprim x _ ys e => max (3 * length ys) (cost_time_exp e)
+      | Ehalt x => 3
+    end
+  with cost_time_fundefs (B : fundefs) : nat :=
+    match B with
+      | Fcons _ _ xs e B => max (cost_time_exp e) (cost_time_fundefs B)
+      | Fnil => 0
+    end.
 
-  Lemma size_cc_heap_alloc H1 H1' l b :
-    alloc b H1 = (l, H1') ->
-    size_cc_heap H1' = size_cc_block b + size_cc_heap H1.
-  Proof.
-    intros Hal. unfold size_cc_heap.
-    erewrite (HL.size_with_measure_alloc _ _ _ _ H1'); eauto.
-    simpl. omega.
-  Qed.
-  
-  Lemma size_cc_heap_def_closures H1 H1' rho1 rho1' B B0 rho :
-    unique_functions B ->
-    def_closures B B0 rho1 H1 rho = (H1', rho1') ->
-    size_cc_heap H1' = 2 * (numOf_fundefs B) + size_cc_heap H1.
-  Proof.
-    revert H1 H1' rho1'.
-    induction B; intros H1 H1' rho1' Hun Hclo.
-    - simpl in Hclo.
-      destruct (def_closures B B0 rho1 H1 rho) as [H2 rho2] eqn:Hclo'.
-      destruct (alloc (Clos (FunPtr B0 v) rho) H2) as [l' H3] eqn:Hal.
-      inv Hun. inv Hclo.
-      erewrite (size_cc_heap_alloc H2 H1'); [ | eassumption ].
-      erewrite  (IHB H1 H2 _ H4 Hclo'). simpl. omega. 
-    - inv Hclo. simpl. reflexivity. 
-  Qed.
+  (** time cost of heap *)
+  Definition cost_time_heap := cost_heap cost_time_fundefs.
+
 
   Lemma cost_env_app_exp_out_le e :
     cost_env_app_exp_out e <= cost_time_exp e.
@@ -278,14 +293,30 @@ Module Size (H : Heap).
     induction e; simpl; omega.
   Qed.
 
-  Lemma size_cc_heap_GC H1 H2 S `{ToMSet S} b : 
-    live' S H1 H2 b ->
-    size_cc_heap H2 <= size_cc_heap H1.
-  Proof.
-    intros. eapply live_size_with_measure_leq; [| eassumption | ].
-    eassumption.
-    intros. eapply block_equiv_size_cc_block. eassumption.
-  Qed. 
+  (* Lemma size_cc_heap_GC H1 H2 S `{ToMSet S} b :  *)
+  (*   live' S H1 H2 b -> *)
+  (*   size_cc_heap H2 <= size_cc_heap H1. *)
+  (* Proof. *)
+  (*   intros. eapply live_size_with_measure_leq; [| eassumption | ]. *)
+  (*   eassumption. *)
+  (*   intros. eapply block_equiv_size_cc_block. eassumption. *)
+  (* Qed.  *)
+
+  Lemma block_equiv_cost_time_block b bl1 bl2 H1 H2 :
+    block_equiv (b, H1, bl1) (id, H2, bl2) ->
+    cost_block cost_time_fundefs bl1 = cost_block cost_time_fundefs bl2.
+  Proof. 
+    intros Hbl. eapply block_equiv_subst_block in Hbl.
+    destruct bl1; destruct bl2; try contradiction.
+    - reflexivity.
+    - simpl.
+      simpl in Hbl. destruct Hbl as [Hh1 Hh2].
+      destruct v0; destruct v2; try (simpl in *; congruence).
+      + destruct v; destruct v1; simpl in *; congruence.
+      + destruct v; destruct v1; simpl in *; congruence.
+    - reflexivity.
+  Qed.
+
   
   Lemma cost_time_heap_GC H1 H2 S `{ToMSet S} b : 
     live' S H1 H2 b ->
@@ -457,19 +488,19 @@ Module Size (H : Heap).
            Hgetf1 Hgetl1 Hgetecl Hfind1 Hgetxs1 Hclo Hset1
            Hgetf2 Hgetxs2 Hset2 Hgetl2 Hfind2 Gc2. 
     assert (Hlen := Forall2_length _ _ _ Hall). inversion Hlen as [Hlen'].
-    assert (Hleq : Init.Nat.max (cost_time_exp e1) (cost_time_heap H1'') <=
-                   Init.Nat.max (cost_time_exp (Eapp f1 t xs1)) (cost_time_heap H1')). 
-    { eapply le_trans; [| now eapply Max.le_max_r ].
-      eapply Nat.max_lub. eapply le_trans.
-      eapply fun_in_fundefs_cost_time_fundefs.
-      eapply find_def_correct. eassumption.
-      eapply HL.max_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1.
-      eassumption.
-      eapply le_trans.
-      erewrite cost_time_heap_def_closures with (H1 := H1') (H1' := H1''); [| eassumption ].
-      eapply Max.max_lub.
-      eapply HL.max_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1.
-      eassumption. reflexivity. reflexivity. }
+    (* assert (Hleq : Init.Nat.max (cost_time_exp e1) (cost_time_heap H1'') <= *)
+    (*                Init.Nat.max (cost_time_exp (Eapp f1 t xs1)) (cost_time_heap H1')).  *)
+    (* { eapply le_trans; [| now eapply Max.le_max_r ]. *)
+    (*   eapply Nat.max_lub. eapply le_trans. *)
+    (*   eapply fun_in_fundefs_cost_time_fundefs. *)
+    (*   eapply find_def_correct. eassumption. *)
+    (*   eapply HL.max_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1. *)
+    (*   eassumption. *)
+    (*   eapply le_trans. *)
+    (*   erewrite cost_time_heap_def_closures with (H1 := H1') (H1' := H1''); [| eassumption ]. *)
+    (*   eapply Max.max_lub. *)
+    (*   eapply HL.max_with_measure_get with (f := cost_block cost_time_fundefs) in Hgetl1. *)
+    (*   eassumption. reflexivity. reflexivity. } *)
     
     { rewrite <- !plus_n_O in *. split.
       - split.
@@ -1336,7 +1367,7 @@ Module Size (H : Heap).
       
       assert (HMS1' : ToMSet S1').
       { eapply ToMSet_Same_set. symmetry. eassumption. eassumption. }
-      
+       
       erewrite <- !(@HL.size_with_measure_Same_set _ _ _ _ _ _ _ Hseq).
       eapply H; try eassumption; repeat setoid_rewrite Hseq at 1; try eassumption.
       
@@ -1677,7 +1708,7 @@ Module Size (H : Heap).
   Proof with (now eauto with Ensembles_DB).
     intros Hgetenv1 Hfd1 Hst1 Hl1 Hs2 Hdf2 Hl2 Hget Hlen Hreach Hdis Hun Heq1 Heq2. 
     unfold PreG, Pre.
-    unfold reach_size, size_reachable, size_heap, size_cc_heap.
+    unfold reach_size, size_reachable, size_heap.
     assert (Hdis' : Disjoint loc Scope
                              (env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1))). 
     { eapply Disjoint_Included_r.

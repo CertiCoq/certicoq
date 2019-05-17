@@ -1,11 +1,13 @@
-Require Import Libraries.CpdtTactics.
-Require Import compcert.lib.Coqlib.
-Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util L6.functions L6.tactics L6.map_util.
+(* Definitions of the L6 CPS intermediate representation.
+ * Part of the CertiCoq project.
+ *) 
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List
-        Coq.omega.Omega Coq.Sets.Ensembles Coq.Relations.Relation_Operators Classes.Morphisms.
-
-Require Import L6.cps L6.ctx L6.eval L6.Ensembles_util L6.List_util.
+From compcert.lib Require Import Coqlib.
+From CertiCoq.L6 Require Import cps ctx Ensembles_util List_util
+                                functions tactics map_util.
+From Coq Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
+     omega.Omega Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
+From Template Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
 
@@ -658,6 +660,61 @@ Proof with now eauto with Ensembles_DB.
     erewrite <- IHxs; eauto.
     now eauto with Ensembles_DB.
 Qed.
+
+
+(** A case statement only pattern matches constructors from the same inductive type *)
+Inductive caseConsistent cenv : list (cTag * exp) -> cTag -> Prop :=
+| CCnil  :
+    forall (t : cTag),
+      caseConsistent cenv nil t
+| CCcons :
+    forall (a a' b b':name) (l : list (cTag * exp)) (t t' : cTag) (ty ty' : iTag)
+      (n n' : N) (i i' : N) (e : exp),
+      M.get t cenv  = Some (a, b, ty, n, i) ->
+      M.get t' cenv = Some (a', b', ty', n', i') ->
+      ty = ty' ->
+      caseConsistent cenv l t ->
+      caseConsistent cenv ((t', e) :: l) t.
+  
+Fixpoint caseConsistent_f (cenv  : cEnv) (l:list (cTag * exp)) (t:cTag): bool :=
+  match l with
+  | nil => true
+  | (t', e)::l' =>
+    caseConsistent_f cenv l' t &&
+    match (M.get t cenv) with
+    | Some (a, _, ty, n, i) =>
+      (match (M.get t' cenv) with
+       | Some (a', _, ty', n', i') =>
+         Pos.eqb ty  ty'
+       | _ => false
+       end)
+    | _ => false
+    end
+  end.
+
+
+Theorem caseConsistent_c cenv:
+  forall l t,
+    caseConsistent cenv l t <-> caseConsistent_f cenv l t = true.
+Proof.
+  induction l; split; intros.
+  - reflexivity.
+  - constructor.
+  - inv H. simpl.
+    setoid_rewrite H2. setoid_rewrite H3.
+    apply andb_true_iff.
+    split.
+    apply IHl; auto.
+    apply Pos.eqb_refl. 
+  - simpl in H. simpl. 
+    destruct a.
+    inv H. 
+    edestruct andb_prop as [Ha1 Ha2]. eassumption. 
+    destruct (M.get t cenv) as [ [[[[? ?] ?] ?] ?] | ] eqn:tc; setoid_rewrite tc in Ha2; try congruence.
+      destruct (M.get c cenv) as [ [[[[? ?] ?] ?] ?] | ] eqn:tc'; setoid_rewrite tc' in Ha2; try congruence.
+      econstructor; eauto. apply Peqb_true_eq in Ha2. auto. apply IHl. auto.
+Qed.
+
 
 (** Lemmas about case consistent *)
 

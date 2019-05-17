@@ -5,10 +5,11 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
      MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
      Classes.Morphisms NArith.Ndist.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From CertiCoq.L6 Require Import cps ctx cps_util eval List_util Ensembles_util functions
-     identifiers Heap.heap Heap.heap_defs Heap.heap_equiv Heap.GC tactics set_util map_util.
-Require Import compcert.lib.Coqlib.
+From CertiCoq.L6 Require Import cps ctx cps_util List_util Ensembles_util functions
+     identifiers tactics set_util map_util.
+From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv GC.
+
+From compcert.lib Require Import Coqlib.
 
 
 Import ListNotations.
@@ -1880,39 +1881,39 @@ Module SpaceSem (H : Heap).
                 injective_subdomain (reach_ans r2) b2' /\
                 ans_equiv b1' r1 b2' r2).
   Proof with (now eauto with Ensembles_DB).
-  Admitted. 
+  Abort. 
 
-  Lemma big_step_GC_cc_mem_mon H rho e i i' m m' :
-    closed (reach' H (env_locs rho (occurs_free e))) H ->
-    big_step_GC_cc H rho e OOT i m ->
-    big_step_GC_cc H rho e OOT i' m' ->
-    i <= i' ->
-    m <= m'.
-  Proof.
-    intros Hc Hbs1 Hbs2 Hleq.
-    eapply big_step_GC_cc_OOT_mon in Hbs2; [| eassumption ].
-    edestruct Hbs2 as [m1 [Hleqm Hbs1']]. 
-    edestruct big_step_GC_cc_det as [ Hbseq _];
-    [ eassumption | eapply Hbs1 | eapply Hbs1' | | | | ] .
-    reflexivity.
-    clear. now firstorder.
-    reflexivity. omega.
-  Qed. 
+  (* Lemma big_step_GC_cc_mem_mon H rho e i i' m m' : *)
+  (*   closed (reach' H (env_locs rho (occurs_free e))) H -> *)
+  (*   big_step_GC_cc H rho e OOT i m -> *)
+  (*   big_step_GC_cc H rho e OOT i' m' -> *)
+  (*   i <= i' -> *)
+  (*   m <= m'. *)
+  (* Proof. *)
+  (*   intros Hc Hbs1 Hbs2 Hleq. *)
+  (*   eapply big_step_GC_cc_OOT_mon in Hbs2; [| eassumption ]. *)
+  (*   edestruct Hbs2 as [m1 [Hleqm Hbs1']].  *)
+  (*   edestruct big_step_GC_cc_det as [ Hbseq _]; *)
+  (*   [ eassumption | eapply Hbs1 | eapply Hbs1' | | | | ] . *)
+  (*   reflexivity. *)
+  (*   clear. now firstorder. *)
+  (*   reflexivity. omega. *)
+  (* Qed.  *)
 
-  Lemma big_step_GC_cc_mem_eq H rho e i m m' r :
-    closed (reach' H (env_locs rho (occurs_free e))) H ->
-    big_step_GC_cc H rho e OOT i m ->
-    big_step_GC_cc H rho e r i m' ->
-    m = m' /\ r = OOT.
-  Proof.
-    intros Hc Hbs1 Hbs2.
-    edestruct big_step_GC_cc_det as [Hmeq [b1 [b2 [Hi1 [Hi2 Heq]]]]];
-      [ eassumption | eapply Hbs1 | eapply Hbs2 | | | | ] .
-    reflexivity.
-    clear. now firstorder.
-    reflexivity.
-    split; eauto. destruct r; eauto. contradiction.
-  Qed. 
+  (* Lemma big_step_GC_cc_mem_eq H rho e i m m' r : *)
+  (*   closed (reach' H (env_locs rho (occurs_free e))) H -> *)
+  (*   big_step_GC_cc H rho e OOT i m -> *)
+  (*   big_step_GC_cc H rho e r i m' -> *)
+  (*   m = m' /\ r = OOT. *)
+  (* Proof. *)
+  (*   intros Hc Hbs1 Hbs2. *)
+  (*   edestruct big_step_GC_cc_det as [Hmeq [b1 [b2 [Hi1 [Hi2 Heq]]]]]; *)
+  (*     [ eassumption | eapply Hbs1 | eapply Hbs2 | | | | ] . *)
+  (*   reflexivity. *)
+  (*   clear. now firstorder. *)
+  (*   reflexivity. *)
+  (*   split; eauto. destruct r; eauto. contradiction. *)
+  (* Qed.  *)
   
 
 End SpaceSem.

@@ -6,10 +6,11 @@ From CertiCoq.L6 Require Import cps cps_util set_util hoisting identifiers ctx
                          Ensembles_util List_util functions eval tactics.
 From CertiCoq.L6.Heap Require Import closure_conversion heap heap_defs space_sem compat.
 
-Require Import compcert.lib.Coqlib.
-Require Import Coq.ZArith.Znumtheory ArithRing Coq.Relations.Relations Coq.Arith.Wf_nat.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+From compcert.lib Require Import Coqlib.
+
+From Coq Require Import ZArith.Znumtheory ArithRing Relations.Relations Arith.Wf_nat
+     Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+     NArith.BinNat PArith.BinPos Sets.Ensembles Omega.
 
 Import ListNotations.
 

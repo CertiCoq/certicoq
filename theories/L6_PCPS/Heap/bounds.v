@@ -176,7 +176,7 @@ Module Size (H : Heap).
   Proof.
     intros Hal. unfold cost_heap.
     erewrite (HL.max_with_measure_alloc _ _ _ _ H1'); eauto.
-    rewrite Max.max_comm. eapply NPeano.Nat.max_compat; omega.
+    rewrite Max.max_comm. eapply Nat.max_compat; omega.
   Qed.
 
   Lemma cost_space_heap_alloc H1 H1' l b :
@@ -264,9 +264,9 @@ Module Size (H : Heap).
   Proof. 
     induction B; intros Hin; inv Hin.
     - simpl. inv H.
-      eapply NPeano.Nat.le_max_l.
+      eapply Nat.le_max_l.
     - eapply le_trans. eapply IHB. eassumption.
-      simpl. eapply NPeano.Nat.le_max_r.
+      simpl. eapply Nat.le_max_r.
   Qed.
 
   (** * Compat lemmas *)
@@ -623,7 +623,7 @@ Module Size (H : Heap).
         erewrite (cost_space_heap_def_closures H' H1''); [| eassumption ].
         erewrite (cost_space_heap_alloc H1' H'); [| eassumption ].      
       destruct B1.
-        * rewrite !Nat.max_assoc. eapply NPeano.Nat.max_le_compat_r.
+        * rewrite !Nat.max_assoc. eapply Nat.max_le_compat_r.
           
           eapply Max.max_lub. eapply Max.max_lub.
           
@@ -635,7 +635,7 @@ Module Size (H : Heap).
           
           simpl. omega. 
           
-        * rewrite !Nat.max_assoc. eapply NPeano.Nat.max_le_compat_r.
+        * rewrite !Nat.max_assoc. eapply Nat.max_le_compat_r.
           
           eapply Max.max_lub.
           eapply le_trans; [| eapply Peano.le_n_S; eapply Max.le_max_l ].
@@ -804,7 +804,7 @@ Module Size (H : Heap).
       rewrite cost_alloc_ctx_CC_comp_ctx_f. 
       eapply (@project_var_cost_alloc_eq Scope1 Scope2 Funs1 _  Funs2 _) in H2.
       rewrite H2. erewrite IHHvar; eauto.
-      rewrite <- NPeano.Nat.mul_add_distr_l.
+      rewrite <- Nat.mul_add_distr_l.
       eapply Nat_as_OT.mul_cancel_l. omega.
       rewrite PS_cardinal_union.
       eapply Proper_carinal.
@@ -918,7 +918,7 @@ Module Size (H : Heap).
       rewrite H3. erewrite IHHvar; eauto.
       rewrite <- !plus_assoc, (plus_assoc _  (3 * _)), (plus_comm _ (3 * _)).
       rewrite !plus_assoc. 
-      rewrite <- NPeano.Nat.mul_add_distr_l.
+      rewrite <- Nat.mul_add_distr_l.
       rewrite <- plus_assoc. eapply f_equal2_plus. 
       + eapply Nat_as_OT.mul_cancel_l. omega.
         rewrite PS_cardinal_union. 
@@ -1032,7 +1032,7 @@ Module Size (H : Heap).
                                                 3 * PS.cardinal (@mset (Funs' :&: S \\ Scope') _))).
     omega.
      
-    rewrite <- NPeano.Nat.mul_add_distr_l.
+    rewrite <- Nat.mul_add_distr_l.
     rewrite PS_cardinal_union. eapply le_trans; [| eassumption ].
     
     eapply plus_le_compat_l.
@@ -1150,7 +1150,7 @@ Module Size (H : Heap).
                                (3 * PS.cardinal (@mset (Funs \\ Funs') _) +
                                 3 * PS.cardinal (@mset (Funs' :&: S \\ Scope') _))). 
     omega. 
-    rewrite  <- NPeano.Nat.mul_add_distr_l.
+    rewrite  <- Nat.mul_add_distr_l.
     rewrite PS_cardinal_union.
 
     eapply plus_le_compat_l. 
@@ -1495,7 +1495,7 @@ Module Size (H : Heap).
         eapply ToMSet_Setminus.
         
         rewrite <- PS_cardinal_union.
-        simpl. rewrite NPeano.Nat.mul_add_distr_l.
+        simpl. rewrite Nat.mul_add_distr_l.
         eapply f_equal2_plus.
         
         rewrite <- (Nat.mul_1_r (g _)). erewrite (Hyp B0 v f).

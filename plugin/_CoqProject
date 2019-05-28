@@ -8,9 +8,9 @@ extraction/char0.mli
 extraction/decidableClass.mli
 extraction/errors0.mli
 extraction/fMapPositive.mli
-extraction/fcore_FLT.mli
-extraction/fcore_Zaux.mli
-extraction/fcore_digits.mli
+extraction/FLT.mli
+extraction/Zaux.mli
+extraction/digits.mli
 extraction/list_util.mli
 extraction/monad0.mli
 extraction/monadState.mli
@@ -55,8 +55,8 @@ extraction/monad0.ml
 extraction/mSetInterface.mli
 extraction/list_util.ml
 extraction/l4_5_to_L5.mli
-extraction/fcore_digits.ml
-extraction/fcalc_bracket.mli
+extraction/digits.ml
+extraction/bracket.mli
 extraction/fMapPositive.ml
 extraction/errors0.ml
 extraction/decidableClass.ml
@@ -68,9 +68,9 @@ extraction/char0.ml
 extraction/astCommon.mli
 # extraction/ast0.ml
 extraction/astCommon.ml
-extraction/fcalc_round.mli
-extraction/fcore_FLT.ml
-extraction/fcore_Zaux.ml
+extraction/round.mli
+extraction/FLT.ml
+extraction/Zaux.ml
 extraction/integers.mli
 extraction/mSetRBT.mli
 extraction/mSetRBT.ml
@@ -117,16 +117,18 @@ extraction/l5_to_L6.mli
 extraction/l4_to_L4_1_to_L4_2.mli
 extraction/l4_5_to_L5.ml
 extraction/l4_2_to_L4_5.mli
-extraction/fcalc_bracket.ml
-extraction/fappli_IEEE.mli
+extraction/bracket.ml
+# extraction/fappli_IEEE.mli
 extraction/cexec.mli
 extraction/cexec.ml
 extraction/globalenvs.mli
 extraction/globalenvs.ml
 extraction/clightexec.mli
-extraction/fappli_IEEE_bits.mli
+# extraction/fappli_IEEE_bits.mli
+extraction/binary.mli
+extraction/bits.mli
 extraction/fappli_IEEE_extra.mli
-extraction/fcalc_round.ml
+extraction/round.ml
 extraction/archi.mli
 extraction/archi.ml
 extraction/memtype.mli
@@ -136,6 +138,8 @@ extraction/memdata.ml
 extraction/memory.mli
 extraction/memory.ml
 extraction/integers.ml
+extraction/binary.ml
+extraction/bits.ml
 extraction/floats.mli
 extraction/maps.ml
 extraction/values.mli
@@ -160,11 +164,11 @@ extraction/l5_to_L6.ml
 extraction/l4_to_L4_1_to_L4_2.ml
 extraction/l4_2_to_L4_5.ml
 extraction/l3_to_L3_eta.mli
-extraction/fappli_IEEE.ml
+# extraction/fappli_IEEE.ml
 extraction/clightexec.ml
 extraction/aST.mli
 extraction/ctypes.mli
-extraction/fappli_IEEE_bits.ml
+# extraction/fappli_IEEE_bits.ml
 extraction/fappli_IEEE_extra.ml
 extraction/floats.ml
 extraction/l3_to_L4.mli

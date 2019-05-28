@@ -97,7 +97,8 @@ Qed.
   integer (type [Z]) plus a proof that it is in the range 0 (included) to
   [modulus] (excluded). *)
 
-Record int: Type := mkint { intval: Z; intrange: -1 < intval < modulus }.
+Record int_: Type := mkint { intval: Z; intrange: -1 < intval < modulus }.
+Definition int := int_.
 
 (** Fast normalization modulo [2^wordsize] *)
 

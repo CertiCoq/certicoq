@@ -28,7 +28,7 @@ Require Import Events.
 Require Import Globalenvs.
 Require Import Ctypes.
 Require Import Cop.
-(* Require compcert.cfrontend.Cexec.   *)
+ Require compcert.cfrontend.Cexec.  
 Require Import Clight.
 Require Import compcert.lib.Maps.
 
@@ -306,9 +306,9 @@ Definition do_ef_free
 Definition do_ef_memcpy (sz al: Z) (vargs: list val) (m: mem) : res (val * mem) :=
   match vargs with
   | Vptr bdst odst :: Vptr bsrc osrc :: nil =>
-      check (Cexec.memcpy_check_args sz al bdst (Int.unsigned odst) bsrc (Int.unsigned osrc)), [MSG "memcpy check_args"];
-        do bytes <- force_opt (Mem.loadbytes m bsrc (Int.unsigned osrc) sz) [MSG "memcpy loadbytes"];
-        do m' <- force_opt (Mem.storebytes m bdst (Int.unsigned odst) bytes) [MSG "memcpy storebytes"];
+      check (Cexec.memcpy_check_args sz al bdst (Ptrofs.unsigned odst) bsrc (Ptrofs.unsigned osrc)), [MSG "memcpy check_args"];
+        do bytes <- force_opt (Mem.loadbytes m bsrc (Ptrofs.unsigned osrc) sz) [MSG "memcpy loadbytes"];
+        do m' <- force_opt (Mem.storebytes m bdst (Ptrofs.unsigned odst) bytes) [MSG "memcpy storebytes"];
         OK (Vundef, m')
   | _ => Error [MSG "memcpy bad args"]
   end.
@@ -332,38 +332,38 @@ Definition do_external (ef: external_function) (vargs: list val) (m: mem): res (
   | EF_malloc => do_ef_malloc vargs m
   | EF_free => do_ef_free vargs m
   | EF_memcpy sz al => do_ef_memcpy sz al vargs m
-  | EF_annot text targs => Error [MSG "annot "; MSG text]
-  | EF_annot_val text targ => Error [MSG "annot_val "; MSG text]
+  | EF_annot kind text targs => Error [MSG "annot "; MSG text]
+  | EF_annot_val kind text targ => Error [MSG "annot_val "; MSG text]
   | EF_inline_asm text sg clob => Error [MSG "inline_asm "; MSG text]
   | EF_debug kind text targs => Error [MSG "debug "; CTX kind; CTX text]
   end.
 
-Definition assign_copy_ok (ty: type) (b: block) (ofs: int) (b': block) (ofs': int) : Prop :=
-  (alignof_blockcopy ge ty | Int.unsigned ofs') /\ (alignof_blockcopy ge ty | Int.unsigned ofs) /\
-  (b' <> b \/ Int.unsigned ofs' = Int.unsigned ofs
-           \/ Int.unsigned ofs' + sizeof ge ty <= Int.unsigned ofs
-           \/ Int.unsigned ofs + sizeof ge ty <= Int.unsigned ofs').
+Definition assign_copy_ok (ty: type) (b: block) (ofs: ptrofs) (b': block) (ofs': ptrofs) : Prop :=
+  (alignof_blockcopy ge ty | Ptrofs.unsigned ofs') /\ (alignof_blockcopy ge ty | Ptrofs.unsigned ofs) /\
+  (b' <> b \/ Ptrofs.unsigned ofs' = Ptrofs.unsigned ofs
+           \/ Ptrofs.unsigned ofs' + sizeof ge ty <= Ptrofs.unsigned ofs
+           \/ Ptrofs.unsigned ofs + sizeof ge ty <= Ptrofs.unsigned ofs').
 
 Remark check_assign_copy:
-  forall (ty: type) (b: block) (ofs: int) (b': block) (ofs': int),
+  forall (ty: type) (b: block) (ofs: ptrofs) (b': block) (ofs': ptrofs),
   { assign_copy_ok ty b ofs b' ofs' } + {~ assign_copy_ok ty b ofs b' ofs' }.
 Proof with try (right; intuition omega).
   intros. unfold assign_copy_ok.
   assert (alignof_blockcopy ge ty > 0) by apply alignof_blockcopy_pos.
-  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Int.unsigned ofs')); auto...
-  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Int.unsigned ofs)); auto...
+  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Ptrofs.unsigned ofs')); auto...
+  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Ptrofs.unsigned ofs)); auto...
   assert (Y: {b' <> b \/
-              Int.unsigned ofs' = Int.unsigned ofs \/
-              Int.unsigned ofs' + sizeof ge ty <= Int.unsigned ofs \/
-              Int.unsigned ofs + sizeof ge ty <= Int.unsigned ofs'} +
+              Ptrofs.unsigned ofs' = Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs' + sizeof ge ty <= Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs + sizeof ge ty <= Ptrofs.unsigned ofs'} +
            {~(b' <> b \/
-              Int.unsigned ofs' = Int.unsigned ofs \/
-              Int.unsigned ofs' + sizeof ge ty <= Int.unsigned ofs \/
-              Int.unsigned ofs + sizeof ge ty <= Int.unsigned ofs')}).
+              Ptrofs.unsigned ofs' = Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs' + sizeof ge ty <= Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs + sizeof ge ty <= Ptrofs.unsigned ofs')}).
   destruct (eq_block b' b); auto.
-  destruct (zeq (Int.unsigned ofs') (Int.unsigned ofs)); auto.
-  destruct (zle (Int.unsigned ofs' + sizeof ge ty) (Int.unsigned ofs)); auto.
-  destruct (zle (Int.unsigned ofs + sizeof ge ty) (Int.unsigned ofs')); auto.
+  destruct (zeq (Ptrofs.unsigned ofs') (Ptrofs.unsigned ofs)); auto.
+  destruct (zle (Ptrofs.unsigned ofs' + sizeof ge ty) (Ptrofs.unsigned ofs)); auto.
+  destruct (zle (Ptrofs.unsigned ofs + sizeof ge ty) (Ptrofs.unsigned ofs')); auto.
   right; intuition omega.
   destruct Y... left; intuition omega.
 Defined.
@@ -381,8 +381,8 @@ Definition do_assign_loc (ty: type) (m: mem) (vp v: val): res mem :=
       match v with
       | Vptr b' ofs' =>
             check (check_assign_copy ty b ofs b' ofs') , [MSG "check_assign_copy failed"];
-            do bytes <- force_opt (Mem.loadbytes m b' (Int.unsigned ofs') (sizeof ge ty)) [MSG "loadbytes failed"];
-            force_opt (Mem.storebytes m b (Int.unsigned ofs) bytes) [MSG "storebytes failed"]
+            do bytes <- force_opt (Mem.loadbytes m b' (Ptrofs.unsigned ofs') (sizeof ge ty)) [MSG "loadbytes failed"];
+            force_opt (Mem.storebytes m b (Ptrofs.unsigned ofs) bytes) [MSG "storebytes failed"]
       | _ => Error [MSG "mem copy at not-a-pointer"]
       end
   | _ => Error [MSG "illegal access_mode for assignment"]
@@ -589,9 +589,9 @@ Definition do_initial_state_wo_main (p: program): res (genv * state * block) :=
   let (m, b) := Mem.alloc m0 0 (sizeof ge.(genv_cenv) (Tstruct threadInfIdent noattr)) in
   let (m', b0) := Mem.alloc m 0 (size_chunk Mint32) in
   do m'' <- force_opt (Mem.store Mint32 m' b0 0 (Vint (Int.repr 0))) [MSG "0 store failed"];
-  do m3 <- force_opt (Mem.store Mint32 m'' b 0 (Vptr b0 (Int.repr 0))) [MSG "alloc ptr store failed"];
-  do m4 <- force_opt (Mem.store Mint32 m3 b (size_chunk Mint32) (Vptr b0 (Int.repr 0))) [MSG "limit ptr store failed"];
-  OK (ge, Callstate f ((Vptr b (Int.repr 0))::nil) Kstop m4, b).
+  do m3 <- force_opt (Mem.store Mint32 m'' b 0 (Vptr b0 (Ptrofs.repr 0))) [MSG "alloc ptr store failed"];
+  do m4 <- force_opt (Mem.store Mint32 m3 b (size_chunk Mint32) (Vptr b0 (Ptrofs.repr 0))) [MSG "limit ptr store failed"];
+  OK (ge, Callstate f ((Vptr b (Ptrofs.repr 0))::nil) Kstop m4, b).
 
 Definition at_final_state_wo_main (S:state):res unit := 
   match S with

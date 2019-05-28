@@ -13,6 +13,7 @@ Require compcert.common.AST
 
 Require L6.L5_to_L6
         L7.L6_to_Clight
+        L7.Clightexec
         Compiler.allInstances.
 
 (* Standard lib *)
@@ -77,6 +78,6 @@ Separate Extraction
          Floats.Float32.to_bits Floats.Float.to_bits *)
          String.length
          Compiler.allInstances.printProg
-         Compiler.allInstances.compile_template_L7.
-(*         L7.Clightexec.run. *)
+         Compiler.allInstances.compile_template_L7
+         L7.Clightexec.run. 
 Cd "..".

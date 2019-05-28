@@ -8,8 +8,8 @@ extraction/char0.mli
 extraction/decidableClass.mli
 extraction/errors0.mli
 extraction/fMapPositive.mli
-extraction/FLT.mli
-extraction/Zaux.mli
+extraction/fLT.mli
+extraction/zaux.mli
 extraction/digits.mli
 extraction/list_util.mli
 extraction/monad0.mli
@@ -69,8 +69,8 @@ extraction/astCommon.mli
 # extraction/ast0.ml
 extraction/astCommon.ml
 extraction/round.mli
-extraction/FLT.ml
-extraction/Zaux.ml
+extraction/fLT.ml
+extraction/zaux.ml
 extraction/integers.mli
 extraction/mSetRBT.mli
 extraction/mSetRBT.ml

@@ -886,7 +886,7 @@ Proof.
 Qed.
 End OldProof.
 
-
+(* OS 05/19 - We no longer use L5a, going instead from L5 -> L6
 Require Import L4.L5a.
 
 (* Fix. Define subst and evaluation on L5a by going to L5 via a bijection? *)
@@ -930,6 +930,9 @@ Definition ctranslateEvalL5a `{F:utils.Fuel}
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm certiL5)}
    (p: Template.Ast.program) (n:nat) : bigStepResult (option L5a.cps)  (option L5a.val_c) :=
   mapBigStepRes (L5a.translateCPS ∘ snd) (L5a.translateVal ∘ snd) (ctranslateEval certiL5 p n).
+
+*)
+
 
 (*
 Require Import Template.Template.

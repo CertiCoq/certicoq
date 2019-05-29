@@ -23,11 +23,11 @@ Module SpaceSem (H : Heap).
   (* The cost of evaluating the head constructor before CC *)
   Definition cost (e : exp) : nat :=
     match e with
-      | Econstr x t ys e => 1 + length ys
+      | Econstr x t ys e => 1 + List.length ys
       | Ecase y cl => 1 
       | Eproj x t n y e => 1
       | Efun B e => 1
-      | Eapp f t ys => 1 + length ys
+      | Eapp f t ys => 1 + List.length ys
       | Eprim x p ys e => 0
       | Ehalt x => 1
     end.
@@ -245,10 +245,10 @@ Module SpaceSem (H : Heap).
 
   Fixpoint cost_ctx_full (c : exp_ctx) : nat :=
     match c with
-      | Econstr_c x t ys c => 1 + length ys + cost_ctx_full c
+      | Econstr_c x t ys c => 1 + List.length ys + cost_ctx_full c
       | Eproj_c x t n y c => 1 + cost_ctx_full c
       | Efun1_c B c => 1 + cost_ctx_full c
-      | Eprim_c x p ys c => 1 + length ys + cost_ctx_full c
+      | Eprim_c x p ys c => 1 + List.length ys + cost_ctx_full c
       | Hole_c => 0
       | Efun2_c B _ => cost_ctx_full_f B
       | Ecase_c _ _ _ c _ => cost_ctx_full c
@@ -262,10 +262,10 @@ Module SpaceSem (H : Heap).
   
   Fixpoint cost_ctx (c : exp_ctx) : nat :=
     match c with
-      | Econstr_c x t ys c => 1 + length ys
+      | Econstr_c x t ys c => 1 + List.length ys
       | Eproj_c x t n y c => 1 
       | Efun1_c B c => 1
-      | Eprim_c x p ys c => 1 + length ys
+      | Eprim_c x p ys c => 1 + List.length ys
       | Hole_c => 0
       | Efun2_c _ _ => 0 (* maybe fix but not needed for now *)
       | Ecase_c _ _ _ _ _ => 0
@@ -342,7 +342,7 @@ Module SpaceSem (H : Heap).
   (** Allocation cost of an evaluation context *)
   Fixpoint cost_alloc_ctx (c : exp_ctx) : nat :=
     match c with
-      | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx c
+      | Econstr_c x t ys c => 1 + List.length ys + cost_alloc_ctx c
       | Eproj_c x t n y c => cost_alloc_ctx c
       | Efun1_c B c => 1 + (numOf_fundefs B) + cost_alloc_ctx c
       (* not relevant *)
@@ -361,7 +361,7 @@ Module SpaceSem (H : Heap).
   (** Allocation cost of an evaluation context *)
   Fixpoint cost_alloc_ctx_CC (c : exp_ctx) : nat :=
     match c with
-      | Econstr_c x t ys c => 1 + length ys + cost_alloc_ctx_CC c
+      | Econstr_c x t ys c => 1 + List.length ys + cost_alloc_ctx_CC c
       | Eproj_c x t n y c => cost_alloc_ctx_CC c
       | Efun1_c B c =>  cost_alloc_ctx_CC c
       (* not relevant *)
@@ -637,7 +637,7 @@ Module SpaceSem (H : Heap).
     - rewrite <- plus_n_O. eassumption.
     - econstructor; eauto. simpl. omega.
       simpl.
-      assert (Heq : c1 + (c + S (length ys)) - S (length ys) = (c1 + c)) by omega.
+      assert (Heq : c1 + (c + S (List.length ys)) - S (List.length ys) = (c1 + c)) by omega.
       specialize (IHHctx e c1). rewrite <- Heq in IHHctx.
       eapply IHHctx. eassumption.
     - econstructor; eauto. simpl. omega.

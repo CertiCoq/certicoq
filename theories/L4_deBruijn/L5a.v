@@ -11,8 +11,10 @@ Set Implicit Arguments.
 
 Require Import SquiggleEq.varImplZ.
 
-Require Import L6.cps.
+ Require Import L6.cps. 
 Require Import L4.variables.
+(* Require Import compcert.lib.Maps.
+Module M := Maps.PTree. *)
 
 (**********************)
 (** * CPS expressions *)

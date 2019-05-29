@@ -4697,7 +4697,7 @@ Transparent rename.
       eapply preord_env_P_getlist_l in H8; eauto.
       destructAll.      
       specialize (H4 vs x0 (k-1) t xs e rho''). 
-      assert ( length vs = length x0).
+      assert ( List.length vs = List.length x0).
       eapply Forall2_length; eauto.
       symmetry in H13.
       specialize (H4 H7 H10 H13).
@@ -4728,7 +4728,7 @@ Transparent rename.
       destruct x1.  inversion H6.
       2: inversion H6.
       simpl in H6.
-      assert (length vs = length x0).
+      assert (List.length vs = List.length x0).
       eapply Forall2_length; eauto.
       symmetry in H13.
       specialize (H6 vs x0 (k-1) t xs e rho'' H7 H10 H13).
@@ -4988,7 +4988,7 @@ Qed.
 
 Theorem Dom_map_set_list:
   forall (sig: M.t var) lx ly,
-  length lx = length ly ->
+    List.length lx = List.length ly ->
   Same_set _ (Dom_map (set_list (combine lx ly) sig)) (Union _ (FromList lx) (Dom_map sig)).
 Proof.
   induction lx.
@@ -5107,7 +5107,7 @@ Theorem FromList_apply_r_list:
   Qed.      
 
   Theorem Dom_map_setlist_ss: forall xs vs,
-                             length xs = length vs -> 
+                             List.length xs = List.length vs -> 
     Same_set _  (Dom_map (set_list (combine xs vs) (M.empty var)))
                 (FromList xs).
   Proof.
@@ -5807,12 +5807,12 @@ Proof.
   - inv H0. destruct vs; inv H4.
     rewrite <- (proj1 rename_all_empty).
     apply preord_exp_refl. apply preord_env_P_refl.    
-  - assert (length (a::xs) = length vs).
+  - assert (List.length (a::xs) = List.length vs).
     eapply setlist_length_eq. apply H0.
     destruct vs; simpl in H3.
     inv H3.
     simpl in H0.
-    assert (length ys = length (v::vs)).
+    assert (List.length ys = List.length (v::vs)).
     eapply getlist_length_eq. apply H.
     destruct ys; simpl in H3. inv H4.
     simpl in H.
@@ -5977,7 +5977,7 @@ Proof.
   assert (Included var (FromList vs) (occurs_free (Eapp f t vs))). rewrite occurs_free_Eapp. left. auto.
   assert (gvsr2' := preord_env_P_getlist_l _ _ _ _ _ _ _ _ H6 H9 gvsr1').
   destructAll. 
-  assert (length xs = length x).  
+  assert (List.length xs = List.length x).  
   apply setlist_length_eq in Hr1'.
   apply getlist_length_eq in H10.
   apply getlist_length_eq in gvsr1'.
@@ -7019,7 +7019,7 @@ Qed.
 Theorem of_fun_inline':
   forall f fds t xs fb vs,
     find_def f fds = Some (t, xs, fb) ->
-    length xs = length vs ->
+    List.length xs = List.length vs ->
   (Setminus var
             (occurs_free
                (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb))
@@ -7059,7 +7059,7 @@ Qed.
 Theorem of_fun_inline'':
   forall f fds t xs fb vs,
     find_def f fds = Some (t, xs, fb) ->
-    length xs = length vs ->
+    List.length xs = List.length vs ->
     Union var 
           (occurs_free
              (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb))
@@ -7211,7 +7211,7 @@ Qed.
 Theorem of_fun_inline''':
   forall xs vs fb t c f fds,
     find_def f fds = Some (t, xs, fb) ->
-    length xs = length vs ->
+    List.length xs = List.length vs ->
     Included _ (occurs_free (Efun fds (c |[ (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb)]|)))
              (occurs_free (Efun fds (c |[ Eapp f t vs ]|))).
 Proof.
@@ -7331,7 +7331,7 @@ Inductive sr_rw: relation exp :=
                  nthN ys n = Some k -> 
                  sr_rw (Econstr x t ys (c |[Eproj v t' n x e]|)) (Econstr x t ys (c |[ rename_all_ns (M.set v k (M.empty var)) e]|))
 | Fun_inline_s: forall c  vs f  t xs fb  B1 B2,
-                length xs = length vs ->
+                List.length xs = List.length vs ->
                 num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|)) f 1 ->
                 sr_rw (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|))
                    (Efun (fundefs_append B1 B2) (c |[ (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb)]|)).                     
@@ -8275,7 +8275,7 @@ Theorem of_fun_inline:
      num_occur
          (Efun (fundefs_append B1 (Fcons f t xs fb B2))
                (c |[ Eapp f t vs ]|)) f 1 ->
-    length xs = length vs ->
+     List.length xs = List.length vs ->
     Included _ (occurs_free (c' |[Efun (fundefs_append B1 B2) (c |[ (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb)]|) ]|))
              (occurs_free (c' |[ Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|) ]|)).
 Proof.

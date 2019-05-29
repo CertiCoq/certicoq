@@ -134,7 +134,7 @@ Module GC (H : Heap).
   (** The cost of evaluating e *)
   Fixpoint cost_time_exp (e : exp) : nat :=
     match e with
-      | Econstr x _ ys e => max (3 * length ys) (cost_time_exp e)
+      | Econstr x _ ys e => max (3 * List.length ys) (cost_time_exp e)
       | Ecase x l =>
         max 3 ((fix sizeOf_l l :=
                   match l with
@@ -143,8 +143,8 @@ Module GC (H : Heap).
                   end) l)
       | Eproj x _ _ y e => max 3 (cost_time_exp e)
       | Efun B e => max (1 + 4 * PS.cardinal (fundefs_fv B)) (max (cost_time_fundefs B) (cost_time_exp e))
-      | Eapp x _ ys => 6 + 3 * length ys
-      | Eprim x _ ys e => max (length ys) (cost_time_exp e)
+      | Eapp x _ ys => 6 + 3 * List.length ys
+      | Eprim x _ ys e => max (List.length ys) (cost_time_exp e)
       | Ehalt x => 3
     end
   with cost_time_fundefs (B : fundefs) : nat :=
@@ -156,12 +156,12 @@ Module GC (H : Heap).
 
   Definition cost_env_app_exp_out (e : exp) : nat :=
     match e with
-      | Econstr x _ ys e => 3 * length ys
+      | Econstr x _ ys e => 3 * List.length ys
       | Ecase x l => 3
       | Eproj x _ _ y e => 3
       | Efun B e => 1 + 4 * PS.cardinal (fundefs_fv B)
-      | Eapp x _ ys => 3 + 3 * length ys
-      | Eprim x _ ys e => length ys
+      | Eapp x _ ys => 3 + 3 * List.length ys
+      | Eprim x _ ys e => List.length ys
       | Ehalt x => 3
     end.
       

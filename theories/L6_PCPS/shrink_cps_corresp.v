@@ -4458,7 +4458,7 @@ Section CONTRACT.
   Theorem FromList_set_list:
     forall {A} x y sig l (l':list A),
       M.get x (set_list (combine l l') sig) = Some y ->
-      length l = length l' ->
+      List.length l = List.length l' ->
       FromList l x ->
       FromList l' y.
   Proof.
@@ -4523,7 +4523,7 @@ Section CONTRACT.
 
   Theorem length_apply_r_list:
     forall sig l,
-      length (apply_r_list sig l) = length l.
+      List.length (apply_r_list sig l) = List.length l.
   Proof.
     induction l; simpl; auto.
   Qed.
@@ -5450,7 +5450,7 @@ Section CONTRACT.
   
   Theorem  update_count_inlined_dom:
     forall v0 lx ly count,
-      length lx = length ly ->
+      List.length lx = List.length ly ->
       FromList lx v0 ->
       Disjoint _ (FromList ly) (FromList lx) ->
       get_c v0
@@ -5520,7 +5520,7 @@ Section CONTRACT.
 
   Theorem e_sum_range_n:
     forall e v lx ly,
-      length lx  = length ly ->
+      List.length lx  = List.length ly ->
       exists n, sum_range_n lx ly e v n.
   Proof.
     induction lx; intros; destruct ly; inv H. exists 0; constructor.
@@ -5764,7 +5764,7 @@ Section CONTRACT.
   Theorem sum_range_length:
     forall v0 e lx ly n,
       sum_range_n lx ly e v0 n ->
-      length lx = length ly.
+      List.length lx = List.length ly.
   Proof.
     induction lx; intros. inv H; auto.
     inv H. apply IHlx in H2. simpl; auto.
@@ -5774,7 +5774,7 @@ Section CONTRACT.
   Theorem sum_range_not_occur:
     forall v e ly lx,
       ~ FromList ly v ->
-      length lx = length ly ->
+      List.length lx = List.length ly ->
       sum_range_n lx ly e v 0.
   Proof.
     induction ly; intros.
@@ -5885,7 +5885,7 @@ Section CONTRACT.
                                                          (Efun1_c
                                                             (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0)) inl))  (rename_all_ns sig (Eapp v f l)) ->
       num_occur ce (apply_r sig v) 1 ->
-      length l0 = length l ->
+      List.length l0 = List.length l ->
       c_count
         (rename_all_ctx_ns sig
                            (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0)) inl)
@@ -8789,7 +8789,7 @@ Section CONTRACT.
           split; auto. split; auto.
           simpl in H5. apply sig_inv_combine in H5. destruct H5. auto.
         * (* eligible to be inlined? *)
-          destruct (andb (Pos.eqb f0 f) (andb (Init.Nat.eqb (length l) (length l0)) (negb (get_b (apply_r sig v) inl)))) eqn:Hel.
+          destruct (andb (Pos.eqb f0 f) (andb (Init.Nat.eqb (List.length l) (List.length l0)) (negb (get_b (apply_r sig v) inl)))) eqn:Hel.
           { 
             (* function inlining *)
             apply andb_true_iff in Hel.

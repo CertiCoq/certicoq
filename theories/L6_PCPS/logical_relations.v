@@ -58,7 +58,7 @@ Section Log_rel.
           | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
             forall (vs1 vs2 : list val) (j : nat) (t : fTag) 
               (xs1 : list var) (e1 : exp) (rho1' : env),
-              length vs1 = length vs2 ->
+              List.length vs1 = List.length vs2 ->
               find_def f1 defs1 = Some (t, xs1, e1) ->
               Some rho1' = setlist xs1 vs1 (def_funs defs1 defs1 rho1 rho1) ->
               exists (xs2 : list var) (e2 : exp) (rho2' : env),
@@ -93,7 +93,7 @@ Section Log_rel.
       | Vfun rho1 defs1 f1, Vfun rho2 defs2 f2 =>
         forall (vs1 vs2 : list val) j (t : fTag) (xs1 : list var)
           (e1 : exp) (rho1' : env),
-          length vs1 = length vs2 -> 
+          List.length vs1 = List.length vs2 -> 
           find_def f1 defs1 = Some (t, xs1, e1) ->
           Some rho1' = setlist xs1 vs1 (def_funs defs1 defs1 rho1 rho1) ->
           exists (xs2 : list var) (e2 : exp) (rho2' : env),
@@ -1732,7 +1732,7 @@ Section Log_rel.
             Vconstr tag ((Vfun rho2 defs2 f2) ::  (Vconstr tag' fvs) :: l)  =>
             forall (vs1 vs2 : list val) (j : nat) (t : fTag) 
               (xs1 : list var) (e1 : exp) (rho1' : env),
-              length vs1 = length vs2 ->
+              List.length vs1 = List.length vs2 ->
               find_def f1 defs1 = Some (t, xs1, e1) ->
               Some rho1' = setlist xs1 vs1 (def_funs defs1 defs1 rho1 rho1) ->
               exists (Γ : var) (xs2 : list var) (e2 : exp) (rho2' : env),
@@ -1773,7 +1773,7 @@ Section Log_rel.
         Vconstr tag ((Vfun rho2 defs2 f2) ::  (Vconstr tag' fvs) :: l) =>
         forall (vs1 vs2 : list val) (j : nat) (t : fTag) 
           (xs1 : list var) (e1 : exp) (rho1' : env),
-          length vs1 = length vs2 ->
+          List.length vs1 = List.length vs2 ->
           find_def f1 defs1 = Some (t, xs1, e1) ->
           Some rho1' = setlist xs1 vs1 (def_funs defs1 defs1 rho1 rho1) ->
           exists (Γ : var) (xs2 : list var) (e2 : exp) (rho2' : env),
@@ -2200,7 +2200,7 @@ Section Log_rel.
   Lemma cc_approx_exp_constr_compat k (S S' : relation nat) P
         rho1 rho2 x t ys1 ys2 e1 e2 :
     Forall2 (cc_approx_var_env k P rho1 rho2) ys1 ys2 ->
-    (forall c1 c2 c, 1 + length ys1 <= c -> S c1 c2 -> S' (c1 + c) (c2 + c)) ->
+    (forall c1 c2 c, 1 + List.length ys1 <= c -> S c1 c2 -> S' (c1 + c) (c2 + c)) ->
     (forall vs1 vs2 : list val,
        (* needed by cost proof *)
        getlist ys1 rho1 = Some vs1 ->
@@ -2324,7 +2324,7 @@ Section Log_rel.
           cc_approx_val k S v1 v2.
   
   Lemma cc_approx_exp_prim_compat k (S S' : relation nat) P rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
-    (forall c1 c2 c, 1 + length ys1 <= c -> S c1 c2 -> S' (c1 + c) (c2 + c)) ->
+    (forall c1 c2 c, 1 + List.length ys1 <= c -> S c1 c2 -> S' (c1 + c) (c2 + c)) ->
     Forall2 (cc_approx_var_env k P rho1 rho2) ys1 ys2 ->
     (forall v1 v2 vs f',
        (* needed by the cost proof *)

@@ -181,7 +181,7 @@ Module CC_log_rel (H : Heap).
                   
                   def_closures B1 B1 rho_clo H1' (Loc env_loc1') =  (H1'', rho_clo1) ->
                   setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
-                  length vs1 = length vs2 ->
+                  List.length vs1 = List.length vs2 ->
 
                   exists (xs2 : list var) (e2 : exp) (rho2' : env),
                     find_def f2 B2 = Some (ft, xs2, e2) /\
@@ -257,7 +257,7 @@ Module CC_log_rel (H : Heap).
 
                   def_closures B1 B1 rho_clo H1' (Loc env_loc1') =  (H1'', rho_clo1) ->
                   setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
-                  length vs1 = length vs2 ->
+                  List.length vs1 = List.length vs2 ->
 
                   exists (xs2 : list var) (e2 : exp) (rho2' : env),
                     find_def f2 B2 = Some (ft, xs2, e2) /\

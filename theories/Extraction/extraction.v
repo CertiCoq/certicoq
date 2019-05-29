@@ -13,6 +13,7 @@ Require compcert.common.AST
 
 Require L6.L5_to_L6
         L7.L6_to_Clight
+        L7.Clightexec
         Compiler.allInstances.
 
 (* Standard lib *)
@@ -59,12 +60,12 @@ Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 Extraction Blacklist List String Nat Int Ast univ uGraph Char OrderedType
            Instances Classes Term Monad Coqlib Errors Compile Checker.
 
-(* Cutting the dependency to R. *)
+(* Cutting the dependency to R. 
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
 Extract Inlined Constant Fappli_IEEE.FF2R => "fun _ -> assert false".
 Extract Inlined Constant Fappli_IEEE.B2R => "fun _ -> assert false".
 Extract Inlined Constant Fappli_IEEE.round_mode => "fun _ -> assert false".
-Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
+Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false". *)
 
 Cd "Extraction".
 Separate Extraction
@@ -72,11 +73,11 @@ Separate Extraction
          Csyntax
          Ctypes.make_program
          AST.signature_main
-         Floats.Float32.from_parsed Floats.Float.from_parsed
+(*         Floats.Float32.from_parsed Floats.Float.from_parsed
          Floats.Float32.of_bits Floats.Float.of_bits
-         Floats.Float32.to_bits Floats.Float.to_bits
+         Floats.Float32.to_bits Floats.Float.to_bits *)
          String.length
          Compiler.allInstances.printProg
          Compiler.allInstances.compile_template_L7
-         L7.Clightexec.run.
+         L7.Clightexec.run. 
 Cd "..".

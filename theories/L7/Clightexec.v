@@ -28,7 +28,7 @@ Require Import Events.
 Require Import Globalenvs.
 Require Import Ctypes.
 Require Import Cop.
-Require compcert.cfrontend.Cexec.  
+ Require compcert.cfrontend.Cexec.  
 Require Import Clight.
 Require Import compcert.lib.Maps.
 
@@ -91,7 +91,7 @@ Definition force_val (v: option val) : val :=
 
 Definition offset_val (ofs: Z) (v: val) : res val :=
   match v with
-  | Vptr b z => OK (Vptr b (Int.add z (Int.repr ofs)))
+  | Vptr b z => OK (Vptr b (Ptrofs.add z (Ptrofs.repr ofs)))
   | _ => Error [MSG "Expected a pointer"]
  end.
 
@@ -130,14 +130,14 @@ Definition geterr {A} id (rho: PTree.tree A) : res A :=
  | None => Error [MSG "Variable "; CTX id; MSG " not in scope"]
  end.
 
-Definition eval_field  (ty: type) (fld: ident) (v: val) : res (block*int) :=
+Definition eval_field  (ty: type) (fld: ident) (v: val) : res (block*ptrofs) :=
   match v with
   | Vptr l ofs => 
     ( match ty with
              | Tstruct id att =>
                 do co <- compos id;
                 do delta <- field_offset ge.(genv_cenv) fld (co_members co);
-                OK (l, (Int.add ofs (Int.repr delta)))
+                OK (l, (Ptrofs.add ofs (Ptrofs.repr delta)))
              | Tunion id att =>
                 do co <- compos id;
                   OK (l, ofs)
@@ -146,20 +146,20 @@ Definition eval_field  (ty: type) (fld: ident) (v: val) : res (block*int) :=
   | _ => Error [MSG "Unexpected field access on a non-pointer"]
   end.
 
-Definition eval_var (id:ident) (ty: type) : res (block * int) :=
+Definition eval_var (id:ident) (ty: type) : res (block * ptrofs) :=
             match PTree.get  id ve with
             | Some (b,ty') =>
                    check (type_eq ty ty') , [MSG "Type-check failure in eval_var"];
-                   OK (b, Int.zero)
+                   OK (b, Ptrofs.zero)
             | None =>
                    match Genv.find_symbol ge id  with
-                   | Some b => OK (b, Int.zero)
+                   | Some b => OK (b, Ptrofs.zero)
                    | None => Error [MSG "Variable "; CTX id; MSG " not in scope"]
                    end
              end.
 
 (* Return the val at loc (b,ofs) in memory *)
-Fixpoint deref_loc (ty:type) (b:block) (ofs:int): res val :=
+Fixpoint deref_loc (ty:type) (b:block) (ofs:ptrofs): res val :=
   match access_mode ty with
   | By_value chunk =>
     match Mem.loadv chunk m (Vptr b ofs) with
@@ -213,7 +213,7 @@ Fixpoint eval_expr (a0: expr) : res val :=
    do (l, ofs) <- eval_field (typeof a) i v;
    deref_loc (typeof a0) l ofs
  end
- with eval_lvalue (a0: expr) : res (block*int) :=
+ with eval_lvalue (a0: expr) : res (block*ptrofs) :=
  match a0 with
  | Evar id ty => eval_var id ty
  | Ederef a ty =>
@@ -242,7 +242,7 @@ Definition do_ef_malloc
   | Vint n :: nil =>
       let (m', b) := Mem.alloc m (-4) (Int.unsigned n) in
       do m'' <- force_opt (Mem.store Mint32 m' b (-4) (Vint n)) [MSG "malloc store failed"];
-      OK (Vptr b Int.zero, m'')
+      OK (Vptr b Ptrofs.zero, m'')
   | _ => Error [MSG "malloc bad args"]
   end.
 
@@ -264,7 +264,7 @@ First argument is a pointer to the number of blocks to allocate (unsigned int32)
 second arg is pointer to tinfo
 
 Mem_alloc n blocks , updates alloc and limit in tinfo, returns void *)
-
+SearchAbout (ptrofs -> Z).
 
 Definition do_ef_gcmalloc
        (vargs: list val) (m: mem) : res (val * mem) :=
@@ -276,9 +276,9 @@ Definition do_ef_gcmalloc
         let balloc := bsrc in
         let blimit := bsrc in
         let oalloc := osrc in
-        let olimit := Int.repr ((Int.unsigned osrc) + size_chunk Mint32) in
-             do m'' <- force_opt (Mem.store Mint32 m' balloc (Int.unsigned oalloc) (Vptr b (Int.repr 0))) [MSG "malloc store failed"];
-               do m''' <- force_opt (Mem.store Mint32 m'' blimit (Int.unsigned olimit) (Vptr b (Int.repr ((Int.unsigned n)* 4)))) [MSG "malloc store failed"];
+        let olimit := Ptrofs.unsigned osrc + size_chunk Mint32 in
+             do m'' <- force_opt (Mem.store Mint32 m' balloc (Ptrofs.unsigned oalloc) (Vptr b (Ptrofs.repr 0))) [MSG "malloc store failed"];
+               do m''' <- force_opt (Mem.store Mint32 m'' blimit olimit (Vptr b (Ptrofs.repr ((Int.unsigned n)* 4)))) [MSG "malloc store failed"];
                OK (Vundef, m''')
 (*           | _ , _ => Error [MSG "gcmalloc: alloc or limit ptr corrupted"]
            end) *)
@@ -292,11 +292,11 @@ Definition do_ef_free
        (vargs: list val) (m: mem) : res (val * mem) :=
   match vargs with
   | Vptr b lo :: nil =>
-      do vsz <- force_opt (Mem.load Mint32 m b (Int.unsigned lo - 4)) [MSG "free: load failed"];
+      do vsz <- force_opt (Mem.load Mint32 m b (Ptrofs.unsigned lo - 4)) [MSG "free: load failed"];
       match vsz with
       | Vint sz =>
           check (zlt 0 (Int.unsigned sz)), [MSG "free: header corrupted"];
-          do m' <- force_opt (Mem.free m b (Int.unsigned lo - 4) (Int.unsigned lo + Int.unsigned sz)) [MSG "free failed"];
+          do m' <- force_opt (Mem.free m b (Ptrofs.unsigned lo - 4) (Ptrofs.unsigned lo + Int.unsigned sz)) [MSG "free failed"];
           OK (Vundef, m')
       | _ => Error [MSG "free: header corrupted"]
       end
@@ -306,9 +306,9 @@ Definition do_ef_free
 Definition do_ef_memcpy (sz al: Z) (vargs: list val) (m: mem) : res (val * mem) :=
   match vargs with
   | Vptr bdst odst :: Vptr bsrc osrc :: nil =>
-      check (Cexec.memcpy_check_args sz al bdst (Int.unsigned odst) bsrc (Int.unsigned osrc)), [MSG "memcpy check_args"];
-        do bytes <- force_opt (Mem.loadbytes m bsrc (Int.unsigned osrc) sz) [MSG "memcpy loadbytes"];
-        do m' <- force_opt (Mem.storebytes m bdst (Int.unsigned odst) bytes) [MSG "memcpy storebytes"];
+      check (Cexec.memcpy_check_args sz al bdst (Ptrofs.unsigned odst) bsrc (Ptrofs.unsigned osrc)), [MSG "memcpy check_args"];
+        do bytes <- force_opt (Mem.loadbytes m bsrc (Ptrofs.unsigned osrc) sz) [MSG "memcpy loadbytes"];
+        do m' <- force_opt (Mem.storebytes m bdst (Ptrofs.unsigned odst) bytes) [MSG "memcpy storebytes"];
         OK (Vundef, m')
   | _ => Error [MSG "memcpy bad args"]
   end.
@@ -332,38 +332,38 @@ Definition do_external (ef: external_function) (vargs: list val) (m: mem): res (
   | EF_malloc => do_ef_malloc vargs m
   | EF_free => do_ef_free vargs m
   | EF_memcpy sz al => do_ef_memcpy sz al vargs m
-  | EF_annot text targs => Error [MSG "annot "; MSG text]
-  | EF_annot_val text targ => Error [MSG "annot_val "; MSG text]
+  | EF_annot kind text targs => Error [MSG "annot "; MSG text]
+  | EF_annot_val kind text targ => Error [MSG "annot_val "; MSG text]
   | EF_inline_asm text sg clob => Error [MSG "inline_asm "; MSG text]
   | EF_debug kind text targs => Error [MSG "debug "; CTX kind; CTX text]
   end.
 
-Definition assign_copy_ok (ty: type) (b: block) (ofs: int) (b': block) (ofs': int) : Prop :=
-  (alignof_blockcopy ge ty | Int.unsigned ofs') /\ (alignof_blockcopy ge ty | Int.unsigned ofs) /\
-  (b' <> b \/ Int.unsigned ofs' = Int.unsigned ofs
-           \/ Int.unsigned ofs' + sizeof ge ty <= Int.unsigned ofs
-           \/ Int.unsigned ofs + sizeof ge ty <= Int.unsigned ofs').
+Definition assign_copy_ok (ty: type) (b: block) (ofs: ptrofs) (b': block) (ofs': ptrofs) : Prop :=
+  (alignof_blockcopy ge ty | Ptrofs.unsigned ofs') /\ (alignof_blockcopy ge ty | Ptrofs.unsigned ofs) /\
+  (b' <> b \/ Ptrofs.unsigned ofs' = Ptrofs.unsigned ofs
+           \/ Ptrofs.unsigned ofs' + sizeof ge ty <= Ptrofs.unsigned ofs
+           \/ Ptrofs.unsigned ofs + sizeof ge ty <= Ptrofs.unsigned ofs').
 
 Remark check_assign_copy:
-  forall (ty: type) (b: block) (ofs: int) (b': block) (ofs': int),
+  forall (ty: type) (b: block) (ofs: ptrofs) (b': block) (ofs': ptrofs),
   { assign_copy_ok ty b ofs b' ofs' } + {~ assign_copy_ok ty b ofs b' ofs' }.
 Proof with try (right; intuition omega).
   intros. unfold assign_copy_ok.
   assert (alignof_blockcopy ge ty > 0) by apply alignof_blockcopy_pos.
-  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Int.unsigned ofs')); auto...
-  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Int.unsigned ofs)); auto...
+  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Ptrofs.unsigned ofs')); auto...
+  destruct (Zdivide_dec (alignof_blockcopy ge ty) (Ptrofs.unsigned ofs)); auto...
   assert (Y: {b' <> b \/
-              Int.unsigned ofs' = Int.unsigned ofs \/
-              Int.unsigned ofs' + sizeof ge ty <= Int.unsigned ofs \/
-              Int.unsigned ofs + sizeof ge ty <= Int.unsigned ofs'} +
+              Ptrofs.unsigned ofs' = Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs' + sizeof ge ty <= Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs + sizeof ge ty <= Ptrofs.unsigned ofs'} +
            {~(b' <> b \/
-              Int.unsigned ofs' = Int.unsigned ofs \/
-              Int.unsigned ofs' + sizeof ge ty <= Int.unsigned ofs \/
-              Int.unsigned ofs + sizeof ge ty <= Int.unsigned ofs')}).
+              Ptrofs.unsigned ofs' = Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs' + sizeof ge ty <= Ptrofs.unsigned ofs \/
+              Ptrofs.unsigned ofs + sizeof ge ty <= Ptrofs.unsigned ofs')}).
   destruct (eq_block b' b); auto.
-  destruct (zeq (Int.unsigned ofs') (Int.unsigned ofs)); auto.
-  destruct (zle (Int.unsigned ofs' + sizeof ge ty) (Int.unsigned ofs)); auto.
-  destruct (zle (Int.unsigned ofs + sizeof ge ty) (Int.unsigned ofs')); auto.
+  destruct (zeq (Ptrofs.unsigned ofs') (Ptrofs.unsigned ofs)); auto.
+  destruct (zle (Ptrofs.unsigned ofs' + sizeof ge ty) (Ptrofs.unsigned ofs)); auto.
+  destruct (zle (Ptrofs.unsigned ofs + sizeof ge ty) (Ptrofs.unsigned ofs')); auto.
   right; intuition omega.
   destruct Y... left; intuition omega.
 Defined.
@@ -381,8 +381,8 @@ Definition do_assign_loc (ty: type) (m: mem) (vp v: val): res mem :=
       match v with
       | Vptr b' ofs' =>
             check (check_assign_copy ty b ofs b' ofs') , [MSG "check_assign_copy failed"];
-            do bytes <- force_opt (Mem.loadbytes m b' (Int.unsigned ofs') (sizeof ge ty)) [MSG "loadbytes failed"];
-            force_opt (Mem.storebytes m b (Int.unsigned ofs) bytes) [MSG "storebytes failed"]
+            do bytes <- force_opt (Mem.loadbytes m b' (Ptrofs.unsigned ofs') (sizeof ge ty)) [MSG "loadbytes failed"];
+            force_opt (Mem.storebytes m b (Ptrofs.unsigned ofs) bytes) [MSG "storebytes failed"]
       | _ => Error [MSG "mem copy at not-a-pointer"]
       end
   | _ => Error [MSG "illegal access_mode for assignment"]
@@ -589,9 +589,9 @@ Definition do_initial_state_wo_main (p: program): res (genv * state * block) :=
   let (m, b) := Mem.alloc m0 0 (sizeof ge.(genv_cenv) (Tstruct threadInfIdent noattr)) in
   let (m', b0) := Mem.alloc m 0 (size_chunk Mint32) in
   do m'' <- force_opt (Mem.store Mint32 m' b0 0 (Vint (Int.repr 0))) [MSG "0 store failed"];
-  do m3 <- force_opt (Mem.store Mint32 m'' b 0 (Vptr b0 (Int.repr 0))) [MSG "alloc ptr store failed"];
-  do m4 <- force_opt (Mem.store Mint32 m3 b (size_chunk Mint32) (Vptr b0 (Int.repr 0))) [MSG "limit ptr store failed"];
-  OK (ge, Callstate f ((Vptr b (Int.repr 0))::nil) Kstop m4, b).
+  do m3 <- force_opt (Mem.store Mint32 m'' b 0 (Vptr b0 (Ptrofs.repr 0))) [MSG "alloc ptr store failed"];
+  do m4 <- force_opt (Mem.store Mint32 m3 b (size_chunk Mint32) (Vptr b0 (Ptrofs.repr 0))) [MSG "limit ptr store failed"];
+  OK (ge, Callstate f ((Vptr b (Ptrofs.repr 0))::nil) Kstop m4, b).
 
 Definition at_final_state_wo_main (S:state):res unit := 
   match S with

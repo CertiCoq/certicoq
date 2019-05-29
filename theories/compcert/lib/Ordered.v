@@ -6,7 +6,6 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  Automatique.  All rights reserved.  This file is distributed       *)
 (*  under the terms of the GNU General Public License as published by  *)
 (*  the Free Software Foundation, either version 2 of the License, or  *)
 (*  (at your option) any later version.  This file is also distributed *)
@@ -31,11 +30,11 @@ Definition eq (x y: t) := x = y.
 Definition lt := Plt.
 
 Lemma eq_refl : forall x : t, eq x x.
-Proof (@refl_equal t).
+Proof (@eq_refl t).
 Lemma eq_sym : forall x y : t, eq x y -> eq y x.
-Proof (@sym_equal t).
+Proof (@eq_sym t).
 Lemma eq_trans : forall x y z : t, eq x y -> eq y z -> eq x z.
-Proof (@trans_equal t).
+Proof (@eq_trans t).
 Lemma lt_trans : forall x y z : t, lt x y -> lt y z -> lt x z.
 Proof Plt_trans.
 Lemma lt_not_eq : forall x y : t, lt x y -> ~ eq x y.
@@ -58,16 +57,16 @@ Module OrderedZ <: OrderedType.
 
 Definition t := Z.
 Definition eq (x y: t) := x = y.
-Definition lt := Zlt.
+Definition lt := Z.lt.
 
 Lemma eq_refl : forall x : t, eq x x.
-Proof (@refl_equal t).
+Proof (@eq_refl t).
 Lemma eq_sym : forall x y : t, eq x y -> eq y x.
-Proof (@sym_equal t).
+Proof (@eq_sym t).
 Lemma eq_trans : forall x y z : t, eq x y -> eq y z -> eq x z.
-Proof (@trans_equal t).
+Proof (@eq_trans t).
 Lemma lt_trans : forall x y z : t, lt x y -> lt y z -> lt x z.
-Proof Zlt_trans.
+Proof Z.lt_trans.
 Lemma lt_not_eq : forall x y : t, lt x y -> ~ eq x y.
 Proof. unfold lt, eq, t; intros. omega. Qed.
 Lemma compare : forall x y : t, Compare lt eq x y.
@@ -91,11 +90,11 @@ Definition eq (x y: t) := x = y.
 Definition lt (x y: t) := Int.unsigned x < Int.unsigned y.
 
 Lemma eq_refl : forall x : t, eq x x.
-Proof (@refl_equal t).
+Proof (@eq_refl t).
 Lemma eq_sym : forall x y : t, eq x y -> eq y x.
-Proof (@sym_equal t).
+Proof (@eq_sym t).
 Lemma eq_trans : forall x y z : t, eq x y -> eq y z -> eq x z.
-Proof (@trans_equal t).
+Proof (@eq_trans t).
 Lemma lt_trans : forall x y z : t, lt x y -> lt y z -> lt x z.
 Proof.
   unfold lt; intros. omega.
@@ -129,11 +128,11 @@ Definition eq (x y: t) := x = y.
 Definition lt (x y: t) := Plt (A.index x) (A.index y).
 
 Lemma eq_refl : forall x : t, eq x x.
-Proof (@refl_equal t).
+Proof (@eq_refl t).
 Lemma eq_sym : forall x y : t, eq x y -> eq y x.
-Proof (@sym_equal t).
+Proof (@eq_sym t).
 Lemma eq_trans : forall x y z : t, eq x y -> eq y z -> eq x z.
-Proof (@trans_equal t).
+Proof (@eq_trans t).
 
 Lemma lt_trans : forall x y z : t, lt x y -> lt y z -> lt x z.
 Proof.

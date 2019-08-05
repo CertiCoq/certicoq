@@ -138,7 +138,8 @@ Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)
  Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color). 
 
  Print demo4.
- Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) Demo1).
+ (* 
+ Definition demo5 := Eval native_compute in (translateTo (cTerm certiL4_2) Demo1).
  Set Printing Depth 1000.
  Print demo5.
  Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) binom). 
@@ -178,7 +179,7 @@ Definition eval_c4 := match binom5 with
 
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
 Print color5. 
-
+*)
  
 
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.

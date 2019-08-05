@@ -105,14 +105,17 @@ Require Import ExtLib.Data.Monads.OptionMonad.
 
 Require Import ExtLib.Structures.Monads.
   
+Require Import Common.AstCommon.
 
 Instance certiL5_t0_L6: 
   CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := 
   fun v =>
     match v with
     | pair venv vt =>
+      (AstCommon.timePhase "L5 to L6")
       (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
-      | Some r =>         
+       | Some r =>
+         
         let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
         let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
         (* let e := postuncurry_contract e s d in            *)

@@ -559,3 +559,8 @@ Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) :
   end.
 
 End trm_Sec.
+
+(* Timing facilities, instanciated by extraction in extraction.v *)
+Variable (timePhase: forall A, string -> A -> A).
+
+Axiom timePhase_id: forall {A:Type} s (x:A), timePhase s x = x.

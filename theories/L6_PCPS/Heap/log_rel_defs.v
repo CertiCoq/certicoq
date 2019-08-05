@@ -49,98 +49,89 @@ Module LogRelDefs (H : Heap).
   Definition Inj := loc -> loc.
   
   (** Tag for closure records *)
-  Variable (clo_tag : cTag). 
+  Variable (clo_tag : cTag).
+
+  Definition exp_rel : Type :=
+    IInv -> IInv -> Inv -> Inj ->
+    list value -> heap block -> list value -> heap block -> Conf -> Conf -> Prop.  
   
+  Definition val_rel : Type := res -> res -> Prop. 
+
+
+  (** An interface for an L6 compiler pass, that defines the source and target semantics
+    * and the relation between function and closure objects *)
+  Class CompPass :=
+    { eval_src : heap block -> env -> exp -> ans -> nat -> nat -> Prop;
+      eval_trg : heap block -> env -> exp -> ans -> nat -> nat -> Prop;
+      fun_rel  : GIInv -> GInv -> Inj -> value -> heap block -> value -> heap block ->
+                 exp_rel -> Prop; 
+      clos_rel : GIInv -> GInv -> Inj -> block -> heap block -> block -> heap block ->
+                 exp_rel -> val_rel -> Prop
+    }.
+
   
   Section LogRelDefs.
     
-    Variable (val_log_rel : nat -> nat -> GIInv -> GInv -> Inj -> ans -> ans -> Prop). 
+    Variable (CP : CompPass). 
 
-    Variable (eval_src : heap block -> env -> exp -> ans -> nat -> nat -> Prop).
-    Variable (eval_trg : heap block -> env -> exp -> ans -> nat -> nat -> Prop).
-    
-    
-    Definition exp_log_rel
-               (* step indexes *)
-               (k : nat) (j : nat)
-               (* Invariants *)
-               (IIL : IInv) (IIG : GIInv) (IL : Inv) (IG : GInv)
-               (* related expressions *)
-               (p1 p2 : Conf) : Prop :=
-      let '(H1, rho1, e1) := p1 in
-      let '(H2, rho2, e2) := p2 in
-      forall (b1 b2 : Inj) (H1' H2' : heap block) (rho1' rho2' : env) (r1 : ans) (c1 m1 : nat),
-        (occurs_free e1) |- (H1, rho1) ⩪_(id, b1) (H1', rho1') ->
-        injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) b1 ->
-        (occurs_free e2) |- (H2, rho2) ⩪_(b2, id) (H2', rho2') ->
-        injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e2))) b2 ->
-        IIL (H1', rho1', e1) (H2', rho2', e2) ->
-        c1 <= k ->
-        eval_src H1' rho1' e1 r1 c1 m1 ->
-        not_stuck_cc H1' rho1' e1 ->
-        exists (r2 : ans) (c2 m2 : nat) (b : Inj),
-          eval_trg H2' rho2' e2 r2 c2 m2 /\
-          (* extra invariants for costs *)
-          IL (H1', rho1', e1) (c1, m1) (c2, m2) /\
-          val_log_rel (k - c1) j IIG IG b r1 r2.
+    Section ExpRelDef.
 
-    (** Environment relation for a single point (i.e. variable) *)
-    Definition var_log_rel (k j : nat) IP P b (H1 : heap block) (rho1 : env)
-               (H2 : heap block) (rho2 : env) (x y : var) : Prop :=
-      forall l1, 
-        M.get x rho1 = Some l1 -> 
-        exists l2, M.get y rho2 = Some l2 /\
-              val_log_rel k j IP P b (Res (l1, H1)) (Res (l2, H2)).
+      Variable (val_log_rel : nat -> nat -> GIInv -> GInv -> Inj -> ans -> ans -> Prop).
+      
     
-    Definition env_log_rel_P (S : Ensemble var) k j IP P b (c1 c2 : heap block * env) :=
-      let (H1, rho1) := c1 in
-      let (H2, rho2) := c2 in
-      forall (x : var), S x -> var_log_rel k j IP P b H1 rho1 H2 rho2 x x.
+      Definition exp_log_rel
+                 (* step indexes *)
+                 (k : nat) (j : nat)
+                 (* Invariants *)
+                 (IIL : IInv) (IIG : GIInv) (IL : Inv) (IG : GInv)
+                 (* related expressions *)
+                 (p1 p2 : Conf) : Prop :=
+        let '(H1, rho1, e1) := p1 in
+        let '(H2, rho2, e2) := p2 in
+        forall (b1 b2 : Inj) (H1' H2' : heap block) (rho1' rho2' : env) (r1 : ans) (c1 m1 : nat),
+          (occurs_free e1) |- (H1, rho1) ⩪_(id, b1) (H1', rho1') ->
+           injective_subdomain (reach' H1' (env_locs rho1' (occurs_free e1))) b1 ->
+           (occurs_free e2) |- (H2, rho2) ⩪_(b2, id) (H2', rho2') ->
+           injective_subdomain (reach' H2 (env_locs rho2 (occurs_free e2))) b2 ->
+           IIL (H1', rho1', e1) (H2', rho2', e2) ->
+           c1 <= k ->
+           eval_src H1' rho1' e1 r1 c1 m1 ->
+           not_stuck_cc H1' rho1' e1 ->
+           exists (r2 : ans) (c2 m2 : nat) (b : Inj),
+             eval_trg H2' rho2' e2 r2 c2 m2 /\
+             (* extra invariants for costs *)
+             IL (H1', rho1', e1) (c1, m1) (c2, m2) /\
+             val_log_rel (k - c1) j IIG IG b r1 r2.
+      
+      (** Environment relation for a single point (i.e. variable) *)
+      Definition var_log_rel (k j : nat) IP P b (H1 : heap block) (rho1 : env)
+                 (H2 : heap block) (rho2 : env) (x y : var) : Prop :=
+        forall l1, 
+          M.get x rho1 = Some l1 -> 
+          exists l2, M.get y rho2 = Some l2 /\
+                val_log_rel k j IP P b (Res (l1, H1)) (Res (l2, H2)).
+      
+      Definition env_log_rel_P (S : Ensemble var) k j IP P b (c1 c2 : heap block * env) :=
+        let (H1, rho1) := c1 in
+        let (H2, rho2) := c2 in
+        forall (x : var), S x -> var_log_rel k j IP P b H1 rho1 H2 rho2 x x.
+      
+      Definition heap_log_rel (S : Ensemble loc) k j IP P b (H1 H2 : heap block) :=
+        forall (x : loc), S x -> val_log_rel k j IP P b (Res (Loc x, H1)) (Res (Loc (b x), H2)).
+      
+      
+    End ExpRelDef.
     
-    Definition heap_log_rel (S : Ensemble loc) k j IP P b (H1 H2 : heap block) :=
-      forall (x : loc), S x -> val_log_rel k j IP P b (Res (Loc x, H1)) (Res (Loc (b x), H2)).
-    
-
-  End LogRelDefs.
-  
-
-  Section ValRelDef.
-
-    (* Semantics of source and target *)
-    Variable (eval_src : heap block -> env -> exp -> ans -> nat -> nat -> Prop).
-    Variable (eval_trg : heap block -> env -> exp -> ans -> nat -> nat -> Prop).
-
-    (* Passed to the caller *)
-    Definition fun_body_rel : Type :=
-      IInv -> IInv -> Inv -> Inj -> list value -> heap block -> list value -> heap block -> Conf -> Conf -> Prop.  
-
-    (* NOTE : We are passing two preconditions. The first one is enforced at the configurations right after function entry.
-              The second one is passed along with the postcondition to the extression relation.  *)
-    
-    Definition val_rel : Type :=
-      res -> res -> Prop. 
-    
-    (* Relation of closure pairs -- Given by the caller *)
-    Variable (clos_rel : GIInv -> GInv -> Inj -> block -> heap block -> block -> heap block -> (* Block being related *)
-                         fun_body_rel ->
-                         val_rel -> 
-                         Prop).
 
     Require Import Coq.Classes.Morphisms Coq.Classes.RelationClasses.
     
     Definition fun_body_args : Tlist :=      
-      Tcons IInv (Tcons IInv (Tcons Inv (Tcons Inj (Tcons (list value) (Tcons (heap block) (Tcons (list value) (Tcons (heap block) (Tcons Conf (Tcons Conf Tnil))))))))).
-    
+      Tcons IInv (Tcons IInv (Tcons Inv (Tcons Inj (Tcons (list value) (Tcons (heap block) (Tcons (list value) (Tcons (heap block) (Tcons Conf (Tcons Conf Tnil))))))))).    
     
     Definition val_rel_args : Tlist :=
       Tcons res (Tcons res Tnil). 
     
-    (* Relation on function values -- Given by the caller *)
-    Variable (fun_rel : GIInv -> GInv -> Inj -> value -> heap block -> value -> heap block ->
-                        fun_body_rel ->
-                        Prop).
-
-
+    
     Variable Proper_clos_rel : forall P Q b b1 H1 b2 H2,
         Proper ((pointwise_lifting iff fun_body_args) ==> (pointwise_lifting iff val_rel_args) ==> iff) (clos_rel P Q b b1 H1 b2 H2).
 
@@ -166,11 +157,9 @@ Module LogRelDefs (H : Heap).
                     let R j v1 v2 := val_log_rel (k - (k - i)) j IP P b (Res (v1, H1)) (Res (v2, H2)) in
                     (forall j, Forall2 (R j) vs1 vs2) ->
                     (PL' (H1', rho1, e1) (H2, rho2, e2)) /\
-                    (forall j, exp_log_rel val_log_rel eval_src eval_trg
-                                      (k - (k - i))
-                                      j
-                                      PL IP
-                                      QL P
+                    (forall j, exp_log_rel val_log_rel
+                                      (k - (k - i)) j
+                                      PL IP QL P
                                       (H1', rho1, e1) (H2', rho2, e2))
                   end)
           in
@@ -223,15 +212,13 @@ Module LogRelDefs (H : Heap).
                let R j v1 v2 := val_log_rel i j IP P b (Res (v1, H1)) (Res (v2, H2)) in
                (forall j, Forall2 (R j) vs1 vs2) ->
                (PL' (H1', rho1, e1) (H2, rho2, e2)) /\
-               (forall j, exp_log_rel val_log_rel eval_src eval_trg
-                                 i
-                                 j
-                                 PL IP
-                                 QL P
+               (forall j, exp_log_rel val_log_rel
+                                 i j
+                                 PL IP QL P
                                  (H1', rho1, e1) (H2', rho2, e2))
       in
       let R_val p1 p2 :=
-          forall i, (i < j)%nat -> val_log_rel k i IP P b (Res p1) (Res p2)                                               
+          forall i, (i < j)%nat -> val_log_rel k i IP P b (Res p1) (Res p2)
       in
       match r1, r2 with
       | OOT, OOT => True (* Both programs timeout *)
@@ -414,7 +401,7 @@ Module LogRelDefs (H : Heap).
 
     Opaque val_log_rel.
     
-    Definition exp_log_rel' := exp_log_rel val_log_rel' eval_src eval_trg. 
+    Definition exp_log_rel' := exp_log_rel val_log_rel'. 
     Definition env_log_rel_P' := env_log_rel_P val_log_rel'.
     Definition heap_log_rel' := heap_log_rel val_log_rel'.
     Definition var_log_rel' := var_log_rel val_log_rel'. 
@@ -687,78 +674,78 @@ Module LogRelDefs (H : Heap).
       rewrite M.gso; eauto.
     Qed.
   
-  Lemma var_log_rel_env_set (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
-        (x y : var) (v1 v2 : value):
-    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y y ->
-    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
-    var_log_rel' k j GP GQ b H1 (M.set x v1 rho1) H2 (M.set x v2 rho2) y y.
-  Proof.
-    intros Hvar Hval.
-    destruct (peq y x); subst.
-    - apply var_log_rel_env_set_eq; eauto.
-    - apply var_log_rel_env_set_neq; eauto.
-  Qed.
-  
-  Lemma var_log_rel_env_set_neq_l (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
-        (y1 x1 y2 : var) (v1 : value) :
-    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y1 y2 ->
-    y1 <> x1 ->
-    var_log_rel' k j GP GQ b H1 (M.set x1 v1 rho1) H2 rho2 y1 y2.
-  Proof. 
-    intros Hval Hneq x' Hget.
-    rewrite M.gso in *; eauto.
-  Qed.
-  
-  Lemma var_log_rel_env_set_neq_r (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
-        (y1 x2 y2 : var) ( v2 : value) :
-    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y1 y2 ->
-    y2 <> x2 ->
-    var_log_rel' k j GP GQ b H1 rho1 H2 (M.set x2 v2 rho2) y1 y2.
-  Proof. 
-    intros Hval Hneq x' Hget.
-    rewrite M.gso in *; eauto.
-  Qed.
+    Lemma var_log_rel_env_set (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+          (x y : var) (v1 v2 : value):
+      var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y y ->
+      val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+      var_log_rel' k j GP GQ b H1 (M.set x v1 rho1) H2 (M.set x v2 rho2) y y.
+    Proof.
+      intros Hvar Hval.
+      destruct (peq y x); subst.
+      - apply var_log_rel_env_set_eq; eauto.
+      - apply var_log_rel_env_set_neq; eauto.
+    Qed.
+    
+    Lemma var_log_rel_env_set_neq_l (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+          (y1 x1 y2 : var) (v1 : value) :
+      var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y1 y2 ->
+      y1 <> x1 ->
+      var_log_rel' k j GP GQ b H1 (M.set x1 v1 rho1) H2 rho2 y1 y2.
+    Proof. 
+      intros Hval Hneq x' Hget.
+      rewrite M.gso in *; eauto.
+    Qed.
+    
+    Lemma var_log_rel_env_set_neq_r (k j : nat) (b : Inj) (rho1 rho2 : env) (H1 H2 : heap block)
+          (y1 x2 y2 : var) ( v2 : value) :
+      var_log_rel' k j GP GQ b H1 rho1 H2 rho2 y1 y2 ->
+      y2 <> x2 ->
+      var_log_rel' k j GP GQ b H1 rho1 H2 (M.set x2 v2 rho2) y1 y2.
+    Proof. 
+      intros Hval Hneq x' Hget.
+      rewrite M.gso in *; eauto.
+    Qed.
+    
+    (** Extend the related environments with a single point *)
+    Lemma env_log_rel_P_set (S : Ensemble var) (k j : nat) (b : Inj)
+          (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
+      env_log_rel_P' (S \\ [set x]) k j GP GQ b (H1, rho1) (H2, rho2) ->
+      val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+      env_log_rel_P' S k j GP GQ b (H1, M.set x v1 rho1) (H2, M.set x v2 rho2).
+    Proof.
+      intros Henv Hval x' HP. destruct (peq x x'); subst.
+      - eapply var_log_rel_env_set_eq; eauto.
+      - eapply var_log_rel_env_set_neq_l; eauto.
+        eapply var_log_rel_env_set_neq_r; eauto.
+        eapply Henv. constructor; eauto. intros Hc; inv Hc. contradiction.
+    Qed.
+    
+    
+    Lemma  env_log_rel_P_set_not_in_S_l (S : Ensemble var) (k j : nat) (b : Inj)
+           (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 : value) :
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+      ~ x \in S -> 
+      env_log_rel_P' S k j GP GQ b (H1, M.set x v1 rho1) (H2, rho2).
+    Proof.
+      intros Henv Hval x' HP. eapply var_log_rel_env_set_neq_l; eauto.
+      eapply Henv; eauto.
+      intros Hc; subst; contradiction.
+    Qed.
 
-  (** Extend the related environments with a single point *)
-  Lemma env_log_rel_P_set (S : Ensemble var) (k j : nat) (b : Inj)
-        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 v2 : value) :
-    env_log_rel_P' (S \\ [set x]) k j GP GQ b (H1, rho1) (H2, rho2) ->
-    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
-    env_log_rel_P' S k j GP GQ b (H1, M.set x v1 rho1) (H2, M.set x v2 rho2).
-  Proof.
-    intros Henv Hval x' HP. destruct (peq x x'); subst.
-    - eapply var_log_rel_env_set_eq; eauto.
-    - eapply var_log_rel_env_set_neq_l; eauto.
-      eapply var_log_rel_env_set_neq_r; eauto.
-      eapply Henv. constructor; eauto. intros Hc; inv Hc. contradiction.
-  Qed.
-
-  
-  Lemma  env_log_rel_P_set_not_in_S_l (S : Ensemble var) (k j : nat) (b : Inj)
-        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 : value) :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
-    ~ x \in S -> 
-    env_log_rel_P' S k j GP GQ b (H1, M.set x v1 rho1) (H2, rho2).
-  Proof.
-    intros Henv Hval x' HP. eapply var_log_rel_env_set_neq_l; eauto.
-    eapply Henv; eauto.
-    intros Hc; subst; contradiction.
-  Qed.
-
-  Lemma env_log_rel_P_set_not_in_S_r (S : Ensemble var) (k j : nat) (b : Inj)
-        (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 : value) :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
-    ~ x \in S -> 
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, M.set x v1 rho2).
-  Proof.
-    intros Henv Hval x' HP. eapply var_log_rel_env_set_neq_r; eauto.
-    eapply Henv; eauto.
-    intros Hc; subst; contradiction.
-  Qed.
-
-
+    Lemma env_log_rel_P_set_not_in_S_r (S : Ensemble var) (k j : nat) (b : Inj)
+          (rho1 rho2 : env) (H1 H2 : heap block) (x : var) (v1 : value) :
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+      ~ x \in S -> 
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, M.set x v1 rho2).
+    Proof.
+      intros Henv Hval x' HP. eapply var_log_rel_env_set_neq_r; eauto.
+      eapply Henv; eauto.
+      intros Hc; subst; contradiction.
+    Qed.
+    
+    
     Lemma env_log_rel_P_empty (S : Ensemble var) (k j : nat) (b : Inj)
-        ( rho2 : env) (H1 H2 : heap block) :
+          ( rho2 : env) (H1 H2 : heap block) :
       env_log_rel_P' S k j GP GQ b (H1, M.empty _) (H2, rho2).
     Proof. 
       intros x Hin v Hget.
@@ -766,239 +753,239 @@ Module LogRelDefs (H : Heap).
       congruence.
     Qed.
     
-  (** Extend the related environments with a list *)
-  Lemma env_log_rel_P_setlist_l (S : Ensemble var) (k j : nat) b
-        (rho1 rho2 rho1' rho2' : env) (H1 H2 : heap block) xs (vs1 vs2 : list value) :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
-    Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
-    setlist xs vs1 rho1 = Some rho1' ->
-    setlist xs vs2 rho2 = Some rho2' ->
-    env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2').
-  Proof.
-    intros Hcc Hall Hset1 Hset2 x HP v Hget.
-    destruct (in_dec var_dec x xs).
-    - edestruct (@setlist_Forall2_get value) as [v1 [v2 [Hget1 [Hget2 HP']]]];
-        try eassumption. subst_exp. repeat eexists; eauto.
-    - erewrite <- setlist_not_In in Hget; eauto.
-      edestruct Hcc as [v2 [Hget' Hpre']]; eauto.
-      repeat eexists; eauto.
-      erewrite <- setlist_not_In; eauto.
-  Qed.
-  
-  Lemma env_log_rel_P_setlist_not_in_P_l (S : Ensemble var) (k j : nat) b
-        (rho1 rho1' rho2 : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
-    Disjoint _ (FromList xs) S ->
-    setlist xs vs rho1 = Some rho1' ->
-    env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2).
-  Proof. 
-    intros Hcc Hnin Hset y Py v' Hget.
-    edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
-    erewrite setlist_not_In. eassumption. eassumption.
-    intros Hc. eapply Hnin. constructor; eauto.
-  Qed.
-
-  Lemma env_log_rel_P_setlist_not_in_P_r (S : Ensemble var) (k j : nat) b
-        (rho1 rho2 rho2' : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
-    Disjoint _ (FromList xs) S ->
-    setlist xs vs rho2 = Some rho2' ->
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2').
-  Proof.
-    intros Hcc Hnin Hset y Py v' Hget.
-    edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
-    eexists; split; eauto. erewrite <- setlist_not_In. eassumption. eassumption.
-    intros Hc. eapply Hnin. constructor; eauto.
-  Qed.
-
-  (** * Related values are well-defined in the heap *)
-
-  Lemma val_log_rel_in_dom1 (k j : nat) b v1 v2 H1 H2 :
-    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
-    val_loc v1 \subset dom H1.
-  Proof.
-    intros Hcc h Hin; destruct v1 as [l1|]; inv Hin.
-    destruct v2  as [l2|]; try contradiction.
-    simpl in Hcc.
-    destruct (get h H1) eqn:Hget; [| destruct Hcc; contradiction ].
-    clear LP LQ .
-    now firstorder.
-  Qed.
-  
-  Lemma val_log_rel_in_dom2 (k j : nat) b v1 v2 H1 H2 :
-    val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
-    val_loc v2 \subset dom H2.
-  Proof.
-    clear LP LQ.
-    intros Hcc l2 Hin; destruct v2 as [l2'|]; inv Hin.
-    destruct v1 as [l1|]; try contradiction.
-    simpl in Hcc.
-    destruct (get l1 H1) as [b1 | ] eqn:Hget; [| destruct Hcc; contradiction ].
-    destruct Hcc as [Heq1 Hcc].
-    destruct b1 as [c1 vs1 | v1 v2 | ]; try contradiction.
+    (** Extend the related environments with a list *)
+    Lemma env_log_rel_P_setlist_l (S : Ensemble var) (k j : nat) b
+          (rho1 rho2 rho1' rho2' : env) (H1 H2 : heap block) xs (vs1 vs2 : list value) :
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+      Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
+      setlist xs vs1 rho1 = Some rho1' ->
+      setlist xs vs2 rho2 = Some rho2' ->
+      env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2').
+    Proof.
+      intros Hcc Hall Hset1 Hset2 x HP v Hget.
+      destruct (in_dec var_dec x xs).
+      - edestruct (@setlist_Forall2_get value) as [v1 [v2 [Hget1 [Hget2 HP']]]];
+          try eassumption. subst_exp. repeat eexists; eauto.
+      - erewrite <- setlist_not_In in Hget; eauto.
+        edestruct Hcc as [v2 [Hget' Hpre']]; eauto.
+        repeat eexists; eauto.
+        erewrite <- setlist_not_In; eauto.
+    Qed.
     
-    destruct (get l2 H2) as [b2 | ] eqn:Hget'; [| contradiction ].
-    now eexists; eauto.
+    Lemma env_log_rel_P_setlist_not_in_P_l (S : Ensemble var) (k j : nat) b
+          (rho1 rho1' rho2 : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+      Disjoint _ (FromList xs) S ->
+      setlist xs vs rho1 = Some rho1' ->
+      env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2).
+    Proof. 
+      intros Hcc Hnin Hset y Py v' Hget.
+      edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
+      erewrite setlist_not_In. eassumption. eassumption.
+      intros Hc. eapply Hnin. constructor; eauto.
+    Qed.
     
-    destruct (get l2 H2) as [b2 | ] eqn:Hget'; [| contradiction ].
-    now eexists; eauto.
-  Qed.
-
+    Lemma env_log_rel_P_setlist_not_in_P_r (S : Ensemble var) (k j : nat) b
+          (rho1 rho2 rho2' : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+      Disjoint _ (FromList xs) S ->
+      setlist xs vs rho2 = Some rho2' ->
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2').
+    Proof.
+      intros Hcc Hnin Hset y Py v' Hget.
+      edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
+      eexists; split; eauto. erewrite <- setlist_not_In. eassumption. eassumption.
+      intros Hc. eapply Hnin. constructor; eauto.
+    Qed.
+    
+    (** * Related values are well-defined in the heap *)
+    
+    Lemma val_log_rel_in_dom1 (k j : nat) b v1 v2 H1 H2 :
+      val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+      val_loc v1 \subset dom H1.
+    Proof.
+      intros Hcc h Hin; destruct v1 as [l1|]; inv Hin.
+      destruct v2  as [l2|]; try contradiction.
+      simpl in Hcc.
+      destruct (get h H1) eqn:Hget; [| destruct Hcc; contradiction ].
+      clear LP LQ .
+      now firstorder.
+    Qed.
   
-  Lemma val_log_rel_Forall2_dom1 (k j : nat) b (H1 H2 : heap block)
-        vs1 vs2 :
-    Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
-    Union_list (map val_loc vs1) \subset dom H1.  
-  Proof.
-    intros Hall. induction Hall; simpl.
-    - now eauto with Ensembles_DB.
-    - eapply Union_Included; [| eassumption ].
-      eapply val_log_rel_in_dom1; eauto.
-  Qed.
-
-  Lemma val_log_rel_Forall2_dom2 (k j : nat) b (rho1 rho2 : env) (H1 H2 : heap block) vs1 vs2 :
-    Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
-    Union_list (map val_loc vs2) \subset dom H2.  
-  Proof.
-    intros Hall. induction Hall; simpl.
-    - now eauto with Ensembles_DB.
-    - eapply Union_Included; [| eassumption ].
-      eapply val_log_rel_in_dom2; eauto.
-  Qed.
-  
-
-  Lemma env_log_rel_P_in_dom1 (R : Ensemble var) (k j : nat) b
-        rho1 rho2 H1 H2 :
-    env_log_rel_P' R k j GP GQ b (H1, rho1) (H2, rho2) ->
-    env_locs rho1 R \subset dom H1.  
-  Proof. 
-    intros Hcc x [y [Hget Hin]].
-    destruct (M.get y rho1) as [ [l1 |] | ] eqn:Hgetl; [| now inv Hin | now inv Hin ].
-    inv Hin. edestruct Hcc as [v2 [Hget' Hcc']]; eauto.
-    eapply val_log_rel_in_dom1. eassumption. reflexivity.
-  Qed.
-  
-  Lemma env_log_rel_P_in_dom2 (R : Ensemble var) (k j : nat) b
-        rho1 rho2 H1 H2 :
-    env_log_rel_P' R k j GP GQ b (H1, rho1) (H2, rho2) ->
-    binding_in_map R rho1 ->
-    env_locs rho2 R \subset dom H2.  
-  Proof. 
-    intros Hcc Hbin x [y [Hget Hin]].
-    edestruct Hbin as [v1 Hget1]. eassumption.
-    destruct (M.get y rho2) as [ [l1 |] | ] eqn:Hgetl; [| now inv Hin | now inv Hin ].
-    inv Hin. edestruct Hcc as [v2 [Hget' Hcc']]; eauto.
-    eapply val_log_rel_in_dom2. eassumption. subst_exp. reflexivity.
-  Qed.
-
-  Lemma heap_log_rel_in_dom1 (k j : nat) S b H1 H2 : 
-    heap_log_rel' S k j GP GQ b H1 H2 ->
-    S \subset dom H1.
-  Proof.
-    intros Hh x Hin. eapply Hh in Hin.
-    eapply val_log_rel_in_dom1. eassumption. reflexivity. 
-  Qed.
-
-  Lemma heap_log_rel_in_dom2 (k j : nat) S b H1 H2 : 
-    heap_log_rel' S k j GP GQ b H1 H2 ->
-    image b S \subset dom H2.
-  Proof.
-    intros Hh x [y [Hin Heq]]. subst. eapply Hh in Hin.
-    eapply val_log_rel_in_dom2. eassumption. reflexivity.
-  Qed.
-
-  (** Properties of the renaming *)
-  
-  Lemma val_log_rel_loc_eq (k j : nat) b H1 H2 l v2 :
-    val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (v2, H2)) ->
+    Lemma val_log_rel_in_dom2 (k j : nat) b v1 v2 H1 H2 :
+      val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)) ->
+      val_loc v2 \subset dom H2.
+    Proof.
+      clear LP LQ.
+      intros Hcc l2 Hin; destruct v2 as [l2'|]; inv Hin.
+      destruct v1 as [l1|]; try contradiction.
+      simpl in Hcc.
+      destruct (get l1 H1) as [b1 | ] eqn:Hget; [| destruct Hcc; contradiction ].
+      destruct Hcc as [Heq1 Hcc].
+      destruct b1 as [c1 vs1 | v1 v2 | ]; try contradiction.
+      
+      destruct (get l2 H2) as [b2 | ] eqn:Hget'; [| contradiction ].
+      now eexists; eauto.
+      
+      destruct (get l2 H2) as [b2 | ] eqn:Hget'; [| contradiction ].
+      now eexists; eauto.
+    Qed.
+    
+    
+    Lemma val_log_rel_Forall2_dom1 (k j : nat) b (H1 H2 : heap block)
+          vs1 vs2 :
+      Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
+      Union_list (map val_loc vs1) \subset dom H1.  
+    Proof.
+      intros Hall. induction Hall; simpl.
+      - now eauto with Ensembles_DB.
+      - eapply Union_Included; [| eassumption ].
+        eapply val_log_rel_in_dom1; eauto.
+    Qed.
+    
+    Lemma val_log_rel_Forall2_dom2 (k j : nat) b (rho1 rho2 : env) (H1 H2 : heap block) vs1 vs2 :
+      Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
+      Union_list (map val_loc vs2) \subset dom H2.  
+    Proof.
+      intros Hall. induction Hall; simpl.
+      - now eauto with Ensembles_DB.
+      - eapply Union_Included; [| eassumption ].
+        eapply val_log_rel_in_dom2; eauto.
+    Qed.
+    
+    
+    Lemma env_log_rel_P_in_dom1 (R : Ensemble var) (k j : nat) b
+          rho1 rho2 H1 H2 :
+      env_log_rel_P' R k j GP GQ b (H1, rho1) (H2, rho2) ->
+      env_locs rho1 R \subset dom H1.  
+    Proof. 
+      intros Hcc x [y [Hget Hin]].
+      destruct (M.get y rho1) as [ [l1 |] | ] eqn:Hgetl; [| now inv Hin | now inv Hin ].
+      inv Hin. edestruct Hcc as [v2 [Hget' Hcc']]; eauto.
+      eapply val_log_rel_in_dom1. eassumption. reflexivity.
+    Qed.
+    
+    Lemma env_log_rel_P_in_dom2 (R : Ensemble var) (k j : nat) b
+          rho1 rho2 H1 H2 :
+      env_log_rel_P' R k j GP GQ b (H1, rho1) (H2, rho2) ->
+      binding_in_map R rho1 ->
+      env_locs rho2 R \subset dom H2.  
+    Proof. 
+      intros Hcc Hbin x [y [Hget Hin]].
+      edestruct Hbin as [v1 Hget1]. eassumption.
+      destruct (M.get y rho2) as [ [l1 |] | ] eqn:Hgetl; [| now inv Hin | now inv Hin ].
+      inv Hin. edestruct Hcc as [v2 [Hget' Hcc']]; eauto.
+      eapply val_log_rel_in_dom2. eassumption. subst_exp. reflexivity.
+    Qed.
+    
+    Lemma heap_log_rel_in_dom1 (k j : nat) S b H1 H2 : 
+      heap_log_rel' S k j GP GQ b H1 H2 ->
+      S \subset dom H1.
+    Proof.
+      intros Hh x Hin. eapply Hh in Hin.
+      eapply val_log_rel_in_dom1. eassumption. reflexivity. 
+    Qed.
+    
+    Lemma heap_log_rel_in_dom2 (k j : nat) S b H1 H2 : 
+      heap_log_rel' S k j GP GQ b H1 H2 ->
+      image b S \subset dom H2.
+    Proof.
+      intros Hh x [y [Hin Heq]]. subst. eapply Hh in Hin.
+      eapply val_log_rel_in_dom2. eassumption. reflexivity.
+    Qed.
+    
+    (** Properties of the renaming *)
+    
+    Lemma val_log_rel_loc_eq (k j : nat) b H1 H2 l v2 :
+      val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (v2, H2)) ->
     v2 = Loc (b l).
-  Proof.
-    intros Hcc. destruct v2; [| now inv Hcc ].
-    destruct Hcc as [Heq _].
-    congruence.
-  Qed.
-  
-  Lemma var_log_rel_env_image_reach
-        (k : nat) j b (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
-    var_log_rel' k j GP GQ b H1 rho1 H2 rho2 x y ->
-    M.get x rho1 = Some v ->
-    image b (env_locs rho1 [set x]) <--> (env_locs rho2 [set y]). 
-  Proof.
-    intros Hcc Hget.
-    edestruct Hcc as [v' [Hget' Hv]]; eauto.
-    rewrite !env_locs_Singleton at 1; eauto.
-    destruct v; destruct v'; try contradiction; simpl.
-    eapply val_log_rel_loc_eq in Hv. inv Hv.
-    now rewrite image_Singleton. 
-    now rewrite image_Empty_set.
-  Qed.
-  
-
-  Lemma env_log_rel_locs_image S (k j : nat) b
-        (H1 H2 : heap block) (rho1 rho2 : env) :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
-    binding_in_map S rho1 ->
-    image b (env_locs rho1 S) <--> (env_locs rho2 S).
-  Proof.
-    intros Hres HB. split.
-    - intros l' [l [Hin Heq]]; subst.
-      destruct Hin as [x [Hin Hp]].
-      destruct (M.get x rho1) as[[l1' |] | ] eqn:Hgetx1; try now inv Hp.
-      inv Hp. eapply Hres in Hgetx1.
-      edestruct Hgetx1 as [l2 [Hget2 Hval]].
-      eapply val_log_rel_loc_eq in Hval. subst.
-      eexists; split; eauto. rewrite Hget2. reflexivity. eassumption.
-    - intros l [x [Hin Hr]].
-      destruct (M.get x rho2) as[[l1' |] | ] eqn:Hgetx1; inv Hr. 
-      edestruct HB as [[l1| ] Hget1]. eassumption.
-      assert (Hget1' := Hget1). 
-      edestruct Hres as [l2 [Hget2 Hval]].
+    Proof.
+      intros Hcc. destruct v2; [| now inv Hcc ].
+      destruct Hcc as [Heq _].
+      congruence.
+    Qed.
+    
+    Lemma var_log_rel_env_image_reach
+          (k : nat) j b (H1 H2 : heap block) (rho1 rho2 : env) (x y : var) (v : value) :
+      var_log_rel' k j GP GQ b H1 rho1 H2 rho2 x y ->
+      M.get x rho1 = Some v ->
+      image b (env_locs rho1 [set x]) <--> (env_locs rho2 [set y]). 
+    Proof.
+      intros Hcc Hget.
+      edestruct Hcc as [v' [Hget' Hv]]; eauto.
+      rewrite !env_locs_Singleton at 1; eauto.
+      destruct v; destruct v'; try contradiction; simpl.
+      eapply val_log_rel_loc_eq in Hv. inv Hv.
+      now rewrite image_Singleton. 
+      now rewrite image_Empty_set.
+    Qed.
+    
+    
+    Lemma env_log_rel_locs_image S (k j : nat) b
+          (H1 H2 : heap block) (rho1 rho2 : env) :
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+      binding_in_map S rho1 ->
+      image b (env_locs rho1 S) <--> (env_locs rho2 S).
+    Proof.
+      intros Hres HB. split.
+      - intros l' [l [Hin Heq]]; subst.
+        destruct Hin as [x [Hin Hp]].
+        destruct (M.get x rho1) as[[l1' |] | ] eqn:Hgetx1; try now inv Hp.
+        inv Hp. eapply Hres in Hgetx1.
+        edestruct Hgetx1 as [l2 [Hget2 Hval]].
+        eapply val_log_rel_loc_eq in Hval. subst.
+        eexists; split; eauto. rewrite Hget2. reflexivity. eassumption.
+      - intros l [x [Hin Hr]].
+        destruct (M.get x rho2) as[[l1' |] | ] eqn:Hgetx1; inv Hr. 
+        edestruct HB as [[l1| ] Hget1]. eassumption.
+        assert (Hget1' := Hget1). 
+        edestruct Hres as [l2 [Hget2 Hval]].
+        eassumption. eassumption.
+        repeat subst_exp. 
+        eapply val_log_rel_loc_eq in Hval. inv Hval. 
+        eexists; split; eauto.
+        eexists; split; eauto.
+        rewrite Hget1. reflexivity.
+        
+        edestruct Hres as [l2 [Hget2 Hval]]; try eassumption.
+        repeat subst_exp. contradiction.
+    Qed. 
+    
+    
+    Lemma env_log_rel_val_log_rel S (k j : nat) b
+          (H1 H2 : heap block) (rho1 rho2 : env) l :
+      env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
+      l \in env_locs rho1 S ->
+            val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (Loc (b l), H2)).
+    Proof.
+      intros Henv [x [Hin Hget]].
+      edestruct (M.get x rho1) as [[l'|] | ] eqn:Hget1; inv Hget.  
+      edestruct Henv as [[l2 |] [Hget2 Hv]].
       eassumption. eassumption.
-      repeat subst_exp. 
-      eapply val_log_rel_loc_eq in Hval. inv Hval. 
-      eexists; split; eauto.
-      eexists; split; eauto.
-      rewrite Hget1. reflexivity.
-
-      edestruct Hres as [l2 [Hget2 Hval]]; try eassumption.
-      repeat subst_exp. contradiction.
-  Qed. 
-
-  
-  Lemma env_log_rel_val_log_rel S (k j : nat) b
-        (H1 H2 : heap block) (rho1 rho2 : env) l :
-    env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
-    l \in env_locs rho1 S ->
-    val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (Loc (b l), H2)).
-  Proof.
-    intros Henv [x [Hin Hget]].
-    edestruct (M.get x rho1) as [[l'|] | ] eqn:Hget1; inv Hget.  
-    edestruct Henv as [[l2 |] [Hget2 Hv]].
-    eassumption. eassumption.
-    assert (Hleq : l2 = b l). 
-    { eapply val_log_rel_loc_eq in Hv. now inv Hv. }
-    subst. eassumption.
-
-    now inv Hv. 
-  Qed.
-
-  Lemma heap_log_rel_val_log_rel S (k j : nat) b
-        (H1 H2 : heap block) l :
-    heap_log_rel' S k j GP GQ b H1 H2 ->
-    l \in S ->
-    val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (Loc (b l), H2)).
-  Proof. eauto. Qed.
-
-
+      assert (Hleq : l2 = b l). 
+      { eapply val_log_rel_loc_eq in Hv. now inv Hv. }
+      subst. eassumption.
+      
+      now inv Hv. 
+    Qed.
+    
+    Lemma heap_log_rel_val_log_rel S (k j : nat) b
+          (H1 H2 : heap block) l :
+      heap_log_rel' S k j GP GQ b H1 H2 ->
+      l \in S ->
+      val_log_rel' k j GP GQ b (Res (Loc l, H1)) (Res (Loc (b l), H2)).
+    Proof. eauto. Qed.
+    
+    
   (** * Getlist lemmas *)
 
-  Lemma var_log_rel_getlist (k j : nat)
-        (rho1 rho2 : env) (b : Inj) (H1 H2 : heap block) xs ys vs1 :
-    Forall2 (var_log_rel' k j GP GQ b H1 rho1 H2 rho2) xs ys ->
-    getlist xs rho1 = Some vs1 ->
-    exists vs2,
-      getlist ys rho2 = Some vs2 /\
-      Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
+    Lemma var_log_rel_getlist (k j : nat)
+          (rho1 rho2 : env) (b : Inj) (H1 H2 : heap block) xs ys vs1 :
+      Forall2 (var_log_rel' k j GP GQ b H1 rho1 H2 rho2) xs ys ->
+      getlist xs rho1 = Some vs1 ->
+      exists vs2,
+        getlist ys rho2 = Some vs2 /\
+        Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
   Proof.
     revert ys vs1. induction xs as [| x xs IHxs]; intros ys vs1 Hall Hget.
     - destruct ys; inv Hall. inv Hget. eexists. split; simpl; eauto.
@@ -1185,7 +1172,5 @@ Module LogRelDefs (H : Heap).
     intros s1 s2 Hseq; constructor; subst;
     intros Hcc z Hin; eapply Hcc; eapply Hseq; eauto.
   Qed.
-
-  End ValRelDef.
 
 End LogRelDefs. 

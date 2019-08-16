@@ -342,9 +342,8 @@ Proof.
   - cbn. now rewrite H, H0.
   - rewrite instantiate_TConstruct. simpl. now rewrite H.
   - rewrite instantiate_TCase. simpl. now rewrite H, H0.
-  - rewrite !instantiate_TFix; simpl. rewrite H; try easy.
-    rewrite !instantiate_TFix; simpl. 
-    now rewrite trans_fixes_pres_dlength. 
+  - simpl instantiate. rewrite !instantiate_TFix. simpl. rewrite H; try easy.
+    now rewrite trans_fixes_pres_dlength.
   - repeat (rewrite !instantiates_tcons; simpl). now rewrite <- H, H0.
   - repeat (rewrite !instantiateBs_bcons; simpl). f_equal.
     rewrite H by easy. rewrite instantiate_eta; auto.

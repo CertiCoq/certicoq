@@ -3,6 +3,7 @@
     [show_exp e] constructs a string representing the term that has some 
     minimal formatting so that it's much more readable.
 *)
+Require Import Common.AstCommon.
 Require Import List.
 Require Import String.
 Require Import L6.cps.
@@ -19,7 +20,6 @@ Open Scope monad_scope.
 
 Require Import Common.AstCommon.
 
-Require Import Common.AstCommon. 
 Definition nEnv := M.t Template.BasicAst.name.
 
 Section PP.

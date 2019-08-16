@@ -22,7 +22,7 @@ Ltac computeExtract certiL4 f:=
        |Ret ?xx => exact xx
      end).
 
-
+From MetaCoq.Template Require Import All.
 
 Quote Recursively Definition One := 1%positive.
 
@@ -135,22 +135,22 @@ Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)
 
 
   
- Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color). 
+(*  Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color).  *)
 
- Print demo4.
- Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) Demo1).
- Set Printing Depth 1000.
- Print demo5.
- Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) binom). 
- Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) binom). 
+(*  Print demo4. *)
+(*  Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) Demo1). *)
+(*  Set Printing Depth 1000. *)
+(*  Print demo5. *)
+(*  Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) binom).  *)
+(*  Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) binom).  *)
 
-Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).
+(* Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color). *)
  
-Print color5.
+(* Print color5. *)
+(*
 
 
-
-Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) binom). 
+Definition binom2 := Eval lazy in (translateTo (cTerm certiL2k) binom).
 Definition eval_c2 := match binom2 with
                       | Ret (mkPgm p env) =>
                         Ret (L2k.wcbvEval.wcbvEval env 1000%nat p)
@@ -174,10 +174,10 @@ Definition eval_c4 := match binom5 with
 
   Definition eval_c4' := Eval vm_compute in eval_c4.
  Print eval_c4'. 
-
+*)
 
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
-Print color5. 
+(* Print color5.  *)
 
  
 

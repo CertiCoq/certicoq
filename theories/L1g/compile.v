@@ -1,3 +1,6 @@
+From MetaCoq.Template Require Import monad_utils utils.
+
+Import MonadNotation.
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -6,10 +9,8 @@ Require Import Coq.Bool.Bool.
 Require Import FunInd.
 Require Import Common.Common.
 
-Require Import
-        TemplateExtraction.EAst
-        TemplateExtraction.ETyping
-        Template.kernel.univ.
+From MetaCoq.Template Require Import utils.
+From MetaCoq.Erasure Require Import EAst ETyping.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -291,20 +292,18 @@ Fixpoint program_Pgm_aux (g:global_declarations) : environ Term :=
   | gd :: g => cons (trans_global_decl g gd) (program_Pgm_aux g)
   end.
 
-Require Template.Ast.
-Require Import PCUIC.TemplateToPCUIC.
-Require Import TemplateExtraction.Extract.
+From MetaCoq Require Import SafeChecker.SafeTemplateChecker.
+From MetaCoq.SafeChecker Require Import PCUICSafeChecker.
+From MetaCoq.PCUIC Require Import TemplateToPCUIC.
+From MetaCoq.Erasure Require Import ErasureFunction SafeTemplateErasure.
 
-Definition program_Program
-           `{F:utils.Fuel} (p:Template.Ast.program) : Program Term :=
-  let '(genv, t) := p in
-  let gc := (genv, uGraph.init_graph) in
-  let genv' := trans_global gc in
-  let genv'' := extract_global genv' in
-  let t' := extract genv' nil (trans t) in
-  match genv'', t' with
-  | PCUICChecker.Checked genv''', PCUICChecker.Checked t''' =>
-    {| main := term_Term genv''' t''';
-       env := program_Pgm_aux (rev genv''') |}
-  | _, _ => {| main := TWrong "program_Program"; env := nil |}
+Existing Instance envcheck_monad.
+Import MonadNotation.
+
+Definition program_Program (p:Template.Ast.program) : Program Term :=
+  match erase_template_program p with
+  | CorrectDecl (gc, t) =>
+    {| main := term_Term gc t;
+       env := program_Pgm_aux (rev gc) |}
+  | EnvError env => {| main := TWrong "program_Program"; env := nil |}
   end.

@@ -19,7 +19,8 @@ Open Scope monad_scope.
 
 Require Import Common.AstCommon.
 
-Definition nEnv := M.t BasicAst.name.
+Require Import Common.AstCommon. 
+Definition nEnv := M.t Template.BasicAst.name.
 
 Section PP.
 

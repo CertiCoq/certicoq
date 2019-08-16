@@ -9,10 +9,7 @@ Require Import L1g.term.
 Require Import L1g.program.
 Require Import L1g.wndEval.
 
-Require Import
-        TemplateExtraction.EAst
-        TemplateExtraction.EWndEval
-        Template.kernel.univ.
+From MetaCoq.Erasure Require Import EAst EWndEval.
 
 Local Open Scope string_scope.
 Local Open Scope bool.

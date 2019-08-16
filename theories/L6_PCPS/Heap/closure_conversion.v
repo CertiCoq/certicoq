@@ -2,12 +2,13 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
+Require Import Common.AstCommon.
+
 From CertiCoq.L6 Require Import cps cps_util set_util relations hoisting identifiers ctx
                          Ensembles_util List_util alpha_conv functions.
 Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String.
-Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
 Require Import compcert.lib.Maps. 

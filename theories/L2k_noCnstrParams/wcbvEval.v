@@ -311,7 +311,7 @@ Function wcbvEval
       match (lookup nm p) with
       | Some (ecTrm t) => wcbvEval n t
       (** note hack coding of axioms in environment **)
-      | Some (ecTyp _ _ _) => raise ("wcbvEval;TConst;ecTyp: " ++ nm)
+      | Some (ecTyp _ _) => raise ("wcbvEval;TConst;ecTyp: " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
     | TApp fn a1 =>
@@ -432,7 +432,6 @@ Proof.
     + now apply H. 
     + intuition.
   - eapply wLetIn; intuition.
-    + apply H. assumption.
   - eapply wProj; try eassumption. subst i.
     + specialize (H _ e1). eassumption.
     + subst. apply H0. assumption.

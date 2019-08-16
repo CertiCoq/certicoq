@@ -3,6 +3,7 @@
     [show_exp e] constructs a string representing the term that has some 
     minimal formatting so that it's much more readable.
 *)
+Require Import Common.AstCommon.
 Require Import List.
 Require Import String.
 Require Import L6.cps.
@@ -13,7 +14,6 @@ Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
 
 
-Require Import Common.AstCommon. 
 Definition nEnv := M.t Template.BasicAst.name.
 
 Section PP.

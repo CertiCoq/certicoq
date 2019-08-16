@@ -14,7 +14,7 @@ Require Import ExtLib.Data.Monads.StateMonad.
 
 
 Require Import Common.AstCommon. 
-Definition nEnv := M.t BasicAst.name.
+Definition nEnv := M.t Template.BasicAst.name.
 
 Section PP.
 

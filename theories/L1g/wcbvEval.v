@@ -295,7 +295,7 @@ Function wcbvEval
       match (lookup nm p) with
       | Some (AstCommon.ecTrm t) => wcbvEval n t
       (** note hack coding of axioms in environment **)
-      | Some (AstCommon.ecTyp _ _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
+      | Some (AstCommon.ecTyp _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
     | TProof => Ret TProof

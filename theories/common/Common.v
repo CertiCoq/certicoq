@@ -1,6 +1,7 @@
 (** Collect all Common together **)
 
-Require Export Template.Ast.
+From MetaCoq Require Export Template.BasicAst.
+From MetaCoq Require Export Erasure.EAst.
 
 Require Export Common.exceptionMonad.
 Require Export Common.RandyPrelude.

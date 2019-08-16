@@ -8,13 +8,15 @@
 
 
 TODO: change L6_to_Clight's fn_vars into fn_temps
-TODO: done change L6_to_Clight's reserve into reserve', todo update proof with new order 
-TODO: update proof to 64 bits -- even better, keep the size opaque  -- will need to update compcert at the same time
+TODO: bundle the notation in L6_to_Clight and import it instead of redefining it 
+
+Done: change L6_to_Clight's reserve into reserve', todo update proof with new order 
+Done: update proof to 64 bits (parametric over Archi.ptr64) 
  *)
-    
+        
 Require Import L6.cps L6.eval L6.cps_util L6.List_util L6.Ensembles_util L6.identifiers L6.tactics L6.shrink_cps_corresp. 
   
-Require Import L7.L6_to_Clight.
+
 
 (* Require Import RamifyCoq.CertiGC.GCGraph. *)
 
@@ -31,6 +33,8 @@ Require Import compcert.common.AST
         compcert.common.Values
         compcert.common.Globalenvs
         compcert.common.Memory.
+
+Require Import L7.L6_to_Clight.
 
 Require Import Libraries.maps_util.
 
@@ -55,7 +59,8 @@ Notation ulongTy := (Tlong Unsigned
 Notation boolTy := (Tint IBool Unsigned noattr). 
 
 
- (* 64-bit *)
+ (* 64-bit 
+
 Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
 Definition val := if Archi.ptr64 then ulongTy else uintTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *) 
 Definition uval := if Archi.ptr64 then ulongTy else uintTy.
@@ -70,22 +75,16 @@ Transparent val_typ.
 Transparent Init_int.
 Transparent make_vint.
 Transparent make_cint.                                                                   
+  *)
 
 
 
                 
 
 
-(* (* 32-bit *)
-Definition int_chunk := Mint32.
- Notation val := uintTy. 
-Notation uval := uintTy.
-Notation val_typ := (Tany32:typ).
-Notation Init_int x := (Init_int32 (Int.repr x)).   *)
-
 
 Definition int_size := (size_chunk int_chunk).
-Definition max_args :=   1024%Z.
+Definition max_args :=   1024%Z. (* limited by space in boxed header *)
 
 Theorem int_size_pos:
   (0 <= size_chunk int_chunk)%Z.
@@ -554,6 +553,7 @@ Notation "'ptrVar' x" := (Etempvar x valPtr) (at level 20).
 Notation "'bvar' x" := (Etempvar x boolTy) (at level 20).
 Notation "'funVar' x" := (Evar x funTy) (at level 20).
 
+
 Notation allocPtr := (Etempvar allocIdent valPtr).
 Notation limitPtr := (Etempvar limitIdent valPtr).
 Notation args := (Etempvar argsIdent valPtr).
@@ -568,16 +568,16 @@ Notation tinfd := (Ederef tinf threadStructInf).
 
 Notation heapInf := (Tstruct heapInfIdent noattr).
 
-Definition add (a b : expr) := Ebinop Oadd a b valPtr.
+
 Notation " a '+'' b " := (add a b) (at level 30).
 
-Definition sub (a b: expr) := Ebinop Osub a b valPtr.
+
 Notation " a '-'' b " := (sub a b) (at level 30).
 
-Definition int_eq (a b : expr) := Ebinop Oeq a b type_bool.
+
 Notation " a '='' b " := (int_eq a b) (at level 35).
 
-Definition not (a : expr) := Eunop Onotbool a type_bool.
+
 Notation "'!' a " := (not a) (at level 40).
 
 Notation seq := Ssequence.
@@ -592,7 +592,7 @@ Notation "'*' p " := (Ederef p val) (at level 40).
 
 Notation "'&' p " := (Eaddrof p valPtr) (at level 40).
 
-Definition c_int' n t := if Archi.ptr64 then Econst_long (Int64.repr n) t else Econst_int (Int.repr n%Z) t.
+
 
 Notation c_int := c_int'.
 
@@ -665,6 +665,10 @@ Ltac archi_red :=
    | None => var x
    end.
 
+ (* The full the domain of map is exactly the symbols of globalenv *)
+ Definition find_symbol_domain {A} (map:M.t A):=
+   forall (x:positive) V1 (b:block), M.get x map = Some V1 <-> Genv.find_symbol (Genv.globalenv p) x = Some b.
+ 
                                          
 Inductive repr_asgn_fun': list positive -> list N -> statement -> Prop :=
 | repr_asgn_nil: forall y i,  repr_asgn_fun' [y] [i] (args[ Z.of_N i ] :::= (var_or_funvar_f y))
@@ -1222,14 +1226,16 @@ Definition prefix_ctx {A:Type} rho' rho :=
      (0 <= h <= Ptrofs.max_unsigned)%Z.
  Proof.
    intros. inv H.   
-   unfold Int.max_unsigned. 
+   unfold Ptrofs.max_unsigned.
+   unfold Ptrofs.half_modulus in *.
+   unfold Ptrofs.modulus in *.
    rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try omega.
    rewrite Z.pow_1_r.
    rewrite Z.add_1_r.
+
    split; try omega.
    apply Zlt_le_succ.
-   unfold Ptrofs.half_modulus in *.
-   unfold Ptrofs.max_unsigned. 
+   simpl.
    
    admit.
  Admitted.
@@ -1781,7 +1787,7 @@ Inductive repr_expr_L6_L7: L6.cps.exp -> statement -> Prop :=
     M.get t fenv = Some inf ->
     repr_asgn_fun ys (snd inf) s ->
     (* 2 - call f *)
-    (* NOTE: added redundant limitIdent |-> limitPtr to avoid having to *)
+    (* NOTE: added redundant limitIdent |-> limitPtr to avoid having to carry this info around, but could optimize it away *)
     repr_expr_L6_L7 (Eapp f t ys)  (s; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr ; call ([pfunTy] (var_or_funvar_f f)))
 | R_halt_e: forall v e,
     (* halt v <-> end with v in args[1] *)
@@ -1801,7 +1807,8 @@ with repr_branches_L6_L7: list (cTag * exp) -> labeled_statements -> labeled_sta
          repr_expr_L6_L7 e s ->
          M.get t rep_env  = Some (enum n) ->
          repr_branches_L6_L7 cl ls LSnil ->
-                            repr_branches_L6_L7 ((t, e) ::cl) ls (LScons None  (Ssequence s Sbreak) LSnil)
+         repr_branches_L6_L7 ((t, e) ::cl) ls (LScons None  (Ssequence s Sbreak)
+                                                      LSnil)
      | Runboxed_br: forall cl ls lsa' lsb' lsc' t n tag e s, repr_branches_L6_L7 cl ls (LScons lsa' lsb' lsc') ->
                                                 repr_expr_L6_L7 e s ->
                                                 M.get t rep_env  = Some (enum n) ->
@@ -5983,17 +5990,225 @@ Admitted.
 
 
 
+Theorem find_symbol_map:
+  forall p map id v, 
+    find_symbol_domain p map ->
+    var_or_funvar id p v (makeVar id v map).
+Proof.
+  intros. unfold makeVar.
+  destruct (cps.M.get v map) eqn:Hgvm.
+  - econstructor. eapply H. eauto.
+  - econstructor.
+    destruct (Genv.find_symbol (Genv.globalenv p) v) eqn:Hgpv; auto.
+    exfalso.
+    specialize (H v). 
+    eapply H in Hgpv. rewrite Hgvm in Hgpv. inv Hgpv.
+    Unshelve. auto. auto.
+Qed.
+
+
+Theorem find_symbol_map_f:
+    forall p map id v, 
+    find_symbol_domain p map ->
+    var_or_funvar_f id p v = makeVar id v map.
+Proof.
+  intros. apply var_or_funvar_of_f.
+  apply find_symbol_map; auto.
+Qed.
+  
+Theorem asgnAppVars_correct:
+  forall p map,
+    find_symbol_domain p map ->
+    forall vs ind s,   
+      asgnAppVars' argsIdent threadInfIdent vs ind map = Some s ->
+      repr_asgn_fun'  argsIdent threadInfIdent p vs ind s.
+Proof.
+  intros p map Hmap.
+  induction vs; intros.
+  - destruct ind; inv H. 
+  - destruct ind. inv H.
+    simpl in H. destruct vs. destruct ind.
+    2: inv H.
+    inv H.
+    + (* last one *)
+      erewrite <- find_symbol_map_f; eauto.
+      constructor.
+    +  (* IH *)
+      destruct ( asgnAppVars' argsIdent threadInfIdent (p0 :: vs) ind map) eqn:Happ.
+      2: inv H.
+      apply IHvs in Happ. inv H. 
+      erewrite <- find_symbol_map_f. 2: eauto.
+      constructor. auto.
+Qed.
+
+
+Theorem repr_make_case_switch:
+  forall x ls ls',
+  repr_switch_L6_L7 isptrIdent caseIdent x ls ls' (make_case_switch isptrIdent caseIdent x ls ls').
+Proof.
+  intros. unfold make_case_switch. constructor. 
+Qed.  
+
+
+Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (p:program) fenv cenv ienv map :=
+ (fix makeCases (l : list (cTag * exp)) :
+            option (labeled_statements * labeled_statements) :=
+            match l with
+            | [] => Monad.ret (LSnil, LSnil)
+            | p :: l' =>
+                Monad.pbind
+                  (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (snd p) fenv cenv ienv map)
+                  (fun prog : statement =>
+                   Monad.pbind (makeCases l')
+                     (fun '(ls, ls') =>
+                      match make_cRep cenv (fst p) with
+                      | Some (enum t) =>
+                        let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
+                          match ls' with
+                          | LSnil =>
+                              Monad.ret (ls, LScons None  (Ssequence prog Sbreak) ls')
+                          | LScons _ _ _ =>
+                              Monad.ret
+                                (ls,
+                                LScons (Some (Z.shiftr tag 1))
+                                  (Ssequence prog Sbreak) ls')
+                          end
+                      | Some (boxed t a) =>
+                        let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
+                          match ls with
+                          | LSnil =>
+                              Monad.ret (LScons None (Ssequence prog Sbreak) ls, ls')
+                          | LScons _ _ _ =>
+                              Monad.ret
+                                (LScons (Some (Z.land tag 255))
+                                   (Ssequence prog Sbreak) ls,
+                                ls')
+                          end
+                      | None => None
+                      end))
+            end).
+
+Theorem crep_cenv_correct:
+forall cenv nienv rep_env, 
+  correct_crep_of_env cenv nienv rep_env ->
+  forall c, 
+    make_cRep cenv c =  M.get c rep_env.
+Proof.
+  intros. unfold make_cRep.
+  destruct (cps.M.get c cenv) eqn:Hgc.
+  - destruct c0. destruct p. destruct p.  destruct p.
+    simpl.
+    destruct (n0 =? 0)%N eqn:Hn0.    
+    + rewrite N.eqb_eq in Hn0. subst.
+      inv H. specialize (H0 _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc. auto.
+    + rewrite N.eqb_neq in Hn0.
+      inv H. specialize (H0 _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc.  exfalso; apply Hn0; auto.
+      auto.
+  -  simpl. symmetry.
+     inv H. destruct (M.get c rep_env) eqn:Hcr.
+     exfalso. apply H1 in Hcr. inv Hcr; rewrite H in Hgc; inv Hgc. auto.
+Qed.    
+
+  
+Theorem repr_makeCases_branches:
+  forall p fenv cenv ienv nienv map rep_env,
+    correct_crep_of_env cenv nienv rep_env ->
+    forall l ls ls',
+  makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l = Some (ls, ls') ->
+  repr_branches_L6_L7 argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv p rep_env l ls ls'.
+Proof.
+  intros p fenv cenv ienv nienv map rep_env Hrep_env.
+  induction l; intros.
+   (* empty L *) inv H. constructor.
+  simpl in H. 
+  destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (snd a) fenv cenv ienv map) eqn:Htb. 2: inv H.
+  destruct ( makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l ) eqn:Hmc. 2: inv H.
+  destruct p0.
+  destruct a; simpl in *.
+  destruct ( make_cRep cenv c ) eqn:HcRep. 2: inv H.
+  destruct c0.
+  - (* unboxed *)
+    destruct l1.
+    + (* last *)
+      inv H. econstructor.
+      * admit.
+      * erewrite <- crep_cenv_correct; eauto.
+      * eapply IHl; reflexivity.
+    + (* not last *) 
+      inv H.
+      econstructor.
+      * eapply IHl; reflexivity.
+      * admit.
+      * erewrite <- crep_cenv_correct; eauto.
+      * constructor; auto.
+        erewrite crep_cenv_correct in HcRep; eauto.
+        inv Hrep_env. apply H0 in HcRep. inv HcRep.
+        admit.
+  - (* boxed *)
+    destruct l0.
+    + (* last *)
+      inv H.
+      econstructor.
+      * eapply IHl; reflexivity.
+      * admit.
+      * erewrite <- crep_cenv_correct; eauto.
+     +  (* not last *)
+       inv H.
+       econstructor.
+       * eapply IHl; reflexivity.
+       * admit.
+       * erewrite <- crep_cenv_correct; eauto.
+       * constructor. auto.
+         erewrite crep_cenv_correct in HcRep; eauto.
+         inv Hrep_env. apply H0 in HcRep. inv HcRep.
+         admit.
+        
+Admitted.
+
+
+
+
+Theorem make_crep_none:
+  forall c cenv,
+  make_cRep cenv c = None ->
+  M.get c cenv = None.
+Proof.
+  intros.
+  unfold make_cRep in *.
+  destruct (cps.M.get c cenv); auto.
+  exfalso. inv H. destruct c0.
+  destruct p.
+  destruct p. destruct p. 
+  destruct  (n0 =? 0)%N; inv H1.
+Qed.
+
+Theorem make_tagZ_none:
+  forall c cenv,
+  makeTagZ cenv c = None ->
+  M.get c cenv = None.
+Proof.
+  intros.
+  unfold makeTagZ in *.
+  simpl in H.
+  
+  
+  
+
 (* probably needs correct cenv *)
 Theorem translate_body_correct:
-  forall fenv cenv ienv p rep_env e map stm, 
-    translate_body argsIdent allocIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map = Some stm -> 
+  forall fenv cenv ienv p rep_env map,
+    find_symbol_domain p map ->
+    forall  e stm,
+    translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map = Some stm ->
+
  repr_expr_L6_L7_id fenv p rep_env e stm. 
 Proof.
+  intros fenv cenv ienv p rep_env map Hmap.
   induction e; intros.
   - (* Econstr *)
     simpl in H.
     destruct (assignConstructorS allocIdent threadInfIdent cenv ienv map v c l) eqn:H_eqAssign.
-    destruct (translate_body argsIdent allocIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:H_eqTranslate; inv H.
+    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:H_eqTranslate; inv H.
     2: inv H.
     constructor.
     2: eapply IHe; eauto.
@@ -6005,30 +6220,47 @@ Proof.
     destruct (make_cRep cenv c) eqn:H_make_cRep.
     simpl in H_eqAssign. destruct c0.
     inv H_eqAssign. unfold makeTag in *.
-    destruct (makeTagZ cenv c) eqn:H_makeTagZ. inv H_makeTag. unfold L6_to_Clight.c_int'.  admit.
+    destruct (makeTagZ cenv c) eqn:H_makeTagZ. inv H_makeTag. unfold L6_to_Clight.c_int'.
+    (* l = [] since make_cRep is enum *)
+    admit.
+    
+    SearchAbout makeTagZ. 
+    inv (H_eqAssign). admit.
 
     admit.
+    simpl in *. inv H_eqAssign.
+  - (* Ecase *)
+      simpl in H.
 
-    admit. admit.
-    inv H_eqAssign. 
-    - (* Ecase *)
-    admit.
+      
+
+      
     - (* Eproj *)
       simpl in H.
-      destruct (translate_body argsIdent allocIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:He.
-      apply IHe in He.
-      inv H.
-      admit.
-      inv H.
+      destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:He.
+      2: inv H. 
+      inv H. constructor.
+      eapply IHe. reflexivity.
   - (* Efun *)
-    admit.
+    inv H.
   - (* Eapp *)
-    admit.
+    simpl in H. destruct (cps.M.get f fenv) eqn:Hffenv. 2: inv H.
+    
+    
+    destruct ( asgnAppVars argsIdent threadInfIdent tinfIdent l (snd f0) map) eqn:Happvar; inv H.
+    unfold asgnAppVars in *.
+    destruct (asgnAppVars' argsIdent threadInfIdent l (snd f0) map) eqn:Happvar'; inv Happvar.
+    erewrite <- find_symbol_map_f. 2: eauto.
+    econstructor.
+    eauto. constructor.
+    eapply asgnAppVars_correct; eauto.    
   - (* Eprim *)
     inv H. 
   - (* Ehalt *)
-    simpl in H. inv H. admit.
-(*     eapply R_halt_e.*)
+    simpl in H. inv H.
+
+    eapply R_halt_e.
+    apply find_symbol_map. auto.
 Admitted.
 
 (* {| co_su := Struct;
@@ -9577,7 +9809,9 @@ solve_nodup. solve_nodup.
       
       split.
       
-      * apply t_step. eapply step_assign with (v := (Vptr b0 Ptrofs.zero)) (m' := m2).  
+      * 
+        apply t_step.
+        eapply step_assign with (v := (Vptr b0 Ptrofs.zero)) (m' := m2).  
         { 
           constructor.
           econstructor. constructor; eauto.

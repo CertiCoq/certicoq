@@ -38,7 +38,7 @@ Global Instance certiL3_to_L3_eta:
   CerticoqTranslation (cTerm certiL2k) (cTerm certiL3_eta) :=
   fun p =>
     (AstCommon.timePhase "L3 to L3_eta")
-    (Ret (L3_to_L3_eta.Program_Program p)).
+      (fun (_:Datatypes.unit) => (Ret (L3_to_L3_eta.Program_Program p))).
 
 Lemma L3_crctEnv_inv d e : L2k.program.crctEnv (d :: e) -> L2k.program.crctEnv e.
 Proof.
@@ -191,8 +191,8 @@ Global Instance certiL4: CerticoqLanguage (ienv * L4.expression.exp) := {}.
 Global  Instance certiL3_eta_to_L4: 
   CerticoqTranslation (cTerm certiL3_eta) (cTerm certiL4)  :=
   fun p =>
-    (AstCommon.timePhase "L3_eta to L4")  (Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
-   (L3_to_L4.translate_program (AstCommon.env p) (main p)))).
+    (AstCommon.timePhase "L3_eta to L4")  (fun (_:Datatypes.unit) => (Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
+   (L3_to_L4.translate_program (AstCommon.env p) (main p))))).
 
 Require Import L4.L3_to_L4_correct.
 
@@ -330,7 +330,7 @@ Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2_Term) := {}.
 
 Global Instance certiL4_to_L4_2: 
   CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4_2) :=
-  fun p => (AstCommon.timePhase "L4 to L4_2") (fst p, (tL4_to_L4_2 (snd p))).
+  fun p => (AstCommon.timePhase "L4 to L4_2") (fun (_:Datatypes.unit) =>(fst p, (tL4_to_L4_2 (snd p)))).
 
 
 Global Program Instance : BigStepOpSem L4_5_Term L4_5_Term := eval.
@@ -364,7 +364,7 @@ Global Instance certiL4_5: CerticoqLanguage (prod ienv L4_5_Term) := {}.
 
 Global Instance certiL4_2_to_L4_5: 
   CerticoqTotalTranslation (cTerm certiL4_2) (cTerm certiL4_5) :=
-  fun p =>       (AstCommon.timePhase "L4_2 to L_5") (fst p, (L4_2_to_L4_5  (snd p))).
+  fun p =>       (AstCommon.timePhase "L4_2 to L_5") (fun (_:Datatypes.unit) => (fst p, (L4_2_to_L4_5  (snd p)))).
 
 
 Require Import L4.variables.
@@ -426,7 +426,7 @@ Qed.
 
 Global Instance certiL4_5_to_L5:
   CerticoqTotalTranslation (cTerm certiL4_5) (cTerm certiL5):=
- (fun x =>   (AstCommon.timePhase "L4_5 to L5") (fst x, ContApp_c (cps_cvt (snd x)) haltCont)).
+ (fun x =>   (AstCommon.timePhase "L4_5 to L5") (fun (_:Datatypes.unit) => (fst x, ContApp_c (cps_cvt (snd x)) haltCont))).
 
 Definition oldTranslation : (cTerm certiL4_5) -> (cTerm certiL5):=
   (fun x => (fst x, (cps_cvt (snd x)))).

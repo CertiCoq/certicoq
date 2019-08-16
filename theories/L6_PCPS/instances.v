@@ -113,7 +113,7 @@ Instance certiL5_t0_L6:
     match v with
     | pair venv vt =>
       (AstCommon.timePhase "L5 to L6")
-      (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+        (fun (_:Datatypes.unit) => (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
        | Some r =>
          
         let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
@@ -132,5 +132,5 @@ Instance certiL5_t0_L6:
         in
         Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _,   shrink_top t'))
       | None => Exc "failed converting from L5 to L6"
-      end)
+      end))
     end.

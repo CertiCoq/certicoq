@@ -217,7 +217,7 @@ Definition update_iEnv (ienv : n_iEnv) (p : positive) (cInf : cTyInfo) : n_iEnv 
 Definition compute_iEnv (cenv : cEnv) : n_iEnv :=
   M.fold update_iEnv cenv (M.empty _).
 
-(* OS: getEnumOrdinal and getBoxedOrdinal are only used in the proof to should that the ordinal is unique (within an ind) within a given tag *)
+(* OS: getEnumOrdinal and getBoxedOrdinal are only used in the proof to show that the ordinal is unique (within an ind) within a given tag *)
 Fixpoint getEnumOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
   match l with
   | nil => None
@@ -298,18 +298,22 @@ Notation longTy := (Tlong Signed
 Notation ulongTy := (Tlong Unsigned
                         {| attr_volatile := false; attr_alignas := None |}).
 
+
 Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
 Definition val := if Archi.ptr64 then ulongTy else uintTy. (* NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *) 
 Definition uval := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval := if Archi.ptr64 then longTy else intTy.
 Definition val_typ := if Archi.ptr64 then  (AST.Tlong:typ) else (Tany32:typ).
 Definition Init_int x := if Archi.ptr64 then (Init_int64 (Int64.repr x)) else (Init_int32 (Int.repr x)).
-Definition make_vint z := if Archi.ptr64 then Vlong (Int64.repr z) else Values.Vint (Int.repr z).
+Definition make_vint (z:Z) := if Archi.ptr64 then Vlong (Int64.repr z) else Values.Vint (Int.repr z).
+Definition make_cint z t := if Archi.ptr64 then Econst_long (Int64.repr z) t else (Econst_int (Int.repr z) t).
 Transparent val.
 Transparent uval.
 Transparent val_typ.
 Transparent Init_int.
-Transparent make_vint.                                                                   
+Transparent make_vint.
+Transparent make_cint.                                                                   
+
 
 
 (* CHANGE THIS FOR 32-bit or 64-bit mode  *)
@@ -574,27 +578,28 @@ Fixpoint asgnFunVars (vs : list positive) (ind : list N) :
 
 
        
-Fixpoint asgnAppVars' (vs : list positive) (ind : list N) :
+Fixpoint asgnAppVars' (vs : list positive) (ind : list N) (map : M.t positive) :
   option statement := 
   match vs with
   | nil =>
-    match ind with
-    | nil => ret (Efield tinfd allocIdent valPtr  :::= allocPtr)
-    | cons _ _ => None
-    end
+     None
   | cons v vs' =>
-    match ind with
+    (match ind with
     | nil => None
-    | cons i ind' =>             
-      rest <- asgnAppVars' vs' ind' ;;
-           ret (args[ Z.of_N i ] :::= (var v) ;
-               rest)
-    end
-  end.
+    | cons i ind' =>
+      let s_iv :=  args[ Z.of_N i ] :::= (makeVar v map) in
+      (match vs', ind' with
+      | nil, nil => ret s_iv
+      | _, _ => 
+        rest <- asgnAppVars' vs' ind' map;;
+           ret (rest ; s_iv)
+       end)
+     end)
+    end.
 
 (* Optional, reduce register pressure *)
-Definition asgnAppVars vs ind :=
-  match asgnAppVars' vs ind with
+Definition asgnAppVars vs ind (map : M.t positive) :=
+  match asgnAppVars' vs ind map with
     | Some s =>
      ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
     | None => None 
@@ -604,9 +609,9 @@ Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_s
       (isPtr caseIdent x;
              Sifthenelse
                (bvar caseIdent)
-               (Sswitch (Ebinop Oand (Field(var x, -1)) (Econst_int (Int.repr 255) val) val) ls)
+               (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
              (
-               Sswitch (Ebinop Oshr (var x) (Econst_int (Int.repr 1) val) val)
+               Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
                       ls')).
 
 
@@ -626,11 +631,11 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
             | cons p l' =>
               prog <- translate_body (snd p) fenv cenv ienv map ;;
                    p' <- makeCases l' ;;
-                   tag <- makeTagZ cenv (fst p) ;;
                    let '(ls , ls') := p' in
-                   match isBoxed cenv ienv (fst p) with
-                   | true =>
-                     match ls with
+                   match (make_cRep cenv (fst p)) with
+                   | Some (boxed t a ) =>
+                     let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
+                     (match ls with
                      | LSnil =>
                        ret ((LScons None
                                     prog
@@ -639,9 +644,10 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
                        ret ((LScons (Some (Z.land tag 255))
                                     (Ssequence prog Sbreak)
                                     ls), ls')
-                     end
-                   | false =>
-                     match ls' with
+                     end)
+                   | Some (enum t) =>
+                     let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
+                     (match ls' with
                      | LSnil =>
                        ret (ls, (LScons None
                                         prog
@@ -650,7 +656,8 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
                        ret (ls, (LScons (Some (Z.shiftr tag 1))
                                         (Ssequence prog Sbreak)
                                         ls'))
-                     end
+                     end)                       
+                   | None => None
                    end
             end) cs) ;;
       let '(ls , ls') := p in
@@ -663,14 +670,14 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
   | Eapp x t vs =>
 
     inf <- M.get t fenv ;;
-        asgn <- asgnAppVars vs (snd inf) ;;
+        asgn <- asgnAppVars vs (snd inf) map;;
     let vv := makeVar x map  in
-                      ret (asgn ; 
+                      ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
                                     call ([pfunTy] vv))
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x  and return *)
-    ret ((args[ Z.of_nat 1 ] :::= (var x)) ; Sreturn None)
+    ret ((args[ Z.of_nat 1 ] :::= (makeVar x map)))
   end.
 
 Definition mkFun (vs : list positive) (body : statement) : function :=

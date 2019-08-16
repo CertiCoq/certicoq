@@ -33,12 +33,12 @@ Extract Constant L6_to_Clight.print => "print_string".
 (* Timing *)
 Extract Constant AstCommon.timePhase =>
 "(fun c x -> let time = Unix.gettimeofday() in
-                            let temp = x in
+                            let temp = x () in
                             let time = (Unix.gettimeofday() -. time) in
               Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
               temp)".
      
-(* Extract Constant AstCommon.timePhase => "(fun x -> x)" *)
+(* Extract Constant AstCommon.timePhase => "(fun x -> x ())" *)
 
 
                                 

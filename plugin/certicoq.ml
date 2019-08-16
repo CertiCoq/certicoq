@@ -28,8 +28,10 @@ let compile gr =
     | _ -> CErrors.user_err ~hdr:"template-coq"
        (Printer.pr_global gr ++ str" is not a constant definition") in
   Feedback.msg_debug (str"Quoting");
+  let time = Unix.gettimeofday() in
   let term = quote_term_rec env (EConstr.to_constr sigma c) in
-  Feedback.msg_debug (str"Finished quoting.. compiling to L7.");
+  let time = (Unix.gettimeofday() -. time) in
+  Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time));
   let fuel = coq_nat_of_int 10000 in
   match AllInstances.compile_template_L7 fuel term with
   | Ret ((nenv, header), prg) ->

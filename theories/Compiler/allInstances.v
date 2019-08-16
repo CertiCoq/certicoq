@@ -64,10 +64,11 @@ Definition caseIdent:positive := 83.
 
 
 Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program * Clight.program :=
-  let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-                   prog cenv nenv in
-  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
+  (AstCommon.timePhase "L6 to L7") 
+     (fun (_:Datatypes.unit) => (let '((_, cenv , nenv, fenv), (_, prog)) := t in
+     let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+                      prog cenv nenv in
+  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)))).
 
 
 

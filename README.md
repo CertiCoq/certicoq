@@ -88,10 +88,9 @@ should do:
   
   This will fetch the appropriate branch from the submodule (e.g. MetaCoq) in the appropriate directory in submodules (e.g. submobules/MetaCoq)
 
-# cd submodules/MetaCoq; make; make install
+# make submodules
 
-  This will make and install the branch of MetaCoq. Now when you
-compile certicoq it will use the appropriate version of MetaCoq.
+  This will remake submodules in their order of dependencies.
 
   When one modifies a submodule (e.g. MetaCoq) (by adding commits for
 example), all users of the branch have to do *by themselves* a:

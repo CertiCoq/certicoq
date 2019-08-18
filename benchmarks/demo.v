@@ -2,6 +2,12 @@ Require Import Arith.
   
 From CertiCoq.Plugin Require Import CertiCoq.
 
+Definition demo0 := true.
+
+MetaCoq Erase demo0.
+
+CertiCoq Compile demo0.
+
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 
@@ -20,3 +26,4 @@ Definition is_valid :=
   end.
 
 Time CertiCoq Compile is_valid. (* 5 secs ! *)
+(* Now 0.3s but probably compiling TWrong *)

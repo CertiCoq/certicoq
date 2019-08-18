@@ -30,16 +30,16 @@ Quote Recursively Definition One := 1%positive.
 Quote Recursively Definition Demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
 
 
-(* 
-Definition One6 : cTerm certiL6.                                                        
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in 
-match t with
-|Ret ?xx => exact xx
-end).
-Defined. *)
+
+(* Definition One6 : cTerm certiL6.                                                         *)
+(* (let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in  *)
+(* match t with *)
+(* |Ret ?xx => exact xx *)
+(* end). *)
+(* Defined. *)
 
 
-Definition ext_comp `{F:utils.Fuel} := fun prog =>
+Definition ext_comp := fun prog =>
   let t := (translateTo (cTerm certiL6) prog) in
   match t with
   | Ret xx => xx
@@ -78,10 +78,10 @@ Definition compile_opt_L7 p  :=
   | Exc s => Exc s
   end.
 
-Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
+Definition compile_template_L4 (p : Template.Ast.program) : exception (cTerm certiL4) :=
   translateTo (cTerm certiL4) p.
 
-Definition compile_template_L7 `{F:utils.Fuel} (p : Template.Ast.program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
+Definition compile_template_L7 (p : Template.Ast.program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
   compile_opt_L7 (translateTo (cTerm certiL6) p).
 
 Open Scope positive_scope.
@@ -122,12 +122,8 @@ Require Import Benchmarks.Binom
         Benchmarks.vs.
 
  
-Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
-
-
-
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
- Quote Recursively Definition binom := Binom.main.    
+Quote Recursively Definition binom := Binom.main.
 (* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
 Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)   
 

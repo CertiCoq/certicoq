@@ -126,9 +126,9 @@ void forward (value *from_start,  /* beginning of from-space */
  {
   value v = *p;
   if(Is_block(v)) {
-    printf("IS BLOCK\n");
+
     if(Is_from(from_start, from_limit, v)) {
-      printf("FORWARD!\n");
+
       header_t hd = Hd_val(v); 
       if(hd == 0) { /* already forwarded */
 	*p = Field(v,0);
@@ -389,67 +389,51 @@ int garbage_collect_all(fun_info fi, struct thread_info *ti) {
         ti->heap = h;
     }
     int i;
+
     assert (h->spaces[0].limit == ti->limit);  
     for (i=0; i < MAX_SPACES - 1 && h->spaces[i+1].start != NULL; i++) {
-        if(0)
-            fprintf(stderr, "Generation %d:  ", i);
+      
         do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+    }
+    
+    /* If i is the nursery, its next won't be tracked, so need to be set to alloc */
+    if(i == 0){
+      h->spaces[i].next = ti->alloc;
     }
     return i;
 }
 
 uintnat const fake_fi[3] = {0, 1, 1};
 
-static void printtree_bodygc(FILE *f, value v) {
-  if(Is_block(v)) {
-    if ((unsigned int)v > (unsigned int)(fake_fi)) {
-      header_t hd = Field(v,-1);
-      int sz = Wosize_hd(hd);
-      int i;
-      fprintf(f,"%d(", Tag_hd(hd));
-      for(i=0; i<sz-1; i++) {
-	printtree_bodygc(f,Field(v,i));
-	fprintf(f,",");
-      }
-      if (i<sz)
-	printtree_bodygc(f,Field(v,i));
-      fprintf(f,")");
-    }
-    else {
-      fprintf(f,"%8x",v);
-    }
-  }
-  else fprintf(f,"%d",v>>1);
-}
-
-static void printtreegc(FILE *f, value v) {
-  printtree_bodygc(f, v);
-  fprintf(f, "\n");
-}
 
 
+/* export (deep copy if boxed) the first field of args */ 
 void* export(struct thread_info *ti) {
+
+  /* if args[1] is unboxed, return it */
+  if(!Is_block(ti->args[1])){
+    return ti->args[1];
+  }
+
+  /* otherwise collect all that is reachable from it to the last generation, then compact it into value_sp */
     int gen_level = garbage_collect_all(fake_fi, ti);
     struct space* sp = ti->heap->spaces+gen_level;
-    printtreegc(stdout, ti -> args[1]);
-    printf("export to fake\n");
     struct space* fake_sp = (struct space*)malloc(sizeof(struct space));
+    
     create_space(fake_sp, sp->next - sp->start);
     do_generation(sp, fake_sp, fake_fi, ti);
-    printtreegc(stdout, fake_sp->start);
-    /*
-    printf("export to value\n");
+   
     struct space* value_sp = (struct space*)malloc(sizeof(struct space));
     create_space(value_sp, fake_sp->next - fake_sp->start);
     do_generation(fake_sp, value_sp, fake_fi, ti);
-    printtreegc(stdout, fake_sp->start);
-    
-    void* result_block = (void *)value_sp->start;
-    
+
+    /* offset start by the header */
+    void* result_block = (void *)(value_sp->start +1);   
+
     free(fake_sp->start);
     free(fake_sp);
-    free(value_sp);      
-    */
-    void* result_block = (void *)fake_sp->start;
+    free(value_sp);       
+    
+
     return result_block;
 }

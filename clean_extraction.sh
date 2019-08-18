@@ -26,6 +26,7 @@ rm -f basicAst.* ast0.* ast1.* eAst.* specif.* peanoNat.* utils.* list0.* dataty
 rm -f binPos.* binNat.* binNums.* binInt.* binIntDef.* bool.* nat0.* string0.* basics.*
 rm -f checker0.* typing.* retyping.* uGraph0.* univSubst.* extract.* stringMap.*
 rm -f templateToPCUIC.* pCUIC*  eTyping.*
+rm -f safeTemplate* classes0*
 # Work around a compiler bug in module name resolution
 sed -f ../extraction.sed -i bak compile0.ml
 cd ../..

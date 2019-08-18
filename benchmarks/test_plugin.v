@@ -1,5 +1,5 @@
 Require Import Arith.
-From CertiCoq Require Import CertiCoq.
+From CertiCoq.Plugin Require Import CertiCoq.
 Unset Template Cast Propositions.
 
 Definition foo := 3 + 4.

@@ -4,6 +4,7 @@
 
 # extracted compiler
 # extraction/ast0.mli
+
 extraction/char0.mli
 extraction/decidableClass.mli
 extraction/errors0.mli
@@ -28,7 +29,7 @@ extraction/zArith_dec.mli
 extraction/zbool.mli
 extraction/zpower.mli
 extraction/certiClasses2.mli
-extraction/classes0.mli
+extraction/classes1.mli
 extraction/exceptionMonad.mli
 extraction/expression.mli
 extraction/list1.mli
@@ -39,7 +40,7 @@ extraction/varImplZ.mli
 extraction/varImplDummyPair.mli
 extraction/terms.mli
 extraction/exceptionMonad.ml
-extraction/classes0.ml
+extraction/classes1.ml
 extraction/certiClasses2.ml
 extraction/certiClasses.mli
 extraction/certiClasses.ml

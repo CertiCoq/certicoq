@@ -58,7 +58,7 @@ Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 
 (* Avoid name clashes with OCaml or Coq module names *)
 Extraction Blacklist List String Nat Int Ast univ uGraph Char OrderedType
-           Instances Classes Term Monad Coqlib Errors Compile Checker.
+           Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0.
 
 (* Cutting the dependency to R. 
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".

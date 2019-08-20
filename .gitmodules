@@ -13,3 +13,6 @@
 	path = submodules/paramcoq
 	url = https://github.com/aa755/paramcoq.git
 	branch = v8.8
+[submodule "submodules/Equations"]
+	path = submodules/Equations
+	url = http://github.com/mattam82/Coq-Equations

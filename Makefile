@@ -37,3 +37,9 @@ cleanCoqc:
 gitsuperclean:
 	git reset HEAD --hard
 	git clean -xdf
+
+submodules:
+	git submodule update
+	./make_submodules.sh
+
+.PHONY: submodules

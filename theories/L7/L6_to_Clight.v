@@ -459,16 +459,19 @@ Definition reserve' (funInf : positive) (l : Z) : statement :=
 
 
 (* Don't shift the tag for boxed, make sure it is under 255 *)
-Fixpoint makeTagZ (cenv:cEnv) (ct : cTag) : option Z :=
-  rep <- make_cRep cenv ct ;;
-      match rep with
-      | enum t => ret (Z.of_N ((N.shiftl t 1) + 1))
-      | boxed t a => ret (Z.of_N ((N.shiftl a 10) + t))
+Definition makeTagZ (cenv:cEnv) (ct : cTag) : option Z :=
+      match make_cRep cenv ct with
+      | Some (enum t) => Some ((Z.shiftl (Z.of_N t) 1) + 1)%Z
+      | Some (boxed t a) => Some  ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z
+      | None => None
       end.
 
 Definition makeTag (cenv: cEnv) (ct : cTag) : option expr :=
-  t <- makeTagZ cenv ct ;;
-    ret (c_int t val).
+  match makeTagZ cenv ct with
+    | Some t =>
+      Some (c_int t val)
+    | None => None
+  end.
 
 (* If x is a in our global map, then Evar, otherwise Etempvar *)
 Definition makeVar (x:positive) (m:M.t positive) :=

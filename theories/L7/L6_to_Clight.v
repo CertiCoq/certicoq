@@ -199,7 +199,7 @@ with max_args_fundefs (fnd : fundefs) :=
    2) list containing
       2.1 name of the constructor
       2.2 tag of the contructor (in cEnv)
-      2.3 arrity of the constructor
+      2.3 arity of the constructor
       2.4 ordinal of the constructor *)
 Definition n_iTyInfo:Type := BasicAst.name * list (BasicAst.name * cTag * N * N).
 
@@ -217,44 +217,6 @@ Definition update_iEnv (ienv : n_iEnv) (p : positive) (cInf : cTyInfo) : n_iEnv 
 Definition compute_iEnv (cenv : cEnv) : n_iEnv :=
   M.fold update_iEnv cenv (M.empty _).
 
-(* OS: getEnumOrdinal and getBoxedOrdinal are only used in the proof to show that the ordinal is unique (within an ind) within a given tag *)
-Fixpoint getEnumOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
-  match l with
-  | nil => None
-  | cons (ct' , n) l' =>
-    match (n =? 0)%N with
-    | true => 
-      match (ct =? ct')%positive with
-      | true => ret 0%N
-      | false =>
-        n' <- getEnumOrdinal' ct l' ;;
-           ret (n' + 1)%N
-      end
-    | false => getEnumOrdinal' ct l'
-    end
-  end.
-
-Definition getEnumOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
-  getEnumOrdinal' ct (rev l).
-
-Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
-  match l with
-  | nil => None
-  | cons (ct' , n) l' =>
-    match (n =? 0)%N with
-    | true => getBoxedOrdinal' ct l'
-    | false => 
-      match (ct =? ct')%positive with
-      | true => Some 0%N
-      | false =>
-        n' <- getBoxedOrdinal' ct l';;
-           ret (n' + 1)%N
-      end
-    end
-  end.
-
-Definition getBoxedOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
-  getBoxedOrdinal' ct (rev l).
 
 Inductive cRep : Type :=
 | enum : N -> cRep
@@ -267,17 +229,11 @@ Inductive cRep : Type :=
 Definition make_cRep (cenv:cEnv) (ct : cTag) : option cRep :=
   p <- M.get ct cenv ;;
     let '(name, _, it , a , n) := p in
-(*    l <- M.get it ienv ;;
-      let '(nameTy, l) := l in *)
       match (a =? 0)%N with
       | true =>
         ret (enum n)
-(*        n' <- getEnumOrdinal ct l ;;
-           ret (enum n') *)
       | false =>
         ret (boxed n a)
-(*        n' <- getBoxedOrdinal ct l ;;
-           ret (boxed n' a) *)
       end.
 
 Notation threadStructInf := (Tstruct threadInfIdent noattr).
@@ -641,7 +597,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
                      (match ls with
                      | LSnil =>
                        ret ((LScons None
-                                    prog
+                                    (Ssequence prog Sbreak)
                                     ls), ls')
                      | LScons _ _ _ =>
                        ret ((LScons (Some (Z.land tag 255))
@@ -653,7 +609,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
                      (match ls' with
                      | LSnil =>
                        ret (ls, (LScons None
-                                        prog
+                                        (Ssequence prog Sbreak)
                                         ls'))
                      | LScons _ _ _ =>
                        ret (ls, (LScons (Some (Z.shiftr tag 1))

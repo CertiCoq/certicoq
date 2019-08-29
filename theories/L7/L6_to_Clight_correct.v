@@ -307,6 +307,29 @@ Proof.
   eapply t_trans; eauto.
 Qed.
 
+Theorem dsubterm_case:
+  forall v l e',
+    dsubterm_e e' (Ecase v l) -> 
+  forall a, dsubterm_e e' (Ecase v (a:: l)).
+Proof.
+  intros. inv H. econstructor.
+  right; eauto.
+Qed.
+
+  
+
+Theorem subterm_case:
+forall v l e', 
+  subterm_e e' (Ecase v l) -> 
+  forall a, subterm_e e' (Ecase v (a:: l)).
+Proof.  
+  intros. remember (Ecase v l) as y. revert dependent v. revert l. induction H.
+  - intros. subst. constructor.
+    eapply dsubterm_case; eauto.
+  - intros. apply IHclos_trans2 in Heqy.
+    eapply t_trans. apply H. eauto.
+Qed.
+
 
 Theorem subval_fun: forall v rho fl x,
     name_in_fundefs fl x -> 
@@ -5937,39 +5960,6 @@ Proof.
 Qed.  
   
 
-
-(* 
-Lemma exp_ind'':
- 
-  forall P : exp -> Type,
-    (forall (v : var) (t : cTag) (l : list var) (e : exp),
-        P e -> P (Econstr v t l e)) ->
-    (forall (v : var) (l : list (cTag * exp)) ,
-       (forall (c : cTag) (e : exp), List.In (c, e) l -> P e)  -> P (Ecase v  l)) ->
-    (forall (v : var) (t : cTag) (n : N) (v0 : var) (e : exp),
-        P e -> P (Eproj v t n v0 e)) ->
-    (forall (f2 : fundefs) (e : exp), P e -> P (Efun f2 e)) ->
-    (forall (v : var) (t : fTag) (l : list var), P (Eapp v t l)) ->
-    (forall (v : var)  (p : prim) (l : list var) (e : exp),
-        P e -> P (Eprim v p l e)) ->
-    (forall (v : var), P (Ehalt v)) ->
-    forall e : exp, P e.
-Proof.
-  intros P H1 H2 H3 H4 H5 H6 H7. fix 1.
-  destruct e; try (now clear exp_ind''; eauto).
-  - eapply H1. eapply exp_ind''; eauto.
-  -  specialize (H2 v l).
-     induction l. apply H2; intros. inv H.
-     apply H2.  intros. apply exp_ind''.     
-  - eapply H3. eapply exp_ind''; eauto.
-  - eapply H4. eapply exp_ind''; eauto.
-  - eapply H6. eapply exp_ind''; eauto.
-Qed.  Unshelve. auto. auto. auto. constructor.
-Qed.
-
-
-   *)
-
 Theorem translate_body_correct:
   forall fenv cenv ienv  p rep_env map,
     find_symbol_domain p map ->
@@ -5977,43 +5967,77 @@ Theorem translate_body_correct:
     forall  e stm,
       correct_cenv_of_exp cenv e ->
     translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map = Some stm ->
-
     repr_expr_L6_L7_id fenv p rep_env e stm.
 Proof.
   intros fenv cenv ienv  p rep_env map Hmap Hcrep.
   induction e using exp_ind'; intros stm Hcenv; intros.
   - (* Econstr *) 
     simpl in H.
-    destruct (assignConstructorS allocIdent threadInfIdent cenv ienv map v c l) eqn:H_eqAssign.
+    destruct (assignConstructorS allocIdent threadInfIdent cenv ienv map v t l) eqn:H_eqAssign.
     destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:H_eqTranslate; inv H.
     2: inv H.
     constructor.
     2: eapply IHe; eauto.
     clear IHe H_eqTranslate.
     apply Forall_constructors_in_constr in Hcenv.
-    destruct (M.get c cenv) eqn:Hccenv. destruct c0; destruct p. destruct p0; destruct p.
+    destruct (M.get t cenv) eqn:Hccenv. destruct c; destruct p. destruct p0; destruct p.
     subst.
     eapply repr_asgn_constructorS; eauto.
     inv Hcenv.
     eapply Forall_constructors_subterm. apply Hcenv. constructor. constructor.
-(*   -  (* Ecase nil *) simpl in H. inv H.
-                     econstructor. constructor. apply repr_make_case_switch. *)
-  - (* Ecase *)
-
-
-    
-      simpl in H.
-    
+  -  (* Ecase nil *) simpl in H. inv H.
+                     econstructor. constructor. apply repr_make_case_switch. 
+  - (* Ecase *)    
+    simpl in H.
+    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:He.
+    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (Ecase v l) fenv cenv ienv map) eqn:Hl.
+    assert (correct_cenv_of_exp cenv (Ecase v l)).
+    { intro; intros. eapply Hcenv. apply rt_then_t_or_eq in H0. inv H0. inv H1. apply t_then_rt. apply subterm_case. eauto. } 
+    specialize (IHe0 s0 H0). clear H0.  assert (Some s0 = Some s0) by reflexivity. specialize (IHe0 H0). clear H0.
+    simpl in Hl. 
     destruct (makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l) eqn:Hmc.
-    assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; clear Hmc.
-    destruct p0. inv H.
-    econstructor.
-    eapply repr_makeCases_branches; eauto.
-    eapply correct_cenv_of_case; eauto.
-    
-    apply repr_make_case_switch.
+    assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc. 
+    destruct p0. inv Hl.
+    + (* step case *)
+      {
+        assert ( correct_cenv_of_exp cenv e).
+        { intro; intros. eapply Hcenv.  eapply rt_trans. eauto. constructor. econstructor. constructor. reflexivity. }
+        specialize (IHe s H0 eq_refl). clear H0.
+        inv IHe0. (* l0 = ls, ls' = l1 *) unfold make_case_switch in H4. inv H4. 
+        destruct ( make_cRep cenv c ) eqn:HcRep. 2: inv H.
+        destruct c0.
+        - (* case-enum *)
+          destruct l1.
+          + (* case-enum-last *)            
+            inv H. econstructor.
+            eapply Runboxed_default_br; eauto. erewrite <- crep_cenv_correct; eauto.
+            apply repr_make_case_switch. 
+          + (* case-enum-step *)
+            inv H. econstructor.
+            eapply Runboxed_br; eauto. erewrite <- crep_cenv_correct; eauto.
+            2: apply repr_make_case_switch.
+            erewrite crep_cenv_correct in HcRep; eauto. 
+            inv Hcrep. apply H0 in HcRep.  inv HcRep. constructor; auto.            
+        - (* case-boxed *)
+          destruct l0.
+          + (* case-boxed-last *)
+            inv H. econstructor.
+            eapply Rboxed_default_br; eauto. erewrite <- crep_cenv_correct; eauto.
+            apply repr_make_case_switch.
+          + (* case-boxed-step *)
+            inv H. econstructor.
+            eapply Rboxed_br; eauto. erewrite <- crep_cenv_correct; eauto.
+            2: apply repr_make_case_switch.
+            erewrite crep_cenv_correct in HcRep; eauto. 
+            inv Hcrep. apply H0 in HcRep.  inv HcRep. constructor; auto.            
 
-    unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H. inv H.
+      }
+    +   assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  inv H.
+    +  (* should probably invvert destruction of makeCases and Hl to avoid this redundant case *) simpl in Hl. 
+      destruct (makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l) eqn:Hmc.
+      assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  destruct p0; inv Hl.
+      assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  inv H. 
+    +  inv H.
   - (* Eproj *)
       simpl in H.
       destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:He.
@@ -6025,12 +6049,12 @@ Proof.
   - (* Efun *)
     inv H.
   - (* Eapp *)
-    simpl in H. destruct (cps.M.get f fenv) eqn:Hffenv. 2: inv H.
+    simpl in H. destruct (cps.M.get t fenv) eqn:Hffenv. 2: inv H.
     
     
-    destruct ( asgnAppVars argsIdent threadInfIdent tinfIdent l (snd f0) map) eqn:Happvar; inv H.
+    destruct ( asgnAppVars argsIdent threadInfIdent tinfIdent l (snd f) map) eqn:Happvar; inv H.
     unfold asgnAppVars in *.
-    destruct (asgnAppVars' argsIdent threadInfIdent l (snd f0) map) eqn:Happvar'; inv Happvar.
+    destruct (asgnAppVars' argsIdent threadInfIdent l (snd f) map) eqn:Happvar'; inv Happvar.
     erewrite <- find_symbol_map_f. 2: eauto.
     econstructor.
     eauto. constructor.
@@ -6042,68 +6066,8 @@ Proof.
 
     eapply R_halt_e.
     apply find_symbol_map. auto.
+Qed.
 
-
-  with repr_makeCases_branches:
-  forall p fenv cenv ienv map rep_env,
-    find_symbol_domain p map ->
-    correct_crep_of_env cenv rep_env ->
-    forall l ls ls',
-      correct_cenv_of_caselist cenv l ->
-  makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l = Some (ls, ls') ->
-  repr_branches_L6_L7 argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv p rep_env l ls ls'.
-
-  - { (* case proof *)
-  intros p fenv cenv ienv map rep_env Hmap Hrep_env.
-  induction l; intros ls ls' Hccenv; intros.
-   (* empty L *) inv H. constructor.
-  simpl in H. 
-  destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (snd a) fenv cenv ienv map) eqn:Htb. 2: inv H.
-  destruct ( makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l ) eqn:Hmc. 2: inv H.
-  destruct p0.
-  destruct a; simpl in *.
-  destruct ( make_cRep cenv c ) eqn:HcRep. 2: inv H.
-  destruct c0.
-  - (* unboxed *)
-    destruct l1.
-    + (* last *)
-      inv H. econstructor.
-      * eapply translate_body_correct; eauto. eapply Hccenv. constructor; eauto.
-      * erewrite <- crep_cenv_correct; eauto.
-      * eapply IHl.  2: reflexivity. intro; intros. eapply Hccenv. constructor 2. eauto.
-    + (* not last *) 
-      inv H.
-      econstructor.
-      * eapply IHl. 2: reflexivity.
-        intro; intros. eapply Hccenv. constructor 2. eauto.
-      * eapply translate_body_correct; eauto. eapply Hccenv. constructor; eauto.
-      * erewrite <- crep_cenv_correct; eauto.
-      * constructor; auto.
-        erewrite crep_cenv_correct in HcRep; eauto.
-        inv Hrep_env. apply H0 in HcRep. inv HcRep.
-        auto. 
-  - (* boxed *)
-    destruct l0.
-    + (* last *)
-      inv H.
-      econstructor.
-      * eapply IHl. 2: reflexivity.
-        intro; intros. eapply Hccenv. constructor 2. eauto.
-      * eapply translate_body_correct; eauto. eapply Hccenv. constructor; eauto. 
-      * erewrite <- crep_cenv_correct; eauto.
-     +  (* not last *)
-       inv H. 
-       econstructor.
-       * eapply IHl. 2: reflexivity.
-        intro; intros. eapply Hccenv. constructor 2. eauto.
-       *  eapply translate_body_correct; eauto. eapply Hccenv. constructor; eauto.
-       * erewrite <- crep_cenv_correct; eauto.
-       * constructor. auto.
-         erewrite crep_cenv_correct in HcRep; eauto.
-         inv Hrep_env. apply H0 in HcRep. inv HcRep.
-         split; auto.
-    }
-Admitted.
 
 
 

@@ -3989,13 +3989,30 @@ Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
                           
   
 
-(* everything in cenv is in ienv, AND there is a unique entry for it, AND its ord is not reused *)
+(* everything in cenv is in ienv, AND there is a unique entry for it, AND its ord is not reused 
+    Doesn't check that name of the i will be consistent (namei could be different from name') *)
   Definition correct_ienv_of_cenv: L6.cps.cEnv -> n_iEnv -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name name', M.get x cenv = Some (name, name', i, a, ord) ->
-                                   exists  cl, M.get i ienv = Some (name', cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
+                                   exists  namei cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
 
+  (* all constructors found in ienv are in cenv *) 
+  Definition domain_ienv_cenv:  L6.cps.cEnv -> n_iEnv -> Prop :=
+    fun cenv ienv =>
+      forall i namei cl, M.get i ienv = Some (namei, cl)  ->
+                         forall name x a ord, List.In (name, x, a, ord) cl ->
+                                              exists namei', M.get x cenv = Some (name, namei', i, a, ord).              
 
+                                   
+
+(* stronger version of ienv_of_cenv that enforces uniqueness of name' for i and that nothing is in ienv and not in cenv *)
+    Definition correct_ienv_of_cenv_strong: L6.cps.cEnv -> n_iEnv -> Prop :=
+    fun cenv ienv =>
+      forall x, forall i a ord name namei, M.get x cenv = Some (name, namei, i, a, ord) ->
+                                   exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
+ 
+  
+  
 
   (* OS 04/24: added in bound on n includes in this *)
   Inductive correct_crep (cenv:cEnv): cTag -> cRep -> Prop :=
@@ -6069,6 +6086,181 @@ Proof.
 Qed.
 
 
+
+(* PROOFs on correct environments *)
+
+(* cTyInfo is proper if a and ord are small enough to be represented *)
+Inductive proper_cTyInfo: cTyInfo -> Prop :=
+| PC_enum: forall name it ord,
+    (0 <= (Z.of_N ord) <   Ptrofs.half_modulus)%Z ->
+    proper_cTyInfo (name, it, 0%N, ord)
+| PC_boxed: forall name it a ord,
+    (* there should not be more than 2^8 - 1 boxed constructors *)
+    (0 <= (Z.of_N ord) <  Zpower.two_p 8)%Z ->
+    (* arity shouldn't be higher than 2^54 - 1  *)
+    (0 <= Z.of_N (Npos a) <  Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z ->
+    proper_cTyInfo (name, it, (Npos a)%N, ord).
+
+  
+ 
+(* cenv is proper if cTyInfo is proper, and that there is a unique (ty, ord) pair for each constructors  *)
+
+Definition proper_cenv (cenv:cEnv):=
+  forall {c name it a ord},
+    M.get c cenv = Some (name, it, a, ord) ->
+    proper_cTyInfo (name, it, a, ord) /\
+      ~ (exists c' name' a', c <> c' /\
+                    M.get c' cenv = Some (name', it, a', ord)).
+
+
+Theorem proper_cenv_set_none:
+  forall k v m,
+  proper_cenv (Maps.PTree.set k v m) ->
+  M.get k m = None ->
+  proper_cenv m.
+Proof.
+  intros; intro; intros.
+  assert (c <> k). intro; subst. rewrite H1 in H0; inv H0.
+  split.
+  erewrite <- M.gso in H1. 2: eauto. apply H in H1. destruct H1; auto.
+  intro; destructAll.  
+  assert (x <> k). intro; subst. rewrite H4 in H0; inv H0.
+  erewrite <- M.gso in H1.
+  apply H in H1. destruct H1.
+  apply H6.
+  exists x, x0, x1.
+  split; auto.
+  rewrite M.gso; auto.
+  auto. 
+Qed.   
+
+
+  Theorem compute_dc_ienv:
+  forall cenv, 
+    (fun cenv ienv => proper_cenv cenv ->
+                      domain_ienv_cenv cenv ienv /\
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv).
+Proof.
+  intro cenv.
+  eapply Maps.PTree_Properties.fold_rec; intros.
+  - assert (proper_cenv m).
+    { intro; intros. rewrite H in H2. apply H1 in H2. destruct H2.
+      split; auto. intro; apply H3.  destructAll. rewrite H in H5. eauto.
+    }
+    specialize (H0 H2). destruct H0. split.
+    intro; intros. eapply H0 in H5; eauto. rewrite H in H5. auto.    
+    intro; intros. rewrite <- H in H4. apply H3 in H4. auto. 
+  - split; intro; intros; rewrite M.gempty in *; exfalso; inv H0. 
+  - assert (proper_cenv  m) by (eapply proper_cenv_set_none; eauto).
+    specialize (H1 H3). destruct H1.
+    assert ( domain_ienv_cenv (Maps.PTree.set k v m) (update_iEnv a k v)).
+    {
+      intro; intros. destruct v. destruct p. destruct p. destruct p. simpl in H5.
+      destruct ( cps.M.get i0 a) eqn:Hgi0a.
+      + destruct n3.
+        destruct (var_dec i i0).
+        * subst. rewrite M.gss in H5. inv H5. inv H6.
+          (* k = x *)
+          inv H5. eexists. apply M.gss.
+          (* k <> x *)
+          eapply H1 in H5; eauto. destruct H5. eexists.
+          rewrite M.gso. eauto. intro; subst. rewrite H5 in H. inv H.
+        * rewrite M.gso in H5 by auto.
+          eapply H1 in H6; eauto. destruct H6. eexists.
+          rewrite M.gso. eauto. intro; subst. rewrite H6 in H; inv H.
+      + destruct (var_dec i i0).
+        * subst. rewrite M.gss in H5. inv H5. inv H6. inv H5. exists namei. apply M.gss. inv H5.
+        * rewrite M.gso in H5 by auto. apply H1 in H5. apply H5 in H6. destruct H6.
+          exists x0. rewrite M.gso. auto.  intro; subst. rewrite H in H6. inv H6.
+    } split; auto.
+    
+
+      
+    intro. intros.
+    assert (H6' := H6).
+    apply H2 in H6'. destruct H6' as [H6b H6'].
+    destruct (cps_util.var_dec x k).
+    + (* x = k  -> can update i and it still be proper *)
+      subst. rewrite M.gss in H6. inv H6.
+      simpl.  destruct (M.get i a) eqn:Hgia.
+      * (* i was already in a *)
+        destruct n. eexists. eexists. split.  apply M.gss.
+        split. constructor. reflexivity.
+        split; intro; intros; destructAll.
+        inv H7. inv H8. apply H6; auto.
+        eapply H1 in H8; eauto. inv H8. rewrite H7 in H; inv H.
+        inv H7. inv H8. apply H6; auto.
+        (* constructor shares the same ord, cannot be proper *)
+        eapply H1 in H8; eauto. inv H8.
+        destruct (var_dec x0 k); subst. rewrite H7 in H; inv H.
+        apply H6'. exists x0. eexists. eexists.
+        split; auto. rewrite M.gso by auto. eauto.
+      * (* k is the first cons of i *)
+        eexists. eexists. split. apply M.gss.
+        split. constructor. reflexivity.
+        split; intro; intros; destructAll.
+        inv H7; inv H8. apply H6; auto.
+        inv H7; inv H8. apply H6; auto.            
+    + (* x <> k *)
+      
+      assert (H6'' := H6).
+      rewrite M.gso in H6 by auto.
+      apply H4 in H6. destructAll.
+      {
+        unfold update_iEnv. destruct v. destruct p. destruct p. destruct p. 
+        destruct  (cps.M.get i0 a) eqn:Hi0a.
+        - destruct n4. 
+          destruct (var_dec i i0).
+          + subst.
+            rewrite Hi0a in H6. inv H6.
+            eexists. exists  ((n2, k, n1, n0) :: x1).
+            split. rewrite M.gss; auto.
+            split. constructor 2. auto.
+            split. 
+            * intro; intros.
+              destructAll.
+              inv H10.
+              inv H11. apply n; auto.
+              apply H8. eexists; eexists. eexists. split; eauto.
+            * intro; intros.
+              destructAll.
+              inv H10.
+              inv H11. apply H6'. eexists. eexists. eexists. split.
+              apply n. rewrite M.gss. reflexivity.
+              eapply H9.
+              eexists. eexists. eexists. split; eauto.                          
+          + exists x0, x1. rewrite M.gso; auto. 
+        - exists x0, x1. rewrite M.gso. auto. intro; subst. rewrite H6 in Hi0a. inv Hi0a.
+      }
+Qed.
+
+
+
+(* Note: can be proven directly *)
+Corollary compute_domain_ienv:
+  forall cenv, 
+                    (fun cenv ienv => proper_cenv cenv -> 
+                    domain_ienv_cenv cenv ienv) cenv (compute_iEnv cenv).
+Proof.
+    assert ( forall cenv, 
+           (fun cenv ienv => proper_cenv cenv ->
+                              domain_ienv_cenv cenv ienv /\
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv)) by apply compute_dc_ienv. simpl; intros. simpl in H.  apply H in H0. destruct H0.
+  auto.
+Qed.
+
+
+Corollary compute_correct_ienv:
+  forall cenv, 
+                    (fun cenv ienv => proper_cenv cenv -> 
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv).
+Proof.
+  assert ( forall cenv, 
+           (fun cenv ienv => proper_cenv cenv ->
+                              domain_ienv_cenv cenv ienv /\
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv)) by apply compute_dc_ienv. simpl; intros. simpl in H.  apply H in H0. destruct H0.
+  auto.
+Qed.
 
 
 Definition program_inv (p:program) := program_isPtr_inv p /\ program_threadinfo_inv p /\ program_gc_inv p.

@@ -3,13 +3,13 @@
 cd submodules
 
 cd coq-ext-lib
+coq_makefile -f _CoqProject -o Makefile
 make all install
 if [ $? -eq 0 ]
 then
     echo "coq-ext-lib looks up-to-date"
 else
     echo "(re)building coq-ext-lib"
-    coq_makefile -f _CoqProject -o Makefile
     make clean
     make all
     make install
@@ -30,13 +30,13 @@ fi
 cd ..
 
 cd Equations
+coq_makefile -f _CoqProject -o Makefile
 make all install
 if [ $? -eq 0 ]
 then
     echo "Equations looks up-to-date"
 else
     echo "(re)building Equations"
-    coq_makefile -f _CoqProject -o Makefile
     make clean
     make all
     make install
@@ -44,6 +44,7 @@ fi
 cd ..
 
 cd Template-Coq
+./configure.sh local
 make all install
 if [ $? -eq 0 ]
 then

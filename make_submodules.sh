@@ -6,7 +6,7 @@ cd coq-ext-lib
 make
 if [ $? -eq 0 ]
 then
-    echo "coq-ext-lib looks upto date"
+    echo "coq-ext-lib looks up-to-date"
 else
     echo "(re)building coq-ext-lib"
     coq_makefile -f _CoqProject -o Makefile
@@ -20,7 +20,7 @@ cd SquiggleEq
 make
 if [ $? -eq 0 ]
 then
-    echo "Squiggleeq looks upto date"
+    echo "Squiggleeq looks up-to-date"
 else
     echo "(re)building SquiggleEq"
     make clean
@@ -33,7 +33,7 @@ cd Equations
 make
 if [ $? -eq 0 ]
 then
-    echo "Equations looks upto date"
+    echo "Equations looks up-to-date"
 else
     echo "(re)building Equations"
     coq_makefile -f _CoqProject -o Makefile
@@ -47,7 +47,7 @@ cd Template-Coq
 make
 if [ $? -eq 0 ]
 then
-    echo "MetaCoq looks upto date"
+    echo "MetaCoq looks up-to-date"
 else
     ./configure.sh local
     make clean

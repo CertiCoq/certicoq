@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 cd submodules
 
 cd coq-ext-lib
-make
+make all install
 if [ $? -eq 0 ]
 then
     echo "coq-ext-lib looks up-to-date"
@@ -17,7 +17,7 @@ fi
 cd ..
 
 cd SquiggleEq
-make
+make all install
 if [ $? -eq 0 ]
 then
     echo "Squiggleeq looks up-to-date"
@@ -30,7 +30,7 @@ fi
 cd ..
 
 cd Equations
-make
+make all install
 if [ $? -eq 0 ]
 then
     echo "Equations looks up-to-date"
@@ -44,11 +44,12 @@ fi
 cd ..
 
 cd Template-Coq
-make
+make all install
 if [ $? -eq 0 ]
 then
     echo "MetaCoq looks up-to-date"
 else
+    echo "(Re)building MetaCoq"
     ./configure.sh local
     make clean
     make all

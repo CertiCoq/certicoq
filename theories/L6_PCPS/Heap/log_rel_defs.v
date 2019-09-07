@@ -1173,4 +1173,5 @@ Module LogRelDefs (H : Heap).
     intros Hcc z Hin; eapply Hcc; eapply Hseq; eauto.
   Qed.
 
+  End LogRelDefs. 
 End LogRelDefs. 

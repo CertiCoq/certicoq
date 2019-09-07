@@ -18,11 +18,15 @@ Module LogRelPostCC (H : Heap).
 
   Import H LRDefs LRDefs.Sem.GC LRDefs.Sem.GC.Equiv
          LRDefs.Sem.GC.Equiv.Defs LRDefs.Sem.
+
+  Section LogRelPostCC.
+
+    Context (CP : CompPass). 
   
-  Definition fun_ptr_rel (GP : GIInv) (GQ : GInv) (b : Inj)
-             (v1 : value) (H1 : heap block) (v2 : value) (H2 : heap block)
-             (fR : fun_body_rel) : Prop :=
-    match v1, v2 with
+    Definition fun_ptr_rel (GP : GIInv) (GQ : GInv) (b : Inj)
+               (v1 : value) (H1 : heap block) (v2 : value) (H2 : heap block)
+               (fR : exp_rel) : Prop :=
+      match v1, v2 with
     | FunPtr B1 f1, FunPtr B2 f2 =>
       forall H1 H2 rho1 ft xs1 e1 vs1 vs2 b,        
         find_def f1 B1 = Some (ft, xs1, e1) ->
@@ -48,7 +52,7 @@ Module LogRelPostCC (H : Heap).
   Definition no_clos_rel  (GP : GIInv) (GQ : GInv) (b : Inj)
              (b1 : block) (H1 : heap block)
              (b2 : block) (H2 : heap block)
-             (fR : fun_body_rel) (vR : val_rel) : Prop := False.
+             (fR : exp_rel) (vR : val_rel) : Prop := False.
 
   Instance Proper_clos_rel : forall P Q b b1 H1 b2 H2,
       Proper ((pointwise_lifting iff fun_body_args) ==> (pointwise_lifting iff val_rel_args) ==> iff) (no_clos_rel P Q b b1 H1 b2 H2).
@@ -82,12 +86,18 @@ Module LogRelPostCC (H : Heap).
     repeat eexists; eauto. eapply Hyp. eassumption.
   Qed. 
 
-  Definition val_rel := val_log_rel' big_step_GC_cc big_step_GC_cc no_clos_rel fun_ptr_rel. 
-  Definition exp_rel := exp_log_rel val_rel big_step_GC_cc big_step_GC_cc.
-  Definition var_rel := var_log_rel' big_step_GC_cc big_step_GC_cc no_clos_rel fun_ptr_rel.
-  Definition env_rel := env_log_rel_P' big_step_GC_cc big_step_GC_cc no_clos_rel fun_ptr_rel.
+  Instance PostCCPass : CompPass := {|
+       eval_src := big_step_GC_cc;
+       eval_trg := big_step_GC_cc;
+       fun_rel  := fun_ptr_rel;
+       clos_rel := no_clos_rel |}.
+  
+  Definition val_rel := val_log_rel' PostCCPass. 
+  Definition exp_rel := exp_log_rel PostCCPass val_rel.
+  Definition var_rel := var_log_rel' PostCCPass.
+  Definition env_rel := env_log_rel_P' PostCCPass.
   Definition heap_rel := heap_log_rel val_rel.
-
+  
   
   Definition val_rel' (k : nat)  (j : nat) (IP : GIInv) (P : GInv) (b : Inj) (r1 r2 : ans) : Prop :=
     match r1, r2 with
@@ -2254,4 +2264,4 @@ Module LogRelPostCC (H : Heap).
   
   End LogRelPostCC. 
 
-  
+End LogRelPostCC. 

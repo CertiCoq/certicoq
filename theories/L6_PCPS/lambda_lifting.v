@@ -52,6 +52,42 @@ Open Scope monad_scope.
 
 **)
 
+(** * Optimizations of the above transformation *)
+
+(*
+
+     In order to never incur extra closure allocation, only the known
+     occurrences in the same scope should use the lambda lifted version. More
+     precisely:
+
+     1) All recursive calls should use the lambda lifter version
+
+     2) All known calls in the same scope that the function is defined should
+     use the lambda lifted version
+
+     3) All other known calls should use the lambda lifted version only if the
+     free variables of the function are free variables of the scope
+
+     To avoid performance cost when the wrapper is called from the outside, we
+     inline the lambda lifted function inside the wrapper. This way we avoid
+     bouncing through the wrapper but we also call the lambda lifted version in
+     recursive calls.
+   
+     Code duplication: Since every function is duplicated, a function nested at
+     level n will have 2^n copies. To avoid that we can (i.e. should) do lambda
+     lifting bottom up and un-nest the (closed) lambda lifted functions. This is
+     not possible when a function escapes inside it's own definition (or a mut.
+     def. function) in this case
+
+
+     Comparing to -unbox-closures of flambda:
+
+     1.) Does not optimize recursive calls when an unknown function is called.
+
+     2.) Since it relies on inliner to unfold the wrapper, it might cause more
+     closure allocation
+ 
+*)
 
 (** * Computational Defintion *)
 
@@ -223,6 +259,7 @@ Fixpoint exp_lambda_lift (e : exp) (fvm : VarInfoMap) (fm : FunInfoMap) : state 
     e' <- exp_lambda_lift e fvm fm ;;
     ret (Eproj x t N (rename fvm y) e')
   | Efun B e =>
+    (* calculate the strict fv set, and pass it to the exp_lambda_lift_function *)
     let fvs := PS.elements (fundefs_true_fv fm B) in
     fm' <- add_functions B fvs fm ;;
     B' <- fundefs_lambda_lift B fvm fm' ;;
@@ -378,7 +415,6 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp (σ f') ft' (map σ (xs ++ fvs))) S
 | LL_Eapp_unknown :
     forall ζ σ f ft xs S,
-      ζ f = None -> 
       Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp (σ f) ft (map σ xs)) S
 | LL_Eprim :
     forall ζ σ x f ys e e' S S',

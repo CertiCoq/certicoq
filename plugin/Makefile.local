@@ -1,5 +1,5 @@
-COQ_SRC_SUBDIRS+=user-contrib/MetaCoq/Template user-contrib/MetaCoq/Checker user-contrib/MetaCoq/PCUIC user-contrib/MetaCoq/SafeChecker user-contrib/MetaCoq/Erasure
-OPENS=-open Metacoq_template_plugin -open Metacoq_checker_plugin -open Metacoq_pcuic_plugin -open Metacoq_safechecker_plugin -open Metacoq_erasure_plugin
+COQ_SRC_SUBDIRS+=user-contrib/MetaCoq/Template user-contrib/MetaCoq/Checker user-contrib/MetaCoq/SafeChecker user-contrib/MetaCoq/Erasure
+OPENS=-open Metacoq_template_plugin -open Metacoq_checker_plugin -open Metacoq_safechecker_plugin -open Metacoq_erasure_plugin
 CAMLFLAGS+=$(OPENS)
 CAMLFLAGS+=-w -33 # Unused opens
 

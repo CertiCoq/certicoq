@@ -2,6 +2,19 @@
 
 cd submodules
 
+cd paramcoq
+make all install
+if [ $? -eq 0 ]
+then
+    echo "paramcoq looks up-to-date"
+else
+    echo "(re)building paramcoq"
+    make clean
+    make all
+    make install
+fi
+cd ..
+
 cd coq-ext-lib
 coq_makefile -f _CoqProject -o Makefile
 make all install

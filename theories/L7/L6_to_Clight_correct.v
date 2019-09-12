@@ -1231,26 +1231,96 @@ Definition prefix_ctx {A:Type} rho' rho :=
    rewrite Z.pow_pos_fold.
    rewrite Pos2Z.inj_pow.  apply Ptrofs.eqm_refl.
  Qed.   
+ SearchAbout Int.max_signed.
 
+ Theorem nat_shiftl_p1:
+   forall n z,
+     1 < z ->
+ n  < (z / 2) ->
+ n * 2 + 1 < z.
+ Proof.
+   induction n; intros.
+   simpl. auto.
+   simpl.
+   destruct z. inv H0. destruct z.
+   - inv H0. 
+   - rewrite <- Nat.div2_div in H0. simpl in H0. rewrite Nat.div2_div in H0. 
+     apply lt_S_n in H0.
+     assert (Hz := NPeano.Nat.lt_decidable 1 z). inv Hz.
+     specialize (IHn _ H1 H0). omega.
+     destruct z.
+       (* case 0 *) inv H0. inv H.
+     destruct z.
+     (* case 1 *) inv H0. 
+     exfalso. apply H1. omega.
+ Qed.
+
+ Theorem pos_nat_div2 : forall p,
+    p <> xH ->
+  Pos.to_nat (Pos.div2 p) = Nat.div2 (Pos.to_nat p).
+ Proof.
+   intros. destruct p0.
+   - simpl Pos.div2.
+     rewrite Pos2Nat.inj_xI.
+     rewrite Nat.div2_succ_double. reflexivity.
+   - simpl Pos.div2.
+     rewrite Pos2Nat.inj_xO.
+     rewrite Div2.div2_double. reflexivity.
+   - exfalso. apply H; auto.
+ Qed.
+ 
+ Theorem Div2_Z_to_nat: forall n,
+     (0 <= n)%Z ->
+    Z.to_nat (Z.div2 n) = Nat.div2 (Z.to_nat n).
+ Proof.
+   induction n; intros.
+   - reflexivity.
+   -  simpl. destruct p0.
+      rewrite Z2Nat.inj_pos. 
+      rewrite pos_nat_div2. reflexivity.
+      intro. inv H0.
+      rewrite Z2Nat.inj_pos. 
+      rewrite pos_nat_div2. reflexivity.
+      intro. inv H0.
+      reflexivity.      
+   - assert (Hp0 := Zlt_neg_0 p0). exfalso. omega.
+ Qed.
+   
+   
+   
  Theorem repr_unboxed_header_range:
    forall t h,
      repr_unboxed_L7 t h ->
      (0 <= h <= Ptrofs.max_unsigned)%Z.
- Proof.
+ Proof. 
    intros. inv H.   
    unfold Ptrofs.max_unsigned.
    unfold Ptrofs.half_modulus in *.
+   
    unfold Ptrofs.modulus in *.
    rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try omega.
    rewrite Z.pow_1_r.
-   rewrite Z.add_1_r.
-
    split; try omega.
-   apply Zlt_le_succ.
-   simpl.
-   
-   admit.
- Admitted.
+
+   rewrite Z.sub_1_r.
+   rewrite <- ReflOmegaCore.Z_as_Int.le_lt_int.
+   destruct H1.
+   unfold Ptrofs.wordsize in *. unfold Wordsize_Ptrofs.wordsize in *. 
+   assert (Hws:(0 <= Zpower.two_power_nat (if Archi.ptr64 then 64%nat else 32%nat))%Z).
+   {     
+     assert (Hws' := Coqlib.two_power_nat_pos (if Archi.ptr64 then 64%nat else 32%nat)). omega.
+   }
+   rewrite Z2Nat.inj_lt; try omega. rewrite Z2Nat.inj_lt in H0; try omega.
+   rewrite Z2Nat.inj_add in * by omega.
+   rewrite Z2Nat.inj_mul in * by omega.
+   rewrite <- Z.div2_div in H0.
+   rewrite Div2_Z_to_nat in H0.
+   rewrite Nat.div2_div in H0.
+   eapply nat_shiftl_p1.
+   chunk_red; simpl; rewrite <- Pos2Nat.inj_1;
+     apply nat_of_P_lt_Lt_compare_morphism; auto.
+   auto. auto.
+ Qed.
 
 
 
@@ -1289,10 +1359,17 @@ Theorem repr_boxed_header_range:
    rewrite Zpower.two_power_nat_correct in *.
    simpl in *.
    unfold Z.pow_pos in *.
-   admit.
-   omega.
- Admitted.
- 
+   2: omega.
+   split. 
+   - apply Z.add_nonneg_nonneg.
+     apply Z.mul_nonneg_nonneg. omega. simpl; omega.
+     omega.
+   - (* moving to pos then computing by archi *)
+     unfold Ptrofs.max_unsigned. unfold Ptrofs.modulus. 
+     unfold Ptrofs.wordsize in *.
+     unfold Wordsize_Ptrofs.wordsize in *. 
+     chunk_red; simpl in *. omega. omega.
+Qed. 
  
 Theorem div2_iter_pos:
   forall p0 a, 
@@ -4031,7 +4108,7 @@ Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
         (0 <= Z.of_N (Npos a) <  Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z -> 
       correct_crep cenv c (boxed n (Npos a)).
 
-  (* also need to go the other way around: if in crep, then in cenv*) 
+  (* crep <-> make_cRep cenv *)
   Definition correct_crep_of_env: L6.cps.cEnv -> M.t cRep -> Prop :=
     fun cenv crep_env =>
       (forall c name it a n,
@@ -5846,6 +5923,21 @@ Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent is
                       end))
             end).
 
+Definition fmake_cRep (p:positive) (c:cTyInfo) : cRep :=
+  let '(name, _, it , a , n) := c in
+      match (a =? 0)%N with
+      | true =>
+        (enum n)
+      | false =>
+        (boxed n a)
+      end.
+
+
+Definition compute_rep_env (cenv:cEnv): M.t cRep :=
+  M.map fmake_cRep cenv.
+
+
+  
 Theorem crep_cenv_correct:
 forall cenv rep_env, 
   correct_crep_of_env cenv rep_env ->
@@ -6112,6 +6204,9 @@ Definition proper_cenv (cenv:cEnv):=
       ~ (exists c' name' a', c <> c' /\
                     M.get c' cenv = Some (name', it, a', ord)).
 
+(* Definition proper_nenv ? *)
+
+
 
 Theorem proper_cenv_set_none:
   forall k v m,
@@ -6132,7 +6227,34 @@ Proof.
   split; auto.
   rewrite M.gso; auto.
   auto. 
-Qed.   
+Qed.
+
+
+
+
+
+Theorem compute_proper_rep_env: forall cenv,
+proper_cenv cenv -> 
+  correct_crep_of_env cenv (compute_rep_env cenv).
+Proof.
+  intros. split; intros.
+  - unfold compute_rep_env. rewrite M.gmap.
+    unfold fmake_cRep. rewrite H0.
+    simpl. destruct name.
+    specialize (H _ _ _ _ _ H0). destructAll. 
+    destruct a.
+    + eexists; split; auto. rewrite N.eqb_refl.  inv H. econstructor; eauto.
+    + eexists; split; auto. assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2. inv H. econstructor; eauto.
+  - unfold compute_rep_env in H0.    
+    rewrite M.gmap in H0.
+    unfold fmake_cRep in H0.
+    destruct (M.get c cenv) eqn:Hccenv. 2: inv H0.
+    destruct c0. destruct p. destruct p. destruct p. simpl in H0.
+    specialize (H _ _ _ _ _ Hccenv). destruct H.
+    destruct n0.
+    + rewrite N.eqb_refl in H0.  inv H0. inv H. econstructor; eauto.
+    +  assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2 in H0. inv H0. inv H. econstructor; eauto.
+Qed.
 
 
   Theorem compute_dc_ienv:
@@ -6261,6 +6383,54 @@ Proof.
                     correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv)) by apply compute_dc_ienv. simpl; intros. simpl in H.  apply H in H0. destruct H0.
   auto.
 Qed.
+
+
+Definition correct_fenv_for_function (fenv:fEnv):=
+  fun f (t:fTag) (ys:list L6.cps.var) (e:exp) =>
+    exists n l, M.get f fenv = Some (n, l) /\
+                n = N.of_nat (length l) /\
+                length l = length ys /\
+                    NoDup l /\
+                    Forall (fun i => 0 <= (Z.of_N i) < max_args)%Z l. 
+
+SearchAbout fTag. 
+(* fTag are associated with an arity and a calling convention. 
+   all functions and applications with this fTag have the right number of arguments *)
+
+Definition correct_fenv (fenv:fEnv) (fds:fundefs):= Forall_fundefs (correct_fenv_for_function fenv) fds.
+
+(*
+(* unique tags of arity *)
+Theorem compute_correct_fenv:
+  forall fds  fenv,
+    
+    forall fenv', 
+  compute_fEnv_fds fds fenv' = fenv ->
+  Forall_fundefs (correct_fenv_for_function fenv) fds.
+Proof.
+  induction fds; intros.
+  -  simpl in H0.
+     inv H.
+     constructor.
+     +   admit.
+     + eapply IHfds. auto. reflexivity.     
+  - constructor.
+Qed.  *)
+
+
+ 
+
+(* TODO: something that implies correct_fundef_info when ldefs are put in memory
+Theorem make_fundef_info_correct:
+  correct_fenv fenv fds ->
+  make_fundef_info fds fenv nenv = Some (ldefs * finfo_env * nenv') -> 
+
+
+*)
+  
+        
+
+
 
 
 Definition program_inv (p:program) := program_isPtr_inv p /\ program_threadinfo_inv p /\ program_gc_inv p.
@@ -9854,5 +10024,12 @@ solve_nodup. solve_nodup.
 
 
 (* Top level theorem on the L6_to_Clight translation 
-Theorem top_repr_L6_L7_are_related: *)
+Theorem top_repr_L6_L7_are_related:
+   forall fds e,
+well_formed (Efun fds e) ->
+proper_cenv cenv ->
+proper_cenv_of_exp cenv e ->
+compile e cenv nenv = ...
+
+ *)
   

@@ -112,16 +112,17 @@ Instance certiL5_t0_L6:
   fun v =>
     match v with
     | pair venv vt =>
-      (AstCommon.timePhase "L5 to L6")
-        (fun (_:Datatypes.unit) => (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
-       | Some r =>
-         
-        let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
-        let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
-        (* let e := postuncurry_contract e s d in            *)
-        (* let e := shrink_cps.shrink_top e in  *)
-        (* let e :=  inlinesmall_contract e 10 10 in *)
-        let e := inline_uncurry_contract e s 10 10 in  
+       (match ((AstCommon.timePhase "L5 to L6")
+                (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt))) with
+        | Some r =>
+          let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
+          (AstCommon.timePhase "L6 to L6cc")
+            (fun (_:Datatypes.unit) =>                
+               let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+               (* let e := postuncurry_contract e s d in            *)
+               (* let e := shrink_cps.shrink_top e in  *)
+               (* let e :=  inlinesmall_contract e 10 10 in *)
+               let e := inline_uncurry_contract e s 10 10 in  
         let e := shrink_cps.shrink_top e in
         let '(cenv',nenv', t') := closure_conversion_hoist
                                     bogus_cloTag
@@ -130,7 +131,7 @@ Instance certiL5_t0_L6:
                                     next_iTag
                                     cenv nenv
         in
-        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _,   shrink_top t'))
+        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _,   shrink_top t')))
       | None => Exc "failed converting from L5 to L6"
-      end))
+      end)
     end.

@@ -37,7 +37,7 @@ Global Instance certiL3_eta: CerticoqLanguage L3_eta_Program := {}.
 Global Instance certiL3_to_L3_eta:
   CerticoqTranslation (cTerm certiL2k) (cTerm certiL3_eta) :=
   fun p =>
-    (AstCommon.timePhase "L3 to L3_eta")
+    (AstCommon.timePhase "L2 to L3")
       (fun (_:Datatypes.unit) => (Ret (L3_to_L3_eta.Program_Program p))).
 
 Lemma L3_crctEnv_inv d e : L2k.program.crctEnv (d :: e) -> L2k.program.crctEnv e.
@@ -191,7 +191,7 @@ Global Instance certiL4: CerticoqLanguage (ienv * L4.expression.exp) := {}.
 Global  Instance certiL3_eta_to_L4: 
   CerticoqTranslation (cTerm certiL3_eta) (cTerm certiL4)  :=
   fun p =>
-    (AstCommon.timePhase "L3_eta to L4")  (fun (_:Datatypes.unit) => (Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
+    (AstCommon.timePhase "L3 to L4")  (fun (_:Datatypes.unit) => (Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
    (L3_to_L4.translate_program (AstCommon.env p) (main p))))).
 
 Require Import L4.L3_to_L4_correct.

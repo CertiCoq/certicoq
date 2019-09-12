@@ -69,6 +69,7 @@ Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
 
 
 (* Compute an fEnv by looking at the number of arguments functions are applied to, assumes that all functions sharing the same tags have the same arity *)
+(* OS 09/2019: deprecated, should delete *)
 Fixpoint compute_fEnv' (n : nat) (fenv : fEnv) (e : exp) : fEnv :=
   match n with
   | 0 => fenv
@@ -95,6 +96,8 @@ with compute_fEnv_fundefs n fnd fenv :=
                 end
        end.
 
+
+
 Fixpoint max_depth (e : exp) : nat :=
   match e with
   | Econstr x t vs e' => S (max_depth e')
@@ -116,9 +119,27 @@ with max_depth_fundefs fnd :=
                                          (max_depth_fundefs fnd'))
        end.
 
-(* fEnv maps tags to function info *)
-Definition compute_fEnv (e : exp) : fEnv :=
-  compute_fEnv' (max_depth e) (M.empty fTyInfo) e.
+
+Fixpoint compute_fEnv_fds fnd fenv:=
+  match fnd with
+  | Fnil => fenv
+  | Fcons f t vs e fnd' =>
+    let fenv' := M.set t (N.of_nat (length vs) , makeArgList vs) fenv in
+    compute_fEnv_fds fnd' fenv'
+  end.
+
+(* fEnv maps tags to function info  *)
+
+Definition compute_fEnv (e : exp) : option fEnv :=
+  match e with
+  | Efun fds e' => ret (compute_fEnv_fds fds (M.empty fTyInfo))
+  | _ => None
+  end.
+
+
+
+
+
 
 
 Fixpoint get_allocs (e : exp) : list positive :=
@@ -1398,29 +1419,31 @@ Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t BasicAst.na
 
 
 Definition compile (e : exp) (cenv : cEnv) (nenv : M.t BasicAst.name) :
-  (M.t BasicAst.name * option Clight.program * option Clight.program) :=
+  exceptionMonad.exception (M.t BasicAst.name * option Clight.program * option Clight.program) :=
   let e := wrap_in_fun e in 
-  let fenv := compute_fEnv e in
-  let ienv := compute_iEnv cenv in
-  let p'' := make_defs e fenv cenv ienv nenv in
-  let n := ((max_var e 100) + 1)%positive in
-  let p' :=  (p''.(runState) n) in
-  let m := snd p' in
-  match fst p' with
-  | None => (nenv, None, None)
-  | Some p =>
-    let '(nenv, defs) := p in
-    let nenv := (add_inf_vars (ensure_unique nenv)) in 
-    let forward_defs := make_extern_decls nenv defs false in
-    let header_pre := make_header cenv ienv e nenv in
-    (*     let header_p := (header_pre.(runState) m%positive) in *)
-    let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
-    (match fst header_p with
-     | None => (nenv, None, None)
-     | Some (nenv, hdefs) =>
-       (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent false, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent true)
-     end)
-  end.
+  match compute_fEnv e with
+  | None => exceptionMonad.Exc "L6_to_Clight: Failure in compute_fEnv, e is not a function"
+  | Some fenv => 
+    (let ienv := compute_iEnv cenv in
+     let p'' := make_defs e fenv cenv ienv nenv in
+     let n := ((max_var e 100) + 1)%positive in
+     let p' :=  (p''.(runState) n) in
+     let m := snd p' in
+     match fst p' with
+     | None => exceptionMonad.Exc "L6_to_Clight: Failure in make_defs"
+     | Some p =>
+       let '(nenv, defs) := p in
+       let nenv := (add_inf_vars (ensure_unique nenv)) in 
+       let forward_defs := make_extern_decls nenv defs false in
+       let header_pre := make_header cenv ienv e nenv in
+       (*     let header_p := (header_pre.(runState) m%positive) in *)
+       let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
+       (match fst header_p with
+        | None => exceptionMonad.Exc "L6_to_Clight: Failure in make_header"
+        | Some (nenv, hdefs) =>
+          exceptionMonad.Ret (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent false, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent true)
+        end)
+  end) end.
 
 
 

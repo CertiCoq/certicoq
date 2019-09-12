@@ -30,6 +30,8 @@ Quote Recursively Definition One := 1%positive.
 Quote Recursively Definition Demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
 
 
+
+
 (* 
 Definition One6 : cTerm certiL6.                                                        
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in 
@@ -75,9 +77,24 @@ Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program * Cli
 
 Definition compile_opt_L7 p  :=
   match p with
-  | Ret p => Ret (compile_L7 p)
+  | Ret p => compile_L7 p
   | Exc s => Exc s
   end.
+
+ Fixpoint map {A B:Type} (f:A -> B) (l:list A):list B :=
+       match l with
+       | nil => nil
+       | cons h t => cons (f h) (map f t)
+end.
+
+Definition compile_template_L3 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL3_eta) :=
+  translateTo (cTerm certiL3_eta) p.
+
+ Quote Recursively Definition Qmap := (@map nat).
+
+ Definition demo3 := Eval native_compute in (translateTo (cTerm certiL3_eta) Qmap).
+
+ 
 
 Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
   translateTo (cTerm certiL4) p.

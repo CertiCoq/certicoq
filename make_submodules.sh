@@ -3,14 +3,14 @@
 cd submodules
 
 cd paramcoq
-make all install
+make coq install
 if [ $? -eq 0 ]
 then
     echo "paramcoq looks up-to-date"
 else
     echo "(re)building paramcoq"
     make clean
-    make all
+    make coq
     make install
 fi
 cd ..

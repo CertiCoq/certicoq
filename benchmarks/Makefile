@@ -22,3 +22,6 @@ demo2: maindemo2.c gc.c CertiCoq.Benchmarks.demo.demo2.c
 
 vs: CertiCoq.Benchmarks.demo.is_valid.c
 	gcc -o vs -Wno-everything -O2 mainvs.c gc.c $<
+
+%.vo: %.v
+	coqc ${COQOPTS} $<

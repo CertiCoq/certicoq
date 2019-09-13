@@ -9,16 +9,16 @@ MetaCoq Check foo.
 MetaCoq Erase foo.
 CertiCoq Compile foo.
 
-Definition bool_list := map negb [true; false].
-Set Printing Universes.
-(* Universe issues: undeclared universes from sections *)
-(* MetaCoq SafeCheck bool_list.*)
+MetaCoq Erase (map negb [true; false]).
 
 Require Import Binom.
 (* Universe issues: template polymorphism not implemented yet *)
+(* MetaCoq SafeCheck main. *)
+(* MetaCoq Check main. *)
+Time MetaCoq Erase main.
 
-(* MetaCoq Erase main. *)
-(* CertiCoq Compile main. *)
+Time CertiCoq Compile main.
 
-(* Require Import CertiCoq.Benchmarks.vs. *)
-(* CertiCoq Compile main. *)
+Require Import CertiCoq.Benchmarks.vs.
+MetaCoq Erase main.
+CertiCoq Compile main.

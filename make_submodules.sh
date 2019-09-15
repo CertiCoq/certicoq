@@ -3,12 +3,12 @@
 cd submodules
 
 cd paramcoq
-make coq install
+make coq && make install
 if [ $? -eq 0 ]
 then
     echo "paramcoq looks up-to-date"
 else
-    echo "(re)building paramcoq"
+    echo "Rebuilding paramcoq"
     git clean -dfx
     make coq
     make install
@@ -22,7 +22,7 @@ if [ $? -eq 0 ]
 then
     echo "coq-ext-lib looks up-to-date"
 else
-    echo "(re)building coq-ext-lib"
+    echo "Rebuilding coq-ext-lib"
     git clean -dfx
     coq_makefile -f _CoqProject -o Makefile
     make all
@@ -36,7 +36,7 @@ if [ $? -eq 0 ]
 then
     echo "Squiggleeq looks up-to-date"
 else
-    echo "(re)building SquiggleEq"
+    echo "Rebuilding SquiggleEq"
     git clean -dfx
     make all
     make install
@@ -50,7 +50,7 @@ if [ $? -eq 0 ]
 then
     echo "Equations looks up-to-date"
 else
-    echo "(re)building Equations"
+    echo "Rebuilding Equations"
     git clean -dfx
     make all
     make install
@@ -64,7 +64,7 @@ if [ $? -eq 0 ]
 then
     echo "MetaCoq looks up-to-date"
 else
-    echo "(Re)building MetaCoq"
+    echo "Rebuilding MetaCoq"
     git clean -dfx
     ./configure.sh local
     make all

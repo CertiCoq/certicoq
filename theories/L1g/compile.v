@@ -304,6 +304,6 @@ Definition program_Program (p:Template.Ast.program) : Program Term :=
   match erase_template_program p with
   | CorrectDecl (gc, t) =>
     {| main := term_Term gc t;
-       env := program_Pgm_aux (rev gc) |}
+       env := program_Pgm_aux gc |}
   | EnvError env => {| main := TWrong "program_Program"; env := nil |}
   end.

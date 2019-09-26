@@ -759,7 +759,7 @@ Lemma PS_cardinal_empty_l s :
   PS.cardinal s = 0. 
 Proof.
   intros Heq.
-  replace 0 with (@length elt nil) by reflexivity.
+  replace 0 with (@List.length elt nil) by reflexivity.
   rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
   eapply NoDupA_NoDup. eapply PS.elements_spec2w.
   constructor; eauto.
@@ -772,7 +772,7 @@ Lemma PS_cardinal_singleton s x :
   PS.cardinal s = 1. 
 Proof.
   intros Heq.
-  replace 1 with (length (cons x nil)) by reflexivity.
+  replace 1 with (List.length (cons x nil)) by reflexivity.
   rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
   eapply NoDupA_NoDup. eapply PS.elements_spec2w.
   constructor; eauto. now constructor.

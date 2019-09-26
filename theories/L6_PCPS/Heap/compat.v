@@ -431,7 +431,7 @@ Module Compat (H : Heap).
                intros Hc. eapply Hnin2. now eauto.
                intros Hc. eapply Hnin1. now eauto.
                now eauto. eassumption. reflexivity. simpl.
-               replace (c2 + 1 + 1 + S (S (length xs2)) - 1 - 1 - S (S (length xs2)))  with c2.
+               replace (c2 + 1 + 1 + S (S (List.length xs2)) - 1 - 1 - S (S (List.length xs2)))  with c2.
                eassumption. omega.
              * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
                split. eapply Hiinv; try eassumption.
@@ -1586,7 +1586,7 @@ Module Compat (H : Heap).
               intros Hc. eapply Hnin2. now eauto.
               intros Hc. eapply Hnin1. now eauto.
               now eauto. eassumption. reflexivity. simpl.
-              replace (c2 + 1 + 1 + S (S (length xs2)) - 1 - 1 - S (S (length xs2)))  with c2.
+              replace (c2 + 1 + 1 + S (S (List.length xs2)) - 1 - 1 - S (S (List.length xs2)))  with c2.
               eassumption. omega.
             * replace c1 with (c1 - cost (Eapp f1 t xs1) + cost (Eapp f1 t xs1)) by (simpl in *; omega).
               eapply Hictx.

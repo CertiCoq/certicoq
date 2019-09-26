@@ -203,7 +203,7 @@ Module HeapDefs (H : Heap) .
   Definition size_val (v : block) : nat :=
     match v with
       | Constr t ls => (* The size of the constructor representation *)
-        1 + length ls
+        1 + List.length ls
       | Clos _ _ => 3
       | Env rho => 1 + size_env rho
     end.

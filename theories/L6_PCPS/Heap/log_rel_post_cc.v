@@ -32,7 +32,7 @@ Module LogRelPostCC (H : Heap).
         find_def f1 B1 = Some (ft, xs1, e1) ->
         setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
 
-        length vs1 = length vs2 ->
+        List.length vs1 = List.length vs2 ->
         
         exists xs2 e2 rho2,
           find_def f2 B2 = Some (ft, xs2, e2) /\
@@ -117,7 +117,7 @@ Module LogRelPostCC (H : Heap).
           find_def f1 B1 = Some (ft, xs1, e1) ->
           setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
 
-          length vs1 = length vs2 ->
+          List.length vs1 = List.length vs2 ->
           
           exists xs2 e2 rho2,
             find_def f2 B2 = Some (ft, xs2, e2) /\
@@ -1697,7 +1697,7 @@ Module LogRelPostCC (H : Heap).
     Proof with now eauto with Ensembles_DB.
       intros b1 b2 H1' H2' rho1' rho2' v1 c1 m1
              Heq1 Hinj1 Heq2 Hinj2 HII Hleq1 Hstep1 Hstuck1.
-      specialize (Hstuck1 (length ys1 + 2)).
+      specialize (Hstuck1 (List.length ys1 + 2)).
       destruct Hstuck1 as [r2 [m2 Hstep]].  inv  Hstep. exfalso.
       simpl in *. 
       omega. 
@@ -2141,7 +2141,7 @@ Module LogRelPostCC (H : Heap).
              HII Hleq1 Hstep1 Hstuck1.
       inv Hstep1.
       (* Timeout! *)
-      - { exists OOT, (c1 - length xs1).
+      - { exists OOT, (c1 - List.length xs1).
           - eexists. eexists id. repeat split.
             constructor; eauto.
             unfold cost_cc in *. omega. 

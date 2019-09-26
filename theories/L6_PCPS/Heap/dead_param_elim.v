@@ -55,7 +55,7 @@ match B with
 | Fnil => []
 end. 
 
-(* Make initial Lping function *)
+(* Make initial live function *)
 Fixpoint get_live_initial (B : fundefs) : live_fun := 
 let yss := get_vars B  in
 let bss := get_bools B  in 
@@ -81,6 +81,8 @@ match funs with
 | [] => (false, n)
 | f :: funs' => if (peq f x) then (true, n) else find_fun x funs' (n+1)
 end. 
+
+(* FUNCTIONS EXPLICITLY ALTERING LIVE FUNCTION *)
 
 Fixpoint add_escaping (x : var) (L : live_fun) (funs : list var) : live_fun :=
 let (b, n) := find_fun x funs 0 in
@@ -151,6 +153,8 @@ if b then (
 )
 else add_vars xs L m. 
 
+(* IDENTIFYING ESCAPING FUNCTIONS *)
+
 Fixpoint escaping_fun_exp (e : exp) (L : live_fun) (funs : list var) := 
 match e with 
 | Eapp f t ys =>
@@ -176,6 +180,8 @@ match B with
   escaping_fun_fundefs B' L' funs
 | Fnil => L
 end. 
+
+(* LIVE PARAMETER ANALYSIS *)
 
 Fixpoint live_expr (B : fundefs) (L : live_fun) (funs : list var) (n : nat) (e : exp) : live_fun := 
 match e with 
@@ -241,9 +247,9 @@ match B with
 | Fnil => n
 end. 
 
-(* Inductively create Lping functions for B, when they are equal, stop *)
+(* Iteratively create live functions for B, when they are equal, stop *)
 (* Note that a naive upper bound for the number of passes is the number of total variables
-   as at each step, if the process doesn't terminate at least one variable must be Lped *)
+   as at each step, if the process doesn't terminate at least one variable must be eliminated *)
 Fixpoint find_live_helper (B : fundefs) (prev_L : live_fun) (funs : list var) (n : nat) : live_fun := 
 match n with 
 | 0 => prev_L
@@ -260,8 +266,6 @@ match e with
   let initial_L := get_live_initial B in
   let L' := escaping_fun_exp e' (escaping_fun_fundefs B initial_L funs) funs in
   let n := num_vars B 0 in
-  (* initial_L *)
-  (* L' *)
   find_live_helper B L' funs n
 | _ => Live [[]] [[]]
 end. 
@@ -274,6 +278,8 @@ match ys, bs with
   else live_args ys' bs'
 | _, _ => ys
 end. 
+
+(* ELIMINATING VARIABLES *)
 
 Fixpoint eliminate_expr (L : live_fun) (funs : list var) (e : exp) : exp := 
 match e with 

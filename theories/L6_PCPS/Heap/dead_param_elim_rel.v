@@ -15,7 +15,7 @@ Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
 
-(* S is the set of the dropped parameters of the function we're in. We need it
+(* S is the set of the eliminated parameters of the function we're in. We need it
    to make sure that these are not used anywhere in the program, and so the proof will go through.
    Everything that we want to keep we want to make sure that is not in S.
    the list of booleans is the L parameters of the function we are calling and we need it so that
@@ -36,7 +36,7 @@ Inductive Live_args (S : Ensemble var) : list var -> list bool -> list var -> Pr
 Definition eliminated_funs L : Ensemble var :=
   [set f | exists bs, L f = Some bs /\ Exists (fun x => x = false) bs]. 
 
-(* S is the set of formal parameters that have been dropped from the *current* function.
+(* S is the set of formal parameters that have been eliminated from the *current* function.
    That is, whatever is in S, is undefined in the environment when we execute the code. *)
 Inductive Live_body (L : var -> option (list bool)) (S : Ensemble var) :  exp -> exp -> Prop := 
 | BLive_Constr : 
@@ -104,11 +104,11 @@ Inductive Live_fundefs (L : var -> option (list bool)) : fundefs -> fundefs -> P
     Live_fundefs L F F' ->
     Live_fundefs L (Fcons g ft xs e F) (Fcons g ft ys e' F'). 
 
-
+(* Top level relation *)
 Inductive Live (L : var -> option (list bool)) : fundefs -> exp -> fundefs -> exp -> Prop := 
 | Live_toplevel :
     forall B e B' e',
-      domain L <--> name_in_fundefs B -> (* XXX New *)
+      domain L <--> name_in_fundefs B -> 
       Live_fundefs L B B' ->
       Live_body L (Empty_set _) e e' -> 
       Live L B e B' e'. 

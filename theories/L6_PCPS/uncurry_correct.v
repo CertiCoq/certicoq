@@ -2,7 +2,7 @@ Require Import L6.cps L6.size_cps L6.cps_util L6.eval L6.logical_relations L6.se
         L6.hoare L6.Ensembles_util L6.List_util L6.alpha_conv L6.functions L6.uncurry
         L6.shrink_cps_correct.
 Require Import FunInd.
-Require Import closure_conversion_corresp. (* for [fresh] *)
+Require Import L6.closure_conversion_corresp. (* for [fresh] *)
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.

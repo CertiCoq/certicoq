@@ -306,5 +306,3 @@ Extraction "testColorT_L7.ml" testColor.
  
 *)
 (* End TEST_L7. *)
- 
-

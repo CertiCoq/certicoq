@@ -348,7 +348,7 @@ Section Lambda_lifting_corresp.
       eassumption. eassumption. now eapply H; eauto.
       now eapply H0; eauto.
     - rewrite !Heq1. econstructor; eauto. rewrite <- Heq2. eauto.
-    - rewrite !Heq1. econstructor; eauto. rewrite <- Heq2. eauto.
+    - rewrite !Heq1. econstructor; eauto.
     - rewrite Heq1. econstructor; eauto. eapply H; eauto.
       rewrite Heq1. reflexivity.
     - rewrite Heq1. econstructor; eauto.
@@ -776,8 +776,7 @@ Section Lambda_lifting_corresp.
       eapply return_triple; intros s1 Hfr.
       + eexists. split; eauto.
         econstructor. unfold fun_map. rewrite Heq. reflexivity.
-      + eexists. split; eauto.
-        econstructor. unfold fun_map. rewrite Heq. reflexivity.
+      + eexists. split; eauto. econstructor. 
     - eapply bind_triple.
       + inv Hun. repeat normalize_bound_var_in_ctx. eapply IHe; try eauto with Ensembles_DB.
         * eapply Disjoint_Included_r; [| eassumption ].

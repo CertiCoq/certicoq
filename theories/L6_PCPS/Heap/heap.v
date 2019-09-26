@@ -1,13 +1,12 @@
-(* Heaps for L6 semantics. Part of the CertiCoq project.
+(* Heaps for L6 space semantics. Part of the CertiCoq project.
  * Author: Zoe Paraskevopoulou, 2016
  *)
-
+ 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms Sorting.Permutation.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
 From CertiCoq.L6 Require Import Ensembles_util functions List_util cps set_util.
-Require Import compcert.lib.Coqlib.
+From compcert.lib Require Import Coqlib.
 
 Import ListNotations.
 
@@ -16,6 +15,8 @@ Close Scope Z_scope.
 
 (** ** Heap module type **) 
 (** The memory model used in the L6 heap semantics *)
+
+(** In heap_impl.v we provide a concrete implementation that inhabits the module type **)
 
 Module Type Heap.
 
@@ -27,21 +28,23 @@ Module Type Heap.
   
   Parameter get : forall {A : Type}, loc -> heap A -> option A.
   
-  Parameter set : forall {A : Type}, A -> loc -> heap A -> heap A.
+  Parameter set : forall {A : Type}, A -> loc -> heap A -> option (heap A).
   
   Parameter alloc : forall {A : Type}, A -> heap A -> loc * heap A.
   
   Parameter emp_get :
     forall (A : Type) (l : loc), get l (@emp A) = None. 
-
+  
   Parameter gss :
-    forall A (x : A) (l : loc) (H : heap A),
-      get l (set x l H) = Some x. 
-
+    forall A (x : A) (l : loc) (H H' : heap A),
+      set x l H = Some H' ->
+      get l H' = Some x.  
+  
   Parameter gso :
-    forall A (x : A) (l1 l2 : loc) (H : heap A),
-      l1 <> l2 ->
-      get l1 (set x l2 H) = get l1 H. 
+    forall A (x : A) (l l' : loc) (H H' : heap A),
+      set x l H = Some H' ->
+      l <> l' ->
+      get l' H' = get l' H. 
 
   Parameter gas :
     forall A (x : A) (l : loc) (H H' : heap A),
@@ -120,7 +123,7 @@ Module Type Heap.
   (** Elements filter *)
   Parameter heap_elements_filter :
     forall {A} (H : Ensemble loc) {_ : ToMSet H}, heap A -> list (loc * A).
-  
+   
   Parameter heap_elements_filter_sound :
     forall (A : Type) (S : Ensemble loc) {H : ToMSet S} (h : heap A) (l : loc) (v : A),
       List.In (l, v) (heap_elements_filter S h) -> get l h = Some v /\ l \in S.
@@ -331,6 +334,12 @@ Module HeapLemmas (H : Heap).
       destruct H as [v Hget]. exists v. congruence.
   Qed.
 
+  Lemma restrict_heap_eq A S (H1 H2 : heap A) :
+    restrict S H1 H2 ->
+    S |- H1 ≡ H2.
+  Proof.
+    intros Hr x Hin. symmetry. eapply restrict_In; eauto. 
+  Qed.  
 
   (** [heap_elements] lemmas *)
 
@@ -922,7 +931,7 @@ Module HeapLemmas (H : Heap).
     + intros x1 x2 [l1 x3] Hleq. simpl.
       eapply le_trans. eassumption. eapply Max.le_max_l.
     + intros x1 x2 [l1 x3] Hleq. simpl.
-      eapply NPeano.Nat.max_le_compat_r. eassumption.
+      eapply Nat.max_le_compat_r. eassumption.
     + intros [l1 x1] [l2 x2] y; simpl. 
       rewrite <- !Max.max_assoc, (Max.max_comm (f x1)).
       reflexivity.
@@ -945,7 +954,7 @@ Module HeapLemmas (H : Heap).
       * eapply le_trans. eapply IHls. eassumption.
         eapply fold_left_monotonic; [| omega ].
         intros x1 x2 [l1 y1] Hleq. simpl.
-        eapply NPeano.Nat.max_le_compat_r. eassumption.
+        eapply Nat.max_le_compat_r. eassumption.
   Qed.
 
   (** [size_with_measure_filter] lemmas *)

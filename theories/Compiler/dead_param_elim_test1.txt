@@ -1,0 +1,108 @@
+Before dropping\n
+letrec [
+  *** Escaping ***
+  fun anon_code_238<101>(anon_env_263,k_156,m_155,n_152) := 
+    case n_152 of {
+    | S => 
+      let x163 := proj_0 101 n_152 in 
+      let env_264 := con_105(k_156) in 
+      let x189 := con_15(anon_code_266,env_264) in 
+      anon_code_238<101>(anon_env_263,x189,m_155,x163)
+    | O => 
+      let k_code_278 := proj_0 15 k_156 in 
+      let k_env_279 := proj_1 15 k_156 in 
+      k_code_278<2>(k_env_279,m_155)
+    }
+  *** Known ***
+  fun anon_code_265<102>(anon_env_270,x0kdcon_187,x225) := 
+    let x188 := S(x0kdcon_187) in 
+    let anon_code_271 := proj_0 15 x225 in 
+    let anon_env_272 := proj_1 15 x225 in 
+    anon_code_271<2>(anon_env_272,x188)
+  *** Escaping *** 
+  fun anon_code_266<2>(anon_env_273,x226) := 
+    let k_proj_275 := proj_0 105 anon_env_273 in 
+    anon_code_265<102>(anon_env_273,x226,k_proj_275)
+  *** Known ***
+  fun anon_code_241<103>(anon_env_243,k_115,k_209,x228) := 
+    let env_244 := con_104(k_209,x228) in 
+    let x139 := con_15(anon_code_246,env_244) in 
+    let k_code_247 := proj_0 15 k_115 in 
+    let k_env_248 := proj_1 15 k_115 in 
+    k_code_247<2>(k_env_248,x139)
+  *** Known ***
+  fun anon_code_245<104>(anon_env_249,x207,x208,x233,x232) := 
+    let x218 := O() in 
+    let x219 := S(x218) in 
+    let anon_code_250 := proj_0 15 x232 in 
+    let anon_env_251 := proj_1 15 x232 in 
+    anon_code_250<101>(anon_env_251,x207,x219,x233)
+  *** Escaping ***
+  fun anon_code_246<3>(anon_env_252,x234,x235) := 
+    let k_proj_254 := proj_0 104 anon_env_252 in 
+    let anon_proj_255 := proj_1 104 anon_env_252 in 
+    anon_code_245<104>(anon_env_252,x234,x235,k_proj_254,anon_proj_255)
+  *** Escaping ***  
+  fun anon_code_242<3>(anon_env_258,x229,x230) := 
+    let anon_proj_260 := proj_0 103 anon_env_258 in 
+    anon_code_241<103>(anon_env_258,x229,x230,anon_proj_260)
+] in
+let env_237 := con_102() in 
+let x220 := con_15(anon_code_238,env_237) in 
+let env_240 := con_103(x220) in 
+let x141 := con_15(anon_code_242,env_240) in 
+halt x141
+After dropping\n
+letrec [
+  *** Escaping ***
+  fun anon_code_238<101>(anon_env_263,k_156,m_155,n_152) := 
+    case n_152 of {
+    | S => 
+      let x163 := proj_0 101 n_152 in 
+      let env_264 := con_105(k_156) in 
+      let x189 := con_15(anon_code_266,env_264) in 
+      anon_code_238<101>(anon_env_263,x189,m_155,x163)
+    | O => 
+      let k_code_278 := proj_0 15 k_156 in 
+      let k_env_279 := proj_1 15 k_156 in 
+      k_code_278<2>(k_env_279,m_155)
+    }
+  *** Known ***
+  fun anon_code_265<102>(x0kdcon_187,x225) := 
+    let x188 := S(x0kdcon_187) in 
+    let anon_code_271 := proj_0 15 x225 in 
+    let anon_env_272 := proj_1 15 x225 in 
+    anon_code_271<2>(anon_env_272,x188)
+  *** Escaping ***
+  fun anon_code_266<2>(anon_env_273,x226) := 
+    let k_proj_275 := proj_0 105 anon_env_273 in 
+    anon_code_265<102>(x226,k_proj_275)
+  *** Known ***
+  fun anon_code_241<103>(k_115,k_209,x228) := 
+    let env_244 := con_104(k_209,x228) in 
+    let x139 := con_15(anon_code_246,env_244) in 
+    let k_code_247 := proj_0 15 k_115 in 
+    let k_env_248 := proj_1 15 k_115 in 
+    k_code_247<2>(k_env_248,x139)
+  *** Known *** (The main functionality)
+  fun anon_code_245<104>(x207,x233,x232) := 
+    let x218 := O() in 
+    let x219 := S(x218) in 
+    let anon_code_250 := proj_0 15 x232 in 
+    let anon_env_251 := proj_1 15 x232 in 
+    anon_code_250<101>(anon_env_251,x207,x219,x233)
+  *** Escaping ***
+  fun anon_code_246<3>(anon_env_252,x234,x235) := 
+    let k_proj_254 := proj_0 104 anon_env_252 in 
+    let anon_proj_255 := proj_1 104 anon_env_252 in 
+    anon_code_245<104>(x234,k_proj_254,anon_proj_255)
+  *** Escaping ***
+  fun anon_code_242<3>(anon_env_258,x229,x230) := 
+    let anon_proj_260 := proj_0 103 anon_env_258 in 
+    anon_code_241<103>(x229,x230,anon_proj_260)
+] in
+let env_237 := con_102() in 
+let x220 := con_15(anon_code_238,env_237) in 
+let env_240 := con_103(x220) in 
+let x141 := con_15(anon_code_242,env_240) in 
+halt x141

@@ -66,6 +66,7 @@ Term0
 TermsDB
 Variables
 Closure_conversion
+Lambda_lifting
 L5a
 L5_to_L6
 L4_to_L4_1_to_L4_2

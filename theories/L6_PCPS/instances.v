@@ -14,7 +14,9 @@ From CertiCoq.L7 Require Import L6_to_Clight.
 
 
 
-(* 1 - environment of primitive operations
+(*
+   Environment for L6 programs: 
+   1 - environment of primitive operations
    2 - environment of constructors (from which datatypes can be reconstructed)
    3 - name environment mapping variables to their original name if it exists
    4 - a map from function tags to information about that class of function
@@ -33,14 +35,11 @@ Let L6val: Type := cps.val.
    variables of a term.
  *)
 
-(* Zoe: Changed definitions to only target closed terms *)
-
 Instance bigStepOpSemL6Term : BigStepOpSem (L6env * L6term) L6val :=
   λ p v,
   let '(pr, cenv, nenv, fenv, (rho, e)) := p in
-  (* should not modify pr, cenv and nenv 
-  let '(pr', cenv', env', nenv', val) := v in *)
-  ∃ (n:nat), (L6.eval.bstep_e pr cenv rho e v n).
+  (* should not modify pr, cenv and nenv *)
+  ∃ (n:nat), L6.eval.bstep_e pr cenv rho e v n.
 
 Require Import certiClasses2.
 
@@ -71,8 +70,6 @@ Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) :=
     | Ret (inr v) => Result v
     end.
 
-
-
 Open Scope positive_scope.
 
 (* starting tags for L5_to_L6, anything under default is reserved for special constructors/types *)
@@ -87,14 +84,14 @@ Definition bogus_cloiTag := 16%positive.
 Definition fun_fTag := 3%positive.
 Definition kon_fTag := 2%positive.
 
-(* Let bindings for function and enviroment.
+(* Let bindings for function and environment.
  * Thee function and the argument should be closed terms
  * so we do not care about capturing *)
 Definition f' := 1%positive.
 Definition Γ := 2%positive.
 
 (* This is application of closure converted functions.
-   We will need regural application as well. It's likely that
+   We will need regular application as well. It's likely that
    only this one will be exposed. *)
 (* Instance CloApp : MkApply L6term := *)
 (*   mkApp (fun f xs =>  *)
@@ -105,31 +102,68 @@ Definition Γ := 2%positive.
 Require Import ExtLib.Data.Monads.OptionMonad.
 
 Require Import ExtLib.Structures.Monads.
-  
+
+
+
+(** * Definition of L6 backend pipelines *)
+
+Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=  
+  match e with
+  | pair venv vt =>
+    match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+    | Some r =>         
+      let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
+      let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+      let e := inline_uncurry_contract e s 10 10 in  
+      let e := shrink_cps.shrink_top e in
+      let '(cenv',nenv', t') := closure_conversion_hoist
+                                  bogus_cloTag
+                                  e
+                                  next_cTag
+                                  next_iTag
+                                  cenv nenv
+      in
+      Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
+    | None => Exc "failed converting from L5 to L6"
+    end
+  end.
+
+(* Optimizing L6 pipeline *)
+Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=  
+  match e with
+  | pair venv vt =>
+    match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+    | Some r =>
+      let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
+      let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+      let e := inline_uncurry_contract e s 10 10 in  
+      let e := shrink_cps.shrink_top e in
+      (* Lambda Lifting *)
+      let e := lambda_lift e next_iTag in
+      (* Shrink reduction *)
+      let e := shrink_cps.shrink_top e in
+      (* closure conversion + hoisting *)
+      let '(cenv',nenv', t') := closure_conversion_hoist
+                                  bogus_cloTag
+                                  e
+                                  next_cTag
+                                  next_iTag
+                                  cenv nenv
+      in
+      (* Shrink reduction *)
+      let e := shrink_cps.shrink_top e in
+      (* Dead parameter elimination *)
+      let e := eliminate e in 
+      Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
+    | None => Exc "failed converting from L5 to L6"
+    end
+  end.
+
+(* TODOs for optimized pipeline:
+   
+   1. Hoist only closed functions 
+   2. Run hoisting before CC, to find top-level functions, and not closure convert them
+*)
 
 Instance certiL5_t0_L6: 
-  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := 
-  fun v =>
-    match v with
-    | pair venv vt =>
-      (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
-      | Some r =>         
-        let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
-        let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
-        (* let e := postuncurry_contract e s d in            *)
-        (* let e := shrink_cps.shrink_top e in  *)
-        (* let e :=  inlinesmall_contract e 10 10 in *)
-        let e := inline_uncurry_contract e s 10 10 in  
-        let e := shrink_cps.shrink_top e in
-        let e := lambda_lift e next_iTag in
-        let '(cenv',nenv', t') := closure_conversion_hoist
-                                    bogus_cloTag
-                                    e
-                                    next_cTag
-                                    next_iTag
-                                    cenv nenv
-        in
-        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
-      | None => Exc "failed converting from L5 to L6"
-      end)
-    end.
+  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := L6_pipeline_opt.

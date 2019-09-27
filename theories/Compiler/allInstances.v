@@ -40,7 +40,7 @@ Defined. *)
 
 
 Definition ext_comp `{F:utils.Fuel} := fun prog =>
-  let t := (translateTo (cTerm certiL6) prog) in
+  let t := (translateTo (cTerm certiL6) (Flag 0) prog) in
   match t with
   | Ret xx => xx
   | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
@@ -79,15 +79,14 @@ Definition compile_opt_L7 p  :=
   end.
 
 Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
-  translateTo (cTerm certiL4) p.
+  translateTo (cTerm certiL4) (Flag 0) p.
 
-Definition compile_template_L7 `{F:utils.Fuel} (p : Template.Ast.program) : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
-  compile_opt_L7 (translateTo (cTerm certiL6) p).
+Definition compile_template_L7 `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+  : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
+  compile_opt_L7 (translateTo (cTerm certiL6) (Flag opt_level) p).
 
 Open Scope positive_scope.
   
-
-
 
 Require Import L6.cps L6.cps_show.
 
@@ -135,22 +134,22 @@ Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)
 
 
   
- Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color). 
+ Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) graph_color). 
 
  Print demo4.
- Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) Demo1).
+ Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) Demo1).
  Set Printing Depth 1000.
  Print demo5.
- Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) binom). 
- Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) binom). 
+ Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) binom). 
+ Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) binom). 
 
-Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).
+Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) graph_color).
  
 Print color5.
 
 
 
-Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) binom). 
+Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) (Flag 0) binom). 
 Definition eval_c2 := match binom2 with
                       | Ret (mkPgm p env) =>
                         Ret (L2k.wcbvEval.wcbvEval env 1000%nat p)
@@ -161,7 +160,7 @@ Definition eval_c2' := Eval native_compute in eval_c2.
 Print eval_c2'. 
 
 
-Definition binom3 := Eval native_compute in (translateTo (cTerm certiL3_eta) binom). 
+Definition binom3 := Eval native_compute in (translateTo (cTerm certiL3_eta) (Flag 0) binom). 
 
 
 Require Export L4.expression.
@@ -172,13 +171,13 @@ Definition eval_c4 := match binom5 with
                         | Exc s => Exc "foo"
                       end.
 
-  Definition eval_c4' := Eval vm_compute in eval_c4.
- Print eval_c4'. 
+Definition eval_c4' := Eval vm_compute in eval_c4.
+Print eval_c4'. 
 
 
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
 Print color5. 
-
+  
  
 
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.

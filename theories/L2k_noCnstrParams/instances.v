@@ -49,7 +49,7 @@ Global Instance certiL2k: CerticoqLanguage (Program L2k.compile.Term).
 Instance certiL2_to_L2k: 
   CerticoqTotalTranslation (Program L1g.compile.Term)
                            (Program L2k.compile.Term) :=
-  stripProgram.
+  (fun o x => stripProgram x).
 
 
 Require Import certiClasses2.

@@ -36,7 +36,7 @@ Global Instance certiL3_eta: CerticoqLanguage L3_eta_Program := {}.
 
 Global Instance certiL3_to_L3_eta:
   CerticoqTranslation (cTerm certiL2k) (cTerm certiL3_eta) :=
-  fun p => Ret (L3_to_L3_eta.Program_Program p).
+  fun o p => Ret (L3_to_L3_eta.Program_Program p).
 
 Lemma L3_crctEnv_inv d e : L2k.program.crctEnv (d :: e) -> L2k.program.crctEnv e.
 Proof.
@@ -187,9 +187,9 @@ Global Instance certiL4: CerticoqLanguage (ienv * L4.expression.exp) := {}.
 
 Global  Instance certiL3_eta_to_L4: 
   CerticoqTranslation (cTerm certiL3_eta) (cTerm certiL4)  :=
-  fun p =>
+  fun o p =>
     Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
-   (L3_to_L4.translate_program (AstCommon.env p) (main p))).
+          (L3_to_L4.translate_program (AstCommon.env p) (main p))).
 
 Require Import L4.L3_to_L4_correct.
 
@@ -325,7 +325,7 @@ Global Instance certiL4_2: CerticoqLanguage (prod ienv L4_2_Term) := {}.
 
 Global Instance certiL4_to_L4_2: 
   CerticoqTotalTranslation (cTerm certiL4) (cTerm certiL4_2) :=
-  fun p => (fst p, (tL4_to_L4_2 (snd p))).
+  fun o p => (fst p, (tL4_to_L4_2 (snd p))).
 
 
 Global Program Instance : BigStepOpSem L4_5_Term L4_5_Term := eval.
@@ -359,7 +359,7 @@ Global Instance certiL4_5: CerticoqLanguage (prod ienv L4_5_Term) := {}.
 
 Global Instance certiL4_2_to_L4_5: 
   CerticoqTotalTranslation (cTerm certiL4_2) (cTerm certiL4_5) :=
-  fun p => (fst p, (L4_2_to_L4_5  (snd p))).
+  fun o p => (fst p, (L4_2_to_L4_5  (snd p))).
 
 
 Require Import L4.variables.
@@ -421,7 +421,7 @@ Qed.
 
 Global Instance certiL4_5_to_L5:
   CerticoqTotalTranslation (cTerm certiL4_5) (cTerm certiL5):=
-  (fun x => (fst x, ContApp_c (cps_cvt (snd x)) haltCont)).
+  (fun o x => (fst x, ContApp_c (cps_cvt (snd x)) haltCont)).
 
 Definition oldTranslation : (cTerm certiL4_5) -> (cTerm certiL5):=
   (fun x => (fst x, (cps_cvt (snd x)))).
@@ -453,7 +453,7 @@ Require Import L4.varInterface.
 (* all variants of the correctness property need this part *)
 Lemma goodPres45 : goodPreserving (ienv * L4_5_Term) (ienv * L5Term).
 Proof using.
-  simpl. red. intros ? Hgood.
+  simpl. red. intros s o Hgood.
   unfold certiClasses.translate, liftTotal, bigStepEval,
   liftBigStepException, translateT, certiL4_5_to_L5. simpl.
   simpl. hnf. simpl.
@@ -552,7 +552,7 @@ Global Instance isValL4: IsValue (cTerm certiL4) := (expression.is_value ∘ snd
 
 Lemma obsNthCommuteL4_L4_2:  valuePredTranslateObserveNthCommute (ienv * exp) (cTerm certiL4_2).
 Proof using.
-  intros ? ? ? Hisv.
+  intros o ? ? ? Hisv.
   destruct sv as [senv v].
   hnf in Hisv.
   simpl in *.
@@ -569,7 +569,7 @@ Qed.
   
 Lemma yesCommuteL4_L4_2:  valuePredTranslateYesPreserved (ienv * exp) (cTerm certiL4_2).
 Proof using.
-  intros ? ? Hisv.
+  intros o ? ? Hisv.
   destruct sv as [senv v].
   hnf in Hisv.
   simpl in *.
@@ -590,13 +590,13 @@ Global Instance certiL4_to_L4_2Correct:
   CerticoqTranslationCorrect certiL4 certiL4_2.
 Proof using.
   split.
-- intros ? Hg. hnf. 
+- intros ? o Hg. hnf. 
   destruct s as [? s]. simpl.
   hnf in Hg. simpl in Hg.
   clear i.
   unfold isprogram.
   dands; eauto using ntwfL4_to_L42, fixwfL4_to_L42, closedL4_to_L42,vcL4_to_L42. 
-- intros ? ? Hg Hev.
+- intros s ? ? Hg Hev.
   destruct s as [? s].
   destruct sv as [senv sv]. 
   hnf in Hev. simpl in Hev.
@@ -610,7 +610,7 @@ Proof using.
   exrepnd. simpl in vt.
   fold L4_2_Term in vt.
   rename vt into v2t.
-  exists (senv, v2t).
+  exists (s1, v2t).
   simpl.
   dands.
   + hnf.
@@ -618,10 +618,13 @@ Proof using.
    dands; try refl;[].
    hnf. eexists; eauto.
   + symmetry in Hev1.
-    apply alpha_EqObs_L4_2 with (senv:=senv) in Hev1; auto;[].
+    apply alpha_EqObs_L4_2 with (senv:=s1) in Hev1; auto;[].
     eapply @obsLeTrns with (InterValue := cTerm certiL4_2);[ | apply Hev1].
-    apply (fun p1 p2 a b v eq => valuePredTranslateLe_suff _ _ p1 p2 a b v eq); auto;[ | ]; clear;
+    eapply (fun p1 p2 a b v eq => valuePredTranslateLe_suff _ _ p1 p2 a b v eq); auto;[ | ]; clear;
       [apply obsNthCommuteL4_L4_2 | apply yesCommuteL4_L4_2].
+
+    Grab Existential Variables.
+    exact (Flag 0). 
 Qed.
 
 
@@ -644,18 +647,18 @@ EqIfRL4Opid : TermAbs_parametricity.EqIfR L4_to_L4_2_correct.L4Opid_R
 
 Lemma goodPres4_2_to_4_5 : goodPreserving (ienv * L4_2_Term) (ienv * L4_5_Term).
 Proof using.
-- intros ? Hg. hnf. 
-  destruct s as [? s]. simpl.
-  hnf in Hg. simpl in Hg.
-  unfold isprogram, closed in *. repnd.
-  dands; try rewrite L4_2_to_L4_5_fvars;
-    eauto using L4_2_to_L4_5_ntwf, fixwf_commute, L4_2_to_L4_5_vc.
+  - intros ? o Hg. hnf. 
+    destruct s as [? s]. simpl.
+    hnf in Hg. simpl in Hg.
+    unfold isprogram, closed in *. repnd.
+    dands; try rewrite L4_2_to_L4_5_fvars;
+      eauto using L4_2_to_L4_5_ntwf, fixwf_commute, L4_2_to_L4_5_vc.
 Qed.
 
 Lemma certiL4_2_to_L4_5_evalPres:
   bigStepPreserving (cTerm certiL4_2) (cTerm certiL4_5).
 Proof using.
-  intros ? ?.
+  intros ? ? ?.
   destruct s as [? s].
   destruct sv as [senv sv]. 
   autounfold with certiclasses. simpl.
@@ -680,18 +683,18 @@ Proof using.
   apply certicoqTranslationCorrect_suff3; try firstorder auto.
   - apply certiL4_2_to_L4_5_evalPres.
   - apply goodPres4_2_to_4_5.
-  - intros ? ? Hsv Heq. clear Hsv. inverts Heq.
+  - intros o ? ? Hsv Heq. clear Hsv. inverts Heq.
       destruct sv as [? ev]. hnf.
       autounfold with certiclasses in *. simpl.
-      destruct ev as [ | o lbt]; simpl; intros q; destruct q; auto;[ | ].
-    +  destruct o; auto;[].
+      destruct ev as [ | o2 lbt]; simpl; intros q; destruct q; auto;[ | ].
+    +  destruct o2; auto;[].
        destruct dc. simpl. unfold implb. btauto.
-    +  destruct o; auto.
-  - intros ? ? ? Hsv Heq. inverts Heq.
+    +  destruct o2; auto.
+  - intros ? ? ? ? Hsv Heq. inverts Heq.
     destruct sv as [? ev]. hnf.
     autounfold with certiclasses. clear Hsv.
-    destruct ev as [ | o lbt]; auto;[].
-    destruct o; auto; [].
+    destruct ev as [ | o2 lbt]; auto;[].
+    destruct o2; auto; [].
     simpl.
     repeat rewrite List.map_map.
     repeat rewrite nth_error_map.
@@ -712,13 +715,12 @@ Module SimplerProof.
 
 Let certiL4_5_to_L5Val:
   CerticoqTranslation (cTerm certiL4_5) (cTerm certiL5):=
-  @liftTotal _ _ (fun x => (fst x, (cps_cvt_val (snd x)))).
+  @liftTotal _ _ (fun o x => (fst x, (cps_cvt_val (snd x)))).
 
   Lemma certiL4_5_to_L5Correct_evalPres:
     @bigStepPreserving (cTerm certiL4_5) (cTerm certiL5) _ _ _ (certiL4_5_to_L5Val) _ _ _ .
   Proof using.
-    intros ?.
-    intros ?.
+    intros ? ? ?.
     destruct s as [? s].
     destruct sv as [senv sv]. 
     autounfold with certiclasses. simpl.
@@ -748,7 +750,7 @@ Let certiL4_5_to_L5Val:
              _ _ _ _ _ _ _ _ _ _ _ _ _ _  _ certiL4_5_to_L5Val).
     - apply certiL4_5_to_L5Correct_evalPres.
     - apply goodPres45.
-    - intros ? ? Hsv Heq. inverts Heq.
+    - intros ? ? ? Hsv Heq. inverts Heq.
       destruct sv as [? ev]. hnf.
       autounfold with certiclasses in *.
       inverts Hsv; simpl in *; subst.
@@ -757,7 +759,7 @@ Let certiL4_5_to_L5Val:
       + intros q.  destruct q; try auto;[]; simpl.
         unfold implb; btauto.
       + intros q.  destruct q; constructor.
-    - intros ? ? ? Hsv Heq. inverts Heq.
+    - intros ? ? ? ? Hsv Heq. inverts Heq.
       destruct sv as [? ev]. hnf.
       autounfold with certiclasses.
       inverts Hsv; simpl in *; subst; simpl; [ | | | ]; try auto; [].
@@ -853,7 +855,7 @@ Global Instance certiL4_5_to_L5Correct: CerticoqTranslationCorrect certiL4_5 cer
 Proof.
   constructor.
 - exact goodPres45.
-- red. intros ? ? Hgood Heval.
+- red. intros ? ? ? Hgood Heval.
   destruct Heval as [Heq Heval].
   destruct s as [senv s].
   destruct sv as [? sv]. symmetry in Heq.

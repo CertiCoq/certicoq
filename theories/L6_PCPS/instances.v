@@ -166,4 +166,8 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
 *)
 
 Instance certiL5_t0_L6: 
-  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := L6_pipeline_opt.
+  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) :=
+  fun o => match o with
+        | Flag 0 => L6_pipeline
+        | Flag _ => L6_pipeline_opt
+        end.

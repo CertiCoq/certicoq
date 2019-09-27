@@ -2,8 +2,8 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From CertiCoq.L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
-                       Ensembles_util List_util functions closure_conversion eval.
+From CertiCoq Require Import L6.cps L6.size_cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx
+     L6.Ensembles_util L6.List_util L6.functions L6.closure_conversion L6.eval.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory ArithRing Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
@@ -23,30 +23,6 @@ Section Closure_conversion_util.
   Variable clo_tag : cTag.
 
   (** ** Proof that after closure conversion all functions are closed *)
-
-  Lemma project_var_occurs_free_ctx_Included Scope Funs σ c Γ FVs S x x' C S' F e:
-    project_var clo_tag Scope Funs σ c Γ FVs S x x' C S' ->
-    Included _ (occurs_free e) (Union _ F (Singleton _ x')) ->
-    Included _ (Union _ Scope
-                      (Union _ (image σ Funs) (Singleton _ Γ))) F ->
-    Included _ (occurs_free (C |[ e ]|)) F. 
-  Proof with now eauto with Ensembles_DB functions_BD. 
-    intros Hproj Hinc1 Hinc2. inv Hproj.
-    - simpl. eapply Included_trans. eassumption. 
-      apply Union_Included. now apply Included_refl.
-      eapply Included_trans; [| eassumption ].
-      eauto with Ensembles_DB.
-    - simpl.
-      rewrite occurs_free_Econstr, !FromList_cons, FromList_nil,
-      Union_Empty_set_neut_r.
-      eapply Union_Included.
-      + eapply Included_trans; [| now apply Hinc2 ]...
-      + eauto with Ensembles_DB.
-    - simpl. rewrite occurs_free_Eproj.
-      eapply Union_Included.
-      + eapply Included_trans; [| now apply Hinc2 ]...
-      + eauto with Ensembles_DB.
-  Qed.
 
   (* TODO : do this with autorewrites *)
   Ltac normalize_sets :=
@@ -76,6 +52,31 @@ Section Closure_conversion_util.
       | [ H : context[Setminus _ _ (Empty_set _)] |- _] =>
         rewrite Setminus_Empty_set_neut_r in H
     end.
+
+  Lemma project_var_occurs_free_ctx_Included Scope Funs σ c Γ FVs S x y C Q F e:
+    project_var clo_tag Scope Funs σ c Γ FVs S x y C Q ->
+    Included _ (occurs_free e) (Union _ F (Singleton _ y)) ->
+    Included _ (Union _ Scope
+                      (Union _ (image σ Funs) (Singleton _ Γ))) F ->
+    Included _ (occurs_free (C |[ e ]|)) F. 
+  Proof with now eauto with Ensembles_DB functions_BD. 
+    intros Hproj Hinc1 Hinc2. inv Hproj.
+    - simpl. eapply Included_trans. eassumption. 
+      apply Union_Included. now apply Included_refl.
+      eapply Included_trans; [| eassumption ].
+      eauto with Ensembles_DB.
+    - simpl.
+      rewrite occurs_free_Econstr, !FromList_cons, FromList_nil,
+      Union_Empty_set_neut_r.
+      eapply Union_Included.
+      + eapply Included_trans; [| now apply Hinc2 ]...
+      + eauto with Ensembles_DB.
+    - simpl. rewrite occurs_free_Eproj.
+      eapply Union_Included.
+      + eapply Included_trans; [| now apply Hinc2 ]...
+      + eauto with Ensembles_DB.
+  Qed.
+
   
   Lemma project_vars_occurs_free_ctx_Included Scope Funs σ c Γ
     FVs S xs xs' C S' F e:

@@ -65,13 +65,15 @@ Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
 
-Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program * Clight.program :=
+Definition compile_L7 (t : cTerm certiL6) : exception ( L5_to_L6.nEnv * Clight.program * Clight.program) :=
   (AstCommon.timePhase "L6 to L7") 
      (fun (_:Datatypes.unit) => (let '((_, cenv , nenv, fenv), (_, prog)) := t in
-     let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-                      prog cenv nenv in
-  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)))).
-
+     match  compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+                    prog cenv nenv with
+       | Ret p => 
+         Ret (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+       | Exc s => Exc s
+     end)).
 
 
 
@@ -89,11 +91,11 @@ end.
 
 Definition compile_template_L3 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL3_eta) :=
   translateTo (cTerm certiL3_eta) p.
-
+(*
  Quote Recursively Definition Qmap := (@map nat).
 
- Definition demo3 := Eval native_compute in (translateTo (cTerm certiL3_eta) Qmap).
-
+  Definition demo3 := Eval native_compute in (translateTo (cTerm certiL3_eta) Qmap).
+*)
  
 
 Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
@@ -153,9 +155,9 @@ Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)
 
 
   
- Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color). 
+ (* Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color). *)
 
- Print demo4.
+ 
  (* 
  Definition demo5 := Eval native_compute in (translateTo (cTerm certiL4_2) Demo1).
  Set Printing Depth 1000.

@@ -20,7 +20,7 @@ let rec coq_nat_of_int x =
   | 0 -> Datatypes.O
   | n -> Datatypes.S (coq_nat_of_int (pred n))
 
-
+(*
 let pcuic_size' a p =
   match p with
   | Coq_tRel n -> a+1
@@ -39,7 +39,7 @@ let pcuic_size' a p =
 | Coq_tProj of projection * term
 | Coq_tFix of term mfixpoint * nat
 | Coq_tCoFix of term mfixpoint * nat
-| _ -> "unimplemented"
+| _ -> "unimplemented" *)
                      
 let compile gr =
   let env = Global.env () in

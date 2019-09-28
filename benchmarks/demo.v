@@ -51,32 +51,21 @@ CertiCoq Compile Opt clos_opt.
    2. Projection out of the env every time clos is called. This does not show in this example,
       and maybe needs invariant argument optimization. 
 *)
-Definition clos_opt (u : unit) :=
-  (fix list_add y z w u k m n k1 k2 k3 k4 k5 l :=
-     match l with
-     | [] => []
-     | x::xs =>
-       let clos z := x + z + w + u + k + m + n + y + k1 + k2 + k3 + k4 + k5 in
-       (clos x) :: list_add y z w u k m n k1 k2 k3 k4 k5 xs
-     end) 1 2 3 4 3 2 1 2 3 4 5 6 (List.repeat 10 (100 * 100 * 50)).
+(* Definition clos_opt (u : unit) := *)
+(*   (fix list_add y z w u k m n k1 k2 k3 k4 k5 l := *)
+(*      match l with *)
+(*      | [] => [] *)
+(*      | x::xs => *)
+(*        let clos z := x + z + w + u + k + m + n + y + k1 + k2 + k3 + k4 + k5 in *)
+(*        (clos x) :: list_add y z w u k m n k1 k2 k3 k4 k5 xs *)
+(*      end) 1 2 3 4 3 2 1 2 3 4 5 6 (List.repeat 10 (100 * 100 * 50)). *)
 
-
-
-
-Fixpoint 
-
-
-
-- recursive closure
-
-
-
-  
-  (fun x y =>
 
 
 From CertiCoq.Benchmarks Require Import vs.
+
 Import VeriStar.
+
 Definition is_valid :=
   match main with
   | Valid => true

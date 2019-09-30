@@ -72,4 +72,13 @@ Definition is_valid :=
   | _ => false
   end.
 
+Definition is_valid_opt :=
+  match main with
+  | Valid => true
+  | _ => false
+  end.
+
+
 Time CertiCoq Compile is_valid. (* 5 secs ! *)
+
+Time CertiCoq Compile Opt is_valid_opt. (* 5 secs ! *)

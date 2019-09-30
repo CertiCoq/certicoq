@@ -79,11 +79,6 @@ Section UNCURRY.
   (* Maps (arrity+1) to the right fTag *)
   Definition arrityMap:Type := M.t fTag.
   Definition localMap:Type := M.t bool.
-
-
-  (* Name environment -- TODO: make these definitions common *)
-  Definition nEnv := M.t BasicAst.name.
-  Definition n_empty:nEnv := M.empty _.
   
   (* The state for this includes 
      1 - "next" var for gensyming a fresh variable
@@ -167,24 +162,6 @@ Section UNCURRY.
        end)
     end.
                       
-
-  (* name environment manipulation *)
-
-
-  Definition add_entry (nenv:nEnv) (x : var) (x_origin : var) (suff : String.string) : nEnv :=
-    match M.get x_origin nenv  with
-    | Some (BasicAst.nNamed s) => M.set x (BasicAst.nNamed (String.append s suff)) nenv
-    | Some BasicAst.nAnon => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
-    | None => nenv
-    end.
-  
-  Fixpoint add_entries (nenv:nEnv) (xs : list var) (xs_origin : list var) (suff : String.string) : nEnv :=
-    match xs, xs_origin with
-    | x::xs, x_origin::xs_origin =>
-      add_entries (add_entry nenv x x_origin suff) xs xs_origin suff
-    | _, _ => nenv
-    end.
-
 
   Definition register_name (new : var) (old : var) (suff : String.string) : uncurryM unit :=
     s <- get;;

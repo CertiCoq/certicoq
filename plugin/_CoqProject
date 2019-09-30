@@ -162,6 +162,7 @@ extraction/variables.ml
 extraction/identifiers.ml
 extraction/closure_conversion.ml
 extraction/lambda_lifting.ml
+extraction/dead_param_elim.ml
 extraction/l5_to_L6.ml
 extraction/l4_to_L4_1_to_L4_2.ml
 extraction/l4_2_to_L4_5.ml

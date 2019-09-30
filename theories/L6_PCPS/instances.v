@@ -9,7 +9,7 @@ Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
 From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion
-     hoisting Heap.dead_param_elim lambda_lifting.
+     hoisting dead_param_elim lambda_lifting.
 From CertiCoq.L7 Require Import L6_to_Clight.
 
 
@@ -113,7 +113,7 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
     match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
     | Some r =>         
       let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
-      let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+      let '(e, (d, s), fenv, nenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv nenv in   
       let e := inline_uncurry_contract e s 10 10 in  
       let e := shrink_cps.shrink_top e in
       let '(cenv',nenv', t') := closure_conversion_hoist
@@ -135,11 +135,11 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
     match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
     | Some r =>
       let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
-      let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+      let '(e, (d, s), fenv, nenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv nenv in   
       let e := inline_uncurry_contract e s 10 10 in  
       let e := shrink_cps.shrink_top e in
       (* Lambda Lifting *)
-      let e := lambda_lift e next_iTag in
+      let e := lambda_lift' e next_iTag in
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* closure conversion + hoisting *)
@@ -153,7 +153,8 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
-      let e := eliminate e in 
+      let e := dead_param_elim.eliminate e in
+      let e := shrink_cps.shrink_top e in
       Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
     | None => Exc "failed converting from L5 to L6"
     end

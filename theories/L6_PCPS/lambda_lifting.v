@@ -328,6 +328,124 @@ Definition lambda_lift (e : exp) ftag : exp :=
         state in
   e.
 
+
+(** Version without closure growth *)
+
+Inductive FunInfo' : Type := 
+(* A known function. The first argument is the name of the lambda lifted version,
+   the second the new fTag and the third and forth the are free variables of the
+   function as a list and as a set *)
+| Fun' : var -> fTag -> list var -> PS.t -> FunInfo'.
+
+(* Maps variables to [FunInfo] *)
+Definition FunInfoMap' := Maps.PTree.t FunInfo'.
+
+Fixpoint add_functions' (B : fundefs) (fvs : list var) (sfvs : PS.t) (m : FunInfoMap')
+: state FunInfoMap' :=
+  match B with
+    | Fcons f ft xs _ B =>
+      m' <- add_functions' B fvs sfvs m ;;
+      (* new name for lambda lifted definition - this function will always be known *)
+      f' <- get_name ;;
+      (* new fTag for lambda listed definition *)
+      ft' <- get_tag ;;
+      ret (M.set f (Fun' f' ft' fvs sfvs) m')
+    | Fnil => ret m
+  end.
+
+Fixpoint exp_lambda_lift' (e : exp) (curr_fvs: PS.t) (fvm : VarInfoMap) (fm : FunInfoMap') : state exp :=
+  match e with
+  | Econstr x t ys e => 
+    e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+    ret (Econstr x t (rename_lst fvm ys) e')
+  | Ecase x P =>
+    P' <-
+    (fix mapM_ll l :=
+       match l with
+         | [] => ret []
+         | (c, e) :: P =>
+           e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+           P' <- mapM_ll P ;;
+           ret ((c, e') :: P')
+       end) P ;;
+    ret (Ecase (rename fvm x) P')
+  | Eproj x t N y e =>
+    e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+    ret (Eproj x t N (rename fvm y) e')
+  | Efun B e =>
+    let sfvs := fundefs_fv B in 
+    let fvs := PS.elements sfvs in
+    fm' <- add_functions' B fvs sfvs fm ;;
+    B' <- fundefs_lambda_lift' B fvm fm' ;;
+    e' <- exp_lambda_lift' e curr_fvs fvm fm' ;;
+    ret (Efun B' e')
+  | Eapp f ft xs => 
+    match fm ! f with
+    | Some inf =>
+      match inf with
+      | Fun' f' ft' fvs sfvs =>
+        (* only call the known function if its free variables can be accessed *)
+        if PS.subset sfvs curr_fvs then 
+          ret (Eapp (rename fvm f') ft' (rename_lst fvm (xs ++ fvs)))
+        else ret (Eapp (rename fvm f) ft (rename_lst fvm xs))
+      end
+    | None =>
+      ret (Eapp (rename fvm f) ft (rename_lst fvm xs))
+    end
+  | Eprim x f ys e =>
+    e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+       ret (Eprim x f (rename_lst fvm ys) e')
+  | Ehalt x => ret (Ehalt (rename fvm x))
+  end
+with fundefs_lambda_lift' B fvm fm :=
+       match B with
+         | Fcons f ft xs e B => 
+           match fm ! f with
+             | Some inf =>
+               match inf with
+                 | Fun' f' ft' fvs sfvs =>
+                   p <- add_free_vars fvs fvm ;;
+                   let (ys, fvm') := p in
+                   xs' <- get_names (length xs) ;;
+                   e' <- exp_lambda_lift' e sfvs fvm' fm ;;
+                   B' <- fundefs_lambda_lift' B fvm fm ;;
+                   ret (Fcons f' ft' (xs ++ ys) e'
+                              (Fcons f ft xs'
+                                     (Eapp f' ft' (xs' ++ (rename_lst fvm fvs)))
+                                     B'))
+               end
+             | None => ret (Fcons f ft xs e B) (* should never match *)
+           end
+         | Fnil => ret Fnil
+       end.
+
+(* Example :
+
+   let f x =
+       let g y = x + y + z in
+       g 3 + x 
+
+   ==>
+
+   let f' x z' =
+       let g' y x' z'' = y + x' + z''
+       and g y = g y x z'
+       in g' 3 x z' + 3
+   and f x = f' x z
+
+ *)
+
+Definition lambda_lift' (e : exp) ftag : exp :=
+  let next := ((max_var e 1%positive) + 1)%positive in
+  let state := mkCont next ftag in
+  let '(e, s) :=
+      runState
+        (exp_lambda_lift' e PS.empty (Maps.PTree.empty VarInfo)
+                          (Maps.PTree.empty FunInfo'))
+        state in
+  e.
+
+
 (** * Relational Defintion *)
 
 Inductive Add_functions :

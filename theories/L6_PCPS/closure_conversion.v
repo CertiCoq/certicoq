@@ -246,7 +246,7 @@ Section CC.
 
   Record state_contents :=
     mkCont { next_var : var ; nect_cTag : cTag ; next_iTag : iTag; cenv : cEnv;
-             name_env : M.t BasicAst.name }.
+             name_env : nEnv }.
   
   (** The state is the next available free variable, cTag and iTag and the tag environment *)
   Definition ccstate :=
@@ -254,63 +254,30 @@ Section CC.
 
   Import MonadNotation.
 
-  (** Get a the name entry of a variable *)
-  Definition get_name_entry (x : var) : ccstate BasicAst.name :=
-    p <- get ;;
-    let '(mkCont n c i e names) := p in
-    match names ! x with
-      | Some name => ret name
-      | None => ret nAnon
-    end.
-
-  (** Set a the name entry of a variable *)
-  Definition set_name_entry (x : var) (name : BasicAst.name) : ccstate unit :=
-    p <- get ;;
-    let '(mkCont n c i e names) := p in
-    put (mkCont n c i e (M.set x name names)) ;;
-    ret tt.
-
-
-  (** Add name *)
-  Definition add_name (fresh : var) (name : string): ccstate unit :=
-    set_name_entry fresh (nNamed "env").
-
-  (** Add_name as suffix *)
-  Definition add_name_suff (fresh old : var) (suff : string) :=
-    oldn <- get_name_entry old ;;
-    match oldn with 
-      | nNamed s =>
-        set_name_entry fresh (nNamed (append s suff))
-      | nAnon =>
-        set_name_entry fresh (nNamed (append "anon" suff))
-    end.
-
-  (** Commonly used suffixes *)
-  Definition clo_env_suffix := "_env".
-  Definition clo_suffix := "_clo".
-  Definition code_suffix := "_code".
-  Definition proj_suffix := "_proj".
-
-
   (** Get a fresh name, and create a pretty name *)
   Definition get_name (old_var : var) (suff : string) : ccstate var :=
     p <- get ;;
-    let '(mkCont n c i e names) := p in
-    put (mkCont ((n+1)%positive) c i e names) ;;
-    add_name_suff n old_var suff ;;
+    let '(mkCont n c i e names) := p in  
+    let names' := add_entry names n old_var suff in  
+    put (mkCont ((n+1)%positive) c i e names') ;;
     ret n.
 
   (** Get a fresh name, and create a pretty name *)
   Definition get_name_no_suff (name : string) : ccstate var :=
     p <- get ;;
     let '(mkCont n c i e names) := p in
-    put (mkCont ((n+1)%positive) c i e names) ;;
-    add_name n name ;;
+    let names' := add_entry_str names n name in
+    put (mkCont ((n+1)%positive) c i e names') ;;
     ret n.
 
+  (** Commonly used suffixes *)
+  Definition clo_env_suffix := "_env".
+  Definition clo_suffix := "_clo".
+  Definition code_suffix := "_code".
+  Definition proj_suffix := "_proj".
   
   Definition make_record_cTag (n : N) : ccstate cTag :=
-    p <- get ;;
+    p <- get ;; 
     let '(mkCont x c i e names) := p  in
     let inf := (nAnon, nAnon,  i, n, 0%N) : cTyInfo in
     let e' := ((M.set c inf e) : cEnv) in
@@ -384,7 +351,7 @@ Section CC.
     match defs with
       | Fcons f typ xs e defs' =>
         (* The new name of the function *)
-        code_ptr <- get_name f code_suffix ;;
+        code_ptr <- get_name f "" ;;
         t <- make_full_closure defs' mapfv_new mapfv_old Γ ;;
         let '(mapfv_new', mapfv_old', g') := t in
         (* update the new map *)
@@ -400,9 +367,7 @@ Section CC.
       | Fnil => ret (mapfv_new, mapfv_old, id)
     end.
 
-
-
-
+  (** Closure conversion *)
   Fixpoint exp_closure_conv (e : exp) (mapfv : VarInfoMap)
            (c : cTag) (Γ : var) : ccstate (exp * (exp -> exp)) := 
     match e with
@@ -468,7 +433,7 @@ Section CC.
              (* Add arguments to the map *)
              let mapfv' := add_params ys mapfv in
              (* formal parameter for the environment pointer *)
-             Γ <- get_name f clo_env_suffix ;;
+             Γ <- get_name_no_suff "env" ;;
              ef <- exp_closure_conv e mapfv' c Γ ;;
              defs'' <- fundefs_closure_conv defs' mapfv c ;;
              (* find the new name of the function *)

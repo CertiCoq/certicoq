@@ -18,7 +18,7 @@ Require Import ExtLib.Core.RelDec.
 Require Import ExtLib.Data.Positive.
 Require Import Coq.Bool.Bool.
 Require Import identifiers.  (* for max_var *)
-Require Import L6.List_util.
+Require Import L6.List_util L6.cps_util.
 
 Open Scope monad_scope. 
 

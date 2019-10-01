@@ -3,88 +3,112 @@
 Require Import L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List.
 Import ListNotations.
-Require Import L6.shrink_cps.
+Require Import ExtLib.Structures.Monad.
+Require Import ExtLib.Structures.MonadState.
+Require Import ExtLib.Data.Monads.StateMonad.
+Require Import L6.shrink_cps L6.cps_util L6.cps_util.
 
-  Definition state:Type := (positive * list positive).  (* n <= hd l *)
+Open Scope monad_scope.
+Import MonadNotation.
 
-  
-Fixpoint get_next (curr:positive) (l:list positive) : (positive * positive * list positive) :=
-  match l with
-  | nil => (curr, Pos.succ curr, nil)
-  | hd::l' => 
-    if (Pos.eqb curr hd) then
-        get_next (Pos.succ curr) l'
-    else
-        (curr, Pos.succ curr, hd::l')
-  end.
+Definition freshM : Type -> Type := state (positive * nEnv).
 
-Fixpoint get_n_next (curr:positive) (l:list positive) (n:nat) : (list positive * positive * list positive ) :=
-  match n with
-  | 0 => ([], curr, l)
-  | S n' => let '(x, curr, l) := get_next curr l in
-            let '(xs, curr, l) := get_n_next curr l n' in
-            (x::xs, curr, l)
+
+Fixpoint get_next (old : var) : freshM var :=
+  s <- get ;;
+  let '(curr, names) := s in
+  let names' := add_entry names curr old "" in
+  _ <- put ((curr + 1)%positive, names');; ret curr.
+
+Fixpoint get_next_lst (old : list var) : freshM (list var) :=
+  match old with
+  | [] => ret []
+  | o :: os =>
+    x <- get_next o ;;
+    xs <- get_next_lst os ;;
+    ret (o :: os)
   end.
 
 
 (* TODO: move apply_r and apply_r_list to cps_util, and all_fun_name (and proofs) to identifiers *)
 (* after freshen_term e sigma curr l = e', curr', l', BV(e') are in interval [curr, curr'[ and disjoint from l *)
-Fixpoint freshen_term (e:exp) (sigma:M.t positive) (curr:positive) (l:list positive) : (exp * positive * list positive) :=
+
+
+Fixpoint freshen_term (e:exp) (sigma:M.t positive) : freshM exp :=
   match e with
-  | Econstr x t ys e => let '(x', curr, l) := get_next curr l in
-                        let ys' := apply_r_list sigma ys in
-                        let '(e', curr, l) := freshen_term e (M.set x x' sigma) curr l in 
-                        (Econstr x' t ys' e', curr, l)
+  | Econstr x t ys e =>
+    x' <- get_next x ;;
+    let ys' := apply_r_list sigma ys in
+    e' <- freshen_term e (M.set x x' sigma) ;; 
+    ret (Econstr x' t ys' e')
   | Ecase v cl =>
-    let '(cl', curr, l) :=
-        (fix alpha_list (br: list (cTag*exp)) (curr:positive) (l:list positive): (list (cTag*exp) * positive * list positive) :=
-           (match br with
-            | nil => (nil, curr, l)
-            | h::br' =>
-              (match h with
-               | (t, e) =>
-                 let '(e', curr, l) := freshen_term e sigma curr l in
-                 let '(br'', curr, l) := alpha_list br' curr l in
-                 ((t, e')::br'', curr, l)
-               end)
-            end)) cl curr l in
-    (Ecase (apply_r sigma v) cl', curr, l)    
-  | Eproj x t n y e => let '(x', curr, l) := get_next curr l in
-                       let y' := apply_r sigma y in
-                        let '(e', curr, l) := freshen_term e (M.set x x' sigma) curr l in
-                        (Eproj x' t n y' e', curr, l)
+    cl' <- (fix alpha_list (pats: list (cTag*exp)) : freshM (list (cTag*exp)) :=
+             match pats with
+             | nil => ret nil
+             | pat::pats =>
+               let '(t, e) := pat in
+               e' <- freshen_term e sigma ;;
+               pats' <- alpha_list pats ;;
+               ret ((t, e')::pats')
+             end) cl ;;
+     ret (Ecase (apply_r sigma v) cl')    
+  | Eproj x t n y e =>
+    x' <- get_next x ;;
+    let y' := apply_r sigma y in
+    e' <- freshen_term e (M.set x x' sigma) ;; 
+    ret (Eproj x' t n y' e')
   | Efun fds e =>
     let f_names := all_fun_name fds in
-    let '(f_names', curr, l) := get_n_next curr l (List.length f_names) in
-    let sigma' := set_list (combine f_names f_names') sigma in
-    let '(fds', curr, l) := freshen_fun fds sigma' curr l in
-    let '(e', curr, l) := freshen_term e sigma' curr l in
-    (Efun fds' e', curr, l)
-
+    f_names' <- get_next_lst f_names ;;
+    (match @setlist var f_names f_names' sigma with
+     | Some sigma' =>
+       fds' <- freshen_fun fds sigma' ;;
+       e' <- freshen_term e sigma' ;;
+       ret (Efun fds' e')
+     | None => (* unreachable *)
+       ret (Efun Fnil e)
+     end)
   | Eapp f t ys =>
     let f' := apply_r sigma f  in
     let ys' := apply_r_list sigma ys in    
-    (Eapp f' t ys', curr, l)
+    ret (Eapp f' t ys')
   | Eprim x t ys e =>
-    let '(x', curr, l) := get_next curr l in
+    x' <- get_next x ;;
     let ys' := apply_r_list sigma ys in
-    let '(e', curr, l) := freshen_term e (M.set x x' sigma) curr l in
-    (Eprim x' t ys' e', curr, l)
+    e' <- freshen_term e (M.set x x' sigma) ;; 
+    ret (Eprim x' t ys' e')
   | Ehalt x =>
     let x' := apply_r sigma x in
-    (Ehalt x', curr, l)
+    ret (Ehalt x')
   end
-with freshen_fun (fds:fundefs) (sigma:M.t positive) (curr:positive) (l:list positive) : (fundefs* positive * list positive) :=
+with freshen_fun (fds:fundefs) (sigma:M.t positive) : freshM fundefs :=
        match fds with
        | Fcons f t xs e fds =>
          let f' := apply_r sigma f in
-         let '(xs', curr, l) := get_n_next curr l (List.length xs) in
-         let sigma' := set_list (combine xs xs') sigma in
-         let '(e', curr, l) := freshen_term e sigma' curr l in
-         let '(fds', curr, l) := freshen_fun fds sigma curr l in
-         (Fcons f' t xs' e' fds', curr, l)
-       | Fnil => (Fnil, curr, l)
+         xs' <- get_next_lst xs ;;
+         (match @setlist var xs xs' sigma with
+          | Some sigma' =>
+            e' <- freshen_term e sigma' ;;
+            fds' <- freshen_fun fds sigma ;;
+            ret (Fcons f' t xs' e' fds')
+          | None => (* unreachable *)
+            ret Fnil
+          end)
+       | Fnil => ret Fnil
        end.
-         
 
+
+
+
+Definition freshen_subexp (e: exp) (next : var) (names: nEnv) : exp * var * nEnv :=
+  let st := (next, names) in
+  let '(e', (next', names')) := runState (freshen_term e (M.empty _)) (next, names) in
+  (e', next', names').
+
+
+Definition freshen_top (e: exp) (names: nEnv) : exp * nEnv :=
+  let next := ((identifiers.max_var e 1) + 1)%positive in
+  let st := (next, names) in
+  let '(e', (next', names')) := runState (freshen_term e (M.empty _)) (next, names) in
+  (e', names').
 

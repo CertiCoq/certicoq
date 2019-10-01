@@ -3,7 +3,7 @@ Require Export Common.certiClasses2.
 Require Export L1g.instances.
 Require Export L2k.instances.
 Require Export L4.instances.
-Require Export L6.instances.
+Require Export L6.instances L6.cps_util.
 (* Require Export L7.Clightexec. *)
 
 
@@ -63,7 +63,7 @@ Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
 
-Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.nEnv * Clight.program * Clight.program :=
+Definition compile_L7 (t : cTerm certiL6) : cps_util.nEnv * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
                    prog cenv nenv in
@@ -82,7 +82,7 @@ Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exce
   translateTo (cTerm certiL4) (Flag 0) p.
 
 Definition compile_template_L7 `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
-  : exception (L5_to_L6.nEnv * Clight.program * Clight.program)  :=
+  : exception (cps_util.nEnv * Clight.program * Clight.program)  :=
   compile_opt_L7 (translateTo (cTerm certiL6) (Flag opt_level) p).
 
 Open Scope positive_scope.
@@ -126,14 +126,12 @@ Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
 
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
- Quote Recursively Definition binom := Binom.main.    
+Quote Recursively Definition binom := Binom.main.    
 (* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
 Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)   
 
 
 
-
-  
  Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) graph_color). 
 
  Print demo4.

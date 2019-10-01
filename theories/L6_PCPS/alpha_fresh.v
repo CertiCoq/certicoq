@@ -111,4 +111,3 @@ Definition freshen_top (e: exp) (names: nEnv) : exp * nEnv :=
   let st := (next, names) in
   let '(e', (next', names')) := runState (freshen_term e (M.empty _)) (next, names) in
   (e', names').
-

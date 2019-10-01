@@ -114,16 +114,16 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
     | Some r =>         
       let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
       let '(e, (d, s), fenv, nenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv nenv in   
-      let e := inline_uncurry_contract e s 10 10 in  
+      let (e, nenv) := inline_uncurry_contract e s 10 10 nenv in  
       let e := shrink_cps.shrink_top e in
-      let '(cenv',nenv', t') := closure_conversion_hoist
+      let '(cenv',nenv, e) := closure_conversion_hoist
                                   bogus_cloTag
                                   e
                                   next_cTag
                                   next_iTag
                                   cenv nenv
       in
-      Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
+      Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv, M.empty _),  (M.empty _, (shrink_top e)))
     | None => Exc "failed converting from L5 to L6"
     end
   end.
@@ -136,14 +136,14 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
     | Some r =>
       let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
       let '(e, (d, s), fenv, nenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv nenv in   
-      let e := inline_uncurry_contract e s 10 10 in  
+      let (e, nenv) := inline_uncurry_contract e s 10 10 nenv in  
       let e := shrink_cps.shrink_top e in
       (* Lambda Lifting *)
       let (e, nenv) := lambda_lift' e next_iTag nenv in
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* closure conversion + hoisting *)
-      let '(cenv',nenv', t') := closure_conversion_hoist
+      let '(cenv',nenve, e) := closure_conversion_hoist
                                   bogus_cloTag
                                   e
                                   next_cTag
@@ -155,7 +155,7 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
       (* Dead parameter elimination *)
       let e := dead_param_elim.eliminate e in
       let e := shrink_cps.shrink_top e in
-      Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
+      Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv, M.empty _),  (M.empty _, (shrink_top e)))
     | None => Exc "failed converting from L5 to L6"
     end
   end.

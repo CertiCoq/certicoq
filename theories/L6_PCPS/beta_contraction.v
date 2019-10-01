@@ -41,45 +41,6 @@ Section Beta.
     | Fcons f t xs e fds => M.set f (t, xs, e) (add_fundefs fds fm)
     end.
 
-  Definition term_size_le: exp -> exp -> Prop :=
-    fun e1 e2 => (term_size e1 < term_size e2).
-
-  Theorem term_size_wf: well_founded term_size_le.
-  Proof.
-    apply well_founded_lt_compat with (f:= term_size).
-    intros. unfold term_size_le in *. auto.
-  Defined.
-
-  Definition term_size_lex :  nat * exp -> nat * exp -> Prop :=
-    fun p1 p2 =>
-      or (lt (fst p1) (fst p2)) (and (eq (fst p1) (fst p2)) (term_size_le (snd p1) (snd p2))).
-  
-  Theorem term_size_Pair_wf: well_founded (Coqlib.lex_ord lt term_size_le).
-  Proof.
-    apply Coqlib.wf_lex_ord; [apply lt_wf |apply term_size_wf].
-  Defined.
-
-  Lemma beta_contract_fds_1:
-    forall {f t xs e fdc' fds} , 
-      cps_util.subfds_or_eq (Fcons f t xs e fdc') fds ->
-      term_size e < funs_size fds.
-  Proof.
-    intros.
-    apply subfds_or_eq_size in H.
-    simpl in H; omega.
-  Defined.
-
-  Lemma beta_contract_fds_2:
-    forall {f t xs e fdc' fds}, 
-      cps_util.subfds_or_eq (Fcons f t xs e fdc') fds ->
-      cps_util.subfds_or_eq fdc' fds.
-  Proof.
-    intros. inversion H.
-    apply cps_util.subfds_rebase in H0. left. auto.
-    subst. left. constructor 2.
-  Defined.
-
-
   Fixpoint beta_contract_fds (fds:fundefs) (fcon: St -> exp -> freshM exp) (sig:r_map) (s:St) : freshM fundefs :=
     match fds with 
     | Fcons f t xs e fds' =>

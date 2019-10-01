@@ -26,7 +26,7 @@ Fixpoint get_next_lst (old : list var) : freshM (list var) :=
   | o :: os =>
     x <- get_next o ;;
     xs <- get_next_lst os ;;
-    ret (o :: os)
+    ret (x :: xs)
   end.
 
 
@@ -98,16 +98,26 @@ with freshen_fun (fds:fundefs) (sigma:M.t positive) : freshM fundefs :=
        end.
 
 
-
-
 Definition freshen_subexp (e: exp) (next : var) (names: nEnv) : exp * var * nEnv :=
   let st := (next, names) in
   let '(e', (next', names')) := runState (freshen_term e (M.empty _)) (next, names) in
   (e', next', names').
-
 
 Definition freshen_top (e: exp) (names: nEnv) : exp * nEnv :=
   let next := ((identifiers.max_var e 1) + 1)%positive in
   let st := (next, names) in
   let '(e', (next', names')) := runState (freshen_term e (M.empty _)) (next, names) in
   (e', names').
+
+
+(* Some unit tests *)
+Definition test :=
+  (Efun (Fcons 1 2 [3] (Ehalt 3) Fnil)
+  (Efun (Fcons 1 2 [3] (Ehalt 3) Fnil) (Ehalt 1)))%positive.
+
+Definition testf := Eval native_compute in (freshen_top test (M.empty _)).
+
+Definition test2 :=
+  (Econstr 1 2 [3; 4] (Econstr 1 2 [3; 4] (Ehalt 1)))%positive.
+
+Definition testf2 := Eval native_compute in (freshen_top test2 (M.empty _)).

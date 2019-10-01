@@ -4,7 +4,7 @@
 
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.List_util
         L6.functions L6.Ensembles_util.
-Require Import Coq.ZArith.Znumtheory.
+Require Import Coq.ZArith.Znumtheory Coq.Strings.String.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
@@ -109,9 +109,8 @@ Definition VarInfoMap := Maps.PTree.t VarInfo.
 (* Maps variables to [FunInfo] *)
 Definition FunInfoMap := Maps.PTree.t FunInfo.
 
-
 Record state_contents :=
-    mkCont { next_var : var ; next_fTag : fTag }.
+  mkSt { next_var : var ; next_fTag : fTag ; nenv : nEnv }.
 
 Definition state :=
   state state_contents.
@@ -119,8 +118,8 @@ Definition state :=
 (** Get a fresh name *)
 Definition get_name : state var :=
   p <- get ;;
-  let '(mkCont n f) := p in
-  put (mkCont ((n+1)%positive) f) ;;
+  let 'mkSt n f nenv := p in
+  put (mkSt ((n+1)%positive) f nenv) ;;
   ret n.
 
 (** Get a list of fresh names *)
@@ -136,8 +135,8 @@ Fixpoint get_names (n : nat) : state (list var) :=
 (** Get a fresh function tag *)
 Definition get_tag : state fTag :=
   p <- get ;;
-  let '(mkCont n f) := p in
-  put (mkCont n ((f+1)%positive)) ;;
+  let '(mkSt n f nenv) := p in
+  put (mkSt n ((f+1)%positive) nenv) ;;
   ret f.
 
 Definition rename (map : VarInfoMap) (x : var) : var :=
@@ -152,6 +151,23 @@ Definition rename (map : VarInfoMap) (x : var) : var :=
 Definition rename_lst (map : VarInfoMap) (xs : list var) : list var :=
   (* all list of variables in the AST are in an escaping positions *)
   List.map (rename map) xs.
+
+Definition register_name (new : var) (old : var) (suff : String.string) : state unit :=
+  s <- get;;
+  match s with
+  | mkSt n f nenv =>
+    let nenv' := add_entry nenv new old suff in
+    put (mkSt n f nenv')
+  end.
+
+Definition register_names (new : list var) (old : list var) (suff : String.string) : state unit :=
+  s <- get;;
+  match s with
+  | mkSt n f nenv =>
+    let nenv' := add_entries nenv new old suff in
+    put (mkSt n f nenv')
+  end.
+
 
 Fixpoint add_functions (B : fundefs) (fvs : list var) (m : FunInfoMap)
 : state FunInfoMap :=
@@ -292,6 +308,9 @@ with fundefs_lambda_lift B fvm fm :=
                    xs' <- get_names (length xs) ;;
                    e' <- exp_lambda_lift e fvm' fm ;;
                    B' <- fundefs_lambda_lift B fvm fm ;;
+                   _ <- register_name f' f "_lifted" ;;
+                   _ <- register_names xs' xs "" ;;
+                   _ <- register_names ys fvs "" ;;
                    ret (Fcons f' ft' (xs ++ ys) e'
                               (Fcons f ft xs'
                                      (Eapp f' ft' (xs' ++ (rename_lst fvm fvs)))
@@ -318,15 +337,15 @@ with fundefs_lambda_lift B fvm fm :=
 
  *)
 
-Definition lambda_lift (e : exp) ftag : exp :=
+Definition lambda_lift (e : exp) ftag nenv : exp * nEnv :=
   let next := ((max_var e 1%positive) + 1)%positive in
-  let state := mkCont next ftag in
-  let '(e, s) :=
+  let state := mkSt next ftag nenv in
+  let '(e, mkSt _ _ nenv) :=
       runState
         (exp_lambda_lift e (Maps.PTree.empty VarInfo)
                          (Maps.PTree.empty FunInfo))
         state in
-  e.
+  (e, nenv).
 
 
 (** Version without closure growth *)
@@ -409,6 +428,9 @@ with fundefs_lambda_lift' B fvm fm :=
                    xs' <- get_names (length xs) ;;
                    e' <- exp_lambda_lift' e sfvs fvm' fm ;;
                    B' <- fundefs_lambda_lift' B fvm fm ;;
+                   _ <- register_name f' f "_lifted" ;;
+                   _ <- register_names xs' xs "" ;;
+                   _ <- register_names ys fvs "" ;;
                    ret (Fcons f' ft' (xs ++ ys) e'
                               (Fcons f ft xs'
                                      (Eapp f' ft' (xs' ++ (rename_lst fvm fvs)))
@@ -435,15 +457,15 @@ with fundefs_lambda_lift' B fvm fm :=
 
  *)
 
-Definition lambda_lift' (e : exp) ftag : exp :=
+Definition lambda_lift' (e : exp) ftag nenv : exp * nEnv:=
   let next := ((max_var e 1%positive) + 1)%positive in
-  let state := mkCont next ftag in
-  let '(e, s) :=
+  let state := mkSt next ftag nenv in
+  let '(e, mkSt _ _ nenv) :=
       runState
         (exp_lambda_lift' e PS.empty (Maps.PTree.empty VarInfo)
                           (Maps.PTree.empty FunInfo'))
         state in
-  e.
+  (e, nenv).
 
 
 (** * Relational Defintion *)

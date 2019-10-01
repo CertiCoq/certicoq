@@ -25,8 +25,11 @@ Definition add_entry (nenv:nEnv) (x : var) (x_origin : var) (suff : String.strin
   match M.get x_origin nenv  with
   | Some (BasicAst.nNamed s) => M.set x (BasicAst.nNamed (String.append s suff)) nenv
   | Some BasicAst.nAnon => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
-  | None => nenv
+  | None => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
   end.
+
+Definition add_entry_str (nenv:nEnv) (x : var) (name : String.string) : nEnv :=
+  M.set x (BasicAst.nNamed name) nenv.
 
 Fixpoint add_entries (nenv:nEnv) (xs : list var) (xs_origin : list var) (suff : String.string) : nEnv :=
   match xs, xs_origin with

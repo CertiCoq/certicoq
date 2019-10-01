@@ -139,7 +139,7 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
       let e := inline_uncurry_contract e s 10 10 in  
       let e := shrink_cps.shrink_top e in
       (* Lambda Lifting *)
-      let e := lambda_lift' e next_iTag in
+      let (e, nenv) := lambda_lift' e next_iTag nenv in
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* closure conversion + hoisting *)

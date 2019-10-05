@@ -1,25 +1,30 @@
 (* Compile Binom, Color, Veristar, and SHA through Certicoq
 
-Time CertiCoq should only be used for T0 or T1 *)
+Time CertiCoq should only be used for T0 or T1 
+(Since T2 does *)
 From CertiCoq Require Import CertiCoq.
 (* Unset Template Cast Propositions. *)
 
 
 (* BINOM *)
 Require Import CertiCoq.Benchmarks.Binom.
-Time Extraction "bench_binom.ml" main.  
+(* Time Extraction "bench_binom.ml" main.   *)
 Time CertiCoq Compile main.
 
-(* VS*)
-Require Import CertiCoq.Benchmarks.vs.
-Time Extraction "bench_vs.ml" main_h.  
-Time CertiCoq Compile main_h. 
 
 (* Color *)
 Require Import CertiCoq.Benchmarks.Color.
-Time Extraction "bench_color.ml" main.  
+(* Time Extraction "bench_color.ml" main.  *)
 Time CertiCoq Compile main.
- 
+
+
+(* VS*)
+Require Import CertiCoq.Benchmarks.vs.
+(* Time Extraction "bench_vs.ml" main_h.  *)
+Time CertiCoq Compile main_h. 
+
+
+
 (* SHA256 *)
 Require Import CertiCoq.Benchmarks.sha256.
 Require Import String.
@@ -35,6 +40,7 @@ Definition test200 := "The Secure Hash Algorithm is a family of cryptographic ha
  
 
 Definition benchsha := compute_sha test200.
-Time Extraction "bench_sha.ml" benchsha.  
+
+(*  Time Extraction "bench_sha.ml" benchsha. *)  
 Time CertiCoq Compile benchsha.
 

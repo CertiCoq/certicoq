@@ -1465,6 +1465,11 @@ Definition make_call_n_export_b (nenv:M.t BasicAst.name) (n:nat) (export:bool) (
 Definition tinf_def:globdef Clight.fundef type :=
   Gvar (mkglobvar threadInf ((Init_space 4%Z)::nil) false false).
 
+
+Definition make_empty_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t BasicAst.name):  nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
+    ret (Some (nenv, nil)).
+
+
 Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t BasicAst.name):  nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
   l <- make_interface cenv (M.elements ienv) nenv;;
     let (nenv, inter_l) := l in
@@ -1503,7 +1508,8 @@ Definition compile (e : exp) (cenv : cEnv) (nenv : M.t BasicAst.name) :
        let '(nenv, defs) := p in
        let nenv := (add_inf_vars (ensure_unique nenv)) in 
        let forward_defs := make_extern_decls nenv defs false in
-       let header_pre := make_header cenv ienv e nenv in
+       (* replace this by make_header to generate interface for datatypes *)
+       let header_pre := make_empty_header cenv ienv e nenv in 
        (*     let header_p := (header_pre.(runState) m%positive) in *)
        let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
        (match fst header_p with

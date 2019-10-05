@@ -243,7 +243,12 @@ Section UNCURRY.
            match fvs, fe with
            | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
                            (Eapp fk' fk_ft (g'::nil)) =>
-             ge' <- uncurry_exp ge ;;
+             (* ge' <- uncurry_exp ge ;; *)
+             (* Zoe : Nested carried arguments should be handled one-at-a-time,
+                      so that functions with > 2 arguments get uncurried properly.
+                      Therefore the body of g will be uncurried at the next iteration
+                      of the transformation.
+              *)
              g_unc <- (already_uncurried g) ;;
              if eq_var fk fk' && eq_var g g' &&
                         negb (occurs_in_exp g ge) &&
@@ -267,10 +272,11 @@ Section UNCURRY.
                           (* Note: tag given for arrity |fvs| + |gvs|  *)
                           (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
                                 (Eapp fk fk_ft (g::nil)))
-                          (Fcons f' fp_ft (gvs ++ fvs) ge' fds1'))
+                          (Fcons f' fp_ft (gvs ++ fvs) ge fds1'))
              else
+               ge' <- uncurry_exp ge ;;
                ret (Fcons f f_ft (fk::fvs) (Efun (Fcons g gt gvs ge' Fnil)
-                                               (Eapp fk' fk_ft (g'::nil))) fds1')
+                                                 (Eapp fk' fk_ft (g'::nil))) fds1')
            | _, _ => 
              fe' <- uncurry_exp fe ;;
                  ret (Fcons f f_ft fvs fe' fds1')

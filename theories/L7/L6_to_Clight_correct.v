@@ -307,7 +307,7 @@ Proof.
   eapply t_trans; eauto.
 Qed.
 
-Theorem dsubterm_case:
+Theorem dsubterm_case_cons:
   forall v l e',
     dsubterm_e e' (Ecase v l) -> 
   forall a, dsubterm_e e' (Ecase v (a:: l)).
@@ -325,7 +325,7 @@ forall v l e',
 Proof.  
   intros. remember (Ecase v l) as y. revert dependent v. revert l. induction H.
   - intros. subst. constructor.
-    eapply dsubterm_case; eauto.
+    eapply dsubterm_case_cons; eauto.
   - intros. apply IHclos_trans2 in Heqy.
     eapply t_trans. apply H. eauto.
 Qed.
@@ -1019,7 +1019,7 @@ Proof.
   induction vs1; intros.
   - simpl in H1; subst. simpl in H0. inv H. auto.
   -   simpl in H1. inv H.
-      rewrite <- app_assoc. eapply IHvs1. apply H6. Focus 2. reflexivity.
+      rewrite <- app_assoc. eapply IHvs1. apply H6. 2: reflexivity.
       simpl.
       simpl length in H0. rewrite Nat2Z.inj_succ in H0.
       econstructor; eauto.
@@ -1530,16 +1530,16 @@ Proof.
     rewrite IHc.
     rewrite pos_iter_xO.
     rewrite pos_iter_xO.
-    Focus 2. intros. apply H.
+    2:{ intros. apply H.
     rewrite Pos2Z.inj_xO.
     assert (0 < Z.pos c)%Z by apply Pos2Z.is_pos.
-    omega.     
+    omega. }
     rewrite IHc. reflexivity.
     intros.
     assert (Hrw := Z.shiftr_spec).
     specialize (Hrw a (Z.pos c)). unfold Z.shiftr in Hrw.
     simpl in Hrw.  rewrite Hrw. 
-    Focus 2. destruct H0. auto.
+    2:{ destruct H0. auto. }
     apply H.
     rewrite Pos2Z.inj_xO. omega.
   - repeat (rewrite pos_iter_xH).
@@ -1571,8 +1571,8 @@ Proof.
   destruct c.
   (* impossible cases *)
   inv H0.
-  Focus 2. exfalso.
-  assert (Hneg:= Pos2Z.neg_is_neg p0). omega.
+  2:{ exfalso.
+  assert (Hneg:= Pos2Z.neg_is_neg p0). omega. }
   rewrite shiftr_testbit_decompose.
   rewrite Z.shiftr_shiftl_l.
   rewrite Z.sub_diag. simpl.
@@ -2510,9 +2510,9 @@ Proof.
     apply Ptrofs.eqm_refl.
     eapply Ptrofs.eqm_trans.
     apply Ptrofs.eqm_unsigned_repr_l.
-    Focus 2.    
+    2:{
     apply Ptrofs.eqm_unsigned_repr_r.
-    apply Ptrofs.eqm_refl.
+    apply Ptrofs.eqm_refl. }
     rewrite Z.add_comm.
     rewrite N2Z.inj_pred by (unfold N.lt; auto).
     int_red.
@@ -2524,7 +2524,7 @@ Proof.
     apply Ptrofs.eqm_unsigned_repr_l.
     apply Ptrofs.eqm_refl. 
     eapply Ptrofs.eqm_trans.
-    Focus 2.
+    2:{
     apply Ptrofs.eqm_add.
     apply Ptrofs.eqm_unsigned_repr_r.
     apply Ptrofs.eqm_mult.
@@ -2533,7 +2533,7 @@ Proof.
     apply Ptrofs.eqm_unsigned_repr_r.
     apply Ptrofs.eqm_refl.
     apply Ptrofs.eqm_unsigned_repr_r.
-    apply Ptrofs.eqm_refl.
+    apply Ptrofs.eqm_refl. }
     rewrite Z.mul_pred_l.
     apply Ptrofs.eqm_refl2. omega.
 Qed.
@@ -3664,11 +3664,11 @@ Proof with archi_red.
        inv H8.
        exists m2.
        split.
-       Focus 2.
-       constructor. rewrite Ptrofs.repr_unsigned. auto.
+       2:{
+       constructor. rewrite Ptrofs.repr_unsigned. auto. }
        inv H0.
        * inv H4. 
-         Focus 2. exfalso. rewrite H1 in H0. inv H0.
+         2:{ exfalso. rewrite H1 in H0. inv H0. }
          
          rewrite H1 in H0; inv H0.
          constructor.
@@ -3682,13 +3682,13 @@ Proof with archi_red.
          archi_red. constructor.
          econstructor.  apply eval_Evar_global.  apply M.gempty.
          apply H1. constructor. constructor. constructor.
-         eapply assign_loc_value. Focus 2.
+         eapply assign_loc_value.
 
-         unfold Ptrofs.of_int64.
+         2:{ unfold Ptrofs.of_int64.
          rewrite Int64.unsigned_repr in *.
          rewrite int_z_mul. archi_red. apply Hsm2.
          solve_uint_range. archi_red. unfold Int64.max_unsigned. simpl; omega. 
-         archi_red. auto.
+         archi_red. auto. }
          archi_red. 
          constructor. }
          {
@@ -3699,15 +3699,15 @@ Proof with archi_red.
          archi_red. constructor.
          econstructor.  apply eval_Evar_global.  apply M.gempty.
          apply H1. constructor. constructor. constructor.
-         eapply assign_loc_value. Focus 2.
+         eapply assign_loc_value.
 
          
-         unfold ptrofs_of_int.  unfold Ptrofs.of_intu.
+         2:{ unfold ptrofs_of_int.  unfold Ptrofs.of_intu.
          unfold Ptrofs.of_int.
          rewrite Int.unsigned_repr in *.
          rewrite int_z_mul. archi_red. apply Hsm2.
          solve_uint_range. archi_red. solve_uint_range. omega. 
-         archi_red. auto.
+         archi_red. auto. }
          archi_red. 
          constructor.
          }
@@ -3721,11 +3721,11 @@ Proof with archi_red.
            econstructor. apply Hxlenv. constructor.
            constructor. constructor. constructor. apply H2.
            simpl. destruct y; inv H3; auto.
-           eapply assign_loc_value. Focus 2.  unfold Ptrofs.of_int64.
+           eapply assign_loc_value. 2:{  unfold Ptrofs.of_int64.
            rewrite Int64.unsigned_repr in *.
            rewrite int_z_mul. archi_red. eauto. solve_uint_range.
            archi_red. unfold Int64.max_unsigned. simpl; omega.
-           archi_red. auto. auto. 
+           archi_red. auto. auto. } 
            constructor. }
          {
            eapply step_assign with (v2 := y) (v := y). 
@@ -3734,24 +3734,24 @@ Proof with archi_red.
            constructor. constructor. constructor. apply H2.
            simpl.  destruct y; inversion H3; auto. simpl in H3. rewrite H3 in Harchi; inv Harchi.
            unfold sem_cast. simpl. rewrite Harchi. constructor.
-           eapply assign_loc_value. Focus 2.
-           unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
+           eapply assign_loc_value.
+           2:{ unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
            rewrite Int.unsigned_repr. 
            rewrite int_z_mul. eauto. solve_uint_range.
            archi_red. solve_uint_range. omega.
            archi_red. auto.
-           solve_uint_range.
+           solve_uint_range. }
            constructor. }
          
      +  (* IH *)
        inv H9.
        eapply IHl with (m := m2) in H5; eauto. destruct H5 as [m3 [H5a H5b]]. exists m3.       
-       split. Focus 2.
-       econstructor. rewrite Ptrofs.repr_unsigned. apply Hsm2. apply H5b.
+       split.
+       2:{ econstructor. rewrite Ptrofs.repr_unsigned. apply Hsm2. apply H5b. }
 
        inv H0.
        * inv H4.
-         Focus 2. exfalso; rewrite H1 in H0; inv H0.
+         2:{ exfalso; rewrite H1 in H0; inv H0. }
          rewrite H1 in H0; inv H0.
          eapply t_trans.
          econstructor.  constructor.
@@ -3793,12 +3793,12 @@ Proof with archi_red.
          constructor. econstructor. econstructor. constructor. eauto. constructor.
          constructor. constructor. econstructor. auto. simpl.
          destruct y; inv H3; auto.
-         eapply assign_loc_value. Focus 2.
-          unfold Ptrofs.of_int64.
+         eapply assign_loc_value.
+         2:{ unfold Ptrofs.of_int64.
            rewrite Int64.unsigned_repr in *.
 
            rewrite int_z_mul. apply Hsm2. solve_uint_range.  archi_red; eauto.
-           unfold Int64.max_unsigned; simpl; omega. archi_red; auto. auto.
+           unfold Int64.max_unsigned; simpl; omega. archi_red; auto. auto. }
            constructor.
          eapply t_trans. constructor. constructor.
          apply H5a. }
@@ -3812,11 +3812,11 @@ Proof with archi_red.
          constructor. constructor.  auto. simpl.
          destruct y; inversion H3; auto. simpl in H3. rewrite H3 in Harchi; inv Harchi.
          unfold sem_cast. simpl. archi_red. constructor.
-         eapply assign_loc_value. Focus 2.
-         unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
+         eapply assign_loc_value.
+         2:{ unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
          rewrite Int.unsigned_repr. 
          rewrite int_z_mul. apply Hsm2. solve_uint_range.  archi_red. solve_uint_range.
-         omega. archi_red. auto. auto.
+         omega. archi_red. auto. auto. }
          constructor.
          eapply t_trans. constructor. constructor.
          apply H5a. } 
@@ -4362,7 +4362,7 @@ Proof.
   - inv H0.
     + eapply Mem.store_valid_access_1; eauto.
     + eapply IHvs.   
-      Focus 2. apply H9.
+      2: apply H9.
       eapply Mem.store_valid_access_1; eauto.
 Qed.      
       
@@ -4377,7 +4377,7 @@ Proof.
   - inv H0.
   -   inv H0.
       + eapply correct_tinfo_after_store; eauto. 
-      + eapply IHvs. Focus 2. apply H9.
+      + eapply IHvs. 2:{ apply H9. }
         eapply correct_tinfo_after_store; eauto.
 Qed.         
 
@@ -4975,8 +4975,8 @@ Proof.
   - (* is-case *)
     inv H2. inv H3.
     (* remove impossible boxed cases *)
-    Focus 3.  rewrite H10 in H. inv H.
-    Focus 3. rewrite H10 in H. inv H.
+    3:{   rewrite H10 in H. inv H. }
+    3:{  rewrite H10 in H. inv H. }
     + (* default *)
       simpl. exists s, Sskip.
       split. reflexivity.
@@ -6197,8 +6197,9 @@ Inductive proper_cTyInfo: cTyInfo -> Prop :=
  
 (* cenv is proper if cTyInfo is proper, and that there is a unique (ty, ord) pair for each constructors  *)
 
+
 Definition proper_cenv (cenv:cEnv):=
-  forall {c name it a ord},
+  forall c name it a ord,
     M.get c cenv = Some (name, it, a, ord) ->
     proper_cTyInfo (name, it, a, ord) /\
       ~ (exists c' name' a', c <> c' /\
@@ -6831,7 +6832,7 @@ Proof.
             
             inv Hrel_m.  destruct H4.
             eapply exists_getvar_or_funvar_list.
-            Focus 2. eauto.
+            2:{  eauto. }
             intros.
             apply H5. constructor. auto.
           } 
@@ -7090,7 +7091,7 @@ Proof.
                 split. chunk_red; omega.
                 rewrite <- Z.le_add_le_sub_l in H12.    
                 etransitivity. etransitivity.
-                Focus 2. apply H12.
+                2: apply H12.
                 rewrite Nat2Z.inj_succ.
                 rewrite Z.mul_succ_r.
                 assert (0 <= Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range.                
@@ -7176,7 +7177,7 @@ Proof.
           - intros. destruct (var_dec x0 x).
                  + (* x0 = x *)
                    subst. split.
-                   Focus 2.
+                   2:{ 
                      intros. rewrite M.gss in H4. inv H4.
                      apply subval_or_eq_fun in H5. destruct H5. destruct H4.
                      assert (Hy0x0 := getlist_In_val _ _ _ _ H H5).
@@ -7187,9 +7188,8 @@ Proof.
                      destruct Hrel_mL' as [Hrel_mL' [Hrel_closed Hrel_f]]. split.
                      eapply repr_val_id_L_sub_locProp.
                      eapply repr_val_id_L_unchanged.                     
-                     Focus 2. eauto.
-                     Focus 2. 
-                     intro. intro. intro. apply bind_n_after_ptr_def. left; auto.
+                     2: eauto.
+                     2:{ intro. intro. intro. apply bind_n_after_ptr_def. left; auto. }
                      apply repr_val_id_set. apply repr_val_id_set.
                      auto.
                      (* unique binding env should take care of this one? ...also since function not bound, but Hrel_mL'...*)
@@ -7217,7 +7217,7 @@ Proof.
                      eapply correct_fundefs_unchanged_global with (m := m).
                      apply Hrel_f.
                      auto.
-                     auto.
+                     auto. }
                      
                    intros. eexists. split.
                    rewrite M.gss. reflexivity.
@@ -7312,7 +7312,7 @@ Proof.
 
                     
                   rewrite repr_val_ptr_list_Z.
-                  Focus 2.
+                  2:{ 
                   rewrite H_alloc4. 
                     unfold int_size in *; simpl size_chunk in *.
                     inv Hc_alloc.
@@ -7351,7 +7351,7 @@ Proof.
                     apply Z.add_le_mono; [ | omega];
                     apply Z.add_le_mono; [ | omega];
                     rewrite <- Z.add_0_l at 1;
-                    apply Z.add_le_mono_r; chunk_red; omega.
+                    apply Z.add_le_mono_r; chunk_red; omega. }
                     
                     (* done *)
 
@@ -7418,7 +7418,7 @@ Proof.
                   assert (Hll' := bind_n_after_ptr_exists  (length vs2) alloc_b (Ptrofs.unsigned alloc_ofs + int_size + int_size * Z.of_nat (length vs1)) L). 
                   destruct Hll' as [L' [H_ll' H_eql']].
                   eapply  repr_val_ptr_list_L_Z_sub_locProp with (L := L'); auto.
-                  Focus 2.                  
+                  2:{                   
                   intro. intro. intro. apply bind_n_after_ptr_def.
                   rewrite <- H_eql' in H6.
                   apply bind_n_after_ptr_def in H6.
@@ -7428,7 +7428,7 @@ Proof.
                   rewrite N2Z.inj_add.
                   replace (Z.of_N a) with (Z.of_nat (length ys)) by omega.
                   replace (length ys) with (length vs2). int_red. simpl in H8. simpl Z.of_N. chunk_red; omega.
-                  apply Forall2_length' in Hvs7. auto.
+                  apply Forall2_length' in Hvs7. auto. }
 
                   (* current locprop, from L + 1 to L + 1 + length vs *)
                   assert (H_ll'':= bind_n_after_ptr_exists' (length vs1) alloc_b  (Ptrofs.unsigned alloc_ofs + int_size) L).
@@ -7474,11 +7474,11 @@ Proof.
                   
                   rewrite get_var_or_funvar_list_correct in Hvs7. rewrite <- get_var_or_funvar_list_set in Hvs7.
                   rewrite <- get_var_or_funvar_list_set in Hvs7.
-                  Focus 2. intro.
+                  2:{  intro.
                   assert (Hxrho := getlist_In _ _ _ _ H H6).
                   destruct Hxrho as [vv Hxrho].
-                  eapply Hrho_id; eauto.
-                  Focus 2. intro.
+                  eapply Hrho_id; eauto. }
+                  2:{  intro.
                   inv Hp_id.
                   
                   eapply getlist_In in H; eauto. 
@@ -7486,7 +7486,7 @@ Proof.
                   eapply H8. apply H.
                   right. 
                   left. reflexivity.
-                  left. reflexivity.
+                  left. reflexivity. }
                   rewrite <- get_var_or_funvar_list_correct in Hvs7. 
                     
                   clear Hrel_mL.
@@ -7530,8 +7530,8 @@ Proof.
                     inv H8. rewrite H9 in H1; inv H1.
                     - (* fun *)
                       eapply repr_val_L_sub_locProp.
-                      Focus 2. intro.  intros. eapply bind_n_after_ptr_from_rev in H_ll'. rewrite <- H_ll'.
-                      apply bind_n_after_ptr_def. left. apply H1.
+                      2:{  intro.  intros. eapply bind_n_after_ptr_from_rev in H_ll'. rewrite <- H_ll'.
+                      apply bind_n_after_ptr_def. left. apply H1. }
                       eapply repr_val_L_unchanged; eauto.
                     - (* constr *)
                       rewrite load_ptr_or_int.
@@ -7539,8 +7539,8 @@ Proof.
                       rewrite H9 in H1; inv H1.
                     - 
                       eapply repr_val_L_sub_locProp.
-                      Focus 2. intro.  intros. eapply bind_n_after_ptr_from_rev in H_ll'. rewrite <- H_ll'.
-                      apply bind_n_after_ptr_def. left. apply H1.
+                      2:{ intro.  intros. eapply bind_n_after_ptr_from_rev in H_ll'. rewrite <- H_ll'.
+                      apply bind_n_after_ptr_def. left. apply H1. }
                       eapply repr_val_L_unchanged; eauto.
                       rewrite load_ptr_or_int by auto.
                       inv H8. rewrite H1 in H9. inv H9.                      
@@ -7694,7 +7694,7 @@ Forall2
           destruct Hstep_m3.          
           eapply correct_tinfo_after_nstore.
           
-          Focus 2. eauto.
+          2: eauto.
           
           eapply correct_tinfo_after_store; eauto.
           inv Hc_alloc.
@@ -7707,7 +7707,7 @@ Forall2
           {
             inv Hp_id.
             intro; subst; eapply H5.
-            Focus 2. constructor.
+            2: constructor.
             inList.
           }
           (* alloc is moved to an OK location *)
@@ -7950,7 +7950,7 @@ Forall2
             { inv Hp_id.
               intro; subst.
               eapply H5.
-              Focus 2. constructor.
+              2: constructor.
               inList.
             }
             intro.
@@ -7982,12 +7982,12 @@ Forall2
           destruct Hrepr_m as [Hrepr_m Hrepr_m'].
           destruct (var_dec x0 x).
           * subst.
-            split. Focus 2. 
-              intros. rewrite M.gss in H2. inv H2.
+            split. 
+              2:{ intros. rewrite M.gss in H2. inv H2.
               apply subval_or_eq_fun in H3. destruct H3. destruct H2.
               assert (Hy0x0 := getlist_In_val _ _ _ _ H H3).
               destruct Hy0x0 as [y0 [Hy0 Hy0']].
-              inv Hy0.
+              inv Hy0. }
             
               
             intro. 
@@ -8013,7 +8013,7 @@ Forall2
             intros. rewrite M.gso in H2 by auto.
             eapply Hrepr_m' in H2; eauto.
             destruct H2 as [H2 Hrepr_f].
-            split. Focus 2. auto.
+            split. 2: auto.
             apply repr_val_id_set; auto.
             intro; subst.
             inv Hf_id.
@@ -8036,7 +8036,7 @@ Forall2
           { inv Hp_id.
             intro; subst.
             eapply H3.
-            Focus 2. constructor.
+            2: constructor.
             inList.
           }
 
@@ -8054,9 +8054,9 @@ Forall2
       eauto.
       - inv Hc_env.
         destructAll.
-        apply Forall_constructors_in_constr in H2. destruct (M.get t cenv) eqn:Mtcenv. Focus 2. inv H2. destruct c0. destruct p. destruct p0. destruct p.
+        apply Forall_constructors_in_constr in H2. destruct (M.get t cenv) eqn:Mtcenv. 2: inv H2. destruct c0. destruct p. destruct p0. destruct p.
         econstructor; eauto.        
-        Focus 2. apply getlist_length_eq in H. subst. auto.
+        2:{ apply getlist_length_eq in H. subst. auto. }
         apply Forall_forall. intros.
         assert (Hgiv := getlist_In_val _ _ _ _ H H4).
         destruct Hgiv. destruct H5.
@@ -8253,7 +8253,7 @@ Forall2
             apply nthN_In in H0.
             specialize (Hmem y). destruct Hmem as [Hmem Hmem'].
             specialize (Hmem' _ _ _ _ Hyv6 (subval_or_eq_constr _ _ _ _ H3 H0)). 
-            destruct Hmem' as [Hmem' Hmem_f]. split. Focus 2. auto.
+            destruct Hmem' as [Hmem' Hmem_f]. split. 2: auto.
             apply repr_val_id_set. auto.
             intro. subst.
             inv Hf_id.
@@ -8275,7 +8275,7 @@ Forall2
             rewrite M.gso; auto.
           * intros. specialize (Hmem' _ _ _ _ H2 H3).
             destruct Hmem' as [Hmem' Hmem_f].
-            split. Focus 2. auto.
+            split. 2: auto.
             apply repr_val_id_set. auto.
             inv Hmem'. intro.  inv Hf_id. specialize (H10 x).
             assert ( bound_var (Eproj x t n y e) x) by constructor. apply H10 in H9. 
@@ -8292,7 +8292,7 @@ Forall2
     {
       inv Hp_id.
       intro. eapply H10.
-      Focus 2. subst. constructor.
+      2:{ subst. constructor. }
       inList.
     }
     specialize (IHHev H2 H3 H9).
@@ -8529,14 +8529,14 @@ Forall2
         destruct Hmem_rel' as [Hmem_rel' Hmem_f].
         split. 2: auto.
         apply repr_val_id_set. auto.
-        intro. inv Hp_id. eapply H22. apply H19. Focus 2. right.
+        intro. inv Hp_id. eapply H22. apply H19. 2:{ right.
         eapply bound_var_subval; eauto.
         inv Hmem_rel'.
         inv H31.
         constructor.
         apply name_in_fundefs_bound_var_fundefs.
         eapply find_def_name_in_fundefs. eauto.
-        inv H25. rewrite H32 in H21. inv H21.
+        inv H25. rewrite H32 in H21. inv H21. }
         inList.
         
     }
@@ -9142,11 +9142,11 @@ Forall2
              
             rewrite Ptrofs.signed_repr with (z := int_size%Z) in H12.
             rewrite Ptrofs.signed_repr in H12.
-            Focus 2. split.
+            2:{ split.
             rewrite <- Z.le_add_le_sub_l. etransitivity. 2: eauto.
             unfold Ptrofs.min_signed.  
             inv Hc_alloc.    unfold Ptrofs.half_modulus. unfold Ptrofs.modulus. simpl. unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. 
-            etransitivity; eauto. unfold gc_size; unfold Ptrofs.max_signed. unfold Ptrofs.half_modulus. unfold Ptrofs.modulus.  unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega.  
+            etransitivity; eauto. unfold gc_size; unfold Ptrofs.max_signed. unfold Ptrofs.half_modulus. unfold Ptrofs.modulus.  unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. } 
             2:unfold Ptrofs.min_signed; unfold Ptrofs.max_signed; unfold Ptrofs.half_modulus;  unfold Ptrofs.modulus;  unfold Ptrofs.wordsize; unfold Wordsize_Ptrofs.wordsize; chunk_red; archi_red; simpl; omega. 
             rewrite Ptrofs.unsigned_repr in H12. 
             rewrite Ptrofs.unsigned_repr in H12.
@@ -10018,7 +10018,7 @@ solve_nodup. solve_nodup.
         rewrite Ptrofs.mul_one in Hm2.
         eapply Mem.load_store_same in Hm2. simpl in Hm2. destruct v7; inv H3; auto.
         rewrite H in Hxrho. inv Hxrho.
-        eapply repr_val_L_unchanged; eauto.       
+        eapply repr_val_L_unchanged; eauto.        
             Qed.
 
 

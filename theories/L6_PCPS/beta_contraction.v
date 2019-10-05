@@ -1,11 +1,11 @@
 (* Generic beta-contraction phase for (stateful) heuristics based on function definitions and call sites, with bounded inlining depth
    *)
 Require Import L6.cps.
-Require Import Coq.ZArith.ZArith Coq.Lists.List.
+Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Import ListNotations.
 Require Import identifiers.
 Require Import L6.shrink_cps L6.alpha_fresh
-        L6.size_cps L6.cps_util.
+        L6.size_cps L6.cps_util L6.cps_show.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
@@ -19,18 +19,21 @@ Record InlineHeuristic (St:Type) :=
     update_inFun:(var -> tag -> list var -> exp -> r_map -> St -> St); (* update inlining decisions when converting a function within a bundle *)
     update_App:(var -> tag -> list var -> St -> (St*bool)) (* update and return inlining decision for f on function application *) }.
 
+
+Definition fun_map := M.t (tag * list var * exp).
+
+Definition freshen_exp (e:exp) : freshM exp  :=
+  freshen_term e (M.empty _).
+
   
 Section Beta.
 
   Import MonadNotation.
   Open Scope monad_scope.
   
-  Definition fun_map := M.t (tag * list var * exp).
-  
-  Definition freshen_exp (e:exp) : freshM exp  :=
-    freshen_term e (M.empty _).
   
   Variable St:Type.
+  Variable (pp_St : St -> nEnv -> string).
   Variable IH : InlineHeuristic St.
 
   
@@ -41,17 +44,20 @@ Section Beta.
     | Fcons f t xs e fds => M.set f (t, xs, e) (add_fundefs fds fm)
     end.
 
-  Fixpoint beta_contract_fds (fds:fundefs) (fcon: St -> exp -> freshM exp) (sig:r_map) (s:St) : freshM fundefs :=
-    match fds with 
-    | Fcons f t xs e fds' =>
-      let s' := update_inFun _ IH f t xs e sig s in (* ??? *)
-      e' <- fcon s' e ;;
-      fds'' <- beta_contract_fds fds' fcon sig s ;;
-      ret (Fcons f t xs e' fds'')
-    | Fnil => ret Fnil
-    end.
+  Definition get_nenv (_ : unit) : freshM nEnv :=
+    s <- get ;;
+    let '(_, nenv, _) := s in ret nenv.
 
+  Definition get_pp_name (x : var) : freshM String.string :=
+    nenv <- get_nenv () ;;
+    ret (show_tree (show_var nenv x)).
+
+  Definition debug_st (s : St) : freshM unit :=    
+    nenv <- get_nenv () ;;
+    log_msg (pp_St s nenv);;
+    log_msg alpha_fresh.newline.
   
+
   Fixpoint beta_contract (d : nat) {struct d} :=
     let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : freshM exp :=
         match e with
@@ -76,27 +82,30 @@ Section Beta.
          ret (Eproj x t n y' e')
        | Efun fds e =>
          let fm' := add_fundefs fds fm in
-         let (s1, s2) := update_funDef _ IH fds sig s in (* ??? *)
-         e' <- beta_contract_aux e sig fm' s1;;
-         fds' <- (fix beta_contract_fds (fds:fundefs) (sf:St) : freshM fundefs :=
+         let (s1, s2) := update_funDef _ IH fds sig s in
+         debug_st s1;;
+         fds' <- (fix beta_contract_fds (fds:fundefs) (s:St) : freshM fundefs :=
                    match fds with 
                    | Fcons f t xs e fds' =>
-                     let s' := update_inFun _ IH f t xs e sig s in (* ??? *)
+                     let s' := update_inFun _ IH f t xs e sig s in
                      e' <- beta_contract_aux e sig fm' s' ;;
                      fds'' <- beta_contract_fds fds' s ;;
                      ret (Fcons f t xs e' fds'')
                    | Fnil => ret Fnil
                    end) fds s2 ;;
+         e' <- beta_contract_aux e sig fm' s1;;         
          ret (Efun fds' e')
        | Eapp f t ys =>
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
-         let (s, inl) := update_App _ IH f' t ys' s in
+         let (s', inl) := update_App _ IH f' t ys' s in
+         fstr <- get_pp_name f' ;;
+         log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined" ++ alpha_fresh.newline) ;;
          (match (inl, M.get f' fm, d) with
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in
             e' <- freshen_exp e;;
-            beta_contract d' e' sig' fm  s
+            beta_contract d' e' sig' fm  s'
           | _ => ret (Eapp f' t ys')
           end)
        | Eprim x t ys e =>
@@ -124,9 +133,16 @@ Section Beta.
 
   Definition beta_contract_top (e:exp) (d:nat) (s:St) (names:nEnv) : exp * nEnv :=
     let n :=((max_var e 1) + 1)%positive in
-    match runState (beta_contract d e (M.empty var) (M.empty _) s) (n, names) with
+    match runState (beta_contract d e (M.empty var) (M.empty _) s) (n, names, []) with
     | (e', (_, names')) => (e', names)
     end.
+
+  Definition beta_contract_top_debug (e:exp) (d:nat) (s:St) (names:nEnv) : exp * nEnv * string :=
+    let n :=((max_var e 1) + 1)%positive in
+    match runState (beta_contract d e (M.empty var) (M.empty _) s) (n, names, []) with
+    | (e', (_, names', str)) => (e', names, log_to_string str)
+    end.
+
   
 End Beta.
 
@@ -186,16 +202,86 @@ Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
                     end
   |}.
 
+Open Scope positive.
+
+
+Definition show_map {A} (m : M.t A) (nenv : nEnv) (str : A -> string) :=
+  (let fix show_lst (lst : list (var * A)) :=
+      match lst with
+      | (x, a) :: lst =>
+        (show_tree (show_var nenv x)) ++ " -> " ++ str a ++ "; " ++ show_lst lst
+      | [] => ""
+      end
+   in
+   "S{" ++ show_lst (M.elements m) ++ "}" ++ alpha_fresh.newline)%string.
+
+Definition show_map_bool m nenv := show_map m nenv (fun (b : bool) => if b then "true" else "false")%string. 
+Definition show_map_bogus {A} (m : A) (nenv : nEnv) := ""%string.
+
+Fixpoint find_uncurried (fds : fundefs) (s:M.t bool) : M.t bool := 
+  match fds with
+  | Fcons f t (k::xs) (Efun (Fcons h _ _ _ Fnil) (Eapp k' _ [h'])) fds' =>
+    let s' := M.set f true s in
+        (* if andb (h =? h') (k =? k') then M.set f true s else s in *)
+    find_uncurried fds' s'
+  | _ => s
+  end.
+          
+           (* (cps.Fcons 438 3 (440 :: 596 :: nil) *)
+           (*    (cps.Efun (cps.Fcons 518 3 (594 :: 595 :: nil) (cps.Eapp 597 4 (594 :: 595 :: 596 :: nil)) cps.Fnil) *)
+           (*       (cps.Eapp 440 2 (518 :: nil))) *)
+
+Definition InineUncurried: InlineHeuristic (M.t bool) :=
+  {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
+                          let s' := find_uncurried fds s in
+                          (s', s'));
+     update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => (M.remove f s);
+     update_App := fun (f:var) (t:tag) (ys:list var) (s:_) =>
+                     match M.get f s with
+                     | Some true => (s, true)
+                     | _ => (s, false)
+                     end
+  |}.
+
+
+(* Fixpoint find_lambda_lifted (fds : fundefs) (s:M.t bool) : M.t bool :=  *)
+(*   match fds with *)
+(*   | Fcons f _ _ (Eapp g _ _) fds' => *)
+(*     let s' := if (f =? g) then s else  M.set f true s in *)
+(*     find_lambda_lifted fds' s' *)
+(*   | _ => s *)
+(*   end. *)
+
+
+(* Definition InineLambdaLifted: InlineHeuristic (M.t bool) := *)
+(*   {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) => *)
+(*                           let s' := find_lambda_lifted fds s in *)
+(*                           (s', s')); *)
+(*      update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => (M.remove f s); *)
+(*      update_App := fun (f:var) (t:tag) (ys:list var) (s:_) => *)
+(*                      match M.get f s with *)
+(*                      | Some true => (s, true) *)
+(*                      | _ => (s, false) *)
+(*                      end *)
+(*   |}. *)
+
+
 Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) (M.t nat)) :=
   CombineInlineHeuristic orb (InlineSmallIH bound) (PostUncurryIH).
 
-
 (* d should be max argument size, perhaps passed through by uncurry *)
 Definition postuncurry_contract (e:exp) (s:M.t nat) (d:nat) :=
-  beta_contract_top _ PostUncurryIH e d s.
+  beta_contract_top _ show_map_bogus PostUncurryIH e d s.
 
 Definition inlinesmall_contract (e:exp) (bound:nat)  (d:nat) :=
-  beta_contract_top _ (InlineSmallIH bound) e d (M.empty _).
+  beta_contract_top _ show_map_bogus (InlineSmallIH bound) e d (M.empty _).
 
 Definition inline_uncurry_contract (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
-  beta_contract_top _ (InlineSmallOrUncurried bound) e d (M.empty bool, s).
+  beta_contract_top _ show_map_bogus (InlineSmallOrUncurried bound) e d (M.empty bool, s).
+
+Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
+  beta_contract_top_debug _ show_map_bool InineUncurried e d (M.empty bool).
+
+(* Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat)  (d:nat) := *)
+(*   beta_contract_top_debug _ show_map_bool InineLambdaLifted e d (M.empty bool). *)
+

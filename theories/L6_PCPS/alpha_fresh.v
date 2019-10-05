@@ -1,24 +1,35 @@
 (* Freshen the names in a term by renaming its bound variables to be unique positives starting from a given positive, except for a finite number of positives *)
 
 Require Import L6.cps.
-Require Import Coq.ZArith.ZArith Coq.Lists.List.
+Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String Coq.Strings.Ascii.
 Import ListNotations.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-Require Import L6.shrink_cps L6.cps_util L6.cps_util.
+Require Import L6.shrink_cps L6.cps_util L6.cps_util L6.cps_show.
 
 Open Scope monad_scope.
 Import MonadNotation.
 
-Definition freshM : Type -> Type := state (positive * nEnv).
+Definition freshM : Type -> Type := state (positive * nEnv * list string).
 
+
+Definition log_msg (msg : string) : freshM unit :=
+  s <- get ;;
+  let '(p, name, msgs) := s in
+  put (p, name, msg::msgs).
+
+Definition chr_newline : ascii := Eval compute in ascii_of_nat 10.
+Definition newline : string := (String chr_newline EmptyString).
+
+Definition log_to_string (log : list string) :=
+  (concat "" ("Debug messages" :: newline :: (List.rev log)))%string.
 
 Fixpoint get_next (old : var) : freshM var :=
   s <- get ;;
-  let '(curr, names) := s in
+  let '(curr, names, log) := s in
   let names' := add_entry names curr old "" in
-  _ <- put ((curr + 1)%positive, names');; ret curr.
+  _ <- put ((curr + 1)%positive, names', log);; ret curr.
 
 Fixpoint get_next_lst (old : list var) : freshM (list var) :=
   match old with
@@ -99,14 +110,14 @@ with freshen_fun (fds:fundefs) (sigma:M.t positive) : freshM fundefs :=
 
 
 Definition freshen_subexp (e: exp) (next : var) (names: nEnv) : exp * var * nEnv :=
-  let st := (next, names) in
-  let '(e', (next', names')) := runState (freshen_term e (M.empty _)) (next, names) in
+  let st := (next, names, []) in
+  let '(e', (next', names', _)) := runState (freshen_term e (M.empty _)) st in
   (e', next', names').
 
 Definition freshen_top (e: exp) (names: nEnv) : exp * nEnv :=
   let next := ((identifiers.max_var e 1) + 1)%positive in
-  let st := (next, names) in
-  let '(e', (next', names')) := runState (freshen_term e (M.empty _)) (next, names) in
+  let st := (next, names, []) in
+  let '(e', (next', names', _)) := runState (freshen_term e (M.empty _)) st in
   (e', names').
 
 

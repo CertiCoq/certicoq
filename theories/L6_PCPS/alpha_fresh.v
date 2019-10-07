@@ -7,11 +7,11 @@ Require Import L6.shrink_cps.
 
   Definition state:Type := (positive * list positive).  (* n <= hd l *)
 
-  
+
 Fixpoint get_next (curr:positive) (l:list positive) : (positive * positive * list positive) :=
   match l with
   | nil => (curr, Pos.succ curr, nil)
-  | hd::l' => 
+  | hd::l' =>
     if (Pos.eqb curr hd) then
         get_next (Pos.succ curr) l'
     else
@@ -33,11 +33,11 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) (curr:positive) (l:list posit
   match e with
   | Econstr x t ys e => let '(x', curr, l) := get_next curr l in
                         let ys' := apply_r_list sigma ys in
-                        let '(e', curr, l) := freshen_term e (M.set x x' sigma) curr l in 
+                        let '(e', curr, l) := freshen_term e (M.set x x' sigma) curr l in
                         (Econstr x' t ys' e', curr, l)
   | Ecase v cl =>
     let '(cl', curr, l) :=
-        (fix alpha_list (br: list (cTag*exp)) (curr:positive) (l:list positive): (list (cTag*exp) * positive * list positive) :=
+        (fix alpha_list (br: list (ctor_tag*exp)) (curr:positive) (l:list positive): (list (ctor_tag*exp) * positive * list positive) :=
            (match br with
             | nil => (nil, curr, l)
             | h::br' =>
@@ -48,7 +48,7 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) (curr:positive) (l:list posit
                  ((t, e')::br'', curr, l)
                end)
             end)) cl curr l in
-    (Ecase (apply_r sigma v) cl', curr, l)    
+    (Ecase (apply_r sigma v) cl', curr, l)
   | Eproj x t n y e => let '(x', curr, l) := get_next curr l in
                        let y' := apply_r sigma y in
                         let '(e', curr, l) := freshen_term e (M.set x x' sigma) curr l in
@@ -63,7 +63,7 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) (curr:positive) (l:list posit
 
   | Eapp f t ys =>
     let f' := apply_r sigma f  in
-    let ys' := apply_r_list sigma ys in    
+    let ys' := apply_r_list sigma ys in
     (Eapp f' t ys', curr, l)
   | Eprim x t ys e =>
     let '(x', curr, l) := get_next curr l in
@@ -85,6 +85,3 @@ with freshen_fun (fds:fundefs) (sigma:M.t positive) (curr:positive) (l:list posi
          (Fcons f' t xs' e' fds', curr, l)
        | Fnil => (Fnil, curr, l)
        end.
-         
-
-

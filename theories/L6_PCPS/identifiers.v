@@ -27,7 +27,7 @@ Fixpoint name_in_fundefs (B : fundefs) : Ensemble var :=
   end.
 
 (** [fun_in_fundefs B] is the set of functions defined in [B] *)
-Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * fTag * list var * exp) :=
+Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * fun_tag * list var * exp) :=
   match B with
     | Fnil => Empty_set _
     | Fcons f tau xs e B =>
@@ -86,13 +86,13 @@ Proof.
   eapply fundefs_append_split_fds; eauto.
 Qed.
 
-Lemma getlist_def_funs_Disjoint xs B B' rho  :
+Lemma get_list_def_funs_Disjoint xs B B' rho  :
   Disjoint _ (FromList xs) (name_in_fundefs B) ->
-  getlist xs (def_funs B' B rho rho) = getlist xs rho.
+  get_list xs (def_funs B' B rho rho) = get_list xs rho.
 Proof with now eauto with Ensembles_DB.
   induction B; intros Hd.
   - simpl.
-    rewrite getlist_set_neq.
+    rewrite get_list_set_neq.
     erewrite IHB...
     intros Hc; eapply Hd. constructor; eauto. now left.
   - reflexivity.
@@ -216,16 +216,16 @@ Proof.
   rewrite def_funs_neq; eauto.
 Qed.
 
-Lemma getlist_fundefs ys vs B B' rho :
-  getlist ys rho = Some vs ->
+Lemma get_list_fundefs ys vs B B' rho :
+  get_list ys rho = Some vs ->
   (forall y, List.In y ys -> ~ name_in_fundefs B y) ->
-  getlist ys (def_funs B' B rho rho) = Some vs.
+  get_list ys (def_funs B' B rho rho) = Some vs.
 Proof.
   revert rho vs. induction ys; intros rho vs Hget Hall.
   - now inv Hget.
   - simpl in Hget.
     destruct (M.get a rho) eqn:Heq1; try discriminate.
-    destruct (getlist ys rho) eqn:Heq2; try discriminate. inv Hget.
+    destruct (get_list ys rho) eqn:Heq2; try discriminate. inv Hget.
     simpl. erewrite IHys; eauto. erewrite get_fundefs; eauto.
     intros Hc. eapply Hall; eauto. left; eauto.
     intros y Hin Hc. eapply Hall; eauto. right; eauto.

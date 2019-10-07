@@ -25,7 +25,7 @@ Close Scope Z_scope.
 
 Section CC_sound.
 
-  Variable (clo_tag : cTag).
+  Variable (clo_tag : ctor_tag).
   
   Definition Scope_st fvmap Scope :=
     [ set x | M.get x fvmap = Some BoundVar ] <--> Scope.
@@ -910,8 +910,8 @@ Section CC_sound.
     intros n s1. destruct n; now apply set_name_entry_preserves_prop.
   Qed.
 
-  Lemma make_record_cTag_preserves_prop n P Q :
-    {{ fun s => Q (var_map s) /\ P (next_var s) }} make_record_cTag n {{ fun _ _ s => Q (var_map s) /\ P (next_var s) }}.
+  Lemma make_record_ctor_tag_preserves_prop n P Q :
+    {{ fun s => Q (var_map s) /\ P (next_var s) }} make_record_ctor_tag n {{ fun _ _ s => Q (var_map s) /\ P (next_var s) }}.
   Proof.
     eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
     intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
@@ -994,7 +994,7 @@ Section CC_sound.
       intros C1 s1. 
       eapply pre_curry_l. intros Hvars.
       eapply bind_triple.
-      eapply make_record_cTag_preserves_prop.
+      eapply make_record_ctor_tag_preserves_prop.
       intros c' s'. eapply return_triple.
       intros s'' [Hcc Hf]. split; eauto.
   Qed.
@@ -1078,7 +1078,7 @@ Section CC_sound.
       eapply pre_curry_l. intros Hvar.       
       eapply bind_triple with (post' := fun _ l' s' =>
                                           Forall2
-                                            (fun pat pat' : cTag * exp =>
+                                            (fun pat pat' : ctor_tag * exp =>
                                                fst pat = fst pat' /\
                                                (exists (C' : exp_ctx) (e' : exp),
                                                    snd pat' = C' |[ e' ]| /\ Closure_conversion clo_tag Scope' Funs' fenv c Γ FVs (snd pat) e' C')) l l' /\ fresh S (next_var s')). 
@@ -1392,7 +1392,7 @@ Section CC_sound.
     rewrite Hr in Hpre. eassumption.
   Qed. 
   
-  Lemma closure_conversion_top_sound (e : exp) (c : cTag) (Γ : var) (i : iTag) (cenv : cEnv) (names:M.t BasicAst.name) :
+  Lemma closure_conversion_top_sound (e : exp) (c : ctor_tag) (Γ : var) (i : ind_tag) (cenv : ctor_env) (names:M.t BasicAst.name) :
     let (e', C) := closure_conversion_top clo_tag e c Γ i cenv names in
     closed_exp e ->
     Closure_conversion clo_tag (Empty_set _) (Empty_set _) id 1%positive Γ [] e e' C.  
@@ -1421,8 +1421,8 @@ Section CC_sound.
     { unfold closed_exp in Hclo. rewrite Hclo. edb. }
     set (s :=  {| var_map := Maps.PTree.empty VarInfo;
                    next_var := (Pos.max (max_var e 1) Γ + 1)%positive;
-                   nect_cTag := c;
-                   next_iTag := i;
+                   nect_ctor_tag := c;
+                   next_ind_tag := i;
                    cenv := cenv;
                    name_env := names |}). 
     fold s in Hcc.  

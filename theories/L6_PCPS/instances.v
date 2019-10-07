@@ -1,6 +1,6 @@
 
- 
-Require Import L4.instances. 
+
+Require Import L4.instances.
 
 
 From CertiCoq.Common Require Import certiClasses certiClassesLinkable Common.
@@ -19,7 +19,7 @@ From CertiCoq.L7 Require Import L6_to_Clight.
    3 - name environment mapping variables to their original name if it exists
    4 - a map from function tags to information about that class of function
 *)
-Let L6env : Type := prims * cEnv *  nEnv * fEnv.
+Let L6env : Type := prims * ctor_env *  L5_to_L6.name_env * fun_env.
 
 Let L6term: Type := env * cps.exp.
 
@@ -38,7 +38,7 @@ Let L6val: Type := cps.val.
 Instance bigStepOpSemL6Term : BigStepOpSem (L6env * L6term) L6val :=
   λ p v,
   let '(pr, cenv, nenv, fenv, (rho, e)) := p in
-  (* should not modify pr, cenv and nenv 
+  (* should not modify pr, cenv and nenv
   let '(pr', cenv', env', nenv', val) := v in *)
   ∃ (n:nat), (L6.eval.bstep_e pr cenv rho e v n).
 
@@ -64,7 +64,7 @@ Eval compute in cValue certiL6.
 
 Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) :=
   fun n p =>
-    let '((penv, cenv, nenv, fenv), (rho, e)) := p in 
+    let '((penv, cenv, nenv, fenv), (rho, e)) := p in
     match bstep_f penv cenv rho e n with
     | exceptionMonad.Exc s => Error s None
     | Ret (inl t) => OutOfTime ((penv,cenv,nenv, fenv), t)
@@ -76,16 +76,16 @@ Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) :=
 Open Scope positive_scope.
 
 (* starting tags for L5_to_L6, anything under default is reserved for special constructors/types *)
-Definition default_cTag := 99%positive.
-Definition default_iTag := 99%positive.
+Definition default_ctor_tag := 99%positive.
+Definition default_ind_tag := 99%positive.
 
 (* assigned for the constructor and the type of closures *)
-Definition bogus_cloTag := 15%positive.
-Definition bogus_cloiTag := 16%positive.
+Definition bogus_closure_tag := 15%positive.
+Definition bogus_cloind_tag := 16%positive.
 
 (* tags for functions and continuations *)
-Definition fun_fTag := 3%positive.
-Definition kon_fTag := 2%positive.
+Definition fun_fun_tag := 3%positive.
+Definition kon_fun_tag := 2%positive.
 
 (* Let bindings for function and enviroment.
  * Thee function and the argument should be closed terms
@@ -105,31 +105,31 @@ Definition Γ := 2%positive.
 Require Import ExtLib.Data.Monads.OptionMonad.
 
 Require Import ExtLib.Structures.Monads.
-  
 
-Instance certiL5_t0_L6: 
-  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := 
+
+Instance certiL5_t0_L6:
+  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) :=
   fun v =>
     match v with
     | pair venv vt =>
-      (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
-      | Some r =>         
-        let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
-        let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+      (match convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag (venv, vt) with
+      | Some r =>
+        let '(cenv, nenv, fenv, next_ctor_tag, next_ind_tag, e) :=  r in
+        let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in
         (* let e := postuncurry_contract e s d in            *)
         (* let e := shrink_cps.shrink_top e in  *)
         (* let e :=  inlinesmall_contract e 10 10 in *)
-        let e := inline_uncurry_contract e s 10 10 in  
+        let e := inline_uncurry_contract e s 10 10 in
         let e := shrink_cps.shrink_top e in
-        let e := lambda_lift e next_iTag in
+        let e := lambda_lift e next_ind_tag in
         let '(cenv',nenv', t') := closure_conversion_hoist
-                                    bogus_cloTag
+                                    bogus_closure_tag
                                     e
-                                    next_cTag
-                                    next_iTag
+                                    next_ctor_tag
+                                    next_ind_tag
                                     cenv nenv
         in
-        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
+        Ret ((M.empty _ , (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv'), nenv', M.empty _),  (M.empty _, (shrink_top t')))
       | None => Exc "failed converting from L5 to L6"
       end)
     end.

@@ -5,7 +5,7 @@ Require Import Coq.ZArith.ZArith Coq.Lists.List.
 Import ListNotations.
 Require Import identifiers.
 Require Import L6.shrink_cps.
- Require Import L6.alpha_fresh. 
+ Require Import L6.alpha_fresh.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
@@ -15,13 +15,13 @@ Require Import Program.
 Require Import Coq.Structures.OrdersEx.
 
 (* St is the type of the [scoped] state used by the  heuristic *)
-Record InlineHeuristic (St:Type) := { 
+Record InlineHeuristic (St:Type) := {
                      update_funDef:(fundefs -> r_map -> St -> (St * St)); (* update inlining decision at functions declaraction. First state is used for the body of the program, second for the function definitions *)
                      update_inFun:(var -> tag -> list var -> exp -> r_map -> St -> St); (* update inlining decisions when converting a function within a bundle *)
                      update_App:(var -> tag -> list var -> St -> (St*bool)) (* update and return inlining decision for f on function application *) }.
 
 
-  
+
 Section Beta.
   Import MonadNotation.
   Open Scope monad_scope.
@@ -29,18 +29,18 @@ Section Beta.
   Definition freshM := state positive.
 
   Definition r_map := M.t var.
-  
+
   Definition freshen_exp (e:exp) : freshM exp  :=
-     curr <- get;; 
+     curr <- get;;
     let '(e', n, l) := freshen_term e (M.empty positive) curr nil in
-    _ <- put n;; 
+    _ <- put n;;
       ret e'.
-  
- 
-  
+
+
+
   Variable St:Type.
   Variable IH : InlineHeuristic St.
-  
+
 
 
 
@@ -66,7 +66,7 @@ Definition term_size_lex :  nat * exp -> nat * exp -> Prop :=
     or (lt (fst p1) (fst p2)) (and (eq (fst p1) (fst p2)) (term_size_le (snd p1) (snd p2))).
 
 
-  
+
   Theorem term_size_Pair_wf: well_founded (Coqlib.lex_ord lt term_size_le).
   Proof.
     apply Coqlib.wf_lex_ord; [apply lt_wf |apply term_size_wf].
@@ -74,7 +74,7 @@ Definition term_size_lex :  nat * exp -> nat * exp -> Prop :=
 
 
   Lemma beta_contract_fds_1:
-    forall {f t xs e fdc' fds} , 
+    forall {f t xs e fdc' fds} ,
       cps_util.subfds_or_eq (Fcons f t xs e fdc') fds ->
   term_size e < funs_size fds.
   Proof.
@@ -84,7 +84,7 @@ Definition term_size_lex :  nat * exp -> nat * exp -> Prop :=
   Defined.
 
 Lemma beta_contract_fds_2:
-    forall {f t xs e fdc' fds}, 
+    forall {f t xs e fdc' fds},
   cps_util.subfds_or_eq (Fcons f t xs e fdc') fds ->
   cps_util.subfds_or_eq fdc' fds.
 Proof.
@@ -112,7 +112,7 @@ Function beta_contract_fds (fds:fundefs) (fcon: St -> forall e:exp, (term_size e
 
 
 
-  
+
   (* Lexicographic on (d, e) *)
   (* del only hold well-scoped functions, and functions can only be inlined up to d depth *)
   Program Fixpoint beta_contract (de:nat * exp) (sig:M.t var) (del:M.t (tag * list var * exp)) (s:St) {wf (Coqlib.lex_ord lt term_size_le) de} : freshM exp :=
@@ -125,8 +125,8 @@ Function beta_contract_fds (fds:fundefs) (fcon: St -> forall e:exp, (term_size e
          ret (Econstr x t ys' e')
        | Ecase v cl =>
          let v' := apply_r sig v in
-         cl' <- (fix beta_list (br: list (cTag*exp)) (s:St) (p:incl br cl):
-                       freshM (list (cTag*exp)) :=
+         cl' <- (fix beta_list (br: list (ctor_tag*exp)) (s:St) (p:incl br cl):
+                       freshM (list (ctor_tag*exp)) :=
                        (match br with
                         | nil => ret ( nil)
                         | h::br' =>
@@ -167,7 +167,7 @@ Function beta_contract_fds (fds:fundefs) (fcon: St -> forall e:exp, (term_size e
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in
             e' <- freshen_exp e;;
-            beta_contract (d',e') sig' del  s 
+            beta_contract (d',e') sig' del  s
           | _ => ret (Eapp f' t ys')
           end)
        | Eprim x t ys e =>
@@ -206,16 +206,16 @@ Function beta_contract_fds (fds:fundefs) (fcon: St -> forall e:exp, (term_size e
         match (runState (beta_contract (d, e) (M.empty var) (M.empty _) s) n) with
         | (e', n') => e'
         end.
-        
 
-      
+
+
 End Beta.
 
 
 Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool) (IH1:InlineHeuristic St1) (IH2:InlineHeuristic St2):InlineHeuristic (prod St1 St2) :=
   {|
     update_funDef :=
-      fun fds sigma (s:(prod St1 St2)) => 
+      fun fds sigma (s:(prod St1 St2)) =>
         let (s1, s2) := s in
         let (s11, s12) := update_funDef _ IH1 fds sigma s1 in
         let (s21, s22) := update_funDef _ IH2 fds sigma s2 in
@@ -224,7 +224,7 @@ Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool) (IH
       fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) =>
         let (s1, s2) := s in
         let s1' := update_inFun _ IH1 f t xs e sigma s1 in
-        let s2' := update_inFun _ IH2 f t xs e sigma s2 in    
+        let s2' := update_inFun _ IH2 f t xs e sigma s2 in
         (s1', s2');
     update_App  :=
       fun (f:var) (t:tag) (ys:list var) (s:_) =>
@@ -238,7 +238,7 @@ Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool) (IH
 Definition PostUncurryIH : InlineHeuristic (M.t nat) :=
   (* at the start, uncurry shell (i.e. not the outermost) all maps to 1 *)
 (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
-  {|  
+  {|
     update_funDef  := fun (fds:fundefs) (sigma:r_map) (s:_) => (s, s);
     update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => s;
     update_App := fun (f:var) (t:tag) (ys:list var) (s:_) =>
@@ -250,18 +250,18 @@ Definition PostUncurryIH : InlineHeuristic (M.t nat) :=
     | _ => (s, false)
     end |}.
 
-  
+
 
   (* d should be max argument size, perhaps passed through by uncurry *)
 Definition postuncurry_contract (e:exp) (s:M.t nat) (d:nat) :=
     beta_contract_top _ PostUncurryIH e d s.
 
-  
-  
+
+
 Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
   {|
     (* Add small, [todo: non-recursive] functions to s *)
-    update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) => let s' := 
+    update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) => let s' :=
                                    (fix upd (fds:fundefs) (sigma:r_map) (s:_) :=
                                       match fds with
                                       | Fcons f t xs e fdc' => if (Init.Nat.ltb (term_size e) bound) then
@@ -286,6 +286,6 @@ Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
     CombineInlineHeuristic orb (InlineSmallIH bound) (PostUncurryIH).
 
 
-  
+
     Definition inline_uncurry_contract (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
     beta_contract_top _ (InlineSmallOrUncurried bound) e d (M.empty bool, s).

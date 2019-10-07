@@ -10,16 +10,16 @@ Import ListNotations.
 (** Expression evaluation contexts *)
 Inductive exp_ctx : Type :=
 | Hole_c : exp_ctx
-| Econstr_c : var -> cTag -> list var -> exp_ctx -> exp_ctx
-| Eproj_c  : var -> cTag -> N -> var -> exp_ctx -> exp_ctx
+| Econstr_c : var -> ctor_tag -> list var -> exp_ctx -> exp_ctx
+| Eproj_c  : var -> ctor_tag -> N -> var -> exp_ctx -> exp_ctx
 | Eprim_c : var -> prim -> list var -> exp_ctx -> exp_ctx   
-| Ecase_c : var -> list (cTag * exp) -> cTag ->
-            exp_ctx -> list (cTag * exp) -> exp_ctx  
+| Ecase_c : var -> list (ctor_tag * exp) -> ctor_tag ->
+            exp_ctx -> list (ctor_tag * exp) -> exp_ctx  
 | Efun1_c : fundefs -> exp_ctx -> exp_ctx
 | Efun2_c : fundefs_ctx -> exp -> exp_ctx
 with fundefs_ctx :=
-     | Fcons1_c:  var -> cTag -> list var -> exp_ctx -> fundefs -> fundefs_ctx
-     | Fcons2_c:  var -> cTag -> list var -> exp -> fundefs_ctx -> fundefs_ctx.
+     | Fcons1_c:  var -> ctor_tag -> list var -> exp_ctx -> fundefs -> fundefs_ctx
+     | Fcons2_c:  var -> ctor_tag -> list var -> exp -> fundefs_ctx -> fundefs_ctx.
 
 (** Evaluation context application - Relational definition *)
 Inductive app_ctx: exp_ctx -> exp -> exp -> Prop :=
@@ -136,19 +136,19 @@ with ctx_fundefs_mut' := Induction for fundefs_ctx Sort Type.
 Lemma exp_fundefs_ctx_mutual_ind :
   forall (P : exp_ctx -> Prop) (P0 : fundefs_ctx -> Prop),
     P Hole_c ->
-    (forall (v : var) (t : cTag) (l : list var) (e : exp_ctx),
+    (forall (v : var) (t : ctor_tag) (l : list var) (e : exp_ctx),
        P e -> P (Econstr_c v t l e)) ->
-    (forall (v : var) (t : cTag) (n : N) (v0 : var) (e : exp_ctx),
+    (forall (v : var) (t : ctor_tag) (n : N) (v0 : var) (e : exp_ctx),
        P e -> P (Eproj_c v t n v0 e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp_ctx),
        P e -> P (Eprim_c v p l e)) ->
-    (forall (v : var) (l : list (cTag * exp)) (t : cTag) (e : exp_ctx),
-       P e -> forall l0 : list (cTag * exp), P (Ecase_c v l t e l0)) ->
+    (forall (v : var) (l : list (ctor_tag * exp)) (t : ctor_tag) (e : exp_ctx),
+       P e -> forall l0 : list (ctor_tag * exp), P (Ecase_c v l t e l0)) ->
     (forall (f4 : fundefs) (e : exp_ctx), P e -> P (Efun1_c f4 e)) ->
     (forall f5 : fundefs_ctx, P0 f5 -> forall e : exp, P (Efun2_c f5 e)) ->
-    (forall (v : var) (t : fTag) (l : list var) (e : exp_ctx),
+    (forall (v : var) (t : fun_tag) (l : list var) (e : exp_ctx),
        P e -> forall f6 : fundefs, P0 (Fcons1_c v t l e f6)) ->
-    (forall (v : var) (t : fTag) (l : list var) 
+    (forall (v : var) (t : fun_tag) (l : list var) 
             (e : exp) (f7 : fundefs_ctx), P0 f7 -> P0 (Fcons2_c v t l e f7)) ->
     (forall e : exp_ctx, P e) /\ (forall f : fundefs_ctx, P0 f).
 Proof.

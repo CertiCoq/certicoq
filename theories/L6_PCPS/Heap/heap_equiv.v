@@ -2077,9 +2077,9 @@ Module HeapEquiv (H : Heap).
     rewrite Setminus_Union_distr...
   Qed. 
 
-  Lemma heap_env_equiv_setlist S β1 β2 H1 H2 xs ls1 ls2 rho1 rho2 rho1' rho2' :
+  Lemma heap_env_equiv_set_lists S β1 β2 H1 H2 xs ls1 ls2 rho1 rho2 rho1' rho2' :
     Setminus _ S (FromList xs) |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
-    setlist xs ls1 rho1 = Some rho1' -> setlist xs ls2 rho2 = Some rho2' ->
+    set_lists xs ls1 rho1 = Some rho1' -> set_lists xs ls2 rho2 = Some rho2' ->
     Forall2 (fun l1 l2 => (l1, H1) ≈_(β1, β2) (l2, H2)) ls1 ls2  ->
     S |- (H1, rho1') ⩪_(β1, β2) (H2, rho2').
   Proof with (now eauto with Ensembles_DB).
@@ -2089,8 +2089,8 @@ Module HeapEquiv (H : Heap).
       rewrite FromList_nil, Setminus_Empty_set_neut_r in Heq. eassumption.
     - destruct ls1; destruct ls2; try discriminate.
       inv Hall. simpl in Hs1, Hs2.
-      destruct (setlist xs ls1 rho1) eqn:Hset1; try discriminate.
-      destruct (setlist xs ls2 rho2) eqn:Hset2; try discriminate.
+      destruct (set_lists xs ls1 rho1) eqn:Hset1; try discriminate.
+      destruct (set_lists xs ls2 rho2) eqn:Hset2; try discriminate.
       inv Hs1; inv Hs2. eapply heap_env_equiv_set; eauto.
       eapply IHxs; eauto. eapply heap_env_equiv_antimon; eauto.
       rewrite FromList_cons...
@@ -2164,7 +2164,7 @@ Module HeapEquiv (H : Heap).
   
 
   Lemma res_equiv_get_Constr β1 β2 (H1 H2 : heap block)
-        (l1 l2 : loc) (c : cTag) (vs1 : list value) :
+        (l1 l2 : loc) (c : ctor_tag) (vs1 : list value) :
     (Loc l1, H1) ≈_(β1, β2) (Loc l2, H2) ->
     get l1 H1 = Some (Constr c vs1) ->
     exists vs2,
@@ -2191,13 +2191,13 @@ Module HeapEquiv (H : Heap).
     eapply Heq in Hget; eassumption.
   Qed.
   
-  Lemma heap_env_equiv_env_getlist (S : Ensemble var) β1 β2 (H1 H2 : heap block)
+  Lemma heap_env_equiv_env_get_list (S : Ensemble var) β1 β2 (H1 H2 : heap block)
         (rho1 rho2 : env) (xs : list var) (ls : list value) :
-    getlist xs rho1 = Some ls ->
+    get_list xs rho1 = Some ls ->
     S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     (FromList xs) \subset S ->
     exists ls',
-      getlist xs rho2 = Some ls' /\
+      get_list xs rho2 = Some ls' /\
       Forall2 (fun l l' => (l, H1) ≈_(β1, β2) (l', H2)) ls ls'.
   Proof with now eauto with Ensembles_DB.
     revert ls; induction xs; intros ls Hget Heq Hin.
@@ -2205,7 +2205,7 @@ Module HeapEquiv (H : Heap).
       eexists; split; eauto. reflexivity.
     - simpl in Hget.
       destruct (M.get a rho1) as [l1 | ] eqn:Hgetl1; try discriminate.
-      destruct (getlist xs rho1) as [ls1 | ] eqn:Hetls1; try discriminate.
+      destruct (get_list xs rho1) as [ls1 | ] eqn:Hetls1; try discriminate.
       inv Hget.
       edestruct heap_env_equiv_env_get as [l2 [Hgetl2 Heq']]; eauto.
       eapply Hin. rewrite FromList_cons...
@@ -2217,38 +2217,38 @@ Module HeapEquiv (H : Heap).
   Qed.
   
 
-  Lemma heap_env_equiv_getlist_Forall2 S β1 β2 H1 H2 ys vs1 vs2 rho1 rho2 :
+  Lemma heap_env_equiv_get_list_Forall2 S β1 β2 H1 H2 ys vs1 vs2 rho1 rho2 :
     S |- (H1, rho1) ⩪_(β1, β2) (H2, rho2) ->
     FromList ys \subset S ->
-    getlist ys rho1 = Some vs1 ->
-    getlist ys rho2 = Some vs2 ->
+    get_list ys rho1 = Some vs1 ->
+    get_list ys rho2 = Some vs2 ->
     Forall2 (fun l1 l2 => (l1, H1) ≈_(β1, β2) (l2, H2)) vs1 vs2.
   Proof.
     revert vs1 vs2; induction ys; intros vs1 vs2 Heq Hin Hg1 Hg2;
     destruct vs1; destruct vs2; simpl in *; try discriminate; try now constructor.
     - destruct (M.get a rho1) eqn:Heqa;
-      destruct (getlist ys rho1) eqn:Heqys; try discriminate.
+      destruct (get_list ys rho1) eqn:Heqys; try discriminate.
     - destruct (M.get a rho2) eqn:Heqa;
-      destruct (getlist ys rho2) eqn:Heqys; try discriminate.
+      destruct (get_list ys rho2) eqn:Heqys; try discriminate.
     - rewrite FromList_cons in Hin.
       destruct (M.get a rho1) eqn:Heqa;
-        destruct (getlist ys rho1) eqn:Heqys; try discriminate. inv Hg1.
+        destruct (get_list ys rho1) eqn:Heqys; try discriminate. inv Hg1.
       eapply Heq in Heqa. destruct Heqa as [l' [Hget Heq']].
       rewrite Hget in Hg2.
-      destruct (getlist ys rho2) eqn:Heqys'; try discriminate. inv Hg2.
+      destruct (get_list ys rho2) eqn:Heqys'; try discriminate. inv Hg2.
       constructor; eauto. eapply IHys; eauto.
       eapply Included_trans; now eauto with Ensembles_DB.
       eapply Included_trans; now eauto with Ensembles_DB.
   Qed.
   
-  Lemma block_equiv_Constr β1 β2 (H1 H2 : heap block) (c : cTag) (vs vs' : list value) :
+  Lemma block_equiv_Constr β1 β2 (H1 H2 : heap block) (c : ctor_tag) (vs vs' : list value) :
     Forall2 (fun l1 l2 => (l1, H1) ≈_(β1, β2) (l2, H2)) vs vs' ->
     block_equiv (β1, H1, Constr c vs) (β2, H2, Constr c vs').
   Proof.
     simpl; split; eauto.
   Qed.
 
-  Lemma block_equiv_Constr_r β1 β2 (H1 H2 : heap block) (c1 c2 : cTag)
+  Lemma block_equiv_Constr_r β1 β2 (H1 H2 : heap block) (c1 c2 : ctor_tag)
         (vs vs' : list value) :
     block_equiv (β1, H1, Constr c1 vs) (β2, H2, Constr c2 vs') ->
     Forall2 (fun l1 l2 => (l1, H1) ≈_(β1, β2) (l2, H2)) vs vs'.

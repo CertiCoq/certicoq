@@ -1,6 +1,6 @@
-(** Pretty printer for L6 CPS language.  
+(** Pretty printer for L6 CPS language.
 
-    [show_exp e] constructs a string representing the term that has some 
+    [show_exp e] constructs a string representing the term that has some
     minimal formatting so that it's much more readable.
 *)
 Require Import List.
@@ -13,20 +13,20 @@ Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
 From Template Require Import BasicAst. (* For identifier names *)
 
-Import MonadNotation. 
+Import MonadNotation.
 
 Open Scope monad_scope.
 
 Require Import Common.AstCommon.
 
-Definition nEnv := M.t BasicAst.name.
+Definition name_env := M.t BasicAst.name.
 
 Section PP.
 
-  Variable (nenv:nEnv).
-  Variable (cenv:cEnv).
+  Variable (nenv:name_env).
+  Variable (cenv:ctor_env).
   Variable (ftag_flag:bool). (* true if print tag *)
-  
+
 (* Convert various numbers to strings *)
 Definition show_nat := nat2string10.
 Definition show_pos x := nat2string10 (Pos.to_nat x).
@@ -40,7 +40,7 @@ Fixpoint sep {A} (s:A) (xs:list A) : list A :=
   | h::t => h :: s :: (sep s t)
   end.
 
-(* It's too expensive to append strings everywhere, so we 
+(* It's too expensive to append strings everywhere, so we
    accumulate a tree and then flatten it once to avoid this
    quadratic overhead. *)
 Inductive string_tree :=
@@ -73,14 +73,14 @@ Definition show_name (no:BasicAst.name) (d:string) :=
     | nNamed s => s
     | nAnon => d
   end.
-                 
-Definition show_con (tg:cTag) :=
+
+Definition show_con (tg:ctor_tag) :=
   match M.get tg cenv with
-    | Some (nNamed s, _, i, t, n) => s
+    | Some {|ctor_name := nNamed s |} => s
     | _ => ("con_"+++(show_pos tg))%string
   end.
 
-Definition show_ftag (tg:fTag) :=
+Definition show_ftag (tg:fun_tag) :=
   if ftag_flag then ("<"+++(show_pos tg)+++">")%string else ""%string.
 
 (* Show a list of variables as comma separated and wrapped in parens. *)
@@ -90,7 +90,7 @@ Definition show_vars (xs:list positive) :=
 
 (* We accumulate a string_tree as we convert the expressions to strings. *)
 Definition M := state string_tree.
-Import MonadNotation.  
+Import MonadNotation.
 
 Definition emit (s:string_tree) : M unit :=
   st <- get ;;
@@ -110,40 +110,40 @@ Definition newline : M unit := emit (String chr_newline EmptyString).
 (* We assume each expression starts on a fresh newline, and that it
    should be indented by [indent] characters. *)
 Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
-  tab indent ;; 
+  tab indent ;;
   match e with
   | Econstr x tg xs e =>
     emit "let " ;; emit (show_var x) ;;
          (* emit " := con_" ;; emit (show_pos tg) ;; *)
-    emit " := ";;emit (show_con tg);;     
-    emit (show_vars xs) ;; emit " in " ;; newline ;; 
+    emit " := ";;emit (show_con tg);;
+    emit (show_vars xs) ;; emit " in " ;; newline ;;
     emit_exp indent e
   | Eproj x tg n y e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := proj_" ;; emit (show_binnat n) ;; emit " " ;;
     emit (show_pos tg) ;; emit " " ;;
-    emit (show_var y) ;; emit " in " ;; newline ;; 
+    emit (show_var y) ;; emit " in " ;; newline ;;
     emit_exp indent e
   | Eprim x p ys e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := prim_" ;; emit (show_pos p) ;; emit (show_vars ys) ;;
-    emit " in " ;; newline ;; 
+    emit " in " ;; newline ;;
     emit_exp indent e
   | Ecase x arms =>
     emit "case " ;; emit (show_var x) ;; emit " of {" ;; newline ;;
-         (fix iter (xs : list (cTag*exp)) : M unit :=
+         (fix iter (xs : list (ctor_tag*exp)) : M unit :=
             match xs with
             | nil => ret tt
             | p::tail =>
               let (tg,e) := p in
               tab indent ;; emit "| " ;; emit (show_con tg) ;;
-                  emit " => " ;; newline ;; 
-                  emit_exp (2 + indent) e ;; 
+                  emit " => " ;; newline ;;
+                  emit_exp (2 + indent) e ;;
                   iter tail
             end) arms ;;
-         tab indent ;; emit "}" ;; newline 
+         tab indent ;; emit "}" ;; newline
   | Efun fds e =>
-    emit "letrec [" ;; newline ;; 
+    emit "letrec [" ;; newline ;;
          (fix iter (fds : fundefs) : M unit :=
             match fds with
             | Fnil => ret tt
@@ -163,14 +163,14 @@ About fold_left.
 
 Fixpoint emit_val (indent:nat) (v:val) : M unit :=
   tab indent ;;
-      match v with 
+      match v with
         | Vconstr tg l =>
           emit "constr "%string;;emit (show_con tg);;emit " "%string;; newline;;
                fold_left (fun u v => emit_val (indent+1) v) l newline
         | Vfun rho fds f =>
           (match  find_def f fds with
              | Some (t', xs ,e) =>
-               emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;;newline;;emit_exp (4 + indent) e ;; newline 
+               emit "fun "%string ;; emit (show_var f);;emit (show_vars xs);;emit ":="%string;;newline;;emit_exp (4 + indent) e ;; newline
             (* emit "fun "%string ;; emit (show_var f);;emit (show_ftag t');;emit (show_vars xs);;emit ":="%string;; emit "..."%string ;; newline *)
              | None => emit "ERROR! FUN "%string ;; emit (show_var f);;emit " NOT FOUND!"%string;;newline
            end)
@@ -182,11 +182,11 @@ with emit_vals (indent:nat) (vl:list val): M unit :=
          | v::vl' =>
            emit_val indent v;;
                      newline;;
-                     emit_vals indent vl' 
+                     emit_vals indent vl'
          | nil => newline
        end. *)
-         
-Definition show_val (v:val) : string := 
+
+Definition show_val (v:val) : string :=
   String chr_newline
           (show_tree (snd (runState (emit_val 0 v) Emp))).
 
@@ -200,22 +200,27 @@ Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)):M unit :=
     | nil => newline
   end.
 
-Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*cTyInfo)):M unit :=
+Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*ctor_ty_info)):M unit :=
   match cenvl with
-    | cons (p, (name, _, it, arr, ord)) cenvl' =>
-      emit "| "%string;;emit (show_pos p);;emit " |-> ("%string;;
-           emit (show_name name ("cons_"++(show_pos p)));; emit " "%string;; emit (show_pos it);; emit " "%string;;emit (show_binnat arr);;
-           emit " "%string;;emit (show_binnat ord);;emit " )"%string
-           ;;newline
-           ;; emit_cenv' indent cenvl'
-
+    | cons (p, info) cenvl' =>
+      emit "| "%string;;
+           emit (show_pos p);;
+           emit " |-> ("%string;;
+           emit (show_name (ctor_name info) ("cons_"++(show_pos p)));;
+           emit " "%string;;
+           emit (show_pos (ctor_ind_tag info));;
+           emit " "%string;; emit (show_binnat (ctor_arity info));;
+           emit " "%string;; emit (show_binnat (ctor_ordinal info));;
+           emit " )"%string ;;
+           newline ;;
+           emit_cenv' indent cenvl'
     | nil => newline
   end.
 
 Definition emit_env (indent:nat) (rho:M.t val): M unit :=
   emit "rho:{"%string;;newline;;emit_env' indent (M.elements rho);;emit "}"%string.
-  
-Definition emit_cenv (indent:nat) (cenv:M.t cTyInfo):M unit :=
+
+Definition emit_cenv (indent:nat) (cenv:M.t ctor_ty_info):M unit :=
   emit "cenv:{"%string;;newline;;emit_cenv' indent (M.elements cenv);;emit "}"%string.
 
 
@@ -224,14 +229,14 @@ Definition show_env (rho:M.t val) : string :=
          (show_tree (snd (runState (emit_env 0 rho) Emp))).
 
 
-Definition show_cenv (cenv:M.t cTyInfo): string :=
+Definition show_cenv (cenv:M.t ctor_ty_info): string :=
   String chr_newline
          (show_tree (snd (runState (emit_cenv 0 cenv) Emp))).
-  
+
 
 (* We add an extra newline at the front so that Coq will display the
    whole program correctly when we evaluate. *)
-Definition show_exp (x:exp) : string := 
+Definition show_exp (x:exp) : string :=
   String chr_newline
          (show_tree (snd (runState (emit_exp 0 x) Emp))).
 
@@ -239,7 +244,7 @@ Definition show_exp (x:exp) : string :=
 (*
 Require Import L5_to_L6.
 
-Let P1 := 
+Let P1 :=
   (Efun
      (Fcons 10 L5_to_L6.ty_con (13 :: nil)
         (Efun
@@ -253,7 +258,7 @@ Let P1 :=
 
 Eval vm_compute in show_exp P1.
 
-Let P2 := 
+Let P2 :=
 (Efun
      (Fcons 32 L5_to_L6.ty_con (3 :: nil)
         (Efun
@@ -262,7 +267,7 @@ Let P2 :=
                  (Fcons 9 L5_to_L6.ty_fun
                     (5 :: 6 :: nil)
                     (Efun
-                       (Fcons 8 L5_to_L6.ty_con 
+                       (Fcons 8 L5_to_L6.ty_con
                           (7 :: nil)
                           (Eapp 7 (5 :: nil)) Fnil)
                        (Eapp 8 (6 :: nil))) Fnil)
@@ -270,7 +275,7 @@ Let P2 :=
            (Efun
               (Fcons 31 L5_to_L6.ty_con (11 :: nil)
                  (Efun
-                    (Fcons 28 L5_to_L6.ty_con 
+                    (Fcons 28 L5_to_L6.ty_con
                        (12 :: nil)
                        (Efun
                           (Fcons 27 L5_to_L6.ty_fun
@@ -296,7 +301,7 @@ Let P2 :=
                                                  (1 :: nil)) Fnil)
                                                  (Eapp 24
                                                  (15 :: nil)))
-                                                :: 
+                                                ::
                                                 (2,
                                                 Eproj 19 L5_to_L6.ty
                                                  0 18

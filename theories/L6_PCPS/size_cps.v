@@ -240,15 +240,15 @@ Proof.
   rewrite <- Max.max_assoc. eauto.
 Qed.
 
-Lemma sizeOf_env_setlist k rho rho' xs vs :
-  setlist xs vs rho = Some rho' ->
+Lemma sizeOf_env_set_lists k rho rho' xs vs :
+  set_lists xs vs rho = Some rho' ->
   sizeOf_env k rho' = max (max_list_nat_with_measure (sizeOf_val k) 0 vs) (sizeOf_env k rho).
 Proof.
   revert vs rho rho'. induction xs; intros vs rho rho' Hset.
   - destruct vs; try discriminate. inv Hset.
     reflexivity.
   - destruct vs; try discriminate.
-    simpl in Hset. destruct (setlist xs vs rho) eqn:Hset'; try discriminate.
+    simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset'; try discriminate.
     inv Hset. rewrite sizeOf_env_set; simpl.
     rewrite max_list_nat_acc_spec.
     rewrite <- Max.max_assoc. eapply Nat.max_compat. reflexivity.
@@ -265,15 +265,15 @@ Proof.
   eassumption.
 Qed.
 
-Lemma sizeOf_env_getlist k rho xs vs :
-  getlist xs rho = Some vs ->
+Lemma sizeOf_env_get_list k rho xs vs :
+  get_list xs rho = Some vs ->
   max_list_nat_with_measure (sizeOf_val k) 0 vs  <= sizeOf_env k rho.
 Proof.
   revert vs. induction xs; intros vs Hgetl. 
   - destruct vs; try discriminate; simpl; omega.
   - simpl in Hgetl.
     destruct (rho ! a) eqn:Hgeta; try discriminate.
-    destruct (getlist xs rho) eqn:Hgetl'; try discriminate.
+    destruct (get_list xs rho) eqn:Hgetl'; try discriminate.
     destruct vs; try discriminate. inv Hgetl. simpl.
     eapply le_trans.
     + rewrite <- (Max.max_0_l (sizeOf_val k v0)).
@@ -287,7 +287,7 @@ Proof.
 Qed.
 
 Lemma sizeOf_env_set_constr k rho xs c vs y:
-  getlist xs rho = Some vs ->
+  get_list xs rho = Some vs ->
   sizeOf_env k (M.set y (Vconstr c vs) rho) = sizeOf_env k rho.
 Proof.
   intros Hget. rewrite sizeOf_env_set.
@@ -300,7 +300,7 @@ Proof.
     eapply fold_left_monotonic; [| now eauto ].
     intros. rewrite sizeOf_val_eq. eapply Nat.max_le_compat.
     now eauto. now eauto.
-    eapply (sizeOf_env_getlist (S k)). eassumption. }
+    eapply (sizeOf_env_get_list (S k)). eassumption. }
   omega.
 Qed.
 
@@ -353,14 +353,14 @@ Qed.
 (* Qed. *)
 
 
-Lemma sizeOf_env_getlist_setlist k rho1 rho2 rho2' xs ys vs :
-  getlist xs rho1 = Some vs ->
-  setlist ys vs rho2 = Some rho2' ->
+Lemma sizeOf_env_get_list_set_lists k rho1 rho2 rho2' xs ys vs :
+  get_list xs rho1 = Some vs ->
+  set_lists ys vs rho2 = Some rho2' ->
   sizeOf_env k rho2' <= max (sizeOf_env k rho1) (sizeOf_env k rho2).
 Proof.
-  intros Hget Hset. erewrite sizeOf_env_setlist; eauto.
+  intros Hget Hset. erewrite sizeOf_env_set_lists; eauto.
   eapply Nat.max_le_compat; eauto.
-  eapply sizeOf_env_getlist; eauto.
+  eapply sizeOf_env_get_list; eauto.
 Qed.
 
 Lemma max_list_nat_monotonic (A : Type) (f1 f2 : A -> nat) (l : list A) (n1 n2 : nat) :
@@ -376,13 +376,13 @@ Qed.
 Lemma sizeOf_env_set_app k rho rho' rho'' f xs B f' ys e vs :
   k > 0 ->
   rho ! f = Some (Vfun rho' B f') ->
-  getlist xs rho = Some vs ->
+  get_list xs rho = Some vs ->
   sizeOf_exp e <= sizeOf_fundefs B ->
-  setlist ys vs (def_funs B B rho' rho') = Some rho'' ->
+  set_lists ys vs (def_funs B B rho' rho') = Some rho'' ->
   max (sizeOf_exp e) (sizeOf_env (k - 1) rho'') <= sizeOf_env k rho.
 Proof.
   intros Hgt Hget Hget' Hf Hset.
-  erewrite sizeOf_env_setlist; eauto.
+  erewrite sizeOf_env_set_lists; eauto.
   rewrite (Max.max_comm (max_list_nat_with_measure _ _ _) _), Max.max_assoc.
   eapply Nat.max_lub.
   - eapply le_trans; [| now eapply sizeOf_env_get; eauto ].
@@ -395,7 +395,7 @@ Proof.
       Max.max_assoc, Max.max_idempotent; eauto.
   - eapply le_trans. eapply (max_list_nat_monotonic _ _ (sizeOf_val k)); eauto.
     intros. eapply sizeOf_val_monotic. omega.
-    eapply sizeOf_env_getlist; eauto.
+    eapply sizeOf_env_get_list; eauto.
 Qed.
 
 Lemma sizeOf_exp_grt_1 e :

@@ -49,7 +49,7 @@ Section UNCURRY.
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     | Ecase x arms =>
       eq_var k x ||
-              (fix occurs_in_arms (arms: list (cTag * exp)) : bool :=
+              (fix occurs_in_arms (arms: list (ctor_tag * exp)) : bool :=
                  match arms with
                  | nil => false
                  | p::arms1 => match p with
@@ -75,18 +75,18 @@ Section UNCURRY.
          end.
 
 
-  (* Maps (arrity+1) to the right fTag *)
-  Definition arrityMap:Type := M.t fTag.
+  (* Maps (arrity+1) to the right fun_tag *)
+  Definition arrityMap:Type := M.t fun_tag.
   Definition localMap:Type := M.t bool.
   
   (* The state for this includes 
      1 - "next" var for gensyming a fresh variable
      2 - a boolean for tracking whether or not a reduction happens
-     3 - Map recording the (new) fTag associated to each arrity
-     4 - fEnv to record the calling convention of each fTag  
-     5 - "next" available fTag 
+     3 - Map recording the (new) fun_tag associated to each arrity
+     4 - fun_env to record the calling convention of each fun_tag  
+     5 - "next" available fun_tag 
      6 - local map from var to if function has already been uncurried *)
-  Definition stateType:Type := (var * bool * arrityMap * fEnv * fTag * localMap * St). 
+  Definition stateType:Type := (var * bool * arrityMap * fun_env * fun_tag * localMap * St). 
   Definition uncurryM := state stateType.
 
 
@@ -149,8 +149,8 @@ Section UNCURRY.
 
 
 
- (* get the fTag at arrity N. If there isn't one already, create it *)
- Definition get_fTag (n:N):uncurryM fTag :=
+ (* get the fun_tag at arrity N. If there isn't one already, create it *)
+ Definition get_fun_tag (n:N):uncurryM fun_tag :=
     s <- get ;;
         match (s:stateType%type) with
         | (y,b, aenv, fenv, ft, lm, s) =>
@@ -194,8 +194,8 @@ Section UNCURRY.
     | Ecase x arms =>
       (* annoyingly, I can't seem to use a separate mapM definition here, but
          if I inline the definition, and specialize it, it seems to work. *)
-      arms' <- (fix uncurry_list (arms: list (cTag*exp)) :
-                  uncurryM (list (cTag*exp)) :=
+      arms' <- (fix uncurry_list (arms: list (ctor_tag*exp)) :
+                  uncurryM (list (ctor_tag*exp)) :=
                   match arms with
                   | nil => ret nil
                   | h::t =>
@@ -241,7 +241,7 @@ Section UNCURRY.
                _ <- click ;;
                let fp_numargs := length (gvs' ++ fvs')  in
                _ <- markToInline fp_numargs f g;;
-               fp_ft <- get_fTag (BinNat.N.of_nat fp_numargs);;
+               fp_ft <- get_fun_tag (BinNat.N.of_nat fp_numargs);;
                ret (Fcons f f_ft (fk::fvs')
                           (* Note: tag given for arrity |fvs| + |gvs|  *)
                           (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
@@ -258,13 +258,13 @@ Section UNCURRY.
 
   (* Tries to uncurry functions within [e].  If no function matches the
      pattern, returns [None], otherwise returns the transformed expression. *)
-  Definition uncurry (e:exp) (aenv: arrityMap) (fenv:fEnv) (ft: fTag) (lm:localMap) (freshvar:positive) (s:St) : option (exp*arrityMap*fEnv *fTag*localMap*var*St) :=
+  Definition uncurry (e:exp) (aenv: arrityMap) (fenv:fun_env) (ft: fun_tag) (lm:localMap) (freshvar:positive) (s:St) : option (exp*arrityMap*fun_env *fun_tag*localMap*var*St) :=
     match runState (uncurry_exp e) (freshvar ,false, aenv, fenv , ft,lm, s) with
     | (e, (maxvar ,true, aenv , fenv , ft, lm, s)) => Some (e, aenv, fenv, ft, lm, maxvar, s)
     | _ => None
     end.
 
-  Fixpoint uncurry_fuel' (n:nat) (e:exp) (aenv:arrityMap) (fenv:fEnv) (ft:fTag) (lm:localMap) (freshvar:positive) (s:St): (exp * St * fEnv) :=
+  Fixpoint uncurry_fuel' (n:nat) (e:exp) (aenv:arrityMap) (fenv:fun_env) (ft:fun_tag) (lm:localMap) (freshvar:positive) (s:St): (exp * St * fun_env) :=
     match n with
     | 0 => (e, s, fenv)
     | S m => match uncurry e aenv fenv ft lm freshvar s with
@@ -274,7 +274,7 @@ Section UNCURRY.
     end.
 
 
-  Definition uncurry_fuel (n:nat) (e:exp) (fenv:fEnv): (exp * St * fEnv) :=
+  Definition uncurry_fuel (n:nat) (e:exp) (fenv:fun_env): (exp * St * fun_env) :=
     let max_ft := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1%positive in
     let freshvar := ((max_var e 1) + 1)%positive in
     uncurry_fuel' n e (M.empty _) fenv (Pos.succ max_ft) (M.empty _) freshvar (0%nat, M.empty _).

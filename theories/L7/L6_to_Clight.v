@@ -65,30 +65,30 @@ Fixpoint makeArgList' (vs : list positive) : list N :=
 Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
 
 
-(* Compute an fEnv by looking at the number of arguments functions are applied to, assumes that all functions sharing the same tags have the same arity *)
-Fixpoint compute_fEnv' (n : nat) (fenv : fEnv) (e : exp) : fEnv :=
+(* Compute an fun_env by looking at the number of arguments functions are applied to, assumes that all functions sharing the same tags have the same arity *)
+Fixpoint compute_fun_env' (n : nat) (fenv : fun_env) (e : exp) : fun_env :=
   match n with
   | 0 => fenv
   | S n' => match e with
-           | Econstr x t vs e' => compute_fEnv' n' fenv e'
-           | Ecase x cs => fold_left (compute_fEnv' n') (map snd cs) fenv
-           | Eproj x t n v e' => compute_fEnv' n' fenv e'
-           | Efun fnd e' => compute_fEnv' n'
-                                         (compute_fEnv_fundefs n' fnd fenv)
+           | Econstr x t vs e' => compute_fun_env' n' fenv e'
+           | Ecase x cs => fold_left (compute_fun_env' n') (map snd cs) fenv
+           | Eproj x t n v e' => compute_fun_env' n' fenv e'
+           | Efun fnd e' => compute_fun_env' n'
+                                         (compute_fun_env_fundefs n' fnd fenv)
                                          e'
            | Eapp x t vs => M.set t (N.of_nat (length vs) , makeArgList vs) fenv
-           | Eprim x p vs e' => compute_fEnv' n' fenv e'
+           | Eprim x p vs e' => compute_fun_env' n' fenv e'
            | Ehalt x => fenv
            end
   end
-with compute_fEnv_fundefs n fnd fenv :=
+with compute_fun_env_fundefs n fnd fenv :=
        match n with
        | 0 => fenv
        | S n' => match fnd with
                 | Fnil => fenv
                 | Fcons f t vs e fnd' =>
                   let fenv' := M.set t (N.of_nat (length vs) , makeArgList vs) fenv in
-                  compute_fEnv_fundefs n' fnd' (compute_fEnv' n' fenv' e)
+                  compute_fun_env_fundefs n' fnd' (compute_fun_env' n' fenv' e)
                 end
        end.
 
@@ -113,16 +113,16 @@ with max_depth_fundefs fnd :=
                                          (max_depth_fundefs fnd'))
        end.
 
-(* fEnv maps tags to function info *)
-Definition compute_fEnv (e : exp) : fEnv :=
-  compute_fEnv' (max_depth e) (M.empty fTyInfo) e.
+(* fun_env maps tags to function info *)
+Definition compute_fun_env (e : exp) : fun_env :=
+  compute_fun_env' (max_depth e) (M.empty fun_ty_info) e.
 
 
 Fixpoint get_allocs (e : exp) : list positive :=
   match e with
   | Econstr x t vs e' => x :: (get_allocs e')
   | Ecase x cs =>
-    (fix helper (cs : list (cTag * exp)) :=
+    (fix helper (cs : list (ctor_tag * exp)) :=
        match cs with
        | nil => nil
        | cons (z, e') cs' => (get_allocs e') ++ (helper cs')
@@ -149,7 +149,7 @@ Fixpoint max_allocs (e : exp) : nat :=
     | _ => S (max_allocs e' + length vs)
     end
   | Ecase x cs =>
-    (fix helper (cs : list (cTag * exp)) :=
+    (fix helper (cs : list (ctor_tag * exp)) :=
        match cs with
        | nil => 0
        | cons (z, e') cs' => max (max_allocs e') (helper cs')
@@ -172,7 +172,7 @@ Fixpoint max_args (e : exp) : nat :=
   match e with
   | Econstr x t vs e' => max_args e'
   | Ecase x cs =>
-    (fix helper (cs : list (cTag * exp)) :=
+    (fix helper (cs : list (ctor_tag * exp)) :=
        match cs with
        | nil => 0
        | cons (z, e') cs' => max (max_args e') (helper cs')
@@ -191,31 +191,35 @@ with max_args_fundefs (fnd : fundefs) :=
        end.
 
 (* named ienv *)
-(* TODO: move this to cps and replace the current definition of iTyInfo *)
+(* TODO: move this to cps and replace the current definition of ind_ty_info *)
 (* 1) name of inductive type
    2) list containing
       2.1 name of the constructor
-      2.2 tag of the contructor (in cEnv)
+      2.2 tag of the contructor (in ctor_env)
       2.3 arrity of the constructor
       2.4 ordinal of the constructor *)
-Definition n_iTyInfo:Type := BasicAst.name * list (BasicAst.name * cTag * N * N).
+Definition n_ind_ty_info:Type := BasicAst.name * list (BasicAst.name * ctor_tag * N * N).
 
-Definition n_iEnv := M.t n_iTyInfo.
+Definition n_ind_env := M.t n_ind_ty_info.
 
 
-
-Definition update_iEnv (ienv : n_iEnv) (p : positive) (cInf : cTyInfo) : n_iEnv :=
-  let '(name, nameTy, t, arity, ord) := cInf in
+Definition update_ind_env (ienv : n_ind_env) (p : positive) (cInf : ctor_ty_info) : n_ind_env :=
+  let '{| ctor_name := name
+        ; ctor_ind_name := nameTy
+        ; ctor_ind_tag := t
+        ; ctor_arity := arity
+        ; ctor_ordinal := ord
+        |} := cInf in
   match (M.get t ienv) with
   | None => M.set t (nameTy, ((name, p, arity, ord) :: nil)) ienv
   | Some (nameTy, iInf) => M.set t (nameTy, (name, p, arity, ord) :: iInf) ienv
   end.
 
-Definition compute_iEnv (cenv : cEnv) : n_iEnv :=
-  M.fold update_iEnv cenv (M.empty _).
+Definition compute_ind_env (cenv : ctor_env) : n_ind_env :=
+  M.fold update_ind_env cenv (M.empty _).
 
 (* OS: getEnumOrdinal and getBoxedOrdinal are only used in the proof to should that the ordinal is unique (within an ind) within a given tag *)
-Fixpoint getEnumOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
+Fixpoint getEnumOrdinal' (ct : ctor_tag) (l : list (ctor_tag * N)) : option N :=
   match l with
   | nil => None
   | cons (ct' , n) l' =>
@@ -231,10 +235,10 @@ Fixpoint getEnumOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
     end
   end.
 
-Definition getEnumOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
+Definition getEnumOrdinal (ct : ctor_tag) (l : list (ctor_tag * N)) : option N :=
   getEnumOrdinal' ct (rev l).
 
-Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
+Fixpoint getBoxedOrdinal' (ct : ctor_tag) (l : list (ctor_tag * N)) : option N :=
   match l with
   | nil => None
   | cons (ct' , n) l' =>
@@ -250,32 +254,21 @@ Fixpoint getBoxedOrdinal' (ct : cTag) (l : list (cTag * N)) : option N :=
     end
   end.
 
-Definition getBoxedOrdinal (ct : cTag) (l : list (cTag * N)) : option N :=
+Definition getBoxedOrdinal (ct : ctor_tag) (l : list (ctor_tag * N)) : option N :=
   getBoxedOrdinal' ct (rev l).
 
-Inductive cRep : Type :=
-| enum : N -> cRep
+Inductive ctor_rep : Type :=
+| enum : N -> ctor_rep
 (* [enum t] represents a constructor with no parameters with ordinal [t] *)
-| boxed : N -> N -> cRep.
+| boxed : N -> N -> ctor_rep.
 (* [boxed t a] represents a construct with arity [a] and ordinal [t]  *)
 
 
-
-Definition make_cRep (cenv:cEnv) (ct : cTag) : option cRep :=
+Definition make_ctor_rep (cenv:ctor_env) (ct : ctor_tag) : option ctor_rep :=
   p <- M.get ct cenv ;;
-  let '(name, _, it , a , n) := p in
-(*  l <- M.get it ienv ;;
-    let '(nameTy, l) := l in *)
-    match (a =? 0)%N with
-    | true =>
-      ret (enum n)
-(*    n' <- getEnumOrdinal ct l ;;
-      ret (enum n') *)
-    | false =>
-      ret (boxed n a)
-(*    n' <- getBoxedOrdinal ct l ;;
-      ret (boxed n' a) *)
-    end.
+  if ((ctor_arity p) =? 0)%N
+    then ret (enum (ctor_ordinal p))
+    else ret (boxed (ctor_ordinal p) (ctor_arity p)).
 
 Notation threadStructInf := (Tstruct threadInfIdent noattr).
 Notation threadInf := (Tpointer threadStructInf noattr).
@@ -449,14 +442,14 @@ Definition reserve' (funInf : positive) (l : Z) : statement :=
 
 
 (* Don't shift the tag for boxed, make sure it is under 255 *)
-Fixpoint makeTagZ (cenv:cEnv) (ct : cTag) : option Z :=
-  rep <- make_cRep cenv ct ;;
+Fixpoint makeTagZ (cenv:ctor_env) (ct : ctor_tag) : option Z :=
+  rep <- make_ctor_rep cenv ct ;;
   match rep with
   | enum t => ret (Z.of_N ((N.shiftl t 1) + 1))
   | boxed t a => ret (Z.of_N ((N.shiftl a 10) + t))
   end.
 
-Definition makeTag (cenv: cEnv) (ct : cTag) : option expr :=
+Definition makeTag (cenv: ctor_env) (ct : ctor_tag) : option expr :=
   t <- makeTagZ cenv ct ;;
   ret (c_int t val).
 
@@ -470,11 +463,11 @@ Definition makeVar (x:positive) (m:M.t positive) :=
 
 
 (* DEPRECATED: map is here to identify which value represents function  *)
-Fixpoint assignConstructor' (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
+Fixpoint assignConstructor' (cenv:ctor_env) (ienv : n_ind_env) (map:M.t positive) (x : positive) (t : ctor_tag) (vs : list positive) :=
   match vs with
   | nil =>
     tag <- makeTag cenv t;;
-        rep <- make_cRep cenv t ;;
+        rep <- make_ctor_rep cenv t ;;
         match rep with
         | enum _ =>
           ret (x ::= tag)
@@ -492,7 +485,7 @@ Fixpoint assignConstructor' (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : 
                    Field(var x, Z.of_nat (length vs')) :::= (*[val]*) vv)
   end.
 (* DEPRECATED *)
-Definition assignConstructor (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv ienv map x t (rev vs).
+Definition assignConstructor (cenv:ctor_env) (ienv : n_ind_env) (map:M.t positive) (x : positive) (t : ctor_tag) (vs : list positive) := assignConstructor' cenv ienv map x t (rev vs).
 
 
 (* OS: assignConstructor' without the rev *)
@@ -511,9 +504,9 @@ Fixpoint assignConstructorS' (map:M.t positive) (x : positive) (cur:nat) (vs : l
   end.
 
 
-Definition assignConstructorS (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
+Definition assignConstructorS (cenv:ctor_env) (ienv : n_ind_env) (map:M.t positive) (x : positive) (t : ctor_tag) (vs : list positive) :=
       tag <- makeTag cenv t;;
-        rep <- make_cRep cenv t ;;
+        rep <- make_ctor_rep cenv t ;;
         match rep with
         | enum _ =>
           ret (x ::= tag)
@@ -539,8 +532,8 @@ Definition isPtr (x : positive) :=
 Definition isPtr (retId:positive) (v:positive) :=
   Scall (Some retId) ptr ([val](var v) :: nil).
 
-Definition isBoxed (cenv:cEnv) (ienv : n_iEnv) (ct : cTag) : bool :=
-  match make_cRep cenv  ct with
+Definition isBoxed (cenv:ctor_env) (ienv : n_ind_env) (ct : ctor_tag) : bool :=
+  match make_ctor_rep cenv  ct with
   | None => false
   | Some rep => match rep with
                | enum t => false
@@ -606,7 +599,7 @@ Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_s
 
 
 
-Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map : M.t positive) : option statement :=
+Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : M.t positive) : option statement :=
   match e with
   | Econstr x t vs e' =>
     prog <- assignConstructorS cenv ienv map x t vs ;;
@@ -614,7 +607,7 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
          ret (prog ; prog')
   | Ecase x cs =>
     (* ls <- boxed cases (Vptr), ls <- unboxed (Vint) *)
-    p <- ((fix makeCases (l : list (cTag * exp)) :=
+    p <- ((fix makeCases (l : list (ctor_tag * exp)) :=
             match l with
             | nil => ret (LSnil, LSnil)
             | cons p l' =>
@@ -675,7 +668,7 @@ Definition mkFun (vs : list positive) (body : statement) : function :=
              nil
              body.
 
-Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (map : M.t positive) :
+Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (map : M.t positive) :
   option (list (positive * globdef Clight.fundef type)) :=
   match fnd with
   | Fnil => ret nil
@@ -747,7 +740,7 @@ Definition body_external_decl: (positive * globdef Clight.fundef type) :=
      (bodyIdent,  Gfun (External (EF_external ("body"%string) (signature_of_type  params Tvoid cc_default)) params Tvoid cc_default)).
 
 
-Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (m : M.t positive) :
+Fixpoint translate_funs (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (m : M.t positive) :
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
@@ -800,7 +793,7 @@ Definition pos2string p :=
 
 Definition show_pos x :=  pos2string x. (*nat2string10 (Pos.to_nat x). *)
 
-Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t BasicAst.name) : M.t BasicAst.name :=
+Definition update_name_env_fun_info (f f_inf : positive) (nenv : M.t BasicAst.name) : M.t BasicAst.name :=
   match M.get f nenv with
   | None => M.set f_inf (nNamed (append (show_pos f) "_info")) nenv
   | Some n => match n with
@@ -816,7 +809,7 @@ Definition update_nEnv_fun_info (f f_inf : positive) (nenv : M.t BasicAst.name) 
   rest = indices of live roots in args array
 *)
 
-Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t BasicAst.name)
+Fixpoint make_fundef_info (fnd : fundefs) (fenv : fun_env) (nenv : M.t BasicAst.name)
   : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t BasicAst.name)) :=
   match fnd with
   | Fnil => ret (Some (nil, M.empty positive, nenv))
@@ -841,14 +834,14 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fEnv) (nenv : M.t BasicAst.nam
                             ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int len) :: (make_ind_array l)) true false in
                        ret (Some (((info_name , Gvar ind) :: defs) ,
                                   M.set x info_name map ,
-                                  update_nEnv_fun_info x info_name nenv'))
+                                  update_name_env_fun_info x info_name nenv'))
            end
     end
   end.
 
 
 
-Fixpoint add_bodyinfo (e : exp) (fenv : fEnv) (nenv : M.t BasicAst.name) (map: M.t positive) (defs:list (positive * globdef Clight.fundef type)) :=
+Fixpoint add_bodyinfo (e : exp) (fenv : fun_env) (nenv : M.t BasicAst.name) (map: M.t positive) (defs:list (positive * globdef Clight.fundef type)) :=
             info_name <- getName ;;
             let ind :=
                 mkglobvar
@@ -864,7 +857,7 @@ Fixpoint add_bodyinfo (e : exp) (fenv : fEnv) (nenv : M.t BasicAst.name) (map: M
 
 
 (* Make fundef_info for functions in fnd (if any), and for the body of the program *)
-Fixpoint make_funinfo (e : exp) (fenv : fEnv) (nenv : M.t BasicAst.name)
+Fixpoint make_funinfo (e : exp) (fenv : fun_env) (nenv : M.t BasicAst.name)
   : nState (option (list (positive * globdef Clight.fundef type) * M.t positive * M.t BasicAst.name)) :=
   match e with
   | Efun fnd e' =>
@@ -901,7 +894,7 @@ Definition global_defs (e : exp)
       ))
     :: nil.
 
-Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (nenv : M.t BasicAst.name) :
+Definition make_defs (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (nenv : M.t BasicAst.name) :
   nState (option (M.t BasicAst.name * (list (positive * globdef Clight.fundef type)))) :=
   fun_inf' <- make_funinfo e fenv nenv ;;
            match fun_inf' with
@@ -1017,11 +1010,11 @@ Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
     make_constrAsgn' argv argList 1.
 
 (* Compute the  header file comprising of:
- 1 ) Constructors and eliminators for every inductive types in the n_iEnv
+ 1 ) Constructors and eliminators for every inductive types in the n_ind_env
 2 ) Direct style calling functions for the original (named) functions
  *)
 
-Fixpoint make_constructors (cenv:cEnv) (nTy:BasicAst.ident) (ctrs: list (BasicAst.name * cTag * N * N)) (nenv : M.t BasicAst.name): nState (M.t BasicAst.name * (list (positive * globdef Clight.fundef type))) :=
+Fixpoint make_constructors (cenv:ctor_env) (nTy:BasicAst.ident) (ctrs: list (BasicAst.name * ctor_tag * N * N)) (nenv : M.t BasicAst.name): nState (M.t BasicAst.name * (list (positive * globdef Clight.fundef type))) :=
   match ctrs with
   | nil => ret (nenv, nil)
   | (nAnon, tag, 0%N, ord)::ctrs =>
@@ -1161,7 +1154,7 @@ Definition make_namesGV (nameList:list BasicAst.name ): (globdef Clight.fundef t
                      false).
 
 
-Definition make_eliminator (cenv: cEnv) (nTy:BasicAst.ident) (ctrs: list (BasicAst.name * cTag * N * N)) (nenv:M.t BasicAst.name): nState (M.t BasicAst.name * (list (ident * globdef Clight.fundef type))) :=
+Definition make_eliminator (cenv: ctor_env) (nTy:BasicAst.ident) (ctrs: list (BasicAst.name * ctor_tag * N * N)) (nenv:M.t BasicAst.name): nState (M.t BasicAst.name * (list (ident * globdef Clight.fundef type))) :=
   valIdent <- getName;;
   ordIdent <- getName;;
   argvIdent <- getName;;
@@ -1169,7 +1162,7 @@ Definition make_eliminator (cenv: cEnv) (nTy:BasicAst.ident) (ctrs: list (BasicA
   nameIdent <- getName;;
   gv_arrIdent <- getName;;
   gv_namesIdent <- getName;;
- temp <- (fix make_elim_cases (ctrs: list (BasicAst.name * cTag * N * N)) (currOrd:nat) :=
+ temp <- (fix make_elim_cases (ctrs: list (BasicAst.name * ctor_tag * N * N)) (currOrd:nat) :=
                        match ctrs with
                        | nil => ret (LSnil, LSnil, nil, nil)
                        | (nName, ctag, n, ord)::ctrs =>
@@ -1212,7 +1205,7 @@ Definition make_eliminator (cenv: cEnv) (nTy:BasicAst.ident) (ctrs: list (BasicA
     ret (nenv, (gv_namesIdent, gv_names)::(gv_arrIdent, gv_arr)::(elim_fun_id ,Gfun elim_fun)::nil).
 
 
-Fixpoint make_interface (cenv: cEnv)(ienv_list:list (positive * n_iTyInfo)) (nenv : M.t BasicAst.name):  nState (M.t BasicAst.name * (list (ident * globdef Clight.fundef type))) :=
+Fixpoint make_interface (cenv: ctor_env)(ienv_list:list (positive * n_ind_ty_info)) (nenv : M.t BasicAst.name):  nState (M.t BasicAst.name * (list (ident * globdef Clight.fundef type))) :=
   match ienv_list with
   | nil => ret (nenv, nil)
   | (_, (nAnon, _))::ienv_list' =>
@@ -1406,7 +1399,7 @@ Definition make_call_n_export_b (nenv:M.t BasicAst.name) (n:nat) (export:bool) (
 Definition tinf_def:globdef Clight.fundef type :=
   Gvar (mkglobvar threadInf ((Init_space 4%Z)::nil) false false).
 
-Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t BasicAst.name):  nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
+Definition make_header (cenv:ctor_env) (ienv:n_ind_env) (e:exp) (nenv : M.t BasicAst.name):  nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
   l <- make_interface cenv (M.elements ienv) nenv;;
     let (nenv, inter_l) := l in
     l <- make_halt nenv;;
@@ -1425,11 +1418,11 @@ Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t BasicAst.na
 (* end of header file *)
 
 
-Definition compile (e : exp) (cenv : cEnv) (nenv : M.t BasicAst.name) :
+Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
   (M.t BasicAst.name * option Clight.program * option Clight.program) :=
   let e := wrap_in_fun e in
-  let fenv := compute_fEnv e in
-  let ienv := compute_iEnv cenv in
+  let fenv := compute_fun_env e in
+  let ienv := compute_ind_env cenv in
   let p'' := make_defs e fenv cenv ienv nenv in
   let n := ((max_var e 100) + 1)%positive in
   let p' :=  (p''.(runState) n) in

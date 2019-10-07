@@ -113,15 +113,15 @@ Module Top.
     intros. unfold key_set, In. rewrite H. eauto.
   Qed. 
 
-  Lemma key_set_getlist {A} rho1 xs (vs : list A) :
-    getlist xs rho1 = Some vs ->
+  Lemma key_set_get_list {A} rho1 xs (vs : list A) :
+    get_list xs rho1 = Some vs ->
     FromList xs \subset key_set rho1. 
   Proof with (now eauto with Ensembles_DB).
     revert rho1 vs. induction xs; intros rho1 vs1 Hget; inv Hget.
     - normalize_sets...
     - normalize_sets.
       destruct (M.get a rho1) eqn:Hgeta; try congruence. 
-      destruct (getlist xs rho1) eqn:Hgetl; try congruence. 
+      destruct (get_list xs rho1) eqn:Hgetl; try congruence. 
       inv H0.
       eapply Union_Included.
       + eapply Singleton_Included. eapply key_set_get.

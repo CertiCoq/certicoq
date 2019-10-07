@@ -24,9 +24,9 @@ Fixpoint get_list {A} (xs: list M.elt) (rho: M.t A) : option (list A) :=
   | nil => Some nil
   end.
 
-Fixpoint set_list {A} (xs: list M.elt) (vs: list A) (rho: M.t A) : option (M.t A) :=
+Fixpoint set_lists {A} (xs: list M.elt) (vs: list A) (rho: M.t A) : option (M.t A) :=
   match xs, vs with
-  | x::xs', v::vs' => match set_list xs' vs' rho with
+  | x::xs', v::vs' => match set_lists xs' vs' rho with
                      | Some rho' => Some (M.set x v rho')
                      | None => None
                      end
@@ -379,7 +379,7 @@ Definition unknown_ctor_ty_info : ctor_ty_info :=
 Definition unknown_ind_ty_info : ind_ty_info := nil.
 
 (* An constructor environment maps [ctor_tag]s to their information *)
-Definition ctorEnv := M.t ctor_ty_info.
+Definition ctor_env := M.t ctor_ty_info.
 
 (* An inductive type environment maps [ind_tag]s to their constructors with their arities *)
 Definition ind_env := M.t ind_ty_info.
@@ -391,7 +391,7 @@ Definition fun_ty_info : Type := N * list N.
 Definition fun_env : Type := M.t fun_ty_info.
 
 (** Register the tag used for closures **)
-Definition add_closureTag (c i : positive) (cenv : ctorEnv) : ctorEnv :=
+Definition add_closure_tag (c i : positive) (cenv : ctor_env) : ctor_env :=
   let info := {| ctor_name     := nAnon
                ; ctor_ind_name := nAnon
                ; ctor_ind_tag  := i

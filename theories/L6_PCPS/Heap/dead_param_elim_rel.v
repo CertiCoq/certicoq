@@ -40,7 +40,7 @@ Definition eliminated_funs L : Ensemble var :=
    That is, whatever is in S, is undefined in the environment when we execute the code. *)
 Inductive Live_body (L : var -> option (list bool)) (S : Ensemble var) :  exp -> exp -> Prop := 
 | BLive_Constr : 
-  forall (x : var) (ys : list var) (ct : cTag) (e : exp) (e' : exp), 
+  forall (x : var) (ys : list var) (ct : ctor_tag) (e : exp) (e' : exp), 
     Disjoint _ (FromList ys) (S :|: eliminated_funs L) -> 
     Live_body L S e e' ->
     Live_body L S (Econstr x ct ys e) (Econstr x ct ys e')
@@ -50,12 +50,12 @@ Inductive Live_body (L : var -> option (list bool)) (S : Ensemble var) :  exp ->
     Live_body L S e e' ->
     Live_body L S (Eprim x g ys e) (Eprim x g ys e')
 | BLive_Proj : 
-  forall (x : var) (ct : cTag) (n : N) (y : var) (e : exp) (e' : exp), 
+  forall (x : var) (ct : ctor_tag) (n : N) (y : var) (e : exp) (e' : exp), 
     ~ y \in (S :|: eliminated_funs L) ->
     Live_body L S e e' ->
     Live_body L S (Eproj x ct n y e) (Eproj x ct n y e')
 | BLive_Case: 
-  forall (x : var) (ce : list (cTag * exp)) (ce' : list (cTag * exp)),
+  forall (x : var) (ce : list (ctor_tag * exp)) (ce' : list (ctor_tag * exp)),
     ~ x \in (S :|: eliminated_funs L) ->
     Forall2 (fun p1 p2 => fst p1 = fst p2 /\ Live_body L S (snd p1) (snd p2)) ce ce' -> 
     Live_body L S (Ecase x ce) (Ecase x ce')
@@ -64,7 +64,7 @@ Inductive Live_body (L : var -> option (list bool)) (S : Ensemble var) :  exp ->
       ~ x \in (S :|: eliminated_funs L) ->
       Live_body L S (Ehalt x) (Ehalt x)
 | BLive_App_Unknown :
-    forall (f : var) (ys : list var) (ft : fTag),
+    forall (f : var) (ys : list var) (ft : fun_tag),
       (* Unknown function application, f is not in the list of top-level
          function definitions. Therefore, it must be a parameter of the current
          function *)
@@ -73,7 +73,7 @@ Inductive Live_body (L : var -> option (list bool)) (S : Ensemble var) :  exp ->
       L f = None -> 
       Live_body L S (Eapp f ft ys) (Eapp f ft ys)
 | BLive_App_Known :
-    forall (f : var) (ys : list var) (ys' : list var) (ft : fTag) (bs : list bool),
+    forall (f : var) (ys : list var) (ys' : list var) (ft : fun_tag) (bs : list bool),
       L f = Some bs ->
       ~ f \in S ->
       Live_args (S :|: eliminated_funs L) ys bs ys' ->
@@ -97,7 +97,7 @@ Inductive Live_fundefs (L : var -> option (list bool)) : fundefs -> fundefs -> P
   Live_fundefs L Fnil Fnil
 | FLive_cons : 
   forall (F : fundefs) (F' : fundefs) (e : exp) (e' : exp) (xs ys : list var) (bs : list bool)
-    (g : var) (ft : fTag) (S : Ensemble var), 
+    (g : var) (ft : fun_tag) (S : Ensemble var), 
     L g = Some bs ->  
     Live_params xs bs ys S -> 
     Live_body L S e e' ->

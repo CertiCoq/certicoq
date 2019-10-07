@@ -162,7 +162,7 @@ match e with
 | Econstr x t ys e' => escaping_fun_exp e' (add_escapings' ys L funs) funs 
 | Eproj x t n y e' => escaping_fun_exp e' L funs
 | Ecase x P => 
-  (fix mapM_LD (l : list (cTag * exp)) (L : live_fun) := 
+  (fix mapM_LD (l : list (ctor_tag * exp)) (L : live_fun) := 
   match l with 
   | [] => L
   | (c', e') :: l' =>
@@ -193,7 +193,7 @@ match e with
   live_expr B L' funs n e'
 | Ecase x P => 
   let L' := add_var x L n in
-  (fix mapM_LD  (l : list (cTag * exp))  (L : live_fun) := 
+  (fix mapM_LD  (l : list (ctor_tag * exp))  (L : live_fun) := 
   match l with 
   | [] => L
   | (c', e') :: l'=>
@@ -286,7 +286,7 @@ match e with
 | Econstr x t ys e' => Econstr x t ys (eliminate_expr L funs e')
 | Eproj x t m y e' => Eproj x t m y (eliminate_expr L funs e')
 | Ecase x P =>
-  let P' := (fix mapM_LD (l : list (cTag * exp)) : list (cTag * exp) :=
+  let P' := (fix mapM_LD (l : list (ctor_tag * exp)) : list (ctor_tag * exp) :=
   match l with 
   | [] => l
   | (c', e') :: l' => (c', eliminate_expr L funs e') :: mapM_LD l'

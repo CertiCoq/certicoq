@@ -20,9 +20,9 @@ Open Scope fun_scope.
 
 Section L6_trans.
    
-    Variable (clo_tag : cTag).
+    Variable (clo_tag : ctor_tag).
     Variable (pr : prims).
-    Variable (cenv : cEnv).
+    Variable (cenv : ctor_env).
 
     (** Observation relation for phases other than closure conversion *)
     Inductive obs_rel : val -> val -> Prop :=
@@ -174,8 +174,8 @@ Section L6_trans.
       unfold closure_conversion_hoist. 
       set (S := fun y => BinPos.Pos.le (max_var e 1 + 1 + 1)%positive y).
       set (s := {| next_var := (max_var e 1 + 1 + 1)%positive;
-                   nect_cTag := ctag;
-                   next_iTag := itag;
+                   nect_ctor_tag := ctag;
+                   next_ind_tag := itag;
                    closure_conversion.cenv := cenv |} ).
       assert ({{ fun s : state_contents => fresh S (next_var s)}}
                 exp_closure_conv clo_tag e (Maps.PTree.empty VarInfo)
@@ -245,8 +245,8 @@ Section L6_trans.
       set (Γ := ((max_list (map fst (M.elements rho)) (max_var e 1)) + 1)%positive).
       set (S := fun y => BinPos.Pos.le (Γ + 1)%positive y).
       set (s := {| next_var := (Γ + 1)%positive;
-                   nect_cTag := ctag;
-                   next_iTag := itag;
+                   nect_ctor_tag := ctag;
+                   next_ind_tag := itag;
                    closure_conversion.cenv := cenv |} ).
       set (map := fold_left
                     (fun (map : M.t VarInfo) (p : M.elt * val) =>

@@ -502,8 +502,8 @@ Module Size (H : Heap).
     eapply le_trans; [| now apply Hm]. omega. simpl.
 
     eapply Forall2_length in Hall.
-    eapply (@getlist_length_eq value) in H11; try eassumption.
-    eapply (@getlist_length_eq value) in H14; try eassumption.
+    eapply (@get_list_length_eq value) in H11; try eassumption.
+    eapply (@get_list_length_eq value) in H14; try eassumption.
     replace (@length var ys1) with (@length M.elt ys1) in *. 
     rewrite <- H14, Hall. rewrite !plus_assoc. reflexivity. reflexivity.
   Qed.
@@ -1544,7 +1544,7 @@ Module Size (H : Heap).
         (H1 H1' H2 Hgc2: heap block)
         env_loc1 env_loc2
         (rho_clo rho_clo1 rho_clo2 rho2 rho2' : env)
-        (B1 B2 : fundefs) (f1 f2 : var) (ct1 ct2 : cTag)
+        (B1 B2 : fundefs) (f1 f2 : var) (ct1 ct2 : ctor_tag)
         (xs1 xs2 : list var) (e1 e2 : exp) c
         (vs1 vs2 : list value) 
         fls d
@@ -1553,10 +1553,10 @@ Module Size (H : Heap).
         get env_loc1 H1 = Some (Env rho_clo) ->
         find_def f1 B1 = Some (ct1, xs1, e1) ->
         def_closures B1 B1 rho_clo H1 (Loc env_loc1) = (H1', rho_clo1) ->
-        setlist xs1 vs1 rho_clo1 = Some rho_clo2 ->
+        set_lists xs1 vs1 rho_clo1 = Some rho_clo2 ->
         
         Some rho2' =
-        setlist xs2 (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
+        set_lists xs2 (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
         find_def f2 B2 = Some (ct2, xs2, e2) ->
         live' ((env_locs rho2') (occurs_free e2)) H2 Hgc2 d ->
 
@@ -1589,7 +1589,7 @@ Module Size (H : Heap).
     assert (Hdis' : Disjoint loc Scope
                              (env_locs rho_clo2 (name_in_fundefs B1 :&: occurs_free e1))). 
     { eapply Disjoint_Included_r.
-      rewrite <- env_locs_setlist_Disjoint; try eassumption.
+      rewrite <- env_locs_set_lists_Disjoint; try eassumption.
       eapply env_locs_monotonic. eapply Included_Intersection_l.
       eapply Disjoint_Included_l; [| eapply Disjoint_sym; eapply def_closures_env_locs_Disjoint ; eassumption ].
       eapply cc_approx_heap_dom1 with (j := 0). eapply Hreach. }
@@ -1637,8 +1637,8 @@ Module Size (H : Heap).
         simpl size_val. eapply mult_le_compat_l.
          
         eapply cardinal_env_locs. intros.
-        setoid_rewrite <- env_locs_setlist_Disjoint; try eassumption.
-        setoid_rewrite <- setlist_not_In; try eassumption. eapply def_closures_env_locs; try eassumption.
+        setoid_rewrite <- env_locs_set_lists_Disjoint; try eassumption.
+        setoid_rewrite <- set_lists_not_In; try eassumption. eapply def_closures_env_locs; try eassumption.
 
         eapply Included_Intersection_l.
         intros Hc. eapply Hdis. now constructor; eauto.
@@ -1646,7 +1646,7 @@ Module Size (H : Heap).
 
         intros. reflexivity.
 
-        rewrite <- env_locs_setlist_Disjoint; try eassumption.
+        rewrite <- env_locs_set_lists_Disjoint; try eassumption.
         eapply env_locs_monotonic. now eapply Included_Intersection_l. }
       (* lemma size_with_measure_filter def_closures *)
       omega. eassumption. }

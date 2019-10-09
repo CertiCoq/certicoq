@@ -18,21 +18,16 @@ Require Import ExtLib.Core.RelDec.
 Require Import ExtLib.Data.Positive.
 Require Import Coq.Bool.Bool.
 Require Import identifiers.  (* for max_var *)
-Require Import L6.List_util L6.cps_util.
+Require Import L6.List_util L6.cps_util L6.state.
 
-Open Scope monad_scope. 
+Open Scope monad_scope.
 
 Section UNCURRY.
   Import MonadNotation.
 
-  (* pair of 
-   1- max number of arguments 
-   2- encoding of inlining decision for beta-contraction phase *)
-  Definition St := (prod nat  (M.t nat)). (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
-
 
   Definition eq_var := Pos.eqb.
-
+  
   (** We need to determine whether variables occur free in some terms.  We
       over-approximate by determining whether the variable occurs at all. *)
   
@@ -76,109 +71,68 @@ Section UNCURRY.
          end.
 
 
-  (* Maps (arrity+1) to the right fTag *)
-  Definition arrityMap:Type := M.t fTag.
+  (* pair of 
+     1- max number of arguments 
+     2- encoding of inlining decision for beta-contraction phase *)
+  Definition St := (nat * (M.t nat))%type. (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
+
+  (* Maps (arity+1) to the right fTag *)
+  Definition arityMap:Type := M.t fTag.
   Definition localMap:Type := M.t bool.
-  
+   
   (* The state for this includes 
-     1 - "next" var for gensyming a fresh variable
-     2 - a boolean for tracking whether or not a reduction happens
-     3 - Map recording the (new) fTag associated to each arrity
-     4 - fEnv to record the calling convention of each fTag  
-     5 - "next" available fTag 
-     6 - local map from var to if function has already been uncurried
-     7 - Map that preserves original names *)
-  Definition stateType:Type := (var * bool * arrityMap * fEnv * fTag * localMap * St * nEnv). 
-  Definition uncurryM := state stateType.
+     1 - a boolean for tracking whether or not a reduction happens
+     2 - Map recording the (new) fTag associated to each arity
+     3 - local map from var to if function has already been uncurried
+     4 - Map for uncurried functions for a 2version of inlining *)
+  Definition stateType:Type := (bool * arityMap * localMap * St). 
+  Definition uncurryM := @compM stateType.
 
 
   (* f is a function to inline [i.e. uncurry shell], k is its local continuation *)
-  Definition markToInline (n:nat) (f:var) (k:var): uncurryM unit :=
-    s <- get;;
-    (match s with
-     | (y, b, aenv, fenv, ft, lm, s, nenv) => 
-       put (y, b, aenv, fenv, ft, lm, (max (fst s) n, (M.set f 1 (M.set k 2 (snd s)))), nenv)
-    end).
+  Definition markToInline (n:nat) (f:var) (k:var) : uncurryM unit :=
+    st <- get_state tt ;;  
+    let '(b, aenv, lm, s) := st in
+    @put_state stateType (b, aenv, lm, (max (fst s) n, (M.set f 1 (M.set k 2 (snd s))))).
         
-  (* Generate a fresh variable, relying upon the fact that variables are
-     represented as positives.  Later on, if we have additional information
-     associated with the variable (e.g., a string), we can preserve that here.
-  *)
-  Definition copyVar (x:var) : uncurryM var :=
-    s <- get ;;
-      match (s:stateType%type) with
-      | (y,b, aenv, fenv, ft, lm, s, nenv) => 
-        _ <- put ((y + 1)%positive,b, aenv, fenv, ft, lm, s, nenv) ;;
-        ret y
-      end.
-
   
   (* Mark variable as uncurried *)
   Definition mark_as_uncurried (x:var): uncurryM unit :=
-    s <- get ;;
-    match (s:stateType%type) with
-    | (y, b, aenv, fenv, ft, lm, s, nenv) => put (y, b, aenv, fenv, ft, (M.set x true lm), s, nenv)
-    end.
-  
-    
-  Fixpoint copyVars (xs:list var) : uncurryM (list var) :=
-    match xs with
-    | nil => ret nil
-    | x::xs' => y <- copyVar x ;; ys <- copyVars xs' ;; ret (y::ys)
-    end.
-
-  (* Like copyVar but mark the new variable as uncurried *)
-  Definition copyVarC (x:var): uncurryM var :=
-    y <- copyVar x;;
-    _ <- mark_as_uncurried y;;
-    ret y.
+    st <- get_state tt ;;
+    let '(b, aenv, lm, s) := st in
+    put_state (b, aenv, (M.set x true lm), s).
+      
 
   Definition click : uncurryM unit :=
-    s <- get ;;
-    match (s :stateType) with
-    | (y,b, aenv, fenv, ft, lm, s, nenv) => put (y, true, aenv, fenv, ft, lm, s, nenv)
-    end.
+    st <- get_state tt ;;
+    let '(b, aenv, lm, s) := st in
+    put_state (true, aenv, lm, s).
+
+  Definition has_clicked : uncurryM bool :=
+    st <- get_state tt ;;
+    let '(b, aenv, lm, s) := st in ret b.
 
 
-  Definition already_uncurried (f:var):uncurryM bool :=
-    s <- get ;;
-    match (s :stateType) with
-    | (y,b, aenv, fenv, ft, lm, s, nenv) => match M.get f lm with
-                                           | Some true => ret true
-                                           | _ => ret false
-                                           end
+  Definition already_uncurried (f:var) : uncurryM bool :=
+    st <- get_state tt ;;
+    let '(b, aenv, lm, s) := st in
+    match M.get f lm with
+    | Some true => ret true
+    | _ => ret false
     end.
 
-  (* get the fTag at arrity N. If there isn't one already, create it *)
-  Definition get_fTag (n:N):uncurryM fTag :=
-    s <- get ;;
-    match (s:stateType%type) with
-    | (y,b, aenv, fenv, ft, lm, s, nenv) =>
-      let p3 := (BinNat.N.succ_pos n) in
-      (match M.get p3  aenv with
-       | Some t3 => ret t3
-       | None => _ <-  put (y, b, (M.set p3 ft aenv), (M.set ft (n, (fromN (0%N) (BinNat.N.to_nat n))) fenv), (Pos.succ ft), lm, s, nenv);;
-                ret ft
-       end)
-    end.
-                      
-
-  Definition register_name (new : var) (old : var) (suff : String.string) : uncurryM unit :=
-    s <- get;;
-    match s with
-    | (y, b, aenv, fenv, ft, lm, s, nenv) =>
-      let nenv' := add_entry nenv new old suff in
-      put (y, b, aenv, fenv, ft, lm, s, nenv')
-    end.
-
-  Definition register_names (new : list var) (old : list var) (suff : String.string) : uncurryM unit :=
-    s <- get;;
-    match s with
-    | (y, b, aenv, fenv, ft, lm, s, nenv) =>
-      let nenv' := add_entries nenv new old suff in
-      put (y, b, aenv, fenv, ft, lm, s, nenv')
-    end.
- 
+  (* get the fTag at arity N. If there isn't one already, create it *)
+  Definition get_fTag (n:N): uncurryM fTag :=
+    st <- get_state tt ;;
+    let '(b, aenv, lm, s) := st in
+    let p3 := (BinNat.N.succ_pos n) in
+    match M.get p3  aenv with
+    | Some t3 => ret t3
+    | None =>
+      ft <- get_ftag n ;;
+      put_state (b, (M.set p3 ft aenv), lm, s);;
+      ret ft
+    end.                       
   
   (* I'm following the same algorithm as in Andrew's book, or more 
      appropriately, in the SML/NJ code base.  In essence, we look for
@@ -254,14 +208,10 @@ Section UNCURRY.
                         negb (occurs_in_exp g ge) &&
                         negb (occurs_in_exp fk ge) &&
                         negb g_unc then 
-               gvs' <- copyVars gvs ;;
-               fvs' <- copyVars fvs ;;
-               f' <- copyVar f ;;
+               gvs' <- get_names_lst gvs "" ;;
+               fvs' <- get_names_lst fvs "" ;;
+               f' <- get_name f "_uncurried" ;;
 
-               (* register names of new vars *)
-               _ <- register_name f' f "_uncurried" ;;
-               _ <- register_names fvs' fvs "" ;;
-               _ <- register_names gvs' gvs "" ;; 
                
                _ <- mark_as_uncurried g ;;               
                _ <- click ;;
@@ -269,7 +219,7 @@ Section UNCURRY.
                _ <- markToInline fp_numargs f g;;
                fp_ft <- get_fTag (BinNat.N.of_nat fp_numargs);;
                ret (Fcons f f_ft (fk::fvs')
-                          (* Note: tag given for arrity |fvs| + |gvs|  *)
+                          (* Note: tag given for arity |fvs| + |gvs|  *)
                           (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
                                 (Eapp fk fk_ft (g::nil)))
                           (Fcons f' fp_ft (gvs ++ fvs) ge fds1'))
@@ -285,26 +235,29 @@ Section UNCURRY.
 
   (* Tries to uncurry functions within [e].  If no function matches the
      pattern, returns [None], otherwise returns the transformed expression. *)
-  Definition uncurry (e:exp) (aenv: arrityMap) (fenv:fEnv) (ft: fTag) (lm:localMap) (freshvar:positive) (s:St) (nenv:nEnv)
-    : option (exp*arrityMap*fEnv *fTag*localMap*var*St*nEnv) :=
-    match runState (uncurry_exp e) (freshvar ,false, aenv, fenv , ft,lm, s, nenv) with
-    | (e, (maxvar, true, aenv , fenv , ft, lm, s, nenv)) => Some (e, aenv, fenv, ft, lm, maxvar, s, nenv)
-    | _ => None
-    end.
+  Definition uncurry (e:exp) : uncurryM (option exp) :=
+    e' <- uncurry_exp e ;;
+    b <- has_clicked ;;
+    if b then ret (Some e') else ret None.
 
-  Fixpoint uncurry_fuel' (n:nat) (e:exp) (aenv:arrityMap) (fenv:fEnv) (ft:fTag) (lm:localMap) (freshvar:positive) (s:St) (nenv:nEnv): (exp * St * fEnv * nEnv) :=
+  Fixpoint uncurry_fuel' (n:nat) (e:exp) : uncurryM exp :=
     match n with
-    | 0 => (e, s, fenv, nenv)
-    | S m => match uncurry e aenv fenv ft lm freshvar s nenv with
-            | None => (e, s, fenv, nenv)
-            | Some (e', aenv', fenv', ft', lm', freshvar, s', nenv') => uncurry_fuel' m e' aenv' fenv' ft' lm' freshvar s' nenv'
-            end
+    | 0 => ret e
+    | S m =>
+      eo <- uncurry e ;;
+      match eo with
+      | None => ret e
+      | Some e' => uncurry_fuel' m e'
+      end
     end.
 
-  Definition uncurry_fuel (n:nat) (e:exp) (fenv:fEnv) (nenv:nEnv): (exp * St * fEnv * nEnv) :=
-    let max_ft := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1%positive in
-    let freshvar := ((max_var e 1) + 1)%positive in
-    uncurry_fuel' n e (M.empty _) fenv (Pos.succ max_ft) (M.empty _) freshvar (0%nat, M.empty _) nenv.
+  Definition uncurry_fuel (n:nat) (e:exp) (c : comp_data) : exp * M.t nat * comp_data :=
+    let local_st := (false, M.empty _, M.empty _, (0%nat, (M.empty _))) in
+    let '(e, (c, (_, _, _ , (_, st)))) := run_compM (uncurry_fuel' n e) c local_st in
+    (e, st, c).
 
+    (* let max_ft := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1%positive in *)
+    (* let freshvar := ((max_var e 1) + 1)%positive in *)
+    (* uncurry_fuel' n e (M.empty _) fenv (Pos.succ max_ft) (M.empty _) freshvar (0%nat, M.empty _) nenv. *)
     
 End UNCURRY.

@@ -4,7 +4,7 @@ Require Import L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Import ListNotations.
 Require Import identifiers.
-Require Import L6.shrink_cps L6.alpha_fresh
+Require Import L6.state L6.shrink_cps L6.alpha_fresh
         L6.size_cps L6.cps_util L6.cps_show.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
@@ -44,18 +44,10 @@ Section Beta.
     | Fcons f t xs e fds => M.set f (t, xs, e) (add_fundefs fds fm)
     end.
 
-  Definition get_nenv (_ : unit) : freshM nEnv :=
-    s <- get ;;
-    let '(_, nenv, _) := s in ret nenv.
-
-  Definition get_pp_name (x : var) : freshM String.string :=
-    nenv <- get_nenv () ;;
-    ret (show_tree (show_var nenv x)).
-
   Definition debug_st (s : St) : freshM unit :=    
-    nenv <- get_nenv () ;;
+    nenv <- get_name_env () ;;
     log_msg (pp_St s nenv);;
-    log_msg alpha_fresh.newline.
+    log_msg state.newline.
   
 
   Fixpoint beta_contract (d : nat) {struct d} :=
@@ -100,7 +92,7 @@ Section Beta.
          let ys' := apply_r_list sig ys in
          let (s', inl) := update_App _ IH f' t ys' s in
          fstr <- get_pp_name f' ;;
-         log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined" ++ alpha_fresh.newline) ;;
+         log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined") ;;
          (match (inl, M.get f' fm, d) with
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in
@@ -131,18 +123,9 @@ Section Beta.
   (*   | Fnil => fun _ => ret Fnil *)
   (*   end) (eq_refl fdc). *)
 
-  Definition beta_contract_top (e:exp) (d:nat) (s:St) (names:nEnv) : exp * nEnv :=
-    let n :=((max_var e 1) + 1)%positive in
-    match runState (beta_contract d e (M.empty var) (M.empty _) s) (n, names, []) with
-    | (e', (_, names')) => (e', names)
-    end.
-
-  Definition beta_contract_top_debug (e:exp) (d:nat) (s:St) (names:nEnv) : exp * nEnv * string :=
-    let n :=((max_var e 1) + 1)%positive in
-    match runState (beta_contract d e (M.empty var) (M.empty _) s) (n, names, []) with
-    | (e', (_, names', str)) => (e', names, log_to_string str)
-    end.
-
+  Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) : exp * comp_data :=    
+    let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s) c tt in
+    (e', st').
   
 End Beta.
 
@@ -213,7 +196,7 @@ Definition show_map {A} (m : M.t A) (nenv : nEnv) (str : A -> string) :=
       | [] => ""
       end
    in
-   "S{" ++ show_lst (M.elements m) ++ "}" ++ alpha_fresh.newline)%string.
+   "S{" ++ show_lst (M.elements m) ++ "}")%string.
 
 Definition show_map_bool m nenv := show_map m nenv (fun (b : bool) => if b then "true" else "false")%string. 
 Definition show_map_bogus {A} (m : A) (nenv : nEnv) := ""%string.
@@ -227,10 +210,6 @@ Fixpoint find_uncurried (fds : fundefs) (s:M.t bool) : M.t bool :=
   | _ => s
   end.
           
-           (* (cps.Fcons 438 3 (440 :: 596 :: nil) *)
-           (*    (cps.Efun (cps.Fcons 518 3 (594 :: 595 :: nil) (cps.Eapp 597 4 (594 :: 595 :: 596 :: nil)) cps.Fnil) *)
-           (*       (cps.Eapp 440 2 (518 :: nil))) *)
-
 Definition InineUncurried: InlineHeuristic (M.t bool) :=
   {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
                           let s' := find_uncurried fds s in
@@ -280,7 +259,7 @@ Definition inline_uncurry_contract (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
   beta_contract_top _ show_map_bogus (InlineSmallOrUncurried bound) e d (M.empty bool, s).
 
 Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
-  beta_contract_top_debug _ show_map_bool InineUncurried e d (M.empty bool).
+  beta_contract_top _ show_map_bool InineUncurried e d (M.empty bool).
 
 (* Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat)  (d:nat) := *)
 (*   beta_contract_top_debug _ show_map_bool InineLambdaLifted e d (M.empty bool). *)

@@ -12,8 +12,6 @@ From CertiCoq.L6 Require Import cps cps_util state eval shrink_cps L5_to_L6 beta
      closure_conversion2 hoisting dead_param_elim lambda_lifting.
 From CertiCoq.L7 Require Import L6_to_Clight.
 
-
-
 (*
    Environment for L6 programs: 
    1 - environment of primitive operations
@@ -93,6 +91,77 @@ Require Import ExtLib.Structures.Monads.
 (** * Definition of L6 backend pipelines *)
 
 
+Definition update_var (names : nEnv) (x : var) : nEnv :=
+  match M.get x names with
+  | Some (nNamed _) => names
+  | Some nAnon => M.set x (nNamed "x") names
+  | None => M.set x (nNamed "x") names
+  end.
+
+Definition update_vars names xs :=
+  List.fold_left update_var xs names.
+
+(** Adds missing names to name environment for the C translation *)
+Fixpoint add_binders_exp (names : nEnv) (e : exp) : nEnv :=
+  match e with
+  | Econstr x _ _ e 
+  | Eprim x _ _ e
+  | Eproj x _ _ _ e => add_binders_exp (update_var names x) e
+  | Ecase _ pats =>
+    List.fold_left (fun names p => add_binders_exp names (snd p)) pats names
+  | Eapp _ _ _
+  | Ehalt _ => names
+  | Efun B e => add_binders_exp (add_binders_fundefs names B) e
+  end
+with add_binders_fundefs (names : nEnv) (B : fundefs) : nEnv :=
+       match B with
+       | Fcons f _ xs e1 B1 =>
+         add_binders_fundefs (add_binders_exp (update_vars (update_var names f) xs) e1) B1
+       | Fnil => names
+       end.
+
+Definition L6_pipeline_old (e : cTerm certiL5) : exception (cTerm certiL6) :=  
+  match e with
+  | pair venv vt =>
+    match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+    | Some r =>
+      let '(c_env, n_env, f_env, next_cTag, next_iTag, e) := r in
+      (* make compilation state *)
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          let next_fTag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) f_env 1 + 1 in
+          pack_data next_var next_cTag next_iTag next_fTag c_env f_env n_env nil
+      in
+      (* uncurring *)
+      let '(e, s, c_data) := uncurry_fuel 100 (shrink_cps.shrink_top e) c_data in   
+      (* inlining *)
+      let (e, c_data) := inline_uncurry_contract e s 10 10 c_data in
+      (* Shrink reduction *)     
+      let e := shrink_cps.shrink_top e in
+      (* (* lambda lifting *) *)
+      (* let (e, c_data) := lambda_lift' e c_data in *)
+      (* Shrink reduction *)      
+      (* let e := shrink_cps.shrink_top e in *)
+      (* Closure conversion *)
+      let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
+      let '(cenv', names', e) :=
+          closure_conversion.closure_conversion_hoist bogus_cloTag e ctag itag cenv names in
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv') fenv names' log
+      in
+      (* Shrink reduction *)
+      (* let e := shrink_cps.shrink_top e in *)
+      (* Dead parameter elimination *)
+      (* let e := dead_param_elim.eliminate e in *)
+      (* Shrink reduction *)      
+      let e := shrink_cps.shrink_top e in
+      Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, e))
+    | None => Exc "failed converting from L5 to L6"
+    end
+  end.
+
+
 
 Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=  
   match e with
@@ -117,15 +186,12 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
       (* Shrink reduction *)      
       let e := shrink_cps.shrink_top e in
       (* Closure conversion *)
+      let (e, c_data) := closure_conversion2.closure_conversion_hoist bogus_cloTag (* bogus_cloiTag *) e c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
-      let '(cenv', names', e) :=
-          closure_conversion.closure_conversion_hoist bogus_cloTag e ctag itag cenv names in
       let c_data :=
           let next_var := ((identifiers.max_var e 1) + 1)%positive in
-          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv') fenv names' log
+          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv) fenv (add_binders_exp names e) log
       in
-      (* Closure conversion *)
-      (* let (e, c_data) := closure_conversion2.closure_conversion_hoist bogus_cloTag bogus_cloiTag e c_data in *)
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
@@ -156,8 +222,8 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
       let (e, c_data) := inline_uncurry e s 10 10 c_data in
       (* Shrink reduction *)     
       let e := shrink_cps.shrink_top e in
-      (* (* lambda lifting *) *)
-      (* let (e, c_data) := lambda_lift' e c_data in *)
+      (* lambda lifting *)
+      let (e, c_data) := lambda_lift' e c_data in
       (* Shrink reduction *)      
       let e := shrink_cps.shrink_top e in
       (* Closure conversion *)
@@ -165,7 +231,7 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
       let c_data :=
           let next_var := ((identifiers.max_var e 1) + 1)%positive in
-          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv) fenv names log
+          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv) fenv (add_binders_exp names e) log
       in
 
       (* Shrink reduction *)
@@ -189,5 +255,6 @@ Instance certiL5_t0_L6:
   CerticoqTranslation (cTerm certiL5) (cTerm certiL6) :=
   fun o => match o with
         | Flag 0 => L6_pipeline
-        | Flag _ => L6_pipeline_opt
+        | Flag 1 => L6_pipeline_opt
+        | Flag _ => L6_pipeline_old  
         end.

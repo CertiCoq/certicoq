@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.List_util
+Require Import L6.cps L6.cps_util L6.ctx L6.state L6.set_util L6.identifiers L6.List_util
         L6.functions L6.Ensembles_util.
 Require Import Coq.ZArith.Znumtheory Coq.Strings.String.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
@@ -95,7 +95,8 @@ Inductive VarInfo : Type :=
 (* A variable that is free in the current function definition.
    The first argument is the name of the parameter of the lambda
    lifted function that corresponds to this free variable *)
-| FreeVar : var -> VarInfo.
+| FreeVar : var -> VarInfo
+| WrapperFun : var -> VarInfo.
 
 Inductive FunInfo : Type := 
 (* A known function. The first argument is the name of the lambda lifted version,
@@ -109,41 +110,14 @@ Definition VarInfoMap := Maps.PTree.t VarInfo.
 (* Maps variables to [FunInfo] *)
 Definition FunInfoMap := Maps.PTree.t FunInfo.
 
-Record state_contents :=
-  mkSt { next_var : var ; next_fTag : fTag ; nenv : nEnv }.
-
-Definition state :=
-  state state_contents.
+Definition lambdaM := @compM unit.  
   
-(** Get a fresh name *)
-Definition get_name : state var :=
-  p <- get ;;
-  let 'mkSt n f nenv := p in
-  put (mkSt ((n+1)%positive) f nenv) ;;
-  ret n.
-
-(** Get a list of fresh names *)
-Fixpoint get_names (n : nat) : state (list var) :=
-  match n with
-    | 0 => ret []
-    | S n =>
-      x <- get_name ;;
-      xs <- get_names n ;;
-      ret (x :: xs)
-  end.
-
-(** Get a fresh function tag *)
-Definition get_tag : state fTag :=
-  p <- get ;;
-  let '(mkSt n f nenv) := p in
-  put (mkSt n ((f+1)%positive) nenv) ;;
-  ret f.
-
 Definition rename (map : VarInfoMap) (x : var) : var :=
   match M.get x map with
     | Some inf =>
       match inf with
-        | FreeVar y => y
+      | FreeVar y => y
+      | WrapperFun y => y
       end
     | None => x
   end.
@@ -152,53 +126,30 @@ Definition rename_lst (map : VarInfoMap) (xs : list var) : list var :=
   (* all list of variables in the AST are in an escaping positions *)
   List.map (rename map) xs.
 
-Definition register_name (new : var) (old : var) (suff : String.string) : state unit :=
-  s <- get;;
-  match s with
-  | mkSt n f nenv =>
-    let nenv' := add_entry nenv new old suff in
-    put (mkSt n f nenv')
-  end.
-
-Definition register_names (new : list var) (old : list var) (suff : String.string) : state unit :=
-  s <- get;;
-  match s with
-  | mkSt n f nenv =>
-    let nenv' := add_entries nenv new old suff in
-    put (mkSt n f nenv')
-  end.
-
 
 Fixpoint add_functions (B : fundefs) (fvs : list var) (m : FunInfoMap)
-: state FunInfoMap :=
+: lambdaM FunInfoMap :=
   match B with
     | Fcons f ft xs _ B =>
       m' <- add_functions B fvs m ;;
       (* new name for lambda lifted definition - this function will always be known *)
-      f' <- get_name ;;
+      f' <- get_name f "_lifted";;
       (* new fTag for lambda listed definition *)
-      ft' <- get_tag ;;
+      ft' <- get_ftag (N.of_nat (length xs)) ;;
       ret (M.set f (Fun f' ft' fvs) m')
     | Fnil => ret m
   end.
 
 Fixpoint add_free_vars (fvs : list var) (m : VarInfoMap)
-: state (list var * VarInfoMap) :=
+: lambdaM (list var * VarInfoMap) :=
   match fvs with
     | [] => ret ([], m)
     | y :: ys =>
       p <- add_free_vars ys m ;; 
-      y' <- get_name ;;
+      y' <- get_name y "";;
       let (ys', m') := p in
       ret (y' :: ys', M.set y (FreeVar y') m')
   end.
-
-(* Fixpoint add_params (ys : list var) (m : VarInfoMap) : VarInfoMap := *)
-(*   match ys with *)
-(*     | [] => m *)
-(*     | y :: ys => *)
-(*       M.set y BoundVar (add_params ys m) *)
-(*   end. *)
 
 Definition FVMap := Maps.PTree.t PS.t.
 
@@ -253,7 +204,7 @@ Section TrueFV.
 
 End TrueFV.
 
-Fixpoint exp_lambda_lift (e : exp) (fvm : VarInfoMap) (fm : FunInfoMap) : state exp :=
+Fixpoint exp_lambda_lift (e : exp) (fvm : VarInfoMap) (fm : FunInfoMap) : lambdaM exp :=
   match e with
   (* We are (too) conservative here and we assume that all variables that are
      being wrapped in a constructor are escaping. *)  
@@ -305,12 +256,9 @@ with fundefs_lambda_lift B fvm fm :=
                  | Fun f' ft' fvs =>
                    p <- add_free_vars fvs fvm ;;
                    let (ys, fvm') := p in
-                   xs' <- get_names (length xs) ;;
+                   xs' <- get_names_lst xs "" ;;
                    e' <- exp_lambda_lift e fvm' fm ;;
                    B' <- fundefs_lambda_lift B fvm fm ;;
-                   _ <- register_name f' f "_lifted" ;;
-                   _ <- register_names xs' xs "" ;;
-                   _ <- register_names ys fvs "" ;;
                    ret (Fcons f' ft' (xs ++ ys) e'
                               (Fcons f ft xs'
                                      (Eapp f' ft' (xs' ++ (rename_lst fvm fvs)))
@@ -337,15 +285,16 @@ with fundefs_lambda_lift B fvm fm :=
 
  *)
 
-Definition lambda_lift (e : exp) ftag nenv : exp * nEnv :=
-  let next := ((max_var e 1%positive) + 1)%positive in
-  let state := mkSt next ftag nenv in
-  let '(e, mkSt _ _ nenv) :=
-      runState
-        (exp_lambda_lift e (Maps.PTree.empty VarInfo)
-                         (Maps.PTree.empty FunInfo))
-        state in
-  (e, nenv).
+Definition lambda_lift (e : exp) (c : comp_data) : exp * comp_data :=
+  (* let next := ((identifiers.max_var e 1) + 1)%positive in *)
+  (* let max_ft := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1 + 1 in     *)
+  (* let dummy_tag := 1%positive in *)
+  (* let st := pack_data next dummy_tag dummy_tag ft (M.empty _) names [] tt in *)
+  let '(e', (c', _)) := run_compM (exp_lambda_lift e (Maps.PTree.empty VarInfo)
+                                               (Maps.PTree.empty FunInfo))
+                                  c tt in
+  
+  (e', c').
 
 
 (** Version without closure growth *)
@@ -359,23 +308,103 @@ Inductive FunInfo' : Type :=
 (* Maps variables to [FunInfo] *)
 Definition FunInfoMap' := Maps.PTree.t FunInfo'.
 
-Fixpoint add_functions' (B : fundefs) (fvs : list var) (sfvs : PS.t) (m : FunInfoMap')
-: state FunInfoMap' :=
+(* A global function name *)
+Inductive GFunInfo : Type := GFun : var -> GFunInfo.
+
+Definition GFunMap := M.t GFunInfo.
+
+Fixpoint add_functions' (B : fundefs) (fvs : list var) (sfvs : PS.t) (m : FunInfoMap') (gfuns : GFunMap)
+         (is_closed : bool)
+  : lambdaM (FunInfoMap' * GFunMap):=
   match B with
     | Fcons f ft xs _ B =>
-      m' <- add_functions' B fvs sfvs m ;;
+      maps <- add_functions' B fvs sfvs m gfuns is_closed ;;
+      let '(m', gfuns') := maps in
       (* new name for lambda lifted definition - this function will always be known *)
-      f' <- get_name ;;
+      f' <- get_name f "_lifted";;
       (* new fTag for lambda listed definition *)
-      ft' <- get_tag ;;
-      ret (M.set f (Fun' f' ft' fvs sfvs) m')
-    | Fnil => ret m
+      ft' <- get_ftag (N.of_nat (length xs)) ;;
+      (* if the function block is closed add it to the global function map *)
+      let gfuns'' := if is_closed then M.set f (GFun f') gfuns' else gfuns' in
+      ret (M.set f (Fun' f' ft' fvs sfvs) m', gfuns'')
+    | Fnil => ret (m, gfuns)
   end.
 
-Fixpoint exp_lambda_lift' (e : exp) (curr_fvs: PS.t) (fvm : VarInfoMap) (fm : FunInfoMap') : state exp :=
+(* Section TrueFV'. *)
+
+(*   Variable (funmap : FunInfoMap). *)
+  
+  (** The set of the *true* free variables of an [exp]. The true free variables
+    are the variables that appear free plus the free variables of the known
+    functions that are called inside the expression. Relies on the the
+    assumption that the free and bound variables are disjoint. *)
+  (* Fixpoint exp_true_fv_aux' (e : exp) (scope  : FVSet) (fvset : PS.t) : PS.t := *)
+  (*   match e with *)
+  (*     | Econstr x c ys e => *)
+  (*       let fvset' := add_list scope fvset ys in  *)
+  (*       exp_true_fv_aux' e (add x scope) fvset' *)
+  (*     | Ecase x pats => *)
+  (*       let fvset' := fold_left (fun fvs p => exp_true_fv_aux' (snd p) scope fvs) pats fvset in *)
+  (*       if mem x scope then fvset' else PS.add x fvset' *)
+  (*     | Eproj x tau n y e => *)
+  (*       let fvset' := if mem y scope then fvset else PS.add y fvset in *)
+  (*       exp_true_fv_aux' e (add x scope) fvset' *)
+  (*     | Efun defs e => *)
+  (*       let '(scope', fvset') := fundefs_true_fv_aux' defs scope fvset in  *)
+  (*       exp_true_fv_aux' e scope' fvset' *)
+  (*     | Eapp x ft xs => *)
+  (*       let fvset' := match funmap ! x with *)
+  (*                    | Some inf => *)
+  (*                       match inf with *)
+  (*                         | Fun f' ft' fvs => union_list fvset (f' :: fvs) *)
+  (*                       end *)
+  (*                    | None => if mem x scope then fvset else PS.add x fvset *)
+  (*                  end *)
+  (*       in *)
+  (*       add_list scope fvset' xs *)
+  (*     | Eprim x prim ys e => *)
+  (*       let fvset' := add_list scope fvset ys in  *)
+  (*       exp_true_fv_aux' e (add x scope) fvset' *)
+  (*     | Ehalt x => if mem x scope then fvset else PS.add x fvset *)
+  (*   end *)
+  (* with fundefs_true_fv_aux' (defs : fundefs) (scope : FVSet) (fvset : PS.t) : FVSet * PS.t := *)
+  (*        match defs with *)
+  (*          | Fcons f t ys e defs' => *)
+  (*            let (scope', fvset') := fundefs_true_fv_aux' defs' (add f scope) fvset in *)
+  (*            (scope', exp_true_fv_aux' e (union_list scope' ys) fvset') *)
+  (*          | Fnil => (scope, fvset) *)
+  (*        end. *)
+  
+  (* Definition exp_true_fv e := exp_true_fv_aux' e empty PS.empty. *)
+  
+(*   Definition fundefs_true_fv B := snd (fundefs_true_fv_aux' B empty PS.empty).  *)
+
+(* End TrueFV. *)
+
+Fixpoint make_wrappers (B: fundefs) (fvm : VarInfoMap) (fm: FunInfoMap') : lambdaM (exp_ctx * VarInfoMap):=
+  match B with
+  | Fcons f ft xs e B =>
+    match M.get f fm with
+    | Some inf =>
+      match inf with
+      | Fun' f' ft' fvs sfvs =>
+        g <- get_name f "_wrapper" ;;
+        xs' <- get_names_lst xs "" ;;
+        cm <- make_wrappers B fvm fm ;;
+        let (c, fvm') := cm in
+        let fvm'' := M.set f (WrapperFun g) fvm' in
+        ret (Efun1_c (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm fvs))) Fnil) c, fvm'')
+      end
+    | None => ret (Hole_c, fvm) (* should never match *)
+    end
+  | Fnil => ret (Hole_c, fvm)
+  end.
+
+
+Fixpoint exp_lambda_lift' (e : exp) (curr_fvs: PS.t) (fvm : VarInfoMap) (fm : FunInfoMap') (gfuns : GFunMap) : lambdaM exp :=
   match e with
   | Econstr x t ys e => 
-    e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+    e' <- exp_lambda_lift' e curr_fvs fvm fm gfuns ;;
     ret (Econstr x t (rename_lst fvm ys) e')
   | Ecase x P =>
     P' <-
@@ -383,21 +412,25 @@ Fixpoint exp_lambda_lift' (e : exp) (curr_fvs: PS.t) (fvm : VarInfoMap) (fm : Fu
        match l with
          | [] => ret []
          | (c, e) :: P =>
-           e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+           e' <- exp_lambda_lift' e curr_fvs fvm fm gfuns ;;
            P' <- mapM_ll P ;;
            ret ((c, e') :: P')
        end) P ;;
     ret (Ecase (rename fvm x) P')
   | Eproj x t N y e =>
-    e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+    e' <- exp_lambda_lift' e curr_fvs fvm fm gfuns ;;
     ret (Eproj x t N (rename fvm y) e')
   | Efun B e =>
-    let sfvs := fundefs_fv B in 
-    let fvs := PS.elements sfvs in
-    fm' <- add_functions' B fvs sfvs fm ;;
-    B' <- fundefs_lambda_lift' B fvm fm' ;;
-    e' <- exp_lambda_lift' e curr_fvs fvm fm' ;;
-    ret (Efun B' e')
+    let sfvs := fundefs_fv B in
+    let fvs :=  List.filter (fun x => match M.get x gfuns with Some _ => false | None => true end) (PS.elements sfvs) in
+    let is_closed := match fvs with [] => true | _ => false end in
+    maps' <- add_functions' B fvs sfvs fm gfuns is_closed ;;
+    let (fm', gfuns') := maps' in
+    B' <- fundefs_lambda_lift' B B fvm fm' gfuns' ;;
+    cm <- make_wrappers B fvm fm' ;;
+    let (C, fvm') := cm in
+    e' <- exp_lambda_lift' e curr_fvs fvm' fm' gfuns' ;;
+    ret (Efun B' (C |[ e' ]|))
   | Eapp f ft xs => 
     match fm ! f with
     | Some inf =>
@@ -412,34 +445,30 @@ Fixpoint exp_lambda_lift' (e : exp) (curr_fvs: PS.t) (fvm : VarInfoMap) (fm : Fu
       ret (Eapp (rename fvm f) ft (rename_lst fvm xs))
     end
   | Eprim x f ys e =>
-    e' <- exp_lambda_lift' e curr_fvs fvm fm ;;
+    e' <- exp_lambda_lift' e curr_fvs fvm fm gfuns ;;
        ret (Eprim x f (rename_lst fvm ys) e')
   | Ehalt x => ret (Ehalt (rename fvm x))
   end
-with fundefs_lambda_lift' B fvm fm :=
+with fundefs_lambda_lift' B Bfull fvm (fm : FunInfoMap') (gfuns : GFunMap) :=
        match B with
          | Fcons f ft xs e B => 
-           match fm ! f with
+           match M.get f fm with
              | Some inf =>
                match inf with
                  | Fun' f' ft' fvs sfvs =>
                    p <- add_free_vars fvs fvm ;;
                    let (ys, fvm') := p in
-                   xs' <- get_names (length xs) ;;
-                   e' <- exp_lambda_lift' e sfvs fvm' fm ;;
-                   B' <- fundefs_lambda_lift' B fvm fm ;;
-                   _ <- register_name f' f "_lifted" ;;
-                   _ <- register_names xs' xs "" ;;
-                   _ <- register_names ys fvs "" ;;
-                   ret (Fcons f' ft' (xs ++ ys) e'
-                              (Fcons f ft xs'
-                                     (Eapp f' ft' (xs' ++ (rename_lst fvm fvs)))
-                                     B'))
+                   cm <- make_wrappers Bfull fvm' fm ;;
+                   let (C, fvm'') := cm in
+                   e' <- exp_lambda_lift' e sfvs fvm'' fm gfuns ;;
+                   B' <- fundefs_lambda_lift' B Bfull fvm fm gfuns ;;
+                   ret (Fcons f' ft' (xs ++ ys) (C |[ e' ]|)  B')
                end
              | None => ret (Fcons f ft xs e B) (* should never match *)
            end
          | Fnil => ret Fnil
        end.
+
 
 (* Example :
 
@@ -457,15 +486,12 @@ with fundefs_lambda_lift' B fvm fm :=
 
  *)
 
-Definition lambda_lift' (e : exp) ftag nenv : exp * nEnv:=
-  let next := ((max_var e 1%positive) + 1)%positive in
-  let state := mkSt next ftag nenv in
-  let '(e, mkSt _ _ nenv) :=
-      runState
-        (exp_lambda_lift' e PS.empty (Maps.PTree.empty VarInfo)
-                          (Maps.PTree.empty FunInfo'))
-        state in
-  (e, nenv).
+Definition lambda_lift' (e : exp) (c : comp_data) : exp * comp_data :=
+  let '(e', (c', _)) := run_compM (exp_lambda_lift' e PS.empty (Maps.PTree.empty VarInfo)
+                                                    (Maps.PTree.empty FunInfo') (M.empty GFunInfo))
+                                  c tt in
+  
+  (e', c').
 
 
 (** * Relational Defintion *)

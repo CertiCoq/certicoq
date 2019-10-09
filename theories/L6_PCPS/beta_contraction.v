@@ -75,7 +75,7 @@ Section Beta.
        | Efun fds e =>
          let fm' := add_fundefs fds fm in
          let (s1, s2) := update_funDef _ IH fds sig s in
-         debug_st s1;;
+         (* debug_st s1;; *)
          fds' <- (fix beta_contract_fds (fds:fundefs) (s:St) : freshM fundefs :=
                    match fds with 
                    | Fcons f t xs e fds' =>
@@ -91,8 +91,8 @@ Section Beta.
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let (s', inl) := update_App _ IH f' t ys' s in
-         fstr <- get_pp_name f' ;;
-         log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined") ;;
+         (* fstr <- get_pp_name f' ;; *)
+         (* log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined") ;; *)
          (match (inl, M.get f' fm, d) with
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in
@@ -250,16 +250,16 @@ Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) 
 
 (* d should be max argument size, perhaps passed through by uncurry *)
 Definition postuncurry_contract (e:exp) (s:M.t nat) (d:nat) :=
-  beta_contract_top _ show_map_bogus PostUncurryIH e d s.
+  beta_contract_top _ PostUncurryIH e d s.
 
 Definition inlinesmall_contract (e:exp) (bound:nat)  (d:nat) :=
-  beta_contract_top _ show_map_bogus (InlineSmallIH bound) e d (M.empty _).
+  beta_contract_top _ (InlineSmallIH bound) e d (M.empty _).
 
 Definition inline_uncurry_contract (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
-  beta_contract_top _ show_map_bogus (InlineSmallOrUncurried bound) e d (M.empty bool, s).
+  beta_contract_top _ (InlineSmallOrUncurried bound) e d (M.empty bool, s).
 
 Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
-  beta_contract_top _ show_map_bool InineUncurried e d (M.empty bool).
+  beta_contract_top _ InineUncurried e d (M.empty bool).
 
 (* Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat)  (d:nat) := *)
 (*   beta_contract_top_debug _ show_map_bool InineLambdaLifted e d (M.empty bool). *)

@@ -13,14 +13,34 @@ Definition demo2 := (negb, List.hd_error).
 
 CertiCoq Compile demo2.
 
+(* Definition lala := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
+(* Definition test1_opt := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
 
-Definition test1 := List.map (fun x => 1 + x) (List.repeat 10 10000).
-Definition test1_opt := List.map (fun x => 1 + x) (List.repeat 10 10000).
 
-CertiCoq Compile test1.
-CertiCoq Compile Opt test1_opt.
+(* CertiCoq Compile lala. *)
+(* CertiCoq Compile Opt test1_opt. *)
+
+
 
 (* an out of generations with (100 * 100 * 100 * 100 * 100) *)
+Fixpoint list_add y z w l : nat :=
+  match l with
+  | nil => 0%nat
+  | x::xs =>
+    let clos r := (y + z + w + r)%nat in
+    (clos x) + list_add y z w xs
+  end.
+
+(* Fixpoint loop n (f : Datatypes.unit -> nat) : nat := *)
+(*   match n with *)
+(*   | 0%nat => f tt *)
+(*   | S n => f tt + loop n f *)
+(*   end. *)
+    
+(* Definition clos := (loop 3 (fun _ => list_add 0 0 0 (List.repeat 0%nat 3))%nat). *)
+
+(* CertiCoq Compile clos. *)
+
 
 Definition clos_loop (u : unit) : nat :=
   (fix list_add y z w u k m n k1 k2 k3 k4 k5 l : nat :=
@@ -40,9 +60,11 @@ Fixpoint loop n (f : unit -> nat) : nat :=
     
 Definition clos := loop (100*10) clos_loop.
 Definition clos_opt := loop (100*10) clos_loop.
+Definition clos_old := loop (100*10) clos_loop.
 
 CertiCoq Compile clos.
-CertiCoq Compile Opt clos_opt.
+CertiCoq Compile Opt 1 clos_opt.
+CertiCoq Compile Opt 2 clos_old.
 
 
 (* In this clos should be lambda lifted and the environment should not be constructed in every iteration of the loop *)
@@ -78,7 +100,22 @@ Definition is_valid_opt :=
   | _ => false
   end.
 
+Time CertiCoq Compile Opt 2 is_valid. (* 5 secs ! *)
 
 Time CertiCoq Compile is_valid. (* 5 secs ! *)
 
-Time CertiCoq Compile Opt is_valid_opt. (* 5 secs ! *)
+
+(* Definition test_pipeline  (e: Ast.global_declarations * Ast.term) := *)
+(*   match (translateTo (cTerm certiL5) (Flag 0) e) with *)
+(*   | Ret p =>  *)
+(*     match L6_pipeline p with  *)
+(*     | Ret ((_, cenv, nenv, _),  (_, e)) => cps_show.show_exp nenv cenv false e *)
+(*     | Exc s => s *)
+(*     end *)
+(*   | Exc s => s *)
+(*   end. *)
+
+
+
+
+(* Time CertiCoq Compile Opt 1 is_valid_opt. (* 5 secs ! *) *)

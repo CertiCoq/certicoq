@@ -366,8 +366,8 @@ Section CC.
             Maps.PTree.set f BoundVar mapfv_old'
         in
         gfuns'' <- (if is_closed then
-                     f_str <- get_pp_name f ;;
-                     log_msg ("Adding " ++ f_str) ;;
+                     (* f_str <- get_pp_name f ;; *)
+                     (* log_msg ("Adding " ++ f_str) ;; *)
                      ret (M.set f (GFun code_ptr) gfuns')
                    else ret gfuns') ;;
         ret (mapfv_new'', mapfv_old'', gfuns'',
@@ -415,8 +415,8 @@ Section CC.
         let '(c', mapfv_new, g1) := t1 in
         let is_closed := match fvs with [] => true | _ => false end in
         (* debug *)
-        fv_names <- get_pp_names_list fvs ;;
-        log_msg (concat " " ("Closed" :: bool_to_string is_closed :: "Block has fvs :" :: fv_names)) ;;
+        (* fv_names <- get_pp_names_list fvs ;; *)
+        (* log_msg (concat " " ("Closed" :: bool_to_string is_closed :: "Block has fvs :" :: fv_names)) ;; *)
         
         t2 <- make_full_closure defs mapfv_new mapfv gfuns Γ' is_closed ;;
         let '(mapfv_new', mapfv_old', gfuns', g2) := t2 in

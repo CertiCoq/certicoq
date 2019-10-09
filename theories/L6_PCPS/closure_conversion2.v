@@ -296,17 +296,17 @@ Section CC.
             ret (y, fun e => Econstr y clo_tag [code_ptr; Γ] e)
           | BoundVar => ret (x, id)
         end
-      | None => ret (x, id) (* should never reach here *)
-        (* match M.get x gfuns with *)
-        (* | Some (GFun code_ptr) => *)
-        (*   (* get the new name of the function and pack it together with the *)
-        (*      current environment argument to construct the closure *) *)
-        (*   c_env <- make_record_cTag 0 ;; *)
-        (*   g_env <- get_name x "bogus_env" ;; *)
-        (*   y <- get_name x clo_suffix ;; *)
-        (*   ret (y, fun e => Econstr g_env c_env [] (Econstr y clo_tag [code_ptr; Γ] e)) *)
-        (* | None => ret (x, id) (* should never reach here *) *)
-        (* end *)
+      | None =>
+        match M.get x gfuns with
+        | Some (GFun code_ptr) =>
+          (* get the new name of the function and pack it together with the *)
+          (*      current environment argument to construct the closure *)
+          c_env <- make_record_cTag 0 ;;
+          g_env <- get_name x "bogus_env" ;;
+          y <- get_name x clo_suffix ;;
+          ret (y, fun e => Econstr g_env c_env [] (Econstr y clo_tag [code_ptr; Γ] e))
+        | None => ret (x, id) (* should never reach here *)
+        end
     end.
   
   Fixpoint get_vars (xs : list var) (map : VarInfoMap) (gfuns : GFunMap)
@@ -469,10 +469,9 @@ Section CC.
          end.
 
   Definition closure_conversion_hoist (e : exp) (c: comp_data) : exp * comp_data :=
-    let '(e', f', (c', _)) := run_compM (Γ <- get_name_no_suff "dummy_env";; (* get a dummy var name for the top level env arg *)
-                                         (* register_record_cTag clo_tag clo_itag 2%N;; *)
-                                         exp_closure_conv e (Maps.PTree.empty VarInfo) (Maps.PTree.empty GFunInfo) 1%positive Γ)
-                                   c tt in
+    let Γ := 1%positive in
+    let '(e', f', (c', _)) := run_compM (exp_closure_conv e (Maps.PTree.empty VarInfo) (Maps.PTree.empty GFunInfo) 1%positive Γ)
+                                        c tt in
     (exp_hoist (f' e'), c').
     
 

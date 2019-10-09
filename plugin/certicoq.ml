@@ -36,6 +36,7 @@ let compile olevel gr =
      Feedback.msg_debug (str"Finished compiling, printing to file.");
      let str = quote_string (Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
      let hstr = quote_string (Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
+     (* PrintClight.print_stdo prg; *)
      AllInstances.printProg (nenv,prg) str;
      AllInstances.printProg (nenv,header) hstr
   | Exc s ->

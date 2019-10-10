@@ -27,7 +27,10 @@ Require Import compcert.common.AST
         compcert.common.Values.
 
 Require Import L6.cps
-               L6.identifiers.
+        L6.identifiers.
+
+Require Import Clightdefs.
+Require Import L6.cps_show.
 
 (* Axioms that are only realized in ocaml *)
 Variable (print_Clight : Clight.program -> unit).
@@ -53,7 +56,7 @@ Section TRANSLATION.
   Variable (caseIdent:ident). (* ident for the case variable , TODO: generate that automatically and only when needed *)
 
   Definition nParam:nat := 11.
-
+  
   Definition maxArgs := 1024%Z.
 
  
@@ -427,6 +430,25 @@ Notation "'args[' n ']'" :=
   ( *(add args (c_int n%Z val))) (at level 36).
 
 
+
+Definition reserve_body (funInf : positive) (l : Z) : statement :=
+  let arr := (Evar funInf (Tarray uval l noattr)) in
+  Sifthenelse
+    (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
+    (Scall None gc (arr :: tinf :: nil) ; allocIdent ::= Efield tinfd allocIdent valPtr)
+    Sskip.
+
+
+Definition reserve_body' (funInf : positive) (l : Z) : statement :=
+  let arr := (Evar funInf (Tarray uval l noattr)) in
+  let allocF := Efield tinfd allocIdent valPtr in
+  let limitF := Efield tinfd limitIdent valPtr in
+  Sifthenelse
+    (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
+    (Scall None gc (arr :: tinf :: nil))
+    Sskip.
+
+
 (* Don't shift the tag for boxed, make sure it is under 255 *)
 Definition makeTagZ (cenv:cEnv) (ct : cTag) : option Z :=
       match make_cRep cenv ct with
@@ -442,65 +464,39 @@ Definition makeTag (cenv: cEnv) (ct : cTag) : option expr :=
     | None => None
   end.
 
-(* If x is a in our global map, then Evar, otherwise Etempvar *)
-Definition makeVar (x:positive) (m:M.t positive) :=
-  match M.get x m with
+Definition mkFunVar x locs := (Evar x (mkFunTy (length (firstn nParam locs)))).
+
+Definition makeVar (x:positive) (fenv :fEnv) :=
+  match M.get x fenv with
   | None => var x
-  | Some _ => funVar x
-  end.   
-
-
-
-(* DEPRECATED: map is here to identify which value represents function  *)
-Fixpoint assignConstructor' (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
-  match vs with
-  | nil =>
-    tag <- makeTag cenv t;;
-        rep <- make_cRep cenv t ;;
-        match rep with
-        | enum _ =>           
-          ret (x ::= tag)
-        | boxed _ a =>
-          ret (x ::= [val] (allocPtr +' (c_int Z.one val));
-                 allocIdent ::= allocPtr +'
-                                           (c_int (Z.of_N (a + 1)) val) ;
-                 Field(var x, -1) :::= tag)
-        end
-  | cons v vs' =>
-    prog <- assignConstructor' cenv ienv map x t vs' ;;
-         (* if v is a function name, funVar, otherwise lvar *)
-    let vv := makeVar v map in      
-            ret (prog ;
-                   Field(var x, Z.of_nat (length vs')) :::= (*[val]*) vv)                                 
+  | Some (l , locs) => mkFunVar x locs
   end.
-(* DEPRECATED *)
-Definition assignConstructor (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) := assignConstructor' cenv ienv map x t (rev vs).
 
 
 (* OS: assignConstructor' without the rev *)
-Fixpoint assignConstructorS' (map:M.t positive) (x : positive) (cur:nat) (vs : list positive): statement :=
+Fixpoint assignConstructorS' (fenv: fEnv) (x : positive) (cur:nat) (vs : list positive): statement :=
   match vs with
   | nil => (* shouldn't be reached *)
        Sskip
   | cons v nil =>
-    let vv := makeVar v map in
+    let vv := makeVar v fenv in
     (Field(var x, Z.of_nat cur) :::= (*[val]*) vv)
   | cons v vs' =>
-    let vv := makeVar v map in  
-    let prog := assignConstructorS' map x (cur+1)  vs'  in
+    let vv := makeVar v fenv in  
+    let prog := assignConstructorS' fenv x (cur+1)  vs'  in
          (* if v is a function name, funVar, otherwise lvar *)
              (Field(var x, Z.of_nat cur) :::= (*[val]*) vv; prog)
   end.
 
 
-Definition assignConstructorS (cenv:cEnv) (ienv : n_iEnv) (map:M.t positive) (x : positive) (t : cTag) (vs : list positive) :=
+Definition assignConstructorS (cenv:cEnv) (ienv : n_iEnv) (fenv : fEnv) (x : positive) (t : cTag) (vs : list positive) :=
       tag <- makeTag cenv t;;
         rep <- make_cRep cenv t ;;
         match rep with
         | enum _ =>           
           ret (x ::= tag)
         | boxed _ a =>
-          let stm := assignConstructorS' map x 0 vs in 
+          let stm := assignConstructorS' fenv x 0 vs in 
           ret (x ::= [val] (allocPtr +' (c_int Z.one val));
                  allocIdent ::= allocPtr +'
                                            (c_int (Z.of_N (a + 1)) val) ;
@@ -529,7 +525,6 @@ Definition isBoxed (cenv:cEnv) (ienv : n_iEnv) (ct : cTag) : bool :=
                | boxed t a => true
                end
   end.
-
 
 Fixpoint mkCallVars (vs : list positive) : list expr :=
   match vs with
@@ -560,29 +555,32 @@ Fixpoint asgnFunVars' (vs : list positive) (ind : list N) :
 
 Definition asgnFunVars (vs : list positive) (ind : list N) :
   option statement := asgnFunVars' (skipn nParam vs) (skipn nParam ind).
-
-Fixpoint asgnAppVars' (vs : list positive) (ind : list N) (map : M.t positive) :
+       
+Fixpoint asgnAppVars'' (vs : list positive) (ind : list N) (fenv : fEnv) :
   option statement := 
   match vs, ind with
   | nil, nil => ret Sskip 
   | cons v vs' , cons i ind' =>
-      let s_iv :=  args[ Z.of_N i ] :::= (makeVar v map) in 
-        rest <- asgnAppVars' vs' ind' map;;
+      let s_iv :=  args[ Z.of_N i ] :::= (makeVar v fenv) in 
+        rest <- asgnAppVars'' vs' ind' fenv;;
         ret (rest ; s_iv)
   | _, _ => None
   end.
 
+Definition asgnAppVars' (vs : list positive) (ind : list N) (fenv : fEnv) :
+  option statement := asgnAppVars'' (skipn nParam vs) (skipn nParam ind) fenv.
+
 (* Optional, reduce register pressure *)
-Definition asgnAppVars vs ind (map : M.t positive) :=
-  match asgnAppVars' (skipn nParam vs) (skipn nParam ind) map with
+Definition asgnAppVars vs ind (fenv : fEnv) :=
+  match asgnAppVars' vs ind fenv with
     | Some s =>
      ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
     | None => None 
   end.
 
-Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list N) (map : M.t positive) : option statement :=
+Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list N) (fenv : fEnv) : option statement :=
   let arr := (Evar funInf (Tarray uval l noattr)) in
-  match asgnAppVars' (firstn nParam vs) (firstn nParam ind) map , asgnFunVars' (firstn nParam vs) (firstn nParam ind) with
+  match asgnAppVars'' (firstn nParam vs) (firstn nParam ind) fenv , asgnFunVars' (firstn nParam vs) (firstn nParam ind) with
   | Some bef , Some aft =>
     Some (Sifthenelse
             (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
@@ -591,24 +589,18 @@ Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list 
   | _, _ => None
   end.
 
-
-Definition reserve_body (funInf : positive) (l : Z) : statement :=
-  let arr := (Evar funInf (Tarray uval l noattr)) in
-    Sifthenelse
-      (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
-      (Scall None gc (arr :: tinf :: nil) ; allocIdent ::= Efield tinfd allocIdent valPtr)
-      Sskip.
-
-(*
-Definition reserve' (funInf : positive) (l : Z) : statement :=
+Definition reserve' (funInf : positive) (l : Z) (vs : list positive) (ind : list N) (fenv : fEnv) : option statement :=
   let arr := (Evar funInf (Tarray uval l noattr)) in
   let allocF := Efield tinfd allocIdent valPtr in
   let limitF := Efield tinfd limitIdent valPtr in
-  Sifthenelse
-    (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
-    (Scall None gc (arr :: tinf :: nil))
-    Sskip.
- *)
+  match asgnAppVars'' (firstn nParam vs) (firstn nParam ind) fenv , asgnFunVars' (firstn nParam vs) (firstn nParam ind) with
+  | Some bef , Some aft =>
+    Some (Sifthenelse
+            (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
+            (bef ; Scall None gc (arr :: tinf :: nil) ; aft)
+            Sskip)
+  | _, _ => None
+  end.
 
 Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_statements):=
       (isPtr caseIdent x;
@@ -625,7 +617,7 @@ Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_s
 Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map : M.t positive) : option statement :=
   match e with
   | Econstr x t vs e' =>
-    prog <- assignConstructorS cenv ienv map x t vs ;;
+    prog <- assignConstructorS cenv ienv fenv x t vs ;;
          prog' <- translate_body e' fenv cenv ienv map ;;
          ret (prog ; prog')
   | Ecase x cs =>
@@ -675,14 +667,14 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
   | Eapp x t vs =>
 
     inf <- M.get t fenv ;;
-        asgn <- asgnAppVars vs (snd inf) map;;
-    let vv := makeVar x map  in
+        asgn <- asgnAppVars vs (snd inf) fenv ;;
+    let vv := makeVar x fenv in
                       ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
-                                    (mkCall ([mkFunTy (length (firstn nParam vs))] vv) vs)) 
+                                    (mkCall ([mkFunTy (length (firstn nParam vs))] vv) vs))
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x  and return *)
-    ret ((args[ Z.of_nat 1 ] :::= (makeVar x map)))
+    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv)))
   end.
 
 Definition mkFun (vs : list positive) (loc : list positive) (body : statement) : function :=
@@ -692,46 +684,6 @@ Definition mkFun (vs : list positive) (loc : list positive) (body : statement) :
              ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc))++(allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) ::nil)
              nil
              body.
-
-Fixpoint translate_fundefs' (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (map : M.t positive) : 
-  option (list (positive * globdef Clight.fundef type)) :=
-  match fnd with
-  | Fnil => ret nil
-  | Fcons f t vs e fnd' =>
-    match translate_fundefs' fnd' fenv cenv ienv map with
-    | None => None
-    | Some rest =>
-      match translate_body e fenv cenv ienv map with
-      | None => None
-      | Some body =>  
-         match M.get t fenv with
-         | None => None
-         | Some inf =>
-             let '(l, locs) := inf in
-             match asgnFunVars vs locs with
-             | None => None
-             | Some asgn =>
-                  match M.get f map with
-                  | None => None
-                  | Some gcArrIdent =>
-                    match reserve gcArrIdent (Z.of_N (l + 2)) vs locs map with
-                    | None => None
-                    | Some res =>
-                         ret ((f , Gfun (Internal
-                                           (mkFun vs (get_allocs e)
-                                                  (allocIdent ::= Efield tinfd allocIdent valPtr ;
-                                                    limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                    argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                    res ;
-                                                    asgn ;
-                                                    body)))) :: rest)
-                    end
-                  end
-             end
-         end
-      end
-    end
-  end.
 
 Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (map : M.t positive) : 
   option (list (positive * globdef Clight.fundef type)) :=
@@ -754,7 +706,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_
                   match M.get f map with
                   | None => None
                   | Some gcArrIdent =>
-                    match reserve gcArrIdent (Z.of_N (l + 2)) vs locs map with
+                    match reserve gcArrIdent (Z.of_N (l + 2)) vs locs fenv with
                     | None => None
                     | Some res =>
                          ret ((f , Gfun (Internal
@@ -772,6 +724,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_
       end
     end
   end.
+
 
 Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Clight.fundef type)) (gv:bool): option (positive * globdef Clight.fundef type) :=
   match def with
@@ -810,9 +763,9 @@ Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (m 
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
-    funs <- translate_fundefs fnd fenv cenv ienv m ;; (* This currently fails *)
+    funs <- translate_fundefs fnd fenv cenv ienv m ;; 
          let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
-         body <- translate_body e fenv cenv ienv m ;; (* This currently fails *)
+         body <- translate_body e fenv cenv ienv m ;;
               gcArrIdent <- M.get mainIdent m ;;
               ret ((bodyIdent , Gfun (Internal
                                         (mkfunction Tvoid
@@ -821,10 +774,10 @@ Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (m 
                                                     ((map (fun x => (x , val)) localVars) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
                                                     nil
                                                     ( allocIdent ::= Efield tinfd allocIdent valPtr ;
-                                                        limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                        argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                        (reserve_body gcArrIdent 2%Z) ;
-                                                        body))))
+                                                      limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                                      argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
+                                                      reserve_body gcArrIdent 2%Z ;
+                                                      body))))
                      :: funs)
   | _ => None
   end.
@@ -976,9 +929,6 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (nenv 
              end
            | None => ret (exceptionMonad.Exc "make_funinfo")
            end.
-
-Require Import Clightdefs.
-
 
 
 Definition composites : list composite_definition :=
@@ -1489,7 +1439,6 @@ Definition make_header (cenv:cEnv) (ienv:n_iEnv) (e:exp) (nenv : M.t BasicAst.na
 
 
 (* end of header file *)
-Require Import L6.cps_show.
 
 Definition compile (e : exp) (cenv : cEnv) (nenv : M.t BasicAst.name) :
   exceptionMonad.exception (M.t BasicAst.name * option Clight.program * option Clight.program) :=

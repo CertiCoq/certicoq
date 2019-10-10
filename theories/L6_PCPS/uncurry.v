@@ -193,6 +193,7 @@ Section UNCURRY.
          match fds with
          | Fnil => ret Fnil
          | Fcons f f_ft fvs fe fds1 =>
+           (* f_str <- get_pp_name f ;; *)
            fds1' <- uncurry_fundefs fds1 ;;
            match fvs, fe with
            | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
@@ -205,9 +206,12 @@ Section UNCURRY.
               *)
              g_unc <- (already_uncurried g) ;;
              if eq_var fk fk' && eq_var g g' &&
-                        negb (occurs_in_exp g ge) &&
-                        negb (occurs_in_exp fk ge) &&
-                        negb g_unc then 
+                       negb (occurs_in_exp g ge) &&
+                       negb (occurs_in_exp fk ge) &&
+                       negb g_unc then
+
+               (* log_msg (f_str ++ " is uncurried" ) ;; *)
+
                gvs' <- get_names_lst gvs "" ;;
                fvs' <- get_names_lst fvs "" ;;
                f' <- get_name f "_uncurried" ;;
@@ -224,12 +228,13 @@ Section UNCURRY.
                                 (Eapp fk fk_ft (g::nil)))
                           (Fcons f' fp_ft (gvs ++ fvs) ge fds1'))
              else
-               ge' <- uncurry_exp ge ;;
-               ret (Fcons f f_ft (fk::fvs) (Efun (Fcons g gt gvs ge' Fnil)
-                                                 (Eapp fk' fk_ft (g'::nil))) fds1')
-           | _, _ => 
+               (* log_msg (f_str ++ " is not uncurried (candidate)" ) ;; *)
+               fe' <- uncurry_exp fe ;;
+               ret (Fcons f f_ft (fk::fvs) fe fds1')
+           | _, _ =>
+             (* log_msg (f_str ++ " is not uncurried" ) ;; *)
              fe' <- uncurry_exp fe ;;
-                 ret (Fcons f f_ft fvs fe' fds1')
+             ret (Fcons f f_ft fvs fe' fds1')
            end
          end.
 

@@ -133,9 +133,9 @@ Definition L6_pipeline_old (e : cTerm certiL5) : exception (cTerm certiL6) :=
           pack_data next_var next_cTag next_iTag next_fTag c_env f_env n_env nil
       in
       (* uncurring *)
-      let '(e, s, c_data) := uncurry_fuel 100 (shrink_cps.shrink_top e) c_data in   
+      let '(e, s, c_data) := uncurry_fuel 100 (shrink_cps.shrink_top e) c_data in
       (* (* inlining *) *)
-      (* let (e, c_data) := inline_uncurry e s 10 10 c_data in *)
+      let (e, c_data) := inline_uncurry e s 10 10 c_data in
       (* Shrink reduction *)     
       let e := shrink_cps.shrink_top e in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
@@ -176,8 +176,6 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
       let (e, c_data) := inline_uncurry e s 10 10 c_data in
       (* Shrink reduction *)     
       let e := shrink_cps.shrink_top e in
-      (* Shrink reduction *)      
-      let e := shrink_cps.shrink_top e in
       (* Closure conversion *)
       let (e, c_data) := closure_conversion2.closure_conversion_hoist bogus_cloTag (* bogus_cloiTag *) e c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
@@ -188,9 +186,9 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
-      (* let e := dead_param_elim.eliminate e in *)
-      (* (* Shrink reduction *)       *)
-      (* let e := shrink_cps.shrink_top e in *)
+      let e := dead_param_elim.eliminate e in
+      (* Shrink reduction *)
+      let e := shrink_cps.shrink_top e in
       Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, e))
     | None => Exc "failed converting from L5 to L6"
     end

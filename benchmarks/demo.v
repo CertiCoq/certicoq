@@ -21,7 +21,6 @@ CertiCoq Compile demo2.
 (* CertiCoq Compile Opt test1_opt. *)
 
 
-
 (* an out of generations with (100 * 100 * 100 * 100 * 100) *)
 Fixpoint list_add y z w l : nat :=
   match l with
@@ -100,9 +99,9 @@ Definition is_valid_opt :=
   | _ => false
   end.
 
-Time CertiCoq Compile Opt 2 is_valid. (* 5 secs ! *)
-
 Time CertiCoq Compile is_valid. (* 5 secs ! *)
+
+Time CertiCoq Compile Opt 1 is_valid_opt. (* 5 secs ! *)
 
 
 (* Definition test_pipeline  (e: Ast.global_declarations * Ast.term) := *)

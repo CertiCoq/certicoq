@@ -184,7 +184,7 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
           pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv) fenv (add_binders_exp names e) log
       in
       (* Shrink reduction *)
-      let e := shrink_cps.shrink_top e in
+      (* let e := shrink_cps.shrink_top e in *)
       (* (* Dead parameter elimination *) *)
       (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)

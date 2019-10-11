@@ -148,8 +148,8 @@ Definition L6_pipeline_old (e : cTerm certiL5) : exception (cTerm certiL6) :=
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
-      let e := dead_param_elim.eliminate e in
-      (* Shrink reduction *)      
+      (* let e := dead_param_elim.eliminate e in *)
+      (* (* Shrink reduction *)       *)
       let e := shrink_cps.shrink_top e in
       Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, e))
     | None => Exc "failed converting from L5 to L6"
@@ -185,8 +185,8 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
       in
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
-      (* Dead parameter elimination *)
-      let e := dead_param_elim.eliminate e in
+      (* (* Dead parameter elimination *) *)
+      (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, e))
@@ -227,8 +227,8 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
 
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
-      (* Dead parameter elimination *)
-      let e := dead_param_elim.eliminate e in
+      (* (* Dead parameter elimination *) *)
+      (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)      
       let e := shrink_cps.shrink_top e in
       Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, (shrink_top e)))

@@ -464,7 +464,7 @@ Definition makeTag (cenv: cEnv) (ct : cTag) : option expr :=
     | None => None
   end.
 
-Definition mkFunVar x locs := (Evar x (mkFunTy (length (firstn nParam locs)))).
+Definition mkFunVar x (locs : list N) := (Evar x (mkFunTy (length (firstn nParam locs)))).
 
 Definition makeVar (x:positive) (fenv :fEnv) :=
   match M.get x fenv with
@@ -570,9 +570,52 @@ Fixpoint asgnAppVars'' (vs : list positive) (ind : list N) (fenv : fEnv) :
 Definition asgnAppVars' (vs : list positive) (ind : list N) (fenv : fEnv) :
   option statement := asgnAppVars'' (skipn nParam vs) (skipn nParam ind) fenv.
 
+Fixpoint get_ind {A} (Aeq : A -> A -> bool) (l : list A) (a : A) : option nat :=
+  match l with
+  | nil => None
+  | x :: l' =>
+    match Aeq a x with
+    | true => Some 0
+    | false =>
+      n <- get_ind Aeq l' a ;;
+        ret (S n)
+    end
+  end.
+
+Fixpoint remove_AppVars (myvs vs : list positive) (myind ind : list N) : option (list positive * list N) :=
+  match vs , ind with
+  | nil , nil => Some (nil , nil)
+  | v :: vs' , i :: ind' =>
+    '(vs' , ind') <- remove_AppVars myvs vs' myind ind' ;;
+    match get_ind Pos.eqb myvs v with
+    | Some n =>
+      match nth_error myind n with
+      | Some i' =>
+        match N.eqb i i' with
+        | true => ret (vs' , ind')
+        | false => ret (v :: vs' , i :: ind')
+        end
+      | None => ret (v :: vs' , i :: ind')
+      end
+    | None => ret (v :: vs' , i :: ind')
+    end
+  | _ , _ => None
+  end.
+          
+Definition asgnAppVars_fast' (myvs vs : list positive) (myind ind : list N) (fenv : fEnv) : option statement :=
+  '(vs' , ind') <- remove_AppVars myvs (skipn nParam vs) myind (skipn nParam ind) ;;
+  asgnAppVars'' vs' ind' fenv.
+
 (* Optional, reduce register pressure *)
 Definition asgnAppVars vs ind (fenv : fEnv) :=
   match asgnAppVars' vs ind fenv with
+    | Some s =>
+     ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
+    | None => None 
+  end.
+
+Definition asgnAppVars_fast myvs vs myind ind (fenv : fEnv) :=
+  match asgnAppVars_fast' myvs vs myind ind fenv with
     | Some s =>
      ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
     | None => None 
@@ -677,6 +720,69 @@ Fixpoint translate_body (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map
     ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv)))
   end.
 
+Fixpoint translate_body_fast (e : exp) (fenv : fEnv) (cenv:cEnv) (ienv : n_iEnv) (map : M.t positive) (myvs : list positive) (myind : list N) : option statement :=
+  match e with
+  | Econstr x t vs e' =>
+    prog <- assignConstructorS cenv ienv fenv x t vs ;;
+         prog' <- translate_body e' fenv cenv ienv map ;;
+         ret (prog ; prog')
+  | Ecase x cs =>
+    (* ls <- boxed cases (Vptr), ls <- unboxed (Vint) *)
+    p <- ((fix makeCases (l : list (cTag * exp)) :=
+            match l with
+            | nil => ret (LSnil, LSnil)
+            | cons p l' =>
+              prog <- translate_body (snd p) fenv cenv ienv map ;;
+                   p' <- makeCases l' ;;
+                   let '(ls , ls') := p' in
+                   match (make_cRep cenv (fst p)) with
+                   | Some (boxed t a ) =>
+                     let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
+                     (match ls with
+                     | LSnil =>
+                       ret ((LScons None
+                                    (Ssequence prog Sbreak)
+                                    ls), ls')
+                     | LScons _ _ _ =>
+                       ret ((LScons (Some (Z.land tag 255))
+                                    (Ssequence prog Sbreak)
+                                    ls), ls')
+                     end)
+                   | Some (enum t) =>
+                     let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
+                     (match ls' with
+                     | LSnil =>
+                       ret (ls, (LScons None
+                                        (Ssequence prog Sbreak)
+                                        ls'))
+                     | LScons _ _ _ =>
+                       ret (ls, (LScons (Some (Z.shiftr tag 1))
+                                        (Ssequence prog Sbreak)
+                                        ls'))
+                     end)                       
+                   | None => None
+                   end
+            end) cs) ;;
+      let '(ls , ls') := p in
+      ret (make_case_switch x ls ls')
+  | Eproj x t n v e' =>
+    prog <- translate_body e' fenv cenv ienv map ;;
+         ret (x ::= Field(var v, Z.of_N n) ;
+                prog)
+  | Efun fnd e => None
+  | Eapp x t vs =>
+
+    inf <- M.get t fenv ;;
+        asgn <- asgnAppVars_fast myvs vs myind (snd inf) fenv ;;
+    let vv := makeVar x fenv in
+                      ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
+                                    (mkCall ([mkFunTy (length (firstn nParam vs))] vv) vs))
+  | Eprim x p vs e => None
+  | Ehalt x =>
+    (* set args[1] to x  and return *)
+    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv)))
+  end.
+
 Definition mkFun (vs : list positive) (loc : list positive) (body : statement) : function :=
   mkfunction Tvoid
              cc_default
@@ -700,6 +806,46 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_
          | None => None
          | Some inf =>
              let '(l, locs) := inf in
+             match asgnFunVars vs locs with
+             | None => None
+             | Some asgn =>
+                  match M.get f map with
+                  | None => None
+                  | Some gcArrIdent =>
+                    match reserve gcArrIdent (Z.of_N (l + 2)) vs locs fenv with
+                    | None => None
+                    | Some res =>
+                         ret ((f , Gfun (Internal
+                                           (mkFun vs (get_allocs e)
+                                                  ((allocIdent ::= Efield tinfd allocIdent valPtr ;
+                                                    limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                                    argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
+                                                    res) ;
+                                                    asgn ;
+                                                    body)))) :: rest)
+                         end
+                  end
+             end
+         end
+      end
+    end
+  end.
+
+Fixpoint translate_fundefs_fast (fnd : fundefs) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (map : M.t positive) : 
+  option (list (positive * globdef Clight.fundef type)) :=
+  match fnd with
+  | Fnil => ret nil
+  | Fcons f t vs e fnd' =>
+    match translate_fundefs_fast fnd' fenv cenv ienv map with
+    | None => None
+    | Some rest =>
+      match M.get t fenv with
+      | None => None
+      | Some inf =>
+         let '(l, locs) := inf in
+         match translate_body_fast e fenv cenv ienv map vs locs  with
+         | None => None
+         | Some body =>
              match asgnFunVars vs locs with
              | None => None
              | Some asgn =>
@@ -763,7 +909,7 @@ Fixpoint translate_funs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (m 
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
-    funs <- translate_fundefs fnd fenv cenv ienv m ;; 
+    funs <- translate_fundefs_fast fnd fenv cenv ienv m ;; 
          let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
          body <- translate_body e fenv cenv ienv m ;;
               gcArrIdent <- M.get mainIdent m ;;
@@ -1512,4 +1658,3 @@ Definition print_err_Clight (p : res Clight.program) : unit :=
 Definition print_test := print_Clight (test_result).
  *)
 End TRANSLATION.
-

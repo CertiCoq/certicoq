@@ -1619,7 +1619,7 @@ Definition compile_old (e : exp) (cenv : cEnv) (nenv : M.t BasicAst.name) :
     let '(nenv, defs) := p in
     let nenv := (add_inf_vars (ensure_unique nenv)) in
     let forward_defs := make_extern_decls nenv defs false in
-    let header_pre := make_empty_header cenv ienv e nenv in
+    let header_pre := make_header cenv ienv e nenv in
     (*     let header_p := (header_pre.(runState) m%positive) in *)
     let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
     (match fst header_p with
@@ -1643,7 +1643,7 @@ Definition compile_old_fast (e : exp) (cenv : cEnv) (nenv : M.t BasicAst.name) :
     let '(nenv, defs) := p in
     let nenv := (add_inf_vars (ensure_unique nenv)) in
     let forward_defs := make_extern_decls nenv defs false in
-    let header_pre := make_empty_header cenv ienv e nenv in
+    let header_pre := make_header cenv ienv e nenv in
     (*     let header_p := (header_pre.(runState) m%positive) in *)
     let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
     (match fst header_p with

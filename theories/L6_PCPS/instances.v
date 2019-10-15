@@ -240,7 +240,13 @@ Instance certiL5_t0_L6:
   CerticoqTranslation (cTerm certiL5) (cTerm certiL6) :=
   fun o => match o with
         | Flag 0 => L6_pipeline
-        | Flag 1 => L6_pipeline_opt
-        | Flag 2 => L6_pipeline_old
+        | Flag 1 => L6_pipeline
+        | Flag 2 => L6_pipeline
+        | Flag 3 => L6_pipeline
+        | Flag 4 => L6_pipeline_opt
+        | Flag 5 => L6_pipeline_opt
+        | Flag 6 => L6_pipeline_opt
+        | Flag 7 => L6_pipeline_opt
+        | Flag 8 => L6_pipeline_old
         | Flag _ => L6_pipeline
         end.

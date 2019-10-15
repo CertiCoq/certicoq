@@ -6751,11 +6751,12 @@ Ltac unsigned_ptrofs_range :=
 Theorem repr_bs_L6_L7_related:
   forall p rep_env cenv fenv finfo_env ienv,
     program_inv p ->
+    find_symbol_domain p fenv -> (* REMOVE *)
   forall rho v e n, bstep_e (M.empty _) cenv rho e v n ->                    
                     correct_envs cenv ienv rep_env rho e ->
                     protected_id_not_bound_id rho e ->
                     unique_bindings_env rho e ->
-                    functions_not_bound p rho e -> 
+                    functions_not_bound p rho e ->
                     forall stm lenv m k max_alloc fu, repr_expr_L6_L7_id fenv p rep_env e stm ->
                                               rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho m lenv ->
                                               correct_alloc e max_alloc -> 
@@ -6764,7 +6765,7 @@ Theorem repr_bs_L6_L7_related:
                                                                 same_args_ptr lenv lenv' /\
                                                                 arg_val_L6_L7 fenv finfo_env p rep_env v m' lenv'.
 Proof.
-  intros p rep_env cenv fenv finfo_env ienv Hpinv rho v e n Hev.
+  intros p rep_env cenv fenv finfo_env ienv Hpinv Hsym rho v e n Hev.
   induction Hev; intros Hc_env Hp_id Hrho_id Hf_id stm lenv m k max_alloc fu Hrepr_e Hrel_m Hc_alloc Hc_tinfo; inv Hrepr_e.
   - (* Econstr *)
 
@@ -6928,9 +6929,9 @@ Proof.
                   (Maps.PTree.set x
                      (Vptr alloc_b (Ptrofs.add alloc_ofs (Ptrofs.mul (Ptrofs.repr (sizeof (globalenv p) val)) (Ptrofs.repr Z.one)))) lenv)) =
              Some (Vptr alloc_b (Ptrofs.add alloc_ofs (Ptrofs.mul (Ptrofs.repr (sizeof (globalenv p) val)) (Ptrofs.repr Z.one))))).
-        rewrite M.gso. rewrite M.gss. reflexivity. intro; apply Hx_not. rewrite H4.  inList.
+        rewrite M.gso. rewrite M.gss. reflexivity. intro; apply Hx_not. rewrite H4. inList.
         (* BROKEN : needs find_symbol_domain p fenv *)
-        specialize (Hstep_m3 Htemp ys s0 0%Z m2 (Kseq s' k)). clear Htemp.
+        specialize (Hstep_m3 Hsym Htemp ys s0 0%Z m2 (Kseq s' k)). clear Htemp.
         assert (Htemp : (0 <= 0)%Z /\ (0 + Z.of_nat (length ys) <= Ptrofs.max_unsigned)%Z ).
         {
           split. omega.
@@ -8829,7 +8830,36 @@ Forall2
 
     (* show that tinfo -> argsIdent is some pointer to the right thing, and then that
   rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho (M.set argsIdent ( m) lenv *)  
-    inv H8.     
+    destruct inf as [n ind].
+    set (bys := firstn nParam ys).
+    set (ays := skipn nParam ys).
+    set (aind := skipn nParam ind).
+    assert (bysEq : bys = firstn nParam ys) by reflexivity.
+    assert (aysEq : ays = skipn nParam ys) by reflexivity.
+    assert (aindEq : aind = skipn nParam ind) by reflexivity.
+    inv H10.
+    assert (Hrepr : repr_asgn_fun' argsIdent threadInfIdent fenv p ays aind s0) by apply H3.
+    clear H3.
+    assert (exists (m' : mem) (lenv' : temp_env),
+    m_tstep2 (globalenv p)
+      (State fu
+         (Ssequence
+            (Ssequence
+               (Ssequence
+                  (Ssequence
+                     (Sset argsIdent
+                        (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) argsIdent
+                           (Tarray uval maxArgs noattr))) s0)
+                  (Sassign (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) allocIdent valPtr)
+                     (Etempvar allocIdent valPtr)))
+               (Sassign (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                  (Etempvar limitIdent valPtr)))
+            (mkCall threadInfIdent tinfIdent
+               (Ecast (var_or_funvar_f threadInfIdent fenv p f)
+                  (mkFunTy threadInfIdent (length bys))) ys)) k empty_env lenv m)
+      (State fu Sskip k empty_env lenv' m') /\
+    same_args_ptr lenv lenv' /\ arg_val_L6_L7 fenv finfo_env p rep_env v m' lenv').
+    2:{ simpl. rewrite bysEq in H3. apply H3. }   
     destruct Hpinv as [Hpinv_ptr [Hpinv_tinfo Hpinv_gc]].
     destruct Hpinv_tinfo as [co [Hget_tinfident Htinfident_members]].
   
@@ -8847,7 +8877,7 @@ Forall2
     rewrite Hfind_def_f' in H1; inv H1. clear Hsubval.
      
     destruct Hfundef_f' as [n' [l' [b' [fi_0 [Hf_fenv [Hnl [Hlvs [Hl_nodub [Hinf1 [Hfind_symbol [Hload_fi0 [Hload_fi1 [Hcorrect_alloc [Hgc_size_fi0 Hforall_l_fi]]]]]]]]]]]]]].    
-    rewrite Hf_fenv in H7. inv H7.
+    rewrite Hf_fenv in H6. inv H6.
 
 
     (* break apart the tinfo *)
@@ -8856,45 +8886,21 @@ Forall2
     destruct Hbound_limit as [Hbound_limit Hbound_gc_size].
     rewrite <- Z.le_add_le_sub_l in Hbound_limit. 
 
-    
-    (*  (State fu s0
-       (Kseq
-          (Sassign
-             (Efield
-                (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr))
-                allocIdent valPtr) (Etempvar allocIdent valPtr))
-          (Kseq
-             (Scall None
-                (Ecast
-                   (Evar f
-                      (Tfunction (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil) Tvoid
-                         {| cc_vararg := false; cc_unproto := false; cc_structret := false |}))
-                   (Tpointer
-                      (Tfunction (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil) Tvoid
-                         {| cc_vararg := false; cc_unproto := false; cc_structret := false |}) noattr))
-                [Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)]) k)) empty_env
-       (Maps.PTree.set argsIdent ?v lenv) m) *)
-
-    (* build the assumptions of repr_asgn_fun_mem to find the memory with marshalled elements *)
-    
-    
     remember (Kseq
-          (Sassign
-             (Efield
-                (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr))
-                allocIdent valPtr) (Etempvar allocIdent valPtr))
-          (Kseq
-          (Sassign
-             (Efield
-                (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr))
-                limitIdent valPtr) (Etempvar limitIdent valPtr))
-          (Kseq
-             (Scall None
-                    (Ecast (var_or_funvar_f threadInfIdent p f)
-                           (Tpointer
-                              (Tfunction (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil) Tvoid
-                                         {| cc_vararg := false; cc_unproto := false; cc_structret := false |}) noattr))
-                [Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)]) k))) as k'.
+                (Sassign
+                   (Efield
+                      (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr))
+                      allocIdent valPtr) (Etempvar allocIdent valPtr))
+                (Kseq
+                   (Sassign
+                      (Efield
+                         (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr))
+                         limitIdent valPtr) (Etempvar limitIdent valPtr))
+                   (Kseq
+                      (mkCall threadInfIdent tinfIdent
+                              (Ecast (var_or_funvar_f threadInfIdent fenv p f) (mkFunTy threadInfIdent (length bys))) ys) k))) as k'.
+    
+
     remember (Maps.PTree.set argsIdent (Vptr args_b args_ofs) lenv) as  lenv'.
     assert (Hlenv' : (Maps.PTree.set argsIdent (Vptr args_b args_ofs) lenv) = lenv) by (apply  Maps.PTree.gsident; auto).
     assert (Hrel_m' : rel_mem_L6_L7_id fenv finfo_env p rep_env  (Eapp f t ys) rho m lenv'). {      
@@ -8904,17 +8910,14 @@ Forall2
     assert (Hys: Forall (fun x => exists v, get_var_or_funvar p lenv x v) ys). {
       apply Forall_forall. intros.      
       assert (Hgl := getlist_In _ _ _ _ H0 H1).
-      destruct Hgl. destruct Hrel_m. destructAll. specialize (H6 x). destruct H6. 
+      destruct Hgl. destruct Hrel_m. destructAll. specialize (H5 x). destruct H5. 
       assert ( occurs_free (Eapp f t ys) x). constructor. auto.
-      specialize (H6 H8). inv H6. destruct H9. rewrite H6 in H4. inv H4. 
-      inv H9. eexists. constructor. eauto.
-      eexists. constructor 2. eauto. eauto. inv H11; auto.       
+      specialize (H5 H7). inv H5. destruct H8. rewrite H5 in H3. inv H3. 
+      inv H8. eexists. constructor. eauto.
+      eexists. constructor 2. eauto. eauto. inv H10; auto.       
     }
 
-
-
-
-    assert (Hasgn_fun_mem :=  repr_asgn_fun_mem fu lenv p rho (Eapp f t ys) fenv max_alloc rep_env finfo_env ys l' s0 m Hrel_m Hc_tinfo' Hys Hinf1 Hl_nodub H3).  
+    assert (Hasgn_fun_mem :=  repr_asgn_fun_mem fu lenv p rho (Eapp f t ys) fenv max_alloc rep_env finfo_env ys ays ind aind s0 m Hrel_m Hc_tinfo' Hys Hinf1 Hl_nodub aysEq aindEq Hrepr).  
     destruct Hasgn_fun_mem as [m2 [Hasgn_fun_mem [Hmem_of_asgn Hrel_mem]]]. 
     specialize (Hasgn_fun_mem k').
     (* lenv' := (Maps.PTree.set argsIdent (Vptr args_b args_ofs) lenv) *) 
@@ -8936,9 +8939,9 @@ Forall2
  
 
     (* m3 saves the value of alloc_ofs into the tinfo *)
-      
+     
     assert (Hm3 : Mem.valid_access m2 int_chunk tinf_b (Ptrofs.unsigned tinf_ofs) Writable). {
-      destruct Hrel_mem. inv H4. destructAll. rewrite H13 in Hget_tinf; inv Hget_tinf. specialize (H16 0%Z). rewrite Ptrofs.add_zero in H16. eapply H16. omega.
+      destruct Hrel_mem. inv H3. destructAll. rewrite H12 in Hget_tinf; inv Hget_tinf. specialize (H15 0%Z). rewrite Ptrofs.add_zero in H15. eapply H15. omega.
     }
     eapply Mem.valid_access_store with (v := (Vptr alloc_b alloc_ofs)) in Hm3.
     destruct Hm3 as [m3 Hm3].
@@ -8947,9 +8950,9 @@ Forall2
     assert (Hm4 : Mem.valid_access m3 int_chunk tinf_b (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size))) Writable). {
       eapply Mem.store_valid_access_1.
       eauto.
-      destruct Hrel_mem. inv H4. destructAll.
-      rewrite H13 in Hget_tinf; inv Hget_tinf.
-      specialize (H16 1%Z). simpl in H16. eapply H16. omega.
+      destruct Hrel_mem. inv H3. destructAll.
+      rewrite H12 in Hget_tinf; inv Hget_tinf.
+      specialize (H15 1%Z). simpl in H15. eapply H15. omega.
     }
     eapply Mem.valid_access_store with (v := (Vptr alloc_b limit_ofs)) in Hm4.
     destruct Hm4 as [m4 Hm4].
@@ -8962,17 +8965,17 @@ Forall2
         (* protected not in x *)
         destruct H1. eapply Mem.store_unchanged_on; eauto.
         intros.
-        inv H1. destructAll. rewrite H11 in   Hget_tinf; inv Hget_tinf. apply H12.
+        inv H1. destructAll. rewrite H10 in Hget_tinf; inv Hget_tinf. apply H11.
       }
       destructAll.
-      split; auto. intro. specialize (H5 x0).
-      destruct H5.
-      split. intro. apply H5 in H7.
+      split; auto. intro. specialize (H4 x0).
+      destruct H4.
+      split. intro. apply H4 in H6.
       destructAll.
       exists x1. split; auto.
       apply repr_val_id_L_unchanged with (m := m2); eauto. 
-      intros. specialize (H6 _ _ _ _ H7 H8).
-      destruct H6. destruct H9 as [Hclosed H9].
+      intros. specialize (H5 _ _ _ _ H6 H7).
+      destruct H5. destruct H8 as [Hclosed H8].
       split; auto.
       apply repr_val_id_L_unchanged with (m := m2); eauto.
       (* tinf_b disjoint from global *)  split; auto.
@@ -8981,7 +8984,7 @@ Forall2
       eapply store_globals_unchanged.
       eauto.
       intros.
-      specialize (Hglobals _ _ H10). destructAll; auto.
+      specialize (Hglobals _ _ H9). destructAll; auto.
     }
 
     assert (Hrel_mem4 :  rel_mem_L6_L7_id fenv finfo_env p rep_env (Eapp f t ys) rho m4 lenv). {
@@ -8990,17 +8993,17 @@ Forall2
       assert (Mem.unchanged_on x m3 m4). {
         destruct H1. eapply Mem.store_unchanged_on; eauto.
         intros.
-        inv H1. destructAll. rewrite H11 in   Hget_tinf; inv Hget_tinf. apply H12.
+        inv H1. destructAll. rewrite H10 in Hget_tinf; inv Hget_tinf. apply H11.
       }
       destructAll.
-      split; auto. intro. specialize (H5 x0).
-      destruct H5. 
-      split. intro. apply H5 in H7.
+      split; auto. intro. specialize (H4 x0).
+      destruct H4. 
+      split. intro. apply H4 in H6.
       destructAll.
       exists x1. split; auto.
       apply repr_val_id_L_unchanged with (m := m3); eauto. 
-      intros. specialize (H6 _ _ _ _ H7 H8).
-      destruct H6. destruct H9 as [Hclosed H9].
+      intros. specialize (H5 _ _ _ _ H6 H7).
+      destruct H5. destruct H8 as [Hclosed H8].
       split; auto.
       apply repr_val_id_L_unchanged with (m := m3); eauto.
       (* tinf_b disjoint from global *) split; auto.
@@ -9009,7 +9012,7 @@ Forall2
       eapply store_globals_unchanged.
       eauto.
       intros.
-      specialize (Hglobals _ _ H10). destructAll; auto.      
+      specialize (Hglobals _ _ H9). destructAll; auto.      
     }
     
     assert (Hc_tinfo_m4 :  correct_tinfo p max_alloc lenv m4). {
@@ -9025,31 +9028,35 @@ Forall2
                (repr_val_L6_L7_thm fenv finfo_env p rep_env (cps.Vfun (M.empty cps.val) fl f') m4 (Vptr b Ptrofs.zero)) /\
 (*               Genv.find_symbol (globalenv p) f' = Some b /\ *)
                eval_expr (globalenv p) empty_env lenv m4
-                         (Ecast (var_or_funvar_f threadInfIdent p f)
+                         (Ecast (var_or_funvar_f threadInfIdent fenv p f)
                                 (Tpointer
                                    (Tfunction (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil) Tvoid
                                               {| cc_vararg := false; cc_unproto := false; cc_structret := false |}) noattr)) (Vptr b Ptrofs.zero)). {
-      inv Hrel_mem4. destruct H1. specialize (H4 f). destruct H4.
+      inv Hrel_mem4. destruct H1. specialize (H3 f). destruct H3.
       assert ( occurs_free (Eapp f t ys) f) by constructor.
-      specialize (H4 H6).
-      destruct H4. destruct H4. rewrite H4 in H. inv H.
-      inv H7.
+      specialize (H3 H5).
+      destruct H3. destruct H3. rewrite H3 in H. inv H.
+      inv H6.
       - exists b. split; auto.
-        inv H15; econstructor; eauto.
-        unfold var_or_funvar_f. rewrite H14. econstructor. econstructor.
+        inv H14; econstructor; eauto.
+        unfold var_or_funvar_f. rewrite H13.
+        specialize (Hsym f). inv Hsym.
+        destruct (H6 (ex_intro _ b H13)). destruct x0.
+        unfold makeVar. rewrite H7.
+        econstructor. econstructor.
         constructor 2. apply M.gempty. eauto. constructor. constructor.
         auto.
-      - inv H9. exists b. split; auto.
+      - inv H8. exists b. split; auto.
         econstructor; eauto.
         unfold var_or_funvar_f. rewrite H. econstructor. econstructor.
-        eauto. constructor.               
+        eauto. constructor.
     }
     destruct H1 as [bf' [Hfind_f' Heval_f']]. 
     inv Hfind_f'.
 
     
-    rewrite  Hfind_def_f' in H6; inv H6.
-    rewrite Hf_fenv in H7; inv H7.
+    rewrite  Hfind_def_f' in H5; inv H5.
+    rewrite Hf_fenv in H6; inv H6.
     
     (* clear old assumptions about m and get them about m4 instead *)
     clear Hload_fi0 Hload_fi1. 
@@ -9073,7 +9080,7 @@ Forall2
     (* lenv_new is just lenv from fentry *)
         remember  (Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs)
                                                                               (create_undef_temps
-                                                                                 (vars ++
+                                                                                 (skipn nParam vars ++
                                                                                        gc_vars argsIdent allocIdent limitIdent caseIdent))) as lenv_new.
 
     (* show that after the branch, some memory m5 will be correct and contain enough space to execute the body *) 
@@ -9084,7 +9091,7 @@ Forall2
     assert (Hc_alloc' : exists max_alloc',  correct_alloc e4 max_alloc') by apply e_correct_alloc.
     destruct Hc_alloc' as [max_alloc' Hc_alloc'].
 
-    assert (rho' = M.empty _). { inv Hrepr_f_m4. reflexivity. inv H5. reflexivity. } rewrite H1 in *. clear H1.
+    assert (rho' = M.empty _). { inv Hrepr_f_m4. reflexivity. inv H4. reflexivity. } rewrite H1 in *. clear H1.
 
                                     
 
@@ -9092,6 +9099,8 @@ Forall2
     
     assert (Hvs := mem_of_asgn_exists_v Hmem_of_asgn Hget_args).
     destruct Hvs as [vs7 Hvs7].
+    set (avs7 := skipn nParam vs7).
+    assert (avs7eq : avs7 = skipn nParam vs7) by reflexivity.
     
     assert (Hnd_vs0: NoDup vsm4). {
       destruct Hrho_id as [Hrho_id1 Hrho_id2].
@@ -9104,11 +9113,11 @@ Forall2
                 intros.
                 inv Hp_id.
                 intro.
-                eapply H4 with (y := x) in H.
+                eapply H3 with (y := x) in H.
                 apply H.
                 right. constructor.
                 eapply shrink_cps_correct.name_boundvar_arg; eauto.
-                inv H6.
+                inv H5.
                 apply is_protected_tinfo_weak; auto.
                 inList. }              
 
@@ -9131,17 +9140,60 @@ Forall2
     assert (Hvs7_m4 : mem_after_asgn args_b args_ofs m4 locs vs7). {
       assert (Hdj := disjointIdent). 
       eapply mem_of_asgn_after.
+      apply aindEq. apply aysEq. apply avs7eq.
       eapply mem_of_asgn_v_store.
       eapply mem_of_asgn_v_store.
       eauto. eauto.
       solve_nodup.
       eauto.
-      solve_nodup.      
-    } 
+      solve_nodup.        
+    }  (* MAIN CHANGE: This is stepping through the function call, stitch together function arguments.
+               Need to update memory state proof to account for the reading/writing with args around gc call *)
+
+    (* 
+    set (bind := firstn nParam locs).
+    assert (bindEq : bind = firstn nParam locs) by reflexivity.
+    assert (Hgc : exists s ,
+               match asgnAppVars'' argsIdent threadInfIdent ays aind fenv with
+               | Some bef =>
+                 match asgnFunVars' argsIdent bys bind with
+                 | Some aft =>
+                   Some
+                     (Sifthenelse
+                        (not
+                           (Ebinop Ole
+                                   (Ederef
+                                      (Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr))
+                                      L6_to_Clight.uval)
+                                   (sub
+                                      (Efield
+                                         (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                                                 (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                                      (Efield
+                                         (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                                                 (Tstruct threadInfIdent noattr)) allocIdent valPtr)) type_bool))
+                        (Ssequence
+                           (Ssequence bef
+                                      (Scall None
+                                             (Evar gcIdent
+                                                   (Tfunction
+                                                      (Tcons (Tpointer uval noattr)
+                                                             (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil)) Tvoid
+                                                      {| cc_vararg := false; cc_unproto := false; cc_structret := false |}))
+                                             [Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr);
+                                              Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)])) aft) Sskip)
+                 | None => None
+                 end
+               | None => None
+               end = Some s). {
+*)
+    assert (Hgc : exists s , gc_test' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent finfo0 (N.of_nat (length locs)) ys locs fenv = Some s). {
+      eexists. unfold gc_test'. unfold reserve'. unfold asgnAppVars''. unfold asgnFunVars'.
+    }
     assert (Hm5 : exists m5 lenv_new',
                 clos_trans state (traceless_step2 (globalenv p))
                            (State F
-                                  (gc_test' allocIdent limitIdent gcIdent threadInfIdent tinfIdent finfo0 (N.of_nat (length locs)))
+                                  (gc_test' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent finfo0 (N.of_nat (length locs)) ys locs fenv)
                                   (Kseq  (Ssequence (Ssequence (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent) asgn) body)
           (Kcall None fu empty_env lenv k))
        empty_env lenv_new m4)
@@ -9160,7 +9212,7 @@ Forall2
                               (Ptrofs.unsigned tinf_ofs) = Some (Val.load_result int_chunk (Vptr alloc_b alloc_ofs)) /\
                    Mem.load int_chunk m5 tinf_b
                             (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size))) = Some (Val.load_result int_chunk (Vptr alloc_b limit_ofs)) /\
-                   mem_after_asgn args_b args_ofs m5 locs vs7' /\
+                   mem_after_asgn args_b args_ofs m5 locs vs7' /\ (* CHANGE : Need old version of relation *)
                 (* lenv_new' then gets the tinf ptr, and then the param_asgn *)
                    (forall lenv_new'', lenv_param_asgn (M.set argsIdent (Vptr args_b args_ofs) (M.set limitIdent (Vptr alloc_b limit_ofs) (M.set allocIdent (Vptr alloc_b alloc_ofs) lenv_new'))) lenv_new'' vsm4 vs7' ->
                 rel_mem_L6_L7_id fenv finfo_env p rep_env e4 rho'' m5 lenv_new'' /\

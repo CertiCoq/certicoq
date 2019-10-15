@@ -4,14 +4,31 @@ Import ListNotations.
   
 From CertiCoq.Plugin Require Import CertiCoq.
 
+(* **
+
+Flags:
+
+0 : C code uses args + default pipeline
+1 : C code uses args and argv optimization + default pipeline
+2 : Old C code generators + default pipeline 
+3 : Old C code generators with argv optimization + default pipeline 
+4 : C code uses args + lambda lifting pipeline
+5 : C code uses args and argv optimization + lambda lifting pipeline
+6 : Old C code generator + lambda lifting pipeline
+7 : Old C code generator with argv optimization + lambda lifting pipeline
+8 :  Old C code generator + old pipeline
+
+**)
+
+
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 
-CertiCoq Compile Opt 0 demo1.
+CertiCoq Compile Opt 6 demo1.
 
 Definition demo2 := (negb, List.hd_error).
 
-CertiCoq Compile Opt 0 demo2.
+CertiCoq Compile Opt 6 demo2.
 
 (* Definition lala := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
 (* Definition test1_opt := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
@@ -62,8 +79,8 @@ Definition clos_opt := loop (100*10) clos_loop.
 Definition clos_old := loop (100*10) clos_loop.
 
 CertiCoq Compile Opt 2 clos.
-CertiCoq Compile Opt 1 clos_opt.
-CertiCoq Compile Opt 2 clos_old.
+CertiCoq Compile Opt 6 clos_opt.
+CertiCoq Compile Opt 8 clos_old.
 
 
 (* In this clos should be lambda lifted and the environment should not be constructed in every iteration of the loop *)
@@ -107,6 +124,6 @@ Definition is_valid_old :=
 
 Time CertiCoq Compile Opt 2 is_valid. (* 5 secs ! *)
 
-(* Time CertiCoq Compile Opt 1 is_valid_opt. (* 5 secs ! *) *)
+Time CertiCoq Compile Opt 6 is_valid_opt. (* 5 secs ! *)
 
-(* Time CertiCoq Compile Opt 2 is_valid_old. (* 5 secs ! *) *)
+Time CertiCoq Compile Opt 8 is_valid_old. (* 5 secs ! *)

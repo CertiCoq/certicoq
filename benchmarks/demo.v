@@ -88,13 +88,19 @@ From CertiCoq.Benchmarks Require Import vs.
 Import VeriStar.
 
 Definition is_valid :=
-  match main with
+  match main_h with
   | Valid => true
   | _ => false
   end.
 
 Definition is_valid_opt :=
-  match main with
+  match main_h with
+  | Valid => true
+  | _ => false
+  end.
+
+Definition is_valid_old :=
+  match main_h with
   | Valid => true
   | _ => false
   end.
@@ -103,18 +109,4 @@ Time CertiCoq Compile is_valid. (* 5 secs ! *)
 
 Time CertiCoq Compile Opt 1 is_valid_opt. (* 5 secs ! *)
 
-
-(* Definition test_pipeline  (e: Ast.global_declarations * Ast.term) := *)
-(*   match (translateTo (cTerm certiL5) (Flag 0) e) with *)
-(*   | Ret p =>  *)
-(*     match L6_pipeline p with  *)
-(*     | Ret ((_, cenv, nenv, _),  (_, e)) => cps_show.show_exp nenv cenv false e *)
-(*     | Exc s => s *)
-(*     end *)
-(*   | Exc s => s *)
-(*   end. *)
-
-
-
-
-(* Time CertiCoq Compile Opt 1 is_valid_opt. (* 5 secs ! *) *)
+Time CertiCoq Compile Opt 2 is_valid_old. (* 5 secs ! *)

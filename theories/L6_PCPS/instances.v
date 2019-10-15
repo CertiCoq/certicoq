@@ -214,7 +214,7 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
       (* Shrink reduction *)     
       let e := shrink_cps.shrink_top e in
       (* lambda lifting *)
-      let (e, c_data) := lambda_lift' e c_data in
+      let (e, c_data) := lambda_lift e c_data in
       (* Shrink reduction *)      
       let e := shrink_cps.shrink_top e in
       (* Closure conversion *)

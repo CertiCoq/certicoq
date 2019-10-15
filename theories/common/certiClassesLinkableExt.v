@@ -52,9 +52,9 @@ Require Import SquiggleEq.LibTactics.
 
 Context `{CerticoqTranslation Src Dst}.
 Definition compObsPreservingLinkableExt `{GoodTerm Dst}:=
-   ∀ (s:Src),
+  ∀ (o:Opt) (s:Src),
     goodTerm s 
-    -> liftLe compObsLeLinkExt (Some s) (exception_option (translate Src Dst s)).
+    -> liftLe compObsLeLinkExt (Some s) (exception_option (translate Src Dst o s)).
 
 End CompObsPreserving.
 
@@ -114,8 +114,8 @@ Proof.
   intros ? ? Hgs Hgd Hobsd.
   specialize (fun d => Hsubi Habs _ d Hgs).
   destruct Ht1 as [GPsi OPsi].
-  specialize (GPsi svArg Hgs).
-  specialize (OPsi _ Hgs).
+  specialize (GPsi svArg (Flag 0) Hgs).
+  specialize (OPsi (Flag 0) _ Hgs).
   (* 
 Where to get the intermediate term ivArg needed to invoke Hsubi, the part
 hat comes from app linkable correctness from Src to Inter? 
@@ -125,7 +125,7 @@ Src to Inter and Inter to Dst have been proved correct.
 However, we get stuck later.
 Note that in this file, the relation ⊑ does not depend on any translation.
  *)
-  destruct (translate Src Inter svArg) as [| iArg ]; try contradiction.
+  destruct (translate Src Inter (Flag 0) svArg) as [| iArg ]; try contradiction.
   invertsn OPsi.
   specialize (Hsubi iArg GPsi (OPsi m)).
   eapply Hind;[apply Hsubi | ].
@@ -174,22 +174,22 @@ Proof using.
   simpl in Hlt.
   constructor.
   intros ? Hev.
-  specialize (Hlt _ Hev). exrepnd.
-  exists dv. dands; eauto using liftLeRimpl;[].
-  clear Hlt3.
-  intros Hq svArg Hg.
-  specialize (Hlt0 Hq svArg).
-  destruct Hgg.
-  specialize (certiGoodPresLink svArg Hg).
-  specialize (obsePresLink svArg Hg).
-  destruct (translate Src Dst svArg) as [ | tsvArg];[contradiction | ].
-  inverts obsePresLink. 
-  simpl. constructor.
-  apply Hind.
-  apply Hlt0; eauto.
-  Fail apply Hind.
-  idtac.
-  Fail apply H11.
+  (* specialize (Hlt (Flag 0) _ Hev). exrepnd. *)
+  (* exists dv. dands; eauto using liftLeRimpl;[]. *)
+  (* clear Hlt3. *)
+  (* intros Hq svArg Hg. *)
+  (* specialize (Hlt0 Hq svArg). *)
+  (* destruct Hgg. *)
+  (* specialize (certiGoodPresLink svArg Hg). *)
+  (* specialize (obsePresLink svArg Hg). *)
+  (* destruct (translate Src Dst svArg) as [ | tsvArg];[contradiction | ]. *)
+  (* inverts obsePresLink.  *)
+  (* simpl. constructor. *)
+  (* apply Hind. *)
+  (* apply Hlt0; eauto. *)
+  (* Fail apply Hind. *)
+  (* idtac. *)
+  (* Fail apply H11. *)
 Abort.
 End Nn.
 End ExtImpliesNonExt.

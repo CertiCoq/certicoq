@@ -1,0 +1,87 @@
+cp ../theories/Runtime/gc.c ./
+cp ../theories/Runtime/gc.h ./
+cp ../theories/Runtime/values.h ./
+cp ../theories/Runtime/main.c ./
+cp ../theories/Runtime/config.h ./
+coqc benchmark_certicoq.v
+Debug: Average time elapsed in L2 to L2k:  0.000000
+Debug: Quoting
+Debug: Finished quoting in 0.000237 s.. compiling to L7.
+Debug: Average time elapsed in L1 to L2:  0.001594
+Debug: Average time elapsed in L2 to L3:  0.000025
+Debug: Average time elapsed in L3 to L4:  0.000038
+Debug: Average time elapsed in L4 to L4_2:  0.000072
+Debug: Average time elapsed in L4_2 to L_5:  0.000016
+Debug: Average time elapsed in L4_5 to L5:  0.000181
+Debug: Average time elapsed in L5 to L6:  0.002567
+Debug: Average time elapsed in L6 to L6cc:  0.018391
+Debug: Average time elapsed in L6 to L7:  0.001182
+Debug: Finished compiling, printing to file.
+Debug: Printed to file in 0.020764 s..
+Finished transaction in 0.262 secs (0.259u,0.002s) (successful)
+Debug: Quoting
+Debug: Finished quoting in 0.168379 s.. compiling to L7.
+Debug: Average time elapsed in L1 to L2:  3.452359
+Debug: Average time elapsed in L2 to L3:  0.000443
+Debug: Average time elapsed in L3 to L4:  0.003212
+Debug: Average time elapsed in L4 to L4_2:  0.002778
+Debug: Average time elapsed in L4_2 to L_5:  0.000867
+Debug: Average time elapsed in L4_5 to L5:  0.003808
+Debug: Average time elapsed in L5 to L6:  0.131621
+Debug: Average time elapsed in L6 to L6cc:  0.517183
+Debug: Average time elapsed in L6 to L7:  2.307410
+Debug: Finished compiling, printing to file.
+Debug: Printed to file in 1.083311 s..
+Finished transaction in 65.452 secs (65.348u,0.092s) (successful)
+Debug: Quoting
+Debug: Finished quoting in 0.084067 s.. compiling to L7.
+Debug: Average time elapsed in L1 to L2:  0.417027
+Debug: Average time elapsed in L2 to L3:  0.000390
+Debug: Average time elapsed in L3 to L4:  0.008844
+Debug: Average time elapsed in L4 to L4_2:  0.003507
+Debug: Average time elapsed in L4_2 to L_5:  0.000476
+Debug: Average time elapsed in L4_5 to L5:  0.004793
+Debug: Average time elapsed in L5 to L6:  0.063707
+Debug: Average time elapsed in L6 to L6cc:  0.789461
+Debug: Average time elapsed in L6 to L7:  0.122009
+Debug: Finished compiling, printing to file.
+Debug: Printed to file in 0.617249 s..
+Finished transaction in 14.804 secs (14.776u,0.024s) (successful)
+Debug: Quoting
+Debug: Finished quoting in 0.942419 s.. compiling to L7.
+Debug: Average time elapsed in L1 to L2:  2.838754
+Debug: Average time elapsed in L2 to L3:  0.003245
+Debug: Average time elapsed in L3 to L4:  0.016461
+Debug: Average time elapsed in L4 to L4_2:  0.004647
+Debug: Average time elapsed in L4_2 to L_5:  0.001029
+Debug: Average time elapsed in L4_5 to L5:  0.008008
+Debug: Average time elapsed in L5 to L6:  0.159621
+Debug: Average time elapsed in L6 to L6cc:  0.894042
+Debug: Average time elapsed in L6 to L7:  0.256138
+Debug: Finished compiling, printing to file.
+Debug: Printed to file in 1.018279 s..
+Finished transaction in 43.781 secs (43.62u,0.151s) (successful)
+ccomp -o binom -w -O2 main.c gc.c CertiCoq.Benchmarks.Binom.main.c
+ccomp -o color -w -O2 main.c gc.c CertiCoq.Benchmarks.Color.main.c
+ccomp -o vs -w -O2 main.c gc.c CertiCoq.Benchmarks.vs.main_h.c
+ccomp -o sha -w -O2 main.c gc.c benchmark_certicoq.benchsha.c
+echo "binom"
+binom
+./binom
+Time taken 0.000014 seconds 0.014000 milliseconds
+16324
+echo "color"
+color
+./color
+Time taken 0.040422 seconds 40.422000 milliseconds
+    7f86
+echo "vs"
+vs
+./vs
+Time taken 0.078509 seconds 78.509000 milliseconds
+       0
+echo "sha"
+sha
+./sha
+Time taken 6.668135 seconds 6668.135000 milliseconds
+       0

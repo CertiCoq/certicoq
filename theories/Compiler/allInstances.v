@@ -3,7 +3,7 @@ Require Export Common.certiClasses2.
 Require Export L1g.instances.
 Require Export L2k.instances.
 Require Export L4.instances.
-Require Export L6.instances.
+Require Export L6.instances L6.cps_util.
 (* Require Export L7.Clightexec. *)
 
 
@@ -40,13 +40,21 @@ Defined. *)
 
 
 Definition ext_comp `{F:utils.Fuel} := fun prog =>
-  let t := (translateTo (cTerm certiL6) prog) in
+  let t := (translateTo (cTerm certiL6) (Flag 0) prog) in
+  match t with
+  | Ret xx => xx
+  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
+  end.
+
+Definition ext_comp_opt `{F:utils.Fuel} f := fun prog =>
+  let t := (translateTo (cTerm certiL6) f prog) in
   match t with
   | Ret xx => xx
   | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
   end.
 
 Require Import L6_to_Clight.
+Require Import L6_to_Clight_old.
 (* Require Import Clightexec.*)
 Require Import compcert.lib.Maps.
 Definition argsIdent:positive := 26.
@@ -62,32 +70,45 @@ Definition numArgsIdent:positive := 97.
 Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
-
-Definition compile_L7 (t : cTerm certiL6) : L5_to_L6.name_env * Clight.program * Clight.program :=
+Definition compile_L7 o (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-                   prog cenv nenv in
-  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
+  match o with
+  | Flag 0 => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 1 =>  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 2 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 3 =>  let p := compile_old_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 4 => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 5 =>  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 6 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 7 =>  let p := compile_old_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 8 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | _ => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  end.
 
-
-
-
-Definition compile_opt_L7 p  :=
+Definition compile_opt_L7 o p :=
   match p with
-  | Ret p => Ret (compile_L7 p)
+  | Ret p => Ret (compile_L7 o p)
   | Exc s => Exc s
   end.
 
 Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
-  translateTo (cTerm certiL4) p.
+  translateTo (cTerm certiL4) (Flag 0) p.
 
-Definition compile_template_L7 `{F:utils.Fuel} (p : Template.Ast.program) : exception (L5_to_L6.name_env * Clight.program * Clight.program)  :=
-  compile_opt_L7 (translateTo (cTerm certiL6) p).
+Definition compile_template_L7 `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+  : exception (cps_util.name_env * Clight.program * Clight.program)  :=
+  compile_opt_L7 (Flag opt_level) (translateTo (cTerm certiL6) (Flag opt_level) p).
 
 Open Scope positive_scope.
-
-
-
 
 Require Import L6.cps L6.cps_show.
 
@@ -96,6 +117,7 @@ Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   | exceptionMonad.Exc s => s
   | exceptionMonad.Ret ((p,cenv, nenv, fenv), (g, e)) => L6.cps_show.show_exp nenv cenv true e
   end.
+
 
 Require Import L6_to_Clight.
 Require Import compcert.lib.Maps.
@@ -117,6 +139,8 @@ Require Import L6.cps L6.cps_show.
  *)
 
 
+Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
+
 Require Import Benchmarks.Binom
         Benchmarks.Color
         Benchmarks.vs.
@@ -124,36 +148,49 @@ Require Import Benchmarks.Binom
 
 Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
+(*
+Quote Recursively Definition foo := (2+3).
+
+Definition foo6 := Eval native_compute in (translateTo (cTerm certiL6) (Flag 1) foo).
+Print foo6.
+
+Definition test := Eval native_compute in
+  let '(nenv , p , _) := (compile_L7 (ext_comp_opt (Flag 1) foo)) in
+  p.
+Print test.
 
 
+Quote Recursively Definition binom := Binom.main.
+*)
+
+(*
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
- Quote Recursively Definition binom := Binom.main.
+Quote Recursively Definition binom := Binom.main.
 (* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
 Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)
 
 
-
-
-
- Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) graph_color).
+(*
+ Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) graph_color).
 
  Print demo4.
- Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) Demo1).
+ Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) Demo1).
  Set Printing Depth 1000.
  Print demo5.
- Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) binom).
- Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) binom).
+ Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) binom).
+ Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) binom).
 
-Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) graph_color).
+Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) graph_color).
 
 Print color5.
 
 
 
-Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) binom).
+Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) (Flag 0) binom).
 Definition eval_c2 := match binom2 with
                       | Ret (mkPgm p env) =>
-                        Ret (L2k.wcbvEval.wcbvEval env 1000%nat p)
+                        Re
+t (L2k.wcbvEval.wcbvEval env 1000%nat p)
                         | Exc s => Exc "foo"
                       end.
 
@@ -161,7 +198,7 @@ Definition eval_c2' := Eval native_compute in eval_c2.
 Print eval_c2'.
 
 
-Definition binom3 := Eval native_compute in (translateTo (cTerm certiL3_eta) binom).
+Definition binom3 := Eval native_compute in (translateTo (cTerm certiL3_eta) (Flag 0) binom).
 
 
 Require Export L4.expression.
@@ -172,8 +209,8 @@ Definition eval_c4 := match binom5 with
                         | Exc s => Exc "foo"
                       end.
 
-  Definition eval_c4' := Eval vm_compute in eval_c4.
- Print eval_c4'.
+Definition eval_c4' := Eval vm_compute in eval_c4.
+Print eval_c4'.
 
 
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
@@ -181,11 +218,8 @@ Print color5.
 
 
 
-Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
-
 (* Definition test := printProg (compile_L7 (ext_comp vs)) "output/vs_h.c".      *)
 (*  Definition test := printProg (compile_L7 (ext_comp graph_color)) "output/color.c".    *)
-
 
 
 
@@ -306,3 +340,5 @@ Extraction "testColorT_L7.ml" testColor.
 
 *)
 (* End TEST_L7. *)
+*)
+*)

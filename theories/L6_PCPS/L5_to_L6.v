@@ -113,10 +113,6 @@ Section Program.
         (Eproj_c  n' tg (N.of_nat (m'+p)) r ctx_p', Pos.succ n')
     end.
 
-
-  Definition name_env := M.t BasicAst.name.
-  Definition n_empty:name_env := M.empty _.
-
   Definition t_info:Type := fun_tag.
   Definition t_map := M.t t_info.
   Definition t_empty:t_map := M.empty _.
@@ -138,9 +134,6 @@ Fixpoint get_t (n:var) (sig:t_map): ind_tag :=
       | Some v => v
     end.
 
-
-
-
   Definition s_map := M.t var.
   Definition s_empty := M.empty var.
 
@@ -158,14 +151,10 @@ Fixpoint get_t (n:var) (sig:t_map): ind_tag :=
     end.
 
 
-
-
-
-
-  (* environment threaded for conversion
+  (* environment threaded for conversion 
  conId_map maps the dcon to the right tag pointing to the constructor info (ctor_env not passed around)
- t_map maps var name to their tag, allowing to index applications with the right function tag
- note:want might to add f and k to t_map on way down
+ t_map maps var name to their tag, allowing to index applications with the right function tag  
+ note:want might to add f and k to t_map on way down 
    *)
   Definition conv_env:Type := conId_map *  t_map * name_env.
 

@@ -63,7 +63,9 @@ int main(int argc, char *argv[]) {
   struct thread_info* tinfo;
   tinfo = make_tinfo();
   // clock_t start = clock(), diff;
-  body(tinfo);
+  for(int i = 0; i < 20000; i++){
+    body(tinfo);
+  }
   // diff = clock() - start;
   // int msec = diff * 1000 / CLOCKS_PER_SEC;
   // printf("Time taken %d seconds %d milliseconds\n", msec/1000, msec%1000);

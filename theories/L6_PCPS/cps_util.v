@@ -15,6 +15,30 @@ Close Scope Z_scope.
 
 Definition var_dec := M.elt_eq.
 
+(** Common name environment handling *)
+
+Definition name_env := M.t BasicAst.name.
+Definition n_empty:name_env := M.empty _.
+
+
+Definition add_entry (nenv:name_env) (x : var) (x_origin : var) (suff : String.string) : name_env :=
+  match M.get x_origin nenv  with
+  | Some (BasicAst.nNamed s) => M.set x (BasicAst.nNamed (String.append s suff)) nenv
+  | Some BasicAst.nAnon => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
+  | None => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
+  end.
+
+Definition add_entry_str (nenv:name_env) (x : var) (name : String.string) : name_env :=
+  M.set x (BasicAst.nNamed name) nenv.
+
+Fixpoint add_entries (nenv:name_env) (xs : list var) (xs_origin : list var) (suff : String.string) : name_env :=
+  match xs, xs_origin with
+  | x::xs, x_origin::xs_origin =>
+    add_entries (add_entry nenv x x_origin suff) xs xs_origin suff
+  | _, _ => nenv
+  end.
+
+
 (** Lemmas about [findtag] *)
 Lemma findtag_not_empty:
   forall A cl (k : A) (v : ctor_tag), findtag cl v = Some k -> 0 < (length cl).

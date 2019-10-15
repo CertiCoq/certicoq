@@ -50,9 +50,9 @@ Require Import SquiggleEq.LibTactics.
 
 Context `{CerticoqTranslation Src Dst}.
 Definition compObsPreserving :=
-   ∀ (s:Src),
+   ∀ (o:Opt) (s:Src),
     goodTerm s
-    -> liftLe compObsLe (Some s) (exception_option (translate Src Dst s)).
+    -> liftLe compObsLe (Some s) (exception_option (translate Src Dst o s)).
 
 End CompObsPreserving.
 
@@ -116,18 +116,19 @@ Global Instance composeCerticoqTranslationCorrect
 Proof.
   destruct Ht1, Ht2.
   constructor; [eapply composePreservesGood; eauto; fail |].
-  intros ? Hgoods.
-  specialize (obsePres0 _ Hgoods).
+  intros ? ? Hgoods.
+  specialize (obsePres0 o _ Hgoods).
   inverts obsePres0 as Hle Heq.
-  apply certiGoodPres0 in Hgoods.
+  unfold goodPreserving in *. 
+  eapply certiGoodPres0 with (o:=o) in Hgoods.
   unfold composeTranslation, translate in *.
-  destruct (t1 s); compute in Hgoods; try contradiction.
+  destruct (t1 o s); compute in Hgoods; try contradiction.
   compute in Heq. inverts Heq.
-  specialize (obsePres1 _ Hgoods).
+  specialize (obsePres1 o _ Hgoods).
   inverts obsePres1 as Hlei Heqi.
-  apply certiGoodPres1 in Hgoods.
+  eapply certiGoodPres1 with (o:=o) in Hgoods.
   unfold composeTranslation, translate in *. simpl.
-  destruct (t2 i); compute in Hgoods; try contradiction.
+  destruct (t2 o i); compute in Hgoods; try contradiction.
   simpl.
   constructor.
   inverts Heqi.

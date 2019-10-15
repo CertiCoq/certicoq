@@ -8,12 +8,13 @@ From CertiCoq.Common Require Import certiClasses certiClassesLinkable Common.
 Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
-From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion hoisting.
+From CertiCoq.L6 Require Import cps cps_util state eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion
+     closure_conversion2 hoisting dead_param_elim lambda_lifting.
 From CertiCoq.L7 Require Import L6_to_Clight.
 
-
-
-(* 1 - environment of primitive operations
+(*
+   Environment for L6 programs: 
+   1 - environment of primitive operations
    2 - environment of constructors (from which datatypes can be reconstructed)
    3 - name environment mapping variables to their original name if it exists
    4 - a map from function tags to information about that class of function
@@ -32,14 +33,11 @@ Let L6val: Type := cps.val.
    variables of a term.
  *)
 
-(* Zoe: Changed definitions to only target closed terms *)
-
 Instance bigStepOpSemL6Term : BigStepOpSem (L6env * L6term) L6val :=
   λ p v,
   let '(pr, cenv, nenv, fenv, (rho, e)) := p in
-  (* should not modify pr, cenv and nenv 
-  let '(pr', cenv', env', nenv', val) := v in *)
-  ∃ (n:nat), (L6.eval.bstep_e pr cenv rho e v n).
+  (* should not modify pr, cenv and nenv *)
+  ∃ (n:nat), L6.eval.bstep_e pr cenv rho e v n.
 
 Require Import certiClasses2.
 
@@ -70,8 +68,6 @@ Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) :=
     | Ret (inr v) => Result v
     end.
 
-
-
 Open Scope positive_scope.
 
 (* starting tags for L5_to_L6, anything under default is reserved for special constructors/types *)
@@ -86,52 +82,165 @@ Definition bogus_cloiTag := 16%positive.
 Definition fun_fTag := 3%positive.
 Definition kon_fTag := 2%positive.
 
-(* Let bindings for function and enviroment.
- * Thee function and the argument should be closed terms
- * so we do not care about capturing *)
-Definition f' := 1%positive.
-Definition Γ := 2%positive.
-
-(* This is application of closure converted functions.
-   We will need regural application as well. It's likely that
-   only this one will be exposed. *)
-(* Instance CloApp : MkApply L6term := *)
-(*   mkApp (fun f xs =>  *)
-(*            Eproj f' bogus_clo_tag 0%N f *)
-(*                  (Eproj Γ bogus_clo_tag 1%N f *)
-(*                         (Eapp f' t (Γ :: xs)))). *)
-
 Require Import ExtLib.Data.Monads.OptionMonad.
 
 Require Import ExtLib.Structures.Monads.
-  
-Require Import Common.AstCommon.
+
+
+
+(** * Definition of L6 backend pipelines *)
+
+
+Definition update_var (names : nEnv) (x : var) : nEnv :=
+  match M.get x names with
+  | Some (nNamed _) => names
+  | Some nAnon => M.set x (nNamed "x") names
+  | None => M.set x (nNamed "x") names
+  end.
+
+Definition update_vars names xs :=
+  List.fold_left update_var xs names.
+
+(** Adds missing names to name environment for the C translation *)
+Fixpoint add_binders_exp (names : nEnv) (e : exp) : nEnv :=
+  match e with
+  | Econstr x _ _ e 
+  | Eprim x _ _ e
+  | Eproj x _ _ _ e => add_binders_exp (update_var names x) e
+  | Ecase _ pats =>
+    List.fold_left (fun names p => add_binders_exp names (snd p)) pats names
+  | Eapp _ _ _
+  | Ehalt _ => names
+  | Efun B e => add_binders_exp (add_binders_fundefs names B) e
+  end
+with add_binders_fundefs (names : nEnv) (B : fundefs) : nEnv :=
+       match B with
+       | Fcons f _ xs e1 B1 =>
+         add_binders_fundefs (add_binders_exp (update_vars (update_var names f) xs) e1) B1
+       | Fnil => names
+       end.
+
+Definition L6_pipeline_old (e : cTerm certiL5) : exception (cTerm certiL6) :=  
+  match e with
+  | pair venv vt =>
+    match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt)) with
+    | Some r =>
+      let '(c_env, n_env, f_env, next_cTag, next_iTag, e) := r in
+      (* make compilation state *)
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          let next_fTag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) f_env 1 + 1 in
+          pack_data next_var next_cTag next_iTag next_fTag c_env f_env n_env nil
+      in
+      (* uncurring *)
+      let '(e, s, c_data) := uncurry_fuel 100 (shrink_cps.shrink_top e) c_data in
+      (* (* inlining *) *)
+      let (e, c_data) := inline_uncurry e s 10 10 c_data in
+      (* Shrink reduction *)     
+      let e := shrink_cps.shrink_top e in
+      let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
+      let '(cenv', names', e) :=
+          closure_conversion.closure_conversion_hoist bogus_cloTag e ctag itag cenv names in
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv') fenv names' log
+      in
+      (* Shrink reduction *)
+      let e := shrink_cps.shrink_top e in
+      (* Dead parameter elimination *)
+      (* let e := dead_param_elim.eliminate e in *)
+      (* (* Shrink reduction *)       *)
+      let e := shrink_cps.shrink_top e in
+      Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, e))
+    | None => Exc "failed converting from L5 to L6"
+    end
+  end.
+
+
+
+Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=  
+  match e with
+  | pair venv vt =>
+    match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt)) with
+    | Some r =>
+      let '(c_env, n_env, f_env, next_cTag, next_iTag, e) := r in
+      (* make compilation state *)
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          let next_fTag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) f_env 1 + 1 in
+          pack_data next_var next_cTag next_iTag next_fTag c_env f_env n_env nil
+      in
+      (* uncurring *)
+      let '(e, s, c_data) := uncurry_fuel 100 (shrink_cps.shrink_top e) c_data in   
+      (* inlining *)
+      let (e, c_data) := inline_uncurry e s 10 10 c_data in
+      (* Shrink reduction *)     
+      let e := shrink_cps.shrink_top e in
+      (* Closure conversion *)
+      let (e, c_data) := closure_conversion2.closure_conversion_hoist bogus_cloTag (* bogus_cloiTag *) e c_data in
+      let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv) fenv (add_binders_exp names e) log
+      in
+      (* Shrink reduction *)
+      (* let e := shrink_cps.shrink_top e in *)
+      (* (* Dead parameter elimination *) *)
+      (* let e := dead_param_elim.eliminate e in *)
+      (* Shrink reduction *)
+      let e := shrink_cps.shrink_top e in
+      Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, e))
+    | None => Exc "failed converting from L5 to L6"
+    end
+  end.
+
+(* Optimizing L6 pipeline *)
+Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=  
+  match e with
+  | pair venv vt =>
+    match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt)) with
+    | Some r =>
+      let '(c_env, n_env, f_env, next_cTag, next_iTag, e) := r in
+      (* make compilation state *)
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          let next_fTag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) f_env 1 + 1 in
+          pack_data next_var next_cTag next_iTag next_fTag c_env f_env n_env nil
+      in
+      (* uncurring *)
+      let '(e, s, c_data) := uncurry_fuel 100 (shrink_cps.shrink_top e) c_data in   
+      (* inlining *)
+      let (e, c_data) := inline_uncurry e s 10 10 c_data in
+      (* Shrink reduction *)     
+      let e := shrink_cps.shrink_top e in
+      (* lambda lifting *)
+      let (e, c_data) := lambda_lift e c_data in
+      (* Shrink reduction *)      
+      let e := shrink_cps.shrink_top e in
+      (* Closure conversion *)
+      let (e, c_data) := closure_conversion2.closure_conversion_hoist bogus_cloTag (* bogus_cloiTag *) e c_data in
+      let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
+      let c_data :=
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in
+          pack_data next_var ctag itag ftag (add_cloTag bogus_cloTag bogus_cloiTag cenv) fenv (add_binders_exp names e) log
+      in
+
+      (* Shrink reduction *)
+      let e := shrink_cps.shrink_top e in
+      (* (* Dead parameter elimination *) *)
+      (* let e := dead_param_elim.eliminate e in *)
+      (* Shrink reduction *)      
+      let e := shrink_cps.shrink_top e in
+      Ret ((M.empty _ ,  state.cenv c_data, state.name_env c_data, state.fenv c_data), (M.empty _, (shrink_top e)))
+    | None => Exc "failed converting from L5 to L6"
+    end
+  end.
 
 Instance certiL5_t0_L6: 
-  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := 
-  fun v =>
-    match v with
-    | pair venv vt =>
-       (match ((AstCommon.timePhase "L5 to L6")
-                (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt))) with
-        | Some r =>
-          let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
-          (AstCommon.timePhase "L6 to L6cc")
-            (fun (_:Datatypes.unit) =>                
-               let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
-               (* let e := postuncurry_contract e s d in            *)
-               (* let e := shrink_cps.shrink_top e in  *)
-               (* let e :=  inlinesmall_contract e 10 10 in *)
-               let e := inline_uncurry_contract e s 10 10 in  
-        let e := shrink_cps.shrink_top e in
-        let '(cenv',nenv', t') := closure_conversion_hoist
-                                    bogus_cloTag
-                                    e
-                                    next_cTag
-                                    next_iTag
-                                    cenv nenv
-        in
-        Ret ((M.empty _ , (add_cloTag bogus_cloTag bogus_cloiTag cenv'), nenv', M.empty _),  (M.empty _,   shrink_top t')))
-      | None => Exc "failed converting from L5 to L6"
-      end)
-    end.
+  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) :=
+  fun o => match o with
+        | Flag 0 => L6_pipeline
+        | Flag 1 => L6_pipeline_opt
+        | Flag 2 => L6_pipeline_old
+        | Flag _ => L6_pipeline
+        end.

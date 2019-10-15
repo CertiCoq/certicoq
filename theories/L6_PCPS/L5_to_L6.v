@@ -113,10 +113,6 @@ Section Program.
         (Eproj_c  n' tg (N.of_nat (m'+p)) r ctx_p', Pos.succ n')
     end.
 
-
-  Definition nEnv := M.t BasicAst.name.
-  Definition n_empty:nEnv := M.empty _.
-
   Definition t_info:Type := fTag.
   Definition t_map := M.t t_info.
   Definition t_empty:t_map := M.empty _.
@@ -138,9 +134,6 @@ Fixpoint get_t (n:var) (sig:t_map): iTag :=
       | Some v => v
     end.
 
-  
-
-
   Definition s_map := M.t var.
   Definition s_empty := M.empty var.
 
@@ -156,10 +149,6 @@ Fixpoint get_t (n:var) (sig:t_map): iTag :=
         set_s_list lx' ly' (M.set (fst x) y sig)
       | _ => sig
     end.
-
-
-
-
 
 
   (* environment threaded for conversion 

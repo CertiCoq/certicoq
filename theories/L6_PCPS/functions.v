@@ -2,11 +2,10 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.Ensembles_util.
-Require Import compcert.lib.Coqlib.
-Require Import Coq.Numbers.BinNums Coq.NArith.BinNat Coq.PArith.BinPos
-        Coq.Relations.Relations Coq.Classes.Morphisms Coq.Lists.List
-        Coq.Sets.Ensembles Coq.Program.Basics.
+From CertiCoq.L6 Require Import Ensembles_util.
+From compcert.lib Require Import Coqlib.
+From Coq Require Import Numbers.BinNums NArith.BinNat PArith.BinPos Relations.Relations
+     Classes.Morphisms Lists.List Sets.Ensembles Program.Basics.
 
 Import ListNotations.
 
@@ -86,7 +85,11 @@ Definition lift {A B} (f : A -> B) : option A -> option B :=
           | Some x => Some (f x)
           | None => None
         end.
-  
+
+Definition inverse_subdomain {A B: Type} S (f : A -> B) g :=
+  f_eq_subdomain (image f S) (f ∘ g) id /\
+  f_eq_subdomain S (g ∘ f) id.
+
 (** * Lemmas about [f_eq_subdomain] and [f_eq] *)
 
 Instance equivalence_f_eq_subdomain {A B} S : Equivalence (@f_eq_subdomain A B S). 
@@ -167,9 +170,21 @@ Proof.
   intros Heq1 Heq2 x Hin. unfold compose.
   rewrite <- Heq1; eauto. rewrite Heq2. reflexivity.
   eexists; split; eauto.
-   Qed.
+Qed.
 
 
+Lemma compose_extend_l S (C : Type) f (g : positive -> positive) (x : positive) (y : C) :
+  injective_subdomain S g ->
+  x \in S -> 
+  f_eq_subdomain S (f {g x ~> y} ∘ g) ((f ∘ g) {x ~> y}).
+Proof.
+  intros Hinj Hin z Hinz. unfold compose. simpl. compute.
+
+  destruct (peq z x); subst; eauto.
+  - rewrite peq_true. reflexivity.
+  - rewrite peq_false. reflexivity.  intros Hc.
+    eapply n. eapply Hinj; eassumption.
+Qed. 
 
 (** * Lemmas about [image] *)
 
@@ -510,6 +525,19 @@ Proof with now eauto with Ensembles_DB.
     now eauto with Ensembles_DB.
 Qed.
 
+Lemma FromList_image_exists {A B} (f : A -> B) l S :
+  FromList l \subset image f S ->
+  exists l', l = map f l'.
+Proof with (now eauto with Ensembles_DB).
+  revert S; induction l; intros S Heq; eauto.
+  - eexists []. reflexivity.
+  - rewrite FromList_cons in Heq.
+    edestruct IHl as [l' Heql'].
+    + eapply Included_trans; try eassumption...
+    + edestruct Heq as [a' [Heqa Hina]]. now left.
+      eexists (a' :: l'). simpl; f_equal; eauto.
+Qed.
+
 Lemma extend_extend_lst_commut {A} f ys xs x (y : A) :
   ~ List.In x xs ->
   ~ List.In y ys ->
@@ -752,6 +780,57 @@ Proof.
   destruct H0 as [y [Hin Heq]]. destruct H1 as [y' [Hin' Heq']].
   subst. eapply Hinj in Heq'; eauto. eapply H. subst; eauto.
 Qed.
+
+Lemma FromList_image_injective_exists (f : positive -> positive) l S :
+  FromList l <--> image f S ->
+  injective_subdomain S f ->
+  exists l', l = map f l' /\ FromList l' <--> S.
+Proof with (now eauto with Ensembles_DB).
+  revert S; induction l; intros S Heq Hinj; eauto.
+  - eexists []. split; eauto.
+    rewrite !FromList_nil in Heq.
+    rewrite FromList_nil.
+    split; intros x Hin; try now inv Hin.
+    assert (Hc : Empty_set _ (f x)). 
+    { eapply Heq. eexists; split; eauto. }
+    inv Hc. 
+  - rewrite FromList_cons in Heq.
+    assert (Ha : image f S a).
+    { eapply Heq; now left. }
+    destruct Ha as [a' [Heqa Hina]]. subst.
+    
+    destruct (Decidable_FromList l) as [Decl].
+    destruct (Decl (f a')).
+    + rewrite Union_Same_set in Heq; 
+        [| eapply Singleton_Included; now eauto ].  
+      edestruct IHl as [l' [Heql Heqs]]; eauto.
+      subst.
+      eexists (a' :: l'). split. now simpl; f_equal; eauto.
+      rewrite FromList_cons.
+      rewrite Union_Same_set. eassumption.
+      rewrite Heqs. eapply Singleton_Included. eassumption.
+    + assert (Heq' := Heq).
+      rewrite (Union_Setminus_Same_set S [set a']) in Heq;
+        [| eapply Singleton_Included; now eauto ].  
+      rewrite image_Union, image_Singleton in Heq.
+      eapply Union_Same_set_Disjoint in Heq.
+      * edestruct IHl as [l' [Heql Heqs]]; try now apply Heq; eauto; subst.
+        eapply injective_subdomain_antimon; try eassumption...
+        
+        eexists (a' :: l'). split. now simpl; f_equal; eauto.
+        rewrite FromList_cons.
+        rewrite Heqs.
+        rewrite <- (Union_Setminus_Same_set S [set a']);
+          [| eapply Singleton_Included; now eauto ].
+        reflexivity.
+      * eapply Disjoint_Singleton_l. eauto.
+      * rewrite <- image_Singleton.
+        eapply injective_subdomain_Union_not_In_image.
+        eapply injective_subdomain_antimon; try eassumption...
+        eapply Disjoint_Singleton_l.
+        intros Hc; inv Hc; eauto.
+Qed.
+
 
 (** * Lemmas about [domain] *)
 
@@ -1013,3 +1092,40 @@ Proof.
   intros [x|]; unfold lift, compose; simpl; reflexivity.
 Qed.
 
+(** * Properties of [inverse_subdomain] *)
+
+Lemma inverse_subdomain_antimon {A B: Type} S S' (f : A -> B) g : 
+  inverse_subdomain S f g ->
+  S' \subset S ->
+  inverse_subdomain S' f g.
+Proof.
+  intros [Heq1 Heq2] Hsub.
+  split; eapply f_eq_subdomain_antimon; eauto.
+  eapply image_monotonic; eauto. 
+Qed.       
+
+Instance Proper_inverse_subdomain {A B} : Proper (Same_set A ==> eq ==> eq ==> iff) (@inverse_subdomain A B).
+Proof. 
+  intros s1 s2 Hseq f1 f2 Hfeq g1 g2 Hgeq; subst.
+  unfold inverse_subdomain. rewrite Hseq. reflexivity.
+Qed.
+
+
+Lemma inverse_subdomain_symm A B S (f1 : A -> B) (f2 : B -> A) :
+  inverse_subdomain S f1 f2 ->
+  inverse_subdomain (image f1 S) f2 f1. 
+Proof.
+  intros [Hin1 Hin2]. split. 
+  rewrite <- image_compose.
+  rewrite image_f_eq_subdomain; [| eassumption ].
+  rewrite image_id. eassumption. eassumption.
+Qed.
+
+Lemma injective_subdomain_f_eq_subdomain {A B} S (f1 f2 : A -> B ) : 
+  injective_subdomain S f1 ->
+  f_eq_subdomain S f1 f2 ->
+  injective_subdomain S f2.
+Proof.
+  intros Hin1 Hsub x1 x2 H1 H2 Heq. eapply Hin1; eauto.
+  rewrite !Hsub; eassumption.
+Qed.

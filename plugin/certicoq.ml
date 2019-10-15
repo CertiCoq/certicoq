@@ -19,6 +19,7 @@ let rec coq_nat_of_int x =
   match x with
   | 0 -> Datatypes.O
   | n -> Datatypes.S (coq_nat_of_int (pred n))
+   
 
 (*
 let pcuic_size' a p =
@@ -41,7 +42,7 @@ let pcuic_size' a p =
 | Coq_tCoFix of term mfixpoint * nat
 | _ -> "unimplemented" *)
                      
-let compile gr =
+let compile olevel gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
@@ -55,7 +56,7 @@ let compile gr =
   let time = (Unix.gettimeofday() -. time) in
   Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time));
   let fuel = coq_nat_of_int 10000 in
-  match AllInstances.compile_template_L7 fuel term with
+  match AllInstances.compile_template_L7 fuel olevel term with
   | Ret ((nenv, header), prg) ->
      Feedback.msg_debug (str"Finished compiling, printing to file.");
      let time = Unix.gettimeofday() in

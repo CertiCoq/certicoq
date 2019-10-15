@@ -2,9 +2,11 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad
-        Coq.Classes.Morphisms Coq.Lists.List.
+From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
+From Coq Require Import Classes.Morphisms Lists.List.
 From CertiCoq.L6 Require Import functions tactics.
+From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
+
 Import MonadNotation ListNotations.
 
 Open Scope monad_scope.
@@ -248,6 +250,28 @@ Proof.
   unfold triple. 
   intros Ht1 Ht2 s HPre. specialize (Ht1 s HPre); specialize (Ht2 s HPre).
   destruct (runState e s). eauto.
+Qed.
+
+
+Lemma pre_transfer_r :
+  forall (A S : Type) (Pre : S -> Prop) (Post : S -> A -> S -> Prop)
+    (e : state S A),
+    {{ Pre }} e {{ fun i x i' => Post i x i' }} -> 
+    {{ Pre }} e {{ fun i x i' => Pre i /\ Post i x i' }}.
+Proof. 
+  intros.
+  eapply pre_strenghtening with (P := fun i => Pre i /\ Pre i). 
+  now firstorder. eapply frame_rule. eassumption.
+Qed.
+
+Lemma pre_strenghtening_true :
+  forall (A S : Type) (Pre : S -> Prop) (Post : S -> A -> S -> Prop) e,
+    {{ fun _ => True }} e {{ Post }} -> 
+    {{ Pre }} e {{ Post }}.
+Proof. 
+  intros.
+  eapply pre_strenghtening; [| eassumption ].
+  now firstorder.
 Qed.
 
 

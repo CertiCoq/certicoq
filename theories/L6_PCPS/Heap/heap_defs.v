@@ -1,46 +1,24 @@
-(* Heap definitions for L6. Part of the CertiCoq project.
+(* Heap definitions for L6 intermediate language. Part of the CertiCoq project.
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
-From ExtLib Require Import Structures.Monad Data.Monads.OptionMonad Core.Type.
-From CertiCoq.L6 Require Import cps cps_util eval List_util Ensembles_util functions
-        identifiers Heap.heap tactics set_util.
-Require Import compcert.lib.Coqlib.
+From CertiCoq.L6 Require Import cps cps_util List_util Ensembles_util functions
+        identifiers tactics set_util map_util.
+From CertiCoq.L6.Heap Require Import heap.
+From compcert.lib Require Import Coqlib.
+
 Import ListNotations.
 
-(* TODO : MOVE do this with autorewrites *)
-Ltac normalize_sets :=
-  match goal with
-    | [|- context[FromList []]] => rewrite FromList_nil
-    | [|- context[FromList(_ :: _)]] => rewrite FromList_cons
-    | [|- context[FromList(_ ++ _)]] => rewrite FromList_app
-    | [|- context[FromList [_ ; _]]] => rewrite FromList_cons
-    | [|- context[Union _ _ (Empty_set _)]] =>
-      rewrite Union_Empty_set_neut_r
-    | [|- context[Union _ (Empty_set _) _]] =>
-      rewrite Union_Empty_set_neut_l
-    | [|- context[Setminus _ (Empty_set _) _]] =>
-      rewrite Setminus_Empty_set_abs_r
-    | [|- context[Setminus _ _ (Empty_set _)]] =>
-      rewrite Setminus_Empty_set_neut_r
-    | [ H : context[FromList []] |- _] => rewrite FromList_nil in H
-    | [ H : context[FromList(_ :: _)] |- _] => rewrite FromList_cons in H
-    | [ H : context[FromList(_ ++ _)] |- _] => rewrite FromList_app in H
-    | [ H : context[FromList [_ ; _]] |- _] => rewrite FromList_cons in H
-    | [ H : context[Union _ _ (Empty_set _)] |- _ ] =>
-      rewrite Union_Empty_set_neut_r in H
-    | [ H : context[Union _ (Empty_set _) _] |- _] =>
-      rewrite Union_Empty_set_neut_l in H
-    | [ H : context[Setminus _ (Empty_set _) _] |- _] =>
-      rewrite Setminus_Empty_set_abs_r in H
-    | [ H : context[Setminus _ _ (Empty_set _)] |- _] =>
-      rewrite Setminus_Empty_set_neut_r in H
-  end.
-
 Open Scope Ensembles_scope.
+Close Scope Z_scope.
+
+Create HintDb Heap_sets_DB.
+
+Ltac solve_sets := eauto with Ensembles_DB Heap_sets_DB typeclass_instances. 
+
 Module HeapDefs (H : Heap) .
 
   Module HL := HeapLemmas H.
@@ -54,13 +32,14 @@ Module HeapDefs (H : Heap) .
   | Loc : loc -> value
   | FunPtr : fundefs -> var -> value.
 
+  
   Definition env : Type := M.t value.
   
   (** A block in the heap *)
   Inductive block :=
   (* A constructed value *)
   | Constr : cTag -> list value -> block
-  (* A closure pair *)
+  (* A closure pair -- Only used in pre-closure conversion semantics *)
   | Clos : value -> value -> block
   (* Env -- heap allocated to account for environment sharing between mutually rec. functions *)
   | Env : env -> block.
@@ -71,8 +50,10 @@ Module HeapDefs (H : Heap) .
   
   Inductive ans : Type :=
   | Res : res -> ans
-  | OOT : ans (* out of time *)
-  | OOM : ans (* out of memory. XXX not used *).
+  | OOT : ans (* out of time *).
+
+
+  (** * Location sets  *)
   
   Definition val_loc (v : value) : Ensemble loc :=
     match v with
@@ -109,24 +90,6 @@ Module HeapDefs (H : Heap) .
         PS.union (env_locs_set_full t1) (env_locs_set_full t2)
     end.
   
-  (** Size of the domain of a map TODO move *)
-  Definition size_map {A} (m : M.t A) :=
-    List.length (M.elements m).
-  
-  (** Size of heap blocks *)
-  Definition size_val (v : block) : nat :=
-    match v with
-      | Constr t ls => (* The size of the constructor representation *)
-        1 + List.length ls
-      | Clos _ _ => 1
-      | Env _ => 1
-        (* Do not count the cost of closure environments in the source *)
-    end.
-  
-  (** Size of the heap *)
-  Definition size_heap (H : heap block) : nat :=
-    size_with_measure size_val H.
-  
   (** The locations that appear on a block *)
   Definition locs (v : block) : Ensemble loc :=
     match v with
@@ -153,9 +116,17 @@ Module HeapDefs (H : Heap) .
   (** The locations that are pointed by the locations in S *)
   Definition post (H : heap block) (S : Ensemble loc) :=
     [ set l : loc | exists l' v, l' \in S /\ get l' H = Some v /\ l \in locs v].  
-  
-  Close Scope Z_scope.
-  
+
+
+  (** Computational definition of [post] *)  
+  Definition post_set (H : heap block) (s : PS.t) :=
+    PS.fold (fun l r =>
+               match get l H with
+                 | Some v => PS.union (locs_set v) r
+                 | None => r
+               end)
+            s PS.empty.
+
   (** Least fixed point *)
   Definition lfp {A} (f : Ensemble A -> Ensemble A) :=
     \bigcup_( n : nat ) ((f ^ n) (Empty_set A)).
@@ -167,6 +138,7 @@ Module HeapDefs (H : Heap) .
   (** Alternative characterization of heap reachability. *)
   Definition reach' (H : heap block) (Si : Ensemble loc) : Ensemble loc :=
     \bigcup_(n : nat) (((post H) ^ n) (Si)).
+
 
   Definition reach_res (r : res) : Ensemble loc :=
     let '(v, H) := r in reach' H (val_loc v).
@@ -180,19 +152,12 @@ Module HeapDefs (H : Heap) .
   Definition reach_var_env (S : Ensemble var) (rho : env) (H : heap block) : Ensemble loc :=
     reach' H (env_locs rho S). 
   
+
   (** N-reachability. *)
   Definition reach_n (H : heap block) (n : nat) (Si : Ensemble loc) : Ensemble loc :=
     \bigcup_(m in (fun m => m <= n)) (((post H) ^ m) (Si)).
   
 
-  (** Computational definition of post set *)  
-  Definition post_set (H : heap block) (s : PS.t) :=
-    PS.fold (fun l r =>
-               match get l H with
-                 | Some v => PS.union (locs_set v) r
-                 | None => r
-               end)
-            s PS.empty.
   
   Fixpoint dfs (roots visited : PS.t) (H : heap block) (size : nat) : PS.t :=
     match size with
@@ -211,7 +176,8 @@ Module HeapDefs (H : Heap) .
   Definition reach_set (H : heap block) (s : PS.t) : PS.t :=
     dfs s PS.empty H (size H).
 
-  (** Reachability (shortest) paths *) 
+  
+  (** Reachability paths *) 
   Inductive path (H : heap block) : list loc -> loc -> nat -> Prop :=
   | Path_Singl :
       forall ld,
@@ -224,13 +190,32 @@ Module HeapDefs (H : Heap) .
         ld \in locs b ->
         path H (l :: ls) ld (S n).
 
-  (* The to definitions should be equivalent. TODO: Do the proof *)
+  (* The two definitions should be equivalent. *)
   Lemma reach_equiv H Si :
     reach H Si <--> reach' H Si.
   Proof.
   Abort.
 
-    
+  Definition size_env {a} (rho : M.t a) : nat :=
+    PS.cardinal (@mset (key_set rho) _).
+
+  (** Size of heap blocks *)
+  Definition size_val (v : block) : nat :=
+    match v with
+      | Constr t ls => (* The size of the constructor representation *)
+        1 + List.length ls
+      | Clos _ _ => 3
+      | Env rho => 1 + size_env rho
+    end.
+  
+  (** Size of the heap *)
+  Definition size_heap (H : heap block) : nat :=
+    size_with_measure size_val H.
+
+
+
+  (** * Wel-formedness definitions *)
+  
   (** A heap is well-formed if there are not dangling pointers in the stored values *)
   Definition well_formed (S : Ensemble loc) (H : heap block) :=
     forall l v, l \in S -> get l H = Some v -> locs v \subset dom H.
@@ -242,6 +227,8 @@ Module HeapDefs (H : Heap) .
   (** A heap is closed in S if the locations of its image on S remain in S *)
   Definition closed (S : Ensemble loc) (H : heap block) : Prop :=
     forall l, l \in S -> exists v, get l H = Some v /\ locs v \subset S.
+
+  (** * Functions used in the semantics *)
 
   (** Add a block of function definitions in the heap and the environment *)
   Fixpoint def_closures (B B0: fundefs) (rho : env) (H : heap block) (cenv : value) {struct B}
@@ -264,70 +251,8 @@ Module HeapDefs (H : Heap) .
         M.set f (FunPtr B0 f) (def_funs B B0 rho)
       | Fnil => rho
     end.
-
   
-  (* TODO move *)  (* M utils *)
-  Definition key_set {A : Type} (map : M.t A) :=
-    [ set x : positive | match M.get x map with
-                           | Some x => True
-                           | None => False
-                         end ]. 
   
-  Definition sub_map {A : Type} (map1 map2 : M.t A) :=
-    forall x v, M.get x map1 = Some v ->
-           M.get x map2 = Some v.
-
-  (* XXX move *)
-
-  Fixpoint xfilter {A : Type} (pred : positive -> A -> bool) (m : M.t A) 
-           (i : positive) {struct m} : M.t A :=
-    match m with
-      | M.Leaf => M.Leaf
-      | M.Node l o r =>
-        let o' :=
-            match o with
-              | Some x => if pred (M.prev i) x then o else None
-              | None => None
-            end
-        in
-      M.Node' (xfilter pred l (i~0)%positive) o' (xfilter pred r (i~1)%positive)
-    end.
-  
-  Lemma xgfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A) 
-        (i j : positive) : 
-    M.get i (xfilter pred m j) =
-    match M.get i m with
-      | Some x => if pred (M.prev (M.prev_append i j)) x then Some x else None
-      | None => None
-    end.
-  Proof.
-    revert i j. induction m; intros i j; simpl.
-    - rewrite !M.gleaf. reflexivity.
-    - rewrite M.gnode'.
-      destruct i; simpl.
-      + rewrite IHm2. reflexivity.
-      + rewrite IHm1. reflexivity.
-      + destruct o; reflexivity.
-  Qed.
-
-  Definition filter  {A : Type} (pred : positive -> A -> bool) (m : M.t A) : M.t A :=
-    xfilter pred m 1.
-  
-  Lemma gfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A) 
-        (i : positive) : 
-    M.get i (filter pred m) =
-    match M.get i m with
-      | Some x => if pred i x then Some x else None
-      | None => None
-    end.
-  Proof.
-    unfold filter. rewrite xgfilter. simpl. 
-    rewrite <- M.prev_append_prev. simpl. 
-    rewrite Maps.PTree.prev_involutive. reflexivity. 
-  Qed.
-  
-  (* XXX end move *)
-
   (** * Location renaming *)
 
   Definition subst_val b (v : value) : value :=
@@ -390,6 +315,11 @@ Module HeapDefs (H : Heap) .
     + eassumption.
   Qed.
 
+  Hint Resolve post_set_monotonic
+       post_n_set_monotonic
+       reach'_set_monotonic : Heap_sets_DB.  
+
+  
   (** Heap monotonicity lemmas *)
 
   Lemma post_heap_monotonic H1 H2 S :
@@ -437,6 +367,10 @@ Module HeapDefs (H : Heap) .
   Proof.
     intros l Hp. eexists; eauto. split; eauto. constructor.
   Qed.
+
+  Hint Immediate reach'_extensive
+       Included_post_reach'
+       Included_post_n_reach' : Heap_sets_DB.
   
   Lemma reach_unfold H S :
     (reach' H S) <--> (Union _ S (reach' H (post H S))).
@@ -491,8 +425,6 @@ Module HeapDefs (H : Heap) .
       exists 0. split; eauto. now constructor.
   Qed.
 
-
-  (* TODO better name for this? *)
   Lemma reach_spec H S S' :
     S \subset S' ->
     S' \subset reach' H S ->
@@ -538,31 +470,15 @@ Module HeapDefs (H : Heap) .
     repeat eexists; eauto; now rewrite Heq; eauto.
   Qed.
 
-  Lemma post_Empty_set :
-      forall (H : heap block), post H (Empty_set _) <--> Empty_set _.
-  Proof.
-    intros H.
-    unfold post. split; intros l H1; try now inv H1.
-    destruct H1 as [l' [b [Hin _]]]. inv Hin.
-  Qed.
-
-  Lemma post_n_Empty_set n H :
-    (post H ^ n) (Empty_set _) <--> Empty_set _.
-  Proof.
-    induction n; try reflexivity.
-    simpl. rewrite IHn. rewrite post_Empty_set.
-    reflexivity.
-  Qed.
-
   Lemma post_n_heap_eq n P H1 H2 :
     reach' H1 P |- H1 ≡ H2 ->
     (post H1 ^ n) P <--> (post H2 ^ n) P.
   Proof.
     induction n; intros Heq; try reflexivity.
-    simpl. rewrite IHn; eauto. apply post_heap_eq.
-    eapply heap_eq_antimon; eauto.
-    rewrite <- IHn; eauto. intros l Hin; eexists; split; eauto.
-    now constructor.
+    simpl. rewrite IHn; solve_sets. apply post_heap_eq.
+    rewrite <- IHn.
+    eapply heap_eq_antimon; [| eassumption ]. eapply Included_post_n_reach'.
+    eassumption.
   Qed.
   
   Lemma post_n_heap_eq' n P H1 H2 :
@@ -571,9 +487,7 @@ Module HeapDefs (H : Heap) .
   Proof.
     induction n; intros Heq; try reflexivity.
     simpl. rewrite IHn; eauto. apply post_heap_eq.
-    eapply heap_eq_antimon; eauto.
-    intros l Hin; eexists; split; eauto.
-    now constructor.
+    eapply heap_eq_antimon; eauto. eapply Included_post_n_reach'.
   Qed.
   
   Lemma reach'_heap_eq P H1 H2 :
@@ -597,6 +511,14 @@ Module HeapDefs (H : Heap) .
   Qed.
   
   (** Set lemmas *)
+  
+  Lemma post_Empty_set :
+    forall (H : heap block), post H (Empty_set _) <--> Empty_set _.
+  Proof.
+    intros H.
+    unfold post. split; intros l H1; try now inv H1.
+    destruct H1 as [l' [b [Hin _]]]. inv Hin.
+  Qed.
 
   Lemma post_Union H S1 S2 :
     post H (Union _ S1 S2) <--> Union _ (post H S1) (post H S2).
@@ -618,7 +540,6 @@ Module HeapDefs (H : Heap) .
     - intros Hin. repeat eexists; eassumption.
   Qed.
 
-
   Lemma post_Singleton_None (H1 : heap block) (l : loc) :
     get l H1 = None -> post H1 [set l] <--> Empty_set _.
   Proof. 
@@ -626,6 +547,15 @@ Module HeapDefs (H : Heap) .
     - intros [l2 [b2 [Hin [Hget' Hin']]]]. inv Hin.
       rewrite Hget in Hget'. inv Hget'; eauto.
     - intros Hin. inv Hin.
+  Qed.
+
+
+  Lemma post_n_Empty_set n H :
+    (post H ^ n) (Empty_set _) <--> Empty_set _.
+  Proof.
+    induction n; try reflexivity.
+    simpl. rewrite IHn. rewrite post_Empty_set.
+    reflexivity.
   Qed.
 
   Lemma post_n_Singleton_None H n l :
@@ -637,23 +567,11 @@ Module HeapDefs (H : Heap) .
     - simpl. rewrite IHn. rewrite post_Empty_set. reflexivity.
   Qed.
 
-
   Lemma post_n_Union n H S1 S2 :
     (post H ^ n) (Union _ S1 S2) <--> Union _ ((post H ^ n) S1) ((post H ^ n) S2).
   Proof with now eauto with Ensembles_DB.
      induction n;  try now firstorder.
      simpl. rewrite IHn, post_Union. reflexivity.
-  Qed.
-  
-  Lemma reach'_Union H S1 S2 :
-    reach' H (S1 :|: S2) <--> (reach' H S1) :|: (reach' H S2).
-  Proof.
-    split; intros l Hp.
-    - destruct Hp as [n [HT Hp]].
-       eapply post_n_Union in Hp. destruct Hp as [Hp | Hp ].
-       now left; firstorder. now right; firstorder.
-    - destruct Hp as [ l [n [HT Hp]] | l [n [HT Hp]] ];
-      repeat eexists; eauto; eapply post_n_Union; eauto.
   Qed.
 
   Lemma reach'_Empty_set H :
@@ -666,6 +584,19 @@ Module HeapDefs (H : Heap) .
     destruct Hin as [y [v [Hin [Hget Hin']]]].
     eapply IHn in Hin. inv Hin.
   Qed.
+
+  
+  Lemma reach'_Union H S1 S2 :
+    reach' H (S1 :|: S2) <--> (reach' H S1) :|: (reach' H S2).
+  Proof.
+    split; intros l Hp.
+    - destruct Hp as [n [HT Hp]].
+       eapply post_n_Union in Hp. destruct Hp as [Hp | Hp ].
+       now left; firstorder. now right; firstorder.
+    - destruct Hp as [ l [n [HT Hp]] | l [n [HT Hp]] ];
+      repeat eexists; eauto; eapply post_n_Union; eauto.
+  Qed.
+
 
   Lemma post_size_H_O S H :
     size H = 0 ->
@@ -756,8 +687,8 @@ Module HeapDefs (H : Heap) .
     (post H' ^ n) S \subset reach' H S.
   Proof.
     revert S.
-    induction n; intros S Ha Hin; simpl; eauto with Ensembles_DB.
-    - now apply reach'_extensive.
+    induction n; intros S Ha Hin; simpl.
+    - eapply reach'_extensive.
     - eapply Included_trans. eapply post_set_monotonic.
       now eauto. eapply Included_trans. now eapply post_alloc; eauto.
       eapply Union_Included. now eapply reach'_post_fixed_point_n with (n := 1).
@@ -775,7 +706,7 @@ Module HeapDefs (H : Heap) .
     - eapply reach'_heap_monotonic. now eapply alloc_subheap; eauto.
   Qed.   
 
-    (** * Lemmas about [path] *)
+  (** * Lemmas about [path] *)
 
   Lemma path_NoDup H ls ld n : 
     path H ls ld n -> NoDup ls.
@@ -905,7 +836,7 @@ Module HeapDefs (H : Heap) .
   Proof.
     split.
     + intros x Hin. destruct Hin as [k [Hleq Hin]].
-      destruct (NPeano.Nat.eq_dec k (m + 1)); subst.
+      destruct (Nat.eq_dec k (m + 1)); subst.
       * now right.
       * left. eexists. split; [| eassumption ]. omega.
     + intros x Hin. destruct Hin as [ x Hin | x Hin].
@@ -1027,7 +958,8 @@ Module HeapDefs (H : Heap) .
     (post H ^ n) S \subset reach_n H m S.  
   Proof.
     intros Hsub1 Hleq.
-    edestruct NPeano.Nat.le_exists_sub as [n' [Hsum Hleq']]; subst. eassumption.
+    edestruct Nat.le_exists_sub as [n' [Hsum Hleq']]; subst.
+    eassumption.
     subst.
     destruct n'.
     - simpl. intros x Hin. eexists; eauto.
@@ -1361,6 +1293,30 @@ Module HeapDefs (H : Heap) .
       eapply Hr; do 2 eexists; repeat split; eauto.
       eapply M.elements_correct; eassumption.
   Qed.
+
+  Instance Decidable_locs v : Decidable (locs v).
+  Proof.
+    constructor. intros l1.
+    destruct v; simpl.
+    - eapply Decidable_map_UnionList; eauto with typeclass_instances.
+      eapply Decidable_val_loc.
+    - destruct v; destruct v0; simpl. 
+      destruct (loc_dec l l1); subst.
+      left. now left.
+      destruct (loc_dec l0 l1); subst.
+      left. now right. 
+      right. intros Hc; inv Hc; now inv H; eauto.
+      destruct (loc_dec l l1); subst.
+      left. now left.
+      right. intros Hc; inv Hc; inv H; now eauto.
+      destruct (loc_dec l l1); subst.
+      left. right. reflexivity.
+      right. intros Hc; inv Hc; inv H; now eauto.
+
+      right. intros Hc; inv Hc; inv H; now eauto.
+    - eapply Decidable_env_locs.
+      constructor. intros. now left.
+  Qed.
   
   (** Set lemmas *)
 
@@ -1407,7 +1363,6 @@ Module HeapDefs (H : Heap) .
   Qed.
 
 
-  (* TODO change name *)
   Lemma env_locs_singleton_env (x : var) (v : value) :
     (val_loc v) <--> env_locs (M.set x v (M.empty _)) [set x].
   Proof.
@@ -1441,28 +1396,6 @@ Module HeapDefs (H : Heap) .
       eapply IHxs. reflexivity.
   Qed.
   
-  (* XXX fix *)
-  (* Lemma reach_env_locs_alloc (S : Ensemble var) (H H' : heap block) (rho : env) *)
-  (*       (x : var) (v : value) (b : block) : *)
-  (*   alloc b H = (l, H') -> *)
-  (*   locs v \subset (reach' H (env_locs rho S)) -> *)
-  (*   reach' H' (env_locs (M.set x l rho) (Union _ S [set x])) \subset *)
-  (*   Union _ [set (val_loc l)] (reach' H (env_locs rho S)). *)
-  (* Proof. *)
-  (*   intros Hal Hsub l1 Hr. *)
-  (*   eapply reach'_set_monotonic in Hr; *)
-  (*     [ | now eapply env_locs_set_Inlcuded ]. *)
-  (*   rewrite reach'_Union in Hr. inv Hr. *)
-  (*   - rewrite reach_unfold in H0. inv H0; eauto. *)
-  (*     right. *)
-  (*     eapply reach'_set_monotonic in H1; [| now eapply post_alloc'; eauto ]. *)
-  (*     rewrite reach'_alloc in H1; try eassumption. *)
-  (*     eapply reach'_set_monotonic in H1; [| eassumption ]. *)
-  (*     now rewrite <- reach'_idempotent in H1. *)
-  (*     eapply reach'_extensive. *)
-  (*   - right. rewrite <- reach'_alloc; eauto. *)
-  (* Qed. *)
-
   (** get lemmas *)
 
   Lemma get_In_env_locs x S rho v:
@@ -1588,35 +1521,7 @@ Module HeapDefs (H : Heap) .
     - rewrite Union_Empty_set_neut_r. inv Hdef.
       eassumption.
   Qed.
-
   
-  (** * Lemmas about locs *)
-  
-  Instance Decidable_locs v : Decidable (locs v).
-  Proof.
-    constructor. intros l1.
-    destruct v; simpl.
-    - eapply Decidable_map_UnionList; eauto with typeclass_instances.
-      eapply Decidable_val_loc.
-    - destruct v; destruct v0; simpl. 
-      destruct (loc_dec l l1); subst.
-      left. now left.
-      destruct (loc_dec l0 l1); subst.
-      left. now right. 
-      right. intros Hc; inv Hc; now inv H; eauto.
-      destruct (loc_dec l l1); subst.
-      left. now left.
-      right. intros Hc; inv Hc; inv H; now eauto.
-      destruct (loc_dec l l1); subst.
-      left. right. reflexivity.
-      right. intros Hc; inv Hc; inv H; now eauto.
-
-      right. intros Hc; inv Hc; inv H; now eauto.
-    - eapply Decidable_env_locs.
-      constructor. intros. now left.
-  Qed.  
-  
-
   (** * Lemmas about [closed] *)
 
   Lemma in_dom_closed (S : Ensemble loc) (H : heap block) :
@@ -1638,7 +1543,22 @@ Module HeapDefs (H : Heap) .
       [| now eapply reach'_post_fixed_point_n with (n := 1)]; simpl.
     intros l' Hin'. do 2 eexists. split. eassumption. now split; eauto.
   Qed.
-  
+
+
+  Lemma closed_reach_monotonic S1 S2 H :
+    closed (reach' H S1) H ->
+    S2 \subset S1 -> 
+    closed (reach' H S2) H.
+  Proof. 
+    intros Hc sub l Hin.
+    edestruct Hc as [v [Hget Hinv]].
+    eapply reach'_set_monotonic; eassumption.
+    eexists v; split; eauto.
+    eapply Included_trans; [| eapply reach'_post_fixed_point ].
+    eapply Included_trans. eapply post_Singleton. eassumption.
+    eapply post_set_monotonic. eapply Singleton_Included. eassumption.
+  Qed.     
+      
   Lemma closed_alloc H H' l v :
     closed (dom H) H ->
     locs v \subset dom H ->
@@ -2416,6 +2336,13 @@ Module HeapDefs (H : Heap) .
   
   (** Lemmas about [Restrict_env] *)
 
+  Lemma key_set_Restrict_env S rho rho' :
+    Restrict_env S rho rho' ->
+    key_set rho' \subset S.
+  Proof.
+    now intros [_ [_ R]].
+  Qed.
+
   Lemma restrict_env_correct S s rho :
     S <--> FromList (set_util.PS.elements s) ->
     Restrict_env S rho (restrict_env s rho).
@@ -2444,6 +2371,22 @@ Module HeapDefs (H : Heap) .
       eapply InA_alt in Hin. destruct Hin as [x' [Heq' Hin']]; subst; eauto.
       eapply Heq. eassumption. 
   Qed.
+
+  Lemma key_set_binding_in_map_alt (S : PS.t) (rho : env) :
+    binding_in_map (FromSet S) rho ->
+    key_set (restrict_env S rho) <--> FromSet S.
+  Proof.
+    intros Hbin.
+    assert (HR : Restrict_env (FromSet S) rho (restrict_env S rho)). 
+    { eapply restrict_env_correct. reflexivity. }
+    split. 
+    eapply key_set_Restrict_env. eassumption.
+
+    intros x Hin. edestruct Hbin as [v Hget1]. eassumption.
+    destruct HR as [Hs1 Hr]. 
+    unfold key_set, In. rewrite <- Hs1, Hget1; eauto.
+  Qed.
+
 
   (** * Correspondence of [set] and [Ensemble] definitions *)
   
@@ -2646,7 +2589,6 @@ Module HeapDefs (H : Heap) .
   Qed.
 
 
-  (** TODO implement DFS in the heap to find reachable locs *)
   Lemma Decidable_reach' (S : Ensemble loc) (H : heap block) :
     ToMSet S ->
     Decidable (reach' H S).
@@ -2692,7 +2634,9 @@ Module HeapDefs (H : Heap) .
   (** Size of the reachable portion of the heap *)
   Definition size_reachable (S : Ensemble loc) {Hmset : ToMSet S} (H : heap block) : nat :=
     size_with_measure_filter size_val (reach' H S) H.
-  
+
+  Definition reach_size (H : heap block) (rho : env) (e : exp) :=
+    size_reachable (env_locs rho (occurs_free e)) H. 
   
   Lemma size_reachable_same_set S1 S2 {H1 : ToMSet S1} {H2 : ToMSet S2} H :
     S1 <--> S2 ->
@@ -3011,4 +2955,46 @@ Module HeapDefs (H : Heap) .
     - inv Hin. 
   Qed. 
 
+  Lemma def_closures_env_locs_post_reach
+        (S : Ensemble var) (H H' : heap block) (rho rho' : env)
+        (B B0 : fundefs) (cenv : value) :
+    def_closures B B0 rho H cenv = (H', rho') ->
+    post H (val_loc cenv) \subset (reach' H (env_locs rho S)) ->
+    post H' (val_loc cenv) \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
+  Proof.
+    revert S rho rho' H H'; induction B; intros S rho rho' H H' Hdef Hsub; simpl.
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho H cenv) as [H'' rho''] eqn:Hdef'.
+      destruct (alloc _ H'') as [l' H'''] eqn:Hal. inv Hdef.
+      rewrite env_locs_set_In; [| now eauto ]. rewrite reach'_Union.
+      eapply Included_Union_preserv_l.
+      eapply Included_trans; [| eapply Included_post_n_reach' with (n := 2) ].
+      simpl. rewrite post_Singleton; [| erewrite gas; eauto ].
+      simpl. eapply post_set_monotonic. now eauto with Ensembles_DB.
+    - rewrite Union_Empty_set_neut_r. inv Hdef.
+      eassumption.
+  Qed.
+
+  Lemma def_closures_env_locs_reach_reach
+        (S : Ensemble var) (H H' : heap block) (rho rho' : env)
+        (B B0 : fundefs) (cenv : value) :
+    def_closures B B0 rho H cenv = (H', rho') ->
+    reach' H (val_loc cenv) \subset (reach' H (env_locs rho S)) ->
+    reach' H' (val_loc cenv) \subset (reach' H' (env_locs rho' (S :|: name_in_fundefs B))).
+  Proof.
+    revert S rho rho' H H'; induction B; intros S rho rho' H H' Hdef Hsub; simpl.
+    - simpl in Hdef.
+      destruct (def_closures B B0 rho H cenv) as [H'' rho''] eqn:Hdef'.
+      destruct (alloc _ H'') as [l' H'''] eqn:Hal. inv Hdef.
+      rewrite env_locs_set_In; [| now eauto ]. rewrite reach'_Union.
+      eapply Included_Union_preserv_l.
+      rewrite (reach_unfold H' (val_loc (Loc l'))). 
+      simpl. rewrite post_Singleton; [| erewrite gas; eauto ]. simpl.
+      eapply Included_Union_preserv_r. rewrite Union_Empty_set_neut_l.
+      reflexivity. 
+    - rewrite Union_Empty_set_neut_r. inv Hdef.
+      eassumption.
+  Qed.
+
+  
 End HeapDefs.

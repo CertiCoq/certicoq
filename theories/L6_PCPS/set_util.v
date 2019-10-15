@@ -3,7 +3,8 @@
  *)
 
 From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
-         Relations.Relations Lists.List Lists.SetoidList Permutation Omega.
+     Relations.Relations Lists.List Lists.SetoidList Permutation Omega.
+Require Import compcert.lib.Coqlib.
 From CertiCoq.L6 Require Import tactics Ensembles_util List_util functions.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
@@ -550,6 +551,7 @@ Proof.
     eapply PS.singleton_spec. reflexivity.
 Qed.
 
+
 Lemma FromSet_cardinal_empty s :
   PS.cardinal s = 0 -> FromSet s <--> Empty_set _.
 Proof.
@@ -752,6 +754,32 @@ Proof.
     tci.
 Qed.
 
+Lemma PS_cardinal_empty_l s :
+  FromSet s <--> Empty_set _ ->
+  PS.cardinal s = 0. 
+Proof.
+  intros Heq.
+  replace 0 with (@List.length elt nil) by reflexivity.
+  rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
+  eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  constructor; eauto.
+  rewrite <- !FromSet_elements. rewrite Heq. repeat normalize_sets.
+  reflexivity.
+Qed. 
+
+Lemma PS_cardinal_singleton s x :
+  FromSet s <--> [set x] ->
+  PS.cardinal s = 1. 
+Proof.
+  intros Heq.
+  replace 1 with (List.length (cons x nil)) by reflexivity.
+  rewrite !PS.cardinal_spec. eapply Same_set_FromList_length'.
+  eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  constructor; eauto. now constructor.
+  rewrite <- !FromSet_elements. rewrite Heq. repeat normalize_sets.
+  reflexivity.
+Qed.
+
 Lemma PS_fold_left_map s l b : 
   image b (FromList l) :|: FromSet s <-->
         FromSet
@@ -929,3 +957,75 @@ Proof.
   rewrite <- app_length. reflexivity.
   symmetry. eapply PS_union_elements. eassumption.
 Qed.
+
+
+
+(** Existence of function inverse -- requires [ToMSet] *)
+
+
+Lemma inverse_exists S {Hs : ToMSet S} (b : positive -> positive) :
+  injective_subdomain S b ->
+  exists b', injective_subdomain (image b S) b' /\
+        inverse_subdomain S b b'.
+Proof. 
+  pose (P := fun S => forall {Hs : ToMSet S},
+                 injective_subdomain S b ->
+                 exists b', injective_subdomain (image b S) b' /\
+                       inverse_subdomain S b b').
+  assert (Hs' := Hs). revert Hs. 
+  eapply Ensemble_ind with (P := P).
+  - intros S1 S2 Heq. unfold P; split.
+    intros Hs1 Hinj. setoid_rewrite <- Heq.  
+    eapply Hs1. eapply ToMSet_Same_set. symmetry. eassumption. 
+    eassumption.
+    intros Hs1 Hinj. setoid_rewrite Heq.  
+    eapply Hs1. eapply ToMSet_Same_set. eassumption. 
+    eassumption.
+  - unfold P. intros _.
+    intros _. eexists id.
+    split.
+    
+    rewrite image_Empty_set. clear. now firstorder.
+
+    split.
+    rewrite image_Empty_set. clear. now firstorder.
+    clear; now firstorder.
+    
+  - intros x S0 Hs0 Hnin IH Hs Hinj. edestruct IH as [b' [Hinj' [Hfeq1 Hfeq2]]].  
+    eassumption. eapply injective_subdomain_antimon. eassumption. now eauto with Ensembles_DB.
+
+    eexists (b' {(b x) ~> x}). split.
+
+    + rewrite image_Union, image_Singleton.
+      eapply injective_subdomain_extend. eassumption.
+      intros [y [Hc Heqcy]]; subst. inv Hc.  
+      destruct H as [z [Hc Heqcz]]. subst. 
+      eapply H0.
+
+      replace (b' (b z)) with z. reflexivity.
+
+      replace (b' (b z)) with ((b' ∘ b) z) by reflexivity.
+      rewrite Hfeq2. reflexivity. eassumption.
+    + assert (Hfeq : f_eq id (id { b x ~> b x } )).
+      { clear. intros y.
+        destruct (peq y (b x)).
+        - subst. rewrite extend_gss. reflexivity.
+        - rewrite extend_gso; eauto. }
+
+      assert (Hfeq' : f_eq id (id { x ~> x } )).
+      { clear. intros y.
+        destruct (peq y x).
+        - subst. rewrite extend_gss. reflexivity.
+        - rewrite extend_gso; eauto. }
+      split.
+      * rewrite compose_extend.
+        rewrite Hfeq.
+        rewrite image_Union, image_Singleton.
+        eapply f_eq_subdomain_extend. eassumption.
+      * eapply transitivity.
+        eapply compose_extend_l. eassumption. now left.
+        rewrite Hfeq'.
+        eapply f_eq_subdomain_extend. eassumption.
+  - eassumption. 
+Qed.
+

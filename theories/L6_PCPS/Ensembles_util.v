@@ -2,9 +2,9 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles
-Sorting.Permutation.
-Require Import compcert.lib.Coqlib.
+From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles Sorting.Permutation.
+From compcert.lib Require Import Coqlib.
+
 Import ListNotations.
 
 Close Scope Z_scope.
@@ -107,6 +107,8 @@ Proof.
 Qed.
 
 Hint Immediate Same_set_refl Included_refl : Ensembles_DB.
+
+Ltac edb := eauto with Ensembles_DB.
 
 (** * Decidability  instances *)
 
@@ -354,6 +356,30 @@ Proof.
   - intros Hc; inv Hc.
 Qed.
 
+Lemma Intersection_Setmius_Disjoint {A} (S1 S2 S3 : Ensemble A) :
+  Disjoint _ S2 S3 ->
+  (S1 \\ S2) :&: S3 <--> S1 :&: S3.
+Proof.
+  intros Hd. split.
+  - intros x Hin. inv Hin. inv H. constructor; eauto.
+  - intros x Hin. inv Hin. constructor; eauto.
+    constructor. eassumption. intros Hc. eapply Hd; constructor; eauto. 
+Qed.
+
+Lemma Intersection_Setmius_Setminus_Disjoint {A} (S1 S2 S3 S4 : Ensemble A) :
+  Disjoint _ S3 S4 ->
+  (S1 \\ (S2 \\ S4)) :&: S3 <--> (S1 \\ S2) :&: S3.
+Proof.
+  intros Hd. split.
+  - intros x Hin. inv Hin. inv H. constructor; eauto. constructor; eauto.
+    intros Hc. eapply H2; eauto. constructor. eassumption.
+    intros Hc'. eapply Hd; constructor; eauto.
+  - intros x Hin. inv Hin. constructor; eauto. inv H. 
+    constructor. eassumption. intros Hc. eapply Hd; constructor; eauto.
+    inv Hc. exfalso; eauto.
+Qed.
+
+
 Hint Immediate Setminus_Union_distr Union_Intersection_distr : Ensembles_DB.
 
 (** ** Compatibility properties *)
@@ -392,6 +418,15 @@ Proof.
   intros [H1 H2] [H3 H4].
   split; apply Included_Setminus_compat; eauto.
 Qed.
+
+Lemma Setminus_Intersection_distr {A} (S1 S2 S3 : Ensemble A) :
+  (S1 :&: S2) \\ S3 <--> (S1 \\ S3) :&: (S2 \\ S3).
+Proof.
+  split; intros x H1.
+  inv H1. inv H. constructor; constructor; eauto. 
+  inv H1. inv H; inv H0. constructor; eauto. 
+Qed.     
+
 
 Hint Resolve Included_Union_compat Same_set_Union_compat
      Included_Setminus_compat Same_set_Setminus_compat : Ensembles_DB.
@@ -773,6 +808,24 @@ Lemma Setminus_Disjoint_preserv_r {A} s1 s2 s3:
 Proof.
   intros Hd. constructor; intros x H. inv H. 
   inv H1. eapply Hd; eauto.
+Qed.
+
+
+Lemma Union_Same_set_Disjoint {A} (S1 S2 S3 : Ensemble A) :
+  S1 :|: S2 <--> S1 :|: S3 ->
+  Disjoint _ S1 S2 ->
+  Disjoint _ S1 S3 ->
+  S2 <--> S3.
+Proof.
+  intros Heq HD HD'. split; intros x Hin.
+  - assert (Hin' : (S1 :|: S3) x).
+    { eapply Heq. now right. }
+    inv Hin'; eauto.
+    exfalso. eapply HD; eauto.
+  - assert (Hin' : (S1 :|: S2) x).
+    { eapply Heq. now right. }
+    inv Hin'; eauto.
+    exfalso. eapply HD'; eauto.
 Qed.
 
 
@@ -1764,6 +1817,15 @@ Proof.
   intros H1 H2 x [Hin1 Hin2]. firstorder.
 Qed.
 
+Lemma Included_Intersection {A : Type} (s1 s2 s3 : Ensemble A) :
+  s1 \subset s2 ->
+  s1 \subset s3 ->
+  s1 \subset s2 :&: s3. 
+Proof.
+  now firstorder.
+Qed. 
+
+
 Lemma Included_Intersection_l {A : Type} (s1 s2 : Ensemble A) :
   s1 :&: s2 \subset s1.
 Proof.
@@ -1807,3 +1869,30 @@ Proof.
     + right. constructor; eauto.
 Qed.
 
+Ltac normalize_sets :=
+  match goal with
+  | [|- context[FromList []]] => rewrite FromList_nil
+  | [|- context[FromList(_ :: _)]] => rewrite FromList_cons
+  | [|- context[FromList(_ ++ _)]] => rewrite FromList_app
+  | [|- context[FromList [_ ; _]]] => rewrite FromList_cons
+  | [|- context[Union _ _ (Empty_set _)]] =>
+    rewrite Union_Empty_set_neut_r
+  | [|- context[Union _ (Empty_set _) _]] =>
+    rewrite Union_Empty_set_neut_l
+  | [|- context[Setminus _ (Empty_set _) _]] =>
+    rewrite Setminus_Empty_set_abs_r
+  | [|- context[Setminus _ _ (Empty_set _)]] =>
+    rewrite Setminus_Empty_set_neut_r
+  | [ H : context[FromList []] |- _] => rewrite FromList_nil in H
+  | [ H : context[FromList(_ :: _)] |- _] => rewrite FromList_cons in H
+  | [ H : context[FromList(_ ++ _)] |- _] => rewrite FromList_app in H
+  | [ H : context[FromList [_ ; _]] |- _] => rewrite FromList_cons in H
+  | [ H : context[Union _ _ (Empty_set _)] |- _ ] =>
+    rewrite Union_Empty_set_neut_r in H
+  | [ H : context[Union _ (Empty_set _) _] |- _] =>
+    rewrite Union_Empty_set_neut_l in H
+  | [ H : context[Setminus _ (Empty_set _) _] |- _] =>
+    rewrite Setminus_Empty_set_abs_r in H
+  | [ H : context[Setminus _ _ (Empty_set _)] |- _] =>
+    rewrite Setminus_Empty_set_neut_r in H
+  end.

@@ -35,7 +35,7 @@ Context (Src Dst: Type)
 
 CoInductive compObsLeLink : Src -> Dst -> Prop :=
 | sameObsLink : forall (s : Src) (d : Dst),
-    (forall (sv:Src),
+    (forall (o:Opt) (sv:Src),
         s ⇓ sv
         -> (exists dv:Dst,
               d ⇓ dv /\
@@ -44,13 +44,13 @@ CoInductive compObsLeLink : Src -> Dst -> Prop :=
               /\ (questionHead  Abs sv = true -> forall svArg, goodTerm svArg ->
                    liftLe compObsLeLink
                       (Some (mkApp sv svArg))
-                      (exception_option (mkAppEx dv (translate Src Dst svArg))))
+                      (exception_option (mkAppEx dv (translate Src Dst o svArg))))
           ))
     -> compObsLeLink s d.
 
 Inductive compObsLeLinkN : nat -> Src -> Dst -> Prop :=
 | sameObsLinkS : forall m (s : Src) (d : Dst),
-    (forall (sv:Src),
+    (forall (o:Opt) (sv:Src),
         s ⇓ sv
         -> (exists dv:Dst,
               d ⇓ dv /\
@@ -59,7 +59,7 @@ Inductive compObsLeLinkN : nat -> Src -> Dst -> Prop :=
               /\ (questionHead  Abs sv = true -> forall svArg, goodTerm svArg ->
                    liftLe (compObsLeLinkN m)
                       (Some (mkApp sv svArg))
-                      (exception_option (mkAppEx dv (translate Src Dst svArg))))
+                      (exception_option (mkAppEx dv (translate Src Dst o svArg))))
           ))
     -> compObsLeLinkN (S m) s d
 | sameObsLinkO : forall (s : Src) (d : Dst), compObsLeLinkN 0 s d.
@@ -76,7 +76,7 @@ Proof using.
     [ constructor; fail | ].
   destruct Hc as [? ? Hc].
   constructor.
-  intros sv Hev. specialize (Hc sv Hev).
+  intros o1 sv Hev. specialize (Hc o1 sv Hev).
   destruct Hc as [dv Hc]. repnd.
   exists dv. dands; eauto with certiclasses.
 Qed.
@@ -88,9 +88,9 @@ Proof using.
   cofix.
   intros ? ? Hi.
   constructor.
-  intros ? Hev. pose proof Hi as Hib.
+  intros o ? Hev. pose proof Hi as Hib.
   specialize (Hi 1); inversion Hi as [ ? ? ? Hc | ]; subst. clear Hi.
-  specialize (Hc sv Hev).
+  specialize (Hc o sv Hev).
   destruct Hc as [dv Hc]. repnd.
   exists dv.
   dands; auto.
@@ -104,7 +104,7 @@ Proof using.
     intros m.
     specialize (Hib (S m)).
     invertsna Hib Hib.
-    specialize (Hib sv Hev).
+    specialize (Hib o sv Hev).
     destruct Hib as [dvv Hib]. repnd.
     specialize (dstDet _ _ _ Hib0 Hc0). subst. clear Hib0 Hib.
     specialize (Hib2 n).
@@ -119,18 +119,18 @@ Proof using.
     intros m.
     specialize (Hib (S m)).
     invertsna Hib Hib.
-    specialize (Hib sv Hev).
+    specialize (Hib o sv Hev).
     destruct Hib as [dvv Hib]. repnd.
     specialize (dstDet _ _ _ Hib0 Hc0). subst. clear Hib0 Hib2.
     specialize (Hib Hq _ Hg).
     rewrite  <- H0c0 in Hib.
     inverts Hib. assumption.
-Qed.    
+Qed.
         
 Definition compObsPreservingLinkable :=
-   ∀ (s:Src),
+   ∀ (o: Opt) (s:Src),
     goodTerm s 
-    -> liftLe compObsLeLink (Some s) (exception_option (translate Src Dst s)).
+    -> liftLe compObsLeLink (Some s) (exception_option (translate Src Dst o s)).
 
 End CompObsPreserving.
 
@@ -173,11 +173,11 @@ Proof.
   inverts Ha as Hah.
   inverts Hb as Hbh.
   constructor; auto.
-  intros ? Hevs.
-  destruct (Hah _ Hevs) as [iv  Hci]. clear Hah.
+  intros o ? Hevs.
+  destruct (Hah o _ Hevs) as [iv  Hci]. clear Hah.
   destruct Hci as [Hevi Hci].
   destruct Hci as [Hyesi Hsubi].
-  destruct (Hbh _ Hevi) as [dv  Hcd]. clear Hbh.
+  destruct (Hbh o _ Hevi) as [dv  Hcd]. clear Hbh.
   destruct Hcd as [Hevd Hcd].
   destruct Hcd as [Hyesd Hsubd].
   exists dv. split;[ assumption|].
@@ -204,13 +204,14 @@ Proof.
   simpl in Hyesi.
   specialize (Hsubd Hyesi).
   inverts Hsubi as Hsub Heq.
-  apply Hgpsi in Hgsv.
+  unfold goodPreserving in *. 
+  eapply Hgpsi with (o:=o) in Hgsv.
   unfold composeTranslation, translate in *.
-  destruct (t1 svArg) as [| ivArg];[inverts Heq|].
+  destruct (t1 o svArg) as [| ivArg];[inverts Heq|].
   simpl in *. inverts Heq.
   specialize (Hsubd ivArg Hgsv).
   inverts Hsubd as Hsubd Heq.
-  destruct (t2 ivArg) as [|dvArg ];[inverts Heq|].
+  destruct (t2 o ivArg) as [|dvArg ];[inverts Heq|].
   simpl in *. inverts Heq.
   constructor. eauto.
 Qed.
@@ -234,11 +235,11 @@ Proof.
   inverts Ha as Hah.
   inverts Hb as Hbh.
   constructor; auto.
-  intros ? Hevs.
-  destruct (Hah _ Hevs) as [iv  Hci]. clear Hah.
+  intros o ? Hevs.
+  destruct (Hah o _ Hevs) as [iv  Hci]. clear Hah.
   destruct Hci as [Hevi Hci].
   destruct Hci as [Hyesi Hsubi].
-  destruct (Hbh _ Hevi) as [dv  Hcd]. clear Hbh.
+  destruct (Hbh o _ Hevi) as [dv  Hcd]. clear Hbh.
   destruct Hcd as [Hevd Hcd].
   destruct Hcd as [Hyesd Hsubd].
   exists dv. split;[ assumption|].
@@ -265,13 +266,14 @@ Proof.
   simpl in Hyesi.
   specialize (Hsubd Hyesi).
   inverts Hsubi as Hsub Heq.
-  apply Hgpsi in Hgsv.
+  unfold goodPreserving in *. 
+  eapply Hgpsi with (o:=o) in Hgsv.
   unfold composeTranslation, translate in *.
-  destruct (t1 svArg) as [| ivArg];[inverts Heq|].
+  destruct (t1 o svArg) as [| ivArg];[inverts Heq|].
   simpl in *. inverts Heq.
   specialize (Hsubd ivArg Hgsv).
   inverts Hsubd as Hsubd Heq.
-  destruct (t2 ivArg) as [|dvArg ];[inverts Heq|].
+  destruct (t2 o ivArg) as [|dvArg ];[inverts Heq|].
   simpl in *. inverts Heq.
   constructor. eauto.
 Qed.
@@ -285,18 +287,19 @@ Global Instance composeCerticoqLinkableTranslationCorrect
 Proof.
   destruct Ht1, Ht2.
   constructor; [eapply composePreservesGood; eauto; fail |].
-  intros ? Hgoods.
-  specialize (obsePresLink0 _ Hgoods).
+  intros o ? Hgoods.
+  specialize (obsePresLink0 o _ Hgoods).
   inverts obsePresLink0 as Hle Heq.
-  apply certiGoodPresLink0 in Hgoods.
+  unfold goodPreserving in *. 
+  eapply certiGoodPresLink0 with (o:=o) in Hgoods.
   unfold composeTranslation, translate in *.
-  destruct (t1 s); compute in Hgoods; try contradiction.
+  destruct (t1 o s); compute in Hgoods; try contradiction.
   compute in Heq. inverts Heq.
-  specialize (obsePresLink1 _ Hgoods).
+  specialize (obsePresLink1 o _ Hgoods).
   inverts obsePresLink1 as Hlei Heqi.
-  apply certiGoodPresLink1 in Hgoods.
+  eapply certiGoodPresLink1 with (o:=o) in Hgoods.
   unfold composeTranslation, translate in *. simpl.
-  destruct (t2 i); compute in Hgoods; try contradiction.
+  destruct (t2 o i); compute in Hgoods; try contradiction.
   simpl.
   constructor.
   inverts Heqi.
@@ -307,7 +310,7 @@ Qed.
 Require Import Morphisms.
 
 (* Outside this section, this definition should not depend at all on Src and Dst.*)
-Definition leObsId : Inter -> Inter -> Prop :=  ((@compObsLeLink Inter Inter _ _ _ _ _ _ _ (fun x => Ret x) _ _ )).
+Definition leObsId : Inter -> Inter -> Prop :=  ((@compObsLeLink Inter Inter _ _ _ _ _ _ _ (fun o x => Ret x) _ _ )).
 
 Definition eqObsId (a b : Inter) := leObsId a b /\ leObsId b a. 
 
@@ -315,7 +318,7 @@ Definition eqObsId (a b : Inter) := leObsId a b /\ leObsId b a.
 Lemma sameValuesImpliesLeObsId a b: sameValues a b -> leObsId a b.
 Proof using.
   revert a b. cofix.
-  intros ? ? Hs. constructor. intros sv Hsv.
+  intros ? ? Hs. constructor. intros o sv Hsv.
   specialize (proj1 (Hs _) Hsv). intros Hsvb.
   exists sv. dands; auto; try reflexivity.
 - intros. apply liftLeRimpl with (R1:= sameValues); auto.
@@ -325,14 +328,14 @@ Proof using.
 Qed.
 
 Lemma sameValuesImpliesEqObsId a b: sameValues a b -> eqObsId a b.
-Proof using.
+Proof using Dst H4 H5 H6 H7 H8 Inter Src t1 t2.
   intros Hs. split; apply sameValuesImpliesLeObsId; auto.
   unfold Reflexive, sameValues in *. firstorder.
 Qed.
 
 
-Local Instance  compObsLeLinkRespectsEval:
-  Proper (eq ==> bigStepEval  ==> Basics.impl) ((@compObsLeLink Src Inter _ _ _ _ _ _ _ _ _ _  )).
+Local Instance compObsLeLinkRespectsEval:
+  Proper (eq ==> bigStepEval  ==> Basics.impl) (@compObsLeLink Src Inter _ _ _ _ _ _ _ _ _ _ ).
 Proof using.
   intros s1 s2 Heqs d1 d2 Hsvd Hs1. subst.
   constructor.
@@ -352,7 +355,7 @@ Context {Src Dst : Type}
         `{Ls: CerticoqLinkableLanguage Src}
         `{Ld: CerticoqLinkableLanguage Dst}.
 Lemma compObsLeLink_proper_Feq t1 t2:
-  (forall s,  t1 s =  t2 s) -> forall a b,
+  (forall o s, t1 o s =  t2 o s) -> forall a b,
   (@compObsLeLink Src Dst _ _ _ _ _ _ _ t1 _ _ ) a b 
   -> (@compObsLeLink Src Dst _ _ _ _ _ _ _ t2 _ _ ) a b.
 Proof using.
@@ -360,7 +363,7 @@ Proof using.
   cofix.
   intros ? ? Hl.
   constructor. invertsn Hl.
-  intros sv Hev. specialize (Hl sv Hev). exrepnd.
+  intros o sv Hev. specialize (Hl o sv Hev). exrepnd.
   exists dv. dands; eauto using  liftLeRimpl;[].
   intros Hq sva Hga. specialize (Hl0 Hq sva Hga). unfold translate in *.
   rewrite <- feq. simpl in *.
@@ -369,14 +372,14 @@ Qed.
 
 (* proof same as above *)
 Lemma compObsLeLinkN_proper_Feq t1 t2:
-  (forall s,  t1 s =  t2 s) -> forall n a b,
+  (forall o s, t1 o s =  t2 o s) -> forall n a b,
   (@compObsLeLinkN Src Dst _ _ _ _ _ _ _ t1  _ _ n) a b 
   -> (@compObsLeLinkN Src Dst _ _ _ _ _ _ _ t2  _ _ n) a b.
 Proof using.
   intros feq n.  induction n;[ constructor |].
   intros ? ? Hl.
   constructor. invertsn Hl.
-  intros sv Hev. specialize (Hl sv Hev). exrepnd.
+  intros o sv Hev. specialize (Hl o sv Hev). exrepnd.
   exists dv. dands; eauto using  liftLeRimpl;[].
   intros Hq sva Hga. specialize (Hl0 Hq sva Hga). unfold translate in *.
   rewrite <- feq. simpl in *.
@@ -393,12 +396,13 @@ Lemma compObsLeLinkRespectsLe:
 Proof using tg.
   intros l1 l2 Heql r1 r2 Heqr Hc.
   unfold leObsId, Basics.flip in *.
-  eapply compObsLeLinkTransitive with (t1:= fun x => Ret x); eauto;
+  eapply compObsLeLinkTransitive with (t1:= fun o x => Ret x); eauto;
     [apply goodPreservingId| ].
-  eapply compObsLeLinkTransitive with (t2:= fun x => Ret x) in Hc; eauto; try assumption;
+  eapply compObsLeLinkTransitive with (t2:= fun o x => Ret x) in Hc; eauto; try assumption;
     [|apply goodPreservingId];[].
   eapply compObsLeLink_proper_Feq;[| exact Hc].
-  intros. unfold composeTranslation, translate. destruct (t s); reflexivity.
+  intros o s. unfold composeTranslation, translate.
+  destruct (t o s); reflexivity.
 Qed.
 
 Lemma compObsLeLinkNRespectsLe n:
@@ -408,12 +412,12 @@ Proof using tg.
   unfold leObsId, Basics.flip in *.
   apply fromCoInd with (m:=n)in Heql.
   apply fromCoInd with (m:=n)in Heqr.
-  eapply compObsLeLinkNTransitive with (t1:= fun x => Ret x); eauto;
+  eapply compObsLeLinkNTransitive with (t1:= fun s x => Ret x); eauto;
     [apply goodPreservingId|].
-  eapply compObsLeLinkNTransitive with (t2:= fun x => Ret x) in Hc; eauto; try assumption;
+  eapply compObsLeLinkNTransitive with (t2:= fun s x => Ret x) in Hc; eauto; try assumption;
     [|apply goodPreservingId];[].
   eapply compObsLeLinkN_proper_Feq;[| exact Hc].
-  intros. unfold composeTranslation, translate. destruct (t s); reflexivity.
+  intros o s. unfold composeTranslation, translate. destruct (t o s); reflexivity.
 Qed.
 
 Global Instance compObsLeLinkRespectsEqObs:
@@ -435,14 +439,19 @@ Global Instance  compObsLeLinkRespectsSameVal:
   Proper (sameValues ==> sameValues ==> iff) (@compObsLeLink Src Dst _ _ _ _ _ _ _ _ _ _  ).
 Proof using H5 tg.
   intros ? ? ? ? ? ?.
-  apply compObsLeLinkRespectsEqObs; apply sameValuesImpliesEqObsId; assumption.
+  apply compObsLeLinkRespectsEqObs.
+  eapply sameValuesImpliesEqObsId; try eassumption.
+  exact (fun o x => Ret x). 
+  eapply sameValuesImpliesEqObsId; try eassumption.
+  exact (fun o x => Ret x). 
 Qed.
 
 Global Instance  compObsLeLinkNRespectsSameVal n:
   Proper (sameValues ==> sameValues ==> iff) (@compObsLeLinkN Src Dst _ _ _ _ _ _ _ _ _ _ n).
 Proof using H5 tg.
   intros ? ? ? ? ? ?.
-  apply compObsLeLinkNRespectsEqObs; apply sameValuesImpliesEqObsId; assumption.
+  apply compObsLeLinkNRespectsEqObs; eapply sameValuesImpliesEqObsId; try eassumption;
+  exact (fun o x => Ret x). 
 Qed.
 
 End LinkObsProper.
@@ -501,6 +510,7 @@ Context {Src Dst : Type}
         {Ht1: CerticoqLinkableTranslationCorrect Ls Ld}.
 
 (** Suppose [f] computes to a function (lambda) [fv] in the [Src] language *)
+Variable (o:Opt).
 Variable f:Src.
 Variable fv:Src.
 Hypothesis fcomputes: f ⇓ fv.
@@ -508,7 +518,7 @@ Hypothesis flam : questionHead Abs fv = true. (** [fv] may say yes to other ques
 
 (** [f] compiles to [fd] *)
 Variable fd:Dst.
-Hypothesis compilef : translate Src Dst f = Ret fd.
+Hypothesis compilef : translate Src Dst o f = Ret fd.
 
 (** [fd] computes to [fdv] *)
 Variable fdv:Dst.
@@ -522,7 +532,7 @@ Notation "s ⊑ t" := (compObsLeLink _ _ s t) (at level 65).
 (** Suppose we SEPARATELY [t] compile by the SAME compiler it to get [td] *)
 Variable td:Dst.
 Section SameCompiler.
-Hypothesis compilet : translate Src Dst t = Ret td.
+Hypothesis compilet : translate Src Dst o t = Ret td.
 
 
 (** The destination language has a notion of application. Consider the destination term: *)
@@ -536,11 +546,11 @@ Corollary fdtdCorrect {dd : deterministicBigStep Dst}
 Proof.
   intros Hgf Hgt.
   destruct Ht1.
-  specialize (obsePresLink0 f Hgf).
+  specialize (obsePresLink0 o f Hgf).
   rewrite compilef in obsePresLink0. simpl in *.
   invertsn obsePresLink0.
   invertsn obsePresLink0.
-  specialize (obsePresLink0 fv fcomputes).
+  specialize (obsePresLink0 o fv fcomputes).
   exrepnd. clear obsePresLink2 obsePresLink3.
   unfold deterministicBigStep in dd.
   apply dd with (v2:= fdv) in obsePresLink0;[ subst | assumption].
@@ -584,7 +594,7 @@ Proof using.
   (* need goodTerm *)
 Abort.
 
-Hypothesis compilet :  (@translate Src Dst comp1 t) = Ret td.
+Hypothesis compilet :  (@translate Src Dst comp1 o t) = Ret td.
 (** Suppose that instead of td, we wish to use another term td', which we produced manually
 or by magic. We also proved that it is a good term and is greater than td *)
 Variable td':Dst.
@@ -603,17 +613,17 @@ Corollary fdtdCorrectDiff {dd : deterministicBigStep Dst}
 Proof.
   intros Hgf Hgt.
   destruct Ht1.
-  specialize (obsePresLink0 f Hgf).
+  specialize (obsePresLink0 o f Hgf).
   rewrite compilef in obsePresLink0. simpl in *.
   invertsn obsePresLink0.
   invertsn obsePresLink0.
-  specialize (obsePresLink0 fv fcomputes).
+  specialize (obsePresLink0 o fv fcomputes).
   exrepnd. clear obsePresLink2 obsePresLink3.
   unfold deterministicBigStep in dd.
   apply dd with (v2:= fdv) in obsePresLink0;[ subst | assumption].
   specialize (obsePresLink1 flam t Hgt).
   pose proof certiGoodPresLink0 as Hgpb.
-  specialize (certiGoodPresLink0 t Hgt).
+  specialize (certiGoodPresLink0 t o Hgt).
   rewrite compilet in *. simpl in *.
   invertsna obsePresLink1 Hinvf.
   apply (mkAppCongrLe fdv) in td'Le; eauto;[].
@@ -643,20 +653,20 @@ Corollary fdtdCorrectDiff {dd : deterministicBigStep Dst}
 Proof.
   intros Hgf Hgt.
   destruct Ht1.
-  specialize (obsePresLink0 f Hgf).
+  specialize (obsePresLink0 o f Hgf).
   rewrite compilef in obsePresLink0. simpl in *.
   invertsn obsePresLink0.
   invertsn obsePresLink0.
-  specialize (obsePresLink0 fv fcomputes).
+  specialize (obsePresLink0 o fv fcomputes).
   exrepnd. clear obsePresLink2 obsePresLink3.
   unfold deterministicBigStep in dd.
   apply dd with (v2:= fdv) in obsePresLink0;[ subst | assumption].
   specialize (obsePresLink1 flam t Hgt).
   pose proof certiGoodPresLink0 as Hgpb.
-  specialize (certiGoodPresLink0 t Hgt).
+  specialize (certiGoodPresLink0 t o Hgt).
   destruct Ht1.
-  specialize (obsePresLink0 t Hgt).
-  destruct (@translate Src Dst comp1 t) as [| tdc]; try contradiction.
+  specialize (obsePresLink0 o t Hgt).
+  destruct (@translate Src Dst comp1 o t) as [| tdc]; try contradiction.
   simpl in *.
   invertsna obsePresLink1 Hinvf.
   invertsna obsePresLink0 Hinvt.

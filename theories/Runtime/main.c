@@ -61,12 +61,18 @@ value maincont[2] = {(value)maincont_code, 0};
 
 int main(int argc, char *argv[]) {
   struct thread_info* tinfo;
+  clock_t start, end;
+  double msec, sec;
+
   tinfo = make_tinfo();
-  // clock_t start = clock(), diff;
+  start = clock();
   body(tinfo);
-  // diff = clock() - start;
-  // int msec = diff * 1000 / CLOCKS_PER_SEC;
-  // printf("Time taken %d seconds %d milliseconds\n", msec/1000, msec%1000);
-  // maincont_code(tinfo);
+  end = clock();
+  
+  sec = (double)(end - start)/CLOCKS_PER_SEC;
+  msec = 1000*sec;
+  printf("Time taken %f seconds %f milliseconds\n", sec, msec);
+
+  maincont_code(tinfo);
   return 0;
 }

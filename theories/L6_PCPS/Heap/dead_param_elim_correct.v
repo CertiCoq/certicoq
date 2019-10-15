@@ -243,10 +243,10 @@ Module DeadParamCorrect (H : Heap).
   Qed.
 
   
-  Lemma live_invariant_setlist_l L rho1 rho2 rho1' xs1 vs1 :
+  Lemma live_invariant_set_lists_l L rho1 rho2 rho1' xs1 vs1 :
     live_invariant L rho1 rho2 ->
     Disjoint _ (FromList xs1) (domain L) ->
-    setlist xs1 vs1 rho1 = Some rho1' ->
+    set_lists xs1 vs1 rho1 = Some rho1' ->
     live_invariant L rho1' rho2.
   Proof with (now eauto with Ensembles_DB).
     revert rho1' vs1.
@@ -254,7 +254,7 @@ Module DeadParamCorrect (H : Heap).
       intros rho1' vs1 Hinv Hd Hset.
     - destruct vs1; inv Hset. eassumption. 
     - simpl in Hset. destruct vs1; try congruence. 
-      destruct (setlist xs1 vs1 rho1) eqn:Hset'; try congruence.
+      destruct (set_lists xs1 vs1 rho1) eqn:Hset'; try congruence.
       inv Hset.
       eapply live_invariant_extend_l. 
       intros Hc. eapply Hd. constructor. now left.
@@ -264,10 +264,10 @@ Module DeadParamCorrect (H : Heap).
       normalize_sets...
   Qed. 
 
-  Lemma live_invariant_setlist_r L rho1 rho2 rho2' xs1 vs1 :
+  Lemma live_invariant_set_lists_r L rho1 rho2 rho2' xs1 vs1 :
     live_invariant L rho1 rho2 ->
     Disjoint _ (FromList xs1) (domain L) ->
-    setlist xs1 vs1 rho2 = Some rho2' ->
+    set_lists xs1 vs1 rho2 = Some rho2' ->
     live_invariant L rho1 rho2'.
   Proof with (now eauto with Ensembles_DB).
     revert rho2' vs1.
@@ -275,7 +275,7 @@ Module DeadParamCorrect (H : Heap).
       intros rho2' vs1 Hinv Hd Hset.
     - destruct vs1; inv Hset. eassumption. 
     - simpl in Hset. destruct vs1; try congruence. 
-      destruct (setlist xs1 vs1 rho2) eqn:Hset'; try congruence.
+      destruct (set_lists xs1 vs1 rho2) eqn:Hset'; try congruence.
       inv Hset.
       eapply live_invariant_extend_r. 
       intros Hc. eapply Hd. constructor. now left.
@@ -449,10 +449,10 @@ Module DeadParamCorrect (H : Heap).
     (forall j, (H1, rho1) ⋞ ^ (FromList xs1 \\ S; k; j; Pre; Post; b) (H2, rho2)) ->
     Live_args S xs1 bs xs2 ->
 
-    getlist xs1 rho1 = Some vs1 ->
+    get_list xs1 rho1 = Some vs1 ->
 
     exists vs2,
-      getlist xs2 rho2 = Some vs2 /\
+      get_list xs2 rho2 = Some vs2 /\
       Forall2_assym (fun v1 v2 => forall j, (Res (v1, H1)) ≺ ^ ( k ; j ; Pre ; Post ; b ) (Res (v2, H2))) vs1 vs2 bs.
   Proof with (now eauto with Ensembles_DB).
     intros Hrel Hlive. revert vs1. induction Hlive; intros vs1 Hget.
@@ -460,7 +460,7 @@ Module DeadParamCorrect (H : Heap).
       constructor. 
     - simpl in Hget.
       destruct (M.get x rho1) eqn:Hget1; [| congruence ].
-      destruct (getlist xs rho1) eqn:Hgetlist; [| congruence ].
+      destruct (get_list xs rho1) eqn:Hget_list; [| congruence ].
       inv Hget.
       
       edestruct IHHlive as [vs2 [Hget2 Hall]]; [| reflexivity | ]. 
@@ -472,7 +472,7 @@ Module DeadParamCorrect (H : Heap).
       econstructor. eassumption. 
     - simpl in Hget.
       destruct (M.get x rho1) eqn:Hget1; [| congruence ].
-      destruct (getlist xs rho1) eqn:Hgetlist; [| congruence ].
+      destruct (get_list xs rho1) eqn:Hget_list; [| congruence ].
       inv Hget. 
       edestruct (Hrel 0) as [v2 [Hgetx2 Hvrel]]; [| eassumption | ].
       constructor; eauto. 
@@ -498,12 +498,12 @@ Module DeadParamCorrect (H : Heap).
     (forall j, (H1, rho1) ⋞ ^ (P ; k; j; Pre; Post; b) (H2, rho2)) ->
 
     Live_params xs1 bs xs2 S ->
-    setlist xs1 vs1 rho1 = Some rho1' ->
+    set_lists xs1 vs1 rho1 = Some rho1' ->
     
     Forall2_assym (fun v1 v2 : value => forall j, Res (v1, H1) ≺ ^ (k; j; Pre; Post; b) Res (v2, H2)) vs1 vs2 bs ->
 
     exists rho2',
-      setlist xs2 vs2 rho2 = Some rho2' /\
+      set_lists xs2 vs2 rho2 = Some rho2' /\
       (forall j, (H1, rho1') ⋞ ^ (P :|: FromList xs1 \\ S ; k; j; Pre; Post; b) (H2, rho2')).    
   Proof with (now eauto with Ensembles_DB).
     intros Hrel Hlive. revert vs1 vs2 rho1 rho1' Hrel. induction Hlive; intros vs1 vs2 rho1 rho1' Hrel Hset1 Hall.
@@ -513,9 +513,9 @@ Module DeadParamCorrect (H : Heap).
       rewrite Union_Empty_set_neut_r, Setminus_Empty_set_neut_r. eapply Hrel.
 
     - simpl in Hset1. destruct vs1 as [ | v1 vs1 ]; try congruence. 
-      destruct (setlist xs vs1 rho1) as [rho1'' |] eqn:Hsetlist1; [| congruence ]. inv Hset1.
+      destruct (set_lists xs vs1 rho1) as [rho1'' |] eqn:Hset_lists1; [| congruence ]. inv Hset1.
       inv Hall.
-      edestruct IHHlive as [rho2' [Hsetlist2 Henv]]. 
+      edestruct IHHlive as [rho2' [Hset_lists2 Henv]]. 
       eassumption. eassumption. eassumption.
       
       exists rho2'. split. eassumption.
@@ -532,13 +532,13 @@ Module DeadParamCorrect (H : Heap).
       intros Hc. inv Hc. eapply H0. now left. 
       
     - simpl in Hset1. destruct vs1 as [ | v1 vs1 ]; try congruence. 
-      destruct (setlist xs vs1 rho1) eqn:Hsetlist1; [| congruence ]. inv Hset1.
+      destruct (set_lists xs vs1 rho1) eqn:Hset_lists1; [| congruence ]. inv Hset1.
       inv Hall.
-      edestruct IHHlive as [rho2' [Hsetlist2 Henv]]. 
+      edestruct IHHlive as [rho2' [Hset_lists2 Henv]]. 
       eassumption. eassumption. eassumption.
 
       exists (M.set x y rho2'). split.
-      simpl. rewrite Hsetlist2. reflexivity.
+      simpl. rewrite Hset_lists2. reflexivity.
       intros j. eapply env_log_rel_P_set.
       
       eapply env_log_rel_P_antimon. eapply Henv.
@@ -782,8 +782,8 @@ Module DeadParamCorrect (H : Heap).
           exists xs2, e2.  
 
           edestruct
-            (setlist_length3 (def_funs B2' B2' (M.empty _)) xs2 vs2) as [rho2' Hset2].
-          rewrite <- Hlen. eapply setlist_length_eq. 
+            (set_lists_length3 (def_funs B2' B2' (M.empty _)) xs2 vs2) as [rho2' Hset2].
+          rewrite <- Hlen. eapply set_lists_length_eq. 
           eassumption.
 
           exists rho2'. split. 
@@ -795,7 +795,7 @@ Module DeadParamCorrect (H : Heap).
                       forall j0 : nat,
                         (H1', rho1') ⋞ ^ (occurs_free e1 \\ eliminated_funs L; i; j0; PreG; PostG; b') (H2', rho2')). 
             { intros j''.
-              eapply env_log_rel_P_setlist_l;
+              eapply env_log_rel_P_set_lists_l;
                 [ | | eassumption | eassumption ].
               * (* Apply IHk *)
                 { eapply IHk; try eassumption.
@@ -805,8 +805,8 @@ Module DeadParamCorrect (H : Heap).
               * eapply Hallv. }
             
             assert (Hdinv' :  live_invariant L rho1' rho2').
-            { eapply live_invariant_setlist_l; try eassumption.
-              eapply live_invariant_setlist_r; try eassumption.
+            { eapply live_invariant_set_lists_l; try eassumption.
+              eapply live_invariant_set_lists_r; try eassumption.
               * eapply Live_fundefs_live_invariant; eassumption.
               * rewrite Hdinv.
                 eapply unique_bindings_fun_in_fundefs.
@@ -836,7 +836,7 @@ Module DeadParamCorrect (H : Heap).
                 eapply logical_relations.occurs_free_closed_fundefs.
                 eapply find_def_correct. eassumption.
                 eassumption.
-                eapply binding_in_map_setlist; [| eassumption ].
+                eapply binding_in_map_set_lists; [| eassumption ].
                 eapply binding_in_map_antimon; [| eapply def_funs_binding_in_map ].
                 rewrite Union_Empty_set_neut_r. reflexivity. 
                 intros x Hin. inv Hin.
@@ -852,7 +852,7 @@ Module DeadParamCorrect (H : Heap).
                     eapply logical_relations.occurs_free_closed_fundefs.
                     eapply find_def_correct. eassumption.
                     eassumption. rewrite Union_commut. 
-                    eapply env_locs_setlist_Included.
+                    eapply env_locs_set_lists_Included.
                     eassumption. }
                 rewrite env_locs_def_funs'; tci.
                 rewrite Setminus_Same_set_Empty_set.
@@ -864,7 +864,7 @@ Module DeadParamCorrect (H : Heap).
                 eapply logical_relations.occurs_free_closed_fundefs.
                 eapply find_def_correct. eassumption.
                 eassumption.
-                eapply binding_in_map_setlist; [| eassumption ].
+                eapply binding_in_map_set_lists; [| eassumption ].
                 eapply binding_in_map_antimon; [| eapply def_funs_binding_in_map ].
                 rewrite Union_Empty_set_neut_r. reflexivity. 
                 intros x Hin. inv Hin. 
@@ -1133,8 +1133,8 @@ Module DeadParamCorrect (H : Heap).
           unfold closed_fundefs in Hclo'. rewrite Hclo'...
           
           assert (Hdinv' : live_invariant L rho1' rho2').
-          { eapply live_invariant_setlist_l; try eassumption.
-            eapply live_invariant_setlist_r; try eassumption.
+          { eapply live_invariant_set_lists_l; try eassumption.
+            eapply live_invariant_set_lists_r; try eassumption.
             * eapply Live_fundefs_live_invariant; eassumption.
             * eapply Disjoint_Included_l.
               eapply Live_params_subset. eassumption. 
@@ -1152,7 +1152,7 @@ Module DeadParamCorrect (H : Heap).
             eapply logical_relations.occurs_free_closed_fundefs.
             eapply find_def_correct. eassumption.
             eassumption.
-            eapply binding_in_map_setlist; [| eassumption ].
+            eapply binding_in_map_set_lists; [| eassumption ].
             eapply binding_in_map_antimon; [| eapply def_funs_binding_in_map ].
             rewrite Union_Empty_set_neut_r. reflexivity. 
             intros x Hin. inv Hin. }
@@ -1196,7 +1196,7 @@ Module DeadParamCorrect (H : Heap).
             - eapply closed_reach_monotonic. eassumption.
               eapply Included_trans.
               eapply Included_trans;
-                [| eapply env_locs_setlist_Included; try now eapply Hset1 ].
+                [| eapply env_locs_set_lists_Included; try now eapply Hset1 ].
               eapply env_locs_monotonic. eapply Included_Union_preserv_l. reflexivity.
               normalize_occurs_free.
               rewrite env_locs_Union, env_locs_FromList, env_locs_Singleton; eauto.

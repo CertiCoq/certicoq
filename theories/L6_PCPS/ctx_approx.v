@@ -14,7 +14,7 @@ Definition empty_env := M.empty val.
 Section ctx_approx.
 
   Variable pr : prims.
-  Variable cenv : cEnv.
+  Variable cenv : ctor_env.
 
   Open Scope ctx_scope.
   
@@ -65,8 +65,8 @@ Section ctx_approx.
   
   Definition x : var := 1%positive.
   Definition y : var := 2%positive.
-  Definition c : cTag := 1%positive.
-  Definition f : fTag := 1%positive.
+  Definition c : ctor_tag := 1%positive.
+  Definition f : fun_tag := 1%positive.
 
   Definition stuck : exp :=
     Econstr x  c [] (

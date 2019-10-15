@@ -26,7 +26,7 @@ Fixpoint erase_fundefs (e : exp) (defs : fundefs)
                                       f (Econstr x tag ys e, defs))
     | Ecase x tes =>
       fold_left
-        (fun (f : exp * fundefs -> exp * fundefs) (te : cTag * exp) =>
+        (fun (f : exp * fundefs -> exp * fundefs) (te : ctor_tag * exp) =>
            fun p =>
              let (c, e) := te in
              let (e1, defs1) := p in
@@ -414,7 +414,7 @@ Fixpoint f c e' e : exp :=
     | Ehalt x => e
   end.
 
-Inductive g (f' : var) (t : cTag) (xs' : list var) (e' : exp)
+Inductive g (f' : var) (t : ctor_tag) (xs' : list var) (e' : exp)
 : exp -> exp -> Prop :=
 | g_constr :
     forall x tag ys e1 e2,
@@ -1356,7 +1356,7 @@ Qed.
 Section hoisting_correct.
 
   Variable (pr : prims).
-  Variable (cenv : cEnv).
+  Variable (cenv : ctor_env).
   
   Lemma hoist_rw_correct e e' rho rho' k :
     closed_fundefs_in_exp e ->
@@ -1368,7 +1368,7 @@ Section hoisting_correct.
   Proof.
     intros Hclo Hun HD Hrw Henv; inv Hrw; intros v1 c1 Hleq1 Hstep1.
     { inv Hstep1. inv H8; eauto.
-      edestruct preord_env_P_getlist_l as [vs' [Hgetl Hpre]]; eauto.
+      edestruct preord_env_P_get_list_l as [vs' [Hgetl Hpre]]; eauto.
       rewrite occurs_free_Econstr. now apply Included_Union_l.
       edestruct (preord_exp_refl pr cenv k e0) as [v2 [c2 [Hstep2 Hpre2]]]; [| eauto | eauto |].
       eapply preord_env_P_antimon.
@@ -1379,7 +1379,7 @@ Section hoisting_correct.
         rewrite Union_assoc. apply Included_Union_compat; eauto using Included_refl.
         eapply occurs_free_Econstr_Included.
       - repeat eexists; eauto. constructor. econstructor; eauto.
-        eapply getlist_fundefs; eauto. 
+        eapply get_list_fundefs; eauto. 
         intros y Hin Hc. eapply HD.
         constructor. constructor 2. constructor.
         now apply name_in_fundefs_bound_var_fundefs; eauto.
@@ -1406,7 +1406,7 @@ Section hoisting_correct.
           simpl. econstructor; [| eapply in_or_app; right; constructor; eauto ].
           constructor. now apply name_in_fundefs_bound_var_fundefs; eauto.
           constructor.
-          * eapply caseConsistent_same_cTags; [| eassumption ].
+          * eapply caseConsistent_same_ctor_tags; [| eassumption ].
             apply Forall2_app.
             now eapply Forall2_same. constructor. reflexivity.
             now eapply Forall2_same.
@@ -1428,7 +1428,7 @@ Section hoisting_correct.
           simpl. econstructor; [| eapply in_or_app; right; constructor; eauto ].
           constructor. now apply name_in_fundefs_bound_var_fundefs; eauto.
           now constructor.
-          eapply caseConsistent_same_cTags; [| eassumption ].
+          eapply caseConsistent_same_ctor_tags; [| eassumption ].
           apply Forall2_app.
           now eapply Forall2_same. constructor. reflexivity.
           now eapply Forall2_same.
@@ -1451,7 +1451,7 @@ Section hoisting_correct.
             simpl. econstructor; [| eapply in_or_app; right; constructor; eauto ].
             constructor. now apply name_in_fundefs_bound_var_fundefs; eauto.
             constructor.
-            eapply caseConsistent_same_cTags; [| eassumption ].
+            eapply caseConsistent_same_ctor_tags; [| eassumption ].
             apply Forall2_app.
             now eapply Forall2_same. constructor. reflexivity.
             now eapply Forall2_same.
@@ -1489,7 +1489,7 @@ Section hoisting_correct.
         apply Included_refl.
       - repeat eexists; eauto. constructor. eauto. }
     { inv Hstep1. inv H10; eauto.
-      edestruct preord_env_P_getlist_l as [vs' [Hgetl Hpre]]; eauto.
+      edestruct preord_env_P_get_list_l as [vs' [Hgetl Hpre]]; eauto.
       rewrite occurs_free_Eprim. now apply Included_Union_l.
       edestruct Prim_axiom as [v' [Heq Hpre']]; eauto.
       edestruct (preord_exp_refl pr cenv k e0) as [v2 [c2 [Hstep2 Hpre2]]];
@@ -1501,7 +1501,7 @@ Section hoisting_correct.
         rewrite Union_assoc. apply Included_Union_compat; eauto using Included_refl.
         eapply occurs_free_Eprim_Included.
       - repeat eexists; eauto. constructor. econstructor; eauto.
-        eapply getlist_fundefs; eauto. 
+        eapply get_list_fundefs; eauto. 
         intros y Hin Hc. eapply HD.
         constructor; [| now constructor; eauto ].
         constructor. constructor.

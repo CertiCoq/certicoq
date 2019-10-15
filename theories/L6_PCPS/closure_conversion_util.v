@@ -20,7 +20,7 @@ Close Scope Z_scope.
 
 Section Closure_conversion_util.
 
-  Variable clo_tag : cTag.
+  Variable clo_tag : ctor_tag.
 
   (** ** Proof that after closure conversion all functions are closed *)
 
@@ -577,11 +577,11 @@ Section Closure_conversion_util.
       eapply project_var_free_set_Included; eassumption.
   Qed.
 
-  Lemma project_var_getlist Scope Funs σ c Γ FVs S1 x x' C1 S2 rho1 rho2 ys :
+  Lemma project_var_get_list Scope Funs σ c Γ FVs S1 x x' C1 S2 rho1 rho2 ys :
     project_var clo_tag Scope Funs σ c Γ FVs S1 x x' C1 S2 ->
     ctx_to_rho C1 rho1 rho2 ->
     Disjoint _ S1 (FromList ys) ->
-    getlist ys rho1 = getlist ys rho2. 
+    get_list ys rho1 = get_list ys rho2. 
   Proof.
     revert rho1 rho2; induction ys; intros rho1 rho2  Hproj Hctx Hnin.
     - reflexivity. 
@@ -594,11 +594,11 @@ Section Closure_conversion_util.
   Qed.        
 
 
-  Lemma project_vars_getlist Scope Funs σ c Γ FVs S1 xs xs' C1 S2 rho1 rho2 ys :
+  Lemma project_vars_get_list Scope Funs σ c Γ FVs S1 xs xs' C1 S2 rho1 rho2 ys :
     project_vars clo_tag Scope Funs σ c Γ FVs S1 xs xs' C1 S2 ->
     ctx_to_rho C1 rho1 rho2 ->
     Disjoint _ S1 (FromList ys) ->
-    getlist ys rho1 = getlist ys rho2. 
+    get_list ys rho1 = get_list ys rho2. 
   Proof.
     revert rho1 rho2; induction ys; intros rho1 rho2  Hproj Hctx Hnin.
     - reflexivity. 
@@ -673,7 +673,7 @@ Section Closure_conversion_util.
   (** Properties about context sizes *)
 
   Lemma project_var_sizeOf_ctx_exp (Scope Funs : Ensemble var) (σ : var -> var) 
-    (c : cTag) (Γ : var) (FVs : list var) (S : Ensemble var) 
+    (c : ctor_tag) (Γ : var) (FVs : list var) (S : Ensemble var) 
     (x x' : var) (C : exp_ctx) (S' : Ensemble var) :
     project_var clo_tag Scope Funs σ c Γ FVs S x x' C S' ->
     sizeOf_exp_ctx C <= 3. 
@@ -682,7 +682,7 @@ Section Closure_conversion_util.
   Qed.
   
   Lemma project_vars_sizeOf_ctx_exp (Scope Funs : Ensemble var) (σ : var -> var) 
-    (c : cTag) (Γ : var) (FVs : list var) (S : Ensemble var) 
+    (c : ctor_tag) (Γ : var) (FVs : list var) (S : Ensemble var) 
     (xs xs' : list var) (C : exp_ctx) (S' : Ensemble var)  :
     project_vars clo_tag Scope Funs σ c Γ FVs S xs xs' C S' ->
     sizeOf_exp_ctx C <= 3 * length xs. 
@@ -703,7 +703,7 @@ Section Closure_conversion_util.
     omega.
   Qed.
 
-  Lemma Closure_conversion_fundefs_numOf_fundefs (Funs : Ensemble var) (σ : var -> var) (c : cTag) 
+  Lemma Closure_conversion_fundefs_numOf_fundefs (Funs : Ensemble var) (σ : var -> var) (c : ctor_tag) 
         (FVs : list var) (B1 B2 : fundefs) :
     Closure_conversion_fundefs clo_tag Funs σ c FVs B1 B2 ->
     numOf_fundefs B1 = numOf_fundefs B2.

@@ -22,7 +22,7 @@ Module Compat (H : Heap).
 
   Section CompatDefs.
     
-    Variable (clo_tag : cTag).
+    Variable (clo_tag : ctor_tag).
 
     Context (IG : GInv) (* Final global *)
             (IL1 IL2: Inv) (* Final local *)
@@ -174,10 +174,10 @@ Module Compat (H : Heap).
     Definition IInvAppCompat (H1 H2 : heap block) (rho1 rho2 : env) f1 t xs1 f2 xs2 f2' Γ :=   
       forall (i  : nat) (H1' H1'' H2' Hgc2: heap block)
         env_loc (rho_clo rho_clo1 rho_clo2 rho1' rho2' rho2'' : env) β1 β2 
-        (B1 : fundefs) (f1' : var) (ct1 : cTag)
+        (B1 : fundefs) (f1' : var) (ct1 : ctor_tag)
         (xs1' : list var) (e1 : exp) (l1 : loc)
         (vs1 : list value) 
-        (B2 : fundefs) (f3 : var) (c ct2 : cTag) (xs2' : list var) 
+        (B2 : fundefs) (f3 : var) (c ct2 : ctor_tag) (xs2' : list var) 
         (e2 : exp) (l2 env_loc2 : loc) (vs2 : list value) c1 c2 m1 m2 d,
         (occurs_free (Eapp f1 t xs1)) |- (H1, rho1) ⩪_(id, β1) (H1', rho1') ->
         injective_subdomain (reach' H1' (env_locs rho1' (occurs_free (Eapp f1 t xs1)))) β1 ->
@@ -195,15 +195,15 @@ Module Compat (H : Heap).
         get l1 H1' = Some (Clos (FunPtr B1 f1') (Loc env_loc)) ->
         get env_loc H1' = Some (Env rho_clo) ->
         find_def f1' B1 = Some (ct1, xs1', e1) ->
-        getlist xs1 rho1' = Some vs1 ->
+        get_list xs1 rho1' = Some vs1 ->
         def_closures B1 B1 rho_clo H1' (Loc env_loc) = (H1'', rho_clo1) ->
-        setlist xs1' vs1 rho_clo1 = Some rho_clo2 ->
+        set_lists xs1' vs1 rho_clo1 = Some rho_clo2 ->
         
         M.get f2 rho2' = Some (Loc l2) ->
-        getlist xs2 rho2' = Some vs2 ->
+        get_list xs2 rho2' = Some vs2 ->
         get l2 H2' = Some (Constr c [FunPtr B2 f3; Loc env_loc2]) ->
         Some rho2'' =
-        setlist xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
+        set_lists xs2' (Loc env_loc2 :: vs2) (def_funs B2 B2 (M.empty value)) ->
         find_def f3 B2 = Some (ct2, xs2', e2) ->
         live' ((env_locs rho2'') (occurs_free e2)) H2' Hgc2 d ->
 
@@ -217,7 +217,7 @@ Module Compat (H : Heap).
   
   Section CompatLemmas.
     
-    Variable (clo_tag : cTag).
+    Variable (clo_tag : ctor_tag).
 
     Context (IG : GInv) (* Final global *)
             (IL1 IL2: Inv) (* Final local *)
@@ -231,7 +231,7 @@ Module Compat (H : Heap).
     (** Application compatibility *)
     Lemma cc_approx_exp_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
           (rho1 rho2 : env) (f1 : var) (xs1 : list var) 
-          (f2 f2' Γ : var) (xs2 : list var) (t : fTag) :
+          (f2 f2' Γ : var) (xs2 : list var) (t : fun_tag) :
       IInvAppCompat clo_tag IG IL1 IIL1 H1 H2 rho1 rho2 f1 t xs1 f2 xs2 f2' Γ ->
       InvCostTimeOut IL1 IIL1 (Eapp f1 t xs1) (AppClo clo_tag f2 t xs2 f2' Γ) ->
       (* InvCostTO IL2 -> *)
@@ -329,7 +329,7 @@ Module Compat (H : Heap).
                 | now intros Hc; inv Hc; eapply Hnin1; eauto ]
               | now intros Hc; inv Hc; eapply Hnin2; eauto ]
             ].  
-          edestruct (cc_approx_var_env_getlist IIG IG  k j rho1' rho2')
+          edestruct (cc_approx_var_env_get_list IIG IG  k j rho1' rho2')
             as [vs2 [Hgetl' Hcc']];
             [ | now eauto |].
           eapply Forall2_monotonic; [| now apply Hall ].
@@ -380,7 +380,7 @@ Module Compat (H : Heap).
               eapply in_map. eassumption. eassumption.
               now eapply Disjoint_Singleton_r; intros Hc; eapply Hnin1; eauto.
               now eapply Disjoint_Singleton_r; intros Hc; inv Hc; eapply Hnin2; eauto. } 
-            edestruct (cc_approx_var_env_getlist IIG IG  k j' rho1' rho2')
+            edestruct (cc_approx_var_env_get_list IIG IG  k j' rho1' rho2')
               as [vs2' [Hgetl'' Hcc'']];
               [ | now eauto |]. 
             eapply Forall2_monotonic; [| now apply Hall ].  
@@ -427,7 +427,7 @@ Module Compat (H : Heap).
                now intros Hc; subst; eauto.
                eassumption.
                simpl. rewrite M.gss.
-               rewrite !getlist_set_neq. now rewrite Hgetl'.
+               rewrite !get_list_set_neq. now rewrite Hgetl'.
                intros Hc. eapply Hnin2. now eauto.
                intros Hc. eapply Hnin1. now eauto.
                now eauto. eassumption. reflexivity. simpl.
@@ -444,7 +444,7 @@ Module Compat (H : Heap).
 
     Lemma cc_approx_exp_constr_compat (k j : nat)
           (b : Inj) (H1 H2 : heap block) (rho1 rho2 : env)
-          (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp)  : 
+          (x1 x2 : var) (t : ctor_tag) (ys1 ys2 : list var) (e1 e2 : exp)  : 
       InvCtxCompat IL1 IL2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
       IInvCtxCompat IIL1 IIL2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
       InvCostTimeOut IL1 IIL1 (Econstr x1 t ys1 e1) (Econstr x2 t ys2 e2)  ->
@@ -483,7 +483,7 @@ Module Compat (H : Heap).
           - eapply Hbase; try eassumption.
           - now rewrite cc_approx_val_eq. }
       (* Termination *)
-      - { edestruct (cc_approx_var_env_getlist IIG IG k j rho1' rho2') as [vs2 [Hget' Hpre']];
+      - { edestruct (cc_approx_var_env_get_list IIG IG k j rho1' rho2') as [vs2 [Hget' Hpre']];
           [| eauto |]; eauto.
           specialize (Hall j).
           eapply Forall2_monotonic_strong; [| eassumption ].
@@ -492,10 +492,10 @@ Module Compat (H : Heap).
           eapply cc_approx_var_env_heap_env_equiv; try eassumption.
           
           normalize_occurs_free... normalize_occurs_free...
-          edestruct heap_env_equiv_env_getlist as [vs1' [Hget1' Hall1]];
+          edestruct heap_env_equiv_env_get_list as [vs1' [Hget1' Hall1]];
             [| symmetry; now apply Heq1 | |]; try eassumption.
           normalize_occurs_free...
-          edestruct heap_env_equiv_env_getlist as [vs2' [Hget2' Hall2]];
+          edestruct heap_env_equiv_env_get_list as [vs2' [Hget2' Hall2]];
             [| symmetry; now apply Heq2 | |]; try eassumption.
           normalize_occurs_free...
           destruct (alloc (Constr t vs1') H1) as [l1 H1''] eqn:Hal1.
@@ -503,8 +503,8 @@ Module Compat (H : Heap).
           destruct (alloc (Constr t vs2') H2) as [l2' H2''] eqn:Hal2.
           assert (Halli := Hall). specialize (Hall j). eapply Forall2_length in Hall.
           assert (Hlen : @List.length M.elt ys1 = @List.length M.elt ys2).
-          { erewrite (@getlist_length_eq value ys1 vs); [| eassumption ].
-            erewrite (@getlist_length_eq value ys2 vs2); [| eassumption ].
+          { erewrite (@get_list_length_eq value ys1 vs); [| eassumption ].
+            erewrite (@get_list_length_eq value ys2 vs2); [| eassumption ].
             eapply Forall2_length. eassumption. }
           
           edestruct Hpre with (b1 := extend b1 l l1)
@@ -515,7 +515,7 @@ Module Compat (H : Heap).
           - simpl. eapply FromList_env_locs. eassumption. reflexivity.
           - simpl. eapply FromList_env_locs. eassumption. reflexivity.
           - intros j'.
-            edestruct (cc_approx_var_env_getlist IIG IG k j' rho1 rho2) as [vs2'' [Hget'' Hall'']];
+            edestruct (cc_approx_var_env_get_list IIG IG k j' rho1 rho2) as [vs2'' [Hget'' Hall'']];
               [| eauto |]; eauto. subst_exp.
             eapply Forall2_monotonic; [| eassumption ]. intros ? ? H.
             eapply cc_approx_val_monotonic.
@@ -695,7 +695,7 @@ Module Compat (H : Heap).
 
     (** Projection compatibility *)
     Lemma cc_approx_exp_proj_compat (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj)
-          (x1 x2 : var) (t : cTag) (n : N) (y1 y2 : var) (e1 e2 : exp) :
+          (x1 x2 : var) (t : ctor_tag) (n : N) (y1 y2 : var) (e1 e2 : exp) :
 
       InvCtxCompat IL1 IL2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
       IInvCtxCompat IIL1 IIL2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
@@ -892,7 +892,7 @@ Module Compat (H : Heap).
     Qed. 
 
     Lemma cc_approx_exp_case_compat (k j : nat) (b : Inj)
-          (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (Pats1 Pats2 : list (cTag * exp)) :
+          (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (Pats1 Pats2 : list (ctor_tag * exp)) :
       InvCostTimeOut IL1 IIL1 (Ecase x1 Pats1) (Ecase x2 Pats2) ->
       IInvCaseCompat IIL1 IILe x1 x2 Pats1 Pats2 ->
       InvCaseCompat IL1 ILe x1 x2 Pats1 Pats2 ->
@@ -1353,7 +1353,7 @@ Module Compat (H : Heap).
     (** Application compatibility *)
     Lemma cc_approx_exp_ctx_app_compat (k j : nat) (b : Inj) (H1 H2 H2' : heap block)
           (rho1 rho2 rho2' : env) (f1 : var) (xs1 : list var) 
-          (f2 f2' Γ : var) (xs2 : list var) (t : fTag) C c :
+          (f2 f2' Γ : var) (xs2 : list var) (t : fun_tag) C c :
       InvCostTimeOut' IL1 IIL1 (cost_alloc_ctx_CC C) (Eapp f1 t xs1) (C |[ AppClo clo_tag f2 t xs2 f2' Γ ]|) ->
       IInvAppCompat clo_tag IG IL2 IIL2 H1 H2' rho1 rho2' f1 t xs1 f2 xs2 f2' Γ ->
 
@@ -1480,7 +1480,7 @@ Module Compat (H : Heap).
                 | now intros Hc; inv Hc; eapply Hnin1; eauto ]
               | now intros Hc; inv Hc; eapply Hnin2; eauto ]
             ].  
-          edestruct (cc_approx_var_env_getlist IIG IG  k j rho1' rho3')
+          edestruct (cc_approx_var_env_get_list IIG IG  k j rho1' rho3')
             as [vs2 [Hgetl' Hcc']];
             [ | now eauto |].
           eapply Forall2_monotonic; [| now apply Hall ].
@@ -1531,7 +1531,7 @@ Module Compat (H : Heap).
               eapply in_map. eassumption. eassumption.
               now eapply Disjoint_Singleton_r; intros Hc; eapply Hnin1; eauto.
               now eapply Disjoint_Singleton_r; intros Hc; inv Hc; eapply Hnin2; eauto. } 
-            edestruct (cc_approx_var_env_getlist IIG IG  k j' rho1' rho3')
+            edestruct (cc_approx_var_env_get_list IIG IG  k j' rho1' rho3')
               as [vs2' [Hgetl'' Hcc'']];
               [ | now eauto |]. 
             eapply Forall2_monotonic; [| now apply Hall ].  
@@ -1582,7 +1582,7 @@ Module Compat (H : Heap).
               now intros Hc; subst; eauto.
               eassumption.
               simpl. rewrite M.gss.
-              rewrite !getlist_set_neq. now rewrite Hgetl'.
+              rewrite !get_list_set_neq. now rewrite Hgetl'.
               intros Hc. eapply Hnin2. now eauto.
               intros Hc. eapply Hnin1. now eauto.
               now eauto. eassumption. reflexivity. simpl.

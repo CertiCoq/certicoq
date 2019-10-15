@@ -45,7 +45,7 @@ Section UNCURRY.
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     | Ecase x arms =>
       eq_var k x ||
-              (fix occurs_in_arms (arms: list (cTag * exp)) : bool :=
+              (fix occurs_in_arms (arms: list (ctor_tag * exp)) : bool :=
                  match arms with
                  | nil => false
                  | p::arms1 => match p with
@@ -76,13 +76,13 @@ Section UNCURRY.
      2- encoding of inlining decision for beta-contraction phase *)
   Definition St := (nat * (M.t nat))%type. (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
 
-  (* Maps (arity+1) to the right fTag *)
-  Definition arityMap:Type := M.t fTag.
+  (* Maps (arity+1) to the right fun_tag *)
+  Definition arityMap:Type := M.t fun_tag.
   Definition localMap:Type := M.t bool.
    
   (* The state for this includes 
      1 - a boolean for tracking whether or not a reduction happens
-     2 - Map recording the (new) fTag associated to each arity
+     2 - Map recording the (new) fun_tag associated to each arity
      3 - local map from var to if function has already been uncurried
      4 - Map for uncurried functions for a 2version of inlining *)
   Definition stateType:Type := (bool * arityMap * localMap * St). 
@@ -121,8 +121,8 @@ Section UNCURRY.
     | _ => ret false
     end.
 
-  (* get the fTag at arity N. If there isn't one already, create it *)
-  Definition get_fTag (n:N): uncurryM fTag :=
+  (* get the fun_tag at arity N. If there isn't one already, create it *)
+  Definition get_fun_tag (n:N): uncurryM fun_tag :=
     st <- get_state tt ;;
     let '(b, aenv, lm, s) := st in
     let p3 := (BinNat.N.succ_pos n) in
@@ -164,8 +164,8 @@ Section UNCURRY.
     | Ecase x arms =>
       (* annoyingly, I can't seem to use a separate mapM definition here, but
          if I inline the definition, and specialize it, it seems to work. *)
-      arms' <- (fix uncurry_list (arms: list (cTag*exp)) :
-                  uncurryM (list (cTag*exp)) :=
+      arms' <- (fix uncurry_list (arms: list (ctor_tag*exp)) :
+                  uncurryM (list (ctor_tag*exp)) :=
                   match arms with
                   | nil => ret nil
                   | h::t =>
@@ -221,7 +221,7 @@ Section UNCURRY.
                _ <- click ;;
                let fp_numargs := length (gvs' ++ fvs')  in
                _ <- markToInline fp_numargs f g;;
-               fp_ft <- get_fTag (BinNat.N.of_nat fp_numargs);;
+               fp_ft <- get_fun_tag (BinNat.N.of_nat fp_numargs);;
                ret (Fcons f f_ft (fk::fvs')
                           (* Note: tag given for arity |fvs| + |gvs|  *)
                           (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)

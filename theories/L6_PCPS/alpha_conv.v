@@ -235,7 +235,7 @@ Qed.
 Section Alpha_conv_correct.
 
   Variable pr : prims.
-  Variable cenv : cEnv.
+  Variable cenv : ctor_env.
 
   Definition preord_env_P_inj (P : Ensemble var) k f rho1 rho2 :=
     forall x : var,
@@ -360,11 +360,11 @@ Section Alpha_conv_correct.
         * do 2 eexists. simpl. rewrite peq_false; eauto.
   Qed.
 
-  Lemma setlist_length2 (rho rho' rho1 : env) (xs1 xs2 : list var) (vs1 vs2 : list val) :
+  Lemma set_lists_length2 (rho rho' rho1 : env) (xs1 xs2 : list var) (vs1 vs2 : list val) :
     length xs1 = length xs2 ->
     length vs1 = length vs2 ->
-    setlist xs1 vs1 rho = Some rho1 ->
-    exists rho2 : M.t val, setlist xs2 vs2 rho' = Some rho2.
+    set_lists xs1 vs1 rho = Some rho1 ->
+    exists rho2 : M.t val, set_lists xs2 vs2 rho' = Some rho2.
   Proof. 
     revert xs2 vs1 vs2 rho1.
     induction xs1 as [| x xs1 IHxs ]; intros xs2 vs1 vs2 rho1 Hlen1 Hlen2 Hset.
@@ -374,18 +374,18 @@ Section Alpha_conv_correct.
     - destruct xs2; try discriminate.
       destruct vs1; try discriminate. destruct vs2; try discriminate.
       inv Hlen1. inv Hlen2. simpl in Hset. 
-      destruct (setlist xs1 vs1 rho) eqn:Heq2; try discriminate. inv Hset.
+      destruct (set_lists xs1 vs1 rho) eqn:Heq2; try discriminate. inv Hset.
       edestruct IHxs as [vs2' Hset2]; try eassumption.
       eexists. simpl; rewrite Hset2; eauto.
   Qed.
 
-  Lemma preord_env_P_inj_setlist (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
+  Lemma preord_env_P_inj_set_lists (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f f':
     preord_env_P_inj (Setminus _ P1 (FromList xs1)) k f rho1 rho2 ->
     Forall2 (preord_val pr cenv k) vs1 vs2 ->
     construct_lst_injection f xs1 xs2 f' ->
-    setlist xs1 vs1 rho1 = Some rho1' ->
-    setlist xs2 vs2 rho2 = Some rho2' ->
+    set_lists xs1 vs1 rho1 = Some rho1' ->
+    set_lists xs2 vs2 rho2 = Some rho2' ->
     preord_env_P_inj P1 k f' rho1' rho2'.
   Proof.
     revert P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f f'. induction xs1;
@@ -395,8 +395,8 @@ Section Alpha_conv_correct.
       constructor; eauto.
     - destruct vs1; try discriminate. inv Hall. inv Hinj.
       simpl in Hset1, Hset2. 
-      destruct (setlist xs1 vs1 rho1) eqn:Heq1;
-        destruct (setlist ys l' rho2) eqn:Heq2; try discriminate.
+      destruct (set_lists xs1 vs1 rho1) eqn:Heq1;
+        destruct (set_lists ys l' rho2) eqn:Heq2; try discriminate.
       inv Hset1; inv Hset2. rewrite M.gsspec in Hget.
       destruct (peq x a); subst.
       + inv Hget. eexists. 
@@ -413,15 +413,15 @@ Section Alpha_conv_correct.
           rewrite extend_gss. rewrite extend_gso; eassumption. 
   Qed.
   
-  Lemma preord_env_P_inj_setlist_alt (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
+  Lemma preord_env_P_inj_set_lists_alt (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f :
     preord_env_P_inj (Setminus _ P1 (FromList xs1)) k f rho1 rho2 ->
     Forall2 (preord_val pr cenv k) vs1 vs2 ->
     NoDup xs1 -> NoDup xs2 ->
     length xs1 = length xs2 ->
     Disjoint _ (image f (Setminus _ P1 (FromList xs1))) (FromList xs2) ->
-    setlist xs1 vs1 rho1 = Some rho1' ->
-    setlist xs2 vs2 rho2 = Some rho2' ->
+    set_lists xs1 vs1 rho1 = Some rho1' ->
+    set_lists xs2 vs2 rho2 = Some rho2' ->
     preord_env_P_inj P1 k (f <{ xs1 ~> xs2 }>)  rho1' rho2'.
   Proof with now eauto with Ensembles_DB.
     revert P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f.
@@ -435,8 +435,8 @@ Section Alpha_conv_correct.
       inv Hset1. inv Hset2. eapply Hpre; eauto.
       constructor; eauto. eapply not_In_Empty_set.
     - inv Hall. inv Hlen. inv Hnd1. inv Hnd2. simpl in *.
-      destruct (setlist xs1 vs1 rho1) eqn:Heq1;
-        destruct (setlist xs2 vs2 rho2) eqn:Heq2; try discriminate.
+      destruct (set_lists xs1 vs1 rho1) eqn:Heq1;
+        destruct (set_lists xs2 vs2 rho2) eqn:Heq2; try discriminate.
       inv Hset1; inv Hset2. rewrite M.gsspec in Hget.
       destruct (peq x a); subst.
       + inv Hget. eexists. 
@@ -478,18 +478,18 @@ Section Alpha_conv_correct.
       rewrite FromList_cons...
   Qed.
 
-  Lemma preord_env_P_inj_getlist_l (P : var -> Prop) k f rho1 rho2 xs vs1 :
+  Lemma preord_env_P_inj_get_list_l (P : var -> Prop) k f rho1 rho2 xs vs1 :
     preord_env_P_inj P k f rho1 rho2 ->
     Included var (FromList xs) P ->
-    getlist xs rho1 = Some vs1 ->
+    get_list xs rho1 = Some vs1 ->
     exists vs2 : list val,
-      getlist (map f xs) rho2 = Some vs2 /\ Forall2 (preord_val pr cenv k) vs1 vs2.
+      get_list (map f xs) rho2 = Some vs2 /\ Forall2 (preord_val pr cenv k) vs1 vs2.
   Proof with now eauto with Ensembles_DB.
     revert vs1. induction xs; intros vs1 Henv Hinc Hget.
     - eexists; split; eauto. inv Hget. constructor.
     - simpl in *.
       destruct (M.get a rho1) eqn:Hgeta; try discriminate.
-      destruct (getlist xs rho1) eqn:Hgetl; try discriminate.
+      destruct (get_list xs rho1) eqn:Hgetl; try discriminate.
       inv Hget.
       edestruct Henv with (x := a) as [x' [Hgetx' Hprex']]. eapply Hinc. rewrite FromList_cons...
       eassumption.
@@ -549,10 +549,10 @@ Section Alpha_conv_correct.
   Qed.
 
 
-  Lemma preord_env_P_inj_resetlist P k f rho rho' rho'' xs ys vs :
-    getlist (map f xs) rho' = Some vs ->
+  Lemma preord_env_P_inj_reset_lists P k f rho rho' rho'' xs ys vs :
+    get_list (map f xs) rho' = Some vs ->
     Disjoint _ (image f P) (FromList ys) ->
-    setlist ys vs rho' = Some rho'' ->
+    set_lists ys vs rho' = Some rho'' ->
     NoDup ys ->
     length xs = length ys ->
     preord_env_P_inj P k f rho rho' ->
@@ -563,10 +563,10 @@ Section Alpha_conv_correct.
       destruct ys; try discriminate. inv Hset. eassumption.
     - simpl in *.
       destruct (M.get (f a) rho') eqn:Heqa; try discriminate.
-      destruct (getlist (map f xs) rho') eqn:Hgetl; try discriminate.
+      destruct (get_list (map f xs) rho') eqn:Hgetl; try discriminate.
       inv Hget.
       destruct ys; try discriminate. simpl in Hset.
-      destruct (setlist ys l rho') eqn:Hsetl; try discriminate.
+      destruct (set_lists ys l rho') eqn:Hsetl; try discriminate.
       rewrite FromList_cons in HD. inv Hset.
       assert (Hpre' : preord_env_P_inj P k (f <{ xs ~> ys }>) rho t).
       { eapply IHxs. reflexivity.
@@ -621,7 +621,7 @@ Section Alpha_conv_correct.
         edestruct Alpha_conv_fundefs_find_def
           as [xs2 [e2 [f'' [Hf' [Hlen' [Hinj''' Ha'' ] ] ] ] ] ]; [ apply Ha' | | | ]; eauto.
         now eapply construct_fundefs_injection_injective; eauto.
-        edestruct setlist_length2 as [rho2' Hs']; eauto.
+        edestruct set_lists_length2 as [rho2' Hs']; eauto.
         exists xs2. exists e2. exists rho2'. split; eauto.
         split; [ now eauto |]. intros Hleq Hpre'.
         eapply IHe; [| | eassumption |]. omega.
@@ -629,7 +629,7 @@ Section Alpha_conv_correct.
         now eapply construct_fundefs_injection_injective; eauto.
         apply find_def_correct in Hf; eauto.
         eapply preord_env_P_inj_antimon; [| eapply occurs_free_in_fun; eassumption ]. 
-        * eapply preord_env_P_inj_setlist;
+        * eapply preord_env_P_inj_set_lists;
           [ | eassumption | eassumption | now eauto | now eauto  ].
           eapply preord_env_P_inj_antimon.
           eapply IH'; eauto. intros. eapply IHe. omega. now eauto. now eauto.

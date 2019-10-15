@@ -22,7 +22,7 @@ Open Scope fun_scope.
 Section Lambda_lifting_corresp.
 
   (** Construct a function map similar to the one that is used in the relational spec from as [FunInfoMap]  *)
-  Definition fun_map (m : FunInfoMap) : var -> option (var * fTag * list var) :=
+  Definition fun_map (m : FunInfoMap) : var -> option (var * fun_tag * list var) :=
     fun f =>
       match M.get f m with
         | Some inf =>
@@ -33,7 +33,7 @@ Section Lambda_lifting_corresp.
       end.
 
   (** Useful equality to use the IH for [Ecase]  *)
-  Lemma st_eq_Ecase {S} (m1 : state S (list (cTag * exp))) (x : var) y :
+  Lemma st_eq_Ecase {S} (m1 : state S (list (ctor_tag * exp))) (x : var) y :
     st_eq
       (bind (bind m1 (fun ys => ret (y :: ys))) (fun ys' => ret (Ecase x ys')))
       (e <- (ys <- m1 ;;
@@ -402,8 +402,8 @@ Section Lambda_lifting_corresp.
   Qed.
   
   Lemma Add_functions_name_in_fundefs_Included (B : fundefs) (fvs : list var) (σ : var -> var)
-        (ζ : var -> option (var * fTag * list var)) (S : Ensemble var)
-        (σ' : var -> var) (ζ' : var -> option (var * fTag * list var))
+        (ζ : var -> option (var * fun_tag * list var)) (S : Ensemble var)
+        (σ' : var -> var) (ζ' : var -> option (var * fun_tag * list var))
         (S' : Ensemble var) :
     Add_functions B fvs σ ζ S σ' ζ' S' ->
     Included var (name_in_fundefs B) (domain ζ').

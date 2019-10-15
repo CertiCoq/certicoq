@@ -33,7 +33,7 @@ Section Beta.
   
   
   Variable St:Type.
-  Variable (pp_St : St -> nEnv -> string).
+  Variable (pp_St : St -> name_env -> string).
   Variable IH : InlineHeuristic St.
 
   
@@ -59,7 +59,7 @@ Section Beta.
           ret (Econstr x t ys' e')
         | Ecase v cl =>
           let v' := apply_r sig v in
-          cl' <- (fix beta_list (br: list (cTag*exp)) : freshM (list (cTag*exp)) :=
+          cl' <- (fix beta_list (br: list (ctor_tag*exp)) : freshM (list (ctor_tag*exp)) :=
                    match br with
                    | nil => ret ( nil)
                    | (t, e)::br' =>
@@ -188,7 +188,7 @@ Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
 Open Scope positive.
 
 
-Definition show_map {A} (m : M.t A) (nenv : nEnv) (str : A -> string) :=
+Definition show_map {A} (m : M.t A) (nenv : name_env) (str : A -> string) :=
   (let fix show_lst (lst : list (var * A)) :=
       match lst with
       | (x, a) :: lst =>
@@ -199,7 +199,7 @@ Definition show_map {A} (m : M.t A) (nenv : nEnv) (str : A -> string) :=
    "S{" ++ show_lst (M.elements m) ++ "}")%string.
 
 Definition show_map_bool m nenv := show_map m nenv (fun (b : bool) => if b then "true" else "false")%string. 
-Definition show_map_bogus {A} (m : A) (nenv : nEnv) := ""%string.
+Definition show_map_bogus {A} (m : A) (nenv : name_env) := ""%string.
 
 Fixpoint find_uncurried (fds : fundefs) (s:M.t bool) : M.t bool := 
   match fds with

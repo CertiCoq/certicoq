@@ -26,7 +26,7 @@ Module Invariants (H : Heap).
   (** Invariant about the free variables *) 
   Definition FV_inv (k j : nat) (IP : GIInv) (P : GInv) (b : Inj)
              (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
+             (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
     well_formed (reach' H2 (env_locs rho2 [set Γ])) H2 /\ (* True when the environment is created *)
     key_set rho1 <--> FV Scope Funs FVs /\ 
     exists (vs : list value) (l : loc),
@@ -62,7 +62,7 @@ Module Invariants (H : Heap).
   
   (** Invariant about the free variables *) 
   Definition FV_inv_weak (rho1 : env) (rho2 : env) (H2 : heap block)
-             (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
+             (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) : Prop :=
     exists (vs : list value) (l : loc),
       M.get Γ rho2 = Some (Loc l) /\
       get l H2 = Some (Constr c vs) /\
@@ -121,7 +121,7 @@ Module Invariants (H : Heap).
 
   Lemma FV_inv_cc_approx_clos  (k j : nat) (IP : GIInv) (P : GInv) (b : Inj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Γ : var) (FVs : list var) l1 l2 : 
+        (c : ctor_tag) (Γ : var) (FVs : list var) l1 l2 : 
     FV_inv k j IP P b rho1 H1 rho2 H2 c (Empty_set _) (Empty_set _) Γ FVs ->
     binding_in_map (FromList FVs) rho1 ->
 
@@ -154,7 +154,7 @@ Module Invariants (H : Heap).
   
   Lemma FV_inv_j_monotonic (k j' j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
+        (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
     FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     j' <= j ->
     FV_inv k j' GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs.
@@ -173,7 +173,7 @@ Module Invariants (H : Heap).
   
   Lemma FV_inv_monotonic (k k' j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
+        (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
     FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     k' <= k ->
     FV_inv k' j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs.
@@ -422,7 +422,7 @@ Module Invariants (H : Heap).
 
   Lemma FV_inv_set_not_in_FVs_l (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x v  :
+        (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x v  :
     FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     FV_inv k j GII GI b (M.set x v rho1) H1 rho2 H2 c (x |: Scope) Funs Γ FVs.
   Proof.
@@ -444,7 +444,7 @@ Module Invariants (H : Heap).
   
   Lemma FV_inv_set_not_in_FVs_r (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x v  :
+        (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x v  :
     FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     x <> Γ ->
     FV_inv k j GII GI b rho1 H1 (M.set x v rho2) H2 c Scope Funs Γ FVs.
@@ -458,7 +458,7 @@ Module Invariants (H : Heap).
   
   Lemma FV_inv_set_not_in_FVs (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
         (rho1 : env) (H1 : heap block) (rho2 : env) (H2 : heap block)
-        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x y v v'  :
+        (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) x y v v'  :
     FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     y <> Γ ->
     FV_inv k j GII GI b (M.set x v rho1) H1 (M.set y v' rho2) H2 c (x |: Scope) Funs Γ FVs.
@@ -471,7 +471,7 @@ Module Invariants (H : Heap).
   (** [FV_inv] is heap monotonic  *)
   Lemma FV_inv_heap_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
         (rho1 : env) (H1 H1' : heap block) (rho2 : env) (H2 H2' : heap block)
-        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
+        (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
     H1 ⊑ H1' ->
     H2 ⊑ H2' ->
     (forall j, FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ) ->
@@ -511,7 +511,7 @@ Module Invariants (H : Heap).
   (** [FV_inv] under rename extension  *)
   Lemma FV_inv_rename_ext (k j : nat) (GII : GIInv) (GI : GInv) (b b' : Inj)
         (rho1 : env) (H1 H2 : heap block) (rho2 : env) 
-        (c : cTag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
+        (c : ctor_tag) (Scope Funs : Ensemble var) (Γ : var) (FVs : list var) :
     FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
     f_eq_subdomain (reach' H1 (env_locs rho1 (FromList FVs \\ (Scope :|: Funs)))) b' b ->
     FV_inv k j GII GI b' rho1 H1 rho2 H2 c Scope Funs Γ FVs.
@@ -532,7 +532,7 @@ Module Invariants (H : Heap).
   (** [FV_inv] monotonic *)
   (* Lemma FV_inv_Scope_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) *)
   (*       (rho1 : env) (H1 H2 : heap block) (rho2 : env)  *)
-  (*       (c : cTag) (Scope Scope' Funs : Ensemble var) (Γ : var) (FVs : list var) : *)
+  (*       (c : ctor_tag) (Scope Scope' Funs : Ensemble var) (Γ : var) (FVs : list var) : *)
   (*   FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs -> *)
   (*   Scope \subset Scope' ->  *)
   (*   FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope' Funs Γ FVs. *)
@@ -545,7 +545,7 @@ Module Invariants (H : Heap).
 
   (* Lemma FV_inv_Funs_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) *)
   (*       (rho1 : env) (H1 H2 : heap block) (rho2 : env)  *)
-  (*       (c : cTag) (Scope Funs Funs' : Ensemble var) (Γ : var) (FVs : list var) : *)
+  (*       (c : ctor_tag) (Scope Funs Funs' : Ensemble var) (Γ : var) (FVs : list var) : *)
   (*   FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs -> *)
   (*   Funs \subset Funs' ->  *)
   (*   FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs' Γ FVs. *)
@@ -558,7 +558,7 @@ Module Invariants (H : Heap).
 
   (* Lemma FV_inv_mon (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj) *)
   (*       (rho1 : env) (H1 H2 : heap block) (rho2 : env)  *)
-  (*       (c : cTag) (Scope Scope' Funs Funs' : Ensemble var) (Γ : var) (FVs : list var) : *)
+  (*       (c : ctor_tag) (Scope Scope' Funs Funs' : Ensemble var) (Γ : var) (FVs : list var) : *)
   (*   FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs -> *)
   (*   Scope :|: Funs \subset Scope' :|: Funs' ->  *)
   (*   FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope' Funs' Γ FVs. *)
@@ -572,7 +572,7 @@ Module Invariants (H : Heap).
 
   Lemma FV_inv_FV_eq (k j : nat) (GII : GIInv) (GI : GInv) (b : Inj)
         (rho1 : env) (H1 H2 : heap block) (rho2 : env)
-        (c : cTag) (Scope Scope' Funs Funs' : Ensemble var)
+        (c : ctor_tag) (Scope Scope' Funs Funs' : Ensemble var)
         {_ : ToMSet Scope} {_ : ToMSet Scope'}
         (Γ : var) FVs :
     FV_inv k j GII GI b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
@@ -749,7 +749,7 @@ Module Invariants (H : Heap).
     key_set rho1 <--> FromList FVs ->
     M.get Γ rho2 = Some (Loc lenv) ->
     get lenv H2 = Some (Constr c vs2) ->
-    getlist FVs rho1 = Some vs1 ->
+    get_list FVs rho1 = Some vs1 ->
     (forall j,  Forall2
              (fun v1 v2 : value =>
                 Res (v1, H1) ≺ ^ (k; j; PG; QG; b) Res (v2, H2)) vs1 vs2) ->
@@ -775,10 +775,10 @@ Module Invariants (H : Heap).
       + destruct FVs as [| x FVs ]; try inv Hgl.
         now constructor.
         destruct (M.get x rho1) eqn:Hgetx; try congruence.
-        destruct (getlist FVs rho1) eqn:Hgetlst; try congruence. 
+        destruct (get_list FVs rho1) eqn:Hgetlst; try congruence. 
       + destruct FVs as [| z FVs ]; try inv Hgl.
         destruct (M.get z rho1) eqn:Hgetx; try congruence.
-        destruct (getlist FVs rho1) eqn:Hgetlst; try congruence. 
+        destruct (get_list FVs rho1) eqn:Hgetlst; try congruence. 
         inv H3. constructor; eauto.
   Qed.
 
@@ -1553,10 +1553,10 @@ Module Invariants (H : Heap).
       reflexivity. reflexivity. eauto.
   Qed.
 
-  Lemma setlist_FV_inv Scope {Hc : ToMSet Scope} Funs FVs Γ k j GIP GP b c rho1 H1 rho1' rho2 H2
+  Lemma set_lists_FV_inv Scope {Hc : ToMSet Scope} Funs FVs Γ k j GIP GP b c rho1 H1 rho1' rho2 H2
         xs vs :
     FV_inv k j GIP GP b rho1 H1 rho2 H2 c Scope Funs Γ FVs ->
-    setlist xs vs rho1 = Some rho1' ->
+    set_lists xs vs rho1 = Some rho1' ->
     FV_inv k j GIP GP b rho1' H1 rho2 H2 c (FromList xs :|: Scope) Funs Γ FVs.
   Proof with (now eauto with Ensembles_DB).
     revert vs H1 rho1 rho1' j.
@@ -1568,7 +1568,7 @@ Module Invariants (H : Heap).
       eapply Proper_FV_inv_Scope. normalize_sets. rewrite <- Union_assoc. reflexivity.
       reflexivity. reflexivity. reflexivity.
       destruct vs; try congruence. 
-      destruct (setlist xs vs rho1) as [rho1''| ] eqn:Hset; try congruence.
+      destruct (set_lists xs vs rho1) as [rho1''| ] eqn:Hset; try congruence.
       inv Hdef. 
       eapply FV_inv_set_not_in_FVs_l.
       eapply IHxs. eassumption. eassumption.
@@ -1705,7 +1705,7 @@ Module Invariants (H : Heap).
     project_vars Size.Util.clo_tag Scope Funs fenv c Γ FVs xs C Scope' Funs'  ->
     Fun_inv_weak rho1 rho2 Scope Funs fenv ->
     FV_inv_weak rho1 rho2 H2 c Scope Funs Γ FVs ->
-    getlist xs rho1 = Some vs1 ->
+    get_list xs rho1 = Some vs1 ->
     exists H2' rho2' s, ctx_to_heap_env_CC C H2 rho2 H2' rho2' s.
   Proof.
     revert Scope Hs Scope' Funs Γ FVs C vs1
@@ -1716,7 +1716,7 @@ Module Invariants (H : Heap).
     - inv Hvars. repeat eexists; econstructor; eauto.
     - inv Hvars. simpl in Hget.
       destruct (M.get a rho1) eqn:Hgeta1; try discriminate.
-      destruct (getlist xs rho1) eqn:Hgetlist1; try discriminate. 
+      destruct (get_list xs rho1) eqn:Hget_list1; try discriminate. 
       edestruct project_var_ctx_to_heap_env with (rho1 := rho1)
         as [H2' [rho2' [s Hctx1]]]; eauto.
       inv Hget.
@@ -1978,11 +1978,11 @@ Module Invariants (H : Heap).
         
   Qed.
 
-    Lemma Fun_inv_setlist_l k j GI GP b rho1 rho1' H1 rho2 H2 Scope Funs fenv FVs xs vs :
+    Lemma Fun_inv_set_lists_l k j GI GP b rho1 rho1' H1 rho2 H2 Scope Funs fenv FVs xs vs :
     Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs ->
     Disjoint _ (FromList xs) (Funs \\ Scope) ->
     Disjoint _ (reach' H1 (Union_list (map val_loc vs))) (env_locs rho1 (Funs \\ Scope)) ->
-    setlist xs vs rho1 = Some rho1' ->
+    set_lists xs vs rho1 = Some rho1' ->
     Fun_inv k j GI GP b rho1' H1 rho2 H2 Scope Funs fenv FVs.
   Proof.
     intros Hfun Hnin1 Hnin2 Hset x Hnin Hin.
@@ -1992,24 +1992,24 @@ Module Invariants (H : Heap).
     destruct Henv as [Hbeq Henv]. subst.
     
     do 7 eexists. repeat split; try eassumption.
-    erewrite <- setlist_not_In; eauto.
+    erewrite <- set_lists_not_In; eauto.
     intros Hc. eapply Hnin1. constructor; eauto. now constructor; eauto.
     rewrite reach'_Union in *. intros Hc. eapply Hsub.
     inv Hc; [| now right ].
     eapply reach'_set_monotonic in H;
       [| eapply env_locs_monotonic; eapply Included_Union_preserv_l; reflexivity ].
-    eapply reach'_set_monotonic in H; [| eapply env_locs_setlist_Included; eassumption ]. 
+    eapply reach'_set_monotonic in H; [| eapply env_locs_set_lists_Included; eassumption ]. 
     rewrite reach'_Union in H. inv H. now left.
     exfalso. eapply Hnin2. constructor; eauto.
     eexists; split; eauto. now constructor; eauto.
     rewrite Hget1. reflexivity. 
   Qed.
 
-  Lemma Fun_inv_setlist_r k j GI GP b rho1 H1 rho2 rho2' H2 Scope Funs fenv FVs xs vs :
+  Lemma Fun_inv_set_lists_r k j GI GP b rho1 H1 rho2 rho2' H2 Scope Funs fenv FVs xs vs :
     Fun_inv k j GI GP b rho1 H1 rho2 H2 Scope Funs fenv FVs ->
     Disjoint _ (FromList xs) (Funs \\ Scope) ->
     Disjoint _ (FromList xs) (image fenv (Funs \\ Scope)) ->
-    setlist xs vs rho2 = Some rho2' ->
+    set_lists xs vs rho2 = Some rho2' ->
     Fun_inv k j GI GP b rho1 H1 rho2' H2 Scope Funs fenv FVs.
   Proof.
     intros Hfun Hnin1 Hnin2 Hset x Hnin Hin.
@@ -2019,18 +2019,18 @@ Module Invariants (H : Heap).
     destruct Henv as [Hbeq Henv]. subst.
     
     do 7 eexists. repeat split; try eassumption.
-    erewrite <- setlist_not_In; eauto.
+    erewrite <- set_lists_not_In; eauto.
     intros Hc. eapply Hnin1. constructor; eauto. now constructor; eauto.
-    erewrite <- setlist_not_In; eauto.    
+    erewrite <- set_lists_not_In; eauto.    
     intros Hc. eapply Hnin2. constructor; eauto.
     eexists; split; eauto. now constructor; eauto.
   Qed.
 
-  Lemma Fun_inv_suffle_setlist k j GI GP b rho1 H1 rho2 rho2' rho2'' H2 Scope Funs fenv FVs
+  Lemma Fun_inv_suffle_set_lists k j GI GP b rho1 H1 rho2 rho2' rho2'' H2 Scope Funs fenv FVs
         x v xs vs:
     Fun_inv k j GI GP b rho1 H1 (M.set x v rho2') H2 Scope Funs fenv FVs ->
-    setlist xs vs rho2 = Some rho2' ->
-    setlist xs vs (M.set x v rho2) = Some rho2'' ->
+    set_lists xs vs rho2 = Some rho2' ->
+    set_lists xs vs (M.set x v rho2) = Some rho2'' ->
     ~ x \in FromList xs ->
     Fun_inv k j GI GP b rho1 H1 rho2'' H2 Scope Funs fenv FVs.
   Proof. 
@@ -2043,16 +2043,16 @@ Module Invariants (H : Heap).
     do 7 eexists. repeat split; try eassumption.
     - destruct (var_dec x y); subst.
       + rewrite M.gss in *.  inv Hget2.
-        erewrite <- setlist_not_In; eauto.
+        erewrite <- set_lists_not_In; eauto.
         rewrite M.gss. reflexivity.
-      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+      + edestruct (set_set_lists_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
         eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
         rewrite <- Heqr. eassumption.
     - destruct (var_dec x (fenv y)); subst.
       + rewrite M.gss in *. inv Hget4.
-        erewrite <- setlist_not_In; eauto.
+        erewrite <- set_lists_not_In; eauto.
         rewrite M.gss. reflexivity.
-      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+      + edestruct (set_set_lists_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
         eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
         rewrite <- Heqr. eassumption.
   Qed.
@@ -2096,11 +2096,11 @@ Module Invariants (H : Heap).
           rewrite M.gso; eassumption.
   Qed.
 
-  Lemma Fun_inv_suffle_setlist_l k j GI GP b rho1 H1 rho2 rho2' rho2'' H2 Scope Funs fenv FVs
+  Lemma Fun_inv_suffle_set_lists_l k j GI GP b rho1 H1 rho2 rho2' rho2'' H2 Scope Funs fenv FVs
         x v xs vs:
     Fun_inv k j GI GP b rho1 H1 rho2'' H2 Scope Funs fenv FVs ->
-    setlist xs vs rho2 = Some rho2' ->
-    setlist xs vs (M.set x v rho2) = Some rho2'' ->
+    set_lists xs vs rho2 = Some rho2' ->
+    set_lists xs vs (M.set x v rho2) = Some rho2'' ->
     ~ x \in FromList xs ->
             Fun_inv k j GI GP b rho1 H1 (M.set x v rho2') H2 Scope Funs fenv FVs.
   Proof. 
@@ -2113,16 +2113,16 @@ Module Invariants (H : Heap).
     do 7 eexists. repeat split; try eassumption.
     - destruct (var_dec x y); subst.
       + rewrite M.gss in *.  inv Hget2.
-        erewrite <- setlist_not_In; eauto.
+        erewrite <- set_lists_not_In; eauto.
         rewrite M.gss. reflexivity.
-      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+      + edestruct (set_set_lists_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
         eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
         rewrite Heqr. eassumption.
     - destruct (var_dec x (fenv y)); subst.
       + rewrite M.gss in *. inv Hget4.
-        erewrite <- setlist_not_In; eauto.
+        erewrite <- set_lists_not_In; eauto.
         rewrite M.gss. reflexivity.
-      + edestruct (set_setlist_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
+      + edestruct (set_set_lists_permut rho2 rho2') as [rho2''' [Hset3 Heqr]].
         eassumption. eassumption. rewrite Hset2 in Hset3. inv Hset3.
         rewrite Heqr. eassumption.
   Qed.

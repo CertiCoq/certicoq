@@ -18,29 +18,29 @@ Open Scope string.
    and debugging utils *)
 
 Section CompM.
-  Context {S : Type}. (* Transformation-specific state *) 
-  
+  Context {S : Type}. (* Transformation-specific state *)
+
   Record comp_data : Type :=  mkCompData { next_var : var;
-                                           nect_cTag : cTag;
-                                           next_iTag : iTag;
-                                           next_fTag : fTag;
-                                           cenv : cEnv;
-                                           fenv : fEnv; (* Maps fTag's to (number of args,  list (arg no)) *)
-                                           name_env : nEnv;
+                                           nect_ctor_tag : ctor_tag;
+                                           next_ind_tag : ind_tag;
+                                           next_fun_tag : fun_tag;
+                                           cenv : ctor_env;
+                                           fenv : fun_env; (* Maps fun_tag's to (number of args,  list (arg no)) *)
+                                           nenv : name_env;
                                            log : list string }.
 
   Definition compM := state (comp_data * S).
 
   (* Get the environment name *)
-  Definition get_name_env (_ : unit) : compM nEnv :=
+  Definition get_name_env (_ : unit) : compM name_env :=
     s <- get ;;
-    ret (name_env (fst s)).
+    ret (nenv (fst s)).
 
   (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var *)
   Definition get_name (old_var : var) (suff : string) : compM var :=
     p <- get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in  
-    let names' := add_entry names n old_var suff in  
+    let '(mkCompData n c i f e fenv names log, st) := p in
+    let names' := add_entry names n old_var suff in
     put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
         ret n.
 
@@ -62,20 +62,30 @@ Section CompM.
     ret n.
 
   (* Get the next fresh record tag of a fresh type *)
-  Definition make_record_cTag (n : N) : compM cTag :=
-    p <- get ;; 
+  Definition make_record_ctor_tag (n : N) : compM ctor_tag :=
+    p <- get ;;
     let '(mkCompData x c i f e fenv names log, st) := p  in
-    let inf := (nAnon, nAnon,  i, n, 0%N) : cTyInfo in
-    let e' := ((M.set c inf e) : cEnv) in
+    let inf := {| ctor_name := nAnon
+                ; ctor_ind_name := nAnon
+                ; ctor_ind_tag := i
+                ; ctor_arity := n
+                ; ctor_ordinal := 0%N
+                |} : ctor_ty_info in
+    let e' := ((M.set c inf e) : ctor_env) in
     put (mkCompData x (c+1)%positive (i+1)%positive f e' fenv names log, st) ;;
     ret c.
 
   (* Register a constructor tag of some type i *)
-  Definition register_record_cTag (c : cTag) (i : iTag) (n : N) : compM unit :=
-    p <- get ;; 
+  Definition register_record_ctor_tag (c : ctor_tag) (i : ind_tag) (n : N) : compM unit :=
+    p <- get ;;
     let '(mkCompData x c i f e fenv names log, st) := p  in
-    let inf := (nAnon, nAnon,  i, n, 0%N) : cTyInfo in
-    let e' := ((M.set c inf e) : cEnv) in
+    let inf := {| ctor_name := nAnon
+                ; ctor_ind_name := nAnon
+                ; ctor_ind_tag := i
+                ; ctor_arity := n
+                ; ctor_ordinal := 0%N
+                |} : ctor_ty_info in
+    let e' := ((M.set c inf e) : ctor_env) in
     put (mkCompData x c i f e' fenv names log, st).
 
   (* Get the pretty name of a binder *)
@@ -87,7 +97,7 @@ Section CompM.
   Fixpoint get_pp_names_list (xs : list var) : compM (list string) :=
     match xs with
     | [] => ret []
-    | x :: xs => 
+    | x :: xs =>
       x' <- get_pp_name x ;;
       xs' <- get_pp_names_list xs ;;
       ret (x' :: xs')
@@ -115,14 +125,14 @@ Section CompM.
     s <- get ;;
     put (fst s, st).
 
-  (** Get a fresh function tag and register it in fEnv *)
-  Definition get_ftag (arity : N) : compM fTag :=
+  (** Get a fresh function tag and register it in fun_env *)
+  Definition get_ftag (arity : N) : compM fun_tag :=
     p <- get ;;
     let '(mkCompData x c i f e fenv names log, st) := p in
     put (mkCompData x c i (f + 1)%positive e (M.set f (arity, (fromN (0%N) (BinNat.N.to_nat arity))) fenv) names log, st) ;;
     ret f.
 
-  
+
   Definition run_compM {A} (m: compM A) (st : comp_data) (s : S) : A * (comp_data * S) :=
     let '(a, st) := runState m (st, s) in
     (a, st).
@@ -130,6 +140,6 @@ Section CompM.
   Definition pack_data := mkCompData.
 
   (* Returns the name environment and the log *)
-  Definition get_result (d : comp_data) : nEnv * string := (name_env d, log_to_string (log d)).  
+  Definition get_result (d : comp_data) : name_env * string := (nenv d, log_to_string (log d)).
 
 End CompM.

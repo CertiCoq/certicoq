@@ -11,28 +11,28 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations MonadNotation.
 
 Section list_lemmas.
-  Lemma setlist_length : forall {A} (l : list M.elt) (l1 : list A) (rho rho1 : M.t A),
-    Some rho1 = setlist l l1 rho -> length l = length l1.
+  Lemma set_lists_length : forall {A} (l : list M.elt) (l1 : list A) (rho rho1 : M.t A),
+    Some rho1 = set_lists l l1 rho -> length l = length l1.
   Proof.
     induction l; intros.
     - (* [] *) destruct l1; [easy|now simpl in H].
     - (* :: *) destruct l1; [now simpl in H|].
       simpl. apply f_equal.
-      remember (setlist l l1 rho).
+      remember (set_lists l l1 rho).
       destruct o.
       + eapply IHl. simpl in H. eapply Heqo.
       + simpl in H. now rewrite <- Heqo in H.
   Qed.
 
-  Lemma exists_setlist_iff_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
-    (exists rho1, Some rho1 = setlist l l1 rho) <-> length l = length l1.
+  Lemma exists_set_lists_iff_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
+    (exists rho1, Some rho1 = set_lists l l1 rho) <-> length l = length l1.
   Proof.
     induction l; split; intros.
     - (* [] -> *) destruct H. destruct l1; [easy|now simpl in H].
     - (* [] <- *) destruct l1; [now exists rho|easy].
     - (* :: -> *) destruct H. destruct l1; [now simpl in H|].
       simpl. apply f_equal.
-      simpl in H. remember (setlist l l1 rho).
+      simpl in H. remember (set_lists l l1 rho).
       destruct o; [|congruence].
       rewrite <- IHl with (rho := rho). now exists t. 
     - (* :: <- *) destruct l1; [easy|]. simpl in H. apply Nat.succ_inj in H.
@@ -40,60 +40,60 @@ Section list_lemmas.
       simpl. rewrite <- H. now exists (M.set a a0 x).
   Qed.
 
-  Corollary exists_setlist_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
-    (exists rho1, Some rho1 = setlist l l1 rho) -> length l = length l1.
-  Proof. intros; now rewrite <- exists_setlist_iff_length with (rho0 := rho). Qed.
+  Corollary exists_set_lists_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
+    (exists rho1, Some rho1 = set_lists l l1 rho) -> length l = length l1.
+  Proof. intros; now rewrite <- exists_set_lists_iff_length with (rho0 := rho). Qed.
 
-  Corollary length_exists_setlist : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
-     length l = length l1 -> (exists rho1, Some rho1 = setlist l l1 rho).
-  Proof. intros; now rewrite exists_setlist_iff_length with (rho0 := rho). Qed.
+  Corollary length_exists_set_lists : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
+     length l = length l1 -> (exists rho1, Some rho1 = set_lists l l1 rho).
+  Proof. intros; now rewrite exists_set_lists_iff_length with (rho0 := rho). Qed.
 
-  (* nesting setlists (TODO: move to cps.v?) *)
-  Lemma setlist_setlist : forall {A} (l l1 : list M.elt) (v v1 : list A) (rho rho1 rho2 : M.t A),
-    Some rho1 = setlist l v rho ->
-    Some rho2 = setlist l1 v1 rho1 ->
-    Some rho2 = setlist (l1 ++ l) (v1 ++ v) rho.
+  (* nesting set_listss (TODO: move to cps.v?) *)
+  Lemma set_lists_set_lists : forall {A} (l l1 : list M.elt) (v v1 : list A) (rho rho1 rho2 : M.t A),
+    Some rho1 = set_lists l v rho ->
+    Some rho2 = set_lists l1 v1 rho1 ->
+    Some rho2 = set_lists (l1 ++ l) (v1 ++ v) rho.
   Proof.
     induction l1.
     - (* [] *)
-      intros. assert (v1 = []) by (apply setlist_length in H0; now destruct v1). subst.
+      intros. assert (v1 = []) by (apply set_lists_length in H0; now destruct v1). subst.
       inversion H0. now subst.
     - (* :: *)
-      intros. destruct v1; [apply setlist_length in H0; inversion H0|].
-      simpl in *. remember (setlist l1 v1 rho1). destruct o; [|congruence].
+      intros. destruct v1; [apply set_lists_length in H0; inversion H0|].
+      simpl in *. remember (set_lists l1 v1 rho1). destruct o; [|congruence].
       now rewrite <- (IHl1 _ _ _ _ _ H Heqo).
   Qed.
 
-  (* expose an M.set from a successful setlist *)
-  Lemma set_setlist : forall {A} h h1 (t : list M.elt) (t1 : list A) (rho rho2 : M.t A),
-    Some rho2 = setlist (h :: t) (h1 :: t1) rho -> exists rho1,
-    rho2 = M.set h h1 rho1 /\ Some rho1 = setlist t t1 rho.
+  (* expose an M.set from a successful set_lists *)
+  Lemma set_set_lists : forall {A} h h1 (t : list M.elt) (t1 : list A) (rho rho2 : M.t A),
+    Some rho2 = set_lists (h :: t) (h1 :: t1) rho -> exists rho1,
+    rho2 = M.set h h1 rho1 /\ Some rho1 = set_lists t t1 rho.
   Proof.
-    simpl. intros. remember (setlist t t1 rho). destruct o; [|congruence].
+    simpl. intros. remember (set_lists t t1 rho). destruct o; [|congruence].
     inversion H. inversion H. subst. eauto.
   Qed.
 
-  Lemma setlist_set : forall {A} a b (l : list M.elt) (v : list A) (rho : M.t A),
-    setlist l v (M.set a b rho) = setlist (l ++ [a]) (v ++ [b]) rho.
+  Lemma set_lists_set : forall {A} a b (l : list M.elt) (v : list A) (rho : M.t A),
+    set_lists l v (M.set a b rho) = set_lists (l ++ [a]) (v ++ [b]) rho.
   Proof.
     induction l; intros.
     - (* [] *) destruct v; [easy|destruct v; easy].
     - (* :: *) destruct v. simpl.
-      assert (setlist (l ++ [a]) [] rho = None) by (now destruct l). now rewrite H.
+      assert (set_lists (l ++ [a]) [] rho = None) by (now destruct l). now rewrite H.
       simpl in *.
-      remember (setlist l v (M.set a b rho)).
-      remember (setlist (l ++ [a]) (v ++ [b]) rho).
+      remember (set_lists l v (M.set a b rho)).
+      remember (set_lists (l ++ [a]) (v ++ [b]) rho).
       destruct o, o0; [| | |auto].
       + rewrite <- IHl in Heqo0. rewrite <- Heqo in Heqo0. inversion Heqo0; now subst.
-      + apply setlist_length in Heqo.
+      + apply set_lists_length in Heqo.
         assert (length (l ++ [a]) = length (v ++ [b]))
           by (repeat rewrite app_length; now rewrite Heqo).
-        apply length_exists_setlist with (rho0 := rho) in H. destruct H. congruence.
+        apply length_exists_set_lists with (rho0 := rho) in H. destruct H. congruence.
       + assert (length l = length v). {
-          apply setlist_length in Heqo0. 
+          apply set_lists_length in Heqo0. 
           repeat rewrite app_length in Heqo0. simpl in Heqo0. omega.
         }
-        apply length_exists_setlist with (rho0 := (M.set a b rho)) in H. destruct H. congruence.
+        apply length_exists_set_lists with (rho0 := (M.set a b rho)) in H. destruct H. congruence.
   Qed.
 
   Lemma list_length_cons : forall {A} {B} h (l : list A) (t : list B),
@@ -112,38 +112,38 @@ Section list_lemmas.
         exists (a :: a1), b1. simpl. now apply f_equal.
   Qed.
 
-  Lemma setlist_fresh : forall {A} v1 v v2 w1 w w2 (rho rho1 : M.t A),
+  Lemma set_lists_fresh : forall {A} v1 v v2 w1 w w2 (rho rho1 : M.t A),
     length v1 = length w1 ->
     ~ List.In v v1 ->
-    Some rho1 = setlist (v1 ++ [v] ++ v2) (w1 ++ [w] ++ w2) rho ->
+    Some rho1 = set_lists (v1 ++ [v] ++ v2) (w1 ++ [w] ++ w2) rho ->
     M.get v rho1 = Some w.
   Proof.
     induction v1.
     - intros. assert (w1 = []) by (destruct w1; easy; inversion H). subst.
-      simpl in H1. remember (setlist v2 w2 rho).
+      simpl in H1. remember (set_lists v2 w2 rho).
       destruct o; [|congruence]. inversion H1. now rewrite M.gss.
     - intros. symmetry in H.
       destruct (list_length_cons _ _ _ H) as [w1h [w1t Hw1]]. subst.
       inversion H.
-      simpl in H1. remember (setlist (v1 ++ v :: v2) (w1t ++ w :: w2) rho).
+      simpl in H1. remember (set_lists (v1 ++ v :: v2) (w1t ++ w :: w2) rho).
       destruct o; [|congruence]. inversion H1; subst.
       rewrite not_in_cons in H0. destruct H0.
       rewrite M.gso; [|assumption].
       eapply IHv1; [symmetry; eassumption|assumption|simpl; eassumption].
   Qed.
 
-  Lemma getlist_setlist_app : forall {A} v v1 w w1 (rho rho1 : M.t A),
+  Lemma get_list_set_lists_app : forall {A} v v1 w w1 (rho rho1 : M.t A),
     length v = length w ->
     NoDup v ->
-    Some rho1 = setlist (v ++ v1) (w ++ w1) rho ->
-    getlist v rho1 = Some w.
+    Some rho1 = set_lists (v ++ v1) (w ++ w1) rho ->
+    get_list v rho1 = Some w.
   Proof.
     induction v; intros.
     - assert (w = []) by (destruct w; easy; inversion H). now subst.
     - inversion H0; subst. destruct w; [inversion H|].
-      simpl in H1. remember (setlist (v ++ v1) (w ++ w1) rho).
+      simpl in H1. remember (set_lists (v ++ v1) (w ++ w1) rho).
       destruct o; [|congruence]. inversion H1; subst.
-      simpl. rewrite getlist_set_neq; [|assumption].
+      simpl. rewrite get_list_set_neq; [|assumption].
       erewrite IHv; [now rewrite M.gss|now inversion H|assumption|eassumption].
   Qed.
 
@@ -157,21 +157,21 @@ Section list_lemmas.
     constructor; [|right]; assumption.
   Qed.
 
-  Lemma getlist_setlist_disjoint_app : forall {A} u v w v1 w1 (rho rho1 : M.t A),
+  Lemma get_list_set_lists_disjoint_app : forall {A} u v w v1 w1 (rho rho1 : M.t A),
     Disjoint _ (FromList u) (FromList v) ->
     length v = length w ->
-    Some rho1 = setlist (v ++ v1) (w ++ w1) rho ->
-    exists rho2, Some rho2 = setlist v1 w1 rho /\ getlist u rho1 = getlist u rho2.
+    Some rho1 = set_lists (v ++ v1) (w ++ w1) rho ->
+    exists rho2, Some rho2 = set_lists v1 w1 rho /\ get_list u rho1 = get_list u rho2.
   Proof.
     induction v; intros.
     - assert (w = []) by (destruct w; easy; inversion H). subst. now exists rho1.
     - destruct w; inversion H0.
-      simpl in H1. remember (setlist (v ++ v1) (w ++ w1) rho).
+      simpl in H1. remember (set_lists (v ++ v1) (w ++ w1) rho).
       destruct o; [inversion H1; subst|congruence].
-      replace (getlist u (M.set a a0 t)) with (getlist u t).
+      replace (get_list u (M.set a a0 t)) with (get_list u t).
       eapply IHv; [|eassumption|assumption].
       eapply Disjoint_FromList_cons_right. eassumption.
-      symmetry. apply getlist_set_neq.
+      symmetry. apply get_list_set_neq.
       intros contra. inversion H. contradiction (H2 a).
       split; [assumption|now left].
   Qed.
@@ -1228,19 +1228,19 @@ Section uncurry_correct.
   Lemma uncurry_step_mutual_ind : 
   forall (P : exp -> Ensemble var -> localMap -> exp -> Ensemble var -> localMap -> Prop)
     (P0 : fundefs -> Ensemble var -> localMap -> fundefs -> Ensemble var -> localMap -> Prop),
-  (forall (x : var) (c : cTag) (args : list var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
+  (forall (x : var) (c : ctor_tag) (args : list var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 ->
    P e s m e1 s1 m1 -> P (Econstr x c args e) s m (Econstr x c args e1) s1 m1) ->
-  (forall (x : var) (arms : list (cTag * exp)) (c : cTag) (e e1 : exp) (s s1 : Ensemble var)
+  (forall (x : var) (arms : list (ctor_tag * exp)) (c : ctor_tag) (e e1 : exp) (s s1 : Ensemble var)
      (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 ->
    P e s m e1 s1 m1 -> P (Ecase x ((c, e) :: arms)) s m (Ecase x ((c, e1) :: arms)) s1 m1) ->
-  (forall (x : var) (arms arms1 : list (cTag * exp)) (arm : cTag * exp) (s s1 : Ensemble var)
+  (forall (x : var) (arms arms1 : list (ctor_tag * exp)) (arm : ctor_tag * exp) (s s1 : Ensemble var)
      (m m1 : localMap),
    uncurry_step (Ecase x arms) s m (Ecase x arms1) s1 m1 ->
    P (Ecase x arms) s m (Ecase x arms1) s1 m1 ->
    P (Ecase x (arm :: arms)) s m (Ecase x (arm :: arms1)) s1 m1) ->
-  (forall (x : var) (c : cTag) (n : N) (y : var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
+  (forall (x : var) (c : ctor_tag) (n : N) (y : var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 -> P e s m e1 s1 m1 -> P (Eproj x c n y e) s m (Eproj x c n y e1) s1 m1) ->
   (forall (x : var) (p : prim) (args : list var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 ->
@@ -1250,23 +1250,23 @@ Section uncurry_correct.
   (forall (fds fds1 : fundefs) (e : exp) (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_fundefs_step fds s m fds1 s1 m1 ->
    P0 fds s m fds1 s1 m1 -> P (Efun fds e) s m (Efun fds1 e) s1 m1) ->
-  (forall (f6 : var) (t : fTag) (args : list var) (e : exp) (fds fds1 : fundefs) 
+  (forall (f6 : var) (t : fun_tag) (args : list var) (e : exp) (fds fds1 : fundefs) 
      (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_fundefs_step fds s m fds1 s1 m1 ->
    P0 fds s m fds1 s1 m1 -> P0 (Fcons f6 t args e fds) s m (Fcons f6 t args e fds1) s1 m1) ->
-  (forall (f7 : var) (t : fTag) (args : list var) (e e1 : exp) (fds : fundefs) 
+  (forall (f7 : var) (t : fun_tag) (args : list var) (e e1 : exp) (fds : fundefs) 
      (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 ->
    P e s m e1 s1 m1 -> P0 (Fcons f7 t args e fds) s m (Fcons f7 t args e1 fds) s1 m1) ->
-  (forall (e e1 : exp) (f8 : var) (ft : fTag) (k : var) (kt : fTag) (fv : list var) 
-     (g : var) (gt : fTag) (gv : list var) (fds : fundefs) (s s1 : Ensemble var) 
+  (forall (e e1 : exp) (f8 : var) (ft : fun_tag) (k : var) (kt : fun_tag) (fv : list var) 
+     (g : var) (gt : fun_tag) (gv : list var) (fds : fundefs) (s s1 : Ensemble var) 
      (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 ->
    P e s m e1 s1 m1 ->
    P0 (Fcons f8 ft (k :: fv) (Efun (Fcons g gt gv e Fnil) (Eapp k kt [g])) fds) s m
      (Fcons f8 ft (k :: fv) (Efun (Fcons g gt gv e1 Fnil) (Eapp k kt [g])) fds) s1 m1) ->
-  (forall (f9 f10 : var) (ft ft1 : fTag) (k : var) (kt : fTag) (fv fv1 : list var) 
-     (g : positive) (gt : fTag) (gv gv1 : list var) (ge : exp) (fds : fundefs) 
+  (forall (f9 f10 : var) (ft ft1 : fun_tag) (k : var) (kt : fun_tag) (fv fv1 : list var) 
+     (g : positive) (gt : fun_tag) (gv gv1 : list var) (ge : exp) (fds : fundefs) 
      (s : Ensemble var) (m : M.t bool) (s' : Ensemble var),
    match M.get g m with
    | Some true => true
@@ -1318,9 +1318,9 @@ Section uncurry_correct.
     preord_val pr cenv k (Vfun rho fds f) (Vfun rho1 fds f).
   Proof.
     intros. rewrite preord_val_eq. simpl. intros.
-    pose (Hlen := H2). apply setlist_length in Hlen. rewrite <- Hlen in H0.
+    pose (Hlen := H2). apply set_lists_length in Hlen. rewrite <- Hlen in H0.
     rename rho1' into rho'.
-    eapply length_exists_setlist in H0. destruct H0 as [rho1' Hrho1'].
+    eapply length_exists_set_lists in H0. destruct H0 as [rho1' Hrho1'].
     do 3 eexists. split; [eassumption|split]; [eassumption|].
 
     intros Hj Hvs. apply preord_exp_refl.
@@ -1334,7 +1334,7 @@ Section uncurry_correct.
       auto with Ensembles_DB.
     }
     clear H.
-    eapply preord_env_P_setlist_l; [eassumption| |eassumption|eauto|eauto].
+    eapply preord_env_P_set_lists_l; [eassumption| |eassumption|eauto|eauto].
 
     apply find_def_correct in H1.
     assert (occurs_free e1 \\ FromList xs1 \subset occurs_free_fundefs fds :|: name_in_fundefs fds). {
@@ -1376,24 +1376,24 @@ Section uncurry_correct.
     preord_env_P pr cenv (occurs_free e) k rho rho1 ->
     preord_exp pr cenv k (e, rho) (e1, rho1).
 
-  Lemma preord_env_P_setlist_extend: forall pr cenv k vs vs1 vs2 P rho1 rho2 rho1' rho2',
+  Lemma preord_env_P_set_lists_extend: forall pr cenv k vs vs1 vs2 P rho1 rho2 rho1' rho2',
     preord_env_P pr cenv (P \\ FromList vs) k rho1 rho2 ->
-    Some rho1' = setlist vs vs1 rho1 ->
-    Some rho2' = setlist vs vs2 rho2 ->
+    Some rho1' = set_lists vs vs1 rho1 ->
+    Some rho2' = set_lists vs vs2 rho2 ->
     Forall2 (preord_val pr cenv k) vs1 vs2 ->
     preord_env_P pr cenv P k rho1' rho2'.
   Proof.
     induction vs; intros vs1 vs2 P rho1 rho2 rho1' rho2' Hrho Hrho1' Hrho2' Hvs1_vs2.
-    - destruct vs1; [|apply setlist_length in Hrho1'; discriminate].
-      destruct vs2; [|apply setlist_length in Hrho2'; discriminate].
+    - destruct vs1; [|apply set_lists_length in Hrho1'; discriminate].
+      destruct vs2; [|apply set_lists_length in Hrho2'; discriminate].
       inv Hrho1'; inv Hrho2'.
       eapply preord_env_P_antimon; [apply Hrho|].
       intros a Ha; split; [apply Ha|inversion 1].
-    - destruct vs1; [apply setlist_length in Hrho1'; discriminate|].
-      destruct vs2; [apply setlist_length in Hrho2'; discriminate|].
+    - destruct vs1; [apply set_lists_length in Hrho1'; discriminate|].
+      destruct vs2; [apply set_lists_length in Hrho2'; discriminate|].
       simpl in Hrho1', Hrho2'.
-      destruct (setlist vs vs1 rho1) as [rho3|] eqn:Hrho3; [|congruence].
-      destruct (setlist vs vs2 rho2) as [rho4|] eqn:Hrho4; [|congruence].
+      destruct (set_lists vs vs1 rho1) as [rho3|] eqn:Hrho3; [|congruence].
+      destruct (set_lists vs vs2 rho2) as [rho4|] eqn:Hrho4; [|congruence].
       inv Hrho1'; inv Hrho2'.
       apply preord_env_P_extend; [|now inv Hvs1_vs2].
       eapply IHvs; [|eauto|eauto|now inv Hvs1_vs2].
@@ -1403,23 +1403,23 @@ Section uncurry_correct.
         [inv Ha'; inv H; contradiction H2; easy|inv Ha'; inv H0; contradiction].
   Qed.
 
-  Lemma preord_env_P_setlist_extend': forall pr cenv k vs vs1 vs2 P rho1 rho2 rho1' rho2',
+  Lemma preord_env_P_set_lists_extend': forall pr cenv k vs vs1 vs2 P rho1 rho2 rho1' rho2',
     preord_env_P pr cenv P k rho1 rho2 ->
-    Some rho1' = setlist vs vs1 rho1 ->
-    Some rho2' = setlist vs vs2 rho2 ->
+    Some rho1' = set_lists vs vs1 rho1 ->
+    Some rho2' = set_lists vs vs2 rho2 ->
     Forall2 (preord_val pr cenv k) vs1 vs2 ->
     preord_env_P pr cenv P k rho1' rho2'.
   Proof with eauto with Ensembles_DB.
     induction vs; intros vs1 vs2 P rho1 rho2 rho1' rho2' Hrho Hrho1' Hrho2' Hvs1_vs2.
-    - destruct vs1; [|apply setlist_length in Hrho1'; discriminate].
-      destruct vs2; [|apply setlist_length in Hrho2'; discriminate].
+    - destruct vs1; [|apply set_lists_length in Hrho1'; discriminate].
+      destruct vs2; [|apply set_lists_length in Hrho2'; discriminate].
       inv Hrho1'; inv Hrho2'.
       eapply preord_env_P_antimon...
-    - destruct vs1; [apply setlist_length in Hrho1'; discriminate|].
-      destruct vs2; [apply setlist_length in Hrho2'; discriminate|].
+    - destruct vs1; [apply set_lists_length in Hrho1'; discriminate|].
+      destruct vs2; [apply set_lists_length in Hrho2'; discriminate|].
       simpl in Hrho1', Hrho2'.
-      destruct (setlist vs vs1 rho1) as [rho3|] eqn:Hrho3; [|congruence].
-      destruct (setlist vs vs2 rho2) as [rho4|] eqn:Hrho4; [|congruence].
+      destruct (set_lists vs vs1 rho1) as [rho3|] eqn:Hrho3; [|congruence].
+      destruct (set_lists vs vs2 rho2) as [rho4|] eqn:Hrho4; [|congruence].
       inv Hrho1'; inv Hrho2'.
       apply preord_env_P_extend; [|now inv Hvs1_vs2].
       eapply IHvs; [|eauto|eauto|now inv Hvs1_vs2].
@@ -1438,29 +1438,29 @@ Section uncurry_correct.
     now apply Heq.
   Qed.
 
-  Lemma setlist_set_permut : forall {A} x (y : A) xs ys rho rho',
+  Lemma set_lists_set_permut : forall {A} x (y : A) xs ys rho rho',
     ~ List.In x xs ->
-    Some rho' = setlist xs ys (M.set x y rho) -> exists rho1,
-    Some rho1 = setlist xs ys rho /\ forall a,
+    Some rho' = set_lists xs ys (M.set x y rho) -> exists rho1,
+    Some rho1 = set_lists xs ys rho /\ forall a,
     M.get a rho' = M.get a (M.set x y rho1).
   Proof.
     intros A x y xs ys rho rho' Hx Hrho.
-    assert (Hrho1 : length xs = length ys) by now apply setlist_length in Hrho.
-    eapply length_exists_setlist in Hrho1; destruct Hrho1 as [rho1 Hrho1].
+    assert (Hrho1 : length xs = length ys) by now apply set_lists_length in Hrho.
+    eapply length_exists_set_lists in Hrho1; destruct Hrho1 as [rho1 Hrho1].
     exists rho1; split; [apply Hrho1|].
     intros a.
     split_var_in_list a xs.
     - assert (forall A (l : list A), Forall2 eq l l) by (induction l; auto); specialize H with (l := ys).
       symmetry in Hrho, Hrho1.
-      destruct (setlist_Forall2_get _ _ _ _ _ _ _ _ _ H Hrho Hrho1 i)
+      destruct (set_lists_Forall2_get _ _ _ _ _ _ _ _ _ H Hrho Hrho1 i)
         as [v1 [v2 [Hv1 [Hv2 Hv1_v2]]]]; subst.
       rewrite M.gso.
       transitivity (Some v2); auto.
       intros Ha; contradiction Hx; now subst.
-    - erewrite <- setlist_not_In; [|symmetry in Hrho; apply Hrho|assumption].
+    - erewrite <- set_lists_not_In; [|symmetry in Hrho; apply Hrho|assumption].
       split_var_eq a x; [subst; now do 2 rewrite M.gss|].
       do 2 (rewrite M.gso; [|assumption]).
-      erewrite <- setlist_not_In with (rho'0 := rho1); eauto.
+      erewrite <- set_lists_not_In with (rho'0 := rho1); eauto.
   Qed.
 
   Lemma Forall2_preord_val_monotonic : forall pr cenv k k1 l1 l2,
@@ -1868,13 +1868,13 @@ Section uncurry_correct.
         destruct (M.elt_eq f f) as [Heq|]; [clear Heq|contradiction].
         intros vs1 vs2 k1 t xs1 e1 rho' Hlen_vs1_vs2 Hsome Hrho'; inv Hsome.
         assert (Hrho1' : length (k0 :: fv1) = length vs2). {
-          apply setlist_length in Hrho'.
+          apply set_lists_length in Hrho'.
           rewrite <- Hlen_vs1_vs2.
           rewrite <- Hrho'.
           simpl; rewrite Hfv_fv1.
           reflexivity.
         }
-        eapply length_exists_setlist in Hrho1'.
+        eapply length_exists_set_lists in Hrho1'.
         destruct Hrho1' as [rho1' Hrho1'].
         do 3 eexists; split; [reflexivity|split]; [eassumption|intros Hk1 Hvs1_vs2].
         apply preord_exp_fun_compat.
@@ -1883,15 +1883,15 @@ Section uncurry_correct.
              rho'' = g + [k0 :: fv -> vs1] + curried f + fds + rho
              rho1'' = uncurried g + [k0 :: fv1 -> vs2] + uncurried f + f1 + fds + rho1
            agree. *)
-        destruct vs1 as [|hvs1 tvs1]; [apply setlist_length in Hrho'; inv Hrho'|].
-        destruct vs2 as [|hvs2 tvs2]; [apply setlist_length in Hrho1'; inv Hrho1'|].
+        destruct vs1 as [|hvs1 tvs1]; [apply set_lists_length in Hrho'; inv Hrho'|].
+        destruct vs2 as [|hvs2 tvs2]; [apply set_lists_length in Hrho1'; inv Hrho1'|].
         intros a Ha.
         inv Ha; [rename a into k0|inv H3]; [|rename a into g|inv H].
         * (* k0: hvs1 == hvs2 *)
           unfold preord_var_env; simpl.
           do 2 (rewrite M.gso; [|assumption]).
-          apply set_setlist in Hrho'; destruct Hrho' as [rho'k0 [Hrho' Hrho'k0]].
-          apply set_setlist in Hrho1'; destruct Hrho1' as [rho1'k0 [Hrho1' Hrho1'k0]].
+          apply set_set_lists in Hrho'; destruct Hrho' as [rho'k0 [Hrho' Hrho'k0]].
+          apply set_set_lists in Hrho1'; destruct Hrho1' as [rho1'k0 [Hrho1' Hrho1'k0]].
           subst rho'; subst rho1'; do 2 rewrite M.gss.
           intros v1 Hv1; inv Hv1; eexists; split; [reflexivity|now inv Hvs1_vs2].
         * (* g *)
@@ -1903,25 +1903,25 @@ Section uncurry_correct.
           intros vs3 vs4 k2 t0 xs1 e1 rho'' Hlen_vs3_vs4 Hsome Hrho''.
           inversion Hsome; subst t0; subst xs1; subst e1; clear Hsome.
           assert (Hrho1'' : length gv1 = length vs4). {
-            apply setlist_length in Hrho''.
+            apply set_lists_length in Hrho''.
             rewrite <- Hlen_vs3_vs4.
             rewrite <- Hrho''.
             assumption.
           }
-          eapply length_exists_setlist in Hrho1''; destruct Hrho1'' as [rho1'' Hrho1''].
+          eapply length_exists_set_lists in Hrho1''; destruct Hrho1'' as [rho1'' Hrho1''].
           do 3 eexists; split; [reflexivity|split]; [eassumption|intros Hk2 Hvs3_vs4].
           assert (Hrho''' : length (gv ++ fv) = length (vs4 ++ tvs2)). {
             do 2 rewrite app_length.
-            apply setlist_length in Hrho1''.
+            apply set_lists_length in Hrho1''.
             rewrite <- Hrho1''.
             rewrite <- Hgv_gv1.
-            apply setlist_length in Hrho1'.
+            apply set_lists_length in Hrho1'.
             inv Hrho1'.
             rewrite <- Hfv_fv1.
             reflexivity.
           }
           Transparent preord_exp. intros v1 c1 Hc1 Hv1. 
-          apply length_exists_setlist with
+          apply length_exists_set_lists with
             (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
           destruct Hrho''' as [rho''' Hrho'''].
           assert (Hgoal : preord_exp pr cenv k2 (ge, rho'') (ge, rho''')). {
@@ -1933,7 +1933,7 @@ Section uncurry_correct.
              *)
 
             (* rho''g := rho'' \ g *)
-            eapply setlist_set_permut in Hgv_g; [|apply Hrho''].
+            eapply set_lists_set_permut in Hgv_g; [|apply Hrho''].
             destruct Hgv_g as [rho''g [Hrho''g Hrho''_rho''g]].
             eapply preord_env_P_subst; [|intros a Ha;symmetry; apply Hrho''_rho''g|reflexivity]. 
             apply preord_env_P_set_not_in_P_l;
@@ -1942,15 +1942,15 @@ Section uncurry_correct.
                 now rewrite <- occurs_in_exp_correct].
 
             (* split [gv ++ fv -> vs4 ++ tvs2] into [gv -> vs4] + [fv -> tvs2] *)
-            symmetry in Hrho'''; eapply setlist_app in Hrho''';
-              [|apply setlist_length in Hrho1''; now rewrite <- Hrho1''].
+            symmetry in Hrho'''; eapply set_lists_app in Hrho''';
+              [|apply set_lists_length in Hrho1''; now rewrite <- Hrho1''].
             destruct Hrho''' as [rho'''fv [Hrho'''fv Hrho''']].
 
             (* [[gv]](rho''g) ==_k2 [[gv]](rho''') *)
-            eapply preord_env_P_setlist_extend; eauto.
+            eapply preord_env_P_set_lists_extend; eauto.
 
             (* rho'k0 := rho' \ k0 *)
-            eapply set_setlist in Hrho'; destruct Hrho' as [rho'k0 [Hrho' Hrho'k0]]; subst rho'.
+            eapply set_set_lists in Hrho'; destruct Hrho' as [rho'k0 [Hrho' Hrho'k0]]; subst rho'.
             apply preord_env_P_set_not_in_P_l;
               [|eapply Disjoint_Included_l;
                   [|rewrite <- occurs_in_exp_correct];
@@ -1960,7 +1960,7 @@ Section uncurry_correct.
 
             (* [[fv]](rho'k0) ==_k2 [[gv]](rho''') *)
             inv Hvs1_vs2.
-            eapply preord_env_P_setlist_extend; eauto;
+            eapply preord_env_P_set_lists_extend; eauto;
               [|eapply Forall2_preord_val_monotonic];
               [| |eassumption];
               [|omega].
@@ -2086,23 +2086,23 @@ Section uncurry_correct.
           do 2 eexists; split; [|eassumption].
           econstructor; [| | |eauto|eassumption].
           {
-            erewrite <- setlist_not_In; [|symmetry; eassumption|assumption].
+            erewrite <- set_lists_not_In; [|symmetry; eassumption|assumption].
             rewrite M.gso; [|auto].
-            erewrite <- setlist_not_In; [|symmetry; eassumption|assumption].
+            erewrite <- set_lists_not_In; [|symmetry; eassumption|assumption].
             rewrite def_funs_get_neq; auto.
             simpl; rewrite M.gso; auto.
             now rewrite M.gss.
           }
           {
-            apply getlist_app.
-            eapply getlist_setlist; [now inv Hgv1_fresh|symmetry; eassumption].
-            erewrite getlist_setlist_Disjoint;
+            apply get_list_app.
+            eapply get_list_set_lists; [now inv Hgv1_fresh|symmetry; eassumption].
+            erewrite get_list_set_lists_Disjoint;
               [|inv Hfv1_fresh; apply Disjoint_Union_r in H; apply H|symmetry; eassumption].
-            rewrite getlist_set_neq; [|assumption].
-            apply set_setlist in Hrho1'.
+            rewrite get_list_set_neq; [|assumption].
+            apply set_set_lists in Hrho1'.
             destruct Hrho1' as [rho1'k0 [Hrho1'k0 Hrho1']]; subst rho1'.
-            rewrite getlist_set_neq; [|assumption].
-            eapply getlist_setlist; [now inv Hfv1_fresh|symmetry; eassumption].
+            rewrite get_list_set_neq; [|assumption].
+            eapply get_list_set_lists; [now inv Hfv1_fresh|symmetry; eassumption].
           }
           {
             rename uncurried into uncurried'; pose (uncurried := uncurried'); subst uncurried'.
@@ -2125,10 +2125,10 @@ Section uncurry_correct.
         destruct (M.elt_eq h f1) as [|Heq]; [contradiction|clear Heq].
         intros vs1 vs2 k1 t xs1 e1 rho' Hlen_vs1_vs2 Hfind_def Hrho'.
         assert (Hrho1' : length xs1 = length vs2). {
-          apply setlist_length in Hrho'.
+          apply set_lists_length in Hrho'.
           now rewrite <- Hlen_vs1_vs2.
         }
-        eapply length_exists_setlist in Hrho1'; destruct Hrho1' as [rho1' Hrho1'].
+        eapply length_exists_set_lists in Hrho1'; destruct Hrho1' as [rho1' Hrho1'].
         exists xs1, e1; eexists; split; [|split]; [|eassumption|intros Hk1 Hvs1_vs2].
         (* only f is uncurried, so h in uncurried = h in curried (Hfind_def) *)
         assert (HLR : In _ (name_in_fundefs curried) h) by auto.
@@ -2153,7 +2153,7 @@ Section uncurry_correct.
          *)
 
         (* [[xs1]](rho') ==_k1 [[xs1]](rho1') *)
-        eapply preord_env_P_setlist_extend; eauto.
+        eapply preord_env_P_set_lists_extend; eauto.
 
         (* remove pre_fds *)
         intros a Ha.
@@ -2339,7 +2339,7 @@ Section uncurry_correct.
 
   Lemma uncurry_step_preserves_ctag : forall x s m s1 m1 arms arms1,
     uncurry_step (Ecase x arms) s m (Ecase x arms1) s1 m1 ->
-    Forall2 (fun p p' : cTag * exp => fst p = fst p') arms arms1.
+    Forall2 (fun p p' : ctor_tag * exp => fst p = fst p') arms arms1.
   Proof.
     induction arms; intros.
     - destruct arms1; inv H.
@@ -4156,7 +4156,7 @@ Section uncurry_correct.
     match s with (y, b, aenv, fenv, ft, lm, s, ne) => lm end.
 
   (* This identity is useful for the Ecase case -- see below *)
-  Lemma st_eq_Ecase {S} (m1 : state S (list (cTag * exp))) (x : var) y :
+  Lemma st_eq_Ecase {S} (m1 : state S (list (ctor_tag * exp))) (x : var) y :
     st_eq
       (bind (bind m1 (fun ys => ret (y :: ys))) (fun ys' => ret (Ecase x ys')))
       (e <- (ys <- m1 ;;
@@ -4510,8 +4510,8 @@ Section uncurry_correct.
     simpl; intros; subst; split; auto.
   Qed.
 
-  Lemma get_fTag_triple : forall s n,
-    {{fun s' => s = s'}} uncurry.get_fTag n
+  Lemma get_fun_tag_triple : forall s n,
+    {{fun s' => s = s'}} uncurry.get_fun_tag n
     {{fun s _ s1 =>
         from_fresh s1 = from_fresh s /\
         already_uncurried s1 = already_uncurried s }}.
@@ -4822,7 +4822,7 @@ Section uncurry_correct.
         intros [] st6''. apply pre_eq_state_lr.
         intros st7' [Hst6' [Hst7 Hst7_m]]; subst st6''.
         eapply bind_triple'. rewrite pre_post_copy.
-        apply get_fTag_triple.
+        apply get_fun_tag_triple.
         intros ft' st7''. apply pre_eq_state_lr.
         intros st8 [Hst7' [Hst8 Hst8_m]]; subst st7''.
         apply return_triple.

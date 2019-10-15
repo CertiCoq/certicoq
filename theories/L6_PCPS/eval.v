@@ -21,19 +21,19 @@ Section EVAL.
 
   Variable (pr : prims).
   
-  Variable (cenv : cEnv).
+  Variable (cenv : ctor_env).
 
   (** Big step semantics with cost counting *)
   Inductive bstep_e : env -> exp -> val -> nat -> Prop :=
   | BStep_constr :
-      forall (x : var) (t : cTag) (ys :list var) (e : exp)
+      forall (x : var) (t : ctor_tag) (ys :list var) (e : exp)
         (rho rho' : env) (vs : list val) (v : val) (c : nat),
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         M.set x (Vconstr t vs) rho = rho' ->
         bstep_e rho' e v c ->
         bstep_e rho (Econstr x t ys e) v c
   | BStep_proj :
-      forall (t : cTag) (vs : list val) (v : val)
+      forall (t : ctor_tag) (vs : list val) (v : val)
         (rho : env) (x : var) (n : N) (y : var)
         (e : exp) (ov : val) (c : nat),
         M.get y rho = Some (Vconstr t vs) ->
@@ -41,7 +41,7 @@ Section EVAL.
         bstep_e (M.set x v rho) e ov c ->
         bstep_e rho (Eproj x t n y e) ov c (* force equality on [t] *)
   | BStep_case :
-      forall (y : var) (v : val) (e : exp) (t : cTag) (cl : list (cTag * exp))
+      forall (y : var) (v : val) (e : exp) (t : ctor_tag) (cl : list (ctor_tag * exp))
         (vl : list val) (rho : env) (c : nat),
         M.get y rho = Some (Vconstr t vl) ->
         caseConsistent cenv cl t -> (* NEW *)
@@ -51,11 +51,11 @@ Section EVAL.
   | BStep_app :
       forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
         (xs : list var) (e : exp) (rho'' rho : env) (f : var)
-        (t : cTag) (ys : list var) (v : val) (c : nat),
+        (t : ctor_tag) (ys : list var) (v : val) (c : nat),
         M.get f rho = Some (Vfun rho' fl f') ->
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         find_def f' fl = Some (t,xs,e) ->
-        setlist xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
         bstep_e rho'' e v c ->
         bstep_e rho (Eapp f t ys) v (c+1)  (* force equality on [t] *)
   | BStep_fun :
@@ -66,7 +66,7 @@ Section EVAL.
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
         (f' : list val -> option val) (ys : list var) (e : exp)
         (v v' : val) (c : nat),
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         M.get f pr = Some f' ->
         f' vs = Some v ->
         M.set x v rho = rho' ->
@@ -93,13 +93,13 @@ Section EVAL.
   Definition sstep_f (rho:env) (e:exp) : exception (env* exp) :=
     match e with
       | Eprim x f ys e' =>
-        do vs  <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
+        do vs  <- l_opt (get_list ys rho) ("Eprim: failed to get_list");
           do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
           do v <- l_opt (f' vs) ("Eprim: prim did not compute");
           let rho' := M.set x v rho in
           Ret (rho', e')
       | Econstr x t ys e' =>
-        do vs <- l_opt (getlist ys rho) ("Econstr: failed to get args");
+        do vs <- l_opt (get_list ys rho) ("Econstr: failed to get args");
           let rho' := M.set x (Vconstr t vs) rho in
           Ret (rho', e')
       | Eproj x t m y e' =>
@@ -132,11 +132,11 @@ Section EVAL.
       | Eapp f t ys =>
         (match (M.get f rho) with
            | Some (Vfun rho' fl f') =>
-             do vs <- l_opt (getlist ys rho) ("App: failed to get args");
+             do vs <- l_opt (get_list ys rho) ("App: failed to get args");
            (match  find_def f' fl with
               | Some (t', xs ,e) =>
                 if (Pos.eqb t t') then
-                  do rho'' <- l_opt (setlist xs vs (def_funs fl fl rho' rho')) ("Fun: setlist failed");   
+                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
                   Ret (rho'', e)
                 else (exceptionMonad.Exc "Fun: tag check failed")
               | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
@@ -152,13 +152,13 @@ Section EVAL.
       | S n' =>
         ( match e with
             | Eprim x f ys e' =>
-              do vs <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
+              do vs <- l_opt (get_list ys rho) ("Eprim: failed to get_list");
             do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
             do v <- l_opt (f' vs) ("Eprim: prim did not compute");
             let rho' := M.set x v rho in
             bstep_f rho' e' n'
             | Econstr x t ys e' =>
-              do vs <- l_opt (getlist ys rho) ("Econstr: failed to get args");
+              do vs <- l_opt (get_list ys rho) ("Econstr: failed to get args");
             let rho' := M.set x (Vconstr t vs) rho in
             bstep_f rho' e' n'
             | Eproj x t m y e' =>
@@ -191,11 +191,11 @@ Section EVAL.
             | Eapp f t ys =>
               (match (M.get f rho) with
                  | Some (Vfun rho' fl f') =>
-                   do vs <- l_opt (getlist ys rho) ("App: failed to get args");
+                   do vs <- l_opt (get_list ys rho) ("App: failed to get args");
                  (match  find_def f' fl with
                     | Some (t', xs ,e) =>
                       if (Pos.eqb t t') then
-                        do rho'' <- l_opt (setlist xs vs (def_funs fl fl rho' rho')) ("Fun: setlist failed");   
+                        do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
                         bstep_f rho'' e n'
                       else (exceptionMonad.Exc "Fun: tag check failed")
                     | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
@@ -213,7 +213,7 @@ Section EVAL.
     induction n; intros. inv H.
     simpl in H.
     destruct e.
-    -  destruct (getlist l rho) eqn:glr; [| inv H].
+    -  destruct (get_list l rho) eqn:glr; [| inv H].
        apply IHn in H. inv H.
        exists x. econstructor; eauto.
     - destruct (M.get v0 rho) eqn:gv0r.
@@ -236,12 +236,12 @@ Section EVAL.
         auto.
     - destruct (M.get v0 rho) eqn:gv0r; [| inv H].
       destruct v1; [inv H| | inv H].
-      destruct (getlist l rho) eqn:glr; [| inv H].
+      destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (find_def v1 f0) eqn:gv1f0; [| inv H].
       destruct p. destruct p.
       destruct (f =? f1)%positive eqn:ff1; [| inv H].
       apply Peqb_true_eq in ff1. subst.
-      destruct ( setlist l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H].
+      destruct ( set_lists l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H].
       simpl in H.
       unfold l_opt in H. rewrite ll0 in H.
       simpl in H. 
@@ -249,7 +249,7 @@ Section EVAL.
       econstructor; eauto.
       rewrite ll0 in H1.
       simpl in H1. inv H1.    
-    - destruct (getlist l rho) eqn:glr; [| inv H].
+    - destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (M.get p pr) eqn:ppr; [| inv H].
       destruct (o l0) eqn:ol0; [| inv H].
       simpl in H. rewrite ol0 in H. simpl in H. 
@@ -269,7 +269,7 @@ Theorem bstep_f_complete:
     exists m, bstep_f rho e m = Some v. *)
 
 
-  Inductive find_tag_nth : list (cTag * exp) -> cTag -> exp -> nat -> Prop :=
+  Inductive find_tag_nth : list (ctor_tag * exp) -> ctor_tag -> exp -> nat -> Prop :=
   | find_tag_hd :
       forall c e l,
         find_tag_nth ((c, e) :: l) c e 1
@@ -286,14 +286,14 @@ Theorem bstep_f_complete:
 
   Inductive bstep_cost :  env -> exp -> val -> nat -> Prop :=
   | BStepc_constr :
-      forall (x : var) (t : cTag) (ys :list var) (e : exp)
+      forall (x : var) (t : ctor_tag) (ys :list var) (e : exp)
         (rho rho' : env) (vs : list val) (v : val) (c : nat),
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         M.set x (Vconstr t vs) rho = rho' ->
         bstep_cost rho' e v c ->
         bstep_cost rho (Econstr x t ys e) v (c + 1 + (List.length ys))
   | BStepc_proj :
-      forall (t : cTag) (vs : list val) 
+      forall (t : ctor_tag) (vs : list val) 
         (rho : env) (x : var) (n : N) (y : var)
         (e : exp) (v v': val) (c : nat),
         M.get y rho = Some (Vconstr t vs) ->
@@ -303,7 +303,7 @@ Theorem bstep_f_complete:
         bstep_cost (M.set x v rho) e v' c ->
         bstep_cost rho (Eproj x t n y e) v' (c + 1)
   | BStepc_case :
-      forall (y : var) (v : val) (e : exp) (t : cTag) (cl : list (cTag * exp))
+      forall (y : var) (v : val) (e : exp) (t : ctor_tag) (cl : list (ctor_tag * exp))
         (vl : list val) (rho : env) (n c : nat),
         M.get y rho = Some (Vconstr t vl) ->
         caseConsistent cenv cl t ->
@@ -313,14 +313,14 @@ Theorem bstep_f_complete:
   | BStepc_app :
       forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
         (xs : list var) (e : exp) (rho'' rho : env) (f : var)
-        (t : cTag) (ys : list var) (v : val) (c : nat),
+        (t : ctor_tag) (ys : list var) (v : val) (c : nat),
         M.get f rho = Some (Vfun rho' fl f') ->
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         (* The number of instructions generated here should be
          * independent of the size of B. We just need to
          * jump to a label *)
         find_def f' fl = Some (t,xs,e) ->
-        setlist xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
         bstep_cost rho'' e v c ->
         bstep_cost rho (Eapp f t ys) v (c + 1 + List.length ys)
   | BStepc_fun :
@@ -332,7 +332,7 @@ Theorem bstep_f_complete:
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
         (f' : list val -> option val) (ys : list var) (e : exp)
         (v v' : val) (c : nat),
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         M.get f pr = Some f' ->
         f' vs = Some v ->
         M.set x v rho = rho' ->
@@ -378,7 +378,7 @@ Theorem bstep_f_complete:
   (** Small step semantics -- Relational definition *)
   Inductive step: state -> state -> Prop := 
   | Step_constr: forall vs rho x t ys e,
-                   getlist ys rho = Some vs ->
+                   get_list ys rho = Some vs ->
                    step (rho, Econstr x t ys e) (M.set x (Vconstr t vs) rho, e)
   | Step_proj: forall vs v rho x t n y e,
                  M.get y rho = Some (Vconstr t vs) ->
@@ -393,12 +393,12 @@ Theorem bstep_f_complete:
                 step (rho, Efun fl e) (def_funs fl fl rho rho, e)
   | Step_app: forall rho' fl f' vs xs e rho'' rho f t ys,
                 M.get f rho = Some (Vfun rho' fl f') ->
-                getlist ys rho = Some vs ->
+                get_list ys rho = Some vs ->
                 find_def f' fl = Some (t,xs,e) ->
-                setlist xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+                set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
                 step (rho, Eapp f t ys) (rho'', e)
   | Step_prim: forall vs v rho' rho x f f' ys e,
-                 getlist ys rho = Some vs ->
+                 get_list ys rho = Some vs ->
                  M.get f pr = Some f' ->
                  f' vs = Some v ->
                  M.set x v rho = rho' ->

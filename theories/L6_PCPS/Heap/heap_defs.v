@@ -38,7 +38,7 @@ Module HeapDefs (H : Heap) .
   (** A block in the heap *)
   Inductive block :=
   (* A constructed value *)
-  | Constr : cTag -> list value -> block
+  | Constr : ctor_tag -> list value -> block
   (* A closure pair -- Only used in pre-closure conversion semantics *)
   | Clos : value -> value -> block
   (* Env -- heap allocated to account for environment sharing between mutually rec. functions *)
@@ -1170,8 +1170,8 @@ Module HeapDefs (H : Heap) .
   Qed.
 
   
-  Lemma env_locs_setlist_Included ys ls rho rho' S :
-    setlist ys ls rho = Some rho'  ->
+  Lemma env_locs_set_lists_Included ys ls rho rho' S :
+    set_lists ys ls rho = Some rho'  ->
     env_locs rho' (S :|: (FromList ys)) \subset
     (env_locs rho S) :|: (Union_list (map val_loc ls)).
   Proof with now eauto with Ensembles_DB.
@@ -1179,7 +1179,7 @@ Module HeapDefs (H : Heap) .
     - rewrite FromList_nil, Union_Empty_set_neut_r. inv Hset.
       destruct ls; try discriminate. inv H0...
     - destruct ls; try discriminate. simpl in *.
-      destruct (setlist ys ls rho) eqn:Hset'; try discriminate.
+      destruct (set_lists ys ls rho) eqn:Hset'; try discriminate.
       inv Hset. rewrite !FromList_cons.
       rewrite (Union_commut [set a]), !Union_assoc. 
       eapply Included_trans. eapply env_locs_set_Inlcuded.
@@ -1381,14 +1381,14 @@ Module HeapDefs (H : Heap) .
   (* get lemmas *)
 
   Lemma env_locs_FromList (rho : env) (xs : list var) (vs : list value) :
-    getlist xs rho = Some vs ->
+    get_list xs rho = Some vs ->
     env_locs rho (FromList xs) <--> (Union_list (map val_loc vs)).
   Proof.
     revert vs. induction xs; intros vs Hgetl; simpl in Hgetl.
     + inv Hgetl. simpl; rewrite !FromList_nil.
       rewrite env_locs_Empty_set. reflexivity.
     + destruct (M.get a rho) eqn:Hgeta; try discriminate.
-      destruct (getlist xs rho) eqn:Hgetl'; try discriminate.
+      destruct (get_list xs rho) eqn:Hgetl'; try discriminate.
       inv Hgetl.
       simpl. rewrite !FromList_cons.
       rewrite env_locs_Union. eapply Same_set_Union_compat.
@@ -1410,14 +1410,14 @@ Module HeapDefs (H : Heap) .
 
   Lemma FromList_env_locs (S : Ensemble var) (rho : env)
         (xs : list var) (ls : list value) :
-    getlist xs rho = Some ls ->
+    get_list xs rho = Some ls ->
     FromList xs \subset S ->
     Union_list (map val_loc ls) \subset env_locs rho S.
   Proof with now eauto with Ensembles_DB.
     revert ls; induction xs; intros ls Hget Hs; simpl in *.
     - inv Hget...
     - destruct (M.get a rho) eqn:Hgeta; try discriminate.
-      destruct (getlist xs rho) eqn:Hgetl; try discriminate.
+      destruct (get_list xs rho) eqn:Hgetl; try discriminate.
       inv Hget. rewrite !FromList_cons in Hs. simpl.
       eapply Union_Included.
       + eapply get_In_env_locs; [| eassumption ]...
@@ -1453,15 +1453,15 @@ Module HeapDefs (H : Heap) .
     eapply H2 in Hget. now rewrite Hget.
   Qed.
 
-  Lemma env_locs_setlist_Disjoint ys ls rho rho' S :
-    setlist ys ls rho = Some rho'  ->
+  Lemma env_locs_set_lists_Disjoint ys ls rho rho' S :
+    set_lists ys ls rho = Some rho'  ->
     Disjoint _ S (FromList ys) ->
     env_locs rho S <--> env_locs rho' S. 
   Proof with now eauto with Ensembles_DB.
     revert rho' S ls; induction ys; intros rho' S ls Hset Hd.
     - destruct ls; inv Hset. reflexivity.
     - destruct ls; try discriminate. simpl in *.
-      destruct (setlist ys ls rho) eqn:Hset'; try discriminate.
+      destruct (set_lists ys ls rho) eqn:Hset'; try discriminate.
       inv Hset. rewrite env_locs_set_not_In. eapply IHys.
       eassumption.
       eapply Disjoint_Included_r; [| eassumption ].
@@ -1470,14 +1470,14 @@ Module HeapDefs (H : Heap) .
       normalize_sets. now left. 
   Qed.
 
-  Lemma env_locs_setlist_In ys ls rho rho' :
-    setlist ys ls rho = Some rho'  ->
+  Lemma env_locs_set_lists_In ys ls rho rho' :
+    set_lists ys ls rho = Some rho'  ->
     env_locs rho' (FromList ys) \subset Union_list (map val_loc ls). 
   Proof with now eauto with Ensembles_DB.
     revert rho' ls; induction ys; intros rho' ls Hset.
     - destruct ls; inv Hset. normalize_sets. rewrite env_locs_Empty_set...
     - destruct ls; try discriminate. simpl in *. 
-      destruct (setlist ys ls rho) eqn:Hset'; try discriminate.
+      destruct (set_lists ys ls rho) eqn:Hset'; try discriminate.
       inv Hset. normalize_sets. rewrite env_locs_Union.
       rewrite env_locs_Singleton; [| rewrite M.gss; reflexivity ].
       eapply Union_Included. now eapply Included_Union_preserv_l. 
@@ -1791,10 +1791,10 @@ Module HeapDefs (H : Heap) .
     eapply reachable_closed; eauto.
   Qed.
     
-  Lemma getlist_in_dom (S : Ensemble var) (H : heap block) (rho : env)
+  Lemma get_list_in_dom (S : Ensemble var) (H : heap block) (rho : env)
         (ys : list var) (vs : list value) :
     well_formed_env S H rho ->
-    getlist ys rho = Some vs ->
+    get_list ys rho = Some vs ->
     FromList ys \subset S ->
     Union_list (map val_loc vs) \subset dom H. 
   Proof.
@@ -1803,7 +1803,7 @@ Module HeapDefs (H : Heap) .
     - now eauto with Ensembles_DB.
     - rewrite !FromList_cons in Hin.
       destruct (M.get a rho) eqn:Hgeta; try discriminate.
-      destruct (getlist ys rho) eqn:Hgetys; try discriminate.
+      destruct (get_list ys rho) eqn:Hgetys; try discriminate.
       inv Hget. eapply Union_Included.
       eapply Included_trans; [| now eapply Hwf].
       now eapply get_In_env_locs; eauto. 
@@ -1952,11 +1952,11 @@ Module HeapDefs (H : Heap) .
     eapply dom_subheap. eapply def_funs_subheap; eauto.
   Qed.
 
-  Lemma well_formed_reach_setlist  (S : Ensemble M.elt) (H : heap block) 
+  Lemma well_formed_reach_set_lists  (S : Ensemble M.elt) (H : heap block) 
         (rho rho' : env)  (xs : list M.elt) (vs : list value) :
     well_formed (reach' H (env_locs rho S)) H ->
     well_formed (reach' H (Union_list (map val_loc vs))) H ->
-    setlist xs vs rho = Some rho' -> 
+    set_lists xs vs rho = Some rho' -> 
     well_formed
       (reach' H (env_locs rho' (Union M.elt S (FromList xs)))) H.
   Proof with now eauto with Ensembles_DB.
@@ -1965,7 +1965,7 @@ Module HeapDefs (H : Heap) .
       rewrite FromList_nil, Union_Empty_set_neut_r. eassumption.
     - simpl. rewrite FromList_cons in *.
       simpl in Hsetl. destruct ls; try discriminate.
-      destruct (setlist _ _ _) eqn:Hsetl'; try discriminate.
+      destruct (set_lists _ _ _) eqn:Hsetl'; try discriminate.
       inv Hsetl. rewrite (Union_commut [set a]), Union_assoc.
       simpl. eapply well_formed_reach_set.
       * eapply IHxs. eassumption.
@@ -1976,15 +1976,15 @@ Module HeapDefs (H : Heap) .
         eapply reach'_set_monotonic. simpl...
   Qed.
 
-  Lemma well_formed_reach_setlist_cor  (S : Ensemble M.elt) (H : heap block) 
+  Lemma well_formed_reach_set_lists_cor  (S : Ensemble M.elt) (H : heap block) 
         (rho rho' : env) (xs : list M.elt) (vs : list value) :
     well_formed (reach' H (env_locs rho S)) H ->
     Union_list (map val_loc vs) \subset (reach' H (env_locs rho S)) ->
-    setlist xs vs rho = Some rho' -> 
+    set_lists xs vs rho = Some rho' -> 
     well_formed
       (reach' H (env_locs rho' (Union M.elt S (FromList xs)))) H.
   Proof.
-    intros. eapply well_formed_reach_setlist; [ eassumption | | eassumption ].
+    intros. eapply well_formed_reach_set_lists; [ eassumption | | eassumption ].
     eapply well_formed_antimon.
     eapply reach'_set_monotonic. eassumption.
     rewrite <- reach'_idempotent. eassumption.

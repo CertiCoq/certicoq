@@ -34,6 +34,10 @@ Fixpoint set_lists {A} (xs: list M.elt) (vs: list A) (rho: M.t A) : option (M.t 
   | _, _ => None
   end.
 
+Definition set_list {A:Type}  (l : list (M.elt * A)) (map: M.t A) : M.t A :=
+  fold_right (fun xv cmap => M.set (fst xv) (snd xv) cmap ) map l.
+
+
 Definition var      := M.elt. (* value variables *)
 Definition fun_tag  := M.elt. (* discrimination tags for functions *)
 Definition ind_tag  := M.elt. (* discrimination tags for inductive types *)

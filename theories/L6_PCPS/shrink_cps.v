@@ -560,9 +560,6 @@ Inductive occ_type : Type :=
 
 
 
-Definition set_list {A:Type}  (l : list (M.elt * A)) (map: M.t A) : M.t A :=
-  fold_right (fun xv cmap => M.set (fst xv) (snd xv) cmap ) map l.
-
 
 
 

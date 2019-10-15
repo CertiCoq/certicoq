@@ -102,6 +102,7 @@ Clight
 PrintAST
 PrintCsyntax
 PrintClight
+Cps_show
 L6_to_Clight
 Instances2
 Instances3

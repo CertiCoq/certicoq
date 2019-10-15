@@ -30,6 +30,8 @@ Quote Recursively Definition One := 1%positive.
 Quote Recursively Definition Demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
 
 
+
+
 (* 
 Definition One6 : cTerm certiL6.                                                        
 (let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in 
@@ -63,20 +65,36 @@ Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
 
-Definition compile_L7 (t : cTerm certiL6) : cps_util.nEnv * Clight.program * Clight.program :=
-  let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-                   prog cenv nenv in
-  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
-
-
-
+Definition compile_L7 (t : cTerm certiL6) : exception ( cps_util.nEnv * Clight.program * Clight.program) :=
+  (AstCommon.timePhase "L6 to L7") 
+     (fun (_:Datatypes.unit) => (let '((_, cenv , nenv, fenv), (_, prog)) := t in
+     match  compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+                    prog cenv nenv with
+       | Ret p => 
+         Ret (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+       | Exc s => Exc s
+     end)).
 
 Definition compile_opt_L7 p  :=
   match p with
-  | Ret p => Ret (compile_L7 p)
+  | Ret p => compile_L7 p
   | Exc s => Exc s
   end.
+
+ Fixpoint map {A B:Type} (f:A -> B) (l:list A):list B :=
+       match l with
+       | nil => nil
+       | cons h t => cons (f h) (map f t)
+end.
+
+Definition compile_template_L3 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL3_eta) :=
+  translateTo (cTerm certiL3_eta) (Flag 0) p.
+(*
+ Quote Recursively Definition Qmap := (@map nat).
+
+  Definition demo3 := Eval native_compute in (translateTo (cTerm certiL3_eta) Qmap).
+*)
+ 
 
 Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
   translateTo (cTerm certiL4) (Flag 0) p.
@@ -126,57 +144,57 @@ Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
 
 (*  Quote Recursively Definition vs := vs.main_h.  (*ce_example_ent*) *)
-Quote Recursively Definition binom := Binom.main.    
+(* Quote Recursively Definition binom := Binom.main.     *)
 (* Quote Recursively Definition graph_color := Color.ex_2.  (*(Color.run G16)*)    *)
-Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)   
+(* Quote Recursively Definition graph_color := (2+3).  (*(Color.run G16)*)    *)
 
 
 
- Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) graph_color). 
+ (* Definition demo4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) graph_color).  *)
 
- Print demo4.
- Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) Demo1).
- Set Printing Depth 1000.
- Print demo5.
- Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) binom). 
- Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) binom). 
+ (* Definition demo5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) Demo1). *)
 
-Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) graph_color).
  
-Print color5.
+(*  Definition demo5 := Eval native_compute in (translateTo (cTerm certiL4_2) Demo1). *)
+(*  Set Printing Depth 1000. *)
+(*  Print demo5. *)
+(*  Definition binom4 := Eval native_compute in (translateTo (cTerm certiL4) (Flag 0) binom).  *)
+(*  Definition binom5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) binom).  *)
+
+(* Definition color5 := Eval native_compute in (translateTo (cTerm certiL5) (Flag 0) graph_color). *)
+ 
+(* Print color5. *)
 
 
 
-Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) (Flag 0) binom). 
-Definition eval_c2 := match binom2 with
-                      | Ret (mkPgm p env) =>
-                        Ret (L2k.wcbvEval.wcbvEval env 1000%nat p)
-                        | Exc s => Exc "foo"
-                      end.
+(* Definition binom2 := Eval native_compute in (translateTo (cTerm certiL2k) (Flag 0) binom).  *)
+(* Definition eval_c2 := match binom2 with *)
+(*                       | Ret (mkPgm p env) => *)
+(*                         Ret (L2k.wcbvEval.wcbvEval env 1000%nat p) *)
+(*                         | Exc s => Exc "foo" *)
+(*                       end. *)
 
-Definition eval_c2' := Eval native_compute in eval_c2.
-Print eval_c2'. 
+(* Definition eval_c2' := Eval native_compute in eval_c2. *)
+(* Print eval_c2'.  *)
 
 
-Definition binom3 := Eval native_compute in (translateTo (cTerm certiL3_eta) (Flag 0) binom). 
+(* Definition binom3 := Eval native_compute in (translateTo (cTerm certiL3_eta) (Flag 0) binom).  *)
 
 
 Require Export L4.expression.
-Print binom4. 
-Definition eval_c4 := match binom5 with
-                      | Ret p =>
-                        Ret (L5_evaln 20%nat p)
-                        | Exc s => Exc "foo"
-                      end.
+(* Print binom4.  *)
+(* Definition eval_c4 := match binom5 with *)
+(*                       | Ret p => *)
+(*                         Ret (L5_evaln 20%nat p) *)
+(*                         | Exc s => Exc "foo" *)
+(*                       end. *)
 
-Definition eval_c4' := Eval vm_compute in eval_c4.
-Print eval_c4'. 
+(* Definition eval_c4' := Eval vm_compute in eval_c4. *)
+(* Print eval_c4'.  *)
 
 
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
-Print color5. 
-  
- 
+(* Print color5.  *)
 
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 

@@ -123,7 +123,7 @@ with add_binders_fundefs (names : nEnv) (B : fundefs) : nEnv :=
 Definition L6_pipeline_old (e : cTerm certiL5) : exception (cTerm certiL6) :=  
   match e with
   | pair venv vt =>
-    match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+    match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt)) with
     | Some r =>
       let '(c_env, n_env, f_env, next_cTag, next_iTag, e) := r in
       (* make compilation state *)
@@ -161,7 +161,7 @@ Definition L6_pipeline_old (e : cTerm certiL5) : exception (cTerm certiL6) :=
 Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=  
   match e with
   | pair venv vt =>
-    match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+    match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt)) with
     | Some r =>
       let '(c_env, n_env, f_env, next_cTag, next_iTag, e) := r in
       (* make compilation state *)
@@ -198,7 +198,7 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
 Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=  
   match e with
   | pair venv vt =>
-    match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+    match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt)) with
     | Some r =>
       let '(c_env, n_env, f_env, next_cTag, next_iTag, e) := r in
       (* make compilation state *)
@@ -235,12 +235,6 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
     | None => Exc "failed converting from L5 to L6"
     end
   end.
-
-(* TODOs for optimized pipeline:
-   
-   1. Hoist only closed functions 
-   2. Run hoisting before CC, to find top-level functions, and not closure convert them
-*)
 
 Instance certiL5_t0_L6: 
   CerticoqTranslation (cTerm certiL5) (cTerm certiL6) :=

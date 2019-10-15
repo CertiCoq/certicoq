@@ -78,10 +78,12 @@ Instance certiL1g: CerticoqLanguage (Program L1g.compile.Term):= {}.
 Local Generalizable Variable Lj.
 
 Definition translateTo `{F:utils.Fuel} `{CerticoqTranslation (Program L1g.compile.Term) Lj}
-           (o:Opt)
-           (p:Template.Ast.program): exception Lj :=
-  let l1g:= L1g.compile.program_Program p in
-  translate (Program L1g.compile.Term) Lj o l1g.
+  (o:Opt)
+  (p:Template.Ast.program): exception Lj :=
+  let l1g := ((AstCommon.timePhase "L1 to L2")
+                (fun (_:Datatypes.unit) =>
+                   L1g.compile.program_Program p)) in 
+     translate (Program L1g.compile.Term) Lj o l1g.
 
 Arguments translateTo {F} Lj {H} o p.
 

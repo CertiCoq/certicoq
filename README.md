@@ -150,18 +150,6 @@ However, it can be configured for x86_32 by:
    by
 	  compcert/x86_32/Archi.v	
 
-2) In theory/L7/L6_to_Clight.v, replace the lines
-         Notation val := ulongTy.
-	 Notation uval := ulongTy.
-	 Notation val_typ := (AST.Tlong:typ).
-	 Notation Init_int x := (Init_int64 (Int64.repr x)).
-
-   by
-         Notation val := uintTy.
-	 Notation uval := uintTy.
-         Notation val_typ := (Tany32:typ).
-         Notation Init_int x := (Init_int32 (Int.repr x)).
-
 
 
 
@@ -173,14 +161,12 @@ Building the compiler:
 
   This will build the compiler and its proofs.
 
-To build the OCaml version of the compiler and the
-`CertiCoq Compile` plugin, in `theories/`, run:
 
-    # sh make_plugin.sh
-
-To install Certicoq, do the following. This steps the above build steps.
+To install the Certicoq plugin, do the following: 
     # make install
 
+To test the installation, go to 'certicoq/benchmark' and run
+   # make all
 
 Troubleshooting:
 ----------------------

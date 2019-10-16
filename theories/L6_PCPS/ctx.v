@@ -12,7 +12,8 @@ Inductive exp_ctx : Type :=
 | Hole_c : exp_ctx
 | Econstr_c : var -> ctor_tag -> list var -> exp_ctx -> exp_ctx
 | Eproj_c  : var -> ctor_tag -> N -> var -> exp_ctx -> exp_ctx
-| Eprim_c : var -> prim -> list var -> exp_ctx -> exp_ctx   
+| Eprim_c : var -> prim -> list var -> exp_ctx -> exp_ctx
+| Eletapp_c : var -> var -> fun_tag -> list var -> exp_ctx -> exp_ctx   
 | Ecase_c : var -> list (ctor_tag * exp) -> ctor_tag ->
             exp_ctx -> list (ctor_tag * exp) -> exp_ctx  
 | Efun1_c : fundefs -> exp_ctx -> exp_ctx
@@ -30,6 +31,9 @@ Inductive app_ctx: exp_ctx -> exp -> exp -> Prop :=
 | Proj_ac : forall x t n y e c ce, 
               app_ctx c e ce ->        
               app_ctx (Eproj_c x t n y c) e (Eproj x t n y ce)
+| Letapp_ac : forall x f ft ys e c ce, 
+    app_ctx c e ce ->
+    app_ctx (Eletapp_c x f ft ys c) e (Eletapp x f ft ys ce)
 | Case_ac : forall x te t e te' c ce,
               app_ctx c e ce ->
               app_ctx (Ecase_c x te t c te') e
@@ -59,6 +63,7 @@ Fixpoint app_ctx_f (c:exp_ctx) (e:exp) : exp :=
     | Hole_c => e
     | Econstr_c x t ys c => Econstr x t ys (app_ctx_f c e)
     | Eproj_c x t n y c => Eproj x t n y (app_ctx_f c e)
+    | Eletapp_c x f ft ys c => Eletapp x f ft ys (app_ctx_f c e)
     | Ecase_c x te t c te' =>
       Ecase x (te ++ (t, app_ctx_f c e) :: te')
     | Eprim_c x f ys c => Eprim x f ys (app_ctx_f c e)
@@ -80,6 +85,9 @@ Inductive  comp_ctx: exp_ctx -> exp_ctx -> exp_ctx -> Prop :=
 | Proj_cc : forall x t n y e c ce,
               comp_ctx c e ce ->
               comp_ctx (Eproj_c x t n y c) e (Eproj_c x t n y ce)
+| Letapp_cc : forall x f ft ys e c ce,
+              comp_ctx c e ce ->
+              comp_ctx (Eletapp_c x f ft ys c) e (Eletapp_c x f ft ys ce)
 | Case_cc : forall x te t c te' c' cc,
               comp_ctx c c' cc ->
               comp_ctx (Ecase_c x te t c te') c' (Ecase_c x te t cc te')
@@ -109,6 +117,7 @@ Fixpoint comp_ctx_f (c1:exp_ctx) (c2:exp_ctx) : exp_ctx :=
     | Econstr_c x t ys c => Econstr_c x t ys (comp_ctx_f c c2)
     | Eproj_c x t n y c => Eproj_c x t n y (comp_ctx_f c c2)
     | Ecase_c x te t c te' => Ecase_c x te t (comp_ctx_f c c2) te'
+    | Eletapp_c x f ft ys c => Eletapp_c x f ft ys (comp_ctx_f c c2)
     | Eprim_c x f ys c => Eprim_c x f ys (comp_ctx_f c c2)
     | Efun1_c fds c => Efun1_c fds (comp_ctx_f c c2)
     | Efun2_c cfds e' => Efun2_c (comp_f_ctx_f cfds c2) e'
@@ -139,7 +148,9 @@ Lemma exp_fundefs_ctx_mutual_ind :
     (forall (v : var) (t : ctor_tag) (l : list var) (e : exp_ctx),
        P e -> P (Econstr_c v t l e)) ->
     (forall (v : var) (t : ctor_tag) (n : N) (v0 : var) (e : exp_ctx),
-       P e -> P (Eproj_c v t n v0 e)) ->
+        P e -> P (Eproj_c v t n v0 e)) ->
+    (forall (v : var) (f : var) (ft : fun_tag) (ys : list var) (e : exp_ctx),
+        P e -> P (Eletapp_c v f ft ys e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp_ctx),
        P e -> P (Eprim_c v p l e)) ->
     (forall (v : var) (l : list (ctor_tag * exp)) (t : ctor_tag) (e : exp_ctx),
@@ -161,6 +172,7 @@ Qed.
 Ltac exp_fundefs_ctx_induction IH1 IH2 :=
   apply exp_fundefs_ctx_mutual_ind;
   [ | intros ? ? ? ? IH1 
+    | intros ? ? ? ? ? IH1
     | intros ? ? ? ? ? IH1
     | intros ? ? ? ? IH1
     | intros ? ? ? ? IH1
@@ -343,6 +355,19 @@ Proof.
       * right. destructAll.
         exists ( Eproj_c v1 c n0 v2 x), x0;
           auto.
+  - simpl in H. destruct c3; inv H.
+    + simpl in H0.
+      left.
+      destruct c4; inv H0.
+      exists (Eletapp_c v0 v1 f0 l e ),  c2; auto.
+    + apply IHc1 in H5. destruct H5.
+      * left.
+        destructAll.
+        exists x, x0.
+        auto.
+      * right. destructAll.
+        exists (Eletapp_c v0 v1 f0 l x), x0;
+          auto.        
   - simpl in H. destruct c3; inv H.
     + simpl in H0.
       left.

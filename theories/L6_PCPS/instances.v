@@ -149,7 +149,7 @@ Definition L6_pipeline_old (e : cTerm certiL5) : exception (cTerm certiL6) :=
       let e := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
       (* let e := dead_param_elim.eliminate e in *)
-      (* (* Shrink reduction *)       *)
+      (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       Ret ((M.empty _ ,  state.cenv c_data, state.nenv c_data, state.fenv c_data), (M.empty _, e))
     | None => Exc "failed converting from L5 to L6"
@@ -184,8 +184,8 @@ Definition L6_pipeline (e : cTerm certiL5) : exception (cTerm certiL6) :=
           pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e) log
       in
       (* Shrink reduction *)
-      (* let e := shrink_cps.shrink_top e in *)
-      (* (* Dead parameter elimination *) *)
+      let e := shrink_cps.shrink_top e in
+      (* Dead parameter elimination *)
       (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
@@ -227,7 +227,7 @@ Definition L6_pipeline_opt (e : cTerm certiL5) : exception (cTerm certiL6) :=
 
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
-      (* (* Dead parameter elimination *) *)
+      (* Dead parameter elimination *)
       (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in

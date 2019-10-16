@@ -24,11 +24,11 @@ Flags:
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 
-CertiCoq Compile Opt 6 demo1.
+CertiCoq Compile Opt 2 demo1.
 
 Definition demo2 := (negb, List.hd_error).
 
-CertiCoq Compile Opt 6 demo2.
+CertiCoq Compile Opt 2 demo2.
 
 (* Definition lala := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
 (* Definition test1_opt := List.map (fun x => 1 + x) (List.repeat 10 10000). *)

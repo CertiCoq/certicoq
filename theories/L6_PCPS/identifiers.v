@@ -286,6 +286,15 @@ Inductive occurs_free : exp -> Ensemble var :=
       x <> y ->
       occurs_free e y ->
       occurs_free (Eproj x tau n y' e) y
+| Free_Eletapp1 :
+    forall y x f ft ys e,
+      List.In y (f::ys) ->
+      occurs_free (Eletapp x f ft ys e) y
+| Free_Eletapp2 :
+    forall y x f ft ys e,
+      x <> y ->
+      occurs_free e y ->
+      occurs_free (Eletapp x f ft ys e) y
 | Free_Efun1 :
     forall y defs e,
       ~ (name_in_fundefs defs y) -> 
@@ -330,7 +339,7 @@ with occurs_free_fundefs : fundefs -> Ensemble var :=
 Hint Constructors occurs_free.
 Hint Constructors occurs_free_fundefs.
 
-(** [occurs_free_applied e] is the set of free variables of [e] that appear in applied position *)
+(** [occurs_free_applied e] is the set of free variables of [e] that appear in application position *)
 Inductive occurs_free_applied : exp -> Ensemble var :=
 | FreeApp_Econstr :
     forall y x t ys e,
@@ -350,6 +359,14 @@ Inductive occurs_free_applied : exp -> Ensemble var :=
       x <> y ->
       occurs_free_applied e y ->
       occurs_free_applied (Eproj x tau n y' e) y
+| FreeApp_Eletapp1 :
+    forall f x ft ys e,
+      occurs_free_applied (Eletapp x f ft ys e) f
+| FreeApp_Eletapp2 :
+    forall y x f ft ys e,
+      x <> y ->
+      occurs_free_applied e y ->
+      occurs_free_applied (Eletapp x f ft ys e) y
 | FreeApp_Efun1 :
     forall y defs e,
       ~ (name_in_fundefs defs y) -> 
@@ -421,6 +438,20 @@ Proof.
   inv H0. eauto.
   inv H0. constructor; eauto.
   intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Eletapp x f ft ys e:
+  (occurs_free (Eletapp x f ft ys e))
+    <--> ((f |: FromList ys) :|: ((occurs_free e) \\ [set x])).
+Proof.
+  split; intros x' H; inv H.
+  + inv H6; eauto with Ensembles_DB.
+  + right. constructor; eauto. intros H. inv H; eauto.
+  + inv H0. inv H. constructor; eauto. now left.
+    constructor. now right.
+  + inv H0; eauto. eapply Free_Eletapp2 .
+    intros Hc. subst; eauto.
+    eassumption. 
 Qed.
 
 Lemma occurs_free_Ehalt x :
@@ -505,8 +536,10 @@ Ltac normalize_occurs_free :=
       rewrite occurs_free_Econstr
     | [|- context[occurs_free (Eproj _ _ _ _ _)]] =>
       rewrite occurs_free_Eproj
+    | [|- context[occurs_free (Eletapp _ _ _ _ _)]] =>
+      rewrite occurs_free_Eletapp
     | [|- context[occurs_free (Ecase _ [])]] =>
-      rewrite occurs_free_Ecase_nil
+      rewrite occurs_free_Ecase_nil              
     | [|- context[occurs_free (Ecase _ (_ :: _))]] =>
       rewrite occurs_free_Ecase_cons
     | [|- context[occurs_free (Ecase _ (_ ++ _))]] =>
@@ -517,6 +550,8 @@ Ltac normalize_occurs_free :=
       rewrite occurs_free_Eapp
     | [|- context[occurs_free (Eprim _ _ _ _)]] =>
       rewrite occurs_free_Eprim
+    | [|- context[occurs_free (Ehalt _)]] =>
+      rewrite occurs_free_Ehalt         
     | [|- context[occurs_free_fundefs (Fcons _ _ _ _ _)]] =>
        rewrite occurs_free_fundefs_Fcons
     | [|- context[occurs_free_fundefs Fnil]] =>
@@ -529,6 +564,8 @@ Ltac normalize_occurs_free_in_ctx :=
       rewrite occurs_free_Econstr in H
     | [ H : context[occurs_free (Eproj _ _ _ _ _)]  |- _ ] =>
       rewrite occurs_free_Eproj in H
+    | [ H : context[occurs_free (Eletapp _ _ _ _ _)]  |- _ ] =>
+      rewrite occurs_free_Eletapp in H
     | [ H : context[occurs_free (Ecase _ [])] |- _ ] =>
       rewrite occurs_free_Ecase_nil in H
     | [ H : context[occurs_free (Ecase _ (_ :: _))] |- _ ] =>
@@ -541,6 +578,8 @@ Ltac normalize_occurs_free_in_ctx :=
       rewrite occurs_free_Eapp in H
     | [ H : context[occurs_free (Eprim _ _ _ _)] |- _ ] =>
       rewrite occurs_free_Eprim in H
+    | [ H : context[occurs_free (Ehalt _)] |- _ ] =>
+      rewrite occurs_free_Ehalt in H
     | [ H : context[occurs_free_fundefs (Fcons _ _ _ _ _)] |- _ ] =>
        rewrite occurs_free_fundefs_Fcons in H
     | [ H : context[occurs_free_fundefs Fnil] |- _ ] =>
@@ -576,6 +615,14 @@ Qed.
 Lemma occurs_free_Eproj_Included x tau t y e :
   Included var (occurs_free e)
            (Union var (occurs_free (Eproj x tau t y e)) (Singleton var x)).
+Proof.
+  intros x' Hin.
+  destruct (var_dec x x'); subst; eauto.
+Qed.
+
+Lemma occurs_free_Eletapp_Included x f ft ys e :
+  Included var (occurs_free e)
+           (Union var (occurs_free (Eletapp x f ft ys e)) (Singleton var x)).
 Proof.
   intros x' Hin.
   destruct (var_dec x x'); subst; eauto.
@@ -698,6 +745,19 @@ Proof.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
     destruct (Dec x); eauto.
     right. intros Hc. inv Hc; eauto.
+  + constructor; intros z.
+    destruct (in_dec var_dec z ys); eauto.
+    left. constructor; now right.
+
+    destruct (var_dec z f); subst; eauto.
+    left. constructor; now left.
+    destruct (var_dec x z); subst.
+    right. intros Hc. inv Hc; eauto.
+    eapply n. inv H6; exfalso; eauto.
+    
+    destruct (Dec z); eauto.
+    right. intros Hc. inv Hc; eauto.
+    inv H6; eauto. 
   + constructor; intros x. destruct (Decidable_name_in_fundefs f2).
     destruct (Dec x).
     * right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
@@ -756,6 +816,17 @@ Proof.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
     destruct (Dec x); eauto.
     right. intros Hc. inv Hc; eauto.
+  + constructor; intros z.
+    destruct (in_dec var_dec z ys); eauto.
+    left; constructor; eauto. now right.
+    destruct (var_dec z f); subst.
+    left; constructor; eauto. now left.    
+    destruct (var_dec z x); subst.
+    * right. intros Hc. inv Hc; eauto. eapply n. inv H6; eauto.
+      congruence. 
+    * destruct (Dec z); eauto.
+      right. intros Hc. inv Hc; eauto.
+      inv H6; eauto.
   + constructor; intros x. destruct (Decidable_name_in_fundefs f2).
     destruct (Dec x).
     * right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.

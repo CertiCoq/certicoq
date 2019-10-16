@@ -129,6 +129,11 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
     emit " := prim_" ;; emit (show_pos p) ;; emit (show_vars ys) ;;
     emit " in " ;; newline ;;
     emit_exp indent e
+  | Eletapp x f ft ys e =>
+    emit "let " ;; emit (show_var x) ;;
+    emit " := app " ;;  emit (show_var x) ;; emit (show_ftag ft);; emit (show_vars ys) ;;
+    emit " in " ;; newline ;;
+    emit_exp indent e
   | Ecase x arms =>
     emit "case " ;; emit (show_var x) ;; emit " of {" ;; newline ;;
          (fix iter (xs : list (ctor_tag*exp)) : M unit :=

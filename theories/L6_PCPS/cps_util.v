@@ -888,6 +888,8 @@ Inductive dsubterm_e:exp -> exp -> Prop :=
     forall v t n y e, dsubterm_e e (Eproj v t n y e)
 | dsubterm_prim :
     forall x p ys e, dsubterm_e e (Eprim x p ys e)
+| dsubterm_letapp :
+    forall x f ft ys e, dsubterm_e e (Eletapp x f ft ys e)
 | dsubterm_case :
     forall x e g cl, List.In (g, e) cl -> dsubterm_e e (Ecase x cl)
 | dsubterm_fds :
@@ -999,6 +1001,10 @@ Inductive num_occur: exp -> var -> nat -> Prop :=
     forall e v n  y v' t n',
       num_occur  e v n ->
       num_occur (Eproj v' t n' y e) v (num_occur_list [y] v + n)
+| Num_occ_letapp:
+    forall e v n v' f ft ys,
+      num_occur  e v n ->
+      num_occur (Eletapp v' f ft ys e) v (num_occur_list (f::ys) v + n)
 | Num_occ_app:
     forall f t ys v,
       num_occur (Eapp f t ys) v (num_occur_list (f::ys) v)
@@ -1045,6 +1051,10 @@ Inductive num_occur_ec: exp_ctx -> var -> nat -> Prop :=
     forall  v n y v' t n' c,
       num_occur_ec c v n ->
       num_occur_ec (Eproj_c v' t n' y c) v (num_occur_list [y] v + n)
+| Noec_letapp:
+    forall  v n v' f ft ys c,
+      num_occur_ec c v n ->
+      num_occur_ec (Eletapp_c v' f ft ys c) v (num_occur_list (f::ys) v + n)
 | Noec_case:
     forall cl cl' c v n m tg y p,
       num_occur_case cl v n ->
@@ -1087,6 +1097,10 @@ Inductive num_binding_e: exp -> var -> nat -> Prop :=
     forall e v n x f ys,
       num_binding_e e v n ->
       num_binding_e (Eprim x f ys e) v (num_occur_list [x] v + n)
+| Ub_letapp:
+    forall e v n x f ft ys,
+      num_binding_e e v n ->
+      num_binding_e (Eletapp x f ft ys e) v (num_occur_list [x] v + n)
 | Ub_app:
     forall f t ys v,
       num_binding_e (Eapp f t ys) v 0
@@ -1145,6 +1159,7 @@ Proof.
       }
       destruct H. exists x; constructor; auto.
     + exists (num_occur_list [v0] v + x); constructor; auto.
+    + exists (num_occur_list [v0] v + x). constructor; auto. 
     + specialize (e_num_binding_f v f).
       destructAll.
       eexists; constructor; eauto.
@@ -1254,6 +1269,19 @@ Proof.
     constructor. rewrite IHc.
     eexists; eexists; eauto.
     omega.
+  - inv H. eapply IHc in H7.
+    destructAll.
+    eexists; eexists.
+    split.
+    constructor; eauto.
+    split; eauto.
+    omega.
+  - destructAll.
+    inv H.
+    eapply num_occur_n.
+    constructor. rewrite IHc.
+    eexists; eexists; eauto.
+    omega.    
   - inv H. apply IHc in H6. destructAll.
     eexists; eexists.
     split.
@@ -1476,7 +1504,7 @@ Proof.
     eapply num_occur_ec_n.
     constructor. rewrite IHc1. eauto.
     omega.
-  - inv H. apply IHc1 in H6. destructAll.
+  - inv H. apply IHc1 in H7. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
     omega.
@@ -1485,7 +1513,7 @@ Proof.
     eapply num_occur_ec_n.
     constructor. rewrite IHc1. eauto.
     omega.
- - inv H. apply IHc1 in H8. destructAll.
+ - inv H. apply IHc1 in H6. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
     omega.
@@ -1494,7 +1522,7 @@ Proof.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHc1. eauto.
     omega.
- - inv H. apply IHc1 in H2. destructAll.
+  - inv H. apply IHc1 in H8. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
     omega.
@@ -1503,6 +1531,14 @@ Proof.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHc1. eauto.
     omega.
+  - inv H. apply IHc1 in H2. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+    omega.
+  - destructAll. inv H.
+    eapply num_occur_ec_n.
+    constructor; eauto. rewrite IHc1. eauto.
+    omega.    
   - inv H. apply IHfc1 in H5. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
@@ -1512,7 +1548,7 @@ Proof.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHfc1. eauto.
     omega.
-      - inv H. apply IHc1 in H7. destructAll.
+  - inv H. apply IHc1 in H7. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
     omega.

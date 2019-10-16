@@ -4038,7 +4038,7 @@ Qed.
     fun cenv e =>
       Forall_constructors_in_e (fun x t ys =>
                                   match (M.get t cenv) with
-                                  | Some (name, it, a, n) =>
+                                  | Some (Build_ctor_ty_info _ _ _ a _) =>
                                     N.of_nat (length ys) = a
                                   | None => False
                                   end) e.
@@ -4087,12 +4087,11 @@ Qed.
 
 
 
-    
 Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
-| CCV_constr:forall cenv c vs a name it n,
+| CCV_constr:forall cenv c vs inf,
     Forall (correct_cenv_of_val cenv) vs ->
-    M.get c cenv = Some (name, it, a, n) ->
-    N.of_nat (length vs) = a ->
+    M.get c cenv = Some inf ->
+    N.of_nat (length vs) = ctor_arity inf ->
     correct_cenv_of_val cenv (Vconstr c vs)
 | CCV_fun: forall cenv rho fds f,
     Forall_fundefs (fun v t xs e => correct_cenv_of_exp cenv e) fds -> 
@@ -4106,7 +4105,7 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
     Doesn't check that name of the i will be consistent (namei could be different from name') *)
   Definition correct_ienv_of_cenv: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
-      forall x, forall i a ord name name', M.get x cenv = Some (name, name', i, a, ord) ->
+      forall x, forall i a ord name name', M.get x cenv = Some (Build_ctor_ty_info name name' i a ord) ->
                                    exists  namei cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
 
   (* all constructors found in ienv are in cenv *) 
@@ -4114,41 +4113,41 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
     fun cenv ienv =>
       forall i namei cl, M.get i ienv = Some (namei, cl)  ->
                          forall name x a ord, List.In (name, x, a, ord) cl ->
-                                              exists namei', M.get x cenv = Some (name, namei', i, a, ord).              
+                                              exists namei', M.get x cenv = Some (Build_ctor_ty_info name namei' i a ord).              
 
                                    
 
 (* stronger version of ienv_of_cenv that enforces uniqueness of name' for i and that nothing is in ienv and not in cenv *)
     Definition correct_ienv_of_cenv_strong: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
-      forall x, forall i a ord name namei, M.get x cenv = Some (name, namei, i, a, ord) ->
+      forall x, forall i a ord name namei, M.get x cenv = Some (Build_ctor_ty_info name namei i a ord) ->
                                    exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
  
   
   
 
-  (* OS 04/24: added in bound on n includes in this *)
-  Inductive correct_crep (cenv:ctor_env): ctor_tag -> cRep -> Prop :=
+  (* OS 04/24: added in bound on n includes in this *) 
+  Inductive correct_crep (cenv:ctor_env): ctor_tag -> ctor_rep -> Prop :=
   | rep_enum :
-      forall c name it  n,
-        M.get c cenv = Some (name, it, 0%N, n) ->
+      forall c name namei it  n,
+        M.get c cenv = Some (Build_ctor_ty_info name namei it 0%N n) ->
         (* there should not be more than 2^(intsize - 1) unboxed constructors *)
         (0 <= (Z.of_N n) <   Ptrofs.half_modulus)%Z ->
       correct_crep cenv c (enum n)
   | rep_boxed:
-      forall c name it a n,
-        M.get c cenv = Some (name, it, (Npos a), n) ->
+      forall c name namei it a n,
+        M.get c cenv = Some (Build_ctor_ty_info name namei it (Npos a%N) n) ->
         (* there should not be more than 2^8 - 1 boxed constructors *)
         (0 <= (Z.of_N n) <  Zpower.two_p 8)%Z ->
         (* arity shouldn't be higher than 2^54 - 1  *)
         (0 <= Z.of_N (Npos a) <  Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z -> 
       correct_crep cenv c (boxed n (Npos a)).
 
-  (* crep <-> make_cRep cenv *)
-  Definition correct_crep_of_env: L6.cps.ctor_env -> M.t cRep -> Prop :=
+  (* crep <-> make_ctor_rep cenv *)
+  Definition correct_crep_of_env: L6.cps.ctor_env -> M.t ctor_rep -> Prop :=
     fun cenv crep_env =>
-      (forall c name it a n,
-        M.get c cenv = Some (name, it, a, n) ->
+      (forall c name namei it a n,
+        M.get c cenv = Some (Build_ctor_ty_info name namei it a n) ->
         exists crep, M.get c crep_env = Some crep /\
                      correct_crep cenv c crep) /\
       (forall c crep, M.get c crep_env = Some crep ->
@@ -4161,7 +4160,7 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
         M.get x rho = Some v ->
         correct_cenv_of_val cenv v.
    
-  Definition correct_envs: ctor_env -> n_ind_env -> M.t cRep ->  cps.M.t cps.val ->  exp -> Prop :=
+  Definition correct_envs: ctor_env -> n_ind_env -> M.t ctor_rep ->  cps.M.t cps.val ->  exp -> Prop :=
     fun cenv ienv crep_env rho e =>
       correct_ienv_of_cenv cenv ienv /\
       correct_cenv_of_env cenv rho /\
@@ -4482,12 +4481,12 @@ Theorem caseConsistent_findtag_In_cenv:
   forall cenv t e l,
     caseConsistent cenv l t ->
     findtag l t = Some e ->
-    exists (a aty:BasicAst.name) (ty:ind_tag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i).
+    exists (a aty:BasicAst.name) (ty:ind_tag) (n:N) (i:N), M.get t cenv = Some (Build_ctor_ty_info a aty ty n i).
 Proof.
   destruct l; intros.
   - inv H0.
-  - inv H. 
-    exists a, b, ty', n, i; auto.    
+  - inv H. destruct info.
+    exists ctor_name, ctor_ind_name, ctor_ind_tag,ctor_arity,ctor_ordinal; auto.
 Qed.
  
 
@@ -4927,8 +4926,8 @@ Qed.
 Theorem disjoint_ord:
   forall {cenv ienv c c' namec namec' namei namei' i a a' ord ord'}, 
     correct_ienv_of_cenv cenv ienv ->        
-    M.get c cenv = Some (namec, namei, i, a, ord) -> 
-    M.get c' cenv = Some (namec', namei', i, a', ord') ->
+    M.get c cenv = Some (Build_ctor_ty_info namec namei i a ord) -> 
+    M.get c' cenv = Some (Build_ctor_ty_info namec' namei' i a' ord') ->
     (c <> c' <-> ord <> ord').
 Proof.
   intros.
@@ -5040,7 +5039,6 @@ Proof.
        specialize (IHcl _ _ H14 H2 H7). apply IHcl.
        inv H0. apply H4 in H11.
        apply H4 in H. inv H. inv H11. 
-       destruct name. destruct name0.
        assert (it = it0). {
          inv Hcc.  rewrite H5 in H13; rewrite H0 in H14; inv H13; inv H14. auto.
        }
@@ -5048,12 +5046,10 @@ Proof.
        assert (n1 <> arr). {
          assert (Hdj := disjoint_ord Hienv H0 H5).
          apply Hdj. auto.
-       }
-
-       
+       }      
        inv Hcc. rewrite H5 in H14; inv H14. rewrite H0 in H15; inv H15.
-       intro. do 2 (erewrite repr_unboxed_shiftr in H6 by eauto).
-       apply H. apply N2Z.inj. auto.
+       intro. do 2 (erewrite repr_unboxed_shiftr in H6 by eauto). 
+       apply H. apply N2Z.inj. apply H6.
      + inv Hcc; eapply IHcl; eauto.       
      + inv Hcc; eapply IHcl; eauto.
 Qed.
@@ -5114,9 +5110,10 @@ Proof.
       inv H0. apply H4 in H11.
       apply H4 in H. inv H. inv H11.          
       inv Hcc.
+ 
+      rewrite H6 in H11. inv H11. rewrite H5 in H16. inv H16.
+      simpl in H18. inv H18.
       
-
-      rewrite H6 in H11; inv H11. rewrite H5 in H16; inv H16. 
       assert (Hdj := disjoint_ord Hienv H5 H6).
       apply Hdj in n0. intro. apply n0.
       apply N2Z.inj. auto.
@@ -5999,7 +5996,7 @@ Proof.
     admit.
 
 
-  - simpl. induction (rev l). simpl. rewrite H_makeTag. rewrite H_make_cRep. auto.
+  - simpl. induction (rev l). simpl. rewrite H_makeTag. rewrite H_make_ctor_rep. auto.
   simpl. rewrite IHl0. auto.
   -  simpl. induction (rev l). simpl. rewrite H_makeTag. auto. 
   simpl. rewrite IHl0. auto.  
@@ -6087,7 +6084,7 @@ Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent is
                   (fun prog : statement =>
                    Monad.pbind (makeCases l')
                      (fun '(ls, ls') =>
-                      match make_cRep cenv (fst p) with
+                      match make_ctor_rep cenv (fst p) with
                       | Some (enum t) =>
                         let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
                           match ls' with
@@ -6114,8 +6111,8 @@ Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent is
                       end))
             end).
 
-Definition fmake_cRep (p:positive) (c:ctor_ty_info) : cRep :=
-  let '(name, _, it , a , n) := c in
+Definition fmake_ctor_rep (p:positive) (c:ctor_ty_info) : ctor_rep :=
+  let '(Build_ctor_ty_info name _ it  a  n) := c in
       match (a =? 0)%N with
       | true =>
         (enum n)
@@ -6124,8 +6121,8 @@ Definition fmake_cRep (p:positive) (c:ctor_ty_info) : cRep :=
       end.
 
 
-Definition compute_rep_env (cenv:ctor_env): M.t cRep :=
-  M.map fmake_cRep cenv.
+Definition compute_rep_env (cenv:ctor_env): M.t ctor_rep :=
+  M.map fmake_ctor_rep cenv.
 
 
   
@@ -6133,18 +6130,18 @@ Theorem crep_cenv_correct:
 forall cenv rep_env, 
   correct_crep_of_env cenv rep_env ->
   forall c, 
-    make_cRep cenv c =  M.get c rep_env.
+    make_ctor_rep cenv c =  M.get c rep_env.
 Proof.
-  intros. unfold make_cRep.
+  intros. unfold make_ctor_rep.
   destruct (cps.M.get c cenv) eqn:Hgc.
-  - destruct c0. destruct p. destruct p.  destruct p.
+  - destruct c0.
     simpl.
-    destruct (n0 =? 0)%N eqn:Hn0.    
+    destruct (ctor_arity =? 0)%N eqn:Hn0.    
     + rewrite N.eqb_eq in Hn0. subst.
-      inv H. specialize (H0 _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc. auto.
+      inv H. specialize (H0 _ _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc. auto.
     + rewrite N.eqb_neq in Hn0.
-      inv H. specialize (H0 _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc.  exfalso; apply Hn0; auto.
-      auto.
+      inv H. specialize (H0 _ _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc.  exfalso; apply Hn0; auto.
+      auto. 
   -  simpl. symmetry.
      inv H. destruct (M.get c rep_env) eqn:Hcr.
      exfalso. apply H1 in Hcr. inv Hcr; rewrite H in Hgc; inv Hgc. auto.
@@ -6187,38 +6184,38 @@ Proof.
 Qed.
 
 Theorem repr_asgn_constructorS:
-  forall p cenv ienv  rep_env fenv v c l s name it n,
+  forall p cenv ienv  rep_env fenv v c l s name iname it n,
       find_symbol_domain p fenv ->
   correct_crep_of_env cenv  rep_env ->
-  M.get c cenv = Some  (name , it, N.of_nat (length l), n) ->
+  M.get c cenv = Some  (Build_ctor_ty_info name iname it (N.of_nat (length l)) n) ->
         assignConstructorS allocIdent threadInfIdent cenv ienv fenv v c l = Some s -> 
 repr_asgn_constr allocIdent threadInfIdent fenv p rep_env v c l s.
 Proof.
-  intros p cenv ienv  rep_env map v c l s name it n Hsymbol; intros.
+  intros p cenv ienv  rep_env map v c l s name iname it n Hsymbol; intros.
   unfold assignConstructorS in *.
     destruct (makeTag cenv c) eqn:H_makeTag.
-    destruct (make_cRep cenv c) eqn:H_make_cRep.
+    destruct (make_ctor_rep cenv c) eqn:H_make_ctor_rep.
     simpl in H1. destruct c0; inv H1.
-  - unfold make_cRep in H_make_cRep. rewrite H0 in H_make_cRep. simpl in *. destruct name.
-    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_cRep.
+  - unfold make_ctor_rep in H_make_ctor_rep. rewrite H0 in H_make_ctor_rep. simpl in *.
+    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_ctor_rep.
     rewrite OrdersEx.N_as_OT.eqb_eq in Hll.
     destruct l; inv Hll.
     unfold makeTag in *.
     destruct (makeTagZ cenv c) eqn:H_makeTagZ; inv H_makeTag.
-    inv H. specialize (H1 _ _ _ _ _ H0). inv H1. inv H. inv H3; rewrite H0 in H; inv H. 
+    inv H. specialize (H1 _ _ _ _ _ _ H0). inv H1. inv H. inv H3; rewrite H0 in H; inv H. 
     econstructor. apply H1. 
-    {split.  unfold makeTagZ in *.  unfold make_cRep in *. rewrite H0 in H_makeTagZ. simpl in H_makeTagZ. inv H_makeTagZ.
+    {split.  unfold makeTagZ in *.  unfold make_ctor_rep in *. rewrite H0 in H_makeTagZ. simpl in H_makeTagZ. inv H_makeTagZ.
      reflexivity. 
      auto. }
-  - unfold make_cRep in H_make_cRep. rewrite H0 in H_make_cRep.     destruct name.  simpl in *.
-    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_cRep.
+  - unfold make_ctor_rep in H_make_ctor_rep. rewrite H0 in H_make_ctor_rep. simpl in *.
+    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_ctor_rep.
     unfold makeTag in H_makeTag. 
     destruct (makeTagZ cenv c) eqn:H_makeTagZ; inv H_makeTag.
-    inv H. specialize (H1 _ _ _ _ _ H0). destruct H1. destruct H.
+    inv H. specialize (H1 _ _ _ _ _ _ H0). destruct H1. destruct H.
     rewrite OrdersEx.N_as_OT.eqb_neq in Hll.
     inv H1; rewrite H3 in H0; inv H0. exfalso; auto.
     econstructor. eauto.
-    { split. unfold makeTagZ in *. unfold make_cRep in *.
+    { split. unfold makeTagZ in *. unfold make_ctor_rep in *.
       rewrite H3 in H_makeTagZ. simpl Monad.pbind in H_makeTagZ.
       inv H_makeTagZ; auto.
       split; auto.  }
@@ -6235,16 +6232,14 @@ Qed.
 
 Theorem make_crep_none:
   forall c cenv,
-  make_cRep cenv c = None ->
+  make_ctor_rep cenv c = None ->
   M.get c cenv = None.
 Proof.
   intros.
-  unfold make_cRep in *.
+  unfold make_ctor_rep in *.
   destruct (cps.M.get c cenv); auto.
-  exfalso. inv H. destruct c0.
-  destruct p.
-  destruct p. destruct p. 
-  destruct  (n0 =? 0)%N; inv H1.
+  exfalso. destruct c0. inv H.
+  destruct (ctor_arity =? 0)%N; inv H1.
 Qed.
 
 Theorem make_tagZ_none:
@@ -6254,9 +6249,9 @@ Theorem make_tagZ_none:
 Proof.
   intros.
   unfold makeTagZ in *.
-  unfold make_cRep in *.
-  destruct (cps.M.get c cenv). destruct c0; destruct p. destruct p. destruct p. simpl in H.
-  destruct  (n0 =? 0)%N; inv H. auto.
+  unfold make_ctor_rep in *.
+  destruct (cps.M.get c cenv). destruct c0. simpl in H.
+  destruct  (ctor_arity =? 0)%N; inv H. auto.
 Qed.  
   
 (* Main Theorem *)
@@ -6280,7 +6275,7 @@ Proof.
     2: eapply IHe; eauto.
     clear IHe H_eqTranslate.
     apply Forall_constructors_in_constr in Hcenv.
-    destruct (M.get t cenv) eqn:Hccenv. destruct c; destruct p. destruct p0; destruct p.
+    destruct (M.get t cenv) eqn:Hccenv. destruct c.
     subst.
     eapply repr_asgn_constructorS; eauto.
     inv Hcenv.
@@ -6304,7 +6299,7 @@ Proof.
         { intro; intros. eapply Hcenv.  eapply rt_trans. eauto. constructor. econstructor. constructor. reflexivity. }
         specialize (IHe s H0 eq_refl). clear H0.
         inv IHe0. (* l0 = ls, ls' = l1 *) unfold make_case_switch in H4. inv H4. 
-        destruct ( make_cRep cenv c ) eqn:HcRep. 2: inv H.
+        destruct ( make_ctor_rep cenv c ) eqn:Hctor_rep. 2: inv H.
         destruct c0.
         - (* case-enum *)
           destruct l1.
@@ -6316,8 +6311,8 @@ Proof.
             inv H. econstructor.
             eapply Runboxed_br; eauto. erewrite <- crep_cenv_correct; eauto.
             2: apply repr_make_case_switch.
-            erewrite crep_cenv_correct in HcRep; eauto. 
-            inv Hcrep. apply H0 in HcRep.  inv HcRep. constructor; auto.            
+            erewrite crep_cenv_correct in Hctor_rep; eauto. 
+            inv Hcrep. apply H0 in Hctor_rep.  inv Hctor_rep. constructor; auto.            
         - (* case-boxed *)
           destruct l0.
           + (* case-boxed-last *)
@@ -6328,8 +6323,8 @@ Proof.
             inv H. econstructor.
             eapply Rboxed_br; eauto. erewrite <- crep_cenv_correct; eauto.
             2: apply repr_make_case_switch.
-            erewrite crep_cenv_correct in HcRep; eauto. 
-            inv Hcrep. apply H0 in HcRep.  inv HcRep. constructor; auto.            
+            erewrite crep_cenv_correct in Hctor_rep; eauto. 
+            inv Hcrep. apply H0 in Hctor_rep.  inv Hctor_rep. constructor; auto.            
 
       }
     +   assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  inv H.
@@ -6408,15 +6403,15 @@ Qed.
 
 (* ctor_ty_info is proper if a and ord are small enough to be represented *)
 Inductive proper_ctor_ty_info: ctor_ty_info -> Prop :=
-| PC_enum: forall name it ord,
+| PC_enum: forall name iname it ord,
     (0 <= (Z.of_N ord) <   Ptrofs.half_modulus)%Z ->
-    proper_ctor_ty_info (name, it, 0%N, ord)
-| PC_boxed: forall name it a ord,
+    proper_ctor_ty_info (Build_ctor_ty_info name iname it 0%N ord)
+| PC_boxed: forall name iname it a ord,
     (* there should not be more than 2^8 - 1 boxed constructors *)
     (0 <= (Z.of_N ord) <  Zpower.two_p 8)%Z ->
     (* arity shouldn't be higher than 2^54 - 1  *)
     (0 <= Z.of_N (Npos a) <  Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z ->
-    proper_ctor_ty_info (name, it, (Npos a)%N, ord).
+    proper_ctor_ty_info (Build_ctor_ty_info name iname it (Npos a)%N ord).
 
   
  
@@ -6424,11 +6419,11 @@ Inductive proper_ctor_ty_info: ctor_ty_info -> Prop :=
 
 
 Definition proper_cenv (cenv:ctor_env):=
-  forall c name it a ord,
-    M.get c cenv = Some (name, it, a, ord) ->
-    proper_ctor_ty_info (name, it, a, ord) /\
-      ~ (exists c' name' a', c <> c' /\
-                    M.get c' cenv = Some (name', it, a', ord)).
+  forall c name iname it a ord,
+    M.get c cenv = Some (Build_ctor_ty_info name iname it a ord) ->
+    proper_ctor_ty_info (Build_ctor_ty_info name iname it a ord) /\
+      ~ (exists c' name' iname' a', c <> c' /\
+                    M.get c' cenv = Some (Build_ctor_ty_info name' iname' it a' ord)).
 
 (* Definition proper_nenv ? *)
 
@@ -6449,7 +6444,7 @@ Proof.
   erewrite <- M.gso in H1.
   apply H in H1. destruct H1.
   apply H6.
-  exists x, x0, x1.
+  exists x, x0, x1, x2.
   split; auto.
   rewrite M.gso; auto.
   auto. 
@@ -6465,21 +6460,21 @@ proper_cenv cenv ->
 Proof.
   intros. split; intros.
   - unfold compute_rep_env. rewrite M.gmap.
-    unfold fmake_cRep. rewrite H0.
-    simpl. destruct name.
-    specialize (H _ _ _ _ _ H0). destructAll. 
+    unfold fmake_ctor_rep. rewrite H0.
+    simpl.
+    specialize (H _ _ _ _ _ _ H0). destructAll.
     destruct a.
     + eexists; split; auto. rewrite N.eqb_refl.  inv H. econstructor; eauto.
     + eexists; split; auto. assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2. inv H. econstructor; eauto.
   - unfold compute_rep_env in H0.    
     rewrite M.gmap in H0.
-    unfold fmake_cRep in H0.
+    unfold fmake_ctor_rep in H0.
     destruct (M.get c cenv) eqn:Hccenv. 2: inv H0.
-    destruct c0. destruct p. destruct p. destruct p. simpl in H0.
-    specialize (H _ _ _ _ _ Hccenv). destruct H.
-    destruct n0.
+    destruct c0. simpl in H0.
+    specialize (H _ _ _ _ _ _ Hccenv). destruct H.
+    destruct ctor_arity.
     + rewrite N.eqb_refl in H0.  inv H0. inv H. econstructor; eauto.
-    +  assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2 in H0. inv H0. inv H. econstructor; eauto.
+    + assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2 in H0. inv H0. inv H. econstructor; eauto.
 Qed.
 
 
@@ -6493,7 +6488,8 @@ Proof.
   eapply Maps.PTree_Properties.fold_rec; intros.
   - assert (proper_cenv m).
     { intro; intros. rewrite H in H2. apply H1 in H2. destruct H2.
-      split; auto. intro; apply H3.  destructAll. rewrite H in H5. eauto.
+      split; auto. intro; apply H3.  destructAll. rewrite H in H5.
+      exists x , x0 , x1 , x2. auto.
     }
     specialize (H0 H2). destruct H0. split.
     intro; intros. eapply H0 in H5; eauto. rewrite H in H5. auto.    
@@ -6503,10 +6499,10 @@ Proof.
     specialize (H1 H3). destruct H1.
     assert ( domain_ienv_cenv (Maps.PTree.set k v m) (update_ind_env a k v)).
     {
-      intro; intros. destruct v. destruct p. destruct p. destruct p. simpl in H5.
-      destruct ( cps.M.get i0 a) eqn:Hgi0a.
-      + destruct n3.
-        destruct (var_dec i i0).
+      intro; intros. destruct v. simpl in H5.
+      destruct ( cps.M.get ctor_ind_tag a) eqn:Hgi0a.
+      + destruct n.
+        destruct (var_dec i ctor_ind_tag).
         * subst. rewrite M.gss in H5. inv H5. inv H6.
           (* k = x *)
           inv H5. eexists. apply M.gss.
@@ -6516,7 +6512,7 @@ Proof.
         * rewrite M.gso in H5 by auto.
           eapply H1 in H6; eauto. destruct H6. eexists.
           rewrite M.gso. eauto. intro; subst. rewrite H6 in H; inv H.
-      + destruct (var_dec i i0).
+      + destruct (var_dec i ctor_ind_tag).
         * subst. rewrite M.gss in H5. inv H5. inv H6. inv H5. exists namei. apply M.gss. inv H5.
         * rewrite M.gso in H5 by auto. apply H1 in H5. apply H5 in H6. destruct H6.
           exists x0. rewrite M.gso. auto.  intro; subst. rewrite H in H6. inv H6.
@@ -6541,7 +6537,7 @@ Proof.
         (* constructor shares the same ord, cannot be proper *)
         eapply H1 in H8; eauto. inv H8.
         destruct (var_dec x0 k); subst. rewrite H7 in H; inv H.
-        apply H6'. exists x0. eexists. eexists.
+        apply H6'. exists x0. eexists. eexists. eexists.
         split; auto. rewrite M.gso by auto. eauto.
       * (* k is the first cons of i *)
         eexists. eexists. split. apply M.gss.
@@ -6555,13 +6551,13 @@ Proof.
       rewrite M.gso in H6 by auto.
       apply H4 in H6. destructAll.
       {
-        unfold update_ind_env. destruct v. destruct p. destruct p. destruct p. 
-        destruct  (cps.M.get i0 a) eqn:Hi0a.
-        - destruct n4. 
-          destruct (var_dec i i0).
+        unfold update_ind_env. destruct v. 
+        destruct  (cps.M.get ctor_ind_tag a) eqn:Hi0a.
+        - destruct n0. 
+          destruct (var_dec i ctor_ind_tag).
           + subst.
             rewrite Hi0a in H6. inv H6.
-            eexists. exists  ((n2, k, n1, n0) :: x1).
+            eexists. exists  ((ctor_name, k, ctor_arity, ctor_ordinal) :: x1).
             split. rewrite M.gss; auto.
             split. constructor 2. auto.
             split. 
@@ -6569,11 +6565,11 @@ Proof.
               destructAll.
               inv H10.
               inv H11. apply n; auto.
-              apply H8. eexists; eexists. eexists. split; eauto.
+              apply H8. eexists; eexists; eexists. split; eauto.
             * intro; intros.
               destructAll.
               inv H10.
-              inv H11. apply H6'. eexists. eexists. eexists. split.
+              inv H11. apply H6'. eexists. eexists. eexists. eexists. split.
               apply n. rewrite M.gss. reflexivity.
               eapply H9.
               eexists. eexists. eexists. split; eauto.                          
@@ -6789,7 +6785,7 @@ Proof.
         assert (Ha_l : a = N.of_nat (length ys) /\ ys <> []). {          
           assert (subterm_or_eq (Econstr x t ys e) (Econstr x t ys e)) by constructor 2.  
           inv Hc_env. destruct H5 as [H5' H5]. destruct H5 as [H5 H6].
-          apply H5 in H3.   destruct (M.get t cenv) eqn:Hmc. destruct c0. destruct p0. destruct p0. inv H6.
+          apply H5 in H3.   destruct (M.get t cenv) eqn:Hmc. destruct c0. inv H6.
           apply H9 in H0. inv H0. rewrite H10 in Hmc. inv Hmc.
           split; auto. destruct ys. inv H2. intro. inv H0. inv H3.
         }
@@ -7699,11 +7695,11 @@ Proof.
                     }
                    
                   clear H_eql'.
-                  
+                   
                   rewrite get_var_or_funvar_list_correct in Hvs7. rewrite <- get_var_or_funvar_list_set in Hvs7.
                   rewrite <- get_var_or_funvar_list_set in Hvs7.
                   2:{  intro.
-                  assert (Hxrho := getlist_In _ _ _ _ H H6).
+                  assert (Hxrho := get_list_In _ _ _ _ H H6).
                   destruct Hxrho as [vv Hxrho].
                   eapply Hrho_id; eauto. }
                   2:{  intro.
@@ -8282,9 +8278,9 @@ Forall2
       eauto.
       - inv Hc_env.
         destructAll.
-        apply Forall_constructors_in_constr in H2. destruct (M.get t cenv) eqn:Mtcenv. 2: inv H2. destruct c0. destruct p. destruct p0. destruct p.
-        econstructor; eauto.        
-        2:{ apply getlist_length_eq in H. subst. auto. }
+        apply Forall_constructors_in_constr in H2. destruct (M.get t cenv) eqn:Mtcenv. 2: inv H2. destruct c0.
+        econstructor; eauto.   
+        2:{ simpl. simpl. subst. symmetry. exact (f_equal N.of_nat (get_list_length_eq _ _ _ H)). }
         apply Forall_forall. intros.
         assert (Hgiv := get_list_In_val _ _ _ _ H H4).
         destruct Hgiv. destruct H5.
@@ -8909,7 +8905,7 @@ Forall2
 
     assert (Hys: Forall (fun x => exists v, get_var_or_funvar p lenv x v) ys). {
       apply Forall_forall. intros.      
-      assert (Hgl := getlist_In _ _ _ _ H0 H1).
+      assert (Hgl := get_list_In _ _ _ _ H0 H1).
       destruct Hgl. destruct Hrel_m. destructAll. specialize (H5 x). destruct H5. 
       assert ( occurs_free (Eapp f t ys) x). constructor. auto.
       specialize (H5 H7). inv H5. destruct H8. rewrite H5 in H3. inv H3. 

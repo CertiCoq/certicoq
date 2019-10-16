@@ -55,7 +55,7 @@ Variable (numArgsIdent : ident).
 Variable (isptrIdent : ident). (* ident for the is_ptr external function *)
 Variable (caseIdent : ident). (* ident for the case variable , TODO: generate that automatically and only when needed *)
 
-  Definition nParam:nat := 11.
+Variable (nParam:nat).
 
   Definition maxArgs := 1024%Z.
 

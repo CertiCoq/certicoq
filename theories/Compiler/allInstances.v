@@ -57,6 +57,7 @@ Definition ext_comp_opt `{F:utils.Fuel} f := fun prog =>
  
 Require Import L6_to_Clight.
 Require Import L6_to_Clight_old.
+Require Import L6_to_Clight_6.
 (* Require Import Clightexec.*)
 Require Import compcert.lib.Maps.
 Definition argsIdent:positive := 26.
@@ -75,23 +76,27 @@ Definition caseIdent:positive := 83.
 Definition compile_L7 o (t : cTerm certiL6) : cps_util.nEnv * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   match o with
-  | Flag 0 => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+  | Flag 0 => let p := compile_6 argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
-  | Flag 1 =>  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+  | Flag 1 => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 2 =>  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
                (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
-  | Flag 2 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+  | Flag 3 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
-  | Flag 3 =>  let p := compile_old_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+  | Flag 4 =>  let p := compile_old_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
-  | Flag 4 => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+  | Flag 5 => let p := compile_6 argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
-  | Flag 5 =>  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+  | Flag 6 => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 7 =>  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
                (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
-  | Flag 6 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
-              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
-  | Flag 7 =>  let p := compile_old_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
-              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
   | Flag 8 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 9 =>  let p := compile_old_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
+              (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Flag 10 =>  let p := compile_old argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
   | _ => let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent prog cenv nenv in
               (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))

@@ -243,10 +243,12 @@ Instance certiL5_t0_L6:
         | Flag 1 => L6_pipeline
         | Flag 2 => L6_pipeline
         | Flag 3 => L6_pipeline
-        | Flag 4 => L6_pipeline_opt
+        | Flag 4 => L6_pipeline
         | Flag 5 => L6_pipeline_opt
         | Flag 6 => L6_pipeline_opt
         | Flag 7 => L6_pipeline_opt
-        | Flag 8 => L6_pipeline_old
+        | Flag 8 => L6_pipeline_opt
+        | Flag 9 => L6_pipeline_opt
+        | Flag 10 => L6_pipeline_old
         | Flag _ => L6_pipeline
         end.

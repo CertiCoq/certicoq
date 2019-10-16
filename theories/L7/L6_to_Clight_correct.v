@@ -411,7 +411,7 @@ Qed.
 
 (* bound_var_val - name_in_fds *)
 Inductive bound_subvar_val : cps.val -> Ensemble var :=
-    Bound_SVconstr : forall (c : cTag) (vs : list cps.val) (v : cps.val) (x : var),
+    Bound_SVconstr : forall (c : ctor_tag) (vs : list cps.val) (v : cps.val) (x : var),
                     bound_var_val (Vconstr c vs) x -> bound_subvar_val (Vconstr c vs) x
   | Bound_SVfun : forall (fds : fundefs) (rho : cps.M.t cps.val) (x f : var),
       bound_var_val (Vfun rho fds f) x -> ~name_in_fundefs fds x -> bound_subvar_val (Vfun rho fds f) x. 
@@ -420,7 +420,7 @@ Inductive bound_subvar_val : cps.val -> Ensemble var :=
  
 (* deep version of bound_subvar_val, likely what is needed for functions_not_bound inv *)
 Inductive bound_notfun_val: cps.val -> Ensemble var :=
-  Bound_FVconstr : forall (c : cTag) (vs : list cps.val) 
+  Bound_FVconstr : forall (c : ctor_tag) (vs : list cps.val) 
                          (v : cps.val) (x : var),
                     bound_notfun_val v x ->
                     List.In v vs -> bound_notfun_val (Vconstr c vs) x
@@ -457,17 +457,17 @@ Proof.
 Qed.        
 
 
-Theorem setlist_In:
+Theorem set_lists_In:
   forall {A} x xs (v:A) vs rho rho' ,
     List.In x xs ->
     M.get x rho' = Some v ->
-    setlist xs vs rho = Some rho' ->
+    set_lists xs vs rho = Some rho' ->
     List.In  v vs.
 Proof.
   induction xs; intros.
   -   inv H.
   - destruct vs. simpl in H1; inv H1. simpl in H1.
-    destruct (setlist xs vs rho) eqn:Hsl; inv H1.
+    destruct (set_lists xs vs rho) eqn:Hsl; inv H1.
     destruct (var_dec x a).     
     + subst. 
       rewrite M.gss in H0. inv H0. constructor; reflexivity.      
@@ -515,14 +515,14 @@ Section RELATION.
 
   
 
-    Variable cenv:L6.cps.cEnv.
-  Variable fenv:L6.cps.fEnv.
+    Variable cenv:L6.cps.ctor_env.
+  Variable fenv:L6.cps.fun_env.
   Variable finfo_env: M.t positive. (* map from a function name to its type info *)
   Variable p:program.
   
   
   (* This should be a definition rather than a parameter, computed once and for all from cenv *)
-  Variable rep_env: M.t cRep.
+  Variable rep_env: M.t ctor_rep.
 
   
   Notation threadStructInf := (Tstruct threadInfIdent noattr).
@@ -667,7 +667,7 @@ Ltac archi_red :=
   (* Any valid mem is disjoint  the global_env *)
   Axiom disjoint_mem: forall m:mem, ~ exists b i z T v v' , (Mem.load T m b z = Some v /\ Genv.find_funct (Genv.globalenv p) (Vptr b i) = Some v').
 
- Inductive header_of_rep: cRep -> Z -> Prop :=
+ Inductive header_of_rep: ctor_rep -> Z -> Prop :=
  | header_enum: forall t, header_of_rep (enum t) (Z.of_N ((N.shiftl t 1) + 1))
  | header_boxed: forall t a, header_of_rep (boxed t a) (Z.of_N ((N.shiftl a 10) + t)).
 
@@ -1829,8 +1829,8 @@ Definition tag_of_header (h:Z): N :=
 
 
 
-Inductive repr_asgn_constr: positive -> cTag -> list positive -> statement -> Prop :=
-| Rconstr_ass_boxed: forall x (t:cTag) vs s a n h,
+Inductive repr_asgn_constr: positive -> ctor_tag -> list positive -> statement -> Prop :=
+| Rconstr_ass_boxed: forall x (t:ctor_tag) vs s a n h,
     (* boxed x *)   
     M.get t rep_env = Some (boxed n a) ->
     boxed_header n a h -> 
@@ -1856,7 +1856,7 @@ Inductive repr_switch_L6_L7: positive -> labeled_statements -> labeled_statement
                              Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
                                      ls')).
 
-(* relate a L6.exp -| cEnv, fEnv to a series of statements in a clight program (passed as parameter) -- syntactic relation that shows the right instructions have been generated for functions body. There should not be function definitions (Efun), or primitive operations (they are not supported by our backend) in this 
+(* relate a L6.exp -| ctor_env, fun_env to a series of statements in a clight program (passed as parameter) -- syntactic relation that shows the right instructions have been generated for functions body. There should not be function definitions (Efun), or primitive operations (they are not supported by our backend) in this 
 TODO: maybe this should be related to a state instead? 
  *)
 
@@ -1891,7 +1891,7 @@ Inductive repr_expr_L6_L7: L6.cps.exp -> statement -> Prop :=
     repr_expr_L6_L7  (Ecase v cl)  s
                      (* default case for last boxed and unboxed constructor 
                         OS: perhaps want to include a *)
-with repr_branches_L6_L7: list (cTag * exp) -> labeled_statements -> labeled_statements -> Prop :=
+with repr_branches_L6_L7: list (ctor_tag * exp) -> labeled_statements -> labeled_statements -> Prop :=
      | Rempty_br : repr_branches_L6_L7 nil LSnil LSnil
      | Runboxed_default_br: forall t e cl ls n s,
          repr_expr_L6_L7 e s ->
@@ -1953,10 +1953,10 @@ Definition gc_set := (allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                     limitIdent ::= Efield tinfd limitIdent valPtr ;
                                                     argsIdent ::= Efield tinfd argsIdent (Tarray val maxArgs noattr)).
 
-Definition gc_test (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fEnv) := (reserve argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent gcArrIdent
+Definition gc_test (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fun_env) := (reserve argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent gcArrIdent
                                                            (Z.of_N (l + 2)) vs ind fenv).
 
-Definition gc_test' (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fEnv) := (reserve' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent gcArrIdent
+Definition gc_test' (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fun_env) := (reserve' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent gcArrIdent
                                                            (Z.of_N (l + 2)) vs ind fenv).
 
 Inductive right_param_asgn: list positive -> list N -> statement -> Prop :=
@@ -2040,9 +2040,9 @@ Proof.
 Qed.
 
 
-Theorem getlist_nth_get' (B:Type):
+Theorem get_list_nth_get' (B:Type):
   forall  (vs : list B) rho v xs  N, 
-  getlist xs rho = Some vs ->
+  get_list xs rho = Some vs ->
   nthN vs N = Some v ->
   exists x, nthN xs N = Some x /\ M.get x rho = Some v. 
 Proof.
@@ -2054,10 +2054,10 @@ Proof.
   - inv H0. simpl in H.
     exists e. split. reflexivity.
     destruct (M.get e rho).
-    destruct (getlist xs rho). inv H; auto.
+    destruct (get_list xs rho). inv H; auto.
     inv H. inv H.
   - simpl in H. destruct (M.get e rho).
-    destruct (getlist xs rho) eqn:Hxs. inv H.
+    destruct (get_list xs rho) eqn:Hxs. inv H.
     specialize (IHvs _ _ _ _ Hxs H0).
     rewrite nthN_equation. auto. inv H.
     inv H.
@@ -2066,7 +2066,7 @@ Qed.
 
 Theorem in_rho_entry:
   forall xs vs fl rho x v, 
-  setlist xs vs (def_funs fl fl (M.empty cps.val) (M.empty cps.val)) = Some rho ->
+  set_lists xs vs (def_funs fl fl (M.empty cps.val) (M.empty cps.val)) = Some rho ->
   NoDup xs ->
   M.get x rho = Some v ->
   (exists n, nthN xs n = Some x /\ nthN vs n = Some v) \/
@@ -2076,16 +2076,16 @@ Proof.
   assert (decidable (List.In x xs)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
   inv H2.
   - left. 
-    assert (Hgl := getlist_setlist _ _ _ _  H0 H ).
+    assert (Hgl := get_list_set_lists _ _ _ _  H0 H ).
     apply In_nthN in H3. destruct H3.
-    assert (Hgl' := getlist_nth_get _ _ _ _ _ Hgl H2).
+    assert (Hgl' := get_list_nth_get _ _ _ _ _ Hgl H2).
     destruct Hgl'.
     destruct H3.
     exists x0.
     rewrite H4 in H1; inv H1.
     split; auto.
   - right.
-    erewrite <- setlist_not_In in H1; eauto.
+    erewrite <- set_lists_not_In in H1; eauto.
     assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
     inv H2.
     + assert (H4' := H4).
@@ -2843,7 +2843,7 @@ Inductive get_allocs_ind: exp -> list positive -> Prop :=
 | GEI_fun: forall fnd e l l', get_allocs_fundefs_ind fnd l ->
                               get_allocs_ind e l' ->
                               get_allocs_ind (Efun fnd e) (l ++ l')
-with get_allocs_case_ind: list (cTag * exp) -> list positive -> Prop :=
+with get_allocs_case_ind: list (ctor_tag * exp) -> list positive -> Prop :=
    | GEI_nil: get_allocs_case_ind nil nil
    | GEI_cons: forall z e cs l l',
        get_allocs_ind e l ->
@@ -2904,7 +2904,7 @@ Qed.
 
 (* see make_fundef_info, this is w.r.t. some fenv, another prop should assert the fenv is correct w.r.t. all functions *)
 
-Definition correct_fundef_info (m:mem) (f:positive) (t:fTag) (vs:list positive) e finfo :=
+Definition correct_fundef_info (m:mem) (f:positive) (t:fun_tag) (vs:list positive) e finfo :=
   exists n l b fi_0,
    (* the tag for f points to a record r *)
     M.get t fenv =  Some (n, l) /\
@@ -2949,8 +2949,8 @@ Genv.find_var_info (globalenv p) b = Some finfo_init /\
  
 (* P is true of every fundefs in a bundle *)
 (* TODO: move this to cps_util *)
-Inductive Forall_fundefs: (L6.cps.var -> fTag -> list L6.cps.var -> exp -> Prop) -> fundefs -> Prop :=
-| Ff_cons : forall (P:(L6.cps.var -> fTag -> list L6.cps.var -> exp -> Prop)) f t vs e fds,
+Inductive Forall_fundefs: (L6.cps.var -> fun_tag -> list L6.cps.var -> exp -> Prop) -> fundefs -> Prop :=
+| Ff_cons : forall (P:(L6.cps.var -> fun_tag -> list L6.cps.var -> exp -> Prop)) f t vs e fds,
          P f t vs e -> 
          Forall_fundefs P fds ->
          Forall_fundefs P (Fcons f t vs e fds)         
@@ -2976,8 +2976,8 @@ Qed.
    2) fenv is consistent with the info
    3) global env holds a correct L7 representation of the function *)
 Definition correct_environments_for_function:
-  genv -> fEnv -> M.t positive -> mem -> fundefs ->  L6.cps.var ->
-  fTag -> list L6.cps.var -> exp ->  Prop
+  genv -> fun_env -> M.t positive -> mem -> fundefs ->  L6.cps.var ->
+  fun_tag -> list L6.cps.var -> exp ->  Prop
   := fun ge fenv finfo_env m fds f t vs e =>
        exists l locs finfo b, 
          (*1*)
@@ -2993,7 +2993,7 @@ Definition correct_environments_for_function:
          repr_val_L6_L7 (cps.Vfun (M.empty cps.val) fds f) m (Vptr b Ptrofs.zero).
 
 
-Definition correct_environments_for_functions: fundefs -> genv -> fEnv -> M.t positive -> mem ->  Prop := fun fds ge fenv finfo_env m =>
+Definition correct_environments_for_functions: fundefs -> genv -> fun_env -> M.t positive -> mem ->  Prop := fun fds ge fenv finfo_env m =>
                                                                                                             Forall_fundefs (correct_environments_for_function ge fenv finfo_env m fds) fds.
 
 
@@ -3144,9 +3144,9 @@ Theorem protected_id_closure:
   forall rho rho' f t0 ys fl f' t xs e' vs,
     protected_id_not_bound rho (Eapp f t0 ys) ->
     cps.M.get f rho = Some (Vfun (M.empty _) fl f') ->
-    getlist ys rho = Some vs ->
+    get_list ys rho = Some vs ->
     find_def f' fl = Some (t, xs, e') ->
-    setlist xs vs (def_funs fl fl (M.empty _) (M.empty _)) = Some rho' -> 
+    set_lists xs vs (def_funs fl fl (M.empty _) (M.empty _)) = Some rho' -> 
     protected_id_not_bound rho' e'.
 Proof.
   intros.
@@ -3159,11 +3159,11 @@ Proof.
     intro. inv H.
     - specialize (H7 _ _ _ H0 H6). apply H7. right.
       constructor. eapply shrink_cps_correct.name_boundvar_arg; eauto.
-    - assert (List.In v vs) by (eapply setlist_In; eauto).
-      assert (Hgl := getlist_In_val _ _ _ _  H1 H). destruct Hgl.
+    - assert (List.In v vs) by (eapply set_lists_In; eauto).
+      assert (Hgl := get_list_In_val _ _ _ _  H1 H). destruct Hgl.
       destruct H11. specialize (H7 _ _ _ H12 H6). apply H7. auto.
   }  
-  erewrite <- setlist_not_In in H5.
+  erewrite <- set_lists_not_In in H5.
   2: eauto.
   2: eauto.
   assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
@@ -3972,35 +3972,35 @@ Proof.
 Qed.
  
 (*
-    Variable cenv:L6.cps.cEnv.
-  Variable fenv:L6.cps.fEnv.
+    Variable cenv:L6.cps.ctor_env.
+  Variable fenv:L6.cps.fun_env.
   Variable finfo_env: M.t positive. (* map from a function name to its type info *)
   Variable p:program.
   
   
   (* This should be a definition rather than a parameter, computed once and for all from cenv *)
-  Variable rep_env: M.t cRep.
+  Variable rep_env: M.t ctor_rep.
 *)
 
 
   (* TODO: move this to cps_util *)
-  Definition Forall_constructors_in_e (P: var -> cTag -> list var -> Prop) (e:exp) := 
+  Definition Forall_constructors_in_e (P: var -> ctor_tag -> list var -> Prop) (e:exp) := 
     forall x t  ys e',
       subterm_or_eq (Econstr x t ys e') e -> P x t ys.
       
 
-  Definition Forall_projections_in_e (P: var -> cTag -> N -> var -> Prop) (e:exp) :=
+  Definition Forall_projections_in_e (P: var -> ctor_tag -> N -> var -> Prop) (e:exp) :=
     forall x t n v e',
       subterm_or_eq (Eproj x t n v e') e -> P x t n v.
   
   (* Note: the fundefs in P is the whole bundle, not the rest of the list *)
-  Definition Forall_functions_in_e (P: var -> fTag -> list var -> exp ->  fundefs -> Prop) (e:exp) :=
+  Definition Forall_functions_in_e (P: var -> fun_tag -> list var -> exp ->  fundefs -> Prop) (e:exp) :=
     forall fds e' f t xs e'',  subterm_or_eq (Efun fds e') e ->
                                fun_in_fundefs fds (f, t, xs, e'') ->
                                P f t xs e'' fds.
 
 
-  Definition Forall_exp_in_caselist (P: exp -> Prop) (cl:list (cTag * exp)) := 
+  Definition Forall_exp_in_caselist (P: exp -> Prop) (cl:list (ctor_tag * exp)) := 
     forall g e, List.In (g, e) cl -> P e.
 
 
@@ -4034,7 +4034,7 @@ Qed.
 
   (* all constructors in the exp exists in cenv and are applied to the right number of arguments 
     May want to have "exists in cenv" also true for constructors in rho *)
-  Definition correct_cenv_of_exp: L6.cps.cEnv -> exp -> Prop :=
+  Definition correct_cenv_of_exp: L6.cps.ctor_env -> exp -> Prop :=
     fun cenv e =>
       Forall_constructors_in_e (fun x t ys =>
                                   match (M.get t cenv) with
@@ -4043,7 +4043,7 @@ Qed.
                                   | None => False
                                   end) e.
 
-  Definition correct_cenv_of_caselist: L6.cps.cEnv -> list (cTag * exp) -> Prop :=
+  Definition correct_cenv_of_caselist: L6.cps.ctor_env -> list (ctor_tag * exp) -> Prop :=
     fun cenv cl =>
       Forall_exp_in_caselist (correct_cenv_of_exp cenv) cl.
 
@@ -4088,7 +4088,7 @@ Qed.
 
 
     
-Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
+Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
 | CCV_constr:forall cenv c vs a name it n,
     Forall (correct_cenv_of_val cenv) vs ->
     M.get c cenv = Some (name, it, a, n) ->
@@ -4104,13 +4104,13 @@ Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
 
 (* everything in cenv is in ienv, AND there is a unique entry for it, AND its ord is not reused 
     Doesn't check that name of the i will be consistent (namei could be different from name') *)
-  Definition correct_ienv_of_cenv: L6.cps.cEnv -> n_iEnv -> Prop :=
+  Definition correct_ienv_of_cenv: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name name', M.get x cenv = Some (name, name', i, a, ord) ->
                                    exists  namei cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
 
   (* all constructors found in ienv are in cenv *) 
-  Definition domain_ienv_cenv:  L6.cps.cEnv -> n_iEnv -> Prop :=
+  Definition domain_ienv_cenv:  L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall i namei cl, M.get i ienv = Some (namei, cl)  ->
                          forall name x a ord, List.In (name, x, a, ord) cl ->
@@ -4119,7 +4119,7 @@ Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
                                    
 
 (* stronger version of ienv_of_cenv that enforces uniqueness of name' for i and that nothing is in ienv and not in cenv *)
-    Definition correct_ienv_of_cenv_strong: L6.cps.cEnv -> n_iEnv -> Prop :=
+    Definition correct_ienv_of_cenv_strong: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name namei, M.get x cenv = Some (name, namei, i, a, ord) ->
                                    exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
@@ -4128,7 +4128,7 @@ Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
   
 
   (* OS 04/24: added in bound on n includes in this *)
-  Inductive correct_crep (cenv:cEnv): cTag -> cRep -> Prop :=
+  Inductive correct_crep (cenv:ctor_env): ctor_tag -> cRep -> Prop :=
   | rep_enum :
       forall c name it  n,
         M.get c cenv = Some (name, it, 0%N, n) ->
@@ -4145,7 +4145,7 @@ Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
       correct_crep cenv c (boxed n (Npos a)).
 
   (* crep <-> make_cRep cenv *)
-  Definition correct_crep_of_env: L6.cps.cEnv -> M.t cRep -> Prop :=
+  Definition correct_crep_of_env: L6.cps.ctor_env -> M.t cRep -> Prop :=
     fun cenv crep_env =>
       (forall c name it a n,
         M.get c cenv = Some (name, it, a, n) ->
@@ -4155,13 +4155,13 @@ Inductive correct_cenv_of_val: L6.cps.cEnv -> (L6.cps.val) -> Prop :=
                      correct_crep cenv c crep).
 
 
-  Definition correct_cenv_of_env: cEnv -> cps.M.t cps.val -> Prop :=
+  Definition correct_cenv_of_env: ctor_env -> cps.M.t cps.val -> Prop :=
     fun cenv rho =>
       forall x v,
         M.get x rho = Some v ->
         correct_cenv_of_val cenv v.
    
-  Definition correct_envs: cEnv -> n_iEnv -> M.t cRep ->  cps.M.t cps.val ->  exp -> Prop :=
+  Definition correct_envs: ctor_env -> n_ind_env -> M.t cRep ->  cps.M.t cps.val ->  exp -> Prop :=
     fun cenv ienv crep_env rho e =>
       correct_ienv_of_cenv cenv ienv /\
       correct_cenv_of_env cenv rho /\
@@ -4462,7 +4462,7 @@ Proof.
 Qed.
   
 (* ident[n] contains either a Vint representing an enum or an integer OR a pointer to a function or the boxed representation of v *)
-Inductive nth_arg_rel_L6_L7 (fenv:fEnv) (finfo_env:M.t positive) (p:program) (rep_env: M.t cRep) : L6.eval.env -> positive -> temp_env -> mem -> Z -> Prop :=
+Inductive nth_arg_rel_L6_L7 (fenv:fun_env) (finfo_env:M.t positive) (p:program) (rep_env: M.t ctor_rep) : L6.eval.env -> positive -> temp_env -> mem -> Z -> Prop :=
 | is_in_and_rel:
     forall lenv args_b args_ofs rho m n x L6v L7v L,
        protected_not_in_L argsIdent allocIdent limitIdent tinfIdent p lenv  L -> 
@@ -4482,7 +4482,7 @@ Theorem caseConsistent_findtag_In_cenv:
   forall cenv t e l,
     caseConsistent cenv l t ->
     findtag l t = Some e ->
-    exists (a aty:BasicAst.name) (ty:iTag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i).
+    exists (a aty:BasicAst.name) (ty:ind_tag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i).
 Proof.
   destruct l; intros.
   - inv H0.
@@ -4681,7 +4681,7 @@ Proof.
     + constructor. auto.
     +    
 *)
-Definition arg_val_L6_L7 (fenv:fEnv) (finfo_env:M.t positive) (p:program) (rep_env: M.t cRep): L6.cps.val -> mem -> temp_env -> Prop :=
+Definition arg_val_L6_L7 (fenv:fun_env) (finfo_env:M.t positive) (p:program) (rep_env: M.t ctor_rep): L6.cps.val -> mem -> temp_env -> Prop :=
   fun v m lenv =>
     exists args_b args_ofs L7v L,
 (*       M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
@@ -4718,18 +4718,18 @@ Proof.
 Qed.
   
   
-Theorem getlist_cons :
+Theorem get_list_cons :
   forall A rho v ys vs,
-    @getlist A ys rho = Some (v :: vs) ->
+    @get_list A ys rho = Some (v :: vs) ->
   exists y ys', ys = y::ys' /\
                 cps.M.get y rho = Some v /\ 
-                getlist ys' rho = Some vs. 
+                get_list ys' rho = Some vs. 
 Proof.
   intros. destruct ys as [ | y ys'].
   inv H. exists y, ys'.
   split; auto.  simpl in H.
   destruct  (cps.M.get y rho).
-  destruct (getlist ys' rho). inv H. auto.
+  destruct (get_list ys' rho). inv H. auto.
   inv H. inv H.
 Qed.
  
@@ -4743,14 +4743,14 @@ Theorem exists_getvar_or_funvar_list:
          repr_val_id_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv finfo_env
                              p rep_env v6 m L lenv x)
             ->
-            getlist xs rho = Some vs  ->
+            get_list xs rho = Some vs  ->
             exists vs7 : list Values.val, get_var_or_funvar_list p lenv xs = Some vs7.
 Proof.  
   induction xs; intros.
   - exists nil. auto.
   - simpl in H0.
     destruct (cps.M.get a rho) eqn:Hgar.
-    destruct (getlist xs rho) eqn:Hgxsr.
+    destruct (get_list xs rho) eqn:Hgxsr.
     inv H0.
     specialize (IHxs l).
     assert ((forall x : positive,
@@ -5798,12 +5798,12 @@ Proof. Admitted. (*
 Qed. *)
 
 
- Theorem cons_getlist: forall {A y ys rho vs},
-   @getlist A (y::ys) rho = Some vs ->
+ Theorem cons_get_list: forall {A y ys rho vs},
+   @get_list A (y::ys) rho = Some vs ->
    exists v vs',
-     v::vs' = vs /\ M.get y rho = Some v /\ @getlist A ys rho = Some vs'.
+     v::vs' = vs /\ M.get y rho = Some v /\ @get_list A ys rho = Some vs'.
  Proof.
-   intros. simpl in H. destruct (M.get y rho) eqn:Hgy; destruct (getlist ys rho) eqn:Hgys.
+   intros. simpl in H. destruct (M.get y rho) eqn:Hgy; destruct (get_list ys rho) eqn:Hgys.
    exists a, l. split. inv H; auto. split; reflexivity.
    inv H. inv H. inv H.
  Qed.
@@ -5823,7 +5823,7 @@ Qed. *)
  
 Theorem rel_mem_of_asgn: forall fenv finfo_env  rep_env args_b args_ofs p lenv m rho L ys inf vs7 vs6,
  mem_of_asgn_v args_b args_ofs p lenv m ys inf vs7 ->
- getlist ys rho = Some vs6 ->
+ get_list ys rho = Some vs6 ->
  (forall x, List.In x ys ->
             exists v6, M.get x rho = Some v6 /\
                        repr_val_id_L_L6_L7_id fenv finfo_env p rep_env v6 m L lenv x) ->
@@ -5831,7 +5831,7 @@ Theorem rel_mem_of_asgn: forall fenv finfo_env  rep_env args_b args_ofs p lenv m
 Proof. Admitted. (*
   induction ys; intros.
   -   inv H0; inv H. constructor.
-  - apply cons_getlist in H0. destruct H0 as [v [vs' [Heqvs [Hgar Hgysr]]]]. subst.
+  - apply cons_get_list in H0. destruct H0 as [v [vs' [Heqvs [Hgar Hgysr]]]]. subst.
     inv H. constructor.
     eapply IHys; eauto. intros. eapply H1. constructor 2; auto.
     eauto.
@@ -5990,7 +5990,7 @@ Proof.
   intros. unfold assignConstructor.
   unfold assignConstructorS.
   destruct (makeTag cenv c) eqn:H_makeTag.
-  destruct (make_cRep cenv c) eqn:H_make_cRep.
+  destruct (make_ctor_rep cenv c) eqn:H_make_ctor_rep.
   simpl. destruct c0.
   - (* true because enum n means l is empty, but need some assumptions on the size of l w.r.t. arity of the constructor *)
     
@@ -6077,7 +6077,7 @@ Qed.
 
 
 Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (p:program) fenv cenv ienv map :=
- (fix makeCases (l : list (cTag * exp)) :
+ (fix makeCases (l : list (ctor_tag * exp)) :
             option (labeled_statements * labeled_statements) :=
             match l with
             | [] => Monad.ret (LSnil, LSnil)
@@ -6114,7 +6114,7 @@ Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent is
                       end))
             end).
 
-Definition fmake_cRep (p:positive) (c:cTyInfo) : cRep :=
+Definition fmake_cRep (p:positive) (c:ctor_ty_info) : cRep :=
   let '(name, _, it , a , n) := c in
       match (a =? 0)%N with
       | true =>
@@ -6124,7 +6124,7 @@ Definition fmake_cRep (p:positive) (c:cTyInfo) : cRep :=
       end.
 
 
-Definition compute_rep_env (cenv:cEnv): M.t cRep :=
+Definition compute_rep_env (cenv:ctor_env): M.t cRep :=
   M.map fmake_cRep cenv.
 
 
@@ -6406,27 +6406,27 @@ Qed.
 
 (* PROOFs on correct environments *)
 
-(* cTyInfo is proper if a and ord are small enough to be represented *)
-Inductive proper_cTyInfo: cTyInfo -> Prop :=
+(* ctor_ty_info is proper if a and ord are small enough to be represented *)
+Inductive proper_ctor_ty_info: ctor_ty_info -> Prop :=
 | PC_enum: forall name it ord,
     (0 <= (Z.of_N ord) <   Ptrofs.half_modulus)%Z ->
-    proper_cTyInfo (name, it, 0%N, ord)
+    proper_ctor_ty_info (name, it, 0%N, ord)
 | PC_boxed: forall name it a ord,
     (* there should not be more than 2^8 - 1 boxed constructors *)
     (0 <= (Z.of_N ord) <  Zpower.two_p 8)%Z ->
     (* arity shouldn't be higher than 2^54 - 1  *)
     (0 <= Z.of_N (Npos a) <  Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z ->
-    proper_cTyInfo (name, it, (Npos a)%N, ord).
+    proper_ctor_ty_info (name, it, (Npos a)%N, ord).
 
   
  
-(* cenv is proper if cTyInfo is proper, and that there is a unique (ty, ord) pair for each constructors  *)
+(* cenv is proper if ctor_ty_info is proper, and that there is a unique (ty, ord) pair for each constructors  *)
 
 
-Definition proper_cenv (cenv:cEnv):=
+Definition proper_cenv (cenv:ctor_env):=
   forall c name it a ord,
     M.get c cenv = Some (name, it, a, ord) ->
-    proper_cTyInfo (name, it, a, ord) /\
+    proper_ctor_ty_info (name, it, a, ord) /\
       ~ (exists c' name' a', c <> c' /\
                     M.get c' cenv = Some (name', it, a', ord)).
 
@@ -6487,7 +6487,7 @@ Qed.
   forall cenv, 
     (fun cenv ienv => proper_cenv cenv ->
                       domain_ienv_cenv cenv ienv /\
-                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv).
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_ind_env cenv).
 Proof.
   intro cenv.
   eapply Maps.PTree_Properties.fold_rec; intros.
@@ -6501,7 +6501,7 @@ Proof.
   - split; intro; intros; rewrite M.gempty in *; exfalso; inv H0. 
   - assert (proper_cenv  m) by (eapply proper_cenv_set_none; eauto).
     specialize (H1 H3). destruct H1.
-    assert ( domain_ienv_cenv (Maps.PTree.set k v m) (update_iEnv a k v)).
+    assert ( domain_ienv_cenv (Maps.PTree.set k v m) (update_ind_env a k v)).
     {
       intro; intros. destruct v. destruct p. destruct p. destruct p. simpl in H5.
       destruct ( cps.M.get i0 a) eqn:Hgi0a.
@@ -6555,7 +6555,7 @@ Proof.
       rewrite M.gso in H6 by auto.
       apply H4 in H6. destructAll.
       {
-        unfold update_iEnv. destruct v. destruct p. destruct p. destruct p. 
+        unfold update_ind_env. destruct v. destruct p. destruct p. destruct p. 
         destruct  (cps.M.get i0 a) eqn:Hi0a.
         - destruct n4. 
           destruct (var_dec i i0).
@@ -6588,12 +6588,12 @@ Qed.
 Corollary compute_domain_ienv:
   forall cenv, 
                     (fun cenv ienv => proper_cenv cenv -> 
-                    domain_ienv_cenv cenv ienv) cenv (compute_iEnv cenv).
+                    domain_ienv_cenv cenv ienv) cenv (compute_ind_env cenv).
 Proof.
     assert ( forall cenv, 
            (fun cenv ienv => proper_cenv cenv ->
                               domain_ienv_cenv cenv ienv /\
-                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv)) by apply compute_dc_ienv. simpl; intros. simpl in H.  apply H in H0. destruct H0.
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_ind_env cenv)) by apply compute_dc_ienv. simpl; intros. simpl in H.  apply H in H0. destruct H0.
   auto.
 Qed.
 
@@ -6601,29 +6601,29 @@ Qed.
 Corollary compute_correct_ienv:
   forall cenv, 
                     (fun cenv ienv => proper_cenv cenv -> 
-                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv).
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_ind_env cenv).
 Proof.
   assert ( forall cenv, 
            (fun cenv ienv => proper_cenv cenv ->
                               domain_ienv_cenv cenv ienv /\
-                    correct_ienv_of_cenv cenv ienv) cenv (compute_iEnv cenv)) by apply compute_dc_ienv. simpl; intros. simpl in H.  apply H in H0. destruct H0.
+                    correct_ienv_of_cenv cenv ienv) cenv (compute_ind_env cenv)) by apply compute_dc_ienv. simpl; intros. simpl in H.  apply H in H0. destruct H0.
   auto.
 Qed.
 
 
-Definition correct_fenv_for_function (fenv:fEnv):=
-  fun f (t:fTag) (ys:list L6.cps.var) (e:exp) =>
+Definition correct_fenv_for_function (fenv:fun_env):=
+  fun f (t:fun_tag) (ys:list L6.cps.var) (e:exp) =>
     exists n l, M.get f fenv = Some (n, l) /\
                 n = N.of_nat (length l) /\
                 length l = length ys /\
                     NoDup l /\
                     Forall (fun i => 0 <= (Z.of_N i) < max_args)%Z l. 
 
-SearchAbout fTag. 
-(* fTag are associated with an arity and a calling convention. 
-   all functions and applications with this fTag have the right number of arguments *)
+SearchAbout fun_tag. 
+(* fun_tag are associated with an arity and a calling convention. 
+   all functions and applications with this fun_tag have the right number of arguments *)
 
-Definition correct_fenv (fenv:fEnv) (fds:fundefs):= Forall_fundefs (correct_fenv_for_function fenv) fds.
+Definition correct_fenv (fenv:fun_env) (fds:fundefs):= Forall_fundefs (correct_fenv_for_function fenv) fds.
 
 (*
 (* unique tags of arity *)
@@ -6631,7 +6631,7 @@ Theorem compute_correct_fenv:
   forall fds  fenv,
     
     forall fenv', 
-  compute_fEnv_fds fds fenv' = fenv ->
+  compute_fun_env_fds fds fenv' = fenv ->
   Forall_fundefs (correct_fenv_for_function fenv) fds.
 Proof.
   induction fds; intros.
@@ -7072,7 +7072,7 @@ Proof.
           auto.
 
           intro.
-          eassert (Hxrho := getlist_In _ _ _ _ H H4).
+          eassert (Hxrho := get_list_In _ _ _ _ H H4).
           destruct Hxrho as [vv Hxrho].
           eapply Hrho_id; eauto.
           
@@ -7080,7 +7080,7 @@ Proof.
           intro.
           inv Hp_id.
           
-          assert (Hgl := getlist_In _ _ _ _ H H4). destruct Hgl.          
+          assert (Hgl := get_list_In _ _ _ _ H H4). destruct Hgl.          
           specialize (H5 _ allocIdent _ H8). apply H5.
           right. 
           left. auto. left; auto.          
@@ -7408,7 +7408,7 @@ Proof.
                    2:{ 
                      intros. rewrite M.gss in H4. inv H4.
                      apply subval_or_eq_fun in H5. destruct H5. destruct H4.
-                     assert (Hy0x0 := getlist_In_val _ _ _ _ H H5).
+                     assert (Hy0x0 := get_list_In_val _ _ _ _ H H5).
                      destruct Hy0x0 as [y0 [Hy0In Hy0x0]].
                      specialize (Hrel_mL y0). 
                      destruct Hrel_mL as [Hrem_mL Hrel_mL'].
@@ -7550,7 +7550,7 @@ Proof.
                     rewrite <- Z.le_add_le_sub_l in H5. 
                     etransitivity. etransitivity. 2: apply H5. 2: apply Ptrofs.unsigned_range_2. 
                     simpl max_allocs.
-                    apply getlist_length_eq in H. 
+                    apply get_list_length_eq in H. 
                     destruct ys. exfalso. apply Ha_l. auto.
                     rewrite Nat2Z.inj_succ.
                     rewrite Nat2Z.inj_add.
@@ -7709,7 +7709,7 @@ Proof.
                   2:{  intro.
                   inv Hp_id.
                   
-                  eapply getlist_In in H; eauto. 
+                  eapply get_list_In in H; eauto. 
                   destruct H. 
                   eapply H8. apply H.
                   right. 
@@ -7748,7 +7748,7 @@ Proof.
                   
                   induction vs. constructor.
                    intros.
-                  apply getlist_cons in H. destruct H as [y [ys' [H_ys [Hyrho Hget_ys']]]].
+                  apply get_list_cons in H. destruct H as [y [ys' [H_ys [Hyrho Hget_ys']]]].
                   subst.
                   inv Hvs7.
 
@@ -7838,7 +7838,7 @@ Proof.
                      }                     
         (* 
 
- getlist ys rho = Some vs ->
+ get_list ys rho = Some vs ->
 Forall2
            (get_var_or_funvar p
               (Maps.PTree.set allocIdent
@@ -8213,7 +8213,7 @@ Forall2
             split. 
               2:{ intros. rewrite M.gss in H2. inv H2.
               apply subval_or_eq_fun in H3. destruct H3. destruct H2.
-              assert (Hy0x0 := getlist_In_val _ _ _ _ H H3).
+              assert (Hy0x0 := get_list_In_val _ _ _ _ H H3).
               destruct Hy0x0 as [y0 [Hy0 Hy0']].
               inv Hy0. }
             
@@ -8286,7 +8286,7 @@ Forall2
         econstructor; eauto.        
         2:{ apply getlist_length_eq in H. subst. auto. }
         apply Forall_forall. intros.
-        assert (Hgiv := getlist_In_val _ _ _ _ H H4).
+        assert (Hgiv := get_list_In_val _ _ _ _ H H4).
         destruct Hgiv. destruct H5.
         eapply H1. eauto.
       -  constructor. constructor.
@@ -8299,7 +8299,7 @@ Forall2
           eapply H3; eauto.                    
           rewrite M.gss in H0. inv H0.
           inv H5.
-          assert (Hgi_v := getlist_In_val _ _ _ _ H H10).
+          assert (Hgi_v := get_list_In_val _ _ _ _ H H10).
           destructAll.           
           eapply H2; eauto. 
         + rewrite M.gso in H0 by auto. eapply H2; auto. 
@@ -8314,7 +8314,7 @@ Forall2
 
         inv H0.
         inv Hf_id.
-        assert (Hx0rho := getlist_In_val _ _ _ _ H H5).
+        assert (Hx0rho := get_list_In_val _ _ _ _ H H5).
         destruct Hx0rho. destruct H2.  
         eapply H1; eauto. 
       - constructor. constructor.
@@ -8330,7 +8330,7 @@ Forall2
         rewrite M.gss in H0. inv H0.
         split; auto. constructor.
         apply Forall_forall. intros.         
-        assert (Hx0rho := getlist_In_val _ _ _ _ H H0). destruct Hx0rho as [xx0 [Hinys Hxx0rho]].
+        assert (Hx0rho := get_list_In_val _ _ _ _ H H0). destruct Hx0rho as [xx0 [Hinys Hxx0rho]].
         apply Hrho_id in Hxx0rho. destruct Hxx0rho. auto.
       -  rewrite M.gso in H0 by auto.
          apply Hrho_id in H0.
@@ -9597,14 +9597,14 @@ solve_nodup. solve_nodup.
             assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.  
             inv Hx_vsm4. 
             + (* x in vsm4 *)
-              assert (Hx_rho'' := get_setlist_In_xs _ _ _ _ _ H8 H2). destruct Hx_rho''. exists x0. split; auto.
+              assert (Hx_rho'' := get_set_lists_In_xs _ _ _ _ _ H8 H2). destruct Hx_rho''. exists x0. split; auto.
               assert (Hx_in_rho := in_rho_entry _ _ _ _ _ _ H2  Hnd_vs0  H12). destruct Hx_in_rho.
               2: exfalso; destructAll; auto.
               destruct H15. destruct H15. 
               assert (H_x0_vs := nthN_In _ _ _ H16). 
               specialize ( H5 x). destruct H5. specialize (H5 _ H15).
               
-              assert (Hx_rho_x_val := getlist_nth_get' _ _ _ _ _ _ H0 H16). destruct Hx_rho_x_val as [y4 [Hy4_ys Hy4_rho]].
+              assert (Hx_rho_x_val := get_list_nth_get' _ _ _ _ _ _ H0 H16). destruct Hx_rho_x_val as [y4 [Hy4_ys Hy4_rho]].
               
               specialize (Hrel_rho_m4 y4). destruct (Hrel_rho_m4). 
               assert (occurs_free (Eapp f tm4 ys) y4). constructor. apply nthN_In in Hy4_ys; auto. apply H18 in H20.
@@ -9620,7 +9620,7 @@ solve_nodup. solve_nodup.
               assert (Hx2v7 := rel_mem_asgn_nthN   Hrel_mem_asgn' H16 Hv7_vs7). auto.
             + (* x in fl *)
               inv Hx_in. exfalso; auto.
-              eapply setlist_not_In in H2. 2: eauto.
+              eapply set_lists_not_In in H2. 2: eauto.
               rewrite def_funs_eq in H2; auto. eexists. split; eauto.
               assert (subval_or_eq  (Vfun (M.empty cps.val) fl x) (Vfun (M.empty cps.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H17 _ _ _ _  H H15). destruct H17. inv H17.
 
@@ -9641,7 +9641,7 @@ solve_nodup. solve_nodup.
               destruct H12.
               destruct H12.
               apply nthN_In in H15.
-              apply (getlist_In_val _ _ _  _ H0) in H15.
+              apply (get_list_In_val _ _ _  _ H0) in H15.
               destruct H15. destruct H15.
 
              
@@ -9750,13 +9750,13 @@ solve_nodup. solve_nodup.
                   assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.  
                   inv Hx_vsm4. 
                   + (* x in vsm4 *)
-                    assert (Hx_rho'' := get_setlist_In_xs _ _ _ _ _ H5 H2). destruct Hx_rho''. exists x0. split; auto.
+                    assert (Hx_rho'' := get_set_lists_In_xs _ _ _ _ _ H5 H2). destruct Hx_rho''. exists x0. split; auto.
                     assert (Hx_in_rho := in_rho_entry _ _ _ _ _ _ H2  Hnd_vs0  H6). destruct Hx_in_rho.
                     2: exfalso; destructAll; auto.
                     destruct H7. destruct H7.
                     assert (H_x0_vs := nthN_In _ _ _ H12).
                     specialize (H1 x). destruct H1. specialize (H1 _ H7).                    
-                    assert (Hx_rho_x_val := getlist_nth_get' _ _ _ _ _ _ H0 H12). destruct Hx_rho_x_val as [y4 [Hy4_ys Hy4_rho]].
+                    assert (Hx_rho_x_val := get_list_nth_get' _ _ _ _ _ _ H0 H12). destruct Hx_rho_x_val as [y4 [Hy4_ys Hy4_rho]].
                     
                     specialize (Hrel_rho_m4 y4). destruct (Hrel_rho_m4). 
                     assert (occurs_free (Eapp f tm4 ys) y4). constructor. apply nthN_In in Hy4_ys; auto. apply H16 in H18.
@@ -9775,7 +9775,7 @@ solve_nodup. solve_nodup.
                     * inv H19. rewrite H23 in H20. inv H20. rewrite H21 in H24. inv H24. auto.
                   + (* x in fl *)
                     inv Hx_in. exfalso; auto.
-                    eapply setlist_not_In in H2. 2: eauto.
+                    eapply set_lists_not_In in H2. 2: eauto.
                     rewrite def_funs_eq in H2; auto. eexists. split; eauto.
                     assert (subval_or_eq  (Vfun (M.empty cps.val) fl x) (Vfun (M.empty cps.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H15 _ _ _ _  H H7). destruct H15. inv H15. econstructor; eauto.
                     (* impossible, functions not bound *)
@@ -9787,7 +9787,7 @@ solve_nodup. solve_nodup.
                     destruct H6.
                     destruct H6. 
                     apply nthN_In in H7.
-                    apply (getlist_In_val _ _ _  _ H0) in H7.
+                    apply (get_list_In_val _ _ _  _ H0) in H7.
                     destruct H7. destruct H7. 
                     specialize (Hrel_rho_m4 x1).
                     destruct Hrel_rho_m4.                    
@@ -9871,12 +9871,12 @@ solve_nodup. solve_nodup.
         assert (decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
         inv H12. 
         (* 1) in vs  *)
-        assert (List.In v0 vs) by (eapply setlist_In; eauto).
-        assert (Hgl := getlist_In_val _ _ _ _  H0 H12).
+        assert (List.In v0 vs) by (eapply set_lists_In; eauto).
+        assert (Hgl := get_list_In_val _ _ _ _  H0 H12).
         destruct Hgl. destruct H16. 
         apply H4 in H17. auto.
         
-        erewrite <- setlist_not_In in H7.
+        erewrite <- set_lists_not_In in H7.
         2: eauto.
         2: eauto.
 
@@ -9924,8 +9924,8 @@ solve_nodup. solve_nodup.
       apply  H4 in H.
       destruct H as [Hbv Hubv].
       inv Hubv.
-      assert (List.In v0 vs) by (eapply setlist_In; eauto).      
-      assert (Hgl := getlist_In_val _ _ _ _  H0 H). destruct Hgl. destruct H12.
+      assert (List.In v0 vs) by (eapply set_lists_In; eauto).      
+      assert (Hgl := get_list_In_val _ _ _ _  H0 H). destruct Hgl. destruct H12.
       
       split. intro.
       
@@ -9936,7 +9936,7 @@ solve_nodup. solve_nodup.
 
       
       (* in fl *)
-      erewrite <- setlist_not_In in H5. 2: eauto. 2:eauto.
+      erewrite <- set_lists_not_In in H5. 2: eauto. 2:eauto.
       
       assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
       inv H7.
@@ -9964,13 +9964,13 @@ solve_nodup. solve_nodup.
         assert (decidable (List.In y vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
         inv H5.
         (* in vsm4 *)
-        assert (List.In v0 vs) by (eapply setlist_In; eauto).      
-        assert (Hgl := getlist_In_val _ _ _ _  H0 H5). destruct Hgl. destruct H7.
+        assert (List.In v0 vs) by (eapply set_lists_In; eauto).      
+        assert (Hgl := get_list_In_val _ _ _ _  H0 H5). destruct Hgl. destruct H7.
         eapply Hf_id2 in H12; eauto. 
 
 
         (* in fl *)
-        erewrite <- setlist_not_In in H1. 2: eauto. 2: eauto.
+        erewrite <- set_lists_not_In in H1. 2: eauto. 2: eauto.
         assert (decidable (name_in_fundefs fl y)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec y). inv Dec; auto.
         inv H5.
 

@@ -22,13 +22,13 @@ Open Scope string.
 (** * Closure conversion as a relation  *)
 
 Section CC.
-  Variable (clo_tag : cTag). (* Tag for closure records *)
+  Variable (clo_tag : ctor_tag). (* Tag for closure records *)
 
   Inductive project_var :
     Ensemble var -> (* Variables in the current scope *)
     Ensemble var -> (* Names of the functions in the current function block *)
     (var -> var) -> (* renaming of function names *)
-    cTag -> (* tag of the current environment constructor *)
+    ctor_tag -> (* tag of the current environment constructor *)
     var -> (* The environment argument *)
     list var -> (* The environment *)
     Ensemble var -> (* The free set *)
@@ -51,7 +51,7 @@ Section CC.
   | Var_in_FVs :
       forall Scope Funs f c Γ FVs S x y N,
         ~ In _ Scope x ->
-        ~ In _ Funs x -> 
+        ~ In _ Funs x ->
         nthN FVs N = Some x ->
         In _ S y ->
         project_var Scope Funs f c Γ FVs S x y
@@ -61,7 +61,7 @@ Section CC.
     Ensemble var -> (* Variables in the current scope *)
     Ensemble var -> (* Names of the functions in the current function block *)
     (var -> var) -> (* renaming of function names *)
-    cTag -> (* tag of the current environment constructor *)
+    ctor_tag -> (* tag of the current environment constructor *)
     var -> (* The environment argument *)
     list var -> (* The free variables *)
     Ensemble var -> (* The free set *)
@@ -103,7 +103,7 @@ Section CC.
     Ensemble var -> (* Variables in the current scope *)
     Ensemble var -> (* Names of the functions in the current function block *)
     (var -> var) -> (* renaming of function names *)
-    cTag -> (* tag of the current environment constructor *)
+    ctor_tag -> (* tag of the current environment constructor *)
     var -> (* The environment argument *)
     list var -> (* The free variables - need to be ordered *)
     exp -> (* Before cc *)
@@ -129,7 +129,7 @@ Section CC.
                             (Union _ (image f (Setminus _ Funs Scope))
                                    (Union _ (FromList FVs) (Singleton _ Γ)))) ->
         project_var Scope Funs f c Γ FVs S x x' C S' ->
-        Forall2 (fun (pat pat' : cTag * exp) =>
+        Forall2 (fun (pat pat' : ctor_tag * exp) =>
                    (fst pat) = (fst pat') /\
                    exists C' e',
                      snd pat' = C' |[ e' ]| /\
@@ -209,7 +209,7 @@ Section CC.
   with Closure_conversion_fundefs :
          Ensemble var -> (* The function names in the current block *)
          (var -> var) -> (* renaming of function names *)
-         cTag -> (* tag of the current environment constructor *)
+         ctor_tag -> (* tag of the current environment constructor *)
          list var -> (* The environment *)
          fundefs -> (* Before cc *)
          fundefs -> (* After cc *)
@@ -230,7 +230,7 @@ Section CC.
 
 
   (** * Computational defintion of closure conversion *)
-  
+
   Inductive VarInfo : Type :=
   (* A free variable, i.e. a variable outside the scope of the current function.
    The argument is position of a free variable in the env record *)
@@ -245,10 +245,10 @@ Section CC.
   Definition VarInfoMap := M.t VarInfo.
 
   Record state_contents :=
-    mkCont { next_var : var ; nect_cTag : cTag ; next_iTag : iTag; cenv : cEnv;
-             name_env : nEnv }.
+    mkCont { next_var : var ; nect_ctor_tag : ctor_tag ; next_ind_tag : ind_tag; cenv : ctor_env;
+             name_env : name_env }.
   
-  (** The state is the next available free variable, cTag and iTag and the tag environment *)
+  (** The state is the next available free variable, ctor_tag and ind_tag and the tag environment *)
   Definition ccstate :=
     state state_contents.
 
@@ -276,16 +276,21 @@ Section CC.
   Definition code_suffix := "_code".
   Definition proj_suffix := "_proj".
   
-  Definition make_record_cTag (n : N) : ccstate cTag :=
+  Definition make_record_ctor_tag (n : N) : ccstate ctor_tag :=
     p <- get ;; 
     let '(mkCont x c i e names) := p  in
-    let inf := (nAnon, nAnon,  i, n, 0%N) : cTyInfo in
-    let e' := ((M.set c inf e) : cEnv) in
+    let inf := {| ctor_name := nAnon
+                ; ctor_ind_name := nAnon
+                ; ctor_ind_tag := i
+                ; ctor_arity := n
+                ; ctor_ordinal := 0%N
+                |} in
+    let e' := ((M.set c inf e) : ctor_env) in
     put (mkCont x (c+1)%positive (i+1)%positive e' names) ;;
     ret c.
 
-  (** Looks up a variable in the map and handles it appropriately *) 
-  Definition get_var (x : var) (map : VarInfoMap) (c : cTag) (Γ : var)
+  (** Looks up a variable in the map and handles it appropriately *)
+  Definition get_var (x : var) (map : VarInfoMap) (c : ctor_tag) (Γ : var)
   : ccstate (var * (exp -> exp)) :=
     match Maps.PTree.get x map with
       | Some entry =>
@@ -293,7 +298,7 @@ Section CC.
           | FVar pos =>
             (* pick a fresh name, register its pretty name *)
             y <- get_name x proj_suffix ;;
-            ret (y, fun e => Eproj y c pos Γ e)   
+            ret (y, fun e => Eproj y c pos Γ e)
           | MRFun code_ptr  =>
             (* get the new name of the function and pack it together with the
                current environment argument to construct the closure *)
@@ -303,15 +308,15 @@ Section CC.
         end
       | None => ret (x, id) (* should never reach here *)
     end.
-  
+
   Fixpoint get_vars (xs : list var) (map : VarInfoMap)
-           (c : cTag) (Γ : var) : ccstate (list var * (exp -> exp)) :=
+           (c : ctor_tag) (Γ : var) : ccstate (list var * (exp -> exp)) :=
     match xs with
       | [] => ret ([], id)
       | x :: xs =>
         t1 <- get_var x map c Γ ;;
         let '(y, f) := t1 in
-        t2 <- get_vars xs map c Γ ;; 
+        t2 <- get_vars xs map c Γ ;;
         let '(ys, f') := t2 in
         ret (y :: ys, fun e => f (f' e))
     end.
@@ -327,8 +332,8 @@ Section CC.
 
   (** Construct the closure environment and the new variable map *)
   Definition make_env (fv : FVSet) (mapfv_new : VarInfoMap)
-             (mapfv_old : VarInfoMap) (c_old : cTag) (Γ_new Γ_old : var)
-  : ccstate (cTag * VarInfoMap * (exp -> exp)) :=
+             (mapfv_old : VarInfoMap) (c_old : ctor_tag) (Γ_new Γ_old : var)
+  : ccstate (ctor_tag * VarInfoMap * (exp -> exp)) :=
     (* put the free variables in a new map *)
     let fvs := PS.elements fv in
     let '(map_new', n) :=
@@ -341,9 +346,9 @@ Section CC.
     in
     t1 <- get_vars fvs mapfv_old c_old Γ_old ;;
     let '(fv', g') :=  t1 in
-    c_new <- make_record_cTag n ;;
+    c_new <- make_record_ctor_tag n ;;
     ret (c_new, map_new', fun e => g' (Econstr Γ_new c_new fv' e)).
-  
+
   (** Construct closures after a function definition block *)
   Fixpoint make_full_closure (defs : fundefs) (mapfv_new mapfv_old : VarInfoMap)
            (Γ : var)
@@ -369,7 +374,7 @@ Section CC.
 
   (** Closure conversion *)
   Fixpoint exp_closure_conv (e : exp) (mapfv : VarInfoMap)
-           (c : cTag) (Γ : var) : ccstate (exp * (exp -> exp)) := 
+           (c : ctor_tag) (Γ : var) : ccstate (exp * (exp -> exp)) :=
     match e with
       | Econstr x tag ys e' =>
         t1 <- get_vars ys mapfv c Γ ;;
@@ -387,7 +392,7 @@ Section CC.
              ret ((y, ((snd ef) (fst ef))) :: xs')
          end) pats;;
         t1 <- get_var x mapfv c Γ ;;
-        let '(x', f1) := t1 in           
+        let '(x', f1) := t1 in
         ret (Ecase x' pats', f1)
       | Eproj x tag n y e' =>
         t1 <- get_var y mapfv c Γ ;;
@@ -408,7 +413,7 @@ Section CC.
         ret (Efun defs' (g2 ((snd ef) (fst ef))), g1)
       | Eapp f ft xs =>
         t1 <- get_var f mapfv c Γ ;;
-        let '(f', g1) := t1 in     
+        let '(f', g1) := t1 in
         t2 <- get_vars xs mapfv c Γ ;;
         let '(xs', g2) := t2 in
         ptr <- get_name f code_suffix ;;
@@ -426,7 +431,7 @@ Section CC.
       let '(x', f) := t1 in
       ret (Ehalt x', f)
     end
-  with fundefs_closure_conv (defs : fundefs) (mapfv : VarInfoMap) (c : cTag)
+  with fundefs_closure_conv (defs : fundefs) (mapfv : VarInfoMap) (c : ctor_tag)
        : ccstate fundefs  :=
          match defs with
            | Fcons f tag ys e defs' =>
@@ -451,7 +456,7 @@ Section CC.
            | Fnil => ret Fnil
          end.
 
-  Definition closure_conversion_hoist (e : exp) ctag itag cenv' nmap : cEnv * M.t BasicAst.name * exp :=
+  Definition closure_conversion_hoist (e : exp) ctag itag cenv' nmap : ctor_env * M.t BasicAst.name * exp :=
     let Γ := ((max_var e 1%positive) + 1)%positive in
     let next := (Γ + 1)%positive in
     let state := mkCont next ctag itag cenv' nmap in
@@ -472,5 +477,5 @@ Section CC.
                         (exp_closure_conv e map 1%positive Γ)
                         state in
     exp_hoist (f e).
-  
+
 End CC.

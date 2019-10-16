@@ -48,8 +48,8 @@ Close Scope Z_scope.
 Section Closure_conversion_correct.
 
   Variable pr : prims.
-  Variable cenv : cEnv.
-  Variable clo_tag : cTag.
+  Variable cenv : ctor_env.
+  Variable clo_tag : ctor_tag.
 
 
   (** ** Semantics preservation proof *)
@@ -307,10 +307,10 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Extend the first environment with a list of variables in [Scope] *)
-  Lemma Fun_inv_setlist_In_Scope_l k rho1 rho1' rho2 Scope Funs σ c Γ xs vs :
+  Lemma Fun_inv_set_lists_In_Scope_l k rho1 rho1' rho2 Scope Funs σ c Γ xs vs :
     Included _ (FromList xs) Scope ->
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
-    setlist xs vs rho1 = Some rho1' ->
+    set_lists xs vs rho1 = Some rho1' ->
     Fun_inv k rho1' rho2 Scope Funs σ c Γ.
   Proof.
     revert rho1 rho1' vs. induction xs; intros rho1 rho1' vs.
@@ -319,7 +319,7 @@ Section Closure_conversion_correct.
     - intros Hinc Hfun Hset.
       simpl in Hset.
       destruct vs; [ discriminate | ].
-      destruct (setlist xs vs rho1) eqn:Heq; [ | discriminate ]. inv Hset.
+      destruct (set_lists xs vs rho1) eqn:Heq; [ | discriminate ]. inv Hset.
       eapply Fun_inv_set_In_Scope_l.
       + rewrite FromList_cons in Hinc. 
         eapply Hinc. eauto.
@@ -330,11 +330,11 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Extend the second environment with a list of variables in [Scope] *)
-  Lemma Fun_inv_setlist_In_Scope_r k rho1 rho2 rho2' Scope Funs σ c Γ xs vs v :
+  Lemma Fun_inv_set_lists_In_Scope_r k rho1 rho2 rho2' Scope Funs σ c Γ xs vs v :
     Included _ (FromList xs) Scope ->
     Disjoint _ (image σ (Setminus _ Funs Scope)) (FromList xs) ->
     Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ c Γ ->
-    setlist xs vs rho2 = Some rho2' ->
+    set_lists xs vs rho2 = Some rho2' ->
     Fun_inv k rho1 (M.set Γ v rho2') Scope Funs σ c Γ.
   Proof.
     revert rho2 rho2' vs. induction xs; intros rho2 rho2' vs.
@@ -343,7 +343,7 @@ Section Closure_conversion_correct.
     - intros Hinc Hd Hfun Hset.
       simpl in Hset.
       destruct vs; [ discriminate | ].
-      destruct (setlist xs vs rho2) eqn:Heq; [ | discriminate ]. inv Hset.
+      destruct (set_lists xs vs rho2) eqn:Heq; [ | discriminate ]. inv Hset.
       eapply Fun_inv_set_In_Scope_r.
       + rewrite FromList_cons in Hinc. 
         eapply Hinc. eauto.
@@ -605,7 +605,7 @@ Section Closure_conversion_correct.
     project_vars clo_tag Scope Funs σ c Γ FVs S xs xs' C S' ->
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
     FV_inv k rho1 rho2 Scope Funs c Γ FVs ->
-    getlist xs rho1 = Some vs1 ->
+    get_list xs rho1 = Some vs1 ->
     exists rho2', ctx_to_rho C rho2 rho2'.
   Proof. 
     intros HD Hvars HFun HFV.
@@ -614,17 +614,17 @@ Section Closure_conversion_correct.
            rho1 rho2  HD  Hvars HFun HFV.
     induction xs;
       intros Scope Funs Γ FVs xs' C S S' vs1 k
-             rho1 rho2 HD Hvars HFun HFV Hgetlist.
+             rho1 rho2 HD Hvars HFun HFV Hget_list.
     - inv Hvars. eexists; econstructor; eauto.
-    - inv Hvars. simpl in Hgetlist.
+    - inv Hvars. simpl in Hget_list.
       destruct (M.get a rho1) eqn:Hgeta1; try discriminate. 
-      destruct (getlist xs rho1) eqn:Hgetlist1; try discriminate.
+      destruct (get_list xs rho1) eqn:Hget_list1; try discriminate.
       edestruct project_var_ctx_to_rho with (rho1 := rho1) as [rho2' Hctx1]; eauto.
       edestruct IHxs with (rho2 := rho2') as [rho2'' Hctx2].
       + eapply Disjoint_Included_l; [| eassumption ].
         eapply project_var_free_set_Included. eassumption.
       + eassumption.
-      +inv Hgetlist. intros f v' Hnin Hin Hget.
+      +inv Hget_list. intros f v' Hnin Hin Hget.
        edestruct HFun as
           [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
        repeat eexists; eauto.
@@ -711,7 +711,7 @@ Section Closure_conversion_correct.
         intros Hc. eapply Hnin2'. right. eauto.
       + rewrite cc_approx_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hfind Hset.
-        edestruct (@setlist_length val)
+        edestruct (@set_lists_length val)
         with (rho' := def_funs B2 B2 (M.set Γ (Vconstr c vs) rho')
                                (M.set Γ (Vconstr c vs) rho')) as [rho2' Hset'].
         eassumption. now eauto.
@@ -724,13 +724,13 @@ Section Closure_conversion_correct.
         intros Hlt Hall. eapply IHe with (Scope := FromList xs1). 
         * eassumption.
         * eapply cc_approx_env_P_set_not_in_P_r.
-          eapply cc_approx_env_P_setlist_l with (P1 := Empty_set _); eauto.
+          eapply cc_approx_env_P_set_lists_l with (P1 := Empty_set _); eauto.
           eapply cc_approx_env_Empty_set. now intros Hc; eauto.
           intros Hc. eapply Hnin''. right; left. eassumption.
         * intros Hc. apply Hnin''. eauto.
         * eapply binding_in_map_antimon.
           eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
-          eapply binding_in_map_setlist; [| now eauto ].
+          eapply binding_in_map_set_lists; [| now eauto ].
           eapply binding_in_map_def_funs. eassumption.
         * intros B Hin. eapply Hun. left. 
           eapply fun_in_fundefs_funs_in_fundef; eauto.
@@ -762,8 +762,8 @@ Section Closure_conversion_correct.
           eapply Hnin2. rewrite <- Hseq. eapply image_monotonic; [| eassumption ].
           now apply Setminus_Included.
           intros Hin. eapply Hnin''. left; eassumption.
-          eapply Fun_inv_setlist_In_Scope_l; [ now apply Included_refl | |].
-          eapply Fun_inv_setlist_In_Scope_r; [ now apply Included_refl | | | eassumption ].  
+          eapply Fun_inv_set_lists_In_Scope_l; [ now apply Included_refl | |].
+          eapply Fun_inv_set_lists_In_Scope_r; [ now apply Included_refl | | | eassumption ].  
           eapply Disjoint_Included_r;
             [| eapply Disjoint_Included_l;
                [ apply image_monotonic; now apply Setminus_Included | now apply Hd ]].
@@ -775,7 +775,7 @@ Section Closure_conversion_correct.
           edestruct Henv as [v' [Hnth'' Hcc'']]; eauto.
           now apply not_In_Empty_set. now apply not_In_Empty_set.
           erewrite <- def_funs_neq.
-          erewrite setlist_not_In. eassumption. now eauto.
+          erewrite set_lists_not_In. eassumption. now eauto.
           intros Hc. now eapply Hnin3; eauto. eassumption.
           repeat eexists; eauto.
           rewrite M.gss. reflexivity.
@@ -861,8 +861,8 @@ Section Closure_conversion_correct.
     Fun_inv k rho1 rho2' Scope Funs σ c Γ /\
     FV_inv k rho1 rho2' Scope Funs c Γ FVs /\
     (forall vs,
-       getlist xs rho1 = Some vs ->
-       exists vs', getlist xs' rho2' = Some vs' /\
+       get_list xs rho1 = Some vs ->
+       exists vs', get_list xs' rho2' = Some vs' /\
               Forall2 (cc_approx_val pr cenv clo_tag k boundG) vs vs').
   Proof.
     revert k rho1 rho2 rho2' Scope Funs Γ FVs xs' C S.
@@ -881,10 +881,10 @@ Section Closure_conversion_correct.
         eapply project_var_free_set_Included; eassumption |].
       repeat split; eauto. intros vs Hget. 
       simpl in Hget. destruct (M.get a rho1) eqn:Hget'; try discriminate. 
-      destruct (getlist xs rho1) eqn:Hgetlist; try discriminate.
-      inv Hget. edestruct Hyp as [vs' [Hgetlist' Hall]]; [ reflexivity |].
+      destruct (get_list xs rho1) eqn:Hget_list; try discriminate.
+      inv Hget. edestruct Hyp as [vs' [Hget_list' Hall]]; [ reflexivity |].
       edestruct Hcc_var as [v' [Hget''' Hcc''']]; eauto.
-      eexists. split; eauto. simpl. rewrite Hgetlist'. 
+      eexists. split; eauto. simpl. rewrite Hget_list'. 
       erewrite <- project_vars_get; eauto. rewrite Hget'''. reflexivity.
   Qed.
   
@@ -971,8 +971,8 @@ Section Closure_conversion_correct.
   Qed.
 
   Lemma Forall2_cc_approx_var_env k P rho1 rho2 l1 l2 vs1 vs2 :
-    getlist l1 rho1 = Some vs1 ->
-    getlist l2 rho2 = Some vs2 ->
+    get_list l1 rho1 = Some vs1 ->
+    get_list l2 rho2 = Some vs2 ->
     Forall2 (cc_approx_val pr cenv clo_tag k P) vs1 vs2 ->
     Forall2 (cc_approx_var_env pr cenv clo_tag k P rho1 rho2) l1 l2.
   Proof.
@@ -981,15 +981,15 @@ Section Closure_conversion_correct.
       inv Hall. destruct l2; try discriminate.
       now constructor.
       simpl in Hget2. destruct (M.get e rho2); try discriminate.
-      destruct (getlist l2 rho2); try discriminate.
+      destruct (get_list l2 rho2); try discriminate.
     - simpl in Hget1.
       destruct (M.get a rho1) eqn:Hgeta; try discriminate.
-      destruct (getlist l1 rho1) eqn:Hgetl; try discriminate.
+      destruct (get_list l1 rho1) eqn:Hgetl; try discriminate.
       inv Hget1.
       inv Hall.
       destruct l2; try discriminate. simpl in Hget2.
       destruct (M.get e rho2) eqn:Hgeta'; try discriminate.
-      destruct (getlist l2 rho2) eqn:Hgetl'; try discriminate.
+      destruct (get_list l2 rho2) eqn:Hgetl'; try discriminate.
       inv Hget2. constructor; eauto.
       eapply cc_approx_val_cc_appox_var_env; eauto.
   Qed.
@@ -1083,7 +1083,7 @@ Section Closure_conversion_correct.
   Lemma Ecase_correct_upper_bound k rho1 rho2 rho2' C x x' c e e' l l' :
     ctx_to_rho C rho2 rho2' ->
     sizeOf_exp_ctx C <= 3 ->
-    Forall2 (fun p1 p2 : cTag * exp => fst p1 = fst p2) l l' ->
+    Forall2 (fun p1 p2 : ctor_tag * exp => fst p1 = fst p2) l l' ->
     cc_approx_var_env pr cenv clo_tag k boundG rho1 rho2' x x' ->
     cc_approx_exp pr cenv clo_tag k (upper_boundL k e rho1)
                   boundG (e, rho1) (e', rho2') ->
@@ -1141,7 +1141,7 @@ Section Closure_conversion_correct.
   Lemma Ecase_correct_lower_bound k rho1 rho2 rho2' C x x' c e e' l l' :
     ctx_to_rho C rho2 rho2' ->
     sizeOf_exp_ctx C <= 3 ->
-    Forall2 (fun p1 p2 : cTag * exp => fst p1 = fst p2) l l' ->
+    Forall2 (fun p1 p2 : ctor_tag * exp => fst p1 = fst p2) l l' ->
     cc_approx_var_env pr cenv clo_tag k boundG rho1 rho2' x x' ->
     cc_approx_exp pr cenv clo_tag k lower_boundL
                   boundG (e, rho1) (e', rho2') ->
@@ -1188,7 +1188,7 @@ Section Closure_conversion_correct.
   Corollary Ecase_correct k rho1 rho2 rho2' C x x' c e e' l l' :
     ctx_to_rho C rho2 rho2' ->
     sizeOf_exp_ctx C <= 3 ->
-    Forall2 (fun p1 p2 : cTag * exp => fst p1 = fst p2) l l' ->
+    Forall2 (fun p1 p2 : ctor_tag * exp => fst p1 = fst p2) l l' ->
     cc_approx_var_env pr cenv clo_tag k boundG rho1 rho2' x x' ->
     cc_approx_exp pr cenv clo_tag k (boundL k e rho1)
                   boundG (e, rho1) (e', rho2') ->
@@ -1373,10 +1373,10 @@ Section Closure_conversion_correct.
     - (* Case Efun -- the hardest one! *)
       inv Hcc.
       specialize (occurs_free_fundefs_cardinality _ _ (proj2 H1) H2); intros Hlen.
-      assert (Ha : exists vs, getlist FVs' rho1 = Some vs).
-      { eapply In_getlist. intros x Hin. eapply HFVs.
+      assert (Ha : exists vs, get_list FVs' rho1 = Some vs).
+      { eapply In_get_list. intros x Hin. eapply HFVs.
         rewrite occurs_free_Efun, H1. eauto. }
-      destruct Ha as [vs Hgetlist].
+      destruct Ha as [vs Hget_list].
       (* sizes of evaluation contexts *)
       assert(HC1 : sizeOf_exp_ctx C' <= 3 * sizeOf_fundefs f2)
         by (eapply le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | omega ]).
@@ -1434,10 +1434,10 @@ Section Closure_conversion_correct.
           + intros Hc. erewrite <- closure_conversion_fundefs_Same_set_image in Hc; [| eassumption ].
             eapply H7. constructor; [| now eauto ].
             eapply make_closures_image_Included. eassumption. eassumption.
-          + edestruct Hvar as [vs' [Hgetlist' Hall]]; eauto.
-            intros x N v _ _ Hnth Hget. rewrite Hget' in Hgetlist'; inv Hgetlist'.
-            edestruct (@getlist_nth_get val) as [v' [Hnth' Hget'']].
-            now apply Hgetlist. eassumption.
+          + edestruct Hvar as [vs' [Hget_list' Hall]]; eauto.
+            intros x N v _ _ Hnth Hget. rewrite Hget' in Hget_list'; inv Hget_list'.
+            edestruct (@get_list_nth_get val) as [v' [Hnth' Hget'']].
+            now apply Hget_list. eassumption.
             edestruct (@Forall2_nthN val) as [v'' [Hget''' Hcc'']]. eassumption.
             eassumption. rewrite Hget in Hget''. inv Hget''. eauto.
         - intros g' Hin. eexists. now rewrite def_funs_eq.
@@ -1517,10 +1517,10 @@ Section Closure_conversion_correct.
               eapply H7. constructor.
               eapply make_closures_image_Included. eassumption.
               eassumption. now eauto.
-            * edestruct Hvar as [vs' [Hgetlist' Hall]]; eauto.
-              intros x N v _ _ Hnth Hget. rewrite Hget' in Hgetlist'; inv Hgetlist'.
-              edestruct (@getlist_nth_get val) as [v' [Hnth' Hget'']].
-              now apply Hgetlist. eassumption.
+            * edestruct Hvar as [vs' [Hget_list' Hall]]; eauto.
+              intros x N v _ _ Hnth Hget. rewrite Hget' in Hget_list'; inv Hget_list'.
+              edestruct (@get_list_nth_get val) as [v' [Hnth' Hget'']].
+              now apply Hget_list. eassumption.
               edestruct (@Forall2_nthN val) as [v'' [Hget''' Hcc'']]. eassumption.
               eassumption. rewrite Hget in Hget''. inv Hget''. eauto.
           + eauto.
@@ -1548,7 +1548,7 @@ Section Closure_conversion_correct.
       intros v1' c1' Hleq' Hstep'. inv Hstep'.
       edestruct Hsuf as [v2' [c2' [Hstep2' [[Hle1 Hle2] Hcc2']]]]; [| eassumption |]; eauto.
       assert (Hadm : length FVs' = length FVs'').
-      {  do 2 (erewrite getlist_length_eq; [| eassumption ]).
+      {  do 2 (erewrite get_list_length_eq; [| eassumption ]).
          eapply Forall2_length. eassumption. }
       assert (Hadm' : numOf_fundefs f2 = numOf_fundefs B')
         by (eapply Closure_conversion_fundefs_numOf_fundefs; eauto).
@@ -1574,7 +1574,7 @@ Section Closure_conversion_correct.
         edestruct Hvar as [v' [Hget' Happ']]; eauto.
         simpl. rewrite H4, H5. reflexivity.
         simpl in Hget'. destruct (M.get f' rho2') eqn:Hgetf'; try discriminate.
-        destruct (getlist ys' rho2') eqn:Hgetlist'; try discriminate. inv Hget'.
+        destruct (get_list ys' rho2') eqn:Hget_list'; try discriminate. inv Hget'.
         inv Happ'. rewrite cc_approx_val_eq in H6. destruct v0; try contradiction.
         eapply ctx_to_rho_cc_approx_exp with (P' := P 0);
           [ now firstorder
@@ -1596,7 +1596,7 @@ Section Closure_conversion_correct.
         - omega.          
         - subst.
           assert (Heq: length ys' = length l).
-          { symmetry. do 2 (erewrite getlist_length_eq; [| eassumption ]).
+          { symmetry. do 2 (erewrite get_list_length_eq; [| eassumption ]).
             eapply Forall2_length. eassumption. }
           repeat eexists.
           + econstructor. eassumption. reflexivity.
@@ -1606,8 +1606,8 @@ Section Closure_conversion_correct.
             reflexivity.
             eapply BStepc_app. rewrite M.gso. rewrite M.gss. reflexivity.
             now eauto.
-            simpl. rewrite M.gss. rewrite getlist_set_neq. rewrite getlist_set_neq.
-            rewrite Hgetlist'. reflexivity. 
+            simpl. rewrite M.gss. rewrite get_list_set_neq. rewrite get_list_set_neq.
+            rewrite Hget_list'. reflexivity. 
             intros Hin. eapply project_vars_not_In_free_set. eassumption. eassumption. 
             constructor. eapply H10. rewrite FromList_cons. now eauto.
             intros Hin. eapply project_vars_not_In_free_set. eassumption. eassumption.

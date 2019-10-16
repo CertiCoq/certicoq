@@ -21,10 +21,10 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) : freshM exp :=
   | Econstr x t ys e =>
     x' <- get_name x "";;
     let ys' := apply_r_list sigma ys in
-    e' <- freshen_term e (M.set x x' sigma) ;; 
+    e' <- freshen_term e (M.set x x' sigma) ;;
     ret (Econstr x' t ys' e')
   | Ecase v cl =>
-    cl' <- (fix alpha_list (pats: list (cTag*exp)) : freshM (list (cTag*exp)) :=
+    cl' <- (fix alpha_list (pats: list (ctor_tag*exp)) : freshM (list (ctor_tag*exp)) :=
              match pats with
              | nil => ret nil
              | pat::pats =>
@@ -33,16 +33,16 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) : freshM exp :=
                pats' <- alpha_list pats ;;
                ret ((t, e')::pats')
              end) cl ;;
-     ret (Ecase (apply_r sigma v) cl')    
+     ret (Ecase (apply_r sigma v) cl')
   | Eproj x t n y e =>
     x' <- get_name x "" ;;
     let y' := apply_r sigma y in
-    e' <- freshen_term e (M.set x x' sigma) ;; 
+    e' <- freshen_term e (M.set x x' sigma) ;;
     ret (Eproj x' t n y' e')
   | Efun fds e =>
     let f_names := all_fun_name fds in
     f_names' <- get_names_lst f_names "" ;;
-    (match @setlist var f_names f_names' sigma with
+    (match @set_lists var f_names f_names' sigma with
      | Some sigma' =>
        fds' <- freshen_fun fds sigma' ;;
        e' <- freshen_term e sigma' ;;
@@ -52,12 +52,12 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) : freshM exp :=
      end)
   | Eapp f t ys =>
     let f' := apply_r sigma f  in
-    let ys' := apply_r_list sigma ys in    
+    let ys' := apply_r_list sigma ys in
     ret (Eapp f' t ys')
   | Eprim x t ys e =>
     x' <- get_name x "" ;;
     let ys' := apply_r_list sigma ys in
-    e' <- freshen_term e (M.set x x' sigma) ;; 
+    e' <- freshen_term e (M.set x x' sigma) ;;
     ret (Eprim x' t ys' e')
   | Ehalt x =>
     let x' := apply_r sigma x in
@@ -68,7 +68,7 @@ with freshen_fun (fds:fundefs) (sigma:M.t positive) : freshM fundefs :=
        | Fcons f t xs e fds =>
          let f' := apply_r sigma f in
          xs' <- get_names_lst xs "" ;;
-         (match @setlist var xs xs' sigma with
+         (match @set_lists var xs xs' sigma with
           | Some sigma' =>
             e' <- freshen_term e sigma' ;;
             fds' <- freshen_fun fds sigma ;;
@@ -90,7 +90,7 @@ Definition test :=
   (Efun (Fcons 1 2 [3] (Ehalt 3) Fnil)
   (Efun (Fcons 1 2 [3] (Ehalt 3) Fnil) (Ehalt 1)))%positive.
 
-Definition dummy_tag := 1%positive. 
+Definition dummy_tag := 1%positive.
 Definition c := pack_data 10%positive dummy_tag dummy_tag dummy_tag  (M.empty _) (M.empty _) (M.empty _) [].
 
 Definition testf := Eval native_compute in (freshen_top test c).

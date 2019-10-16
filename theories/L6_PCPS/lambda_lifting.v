@@ -110,9 +110,9 @@ Section LambdaLifting.
 
   Inductive FunInfo : Type := 
   (* A known function. The first argument is the name of the lambda lifted version,
-   the second the new fTag and the third and forth the are free variables of the
+   the second the new fun_tag and the third and forth the are free variables of the
    function as a list and as a set *)
-  | Fun : var -> fTag -> list var -> PS.t -> FunInfo.
+  | Fun : var -> fun_tag -> list var -> PS.t -> FunInfo.
 
   (* Maps variables to [FunInfo] *)
   Definition FunInfoMap := Maps.PTree.t FunInfo.
@@ -133,7 +133,7 @@ Section LambdaLifting.
       let '(m', gfuns') := maps in
       (* new name for lambda lifted definition - this function will always be known *)
       f' <- get_name f "_lifted";;
-      (* new fTag for lambda listed definition *)
+      (* new fun_tag for lambda listed definition *)
       ft' <- get_ftag (N.of_nat (length xs)) ;;
       (* if the function block is closed add it to the global function map *)
       let gfuns'' := if is_closed then M.set f (GFun f') gfuns' else gfuns' in
@@ -356,10 +356,10 @@ Inductive Add_functions :
   fundefs ->
   list var ->
   (var -> var) ->
-  (var -> option (var * fTag * list var)) ->
+  (var -> option (var * fun_tag * list var)) ->
   Ensemble var ->
   (var -> var) ->
-  (var -> option (var * fTag * list var)) ->
+  (var -> option (var * fun_tag * list var)) ->
   Ensemble var ->
   Prop :=
 | Add_Fcons :
@@ -374,32 +374,32 @@ Inductive Add_functions :
       Add_functions Fnil fvs σ ζ S σ ζ S.
 
 (* Map from the original name to the name of the lifted function *)
-Definition lifted_name (ζ : var -> option (var * fTag * list var)) : var -> option var :=
+Definition lifted_name (ζ : var -> option (var * fun_tag * list var)) : var -> option var :=
   fun f => (liftM (fun x => (fst (fst x)))) (ζ f).
 
 (* Map from the original name to the list of free vars *)
-Definition free_vars (ζ : var -> option (var * fTag * list var)) : var -> option (list var) :=
+Definition free_vars (ζ : var -> option (var * fun_tag * list var)) : var -> option (list var) :=
   fun f => (liftM (fun x => snd x)) (ζ f).
 
 (** The domain of ζ *)
-Definition Funs (ζ : var -> option (var * fTag * list var)) : Ensemble var :=
+Definition Funs (ζ : var -> option (var * fun_tag * list var)) : Ensemble var :=
   domain (lifted_name ζ).
 
 (** The image of ζ on its domain - i.e. the names of the lifted functions *)
-Definition LiftedFuns (ζ : var -> option (var * fTag * list var)) : Ensemble var :=
+Definition LiftedFuns (ζ : var -> option (var * fun_tag * list var)) : Ensemble var :=
   image' (lifted_name ζ) (Funs ζ).
 
 (**  The free variables of functions in ζ, alternative definition *)
-Definition FunsFVsLst (ζ : var -> option (var * fTag * list var)) : Ensemble (list var) :=
+Definition FunsFVsLst (ζ : var -> option (var * fun_tag * list var)) : Ensemble (list var) :=
   fun fvs => exists f f' ft', ζ f = Some (f', ft', fvs).
 
 (**  The free variables of functions in ζ *)
-Definition FunsFVs (ζ : var -> option (var * fTag * list var)) : Ensemble var :=
+Definition FunsFVs (ζ : var -> option (var * fun_tag * list var)) : Ensemble var :=
   fun v => exists f f' ft' fvs, ζ f = Some (f', ft', fvs) /\
                         Ensembles.In _ (FromList fvs) v.
 
 Inductive Exp_lambda_lift :
-  (var -> option (var * fTag * list var)) ->
+  (var -> option (var * fun_tag * list var)) ->
   (var -> var) ->
   exp ->
   Ensemble var ->
@@ -446,7 +446,7 @@ Inductive Exp_lambda_lift :
     forall ζ σ x S,
       Exp_lambda_lift ζ σ (Ehalt x) S (Ehalt (σ x)) S
 with Fundefs_lambda_lift :
-  (var -> option (var * fTag * list var)) ->
+  (var -> option (var * fun_tag * list var)) ->
   (var -> var) ->
   fundefs ->
   Ensemble var ->

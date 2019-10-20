@@ -7,9 +7,10 @@
   > Relates L6 states to L7 states according to execution semantics
 
 
-TODO: change L6_to_Clight's fn_vars into fn_temps
+
 TODO: bundle the notation in L6_to_Clight and import it instead of redefining it 
 
+Done: change L6_to_Clight's fn_vars into fn_temps
 Done: change L6_to_Clight's reserve into reserve', todo update proof with new order 
 Done: update proof to 64 bits (parametric over Archi.ptr64) 
  *)
@@ -1887,7 +1888,7 @@ Inductive repr_expr_L6_L7: L6.cps.exp -> statement -> Prop :=
     (* 2 - call f *)
     (* NOTE: added redundant limitIdent |-> limitPtr to avoid having to carry this info around, but could optimize it away *)
     repr_expr_L6_L7 (Eapp f t ys) (s1; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr ;
-                                      (Scall None ([mkFunTy threadInfIdent pnum] (var_or_funvar_f f)) ((Etempvar tinfIdent threadInf) :: s2)))
+                                      (Scall None ([Tpointer (mkFunTy threadInfIdent pnum) noattr] (var_or_funvar_f f)) ((Etempvar tinfIdent threadInf) :: s2)))
 | R_halt_e: forall v e,
     (* halt v <-> end with v in args[1] *)
     var_or_funvar v e -> 
@@ -6279,12 +6280,12 @@ Proof.
     rewrite <- vsEq in H. rewrite <- indEq in H. rewrite <- bvsEq in H.  
     destruct (asgnAppVars'' argsIdent threadInfIdent nParam avs aind fenv map) eqn:Happvar; inv H.
     destruct (mkCallVars (Init.Nat.min (N.to_nat n) nParam) bvs) eqn:Hcallvar; inv H1.
-    erewrite <- find_symbol_map_f. 2: eauto. 
-    econstructor. 
+    erewrite <- find_symbol_map_f. 2: eauto. admit.
+(*     econstructor. 
     eauto. eauto. eauto. eauto. constructor.
     eapply asgnAppVars_correct; eauto.
     reflexivity.
-    eapply mkCallVars_correct; eauto.
+    eapply mkCallVars_correct; eauto. *)
   - (* Eprim *)
     inv H. 
   - (* Ehalt *)
@@ -6292,7 +6293,7 @@ Proof.
 
     eapply R_halt_e.
     apply find_symbol_map. auto.
-Qed.
+Admitted.
 
 
 
@@ -6719,6 +6720,23 @@ Proof.
 
 Ltac unsigned_ptrofs_range :=
   split; [apply Ptrofs.unsigned_range |  etransitivity;  [apply Ptrofs.unsigned_range_2 | rewrite ptrofs_mu; archi_red; reflexivity] ].
+
+
+Theorem type_of_mkFunTyList:
+  forall nParam vsm4, 
+  (mkFunTyList
+     (Init.Nat.min (length vsm4)
+             nParam)) = (type_of_params (map (fun x : ident => (x, uval))
+                                              (firstn nParam vsm4))).
+Proof.
+  induction nParam0; intros; simpl.
+  -  rewrite Nat.min_0_r.
+     reflexivity.
+  - destruct vsm4.
+    + (* empty list *)
+      reflexivity.
+    + simpl. erewrite IHnParam0. reflexivity.
+Qed.
 
 (* Main Theorem *)
 Theorem repr_bs_L6_L7_related:
@@ -8847,7 +8865,7 @@ Forall2
     destruct Hc_tinfo as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Hdiv_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Hget_tinf [Htinfne1 [Htinfne2 [Hinfo_limit [Hloc_args Hglobals]]]]]]]]]]]]]]]]]]]]].
     destruct Hbound_limit as [Hbound_limit Hbound_gc_size].
     rewrite <- Z.le_add_le_sub_l in Hbound_limit. 
-
+ 
     remember (Kseq
                 (Sassign
                    (Efield
@@ -8860,7 +8878,7 @@ Forall2
                          limitIdent valPtr) (Etempvar limitIdent valPtr))
                    (Kseq
                       (Scall None (Ecast (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f)
-                                         (mkFunTy threadInfIdent (Init.Nat.min (N.to_nat (fst (N.of_nat (length ind), ind))) nParam)))
+                                         (Tpointer (mkFunTy threadInfIdent (Init.Nat.min (N.to_nat (fst (N.of_nat (length ind), ind))) nParam)) noattr))
                              (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr) :: s2)) k))) as k'.
 
     remember (Maps.PTree.set argsIdent (Vptr args_b args_ofs) lenv) as  lenv'.
@@ -10280,7 +10298,7 @@ solve_nodup. solve_nodup.
 
     split.
    
-    (* step through s*) 
+    (* step through s*)  
     eapply t_trans.
     constructor. constructor.
 
@@ -10349,39 +10367,55 @@ solve_nodup. solve_nodup.
     
      
     (* CALL TIME! *)
-    eapply t_trans. 
-    constructor. econstructor.
-    reflexivity. 
-    simpl. rewrite Nnat.Nat2N.id. (* I'M HERE *)
-    eauto. econstructor. econstructor.
-    eauto. constructor. constructor.
-    eauto. reflexivity.
- 
-    
-    (* eval_expr (globalenv p) empty_env lenv m4
-               (Ecast (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f) (Tpointer (mkFunTy threadInfIdent (Init.Nat.min (length locs) nParam)) noattr))
-               (Vptr bf' Ptrofs.zero) *)
-    
-    econstructor. econstructor. 
-    eauto. constructor. constructor.
-    eauto. reflexivity.
 
-    (* CALL TIME! *)
     eapply t_trans. 
     constructor. econstructor.
-    reflexivity. eauto. econstructor. econstructor.
-    eauto. constructor. constructor.
-    eauto. reflexivity.
+    reflexivity.   
+    simpl. rewrite Nnat.Nat2N.id.
+    eapply Heval_f'.
+    econstructor. econstructor.
+    eauto. constructor.
+    (* OSTODO: need a hyp:
+   eval_exprlist (globalenv p) empty_env lenv m4 s2
+    (mkFunTyList
+       (Init.Nat.min
+          (N.to_nat (fst (N.of_nat (length locs), locs))) nParam))
+    ?Goal12 for some ?Goal12 equivalent to values in bys *)
+    simpl. rewrite Nnat.Nat2N.id.
+    admit.
+    (* -- find_funct f'*)
+    eauto.
+    (* -- type_of_fundef F*)
+    simpl. unfold type_of_function. rewrite Nnat.Nat2N.id.
+    rewrite Hlvs. unfold fn_params. simpl.
+    rewrite type_of_mkFunTyList. reflexivity.
+
     
+
+    (* - step through the Callstate *)
     eapply t_trans. 
-    constructor.  eapply  step_internal_function with (le :=
+    constructor.
+    (* I'M HERE : TODO: update the le in step_internal_function to include the argument vector computed earlier [in the eval_exprlist] *)
+    eapply  step_internal_function with (le :=
     (Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs)
-       (create_undef_temps (vars ++ gc_vars argsIdent allocIdent limitIdent caseIdent)))).
+       (create_undef_temps ((skipn nParam vars) ++ gc_vars argsIdent allocIdent limitIdent caseIdent)))).
     constructor. 
     simpl. constructor.
-    simpl. constructor. intro Hfalse; inv Hfalse. constructor.
-    simpl. intro; intros. inv H1. rewrite <- H5 in *. clear H5.
+    (* OSTODO: need to show that tinfo and all params are disjoint (from unique_bindigns and protected_not_bound) *)
+    (*    simpl. constructor. intro Hfalse; inv Hfalse. constructor. *)
+    admit.
+    (* OSTODO: need to show that first n param are disjoint from last arity-n *)
+    (*simpl. intro; intros. inv H1. rewrite <- H5 in *. clear H5. *)
+    admit.
 
+
+    (* --  alloc_variables (globalenv p) empty_env m4 
+    (fn_vars F) ?Goal12 ?Goal13 *) 
+    admit.
+    
+    (* -- bind_parameter_temps *)
+    admit.
+    (* 
     rewrite var_names_app in H4.
     rewrite Coqlib.in_app in H4. destruct H4.
     intro. rewrite <- H4 in *; clear H4.
@@ -10401,7 +10435,9 @@ solve_nodup. solve_nodup.
     inv H4. apply H19; inList. auto.   
     inv H5.
     constructor. reflexivity.
+     *)
 
+    (* OS: didn't look after this *)
     eapply t_trans.
     constructor. constructor.
 

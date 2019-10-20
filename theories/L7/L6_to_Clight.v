@@ -706,7 +706,7 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
         asgn <- asgnAppVars vs (snd inf) fenv map ;;
         let vv :=  makeVar x fenv map in
         let pnum := min (N.to_nat (fst inf)) nParam in
-        c <- (mkCall ([mkFunTy pnum] vv) pnum vs) ;;
+        c <- (mkCall ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
              ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c)
   | Eprim x p vs e => None
   | Ehalt x =>

@@ -219,8 +219,6 @@ Definition update_ind_env (ienv : n_ind_env) (p : positive) (cInf : ctor_ty_info
         ; ctor_ordinal := ord
         |} := cInf in
   match (M.get t ienv) with
-  (* | None => M.set t (nameTy, ((name, p, arity, ord) :: nil)) ienv *)
-  (* | Some (nameTy, iInf) => M.set t (nameTy, (name, p, arity, ord) :: iInf) ienv *)
   | None => M.set t (nameTy, (cInf :: nil)) ienv
   | Some (nameTy, iInf) => M.set t (nameTy, cInf :: iInf) ienv
   end.
@@ -1406,6 +1404,8 @@ Fixpoint make_interface
    the name of the print function in C. *)
 Definition print_env := M.t ident.
 
+(* We need a preliminary pass to generate the names for all
+   printer functions for each type because they can be mutually recursive. *)
 Fixpoint make_printer_names
          (ienv_list : list (ind_tag * n_ind_ty_info))
          (nenv : name_env)
@@ -1438,6 +1438,8 @@ Fixpoint get_max_ctor_arity (ctors : list ctor_ty_info) : N :=
   end.
 
 Definition def_info : Type := positive * type.
+(* printf and these literals will be used by multiple functions
+   so we want to reuse them, not redefine every time *)
 Record print_def_info : Type :=
   Build_print_def_info
     { printf_info : def_info
@@ -1472,17 +1474,24 @@ Fixpoint make_printer_funs
             we will declare an array for the arguments of the constructor
             of the resulting value from the eliminator *)
          let max_ctor_arity : N := get_max_ctor_arity ctors in
+
+         (* if none of the constructors take any args *)
          let won't_take_args : bool := N.eqb max_ctor_arity 0 in
          let prodArr_type : type := tarray val (Z.of_N max_ctor_arity) in
+
+         (* null pointer or properly sized array *)
          let elim_last_arg : expr :=
            if won't_take_args
              then Ecast (Econst_int (Int.repr 0) val) (tptr tvoid)
              else Evar _prodArr prodArr_type in
+
+         (* names and Clight types of printf and string literals *)
          let (_printf, ty_printf) := printf_info pinfo in
          let (_space, ty_space) := space_info pinfo in
          let (_lparen, ty_lparen) := lparen_info pinfo in
          let (_rparen, ty_rparen) := rparen_info pinfo in
          let (_sep, ty_sep) := sep_info pinfo in
+
          let fix generate_switch_cases
                  (ctors : list (nat * ctor_ty_info))
                  : labeled_statements :=
@@ -1499,9 +1508,14 @@ Fixpoint make_printer_funs
                               ((Evar _lparen ty_lparen) :: nil)) ;;;
                   (Scall None (Evar _printf ty_printf)
                               ((Evar _rparen ty_rparen) :: nil)) ;;;
-                   Sbreak)
+                  (* TODO calls to the print functions
+                     for each argument of the ctor. *)
+                  (* This is currently not possible because ctor
+                     field types are not stored! *)
+                  Sbreak)
                (generate_switch_cases ctors')
            end in
+
          let body :=
            (Scall None
              (Evar ename (Tfunction
@@ -1519,9 +1533,12 @@ Fixpoint make_printer_funs
                   (Evar cnname ty_names)
                   (Evar _index tint) ty_names)
                 ty_names) :: nil)) ;;;
-           (Sswitch (Evar _index val)
-                    (generate_switch_cases (enumerate ctors))) in
-        (* declare a prodArr array if any of the constructors take arguments,
+          (if won't_take_args
+            then Sreturn None
+            else Sswitch (Evar _index val)
+                         (generate_switch_cases (enumerate ctors))) in
+
+        (* declare a prodArr array if any of the constructors take args,
            if not then prodArr will not be declared at all *)
         let vars := if won't_take_args then nil
                     else (_prodArr, prodArr_type) :: nil in
@@ -1537,7 +1554,8 @@ Fixpoint make_printer_funs
                     (_index, nNamed "index"%string) ::
                     (_prodArr, nNamed "prodArr"%string) ::
                     nil) nenv in
-        '(nenv, funs) <- make_printer_funs cenv ienv_list' pinfo nenv eenv cnenv penv ;;
+        '(nenv, funs) <- make_printer_funs cenv ienv_list' pinfo
+                                           nenv eenv cnenv penv ;;
         ret (nenv, (pname, Gfun (Internal f)) :: funs)
     | _, _, _ =>
         (* If there is not print function name generated,

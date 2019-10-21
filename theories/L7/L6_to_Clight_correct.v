@@ -5459,7 +5459,7 @@ Theorem repr_asgn_fun_entry:
     M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
     mem_after_asgn args_b args_ofs m (skipn nParam locs) (skipn nParam vs7) ->
     right_param_asgn argsIdent (skipn nParam xs) (skipn nParam locs) asgn ->
-    lenv_param_asgn_i lenv lenv' xs (skipn nParam vs7) ->
+    lenv_param_asgn_i lenv lenv' (skipn nParam xs) (skipn nParam vs7) ->
     NoDup xs ->
     ~ List.In argsIdent xs ->
     Forall (fun i : N => (0 <= Z.of_N i < max_args)%Z) locs -> 
@@ -10534,13 +10534,11 @@ solve_nodup. solve_nodup.
     (* asgn! *)
     
     eapply clos_rt_t.
-    
+     
     eapply repr_asgn_fun_entry; eauto.
     rewrite M.gss. reflexivity. eauto.
-    rewrite load_ptr_or_int.
-    rewrite load_ptr_or_int.
-    (* OSTODO: make this line up with Hlenv_new'''_asgn_i *) admit.
-    constructor. constructor. 
+
+
 
     eapply t_trans. constructor. constructor.
 

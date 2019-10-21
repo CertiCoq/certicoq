@@ -515,17 +515,18 @@ Definition isBoxed (cenv:ctor_env) (ienv : n_ind_env) (ct : ctor_tag) : bool :=
                 end
   end.
 
-Fixpoint mkCallVars (n : nat) (vs : list positive) : option (list expr) :=
+Fixpoint mkCallVars (fenv : fun_env) (map: fun_info_env) (n : nat) (vs : list positive)  : option (list expr) :=
   match n , vs with
   | 0 , nil => Some nil
   | S n , cons v vs' =>
-    rest <- mkCallVars n vs' ;;
-        ret ((Etempvar v valPtr) :: rest)
+    let vv := makeVar v fenv map in
+    rest <- mkCallVars fenv map n vs' ;;
+        ret (vv :: rest)
   | _ , _ => None
   end.
 
-Definition mkCall (f : expr) n (vs : list positive) : option statement :=
-  match (mkCallVars n (firstn nParam vs)) with
+Definition mkCall (fenv : fun_env) (map: fun_info_env) (f : expr) n (vs : list positive) : option statement :=
+  match (mkCallVars fenv map n (firstn nParam vs)) with
   | Some v => Some (Scall None f (tinf :: v))
   | None => None
   end.
@@ -706,7 +707,7 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
         asgn <- asgnAppVars vs (snd inf) fenv map ;;
         let vv :=  makeVar x fenv map in
         let pnum := min (N.to_nat (fst inf)) nParam in
-        c <- (mkCall ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
+        c <- (mkCall fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
              ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c)
   | Eprim x p vs e => None
   | Ehalt x =>
@@ -770,7 +771,7 @@ Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : 
         asgn <- asgnAppVars_fast myvs vs myind (snd inf) fenv map ;;
         let vv :=  makeVar x fenv map in
         let pnum := min (N.to_nat (fst inf)) nParam in
-        c <- (mkCall ([mkFunTy pnum] vv) pnum vs) ;;
+        c <- (mkCall fenv map ([mkFunTy pnum] vv) pnum vs) ;;
              ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c)
   | Eprim x p vs e => None
   | Ehalt x =>

@@ -35,16 +35,19 @@ Definition mainIdent : positive := 1.
 Notation " p ';;;' q " := (Ssequence p q)
                           (at level 100, format " p ';;;' '//' q ").
 
+Definition ind_L1_tag := positive.
 Definition ind_L1_env := M.t Ast.one_inductive_body.
 
-(* Matches [ind_tag]s to a [ident] (i.e. [positive]) that holds
+(* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name of the eliminator function in C. *)
 Definition elim_env := M.t ident.
-(* Matches [ind_tag]s to a [ident] (i.e. [positive]) that holds
+
+(* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name and type of the names array in C. *)
 Definition ctor_names_env := M.t (ident * type).
+Definition ctor_arities_env := M.t (ident * type).
 
-(* Matches [ind_tag]s to a [ident] (i.e. [positive]) that holds
+(* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name of the print function in C. *)
 Definition print_env := M.t ident.
 
@@ -61,7 +64,9 @@ Section GState.
       ; gstate_nenv   : name_env
       ; gstate_eenv   : elim_env
       ; gstate_cnenv  : ctor_names_env
+      ; gstate_caenv  : ctor_names_env
       ; gstate_penv   : print_env
+      ; gstate_log    : list string
       }.
 
   Definition gState : Type -> Type := StateMonad.state gstate_data.
@@ -69,15 +74,15 @@ Section GState.
   (* generate fresh ident and record it to the name_env
     with the given string *)
   Definition gensym (s : string) : gState ident :=
-    '(Build_gstate_data n ienv nenv eenv cnenv penv) <- get ;;
+    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
     let nenv := M.set n (nNamed s) nenv in
-    put (Build_gstate_data ((n+1)%positive) ienv nenv eenv cnenv penv) ;;
+    put (Build_gstate_data ((n+1)%positive) ienv nenv eenv cnenv caenv penv log) ;;
     ret n.
 
   Definition set_print_env (k v : ident) : gState unit :=
-    '(Build_gstate_data n ienv nenv eenv cnenv penv) <- get ;;
+    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
     let penv := M.set k v penv in
-    put (Build_gstate_data n ienv nenv eenv cnenv penv) ;;
+    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
     ret tt.
 
   Definition get_print_env (k : ident) : gState (option ident) :=
@@ -85,9 +90,9 @@ Section GState.
     ret (M.get k penv).
 
   Definition set_elim_env (k v : ident) : gState unit :=
-    '(Build_gstate_data n ienv nenv eenv cnenv penv) <- get ;;
-    let penv := M.set k v penv in
-    put (Build_gstate_data n ienv nenv eenv cnenv penv) ;;
+    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+    let eenv := M.set k v eenv in
+    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
     ret tt.
 
   Definition get_elim_env (k : ident) : gState (option ident) :=
@@ -98,13 +103,30 @@ Section GState.
     cnenv <- gets gstate_cnenv ;;
     ret (M.get k cnenv).
 
+  Definition set_ctor_names_env (k : ident) (v : ident * type) : gState unit :=
+    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+    let cnenv := M.set k v cnenv in
+    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
+    ret tt.
+
+  Definition set_ctor_arities_env (k : ident) (v : ident * type) : gState unit :=
+    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+    let caenv := M.set k v caenv in
+    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
+    ret tt.
+
   Definition get_ind_L1_env (k : ident) : gState (option Ast.one_inductive_body) :=
     ienv <- gets gstate_ienv ;;
     ret (M.get k ienv).
 
   Definition put_ind_L1_env (ienv : ind_L1_env) : gState unit :=
-    '(Build_gstate_data n _ nenv eenv cnenv penv) <- get ;;
-    put (Build_gstate_data n ienv nenv eenv cnenv penv) ;;
+    '(Build_gstate_data n _ nenv eenv cnenv caenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
+    ret tt.
+
+  Definition log (s : string) : gState unit :=
+    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv (s :: log)) ;;
     ret tt.
 
 End GState.
@@ -140,12 +162,21 @@ Definition enumerate_pos {a : Type} (xs : list a) : list (positive * a) :=
   in aux 1%positive xs.
 
 Section Externs.
-  (* create a global variable with a string literal constant *)
+
+  (* Converts Coq string to Clight array *)
+  Fixpoint string_as_array (s : string) : list init_data :=
+    match s with
+    | EmptyString => Init_int8 Int.zero :: nil
+    | String c s' =>
+        Init_int8 (Int.repr (Z.of_N (N_of_ascii c))) :: string_as_array s'
+    end.
+
+  (* Creates a global variable with a string literal constant *)
   Definition string_literal (name : string) (literal : string)
-            : gState (ident * type * globdef Clight.fundef type) :=
+            : gState (ident * type * globdef fundef type) :=
     ident <- gensym name ;;
     let len := String.length literal in
-    let init := asgn_string_init literal in
+    let init := string_as_array literal in
     let ty := tarray tschar (Z.of_nat len) in
     let gv := Gvar (mkglobvar ty init true false) in
     ret (ident, ty, gv).
@@ -183,7 +214,7 @@ Section Externs.
 
 End Externs.
 
-Section L1_Types.
+Section L1Types.
 
   Fixpoint get_max_ctor_arity
           (ctors : list (BasicAst.ident * Ast.term * nat)) : nat :=
@@ -223,7 +254,7 @@ Section L1_Types.
     put_ind_L1_env ienv ;;
     ret res.
 
-End L1_Types.
+End L1Types.
 
 Section Printers.
   (* We need a preliminary pass to generate the names for all
@@ -235,16 +266,17 @@ Section Printers.
     | nil => ret tt
     | (tag, ty) :: tys' =>
         pname <- gensym ("print_" ++ Ast.ind_name ty) ;;
-        set_print_env tag pname
+        set_print_env tag pname ;;
+        make_printer_names tys'
     end.
 
   Variable pinfo : print_def_info.
-  Close Scope nat.
 
   Definition generate_printer
              (info : positive * Ast.one_inductive_body)
             : gState (option def) :=
     let (tag, b) := info in
+    let name := Ast.ind_name b in
     let ctors := Ast.ind_ctors b in
     pnameM <- get_print_env tag ;;
     enameM <- get_elim_env tag ;;
@@ -281,8 +313,25 @@ Section Printers.
         let (_rparen, ty_rparen) := rparen_info pinfo in
         let (_sep, ty_sep) := sep_info pinfo in
 
-        let fix rec_print_calls (ty : Ast.term) : statement :=
-            Sbreak in
+        let fix strip_ctor_args (ty : Ast.term) : list Ast.term :=
+           match ty with
+           | Ast.tProd _ e1 e2 => e1 :: strip_ctor_args e2
+           | _ => nil
+           end in (* TODO find a way to go from these types to the tag *)
+
+        let fix rec_print_calls (args : list Ast.term) : statement :=
+          match args with
+          | nil => Sskip
+          | arg :: nil => (* to handle the separator *)
+              Scall None (Evar _printf ty_printf) (* TODO replace with rec call *)
+                         (Evar _space ty_space :: nil)
+          | arg :: args' =>
+              Scall None (Evar _printf ty_printf) (* TODO replace with rec call *)
+                         (Evar _space ty_space :: nil) ;;;
+              Scall None (Evar _printf ty_printf)
+                         (Evar _sep ty_sep :: nil) ;;;
+              rec_print_calls args'
+          end in
 
         let fix switch_cases
                 (ctors : list (nat * (BasicAst.ident * Ast.term * nat)))
@@ -294,18 +343,18 @@ Section Printers.
               (if Nat.eqb arity 0
                  then Sreturn None
                  else
-                   ((Scall None (Evar _printf ty_printf)
-                               ((Evar _space ty_space) :: nil)) ;;;
-                   (Scall None (Evar _printf ty_printf)
-                               ((Evar _lparen ty_lparen) :: nil)) ;;;
-                   (rec_print_calls ty) ;;;
-                   (Scall None (Evar _printf ty_printf)
-                               ((Evar _rparen ty_rparen) :: nil)) ;;;
+                   Scall None (Evar _printf ty_printf)
+                               (Evar _space ty_space :: nil) ;;;
+                   Scall None (Evar _printf ty_printf)
+                               (Evar _lparen ty_lparen :: nil) ;;;
+                   rec_print_calls (strip_ctor_args ty) ;;;
+                   Scall None (Evar _printf ty_printf)
+                              (Evar _rparen ty_rparen :: nil) ;;;
                    (* TODO calls to the print functions *)
                    (*    for each argument of the ctor. *)
                    (* This is currently not possible because ctor *)
                    (*    field types are not stored! *)
-                   Sbreak))
+                   Sbreak)
               (switch_cases ctors')
           end in
 
@@ -338,13 +387,22 @@ Section Printers.
                     else (_prodArr, prodArr_type) :: nil in
         let f := {| fn_return := tvoid
                   ; fn_callconv := cc_default
-                  ; fn_params := (_v, tint) :: nil
-                  ; fn_vars := (_index, tint) :: vars
+                  ; fn_params := (_v, val) :: nil
+                  ; fn_vars := (_index, val) :: vars
                   ; fn_temps := nil
                   ; fn_body := body
                 |} in
         ret (Some (pname, Gfun (Internal f)))
-    | _, _, _, _ => ret None
+
+    (* pnameM, enameM, cnnameM, iM *)
+    | None, _, _, _ =>
+        log ("No print function name for " ++ name ++ ".") ;; ret None
+    | _, None, _, _ =>
+        log ("No elim function name for " ++ name ++ ".") ;; ret None
+    | _, _, None, _ =>
+        log ("No constructor names array name for " ++ name ++ ".") ;; ret None
+    | _, _, _, None =>
+        log ("No L1 info for the inductive type  " ++ name ++ ".") ;; ret None
     end.
 
   Fixpoint generate_printers
@@ -363,16 +421,82 @@ Section Printers.
 
 End Printers.
 
+Section CtorArrays.
+  Definition pad_char_init (l : list init_data) (n : nat) : list init_data :=
+    l ++ List.repeat (Init_int8 Int.zero) (n - (length l)).
+
+  Fixpoint normalized_names_array
+           (ctors : list (BasicAst.ident * Ast.term * nat))
+           (n : nat) : nat * list init_data :=
+    match ctors with
+    | nil => (n, nil)
+    | (s, _, _) :: ctors' =>
+        let (max_len, init_l) :=
+          normalized_names_array ctors' (max n (String.length s + 1)) in
+        let i := pad_char_init (string_as_array s) max_len in
+        (max_len, i ++ init_l)
+    end.
+
+  Fixpoint make_name_array
+           (tag : positive)
+           (name : string)
+           (ctors : list (BasicAst.ident * Ast.term * nat))
+           : gState def :=
+    let (max_len, init_l) := normalized_names_array ctors 1 in
+    let ty := tarray (tarray tschar (Z.of_nat max_len))
+                     (Z.of_nat (length ctors)) in
+    nname <- gensym ("names_of_" ++ name) ;;
+    set_ctor_names_env tag (nname, ty) ;;
+    ret (nname, Gvar (mkglobvar ty init_l true false)).
+
+  Fixpoint make_name_arrays
+           (tys : list (positive * Ast.one_inductive_body))
+           : gState defs :=
+    match tys with
+    | nil => ret nil
+    | (tag, b) :: tys' =>
+        rest <- make_name_arrays tys' ;;
+        def <- make_name_array tag (Ast.ind_name b) (Ast.ind_ctors b) ;;
+        ret (def :: rest)
+    end.
+
+End CtorArrays.
+
+Section Eliminators.
+
+  Fixpoint make_elims
+           (tys : list (positive * Ast.one_inductive_body))
+           : gState defs :=
+    match tys with
+    | nil => ret nil
+    | (tag, b) :: tys' =>
+        rest <- make_elims tys' ;;
+        let s : string := ("elim_" ++ Ast.ind_name b)%string in
+        ename <- gensym s ;;
+        set_elim_env tag ename ;;
+        let gv :=
+          Gfun (External
+                  (EF_external s (mksignature (val_typ :: val_typ :: val_typ :: nil)
+                               None cc_default))
+                  (Tcons val (Tcons (tptr val) (Tcons (tptr (tptr val)) Tnil)))
+                  tvoid cc_default) in
+        ret ((ename, gv) :: rest)
+    end.
+
+End Eliminators.
+
 (* Generates the header and the source programs *)
 Definition make_glue_program
         (gs : Ast.global_declarations)
         : gState (Clight.program * Clight.program) :=
   '(externs, pinfo) <- make_externs ;;
   singles <- propagate_types gs ;;
+  name_defs <- make_name_arrays singles ;;
+  elim_defs <- make_elims singles ;;
   make_printer_names singles;;
-  gd <- generate_printers pinfo singles ;;
+  printer_defs <- generate_printers pinfo singles ;;
   nenv <- gets gstate_nenv ;;
-  let gd := externs ++ gd in
+  let gd := externs ++ name_defs ++ elim_defs ++ printer_defs in
   let pi := map fst gd in
   ret (mkprogram nil (make_extern_decls nenv gd true) pi mainIdent Logic.I,
        mkprogram nil gd pi mainIdent Logic.I).
@@ -380,7 +504,7 @@ Definition make_glue_program
 
 Definition generate_glue
            (p : Ast.program) (* an L1 program *)
-           : name_env * option Clight.program * option Clight.program :=
+           : name_env * option Clight.program * option Clight.program * list string :=
   let (globs, _) := p in
   let init : gstate_data :=
       {| gstate_gensym := 2%positive
@@ -388,10 +512,13 @@ Definition generate_glue
        ; gstate_nenv   := M.empty _
        ; gstate_eenv   := M.empty _
        ; gstate_cnenv  := M.empty _
+       ; gstate_caenv  := M.empty _
        ; gstate_penv   := M.empty _
+       ; gstate_log    := nil
        |} in
   let '((header, source), st) := runState (make_glue_program globs) init in
   let nenv := gstate_nenv st in
-  (nenv,
-   (* the header content *) Some header,
-   (* the source content *) Some source).
+  (nenv (* the name environment to be passed to C generation *) ,
+   Some header (* the header content *),
+   Some source (* the source content *),
+   rev (gstate_log st) (* logged messages *)).

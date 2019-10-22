@@ -110,9 +110,10 @@ Definition compile_template_L7 `{F:utils.Fuel} (opt_level : nat) (p : Template.A
 
 Require Import Glue.glue.
 Definition make_glue (p : Template.Ast.program)
-  : exception (cps_util.name_env * Clight.program * Clight.program)  :=
+  : exception (cps_util.name_env * Clight.program * Clight.program * list string)  :=
   match generate_glue p with
-  | (nenv, Some hdr, Some prg) => Ret (nenv, hdr, prg)
+  | (nenv, Some hdr, Some prg, logs) =>
+      Ret (nenv, hdr, prg, logs)
   | _ => Exc ""
   end.
 

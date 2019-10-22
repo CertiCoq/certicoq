@@ -15,6 +15,11 @@ let pr_char c = str (Char.escaped c)
 let pr_char_list =
   prlist_with_sep mt pr_char
 
+let string_of_chars (chars : char list) : string =
+  let buf = Buffer.create 16 in
+  List.iter (Buffer.add_char buf) chars;
+  Buffer.contents buf
+
 let rec coq_nat_of_int x =
   match x with
   | 0 -> Datatypes.O
@@ -72,14 +77,17 @@ let compile olevel gr =
   in
   let time = Unix.gettimeofday() in
   (match AllInstances.make_glue term with
-  | Ret ((nenv, header), prg) ->
+  | Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
-    Feedback.msg_debug (str(Printf.sprintf "Generated glue code in %f s.." time));
+    Feedback.msg_debug (str (Printf.sprintf "Generated glue code in %f s.." time));
+    (match logs with [] -> () | _ ->
+      Feedback.msg_debug (str (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs)))));
     let time = Unix.gettimeofday() in
     let cstr = quote_string ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
     let hstr = quote_string ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
     AllInstances.printProg (nenv, prg) cstr;
     AllInstances.printProg (nenv, header) hstr;
+
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str(Printf.sprintf "Printed glue code to file in %f s.." time))
   | Exc s ->

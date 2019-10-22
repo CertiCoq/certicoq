@@ -1082,11 +1082,13 @@ Definition make_defs_fast (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_
            end.
 
 Definition composites : list composite_definition :=
- (Composite threadInfIdent Struct
-   ((allocIdent, valPtr) ::
-                         (limitIdent, valPtr) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
-                         (argsIdent, (Tarray uval maxArgs noattr))::nil)
-   noattr ::  nil).
+  Composite threadInfIdent Struct
+    ((allocIdent, valPtr) ::
+     (limitIdent, valPtr) ::
+     (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
+     (argsIdent, (Tarray uval maxArgs noattr)) ::
+     nil) noattr ::
+  nil.
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
            (main : ident) (add_comp:bool): option Clight.program :=

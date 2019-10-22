@@ -108,6 +108,14 @@ Definition compile_template_L7 `{F:utils.Fuel} (opt_level : nat) (p : Template.A
   : exception (cps_util.name_env * Clight.program * Clight.program)  :=
   compile_opt_L7 (Flag opt_level) (translateTo (cTerm certiL6) (Flag opt_level) p).
 
+Require Import Glue.glue.
+Definition make_glue (p : Template.Ast.program)
+  : exception (cps_util.name_env * Clight.program * Clight.program)  :=
+  match generate_glue p with
+  | (nenv, Some hdr, Some prg) => Ret (nenv, hdr, prg)
+  | _ => Exc ""
+  end.
+
 Open Scope positive_scope.
 
 Require Import L6.cps L6.cps_show.

@@ -27,6 +27,7 @@ Fixpoint sizeOf_exp (e : exp) : nat :=
                 | (t, e) :: l => sizeOf_exp e + sizeOf_l l
               end) l
     | Eproj x _ _ y e => 1 + sizeOf_exp e
+    | Eletapp x f _ ys e => 1 + length ys + sizeOf_exp e
     | Efun B e => 1 + sizeOf_fundefs B + sizeOf_exp e
     | Eapp x _ ys => 1 + length ys
     | Eprim x _ ys e => length ys + sizeOf_exp e
@@ -46,6 +47,7 @@ Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
     | Econstr_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Eproj_c _ _ _ _ c => 1 + sizeOf_exp_ctx c
     | Eprim_c _ _ ys c => length ys + sizeOf_exp_ctx c
+    | Eletapp_c _ f _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Ecase_c _ l1 _ c l2  =>
       1 + sizeOf_exp_ctx c
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l1 0
@@ -206,7 +208,9 @@ Fixpoint numOf_fundefs_in_exp (e : exp) : nat :=
                | [] => 0
                | (t, e) :: l => numOf_fundefs_in_exp e + num l
              end) l
+    (* Maybe 1 + should be removed?*)
     | Eproj x _ _ y e => 1 + numOf_fundefs_in_exp e
+    | Eletapp x _ _ y e => numOf_fundefs_in_exp e
     | Efun B e => numOf_fundefs_in_fundefs B + numOf_fundefs_in_exp e
     | Eapp x _ ys => 0
     | Eprim x _ ys e => numOf_fundefs_in_exp e
@@ -499,6 +503,18 @@ Proof.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
     rewrite app_length.
+    eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set x])) in Hin2;
+      [| now apply Setminus_Included ].
+    rewrite <- FromList_cons in Hin1.
+    eapply Same_set_FromList_length in Hin1.
+    eapply IHe in Hin2. simpl in Hin1. omega.
+    eapply NoDup_cons_r; eauto. 
+    eapply NoDup_cons_l; eauto.
+  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
+    eassumption.
+    rewrite <- HP in Hnd.
+    eapply Permutation_length in HP. rewrite <- HP.
+    rewrite app_length.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) _)) in Hin2;
       [| now apply Setminus_Included ].
     eapply IHb in Hin1. eapply IHe in Hin2. omega.
@@ -526,8 +542,7 @@ Proof.
     eapply IHe in Hin2. omega.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
-  - rewrite occurs_free_Ehalt in Heq.
-    rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
+  - rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
     rewrite <- FromList_nil, <- FromList_cons in Heq.
     eapply Same_set_FromList_length in Heq; eauto.
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].

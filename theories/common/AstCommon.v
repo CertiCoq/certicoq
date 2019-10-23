@@ -564,6 +564,7 @@ End trm_Sec.
 
 
 
-Variable (timePhase: forall A, string -> (Datatypes.unit -> A) -> A).
+Definition timePhase: forall A, string -> (Datatypes.unit -> A) -> A := fun a s f => f tt.
 
-Axiom timePhase_id: forall {A:Type} s (x:Datatypes.unit -> A), timePhase s x = x tt.
+Lemma timePhase_id: forall {A:Type} s (x:Datatypes.unit -> A), timePhase s x = x tt.
+Proof. reflexivity. Qed.

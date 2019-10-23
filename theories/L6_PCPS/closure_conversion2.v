@@ -2,8 +2,8 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.cps L6.cps_util L6.set_util L6.relations L6.hoisting L6.identifiers L6.ctx
-        L6.Ensembles_util L6.List_util L6.alpha_conv L6.functions L6.cps_show L6.state.
+Require Import L6.cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx
+        L6.Ensembles_util L6.List_util L6.functions L6.cps_show L6.state.
 Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String  Coq.Strings.Ascii.
@@ -405,6 +405,19 @@ Section CC.
         let '(y', f) := t1 in
         ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
         ret (Eproj x tag n y' ((snd ef) (fst ef)), f)
+      | Eletapp x f ft xs e' =>
+        t1 <- get_var f mapfv gfuns c Γ ;;
+        let '(f', g1) := t1 in
+        t2 <- get_vars xs mapfv gfuns c Γ ;;
+        let '(xs', g2) := t2 in
+        ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
+        ptr <- get_name f code_suffix ;;
+        Γ <- get_name f clo_env_suffix ;;
+        ret (Eproj ptr clo_tag 0 f'
+                   (Eproj Γ clo_tag 1 f'
+                          (Eletapp x ptr ft (Γ :: xs')
+                                   ((snd ef) (fst ef)))),
+             fun e => g1 (g2 e))
       | Efun defs e =>
         let fv := fundefs_fv defs in
         let fvs :=  List.filter (fun x => match M.get x gfuns with Some _ => false | None => true end) (PS.elements fv) in
@@ -468,11 +481,15 @@ Section CC.
            | Fnil => ret Fnil
          end.
 
-  Definition closure_conversion_hoist (e : exp) (c: comp_data) : exp * comp_data :=
+  Definition closure_conversion_hoist (e : exp) (c: comp_data) : error exp * comp_data :=
     let Γ := 1%positive in
-    let '(e', f', (c', _)) := run_compM (exp_closure_conv e (Maps.PTree.empty VarInfo) (Maps.PTree.empty GFunInfo) 1%positive Γ)
+    let '(ef'_err, (c', _)) :=
+        run_compM (exp_closure_conv e (Maps.PTree.empty VarInfo) (Maps.PTree.empty GFunInfo) 1%positive Γ)
                                         c tt in
-    (exp_hoist (f' e'), c').
+    match ef'_err with
+    | Ret (e', f') => (Ret (exp_hoist (f' e')), c')
+    | Err str => (Err str, c')
+    end.
     
 
   Definition populate_map (l : list (var * val)) map  :=

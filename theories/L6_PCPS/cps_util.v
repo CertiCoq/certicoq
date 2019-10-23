@@ -8,6 +8,10 @@ From CertiCoq.L6 Require Import cps ctx Ensembles_util List_util
 From Coq Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
      omega.Omega Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
 From Template Require Import BasicAst. (* For identifier names *)
+Require Import ExtLib.Structures.Monad ExtLib.Structures.MonadState ExtLib.Data.Monads.StateMonad.
+
+Import MonadNotation.
+Open Scope monad_scope.
 
 Import ListNotations.
 
@@ -37,7 +41,6 @@ Fixpoint add_entries (nenv:name_env) (xs : list var) (xs_origin : list var) (suf
     add_entries (add_entry nenv x x_origin suff) xs xs_origin suff
   | _, _ => nenv
   end.
-
 
 (** Lemmas about [findtag] *)
 Lemma findtag_not_empty:
@@ -1606,3 +1609,48 @@ Proof.
   rewrite Nat.add_comm.
   apply H3.
 Qed.
+
+
+(* Instance for option monad. Maybe move to more general file *)  Instance OptMonad : Monad option.
+Instance OptMonad : Monad option.
+Proof. 
+  constructor.
+  - intros X x. exact (Some x).
+  - intros A B [ a | ] f.
+    now eauto.
+    exact None.
+Defined.
+
+Fixpoint inline_letapp
+         (e : exp) (* function body to be inlined *)
+         (z : var) (* the binding used for the app *)
+  : option (exp_ctx * var) := (* Returns an evaluation context that computes the result of the function and puts it in the variable that's returned *)
+  match e with
+  | Econstr x ct xs e =>
+    res <- inline_letapp e z ;;
+    let (C, v) := (res : exp_ctx * var) in
+    ret (Econstr_c x ct xs C, v)
+  | Ecase _ _ =>
+    (* currently we don't support inlining of let-bound applications of functions that
+         are not straight line code *)
+    None
+  | Eproj x n ct y e =>
+    res <- inline_letapp e z ;;
+    let (C, v) := (res : exp_ctx * var) in
+    ret (Eproj_c x n ct y C, v)
+  | Eletapp x f ft ys e =>
+    res <- inline_letapp e z ;;
+    let (C, v) := (res : exp_ctx * var) in
+    ret (Eletapp_c x f ft ys C, v)
+  | Efun B e =>      
+    res <- inline_letapp e z ;;
+    let (C, v) := (res : exp_ctx * var) in
+    ret (Efun1_c B C, v)
+  | Eapp f ft ys =>
+    ret (Eletapp_c z f ft ys Hole_c, z)
+  | Eprim x p ys e  =>
+    res <- inline_letapp e z ;;
+    let (C, v) := (res : exp_ctx * var) in      
+    ret (Eprim_c x p ys C, v)
+  | Ehalt x => ret (Hole_c, x)
+  end.

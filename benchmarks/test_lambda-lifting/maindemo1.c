@@ -45,7 +45,7 @@ void bool_elim(value bool){
     elim_bool(bool, &ordinal, NULL);
     if(ordinal == 0){
       printf(" %s ", names_of_bool[ordinal]);
-    } else{
+    } else {
       printf(" %s ", names_of_bool[ordinal]);     
     }
 }

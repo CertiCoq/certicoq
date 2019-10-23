@@ -131,7 +131,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
     emit_exp indent e
   | Eletapp x f ft ys e =>
     emit "let " ;; emit (show_var x) ;;
-    emit " := app " ;;  emit (show_var x) ;; emit (show_ftag ft);; emit (show_vars ys) ;;
+    emit " := app " ;;  emit (show_var f) ;; emit (show_ftag ft);; emit (show_vars ys) ;;
     emit " in " ;; newline ;;
     emit_exp indent e
   | Ecase x arms =>
@@ -164,7 +164,6 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
   | Eapp x ft ys => emit (show_var x) ;; emit (show_ftag ft);; emit (show_vars ys) ;; newline
   | Ehalt x  => emit "halt " ;; emit (show_var x) ;; newline
   end%string.
-About fold_left.
 
 Fixpoint emit_val (indent:nat) (v:val) : M unit :=
   tab indent ;;

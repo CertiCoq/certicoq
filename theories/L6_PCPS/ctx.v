@@ -4,7 +4,9 @@
 
 From Coq Require Import Arith.Arith NArith.BinNat Lists.List omega.Omega.
 From CertiCoq.L6 Require Import cps tactics set_util.
+Require Import ExtLib.Structures.Monad.
 
+Import MonadNotation.
 Import ListNotations.
 
 (** Expression evaluation contexts *)
@@ -167,6 +169,7 @@ Proof.
   apply (ctx_exp_mut P P0); assumption.
   apply (ctx_fundefs_mut P P0); assumption.
 Qed.
+
 
 (** Name the induction hypotheses only *)
 Ltac exp_fundefs_ctx_induction IH1 IH2 :=
@@ -468,7 +471,6 @@ Fixpoint app_fundefs_ctx (f:fundefs) (fc:fundefs_ctx): fundefs_ctx:=
     | Fcons x t xs e f' =>
       Fcons2_c x t xs e (app_fundefs_ctx f' fc)
   end.
-
 
 Lemma comp_ctx_f_Hole_c C :
   comp_ctx_f C Hole_c = C

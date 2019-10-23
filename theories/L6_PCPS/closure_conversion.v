@@ -3,7 +3,7 @@
  *)
 
 Require Import L6.cps L6.cps_util L6.set_util L6.relations L6.hoisting L6.identifiers L6.ctx
-        L6.Ensembles_util L6.List_util L6.alpha_conv L6.functions.
+        L6.Ensembles_util L6.List_util L6.functions.
 Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String.
@@ -398,7 +398,20 @@ Section CC.
         t1 <- get_var y mapfv c Γ ;;
         let '(y', f) := t1 in
         ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) c Γ ;;
-        ret (Eproj x tag n y' ((snd ef) (fst ef)), f)
+           ret (Eproj x tag n y' ((snd ef) (fst ef)), f)
+      | Eletapp x f ft xs e' =>
+        t1 <- get_var f mapfv c Γ ;;
+        let '(f', g1) := t1 in
+        t2 <- get_vars xs mapfv c Γ ;;
+        let '(xs', g2) := t2 in
+        ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) c Γ ;;
+        ptr <- get_name f code_suffix ;;
+        Γ <- get_name f clo_env_suffix ;;
+        ret (Eproj ptr clo_tag 0 f'
+                   (Eproj Γ clo_tag 1 f'
+                          (Eletapp x ptr ft (Γ :: xs')
+                                   ((snd ef) (fst ef)))),
+             fun e => g1 (g2 e))
       | Efun defs e =>
         (* precompute free vars so this computation does not mess up the complexity *)
         let fv := fundefs_fv defs in
@@ -468,7 +481,7 @@ Section CC.
   Definition populate_map (l : list (var * val)) map  :=
     fold_left (fun map x => M.set (fst x) BoundVar map) l map.
 
-  Definition closure_conversion_hoist_open (rho : eval.env) (e : exp) ctag itag cenv nmap : exp :=
+  Definition closure_conversion_hoist_open (rho : M.t val) (e : exp) ctag itag cenv nmap : exp :=
     let Γ := ((max_list (map fst (M.elements rho)) (max_var e 1%positive)) + 1)%positive in
     let map := populate_map (M.elements rho) (Maps.PTree.empty VarInfo) in
     let next := (Γ + 1)%positive in

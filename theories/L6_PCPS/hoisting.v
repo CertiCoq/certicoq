@@ -2,8 +2,8 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.cps L6.cps_util L6.identifiers L6.eval L6.env L6.ctx L6.relations
-        L6.logical_relations L6.Ensembles_util L6.List_util.
+Require Import L6.cps L6.cps_util L6.identifiers (* L6.eval L6.env *) L6.ctx (* L6.relations *)
+        (* L6.logical_relations *) L6.Ensembles_util L6.List_util.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.NArith.BinNat Coq.Relations.Relations
         Coq.omega.Omega Coq.Sets.Ensembles Coq.Classes.Morphisms.
@@ -43,6 +43,11 @@ Fixpoint erase_fundefs (e : exp) (defs : fundefs)
       erase_fundefs e' defs (fun p =>
                            let (e, defs) := p in
                            f (Eproj x tag n y e, defs))
+    | Eletapp x g ft ys e' =>
+      erase_fundefs e' defs (fun p =>
+                               let (e, defs) := p in
+                               f (Eletapp x g ft ys e, defs))
+
     | Efun fdefs e' =>
       erase_fundefs e' defs (fun p =>
                            let (e'', defs'') := p in
@@ -78,6 +83,7 @@ Definition exp_hoist (e : exp) :=
     | _ => Efun defs e
   end.
 
+(*
 (** [erase_fundefs e e' B] iff [e'] is [e] after erasing all the function 
   *  definition blocks and [B] is exactly the function definitions of [e] 
   *) 
@@ -1656,4 +1662,4 @@ Section hoisting_correct.
     now eapply exp_hoist_in_hoist_star.
   Qed.
 
-End hoisting_correct.
+End hoisting_correct. *)

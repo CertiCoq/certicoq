@@ -94,14 +94,13 @@ Proof.
   split; intros ? *; unfold goodTerm, certiClasses.translate, certiL3_to_L3_eta, goodTerm, WfL2Term, WfL3_etaTerm.
   - destruct s; simpl in *.
     intros H. apply trans_pres_Crct in H.
-    rewrite timePhase_id.
     now apply L3_to_L3_eta_correct.trans_pres_Crct.
 
   - intros Hcrct Hred.
     exists (L3_to_L3_eta.Program_Program sv). split; auto.
     destruct s as [main e], sv as [main' e'].
     simpl in *. hnf in Hred. destruct Hred as [evenv evmain].
-    + hnf. rewrite timePhase_id.
+    + hnf.
       split; subst; auto.
       apply L3_to_L3_eta_correct.translate_correct_subst; eauto.
       apply L2k.program.Crct_CrctEnv in Hcrct; auto.
@@ -221,7 +220,6 @@ Proof.
   simpl. destruct s. simpl in *.
   unfold L3_to_L4.translate_program. simpl.
   unfold translate. simpl.
-  rewrite timePhase_id.
   now apply exp_wf_lets. }
 
 { red; unfold certiClasses.translate, goodTerm, WfL3_etaTerm. intros.
@@ -567,13 +565,11 @@ Proof using.
   invertsn Hev.
   autounfold with certiclasses.
   simpl. unfold certiL4_to_L4_2. 
-  rewrite timePhase_id.
   invertsn Hisv; simpl; try auto.
   revert n.
   induction Hisv.
   + destruct n; simpl; auto.
   + destruct n; simpl; auto.
-    unfold translateT. rewrite timePhase_id. auto.
 Qed.    
   
 Lemma yesCommuteL4_L4_2:  valuePredTranslateYesPreserved (ienv * exp) (cTerm certiL4_2).
@@ -626,19 +622,18 @@ Proof using.
   dands.
   + hnf.
     simpl.
-    unfold translateT; unfold certiL4_to_L4_2; rewrite timePhase_id.    
-   dands; try refl;[].
-   hnf. eexists; eauto.
+    unfold translateT; unfold certiL4_to_L4_2.
+    dands; try refl;[].
+    hnf. eexists; eauto.
   + symmetry in Hev1.
     apply alpha_EqObs_L4_2 with (senv:=s1) in Hev1; auto;[].
     eapply @obsLeTrns with (InterValue := cTerm certiL4_2);[ | apply Hev1].
-    (* eapply (fun p1 p2 a b v eq => valuePredTranslateLe_suff _ _ p1 p2 a b v eq); auto;[ | ]; clear; *)
-    (*   [apply obsNthCommuteL4_L4_2 | apply yesCommuteL4_L4_2]. *)
-
-    (* Grab Existential Variables. *)
-    (* exact (Flag 0).  *)
-(* Qed. *)
-Admitted.
+    eapply (fun p1 p2 a b v eq => valuePredTranslateLe_suff _ _ p1 p2 a b v eq); auto;[ | ]; clear;
+      [apply obsNthCommuteL4_L4_2 | apply yesCommuteL4_L4_2].
+    
+    Grab Existential Variables.
+    exact (Flag 0).
+Qed.
 
 
 Section DemoDelete.
@@ -679,7 +674,7 @@ Proof using.
   autounfold with certiclasses. simpl.
   intros Hgood Heval. repnd. subst.
   simpl in *. repnd. destruct Hgood1 as [Hclosed Hwf].
-   unfold L4_2_to_L4_5; unfold certiL4_2_to_L4_5; rewrite timePhase_id. rewrite timePhase_id.    
+  unfold L4_2_to_L4_5; unfold certiL4_2_to_L4_5.
   dands; auto.
   pose proof L4_2_to_L4_5_correct.
   hnf in Heval. exrepnd.
@@ -705,11 +700,11 @@ Proof using.
       destruct ev as [ | o2 lbt]; simpl; intros q; destruct q; auto;[ | ].
     +  destruct o2; auto;[].
        destruct dc.
-       unfold certiL4_2_to_L4_5; unfold L4_2_to_L4_5; rewrite timePhase_id.
+       unfold certiL4_2_to_L4_5; unfold L4_2_to_L4_5.
        simpl. unfold implb.
        
        btauto.
-    + unfold certiL4_2_to_L4_5; unfold L4_2_to_L4_5; rewrite timePhase_id.
+    + unfold certiL4_2_to_L4_5; unfold L4_2_to_L4_5.
 
       destruct o2; auto.
   - intros o ? ? ? Hsv Heq. inverts Heq.
@@ -726,8 +721,7 @@ Proof using.
     simpl. split; hnf; auto.
     do 2 f_equal.
     destruct ess; auto.
-Admitted.    
-(* Qed. *)
+Qed.
 
 (*
 Print Assumptions certiL4_2_to_L4_5_Correct.
@@ -750,7 +744,6 @@ Let certiL4_5_to_L5Val:
     autounfold with certiclasses. simpl.
     autounfold with certiclasses. simpl.
     intros Hgood Heval.
-    rewrite timePhase_id.
     repnd. subst.
     simpl in *. repnd. destruct Hgood1 as [Hclosed Hwf].
     rename Hgood0 into Hvc. rename Hgood into Hfixwf.
@@ -895,7 +888,6 @@ Proof.
   unfold goodTerm, dummyEnvWf, goodTerm, GoodTerm_instance_1 in Hgood.
   simpl in *. repnd. destruct Hgood1 as [Hclosed Hwf].
   rename Hgood0 into Hvc. rename Hgood into Hfixwf.
-  rewrite timePhase_id.
   dands;[reflexivity | | ].
   + pose proof
          (cps_cvt_corr _ _ Hwf Hfixwf Hvc Heval
@@ -914,7 +906,7 @@ Proof.
     apply valueObsEq.
 Qed.
 End OldProof.
-
+ 
 (* OS 05/19 - We no longer use L5a, going instead from L5 -> L6
 Require Import L4.L5a.
 

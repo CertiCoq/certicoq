@@ -90,6 +90,10 @@ Section EVAL.
       | Some e => Ret e
     end.
 
+  (* TODO update function definitions with Letapp constructor and
+     remove comments *)
+
+  (* 
   Definition sstep_f (rho:env) (e:exp) : exception (env* exp) :=
     match e with
       | Eprim x f ys e' =>
@@ -268,7 +272,7 @@ Theorem bstep_f_complete:
     bstep_e rho e v n -> 
     exists m, bstep_f rho e m = Some v. *)
 
-
+*)
   Inductive find_tag_nth : list (ctor_tag * exp) -> ctor_tag -> exp -> nat -> Prop :=
   | find_tag_hd :
       forall c e l,
@@ -455,7 +459,7 @@ Theorem bstep_f_complete:
   Qed.  
 
   (** Correspondence of the two small step semantics definitions *)
-  Lemma sstep_f_complete:
+(*  Lemma sstep_f_complete:
     forall (rho : env) (e : exp) (rho':env) (e':exp),  step (rho,e) (rho', e') -> sstep_f rho e = Ret (rho', e').
   Proof.
     intros rho e rho' e' H;
@@ -490,7 +494,7 @@ Theorem bstep_f_complete:
   Qed. 
 
   
-
+*)
   
   (** Reflexive transitive closure of the small-step relation *)
   Definition mstep : relation state := clos_refl_trans_1n state step.

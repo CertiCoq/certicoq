@@ -54,6 +54,8 @@ Section UNCURRY.
                  end) arms
     | Eproj z _ _ x e1 =>
       eq_var z k || eq_var k x || occurs_in_exp k e1
+    | Eletapp z f _ xs e1 =>
+      eq_var z k || eq_var f k || occurs_in_vars k xs || occurs_in_exp k e1
     | Efun fds e =>
       occurs_in_fundefs k fds || occurs_in_exp k e
     | Eapp x _ xs => eq_var k x || occurs_in_vars k xs
@@ -108,6 +110,11 @@ Section UNCURRY.
     let '(b, aenv, lm, s) := st in
     put_state (true, aenv, lm, s).
 
+  Definition unclick : uncurryM unit :=
+    st <- get_state tt ;;
+    let '(b, aenv, lm, s) := st in
+    put_state (false, aenv, lm, s).
+  
   Definition has_clicked : uncurryM bool :=
     st <- get_state tt ;;
     let '(b, aenv, lm, s) := st in ret b.
@@ -179,6 +186,9 @@ Section UNCURRY.
     | Eproj x ct n y e1 =>
       e1' <- uncurry_exp e1 ;;
       ret (Eproj x ct n y e1')
+    | Eletapp x f ft ys e1 =>
+      e1' <- uncurry_exp e1 ;;
+      ret (Eletapp x f ft ys e1')
     | Eapp x ft xs => ret (Eapp x ft xs)
     | Eprim x p xs e1 =>
       e1' <- uncurry_exp e1 ;;
@@ -230,7 +240,7 @@ Section UNCURRY.
              else
                (* log_msg (f_str ++ " is not uncurried (candidate)" ) ;; *)
                fe' <- uncurry_exp fe ;;
-               ret (Fcons f f_ft (fk::fvs) fe fds1')
+               ret (Fcons f f_ft (fk::fvs) fe' fds1')
            | _, _ =>
              (* log_msg (f_str ++ " is not uncurried" ) ;; *)
              fe' <- uncurry_exp fe ;;
@@ -238,31 +248,125 @@ Section UNCURRY.
            end
          end.
 
-  (* Tries to uncurry functions within [e].  If no function matches the
-     pattern, returns [None], otherwise returns the transformed expression. *)
-  Definition uncurry (e:exp) : uncurryM (option exp) :=
-    e' <- uncurry_exp e ;;
-    b <- has_clicked ;;
-    if b then ret (Some e') else ret None.
+  (* Uncurring for direct code *)  
+  Fixpoint uncurry_exp_anf (e:exp) : uncurryM exp :=
+    match e with
+    | Econstr x ct vs e1 =>
+      e1' <- uncurry_exp_anf e1 ;; 
+      ret (Econstr x ct vs e1')
+    | Ecase x arms =>
+      arms' <- (fix uncurry_list (arms: list (ctor_tag*exp)) :
+                  uncurryM (list (ctor_tag*exp)) :=
+                  match arms with
+                  | nil => ret nil
+                  | h::t =>
+                    match h with
+                    | (s,e) => 
+                      e' <- uncurry_exp_anf e ;; t' <- uncurry_list t ;;
+                         ret ((s,e')::t')
+                    end
+                  end) arms ;;
+      ret (Ecase x arms')
+    | Eproj x ct n y e1 =>
+      e1' <- uncurry_exp_anf e1 ;;
+      ret (Eproj x ct n y e1')
+    | Eletapp x f ft ys e1 =>
+      e1' <- uncurry_exp_anf e1 ;;
+      ret (Eletapp x f ft ys e1')
+    | Eapp x ft xs => ret (Eapp x ft xs)
+    | Eprim x p xs e1 =>
+      e1' <- uncurry_exp_anf e1 ;;
+      ret (Eprim x p xs e1')
+    | Efun fds e1 =>
+      fds' <- uncurry_fundefs_anf fds ;;
+      e1' <- uncurry_exp_anf e1 ;;
+      ret (Efun fds' e1')
+    | Ehalt x => ret (Ehalt x)
+    end
+  with uncurry_fundefs_anf (fds : fundefs) : uncurryM fundefs :=
+         match fds with
+         | Fnil => ret Fnil
+         | Fcons f f_ft fvs fe fds1 =>
+           (* f_str <- get_pp_name f ;; *)
+           fds1' <- uncurry_fundefs_anf fds1 ;;
+           match fe with
+           | Efun (Fcons g gt gvs ge Fnil)
+                  (Ehalt g') =>
+             g_unc <- (already_uncurried g) ;;
+             if eq_var g g' && negb g_unc  && negb (occurs_in_exp g ge) 
+             then               
+               (* log_msg (f_str ++ " is uncurried" ) ;; *)
+               gvs' <- get_names_lst gvs "" ;;
+               (* gvs'' <- get_names_lst gvs "" ;; *)
+               (* g'' <- get_name g "";; *)
+               fvs' <- get_names_lst fvs "" ;;
+               f' <- get_name f "_uncurried" ;;
 
-  Fixpoint uncurry_fuel' (n:nat) (e:exp) : uncurryM exp :=
-    match n with
-    | 0 => ret e
-    | S m =>
-      eo <- uncurry e ;;
-      match eo with
-      | None => ret e
-      | Some e' => uncurry_fuel' m e'
-      end
-    end.
+               let fp_numargs := length (gvs' ++ fvs')  in               
+               _ <- mark_as_uncurried g ;;
+               (* _ <- mark_as_uncurried g'' ;; *)
+               _ <- markToInline fp_numargs f g;;
+               _ <- click ;;
+               fp_ft <- get_fun_tag (BinNat.N.of_nat fp_numargs);;
+               ret (Fcons f f_ft fvs'
+                          (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
+                                (Ehalt g))
+                          (Fcons f' fp_ft (gvs ++ fvs) ge
+                                 (* redefine g here so we can call g *)
+                                 (* (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)                                        *)
+                                 (*       ge) *)
+                                 fds1'))
 
-  Definition uncurry_fuel (n:nat) (e:exp) (c : comp_data) : exp * M.t nat * comp_data :=
-    let local_st := (false, M.empty _, M.empty _, (0%nat, (M.empty _))) in
-    let '(e, (c, (_, _, _ , (_, st)))) := run_compM (uncurry_fuel' n e) c local_st in
-    (e, st, c).
-
-    (* let max_ft := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1%positive in *)
-    (* let freshvar := ((max_var e 1) + 1)%positive in *)
-    (* uncurry_fuel' n e (M.empty _) fenv (Pos.succ max_ft) (M.empty _) freshvar (0%nat, M.empty _) nenv. *)
+               (* Previous strategy that requires ~ g \in  ge *)
+               (* ret (Fcons f f_ft fvs' *)
+               (*            (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil) *)
+               (*                  (Ehalt g)) *)
+               (*            (Fcons f' fp_ft (gvs ++ fvs) ge fds1')) *)
+             else
+               (* log_msg (f_str ++ " is not uncurried (candidate)" ) ;; *)
+               fe' <- uncurry_exp_anf fe ;;
+               ret (Fcons f f_ft fvs fe' fds1')
+           | _ =>
+             (* log_msg (f_str ++ " is not uncurried" ) ;; *)
+             fe' <- uncurry_exp_anf fe ;;
+             ret (Fcons f f_ft fvs fe' fds1')
+           end
+         end.
+  
+  
+  Section UncurryTop. 
     
+    Context (uncurry_exp : exp -> uncurryM exp).
+
+    (* Tries to uncurry functions within [e].  If no function matches the
+     pattern, returns [None], otherwise returns the transformed expression. *)
+    Definition uncurry (e:exp) : uncurryM (option exp) :=
+      e' <- uncurry_exp e ;;
+      b <- has_clicked ;;         
+      if b then ret (Some e') else ret None.
+    
+    Fixpoint uncurry_fuel' (n:nat) (e:exp) : uncurryM exp :=
+      match n with
+      | 0 => ret e
+      | S m =>
+        eo <- uncurry e ;;
+        _ <- unclick ;;
+        match eo with
+        | None => ret e
+        | Some e' => uncurry_fuel' m e'
+        end
+      end.
+
+    Definition uncurry_fuel (n:nat) (e:exp) (c : comp_data) : error exp * M.t nat * comp_data :=
+      let local_st := (false, M.empty _, M.empty _, (0%nat, (M.empty _))) in
+      let '(e, (c, (_, _, _ , (_, st)))) := run_compM (uncurry_fuel' n e) c local_st in
+      (e, st, c).
+
+  End UncurryTop.
+
+
+  Definition uncurry_fuel_cps n e c := uncurry_fuel uncurry_exp n e c. 
+
+  Definition uncurry_fuel_anf n e c := uncurry_fuel uncurry_exp_anf n e c. 
+
 End UNCURRY.

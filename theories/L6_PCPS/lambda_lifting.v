@@ -169,7 +169,7 @@ Section LambdaLifting.
   Definition FVMap := Maps.PTree.t PS.t.
 
   Section TrueFV.
-
+    
     Variable (funmap : FunInfoMap).
     Variable (active_fun : FVSet). (* Functions whose scope is currently active *)
   
@@ -178,7 +178,7 @@ Section LambdaLifting.
     functions that are called inside the expression. Relies on the the
     assumption that the free and bound variables are disjoint. *)
     Fixpoint exp_true_fv_aux (e : exp)
-             (scope  : FVSet) (* the current variables in scope. Initially only contains the global functions *)
+             (scope  : FVSet) (* the current variables in scope. Initially empty *)
              (fvset : PS.t) : PS.t :=
       match e with
       | Econstr x c ys e =>
@@ -190,6 +190,20 @@ Section LambdaLifting.
       | Eproj x tau n y e =>
         let fvset' := if mem y scope then fvset else PS.add y fvset in
         exp_true_fv_aux e (add x scope) fvset'
+      | Eletapp x f ft ys e =>
+        let fvset' := match funmap ! f with
+                      | Some inf => (* A known function call that can be lifted *)
+                        match inf with
+                        | Fun f' ft' fvs _ =>
+                          let is_rec := PS.mem f' active_fun in
+                          if lift is_rec then union_list fvset fvs  (* f' should not count as a fv since it's a known closed function *)
+                          else if mem f scope then fvset else PS.add f fvset
+                        end
+                      | None => if mem f scope then fvset else PS.add f fvset
+                      end
+        in
+        let fvset'' := add_list scope fvset' ys in 
+        exp_true_fv_aux e (add x scope) fvset''
       | Efun defs e =>
         let fvs':=  fundefs_fv defs in 
         let '(scope', fvset') := fundefs_true_fv_aux defs scope fvset in 
@@ -198,15 +212,13 @@ Section LambdaLifting.
         let fvset' := match funmap ! x with
                       | Some inf => (* A known function call that can be lifted *)
                         match inf with
-                        | Fun f' ft' fvs fvset =>
+                        | Fun f' ft' fvs _ =>
                           let is_rec := PS.mem f' active_fun in
-                          if lift is_rec then 
-                            union_list fvset (f' :: fvs)
+                          if lift is_rec then union_list fvset fvs (* count the fvs of the known function (LL def -> closed) but not its name *) 
                           else if mem x scope then fvset else PS.add x fvset
                         end
                       | None => if mem x scope then fvset else PS.add x fvset
                       end
-
         in
         add_list scope fvset' xs
       | Eprim x prim ys e =>
@@ -222,9 +234,9 @@ Section LambdaLifting.
            | Fnil => (scope, fvset)
            end.
   
-    Definition exp_true_fv e := exp_true_fv_aux e empty PS.empty.
+    Definition exp_true_fv e := exp_true_fv_aux e PS.empty PS.empty.
     
-    Definition fundefs_true_fv B := snd (fundefs_true_fv_aux B empty PS.empty). 
+    Definition fundefs_true_fv B := snd (fundefs_true_fv_aux B PS.empty PS.empty). 
     
   End TrueFV.
   
@@ -248,6 +260,12 @@ Section LambdaLifting.
     end.
   
 
+  Definition name_block B :=
+    match B with
+    | Fcons f _ _ _ _ => f
+    | Fnil => 1%positive
+    end.
+  
   Fixpoint exp_lambda_lift (e : exp) (scope: PS.t) (active_funs : PS.t)
            (fvm : VarInfoMap) (fm : FunInfoMap) (gfuns : GFunMap) : lambdaM exp :=
     match e with
@@ -268,9 +286,29 @@ Section LambdaLifting.
     | Eproj x t N y e =>
       e' <- exp_lambda_lift e (PS.add x scope) active_funs fvm fm gfuns ;;
       ret (Eproj x t N (rename fvm y) e')
+    | Eletapp x f ft ys e =>
+      e' <- exp_lambda_lift e (PS.add x scope) active_funs fvm fm gfuns ;;
+      match fm ! f with
+      | Some inf =>
+        match inf with
+        | Fun f' ft' fvs sfvs =>
+          (* only call the known function if its free variables can be accessed *)
+          if PS.subset sfvs scope || lift (PS.mem f active_funs) then 
+            ret (Eletapp x (rename fvm f') ft' (rename_lst fvm (ys ++ fvs)) e')
+          else ret (Eletapp x (rename fvm f) ft (rename_lst fvm ys) e')
+        end
+      | None =>
+        ret (Eletapp x (rename fvm f) ft (rename_lst fvm ys) e')
+      end
     | Efun B e =>
-      let sfvs := fundefs_true_fv fm active_funs B in
-      let fvs := List.filter (fun x => match M.get x gfuns with Some _ => false | None => true end) (PS.elements sfvs) in
+      let sfvsi := fundefs_true_fv fm active_funs B in
+      let sfvs := PS.filter (fun x => match M.get x gfuns with Some _ => false | None => true end) sfvsi in
+      let fvs := PS.elements sfvs in
+      (* DEBUG *)
+      b_name <- get_pp_name (name_block B) ;;
+      fv_names <- get_pp_names_list (PS.elements sfvsi) ;;
+      log_msg (String.concat " " ("Block" :: b_name :: "has fvs :" :: fv_names)) ;;
+
       let is_closed := match fvs with [] => true | _ => false end in
       maps' <- add_functions B fvs sfvs fm gfuns is_closed ;;
       let (fm', gfuns') := maps' in
@@ -306,11 +344,18 @@ Section LambdaLifting.
            | Some inf =>
              match inf with
              | Fun f' ft' fvs sfvs =>
+               (* Debug *)
+               f_str <- get_pp_name f ;;
+               fv_names <- get_pp_names_list fvs ;;
+               log_msg (String.concat " " (f_str :: "has fvs :" :: fv_names)) ;;
+               (* *)
                p <- add_free_vars fvs fvm ;;
                let (ys, fvm') := p in
                cm <- make_wrappers Bfull fvm' fm ;;
                let (C, fvm'') := cm in
-               e' <- exp_lambda_lift e (PS.union fnames sfvs) active_funs fvm'' fm gfuns ;;
+               (* Variables in scope are : 1. Whatever variables are locally bound (current functions, arguments, local defs)
+                  and 2. The FVs of the current function *)
+               e' <- exp_lambda_lift e (PS.union fnames (union_list sfvs xs)) active_funs fvm'' fm gfuns ;;
                B' <- fundefs_lambda_lift B Bfull fnames active_funs fvm fm gfuns ;;
                ret (Fcons f' ft' (xs ++ ys) (C |[ e' ]|)  B')
              end
@@ -343,7 +388,7 @@ Definition lift_rec (is_rec : bool) := is_rec.
 
 Definition lift_conservative (is_rec : bool) := false.
 
-Definition lambda_lift (e : exp) (c : comp_data) : exp * comp_data :=
+Definition lambda_lift (e : exp) (c : comp_data) : error exp * comp_data :=
   let '(e', (c', _)) := run_compM (exp_lambda_lift lift_rec e PS.empty PS.empty (Maps.PTree.empty VarInfo)
                                                    (Maps.PTree.empty FunInfo) (M.empty GFunInfo))
                                   c tt in  

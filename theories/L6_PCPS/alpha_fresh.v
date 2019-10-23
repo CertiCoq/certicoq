@@ -6,7 +6,7 @@ Import ListNotations.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-Require Import L6.shrink_cps L6.cps_util L6.cps_util L6.cps_show L6.state.
+Require Import L6.cps_util L6.cps_util L6.cps_show L6.state.
 
 Open Scope monad_scope.
 Import MonadNotation.
@@ -15,6 +15,23 @@ Definition freshM : Type -> Type := @compM unit.
 
 (* TODO: move apply_r and apply_r_list to cps_util, and all_fun_name (and proofs) to identifiers *)
 (* after freshen_term e sigma curr l = e', curr', l', BV(e') are in interval [curr, curr'[ and disjoint from l *)
+
+(* XXX Compied temporarily from shrink_cps. Probably move to common file *)
+Definition apply_r sigma y :=
+  match (@M.get M.elt y sigma) with
+    | Some v => v
+    | None => y
+  end.
+
+Definition apply_r_list sigma ys :=
+  map (apply_r sigma) ys.
+
+Fixpoint all_fun_name (fds:fundefs) : list var :=
+  match fds with
+    | Fcons f t ys e fds' => f::(all_fun_name fds')
+    | Fnil => []
+  end.
+
 
 Fixpoint freshen_term (e:exp) (sigma:M.t positive) : freshM exp :=
   match e with
@@ -39,6 +56,12 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) : freshM exp :=
     let y' := apply_r sigma y in
     e' <- freshen_term e (M.set x x' sigma) ;;
     ret (Eproj x' t n y' e')
+  | Eletapp x f ft ys e =>
+    x' <- get_name x "" ;;
+    let f' := apply_r sigma f in
+    let ys' := apply_r_list sigma ys in
+    e' <- freshen_term e (M.set x x' sigma) ;;
+    ret (Eletapp x' f' ft ys' e')
   | Efun fds e =>
     let f_names := all_fun_name fds in
     f_names' <- get_names_lst f_names "" ;;
@@ -80,7 +103,7 @@ with freshen_fun (fds:fundefs) (sigma:M.t positive) : freshM fundefs :=
        end.
 
 
-Definition freshen_top (e: exp) (c: comp_data) : exp * comp_data :=
+Definition freshen_top (e: exp) (c: comp_data) : error exp * comp_data :=
   let '(e', (st', _)) := run_compM (freshen_term e (M.empty _)) c tt in
   (e', st').
 

@@ -4,7 +4,7 @@ Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Strings.String Coq.Strings.Ascii.
 Require Import Common.AstCommon.
-Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
+Require Import ExtLib.Structures.Monads.
 
 Import ListNotations Nnat MonadNotation.
 
@@ -27,10 +27,54 @@ Section CompM.
                                            cenv : ctor_env;
                                            fenv : fun_env; (* Maps fun_tag's to (number of args,  list (arg no)) *)
                                            nenv : name_env;
-                                           log : list string }.
+                                           log : list string;
+                                         }.
 
-  Definition compM := state (comp_data * S).
 
+  (* Copied from Common.exceptionMonad because of notation overlap *)
+  Inductive error (A : Type) : Type :=
+    Err : string -> error A | Ret : A -> error A.
+
+  Global Arguments Err {_} _.
+  Global Arguments Ret {_} _.
+
+  Global Instance MonadError : Monad error.
+  Proof.
+    constructor.
+    - (* ret *)
+      intros T t. exact (Ret t).
+
+    - (* bind *)
+      intros T U [s | r] m2.
+      exact (Err s).
+      exact (m2 r).
+  Defined.
+  
+  Record stateErr S t : Type := mkStateErr { runStateErr : S -> error t * S }.
+  
+  Global Instance stateErrMonad S : Monad (stateErr S).
+  Proof.
+    constructor.
+    - (* ret *)
+      intros T t. constructor. intros s. exact (Ret t, s).
+    - (* bind *)
+      intros t u [m1] f1. constructor. intros s.
+      destruct (m1 s) as [[err|r] s']. 
+      exact (Err err, s').
+      eapply f1. exact r. exact s'.
+  Defined.      
+
+  Definition get {St : Type} : stateErr St St :=
+    mkStateErr St St (fun s => (Ret s, s)).
+
+  Definition put {St : Type} (s : St) : stateErr St unit :=
+    mkStateErr St unit (fun s' => (Ret tt, s)).
+
+  Definition fail_with {St A : Type} (str : string) : stateErr St A :=
+    mkStateErr St A (fun s => (Err str, s)).
+  
+  Definition compM := stateErr (comp_data * S).
+  
   (* Get the environment name *)
   Definition get_name_env (_ : unit) : compM name_env :=
     s <- get ;;
@@ -42,7 +86,7 @@ Section CompM.
     let '(mkCompData n c i f e fenv names log, st) := p in
     let names' := add_entry names n old_var suff in
     put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
-        ret n.
+    ret n.
 
   Fixpoint get_names_lst (old : list var) (suff : string) : compM (list var) :=
     match old with
@@ -52,6 +96,24 @@ Section CompM.
       xs <- get_names_lst os suff ;;
       ret (x :: xs)
     end.
+
+  (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var *)
+  Definition get_named (s : name) : compM var :=
+    p <- get ;;
+    let '(mkCompData n c i f e fenv names log, st) := p in
+    let names' := M.set n s names in
+    put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
+    ret n.
+
+  Fixpoint get_named_lst (s : list name) : compM (list var) :=
+    match s with
+    | [] => ret []
+    | o :: os =>
+      x <- get_named o ;;
+      xs <- get_named_lst os ;;
+      ret (x :: xs)
+    end.
+    
 
   (** Get a fresh name, and create a new pretty name *)
   Definition get_name_no_suff (name : string) : compM var :=
@@ -133,8 +195,9 @@ Section CompM.
     ret f.
 
 
-  Definition run_compM {A} (m: compM A) (st : comp_data) (s : S) : A * (comp_data * S) :=
-    let '(a, st) := runState m (st, s) in
+  Definition run_compM {A} (m: compM A) (st : comp_data) (s : S)
+    : error A * (comp_data * S) :=
+    let '(a, st) := runStateErr _ _ m (st, s) in
     (a, st).
 
   Definition pack_data := mkCompData.

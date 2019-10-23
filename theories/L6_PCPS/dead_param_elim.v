@@ -2,9 +2,7 @@
  * Author: Katja Vassilev, 2018
  *)
 
-Require Import L6.cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx
-        L6.Ensembles_util L6.alpha_conv L6.List_util L6.functions L6.lambda_lifting
-        L6.eval L6.logical_relations L6.hoare.
+Require Import L6.cps L6.identifiers L6.ctx L6.set_util L6.state.
 Require Import compcert.lib.Coqlib Common.exceptionMonad.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -61,6 +59,7 @@ match e with
 | Eapp f t ys => add_escapings L ys
 | Econstr x t ys e' => escaping_fun_exp e' (add_escapings L ys)
 | Eproj x t n y e' => escaping_fun_exp e' (add_escaping L y)
+| Eletapp x f ft ys e' => escaping_fun_exp e' (add_escapings L ys)
 | Ecase x P => 
   (fix mapM_LD (l : list (ctor_tag * exp)) (L : live_fun) := 
      match l with 
@@ -104,6 +103,10 @@ match e with
   live_expr L e' (add_list ys S)
 | Eproj x t m y e' =>
   live_expr L e' (PS.add y S)
+| Eletapp x f ft ys e' =>
+  let S' := PS.add f S in
+  let S'' := add_fun_vars L f ys S' in
+  live_expr L e' S''
 | Ecase x P =>
   let S' := PS.add x S in
   (fix mapM_LD  (S: PS.t) (l : list (ctor_tag * exp)) : PS.t := 
@@ -192,11 +195,34 @@ match ys, bs with
 | _, _ => ys
 end. 
 
+Definition is_nil {A} (l : list A) : bool :=
+  match l with
+  | [] => true
+  | _ :: _ => false
+  end.
 
+  
 Fixpoint eliminate_expr (L : live_fun) (e : exp) : exp := 
 match e with 
 | Econstr x t ys e' => Econstr x t ys (eliminate_expr L e')
 | Eproj x t m y e' => Eproj x t m y (eliminate_expr L e')
+| Eletapp x f ft ys e' =>
+  match get_fun_vars L f with
+  | Some bs =>
+    let ys' := live_args ys bs in
+    if is_nil ys' then
+    (* All arguments are redundant, keep the first.
+     * I'm not sure if this is the optimal strategy.
+     * An alternative would be to construct a unit value and pass as the argument
+     * but that may be better or worse in terms of allocation *)
+      match ys with
+      | [] => Eletapp x f ft [] (eliminate_expr L e')
+      | [y] | _ :: y :: _ => Eletapp x f ft [y] (eliminate_expr L e')
+      end
+    else 
+      Eletapp x f ft ys' (eliminate_expr L e')
+  | None => Eletapp x f ft ys (eliminate_expr L e')
+  end
 | Ecase x P =>
   let P' := (fix mapM_LD (l : list (ctor_tag * exp)) : list (ctor_tag * exp) :=
   match l with 
@@ -209,10 +235,19 @@ match e with
 | Eprim x f ys e' => Eprim x f ys (eliminate_expr L e')
 | Eapp f t ys => 
   match get_fun_vars L f with
-  | Some bs => Eapp f t (live_args ys bs)
+  | Some bs =>
+    let ys' := live_args ys bs in
+    if is_nil ys' then
+      match ys with
+      | [] => Eapp f t []
+      | [y] | _ :: y :: _ => Eapp f t [y]
+      end
+    else       
+      Eapp f t ys'
   | None => Eapp f t ys 
   end
-end. 
+end.
+
 
 Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : option fundefs := 
   match B with 
@@ -220,9 +255,17 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : option fundefs :=
     match get_fun_vars L f with
     | Some bs =>
       let ys' := live_args ys bs in
+      let ys'' :=
+          if is_nil ys' then
+            match ys with
+            | [] => []
+            | [y] |  _ :: y ::  _  => [y]    (* avoid keeping the (empty) closure environment (?) *)
+            end
+          else ys'
+      in 
       let e' := eliminate_expr L e in
       match eliminate_fundefs B' L with
-      | Some B'' => Some (Fcons f ft ys' e' B'')
+      | Some B'' => Some (Fcons f ft ys'' e' B'')
       | None => None
       end
     | None => None
@@ -244,4 +287,4 @@ match e with
   | None => e
   end
 | _ => e
-end. 
+end.

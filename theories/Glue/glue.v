@@ -119,6 +119,17 @@ Section GState.
     ienv <- gets gstate_ienv ;;
     ret (M.get k ienv).
 
+  Definition get_tag_from_type_name (s : string) : gState (option positive) :=
+    ienv <- gets gstate_ienv ;;
+    let find (prev : option positive)
+             (tag : positive)
+             (b : Ast.one_inductive_body) : option positive :=
+      match prev with
+      | None => if string_dec s (Ast.ind_name b) then Some tag else None
+      | _ => prev
+      end in
+    ret (M.fold find ienv None).
+
   Definition put_ind_L1_env (ienv : ind_L1_env) : gState unit :=
     '(Build_gstate_data n _ nenv eenv cnenv caenv penv log) <- get ;;
     put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
@@ -140,6 +151,9 @@ Record print_def_info : Type :=
     ; rparen_info : def_info
     ; sep_info    : def_info
     ; space_info  : def_info
+    ; fun'_info   : def_info
+    ; type'_info  : def_info
+    ; unk_info    : def_info
     }.
 
 Definition def : Type := ident * globdef fundef type.
@@ -189,15 +203,21 @@ Section Externs.
     '(_rparen, ty_rparen, def_rparen) <- string_literal "rparen_lit" ")" ;;
     '(_sep,    ty_sep,    def_sep)    <- string_literal "sep_lit"    ", " ;;
     '(_space,  ty_space,  def_space)  <- string_literal "space_lit"  " " ;;
+    '(_fun',   ty_fun',   def_fun')   <- string_literal "fun_lit"    "<fun>" ;;
+    '(_type',  ty_type',  def_type')  <- string_literal "type_lit"   "<type>" ;;
+    '(_unk,    ty_unk,    def_unk')   <- string_literal "unk_lit"    "<unk>" ;;
     _printf <- gensym "printf" ;;
     let pinfo :=
         {| printf_info :=
               (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
-          ; lparen_info := (_lparen, ty_lparen)
-          ; rparen_info := (_rparen, ty_rparen)
-          ; sep_info    := (_sep,    ty_sep)
-          ; space_info  := (_space,  ty_space)
-        |} in
+         ; lparen_info := (_lparen, ty_lparen)
+         ; rparen_info := (_rparen, ty_rparen)
+         ; sep_info    := (_sep,    ty_sep)
+         ; space_info  := (_space,  ty_space)
+         ; fun'_info   := (_fun',   ty_fun')
+         ; type'_info  := (_type',  ty_type')
+         ; unk_info    := (_unk,    ty_unk)
+         |} in
     let dfs :=
       ((_lparen, def_lparen) ::
         (_rparen, def_rparen) ::
@@ -249,6 +269,8 @@ Section L1Types.
              (gs : Ast.global_declarations)
              : gState (list (positive * Ast.one_inductive_body)) :=
     let singles := get_single_types gs in
+    (* for debugging purposes: *)
+    (* log ("Propagating types: " ++ String.concat ", " (map Ast.ind_name singles)) ;; *)
     let res := enumerate_pos singles in
     let ienv : ind_L1_env := set_list res (M.empty _) in
     put_ind_L1_env ienv ;;
@@ -268,6 +290,27 @@ Section Printers.
         pname <- gensym ("print_" ++ Ast.ind_name ty) ;;
         set_print_env tag pname ;;
         make_printer_names tys'
+    end.
+
+  Inductive normalized_L1_type :=
+  | nInd : string -> normalized_L1_type
+  | nApp : list normalized_L1_type -> normalized_L1_type
+  | nParam : normalized_L1_type (* used for argument of the parametrized types *)
+  | nSort : normalized_L1_type (* used for type arguments to the ctor *)
+  | nInvalid : normalized_L1_type.
+
+  Fixpoint normalize_arg (ty : Ast.term) : normalized_L1_type :=
+    match ty with
+    | Ast.tInd ind _ => nInd (BasicAst.inductive_mind ind)
+    | _ => nInvalid (* TODO fix *)
+    end.
+
+  Fixpoint normalize_ctor_args (ty : Ast.term) : list normalized_L1_type :=
+    match ty with
+    | Ast.tProd _ e1 e2 => normalize_arg e1 :: normalize_ctor_args e2
+    | Ast.tRel _ => nil
+    | _ => normalize_arg ty :: nil
+           (* TODO handle tRel *)
     end.
 
   Variable pinfo : print_def_info.
@@ -298,13 +341,13 @@ Section Printers.
 
         (* if none of the constructors take any args *)
         let won't_take_args : bool := Nat.eqb max_ctor_arity 0 in
-        let prodArr_type : type := tarray val (Z.of_nat max_ctor_arity) in
+        let ty_prodArr : type := tarray val (Z.of_nat max_ctor_arity) in
 
         (* null pointer or properly sized array *)
         let elim_last_arg : expr :=
           if won't_take_args
             then Ecast (Econst_int (Int.repr 0) val) (tptr tvoid)
-            else Evar _prodArr prodArr_type in
+            else Evar _prodArr ty_prodArr in
 
         (* names and Clight types of printf and string literals *)
         let (_printf, ty_printf) := printf_info pinfo in
@@ -313,51 +356,79 @@ Section Printers.
         let (_rparen, ty_rparen) := rparen_info pinfo in
         let (_sep, ty_sep) := sep_info pinfo in
 
-        let fix strip_ctor_args (ty : Ast.term) : list Ast.term :=
-           match ty with
-           | Ast.tProd _ e1 e2 => e1 :: strip_ctor_args e2
-           | _ => nil
-           end in (* TODO find a way to go from these types to the tag *)
+        let rec_print_call
+            (arg : normalized_L1_type) : gState statement :=
+          match arg with
+          | nInd name => (* for monomorphic types *)
+              tagM <- get_tag_from_type_name name ;;
+              match tagM with
+              | None => log ("Can't find L1 tag for the type " ++ name) ;;
+                        ret Sskip (* ideally shouldn't happen *)
+              (* TODO the problem with this is that we record [ident]s like "nat"
+                but we try to check them against fully qualified [kername]s
+                like "Coq.Init.Datatypes.nat". We should only use [kername]s
+                since they're globally unique.
+                However, the input L1 program contains [ident]s for some reason. *)
+              | Some tag =>
+                  printerM <- get_print_env tag ;;
+                  match printerM with
+                  | None =>
+                      log ("Can't find printer for the type " ++ name) ;; ret Sskip
+                  | Some printer => (* success! *)
+                      ret (Scall None (Evar printer ty_printf)
+                                      ((Ederef
+                                         (Ebinop Oadd
+                                           (Evar _prodArr ty_prodArr)
+                                           (Econst_int (Int.repr 0) val) ty_names)
+                                         ty_names) :: nil))
+                          (* TODO don't hardcode 0 *)
+                  end
+              end
+          | _ => (* TODO expand this for other cases *)
+              log ("Found a non-inductive constructor argument for " ++ name) ;;
+              ret (Scall None (Evar _printf ty_printf)
+                              (Evar _space ty_space :: nil))
+          end in
 
-        let fix rec_print_calls (args : list Ast.term) : statement :=
+        let fix rec_print_calls
+                (args : list normalized_L1_type)
+                : gState statement :=
           match args with
-          | nil => Sskip
+          | nil => ret Sskip
           | arg :: nil => (* to handle the separator *)
-              Scall None (Evar _printf ty_printf) (* TODO replace with rec call *)
-                         (Evar _space ty_space :: nil)
+              rec_print_call arg
           | arg :: args' =>
-              Scall None (Evar _printf ty_printf) (* TODO replace with rec call *)
-                         (Evar _space ty_space :: nil) ;;;
-              Scall None (Evar _printf ty_printf)
-                         (Evar _sep ty_sep :: nil) ;;;
-              rec_print_calls args'
+              call <- rec_print_call arg ;;
+              rest <- rec_print_calls args' ;;
+              ret (call ;;;
+                   Scall None (Evar _printf ty_printf)
+                              (Evar _sep ty_sep :: nil) ;;;
+                   rest)
           end in
 
         let fix switch_cases
                 (ctors : list (nat * (BasicAst.ident * Ast.term * nat)))
-                : labeled_statements :=
+                : gState labeled_statements :=
           match ctors with
-          | nil => LSnil
+          | nil => ret LSnil
           | (index, (name, ty, arity)) :: ctors' =>
-            LScons (Some (Z_of_nat index))
-              (if Nat.eqb arity 0
-                 then Sreturn None
-                 else
-                   Scall None (Evar _printf ty_printf)
-                               (Evar _space ty_space :: nil) ;;;
-                   Scall None (Evar _printf ty_printf)
-                               (Evar _lparen ty_lparen :: nil) ;;;
-                   rec_print_calls (strip_ctor_args ty) ;;;
-                   Scall None (Evar _printf ty_printf)
-                              (Evar _rparen ty_rparen :: nil) ;;;
-                   (* TODO calls to the print functions *)
-                   (*    for each argument of the ctor. *)
-                   (* This is currently not possible because ctor *)
-                   (*    field types are not stored! *)
-                   Sbreak)
-              (switch_cases ctors')
+            calls <- rec_print_calls (normalize_ctor_args ty) ;;
+            rest <- switch_cases ctors' ;;
+            ret (LScons (Some (Z_of_nat index))
+                  (if Nat.eqb arity 0
+                    then Sreturn None
+                    else
+                      Scall None (Evar _printf ty_printf)
+                                  (Evar _space ty_space :: nil) ;;;
+                      Scall None (Evar _printf ty_printf)
+                                  (Evar _lparen ty_lparen :: nil) ;;;
+                      calls ;;;
+                      Scall None (Evar _printf ty_printf)
+                                  (Evar _rparen ty_rparen :: nil) ;;;
+                      Sbreak) rest)
           end in
 
+        entire_switch <- switch_cases (enumerate_nat ctors) ;;
         let body :=
           (Scall None
             (Evar ename (Tfunction
@@ -378,13 +449,13 @@ Section Printers.
          (if won't_take_args
            then Sreturn None
            else Sswitch (Evar _index val)
-                        (switch_cases (enumerate_nat ctors))) in
+                        entire_switch) in
 
 
         (* declare a prodArr array if any of the constructors take args,
           if not then prodArr will not be declared at all *)
         let vars := if won't_take_args then nil
-                    else (_prodArr, prodArr_type) :: nil in
+                    else (_prodArr, ty_prodArr) :: nil in
         let f := {| fn_return := tvoid
                   ; fn_callconv := cc_default
                   ; fn_params := (_v, val) :: nil

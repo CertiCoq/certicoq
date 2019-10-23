@@ -24,7 +24,7 @@ Flags:
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 
-CertiCoq Compile Opt 2 demo1.
+CertiCoq Compile ANF Opt 0 demo1.
 
 Definition demo2 := (negb, List.hd_error).
 

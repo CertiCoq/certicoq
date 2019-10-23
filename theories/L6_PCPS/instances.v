@@ -154,7 +154,7 @@ Definition L6_pipeline_old (e : cTerm certiL5) : exceptionMonad.exception (cTerm
         (* Shrink reduction *)
         let e := shrink_cps.shrink_top e in
         (* Dead parameter elimination *)
-        (* let e := dead_param_elim.eliminate e in *)
+        let e := dead_param_elim.eliminate e in
         (* Shrink reduction *)
         ret (shrink_cps.shrink_top e, c_data)
     in
@@ -195,10 +195,10 @@ Definition L6_pipeline_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.ex
           pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e) log
       in
       e <- e_err ;;
-      (* Shrink reduction *)
-      let e := shrink_cps.shrink_top e in
-      (* Dead parameter elimination *)
-      let e := dead_param_elim.eliminate e in
+      (* (* Shrink reduction *) *)
+      (* let e := shrink_cps.shrink_top e in *)
+      (* (* Dead parameter elimination *) *)
+      (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)
       ret (shrink_cps.shrink_top e, c_data)
   in

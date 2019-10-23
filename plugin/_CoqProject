@@ -219,8 +219,6 @@ extraction/clightdefs.ml
 extraction/clight.ml
 extraction/printCsyntax.ml
 extraction/printClight.ml
-extraction/cps_show.mli
-extraction/cps_show.ml
 extraction/l6_to_Clight.ml
 extraction/allInstances.ml
 

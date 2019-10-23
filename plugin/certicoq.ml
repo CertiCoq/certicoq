@@ -42,7 +42,7 @@ let pcuic_size' a p =
 | Coq_tCoFix of term mfixpoint * nat
 | _ -> "unimplemented" *)
                      
-let compile olevel gr =
+let compile cps olevel gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
@@ -56,7 +56,9 @@ let compile olevel gr =
   let time = (Unix.gettimeofday() -. time) in
   Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time));
   let fuel = coq_nat_of_int 10000 in
-  match AllInstances.compile_template_L7 fuel olevel term with
+  let p = if cps then AllInstances.compile_template_L7 fuel olevel term
+          else AllInstances.compile_template_L7_anf fuel olevel term in
+  match p with
   | Ret ((nenv, header), prg) ->
      Feedback.msg_debug (str"Finished compiling, printing to file.");
      let time = Unix.gettimeofday() in

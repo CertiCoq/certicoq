@@ -79,12 +79,17 @@ Definition compile_L7_fast' n (t : cTerm certiL6) : cps_util.name_env * Clight.p
   let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
+Definition compile_L7_anf (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
+  let '((_, cenv , nenv, fenv), (_, prog)) := t in
+  let p := compile_anf argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent 5 prog cenv nenv in
+  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
+
 Definition compile_L7 o (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   match o with
   | Flag 0 => compile_L7' 5 t
-  | Flag 1 => compile_L7' 11 t
-  | Flag 2 => compile_L7_fast' 11 t
+  | Flag 1 => compile_L7' 5 t
+  | Flag 2 =>  compile_L7' 5 t
   | Flag 3 => compile_L7' 0 t
   | Flag 4 => compile_L7_fast' 0 t
   | Flag 5 => compile_L7' 5 t
@@ -108,6 +113,13 @@ Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exce
 Definition compile_template_L7 `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
   : exception (cps_util.name_env * Clight.program * Clight.program)  :=
   compile_opt_L7 (Flag opt_level) (translateTo (cTerm certiL6) (Flag opt_level) p).
+
+Definition compile_template_L7_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+  : exception (cps_util.name_env * Clight.program * Clight.program)  :=
+  let opt := match opt_level with O => false | S O => true | _ => false end in
+  do p' <- translateTo (cTerm certiL4) (Flag opt_level) p ;
+  do p'' <- L6_pipeline_anf opt p' ;
+  ret (compile_L7_anf p'').
 
 Open Scope positive_scope.
 

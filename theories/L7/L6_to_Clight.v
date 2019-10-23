@@ -82,6 +82,7 @@ Fixpoint compute_fun_env' (n : nat) (fenv : fun_env) (e : exp) : fun_env :=
     | Econstr x t vs e' => compute_fun_env' n' fenv e'
     | Ecase x cs => fold_left (compute_fun_env' n') (map snd cs) fenv
     | Eproj x t n v e' => compute_fun_env' n' fenv e'
+    | Eletapp x f t vs e' => compute_fun_env' n' (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
     | Efun fnd e' => compute_fun_env' n' (compute_fun_env_fundefs n' fnd fenv) e'
     | Eapp x t vs => M.set t (N.of_nat (length vs) , makeArgList vs) fenv
     | Eprim x p vs e' => compute_fun_env' n' fenv e'
@@ -107,6 +108,7 @@ Fixpoint max_depth (e : exp) : nat :=
   | Econstr x t vs e' => S (max_depth e')
   | Ecase x cs => S (fold_left Nat.max (map (compose max_depth snd) cs) (S 0))
   | Eproj x t n v e' => S (max_depth e')
+  | Eletapp x f t ys e' => S (max_depth e')
   | Efun fnd e' => S (Nat.max (max_depth_fundefs fnd) (max_depth e'))
   | Eapp x t vs => 1
   | Eprim x p vs e' => S (max_depth e')
@@ -149,6 +151,7 @@ Fixpoint get_allocs (e : exp) : list positive :=
        | cons (z, e') cs' => (get_allocs e') ++ (helper cs')
        end) cs
   | Eproj x t n v e' => x :: (get_allocs e')
+  | Eletapp x f t xs e' => x :: (get_allocs e')
   | Efun fnd e' => (get_allocs_fundefs fnd) ++ (get_allocs e')
   | Eapp x t vs => nil (* stores into args, not alloc new vars *)
   | Eprim x p vs e' => x :: (get_allocs e')
@@ -176,6 +179,7 @@ Fixpoint max_allocs (e : exp) : nat :=
        | cons (z, e') cs' => max (max_allocs e') (helper cs')
        end) cs
   | Eproj x t n v e' => max_allocs e'
+  | Eletapp x f t ys e' => max_allocs e' (* XXX Zoe : This doesn't include the allocation happening by the function *)
   | Efun fnd e' => max (max_allocs_fundefs fnd) (max_allocs e')
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_allocs e'
@@ -199,6 +203,7 @@ Fixpoint max_args (e : exp) : nat :=
        | cons (z, e') cs' => max (max_args e') (helper cs')
        end) cs
   | Eproj x t n v e' => max_args e'
+  | Eletapp x f n xs e' => max_args e'
   | Efun fnd e' => max (max_args_fundefs fnd) (max_args e')
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_args e'
@@ -417,14 +422,19 @@ Notation "'args[' n ']'" :=
   ( *(add args (c_int n%Z val))) (at level 36).
 
 
+Section CodeGen.
 
-Definition reserve_body (funInf : positive) (l : Z) : statement :=
-  let arr := (Evar funInf (Tarray uval l noattr)) in
-  Sifthenelse
-    (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
+  Context (gc_flag : bool). (* option to turn off gc for now fore direct code generation *)
+
+
+
+  Definition reserve_body (funInf : positive) (l : Z) : statement :=
+    let arr := (Evar funInf (Tarray uval l noattr)) in
+    Sifthenelse
+      (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
     (Scall None gc (arr :: tinf :: nil) ; allocIdent ::= Efield tinfd allocIdent valPtr)
     Sskip.
-
+  
 
 Definition reserve_body' (funInf : positive) (l : Z) : statement :=
   let arr := (Evar funInf (Tarray uval l noattr)) in
@@ -525,9 +535,9 @@ Fixpoint mkCallVars (fenv : fun_env) (map: fun_info_env) (n : nat) (vs : list po
   | _ , _ => None
   end.
 
-Definition mkCall (fenv : fun_env) (map: fun_info_env) (f : expr) n (vs : list positive) : option statement :=
+Definition mkCall (loc : option positive) (fenv : fun_env) (map: fun_info_env) (f : expr) n (vs : list positive) : option statement :=
   match (mkCallVars fenv map n (firstn nParam vs)) with
-  | Some v => Some (Scall None f (tinf :: v))
+  | Some v => Some (Scall loc f (tinf :: v))
   | None => None
   end.
 
@@ -696,18 +706,25 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
             end) cs) ;;
       let '(ls , ls') := p in
       ret (make_case_switch x ls ls')
+  | Eletapp x f t vs e' =>
+    prog <- translate_body e' fenv cenv ienv map ;;
+    inf <- M.get t fenv ;;
+    asgn <- asgnAppVars vs (snd inf) fenv map ;;
+    let vv :=  makeVar x fenv map in
+    let pnum := min (N.to_nat (fst inf)) nParam in
+    c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
+    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; x ::= Field(args, Z.of_nat 1); prog)
   | Eproj x t n v e' =>
     prog <- translate_body e' fenv cenv ienv map ;;
          ret (x ::= Field(var v, Z.of_N n) ;
                 prog)
   | Efun fnd e => None
   | Eapp x t vs =>
-
     inf <- M.get t fenv ;;
         asgn <- asgnAppVars vs (snd inf) fenv map ;;
         let vv :=  makeVar x fenv map in
         let pnum := min (N.to_nat (fst inf)) nParam in
-        c <- (mkCall fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
+        c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
              ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c)
   | Eprim x p vs e => None
   | Ehalt x =>
@@ -760,6 +777,14 @@ Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : 
             end) cs) ;;
       let '(ls , ls') := p in
       ret (make_case_switch x ls ls')
+  | Eletapp x f t vs e' =>
+    prog <- translate_body_fast e' fenv cenv ienv map myvs myind;;
+    inf <- M.get t fenv ;;
+    asgn <- asgnAppVars_fast myvs vs myind (snd inf) fenv map ;;
+    let vv :=  makeVar x fenv map in
+    let pnum := min (N.to_nat (fst inf)) nParam in
+    c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
+    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; x ::= Field(args, Z.of_nat 1); prog)
   | Eproj x t n v e' =>
     prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
          ret (x ::= Field(var v, Z.of_N n) ;
@@ -771,7 +796,7 @@ Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : 
         asgn <- asgnAppVars_fast myvs vs myind (snd inf) fenv map ;;
         let vv :=  makeVar x fenv map in
         let pnum := min (N.to_nat (fst inf)) nParam in
-        c <- (mkCall fenv map ([mkFunTy pnum] vv) pnum vs) ;;
+        c <- (mkCall None fenv map ([mkFunTy pnum] vv) pnum vs) ;;
              ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c)
   | Eprim x p vs e => None
   | Ehalt x =>
@@ -816,7 +841,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ie
                                                   ((allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                     limitIdent ::= Efield tinfd limitIdent valPtr ;
                                                     argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                    res) ;
+                                                    (if gc_flag then res else Sskip)) ;
                                                     asgn ;
                                                     body)))) :: rest)
                          end
@@ -856,7 +881,7 @@ Fixpoint translate_fundefs_fast (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env
                                                   ((allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                     limitIdent ::= Efield tinfd limitIdent valPtr ;
                                                     argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                    res) ;
+                                                    (if gc_flag then res else Sskip)) ;
                                                     asgn ;
                                                     body)))) :: rest)
                          end
@@ -918,7 +943,7 @@ Fixpoint translate_funs (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_in
                                                     ( allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                         limitIdent ::= Efield tinfd limitIdent valPtr ;
                                                         argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                        reserve_body gcArrIdent 2%Z ;
+                                                        (if gc_flag then reserve_body gcArrIdent 2%Z else Sskip);
                                                         body))))
                      :: funs)
   | _ => None
@@ -941,7 +966,7 @@ Fixpoint translate_funs_fast (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv :
                                                     ( allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                       limitIdent ::= Efield tinfd limitIdent valPtr ;
                                                       argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                      reserve_body gcArrIdent 2%Z ;
+                                                      (if gc_flag then reserve_body gcArrIdent 2%Z else Sskip);
                                                       body))))
                      :: funs)
   | _ => None
@@ -1574,7 +1599,7 @@ Definition make_header (cenv:ctor_env) (ienv:n_ind_env) (e:exp) (nenv : M.t Basi
 
 
 
-Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
+Definition compile_gc_opt (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
   (M.t BasicAst.name * option Clight.program * option Clight.program) :=
   let e := wrap_in_fun e in
   let fenv := compute_fun_env e in
@@ -1602,7 +1627,7 @@ Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
      end)
   end.
 
-Definition compile_fast (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
+Definition compile_fast_gc_opt (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
   (M.t BasicAst.name * option Clight.program * option Clight.program) :=
   let e := wrap_in_fun e in
   let fenv := compute_fun_env e in
@@ -1626,6 +1651,14 @@ Definition compile_fast (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
        (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent false, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent true)
      end)
   end.
+
+End CodeGen.
+
+Definition compile := compile_gc_opt true.
+
+Definition compile_anf := compile_gc_opt false.
+
+Definition compile_fast := compile_fast_gc_opt true.
 
 Definition err {A : Type} (s : String.string) : res A :=
   Error ((MSG s) :: nil).

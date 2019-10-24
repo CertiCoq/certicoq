@@ -710,10 +710,10 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
     prog <- translate_body e' fenv cenv ienv map ;;
     inf <- M.get t fenv ;;
     asgn <- asgnAppVars vs (snd inf) fenv map ;;
-    let vv :=  makeVar x fenv map in
+    let vv :=  makeVar f fenv map in
     let pnum := min (N.to_nat (fst inf)) nParam in
     c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
-    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; x ::= Field(args, Z.of_nat 1); prog)
+    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; allocIdent ::= Efield tinfd allocIdent valPtr; x ::= Field(args, Z.of_nat 1); prog)
   | Eproj x t n v e' =>
     prog <- translate_body e' fenv cenv ienv map ;;
          ret (x ::= Field(var v, Z.of_N n) ;
@@ -729,7 +729,7 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x  and return *)
-    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)))
+    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)); Efield tinfd allocIdent valPtr  :::= allocPtr)
   end.
 
 Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : fun_info_env) (myvs : list positive) (myind : list N) : option statement :=
@@ -781,10 +781,10 @@ Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : 
     prog <- translate_body_fast e' fenv cenv ienv map myvs myind;;
     inf <- M.get t fenv ;;
     asgn <- asgnAppVars_fast myvs vs myind (snd inf) fenv map ;;
-    let vv :=  makeVar x fenv map in
+    let vv :=  makeVar f fenv map in
     let pnum := min (N.to_nat (fst inf)) nParam in
     c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
-    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; x ::= Field(args, Z.of_nat 1); prog)
+    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; allocIdent ::= Efield tinfd allocIdent valPtr ; x ::= Field(args, Z.of_nat 1); prog)
   | Eproj x t n v e' =>
     prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
          ret (x ::= Field(var v, Z.of_N n) ;
@@ -801,7 +801,7 @@ Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : 
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x  and return *)
-    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)))
+    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)); Efield tinfd allocIdent valPtr  :::= allocPtr)
   end.
 
 Definition mkFun (vs : list positive) (loc : list positive) (body : statement) : function :=
@@ -996,11 +996,11 @@ Fixpoint pos2string' p s :=
   | xH => String "1" s
   end.
 
-Definition pos2string p :=
- pos2string' p "".
+(* Definition pos2string p := *)
+(*  pos2string' p "". *)
 
 
-Definition show_pos x :=  pos2string x. (*nat2string10 (Pos.to_nat x). *)
+(* Definition show_pos x :=  pos2string x. (*nat2string10 (Pos.to_nat x). *) *)
 
 Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : name_env :=
   match M.get f nenv with

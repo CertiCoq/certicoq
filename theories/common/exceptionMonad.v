@@ -4,8 +4,8 @@ From MetaCoq.Template Require Import monad_utils.
 Import MonadNotation.
 
 Inductive exception (A:Type) := Exc (_:string) | Ret (_:A).
-Implicit Arguments Ret [A].
-Implicit Arguments Exc [A].
+Arguments Ret [A].
+Arguments Exc [A].
 
 Definition ret {A: Type} (x: A) := Ret x.
 Definition raise {A: Type} (str:string) := @Exc A str.

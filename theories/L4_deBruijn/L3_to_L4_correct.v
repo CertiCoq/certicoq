@@ -753,9 +753,6 @@ Proof.
     setoid_rewrite Nat.add_comm at 3.
     rewrite Nat.add_assoc.
     apply H0.
-  - specialize (H0 _ H3 H4 H5).
-    specialize (H2 _ H3 H4 H5).
-    apply H2.
   - simpl.
     specialize (H0 _ H4 H5 H6).
     destruct strip_lam eqn:Hs. constructor.

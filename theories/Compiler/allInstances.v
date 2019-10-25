@@ -3,59 +3,18 @@ Require Export Common.certiClasses2.
 Require Export L1g.instances.
 Require Export L2k.instances.
 Require Export L4.instances.
-Require Export L6.instances L6.cps_util.
+Require Export L6.instances L6.cps_util L6.cps L6.cps_show.
 (* Require Export L7.Clightexec. *)
-
-
-Open Scope Z_scope.
+Require Import L6_to_Clight L6_to_Clight_stack.
+Require Import compcert.lib.Maps.
 Require Import ZArith.
-
-
 Require Import Common.Common.
 Require Import String.
-Open Scope string_scope.
 Require Import  maps_util.
 
-Ltac computeExtract certiL4 f:=
-(let t:= eval compute in (translateTo (cTerm certiL4) f) in
-     match t with
-       |Ret ?xx => exact xx
-     end).
+Open Scope Z_scope.
+Open Scope string_scope.
 
-
-
-Quote Recursively Definition One := 1%positive.
-
-
-Quote Recursively Definition Demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
-
-
-(*
-Definition One6 : cTerm certiL6.
-(let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in
-match t with
-|Ret ?xx => exact xx
-end).
-Defined. *)
-
-
-Definition ext_comp `{F:utils.Fuel} := fun prog =>
-  let t := (translateTo (cTerm certiL6) (Flag 0) prog) in
-  match t with
-  | Ret xx => xx
-  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
-  end.
-
-Definition ext_comp_opt `{F:utils.Fuel} f := fun prog =>
-  let t := (translateTo (cTerm certiL6) f prog) in
-  match t with
-  | Ret xx => xx
-  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
-  end.
-
-Require Import L6_to_Clight.
-(* Require Import Clightexec.*)
-Require Import compcert.lib.Maps.
 Definition argsIdent:positive := 26.
 Definition allocIdent:positive := 28.
 Definition limitIdent:positive := 29.
@@ -69,19 +28,33 @@ Definition numArgsIdent:positive := 97.
 Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
+Definition stackframeTIdent:positive := 78. (* the stack_frame type *)
+Definition frameIdent:positive := 79. (* the stack frame of the current function *)
+Definition rootIdent:positive := 84. (* live roots array *)
+Definition spIdent:positive := 85. (* stack pointer *)
+Definition fpIdent:positive := 86. (* frame pointer *)
+(* Fields of stack_frame struct *)
+Definition nextFld:positive := 87.
+Definition rootFld:positive := 88.
+Definition prevFld:positive := 89.
+
 Definition compile_L7' n (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
+  let p := L6_to_Clight.compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
 Definition compile_L7_fast' n (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
+  let p := L6_to_Clight.compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
 Definition compile_L7_anf (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := compile_anf argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent 5 prog cenv nenv in
+  let p := L6_to_Clight_stack.compile
+             argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+             5
+             stackframeTIdent frameIdent rootIdent spIdent fpIdent nextFld rootIdent prevFld
+             prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
 Definition compile_L7 o (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
@@ -123,7 +96,6 @@ Definition compile_template_L7_anf `{F:utils.Fuel} (opt_level : nat) (p : Templa
 
 Open Scope positive_scope.
 
-Require Import L6.cps L6.cps_show.
 
 Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   match x with
@@ -132,10 +104,6 @@ Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   end.
 
 
-Require Import L6_to_Clight.
-Require Import compcert.lib.Maps.
-
-Require Import L6.cps L6.cps_show.
 (* copy of L6.instances.L5a_comp_L6 *)
 (* Definition L5a_comp_L6 (v:(ienv * L4.L5a.cps)): ((L6.eval.prims * cEnv * nEnv)* (L6.eval.env * L6.cps.exp)):=
     match v with
@@ -154,6 +122,8 @@ Require Import L6.cps L6.cps_show.
 
 Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 
+
+(*
 Require Import Benchmarks.Binom
         Benchmarks.Color
         Benchmarks.vs.
@@ -161,7 +131,27 @@ Require Import Benchmarks.Binom
 
 Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
-(*
+
+Ltac computeExtract certiL4 f:=
+(let t:= eval compute in (translateTo (cTerm certiL4) f) in
+     match t with
+       |Ret ?xx => exact xx
+     end).
+
+Definition ext_comp `{F:utils.Fuel} := fun prog =>
+  let t := (translateTo (cTerm certiL6) (Flag 0) prog) in
+  match t with
+  | Ret xx => xx
+  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
+  end.
+
+Definition ext_comp_opt `{F:utils.Fuel} f := fun prog =>
+  let t := (translateTo (cTerm certiL6) f prog) in
+  match t with
+  | Ret xx => xx
+  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
+  end.
+
 Quote Recursively Definition foo := (2+3).
 
 Definition foo6 := Eval native_compute in (translateTo (cTerm certiL6) (Flag 1) foo).

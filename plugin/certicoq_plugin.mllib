@@ -104,6 +104,7 @@ PrintAST
 PrintCsyntax
 PrintClight
 L6_to_Clight
+L6_to_Clight_stack
 Instances2
 Instances3
 Instances4

@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
   struct thread_info* tinfo;
   tinfo = make_tinfo();
   body(tinfo);
-
+  printf("After execution \n");
   val = tinfo -> args[1];
   alpha_list_elim(val, bool_elim);
 

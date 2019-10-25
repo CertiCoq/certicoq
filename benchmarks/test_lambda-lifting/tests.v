@@ -21,10 +21,17 @@ Flags:
 **)
 
 
+(* Definition demo0 := List.app [true; false] [true]. *)
+(* Definition demo0_cps := List.app [true; false] [true]. *)
 
-Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
+(* CertiCoq Compile ANF Opt 0 demo0. *)
+(* CertiCoq Compile Opt 0 demo0_cps. *)
+
+Definition demo1 := List.app (List.repeat true 5) (List.repeat false 4).
+Definition demo1_cps := List.app (List.repeat true 5) (List.repeat false 4).
 
 CertiCoq Compile ANF Opt 0 demo1.
+CertiCoq Compile Opt 0 demo1_cps.
 
 Definition demo2 := (negb, List.hd_error).
 
@@ -47,40 +54,45 @@ Fixpoint list_add y z w l : nat :=
     (clos x) + list_add y z w xs
   end.
 
-(* Fixpoint loop n (f : Datatypes.unit -> nat) : nat := *)
-(*   match n with *)
-(*   | 0%nat => f tt *)
-(*   | S n => f tt + loop n f *)
-(*   end. *)
+Fixpoint loop n (f : Datatypes.unit -> nat) : nat :=
+  match n with
+  | 0%nat => f tt
+  | S n => f tt + loop n f
+  end.
     
-(* Definition clos := (loop 3 (fun _ => list_add 0 0 0 (List.repeat 0%nat 3))%nat). *)
+Definition clos := (loop 3 (fun _ => list_add 0 0 0 (List.repeat 0%nat 3))%nat).
+Definition clos_old := (loop 3 (fun _ => list_add 0 0 0 (List.repeat 0%nat 3))%nat).
 
 (* CertiCoq Compile clos. *)
 
 
-Definition clos_loop (u : unit) : nat :=
-  (fix list_add y z w u k m n k1 k2 k3 k4 k5 l : nat :=
-     match l with
-     | [] => 0
-     | x::xs =>
-       let clos z := x + z + w + u + k + m + n + y + k1 + k2 + k3 + k4 + k5 in
-       (clos x) + list_add y z w u k m n k1 k2 k3 k4 k5 xs
-     end) 0 0 0 0 0 0 0 0 0 0 0 0 (List.repeat 0 (100*1000)).
+(* Definition clos_loop (u : unit) : nat := *)
+(*   (fix list_add y z w l : nat := *)
+(*      match l with *)
+(*      | [] => 0 *)
+(*      | x::xs => *)
+(*        let clos z := y + z + w + z in *)
+(*        (clos x) + (clos (x + 1)) + list_add y z w xs *)
+(*      end) 0 0 0 (List.repeat 2 2). *)
 
 
-Fixpoint loop n (f : unit -> nat) : nat :=
-  match n with
-  | 0 => f tt
-  | S n => f tt + loop n f
-  end.
+(* Fixpoint loop n (f : unit -> nat) : nat := *)
+(*   match n with *)
+(*   | 0 => f tt *)
+(*   | S n => f tt + loop n f *)
+(*   end. *)
     
-Definition clos := loop (100*10) clos_loop.
-Definition clos_opt := loop (100*10) clos_loop.
-Definition clos_old := loop (100*10) clos_loop.
+(* Definition clos := loop 2 clos. *)
+(* Definition clos_opt := loop 2 clos. *)
+(* Definition clos_old := loop 2 clos_loop. *)
 
-CertiCoq Compile Opt 2 clos.
-CertiCoq Compile Opt 6 clos_opt.
-CertiCoq Compile Opt 8 clos_old.
+(* Definition clos := 1. *)
+(* Definition clos_opt := 2. *)
+(* Definition clos_old := 3. *)
+
+CertiCoq Compile ANF Opt 0 clos.
+(* CertiCoq Compile ANF Opt 1 clos_opt. *)
+CertiCoq Compile Opt 0 clos_old.
 
 
 (* In this clos should be lambda lifted and the environment should not be constructed in every iteration of the loop *)
@@ -122,8 +134,8 @@ Definition is_valid_old :=
   | _ => false
   end.
 
-Time CertiCoq Compile Opt 2 is_valid. (* 5 secs ! *)
+Time CertiCoq Compile ANF Opt 0 is_valid. (* 5 secs ! *)
 
-Time CertiCoq Compile Opt 6 is_valid_opt. (* 5 secs ! *)
+Time CertiCoq Compile ANF Opt 1 is_valid_opt. (* 5 secs ! *)
 
-Time CertiCoq Compile Opt 8 is_valid_old. (* 5 secs ! *)
+Time CertiCoq Compile Opt 0 is_valid_old. (* 5 secs ! *)

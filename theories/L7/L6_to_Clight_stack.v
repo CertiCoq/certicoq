@@ -13,7 +13,7 @@ Require Import ExtLib.Structures.Monads
         ExtLib.Data.Monads.StateMonad
         ExtLib.Data.String.
 
-Import MonadNotation.
+Import MonadNotation ListNotations.
 Open Scope monad_scope.
 
 Require Import Template.BasicAst.
@@ -26,11 +26,8 @@ Require Import compcert.common.AST
         compcert.cfrontend.Clight
         compcert.common.Values.
 
-Require Import L6.cps
-        L6.identifiers.
-
+Require Import L6.set_util L6.cps L6.identifiers L6.cps_show.
 Require Import Clightdefs.
-Require Import L6.cps_show.
 
 (* Axioms that are only realized in ocaml *)
 Variable (print_Clight : Clight.program -> unit).
@@ -137,10 +134,6 @@ Definition compute_fun_env (e : exp) : fun_env :=
 
 
 
-
-
-
-
 Fixpoint get_allocs (e : exp) : list positive :=
   match e with
   | Econstr x t vs e' => x :: (get_allocs e')
@@ -163,7 +156,7 @@ with get_allocs_fundefs (fnd : fundefs) :=
        | Fcons f t vs e fnd' => vs ++ (get_allocs e) ++ (get_allocs_fundefs fnd')
        end.
 
-(* Max number of value-sized words allocated by the translation of expression e
+(* Max number of value-sized words allocated by the translation of expression e until the next function call
   For constructor: 1 word per argument + 1 for header if boxed (more than 1 param), otherwise 0 (since enum) *)
 Fixpoint max_allocs (e : exp) : nat :=
   match e with
@@ -179,7 +172,7 @@ Fixpoint max_allocs (e : exp) : nat :=
        | cons (z, e') cs' => max (max_allocs e') (helper cs')
        end) cs
   | Eproj x t n v e' => max_allocs e'
-  | Eletapp x f t ys e' => max_allocs e' (* XXX Zoe : This doesn't include the allocation happening by the function *)
+  | Eletapp x f t ys e' => 0
   | Efun fnd e' => max (max_allocs_fundefs fnd) (max_allocs e')
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_allocs e'
@@ -214,6 +207,15 @@ with max_args_fundefs (fnd : fundefs) :=
   | Fnil => 0
   | Fcons f t vs e fnd' => max (max (length vs) (max_args e))
                                (max_allocs_fundefs fnd')
+  end.
+
+(* Compute the max live roots of a expression/fundefs  *)
+(* Will be the size of the stack frame array *)
+Fixpoint max_live_fundefs (fnd : fundefs) :=
+  match fnd with
+  | Fnil => 0
+  | Fcons f t vs e fnd' => max (length vs + length (get_allocs e)) (* local vars + args for a function *)
+                              (max_live_fundefs fnd')
   end.
 
 (* named ienv *)
@@ -268,10 +270,10 @@ Notation uintTy := (Tint I32 Unsigned
                          {| attr_volatile := false; attr_alignas := None |}).
 
 Notation longTy := (Tlong Signed
-                        {| attr_volatile := false; attr_alignas := None |}).
+                          {| attr_volatile := false; attr_alignas := None |}).
 
 Notation ulongTy := (Tlong Unsigned
-                        {| attr_volatile := false; attr_alignas := None |}).
+                           {| attr_volatile := false; attr_alignas := None |}).
 
 
 Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
@@ -328,8 +330,7 @@ Notation isptrTy := (Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr)
                                  cc_structret := false |}).
 
 
-Notation valPtr := (Tpointer val
-                            {| attr_volatile := false; attr_alignas := None |}).
+Notation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
 
 Notation argvTy :=
   (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
@@ -372,11 +373,10 @@ Notation args := (Etempvar argsIdent valPtr).
 Notation gc := (Evar gcIdent gcTy).
 Notation ptr := (Evar isptrIdent isptrTy).
 
-
-
 (* changed tinf to be tempvar and have type Tstruct rather than Tptr Tstruct *)
 Notation tinf := (Etempvar tinfIdent threadInf).
 Notation tinfd := (Ederef tinf threadStructInf).
+
 
 Notation heapInf := (Tstruct heapInfIdent noattr).
 
@@ -423,13 +423,88 @@ Notation "'args[' n ']'" :=
 
 
 
+(* Shadow stack vars *)
+
+(* Stack-related ids *)
+Variable (stackframeTIdent : ident). (* the stack_frame type *)
+Variable (frameIdent : ident). (* the stack frame of the current function *)
+Variable (rootIdent : ident). (* live roots array *)
+Variable (spIdent : ident). (* stack pointer *)
+Variable (fpIdent : ident). (* frame pointer *)
+(* Fields of stack_frame struct *)
+Variable (nextFld : ident).
+Variable (rootFld : ident).
+Variable (prevFld : ident).
+
+
+Section STACK.
+
+Variable (MAX_LOCS: Z). (* Max numbers of local bindings for a function per program *)
+
+(* The type of the stack_frame struct *)
+Definition stackframeT := Tstruct stackframeTIdent noattr.
+(* The type of a pointer the stack_frame struct *)
+Definition stackframeTPtr := Tpointer stackframeT noattr.
+(* The type of the root array for each frame. *)
+Definition rootT := Tarray val MAX_LOCS noattr.
+
+(* local vars declared when a function uses the stack *)
+(* struct stack_frame frame; val roots[MAX_LOCS]; val* sp; *)
+Definition stack_decl : list (ident * type)  :=
+  (frameIdent, stackframeT) :: (* local variable for local stack frame *)
+  (rootIdent, rootT) :: (* local variable for the live array *)
+  (spIdent, valPtr) :: nil. (* local variable for the stack pointer *)
+
+
+Definition init_stack : statement :=
+  (* frame.next = roots; *)
+  (Efield (Evar frameIdent stackframeT) nextFld valPtr :::= Evar rootIdent rootT);
+  (* frame.roots = roots; *)
+  (Efield (Evar frameIdent stackframeT) rootFld valPtr :::= Evar rootIdent rootT);
+  (* frame.prev = tinf->fp; *)
+  (Efield (Evar frameIdent stackframeT) prevFld valPtr :::= Efield tinfd fpIdent stackframeTPtr);
+  (* sp = roots; *)
+  (spIdent ::= Evar rootIdent rootT);
+  (* tinfo->fp = &frame; *)
+  (Efield tinfd fpIdent stackframeTPtr :::= Eaddrof (Evar frameIdent stackframeT) stackframeTPtr).
+
+(* update the stack pointer of the stack before a call *)
+Definition update_stack : statement :=
+  (* frame.next = sp *)
+  (Efield (Evar frameIdent stackframeT) nextFld valPtr :::= Evar spIdent valPtr).
+
+Definition push_var (x : positive) :=
+  (* */(unsigned long long */) next = x  ;*)
+  (Field(ptrVar spIdent,Z.of_nat 0) :::= var x);
+  (* sp = sp + 1*)
+  (spIdent ::= (ptrVar spIdent) +' (c_int (Z.of_N 1) val)).
+
+Fixpoint push_live_vars (vars: FVSet) (xs : list positive) :=
+  match xs with
+  | nil => Sskip
+  | x :: xs =>
+    if PS.mem x vars then Sskip
+    else push_var x; push_live_vars vars xs
+  end.
+
+(* Discard the current function frame before a function returns or calls an other function *)
+Definition discard_frame (uses_stack : bool): statement :=
+  (* tinfo->fp = frame.prev; *)
+  if uses_stack then Efield tinfd fpIdent stackframeTPtr :::= Efield (Evar frameIdent stackframeT) prevFld valPtr
+  else Sskip.
+
+(* Qs:
+   1. Evar vs Etempvar?
+*)
+
+
+(* GC calls *)
 Definition reserve_body (funInf : positive) (l : Z) : statement :=
   let arr := (Evar funInf (Tarray uval l noattr)) in
   Sifthenelse
     (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
     (Scall None gc (arr :: tinf :: nil) ; allocIdent ::= Efield tinfd allocIdent valPtr)
-    Sskip.
-
+    Sskip.  
 
 Definition reserve_body' (funInf : positive) (l : Z) : statement :=
   let arr := (Evar funInf (Tarray uval l noattr)) in
@@ -439,7 +514,6 @@ Definition reserve_body' (funInf : positive) (l : Z) : statement :=
     (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
     (Scall None gc (arr :: tinf :: nil))
     Sskip.
-
 
 (* Don't shift the tag for boxed, make sure it is under 255 *)
 Definition makeTagZ (cenv:ctor_env) (ct : ctor_tag) : option Z :=
@@ -485,18 +559,18 @@ Fixpoint assignConstructorS'  (fenv : fun_env) (map: fun_info_env) (x : positive
 
 
 Definition assignConstructorS (cenv:ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map: fun_info_env) (x : positive) (t : ctor_tag) (vs : list positive) :=
-      tag <- makeTag cenv t;;
-        rep <- make_ctor_rep cenv t ;;
-        match rep with
-        | enum _ =>
-          ret (x ::= tag)
-        | boxed _ a =>
-          let stm := assignConstructorS' fenv map x 0 vs in
-          ret (x ::= [val] (allocPtr +' (c_int Z.one val));
-                 allocIdent ::= allocPtr +'
-                                           (c_int (Z.of_N (a + 1)) val) ;
-                 Field(var x, -1) :::= tag; stm)
-        end.
+  tag <- makeTag cenv t;;
+  rep <- make_ctor_rep cenv t ;;
+  match rep with
+  | enum _ =>
+    ret (x ::= tag)
+  | boxed _ a =>
+    let stm := assignConstructorS' fenv map x 0 vs in
+    ret (x ::= [val] (allocPtr +' (c_int Z.one val));
+         allocIdent ::= allocPtr +'
+         (c_int (Z.of_N (a + 1)) val) ;
+         Field(var x, -1) :::= tag; stm)
+      end.
 
 (* This is not valid in Clight if x is a Vptr, implementing instead as an external function
 Definition isPtr (x : positive) :=
@@ -610,16 +684,16 @@ Definition asgnAppVars_fast' (myvs vs : list positive) (myind ind : list N) (fen
 (* Optional, reduce register pressure *)
 Definition asgnAppVars vs ind (fenv : fun_env) (map : fun_info_env) :=
   match asgnAppVars' vs ind fenv map with
-    | Some s =>
-     ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
-    | None => None
+  | Some s =>
+    ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
+  | None => None
   end.
 
 Definition asgnAppVars_fast myvs vs myind ind (fenv : fun_env) (map : fun_info_env) :=
   match asgnAppVars_fast' myvs vs myind ind fenv map with
-    | Some s =>
-     ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
-    | None => None
+  | Some s =>
+    ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s)
+  | None => None
   end.
 
 Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) : option statement :=
@@ -647,99 +721,147 @@ Definition reserve' (funInf : positive) (l : Z) (vs : list positive) (ind : list
   end.
 
 Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_statements):=
-      (isPtr caseIdent x;
-             Sifthenelse
-               (bvar caseIdent)
-               (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
-             (
-               Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
-                      ls')).
+  (isPtr caseIdent x;
+     Sifthenelse
+       (bvar caseIdent)
+       (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
+       (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
+                ls')).
 
 
-Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : fun_info_env) : option statement :=
+(** * Shadow stack strategy *)
+(*
+
+ 1. Before the first non-tail call create a local (stored in the stack) array and a frame
+    struct with pointer to the array and the previous frame. Modify the stack pointer of
+    tinfo to point to the newly created stack frame
+ 2. Before the last (tail) call or return modify tinfo to point to the previous stack frame
+
+ *)
+
+(* To create the shadow stack:
+
+   long long int live[MAX_live];
+   frame_pointer fp = { next = *live; roots=*live; prev:=tinfo->sp}
+   long long int *next = fp.next;
+   tinfo->sp = *fp 
+ *)
+
+(* To push a value to the shadow stack:
+
+   live[NEXT] := x;
+   next = next + 1LLU;
+*)
+
+(* To discard the current stack:
+
+  tinfo->sp = fp.prev
+*)
+
+
+(* Create a new shadow stack frame *)
+(* Definition make_shadow_stack () : statement :=  *)
+
+(* The program returns the translated code and the set of live vars at the next call *)
+Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : fun_info_env)
+         (stack_vars : option FVSet) (gc_call : statement) (uses_stack : bool) : option statement:=
   match e with
   | Econstr x t vs e' =>
     prog <- assignConstructorS cenv ienv fenv map x t vs ;;
-         prog' <- translate_body e' fenv cenv ienv map ;;
-         ret (prog ; prog')
+    prog' <- translate_body e' fenv cenv ienv map stack_vars gc_call uses_stack;;
+    ret (prog ; prog')
   | Ecase x cs =>
     (* ls <- boxed cases (Vptr), ls <- unboxed (Vint) *)
     p <- ((fix makeCases (l : list (ctor_tag * exp)) :=
             match l with
             | nil => ret (LSnil, LSnil)
             | cons p l' =>
-              prog <- translate_body (snd p) fenv cenv ienv map ;;
-                   p' <- makeCases l' ;;
-                   let '(ls , ls') := p' in
-                   match (make_ctor_rep cenv (fst p)) with
-                   | Some (boxed t a ) =>
-                     let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
-                     (match ls with
-                     | LSnil =>
-                       ret ((LScons None
+              prog <- translate_body (snd p) fenv cenv ienv map stack_vars gc_call uses_stack;;
+              p' <- makeCases l' ;;
+              let '(ls , ls') := p' in
+              match (make_ctor_rep cenv (fst p)) with
+              | Some (boxed t a ) =>
+                let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
+                (match ls with
+                 | LSnil =>
+                   ret ((LScons None
+                                (Ssequence prog Sbreak)
+                                ls), ls')
+                 | LScons _ _ _ =>
+                   ret ((LScons (Some (Z.land tag 255))
+                                (Ssequence prog Sbreak)
+                                ls), ls')
+                 end)
+              | Some (enum t) =>
+                let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
+                (match ls' with
+                 | LSnil =>
+                   ret (ls, (LScons None
                                     (Ssequence prog Sbreak)
-                                    ls), ls')
-                     | LScons _ _ _ =>
-                       ret ((LScons (Some (Z.land tag 255))
+                                    ls'))
+                 | LScons _ _ _ =>
+                   ret (ls, (LScons (Some (Z.shiftr tag 1))
                                     (Ssequence prog Sbreak)
-                                    ls), ls')
-                     end)
-                   | Some (enum t) =>
-                     let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
-                     (match ls' with
-                     | LSnil =>
-                       ret (ls, (LScons None
-                                        (Ssequence prog Sbreak)
-                                        ls'))
-                     | LScons _ _ _ =>
-                       ret (ls, (LScons (Some (Z.shiftr tag 1))
-                                        (Ssequence prog Sbreak)
-                                        ls'))
-                     end)
-                   | None => None
-                   end
+                                    ls'))
+                 end)
+              | None => None
+              end
             end) cs) ;;
       let '(ls , ls') := p in
       ret (make_case_switch x ls ls')
   | Eletapp x f t vs e' =>
-    prog <- translate_body e' fenv cenv ienv map ;;
+    let fvs := exp_fv e' in
+    let (make_stack, stack_vars') :=
+        match stack_vars with
+        | Some vars => (push_live_vars vars (PS.elements fvs); update_stack, Some (PS.union fvs vars)) (* push the vars that are not in the stack already *)
+        | Option =>
+          (init_stack; push_live_vars PS.empty (PS.elements fvs); update_stack, Some fvs)
+        end
+    in
+    prog <- translate_body e' fenv cenv ienv map stack_vars' gc_call uses_stack;;
     inf <- M.get t fenv ;;
     asgn <- asgnAppVars vs (snd inf) fenv map ;;
     let vv :=  makeVar f fenv map in
     let pnum := min (N.to_nat (fst inf)) nParam in
     c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
-    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; allocIdent ::= Efield tinfd allocIdent valPtr; x ::= Field(args, Z.of_nat 1); prog)
+    ret (asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
+         make_stack;
+         c;
+         allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr;
+         x ::= Field(args, Z.of_nat 1);
+         gc_call; prog)
   | Eproj x t n v e' =>
-    prog <- translate_body e' fenv cenv ienv map ;;
-         ret (x ::= Field(var v, Z.of_N n) ;
-                prog)
+    prog <- translate_body e' fenv cenv ienv map stack_vars gc_call uses_stack;;
+    ret (x ::= Field(var v, Z.of_N n) ;
+         prog)
   | Efun fnd e => None
   | Eapp x t vs =>
     inf <- M.get t fenv ;;
-        asgn <- asgnAppVars vs (snd inf) fenv map ;;
-        let vv :=  makeVar x fenv map in
-        let pnum := min (N.to_nat (fst inf)) nParam in
-        c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
-             ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c)
+    asgn <- asgnAppVars vs (snd inf) fenv map ;;
+    let vv :=  makeVar x fenv map in
+    let pnum := min (N.to_nat (fst inf)) nParam in
+    c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
+    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; discard_frame uses_stack; c)
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x  and return *)
-    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)); Efield tinfd allocIdent valPtr  :::= allocPtr)
+    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)); Efield tinfd allocIdent valPtr :::= allocPtr; Efield tinfd limitIdent valPtr :::= limitPtr; discard_frame uses_stack)
   end.
 
-Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : fun_info_env) (myvs : list positive) (myind : list N) : option statement :=
+Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : fun_info_env)
+         (myvs : list positive) (myind : list N) (stack_vars : option FVSet) (gc_call : statement) (uses_stack : bool): option statement :=
   match e with
   | Econstr x t vs e' =>
     prog <- assignConstructorS cenv ienv fenv map x t vs ;;
-         prog' <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
-         ret (prog ; prog')
+    prog' <- translate_body_fast e' fenv cenv ienv map myvs myind stack_vars gc_call uses_stack;;
+    ret (prog ; prog')
   | Ecase x cs =>
     (* ls <- boxed cases (Vptr), ls <- unboxed (Vint) *)
     p <- ((fix makeCases (l : list (ctor_tag * exp)) :=
             match l with
             | nil => ret (LSnil, LSnil)
             | cons p l' =>
-              prog <- translate_body_fast (snd p) fenv cenv ienv map myvs myind ;;
+              prog <- translate_body_fast (snd p) fenv cenv ienv map myvs myind stack_vars gc_call uses_stack;;
                    p' <- makeCases l' ;;
                    let '(ls , ls') := p' in
                    match (make_ctor_rep cenv (fst p)) with
@@ -773,39 +895,72 @@ Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : 
       let '(ls , ls') := p in
       ret (make_case_switch x ls ls')
   | Eletapp x f t vs e' =>
-    prog <- translate_body_fast e' fenv cenv ienv map myvs myind;;
+    let fvs := exp_fv e' in
+    let (make_stack, stack_vars') :=
+        match stack_vars with
+        | Some vars => (push_live_vars vars (PS.elements fvs); update_stack, Some (PS.union fvs vars)) (* push the vars that are not in the stack already *)
+        | Option =>
+          (init_stack; push_live_vars PS.empty (PS.elements fvs); update_stack, Some fvs)
+        end
+    in
+    prog <- translate_body_fast e' fenv cenv ienv map myvs myind stack_vars' gc_call uses_stack;;
     inf <- M.get t fenv ;;
     asgn <- asgnAppVars_fast myvs vs myind (snd inf) fenv map ;;
     let vv :=  makeVar f fenv map in
     let pnum := min (N.to_nat (fst inf)) nParam in
     c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
-    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c; allocIdent ::= Efield tinfd allocIdent valPtr ; x ::= Field(args, Z.of_nat 1); prog)
+    ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr :::= limitPtr;
+         make_stack; c;
+         allocIdent ::= Efield tinfd allocIdent valPtr ;
+         limitIdent ::= Efield tinfd limitIdent valPtr ;
+         x ::= Field(args, Z.of_nat 1); gc_call; prog)
   | Eproj x t n v e' =>
-    prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
-         ret (x ::= Field(var v, Z.of_N n) ;
-                prog)
+    prog <- translate_body_fast e' fenv cenv ienv map myvs myind stack_vars gc_call uses_stack ;;
+    ret (x ::= Field(var v, Z.of_N n); prog)
   | Efun fnd e => None
   | Eapp x t vs =>
-
     inf <- M.get t fenv ;;
         asgn <- asgnAppVars_fast myvs vs myind (snd inf) fenv map ;;
         let vv :=  makeVar x fenv map in
         let pnum := min (N.to_nat (fst inf)) nParam in
         c <- (mkCall None fenv map ([mkFunTy pnum] vv) pnum vs) ;;
-             ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; c)
+             ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr; discard_frame uses_stack; c)
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x  and return *)
-    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)); Efield tinfd allocIdent valPtr  :::= allocPtr)
+    ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map)); Efield tinfd allocIdent valPtr :::= allocPtr; Efield tinfd limitIdent valPtr :::= limitPtr; discard_frame uses_stack)
   end.
 
-Definition mkFun (vs : list positive) (loc : list positive) (body : statement) : function :=
+Definition mkFun
+           (uses_stack : bool)
+           (vs : list positive) (* args *)
+           (loc : list positive) (* local vars *)
+           (body : statement) : function :=
   mkfunction Tvoid
              cc_default
              ((tinfIdent , threadInf) :: (map (fun x => (x , val)) (firstn nParam vs)))
-             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc))++(allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) ::nil)
+             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc)) ++ (if uses_stack then stack_decl else nil) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) ::nil)
              nil
              body.
+
+Fixpoint uses_stack (e : exp) : bool :=
+  match e with
+  | Econstr _ _ _ e => uses_stack e
+  | Ecase x pats =>
+    (fix aux l :=
+       match l with
+       | nil => false 
+       | (c, e) :: xs =>
+         (uses_stack e || aux xs)%bool
+       end) pats
+  | Eproj _ _ _ _ e => uses_stack e
+  | Eletapp _ _ _ _ _ => true
+  | Efun _ e => uses_stack e
+  | Eapp _ _ _ => false
+  | Eprim _ _ _  e => uses_stack e
+  | Ehalt _ => false
+  end.
+
 
 Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (map : fun_info_env) :
   option (list (positive * globdef Clight.fundef type)) :=
@@ -815,34 +970,35 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ie
     match translate_fundefs fnd' fenv cenv ienv map with
     | None => None
     | Some rest =>
-      match translate_body e fenv cenv ienv map with
+      match M.get t fenv with
       | None => None
-      | Some body =>
-         match M.get t fenv with
-         | None => None
-         | Some inf =>
-             let '(l, locs) := inf in
-             match asgnFunVars vs locs with
-             | None => None
-             | Some asgn =>
-                  match M.get f map with
-                  | None => None
-                  | Some gcArrIdent =>
-                    match reserve (fst gcArrIdent) (Z.of_N (l + 2)) vs locs fenv map with
-                    | None => None
-                    | Some res =>
-                         ret ((f , Gfun (Internal
-                                           (mkFun vs (get_allocs e)
-                                                  ((allocIdent ::= Efield tinfd allocIdent valPtr ;
-                                                    limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                    argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                    res) ;
-                                                    asgn ;
-                                                    body)))) :: rest)
-                         end
-                  end
-             end
-         end
+      | Some inf =>
+        let '(l, locs) := inf in
+        match asgnFunVars vs locs with
+        | None => None
+        | Some asgn =>
+          match M.get f map with
+          | None => None
+          | Some gcArrIdent =>
+            match reserve (fst gcArrIdent) (Z.of_N (l + 2)) vs locs fenv map with
+            | None => None
+            | Some res =>
+              let uses_stack := uses_stack e in
+              match translate_body e fenv cenv ienv map None res uses_stack with
+              | None => None
+              | Some body =>
+                ret ((f , Gfun (Internal
+                                  (mkFun uses_stack vs (get_allocs e)
+                                         ((allocIdent ::= Efield tinfd allocIdent valPtr ;
+                                                 limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                                 argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
+                                                 res) ;
+                                                 asgn ;
+                                                 body)))) :: rest)
+              end
+            end
+          end
+        end
       end
     end
   end.
@@ -859,29 +1015,30 @@ Fixpoint translate_fundefs_fast (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env
       | None => None
       | Some inf =>
          let '(l, locs) := inf in
-         match translate_body_fast e fenv cenv ienv map vs locs  with
+         match asgnFunVars vs locs with
          | None => None
-         | Some body =>
-             match asgnFunVars vs locs with
+         | Some asgn =>
+           match M.get f map with
+           | None => None
+           | Some gcArrIdent =>
+             match reserve (fst gcArrIdent) (Z.of_N (l + 2)) vs locs fenv map with
              | None => None
-             | Some asgn =>
-                  match M.get f map with
-                  | None => None
-                  | Some gcArrIdent =>
-                    match reserve (fst gcArrIdent) (Z.of_N (l + 2)) vs locs fenv map with
-                    | None => None
-                    | Some res =>
-                         ret ((f , Gfun (Internal
-                                           (mkFun vs (get_allocs e)
-                                                  ((allocIdent ::= Efield tinfd allocIdent valPtr ;
-                                                    limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                    argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                    res) ;
-                                                    asgn ;
-                                                    body)))) :: rest)
-                         end
-                  end
+             | Some res =>
+               let uses_stack := uses_stack e in
+               match translate_body_fast e fenv cenv ienv map vs locs None res uses_stack with
+               | None => None
+               | Some body =>
+                 ret ((f , Gfun (Internal
+                                   (mkFun uses_stack vs (get_allocs e)
+                                          ((allocIdent ::= Efield tinfd allocIdent valPtr ;
+                                            limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
+                                            res) ;
+                                             asgn ;
+                                             body)))) :: rest)
+               end
              end
+           end
          end
       end
     end
@@ -920,27 +1077,31 @@ Definition body_external_decl : (positive * globdef Clight.fundef type) :=
   let params := (type_of_params ((tinfIdent, threadInf):: nil)) in
      (bodyIdent,  Gfun (External (EF_external ("body"%string) (signature_of_type  params Tvoid cc_default)) params Tvoid cc_default)).
 
+End STACK.
 
 Fixpoint translate_funs (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (m : fun_info_env) :
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
-    funs <- translate_fundefs fnd fenv cenv ienv m  ;;
-         let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
-         body <- translate_body e fenv cenv ienv m ;;
-              '(gcArrIdent , _) <- M.get mainIdent m ;;
-              ret ((bodyIdent , Gfun (Internal
-                                        (mkfunction Tvoid
-                                                    cc_default
-                                                    ((tinfIdent, threadInf)::nil)
-                                                    ((map (fun x => (x , val)) localVars) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
-                                                    nil
-                                                    ( allocIdent ::= Efield tinfd allocIdent valPtr ;
-                                                        limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                        argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                        reserve_body gcArrIdent 2%Z;
-                                                        body))))
-                     :: funs)
+    let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
+    let MAX_LOCS := Z.of_nat (max (max_live_fundefs fnd) (length localVars)) in (* maximum number of live vars per functions *)
+    funs <- translate_fundefs MAX_LOCS fnd fenv cenv ienv m ;;
+    '(gcArrIdent , _) <- M.get mainIdent m ;;
+    let gc_call := reserve_body gcArrIdent 2%Z in
+    let uses_stack := uses_stack e in
+    body <- translate_body MAX_LOCS e fenv cenv ienv m None gc_call uses_stack ;;
+    ret ((bodyIdent , Gfun (Internal
+                              (mkfunction Tvoid
+                                          cc_default
+                                          ((tinfIdent, threadInf)::nil)
+                                          ((map (fun x => (x , val)) localVars) ++ (if uses_stack then stack_decl MAX_LOCS else nil) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
+                                          nil
+                                          (allocIdent ::= Efield tinfd allocIdent valPtr ;
+                                           limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                           argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
+                                           gc_call;
+                                           body))))
+           :: funs)
   | _ => None
   end.
 
@@ -948,22 +1109,25 @@ Fixpoint translate_funs_fast (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv :
   option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
-    funs <- translate_fundefs_fast fnd fenv cenv ienv m ;;
-         let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
-         body <- translate_body e fenv cenv ienv m ;;
-              '(gcArrIdent , _) <- M.get mainIdent m ;;
-              ret ((bodyIdent , Gfun (Internal
-                                        (mkfunction Tvoid
-                                                    cc_default
-                                                    ((tinfIdent, threadInf)::nil)
-                                                    ((map (fun x => (x , val)) localVars) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
-                                                    nil
-                                                    ( allocIdent ::= Efield tinfd allocIdent valPtr ;
-                                                      limitIdent ::= Efield tinfd limitIdent valPtr ;
-                                                      argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                                                      reserve_body gcArrIdent 2%Z;
-                                                      body))))
-                     :: funs)
+    let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
+    let MAX_LOCS := Z.of_nat (max (max_live_fundefs fnd) (length localVars)) in (* maximum number of live vars per functions *)
+    funs <- translate_fundefs_fast MAX_LOCS fnd fenv cenv ienv m ;;
+    '(gcArrIdent , _) <- M.get mainIdent m ;;
+    let gc_call := reserve_body gcArrIdent 2%Z in
+    let uses_stack := uses_stack e in
+    body <- translate_body MAX_LOCS e fenv cenv ienv m None gc_call uses_stack;;
+    ret ((bodyIdent , Gfun (Internal
+                              (mkfunction Tvoid
+                                          cc_default
+                                          ((tinfIdent, threadInf)::nil)
+                                          ((map (fun x => (x , val)) localVars) ++ (if uses_stack then stack_decl MAX_LOCS else nil) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
+                                          nil
+                                          (allocIdent ::= Efield tinfd allocIdent valPtr ;
+                                           limitIdent ::= Efield tinfd limitIdent valPtr ;
+                                           argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
+                                           gc_call;
+                                           body))))
+            :: funs)
   | _ => None
   end.
 
@@ -981,8 +1145,6 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   end.
 
 
-
-
 (* representation of pos as string *)
 Fixpoint pos2string' p s :=
   match p with
@@ -991,10 +1153,10 @@ Fixpoint pos2string' p s :=
   | xH => String "1" s
   end.
 
-(* Definition pos2string p := *)
-(*  pos2string' p "". *)
+Definition pos2string p :=
+ pos2string' p "".
 
-
+(* Currently showing positive as decimal numbers *)
 (* Definition show_pos x :=  pos2string x. (*nat2string10 (Pos.to_nat x). *) *)
 
 Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : name_env :=
@@ -1131,11 +1293,19 @@ Definition make_defs_fast (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_
            end.
 
 Definition composites : list composite_definition :=
- (Composite threadInfIdent Struct
-   ((allocIdent, valPtr) ::
-                         (limitIdent, valPtr) :: (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
-                         (argsIdent, (Tarray uval maxArgs noattr))::nil)
-   noattr ::  nil).
+  Composite stackframeTIdent Struct
+            ((nextFld, valPtr) ::
+             (rootFld, valPtr) ::
+             (prevFld, (tptr stackframeT)) :: nil)
+            noattr ::
+  Composite threadInfIdent Struct
+            ((allocIdent, valPtr) ::
+             (limitIdent, valPtr) ::
+             (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
+             (argsIdent, (Tarray uval maxArgs noattr)) ::
+             (fpIdent, (tptr stackframeT)) :: nil)
+            noattr ::
+   nil.
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
            (main : ident) (add_comp:bool): option Clight.program :=
@@ -1147,7 +1317,6 @@ Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
   end.
 
 
-
 (* Wrap program in empty Efun if e.g. fully inlined *)
 Definition wrap_in_fun (e:exp) :=
   match e with
@@ -1156,19 +1325,30 @@ Definition wrap_in_fun (e:exp) :=
   | _ => Efun Fnil e
   end.
 
-Definition add_inf_vars (nenv: name_env): name_env :=
-  M.set isptrIdent (nNamed "is_ptr"%string) (
-  M.set argsIdent (nNamed "args"%string) (
-          M.set allocIdent (nNamed "alloc"%string) (
-                  M.set limitIdent (nNamed "limit"%string) (
-                        M.set gcIdent (nNamed "garbage_collect"%string) (
-                                M.set mainIdent (nNamed "main"%string) (
-                                       M.set bodyIdent (nNamed "body"%string) (
-                                               M.set threadInfIdent (nNamed "thread_info"%string) (
-                                                       M.set tinfIdent (nNamed "tinfo"%string) (
-                                                               M.set heapInfIdent (nNamed "heap"%string) (
-                                                                     M.set numArgsIdent (nNamed "num_args"%string) nenv)))))))))).
+Definition inf_vars :=
+  (isptrIdent, (nNamed "is_ptr"%string)) ::
+  (argsIdent, (nNamed "args"%string)) ::
+  (allocIdent, (nNamed "alloc"%string)) ::
+  (limitIdent, (nNamed "limit"%string)) ::
+  (gcIdent, (nNamed "garbage_collect"%string)) ::
+  (mainIdent, (nNamed "main"%string)) ::
+  (bodyIdent, (nNamed "body"%string)) ::
+  (threadInfIdent, (nNamed "thread_info"%string)) ::
+  (tinfIdent, (nNamed "tinfo"%string)) ::
+  (heapInfIdent, (nNamed "heap"%string)) ::
+  (numArgsIdent, (nNamed "num_args"%string)) ::
+  (stackframeTIdent, (nNamed "stack_frame"%string)) ::
+  (frameIdent, nNamed "frame"%string) ::
+  (rootIdent, nNamed "roots"%string) ::
+  (spIdent, nNamed "sp"%string) ::
+  (fpIdent, nNamed "fp"%string) ::
+  (nextFld, nNamed "next"%string) ::
+  (rootFld, nNamed "root"%string) ::
+  (prevFld, nNamed "prev"%string) :: nil.
 
+
+Definition add_inf_vars (nenv: name_env): name_env :=
+  List.fold_left (fun nenv inf => M.set (fst inf) (snd inf) nenv) inf_vars nenv.
 
 
 Definition ensure_unique : M.t name -> M.t name :=
@@ -1177,8 +1357,6 @@ Definition ensure_unique : M.t name -> M.t name :=
                     | nAnon =>  nAnon
                     | nNamed s => nNamed (append s (append "_"%string (show_pos x)))
                   end) l.
-
-
 
 Fixpoint make_proj (recExpr:expr) (start:nat) (left:nat): list expr  :=
   match left with
@@ -1226,7 +1404,7 @@ Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
 
 (* Compute the  header file comprising of:
  1 ) Constructors and eliminators for every inductive types in the n_ind_env
-2 ) Direct style calling functions for the original (named) functions
+ 2 ) Direct style calling functions for the original (named) functions
  *)
 
 Fixpoint make_constructors
@@ -1616,7 +1794,7 @@ Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
      | None => (nenv, None, None)
      | Some (nenv, hdefs) =>
        (M.set make_tinfoIdent (nNamed "make_tinfo"%string)
-          (M.set exportIdent (nNamed "export"%string) nenv),
+              (M.set exportIdent (nNamed "export"%string) nenv),
         mk_prog_opt (body_external_decl :: (make_extern_decls nenv hdefs true)) mainIdent false,
         mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs ++ hdefs) mainIdent true)
      end)
@@ -1643,9 +1821,13 @@ Definition compile_fast (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
     (match fst header_p with
      | None => (nenv, None, None)
      | Some (nenv, hdefs) =>
-       (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent false, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent true)
+       (M.set make_tinfoIdent (nNamed "make_tinfo"%string)
+              (M.set exportIdent (nNamed "export"%string) nenv),
+        mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent false,
+        mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent true)
      end)
   end.
+
 
 Definition err {A : Type} (s : String.string) : res A :=
   Error ((MSG s) :: nil).

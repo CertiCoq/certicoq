@@ -340,7 +340,6 @@ Proof.
     + rewrite (proj1 (nat_compare_gt n0 n)); try intro; trivial.
   - cbn. now rewrite H, H0.
   - cbn. now rewrite H, H0.
-  - rewrite instantiate_TConstruct. simpl. now rewrite H.
   - rewrite instantiate_TCase. simpl. now rewrite H, H0.
   - simpl instantiate. rewrite !instantiate_TFix. simpl. rewrite H; try easy.
     now rewrite trans_fixes_pres_dlength.

@@ -7,6 +7,8 @@ Require Import Integers.
 Require Import Clight.
 Require Import Ctypes.
 Require Import Cop.
+Require Import AltBinNotations.
+Require Import Common.Common.
 
 Definition ___builtin_annot : AST.ident := 37%positive.
 Definition ___builtin_annot_intval : AST.ident := 38%positive.

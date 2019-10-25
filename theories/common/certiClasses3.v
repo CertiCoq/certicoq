@@ -82,7 +82,7 @@ Lemma compObsLeTransitive  :
   -> i ⊑ d 
   -> s ⊑ d.
 Proof.
-  cofix.
+  cofix compObsLeTransitive.
   intros ? ? ? Ha Hb.
   inversion Ha as [ss is Hah Has]. subst. clear Ha.
   inversion Hb as [is ds Hbh Hbs]. subst. clear Hb.

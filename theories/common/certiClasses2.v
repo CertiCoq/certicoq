@@ -117,7 +117,7 @@ Lemma toCoInd s d:
   (forall m, obsLeInd m s d) -> obsLe s d.
 Proof using.
   revert s d.
-  cofix. intros ? ? Hi. pose proof Hi as Hib.
+  cofix toCoInd. intros ? ? Hi. pose proof Hi as Hib.
   specialize (Hi 1); inversion Hi as [ ? ? ? Hyes Hsub | ]; subst. clear Hi.
   constructor; [ assumption | ].
   intros ?.
@@ -211,7 +211,7 @@ Proof.
     unfold yesPreserved in H10. specialize (H10 q).
     unfold implb in *.
 **********)
-  cofix.
+  cofix obsLeTrns.
   intros ? ? ? Ha Hb.
   inversion Ha as [ss is Hah Has]. subst. clear Ha.
   inversion Hb as [is ds Hbh Hbs]. subst. clear Hb.
@@ -415,7 +415,7 @@ Lemma valuePredTranslateLe_suff  (Src Dst : Type)
   -> valuePredTranslateLe Src Dst.
 Proof using.
   intros Ho Hy.
-  cofix.
+  cofix valuePredTranslateLe_suff.
   intros ? ? Hv Ht.
   constructor;[eauto|].
   intros.

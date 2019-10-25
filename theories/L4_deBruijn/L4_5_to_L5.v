@@ -209,7 +209,7 @@ Open Scope program_scope.
 Require Import List.
 Require Import certiClasses.
 
-Local Notation "' x" := (certiClasses.injectOption x) (at level 70).
+Local Notation "' x" := (certiClasses.injectOption x) (at level 50).
 
 (* this function is polymorphic over the interface AbsTerm, which abstracts over
 de-bruijn/named terms. The main benefit of this ugly abstract definition is that parametricity

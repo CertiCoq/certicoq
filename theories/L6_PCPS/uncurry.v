@@ -18,6 +18,8 @@ Require Import ExtLib.Data.Positive.
 Require Import Coq.Bool.Bool.
 Require Import identifiers.  (* for max_var *)
 Require Import L6.List_util.
+Require Import AltBinNotations.
+
 Section UNCURRY.
   Import MonadNotation.
 

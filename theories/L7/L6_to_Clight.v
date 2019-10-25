@@ -351,12 +351,10 @@ Notation "'*' p " := (Ederef p val) (at level 40).
 
 Notation "'&' p " := (Eaddrof p valPtr) (at level 40).
 
-Definition c_int' n t :=
+Definition c_int (n : Z) (t : type) : expr :=
   if Archi.ptr64
     then Econst_long (Int64.repr n) t
     else Econst_int (Int.repr n%Z) t.
-
-Notation c_int := c_int'.
 
 Notation "'while(' a ')' '{' b '}'" :=
   (Swhile a b) (at level 60).
@@ -1181,6 +1179,7 @@ Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
    1) Constructors and eliminators for every inductive types in the n_ind_env
    2) Direct style calling functions for the original (named) functions *)
 
+Check c_int.
 Fixpoint make_constructors
          (cenv : ctor_env)
          (nTy : BasicAst.ident)
@@ -1299,23 +1298,13 @@ Definition make_names_gv
                    (Z.of_nat (length nameList)) in
   (Gvar (mkglobvar ty init_l true false), ty).
 
-(* Matches [ind_tag]s to a [ident] (i.e. [positive]) that holds
-   the name of the eliminator function in C. *)
-Definition elim_env := M.t ident.
-(* Matches [ind_tag]s to a [ident] (i.e. [positive]) that holds
-   the name and type of the names array in C. *)
-Definition ctor_names_env := M.t (ident * type).
-
 Definition make_eliminator
            (itag : ind_tag)
            (cenv : ctor_env)
            (nTy : BasicAst.ident)
            (ctors : list ctor_ty_info)
            (nenv : name_env)
-           (eenv : elim_env)
-           (cnenv : ctor_names_env)
-           : nState (name_env * elim_env * ctor_names_env
-                     * (list (ident * globdef Clight.fundef type))) :=
+           : nState (name_env * list (ident * globdef Clight.fundef type)) :=
   valIdent <- getName ;;
   ordIdent <- getName ;;
   argvIdent <- getName ;;
@@ -1373,9 +1362,7 @@ Definition make_eliminator
                 (argvIdent, nNamed "argv"%string) ::
                 (elim_fun_id, nNamed (append "elim_" nTy)) ::
                 nil) nenv in
-  let eenv := M.set itag elim_fun_id eenv in
-  let cnenv := M.set itag (gv_namesIdent, ty_gv_names) cnenv in
-  ret (nenv, eenv, cnenv,
+  ret (nenv,
        (gv_namesIdent, gv_names) ::
        (gv_aritiesIdent, gv_arities) ::
        (elim_fun_id, Gfun elim_fun) :: nil).
@@ -1386,223 +1373,18 @@ Fixpoint make_interface
          (cenv : ctor_env)
          (ienv_list : list (ind_tag * n_ind_ty_info))
          (nenv : name_env)
-         (eenv : elim_env)
-         (cnenv : ctor_names_env)
-         : nState (name_env * elim_env * ctor_names_env
-                   * list (ident * globdef Clight.fundef type)) :=
-  match ienv_list with
-  | nil => ret (nenv, eenv, cnenv, nil)
-  | (_, (nAnon, _)) :: ienv_list' =>
-    (* skip anon-types *)
-      make_interface cenv ienv_list' nenv eenv cnenv
-  | (itag, (nNamed nTy, lCtr)) :: ienv_list' =>
-      '(nenv, def1) <- make_constructors cenv nTy lCtr nenv ;;
-      '(nenv, eenv, cnenv, def2) <- make_eliminator itag cenv nTy lCtr nenv eenv cnenv ;;
-      '(nenv, eenv, cnenv, def3) <- make_interface cenv ienv_list' nenv eenv cnenv ;;
-      ret (nenv, eenv, cnenv, (def1 ++ def2 ++ def3))
-  end.
-
-(* Matches [ind_tag]s to a [ident] (i.e. [positive]) that holds
-   the name of the print function in C. *)
-Definition print_env := M.t ident.
-
-(* We need a preliminary pass to generate the names for all
-   printer functions for each type because they can be mutually recursive. *)
-Fixpoint make_printer_names
-         (ienv_list : list (ind_tag * n_ind_ty_info))
-         (nenv : name_env)
-         (penv : print_env)
-         : nState (name_env * print_env) :=
-  match ienv_list with
-  | nil => ret (nenv, penv)
-  | (_, (nAnon, _)) :: ienv_list' =>
-      make_printer_names ienv_list' nenv penv (* skip anon-types *)
-  | (itag, (nNamed nTy, lCtr)) :: ienv_list' =>
-      pname <- getName ;;
-      make_printer_names ienv_list'
-        (M.set pname (nNamed ("print_" ++ nTy)%string) nenv)
-        (M.set itag pname penv)
-  end.
-
-Definition enumerate {a : Type} (xs : list a) : list (nat * a) :=
-  let fix aux (n : nat) (xs : list a) :=
-      match xs with
-      | nil => nil
-      | x :: xs => (n, x) :: aux (S n) xs
-      end
-  in aux O xs.
-
-Fixpoint get_max_ctor_arity (ctors : list ctor_ty_info) : N :=
-  match ctors with
-  | nil => 0
-  | ctor :: ctors' =>
-      N.max (ctor_arity ctor) (get_max_ctor_arity ctors')
-  end.
-
-Definition def_info : Type := positive * type.
-(* printf and these literals will be used by multiple functions
-   so we want to reuse them, not redefine every time *)
-Record print_def_info : Type :=
-  Build_print_def_info
-    { printf_info : def_info
-    ; lparen_info : def_info
-    ; rparen_info : def_info
-    ; sep_info : def_info
-    ; space_info : def_info
-    }.
-
-Fixpoint make_printer_funs
-         (cenv : ctor_env)
-         (ienv_list : list (ind_tag * n_ind_ty_info))
-         (pinfo : print_def_info)
-         (nenv : name_env)
-         (eenv : elim_env)
-         (cnenv : ctor_names_env)
-         (penv : print_env)
          : nState (name_env * list (ident * globdef Clight.fundef type)) :=
   match ienv_list with
   | nil => ret (nenv, nil)
   | (_, (nAnon, _)) :: ienv_list' =>
-      make_printer_funs cenv ienv_list' pinfo nenv eenv cnenv penv (* skip anon-types *)
-  | (itag, (nNamed nTy, ctors)) :: ienv_list' =>
-    _v <- getName ;;
-    _index <- getName ;;
-    _prodArr <- getName ;;
-    match M.get itag penv, M.get itag eenv, M.get itag cnenv with
-    | Some pname (* name of the current print function *),
-      Some ename (* name of the elim function this will use *),
-      Some (cnname, ty_names) (* name of the names array this will use *) =>
-         (* We need the maximum arity of all the ctors because
-            we will declare an array for the arguments of the constructor
-            of the resulting value from the eliminator *)
-         let max_ctor_arity : N := get_max_ctor_arity ctors in
-
-         (* if none of the constructors take any args *)
-         let won't_take_args : bool := N.eqb max_ctor_arity 0 in
-         let prodArr_type : type := tarray val (Z.of_N max_ctor_arity) in
-
-         (* null pointer or properly sized array *)
-         let elim_last_arg : expr :=
-           if won't_take_args
-             then Ecast (Econst_int (Int.repr 0) val) (tptr tvoid)
-             else Evar _prodArr prodArr_type in
-
-         (* names and Clight types of printf and string literals *)
-         let (_printf, ty_printf) := printf_info pinfo in
-         let (_space, ty_space) := space_info pinfo in
-         let (_lparen, ty_lparen) := lparen_info pinfo in
-         let (_rparen, ty_rparen) := rparen_info pinfo in
-         let (_sep, ty_sep) := sep_info pinfo in
-
-         let fix generate_switch_cases
-                 (ctors : list (nat * ctor_ty_info))
-                 : labeled_statements :=
-           match ctors with
-           | nil => LSnil
-           | (index, info) :: ctors' =>
-             LScons (Some (Z_of_nat index))
-               (if N.eqb (ctor_arity info) 0
-                 then Sreturn None
-                 else
-                  (Scall None (Evar _printf ty_printf)
-                              ((Evar _space ty_space) :: nil)) ;;;
-                  (Scall None (Evar _printf ty_printf)
-                              ((Evar _lparen ty_lparen) :: nil)) ;;;
-                  (Scall None (Evar _printf ty_printf)
-                              ((Evar _rparen ty_rparen) :: nil)) ;;;
-                  (* TODO calls to the print functions
-                     for each argument of the ctor. *)
-                  (* This is currently not possible because ctor
-                     field types are not stored! *)
-                  Sbreak)
-               (generate_switch_cases ctors')
-           end in
-
-         let body :=
-           (Scall None
-             (Evar ename (Tfunction
-                           (Tcons val
-                             (Tcons (tptr val)
-                                   (Tcons (tptr (tptr val)) Tnil))) tvoid
-                           cc_default))
-             ((Etempvar _v val) ::
-              (Eaddrof (Evar _index val) (tptr val)) ::
-              elim_last_arg :: nil)) ;;;
-          (Scall None
-            (Evar _printf ty_printf)
-            ((Ederef
-                (Ebinop Oadd
-                  (Evar cnname ty_names)
-                  (Evar _index tint) ty_names)
-                ty_names) :: nil)) ;;;
-          (if won't_take_args
-            then Sreturn None
-            else Sswitch (Evar _index val)
-                         (generate_switch_cases (enumerate ctors))) in
-
-        (* declare a prodArr array if any of the constructors take args,
-           if not then prodArr will not be declared at all *)
-        let vars := if won't_take_args then nil
-                    else (_prodArr, prodArr_type) :: nil in
-        let f := {| fn_return := tvoid
-                  ; fn_callconv := cc_default
-                  ; fn_params := (_v, val) :: nil
-                  ; fn_vars := (_index, val) :: vars
-                  ; fn_temps := nil
-                  ; fn_body := body
-                  |} in
-        let nenv :=
-          set_list ((_v, nNamed "v"%string) ::
-                    (_index, nNamed "index"%string) ::
-                    (_prodArr, nNamed "prodArr"%string) ::
-                    nil) nenv in
-        '(nenv, funs) <- make_printer_funs cenv ienv_list' pinfo
-                                           nenv eenv cnenv penv ;;
-        ret (nenv, (pname, Gfun (Internal f)) :: funs)
-    | _, _, _ =>
-        (* If there is not print function name generated,
-           then skip this printer altogether *)
-        make_printer_funs cenv ienv_list' pinfo nenv eenv cnenv penv
-    end
+    (* skip anon-types *)
+      make_interface cenv ienv_list' nenv
+  | (itag, (nNamed nTy, lCtr)) :: ienv_list' =>
+      '(nenv, def1) <- make_constructors cenv nTy lCtr nenv ;;
+      '(nenv, def2) <- make_eliminator itag cenv nTy lCtr nenv ;;
+      '(nenv, def3) <- make_interface cenv ienv_list' nenv ;;
+      ret (nenv, (def1 ++ def2 ++ def3))
   end.
-
-Definition make_printers
-           (cenv : ctor_env)
-           (ienv_list : list (ind_tag * n_ind_ty_info))
-           (nenv : name_env)
-           (eenv : elim_env)
-           (cnenv : ctor_names_env)
-           : nState (name_env * list (ident * globdef Clight.fundef type)) :=
-  '(nenv, penv) <- make_printer_names ienv_list nenv (M.empty _) ;;
-  _printf <- getName ;;
-  '(_lparen_lit, ty_lparen_lit, def_lparen_lit) <- asgn_string_gv "(" ;;
-  '(_rparen_lit, ty_rparen_lit, def_rparen_lit) <- asgn_string_gv ")" ;;
-  '(_sep_lit, ty_sep_lit, def_sep_lit) <- asgn_string_gv ", " ;;
-  '(_space_lit, ty_space_lit, def_space_lit) <- asgn_string_gv " " ;;
-  let pinfo :=
-      {| printf_info :=
-           (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
-       ; lparen_info := (_lparen_lit, ty_lparen_lit)
-       ; rparen_info := (_rparen_lit, ty_rparen_lit)
-       ; sep_info := (_sep_lit, ty_sep_lit)
-       ; space_info := (_space_lit, ty_space_lit)
-      |} in
-  '(nenv, funs) <- make_printer_funs cenv ienv_list pinfo nenv eenv cnenv penv ;;
-  let funs :=
-    (_printf, Gfun (External (EF_external "printf"
-                                (mksignature (AST.Tint :: nil)
-                                              (Some AST.Tint)
-                                              cc_default))
-                             (Tcons (tptr tschar) Tnil) tint cc_default)) ::
-    (_lparen_lit, def_lparen_lit) :: (_rparen_lit, def_rparen_lit) ::
-    (_sep_lit, def_sep_lit) :: (_space_lit, def_space_lit) :: funs in
-  let nenv :=
-    set_list ((_lparen_lit, nNamed "lparen_lit"%string) ::
-              (_rparen_lit, nNamed "rparen_lit"%string) ::
-              (_sep_lit, nNamed "sep_lit"%string) ::
-              (_space_lit, nNamed "space_lit"%string) ::
-              (_printf, nNamed "printf"%string) :: nil) nenv in
-  ret (nenv, funs).
 
 
 Definition make_tinfoIdent := 20%positive.
@@ -1756,9 +1538,8 @@ Definition make_header
            (e : exp)
            (nenv : name_env)
            : nState (option (name_env * list (ident * globdef Clight.fundef type))) :=
-  '(nenv, eenv, cnenv, inter_l) <-
-      make_interface cenv (M.elements ienv) nenv (M.empty _) (M.empty _) ;;
-  '(nenv, printers) <- make_printers cenv (M.elements ienv) nenv eenv cnenv ;;
+  '(nenv, inter_l) <-
+      make_interface cenv (M.elements ienv) nenv ;;
   '(nenv, halt_f, (halt_cloIdent, halt_clo_def)) <- make_halt nenv ;;
   '(nenv, call_0) <- make_call_n_export_b nenv 1 false halt_cloIdent ;;
   '(nenv, call_2) <- make_call_n_export_b nenv 2 false halt_cloIdent ;;
@@ -1767,7 +1548,7 @@ Definition make_header
   ret (Some (nenv, (halt_f ::
                     (halt_cloIdent, halt_clo_def) ::
                     (tinfIdent, tinf_def) ::
-                    call_0 :: call_1 :: call_2 :: call_3 :: (inter_l ++ printers)))).
+                    call_0 :: call_1 :: call_2 :: call_3 :: inter_l))).
 
 
 

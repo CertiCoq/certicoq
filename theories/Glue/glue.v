@@ -32,11 +32,20 @@ Open Scope monad_scope.
 
 Definition mainIdent : positive := 1.
 
+Notation "'var' x" := (Etempvar x val) (at level 20).
+
 Notation " p ';;;' q " := (Ssequence p q)
                           (at level 100, format " p ';;;' '//' q ").
 
+Notation "'*' p " := (Ederef p val) (at level 40).
+
+Notation "'[' t ']' e " := (Ecast e t) (at level 34).
+
+Notation "'Field(' t ',' n ')'" :=
+  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+
 Definition ind_L1_tag := positive.
-Definition ind_L1_env := M.t Ast.one_inductive_body.
+Definition ind_L1_env := M.t (kername * Ast.one_inductive_body).
 
 (* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name of the eliminator function in C. *)
@@ -64,7 +73,7 @@ Section GState.
       ; gstate_nenv   : name_env
       ; gstate_eenv   : elim_env
       ; gstate_cnenv  : ctor_names_env
-      ; gstate_caenv  : ctor_names_env
+      ; gstate_caenv  : ctor_arities_env
       ; gstate_penv   : print_env
       ; gstate_log    : list string
       }.
@@ -115,7 +124,7 @@ Section GState.
     put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
     ret tt.
 
-  Definition get_ind_L1_env (k : ident) : gState (option Ast.one_inductive_body) :=
+  Definition get_ind_L1_env (k : ident) : gState (option (kername * Ast.one_inductive_body)) :=
     ienv <- gets gstate_ienv ;;
     ret (M.get k ienv).
 
@@ -123,9 +132,9 @@ Section GState.
     ienv <- gets gstate_ienv ;;
     let find (prev : option positive)
              (tag : positive)
-             (b : Ast.one_inductive_body) : option positive :=
+             (p : kername * Ast.one_inductive_body) : option positive :=
       match prev with
-      | None => if string_dec s (Ast.ind_name b) then Some tag else None
+      | None => if string_dec s (fst p) then Some tag else None
       | _ => prev
       end in
     ret (M.fold find ienv None).
@@ -244,22 +253,54 @@ Section L1Types.
         max arity (get_max_ctor_arity ctors')
     end.
 
+  Fixpoint split_aux (acc : string) (sep : ascii) (s : string) : list string :=
+    match s with
+    | EmptyString => acc :: nil
+    | String c s' =>
+        if Char.ascii_dec sep c
+          then acc :: split_aux EmptyString sep s'
+          else split_aux (acc ++ String c EmptyString) sep s'
+    end.
+
+  Definition split (c : ascii) (s : string) : list string :=
+    split_aux EmptyString c s.
+
+ (* takes a fully qualified name and removes the base type,
+    leaving behind the qualifying prefix.
+    e.g. "Coq.Init.Datatypes.bool" becomes "Coq.Init.Datatypes." *)
+  Definition find_qualifying_prefix (n : kername) : string :=
+    match rev (split "." n) with
+    | nil => (* not possible *) ""
+    | base :: rest => String.concat "." (rev (""%string :: rest))
+    end.
+
+  (* takes an inductive type declaration and returns
+     the qualifying prefix for the name and the type definition *)
   Definition extract_mut_ind
             (g : Ast.global_decl)
-            : option Ast.mutual_inductive_body :=
+            : option (string * Ast.mutual_inductive_body) :=
     match g with
-    | Ast.InductiveDecl name body => Some body
+    | Ast.InductiveDecl name body => Some (find_qualifying_prefix name, body)
     | _ => None
     end.
 
   Fixpoint get_single_types
            (gs : Ast.global_declarations)
-           : list Ast.one_inductive_body :=
+           : list (kername * Ast.one_inductive_body) :=
     match gs with
     | nil => nil
     | g :: gs' =>
       match extract_mut_ind g with
-      | Some b => Ast.ind_bodies b ++ get_single_types gs'
+      | Some (qual_pre, b) =>
+          (* This relies on the assumption that mutually recursive types
+             must exist in the same namespace. So if we only have one of them
+             fully qualified, then we can apply the same qualification to
+             the other types in the mut rec type declaration.
+             Type names in one_inductive_body are NOT qualified,
+             which makes them globally nonunique. *)
+          let tys := map (fun o => ((qual_pre ++ Ast.ind_name o)%string, o))
+                         (Ast.ind_bodies b) in
+          tys ++ get_single_types gs'
       | None => get_single_types gs'
       end
     end.
@@ -267,10 +308,10 @@ Section L1Types.
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
              (gs : Ast.global_declarations)
-             : gState (list (positive * Ast.one_inductive_body)) :=
+             : gState (list (positive * (kername * Ast.one_inductive_body))) :=
     let singles := get_single_types gs in
     (* for debugging purposes: *)
-    (* log ("Propagating types: " ++ String.concat ", " (map Ast.ind_name singles)) ;; *)
+    log ("Propagating types: " ++ String.concat ", " (map fst singles)) ;;
     let res := enumerate_pos singles in
     let ienv : ind_L1_env := set_list res (M.empty _) in
     put_ind_L1_env ienv ;;
@@ -278,48 +319,165 @@ Section L1Types.
 
 End L1Types.
 
+Section L1Constructors.
+
+  Inductive dissected_type :=
+  | dInd : string -> dissected_type
+  | dApp : dissected_type -> list dissected_type -> dissected_type
+  | dFun : dissected_type (* for higher-order arguments to constructor *)
+  | dParam : string -> dissected_type (* for argument of the parametrized types *)
+  | dSort : dissected_type (* for type arguments to the ctor *)
+  | dInvalid : dissected_type (* used for variables that could not be found *).
+
+  Definition lookup (ctx : list dissected_type) (n : nat) : dissected_type :=
+    nth_default dInvalid ctx n.
+
+  Fixpoint dissect_type
+           (ctx : list dissected_type)
+         (* a simple component of constructor type *)
+           (ty : Ast.term)
+         (* a list of arguments and the return type *)
+           : dissected_type :=
+    match ty with
+    | Ast.tRel n => lookup ctx n
+    | Ast.tInd kn _ => dInd (inductive_mind kn)
+    | Ast.tProd _ e1 e2 => dFun
+    | Ast.tSort _ => dSort
+    | Ast.tApp hd args =>
+        dApp (dissect_type ctx hd) (map (dissect_type ctx) args)
+    | _ => dInvalid
+    end.
+
+  Definition for_ctx (d : dissected_type) : dissected_type :=
+    match d with
+    | dSort => dInvalid
+    | _ => d
+    end.
+
+  Fixpoint dissect_types
+         (* context of types for De Bruijn indices in the type *)
+           (ctx : list dissected_type)
+         (* the type of the constructor that will be dissected *)
+           (ty : Ast.term)
+         (* a list of arguments and the return type *)
+           : list dissected_type * dissected_type :=
+    match ty with
+    | Ast.tProd _ e1 e2 =>
+        let e1' := dissect_type ctx e1 in
+        let (args, rt) := dissect_types (for_ctx e1' :: ctx) e2 in
+        (e1' :: args, rt)
+    | _ => (nil, dissect_type ctx ty)
+    end.
+
+  (*
+  Import Template.Ast.
+  Definition change := tProd nAnon
+                          (tProd nAnon
+                            (tInd
+                                {|
+                                inductive_mind := "Coq.Init.Datatypes.nat";
+                                inductive_ind := 0 |} nil)
+                            (tRel 1))
+                          (tRel 1).
+  Eval compute in (dissect_types (dInd "Top.color" :: nil) change).
+
+  Definition c := tProd (nNamed "a"%string)
+                    (tSort ((Level.Level "Top.43", false) :: nil))
+                    (tProd nAnon (tRel 0) (tRel 2)).
+  Eval compute in (dissect_types (dInd "Top.test" :: nil) c).
+
+  Definition s := tProd nAnon (tRel 0) (tRel 1).
+  Eval compute in (dissect_types (dInd "Coq.Init.Datatypes.nat" :: nil) s).
+
+  Definition no := tProd (nNamed "a"%string)
+                     (tSort ((Level.Level "Top.40", false) :: nil))
+                     (tProd nAnon (tRel 0)
+                         (tProd nAnon (tApp (tRel 2) (tRel 1 :: nil))
+                           (tProd nAnon (tApp (tRel 3) (tRel 2 :: nil))
+                               (tApp (tRel 4) (tRel 3 :: nil))))).
+  Eval compute in (dissect_types (dInd "Top.tree" :: nil) no).
+  *)
+
+End L1Constructors.
+
+Section CConstructors.
+
+  Fixpoint make_arg_list'
+           (n : nat) : gState (list (ident * type)) :=
+    match n with
+    | O => ret nil
+    | S n' =>
+        new_id <- gensym ("arg" ++ nat2string10 n')%string ;;
+        rest_id <- make_arg_list' n' ;;
+        ret ((new_id, val) :: rest_id)
+    end.
+
+  Definition make_arg_list
+             (n : nat) : gState (list (ident * type)) :=
+    rest <- make_arg_list' n ;;
+    ret (rev rest).
+
+  (* TODO this function is not used yet because we have to find out how
+     we can get the list of ctor arities and ordinals.
+     For arities, we have to take into account parametrized types.
+     Parameters are not counted in arities.
+     These are calculated somewhere in the earlier phases,
+     so we should ask this and find out. *)
+  Fixpoint make_constructors
+          (name_ty : string) (* like bool or nat *)
+          (ctors : list (string * N * N)) (* name, arity, ordinal *)
+          : gState defs :=
+    let make_name (nCtor : string) : string :=
+      ("make_" ++ name_ty ++ "_" ++ nCtor)%string in
+    match ctors with
+    | nil => ret nil
+    | (* Unboxed *) (nCtor, 0%N, ord) :: ctors =>
+        constr_fun_id <- gensym (make_name nCtor) ;;
+        let constr_body :=
+          Sreturn (Some (Econst_int (Int.repr (Z.add (Z.shiftl (Z.of_N ord) 1) 1)) val)) in
+        let constr_fun := Internal (mkfunction val cc_default nil nil nil constr_body) in
+        funs <- make_constructors name_ty ctors ;;
+        ret ((constr_fun_id, Gfun constr_fun) :: funs)
+    | (* Boxed *) (nCtor, Npos ar, ord) :: ctors =>
+        constr_fun_id <- gensym (make_name nCtor) ;;
+        argvIdent <- gensym "argv" ;;
+        arg_list <- make_arg_list (Pos.to_nat ar) ;;
+        let asgn_s := make_constrAsgn argvIdent arg_list in
+        let header := c_int (Z.of_N ((N.shiftl (Npos ar) 10) + ord)) val in
+        let constr_body :=
+            Sassign (Field(var argvIdent, 0%Z)) header ;;;
+            asgn_s ;;;
+            Sreturn (Some (add (Evar argvIdent argvTy) (c_int 1%Z val))) in
+        let constr_fun := Internal (mkfunction val cc_default
+                                      (arg_list ++ ((argvIdent, argvTy) :: nil))
+                                      nil nil constr_body) in
+        funs <- make_constructors name_ty ctors ;;
+        ret ((constr_fun_id, Gfun constr_fun) :: funs)
+    end.
+
+End CConstructors.
+
 Section Printers.
   (* We need a preliminary pass to generate the names for all
     printer functions for each type because they can be mutually recursive. *)
   Fixpoint make_printer_names
-          (tys : list (positive * Ast.one_inductive_body))
+          (tys : list (positive * (kername * Ast.one_inductive_body)))
           : gState unit :=
     match tys with
     | nil => ret tt
-    | (tag, ty) :: tys' =>
+    | (tag, (kn, ty)) :: tys' =>
         pname <- gensym ("print_" ++ Ast.ind_name ty) ;;
         set_print_env tag pname ;;
         make_printer_names tys'
     end.
 
-  Inductive normalized_L1_type :=
-  | nInd : string -> normalized_L1_type
-  | nApp : list normalized_L1_type -> normalized_L1_type
-  | nParam : normalized_L1_type (* used for argument of the parametrized types *)
-  | nSort : normalized_L1_type (* used for type arguments to the ctor *)
-  | nInvalid : normalized_L1_type.
-
-  Fixpoint normalize_arg (ty : Ast.term) : normalized_L1_type :=
-    match ty with
-    | Ast.tInd ind _ => nInd (BasicAst.inductive_mind ind)
-    | _ => nInvalid (* TODO fix *)
-    end.
-
-  Fixpoint normalize_ctor_args (ty : Ast.term) : list normalized_L1_type :=
-    match ty with
-    | Ast.tProd _ e1 e2 => normalize_arg e1 :: normalize_ctor_args e2
-    | Ast.tRel _ => nil
-    | _ => normalize_arg ty :: nil
-           (* TODO handle tRel *)
-    end.
-
   Variable pinfo : print_def_info.
 
   Definition generate_printer
-             (info : positive * Ast.one_inductive_body)
+             (info : positive * (kername * Ast.one_inductive_body))
             : gState (option def) :=
-    let (tag, b) := info in
-    let name := Ast.ind_name b in
+    let '(tag, (name, b)) := info in
+    let basename := Ast.ind_name b in
     let ctors := Ast.ind_ctors b in
     pnameM <- get_print_env tag ;;
     enameM <- get_elim_env tag ;;
@@ -355,20 +513,24 @@ Section Printers.
         let (_lparen, ty_lparen) := lparen_info pinfo in
         let (_rparen, ty_rparen) := rparen_info pinfo in
         let (_sep, ty_sep) := sep_info pinfo in
+        let (_fun, ty_fun) := fun'_info pinfo in
+        let (_type, ty_type) := type'_info pinfo in
+        let (_unk, ty_unk) := unk_info pinfo in
 
         let rec_print_call
-            (arg : normalized_L1_type) : gState statement :=
+            (arg : nat * dissected_type) : gState statement :=
           match arg with
-          | nInd name => (* for monomorphic types *)
-              tagM <- get_tag_from_type_name name ;;
+          | (i, dInd arg_type_name) => (* for monomorphic types *)
+              (* We check them against fully qualified [kername]s
+                 like "Coq.Init.Datatypes.nat". We should only use [kername]s
+                 since they're globally unique. *)
+              tagM <- get_tag_from_type_name arg_type_name ;;
               match tagM with
-              | None => log ("Can't find L1 tag for the type " ++ name) ;;
-                        ret Sskip (* ideally shouldn't happen *)
-              (* TODO the problem with this is that we record [ident]s like "nat"
-                but we try to check them against fully qualified [kername]s
-                like "Coq.Init.Datatypes.nat". We should only use [kername]s
-                since they're globally unique.
-                However, the input L1 program contains [ident]s for some reason. *)
+              | None =>
+                  log ("No L1 tag for the type " ++ name ++
+                       " for the #" ++ show_nat i ++
+                       " constructor that takes " ++ arg_type_name) ;;
+                  ret Sskip (* ideally shouldn't happen *)
               | Some tag =>
                   printerM <- get_print_env tag ;;
                   match printerM with
@@ -376,14 +538,23 @@ Section Printers.
                       log ("Can't find printer for the type " ++ name) ;; ret Sskip
                   | Some printer => (* success! *)
                       ret (Scall None (Evar printer ty_printf)
-                                      ((Ederef
-                                         (Ebinop Oadd
-                                           (Evar _prodArr ty_prodArr)
-                                           (Econst_int (Int.repr 0) val) ty_names)
-                                         ty_names) :: nil))
-                          (* TODO don't hardcode 0 *)
+                            ((Ederef
+                                (Ebinop Oadd
+                                  (Evar _prodArr ty_prodArr)
+                                  (Econst_int (Int.repr (Z.of_nat i)) val)
+                                  ty_names)
+                                ty_names) :: nil))
                   end
               end
+          | (_, dFun) =>
+              ret (Scall None (Evar _printf ty_printf)
+                              (Evar _fun ty_fun :: nil))
+          | (_, dInvalid) =>
+              ret (Scall None (Evar _printf ty_printf)
+                              (Evar _unk ty_unk :: nil))
+          | (_, dSort) =>
+              ret (Scall None (Evar _printf ty_printf)
+                              (Evar _type ty_type :: nil))
           | _ => (* TODO expand this for other cases *)
               log ("Found a non-inductive constructor argument for " ++ name) ;;
               ret (Scall None (Evar _printf ty_printf)
@@ -391,7 +562,7 @@ Section Printers.
           end in
 
         let fix rec_print_calls
-                (args : list normalized_L1_type)
+                (args : list (nat * dissected_type))
                 : gState statement :=
           match args with
           | nil => ret Sskip
@@ -411,8 +582,9 @@ Section Printers.
                 : gState labeled_statements :=
           match ctors with
           | nil => ret LSnil
-          | (index, (name, ty, arity)) :: ctors' =>
-            calls <- rec_print_calls (normalize_ctor_args ty) ;;
+          | (index, (_, ty, arity)) :: ctors' =>
+            let (args, rt) := dissect_types (dInd name :: nil) ty in
+            calls <- rec_print_calls (enumerate_nat args) ;;
             rest <- switch_cases ctors' ;;
             ret (LScons (Some (Z_of_nat index))
                   (if Nat.eqb arity 0
@@ -477,7 +649,7 @@ Section Printers.
     end.
 
   Fixpoint generate_printers
-          (tys : list (positive * Ast.one_inductive_body))
+          (tys : list (positive * (kername * Ast.one_inductive_body)))
           : gState defs :=
     match tys with
     | nil => ret nil
@@ -510,22 +682,22 @@ Section CtorArrays.
 
   Fixpoint make_name_array
            (tag : positive)
-           (name : string)
+           (basename : kername)
            (ctors : list (BasicAst.ident * Ast.term * nat))
            : gState def :=
     let (max_len, init_l) := normalized_names_array ctors 1 in
     let ty := tarray (tarray tschar (Z.of_nat max_len))
                      (Z.of_nat (length ctors)) in
-    nname <- gensym ("names_of_" ++ name) ;;
+    nname <- gensym ("names_of_" ++ basename) ;;
     set_ctor_names_env tag (nname, ty) ;;
     ret (nname, Gvar (mkglobvar ty init_l true false)).
 
   Fixpoint make_name_arrays
-           (tys : list (positive * Ast.one_inductive_body))
+           (tys : list (positive * (kername * Ast.one_inductive_body)))
            : gState defs :=
     match tys with
     | nil => ret nil
-    | (tag, b) :: tys' =>
+    | (tag, (kn, b)) :: tys' =>
         rest <- make_name_arrays tys' ;;
         def <- make_name_array tag (Ast.ind_name b) (Ast.ind_ctors b) ;;
         ret (def :: rest)
@@ -536,11 +708,11 @@ End CtorArrays.
 Section Eliminators.
 
   Fixpoint make_elims
-           (tys : list (positive * Ast.one_inductive_body))
+           (tys : list (positive * (kername * Ast.one_inductive_body)))
            : gState defs :=
     match tys with
     | nil => ret nil
-    | (tag, b) :: tys' =>
+    | (tag, (kn, b)) :: tys' =>
         rest <- make_elims tys' ;;
         let s : string := ("elim_" ++ Ast.ind_name b)%string in
         ename <- gensym s ;;

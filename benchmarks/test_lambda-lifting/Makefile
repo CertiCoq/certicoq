@@ -19,13 +19,13 @@ demo2: maindemo2.c tests.demo2.c
 
 
 clos: main.c tests.clos.c
-	gcc -o clos -Wno-everything -O2 mainclos.c gc_stack.c tests.clos.c
+	clang -o clos -Wno-everything -O2 mainclos.c gc_stack.c tests.clos.c
 
 clos_opt: main.c tests.clos_opt.c
-	gcc -o clos_opt -Wno-everything -O2 mainclos.c gc_stack.c tests.clos_opt.c
+	clang -o clos_opt -Wno-everything -O2 mainclos.c gc_stack.c tests.clos_opt.c
 
 clos_old: main.c tests.clos_old.c
-	gcc -o clos_old -Wno-everything -O2 mainclos.c gc_stack.c tests.clos_old.c
+	clang -o clos_old -Wno-everything -O2 mainclos.c gc.c tests.clos_old.c
 
 
 is_valid: main.c tests.is_valid.c

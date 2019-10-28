@@ -1,19 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "gc.h"
 #include <time.h>
 #include "tests.demo1.h"
-
-extern void body(struct thread_info *);
+#include "utils.c"
 
 extern value args[];
 
 
-
-
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-} 
 
 /* OS: not generated */	       
 void nat_elim(value nat){

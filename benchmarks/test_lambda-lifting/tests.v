@@ -81,13 +81,13 @@ Definition clos_loop (u : unit) : nat :=
      | x::xs =>
        let clos z := y + z + w + z in
        (clos x) + (clos x) + list_add y z w xs
-     end) 1 3 5 (List.repeat 0 100).
+     end) 1 3 5 (List.repeat 6 (50*10*10)).
     
-Definition clos := loop (5*10) clos_loop.
-Definition clos_opt := loop (5*10) clos_loop.
-Definition clos_old := loop (5*10) clos_loop.
+Definition clos := loop (10*10) clos_loop.
+Definition clos_opt := loop (10*10) clos_loop.
+Definition clos_old := loop (10*10) clos_loop.
 
-Definition res := Eval native_compute in clos.
+(* Definition res := Eval native_compute in clos. *)
 
 (* Definition clos := 1. *)
 (* Definition clos_opt := 2. *)

@@ -54,6 +54,7 @@ Definition compile_L7_anf (t : cTerm certiL6) : cps_util.name_env * Clight.progr
              argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
              5
              stackframeTIdent frameIdent rootIdent spIdent fpIdent nextFld rootIdent prevFld
+             false
              prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 

@@ -33,9 +33,19 @@ Definition demo1_cps := List.app (List.repeat true 5) (List.repeat false 4).
 CertiCoq Compile ANF Opt 0 demo1.
 CertiCoq Compile Opt 0 demo1_cps.
 
-Definition demo2 := (negb, List.hd_error).
+(* Definition demo2 := (negb, List.hd_error). *)
+Definition demo2 := List.map negb [true; false; true].
+Definition demo2_cps := List.map negb [true; false; true].
 
-CertiCoq Compile Opt 2 demo2.
+CertiCoq Compile ANF Opt 0 demo2.
+CertiCoq Compile Opt 0 demo2_cps.
+
+Definition add := 10*10*10*7*2 + 4.
+Definition add_cps := 3 + 4.
+
+CertiCoq Compile ANF Opt 0 add.
+CertiCoq Compile Opt 0 add_cps.
+
 
 (* Definition lala := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
 (* Definition test1_opt := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
@@ -51,49 +61,42 @@ Fixpoint list_add y z w l : nat :=
   | nil => 0%nat
   | x::xs =>
     let clos r := (y + z + w + r)%nat in
-    (clos x) + list_add y z w xs
+    x + list_add y z w xs
   end.
 
 Fixpoint loop n (f : Datatypes.unit -> nat) : nat :=
   match n with
-  | 0%nat => f tt
+  | 0%nat => f tt + 1
   | S n => f tt + loop n f
   end.
     
-Definition clos := (loop 3 (fun _ => list_add 0 0 0 (List.repeat 0%nat 3))%nat).
-Definition clos_old := (loop 3 (fun _ => list_add 0 0 0 (List.repeat 0%nat 3))%nat).
-
-(* CertiCoq Compile clos. *)
+(* Definition clos := (loop 3 (fun _ => list_add (* 0 0 0 *) (List.repeat 2%nat 3))%nat). *)
+(* Definition clos_old := (loop 3 (fun _ => list_add (* 0 0 0 *) (List.repeat 2%nat 3))%nat). *)
 
 
-(* Definition clos_loop (u : unit) : nat := *)
-(*   (fix list_add y z w l : nat := *)
-(*      match l with *)
-(*      | [] => 0 *)
-(*      | x::xs => *)
-(*        let clos z := y + z + w + z in *)
-(*        (clos x) + (clos (x + 1)) + list_add y z w xs *)
-(*      end) 0 0 0 (List.repeat 2 2). *)
-
-
-(* Fixpoint loop n (f : unit -> nat) : nat := *)
-(*   match n with *)
-(*   | 0 => f tt *)
-(*   | S n => f tt + loop n f *)
-(*   end. *)
+Definition clos_loop (u : unit) : nat :=
+  (fix list_add y z w l : nat :=
+     match l with
+     | [] => 0
+     | x::xs =>
+       let clos z := y + z + w + z in
+       (clos x) + (clos x) + list_add y z w xs
+     end) 1 3 5 (List.repeat 0 100).
     
-(* Definition clos := loop 2 clos. *)
-(* Definition clos_opt := loop 2 clos. *)
-(* Definition clos_old := loop 2 clos_loop. *)
+Definition clos := loop (5*10) clos_loop.
+Definition clos_opt := loop (5*10) clos_loop.
+Definition clos_old := loop (5*10) clos_loop.
+
+Definition res := Eval native_compute in clos.
 
 (* Definition clos := 1. *)
 (* Definition clos_opt := 2. *)
 (* Definition clos_old := 3. *)
 
 CertiCoq Compile ANF Opt 0 clos.
+CertiCoq Compile ANF Opt 1 clos_opt.
 (* CertiCoq Compile ANF Opt 1 clos_opt. *)
 CertiCoq Compile Opt 0 clos_old.
-
 
 (* In this clos should be lambda lifted and the environment should not be constructed in every iteration of the loop *)
 (* Time saved:

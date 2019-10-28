@@ -3,8 +3,8 @@ clos_all : clos clos_opt clos_old
 is_valid_all : is_valid is_valid_old is_valid_opt
 
 copy:
-	cp ../../theories/Runtime/gc_stack.c ./
-	cp ../../theories/Runtime/gc_stack.h ./
+	# cp ../../theories/Runtime/gc_stack.c ./
+	# cp ../../theories/Runtime/gc_stack.h ./
 	cp ../../theories/Runtime/values.h ./
 	cp ../../theories/Runtime/main.c ./
 	cp ../../theories/Runtime/config.h ./

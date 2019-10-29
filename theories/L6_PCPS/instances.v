@@ -210,6 +210,60 @@ Definition L6_pipeline_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.ex
       ((M.empty _ ,  state.cenv c_data, state.nenv c_data, state.fenv c_data), (M.empty _, e))
   end.
 
+Definition L6_pipeline_pre_cc (opt : bool) (e : cTerm certiL4)  : exceptionMonad.exception (cTerm certiL6) :=
+  let (venv, vt) := e in
+  let res : error (exp * comp_data) := 
+      (* L4 to L6 anf *)
+      let (e_err, c_data) := convert_top_anf fun_fun_tag default_ctor_tag default_ind_tag (venv, vt) in
+      e <- e_err ;;
+      (* uncurring *)
+      let '(e_err, s, c_data) := uncurry_fuel_anf 100 (shrink_cps.shrink_top e) c_data in
+      e <- e_err ;;
+      (* inlining *)
+      let (e_err, c_data) := inline_uncurry_marked_anf e s 10 10 c_data in
+      e <- e_err ;;
+      (* (* Shrink reduction *) *)
+      (* let e := shrink_cps.shrink_top e in *)
+      (* (* Dead parameter elimination *) *)
+      (* let e := dead_param_elim.eliminate e in *)
+      (* Shrink reduction *)
+      ret (shrink_cps.shrink_top e, c_data)
+  in
+  match res with
+  | Err s =>
+    exceptionMonad.Exc ("failed converting from L5 to L6 (anf) : " ++ s)%string
+  | Ret (e, c_data) =>
+    exceptionMonad.Ret
+      ((M.empty _ ,  state.cenv c_data, state.nenv c_data, state.fenv c_data), (M.empty _, e))
+  end.
+
+Definition L5_to_L6_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.exception (cTerm certiL6) :=
+  let (venv, vt) := e in
+  let res : error (exp * comp_data) := 
+      (* L4 to L6 anf *)
+      let (e_err, c_data) := convert_top_anf fun_fun_tag default_ctor_tag default_ind_tag (venv, vt) in
+      e <- e_err ;;
+      (* (* uncurring *) *)
+      (* let '(e_err, s, c_data) := uncurry_fuel_anf 100 (shrink_cps.shrink_top e) c_data in *)
+      (* e <- e_err ;; *)
+      (* (* inlining *) *)
+      (* let (e_err, c_data) := inline_uncurry_marked_anf e s 10 10 c_data in *)
+      (* e <- e_err ;; *)
+      (* (* Shrink reduction *) *)
+      (* let e := shrink_cps.shrink_top e in *)
+      (* (* Dead parameter elimination *) *)
+      (* let e := dead_param_elim.eliminate e in *)
+      (* Shrink reduction *)
+      ret ((* shrink_cps.shrink_top *) e, c_data)
+  in
+  match res with
+  | Err s =>
+    exceptionMonad.Exc ("failed converting from L5 to L6 (anf) : " ++ s)%string
+  | Ret (e, c_data) =>
+    exceptionMonad.Ret
+      ((M.empty _ ,  state.cenv c_data, state.nenv c_data, state.fenv c_data), (M.empty _, e))
+  end.
+
 
 (* Optimizing L6 pipeline *)
 Definition L6_pipeline  (opt : bool) (e : cTerm certiL5) : exceptionMonad.exception (cTerm certiL6) :=

@@ -95,7 +95,29 @@ Definition compile_template_L7_anf `{F:utils.Fuel} (opt_level : nat) (p : Templa
   do p'' <- L6_pipeline_anf opt p' ;
   ret (compile_L7_anf p'').
 
-Open Scope positive_scope.
+Definition emit_L6_cc `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+  : exceptionMonad.exception string :=
+  let opt := match opt_level with O => false | S O => true | _ => false end in
+  do p' <- translateTo (cTerm certiL4) (Flag opt_level) p ;
+  do p'' <- L6_pipeline_anf opt p' ;
+  let '((_, cenv, nenv, _), (_, e)) := p'' in
+  ret (cps_show.show_exp nenv cenv false e).
+
+Definition emit_L6_pre_cc `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+  : exceptionMonad.exception string :=
+  let opt := match opt_level with O => false | S O => true | _ => false end in
+  do p' <- translateTo (cTerm certiL4) (Flag opt_level) p ;
+  do p'' <- L6_pipeline_pre_cc opt p' ;
+  let '((_, cenv, nenv, _), (_, e)) := p'' in
+  ret (cps_show.show_exp nenv cenv false e).
+
+Definition emit_L6_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+  : exceptionMonad.exception string :=
+  let opt := match opt_level with O => false | S O => true | _ => false end in
+  do p' <- translateTo (cTerm certiL4) (Flag opt_level) p ;
+  do p'' <- L5_to_L6_anf opt p' ;
+  let '((_, cenv, nenv, _), (_, e)) := p'' in
+  ret (cps_show.show_exp nenv cenv false e).
 
 
 Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=

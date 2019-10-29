@@ -117,5 +117,7 @@ Separate Extraction
          Compiler.allInstances.printProg
          Compiler.allInstances.compile_template_L7
          Compiler.allInstances.compile_template_L7_anf
+         Compiler.allInstances.emit_L6_anf
+         Compiler.allInstances.emit_L6_pre_cc
          L7.Clightexec.run. 
 Cd "..".

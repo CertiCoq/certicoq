@@ -90,7 +90,7 @@ Section Beta.
             match inline_letapp e' x with
             | Some (C, x') =>
               let sig' := set_list (combine xs ys') sig  in
-              beta_contract d' (C |[ ec ]|) (M.set x x' sig') fm s' 
+              beta_contract d' (C |[ ec ]|) (M.set x (apply_r sig' x') sig') fm s' 
             | None =>
               ec' <- beta_contract_aux ec sig fm s' ;;
               ret (Eletapp x f' t ys' ec')

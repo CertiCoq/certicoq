@@ -1281,6 +1281,9 @@ Section CONTRACT.
     | _ => Ehalt 1%positive
     end.
 
+  (* The return type of contractT *)
+  Definition contractT im :=
+    {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}.
 
 
   Program Fixpoint contract (sig:r_map) (count:c_map) (e:exp) (sub:ctx_map) (im:b_map) {measure (term_sub_inl_size (e,sub,im))} : {esir:(exp * c_map * b_map) & (b_map_le_i im (snd esir))} :=
@@ -1351,7 +1354,7 @@ Section CONTRACT.
       | Eletapp x f t ys e =>
         (* Zoe: I couldn't get the equality proof of the two defs to go through without expanding all the return types
            in this definition which makes this code hard to read *)
-        match get_c x count as k return (k = get_c x count -> {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+        match get_c x count as k return (k = get_c x count -> contractT im) with
         | 0%nat =>
           (*  Delete the finding if its not used *)
           fun Heq0_1 =>
@@ -1363,21 +1366,15 @@ Section CONTRACT.
             let f' := apply_r sig f in
             let ys' := apply_r_list sig ys in
             (* check how many times the function is used *)
-            (match get_c f' count as anonymous'
-                   return
-                   (anonymous' = get_c f' count ->
-                    {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)})  with
+            (match get_c f' count as k return (k = get_c f' count -> contractT im)  with
              | 1%nat =>
                (fun Heq1 =>
                   match (M.get f' sub) as k return (k = M.get f' sub -> {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
                   | Some (SVfun t' xs e_body)  =>
                     (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
                     (fun Heqs1 =>
-                       match andb (Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im))) as anonymous'
-                             return
-                             (anonymous' =
-                              ((t' =? t)%positive && ((length ys =? length xs) && negb (get_b f' im)))%bool ->
-                              {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)})
+                       match andb (Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im))) as k
+                             return (k = ((t' =? t)%positive && ((length ys =? length xs) && negb (get_b f' im)))%bool -> contractT im)
                        with
                        | true =>
                          fun Heq2 => 
@@ -1385,15 +1382,22 @@ Section CONTRACT.
                            (* update counts of ys' and xs after setting f' to 0 *)
                            let count' := update_count_inlined ys' xs (M.set f' 0 count) in
                            let inl := inline_letapp e_body x in
-                           (match inl as inl' return (inl' = inl -> {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                           (match inl as inl' return (inl' = inl -> contractT im) with
                             (* body can be inlined *)
                             | Some (C_inl, x') =>
                               (fun Heq3 =>
-                                 match contract (set_list (combine xs ys') (M.set x x' sig)) count' (C_inl |[ e ]|) sub im'
-                                       as anonymous'
-                                       return
-                                       (anonymous' = contract (set_list (combine xs ys') (M.set x x' sig)) count' (C_inl |[ e ]|)  sub im' ->
-                                        {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                                 let sig' := set_list (combine xs ys') sig in
+                                 (* x' is the variable holding the result of the inlined function.
+                                  * If the function ends with a tail call x' will be the same as x
+                                  * and it will bind the result of the last call (that will not be a tail call anymore
+                                  * If the function halts, x' will be the returned variable.
+                                  * In such case, x' can be either a fv or an argument of the function
+                                  * (in which case we should apply the sig' substitution) or a bound variable
+                                  * of the function, which is not affected by the substitution because
+                                  * of the unique ids assumption *)
+                                 let sig'' := M.set x (apply_r sig' x') sig' in
+                                 match contract sig'' count' (C_inl |[ e ]|) sub im'
+                                       as k return (k = contract sig'' count' (C_inl |[ e ]|)  sub im' -> contractT im) with
                                  | existT  (e', count', im'') bp =>  fun Heq4 => existT _ (e', count', im'')
                                                                                     (b_map_le_i_trans im (M.set (apply_r sig f) true im)
                                                                                                       (ble_add im im (apply_r sig f) (ble_refl im)) im''
@@ -1402,16 +1406,10 @@ Section CONTRACT.
                             (* body can't be inlined *)
                             | None =>
                               (fun Heq5 =>
-                                 match (contract sig count e sub im) as anonymous'
-                                       return
-                                       (anonymous' = contract sig count e sub im ->
-                                        {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                                 match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                                  | existT  (e', count', im') bp =>
                                    (fun Heq =>
-                                      match (get_c x count') as anonymous'
-                                            return
-                                            (anonymous' = get_c x count' ->
-                                             {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                                      match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                                       | 0%nat =>
                                         fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
                                                  existT _ (e', count'', im') bp
@@ -1422,66 +1420,47 @@ Section CONTRACT.
                             end (eq_refl _))
                        | false =>
                          (fun Heq7 =>
-                            match (contract sig count e sub im) as anonymous'
-                                  return
-                                  (anonymous' = contract sig count e sub im ->
-                                   {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                            match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                             | existT  (e', count', im') bp =>
-                              (fun Heq8 =>
-                                 match (get_c x count') as anonymous'
-                                       return
-                                       (anonymous' = get_c x count' ->
-                                        {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                              (fun Heq =>
+                                 match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                                  | 0%nat =>
-                                   fun Heq9 => let count'' := dec_census_list sig (f::ys) count'  in
+                                   fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
                                             existT _ (e', count'', im') bp
                                  | _ =>
-                                   fun Heq10 => existT _ (Eletapp x f' t ys' e', count', im') bp
+                                   fun Heq7 => existT _ (Eletapp x f' t ys' e', count', im') bp
                                  end (eq_refl _))
                             end (eq_refl _))
                        end (eq_refl _))
                   | _ =>
                     (fun Heq2 =>
-                       match (contract sig count e sub im) as anonymous'
-                             return
-                             (anonymous' = contract sig count e sub im ->
-                              {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                       match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                        | existT  (e', count', im') bp =>
-                         (fun Heq11 =>
-                            match (get_c x count') as anonymous'
-                                  return
-                                  (anonymous' = get_c x count' ->
-                                   {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                         (fun Heq =>
+                            match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                             | 0%nat =>
-                              fun Heq12 => let count'' := dec_census_list sig (f::ys) count'  in
-                                        existT _ (e', count'', im') bp
+                              fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
+                                       existT _ (e', count'', im') bp
                             | _ =>
-                              fun Heq13 => existT _ (Eletapp x f' t ys' e', count', im') bp
+                              fun Heq7 => existT _ (Eletapp x f' t ys' e', count', im') bp
                             end (eq_refl _))
                        end (eq_refl _))
                   end (eq_refl _))
              | _ =>
                (fun Heq14 =>
-                  match (contract sig count e sub im) as anonymous'
-                        return
-                        (anonymous' = contract sig count e sub im ->
-                         {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                  match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                   | existT  (e', count', im') bp =>
-                    (fun Heq15 =>
-                       match (get_c x count') as anonymous'
-                             return
-                             (anonymous' = get_c x count' ->
-                              {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                    (fun Heq =>
+                       match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                        | 0%nat =>
-                         fun Heq16 => let count'' := dec_census_list sig (f::ys) count'  in
-                                   existT _ (e', count'', im') bp
+                         fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
+                                  existT _ (e', count'', im') bp
                        | _ =>
-                         fun Heq17 => existT _ (Eletapp x f' t ys' e', count', im') bp
+                         fun Heq7 => existT _ (Eletapp x f' t ys' e', count', im') bp
                        end (eq_refl _))
                   end (eq_refl _))
              end (eq_refl _))
         end (eq_refl _)
-
       | Eprim x f ys e=>
         match (get_c x count) return _ with
           | 0%nat =>
@@ -1697,9 +1676,9 @@ Section CONTRACT.
              end)
         end
       | Eletapp x f t ys e =>
-        match get_c x count as k return (k = get_c x count -> {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+        match get_c x count as k return (k = get_c x count -> contractT im) with
         | 0%nat =>
-          (* Delete the finding if its not used *)
+          (*  Delete the finding if its not used *)
           fun Heq0_1 =>
             let count' := dec_census_list sig (f::ys) count in
             contract sig count' e sub im
@@ -1709,21 +1688,15 @@ Section CONTRACT.
             let f' := apply_r sig f in
             let ys' := apply_r_list sig ys in
             (* check how many times the function is used *)
-            (match get_c f' count as anonymous'
-                   return
-                   (anonymous' = get_c f' count ->
-                    {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)})  with
+            (match get_c f' count as k return (k = get_c f' count -> contractT im)  with
              | 1%nat =>
                (fun Heq1 =>
                   match (M.get f' sub) as k return (k = M.get f' sub -> {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
                   | Some (SVfun t' xs e_body)  =>
                     (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
                     (fun Heqs1 =>
-                       match andb (Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im))) as anonymous'
-                             return
-                             (anonymous' =
-                              ((t' =? t)%positive && ((length ys =? length xs) && negb (get_b f' im)))%bool ->
-                              {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)})
+                       match andb (Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im))) as k
+                             return (k = ((t' =? t)%positive && ((length ys =? length xs) && negb (get_b f' im)))%bool -> contractT im)
                        with
                        | true =>
                          fun Heq2 => 
@@ -1731,15 +1704,22 @@ Section CONTRACT.
                            (* update counts of ys' and xs after setting f' to 0 *)
                            let count' := update_count_inlined ys' xs (M.set f' 0 count) in
                            let inl := inline_letapp e_body x in
-                           (match inl as inl' return (inl' = inl -> {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                           (match inl as inl' return (inl' = inl -> contractT im) with
                             (* body can be inlined *)
                             | Some (C_inl, x') =>
                               (fun Heq3 =>
-                                 match contract (set_list (combine xs ys') (M.set x x' sig)) count' (C_inl |[ e ]|)  sub im'
-                                       as anonymous'
-                                       return
-                                       (anonymous' = contract (set_list (combine xs ys') (M.set x x' sig)) count' (C_inl |[ e ]|)  sub im' ->
-                                        {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                                 let sig' := set_list (combine xs ys') sig in
+                                 (* x' is the variable holding the result of the inlined function.
+                                  * If the function ends with a tail call x' will be the same as x
+                                  * and it will bind the result of the last call (that will not be a tail call anymore
+                                  * If the function halts, x' will be the returned variable.
+                                  * In such case, x' can be either a fv or an argument of the function
+                                  * (in which case we should apply the sig' substitution) or a bound variable
+                                  * of the function, which is not affected by the substitution because
+                                  * of the unique ids assumption *)
+                                 let sig'' := M.set x (apply_r sig' x') sig' in
+                                 match contract sig'' count' (C_inl |[ e ]|) sub im'
+                                       as k return (k = contract sig'' count' (C_inl |[ e ]|)  sub im' -> contractT im) with
                                  | existT  (e', count', im'') bp =>  fun Heq4 => existT _ (e', count', im'')
                                                                                     (b_map_le_i_trans im (M.set (apply_r sig f) true im)
                                                                                                       (ble_add im im (apply_r sig f) (ble_refl im)) im''
@@ -1748,16 +1728,10 @@ Section CONTRACT.
                             (* body can't be inlined *)
                             | None =>
                               (fun Heq5 =>
-                                 match (contract sig count e sub im) as anonymous'
-                                       return
-                                       (anonymous' = contract sig count e sub im ->
-                                        {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                                 match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                                  | existT  (e', count', im') bp =>
                                    (fun Heq =>
-                                      match (get_c x count') as anonymous'
-                                            return
-                                            (anonymous' = get_c x count' ->
-                                             {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                                      match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                                       | 0%nat =>
                                         fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
                                                  existT _ (e', count'', im') bp
@@ -1768,61 +1742,43 @@ Section CONTRACT.
                             end (eq_refl _))
                        | false =>
                          (fun Heq7 =>
-                            match (contract sig count e sub im) as anonymous'
-                                  return
-                                  (anonymous' = contract sig count e sub im ->
-                                   {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                            match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                             | existT  (e', count', im') bp =>
-                              (fun Heq8 =>
-                                 match (get_c x count') as anonymous'
-                                       return
-                                       (anonymous' = get_c x count' ->
-                                        {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                              (fun Heq =>
+                                 match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                                  | 0%nat =>
-                                   fun Heq9 => let count'' := dec_census_list sig (f::ys) count'  in
+                                   fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
                                             existT _ (e', count'', im') bp
                                  | _ =>
-                                   fun Heq10 => existT _ (Eletapp x f' t ys' e', count', im') bp
+                                   fun Heq7 => existT _ (Eletapp x f' t ys' e', count', im') bp
                                  end (eq_refl _))
                             end (eq_refl _))
                        end (eq_refl _))
                   | _ =>
                     (fun Heq2 =>
-                       match (contract sig count e sub im) as anonymous'
-                             return
-                             (anonymous' = contract sig count e sub im ->
-                              {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                       match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                        | existT  (e', count', im') bp =>
-                         (fun Heq11 =>
-                            match (get_c x count') as anonymous'
-                                  return
-                                  (anonymous' = get_c x count' ->
-                                   {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                         (fun Heq =>
+                            match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                             | 0%nat =>
-                              fun Heq12 => let count'' := dec_census_list sig (f::ys) count'  in
-                                        existT _ (e', count'', im') bp
+                              fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
+                                       existT _ (e', count'', im') bp
                             | _ =>
-                              fun Heq13 => existT _ (Eletapp x f' t ys' e', count', im') bp
+                              fun Heq7 => existT _ (Eletapp x f' t ys' e', count', im') bp
                             end (eq_refl _))
                        end (eq_refl _))
                   end (eq_refl _))
              | _ =>
                (fun Heq14 =>
-                  match (contract sig count e sub im) as anonymous'
-                        return
-                        (anonymous' = contract sig count e sub im ->
-                         {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                  match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                   | existT  (e', count', im') bp =>
-                    (fun Heq15 =>
-                       match (get_c x count') as anonymous'
-                             return
-                             (anonymous' = get_c x count' ->
-                              {esir : exp * c_map * b_map & b_map_le_i im (let (_, y) := esir in y)}) with
+                    (fun Heq =>
+                       match (get_c x count') as k return (k = get_c x count' -> contractT im) with
                        | 0%nat =>
-                         fun Heq16 => let count'' := dec_census_list sig (f::ys) count'  in
-                                   existT _ (e', count'', im') bp
+                         fun Heq6 => let count'' := dec_census_list sig (f::ys) count'  in
+                                  existT _ (e', count'', im') bp
                        | _ =>
-                         fun Heq17 => existT _ (Eletapp x f' t ys' e', count', im') bp
+                         fun Heq7 => existT _ (Eletapp x f' t ys' e', count', im') bp
                        end (eq_refl _))
                   end (eq_refl _))
              end (eq_refl _))

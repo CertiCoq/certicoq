@@ -472,6 +472,11 @@ Definition update_stack : statement :=
   (* frame.next = sp *)
   (Efield (Evar frameIdent stackframeT) nextFld valPtr :::= Evar spIdent valPtr).
 
+(*reset the stack pointer after a call  *)
+Definition reset_stack : statement :=
+  (* sp = roots; *)
+  (spIdent ::= Evar rootIdent rootTPtr).
+
 Definition push_var (x : positive) :=
   (* */(unsigned long long **/) next = x  ;*)  
   Ederef (Evar spIdent valPtrPtr) valPtr :::= Eaddrof (var x) valPtr;
@@ -479,17 +484,13 @@ Definition push_var (x : positive) :=
   (* sp = sp + 1*)
   (spIdent ::= Ebinop Oadd (ptrptrVar spIdent) (c_int (Z.of_N 1) valPtr) valPtrPtr).
 
-Definition push_live_vars (vars: FVSet) (xs : list positive) : statement * nat :=
+Definition push_live_vars (xs : list positive) : statement * nat :=
   (fix aux xs no : statement * nat:=
      match xs with
      | nil => (Sskip, 0)
      | x :: xs =>
-       if PS.mem x vars then
-         let (stmt, no') := aux xs no in
-         (push_var x; stmt, 1 + no')
-       else
-         let (stmt, no') := aux xs no in
-         (Sskip; stmt, no') 
+       let (stmt, no') := aux xs no in
+       (push_var x; stmt, 1 + no')        
      end) xs 0.
 
 (* Discard the current function frame before a function returns or calls an other function *)
@@ -703,21 +704,18 @@ Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list 
   | _, _ => None
   end.
 
-Definition reserve_num (n : nat) (funInf : positive) (l : Z) (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) (live_vars : FVSet) (stack_vars : list positive) : option (statement * nat) :=
-  let (push, slots) := push_live_vars live_vars stack_vars in
-  let make_gc_stack :=
-      push ; update_stack
-  in
+Definition reserve_num (n : nat) (funInf : positive) (l : Z) (stack_vars : list positive) : statement * nat :=
+  let (push, slots) := push_live_vars stack_vars in
+  let make_gc_stack := push ; update_stack in
   let arr := (Evar funInf (Tarray uval l noattr)) in
-  if n =? 0 then ret (Sskip, 0) else 
-    match asgnAppVars'' (firstn nParam vs) (firstn nParam ind) fenv map , asgnFunVars' (firstn nParam vs) (firstn nParam ind) with
-    | Some bef , Some aft =>
-      Some (Sifthenelse
-              (!(Ebinop Ole (c_int (Z.of_nat n) val) (limitPtr -' allocPtr) type_bool))
-              (make_gc_stack; bef ; Scall None gc (arr :: tinf :: nil) ; allocIdent ::= Efield tinfd allocIdent valPtr ; aft)
-              Sskip, slots)
-    | _, _ => None
-    end.
+  if n =? 0 then (Sskip, 0) else 
+    ((Sifthenelse
+        (!(Ebinop Ole (c_int (Z.of_nat n) val) (limitPtr -' allocPtr) type_bool))
+        (make_gc_stack;
+         Scall None gc (arr :: tinf :: nil) ;
+         reset_stack;
+         allocIdent ::= Efield tinfd allocIdent valPtr)
+        Sskip), slots).
 
 Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_statements):=
   (isPtr caseIdent x;
@@ -830,16 +828,19 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
       let '(ls , ls', slots') := p in
     ret ((make_case_switch x ls ls'), slots')
   | Eletapp x f t vs e' =>
-    let fvs_post_call := (PS.inter loc_vars (exp_fv e')) in
+    (* find local live vars *)
+    let fvs_post_call := PS.inter (exp_fv e') loc_vars in
     let fvs := PS.remove x fvs_post_call in
-    let fvs_list := PS.elements fvs in 
+    let fvs_list := PS.elements fvs in
+    let fv_gc := if PS.mem x fvs_post_call then cons x nil else nil in
+    (* push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
     let '(make_stack, stack_vars', slots_call) :=
         match stack_vars with
-        | Some vars =>
-          let (push, slots) := push_live_vars vars fvs_list in
-          (push ; update_stack, Some (PS.union fvs vars), slots) (* push the vars that are not in the stack already *)
+        | Some _ =>
+          let (push, slots) := push_live_vars fvs_list in
+          (push ; update_stack, Some fvs, slots)
         | Option =>
-          let (push, slots) := push_live_vars PS.empty fvs_list in
+          let (push, slots) := push_live_vars fvs_list in
           (init_stack; push; update_stack, Some fvs, slots)
         end
     in
@@ -849,15 +850,16 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
     let pnum := min (N.to_nat (fst inf)) nParam in
     c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
     let alloc := max_allocs e' in
-    gc_call_s <- reserve_num alloc fun_inf (Z.of_N (l + 2)) fun_vars locs fenv map fvs_post_call [x];;
-    let (gc_call, slots_gc) := (gc_call_s : statement * nat) in
-    progn <- translate_body e' fenv cenv ienv map stack_vars' (slots + slots_call + slots_gc);;
+    (* Call GC after the call if needed *)
+    let (gc_call, slots_gc) := reserve_num alloc fun_inf (Z.of_N (l + 2)) fv_gc in
+    progn <- translate_body e' fenv cenv ienv map stack_vars' (max slots (slots_call + slots_gc));;
     ret ((asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
          make_stack;
          c;
          allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr;
          x ::= Field(args, Z.of_nat 1);
          gc_call;
+         reset_stack; (* SP point to the beginning of the current frame *)
          fst progn),
          snd progn)
   | Eproj x t n v e' =>

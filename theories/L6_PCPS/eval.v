@@ -58,6 +58,19 @@ Section EVAL.
         set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
         bstep_e rho'' e v c ->
         bstep_e rho (Eapp f t ys) v (c+1)  (* force equality on [t] *)
+  | BStep_letapp :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
+        (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
+        (t : ctor_tag) (ys : list var) (v v' : val) (c c' : nat),
+        (* evaluate application *)
+        M.get f rho = Some (Vfun rho' fl f') ->
+        get_list ys rho = Some vs ->
+        find_def f' fl = Some (t,xs,e_body) ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        bstep_e rho'' e_body v c -> (* body evaluates to v *)
+        (* evaluate let continuation *)
+        bstep_e (M.set x v rho) e v' c' ->
+        bstep_e rho (Eletapp x f t ys e) v' (c + c' + 1)  (* force equality on [t] *)
   | BStep_fun :
       forall (rho : env) (fl : fundefs) (e : exp) (v : val) (c : nat),
         bstep_e (def_funs fl fl rho rho) e v c ->
@@ -90,10 +103,8 @@ Section EVAL.
       | Some e => Ret e
     end.
 
-  (* TODO update function definitions with Letapp constructor and
-     remove comments *)
-
-  (* 
+(*
+  (* Zoe : How to write small step for letapp? *)
   Definition sstep_f (rho:env) (e:exp) : exception (env* exp) :=
     match e with
       | Eprim x f ys e' =>
@@ -120,9 +131,7 @@ Section EVAL.
         let rho' := def_funs fl fl rho rho in
         Ret (rho', e')
       | Ehalt x =>
-        (* Maybe fail? *)
         (exceptionMonad.Exc "Halt: can't step")
-      (* Ret (rho, Ehalt x) *)
       | Ecase y cl =>
         match M.get y rho with
           | Some (Vconstr t vs) =>
@@ -132,7 +141,23 @@ Section EVAL.
               else     (exceptionMonad.Exc "Case: consistency failure")
           | Some _ =>  (exceptionMonad.Exc "Case: arg is not a constructor")
           | None => (exceptionMonad.Exc "Case: arg not found")
-        end          
+        end
+      | Eletapp x f t ys e =>
+        (match (M.get f rho) with
+           | Some (Vfun rho' fl f') =>
+             do vs <- l_opt (get_list ys rho) ("App: failed to get args");
+               (match  find_def f' fl with
+                | Some (t', xs ,e_body) =>
+                  if (Pos.eqb t t') then
+                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
+                    Ret (rho'', e)
+                  else (exceptionMonad.Exc "Fun: tag check failed")
+              | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
+            end)
+           |  _ => (exceptionMonad.Exc "Fun: Bundle not found")
+         end)
+    end.
+
       | Eapp f t ys =>
         (match (M.get f rho) with
            | Some (Vfun rho' fl f') =>
@@ -148,7 +173,7 @@ Section EVAL.
            |  _ => (exceptionMonad.Exc "Fun: Bundle not found")
          end)
     end.
-
+*)
   (* Either fail with an Exn, runs out of fuel and return (Ret) inl of the current state or finish to evaluate and return inr of a val *)
   Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exception ((env * exp) + val) :=
     match n with
@@ -157,23 +182,23 @@ Section EVAL.
         ( match e with
             | Eprim x f ys e' =>
               do vs <- l_opt (get_list ys rho) ("Eprim: failed to get_list");
-            do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
-            do v <- l_opt (f' vs) ("Eprim: prim did not compute");
-            let rho' := M.set x v rho in
-            bstep_f rho' e' n'
+              do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
+              do v <- l_opt (f' vs) ("Eprim: prim did not compute");
+              let rho' := M.set x v rho in
+              bstep_f rho' e' n'
             | Econstr x t ys e' =>
               do vs <- l_opt (get_list ys rho) ("Econstr: failed to get args");
-            let rho' := M.set x (Vconstr t vs) rho in
-            bstep_f rho' e' n'
+              let rho' := M.set x (Vconstr t vs) rho in
+              bstep_f rho' e' n'
             | Eproj x t m y e' =>
               (match (M.get y rho) with
-                 | Some (Vconstr t' vs) =>
-                   if Pos.eqb t t' then
-                     do v <- l_opt (nthN vs m) ("Eproj: projection failed");
-                     let rho' := M.set x v rho in
-                     bstep_f rho' e' n'
-                   else (exceptionMonad.Exc "Proj: tag check failed")
-                 | _ => (exceptionMonad.Exc "Proj: var not found")
+               | Some (Vconstr t' vs) =>
+                 if Pos.eqb t t' then
+                   do v <- l_opt (nthN vs m) ("Eproj: projection failed");
+                   let rho' := M.set x v rho in
+                   bstep_f rho' e' n'
+                 else (exceptionMonad.Exc "Proj: tag check failed")
+               | _ => (exceptionMonad.Exc "Proj: var not found")
                end)
             | Efun fl e' =>
               let rho' := def_funs fl fl rho rho in
@@ -191,7 +216,25 @@ Section EVAL.
                   bstep_f rho e n'
                 else (exceptionMonad.Exc "Case: consistency failure")
                 | _ => (exceptionMonad.Exc "Case: branch not found")
-              end          
+              end
+            | Eletapp x f t ys e =>
+              (match (M.get f rho) with
+               | Some (Vfun rho' fl f') =>
+                 do vs <- l_opt (get_list ys rho) ("App: failed to get args");
+                   (match  find_def f' fl with
+                    | Some (t', xs ,e_body) =>
+                      if (Pos.eqb t t') then
+                        do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
+                        do v <- bstep_f rho'' e_body n';
+                        match v with
+                        | inl st => Ret (inl st)
+                        | inr v => bstep_f (M.set x v rho) e n'
+                        end
+                      else (exceptionMonad.Exc "Fun: tag check failed")
+                    | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
+                    end)
+               |  _ => (exceptionMonad.Exc "Fun: Bundle not found")
+               end)
             | Eapp f t ys =>
               (match (M.get f rho) with
                  | Some (Vfun rho' fl f') =>
@@ -234,6 +277,23 @@ Section EVAL.
       apply IHn in H. inv H.
       apply Peqb_true_eq in eqcc0. subst.
       exists x. econstructor; eauto.
+    - destruct (M.get v1 rho) eqn:gv0r; [| inv H].
+      destruct v2; [inv H| | inv H].
+      destruct (get_list l rho) eqn:glr; [| inv H].
+      destruct (find_def v2 f0) eqn:gv1f0; [| inv H].
+      destruct p. destruct p.
+      destruct (f =? f1)%positive eqn:ff1; [| inv H].
+      apply Peqb_true_eq in ff1. subst.
+      simpl in H.
+      destruct (set_lists l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H].
+      simpl in H. 
+      destruct (bstep_f t0 e0 n) as [ exc | [ oot | v' ] ] eqn:Heval; simpl.
+      + simpl in H. congruence.
+      + simpl in H. congruence.
+      + simpl in H.  
+        apply IHn in H. inv H.
+        apply IHn in Heval. inv Heval.        
+        eexists. eapply BStep_letapp; try eassumption.
     - apply IHn in H. inv H.
       exists x.
       constructor;
@@ -266,13 +326,7 @@ Section EVAL.
       inv H.
   Qed.
 
-  (* lexicographic on (n, size of e) 
-Theorem bstep_f_complete:
-  forall n rho e v,
-    bstep_e rho e v n -> 
-    exists m, bstep_f rho e m = Some v. *)
 
-*)
   Inductive find_tag_nth : list (ctor_tag * exp) -> ctor_tag -> exp -> nat -> Prop :=
   | find_tag_hd :
       forall c e l,
@@ -287,7 +341,6 @@ Theorem bstep_f_complete:
   (** Big step semantics with a more precise cost model.
    * The goal is that the number of machine instructions that
    * correspond to each rule is proportional to the assigned cost. *)
-
   Inductive bstep_cost :  env -> exp -> val -> nat -> Prop :=
   | BStepc_constr :
       forall (x : var) (t : ctor_tag) (ys :list var) (e : exp)
@@ -327,6 +380,19 @@ Theorem bstep_f_complete:
         set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
         bstep_cost rho'' e v c ->
         bstep_cost rho (Eapp f t ys) v (c + 1 + List.length ys)
+  | BStepc_letapp :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
+        (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
+        (t : ctor_tag) (ys : list var) (v v' : val) (c c' : nat),
+        (* evaluate application *)
+        M.get f rho = Some (Vfun rho' fl f') ->
+        get_list ys rho = Some vs ->
+        find_def f' fl = Some (t,xs,e_body) ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        bstep_cost rho'' e_body v c -> (* body evaluates to v *)
+        (* evaluate let continuation *)
+        bstep_cost (M.set x v rho) e v' c' ->
+        bstep_cost rho (Eletapp x f t ys e) v' (c + c' + 1 + List.length ys)  (* force equality on [t] *)
   | BStepc_fun :
       forall (rho : env) (B : fundefs) (e : exp) (v : val) (c : nat),
         bstep_cost (def_funs B B rho rho) e v c ->
@@ -372,15 +438,22 @@ Theorem bstep_f_complete:
     v1 = v2 /\ c1 = c2.
   Proof.
     intros Heval1 Heval2.
-    revert c2 Heval2; induction Heval1; intros c2 Heval2;
+    revert v2 c2 Heval2; induction Heval1; intros v2 c2 Heval2;
     inv Heval2; repeat subst_exp; eauto;
-    try now edestruct IHHeval1 as [Heq1 Heq2]; eauto.
-    eapply find_tag_nth_deterministic in H7; eauto; inv H7.
-    now edestruct IHHeval1 as [Heq1 Heq2]; eauto.
+      try now edestruct IHHeval1 as [Heq1 Heq2]; eauto.
+    + eapply IHHeval1 in H10. inv H10. split; congruence.
+    + eapply find_tag_nth_deterministic in H7; eauto; inv H7.
+      eapply IHHeval1 in H10. inv H10. split; congruence.
+    + eapply IHHeval1 in H13. inv H13. split; congruence.
+    + eapply IHHeval1_1 in H15. inv H15.
+      eapply IHHeval1_2 in H16. inv H16.
+      split; congruence.
   Qed.
 
+
   (** Small step semantics -- Relational definition *)
-  Inductive step: state -> state -> Prop := 
+  (* Zoe : How to write small step for letapp? *)
+  Inductive step: state -> state -> Prop :=
   | Step_constr: forall vs rho x t ys e,
                    get_list ys rho = Some vs ->
                    step (rho, Econstr x t ys e) (M.set x (Vconstr t vs) rho, e)
@@ -506,9 +579,13 @@ Theorem bstep_f_complete:
     v1 = v2 /\ c1 = c2.
   Proof.
     intros Heval1 Heval2.
-    revert c2 Heval2; induction Heval1; intros c2 Heval2;
+    revert v2 c2 Heval2; induction Heval1; intros v2 c2 Heval2;
     inv Heval2; repeat subst_exp; eauto.
-    split; f_equal; eapply IHHeval1; eauto. 
+    split; f_equal; eapply IHHeval1; eauto.
+
+    eapply IHHeval1_1 in H15. inv H15.
+    eapply IHHeval1_2 in H16. inv H16.
+    split; congruence. 
   Qed.
 
   Lemma step_deterministic:
@@ -568,6 +645,7 @@ Theorem bstep_f_complete:
     - destruct IHbstep_e. destruct H4. inv H4.
       exists x, x0. split; auto.
       econstructor 2. econstructor; eauto. auto.
+    - admit. (* No case for letapp *)
     - destruct IHbstep_e. destruct H0. destruct H0. exists x, x0.
       split; auto. econstructor 2.
       econstructor; eauto. auto.
@@ -577,7 +655,7 @@ Theorem bstep_f_complete:
     - exists rho, x.
       split; auto.
       constructor.
-  Qed.
+  Abort.
 
   Lemma mstep_then_bstep:
     forall s s',
@@ -604,10 +682,10 @@ Theorem bstep_f_complete:
     - do 2 (destruct H).
       eapply mstep_then_bstep; eauto.
     - destruct H. destruct s. simpl in H.
-      apply bstep_then_mstep in H. do 3 (destruct H).
-      exists (x0, Ehalt x1). split; auto.
-      constructor; auto.
-  Qed.      
+      (* apply bstep_then_mstep in H. do 3 (destruct H). *)
+      (* exists (x0, Ehalt x1). split; auto. *)
+      (* constructor; auto. *)
+  Abort.      
   
 End EVAL.
 

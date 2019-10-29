@@ -20,6 +20,10 @@ let rec coq_nat_of_int x =
   | 0 -> Datatypes.O
   | n -> Datatypes.S (coq_nat_of_int (pred n))
    
+let string_of_chars chars = 
+  let buf = Buffer.create 16 in
+  List.iter (Buffer.add_char buf) chars;
+  Buffer.contents buf
 
 (*
 let pcuic_size' a p =
@@ -68,5 +72,29 @@ let compile cps olevel gr =
      AllInstances.printProg (nenv,header) hstr;
      let time = (Unix.gettimeofday() -. time) in
      Feedback.msg_debug (str(Printf.sprintf "Printed to file in %f s.." time))
+  | Exc s ->
+     CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s)
+
+let show_l6 olevel gr = 
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let sigma, c = Evarutil.new_global sigma gr in
+  let const = match gr with
+    | Globnames.ConstRef c -> c
+    | _ -> CErrors.user_err ~hdr:"template-coq"
+       (Printer.pr_global gr ++ str" is not a constant definition") in
+  Feedback.msg_debug (str"Quoting");
+  let time = Unix.gettimeofday() in
+  let term = quote_term_rec env (EConstr.to_constr sigma c) in
+  let time = (Unix.gettimeofday() -. time) in
+  Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time));
+  let fuel = coq_nat_of_int 10000 in
+  let p = AllInstances.emit_L6_pre_cc fuel olevel term in
+  match p with
+  | Ret str ->
+     let l6f = (Names.KerName.to_string (Names.Constant.canonical const) ^ ".l6") in
+     let f = open_out l6f in
+     Printf.fprintf f "%s" (string_of_chars str);
+     close_out f;
   | Exc s ->
      CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s)

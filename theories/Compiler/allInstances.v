@@ -113,9 +113,14 @@ Definition emit_L6_pre_cc `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.pr
 
 Definition emit_L6_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
   : exceptionMonad.exception string :=
-  let opt := match opt_level with O => false | S O => true | _ => false end in
+  (* let opt := match opt_level with O => false | S O => true | _ => false end in *)
   do p' <- translateTo (cTerm certiL4) (Flag opt_level) p ;
-  do p'' <- L5_to_L6_anf opt p' ;
+  do p'' <- match opt_level with
+           | S 0 =>  L6_pipeline_pre_cc false p'
+           | S (S 0) => L6_pipeline_anf false p'
+           | S (S (S 0)) => L6_pipeline_anf true p'
+           | _ => L5_to_L6_anf false p'   
+           end;
   let '((_, cenv, nenv, _), (_, e)) := p'' in
   ret (cps_show.show_exp nenv cenv false e).
 

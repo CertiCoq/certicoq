@@ -30,6 +30,8 @@ Flags:
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 4).
 Definition demo1_cps := List.app (List.repeat true 5) (List.repeat false 4).
 
+CertiCoq Show L6 Opt 1 demo1.
+
 CertiCoq Compile ANF Opt 0 demo1.
 CertiCoq Compile Opt 0 demo1_cps.
 
@@ -40,11 +42,11 @@ Definition demo2_cps := List.map negb [true; false; true].
 CertiCoq Compile ANF Opt 0 demo2.
 CertiCoq Compile Opt 0 demo2_cps.
 
-Definition add := 10*10*10*7*2 + 4.
-Definition add_cps := 3 + 4.
+Definition add := 10*10*10*7*2*10 + 4.
+Definition add_cps := 10*10*10*7*2*10 + 4.
 
-CertiCoq Compile ANF Opt 0 add.
 CertiCoq Compile Opt 0 add_cps.
+CertiCoq Compile ANF Opt 0 add.
 
 
 (* Definition lala := List.map (fun x => 1 + x) (List.repeat 10 10000). *)
@@ -66,26 +68,59 @@ Fixpoint list_add y z w l : nat :=
 
 Fixpoint loop n (f : Datatypes.unit -> nat) : nat :=
   match n with
-  | 0%nat => f tt + 1
+  | 0%nat => f tt
   | S n => f tt + loop n f
   end.
     
 (* Definition clos := (loop 3 (fun _ => list_add (* 0 0 0 *) (List.repeat 2%nat 3))%nat). *)
 (* Definition clos_old := (loop 3 (fun _ => list_add (* 0 0 0 *) (List.repeat 2%nat 3))%nat). *)
 
-
+(* XXX weird performance *)
+(* 
 Definition clos_loop (u : unit) : nat :=
-  (fix list_add y z w l : nat :=
+  (fix list_add y z w u k m n k1 k2 k3 k4 k5 l : nat :=
      match l with
      | [] => 0
      | x::xs =>
-       let clos z := y + z + w + z in
-       (clos x) + (clos x) + list_add y z w xs
-     end) 1 3 5 (List.repeat 6 (50*10*10)).
+       let clos z := x + z + w + u + k + m + n + y + k1 + k2 + k3 + k4 + k5 in
+       (clos x) + (clos 0) + list_add y z w u k m n k1 k2 k3 k4 k5 xs
+     end) 0 0 0 0 0 0 0 0 0 0 0 0 (List.repeat 0 (100*1000)).
+Definition clos := loop (100*10) clos_loop.
+*)
+
+(* Definition clos_loop (u : unit) : nat := *)
+(*   (fix list_add y z w u k l : nat := *)
+(*      match l with *)
+(*      | [] => 0 *)
+(*      | x::xs => *)
+(*        let clos z := x + z + w + u + k  in *)
+(*        (clos x) + (clos 0) + list_add y z w u k xs *)
+(*      end) 0 0 0 0 0 (List.repeat 0 (100*1000)). *)
+
+Definition clos_loop (u : unit) : nat :=
+  (fix list_add y z w u k m n k1 k2 k3 k4 k5 l : nat :=
+     match l with
+     | [] => 0
+     | x::xs =>
+       let clos z := x + z + w + u + k + m + n + y + k1 + k2 + k3 + k4 + k5 in
+       (clos x) + list_add y z w u k m n k1 k2 k3 k4 k5 xs
+     end) 0 0 0 0 0 0 0 0 0 0 0 0 (List.repeat 0 (100*1000)).
+
+
+
+(* Fixpoint loop n (f : unit -> nat) : nat := *)
+(*   match n with *)
+(*   | 0 => f tt *)
+(*   | S n => f tt + loop n f *)
+(*   end. *)
     
-Definition clos := loop (10*10) clos_loop.
-Definition clos_opt := loop (10*10) clos_loop.
-Definition clos_old := loop (10*10) clos_loop.
+Definition clos := loop (100*10) clos_loop.
+Definition clos_opt := loop (100*10) clos_loop.
+Definition clos_old := loop (100*10) clos_loop.
+
+(* Definition clos := loop (100*100*10) clos_loop. *)
+(* Definition clos_opt := loop (100*100*10) clos_loop. *)
+(* Definition clos_old := loop (100*100*10) clos_loop. *)
 
 (* Definition res := Eval native_compute in clos. *)
 
@@ -136,6 +171,8 @@ Definition is_valid_old :=
   | Valid => true
   | _ => false
   end.
+
+(* CertiCoq Show L6 Opt 0 is_valid. *)
 
 Time CertiCoq Compile ANF Opt 0 is_valid. (* 5 secs ! *)
 

@@ -89,7 +89,7 @@ let show_l6 olevel gr =
   let time = (Unix.gettimeofday() -. time) in
   Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time));
   let fuel = coq_nat_of_int 10000 in
-  let p = AllInstances.emit_L6_pre_cc fuel olevel term in
+  let p = AllInstances.emit_L6_anf fuel olevel term in
   match p with
   | Ret str ->
      let l6f = (Names.KerName.to_string (Names.Constant.canonical const) ^ ".l6") in

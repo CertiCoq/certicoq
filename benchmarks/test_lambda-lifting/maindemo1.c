@@ -4,9 +4,9 @@
 #include "tests.demo1.h"
 #include "utils.c"
 
+extern void body(struct thread_info *);
+
 extern value args[];
-
-
 
 /* OS: not generated */	       
 void nat_elim(value nat){

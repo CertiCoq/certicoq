@@ -293,7 +293,7 @@ Section UNCURRY.
            | Efun (Fcons g gt gvs ge Fnil)
                   (Ehalt g') =>
              g_unc <- (already_uncurried g) ;;
-             if eq_var g g' && negb g_unc  && negb (occurs_in_exp g ge) 
+             if eq_var g g' && negb g_unc && negb (occurs_in_exp g ge)
              then               
                (* log_msg (f_str ++ " is uncurried" ) ;; *)
                gvs' <- get_names_lst gvs "" ;;
@@ -311,17 +311,22 @@ Section UNCURRY.
                ret (Fcons f f_ft fvs'
                           (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
                                 (Ehalt g))
-                          (Fcons f' fp_ft (gvs ++ fvs) ge
-                                 (* redefine g here so we can call g *)
-                                 (* (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)                                        *)
-                                 (*       ge) *)
-                                 fds1'))
+                          (Fcons f' fp_ft (gvs ++ fvs) ge fds1'))
+               (* Zoe : The above misses some opportunities for uncurrying when the recursion is
+                * "nested" in some inner argument. Example from Coq:
+                  Definition filter (A : Type) (P : A -> bool) := fix aux (l : list A) := ...
 
-               (* Previous strategy that requires ~ g \in  ge *)
+                  For this we need to lift the constraint that negb (occurs_in_exp g ge) by 
+                  redefining the g wrapper inside f'. This however messes up the uncurring
+                  pattern for the inner args, so we need to do this in two stages
+                *)
                (* ret (Fcons f f_ft fvs' *)
-               (*            (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil) *)
-               (*                  (Ehalt g)) *)
-               (*            (Fcons f' fp_ft (gvs ++ fvs) ge fds1')) *)
+               (*            (Efun (Fcons g'' gt gvs'' (Eapp f' fp_ft (gvs'' ++ fvs')) Fnil) *)
+               (*                  (Ehalt g'')) *)
+               (*            (Fcons f' fp_ft (gvs ++ fvs) ge *)
+               (*                   (* redefine g in this block here so we can call it from ge *) *)
+               (*                   (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil))) *)
+               (* fds1' *)
              else
                (* log_msg (f_str ++ " is not uncurried (candidate)" ) ;; *)
                fe' <- uncurry_exp_anf fe ;;

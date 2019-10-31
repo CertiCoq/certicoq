@@ -48,23 +48,17 @@ Extract Constant AstCommon.timePhase =>
 (* T2 : Time each phase 10 times, print average to debug 
 debug: Feedback.msg_debug (Pp.str (Printf.sprintf ""%f""  (Unix.gettimeofday() -. time)));   *)
 
-(* Extract Constant AstCommon.timePhase => *)
-(* "(fun c x -> let time = Unix.gettimeofday() in *)
-(*              let temp = ref (x ()) in *)
-(*              for i = 2 to 10 do  *)
-(*               temp := x () *)
-(*              done; *)
-(*              let time = ((Unix.gettimeofday() -. time) /. 10.) in *)
-(*               Feedback.msg_debug (Pp.str (Printf.sprintf ""Average time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time)); *)
-(*               !temp)". *)
-
-
-
-
-
-
-                                
-        
+(*
+Extract Constant AstCommon.timePhase =>
+"(fun c x -> let time = Unix.gettimeofday() in
+             let temp = ref (x ()) in
+             for i = 2 to 10 do
+              temp := x ()
+             done;
+             let time = ((Unix.gettimeofday() -. time) /. 10.) in
+              Feedback.msg_debug (Pp.str (Printf.sprintf ""Average time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
+              !temp)".
+*)
 
 (* TEMP STUFF *)
 (* OS: This is now defined in allInstances

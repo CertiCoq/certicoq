@@ -4,7 +4,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 Import ListNotations.
 Require Import Coq.Strings.String.
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
-From CertiCoq.L6 Require Import cps cps_util List_util size_cps.
+From CertiCoq.L6 Require Import cps List_util size_cps ctx cps_util.
 
 
 
@@ -413,11 +413,75 @@ Section EVAL.
         M.get x rho = Some v ->
         bstep_cost rho (Ehalt x) v 1.
 
+  (** * Interpretation of (certain) evaluation contexts as environments *)
+
+  (* TODO move to more appropriate file *)
+
+  Inductive ctx_to_rho : exp_ctx -> env -> env -> Prop :=
+  | Hole_c_to_rho :
+      forall rho,
+        ctx_to_rho Hole_c rho rho
+  | Eproj_c_to_rho :
+      forall rho rho' t y N Γ C vs v,
+        M.get Γ rho = Some (Vconstr t vs) ->
+        nthN vs N = Some v ->
+        ctx_to_rho C (M.set y v rho) rho' ->
+        ctx_to_rho (Eproj_c y t N Γ C) rho rho'
+  | Econstr_c_to_rho :
+      forall rho rho' x t ys C vs,
+        get_list ys rho = Some vs ->
+        ctx_to_rho C (M.set x (Vconstr t vs) rho) rho' ->
+        ctx_to_rho (Econstr_c x t ys C) rho rho'.
+
+
+  (** * Lemmas about [ctx_to_rho] *)
+
+  Lemma ctx_to_rho_comp_ctx_l C C1 C2 rho rho' :
+    ctx_to_rho C rho rho' ->
+    comp_ctx C1 C2 C ->
+    exists rho'',
+      ctx_to_rho C1 rho rho'' /\
+      ctx_to_rho C2 rho'' rho'.
+  Proof.
+    intros Hctx. revert C1 C2.
+    induction Hctx; intros C1 C2 Hcomp.
+    - inv Hcomp. eexists; split; constructor.
+    - inv Hcomp.
+      + edestruct IHHctx as [rho'' [H1 H2]].
+        constructor. inv H1.
+        eexists; split. constructor.
+        econstructor; eauto.
+      + edestruct IHHctx as [rho'' [H1 H2]]. eassumption.
+        eexists; split. econstructor; eauto.
+        eassumption.
+    - inv Hcomp.
+      + edestruct IHHctx as [rho'' [H1 H2]].
+        constructor. inv H1.
+        eexists; split. constructor.
+        econstructor; eauto.
+      + edestruct IHHctx as [rho'' [H1 H2]]. eassumption.
+        eexists; split. econstructor; eauto.
+        eassumption.
+  Qed.
+
+  Lemma ctx_to_rho_comp_ctx_f_r C1 C2 rho1 rho2 rho3 :
+    ctx_to_rho C1 rho1 rho2 ->
+    ctx_to_rho C2 rho2 rho3 ->
+    ctx_to_rho (comp_ctx_f C1 C2) rho1 rho3.
+  Proof.
+    revert C2 rho1 rho2 rho3.
+    induction C1; intros C2 rho1 rho2 rho3 Hctx1 GHctx2; inv Hctx1.
+    - eassumption.
+    - simpl; econstructor; eauto. 
+    - simpl; econstructor; eauto.
+  Qed.
+
+
 
   Ltac subst_exp :=
     match goal with
-      | [H1 : ?e = ?e1, H2 : ?e = ?e2 |- _ ] =>
-        rewrite H1 in H2; inv H2
+    | [H1 : ?e = ?e1, H2 : ?e = ?e2 |- _ ] =>
+      rewrite H1 in H2; inv H2
     end.
 
   Lemma find_tag_nth_deterministic l c e n e' n' :

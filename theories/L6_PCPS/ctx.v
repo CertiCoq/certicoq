@@ -478,7 +478,7 @@ with comp_f_ctx_f_Hole_c f :
        comp_f_ctx_f f Hole_c = f.
 Proof.
   - destruct C; simpl; eauto;
-    try (rewrite comp_ctx_f_Hole_c; reflexivity). 
+      try (rewrite comp_ctx_f_Hole_c; reflexivity). 
     rewrite comp_f_ctx_f_Hole_c. reflexivity.
   - destruct f; simpl; eauto.
     rewrite comp_ctx_f_Hole_c; reflexivity.

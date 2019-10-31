@@ -16,6 +16,8 @@ Ltac subst_exp :=
 
 Ltac tci := eauto with typeclass_instances.
 
+Ltac sets := eauto with Ensembles_DB functions_BD.
+
 Ltac destructAll :=
   match goal with
     | [ H : _ /\ _ |- _] => destruct H; destructAll

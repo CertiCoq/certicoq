@@ -8,8 +8,10 @@ From CertiCoq.Common Require Import certiClasses certiClassesLinkable classes Ra
 Require Import Coq.Unicode.Utf8 Coq.Strings.String.
 
 Require Import ZArith.
-From CertiCoq.L6 Require Import cps cps_util state eval shrink_cps L4_to_L6_anf L5_to_L6 beta_contraction uncurry closure_conversion
-     closure_conversion hoisting dead_param_elim lambda_lifting.
+From CertiCoq Require Import
+     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L5_to_L6
+     L6.beta_contraction L6.uncurry L6.closure_conversion
+     L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 (* From CertiCoq.L7 Require Import L6_to_Clight. *)
 Require Import ExtLib.Structures.Monad.
 

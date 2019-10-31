@@ -17,7 +17,7 @@
 (** In-memory representation of values. *)
 
 Require Import Coqlib.
-Require Archi.
+Require x86_64.Archi.
 Require Import AST.
 Require Import Integers.
 Require Import Floats.

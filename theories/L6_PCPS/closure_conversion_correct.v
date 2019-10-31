@@ -142,20 +142,22 @@ Section Closure_conversion_correct.
     boundL k e1 rho1 c1 c2.
   
   (** Invariant about the values of free variables. *)
-  Definition closure_env k rho Scope Funs vs FVs : Prop :=
+  Definition closure_env k rho Scope Funs GFuns vs FVs : Prop :=
     forall (x : var) N (v : val),
       ~ In _ Scope x ->
-      ~ In _ Funs x -> 
+      ~ In _ Funs x ->
+      ~ In _ GFuns x -> 
       nthN FVs N = Some x ->
       M.get x rho = Some v ->
       exists (v' : val),  nthN vs N = Some v' /\
                      cc_approx_val pr cenv clo_tag k boundG v v'.
   
   (** Invariant about the free variables *) 
-  Definition FV_inv k rho rho' Scope Funs c Γ FVs : Prop :=
+  Definition FV_inv k rho rho' Scope Funs GFuns c Γ FVs : Prop :=
     forall (x : var) N (v : val),
       ~ In _ Scope x ->
-      ~ In _ Funs x -> 
+      ~ In _ Funs x ->
+      ~ In _ GFuns x -> 
       nthN FVs N = Some x ->
       M.get x rho = Some v ->
       exists (vs : list val) (v' : val),
@@ -177,7 +179,22 @@ Section Closure_conversion_correct.
         cc_approx_val pr cenv clo_tag k boundG
                       (Vfun rho1 B1 f1)
                       (Vconstr clo_tag [(Vfun rho2 B2 f2) ; (Vconstr c vs)]).
-  
+
+  (** Invariant about the functions in the current function definition *)
+  Definition GFun_inv k (rho rho' : env) Scope Funs GFuns σ c : Prop :=
+    forall f v,
+      ~ In _ Scope f ->
+      ~ In var Funs f ->
+      In var GFuns f ->
+      M.get f rho = Some v  ->
+      exists rho1 B1 f1 rho2 B2 f2,
+        v = (Vfun rho1 B1 f1) /\
+        ~ In _ Scope (σ f) /\ (* Check if needed *)
+        M.get (σ f) rho' = Some (Vfun rho2 B2 f2) /\
+        cc_approx_val pr cenv clo_tag k boundG
+                      (Vfun rho1 B1 f1)
+                      (Vconstr clo_tag [(Vfun rho2 B2 f2) ; (Vconstr c [])]).
+
 
   (** * Lemmas about Fun_inv *)
 
@@ -466,12 +483,12 @@ Section Closure_conversion_correct.
   (** * Lemmas about FV_inv *)
 
   (** Extend the first environment with a variable in [Scope] *)
-  Lemma FV_inv_set_In_Scope_l k rho rho' x v Scope Funs FVs c Γ :
+  Lemma FV_inv_set_In_Scope_l k rho rho' x v Scope Funs GFuns FVs c Γ :
     In var Scope x ->
-    FV_inv k rho rho' Scope Funs c Γ FVs ->
-    FV_inv k (M.set x v rho) rho' Scope Funs c Γ FVs.
+    FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
+    FV_inv k (M.set x v rho) rho' Scope Funs GFuns c Γ FVs.
   Proof.
-    intros Hin HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    intros Hin HInv x' N v' Hnin1 Hnin2 Hnin3 Hnth Hget.
     edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
     rewrite M.gso in Hget. now eauto.
     intros Hc; subst. now eauto.
@@ -479,25 +496,25 @@ Section Closure_conversion_correct.
   
   (** Extend the second environment with a variable in [Scope] that is not [Γ].
     XXX : deprecated. See [FV_inv_set_r] *)
-  Lemma FV_inv_set_In_Scope_r k rho rho' x v Scope Funs FVs c Γ :
+  Lemma FV_inv_set_In_Scope_r k rho rho' x v Scope Funs GFuns FVs c Γ :
     In var Scope x ->
     x <> Γ ->
-    FV_inv k rho rho' Scope Funs c Γ FVs ->
-    FV_inv k rho (M.set x v rho') Scope Funs c Γ FVs.
+    FV_inv k rho rho' Scope GFuns Funs c Γ FVs ->
+    FV_inv k rho (M.set x v rho') Scope GFuns Funs c Γ FVs.
   Proof.
-    intros Hin Hneq HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    intros Hin Hneq HInv x' N v' Hnin1 Hnin2 Hnin3 Hnth Hget.
     edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
     repeat eexists; eauto.
     now rewrite M.gso; eauto.
   Qed.
 
   (** Extend the first environment with a variable not in [FVs] *)
-  Lemma FV_inv_set_not_In_FVs_l k rho rho' x v Scope Funs c Γ FVs :
+  Lemma FV_inv_set_not_In_FVs_l k rho rho' x v Scope Funs GFuns c Γ FVs :
     ~ List.In x FVs ->
-    FV_inv k rho rho' Scope Funs c Γ FVs ->
-    FV_inv k (M.set x v rho) rho' Scope Funs c Γ FVs.
+    FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
+    FV_inv k (M.set x v rho) rho' Scope Funs GFuns c Γ FVs.
   Proof.
-    intros Hnin HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    intros Hnin HInv x' N v' Hnin1 Hnin2 Hnin3 Hnth Hget.
     edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
     rewrite M.gso in Hget. now eauto. intros Hc. subst.
     eapply nthN_In in Hnth.
@@ -505,35 +522,35 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Extend the second environment with a variable that is not [Γ] *)
-  Lemma FV_inv_set_r k rho rho' x v Scope Funs c Γ FVs :
+  Lemma FV_inv_set_r k rho rho' x v Scope Funs GFuns c Γ FVs :
     x <> Γ ->
-    FV_inv k rho rho' Scope Funs c Γ FVs ->
-    FV_inv k rho (M.set x v rho') Scope Funs c Γ FVs.
+    FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
+    FV_inv k rho (M.set x v rho') Scope Funs GFuns c Γ FVs.
   Proof.
-    intros Hneq HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    intros Hneq HInv x' N v' Hnin1 Hnin2 Hnin3 Hnth Hget.
     edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
     repeat eexists; eauto. 
     rewrite M.gso. now eauto. congruence.
   Qed.
   
   (** Extend the [Scope]. TODO : replace with monotonicity property? *)
-  Lemma FV_inv_extend_Scope k rho rho' Scope Funs c Γ FVs x :
-    FV_inv k rho rho' Scope Funs c Γ FVs ->
-    FV_inv k rho rho' (Union _ (Singleton _ x) Scope) Funs c Γ FVs.
+  Lemma FV_inv_extend_Scope k rho rho' Scope GFuns Funs c Γ FVs x :
+    FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
+    FV_inv k rho rho' (Union _ (Singleton _ x) Scope) Funs GFuns c Γ FVs.
   Proof.
     intros HInv x' N v' Hnin1 Hnin2 Hnth Hget. eapply HInv; eauto.
   Qed.
   
   (** Define a block of functions in both environments and put the in the
     current scope *)
-  Lemma FV_inv_def_funs k rho rho' B1 B1' B2 B2' Scope Funs c Γ FVs:
+  Lemma FV_inv_def_funs k rho rho' B1 B1' B2 B2' Scope Funs GFuns c Γ FVs:
     ~ In _ (name_in_fundefs B1') Γ ->
     ~ In _ (name_in_fundefs B2') Γ ->
-    FV_inv k rho rho' Scope Funs c Γ FVs ->
+    FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k  (def_funs B1 B1' rho rho) (def_funs B2 B2' rho' rho')
-           (Union _ (name_in_fundefs B1') Scope) Funs c Γ FVs.
+           (Union _ (name_in_fundefs B1') Scope) Funs GFuns c Γ FVs.
   Proof.
-    intros Hnin Hnin' HInv x' N v' Hnin1 Hnin2 Hnth Hget.
+    intros Hnin Hnin' HInv x' N v' Hnin1 Hnin2 Hnin3 Hnth Hget.
     edestruct HInv as [vs [v1 [Hget' [Hnth' Hcc]]]]; eauto.
     now rewrite def_funs_neq in Hget; eauto.
     repeat eexists; eauto. now rewrite def_funs_neq.
@@ -541,29 +558,41 @@ Section Closure_conversion_correct.
 
     (** * Lemmas about the existance of the interpretation of an evaluation context *)
 
-  Lemma project_var_ctx_to_rho Scope Funs σ c Γ FVs x x' C S S' v1 k rho1 rho2 :
-    project_var clo_tag Scope Funs σ c Γ FVs S x x' C S' ->
-    FV_inv k rho1 rho2 Scope Funs c Γ FVs ->
+  Lemma project_var_ctx_to_rho Scope Funs GFuns σ c Γ FVs x x' C S S' v1 k rho1 rho2 :
+    Disjoint _ S (image σ GFuns) ->
+    project_var clo_tag Scope Funs GFuns σ c Γ FVs S x x' C S' ->
+    FV_inv k rho1 rho2 Scope Funs GFuns c Γ FVs ->
     Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
+    GFun_inv k rho1 rho2 Scope Funs GFuns σ c ->
     M.get x rho1 = Some v1 ->
     exists rho2', ctx_to_rho C rho2 rho2'.
   Proof.
-    intros Hproj HFV HFun Hget. inv Hproj.
+    intros Hg Hproj HFV HFun HGfun Hget. inv Hproj.
     - eexists; econstructor; eauto.
     - edestruct HFun as
           [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
       eexists; econstructor; eauto.
+      simpl. rewrite Hget2. rewrite Hget1. reflexivity.
+      constructor.
+    - edestruct HGfun as
+          [rho3 [B3 [f3 [rho4 [B4 [f4 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]; eauto.
+      eexists; econstructor; eauto. reflexivity. 
+      subst. econstructor.
+      simpl. rewrite M.gso, Hget2.
+      rewrite M.gss. reflexivity.
+      intros Hc; subst. eapply Hg. constructor.
+      now eapply H3. eapply In_image. eassumption. 
       constructor.
     - edestruct HFV as [vs [v [Hget' [Hnth' Hcc]]]]; eauto.
       eexists. econstructor; eauto. constructor. 
   Qed.
 
-  Lemma make_closures_ctx_to_rho B S c Γ C σ S' k rho1 rho2 :
-    make_closures clo_tag B S Γ C σ S' ->
+  Lemma make_closures_ctx_to_rho B S c Γ C σ σ' S' k rho1 rho2 :
+    make_closures clo_tag B S Γ σ C σ' S' ->
     unique_functions B ->
     Disjoint _ S (name_in_fundefs B) ->
     ~ In _ (name_in_fundefs B) Γ ->
-    Fun_inv k rho1 rho2 (Empty_set _) (name_in_fundefs B) σ c Γ ->
+    Fun_inv k rho1 rho2 (Empty_set _) (name_in_fundefs B) σ' c Γ ->
     (forall f, In _ (name_in_fundefs B) f -> exists v, M.get f rho1 = Some v) ->
     exists rho2', ctx_to_rho C rho2 rho2'.
   Proof.
@@ -595,10 +624,11 @@ Section Closure_conversion_correct.
         intros Hc; subst; contradiction.
       + intros. eapply Hyp. right; eauto.
       + eexists. econstructor; eauto.
-        now rewrite <-  H0, extend_gss in Hget2; eauto.
+        rewrite <-  H0, extend_gss in Hget2; eauto.
+        simpl. rewrite Hget1, Hget2. reflexivity.
   Qed.
   
-  Lemma project_vars_ctx_to_rho Scope Funs σ c Γ FVs xs xs' C S S' vs1 k rho1 rho2 :
+  Lemma project_vars_ctx_to_rho Scope Funs GFuns σ c Γ FVs xs xs' C S S' vs1 k rho1 rho2 :
     Disjoint _ S (Union var Scope
                         (Union var (image σ (Setminus _ Funs Scope))
                                (Union var (FromList FVs) (Singleton var Γ)))) ->

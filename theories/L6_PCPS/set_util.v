@@ -4,8 +4,8 @@
 
 From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
      Relations.Relations Lists.List Lists.SetoidList Permutation Omega.
-Require Import compcert.lib.Coqlib.
-From CertiCoq.L6 Require Import tactics Ensembles_util List_util functions.
+Require Import compcert.lib.Coqlib L6.tactics.
+From CertiCoq.L6 Require Import Ensembles_util List_util functions.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 

@@ -31,7 +31,7 @@ Require Import Axioms.
 Require Import Coqlib.
 Require Intv.
 Require Import Maps.
-Require Archi.
+Require x86_64.Archi.
 Require Import AST.
 Require Import Integers.
 Require Import Floats.

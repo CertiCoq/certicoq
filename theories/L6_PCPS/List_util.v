@@ -8,7 +8,7 @@ From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
          Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
          FunInd.
 
-From CertiCoq.L6 Require Import Ensembles_util tactics.
+From CertiCoq Require Import L6.Ensembles_util L6.tactics. 
 
 Import ListNotations.
 

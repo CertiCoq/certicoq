@@ -3,7 +3,8 @@
  *)
 
 From Coq Require Import Arith.Arith NArith.BinNat Lists.List omega.Omega.
-From CertiCoq.L6 Require Import cps tactics set_util.
+Require Import L6.tactics.
+From CertiCoq.L6 Require Import cps set_util.
 Require Import ExtLib.Structures.Monad.
 
 Import MonadNotation.

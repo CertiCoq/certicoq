@@ -22,7 +22,7 @@ Require Import Integers.
 Require Import Binary Bits Core.
 Require Import Fappli_IEEE_extra.
 Require Import Program.
-Require Archi.
+Require x86_64.Archi.
 
 Close Scope R_scope.
 

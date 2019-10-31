@@ -9,7 +9,7 @@ Require Import Coq.Unicode.Utf8 Coq.Strings.String.
 
 Require Import ZArith.
 From CertiCoq.L6 Require Import cps cps_util state eval shrink_cps L4_to_L6_anf L5_to_L6 beta_contraction uncurry closure_conversion
-     closure_conversion2 hoisting dead_param_elim lambda_lifting.
+     closure_conversion hoisting dead_param_elim lambda_lifting.
 (* From CertiCoq.L7 Require Import L6_to_Clight. *)
 Require Import ExtLib.Structures.Monad.
 
@@ -125,48 +125,48 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
   | Fnil => names
   end.
 
-Definition L6_pipeline_old (e : cTerm certiL5) : exceptionMonad.exception (cTerm certiL6) :=
-  let (venv, vt) := e in
-  match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag (venv, vt)) with
-  | Some r =>
-    let '(c_env, n_env, f_env, next_ctor_tag, next_ind_tag, e) := r in
-    (* make compilation state *)
-    let c_data :=
-        let next_var := ((identifiers.max_var e 1) + 1)%positive in
-        let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) f_env 1 + 1 in
-        pack_data next_var next_ctor_tag next_ind_tag next_fun_tag c_env f_env n_env nil
-    in
-    let res : error (exp * comp_data):= (* uncurring *)
-        let '(e_err, s, c_data) := uncurry_fuel_cps 100 (shrink_cps.shrink_top e) c_data in
-        (* (* inlining *) *)
-        e <- e_err ;;
-        let (e_err, c_data) := inline_uncurry e s 10 10 c_data in
-        e <- e_err ;;
-        (* Shrink reduction *)
-        let e := shrink_cps.shrink_top e in
-        let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
-        let '(cenv', names', e) :=
-            closure_conversion.closure_conversion_hoist bogus_closure_tag e ctag itag cenv names in
-        let c_data :=
-            let next_var := ((identifiers.max_var e 1) + 1)%positive in
-            pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv') fenv names' log
-        in
-        (* Shrink reduction *)
-        let e := shrink_cps.shrink_top e in
-        (* Dead parameter elimination *)
-        let e := dead_param_elim.eliminate e in
-        (* Shrink reduction *)
-        ret (shrink_cps.shrink_top e, c_data)
-    in
-    match res with
-    | Err s =>
-      exceptionMonad.Exc ("failed converting from L5 to L6 (anf) : " ++ s)%string
-    | Ret (e, c_data) =>
-      exceptionMonad.Ret
-        ((M.empty _ ,  state.cenv c_data, state.nenv c_data, state.fenv c_data), (M.empty _, e))
-    end
-  | None => exceptionMonad.Exc "failed converting from L5 to L6"
-  end.
+(* Definition L6_pipeline_old (e : cTerm certiL5) : exceptionMonad.exception (cTerm certiL6) := *)
+(*   let (venv, vt) := e in *)
+(*   match AstCommon.timePhase "L5 to L6" (fun (_:Datatypes.unit) => convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag (venv, vt)) with *)
+(*   | Some r => *)
+(*     let '(c_env, n_env, f_env, next_ctor_tag, next_ind_tag, e) := r in *)
+(*     (* make compilation state *) *)
+(*     let c_data := *)
+(*         let next_var := ((identifiers.max_var e 1) + 1)%positive in *)
+(*         let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) f_env 1 + 1 in *)
+(*         pack_data next_var next_ctor_tag next_ind_tag next_fun_tag c_env f_env n_env nil *)
+(*     in *)
+(*     let res : error (exp * comp_data):= (* uncurring *) *)
+(*         let '(e_err, s, c_data) := uncurry_fuel_cps 100 (shrink_cps.shrink_top e) c_data in *)
+(*         (* (* inlining *) *) *)
+(*         e <- e_err ;; *)
+(*         let (e_err, c_data) := inline_uncurry e s 10 10 c_data in *)
+(*         e <- e_err ;; *)
+(*         (* Shrink reduction *) *)
+(*         let e := shrink_cps.shrink_top e in *)
+(*         let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in *)
+(*         let '(cenv', names', e) := *)
+(*             closure_conversion.closure_conversion_hoist bogus_closure_tag e ctag itag cenv names in *)
+(*         let c_data := *)
+(*             let next_var := ((identifiers.max_var e 1) + 1)%positive in *)
+(*             pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv') fenv names' log *)
+(*         in *)
+(*         (* Shrink reduction *) *)
+(*         let e := shrink_cps.shrink_top e in *)
+(*         (* Dead parameter elimination *) *)
+(*         let e := dead_param_elim.eliminate e in *)
+(*         (* Shrink reduction *) *)
+(*         ret (shrink_cps.shrink_top e, c_data) *)
+(*     in *)
+(*     match res with *)
+(*     | Err s => *)
+(*       exceptionMonad.Exc ("failed converting from L5 to L6 (anf) : " ++ s)%string *)
+(*     | Ret (e, c_data) => *)
+(*       exceptionMonad.Ret *)
+(*         ((M.empty _ ,  state.cenv c_data, state.nenv c_data, state.fenv c_data), (M.empty _, e)) *)
+(*     end *)
+(*   | None => exceptionMonad.Exc "failed converting from L5 to L6" *)
+(*   end. *)
 
 Definition L6_pipeline_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.exception (cTerm certiL6) :=
   let (venv, vt) := e in
@@ -188,7 +188,7 @@ Definition L6_pipeline_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.ex
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* Closure conversion *)
-      let (e_err, c_data) := closure_conversion2.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data in
+      let (e_err, c_data) := closure_conversion.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
       let c_data :=
           let next_var := ((identifiers.max_var e 1) + 1)%positive in
@@ -291,7 +291,7 @@ Definition L6_pipeline  (opt : bool) (e : cTerm certiL5) : exceptionMonad.except
         (* Shrink reduction *)
         let e := shrink_cps.shrink_top e in
         (* Closure conversion *)
-        let (e_err, c_data) := closure_conversion2.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data in
+        let (e_err, c_data) := closure_conversion.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data in
         let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
         let c_data :=
             let next_var := ((identifiers.max_var e 1) + 1)%positive in
@@ -328,6 +328,5 @@ Instance certiL5_t0_L6:
   fun o => match o with
         | Flag 0 => L6_pipeline false
         | Flag 1 => L6_pipeline true
-        | Flag 2 => L6_pipeline_old
         | _ => L6_pipeline false
         end.

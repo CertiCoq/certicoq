@@ -23,6 +23,7 @@ Open Scope string.
 
 Section CC.
   Variable (clo_tag : ctor_tag). (* Tag for closure records *)
+
   Variable (clo_itag : ind_tag). (* Dummy ind_tag for closure records *)
 
   Inductive project_var :
@@ -51,14 +52,14 @@ Section CC.
         project_var Scope Funs GFuns f c Γ FVs S x y
                     (Econstr_c y clo_tag [(f x); Γ] Hole_c) (Setminus _ S (Singleton _ y))
   | Var_in_GFuns :
-      forall Scope Funs GFuns f c cenv Γ FVs S x y g_env,
+      forall Scope Funs GFuns f c Γ FVs S x y g_env,
         ~ In _ Scope x ->
         ~ In _ Funs x ->
         In _ GFuns x ->
         In _ S y ->
         In _ (S \\ [set y]) g_env ->
         project_var Scope Funs GFuns f c Γ FVs S x y
-                    (Econstr_c g_env cenv [] (Econstr_c y clo_tag [(f x); g_env] Hole_c)) (S \\ [set y] \\ [set g_env])
+                    (Econstr_c g_env c [] (Econstr_c y clo_tag [(f x); g_env] Hole_c)) (S \\ [set y] \\ [set g_env])
   | Var_in_FVs :
       forall Scope Funs GFuns f c Γ FVs S x y N,
         ~ In _ Scope x ->
@@ -96,22 +97,35 @@ Section CC.
     fundefs -> (* The function block *)
     Ensemble var -> (* The free set *)
     var -> (* The environment variable *)
-    (var -> var) -> (* The old renaming *)
     exp_ctx -> (* The context that constructs the closures *)
     (var -> var) -> (* The new renaming *)
     Ensemble var -> (* The new free set *)
     Prop :=
   | closures_Fnil :
       forall Γ f S,
-        make_closures Fnil S Γ f Hole_c f S
+        make_closures Fnil S Γ Hole_c f S
   | closures_Fcons :
-      forall f f' xs t e B Γ C g g' g'' S S',
-        make_closures B (Setminus _ S (Singleton _ f')) Γ g C g' S' ->
-        In _ S f' ->
-        f_eq (g' {f ~> f'}) g'' ->
+      forall f xs t e B Γ C g S S',
+        make_closures B (Setminus _ S (Singleton _ (g f))) Γ C g S' ->
+        In _ S (g f) ->
         make_closures (Fcons f t xs e B) S Γ
-                      g (Econstr_c f clo_tag [f' ; Γ] C)
-                      g'' S'.
+                      (Econstr_c f clo_tag [(g f) ; Γ] C)
+                      g S'.
+
+  Inductive add_global_funs : Ensemble var -> (* Previous GFuns *)
+                              Ensemble var -> (* New Funs *)
+                              Ensemble var -> (* FVs of Funs *)
+                              Ensemble var -> (* New GFuns *)
+                              Type := 
+  | Closed :
+      forall GFuns Funs FVs,
+        FVs <--> Empty_set _ ->
+        add_global_funs GFuns Funs FVs (Funs :|: GFuns)        
+  | Open :
+      forall GFuns Funs FVs,
+        ~ FVs <--> Empty_set _ -> (* maybe not needed, but it shouldn't hurt *)
+        add_global_funs GFuns Funs FVs (GFuns \\ Funs).
+      
 
   Inductive Closure_conversion :
     Ensemble var -> (* Variables in the current scope *)
@@ -129,20 +143,16 @@ Section CC.
       forall Scope Funs GFuns f c Γ FVs S' S x ys ys' C C' t e e',
         (* Variables for projected vars should not shadow the variables in
          scope, i.e. Scope U FV U { Γ } *)
-        Disjoint _ S (Union _ Scope
-                            (Union _ (image f (Setminus _ Funs Scope))
-                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         project_vars Scope Funs GFuns f c Γ FVs S ys ys' C S' ->
         (* We do not care about ys'. Should never be accessed again so do not
          add them aτ the current scope *)
-        Closure_conversion (Union _ (Singleton _ x) Scope) Funs GFuns f c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) f c Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns f c Γ FVs (Econstr x t ys e)
                            (Econstr x t ys' (C' |[ e' ]|)) C
   | CC_Ecase :
       forall Scope Funs GFuns f c Γ FVs x x' C S S' pats pats',
-        Disjoint _ S (Union _ Scope
-                            (Union _ (image f (Setminus _ Funs Scope))
-                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         project_var Scope Funs GFuns f c Γ FVs S x x' C S' ->
         Forall2 (fun (pat pat' : ctor_tag * exp) =>
                    (fst pat) = (fst pat') /\
@@ -153,46 +163,34 @@ Section CC.
         Closure_conversion Scope Funs GFuns f c Γ FVs (Ecase x pats) (Ecase x' pats') C
   | CC_Eproj :
       forall Scope Funs GFuns f c Γ FVs S S' x y y' C C' t N e e',
-        Disjoint _ S (Union _ Scope
-                            (Union _ (image f (Setminus _ Funs Scope))
-                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         project_var Scope Funs GFuns f c Γ FVs S y y' C S' ->
-        Closure_conversion (Union _ (Singleton _ x) Scope) Funs GFuns f c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) f c Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns f c Γ FVs (Eproj x t N y e)
                            (Eproj x t N y' (C' |[ e' ]|)) C
   | CC_Efun :
-      forall Scope Funs GFuns f f' c Γ c' Γ' FVs FVs' FVs'' B B' e e' C C' Ce S1 S1' S2 S2' S3,
+      forall Scope Funs GFuns GFuns' f c Γ c' Γ' FVs FVs' FVs'' B B' e e' C C' Ce S1 S1' S2 S2' S3,
         (* The environment contains all the variables that are free in B *)
         (occurs_free_fundefs B) \\ GFuns <--> (FromList FVs') ->
         (* needed for cost preservation *)
         NoDup FVs' ->
         (* Project the FVs to construct the environment *)
-        Disjoint _ S1 (Union _ Scope
-                             (Union _ (image f (Setminus _ Funs Scope))
-                                    (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S1 (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ])))  ->
         project_vars Scope Funs GFuns f c Γ FVs S1 FVs' FVs'' C' S1' ->
         (* Γ' is the variable that will hold the record of the environment *)
-        Disjoint _ S3 (Union _ (name_in_fundefs B)
-                             (Union _ Scope
-                                    (Union _ (image f (Setminus _ Funs Scope))
-                                           (Union _ (FromList FVs) (Singleton _ Γ))))) ->
-        In _ S3 Γ' ->
-        Disjoint _ S2 (Union _ (bound_var_fundefs B)
-                             (Union _ (Singleton _ Γ')
-                                    (Union _ Scope
-                                           (Union _ (image f (Setminus _ Funs Scope))
-                                                  (Union _ (FromList FVs) (Singleton _ Γ)))))) ->
-        make_closures B S2  Γ' f C f' S2' ->
-        Closure_conversion_fundefs (name_in_fundefs B) GFuns f' c' FVs' B B' ->
+        Disjoint _ S3 (name_in_fundefs B :|: (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ])))) ->
+           In _ S3 Γ' ->
+        Disjoint _ S2 (bound_var_fundefs B :|: (Γ' |: (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))))) ->
+        make_closures B S2  Γ' C f S2' ->
+        add_global_funs GFuns (name_in_fundefs B) (FromList FVs') GFuns' ->
+        Closure_conversion_fundefs (name_in_fundefs B) GFuns' f c' FVs' B B' ->
         (* Add B in Funs if its only fvs are names are in GFuns *)
-        Closure_conversion (Union _ (name_in_fundefs B) Scope) Funs (GFuns :|: (name_in_fundefs B :&: Complement _ (occurs_free_fundefs B \\ GFuns))) f' c Γ FVs e e' Ce  ->
+        Closure_conversion (Union _ (name_in_fundefs B) Scope) Funs GFuns' f c Γ FVs e e' Ce  ->
         Closure_conversion Scope Funs GFuns f c Γ FVs (Efun B e)
                            (Efun B' (C |[ Ce |[ e' ]| ]|)) (comp_ctx_f C' (Econstr_c Γ' c' FVs'' Hole_c))
   | CC_Eletapp :
       forall Scope Funs GFuns g c Γ FVs x f f' f'' ft e env' ys ys' C C' e' S S',
-        Disjoint _ S (Union _ Scope
-                            (Union _ (image g (Setminus _ Funs Scope))
-                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S (Scope :|: (image g ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         (* Project the function name and the actual parameter *)
         project_vars Scope Funs GFuns g c Γ FVs S (f :: ys) (f' :: ys') C S' ->
         (* (* Project the actual parameters *) *)
@@ -208,9 +206,7 @@ Section CC.
                                          (Eletapp x f'' ft (env' :: ys') (C' |[ e' ]|)))) C
   | CC_Eapp :
       forall Scope Funs GFuns g c Γ FVs f f' f'' ft env' ys ys' C S S',
-        Disjoint _ S (Union _ Scope
-                            (Union _ (image g (Setminus _ Funs Scope))
-                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S (Scope :|: (image g ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         (* Project the function name and the actual parameter *)
         project_vars Scope Funs GFuns g c Γ FVs S (f :: ys) (f' :: ys') C S' ->
         (* (* Project the actual parameters *) *)
@@ -225,18 +221,14 @@ Section CC.
                                          (Eapp f'' ft (env' :: ys')))) C
   | CC_Eprim :
       forall Scope Funs GFuns g c Γ FVs S S' x ys ys' C C' f e e',
-        Disjoint _ S (Union _ Scope
-                            (Union _ (image g (Setminus _ Funs Scope))
-                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S (Scope :|: (image g ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         project_vars Scope Funs GFuns g c Γ FVs S ys ys' C S' ->
-        Closure_conversion (Union _ (Singleton _ x) Scope) Funs GFuns g c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs GFuns g c Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns g c Γ FVs (Eprim x f ys e)
                            (Eprim x f ys' (C' |[ e' ]|)) C
   | CC_Ehalt :
       forall Scope Funs GFuns g c Γ FVs x x' C S S',
-        Disjoint _ S (Union _ Scope
-                            (Union _ (image g (Setminus _ Funs Scope))
-                                   (Union _ (FromList FVs) (Singleton _ Γ)))) ->
+        Disjoint _ S (Scope :|: (image g ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         (* Project the function name and the actual parameter *)
         project_var Scope Funs GFuns g c Γ FVs S x x' C S' ->
         Closure_conversion Scope Funs GFuns g c Γ FVs (Ehalt x) (Ehalt x') C
@@ -253,10 +245,10 @@ Section CC.
            forall Funs GFuns g c Γ' FVs S f t ys e e' C defs defs',
              (* The environment binding should not shadow the current scope
          (i.e. the names of the mut. rec. functions and the other arguments) *)
-             Disjoint _ S (Union _ (image g Funs) (Union _ (FromList ys) (bound_var e))) ->
+             Disjoint _ S (image g (Funs :|: GFuns) :|: (FromList ys :|: bound_var e)) ->
              In _ S  Γ' ->
              Closure_conversion_fundefs Funs GFuns g c FVs defs defs' ->
-             Closure_conversion (FromList ys) Funs GFuns g c Γ' FVs e e' C ->
+             Closure_conversion (FromList ys) Funs (GFuns \\ FromList ys) g c Γ' FVs e e' C ->
              Closure_conversion_fundefs Funs GFuns g c FVs (Fcons f t ys e defs )
                                         (Fcons (g f) t (Γ' :: ys) (C |[ e' ]|) defs')
        | CC_Fnil :

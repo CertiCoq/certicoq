@@ -108,8 +108,8 @@ Section Closure_conversion_util.
 
     (** * Lemmas about [make_closures] *)
 
-  Lemma make_closures_free_set_Included B S Γ C σ σ' S' :
-    make_closures clo_tag B S Γ σ C σ' S' ->
+  Lemma make_closures_free_set_Included B S Γ C σ  S' :
+    make_closures clo_tag B S Γ C σ S' ->
     S' \subset S.
   Proof. 
     intros Hmc. induction Hmc.
@@ -118,102 +118,97 @@ Section Closure_conversion_util.
       now apply Setminus_Included.
   Qed.
 
-  Lemma make_closures_image_Included B S Γ C σ σ' S' :
-    make_closures clo_tag B S Γ σ C σ' S' ->
-    Included _ (image σ' (name_in_fundefs B)) (S \\ S').
+  Lemma make_closures_image_Included B S Γ C σ S' :
+    make_closures clo_tag B S Γ C σ S' ->
+    Included _ (image σ (name_in_fundefs B)) (S \\ S').
   Proof. 
     intros Hmc. induction Hmc.
     - rewrite image_Empty_set. apply Included_Empty_set.
     - simpl. subst. 
       rewrite image_Union, image_Singleton.
       apply Union_Included. apply Singleton_Included.
-      rewrite <- H0. rewrite extend_gss.
       constructor; eauto. eapply make_closures_free_set_Included in Hmc.
       now intros Hc; eapply Hmc; eauto. 
-      eapply Included_trans.
-      rewrite <- H0. now apply image_extend_Included.
-      apply Union_Included.
       eapply Included_trans. eassumption.
       now eauto with Ensembles_DB.
-      eapply Singleton_Included. constructor; eauto. eapply make_closures_free_set_Included in Hmc.
-      now intros Hc; eapply Hmc; eauto. 
   Qed.
 
-  Lemma make_closures_image_eq B S Γ C σ σ' S' :
+  Lemma make_closures_image_eq B S Γ C σ S' :
     unique_functions B ->
-    make_closures clo_tag B S Γ σ C σ' S' ->
-    (image σ' (name_in_fundefs B)) <--> (S \\ S').
+    make_closures clo_tag B S Γ C σ S' ->
+    (image σ (name_in_fundefs B)) <--> (S \\ S').
   Proof. 
     intros Hun Hmc. induction Hmc.
     - rewrite image_Empty_set, Setminus_Same_set_Empty_set. reflexivity.
     - simpl. subst. 
       rewrite image_Union, image_Singleton.
-      rewrite <- !H0. inv Hun. 
-      rewrite extend_gss. rewrite image_extend_not_In_S.
-      rewrite IHHmc; [| eassumption ].
-      rewrite Setminus_Union, (Union_commut [set f'] S'), <- Setminus_Union. 
-      rewrite Union_Setminus_Included, Union_Same_set. reflexivity.
+      inv Hun. rewrite IHHmc; [| eassumption ].
+      rewrite Setminus_Union, (Union_commut [set _] S'), <- Setminus_Union. 
+      rewrite Union_Setminus_Included, Union_Same_set. reflexivity.                                                         
       eapply Singleton_Included. constructor. eassumption.
       eapply make_closures_free_set_Included in Hmc.
       now intros Hc; eapply Hmc; eauto.
       tci. reflexivity.
-      eassumption. 
   Qed.
 
-  Lemma make_closures_image_set B S Γ C σ σ' S' P  :
-    make_closures clo_tag B S Γ σ C σ' S' ->
-    image σ' P \subset image σ (P \\ name_in_fundefs B) :|: (S \\ S').
-  Proof. 
+  Lemma make_closures_image_set B S Γ C σ S' P  :
+    make_closures clo_tag B S Γ C σ S' ->
+    image σ P \subset image σ (P \\ name_in_fundefs B) :|: (S \\ S').
+  Proof.
     intros Hmc. revert P. induction Hmc; intros P.
     - simpl. rewrite Setminus_Empty_set_neut_r, Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
       reflexivity.
-    - simpl. subst. rewrite <- H0.
-      eapply Included_trans. eapply image_extend_Included'.
+    - simpl. subst.
+      eapply Included_trans. eapply image_monotonic.
+      eapply Included_Union_Setminus with (s2 := [set f]); tci.
+      rewrite image_Union, image_Singleton.
       eapply Union_Included.
       + eapply Included_trans. eapply IHHmc.
-        eapply Union_Included.
+        eapply Union_Included. 
         eapply Included_Union_preserv_l. eapply image_monotonic.
         now sets.
         now sets.
       + eapply Singleton_Included. right. constructor; eauto.
         eapply make_closures_free_set_Included in Hmc.
-        now intros Hc; eapply Hmc; eauto. 
+        now intros Hc; eapply Hmc; eauto.
   Qed.
 
-  Lemma make_closures_image_Disjoint B S Γ C σ σ' S' :
-    make_closures clo_tag B S Γ σ C σ' S' ->
-    Disjoint _ (image σ' (name_in_fundefs B)) S'.
+  Lemma make_closures_image_Disjoint B S Γ C σ  S' :
+    make_closures clo_tag B S Γ C σ S' ->
+    Disjoint _ (image σ (name_in_fundefs B)) S'.
   Proof.
     intros Hc. constructor. intros x H1. inv H1.
     eapply make_closures_image_Included in H; [| eassumption ].
     now inv H.
   Qed.
 
-  Lemma make_closures_injective B S Γ C σ σ' S' :
+  Lemma make_closures_injective GFuns B S Γ C σ S' :
     Disjoint _ S (name_in_fundefs B) ->
-    make_closures clo_tag B S Γ σ C σ' S' ->
-    injective_subdomain (name_in_fundefs B) σ'.
-  Proof. 
-    intros Hd Hmc. induction Hmc.
-    - intros x y Hc. inv Hc. 
-    - simpl. rewrite <- H0.
-      eapply injective_subdomain_extend.
-      + eapply IHHmc.
-        eapply Disjoint_Included_r; [
-          | eapply Disjoint_Included_l; [| eassumption ] ];
-        eauto with Ensembles_DB.
-      + eapply make_closures_image_Included in Hmc.
-        intros Hc. 
-        rewrite Setminus_Union in Hmc. 
-        eapply Hmc.
-        eapply image_monotonic; [ | eassumption ].
-        now eauto with Ensembles_DB. 
-        now left. 
+    Disjoint _ S (image σ GFuns) ->
+    injective_subdomain GFuns σ ->
+    make_closures clo_tag B S Γ C σ S' ->
+    injective_subdomain (name_in_fundefs B :|: GFuns) σ.
+  Proof.
+    revert GFuns S Γ C σ S'; induction B; intros GFuns S Γ C σ S' Hd Hd' Hinj Hmc.
+    - simpl. inv Hmc.
+      rewrite <- Union_assoc. eapply injective_subdomain_Union.
+      + eapply injective_subdomain_Singleton.
+      + eapply IHB; [| | | eassumption ].
+        now eapply Disjoint_Included; [| | eapply Hd ]; sets.
+        sets.
+        eassumption.
+      + rewrite image_Singleton, image_Union.
+        eapply Union_Disjoint_r.
+        eapply Disjoint_Included_r.
+        eapply make_closures_image_Included. eassumption. now sets.
+        eapply Disjoint_Included_l; [| eassumption ].
+        eapply Singleton_Included. eassumption.
+    - simpl. rewrite Union_Empty_set_neut_l. eassumption.
   Qed.
 
-  Lemma make_closures_occurs_free_ctx_Included B S Γ C f f' S' F e:
+  Lemma make_closures_occurs_free_ctx_Included B S Γ C f S' F e:
     unique_functions B ->
-    make_closures clo_tag B S Γ f C f' S'  ->
+    make_closures clo_tag B S Γ C f S'  ->
     Included _ (occurs_free e) (Union _ F (name_in_fundefs B)) ->
     (S \\ S') :|: [set Γ] \subset F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
@@ -256,8 +251,8 @@ Section Closure_conversion_util.
     rewrite <- app_ctx_f_fuse, project_var_free_funs_in_exp; eassumption.
   Qed.
 
-  Lemma make_closures_funs_in_exp B S Γ C σ σ' S' B' e:
-    make_closures clo_tag B S Γ σ C σ' S'  ->
+  Lemma make_closures_funs_in_exp B S Γ C σ S' B' e:
+    make_closures clo_tag B S Γ C σ S'  ->
     (funs_in_exp B' (C |[ e ]|) <-> funs_in_exp B' e).
   Proof.
     intros Hmc; induction Hmc;
@@ -295,7 +290,7 @@ Section Closure_conversion_util.
       eapply Included_trans. eapply IHe. eassumption.
       intros f Hunf. eapply Hun. now constructor.
       rewrite Union_commut with (s2 := Singleton var v), !Union_assoc.
-      now apply Included_Union_l.
+      eauto 20 with Ensembles_DB.
     - eapply project_var_occurs_free_ctx_Included;
         [ eassumption | | now apply Included_refl ]. inv H12.
       rewrite occurs_free_Ecase_nil. now apply Included_Union_r.
@@ -319,7 +314,7 @@ Section Closure_conversion_util.
       apply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption.
       intros f Hunf. eapply Hun. now constructor.      
-      eauto with Ensembles_DB.
+      eauto 20 with Ensembles_DB.
     - eapply project_vars_occurs_free_ctx_Included; [ eassumption | | now apply Included_refl ].
       repeat normalize_occurs_free. repeat normalize_sets. 
       eapply Union_Included.
@@ -348,10 +343,12 @@ Section Closure_conversion_util.
         rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set, Union_Empty_set_neut_l.
         rewrite image_Union.
         eapply Union_Included.
-        now eauto 10 with Ensembles_DB functions_BD.
-        rewrite <- make_closures_image_eq with (S := S2); [| | eassumption ].
-        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]...
-        eapply Hun. now constructor.
+        * inv X. rewrite Setminus_Union_distr, image_Union.
+          now eauto 20 with Ensembles_DB functions_BD.
+          now eauto 20 with Ensembles_DB functions_BD.
+        * rewrite <- make_closures_image_eq with (S := S2); [| | eassumption ].
+          rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]...
+          eapply Hun. now constructor.
       + eapply Setminus_Included_Included_Union.
         eapply make_closures_occurs_free_ctx_Included; [| eassumption | | ].
         * eapply Hun. now constructor.
@@ -359,20 +356,16 @@ Section Closure_conversion_util.
           intros f Hunf. eapply Hun. now constructor.
           eapply Union_Included.
           now eauto 20 with Ensembles_DB. 
-          eapply Union_Included.
+          eapply Union_Included; [| now eauto 10 with Ensembles_DB ].
           eapply Included_trans. eapply make_closures_image_set. eassumption.
           eapply Union_Included.
-          do 4 eapply Included_Union_preserv_l. eapply Included_Union_preserv_r.
-          eapply Included_Union_preserv_l. eapply image_monotonic. 
-          eapply Setminus_Included_Included_Union.
-          eapply Union_Included; sets.
-          eapply Union_Included; sets.
-          eapply Included_trans. eapply Included_Intersection_l. 
-          now sets.
+          rewrite Setminus_Union_distr, image_Union. inv X. 
+          now eauto 20 with Ensembles_DB functions_BD.
+          now eauto 20 with Ensembles_DB functions_BD.
+          do 1 eapply Included_Union_preserv_l. eapply Included_Union_preserv_r.
           rewrite <- make_closures_image_eq with (S := S2); [| | eassumption ].
           rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]...
           eapply Hun. now constructor.  
-          eauto 15 with Ensembles_DB.
         * eapply Union_Included; sets.
           rewrite <- make_closures_image_eq with (S := S2); [| | eassumption ].
           rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]...
@@ -403,7 +396,7 @@ Section Closure_conversion_util.
         intros f Hunf. eapply Hun. left. now eauto.
         rewrite FromList_cons. simpl.
         rewrite <- Union_Included_Union_Setminus;
-          eauto 6 with Ensembles_DB typeclass_instances.
+          eauto 16 with Ensembles_DB typeclass_instances.
       + apply Setminus_Included_Included_Union.
         eapply Included_trans. eapply IHB. eassumption.
         intros f Hunf. inv Hunf; eauto.
@@ -495,14 +488,14 @@ Section Closure_conversion_util.
     Closure_conversion_fundefs clo_tag Funs GFuns σ c FVs B1 B2 ->
     find_def f B1 = Some (t1, xs, e1) ->
     exists Γ' C e2,
-      ~ In var (Union var (image σ Funs) (Union _ (FromList xs) (bound_var e1))) Γ' /\
+      ~ In var (Union var (image σ (Funs :|: GFuns)) (Union _ (FromList xs) (bound_var e1))) Γ' /\
       find_def (σ f) B2 = Some (t1, Γ' :: xs, (C |[ e2 ]|)) /\
-      Closure_conversion clo_tag (FromList xs) Funs GFuns σ c Γ' FVs e1 e2 C.
+      Closure_conversion clo_tag (FromList xs) Funs (GFuns \\ (FromList xs)) σ c Γ' FVs e1 e2 C.
   Proof.
     intros Hinj Hcc Hdef. induction Hcc.
     - simpl in Hdef. destruct (M.elt_eq f f0) eqn:Heq; subst.
       + inv Hdef. repeat eexists; eauto. 
-        simpl.
+        simpl. 
         intros Hc. eapply H. now eauto.
         simpl. rewrite peq_true. reflexivity.
       + edestruct IHHcc as [Γ'' [C' [e2 [Hnin [Hfind Hcc']]]]]; eauto.
@@ -737,8 +730,8 @@ Section Closure_conversion_util.
   Qed.
 
   Lemma make_closures_sizeOf_ctx_exp (B : fundefs) (S : Ensemble var) (Γ : var)
-        (C : exp_ctx) (σ σ' : var -> var) (S' : Ensemble var) :
-    make_closures clo_tag B S Γ σ C σ' S' ->
+        (C : exp_ctx) (σ  : var -> var) (S' : Ensemble var) :
+    make_closures clo_tag B S Γ C σ S' ->
     sizeOf_exp_ctx C <= 3 * numOf_fundefs B.
   Proof.
     induction 1; eauto.

@@ -153,8 +153,9 @@ Section Closure_conversion_correct.
   
   (** Invariant about the free variables *) 
   Definition FV_inv k rho rho' Scope Funs GFuns c Γ FVs : Prop :=
-    exists (vs : list val),
-      M.get Γ rho' = Some (Vconstr c vs) /\
+    exists c' (vs : list val),
+      M.get Γ rho' = Some (Vconstr c' vs) /\
+      (FVs <> [] -> c' = c) /\ (* Because if FVs = [] we don't care about c' *)
       Forall2 (fun x v' => 
                  forall v, ~ In _ Scope x ->
                       ~ In _ Funs x ->
@@ -163,19 +164,19 @@ Section Closure_conversion_correct.
                       cc_approx_val pr cenv clo_tag k boundG v v') FVs vs.
   
   (** Invariant about the functions in the current function definition *)
-  Definition Fun_inv k (rho rho' : env) Scope Funs σ c Γ : Prop :=
+  Definition Fun_inv k (rho rho' : env) Scope Funs σ Γ : Prop :=
     forall f v,
       ~ In _ Scope f ->
       In var Funs f ->
       M.get f rho = Some v  ->
-      exists vs rho1 B1 f1 rho2 B2 f2,
-        M.get Γ rho' = Some (Vconstr c vs) /\
+      exists env rho1 B1 f1 rho2 B2 f2,
+        M.get Γ rho' = Some env /\
         v = (Vfun rho1 B1 f1) /\
         ~ In _ Scope (σ f) /\
         M.get (σ f) rho' = Some (Vfun rho2 B2 f2) /\
         cc_approx_val pr cenv clo_tag k boundG
                       (Vfun rho1 B1 f1)
-                      (Vconstr clo_tag [(Vfun rho2 B2 f2) ; (Vconstr c vs)]).
+                      (Vconstr clo_tag [(Vfun rho2 B2 f2) ; env]).
 
   (** Invariant about the functions in the current function definition *)
   Definition GFun_inv k (rho rho' : env) Scope GFuns σ : Prop :=
@@ -195,17 +196,17 @@ Section Closure_conversion_correct.
 
   (** Extend the two environments with a variable that is not the current environment
     argument (i.e. [Γ]) *)
-  Lemma Fun_inv_set k rho rho' Scope Funs σ c Γ f rho1 B1 f1 rho2 B2 f2 vs:
-    Fun_inv k rho rho' Scope Funs σ c Γ ->
+  Lemma Fun_inv_set k rho rho' Scope Funs σ Γ f rho1 B1 f1 rho2 B2 f2 env:
+    Fun_inv k rho rho' Scope Funs σ Γ ->
     (σ f) <> Γ ->
     ~ In _ Scope (σ f) ->
     ~ In _ (image σ (Setminus _ Funs Scope)) (σ f) ->
-    M.get Γ rho' = Some (Vconstr c vs) ->
+    M.get Γ rho' = Some env ->
     (cc_approx_val pr cenv clo_tag k boundG (Vfun rho1 B1 f1)
-                   (Vconstr clo_tag [(Vfun rho2 B2 f2) ; (Vconstr c vs)])) ->
+                   (Vconstr clo_tag [(Vfun rho2 B2 f2) ; env])) ->
     Fun_inv k (M.set f (Vfun rho1 B1 f1) rho)
             (M.set (σ f) (Vfun rho2 B2 f2) rho')
-            Scope (Union _ (Singleton _ f) Funs) σ c Γ.
+            Scope (Union _ (Singleton _ f) Funs) σ Γ.
   Proof.
     intros Hinv Hneq Hnin Hnin' Hget Hv f'' v Hnin'' Hin Hget'.
     destruct (peq f'' f); subst.
@@ -223,10 +224,10 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Rename the environment parameter *)
-  Lemma Fun_inv_rename k rho1 rho2 Scope Funs σ c Γ Γ' v :
+  Lemma Fun_inv_rename k rho1 rho2 Scope Funs σ Γ Γ' v :
     ~ In _ (image σ (Setminus _ Funs Scope)) Γ ->  ~ In _ (image σ Funs) Γ' ->
-    Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ c Γ ->
-    Fun_inv k rho1 (M.set Γ' v rho2) Scope Funs σ c Γ'.
+    Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ Γ ->
+    Fun_inv k rho1 (M.set Γ' v rho2) Scope Funs σ Γ'.
   Proof.
     intros Hnin Hnin' Hinv f v1 Hninf Hinf Hget.
     edestruct Hinv with (f := f) as
@@ -239,10 +240,10 @@ Section Closure_conversion_correct.
   Qed.
   
   (** Extend [Scope] with a set that does not shadow the new function names *)
-  Lemma Fun_inv_mon k rho1 rho2 Scope Scope' Funs σ c Γ :
+  Lemma Fun_inv_mon k rho1 rho2 Scope Scope' Funs σ Γ :
     Disjoint _ (image σ (Setminus _ Funs Scope)) Scope' ->
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
-    Fun_inv k rho1 rho2 (Union _ Scope' Scope) Funs σ c Γ.
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
+    Fun_inv k rho1 rho2 (Union _ Scope' Scope) Funs σ Γ.
   Proof.
     intros Hd Hinv f v Hninf Hinf Hget.
     edestruct Hinv with (f := f) as
@@ -254,10 +255,10 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Extend the first environment with a variable in [Scope] *)
-  Lemma Fun_inv_set_In_Scope_l k rho1 rho2 Scope Funs σ c Γ x v :
+  Lemma Fun_inv_set_In_Scope_l k rho1 rho2 Scope Funs σ Γ x v :
     In _ Scope x ->
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
-    Fun_inv k (M.set x v rho1) rho2 Scope Funs σ c Γ.
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
+    Fun_inv k (M.set x v rho1) rho2 Scope Funs σ Γ.
   Proof.
     intros Hin Hinv f v' Hninf Hinf Hget.
     eapply Hinv; eauto. rewrite M.gso in Hget.
@@ -265,10 +266,10 @@ Section Closure_conversion_correct.
   Qed.
 
     (** Extend the first environment with a variable in not in [Funs] *)
-  Lemma Fun_inv_set_not_In_Funs_l k rho1 rho2 Scope Funs σ c Γ x v :
+  Lemma Fun_inv_set_not_In_Funs_l k rho1 rho2 Scope Funs σ Γ x v :
     ~ In _ Funs x  ->
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
-    Fun_inv k (M.set x v rho1) rho2 Scope Funs σ c Γ.
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
+    Fun_inv k (M.set x v rho1) rho2 Scope Funs σ Γ.
   Proof.
     intros Hin Hinv f v' Hninf Hinf Hget.
     eapply Hinv; eauto. rewrite M.gso in Hget.
@@ -276,20 +277,20 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Extend the first environment with a variable in not in [Funs] *)
-  Lemma Fun_inv_funs_monotonic k rho1 rho2 Scope Funs Funs' σ c Γ :
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
+  Lemma Fun_inv_funs_monotonic k rho1 rho2 Scope Funs Funs' σ Γ :
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
     Funs' \subset Funs -> 
-    Fun_inv k rho1 rho2 Scope Funs' σ c Γ.
+    Fun_inv k rho1 rho2 Scope Funs' σ Γ.
   Proof.
     intros Hin Hinv f v' Hninf Hinf Hget.
     eapply Hin; eauto.
   Qed.
   
   (** Extend the second environment with a variable in [Scope] *)
-  Lemma Fun_inv_set_In_Scope_r k rho1 rho2 Scope Funs σ c Γ x v v' :
+  Lemma Fun_inv_set_In_Scope_r k rho1 rho2 Scope Funs σ Γ x v v' :
     In _ Scope x ->  ~ In _ (image σ (Setminus _ Funs Scope)) x ->
-    Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ c Γ ->
-    Fun_inv k rho1 (M.set Γ v (M.set x v' rho2)) Scope Funs σ c Γ.
+    Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ Γ ->
+    Fun_inv k rho1 (M.set Γ v (M.set x v' rho2)) Scope Funs σ Γ.
   Proof.
     intros Hin Hnin Hinv f v1 Hninf Hinf Hget.
     edestruct Hinv with (f := f) as
@@ -306,10 +307,10 @@ Section Closure_conversion_correct.
 
   (** Extend the second environment with a variable in [Scope] that is different
     from [Γ] *)
-  Lemma Fun_inv_set_In_Scope_r_not_Γ k rho1 rho2 Scope Funs σ c Γ x v :
+  Lemma Fun_inv_set_In_Scope_r_not_Γ k rho1 rho2 Scope Funs σ Γ x v :
     In _ Scope x -> Γ <> x ->
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
-    Fun_inv k rho1 (M.set x v rho2) Scope Funs σ c Γ.
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
+    Fun_inv k rho1 (M.set x v rho2) Scope Funs σ Γ.
   Proof.
     intros Hin Hnin Hinv f v1 Hninf Hinf Hget.
     edestruct Hinv with (f := f) as
@@ -322,11 +323,11 @@ Section Closure_conversion_correct.
 
   (** Extend the second environment with a variable not in [Funs] that is different
     from Γ *)
-  Lemma Fun_inv_set_not_In_Funs_r_not_Γ k rho1 rho2 Scope Funs σ c Γ x v :
+  Lemma Fun_inv_set_not_In_Funs_r_not_Γ k rho1 rho2 Scope Funs σ Γ x v :
     ~ In _ (image σ (Setminus _ Funs Scope)) x ->
     x <> Γ -> 
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
-    Fun_inv k rho1 (M.set x v rho2) Scope Funs σ c Γ.
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
+    Fun_inv k rho1 (M.set x v rho2) Scope Funs σ Γ.
   Proof.
     intros Hnin Hneq Hinv f v1 Hninf Hinf Hget.
     edestruct Hinv with (f := f) as
@@ -340,11 +341,11 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Extend the first environment with a list of variables in [Scope] *)
-  Lemma Fun_inv_set_lists_In_Scope_l k rho1 rho1' rho2 Scope Funs σ c Γ xs vs :
+  Lemma Fun_inv_set_lists_In_Scope_l k rho1 rho1' rho2 Scope Funs σ Γ xs vs :
     Included _ (FromList xs) Scope ->
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
     set_lists xs vs rho1 = Some rho1' ->
-    Fun_inv k rho1' rho2 Scope Funs σ c Γ.
+    Fun_inv k rho1' rho2 Scope Funs σ Γ.
   Proof.
     revert rho1 rho1' vs. induction xs; intros rho1 rho1' vs.
     - intros Hinc Hfun Hset. inv Hset.
@@ -363,12 +364,12 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Extend the second environment with a list of variables in [Scope] *)
-  Lemma Fun_inv_set_lists_In_Scope_r k rho1 rho2 rho2' Scope Funs σ c Γ xs vs v :
+  Lemma Fun_inv_set_lists_In_Scope_r k rho1 rho2 rho2' Scope Funs σ Γ xs vs v :
     Included _ (FromList xs) Scope ->
     Disjoint _ (image σ (Setminus _ Funs Scope)) (FromList xs) ->
-    Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ c Γ ->
+    Fun_inv k rho1 (M.set Γ v rho2) Scope Funs σ Γ ->
     set_lists xs vs rho2 = Some rho2' ->
-    Fun_inv k rho1 (M.set Γ v rho2') Scope Funs σ c Γ.
+    Fun_inv k rho1 (M.set Γ v rho2') Scope Funs σ Γ.
   Proof.
     revert rho2 rho2' vs. induction xs; intros rho2 rho2' vs.
     - intros Hinc Hd Hfun Hset. inv Hset.
@@ -390,40 +391,72 @@ Section Closure_conversion_correct.
   Qed.
 
   (** Redefine the environment argument in the second environment *)
-  Lemma Fun_inv_reset k rho rho' B v Scope Funs σ c Γ :
+  Lemma Fun_inv_reset k rho rho' B v Scope Funs σ Γ :
     ~ In _ (name_in_fundefs B) Γ ->
-    Fun_inv k rho
-            (def_funs B B (M.set Γ v rho') (M.set Γ v rho')) Scope Funs σ c Γ ->
-    Fun_inv k rho
-            (M.set Γ v (def_funs B B  (M.set Γ v rho') (M.set Γ v rho')))
-            Scope Funs σ c Γ.
+    M.get Γ rho' = Some v ->
+    Fun_inv k rho (def_funs B B rho' rho') Scope Funs σ Γ ->
+    Fun_inv k rho (M.set Γ v (def_funs B B rho' rho')) Scope Funs σ Γ.
   Proof. 
-    intros Hnin Hinv f v1 Hninf Hinf Hget.
+    intros Hnin Hget Hinv f v1 Hninf Hinf Hget'.
     edestruct Hinv with (f := f) as
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
-    rewrite def_funs_neq in Hget1; eauto. rewrite M.gss in Hget1.
-    inv Hget1.
+    rewrite def_funs_neq in Hget1; eauto. subst.
+    repeat subst_exp.
     repeat eexists; eauto.
     now rewrite M.gss.
-    eapply def_funs_spec in Hget2.
-    destruct Hget2 as [[Hname Heq] | [Hname Hget']].
-    - inv Heq. repeat eexists; eauto.
-      rewrite M.gso.
+    eapply def_funs_spec in Hget2. destruct Hget2 as [[Hname Heq] | [Hname Hget'']].
+    - inv Heq. rewrite M.gso.
       rewrite def_funs_eq. reflexivity. eassumption.
       intros Hc; subst; eauto.
-    - rewrite M.gsspec in Hget'.
-      destruct (peq (σ f) Γ).
-      + subst. inv Hget'.
-      + repeat eexists; eauto. rewrite M.gso. 
-        rewrite def_funs_neq; eauto. 
-        rewrite M.gso. eassumption.
-        now intros Hc; subst; eauto.
-        now intros Hc; subst; eauto.
+    - destruct (peq (σ f) Γ); subst.
+      rewrite M.gss. congruence.
+      rewrite M.gso.
+      rewrite def_funs_neq; eauto. 
+      now intros Hc; subst; eauto.
   Qed.
+
+  (** Redefine the environment argument in the second environment *)
+  (* Lemma Fun_inv_reset_strong k rho rho' B v v' Scope Funs σ c Γ : *)
+  (*   ~ In _ (name_in_fundefs B) Γ -> *)
+  (*   Disjoint _ (image σ (Funs \\ Scope)) [set Γ] -> *)
+
+  (*   Fun_inv k rho *)
+  (*           (def_funs B B (M.set Γ v' rho') (M.set Γ v' rho')) Scope Funs σ c Γ -> *)
+  (*   Fun_inv k rho *)
+  (*           (M.set Γ v' (def_funs B B  (M.set Γ v rho') (M.set Γ v rho'))) *)
+  (*           Scope Funs σ c Γ. *)
+  (* Proof.  *)
+  (*   intros Hnin1 Hnin2 Hinv f v1 Hninf Hinf Hget. *)
+  (*   assert (Hneq : σ f <> Γ). *)
+  (*   { intros Hc; subst. eapply Hnin2. constructor; eauto. *)
+  (*     eapply In_image. constructor; eauto. } *)
+  (*   edestruct Hinv with (f := f) as *)
+  (*       [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto. subst. *)
+    
+  (*   eapply def_funs_spec in Hget2. *)
+  (*   rewrite def_funs_neq in Hget1; eauto. rewrite M.gss in Hget1. inv Hget1.  *)
+  (*   destruct Hget2 as [[Hname Heq] | [Hname Hget']]. *)
+  (*   - inv Heq. repeat eexists; eauto. *)
+  (*     now rewrite M.gss. *)
+  (*     rewrite M.gso; eauto.   *)
+  (*     rewrite def_funs_eq; eauto. *)
+  (*     rewrite M.gso; eauto. *)
+  (*   assert (Hnin' : ~ name_in_fundefs B (σ f)). *)
+  (*   { intros Hc; subst. eapply Hnin2. *)
+  (*     constructor; [ | right; eassumption ]. eapply In_image. constructor; eauto. } *)
+    
+  (*   rewrite def_funs_neq in Hget2; eauto. *)
+  (*   rewrite M.gso in Hget2; eauto.  *)
+  (*   repeat eexists; eauto. *)
+  (*   now rewrite M.gss. *)
+  (*   rewrite M.gso; eauto. *)
+  (*   rewrite def_funs_neq; eauto. *)
+  (*   rewrite M.gso; eauto. *)
+  (* Qed. *)
 
   Global Instance Fun_inv_proper :
     Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Same_set var ==>
-                     Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+                     Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            (Fun_inv).
   Proof.
     constructor; intros Hinv; subst;
@@ -435,11 +468,11 @@ Section Closure_conversion_correct.
   
   (** Define a block of functions in the first environment and put them in the
     current scope *)
-  Lemma Fun_inv_def_funs_l k rho rho' B1 B1' Scope Funs σ c Γ:
+  Lemma Fun_inv_def_funs_l k rho rho' B1 B1' Scope Funs σ Γ:
     Disjoint _ (image σ (Setminus _ Funs Scope)) (name_in_fundefs B1') -> 
-    Fun_inv k rho rho' Scope Funs σ c Γ ->
+    Fun_inv k rho rho' Scope Funs σ Γ ->
     Fun_inv k (def_funs B1 B1' rho rho) rho'
-            (Union _ (name_in_fundefs B1')  Scope) Funs σ c Γ.
+            (Union _ (name_in_fundefs B1')  Scope) Funs σ Γ.
   Proof.
     intros HD Hinv f v1 Hninf Hinf Hget. rewrite def_funs_neq in Hget; eauto.
     edestruct Hinv with (f := f) as
@@ -452,12 +485,12 @@ Section Closure_conversion_correct.
 
   (** Define a block of functions in the second environment and put the in the
     current scope *)
-  Lemma Fun_inv_def_funs_r k rho rho' B1 B1' Scope Funs σ c Γ:
+  Lemma Fun_inv_def_funs_r k rho rho' B1 B1' Scope Funs σ Γ:
     ~ In _ (name_in_fundefs B1') Γ ->
     Disjoint _ (image σ (Setminus _ Funs Scope)) (name_in_fundefs B1') -> 
-    Fun_inv k rho rho' Scope Funs σ c Γ ->
+    Fun_inv k rho rho' Scope Funs σ Γ ->
     Fun_inv k rho (def_funs B1 B1' rho' rho')
-            (Union _ (name_in_fundefs B1') Scope) Funs σ c Γ.
+            (Union _ (name_in_fundefs B1') Scope) Funs σ Γ.
   Proof.
     intros Hnin HD Hinv f v1 Hninf Hinf Hget.
     edestruct Hinv with (f := f) as
@@ -474,13 +507,13 @@ Section Closure_conversion_correct.
 
   (** Define a block of functions in both environments and put the in the
     current scope *)
-  Lemma Fun_inv_def_funs k rho rho' B1 B1' B2 B2' Scope Funs σ c Γ:
+  Lemma Fun_inv_def_funs k rho rho' B1 B1' B2 B2' Scope Funs σ Γ:
     ~ In _ (name_in_fundefs B2') Γ -> ~ In _ (name_in_fundefs B1') Γ ->
     Disjoint _ (image σ (Setminus _ Funs Scope)) (name_in_fundefs B1') ->
     Disjoint _ (image σ (Setminus _ Funs Scope)) (name_in_fundefs B2') ->
-    Fun_inv k rho rho' Scope Funs σ c Γ ->
+    Fun_inv k rho rho' Scope Funs σ Γ ->
     Fun_inv k  (def_funs B1 B1' rho rho) (def_funs B2 B2' rho' rho')
-            (Union _ (name_in_fundefs B1') Scope) Funs σ c Γ.
+            (Union _ (name_in_fundefs B1') Scope) Funs σ Γ.
   Proof.
     intros Hnin1 Hnin2 HD1 HD2 Hinv f v1 Hninf Hinf Hget.
     rewrite def_funs_neq in Hget; eauto.
@@ -504,11 +537,16 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k (M.set x v rho) rho' Scope Funs GFuns c Γ FVs.
   Proof.
-    intros Hin [g [Hget HInv]]. eexists; split; eauto.
-    eapply Forall2_monotonic_strong; [| eassumption ].
-    intros z w Hin1 Hin2 He v1 Hnin1 Hnin2 Hnin3 Hget'.
-    eapply He; eauto. rewrite M.gso in Hget'; eauto.
-    intros Hc; subst; contradiction. 
+    intros Hin [g [c' [Hget [Hleq HInv]]]].
+    destruct FVs.
+    - inv HInv. exists g.
+      eexists; repeat split; eauto.
+    - do 2 eexists; repeat split; eauto.
+      rewrite <- Hleq; eauto. congruence.
+      eapply Forall2_monotonic_strong; [| eassumption ].
+      intros z w Hin1 Hin2 He v1 Hnin1 Hnin2 Hnin3 Hget'.
+      eapply He; eauto. rewrite M.gso in Hget'; eauto.
+      intros Hc; subst; contradiction. 
   Qed.
   
   (** Extend the first environment with a variable not in [FVs] *)
@@ -517,20 +555,25 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k (M.set x v rho) rho' Scope Funs GFuns c Γ FVs.
   Proof.
-    intros Hnin [g [Hget HInv]]. eexists; split; eauto.
-    eapply Forall2_monotonic_strong; [| eassumption ].
-    intros z w Hin1 Hin2 He v1 Hnin1 Hnin2 Hnin3 Hget'.
-    eapply He; eauto. rewrite M.gso in Hget'; eauto.
-    intros Hc; subst; contradiction. 
+    intros Hnin [c' [g [Hget [Hleq HInv]]]].
+    destruct FVs.
+    - inv HInv. exists c'.
+      eexists; repeat split; eauto.
+    - do 2 eexists; repeat split; eauto.
+      rewrite <- Hleq; eauto. congruence.
+      eapply Forall2_monotonic_strong; [| eassumption ].
+      intros z w Hin1 Hin2 He v1 Hnin1 Hnin2 Hnin3 Hget'.
+      eapply He; eauto. rewrite M.gso in Hget'; eauto.
+      intros Hc; subst; contradiction. 
   Qed.
-
+  
   (** Extend the second environment with a variable that is not [Γ] *)
   Lemma FV_inv_set_r k rho rho' x v Scope Funs GFuns c Γ FVs :
     x <> Γ ->
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k rho (M.set x v rho') Scope Funs GFuns c Γ FVs.
   Proof.
-    intros Hnin [g [Hget HInv]]. eexists; split; eauto.
+    intros Hnin [c' [g [Hget HInv]]]. do 2 eexists; split; eauto.
     rewrite M.gso; eauto.
   Qed.
 
@@ -540,10 +583,22 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k rho rho' (x |: Scope) Funs (GFuns \\ [set x]) c Γ FVs.
   Proof.
-    intros [g [Hget HInv]]. eexists; split; eauto.
+    intros [c' [g [Hget [Hc HInv]]]]. do 2 eexists; split; eauto.
+    split; eauto.
     eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
     intros; eauto. eapply H1; eauto.
-    intros Hc; eapply H4. constructor; eauto.  
+    intros Hc'; eapply H4. constructor; eauto.  
+  Qed.
+
+  Lemma FV_inv_monotonic k j rho rho' Scope GFuns Funs c Γ FVs :
+    FV_inv j rho rho' Scope Funs GFuns c Γ FVs ->
+    j >= k ->
+    FV_inv k rho rho' Scope Funs GFuns c Γ FVs.
+  Proof.
+    intros [c' [g [Hget [Hc HInv]]]]. do 2 eexists; split; eauto.
+    split; eauto.
+    eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
+    intros; eauto. eapply cc_approx_val_monotonic. eauto. eassumption.
   Qed.
 
   (** Extend the [Scope]. TODO : replace with monotonicity property? *)
@@ -551,8 +606,9 @@ Section Closure_conversion_correct.
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k rho rho' (Union _ (Singleton _ x) Scope) Funs GFuns c Γ FVs.
   Proof.
-    intros [g [Hget HInv]]. eexists; split; eauto.
-    eapply Forall2_monotonic_strong; [| eassumption ]; eauto. 
+    intros [c' [g [Hget [Hc HInv]]]]. do 2 eexists; split; eauto.
+    split; eauto.
+    eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
   Qed.
   
   (** Define a block of functions in both environments and put the in the
@@ -564,37 +620,38 @@ Section Closure_conversion_correct.
     FV_inv k  (def_funs B1 B1' rho rho) (def_funs B2 B2' rho' rho')
            (Union _ (name_in_fundefs B1') Scope) Funs GFuns c Γ FVs.
   Proof.
-    intros Hnin1 Hnin2 [g [Hget HInv]]. eexists; split; eauto.
+    intros Hnin1 Hnin2 [c' [g [Hget [Hc HInv]]]]. do 2 eexists; split; eauto.
     now rewrite def_funs_neq; eauto.    
-    eapply Forall2_monotonic_strong; [| eassumption ].
+    split; eauto.
+    eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
     intros z w Hin1 Hin2 He v1 Hnin3 Hnin4 Hnin5 Hget'.
     eapply He; eauto. now rewrite def_funs_neq in Hget'; eauto.
   Qed.
 
   (** * Lemmas about GFun_inv  *)
-  
-  Lemma GFun_inv_from_Fun_inv j GFuns GFuns' Funs {HD : Decidable Funs} Scope rho1 rho2 σ Γ FVs :
-    GFun_inv j rho1 rho2 Scope (GFuns \\ Scope \\ Funs) σ  ->
-    add_global_funs GFuns Funs (FromList FVs) GFuns' ->
-    (forall c, Fun_inv j rho1 rho2 Scope Funs σ c Γ /\
-          FV_inv j rho1 rho2 Scope Funs (GFuns' \\ Scope) c Γ FVs) ->
-    GFun_inv j rho1 rho2 Scope (GFuns' \\ Scope) σ.
-  Proof.
-    intros Hgfun Hadd Hc x v c Hin Hget. inv Hadd.
-    - edestruct FVs.
-      2:{ rewrite FromList_cons in H. exfalso.
-          eapply not_In_Empty_set. eapply H. now left. }
-      inv Hin. destruct HD. destruct (Dec x).
-      + destruct (Hc c) as [Hfun Hfv].
-        edestruct Hfv as [g [Hgetg Hinv]]. inv Hinv.
-        edestruct Hfun as
-            [vs'' [rho3' [B3' [f3' [rho4' [B4' [f4' [Hget1' [Heq2' [Ηnin2' [Hget2' Happrox']]]]]]]]]]]; eauto.
-        repeat subst_exp. repeat eexists; eauto.
-      + inv H0. contradiction. eapply Hgfun; eauto. do 2 (constructor; eauto).
-    - inv Hin. eapply Hgfun; eauto.
-      inv H0. do 2 (constructor; eauto).
-  Qed.
 
+  (** Extend the two environments with a variable that is not the current environment
+    argument (i.e. [Γ]) *)
+  Lemma GFun_inv_set k rho rho' Scope GFuns σ f rho1 B1 f1 rho2 B2 f2:
+    GFun_inv k rho rho' Scope (GFuns \\ [set f]) σ ->
+    ~ In _ Scope (σ f) ->
+    ~ In _ (image σ GFuns) (σ f) ->
+    (forall c, f \in GFuns ->
+          cc_approx_val pr cenv clo_tag k boundG (Vfun rho1 B1 f1) (Vconstr clo_tag [(Vfun rho2 B2 f2) ; Vconstr c []])) ->
+    GFun_inv k (M.set f (Vfun rho1 B1 f1) rho) (M.set (σ f) (Vfun rho2 B2 f2) rho') Scope GFuns σ.
+  Proof.
+    intros Hinv Hnin Hnin' Hv f'' v Hnin'' Hin Hget'.
+    destruct (peq f'' f); subst; eauto.
+    - rewrite M.gss in Hget'. inv Hget'. repeat eexists; eauto.
+      now rewrite M.gss.
+    - rewrite M.gso in Hget'; eauto.
+      edestruct Hinv with (f0 := f'') as
+          [rho3 [B3 [f3 [rho4 [B4 [f4 [Heq [Ηnin2 [Hget2 Happrox]]]]]]]]]; subst; eauto.
+      constructor; eauto. intros Hc. inv Hc. congruence. repeat eexists; eauto.
+      rewrite M.gso. now eauto. 
+      intros Hc. eapply Hnin'. eexists; eauto.
+  Qed.
+  
   (** Extend the first environment with a variable not in [GFuns] *)
   Lemma GFun_inv_set_not_In_GFuns_l k rho1 rho2 Scope GFuns σ x v :
     ~ x \in GFuns ->
@@ -720,7 +777,7 @@ Section Closure_conversion_correct.
     Disjoint _ S (image σ (GFuns \\ Scope)) ->
     project_var clo_tag Scope Funs GFuns σ c Γ FVs S x x' C S' ->
     FV_inv k rho1 rho2 Scope Funs GFuns c Γ FVs ->
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
     GFun_inv k rho1 rho2 Scope GFuns σ ->
     M.get x rho1 = Some v1 ->
     exists rho2', ctx_to_rho C rho2 rho2'.
@@ -741,18 +798,19 @@ Section Closure_conversion_correct.
       intros Hc; subst. eapply Hg. constructor.
       now eapply H3. eapply In_image. now constructor; eauto.
       constructor.
-    - edestruct HFV as [g [Hgetg Hin]].
+    - edestruct HFV as [c' [g [Hgetg [Hleq Hin]]]].
       eapply Forall2_nthN in Hin; eauto.
-      destruct Hin as [v2 [Hnth' Hyp]].
+      destruct Hin as [v2 [Hnth' Hyp]]. destruct FVs; try now inv H2.
+      rewrite Hleq in *; try congruence. 
       eexists. econstructor; eauto. constructor. 
   Qed.
 
-  Lemma make_closures_ctx_to_rho B S c Γ C σ S' k rho1 rho2 :
+  Lemma make_closures_ctx_to_rho B S Γ C σ S' k rho1 rho2 :
     make_closures clo_tag B S Γ C σ S' ->
     unique_functions B ->
     Disjoint _ S (name_in_fundefs B) ->
     ~ In _ (name_in_fundefs B) Γ ->
-    Fun_inv k rho1 rho2 (Empty_set _) (name_in_fundefs B) σ c Γ ->
+    Fun_inv k rho1 rho2 (Empty_set _) (name_in_fundefs B) σ Γ ->
     (forall f, In _ (name_in_fundefs B) f -> exists v, M.get f rho1 = Some v) ->
     exists rho2', ctx_to_rho C rho2 rho2'.
   Proof.
@@ -786,7 +844,7 @@ Section Closure_conversion_correct.
   Lemma project_vars_ctx_to_rho Scope Funs GFuns σ c Γ FVs xs xs' C S S' vs1 k rho1 rho2 :
     Disjoint _ S (Scope :|: (image σ ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
     project_vars clo_tag Scope Funs GFuns σ c Γ FVs S xs xs' C S' ->
-    Fun_inv k rho1 rho2 Scope Funs σ c Γ ->
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
     GFun_inv k rho1 rho2 Scope GFuns σ -> 
     FV_inv k rho1 rho2 Scope Funs GFuns c Γ FVs ->
     get_list xs rho1 = Some vs1 ->
@@ -823,7 +881,8 @@ Section Closure_conversion_correct.
         erewrite <- project_var_get; eauto.
         intros Hin'. eapply HD. constructor; eauto.
         right. left. eapply In_image. right. eauto.
-      + edestruct HFV as [g [Hgetg Hinv]]. eexists; split; eauto.
+      + edestruct HFV as [c' [g [Hgetg [Hleq Hinv]]]].
+        exists c'.  eexists; split; eauto.
         erewrite <- project_var_get; eauto.
         intros Hin. eapply HD. now eauto.
       + eassumption.
@@ -845,13 +904,38 @@ Section Closure_conversion_correct.
     intros Hin. inv Hin; sets.
   Qed.
 
+  Definition is_gfuns (GFuns : Ensemble var) names (FVs : list var) GFuns' :=
+    (FVs = [] /\ GFuns' \subset GFuns :|: names) \/
+    (FVs <> [] /\ GFuns' \subset GFuns \\ names).
+
+  Lemma add_global_funs_is_gfuns (GFuns : Ensemble var) names (FVs : list var) GFuns':
+    add_global_funs GFuns names (FromList FVs) GFuns' ->
+    is_gfuns GFuns names FVs GFuns'.
+  Proof.
+    intros Hin; destruct FVs; inv Hin; unfold is_gfuns; sets.
+    - exfalso. eapply not_In_Empty_set. eapply H.
+      now left.
+    - right. split; sets. congruence.
+  Qed.
+
+  Lemma is_gfuns_setminus (GFuns : Ensemble var) names (FVs : list var) GFuns' x:
+   is_gfuns GFuns (x |: names) FVs GFuns' ->
+   is_gfuns GFuns names FVs (GFuns' \\ [set x]).
+  Proof.
+    intros [[H1 H2] | [H1 H2]]; subst; unfold is_gfuns in *.
+    left; split; eauto.
+    eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption. sets.
+    right; split; eauto.
+    eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption. sets.
+  Qed. 
+    
   (** * Correctness lemmas *)
 
   (** Correctness of [closure_conversion_fundefs]. Basically un-nesting the nested
       induction that is required by the correctness of [Closure_conversion] *) 
   Lemma Closure_conversion_fundefs_correct k rho rho' B1 B2 B1' B2'
-        Scope c Γ FVs Funs' GFuns GFuns' σ FVs' vs:
-    (* The IH *) 
+        Scope c Γ FVs Funs' GFuns GFuns' GFuns'' σ FVs' :
+    (* The IH *)
     (forall m : nat,
        m < k ->
        forall (e : exp) (rho rho' : env) (e' : exp)
@@ -863,17 +947,21 @@ Section Closure_conversion_correct.
          fundefs_names_unique e ->
          injective_subdomain (Funs :|: GFuns) σ ->
          Disjoint var (image σ (Funs \\ Scope :|: GFuns)) (bound_var e) ->
-         Fun_inv m rho rho' Scope Funs σ c Γ ->
+         Fun_inv m rho rho' Scope Funs σ Γ ->
          GFun_inv m rho rho' Scope GFuns σ ->
          FV_inv m rho rho' Scope Funs GFuns c Γ FVs ->
          Closure_conversion clo_tag Scope Funs GFuns σ c Γ FVs e e' C ->
          cc_approx_exp pr cenv clo_tag m (boundL m e rho) boundG (e, rho) (C |[ e' ]|, rho')) ->
+    (* FVs *)
     (occurs_free_fundefs B1 \\ GFuns) <--> (FromList FVs) ->
+    (* unique functions *)
     fundefs_names_unique_fundefs B1 ->
     fundefs_names_unique_fundefs B1' ->
     binding_in_map (occurs_free_fundefs B1) rho ->
     GFun_inv k rho rho' Scope GFuns σ ->
+    is_gfuns GFuns (name_in_fundefs B1') FVs GFuns'' ->
     add_global_funs GFuns (name_in_fundefs B1) (FromList FVs) GFuns' ->
+    (* Closure Conversion *)
     Closure_conversion_fundefs clo_tag (name_in_fundefs B1) GFuns' σ c FVs B1 B2 ->
     Closure_conversion_fundefs clo_tag Funs' GFuns' σ c FVs' B1' B2' ->
     Disjoint _ (image σ (name_in_fundefs B1 :|: GFuns')) (bound_var_fundefs B1) ->
@@ -885,44 +973,35 @@ Section Closure_conversion_correct.
     ~ In _ (name_in_fundefs B1') Γ ->
     ~ In _ (name_in_fundefs B2) Γ ->
     ~ In _ (name_in_fundefs B2') Γ ->
-    closure_env k rho (Empty_set _) (Empty_set _) GFuns vs FVs ->
-    Fun_inv k (def_funs B1 B1' rho rho)
-            (def_funs B2 B2' (M.set Γ (Vconstr c vs) rho') (M.set Γ (Vconstr c vs) rho'))
-            Scope (name_in_fundefs B1') σ c Γ /\
-    GFun_inv k (def_funs B1 B1' rho rho)
-             (def_funs B2 B2' (M.set Γ (Vconstr c vs) rho') (M.set Γ (Vconstr c vs) rho'))
-             Scope GFuns' σ.
+    FV_inv k rho rho' (Empty_set _) (Empty_set _) GFuns c Γ FVs ->
+    Fun_inv k (def_funs B1 B1' rho rho) (def_funs B2 B2' rho' rho') Scope (name_in_fundefs B1') σ Γ /\
+    GFun_inv k (def_funs B1 B1' rho rho) (def_funs B2 B2' rho' rho') Scope GFuns'' σ.
   Proof.
-    revert B1' rho rho' B2 B1 B2' Scope Γ FVs Funs' GFuns GFuns' FVs' c vs.
+    revert B1' rho rho' B2 B1 B2' Scope Γ FVs Funs' GFuns GFuns' GFuns'' FVs' c. 
     induction k as [k IHk] using lt_wf_rec1.
     induction B1'; 
-      intros rho rho' B2 B1 B2' Scope Γ FVs Funs' GFuns GFuns' FVs' c vs
-             IHe Hs Hun Hun' Hfv Hgfun Hadd Hcc Hcc' Hd Hd'' Hseq Hinj Hinj' Hnin1 Hnin1' Hnin2 Hnin2' Henv.
-    - inv Hcc'.  
+      intros rho rho' B2 B1 B2' Scope Γ FVs Funs' GFuns GFuns' GFuns'' FVs' c
+             IHe Hs Hun Hun' Hfv Hgfun Hadd1 Hadd2 Hcc Hcc' Hd Hd'' Hseq Hinj Hinj' Hnin1 Hnin1' Hnin2 Hnin2' Henv.
+    - inv Hcc'. 
       (* show the IH for B first *)
-      assert (HB1 : Fun_inv k (def_funs B1 B1' rho rho)
-                            (def_funs B2 defs' (M.set Γ (Vconstr c vs) rho') (M.set Γ (Vconstr c vs) rho')) Scope
-                            (name_in_fundefs B1') σ c Γ /\           
-                    GFun_inv k (def_funs B1 B1' rho rho)
-                             (def_funs B2 defs' (M.set Γ (Vconstr c vs) rho') (M.set Γ (Vconstr c vs) rho'))
-                             Scope GFuns' σ).
-      { eapply IHB1'; eauto.
+      assert (HB1 : Fun_inv k (def_funs B1 B1' rho rho) (def_funs B2 defs' rho' rho') Scope (name_in_fundefs B1') σ Γ /\
+                    GFun_inv k (def_funs B1 B1' rho rho) (def_funs B2 defs' rho' rho') Scope (GFuns'' \\ [set v]) σ).
+      { eapply IHB1'; eauto. 
         * intros B H. inv H; eauto. specialize (Hun' (Fcons v f l e B1') (or_intror eq_refl)).
           inv Hun'; eauto.
+        * eapply is_gfuns_setminus. eassumption. 
         * eapply Disjoint_Included_l; [| eassumption ].
           eapply image_monotonic.  now apply Included_Union_r.
         * eapply injective_subdomain_antimon. eassumption. now sets.
         * intros Hc. apply Hnin1'. simpl; eauto.
         * intros Hc. apply Hnin2'. simpl; eauto. }
-      destruct HB1 as [IHfuns IHgfuns]. simpl.
-
-      
-      
+      destruct HB1 as [IHF IHG].
+      (* Now show each goal separately *)
       split.
-      + (* Fun inv *)
-        eapply Fun_inv_set.
+      + edestruct Henv as [c' [vs [Hgetg [Hleq Hallg]]]].
+        simpl. eapply Fun_inv_set. 
         * eassumption.
-        * intros Hc. eapply Hnin2'. subst. left. eauto.
+        * intros Hc. eapply Hnin2'. subst. left. eauto.          
         * intros Hc. eapply Hd''. constructor; eauto. eexists. split; eauto.
           left. eauto.
         * simpl in Hinj'.
@@ -934,255 +1013,206 @@ Section Closure_conversion_correct.
           eapply Disjoint_sym. eapply Disjoint_Singleton_r.
           specialize (Hun' (Fcons v f l e B1') (or_intror eq_refl)).
           inv Hun'; eauto.
-        * rewrite def_funs_neq. rewrite M.gss. reflexivity.
+        * rewrite def_funs_neq. eassumption.
           intros Hc. eapply Hnin2'. right. eauto.
-        * rewrite cc_approx_val_eq.
-          intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hfind Hset.
+        * (* Finally show that the added funs ares related *)     
+          simpl. rewrite cc_approx_val_eq. 
+          intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hfind Hset.  
           edestruct (@set_lists_length val)
-            with (rho' := def_funs B2 B2 (M.set Γ (Vconstr c vs) rho')
-                                   (M.set Γ (Vconstr c vs) rho')) as [rho2' Hset'].
+            with (rho' := def_funs B2 B2 rho' rho') as [rho2' Hset'].
           eassumption. now eauto.
           edestruct closure_conversion_fundefs_find_def
             as [Γ'' [C2 [e2 [Hnin'' [Hfind' Hcc']]]]]; [  |  | eassumption |].
-          eapply injective_subdomain_antimon. now eapply Hinj. now sets.        
-          eassumption. 
+          eapply injective_subdomain_antimon. now eapply Hinj. now sets. eassumption. 
           exists Γ'', xs1. do 2 eexists.
           split. reflexivity. split. eassumption. split.
           simpl. rewrite Hset'. reflexivity.        
           intros Hlt Hall.
-          (* for the IHe *)
-          assert
-            (HK : Fun_inv j (def_funs B1 B1 rho rho)
-                          (def_funs B2 B2 (M.set Γ (Vconstr c vs) rho')
-                                    (M.set Γ (Vconstr c vs) rho'))
-                          (FromList xs1) (name_in_fundefs B1) σ c Γ).
-          { eapply IHk with (Funs' := name_in_fundefs B1); try eassumption.
+          assert (HK : Fun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) (name_in_fundefs B1) σ Γ /\
+                       GFun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) GFuns' σ).
+          { eapply IHk with (Funs' := name_in_fundefs B1); try eassumption. 
             - intros. eapply IHe; eauto. omega.
             - eapply GFun_inv_Scope.
               eapply Disjoint_sym.
               eapply Disjoint_Included; [ | | now eapply Hd ].
               eapply Included_trans;
                 [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
-              now sets.
+              now sets.  
               eapply image_monotonic. eapply Included_trans.
               eapply add_global_funs_included; [| eassumption ]; tci. now sets.
               eapply GFun_inv_monotonic; eauto. omega. 
+            - eapply add_global_funs_is_gfuns. eassumption.
             - eapply Disjoint_Included_r; [| eapply Disjoint_Included_l; [ | now eapply Hd ] ].
               eapply Included_trans;
                 [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ]...
               now sets. now sets.
             - sets.
-            - eapply Forall2_monotonic; [| eassumption ]; intros.
-              eapply cc_approx_val_monotonic.
-              now eauto. omega. } 
-          assert (Hfun' : Fun_inv j rho1' (M.set Γ'' (Vconstr c vs) rho2') (FromList xs1) (name_in_fundefs B1) σ c Γ'').
-          { eapply Fun_inv_rename with (Γ := Γ). 
-            intros Hin.
-            eapply Hnin2. rewrite <- Hseq. eapply image_monotonic; [| eassumption ].
-            now apply Setminus_Included.
-            intros Hin. eapply Hnin''. left. rewrite image_Union. left; eassumption.
-            eapply Fun_inv_set_lists_In_Scope_l; [ now apply Included_refl | | now eauto ].
-            eapply Fun_inv_set_lists_In_Scope_r; [ now apply Included_refl | | | eassumption ].
-            eapply Disjoint_Included_r; 
-              [| eapply Disjoint_Included_l;
-                 [ apply image_monotonic; now apply Setminus_Included | eapply Disjoint_Included_l; [| now apply Hd ]]].
-            eapply Included_trans;
-              [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
-            right; eauto. now sets.  
-            eapply Fun_inv_reset; [| eassumption ]. eassumption. }
-
-          assert (Hfvs : FV_inv j rho1' (M.set Γ'' (Vconstr c vs) rho2') (FromList xs1) (name_in_fundefs B1)
-                                (GFuns' \\ FromList xs1) c Γ'' FVs).
-          { eexists. split.
-            rewrite M.gss. reflexivity.
-            eapply Forall2_monotonic; [| eassumption ]. 
-            intros x v1 Hyp v2 Hnin3 Hnin4 Hnin5 Hget'. 
-            erewrite <- set_lists_not_In in Hget'; [| now eauto | eassumption ].
-            erewrite def_funs_neq in Hget'.
-            eapply cc_approx_val_monotonic. eapply Hyp; eauto.
-            now eapply not_In_Empty_set. now eapply not_In_Empty_set.
-            intros Hnin. eapply Hnin5. constructor; eauto.
-            eapply add_global_funs_included in Hnin; [| | eassumption ]; tci. inv Hnin; eauto.
-            contradiction.
-            omega. eassumption. }
-          (* Apply the IHe *)
-          { (* generalize over c *)
-            eapply IHe with (Scope := FromList xs1) (GFuns := GFuns' \\ FromList xs1). 
-            * eassumption.
-            * eapply cc_approx_env_P_set_not_in_P_r.
-              eapply cc_approx_env_P_set_lists_l with (P1 := Empty_set _); eauto.
-              eapply cc_approx_env_Empty_set. now intros Hc; eauto.
-              intros Hc. eapply Hnin''. right; left. eassumption.
-            * intros Hc. apply Hnin''. eauto.
-            * eapply binding_in_map_antimon.
-              eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
-              eapply binding_in_map_set_lists; [| now eauto ].
-              eapply binding_in_map_def_funs. eassumption.
-            * intros B Hin. eapply Hun. left. 
-              eapply fun_in_fundefs_funs_in_fundef; eauto.
-              eapply find_def_correct. eassumption.
-            * eapply injective_subdomain_antimon. now eapply Hinj.
-              eapply Union_Included. eapply Included_Union_l.
-              eapply Included_trans. eapply Setminus_Included.
-              rewrite Union_commut. eapply add_global_funs_included_r. eassumption.
-            * eapply Disjoint_Included;[ | | eapply Hd ]; sets.
+            - eapply FV_inv_monotonic. eassumption. omega. }
+          destruct HK as [Hkf Hkg].
+          (* Apply IHe *)
+          eapply IHe with (Scope := FromList xs1) (GFuns := GFuns' \\ FromList xs1). 
+          -- eassumption.
+          -- eapply cc_approx_env_P_set_not_in_P_r.
+             eapply cc_approx_env_P_set_lists_l with (P1 := Empty_set _); eauto.
+             eapply cc_approx_env_Empty_set. now intros Hc; eauto.
+             intros Hc. eapply Hnin''. right; left. eassumption.
+          -- intros Hc. apply Hnin''. eauto.
+          -- eapply binding_in_map_antimon.
+             eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
+             eapply binding_in_map_set_lists; [| now eauto ].
+             eapply binding_in_map_def_funs. eassumption.
+          -- intros B Hin. eapply Hun. left. 
+             eapply fun_in_fundefs_funs_in_fundef; eauto.
+             eapply find_def_correct. eassumption.
+          -- eapply injective_subdomain_antimon. now eapply Hinj.
+             eapply Union_Included. eapply Included_Union_l.
+             eapply Included_trans. eapply Setminus_Included.
+             rewrite Union_commut. eapply add_global_funs_included_r. eassumption.
+          -- eapply Disjoint_Included;[ | | eapply Hd ]; sets.
+             eapply Included_trans;
+               [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
+             rewrite !Union_assoc. now apply Included_Union_r.
+          -- (* Fun_inv *)
+             eapply Fun_inv_rename with (Γ := Γ). intros Hin. 
+             eapply Hnin2. rewrite <- Hseq. eapply image_monotonic; [| eassumption ].
+             now apply Setminus_Included.
+             intros Hin. eapply Hnin''. left. rewrite image_Union. left; eassumption. 
+             eapply Fun_inv_set_lists_In_Scope_l; [ now apply Included_refl | | now eauto ].
+             eapply Fun_inv_set_lists_In_Scope_r; [ now apply Included_refl | | | eassumption ].
+             eapply Disjoint_Included_r; 
+               [| eapply Disjoint_Included_l;
+                  [ apply image_monotonic; now apply Setminus_Included | eapply Disjoint_Included_l; [| now apply Hd ]]].
+             eapply Included_trans;
+               [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
+             right; eauto. now sets. eapply Fun_inv_reset; eauto.
+          -- eapply GFun_inv_set_not_In_GFuns_r.
+             intros Hc. eapply Hnin''.
+             left. eapply image_monotonic; [| eassumption ]. sets.
+             eapply GFun_inv_setlist_not_In_GFuns_l; [| now eauto | ].
+             now sets.
+             eapply GFun_inv_setlist_not_In_GFuns_r; [| now eauto | ].
+             eapply Disjoint_sym.
+             eapply Disjoint_Included; [ | | now eapply Hd ].
+             eapply Included_trans;
+                [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
+              now sets.
+              eapply image_monotonic. sets.
+              eapply GFun_inv_antimon. eassumption. sets.
+          -- do 2 eexists. split. rewrite M.gss. reflexivity.
+             split. intros. reflexivity.
+             eapply Forall2_monotonic; [| eassumption ].
+             intros x v1 Hyp v2 Hnin3 Hnin4 Hnin5 Hget'.  
+             erewrite <- set_lists_not_In in Hget'; [| now eauto | eassumption ].
+             erewrite def_funs_neq in Hget'.
+             eapply cc_approx_val_monotonic. eapply Hyp; eauto.
+             now eapply not_In_Empty_set. now eapply not_In_Empty_set.
+             intros Hnin. eapply Hnin5. constructor; eauto.
+             eapply add_global_funs_included in Hnin; [| | eassumption ]; tci. inv Hnin; eauto.
+             contradiction. omega. eassumption.
+          -- admit. (* CC lemma *)
+      + edestruct Henv as [c' [vs [Hgetg [Hleq Hallg]]]].
+        simpl. eapply GFun_inv_set. 
+        * eassumption.
+        * intros Hc. eapply Hd''. constructor; eauto. eexists. split; eauto.
+          left. eauto.
+        * intros Hc. eapply Hd. admit. (* sub lemma *)
+          (* rewrite image_Union. right. eexists. split; eauto. *)
+          (* left. eauto. *)
+        * (* Finally show that the added funs ares related *)     
+          simpl. intros c'' Hin. rewrite cc_approx_val_eq.
+          intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hfind Hset.  
+          edestruct (@set_lists_length val)
+            with (rho' := def_funs B2 B2 rho' rho') as [rho2' Hset'].
+          eassumption. now eauto.
+          edestruct closure_conversion_fundefs_find_def
+            as [Γ'' [C2 [e2 [Hnin'' [Hfind' Hcc']]]]]; [  |  | eassumption |]. 
+          eapply injective_subdomain_antimon. now eapply Hinj. now sets. eassumption. 
+          exists Γ'', xs1. do 2 eexists.
+          split. reflexivity. split. eassumption. split.
+          simpl. rewrite Hset'. reflexivity.        
+          intros Hlt Hall.
+          assert (HK : Fun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) (name_in_fundefs B1) σ Γ /\
+                       GFun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) GFuns' σ).
+          { eapply IHk with (Funs' := name_in_fundefs B1); try eassumption. 
+            - intros. eapply IHe; eauto. omega.
+            - eapply GFun_inv_Scope.
+              eapply Disjoint_sym.
+              eapply Disjoint_Included; [ | | now eapply Hd ].
               eapply Included_trans;
                 [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
-              rewrite !Union_assoc. now apply Included_Union_r.
-            * eassumption. 
-            * admit. (* From IHgfuns *)
-              (* eapply GFun_inv_from_Fun_inv; try eassumption; tci. *)
-              (* eapply GFun_inv_set_not_In_GFuns_r. *)
-              (* intros Hc. eapply Hnin''. *)
-              (* left. eapply image_monotonic; [| eassumption ]. *)
-              (* eapply Included_trans. eapply Setminus_Included.  *)
-              (* eapply Included_trans. eapply Setminus_Included. *)
-              (* eapply Included_trans. eapply add_global_funs_included; [| eassumption ]; tci.  *)
-              (* now sets. *)
-              (* eapply GFun_inv_setlist_not_In_GFuns_l; [| now eauto | ]. *)
-              (* now sets. *)
-              (* eapply GFun_inv_setlist_not_In_GFuns_r; [| now eauto | ]. *)
-              (* eapply Disjoint_sym. *)
-              (* eapply Disjoint_Included; [ | | now eapply Hd ]. *)
-              (* eapply Included_trans; *)
-              (*   [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ]. *)
-              (* now sets. *)
-              (* eapply image_monotonic. *)
-              (* eapply Included_trans. eapply Setminus_Included.  *)
-              (* eapply Included_trans. eapply Setminus_Included. *)
-              (* eapply Included_trans. eapply add_global_funs_included; [| eassumption ]; tci. *)
-              (* now sets. *)
-              (* eapply GFun_inv_def_funs_not_In_GFuns_r. rewrite <- Hseq.  *)
-              (* eapply injective_subdomain_Union_not_In_image. *)
-              (* eapply injective_subdomain_antimon. eapply Hinj. now sets.    *)
-              (* now sets. *)
-              (* eapply GFun_inv_def_funs_not_In_GFuns_l. now sets. *)
-              (* eapply GFun_inv_set_not_In_GFuns_r. intros HC. eapply Hnin1. left. *)
-              (* eapply image_monotonic; [| eassumption ]. now sets.  *)
-              (* eapply GFun_inv_Scope. *)
-              (* eapply Disjoint_sym. eapply Disjoint_Included; [ | | now eapply Hd ]. *)
-              (* eapply Included_trans; *)
-              (*   [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ]. *)
-              (* now sets. *)
-              (* eapply image_monotonic. rewrite Union_commut. *)
-              (* eapply Included_trans;  *)
-              (*   [| eapply add_global_funs_included; [| eassumption ]; tci ]. now sets.  *)
-              (* eapply GFun_inv_antimon. eapply GFun_inv_monotonic; eauto. omega. *)
-              (* now sets.  *)
-            * eassumption. 
-            * eassumption. }
-      + (* Is v in GFuns'?
-           - No, don't care.
-           - Yes, then FVs = [],  apply IHe, but with arbitrary c. (* assertion *) 
-         *)
-              
-      
-    - inv Hcc'. simpl. split. 
-      eapply Hun_inv_set
-      + eapply IHB1'; eauto. 
-        * intros B H. inv H; eauto. specialize (Hun' (Fcons v f l e B1') (or_intror eq_refl)).
-          inv Hun'; eauto.
-        * eapply Disjoint_Included_l; [| eassumption ].
-          eapply image_monotonic.  now apply Included_Union_r.
-        * eapply injective_subdomain_antimon. eassumption. now sets.
-        * intros Hc. apply Hnin1'. simpl; eauto.
-        * intros Hc. apply Hnin2'. simpl; eauto.
-      + intros Hc. eapply Hnin2'. subst. left. eauto.
-      + intros Hc. eapply Hd''. constructor; eauto. eexists. split; eauto.
-        left. eauto.
-      + simpl in Hinj'.
-        assert (Hinj'' : injective_subdomain (v |: name_in_fundefs B1') σ). 
-        { eapply injective_subdomain_antimon. eauto. sets. }
-        eapply injective_subdomain_Union_not_In_image in Hinj''.
-        intros Hc. eapply Hinj''. constructor; eauto. eexists; eauto.
-        eapply image_monotonic; [| eassumption ]. now sets.
-        eapply Disjoint_sym. eapply Disjoint_Singleton_r.
-        specialize (Hun' (Fcons v f l e B1') (or_intror eq_refl)).
-        inv Hun'; eauto.
-      + rewrite def_funs_neq. rewrite M.gss. reflexivity.
-        intros Hc. eapply Hnin2'. right. eauto.
-      + rewrite cc_approx_val_eq.
-        intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hfind Hset.
-        edestruct (@set_lists_length val)
-        with (rho' := def_funs B2 B2 (M.set Γ (Vconstr c vs) rho')
-                               (M.set Γ (Vconstr c vs) rho')) as [rho2' Hset'].
-        eassumption. now eauto.
-        edestruct closure_conversion_fundefs_find_def
-          as [Γ'' [C2 [e2 [Hnin'' [Hfind' Hcc']]]]]; [  |  | eassumption |].
-        eapply injective_subdomain_antimon. now eapply Hinj. now sets.        
-        eassumption. 
-        exists Γ'', xs1. do 2 eexists.
-        split. reflexivity. split. eassumption. split.
-        simpl. rewrite Hset'. reflexivity.        
-        intros Hlt Hall.
-        
-  
-        
-                  
-        eapply IHe with (Scope := FromList xs1) (GFuns := GFuns' \\ FromList xs1).
-        * eassumption.
-        * eapply cc_approx_env_P_set_not_in_P_r.
-          eapply cc_approx_env_P_set_lists_l with (P1 := Empty_set _); eauto.
-          eapply cc_approx_env_Empty_set. now intros Hc; eauto.
-          intros Hc. eapply Hnin''. right; left. eassumption.
-        * intros Hc. apply Hnin''. eauto.
-        * eapply binding_in_map_antimon.
-          eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
-          eapply binding_in_map_set_lists; [| now eauto ].
-          eapply binding_in_map_def_funs. eassumption.
-        * intros B Hin. eapply Hun. left. 
-          eapply fun_in_fundefs_funs_in_fundef; eauto.
-          eapply find_def_correct. eassumption.
-        * eapply injective_subdomain_antimon. now eapply Hinj.
-          eapply Union_Included. eapply Included_Union_l.
-          eapply Included_trans. eapply Setminus_Included.
-          rewrite Union_commut. eapply add_global_funs_included_r. eassumption.
-        * eapply Disjoint_Included;[ | | eapply Hd ]; sets.
-          eapply Included_trans;
-            [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
-          rewrite !Union_assoc. now apply Included_Union_r.
-        * eassumption. 
-        * eapply GFun_inv_from_Fun_inv; try eassumption; tci.
-          eapply GFun_inv_set_not_In_GFuns_r.
-          intros Hc. eapply Hnin''.
-          left. eapply image_monotonic; [| eassumption ].
-          eapply Included_trans. eapply Setminus_Included. 
-          eapply Included_trans. eapply Setminus_Included.
-          eapply Included_trans. eapply add_global_funs_included; [| eassumption ]; tci. 
-          now sets.
-          eapply GFun_inv_setlist_not_In_GFuns_l; [| now eauto | ].
-          now sets.
-          eapply GFun_inv_setlist_not_In_GFuns_r; [| now eauto | ].
-          eapply Disjoint_sym.
-          eapply Disjoint_Included; [ | | now eapply Hd ].
-          eapply Included_trans;
-            [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
-          now sets.
-          eapply image_monotonic.
-          eapply Included_trans. eapply Setminus_Included. 
-          eapply Included_trans. eapply Setminus_Included.
-          eapply Included_trans. eapply add_global_funs_included; [| eassumption ]; tci.
-          now sets.
-          eapply GFun_inv_def_funs_not_In_GFuns_r. rewrite <- Hseq. 
-          eapply injective_subdomain_Union_not_In_image.
-          eapply injective_subdomain_antimon. eapply Hinj. now sets.   
-          now sets.
-          eapply GFun_inv_def_funs_not_In_GFuns_l. now sets.
-          eapply GFun_inv_set_not_In_GFuns_r. intros HC. eapply Hnin1. left.
-          eapply image_monotonic; [| eassumption ]. now sets. 
-          eapply GFun_inv_Scope.
-          eapply Disjoint_sym. eapply Disjoint_Included; [ | | now eapply Hd ].
-          eapply Included_trans;
-            [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
-          now sets.
-          eapply image_monotonic. rewrite Union_commut.
-          eapply Included_trans; 
-            [| eapply add_global_funs_included; [| eassumption ]; tci ]. now sets. 
-          eapply GFun_inv_antimon. eapply GFun_inv_monotonic; eauto. omega.
-          now sets. 
-        * eassumption. 
-        * eassumption.
-    - intros f v Hnin Hin Hget. now inv Hin.
+              now sets.  
+              eapply image_monotonic. eapply Included_trans.
+              eapply add_global_funs_included; [| eassumption ]; tci. now sets.
+              eapply GFun_inv_monotonic; eauto. omega. 
+            - eapply add_global_funs_is_gfuns. eassumption.
+            - eapply Disjoint_Included_r; [| eapply Disjoint_Included_l; [ | now eapply Hd ] ].
+              eapply Included_trans;
+                [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ]...
+              now sets. now sets.
+            - sets.
+            - eapply FV_inv_monotonic. eassumption. omega. }
+          destruct HK as [Hkf Hkg].
+          (* Apply IHe *) 
+          eapply IHe with (Scope := FromList xs1) (GFuns := GFuns' \\ FromList xs1). 
+          -- eassumption.
+          -- eapply cc_approx_env_P_set_not_in_P_r.
+             eapply cc_approx_env_P_set_lists_l with (P1 := Empty_set _); eauto.
+             eapply cc_approx_env_Empty_set. now intros Hc; eauto.
+             intros Hc. eapply Hnin''. right; left. eassumption.
+          -- intros Hc. apply Hnin''. eauto.
+          -- eapply binding_in_map_antimon.
+             eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
+             eapply binding_in_map_set_lists; [| now eauto ].
+             eapply binding_in_map_def_funs. eassumption.
+          -- intros B Hin'. eapply Hun. left. 
+             eapply fun_in_fundefs_funs_in_fundef; eauto.
+             eapply find_def_correct. eassumption.
+          -- eapply injective_subdomain_antimon. now eapply Hinj.
+             eapply Union_Included. eapply Included_Union_l.
+             eapply Included_trans. eapply Setminus_Included.
+             rewrite Union_commut. eapply add_global_funs_included_r. eassumption.
+          -- eapply Disjoint_Included;[ | | eapply Hd ]; sets.
+             eapply Included_trans;
+               [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
+             rewrite !Union_assoc. now apply Included_Union_r.
+          -- (* Fun_inv *) 
+             (* eapply Fun_inv_rename with (Γ := Γ). intros Hin'.  *)
+             (* eapply Hnin2. rewrite <- Hseq. eapply image_monotonic; [| eassumption ]. *)
+             (* now apply Setminus_Included. *)
+             (* intros Hin'. eapply Hnin''. left. rewrite image_Union. left; eassumption.  *)
+             (* eapply Fun_inv_set_lists_In_Scope_l; [ now apply Included_refl | | now eauto ]. *)
+             (* eapply Fun_inv_set_lists_In_Scope_r; [ now apply Included_refl | | | eassumption ]. *)
+             (* eapply Disjoint_Included_r;  *)
+             (*   [| eapply Disjoint_Included_l; *)
+             (*      [ apply image_monotonic; now apply Setminus_Included | eapply Disjoint_Included_l; [| now apply Hd ]]]. *)
+             (* eapply Included_trans; *)
+             (*   [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ]. *)
+          (* right; eauto. now sets. eapply Fun_inv_reset; eauto. *)
+            admit. (* Lemma from Gfuns *)
+          -- eapply GFun_inv_set_not_In_GFuns_r.
+             intros Hc. eapply Hnin''.
+             left. eapply image_monotonic; [| eassumption ]. sets.
+             eapply GFun_inv_setlist_not_In_GFuns_l; [| now eauto | ].
+             now sets.
+             eapply GFun_inv_setlist_not_In_GFuns_r; [| now eauto | ].
+             eapply Disjoint_sym.
+             eapply Disjoint_Included; [ | | now eapply Hd ].
+             eapply Included_trans;
+                [| eapply fun_in_fundefs_bound_var_fundefs; now eapply find_def_correct; eauto ].
+              now sets.
+              eapply image_monotonic. sets.
+              eapply GFun_inv_antimon. eassumption. sets.
+          -- do 2 eexists. split; [| split; [| constructor ]]. rewrite M.gss. reflexivity.
+             eauto.
+          -- destruct Hadd1 as [ [Heq He2] | [Heq1 He2] ]; subst.
+             admit. (* Lemma cc *)
+             exfalso. eapply He2. eassumption. now left.
+    - split. intros f v Hnin Hin Hget. now inv Hin.
+      inv Hcc'. simpl. eapply GFun_inv_antimon.
+      eassumption.
+      simpl in Hadd1.
+      admit. (* subset *) 
+      Grab Existential Variables. eassumption.
   Qed.
 
   

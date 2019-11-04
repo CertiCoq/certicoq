@@ -4,7 +4,8 @@
 
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
-Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.Ensembles_util L6.List_util.
+Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx
+        L6.Ensembles_util L6.List_util L6.size_cps L6.tactics.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
@@ -2554,6 +2555,31 @@ Section Log_rel.
     repeat eexists; eauto. now econstructor; eauto.
     eapply cc_approx_val_monotonic; eauto. omega.
   Qed.
+
+  (* Lemma cc_approx_exp_letapp_compat k (S S' : relation nat) P *)
+  (*       rho1 rho2 x tau n y1 y2 e1 e2 : *)
+  (*   cc_approx_var_env k P rho1 rho2 y1 y2 -> *)
+  (*   (forall c1 c2, S c1 c2 -> S' (c1 + 1) (c2 + 1)) -> *)
+  (*   (forall v1 v2 c vs, *)
+  (*       (* needed for cost proof *) *)
+  (*       M.get y1 rho1 = Some (Vconstr c vs) -> *)
+  (*       List.In v1 vs -> *)
+  (*       cc_approx_val k P v1 v2 ->  *)
+  (*       cc_approx_exp k S P (e1, M.set x v1 rho1) *)
+  (*                     (e2, M.set x v2 rho2)) -> *)
+  (*   cc_approx_exp k S' P (Eletapp x f ft ys e1, rho1) (Eletapp x f' ft ys e2, rho2). *)
+  (* Proof. *)
+  (*   intros Henv Hyp Hexp v1 c1 Hleq1 Hstep1. inv Hstep1. *)
+  (*   edestruct Henv as [v' [Hget Hpre]]; eauto. *)
+  (*   destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction. *)
+  (*   inv Hpre. *)
+  (*   edestruct (Forall2_asym_nthN (cc_approx_val k P) vs l) as [v2 [Hnth Hval]]; eauto. *)
+  (*   edestruct Hexp as [v2' [c2 [Hstep [HS Hval']]]]; *)
+  (*     [| | |  | eassumption | ]; eauto. *)
+  (*   now eapply nthN_In; eauto. omega. *)
+  (*   repeat eexists; eauto. now econstructor; eauto. *)
+  (*   eapply cc_approx_val_monotonic; eauto. omega. *)
+  (* Qed. *)
   
   Lemma cc_approx_exp_case_nil_compat k S P rho1 rho2 x1 x2 :
     cc_approx_exp k S P (Ecase x1 [], rho1) (Ecase x2 [], rho2).
@@ -2918,6 +2944,119 @@ Section Log_rel.
   Qed.
 
   End Compose.
+
+
+  (* More environment lemmas *)
+  
+  Lemma cc_approx_val_cc_appox_var_env k P rho1 rho2 x y v1 v2 :
+    M.get x rho1 = Some v1 -> M.get y rho2 = Some v2 ->
+    cc_approx_val k P v1 v2 ->
+    cc_approx_var_env k P rho1 rho2 x y.
+  Proof.
+    intros Hget1 Hget2 Hcc.
+    intros v1' Hget1'. rewrite Hget1 in Hget1'. inv Hget1'.
+    firstorder.
+  Qed.
+
+  Lemma Forall2_cc_approx_var_env k P rho1 rho2 l1 l2 vs1 vs2 :
+    get_list l1 rho1 = Some vs1 ->
+    get_list l2 rho2 = Some vs2 ->
+    Forall2 (cc_approx_val k P) vs1 vs2 ->
+    Forall2 (cc_approx_var_env k P rho1 rho2) l1 l2.
+  Proof.
+    revert vs1 l2 vs2; induction l1; intros vs1 l2 vs2  Hget1 Hget2 Hall.
+    - destruct vs1; try discriminate.
+      inv Hall. destruct l2; try discriminate.
+      now constructor.
+      simpl in Hget2. destruct (M.get e rho2); try discriminate.
+      destruct (get_list l2 rho2); try discriminate.
+    - simpl in Hget1.
+      destruct (M.get a rho1) eqn:Hgeta; try discriminate.
+      destruct (get_list l1 rho1) eqn:Hgetl; try discriminate.
+      inv Hget1.
+      inv Hall.
+      destruct l2; try discriminate. simpl in Hget2.
+      destruct (M.get e rho2) eqn:Hgeta'; try discriminate.
+      destruct (get_list l2 rho2) eqn:Hgetl'; try discriminate.
+      inv Hget2. constructor; eauto.
+      eapply cc_approx_val_cc_appox_var_env; eauto.
+  Qed.
+
+  (** Lemmas about evaluation contexts *)
+
+  (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+      interpretation of [C] in [ρ2] *)
+  Lemma ctx_to_rho_cc_approx_exp k (P : nat -> relation nat) P' boundG rho1 rho2 rho2' C e e' :
+    inclusion _ P' (P 0) ->
+    (forall c1 c2 n c ,  P n c1 c2 -> P (n + c) c1 (c2 + c)) ->
+    ctx_to_rho C rho2 rho2' -> 
+    cc_approx_exp k P' boundG (e, rho1) (e', rho2') ->
+    cc_approx_exp k (P (sizeOf_exp_ctx C)) boundG (e, rho1) (C |[ e' ]|, rho2).
+  Proof.  
+    intros H1 H2 Hctx Hcc. induction Hctx.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      firstorder.
+    - intros v1 c1 Hleq1 Hstep1.
+      edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; try eassumption.
+      repeat eexists.
+      now econstructor; eauto.
+      simpl.
+      rewrite (plus_comm 1). now eauto.
+      eassumption.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      repeat eexists.
+      simpl. econstructor; eauto. simpl.
+      (* rewrite H, H0. reflexivity. *)
+      rewrite !plus_assoc_reverse, <- plus_Sn_m, (plus_comm _ (sizeOf_exp_ctx C)).
+      now eauto.
+      eassumption.
+  Qed.
+  
+  Lemma cc_approx_exp_ctx_to_rho k (P' : nat -> relation nat) P boundG rho1 rho2 rho2' C e e' :
+    inclusion _ (P' 0) P ->
+    (forall c1 c2 c n, c <= sizeOf_exp_ctx C -> P' (n + c) c1 (c2 + c) -> P' n c1 c2) ->
+    ctx_to_rho C rho2 rho2' -> 
+    cc_approx_exp k (P' (sizeOf_exp_ctx C)) boundG (e, rho1) (C |[ e' ]|, rho2) ->
+    cc_approx_exp k P boundG (e, rho1) (e', rho2').
+  Proof.  
+    intros H1 H2 Hctx Hcc. induction Hctx.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      firstorder.
+    - eapply IHHctx; eauto.
+      + intros c1 c2 c3 n Hleq. eapply H2. simpl; omega.
+      + intros v1 c1 Hleq1 Hstep1.
+        edestruct Hcc as [v2 [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+        inv Hstep2. rewrite H in H11; inv H11. rewrite H12 in H0; inv H0.
+        repeat eexists; eauto.
+        simpl in Hub. rewrite (plus_comm 1) in Hub. eapply H2; try eassumption.
+        simpl; omega.
+    - eapply IHHctx; eauto.
+      intros c1 c2 c3 n Hleq. eapply H2; simpl; omega.
+      intros v1' c1' Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      inv Hstep2. simpl in H11. repeat subst_exp. 
+      repeat eexists; eauto.
+      
+      simpl in Hub.
+      rewrite !plus_assoc_reverse, <- plus_Sn_m, (plus_comm _ (sizeOf_exp_ctx C)) in Hub.
+      eapply H2; try eassumption.
+      simpl; omega.
+  Qed.
+
+  Lemma cc_approx_exp_rel_conj k P1 P2 P rho1 rho2 e1 e2 :
+    cc_approx_exp k P1 P (e1, rho1) (e2, rho2) ->
+    cc_approx_exp k P2 P (e1, rho1) (e2, rho2) ->
+    cc_approx_exp k (fun c1 c2 => P1 c1 c2 /\ P2 c1 c2) P (e1, rho1) (e2, rho2).
+  Proof. 
+    intros Hcc1 Hcc2 v c Hlt Hstep.
+    edestruct Hcc1 as [v1 [c1 [Hstep1 [HP1 Hv1]]]]; eauto.
+    edestruct Hcc2 as [v2 [c2 [Hstep2 [HP2 Hv2]]]]; eauto.
+    eapply bstep_cost_deterministic in Hstep1; eauto. inv Hstep1.
+    firstorder.
+  Qed.  
   
   (* The following are obsolete *)
   (* TODO: move to identifiers.v *)
@@ -3025,5 +3164,6 @@ Section Log_rel.
       + intros B Hin. eauto.
     - eapply Hcl1. now constructor. eassumption.
   Abort.
+
 
 End Log_rel.

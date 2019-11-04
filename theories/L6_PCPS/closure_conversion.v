@@ -52,14 +52,14 @@ Section CC.
         project_var Scope Funs GFuns f c Γ FVs S x y
                     (Econstr_c y clo_tag [(f x); Γ] Hole_c) (Setminus _ S (Singleton _ y))
   | Var_in_GFuns :
-      forall Scope Funs GFuns f c Γ FVs S x y g_env,
+      forall Scope Funs GFuns f c c' Γ FVs S x y g_env,
         ~ In _ Scope x ->
         ~ In _ Funs x ->
         In _ GFuns x ->
         In _ S y ->
         In _ (S \\ [set y]) g_env ->
         project_var Scope Funs GFuns f c Γ FVs S x y
-                    (Econstr_c g_env c [] (Econstr_c y clo_tag [(f x); g_env] Hole_c)) (S \\ [set y] \\ [set g_env])
+                    (Econstr_c g_env c' [] (Econstr_c y clo_tag [(f x); g_env] Hole_c)) (S \\ [set y] \\ [set g_env])
   | Var_in_FVs :
       forall Scope Funs GFuns f c Γ FVs S x y N,
         ~ In _ Scope x ->
@@ -180,7 +180,7 @@ Section CC.
         (* Γ' is the variable that will hold the record of the environment *)
         Disjoint _ S3 (name_in_fundefs B :|: (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ])))) ->
            In _ S3 Γ' ->
-        Disjoint _ S2 (bound_var_fundefs B :|: (Γ' |: (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))))) ->
+        Disjoint _ S2 (bound_var (Efun B e) :|: (Γ' |: (Scope :|: (image f ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))))) ->
         make_closures B S2  Γ' C f S2' ->
         add_global_funs GFuns (name_in_fundefs B) (FromList FVs') GFuns' ->
         Closure_conversion_fundefs (name_in_fundefs B) GFuns' f c' FVs' B B' ->

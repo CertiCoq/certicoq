@@ -747,4 +747,44 @@ Section Closure_conversion_util.
     intros Hcc; induction Hcc; eauto; simpl. congruence.
   Qed.
 
+  Lemma project_var_tag_inv Scope GFuns Funs σ c1 c2 Γ  S x x' C S' :
+    project_var clo_tag Scope GFuns Funs σ c1 Γ [] S x  x' C S' ->
+    project_var clo_tag Scope GFuns Funs σ c2 Γ [] S x  x' C S'.
+  Proof.
+    intros Hc; inv Hc; (try constructor; eauto).
+    inv H2.
+  Qed.
+
+  Lemma project_vars_tag_inv Scope GFuns Funs σ c1 c2 Γ  S x x' C S' :
+    project_vars clo_tag Scope GFuns Funs σ c1 Γ [] S x  x' C S' ->
+    project_vars clo_tag Scope GFuns Funs σ c2 Γ [] S x  x' C S'.
+  Proof.
+    revert Scope GFuns Funs σ c1 c2 Γ  S x' C S'; induction x;
+      intros Scope GFuns Funs σ c1 c2 Γ  S x' C S' Hvs; inv Hvs; try (constructor; eauto).
+    econstructor. eapply project_var_tag_inv. eassumption.
+    eapply IHx; eassumption.
+  Qed.
+
+  Lemma Closure_conversion_tag_inv Scope Funs GFuns g c1 c2 Γ e e' C :
+    Closure_conversion clo_tag Scope Funs GFuns g c1 Γ [] e e' C ->
+    Closure_conversion clo_tag Scope Funs GFuns g c2 Γ [] e e' C.
+  Proof.
+    revert Scope Funs GFuns g c1 c2 Γ e' C; induction e using exp_ind';
+      intros Scope Funs GFuns g c1 c2 Γ e' C Hcc; inv Hcc;
+        try (econstructor; eauto; eapply project_vars_tag_inv; eassumption);
+        try (econstructor; eauto; eapply project_var_tag_inv; eassumption).
+    - econstructor; eauto.
+      eapply project_var_tag_inv. eassumption. inv H12.
+      constructor.
+    - econstructor; eauto.
+      eapply project_var_tag_inv. eassumption.
+      inv H12. destruct H2 as [Heq [C' [e' [HeqC Hcc']]]].
+      destruct y as [c2' e2]. simpl in *; subst.
+      constructor; eauto.
+      split; eauto. do 2 eexists; split; eauto. simpl. reflexivity.
+      assert (Hcc1 : Closure_conversion clo_tag Scope Funs GFuns g c2 Γ [] (Ecase v l) (Ecase x' l') C).
+      { eapply IHe0. econstructor; eauto. }
+      inv Hcc1. eassumption.
+  Qed. 
+
 End Closure_conversion_util.

@@ -66,10 +66,11 @@ Notation tunit t := (unit t).
 Notation btunit n t := (bcons n t bnil).
 Notation dunit nm t m := (dcons nm t m dnil).
 
-(** Printing terms in exceptions for debugging purposes **
+(** Printing terms in exceptions for debugging purposes **)
 Fixpoint print_template_term (t:term) : string :=
   match t with
     | tRel n => " (" ++ (nat_to_string n) ++ ") "
+    | tBox => "BOX"
     | tLambda _ _ => " LAM "
     | tLetIn _ _ _ => " LET "
     | tApp fn args =>
@@ -81,10 +82,10 @@ Fixpoint print_template_term (t:term) : string :=
       " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++
                 (print_template_term mch) ++ " _ " ++") "
     | tFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+    | tCoFix _ n => " (COFIX " ++ (nat_to_string n) ++ ") "
     | _ =>  " Wrong "
   end.
- *********************)
-
+ 
 (** needed for compiling L1 to L1g **
 Function tappend (ts1 ts2:Terms) : Terms :=
   match ts1 with

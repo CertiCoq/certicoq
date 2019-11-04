@@ -5,6 +5,9 @@
 # extracted compiler
 # extraction/ast0.mli
 
+certicoq_debug.mli
+certicoq_debug.ml
+
 extraction/char0.mli
 extraction/decidableClass.mli
 extraction/errors0.mli

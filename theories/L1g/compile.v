@@ -301,10 +301,20 @@ From MetaCoq.Erasure Require Import ErasureFunction SafeTemplateErasure.
 Existing Instance envcheck_monad.
 Import MonadNotation.
 
+Open Scope string_scope.
+
 Definition program_Program (p:Template.Ast.program) : Program Term :=
+  let p := fix_program_universes p in
   match erase_template_program p with
   | CorrectDecl (gc, t) =>
     {| main := term_Term gc t;
        env := program_Pgm_aux gc |}
-  | EnvError env => {| main := TWrong "program_Program"; env := nil |}
+  | EnvError err => 
+    let str :=
+      match err with
+      | AlreadyDeclared id => "Already declared: " ++ id
+      | IllFormedDecl id e => "Type error: " ++ PCUICSafeChecker.string_of_type_error e ++ ", while checking " ++ id
+      end
+    in
+    {| main := TWrong ("L1g.program_Program: erase_template_program failed with error:" ++ str); env := nil |}
   end.

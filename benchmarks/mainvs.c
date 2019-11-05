@@ -13,7 +13,7 @@ extern value args[];
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
 } 
-
+/* 
 unsigned long long make_bool_false(void)
 {
   return 3;
@@ -48,7 +48,7 @@ void elim_bool(unsigned long long val, unsigned long long *ordinal, unsigned lon
       
     }
   }
-}
+} */
 /* OS: not generated */
 void bool_elim(value bool){
     value ordinal;

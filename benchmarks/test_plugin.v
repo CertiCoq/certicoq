@@ -11,6 +11,9 @@ CertiCoq Compile foo.
 
 MetaCoq Erase (map negb [true; false]).
 
+Definition test := map negb [true; false].
+CertiCoq Compile test.
+
 Require Import Binom.
 (* Universe issues: template polymorphism not implemented yet *)
 (* MetaCoq SafeCheck main. *)

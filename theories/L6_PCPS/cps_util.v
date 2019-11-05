@@ -63,6 +63,23 @@ Proof.
   - right. eauto.
 Defined.
 
+Lemma find_def_def_funs_ctx B f e1 e2 tau xs e' :
+  find_def f (B <[ e1 ]>) = Some (tau, xs, e') ->
+  (find_def f (B <[ e2 ]>) = Some (tau, xs, e')) \/
+  (exists c, e' = c |[ e1 ]| /\
+                        find_def f (B <[ e2 ]>) = Some (tau, xs, c |[ e2 ]|)).
+Proof.
+  revert tau xs e'. induction B; simpl; intros tau xs e' Heq.
+  - destruct (M.elt_eq f v).
+    + inv Heq. right. eexists e.
+      split; eauto.
+    + left; eauto.
+  - destruct (M.elt_eq f v).
+    + inv Heq. left; eauto.
+    + eauto.
+Qed.
+
+
 Lemma findtag_append_spec {A} c P P' (v : A) :
   findtag (P ++ P') c = Some v ->
   (findtag P c = Some v) \/
@@ -122,6 +139,35 @@ Proof.
     eexists; split; eauto.
 Qed.
 
+(** [find_tag_nth] *)
+Inductive find_tag_nth : list (ctor_tag * exp) -> ctor_tag -> exp -> nat -> Prop :=
+| find_tag_hd :
+    forall c e l,
+      find_tag_nth ((c, e) :: l) c e 1
+| find_tag_lt :
+    forall c e l c' e' n,
+      find_tag_nth l c' e' n ->
+      c <> c' ->
+      find_tag_nth ((c, e) :: l) c' e' (n + 1).          
+
+Lemma find_tag_nth_In_patterns (P : list (ctor_tag * exp)) (c : ctor_tag) n e :
+  find_tag_nth P c e n -> List.In (c, e) P.
+Proof. 
+  intros H; induction H; eauto.
+  now constructor.
+  now constructor. 
+Qed.
+
+Lemma find_tag_nth_same_tags (D1 D2 : list (ctor_tag * exp)) c e e' n n':
+  Forall2 (fun p1 p2 => fst p1 = fst p2) D1 D2 ->
+  find_tag_nth D1 c e n ->
+  find_tag_nth D2 c e' n' ->
+  n = n'.
+Proof.
+  intros Hall. revert n n'.
+  induction Hall; intros n n' Hf Hf'; inv Hf; inv Hf'; eauto;
+    simpl in H; subst; congruence.
+Qed.
 
 (** [split_fds B1 B2 B] iff B is an interleaving of the definitions in B1 and B2 *)
 Inductive split_fds: fundefs -> fundefs -> fundefs -> Prop :=

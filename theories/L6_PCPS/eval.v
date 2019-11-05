@@ -327,17 +327,6 @@ Section EVAL.
   Qed.
 
 
-  Inductive find_tag_nth : list (ctor_tag * exp) -> ctor_tag -> exp -> nat -> Prop :=
-  | find_tag_hd :
-      forall c e l,
-        find_tag_nth ((c, e) :: l) c e 1
-  | find_tag_lt :
-      forall c e l c' e' n,
-        find_tag_nth l c' e' n ->
-        c <> c' ->
-        find_tag_nth ((c, e) :: l) c' e' (n + 1).          
-
-
   (** Big step semantics with a more precise cost model.
    * The goal is that the number of machine instructions that
    * correspond to each rule is proportional to the assigned cost. *)

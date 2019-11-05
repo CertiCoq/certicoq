@@ -447,6 +447,68 @@ Proof.
     simpl. omega.
 Qed.
 
+  (** *  Useful definitions and lemmas for the  bound. *)
+
+Definition max_exp_env (k : nat) (e : exp) rho :=
+  max (sizeOf_exp e) (sizeOf_env k rho).
+
+
+Lemma max_exp_env_grt_1 k e rho :
+  1 <= max_exp_env k e rho.
+Proof.
+  unfold max_exp_env.
+  eapply le_trans. now apply sizeOf_exp_grt_1.
+  eapply Max.le_max_l.
+Qed.
+
+(** Lemmas used to establish the upper bound given the IH *)
+
+Lemma max_exp_env_Econstr k x t ys e rho :
+  max_exp_env k e rho <= max_exp_env k (Econstr x t ys e) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Eproj k x t N y e rho :
+  max_exp_env k e rho <= max_exp_env k (Eproj x t N y e) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Ecase_cons_hd k x c e l rho :
+  max_exp_env k e rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Ecase_cons_tl k x c e l rho :
+  max_exp_env k (Ecase x l) rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Eprim k x f ys e rho :
+  max_exp_env k e rho <= max_exp_env k (Eprim x f ys e) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Efun k B e rho :
+  max_exp_env k e (def_funs B B rho rho) <= max_exp_env k (Efun B e) rho.
+Proof.
+  unfold max_exp_env. eapply le_trans.
+  - eapply Nat.max_le_compat_l.
+    now apply sizeOf_env_def_funs.
+  - rewrite (Max.max_comm (sizeOf_env _ _)), Max.max_assoc.
+    eapply Nat.max_le_compat_r.
+    eapply Nat.max_lub; simpl; omega.
+  Qed.
+
 (* Lemma about the number of free variables *)
 Lemma occurs_free_cardinality_mut :
   (forall e FVs,

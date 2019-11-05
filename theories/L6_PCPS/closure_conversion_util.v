@@ -385,7 +385,7 @@ Section Closure_conversion_util.
       apply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption.
       intros f Hunf. eapply Hun. now constructor.
-      eauto 7 with Ensembles_DB.
+      eauto 20 with Ensembles_DB.
     - eapply project_var_occurs_free_ctx_Included;
       [ eassumption | | now apply Included_refl ].
       rewrite occurs_free_Ehalt...
@@ -531,9 +531,8 @@ Section Closure_conversion_util.
 
   Lemma project_var_not_In_free_set Scope Funs GFuns σ c Γ FVs x x' C S S'  :
     project_var clo_tag Scope Funs GFuns σ c Γ FVs S x x' C S' ->
-    Disjoint _ S (Union var Scope
-                        (Union var (image σ (Setminus _ (Funs :|: GFuns) Scope))
-                               (Union var (FromList FVs) (Singleton var Γ)))) ->
+    Disjoint _ S (Scope :|: (image σ ((Funs \\ Scope) :|: GFuns) :|:
+                                   ((FromList FVs) :|: ([set Γ])))) ->
     ~ In _ S' x'.
   Proof.
     intros Hproj Hd. inv Hproj; intros Hc.
@@ -545,9 +544,8 @@ Section Closure_conversion_util.
 
   Lemma project_vars_not_In_free_set Scope Funs GFuns σ c Γ FVs xs xs' C S S'  :
     project_vars clo_tag Scope Funs GFuns σ c Γ FVs S xs xs' C S' ->
-    Disjoint _ S (Union var Scope
-                        (Union var (image σ (Setminus _ (Funs :|: GFuns) Scope))
-                               (Union var (FromList FVs) (Singleton var Γ)))) ->
+    Disjoint _ S (Scope :|: (image σ ((Funs \\ Scope) :|: GFuns) :|:
+                                   ((FromList FVs) :|: ([set Γ]))))  ->
     Disjoint _ S' (FromList xs').
   Proof.
     intros Hproj Hd. induction Hproj.
@@ -785,6 +783,68 @@ Section Closure_conversion_util.
       assert (Hcc1 : Closure_conversion clo_tag Scope Funs GFuns g c2 Γ [] (Ecase v l) (Ecase x' l') C).
       { eapply IHe0. econstructor; eauto. }
       inv Hcc1. eassumption.
-  Qed. 
+  Qed.
+
+
+  (** * Lemmas about [add_global_funs] *)
+  
+  Lemma add_global_funs_included G F {_ : Decidable F} V G' :
+    add_global_funs G F V G' ->
+    G \subset G' :|: F.
+  Proof. 
+    intros Hin. inv Hin; sets.
+  Qed.
+  
+  Lemma add_global_funs_included_r G F V G' :
+    add_global_funs G F V G' ->
+    G' \subset G :|: F.
+  Proof. 
+    intros Hin. inv Hin; sets.
+  Qed.
+
+  Definition is_gfuns (GFuns : Ensemble var) names (FVs : list var) GFuns' :=
+    (FVs = [] /\ GFuns' \subset GFuns :|: names) \/
+    (FVs <> [] /\ GFuns' \subset GFuns \\ names).
+
+  Lemma add_global_funs_is_gfuns (GFuns : Ensemble var) names (FVs : list var) GFuns':
+    add_global_funs GFuns names (FromList FVs) GFuns' ->
+    is_gfuns GFuns names FVs GFuns'.
+  Proof.
+    intros Hin; destruct FVs; inv Hin; unfold is_gfuns; sets.
+    - exfalso. eapply not_In_Empty_set. eapply H.
+      now left.
+    - right. split; sets. congruence.
+  Qed.
+
+  Lemma is_gfuns_setminus (GFuns : Ensemble var) names (FVs : list var) GFuns' x:
+   is_gfuns GFuns (x |: names) FVs GFuns' ->
+   is_gfuns GFuns names FVs (GFuns' \\ [set x]).
+  Proof.
+    intros [[H1 H2] | [H1 H2]]; subst; unfold is_gfuns in *.
+    left; split; eauto.
+    eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption. sets.
+    right; split; eauto.
+    eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption. sets.
+  Qed.
+
+  Lemma is_gfuns_included_r G F {_ : Decidable F} V G' :
+    is_gfuns G F V G' ->
+    G' \subset G :|: F.
+  Proof. 
+    intros Hin. destruct Hin as [[? ?] | [? ?]]; subst; sets.
+    eapply Included_trans. eassumption. sets.
+  Qed.
+
+  Lemma add_global_funs_is_gfuns_included (GFuns : Ensemble var) names (FVs : list var) GFuns' GFuns'' :
+    add_global_funs GFuns names (FromList FVs) GFuns' ->
+    is_gfuns GFuns names FVs GFuns'' ->
+    GFuns'' \subset GFuns'.
+  Proof.
+    intros Hadd Hin; destruct Hin as [[? ?] | [? ?]]; inv Hadd; unfold is_gfuns; sets.
+    - eapply Included_trans. eassumption. sets.
+    - rewrite FromList_nil in H1. exfalso; eapply H1; reflexivity.
+    - eapply Included_trans. eassumption. sets.
+  Qed.
+
 
 End Closure_conversion_util.

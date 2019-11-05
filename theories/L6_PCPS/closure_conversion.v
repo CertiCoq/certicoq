@@ -199,7 +199,7 @@ Section CC.
          should not shadow the variables in the current scope and the
          variables that where used in the projections *)
         In _ S' f'' -> In _ S' env' -> f'' <> env' ->
-        Closure_conversion (Union _ (Singleton _ x) Scope) Funs GFuns g c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) g c Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns g c Γ FVs (Eletapp x f ft ys e)
                            (Eproj f'' clo_tag 0%N f'
                                   (Eproj env' clo_tag 1%N f'
@@ -223,7 +223,7 @@ Section CC.
       forall Scope Funs GFuns g c Γ FVs S S' x ys ys' C C' f e e',
         Disjoint _ S (Scope :|: (image g ((Funs \\ Scope) :|: GFuns) :|: (FromList FVs :|: [set Γ]))) ->
         project_vars Scope Funs GFuns g c Γ FVs S ys ys' C S' ->
-        Closure_conversion (x |: Scope) Funs GFuns g c Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) g c Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns g c Γ FVs (Eprim x f ys e)
                            (Eprim x f ys' (C' |[ e' ]|)) C
   | CC_Ehalt :

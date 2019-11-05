@@ -24,8 +24,20 @@ Section Closure_conversion_correct.
   Variable clo_tag : ctor_tag.
 
   (* Parameterize over the postconditions *)
-  Context (boundL : nat -> exp -> env -> relation nat)
-          (boundG : nat -> relation (exp * env * nat)).
+  (* Currently assume that the bounds are independent from the size of exp and environment for simplicity *)
+  (* For the current cost model and L6 transformations that should suffice *)
+  Context (boundL : nat (* local steps *) -> relation nat)
+          (boundG : nat -> relation (exp * env * nat))
+          (Hbounds_eq : forall i e1 rho1 c1 e2 rho2 c2, boundL 0 c1 c2 <-> boundG i (e1, rho1, c1) (e2, rho2, c2))
+          (bound_add_compat : forall A c c1 c2, boundL c c1 c2 -> boundL c (c1 + A) (c2 + A))
+          (bound_letapp_compat :
+             forall c k f1 rho1 rho' rho'' B f' t xs vs e1 e2 rho2 c1 c2 c1' c2' A,
+               M.get f1 rho1 = Some (Vfun rho' B f') ->
+               find_def f' B = Some (t, xs, e1) ->
+               set_lists xs vs (def_funs B B rho' rho') = Some rho'' ->
+               boundG (k - 1) (e1, rho'', c1) (e2, rho2, c2) ->
+               boundL c c1' c2' ->
+               boundL c (c1 + c1' + A) (c2 + c2' + A + 3)).
   
   (** ** Semantics preservation proof *)
 
@@ -158,7 +170,7 @@ Section Closure_conversion_correct.
   Qed.
 
   (** * Correctness lemmas *)
-
+  
   (** Correctness of [closure_conversion_fundefs]. Basically un-nesting the nested
       induction that is required by the correctness of [Closure_conversion] *) 
   Lemma Closure_conversion_fundefs_correct k rho rho' B1 B2 B1' B2'
@@ -179,7 +191,7 @@ Section Closure_conversion_correct.
          GFun_inv m rho rho' Scope GFuns σ ->
          FV_inv m rho rho' Scope Funs GFuns c Γ FVs ->
          Closure_conversion clo_tag Scope Funs GFuns σ c Γ FVs e e' C ->
-         cc_approx_exp pr cenv clo_tag m (boundL m e rho) boundG (e, rho) (C |[ e' ]|, rho')) ->
+         cc_approx_exp pr cenv clo_tag m (boundL 0) boundG (e, rho) (C |[ e' ]|, rho')) ->
     (* FVs *)
     (occurs_free_fundefs B1 \\ GFuns) <--> (FromList FVs) ->
     (* unique functions *)

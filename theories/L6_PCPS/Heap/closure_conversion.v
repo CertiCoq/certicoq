@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 Require Import Common.AstCommon.
 
 From CertiCoq.L6 Require Import cps cps_util set_util relations hoisting identifiers ctx
@@ -465,13 +465,6 @@ Section CC.
     let '(e, C, s) := runState
                         (exp_closure_conv e 1%positive Γ)
                         state in
-<<<<<<< HEAD
-    
     (e, C).
 
 End CC.
-=======
-    exp_hoist (f e).
-  
-End CC.
->>>>>>> Adapt to MetaCoq

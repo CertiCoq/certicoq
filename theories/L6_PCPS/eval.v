@@ -4,7 +4,8 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 Import ListNotations.
 Require Import Coq.Strings.String.
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
-From CertiCoq.L6 Require Import cps List_util size_cps ctx cps_util.
+From CertiCoq.L6 Require Import cps List_util size_cps ctx cps_util set_util map_util identifiers.
+Require Import compcert.lib.Coqlib.
 
 
 
@@ -304,15 +305,11 @@ Section EVAL.
       destruct (find_def v1 f0) eqn:gv1f0; [| inv H].
       destruct p. destruct p.
       destruct (f =? f1)%positive eqn:ff1; [| inv H].
-      apply Peqb_true_eq in ff1. subst.
-      destruct ( set_lists l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H].
+      apply Peqb_true_eq in ff1. subst. simpl in *. 
+      destruct (set_lists l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H]. 
       simpl in H.
-      unfold l_opt in H. rewrite ll0 in H.
-      simpl in H. 
-      apply IHn in H. inv H. exists (x+1).
+      apply IHn in H. inv H. exists (x+1)%nat.
       econstructor; eauto.
-      rewrite ll0 in H1.
-      simpl in H1. inv H1.    
     - destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (M.get p pr) eqn:ppr; [| inv H].
       destruct (o l0) eqn:ol0; [| inv H].
@@ -322,7 +319,7 @@ Section EVAL.
       rewrite ol0 in H1. simpl in H1. inv H1.
     - destruct (M.get v0 rho) eqn:gv0r.
       inv H.
-      exists 0. constructor; auto.
+      exists 0%nat. constructor; auto.
       inv H.
   Qed.
 
@@ -385,8 +382,10 @@ Section EVAL.
   | BStepc_fun :
       forall (rho : env) (B : fundefs) (e : exp) (v : val) (c : nat),
         bstep_cost (def_funs B B rho rho) e v c ->
-        (* The definition of a function should incur no cost *)
-        bstep_cost rho (Efun B e) v c
+        (* The definition of a function incur cost proportional to the number of FVs and the
+         * number of fundefs (to make the bound of the current cc independent of the term
+         *)
+        bstep_cost rho (Efun B e) v (c + (1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)))
   | BStepc_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
         (f' : list val -> option val) (ys : list var) (e : exp)
@@ -420,7 +419,11 @@ Section EVAL.
       forall rho rho' x t ys C vs,
         get_list ys rho = Some vs ->
         ctx_to_rho C (M.set x (Vconstr t vs) rho) rho' ->
-        ctx_to_rho (Econstr_c x t ys C) rho rho'.
+        ctx_to_rho (Econstr_c x t ys C) rho rho'
+  | Efun_c_to_rho :
+      forall rho rho' C B,
+        ctx_to_rho C (def_funs B B rho rho) rho' ->                
+        ctx_to_rho (Efun1_c B C) rho rho'.
 
 
   (** * Lemmas about [ctx_to_rho] *)
@@ -451,6 +454,11 @@ Section EVAL.
       + edestruct IHHctx as [rho'' [H1 H2]]. eassumption.
         eexists; split. econstructor; eauto.
         eassumption.
+    - inv Hcomp.
+      eexists; split. econstructor; eauto. econstructor. now eauto.
+      edestruct IHHctx as [rho'' [H1 H2']]. eassumption.
+      eexists; split. econstructor; eauto.
+      eassumption.
   Qed.
 
   Lemma ctx_to_rho_comp_ctx_f_r C1 C2 rho1 rho2 rho3 :
@@ -463,9 +471,8 @@ Section EVAL.
     - eassumption.
     - simpl; econstructor; eauto. 
     - simpl; econstructor; eauto.
+    - simpl; econstructor; eauto.
   Qed.
-
-
 
   Ltac subst_exp :=
     match goal with
@@ -719,7 +726,7 @@ Section EVAL.
   Proof.
     intros s s' H.
     induction H; intros.
-    - inv H. exists 0; simpl.
+    - inv H. exists 0%nat; simpl.
       constructor; auto.
     - apply IHclos_refl_trans_1n in H1.
       destruct H1. 

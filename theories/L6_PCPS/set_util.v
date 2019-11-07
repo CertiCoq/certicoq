@@ -602,13 +602,13 @@ Instance ToMSet_EmptySet : ToMSet (Empty_set _).
 Proof.
   econstructor. 
   symmetry. eapply FromSet_empty.
-Qed.
+Defined.
 
 Instance ToMSet_Singleton x : ToMSet [set x].
 Proof.
   econstructor. 
   symmetry. eapply FromSet_singleton.
-Qed.
+Defined.
 
 Instance ToMSet_Same_set (S1 S2 : Ensemble positive) :
   S1 <--> S2 ->
@@ -627,7 +627,7 @@ Proof.
   symmetry. eapply FromSet_singleton.
   econstructor. rewrite image'_Singleton_None; eauto.
   symmetry. eapply FromSet_empty.
-Qed.
+Defined.
 
 Instance ToMSet_Union S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 :|: S2).
 Proof.
@@ -666,7 +666,7 @@ Proof.
   eexists (union_list PS.empty l).
   rewrite FromSet_union_list. rewrite FromSet_empty.
   rewrite Union_Empty_set_neut_l. reflexivity.
-Qed.
+Defined.
   
 Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
 Proof.
@@ -1028,4 +1028,83 @@ Proof.
         eapply f_eq_subdomain_extend. eassumption.
   - eassumption. 
 Qed.
+
+Lemma PS_add_elements_in S x : 
+  PS.In x S ->
+  Permutation (PS.elements S) (PS.elements (PS.add x S)).
+Proof.
+  intros Hnin. 
+  eapply NoDup_Permutation.
+  - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
+  - intros y. split.
+    + intros Hin. 
+      assert (HinA : InA Logic.eq y (PS.elements (PS.add x S))).
+      { eapply PS.elements_spec1. eapply PS.add_spec. right.
+        eapply PS.elements_spec1. eapply In_InA; tci. }
+      eapply InA_In; eauto.
+    + intros Hin. eapply In_InA in Hin; tci.
+
+      eapply PS.elements_spec1 in Hin. 
+      eapply PS.add_spec in Hin. inv Hin.
+      eapply InA_In. 
+      eapply PS.elements_spec1. eassumption.
+      eapply InA_In. 
+      eapply PS.elements_spec1. eassumption.
+Qed. 
+
+Lemma PS_cardinal_add_in x s:
+  PS.In x s ->
+  PS.cardinal (PS.add x s) = PS.cardinal s.  
+Proof.
+  intros Hnin. rewrite !PS.cardinal_spec. 
+  erewrite (@Permutation_length _ (PS.elements (PS.add x s)));
+    [| symmetry; now apply PS_add_elements_in ]. 
+  reflexivity.
+Qed.
+  
+
+Lemma PS_union_list f l s1 s2 :
+  PS.cardinal s1 <= PS.cardinal s2 ->
+  (forall x, PS.In x s2 -> PS.In (f x) s1) ->
+  PS.cardinal (union_list s1 (map f l)) <= PS.cardinal (union_list s2 l).
+Proof.
+  revert s1 s2. induction l; intros s1 s2 Hleq Hin.
+  - eassumption.
+  - simpl. eapply IHl.      
+    destruct (PS.mem a s2) eqn:Heq.
+    + eapply mem_spec in Heq.
+      rewrite PS_cardinal_add_in with (x := a); eauto.
+      eapply Hin in Heq. 
+      rewrite PS_cardinal_add_in with (x := f a); eauto.
+    + rewrite <- PS_cardinal_add with (x := a); eauto.
+      destruct (PS.mem (f a) s1) eqn:Heq'.
+      eapply mem_spec in Heq'. rewrite PS_cardinal_add_in with (x := f a); eauto.
+      rewrite <- PS_cardinal_add with (x := f a); eauto.
+      omega.
+      intros Hc. eapply mem_spec in Hc. congruence.
+      intros Hc. eapply mem_spec in Hc. congruence.
+    + intros x Hina. eapply add_spec in Hina. inv Hina.
+
+      eapply add_spec. now left.
+
+      eapply Hin in H. 
+      eapply add_spec. now right.
+Qed.
+
+Lemma PS_union_list_corr f l  :
+  PS.cardinal (union_list PS.empty (map f l)) <= PS.cardinal (union_list PS.empty l).
+Proof.
+  eapply PS_union_list.
+  reflexivity.
+
+  intros x Hin. inv Hin.
+Qed.
+
+Lemma PS_cardinal_map f l :
+  PS.cardinal (@mset (FromList (map f l)) _) <= PS.cardinal (@mset (FromList l) _).
+Proof.
+  unfold mset. unfold ToMSetFromList. simpl.
+  eapply PS_union_list_corr. 
+Qed. 
 

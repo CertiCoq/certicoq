@@ -5,7 +5,7 @@
 
 From Coq Require Import ZArith List SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation.
-From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util.
+From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util.
 
 Require Import compcert.lib.Maps.
 
@@ -52,8 +52,8 @@ Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
       1 + sizeOf_exp_ctx c
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l1 0
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l2 0 
-    | Efun1_c B c => sizeOf_fundefs B + sizeOf_exp_ctx c
-    | Efun2_c B e => sizeOf_fundefs_ctx B + sizeOf_exp e
+    | Efun1_c B c => (1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx c
+    | Efun2_c B e => 1 + sizeOf_fundefs_ctx B + sizeOf_exp e
   end
 with sizeOf_fundefs_ctx (B : fundefs_ctx) : nat :=
        match B with
@@ -190,13 +190,6 @@ Proof.
 Qed.
 
 
-(** Number of function definitions *)
-Fixpoint numOf_fundefs (B : fundefs) : nat := 
-  match B with
-    | Fcons _ _ xs e B =>
-      1 + numOf_fundefs B
-    | Fnil => 0
-  end.
 
 (** Number of function definitions in an expression *)
 Fixpoint numOf_fundefs_in_exp (e : exp) : nat :=

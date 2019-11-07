@@ -5,7 +5,7 @@
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx
-        L6.Ensembles_util L6.List_util L6.size_cps L6.tactics.
+        L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.set_util.
 Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
@@ -659,15 +659,18 @@ Section Log_rel.
     Qed.
 
     Lemma preord_exp_fun_compat k rho1 rho2 B B' e1 e2 :
+      (forall c1 c2, P1 c1 c2 -> P2 (c1 + (1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)))
+                              (c2 + (1 + numOf_fundefs B' + PS.cardinal (fundefs_fv B')))) ->
       preord_exp k P1 PG (e1, def_funs B B rho1 rho1)
                  (e2, def_funs B' B' rho2 rho2) ->
       preord_exp k P2 PG (Efun B e1, rho1) (Efun B' e2, rho2).
     Proof.
-      intros Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
-      edestruct Hexp as [v2' [c2 [Hstepv2' [Hprev2' Hpost]]]]; [ | eassumption | ]; eauto.
+      intros Hyp Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
+      edestruct Hexp as [v2' [c2 [Hstepv2' [Hprev2' Hpost]]]];
+        [ | eassumption | ]; eauto. omega.
       repeat eexists. now econstructor; eauto.
-      rewrite (plus_n_O c1). rewrite (plus_n_O c2). eapply HPost. eassumption.
-      eassumption.
+      eapply Hyp. eassumption.
+      eapply preord_val_monotonic. eassumption. omega.
     Qed.
     
   End Compat.
@@ -1089,13 +1092,16 @@ Section Log_rel.
   Qed.
   
   Lemma preord_exp_compat k rho1 rho2 c e1 e2 :
+    (* Annoying, but we need that for the cost of fundefs *)
+    (* PS.cardinal (exp_fv (c |[ e1 ]|)) = PS.cardinal (exp_fv (c |[ e2 ]|)) -> *)
     (forall k rho1 rho2, preord_env_P (occurs_free e1) k PG rho1 rho2 ->
                     preord_exp k P1 PG (e1, rho1) (e2, rho2)) ->
     preord_env_P (occurs_free (c |[ e1 ]|)) k PG rho1 rho2 ->
     preord_exp k P1 PG (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
+    (* unfold exp_fv. *)
     revert c rho1 rho2 e1 e2. induction k as [ k IH' ] using lt_wf_rec1. 
-    intros c. revert k IH'.
+    intros c. revert k IH'. 
     induction c; intros k IH' rho1 rho2 e1 e2 Hyp Hpre; eauto.
     - simpl. eapply preord_exp_const_compat; eauto.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
@@ -1142,20 +1148,18 @@ Section Log_rel.
       intros x' H'. inv H'.
       + inv H. simpl. constructor; eauto.
       + simpl. eapply Free_Efun2; eauto.
-    - intros v1 c1 Hleq Hstep. inv Hstep.
-      edestruct (preord_exp_refl P1 PG) with (e := e)  as [v2 [c2 [Hstep1 [Hpost Henv2]]]]; eauto.
-      + eapply preord_env_P_antimon.
-        * eapply preord_env_P_def_funs_compat_pre; eauto.
-          eapply preord_env_P_antimon; [ eassumption |].
-          intros x' H'. simpl. inv H'.
-          now eapply Free_Efun2.
-          inv H. constructor; eauto.
-        * eapply Included_trans.
-          eapply occurs_free_Efun_Included.
-          normalize_occurs_free. eauto with Ensembles_DB.
-      + repeat eexists. simpl. constructor; eauto.
-        eassumption. eassumption. 
-  Qed.
+    - simpl app_ctx_f.
+      eapply preord_exp_fun_compat.
+      admit. (* Needs some assumption about the num of FV in *)
+      eapply preord_exp_refl; eauto.
+      
+      eapply preord_env_P_antimon.
+      eapply preord_env_P_def_funs_compat_pre.
+      * intros. eapply IH'; eauto.
+      * eapply preord_env_P_antimon. eassumption.
+        simpl. rewrite occurs_free_Efun. reflexivity.
+      * rewrite <- Union_Included_Union_Setminus. now sets. tci. sets.
+  Abort. 
 
   End Rel.
 
@@ -1545,7 +1549,8 @@ Section Log_rel.
         inv H; eauto. unfold closed_fundefs in Hclo. rewrite Hclo in H0. inv H0.
     - simpl. intros x HP. inv HP.
   Qed.
-  
+
+  (* 
   Lemma preord_val_def_funs_append_pre (k : nat) f tau xs e (B1 B2 : fundefs)
         (rho1 rho2  : env) :
     closed_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
@@ -1564,31 +1569,52 @@ Section Log_rel.
   Proof.
     revert f tau xs e B1 B2 rho1 rho2. induction k using lt_wf_rec1.
     intros f tau xs e B1 B2 rho1 rho2 Hcl1 Hcl2 Hun HD Hyp. rewrite preord_val_eq.
-    intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-    edestruct (@set_lists_length val) as [rho2' Hs']; eauto. simpl in Hf.
-    destruct (M.elt_eq f f); try congruence. inv Hf. do 3 eexists. split. simpl.
+    intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs. inv Hf. destruct (M.elt_eq f f); try congruence. subst; inv H1.
+    clear e0. 
+    
+    edestruct (@set_lists_length val) as [rho2' Hs']; eauto.
+    do 3 eexists. split. simpl.
+    
     destruct (M.elt_eq f f); try congruence. eauto. split; eauto.
+    
     intros Hleq Hpre'. simpl in Hs, Hs'. rewrite def_funs_append in Hs'.
-    intros v1 c1 Hleq1 Hstep1. inv Hstep1. edestruct preord_exp_refl; eauto.
-    intros. eapply HGPost. now eapply H0. 
-    apply preord_env_P_antimon with
-    (P2 := Union var (FromList xs1)
-                 (Union var (name_in_fundefs B2)
-                        (Union var (Singleton var f) (name_in_fundefs B1)))).
-    - repeat apply preord_env_P_union.
-      + apply preord_env_P_def_funs_not_in_P_l.
-        * eapply preord_env_P_set_lists_l with (P1 := Empty_set var); eauto.
-          eapply preord_env_Empty_set. intros x Hc1 Hc2. exfalso; eauto.
-        * inv Hun. eapply Disjoint_Included_r.
-          eapply name_in_fundefs_bound_var_Efun. eauto using Disjoint_sym.
-      + eapply preord_env_P_set_lists_not_in_P_r; eauto. 
-        * eapply preord_env_P_set_not_in_P_r; eauto with Ensembles_DB.
-          eapply preord_env_P_def_funs_not_in_P_r; eauto with Ensembles_DB.
-          eapply preord_env_P_trans;
-            [| intros m; eapply preord_env_P_def_funs_strengthen_l
-               with (B2 := Fcons f t1 xs1 e B1) ]; eauto with Ensembles_DB. 
-          eapply preord_env_P_def_funs_cor; eauto.
-          eapply preord_env_P_antimon. eapply preord_env_Empty_set.
+    
+    intros v1 c1 Hleq1 Hstep1. inv Hstep1.
+    edestruct preord_exp_refl
+      with (k := j + c) (rho := def_funs B2 B2 rho1' rho1') as [v2 [c2 [Hst2 [Hp2 Hv2]]]]; (try now eapply H5); eauto.
+    - intros. eapply HGPost. now eapply H0.
+    - admit.
+    - omega.
+    - do 2 eexists. split; eauto. split; eauto. simpl in Hp2. admit. eapply Hp2. 
+    - apply preord_env_P_antimon with
+          (P2 := Union var (FromList xs1)
+                       (Union var (name_in_fundefs B2)
+                              (Union var (Singleton var f) (name_in_fundefs B1)))).
+      { - repeat apply preord_env_P_union. 
+          + apply preord_env_P_def_funs_not_in_P_l.
+            * eapply preord_env_P_set_lists_l with (P1 := Empty_set var) (xs := xs1);
+                [ | | | now eauto | clear Hs'; now eauto ].
+              eapply preord_env_Empty_set. intros x Hc1 Hc2. exfalso. eapply Hc1; eauto.
+              eapply Forall2_refl. now eapply preord_val_refl. 
+            * inv Hun. eapply Disjoint_Included_r.
+              eapply name_in_fundefs_bound_var_Efun. eauto using Disjoint_sym.
+          + apply preord_env_P_def_funs_not_in_P_l. eapply preord_env_P_refl; eauto.
+            eassumption. 
+          * eapply preord_env_P_set_lists_l with (P1 := Empty_set var) (xs := xs1);
+              [ | | | now eauto | clear Hs'; now eauto ].
+            eapply preord_env_Empty_set. intros x Hc1 Hc2. exfalso. eapply Hc1; eauto.
+            eapply Forall2_refl. now eapply preord_val_refl. 
+          * inv Hun. eapply Disjoint_Included_r.
+            eapply name_in_fundefs_bound_var_Efun. eauto using Disjoint_sym.
+       
+        + eapply preord_env_P_set_lists_not_in_P_r.
+          * eapply preord_env_P_set_not_in_P_r; eauto with Ensembles_DB.
+            eapply preord_env_P_def_funs_not_in_P_r; eauto with Ensembles_DB.
+            eapply preord_env_P_trans;
+              [| intros m; eapply preord_env_P_def_funs_strengthen_l
+                             with (B2 := Fcons f t1 xs1 e B1) ]; eauto with Ensembles_DB. 
+            eapply preord_env_P_def_funs_cor; eauto.
+            eapply preord_env_P_antimon. eapply preord_env_Empty_set.
           unfold closed_fundefs in Hcl2. rewrite Hcl2. eauto with Ensembles_DB.
           unfold closed_fundefs in Hcl2. rewrite Hcl2. eauto with Ensembles_DB.
         * inv Hun. eapply Disjoint_Included_l ; [| apply H8 ].
@@ -1622,8 +1648,9 @@ Section Log_rel.
         by (constructor; eauto).
       edestruct (occurs_free_in_fun _ _ _ _ _ Hin x H0); eauto.  inv H1; eauto.
       unfold closed_fundefs in Hcl1. rewrite Hcl1 in H2. inv H2.
+    - 
     - edestruct H0 as [c2 [Hs'' [Hp Hr]]].
-      do 2 eexists. split; eauto.
+     
 
       Grab Existential Variables. eauto. eauto. eauto. eauto.
   Qed.
@@ -1669,7 +1696,8 @@ Section Log_rel.
           exfalso. eapply not_In_Empty_set. eapply Hcl1; eauto.
     - simpl. now rewrite Union_Empty_set_neut_r.
   Qed.
-
+  
+  
   Lemma preord_env_P_def_funs_hoist (k : nat) S1 f tau xs e (B1 B2 : fundefs)
         (rho1 rho2 : env) :
     closed_fundefs (Fcons f tau xs (Efun B2 e) B1) ->
@@ -1695,7 +1723,10 @@ Section Log_rel.
     - eapply preord_val_def_funs_append_pre; eauto.
       intros. eapply preord_env_P_def_funs_append; eauto.
   Qed.
+   *)
 
+  (* TODO : figure out fundefs above... *)
+  
   Lemma proerd_env_P_def_funs_weakening k S1 B B1 B2 f tau xs e rho rho':
     ~ In var S1 f ->
     preord_env_P S1 k PG (def_funs B (fundefs_append B1 B2) rho rho')

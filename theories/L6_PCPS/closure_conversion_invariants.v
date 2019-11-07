@@ -114,6 +114,19 @@ Section Closure_conversion_invariants.
 
   (** * Lemmas about Fun_inv *)
 
+  (** Extend the first environment with a variable in not in [Funs] *)
+  Lemma Fun_inv_monotonic k m rho1 rho2 Scope Funs σ Γ :
+    Fun_inv k rho1 rho2 Scope Funs σ Γ ->
+    m <= k ->
+    Fun_inv m rho1 rho2 Scope Funs σ Γ.
+  Proof.
+    intros Hinv Hin f v' Hninf Hinf Hget.
+    edestruct Hinv with (f := f) as
+        [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
+    repeat eexists; eauto.
+    eapply cc_approx_val_monotonic. eassumption. omega. 
+  Qed.
+
   (** Extend the two environments with a variable that is not the current environment
     argument (i.e. [Γ]) *)
   Lemma Fun_inv_set k rho rho' Scope Funs σ Γ f rho1 B1 f1 rho2 B2 f2 env:

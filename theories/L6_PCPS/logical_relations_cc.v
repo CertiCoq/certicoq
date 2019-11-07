@@ -570,13 +570,13 @@ Section LogRelCC.
   Lemma cc_approx_exp_letapp_compat (P P' : relation nat) (PG : nat -> relation (exp * env * nat)) (k : nat) 
         (rho1 rho2 rho2' : env) (x f1 : var) (xs1 : list var) 
         (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) (e1 e2 : exp)
-        (HypG : forall rho' rho'' B f' t xs vs e1 e2 rho2 c1 c2 c1' c2' A,
+        (HypG : forall rho' rho'' B f' t xs vs e1 e2 rho2 c1 c2 c1' c2',
             M.get f1 rho1 = Some (Vfun rho' B f') ->
             find_def f' B = Some (t, xs, e1) ->
             set_lists xs vs (def_funs B B rho' rho') = Some rho'' ->
             PG (k - 1) (e1, rho'', c1) (e2, rho2, c2) ->
             P' c1' c2' ->
-            P (c1 + c1' + A) (c2 + c2' + A + 3)) : 
+            P (c1 + c1' + (List.length xs1 + 1)) (c2 + c2' + (List.length xs1 + 1) + 3)) : 
     ~ Γ \in (f2 |: [set f'] :|: FromList xs2) ->
     ~ f' \in (f2 |: FromList xs2) ->
 
@@ -627,7 +627,7 @@ Section LogRelCC.
       * rewrite <- plus_assoc.
         replace (c2 + c2' + 1 + Datatypes.length (Γ :: xs2) + 1 + 1) with
             (c2 + c2' + (1 + Datatypes.length xs1) + 3).
-        eapply HypG; eauto.
+        rewrite (plus_comm 1). eapply HypG; eauto.
         simpl. erewrite Forall2_length; eauto. omega. 
       * eapply cc_approx_val_monotonic; eauto. omega.
       * intros Hc. eapply Hnin2; subst; eauto.
@@ -638,12 +638,12 @@ Section LogRelCC.
   Lemma cc_approx_exp_app_compat (P : relation nat) (PG : nat -> relation (exp * env * nat)) (k : nat) 
         (rho1 rho2 rho2' : env) (x f1 : var) (xs1 : list var) 
         (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) (e1 e2 : exp)
-        (HypG : forall rho' rho'' B f' t xs vs e1 e2 rho2 c1 c2 A,
+        (HypG : forall rho' rho'' B f' t xs vs e1 e2 rho2 c1 c2,
             M.get f1 rho1 = Some (Vfun rho' B f') ->
             find_def f' B = Some (t, xs, e1) ->
             set_lists xs vs (def_funs B B rho' rho') = Some rho'' ->
             PG (k - 1) (e1, rho'', c1) (e2, rho2, c2) ->
-            P (c1 + A) (c2 + A + 3)) : 
+            P (c1 + (List.length xs1 + 1)) (c2 + (List.length xs1 + 1) + 3)) : 
     ~ Γ \in (f2 |: [set f'] :|: FromList xs2) ->
     ~ f' \in (f2 |: FromList xs2) ->
 
@@ -685,12 +685,11 @@ Section LogRelCC.
       * rewrite <- plus_assoc.
         replace (c4 + 1 + Datatypes.length (Γ :: xs2) + 1 + 1) with
             (c4 + (1 + Datatypes.length xs1) + 3).
-        eapply HypG; eauto.
-        simpl. erewrite Forall2_length; eauto. omega. 
+        do 2 rewrite (plus_comm 1). eapply HypG; eauto. simpl.
+        erewrite Forall2_length; eauto. omega. 
       * eapply cc_approx_val_monotonic; eauto. omega.
     - intros. eapply cc_approx_val_monotonic; eauto. omega.
   Qed.
-
 
   Lemma cc_approx_exp_case_nil_compat k S P rho1 rho2 x1 x2 :
     cc_approx_exp k S P (Ecase x1 [], rho1) (Ecase x2 [], rho2).
@@ -1093,68 +1092,277 @@ Section LogRelCC.
       eapply cc_approx_val_cc_appox_var_env; eauto.
   Qed.
 
+  Require Import set_util. 
+
   (** Lemmas about evaluation contexts *)
 
   (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
       interpretation of [C] in [ρ2] *)
-  Lemma ctx_to_rho_cc_approx_exp k (P : nat -> relation nat) P' boundG rho1 rho2 rho2' C e e' :
-    inclusion _ P' (P 0) ->
-    (forall c1 c2 n c ,  P n c1 c2 -> P (n + c) c1 (c2 + c)) ->
+  Lemma ctx_to_rho_cc_approx_exp k (P : nat -> relation nat) boundG rho1 rho2 rho2' C e e' m :
+    (forall c1 c2 n c , c <= sizeOf_exp_ctx C ->  P (n + c) c1 c2 -> P n c1 (c2 + c)) ->
     ctx_to_rho C rho2 rho2' -> 
-    cc_approx_exp k P' boundG (e, rho1) (e', rho2') ->
-    cc_approx_exp k (P (sizeOf_exp_ctx C)) boundG (e, rho1) (C |[ e' ]|, rho2).
+    cc_approx_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2') ->
+    cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2).
   Proof.  
-    intros H1 H2 Hctx Hcc. induction Hctx.
+    intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
     - intros v1' c1 Hleq1 Hstep1.
       edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
-      firstorder.
+      simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder.
     - intros v1 c1 Hleq1 Hstep1.
       edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; try eassumption.
+      intros. eapply H1; eauto. simpl; omega.
+
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      eassumption.
       repeat eexists.
-      now econstructor; eauto.
-      simpl.
-      rewrite (plus_comm 1). now eauto.
+      now econstructor; eauto. eapply H1; eauto. simpl; omega.
       eassumption.
     - intros v1' c1 Hleq1 Hstep1.
       edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      intros. eapply H1; eauto. simpl; omega.
+
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
+        with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      eassumption. 
       repeat eexists.
       simpl. econstructor; eauto. simpl.
-      (* rewrite H, H0. reflexivity. *)
-      rewrite !plus_assoc_reverse, <- plus_Sn_m, (plus_comm _ (sizeOf_exp_ctx C)).
-      now eauto.
+      rewrite <- plus_assoc in *. eauto. eapply H1; eauto. simpl; omega.       
       eassumption.
+    - intros v1' c1 Hleq1 Hstep1. 
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]];
+      [ | | | eassumption | ].
+
+      intros. eapply H1; eauto. simpl; omega.
+      
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
+      eassumption.
+      omega. 
+
+      repeat eexists.
+      simpl. econstructor; eauto. simpl.
+      eapply H1; eauto. simpl.
+      omega. eassumption. 
   Qed.
   
-  Lemma cc_approx_exp_ctx_to_rho k (P' : nat -> relation nat) P boundG rho1 rho2 rho2' C e e' :
-    inclusion _ (P' 0) P ->
-    (forall c1 c2 c n, c <= sizeOf_exp_ctx C -> P' (n + c) c1 (c2 + c) -> P' n c1 c2) ->
+  Lemma cc_approx_exp_ctx_to_rho k (P : nat -> relation nat) boundG rho1 rho2 rho2' C e e' m :
+    (forall c1 c2 n c , c <= sizeOf_exp_ctx C ->  P n c1 (c2 + c) -> P (n + c) c1 c2) ->
     ctx_to_rho C rho2 rho2' -> 
-    cc_approx_exp k (P' (sizeOf_exp_ctx C)) boundG (e, rho1) (C |[ e' ]|, rho2) ->
-    cc_approx_exp k P boundG (e, rho1) (e', rho2').
+    cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2) ->
+    cc_approx_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2').
   Proof.  
-    intros H1 H2 Hctx Hcc. induction Hctx.
+    intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
     - intros v1' c1 Hleq1 Hstep1.
       edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
-      firstorder.
-    - eapply IHHctx; eauto.
-      + intros c1 c2 c3 n Hleq. eapply H2. simpl; omega.
+      simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder.
+    - simpl sizeOf_exp_ctx.
+      replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) by omega.
+      eapply IHHctx; eauto.
+      + intros c1 c2 c3 n Hleq. eapply H1. simpl; omega.
       + intros v1 c1 Hleq1 Hstep1.
         edestruct Hcc as [v2 [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
-        inv Hstep2. rewrite H in H11; inv H11. rewrite H12 in H0; inv H0.
+        inv Hstep2. repeat subst_exp. 
         repeat eexists; eauto.
-        simpl in Hub. rewrite (plus_comm 1) in Hub. eapply H2; try eassumption.
-        simpl; omega.
-    - eapply IHHctx; eauto.
-      intros c1 c2 c3 n Hleq. eapply H2; simpl; omega.
+        eapply H1; eauto. simpl; omega.
+    - simpl sizeOf_exp_ctx.
+      replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
+        with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) by omega.
+      eapply IHHctx; eauto.
+      intros c1 c2 c3 n Hleq. eapply H1; simpl; omega.
       intros v1' c1' Hleq1 Hstep1.
       edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
-      inv Hstep2. simpl in H11. repeat subst_exp. 
-      repeat eexists; eauto.
+      inv Hstep2. simpl in *. repeat subst_exp. 
+      repeat eexists; eauto. rewrite <- !plus_assoc in *. 
+      eapply H1; eauto. simpl; omega.
+    - simpl sizeOf_exp_ctx.
+      replace (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) by omega. 
+      eapply IHHctx; eauto. 
       
-      simpl in Hub.
-      rewrite !plus_assoc_reverse, <- plus_Sn_m, (plus_comm _ (sizeOf_exp_ctx C)) in Hub.
-      eapply H2; try eassumption.
-      simpl; omega.
+      intros. eapply H1; eauto. simpl; omega.
+      intros v1' c1' Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      inv Hstep2. simpl in *. repeat subst_exp. 
+      repeat eexists; eauto. rewrite <- !plus_assoc in *. 
+      eapply H1; eauto. simpl; omega.
+  Qed.
+
+  Lemma leq_sum_exists A B C:
+    A <= B + C ->
+    exists B' C', A = B' + C' /\ B' <= B /\ C' <= C.
+  Proof.
+    revert B C. induction A; intros B C Hleq.
+    - eexists 0, 0. split; eauto. split; omega. 
+    - destruct B; destruct C.
+      + omega.
+      + assert (Hleq' : A <= 0 + C) by omega.
+        edestruct IHA as [B' [C' [Heq1 [Hl1 Hl2]]]]. eassumption.
+        subst. eexists 0. eexists (S C'). split; omega.
+      + assert (Hleq' : A <= B + 0) by omega.
+        edestruct IHA as [B' [C' [Heq1 [Hl1 Hl2]]]]. eassumption.
+        subst. eexists (S B'). eexists 0. destruct C'; try omega.
+      + assert (Hleq' : A <= S B + C) by omega.
+        edestruct IHA as [B' [C' [Heq1 [Hl1 Hl2]]]]. eassumption.
+        subst. eexists B'. eexists (S C').
+        split; try omega.
+  Qed. 
+
+  Lemma ctx_to_rho_cc_approx_exp_left_weak k (P : nat -> relation nat) boundG rho1 rho1' rho2 C e e' m A :
+    (* This is very specific to what holds currently for CC *)
+    (forall c1 c2 m a b, b <= 7 * a -> P m c1 c2 -> P (m + b) (c1 + a) c2) ->
+    ctx_to_rho C rho1 rho1' ->
+    A <= 7 * sizeOf_exp_ctx C ->
+    cc_approx_exp k (P m) boundG (e, rho1') (e', rho2) ->
+    cc_approx_exp k (P (m + A)) boundG (C|[ e ]|, rho1) (e', rho2).
+  Proof. 
+    intros H1 Hctx Hcc; revert m A rho2 H1 Hcc; induction Hctx;
+      intros m A rho2 H1 Hleq Hcc.
+    - intros v1 c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      simpl in *. do 2 eexists; split; eauto. split; eauto.
+      rewrite (plus_n_O c1). eapply H1; eauto.
+    - intros v1 c1 Hleq1 Hstep1. simpl in Hstep1. inv Hstep1. repeat subst_exp.
+      assert (Heq' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7).
+      { revert Hleq. clear. intros Hleq.
+        destruct A. eexists 0, 0. split; eauto. split; omega.
+        assert (Heq : A <= 7 * (sizeOf_exp_ctx C) + 6) by (simpl in *; omega).
+        destruct (Nat_as_DT.le_decidable A (7 * (sizeOf_exp_ctx C))). 
+        + eexists A, 1. split; eauto. omega. split; eauto.
+          omega.
+        + eexists (7 * sizeOf_exp_ctx C).
+          eexists (S A - 7 * sizeOf_exp_ctx C).
+          split. omega. split. omega. omega. }
+      edestruct Heq' as [B [D [Heq [HeqB HleqD]]]]. subst.
+      edestruct IHHctx with (A := B) as [v2 [c2 [Hstep2 [HP Hcc2]]]];
+        [ | | | | eassumption | ].      
+      intros. now eapply H1; eauto.
+      simpl in *. omega.
+      eassumption.
+      omega. 
+      repeat eexists. eassumption. 
+      replace (m + (B + D)) with (m + B + D) by omega. eapply H1; eauto.
+      eapply cc_approx_val_monotonic. eassumption. omega. 
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      assert (Heq'' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7 + 7 * @List.length var ys).
+      { eapply leq_sum_exists. simpl in *; omega. }      
+      destruct Heq'' as [B [D [Heq [Hleqb Hleqd]]]]. subst.
+      
+      edestruct IHHctx with (A := B)
+        as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [ eassumption | | eassumption | | eassumption | ].
+      eassumption. omega.
+      repeat eexists. eassumption.
+      rewrite (plus_assoc m). rewrite <- (plus_assoc c).
+      eapply H1. eauto. omega. eassumption.
+      eapply cc_approx_val_monotonic. eassumption. omega.
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      simpl in Hleq.
+      pose (cost := 1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)).
+      assert (Heq'' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7*cost).
+      { eapply leq_sum_exists. simpl in *; omega. }
+      destruct Heq'' as [B' [D [Heq [Hleqb Hleqd]]]]. subst.
+      
+      edestruct IHHctx with (A := B')
+        as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [ eassumption | | eassumption | | eassumption | ].
+      eassumption. omega.
+      repeat eexists. eassumption.
+      rewrite (plus_assoc m).
+      eapply H1; eauto.
+       eapply cc_approx_val_monotonic. eassumption. omega.
+  Qed.
+  
+  Lemma ctx_to_rho_cc_approx_exp_left k (P : nat -> relation nat) boundG rho1 rho1' rho2 C e e' m A :
+    (* This is very specific to what holds currently for CC *)
+    (forall c1 c2 m a b, a <= b <= 7 * a -> P m c1 c2 -> P (m + b) (c1 + a) c2) ->
+    ctx_to_rho C rho1 rho1' ->
+    sizeOf_exp_ctx C <= A <= 7 * sizeOf_exp_ctx C ->
+    cc_approx_exp k (P m) boundG (e, rho1') (e', rho2) ->
+    cc_approx_exp k (P (m + A)) boundG (C|[ e ]|, rho1) (e', rho2).
+  Proof. 
+    intros H1 Hctx Hcc; revert m A rho2 H1 Hcc; induction Hctx;
+      intros m A rho2 H1 Hleq Hcc.
+    - intros v1 c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      simpl in *. do 2 eexists; split; eauto. split; eauto.
+      rewrite (plus_n_O c1). eapply H1; eauto.
+    - intros v1 c1 Hleq1 Hstep1. simpl in Hstep1. inv Hstep1. repeat subst_exp.
+      assert (Heq' : exists B D, A = B + D /\ sizeOf_exp_ctx C <= B <= 7 * sizeOf_exp_ctx C /\ 1 <= D <= 7).
+      { revert Hleq. clear. intros Hleq.
+        destruct A; try (simpl in *; omega). simpl in Hleq. 
+        assert (Heq : sizeOf_exp_ctx C <= A <= 7 * (sizeOf_exp_ctx C) + 6) by omega.
+        clear Hleq.
+        destruct (Nat_as_DT.le_decidable A (7 * (sizeOf_exp_ctx C))). 
+        + eexists A, 1. split; eauto. omega. split; eauto.
+          omega. omega.
+        + eexists (7 * sizeOf_exp_ctx C).
+          eexists (S A - 7 * sizeOf_exp_ctx C).
+          split. omega. split. omega. omega. }
+      edestruct Heq' as [B [D [Heq [HeqB HleqD]]]]. subst.
+      edestruct IHHctx with (A := B) as [v2 [c2 [Hstep2 [HP Hcc2]]]];
+        [ | | | | eassumption | ].      
+      intros. now eapply H1; eauto.
+      simpl in *. omega.
+      eassumption.
+      omega. 
+      repeat eexists. eassumption. 
+      replace (m + (B + D)) with (m + B + D) by omega. eapply H1; eauto.
+      eapply cc_approx_val_monotonic. eassumption. omega. 
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      assert (Heq' : exists B, A = B + (1 + @List.length var ys)). 
+      { simpl in *. eexists (A - S (Datatypes.length ys)).
+        rewrite NPeano.Nat.sub_add. omega. simpl in *. omega. }
+      destruct Heq' as [B' Hbeq].
+      assert (Heq'' : exists B D, A = B + D /\ sizeOf_exp_ctx C <= B <= 7 * sizeOf_exp_ctx C /\
+                             1 + @List.length var ys <= D <= 7 + 7 * @List.length var ys).
+      { revert Hbeq Hleq. clear. intros Hbeq Hleq. subst.
+        assert (Heq : sizeOf_exp_ctx C <= B' <= 7 * (sizeOf_exp_ctx C) + (6 + 6 * @List.length var ys))
+          by (simpl in *; omega).
+        clear Hleq.
+        destruct (Nat_as_DT.le_decidable B' (7 * (sizeOf_exp_ctx C))). 
+        + eexists B'. eexists. split; eauto. split. omega. omega.
+        + eexists (7 * sizeOf_exp_ctx C).
+          eexists (1 + @List.length var ys + B' - 7 * sizeOf_exp_ctx C).
+          split. omega. split. omega. omega. }
+      clear Hbeq.
+      destruct Heq'' as [B [D [Heq [Hleqb Hleqd]]]]. subst.
+      
+      edestruct IHHctx with (A := B)
+        as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [ eassumption | | eassumption | | eassumption | ].
+      eassumption. omega.
+      repeat eexists. eassumption.
+      rewrite (plus_assoc m). rewrite <- (plus_assoc c).
+      eapply H1. eauto. omega. eassumption.
+      eapply cc_approx_val_monotonic. eassumption. omega.
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      simpl in Hleq.
+      pose (cost := 1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)).
+       assert (Heq' : exists B, A = B + cost). 
+       { simpl in *. eexists (A - cost).
+         rewrite NPeano.Nat.sub_add. omega. omega. }
+      assert (Heq'' : exists B D, A = B + D /\ sizeOf_exp_ctx C <= B <= 7 * sizeOf_exp_ctx C /\
+                             cost <= D <= 7*cost).
+       { destruct Heq' as [B' Hbeq].
+         revert Hbeq Hleq. clear. intros Hbeq Hleq. subst.
+         assert (Heq : sizeOf_exp_ctx C <= B' <= 7 * (sizeOf_exp_ctx C) + 6*cost)
+           by (simpl in *; omega).
+        clear Hleq.
+        destruct (Nat_as_DT.le_decidable B' (7 * (sizeOf_exp_ctx C))). 
+        + eexists B'. eexists. split; eauto. split. omega. omega.
+        + eexists (7 * sizeOf_exp_ctx C).
+          eexists (cost + B' - 7 * sizeOf_exp_ctx C).
+          split. omega. split. omega. omega. }
+       clear Heq'.
+       destruct Heq'' as [B' [D [Heq [Hleqb Hleqd]]]]. subst.
+       
+       edestruct IHHctx with (A := B')
+         as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [ eassumption | | eassumption | | eassumption | ].
+       eassumption. omega.
+       repeat eexists. eassumption.
+       rewrite (plus_assoc m).
+       eapply H1; eauto.
+       eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.
 
   Lemma cc_approx_exp_rel_conj k P1 P2 P rho1 rho2 e1 e2 :
@@ -1168,7 +1376,7 @@ Section LogRelCC.
     eapply bstep_cost_deterministic in Hstep1; eauto. inv Hstep1.
     firstorder.
   Qed.  
-  
+
   (* The following are obsolete *)
   (* TODO: move to identifiers.v *)
   Inductive closed_fundefs_in_val : val -> Prop :=

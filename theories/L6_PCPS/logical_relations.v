@@ -659,8 +659,8 @@ Section Log_rel.
     Qed.
 
     Lemma preord_exp_fun_compat k rho1 rho2 B B' e1 e2 :
-      (forall c1 c2, P1 c1 c2 -> P2 (c1 + (1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)))
-                              (c2 + (1 + numOf_fundefs B' + PS.cardinal (fundefs_fv B')))) ->
+      (forall c1 c2, P1 c1 c2 -> P2 (c1 + (1 + PS.cardinal (fundefs_fv B)))
+                              (c2 + (1 + PS.cardinal (fundefs_fv B')))) ->
       preord_exp k P1 PG (e1, def_funs B B rho1 rho1)
                  (e2, def_funs B' B' rho2 rho2) ->
       preord_exp k P2 PG (Efun B e1, rho1) (Efun B' e2, rho2).
@@ -672,6 +672,61 @@ Section Log_rel.
       eapply Hyp. eassumption.
       eapply preord_val_monotonic. eassumption. omega.
     Qed.
+
+
+    (** Context application lemma *)
+      (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+      interpretation of [C] in [ρ2] *)
+    Lemma ctx_to_rho_preord_exp k (P : nat -> relation nat) boundG rho1 rho2 rho2' C e e' m :
+      (forall c1 c2 n c , c <= sizeOf_exp_ctx C ->  P (n + c) c1 c2 -> P n c1 (c2 + c)) ->
+      ctx_to_rho C rho2 rho2' -> 
+      preord_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2') ->
+      preord_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2).
+  Proof.  
+    intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder.
+    - intros v1 c1 Hleq1 Hstep1.
+      edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; try eassumption.
+      intros. eapply H1; eauto. simpl; omega.
+
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      eassumption.
+      repeat eexists.
+      now econstructor; eauto. eapply H1; eauto. simpl; omega.
+      eassumption.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      intros. eapply H1; eauto. simpl; omega.
+
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
+        with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      eassumption. 
+      repeat eexists.
+      simpl. econstructor; eauto. simpl.
+      rewrite <- plus_assoc in *. eauto. eapply H1; eauto. simpl; omega.       
+      eassumption.
+    - intros v1' c1 Hleq1 Hstep1.  
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]];
+      [ | | | eassumption | ].
+
+      intros. eapply H1; eauto. simpl; omega.
+      
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
+      eassumption.
+      omega. 
+
+      repeat eexists.
+      simpl. econstructor; eauto. simpl.
+      eapply H1; eauto. simpl. omega.
+      eassumption.
+  Qed.
+
     
   End Compat.
   

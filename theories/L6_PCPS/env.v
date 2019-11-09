@@ -29,6 +29,11 @@ Inductive well_scoped_exp : env -> exp -> Prop :=
       M.get y Γ = Some v ->
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
       well_scoped_exp Γ (Eproj x tau N y e)
+| WSletapp :
+    forall x tau f ys v e Γ,
+      get_list ys Γ = Some v ->
+      (forall v, well_scoped_exp (M.set x v Γ) e) ->
+      well_scoped_exp Γ (Eletapp x f tau ys e)
 | WS_app :
     forall x v ys vs ft Γ,
       get_list ys Γ = Some vs ->
@@ -86,6 +91,11 @@ Inductive well_scoped_exp_ctx : env -> exp_ctx -> env -> Prop :=
       M.get y Γ = Some v ->
       (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
       well_scoped_exp_ctx Γ (Eproj_c x tau N y c) Γ'
+| WSCtx_letapp :
+    forall x tau f ys vs c Γ Γ',
+      get_list ys Γ = Some vs->
+      (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
+      well_scoped_exp_ctx Γ (Eletapp_c x f tau ys c) Γ'
 | WSCtx_prim :
     forall x f ys vs c Γ Γ',
       get_list ys Γ = Some vs ->

@@ -1137,8 +1137,8 @@ Section LogRelCC.
       intros. eapply H1; eauto. simpl; omega.
       
       simpl sizeOf_exp_ctx in Hcc.
-      replace (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
-          (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
+      replace (m + S  (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
       eassumption.
       omega. 
 
@@ -1178,15 +1178,15 @@ Section LogRelCC.
       repeat eexists; eauto. rewrite <- !plus_assoc in *. 
       eapply H1; eauto. simpl; omega.
     - simpl sizeOf_exp_ctx.
-      replace (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
-          (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) by omega. 
+      replace (m + S (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) by omega. 
       eapply IHHctx; eauto. 
       
       intros. eapply H1; eauto. simpl; omega.
       intros v1' c1' Hleq1 Hstep1.
       edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
       inv Hstep2. simpl in *. repeat subst_exp. 
-      repeat eexists; eauto. rewrite <- !plus_assoc in *. 
+      repeat eexists; eauto.
       eapply H1; eauto. simpl; omega.
   Qed.
 
@@ -1259,7 +1259,7 @@ Section LogRelCC.
       eapply cc_approx_val_monotonic. eassumption. omega.
     - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
       simpl in Hleq.
-      pose (cost := 1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)).
+      pose (cost := 1 + PS.cardinal (fundefs_fv B)).
       assert (Heq'' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7*cost).
       { eapply leq_sum_exists. simpl in *; omega. }
       destruct Heq'' as [B' [D [Heq [Hleqb Hleqd]]]]. subst.
@@ -1337,7 +1337,7 @@ Section LogRelCC.
       eapply cc_approx_val_monotonic. eassumption. omega.
     - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
       simpl in Hleq.
-      pose (cost := 1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)).
+      pose (cost := 1 + PS.cardinal (fundefs_fv B)).
        assert (Heq' : exists B, A = B + cost). 
        { simpl in *. eexists (A - cost).
          rewrite NPeano.Nat.sub_add. omega. omega. }

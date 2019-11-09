@@ -219,14 +219,14 @@ Section CompM.
   Definition st_eq {A} (m1 m2 : compM A) :=
     forall st s, run_compM m1 st s = run_compM m2 st s.
   
-  Instance triple_Proper {A} : Proper (Logic.eq ==> st_eq ==> Logic.eq ==> iff) (@triple A).
+  Global Instance triple_Proper {A} : Proper (Logic.eq ==> st_eq ==> Logic.eq ==> iff) (@triple A).
   Proof.
     intros P1 P2 Heq1 m1 m2 Hfeq P3 P4 Heq2; subst; split; intros H.
     - intros s HP2. rewrite <- Hfeq. eapply H.
     - intros s HP2. rewrite  Hfeq. eapply H.
   Qed.
   
-  Instance bind_Proper_l {A B} : Proper (st_eq ==> Logic.eq ==> st_eq)
+  Global Instance bind_Proper_l {A B} : Proper (st_eq ==> Logic.eq ==> st_eq)
                                           (@bind compM (stateErrMonad (comp_data * S)) A B).
   Proof. 
     intros [m1] [m2] Hfeq f1 f2 Heq m; subst.
@@ -241,8 +241,9 @@ Section CompM.
     reflexivity.
   Qed.
   
-  Instance bind_Proper_r {A B} : Proper (Logic.eq ==> (fun f1 f2 => forall x, st_eq (f1 x) (f2 x)) ==> st_eq)
-                                          (@bind compM (stateErrMonad (comp_data * S)) A B).
+  Global Instance bind_Proper_r {A B} :
+    Proper (Logic.eq ==> (fun f1 f2 => forall x, st_eq (f1 x) (f2 x)) ==> st_eq)
+      (@bind compM (stateErrMonad (comp_data * S)) A B).
   Proof. 
     intros m1 [fm2] Hfeq f1 f2 Heq m; subst; intros s.
     unfold run_compM.
@@ -252,13 +253,13 @@ Section CompM.
     destruct (fm2 (m, s)), e, p; auto.
   Qed.
   
-  Instance st_eq_Proper_l {A} : Proper (st_eq ==> Logic.eq ==> iff) (@st_eq A).
+  Global Instance st_eq_Proper_l {A} : Proper (st_eq ==> Logic.eq ==> iff) (@st_eq A).
   Proof. 
     intros m1 m2 Heq1 m3 m4 Heq2; subst.
     split; intros Heq st s. now rewrite <- Heq1, Heq. now rewrite Heq1, Heq. 
   Qed.
   
-  Instance st_eq_Proper_r {A} : Proper (Logic.eq ==> st_eq ==> iff) (@st_eq A).
+  Global Instance st_eq_Proper_r {A} : Proper (Logic.eq ==> st_eq ==> iff) (@st_eq A).
   Proof. 
     intros m1 m2 Heq1 m3 m4 Heq2; subst.
     split; intros Heq st s. now rewrite <- Heq2, Heq. now rewrite Heq2, Heq. 
@@ -290,10 +291,10 @@ Section CompM.
     destruct e; try reflexivity.
   Qed.
 
-  (** * Usefull lemmas about triples *)
+  (** * Useful lemmas about triples *)
 
-  Definition Pre := comp_data -> S -> Prop.
-  Definition Post A := comp_data -> S -> A -> comp_data -> S ->  Prop.
+  Local Definition Pre := comp_data -> S -> Prop.
+  Local Definition Post A := comp_data -> S -> A -> comp_data -> S ->  Prop.
 
   Ltac destruct_compM :=
     let e := fresh "e" in
@@ -456,17 +457,35 @@ Section CompM.
   Proof.
     intros Hb st s [b' Hre]. eapply Hb. eassumption.
   Qed.    
-  
-  Lemma pre_curry_r {A} (P : Pre) (Q : Post A) (P' : Prop) e :
-    (P' -> {{ P }} e {{ Q }}) ->
-    {{ fun st s => P st s /\ P' }} e {{ Q }}.
+
+  Lemma post_universal : forall {A B} (P : Pre) (Q : B -> Post A) (e : compM A),
+    (forall y : B, {{ P }} e {{ Q y }}) ->
+    {{ P }} e {{ fun st s x st' s' => forall y : B, Q y st s x st' s' }}.
   Proof.
-    intros Hyp st s [Hpre HP]. eapply Hyp; eauto.
+    unfold triple; intros.
+    specialize H with (st := st) (s := s).
+    destruct_compM; firstorder.
+  Qed.
+ 
+  Lemma post_universal' : forall {A B} (P : Pre) (Q : Post A) (f : B -> Prop) (e : compM A),
+    (forall y : B, f y -> {{ P }} e {{ Q }}) ->
+    {{ P }} e {{ fun st s x st' s' => forall y : B, f y -> Q st s x st' s' }}.
+  Proof.
+    unfold triple; intros.
+    specialize H with (st := st) (s := s).
+    destruct_compM; firstorder.
   Qed.
   
   Lemma pre_curry_l {A} (P : Pre) (Q : Post A) (P' : Prop) e :
     (P' -> {{ P }} e {{ Q }}) ->
     {{ fun st s => P' /\ P st s }} e {{ Q }}.
+  Proof.
+    intros Hyp st s [Hpre HP]. eapply Hyp; eauto.
+  Qed.
+  
+  Lemma pre_curry_r {A} (P : Pre) (Q : Post A) (P' : Prop) e :
+    (P' -> {{ P }} e {{ Q }}) ->
+    {{ fun st s => P st s /\ P' }} e {{ Q }}.
   Proof.
     intros Hyp st s [Hpre HP]. eapply Hyp; eauto.
   Qed.
@@ -531,6 +550,13 @@ Section CompM.
     (forall (x : A) st s, {{fun st' s' => P st s /\ Q' st s x st' s'}} f x {{fun _ _ => Q st s}}) ->
     {{P}} bind m f {{Q}}.
   Proof. intros; eapply bind_triple; eauto. Qed.
+
+  Lemma bind_triple'' {A B} (m : compM A) (f : A -> compM B)
+        (P : Pre) (Q : Post B) (Q' : Post A) :
+    (forall x st s, {{ Q' st s x }} f x {{ fun _ _ x' st' s' => Q st s x' st' s' }}) -> 
+    {{ P }} m {{ Q' }} ->
+    {{ P }} bind m f {{ Q }}.
+  Proof. intros; eapply bind_triple; eauto. Qed.
   
   Lemma get_triple : {{ fun _ _ => True }} get {{ fun st s x st' s' => x = (st, s) /\ st = st' /\ s = s' }}.
   Proof. unfold triple; intros. simpl. eauto. Qed.
@@ -567,7 +593,13 @@ Section CompM.
       intros x' st' s'. eapply return_triple.
       intros st'' s'' [HP [Hall Hpre]]. split; eauto.
   Qed.
+
+  Definition from_maxvar v := fun a => (a < v)%positive.
+  Definition from_fresh st := from_maxvar (next_var st).
   
   Opaque triple bind ret.
 
 End CompM.
+
+Notation "{{ p }} e {{ q }}" :=
+  (triple p e q) (at level 90, e at next level).

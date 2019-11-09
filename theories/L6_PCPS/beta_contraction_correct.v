@@ -1293,6 +1293,11 @@ Ltac spark_evaluation :=
     rewrite nat_merge by reflexivity
   end.
 
+Ltac Intros' :=
+  repeat lazymatch goal with
+  | |- forall _ : (), _ => intros []
+  | |- forall _, _ => intro
+  end.
 Ltac Intros :=
   repeat lazymatch goal with
   | |- forall _ : (), _ => intros []
@@ -1302,7 +1307,7 @@ Ltac Intros :=
 
 Ltac Intro x := apply post_universal; intro x.
 
-Ltac bind_next := eapply bind_triple''; Intros.
+Ltac bind_next := eapply bind_triple''; Intros'.
 
 Ltac ret := apply return_triple; Intros.
 
@@ -1312,6 +1317,9 @@ Ltac mon_apply H :=
     | eapply H
     | eapply pre_strenghtening; [|apply H]
     | eapply pre_strenghtening; [|eapply H]
+    | eapply pre_strenghtening; [|eapply H]
+    | eapply pre_strenghtening; [|eapply post_weakening; [|apply H]]
+    | eapply pre_strenghtening; [|eapply post_weakening; [|eapply H]]
     ].
 
 Ltac choose_post P :=
@@ -1327,18 +1335,31 @@ Ltac choose_post P :=
 *)
 
 Section beta_contraction_correct'.
+
+Ltac gen x := generalize dependent x.
+
+Theorem freshen_exp_triple : forall e,
+  {{ fun st _ => used_vars e \subset from_fresh st }}
+     freshen_exp e
+  {{ fun _ _ e' st' _ => forall k rho rho',
+     preord_env_P pr cenv (occurs_free e) k PG rho rho' ->
+     preord_exp pr cenv k P PG (e, rho) (e', rho') /\
+     used_vars e' \subset from_fresh st' }}.
+Admitted.
+
 (* TODO: write the proper freshen_exp triple needed to complete the proof
    No other triples are really needed--freshen_exp is the only nontrivial
    monad operation we use here *)
-Theorem beta_contraction_correct : forall e d sig fm s k rho rho',
+Theorem beta_contraction_correct : forall e d sig fm s,
   unique_bindings e ->
-  preord_env_P_inj pr cenv PG (occurs_free e :|: map_dom fm) k (apply_r sig) rho rho' ->
   Disjoint _ (bound_var e) (map_dom sig) ->
   Disjoint _ (used_vars e) (map_cod sig) ->
   (* forall (k, v) in fm, k not in rho /\ k not in rho' *)
   {{ fun st _ => used_vars e \subset from_fresh st }}
      beta_contract St IH d e sig fm s
-  {{ fun _ _ e' _ _ => preord_exp pr cenv k P PG (e, rho) (e', rho') }}.
+  {{ fun _ _ e' _ _ => forall k rho rho',
+     preord_env_P_inj pr cenv PG (occurs_free e :|: map_dom fm) k (apply_r sig) rho rho' ->
+     preord_exp pr cenv k P PG (e, rho) (e', rho') }}.
 Proof.
   (* To discharge the simpler cases that come up when applying IH *)
   Ltac cleanup :=
@@ -1373,22 +1394,30 @@ Proof.
   intros e d; remember (beta_contraction_metric (e, d)) as med.
   generalize dependent e; generalize dependent d.
   pattern med; apply lt_wf_ind; clear med.
-  intros med IHmed' d e Hmed sig fm s k rho rho' Huniq Henv Hdom Hcod; destruct e.
+  intros med IHmed' d e Hmed sig fm s Huniq Hdom Hcod; destruct e.
   - (* Econstr *)
     spark_evaluation. bind_next. ret.
     (* We need to figure out what Q is. *)
     eapply preord_exp_const_compat; cleanup; cleanup.
     (* We've found Q. *)
+    gen k; gen rho; gen rho'.
     choose_post H.
     Intro vs1; Intro vs2; Intro Hvs.
     mon_apply IHmed'; Intros; cleanup; cleanup.
     admit.
   - (* Ecase *)
     spark_evaluation.
-    admit.
+    subst med; induction l.
+    + bind_next; [|ret].
+      ret.
+      assert (x = []) by choose_post H; subst.
+      admit.
+      simpl; auto.
+    + admit.
   - (* Eproj *)
     spark_evaluation. bind_next. ret.
     eapply preord_exp_proj_compat; cleanup; cleanup.
+    gen k; gen rho; gen rho'.
     choose_post H.
     Intro v1; Intro v2; Intro Hvs.
     mon_apply IHmed'; Intros; cleanup; cleanup.
@@ -1400,22 +1429,42 @@ Proof.
       destruct (M.get _ _) eqn:Hget.
       destruct p.
       destruct p.
-      bind_next.
+      bind_next; [|mon_apply freshen_exp_triple].
       destruct (inline_letapp _ _) eqn:Hctx.
       destruct p.
+      (* Q' is the postcondtion of freshen_exp e0, and its job is to relate e0 to x *)
+      apply pre_eq_state_lr; Intros.
+      mon_apply IHmed'.
+      4:reflexivity.
+      2: {
+        (* Q contains "e1 is freshen_exp e0" *)
+        (* Proof sketch: we have
+            (let x = f xs in e, rho)⇓c v and wish to show ∃ v' c', (e', rho')⇓c' v' /\ v ~(k-c) v'.
+            If can show (C |[ e ]|, rho[fds][ys↦xs])⇓c' v where
+              fds is the function bundle of f
+              ys are f's formals
+              xs are f's actuals
+            then IH gives ∃ v' c', (e', rho')⇓c' v' /\ v ~(k-c1) v'
+            which implies what we want because ~ is monotonic in k
+        *)
+        simpl; Intros.
+        unfold preord_exp; intros.
+        match goal with H : bstep_cost _ _ _ _ _ _ |- _ => inv H end.
+        assert (exists c'', bstep_cost pr cenv rho'' (e1 |[ e ]|) v2 c''). {
+          admit.
+        }
+        admit. (* need to actually write out Q in the lemma *)
+      }
       (* Unfolding preord_exp and stepping forward from the Eletapp should hopefully give
          extended environment + reduced expression that resemble x', rho'
          Can then apply IH to these *)
-      admit.
-      admit.
-      admit.
-      admit.
-      admit.
+      all: admit.
   - (* Efun *)
     spark_evaluation.
     destruct (update_funDef St IH f sig s).
     bind_next. bind_next. ret.
     eapply preord_exp_fun_compat; cleanup.
+    gen k; gen rho; gen rho'.
     choose_post H.
     mon_apply IHmed'; Intros; cleanup; cleanup.
     admit.
@@ -1431,10 +1480,20 @@ Proof.
       destruct p.
       destruct p.
       bind_next.
+      eapply pre_eq_state_lr; Intros.
+      mon_apply IHmed'; cleanup.
+      2: {
+        simpl; Intros.
       (* Unfolding preord_exp and stepping forward from Eapp v f l should give an extended
          environment + reduced expression that resemble x', rho'
          Can then apply IH to these
          *)
+        admit.
+      }
+      admit.
+      admit.
+      admit.
+      admit.
       admit.
       admit.
       admit.
@@ -1442,6 +1501,7 @@ Proof.
   - (* Eprim *)
     spark_evaluation. bind_next. ret.
     eapply preord_exp_prim_compat; cleanup; cleanup.
+    gen k; gen rho; gen rho'.
     choose_post H.
     Intro v1; Intro v2; Intro Hvs.
     mon_apply IHmed'; Intros; cleanup; cleanup.

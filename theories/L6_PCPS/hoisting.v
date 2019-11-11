@@ -665,7 +665,6 @@ Section Hoisting_correct.
       edestruct (@set_lists_length3 val (def_funs Ball Ball (M.empty val) (M.empty val)) xs1 vs2)
         as [rho2' Hset2].
       rewrite <- Heq1. eapply set_lists_length_eq. now eauto.
-
       do 3 eexists. split; [| split ].
       + erewrite split_fds_find_def; try eassumption.
         eapply unique_bindings_fundefs_unique_functions. eassumption.
@@ -723,52 +722,7 @@ Section Hoisting_correct.
       eapply preord_env_P_def_funs_not_in_P_l; [| sets ]. 
       eapply preord_env_P_antimon. eassumption. sets.
   Qed.
-      
-  (** Context application lemma, left *)
-  (** [(C |[ e1 ]|, ρ1) < (e2, ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
-      interpretation of [C] in [ρ2] *)
-  Lemma ctx_to_rho_preord_exp_l k (L : nat -> relation nat) boundG rho1 rho1' rho2 C e e' m :
-    (forall c1 c2 n c , c <= size_cps.sizeOf_exp_ctx C ->  L n c1 c2 -> L (n + c) (c1 + c) c2) ->
-    ctx_to_rho C rho1 rho1' -> 
-    preord_exp pr cenv k (L m) boundG (e, rho1') (e', rho2) ->
-    preord_exp pr cenv k (L (m + size_cps.sizeOf_exp_ctx C)) boundG (C |[ e ]|, rho1) (e', rho2).
-  Proof.  
-    intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
-    - intros v1' c1 Hleq1 Hstep1.
-      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
-      simpl in *. repeat eexists; eauto.
-      rewrite <- plus_n_O. eassumption.
-    - intros v1 c1 Hleq1 Hstep1. inv Hstep1.
-      repeat subst_exp.
-      edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
-      intros. eapply H1; eauto. simpl; omega.
-      repeat eexists; eauto.
-      simpl.
-      replace (m + S (size_cps.sizeOf_exp_ctx C)) with (m + size_cps.sizeOf_exp_ctx C + 1) by omega.
-      eapply H1; eauto. simpl; omega.
-      eapply preord_val_monotonic. eassumption. omega.
-    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
-      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
-      intros. eapply H1; eauto. simpl; omega.
-      repeat eexists; eauto.
-      simpl.
-      rewrite <- (plus_assoc c 1 _).
-      replace (m + S (@Datatypes.length var ys + size_cps.sizeOf_exp_ctx C))
-        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + @Datatypes.length var ys)) by omega.
-      eapply H1; eauto. simpl; omega. 
-      eapply preord_val_monotonic. eassumption. omega.
-    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
-      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
-      intros. eapply H1; eauto. simpl; omega.
-      repeat eexists; eauto.
-      simpl.
-      replace (m + S (set_util.PS.cardinal (fundefs_fv B) + size_cps.sizeOf_exp_ctx C))
-        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + set_util.PS.cardinal (fundefs_fv B))) by omega.
-      eapply H1; eauto. simpl; omega. 
-      eapply preord_val_monotonic. eassumption. omega.
-  Qed.
-
-            
+                  
   Lemma hoisting_correct k e e' Bprev B Ball rho rho' :
     unique_bindings_fundefs Ball ->
     unique_bindings e ->
@@ -786,21 +740,21 @@ Section Hoisting_correct.
     preord_exp pr cenv k P PG (e, rho) (e', rho').
   Proof.
     revert e e' Bprev B Ball rho rho'.
-    induction k as [k IHk] using lt_wf_rec1. intros e.
-    revert k IHk.
-    induction e using exp_ind'; intros k IHk e' Bprev B Ball rho rho' Hun1 Hun2
-                                       Henv Hfuns Hsplit Hdis Hfvs Hhoist;
-    inv Hhoist; inv Hun2.
+    induction k as [k IHk] using lt_wf_rec1.
+    intros e; revert k IHk; induction e using exp_ind';
+    intros k IHk e' Bprev B Ball rho rho' Hun1 Hun2 Henv Hfuns Hsplit Hdis Hfvs Hhoist;
+      inv Hhoist; inv Hun2.
     - (* Econstr *)
       eapply preord_exp_const_compat.
       + eassumption.
       + eapply Forall2_same. intros x Hin. eapply Henv.
         now constructor.
-      + intros vs1 vs2 Hall. 
-        eapply IHe; [ eassumption | eassumption | | | | eassumption | | | ].
+      + intros m vs1 vs2 Hlt Hall. 
+        eapply IHk; [ eassumption | eassumption | | | | eassumption | | | ].
         * eassumption.
         * eapply preord_env_P_extend.
-          -- eapply preord_env_P_antimon; sets.
+          -- eapply preord_env_P_antimon.
+             eapply preord_env_P_monotonic; [| eassumption ]. omega. 
              normalize_occurs_free. sets.
           -- rewrite preord_val_eq. constructor; eauto.
              eapply Forall2_Forall2_asym_included. eassumption.
@@ -819,12 +773,12 @@ Section Hoisting_correct.
       now eapply H7. eapply split_fds_sym. eassumption.
       eapply split_fds_sym in H7.
       edestruct split_fds_trans as [Bnew' [Hs1' Hs2']].
-      now eapply H7. eapply split_fds_sym. eassumption.
-      
+      now eapply H7. eapply split_fds_sym. eassumption.      
       eapply preord_exp_case_cons_compat; eauto.
       + eapply Erase_fundefs_Ecase. eassumption.
-      + eapply IHe; last eassumption; eauto.
-        * eapply preord_env_P_antimon. eassumption.
+      + intros m Hlt. eapply IHk; last eassumption; eauto.
+        * eapply preord_env_P_antimon.
+          eapply preord_env_P_monotonic; [| eassumption ]. omega.
           normalize_occurs_free; sets.
         * apply split_fds_sym. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
@@ -844,11 +798,12 @@ Section Hoisting_correct.
       eapply preord_exp_proj_compat.
       + eassumption.
       + eapply Henv. eauto.
-      + intros vs1 vs2 Hall. 
-        eapply IHe; [ eassumption | eassumption | | | | eassumption | | | ].
+      + intros m vs1 vs2 Hlt Hall. 
+        eapply IHk; [ eassumption | eassumption | | | | eassumption | | | ].
         * eassumption.
         * eapply preord_env_P_extend.
-          -- eapply preord_env_P_antimon; sets.
+          -- eapply preord_env_P_antimon.
+             eapply preord_env_P_monotonic; [| eassumption ]. omega.
              normalize_occurs_free. sets.
           -- eassumption.
         * eapply funs_inv_env_set. eassumption.
@@ -865,8 +820,7 @@ Section Hoisting_correct.
       + eapply Forall2_same. intros z Hin. eapply Henv.
         constructor. now right.
       + intros m v1 v2 hlew Hrel.
-        eapply IHe; [ | eassumption | | | | eassumption | | | ].
-        * intros. eapply IHk; eauto. omega. 
+        eapply IHk; [ eassumption | eassumption | | | | eassumption | | | ].
         * eassumption.
         * eapply preord_env_P_extend.
           -- eapply preord_env_P_antimon.
@@ -907,7 +861,7 @@ Section Hoisting_correct.
                - eapply Disjoint_Included_r; [| eassumption ].
                  normalize_bound_var; sets.
                - intros x Hfv. inv Hfv; eauto. }
-          -- sets.             
+          -- sets.         
         * eassumption.
         * eapply split_fds_sym. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
@@ -925,11 +879,12 @@ Section Hoisting_correct.
       + eassumption.
       + eapply Forall2_same. intros x Hin. eapply Henv.
         now constructor.
-      + intros vs1 vs2 Hall. 
-        eapply IHe; [ eassumption | eassumption | | | | eassumption | | | ].
+      + intros m vs1 vs2 Hlt Hall. 
+        eapply IHk; [ eassumption | eassumption | | | | eassumption | | | ].
         * eassumption.
         * eapply preord_env_P_extend.
-          -- eapply preord_env_P_antimon; sets.
+          -- eapply preord_env_P_antimon.
+             eapply preord_env_P_monotonic; [| eassumption ]. omega.
              normalize_occurs_free. sets.
           -- eassumption.
         * eapply funs_inv_env_set. eassumption.
@@ -941,7 +896,7 @@ Section Hoisting_correct.
         * eassumption.
     - (* Ehalt *)
       eapply preord_exp_halt_compat; eauto.
-  Qed. 
+  Qed.
 
 End Hoisting_correct.
 

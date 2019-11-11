@@ -251,6 +251,700 @@ Proof.
   - inv H; eauto.
 Qed.
 
+Definition funs_inv_env B rho :=
+  forall f, f \in name_in_fundefs B ->
+             M.get f rho = Some (Vfun (M.empty _) B f).
+
+
+Lemma funs_inv_env_set B rho x v :
+  funs_inv_env B rho ->
+  ~ x \in name_in_fundefs B ->
+          funs_inv_env B (M.set x v rho).
+Proof.
+  intros Hin Hnin f Hfun.
+  rewrite M.gso; eauto.
+  intros Hc; subst; eauto.
+Qed.
+
+(* TODO move *)
+Lemma Disjoint_In_l {A} (s1 s2 : Ensemble A) x :
+  Disjoint _ s1 s2 ->
+  x \in s1 ->
+        ~ x \in s2.
+Proof.
+  intros Hd Hin Hc. eapply Hd. constructor; eauto.
+Qed.
+
+
+Definition fun_fv_in e G :=
+  forall B, funs_in_exp B e -> occurs_free_fundefs B \subset G.
+
+Definition fun_fv_in_fundefs B G :=
+  forall B', B = B' \/ funs_in_fundef B' B -> occurs_free_fundefs B' \subset G.
+
+
+Lemma find_def_complete (f : var) (B : fundefs) (tau : fun_tag) (xs : list var) (e : exp) :
+  unique_functions B ->
+  fun_in_fundefs B (f, tau, xs, e) ->
+  find_def f B = Some (tau, xs, e).
+Proof.
+  intros Hun HB. induction B.
+  - inv Hun. destruct (peq f v); subst.
+    + inv HB. inv H. simpl. rewrite peq_true. reflexivity.
+      exfalso. eapply H5. eapply fun_in_fundefs_name_in_fundefs.
+      eassumption.
+    + inv HB. inv H. contradiction.
+      simpl. rewrite peq_false; eauto.
+  - inv HB.
+Qed.
+
+Lemma split_fds_find_def B1 B2 B3 f:
+  unique_functions B3 ->
+  split_fds B1 B2 B3 ->
+  f \in name_in_fundefs B2 ->
+        find_def f B3 = find_def f B2.
+Proof.
+  intros Hun Hs Hin.
+  edestruct name_in_fundefs_find_def_is_Some as [ft [xs [e Hfind]]]; eauto.
+  assert (Hfun := find_def_correct _ _ _ _ _ Hfind).
+  assert (Hfun' : fun_in_fundefs B3 (f, ft, xs, e)).
+  { eapply split_fds_fun_in_fundefs. eassumption. now right. }
+  eapply find_def_complete in Hfun'. congruence. eassumption.
+Qed.
+
+Lemma Erase_fundefs_bound_var_mut :
+  (forall e e' B (Herase : Erase_fundefs e e' B),       
+      bound_var e <--> bound_var e' :|: bound_var_fundefs B) /\
+  (forall B B' (Herase : Erase_nested_fundefs B B'),
+      bound_var_fundefs B <--> bound_var_fundefs B').
+Proof.
+  exp_defs_induction IHe IHc IHB;
+    try (intros e' B Hr); try (intros B' Hr); inv Hr;
+      try (now repeat normalize_bound_var; rewrite IHe; [| eassumption ];
+           split; xsets).
+  - repeat normalize_bound_var. sets.
+  - repeat normalize_bound_var.
+    rewrite IHe; [| eassumption ].
+    rewrite IHc; [| eassumption ].
+    erewrite (split_fds_bound_vars B0 B' B); eauto.
+    split; xsets.
+  - normalize_bound_var.
+    rewrite IHe; [| eassumption ].
+    rewrite IHB; [| eassumption ].
+    erewrite (split_fds_bound_vars Be Bdefs B); eauto.            
+    sets.
+  - repeat normalize_bound_var. sets.
+  - repeat normalize_bound_var. sets.
+  - erewrite (split_fds_bound_vars B (Fcons v t l e' B'0) B'); eauto.   
+    repeat normalize_bound_var.
+    rewrite IHe; [| eassumption ].
+    rewrite IHB; [| eassumption ]. xsets.
+  - normalize_bound_var. xsets.
+Qed. 
+
+
+Lemma Erase_fundefs_bound_var :
+  forall e e' B (Herase : Erase_fundefs e e' B),       
+    bound_var e <--> bound_var e' :|: bound_var_fundefs B.
+Proof.
+  eapply Erase_fundefs_bound_var_mut.
+Qed.
+
+Lemma Erase_nested_fundefs_bound_var :
+  forall B B' (Herase : Erase_nested_fundefs B B'),
+    bound_var_fundefs B <--> bound_var_fundefs B'.
+Proof.
+  eapply Erase_fundefs_bound_var_mut.
+Qed.
+
+Ltac bound_var_heq Hname :=
+  match goal with
+  | [ H : Erase_fundefs _ _ _ |- _ ] =>
+    assert (Hname := Erase_fundefs_bound_var _ _ _ H)
+  end.
+
+Ltac bound_var_fundefs_heq Hname :=
+  match goal with
+  | [ H : Erase_nested_fundefs _ _ |- _ ] =>
+    assert (Hname := Erase_nested_fundefs_bound_var _ _ H)
+  end.
+
+
+
+Lemma Erase_fundefs_unique_bindings_mut :
+  (forall e e' B (Herase : Erase_fundefs e e' B),
+      unique_bindings e ->
+      unique_bindings e' /\
+      unique_bindings_fundefs B /\
+      Disjoint _ (bound_var_fundefs B) (bound_var e')) /\
+  (forall B B' (Herase : Erase_nested_fundefs B B'),
+      unique_bindings_fundefs B ->
+      unique_bindings_fundefs B').
+Proof.
+  exp_defs_induction IHe IHc IHB;
+    try (intros e' B Hr Hun); try (intros B' Hr Hun); inv Hr;
+      try (bound_var_heq Hbin); try (bound_var_fundefs_heq Hbin'). 
+  - inv Hun. 
+    edestruct (IHe _ _ H5) as [Hun [Hunf Hdis]]; eauto. 
+    split; [| split ].
+    + constructor; eauto.
+      intros Hc. eapply H1. eapply Erase_fundefs_bound_var_mut.
+      eassumption. now left.
+    + eassumption.
+    + normalize_bound_var.
+      eapply Union_Disjoint_r.
+      eassumption. eapply Disjoint_Singleton_r.
+      intros Hc. eapply H1. eapply Hbin. now right.
+  - repeat normalize_bound_var.
+    split; [| split ].
+    + sets.
+    + constructor.
+    + sets.
+  - normalize_bound_var.
+    inv Hun.
+    edestruct (IHe _ _ H6) as [Hun' [Hunf' Hd']]; eauto. 
+    edestruct (IHc _ _ H5) as [Hun [Hunf Hd]]; eauto.
+    clear H6. bound_var_heq Hbin'.
+    split; [| split ].
+    + constructor; eauto. 
+      eapply Disjoint_Included; [| | eapply H8 ].
+      rewrite Hbin'. sets.
+      rewrite Hbin. sets.
+    + rewrite Hbin', Hbin in *.  
+      eapply split_fds_unique_bindings_fundefs_r;
+        [| | | eassumption ]; eauto.
+      eapply Disjoint_sym.
+      eapply Disjoint_Included; [| | eapply H8 ]; sets.
+    + rewrite (split_fds_bound_vars B0 B' B); eauto.
+      rewrite Hbin, Hbin' in *.
+      eapply Union_Disjoint_l; eapply Union_Disjoint_r.
+      * eapply Disjoint_sym.
+        eapply Disjoint_Included; [| | eapply H8 ]; sets.
+      * eassumption.
+      * eassumption.
+      * eapply Disjoint_Included; [| | eapply H8 ]; sets.
+  - inv Hun. 
+    edestruct (IHe _ _ H6) as [Hun [Hunf Hdis]]; eauto. 
+    split; [| split ].
+    + constructor; eauto.
+      intros Hc. eapply H1. eapply Erase_fundefs_bound_var_mut.
+      eassumption. now left.
+    + eassumption.
+    + normalize_bound_var.
+      eapply Union_Disjoint_r.
+      eassumption. eapply Disjoint_Singleton_r.
+      intros Hc. eapply H1. eapply Hbin. now right.
+  - inv Hun.
+    edestruct (IHe _ _ H6) as [Hun [Hunf Hdis]]; eauto. 
+    split; [| split ].
+    + constructor; eauto.
+      intros Hc. eapply H1. eapply Erase_fundefs_bound_var_mut.
+      eassumption. now left.
+    + eassumption.
+    + normalize_bound_var.
+      eapply Union_Disjoint_r.
+      eassumption. eapply Disjoint_Singleton_r.
+      intros Hc. eapply H1. eapply Hbin. now right.
+  - inv Hun.
+    edestruct (IHe _ _ H1) as [Hun [Hunf Hdis]]; eauto. 
+    assert (Hunf' := IHB _ H2 H4).
+    split; [| split ]; eauto.
+    + eapply split_fds_unique_bindings_fundefs_r;
+        [ | | | eassumption ]; eauto.
+      eapply Disjoint_Included; [| | eapply H6 ]; sets.
+      rewrite Hbin'. sets.
+      rewrite Hbin. sets.
+    + erewrite (split_fds_bound_vars _ _ B); eauto.
+      eapply Union_Disjoint_l.
+      * eassumption.
+      * rewrite <- Hbin'.
+        eapply Disjoint_sym.
+        eapply Disjoint_Included; [| | eapply H6 ]; sets.
+        rewrite Hbin; sets.
+  - inv Hun.
+    split; [| split ]; eauto.
+    + constructor; eauto.
+    + constructor.
+    + normalize_bound_var. sets.
+  - inv Hun. 
+    edestruct (IHe _ _ H5) as [Hun [Hunf Hdis]]; eauto. 
+    split; [| split ].
+    + constructor; eauto.
+      intros Hc. eapply H1. eapply Erase_fundefs_bound_var_mut.
+      eassumption. now left.
+    + eassumption.
+    + normalize_bound_var.
+      eapply Union_Disjoint_r.
+      eassumption. eapply Disjoint_Singleton_r.
+      intros Hc. eapply H1. eapply Hbin. now right.
+  - inv Hun.
+    split; [| split ].
+    + constructor; eauto.
+    + constructor.
+    + normalize_bound_var; sets.
+  - inv Hun.
+    eapply split_fds_unique_bindings_fundefs_r;
+      [ | | | eassumption ]; eauto.
+    * eapply IHe. eassumption. eassumption.
+    * constructor; eauto.
+      intros Hc; eapply H4. 
+      eapply Hbin. now left.
+      intros Hc. eapply H8.
+      eapply Hbin'. eassumption.
+      eapply Disjoint_Included_l; [| eapply H9 ]; sets.
+      rewrite Hbin. sets.
+      eapply Disjoint_Included_l; [| eapply H10 ]; sets.
+      rewrite Hbin'. sets.
+      eapply Disjoint_Included; [| | eapply H11 ]; sets.
+      rewrite Hbin'. sets.
+      rewrite Hbin. sets.
+      eapply IHe. eassumption. eassumption.
+    * normalize_bound_var.
+      repeat eapply Union_Disjoint_r.
+      -- eapply Disjoint_Singleton_r.
+         intros Hc; eapply H4. 
+         eapply Hbin. now right.
+      -- eapply Disjoint_Included_l; [| eapply H9 ]; sets.
+         rewrite Hbin. sets.
+      -- eapply IHe. eassumption. eassumption.
+      -- rewrite <- Hbin'.
+         eapply Disjoint_Included; [| | eapply H11 ]; sets.
+         rewrite Hbin. sets.
+  - constructor.
+Qed.
+
+
+
+Lemma Erase_nested_fundefs_name_in_fundefs :
+  (forall B B' (Herase : Erase_nested_fundefs B B'),
+      name_in_fundefs B \subset name_in_fundefs B').
+Proof.
+  intros B B' Hr. induction Hr; sets.
+  rewrite (split_fds_name_in_fundefs _ _ _ H0).
+  simpl. sets.
+Qed.
+
+
+Lemma Erase_fundefs_unique_bindings :
+  forall e e' B (Herase : Erase_fundefs e e' B),
+    unique_bindings e ->
+    unique_bindings e' /\
+    unique_bindings_fundefs B /\
+    Disjoint _ (bound_var_fundefs B) (bound_var e').
+Proof. eapply Erase_fundefs_unique_bindings_mut. Qed.
+
+Lemma Erase_nested_fundefs_unique_bindings :
+  forall B B' (Herase : Erase_nested_fundefs B B'),
+    unique_bindings_fundefs B ->
+    unique_bindings_fundefs B'.
+Proof. eapply Erase_fundefs_unique_bindings_mut. Qed.   
+
+
+Lemma Erase_nested_fundefs_in_name B B_hoist f tau xs e :
+  unique_bindings_fundefs B ->
+  f \in name_in_fundefs B ->  
+        Erase_nested_fundefs B B_hoist ->
+        find_def f B = Some (tau, xs, e) ->
+        exists e' Be Bfuns,
+          find_def f B_hoist = Some (tau, xs, e') /\
+          Erase_fundefs e e' Be /\
+          split_fds Be Bfuns B_hoist.
+Proof.
+  intros Hun Hin Hhoist Hfind.
+  induction Hhoist. 
+  - assert (Hunn'' : unique_bindings_fundefs B'').
+    { eapply Erase_nested_fundefs_unique_bindings; [| now eapply Hun ].
+      eapply Fcons_erase; eassumption. }
+    inv Hun.
+    destruct (peq f f0).
+    * subst. simpl in Hfind. rewrite peq_true in Hfind. inv Hfind.
+      do 3 eexists. split; [| split ].
+      erewrite split_fds_find_def; [ | | eassumption | ].
+      simpl. rewrite peq_true. reflexivity.
+      eapply unique_bindings_fundefs_unique_functions.
+      eassumption. now left. eassumption.
+      eassumption.
+    * subst. simpl in Hfind. rewrite peq_false in Hfind; eauto.
+      inv Hin. inv H1; congruence. 
+      edestruct IHHhoist as [e'' [Be' [Bfuns' [Hfind' [Hr Hsplit]]]]];
+        eauto.
+      assert (Hfind'' : find_def f B'' = Some (tau, xs, e'')).
+      { erewrite split_fds_find_def; [ | | eassumption | ].
+        simpl. now  rewrite peq_false; eauto.
+        eapply unique_bindings_fundefs_unique_functions. eassumption.
+        right. eapply Erase_nested_fundefs_name_in_fundefs. eassumption. eassumption. }
+      edestruct split_fds_trans as [Bf [Heq1 Heq2]];
+        [| eapply split_fds_sym; eapply H0 | ].        
+      eapply Right_f; eassumption.
+      do 3 eexists. split; [| split ].
+      -- eassumption.
+      -- eassumption.
+      -- eassumption.
+  - inv Hfind.
+Qed.
+  
+Lemma funs_in_fundef_fun_in_fundefs B Be xs t e : 
+  funs_in_exp Be e ->
+  fun_in_fundefs B (xs, t, e) ->
+  funs_in_fundef Be B.
+Proof.
+  intros Hf1 Hf2. induction B.
+  - inv Hf2.
+    + inv H. constructor. eassumption.
+    + constructor 2. eapply IHB. eassumption.
+  - inv Hf2.
+Qed. 
+
+Lemma Erase_fundefs_Ecase x l1 l2 B :
+  Erase_fundefs (Ecase x l1) (Ecase x l2) B ->
+  Forall2 (fun p1 p2 => fst p1 = fst p2) l1 l2.
+Proof.
+  revert x l2 B; induction l1; intros x l2 B Herase; inv Herase; eauto.
+Qed.
+  
+  
+Section Hoisting_correct.
+  
+  Variable (pr : prims) (cenv : ctor_env). 
+
+  Variable (P : Post) (PG : PostG)
+           (Hcompat : post_compat P P)
+           (Happcompat : post_app_compat PG P)
+           (Hletappcompat : post_letapp_compat PG P P)
+           (Hrefl : post_refl P)
+           (Hlocalstrong : (* local implies global *)
+              forall (m : nat) (e1 e2 : exp) (rho rho' : env) (c1 c2 : nat),
+                P c1 c2 -> PG m (e1, rho, c1) (e2, rho', c2))
+           (* This means that we don't support lower bound yet *)
+           (Hadd_src : forall c1 c2 c, P c1 c2 -> P (c1 + c) c2). 
+
+
+  Lemma Erase_nested_fundefs_correct S k B rho rho' B_hoist Bprev Ball 
+        (IHe : forall m : nat,
+            m < k ->
+            forall (e e' : exp) (Bprev B Ball : fundefs) (rho rho' : env),
+              unique_bindings_fundefs Ball ->
+              unique_bindings e ->
+              preord_env_P pr cenv (occurs_free e) m PG rho rho' ->
+              funs_inv_env Ball rho' ->
+              split_fds Bprev B Ball ->
+              Disjoint var (name_in_fundefs Ball) (bound_var e) ->
+              fun_fv_in e (name_in_fundefs Ball) ->
+              Erase_fundefs e e' B -> preord_exp pr cenv m P PG (e, rho) (e', rho')) :
+    unique_bindings_fundefs Ball ->
+    unique_bindings_fundefs B ->
+    occurs_free_fundefs B \subset S ->
+    (* initial environments are related *)
+    preord_env_P pr cenv (S \\ name_in_fundefs B) k PG rho rho' ->
+    (* assumptions about global funs *)     
+    funs_inv_env Ball rho' ->
+    split_fds Bprev B_hoist Ball ->
+    Disjoint var (name_in_fundefs Ball) (bound_var_fundefs B) ->
+    fun_fv_in_fundefs B (name_in_fundefs Ball) ->
+    (* Erase fundefs *)
+    Erase_nested_fundefs B B_hoist ->
+    preord_env_P pr cenv (name_in_fundefs B :|: S) k PG (def_funs B B rho rho) rho'.
+  Proof.
+    revert S B rho rho' B_hoist Bprev Ball IHe.
+    induction k as [k IHk] using lt_wf_rec1.
+    intros S B rho rho' B_hoist Bprev Ball IHe Hun1 Hun2 Hsub Henv Hfuns Hsplit Hdis Hfvs Hhoist.
+    rewrite <- (Union_Setminus_Included (name_in_fundefs B) S (name_in_fundefs B)) at 1;
+      [| tci | reflexivity ]. 
+    eapply preord_env_P_union.
+    - (* show it for the set of the added functions *)
+      intros x Hin v Hget. rewrite def_funs_eq in Hget; eauto.
+      inv Hget. 
+      eexists. split.
+       
+      eapply Hfuns. rewrite split_fds_name_in_fundefs; [| eassumption ]. right.
+      eapply Erase_nested_fundefs_name_in_fundefs. eassumption. eassumption.
+      rewrite preord_val_eq. 
+      intros vs1 vs2 j t xs1 e1 rho1' Heq1 Hf1 Hset1.
+      edestruct Erase_nested_fundefs_in_name as [e2' [B2 [B2f [Hf2 [Hr2 Hs2]]]]];
+        [| | | eapply Hf1 | ]; eauto.
+      edestruct (@set_lists_length3 val (def_funs Ball Ball (M.empty val) (M.empty val)) xs1 vs2)
+        as [rho2' Hset2].
+      rewrite <- Heq1. eapply set_lists_length_eq. now eauto.
+
+      do 3 eexists. split; [| split ].
+      + erewrite split_fds_find_def; try eassumption.
+        eapply unique_bindings_fundefs_unique_functions. eassumption.
+        eapply Erase_nested_fundefs_name_in_fundefs; eassumption.
+      + eauto.
+      + intros Hlt Hall.
+        eapply preord_exp_post_monotonic with (P1 := P).
+        { intros x1 x2 Hp. eapply Hlocalstrong. eassumption. }
+
+        eapply split_fds_sym in Hsplit.
+        edestruct (split_fds_trans _ _ _ _ _ Hs2 Hsplit) as [Bprev' [Hs3 Hs4]].
+        eapply IHe with (Ball := Ball) (Bprev := Bprev');
+          last eassumption; try eassumption.
+        * eapply unique_bindings_fun_in_fundefs.
+          eapply find_def_correct. eassumption.
+          eassumption.
+        * eapply preord_env_P_antimon;
+            [| eapply occurs_free_in_fun; eapply find_def_correct; eauto ].
+          eapply preord_env_P_set_lists_l with (P1 := name_in_fundefs B :|: occurs_free_fundefs B);
+            try now eauto.
+          2:{ intros z Hnin Hinz. inv Hinz; eauto. contradiction. }
+          clear Hs3 Hs4. 
+          (* eapply IHk to show that inner def_funs are related *)
+          { eapply IHk with (Ball := Ball); last eassumption; try eassumption. 
+            - intros. eapply IHe; eauto. omega. 
+            - reflexivity.
+            - intros z Hinz v Hgetz.  
+              inv Hinz. 
+              setoid_rewrite def_funs_eq; eauto.
+              eexists; split; eauto.
+              edestruct Henv as [v2 [Hget2 Hv2]]; eauto. constructor; eauto.
+              rewrite Hfuns in Hget2. inv Hget2; eauto.
+              eapply preord_val_monotonic. eassumption. omega.
+              eapply Hfvs; eauto.
+              eapply Hfvs; eauto.
+            - intros f1 Hf. rewrite def_funs_eq. reflexivity.
+              eassumption.
+            - eapply split_fds_sym. eassumption. } 
+        * intros f H1. erewrite <- set_lists_not_In; [| now eauto | ].
+          rewrite def_funs_eq. reflexivity. eassumption.
+          assert (Hun : Disjoint var (FromList xs1) (name_in_fundefs Ball)).
+          { eapply unique_bindings_fun_in_fundefs; [| eassumption ].
+            erewrite split_fds_fun_in_fundefs; [| eapply Hsplit ].
+            left. eapply find_def_correct. eassumption. }
+          intros Hc. eapply Hun. constructor. eassumption. eassumption.
+        * eapply split_fds_sym. eassumption.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eauto;
+                                    eapply find_def_correct; eauto ].
+          sets.
+        * intros Be HBe. eapply Included_trans; [| eapply Hfvs ]. reflexivity.
+          right. eapply funs_in_fundef_fun_in_fundefs. eassumption.
+          eapply find_def_correct. eassumption.
+    - (* show if for S *)
+      eapply preord_env_P_def_funs_not_in_P_l; [| sets ]. 
+      eapply preord_env_P_antimon. eassumption. sets.
+  Qed.
+      
+  (** Context application lemma, left *)
+  (** [(C |[ e1 ]|, ρ1) < (e2, ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+      interpretation of [C] in [ρ2] *)
+  Lemma ctx_to_rho_preord_exp_l k (L : nat -> relation nat) boundG rho1 rho1' rho2 C e e' m :
+    (forall c1 c2 n c , c <= size_cps.sizeOf_exp_ctx C ->  L n c1 c2 -> L (n + c) (c1 + c) c2) ->
+    ctx_to_rho C rho1 rho1' -> 
+    preord_exp pr cenv k (L m) boundG (e, rho1') (e', rho2) ->
+    preord_exp pr cenv k (L (m + size_cps.sizeOf_exp_ctx C)) boundG (C |[ e ]|, rho1) (e', rho2).
+  Proof.  
+    intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      simpl in *. repeat eexists; eauto.
+      rewrite <- plus_n_O. eassumption.
+    - intros v1 c1 Hleq1 Hstep1. inv Hstep1.
+      repeat subst_exp.
+      edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+      intros. eapply H1; eauto. simpl; omega.
+      repeat eexists; eauto.
+      simpl.
+      replace (m + S (size_cps.sizeOf_exp_ctx C)) with (m + size_cps.sizeOf_exp_ctx C + 1) by omega.
+      eapply H1; eauto. simpl; omega.
+      eapply preord_val_monotonic. eassumption. omega.
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+      intros. eapply H1; eauto. simpl; omega.
+      repeat eexists; eauto.
+      simpl.
+      rewrite <- (plus_assoc c 1 _).
+      replace (m + S (@Datatypes.length var ys + size_cps.sizeOf_exp_ctx C))
+        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + @Datatypes.length var ys)) by omega.
+      eapply H1; eauto. simpl; omega. 
+      eapply preord_val_monotonic. eassumption. omega.
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+      intros. eapply H1; eauto. simpl; omega.
+      repeat eexists; eauto.
+      simpl.
+      replace (m + S (set_util.PS.cardinal (fundefs_fv B) + size_cps.sizeOf_exp_ctx C))
+        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + set_util.PS.cardinal (fundefs_fv B))) by omega.
+      eapply H1; eauto. simpl; omega. 
+      eapply preord_val_monotonic. eassumption. omega.
+  Qed.
+
+            
+  Lemma hoisting_correct k e e' Bprev B Ball rho rho' :
+    unique_bindings_fundefs Ball ->
+    unique_bindings e ->
+    (* environments are related *)
+    preord_env_P pr cenv (occurs_free e) k PG rho rho' ->
+    (* Hoisted functions are already defined *)
+    funs_inv_env Ball rho' ->
+    split_fds Bprev B Ball ->
+    (* And will not be shadowed by other vars *)
+    Disjoint _ (name_in_fundefs Ball) (bound_var e) ->
+    (* the FVs of the original functions are in the global fundefs *)
+    fun_fv_in e (name_in_fundefs Ball) ->
+    (* Hoisting *)            
+    Erase_fundefs e e' B ->    
+    preord_exp pr cenv k P PG (e, rho) (e', rho').
+  Proof.
+    revert e e' Bprev B Ball rho rho'.
+    induction k as [k IHk] using lt_wf_rec1. intros e.
+    revert k IHk.
+    induction e using exp_ind'; intros k IHk e' Bprev B Ball rho rho' Hun1 Hun2
+                                       Henv Hfuns Hsplit Hdis Hfvs Hhoist;
+    inv Hhoist; inv Hun2.
+    - (* Econstr *)
+      eapply preord_exp_const_compat.
+      + eassumption.
+      + eapply Forall2_same. intros x Hin. eapply Henv.
+        now constructor.
+      + intros vs1 vs2 Hall. 
+        eapply IHe; [ eassumption | eassumption | | | | eassumption | | | ].
+        * eassumption.
+        * eapply preord_env_P_extend.
+          -- eapply preord_env_P_antimon; sets.
+             normalize_occurs_free. sets.
+          -- rewrite preord_val_eq. constructor; eauto.
+             eapply Forall2_Forall2_asym_included. eassumption.
+        * eapply funs_inv_env_set. eassumption.
+          eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
+          normalize_bound_var; sets.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros B' Hbin. eapply Hfvs. constructor; eauto.
+        * eassumption.
+    - (* Ecase nil *)
+      eapply preord_exp_case_nil_compat.
+    - (* Ecase cons *)
+      eapply split_fds_sym in H7.
+      edestruct split_fds_trans as [Bnew [Hs1 Hs2]].
+      now eapply H7. eapply split_fds_sym. eassumption.
+      eapply split_fds_sym in H7.
+      edestruct split_fds_trans as [Bnew' [Hs1' Hs2']].
+      now eapply H7. eapply split_fds_sym. eassumption.
+      
+      eapply preord_exp_case_cons_compat; eauto.
+      + eapply Erase_fundefs_Ecase. eassumption.
+      + eapply IHe; last eassumption; eauto.
+        * eapply preord_env_P_antimon. eassumption.
+          normalize_occurs_free; sets.
+        * apply split_fds_sym. eassumption.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros x Hin; eapply Hfvs. econstructor; eauto.
+          now left.
+      + eapply IHe0; last eassumption; eauto.
+        * eapply preord_env_P_antimon. eassumption.
+          normalize_occurs_free; sets.
+        *  apply split_fds_sym. eassumption.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros x Hin; eapply Hfvs.
+          inv Hin. econstructor. eassumption.
+          right. eassumption.
+    - (* Eproj *)
+      eapply preord_exp_proj_compat.
+      + eassumption.
+      + eapply Henv. eauto.
+      + intros vs1 vs2 Hall. 
+        eapply IHe; [ eassumption | eassumption | | | | eassumption | | | ].
+        * eassumption.
+        * eapply preord_env_P_extend.
+          -- eapply preord_env_P_antimon; sets.
+             normalize_occurs_free. sets.
+          -- eassumption.
+        * eapply funs_inv_env_set. eassumption.
+          eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
+          normalize_bound_var; sets.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros B' Hbin. eapply Hfvs. constructor; eauto.
+        * eassumption.
+    - (* Eletapp *)
+      eapply preord_exp_letapp_compat.
+      + eassumption.
+      + eapply Henv. constructor. now left.
+      + eapply Forall2_same. intros z Hin. eapply Henv.
+        constructor. now right.
+      + intros m v1 v2 hlew Hrel.
+        eapply IHe; [ | eassumption | | | | eassumption | | | ].
+        * intros. eapply IHk; eauto. omega. 
+        * eassumption.
+        * eapply preord_env_P_extend.
+          -- eapply preord_env_P_antimon.
+             eapply preord_env_P_monotonic; [| eassumption ]. omega.
+             normalize_occurs_free. sets.
+          -- eassumption.
+        * eapply funs_inv_env_set. eassumption.
+          eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
+          normalize_bound_var; sets.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros B' Hbin. eapply Hfvs. constructor; eauto.
+        * eassumption.
+    - (* Efun -- the only non trivial case *)
+      eapply ctx_to_rho_preord_exp_l with (L := fun _ => P) (C := Efun1_c f2 Hole_c).
+      exact 0.
+      + intros; eauto.  (* no low bound *)
+      + constructor. constructor.
+      + eapply split_fds_sym in Hsplit.
+        eapply split_fds_sym in H5.
+        edestruct split_fds_trans as [Bnew [Hs1 Hs2]]. now eapply H5. eassumption.        
+        eapply split_fds_sym in H5.
+        edestruct split_fds_trans as [Bnew' [Hs1' Hs2']]. now eapply H5. eassumption.
+                         
+        eapply IHe with (Ball := Ball); [ eassumption | eassumption | eassumption | | | | | | eassumption ]. 
+        * eapply preord_env_P_antimon.
+          -- { eapply Erase_nested_fundefs_correct with (S := occurs_free_fundefs f2 :|: occurs_free e);
+               [ | | | | | | | | | eassumption ].
+               - eauto.
+               - eapply Hun1.
+               - eassumption.
+               - sets.
+               - eapply preord_env_P_antimon.
+                 eassumption. normalize_occurs_free; sets.
+                 rewrite Setminus_Union_distr. sets.
+               - eassumption.
+               - eapply split_fds_sym.  eassumption.
+               - eapply Disjoint_Included_r; [| eassumption ].
+                 normalize_bound_var; sets.
+               - intros x Hfv. inv Hfv; eauto. }
+          -- sets.             
+        * eassumption.
+        * eapply split_fds_sym. eassumption.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var...
+          sets.
+        * intros x Hin. eapply Hfvs. constructor; eauto.
+    - (* Eapp *)
+      eapply preord_exp_app_compat.
+      + eassumption.
+      + eapply Henv. constructor.
+      + eapply Forall2_same. intros z Hin. eapply Henv.
+        now constructor.
+    - (* Eprim *)
+      eapply preord_exp_prim_compat.
+      + eassumption.
+      + eapply Forall2_same. intros x Hin. eapply Henv.
+        now constructor.
+      + intros vs1 vs2 Hall. 
+        eapply IHe; [ eassumption | eassumption | | | | eassumption | | | ].
+        * eassumption.
+        * eapply preord_env_P_extend.
+          -- eapply preord_env_P_antimon; sets.
+             normalize_occurs_free. sets.
+          -- eassumption.
+        * eapply funs_inv_env_set. eassumption.
+          eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
+          normalize_bound_var; sets.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          normalize_bound_var; sets.
+        * intros B' Hbin. eapply Hfvs. constructor; eauto.
+        * eassumption.
+    - (* Ehalt *)
+      eapply preord_exp_halt_compat; eauto.
+  Qed. 
+
+End Hoisting_correct.
+
 (* 
 
 (** Hoisting as a rewrite relation *)

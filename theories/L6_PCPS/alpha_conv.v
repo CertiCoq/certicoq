@@ -650,6 +650,10 @@ Section Alpha_conv_correct.
       eauto with Ensembles_DB.
   Admitted.
 
+(*
+Needs : 1.) Fixing the right assumptions for the bounds
+        2.) Uses the updated compat lemmas (m < k)
+
   (** α-equivalence preserves semantics *)
   Lemma Alpha_conv_correct k rho1 rho2 e1 e2 g :
     injective g ->
@@ -721,7 +725,7 @@ Section Alpha_conv_correct.
       admit.
       eapply Henv. now constructor.
   Admitted.
-  
+*)
 End Alpha_conv_correct.
 
 Close Scope fun_scope.

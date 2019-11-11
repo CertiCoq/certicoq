@@ -668,6 +668,14 @@ Hint Resolve Included_Union_preserv_l Included_Union_preserv_r Setminus_Included
 
 (** ** Disjoint properties *)
 
+Lemma Disjoint_In_l {A} (s1 s2 : Ensemble A) x :
+  Disjoint _ s1 s2 ->
+  x \in s1 ->
+  ~ x \in s2.
+Proof.
+  intros Hd Hin Hc. eapply Hd. constructor; eauto.
+Qed.
+
 Lemma Disjoint_Setminus_l {A} s1 s2 s3 :
   Included A s3 s2 ->
   Disjoint A (Setminus A s1 s2) s3.

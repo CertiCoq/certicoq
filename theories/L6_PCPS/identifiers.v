@@ -1037,6 +1037,8 @@ Proof with eauto with Ensembles_DB.
   rewrite H2, H3...
 Qed.
 
+
+
 (** * Function blocks defined inside in expressions and function blocks *)
 
 (** [funs_in_exp B e] iff [B] is a block of functions in [e] *)
@@ -1715,6 +1717,23 @@ Proof.
   intros Hin. eapply H0. now apply name_in_fundefs_bound_var_fundefs.
 Qed.
 
+
+Lemma find_def_complete (f : var) (B : fundefs) (tau : fun_tag) (xs : list var) (e : exp) :
+  unique_functions B ->
+  fun_in_fundefs B (f, tau, xs, e) ->
+  find_def f B = Some (tau, xs, e).
+Proof.
+  intros Hun HB. induction B.
+  - inv Hun. destruct (peq f v); subst.
+    + inv HB. inv H. simpl. rewrite peq_true. reflexivity.
+      exfalso. eapply H5. eapply fun_in_fundefs_name_in_fundefs.
+      eassumption.
+    + inv HB. inv H. contradiction.
+      simpl. rewrite peq_false; eauto.
+  - inv HB.
+Qed.
+
+
 Lemma unique_bindings_Ecase_l x P1 c e P2 :
   unique_bindings (Ecase x (P1 ++ ((c, e) :: P2))) ->
   unique_bindings e /\
@@ -1946,6 +1965,20 @@ Proof with eauto with Ensembles_DB.
     + rewrite split_fds_bound_vars; [| eassumption ]...
     + eapply IHHspl...
   - constructor.
+Qed.
+
+Lemma split_fds_find_def B1 B2 B3 f:
+  unique_functions B3 ->
+  split_fds B1 B2 B3 ->
+  f \in name_in_fundefs B2 ->
+  find_def f B3 = find_def f B2.
+Proof.
+  intros Hun Hs Hin.
+  edestruct name_in_fundefs_find_def_is_Some as [ft [xs [e Hfind]]]; eauto.
+  assert (Hfun := find_def_correct _ _ _ _ _ Hfind).
+  assert (Hfun' : fun_in_fundefs B3 (f, ft, xs, e)).
+  { eapply split_fds_fun_in_fundefs. eassumption. now right. }
+  eapply find_def_complete in Hfun'. congruence. eassumption.
 Qed.
 
 Lemma fundefs_append_unique_bindings_l B1 B2 B3 :

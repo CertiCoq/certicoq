@@ -266,51 +266,13 @@ Proof.
   intros Hc; subst; eauto.
 Qed.
 
-(* TODO move *)
-Lemma Disjoint_In_l {A} (s1 s2 : Ensemble A) x :
-  Disjoint _ s1 s2 ->
-  x \in s1 ->
-        ~ x \in s2.
-Proof.
-  intros Hd Hin Hc. eapply Hd. constructor; eauto.
-Qed.
-
-
+(* FVs of function definitions are in G *)
 Definition fun_fv_in e G :=
   forall B, funs_in_exp B e -> occurs_free_fundefs B \subset G.
 
 Definition fun_fv_in_fundefs B G :=
   forall B', B = B' \/ funs_in_fundef B' B -> occurs_free_fundefs B' \subset G.
 
-
-Lemma find_def_complete (f : var) (B : fundefs) (tau : fun_tag) (xs : list var) (e : exp) :
-  unique_functions B ->
-  fun_in_fundefs B (f, tau, xs, e) ->
-  find_def f B = Some (tau, xs, e).
-Proof.
-  intros Hun HB. induction B.
-  - inv Hun. destruct (peq f v); subst.
-    + inv HB. inv H. simpl. rewrite peq_true. reflexivity.
-      exfalso. eapply H5. eapply fun_in_fundefs_name_in_fundefs.
-      eassumption.
-    + inv HB. inv H. contradiction.
-      simpl. rewrite peq_false; eauto.
-  - inv HB.
-Qed.
-
-Lemma split_fds_find_def B1 B2 B3 f:
-  unique_functions B3 ->
-  split_fds B1 B2 B3 ->
-  f \in name_in_fundefs B2 ->
-        find_def f B3 = find_def f B2.
-Proof.
-  intros Hun Hs Hin.
-  edestruct name_in_fundefs_find_def_is_Some as [ft [xs [e Hfind]]]; eauto.
-  assert (Hfun := find_def_correct _ _ _ _ _ Hfind).
-  assert (Hfun' : fun_in_fundefs B3 (f, ft, xs, e)).
-  { eapply split_fds_fun_in_fundefs. eassumption. now right. }
-  eapply find_def_complete in Hfun'. congruence. eassumption.
-Qed.
 
 Lemma Erase_fundefs_bound_var_mut :
   (forall e e' B (Herase : Erase_fundefs e e' B),       
@@ -368,7 +330,6 @@ Ltac bound_var_fundefs_heq Hname :=
   | [ H : Erase_nested_fundefs _ _ |- _ ] =>
     assert (Hname := Erase_nested_fundefs_bound_var _ _ H)
   end.
-
 
 
 Lemma Erase_fundefs_unique_bindings_mut :
@@ -540,15 +501,16 @@ Lemma Erase_nested_fundefs_unique_bindings :
 Proof. eapply Erase_fundefs_unique_bindings_mut. Qed.   
 
 
+
 Lemma Erase_nested_fundefs_in_name B B_hoist f tau xs e :
   unique_bindings_fundefs B ->
   f \in name_in_fundefs B ->  
-        Erase_nested_fundefs B B_hoist ->
-        find_def f B = Some (tau, xs, e) ->
-        exists e' Be Bfuns,
-          find_def f B_hoist = Some (tau, xs, e') /\
-          Erase_fundefs e e' Be /\
-          split_fds Be Bfuns B_hoist.
+  Erase_nested_fundefs B B_hoist ->
+  find_def f B = Some (tau, xs, e) ->
+  exists e' Be Bfuns,
+    find_def f B_hoist = Some (tau, xs, e') /\
+    Erase_fundefs e e' Be /\
+    split_fds Be Bfuns B_hoist.
 Proof.
   intros Hun Hin Hhoist Hfind.
   induction Hhoist. 
@@ -619,18 +581,22 @@ Section Hoisting_correct.
            (Hadd_src : forall c1 c2 c, P c1 c2 -> P (c1 + c) c2). 
 
 
-  Lemma Erase_nested_fundefs_correct S k B rho rho' B_hoist Bprev Ball 
-        (IHe : forall m : nat,
-            m < k ->
-            forall (e e' : exp) (Bprev B Ball : fundefs) (rho rho' : env),
-              unique_bindings_fundefs Ball ->
-              unique_bindings e ->
-              preord_env_P pr cenv (occurs_free e) m PG rho rho' ->
-              funs_inv_env Ball rho' ->
-              split_fds Bprev B Ball ->
-              Disjoint var (name_in_fundefs Ball) (bound_var e) ->
-              fun_fv_in e (name_in_fundefs Ball) ->
-              Erase_fundefs e e' B -> preord_exp pr cenv m P PG (e, rho) (e', rho')) :
+  (** * Correctness of Erase_nested_fundefs *)
+  
+  Lemma Erase_nested_fundefs_correct S k B rho rho' B_hoist Bprev Ball
+        (* IH for expresssions *)
+        (IHe :
+           forall m : nat,
+             m < k ->
+             forall (e e' : exp) (Bprev B Ball : fundefs) (rho rho' : env),
+               unique_bindings_fundefs Ball ->
+               unique_bindings e ->
+               preord_env_P pr cenv (occurs_free e) m PG rho rho' ->
+               funs_inv_env Ball rho' ->
+               split_fds Bprev B Ball ->
+               Disjoint var (name_in_fundefs Ball) (bound_var e) ->
+               fun_fv_in e (name_in_fundefs Ball) ->
+               Erase_fundefs e e' B -> preord_exp pr cenv m P PG (e, rho) (e', rho')) :
     unique_bindings_fundefs Ball ->
     unique_bindings_fundefs B ->
     occurs_free_fundefs B \subset S ->
@@ -643,6 +609,7 @@ Section Hoisting_correct.
     fun_fv_in_fundefs B (name_in_fundefs Ball) ->
     (* Erase fundefs *)
     Erase_nested_fundefs B B_hoist ->
+    (* Environments after defining the function bundles *)
     preord_env_P pr cenv (name_in_fundefs B :|: S) k PG (def_funs B B rho rho) rho'.
   Proof.
     revert S B rho rho' B_hoist Bprev Ball IHe.
@@ -722,7 +689,9 @@ Section Hoisting_correct.
       eapply preord_env_P_def_funs_not_in_P_l; [| sets ]. 
       eapply preord_env_P_antimon. eassumption. sets.
   Qed.
-                  
+
+  (** * Correctness of Erase_fundefs *)
+  
   Lemma hoisting_correct k e e' Bprev B Ball rho rho' :
     unique_bindings_fundefs Ball ->
     unique_bindings e ->

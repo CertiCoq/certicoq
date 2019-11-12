@@ -17,6 +17,7 @@ Require Import L6.cps.
 Require Import L6.ctx L6.logical_relations.
 Require Import L6.cps_util L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx.
 
+
 Ltac pi0 :=
 repeat match goal with
 | [ H: _ + _ = 0 |- _ ] =>
@@ -29,6 +30,7 @@ repeat match goal with
     exfalso; apply H; auto
 end.
 
+(* TODO move *)
 Theorem find_def_rename: forall f t xs e sigma fds,
   find_def f fds = Some (t, xs, e) ->
   find_def f (rename_all_fun sigma fds) = Some (t, xs, rename_all (remove_all sigma xs) e).
@@ -54,68 +56,70 @@ Proof.
   reflexivity.
 Qed.
 
-Inductive unique_name_fundefs: fundefs -> Prop :=
-| Uname_Fcons: forall f tau ys e defs,
-                ~ name_in_fundefs defs f ->
-                unique_name_fundefs defs ->
-                unique_name_fundefs (Fcons f tau ys e defs)
-| Uname_Fnil: unique_name_fundefs Fnil .
-
-  (** general rewrite rules that preserves semantics
+(** general rewrite rules that preserves semantics
     - Fun_inline replaces one occurence on f by its definition
     - Fun_dead removes the definition of a set of functions if none of them occur free in the rest of the program
     - Fun_rm removes a function if it doesn't occur anywhere in its mutual bundle or in the rest of the term
     -  Constr_dead removes the binding of a datatype when it doesn't occur free in the rest of the program
     -  Constr_proj replaces a binding by the nth projection of a datatype when the datatype is known (in ctx)
-    -  Constr_case reduces a pattern match into an application of the right continuation on the datatype when the datatype is known
-*)
+    -  Constr_case reduces a pattern match into an application of the right continuation on the datatype when the
+        datatype is known
+ *)
+
 Inductive rw: relation exp :=
 (* Rules about dead var elimination *)
-| Constr_dead: forall x t ys e,
-                 ~ occurs_free e x ->
-                 rw (Econstr x t ys e) e
-| Prim_dead: forall x p ys e,
-               ~ occurs_free e x ->
-               rw (Eprim x p ys e) e
-| Proj_dead: forall x t n y e,
-               ~ occurs_free e x ->
-               rw (Eproj x t n y e) e
-| Fun_dead: forall e fds,
-              Forall (fun v => ~ occurs_free e v) (all_fun_name fds) ->
-              rw (Efun fds e) e
-| Fun_rem: forall f t xs fb B1 B2 e,
-             unique_name_fundefs (fundefs_append B1 (Fcons f t xs fb B2)) ->
-               num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) f 0 ->
-               rw (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)
-
+| Constr_dead:
+    forall x t ys e,
+      ~ occurs_free e x ->
+      rw (Econstr x t ys e) e
+| Prim_dead:
+    forall x p ys e,
+      ~ occurs_free e x ->
+      rw (Eprim x p ys e) e
+| Proj_dead:
+    forall x t n y e,
+      ~ occurs_free e x ->
+      rw (Eproj x t n y e) e
+| Fun_dead:
+    forall e fds,
+      Forall (fun v => ~ occurs_free e v) (all_fun_name fds) ->
+      rw (Efun fds e) e
+| Fun_rem:
+    forall f t xs fb B1 B2 e,
+      unique_functions (fundefs_append B1 (Fcons f t xs fb B2)) ->
+      (* Zoe : This will not delete unused rec. functions. *)
+      num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) f 0 ->
+      rw (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)       
 (* Rules about inlining/constant-folding *)
-| Constr_case: forall x c cl co e ys,
-    findtag cl co = Some e ->
-    (* x isn't shadowed on the way to the case statement *)
+| Constr_case:
+    forall x c cl co e ys,
+      findtag cl co = Some e ->
+      (* x isn't shadowed on the way to the case statement *)
       ~bound_stem_ctx c x ->
       rw (Econstr x co ys (c |[ Ecase x cl ]|)) (Econstr x co ys (c |[e]|))
-
-| Constr_proj: forall v  t t' n x e k ys c,
-                 (* nothing shadows constructor x or var k in c *)
-                 ~ bound_stem_ctx c x ->
-                 ~ bound_stem_ctx c k ->
-                 (* nothing rebinds k in e *)
-                 ~ bound_var e k ->
-                 x <> k ->
-                 v <> k ->
-                 nthN ys n = Some k ->
-                 rw (Econstr x t ys (c |[Eproj v t' n x e]|)) (Econstr x t ys (c |[ rename k v e]|))
-| Fun_inline: forall c  vs f  t xs fb  fds,
-    find_def f fds = Some (t, xs, fb) ->
-                (* nothing rebinds vs in \xs.fb *)
-                Disjoint _ (Union _ (FromList xs) (bound_var fb)) (FromList vs) ->
-                unique_name_fundefs fds ->
-                (* nothing shadows the names and FV of fds in c *)
-                Disjoint var (bound_stem_ctx c) (occurs_free_fundefs fds)  ->
-                Disjoint var (bound_stem_ctx c) (name_in_fundefs fds)  ->
-                List.NoDup xs ->
-                rw (Efun fds (c |[ Eapp f t vs ]|)) (Efun fds (c |[ (rename_all (set_list (combine xs vs) (M.empty var)) fb)]|))
-.
+         
+| Constr_proj:
+    forall v t t' n x e k ys c,
+      (* nothing shadows constructor x or var k in c *)
+      ~ bound_stem_ctx c x ->
+      ~ bound_stem_ctx c k ->
+      (* nothing rebinds k in e *)
+      ~ bound_var e k ->
+      x <> k ->
+      v <> k ->
+      nthN ys n = Some k ->
+      rw (Econstr x t ys (c |[Eproj v t' n x e]|)) (Econstr x t ys (c |[ rename k v e]|))
+| Fun_inline:
+    forall c vs f t xs fb  fds,
+      find_def f fds = Some (t, xs, fb) ->
+      (* nothing rebinds vs in \xs.fb *)
+      Disjoint _ (FromList xs :|: bound_var fb) (FromList vs) ->
+      unique_functions fds ->
+      (* nothing shadows the names and FV of fds in cμ   *)
+      Disjoint var (bound_stem_ctx c) (occurs_free_fundefs fds)  ->
+      Disjoint var (bound_stem_ctx c) (name_in_fundefs fds)  ->
+      List.NoDup xs ->
+      rw (Efun fds (c |[ Eapp f t vs ]|)) (Efun fds (c |[ (rename_all (set_list (combine xs vs) (M.empty var)) fb)]|)).
 
 
 Fixpoint collect_funvals (fds:fundefs)  : list (var * svalue) :=
@@ -126,11 +130,8 @@ Fixpoint collect_funvals (fds:fundefs)  : list (var * svalue) :=
 
 
 Inductive gen_rw : relation exp :=
-| Ctx_rw : forall c e e',
-             rw e e' ->
-             gen_rw (c |[ e ]|) (c |[ e' ]|)
-.
-
+| Ctx_rw :
+    forall c e e', rw e e' -> gen_rw (c |[ e ]|) (c |[ e' ]|).
 
 Definition gr_clos := clos_refl_trans exp gen_rw.
 
@@ -139,76 +140,52 @@ Section Shrink_correct.
   Variable pr : prims.
   Variable cenv : ctor_env.
 
+  Variable (P :  Post) (PG : PostG).
+
+  (* TODO move *)
+  Lemma preord_val_constr:
+  forall k t vl x,
+    preord_val pr cenv k PG (cps.Vconstr t vl) x  ->
+    exists vl', x = cps.Vconstr t vl' /\ Forall2_asym (preord_val pr cenv k PG) vl vl'.
+  Proof.
+    intros. eapply preord_val_eq in H.
+    destruct x. simpl in H.
+    destructAll. eauto.
+    destruct H. destruct H.
+  Qed.
 
 
-
-
-Lemma preord_val_constr: forall k t vl x,
-
-  preord_val pr cenv k (cps.Vconstr t vl) x  ->
- exists vl',  x = cps.Vconstr t vl' /\ Forall2_asym (preord_val pr cenv k) vl vl'.
-Proof.
-  intros.
-  eapply preord_val_eq in H.
-  destruct x.
-  simpl in H.
-  destructAll.
-  eauto.
-  destruct H.
-  destruct H.
-Qed.
-
-
-
-
-Lemma not_occur_list_not_in:
-  forall v l,
-    num_occur_list l v = 0 <-> ~ List.In  v l.
-Proof.
-  induction l; split; intros.
-  - intro. inversion H0.
-  - auto.
-  - intro. inversion H0.
-    + subst. simpl in H.
-      unfold cps_util.var_dec in *.
-      destruct (M.elt_eq v v).
-      inversion H.
-      apply n; auto.
-    + inversion H.
-      apply IHl.
+  (* TODO move *)
+  Lemma not_occur_list_not_in:
+    forall v l, num_occur_list l v = 0 <-> ~ List.In  v l.
+  Proof.
+    induction l; split; intros.
+    - intro. inversion H0.
+    - auto.
+    - intro. inversion H0.
+      + subst. simpl in H.
+        unfold cps_util.var_dec in *.
+        destruct (M.elt_eq v v).
+        inversion H. apply n; auto.
+      + inversion H.
+        apply IHl. destruct (cps_util.var_dec v a).
+        inversion H3. auto. auto.
+    - simpl.
       destruct (cps_util.var_dec v a).
-      inversion H3. auto.
-      auto.
-  - simpl.
-    destruct (cps_util.var_dec v a).
-    exfalso.
-    apply H. constructor. auto.
-    apply IHl.
-    intro. apply H. constructor 2.
-    auto.
-Qed.
+      exfalso. apply H. constructor. auto.
+      apply IHl. intro. apply H. constructor 2. auto.
+  Qed.
 
 
-
-Lemma not_occurs_not_free:
-  forall v, (forall e,
-  num_occur e v 0 ->
-  ~occurs_free e v )
-  /\
-  (forall f, num_occur_fds f v 0 ->
-               ~ occurs_free_fundefs f v )
-.
+  Lemma not_occurs_not_free:
+    forall v, (forall e, num_occur e v 0 -> ~ occurs_free e v ) /\
+         (forall f, num_occur_fds f v 0 -> ~ occurs_free_fundefs f v ).
 Proof.
-  intro v. eapply (exp_def_mutual_ind (fun e =>
-  num_occur e v 0 ->
-  ~occurs_free e v ) (fun f => num_occur_fds f v 0 ->
-               ~ occurs_free_fundefs f v)); intros; intro; try (inversion H0; inversion H1; subst; pi0).
-  - apply H; auto.
-     exfalso.
-     revert H14.
-     apply not_occur_list_not_in.
-     auto.
-  - apply H; auto.
+  intro v.
+  exp_defs_induction IHe IHl IHB; intros Hnum Hc; try (inv Hc; inv Hnum; pi0);
+    (try now eapply not_occur_list_not_in; eauto);
+    (try now eapply IHe; eauto).
+  apply H; auto.
   - inversion H; subst.
     destruct (cps_util.var_dec v v). inversion H6. apply n0; auto.
   - inversion H1; inversion H2; subst; pi0.
@@ -220,7 +197,7 @@ Proof.
     inversion H6; pi0. auto.
     simpl. destruct (cps_util.var_dec v v0). exfalso; auto. auto.
   - revert H17; apply H; auto.
-
+  - inv H1; eauto. revert H11. apply n; auto.
   - inversion H1; inversion H2; subst; pi0.
     revert H13; apply H0; auto.
     revert H12; apply H; auto.

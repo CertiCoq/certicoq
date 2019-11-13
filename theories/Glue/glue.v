@@ -30,7 +30,7 @@ Require Template.All.
 Import MonadNotation.
 Open Scope monad_scope.
 
-Definition mainIdent : positive := 1.
+Definition main_ident : positive := 1.
 
 Notation "'var' x" := (Etempvar x val) (at level 20).
 
@@ -44,24 +44,112 @@ Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 Notation "'Field(' t ',' n ')'" :=
   ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
 
-Definition ind_L1_tag := positive.
-Definition ind_L1_env := M.t (kername * Ast.one_inductive_body).
+
+(* aliases for Clight AST types *)
+Definition def : Type := ident * globdef fundef type.
+Definition defs : Type := list def.
+
+(* An enumeration of L1 types.
+   This is separate from the [ind_tag] values generated in L6.
+   These are generated only for gluing purposes.
+   There is no good reason for this, except for easier plumbing. *)
+Definition ind_L1_tag : Type := positive.
+Definition ind_L1_env : Type := M.t (kername * Ast.one_inductive_body).
 
 (* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
-   the name of the eliminator function in C. *)
-Definition elim_env := M.t ident.
+   the name of the get_tag_... function in C. *)
+Definition get_tag_env : Type := M.t ident.
 
 (* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name and type of the names array in C. *)
-Definition ctor_names_env := M.t (ident * type).
-Definition ctor_arities_env := M.t (ident * type).
+Definition ctor_names_env : Type := M.t (ident * type).
+
+(* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
+   the name and type of the arities array in C. *)
+Definition ctor_arities_env : Type := M.t (ident * type).
+
+(* An enumeration of constructors in a type starting from 1.
+   Should preserve the ordering of the ctors in the original Coq definition.
+   Should coincide with the index the glue functions return.
+   But that index should start from 0, while this one starts from 1. *)
+Definition ctor_L1_tag : Type := positive.
+
+(* Matches [ind_L1_tag]s to another map matching [ctor_L1_tag]
+   to the [Struct] type and the accessor function name (like "get_S_args")
+   associated with that constructor.
+   In practice, this is like a 2D dictionary. *)
+Definition ctor_arg_accessor_env : Type := M.t (M.t (type * ident)).
 
 (* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name of the print function in C. *)
-Definition print_env := M.t ident.
+Definition print_env : Type := M.t ident.
 
 (* A Clight ident and a Clight type packed together *)
 Definition def_info : Type := positive * type.
+
+Section Helpers.
+
+  (* printf, is_ptr and these literals will be used by multiple functions
+     so we want to reuse them, not redefine every time.
+     Hence we keep references to them in this "toolbox".
+  *)
+  Record toolbox_info : Type :=
+    Build_toolbox_info
+      { printf_info : def_info
+      ; is_ptr_info : def_info
+      ; lparen_info : def_info
+      ; rparen_info : def_info
+      ; space_info  : def_info
+      ; fun'_info   : def_info
+      ; type'_info  : def_info
+      ; unk_info    : def_info
+      }.
+
+  Definition enumerate_nat {a : Type} (xs : list a) : list (nat * a) :=
+    let fix aux (n : nat) (xs : list a) :=
+          match xs with
+          | nil => nil
+          | x :: xs => (n, x) :: aux (S n) xs
+          end
+    in aux O xs.
+
+  Definition enumerate_pos {a : Type} (xs : list a) : list (positive * a) :=
+    let fix aux (n : positive) (xs : list a) :=
+          match xs with
+          | nil => nil
+          | x :: xs => (n, x) :: aux (Pos.succ n) xs
+          end
+    in aux 1%positive xs.
+
+  Definition get_2d {A : Type} (k1 k2 : positive) (m : M.t (M.t A)) : option A :=
+    match M.get k1 m with
+    | None => None
+    | Some m2 => M.get k2 m2
+    end.
+
+  Definition set_2d {A : Type}
+             (k1 k2 : positive) (v : A) (m : M.t (M.t A)) : M.t (M.t A) :=
+    let sub_map := match M.get k1 m with
+                   | None => M.empty A
+                   | Some m2 => m2
+                   end
+    in M.set k1 (M.set k2 v sub_map) m.
+
+End Helpers.
+
+Section Ctor_Info.
+
+Variant ctor_box : Type := unboxed | boxed.
+
+(* Can be used [if unbox_check c then ... else ...] *)
+Definition unbox_check (ctor : BasicAst.ident * Ast.term * nat) : ctor_box :=
+  let '(_, _, arity) := ctor in
+  match arity with
+  | O => unboxed
+  | S _ => boxed
+  end.
+
+End Ctor_Info.
 
 (* A state monad for the glue code generation *)
 Section GState.
@@ -71,9 +159,10 @@ Section GState.
       { gstate_gensym : ident
       ; gstate_ienv   : ind_L1_env
       ; gstate_nenv   : name_env
-      ; gstate_eenv   : elim_env
+      ; gstate_gtenv  : get_tag_env
       ; gstate_cnenv  : ctor_names_env
       ; gstate_caenv  : ctor_arities_env
+      ; gstate_caaenv : ctor_arg_accessor_env
       ; gstate_penv   : print_env
       ; gstate_log    : list string
       }.
@@ -83,106 +172,85 @@ Section GState.
   (* generate fresh ident and record it to the name_env
     with the given string *)
   Definition gensym (s : string) : gState ident :=
-    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
     let nenv := M.set n (nNamed s) nenv in
-    put (Build_gstate_data ((n+1)%positive) ienv nenv eenv cnenv caenv penv log) ;;
+    put (Build_gstate_data ((n+1)%positive) ienv nenv gtenv cnenv caenv caaenv penv log) ;;
     ret n.
 
-  Definition set_print_env (k v : ident) : gState unit :=
-    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+  Definition set_print_env (k : ind_L1_tag) (v : ident) : gState unit :=
+    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
     let penv := M.set k v penv in
-    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
-    ret tt.
+    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
 
-  Definition get_print_env (k : ident) : gState (option ident) :=
+  Definition get_print_env (k : ind_L1_tag) : gState (option ident) :=
     penv <- gets gstate_penv ;;
     ret (M.get k penv).
 
-  Definition set_elim_env (k v : ident) : gState unit :=
-    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
-    let eenv := M.set k v eenv in
-    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
-    ret tt.
+  Definition set_get_tag_env (k : ind_L1_tag) (v : ident) : gState unit :=
+    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    let gtenv := M.set k v gtenv in
+    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
 
-  Definition get_elim_env (k : ident) : gState (option ident) :=
-    eenv <- gets gstate_eenv ;;
-    ret (M.get k eenv).
+  Definition get_get_tag_env (k : ind_L1_tag) : gState (option ident) :=
+    gtenv <- gets gstate_gtenv ;;
+    ret (M.get k gtenv).
 
-  Definition get_ctor_names_env (k : ident) : gState (option (ident * type)) :=
+  Definition get_ctor_names_env (k : ind_L1_tag) : gState (option (ident * type)) :=
     cnenv <- gets gstate_cnenv ;;
     ret (M.get k cnenv).
 
-  Definition set_ctor_names_env (k : ident) (v : ident * type) : gState unit :=
-    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+  Definition set_ctor_names_env (k : ind_L1_tag) (v : ident * type) : gState unit :=
+    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
     let cnenv := M.set k v cnenv in
-    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
-    ret tt.
+    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
 
-  Definition set_ctor_arities_env (k : ident) (v : ident * type) : gState unit :=
-    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
+  Definition get_ctor_arities_env (k : ind_L1_tag) : gState (option (ident * type)) :=
+    caenv <- gets gstate_caenv ;;
+    ret (M.get k caenv).
+
+  Definition set_ctor_arities_env (k : ind_L1_tag) (v : ident * type) : gState unit :=
+    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
     let caenv := M.set k v caenv in
-    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
-    ret tt.
+    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
 
-  Definition get_ind_L1_env (k : ident) : gState (option (kername * Ast.one_inductive_body)) :=
+  Definition get_ctor_arg_accessor_env
+             (k1 : ind_L1_tag) (k2: ctor_L1_tag)
+             : gState (option (type * ident)) :=
+    caaenv <- gets gstate_caaenv ;;
+    ret (get_2d k1 k2 caaenv).
+
+  Definition set_ctor_arg_accessor_env
+             (k1 : ind_L1_tag) (k2 : ctor_L1_tag) (v : type * ident) : gState unit :=
+    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    let caaenv := set_2d k1 k2 v caaenv in
+    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
+
+  Definition get_ind_L1_env (k : ind_L1_tag) : gState (option (kername * Ast.one_inductive_body)) :=
     ienv <- gets gstate_ienv ;;
     ret (M.get k ienv).
 
-  Definition get_tag_from_type_name (s : string) : gState (option positive) :=
-    ienv <- gets gstate_ienv ;;
-    let find (prev : option positive)
-             (tag : positive)
-             (p : kername * Ast.one_inductive_body) : option positive :=
+  (* A hacky way to get the [ind_L1_tag] of a type from its name.
+     This is necessary because of a shortcoming of Template Coq. *)
+  Definition get_tag_from_type_name (s : string) : gState (option ind_L1_tag) :=
+    let find (prev : option ind_L1_tag)
+             (tag : ind_L1_tag)
+             (p : kername * Ast.one_inductive_body) : option ind_L1_tag :=
       match prev with
       | None => if string_dec s (fst p) then Some tag else None
       | _ => prev
       end in
+    ienv <- gets gstate_ienv ;;
     ret (M.fold find ienv None).
 
   Definition put_ind_L1_env (ienv : ind_L1_env) : gState unit :=
-    '(Build_gstate_data n _ nenv eenv cnenv caenv penv log) <- get ;;
-    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv log) ;;
-    ret tt.
+    '(Build_gstate_data n _ nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
 
   Definition log (s : string) : gState unit :=
-    '(Build_gstate_data n ienv nenv eenv cnenv caenv penv log) <- get ;;
-    put (Build_gstate_data n ienv nenv eenv cnenv caenv penv (s :: log)) ;;
-    ret tt.
+    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv (s :: log)).
 
 End GState.
-
-(* printf and these literals will be used by multiple functions
-   so we want to reuse them, not redefine every time *)
-Record print_def_info : Type :=
-  Build_print_def_info
-    { printf_info : def_info
-    ; lparen_info : def_info
-    ; rparen_info : def_info
-    ; sep_info    : def_info
-    ; space_info  : def_info
-    ; fun'_info   : def_info
-    ; type'_info  : def_info
-    ; unk_info    : def_info
-    }.
-
-Definition def : Type := ident * globdef fundef type.
-Definition defs : Type := list def.
-
-Definition enumerate_nat {a : Type} (xs : list a) : list (nat * a) :=
-  let fix aux (n : nat) (xs : list a) :=
-        match xs with
-        | nil => nil
-        | x :: xs => (n, x) :: aux (S n) xs
-        end
-  in aux O xs.
-
-Definition enumerate_pos {a : Type} (xs : list a) : list (positive * a) :=
-  let fix aux (n : positive) (xs : list a) :=
-        match xs with
-        | nil => nil
-        | x :: xs => (n, x) :: aux (Pos.succ n) xs
-        end
-  in aux 1%positive xs.
 
 Section Externs.
 
@@ -207,21 +275,22 @@ Section Externs.
   Definition ty_printf : type :=
     Tfunction (Tcons (tptr tschar) Tnil) tint cc_default.
 
-  Definition make_externs : gState (defs * print_def_info) :=
+  Definition make_externs : gState (defs * toolbox_info) :=
     '(_lparen, ty_lparen, def_lparen) <- string_literal "lparen_lit" "(" ;;
     '(_rparen, ty_rparen, def_rparen) <- string_literal "rparen_lit" ")" ;;
-    '(_sep,    ty_sep,    def_sep)    <- string_literal "sep_lit"    ", " ;;
     '(_space,  ty_space,  def_space)  <- string_literal "space_lit"  " " ;;
     '(_fun',   ty_fun',   def_fun')   <- string_literal "fun_lit"    "<fun>" ;;
     '(_type',  ty_type',  def_type')  <- string_literal "type_lit"   "<type>" ;;
     '(_unk,    ty_unk,    def_unk')   <- string_literal "unk_lit"    "<unk>" ;;
     _printf <- gensym "printf" ;;
-    let pinfo :=
+    _is_ptr <- gensym "is_ptr" ;;
+    let toolbox :=
         {| printf_info :=
               (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
+         ; is_ptr_info :=
+              (_is_ptr, Tfunction (Tcons val Tnil) tbool cc_default)
          ; lparen_info := (_lparen, ty_lparen)
          ; rparen_info := (_rparen, ty_rparen)
-         ; sep_info    := (_sep,    ty_sep)
          ; space_info  := (_space,  ty_space)
          ; fun'_info   := (_fun',   ty_fun')
          ; type'_info  := (_type',  ty_type')
@@ -230,16 +299,21 @@ Section Externs.
     let dfs :=
       ((_lparen, def_lparen) ::
         (_rparen, def_rparen) ::
-        (_sep, def_sep) ::
         (_space, def_space) ::
         (_printf,
         Gfun (External (EF_external "printf"
                           (mksignature (AST.Tint :: nil)
-                                        (Some AST.Tint)
-                                        cc_default))
+                                       (Some AST.Tint)
+                                       cc_default))
                         (Tcons (tptr tschar) Tnil) tint cc_default)) ::
+        (_is_ptr,
+         Gfun (External (EF_external "is_ptr"
+                          (mksignature (val_typ :: nil) None cc_default))
+                        (Tcons val Tnil)
+                        (Tint IBool Unsigned noattr) cc_default)) ::
+
         nil) in
-    ret (dfs, pinfo).
+    ret (dfs, toolbox).
 
 End Externs.
 
@@ -265,12 +339,15 @@ Section L1Types.
   Definition split (c : ascii) (s : string) : list string :=
     split_aux EmptyString c s.
 
+ Definition qualifying_prefix := string.
+ Definition base_name := string.
+
  (* takes a fully qualified name and removes the base type,
     leaving behind the qualifying prefix.
     e.g. "Coq.Init.Datatypes.bool" becomes "Coq.Init.Datatypes." *)
-  Definition find_qualifying_prefix (n : kername) : string :=
+  Definition find_qualifying_prefix (n : kername) : qualifying_prefix :=
     match rev (split "." n) with
-    | nil => (* not possible *) ""
+    | nil => (* not possible *) ""%string
     | base :: rest => String.concat "." (rev (""%string :: rest))
     end.
 
@@ -278,7 +355,7 @@ Section L1Types.
      the qualifying prefix for the name and the type definition *)
   Definition extract_mut_ind
             (g : Ast.global_decl)
-            : option (string * Ast.mutual_inductive_body) :=
+            : option (qualifying_prefix * Ast.mutual_inductive_body) :=
     match g with
     | Ast.InductiveDecl name body => Some (find_qualifying_prefix name, body)
     | _ => None
@@ -308,7 +385,7 @@ Section L1Types.
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
              (gs : Ast.global_declarations)
-             : gState (list (positive * (kername * Ast.one_inductive_body))) :=
+             : gState (list (ind_L1_tag * (kername * Ast.one_inductive_body))) :=
     let singles := get_single_types gs in
     (* for debugging purposes: *)
     log ("Propagating types: " ++ String.concat ", " (map fst singles)) ;;
@@ -440,16 +517,16 @@ Section CConstructors.
         ret ((constr_fun_id, Gfun constr_fun) :: funs)
     | (* Boxed *) (nCtor, Npos ar, ord) :: ctors =>
         constr_fun_id <- gensym (make_name nCtor) ;;
-        argvIdent <- gensym "argv" ;;
+        argv_ident <- gensym "argv" ;;
         arg_list <- make_arg_list (Pos.to_nat ar) ;;
-        let asgn_s := make_constrAsgn argvIdent arg_list in
+        let asgn_s := make_constrAsgn argv_ident arg_list in
         let header := c_int (Z.of_N ((N.shiftl (Npos ar) 10) + ord)) val in
         let constr_body :=
-            Sassign (Field(var argvIdent, 0%Z)) header ;;;
+            Sassign (Field(var argv_ident, 0%Z)) header ;;;
             asgn_s ;;;
-            Sreturn (Some (add (Evar argvIdent argvTy) (c_int 1%Z val))) in
+            Sreturn (Some (add (Evar argv_ident argvTy) (c_int 1%Z val))) in
         let constr_fun := Internal (mkfunction val cc_default
-                                      (arg_list ++ ((argvIdent, argvTy) :: nil))
+                                      (arg_list ++ ((argv_ident, argvTy) :: nil))
                                       nil nil constr_body) in
         funs <- make_constructors name_ty ctors ;;
         ret ((constr_fun_id, Gfun constr_fun) :: funs)
@@ -461,7 +538,7 @@ Section Printers.
   (* We need a preliminary pass to generate the names for all
     printer functions for each type because they can be mutually recursive. *)
   Fixpoint make_printer_names
-          (tys : list (positive * (kername * Ast.one_inductive_body)))
+          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
           : gState unit :=
     match tys with
     | nil => ret tt
@@ -471,26 +548,26 @@ Section Printers.
         make_printer_names tys'
     end.
 
-  Variable pinfo : print_def_info.
+  Variable toolbox : toolbox_info.
 
   Definition generate_printer
-             (info : positive * (kername * Ast.one_inductive_body))
+             (info : ind_L1_tag * (kername * Ast.one_inductive_body))
             : gState (option def) :=
-    let '(tag, (name, b)) := info in
+    let '(itag, (name, b)) := info in
     let basename := Ast.ind_name b in
     let ctors := Ast.ind_ctors b in
-    pnameM <- get_print_env tag ;;
-    enameM <- get_elim_env tag ;;
-    cnnameM <- get_ctor_names_env tag ;;
-    iM <- get_ind_L1_env tag ;;
-    match pnameM, enameM, cnnameM, iM with
+    pnameM <- get_print_env itag ;;
+    gtnameM <- get_get_tag_env itag ;;
+    cnnameM <- get_ctor_names_env itag ;;
+    iM <- get_ind_L1_env itag ;;
+    match pnameM, gtnameM, cnnameM, iM with
     | Some pname (* name of the current print function *),
-      Some ename (* name of the elim function this will use *),
+      Some gtname (* name of the elim function this will use *),
       Some (cnname, ty_names) (* name of the names array this will use *),
       Some iinfo (* L1 info about the inductive type *) =>
         _v <- gensym "v" ;;
-        _index <- gensym "index" ;;
-        _prodArr <- gensym "prodArr" ;;
+        _tag <- gensym "tag" ;;
+        _args <- gensym "args" ;;
 
         (* We need the maximum arity of all the ctors because
           we will declare an array for the arguments of the constructor
@@ -499,24 +576,36 @@ Section Printers.
 
         (* if none of the constructors take any args *)
         let won't_take_args : bool := Nat.eqb max_ctor_arity 0 in
-        let ty_prodArr : type := tarray val (Z.of_nat max_ctor_arity) in
-
-        (* null pointer or properly sized array *)
-        let elim_last_arg : expr :=
-          if won't_take_args
-            then Ecast (Econst_int (Int.repr 0) val) (tptr tvoid)
-            else Evar _prodArr ty_prodArr in
 
         (* names and Clight types of printf and string literals *)
-        let (_printf, ty_printf) := printf_info pinfo in
-        let (_space, ty_space) := space_info pinfo in
-        let (_lparen, ty_lparen) := lparen_info pinfo in
-        let (_rparen, ty_rparen) := rparen_info pinfo in
-        let (_sep, ty_sep) := sep_info pinfo in
-        let (_fun, ty_fun) := fun'_info pinfo in
-        let (_type, ty_type) := type'_info pinfo in
-        let (_unk, ty_unk) := unk_info pinfo in
+        let (_printf, ty_printf) := printf_info toolbox in
+        let (_space, ty_space) := space_info toolbox in
+        let (_lparen, ty_lparen) := lparen_info toolbox in
+        let (_rparen, ty_rparen) := rparen_info toolbox in
+        let (_fun, ty_fun) := fun'_info toolbox in
+        let (_type, ty_type) := type'_info toolbox in
+        let (_unk, ty_unk) := unk_info toolbox in
 
+        (* function calls to printf *)
+        let print_ctor_name : statement :=
+          Scall None
+            (Evar _printf ty_printf)
+            ((Ederef
+                (Ebinop Oadd
+                  (Evar cnname ty_names)
+                  (Evar _tag tint) ty_names)
+                ty_names) :: nil) in
+        let print_lparen : statement :=
+            Scall None (Evar _printf ty_printf)
+                       (Evar _lparen ty_lparen :: nil) in
+        let print_rparen : statement :=
+            Scall None (Evar _printf ty_printf)
+                       (Evar _rparen ty_rparen :: nil) in
+        let print_space : statement :=
+            Scall None (Evar _printf ty_printf)
+                       (Evar _space ty_space :: nil) in
+
+        (* Generates a single function call to a printer with the right argument type *)
         let rec_print_call
             (arg : nat * dissected_type) : gState statement :=
           match arg with
@@ -537,13 +626,16 @@ Section Printers.
                   | None =>
                       log ("Can't find printer for the type " ++ name) ;; ret Sskip
                   | Some printer => (* success! *)
-                      ret (Scall None (Evar printer ty_printf)
-                            ((Ederef
-                                (Ebinop Oadd
-                                  (Evar _prodArr ty_prodArr)
-                                  (Econst_int (Int.repr (Z.of_nat i)) val)
-                                  ty_names)
-                                ty_names) :: nil))
+                      let i' := Int.repr (Z.of_nat i) in
+                      let ty_printer := Tfunction (Tcons val Tnil) tvoid cc_default in
+                      ret (Scall None (Evar printer ty_printer)
+                             (Ederef
+                                 (Ebinop Oadd
+                                         (Ecast
+                                           (Evar _args (tptr tvoid))
+                                           (tptr val))
+                                         (Econst_int i' val)
+                                         ty_names) ty_names :: nil))
                   end
               end
           | (_, dFun) =>
@@ -557,10 +649,10 @@ Section Printers.
                               (Evar _type ty_type :: nil))
           | _ => (* TODO expand this for other cases *)
               log ("Found a non-inductive constructor argument for " ++ name) ;;
-              ret (Scall None (Evar _printf ty_printf)
-                              (Evar _space ty_space :: nil))
+              ret print_space
           end in
 
+        (* Generates function calls to printers with the right argument types *)
         let fix rec_print_calls
                 (args : list (nat * dissected_type))
                 : gState statement :=
@@ -569,79 +661,71 @@ Section Printers.
           | arg :: nil => (* to handle the separator *)
               rec_print_call arg
           | arg :: args' =>
-              call <- rec_print_call arg ;;
               rest <- rec_print_calls args' ;;
-              ret (call ;;;
-                   Scall None (Evar _printf ty_printf)
-                              (Evar _sep ty_sep :: nil) ;;;
-                   rest)
+              call <- rec_print_call arg ;;
+              ret (call ;;; print_space ;;; rest)
           end in
 
+        (* Generates cases for the switch statement in the print function *)
         let fix switch_cases
-                (ctors : list (nat * (BasicAst.ident * Ast.term * nat)))
+                (ctors : list (ctor_L1_tag * (BasicAst.ident * Ast.term * nat)))
                 : gState labeled_statements :=
           match ctors with
           | nil => ret LSnil
-          | (index, (_, ty, arity)) :: ctors' =>
+          | (ctag, (_, ty, arity)) :: ctors' =>
             let (args, rt) := dissect_types (dInd name :: nil) ty in
             calls <- rec_print_calls (enumerate_nat args) ;;
             rest <- switch_cases ctors' ;;
-            ret (LScons (Some (Z_of_nat index))
-                  (if Nat.eqb arity 0
-                    then Sreturn None
-                    else
-                      Scall None (Evar _printf ty_printf)
-                                  (Evar _space ty_space :: nil) ;;;
-                      Scall None (Evar _printf ty_printf)
-                                  (Evar _lparen ty_lparen :: nil) ;;;
-                      calls ;;;
-                      Scall None (Evar _printf ty_printf)
-                                  (Evar _rparen ty_rparen :: nil) ;;;
-                      Sbreak) rest)
+            accM <- get_ctor_arg_accessor_env itag ctag ;;
+            match accM with
+            | Some (ty_acc, _acc) =>
+                ret (LScons (Some (Zpos ctag - 1)%Z)
+                      (if Nat.eqb arity 0
+                        then print_ctor_name ;;; Sbreak
+                        else
+                          Scall (Some _args) (Evar _acc ty_acc)
+                                (Evar _v val :: nil) ;;;
+                          print_lparen ;;;
+                          print_ctor_name ;;;
+                          print_space ;;;
+                          calls ;;;
+                          print_rparen ;;;
+                          Sbreak)
+                      rest)
+            | None =>
+                log ("Cannot find ctor arg accessor function for ctor #" ++ show_nat (Pos.to_nat ctag)) ;;
+                ret LSnil (* TODO handle this better *)
+            end
           end in
 
-        entire_switch <- switch_cases (enumerate_nat ctors) ;;
+        entire_switch <- switch_cases (enumerate_pos ctors) ;;
         let body :=
-          (Scall None
-            (Evar ename (Tfunction
-                          (Tcons val
-                            (Tcons (tptr val)
-                                  (Tcons (tptr (tptr val)) Tnil))) tvoid
-                          cc_default))
-            ((Etempvar _v val) ::
-             (Eaddrof (Evar _index val) (tptr val)) ::
-             elim_last_arg :: nil)) ;;;
-         (Scall None
-           (Evar _printf ty_printf)
-           ((Ederef
-               (Ebinop Oadd
-                 (Evar cnname ty_names)
-                 (Evar _index tint) ty_names)
-               ty_names) :: nil)) ;;;
-         (if won't_take_args
-           then Sreturn None
-           else Sswitch (Evar _index val)
-                        entire_switch) in
+          Scall (Some _tag)
+             (Evar gtname (Tfunction (Tcons val Tnil) tuint cc_default))
+             ((Etempvar _v val) :: nil) ;;;
+          (if won't_take_args
+            then print_ctor_name
+            else Sswitch (Evar _tag val) entire_switch) in
 
 
-        (* declare a prodArr array if any of the constructors take args,
+        (* declare an args array if any of the constructors take args,
           if not then prodArr will not be declared at all *)
         let vars := if won't_take_args then nil
-                    else (_prodArr, ty_prodArr) :: nil in
+                    else (_args, tptr tvoid) :: nil in
         let f := {| fn_return := tvoid
                   ; fn_callconv := cc_default
                   ; fn_params := (_v, val) :: nil
-                  ; fn_vars := (_index, val) :: vars
+                  ; fn_vars := (_tag, tuint) :: vars
                   ; fn_temps := nil
                   ; fn_body := body
                 |} in
         ret (Some (pname, Gfun (Internal f)))
 
-    (* pnameM, enameM, cnnameM, iM *)
+    (* pnameM, gtnameM, cnnameM, iM *)
     | None, _, _, _ =>
         log ("No print function name for " ++ name ++ ".") ;; ret None
     | _, None, _, _ =>
-        log ("No elim function name for " ++ name ++ ".") ;; ret None
+        log ("No get_tag_... function name for " ++ name ++ ".") ;; ret None
     | _, _, None, _ =>
         log ("No constructor names array name for " ++ name ++ ".") ;; ret None
     | _, _, _, None =>
@@ -649,7 +733,7 @@ Section Printers.
     end.
 
   Fixpoint generate_printers
-          (tys : list (positive * (kername * Ast.one_inductive_body)))
+          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
           : gState defs :=
     match tys with
     | nil => ret nil
@@ -681,8 +765,8 @@ Section CtorArrays.
     end.
 
   Fixpoint make_name_array
-           (tag : positive)
-           (basename : kername)
+           (tag : ind_L1_tag)
+           (basename : BasicAst.ident)
            (ctors : list (BasicAst.ident * Ast.term * nat))
            : gState def :=
     let (max_len, init_l) := normalized_names_array ctors 1 in
@@ -693,7 +777,7 @@ Section CtorArrays.
     ret (nname, Gvar (mkglobvar ty init_l true false)).
 
   Fixpoint make_name_arrays
-           (tys : list (positive * (kername * Ast.one_inductive_body)))
+           (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
            : gState defs :=
     match tys with
     | nil => ret nil
@@ -705,10 +789,11 @@ Section CtorArrays.
 
 End CtorArrays.
 
+(*
 Section Eliminators.
 
   Fixpoint make_elims
-           (tys : list (positive * (kername * Ast.one_inductive_body)))
+           (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
            : gState defs :=
     match tys with
     | nil => ret nil
@@ -716,7 +801,7 @@ Section Eliminators.
         rest <- make_elims tys' ;;
         let s : string := ("elim_" ++ Ast.ind_name b)%string in
         ename <- gensym s ;;
-        set_elim_env tag ename ;;
+        set_get_tag_env tag ename ;;
         let gv :=
           Gfun (External
                   (EF_external s (mksignature (val_typ :: val_typ :: val_typ :: nil)
@@ -727,23 +812,145 @@ Section Eliminators.
     end.
 
 End Eliminators.
+*)
+
+Section ArgsStructs.
+
+  Fixpoint members_from_ctor
+           (name : BasicAst.ident)
+           (i : nat) (* initially 0 *)
+           (j : nat) (* initially the arity *)
+           : gState members :=
+    match j with
+    | O => ret nil
+    | S j' =>
+        arg_name <- gensym (name ++ "_args_" ++ show_nat i) ;;
+        rest <- members_from_ctor name (i + 1) j' ;;
+        ret ((arg_name, val) :: rest)
+    end.
+
+  Fixpoint args_structs_from_ctors
+          (itag : ind_L1_tag)
+          (ctors : list (ctor_L1_tag * (BasicAst.ident * Ast.term * nat)))
+          : gState (list (composite_definition * def)) :=
+    match ctors with
+    | nil => ret nil
+    | (ctag, ctor) :: ctors' =>
+        let '(name, ty, arity) := ctor in
+        _struct <- gensym (name ++ "_args") ;;
+        mems <- members_from_ctor name 0 arity ;;
+        let comp := Composite _struct Struct mems noattr in
+
+
+        aname <- gensym ("get_" ++ name ++ "_args") ;;
+        _v <- gensym "v" ;;
+        let tstruct := Tpointer (Tstruct _struct noattr) noattr in
+        let null := Ecast (Econst_int (Int.repr 0) val) tstruct in
+        let e :=
+            if unbox_check ctor
+            then Econst_int (Int.repr 0) val (* null pointer *)
+            else Evar _v val in
+        let body := Sreturn (Some (Ecast e tstruct)) in
+        let f := (aname,
+                  Gfun (Internal
+                          {| fn_return := tstruct
+                           ; fn_callconv := cc_default
+                           ; fn_params := (_v, val) :: nil
+                           ; fn_vars := nil
+                           ; fn_temps := nil
+                           ; fn_body := body
+                           |})) in
+
+        set_ctor_arg_accessor_env itag ctag (tstruct, aname) ;;
+        rest <- args_structs_from_ctors itag ctors' ;;
+        ret ((comp, f) :: rest)
+    end.
+
+  Fixpoint args_structs_from_types
+          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
+          : gState (list (composite_definition * def)) :=
+    match tys with
+    | nil => ret nil
+    | (itag, (_, ty)) :: tys' =>
+        s' <- args_structs_from_ctors itag (enumerate_pos (Ast.ind_ctors ty)) ;;
+        rest <- args_structs_from_types tys' ;;
+        ret (app s' rest)
+    end.
+
+End ArgsStructs.
+
+Section CtorEnumTag.
+  Variable toolbox : toolbox_info.
+
+  Fixpoint get_enum_tag_from_types
+          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
+          : gState defs :=
+    match tys with
+    | nil => ret nil
+    | (itag, (kn, ty)) :: tys' =>
+        (* s' <- get_enum_tag_from_ctors itag (enumerate_pos (Ast.ind_ctors ty)) ;; *)
+          let ls := LSnil in
+          let ls' := LSnil in
+          _b <- gensym "b" ;;
+          _v <- gensym "v" ;;
+          let (_is_ptr, ty_is_ptr) := is_ptr_info toolbox in
+          let body :=
+            Scall (Some _b) (Evar _is_ptr ty_is_ptr) (Evar _v val :: nil) ;;;
+            Sifthenelse
+              (Evar _b tbool)
+              (Sreturn (Some (Ebinop Oand (Field(var _v, -1)) (make_cint 255 val) val)))
+              (Sreturn (Some (Ebinop Oshr (var _v) (make_cint 1 val) val))) in
+          gname <- gensym ("get_" ++ Ast.ind_name ty ++ "_tag") ;;
+          let f := (gname,
+                    Gfun (Internal
+                            {| fn_return := tuint
+                             ; fn_callconv := cc_default
+                             ; fn_params := (_v, val) :: nil
+                             ; fn_vars := (_b, tbool) :: nil
+                             ; fn_temps := nil
+                             ; fn_body := body
+                             |})) in
+        set_get_tag_env itag gname ;;
+        rest <- get_enum_tag_from_types tys' ;;
+        ret (f :: rest)
+    end.
+
+End CtorEnumTag.
+
+Definition mk_prog_opt
+           (composites : list composite_definition)
+           (ds : defs)
+           (main : ident)
+           (add_comp : bool)
+           : option Clight.program :=
+  let composites := if add_comp then composites else nil in
+  let res := Ctypes.make_program composites ds nil main in
+  match res with
+  | Error e => None
+  | OK p => Some p
+  end.
 
 (* Generates the header and the source programs *)
 Definition make_glue_program
         (gs : Ast.global_declarations)
-        : gState (Clight.program * Clight.program) :=
-  '(externs, pinfo) <- make_externs ;;
+        : gState (option Clight.program * option Clight.program) :=
+  '(externs, toolbox) <- make_externs ;;
   singles <- propagate_types gs ;;
   name_defs <- make_name_arrays singles ;;
-  elim_defs <- make_elims singles ;;
+  structs <- args_structs_from_types singles ;;
+  get_tag_defs <- get_enum_tag_from_types toolbox singles ;;
   make_printer_names singles;;
-  printer_defs <- generate_printers pinfo singles ;;
+  printer_defs <- generate_printers toolbox singles ;;
   nenv <- gets gstate_nenv ;;
-  let gd := externs ++ name_defs ++ elim_defs ++ printer_defs in
-  let pi := map fst gd in
-  ret (mkprogram nil (make_extern_decls nenv gd true) pi mainIdent Logic.I,
-       mkprogram nil gd pi mainIdent Logic.I).
-
+  let (composites, struct_defs) := List.split structs in
+  let glob_defs := externs ++ name_defs ++
+                   get_tag_defs ++ struct_defs ++
+                   printer_defs in
+  let pi := map fst glob_defs in
+  ret (mk_prog_opt composites (make_extern_decls nenv glob_defs true)
+                   main_ident true,
+       mk_prog_opt composites glob_defs
+                   main_ident true).
 
 Definition generate_glue
            (p : Ast.program) (* an L1 program *)
@@ -753,15 +960,16 @@ Definition generate_glue
       {| gstate_gensym := 2%positive
        ; gstate_ienv   := M.empty _
        ; gstate_nenv   := M.empty _
-       ; gstate_eenv   := M.empty _
+       ; gstate_gtenv  := M.empty _
        ; gstate_cnenv  := M.empty _
        ; gstate_caenv  := M.empty _
+       ; gstate_caaenv := M.empty _
        ; gstate_penv   := M.empty _
        ; gstate_log    := nil
        |} in
   let '((header, source), st) := runState (make_glue_program globs) init in
   let nenv := gstate_nenv st in
   (nenv (* the name environment to be passed to C generation *) ,
-   Some header (* the header content *),
-   Some source (* the source content *),
+   header (* the header content *),
+   source (* the source content *),
    rev (gstate_log st) (* logged messages *)).

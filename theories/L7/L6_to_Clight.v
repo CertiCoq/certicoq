@@ -70,6 +70,7 @@ Fixpoint makeArgList' (vs : list positive) : list N :=
 Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
 
 
+
 Definition fun_info_env : Type := M.t (positive * fun_tag).
 
 (* Compute a fun_env by looking at the number of arguments functions
@@ -128,6 +129,7 @@ Fixpoint compute_fun_env_fds fnd fenv:=
   end.
 
 (* fun_env maps tags to function info  *)
+
 
 (* fun_env maps tags to function info *)
 Definition compute_fun_env (e : exp) : fun_env :=
@@ -1078,21 +1080,24 @@ Definition global_defs (e : exp)
       ))
     :: nil.
 
-Definition make_defs (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (nenv : name_env) :
-  nState (option (name_env * (list (positive * globdef Clight.fundef type)))) :=
-  fun_inf' <- make_funinfo e fenv nenv ;;
-  match fun_inf' with
-  | None => ret None
-  | Some p =>
-      let '(fun_inf, map, nenv') := p in
-      match translate_funs e fenv cenv ienv map with
-      | None => ret None
-      | Some fun_defs' =>
-          let fun_defs := rev fun_defs' in
-          ret (Some (nenv', (((global_defs e ++ fun_inf ++ fun_defs)))))
-      end
-  end.
 
+Definition make_defs (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (nenv : M.t BasicAst.name) :
+  nState (exceptionMonad.exception (M.t BasicAst.name * (list (positive * globdef Clight.fundef type)))) :=
+  fun_inf' <- make_funinfo e fenv nenv ;;
+           match fun_inf' with
+           | Some p =>
+             let '(fun_inf, map, nenv') := p in
+             match translate_funs e fenv cenv ienv map with
+             | None => ret (exceptionMonad.Exc "translate_funs")
+             | Some fun_defs' =>
+               let fun_defs := rev fun_defs' in
+               ret (exceptionMonad.Ret (nenv',
+                          ((((global_defs e)
+                               ++ fun_inf ++ fun_defs))))) 
+             end
+           | None => ret (exceptionMonad.Exc "make_funinfo")
+           end.
+           
 Definition make_defs_fast (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (nenv : M.t BasicAst.name) :
   nState (option (M.t BasicAst.name * (list (positive * globdef Clight.fundef type)))) :=
   fun_inf' <- make_funinfo e fenv nenv ;;
@@ -1548,6 +1553,7 @@ Definition tinf_def : globdef Clight.fundef type :=
   Gvar (mkglobvar threadInf ((Init_space 4%Z)::nil) false false).
 
 
+
 Definition make_empty_header (cenv:ctor_env) (ienv:n_ind_env) (e:exp) (nenv : M.t BasicAst.name):  nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
     ret (Some (nenv, nil)).
 
@@ -1567,16 +1573,12 @@ Definition make_header (cenv:ctor_env) (ienv:n_ind_env) (e:exp) (nenv : M.t Basi
           let  '(nenv, call_3) := l in
           ret (Some (nenv, (halt_f::(halt_cloIdent, halt_clo_def)::(tinfIdent, tinf_def)::call_0::call_1::call_2::call_3::inter_l))).
 
-
-
-
 (* end of header file *)
-
-
+Require Import L6.cps_show.
 
 Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
-  (M.t BasicAst.name * option Clight.program * option Clight.program) :=
-  let e := wrap_in_fun e in
+  exceptionMonad.exception (M.t BasicAst.name * option Clight.program * option Clight.program) :=
+  let e := wrap_in_fun e in 
   let fenv := compute_fun_env e in
   let ienv := compute_ind_env cenv in
   let p'' := make_defs e fenv cenv ienv nenv in
@@ -1584,23 +1586,21 @@ Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
   let p' :=  (p''.(runState) n) in
   let m := snd p' in
   match fst p' with
-  | None => (nenv, None, None)
-  | Some p =>
+  | exceptionMonad.Exc s => exceptionMonad.Exc (append "L6_to_Clight: Failure in make_defs:" s)
+  | exceptionMonad.Ret p =>
     let '(nenv, defs) := p in
-    let nenv := (add_inf_vars (ensure_unique nenv)) in
+    let nenv := (add_inf_vars (ensure_unique nenv)) in 
     let forward_defs := make_extern_decls nenv defs false in
-    let header_pre := make_header cenv ienv e nenv in
+    let header_pre := make_header cenv ienv e nenv in 
     (*     let header_p := (header_pre.(runState) m%positive) in *)
     let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
     (match fst header_p with
-     | None => (nenv, None, None)
+     | None => exceptionMonad.Exc "L6_to_Clight: Failure in make_header"
      | Some (nenv, hdefs) =>
-       (M.set make_tinfoIdent (nNamed "make_tinfo"%string)
-          (M.set exportIdent (nNamed "export"%string) nenv),
-        mk_prog_opt (body_external_decl :: (make_extern_decls nenv hdefs true)) mainIdent false,
-        mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs ++ hdefs) mainIdent true)
+       exceptionMonad.Ret (M.set make_tinfoIdent (nNamed "make_tinfo"%string) (M.set exportIdent (nNamed "export"%string) nenv), mk_prog_opt (body_external_decl::(make_extern_decls nenv hdefs true)) mainIdent false, mk_prog_opt (make_tinfo_rec::export_rec::forward_defs++defs++hdefs) mainIdent true)
      end)
   end.
+
 
 Definition compile_fast (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
   (M.t BasicAst.name * option Clight.program * option Clight.program) :=

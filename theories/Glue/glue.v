@@ -49,12 +49,20 @@ Notation "'Field(' t ',' n ')'" :=
 Definition def : Type := ident * globdef fundef type.
 Definition defs : Type := list def.
 
+(* A record that holds L1 information about Coq types. *)
+Record ty_info : Type :=
+  Build_ty_info
+    { ty_name   : kername
+    ; ty_body   : Ast.one_inductive_body
+    ; ty_params : list string
+    }.
+
 (* An enumeration of L1 types.
    This is separate from the [ind_tag] values generated in L6.
    These are generated only for gluing purposes.
    There is no good reason for this, except for easier plumbing. *)
 Definition ind_L1_tag : Type := positive.
-Definition ind_L1_env : Type := M.t (kername * Ast.one_inductive_body).
+Definition ind_L1_env : Type := M.t ty_info.
 
 (* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name of the get_tag_... function in C. *)
@@ -121,12 +129,14 @@ Section Helpers.
           end
     in aux 1%positive xs.
 
+  (* lookup in a 2D dictionary *)
   Definition get_2d {A : Type} (k1 k2 : positive) (m : M.t (M.t A)) : option A :=
     match M.get k1 m with
     | None => None
     | Some m2 => M.get k2 m2
     end.
 
+  (* insertion in a 2D dictionary *)
   Definition set_2d {A : Type}
              (k1 k2 : positive) (v : A) (m : M.t (M.t A)) : M.t (M.t A) :=
     let sub_map := match M.get k1 m with
@@ -225,7 +235,7 @@ Section GState.
     let caaenv := set_2d k1 k2 v caaenv in
     put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
 
-  Definition get_ind_L1_env (k : ind_L1_tag) : gState (option (kername * Ast.one_inductive_body)) :=
+  Definition get_ind_L1_env (k : ind_L1_tag) : gState (option ty_info) :=
     ienv <- gets gstate_ienv ;;
     ret (M.get k ienv).
 
@@ -234,9 +244,9 @@ Section GState.
   Definition get_tag_from_type_name (s : string) : gState (option ind_L1_tag) :=
     let find (prev : option ind_L1_tag)
              (tag : ind_L1_tag)
-             (p : kername * Ast.one_inductive_body) : option ind_L1_tag :=
+             (info : ty_info) : option ind_L1_tag :=
       match prev with
-      | None => if string_dec s (fst p) then Some tag else None
+      | None => if string_dec s (ty_name info) then Some tag else None
       | _ => prev
       end in
     ienv <- gets gstate_ienv ;;
@@ -361,9 +371,15 @@ Section L1Types.
     | _ => None
     end.
 
+  Definition context_names (ctx : Ast.context) : list string :=
+    map (fun d => match Ast.decl_name d with
+                  | nNamed x => x
+                  | _ => ""%string (* TODO error handling *)
+                  end) ctx.
+
   Fixpoint get_single_types
            (gs : Ast.global_declarations)
-           : list (kername * Ast.one_inductive_body) :=
+           : list ty_info :=
     match gs with
     | nil => nil
     | g :: gs' =>
@@ -375,8 +391,10 @@ Section L1Types.
              the other types in the mut rec type declaration.
              Type names in one_inductive_body are NOT qualified,
              which makes them globally nonunique. *)
-          let tys := map (fun o => ((qual_pre ++ Ast.ind_name o)%string, o))
-                         (Ast.ind_bodies b) in
+        let tys := map (fun o => {| ty_name := (qual_pre ++ Ast.ind_name o)%string
+                                  ; ty_body := o
+                                  ; ty_params := context_names (Ast.ind_params b)
+                                  |}) (Ast.ind_bodies b) in
           tys ++ get_single_types gs'
       | None => get_single_types gs'
       end
@@ -385,10 +403,10 @@ Section L1Types.
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
              (gs : Ast.global_declarations)
-             : gState (list (ind_L1_tag * (kername * Ast.one_inductive_body))) :=
+             : gState (list (ind_L1_tag * ty_info)) :=
     let singles := get_single_types gs in
     (* for debugging purposes: *)
-    log ("Propagating types: " ++ String.concat ", " (map fst singles)) ;;
+    log ("Propagating types: " ++ String.concat ", " (map ty_name singles)) ;;
     let res := enumerate_pos singles in
     let ienv : ind_L1_env := set_list res (M.empty _) in
     put_ind_L1_env ienv ;;
@@ -432,18 +450,24 @@ Section L1Constructors.
     end.
 
   Fixpoint dissect_types
+         (* number of parameters in the type *)
+           (params : list string)
          (* context of types for De Bruijn indices in the type *)
            (ctx : list dissected_type)
          (* the type of the constructor that will be dissected *)
            (ty : Ast.term)
          (* a list of arguments and the return type *)
            : list dissected_type * dissected_type :=
-    match ty with
-    | Ast.tProd _ e1 e2 =>
+    match ty, params with
+    (* Parameters have to be named!
+       Ideally we'd print an error message otherwise. *)
+    | Ast.tProd (nNamed x) e1 e2, _ :: p' =>
+        dissect_types p' (dParam x :: ctx) e2
+    | Ast.tProd _ e1 e2, nil =>
         let e1' := dissect_type ctx e1 in
-        let (args, rt) := dissect_types (for_ctx e1' :: ctx) e2 in
+        let (args, rt) := dissect_types params (for_ctx e1' :: ctx) e2 in
         (e1' :: args, rt)
-    | _ => (nil, dissect_type ctx ty)
+    | _, _ => (nil, dissect_type ctx ty)
     end.
 
   (*
@@ -456,15 +480,15 @@ Section L1Constructors.
                                 inductive_ind := 0 |} nil)
                             (tRel 1))
                           (tRel 1).
-  Eval compute in (dissect_types (dInd "Top.color" :: nil) change).
+  Eval compute in (dissect_types 0 (dInd "Top.color" :: nil) change).
 
   Definition c := tProd (nNamed "a"%string)
                     (tSort ((Level.Level "Top.43", false) :: nil))
                     (tProd nAnon (tRel 0) (tRel 2)).
-  Eval compute in (dissect_types (dInd "Top.test" :: nil) c).
+  Eval compute in (dissect_types 0 (dInd "Top.test" :: nil) c).
 
   Definition s := tProd nAnon (tRel 0) (tRel 1).
-  Eval compute in (dissect_types (dInd "Coq.Init.Datatypes.nat" :: nil) s).
+  Eval compute in (dissect_types 0 (dInd "Coq.Init.Datatypes.nat" :: nil) s).
 
   Definition no := tProd (nNamed "a"%string)
                      (tSort ((Level.Level "Top.40", false) :: nil))
@@ -472,7 +496,7 @@ Section L1Constructors.
                          (tProd nAnon (tApp (tRel 2) (tRel 1 :: nil))
                            (tProd nAnon (tApp (tRel 3) (tRel 2 :: nil))
                                (tApp (tRel 4) (tRel 3 :: nil))))).
-  Eval compute in (dissect_types (dInd "Top.tree" :: nil) no).
+  Eval compute in (dissect_types 1 (dInd "Top.tree" :: nil) no).
   *)
 
 End L1Constructors.
@@ -538,22 +562,77 @@ Section Printers.
   (* We need a preliminary pass to generate the names for all
     printer functions for each type because they can be mutually recursive. *)
   Fixpoint make_printer_names
-          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
+          (tys : list (ind_L1_tag * ty_info))
           : gState unit :=
     match tys with
     | nil => ret tt
-    | (tag, (kn, ty)) :: tys' =>
+    | (tag, {| ty_name := kn ; ty_body := ty |}) :: tys' =>
         pname <- gensym ("print_" ++ Ast.ind_name ty) ;;
         set_print_env tag pname ;;
         make_printer_names tys'
     end.
 
+  Fixpoint gen_param_fun_names (params : list string) : gState (list (string * ident)) :=
+    match params with
+    | nil => ret nil
+    | x :: xs =>
+        x' <- gensym ("fn_print_" ++ x) ;;
+        xs' <- gen_param_fun_names xs ;;
+        ret ((x, x') :: xs')
+    end.
+
+  Fixpoint find_param_fun_name
+           (param : string) (params : list (string * ident)) : option ident :=
+    match params with
+    | nil => None
+    | (s, i) :: xs =>
+        if string_dec param s
+          then Some i
+          else find_param_fun_name param xs
+    end.
+
+  Definition ty_printer : type := Tfunction (Tcons val Tnil) tvoid cc_default.
+  (*
+  Fixpoint spine_to_args
+           (spine : list string)
+           (params : list (string * ident)) : option (list expr) :=
+    match spine with
+    | nil => Some nil
+    | p :: spine' =>
+        match find_param_fun_name p params with
+        | None => None
+        | Some i =>
+            match spine_to_args spine' params with
+            | None => None
+            | Some rest => Some ((Evar i ty_printer) :: rest)
+            end
+        end
+    end.
+  *)
+
+  Fixpoint spine_to_args
+           (spine : list dissected_type)
+           (params : list (string * ident)) : option (list expr) :=
+    match spine with
+    | nil => Some nil
+    | dParam p :: spine' =>
+        match find_param_fun_name p params with
+        | None => None
+        | Some i =>
+            match spine_to_args spine' params with
+            | None => None
+            | Some rest => Some ((Evar i ty_printer) :: rest)
+            end
+        end
+    | _ :: _ => None
+    end.
+
   Variable toolbox : toolbox_info.
 
   Definition generate_printer
-             (info : ind_L1_tag * (kername * Ast.one_inductive_body))
+             (info : ind_L1_tag * ty_info)
             : gState (option def) :=
-    let '(itag, (name, b)) := info in
+    let '(itag, {| ty_name := name ; ty_body := b ; ty_params := params |}) := info in
     let basename := Ast.ind_name b in
     let ctors := Ast.ind_ctors b in
     pnameM <- get_print_env itag ;;
@@ -568,6 +647,7 @@ Section Printers.
         _v <- gensym "v" ;;
         _tag <- gensym "tag" ;;
         _args <- gensym "args" ;;
+        param_table <- gen_param_fun_names params ;;
 
         (* We need the maximum arity of all the ctors because
           we will declare an array for the arguments of the constructor
@@ -585,6 +665,7 @@ Section Printers.
         let (_fun, ty_fun) := fun'_info toolbox in
         let (_type, ty_type) := type'_info toolbox in
         let (_unk, ty_unk) := unk_info toolbox in
+
 
         (* function calls to printf *)
         let print_ctor_name : statement :=
@@ -604,6 +685,9 @@ Section Printers.
         let print_space : statement :=
             Scall None (Evar _printf ty_printf)
                        (Evar _space ty_space :: nil) in
+        let print_unk : statement :=
+            Scall None (Evar _printf ty_printf)
+                       (Evar _unk ty_unk :: nil) in
 
         (* Generates a single function call to a printer with the right argument type *)
         let rec_print_call
@@ -626,30 +710,73 @@ Section Printers.
                   | None =>
                       log ("Can't find printer for the type " ++ name) ;; ret Sskip
                   | Some printer => (* success! *)
-                      let i' := Int.repr (Z.of_nat i) in
-                      let ty_printer := Tfunction (Tcons val Tnil) tvoid cc_default in
                       ret (Scall None (Evar printer ty_printer)
                              (Ederef
                                  (Ebinop Oadd
                                          (Ecast
                                            (Evar _args (tptr tvoid))
                                            (tptr val))
-                                         (Econst_int i' val)
-                                         ty_names) ty_names :: nil))
+                                         (Econst_int (Int.repr (Z.of_nat i)) val)
+                                         (tptr val)) val :: nil)) (* FIXME *)
                   end
               end
           | (_, dFun) =>
               ret (Scall None (Evar _printf ty_printf)
                               (Evar _fun ty_fun :: nil))
           | (_, dInvalid) =>
-              ret (Scall None (Evar _printf ty_printf)
-                              (Evar _unk ty_unk :: nil))
+              ret print_unk
           | (_, dSort) =>
               ret (Scall None (Evar _printf ty_printf)
                               (Evar _type ty_type :: nil))
+          | (i, dParam p) =>
+              match find_param_fun_name p param_table with
+              | None =>
+                  log ("Found a param " ++ p ++ " for type " ++ name) ;;
+                  ret print_unk
+              | Some fn_name =>
+                  ret (Scall None (Evar fn_name ty_printer)
+                          (Ederef
+                              (Ebinop Oadd
+                                      (Ecast
+                                        (Evar _args (tptr tvoid))
+                                        (tptr val))
+                                      (Econst_int (Int.repr (Z.of_nat i)) val)
+                                      (tptr val)) val :: nil))
+              end
+          | (i, dApp (dInd arg_type_name) spine) =>
+              log ("Found a type application on " ++ arg_type_name ++
+                   " for type " ++ name) ;;
+              tagM <- get_tag_from_type_name arg_type_name ;;
+              match tagM, spine_to_args spine param_table with
+              | None, _ =>
+                  log ("No L1 tag for the type " ++ name ++
+                       " for the #" ++ show_nat i ++
+                       " constructor that takes " ++ arg_type_name) ;;
+                  ret Sskip (* ideally shouldn't happen *)
+              | _, None =>
+                  log ("Couldn't create spine application for the type " ++ name ++
+                       " for the #" ++ show_nat i ++
+                       " constructor that takes " ++ arg_type_name) ;;
+                  ret Sskip (* ideally shouldn't happen *)
+              | Some tag, Some spine_args =>
+                  printerM <- get_print_env tag ;;
+                  match printerM with
+                  | None =>
+                      log ("Can't find printer for the type " ++ name) ;; ret Sskip
+                  | Some printer => (* success! *)
+                      ret (Scall None (Evar printer ty_printer)
+                             (Ederef
+                                 (Ebinop Oadd
+                                         (Ecast
+                                           (Evar _args (tptr tvoid))
+                                           (tptr val))
+                                         (Econst_int (Int.repr (Z.of_nat i)) val)
+                                         (tptr val)) val :: spine_args)) (* FIXME *)
+                  end
+              end
           | _ => (* TODO expand this for other cases *)
               log ("Found a non-inductive constructor argument for " ++ name) ;;
-              ret print_space
+              ret print_unk
           end in
 
         (* Generates function calls to printers with the right argument types *)
@@ -668,14 +795,15 @@ Section Printers.
 
         (* Generates cases for the switch statement in the print function *)
         let fix switch_cases
+                (params : list string)
                 (ctors : list (ctor_L1_tag * (BasicAst.ident * Ast.term * nat)))
                 : gState labeled_statements :=
           match ctors with
           | nil => ret LSnil
           | (ctag, (_, ty, arity)) :: ctors' =>
-            let (args, rt) := dissect_types (dInd name :: nil) ty in
+            let (args, rt) := dissect_types params (dInd name :: nil) ty in
             calls <- rec_print_calls (enumerate_nat args) ;;
-            rest <- switch_cases ctors' ;;
+            rest <- switch_cases params ctors' ;;
             accM <- get_ctor_arg_accessor_env itag ctag ;;
             match accM with
             | Some (ty_acc, _acc) =>
@@ -698,7 +826,7 @@ Section Printers.
             end
           end in
 
-        entire_switch <- switch_cases (enumerate_pos ctors) ;;
+        entire_switch <- switch_cases params (enumerate_pos ctors) ;;
         let body :=
           Scall (Some _tag)
              (Evar gtname (Tfunction (Tcons val Tnil) tuint cc_default))
@@ -710,11 +838,17 @@ Section Printers.
 
         (* declare an args array if any of the constructors take args,
           if not then prodArr will not be declared at all *)
-        let vars := if won't_take_args then nil
-                    else (_args, tptr tvoid) :: nil in
+        let vars : list (ident * type) :=
+            if won't_take_args then nil
+            else (_args, tptr tvoid) :: nil in
+
+        (* to handle polymorphic data types *)
+        let param_pairs : list (ident * type) :=
+            map (fun p => let '(_, i) := p in (i, ty_printer)) param_table in
+
         let f := {| fn_return := tvoid
                   ; fn_callconv := cc_default
-                  ; fn_params := (_v, val) :: nil
+                  ; fn_params := (_v, val) :: param_pairs
                   ; fn_vars := (_tag, tuint) :: vars
                   ; fn_temps := nil
                   ; fn_body := body
@@ -733,7 +867,7 @@ Section Printers.
     end.
 
   Fixpoint generate_printers
-          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
+          (tys : list (ind_L1_tag * ty_info))
           : gState defs :=
     match tys with
     | nil => ret nil
@@ -777,11 +911,11 @@ Section CtorArrays.
     ret (nname, Gvar (mkglobvar ty init_l true false)).
 
   Fixpoint make_name_arrays
-           (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
+           (tys : list (ind_L1_tag * ty_info))
            : gState defs :=
     match tys with
     | nil => ret nil
-    | (tag, (kn, b)) :: tys' =>
+    | (tag, {| ty_name := kn; ty_body := b |}) :: tys' =>
         rest <- make_name_arrays tys' ;;
         def <- make_name_array tag (Ast.ind_name b) (Ast.ind_ctors b) ;;
         ret (def :: rest)
@@ -867,11 +1001,11 @@ Section ArgsStructs.
     end.
 
   Fixpoint args_structs_from_types
-          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
+          (tys : list (ind_L1_tag * ty_info))
           : gState (list (composite_definition * def)) :=
     match tys with
     | nil => ret nil
-    | (itag, (_, ty)) :: tys' =>
+    | (itag, {| ty_body := ty |}) :: tys' =>
         s' <- args_structs_from_ctors itag (enumerate_pos (Ast.ind_ctors ty)) ;;
         rest <- args_structs_from_types tys' ;;
         ret (app s' rest)
@@ -883,11 +1017,11 @@ Section CtorEnumTag.
   Variable toolbox : toolbox_info.
 
   Fixpoint get_enum_tag_from_types
-          (tys : list (ind_L1_tag * (kername * Ast.one_inductive_body)))
+          (tys : list (ind_L1_tag * ty_info))
           : gState defs :=
     match tys with
     | nil => ret nil
-    | (itag, (kn, ty)) :: tys' =>
+    | (itag, {| ty_name := kn ; ty_body := ty |}) :: tys' =>
         (* s' <- get_enum_tag_from_ctors itag (enumerate_pos (Ast.ind_ctors ty)) ;; *)
           let ls := LSnil in
           let ls' := LSnil in

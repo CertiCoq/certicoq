@@ -775,11 +775,7 @@ Ltac normalize_used_vars :=
 
 Ltac normalize_vars :=
   (* Rewrite single terms *)
-  repeat lazymatch goal with
-  | |- context [ used_vars _ ] => normalize_used_vars
-  | |- context [ bound_var _ ] => normalize_bound_var
-  | |- context [ occurs_free _ ] => normalize_occurs_free
-  end.
+  repeat (normalize_used_vars || normalize_bound_var || normalize_occurs_free).
 
 Ltac normalize_Ensemble :=
   normalize_vars;
@@ -1338,27 +1334,74 @@ Section beta_contraction_correct'.
 
 Ltac gen x := generalize dependent x.
 
+Notation "'(' rho ',' e ')' '⇓' '{' c '}' v" :=
+  (bstep_cost _ _ rho e v c)
+  (at level 60, only printing).
+
+Notation "rho1 '~' '{' k '}' rho2 'on' '{' S '}' 'under' '{' f '}'" :=
+  (preord_env_P_inj pr cenv PG S k f rho1 rho2)
+  (at level 60, only printing).
+
+Notation "rhoe1 '~' '{' k '}' rhoe2" :=
+  (preord_exp pr cenv k P PG rhoe1 rhoe2)
+  (at level 60, only printing).
+
+Notation "v1 '~' '{' k '}' v2" :=
+  (preord_val pr cenv k PG v1 v2)
+  (only printing).
+
+Notation "S '⊆' T" := (S \subset T) (at level 60, only printing).
+
+Notation "S ∩ T = ∅" := (Disjoint _ S T) (at level 60, only printing).
+
+Notation "sig '[' x ']'" := (apply_r sig x) (at level 60, only printing).
+Notation "sig '[' x ']'" := (shrink_cps.apply_r sig x) (at level 60, only printing).
+Notation "sig '[' xs ']'" := (apply_r_list sig xs) (at level 60, only printing).
+Notation "sig '[' xs ']'" := (shrink_cps.apply_r_list sig xs) (at level 60, only printing).
+Notation "rho '[' xs '↦' vs ']'" :=
+  (set_list (combine xs vs) rho) (at level 60, left associativity, only printing).
+Notation "m '[' x '↦' v ']'" :=
+  (M.set x v m) (at level 60, left associativity, only printing).
+Notation "m '[' x ']'" := (M.get x m) (only printing).
+Notation "m '[' xs ']'" := (get_list xs m) (only printing).
+Notation "'FV'" := occurs_free (only printing).
+Notation "'BV'" := bound_var (only printing).
+Notation "'UV'" := used_vars (only printing).
+
 Theorem freshen_exp_triple : forall e,
   {{ fun st _ => used_vars e \subset from_fresh st }}
      freshen_exp e
-  {{ fun _ _ e' st' _ => forall k rho rho',
-     preord_env_P pr cenv (occurs_free e) k PG rho rho' ->
-     preord_exp pr cenv k P PG (e, rho) (e', rho') /\
+  {{ fun _ _ e' st' _ =>
+     (forall rho v c, bstep_cost pr cenv rho e v c <-> bstep_cost pr cenv rho e' v c) /\
+     occurs_free e <--> occurs_free e' /\
      used_vars e' \subset from_fresh st' }}.
 Admitted.
 
-(* TODO: write the proper freshen_exp triple needed to complete the proof
-   No other triples are really needed--freshen_exp is the only nontrivial
-   monad operation we use here *)
+Fixpoint complete_bundle (B : fundefs) clo rho :=
+  forall f, In _ (name_in_fundefs B) f -> exists f', M.get f rho = Some (Vfun clo B f').
+
+Definition fun_map_inv k sig fm rho rho' := forall f ft vs e rho_clo B f',
+  M.get (apply_r sig f) fm = Some (ft, vs, e) -> 
+  M.get f rho = Some (Vfun rho_clo B f') ->
+  (* rho and fm agree syntactically on each known function f *)
+  find_def f' B = Some (ft, vs, e) /\
+  (* The captured environment agrees with rho' on free variables in B *)
+  preord_env_P_inj pr cenv PG (occurs_free_fundefs B) k (apply_r sig) rho_clo rho' /\
+  (* Every other function in the bundle is also in rho *)
+  preord_env_P_inj pr cenv PG (occurs_free_fundefs B) k (apply_r sig)
+                   (def_funs B B rho_clo rho_clo) rho'.
+  (* complete_bundle B rho_clo rho. *)
+
 Theorem beta_contraction_correct : forall e d sig fm s,
   unique_bindings e ->
-  Disjoint _ (bound_var e) (map_dom sig) ->
+  Disjoint _ (bound_var e :|: map_dom fm) (map_dom sig) ->
+  Disjoint _ (bound_var e) (map_dom fm) ->
   Disjoint _ (used_vars e) (map_cod sig) ->
-  (* forall (k, v) in fm, k not in rho /\ k not in rho' *)
   {{ fun st _ => used_vars e \subset from_fresh st }}
      beta_contract St IH d e sig fm s
   {{ fun _ _ e' _ _ => forall k rho rho',
-     preord_env_P_inj pr cenv PG (occurs_free e :|: map_dom fm) k (apply_r sig) rho rho' ->
+     fun_map_inv k sig fm rho rho' ->
+     preord_env_P_inj pr cenv PG (occurs_free e) k (apply_r sig) rho rho' ->
      preord_exp pr cenv k P PG (e, rho) (e', rho') }}.
 Proof.
   (* To discharge the simpler cases that come up when applying IH *)
@@ -1394,7 +1437,7 @@ Proof.
   intros e d; remember (beta_contraction_metric (e, d)) as med.
   generalize dependent e; generalize dependent d.
   pattern med; apply lt_wf_ind; clear med.
-  intros med IHmed' d e Hmed sig fm s Huniq Hdom Hcod; destruct e.
+  intros med IHmed' d e Hmed sig fm s Huniq Hdom Hdom_fm Hcod; destruct e.
   - (* Econstr *)
     spark_evaluation. bind_next. ret.
     (* We need to figure out what Q is. *)
@@ -1430,30 +1473,30 @@ Proof.
       destruct p.
       destruct p.
       bind_next; [|mon_apply freshen_exp_triple].
+      Print inline_letapp.
       destruct (inline_letapp _ _) eqn:Hctx.
       destruct p.
-      (* Q' is the postcondtion of freshen_exp e0, and its job is to relate e0 to x *)
       apply pre_eq_state_lr; Intros.
       mon_apply IHmed'.
       4:reflexivity.
       2: {
-        (* Q contains "e1 is freshen_exp e0" *)
-        (* Proof sketch: we have
-            (let x = f xs in e, rho)⇓c v and wish to show ∃ v' c', (e', rho')⇓c' v' /\ v ~(k-c) v'.
-            If can show (C |[ e ]|, rho[fds][ys↦xs])⇓c' v where
-              fds is the function bundle of f
-              ys are f's formals
-              xs are f's actuals
-            then IH gives ∃ v' c', (e', rho')⇓c' v' /\ v ~(k-c1) v'
-            which implies what we want because ~ is monotonic in k
-        *)
         simpl; Intros.
+        Print fun_map_inv.
         unfold preord_exp; intros.
         match goal with H : bstep_cost _ _ _ _ _ _ |- _ => inv H end.
-        assert (exists c'', bstep_cost pr cenv rho'' (e1 |[ e ]|) v2 c''). {
+        SearchAbout app_ctx.
+        assert (Hctx_step : exists c'', (c'' <= c + c' + 1 + Datatypes.length l)%nat /\
+                       bstep_cost pr cenv rho'' (e1 |[ e ]|) v2 c''). {
           admit.
         }
-        admit. (* need to actually write out Q in the lemma *)
+        destruct Hctx_step as [? [? ?]].
+        match goal with H : forall _ _ _, fun_map_inv _ _ _ _ _ -> _ |- _ =>
+          edestruct (H k) as [? [? [? [? ?]]]]; try apply H7; try omega
+        end.
+        admit. admit.
+        do 2 eexists; split; try eassumption; split.
+        admit.
+        eapply preord_val_monotonic; eauto; omega.
       }
       (* Unfolding preord_exp and stepping forward from the Eletapp should hopefully give
          extended environment + reduced expression that resemble x', rho'
@@ -1470,26 +1513,110 @@ Proof.
     admit.
     admit.
     admit.
+    admit.
+    admit.
   - (* Eapp *)
+    rename f into ft, v into f, l into ys.
     destruct d; simpl.
     + destruct (update_App _ _ _ _ _ _), b.
       admit.
       admit.
     + destruct (update_App _ _ _ _ _ _), b.
       destruct (M.get _ _) eqn:Hget.
-      destruct p.
-      destruct p.
-      bind_next.
-      eapply pre_eq_state_lr; Intros.
+      repeat match goal with |- context [let (_, _) := ?p in _] => destruct p end.
+      bind_next; [|eapply pre_strenghtening; [|apply freshen_exp_triple]].
+      eapply pre_eq_state_lr.
+      rename l into xs, f0 into ft', e into body, x into body'.
+      intros st0 [] [Hfreshen [Hfreshfv Hfreshuv]].
       mon_apply IHmed'; cleanup.
       2: {
-        simpl; Intros.
-      (* Unfolding preord_exp and stepping forward from Eapp v f l should give an extended
-         environment + reduced expression that resemble x', rho'
-         Can then apply IH to these
-         *)
-        admit.
+        intros st0' [] e' st1 [] Hused IHmed [? []] k rho rho' Hinv Henv; subst st0'.
+        intros v' c' Hle Hstep.
+        inv Hstep.
+        match goal with H : bstep_cost _ _ _ _ _ _ |- _ => rename H into Hstep end.
+        rename rho'0 into rho_cap, fl into B, xs0 into xs'', e into body'', ft into ft''.
+        pose (Hinv' := Hinv).
+        unfold fun_map_inv in Hinv'.
+        specialize Hinv' with (rho_clo := rho_cap) (B := B) (e := body) (f' := f') (vs := xs)
+          (f := f) (ft := ft').
+        edestruct Hinv' as [Hfind_def [Hrho_cap Hbundle]]; try assumption.
+        assert (ft'' = ft') by congruence;
+        assert (xs'' = xs) by congruence;
+        assert (body'' = body) by congruence.
+        subst ft'' xs'' body''.
+        rewrite Hfreshen in Hstep.
+        edestruct (IHmed k rho'' rho') as [? [? [? [? ?]]]];
+          try match goal with |- bstep_cost _ _ _ _ _ _ => eassumption end;
+          try omega.
+        Print add_fundefs.
+        - unfold fun_map_inv.
+          unfold fun_map_inv in Hinv.
+          intros f'' ft'' xs'' e'' rho_clo'' B'' f'''.
+          (* There are 3 cases: f'' in xs, f'' in B, and f'' in rho_cap
+             - f'' in rho_cap: fm[sig[f'']] = Some (ft'', xs'', e'') ->
+                               rho_cap[f''] = Some (Vfun rho_clo'' B'' f''') ->
+                               find_def f''' B'' = Some (ft'', xs'', e'') /\
+                               rho_clo'' ~ {k} rho' on {fv_fds B''} under {sig [xs↦xig ys]} /\
+                               complete_bundle B'' rho_clo'' rho''
+               Hinv says find_def f''' B'' = Some (ft'', xs'', e'') /\
+                         rho_clo'' ~ {k} rho' on {fv_fds B''} under {apply_r sig} /\
+                         complete_bundle B'' rho_clo'' rho
+          *)
+          split_var_in_list f'' xs; [|split_var_in_fundefs f'' B Hfds].
+          + (* f'' in xs *)
+            intros Hfm Hrho''.
+            (* Hinv says find_def f''' B'' = Some (ft'', xs'', e'') /\
+                         rho_clo'' ~ {k} rho' on {occurs_free_fundefs B''} under {apply_r sig} /\
+                         def_funs B B rho_clo'' rho_clo'' ~ {k} rho' on {fv_fds B''} under sig
+                         (* complete_bundle B'' rho_clo'' rho *)
+              Need rho_clo'' ~ {k} rho' on {FV_fundefs B''} under {apply_r (sig[xs↦sig ys])}
+                 and similar for def_funs B B rho_clo'' rho_clo''
+              Agree on xs because rho_clo''[x in xs] = v in vs = rho[y in ys] for some y
+                              and rho'[sig[x in xs]] = rho'[y in ys]
+                              and rho, rho' agree on fv(App f ys) ⊇ ys *)
+            admit.
+          + (* f'' in B *)
+            intros Hfm Hrho''.
+            (* f'' in B: fm[sig[f'']] = Some (ft'', xs'', e'') ->
+                         rho''[f''] = Some (Vfun rho_cap B f''') ->
+                         find_def f''' B = Some (ft'', xs'', e'') /\
+                         rho_cap ~{k} rho' on {FV_fds B} under {apply_r (sig[xs↦sig ys])} /\
+                         similar for rho_cap[B] ~ rho'
+               So rho[f''] = Some (Vfun rho_cap B f''')
+               So Hinv says find_def f''' B = Some (ft'', xs'', e'') /\
+                            rho_cap ~{k} rho' on {FV_fds B} under {apply_r sig} /\
+                            complete_bundle B rho_cap rho
+               Need complete_bundle B rho'', this is obvious because rho'' defined by def_funs
+               and xs ∩ B = ∅ or else violate UB *)
+            admit.
+          + (* f'' in rho_cap *)
+          match goal with |- context [M.get (apply_r (set_list ?xys sig) ?x) fm] =>
+            assert (Hnosig : M.get (apply_r (set_list xys sig) x) fm = M.get (apply_r sig x) fm)
+          end. { admit. }
+          rewrite Hnosig.
+          assert (Hnotin : ~ List.In f'' xs). { admit. }
+          erewrite <- set_lists_not_In with (rho'0 := rho''); eauto.
+          (* Can use fact that dom sig ∩ dom fm = ∅ *)
+        (*{ unfold fun_map_inv.
+          intros.
+          assert (~ List.In f l0) by admit.
+          Search def_funs M.get. (* get_fundefs *)
+          erewrite <- set_lists_not_In; eauto.
+          edestruct H3 as [? [? ?]].
+          match goal with H : M.get ?x fm = Some _ |- ?lhs = _ => assert (Heq : M.get x fm = lhs) end.
+          match goal with |- M.get ?x fm = M.get ?y fm => assert (Hnotin : x = y) end. admit.
+          rewrite Hnotin; reflexivity.
+          rewrite <- Heq; eassumption.
+          split; [|split]; try eassumption.
+          admit.
+          admit.
+        }*) admit.
+        - (* occurs_free body' <--> occurs_free body *) admit.
+        - do 2 eexists.
+          split; [|split]; [eassumption| |eapply preord_val_monotonic; eauto; omega].
+          admit.
       }
+      admit.
       admit.
       admit.
       admit.

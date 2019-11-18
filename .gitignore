@@ -19,6 +19,7 @@ Makefile.coq
 /theories/Extraction/*.mli
 .coqdeps.d
 
+.DS_Store
 *.bak
 Makefile.conf
 Makefile.plugin.conf

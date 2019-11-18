@@ -4,7 +4,7 @@
 
 
 Require Import L6.cps L6.ctx L6.cps_util L6.set_util L6.identifiers L6.Ensembles_util L6.List_util
-        L6.eval L6.logical_relations L6.functions.
+        L6.eval L6.logical_relations L6.functions L6.tactics.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
@@ -28,13 +28,26 @@ Fixpoint extend_fundefs (f: var -> var) (B B' : fundefs) : (var -> var) :=
       end
   end.
 
+Instance Proper_extend_fundefs : Proper (f_eq ==> eq ==> eq ==> f_eq) extend_fundefs.
+Proof.
+  intros f1 f2 Hfeq y1 y2 Heq1 x1 x2 Heq2 z1.
+  subst. revert x2; induction y2; intros x2; simpl; eauto.
+  destruct x2; simpl; eauto.
+  destruct (peq v z1); subst.
+  - rewrite !extend_gss. reflexivity.
+  - rewrite !extend_gso; eauto.
+Qed.
+
+
+(* These are required to make sure that at every step of extending the function
+   it is injective, which is useful for proofs with induction on the list or fundefs *)
 Inductive construct_lst_injection : (var -> var) -> list var -> list var -> (var -> var) -> Prop :=
 | Inj_nil :
     forall f, construct_lst_injection f [] [] f
 | Inf_cons :
     forall f f' x xs y ys,
       construct_lst_injection f xs ys f' ->
-      injective (f' {x ~> y}) ->
+      injective_subdomain (FromList (x :: xs)) (f' {x ~> y}) ->
       construct_lst_injection f (x :: xs) (y :: ys) (f' {x ~> y}).
 
 Inductive construct_fundefs_injection : (var -> var) -> fundefs -> fundefs -> (var -> var) -> Prop :=
@@ -43,23 +56,34 @@ Inductive construct_fundefs_injection : (var -> var) -> fundefs -> fundefs -> (v
 | Inf_Fcons :
     forall f f' g1 t1 xs1 e1 B1 g2 t2 xs2 e2 B2,
       construct_fundefs_injection f B1 B2 f' ->
-      injective (f' {g1 ~> g2}) ->
+      injective_subdomain (g1 |: name_in_fundefs B1) (f' {g1 ~> g2}) ->
       construct_fundefs_injection f (Fcons g1 t1 xs1 e1 B1) (Fcons g2 t2 xs2 e2 B2) (f' {g1 ~> g2}).
 
+
 (** α-equivalent terms *)
-Inductive Alpha_conv : exp -> exp -> (var -> var) -> Prop :=
+Inductive Alpha_conv :
+  exp -> exp -> (* the two related expressions *)
+  (var -> var) -> (* The current renaming of fvs *)
+  Prop :=
 | Alpha_Econstr :
     forall x x' t ys ys' e e' f,
       Forall2 (fun y y' => f y = y') ys ys' ->
-      injective (f {x ~> x'}) -> 
+      ~ x' \in image f (occurs_free e) :|: bound_var e -> 
       Alpha_conv e e' (f {x ~> x'}) ->
       Alpha_conv (Econstr x t ys e) (Econstr x' t ys' e') f
 | Alpha_Eproj :
     forall x x' tau N y y' e e' f, 
       f y = y' ->
-      injective (f {x ~> x'}) ->
+      ~ x' \in image f (occurs_free e) :|: bound_var e -> 
       Alpha_conv e e' (f {x ~> x'}) ->
       Alpha_conv (Eproj x tau N y e) (Eproj x' tau N y' e') f
+| Alpha_Eletapp :
+    forall x x' g g' tau ys ys' e e' f, 
+      Forall2 (fun y y' => f y = y') ys ys' ->
+      f g = g' ->
+      ~ x' \in image f (occurs_free e) :|: bound_var e -> 
+      Alpha_conv e e' (f {x ~> x'}) ->
+      Alpha_conv (Eletapp x g tau ys e) (Eletapp x' g' tau ys' e') f
 | Alpha_Ecase :
     forall x x' pats pats' f,
       Forall2 (fun p p' => fst p = fst p' /\ Alpha_conv (snd p) (snd p') f) pats pats' ->
@@ -72,12 +96,13 @@ Inductive Alpha_conv : exp -> exp -> (var -> var) -> Prop :=
       Alpha_conv (Eapp g ft xs) (Eapp g' ft xs') f
 | Alpha_Eprim :
     forall x x' p ys ys' e e' f, 
-      Forall2 (fun y y' => f y = y') ys ys' ->      
-      injective (f {x ~> x'}) ->
+      Forall2 (fun y y' => f y = y') ys ys' ->
+      ~ x' \in image f (occurs_free e) :|: bound_var e ->
       Alpha_conv e e' (f {x ~> x'}) ->
       Alpha_conv (Eprim x p ys e) (Eprim x' p ys' e') f
 | Alpha_Efun :
     forall B B' e e' f f',
+      Disjoint _ (name_in_fundefs B') (image f (occurs_free e) :|: bound_var e) ->
       construct_fundefs_injection f B B' f' ->
       Alpha_conv_fundefs B B' f' ->
       Alpha_conv e e' f' ->
@@ -92,11 +117,15 @@ with Alpha_conv_fundefs : fundefs -> fundefs -> (var -> var) -> Prop :=
 | Alpha_Fcons :
     forall g g' t xs xs' e e' B B' f f',
       f g = g' ->
-      length xs = length xs' ->
       Alpha_conv_fundefs B B' f ->
+      
+      length xs = length xs' ->
+      Disjoint _ (FromList xs) (image f (occurs_free e) :|: bound_var e) ->
       construct_lst_injection f xs xs' f' ->
       Alpha_conv e e' f' ->
+      
       Alpha_conv_fundefs (Fcons g t xs e B) (Fcons g' t xs' e' B') f.
+
 
 Lemma construct_fundefs_injection_f_eq f f' B B' g :
   construct_fundefs_injection f B B' f' ->
@@ -128,6 +157,8 @@ Proof.
     now symmetry.
 Qed.
 
+
+(* To rewrite with extensionally equal functions *)
 Lemma Alpha_conv_proper_mut :
   Proper (Logic.eq ==> Logic.eq ==> f_eq ==> iff) Alpha_conv /\
   Proper (Logic.eq ==> Logic.eq ==> f_eq ==> iff) Alpha_conv_fundefs.
@@ -136,15 +167,14 @@ Proof.
   - inv H'; constructor; eauto.
     + eapply Forall2_monotonic; [| eassumption ].
       intros x1 x2 Heq. rewrite <- H2. eassumption.
-    + rewrite f_eq_extend. eassumption. symmetry. eassumption.
+    + rewrite <- H2. eassumption.
     + eapply H; eauto. symmetry.
       eapply f_eq_extend. eassumption. 
   - inv H'; constructor; eauto.
     + eapply Forall2_monotonic; [| eassumption ].
       intros x1 x2 Heq. rewrite H2. eassumption.
-    + rewrite f_eq_extend. eassumption. eassumption.
-    + eapply H; eauto.
-      eapply f_eq_extend. eassumption. 
+    + rewrite H2. eassumption.
+    + eapply H; eauto. eapply f_eq_extend. eassumption. 
   - inv H'. inv H2. constructor. constructor.
     rewrite H1. reflexivity.
   - inv H'. inv H2. constructor;  eauto.
@@ -162,23 +192,34 @@ Proof.
     { eapply H0; eauto. constructor; eauto. }
     now inv Hsuf.
   - inv H'; constructor; eauto.
-    + rewrite f_eq_extend. eassumption. symmetry. eassumption.
+    + rewrite <- H2. eassumption.
     + eapply H; eauto. symmetry.
       eapply f_eq_extend. eassumption. 
   - inv H'; constructor; eauto.
-    + rewrite f_eq_extend; eassumption.
+    + rewrite H2; eassumption.
     + eapply H; eauto. 
       eapply f_eq_extend. eassumption. 
-  - admit. (* TODO: Eletapp *)
-  - admit.
+  - inv H'; constructor; eauto.
+    + eapply Forall2_monotonic; [| eassumption ].
+      intros x3 x4 Heq. rewrite <- H2. eassumption.
+    + rewrite <- H2. eassumption.
+    + eapply H; eauto. symmetry.
+      eapply f_eq_extend. eassumption.
+  - inv H'; constructor; eauto.
+    + eapply Forall2_monotonic; [| eassumption ].
+      intros x3 x4 Heq. rewrite H2. eassumption.
+    + rewrite H2; eassumption.
+    + eapply H; eauto. eapply f_eq_extend. eassumption.
   - inv H'. edestruct construct_fundefs_injection_f_eq as [g' [Heq Hinj]].
-    eassumption. eassumption. econstructor. eassumption.
-    eapply H; eauto. now symmetry.
-    eapply H0; eauto. now symmetry.
+    eassumption. eassumption. symmetry in Heq.
+    econstructor; (try rewrite <- H3 at 1); eauto.
+    + eapply H; eauto.
+    + eapply H0; eauto.
   - inv H'. edestruct construct_fundefs_injection_f_eq as [g' [Heq Hinj]].
-    eassumption. now symmetry; eassumption. econstructor. eassumption.
-    eapply H; eauto. now symmetry.
-    eapply H0; eauto. now symmetry. 
+    eassumption. symmetry. eassumption. symmetry in Heq.
+    econstructor; (try rewrite H3 at 1); eauto.
+    + eapply H; eauto.
+    + eapply H0; eauto.
   - inv H'. constructor; eauto. 
     eapply Forall2_monotonic; [| eassumption ].
     intros x1 x2 Heq. rewrite <- H1. eassumption.
@@ -188,26 +229,27 @@ Proof.
   - inv H'; constructor; eauto.
     + eapply Forall2_monotonic; [| eassumption ].
       intros x1 x2 Heq. rewrite <- H2. eassumption. 
-    + rewrite f_eq_extend. eassumption. symmetry. eassumption.
+    + rewrite <- H2. eassumption.
     + eapply H; eauto. symmetry.
       eapply f_eq_extend. eassumption. 
   - inv H'; constructor; eauto.
     + eapply Forall2_monotonic; [| eassumption ].
       intros x1 x2 Heq. rewrite H2. eassumption. 
-    + rewrite f_eq_extend. eassumption. eassumption.
+    + rewrite H2. eassumption. 
     + eapply H; eauto. eapply f_eq_extend. eassumption. 
   - inv H'; constructor; eauto.
   - inv H'; constructor; eauto.
   - inv H'. edestruct construct_lst_injection_f_eq as [g' [Heq Hinj]].
-    eassumption. eassumption. econstructor; eauto.
+    eassumption. eassumption. econstructor; (try rewrite <- H3; eauto).
     eapply H0; eauto. now symmetry.
-    eapply H; eauto. now symmetry. 
+    eapply H; eauto. now symmetry.
   - inv H'. edestruct construct_lst_injection_f_eq as [g' [Heq Hinj]].
-    eassumption. symmetry. eassumption. econstructor; eauto.
-    now eapply H0; eauto. now eapply H; eauto.
+    eassumption. symmetry. eassumption. econstructor; (try rewrite H3; eauto).
+    eapply H0; eauto.
+    eapply H; eauto. now symmetry. 
   - inv H'. constructor.
   - inv H'. constructor.
-Admitted.
+Qed.
 
 Instance Alpha_conv_proper :
   Proper (Logic.eq ==> Logic.eq ==> f_eq ==> iff) Alpha_conv.
@@ -234,6 +276,133 @@ Proof.
   rewrite Hfeq. rewrite Hfeq in H2. now eauto. 
 Qed.
 
+
+Lemma construct_fundefs_injection_injective f B1 B2 f' :
+  construct_fundefs_injection f B1 B2 f' ->
+  injective_subdomain (name_in_fundefs B1) f'.
+Proof.
+  intros H1. inv H1; eauto.
+  eapply injective_subdomain_Empty_set.
+Qed.
+
+Require Import L6.tactics.
+
+Lemma construct_fundefs_injection_f_eq_subdomain S f B1 B2 f' :
+  construct_fundefs_injection f B1 B2 f' ->
+  Disjoint _ S (name_in_fundefs B1) ->
+  f_eq_subdomain S f f'.
+Proof.
+  intros Hinj Hd. induction Hinj.
+  - reflexivity.
+  - eapply f_eq_subdomain_extend_not_In_S_r.
+    eapply Disjoint_In_l.
+    eapply Disjoint_sym. eassumption.
+    simpl. now sets.
+    eapply IHHinj. eapply Disjoint_Included_r; [| eassumption ].
+    sets.
+Qed.
+
+  
+Lemma construct_fundefs_injection_injective_pres S f B1 B2 f' :
+  construct_fundefs_injection f B1 B2 f' ->
+  injective_subdomain (S \\ name_in_fundefs B1) f ->
+  Disjoint _ (image f' (name_in_fundefs B1)) (image f (S \\ name_in_fundefs B1)) ->  
+  injective_subdomain (name_in_fundefs B1 :|: S) f'.
+Proof.
+  intros H1 Hinj Hdis.
+  assert (H1' := H1). 
+  eapply construct_fundefs_injection_injective in H1.
+  rewrite <- Union_Setminus_Included; last reflexivity; tci.
+  eapply injective_subdomain_Union; eauto.
+  
+  eapply injective_subdomain_f_eq_subdomain. 
+  eapply injective_subdomain_antimon. eassumption. 
+  simpl. xsets.
+  eapply f_eq_subdomain_antimon;
+    [| eapply construct_fundefs_injection_f_eq_subdomain; eauto ].
+  reflexivity. now sets.
+  eapply Disjoint_Included_r; [| eassumption ].
+  rewrite image_f_eq_subdomain. reflexivity.
+  symmetry. eapply construct_fundefs_injection_f_eq_subdomain.
+  eassumption. sets.
+Qed.
+
+
+Lemma construct_lst_injection_injective f xs ys f' :
+  construct_lst_injection f xs ys f' ->
+  injective_subdomain (FromList xs) f'. 
+Proof.
+  intros H1.
+  inv H1; eauto.
+  normalize_sets. eapply injective_subdomain_Empty_set.
+Qed.
+
+
+Lemma construct_lst_injection_f_eq_subdomain S f xs ys f' :
+  construct_lst_injection f xs ys f' ->
+  Disjoint _ S (FromList xs) ->
+  f_eq_subdomain S f f'.
+Proof.
+  intros Hinj Hd. induction Hinj.
+  - reflexivity.
+  - eapply f_eq_subdomain_extend_not_In_S_r.
+    eapply Disjoint_In_l.
+    eapply Disjoint_sym. eassumption.
+    normalize_sets. now sets.
+    eapply IHHinj. eapply Disjoint_Included_r; [| eassumption ].
+    normalize_sets. sets.
+Qed.
+
+Lemma construct_lst_injection_image_subset S f xs ys f' :
+  construct_lst_injection f xs ys f' ->
+  image f' (FromList xs :|: S) \subset FromList ys :|: image f (S \\ FromList xs).
+Proof.
+  intros Hinj. revert S; induction Hinj; intros S.
+  - rewrite !FromList_nil at 1. sets.
+  - rewrite <- Union_Setminus_Included; last reflexivity; tci.
+    rewrite !FromList_cons at 1.   
+    repeat normalize_sets.
+    eapply Included_trans.
+    eapply image_extend_Included'.
+    rewrite !Setminus_Union_distr.
+    eapply Union_Included; [| sets ].
+    rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l. 
+    rewrite <- !Setminus_Union_distr.
+    eapply Included_trans.
+    eapply image_monotonic. eapply Setminus_Included.
+    eapply Included_trans.
+    eapply IHHinj. sets.
+Qed.
+  
+Lemma construct_lst_injection_injective_pres  S f xs ys f' :
+  construct_lst_injection f xs ys f' ->
+  injective_subdomain (S \\ FromList xs) f ->
+  Disjoint _ (FromList ys) (image f (S \\ FromList xs)) ->
+  injective_subdomain (FromList xs :|: S) f'.
+Proof.
+  intros H1 Hinj Hdis.
+  assert (H1' := H1). 
+  eapply construct_lst_injection_injective in H1.
+  rewrite <- Union_Setminus_Included; last reflexivity; tci.
+  eapply injective_subdomain_Union; eauto.
+  
+  eapply injective_subdomain_f_eq_subdomain.
+  eapply injective_subdomain_antimon. eassumption. sets. 
+  eapply f_eq_subdomain_antimon;
+    [| eapply construct_lst_injection_f_eq_subdomain; eauto ].
+  reflexivity. now sets.
+  eapply injective_subdomain_Union_not_In_image; sets.
+  eapply injective_subdomain_Union. 
+  
+  eapply construct_lst_injection_injective_pres. 
+  eapply Disjoint_Included_r; [| eassumption ].
+  rewrite image_f_eq_subdomain. reflexivity.
+  symmetry. eapply construct_lst_injection_f_eq_subdomain.
+  eassumption. sets.
+Qed.
+
+
+
 Section Alpha_conv_correct.
 
   Variable pr : prims.
@@ -241,46 +410,19 @@ Section Alpha_conv_correct.
   Variable PT : Post.
   Variable PG : PostG.
 
-  Check preord_var_env.
+
+  (** ** Environment relation up to renaming *)
+  (* TODO move to log rel *)
+
   Definition preord_env_P_inj (P : Ensemble var) k f rho1 rho2 :=
     forall x : var,
       P x -> preord_var_env pr cenv k PG rho1 rho2 x (f x).
 
-  Lemma Forall2_app {A B} (P : A -> B -> Prop) xs ys f :
-    Forall2 (fun x y => f x = y) xs ys ->
-    (forall x y, List.In x xs -> f x = y -> P x y) ->
-    Forall2 P xs ys. 
-  Proof. 
-    intros Hall Hyp. induction Hall.
-    - constructor.
-    - constructor.
-      + eapply Hyp. now constructor. eassumption.
-      + eapply IHHall.
-        intros. eapply Hyp. now constructor 2.
-        eassumption. 
-  Qed.
-
-  Lemma construct_fundefs_injection_injective f B1 B2 f' :
-    construct_fundefs_injection f B1 B2 f' ->
-    injective f ->
-    injective f'. 
-  Proof.
-    intros H1 H2. induction H1; eauto. 
-  Qed.
-
-  Lemma construct_lst_injection_injective f xs ys f' :
-    construct_lst_injection f xs ys f' ->
-    injective f ->
-    injective f'. 
-  Proof.
-    intros H1 H2. induction H1; eauto. 
-  Qed.
-  
   Lemma preord_env_P_inj_set (P : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
-    preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
+    preord_env_P_inj  (P \\ [set x]) k f rho1 rho2 ->
     preord_val pr cenv k PG v1 v2 ->
-    injective_subdomain (Union _ P (Singleton _ x)) (f {x ~> y}) ->
+    injective_subdomain (x |: P) (f {x ~> y}) ->
     preord_env_P_inj P k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof.
     intros Henv Hv Hinj z HP. unfold extend. 
@@ -289,7 +431,7 @@ Section Alpha_conv_correct.
       rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
     - intros z' Hget. rewrite M.gso in Hget; eauto.
       destruct (peq (f z) y).
-      + exfalso. eapply Hneq. eapply Hinj. left. eassumption.
+      + exfalso. eapply Hneq. eapply Hinj. right. eassumption.
         now eauto.
         rewrite extend_gso; eauto.
         rewrite extend_gss. eassumption.
@@ -300,9 +442,9 @@ Section Alpha_conv_correct.
   
   Lemma preord_env_P_inj_set_alt (P : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
-    preord_env_P_inj (Setminus var P (Singleton var x)) k f rho1 rho2 ->
+    preord_env_P_inj (P \\ [set x]) k f rho1 rho2 ->
     preord_val pr cenv k PG v1 v2 ->
-    ~ In _ (image f (Setminus _ P (Singleton _ x))) y ->
+    ~ In _ (image f (P \\ [set x])) y ->
     preord_env_P_inj P k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof.
     intros Henv Hv Hnin z HP. unfold extend. 
@@ -321,16 +463,18 @@ Section Alpha_conv_correct.
 
   Lemma preord_env_P_inj_antimon (P1 P2 : var -> Prop) (k : nat) (rho1 rho2 : env) f :
     preord_env_P_inj P2 k f rho1 rho2 ->
-    Included var P1 P2 -> preord_env_P_inj P1 k f rho1 rho2.
+    P1 \subset P2 ->
+    preord_env_P_inj P1 k f rho1 rho2.
   Proof.
     intros Henv Hi x HP. eapply Henv. now apply Hi.
   Qed.
 
-  Lemma preord_env_P_inj_monotonic :
-    forall P (k j : nat) (rho1 rho2 : env) f,
-      j <= k -> preord_env_P_inj P k f rho1 rho2 -> preord_env_P_inj P j f rho1 rho2.
+  Lemma preord_env_P_inj_monotonic P (k j : nat) (rho1 rho2 : env) f : 
+    j <= k ->
+    preord_env_P_inj P k f rho1 rho2 ->
+    preord_env_P_inj P j f rho1 rho2.
   Proof.
-    intros P k j rho1 rho2 f Hleq Hpre x HP v Hget.
+    intros Hleq Hpre x HP v Hget.
     edestruct Hpre as [v2 [Heq Hpre2] ]; eauto.
     eexists; split; eauto. eapply preord_val_monotonic; eauto.
   Qed.
@@ -342,29 +486,32 @@ Section Alpha_conv_correct.
     intros s1 s2 [H1 H2]; split; intros Hpre;
     eapply preord_env_P_inj_antimon; subst; eauto.
   Qed.
-
+  
   Lemma Alpha_conv_fundefs_find_def B1 B2 f g t xs1 e1 :
     Alpha_conv_fundefs B1 B2 f ->
+    injective_subdomain (name_in_fundefs B1) f -> 
     find_def g B1 = Some (t, xs1, e1) ->
-    injective f ->
     exists xs2 e2 f', 
       find_def (f g) B2 = Some (t, xs2, e2) /\
-      length xs1 = length xs2 /\
-      construct_lst_injection f xs1 xs2 f' /\
+      construct_lst_injection f xs1 xs2 f' /\ 
       Alpha_conv e1 e2 f'.
-  Proof. 
-    intros Ha Hdef Hinj. induction Ha. 
+  Proof.
+    intros Ha Hinj Hdef. induction Ha. 
     - inv Hdef. 
     - simpl in Hdef. subst. destruct (M.elt_eq g g0).
-      + subst. inv Hdef. exists xs', e'.
-        simpl. rewrite peq_true. eauto.
-      + edestruct IHHa as [xs2 [ e2 Ha' ] ]; eauto.
-        edestruct (peq (f g) (f g0)). 
-        * eapply Hinj in e0. subst. congruence. now constructor.
-          now constructor.
-        * do 2 eexists. simpl. rewrite peq_false; eauto.
+      + subst. inv Hdef. exists xs', e', f'.
+        simpl. rewrite peq_true; eauto.
+      + edestruct IHHa as [xs2 [ e2 [Hf' [Hlen Ha'] ] ] ]; eauto.
+        eapply injective_subdomain_antimon. eassumption. sets.
+        do 3 eexists. split; eauto.
+        edestruct (peq (f g) (f g0)).
+        * eapply Hinj in e0. subst. congruence. right.
+          eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct. eassumption.
+          now left.
+        * simpl. rewrite peq_false; eauto.
   Qed.
 
+  (* TODO move *)
   Lemma set_lists_length2 (rho rho' rho1 : env) (xs1 xs2 : list var) (vs1 vs2 : list val) :
     length xs1 = length xs2 ->
     length vs1 = length vs2 ->
@@ -384,21 +531,45 @@ Section Alpha_conv_correct.
       eexists. simpl; rewrite Hset2; eauto.
   Qed.
 
-  Lemma preord_env_P_inj_set_lists (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
+
+  (* Lemma extend_lst_codom  (A : Type) (f : positive -> A) (l : list positive) *)
+  (*       (l' : list A) (x : positive) : *)
+  (*   List.In (f <{ l ~> l' }> x) l' -> *)
+  (*   List.length l = List.length l' -> *)
+  (*   injective_subdomain (FromList l) (f <{ l ~> l' }>) -> *)
+  (*   List.In x l. *)
+  (* Proof. *)
+  (*   revert l'; induction l; intros l' Hin Heq Hinj; simpl in *. *)
+  (*   - destruct l'; try contradiction. inv Heq. *)
+  (*   - destruct l'; try contradiction. inv Heq. *)
+  (*     destruct (peq a x); subst; eauto. *)
+  (*     rewrite extend_gso in Hin; eauto. *)
+  (*     inv Hin.  *)
+  (*     exfalso. eapply n. eapply Hinj. left. reflexivity. *)
+  (*     right. eapply IHl. *)
+  (*     eassumption. *)
+      
+
+  Lemma preord_env_P_inj_setlist (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f f':
     preord_env_P_inj (Setminus _ P1 (FromList xs1)) k f rho1 rho2 ->
     Forall2 (preord_val pr cenv k PG) vs1 vs2 ->
+    
+    injective_subdomain (P1 \\ FromList xs1) f ->
+    Disjoint _ (FromList xs2) (image f (P1 \\ FromList xs1)) ->
     construct_lst_injection f xs1 xs2 f' ->
+    
     set_lists xs1 vs1 rho1 = Some rho1' ->
     set_lists xs2 vs2 rho2 = Some rho2' ->
+
     preord_env_P_inj P1 k f' rho1' rho2'.
   Proof.
     revert P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f f'. induction xs1;
-      intros P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2  f f' Hpre Hall Hinj Hset1 Hset2 x HP v Hget.
+      intros P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2  f f' Hpre Hall Hinjf Hinj Hset1 Hset2 x HP v Hget.
     - inv Hinj. destruct vs1; try discriminate.
       inv Hall. inv Hset1; inv Hset2. eapply Hpre; eauto.
       constructor; eauto.
-    - destruct vs1; try discriminate. inv Hall. inv Hinj.
+    - destruct vs1; try discriminate. inv Hall. assert (Hinj' := Hinj). inv Hinj.
       simpl in Hset1, Hset2. 
       destruct (set_lists xs1 vs1 rho1) eqn:Heq1;
         destruct (set_lists ys l' rho2) eqn:Heq2; try discriminate.
@@ -410,13 +581,34 @@ Section Alpha_conv_correct.
       + edestruct IHxs1 with (P1 := Setminus var P1 (Singleton _ a)) as [v2 [Het' Hpre']]; eauto.
         * rewrite Setminus_Union.
           rewrite FromList_cons in Hpre. eassumption.
+        * eapply injective_subdomain_antimon. eassumption. normalize_sets. sets. 
         * constructor; eauto. intros Hc.  inv Hc; eauto.
-        * eexists. rewrite extend_gso; eauto.
+        * eexists. rewrite extend_gso; eauto. split; eauto.
           rewrite M.gso; [ now eauto |].
-          intros Heq. eapply n. 
-          eapply H7; try now constructor.
+          
+          intros Heq. eapply n.
+          
+          eapply construct_lst_injection_injective_pres with (S := P1) in Hinj'; eauto.
+          eapply Hinj'; eauto.
+          normalize_sets. sets.
+          rewrite extend_gss.
+          rewrite extend_gso. eassumption. eassumption.
+
+          
+          eapply Disjoint_Included_r.
+          rewrite image_f_eq_subdomain. reflexivity.
+          eapply construct_lst_injection_f_eq_subdomain.
+          eapply Hinj'. sets.
+          
+          eapply injective_subdomain_Union_not_In_image; [| sets ].
+          
+          eapply construct_lst_injection_injective_pres. eassumption.
+          eapply injective_subdomain_antimon. eassumption. sets.
+          
+          eassumption. eapply H7; try now constructor.
           rewrite extend_gss. rewrite extend_gso; eassumption. 
   Qed.
+
   
   Lemma preord_env_P_inj_set_lists_alt (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f :
@@ -553,7 +745,6 @@ Section Alpha_conv_correct.
       intros Hc; subst. eapply Hnin; eexists; eauto.
   Qed.
 
-
   Lemma preord_env_P_inj_reset_lists P k f rho rho' rho'' xs ys vs :
     get_list (map f xs) rho' = Some vs ->
     Disjoint _ (image f P) (FromList ys) ->
@@ -597,7 +788,7 @@ Section Alpha_conv_correct.
         reflexivity.
   Qed.
 
-  Lemma preord_env_P_inj_def_funs_pre k rho1 rho2 B1 B1' B2 B2' f h h' e :
+  Lemma preord_env_P_inj_def_funs_pre k rho1 rho2 B1 B1' B2 f h h' e :
     (* The IH *)
     (forall m : nat,
        m < k ->
@@ -607,13 +798,11 @@ Section Alpha_conv_correct.
          preord_env_P_inj (occurs_free e1) m f rho1 rho2 ->
          preord_exp pr cenv m PT PG (e1, rho1) (e2, rho2)) ->
     construct_fundefs_injection f B1 B2 h ->
-    construct_fundefs_injection f B1' B2' h' ->
-    injective f ->
+    injective_subdomain (occurs_free e) f ->
     Alpha_conv_fundefs B1 B2 h'  ->
-    Alpha_conv_fundefs B1' B2' h' ->
     preord_env_P_inj (occurs_free (Efun B1' e)) k f rho1 rho2 ->
-    preord_env_P_inj (Union _ (occurs_free (Efun B1' e)) (name_in_fundefs B1)) k h
-                     (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2).
+    preord_env_P_inj (occurs_free (Efun B1' e) :|: (name_in_fundefs B1)) k h
+                     (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2).
   Proof with now eauto with Ensembles_DB.
     revert B1 rho1 rho2 B1' B2 B2' f h h' e.
     induction k as [ k IH' ] using lt_wf_rec1.
@@ -649,6 +838,10 @@ Section Alpha_conv_correct.
     - inv Ha. simpl. inv Hinj. eapply preord_env_P_inj_antimon. eassumption.
       eauto with Ensembles_DB.
   Admitted.
+
+(*
+Needs : 1.) Fixing the right assumptions for the bounds
+        2.) Uses the updated compat lemmas (m < k)
 
   (** α-equivalence preserves semantics *)
   Lemma Alpha_conv_correct k rho1 rho2 e1 e2 g :
@@ -721,7 +914,7 @@ Section Alpha_conv_correct.
       admit.
       eapply Henv. now constructor.
   Admitted.
-  
+*)
 End Alpha_conv_correct.
 
 Close Scope fun_scope.

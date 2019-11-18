@@ -371,7 +371,7 @@ Module ClosureConversionCorrect (H : Heap).
       
       Closure_conversion_fundefs ct B1 c FVs' B1 B2 ->
       
-      def_closures B1 B1 rho1 H1 (Loc lenv)  = (H1', rho1') -> 
+      def_closures B1 B1 rho1 H1 (Loc lenv) = (H1', rho1') -> 
       
       (forall j, Fun_inv k j PreG PostG b
                     rho1' H1' (def_funs B2 B2 rho2) H2

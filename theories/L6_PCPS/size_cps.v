@@ -52,7 +52,7 @@ Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
       1 + sizeOf_exp_ctx c
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l1 0
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l2 0 
-    | Efun1_c B c => (1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx c
+    | Efun1_c B c => (1 + PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx c
     | Efun2_c B e => 1 + sizeOf_fundefs_ctx B + sizeOf_exp e
   end
 with sizeOf_fundefs_ctx (B : fundefs_ctx) : nat :=

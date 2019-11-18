@@ -1053,6 +1053,53 @@ Section LogRelCC.
     now intros; eapply cc_approx_val_respects_preord_val_r; eauto.
   Qed.
 
+
+  (* Sadly, composing with the preord relation on the left doesn't seem provable *)
+
+  Lemma cc_approx_exp_respects_preord_exp_l (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) k:
+    (forall k, preord_exp pr cenv k P1 PG (e1, rho1) (e2, rho2)) ->
+    cc_approx_exp k P2 PG (e2, rho2) (e3, rho3) ->
+    cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
+  Proof.
+    intros Hyp1 Hyp2 v c1 Hleq Hstep1.
+    edestruct (Hyp1 k) as (v2 & c2 & Hstep2 & Hpost & Hv2). eassumption. eassumption.
+  Abort.
+  
+  Lemma cc_approx_val_respects_preord_val_l (v1 v2 v3 : val) :
+    (forall k, preord_val pr cenv k PG v1 v2) ->
+    (forall k, cc_approx_val k PG v2 v3) ->
+    (forall k, cc_approx_val k PG v1 v3).
+  Proof.
+    intros H1 H2 k. 
+    revert v1 v2 v3 H1 H2. induction k as [k IHK] using lt_wf_rec.
+    induction v1 using val_ind'; intros v2 v3 Hpre Happrox;
+      assert (Hpre' := Hpre k);
+      assert (Happrox' := Happrox k); 
+      rewrite cc_approx_val_eq, preord_val_eq in *.    
+    - admit.
+    - admit.
+    - destruct v2; try contradiction.
+      destruct v3; try contradiction.
+      destruct l. now inv Happrox'.
+      simpl in Happrox'.
+      destruct v1; try contradiction.
+      destruct l. now inv Happrox'.
+      destruct v2; try contradiction.
+       
+      intros vs1 vs2 i t2 xs1 e1 rho1 Hleneq Hfdef Hset. 
+      simpl in Hpre'. 
+      edestruct (Hpre' vs1 vs1) as [xs2' [e2 [rho2 [Hfind2 [Hset2 _]]]]]; eauto.
+      edestruct (Happrox' vs1 vs2) with (j := i)
+        as [Γ [xs3' [e3 [rho3 [Heq [Hfind3 [Hset3 Heval3]]]]]]]; eauto.
+      subst.
+      do 4 eexists. split; [| split; [| split ] ]; eauto.
+      intros Hlt Hall. 
+
+      
+      eapply cc_approx_exp_rel_mon; [| eapply HIncl ].
+  Abort.
+
+  
   End Compose.
 
 
@@ -1137,8 +1184,8 @@ Section LogRelCC.
       intros. eapply H1; eauto. simpl; omega.
       
       simpl sizeOf_exp_ctx in Hcc.
-      replace (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
-          (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
+      replace (m + S  (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
       eassumption.
       omega. 
 
@@ -1178,15 +1225,15 @@ Section LogRelCC.
       repeat eexists; eauto. rewrite <- !plus_assoc in *. 
       eapply H1; eauto. simpl; omega.
     - simpl sizeOf_exp_ctx.
-      replace (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
-          (m + S (numOf_fundefs B +  PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) by omega. 
+      replace (m + S (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) by omega. 
       eapply IHHctx; eauto. 
       
       intros. eapply H1; eauto. simpl; omega.
       intros v1' c1' Hleq1 Hstep1.
       edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
       inv Hstep2. simpl in *. repeat subst_exp. 
-      repeat eexists; eauto. rewrite <- !plus_assoc in *. 
+      repeat eexists; eauto.
       eapply H1; eauto. simpl; omega.
   Qed.
 
@@ -1259,7 +1306,7 @@ Section LogRelCC.
       eapply cc_approx_val_monotonic. eassumption. omega.
     - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
       simpl in Hleq.
-      pose (cost := 1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)).
+      pose (cost := 1 + PS.cardinal (fundefs_fv B)).
       assert (Heq'' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7*cost).
       { eapply leq_sum_exists. simpl in *; omega. }
       destruct Heq'' as [B' [D [Heq [Hleqb Hleqd]]]]. subst.
@@ -1337,7 +1384,7 @@ Section LogRelCC.
       eapply cc_approx_val_monotonic. eassumption. omega.
     - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
       simpl in Hleq.
-      pose (cost := 1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)).
+      pose (cost := 1 + PS.cardinal (fundefs_fv B)).
        assert (Heq' : exists B, A = B + cost). 
        { simpl in *. eexists (A - cost).
          rewrite NPeano.Nat.sub_add. omega. omega. }

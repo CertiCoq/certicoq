@@ -382,10 +382,10 @@ Section EVAL.
   | BStepc_fun :
       forall (rho : env) (B : fundefs) (e : exp) (v : val) (c : nat),
         bstep_cost (def_funs B B rho rho) e v c ->
-        (* The definition of a function incur cost proportional to the number of FVs and the
-         * number of fundefs (to make the bound of the current cc independent of the term
-         *)
-        bstep_cost rho (Efun B e) v (c + (1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)))
+        (* The definition of a function incur cost proportional to the number of FVs
+           (to make the bound of the current cc independent of the term) *)
+        (* TODO eventually remove the unit cost, it helps but it shouldn't be required *)
+        bstep_cost rho (Efun B e) v (c + (1 + PS.cardinal (fundefs_fv B)))
   | BStepc_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
         (f' : list val -> option val) (ys : list var) (e : exp)

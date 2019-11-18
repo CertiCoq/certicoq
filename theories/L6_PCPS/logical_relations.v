@@ -462,17 +462,21 @@ Section Log_rel.
 
     Lemma preord_exp_const_compat k rho1 rho2 x x' t ys1 ys2 e1 e2 :
       Forall2 (preord_var_env k PG rho1 rho2) ys1 ys2 ->
-      (forall vs1 vs2 : list val,
-          Forall2 (preord_val k PG) vs1 vs2 ->
-          preord_exp k P1 PG (e1, M.set x (Vconstr t vs1) rho1)
+      (forall m (vs1 vs2 : list val),
+          m < k ->
+          Forall2 (preord_val m PG) vs1 vs2 ->
+          preord_exp m P1 PG (e1, M.set x (Vconstr t vs1) rho1)
                      (e2, M.set x' (Vconstr t vs2) rho2)) ->
       preord_exp k P2 PG (Econstr x t ys1 e1, rho1) (Econstr x' t ys2 e2, rho2).
     Proof.
       intros Hall Hpre v1 c1 Hleq1 Hstep1. inv Hstep1.
       edestruct (preord_var_env_get_list PG rho1 rho2) as [vs2' [Hget' Hpre']];
         [| eauto |]; eauto.
-      edestruct Hpre as [v2 [c2 [Hstep [Hpost Hval]]]]; [| | eassumption | ]; eauto.
-      omega. 
+      edestruct (Hpre (k - 1)) as [v2 [c2 [Hstep [Hpost Hval]]]];
+        [| | | eassumption | ]; eauto.
+      omega.
+      eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption.
+      omega. omega.
       repeat eexists. now econstructor; eauto.
       rewrite <- !plus_assoc.
       erewrite get_list_length_eq; [| eassumption ]. 
@@ -484,9 +488,10 @@ Section Log_rel.
 
     Lemma preord_exp_proj_compat k rho1 rho2 x x' tau n y1 y2 e1 e2 :
       preord_var_env k PG rho1 rho2 y1 y2 ->
-      (forall v1 v2,
-          preord_val k PG v1 v2 -> 
-          preord_exp k P1 PG (e1, M.set x v1 rho1)
+      (forall m v1 v2,
+          m < k ->
+          preord_val m PG v1 v2 -> 
+          preord_exp m P1 PG (e1, M.set x v1 rho1)
                      (e2, M.set x' v2 rho2)) ->
       preord_exp k P2 PG (Eproj x tau n y1 e1, rho1) (Eproj x' tau n y2 e2, rho2).
     Proof.
@@ -496,8 +501,11 @@ Section Log_rel.
       inv Hpre.
       edestruct (Forall2_asym_nthN (preord_val k PG) vs l) as [v2 [Hnth Hval]];
         try eassumption.
-      edestruct Hexp as [v2' [c2 [Hstep [Hpost Hval']]]]; [ | | eassumption | ]; eauto.
+      edestruct (Hexp  (k - 1)) as [v2' [c2 [Hstep [Hpost Hval']]]];
+        [ | | | eassumption | ]; eauto.
       omega.
+      eapply preord_val_monotonic. eassumption.
+      omega. omega.
       repeat eexists; eauto. 
       econstructor; eauto.
       eapply preord_val_monotonic. eassumption. omega.
@@ -538,7 +546,7 @@ Section Log_rel.
       preord_var_env k PG rho1 rho2 f1 f2 ->
       Forall2 (preord_var_env k PG rho1 rho2) ys1 ys2 ->
       (forall m v1 v2,
-          m <= k ->
+          m < k ->
           preord_val m PG v1 v2 -> 
           preord_exp m P1 PG (e1, M.set x v1 rho1)
                      (e2, M.set x' v2 rho2)) ->
@@ -588,7 +596,7 @@ Section Log_rel.
       post_compat P2 P2 -> 
       Forall2 (fun p p' => fst p = fst p') D1 D2 ->
       preord_var_env k PG rho1 rho2 x1 x2 ->
-      preord_exp k P1 PG (e1, rho1) (e2, rho2) ->
+      (forall m, m < k -> preord_exp m P1 PG (e1, rho1) (e2, rho2)) ->
       preord_exp k P2 PG (Ecase x1 D1, rho1)
                  (Ecase x2 D2, rho2) ->
       preord_exp k P2 PG (Ecase x1 ((c, e1) :: D1), rho1)
@@ -596,8 +604,9 @@ Section Log_rel.
     Proof.
       intros HPost2 Hall Henv Hexp_hd Hexp_tl v1 c1 Hleq1 Hstep1. inv Hstep1.
       destruct (M.elt_eq c t) eqn:Heq; subst.
-      - inv H4; subst; [| contradiction ].
-        edestruct Hexp_hd as [v2 [c2 [Hstep2 [Hpost Hpre2]]]]; [ | eassumption | ]; eauto. omega.
+      - inv H4; subst; [| contradiction ]. subst.
+        edestruct (Hexp_hd (k - 1)) as [v2 [c2 [Hstep2 [Hpost Hpre2]]]];
+          [ | | eassumption | ]; eauto. omega. omega.
         edestruct Henv as [v2' [Hget Hpre]]; eauto.
         rewrite preord_val_eq in Hpre.
         destruct v2'; try (now simpl in Hpre; contradiction). inv Hpre. 
@@ -640,17 +649,21 @@ Section Log_rel.
     
     Lemma preord_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
       Forall2 (preord_var_env k PG rho1 rho2) ys1 ys2 ->
-      (forall v1 v2,
-          preord_val k PG v1 v2 -> 
-          preord_exp k P1 PG (e1, M.set x1 v1 rho1)
+      (forall m v1 v2,
+          m < k ->
+          preord_val m PG v1 v2 -> 
+          preord_exp m P1 PG (e1, M.set x1 v1 rho1)
                      (e2, M.set x2 v2 rho2)) ->
       preord_exp k P2 PG (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
     Proof.
       intros Henv Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
       edestruct preord_var_env_get_list as [vs2 [Hget' Hpre']]; eauto.
       edestruct Prim_axiom as [v2 [Heq Hprev2]]; eauto.
-      edestruct Hexp as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | eassumption | ]; eauto.
-      omega. repeat eexists. econstructor; eauto.
+      edestruct (Hexp (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | eassumption | ]; eauto.
+      omega.
+      eapply preord_val_monotonic. eassumption.
+      omega. omega.
+      repeat eexists. econstructor; eauto.
       erewrite get_list_length_eq; [| eassumption ]. 
       erewrite get_list_length_eq; [| eassumption ]. 
       erewrite Forall2_length; [| eassumption ].
@@ -659,8 +672,8 @@ Section Log_rel.
     Qed.
 
     Lemma preord_exp_fun_compat k rho1 rho2 B B' e1 e2 :
-      (forall c1 c2, P1 c1 c2 -> P2 (c1 + (1 + numOf_fundefs B + PS.cardinal (fundefs_fv B)))
-                              (c2 + (1 + numOf_fundefs B' + PS.cardinal (fundefs_fv B')))) ->
+      (forall c1 c2, P1 c1 c2 -> P2 (c1 + (1 + PS.cardinal (fundefs_fv B)))
+                              (c2 + (1 + PS.cardinal (fundefs_fv B')))) ->
       preord_exp k P1 PG (e1, def_funs B B rho1 rho1)
                  (e2, def_funs B' B' rho2 rho2) ->
       preord_exp k P2 PG (Efun B e1, rho1) (Efun B' e2, rho2).
@@ -672,6 +685,106 @@ Section Log_rel.
       eapply Hyp. eassumption.
       eapply preord_val_monotonic. eassumption. omega.
     Qed.
+
+
+    (** Context application lemma *)
+      (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+      interpretation of [C] in [ρ2] *)
+    Lemma ctx_to_rho_preord_exp k (P : nat -> relation nat) boundG rho1 rho2 rho2' C e e' m :
+      (forall c1 c2 n c , c <= sizeOf_exp_ctx C ->  P (n + c) c1 c2 -> P n c1 (c2 + c)) ->
+      ctx_to_rho C rho2 rho2' -> 
+      preord_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2') ->
+      preord_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2).
+  Proof.  
+    intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder.
+    - intros v1 c1 Hleq1 Hstep1.
+      edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; try eassumption.
+      intros. eapply H1; eauto. simpl; omega.
+
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      eassumption.
+      repeat eexists.
+      now econstructor; eauto. eapply H1; eauto. simpl; omega.
+      eassumption.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      intros. eapply H1; eauto. simpl; omega.
+
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
+        with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      eassumption. 
+      repeat eexists.
+      simpl. econstructor; eauto. simpl.
+      rewrite <- plus_assoc in *. eauto. eapply H1; eauto. simpl; omega.       
+      eassumption.
+    - intros v1' c1 Hleq1 Hstep1.  
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]];
+      [ | | | eassumption | ].
+
+      intros. eapply H1; eauto. simpl; omega.
+      
+      simpl sizeOf_exp_ctx in Hcc.
+      replace (m + S (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
+          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
+      eassumption.
+      omega. 
+
+      repeat eexists.
+      simpl. econstructor; eauto. simpl.
+      eapply H1; eauto. simpl. omega.
+      eassumption.
+  Qed.
+
+  (** Context application lemma, left *)
+  (** [(C |[ e1 ]|, ρ1) < (e2, ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+      interpretation of [C] in [ρ2] *)
+  Lemma ctx_to_rho_preord_exp_l k (L : nat -> relation nat) boundG rho1 rho1' rho2 C e e' m :
+    (forall c1 c2 n c , c <= sizeOf_exp_ctx C -> L n c1 c2 -> L (n + c) (c1 + c) c2) ->
+    ctx_to_rho C rho1 rho1' -> 
+    preord_exp k (L m) boundG (e, rho1') (e', rho2) ->
+    preord_exp k (L (m + sizeOf_exp_ctx C)) boundG (C |[ e ]|, rho1) (e', rho2).
+  Proof.  
+    intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
+    - intros v1' c1 Hleq1 Hstep1.
+      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+      simpl in *. repeat eexists; eauto.
+      rewrite <- plus_n_O. eassumption.
+    - intros v1 c1 Hleq1 Hstep1. inv Hstep1.
+      repeat subst_exp.
+      edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+      intros. eapply H1; eauto. simpl; omega.
+      repeat eexists; eauto.
+      simpl.
+      replace (m + S (size_cps.sizeOf_exp_ctx C)) with (m + size_cps.sizeOf_exp_ctx C + 1) by omega.
+      eapply H1; eauto. simpl; omega.
+      eapply preord_val_monotonic. eassumption. omega.
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+      intros. eapply H1; eauto. simpl; omega.
+      repeat eexists; eauto.
+      simpl.
+      rewrite <- (plus_assoc c 1 _).
+      replace (m + S (@Datatypes.length var ys + size_cps.sizeOf_exp_ctx C))
+        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + @Datatypes.length var ys)) by omega.
+      eapply H1; eauto. simpl; omega. 
+      eapply preord_val_monotonic. eassumption. omega.
+    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+      intros. eapply H1; eauto. simpl; omega.
+      repeat eexists; eauto.
+      simpl.
+      replace (m + S (set_util.PS.cardinal (fundefs_fv B) + size_cps.sizeOf_exp_ctx C))
+        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + set_util.PS.cardinal (fundefs_fv B))) by omega.
+      eapply H1; eauto. simpl; omega. 
+      eapply preord_val_monotonic. eassumption. omega.
+  Qed.
+
+
     
   End Compat.
   
@@ -769,28 +882,40 @@ Section Log_rel.
     (* Each case follows from the corresponding compat lemma *)
     - eapply preord_exp_const_compat; eauto; intros.
       * eapply Forall2_same. intros x HIn. apply Henv. now constructor.
-      * eapply IHe; try eassumption. eapply preord_env_P_extend.
-        eapply preord_env_P_antimon. eassumption.
+      * eapply IHe. intros. eapply IH; eauto. omega.
+        eapply preord_env_P_extend.
+        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ].
+        omega.
         now (normalize_occurs_free; eauto with Ensembles_DB). 
         rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
     - eapply preord_exp_case_nil_compat.
     - eapply preord_exp_case_cons_compat; eauto.
       now apply Forall2_refl.
-      apply IHe; try eassumption. intros x P. apply Henv. now constructor; eauto.
-      apply IHe0; try eassumption. intros x P. apply Henv. now apply Free_Ecase3; eauto.
+      intros m Hlt. apply IHe; try eassumption.
+      intros. eapply IH; eauto. omega.
+      eapply preord_env_P_antimon. 
+      eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      normalize_occurs_free. sets.
+      eapply IHe0; eauto.
+      eapply preord_env_P_antimon. 
+      eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      normalize_occurs_free. sets.
     - eapply preord_exp_proj_compat; eauto.
-      intros v1 v2 Hval. eapply IHe; try eassumption. eapply preord_env_P_extend; eauto.
-      eapply preord_env_P_antimon. eassumption.
+      intros m v1 v2 Hlt Hval. apply IHe; try eassumption.
+      intros. eapply IH; eauto. omega.
+      eapply preord_env_P_extend; eauto.
+      eapply preord_env_P_antimon.
+      eapply preord_env_P_monotonic; [| eassumption ]. omega.
       now (normalize_occurs_free; eauto with Ensembles_DB).
     - eapply preord_exp_letapp_compat; eauto.
       eapply Henv. constructor. now left.
       eapply Forall2_same. intros. apply Henv. constructor. now right.
       intros m v1 v2 Hlt Hval. 
-      eapply IHe; try eassumption. 
-      intros. eapply IH; try eassumption. omega.
+      eapply IHe; try eassumption.
+      intros. eapply IH; eauto. omega.
       eapply preord_env_P_extend; eauto.
       eapply preord_env_P_antimon.
-      eapply preord_env_P_monotonic; eassumption.
+      eapply preord_env_P_monotonic; [| eassumption ]. omega.
       now (normalize_occurs_free; eauto with Ensembles_DB).
     - eapply preord_exp_fun_compat; eauto. 
       eapply IHe; try eassumption. eapply preord_env_P_antimon.
@@ -801,8 +926,11 @@ Section Log_rel.
       apply Forall2_same. intros. apply Henv. now constructor.
     - eapply preord_exp_prim_compat; eauto; intros.
       eapply Forall2_same. intros. apply Henv. now constructor.
-      eapply IHe; try eassumption. eapply preord_env_P_extend; eauto.
-      eapply preord_env_P_antimon. eassumption.
+      eapply IHe; try eassumption.
+      intros. eapply IH; eauto. omega.
+      eapply preord_env_P_extend; eauto.
+      eapply preord_env_P_antimon.
+      eapply preord_env_P_monotonic; [| eassumption ]. omega.
       now (normalize_occurs_free; eauto with Ensembles_DB).
     - eapply preord_exp_halt_compat; try eassumption.
       intros x HP. apply Henv; eauto.
@@ -1094,48 +1222,60 @@ Section Log_rel.
   Lemma preord_exp_compat k rho1 rho2 c e1 e2 :
     (* Annoying, but we need that for the cost of fundefs *)
     (* PS.cardinal (exp_fv (c |[ e1 ]|)) = PS.cardinal (exp_fv (c |[ e2 ]|)) -> *)
-    (forall k rho1 rho2, preord_env_P (occurs_free e1) k PG rho1 rho2 ->
-                    preord_exp k P1 PG (e1, rho1) (e2, rho2)) ->
+    (forall m rho1 rho2,
+        m <= k ->
+        preord_env_P (occurs_free e1) m PG rho1 rho2 ->
+        preord_exp m P1 PG (e1, rho1) (e2, rho2)) ->
     preord_env_P (occurs_free (c |[ e1 ]|)) k PG rho1 rho2 ->
     preord_exp k P1 PG (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
-    (* unfold exp_fv. *)
-    revert c rho1 rho2 e1 e2. induction k as [ k IH' ] using lt_wf_rec1. 
-    intros c. revert k IH'. 
+    unfold exp_fv.
+    revert c rho1 rho2 e1 e2. induction k as [ k IH' ] using lt_wf_rec1.
+    intros c. revert k IH'.
     induction c; intros k IH' rho1 rho2 e1 e2 Hyp Hpre; eauto.
     - simpl. eapply preord_exp_const_compat; eauto.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
-      + intros vs1 vs2 Hall. eapply IHc; eauto.
-        eapply preord_env_P_extend.
-        * eapply preord_env_P_antimon; eauto.
-          simpl. intros x H. inv H. constructor 2; eauto.
-          intros H. subst; eauto.
-        * rewrite preord_val_eq. simpl; split; eauto using Forall2_Forall2_asym_included.
+      + intros m vs1 vs2 Hlt Hall. eapply IHc; eauto.
+
+        * intros. eapply IH'; eauto. omega. 
+        * intros. eapply Hyp; eauto. omega.
+        * eapply preord_env_P_extend.
+
+          eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          simpl. normalize_occurs_free.  sets.
+
+          rewrite preord_val_eq. simpl; split; eauto using Forall2_Forall2_asym_included.
+          
     - simpl. eapply preord_exp_proj_compat; eauto.
       + eapply Hpre. constructor; eauto.
-      + intros vs1 vs2 Hall. eapply IHc; eauto.
-        eapply preord_env_P_extend; [| assumption ].
-        eapply preord_env_P_antimon; eauto.
-        simpl. intros x H. inv H. constructor; eauto.
-        intros H. subst; eauto.
+      + intros m v1 v2 Hlt Hval. eapply IHc; eauto.
+        * intros. eapply IH'; eauto. omega.
+        * intros. eapply Hyp; eauto. omega.
+        * eapply preord_env_P_extend; [| assumption ].
+          eapply preord_env_P_antimon; eauto.
+          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          simpl. normalize_occurs_free. sets.
     - simpl. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
-      + intros vs1 vs2 Hall. eapply IHc; eauto.
-        eapply preord_env_P_extend; [| assumption ].
-        eapply preord_env_P_antimon; eauto.
-        simpl. intros x H. inv H. eapply Free_Eprim2; eauto.
-        intros H. subst; eauto.
+      + intros m vs1 vs2 Hlt Hall. eapply IHc; eauto.
+        * intros. eapply IH'; eauto. omega.
+        * intros. eapply Hyp; eauto. omega.
+        * eapply preord_env_P_extend; [| assumption ].
+          eapply preord_env_P_antimon; eauto.
+          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          simpl. normalize_occurs_free. sets.
     - simpl. eapply preord_exp_letapp_compat; eauto.
       + eapply Hpre. constructor. now left.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
         now right.
       + intros m vs1 vs2 Hlt Hall.
-        eapply IHc; eauto. intros. eapply IH'. omega. eassumption. 
-        eassumption. 
-        eapply preord_env_P_extend; [| assumption ].
-        eapply preord_env_P_antimon.
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
-        simpl. normalize_occurs_free. now eauto with Ensembles_DB. 
+        eapply IHc; eauto. intros.
+        * eapply IH'. omega. eassumption. eassumption.
+        * intros; eapply Hyp; eauto; omega.
+        * eapply preord_env_P_extend; [| assumption ].
+          eapply preord_env_P_antimon.
+          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          simpl. normalize_occurs_free. now eauto with Ensembles_DB.          
     - simpl. eapply preord_exp_case_compat; eauto.
       eapply IHc; auto. eapply preord_env_P_antimon; eauto.
       simpl. intros x H.
@@ -1149,18 +1289,20 @@ Section Log_rel.
       + inv H. simpl. constructor; eauto.
       + simpl. eapply Free_Efun2; eauto.
     - simpl app_ctx_f.
-      eapply preord_exp_fun_compat.
+      eapply preord_exp_fun_compat.      
       admit. (* Needs some assumption about the num of FV in *)
       eapply preord_exp_refl; eauto.
       
       eapply preord_env_P_antimon.
       eapply preord_env_P_def_funs_compat_pre.
-      * intros. eapply IH'; eauto.
+      * intros. eapply IH'. omega.
+        intros. eapply Hyp; eauto. omega.
+        eassumption.
       * eapply preord_env_P_antimon. eassumption.
         simpl. rewrite occurs_free_Efun. reflexivity.
-      * rewrite <- Union_Included_Union_Setminus. now sets. tci. sets.
-  Abort. 
-
+      * rewrite <- Union_Included_Union_Setminus. now sets. tci. sets.        
+  Abort.
+  
   End Rel.
 
   Definition comp (P1 P2 : Post) : Post := fun c1 c2 => exists c3, P1 c1 c3 /\ P2 c3 c2.

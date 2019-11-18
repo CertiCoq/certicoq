@@ -29,7 +29,7 @@ Section ctx_approx.
     fun e1 e2 => ctx_approx e1 e2 /\ ctx_approx e2 e1.
   
   Lemma ctx_approx_trans :
-  Transitive ctx_approx.
+    Transitive ctx_approx.
   Proof. 
     intros x y z H1 H2 C i v1 Hstep.
     edestruct H1 as [v2 [j2 Hstep2]]; eauto. 
@@ -51,14 +51,16 @@ Section ctx_approx.
     - intros x y z [H1 H2] [H3 H4]; split; eapply ctx_approx_trans; eauto.
   Qed.
 
+  Context (P : Post) (PG : PostG). 
+
   Lemma preord_exp_sound e1 e2 :
-    (forall k rho1 rho2, preord_env_P pr cenv (occurs_free e1) k rho1 rho2 ->
-                    preord_exp pr cenv k (e1, rho1) (e2, rho2)) ->
+    (forall k rho1 rho2, preord_env_P pr cenv (occurs_free e1) k PG rho1 rho2 ->
+                    preord_exp pr cenv k P PG (e1, rho1) (e2, rho2)) ->
     ctx_approx e1 e2.
   Proof.
     intros Hyp C i v1 Hstep.
     assert (Hyp' := Hyp).
-    eapply (preord_exp_compat pr cenv i empty_env empty_env C) in Hyp;
+    eapply (preord_exp_compat pr cenv i PG empty_env empty_env C) in Hyp;
       [| now eapply preord_env_P_refl ].
     edestruct Hyp as [v2 [c2 [Hstep2 Hpre2]]]; eauto.
   Qed.
@@ -81,5 +83,5 @@ Section ctx_approx.
     rewrite M.gso, M.gss in H2. inv H2.
     intros Hc. inv Hc.
   Qed.
-  
+
 End ctx_approx.

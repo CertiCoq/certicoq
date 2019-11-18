@@ -248,6 +248,7 @@ Proof.
   revert B1. induction B2; intros B1 H; auto; inv H; f_equal; eauto.
 Qed.
 
+
 (** Append function definitions *)
 Fixpoint fundefs_append (B1 B2 : fundefs) : fundefs :=
   match B1 with

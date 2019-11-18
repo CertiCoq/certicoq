@@ -200,7 +200,7 @@ Definition L6_pipeline_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.ex
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
-      let e := dead_param_elim.eliminate e in
+      (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)
       ret (shrink_cps.shrink_top e, c_data)
   in
@@ -303,7 +303,7 @@ Definition L6_pipeline  (opt : bool) (e : cTerm certiL5) : exceptionMonad.except
         (* Shrink reduction *)
         let e := shrink_cps.shrink_top e in
         (* Dead parameter elimination *)
-        let e := dead_param_elim.eliminate e in
+        (* let e := dead_param_elim.eliminate e in *)
         (* Shrink reduction *)
         ret (shrink_cps.shrink_top e, c_data)
     in

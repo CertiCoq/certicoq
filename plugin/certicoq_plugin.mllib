@@ -104,7 +104,6 @@ PrintCsyntax
 PrintClight
 Cps_show
 L6_to_Clight
-L6_to_Clight_old
 Instances2
 Instances3
 Instances4

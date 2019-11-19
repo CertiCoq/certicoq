@@ -206,7 +206,6 @@ extraction/aST.ml
 extraction/ctypes.ml
 extraction/l3_to_L4.ml
 extraction/l6_to_Clight.mli
-extraction/l6_to_Clight_old.mli
 extraction/glue.mli
 extraction/printAST.ml
 extraction/instances7.mli
@@ -222,7 +221,6 @@ extraction/printClight.ml
 extraction/cps_show.mli
 extraction/cps_show.ml
 extraction/l6_to_Clight.ml
-extraction/l6_to_Clight_old.ml
 extraction/glue.ml
 extraction/allInstances.ml
 

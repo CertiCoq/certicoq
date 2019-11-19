@@ -7,9 +7,10 @@
   > Relates L6 states to L7 states according to execution semantics
 
 
-TODO: change L6_to_Clight's fn_vars into fn_temps
+
 TODO: bundle the notation in L6_to_Clight and import it instead of redefining it 
 
+Done: change L6_to_Clight's fn_vars into fn_temps
 Done: change L6_to_Clight's reserve into reserve', todo update proof with new order 
 Done: update proof to 64 bits (parametric over Archi.ptr64) 
  *)
@@ -34,7 +35,8 @@ Require Import compcert.common.AST
         compcert.common.Globalenvs
         compcert.common.Memory.
 
-Require Import L7.L6_to_Clight.
+Require Import L7.tactics
+               L7.L6_to_Clight.
 
 Require Import Libraries.maps_util.
 
@@ -509,26 +511,25 @@ Section RELATION.
   Variable (numArgsIdent : ident).  
   Variable (isptrIdent: ident). (* ident for the isPtr external function *)
   Variable (caseIdent:ident).
+  Variable (nParam:nat).
 
   Definition protectedIdent: list ident := (argsIdent::allocIdent::limitIdent::gcIdent::mainIdent::bodyIdent::threadInfIdent::tinfIdent::heapInfIdent::numArgsIdent::numArgsIdent::isptrIdent::caseIdent::[]).
 
-
   
 
-    Variable cenv:L6.cps.ctor_env.
+  Variable cenv:L6.cps.ctor_env.
   Variable fenv:L6.cps.fun_env.
-  Variable finfo_env: M.t positive. (* map from a function name to its type info *)
+  Variable finfo_env: L6_to_Clight.fun_info_env. (* map from a function name to its type info *)
   Variable p:program.
-  
   
   (* This should be a definition rather than a parameter, computed once and for all from cenv *)
   Variable rep_env: M.t ctor_rep.
-
+ 
   
   Notation threadStructInf := (Tstruct threadInfIdent noattr).
-Notation threadInf := (Tpointer threadStructInf noattr).
+  Notation threadInf := (Tpointer threadStructInf noattr).
 
-Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid
+  Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid
                             {|
                               cc_vararg := false;
                               cc_unproto := false;
@@ -663,24 +664,30 @@ Ltac archi_red :=
      unfold Int.max_unsigned in *.
 
 
-   
-  (* Any valid mem is disjoint  the global_env *)
-  Axiom disjoint_mem: forall m:mem, ~ exists b i z T v v' , (Mem.load T m b z = Some v /\ Genv.find_funct (Genv.globalenv p) (Vptr b i) = Some v').
 
  Inductive header_of_rep: ctor_rep -> Z -> Prop :=
  | header_enum: forall t, header_of_rep (enum t) (Z.of_N ((N.shiftl t 1) + 1))
  | header_boxed: forall t a, header_of_rep (boxed t a) (Z.of_N ((N.shiftl a 10) + t)).
 
+ Function var_or_funvar_f' (n : nat) (x:positive):expr :=
+   match Genv.find_symbol (Genv.globalenv p) x with
+   | Some _ =>  makeVar threadInfIdent n x fenv finfo_env
+   | None => var x
+   end.
+ 
  Function var_or_funvar_f (x:positive):expr :=
    match Genv.find_symbol (Genv.globalenv p) x with
-   | Some _ =>  makeVar threadInfIdent x fenv
+   | Some _ =>  makeVar threadInfIdent nParam x fenv finfo_env
    | None => var x
    end.
  
  (* The full the domain of map is exactly the symbols of globalenv *)
- Definition find_symbol_domain {A} (map:M.t A):=
+  Definition find_symbol_domain {A} (map:M.t A):=
    forall (x:positive), (exists V1, M.get x map = Some V1) <-> (exists b, Genv.find_symbol (Genv.globalenv p) x = Some b).
- 
+
+ Definition finfo_env_correct :=
+   forall (x:positive) i t, M.get x finfo_env = Some (i , t) -> (exists finfo, M.get t fenv = Some finfo).
+  
 (* CHANGE THIS *)                                    
 Inductive repr_asgn_fun': list positive -> list N -> statement -> Prop :=
 | repr_asgn_nil: repr_asgn_fun' [] [] Sskip
@@ -691,7 +698,13 @@ Inductive repr_asgn_fun: list positive -> list N -> statement -> Prop :=
   |repr_asgn_wrap: forall ys inf s, repr_asgn_fun' ys inf s ->
                    repr_asgn_fun ys inf (argsIdent ::= Efield tinfd argsIdent (Tarray val maxArgs noattr);s).
 
+Inductive repr_call_vars' (par : nat) : nat -> list positive -> list expr -> Prop :=
+| repr_call_nil : repr_call_vars' par 0 [] []
+| repr_call_cons : forall n y ys es, repr_call_vars' par n ys es ->
+                                     repr_call_vars' par (S n) (y :: ys) (var_or_funvar_f' par y :: es).
 
+
+Definition repr_call_vars : nat -> list positive -> list expr -> Prop := repr_call_vars' nParam.
 
 (* like fromN but for Z, should move to list_util and make a generic one *)
 Fixpoint fromZ (z:Z) (m:nat): list Z :=
@@ -772,7 +785,7 @@ Definition Forall_statements_in_seq {A}: (BinNums.Z  -> A -> statement -> Prop) 
 Inductive var_or_funvar : positive -> expr -> Prop :=
 | F_VoF : forall x b,
     Genv.find_symbol (Genv.globalenv p) x = Some b ->
-                var_or_funvar x (makeVar threadInfIdent x fenv)
+                var_or_funvar x (makeVar threadInfIdent nParam x fenv finfo_env)
 | V_VoF : forall x,
     Genv.find_symbol (Genv.globalenv p) x = None ->
        var_or_funvar x (var x).
@@ -1870,15 +1883,19 @@ Inductive repr_expr_L6_L7: L6.cps.exp -> statement -> Prop :=
 | Rproj_e: forall x t n v e  s,
     repr_expr_L6_L7 e  s ->
     repr_expr_L6_L7 (Eproj x t n v e)  (x ::= Field(var v, Z.of_N n) ; s)
-| R_app_e: forall f inf ainf ys ays t s, (* CHANGE THIS *)
+| R_app_e: forall f inf ainf ys ays bys pnum (t : fun_tag) s1 s2,
     (* 1 - assign vs to the right args acording to fenv(f)*)
     M.get t fenv = Some inf ->
     ays = skipn nParam ys ->
+    bys = firstn nParam ys ->
     ainf = skipn nParam (snd inf) ->
-    repr_asgn_fun ays ainf s ->
+    repr_asgn_fun ays ainf s1 ->
+    pnum = min (N.to_nat (fst inf)) nParam ->
+    repr_call_vars pnum bys s2 ->
     (* 2 - call f *)
     (* NOTE: added redundant limitIdent |-> limitPtr to avoid having to carry this info around, but could optimize it away *)
-    repr_expr_L6_L7 (Eapp f t ys)  (s; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr ; mkCall threadInfIdent tinfIdent ([mkFunTy threadInfIdent (length (firstn nParam ys))] (var_or_funvar_f f)) ys) 
+    repr_expr_L6_L7 (Eapp f t ys) (s1; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr ;
+                                      (Scall None ([Tpointer (mkFunTy threadInfIdent pnum) noattr] (var_or_funvar_f f)) ((Etempvar tinfIdent threadInf) :: s2)))
 | R_halt_e: forall v e,
     (* halt v <-> end with v in args[1] *)
     var_or_funvar v e -> 
@@ -1953,11 +1970,11 @@ Definition gc_set := (allocIdent ::= Efield tinfd allocIdent valPtr ;
                                                     limitIdent ::= Efield tinfd limitIdent valPtr ;
                                                     argsIdent ::= Efield tinfd argsIdent (Tarray val maxArgs noattr)).
 
-Definition gc_test (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fun_env) := (reserve argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent gcArrIdent
-                                                           (Z.of_N (l + 2)) vs ind fenv).
+Definition gc_test (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fun_env) (finfo_env : fun_info_env) := (reserve argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent nParam gcArrIdent
+                                                           (Z.of_N (l + 2)) vs ind fenv finfo_env).
 
-Definition gc_test' (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fun_env) := (reserve' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent gcArrIdent
-                                                           (Z.of_N (l + 2)) vs ind fenv).
+Definition gc_test' (gcArrIdent:positive) (l:N) (vs : list positive) (ind : list N) (fenv : fun_env) (finfo_env : fun_info_env) := (reserve' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent nParam gcArrIdent
+                                                           (Z.of_N (l + 2)) vs ind fenv finfo_env).
 
 Inductive right_param_asgn: list positive -> list N -> statement -> Prop :=
 | asgn_nil: right_param_asgn nil nil Sskip
@@ -2123,7 +2140,7 @@ Inductive repr_val_L6_L7:  L6.cps.val -> mem -> Values.val -> Prop :=
     repr_val_ptr_list_L6_L7 vs m b i ->
     repr_val_L6_L7 (L6.cps.Vconstr t vs) m  (Vptr b i)
 | Rfunction_v: 
-    forall vars avars fds f m b t vs pvs avs alocs e asgn body l locs finfo gccall,
+    forall vars avars fds f m b t t' vs pvs avs alocs e asgn body l locs finfo gccall,
       let F := mkfunction (Tvoid)
                           ((mkcallconv false false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})*)
              ((tinfIdent, threadInf)::(map (fun x => (x , val)) pvs))
@@ -2133,10 +2150,11 @@ Inductive repr_val_L6_L7:  L6.cps.val -> mem -> Values.val -> Prop :=
                                           body)) in
       find_def f fds = Some (t, vs, e) ->
       M.get t fenv = Some (l, locs) ->
-      M.get f finfo_env = Some finfo -> (* TODO: check this *)
+      M.get f finfo_env = Some (finfo , t') -> (* TODO: check this *)
+      t = t' ->
       Genv.find_symbol (Genv.globalenv p) f = Some b -> (* symbol f points to b in the globalenv *)
       (* b points to an internal function in the heap [and i is 0] *)
-      gc_test' finfo l vs locs fenv = Some gccall ->
+      gc_test' finfo l vs locs fenv finfo_env = Some gccall ->
       Genv.find_funct (globalenv p) (Vptr b  Ptrofs.zero) = Some (Internal F) ->
       (* F should have the shape that we expect for functions generated by our compiler, 
        > see translate_fundefs i.e.
@@ -2206,7 +2224,7 @@ Inductive repr_val_L_L6_L7:  L6.cps.val -> mem -> locProp -> Values.val -> Prop 
     repr_val_ptr_list_L_L6_L7 vs m L b i ->
     repr_val_L_L6_L7 (L6.cps.Vconstr t vs) m L (Vptr b i)
 | RSfunction_v:             
-    forall (L:block -> Z -> Prop)  vars avars fds f m b t vs pvs avs e asgn body l locs alocs finfo gccall,
+    forall (L:block -> Z -> Prop)  vars avars fds f m b t t' vs pvs avs e asgn body l locs alocs finfo gccall,
       let F := mkfunction (Tvoid)
                           ((mkcallconv false false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})*)
              ((tinfIdent, threadInf)::(map (fun x => (x , val)) pvs))
@@ -2216,10 +2234,11 @@ Inductive repr_val_L_L6_L7:  L6.cps.val -> mem -> locProp -> Values.val -> Prop 
                                           body)) in
       find_def f fds = Some (t, vs, e) ->
       M.get t fenv = Some (l, locs) ->
-      M.get f finfo_env = Some finfo -> (* TODO: check this *)
+      M.get f finfo_env = Some (finfo , t') -> (* TODO: check this *)
+      t = t' ->
       Genv.find_symbol (Genv.globalenv p) f = Some b -> (* symbol f points to b in the globalenv *)
       (* b points to an internal function in the heap [and i is 0] *)
-      gc_test' finfo l vs locs fenv = Some gccall ->
+      gc_test' finfo l vs locs fenv finfo_env = Some gccall ->
       Genv.find_funct (globalenv p) (Vptr b  Ptrofs.zero) = Some (Internal F) ->
       (* F should have the shape that we expect for functions generated by our compiler, 
        > see translate_fundefs i.e.
@@ -2388,14 +2407,19 @@ Qed.
 
 
 Theorem get_var_or_funvar_eval:
-  forall lenv a v m,
-    find_symbol_domain fenv ->
-  get_var_or_funvar lenv a v ->
-  eval_expr (globalenv p) empty_env lenv m (var_or_funvar_f   a) v.
-Proof.
-  intros. specialize (H a). inv H. unfold var_or_funvar_f. inv H0.
-  - rewrite H. destruct (H2 (ex_intro _ b H)). destruct x.
-    unfold makeVar. rewrite H0.
+  forall lenv a v m, 
+    find_symbol_domain finfo_env ->
+    finfo_env_correct ->
+    get_var_or_funvar lenv a v ->
+    eval_expr (globalenv p) empty_env lenv m (var_or_funvar_f   a) v.
+Proof. 
+  intros. specialize (H a). inv H. unfold var_or_funvar_f. inv H1.
+  - rewrite H. destruct (H3 (ex_intro _ b H)). 
+    unfold makeVar. rewrite H1.
+    destruct x.
+    specialize (H0 _ _ f H1).
+    destruct H0. destruct x.
+    rewrite H0.
     econstructor. constructor 2.
     apply M.gempty. eauto.
     constructor. auto.
@@ -2404,15 +2428,20 @@ Qed.
 
 Theorem get_var_or_funvar_semcast:
   forall v a m lenv,
-    find_symbol_domain fenv ->
+    find_symbol_domain finfo_env ->
+    finfo_env_correct ->
     get_var_or_funvar lenv a v ->
     sem_cast v (typeof (var_or_funvar_f a)) uval m = Some v.
 Proof.
-  intros. unfold var_or_funvar_f. specialize (H a). inv H. inv H0.
-  - rewrite H. destruct (H2 (ex_intro _ b H)). destruct x.
-    unfold makeVar. rewrite H0.
-    constructor.
-  - rewrite H. destruct v; inv H4; auto. 
+  intros. unfold var_or_funvar_f. specialize (H a). inv H. inv H1.
+  - rewrite H. destruct (H3 (ex_intro _ b H)). 
+    unfold makeVar. rewrite H1.
+    destruct x.
+    specialize (H0 _ _ f H1).
+    destruct H0. destruct x.
+    rewrite H0.
+    constructor. 
+  - rewrite H. destruct v; inv H5; auto. 
 Qed.  
 
 Theorem repr_val_id_implies_var_or_funvar:
@@ -3424,9 +3453,10 @@ Definition Vint_or_Vconstr (v:cps.val): Prop :=
   (exists i, v = cps.Vint i) \/ (exists c vs, v = cps.Vconstr c vs).
 
 Definition correct_fundef_id_info (m:mem) (fds:fundefs) (f:positive) :=
-            exists finfo t vs e, (find_def f fds = Some (t, vs, e) /\                          
-                                  M.get f finfo_env = Some finfo /\
-                                  correct_fundef_info  m f t vs e finfo).
+            exists finfo t t' vs e, (find_def f fds = Some (t, vs, e) /\                          
+                                     M.get f finfo_env = Some (finfo , t') /\
+                                     t = t' /\
+                                     correct_fundef_info  m f t vs e finfo).
 
 (* relates a L6 evaluation environment to a Clight memory up to the free variables in e *)
 (* If x is a free variable of e, then it might be in the generated code:
@@ -3496,19 +3526,20 @@ Theorem correct_fundefs_unchanged_global:
     correct_fundef_id_info m' fds f.
 Proof.
   intros.
-  destruct H as [finfo [t [vs [e H]]]].
-  exists finfo, t, vs, e.
-  destruct H. destruct H1.
+  destruct H as [finfo [t [t' [vs [e H]]]]].
+  exists finfo, t, t', vs, e.
+  destruct H. destruct H1. destruct H2.
   split; auto.
   split; auto.
-  destruct H2 as [n [l [b [fi_0 [fi_1 H2]]]]].
+  split; auto.
+  destruct H3 as [n [l [b [fi_0 [fi_1 H3]]]]].
   exists n, l, b, fi_0.
   destructAll.
   repeat split; auto.
   specialize (H0 finfo b); rewrite <- H0; auto.
   specialize (H0 finfo b); rewrite <- H0; auto.
   intros.
-  apply H11 in H2.
+  apply H12 in H2.
   destruct H2 as [li H2].
   exists li.
   destructAll.
@@ -3640,7 +3671,8 @@ Qed.
 
 Theorem mem_of_Forall_nth_projection_cast:
   forall x lenv b ofs f, 
-    find_symbol_domain fenv ->
+    find_symbol_domain finfo_env ->
+    finfo_env_correct ->
     M.get x lenv = Some (Vptr b ofs) ->
     forall l s i m k,
       (0 <= i /\ i + (Z.of_nat (List.length l)) <= Ptrofs.max_unsigned )%Z ->
@@ -3653,7 +3685,7 @@ Theorem mem_of_Forall_nth_projection_cast:
                (State f Sskip k empty_env lenv m') /\ 
       mem_after_n_proj_store_cast b (Ptrofs.unsigned ofs) vs i m m'.
 Proof with archi_red.
-  intros x lenv b ofs f Hsym Hxlenv.
+  intros x lenv b ofs f Hsym HfinfoCorrect Hxlenv.
   induction l; intros s i m k Hil_max; intros.
   - (* empty -- impossible *)
     inv H1. inv H0. 
@@ -3695,11 +3727,17 @@ Proof with archi_red.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
          unfold makeVar. rewrite H3.
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4. 
          econstructor.  apply eval_Evar_global.  apply M.gempty.
+
          apply H1. constructor. constructor.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3. constructor.
+         unfold makeVar. rewrite H3. 
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4.
+         constructor.
          eapply assign_loc_value.
 
          2:{ unfold Ptrofs.of_int64.
@@ -3715,14 +3753,20 @@ Proof with archi_red.
          econstructor. apply Hxlenv. constructor.
          archi_red. constructor.
          archi_red. constructor.
+
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3.
+         unfold makeVar. rewrite H3. 
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4.
          econstructor. apply eval_Evar_global.  apply M.gempty.
          apply H1. constructor. constructor. 
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3. constructor.
+         unfold makeVar. rewrite H3.  
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4.
+         constructor.
          eapply assign_loc_value.
 
          
@@ -3787,11 +3831,18 @@ Proof with archi_red.
          constructor. constructor. 
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3. econstructor.          
-         apply eval_Evar_global. apply M.gempty. eauto.  constructor. constructor.
+         unfold makeVar. rewrite H3. econstructor.   
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4.  
+         apply eval_Evar_global. apply M.gempty. eauto.
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4. 
+         constructor. constructor.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
          unfold makeVar. rewrite H3.
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4. 
          constructor. eapply assign_loc_value. constructor.
           unfold Ptrofs.of_int64.
            rewrite Int64.unsigned_repr in *. 
@@ -3806,12 +3857,16 @@ Proof with archi_red.
          constructor. constructor.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3. econstructor.          
-         apply eval_Evar_global.  apply M.gempty. eauto.  constructor. constructor.
+         unfold makeVar. rewrite H3.
+         specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4. 
+         econstructor.          
+         apply eval_Evar_global.  apply M.gempty. eauto. constructor. constructor.
          unfold sem_cast. simpl. archi_red. 
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3. constructor.  eapply assign_loc_value. constructor.
+         unfold makeVar. rewrite H3. specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
+         destruct x0. rewrite H4. constructor.  eapply assign_loc_value. constructor.
          unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
            rewrite Int.unsigned_repr in *. 
          rewrite int_z_mul. eauto. solve_uint_range.
@@ -3939,9 +3994,11 @@ Notation valPtr := (Tpointer vval
   Variable (numArgsIdent : ident).  
   Variable (isptrIdent: ident). (* ident for the isPtr external function *)
   Variable (caseIdent:ident).
+  Variable (nParam:nat).
 
   Definition protectedIdent_thm := protectedIdent argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent.
-
+  Variable (disjointIdent: NoDup protectedIdent_thm).
+  
   Definition protectedNotTinfoIdent_thm: list ident := (gcIdent::mainIdent::bodyIdent::threadInfIdent::tinfIdent::heapInfIdent::numArgsIdent::numArgsIdent::isptrIdent::caseIdent::[]).
 
   
@@ -3949,11 +4006,10 @@ Notation valPtr := (Tpointer vval
 
   Definition is_protected_tinfo_id_thm := is_protected_tinfo_id argsIdent allocIdent limitIdent.
 
-  Definition repr_val_id_L_L6_L7_thm := repr_val_id_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent.
+  Definition repr_val_id_L_L6_L7_thm := repr_val_id_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam.
 
- Definition repr_val_L6_L7_thm := repr_val_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent. 
+  Definition repr_val_L6_L7_thm := repr_val_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam. 
   
-  Axiom disjointIdent: NoDup protectedIdent_thm.
 
 
 Theorem is_protected_not_tinfo:
@@ -4038,7 +4094,7 @@ Qed.
     fun cenv e =>
       Forall_constructors_in_e (fun x t ys =>
                                   match (M.get t cenv) with
-                                  | Some (name, it, a, n) =>
+                                  | Some (Build_ctor_ty_info _ _ _ a _) =>
                                     N.of_nat (length ys) = a
                                   | None => False
                                   end) e.
@@ -4087,12 +4143,11 @@ Qed.
 
 
 
-    
 Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
-| CCV_constr:forall cenv c vs a name it n,
+| CCV_constr:forall cenv c vs inf,
     Forall (correct_cenv_of_val cenv) vs ->
-    M.get c cenv = Some (name, it, a, n) ->
-    N.of_nat (length vs) = a ->
+    M.get c cenv = Some inf ->
+    N.of_nat (length vs) = ctor_arity inf ->
     correct_cenv_of_val cenv (Vconstr c vs)
 | CCV_fun: forall cenv rho fds f,
     Forall_fundefs (fun v t xs e => correct_cenv_of_exp cenv e) fds -> 
@@ -4106,7 +4161,7 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
     Doesn't check that name of the i will be consistent (namei could be different from name') *)
   Definition correct_ienv_of_cenv: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
-      forall x, forall i a ord name name', M.get x cenv = Some (name, name', i, a, ord) ->
+      forall x, forall i a ord name name', M.get x cenv = Some (Build_ctor_ty_info name name' i a ord) ->
                                    exists  namei cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
 
   (* all constructors found in ienv are in cenv *) 
@@ -4114,41 +4169,41 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
     fun cenv ienv =>
       forall i namei cl, M.get i ienv = Some (namei, cl)  ->
                          forall name x a ord, List.In (name, x, a, ord) cl ->
-                                              exists namei', M.get x cenv = Some (name, namei', i, a, ord).              
+                                              exists namei', M.get x cenv = Some (Build_ctor_ty_info name namei' i a ord).              
 
                                    
 
 (* stronger version of ienv_of_cenv that enforces uniqueness of name' for i and that nothing is in ienv and not in cenv *)
     Definition correct_ienv_of_cenv_strong: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
-      forall x, forall i a ord name namei, M.get x cenv = Some (name, namei, i, a, ord) ->
+      forall x, forall i a ord name namei, M.get x cenv = Some (Build_ctor_ty_info name namei i a ord) ->
                                    exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
  
   
   
 
-  (* OS 04/24: added in bound on n includes in this *)
-  Inductive correct_crep (cenv:ctor_env): ctor_tag -> cRep -> Prop :=
+  (* OS 04/24: added in bound on n includes in this *) 
+  Inductive correct_crep (cenv:ctor_env): ctor_tag -> ctor_rep -> Prop :=
   | rep_enum :
-      forall c name it  n,
-        M.get c cenv = Some (name, it, 0%N, n) ->
+      forall c name namei it  n,
+        M.get c cenv = Some (Build_ctor_ty_info name namei it 0%N n) ->
         (* there should not be more than 2^(intsize - 1) unboxed constructors *)
         (0 <= (Z.of_N n) <   Ptrofs.half_modulus)%Z ->
       correct_crep cenv c (enum n)
   | rep_boxed:
-      forall c name it a n,
-        M.get c cenv = Some (name, it, (Npos a), n) ->
+      forall c name namei it a n,
+        M.get c cenv = Some (Build_ctor_ty_info name namei it (Npos a%N) n) ->
         (* there should not be more than 2^8 - 1 boxed constructors *)
         (0 <= (Z.of_N n) <  Zpower.two_p 8)%Z ->
         (* arity shouldn't be higher than 2^54 - 1  *)
         (0 <= Z.of_N (Npos a) <  Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z -> 
       correct_crep cenv c (boxed n (Npos a)).
 
-  (* crep <-> make_cRep cenv *)
-  Definition correct_crep_of_env: L6.cps.ctor_env -> M.t cRep -> Prop :=
+  (* crep <-> make_ctor_rep cenv *)
+  Definition correct_crep_of_env: L6.cps.ctor_env -> M.t ctor_rep -> Prop :=
     fun cenv crep_env =>
-      (forall c name it a n,
-        M.get c cenv = Some (name, it, a, n) ->
+      (forall c name namei it a n,
+        M.get c cenv = Some (Build_ctor_ty_info name namei it a n) ->
         exists crep, M.get c crep_env = Some crep /\
                      correct_crep cenv c crep) /\
       (forall c crep, M.get c crep_env = Some crep ->
@@ -4161,7 +4216,7 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
         M.get x rho = Some v ->
         correct_cenv_of_val cenv v.
    
-  Definition correct_envs: ctor_env -> n_ind_env -> M.t cRep ->  cps.M.t cps.val ->  exp -> Prop :=
+  Definition correct_envs: ctor_env -> n_ind_env -> M.t ctor_rep ->  cps.M.t cps.val ->  exp -> Prop :=
     fun cenv ienv crep_env rho e =>
       correct_ienv_of_cenv cenv ienv /\
       correct_cenv_of_env cenv rho /\
@@ -4435,18 +4490,18 @@ Qed.
 
 
 Definition repr_expr_L6_L7_id := repr_expr_L6_L7 argsIdent allocIdent limitIdent threadInfIdent tinfIdent
-     isptrIdent caseIdent.
+     isptrIdent caseIdent nParam.
 
 
 Definition rel_mem_L6_L7_id := rel_mem_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
-   isptrIdent caseIdent.
+   isptrIdent caseIdent nParam.
+ 
 
-
-Definition repr_val_L_L6_L7_id := repr_val_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent.
+Definition repr_val_L_L6_L7_id := repr_val_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam. 
 
 Definition repr_val_id_L_L6_L7_id := repr_val_id_L_L6_L7
     argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent
-     caseIdent.
+     caseIdent nParam.
  
 Definition protected_id_not_bound_id := protected_id_not_bound argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent
    caseIdent.
@@ -4462,7 +4517,7 @@ Proof.
 Qed.
   
 (* ident[n] contains either a Vint representing an enum or an integer OR a pointer to a function or the boxed representation of v *)
-Inductive nth_arg_rel_L6_L7 (fenv:fun_env) (finfo_env:M.t positive) (p:program) (rep_env: M.t ctor_rep) : L6.eval.env -> positive -> temp_env -> mem -> Z -> Prop :=
+Inductive nth_arg_rel_L6_L7 (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep) : L6.eval.env -> positive -> temp_env -> mem -> Z -> Prop :=
 | is_in_and_rel:
     forall lenv args_b args_ofs rho m n x L6v L7v L,
        protected_not_in_L argsIdent allocIdent limitIdent tinfIdent p lenv  L -> 
@@ -4482,12 +4537,12 @@ Theorem caseConsistent_findtag_In_cenv:
   forall cenv t e l,
     caseConsistent cenv l t ->
     findtag l t = Some e ->
-    exists (a aty:BasicAst.name) (ty:ind_tag) (n:N) (i:N), M.get t cenv = Some (a, aty, ty, n, i).
+    exists (a aty:BasicAst.name) (ty:ind_tag) (n:N) (i:N), M.get t cenv = Some (Build_ctor_ty_info a aty ty n i).
 Proof.
   destruct l; intros.
   - inv H0.
-  - inv H. 
-    exists a, b, ty', n, i; auto.    
+  - inv H. destruct info.
+    exists ctor_name, ctor_ind_name, ctor_ind_tag,ctor_arity,ctor_ordinal; auto.
 Qed.
  
 
@@ -4681,7 +4736,7 @@ Proof.
     + constructor. auto.
     +    
 *)
-Definition arg_val_L6_L7 (fenv:fun_env) (finfo_env:M.t positive) (p:program) (rep_env: M.t ctor_rep): L6.cps.val -> mem -> temp_env -> Prop :=
+Definition arg_val_L6_L7 (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep): L6.cps.val -> mem -> temp_env -> Prop :=
   fun v m lenv =>
     exists args_b args_ofs L7v L,
 (*       M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
@@ -4735,12 +4790,12 @@ Qed.
  
       
 Theorem exists_getvar_or_funvar_list:
-  forall lenv p rho L rep_env finfo_env argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv
+  forall lenv p rho L rep_env finfo_env argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
          m xs vs,
             ( forall x, List.In x xs ->
                         exists v6 : cps.val,
          M.get x rho = Some v6 /\
-         repr_val_id_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv finfo_env
+         repr_val_id_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env
                              p rep_env v6 m L lenv x)
             ->
             get_list xs rho = Some vs  ->
@@ -4757,7 +4812,7 @@ Proof.
           List.In x xs ->
           exists v6 : cps.val,
             M.get x rho = Some v6 /\
-            repr_val_id_L_L6_L7 argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0
+            repr_val_id_L_L6_L7 argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0
                                 fenv finfo_env p rep_env v6 m L lenv x)).
     {
       intros. apply H. constructor 2; auto.
@@ -4766,7 +4821,7 @@ Proof.
     assert 
       (exists v6 : cps.val,
         M.get a rho = Some v6 /\
-        repr_val_id_L_L6_L7 argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 fenv
+        repr_val_id_L_L6_L7 argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0 fenv
                             finfo_env p rep_env v6 m L lenv a).
     apply H. constructor. reflexivity.
     destruct H1. destruct H1.
@@ -4927,8 +4982,8 @@ Qed.
 Theorem disjoint_ord:
   forall {cenv ienv c c' namec namec' namei namei' i a a' ord ord'}, 
     correct_ienv_of_cenv cenv ienv ->        
-    M.get c cenv = Some (namec, namei, i, a, ord) -> 
-    M.get c' cenv = Some (namec', namei', i, a', ord') ->
+    M.get c cenv = Some (Build_ctor_ty_info namec namei i a ord) -> 
+    M.get c' cenv = Some (Build_ctor_ty_info namec' namei' i a' ord') ->
     (c <> c' <-> ord <> ord').
 Proof.
   intros.
@@ -4991,7 +5046,7 @@ Qed.
  
 
 Theorem case_of_labeled_stm_unboxed:
-  forall rep_env arr t  n0 e p fenv ienv cenv ,
+  forall rep_env arr t  n0 e p fenv finfo_env ienv cenv ,
     correct_ienv_of_cenv cenv ienv ->
     M.get t rep_env = Some (enum arr) ->
     correct_crep_of_env cenv  rep_env ->
@@ -4999,11 +5054,11 @@ Theorem case_of_labeled_stm_unboxed:
     forall cl ls ls',
       caseConsistent cenv cl t ->
   findtag cl t = Some e ->
-  repr_branches_L6_L7 argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv p rep_env cl ls ls' ->
+  repr_branches_L6_L7 argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env p rep_env cl ls ls' ->
   exists s s', 
-    seq_of_labeled_statement (select_switch (Z.shiftr n0 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s.
+    seq_of_labeled_statement (select_switch (Z.shiftr n0 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv finfo_env p rep_env e s.
 Proof.
-  intros rep_env arr t  n0 e p fenv ienv cenv Hienv H H0 H1.
+  intros rep_env arr t  n0 e p fenv finfo_env ienv cenv Hienv H H0 H1.
   induction cl;
   intros ls ls' Hcc; intros.
   (* impossible empty cl *)  inv H2.
@@ -5030,7 +5085,7 @@ Proof.
     inv H3.
     + (* impossible because rep_env is correct, t is in cl but cl -unboxed-> LSnil *)
       exfalso.
-      assert (Hn_repr := repr_branches_LSnil_no_unboxed _ _ _ _ _ _ _ _ _ _ _ _ _ _ H2 H11). apply Hn_repr.
+      assert (Hn_repr := repr_branches_LSnil_no_unboxed _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ H2 H11). apply Hn_repr.
       eauto.
      + simpl. (* c <> t so arr <> n1 and the headers are different *)
        unfold select_switch.
@@ -5040,7 +5095,6 @@ Proof.
        specialize (IHcl _ _ H14 H2 H7). apply IHcl.
        inv H0. apply H4 in H11.
        apply H4 in H. inv H. inv H11. 
-       destruct name. destruct name0.
        assert (it = it0). {
          inv Hcc.  rewrite H5 in H13; rewrite H0 in H14; inv H13; inv H14. auto.
        }
@@ -5048,12 +5102,10 @@ Proof.
        assert (n1 <> arr). {
          assert (Hdj := disjoint_ord Hienv H0 H5).
          apply Hdj. auto.
-       }
-
-       
+       }      
        inv Hcc. rewrite H5 in H14; inv H14. rewrite H0 in H15; inv H15.
-       intro. do 2 (erewrite repr_unboxed_shiftr in H6 by eauto).
-       apply H. apply N2Z.inj. auto.
+       intro. do 2 (erewrite repr_unboxed_shiftr in H6 by eauto). 
+       apply H. apply N2Z.inj. apply H6.
      + inv Hcc; eapply IHcl; eauto.       
      + inv Hcc; eapply IHcl; eauto.
 Qed.
@@ -5064,7 +5116,7 @@ Definition z_and z1 z2 :=
     (Int.unsigned (Int.and (Int.repr z1) (Int.repr z2))). *)
   
 Theorem case_of_labeled_stm_boxed:
-  forall rep_env n arr t  h e p fenv ienv cenv ,
+  forall rep_env n arr t  h e p fenv finfo_env ienv cenv ,
     correct_ienv_of_cenv cenv ienv ->
      M.get t rep_env = Some (boxed n arr)  ->
     correct_crep_of_env cenv rep_env ->
@@ -5072,11 +5124,11 @@ Theorem case_of_labeled_stm_boxed:
     forall cl ls ls',
       caseConsistent cenv cl t ->
   findtag cl t = Some e ->
-  repr_branches_L6_L7 argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv p rep_env cl ls ls' ->
+  repr_branches_L6_L7 argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env p rep_env cl ls ls' ->
   exists s s', 
-                       (seq_of_labeled_statement (select_switch (Z.land  h 255) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s.
+                       (seq_of_labeled_statement (select_switch (Z.land  h 255) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv finfo_env p rep_env e s.
 Proof. 
-  intros rep_env n arr t  h e p fenv ienv cenv  Hienv H H0 H1.
+  intros rep_env n arr t  h e p fenv finfo_env ienv cenv  Hienv H H0 H1.
   induction cl; intros ls ls' Hcc; intros.
   (* impossible empty cl *) inv H2.
   simpl in H2. destruct a. destruct (M.elt_eq c t).
@@ -5114,55 +5166,17 @@ Proof.
       inv H0. apply H4 in H11.
       apply H4 in H. inv H. inv H11.          
       inv Hcc.
+ 
+      rewrite H6 in H11. inv H11. rewrite H5 in H16. inv H16.
+      simpl in H18. inv H18.
       
-
-      rewrite H6 in H11; inv H11. rewrite H5 in H16; inv H16. 
       assert (Hdj := disjoint_ord Hienv H5 H6).
       apply Hdj in n0. intro. apply n0.
       apply N2Z.inj. auto.
 Qed.
 
 (* CHANGE HERE *)
-(* place values lenv(ys) into the inf slots of the args array
-   something about allocPtr *)
-Definition mem_of_asgn' argsIdent p lenv (ys:list positive) (inf:list N) m :=
-  exists args_b args_ofs, M.get argsIdent lenv = Some (Vptr args_b args_ofs)  /\ Forall2 (fun y i => exists v, Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v /\ get_var_or_funvar p lenv y v) ys inf.
 
-Definition mem_of_asgn argsIdent p lenv (ys:list positive) (inf:list N) m :=
-  mem_of_asgn' argsIdent p lenv (skipn nParam ys) (skipn nParam inf) m.
-
-(* same as above but with val list explicit *)
-Inductive mem_of_asgn_v' args_b args_ofs p lenv m: list positive -> list N -> list Values.val -> Prop :=
-| moa_cons: forall y i v ys inf vs, 
-    mem_of_asgn_v' args_b args_ofs p lenv m ys inf vs ->
-    Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v ->
-    get_var_or_funvar p lenv y v ->
-     mem_of_asgn_v' args_b args_ofs p lenv m (y::ys) (i::inf) (v::vs)
-| moa_nil:
-    mem_of_asgn_v' args_b args_ofs p lenv m [] [] [].
-
-Lemma mem_of_asgn_v_pred' args_b args_ofs p lenv m (ys:list positive) (inf:list N) map y i x :
-  mem_of_asgn_v' args_b args_ofs p lenv m (y :: ys) (i :: inf) (x :: map)
-  -> mem_of_asgn_v' args_b args_ofs p lenv m ys inf map.
-Proof.
-  destruct ys; intros; inv H; assumption.
-Qed.
-  
-Definition mem_of_asgn_v args_b args_ofs p lenv m (ys:list positive) (inf:list N) map : Prop :=
-  mem_of_asgn_v' args_b args_ofs p lenv m (skipn nParam ys) (skipn nParam inf) (skipn nParam map).
-
-(* same as above, but without lenv and ys 
-   i.e. disregarding provenance *)
-Inductive mem_after_asgn' args_b args_ofs  m: list N -> list Values.val -> Prop :=
-  | maa_cons: forall  i v  inf vs, 
-    mem_after_asgn' args_b args_ofs  m inf vs ->
-    Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v ->
-     mem_after_asgn' args_b args_ofs  m (i::inf) (v::vs)
-| maa_nil:
-    mem_after_asgn' args_b args_ofs  m [] [].
-
-Definition mem_after_asgn args_b args_ofs m ys inf := mem_after_asgn' args_b args_ofs m (skipn nParam ys) (skipn nParam inf).
- 
 Lemma skipn_suc1  {A} n (x : A) (l1 l2 : list A) : skipn n l1 = x :: l2 -> skipn (S n) l1 = l2.
 Proof.
   generalize n l2. induction l1; destruct n0; intros.
@@ -5200,135 +5214,69 @@ Proof.
     + simpl in H. simpl.  apply (IHl n0 a). assumption.
 Qed.
 
-Lemma mem_of_asgn_v_pred args_b args_ofs p lenv m (ys:list positive) (inf:list N) map y i x :
-  mem_of_asgn_v args_b args_ofs p lenv m (y :: ys) (i :: inf) (x :: map)
-  -> mem_of_asgn_v args_b args_ofs p lenv m ys inf map.
-Proof.
-  induction ys as [ | y' ys]; intros.
-  - inv H. unfold mem_of_asgn_v.
-    symmetry in H0. symmetry in H1.
-    rewrite (skipn_cons_nil nParam i inf H0).
-    rewrite (skipn_cons_nil nParam x map H1).
-    constructor.
-  - inv H.
-    + destruct inf as [ | i' inf ] , map as [ | x' map ]; [ inv H1 | inv H1 | inv H2 | ].
-      unfold mem_of_asgn_v. simpl.
-      symmetry in H0. 
-      set (ysSkipEq := skipn_suc2 10 y' y0 ys ys0 H0).
-      simpl in ysSkipEq. rewrite ysSkipEq. clear ysSkipEq.
-      symmetry in H1. 
-      set (infSkipEq := skipn_suc2 10 i' i0 inf inf0 H1).
-      simpl in infSkipEq. rewrite infSkipEq. clear infSkipEq.
-      symmetry in H2. 
-      set (mapSkipEq := skipn_suc2 10 x' v map vs H2).
-      simpl in mapSkipEq. rewrite mapSkipEq. clear mapSkipEq.
-      assumption.
-    + unfold mem_of_asgn_v. simpl.
-      symmetry in H1.
-      set (infSkipEq := skipn_cons_nil 10 y ys H1).
-      simpl in infSkipEq. rewrite infSkipEq. clear infSkipEq.
-      symmetry in H2.
-      set (infSkipEq := skipn_cons_nil nParam i inf H2).
-      simpl in infSkipEq. rewrite infSkipEq. clear infSkipEq.
-      symmetry in H3.
-      set (mapSkipEq := skipn_cons_nil nParam x map H3).
-      simpl in mapSkipEq. rewrite mapSkipEq. clear mapSkipEq.
-      constructor.
-Qed.
-       
+(* place values lenv(ys) into the inf slots of the args array
+   something about allocPtr *)
+Definition mem_of_asgn argsIdent p lenv (ys:list positive) (inf:list N) m :=
+  exists args_b args_ofs, M.get argsIdent lenv = Some (Vptr args_b args_ofs)  /\ Forall2 (fun y i => exists v, Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v /\ get_var_or_funvar p lenv y v) ys inf.
+
+(* same as above but with val list explicit *)
+Inductive mem_of_asgn_v args_b args_ofs p lenv m: list positive -> list N -> list Values.val -> Prop :=
+| moa_cons: forall y i v ys inf vs, 
+    mem_of_asgn_v args_b args_ofs p lenv m ys inf vs ->
+    Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v ->
+    get_var_or_funvar p lenv y v ->
+     mem_of_asgn_v args_b args_ofs p lenv m (y::ys) (i::inf) (v::vs)
+| moa_nil:
+    mem_of_asgn_v args_b args_ofs p lenv m [] [] [].
+ 
+(* same as above, but without lenv and ys 
+   i.e. disregarding provenance *)
+Inductive mem_after_asgn args_b args_ofs  m: list N -> list Values.val -> Prop :=
+  | maa_cons: forall  i v  inf vs, 
+    mem_after_asgn args_b args_ofs  m inf vs ->
+    Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v ->
+     mem_after_asgn args_b args_ofs  m (i::inf) (v::vs)
+| maa_nil:
+    mem_after_asgn args_b args_ofs  m [] [].
+
+
+
 Theorem mem_of_asgn_nthN:
-  forall {args_b args_ofs p lenv m ys ays inf vs avs y v n},
-    mem_of_asgn_v args_b args_ofs p lenv m ys inf vs  ->
-    skipn nParam ys = ays ->
-    skipn nParam vs = avs ->
-    nthN ays n = Some y ->
-    nthN avs n = Some v ->
-    get_var_or_funvar p lenv y v.
-Proof. 
-  induction ys , ays; intros; [inv H2 |  inv H0 | inv H2  | ].
-  destruct avs , vs; [inv H3 | inv H3 | inv H1 | ].
+  forall {args_b args_ofs p lenv m ys inf vs y v n},
+  mem_of_asgn_v args_b args_ofs p lenv m ys inf vs  ->
+  nthN ys n = Some y ->
+  nthN vs n = Some v ->
+  get_var_or_funvar p lenv y v.
+Proof.
+  induction ys; intros.
+  inv H0.
+  destruct vs. inv H1.
   inv H.
-  - destruct n. inv H2; inv H3.
-    + unfold skipn in H0; simpl in H0.
-      unfold skipn in H1; simpl in H1.
-      rewrite H0 in H4; rewrite H1 in H6. inv H4; inv H6; auto.
-    + apply nthN_pos_pred in H2.
-      apply nthN_pos_pred in H3.
-      remember H0 as ysEq; clear HeqysEq.
-      remember H1 as vsEq; clear HeqvsEq.
-      apply skipn_cons in ysEq.
-      apply skipn_cons in vsEq.
-      destruct inf as [ | i' inf].
-      * inv H5.
-      * symmetry in H5. set (infEq := skipn_cons nParam i' i inf inf0 H5). 
-        refine (IHys ays inf vs avs y v (N.pred (N.pos p1)) _ ysEq vsEq H2 H3).
-        unfold mem_of_asgn_v.
-        rewrite ysEq; clear ysEq.
-        rewrite vsEq; clear vsEq.
-        rewrite infEq; clear infEq.
-        unfold skipn in H0; simpl in H0.
-        unfold skipn in H1; simpl in H1.
-        rewrite H0 in H4; rewrite H1 in H6.
-        inv H4; inv H6. assumption.
-  - unfold skipn in H0. simpl in H0.
-    rewrite H0 in H5. inv H5.
+  destruct n. inv H0; inv H1; auto.  
+  apply nthN_pos_pred in H0.
+  apply nthN_pos_pred in H1.
+  eapply IHys; eauto.
 Qed.
 
 Theorem mem_of_asgn_after:
-  forall args_b args_ofs p m lenv inf ainf ys ays vs avs,
-    skipn nParam inf = ainf ->
-    skipn nParam ys = ays ->
-    skipn nParam vs = avs ->
-    mem_of_asgn_v args_b args_ofs p lenv m ys inf vs ->
-    mem_after_asgn args_b args_ofs m inf vs.
-Proof.   
-  induction inf , ainf; intros;  unfold mem_after_asgn.
-  - inv H2. simpl. rewrite <- H3. constructor.
-  - inv H. 
-  - set (skipInf := skipn_cons_nil nParam a inf H).
-    rewrite H. rewrite <- skipInf. eapply IHinf.
-    + apply skipInf.
-    + apply H0.
-    + apply H1.
-    + unfold mem_of_asgn_v in H2. rewrite H in H2. rewrite <- skipInf in H2. apply H2.
-  - destruct vs , avs.
-    + inv H2. simpl in H. rewrite H in H5. inv H5.
-    + inv H1.
-    + unfold mem_of_asgn_v in H2. rewrite H1 in H2. rewrite H in H2. inv H2.
-    + destruct ys , ays.
-      * inv H2.
-        simpl in H. rewrite H in H3. inv H3.
-      * inv H0.
-      * inv H2.
-        -- simpl in H0. rewrite H0 in H3. inv H3.
-        -- simpl in H. rewrite H in H5. inv H5.
-      *  set (skipInf := skipn_cons nParam a n inf ainf H).
-         set (skipMap := skipn_cons nParam p0 p1 ys ays H0).
-         set (skipVs := skipn_cons nParam v v0 vs avs H1).
-         rewrite H. rewrite H1. constructor. 
-         -- unfold mem_after_asgn in IHinf.
-            rewrite <- skipInf. rewrite <- skipVs.
-            apply (IHinf ainf ys ays vs avs skipInf skipMap skipVs).
-        eapply mem_of_asgn_v_pred; eauto.
-         -- clear skipInf. clear skipMap. clear skipVs.
-            inv H2.
-            ++ simpl in H. rewrite H in H4.
-               simpl in H1. rewrite H1 in H5.
-               inv H4. inv H5.
-               assumption.
-            ++ simpl in H. rewrite H in H5. inv H5.
+  forall args_b args_ofs p m lenv inf ys vs,
+  mem_of_asgn_v args_b args_ofs p lenv m ys inf vs ->
+  mem_after_asgn args_b args_ofs m inf vs.
+Proof.
+  induction inf; intros.
+  - inv H; constructor.
+  - inv H; constructor; eauto.
 Qed.
-               
 
 Theorem mem_after_asgn_length:
   forall args_b args_ofs m  inf vs,
   mem_after_asgn args_b args_ofs m inf vs ->
   length inf = length vs. 
-Proof. Admitted. (*
+Proof.
   induction inf; intros.
   inv H; auto.
   inv H. simpl. erewrite IHinf; eauto.
-Qed. *)
+Qed.
 
 Theorem mem_of_asgn_exists_v:
   forall {argsIdent p lenv m args_b args_ofs ys inf},
@@ -5336,7 +5284,7 @@ Theorem mem_of_asgn_exists_v:
   M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
   exists vs,
     mem_of_asgn_v args_b args_ofs p lenv m ys inf vs.
-Proof. Admitted. (*
+Proof.
   intros. inv H. destruct H1. destruct H.
   rewrite H in H0. inv H0. 
   clear H. revert dependent inf. induction ys; intros.
@@ -5345,7 +5293,7 @@ Proof. Admitted. (*
   - inv H1. specialize (IHys _ H4).
     inv IHys. inv H2.
     exists (x0::x). destruct H0. constructor; eauto.
-Qed. *)
+Qed.
 
 
 Theorem mem_of_asgn_forall_v:
@@ -5353,7 +5301,7 @@ Theorem mem_of_asgn_forall_v:
   mem_of_asgn_v args_b args_ofs p lenv m ys inf vs ->
   M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
   mem_of_asgn argsIdent p lenv ys inf m.
-Proof. Admitted. (*
+Proof.
   induction ys; intros.
   - inv H. eexists. eexists. split; eauto.
   - inv H. specialize (IHys _ _ H3 H0).
@@ -5361,30 +5309,30 @@ Proof. Admitted. (*
     exists v; eauto.
     inv IHys. destructAll. rewrite H in H0. inv H0.
     auto.
-Qed. *)
+Qed.
  
     
 Theorem mem_of_asgn_v_length:
   forall {p lenv m args_b args_ofs ys inf vs},
     mem_of_asgn_v args_b args_ofs p lenv m ys inf vs ->
     length inf = length vs.
-Proof. Admitted. (*
+Proof.
   induction ys; intros; inv H.
   reflexivity.
   simpl. erewrite IHys. reflexivity.
   eauto.
-Qed. *)
+Qed.
 
 Theorem mem_of_asgn_v_length13:
   forall {p lenv m args_b args_ofs ys inf vs},
     mem_of_asgn_v args_b args_ofs p lenv m ys inf vs ->
     length ys = length vs.
-Proof. Admitted. (*
+Proof.
   induction ys; intros; inv H.
   reflexivity.
   simpl. erewrite IHys. reflexivity.
   eauto.
-Qed. *)
+Qed.
 
 
 
@@ -5394,7 +5342,7 @@ Theorem mem_of_asgn_v_disjoint:
     ~ List.In a ys ->
     mem_of_asgn_v args_b args_ofs p lenv m ys inf vs ->
     mem_of_asgn_v args_b args_ofs p (Maps.PTree.set a v lenv) m ys inf vs.
-Proof. Admitted. (*
+Proof.
   induction ys; intros.
   - inv H0. constructor.
   - inv H0. constructor. apply IHys. intro; apply H. constructor 2; auto.
@@ -5403,7 +5351,7 @@ Proof. Admitted. (*
     + constructor 2; auto.
       rewrite M.gso. auto. intro; apply H. subst.
       constructor. auto.
-Qed. *)
+Qed.
 
 Theorem mem_of_asgn_v_store:
   forall args_b args_ofs p v chunk b ofs lenv m m' ys inf vs,
@@ -5411,7 +5359,7 @@ Theorem mem_of_asgn_v_store:
   Mem.store chunk m b ofs v  = Some m' ->
   b <> args_b ->
   mem_of_asgn_v args_b args_ofs p lenv m' ys inf vs.
-Proof. Admitted. (*
+Proof.  
   induction ys; intros.
   - inv H.
     constructor.
@@ -5419,7 +5367,7 @@ Proof. Admitted. (*
     constructor; auto.
     unfold Mem.loadv in *.
     erewrite Mem.load_store_other; eauto.
-Qed. *)   
+Qed.    
 
 Ltac solve_ptrofs_range:=
   solve_uint_range; uint_range_ptrofs; chunk_red; archi_red; unfold Int64.max_unsigned; unfold Int.max_unsigned; simpl; try omega.  
@@ -5443,7 +5391,7 @@ Definition mem_of_asgn_cons:
   
   Mem.storev int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) v = Some m' ->
   mem_of_asgn argsIdent p lenv (y::ys) (i::inf) m'.
-Proof. Admitted. (*
+Proof.
    intros. 
   destruct H3 as [alloc_b [alloc_ofs [limit_ofs [args_b' [args_ofs' [tinf_b [tinf_ofs [Hget_alloc [Halign_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Htinf1 Htinf2]]]]]]]]]]]]]]]]].
   rewrite Hget_args in H4. inv H4.
@@ -5512,15 +5460,15 @@ Proof. Admitted. (*
        eapply OrdersEx.Z_as_OT.le_lt_trans; eauto. chunk_red; uomega.
        split. apply OrdersEx.Z_as_OT.add_nonneg_nonneg. apply Ptrofs.unsigned_range. chunk_red; uomega.
        eapply OrdersEx.Z_as_OT.le_lt_trans; eauto. chunk_red; uomega.
-Qed. *)
+Qed.
 
 (* What is needed at function entry to unmarshal the parameters *)
 Theorem repr_asgn_fun_entry: 
   forall args_b args_ofs argsIdent F p m k xs locs vs7 asgn lenv lenv',
     M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
-    mem_after_asgn args_b args_ofs m locs vs7 ->
+    mem_after_asgn args_b args_ofs m (skipn nParam locs) (skipn nParam vs7) ->
     right_param_asgn argsIdent (skipn nParam xs) (skipn nParam locs) asgn ->
-    lenv_param_asgn_i lenv lenv' xs vs7 ->
+    lenv_param_asgn_i lenv lenv' (skipn nParam xs) (skipn nParam vs7) ->
     NoDup xs ->
     ~ List.In argsIdent xs ->
     Forall (fun i : N => (0 <= Z.of_N i < max_args)%Z) locs -> 
@@ -5567,80 +5515,37 @@ Qed. *)
 (* also wants NoDup on i *)
 Theorem repr_asgn_fun_mem:
   forall fu lenv p rho e fenv max_alloc rep_env finfo_env,
-  forall ys ays inf ainf s m, 
- rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho m lenv ->
+  forall ys inf s m,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+ rel_mem_L6_L7_id fenv finfo_env p rep_env e rho m lenv ->
  correct_tinfo p max_alloc lenv m ->
  Forall (fun x => exists v, get_var_or_funvar p lenv x v) ys ->
  Forall (fun i => 0 <= (Z.of_N i) < max_args)%Z inf ->
  NoDup inf ->
- ays = (skipn nParam ys) ->
- ainf = (skipn nParam inf) ->
- repr_asgn_fun' argsIdent threadInfIdent fenv p ays ainf s ->
+ repr_asgn_fun' argsIdent threadInfIdent nParam fenv finfo_env p ys inf s ->
  exists m', 
-  (forall k, clos_trans state (traceless_step2 (globalenv p))
+  (forall k, clos_refl_trans state (traceless_step2 (globalenv p))
     (State fu s k empty_env lenv m)
     (State fu Sskip k empty_env lenv m')) /\ mem_of_asgn argsIdent p lenv ys inf m' /\rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho m' lenv /\ correct_tinfo p max_alloc lenv m'.
 Proof. 
   intros fu lenv p rho e fenv max_alloc rep_env finfo_env.
-  induction ays; intros inf ainf s m Hrel_mem Htinfo Hfys Hfinf Hnodub Hasgn; inv Hasgn. 
-  - (* ys = [a] inf = [i] *)
+  induction ys; intros inf s m Hsym HfinfoCorrect Hrel_mem Htinfo Hfys Hfinf Hnodub Hasgn; inv Hasgn. 
+  - (* ys = [] inf = [] *)
     assert (Htinfo' := Htinfo).
     destruct Htinfo as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Halign_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Htinf1 Htinf2]]]]]]]]]]]]]]]]].
-    
-    inv Hfys; inv Hfinf. Admitted. (* destruct H.
+    (* cam have empty asgn now *)
+    exists m.
+    repeat split; try assumption.
+    + intros. constructor 2.
+    + econstructor. eauto.
 
-    assert (Hm'_valid : Mem.valid_access m int_chunk args_b (Ptrofs.unsigned
-                     (Ptrofs.add args_ofs
-                                 (Ptrofs.mul (Ptrofs.repr int_size) (Ptrofs.repr (Z.of_N i))))) Writable).
-    { 
-      apply Hrange_args. unfold max_args. auto. }
-    assert (Hm' := Mem.valid_access_store _ _ _ _ x Hm'_valid).
-    destruct Hm' as [m' Hm'].
-    exists m'. split.
-    {
-      
-      intro.
-      constructor.
-      chunk_red.
-      - eapply step_assign with (v := x).
-      constructor. econstructor. constructor. eauto. constructor. simpl. constructor.
-      eapply get_var_or_funvar_eval. eauto.
-       eapply get_var_or_funvar_semcast; eauto.
-      simpl. econstructor. constructor. ptrofs_of_int; int_unsigned_repr. auto. unfold max_args in *. solve_uint_range. omega.
-       -  archi_red. eapply step_assign with (v := x).
-      constructor. econstructor. constructor. eauto. constructor. simpl. constructor.
-      eapply get_var_or_funvar_eval. eauto. 
-      eapply get_var_or_funvar_semcast in H. archi_red. apply H. 
-      simpl. econstructor. constructor. ptrofs_of_int; int_unsigned_repr. auto. unfold max_args in *. solve_uint_range. omega.
-    }
-    split.  exists args_b, args_ofs.
-
-
-    
-    split; auto. constructor. exists (Val.load_result int_chunk x). split.
-    eapply Mem.load_store_same.
-    
-    rewrite <- int_z_mul. apply Hm'.
-    unfold max_args in *; solve_ptrofs_range. 
-
-    assert (H' := H).
-    apply get_var_or_funvar_int_or_ptr in H.
-    destruct x; inv H; auto. 
-    constructor.
-    split.
-    + eapply rel_mem_update_protected; eauto.
-      rewrite <- int_z_mul. apply Hm'.
-      unfold max_args in *; solve_ptrofs_range.
-    + eapply correct_tinfo_valid_access; eauto.
-      eapply mem_range_valid.
-      intros.
-      eapply Mem.store_valid_access_1. eauto. auto.
   -  (* ys = a::ys0 inf = i::inf0 *)
     (* repeat of the init case *)
     assert (Hfinf' := Hfinf).
     inv Hfys; inv Hfinf. destruct H1.
     assert (Hnodub' := Hnodub). inv Hnodub. 
-    specialize (IHys inf0 s0 m Hrel_mem Htinfo H2 H5 H7 H3).
+    specialize (IHys inf0 s0 m Hsym HfinfoCorrect Hrel_mem Htinfo H2 H5 H7 H3).
     destruct IHys as [m' [Hclo_m' [Hmem_m' [Hrel_m' Htinfo_m']]]].
     assert (Htinfo_m'c := Htinfo_m').
     destruct Htinfo_m' as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Halign_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Htinf1 Htinf2]]]]]]]]]]]]]]]]].
@@ -5660,21 +5565,19 @@ Proof.
     apply OrdersEx.Z_as_OT.add_nonneg_nonneg. apply Ptrofs.unsigned_range. chunk_red; uomega.    
     auto.  
     assert (Hmem_of_asgn := mem_of_asgn_cons _ _ _ _ _ _ _ _ _ _ _ _ Hmem_m' Hnodub' Hfinf' Hargs_bound Htinfo_m'c Hget_args H Hm2').
-    
-    
-    
+
     split.
     
     (* step though cons and then asgn *)
       intro.
-      eapply t_trans.
+      eapply rt_trans.
       constructor. constructor.
-      eapply t_trans.
+      eapply rt_trans.
       apply Hclo_m'.
       (* branch ptr64 *)
       chunk_red; archi_red.
       {
-        eapply t_trans. constructor. constructor.
+        eapply rt_trans. constructor. constructor.
         constructor. econstructor. constructor. econstructor. constructor. eauto.
         constructor. simpl. constructor.
         eapply get_var_or_funvar_eval; eauto.
@@ -5684,7 +5587,7 @@ Proof.
         unfold max_args in *.  solve_uint_range. omega. 
       }
       {
-        eapply t_trans. constructor. constructor.
+        eapply rt_trans. constructor. constructor.
         constructor. econstructor. constructor. econstructor. constructor. eauto.
         constructor. simpl. constructor.
         eapply get_var_or_funvar_eval; eauto.
@@ -5704,7 +5607,7 @@ Proof.
     eapply mem_range_valid. intros. 
     eapply Mem.store_valid_access_1; eauto.
     unfold max_args in *; solve_ptrofs_range.
-Qed. *)
+Qed.
 
  
 
@@ -5757,36 +5660,34 @@ Definition program_gc_inv (p:program) :=
    correct_tinfo p (Int.unsigned finfo_maxalloc) lenv' m'). *)
                                           
 (* deep version of mem_after_asgn  *)
- Inductive rel_mem_asgn' {fenv finfo_env p rep_env} args_b args_ofs m L: list L6.cps.val -> list N -> list Values.val -> Prop :=
+ Inductive rel_mem_asgn {fenv finfo_env p rep_env} args_b args_ofs m L: list L6.cps.val -> list N -> list Values.val -> Prop :=
   | rma_cons: forall  i v6 v7  vs6 inf vs7, 
-    rel_mem_asgn' args_b args_ofs  m L vs6 inf vs7 ->
+    rel_mem_asgn args_b args_ofs  m L vs6 inf vs7 ->
     Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v7 ->
     repr_val_L_L6_L7_id fenv finfo_env p rep_env v6 m L v7 ->
-     rel_mem_asgn' args_b args_ofs  m L (v6::vs6) (i::inf) (v7::vs7)
+     rel_mem_asgn args_b args_ofs  m L (v6::vs6) (i::inf) (v7::vs7)
 | rma_nil:
-    rel_mem_asgn' args_b args_ofs  m L [] [] []. 
-
-Definition rel_mem_asgn {fenv finfo_env p rep_env} args_b args_ofs m L vs1 inf vs2 := @rel_mem_asgn' fenv finfo_env p rep_env args_b args_ofs m L (skipn nParam vs1) (skipn nParam inf) (skipn nParam vs2).
+    rel_mem_asgn args_b args_ofs  m L [] [] []. 
  
  Theorem rel_mem_asgn_length:
    forall {fenv finfo_env p rep_env m L args_b args_ofs ys inf vs},
      @rel_mem_asgn fenv finfo_env p rep_env args_b args_ofs m L ys inf vs ->
     length ys = length vs.
- Proof. Admitted. (*
+ Proof.
    induction ys; intros.
    inv H; auto.
    inv H. simpl. erewrite IHys. reflexivity.
    eauto.
- Qed. *)
+ Qed.
 
  
  Theorem rel_mem_asgn_nthN:
   forall {L rep_env finfo_env fenv args_b args_ofs p  m vs6 inf vs7 v6 v7 n},
   @rel_mem_asgn fenv finfo_env p rep_env args_b args_ofs  m L vs6 inf vs7 -> 
-  nthN (skipn nParam vs6) n = Some v6 ->
-  nthN (skipn nParam vs7) n = Some v7 ->
+  nthN vs6 n = Some v6 ->
+  nthN vs7 n = Some v7 ->
   repr_val_L_L6_L7_id fenv finfo_env p rep_env v6 m L v7.
-Proof. Admitted. (*
+Proof.
   induction vs6; intros.
   inv H0.
   destruct vs7. inv H1.
@@ -5795,7 +5696,7 @@ Proof. Admitted. (*
   apply nthN_pos_pred in H0.
   apply nthN_pos_pred in H1.
   eapply IHvs6; eauto.
-Qed. *)
+Qed.
 
 
  Theorem cons_get_list: forall {A y ys rho vs},
@@ -5813,13 +5714,13 @@ Qed. *)
    forall fenv finfo_env p rep_env args_b args_ofs m L vs6 locs vs7,
    @rel_mem_asgn fenv finfo_env p rep_env args_b args_ofs  m L vs6 locs vs7 ->
      mem_after_asgn args_b args_ofs m locs vs7.
- Proof. Admitted. (*
+ Proof.
    induction vs6; intros.
    - inv H.
      constructor.
    - inv H.
      constructor; eauto.
- Qed. *)
+ Qed.
  
 Theorem rel_mem_of_asgn: forall fenv finfo_env  rep_env args_b args_ofs p lenv m rho L ys inf vs7 vs6,
  mem_of_asgn_v args_b args_ofs p lenv m ys inf vs7 ->
@@ -5828,7 +5729,7 @@ Theorem rel_mem_of_asgn: forall fenv finfo_env  rep_env args_b args_ofs p lenv m
             exists v6, M.get x rho = Some v6 /\
                        repr_val_id_L_L6_L7_id fenv finfo_env p rep_env v6 m L lenv x) ->
  @rel_mem_asgn fenv finfo_env p rep_env args_b args_ofs m L vs6 inf vs7.
-Proof. Admitted. (*
+Proof.
   induction ys; intros.
   -   inv H0; inv H. constructor.
   - apply cons_get_list in H0. destruct H0 as [v [vs' [Heqvs [Hgar Hgysr]]]]. subst.
@@ -5840,7 +5741,7 @@ Proof. Admitted. (*
     rewrite H2 in H5. inv H5. rewrite H in Hgar. inv Hgar. auto.
     rewrite H2 in H5; inv H5. rewrite H2 in H7; inv H7.
     rewrite H5 in H8; inv H8. rewrite H in Hgar. inv Hgar. auto.
-Qed. *)
+Qed. 
 
 (* invariant for GC, needs to be shown to be provable from GC proof *)
 (* OS: Changed returned vs7 into vs7' s.t. the pointers can have changed (but represent the same values in L6) *)
@@ -5999,7 +5900,7 @@ Proof.
     admit.
 
 
-  - simpl. induction (rev l). simpl. rewrite H_makeTag. rewrite H_make_cRep. auto.
+  - simpl. induction (rev l). simpl. rewrite H_makeTag. rewrite H_make_ctor_rep. auto.
   simpl. rewrite IHl0. auto.
   -  simpl. induction (rev l). simpl. rewrite H_makeTag. auto. 
   simpl. rewrite IHl0. auto.  
@@ -6009,46 +5910,45 @@ Admitted.
 
 
 Theorem find_symbol_map:
-  forall p fenv id v, 
-    find_symbol_domain p fenv ->
-    var_or_funvar id fenv p v (makeVar id v fenv).
-Proof.
-  intros. specialize (H v). inv H.
-  destruct (cps.M.get v fenv) eqn:Hgvm.
-  - destruct (H0 (ex_intro _ f (eq_refl _))). econstructor. apply H.
+  forall p fenv m finfo_env id v, 
+    find_symbol_domain p finfo_env ->
+    var_or_funvar id m fenv finfo_env p v (makeVar id m v fenv finfo_env).
+Proof. 
+  intros. specialize (H v). inv H. 
+  destruct (cps.M.get v finfo_env) eqn:Hgvm.
+  - destruct (H0 (ex_intro _ p0 (eq_refl _))). econstructor. apply H.
   - unfold makeVar. rewrite Hgvm. econstructor.
     destruct (Genv.find_symbol (Genv.globalenv p) v) eqn:Hgpv; auto.
     exfalso.
     destruct (H1 (ex_intro _ b (eq_refl _))).
     inv H.
 Qed.
-
+ 
 Theorem find_symbol_map_f:
-    forall p fenv id v, 
-    find_symbol_domain p fenv ->
-    var_or_funvar_f id fenv p v = makeVar id v fenv.
-Proof.
+    forall p fenv m finfo_env id v, 
+    find_symbol_domain p finfo_env ->
+    var_or_funvar_f id m fenv finfo_env p v = makeVar id m v fenv finfo_env.
+Proof. 
   intros. apply var_or_funvar_of_f.
   apply find_symbol_map; auto.
 Qed.
 
-
 Theorem asgnAppVars_correct:
-  forall p fenv,
+  forall p fenv finfo_env,
     forall vs avs ind aind s,
-    find_symbol_domain p fenv ->
+    find_symbol_domain p finfo_env ->
       avs = skipn nParam vs ->
       aind = skipn nParam ind ->
-      asgnAppVars' argsIdent threadInfIdent vs ind fenv = Some s ->
-      repr_asgn_fun' argsIdent threadInfIdent fenv p avs aind s.
+      asgnAppVars' argsIdent threadInfIdent nParam vs ind fenv finfo_env = Some s ->
+      repr_asgn_fun' argsIdent threadInfIdent nParam fenv finfo_env p avs aind s.
 Proof.
-  intros p fenv vs avs. generalize vs. clear vs.
-  induction avs; intros vs ind aind s Hfenv Hvs Hind Hasgn; unfold asgnAppVars' in Hasgn.
-  - destruct aind; rewrite <- Hvs in Hasgn; rewrite <- Hind in Hasgn; inv Hasgn.
-    + constructor.
-  - destruct aind; rewrite <- Hvs in Hasgn; rewrite <- Hind in Hasgn; [ inv Hasgn | ].
-    destruct vs; [inv Hvs | ].
-    destruct ind; [inv Hind | ].
+  intros p fenv finfo_env vs avs. generalize vs. clear vs.
+  induction avs; intros vs ind aind s Hfinfo_env Hvs Hind Hasgn; unfold asgnAppVars' in Hasgn.
+  - destruct aind; rewrite <- Hvs in Hasgn; rewrite <- Hind in Hasgn;
+      destruct nParam; inv Hasgn; constructor.
+  - destruct aind; rewrite <- Hvs in Hasgn; rewrite <- Hind in Hasgn; [ destruct nParam; inv Hasgn | ].
+    destruct vs; [destruct nParam; inv Hvs | ].
+    destruct ind; [destruct nParam; inv Hind | ].
     symmetry in Hvs.
     set (Hvs' := skipn_cons nParam p0 a vs avs Hvs).
     symmetry in Hvs'.
@@ -6056,17 +5956,76 @@ Proof.
     set (Hind' := skipn_cons nParam n0 n ind aind Hind).
     symmetry in Hind'.
     simpl in Hasgn.
-    destruct (asgnAppVars'' argsIdent threadInfIdent avs aind fenv) eqn:Happ.
+    destruct (asgnAppVars'' argsIdent threadInfIdent nParam avs aind fenv) eqn:Happ.
     2: inv Hasgn.
-    specialize (IHavs _ _ _ s0 Hfenv Hvs' Hind').
+    specialize (IHavs _ _ _ s0 Hfinfo_env Hvs' Hind').
     unfold asgnAppVars' in IHavs.
     rewrite <- Hvs' in IHavs.
     rewrite <- Hind' in IHavs.
     apply IHavs in Happ.
     inv Hasgn.
     erewrite <- find_symbol_map_f; eauto.
-    exact (repr_asgn_cons _ _ _ _ _ _ _ _ s0 Happ).
+    exact (repr_asgn_cons _ _ _ _ _ _ _ _ _ _ s0 Happ).
 Qed.    
+
+Theorem repr_call_vars_length1 : forall p fenv map n l1 l2, repr_call_vars threadInfIdent nParam fenv map p  n l1 l2 -> length l1 = n.
+Proof.
+      induction n; intros l1 l2 Hr; destruct l1; inv Hr.
+      + reflexivity. 
+      + simpl. apply f_equal.
+        eapply IHn. eauto.
+Qed.   
+
+ 
+Theorem  mkCallVars_correct:
+  forall p fenv map n vs bvs es,
+    find_symbol_domain p map ->
+    bvs = firstn nParam vs -> 
+    mkCallVars threadInfIdent nParam fenv map n bvs = Some es ->
+    repr_call_vars threadInfIdent nParam fenv map p n bvs es.
+Proof.
+  Admitted. (*
+  intros p fenv map n. unfold repr_call_vars. 
+  generalize nParam as m.
+  induction n; intros m vs bvs es Hsym bvsEq Hcall;
+    destruct bvs; try solve [unfold mkCallVars in Hcall; inv Hcall; try constructor; try inv bvsEq].
+  + simpl in Hcall.
+    match_case_hyp Hcall.
+    inv Hcall.
+    erewrite <- (find_symbol_map_f _ _ _ _ _ _ Hsym). 
+    constructor.
+    eapply IHn; eauto.
+    constructor. destruct m; inv bvsEq. 
+    destruct m. inv bvsEq.
+    rewrite (firstn_cons m p1 vs) in bvsEq.
+    eapply IHn; auto.
+    inbvsEq. destruct m; inv bvsEq.
+    destruct m. inv bvsEq. 
+    rewrite (firstn_cons m p1 vs) in bvsEq.
+    inversion bvsEq. Print repr_call_vars.
+    admit.
+
+  Set Printing All. simpl.
+  generalize nParam as m.
+  induction m; induction n; intros vs bvs es Hsym bvsEq Hcall;
+    destruct bvs; try solve [unfold mkCallVars in Hcall; inv Hcall; try constructor].
+  - inv bvsEq.
+  - simpl in Hcall.
+    destruct (mkCallVars threadInfIdent (S m) fenv map n bvs) eqn:HcallEq; inv Hcall.
+    erewrite <- (find_symbol_map_f _ _ _ _ _ _ Hsym).
+    constructor.
+    Print repr_call_vars.
+  intro n.
+  
+
+    admit.
+(*
+    eapply IHn.
+    reflexivity.
+    assumption.
+Qed. *)
+Admitted. *)
+
 
 Theorem repr_make_case_switch:
   forall x ls ls',
@@ -6083,11 +6042,11 @@ Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent is
             | [] => Monad.ret (LSnil, LSnil)
             | p :: l' =>
                 Monad.pbind
-                  (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (snd p) fenv cenv ienv map)
+                  (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam (snd p) fenv cenv ienv map)
                   (fun prog : statement =>
                    Monad.pbind (makeCases l')
                      (fun '(ls, ls') =>
-                      match make_cRep cenv (fst p) with
+                      match make_ctor_rep cenv (fst p) with
                       | Some (enum t) =>
                         let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
                           match ls' with
@@ -6114,8 +6073,8 @@ Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent is
                       end))
             end).
 
-Definition fmake_cRep (p:positive) (c:ctor_ty_info) : cRep :=
-  let '(name, _, it , a , n) := c in
+Definition fmake_ctor_rep (p:positive) (c:ctor_ty_info) : ctor_rep :=
+  let '(Build_ctor_ty_info name _ it  a  n) := c in
       match (a =? 0)%N with
       | true =>
         (enum n)
@@ -6124,8 +6083,8 @@ Definition fmake_cRep (p:positive) (c:ctor_ty_info) : cRep :=
       end.
 
 
-Definition compute_rep_env (cenv:ctor_env): M.t cRep :=
-  M.map fmake_cRep cenv.
+Definition compute_rep_env (cenv:ctor_env): M.t ctor_rep :=
+  M.map fmake_ctor_rep cenv.
 
 
   
@@ -6133,29 +6092,29 @@ Theorem crep_cenv_correct:
 forall cenv rep_env, 
   correct_crep_of_env cenv rep_env ->
   forall c, 
-    make_cRep cenv c =  M.get c rep_env.
+    make_ctor_rep cenv c =  M.get c rep_env.
 Proof.
-  intros. unfold make_cRep.
+  intros. unfold make_ctor_rep.
   destruct (cps.M.get c cenv) eqn:Hgc.
-  - destruct c0. destruct p. destruct p.  destruct p.
+  - destruct c0.
     simpl.
-    destruct (n0 =? 0)%N eqn:Hn0.    
+    destruct (ctor_arity =? 0)%N eqn:Hn0.    
     + rewrite N.eqb_eq in Hn0. subst.
-      inv H. specialize (H0 _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc. auto.
+      inv H. specialize (H0 _ _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc. auto.
     + rewrite N.eqb_neq in Hn0.
-      inv H. specialize (H0 _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc.  exfalso; apply Hn0; auto.
-      auto.
+      inv H. specialize (H0 _ _ _ _ _ _ Hgc). destruct H0. destruct H. inv H0; rewrite H2 in Hgc; inv Hgc.  exfalso; apply Hn0; auto.
+      auto. 
   -  simpl. symmetry.
      inv H. destruct (M.get c rep_env) eqn:Hcr.
      exfalso. apply H1 in Hcr. inv Hcr; rewrite H in Hgc; inv Hgc. auto.
 Qed.
  
 Theorem nth_proj_assign': 
-      forall p fenv,
-        find_symbol_domain p fenv ->
+      forall p fenv finfo_env,
+        find_symbol_domain p finfo_env ->
         forall v l a n,
-        Forall_statements_in_seq' (is_nth_projection_of_x threadInfIdent fenv p v) 
-                                  (a :: l) (assignConstructorS' threadInfIdent fenv v n (a :: l)) (Z.of_nat n).
+        Forall_statements_in_seq' (is_nth_projection_of_x threadInfIdent nParam fenv finfo_env p v) 
+                                  (a :: l) (assignConstructorS' threadInfIdent nParam fenv finfo_env v n (a :: l)) (Z.of_nat n).
 Proof.
   induction l; intros.
   - (* last *)
@@ -6174,11 +6133,11 @@ Qed.
 
 
 Theorem nth_proj_assign:
-      forall p fenv,
-        find_symbol_domain p fenv ->
+      forall p fenv finfo_env ,
+        find_symbol_domain p finfo_env ->
         forall v l,
           length l > 0 ->
-      Forall_statements_in_seq (is_nth_projection_of_x threadInfIdent fenv p v) l (assignConstructorS' threadInfIdent fenv v 0 l).
+      Forall_statements_in_seq (is_nth_projection_of_x threadInfIdent nParam fenv finfo_env p v) l (assignConstructorS' threadInfIdent nParam fenv finfo_env v 0 l).
 Proof.
   induction l.
   intros Hl. inv Hl.
@@ -6187,38 +6146,38 @@ Proof.
 Qed.
 
 Theorem repr_asgn_constructorS:
-  forall p cenv ienv  rep_env fenv v c l s name it n,
-      find_symbol_domain p fenv ->
+  forall p cenv ienv  rep_env fenv finfo_env v c l s name iname it n,
+      find_symbol_domain p finfo_env ->
   correct_crep_of_env cenv  rep_env ->
-  M.get c cenv = Some  (name , it, N.of_nat (length l), n) ->
-        assignConstructorS allocIdent threadInfIdent cenv ienv fenv v c l = Some s -> 
-repr_asgn_constr allocIdent threadInfIdent fenv p rep_env v c l s.
+  M.get c cenv = Some  (Build_ctor_ty_info name iname it (N.of_nat (length l)) n) ->
+        assignConstructorS allocIdent threadInfIdent nParam cenv ienv fenv finfo_env v c l = Some s -> 
+repr_asgn_constr allocIdent threadInfIdent nParam fenv finfo_env p rep_env v c l s.
 Proof.
-  intros p cenv ienv  rep_env map v c l s name it n Hsymbol; intros.
+  intros p cenv ienv rep_env fenv map v c l s name iname it n Hsymbol; intros.
   unfold assignConstructorS in *.
     destruct (makeTag cenv c) eqn:H_makeTag.
-    destruct (make_cRep cenv c) eqn:H_make_cRep.
+    destruct (make_ctor_rep cenv c) eqn:H_make_ctor_rep.
     simpl in H1. destruct c0; inv H1.
-  - unfold make_cRep in H_make_cRep. rewrite H0 in H_make_cRep. simpl in *. destruct name.
-    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_cRep.
+  - unfold make_ctor_rep in H_make_ctor_rep. rewrite H0 in H_make_ctor_rep. simpl in *.
+    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_ctor_rep.
     rewrite OrdersEx.N_as_OT.eqb_eq in Hll.
     destruct l; inv Hll.
     unfold makeTag in *.
     destruct (makeTagZ cenv c) eqn:H_makeTagZ; inv H_makeTag.
-    inv H. specialize (H1 _ _ _ _ _ H0). inv H1. inv H. inv H3; rewrite H0 in H; inv H. 
+    inv H. specialize (H1 _ _ _ _ _ _ H0). inv H1. inv H. inv H3; rewrite H0 in H; inv H. 
     econstructor. apply H1. 
-    {split.  unfold makeTagZ in *.  unfold make_cRep in *. rewrite H0 in H_makeTagZ. simpl in H_makeTagZ. inv H_makeTagZ.
+    {split.  unfold makeTagZ in *.  unfold make_ctor_rep in *. rewrite H0 in H_makeTagZ. simpl in H_makeTagZ. inv H_makeTagZ.
      reflexivity. 
      auto. }
-  - unfold make_cRep in H_make_cRep. rewrite H0 in H_make_cRep.     destruct name.  simpl in *.
-    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_cRep.
+  - unfold make_ctor_rep in H_make_ctor_rep. rewrite H0 in H_make_ctor_rep. simpl in *.
+    destruct ((N.of_nat (length l) =? 0)%N ) eqn:Hll; inv H_make_ctor_rep.
     unfold makeTag in H_makeTag. 
     destruct (makeTagZ cenv c) eqn:H_makeTagZ; inv H_makeTag.
-    inv H. specialize (H1 _ _ _ _ _ H0). destruct H1. destruct H.
+    inv H. specialize (H1 _ _ _ _ _ _ H0). destruct H1. destruct H.
     rewrite OrdersEx.N_as_OT.eqb_neq in Hll.
     inv H1; rewrite H3 in H0; inv H0. exfalso; auto.
     econstructor. eauto.
-    { split. unfold makeTagZ in *. unfold make_cRep in *.
+    { split. unfold makeTagZ in *. unfold make_ctor_rep in *.
       rewrite H3 in H_makeTagZ. simpl Monad.pbind in H_makeTagZ.
       inv H_makeTagZ; auto.
       split; auto.  }
@@ -6235,16 +6194,14 @@ Qed.
 
 Theorem make_crep_none:
   forall c cenv,
-  make_cRep cenv c = None ->
+  make_ctor_rep cenv c = None ->
   M.get c cenv = None.
 Proof.
   intros.
-  unfold make_cRep in *.
+  unfold make_ctor_rep in *.
   destruct (cps.M.get c cenv); auto.
-  exfalso. inv H. destruct c0.
-  destruct p.
-  destruct p. destruct p. 
-  destruct  (n0 =? 0)%N; inv H1.
+  exfalso. destruct c0. inv H.
+  destruct (ctor_arity =? 0)%N; inv H1.
 Qed.
 
 Theorem make_tagZ_none:
@@ -6254,33 +6211,34 @@ Theorem make_tagZ_none:
 Proof.
   intros.
   unfold makeTagZ in *.
-  unfold make_cRep in *.
-  destruct (cps.M.get c cenv). destruct c0; destruct p. destruct p. destruct p. simpl in H.
-  destruct  (n0 =? 0)%N; inv H. auto.
-Qed.  
-  
+  unfold make_ctor_rep in *.
+  destruct (cps.M.get c cenv). destruct c0. simpl in H.
+  destruct  (ctor_arity =? 0)%N; inv H. auto.
+Qed.
+
 (* Main Theorem *)
 Theorem translate_body_correct:
   forall fenv cenv ienv  p rep_env map,
-    find_symbol_domain p fenv ->
+    find_symbol_domain p map ->
+    finfo_env_correct fenv map ->
     correct_crep_of_env cenv rep_env ->
     forall  e stm,
       correct_cenv_of_exp cenv e ->
-    translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map = Some stm ->
-    repr_expr_L6_L7_id fenv p rep_env e stm.
+    translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map = Some stm ->
+    repr_expr_L6_L7_id fenv map p rep_env e stm.
 Proof.
-  intros fenv cenv ienv  p rep_env map Hmap Hcrep.
+  intros fenv cenv ienv  p rep_env map Hmap Hmapcorrect Hcrep.
   induction e using exp_ind'; intros stm Hcenv; intros.
   - (* Econstr *) 
     simpl in H.
-    destruct (assignConstructorS allocIdent threadInfIdent cenv ienv fenv v t l) eqn:H_eqAssign.
-    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:H_eqTranslate; inv H.
+    destruct (assignConstructorS allocIdent threadInfIdent nParam cenv ienv fenv map v t l) eqn:H_eqAssign.
+    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map) eqn:H_eqTranslate; inv H.
     2: inv H.
     constructor.
     2: eapply IHe; eauto.
     clear IHe H_eqTranslate.
     apply Forall_constructors_in_constr in Hcenv.
-    destruct (M.get t cenv) eqn:Hccenv. destruct c; destruct p. destruct p0; destruct p.
+    destruct (M.get t cenv) eqn:Hccenv. destruct c.
     subst.
     eapply repr_asgn_constructorS; eauto.
     inv Hcenv.
@@ -6289,8 +6247,8 @@ Proof.
                      econstructor. constructor. apply repr_make_case_switch. 
   - (* Ecase *)    
     simpl in H.
-    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:He.
-    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (Ecase v l) fenv cenv ienv map) eqn:Hl.
+    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map) eqn:He.
+    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam (Ecase v l) fenv cenv ienv map) eqn:Hl.
     assert (correct_cenv_of_exp cenv (Ecase v l)).
     { intro; intros. eapply Hcenv. apply rt_then_t_or_eq in H0. inv H0. inv H1. apply t_then_rt. apply subterm_case. eauto. } 
     specialize (IHe0 s0 H0). clear H0.  assert (Some s0 = Some s0) by reflexivity. specialize (IHe0 H0). clear H0.
@@ -6304,7 +6262,7 @@ Proof.
         { intro; intros. eapply Hcenv.  eapply rt_trans. eauto. constructor. econstructor. constructor. reflexivity. }
         specialize (IHe s H0 eq_refl). clear H0.
         inv IHe0. (* l0 = ls, ls' = l1 *) unfold make_case_switch in H4. inv H4. 
-        destruct ( make_cRep cenv c ) eqn:HcRep. 2: inv H.
+        destruct ( make_ctor_rep cenv c ) eqn:Hctor_rep. 2: inv H.
         destruct c0.
         - (* case-enum *)
           destruct l1.
@@ -6316,8 +6274,8 @@ Proof.
             inv H. econstructor.
             eapply Runboxed_br; eauto. erewrite <- crep_cenv_correct; eauto.
             2: apply repr_make_case_switch.
-            erewrite crep_cenv_correct in HcRep; eauto. 
-            inv Hcrep. apply H0 in HcRep.  inv HcRep. constructor; auto.            
+            erewrite crep_cenv_correct in Hctor_rep; eauto. 
+            inv Hcrep. apply H0 in Hctor_rep.  inv Hctor_rep. constructor; auto.            
         - (* case-boxed *)
           destruct l0.
           + (* case-boxed-last *)
@@ -6328,8 +6286,8 @@ Proof.
             inv H. econstructor.
             eapply Rboxed_br; eauto. erewrite <- crep_cenv_correct; eauto.
             2: apply repr_make_case_switch.
-            erewrite crep_cenv_correct in HcRep; eauto. 
-            inv Hcrep. apply H0 in HcRep.  inv HcRep. constructor; auto.            
+            erewrite crep_cenv_correct in Hctor_rep; eauto. 
+            inv Hcrep. apply H0 in Hctor_rep.  inv Hctor_rep. constructor; auto.            
 
       }
     +   assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  inv H.
@@ -6340,7 +6298,7 @@ Proof.
     +  inv H.
   - (* Eproj *)
       simpl in H.
-      destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent e fenv cenv ienv map) eqn:He.
+      destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map) eqn:He.
       2: inv H. 
       inv H. constructor.
       eapply IHe.
@@ -6352,6 +6310,7 @@ Proof.
     unfold translate_body in H.
     destruct (cps.M.get t fenv) eqn:Hffenv. 2:inv H. 
     destruct f as [n locs].
+    unfold var , cps.M.elt in l.
     set (avs := skipn nParam l).
     set (aind := skipn nParam locs).
     set (bvs := firstn nParam l).
@@ -6359,40 +6318,16 @@ Proof.
     assert (indEq : aind = skipn nParam locs). reflexivity. 
     assert (bvsEq : bvs = firstn nParam l). reflexivity.
     unfold asgnAppVars in H. unfold asgnAppVars' in H.
-    simpl (Monad.pbind (Some (n, locs))) in H.
-    assert (H' : Monad.pbind
-           match asgnAppVars'' argsIdent threadInfIdent (skipn nParam l) (skipn nParam locs) fenv with
-           | Some s =>
-               Monad.ret
-                 (Ssequence
-                    (Sset argsIdent
-                       (Efield
-                          (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
-                             (Tstruct threadInfIdent noattr)) argsIdent (Tarray L6_to_Clight.uval maxArgs noattr)))
-                    s)
-           | None => None
-           end
-           (fun asgn : statement =>
-            Monad.ret
-              (Ssequence
-                 (Ssequence
-                    (Ssequence asgn
-                       (Sassign
-                          (Efield
-                             (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
-                                (Tstruct threadInfIdent noattr)) allocIdent valPtr) (Etempvar allocIdent valPtr)))
-                    (Sassign
-                       (Efield
-                          (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
-                             (Tstruct threadInfIdent noattr)) limitIdent valPtr) (Etempvar limitIdent valPtr)))
-                 (mkCall threadInfIdent tinfIdent
-                         (Ecast (makeVar threadInfIdent v fenv) (mkFunTy threadInfIdent (length (firstn nParam l)))) l))) = Some stm). apply H. clear H.
-    rewrite <- vsEq in H'. rewrite <- indEq in H'. rewrite <- bvsEq in H'. simpl in H'.
-    destruct (asgnAppVars'' argsIdent threadInfIdent avs aind fenv) eqn:Happvar; inv H'.
-    erewrite <- find_symbol_map_f. 2: eauto. 
-    econstructor.
-    eauto. eauto. eauto. constructor.
-    eapply asgnAppVars_correct; eauto.    
+    unfold mkCall in H.
+    simpl in H.
+    rewrite <- vsEq in H. rewrite <- indEq in H. rewrite <- bvsEq in H.  
+    destruct (asgnAppVars'' argsIdent threadInfIdent nParam avs aind fenv map) eqn:Happvar; inv H.
+    destruct (mkCallVars threadInfIdent nParam fenv map (Init.Nat.min (N.to_nat n) nParam) bvs) eqn:Hcallvar; inv H1.
+    erewrite <- find_symbol_map_f. 2: eauto.
+    econstructor; eauto.
+    constructor.
+    eapply asgnAppVars_correct; eauto.
+    eapply mkCallVars_correct; eauto.
   - (* Eprim *)
     inv H. 
   - (* Ehalt *)
@@ -6408,27 +6343,25 @@ Qed.
 
 (* ctor_ty_info is proper if a and ord are small enough to be represented *)
 Inductive proper_ctor_ty_info: ctor_ty_info -> Prop :=
-| PC_enum: forall name it ord,
+| PC_enum: forall name iname it ord,
     (0 <= (Z.of_N ord) <   Ptrofs.half_modulus)%Z ->
-    proper_ctor_ty_info (name, it, 0%N, ord)
-| PC_boxed: forall name it a ord,
+    proper_ctor_ty_info (Build_ctor_ty_info name iname it 0%N ord)
+| PC_boxed: forall name iname it a ord,
     (* there should not be more than 2^8 - 1 boxed constructors *)
     (0 <= (Z.of_N ord) <  Zpower.two_p 8)%Z ->
     (* arity shouldn't be higher than 2^54 - 1  *)
     (0 <= Z.of_N (Npos a) <  Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z ->
-    proper_ctor_ty_info (name, it, (Npos a)%N, ord).
+    proper_ctor_ty_info (Build_ctor_ty_info name iname it (Npos a)%N ord).
 
   
  
 (* cenv is proper if ctor_ty_info is proper, and that there is a unique (ty, ord) pair for each constructors  *)
-
-
 Definition proper_cenv (cenv:ctor_env):=
-  forall c name it a ord,
-    M.get c cenv = Some (name, it, a, ord) ->
-    proper_ctor_ty_info (name, it, a, ord) /\
-      ~ (exists c' name' a', c <> c' /\
-                    M.get c' cenv = Some (name', it, a', ord)).
+  forall c name iname it a ord,
+    M.get c cenv = Some (Build_ctor_ty_info name iname it a ord) ->
+    proper_ctor_ty_info (Build_ctor_ty_info name iname it a ord) /\
+      ~ (exists c' name' iname' a', c <> c' /\
+                    M.get c' cenv = Some (Build_ctor_ty_info name' iname' it a' ord)).
 
 (* Definition proper_nenv ? *)
 
@@ -6449,7 +6382,7 @@ Proof.
   erewrite <- M.gso in H1.
   apply H in H1. destruct H1.
   apply H6.
-  exists x, x0, x1.
+  exists x, x0, x1, x2.
   split; auto.
   rewrite M.gso; auto.
   auto. 
@@ -6465,21 +6398,21 @@ proper_cenv cenv ->
 Proof.
   intros. split; intros.
   - unfold compute_rep_env. rewrite M.gmap.
-    unfold fmake_cRep. rewrite H0.
-    simpl. destruct name.
-    specialize (H _ _ _ _ _ H0). destructAll. 
+    unfold fmake_ctor_rep. rewrite H0.
+    simpl.
+    specialize (H _ _ _ _ _ _ H0). destructAll.
     destruct a.
     + eexists; split; auto. rewrite N.eqb_refl.  inv H. econstructor; eauto.
     + eexists; split; auto. assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2. inv H. econstructor; eauto.
   - unfold compute_rep_env in H0.    
     rewrite M.gmap in H0.
-    unfold fmake_cRep in H0.
+    unfold fmake_ctor_rep in H0.
     destruct (M.get c cenv) eqn:Hccenv. 2: inv H0.
-    destruct c0. destruct p. destruct p. destruct p. simpl in H0.
-    specialize (H _ _ _ _ _ Hccenv). destruct H.
-    destruct n0.
+    destruct c0. simpl in H0.
+    specialize (H _ _ _ _ _ _ Hccenv). destruct H.
+    destruct ctor_arity.
     + rewrite N.eqb_refl in H0.  inv H0. inv H. econstructor; eauto.
-    +  assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2 in H0. inv H0. inv H. econstructor; eauto.
+    + assert (N.pos p <> 0%N). intro Hp; inv Hp. rewrite <- N.eqb_neq in H2.  rewrite H2 in H0. inv H0. inv H. econstructor; eauto.
 Qed.
 
 
@@ -6493,7 +6426,8 @@ Proof.
   eapply Maps.PTree_Properties.fold_rec; intros.
   - assert (proper_cenv m).
     { intro; intros. rewrite H in H2. apply H1 in H2. destruct H2.
-      split; auto. intro; apply H3.  destructAll. rewrite H in H5. eauto.
+      split; auto. intro; apply H3.  destructAll. rewrite H in H5.
+      exists x , x0 , x1 , x2. auto.
     }
     specialize (H0 H2). destruct H0. split.
     intro; intros. eapply H0 in H5; eauto. rewrite H in H5. auto.    
@@ -6503,10 +6437,10 @@ Proof.
     specialize (H1 H3). destruct H1.
     assert ( domain_ienv_cenv (Maps.PTree.set k v m) (update_ind_env a k v)).
     {
-      intro; intros. destruct v. destruct p. destruct p. destruct p. simpl in H5.
-      destruct ( cps.M.get i0 a) eqn:Hgi0a.
-      + destruct n3.
-        destruct (var_dec i i0).
+      intro; intros. destruct v. simpl in H5.
+      destruct ( cps.M.get ctor_ind_tag a) eqn:Hgi0a.
+      + destruct n.
+        destruct (var_dec i ctor_ind_tag).
         * subst. rewrite M.gss in H5. inv H5. inv H6.
           (* k = x *)
           inv H5. eexists. apply M.gss.
@@ -6516,7 +6450,7 @@ Proof.
         * rewrite M.gso in H5 by auto.
           eapply H1 in H6; eauto. destruct H6. eexists.
           rewrite M.gso. eauto. intro; subst. rewrite H6 in H; inv H.
-      + destruct (var_dec i i0).
+      + destruct (var_dec i ctor_ind_tag).
         * subst. rewrite M.gss in H5. inv H5. inv H6. inv H5. exists namei. apply M.gss. inv H5.
         * rewrite M.gso in H5 by auto. apply H1 in H5. apply H5 in H6. destruct H6.
           exists x0. rewrite M.gso. auto.  intro; subst. rewrite H in H6. inv H6.
@@ -6541,7 +6475,7 @@ Proof.
         (* constructor shares the same ord, cannot be proper *)
         eapply H1 in H8; eauto. inv H8.
         destruct (var_dec x0 k); subst. rewrite H7 in H; inv H.
-        apply H6'. exists x0. eexists. eexists.
+        apply H6'. exists x0. eexists. eexists. eexists.
         split; auto. rewrite M.gso by auto. eauto.
       * (* k is the first cons of i *)
         eexists. eexists. split. apply M.gss.
@@ -6555,13 +6489,13 @@ Proof.
       rewrite M.gso in H6 by auto.
       apply H4 in H6. destructAll.
       {
-        unfold update_ind_env. destruct v. destruct p. destruct p. destruct p. 
-        destruct  (cps.M.get i0 a) eqn:Hi0a.
-        - destruct n4. 
-          destruct (var_dec i i0).
+        unfold update_ind_env. destruct v. 
+        destruct  (cps.M.get ctor_ind_tag a) eqn:Hi0a.
+        - destruct n0. 
+          destruct (var_dec i ctor_ind_tag).
           + subst.
             rewrite Hi0a in H6. inv H6.
-            eexists. exists  ((n2, k, n1, n0) :: x1).
+            eexists. exists  ((ctor_name, k, ctor_arity, ctor_ordinal) :: x1).
             split. rewrite M.gss; auto.
             split. constructor 2. auto.
             split. 
@@ -6569,11 +6503,11 @@ Proof.
               destructAll.
               inv H10.
               inv H11. apply n; auto.
-              apply H8. eexists; eexists. eexists. split; eauto.
+              apply H8. eexists; eexists; eexists. split; eauto.
             * intro; intros.
               destructAll.
               inv H10.
-              inv H11. apply H6'. eexists. eexists. eexists. split.
+              inv H11. apply H6'. eexists. eexists. eexists. eexists. split.
               apply n. rewrite M.gss. reflexivity.
               eapply H9.
               eexists. eexists. eexists. split; eauto.                          
@@ -6743,21 +6677,119 @@ Proof.
   unfold make_cint. archi_red. constructor.
 Qed.
 
+Definition mk_gc_call_env' p (ys vs : list positive) (lenv_old lenv : temp_env) :
+  (Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv_old x v) ys) -> length ys = length vs -> temp_env.
+Proof.
+  generalize vs. clear vs.
+  induction ys; intros vs Hval Hlen; destruct vs; [ | inv Hlen | inv Hlen | ].
+  - exact lenv. 
+  - refine (M.set p0 _ (IHys vs _ _)).
+    destruct (Genv.find_symbol (Genv.globalenv p) a) eqn:geta1.
+    + exact (Vptr b (Ptrofs.repr 0)).
+    + destruct (M.get a lenv_old) eqn:geta2.
+      * exact v.
+      * abstract (
+            set (t := proj1 (Forall_forall _ _) Hval a (or_introl eq_refl));
+            simpl in t;
+            exfalso; inv t; inv H; [ rewrite geta1 in H0; inv H0
+                                   | rewrite geta2 in H1; inv H1]
+            ).
+    + abstract(apply Forall_forall; intros x Hin;
+               exact (proj1 (Forall_forall _ _) Hval x (or_intror Hin))).
+    + abstract (inv Hlen; auto).
+Defined.
+
+
+Definition mk_gc_call_env p (ys vs : list positive) (lenv_old lenv : temp_env) :
+  (Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv_old x v) ys) -> length ys = length vs -> temp_env.
+Proof.
+  generalize vs. clear vs.
+  induction ys; intros vs Hval Hlen; destruct vs; [ | inv Hlen | inv Hlen | ].
+  - exact lenv. 
+  - refine (M.set p0 _ (IHys vs _ _)).
+    destruct (Genv.find_symbol (Genv.globalenv p) a).
+    + exact (Vptr b (Ptrofs.repr 0)).
+    + destruct (M.get a lenv_old).
+      * exact v.
+      * exact Vundef.
+    + abstract(apply Forall_forall; intros x Hin;
+               exact (proj1 (Forall_forall _ _) Hval x (or_intror Hin))).
+    + abstract (inv Hlen; auto).
+Defined.
+
+Theorem mk_gc_call_env_correct : forall p (ys vs : list positive) (lenv_old lenv : temp_env) Hys Hlen, NoDup vs ->
+    (Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p (mk_gc_call_env p ys vs lenv_old lenv Hys Hlen) x v) vs).
+Proof.
+  intros p ys. induction ys; intros vs lenv_old lenv Hys Hlen noDupvs; destruct vs; [ | inv Hlen | inv Hlen | ]; constructor.
+  - destruct Hys. inv Hlen. clear a.
+    destruct e as [v Hv]. exists v.
+    destruct Hv; simpl.
+    + constructor 2.
+      * admit.
+      * rewrite Maps.PTree.gss. rewrite e.
+        reflexivity.
+      * auto.
+    + constructor 2.
+      * admit.
+      * rewrite Maps.PTree.gss. rewrite e.
+        rewrite e0.
+        reflexivity.
+      * auto.
+  - admit.
+    Admitted.
+   (* apply IHys.
+        
+    destruct (Genv.find_symbol (Genv.globalenv p) x) eqn:geta1.
+    + exists (Vptr b (Ptrofs.repr 0)).
+      simpl. constructor 2.
+      * admit.
+      * rewrite Maps.PTree.gss.
+        rewrite geta1. reflexivity.
+      * 
+        
+    + destruct (M.get a lenv_old) eqn:geta2.
+      * 
+      * 
+        rewrite geta1.
+        rewrite geta1.
+    unfold mk_gc_call_env. simpl.
+    
+    eexists. 
+    simpl. 
+    rewrite geta1. *)
 
 Ltac unsigned_ptrofs_range :=
   split; [apply Ptrofs.unsigned_range |  etransitivity;  [apply Ptrofs.unsigned_range_2 | rewrite ptrofs_mu; archi_red; reflexivity] ].
+
+
+Theorem type_of_mkFunTyList:
+  forall nParam vsm4, 
+  (mkFunTyList
+     (Init.Nat.min (length vsm4)
+             nParam)) = (type_of_params (map (fun x : ident => (x, uval))
+                                              (firstn nParam vsm4))).
+Proof.
+  induction nParam0; intros; simpl.
+  -  rewrite Nat.min_0_r.
+     reflexivity.
+  - destruct vsm4.
+    + (* empty list *)
+      reflexivity.
+    + simpl. erewrite IHnParam0. reflexivity.
+Qed.
 
 (* Main Theorem *)
 Theorem repr_bs_L6_L7_related:
   forall p rep_env cenv fenv finfo_env ienv,
     program_inv p ->
-    find_symbol_domain p fenv -> (* REMOVE *)
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
   forall rho v e n, bstep_e (M.empty _) cenv rho e v n ->                    
                     correct_envs cenv ienv rep_env rho e ->
                     protected_id_not_bound_id rho e ->
                     unique_bindings_env rho e ->
                     functions_not_bound p rho e ->
-                    forall stm lenv m k max_alloc fu, repr_expr_L6_L7_id fenv p rep_env e stm ->
+                    forall stm lenv m k max_alloc fu, repr_expr_L6_L7_id fenv finfo_env p rep_env e stm ->
                                               rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho m lenv ->
                                               correct_alloc e max_alloc -> 
                                               correct_tinfo p max_alloc lenv m ->
@@ -6765,7 +6797,7 @@ Theorem repr_bs_L6_L7_related:
                                                                 same_args_ptr lenv lenv' /\
                                                                 arg_val_L6_L7 fenv finfo_env p rep_env v m' lenv'.
 Proof.
-  intros p rep_env cenv fenv finfo_env ienv Hpinv Hsym rho v e n Hev.
+  intros p rep_env cenv fenv finfo_env ienv Hpinv Hsym HfinfoCorrect rho v e n Hev.
   induction Hev; intros Hc_env Hp_id Hrho_id Hf_id stm lenv m k max_alloc fu Hrepr_e Hrel_m Hc_alloc Hc_tinfo; inv Hrepr_e.
   - (* Econstr *)
 
@@ -6789,7 +6821,7 @@ Proof.
         assert (Ha_l : a = N.of_nat (length ys) /\ ys <> []). {          
           assert (subterm_or_eq (Econstr x t ys e) (Econstr x t ys e)) by constructor 2.  
           inv Hc_env. destruct H5 as [H5' H5]. destruct H5 as [H5 H6].
-          apply H5 in H3.   destruct (M.get t cenv) eqn:Hmc. destruct c0. destruct p0. destruct p0. inv H6.
+          apply H5 in H3.   destruct (M.get t cenv) eqn:Hmc. destruct c0. inv H6.
           apply H9 in H0. inv H0. rewrite H10 in Hmc. inv Hmc.
           split; auto. destruct ys. inv H2. intro. inv H0. inv H3.
         }
@@ -6911,7 +6943,7 @@ Proof.
         
         (* 2 -> use mem_of_Forall_nth_projection to step through the assignment of vs *)
         assert (Hstep_m3 := mem_of_Forall_nth_projection_cast).
-        specialize (Hstep_m3 threadInfIdent fenv p x
+        specialize (Hstep_m3 threadInfIdent nParam fenv finfo_env p x
                              (Maps.PTree.set allocIdent
                                              (Vptr alloc_b
                                                    (Ptrofs.add alloc_ofs (Ptrofs.mul (Ptrofs.repr (sizeof (globalenv p) val)) (Ptrofs.repr (Z.of_N (a + 1))))))
@@ -6930,8 +6962,7 @@ Proof.
                      (Vptr alloc_b (Ptrofs.add alloc_ofs (Ptrofs.mul (Ptrofs.repr (sizeof (globalenv p) val)) (Ptrofs.repr Z.one)))) lenv)) =
              Some (Vptr alloc_b (Ptrofs.add alloc_ofs (Ptrofs.mul (Ptrofs.repr (sizeof (globalenv p) val)) (Ptrofs.repr Z.one))))).
         rewrite M.gso. rewrite M.gss. reflexivity. intro; apply Hx_not. rewrite H4. inList.
-        (* BROKEN : needs find_symbol_domain p fenv *)
-        specialize (Hstep_m3 Hsym Htemp ys s0 0%Z m2 (Kseq s' k)). clear Htemp.
+        specialize (Hstep_m3 Hsym HfinfoCorrect Htemp ys s0 0%Z m2 (Kseq s' k)). clear Htemp.
         assert (Htemp : (0 <= 0)%Z /\ (0 + Z.of_nat (length ys) <= Ptrofs.max_unsigned)%Z ).
         {
           split. omega.
@@ -7425,8 +7456,8 @@ Proof.
                      inv Hf_id.
                      assert (bound_var (Econstr x t ys e) x) by constructor.
                      apply H9 in H11.
-                     inv Hrel_mL'. rewrite H19 in H11. inv H11.
-                     inv H14. rewrite H21 in H11. inv H11.
+                     inv Hrel_mL'. rewrite H19 in H11. inv H11. 
+                     inv H14. rewrite H22 in H11. inv H11.
 
                      (* since fds includes f *)
                      intro. inv Hp_id. eapply H8.
@@ -7439,7 +7470,7 @@ Proof.
                      constructor.
                      apply name_in_fundefs_bound_var_fundefs.
                      eapply find_def_name_in_fundefs. eauto.
-                     inv H11. rewrite H18 in H6. inv H6. split. auto.
+                     inv H11. rewrite H19 in H6. inv H6. split. auto.
                      
                      eapply correct_fundefs_unchanged_global with (m := m2).
                      eapply correct_fundefs_unchanged_global with (m := m).
@@ -7638,7 +7669,7 @@ Proof.
                   assert (forall y, List.In y ys -> 
                                     exists v6 : cps.val,
               M.get y rho = Some v6 /\
-              repr_val_id_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent fenv
+              repr_val_id_L_L6_L7 argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
                                   finfo_env p rep_env v6 m L lenv y).  
                   intros. apply Hrel_mL. constructor. auto.
  
@@ -7699,11 +7730,11 @@ Proof.
                     }
                    
                   clear H_eql'.
-                  
+                   
                   rewrite get_var_or_funvar_list_correct in Hvs7. rewrite <- get_var_or_funvar_list_set in Hvs7.
                   rewrite <- get_var_or_funvar_list_set in Hvs7.
                   2:{  intro.
-                  assert (Hxrho := getlist_In _ _ _ _ H H6).
+                  assert (Hxrho := get_list_In _ _ _ _ H H6).
                   destruct Hxrho as [vv Hxrho].
                   eapply Hrho_id; eauto. }
                   2:{  intro.
@@ -7895,7 +7926,7 @@ Forall2
                         assert ( bound_var (Econstr x t ys e) x) by constructor. intro; subst.
                         apply H6 in H9. inv Hrel_ml'.
                         rewrite H17 in H9; inv H9.
-                        inv H12. rewrite H19 in H9. inv H9. 
+                        inv H12. rewrite H20 in H9. inv H9. 
                         intro. subst.
                         
                         inv Hp_id. eapply H6.  apply H4. right; left. reflexivity. right.
@@ -7903,7 +7934,7 @@ Forall2
                         inv Hrel_ml'. inv H17. constructor.
                         apply name_in_fundefs_bound_var_fundefs.
                         eapply find_def_name_in_fundefs. eauto.
-                        inv H11. rewrite H18 in H9. inv H9. split. auto. 
+                        inv H11. rewrite H19 in H9. inv H9. split. auto. 
                         eapply correct_fundefs_unchanged_global with (m := m2).
                         eapply correct_fundefs_unchanged_global with (m := m).
                         apply Hrel_f.
@@ -8251,7 +8282,7 @@ Forall2
             inv H2.
             rewrite H15 in H6; inv H6.
             inv H10.
-            rewrite H16 in H6.
+            rewrite H17 in H6.
             inv H6.
         + split.
           (* tinfo *)
@@ -8282,9 +8313,9 @@ Forall2
       eauto.
       - inv Hc_env.
         destructAll.
-        apply Forall_constructors_in_constr in H2. destruct (M.get t cenv) eqn:Mtcenv. 2: inv H2. destruct c0. destruct p. destruct p0. destruct p.
-        econstructor; eauto.        
-        2:{ apply getlist_length_eq in H. subst. auto. }
+        apply Forall_constructors_in_constr in H2. destruct (M.get t cenv) eqn:Mtcenv. 2: inv H2. destruct c0.
+        econstructor; eauto.   
+        2:{ simpl. simpl. subst. symmetry. exact (f_equal N.of_nat (get_list_length_eq _ _ _ H)). }
         apply Forall_forall. intros.
         assert (Hgiv := get_list_In_val _ _ _ _ H H4).
         destruct Hgiv. destruct H5.
@@ -8368,7 +8399,7 @@ Forall2
     }
     (* get the value on the nth of vs in memory *)
     
-    assert (Hvn := repr_val_ptr_list_L_nth argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent   _ _ _ _ H12  H0).
+    assert (Hvn := repr_val_ptr_list_L_nth argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam _ _ _ _ H12  H0).
  
     (* done setting up, taking the proj step *)
     destruct Hvn as [v7' [Hv7'_l Hv7'_rep]]. 
@@ -8489,7 +8520,7 @@ Forall2
             apply H2 in H10.
             inv Hmem'.
             rewrite H10 in H19. inv H19.
-            inv H14. rewrite H10 in H21. inv H21.
+            inv H14. rewrite H10 in H22. inv H22.
         + rewrite M.gso by auto.
           specialize (Hmem x0). destruct Hmem as [Hmem Hmem'].
           split. intros.
@@ -8509,7 +8540,7 @@ Forall2
             assert ( bound_var (Eproj x t n y e) x) by constructor. apply H10 in H9. 
             rewrite H9 in H17. inv H17.
             inv H11.
-            rewrite H19 in H9. inv H9.            
+            rewrite H20 in H9. inv H9.            
     } 
     assert ( correct_alloc e max_alloc). inv Hc_alloc.
     simpl. constructor.
@@ -8575,12 +8606,12 @@ Forall2
          k empty_env lenv m)
          (State fu s (Kseq Sbreak (Kseq s' (Kswitch k))) empty_env
                 (Maps.PTree.set caseIdent vbool lenv) m) /\
-         repr_expr_L6_L7_id fenv p rep_env e s).
+         repr_expr_L6_L7_id fenv finfo_env p rep_env e s).
     {
       inv Hrepr_y.
       - (* unboxed *)
         exists (Vfalse).
-        assert (exists s s', seq_of_labeled_statement (select_switch (Z.shiftr n0 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s).
+        assert (exists s s', seq_of_labeled_statement (select_switch (Z.shiftr n0 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv finfo_env p rep_env e s).
         eapply case_of_labeled_stm_unboxed; eauto; inv Hc_env; destruct H2; destruct H5; eauto.
         destruct H as [s [s' [Hseq Hrepr_es]]].
         exists s, s'.
@@ -8627,7 +8658,7 @@ Forall2
       - exists Vtrue.
 
         assert ( exists s s', 
-                   (seq_of_labeled_statement (select_switch (Z.land h 255) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv p rep_env e s).
+                   (seq_of_labeled_statement (select_switch (Z.land h 255) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_L6_L7_id fenv finfo_env p rep_env e s).
         inv Hc_env. inv H2. destruct H9. 
          eapply case_of_labeled_stm_boxed; eauto. 
         destruct H as [s [s' [H_seq H_repr_es]]].
@@ -8764,7 +8795,7 @@ Forall2
         constructor.
         apply name_in_fundefs_bound_var_fundefs.
         eapply find_def_name_in_fundefs. eauto.
-        inv H25. rewrite H32 in H21. inv H21. }
+        inv H25. rewrite H33 in H21. inv H21. }
         inList.
         
     }
@@ -8817,8 +8848,8 @@ Forall2
     unfold same_args_ptr in *. rewrite <- Hargs1.
     rewrite M.gso; auto.
     assert (H_dj := disjointIdent). inv H_dj.
-    intro; apply H3; subst; inList.    
-  - (* Eapp  *)  (* CHANGE THIS *)
+    intro; apply H3; subst; inList.     
+  - (* Eapp  *)  (* CHANGE THIS *)  
 
     (* need assumption that unique_binding_env -> done! and functions_not_bound is preserved by all closures (rho', e) in rho - DONE *)
     (* Show protected_id_not_bound_id is preserved by prefixes - done *)
@@ -8831,35 +8862,24 @@ Forall2
     (* show that tinfo -> argsIdent is some pointer to the right thing, and then that
   rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho (M.set argsIdent ( m) lenv *)  
     destruct inf as [n ind].
+    unfold ctor_tag in t.
     set (bys := firstn nParam ys).
     set (ays := skipn nParam ys).
     set (aind := skipn nParam ind).
+    set (bind := firstn nParam ind).
     assert (bysEq : bys = firstn nParam ys) by reflexivity.
     assert (aysEq : ays = skipn nParam ys) by reflexivity.
     assert (aindEq : aind = skipn nParam ind) by reflexivity.
+    assert (bindEq : bind = firstn nParam ind) by reflexivity.
+   
     inv H10.
-    assert (Hrepr : repr_asgn_fun' argsIdent threadInfIdent fenv p ays aind s0) by apply H3.
+
+    assert (Hrepr : repr_asgn_fun' argsIdent threadInfIdent nParam fenv finfo_env p ays aind s) by apply H3.
     clear H3.
-    assert (exists (m' : mem) (lenv' : temp_env),
-    m_tstep2 (globalenv p)
-      (State fu
-         (Ssequence
-            (Ssequence
-               (Ssequence
-                  (Ssequence
-                     (Sset argsIdent
-                        (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) argsIdent
-                           (Tarray uval maxArgs noattr))) s0)
-                  (Sassign (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) allocIdent valPtr)
-                     (Etempvar allocIdent valPtr)))
-               (Sassign (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) limitIdent valPtr)
-                  (Etempvar limitIdent valPtr)))
-            (mkCall threadInfIdent tinfIdent
-               (Ecast (var_or_funvar_f threadInfIdent fenv p f)
-                  (mkFunTy threadInfIdent (length bys))) ys)) k empty_env lenv m)
-      (State fu Sskip k empty_env lenv' m') /\
-    same_args_ptr lenv lenv' /\ arg_val_L6_L7 fenv finfo_env p rep_env v m' lenv').
-    2:{ simpl. rewrite bysEq in H3. apply H3. }   
+    
+    assert (Hcall : repr_call_vars threadInfIdent nParam fenv finfo_env p (Init.Nat.min (N.to_nat n) nParam) bys s2) by apply H13.
+    clear H13.
+    
     destruct Hpinv as [Hpinv_ptr [Hpinv_tinfo Hpinv_gc]].
     destruct Hpinv_tinfo as [co [Hget_tinfident Htinfident_members]].
   
@@ -8870,22 +8890,22 @@ Forall2
     destruct Hrel_m' as [Hrel_of Hrel_fun].
     
     assert (Hsubval : subval_or_eq (Vfun rho' fl f') (Vfun rho' fl f')) by apply rt_refl.
-     
+      
     specialize (Hrel_fun rho' fl f' _ H Hsubval).   
-    destruct Hrel_fun as [Hrepr_f [Hclosed_f Hfundef_f]].
-    destruct Hfundef_f as [finfo [t' [vs' [e' [Hfind_def_f' [Hfinfo_env_f' Hfundef_f']]]]]].
-    rewrite Hfind_def_f' in H1; inv H1. clear Hsubval.
+    destruct Hrel_fun as [Hrepr_f [Hclosed_f Hfundef_f]]. 
+    destruct Hfundef_f as [finfo [t' [t'' [vs' [e' [Hfind_def_f' [Hfinfo_env_f' [Hfundef_tag' Hfundef_f']]]]]]]].
+    rewrite Hfind_def_f' in H1. inversion H1. subst. clear H1. clear Hsubval.
      
     destruct Hfundef_f' as [n' [l' [b' [fi_0 [Hf_fenv [Hnl [Hlvs [Hl_nodub [Hinf1 [Hfind_symbol [Hload_fi0 [Hload_fi1 [Hcorrect_alloc [Hgc_size_fi0 Hforall_l_fi]]]]]]]]]]]]]].    
     rewrite Hf_fenv in H6. inv H6.
-
+    rewrite Nnat.Nat2N.id in Hcall.
 
     (* break apart the tinfo *)
-    assert (Hc_tinfo' := Hc_tinfo). 
+    assert (Hc_tinfo' := Hc_tinfo).  
     destruct Hc_tinfo as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Hdiv_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Hget_tinf [Htinfne1 [Htinfne2 [Hinfo_limit [Hloc_args Hglobals]]]]]]]]]]]]]]]]]]]]].
     destruct Hbound_limit as [Hbound_limit Hbound_gc_size].
     rewrite <- Z.le_add_le_sub_l in Hbound_limit. 
-
+ 
     remember (Kseq
                 (Sassign
                    (Efield
@@ -8897,27 +8917,95 @@ Forall2
                          (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr))
                          limitIdent valPtr) (Etempvar limitIdent valPtr))
                    (Kseq
-                      (mkCall threadInfIdent tinfIdent
-                              (Ecast (var_or_funvar_f threadInfIdent fenv p f) (mkFunTy threadInfIdent (length bys))) ys) k))) as k'.
-    
+                      (Scall None (Ecast (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f)
+                                         (Tpointer (mkFunTy threadInfIdent (Init.Nat.min (N.to_nat (fst (N.of_nat (length ind), ind))) nParam)) noattr))
+                             (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr) :: s2)) k))) as k'.
 
     remember (Maps.PTree.set argsIdent (Vptr args_b args_ofs) lenv) as  lenv'.
     assert (Hlenv' : (Maps.PTree.set argsIdent (Vptr args_b args_ofs) lenv) = lenv) by (apply  Maps.PTree.gsident; auto).
     assert (Hrel_m' : rel_mem_L6_L7_id fenv finfo_env p rep_env  (Eapp f t ys) rho m lenv'). {      
       rewrite Heqlenv'. rewrite Hlenv'. auto.
     }
-
+ 
     assert (Hys: Forall (fun x => exists v, get_var_or_funvar p lenv x v) ys). {
       apply Forall_forall. intros.      
-      assert (Hgl := getlist_In _ _ _ _ H0 H1).
+      assert (Hgl := get_list_In _ _ _ _ H0 H1).
       destruct Hgl. destruct Hrel_m. destructAll. specialize (H5 x). destruct H5. 
       assert ( occurs_free (Eapp f t ys) x). constructor. auto.
       specialize (H5 H7). inv H5. destruct H8. rewrite H5 in H3. inv H3. 
       inv H8. eexists. constructor. eauto.
       eexists. constructor 2. eauto. eauto. inv H10; auto.       
+    } 
+    assert (HInFirstn : forall {A} n x (l : list A) , List.In x (firstn n l) -> List.In x l). (* TODO : move out *)
+    {
+      intros A n x l Hl.
+      erewrite <- firstn_skipn.
+      eapply in_or_app. eauto.
     }
-
-    assert (Hasgn_fun_mem :=  repr_asgn_fun_mem fu lenv p rho (Eapp f t ys) fenv max_alloc rep_env finfo_env ys ays ind aind s0 m Hrel_m Hc_tinfo' Hys Hinf1 Hl_nodub aysEq aindEq Hrepr).  
+    assert (HInSkipn : forall {A} n x (l : list A) , List.In x (skipn n l) -> List.In x l). (* TODO : move out *)
+    {
+      induction n; intros. assumption.
+      induction l. inv H1.
+      simpl in H1.
+      specialize (IHn x l H1).
+      right. assumption.
+    }
+    assert (HFirstnLength : forall {A B} n (l1 : list A) (l2 : list B), length l1 = length l2 -> length (firstn n l1) = length (firstn n l2)). (* TODO : move out *)
+    {
+      intros A B n l1. generalize n. clear n. induction l1; intros n l2 Hlen; destruct l2; [ | inv Hlen | inv Hlen | ].
+      + destruct n; reflexivity.
+      + inv Hlen. destruct n. reflexivity.
+        simpl. apply f_equal.
+        auto.
+    }
+    assert (HSkipnLength : forall {A B} n (l1 : list A) (l2 : list B), length l1 = length l2 -> length (skipn n l1) = length (skipn n l2)). (* TODO : move out *)
+    {
+      intros A B n l1. generalize n. clear n. induction l1; intros n l2 Hlen; destruct l2; [ | inv Hlen | inv Hlen | ].
+      + destruct n; reflexivity.
+      + inv Hlen. destruct n.
+        * simpl. apply f_equal. auto.
+        * simpl. apply IHl1; auto.
+    }
+    assert (Hbys : Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv x v) bys).
+    {
+      apply Forall_forall. intros.
+      apply (proj1 (Forall_forall _ ys) Hys x).
+      rewrite bysEq in H1. eapply HInFirstn. eauto.
+    }
+    assert (Hays : Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv x v) ays).
+    {
+      apply Forall_forall. intros.
+      apply (proj1 (Forall_forall _ ys) Hys x).
+      rewrite aysEq in H1. eapply HInSkipn. eauto.
+    }
+    assert (Haind :  Forall (fun i : N => (0 <= Z.of_N i < max_args)%Z) aind).
+    {
+      apply Forall_forall. intros.
+      apply (proj1 (Forall_forall _ ind) Hinf1 x).
+      rewrite aindEq in H1. eapply HInSkipn. eauto.  
+    }
+    assert (Hbind :  Forall (fun i : N => (0 <= Z.of_N i < max_args)%Z) bind).
+    {
+      apply Forall_forall. intros.
+      apply (proj1 (Forall_forall _ ind) Hinf1 x).
+      rewrite bindEq in H1. eapply HInFirstn. eauto.  
+    }
+    assert (Haind_nodup : NoDup aind).
+    {
+      rewrite aindEq.
+      eapply NoDup_cons_r.
+      rewrite (firstn_skipn nParam ind).
+      assumption.
+    } 
+    assert (Hbind_nodup : NoDup bind).
+    {
+      rewrite bindEq.
+      eapply NoDup_cons_l.
+      rewrite (firstn_skipn nParam ind).
+      assumption.
+    }
+    
+    assert (Hasgn_fun_mem :=  repr_asgn_fun_mem fu lenv p rho (Eapp f t ys) fenv max_alloc rep_env finfo_env ays aind s m Hsym HfinfoCorrect Hrel_m Hc_tinfo' Hays Haind Haind_nodup Hrepr). 
     destruct Hasgn_fun_mem as [m2 [Hasgn_fun_mem [Hmem_of_asgn Hrel_mem]]]. 
     specialize (Hasgn_fun_mem k').
     (* lenv' := (Maps.PTree.set argsIdent (Vptr args_b args_ofs) lenv) *) 
@@ -9021,35 +9109,35 @@ Forall2
       apply Hc_tinfo_m2.
       eauto.
       eauto.
-    }
-    
-    
+    } 
+
     assert (exists b,
                (repr_val_L6_L7_thm fenv finfo_env p rep_env (cps.Vfun (M.empty cps.val) fl f') m4 (Vptr b Ptrofs.zero)) /\
 (*               Genv.find_symbol (globalenv p) f' = Some b /\ *)
                eval_expr (globalenv p) empty_env lenv m4
-                         (Ecast (var_or_funvar_f threadInfIdent fenv p f)
+                         (Ecast (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f)
                                 (Tpointer
-                                   (Tfunction (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil) Tvoid
-                                              {| cc_vararg := false; cc_unproto := false; cc_structret := false |}) noattr)) (Vptr b Ptrofs.zero)). {
+                                   (mkFunTy threadInfIdent (Init.Nat.min (length ind) nParam)) noattr)) (Vptr b Ptrofs.zero)). {
       inv Hrel_mem4. destruct H1. specialize (H3 f). destruct H3.
-      assert ( occurs_free (Eapp f t ys) f) by constructor.
+      assert ( occurs_free (Eapp f t ys) f) by constructor. 
       specialize (H3 H5).
       destruct H3. destruct H3. rewrite H3 in H. inv H.
-      inv H6.
-      - exists b. split; auto.
+      inv H6. 
+      - exists b. split; auto. 
         inv H14; econstructor; eauto.
-        unfold var_or_funvar_f. rewrite H13.
+        unfold var_or_funvar_f. rewrite H13. 
         specialize (Hsym f). inv Hsym.
-        destruct (H6 (ex_intro _ b H13)). destruct x0.
-        unfold makeVar. rewrite H7.
-        econstructor. econstructor.
+        destruct (H6 (ex_intro _ b H13)). destruct x0. 
+        unfold makeVar. rewrite H7. 
+        specialize (HfinfoCorrect _ _ _ H7). inv HfinfoCorrect.   
+        destruct x0. rewrite H8.
+        econstructor. econstructor.     
         constructor 2. apply M.gempty. eauto. constructor. constructor.
         auto.
-      - inv H8. exists b. split; auto.
+      - admit. (* inv H8. exists b. split. auto. 
         econstructor; eauto.
         unfold var_or_funvar_f. rewrite H. econstructor. econstructor.
-        eauto. constructor.
+        eauto. constructor.*)
     }
     destruct H1 as [bf' [Hfind_f' Heval_f']]. 
     inv Hfind_f'.
@@ -9059,30 +9147,61 @@ Forall2
     rewrite Hf_fenv in H6; inv H6.
     
     (* clear old assumptions about m and get them about m4 instead *)
-    clear Hload_fi0 Hload_fi1. 
-    destruct Hrel_mem4 as [Lm4 [Hrel_pm4 Hrel_rho_m4]].
+    clear Hload_fi0 Hload_fi1.
+    assert (Hrel_mem4' := Hrel_mem4).
+    destruct Hrel_mem4' as [Lm4 [Hrel_pm4 Hrel_rho_m4]].
     assert (Hrel_rho_m4f := Hrel_rho_m4 f). 
     destruct Hrel_rho_m4f as [_  Hrel_fun_m4].
     assert (Hsubval : subval_or_eq (Vfun rho' fl f') (Vfun rho' fl f')) by apply rt_refl.
      
-    specialize (Hrel_fun_m4 rho' fl f' _ H Hsubval).
+    specialize (Hrel_fun_m4 rho' fl f' _ H Hsubval). 
     destruct Hrel_fun_m4 as [Hrepr_f_m4 [Hclosed_f_m4 Hfundef_f_m4]].
     clear Hsubval.
-    destruct Hfundef_f_m4 as [finfom4 [tm4 [vsm4 [e4 [Hbd_f' [Hget_finfo Hfundef_f']]]]]].
+    destruct Hfundef_f_m4 as [finfom4 [tm4 [tm4' [vsm4 [e4 [Hbd_f' [Hget_finfo [hfundef_tag' Hfundef_f']]]]]]]].
     rewrite Hfind_def_f' in Hbd_f'; inv Hbd_f'.
     
     destruct Hfundef_f' as [nm4 [lm4 [bm4 [fi_0_m4  [_ [_ [_ [_ [_ [Hfind_symbol_m4 [Hload_fi0 [Hload_fi1 [Hcorrect_alloc_m4 [Hgc_size_fi0m4 _]]]]]]]]]]]]]].
     rewrite  Hfinfo_env_f' in Hget_finfo. inv Hget_finfo.
     
-    rewrite Hfind_symbol in Hfind_symbol_m4. inv Hfind_symbol_m4. 
+    rewrite Hfind_symbol in Hfind_symbol_m4. inv Hfind_symbol_m4.
 
+    assert (repr_asgn_fun_length : forall ys ind s,
+               repr_asgn_fun' argsIdent threadInfIdent nParam fenv finfo_env p ys ind s -> length ys = length ind). (* TODO : Move out *)
+    {
+      intro ys0. induction ys0; intros ind s' Hr; destruct ind; [ | inv Hr | inv Hr | ].
+      - reflexivity. 
+      - simpl. apply f_equal. inv Hr. apply (IHys0 _ _ H8).
+    }
+    assert (ays_aind_length : length ays = length aind).
+    { eapply repr_asgn_fun_length. apply Hrepr. }
+    assert (bys_bind_length : length bys = length bind).
+    { eapply repr_call_vars_length1. rewrite bindEq.
+      rewrite firstn_length. rewrite Nat.min_comm. apply Hcall. }
+    
+    set (bvsm4 := firstn nParam vsm4).
+    set (avsm4 := skipn nParam vsm4).
+    assert (bvsm4Eq : bvsm4 = firstn nParam vsm4) by reflexivity.
+    assert (avsm4Eq : avsm4 = skipn nParam vsm4) by reflexivity.
+
+    assert (bys_bvsm4_length : length bys = length bvsm4).
+    {
+      rewrite bvsm4Eq. Set Printing All.
+      simpl. unfold var , cps.M.elt.
+      rewrite <- (HFirstnLength _ _ nParam _ _ Hlvs).
+      rewrite <- bindEq.
+      Unset Printing All. simpl.
+      apply bys_bind_length.
+    }
 
     (* lenv_new is just lenv from fentry *)
-        remember  (Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs)
-                                                                              (create_undef_temps
-                                                                                 (skipn nParam vars ++
-                                                                                       gc_vars argsIdent allocIdent limitIdent caseIdent))) as lenv_new.
 
+    remember (create_undef_temps (skipn nParam vars ++ gc_vars argsIdent allocIdent limitIdent caseIdent)) as lenv_new''.
+    
+    set (lenv_new' := mk_gc_call_env p bys bvsm4 lenv lenv_new'' Hbys bys_bvsm4_length).
+    assert (lenv_newEq' : lenv_new' = mk_gc_call_env p bys bvsm4 lenv lenv_new'' Hbys bys_bvsm4_length) by reflexivity.
+ 
+    set (lenv_new := Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs) lenv_new').
+    assert (lenv_newEq : lenv_new = Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs) lenv_new') by reflexivity.    
     (* show that after the branch, some memory m5 will be correct and contain enough space to execute the body *) 
     (* need to construct the memory and environment that exists after the (potential) gc call 
     > every function has a code_info which points to the total number of alloc 
@@ -9093,14 +9212,11 @@ Forall2
 
     assert (rho' = M.empty _). { inv Hrepr_f_m4. reflexivity. inv H4. reflexivity. } rewrite H1 in *. clear H1.
 
-                                    
 
-
-    
+   
     assert (Hvs := mem_of_asgn_exists_v Hmem_of_asgn Hget_args).
-    destruct Hvs as [vs7 Hvs7].
-    set (avs7 := skipn nParam vs7).
-    assert (avs7eq : avs7 = skipn nParam vs7) by reflexivity.
+    destruct Hvs as [avs7 Hvs7].
+
     
     assert (Hnd_vs0: NoDup vsm4). {
       destruct Hrho_id as [Hrho_id1 Hrho_id2].
@@ -9121,7 +9237,7 @@ Forall2
                 apply is_protected_tinfo_weak; auto.
                 inList. }              
 
-    assert (Hnoargs_vs0:   ~ List.In argsIdent vsm4).
+    assert (Hnoargs_vs0: ~ List.In argsIdent vsm4).
     {
       intro.
       eapply Hnoprot_vs0.
@@ -9129,17 +9245,28 @@ Forall2
       left; inList.
       reflexivity.
     }
- 
 
-
-    assert (Hl_temp: length vsm4 = length vs7). {
-          eapply mem_of_asgn_v_length in Hvs7.
-          rewrite <- Hvs7.
-          auto.
+    assert (Hnotinf_vs0: ~ List.In tinfIdent vsm4).
+    {
+      intro.
+      eapply Hnoprot_vs0.
+      eauto.
+      right.
+      reflexivity.
     }
-    assert (Hvs7_m4 : mem_after_asgn args_b args_ofs m4 locs vs7). {
-      assert (Hdj := disjointIdent). 
-      eapply mem_of_asgn_after.
+
+(* TODO: do something with bvs7, lenv, lenv_new, bys, and bvsm4 *)
+    
+(*
+    assert (Hl_temp: length vsm4 = length vs7). { 
+
+      eapply mem_of_asgn_v_length in Hvs7.
+      rewrite <- Hvs7.
+      auto.
+    } 
+    assert (Hvs7_m4 : mem_after_asgn args_b args_ofs m4 aind avs7). {
+      assert (Hdj := disjointIdent).  
+      eapply mem_of_asgn_after. Print mem_of_asgn_after.
       apply aindEq. apply aysEq. apply avs7eq.
       eapply mem_of_asgn_v_store.
       eapply mem_of_asgn_v_store.
@@ -9147,7 +9274,8 @@ Forall2
       solve_nodup.
       eauto.
       solve_nodup.        
-    }  (* MAIN CHANGE: This is stepping through the function call, stitch together function arguments.
+    } *)
+    (* MAIN CHANGE: This is stepping through the function call, stitch together function arguments.
                Need to update memory state proof to account for the reading/writing with args around gc call *)
 
     (* 
@@ -9186,39 +9314,265 @@ Forall2
                  end
                | None => None
                end = Some s). {
-*)
-    assert (Hgc : exists s , gc_test' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent finfo0 (N.of_nat (length locs)) ys locs fenv = Some s). {
-      eexists. unfold gc_test'. unfold reserve'. unfold asgnAppVars''. unfold asgnFunVars'.
-    }
-    assert (Hm5 : exists m5 lenv_new',
-                clos_trans state (traceless_step2 (globalenv p))
-                           (State F
-                                  (gc_test' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent finfo0 (N.of_nat (length locs)) ys locs fenv)
-                                  (Kseq  (Ssequence (Ssequence (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent) asgn) body)
-          (Kcall None fu empty_env lenv k))
-       empty_env lenv_new m4)
-    (State F
-           Sskip
-           (Kseq (Ssequence (Ssequence (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent) asgn) body)
-          (Kcall None fu empty_env lenv k))
-           empty_env lenv_new' m5) /\
-                same_tinf_ptr lenv_new lenv_new' /\
-                exists alloc_b alloc_ofs limit_ofs vs7', 
+     *) 
 
-                  deref_loc (Tarray uval maxArgs noattr) m5 tinf_b
-                            (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 3)))
-                            (Vptr args_b args_ofs) /\
-                   Mem.load int_chunk m5 tinf_b
+(*   
+    set (bvsm4 := firstn nParam vsm4).
+    assert (bvsm4Eq : bvsm4 = firstn nParam vsm4) by reflexivity. 
+    assert(firstnLengthEq : forall {A B} n (l1 : list A) (l2 : list B), length l1 = length l2 -> length (firstn n l1) = length (firstn n l2)).
+    {
+      intros A B n l1. generalize n. clear n. induction l1; destruct l2; intros Heq; inv Heq. 
+      + destruct n; reflexivity.
+      + destruct n. auto.
+        simpl.
+        apply f_equal. apply IHl1. auto.
+    }
+    assert (bindLengthEq : length bind = length bvsm4).
+    { 
+      rewrite bindEq. rewrite bvsm4Eq.
+      apply firstnLengthEq. assumption.
+    } 
+    assert(lengthAsgnFun : forall l1 l2, length l1 = length l2 -> exists s, asgnFunVars' argsIdent l1 l2 = Some s).
+    {
+      induction l1; intros l2 lEq; destruct l2; inv lEq.
+      - eexists. reflexivity.
+      - apply IHl1 in H3. inv H3.
+        eexists. simpl.
+        rewrite H1. reflexivity.
+    }
+    assert (HgcAsgn : exists gcAsgn, asgnFunVars' argsIdent bvsm4 bind = Some gcAsgn).
+    {
+      apply lengthAsgnFun. auto.
+    }
+    destruct HgcAsgn as [gcAsgn gcAsgnEq].
+ 
+    Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv x v) bvsm4
+    assert (Hasgn_gc_fun_mem :=  repr_asgn_fun_mem fu lenv p rho (Eapp f t ys) fenv max_alloc rep_env finfo_env ays aind s0 m Hsym Hrel_m Hc_tinfo' Hays Haind Haind_nodup Hrepr). *)
+    assert (Hgcbef : exists bef, asgnAppVars'' argsIdent threadInfIdent nParam (firstn nParam vsm4) (firstn nParam locs) fenv finfo_env = Some bef).
+    {
+      unfold gc_test' in H9. unfold reserve' in H9.
+      remember (asgnAppVars'' argsIdent threadInfIdent nParam (firstn nParam vsm4) (firstn nParam locs) fenv finfo_env) as bef.
+      assert (match bef with
+              | Some bef =>
+                match asgnFunVars' argsIdent (firstn nParam vsm4) (firstn nParam locs) with
+                | Some aft =>
+                  Some
+                    (Sifthenelse
+                       (not
+                          (Ebinop Ole (Ederef (Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr)) L6_to_Clight.uval)
+                                  (sub (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                                       (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) allocIdent valPtr))
+                                  type_bool))
+                       (Ssequence
+                          (Ssequence bef
+                                     (Scall None
+                                            (Evar gcIdent
+                                                  (Tfunction (Tcons (Tpointer uval noattr) (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil)) Tvoid
+                                                             {| cc_vararg := false; cc_unproto := false; cc_structret := false |}))
+                                            [Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr);
+                                             Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)])) aft) Sskip)
+                | None => None
+                end
+              | None => None
+              end = Some gccall).
+      { rewrite Heqbef. assumption. } 
+      destruct bef.
+      + exists s0. auto.
+      + inv H1.
+    }
+    assert (Hgcaft : exists aft, asgnFunVars' argsIdent (firstn nParam vsm4) (firstn nParam locs) = Some aft).
+    {
+      unfold gc_test' in H9. unfold reserve' in H9.
+      remember (asgnFunVars' argsIdent (firstn nParam vsm4) (firstn nParam locs)) as aft.
+      assert (match asgnAppVars'' argsIdent threadInfIdent nParam (firstn nParam vsm4) (firstn nParam locs) fenv finfo_env with
+              | Some bef =>
+                match aft with
+                | Some aft =>
+                  Some
+                    (Sifthenelse
+                       (not
+                          (Ebinop Ole (Ederef (Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr)) L6_to_Clight.uval)
+                                  (sub (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                                       (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) allocIdent valPtr))
+                                  type_bool))
+                       (Ssequence
+                          (Ssequence bef
+                                     (Scall None
+                                            (Evar gcIdent
+                                                  (Tfunction (Tcons (Tpointer uval noattr) (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil)) Tvoid
+                                                             {| cc_vararg := false; cc_unproto := false; cc_structret := false |}))
+                                            [Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr);
+                                             Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)])) aft) Sskip)
+                | None => None
+                end
+              | None => None
+              end = Some gccall). 
+      { rewrite Heqaft. assumption. }
+      destruct aft.
+      + exists s0. auto.
+      + destruct (asgnAppVars'' argsIdent threadInfIdent nParam (firstn nParam vsm4) (firstn nParam locs) fenv); inv H1.
+    }
+    destruct Hgcbef as [bef Heqbef].
+    destruct Hgcaft as [aft Heqaft].
+    
+    assert (Hgc : gc_test' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent nParam finfo0 (N.of_nat (length locs)) vsm4 locs fenv finfo_env =
+            Some
+              (Sifthenelse
+                 (not
+                    (Ebinop Ole (Ederef (Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr)) L6_to_Clight.uval)
+                            (sub (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                                 (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) allocIdent valPtr)) type_bool))
+                 (Ssequence
+                    (Ssequence bef
+                               (Scall None
+                                      (Evar gcIdent
+                                            (Tfunction (Tcons (Tpointer uval noattr) (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil)) Tvoid
+                                                       {| cc_vararg := false; cc_unproto := false; cc_structret := false |}))
+                                      [Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr); Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)])) aft)
+                 Sskip)).
+    { unfold gc_test'. unfold reserve'. Set Printing All. simpl.
+      unfold var , cps.M.elt in Heqbef.
+      unfold var , cps.M.elt in Heqaft.
+      rewrite Heqbef. rewrite Heqaft.
+      Unset Printing All. simpl.
+      reflexivity.
+    }
+    assert (Hgccalleq : gccall = (Sifthenelse
+                 (not
+                    (Ebinop Ole (Ederef (Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr)) L6_to_Clight.uval)
+                            (sub (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                                 (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) allocIdent valPtr)) type_bool))
+                 (Ssequence
+                    (Ssequence bef
+                               (Scall None
+                                      (Evar gcIdent
+                                            (Tfunction (Tcons (Tpointer uval noattr) (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil)) Tvoid
+                                                       {| cc_vararg := false; cc_unproto := false; cc_structret := false |}))
+                                      [Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr); Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)])) aft)
+                 Sskip)).
+    {
+      rewrite Hgc in H10. inv H10. reflexivity.
+    }
+
+    assert (rel_mem_gc : rel_mem_L6_L7_id fenv finfo_env p rep_env (Ehalt 1%positive) rho m4 lenv_new).
+    {
+      admit.
+    }
+
+    assert (Hbvsm4_nodup : NoDup bvsm4).
+    {
+      rewrite bvsm4Eq.
+      eapply NoDup_cons_l.
+      rewrite (firstn_skipn nParam vsm4).
+      assumption.
+    } 
+
+    assert (Havsm4_nodup : NoDup avsm4).
+    {
+      rewrite avsm4Eq.
+      eapply NoDup_cons_r.
+      rewrite (firstn_skipn nParam vsm4).
+      assumption.
+    } 
+   
+    assert (Hvsm4 : Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv_new x v) bvsm4).
+    {
+      rewrite lenv_newEq.
+      apply Forall_forall. intros.
+      assert (Hcorrect := proj1 (Forall_forall _ _) (mk_gc_call_env_correct p bys bvsm4 lenv lenv_new'' Hbys bys_bvsm4_length Hbvsm4_nodup) x H1).
+      rewrite <- lenv_newEq' in Hcorrect.
+      destruct Hcorrect as [z Hz].
+      exists z.
+      eapply get_var_or_funvar_proper; eauto.
+      unfold map_get_r_l. intros.
+      symmetry. apply M.gso. intros veq. inv veq.
+      rewrite bvsm4Eq in H3. apply HInFirstn in H3.
+      apply Hnotinf_vs0. assumption.
+    }
+
+    assert (Hc_tinfo_m4_new : correct_tinfo p max_alloc lenv_new m4).
+    {
+      admit.
+    }
+
+    assert (Hrepr_gc : repr_asgn_fun' argsIdent threadInfIdent nParam fenv finfo_env p bvsm4 bind bef).
+    {
+      admit.
+    }
+
+    (*
+    NEED:
+      rel_mem_L6_L7_id fenv finfo_env p rep_env (Ehalt 1%positive) rho m4 lenv
+      correct_tinfo p max_alloc lenv_new m4     
+      Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv x v) bvsm4
+      repr_asgn_fun' argsIdent threadInfIdent nParam fenv p bvsm4 bind bef
+     *) 
+
+    assert (Hasgn_fun_mem_bgc := repr_asgn_fun_mem fu lenv_new p rho (Ehalt 1%positive) fenv max_alloc rep_env finfo_env bvsm4 bind bef m4 Hsym HfinfoCorrect rel_mem_gc Hc_tinfo_m4_new Hvsm4 Hbind Hbind_nodup Hrepr_gc). 
+    destruct Hasgn_fun_mem_bgc as [mgc [Hasgn_fun_mem_bgc [Hmem_of_asgn_bgc Hrel_mem_bgc]]]. 
+    
+    assert (Hm_agc : exists magc lenv_new_agc,
+               clos_trans state (traceless_step2 (globalenv p))
+                          (State F
+                                 (Ssequence bef
+                                            (Scall None
+                                                   (Evar gcIdent
+                                                         (Tfunction (Tcons (Tpointer uval noattr) (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) Tnil)) Tvoid
+                                                                    {| cc_vararg := false; cc_unproto := false; cc_structret := false |}))
+                                                   [Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr);
+                                                    Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)]))
+                                 (Kseq (Ssequence aft Sskip) (Kseq  (Ssequence (Ssequence (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent) asgn) body)
+                                                                    (Kcall None fu empty_env lenv k)))
+                                       empty_env lenv_new m4)
+                                 (State F
+                                        Sskip
+                                        (Kseq (Ssequence aft Sskip) (Kseq  (Ssequence (Ssequence (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent) asgn) body)
+                                                                           (Kcall None fu empty_env lenv k)))
+                                              empty_env lenv_new_agc magc) /\
+                           same_tinf_ptr lenv_new lenv_new_agc /\
+                           exists alloc_b alloc_ofs limit_ofs, 
+                             deref_loc (Tarray uval maxArgs noattr) magc tinf_b
+                                       (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 3)))
+                                       (Vptr args_b args_ofs) /\
+                             Mem.load int_chunk magc tinf_b
+                                      (Ptrofs.unsigned tinf_ofs) = Some (Val.load_result int_chunk (Vptr alloc_b alloc_ofs)) /\
+                             Mem.load int_chunk magc tinf_b
+                                      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size))) = Some (Val.load_result int_chunk (Vptr alloc_b limit_ofs))).
+    {
+      admit.
+    }
+
+    destruct Hm_agc as [macg [lenv_new_agc [Hmem_agc [Hptr_agc [alloc_b_agc [alloc_ofs_agc [limit_ofs_agc [Hderef_agc [Htinf_ofs_agc H_tinf_ofs_size_agc]]]]]]]]].
+      
+    assert (Hm5 : exists m5 lenv_new',
+               clos_trans state (traceless_step2 (globalenv p))
+                          (State F
+                                 gccall
+                                 (Kseq  (Ssequence (Ssequence (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent) asgn) body)
+                                        (Kcall None fu empty_env lenv k))
+                                 empty_env lenv_new m4)
+                          (State F
+                                 Sskip
+                                 (Kseq (Ssequence (Ssequence (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent) asgn) body)
+                                       (Kcall None fu empty_env lenv k))
+                                 empty_env lenv_new' m5) /\
+               same_tinf_ptr lenv_new lenv_new' /\
+               exists alloc_b alloc_ofs limit_ofs vs7', 
+
+                 deref_loc (Tarray uval maxArgs noattr) m5 tinf_b
+                           (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 3)))
+                           (Vptr args_b args_ofs) /\
+                 Mem.load int_chunk m5 tinf_b
                               (Ptrofs.unsigned tinf_ofs) = Some (Val.load_result int_chunk (Vptr alloc_b alloc_ofs)) /\
                    Mem.load int_chunk m5 tinf_b
                             (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size))) = Some (Val.load_result int_chunk (Vptr alloc_b limit_ofs)) /\
-                   mem_after_asgn args_b args_ofs m5 locs vs7' /\ (* CHANGE : Need old version of relation *)
-                (* lenv_new' then gets the tinf ptr, and then the param_asgn *)
-                   (forall lenv_new'', lenv_param_asgn (M.set argsIdent (Vptr args_b args_ofs) (M.set limitIdent (Vptr alloc_b limit_ofs) (M.set allocIdent (Vptr alloc_b alloc_ofs) lenv_new'))) lenv_new'' vsm4 vs7' ->
+                   mem_after_asgn args_b args_ofs m5 (skipn nParam locs) (skipn nParam vs7') /\
+                (* lenv_new' then gets the tinf ptr, and then the param_asgn *) (* TODO: say something about lenv_new' and firstn nParam *)
+                   (forall lenv_new'', lenv_param_asgn (M.set argsIdent (Vptr args_b args_ofs) (M.set limitIdent (Vptr alloc_b limit_ofs) (M.set allocIdent (Vptr alloc_b alloc_ofs) lenv_new'))) lenv_new'' (skipn nParam vsm4) (skipn nParam vs7') -> 
                 rel_mem_L6_L7_id fenv finfo_env p rep_env e4 rho'' m5 lenv_new'' /\
-                correct_tinfo p max_alloc' lenv_new'' m5)
-           ). {
-            
+                correct_tinfo p max_alloc' lenv_new'' m5)).
+    { (*
+      unfold gc_test' in H9. unfold reserve' in H9. simpl in H9.
       unfold gc_test'. 
       unfold reserve'.
       remember  (L6_to_Clight.not
@@ -9239,423 +9593,442 @@ Forall2
                            (Tstruct threadInfIdent noattr)) allocIdent valPtr)) type_bool)) as gc_test.
       
       unfold L6_to_Clight.not in *.
+       *)  
+      rewrite Hgccalleq.   
+      eexists. eexists.   
+      repeat weak_split. 
+      - remember  (not (Ebinop Ole (Ederef (Evar finfo0 (Tarray L6_to_Clight.uval (Z.of_N (N.of_nat (length locs) + 2)) noattr)) L6_to_Clight.uval)
+                               (sub (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                                    (Efield (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr)) (Tstruct threadInfIdent noattr)) allocIdent valPtr)) type_bool)) as gc_test.
+        unfold L6_to_Clight.not in *.
 
-      assert (H1: exists v, 
-                 eval_expr (globalenv p) empty_env lenv_new m4 gc_test v /\
-              exists b,
-                 bool_val v (typeof gc_test) m4 = Some b).
-      { 
-        rewrite Heqgc_test.
-
-        assert (exists v, match
-                     Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4)))
-                   with
-                   | Vint n => Some (Val.of_bool (Int.eq n Int.zero))
-                   | _ => None
-                   end = Some v).  { 
-          destruct (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))); eexists; reflexivity.
-        }
-        
-        destruct H1 as [vb Hvb].
-        
-        rewrite Hfinfo_env_f' in H8; inv H8.
-        assert (Hnd := disjointIdent).
-        eexists. split.
-
-        econstructor. econstructor. econstructor. constructor. econstructor. constructor 2.  apply M.gempty. eauto.
-        constructor. reflexivity. econstructor 1. constructor. eauto.
-
-        econstructor. econstructor. econstructor. econstructor. constructor. constructor. apply M.gss. constructor 3. reflexivity.
-        reflexivity. eauto. rewrite  Htinfident_members. apply limitIdent_delta.  
-        econstructor 1. reflexivity.
-        eapply Mem.load_store_same. eauto.
-
-        econstructor. econstructor. econstructor. econstructor. constructor. apply M.gss. constructor 3. reflexivity. reflexivity. eauto.
-        rewrite Htinfident_members. apply allocIdent_delta. econstructor 1. reflexivity.
-        simpl. rewrite Ptrofs.add_zero. erewrite Mem.load_store_other.
-        eapply Mem.load_store_same. eauto. eauto.
-        right.
-        assert (Het := Ptrofs.unsigned_add_either tinf_ofs (Ptrofs.repr int_size)). destruct Het. rewrite H1. left. simpl. rewrite Ptrofs.unsigned_repr. reflexivity.
-        rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; omega.
-
-        right. rewrite H1.  rewrite Ptrofs.unsigned_repr. fold int_size.
-        assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: omega.
-        unfold Ptrofs.modulus; unfold Ptrofs.wordsize;  unfold Wordsize_Ptrofs.wordsize;
-        chunk_red; archi_red; simpl; omega. 
-        rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.
-                
-        
-        simpl. unfold sem_sub. simpl. rewrite load_ptr_or_int. rewrite load_ptr_or_int. rewrite Coqlib.peq_true. reflexivity. reflexivity. reflexivity.
-        simpl.
-        assert (
-            sem_cmp Cle (make_vint fi_0_m4) uval
-                    (Vptrofs (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr (sizeof (prog_comp_env p) uval))))
-                    (Tpointer L6_to_Clight.val {| attr_volatile := false; attr_alignas := None |}) m4 =
-            Some (Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))))).
+        assert (Hgc_test : exists v,  eval_expr (globalenv p) empty_env lenv_new m4 gc_test v /\ exists b, bool_val v (typeof gc_test) m4 = Some b).
         {
-          unfold sem_cmp. simpl. chunk_red; archi_red; simpl; unfold cmp_ptr; archi_red; unfold Val.cmplu_bool; unfold Vptrofs; archi_red; simpl. unfold Int64.ltu. unfold Ptrofs.to_int64. rewrite Int64.unsigned_repr.  rewrite Int64.unsigned_repr.
-          unfold Ptrofs.ltu. unfold Ptrofs.of_int64.  rewrite ptrofs_of_int64. reflexivity. unsigned_ptrofs_range.
-          unsigned_ptrofs_range.
-
-          unfold Int.ltu. unfold Ptrofs.to_int. rewrite Int.unsigned_repr. rewrite Int.unsigned_repr.
-          unfold Ptrofs.ltu. unfold Ptrofs.of_intu. unfold Ptrofs.of_int. rewrite ptrofs_of_int. reflexivity. auto.
-          unsigned_ptrofs_range.
-          unsigned_ptrofs_range.
-        } apply H1.
-        
-        simpl.   unfold sem_notbool. unfold bool_val. simpl. destruct
-                                                              (Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4)))); try (solve [inv Hvb]). simpl. rewrite Bool.negb_involutive. apply Hvb. 
-        destruct (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))); eexists; inv Hvb; reflexivity.
-      }        
-      destruct H1 as [gc_test_v [Hgc_test_v [gc_test_b Hgc_test_b]]].
-      (* give the gc_test inequality with Z ops *)
-      (* Ederef evaluated to the old limit_ofs and alloc_ofs *)
-      assert (Hgc_case : (((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs) / int_size) <?  max_alloc' = gc_test_b)%Z).
-      {
-           
-           subst.        
-           simpl in Hgc_test_b.
-           unfold bool_val in Hgc_test_b. simpl in Hgc_test_b.
-
-            (* * get the value of gc_test_v *)
-           destruct gc_test_v; inv Hgc_test_b. 
-
-            inv Hgc_test_v.  2: inv H1.
-            inv H7. 2: inv H1.
-            inv H16.
-            inv H1. inv H16. inv H1. rewrite M.gempty in H19; inv H19.
-            inv H17. 2: inv H1.
-
-            inv H22.  inv H21.
-
-
-            assert (H_dj := disjointIdent).
-            inv H1. 2: inv H26.
-            inv H24. rewrite <- H17 in *. clear H17.            
+          rewrite Heqgc_test.
+          assert (exists v, match
+                       Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4)))
+                     with
+                     | Vint n => Some (Val.of_bool (Int.eq n Int.zero))
+                     | _ => None
+                     end = Some v).  { 
+            destruct (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))); eexists; reflexivity.
+          }
+          destruct H1 as [vb Hvb].
+          rewrite Hfinfo_env_f' in H7. inv H7.
+          assert (Hnd := disjointIdent).
+          eexists. split. 
+          - econstructor. econstructor. econstructor. constructor. econstructor. constructor 2. apply M.gempty. eauto.
+            constructor. reflexivity. econstructor 1. constructor. eauto.
             
-            inv H7. 2: inv H26. inv H24.
-            rewrite <- H7 in *; clear H7.
-            rewrite Hget_tinfident in H29; inv H29.
-            rewrite Hget_tinfident in H27; inv H27.
-            rewrite Htinfident_members in *. simpl in H28.
-            rewrite allocIdent_delta in H28. inv H28. 
-            rewrite limitIdent_delta in H30; inv H30.
+            econstructor. econstructor. econstructor. econstructor. constructor. constructor. apply M.gss. constructor 3. reflexivity.
+            reflexivity. eauto. rewrite  Htinfident_members. apply limitIdent_delta.  
+            econstructor 1. reflexivity.
+            eapply Mem.load_store_same. eauto.
 
-            inv H21. inv H1. inv H7. inv H1. inv H17. clear H17.
-            inv H22. inv H1. inv H7. inv H1. inv H17. clear H17.
-            inv H25. 2: inv H1. rewrite M.gss in H19; inv H19.
-            
-            inv H24. 2: inv H1. rewrite M.gss in H19; inv H19.
-            inv H6; inv H1.
-            inv H16; inv H1.
-            
-             
-            unfold Mem.loadv in H6. 
-            erewrite Mem.load_store_same in H6; eauto.
-            simpl in H6. inv H6.
+            econstructor. econstructor. econstructor. econstructor. constructor. apply M.gss. constructor 3. reflexivity. reflexivity. eauto.
+            rewrite Htinfident_members. apply allocIdent_delta. econstructor 1. reflexivity.
+            simpl. rewrite Ptrofs.add_zero. erewrite Mem.load_store_other.
+            eapply Mem.load_store_same. eauto. eauto.
+            right.
+            assert (Het := Ptrofs.unsigned_add_either tinf_ofs (Ptrofs.repr int_size)). destruct Het. rewrite H1. left. simpl. rewrite Ptrofs.unsigned_repr. reflexivity.
+            rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; omega.
 
-            unfold Mem.loadv in H7.
-            erewrite Mem.load_store_other in H7; eauto.
-            rewrite Ptrofs.add_zero in H7. 
-            erewrite Mem.load_store_same in H7; eauto. inv H7.
-            2: { right. rewrite Ptrofs.add_zero. simpl.
-            assert (Het := Ptrofs.unsigned_add_either ofs2 (Ptrofs.repr int_size)). destruct Het.
-            rewrite H1. left. rewrite Ptrofs.unsigned_repr. unfold Mptr; chunk_red; archi_red; omega. rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega. 
-            right. rewrite H1. rewrite Ptrofs.unsigned_repr.
-            fold int_size.
+            right. rewrite H1.  rewrite Ptrofs.unsigned_repr. fold int_size.
             assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: omega.
             unfold Ptrofs.modulus; unfold Ptrofs.wordsize;  unfold Wordsize_Ptrofs.wordsize;
-        chunk_red; archi_red; simpl; omega. 
+              chunk_red; archi_red; simpl; omega. 
             rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.
-                 }
-             
             
-            (* get the value of max_alloc in tinfo *)
-            rewrite   Hfinfo_env_f' in H8; inv H8.
-            rewrite  Hfind_symbol in H20 ; inv H20.
             
-            inv H5. inv H1. 2: inv H6.
-            inv H4; inv H1.
-            unfold int_chunk in *.
-            assert
-              (Some v0 =  Some (make_vint fi_0_m4) ).
-            chunk_red; archi_red; simpl in *; rewrite Hload_fi0 in H5; auto.
-            clear H5. inv H1. 
-            
-            clear H6.
+            simpl. unfold sem_sub. simpl. rewrite load_ptr_or_int. rewrite load_ptr_or_int. rewrite Coqlib.peq_true. reflexivity. reflexivity. reflexivity.
+            simpl.
+            assert (
+                sem_cmp Cle (make_vint fi_0_m4) uval
+                        (Vptrofs (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr (sizeof (prog_comp_env p) uval))))
+                        (Tpointer L6_to_Clight.val {| attr_volatile := false; attr_alignas := None |}) m4 =
+                Some (Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))))).
+            {
+              unfold sem_cmp. simpl. chunk_red; archi_red; simpl; unfold cmp_ptr; archi_red; unfold Val.cmplu_bool; unfold Vptrofs; archi_red; simpl. unfold Int64.ltu. unfold Ptrofs.to_int64. rewrite Int64.unsigned_repr.  rewrite Int64.unsigned_repr.
+              unfold Ptrofs.ltu. unfold Ptrofs.of_int64.  rewrite ptrofs_of_int64. reflexivity. unsigned_ptrofs_range.
+              unsigned_ptrofs_range.
 
+              unfold Int.ltu. unfold Ptrofs.to_int. rewrite Int.unsigned_repr. rewrite Int.unsigned_repr.
+              unfold Ptrofs.ltu. unfold Ptrofs.of_intu. unfold Ptrofs.of_int. rewrite ptrofs_of_int. reflexivity. auto.
+              unsigned_ptrofs_range.
+              unsigned_ptrofs_range.
+            } apply H1. 
             
-            assert (max_alloc' = fi_0_m4).
-            unfold correct_alloc in *; subst; auto. subst.
-
-            simpl in H18.
-            simpl in H23.  unfold sem_sub in H23; simpl in H23.
-            rewrite load_ptr_or_int in H23; [ | auto].
-            rewrite load_ptr_or_int in H23; [ | auto].
-            rewrite Coqlib.peq_true in H23.
-            assert ((Coqlib.proj_sumbool (Coqlib.zlt 0 (sizeof (prog_comp_env p) uval)) &&
-                                         Coqlib.proj_sumbool (Coqlib.zle (sizeof (prog_comp_env p) uval) Ptrofs.max_signed))%bool = true). { rewrite ptrofs_ms. unfold sizeof in *; chunk_red; archi_red; reflexivity. } 
-                                                                                                                                           rewrite H1 in H23. inv H23. clear H1.
-                    assert (
-            sem_cmp Cle (make_vint fi_0_m4) uval
-                    (Vptrofs (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr (sizeof (prog_comp_env p) uval))))
-                    (Tpointer L6_to_Clight.val {| attr_volatile := false; attr_alignas := None |}) m4 =
-            Some (Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))))).
+            simpl. unfold sem_notbool. unfold bool_val. simpl.
+            destruct (Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))));
+              try (solve [inv Hvb]). simpl. rewrite Bool.negb_involutive. apply Hvb.
+            
+          - destruct (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))); eexists; inv Hvb; reflexivity.
+        }   
+         
+        destruct Hgc_test as [gc_test_v [Hgc_test_v [gc_test_b Hgc_test_b]]].
+        (* give the gc_test inequality with Z ops *)
+        (* Ederef evaluated to the old limit_ofs and alloc_ofs *)
+        assert (Hgc_case : (((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs) / int_size) <?  max_alloc' = gc_test_b)%Z).
         {
-          unfold sem_cmp. simpl. chunk_red; archi_red; simpl; unfold cmp_ptr; archi_red; unfold Val.cmplu_bool; unfold Vptrofs; archi_red; simpl. unfold Int64.ltu. unfold Ptrofs.to_int64. rewrite Int64.unsigned_repr.  rewrite Int64.unsigned_repr.
-          unfold Ptrofs.ltu. unfold Ptrofs.of_int64.  rewrite ptrofs_of_int64. reflexivity. unsigned_ptrofs_range.
-          unsigned_ptrofs_range.
+          
+          subst.        
+          simpl in Hgc_test_b.
+          unfold bool_val in Hgc_test_b. simpl in Hgc_test_b.
+ 
+          (* * get the value of gc_test_v *)
+          destruct gc_test_v; inv Hgc_test_b.  
+   
+          inv Hgc_test_v.  2: inv H1. 
+          inv H6. 2: inv H1. 
+          inv H14. 
+          inv H1. inv H14. inv H1. rewrite M.gempty in H17; inv H17.
+          inv H15. 2: inv H1.
 
-          unfold Int.ltu. unfold Ptrofs.to_int. rewrite Int.unsigned_repr. rewrite Int.unsigned_repr.
-          unfold Ptrofs.ltu. unfold Ptrofs.of_intu. unfold Ptrofs.of_int. rewrite ptrofs_of_int. reflexivity. auto.
-          unsigned_ptrofs_range.
-          unsigned_ptrofs_range.
-        }  rewrite H18 in H1. inv H1.
-        
+          inv H22.  inv H21.
+ 
 
-        simpl in H12. rewrite sem_notbool_val in H12. 
-        rewrite Bool.negb_involutive in H12. simpl in H12.
-        clear H18.
-        unfold Ptrofs.ltu in *. unfold Ptrofs.sub in *.
-            unfold Ptrofs.divs in *.
+          assert (H_dj := disjointIdent).
+          inv H1. 2: inv H26.
+          inv H24. rewrite <- H15 in *. clear H15.             
+          
+          inv H6. 2: inv H26. inv H24.
+          rewrite <- H6 in *; clear H6. 
+          rewrite Hget_tinfident in H29; inv H29.
+          rewrite Hget_tinfident in H27; inv H27.
+          rewrite Htinfident_members in *. simpl in H28.
+          rewrite allocIdent_delta in H28. inv H28.  
+          rewrite limitIdent_delta in H30; inv H30.
+ 
+          inv H21. inv H1. inv H6. inv H1. inv H15. clear H15.
+          inv H22. inv H1. inv H6. inv H1. inv H15. clear H15.
+          inv H25. 2: inv H1. rewrite lenv_newEq in *.
+          rewrite M.gss in H17; inv H17.
+          
+          inv H24. 2: inv H1. rewrite M.gss in H17; inv H17.
+          inv H5; inv H1.
+          inv H14; inv H1.
+          
+          
+          unfold Mem.loadv in H5. 
+          erewrite Mem.load_store_same in H5; eauto.
+          simpl in H5. inv H5. 
+
+          unfold Mem.loadv in H6.
+          erewrite Mem.load_store_other in H6; eauto.
+          rewrite Ptrofs.add_zero in H6. 
+          erewrite Mem.load_store_same in H6; eauto. inv H6.
+          2: { right. rewrite Ptrofs.add_zero. simpl.
+               assert (Het := Ptrofs.unsigned_add_either ofs2 (Ptrofs.repr int_size)). destruct Het.
+               rewrite H1. left. rewrite Ptrofs.unsigned_repr. unfold Mptr; chunk_red; archi_red; omega. rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega. 
+               right. rewrite H1. rewrite Ptrofs.unsigned_repr.
+               fold int_size.
+               assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: omega.
+               unfold Ptrofs.modulus; unfold Ptrofs.wordsize;  unfold Wordsize_Ptrofs.wordsize;
+                 chunk_red; archi_red; simpl; omega. 
+               rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.
+               }
              
-            rewrite Ptrofs.signed_repr with (z := int_size%Z) in H12.
-            rewrite Ptrofs.signed_repr in H12.
-            2:{ split.
-            rewrite <- Z.le_add_le_sub_l. etransitivity. 2: eauto.
-            unfold Ptrofs.min_signed.  
-            inv Hc_alloc.    unfold Ptrofs.half_modulus. unfold Ptrofs.modulus. simpl. unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. 
-            etransitivity; eauto. unfold gc_size; unfold Ptrofs.max_signed. unfold Ptrofs.half_modulus. unfold Ptrofs.modulus.  unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. } 
-            2:unfold Ptrofs.min_signed; unfold Ptrofs.max_signed; unfold Ptrofs.half_modulus;  unfold Ptrofs.modulus;  unfold Ptrofs.wordsize; unfold Wordsize_Ptrofs.wordsize; chunk_red; archi_red; simpl; omega. 
-            rewrite Ptrofs.unsigned_repr in H12. 
-            rewrite Ptrofs.unsigned_repr in H12.
-            rewrite  Zquot.Zquot_Zdiv_pos in H12.
-            destruct  ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs) / int_size <?  fi_0_m4)%Z eqn: Hcase.
-            (* true *)
-            apply Z.ltb_lt in Hcase.
-            rewrite Coqlib.zlt_true in H12 by auto. simpl in H12. inv H12.
-            reflexivity. 
-            (* false *)
-            apply Z.ltb_ge in Hcase.
-            apply Z.le_ge in Hcase.
-            rewrite Coqlib.zlt_false in H12 by auto.
-            inv H12. reflexivity.
-            (* bounds *) 
-            apply Zle_minus_le_0. unfold int_size in *. etransitivity; eauto.
-            inv Hc_alloc.
-            simpl. chunk_red; omega. chunk_red; omega. 
-            (* Assumption that max_allocs is smaller than gc_size -- add this to correct_fundef_info *)
-            assert (  (0 <= fi_0_m4)%Z) by (inv Hcorrect_alloc_m4; apply Zle_0_nat).
-            split. auto.
-            unfold gc_size in *. rewrite ptrofs_mu. simpl in Hgc_size_fi0m4. etransitivity. etransitivity. 2: apply Hgc_size_fi0m4. chunk_red; omega. chunk_red; archi_red; solve_uint_range; simpl; omega.
 
-            split. apply Zquot.Z_quot_pos.
-            apply Zle_minus_le_0. unfold int_size in *. etransitivity; eauto.
-            inv Hc_alloc.
-            simpl. chunk_red; omega. chunk_red; omega.
-            apply Z.quot_le_upper_bound. chunk_red; omega.
-            assert  (Ptrofs.max_unsigned <= int_size * Ptrofs.max_unsigned)%Z. assert (0 <= Ptrofs.max_unsigned)%Z. etransitivity. 2: apply ptrofs_mu_weak. unfold Int.max_unsigned; simpl; omega. chunk_red; omega.
-            etransitivity; eauto.
-            
-       }
+             (* get the value of max_alloc in tinfo *)
+             rewrite Hfinfo_env_f' in H7; inv H7.
+               rewrite Hfind_symbol in H20 ; inv H20.
+               
+               inv H4. inv H1. 2: inv H5.
+               inv H3; inv H1.
+               unfold int_chunk in *.
+               assert
+                 (Some v0 =  Some (make_vint fi_0_m4) ).
+               chunk_red; archi_red; simpl in *; rewrite Hload_fi0 in H4; auto.
+               clear H4. inv H1. 
+               
+               clear H5.
+
+               
+               assert (max_alloc' = fi_0_m4).
+               unfold correct_alloc in *; subst; auto. subst.
+
+               simpl in H16.
+               simpl in H23.  unfold sem_sub in H23; simpl in H23.
+               rewrite load_ptr_or_int in H23; [ | auto].
+               rewrite load_ptr_or_int in H23; [ | auto].
+               rewrite Coqlib.peq_true in H23.
+               assert ((Coqlib.proj_sumbool (Coqlib.zlt 0 (sizeof (prog_comp_env p) uval)) &&
+                                            Coqlib.proj_sumbool (Coqlib.zle (sizeof (prog_comp_env p) uval) Ptrofs.max_signed))%bool = true). { rewrite ptrofs_ms. unfold sizeof in *; chunk_red; archi_red; reflexivity. } 
+                                                                                                                                              rewrite H1 in H23. inv H23. clear H1.
+               assert (
+                   sem_cmp Cle (make_vint fi_0_m4) L6_to_Clight.uval (Vptrofs (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr (sizeof (prog_comp_env p) uval)))) valPtr m4 =
+                   Some (Val.of_bool (negb (Ptrofs.ltu (Ptrofs.divs (Ptrofs.sub limit_ofs alloc_ofs) (Ptrofs.repr int_size)) (Ptrofs.repr fi_0_m4))))).
+               {
+                 unfold sem_cmp. simpl. chunk_red; archi_red; simpl; unfold cmp_ptr; archi_red; unfold Val.cmplu_bool; unfold Vptrofs; archi_red; simpl. unfold Int64.ltu. unfold Ptrofs.to_int64. rewrite Int64.unsigned_repr.  rewrite Int64.unsigned_repr.
+                 unfold Ptrofs.ltu. unfold Ptrofs.of_int64.  rewrite ptrofs_of_int64. reflexivity. unsigned_ptrofs_range.
+                 unsigned_ptrofs_range.
+
+                 unfold Int.ltu. unfold Ptrofs.to_int. rewrite Int.unsigned_repr. rewrite Int.unsigned_repr.
+                 unfold Ptrofs.ltu. unfold Ptrofs.of_intu. unfold Ptrofs.of_int. rewrite ptrofs_of_int. reflexivity. auto.
+                 unsigned_ptrofs_range.
+                 unsigned_ptrofs_range.
+               }
+               Set Printing All. simpl. rewrite H16 in H1.
+               Unset Printing All. simpl. inv H1.
+                 
+               simpl in H8. rewrite sem_notbool_val in H8. 
+               rewrite Bool.negb_involutive in H8. simpl in H8.
+               clear H16.
+               unfold Ptrofs.ltu in *. unfold Ptrofs.sub in *.
+               unfold Ptrofs.divs in *.
+               
+               rewrite Ptrofs.signed_repr with (z := int_size%Z) in H8.
+               rewrite Ptrofs.signed_repr in H8.
+               2:{ split.
+                   rewrite <- Z.le_add_le_sub_l. etransitivity. 2: eauto.
+                   unfold Ptrofs.min_signed.  
+                   inv Hc_alloc.    unfold Ptrofs.half_modulus. unfold Ptrofs.modulus. simpl. unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. 
+                   etransitivity; eauto. unfold gc_size; unfold Ptrofs.max_signed. unfold Ptrofs.half_modulus. unfold Ptrofs.modulus.  unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. } 
+                 2:unfold Ptrofs.min_signed; unfold Ptrofs.max_signed; unfold Ptrofs.half_modulus;  unfold Ptrofs.modulus;  unfold Ptrofs.wordsize; unfold Wordsize_Ptrofs.wordsize; chunk_red; archi_red; simpl; omega. 
+                   rewrite Ptrofs.unsigned_repr in H8. 
+                   rewrite Ptrofs.unsigned_repr in H8.
+                   rewrite  Zquot.Zquot_Zdiv_pos in H8.
+                   destruct  ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs) / int_size <?  fi_0_m4)%Z eqn: Hcase.
+                   (* true *)
+                   apply Z.ltb_lt in Hcase.
+                   rewrite Coqlib.zlt_true in H8 by auto. simpl in H8. inv H8.
+                   reflexivity. 
+                   (* false *)
+                   apply Z.ltb_ge in Hcase.
+                   apply Z.le_ge in Hcase.
+                   rewrite Coqlib.zlt_false in H8 by auto.
+                   inv H8. reflexivity.
+                   (* bounds *) 
+                   apply Zle_minus_le_0. unfold int_size in *. etransitivity; eauto.
+                   inv Hc_alloc.
+                   simpl. chunk_red; omega. chunk_red; omega. 
+                   (* Assumption that max_allocs is smaller than gc_size -- add this to correct_fundef_info *)
+                   assert (  (0 <= fi_0_m4)%Z) by (inv Hcorrect_alloc_m4; apply Zle_0_nat).
+                   split. auto.
+                   unfold gc_size in *. rewrite ptrofs_mu. simpl in Hgc_size_fi0m4. etransitivity. etransitivity. 2: apply Hgc_size_fi0m4. chunk_red; omega. chunk_red; archi_red; solve_uint_range; simpl; omega.
+
+                   split. apply Zquot.Z_quot_pos.
+                   apply Zle_minus_le_0. unfold int_size in *. etransitivity; eauto.
+                   inv Hc_alloc.
+                   simpl. chunk_red; omega. chunk_red; omega.
+                   apply Z.quot_le_upper_bound. chunk_red; omega.
+                   assert  (Ptrofs.max_unsigned <= int_size * Ptrofs.max_unsigned)%Z. assert (0 <= Ptrofs.max_unsigned)%Z. etransitivity. 2: apply ptrofs_mu_weak. unfold Int.max_unsigned; simpl; omega. chunk_red; omega.
+                   etransitivity; eauto.
+                   
+                   }
 
         destruct gc_test_b.
       (* two cases *)
       (** 1) not enough space in the nursery for body, GC call *)
                  
-      -   (* done - modify gc_inv to account for new lenv and additional restriction on args*)
-        rewrite Hfinfo_env_f' in H8. inv H8.
+      *   (* done - modify gc_inv to account for new lenv and additional restriction on args*)
+        rewrite Hfinfo_env_f' in H7. inv H7.
         destruct Hpinv_gc as [b_gcPtr [name_gc [sg_gc [Hfind_gc_ptr [Hfind_gc_funct Hinv_gc]]]]].
         
-        assert (@rel_mem_asgn fenv finfo_env p rep_env args_b args_ofs m4 Lm4 vs locs vs7). {
-          assert (Hdj := disjointIdent).
-          assert (Hmem_of_asgn_m4: mem_of_asgn_v args_b args_ofs p lenv m4 ys locs vs7).
+        assert (@rel_mem_asgn fenv finfo_env p rep_env args_b args_ofs m4 Lm4 (skipn nParam vs) aind avs7). {
+          assert (Hdj := disjointIdent). 
+          assert (Hmem_of_asgn_m4: mem_of_asgn_v args_b args_ofs p lenv m4 ays aind avs7). 
           eapply mem_of_asgn_v_store.
           eapply mem_of_asgn_v_store.
           eauto. eauto. solve_nodup.
           eauto. solve_nodup.
-          eapply rel_mem_of_asgn; eauto.
-          intros.
-          assert (occurs_free (Eapp f tm4 ys) x). constructor. eauto. 
+          eapply rel_mem_of_asgn; eauto. 
+          intros. 
+          assert (Hskipn_get_list : forall {A} n l1 (l2 : list A) rho,
+                                        get_list l1 rho = Some l2 -> get_list (skipn n l1) rho = Some (skipn n l2)). (* TODO : Move out *)
+          {
+            intros A. induction n; intros. auto.
+            destruct l1 , l2. 
+            - reflexivity.
+            - inv H1.  
+            - simpl in H1.
+              repeat match_case in H1.
+            - simpl in H1.
+              repeat match_case in H1.
+              simpl. apply IHn; auto.
+              inv H1. assumption.
+          }
+          rewrite aysEq.
+          apply Hskipn_get_list. eauto. intros.
+          assert (occurs_free (Eapp f tm4' ys) x). constructor. eauto. 
           specialize (Hrel_rho_m4 x). destruct Hrel_rho_m4 as [Hrel_mg1 Hrel_mg2].
-          specialize (Hrel_mg1 H4).
+          specialize (Hrel_mg1 H3).
           destruct Hrel_mg1 as [v6 [Hgv6 Hv6_repr]].
           exists v6. split; auto. 
         }          
-        
+         
         assert ( deref_loc (Tarray uval maxArgs noattr) m4 tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (3 * int_size)))
                            (Vptr args_b args_ofs)). {
-          destruct Hc_tinfo_m4.
+          destruct Hc_tinfo_m4. 
           destructAll.
-          rewrite H12 in  Hget_args; inv Hget_args.
-          rewrite H18 in  Hget_tinf; inv Hget_tinf.
+          rewrite H14 in  Hget_args; inv Hget_args.
+          rewrite H20 in  Hget_tinf; inv Hget_tinf.
           eauto.
-        }
-                                 
+        }   
         
-        specialize (Hinv_gc _ _ _ _ _ _ _  _ _   _ _ _ _ _ _ _ H1 Hget_tinf  Hload_fi0  Hgc_size_fi0m4 H4).
-         
-        destruct Hinv_gc as [gc_vret [m5 [alloc_b' [alloc_ofs' [limit_ofs' [L' [vs7' [Hinv_gc [Hderef_alloc' [Hderef_limit' [Hderef_args' [Hrel_mem_asgn' [Hrel_mem_unchanged' [Hprotected_L' Hcorrect_tinfo']]]]]]]]]]]]]].
+        specialize (Hinv_gc _ _ _ _ _ _ _  _ _   _ _ _ _ _ _ _ H1 Hget_tinf  Hload_fi0  Hgc_size_fi0m4 H3).
+        
+        destruct Hinv_gc as [gc_vret [m5 [alloc_b' [alloc_ofs' [limit_ofs' [L' [vs7' [Hinv_gc [Hderef_alloc' [Hderef_limit' [Hderef_args' [Hrel_mem_asgn' [Hrel_mem_unchanged' [Hprotected_L' Hcorrect_tinfo']]]]]]]]]]]]]]. (* I'M HERE *)
         eexists. eexists. split.
-         eapply t_trans.
-         constructor. econstructor. eauto. eauto. 
-         simpl. 
-         
+        eapply t_trans.
+        constructor. econstructor. eauto. eauto. 
+        simpl. 
+        
 
-         
-         (* true branch -> call to gc *)
-         eapply t_trans.
-         constructor. econstructor. reflexivity. eauto.
-         econstructor. 
-         apply eval_Evar_global. apply M.gempty. eauto.
-         simpl. constructor. simpl. constructor.         
-         econstructor. econstructor. constructor 2.
-         apply M.gempty.  eauto. 
-         constructor. reflexivity. simpl. reflexivity.
-         econstructor. constructor.
-         assert (Hdj:=disjointIdent).
-         rewrite M.gss. reflexivity.
-         reflexivity. constructor.
-         eauto. simpl. reflexivity.
+        
+        (* true branch -> call to gc *)
+        eapply t_trans.
+        constructor. econstructor. reflexivity. eauto.
+        econstructor. 
+        apply eval_Evar_global. apply M.gempty. eauto.
+        simpl. constructor. simpl. constructor.         
+        econstructor. econstructor. constructor 2.
+        apply M.gempty.  eauto. 
+        constructor. reflexivity. simpl. reflexivity.
+        econstructor. constructor.
+        assert (Hdj:=disjointIdent).
+        rewrite M.gss. reflexivity.
+        reflexivity. constructor.
+        eauto. simpl. reflexivity.
 
-         eapply t_trans. 
-         constructor.
-         eapply step_external_function.
-         eauto.
+        eapply t_trans. 
+        constructor.
+        eapply step_external_function.
+        eauto.
 
-         constructor. constructor.
+        constructor. constructor.
 
-         split. simpl. reflexivity.
-         exists alloc_b', alloc_ofs', limit_ofs', vs7'.
-         split. auto. split.          
-         inv Hderef_alloc' ; try (inv H6). inv H5. auto.
-         split. inv Hderef_limit'; try (inv H6). inv H5; auto.
+        split. simpl. reflexivity.
+        exists alloc_b', alloc_ofs', limit_ofs', vs7'.
+        split. auto. split.          
+        inv Hderef_alloc' ; try (inv H6). inv H5. auto.
+        split. inv Hderef_limit'; try (inv H6). inv H5; auto.
 
-         split.
-         eapply rel_mem_after_asgn; eauto.
-         intros.
-         assert (map_get_r_l Values.val [argsIdent; limitIdent; allocIdent; tinfIdent]
-                             (M.set argsIdent (Vptr args_b args_ofs)
-                                    (M.set limitIdent (Vptr alloc_b' limit_ofs')
-                                           (M.set allocIdent (Vptr alloc_b' alloc_ofs')
-                                                  (Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs) (M.empty Values.val))))) lenv_new''). {
-           assert (H_nodup := disjointIdent).
-           eapply lenv_param_asgn_map with (l := [argsIdent; limitIdent; allocIdent; tinfIdent]) in H5.
-                      
-           intro. intro. rewrite <- H5.
-           2: auto.
-           inv H6. rewrite M.gss. rewrite M.gss. reflexivity.
-           inv H7. clear H6. rewrite M.gso. rewrite M.gss. rewrite M.gso. rewrite M.gss.
-           reflexivity. 
-solve_nodup. solve_nodup.
-           inv H6. clear H7. rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gss.
-           rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gss. reflexivity.
-           inv H7. clear H6.
-           rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gss.
-           rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. simpl. rewrite M.gss. reflexivity.
-           inv H6.
-           split. intro. intro. destruct H6. apply Hnoprot_vs0 in H6. apply H6. inv H7. left. constructor 2. auto.
-           inv H8. left. constructor 2. auto. inv H7. left. constructor. auto. inv H8. auto. inv H7.            
-         }
-         split.
-        * (* rel_mem m5 *)
-          exists L'.
+        split.
+        eapply rel_mem_after_asgn; eauto.
+        intros.
+        assert (map_get_r_l Values.val [argsIdent; limitIdent; allocIdent; tinfIdent]
+                            (M.set argsIdent (Vptr args_b args_ofs)
+                                   (M.set limitIdent (Vptr alloc_b' limit_ofs')
+                                          (M.set allocIdent (Vptr alloc_b' alloc_ofs')
+                                                 (Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs) (M.empty Values.val))))) lenv_new''). {
+          assert (H_nodup := disjointIdent).
+          eapply lenv_param_asgn_map with (l := [argsIdent; limitIdent; allocIdent; tinfIdent]) in H5.
+          
+          intro. intro. rewrite <- H5.
+          2: auto.
+          inv H6. rewrite M.gss. rewrite M.gss. reflexivity.
+          inv H7. clear H6. rewrite M.gso. rewrite M.gss. rewrite M.gso. rewrite M.gss.
+          reflexivity. 
+          solve_nodup. solve_nodup.
+          inv H6. clear H7. rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gss.
+          rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gss. reflexivity.
+          inv H7. clear H6.
+          rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gss.
+          rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. rewrite M.gso by solve_nodup. simpl. rewrite M.gss. reflexivity.
+          inv H6.
+          split. intro. intro. destruct H6. apply Hnoprot_vs0 in H6. apply H6. inv H7. left. constructor 2. auto.
+          inv H8. left. constructor 2. auto. inv H7. left. constructor. auto. inv H8. auto. inv H7.            
+        }
+        split.
+      * (* rel_mem m5 *)
+        exists L'.
 
-          assert (Hug_m45: unchanged_globals p m4 m5). {
-                intro.
-                intros. symmetry.
-                eapply Mem.load_unchanged_on_1.
-                eauto. destruct Hc_tinfo_m4. destructAll. apply H27 in H7. destructAll.
-                eapply Mem.valid_access_valid_block. eauto. (* any block in globalenv is valid, and that GC preserve those blocks *)
-                intros. simpl. split.
-                inv Hrel_pm4. destructAll.
-                rewrite  Hget_args in H18; inv H18.
-                rewrite Hget_alloc in H12; inv H12. eapply H22.
-                apply H7.
-                inv  Hprotected_L'. destructAll.
-                rewrite M.gss in H18. inv H18.
-                assert (Hnd := disjointIdent).
-                rewrite M.gso in H20 by solve_nodup.
-                rewrite M.gso in H20 by solve_nodup.
-                rewrite M.gso in H20 by solve_nodup.
-                rewrite M.gss in H20. inv H20.
-                split.
-                eapply H22. eauto.
-                inv Hc_tinfo'. destructAll.
-                apply H35 in H7. destructAll. rewrite H30 in Hget_tinf. inv Hget_tinf. eauto.
-              }
+        assert (Hug_m45: unchanged_globals p m4 m5). {
+          intro.
+          intros. symmetry.
+          eapply Mem.load_unchanged_on_1.
+          eauto. destruct Hc_tinfo_m4. destructAll. apply H27 in H7. destructAll.
+          eapply Mem.valid_access_valid_block. eauto. (* any block in globalenv is valid, and that GC preserve those blocks *)
+          intros. simpl. split.
+          inv Hrel_pm4. destructAll.
+          rewrite  Hget_args in H18; inv H18.
+          rewrite Hget_alloc in H12; inv H12. eapply H22.
+          apply H7.
+          inv  Hprotected_L'. destructAll.
+          rewrite M.gss in H18. inv H18.
+          assert (Hnd := disjointIdent).
+          rewrite M.gso in H20 by solve_nodup.
+          rewrite M.gso in H20 by solve_nodup.
+          rewrite M.gso in H20 by solve_nodup.
+          rewrite M.gss in H20. inv H20.
+          split.
+          eapply H22. eauto.
+          inv Hc_tinfo'. destructAll.
+          apply H35 in H7. destructAll. rewrite H30 in Hget_tinf. inv Hget_tinf. eauto.
+        }
 
 
-          split.          
-          eapply protected_not_in_L_proper; eauto. split.
-          { (* rel_mem of *)
-            intros.
-            (* e4 is closed under  (name_in_fundefs fl + vsm4) so x is in rho'' *)
-            assert (Hx_in: (In _ (Ensembles.Union _  (FromList vsm4) (name_in_fundefs fl)) x)). {
-               eapply closed_val_fun; eauto.
-              }
-            assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.  
-            inv Hx_vsm4. 
-            + (* x in vsm4 *)
-              assert (Hx_rho'' := get_set_lists_In_xs _ _ _ _ _ H8 H2). destruct Hx_rho''. exists x0. split; auto.
-              assert (Hx_in_rho := in_rho_entry _ _ _ _ _ _ H2  Hnd_vs0  H12). destruct Hx_in_rho.
-              2: exfalso; destructAll; auto.
-              destruct H15. destruct H15. 
-              assert (H_x0_vs := nthN_In _ _ _ H16). 
-              specialize ( H5 x). destruct H5. specialize (H5 _ H15).
-              
-              assert (Hx_rho_x_val := get_list_nth_get' _ _ _ _ _ _ H0 H16). destruct Hx_rho_x_val as [y4 [Hy4_ys Hy4_rho]].
-              
-              specialize (Hrel_rho_m4 y4). destruct (Hrel_rho_m4). 
-              assert (occurs_free (Eapp f tm4 ys) y4). constructor. apply nthN_In in Hy4_ys; auto. apply H18 in H20.
-              destruct H20. destruct H20. rewrite Hy4_rho in H20. inv H20.
-              assert (Genv.find_symbol (Genv.globalenv p) x = None). {
-                inv Hf_id. eapply H22. apply H.
-                eapply  Bound_FVfun. left. eauto. eauto.
-              }
-              assert (exists v7, nthN vs7' x1 = Some v7). 
-              eapply nthN_length. eapply OrdersEx.Nat_as_OT.eq_le_incl. eapply rel_mem_asgn_length; eauto. 
-              eauto. destruct H22 as [v7 Hv7_vs7].
-              econstructor. eauto. erewrite Hv7_vs7 in H5. apply H5.
-              assert (Hx2v7 := rel_mem_asgn_nthN   Hrel_mem_asgn' H16 Hv7_vs7). auto.
-            + (* x in fl *)
-              inv Hx_in. exfalso; auto.
-              eapply set_lists_not_In in H2. 2: eauto.
-              rewrite def_funs_eq in H2; auto. eexists. split; eauto.
-              assert (subval_or_eq  (Vfun (M.empty cps.val) fl x) (Vfun (M.empty cps.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H17 _ _ _ _  H H15). destruct H17. inv H17.
-
-              econstructor. apply H21. inv H26.
-              econstructor; eauto. 
-              (* impossible, functions not bound *)
-              inv H21. rewrite H26 in H19. inv H19.              
+        split.          
+        eapply protected_not_in_L_proper; eauto. split.
+        { (* rel_mem of *)
+          intros.
+          (* e4 is closed under  (name_in_fundefs fl + vsm4) so x is in rho'' *)
+          assert (Hx_in: (In _ (Ensembles.Union _  (FromList vsm4) (name_in_fundefs fl)) x)). {
+            eapply closed_val_fun; eauto.
           }
-          { (* rel_mem fun *)
-            intros.
+          assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.  
+          inv Hx_vsm4. 
+          + (* x in vsm4 *)
+            assert (Hx_rho'' := get_set_lists_In_xs _ _ _ _ _ H8 H2). destruct Hx_rho''. exists x0. split; auto.
+            assert (Hx_in_rho := in_rho_entry _ _ _ _ _ _ H2  Hnd_vs0  H12). destruct Hx_in_rho.
+            2: exfalso; destructAll; auto.
+            destruct H15. destruct H15. 
+            assert (H_x0_vs := nthN_In _ _ _ H16). 
+            specialize ( H5 x). destruct H5. specialize (H5 _ H15).
+            
+            assert (Hx_rho_x_val := get_list_nth_get' _ _ _ _ _ _ H0 H16). destruct Hx_rho_x_val as [y4 [Hy4_ys Hy4_rho]].
+            
+            specialize (Hrel_rho_m4 y4). destruct (Hrel_rho_m4). 
+            assert (occurs_free (Eapp f tm4 ys) y4). constructor. apply nthN_In in Hy4_ys; auto. apply H18 in H20.
+            destruct H20. destruct H20. rewrite Hy4_rho in H20. inv H20.
+            assert (Genv.find_symbol (Genv.globalenv p) x = None). {
+              inv Hf_id. eapply H22. apply H.
+              eapply  Bound_FVfun. left. eauto. eauto.
+            }
+            assert (exists v7, nthN vs7' x1 = Some v7). 
+            eapply nthN_length. eapply OrdersEx.Nat_as_OT.eq_le_incl. eapply rel_mem_asgn_length; eauto. 
+            eauto. destruct H22 as [v7 Hv7_vs7].
+            econstructor. eauto. erewrite Hv7_vs7 in H5. apply H5.
+            assert (Hx2v7 := rel_mem_asgn_nthN   Hrel_mem_asgn' H16 Hv7_vs7). auto.
+          + (* x in fl *)
+            inv Hx_in. exfalso; auto.
+            eapply set_lists_not_In in H2. 2: eauto.
+            rewrite def_funs_eq in H2; auto. eexists. split; eauto.
+            assert (subval_or_eq  (Vfun (M.empty cps.val) fl x) (Vfun (M.empty cps.val) fl f')). constructor. eapply dsubval_fun.  auto. destruct (Hrel_rho_m4 f). specialize (H17 _ _ _ _  H H15). destruct H17. inv H17.
 
+            econstructor. apply H21. inv H26.
+            econstructor; eauto. 
+            (* impossible, functions not bound *)
+            inv H21. rewrite H26 in H19. inv H19.              
+        }
+        { (* rel_mem fun *)
+          intros.
+
+
+          
+          assert (Hin := in_rho_entry _ _ _ _ _ _ H2 Hnd_vs0 H7).
+          
+          destruct Hin.
+          + (* x is from vs0 *)
+            destruct H12.
+            destruct H12.
+            apply nthN_In in H15.
+            apply (get_list_In_val _ _ _  _ H0) in H15.
+            destruct H15. destruct H15.
 
             
-            assert (Hin := in_rho_entry _ _ _ _ _ _ H2 Hnd_vs0 H7).
-            
-            destruct Hin.
-            + (* x is from vs0 *)
-              destruct H12.
-              destruct H12.
-              apply nthN_In in H15.
-              apply (get_list_In_val _ _ _  _ H0) in H15.
-              destruct H15. destruct H15.
-
-             
-              specialize (Hrel_rho_m4 x1). 
-              destruct Hrel_rho_m4.                     
-              specialize (H18 _ _ _ _ H16 H8).
-              destruct H18 as [Hrel_m421 Hrel_m422].
-              split.
-            - inv Hrel_m421.
-              inv H26. econstructor; eauto.
-              econstructor; eauto.
-              (* imposible since function not bound *)
-              inv H20. rewrite H27 in H18. inv H18.
-            - destruct  Hrel_m422.  split. auto. eapply correct_fundefs_unchanged_global; eauto.
+            specialize (Hrel_rho_m4 x1). 
+            destruct Hrel_rho_m4.                     
+            specialize (H18 _ _ _ _ H16 H8).
+            destruct H18 as [Hrel_m421 Hrel_m422].
+            split.
+          - inv Hrel_m421.
+            inv H26. econstructor; eauto.
+            econstructor; eauto.
+            (* imposible since function not bound *)
+            inv H20. rewrite H27 in H18. inv H18.
+          - destruct  Hrel_m422.  split. auto. eapply correct_fundefs_unchanged_global; eauto.
 
             + (* x is from fl *) 
               destructAll.
@@ -9665,22 +10038,22 @@ solve_nodup. solve_nodup.
               assert (subval_or_eq (Vfun (M.empty cps.val) fl x3) (Vfun (M.empty cps.val) fl f')). 
               constructor. constructor. auto.                                       
               specialize (Hrel_m42 _ _ _ _ H H16). destruct Hrel_m42 as [Hrel_m421 [Hrel_closed_m42 Hrel_m422]].
-                 
+              
               split.
-            - inv Hrel_m421.
-              inv H25. econstructor; eauto.
-              econstructor; eauto.
-              (* imposible since function not bound *)
-              inv H20. rewrite H26 in H18. inv H18.
-              - split; auto. eapply correct_fundefs_unchanged_global; eauto.                               
-          }
-         
-        *             (* correct_tinfo m5 *)            
-          assert ( max_alloc' = fi_0_m4).
-              inv Hc_alloc'; inv Hcorrect_alloc_m4.
-              reflexivity. 
-              eapply correct_tinfo_proper. rewrite H7. eauto.
-              eauto.
+          - inv Hrel_m421.
+            inv H25. econstructor; eauto.
+            econstructor; eauto.
+            (* imposible since function not bound *)
+            inv H20. rewrite H26 in H18. inv H18.
+          - split; auto. eapply correct_fundefs_unchanged_global; eauto.                               
+        }
+        
+      *             (* correct_tinfo m5 *)            
+        assert ( max_alloc' = fi_0_m4).
+        inv Hc_alloc'; inv Hcorrect_alloc_m4.
+        reflexivity. 
+        eapply correct_tinfo_proper. rewrite H7. eauto.
+        eauto.
 
 
 
@@ -9841,64 +10214,71 @@ solve_nodup. solve_nodup.
 
             assert ( int_size * ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs) / int_size)<= ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs)))%Z by (apply Z.mul_div_le; chunk_red; archi_red; omega).
             omega.
-            chunk_red; archi_red; omega.            
-            }
-               
-              destruct Hm5 as [m5 [lenv_new' [Hm5 [Hm5_lenv [alloc_b_m5 [alloc_ofs_m5 [limit_ofs_m5 [vs7_m5 [deref_args_m5 [load_alloc_m5 [load_limit_m5 [Hvs7_m5 Hm5_all_rel]]]]]]]]]]]].
+            chunk_red; archi_red; omega.
+                       *)       
+            } (*END OF Hm5*)
+              
+              destruct Hm5 as [m5 [lenv_new'' [Hm5 [Hm5_lenv [alloc_b_m5 [alloc_ofs_m5 [limit_ofs_m5 [vs7_m5 [deref_args_m5 [load_alloc_m5 [load_limit_m5 [Hvs7_m5 Hm5_all_rel]]]]]]]]]]]].
             
-            assert (Hl_temp': length vsm4 = length vs7_m5). {
-              eapply mem_after_asgn_length in Hvs7_m5.
-              rewrite Hlvs in Hvs7_m5. auto.
-            }
+    assert (Hl_temp': length avsm4 = length (skipn nParam vs7_m5)). {
+      SearchAbout mem_after_asgn length.
+      apply mem_after_asgn_length in Hvs7_m5.
+      eapply HSkipnLength in Hlvs.
+      rewrite avsm4Eq.
+      rewrite <- Hlvs. auto.
+    }
 
-            
-            assert (Help := e_lenv_param_asgn_i _ (M.set argsIdent (Vptr args_b args_ofs)
-                     (M.set limitIdent (Vptr alloc_b_m5 limit_ofs_m5)
-                        (M.set allocIdent (Vptr alloc_b_m5 alloc_ofs_m5) lenv_new')))  _ Hl_temp' Hnd_vs0).
-            destruct Help as [lenv_new'' Hlenv_new''_asgn_i].
-            assert (Hlenv_new''_asgn := lenv_param_asgn_rel _ _ _ _ Hlenv_new''_asgn_i Hnd_vs0). 
-            specialize (Hm5_all_rel lenv_new'' Hlenv_new''_asgn).
-            destruct Hm5_all_rel as [Hm5_relmem Hm5_tinfo].
-            
+    assert (Help := e_lenv_param_asgn_i _ (M.set argsIdent (Vptr args_b args_ofs)
+                                                 (M.set limitIdent (Vptr alloc_b_m5 limit_ofs_m5)
+                                                        (M.set allocIdent (Vptr alloc_b_m5 alloc_ofs_m5) lenv_new'')))  _ Hl_temp' Havsm4_nodup).
+    destruct Help as [lenv_new''' Hlenv_new'''_asgn_i].
+    assert (Hlenv_new'''_asgn := lenv_param_asgn_rel _ _ _ _ Hlenv_new'''_asgn_i Havsm4_nodup). 
+    specialize (Hm5_all_rel lenv_new''' Hlenv_new'''_asgn).
+    destruct Hm5_all_rel as [Hm5_relmem Hm5_tinfo].
     
-    assert (Hc_env' : correct_envs cenv ienv rep_env rho'' e4). {
+    
+    assert (Hc_env' : correct_envs cenv ienv rep_env rho'' e4). { 
       inv Hc_env. destructAll.
       split.
       (* ienv_of_cenv *)
       auto. split. 
       (* cenv of env  ccenv rho'' *)
       { intro; intros. 
-        assert (decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
-        inv H12. 
-        (* 1) in vs  *)
+        assert (decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.
+        inv H14. 
+        (* 1) in vs  *) 
         assert (List.In v0 vs) by (eapply set_lists_In; eauto).
-        assert (Hgl := get_list_In_val _ _ _ _  H0 H12).
-        destruct Hgl. destruct H16. 
-        apply H4 in H17. auto.
         
-        erewrite <- set_lists_not_In in H7.
+        assert (Hgl := get_list_In_val _ _ _ _  H0 H14). 
+        destruct Hgl. destruct H16. 
+        apply H3 in H17. auto.
+        
+        erewrite <- set_lists_not_In in H13.
         2: eauto.
         2: eauto.
 
-        assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
-        inv H12.
+        assert (decidable (name_in_fundefs fl x)).
+        {
+          unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
+        } 
+        inv H14.
         (*
           2) in fl *)
-        rewrite def_funs_eq in H7. 2: eauto.
-        inv H7.
-        apply H4 in H. inv H.
+        rewrite def_funs_eq in H13. 2: eauto.
+        inv H13.
+        apply H3 in H. inv H.
         constructor. auto. 
         
         (*
           3* ) in rho' (EMPTY!!!)
          *)
-        rewrite def_funs_neq in H7. 2: eauto.
-        rewrite M.gempty in H7. inv H7.
+        rewrite def_funs_neq in H13. 2: eauto.
+        rewrite M.gempty in H13. inv H13.
       }       
       
       split.
       (* cenv_of_exp cenv e0 -- can get this from correct_cenv_of_val (CCV_fun) *)
-      apply H4 in H. inv H.
+      apply H3 in H. inv H.
       eapply Forall_fundefs_In in H15. apply H15.
       eapply find_def_correct. eauto.
 
@@ -9911,7 +10291,7 @@ solve_nodup. solve_nodup.
     assert (Hrho''_id : unique_bindings_env rho'' e4). {
       destruct Hrho_id. 
       split.
-      apply H4 in H.
+      apply H3 in H.
       
       destruct H as [Hbv Hubv].
       inv Hubv.
@@ -9919,40 +10299,40 @@ solve_nodup. solve_nodup.
 
 
       intros.   assert (decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.
-      destruct H6.
+      destruct H5. 
       (* in vs0 *)
-      apply  H4 in H.
+      apply H3 in H.
       destruct H as [Hbv Hubv].
       inv Hubv.
-      assert (List.In v0 vs) by (eapply set_lists_In; eauto).      
-      assert (Hgl := get_list_In_val _ _ _ _  H0 H). destruct Hgl. destruct H12.
+      assert (List.In v0 vs) by (eapply set_lists_In; eauto).       
+      assert (Hgl := get_list_In_val _ _ _ _  H0 H). destruct Hgl. destruct H8.
       
-      split. intro.
-      
-      assert (Hdj:=shrink_cps_correct.Disjoint_bindings_find_def _ _ _ _ _ H7 Hfind_def_f').
-      inv Hdj. specialize (H17 x). apply H17. split; auto.
+      split. intro.  
+       
+      assert (Hdj:=shrink_cps_correct.Disjoint_bindings_find_def _ _ _ _ _ H6 Hfind_def_f'). 
+      inv Hdj. specialize (H15 x). apply H15. split; auto.
 
-      apply H4 in H15. destruct H15; auto. 
+      apply H3 in H13. destruct H13; auto. 
 
       
       (* in fl *)
-      erewrite <- set_lists_not_In in H5. 2: eauto. 2:eauto.
+      erewrite <- set_lists_not_In in H4. 2: eauto. 2:eauto.
       
       assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
-      inv H7.
-      apply  H4 in H.
+      inv H6.
+      apply H3 in H.
       destruct H as [Hbv Hubv].
       inv Hubv. 
-      erewrite def_funs_eq in H5. 2: eauto.
-      inv H5.
+      erewrite def_funs_eq in H4. 2: eauto.
+      inv H4.
       split.
-      assert  (Hdj := shrink_cps_correct.Disjoint_bindings_fundefs _ _ _ _ _ H7   Hfind_def_f').
+      assert  (Hdj := shrink_cps_correct.Disjoint_bindings_fundefs _ _ _ _ _ H6 Hfind_def_f').
       inv Hdj. intro. specialize (H x). apply H. split; auto.
       
       constructor; auto.
       
-      rewrite def_funs_neq in H5; eauto.
-      rewrite M.gempty in H5. inv H5. 
+      rewrite def_funs_neq in H4; eauto.
+      rewrite M.gempty in H4. inv H4. 
     }
         assert (Hf_id': functions_not_bound p rho'' e4 ). {
       destruct Hf_id as [Hf_id1 Hf_id2].
@@ -9962,35 +10342,34 @@ solve_nodup. solve_nodup.
         econstructor. right. apply H1. eauto.
       - intros.
         assert (decidable (List.In y vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
-        inv H5.
+        inv H4.
         (* in vsm4 *)
-        assert (List.In v0 vs) by (eapply set_lists_In; eauto).      
-        assert (Hgl := get_list_In_val _ _ _ _  H0 H5). destruct Hgl. destruct H7.
-        eapply Hf_id2 in H12; eauto. 
+        assert (List.In v0 vs) by (eapply set_lists_In; eauto).       
+        assert (Hgl := get_list_In_val _ _ _ _  H0 H4). destruct Hgl. destruct H6.
+        eapply Hf_id2 in H8; eauto. 
 
 
         (* in fl *)
         erewrite <- set_lists_not_In in H1. 2: eauto. 2: eauto.
         assert (decidable (name_in_fundefs fl y)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec y). inv Dec; auto.
-        inv H5.
+        inv H4. 
 
         erewrite def_funs_eq in H1. 2: eauto. inv H1.
-        eapply Hf_id2 in H; eauto. inv H4. econstructor; eauto. 
+        eapply Hf_id2 in H; eauto. inv H3. econstructor; eauto. 
         
         rewrite def_funs_neq in H1; eauto.
-        rewrite M.gempty in H1. inv H1.        
+        rewrite M.gempty in H1. inv H1.         
 
     }
-    
-    specialize (IHHev Hc_env' Hrel_p'' Hrho''_id Hf_id' _ _ _ (Kcall None fu empty_env lenv k) _ F H14 Hm5_relmem Hc_alloc'   Hm5_tinfo).  
+    specialize (IHHev Hc_env' Hrel_p'' Hrho''_id Hf_id' _ _ _ (Kcall None fu empty_env lenv k) _ F H19 Hm5_relmem Hc_alloc' Hm5_tinfo).
     destruct IHHev as [m6 [lenv6 [Hstep_m6 Hargs_m6]]].
     
     
     exists m6, lenv.
 
     split.
- 
-    (* step through s*) 
+   
+    (* step through s*)  
     eapply t_trans.
     constructor. constructor.
 
@@ -10009,25 +10388,25 @@ solve_nodup. solve_nodup.
     econstructor. econstructor. econstructor.  constructor.
     constructor. 
     (* tinfIdent is in lenv *) eauto.
-    constructor 3.  simpl. reflexivity. simpl. reflexivity.
+    constructor 3. simpl. reflexivity. simpl. reflexivity.
     eauto.
     rewrite Htinfident_members. apply argsIdent_delta. 
-    simpl. eauto. 
-    
+    simpl. eauto.  
+     
     eapply t_trans.
     constructor.
     constructor.
-
-
-    
-    eapply t_trans.
-(*     rewrite <- Heqk'. *)
+ 
+    eapply clos_rt_t.
+    Set Printing All. simpl.
     rewrite Hlenv'.
+    Unset Printing All. simpl.
     eauto.
 
-    (* done marshalling elements *)
+    (* done marshalling elements *) 
     eapply t_trans.
-    constructor. constructor.
+    constructor.
+    constructor.
 
     eapply t_trans.
     constructor. econstructor. econstructor. econstructor.
@@ -10055,25 +10434,63 @@ solve_nodup. solve_nodup.
 
 
     eapply t_trans.
-    constructor. econstructor.
-
+    constructor. econstructor. 
     
+     
     (* CALL TIME! *)
-    eapply t_trans.
+
+    eapply t_trans. 
     constructor. econstructor.
-    reflexivity. eauto. econstructor.   econstructor. eauto. constructor. constructor.
-    eauto. reflexivity.
+    reflexivity.   
+    simpl. rewrite Nnat.Nat2N.id.
+    eapply Heval_f'.
+    econstructor. econstructor.
+    eauto. constructor.
+    (* OSTODO: need a hyp:
+   eval_exprlist (globalenv p) empty_env lenv m4 s2
+    (mkFunTyList
+       (Init.Nat.min
+          (N.to_nat (fst (N.of_nat (length locs), locs))) nParam))
+    ?Goal12 for some ?Goal12 equivalent to values in bys *)
+    simpl. rewrite Nnat.Nat2N.id.
+    admit.
+    (* -- find_funct f'*)
+    eauto.
+    (* -- type_of_fundef F*)
+    simpl. unfold type_of_function. rewrite Nnat.Nat2N.id.
+    rewrite Hlvs. unfold fn_params. simpl.
+    rewrite type_of_mkFunTyList. reflexivity.
 
     
+
+    (* - step through the Callstate *)
+    (* OSTODO: HOSTEMP1 shows that you can skip the mk_gv_call when looking up a protected ident [whenever used to rewrite Heqlenv_new *)
+    assert (HOSTEMP1: M.get tinfIdent lenv_new = Some (Vptr tinf_b tinf_ofs)) by admit.
     eapply t_trans. 
-    constructor.  eapply  step_internal_function with (le :=
-    (Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs)
-       (create_undef_temps (vars ++ gc_vars argsIdent allocIdent limitIdent caseIdent)))).
+    constructor.
+    (* I'M HERE : TODO: update the le in step_internal_function to include the argument vector computed earlier [in the eval_exprlist] *) 
+
+    eapply  step_internal_function with (le := lenv_new).
+(*    (Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs)
+       (create_undef_temps ((skipn nParam vars) ++ gc_vars argsIdent allocIdent limitIdent caseIdent)))). *)
     constructor. 
     simpl. constructor.
-    simpl. constructor. intro Hfalse; inv Hfalse. constructor.
-    simpl. intro; intros. inv H1. rewrite <- H5 in *. clear H5.
+    (* OSTODO: need to show that tinfo and all params are disjoint (from unique_bindigns and protected_not_bound) *)
+    (*    simpl. constructor. intro Hfalse; inv Hfalse. constructor. *)
+    admit.
+    (* OSTODO: need to show that first n param are disjoint from last arity-n *)
+    (*simpl. intro; intros. inv H1. rewrite <- H5 in *. clear H5. *)
+    admit.
 
+
+    (* --  alloc_variables (globalenv p) empty_env m4 
+    (fn_vars F) ?Goal12 ?Goal13 *) 
+    admit.
+    
+    (* -- bind_parameter_temps*)
+    unfold lenv_new; rewrite Heqlenv_new'. 
+    admit.
+    (* 
     rewrite var_names_app in H4.
     rewrite Coqlib.in_app in H4. destruct H4.
     intro. rewrite <- H4 in *; clear H4.
@@ -10093,13 +10510,14 @@ solve_nodup. solve_nodup.
     inv H4. apply H19; inList. auto.   
     inv H5.
     constructor. reflexivity.
+     *)
 
+ 
     eapply t_trans.
     constructor. constructor.
 
     (* go through gc_test' to m5 *)
     eapply t_trans.
-    rewrite Heqlenv_new in *.
     apply Hm5.
 
 
@@ -10125,12 +10543,14 @@ solve_nodup. solve_nodup.
     constructor. constructor.
     
     econstructor. econstructor. econstructor.
-    constructor. constructor. rewrite <- Hm5_lenv. rewrite Heqlenv_new. rewrite M.gss. reflexivity.    
+    constructor. constructor. rewrite <- Hm5_lenv. 
+    eauto.
+(*    unfold lenv_new; rewrite Heqlenv_new'. rewrite M.gss. reflexivity.     *)
     constructor 3. reflexivity.
     reflexivity.
     eauto. rewrite Htinfident_members.  apply allocIdent_delta.  eapply deref_loc_value. constructor.
     unfold Mem.loadv.   rewrite Ptrofs.add_zero. eauto.
-    
+     
     
     eapply t_trans.
     constructor. constructor.
@@ -10140,7 +10560,7 @@ solve_nodup. solve_nodup.
     constructor. constructor.
     econstructor. econstructor. econstructor.
     constructor. constructor.
-    rewrite M.gso. rewrite <- Hm5_lenv. rewrite Heqlenv_new. rewrite M.gss. reflexivity.
+    rewrite M.gso. rewrite <- Hm5_lenv. eauto.  (* rewrite Heqlenv_new. rewrite M.gss. reflexivity. *)
     
     assert (H_dj := disjointIdent).
     solve_nodup.
@@ -10150,7 +10570,7 @@ solve_nodup. solve_nodup.
     eapply deref_loc_value. constructor.
     eauto.
 
-
+ 
     
     eapply t_trans.
     constructor. constructor.
@@ -10160,7 +10580,8 @@ solve_nodup. solve_nodup.
     eapply t_trans.
     constructor. constructor.
     econstructor. econstructor. econstructor.
-    constructor. constructor. rewrite M.gso. rewrite M.gso. rewrite <- Hm5_lenv. rewrite Heqlenv_new. rewrite M.gss. reflexivity.
+    constructor. constructor. rewrite M.gso. rewrite M.gso. rewrite <- Hm5_lenv.
+    eauto.  (* rewrite Heqlenv_new. rewrite M.gss. reflexivity. *)
     assert (H_dj := disjointIdent).  solve_nodup. 
     assert (H_dj := disjointIdent).  solve_nodup. 
     constructor 3. reflexivity. reflexivity.
@@ -10174,9 +10595,11 @@ solve_nodup. solve_nodup.
 
     (* asgn! *)
     
-    eapply clos_rt_t.  
+    eapply clos_rt_t.
+     
     eapply repr_asgn_fun_entry; eauto.
-    rewrite M.gss. reflexivity. eauto. 
+    rewrite M.gss. reflexivity. eauto.
+
 
 
     eapply t_trans. constructor. constructor.
@@ -10201,10 +10624,12 @@ solve_nodup. solve_nodup.
 
     assert (M.get argsIdent (M.set argsIdent (Vptr args_b args_ofs)
                           (M.set limitIdent (Vptr alloc_b_m5 limit_ofs_m5)
-                                 (M.set allocIdent (Vptr alloc_b_m5 alloc_ofs_m5) lenv_new')))= M.get argsIdent lenv_new'').
+                                 (M.set allocIdent (Vptr alloc_b_m5 alloc_ofs_m5) lenv_new'')))= M.get argsIdent lenv_new''').
     eapply lenv_param_asgn_map with (l := [argsIdent]). eauto.
-    split. intro; intro. inv H7. inv H15. eapply Hnoprot_vs0. eauto. 
-    left. right. auto. inv H7. constructor; auto. rewrite <- H7 in H1.
+    split. intro; intro.
+    inv H13. inv H15. eapply Hnoprot_vs0. eauto.
+
+    left. right. auto. inv H13. constructor; auto. rewrite <- H13 in H1.
     rewrite M.gss in H1. inv H1. auto. 
   - (* Ehalt *)
 
@@ -10241,7 +10666,7 @@ solve_nodup. solve_nodup.
         simpl. unfold int_size in *; eauto.
       }
       exists m2, lenv.
-      
+       
       split.
       
       * 
@@ -10250,12 +10675,30 @@ solve_nodup. solve_nodup.
         { 
           constructor.
           econstructor. constructor; eauto.
-          constructor. simpl. unfold sem_add. simpl. reflexivity.      
+          constructor. simpl. unfold sem_add. simpl. reflexivity.       
         }
-        econstructor. constructor 2.
-              apply M.gempty. eauto. constructor.
-      constructor. constructor.
-      econstructor. simpl. reflexivity. apply Hm2.
+        assert (Hvorfv : get_var_or_funvar p lenv x (Vptr b0 (Ptrofs.repr 0))).
+        {
+          constructor. auto.
+        }
+        assert (HvorfvEval := get_var_or_funvar_eval threadInfIdent nParam fenv finfo_env p lenv x (Vptr b0 (Ptrofs.repr 0)) m Hsym HfinfoCorrect Hvorfv).
+        assert (HvorfvEq : var_or_funvar_f threadInfIdent nParam fenv finfo_env p x = makeVar threadInfIdent nParam x fenv finfo_env).
+        {
+          unfold var_or_funvar_f. rewrite H0. reflexivity.
+        }
+        rewrite <- HvorfvEq.
+        eassumption.   
+        assert (Hvorfv : get_var_or_funvar p lenv x (Vptr b0 (Ptrofs.repr 0))).
+        {
+          constructor. auto.
+        }
+        assert (HvorfvEq : var_or_funvar_f threadInfIdent nParam fenv finfo_env p x = makeVar threadInfIdent nParam x fenv finfo_env).
+        {
+          unfold var_or_funvar_f. rewrite H0. reflexivity.
+        }
+        rewrite <- HvorfvEq.
+        eapply get_var_or_funvar_semcast; eauto.
+        econstructor. simpl. reflexivity. apply Hm2.
       * unfold arg_val_L6_L7. split. reflexivity.
         exists args_b, args_ofs, (Vptr b0 Ptrofs.zero), L.
         split; auto. rewrite Ptrofs.mul_one in Hm2. split.
@@ -10286,7 +10729,7 @@ solve_nodup. solve_nodup.
           constructor.
           econstructor. constructor; eauto.
           constructor. simpl. unfold sem_add. simpl. reflexivity.      
-        }
+        } 
         econstructor. eauto.  simpl. 
         unfold sem_cast. simpl. inv H3; reflexivity.
         econstructor. constructor.
@@ -10295,10 +10738,10 @@ solve_nodup. solve_nodup.
         exists args_b, args_ofs, v7, L.
         split; auto. split.
         rewrite Ptrofs.mul_one in Hm2.
-        eapply Mem.load_store_same in Hm2. simpl in Hm2. destruct v7; inv H3; auto.
-        rewrite H in Hxrho. inv Hxrho.
-        eapply repr_val_L_unchanged; eauto.        
-            Qed.
+        eapply Mem.load_store_same in Hm2. simpl in Hm2. destruct v7; inv H3; auto. 
+        rewrite H in Hxrho. inv Hxrho. 
+        eapply repr_val_L_unchanged; eauto.
+Admitted.
 
 
 

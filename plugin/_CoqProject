@@ -115,7 +115,6 @@ extraction/terms.ml
 extraction/identifiers.mli
 extraction/compile0.ml
 extraction/closure_conversion.mli
-extraction/closure_conversion2.mli
 extraction/lambda_lifting.mli
 extraction/ordersFacts.ml
 extraction/mSetInterface.ml
@@ -171,7 +170,6 @@ extraction/termsDB.ml
 extraction/variables.ml
 extraction/identifiers.ml
 extraction/closure_conversion.ml
-extraction/closure_conversion2.ml
 extraction/lambda_lifting.ml
 extraction/dead_param_elim.ml
 extraction/dead_param_elim.mli

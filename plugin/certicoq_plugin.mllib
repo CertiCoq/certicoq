@@ -70,7 +70,6 @@ Term0
 TermsDB
 Variables
 Closure_conversion
-Closure_conversion2
 Lambda_lifting
 Dead_param_elim
 L5a

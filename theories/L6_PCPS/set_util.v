@@ -1101,6 +1101,13 @@ Proof.
   intros x Hin. inv Hin.
 Qed.
 
+Lemma PS_cardinal_map f l :
+  PS.cardinal (@mset (FromList (map f l)) _) <= PS.cardinal (@mset (FromList l) _).
+Proof.
+  unfold mset. unfold ToMSetFromList. simpl.
+  eapply PS_union_list_corr. 
+Qed. 
+
 Lemma PS_union_list_eq f l s1 s2 :
   injective_subdomain (FromList l :|: FromSet s2) f ->
   PS.cardinal s1 = PS.cardinal s2 ->

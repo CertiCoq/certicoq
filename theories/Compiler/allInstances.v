@@ -15,6 +15,8 @@ Require Import  maps_util.
 Open Scope Z_scope.
 Open Scope string_scope.
 
+
+(* Zoe : TODO these are very verbose and L6 specific so move it there. Generally this file needs massive cleanup. *)
 Definition argsIdent:positive := 26.
 Definition allocIdent:positive := 28.
 Definition limitIdent:positive := 29.
@@ -28,6 +30,7 @@ Definition numArgsIdent:positive := 97.
 Definition isptrIdent:positive := 82.
 Definition caseIdent:positive := 83.
 
+
 Definition stackframeTIdent:positive := 78. (* the stack_frame type *)
 Definition frameIdent:positive := 79. (* the stack frame of the current function *)
 Definition rootIdent:positive := 84. (* live roots array *)
@@ -38,16 +41,22 @@ Definition nextFld:positive := 87.
 Definition rootFld:positive := 88.
 Definition prevFld:positive := 89.
 
-Definition compile_L7' n (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
+Definition compile_L7' n (t : cTerm certiL6) : exception (cps_util.name_env * Clight.program * Clight.program) :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := L6_to_Clight.compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
-  (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
+  let p := L6_to_Clight.compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+                                n prog cenv nenv in
+  match p with
+  | Ret p =>
+    Ret (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | Exc s => Exc s
+  end.
 
 Definition compile_L7_fast' n (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
-  let p := L6_to_Clight.compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
+  let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
+  
 Definition compile_L7_anf (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   let p := L6_to_Clight_stack.compile
@@ -58,26 +67,26 @@ Definition compile_L7_anf (t : cTerm certiL6) : cps_util.name_env * Clight.progr
              prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
-Definition compile_L7 o (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
+Definition compile_L7 o (t : cTerm certiL6) : exception (cps_util.name_env * Clight.program * Clight.program) :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   match o with
   | Flag 0 => compile_L7' 5 t
   | Flag 1 => compile_L7' 5 t
   | Flag 2 =>  compile_L7' 5 t
   | Flag 3 => compile_L7' 0 t
-  | Flag 4 => compile_L7_fast' 0 t
+  | Flag 4 => Ret (compile_L7_fast' 0 t)
   | Flag 5 => compile_L7' 5 t
   | Flag 6 => compile_L7' 11 t
-  | Flag 7 => compile_L7_fast' 11 t
+  | Flag 7 => Ret (compile_L7_fast' 11 t)
   | Flag 8 => compile_L7' 0 t
-  | Flag 9 => compile_L7_fast' 0 t
+  | Flag 9 => Ret (compile_L7_fast' 0 t)
   | Flag 10 => compile_L7' 0 t
   | _ => compile_L7' 5 t
   end.
 
 Definition compile_opt_L7 o p :=
   match p with
-  | Ret p => Ret (compile_L7 o p)
+  | Ret p => compile_L7 o p
   | Exc s => Exc s
   end.
 
@@ -123,6 +132,18 @@ Definition emit_L6_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.progr
            end;
   let '((_, cenv, nenv, _), (_, e)) := p'' in
   ret (cps_show.show_exp nenv cenv false e).
+
+
+Require Import Glue.glue.
+Definition make_glue (p : Template.Ast.program)
+  : exception (cps_util.name_env * Clight.program * Clight.program * list string)  :=
+  match generate_glue p with
+  | (nenv, Some hdr, Some prg, logs) =>
+      Ret (nenv, hdr, prg, logs)
+  | _ => Exc ""
+  end.
+
+Open Scope positive_scope.
 
 
 Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=

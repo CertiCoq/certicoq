@@ -3730,6 +3730,7 @@ Proof with archi_red.
          specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
          destruct x0. rewrite H4. 
          econstructor.  apply eval_Evar_global.  apply M.gempty.
+
          apply H1. constructor. constructor.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
@@ -3752,6 +3753,7 @@ Proof with archi_red.
          econstructor. apply Hxlenv. constructor.
          archi_red. constructor.
          archi_red. constructor.
+
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
          unfold makeVar. rewrite H3. 
@@ -6354,8 +6356,6 @@ Inductive proper_ctor_ty_info: ctor_ty_info -> Prop :=
   
  
 (* cenv is proper if ctor_ty_info is proper, and that there is a unique (ty, ord) pair for each constructors  *)
-
-
 Definition proper_cenv (cenv:ctor_env):=
   forall c name iname it a ord,
     M.get c cenv = Some (Build_ctor_ty_info name iname it a ord) ->
@@ -9728,6 +9728,7 @@ Forall2
                rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.
                }
              
+
              (* get the value of max_alloc in tinfo *)
              rewrite Hfinfo_env_f' in H7; inv H7.
                rewrite Hfind_symbol in H20 ; inv H20.

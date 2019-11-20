@@ -14,6 +14,7 @@ Require compcert.common.AST
 Require L6.L5_to_L6
         L7.L6_to_Clight
         L7.Clightexec
+        Glue.glue
         Compiler.allInstances.
 
 (* Standard lib *)
@@ -33,7 +34,7 @@ Extract Constant L6_to_Clight.print => "print_string".
 (* Timing *)
 (* T0 : No timing *)
 (*
-Extract Constant AstCommon.timePhase => "(fun c x -> x ())". 
+Extract Constant AstCommon.timePhase => "(fun c x -> x ())".
 *)
 
 (* T1 : Time each phase, print to debug *)
@@ -45,20 +46,22 @@ Extract Constant AstCommon.timePhase =>
               Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
               temp)".
 *)
-(* T2 : Time each phase 10 times, print average to debug 
+(* T2 : Time each phase 10 times, print average to debug
 debug: Feedback.msg_debug (Pp.str (Printf.sprintf ""%f""  (Unix.gettimeofday() -. time)));   *)
 
-(*
-Extract Constant AstCommon.timePhase =>
-"(fun c x -> let time = Unix.gettimeofday() in
-             let temp = ref (x ()) in
-             for i = 2 to 10 do
-              temp := x ()
-             done;
-             let time = ((Unix.gettimeofday() -. time) /. 10.) in
-              Feedback.msg_debug (Pp.str (Printf.sprintf ""Average time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
-              !temp)".
-*)
+(** **  Zoe : I'm commenting timing out for now because it blocks computation inside Coq when we want to test
+              comp passes. TODO add compiler opt *)
+
+(* Extract Constant AstCommon.timePhase => *)
+(* "(fun c x -> let time = Unix.gettimeofday() in *)
+(*              let temp = ref (x ()) in *)
+(*              for i = 2 to 10 do *)
+(*               temp := x () *)
+(*              done; *)
+(*              let time = ((Unix.gettimeofday() -. time) /. 10.) in *)
+(*               Feedback.msg_debug (Pp.str (Printf.sprintf ""Average time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time)); *)
+(*               !temp)". *)
+
 
 (* TEMP STUFF *)
 (* OS: This is now defined in allInstances
@@ -91,7 +94,7 @@ Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 Extraction Blacklist List String Nat Int Ast univ uGraph Char OrderedType
            Instances Classes Term Monad Coqlib Errors Compile Checker.
 
-(* Cutting the dependency to R. 
+(* Cutting the dependency to R.
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
 Extract Inlined Constant Fappli_IEEE.FF2R => "fun _ -> assert false".
 Extract Inlined Constant Fappli_IEEE.B2R => "fun _ -> assert false".
@@ -114,5 +117,6 @@ Separate Extraction
          Compiler.allInstances.emit_L6_anf
          Compiler.allInstances.emit_L6_pre_cc
          Compiler.allInstances.emit_L6_cc
-         L7.Clightexec.run. 
+         Compiler.allInstances.make_glue
+         L7.Clightexec.run.
 Cd "..".

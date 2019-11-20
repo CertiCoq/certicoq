@@ -1101,10 +1101,57 @@ Proof.
   intros x Hin. inv Hin.
 Qed.
 
-Lemma PS_cardinal_map f l :
-  PS.cardinal (@mset (FromList (map f l)) _) <= PS.cardinal (@mset (FromList l) _).
+Lemma PS_union_list_eq f l s1 s2 :
+  injective_subdomain (FromList l :|: FromSet s2) f ->
+  PS.cardinal s1 = PS.cardinal s2 ->
+  (FromSet s1 <--> image f (FromSet s2)) ->
+  PS.cardinal (union_list s1 (map f l)) = PS.cardinal (union_list s2 l).
+Proof.
+  revert s1 s2. induction l; intros s1 s2 Hinj Heq Hin.
+  - eassumption.
+  - simpl. eapply IHl.      
+    + eapply injective_subdomain_antimon. eassumption. normalize_sets; sets.
+      rewrite FromSet_add. sets.  
+    + destruct (PS.mem a s2) eqn:Heq'.
+      * eapply mem_spec in Heq'.
+        rewrite PS_cardinal_add_in with (x := a); eauto.
+        
+        eapply (FromSet_complete (FromSet s2) s2 a) in Heq'; [| reflexivity ].
+        eapply In_image in Heq'. eapply Hin in Heq'. 
+        eapply FromSet_sound in Heq'; [| reflexivity ].
+        rewrite PS_cardinal_add_in with (x := f a); eauto.        
+      * rewrite <- PS_cardinal_add with (x := a); eauto.
+        destruct (PS.mem (f a) s1) eqn:Heq''.
+        { exfalso. eapply mem_spec in Heq''.
+          eapply FromSet_complete in Heq''; [| symmetry; eassumption ].
+          edestruct Heq'' as [z' [Hin1 Heq2]].
+          assert (Heq1 : z' = a).
+          { eapply Hinj. right. eassumption. left. normalize_sets; sets.
+            eassumption. }
+          subst. eapply FromSet_sound in Hin1; [| reflexivity ].
+          eapply mem_spec in Hin1. congruence. }
+        rewrite <- PS_cardinal_add with (x := f a); eauto.
+        intros Hc. eapply mem_spec in Hc. congruence.
+        intros Hc. eapply mem_spec in Hc. congruence.
+    + rewrite ! FromSet_add. rewrite image_Union, image_Singleton, Hin.
+      reflexivity.
+Qed.
+
+Lemma PS_union_list_eq_corr f l  :
+  injective_subdomain (FromList l) f ->
+  PS.cardinal (union_list PS.empty (map f l)) = PS.cardinal (union_list PS.empty l).
+Proof.
+  intros Hinj.
+  eapply PS_union_list_eq.
+  rewrite FromSet_empty, Union_Empty_set_neut_r. eassumption.
+  reflexivity. rewrite FromSet_empty, image_Empty_set. reflexivity.
+Qed.
+
+Lemma PS_cardinal_map_eq f l :
+  injective_subdomain (FromList l) f ->
+  PS.cardinal (@mset (FromList (map f l)) _) = PS.cardinal (@mset (FromList l) _).
 Proof.
   unfold mset. unfold ToMSetFromList. simpl.
-  eapply PS_union_list_corr. 
+  eapply PS_union_list_eq_corr. 
 Qed. 
 

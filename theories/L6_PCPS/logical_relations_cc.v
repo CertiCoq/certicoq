@@ -4,7 +4,7 @@
 
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
-Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx
+Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
         L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.logical_relations.
 Require Import compcert.lib.Coqlib.
 
@@ -1138,8 +1138,6 @@ Section LogRelCC.
       inv Hget2. constructor; eauto.
       eapply cc_approx_val_cc_appox_var_env; eauto.
   Qed.
-
-  Require Import set_util. 
 
   (** Lemmas about evaluation contexts *)
 

@@ -20,7 +20,7 @@ research purposes.
 INSTALLATION INSTRUCTIONS
 =========================
 
-  To install the compiler, you need OCaml, Coq.8.8.1 along with the
+  To install the compiler, you need OCaml, Coq.8.9.1 along with the
 ExtLib, MetaCoq (which requires Equations), squiggle-eq and paramcoq
 packages.  One way to get everything is using
 [`opam`](http://opam.ocaml.org) (current version: `2.0.4`):
@@ -31,7 +31,7 @@ repositories:
     # opam repo add coq-released https://coq.inria.fr/opam/released
     # opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev
 
-  Add the `extra-dev` repository, which contains packages
+  One can also **optionally** add the `extra-dev` repository, which contains packages
 for development versions (e.g. `git` branches) and is relatively
 unstable.  It might be needed to compile non-released versions of
 CertiCoq. Beware `opam` will usually select packages from there as they
@@ -49,25 +49,28 @@ use `opam config var ocaml-version` to confirm you have a compatible
 compiler. If not, you should create a fresh new switch with a specific
 compiler, using:
 
-    # opam switch -A 4.06.1 coq88
+    # opam switch -A 4.07.1 coq89
     # eval `opam config env`
 
-  This will install the `4.06.1` compiler in a new switch named `coq88`
+  This will install the `4.07.1` compiler in a new switch named `coq89`
 and put you in the right environment (check with `ocamlc --version`).
 
 Installing Coq
 --------------
 
-  To install coq in a fresh switch and pin it to a specific version so
-that `opam` doesn't try to upgrade it:
+  To install coq in a fresh switch:
 
-    # opam install coq.8.8.1
-    # opam pin add coq 8.8.1
+    # opam install coq.8.9.1
 
-  Alternatively, if you can you want to update a pinned Coq:
+  *Recommended* To pin Coq to a specific version so that `opam` doesn't 
+  try to upgrade it in this switch, use:
+
+    # opam pin add coq 8.9.1
+
+  Alternatively, if you can you want to update a pinned version of Coq:
 
     # opam pin remove coq
-    # opam pin add coq 8.8.1
+    # opam pin add coq 8.9.1
 
   After this you should have `coqc --version` give you the right version
 number.
@@ -80,25 +83,32 @@ packages to keep in sync with upstream. To work with submodules, follow
 these steps. At the first checkout of a branch using submodules, you
 should do:
 
-# git submodule init
+    # git submodule init
 
-  this should tell you that it registered e.g. the MetaCoq module. Then
+  this should tell you that it registered e.g. the MetaCoq module.
 
-# git submodule update
-  
-  This will fetch the appropriate branch from the submodule (e.g. MetaCoq) in the appropriate directory in submodules (e.g. submobules/MetaCoq)
+    # make submodules
 
-# make submodules
-
-  This will remake submodules in their order of dependencies.
+  This will fetch the appropriate branch from the submodule (e.g. MetaCoq) in the 
+appropriate directory in submodules and (re)make and (re)install submodules in 
+their order of dependencies.
 
   When one modifies a submodule (e.g. MetaCoq) (by adding commits for
 example), all users of the branch have to do *by themselves* a:
 
-# git submodule update
-# cd MetaCoq; make; make install
+    # make submodules
 
-To get the updated version of the submodule.
+Which will perform a `git submodule update` and rebuild and reinstall all submodules
+from scratch.
+
+  *Not recommended* and **at your own risk**, you can use:
+
+    # git submodule update
+    # ./make_submodules.sh noclean
+
+  This reperforms installation of the submodules **without** cleaning the previous
+compilation state of each submodule. It can be useful if the update does not require
+a full rebuild of the module. 
 
 Keeping opam up-to-date
 -----------------------
@@ -108,18 +118,19 @@ When the above opam repositories are updated, you may need to update your instal
     # opam update
 
 If the dependencies are already installed then you can skip the following section and just do:
-FIXME: outdated, we don't have metacoq packages yet (incoming)
 
     # opam upgrade coq-metacoq coq-ext-lib coq-paramcoq coq-squiggle-eq 
 
-Installing dependencies
------------------------
+Installing dependencies through opam
+------------------------------------
 
-To install CertiCoq's dependencies in the current opam switch:
+FIXME: **currently not working**, we need a synchronized release of upstream packages (notably
+  metacoq) and certicoq.
+
+To install CertiCoq's dependencies in the current `opam` switch:
 
     # opam install coq-equations coq-metacoq coq-ext-lib coq-squiggle-eq.dev coq-paramcoq
 
-FIXME: outdated
 The package is known to build with `coq-template-coq.2.1~beta3`,
 `coq-ext-lib.0.9.8`, `coq-squiggle-eq.1.0.4` and `coq-paramcoq.1.0.8`.
 
@@ -132,12 +143,12 @@ Installing from source
 ----------------------
 Alternatively, you can install Coq from source or download a binary from:
 
-	https://coq.inria.fr/coq-88
+	https://github.com/coq/coq/releases/tag/V8.9.1
 
 and install the packages from source:
 
 	https://github.com/coq-ext-lib/coq-ext-lib
-	https://github.com/gmalecha/template-coq (branch: coq-8.8)
+	https://github.com/MetaCoq/metacoq (branch: coq-8.9)
 	https://github.com/aa755/SquiggleEq  (branch: vcoq87)
 	https://github.com/aa755/paramcoq (branch: v8.8)
 
@@ -180,6 +191,7 @@ To build the OCaml version of the compiler and the
     # sh make_plugin.sh
 
 To install Certicoq, do the following. This steps the above build steps.
+
     # make install
 
 

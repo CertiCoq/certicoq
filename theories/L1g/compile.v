@@ -217,8 +217,7 @@ End term_Term_sec.
 (** for debuggung **)
 Fixpoint print_global_declarations (g:global_declarations) : string :=
   match g with
-  | cons (ConstantDecl knm _) p => knm ++ print_global_declarations p
-  | cons (InductiveDecl knm _) p => knm ++ print_global_declarations p
+  | cons (knm, _) p => knm ++ print_global_declarations p
   | nil => "!"
   end.
 
@@ -228,14 +227,14 @@ Definition Cstr_npars_nargs
   match ind with
   | {| inductive_mind:= knm;  inductive_ind:= nbod |} =>
     match lookup_env g knm with
-    | Some (ConstantDecl _ _) =>
+    | Some (ConstantDecl _) =>
       raise ("Cstr_npars_nargs:lookup_env ConstantDecl")
     | None =>
       raise ("Cstr_npars_nargs:lookup_env; "
                ++ knm ++ "," ++ (nat_to_string nbod) ++
                "," ++ (nat_to_string ncst) ++
                "/" ++ print_global_declarations g)
-    | Some (InductiveDecl _ {| ind_npars:= npars; ind_bodies:= bodies |}) =>
+    | Some (InductiveDecl {| ind_npars:= npars; ind_bodies:= bodies |}) =>
       match List.nth_error bodies nbod with
       | None => raise ("Cstr_npars_nargs:nth_error bodies")
       | Some  {| ind_ctors := ctors |} =>
@@ -256,7 +255,7 @@ Function term_Term (g:global_declarations) (t:term) : Term :=
     | tApp fn arg => TApp (term_Term g fn) (term_Term g arg)
     | tConst pth =>
       match lookup_env g pth with
-      | Some (ConstantDecl _ _) => TConst pth
+      | Some (ConstantDecl _) => TConst pth
       | _ => TWrong ("term_Term:Const inductive or axiom: " ++ pth)
       end
     | tConstruct ind ncst =>
@@ -273,16 +272,16 @@ Function term_Term (g:global_declarations) (t:term) : Term :=
     
 (*** environments and programs ***)
 Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
-  (string * envClass Term) :=
+  (envClass Term) :=
   match dcl with
-    | ConstantDecl nm cb =>
+    | ConstantDecl cb =>
       match cb.(cst_body) with
-      | Some t => pair nm (ecTrm (term_Term g t))
-      | None => pair nm (ecAx Term)
+      | Some t => ecTrm (term_Term g t)
+      | None => ecAx Term
       end
-    | InductiveDecl nm mib =>
+    | InductiveDecl mib =>
         let Ibs := ibodies_itypPack mib.(ind_bodies) in
-        pair nm (ecTyp Term mib.(ind_npars) Ibs)
+        ecTyp Term mib.(ind_npars) Ibs
   end.  
 
   
@@ -290,7 +289,7 @@ Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
 Fixpoint program_Pgm_aux (g:global_declarations) : environ Term :=
   match g with
   | nil => nil
-  | gd :: g => cons (trans_global_decl g gd) (program_Pgm_aux g)
+  | gd :: g => cons (on_snd (trans_global_decl g) gd) (program_Pgm_aux g)
   end.
 
 From MetaCoq Require Import SafeChecker.SafeTemplateChecker.
@@ -309,11 +308,11 @@ Definition program_Program (p:Template.Ast.program) : Program Term :=
   | CorrectDecl (gc, t) =>
     {| main := term_Term gc t;
        env := program_Pgm_aux gc |}
-  | EnvError err => 
+  | EnvError Σ err => 
     let str :=
       match err with
       | AlreadyDeclared id => "Already declared: " ++ id
-      | IllFormedDecl id e => "Type error: " ++ PCUICSafeChecker.string_of_type_error e ++ ", while checking " ++ id
+      | IllFormedDecl id e => "Type error: " ++ PCUICSafeChecker.string_of_type_error Σ e ++ ", while checking " ++ id
       end
     in
     {| main := TWrong ("L1g.program_Program: erase_template_program failed with error:" ++ str); env := nil |}

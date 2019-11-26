@@ -1,0 +1,17 @@
+demo.*.c
+demo.*.h
+glue.demo.*.c
+glue.demo.*.h
+
+gc.c
+gc.h
+values.h
+main.c
+config.h
+
+demo1
+demo2
+binom
+color
+sha
+vs

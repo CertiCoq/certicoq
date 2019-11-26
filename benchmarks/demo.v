@@ -1,7 +1,7 @@
 Require Import Arith List.
 
 Import ListNotations.
-  
+
 From CertiCoq.Plugin Require Import CertiCoq.
 
 
@@ -35,7 +35,7 @@ Fixpoint list_add y z w l : nat :=
 (*   | 0%nat => f tt *)
 (*   | S n => f tt + loop n f *)
 (*   end. *)
-    
+
 (* Definition clos := (loop 3 (fun _ => list_add 0 0 0 (List.repeat 0%nat 3))%nat). *)
 
 (* CertiCoq Compile clos. *)
@@ -56,7 +56,7 @@ Fixpoint loop n (f : unit -> nat) : nat :=
   | 0 => f tt
   | S n => f tt + loop n f
   end.
-    
+
 Definition clos := loop (100*10) clos_loop.
 Definition clos_opt := loop (100*10) clos_loop.
 Definition clos_old := loop (100*10) clos_loop.
@@ -70,7 +70,7 @@ CertiCoq Compile Opt 2 clos_old.
 (* Time saved:
    1. Closure construction upon each rec. call. Check if that works.
    2. Projection out of the env every time clos is called. This does not show in this example,
-      and maybe needs invariant argument optimization. 
+      and maybe needs invariant argument optimization.
 *)
 (* Definition clos_opt (u : unit) := *)
 (*   (fix list_add y z w u k m n k1 k2 k3 k4 k5 l := *)
@@ -105,8 +105,8 @@ Definition is_valid_old :=
   | _ => false
   end.
 
-Time CertiCoq Compile is_valid. (* 5 secs ! *)
+(* Time CertiCoq Compile is_valid. (* 5 secs ! *) *)
 
-Time CertiCoq Compile Opt 1 is_valid_opt. (* 5 secs ! *)
+(* Time CertiCoq Compile Opt 1 is_valid_opt. (* 5 secs ! *) *)
 
-Time CertiCoq Compile Opt 2 is_valid_old. (* 5 secs ! *)
+(* Time CertiCoq Compile Opt 2 is_valid_old. (* 5 secs ! *) *)

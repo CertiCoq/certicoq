@@ -25,12 +25,6 @@ let rec coq_nat_of_int x =
   | 0 -> Datatypes.O
   | n -> Datatypes.S (coq_nat_of_int (pred n))
 
-
-let string_of_chars chars = 
-  let buf = Buffer.create 16 in
-  List.iter (Buffer.add_char buf) chars;
-  Buffer.contents buf
-
 (*
 let pcuic_size' a p =
   match p with
@@ -101,7 +95,7 @@ let compile cps olevel gr =
     CErrors.user_err ~hdr:"template-coq" (str "Could not generate glue code: " ++ pr_char_list s))
 
 (* For emitting L6 code *)
-let show_l6 olevel gr = 
+let show_l6 olevel gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in

@@ -418,7 +418,7 @@ Lemma valuePredTranslateLe_suff  (Src Dst : Type)
 Proof using.
   intros Ho Hy.
   cofix valuePredTranslateLe_suff.
-  intros ? ? Hv Ht.
+  intros ? ? ? Hv Ht.
   constructor;[eauto|].
   intros.
   specialize (Ho o _ _ n Hv Ht).

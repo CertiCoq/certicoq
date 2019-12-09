@@ -318,7 +318,7 @@ Definition eqObsId (a b : Inter) := leObsId a b /\ leObsId b a.
 Lemma sameValuesImpliesLeObsId a b: sameValues a b -> leObsId a b.
 Proof using.
   revert a b. cofix sameValuesImpliesLeObsId.
-  intros ? ? Hs. constructor. intros sv Hsv.
+  intros ? ? Hs. constructor. intros o sv Hsv.
   specialize (proj1 (Hs _) Hsv). intros Hsvb.
   exists sv. dands; auto; try reflexivity.
 - intros. apply liftLeRimpl with (R1:= sameValues); auto.

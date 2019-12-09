@@ -82,16 +82,16 @@ Extract Constant debug => "(fun msg x -> Certicoq_debug.certicoq_msg_debug msg; 
 Require Import String.
 (** When defining [Show] instance for your own datatypes, you sometimes need to
     start a new line for better printing. [nl] is a shorthand for it. *)
-    Definition nl : string := String (Ascii.ascii_of_nat 10) EmptyString.
+Definition nl : string := String (Ascii.ascii_of_nat 10) EmptyString.
 
 Definition translateTo `{CerticoqTranslation (Program L1g.compile.Term) Lj}
-  (p:Template.Ast.program): exception Lj :=
+  (o:Opt) (p:Template.Ast.program): exception Lj :=
   let db := debug ("Translating from template to L1 " ++ nl ++ Pretty.print_term (AstUtils.empty_ext (fst p)) nil true (snd p)) in
   let l1g:= db (L1g.compile.program_Program p) in
   let db := debug ("Result" ++ nl ++ L1g.term.print_term l1g.(main)) in
-  db (translate (Program L1g.compile.Term) Lj l1g).
+  db (translate (Program L1g.compile.Term) Lj o l1g).
 
-Arguments translateTo Lj {H} p.
+Arguments translateTo Lj {H} o p.
 
 Require Import certiClasses.
 
@@ -113,4 +113,4 @@ Definition ctranslateEval {Term Value BigStep WF QH ObsS }
   | Exc s => Error s None 
   end.
 
-Arguments ctranslateEval {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} p n.
+Arguments ctranslateEval {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} o p n.

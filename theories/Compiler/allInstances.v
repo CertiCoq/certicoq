@@ -3,7 +3,7 @@ Require Export Common.certiClasses2.
 Require Export L1g.instances.
 Require Export L2k.instances.
 Require Export L4.instances.
-Require Export L6.instances L6.cps_util L6.cps L6.cps_show.
+Require Export L6.instances L6.cps_util L6.cps L6.cps_show L6.tactics.
 (* Require Export L7.Clightexec. *)
 Require Import L6_to_Clight L6_to_Clight_stack.
 Require Import compcert.lib.Maps.
@@ -17,32 +17,11 @@ Open Scope string_scope.
 
 From MetaCoq.Template Require Import All.
 
-(* Zoe : TODO these are very verbose and L6 specific so move it there. Generally this file needs massive cleanup. *)
-Quote Recursively Definition One := 1%positive.
-
-
-Quote Recursively Definition Demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
-
-
-
-(* Definition One6 : cTerm certiL6.                                                         *)
-(* (let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in  *)
-(* match t with *)
-(* |Ret ?xx => exact xx *)
-(* end). *)
-(* Defined. *)
-
-
-Definition ext_comp := fun prog =>
-  let t := (translateTo (cTerm certiL6) prog) in
-  match t with
-  | Ret xx => xx
-  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
-  end.
- 
+(* Zoe : TODO these are very verbose and L6 specific so move it there. Generally this file needs massive cleanup. *) 
 Require Import L6_to_Clight.
 (* Require Import Clightexec.*)
 Require Import compcert.lib.Maps.
+
 Definition argsIdent:positive := 26.
 Definition allocIdent:positive := 28.
 Definition limitIdent:positive := 29.
@@ -123,6 +102,19 @@ Definition compile_template_L7 (opt_level : nat) (p : Template.Ast.program)
   : exception (cps_util.name_env * Clight.program * Clight.program)  :=
   compile_opt_L7 (Flag opt_level) (translateTo (cTerm certiL6) (Flag opt_level) p).
 
+Definition emit_L6_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+  : exceptionMonad.exception string :=
+  (* let opt := match opt_level with O => false | S O => true | _ => false end in *)
+  do p' <- translateTo (cTerm certiL4) (Flag opt_level) p ;
+  do p'' <- match opt_level with
+           | S 0 =>  L6_pipeline_pre_cc false p'
+           | S (S 0) => L6_pipeline_anf false p'
+           | S (S (S 0)) => L6_pipeline_anf true p'
+           | _ => L5_to_L6_anf false p'   
+           end;
+  let '((_, cenv, nenv, _), (_, e)) := p'' in
+  ret (cps_show.show_exp nenv cenv false e).
+
 Definition compile_template_L7_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
   : exception (cps_util.name_env * Clight.program * Clight.program)  :=
   let opt := match opt_level with O => false | S O => true | _ => false end in
@@ -146,31 +138,19 @@ Definition emit_L6_pre_cc `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.pr
   let '((_, cenv, nenv, _), (_, e)) := p'' in
   ret (cps_show.show_exp nenv cenv false e).
 
-Definition emit_L6_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
-  : exceptionMonad.exception string :=
-  (* let opt := match opt_level with O => false | S O => true | _ => false end in *)
-  do p' <- translateTo (cTerm certiL4) (Flag opt_level) p ;
-  do p'' <- match opt_level with
-           | S 0 =>  L6_pipeline_pre_cc false p'
-           | S (S 0) => L6_pipeline_anf false p'
-           | S (S (S 0)) => L6_pipeline_anf true p'
-           | _ => L5_to_L6_anf false p'   
-           end;
-  let '((_, cenv, nenv, _), (_, e)) := p'' in
-  ret (cps_show.show_exp nenv cenv false e).
+(* Zoe: Commenting out until merge is done *)
 
+(* Require Import Glue.glue. *)
+(* Definition make_glue (p : Template.Ast.program) *)
+(*   : exception (cps_util.name_env * Clight.program * Clight.program * list string)  := *)
+(*   match generate_glue p with *)
+(*   | (nenv, Some hdr, Some prg, logs) => *)
+(*       Ret (nenv, hdr, prg, logs) *)
+(*   | _ => Exc "" *)
+(*   end. *)
 
-Require Import Glue.glue.
-Definition make_glue (p : Template.Ast.program)
-  : exception (cps_util.name_env * Clight.program * Clight.program * list string)  :=
-  match generate_glue p with
-  | (nenv, Some hdr, Some prg, logs) =>
-      Ret (nenv, hdr, prg, logs)
-  | _ => Exc ""
-  end.
 
 Open Scope positive_scope.
-
 
 Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
   match x with

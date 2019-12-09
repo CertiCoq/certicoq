@@ -14,7 +14,7 @@ Require compcert.common.AST
 Require L6.L5_to_L6
         L7.L6_to_Clight
         L7.Clightexec
-        Glue.glue
+        (* Glue.glue *)
         Compiler.allInstances.
 
 (* Standard lib *)
@@ -117,6 +117,6 @@ Separate Extraction
          Compiler.allInstances.emit_L6_anf
          Compiler.allInstances.emit_L6_pre_cc
          Compiler.allInstances.emit_L6_cc
-         Compiler.allInstances.make_glue
+         (* Compiler.allInstances.make_glue *)
          L7.Clightexec.run.
 Cd "..".

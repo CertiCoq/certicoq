@@ -8,7 +8,7 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.StateMonad
                ExtLib.Data.String.
 
-Require Import Template.BasicAst.
+From MetaCoq.Template Require Import BasicAst.
 
 Require Import compcert.common.AST
                compcert.common.Errors
@@ -25,7 +25,7 @@ Require Import Clightdefs.
 Require Import L6.cps_show.
 Require Import L6_to_Clight.
 
-Require Template.All.
+Require MetaCoq.Template.All.
 
 Import MonadNotation.
 Open Scope monad_scope.

@@ -510,7 +510,7 @@ Qed.
 Function stripEC (ec:L1gEC) : AstCommon.envClass Term :=
   match ec with
   | ecTrm t => ecTrm (strip t)
-  | ecTyp _ n itp =>
+  | ecTyp n itp =>
     (** We stripped the parameters of all constructors *)
     ecTyp Term 0 itp
   end.

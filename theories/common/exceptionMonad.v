@@ -1,9 +1,11 @@
 Require Import Coq.Strings.String.
 Set Implicit Arguments.
+From MetaCoq.Template Require Import monad_utils.
+Import MonadNotation.
 
 Inductive exception (A:Type) := Exc (_:string) | Ret (_:A).
-Implicit Arguments Ret [A].
-Implicit Arguments Exc [A].
+Arguments Ret [A].
+Arguments Exc [A].
 
 Definition ret {A: Type} (x: A) := Ret x.
 Definition raise {A: Type} (str:string) := @Exc A str.
@@ -15,7 +17,7 @@ Definition bind
     | Exc str => Exc str
   end.
 
-Notation "A >>= F" := (bind A F) (at level 42, left associativity).
+Notation "A >>= F" := (bind A F).
 Notation "'do' X <- A ; B" := (bind A (fun X => B))
     (at level 200, X ident, A at level 100, B at level 200).
 
@@ -38,6 +40,18 @@ Lemma mon_assoc :
 intros.
 induction a; repeat reflexivity.
 Qed.
+
+Instance exn_monad : Monad (fun A => exception A) :=
+  { ret := @ret; bind := @bind }.
+
+Definition catch {T} (e : exception T) (f : string -> exception T) : exception T :=
+  match e with
+  | Ret x => Ret x
+  | Exc s => f s
+  end.
+
+Instance exn_monad_exc : MonadExc string (fun A => exception A) :=
+  { raise := @raise; catch := @catch }.
 
 Definition econs
   (B:Type) (b:exception B) (bs:exception (list B)): exception (list B) :=

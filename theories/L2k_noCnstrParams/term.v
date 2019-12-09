@@ -3771,7 +3771,7 @@ Let fl (body:Term) (dts:Defs) :=
 
 Function whFixStep (dts:Defs) (m:nat) : option Term :=
   match dnth m dts with
-  | Some (Build_def _ _ body _) => Some (fl body dts)
+  | Some (Build_def _ body _) => Some (fl body dts)
   | None => None
   end.
 Function whFixStep' (dts:Defs) (m:nat) : option Term :=

@@ -2,15 +2,15 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx
-     Ensembles_util List_util functions.
+From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
+Require Import Common.AstCommon.
 
-From Coq Require Import ZArith.Znumtheory
-     Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
-     NArith.BinNat PArith.BinPos Sets.Ensembles Strings.String.
-
-From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
-From Template Require Import BasicAst. (* For identifier names *)
+From CertiCoq.L6 Require Import cps cps_util set_util relations hoisting identifiers ctx
+                         Ensembles_util List_util alpha_conv functions.
+Require Import Coq.ZArith.Znumtheory.
+Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String.
+Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Import ListNotations Nnat MonadNotation.
 

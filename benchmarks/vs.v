@@ -13,8 +13,7 @@ Definition omap := match o with Some a => Some (h a) | None => None end.
 Definition obnd := match o with Some a => f a | None => None end.
 
 End option.
-Implicit Arguments omap [A B].
-Implicit Arguments obnd [A B].
+Arguments obnd [A B].
 
 Definition isSome {A : Type} (o : option A) := 
   match o with Some _ => true | _ => false end.
@@ -25,7 +24,7 @@ Variables (A B C : Type) (g : B -> C) (f : A -> B) (a : A).
 Definition compose := g (f a).
 
 End comp.
-Implicit Arguments compose [A B C].
+Arguments compose [A B C].
 
 (*new notation*)
 (*Notation "f \o g" := (compose f g) (at level 54, right associativity).*)
@@ -54,7 +53,7 @@ Fixpoint iter (n : nat) (a : A) :=
   end.
 
 End iter.
-Implicit Arguments iter [A].
+Arguments iter [A].
 
 Section tryfind.
 Variables (A E B : Type) (f : A -> E + B).
@@ -142,8 +141,8 @@ Inductive ret_kind (val : Type) : Type :=
 | Success : val -> ret_kind val
 | Failure : ret_kind val.
 
-Implicit Arguments Success [val].
-Implicit Arguments Failure [val].
+Arguments Success [val].
+Arguments Failure [val].
 
 (* variables.v *)
 
@@ -407,7 +406,7 @@ Qed.
 
 
 (* clauses.v *)
-Unset Implicit Arguments.
+Unset Arguments.
 
 Require Import ZArith List Recdef Coq.MSets.MSetInterface Coq.Sorting.Mergesort
                Permutation Coq.MSets.MSetAVL Coq.MSets.MSetRBT.
@@ -523,11 +522,11 @@ Definition normalize_atoms pa :=
   rsort_uniq pure_atom_cmp (map order_eqv_pure_atom pa).
 
 Definition mkPureClause (gamma delta: list pure_atom) : clause :=
-  PureClause gamma delta _ (eq_refl _).
+  @PureClause gamma delta _ (eq_refl _).
 
 Definition order_eqv_clause (c: clause) :=
   match c with 
-  | PureClause pa pa' _ _ => 
+  | @PureClause pa pa' _ _ => 
     mkPureClause (normalize_atoms (filter nonreflex_atom pa))
                  (normalize_atoms pa')
   | PosSpaceClause pa pa' sa' => 
@@ -611,13 +610,13 @@ Definition compare_space_atom (a b : space_atom) : comparison :=
 
 Definition compare_clause (cl1 cl2 : clause) : comparison :=
   match cl1 , cl2 with
-  | PureClause neg pos _ _ , PureClause neg' pos' _ _ =>
+  | @PureClause neg pos _ _ , @PureClause neg' pos' _ _ =>
     match compare_list pure_atom_cmp neg neg' with
     | Eq => compare_list pure_atom_cmp pos pos' 
     | c => c
     end
-  | PureClause _ _ _ _ , _ => Lt
-  | _ , PureClause _ _ _ _ => Gt
+  | @PureClause _ _ _ _ , _ => Lt
+  | _ , @PureClause _ _ _ _ => Gt
   | PosSpaceClause gamma delta sigma , PosSpaceClause gamma' delta' sigma'
   | NegSpaceClause gamma sigma delta , NegSpaceClause gamma' sigma' delta' =>
     match compare_list pure_atom_cmp gamma gamma' with
@@ -666,7 +665,7 @@ Definition prio1001 := Z2id 1001.
 
 Definition clause_prio (cl : clause) : var := 
   match cl with 
-  | PureClause gamma delta prio _ => prio
+  | @PureClause gamma delta prio _ => prio
   | PosSpaceClause _ _ _ => prio1000
   | NegSpaceClause gamma sigma delta => prio1001
   end%Z.
@@ -691,7 +690,7 @@ Hint Resolve clause_cspec'.
 
 Definition clause_length (cl : clause) : Z := 
   match cl with 
-  | PureClause gamma delta _ _ => Zlength gamma + Zlength delta
+  | @PureClause gamma delta _ _ => Zlength gamma + Zlength delta
   | PosSpaceClause gamma delta sigma => 
       Zlength gamma + Zlength delta + Zlength sigma
   | NegSpaceClause gamma sigma delta => 
@@ -877,7 +876,7 @@ Definition greater_than_all (i: var) : list pure_atom -> bool :=
 
 Definition subst_clause i e cl : clause :=
   match cl with
-  | PureClause pa pa' _ _ => 
+  | @PureClause pa pa' _ _ => 
       mkPureClause (subst_pures_delete i e pa) (subst_pures i e pa')
   | NegSpaceClause pa sa pa' =>
       NegSpaceClause (subst_pures_delete i e pa) (subst_spaces i e sa) 
@@ -918,7 +917,7 @@ Notation sortu_clauses := (rsort_uniq compare_clause).
 
 Lemma pure_clause_ext:
   forall gamma delta p Pp p' Pp',
-     PureClause gamma delta p Pp = PureClause gamma delta p' Pp'.
+     @PureClause gamma delta p Pp = @PureClause gamma delta p' Pp'.
 Proof.
   intros. subst. auto.
 Qed.
@@ -993,12 +992,12 @@ Lemma extensionality:
   forall (A B: Type) (f g : A -> B),  (forall x, f x = g x) -> f = g.
 Proof. intros; apply functional_extensionality. auto. Qed.
 
-Implicit Arguments extensionality.
+Arguments extensionality.
 
 (** We also assert propositional extensionality. *)
 
 Axiom prop_ext: ClassicalFacts.prop_extensionality.
-Implicit Arguments prop_ext.
+Arguments prop_ext.
 
 (** * Proof irrelevance *)
 
@@ -1009,7 +1008,7 @@ Lemma proof_irr: ClassicalFacts.proof_irrelevance.
 Proof.
   exact (ClassicalFacts.ext_prop_dep_proof_irrel_cic prop_ext).
 Qed.
-Implicit Arguments proof_irr.
+Arguments proof_irr.
 
 (* end msl/Axioms.v *)
 
@@ -1112,7 +1111,7 @@ Definition pn_atom_cmp (a1 a2 : pn_atom) : comparison :=
 
 Definition pure_clause2pn_list (c : clause) :=
   match c with
-  | PureClause gamma delta _ _ => 
+  | @PureClause gamma delta _ _ => 
     rsort pn_atom_cmp 
       (map (pure_atom2pn_atom false) gamma ++ map (pure_atom2pn_atom true) delta)
   | _ => nil
@@ -1120,7 +1119,7 @@ Definition pure_clause2pn_list (c : clause) :=
 
 Definition compare_clause2 (cl1 cl2 : clause) :=
   match cl1, cl2 with
-  | PureClause _ _ _ _, PureClause _ _ _ _ =>
+  | @PureClause _ _ _ _, @PureClause _ _ _ _ =>
     compare_list pn_atom_cmp (pure_clause2pn_list cl1) (pure_clause2pn_list cl2)
   | _, _ => compare_clause cl1 cl2
   end.
@@ -1206,14 +1205,14 @@ Definition mergeC (a1 a2 : A) (cs: canons) : canons :=
 End cclosure.
 
 Notation expr_get := (lookC _ _ expr_cmp (@id _)).
-Notation expr_merge := (mergeC _ _ expr_cmp expr_cmp (@id _)).
+Notation expr_merge := (@mergeC _ _ expr_cmp expr_cmp (@id _)).
 
 (* used internally *)
 Local Notation expr_rewriteC := (rewriteC expr _ expr_cmp).
 
 Fixpoint cclose_aux (l : list clause) : list (expr * expr) := 
   match l with 
-  | PureClause nil [Eqv s t] _ _ :: l' => expr_merge s t (cclose_aux l')
+  | @PureClause nil [Eqv s t] _ _ :: l' => @expr_merge s t (cclose_aux l')
   | _ => nil
   end.
 
@@ -1297,7 +1296,7 @@ Fixpoint ef_aux neg u0 u v pos0 pos l0 : list clause :=
 
 Definition ef (cty : ce_type) (c : clause) l0 : list clause := 
   match cty, c with
-  | CexpEf, PureClause neg (Eqv (Var u0 as u) v :: pos) _ _ =>
+  | CexpEf, @PureClause neg (Eqv (Var u0 as u) v :: pos) _ _ =>
     if greater_than_all u0 neg then ef_aux neg u0 u v nil pos l0
     else l0
   | _, _ => l0
@@ -1305,6 +1304,8 @@ Definition ef (cty : ce_type) (c : clause) l0 : list clause :=
 
 (** sp:
 left and right superposition *)
+
+Arguments PureClause : clear implicits.
 
 Definition sp (cty : ce_type) (c d : clause) l0 : list clause :=
   match cty, c, d with
@@ -2182,7 +2183,7 @@ Print Assumptions the_loop.
 
 (* end show *)
 (* Required to work around Coq bug #2613 *)
-Implicit Arguments eq_sym. 
+Arguments eq_sym. 
 
 Definition check_entailment (ent: entailment) : veristar_result :=
   let s := clause_list2set (pure_clauses (map order_eqv_clause (cnf ent)))

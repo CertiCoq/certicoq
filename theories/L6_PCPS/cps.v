@@ -4,7 +4,7 @@
 From Coq Require Import ZArith.ZArith Lists.List.
 From CertiCoq.L6 Require Import List_util.
 From compcert.lib Require Import Maps.
-From Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
 

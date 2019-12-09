@@ -10,7 +10,8 @@ Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
 Require Import Coq.omega.Omega.
 
-Require Import TemplateExtraction.EAst Template.kernel.univ.
+Require Import MetaCoq.Erasure.EAst MetaCoq.Template.Universes.
+Require Import MetaCoq.Template.Loader.
 
 Require Import Common.Common.
 Require Import L1g.compile.
@@ -21,9 +22,6 @@ Local Open Scope bool.
 Local Open Scope list.
 
 Set Implicit Arguments.
-
-Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
-Set Implicit Arguments.
 Check program_Program.
 Print program.
 
@@ -33,15 +31,15 @@ Quote Recursively Definition cbv_bol := (* [program] of Coq's answer *)
   ltac:(let t:=(eval cbv in (bol)) in exact t).
 Print cbv_bol.
 (* [Term] of Coq's answer *)
-Definition ans_bol := Eval cbv in (main (program_Program cbv_bol)).
+Definition ans_bol := Eval lazy in (main (program_Program cbv_bol)).
 Print ans_bol.
 (* [program] of the program *)
 Quote Recursively Definition p_bol := bol.
 Print p_bol.
-Definition P_bol := Eval cbv in (program_Program p_bol).
+Definition P_bol := Eval lazy in (program_Program p_bol).
 Print P_bol.
 Goal
-  let env := (env (program_Program p_bol)) in
+  let env := (env P_bol) in
   let main := (main P_bol) in
   wcbvEval (env) 100 (main) = Ret ans_bol.
 Proof.
@@ -68,9 +66,9 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
-Require Template.Ast.
-Require Import PCUIC.TemplateToPCUIC.
-Require Import TemplateExtraction.Extract.
+From MetaCoq Require Template.Ast.
+From MetaCoq.PCUIC Require Import TemplateToPCUIC.
+From MetaCoq.Erasure Require Import EAst SafeErasureFunction SafeTemplateErasure.
 
 Definition tru := true.
 Quote Recursively Definition cbv_tru := (* [program] of Coq's answer *)
@@ -89,31 +87,32 @@ Definition genv := fst p_tru.
 Eval cbn in genv.
 Definition t := snd p_tru.
 Eval cbn in t.
-Definition gc := (genv, uGraph.init_graph).
-Definition genv' := trans_global gc.
-Definition genv'' := Eval cbn in extract_global genv'.
+(* empty_ext is necessary to move to a [global_env_ext] *)
+Definition genv' := trans_global (AstUtils.empty_ext genv).
+Definition genv'' := Eval lazy in erase_global (fst genv').
 Print genv''.
-Definition t' := Eval cbn in (extract genv' nil (trans t)).
+Axiom todo : forall {A}, string -> A.
+
+Definition t' := Eval lazy in (erase genv' (todo "wf genv'") nil (trans t) (todo "welltyped t")).
 Print t'.
-Definition genv''': list E.global_decl :=
-  (E.InductiveDecl "Coq.Init.Datatypes.bool"
+Definition genv''': list (kername * EAst.global_decl) :=
+  ("Coq.Init.Datatypes.bool", 
+  EAst.InductiveDecl
             {|
-            E.ind_npars := 0;
-            E.ind_bodies := {|
-                            E.ind_name := "bool";
-                            E.ind_type := E.tBox;
-                            E.ind_kelim := InProp :: InSet :: InType :: nil;
-                            E.ind_ctors :=
-                              ("true", E.tBox, 0) :: ("false", E.tBox, 0) :: nil;
-                            E.ind_projs := nil |} :: nil |}
-          :: E.ConstantDecl "Top.tru"
-          {| E.cst_type := E.tBox;
-             E.cst_body :=
-               Some (E.tConstruct
+            EAst.ind_npars := 0;
+            EAst.ind_bodies := {|
+                            EAst.ind_name := "bool";
+                            EAst.ind_kelim := InProp :: InSet :: InType :: nil;
+                            EAst.ind_ctors :=
+                              ("true", EAst.tBox, 0) :: ("false", EAst.tBox, 0) :: nil;
+                            EAst.ind_projs := nil |} :: nil |})
+          :: ("Top.tru", EAst.ConstantDecl
+          {| EAst.cst_body :=
+               Some (EAst.tConstruct
                        {| inductive_mind := "Coq.Init.Datatypes.bool";
-                          inductive_ind := 0 |} 0) |}
-          :: nil).
-Definition t''': E.term := (E.tConst "Top.tru").
+                          inductive_ind := 0 |} 0) |})
+          :: nil.
+Definition t''': EAst.term := (EAst.tConst "Top.tru").
 Eval cbn in (program_Pgm_aux genv''').  (* ecTrm tru is right now! *)
 Goal
   let env := (env P_tru) in
@@ -169,10 +168,13 @@ Print cbv_plus01.
 Definition ans_plus01 := Eval cbv in (main (program_Program cbv_plus01)).
 Print ans_plus01.
 (* [program] of the program *)
-Quote Recursively Definition p_plus01 := plus01.
+Quote Recursively Definition p_plus01 := (plus 0 1).
 Print p_plus01.
-Definition P_plus01 := Eval cbv in (program_Program p_plus01).
-Print P_plus01.
+Definition erase p := 
+  let p0 := SafeTemplateChecker.fix_program_universes p in
+  erase_template_program p0.
+Definition P_plus01 := Eval lazy in (program_Program p_plus01).
+Print P_plus01. 
 Goal
   let env := (env P_plus01) in
   let main := (main P_plus01) in
@@ -211,7 +213,7 @@ Print ans_plus98.
 (* [program] of the program *)
 Quote Recursively Definition p_plus98 := plus98.
 Print p_plus98.
-Definition P_plus98 := Eval cbv in (program_Program p_plus98).
+Definition P_plus98 := Eval lazy in (program_Program p_plus98).
 Print P_plus98.
 Goal
   let env := (env P_plus98) in
@@ -238,11 +240,11 @@ Quote Recursively Definition cbv_vplus0123 := (* [program] of Coq's answer *)
   ltac:(let t:=(eval cbv in (vplus0123)) in exact t).
 Print cbv_vplus0123.
 (* [Term] of Coq's answer *)
-Definition ans_vplus0123 := Eval cbv in (main (program_Program cbv_vplus0123)).
+Definition ans_vplus0123 := Eval lazy in (main (program_Program cbv_vplus0123)).
 (* [program] of the program *)
 Quote Recursively Definition p_vplus0123 := vplus0123.
 Print p_vplus0123.
-Definition P_vplus0123 := Eval cbv in (program_Program p_vplus0123).
+Definition P_vplus0123 := Eval lazy in (program_Program p_vplus0123).
 Print P_vplus0123.
 Goal
   let env := (env P_vplus0123) in
@@ -315,7 +317,7 @@ Definition ans_arden_size :=
 (* [program] of the program *)
 Quote Recursively Definition p_arden_size := arden_size.
 Print p_arden_size.
-Definition P_arden_size := Eval cbv in (program_Program p_arden_size).
+Definition P_arden_size := Eval lazy in (program_Program p_arden_size).
 Print P_arden_size.
 Eval cbv in (env P_arden_size).
 Goal
@@ -347,7 +349,7 @@ Print ans_pierce.
 (* [program] of the program *)
 Quote Recursively Definition p_pierce := pierce.
 Print p_pierce.
-Definition P_pierce := Eval cbv in (program_Program p_pierce).
+Definition P_pierce := Eval lazy in (program_Program p_pierce).
 Print P_pierce.
 Goal
   let env := (env P_pierce) in
@@ -368,7 +370,7 @@ Print ans_Scomb.
 (* [program] of the program *)
 Quote Recursively Definition p_Scomb := Scomb.
 Print p_Scomb.
-Definition P_Scomb := Eval cbv in (program_Program p_Scomb).
+Definition P_Scomb := Eval lazy in (program_Program p_Scomb).
 Print P_Scomb.
 Goal
   let env := (env P_Scomb) in
@@ -393,7 +395,7 @@ Definition ans_slowFib3 :=
   Eval cbv in (main (program_Program cbv_slowFib3)).
 (* [program] of the program *)
 Quote Recursively Definition p_slowFib3 := slowFib3.
-Definition P_slowFib3 := Eval cbv in (program_Program p_slowFib3).
+Definition P_slowFib3 := Eval lazy in (program_Program p_slowFib3).
 Goal
   let env := (env P_slowFib3) in
   let main := (main P_slowFib3) in
@@ -412,10 +414,10 @@ Definition fib9 := fib 9.
 Quote Recursively Definition cbv_fib9 :=
   ltac:(let t:=(eval cbv in fib9) in exact t).
 Definition ans_fib9 :=
-  Eval cbv in (main (program_Program cbv_fib9)).
+  Eval lazy in (main (program_Program cbv_fib9)).
 (* [program] of the program *)
 Quote Recursively Definition p_fib9 := fib9.
-Definition P_fib9 := Eval cbv in (program_Program p_fib9).
+Definition P_fib9 := Eval lazy in (program_Program p_fib9).
 Goal
   let env := (env P_fib9) in
   let main := (main P_fib9) in
@@ -436,6 +438,7 @@ Fixpoint unzip (A:Set) (l:list (A*A)) {struct l} : list A :=
     | nil => nil
     | cons (a1,a2) l' => cons a1 (cons a2 (unzip l'))
   end.
+  Unset Asymmetric Patterns.
 Fixpoint PListToList (A:Set) (l:PList A) {struct l} : list A :=
   match l in PList A return list A with
     | zero a => cons a (nil )
@@ -492,7 +495,7 @@ Definition ans_size_myTree :=
   Eval cbv in (main (program_Program cbv_size_myTree)).
 (* [program] of the program *)
 Quote Recursively Definition p_size_myTree := size_myTree.
-Definition P_size_myTree := Eval cbv in (program_Program p_size_myTree).
+Definition P_size_myTree := Eval lazy in (program_Program p_size_myTree).
 Goal
   let env := (env P_size_myTree) in
   let main := (main P_size_myTree) in
@@ -501,13 +504,11 @@ Goal
 Qed.
 
 
-Function provedCopy (n:nat) {wf lt n} :=
+Program Fixpoint provedCopy (n:nat) {wf lt n} :=
   match n with 0 => 0 | S k => S (provedCopy k) end.
-Proof.
-  - intros. constructor.
-  - apply lt_wf.
-Defined.
-Print Assumptions provedCopy_tcc.
+Next Obligation. apply lt_wf. Defined.  
+
+Print Assumptions provedCopy.
 Quote Recursively Definition pCopy := provedCopy. (* program *)
 Print provedCopy_tcc.
 Definition x := 3.
@@ -516,17 +517,18 @@ Compute provedCopyx.  (** evals correctly in Coq **)
 Quote Recursively Definition cbv_provedCopyx :=
   ltac:(let t:=(eval cbv in provedCopyx) in exact t).
 Definition ans_provedCopyx :=
-  Eval cbv in (main (program_Program cbv_provedCopyx)).
+  Eval lazy in (main (program_Program cbv_provedCopyx)).
 Quote Recursively Definition p_provedCopyx := provedCopyx. (* program *)
+(* Very long
 Definition P_provedCopyx :=                            (* Program *)
-  Eval cbv in (program_Program p_provedCopyx).
+  Eval lazy in (program_Program p_provedCopyx).
 Goal
   let env := (env P_provedCopyx) in
   let main := (main P_provedCopyx) in
   wcbvEval (env) 100 (main) = Ret ans_provedCopyx.
   vm_compute. reflexivity.
 Qed.
-
+*)
 
 Definition plusx := (plus 0).
 Compute plusx.
@@ -579,7 +581,7 @@ Qed.
 Quote Recursively Definition p_and_rect := and_rect.
 Eval cbv in (program_Program p_and_rect).
 Definition and_rect_x :=
-  (and_rect (fun (a:1=1) (b:True) => conj b a) (conj (eq_refl 1) I)).
+  (and_rect (fun (a:1=1) (b:True) => conj b a) (conj (@eq_refl _ 1) I)).
 Quote Recursively Definition p_and_rect_x := and_rect_x.
 Print p_and_rect_x.
 Definition P_and_rect_x := Eval cbv in (program_Program p_and_rect_x).

@@ -829,6 +829,8 @@ Proof using.
   unfold isprogram. split.  repnd. eauto with eval.
 
   (* Move to L4_5_to_L5 *)
+Set Nested Proofs Allowed.
+  
 Lemma eval_preserves_isprog :
   forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
 Proof using.

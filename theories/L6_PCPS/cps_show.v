@@ -3,6 +3,7 @@
     [show_exp e] constructs a string representing the term that has some
     minimal formatting so that it's much more readable.
 *)
+Require Import Common.AstCommon.
 Require Import List.
 Require Import String.
 Require Import L6.cps.
@@ -11,7 +12,7 @@ Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-From Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 
 Import MonadNotation.
 
@@ -19,7 +20,7 @@ Open Scope monad_scope.
 
 Require Import Common.AstCommon.
 
-Definition name_env := M.t BasicAst.name.
+Definition name_env := M.t Template.BasicAst.name.
 
 Section PP.
 

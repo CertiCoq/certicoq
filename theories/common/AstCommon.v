@@ -1,5 +1,6 @@
-Require Import Template.kernel.univ.
-Require Export TemplateExtraction.EAst.
+From MetaCoq.Template Require Import Universes.
+From MetaCoq Require Export Template.BasicAst.
+From MetaCoq Require Export Erasure.EAst.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
@@ -54,7 +55,7 @@ Proof.
 Defined.
 
 Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
-  decide equality. apply level_bool_dec.
+  decide equality; apply level_bool_dec.
 Defined.
 
 Lemma cast_kind_dec: forall (c1 c2:cast_kind), {c1 = c2}+{c1 <> c2}.

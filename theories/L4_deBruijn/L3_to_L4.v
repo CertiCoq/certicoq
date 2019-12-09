@@ -113,7 +113,7 @@ Definition translate_entry x acc :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
     (s, t') :: acc
-  | (s, ecTyp _ _ _) => acc
+  | (s, ecTyp _ _) => acc
   end.
 
 Definition translate_entry_aux x acc : option (string * exp) :=
@@ -121,7 +121,7 @@ Definition translate_entry_aux x acc : option (string * exp) :=
   | (s, ecTrm t) =>
     let t' := translate acc t in
     Some (s, t')
-  | (s, ecTyp _ _ _) => None
+  | (s, ecTyp _ _) => None
   end.
 
 Definition translate_env_aux (e : environ L2k.compile.Term) (k : env) : env :=
@@ -133,7 +133,7 @@ Definition translate_env (e : environ L2k.compile.Term) : env :=
 Definition inductive_entry_aux {A} (x : string * envClass A) acc : ienv :=
   match x with
   | (s, ecTrm t) => acc
-  | (s, ecTyp _ pars pack) =>
+  | (s, ecTyp pars pack) =>
     (* pars is always 0 in the output of L2k_noCstrParams *)
     (s, pack) :: acc
   end.

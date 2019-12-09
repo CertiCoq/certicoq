@@ -340,7 +340,7 @@ Qed.
 
 
 Require Import SquiggleEq.UsefulTypes.
-Require Import Template.Ast.
+From MetaCoq Require Import Template.Ast.
 
 Global Instance EqDecInd : Deq inductive.
 eapply @deqAsSumbool.

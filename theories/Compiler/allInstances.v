@@ -15,8 +15,34 @@ Require Import  maps_util.
 Open Scope Z_scope.
 Open Scope string_scope.
 
+From MetaCoq.Template Require Import All.
 
 (* Zoe : TODO these are very verbose and L6 specific so move it there. Generally this file needs massive cleanup. *)
+Quote Recursively Definition One := 1%positive.
+
+
+Quote Recursively Definition Demo1 :=  (List.app (List.repeat true 5) (List.repeat false 3)).
+
+
+
+(* Definition One6 : cTerm certiL6.                                                         *)
+(* (let t:= eval vm_compute in (translateTo (cTerm certiL6) One) in  *)
+(* match t with *)
+(* |Ret ?xx => exact xx *)
+(* end). *)
+(* Defined. *)
+
+
+Definition ext_comp := fun prog =>
+  let t := (translateTo (cTerm certiL6) prog) in
+  match t with
+  | Ret xx => xx
+  | _ => ((M.empty _, M.empty _, M.empty _, M.empty _) , (M.empty _, cps.Ehalt 1%positive))
+  end.
+ 
+Require Import L6_to_Clight.
+(* Require Import Clightexec.*)
+Require Import compcert.lib.Maps.
 Definition argsIdent:positive := 26.
 Definition allocIdent:positive := 28.
 Definition limitIdent:positive := 29.
@@ -90,10 +116,10 @@ Definition compile_opt_L7 o p :=
   | Exc s => Exc s
   end.
 
-Definition compile_template_L4 `{F:utils.Fuel} (p : Template.Ast.program) : exception (cTerm certiL4) :=
+Definition compile_template_L4 (p : Template.Ast.program) : exception (cTerm certiL4) :=
   translateTo (cTerm certiL4) (Flag 0) p.
 
-Definition compile_template_L7 `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.program)
+Definition compile_template_L7 (opt_level : nat) (p : Template.Ast.program)
   : exception (cps_util.name_env * Clight.program * Clight.program)  :=
   compile_opt_L7 (Flag opt_level) (translateTo (cTerm certiL6) (Flag opt_level) p).
 
@@ -263,7 +289,6 @@ Definition eval_c4 := match binom5 with
 
 Definition eval_c4' := Eval vm_compute in eval_c4.
 Print eval_c4'.
-
 
 (* Definition vs5 := Eval native_compute in (translateTo (cTerm certiL5a) vs).  *)
 Print color5.

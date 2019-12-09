@@ -16,7 +16,7 @@ Require Import ExtLib.Structures.Monads
 Import MonadNotation.
 Open Scope monad_scope.
 
-Require Import Template.BasicAst.
+From MetaCoq.Template Require Import BasicAst.
 
 Require Import compcert.common.AST
                compcert.common.Errors

@@ -85,7 +85,7 @@ Lemma toCoInd {dstDet: deterministicBigStep Dst}s d:
   (forall m, compObsLeLinkN m s d) -> compObsLeLink s d.
 Proof using.
   revert d. revert s.
-  cofix.
+  cofix toCoInd.
   intros ? ? Hi.
   constructor.
   intros o ? Hev. pose proof Hi as Hib.
@@ -168,7 +168,7 @@ Lemma compObsLeLinkTransitive
   -> i ⊑ d 
   -> s ⊑ d.
 Proof.
-  cofix.
+  cofix compObsLeLinkTransitive.
   intros ? ? ? Ha Hb.
   inverts Ha as Hah.
   inverts Hb as Hbh.
@@ -317,8 +317,8 @@ Definition eqObsId (a b : Inter) := leObsId a b /\ leObsId b a.
 
 Lemma sameValuesImpliesLeObsId a b: sameValues a b -> leObsId a b.
 Proof using.
-  revert a b. cofix.
-  intros ? ? Hs. constructor. intros o sv Hsv.
+  revert a b. cofix sameValuesImpliesLeObsId.
+  intros ? ? Hs. constructor. intros sv Hsv.
   specialize (proj1 (Hs _) Hsv). intros Hsvb.
   exists sv. dands; auto; try reflexivity.
 - intros. apply liftLeRimpl with (R1:= sameValues); auto.
@@ -360,7 +360,7 @@ Lemma compObsLeLink_proper_Feq t1 t2:
   -> (@compObsLeLink Src Dst _ _ _ _ _ _ _ t2 _ _ ) a b.
 Proof using.
   intros feq.
-  cofix.
+  cofix compObsLeLink_proper_Feq.
   intros ? ? Hl.
   constructor. invertsn Hl.
   intros o sv Hev. specialize (Hl o sv Hev). exrepnd.

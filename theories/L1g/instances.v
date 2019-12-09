@@ -77,28 +77,33 @@ Instance certiL1g: CerticoqLanguage (Program L1g.compile.Term):= {}.
 
 Local Generalizable Variable Lj.
 
-Definition translateTo `{F:utils.Fuel} `{CerticoqTranslation (Program L1g.compile.Term) Lj}
-  (o:Opt)
-  (p:Template.Ast.program): exception Lj :=
-  let l1g := ((AstCommon.timePhase "L1 to L2")
-                (fun (_:Datatypes.unit) =>
-                   L1g.compile.program_Program p)) in 
-     translate (Program L1g.compile.Term) Lj o l1g.
+Axiom debug : forall {A}, String.string -> A -> A.
+Extract Constant debug => "(fun msg x -> Certicoq_debug.certicoq_msg_debug msg; x)".
+Require Import String.
+(** When defining [Show] instance for your own datatypes, you sometimes need to
+    start a new line for better printing. [nl] is a shorthand for it. *)
+    Definition nl : string := String (Ascii.ascii_of_nat 10) EmptyString.
 
-Arguments translateTo {F} Lj {H} o p.
+Definition translateTo `{CerticoqTranslation (Program L1g.compile.Term) Lj}
+  (p:Template.Ast.program): exception Lj :=
+  let db := debug ("Translating from template to L1 " ++ nl ++ Pretty.print_term (AstUtils.empty_ext (fst p)) nil true (snd p)) in
+  let l1g:= db (L1g.compile.program_Program p) in
+  let db := debug ("Result" ++ nl ++ L1g.term.print_term l1g.(main)) in
+  db (translate (Program L1g.compile.Term) Lj l1g).
+
+Arguments translateTo Lj {H} p.
 
 Require Import certiClasses.
 
-Definition ctranslateTo `{F:utils.Fuel} {Term Value BigStep WF QH ObsS }
+Definition ctranslateTo {Term Value BigStep WF QH ObsS }
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
   `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
   : Opt -> Template.Ast.program -> exception (cTerm Lj) :=
   translateTo (cTerm Lj).
 
-Arguments ctranslateTo {F} {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
+Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
 
-
-Definition ctranslateEval `{F:utils.Fuel} {Term Value BigStep WF QH ObsS }
+Definition ctranslateEval {Term Value BigStep WF QH ObsS }
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
    `{BigStepOpSemExec (cTerm Lj) (cValue Lj)}
@@ -108,4 +113,4 @@ Definition ctranslateEval `{F:utils.Fuel} {Term Value BigStep WF QH ObsS }
   | Exc s => Error s None 
   end.
 
-Arguments ctranslateEval {F} {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} o p n.
+Arguments ctranslateEval {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} p n.

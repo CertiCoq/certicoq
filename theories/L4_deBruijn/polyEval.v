@@ -75,12 +75,13 @@ Definition branch
 
 (** Find a branch in a match expression corresponding to a given constructor
     and arity. *)
+
 Definition find_branch  (d:dcon) (m:nat) (matcht :list branch) : 
     option (AbsBTerm Opid ta) 
   := 
   let obr :=
   find 
-    (fun a : (branch) => decide (d = (fst a))) matcht in
+    (fun a : branch => decide (d = (fst a) :> dcon)) matcht in
   match obr with
   | Some a => if decide (m=absNumBound _ _ (snd a)) then Some (snd a) else None
   | None => None

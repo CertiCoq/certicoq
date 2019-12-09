@@ -109,7 +109,7 @@ Section EVAL.
   Definition sstep_f (rho:env) (e:exp) : exception (env* exp) :=
     match e with
       | Eprim x f ys e' =>
-        do vs  <- l_opt (get_list ys rho) ("Eprim: failed to get_list");
+          do vs  <- l_opt (getlist ys rho) ("Eprim: failed to getlist");
           do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
           do v <- l_opt (f' vs) ("Eprim: prim did not compute");
           let rho' := M.set x v rho in

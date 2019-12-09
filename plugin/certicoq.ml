@@ -5,7 +5,7 @@
 
 open Pp
 open Printer
-open Term_quoter
+open Ast_quoter
 open ExceptionMonad
 open AstCommon
 

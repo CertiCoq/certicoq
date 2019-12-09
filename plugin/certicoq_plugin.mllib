@@ -1,3 +1,4 @@
+Certicoq_debug
 Ast0
 Basics
 BinInt
@@ -28,7 +29,7 @@ Coqlib0
 Zbool
 Zpower
 CertiClasses2
-Classes0
+Classes1
 ExceptionMonad
 Expression
 List1
@@ -59,6 +60,7 @@ State
 Ctx
 Eval
 Hoisting
+Term0
 Instances0
 Instances1
 Set_util
@@ -66,7 +68,6 @@ Identifiers
 Uncurry
 Color
 Shrink_cps
-Term0
 TermsDB
 Variables
 Closure_conversion

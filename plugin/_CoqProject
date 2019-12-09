@@ -4,6 +4,10 @@
 
 # extracted compiler
 # extraction/ast0.mli
+
+certicoq_debug.mli
+certicoq_debug.ml
+
 extraction/char0.mli
 extraction/decidableClass.mli
 extraction/errors0.mli
@@ -28,7 +32,7 @@ extraction/zArith_dec.mli
 extraction/zbool.mli
 extraction/zpower.mli
 extraction/certiClasses2.mli
-extraction/classes0.mli
+extraction/classes1.mli
 extraction/exceptionMonad.mli
 extraction/expression.mli
 extraction/list1.mli
@@ -39,7 +43,7 @@ extraction/varImplZ.mli
 extraction/varImplDummyPair.mli
 extraction/terms.mli
 extraction/exceptionMonad.ml
-extraction/classes0.ml
+extraction/classes1.ml
 extraction/certiClasses2.ml
 extraction/certiClasses.mli
 extraction/certiClasses.ml
@@ -82,10 +86,6 @@ extraction/string1.ml
 extraction/usefulTypes.ml
 extraction/zArith_dec.ml
 extraction/zbool.ml
-extraction/astUtils.ml
-extraction/astUtils.mli
-extraction/eTyping.ml
-extraction/eTyping.mli
 extraction/compile0.mli
 extraction/compile1.mli
 extraction/cps.mli
@@ -162,7 +162,6 @@ extraction/instances0.ml
 extraction/instances1.ml
 extraction/instances2.mli
 extraction/instances3.ml
-extraction/instances4.mli
 extraction/set_util.ml
 extraction/shrink_cps.ml
 extraction/term0.ml
@@ -188,15 +187,12 @@ extraction/floats.ml
 extraction/l3_to_L4.mli
 extraction/values.ml
 extraction/instances2.ml
-extraction/instances4.ml
-extraction/instances5.mli
 extraction/alpha_fresh.mli
 extraction/alpha_fresh.ml
 extraction/beta_contraction.mli
 extraction/beta_contraction.ml
 extraction/uncurry.mli
 extraction/uncurry.ml
-extraction/instances6.mli
 extraction/l3_to_L3_eta.ml
 extraction/csyntax.mli
 extraction/clightdefs.mli
@@ -209,11 +205,7 @@ extraction/l6_to_Clight.mli
 extraction/l6_to_Clight_stack.mli
 extraction/glue.mli
 extraction/printAST.ml
-extraction/instances7.mli
-extraction/instances7.ml
 extraction/allInstances.mli
-extraction/instances5.ml
-extraction/instances6.ml
 extraction/csyntax.ml
 extraction/clightdefs.ml
 extraction/clight.ml

@@ -1,3 +1,6 @@
+COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ../benchmarks CertiCoq.Benchmarks
+
+all: copy demo demo1 demo2
 CCOMPILER=gcc
 
 all: benchmarks # copy demo demo1 demo2
@@ -23,39 +26,19 @@ clean:
 	rm -f ./glue.*.*.h
 
 demo: demo.v
-	coqc demo.v
+	coqc $(COQOPTS) demo.v
 
-demo1: maindemo1.c demo.demo1.c glue.demo.demo1.c
-	$(CCOMPILER) -o demo1 -w -O2 maindemo1.c gc.c demo.demo1.c glue.demo.demo1.c
+demo0: maindemo0.c gc.c CertiCoq.Benchmarks.demo.demo0.c glue.CertiCoq.Benchmarks.demo.demo0.c
+	$(CCOMPILER) -o demo0 -Wno-everything -O2 $+
 
-demo2: maindemo2.c demo.demo2.c glue.demo.demo2.c
-	$(CCOMPILER) -o demo2 -w -O2 maindemo2.c gc.c demo.demo2.c glue.demo.demo2.c
+demo1: maindemo1.c gc.c CertiCoq.Benchmarks.demo.demo1.c glue.CertiCoq.Benchmarks.demo.demo1.c
+	$(CCOMPILER) -o demo1 -Wno-everything -O2 $+
 
-# vs: demo.is_valid.c
-# 	$(CCOMPILER) -o vs -w -O2 mainvs.c gc.c demo.is_valid.c
+demo2: maindemo2.c gc.c CertiCoq.Benchmarks.demo.demo2.c glue.CertiCoq.Benchmarks.demo.demo2.c
+	$(CCOMPILER) -o demo2 -Wno-everything -O2 $+
 
-binom: CertiCoq.Benchmarks.Binom.main.c
-	$(CCOMPILER) -o binom -w -O2 main.c gc.c CertiCoq.Benchmarks.Binom.main.c
+vs: CertiCoq.Benchmarks.demo.is_valid.c
+	$(CCOMPILER) -o vs -Wno-everything -O2 mainvs.c gc.c $<
 
-sha: benchmark_certicoq.benchsha.c
-	$(CCOMPILER) -o sha -w -O2 main.c gc.c benchmark_certicoq.benchsha.c
-
-
-color: CertiCoq.Benchmarks.Color.main.c
-	$(CCOMPILER) -o color -w -O2 main.c gc.c CertiCoq.Benchmarks.Color.main.c
-
-vs: CertiCoq.Benchmarks.vs.main_h.c
-	$(CCOMPILER) -o vs -w -O2 main.c gc.c CertiCoq.Benchmarks.vs.main_h.c
-
-benchmark: benchmark_certicoq.v
-	coqc benchmark_certicoq.v
-
-runbenchmarks:
-	echo "binom"
-	./binom
-	echo "color"
-	./color
-	echo "vs"
-	./vs
-	echo "sha"
-	./sha
+%.vo: %.v
+	coqc ${COQOPTS} $<

@@ -13,7 +13,6 @@ Require Export Common.Common.
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
-
 Require Import Common.AstCommon.
 Require Import L2k.term L2k.program L2k.compile L2k.wcbvEval.
 
@@ -28,6 +27,7 @@ Require Import L3_to_L3_eta_correct.
 
 Require Import L4.expression.
 Require Import L4.L3_to_L4.
+Unset Keyed Unification.
 
 (** Tactics *)
 Ltac crush :=
@@ -431,7 +431,8 @@ Proof.
     destruct a. destruct x. simpl.
     case_eq (sbst_env_aux e0 k (0, [])).
     intros. simpl. f_equal. simpl in Hwf.
-    rewrite substitution. simpl. repeat (f_equal; try lia). lia.
+    epose (substitution _ _ _ N0 n).
+    simpl in e2. rewrite e2; repeat (f_equal; try lia).
 Qed.
 
 (** Simplification lemmas for [subst_env] *)
@@ -752,9 +753,6 @@ Proof.
     setoid_rewrite Nat.add_comm at 3.
     rewrite Nat.add_assoc.
     apply H0.
-  - specialize (H0 _ H3 H4 H5).
-    specialize (H2 _ H3 H4 H5).
-    apply H2.
   - simpl.
     specialize (H0 _ H4 H5 H6).
     destruct strip_lam eqn:Hs. constructor.
@@ -916,7 +914,7 @@ Proof.
                                                      let k := (N.of_nat k) in
              trans_fixes (trans e) (k + N.of_nat n) a =
              shift_fns (N.of_nat n) k (trans_fixes (trans e) k a)
-     ) /\ (forall pree, crctEnv pree -> True)). Focus 2. intros. apply H. auto. 
+     ) /\ (forall pree, crctEnv pree -> True)). 2:{ intros; apply H. auto. }
   clear. apply crctCrctsCrctBsDsEnv_ind; intros *; auto.
 
   - intros. simpl; destruct lt_dec. reflexivity.
@@ -1395,7 +1393,7 @@ Lemma sbst_fix_preserves_lam es na bod :
   Lam_e na (sbst_fix_aux es bod 1).
 Proof.
   revert bod; unfold sbst_fix, sbst_fix_aux.
-  generalize (eq_refl (efnlength es)).
+  generalize (@eq_refl _ (efnlength es)).
   generalize (efnlength es) at 1 3.
   generalize (le_refl (efnlength es)).
   generalize es at 1 4 5 7.

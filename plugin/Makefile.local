@@ -1,3 +1,7 @@
-COQ_SRC_SUBDIRS+=user-contrib/TemplateChecker user-contrib/PCUIC user-contrib/TemplateExtraction
-CAMLFLAGS+=-open Template_coq_checker_plugin -open Template_coq_pcuic_plugin -open Template_coq_extraction_plugin
+COQ_SRC_SUBDIRS+=user-contrib/MetaCoq/Template user-contrib/MetaCoq/Checker user-contrib/MetaCoq/SafeChecker user-contrib/MetaCoq/Erasure
+OPENS=-open Metacoq_template_plugin -open Metacoq_checker_plugin -open Metacoq_safechecker_plugin -open Metacoq_erasure_plugin
+CAMLFLAGS+=$(OPENS)
 CAMLFLAGS+=-w -33 # Unused opens
+
+merlin-hook::
+	$(HIDE)echo 'FLG $(OPENS)' >> .merlin

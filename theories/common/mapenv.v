@@ -1,5 +1,5 @@
 
-Require Export Template.Ast.
+From MetaCoq Require Export Template.Ast.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.

@@ -4,7 +4,7 @@
 From Coq Require Import ZArith.ZArith Lists.List.
 From CertiCoq.L6 Require Import List_util.
 From compcert.lib Require Import Maps.
-From Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
 
@@ -139,7 +139,7 @@ Lemma exp_ind' :
     (forall (v : var), P (Ehalt v)) ->
     forall e : exp, P e.
 Proof.
-  intros P H1 H2 H3 H4 H5 H6 H7 H8. fix 1.
+  intros P H1 H2 H3 H4 H5 H6 H7 H8. fix exp_ind' 1.
   destruct e; try (now clear exp_ind'; eauto).
   - eapply H1. eapply exp_ind'; eauto.
   - induction l as [ | [c e] xs IHxs].
@@ -335,7 +335,7 @@ Lemma val_ind' :
     forall v : val, P v.
 Proof.
   intros P H1 H2 H3 H4.
-  fix 1.
+  fix val_ind' 1.
   destruct v; try (now clear val_ind'; eauto).
   - induction l as [ | x xs IHxs].
     eapply H1. eapply H2. apply val_ind'. eauto.

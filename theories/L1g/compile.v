@@ -1,3 +1,6 @@
+From MetaCoq.Template Require Import monad_utils utils.
+
+Import MonadNotation.
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
@@ -6,10 +9,8 @@ Require Import Coq.Bool.Bool.
 Require Import FunInd.
 Require Import Common.Common.
 
-Require Import
-        TemplateExtraction.EAst
-        TemplateExtraction.ETyping
-        Template.kernel.univ.
+From MetaCoq.Template Require Import utils.
+From MetaCoq.Erasure Require Import EAst ETyping.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -65,10 +66,11 @@ Notation tunit t := (unit t).
 Notation btunit n t := (bcons n t bnil).
 Notation dunit nm t m := (dcons nm t m dnil).
 
-(** Printing terms in exceptions for debugging purposes **
+(** Printing terms in exceptions for debugging purposes **)
 Fixpoint print_template_term (t:term) : string :=
   match t with
     | tRel n => " (" ++ (nat_to_string n) ++ ") "
+    | tBox => "BOX"
     | tLambda _ _ => " LAM "
     | tLetIn _ _ _ => " LET "
     | tApp fn args =>
@@ -80,10 +82,10 @@ Fixpoint print_template_term (t:term) : string :=
       " (CASE " ++ (nat_to_string (snd n)) ++ " _ " ++
                 (print_template_term mch) ++ " _ " ++") "
     | tFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+    | tCoFix _ n => " (COFIX " ++ (nat_to_string n) ++ ") "
     | _ =>  " Wrong "
   end.
- *********************)
-
+ 
 (** needed for compiling L1 to L1g **
 Function tappend (ts1 ts2:Terms) : Terms :=
   match ts1 with
@@ -215,8 +217,7 @@ End term_Term_sec.
 (** for debuggung **)
 Fixpoint print_global_declarations (g:global_declarations) : string :=
   match g with
-  | cons (ConstantDecl knm _) p => knm ++ print_global_declarations p
-  | cons (InductiveDecl knm _) p => knm ++ print_global_declarations p
+  | cons (knm, _) p => knm ++ print_global_declarations p
   | nil => "!"
   end.
 
@@ -226,14 +227,14 @@ Definition Cstr_npars_nargs
   match ind with
   | {| inductive_mind:= knm;  inductive_ind:= nbod |} =>
     match lookup_env g knm with
-    | Some (ConstantDecl _ _) =>
+    | Some (ConstantDecl _) =>
       raise ("Cstr_npars_nargs:lookup_env ConstantDecl")
     | None =>
       raise ("Cstr_npars_nargs:lookup_env; "
                ++ knm ++ "," ++ (nat_to_string nbod) ++
                "," ++ (nat_to_string ncst) ++
                "/" ++ print_global_declarations g)
-    | Some (InductiveDecl _ {| ind_npars:= npars; ind_bodies:= bodies |}) =>
+    | Some (InductiveDecl {| ind_npars:= npars; ind_bodies:= bodies |}) =>
       match List.nth_error bodies nbod with
       | None => raise ("Cstr_npars_nargs:nth_error bodies")
       | Some  {| ind_ctors := ctors |} =>
@@ -254,7 +255,7 @@ Function term_Term (g:global_declarations) (t:term) : Term :=
     | tApp fn arg => TApp (term_Term g fn) (term_Term g arg)
     | tConst pth =>
       match lookup_env g pth with
-      | Some (ConstantDecl _ _) => TConst pth
+      | Some (ConstantDecl _) => TConst pth
       | _ => TWrong ("term_Term:Const inductive or axiom: " ++ pth)
       end
     | tConstruct ind ncst =>
@@ -271,16 +272,16 @@ Function term_Term (g:global_declarations) (t:term) : Term :=
     
 (*** environments and programs ***)
 Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
-  (string * envClass Term) :=
+  (envClass Term) :=
   match dcl with
-    | ConstantDecl nm cb =>
+    | ConstantDecl cb =>
       match cb.(cst_body) with
-      | Some t => pair nm (ecTrm (term_Term g t))
-      | None => pair nm (ecAx Term)
+      | Some t => ecTrm (term_Term g t)
+      | None => ecAx Term
       end
-    | InductiveDecl nm mib =>
+    | InductiveDecl mib =>
         let Ibs := ibodies_itypPack mib.(ind_bodies) in
-        pair nm (ecTyp Term mib.(ind_npars) Ibs)
+        ecTyp Term mib.(ind_npars) Ibs
   end.  
 
   
@@ -288,23 +289,31 @@ Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
 Fixpoint program_Pgm_aux (g:global_declarations) : environ Term :=
   match g with
   | nil => nil
-  | gd :: g => cons (trans_global_decl g gd) (program_Pgm_aux g)
+  | gd :: g => cons (on_snd (trans_global_decl g) gd) (program_Pgm_aux g)
   end.
 
-Require Template.Ast.
-Require Import PCUIC.TemplateToPCUIC.
-Require Import TemplateExtraction.Extract.
+From MetaCoq Require Import SafeChecker.SafeTemplateChecker.
+From MetaCoq.SafeChecker Require Import PCUICSafeChecker.
+From MetaCoq.PCUIC Require Import TemplateToPCUIC.
+From MetaCoq.Erasure Require Import ErasureFunction SafeTemplateErasure.
 
-Definition program_Program
-           `{F:utils.Fuel} (p:Template.Ast.program) : Program Term :=
-  let '(genv, t) := p in
-  let gc := (genv, uGraph.init_graph) in
-  let genv' := trans_global gc in
-  let genv'' := extract_global genv' in
-  let t' := extract genv' nil (trans t) in
-  match genv'', t' with
-  | PCUICChecker.Checked genv''', PCUICChecker.Checked t''' =>
-    {| main := term_Term genv''' t''';
-       env := program_Pgm_aux (rev genv''') |}
-  | _, _ => {| main := TWrong "program_Program"; env := nil |}
+Existing Instance envcheck_monad.
+Import MonadNotation.
+
+Open Scope string_scope.
+
+Definition program_Program (p:Template.Ast.program) : Program Term :=
+  let p := fix_program_universes p in
+  match erase_template_program p with
+  | CorrectDecl (gc, t) =>
+    {| main := term_Term gc t;
+       env := program_Pgm_aux gc |}
+  | EnvError Σ err => 
+    let str :=
+      match err with
+      | AlreadyDeclared id => "Already declared: " ++ id
+      | IllFormedDecl id e => "Type error: " ++ PCUICSafeChecker.string_of_type_error Σ e ++ ", while checking " ++ id
+      end
+    in
+    {| main := TWrong ("L1g.program_Program: erase_template_program failed with error:" ++ str); env := nil |}
   end.

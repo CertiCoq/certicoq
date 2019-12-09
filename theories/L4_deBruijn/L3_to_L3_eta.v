@@ -105,7 +105,7 @@ End TermTranslation.
 Definition transEC (ec:envClass Term) : envClass Term :=
   match ec with
     | ecTrm t => ecTrm (trans t)
-    | ecTyp _ n itp => ecTyp _ n itp
+    | ecTyp n itp => ecTyp _ n itp
   end.
 
 Fixpoint transEnv (p:environ Term) : environ Term :=

@@ -7,7 +7,7 @@ From CertiCoq.L6 Require Import cps ctx Ensembles_util List_util
                                 functions tactics map_util.
 From Coq Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
      omega.Omega Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
-From Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
 

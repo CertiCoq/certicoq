@@ -205,7 +205,7 @@ extraction/ctypes.ml
 extraction/l3_to_L4.ml
 extraction/l6_to_Clight.mli
 extraction/l6_to_Clight_stack.mli
-extraction/glue.mli
+# extraction/glue.mli
 extraction/printAST.ml
 extraction/allInstances.mli
 extraction/csyntax.ml
@@ -215,7 +215,7 @@ extraction/printCsyntax.ml
 extraction/printClight.ml
 extraction/l6_to_Clight.ml
 extraction/l6_to_Clight_stack.ml
-extraction/glue.ml
+# extraction/glue.ml
 extraction/allInstances.ml
 
 # plugin

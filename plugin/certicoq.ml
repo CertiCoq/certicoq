@@ -61,14 +61,14 @@ let compile cps olevel gr =
   Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time));
   let fuel = coq_nat_of_int 10000 in
   let nenv =
-    let p = if cps then AllInstances.compile_template_L7 fuel olevel term
+    let p = if cps then AllInstances.compile_template_L7 olevel term
             else AllInstances.compile_template_L7_anf fuel olevel term in
     match p with
     | Ret ((nenv, header), prg) ->
       Feedback.msg_debug (str"Finished compiling, printing to file.");
       let time = Unix.gettimeofday() in
-      let cstr = quote_string (Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
-      let hstr = quote_string (Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
+      let cstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
+      let hstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
       AllInstances.printProg (nenv,prg) cstr;
       AllInstances.printProg (nenv,header) hstr;
       let time = (Unix.gettimeofday() -. time) in
@@ -76,6 +76,8 @@ let compile cps olevel gr =
     | Exc s ->
       CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s)
   in
+  ()
+  (*
   let time = Unix.gettimeofday() in
   (match AllInstances.make_glue term with
   | Ret (((nenv, header), prg), logs) ->
@@ -84,8 +86,8 @@ let compile cps olevel gr =
     (match logs with [] -> () | _ ->
       Feedback.msg_debug (str (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs)))));
     let time = Unix.gettimeofday() in
-    let cstr = quote_string ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
-    let hstr = quote_string ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
+    let cstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
+    let hstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
     AllInstances.printProg (nenv, prg) cstr;
     AllInstances.printProg (nenv, header) hstr;
 
@@ -93,6 +95,7 @@ let compile cps olevel gr =
     Feedback.msg_debug (str(Printf.sprintf "Printed glue code to file in %f s.." time))
   | Exc s ->
     CErrors.user_err ~hdr:"template-coq" (str "Could not generate glue code: " ++ pr_char_list s))
+  *)
 
 (* For emitting L6 code *)
 let show_l6 olevel gr =

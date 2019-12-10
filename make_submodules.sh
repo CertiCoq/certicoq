@@ -42,7 +42,7 @@ make all
 make install
 cd ..
 
-cd MetaCoq
+cd metacoq
 echo "Rebuilding MetaCoq"
 clean
 ./configure.sh local

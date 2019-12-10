@@ -44,12 +44,12 @@ Setting up a switch with OCaml
 ------------------------------
 
   Note that supported OCaml version are `4.06.1` and upwards, avoid
-`4.06.0` which sometimes produces dynamic linking errors. In `opam 1.*`,
-use `opam config var ocaml-version` to confirm you have a compatible
+`4.06.0` which sometimes produces dynamic linking errors. Use `opam list` 
+to confirm you have a compatible
 compiler. If not, you should create a fresh new switch with a specific
 compiler, using:
 
-    # opam switch -A 4.07.1 coq89
+    # opam switch create coq89 4.07.1
     # eval `opam config env`
 
   This will install the `4.07.1` compiler in a new switch named `coq89`
@@ -67,7 +67,7 @@ Installing Coq
 
     # opam pin add coq 8.9.1
 
-  Alternatively, if you can you want to update a pinned version of Coq:
+  Alternatively, if you want to update a pinned version of Coq:
 
     # opam pin remove coq
     # opam pin add coq 8.9.1

@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include "gc.h"
 #include <time.h>
-#include "demo.demo1.h"
-#include "glue.demo.demo1.h"
+#include "CertiCoq.Benchmarks.demo.demo1.h"
+#include "glue.CertiCoq.Benchmarks.demo.demo1.h"
 
 extern void body(struct thread_info *);
 

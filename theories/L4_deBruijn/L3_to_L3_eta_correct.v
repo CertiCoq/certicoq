@@ -16,6 +16,8 @@ Require Import L2k.term L2k.program L2k.compile L2k.wcbvEval.
 Require Import L3_eta_crct.
 Module L3C := L3_eta_crct.
 
+Set Keyed Unification.
+
 Lemma Lookup_trans_env e nm t :
   LookupDfn nm e t -> LookupDfn nm (transEnv e) (trans t).
 Proof.

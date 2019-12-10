@@ -9,6 +9,7 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.String.
 
 From MetaCoq.Template Require Import BasicAst.
+Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST
                compcert.common.Errors
@@ -25,7 +26,6 @@ Require Import Clightdefs.
 Require Import L6.cps_show.
 Require Import L6_to_Clight.
 
-Require MetaCoq.Template.All.
 
 Import MonadNotation.
 Open Scope monad_scope.
@@ -412,10 +412,11 @@ Section L1Types.
   (* takes an inductive type declaration and returns
      the qualifying prefix for the name and the type definition *)
   Definition extract_mut_ind
+            (name : kername)
             (g : Ast.global_decl)
             : option (qualifying_prefix * Ast.mutual_inductive_body) :=
     match g with
-    | Ast.InductiveDecl name body => Some (find_qualifying_prefix name, body)
+    | Ast.InductiveDecl body => Some (find_qualifying_prefix name, body)
     | _ => None
     end.
 
@@ -426,12 +427,12 @@ Section L1Types.
                   end) ctx.
 
   Fixpoint get_single_types
-           (gs : Ast.global_declarations)
+           (gs : Ast.global_env)
            : list ty_info :=
     match gs with
     | nil => nil
-    | g :: gs' =>
-      match extract_mut_ind g with
+    | (name, g) :: gs' =>
+      match extract_mut_ind name g with
       | Some (qual_pre, b) =>
           (* This relies on the assumption that mutually recursive types
              must exist in the same namespace. So if we only have one of them
@@ -450,7 +451,7 @@ Section L1Types.
 
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
-             (gs : Ast.global_declarations)
+             (gs : Ast.global_env)
              : gState (list (ind_L1_tag * ty_info)) :=
     let singles := get_single_types gs in
     (* for debugging purposes: *)
@@ -1108,7 +1109,7 @@ Definition mk_prog_opt
 
 (* Generates the header and the source programs *)
 Definition make_glue_program
-        (gs : Ast.global_declarations)
+        (gs : Ast.global_env)
         : gState (option Clight.program * option Clight.program) :=
   '(externs, toolbox) <- make_externs ;;
   singles <- propagate_types gs ;;

@@ -76,8 +76,6 @@ let compile cps olevel gr =
     | Exc s ->
       CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s)
   in
-  ()
-  (*
   let time = Unix.gettimeofday() in
   (match AllInstances.make_glue term with
   | Ret (((nenv, header), prg), logs) ->
@@ -95,7 +93,6 @@ let compile cps olevel gr =
     Feedback.msg_debug (str(Printf.sprintf "Printed glue code to file in %f s.." time))
   | Exc s ->
     CErrors.user_err ~hdr:"template-coq" (str "Could not generate glue code: " ++ pr_char_list s))
-  *)
 
 (* For emitting L6 code *)
 let show_l6 olevel gr =

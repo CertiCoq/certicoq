@@ -17,7 +17,7 @@ Open Scope string_scope.
 
 From MetaCoq.Template Require Import All.
 
-(* Zoe : TODO these are very verbose and L6 specific so move it there. Generally this file needs massive cleanup. *) 
+(* Zoe : TODO these are very verbose and L6 specific so move it there. Generally this file needs massive cleanup. *)
 Require Import L6_to_Clight.
 (* Require Import Clightexec.*)
 Require Import compcert.lib.Maps.
@@ -61,7 +61,7 @@ Definition compile_L7_fast' n (t : cTerm certiL6) : cps_util.name_env * Clight.p
   let p := compile_fast argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent n prog cenv nenv in
   (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
-  
+
 Definition compile_L7_anf (t : cTerm certiL6) : cps_util.name_env * Clight.program * Clight.program :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   let p := L6_to_Clight_stack.compile
@@ -110,7 +110,7 @@ Definition emit_L6_anf `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.progr
            | S 0 =>  L6_pipeline_pre_cc false p'
            | S (S 0) => L6_pipeline_anf false p'
            | S (S (S 0)) => L6_pipeline_anf true p'
-           | _ => L5_to_L6_anf false p'   
+           | _ => L5_to_L6_anf false p'
            end;
   let '((_, cenv, nenv, _), (_, e)) := p'' in
   ret (cps_show.show_exp nenv cenv false e).
@@ -140,14 +140,14 @@ Definition emit_L6_pre_cc `{F:utils.Fuel} (opt_level : nat) (p : Template.Ast.pr
 
 (* Zoe: Commenting out until merge is done *)
 
-(* Require Import Glue.glue. *)
-(* Definition make_glue (p : Template.Ast.program) *)
-(*   : exception (cps_util.name_env * Clight.program * Clight.program * list string)  := *)
-(*   match generate_glue p with *)
-(*   | (nenv, Some hdr, Some prg, logs) => *)
-(*       Ret (nenv, hdr, prg, logs) *)
-(*   | _ => Exc "" *)
-(*   end. *)
+Require Import Glue.glue.
+Definition make_glue (p : Template.Ast.program)
+  : exception (cps_util.name_env * Clight.program * Clight.program * list string)  :=
+  match generate_glue p with
+  | (nenv, Some hdr, Some prg, logs) =>
+      Ret (nenv, hdr, prg, logs)
+  | _ => Exc ""
+  end.
 
 
 Open Scope positive_scope.

@@ -2,6 +2,10 @@ demo.*.c
 demo.*.h
 glue.demo.*.c
 glue.demo.*.h
+Top.*.c
+Top.*.h
+glue.Top.*.c
+glue.Top.*.h
 CertiCoq.Benchmarks.demo.*.c
 CertiCoq.Benchmarks.demo.*.h
 glue.CertiCoq.Benchmarks.demo.*.c

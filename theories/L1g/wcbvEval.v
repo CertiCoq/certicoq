@@ -65,18 +65,6 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p (TProj (ind, npars, arg) bod) res.
 Hint Constructors WcbvEval.
 
-(******************
-with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
-| wNil: WcbvEvals p tnil tnil
-| wCons: forall t t' ts ts',
-    WcbvEval p t t' -> WcbvEvals p ts ts' -> 
-    WcbvEvals p (tcons t ts) (tcons t' ts').
-Hint Constructors WcbvEvals WcbvEval.
-Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
-  with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
-Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
- **********************)
-
 (** when reduction stops **)
 Definition no_Wcbv_step (p:environ Term) (t:Term) : Prop :=
   no_step (WcbvEval p) t.

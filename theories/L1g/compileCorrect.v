@@ -7,7 +7,8 @@ Require Import L1g.compile L1g.term L1g.program L1g.wcbvEval.
 
 Lemma WcbvEval_hom:
   forall (Σ : global_declarations) t t',
-    EWcbvEval.eval t t' -> True.
+    EWcbvEval.eval Σ t t' -> True.
+Admitted.
 
 (**********************
                     L2d.wcbvEval.WcbvEval p t t' ->

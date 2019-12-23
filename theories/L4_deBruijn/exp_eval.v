@@ -794,8 +794,16 @@ Lemma n_sub_0 n :
   n - 0 = n.
 Proof.
   destruct n. reflexivity. reflexivity.
-Qed. 
+Qed.
 
+Lemma exps_length_is_Datatypes_length:
+  forall es, exps_length es = N.of_nat (Datatypes.length (exps_to_list es)).
+Proof.
+  induction es.
+  - reflexivity. 
+  - simpl. zify. omega.
+Qed. 
+    
 Lemma nth_inlist_is_value' :
   forall l default n, 
     Forall is_value_env l -> is_value_env default ->
@@ -1490,11 +1498,18 @@ Proof.
     rewrite Hefns; try eassumption. reflexivity.
   - unfold parallel_sbst_with_sbst_branches.
     simpl. reflexivity.
-  - intros dc p e IHe bs Hbs.
-    unfold parallel_sbst_with_sbst_branches in *.
-    intros rho x n Hwf1 Hwf2.
-    simpl. inv Hwf1.    
-Abort.
+  - intros dc [n names] e IHe bs Hbs. 
+    unfold parallel_sbst_with_sbst_branches in *. 
+    intros rho x n' Hwf1 Hwf2.
+    simpl. inv Hwf1. rewrite Hbs; try eassumption.
+    replace (n' + 1 + n) with (n' + n + 1) by (zify; omega).
+    rewrite IHe; try eassumption.
+    rewrite (N.add_comm n' n).
+    reflexivity. simpl in H2.
+    replace (n' + n + 1 + list.NLength rho) with (n + (n' + 1 + list.NLength rho))
+      by (zify; omega).
+    eassumption.
+Admitted.
 
 Lemma eval_is_value_env :
   forall e e', is_value_env e -> eval e e' -> e = e'.
@@ -1513,7 +1528,17 @@ Proof.
   eapply Hv' in Hv.
   eapply eval_single_valued; eauto.
 Qed.
-  
+
+Lemma find_branch_parallel_sbst:
+  forall l dc b es e,
+    find_branch dc l (parallel_sbst_branches b 0 es) = Some e -> 
+    exists n e', e = parallel_sbst e' n es. 
+Proof.
+  intros l dc b es e H.
+  induction b.
+  - inv H.
+  - simpl in H. destruct p eqn: Hp.
+Admitted.
   
 Lemma equiv_semantics_fwd_version2 :
   (forall e e' P, equiv_semantics_stmt_exp' e e' P) /\
@@ -1628,7 +1653,32 @@ Proof.
         ++ econstructor. eapply He1. eapply He2.
         ++ eassumption.
     + eapply sbst_all_values. reflexivity. 
-  - admit.
+  - (* Match_e *)
+    destruct e3; try inv H3.
+    + destruct (n <? 0).
+      now inv H5.
+      rewrite n_sub_0 in *.
+      eexists. split.
+      econstructor. reflexivity.
+      assert (Hnotval: ~(is_value_env (Match_e e p bs))).
+      { intros Hfalse. inv Hfalse. }
+      assert (Hval: is_value_env (Match_e e p bs)).
+      { rewrite H5. eapply nth_inlist_Forall.
+        eapply not_default_then_nth.
+        symmetry in H5. now eapply H5.
+        intros Hfalse. inv Hfalse.
+        eapply sbst_all_values. reflexivity. }
+      eapply Hnotval in Hval. destruct Hval.
+    + inv H1. specialize (H rho e3 H6 H2 ltac:(reflexivity)).
+      edestruct H as [v3 He3].
+      destruct He3. inv H3.
+      eexists. split.
+      * econstructor. eapply H1.
+        assert (Hlen: exps_length vs = N.of_nat (Datatypes.length vs_t)). 
+        { eapply Forall2_length in H10. rewrite <- H10. 
+          eapply exps_length_is_Datatypes_length. }
+        rewrite <- Hlen. admit. admit.
+      * admit. 
   - (* Fix_e *)
     destruct e2; try inv H1.
     + destruct (n <? 0).
@@ -1643,24 +1693,79 @@ Proof.
       unfold not. intros Hfalse. inv Hfalse.
       reflexivity.
     + eexists. split.
-      econstructor.
+      now econstructor.
       econstructor. reflexivity.
       rewrite (N.add_0_l (efnlst_length e)).
-      unfold sbst_env.
+      unfold sbst_env. 
       pose proof (parallel_sbst_inv_efnlst_length
                     e (map val_to_exp rho) (efnlst_length e)) as Hlen.
-      rewrite !Hlen.
+      rewrite !Hlen. 
+      clear Hlen.
+      inv H. revert H3.
       generalize dependent (efnlst_length e).
-      induction e. 
-      -- intros n0 Hn0. simpl. econstructor.
-      -- intros n1 Hn1.
+      induction e.
+      -- intros n0. simpl. econstructor.
+      -- intros n1.
          econstructor; fold parallel_sbst.
          split; reflexivity. 
          fold efnlst_as_list. fold parallel_sbst_efnlst.
-         assert (Hcons : efnlst_length e0 = (n1 - 1)) by admit. 
-         eapply IHe.
-         admit. admit.
+         eapply IHe. inv H3. eassumption.
   - (* Fix_app *)
+    symmetry in H4. 
+    eapply parallel_sbst_inv_App_e' in H4.
+    + destruct H4 as [e1'' [e2'' [Heqapp [Hs1 Hs2]]]]. subst.
+      inv e4.      
+      * assert (Hwf1 : well_formed_in_env e1'' rho).
+        { eapply well_formed_in_env_App in H2.
+          destruct H2 as [He1'' He2'']. eassumption. }     
+        assert (Hwf2 : well_formed_in_env e2'' rho).
+        { eapply well_formed_in_env_App in H2.
+          destruct H2 as [He1'' He2'']. eassumption. }                
+        destruct (H rho _ Hwf1 H3 (eq_refl _)) as [v1 [He1 Hr1]].
+        inv Hr1.        
+        specialize (H1 (make_rec_env fnlst_t rho0) (e' $ v2)).
+        destruct (H0 rho _ Hwf2 H3 (eq_refl _)) as [v2' [He2 Hr2]].
+        edestruct H1 as [vf [Heval Hrel]].
+        ** admit.
+        ** admit.
+        ** (* first derive that (sbst_fix es e' $ v2) if exp_wf 0 and then 
+              that parallel subst has no effect *)
+          admit.          
+        ** inv Heval.
+           +++ (* the fun app *)
+               eexists. split.
+               { eapply eval_FixApp.
+                 - eassumption.                   
+                 - admit.
+                   (* lemma : if enthop k fnl = Some e -> Forall2 P (as_list fnl) (as_list fnl') -> exists e, enthopt k fnl' = Some e' *)
+                 - reflexivity.
+                 - eassumption.
+                 - eassumption.
+                 - 
+
+                  
+using e3 (enthopt) 
+               eassumption.
+               econstructor. 
+             admit.
+           +++ (* because e' is lambda, subst_fix es e' is lambda, --> 
+                  inv H8 --> contraiction *)
+               admit. 
+           +++ admit. 
+
+          simpl. 
+      assert (Heq : 
+        admit.
+      * admit. (* contradiction *)
+      * admit. (* contradiction *)
+      inv Hr1.
+      assert (HClosFix_wf: well_formed_val (ClosFix_v rho0 fnlst_t k2)).
+      { eapply eval_env_preserves_well_formed.
+        eapply He1. eassumption. eassumption. }
+      edestruct (H1 (v2'::rho0) e') as [v3 [He3 Hr3]].
+      * inv HClosFix_wf. unfold well_formed_in_env.
+        eapply nthopt_preserves_wf.
+        
     admit.
   - (* Prf_app *)
     symmetry in H3. 
@@ -1843,4 +1948,11 @@ Proof.
   split.
   inversion H.
   inversion H1; try simpl; try discriminate.
-  Abort.
+Abort.
+
+
+assert (Hb: forall l,
+                 find_branch dc2 l
+                             (parallel_sbst_branches b 0 (map val_to_exp rho))
+                 = Some e' ->
+                 exists e'', find_branch dc2 l b = Some e'').

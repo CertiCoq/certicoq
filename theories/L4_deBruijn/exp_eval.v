@@ -1370,6 +1370,142 @@ Proof.
     + simpl. reflexivity.
 Qed.
 
+Definition parallel_sbst_inv_wf_exp e :=
+  forall n rho,
+    exp_wf n e ->
+    parallel_sbst e n rho = e.
+
+Definition parallel_sbst_inv_wf_exps es :=
+  forall n rho,
+    exps_wf n es ->
+    parallel_sbsts es n rho = es.
+
+Definition parallel_sbst_inv_wf_efnlst efns :=
+  forall n rho,
+    efnlst_wf n efns ->
+    parallel_sbst_efnlst efns n rho = efns.
+
+Definition parallel_sbst_inv_wf_branches bs :=
+  forall n rho,
+    branches_wf n bs ->
+    parallel_sbst_branches bs n rho = bs. 
+
+Lemma parallel_sbst_inv_wf:
+  (forall e, parallel_sbst_inv_wf_exp e) /\
+  (forall es, parallel_sbst_inv_wf_exps es) /\
+  (forall efns, parallel_sbst_inv_wf_efnlst efns) /\
+  (forall bs, parallel_sbst_inv_wf_branches bs).
+Proof.
+  apply my_exp_ind; unfold parallel_sbst_inv_wf_exp.
+  - intros n i rho Hwf.
+    simpl. destruct (lt_dec n i).
+    + eapply OrdersEx.N_as_OT.ltb_lt in l. rewrite l.
+      reflexivity.
+    + eapply OrdersEx.N_as_OT.ge_le in g.
+      inv Hwf. zify. omega. 
+  - intros na e IH n rho Hwf.
+    simpl. inv Hwf.
+    eapply IH in H1. rewrite N.add_comm.
+    rewrite H1. reflexivity.
+  - intros e1 IHe1 e2 IHe2 n rho Hwf.
+    simpl. inv Hwf.
+    eapply IHe1 in H2. eapply IHe2 in H3.
+    rewrite H2. rewrite H3. reflexivity.
+  - intros dc es IHes n rho Hwf.
+    simpl. unfold parallel_sbst_inv_wf_exps in IHes.
+    rewrite IHes. reflexivity.
+    inv Hwf. eassumption.
+  - intros e IHe pars bs IHbs n rho Hwf.
+    unfold parallel_sbst_inv_wf_branches in IHbs.
+    simpl. inv Hwf. 
+    rewrite IHe; try eassumption.
+    rewrite IHbs; try eassumption. reflexivity.
+  - intros na e1 IHe1 e2 IHe2 n rho Hwf.
+    simpl. inv Hwf.
+    eapply IHe1 in H2. eapply IHe2 in H4.
+    rewrite H2. rewrite N.add_comm. rewrite H4.
+    reflexivity.
+  - intros e IHe n i rho Hwf.
+    unfold parallel_sbst_inv_wf_efnlst in IHe.
+    simpl. inv Hwf. eapply IHe in H1.
+    rewrite N.add_comm. rewrite H1.
+    reflexivity.
+  - intros n rho Hwf. simpl. reflexivity.
+  - unfold parallel_sbst_inv_wf_exps. reflexivity.
+  - intros e IHe es IHes.
+    unfold parallel_sbst_inv_wf_exps in *.
+    intros n rho Hwf. simpl.
+    inv Hwf. rewrite IHe; try eassumption.
+    rewrite IHes; try eassumption. reflexivity.
+  - unfold parallel_sbst_inv_wf_efnlst. reflexivity.
+  - intros na e IHe efns IHefns.
+    unfold parallel_sbst_inv_wf_efnlst in *.
+    intros n rho Hwf. simpl.
+    inv Hwf. rewrite IHe; try eassumption.
+    rewrite IHefns; try eassumption. reflexivity.
+  - unfold parallel_sbst_inv_wf_branches. reflexivity.
+  - intros dc p e IHe bs IHbs.
+    unfold parallel_sbst_inv_wf_branches in *.
+    intros n rho Hwf. simpl.
+    destruct p. inv Hwf.
+    simpl in H2. rewrite N.add_comm. 
+    rewrite IHe; try eassumption.
+    rewrite IHbs; try eassumption. reflexivity.
+Qed.
+
+
+Definition val_to_exp_is_wf_exp e :=
+  forall v, well_formed_val v -> val_to_exp v = e -> exp_wf 0 e.
+
+Definition val_to_exp_is_wf_exps es :=
+  forall vs, Forall well_formed_val vs ->
+             map val_to_exp vs = (exps_to_list es) -> exps_wf 0 es.
+
+Definition val_to_exp_is_wf_efnlst efns :=
+  forall vs n efnlst, well_formed_val (ClosFix_v vs efns n) ->
+               val_to_exp (ClosFix_v vs efns n) = Fix_e efnlst n ->
+               efnlst_wf 0 efnlst.
+
+(* val_to_exp never applies to branches *)
+Definition val_to_exp_is_wf_branches bs :=
+  branches_wf 0 bs.
+
+Lemma val_to_exp_is_wf' :
+  forall v, 
+    (* well_formed_val v -> exp_wf 0 (val_to_exp v).  *)
+    exp_wf 0 (val_to_exp v). 
+Proof.
+  apply value_ind'.
+  - intros dc vs Hvs.
+    induction vs.
+    + simpl in *.
+      constructor. constructor. 
+    + simpl in *.
+      constructor. constructor.
+      inv Hvs. eassumption.
+      inv Hvs. eapply IHvs in H2.
+      inv H2. eassumption.
+  - constructor.
+  - intros vs na e.     
+    
+Abort. 
+
+Lemma val_to_exp_is_wf :
+  (forall e, val_to_exp_is_wf_exp e) /\
+  (forall es, val_to_exp_is_wf_exps es) /\
+  (forall efns, val_to_exp_is_wf_efnlst efns) /\
+  (forall bs, val_to_exp_is_wf_branches bs).
+Proof.
+  apply my_exp_ind; unfold val_to_exp_is_wf_exp.
+  - intros n v Hwf H. destruct v; inv H.
+  - intros na e IH v Hwf H.
+    destruct v; try inversion H.
+    subst. constructor. inv Hwf.
+    (* need to do induction on value cases *)
+    (* specialize (IH (Clos_v l na e0) Hwf H). *)
+Abort. 
+     
+
 Definition parallel_sbst_with_sbst_exp e :=
   forall rho x n,
     exp_wf (n + 1 + list.NLength rho) e ->
@@ -1469,7 +1605,8 @@ Proof.
     simpl.
     assert (Hleneq: efnlst_length
                       (parallel_sbst_efnlst efns (n + 1 + efnlst_length efns) rho) =
-                    efnlst_length efns). admit.
+                    efnlst_length efns).
+    { eapply parallel_sbst_inv_efnlst_length. } 
     rewrite Hleneq. erewrite Hefns.
     rewrite N.add_shuffle0.
     rewrite (N.add_comm n (efnlst_length efns)).
@@ -1538,7 +1675,7 @@ Proof.
   induction b.
   - inv H.
   - simpl in H. destruct p eqn: Hp.
-Admitted.
+Abort.
   
 Lemma equiv_semantics_fwd_version2 :
   (forall e e' P, equiv_semantics_stmt_exp' e e' P) /\
@@ -1587,7 +1724,19 @@ Proof.
         eapply eval_env_preserves_well_formed.
         eapply He2. eassumption. eassumption. 
         inv HClos_wf. eassumption. 
-      * unfold sbst_env. admit.
+      * unfold sbst_env. symmetry.
+        simpl. eapply rel_value_then_val_to_exp in Hr2.
+        rewrite Hr2.
+        edestruct parallel_sbst_with_sbst. eapply H4. clear H4 H5. 
+        inv HClos_wf. rewrite N.add_0_l.
+        unfold well_formed_in_env in H8. unfold list.NLength in *.
+        simpl in H8. rewrite Pos.of_nat_succ in H8.
+        rewrite <- positive_nat_N in H8.
+        rewrite Nat2Pos.id in H8.
+        rewrite Nnat.Nat2N.inj_succ in H8. rewrite <- N.add_1_l in H8.
+        rewrite map_length. eapply H8. eassumption.
+        intros Hfalse; inv Hfalse.        
+        admit.
       * eexists. split.       
         ++ econstructor. eassumption. eassumption.
            eassumption.
@@ -1648,7 +1797,17 @@ Proof.
         eapply eval_env_preserves_well_formed.
         eapply He1. eassumption. eassumption.
         eassumption.
-      * admit.
+      * simpl. eapply rel_value_then_val_to_exp in Hr1.
+        rewrite Hr1. symmetry. 
+        edestruct parallel_sbst_with_sbst. eapply H3.
+        unfold well_formed_in_env in Hwf2. unfold list.NLength in *.
+        simpl in Hwf2. rewrite Pos.of_nat_succ in Hwf2.
+        rewrite <- positive_nat_N in Hwf2.
+        rewrite Nat2Pos.id in Hwf2.
+        rewrite Nnat.Nat2N.inj_succ in Hwf2. rewrite <- N.add_1_l in Hwf2.
+        rewrite map_length. eapply Hwf2. 
+        intros Hfalse; inv Hfalse.
+        constructor. admit.
       * eexists. split.
         ++ econstructor. eapply He1. eapply He2.
         ++ eassumption.

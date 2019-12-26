@@ -1,5 +1,6 @@
-Require Import CertiCoq.
-Require Import Template.Template Arith List.
+(* Require Import CertiCoq. *)
+From MetaCoq Require Import Template.Ast.
+Require Import Arith List.
 
 Import ListNotations.
 
@@ -121,6 +122,16 @@ Instance ArrowRep {A B : Type} `{Rep A} `{Rep B} : Rep (A -> B) :=
       forall (a : A) (v : Ast.term), rep a v -> rep (f a) (eval (Ast.tApp t [v]))
   }.
 
+
+Instance ProdRep (B : Type -> Type) `{forall (A : Type) (H : Rep A), Rep (B A)}
+: Rep (forall (A : Type), B A) :=
+  { rep f t :=
+      forall (A : Type) `{Rep A}, rep (f A) (eval (Ast.tApp t [qUnit]))
+  }.
+
+
+
+
 (* For every term f we reify we want to generate a proof that [rep f f_reified].
    If we can generate such a thing (can we?) then we could obtain the
    top-level theorem we want. *)
@@ -135,8 +146,13 @@ Instance ProdRep (B : Type -> Type) `{forall (A : Type) (H : Rep A), Rep (B A)}
       forall (A : Type) `{Rep A}, rep (f A) (eval (Ast.tApp t [qUnit]))
   }.
 
-
 (* This resembles a lot the approach we follow in QuickChick to automatically
    generate correctness proofs for automatically generated generators. We do the
    proof term generation in OCaml, but I think it would be nice to do it in Coq
    and then reflect the terms. *)
+
+Instance ProdRep (B : Type -> Type) `{forall (A : Type) (H : Rep A), Rep (B A)}
+: Rep (forall (A : Type), B A) :=
+  { rep f t :=
+      forall (A : Type) `{Rep A}, rep (f A) (eval (Ast.tApp t [qUnit]))
+  }.

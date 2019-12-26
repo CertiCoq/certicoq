@@ -1,5 +1,3 @@
-
-
 Require Import L4.instances.
 
 
@@ -11,7 +9,7 @@ Require Import ZArith.
 From CertiCoq Require Import
      L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L5_to_L6
      L6.beta_contraction L6.uncurry L6.closure_conversion
-     L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
+     L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting L6.toplevel.
 (* From CertiCoq.L7 Require Import L6_to_Clight. *)
 Require Import ExtLib.Structures.Monad.
 
@@ -92,40 +90,6 @@ Require Import ExtLib.Data.Monads.OptionMonad.
 
 Require Import ExtLib.Structures.Monads.
 
-
-
-(** * Definition of L6 backend pipelines *)
-
-
-Definition update_var (names : cps_util.name_env) (x : var) : cps_util.name_env :=
-  match M.get x names with
-  | Some (nNamed _) => names
-  | Some nAnon => M.set x (nNamed "x") names
-  | None => M.set x (nNamed "x") names
-  end.
-
-Definition update_vars names xs :=
-  List.fold_left update_var xs names.
-
-(** Adds missing names to name environment for the C translation *)
-Fixpoint add_binders_exp (names : cps_util.name_env) (e : exp) : cps_util.name_env :=
-  match e with
-  | Econstr x _ _ e
-  | Eprim x _ _ e
-  | Eletapp x _ _ _ e          
-  | Eproj x _ _ _ e => add_binders_exp (update_var names x) e
-  | Ecase _ pats =>
-    List.fold_left (fun names p => add_binders_exp names (snd p)) pats names
-  | Eapp _ _ _
-  | Ehalt _ => names
-  | Efun B e => add_binders_exp (add_binders_fundefs names B) e
-  end
-with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.name_env :=
-  match B with
-  | Fcons f _ xs e1 B1 =>
-    add_binders_fundefs (add_binders_exp (update_vars (update_var names f) xs) e1) B1
-  | Fnil => names
-  end.
 
 (* Definition L6_pipeline_old (e : cTerm certiL5) : exceptionMonad.exception (cTerm certiL6) := *)
 (*   let (venv, vt) := e in *)
@@ -239,7 +203,7 @@ Definition L6_pipeline_pre_cc (opt : bool) (e : cTerm certiL4)  : exceptionMonad
       ((M.empty _ ,  state.cenv c_data, state.nenv c_data, state.fenv c_data), (M.empty _, e))
   end.
 
-Definition L5_to_L6_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.exception (cTerm certiL6) :=
+Definition L4_to_L6_anf (opt : bool) (e : cTerm certiL4)  : exceptionMonad.exception (cTerm certiL6) :=
   let (venv, vt) := e in
   let res : error (exp * comp_data) := 
       (* L4 to L6 anf *)

@@ -133,7 +133,7 @@ Existing Instance dummyEnvBigStep | 1000000.
 (* very low priority *)
 Existing Instance dummyEnvWf | 1000000.
 
-Let L4Term := prod ienv  L4.expression.exp.
+Let L4Term := prod ienv L4.expression.exp.
 
 Instance certiL4eval: BigStepOpSem L4.expression.exp L4.expression.exp := eval.
 Global Instance L4_evaln : BigStepOpSemExec (ienv * L4.expression.exp)

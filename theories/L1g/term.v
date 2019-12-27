@@ -6,7 +6,7 @@ Require Import Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.omega.Omega.
-Require Export Common.Common.
+Require Export Common.Common Common.AstCommon.
 Require Export L1g.compile.
 
 Open Scope string_scope.

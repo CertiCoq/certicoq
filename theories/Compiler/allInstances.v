@@ -22,30 +22,6 @@ Require Import L6_to_Clight.
 (* Require Import Clightexec.*)
 Require Import compcert.lib.Maps.
 
-Definition argsIdent:positive := 26.
-Definition allocIdent:positive := 28.
-Definition limitIdent:positive := 29.
-Definition gcIdent:positive := 80.
-Definition mainIdent:positive := 81.
-Definition bodyIdent:positive := 90.
-Definition threadInfIdent:positive := 31.
-Definition tinfIdent:positive := 91.
-Definition heapInfIdent:positive := 95.
-Definition numArgsIdent:positive := 97.
-Definition isptrIdent:positive := 82.
-Definition caseIdent:positive := 83.
-
-
-Definition stackframeTIdent:positive := 78. (* the stack_frame type *)
-Definition frameIdent:positive := 79. (* the stack frame of the current function *)
-Definition rootIdent:positive := 84. (* live roots array *)
-Definition spIdent:positive := 85. (* stack pointer *)
-Definition fpIdent:positive := 86. (* frame pointer *)
-(* Fields of stack_frame struct *)
-Definition nextFld:positive := 87.
-Definition rootFld:positive := 88.
-Definition prevFld:positive := 89.
-
 Definition compile_L7' n (t : cTerm certiL6) : exception (cps_util.name_env * Clight.program * Clight.program) :=
   let '((_, cenv , nenv, fenv), (_, prog)) := t in
   let p := L6_to_Clight.compile argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
@@ -174,8 +150,6 @@ Definition show_exn  (x : exceptionMonad.exception (cTerm certiL6)) : string :=
     end.
  *)
 
-
-Definition printProg := fun prog file => L6_to_Clight.print_Clight_dest_names (snd prog) (cps.M.elements (fst prog)) file.
 
 
 (*

@@ -31,7 +31,6 @@ extraction/usefulTypes.mli
 extraction/zArith_dec.mli
 extraction/zbool.mli
 extraction/zpower.mli
-extraction/certiClasses2.mli
 extraction/classes1.mli
 extraction/monad_utils.mli
 extraction/exceptionMonad.mli
@@ -46,9 +45,10 @@ extraction/terms.mli
 extraction/monad_utils.ml
 extraction/exceptionMonad.ml
 extraction/classes1.ml
-extraction/certiClasses2.ml
-extraction/certiClasses.mli
-extraction/certiClasses.ml
+extraction/compM.mli
+extraction/compM.ml
+extraction/pipeline_utils.mli
+extraction/pipeline_utils.ml
 extraction/zpower.ml
 extraction/termAbs.ml
 extraction/randyPrelude.mli
@@ -99,9 +99,16 @@ extraction/ctx.mli
 extraction/eval.mli
 extraction/expression.ml
 extraction/hoisting.mli
-extraction/instances0.mli
-extraction/instances1.mli
-extraction/instances3.mli
+extraction/toplevel.ml
+extraction/toplevel.mli
+extraction/toplevel0.ml
+extraction/toplevel0.mli
+extraction/toplevel1.ml
+extraction/toplevel1.mli
+extraction/toplevel2.ml
+extraction/toplevel2.mli
+extraction/toplevel3.ml
+extraction/toplevel3.mli
 extraction/list1.ml
 extraction/polyEval.ml
 extraction/set_util.mli
@@ -160,10 +167,6 @@ extraction/state.ml
 extraction/ctx.ml
 extraction/eval.ml
 extraction/hoisting.ml
-extraction/instances0.ml
-extraction/instances1.ml
-extraction/instances2.mli
-extraction/instances3.ml
 extraction/set_util.ml
 extraction/shrink_cps.ml
 extraction/term0.ml
@@ -188,7 +191,6 @@ extraction/fappli_IEEE_extra.ml
 extraction/floats.ml
 extraction/l3_to_L4.mli
 extraction/values.ml
-extraction/instances2.ml
 extraction/alpha_fresh.mli
 extraction/alpha_fresh.ml
 extraction/beta_contraction.mli
@@ -207,7 +209,6 @@ extraction/l6_to_Clight.mli
 extraction/l6_to_Clight_stack.mli
 extraction/glue.mli
 extraction/printAST.ml
-extraction/allInstances.mli
 extraction/csyntax.ml
 extraction/clightdefs.ml
 extraction/clight.ml
@@ -216,7 +217,8 @@ extraction/printClight.ml
 extraction/l6_to_Clight.ml
 extraction/l6_to_Clight_stack.ml
 extraction/glue.ml
-extraction/allInstances.ml
+extraction/pipeline.mli
+extraction/pipeline.ml
 
 # plugin
 certicoq.mli

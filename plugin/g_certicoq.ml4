@@ -23,8 +23,8 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     let gr = Nametab.global gr in
     Certicoq.compile false (coq_nat_of_int n) gr
   ]
-| [ "CertiCoq" "Show" "L6" "Opt" int(n) global(gr) ] -> [
-    let gr = Nametab.global gr in
-    Certicoq.show_l6 (coq_nat_of_int n) gr
-  ]
+(* | [ "CertiCoq" "Show" "L6" "Opt" int(n) global(gr) ] -> [ *)
+(*     let gr = Nametab.global gr in *)
+(*     Certicoq.show_l6 (coq_nat_of_int n) gr *)
+(*   ] *)
 END

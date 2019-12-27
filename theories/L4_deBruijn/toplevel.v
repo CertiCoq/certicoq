@@ -7,7 +7,6 @@ Require Import L4.L3_eta_crct.
 Require Import L4.L3_to_L3_eta_correct.
 Require Import L4.L3_to_L4_correct.
 Require L2k.
-Require Import L2k.instances.
 Require Import BinNat.
 Require Import L4_5_to_L5.
 Require Import L4.L4_to_L4_1_to_L4_2 L4.variables.

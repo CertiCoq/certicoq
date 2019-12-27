@@ -11,11 +11,9 @@ Require compcert.common.AST
         compcert.common.Globalenvs
         Int31.
 
-Require L6.L5_to_L6
-        L7.L6_to_Clight
-        L7.Clightexec
+Require L7.Clightexec
         Glue.glue
-        Compiler.allInstances.
+        Compiler.pipeline.
 
 (* Standard lib *)
 Require Import ExtrOcamlBasic.
@@ -63,20 +61,6 @@ debug: Feedback.msg_debug (Pp.str (Printf.sprintf ""%f""  (Unix.gettimeofday() -
 (*               !temp)". *)
 
 
-(* TEMP STUFF *)
-(* OS: This is now defined in allInstances
-Extract Constant L6_to_Clight.allocIdent => "Camlcoq.P.of_int 28".
-Extract Constant L6_to_Clight.limitIdent => "Camlcoq.P.of_int 29".
-Extract Constant L6_to_Clight.argsIdent => "Camlcoq.P.of_int 26".
-Extract Constant L6_to_Clight.gcIdent => "Camlcoq.P.of_int 80".
-Extract Constant L6_to_Clight.mainIdent => "Camlcoq.P.of_int 81".
-Extract Constant L6_to_Clight.bodyIdent => "Camlcoq.P.of_int 90".
-Extract Constant L6_to_Clight.threadInfIdent => "Camlcoq.P.of_int 31".
-Extract Constant L6_to_Clight.tinfIdent => "Camlcoq.P.of_int 91".
-Extract Constant L6_to_Clight.heapInfIdent => "Camlcoq.P.of_int 95".
-Extract Constant L6_to_Clight.numArgsIdent => "Camlcoq.P.of_int 97". *)
-
-
 (* Int31 *)
 Extract Inductive Int31.digits => "bool" [ "false" "true" ].
 Extract Inductive Int31.int31 => "int" [ "Camlcoq.Int31.constr" ] "Camlcoq.Int31.destr".
@@ -111,12 +95,8 @@ Separate Extraction
          Floats.Float32.of_bits Floats.Float.of_bits
          Floats.Float32.to_bits Floats.Float.to_bits *)
          String.length
-         Compiler.allInstances.printProg
-         Compiler.allInstances.compile_template_L7
-         Compiler.allInstances.compile_template_L7_anf
-         Compiler.allInstances.emit_L6_anf
-         Compiler.allInstances.emit_L6_pre_cc
-         Compiler.allInstances.emit_L6_cc
-         Compiler.allInstances.make_glue
+         Compiler.pipeline.printProg
+         Compiler.pipeline.compile
+         Compiler.pipeline.make_glue
          L7.Clightexec.run.
 Cd "..".

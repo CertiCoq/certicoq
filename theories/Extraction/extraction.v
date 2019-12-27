@@ -91,9 +91,9 @@ Separate Extraction
          Csyntax
          Ctypes.make_program
          AST.signature_main
-(*         Floats.Float32.from_parsed Floats.Float.from_parsed
+         Floats.Float32.from_parsed Floats.Float.from_parsed
          Floats.Float32.of_bits Floats.Float.of_bits
-         Floats.Float32.to_bits Floats.Float.to_bits *)
+         Floats.Float32.to_bits Floats.Float.to_bits
          String.length
          Compiler.pipeline.printProg
          Compiler.pipeline.compile

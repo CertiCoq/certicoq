@@ -97,6 +97,6 @@ Separate Extraction
          String.length
          Compiler.pipeline.printProg
          Compiler.pipeline.compile
-         Compiler.pipeline.make_glue
-         L7.Clightexec.run.
+         Compiler.pipeline.make_glue.
+         (* L7.Clightexec.run. *)
 Cd "..".

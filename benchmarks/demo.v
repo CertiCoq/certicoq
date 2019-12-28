@@ -33,8 +33,8 @@ Definition vs_hard :=
   | _ => false
   end.
 
-CertiCoq Compile ANF Opt 0 vs_easy.
 CertiCoq Compile vs_easy.
+CertiCoq Compile ANF Opt 0 vs_easy.
 
 CertiCoq Compile vs_hard.
 CertiCoq Compile ANF Opt 0 vs_hard.

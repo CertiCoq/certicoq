@@ -66,8 +66,10 @@ let compile cps olevel gr =
     | (Ret ((nenv, header), prg), inf) ->
       Feedback.msg_debug (str"Finished compiling, printing to file.");
       let time = Unix.gettimeofday() in
-      let cstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
-      let hstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
+      (* Zoe: Make suffix appear only in testing/debugging mode *)
+      let suff = if cps then "_cps" else "" ^ if olevel <> O then "_opt" else "" in
+      let cstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+      let hstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
       Pipeline.printProg (nenv,prg) cstr;
       Pipeline.printProg (nenv,header) hstr;
       let time = (Unix.gettimeofday() -. time) in

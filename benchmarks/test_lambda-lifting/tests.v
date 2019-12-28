@@ -30,8 +30,6 @@ Flags:
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 4).
 Definition demo1_cps := List.app (List.repeat true 5) (List.repeat false 4).
 
-CertiCoq Show L6 Opt 1 demo1.
-
 CertiCoq Compile ANF Opt 0 demo1.
 CertiCoq Compile Opt 0 demo1_cps.
 

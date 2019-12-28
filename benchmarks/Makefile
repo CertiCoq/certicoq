@@ -1,4 +1,4 @@
-COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ../benchmarks CertiCoq.Benchmarks
+COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R lib Benchmarks
 
 all: copy demo demo1 demo2
 CCOMPILER=gcc
@@ -24,6 +24,7 @@ clean:
 	rm -f ./*.*.h
 	rm -f ./glue.*.*.c
 	rm -f ./glue.*.*.h
+	rm -f ./*.vo
 
 demo: demo.v
 	coqc $(COQOPTS) demo.v

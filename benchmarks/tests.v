@@ -1,5 +1,9 @@
 Require Import Arith List.
 Require Import CertiCoq.Benchmarks.lib.vs.
+Require Import CertiCoq.Benchmarks.lib.Binom.
+Require Import CertiCoq.Benchmarks.lib.Color.
+Require Import CertiCoq.Benchmarks.lib.sha256.
+
 From CertiCoq.Plugin Require Import CertiCoq.
 
 Import ListNotations.
@@ -22,19 +26,27 @@ CertiCoq Compile ANF Opt 0 list_sum.
 Import VeriStar.
 
 Definition vs_easy :=
-  match main with
+  match vs.main with
   | Valid => true
   | _ => false
   end.
 
 Definition vs_hard :=
-  match main_h with
+  match vs.main_h with
   | Valid => true
   | _ => false
   end.
 
-CertiCoq Compile vs_easy.
+CertiCoq Compile vs_easy. (* XXX this takes too long and needs investigation *)
 CertiCoq Compile ANF Opt 0 vs_easy.
 
 CertiCoq Compile vs_hard.
 CertiCoq Compile ANF Opt 0 vs_hard.
+
+CertiCoq Compile Binom.main. (* returns nat *)
+CertiCoq Compile ANF Opt 0 Binom.main.  (* returns nat *)
+
+CertiCoq Compile Color.main.
+CertiCoq Compile ANF Opt 0 Color.main.
+
+

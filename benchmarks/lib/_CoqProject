@@ -1,6 +1,7 @@
 -R ./ CertiCoq.Benchmarks.lib
-# bignum.v
 Binom.v
 Color.v
-# SqlQueries.v
 vs.v
+sha256.v
+# bignum.v
+# SqlQueries.v

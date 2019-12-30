@@ -1,20 +1,21 @@
-COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R lib Benchmarks
-
-all: copy demo demo1 demo2
+COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
+CFILES= demo1 demo2 list_sum vs_easy vs_hard Binom.main Color.main
 
-all: benchmarks # copy demo demo1 demo2
-
-benchmarks: copy benchmark binom color vs sha runbenchmarks
+cfiles: $(CFILES)
+all: copy lib tests cfiles
 
 copy:
 	cp ../theories/Runtime/gc.c ./
 	cp ../theories/Runtime/gc.h ./
+	cp ../theories/Runtime/gc_stack.c ./
+	cp ../theories/Runtime/gc_stack.h ./
 	cp ../theories/Runtime/values.h ./
 	cp ../theories/Runtime/main.c ./
 	cp ../theories/Runtime/config.h ./
 
 clean:
+	$(MAKE) clean -C lib
 	rm -f ./gc.c
 	rm -f ./gc.h
 	rm -f ./values.h
@@ -26,20 +27,15 @@ clean:
 	rm -f ./glue.*.*.h
 	rm -f ./*.vo
 
-demo: demo.v
-	coqc $(COQOPTS) demo.v
+lib/Makefile:
+	cd lib; coq_makefile -f _CoqProject -o Makefile
 
-demo0: maindemo0.c gc.c CertiCoq.Benchmarks.demo.demo0.c glue.CertiCoq.Benchmarks.demo.demo0.c
-	$(CCOMPILER) -o demo0 -Wno-everything -O2 $+
+lib: lib/Makefile
+	$(MAKE) -C lib
 
-demo1: maindemo1.c gc.c CertiCoq.Benchmarks.demo.demo1.c glue.CertiCoq.Benchmarks.demo.demo1.c
-	$(CCOMPILER) -o demo1 -Wno-everything -O2 $+
+tests: tests.v
+	coqc $(COQOPTS) tests.v
 
-demo2: maindemo2.c gc.c CertiCoq.Benchmarks.demo.demo2.c glue.CertiCoq.Benchmarks.demo.demo2.c
-	$(CCOMPILER) -o demo2 -Wno-everything -O2 $+
-
-vs: CertiCoq.Benchmarks.demo.is_valid.c
-	$(CCOMPILER) -o vs -Wno-everything -O2 mainvs.c gc.c $<
-
-%.vo: %.v
-	coqc ${COQOPTS} $<
+$(CFILES): 
+	$(CCOMPILER) -o $@_cps -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@.c
+	$(CCOMPILER) -o $@ -Wno-everything -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c

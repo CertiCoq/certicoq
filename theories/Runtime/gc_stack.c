@@ -71,11 +71,11 @@ void printtree(FILE *f, struct heap *h, value v) {
       int i;
       fprintf(f,"%d(", Tag_hd(hd));
       for(i=0; i<sz-1; i++) {
-	printtree(f,h,Field(v,i));
-	fprintf(f,",");
+        printtree(f,h,Field(v,i));
+        fprintf(f,",");
       }
       if (i<sz)
-	printtree(f,h,Field(v,i));
+        printtree(f,h,Field(v,i));
       fprintf(f,")");
     }
     else {
@@ -128,38 +128,44 @@ void forward (value *from_start,  /* beginning of from-space */
    collection.  Setting depth to a small integer (perhaps 10)
    may improve the cache locality of the copied graph.
 */
- {
+{
   value v = *p;
   if(Is_block(v)) {
 
+    /* printf("Start: %lld end"" %lld word %lld \n", from_start, from_limit, v); */
+    /* if  (v == 4360698480) printf ("Found it\n"); */
     if(Is_from(from_start, from_limit, v)) {
-
+      /* printf("Moving\n"); */
       header_t hd = Hd_val(v);
       if(hd == 0) { /* already forwarded */
-	*p = Field(v,0);
+        *p = Field(v,0);
       } else {
-	int i;
-	int sz;
-	value *new;
+        int i;
+        int sz;
+        value *new;
         sz = Wosize_hd(hd);
-	new = *next+1;
-	*next = new+sz;
-	for(i = -1; i < sz; i++) {
-	  Field(new, i) = Field(v, i);
-	}
-	Hd_val(v) = 0;
-	Field(v, 0) = (value)new;
-	*p = (value)new;
-	if (depth>0)
-	  for (i=0; i<sz; i++)
-	    forward(from_start, from_limit, next, &Field(new,i), depth-1);
+        new = *next+1;
+        *next = new+sz;
+        if (sz > 50) printf("Moving value %lld with tag %lld with %d fields\n", v, hd, sz);
+        for(i = -1; i < sz; i++) {
+          /* printf("Moving field %d\n", i); */
+          Field(new, i) = Field(v, i);
+        }
+        Hd_val(v) = 0;
+        Field(v, 0) = (value)new;
+        *p = (value)new;
+        /* printf("New %lld\n", new); */
+        /* if (*p == 73832) printf("Found it\n"); */
+        if (depth>0)
+          for (i=0; i<sz; i++)
+            forward(from_start, from_limit, next, &Field(new,i), depth-1);
       }
     }
   }
 }
 
 void forward_roots (value *from_start,  /* beginning of from-space */
-		    value *from_limit,  /* end of from-space */
+                    value *from_limit,  /* end of from-space */
 		    value **next,       /* next available spot in to-space */
 		    fun_info fi,        /* which args contain live roots? */
 		    struct thread_info *ti) /* where's the args array? */
@@ -177,21 +183,37 @@ void forward_roots (value *from_start,  /* beginning of from-space */
      forward(from_start, from_limit, next, args+roots[i], DEPTH);
    };
    /* Then scan the stack by traversing the stack pointers */
-   value *live, *curr, *limit;
+   value **live, **curr, **limit, val;
+   header_t hd; int sz;
+   /* printf("Scaning frame \n"); */
    while (frame != NULL) {
      live = frame->roots;
      curr = live;
      limit = frame->next;
-     while (curr != limit) {
-       forward(from_start, from_limit, next, curr, DEPTH);
-       curr ++; }
+     /* printf("Scanning frame \n"); */
+     /* int cnt = 0; */
+     while (curr < limit) {
+       /* printf("%d \n", cnt); */
+       /* cnt ++; */
+       /* printf("Before \n"); */
+       /* Curr has the stack address of the local */
+       val = **curr;
+       if Is_block(val) {
+           hd = Hd_val(val);
+           sz = Wosize_hd(hd);
+           /* printf("Moving root %lld with tag %ldd and %d fields\n", val, hd, sz); */
+       }
+       forward(from_start, from_limit, next, Field(curr,0), DEPTH);
+       /* printf("After \n"); */
+       curr ++;
+     }
      frame = frame->prev;
    }
+   /* printf("Scanned frames\n"); */
 }
 
 #define No_scan_tag 251
 #define No_scan(t) ((t) >= No_scan_tag)
-
 void do_scan(value *from_start,  /* beginning of from-space */
 	     value *from_limit,  /* end of from-space */
 	     value *scan,        /* start of unforwarded part of to-space */
@@ -210,7 +232,9 @@ void do_scan(value *from_start,  /* beginning of from-space */
     if (!No_scan(tag)) {
       intnat j;
       for(j = 1; j <= sz; j++) {
+        /* printf("before \n"); */
         forward (from_start, from_limit, next, &Field(s, j), DEPTH);
+        /* printf("after \n"); */
       }
     }
     s += 1+sz;
@@ -326,6 +350,7 @@ void resume(fun_info fi, struct thread_info *ti)
     abort_with ("Nursery is too small for function's num_allocs\n");
   ti->alloc = lo;
   ti->limit = hi;
+  /* printf ("end gc\n"); */
 }
 
 void garbage_collect(fun_info fi, struct thread_info *ti)
@@ -340,6 +365,7 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
     return;
   } else {
     int i;
+    /* printf("In GC\n"); */
     assert (h->spaces[0].limit == ti->limit);
     h->spaces[0].next = ti->alloc; /* this line is probably unnecessary */
     for (i=0; i<MAX_SPACES-1; i++) {
@@ -354,8 +380,7 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
         create_space(h->spaces+(i+1), RATIO*w);
       }
       /* Copy all the objects in generation i, into generation i+1 */
-      if(0)
-        fprintf(stderr, "Generation %d:  ", i);
+      if(0) fprintf(stderr, "Generation %d:  ", i);
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
       /* If there's enough space in gen i+1 to guarantee that the
          NEXT collection into i+1 will succeed, we can stop here */

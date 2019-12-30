@@ -20,5 +20,5 @@ Definition compile_L2k
   : CertiCoqTrans (Program L1g.compile.Term) (Program L2k.compile.Term) :=
   fun src =>
     debug_msg "Translating from L1g to L1k" ;;
-    (LiftCertiCoqTrans stripProgram src).
+    (LiftCertiCoqTrans "L2k" stripProgram src).
 

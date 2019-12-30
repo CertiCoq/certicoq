@@ -24,7 +24,7 @@ Definition compile_L2k_eta
   : CertiCoqTrans (Program L2k.compile.Term) L3_eta_Program:=
   fun src =>
     debug_msg "Translating from L2k to L2k - eta expansion" ;;
-    (LiftCertiCoqTrans L3_to_L3_eta.Program_Program src).
+    (LiftCertiCoqTrans "L2k_eta" L3_to_L3_eta.Program_Program src).
 
 (* TODO instance for correctness proof *)
 
@@ -39,9 +39,9 @@ Instance L4_Lang : Lang L4Term :=
 Definition compile_L4 : CertiCoqTrans L3_eta_Program L4Term :=
   fun src =>
     debug_msg "Translating from L2k to L4" ;;
-    LiftCertiCoqTrans (fun p =>  
-                         (L3_to_L4.inductive_env (AstCommon.env p),
-                          L3_to_L4.translate_program (AstCommon.env p)(main p))) src.
+    LiftCertiCoqTrans "L4" (fun p =>  
+                              (L3_to_L4.inductive_env (AstCommon.env p),
+                               L3_to_L4.translate_program (AstCommon.env p)(main p))) src.
 
 Let L4_2_FullTerm := (prod ienv L4_2_Term).
 
@@ -56,7 +56,7 @@ Instance L4_2_Lang : Lang L4_2_FullTerm :=
 Definition compile_L4_2 : CertiCoqTrans L4Term L4_2_FullTerm :=
   fun src =>
     debug_msg "Translating from L4 to L4_2" ;;
-    LiftCertiCoqTrans (fun p => (fst p, tL4_to_L4_2 (snd p))) src.
+    LiftCertiCoqTrans "L4_2" (fun p => (fst p, tL4_to_L4_2 (snd p))) src.
 
 
 Definition L4_5_FullTerm := prod ienv L4_5_Term.
@@ -71,7 +71,7 @@ Instance L4_5_Lang : Lang L4_5_FullTerm :=
 Definition compile_L4_5 : CertiCoqTrans L4_2_FullTerm L4_5_FullTerm :=
   fun src =>
     debug_msg "Translating from L4_2 to L4_5" ;;
-    LiftCertiCoqTrans (fun p => (fst p, L4_2_to_L4_5 (snd p))) src.
+    LiftCertiCoqTrans "L4_5" (fun p => (fst p, L4_2_to_L4_5 (snd p))) src.
 
 Definition L5_Term := @terms.NTerm NVar L5Opid.
 Definition L5_FullTerm := prod ienv L5_Term.
@@ -86,4 +86,4 @@ Instance L5_Lang : Lang L5_FullTerm :=
 Definition compile_L5 : CertiCoqTrans L4_5_FullTerm L5_FullTerm :=
   fun src =>
       debug_msg "Translating from L4_5 to L5" ;;
-      LiftCertiCoqTrans (fun p => (fst p, ContApp_c (cps_cvt (snd p)) haltCont)) src.
+      LiftCertiCoqTrans "L5" (fun p => (fst p, ContApp_c (cps_cvt (snd p)) haltCont)) src.

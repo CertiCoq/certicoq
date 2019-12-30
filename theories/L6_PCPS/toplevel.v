@@ -44,7 +44,7 @@ Definition kon_fun_tag := 2%positive.
 Definition compile_L6_CPS : CertiCoqTrans L5_FullTerm L6_FullTerm :=
   fun src => 
       debug_msg "Translating from L5 to L6 (CPS)" ;;
-      LiftErrorCertiCoqTrans _ _
+      LiftErrorCertiCoqTrans "L6 CPS"
         (fun (p : L5_FullTerm) =>
            match convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag p with
            | Some (cenv, nenv, fenv, ctag, itag, e) =>
@@ -56,7 +56,7 @@ Definition compile_L6_CPS : CertiCoqTrans L5_FullTerm L6_FullTerm :=
 Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
   fun src => 
       debug_msg "Translating from L4 to L6 (ANF)" ;;
-      LiftErrorCertiCoqTrans _ _
+      LiftErrorCertiCoqTrans "L6 ANF"
         (fun (p : toplevel.L4Term) =>
            match convert_top_anf fun_fun_tag default_ctor_tag default_ind_tag p with
            | (state.Ret e, data) =>
@@ -155,4 +155,4 @@ Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     opts <- get_options ;;
     let cps := negb (direct opts) in
     let o := (0 <? (o_level opts))%nat in
-    LiftErrorCertiCoqTrans _ _ (L6_pipeline cps o) src.
+    LiftErrorCertiCoqTrans "L6 Pipeline" (L6_pipeline cps o) src.

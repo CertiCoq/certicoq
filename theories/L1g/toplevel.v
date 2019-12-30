@@ -12,7 +12,7 @@ Import MonadNotation.
 Definition compile_L1g : CertiCoqTrans Ast.program (Program Term) :=
   fun src =>
     debug_msg "Translating from Template to L1" ;;
-    (LiftCertiCoqTrans L1g.compile.program_Program src).
+    (LiftCertiCoqTrans "L1g" L1g.compile.program_Program src).
 
 
 (* Zoe: AFAICT we don't have these definitions *)

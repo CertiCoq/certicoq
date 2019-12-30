@@ -39,52 +39,55 @@ Section Translation.
     
   Definition CertiCoqTrans := Src -> pipelineM Dst.
 
+  (* TODO make something like that work *)
+  (* Notation "' e1 ;;; .. ;;; em ;;; en" := *)
+  (*   ( fun p => bind ( e1 p ) (  .. ( bind ( em p ) ( fun p => en p ) ) .. )) (at level 110, right associativity). *)
+
   Definition get_options : pipelineM Options := @compM.ask _ _.
   
   Definition log_msg (s : string) : pipelineM unit :=
-    c <- get ;; 
-    match (c : CompInfo) with
-    | Build_CompInfo tm log dbg =>
-      put (Build_CompInfo tm (s :: log) dbg)
-    end.
+    '(Build_CompInfo tm log dbg) <- get ;; 
+    put (Build_CompInfo tm (s :: log) dbg).
   
   Definition debug_msg (s : string) : pipelineM unit :=
     o <- get_options ;;
     if (debug o) then
-      c <- get ;;
-      match c with
-      | Build_CompInfo tm log dbg =>
-        @put Options CompInfo (Build_CompInfo tm log (s :: dbg))
-      end
+    '(Build_CompInfo tm log dbg) <- get ;;
+     @put Options CompInfo (Build_CompInfo tm log (s :: dbg))
     else ret tt.
   
   Definition log_time (s : string) : pipelineM unit :=
-    c <- get ;;
-    match (c : CompInfo) with
-    | Build_CompInfo tm log dbg =>
-      put (Build_CompInfo (s :: tm) log dbg)
-    end.
+    '(Build_CompInfo tm log dbg) <- get ;;
+    put (Build_CompInfo (s :: tm) log dbg).
 
-  
   Definition run_pipeline (o : Options) (src : Src) (m : CertiCoqTrans) : (error Dst * CompInfo) :=
     let w := Build_CompInfo [] [] [] in
     runState (m src) o w.
 
 End Translation.
 
+Definition timePhase_opt {A} (o : Options) (s : string) (f : unit -> A) : A :=
+  if time o then
+    timePhase s f
+  else f tt.
+
 Definition BuildCertiCoqTrans {Src Trg}
+           (name : string)
            (f : Src -> Options -> CompInfo -> compM.error Trg * CompInfo)
-  : CertiCoqTrans Src Trg := fun s => State (f s).
+  : CertiCoqTrans Src Trg := fun s => State (fun o inf  => timePhase_opt o name (fun _ => f s o inf)).
 
-Definition LiftCertiCoqTrans {Src Trg} (f : Src -> Trg)
+Definition LiftCertiCoqTrans {Src Trg}
+           (name : string) (f : Src -> Trg)
   : CertiCoqTrans Src Trg :=
-  fun s => ret (f s).
+  fun s =>
+    o <- get_options ;;
+    ret (timePhase_opt o name (fun _ => f s)).
 
-Definition LiftErrorCertiCoqTrans Src Trg (f : Src -> error Trg)
+Definition LiftErrorCertiCoqTrans {Src Trg}
+           (name : string) (f : Src -> error Trg)
   : CertiCoqTrans Src Trg :=
-  BuildCertiCoqTrans (fun s r w => (f s, w)).
-
-
+  fun s => State (fun o inf  => timePhase_opt o name (fun _ => (f s,  inf))).
+             
 Section Lang. 
 
   (** ** CertiCoq Language properties *)

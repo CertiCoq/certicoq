@@ -74,6 +74,6 @@ Definition compile_Clight : CertiCoqTrans toplevel.L6_FullTerm Cprogram :=
     let args := c_args opts in
     let cps := negb (direct opts) in
     if cps then 
-      LiftErrorCertiCoqTrans _ _ (Clight_trans args) s
+      LiftErrorCertiCoqTrans "L7" (Clight_trans args) s
     else
-      LiftErrorCertiCoqTrans _ _ (Clight_trans_ANF args) s.
+      LiftErrorCertiCoqTrans "L7" (Clight_trans_ANF args) s.

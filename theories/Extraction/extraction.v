@@ -36,14 +36,14 @@ Extract Constant AstCommon.timePhase => "(fun c x -> x ())".
 *)
 
 (* T1 : Time each phase, print to debug *)
-(*
+
 Extract Constant AstCommon.timePhase =>
 "(fun c x -> let time = Unix.gettimeofday() in
                             let temp = x () in
                             let time = (Unix.gettimeofday() -. time) in
               Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
               temp)".
-*)
+
 (* T2 : Time each phase 10 times, print average to debug
 debug: Feedback.msg_debug (Pp.str (Printf.sprintf ""%f""  (Unix.gettimeofday() -. time)));   *)
 

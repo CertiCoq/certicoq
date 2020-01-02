@@ -1,6 +1,6 @@
 (* Freshen the names in a term by renaming its bound variables to be unique positives starting from a given positive, except for a finite number of positives *)
 
-Require Import L6.cps.
+Require Import Common.compM L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String Coq.Strings.Ascii.
 Import ListNotations.
 Require Import ExtLib.Structures.Monad.
@@ -11,7 +11,7 @@ Require Import L6.cps_util L6.cps_util L6.cps_show L6.state.
 Open Scope monad_scope.
 Import MonadNotation.
 
-Definition freshM : Type -> Type := @compM unit.
+Definition freshM : Type -> Type := @compM' unit.
 
 (* TODO: move apply_r and apply_r_list to cps_util, and all_fun_name (and proofs) to identifiers *)
 (* after freshen_term e sigma curr l = e', curr', l', BV(e') are in interval [curr, curr'[ and disjoint from l *)

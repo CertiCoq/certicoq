@@ -2,7 +2,7 @@
 
 Require Import Coq.ZArith.ZArith Coq.Strings.String Coq.Lists.List.
 Require Import ExtLib.Data.String.
-Require Import Common.AstCommon.
+Require Import Common.AstCommon Common.compM.
 Require Import Znumtheory.
 Require Import Bool.
 Require compcert.lib.Maps.
@@ -26,7 +26,7 @@ Section Tags.
   Variable default_tag : ctor_tag.
   Variable default_itag : ind_tag. 
   
-  Definition anfM := @compM unit.
+  Definition anfM := @compM' unit.
   
   Definition next_id := 103%positive. (* next var *)
   
@@ -156,7 +156,7 @@ Section Convert.
     | Var_e x =>
       match get_var_name vm x with
       | Some v => ret (Anf_Var v, Hole_c)
-      | None => fail_with  "Unknown DeBruijn index"
+      | None => failwith  "Unknown DeBruijn index"
       end
     | App_e e1 e2 =>
       a1 <- convert_anf e1 vm ;;
@@ -234,9 +234,9 @@ Section Convert.
                         | Npos _ => fi
                         end in
              ret (fi', Fcons f_name fun_tag [arg] e_body defs')
-           | (_, _) => fail_with "Unexpected body of fix"
+           | (_, _) => failwith "Unexpected body of fix"
            end
-         |_, _ => fail_with "Wrong number of names for mut. rec. functions"
+         |_, _ => failwith "Wrong number of names for mut. rec. functions"
          end
   with convert_anf_branches (bl : expression.branches_e) (scrut : var) (vm : var_map) : anfM (list (ctor_tag * exp)) :=
          match bl with
@@ -342,7 +342,7 @@ Definition convert_top_anf (ee: ienv * expression.exp) : error cps.exp * comp_da
   let ftag := (fun_tag + 1)%positive in
   let fenv : fun_env := M.set fun_tag (1%N, (0%N::nil)) (M.empty _) in
   let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) [] in
-  let '(res_err, (comp_d', _)) := runStateErr _ _ (convert_anf_exp dcm (snd ee)) (comp_d, tt) in
+  let '(res_err, (comp_d', _)) := run_compM (convert_anf_exp dcm (snd ee)) comp_d tt in
   (res_err, comp_d').
 
 End Tags.

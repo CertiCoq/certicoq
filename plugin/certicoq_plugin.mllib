@@ -71,7 +71,6 @@ TermsDB
 Variables
 Closure_conversion
 Lambda_lifting
-Dead_param_elim
 L5a
 L5_to_L6
 L4_to_L6_anf
@@ -95,6 +94,7 @@ Ctypes
 Cop
 Alpha_fresh
 Beta_contraction
+Dead_param_elim
 Csyntax
 Clightdefs
 Globalenvs

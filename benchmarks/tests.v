@@ -13,6 +13,8 @@ Import ListNotations.
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 
 CertiCoq Compile "time" demo1.
+(* With dead_param_elim:
+ L6_to_Clight: Failure in make_defs:translate_funs *)
 CertiCoq Compile "anf" "time" demo1.
 
 Definition demo2 := List.map negb [true; false; true].
@@ -65,8 +67,6 @@ Debug: Time elapsed in L4:  0.013329
 Debug: Time elapsed in L6 ANF:  0.020384
 Debug: Time elapsed in L6 Pipeline:  0.148308
 Debug: Time elapsed in L7:  2.394216 *)
-
-
 
 CertiCoq Compile vs_hard.
 CertiCoq Compile "anf" vs_hard.

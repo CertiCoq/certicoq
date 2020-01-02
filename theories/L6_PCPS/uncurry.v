@@ -7,7 +7,7 @@
       the eta expansion (thereby undoing the uncurrying.)
  *)
 Require Import Coq.Strings.String.
-Require Import Libraries.CpdtTactics.
+Require Import Libraries.CpdtTactics Common.compM.
 Require Import L6.cps.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
@@ -89,7 +89,7 @@ Section UNCURRY.
      3 - local map from var to if function has already been uncurried
      4 - Map for uncurried functions for a 2version of inlining *)
   Definition stateType:Type := (bool * arityMap * localMap * St). 
-  Definition uncurryM := @compM stateType.
+  Definition uncurryM := @compM' stateType.
 
 
   (* f is a function to inline [i.e. uncurry shell], k is its local continuation *)

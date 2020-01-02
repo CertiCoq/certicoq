@@ -121,6 +121,8 @@ Global Arguments put {_ _} _.
 
 Global Arguments get {_ _}.
 
+Global Arguments failwith {_ _ _} _.
+
 
 Section Hoare.
 

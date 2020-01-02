@@ -1,8 +1,3 @@
-(*
-  Translation from L6 to CompCert CLight
-
-  2016 -- Matthew Weaver
- *)
 Require Import Coq.ZArith.ZArith
                Coq.Program.Basics
                Coq.Strings.String

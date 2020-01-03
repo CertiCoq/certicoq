@@ -57,15 +57,13 @@ Definition Clight_trans_fast (args : nat) (t : toplevel.L6_FullTerm) : error Cpr
 
 Definition Clight_trans_ANF (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
-  let p := L6_to_Clight_stack.compile
-             argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
-             tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-             args
-             stackframeTIdent frameIdent rootIdent spIdent fpIdent nextFld rootIdent prevFld
-             false (* args optimization *)
-             prog cenv nenv in
-  Ret (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
-
+  L6_to_Clight_stack.compile
+    argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
+    tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+    args
+    stackframeTIdent frameIdent rootIdent spIdent fpIdent nextFld rootIdent prevFld
+    false (* args optimization *)
+    prog cenv nenv.
 
 Definition compile_Clight : CertiCoqTrans toplevel.L6_FullTerm Cprogram :=
   fun s =>

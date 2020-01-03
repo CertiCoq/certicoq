@@ -2,6 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
+Require Import Common.compM.
 Require Import L6.cps L6.cps_util L6.ctx L6.state L6.set_util L6.identifiers L6.List_util
         L6.functions L6.Ensembles_util.
 Require Import Coq.ZArith.Znumtheory Coq.Strings.String.
@@ -122,7 +123,7 @@ Section LambdaLifting.
 
   Definition GFunMap := M.t GFunInfo.
 
-  Definition lambdaM := @compM unit.
+  Definition lambdaM := @compM' unit.
 
   Fixpoint add_functions (B : fundefs) (fvs : list var) (sfvs : PS.t) (m : FunInfoMap) (gfuns : GFunMap)
            (is_closed : bool)

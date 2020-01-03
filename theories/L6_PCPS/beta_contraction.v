@@ -1,6 +1,6 @@
 (* Generic beta-contraction phase for (stateful) heuristics based on function definitions and call sites, with bounded inlining depth
    *)
-Require Import L6.cps.
+Require Import Common.compM L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Import ListNotations.
 Require Import identifiers.
@@ -360,4 +360,3 @@ Definition inline_uncurry_marked_anf (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
 (*   |}. *)
 (* Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat)  (d:nat) := *)
 (*   beta_contract_top_debug _ show_map_bool InineLambdaLifted e d (M.empty bool). *)
-

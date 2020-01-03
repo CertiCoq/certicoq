@@ -1,4 +1,5 @@
 Require Import ZArith.
+Require Import Common.compM.
 From CertiCoq Require Import
      L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L5_to_L6
      L6.beta_contraction L6.uncurry L6.closure_conversion
@@ -59,10 +60,10 @@ Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
       LiftErrorCertiCoqTrans "L6 ANF"
         (fun (p : toplevel.L4Term) =>
            match convert_top_anf fun_fun_tag default_ctor_tag default_ind_tag p with
-           | (state.Ret e, data) =>
+           | (compM.Ret e, data) =>
               let (_, ctag, itag, ftag, cenv, fenv, nenv, _) := data in
               Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
-           | (state.Err s, _) => Err s
+           | (compM.Err s, _) => Err s
            end) src.
 
 (** * Definition of L6 backend pipelines *)
@@ -110,7 +111,7 @@ Definition L6_pipeline  (opt cps : bool) (t : L6_FullTerm) : error L6_FullTerm :
       let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1 + 1 in
       pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
   in
-  let res : state.error (exp * comp_data):=
+  let res : error (exp * comp_data):=
       (* uncurring *)
       let '(e_err, s, c_data) := if cps then uncurry_fuel_cps 100 (shrink_cps.shrink_top e) c_data 
                                  else uncurry_fuel_anf 100 (shrink_cps.shrink_top e) c_data in
@@ -122,7 +123,7 @@ Definition L6_pipeline  (opt cps : bool) (t : L6_FullTerm) : error L6_FullTerm :
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* lambda lifting *)
-      let (e_rr, c_data) := if opt then lambda_lift e c_data else (state.Ret e, c_data)in
+      let (e_rr, c_data) := if opt then lambda_lift e c_data else (compM.Ret e, c_data)in
       e <- e_rr ;;
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
@@ -143,9 +144,9 @@ Definition L6_pipeline  (opt cps : bool) (t : L6_FullTerm) : error L6_FullTerm :
       ret (e, c_data)
   in
   match res with
-  | state.Err s =>
+  | compM.Err s =>
     Err ("Failed compiling L6 program: " ++ s)%string
-  | state.Ret (e, c_data) =>
+  | compM.Ret (e, c_data) =>
     let (_, ctag, itag, ftag, cenv, fenv, nenv, log) := c_data in
     Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e) 
   end.

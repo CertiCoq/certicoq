@@ -1,7 +1,7 @@
 (* Computational definition and declarative spec for closure conversion. Part of the CertiCoq project.
  * Author: Zoe Paraskevopoulou, 2016
  *)
-Require Import Common.AstCommon.
+Require Import Common.AstCommon Common.compM.
 
 Require Import L6.cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx
         L6.Ensembles_util L6.List_util L6.functions L6.cps_show L6.state.
@@ -296,7 +296,7 @@ Section CC.
 
   Definition GFunMap := M.t GFunInfo.
 
-  Definition ccstate := @compM unit.
+  Definition ccstate := @compM' unit.
 
   Import MonadNotation.
 

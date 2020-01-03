@@ -1944,68 +1944,97 @@ Proof.
   - (* Fix_app *)
     symmetry in H4. 
     eapply parallel_sbst_inv_App_e' in H4.
-    + destruct H4 as [e1'' [e2'' [Heqapp [Hs1 Hs2]]]]. subst.
-      inv e4.      
-      * assert (Hwf1 : well_formed_in_env e1'' rho).
+    + { destruct H4 as [e1'' [e2'' [Heqapp [Hs1 Hs2]]]]. subst.
+
+        assert (Hwf1 : well_formed_in_env e1'' rho).
         { eapply well_formed_in_env_App in H2.
-          destruct H2 as [He1'' He2'']. eassumption. }     
+          destruct H2 as [He1'' He2'']. eassumption. }
         assert (Hwf2 : well_formed_in_env e2'' rho).
         { eapply well_formed_in_env_App in H2.
-          destruct H2 as [He1'' He2'']. eassumption. }                
-        destruct (H rho _ Hwf1 H3 (eq_refl _)) as [v1 [He1 Hr1]].
-        inv Hr1.        
-        specialize (H1 (make_rec_env fnlst_t rho0) (e' $ v2)).
-        destruct (H0 rho _ Hwf2 H3 (eq_refl _)) as [v2' [He2 Hr2]].
-        assert (HClosFix_wf: well_formed_val (ClosFix_v rho0 fnlst_t k2)).
-        { eapply eval_env_preserves_well_formed.
-        eapply He1. eassumption. eassumption. }
-        edestruct H1 as [vf [Heval Hrel]].
-        ** constructor.
-           +++ (* well_formed_in env -> parallel_sbst 0 rho -> exp_wf 0 *)
-             
-             admit.
-           +++ (* use val_to_exp is wf- we have that rel_value v2 v2' *)
-             admit. 
-        ** eapply make_rec_env_wf (*admitted*). now eapply HClosFix_wf. 
-        ** (* first derive that (sbst_fix es e' $ v2) if exp_wf 0 and then 
-              that parallel subst has no effect *)
-          admit.          
-        ** inv Heval.
-           +++ (* the fun app *)
-               eexists. split.
-               { eapply eval_FixApp.
-                 - eassumption.                   
-                 - admit.
-                   (* lemma : if enthop k fnl = Some e -> Forall2 P (as_list fnl) (as_list fnl') -> exists e, enthopt k fnl' = Some e' *)
-                 - reflexivity.
-                 - eassumption.
-                 - eassumption.
-                 - 
-
-                  
-using e3 (enthopt) 
-               eassumption.
-               econstructor. 
-             admit.
-           +++ (* because e' is lambda, subst_fix es e' is lambda, --> 
-                  inv H8 --> contraiction *)
-               admit. 
-           +++ admit. 
-
-          simpl. 
-      assert (Heq : 
-        admit.
-      * admit. (* contradiction *)
-      * admit. (* contradiction *)
-      inv Hr1.
-      assert (HClosFix_wf: well_formed_val (ClosFix_v rho0 fnlst_t k2)).
-      { eapply eval_env_preserves_well_formed.
-        eapply He1. eassumption. eassumption. }
-      edestruct (H1 (v2'::rho0) e') as [v3 [He3 Hr3]].
-      * inv HClosFix_wf. unfold well_formed_in_env.
-        eapply nthopt_preserves_wf.
+          destruct H2 as [He1'' He2'']. eassumption. }
         
-    admit.
+        assert (Hwf : exp_wf 0 (parallel_sbst e1'' 0 (map val_to_exp rho))).
+        { (* (parallel_sbst e1'' 0 (map val_to_exp rho)) is WF because
+           * e1'' is WF in rho and rho is WF (TODO lemma)
+           *) admit.
+        }
+
+        (* because eval preserves wf we can derive: *)
+        assert (Hwf' : exp_wf 0 (Fix_e es n)).
+        { (* hint: use eval_preserves_wf *) admit. }
+               
+        assert (Hlam : isLambda e').
+        { inv Hwf'.
+          (* lemma about efnlst_wf :
+             if efnlst_wf i es and e \in es -> isLambda e /\ exp_ef i e 
+           *)
+          admit.                          
+        }      
+        destruct e'; inv Hlam. simpl in e4.        
+        inv e4.
+        - assert (Heq : sbst_fix es (Lam_e n0 e') = Lam_e na e1').
+          { (* because sbst_fix es (Lam_e n0 e') is value *)
+            admit. }
+
+          assert (Heqv0 : is_value v0). { admit. }
+          assert (Heqv2 : is_value v2). { admit. }                                        
+          assert (Hveq : v2 = v0). 
+          { (* because v2 is a value *) admit. } subst. clear H7.
+
+          (* first IH *)
+          destruct (H rho _ Hwf1 H3 (eq_refl _)) as [v1 [He1 Hr1]].
+          inv Hr1.
+
+          (* second IH *)                    
+          destruct (H0 rho _ Hwf2 H3 (eq_refl _)) as [v2 [He2 Hr2]].
+
+          (* third IH *) 
+          specialize (H1 (make_rec_env fnlst_t rho0) (Lam_e n0 e' $ v0)).
+
+          assert (HClosFix_wf: well_formed_val (ClosFix_v rho0 fnlst_t k2)).
+          { eapply eval_env_preserves_well_formed.
+            eapply He1. eassumption. eassumption. }
+          
+          edestruct H1 as [vf [Heval Hrel]]. 
+          ** constructor.
+             +++ (* well_formed_in env -> parallel_sbst 0 rho -> exp_wf 0 *)
+               admit.
+             +++ (* use val_to_exp is wf- we have that rel_value v2 v2' *)
+               admit.
+          ** eapply make_rec_env_wf (*admitted*). now eapply HClosFix_wf.
+          ** (* because of H10, sbst_fix es is the same as parallel_subst *)
+             (* TODO write lemma *)
+             (* also note that (sbst_fix es (Lam_e n0 e') $ v0) is exp_wf 0 *)
+              admit.
+          ** inv Heval.
+             +++ eexists. split. 
+                 { eapply eval_FixApp.
+                   - eassumption.
+                   - admit.
+                   (* lemma : if enthop k fnl = Some e ->
+                      Forall2 P (as_list fnl) (as_list fnl') -> exists e, enthopt k fnl' = Some e' *)
+                   - reflexivity.
+                   - eassumption.
+                   - eassumption.
+                   - (* This is the trickiest part because H13 and H11.
+                        Think about this case and how it might be workable and lets discuss it the next time
+                        we meet. Hint: you might need to come up with a notion of value relatedness for values
+                        of the environment based semantics.
+                      *)
+                     admit. }
+                 admit.
+             +++ inv H7. (* contradiction because Lam expected *)
+             +++ inv H8. (* contradiction because Lam expected *)
+        - (* Zoe: Contradiction because of H6.
+             Should be IsLambda (sbst_fix es (Lam_e n0 e'))
+           *)
+          admit.
+        - (* Zoe: Contradiction because of H6.
+             Should be IsLambda (sbst_fix es (Lam_e n0 e'))
+           *)
+          admit. }
+    + admit. (* Zoe: easy corollary of is_value_env_val_to_exp *)
+
   - (* Prf_app *)
     symmetry in H3. 
     eapply parallel_sbst_inv_App_e' in H3.

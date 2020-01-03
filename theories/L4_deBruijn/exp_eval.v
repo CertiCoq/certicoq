@@ -3,10 +3,7 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat omega.Omega Coq.Strings.String
 Require Import Common.Common.
 Require Import L4.expression L6.List_util.
 
-
-(* Definition Clo := (env, expression.exp). *)
-
-(* extend is_value from L4.expression to include closures perhaps *)
+(* Environment semantics values *)
 Inductive value :=
 | Con_v : dcon -> list value -> value 
 | Prf_v : value
@@ -22,10 +19,10 @@ Lemma value_ind' (P : value -> Prop) :
   (forall v,  P v).
 Proof.
   intros H1 H2 H3 H4.
-  fix 1. destruct v.
+  fix IHv 1; intros v. destruct v.
   - eapply H1. induction l.
     constructor.
-    constructor. eapply value_ind'. eassumption.
+    constructor. eapply IHv. eassumption.
   - eauto.
   - eauto. 
   - eauto.  
@@ -33,16 +30,6 @@ Qed.
                              
 (* Definition of env *)
 Definition env := list value.
-
-(* Fixpoint make_rec_env (fnlst : efnlst) (rho : env) : env := *)
-(*   let fix make_env_aux funcs rec_env := *)
-(*       match funcs with *)
-(*       | eflnil => List.rev rec_env ++ rho *)
-(*       | eflcons na e fnlst' => *)
-(*         make_env_aux fnlst' ((Clos_v rho na e) :: rec_env) *)
-(*       end *)
-(*   in *)
-(*   make_env_aux fnlst nil. *)
 
 Definition make_rec_env (fnlst : efnlst) (rho : env) : env :=
   let fix make_env_aux funcs n :=
@@ -70,6 +57,8 @@ Fixpoint list_to_exps l : expression.exps :=
     let exps' := list_to_exps l' in
     (econs e exps')
   end.
+
+(** * Environment-based semantics for L4 *)
                                       
 Inductive eval_env: env -> exp -> value -> Prop :=
 | eval_Var:
@@ -177,36 +166,36 @@ Lemma eval_env_ind_strong :
         P rho f8 Prf_v -> eval_env rho e e' -> P rho e e' -> P rho (f8 $ e) Prf_v) ->
     forall (rho : env) (e : exp) (v : value), eval_env rho e v -> P rho e v.
 Proof.
-  intros H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11. fix 4.
+  intros P H1 H2 H3 H4 H5 H6 H7 H8 H9 H10. fix IH 4.
   intros rho e v Heval; inv Heval;
-    try (now clear eval_env_ind_strong; eauto).
+    try (now clear IH; eauto).
+  - eapply H3.
+    eassumption. eapply IH. eassumption.
+    eassumption. eapply IH. eassumption.
+    eassumption. eapply IH. eassumption.
   - eapply H4.
-    eassumption. eapply eval_env_ind_strong. eassumption.
-    eassumption. eapply eval_env_ind_strong. eassumption.
-    eassumption. eapply eval_env_ind_strong. eassumption.
+    eassumption. eapply IH. eassumption.
+    eassumption. eapply IH. eassumption.
   - eapply H5.
-    eassumption. eapply eval_env_ind_strong. eassumption.
-    eassumption. eapply eval_env_ind_strong. eassumption.
-  - eapply H6.
     eassumption.
     induction H.
     + constructor.
     + simpl in *.
       constructor.
-      * eapply eval_env_ind_strong. eassumption.
+      * eapply IH. eassumption.
       * eapply IHForall2.
+  - eapply H7.
+    eassumption. eapply IH. eassumption.
+    eassumption. reflexivity. eassumption. eapply IH. eassumption.
+    eassumption. eapply IH. eassumption.
+    eassumption. eapply IH. eassumption.
   - eapply H8.
-    eassumption. eapply eval_env_ind_strong. eassumption.
-    eassumption. reflexivity. eassumption. eapply eval_env_ind_strong. eassumption.
-    eassumption. eapply eval_env_ind_strong. eassumption.
-    eassumption. eapply eval_env_ind_strong. eassumption.
-  - eapply H9.
-    eassumption. eapply eval_env_ind_strong. eassumption.
+    eassumption. eapply IH. eassumption.
     eassumption. eassumption. 
-    eapply eval_env_ind_strong. eassumption.
-  - eapply H11. 
-    eassumption. eapply eval_env_ind_strong. eassumption.
-    eassumption. eapply eval_env_ind_strong. eassumption.
+    eapply IH. eassumption.
+  - eapply H10. 
+    eassumption. eapply IH. eassumption.
+    eassumption. eapply IH. eassumption.
 Qed.
         
     
@@ -710,7 +699,7 @@ Lemma my_rel_value_ind (P : exp -> value -> Prop) :
   P Prf_e Prf_v -> forall (e : exp) (v : value), rel_value e v -> P e v.
 Proof.
   intros H1 H2 H3 H4. 
-  fix 1. intros e. destruct v.
+  fix IH 1. intros e. destruct v.
   - intros H.
     destruct e; try inv H.
     eapply H3.
@@ -720,7 +709,7 @@ Proof.
       -- intros. inv H9. constructor.
       -- intros. destruct l.
          inv H9. 
-         constructor. inv H9. eapply my_rel_value_ind. eassumption.
+         constructor. inv H9. eapply IH.  eassumption.
          eapply IHe. inv H9. eapply H8.
   - intros. destruct e; try inv H. eapply H4.  
   - intros. destruct e; try inv H. eapply H1. reflexivity. 
@@ -1531,9 +1520,10 @@ Proof.
   apply my_exp_ind; unfold val_to_exp_is_wf_exp.
   - intros n v Hwf H. destruct v; inv H.
   - intros na e IH v Hwf H.
-    destruct v; try inversion H.
-    subst. constructor. inv Hwf.
-    (* need to do induction on value cases *)
+    destruct v; try inversion H; subst. inv Hwf.
+    subst. constructor. clear H.
+    (* ZOE: For this you need [parallel_sbst_makes_wf_exp]. The goal is exactly what the lemma states *)
+    (* need to do induction on value cases *) 
     (* specialize (IH (Clos_v l na e0) Hwf H). *)
 Abort.
 
@@ -1573,7 +1563,7 @@ Proof.
     + eapply OrdersEx.N_as_OT.ltb_lt in l. rewrite l.
       constructor.
       eapply OrdersEx.N_as_OT.ltb_lt in l. eassumption. 
-    + eapply OrdersEx.N_as_OT.ge_le in g. 
+    + eapply OrdersEx.N_as_OT.ge_le in g.
       eapply N.ltb_ge in g. rewrite g.
       (* val_to_exp_is_wf -> Forall (exp_wf 0) rho -> nth is wf *)
       admit.
@@ -1761,7 +1751,7 @@ Abort.
   
 Lemma equiv_semantics_fwd_version2 :
   (forall e e' P, equiv_semantics_stmt_exp' e e' P) /\
-  (forall es es' P,  equiv_semantics_stmt_exps' es es' P).
+  (forall es es' P, equiv_semantics_stmt_exps' es es' P).
 Proof. 
   eapply my_eval_ind with (P := equiv_semantics_stmt_exp');
     unfold equiv_semantics_stmt_exp', equiv_semantics_stmt_exps';

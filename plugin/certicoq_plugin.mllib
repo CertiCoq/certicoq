@@ -52,6 +52,7 @@ Maps
 Map_util
 Compile0
 Compile1
+CompM
 Cps
 Cps_util
 Cps_show
@@ -60,7 +61,6 @@ Ctx
 Eval
 Hoisting
 Term0
-CompM
 Pipeline_utils
 Set_util
 Identifiers

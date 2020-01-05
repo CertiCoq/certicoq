@@ -138,7 +138,7 @@ Definition L6_pipeline  (opt cps : bool) (t : L6_FullTerm) : error L6_FullTerm :
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
-      let e := dead_param_elim.eliminate e in
+      (* let e := dead_param_elim.eliminate e in *)
       (* Shrink reduction *)
       let e := shrink_cps.shrink_top e in
       ret (e, c_data)

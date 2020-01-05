@@ -936,7 +936,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ie
   end.
 
 Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Clight.fundef type))
-           (gv:bool) : error (positive * globdef Clight.fundef type) :=
+  : error (positive * globdef Clight.fundef type) :=
   match def with
   | (fIdent, Gfun (Internal f)) =>
     (match M.get fIdent nenv with
@@ -945,9 +945,7 @@ Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Cl
      | _ => Err "make_external_decl:"
      end)
   | (vIdent, Gvar (mkglobvar v_info v_init v_r v_v)) =>
-     if gv then
-       ret (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
-     else Err "make_external_decl: gv is false (?)"
+    ret (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
   | _ => Err "make_external_decl: Unsupported def"
   end.
 
@@ -956,8 +954,10 @@ Fixpoint make_extern_decls (nenv:name_env) (defs:list (positive * globdef Clight
   match defs with
   | fdefs::defs' =>
     decls <- make_extern_decls nenv defs' gv ;;
-    decl <- make_extern_decl nenv fdefs gv ;;
-    ret (decl :: decls)
+    if gv then
+      decl <- make_extern_decl nenv fdefs ;;
+      ret (decl :: decls)
+    else ret decls       
   | nil => ret nil
   end.
 

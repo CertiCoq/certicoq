@@ -6,7 +6,7 @@
 
 extern void body(struct thread_info *);
 
-extern void print_nat(unsigned long long);
+extern void print_Coq_Init_Datatypes_nat(unsigned long long);
 
 extern value args[];
 
@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 
   val = tinfo -> args[1];
   // TODO : fold over nat to print the C int
-  print_nat(val);
+  print_Coq_Init_Datatypes_nat(val);
   printf("\n");
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

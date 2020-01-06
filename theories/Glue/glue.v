@@ -316,7 +316,7 @@ Section Externs.
     ident <- gensym name ;;
     let len := String.length literal in
     let init := string_as_array literal in
-    let ty := tarray tschar (Z.of_nat len) in
+    let ty := tarray tschar (Z.of_nat (S len)) in
     let gv := Gvar (mkglobvar ty init true false) in
     ret (ident, ty, gv).
 
@@ -392,6 +392,7 @@ Section L1Types.
 
  Definition qualifying_prefix := string.
  Definition base_name := string.
+ Definition sanitized_name := string.
 
  (* takes a fully qualified name and removes the base name,
     leaving behind the qualifying prefix.
@@ -408,6 +409,10 @@ Section L1Types.
     | nil => (* not possible *) ""%string
     | base :: rest => base
     end.
+
+  (* Takes in "M1.M2.tau" and returns "M1_M2_tau". *)
+  Definition sanitize_qualified (n : kername) : sanitized_name :=
+    String.concat "_" (split "." n).
 
   (* takes an inductive type declaration and returns
      the qualifying prefix for the name and the type definition *)
@@ -448,6 +453,27 @@ Section L1Types.
       | None => get_single_types gs'
       end
     end.
+
+  (*
+  (* Checks if there's a [ty_info] in the list with the same [kername] *)
+  Fixpoint found_up_to_kername (k : kername) (l : list ty_info) : bool :=
+    match l with
+      | nil => false
+      | x :: xs => if string_dec k (ty_name x)
+                   then true
+                   else found_up_to_kername k xs
+    end.
+
+  (* Removes the [ty_info]s from the list with duplicate [kername]s,
+     keeps the last one. *)
+  Fixpoint nodup_up_to_kername (l : list ty_info) : list ty_info :=
+    match l with
+      | nil => nil
+      | x :: xs => if found_up_to_kername (ty_name x) xs
+                   then nodup_up_to_kername xs
+                   else x :: nodup_up_to_kername xs
+    end.
+  *)
 
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
@@ -562,7 +588,7 @@ Section Printers.
     match tys with
     | nil => ret tt
     | (tag, {| ty_name := kn ; ty_body := ty |}) :: tys' =>
-        pname <- gensym ("print_" ++ Ast.ind_name ty) ;;
+        pname <- gensym ("print_" ++ sanitize_qualified kn) ;;
         set_print_env tag pname ;;
         make_printer_names tys'
     end.
@@ -571,7 +597,7 @@ Section Printers.
     match params with
     | nil => ret nil
     | x :: xs =>
-        x' <- gensym ("fn_print_" ++ x) ;;
+        x' <- gensym ("print_param_" ++ x) ;;
         xs' <- gen_param_fun_names xs ;;
         ret ((x, x') :: xs')
     end.
@@ -886,13 +912,13 @@ Section CtorArrays.
 
   Fixpoint make_name_array
            (tag : ind_L1_tag)
-           (basename : BasicAst.ident)
+           (kn : kername)
            (ctors : list (BasicAst.ident * Ast.term * nat))
            : gState def :=
     let (max_len, init_l) := normalized_names_array ctors 1 in
     let ty := tarray (tarray tschar (Z.of_nat max_len))
                      (Z.of_nat (length ctors)) in
-    nname <- gensym ("names_of_" ++ basename) ;;
+    nname <- gensym ("names_of_" ++ sanitize_qualified kn) ;;
     set_ctor_names_env tag (nname, ty) ;;
     ret (nname, Gvar (mkglobvar ty init_l true false)).
 
@@ -903,7 +929,7 @@ Section CtorArrays.
     | nil => ret nil
     | (tag, {| ty_name := kn; ty_body := b |}) :: tys' =>
         rest <- make_name_arrays tys' ;;
-        def <- make_name_array tag (Ast.ind_name b) (Ast.ind_ctors b) ;;
+        def <- make_name_array tag kn (Ast.ind_ctors b) ;;
         ret (def :: rest)
     end.
 
@@ -912,6 +938,7 @@ End CtorArrays.
 Section ArgsStructs.
 
   Fixpoint members_from_ctor
+           (qp : qualifying_prefix)
            (name : BasicAst.ident)
            (i : nat) (* initially 0 *)
            (j : nat) (* initially the arity *)
@@ -919,25 +946,27 @@ Section ArgsStructs.
     match j with
     | O => ret nil
     | S j' =>
-        arg_name <- gensym (name ++ "_args_" ++ show_nat i) ;;
-        rest <- members_from_ctor name (i + 1) j' ;;
+        arg_name <- gensym (sanitize_qualified (qp ++ name)%string ++ "_args_" ++ show_nat i) ;;
+        rest <- members_from_ctor qp name (i + 1) j' ;;
         ret ((arg_name, val) :: rest)
     end.
 
   Fixpoint args_structs_from_ctors
           (itag : ind_L1_tag)
+          (qp : qualifying_prefix)
           (ctors : list (ctor_L1_index * (BasicAst.ident * Ast.term * nat)))
           : gState (list (composite_definition * def)) :=
     match ctors with
     | nil => ret nil
     | (ctag, ctor) :: ctors' =>
         let '(name, ty, arity) := ctor in
-        _struct <- gensym (name ++ "_args") ;;
-        mems <- members_from_ctor name 0 arity ;;
+        let sn := sanitize_qualified (qp ++ name)%string in
+        _struct <- gensym (sn ++ "_args") ;;
+        mems <- members_from_ctor qp name 0 arity ;;
         let comp := Composite _struct Struct mems noattr in
 
 
-        aname <- gensym ("get_" ++ name ++ "_args") ;;
+        aname <- gensym ("get_" ++ sn ++ "_args") ;;
         _v <- gensym "v" ;;
         let tstruct := Tpointer (Tstruct _struct noattr) noattr in
         let null := Ecast (Econst_int (Int.repr 0) val) tstruct in
@@ -957,7 +986,7 @@ Section ArgsStructs.
                            |})) in
 
         set_ctor_arg_accessor_env itag ctag (tstruct, aname) ;;
-        rest <- args_structs_from_ctors itag ctors' ;;
+        rest <- args_structs_from_ctors itag qp ctors' ;;
         ret ((comp, f) :: rest)
     end.
 
@@ -966,8 +995,9 @@ Section ArgsStructs.
           : gState (list (composite_definition * def)) :=
     match tys with
     | nil => ret nil
-    | (itag, {| ty_body := ty |}) :: tys' =>
-        s' <- args_structs_from_ctors itag (enumerate_pos (Ast.ind_ctors ty)) ;;
+    | (itag, {| ty_body := ty ; ty_name := kn |}) :: tys' =>
+        let qp := find_qualifying_prefix kn in
+        s' <- args_structs_from_ctors itag qp (enumerate_pos (Ast.ind_ctors ty)) ;;
         rest <- args_structs_from_types tys' ;;
         ret (app s' rest)
     end.
@@ -992,7 +1022,7 @@ Section CtorEnumTag.
             (Evar _b tbool)
             (Sreturn (Some (Ebinop Oand (Field(var _v, -1)) (make_cint 255 val) val)))
             (Sreturn (Some (Ebinop Oshr (var _v) (make_cint 1 val) val))) in
-        gname <- gensym ("get_" ++ Ast.ind_name ty ++ "_tag") ;;
+        gname <- gensym ("get_" ++ sanitize_qualified kn ++ "_tag") ;;
         let f := (gname,
                   Gfun (Internal
                           {| fn_return := tuint
@@ -1027,11 +1057,11 @@ Section CConstructors.
     ret (rev rest).
 
   Fixpoint constructors_from_ctors
-          (name_ty : base_name) (* like bool or nat *)
+          (name_ty : kername) (* like bool or nat *)
           (ctors : list ctor_info) (* name, arity, ordinal *)
           : gState defs :=
     let make_name (cname : string) : string :=
-      ("make_" ++ name_ty ++ "_" ++ cname)%string in
+      ("make_" ++ sanitize_qualified name_ty ++ "_" ++ cname)%string in
     match ctors with
     | nil => ret nil
     | (* Unboxed *) {| ctor_name := cname ; ctor_arity := O ; ctor_ordinal := ord |} :: ctors =>
@@ -1084,7 +1114,8 @@ Section CConstructors.
           | None => constructors_for_tys tys'
           | Some info =>
               s' <- constructors_from_ctors
-                      (find_base_name (ty_name info))
+                      (ty_name info)
+                      (* (find_base_name (ty_name info)) *)
                       (process_ctors (Ast.ind_ctors ty)) ;;
               rest <- constructors_for_tys tys' ;;
               ret (app s' rest)

@@ -2,7 +2,9 @@
 type options =
   { cps  : bool;
     time : bool;
-    opt  : int; }
+    opt  : int;
+    debug : bool;
+  }
 
 type 'a error = Res of 'a | Error of string
 

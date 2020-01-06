@@ -11,31 +11,34 @@ open AstCommon
 
 
 type options =
-  { cps  : bool;
-    time : bool;
-    opt  : int; }
+  { cps   : bool;
+    time  : bool;
+    opt   : int;
+    debug : bool; }
 
 let default_options : options =
   { cps  = true;
     time = false;
     opt  = 0;
+    debug = true;
   }
 
 type 'a error = Res of 'a | Error of string
 
 
 let options_help : string =
-  "List of valid options: \"direct\", \"-o1\", \"time\"\n"
+  "List of valid options: \"direct\", \"-o1\", \"time\", \"debug\"\n"
 
 
 let parse_options (l : string list) : options error =
   let rec aux (o : options) l =
     match l with
     | [] -> Res o
-    | "anf" :: xs -> aux {o with cps = false} xs
-    | "time" :: xs -> aux {o with time = true} xs
-    | "-o1" :: xs -> aux {o with opt = 1} xs
-    | x :: xs -> Error ("Unsupported option " ^ x)
+    | "anf"   :: xs -> aux {o with cps = false} xs
+    | "time"  :: xs -> aux {o with time = true} xs
+    | "-o1"   :: xs -> aux {o with opt = 1} xs
+    | "debug" :: xs -> aux {o with debug = true} xs
+    | x       :: xs -> Error ("Unsupported option " ^ x)
   in aux default_options l
 
 let pr_char c = str (Char.escaped c)
@@ -53,32 +56,18 @@ let rec coq_nat_of_int x =
   | 0 -> Datatypes.O
   | n -> Datatypes.S (coq_nat_of_int (pred n))
 
-(*
-let pcuic_size' a p =
-  match p with
-  | Coq_tRel n -> a+1
-  | Coq_tMeta n -> a+1
-  | Coq_tVar id -> a+1
-  | Coq_tEvar -> a+1
-  | Coq_tSort -> a+1
-  | Coq_tProd n t1 t2 ->  pcuic_size (pcuic_size (a+1) t1) t2
-| Coq_tLambda n t b -> pcuic_size (a+1) 1
-| Coq_tLetIn n t1 ty t2 -> pcuic_size (pcuic_size (a+1) t1) t2
-| Coq_tApp t1 t2 ->  of term * term
-| Coq_tConst of kername * universe_instance
-| Coq_tInd of inductive * universe_instance
-| Coq_tConstruct of inductive * nat * universe_instance
-| Coq_tCase of (inductive * nat) * term * term * (nat * term) list
-| Coq_tProj of projection * term
-| Coq_tFix of term mfixpoint * nat
-| Coq_tCoFix of term mfixpoint * nat
-| _ -> "unimplemented" *)
+let debug_msg (flag : bool) (s : string) =
+  if flag then
+    Feedback.msg_debug (str s)
+  else ()
+
 
 let compile opts gr =
   (* get opts *)
-  let cps = opts.cps in
+  let cps    = opts.cps in
   let olevel = coq_nat_of_int opts.opt in
   let timing = opts.time in
+  let debug  = opts.debug in
   
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -87,17 +76,17 @@ let compile opts gr =
     | Globnames.ConstRef c -> c
     | _ -> CErrors.user_err ~hdr:"template-coq"
        (Printer.pr_global gr ++ str" is not a constant definition") in
-  Feedback.msg_debug (str"Quoting");
+  debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
   let term = quote_term_rec env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
-  Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time));
+  debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   let fuel = coq_nat_of_int 10000 in
   let nenv = 
     let p = Pipeline.compile cps olevel timing term in
     match p with
     | (Ret ((nenv, header), prg), inf) ->
-      Feedback.msg_debug (str"Finished compiling, printing to file.");
+      debug_msg debug "Finished compiling, printing to file.";
       let time = Unix.gettimeofday() in
       (* Zoe: Make suffix appear only in testing/debugging mode *)
       let suff = if cps then "_cps" else "" ^ if olevel <> O then "_opt" else "" in
@@ -106,7 +95,7 @@ let compile opts gr =
       Pipeline.printProg (nenv,prg) cstr;
       Pipeline.printProg (nenv,header) hstr;
       let time = (Unix.gettimeofday() -. time) in
-      Feedback.msg_debug (str(Printf.sprintf "Printed to file in %f s.." time))
+      debug_msg debug (Printf.sprintf "Printed to file in %f s.." time)
     | (Err s, inf) ->
       CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s)
   in
@@ -114,9 +103,9 @@ let compile opts gr =
   (match Pipeline.make_glue term with
   | Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
-    Feedback.msg_debug (str (Printf.sprintf "Generated glue code in %f s.." time));
+    debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);
     (match logs with [] -> () | _ ->
-      Feedback.msg_debug (str (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs)))));
+      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let cstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
     let hstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
@@ -124,7 +113,7 @@ let compile opts gr =
     Pipeline.printProg (nenv, header) hstr;
 
     let time = (Unix.gettimeofday() -. time) in
-    Feedback.msg_debug (str(Printf.sprintf "Printed glue code to file in %f s.." time))
+    debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
   | Exc s ->
     CErrors.user_err ~hdr:"template-coq" (str "Could not generate glue code: " ++ pr_char_list s))
 

@@ -612,19 +612,26 @@ Fixpoint asgnFunVars' (vs : list positive) (ind : list N) : error statement :=
 Definition asgnFunVars (vs : list positive) (ind : list N) : error statement :=
   asgnFunVars' (skipn nParam vs) (skipn nParam ind).
 
-Fixpoint asgnAppVars'' (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) :
+
+Definition show_name (name : BasicAst.name) : string :=
+  match name with
+  | nAnon => "anon"
+  | nNamed d => d
+  end.
+
+Fixpoint asgnAppVars'' (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) (name : string) :
   error statement :=
   match vs, ind with
   | nil, nil => ret Sskip
   | cons v vs' , cons i ind' =>
     let s_iv :=  args[ Z.of_N i ] :::= (makeVar v fenv map) in
-    rest <- asgnAppVars'' vs' ind' fenv map ;;
+    rest <- asgnAppVars'' vs' ind' fenv map name ;;
     ret (rest ; s_iv)
-  | _, _ => Err "asgnAppVars''"
+  | _, _ => Err ("asgnAppVars'' " ++ name)%string
   end.
 
-Definition asgnAppVars' (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) :
-  error statement := asgnAppVars'' (skipn nParam vs) (skipn nParam ind) fenv map.
+Definition asgnAppVars' (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) name :
+  error statement := asgnAppVars'' (skipn nParam vs) (skipn nParam ind) fenv map name.
 
 Fixpoint get_ind {A} (Aeq : A -> A -> bool) (l : list A) (a : A) : error nat :=
   match l with
@@ -655,17 +662,17 @@ Fixpoint remove_AppVars (myvs vs : list positive) (myind ind : list N) : error (
   | _ , _ => Err "remove_AppVars"
   end.
 
-Definition asgnAppVars_fast' (myvs vs : list positive) (myind ind : list N) (fenv : fun_env) (map : fun_info_env) : error statement :=
+Definition asgnAppVars_fast' (myvs vs : list positive) (myind ind : list N) (fenv : fun_env) (map : fun_info_env) name : error statement :=
   '(vs' , ind') <- remove_AppVars myvs (skipn nParam vs) myind (skipn nParam ind) ;;
-  asgnAppVars'' vs' ind' fenv map.
+  asgnAppVars'' vs' ind' fenv map name.
 
 (* Optional, reduce register pressure *)
-Definition asgnAppVars vs ind (fenv : fun_env) (map : fun_info_env) :=
-  s <- asgnAppVars' vs ind fenv map ;;
+Definition asgnAppVars vs ind (fenv : fun_env) (map : fun_info_env) name :=
+  s <- asgnAppVars' vs ind fenv map name ;;
   ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s).
 
-Definition asgnAppVars_fast myvs vs myind ind (fenv : fun_env) (map : fun_info_env) :=
-  s <- asgnAppVars_fast' myvs vs myind ind fenv map ;;
+Definition asgnAppVars_fast myvs vs myind ind (fenv : fun_env) (map : fun_info_env) name :=
+  s <- asgnAppVars_fast' myvs vs myind ind fenv map name ;;
   ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s).
 
 (* GC calls *)
@@ -676,9 +683,9 @@ Definition reserve_body (funInf : positive) (l : Z) : statement :=
     (Scall None gc (arr :: tinf :: nil) ; allocIdent ::= Efield tinfd allocIdent valPtr)
     Sskip.  
 
-Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) : error statement :=
+Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) name : error statement :=
   let arr := (Evar funInf (Tarray uval l noattr)) in
-  bef <- asgnAppVars'' (firstn nParam vs) (firstn nParam ind) fenv map ;;
+  bef <- asgnAppVars'' (firstn nParam vs) (firstn nParam ind) fenv map name ;;
   aft <- asgnFunVars' (firstn nParam vs) (firstn nParam ind) ;;
   ret (Sifthenelse
          (!(Ebinop Ole (Ederef arr uval) (limitPtr -' allocPtr) type_bool))
@@ -757,7 +764,7 @@ Section Translation.
     Context (fun_vars : list positive)
             (loc_vars : FVSet) (* The set of local vars including definitions and arguments *)
             (l : N) (locs : list N) (fun_inf : positive)
-            (uses_stack : bool).
+            (uses_stack : bool) (nenv : M.t BasicAst.name).
 
 (* Returns the statement and the number of stack slots needed *)
 
@@ -827,7 +834,14 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
     in
     match M.get t fenv with 
     | Some inf =>
-      asgn <- (if args_opt then asgnAppVars_fast fun_vars vs locs (snd inf) fenv map else asgnAppVars vs (snd inf) fenv map) ;;
+      let name :=
+          match M.get f nenv with
+          | Some n => show_name n
+          | None => "not an entry"
+          end
+      in
+      asgn <- (if args_opt then asgnAppVars_fast fun_vars vs locs (snd inf) fenv map name
+               else asgnAppVars vs (snd inf) fenv map name) ;;
       let vv :=  makeVar f fenv map in
       let pnum := min (N.to_nat (fst inf)) nParam in
       c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
@@ -853,7 +867,13 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
   | Eapp x t vs =>
     match M.get t fenv with
     | Some inf =>
-      asgn <- (if args_opt then asgnAppVars_fast fun_vars vs locs (snd inf) fenv map else asgnAppVars vs (snd inf) fenv map) ;;
+      let name :=
+          match M.get x nenv with
+          | Some n => show_name n
+          | None => "not an entry"
+          end
+      in
+      asgn <- (if args_opt then asgnAppVars_fast fun_vars vs locs (snd inf) fenv map name else asgnAppVars vs (snd inf) fenv map name) ;;
       let vv := makeVar x fenv map in
       let pnum := min (N.to_nat (fst inf)) nParam in
       c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
@@ -904,12 +924,12 @@ Fixpoint uses_stack (e : exp) : bool :=
   end.
 
 
-Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (map : fun_info_env) :
+Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (map : fun_info_env) nenv :
   error (list (positive * globdef Clight.fundef type)) :=
   match fnd with
   | Fnil => ret nil
   | Fcons f t vs e fnd' =>
-    rest <- translate_fundefs fnd' fenv cenv ienv map ;;
+    rest <- translate_fundefs fnd' fenv cenv ienv map nenv ;;
     match M.get t fenv with
     | None => Err "translate_fundefs: Unknown function tag"
     | Some inf =>
@@ -918,11 +938,17 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ie
       match M.get f map with
       | None => Err "translate_fundefs: Unknown function"
       | Some gcArrIdent =>
-        res <- reserve (fst gcArrIdent) (Z.of_N (l + 2)) vs locs fenv map ;;
+        let name :=
+            match M.get f nenv with
+            | Some n => show_name n
+            | None => "not an entry"
+            end
+        in
+        res <- reserve (fst gcArrIdent) (Z.of_N (l + 2)) vs locs fenv map (name ++ " reserve");;
         let uses_stack := uses_stack e in
         let loc_vars := get_allocs e in
         let loc_ids := union_list (union_list PS.empty vs) loc_vars  in
-        '(body, MAX_LOCS) <- translate_body vs loc_ids l locs (fst gcArrIdent) uses_stack e fenv cenv ienv map None 0 ;;
+        '(body, MAX_LOCS) <- translate_body vs loc_ids l locs (fst gcArrIdent) uses_stack nenv e fenv cenv ienv map None 0 ;;
         ret ((f , Gfun (Internal
                           (mkFun uses_stack (Z.of_nat MAX_LOCS) vs loc_vars
                                  ((allocIdent ::= Efield tinfd allocIdent valPtr ;
@@ -935,39 +961,39 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ie
     end
   end.
 
-Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Clight.fundef type))
-  : error (positive * globdef Clight.fundef type) :=
+Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Clight.fundef type)) (gv:bool)
+  : option (positive * globdef Clight.fundef type) :=
   match def with
   | (fIdent, Gfun (Internal f)) =>
     (match M.get fIdent nenv with
      | Some (nNamed f_string) =>
-       ret (fIdent, Gfun (External (EF_external f_string (signature_of_type (type_of_params (fn_params f)) (fn_return f) (fn_callconv f))) (type_of_params (fn_params f)) (fn_return f) (fn_callconv f)))
-     | _ => Err "make_external_decl:"
+       if gv then
+         Some (fIdent, Gfun (External (EF_external f_string (signature_of_type (type_of_params (fn_params f)) (fn_return f) (fn_callconv f))) (type_of_params (fn_params f)) (fn_return f) (fn_callconv f)))
+       else None
+     | _ => None
      end)
   | (vIdent, Gvar (mkglobvar v_info v_init v_r v_v)) =>
-    ret (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
-  | _ => Err "make_external_decl: Unsupported def"
+    Some (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
+  | _ => None
   end.
 
 
-Fixpoint make_extern_decls (nenv:name_env) (defs:list (positive * globdef Clight.fundef type)) (gv:bool) : error (list (positive * globdef Clight.fundef type)) :=
+Fixpoint make_extern_decls (nenv:name_env) (defs:list (positive * globdef Clight.fundef type)) (gv:bool) : list (positive * globdef Clight.fundef type) :=
   match defs with
   | fdefs::defs' =>
-    decls <- make_extern_decls nenv defs' gv ;;
-    if gv then
-      decl <- make_extern_decl nenv fdefs ;;
-      ret (decl :: decls)
-    else ret decls       
-  | nil => ret nil
+    let decls := make_extern_decls nenv defs' gv in
+    match make_extern_decl nenv fdefs gv with
+    | Some decl => decl :: decls
+    | None => decls
+    end
+  | nil => nil
   end.
 
 Definition body_external_decl : (positive * globdef Clight.fundef type) :=
   let params := (type_of_params ((tinfIdent, threadInf):: nil)) in
-  (bodyIdent,  Gfun (External (EF_external ("body"%string) (signature_of_type  params Tvoid cc_default)) params Tvoid cc_default)).
-
+  (bodyIdent, Gfun (External (EF_external ("body"%string) (signature_of_type  params Tvoid cc_default)) params Tvoid cc_default)).
 
 End Translation.
-
 
 (* TODO move *)
 
@@ -977,17 +1003,17 @@ Definition lift_error {A : Type} (o : option A) (s : string) : error A :=
   | None => Err s
   end.
 
-Fixpoint translate_funs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (m : fun_info_env) :
+Fixpoint translate_funs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (m : fun_info_env) nenv :
   error (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e =>                      (* currently assuming e is body *)
     let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
     let MAX_LOCS := Z.of_nat (max (max_live_fundefs fnd) (length localVars)) in (* maximum number of live vars per functions *)
-    funs <- translate_fundefs args_opt fnd fenv cenv ienv m ;;
+    funs <- translate_fundefs args_opt fnd fenv cenv ienv m nenv ;;
     '(gcArrIdent , _) <- lift_error (M.get mainIdent m) "translate_funs: Couldn't find main ident" ;;
     let gc_call := reserve_body gcArrIdent 2%Z in
     let uses_stack := uses_stack e in
-    bodyn <- translate_body args_opt [] (union_list PS.empty localVars) N0 [] gcArrIdent uses_stack e fenv cenv ienv m None 0 ;;
+    bodyn <- translate_body args_opt [] (union_list PS.empty localVars) N0 [] gcArrIdent uses_stack nenv e fenv cenv ienv m None 0 ;;
     let (body, slots) := (bodyn : statement * nat) in
     ret ((bodyIdent , Gfun (Internal
                               (mkfunction Tvoid
@@ -1126,7 +1152,7 @@ Definition make_defs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_en
   nState (name_env * (list (positive * globdef Clight.fundef type))) :=
   fun_inf' <- make_funinfo e fenv nenv ;;
   let '(fun_inf, map, nenv') := fun_inf' in
-  match translate_funs args_opt e fenv cenv ienv map with
+  match translate_funs args_opt e fenv cenv ienv map nenv with
   | Err s => failwith s
   | Ret fun_defs' =>
     let fun_defs := rev fun_defs' in
@@ -1616,12 +1642,12 @@ Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv : M.t Bas
   let '(res, (p, m)) := run_compM p'' comp_d n in
   '(nenv, defs) <- res ;;
   let nenv := (add_inf_vars (ensure_unique nenv)) in
-  forward_defs <- make_extern_decls nenv defs false ;;
+  let forward_defs := make_extern_decls nenv defs false in
   let header_pre := make_empty_header cenv ienv e nenv in
   (* let header_p := (header_pre.(runState) m%positive) in *)
   let header_p := run_compM p'' comp_d 1000000%positive in (* should be m, but m causes collision in nenv for some reason *)
   '(nenv, hdefs) <- fst header_p ;;
-   decls <- make_extern_decls nenv hdefs true ;;
+   let decls := make_extern_decls nenv hdefs true in
    body <- mk_prog_opt (body_external_decl :: decls) mainIdent false;;
    head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs ++ hdefs)%list mainIdent true ;;
    ret (M.set make_tinfoIdent (nNamed "make_tinfo"%string)

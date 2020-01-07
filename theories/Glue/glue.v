@@ -52,9 +52,9 @@ Definition defs : Type := list def.
 (* A record that holds L1 information about Coq types. *)
 Record ty_info : Type :=
   Build_ty_info
-    { ty_name   : kername
-    ; ty_body   : Ast.one_inductive_body
-    ; ty_params : list string
+    { ty_name    : kername
+    ; ty_body    : Ast.one_inductive_body
+    ; ty_params  : list string
     }.
 
 (* A record that holds information about Coq constructors.
@@ -445,10 +445,11 @@ Section L1Types.
              the other types in the mut rec type declaration.
              Type names in one_inductive_body are NOT qualified,
              which makes them globally nonunique. *)
-        let tys := map (fun o => {| ty_name := (qual_pre ++ Ast.ind_name o)%string
-                                  ; ty_body := o
-                                  ; ty_params := context_names (rev (Ast.ind_params b))
-                                  |}) (Ast.ind_bodies b) in
+        let tys := map (fun o =>
+                          {| ty_name := (qual_pre ++ Ast.ind_name o)%string
+                           ; ty_body := o
+                           ; ty_params := context_names (rev (Ast.ind_params b))
+                           |}) (Ast.ind_bodies b) in
           tys ++ get_single_types gs'
       | None => get_single_types gs'
       end
@@ -550,6 +551,7 @@ Section L1Constructors.
 
   (*
   Import Template.Ast.
+
   Definition change := tProd nAnon
                           (tProd nAnon
                             (tInd
@@ -769,11 +771,18 @@ Section Printers.
                   ret Sskip (* ideally shouldn't happen *)
               | Some tag, Some spine_args =>
                   printerM <- get_print_env tag ;;
-                  match printerM with
-                  | None =>
+                  infoM <- get_ind_L1_env tag ;;
+                  match printerM , infoM with
+                  | None , _ =>
                       log ("Can't find printer for the type " ++ name) ;;
                       ret Sskip
-                  | Some printer => (* success! *)
+                  | _ , None =>
+                      log ("Can't find info for the type " ++ name ++
+                           " in recursive call") ;;
+                      ret Sskip
+                  | Some printer , Some info => (* success! *)
+                      let spine_args :=
+                          firstn (length (ty_params info)) spine_args in (* hacky *)
                       ret (Scall None (Evar printer ty_printer) (* FIXME wrong type *)
                              (Ederef
                                  (Ebinop Oadd
@@ -902,7 +911,12 @@ Section CtorArrays.
            (ctors : list (BasicAst.ident * Ast.term * nat))
            (n : nat) : nat * list init_data :=
     match ctors with
-    | nil => (n, nil)
+    | nil => (n, Init_int8 Int.zero :: nil)
+             (* This will cause a warning in some C compilers because
+                we create an array with the array length not matching with
+                the number of elements. However, if we make an empty array then
+                Clight considers it as an extern for some reason.
+                So this is a hacky solution for that for now. *)
     | (s, _, _) :: ctors' =>
         let (max_len, init_l) :=
           normalized_names_array ctors' (max n (String.length s + 1)) in
@@ -1115,7 +1129,6 @@ Section CConstructors.
           | Some info =>
               s' <- constructors_from_ctors
                       (ty_name info)
-                      (* (find_base_name (ty_name info)) *)
                       (process_ctors (Ast.ind_ctors ty)) ;;
               rest <- constructors_for_tys tys' ;;
               ret (app s' rest)

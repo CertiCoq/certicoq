@@ -52,9 +52,9 @@ Definition defs : Type := list def.
 (* A record that holds L1 information about Coq types. *)
 Record ty_info : Type :=
   Build_ty_info
-    { ty_name    : kername
-    ; ty_body    : Ast.one_inductive_body
-    ; ty_params  : list string
+    { ty_name   : kername
+    ; ty_body   : Ast.one_inductive_body
+    ; ty_params : list string
     }.
 
 (* A record that holds information about Coq constructors.
@@ -81,10 +81,6 @@ Definition get_tag_env : Type := M.t ident.
 (* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name and type of the names array in C. *)
 Definition ctor_names_env : Type := M.t (ident * type).
-
-(* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
-   the name and type of the arities array in C. *)
-Definition ctor_arities_env : Type := M.t (ident * type).
 
 (* An enumeration of constructors in a type starting from 1.
    Should preserve the ordering of the ctors in the original Coq definition.
@@ -206,7 +202,6 @@ Section GState.
       ; gstate_nenv   : name_env
       ; gstate_gtenv  : get_tag_env
       ; gstate_cnenv  : ctor_names_env
-      ; gstate_caenv  : ctor_arities_env
       ; gstate_caaenv : ctor_arg_accessor_env
       ; gstate_penv   : print_env
       ; gstate_log    : list string
@@ -217,24 +212,24 @@ Section GState.
   (* generate fresh [ident] and record it to the [name_env]
      with the given [string] *)
   Definition gensym (s : string) : gState ident :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let nenv := M.set n (nNamed s) nenv in
-    put (Build_gstate_data ((n+1)%positive) ienv nenv gtenv cnenv caenv caaenv penv log) ;;
+    put (Build_gstate_data ((n+1)%positive) ienv nenv gtenv cnenv caaenv penv log) ;;
     ret n.
 
   Definition set_print_env (k : ind_L1_tag) (v : ident) : gState unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let penv := M.set k v penv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
+    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
   Definition get_print_env (k : ind_L1_tag) : gState (option ident) :=
     penv <- gets gstate_penv ;;
     ret (M.get k penv).
 
   Definition set_get_tag_env (k : ind_L1_tag) (v : ident) : gState unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let gtenv := M.set k v gtenv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
+    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
   Definition get_get_tag_env (k : ind_L1_tag) : gState (option ident) :=
     gtenv <- gets gstate_gtenv ;;
@@ -245,18 +240,9 @@ Section GState.
     ret (M.get k cnenv).
 
   Definition set_ctor_names_env (k : ind_L1_tag) (v : ident * type) : gState unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let cnenv := M.set k v cnenv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
-
-  Definition get_ctor_arities_env (k : ind_L1_tag) : gState (option (ident * type)) :=
-    caenv <- gets gstate_caenv ;;
-    ret (M.get k caenv).
-
-  Definition set_ctor_arities_env (k : ind_L1_tag) (v : ident * type) : gState unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
-    let caenv := M.set k v caenv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
+    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
   Definition get_ctor_arg_accessor_env
              (k1 : ind_L1_tag) (k2: ctor_L1_index)
@@ -266,9 +252,9 @@ Section GState.
 
   Definition set_ctor_arg_accessor_env
              (k1 : ind_L1_tag) (k2 : ctor_L1_index) (v : type * ident) : gState unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let caaenv := set_2d k1 k2 v caaenv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
+    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
   Definition get_ind_L1_env (k : ind_L1_tag) : gState (option ty_info) :=
     ienv <- gets gstate_ienv ;;
@@ -289,14 +275,14 @@ Section GState.
     ret (M.fold find ienv None).
 
   Definition put_ind_L1_env (ienv : ind_L1_env) : gState unit :=
-    '(Build_gstate_data n _ nenv gtenv cnenv caenv caaenv penv log) <- get ;;
-    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log).
+    '(Build_gstate_data n _ nenv gtenv cnenv caaenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
   (* logs are appended to the list and the list is reversed
      at the end to keep them in chronological order *)
   Definition log (s : string) : gState unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv log) <- get ;;
-    put (Build_gstate_data n ienv nenv gtenv cnenv caenv caaenv penv (s :: log)).
+    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv (s :: log)).
 
 End GState.
 
@@ -911,12 +897,9 @@ Section CtorArrays.
            (ctors : list (BasicAst.ident * Ast.term * nat))
            (n : nat) : nat * list init_data :=
     match ctors with
-    | nil => (n, Init_int8 Int.zero :: nil)
-             (* This will cause a warning in some C compilers because
-                we create an array with the array length not matching with
-                the number of elements. However, if we make an empty array then
-                Clight considers it as an extern for some reason.
-                So this is a hacky solution for that for now. *)
+    | nil => (n, Init_space 0 :: nil)
+             (* This may cause a warning in some C compilers.
+                This is a hacky solution for that for now. *)
     | (s, _, _) :: ctors' =>
         let (max_len, init_l) :=
           normalized_names_array ctors' (max n (String.length s + 1)) in
@@ -1026,7 +1009,7 @@ Section CtorEnumTag.
           : gState defs :=
     match tys with
     | nil => ret nil
-    | (itag, {| ty_name := kn ; ty_body := ty |}) :: tys' =>
+    | (itag, {| ty_name := kn ; ty_body := _ |}) :: tys' =>
         _b <- gensym "b" ;;
         _v <- gensym "v" ;;
         let (_is_ptr, ty_is_ptr) := is_ptr_info toolbox in
@@ -1185,7 +1168,6 @@ Definition generate_glue
        ; gstate_nenv   := M.empty _
        ; gstate_gtenv  := M.empty _
        ; gstate_cnenv  := M.empty _
-       ; gstate_caenv  := M.empty _
        ; gstate_caaenv := M.empty _
        ; gstate_penv   := M.empty _
        ; gstate_log    := nil

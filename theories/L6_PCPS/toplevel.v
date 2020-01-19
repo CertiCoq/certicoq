@@ -104,44 +104,45 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
 
 (* Optimizing L6 pipeline *)
 Definition L6_pipeline  (opt cps : bool) (t : L6_FullTerm) : error L6_FullTerm :=
-  let '(prims, cenv, ctag, itag, nenv, fenv, _, e) := t in
+  let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
   (* make compilation state *)
   let c_data :=
-      let next_var := ((identifiers.max_var e 1) + 1)%positive in
+      let next_var := ((identifiers.max_var e0 1) + 1)%positive in
       let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1 + 1 in
       pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
   in
   let res : error (exp * comp_data):=
       (* uncurring *)
-      let '(e_err, s, c_data) := if cps then uncurry_fuel_cps 100 (shrink_cps.shrink_top e) c_data 
-                                 else uncurry_fuel_anf 100 (shrink_cps.shrink_top e) c_data in
+      let '(e_err1, s, c_data) := if cps then uncurry_fuel_cps 100 (shrink_cps.shrink_top e0) c_data 
+                                 else uncurry_fuel_anf 100 (shrink_cps.shrink_top e0) c_data in
       (* inlining *)
-      e <- e_err ;;
-      let (e_err, c_data) := if cps then inline_uncurry e s 10 10 c_data
-                             else inline_uncurry_marked_anf e s 10 10 c_data in
-      e <- e_err ;;
+      e1 <- e_err1 ;;
+      let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data
+                             else inline_uncurry_marked_anf e1 s 10 10 c_data in
+      e2 <- e_err2 ;;
       (* Shrink reduction *)
-      let e := shrink_cps.shrink_top e in
+      let e3 := shrink_cps.shrink_top e2 in
       (* lambda lifting *)
-      let (e_rr, c_data) := if opt then lambda_lift e c_data else (compM.Ret e, c_data)in
-      e <- e_rr ;;
+      let (e_rr4, c_data) := if opt then lambda_lift e3 c_data else (compM.Ret e3, c_data)in
+      e4 <- e_rr4 ;;
       (* Shrink reduction *)
-      let e := shrink_cps.shrink_top e in
+      let e5 := shrink_cps.shrink_top e4 in
       (* Closure conversion *)
-      let (e_err, c_data) := closure_conversion.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data in
+      let (e_err5, c_data) := closure_conversion.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e5 c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
+      e5 <- e_err5 ;;
       let c_data :=
-          let next_var := ((identifiers.max_var e 1) + 1)%positive in (* ΧΧΧ check why this is needed *)
-          pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e) log
+          let next_var := ((identifiers.max_var e5 1) + 1)%positive in (* ΧΧΧ check why this is needed *)
+          pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e5) log
       in
-      e <- e_err ;;
       (* Shrink reduction *)
-      let e := shrink_cps.shrink_top e in
+      let e6 := shrink_cps.shrink_top e5 in
       (* Dead parameter elimination *)
-      let e := dead_param_elim.eliminate e in
+      let (e_err7, c_data) := dead_param_elim.eliminate e6 c_data in
+      e7 <- e_err7 ;;
       (* Shrink reduction *)
-      let e := shrink_cps.shrink_top e in
-      ret (e, c_data)
+      let e8 := shrink_cps.shrink_top e7 in
+      ret (e8, c_data)
   in
   match res with
   | compM.Err s =>
@@ -157,4 +158,4 @@ Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     opts <- get_options ;;
     let cps := negb (direct opts) in
     let o := (0 <? (o_level opts))%nat in
-    LiftErrorCertiCoqTrans "L6 Pipeline" (L6_pipeline cps o) src.
+    LiftErrorCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps) src.

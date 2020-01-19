@@ -15,6 +15,7 @@ Monad0
 MonadState
 OptionMonad
 Orders
+OrdersEx
 OrdersTac
 POrderedType
 PeanoNat

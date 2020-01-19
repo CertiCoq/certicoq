@@ -2,7 +2,7 @@ Require Import Arith List String.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
-Require Import CertiCoq.Benchmarks.lib.sha256.
+(* Require Import CertiCoq.Benchmarks.lib.sha256. *)
 
 From CertiCoq.Plugin Require Import CertiCoq.
 
@@ -12,10 +12,25 @@ Import ListNotations.
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 
-CertiCoq Compile "time" demo1.
+(* CertiCoq Compile "time" demo1. *)
 (* With dead_param_elim:
  L6_to_Clight: Failure in make_defs:translate_funs *)
-CertiCoq Compile "anf" "time" demo1.
+CertiCoq Compile "anf" demo1.
+
+
+Def: Function Coq.Lists.List.repeat has arity 2 2
+Def: Function repeat has arity 2 2
+Def: Function  y has arity 2 2
+Def: Function repeat_uncurried has arity 2 2
+Def: Function app_uncurried has arity 2 2
+LetApp: Function Coq.Lists.List.repeat has arity 2 2
+LetApp: Function y_code has arity 2 2
+LetApp: Function y_code has arity 2 2
+LetApp: Function Coq.Lists.List.repeat has arity 2 2
+LetApp: Function y_code has arity 2 2
+LetApp: Function y_code has arity 2 2
+LetApp: Function app_uncurried has arity 2 2
+
 
 Definition demo2 := List.map negb [true; false; true].
 

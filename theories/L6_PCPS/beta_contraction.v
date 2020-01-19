@@ -1,6 +1,6 @@
 (* Generic beta-contraction phase for (stateful) heuristics based on function definitions and call sites, with bounded inlining depth
    *)
-Require Import Common.compM L6.cps.
+Require Import Common.compM Common.Pipeline_utils L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Import ListNotations.
 Require Import identifiers.
@@ -56,7 +56,7 @@ Section Beta.
   Definition debug_st (s : St) : freshM unit :=    
     nenv <- get_name_env () ;;
     log_msg (pp_St s nenv);;
-    log_msg state.newline.
+    log_msg Pipeline_utils.newline.
 
   Fixpoint beta_contract (d : nat) {struct d} :=
     let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : freshM exp :=

@@ -3,11 +3,15 @@
  *)
 
 Require Import L6.cps L6.identifiers L6.ctx L6.set_util L6.state.
-Require Import compcert.lib.Coqlib Common.exceptionMonad.
+Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
+
+
+Import MonadNotation.
+Open Scope monad_scope.
 
 Open Scope ctx_scope.
 Open Scope fun_scope.
@@ -201,55 +205,117 @@ Definition is_nil {A} (l : list A) : bool :=
   | _ :: _ => false
   end.
 
+
+Definition arityMap : Type := M.t fun_tag.
+
+Definition elimM := @compM' arityMap.
+
+(* Single pass to create arity map. Assumes that initial fun_tags are consistent with arities *)
+Fixpoint make_arityMap (e : exp) (m : arityMap) : arityMap :=
+  match e with
+  | Econstr _ _ _ e => make_arityMap e m
+  | Ecase x bs =>
+    fold_left (fun m p => make_arityMap (snd p) m) bs m 
+  | Eproj _ _ _ _ e => make_arityMap e m
+  | Eletapp x f ft xs e =>
+    make_arityMap e (M.set (Positive_as_DT.of_succ_nat (length xs)) ft m)
+  | Efun B e =>
+    make_arityMap e (make_arityMap_fundefs B m)
+  | Eapp f ft xs => M.set (Positive_as_DT.of_succ_nat (length xs)) ft m
+  | Eprim _ _ _ e => make_arityMap e m
+  | Ehalt x => m
+  end
+with make_arityMap_fundefs (B : fundefs) (m : arityMap) : arityMap :=
+       match B with
+       | Fcons f ft xs e B =>
+         let m := M.set (Positive_as_DT.of_succ_nat (length xs)) ft m in
+         make_arityMap_fundefs B (make_arityMap e m)
+       | Fnil => m
+       end.
+
+Definition get_fun_tag (n : nat) : elimM fun_tag :=
+  st <- get_state tt ;;
+  let m := st in
+  let p := Positive_as_DT.of_succ_nat n in
+  match M.get p m with
+  | Some t => ret t
+  | None =>
+    ft <- get_ftag (N.of_nat n) ;;
+    put_state (M.set p ft m) ;;
+    ret ft
+  end.       
   
-Fixpoint eliminate_expr (L : live_fun) (e : exp) : exp := 
+         
+Fixpoint eliminate_expr (L : live_fun) (e : exp) : elimM exp := 
 match e with 
-| Econstr x t ys e' => Econstr x t ys (eliminate_expr L e')
-| Eproj x t m y e' => Eproj x t m y (eliminate_expr L e')
+| Econstr x t ys e' =>
+  e' <- eliminate_expr L e' ;;
+  ret (Econstr x t ys e')
+| Eproj x t m y e' =>
+  e' <- eliminate_expr L e' ;;
+  ret (Eproj x t m y e')
 | Eletapp x f ft ys e' =>
   match get_fun_vars L f with
   | Some bs =>
     let ys' := live_args ys bs in
+    e' <- eliminate_expr L e';;
     if is_nil ys' then
     (* All arguments are redundant, keep the first.
      * I'm not sure if this is the optimal strategy.
      * An alternative would be to construct a unit value and pass as the argument
      * but that may be better or worse in terms of allocation *)
       match ys with
-      | [] => Eletapp x f ft [] (eliminate_expr L e')
-      | [y] | _ :: y :: _ => Eletapp x f ft [y] (eliminate_expr L e')
+      | [] =>
+        (* get fresh ftag -- Currently don't care about tag sharing *)
+        ft <- get_fun_tag 0 ;;
+        ret (Eletapp x f ft [] e')
+      | [y] | _ :: y :: _ =>
+        ft <- get_fun_tag 1 ;;
+        ret (Eletapp x f ft [y] e')
       end
     else 
-      Eletapp x f ft ys' (eliminate_expr L e')
-  | None => Eletapp x f ft ys (eliminate_expr L e')
+      ft <- get_fun_tag (length ys') ;;
+      ret (Eletapp x f ft ys' e')
+  | None =>
+    ret (Eletapp x f ft ys e')
   end
 | Ecase x P =>
-  let P' := (fix mapM_LD (l : list (ctor_tag * exp)) : list (ctor_tag * exp) :=
-  match l with 
-  | [] => l
-  | (c', e') :: l' => (c', eliminate_expr L e') :: mapM_LD l'
-  end) P in
-  Ecase x P'
-| Ehalt x => Ehalt x
-| Efun fl e' => e
-| Eprim x f ys e' => Eprim x f ys (eliminate_expr L e')
-| Eapp f t ys => 
+  P' <- (fix mapM_LD (l : list (ctor_tag * exp)) : elimM (list (ctor_tag * exp)) :=
+          match l with 
+          | [] => ret []
+          | (c', e') :: l' =>
+            e' <- eliminate_expr L e';;
+            l' <- mapM_LD l' ;;
+            ret ((c', e') :: l')
+          end) P ;;
+  ret (Ecase x P')
+| Ehalt x => ret (Ehalt x)
+| Efun fl e' => ret e
+| Eprim x f ys e' =>
+  e' <- eliminate_expr L e' ;;
+  ret (Eprim x f ys e')
+| Eapp f ft ys => 
   match get_fun_vars L f with
   | Some bs =>
     let ys' := live_args ys bs in
     if is_nil ys' then
       match ys with
-      | [] => Eapp f t []
-      | [y] | _ :: y :: _ => Eapp f t [y]
+      | [] =>
+        ft <- get_fun_tag 0 ;;
+        ret (Eapp f ft [])
+      | [y] | _ :: y :: _ =>
+        ft <- get_fun_tag 1 ;;
+        ret (Eapp f ft [y])
       end
-    else       
-      Eapp f t ys'
-  | None => Eapp f t ys 
+    else
+      ft <- get_fun_tag (length ys') ;;
+      ret (Eapp f ft ys')
+  | None => ret (Eapp f ft ys)
   end
 end.
 
 
-Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : option fundefs := 
+Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs := 
   match B with 
   | Fcons f ft ys e B' =>
     match get_fun_vars L f with
@@ -263,28 +329,31 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : option fundefs :=
             end
           else ys'
       in 
-      let e' := eliminate_expr L e in
-      match eliminate_fundefs B' L with
-      | Some B'' => Some (Fcons f ft ys'' e' B'')
-      | None => None
-      end
-    | None => None
+      e' <- eliminate_expr L e ;;
+      B'' <- eliminate_fundefs B' L ;;
+      ft <- get_fun_tag (length ys'') ;;
+      ret (Fcons f ft ys'' e' B'')
+    | None => failwith "Known function not found in live_fun map"
     end
-  | Fnil => Some Fnil
+  | Fnil => ret Fnil
   end. 
 
-Fixpoint eliminate (e : exp) : exp := 
+Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data := 
 match e with 
 | Efun B e' =>
   match find_live e with
-  | Some L => 
-    match eliminate_fundefs B L with
-    | Some B' => 
-      let e'' := eliminate_expr L e' in
-      Efun B' e''
-    | None => e
+  | Some L =>
+    let m := make_arityMap e (M.empty _) in
+    match run_compM (eliminate_fundefs B L) c_data m with
+    | (Ret B', (c_data, m)) => 
+      match run_compM (eliminate_expr L e') c_data m with
+      | (Ret e'', (c_data, m)) =>
+        (Ret (Efun B' e''), c_data)
+      | (Err s, (c_data, m)) => (Err s, c_data)
+      end
+    | (Err s, (c_data, m)) => (Err s, c_data)
     end
-  | None => e
+  | None => (Err "Dead param elim: find_live failed", c_data)
   end
-| _ => e
+| _ => (Err "Dead param elim: find_live failed", c_data)
 end.

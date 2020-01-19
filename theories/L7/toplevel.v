@@ -55,7 +55,7 @@ Definition Clight_trans_fast (args : nat) (t : toplevel.L6_FullTerm) : error Cpr
   Ret (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
 
 
-Definition Clight_trans_ANF (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram :=
+Definition Clight_trans_ANF (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   L6_to_Clight_stack.compile
     argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
@@ -74,4 +74,4 @@ Definition compile_Clight : CertiCoqTrans toplevel.L6_FullTerm Cprogram :=
     if cps then 
       LiftErrorCertiCoqTrans "L7" (Clight_trans args) s
     else
-      LiftErrorCertiCoqTrans "L7" (Clight_trans_ANF args) s.
+      LiftErrorLogCertiCoqTrans "L7" (Clight_trans_ANF args) s.

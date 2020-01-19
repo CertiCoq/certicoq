@@ -20,6 +20,7 @@ extraction/monad0.mli
 extraction/monadState.mli
 extraction/optionMonad.mli
 extraction/orders.mli
+extraction/ordersEx.mli
 extraction/ordersTac.mli
 extraction/pOrderedType.mli
 extraction/stateMonad.mli
@@ -56,6 +57,7 @@ extraction/randyPrelude.ml
 extraction/pOrderedType.ml
 extraction/ordersFacts.mli
 extraction/orders.ml
+extraction/ordersEx.ml
 extraction/monadState.ml
 extraction/monad0.ml
 extraction/mSetInterface.mli

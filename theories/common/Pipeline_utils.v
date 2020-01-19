@@ -1,4 +1,4 @@
-From Coq Require Import List Unicode.Utf8 Strings.String Classes.RelationClasses Program.Basics Relations.Relation_Definitions.
+From Coq Require Import List Unicode.Utf8 Strings.Ascii Strings.String.
 From ExtLib Require Import Monads.
 Require Import Common.AstCommon Common.compM.
 
@@ -59,10 +59,17 @@ Section Translation.
   Definition log_time (s : string) : pipelineM unit :=
     '(Build_CompInfo tm log dbg) <- get ;;
     put (Build_CompInfo (s :: tm) log dbg).
+  
+  Definition chr_newline : ascii := Eval compute in ascii_of_nat 10.
+  Definition newline : string := (String chr_newline EmptyString).
 
-  Definition run_pipeline (o : Options) (src : Src) (m : CertiCoqTrans) : (error Dst * CompInfo) :=
+  Definition log_to_string (log : list string) : string :=
+    (concat newline ("Debug messages" :: (List.rev log)))%string.
+
+  Definition run_pipeline (o : Options) (src : Src) (m : CertiCoqTrans) : (error Dst * string (* debug *)) :=
     let w := Build_CompInfo [] [] [] in
-    runState (m src) o w.
+    let '(res, c_info) := runState (m src) o w in
+    (res, log_to_string (debug_log c_info)).
 
 End Translation.
 
@@ -87,7 +94,19 @@ Definition LiftErrorCertiCoqTrans {Src Trg}
            (name : string) (f : Src -> error Trg)
   : CertiCoqTrans Src Trg :=
   fun s => State (fun o inf  => timePhase_opt o name (fun _ => (f s,  inf))).
-             
+
+Definition LiftErrorLogCertiCoqTrans {Src Trg}
+           (name : string) (f : Src -> error Trg * string)
+  : CertiCoqTrans Src Trg :=
+  fun s =>
+    State (fun o inf  =>
+             timePhase_opt o name
+                           (fun _ =>
+                              let (res, dbg) := f s in 
+                              let inf' := Build_CompInfo (time_log inf) (log inf) (dbg :: debug_log inf) in
+                              (res, inf'))).
+
+
 Section Lang. 
 
   (** ** CertiCoq Language properties *)

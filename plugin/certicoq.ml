@@ -20,7 +20,7 @@ let default_options : options =
   { cps  = true;
     time = false;
     opt  = 0;
-    debug = true;
+    debug = false;
   }
 
 type 'a error = Res of 'a | Error of string
@@ -85,7 +85,7 @@ let compile opts gr =
   let nenv = 
     let p = Pipeline.compile cps olevel timing term in
     match p with
-    | (Ret ((nenv, header), prg), inf) ->
+    | (Ret ((nenv, header), prg), dbg) ->
       debug_msg debug "Finished compiling, printing to file.";
       let time = Unix.gettimeofday() in
       (* Zoe: Make suffix appear only in testing/debugging mode *)
@@ -95,9 +95,11 @@ let compile opts gr =
       Pipeline.printProg (nenv,prg) cstr;
       Pipeline.printProg (nenv,header) hstr;
       let time = (Unix.gettimeofday() -. time) in
-      debug_msg debug (Printf.sprintf "Printed to file in %f s.." time)
-    | (Err s, inf) ->
-      CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s)
+      Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_chars dbg)
+    | (Err s, dbg) ->
+      CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ (pr_char_list s) ++ str ("\n" ^ "Pipeline debug: \n" ^ string_of_chars dbg))
   in
   let time = Unix.gettimeofday() in
   (match Pipeline.make_glue term with

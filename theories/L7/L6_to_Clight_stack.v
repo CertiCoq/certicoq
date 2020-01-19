@@ -49,8 +49,21 @@ Variable (heapInfIdent : ident).
 Variable (numArgsIdent : ident).
 Variable (isptrIdent : ident). (* ident for the is_ptr external function *)
 Variable (caseIdent : ident). (* ident for the case variable , TODO: generate that automatically and only when needed *)
-
 Variable (nParam:nat).
+
+
+Definition show_name (name : BasicAst.name) : string :=
+  match name with
+  | nAnon => "anon"
+  | nNamed d => d
+  end.
+
+Definition get_fname f (nenv : name_env) : string := 
+  match M.get f nenv with
+  | Some name => show_name name
+  | None => "Undef"
+  end.
+
 
 Definition maxArgs := 1024%Z.
 
@@ -67,35 +80,42 @@ Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
 
 Definition fun_info_env : Type := M.t (positive * fun_tag).
 
+
 (* Compute a fun_env by looking at the number of arguments functions
    are applied to, assumes that all functions sharing the same tags have the same arity *)
-Fixpoint compute_fun_env' (n : nat) (fenv : fun_env) (e : exp) : fun_env :=
+Fixpoint compute_fun_env' (n : nat) (nenv : name_env) (s : list string) (fenv : fun_env)  (e : exp) : fun_env * (list string) :=
   match n with
-  | 0 => fenv
+  | 0 => (fenv, s)
   | S n' =>
     match e with
-    | Econstr x t vs e' => compute_fun_env' n' fenv e'
-    | Ecase x cs => fold_left (compute_fun_env' n') (map snd cs) fenv
-    | Eproj x t n v e' => compute_fun_env' n' fenv e'
-    | Eletapp x f t vs e' => compute_fun_env' n' (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
-    | Efun fnd e' => compute_fun_env' n' (compute_fun_env_fundefs n' fnd fenv) e'
-    | Eapp x t vs => M.set t (N.of_nat (length vs) , makeArgList vs) fenv
-    | Eprim x p vs e' => compute_fun_env' n' fenv e'
-    | Ehalt x => fenv
+    | Econstr x t vs e' => compute_fun_env' n' nenv s fenv e'
+    | Ecase x cs => fold_left (fun p e => compute_fun_env' n' nenv (snd p) (fst p) e) (map snd cs) (fenv, s)
+    | Eproj x t n v e' => compute_fun_env' n' nenv s fenv e'
+    | Eletapp x f t vs e' =>
+      let s' := "App: Adding function " ++ get_fname f nenv ++ " with arity " ++ (nat2string10 (length vs)) in
+      compute_fun_env' n' nenv (s' :: s) (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
+    | Efun fnd e' =>
+      let (fenv', s') := compute_fun_env_fundefs n' nenv s fnd fenv in
+      compute_fun_env' n' nenv s' fenv' e'
+    | Eapp x t vs => (M.set t (N.of_nat (length vs) , makeArgList vs) fenv,
+                      ("App: Adding function " ++ get_fname x nenv ++ " with arity " ++ (nat2string10 (length vs))) :: s)
+    | Eprim x p vs e' => compute_fun_env' n' nenv s fenv e'
+    | Ehalt x => (fenv, s)
     end
   end
-with compute_fun_env_fundefs n fnd fenv :=
+with compute_fun_env_fundefs n nenv s fnd fenv : fun_env * (list string):=
   match n with
-  | 0 => fenv
+  | 0 => (fenv, s)
   | S n' =>
     match fnd with
-    | Fnil => fenv
+    | Fnil => (fenv, s)
     | Fcons f t vs e fnd' =>
+      let s' := "Fun: Adding function " ++ get_fname f nenv ++ " with arity " ++ (nat2string10 (length vs)) in
       let fenv' := M.set t (N.of_nat (length vs) , makeArgList vs) fenv in
-      compute_fun_env_fundefs n' fnd' (compute_fun_env' n' fenv' e)
+      let (fenv'', s'') := compute_fun_env' n' nenv (s' :: s) fenv' e in
+      compute_fun_env_fundefs n' nenv s'' fnd' fenv''
     end
   end.
-
 
 
 Fixpoint max_depth (e : exp) : nat :=
@@ -127,8 +147,9 @@ Fixpoint compute_fun_env_fds fnd fenv:=
 (* fun_env maps tags to function info  *)
 
 (* fun_env maps tags to function info *)
-Definition compute_fun_env (e : exp) : fun_env :=
-  compute_fun_env' (max_depth e) (M.empty fun_ty_info) e.
+Definition compute_fun_env (nenv : name_env) (e : exp) : fun_env * string :=
+  let (fenv, log) := compute_fun_env' (max_depth e) nenv [] (M.empty fun_ty_info) e in
+  (fenv, String.concat Pipeline_utils.newline (rev log)).
 
 
 Fixpoint get_allocs (e : exp) : list positive :=
@@ -612,12 +633,6 @@ Fixpoint asgnFunVars' (vs : list positive) (ind : list N) : error statement :=
 Definition asgnFunVars (vs : list positive) (ind : list N) : error statement :=
   asgnFunVars' (skipn nParam vs) (skipn nParam ind).
 
-
-Definition show_name (name : BasicAst.name) : string :=
-  match name with
-  | nAnon => "anon"
-  | nNamed d => d
-  end.
 
 Fixpoint asgnAppVars'' (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) (name : string) :
   error statement :=
@@ -1628,33 +1643,94 @@ Definition make_header (cenv:ctor_env) (ienv:n_ind_env) (e:exp) (nenv : M.t Basi
 
 (* end of header file *)
 
+Section Check.
 
-Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
-  error (M.t BasicAst.name * Clight.program * Clight.program) :=
+  Context (fenv : fun_env) (nenv : name_env).
+
+  Fixpoint check_tags' (e : exp) (log : list string) :=
+    match e with
+    | Econstr _ _ _ e | Eproj _ _ _ _ e | Eprim _ _ _ e => check_tags' e log
+
+    | Ecase _ bs =>
+      fold_left (fun a b => check_tags' (snd b) a) bs log
+
+    | Eletapp x f t ys e =>
+      let s :=
+          match M.get t fenv with
+          | Some (n, l) =>
+            "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+          | None =>
+            "LetApp: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+          end
+      in check_tags' e (s :: log)
+
+    | Efun B e =>
+      let s := check_tags_fundefs' B log in
+      check_tags' e s
+
+    | Eapp f t ys =>
+      let s :=
+          match M.get t fenv with
+          | Some (n, l) =>
+            "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+          | None =>
+            "App: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+          end
+      in
+      s :: log
+    | Ehalt x => log
+    end
+  with check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
+         match B with
+         | Fcons f t xs e B' =>
+           let s :=
+               match M.get t fenv with
+               | Some (n, l) =>
+                 "Definition " ++ get_fname f nenv ++ " has tag " ++ (pos2string t) ++ Pipeline_utils.newline ++
+                 "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+               | None =>
+                 "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+               end
+           in check_tags_fundefs' B' (s :: log)
+         | Fnil => log
+         end.
+
+  Definition check_tags (e : exp) :=
+    String.concat Pipeline_utils.newline (rev (check_tags' e [])).
+
+End Check.
+
+
+Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv : name_env) :
+  error (M.t BasicAst.name * Clight.program * Clight.program) * string :=
   let e := wrap_in_fun e in
-  let fenv := compute_fun_env e in
+  let (fenv, log) := compute_fun_env nenv e in
   let ienv := compute_ind_env cenv in
+  (* debug *)
+  let dbg := (cps_show.show_exp nenv cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv e in
+  (* end debug *)
   let p'' := make_defs args_opt e fenv cenv ienv nenv in
   (* state *)
   let n := ((max_var e 100) + 1)%positive in
   let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv [] in (* XXX dummy *)
   (* run compM *)
-  let '(res, (p, m)) := run_compM p'' comp_d n in
-  '(nenv, defs) <- res ;;
-  let nenv := (add_inf_vars (ensure_unique nenv)) in
-  let forward_defs := make_extern_decls nenv defs false in
-  let header_pre := make_empty_header cenv ienv e nenv in
-  (* let header_p := (header_pre.(runState) m%positive) in *)
-  let header_p := run_compM p'' comp_d 1000000%positive in (* should be m, but m causes collision in nenv for some reason *)
-  '(nenv, hdefs) <- fst header_p ;;
-   let decls := make_extern_decls nenv hdefs true in
-   body <- mk_prog_opt (body_external_decl :: decls) mainIdent false;;
-   head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs ++ hdefs)%list mainIdent true ;;
-   ret (M.set make_tinfoIdent (nNamed "make_tinfo"%string)
-             (M.set exportIdent (nNamed "export"%string) nenv),
-        body, head).
-(* end) *)
-(*   end. *)
+  let err : error (M.t BasicAst.name * Clight.program * Clight.program) :=
+      let '(res, (p, m)) := run_compM p'' comp_d n in
+      '(nenv, defs) <- res ;;
+       let nenv := (add_inf_vars (ensure_unique nenv)) in
+       let forward_defs := make_extern_decls nenv defs false in
+       let header_pre := make_empty_header cenv ienv e nenv in
+       (* let header_p := (header_pre.(runState) m%positive) in *)
+       let header_p := run_compM p'' comp_d 1000000%positive in (* should be m, but m causes collision in nenv for some reason *)
+       '(nenv, hdefs) <- fst header_p ;;
+        let decls := make_extern_decls nenv hdefs true in
+       body <- mk_prog_opt (body_external_decl :: decls) mainIdent false;;
+       head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs ++ hdefs)%list mainIdent true ;;
+       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%string)
+                  (M.set exportIdent (nNamed "export"%string) nenv),
+            body, head)
+  in
+  (err, dbg).
 
 Definition err {A : Type} (s : String.string) : res A :=
   Error ((MSG s) :: nil).

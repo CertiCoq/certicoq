@@ -14,8 +14,8 @@ Inductive value :=
 Lemma value_ind' (P : value -> Prop) :
   (forall dcon vs, Forall P vs -> P (Con_v dcon vs)) ->
   (P Prf_v) ->
-  (forall vs na e, P (Clos_v vs na e)) ->
-  (forall vs fnl n, P (ClosFix_v vs fnl n)) ->
+  (forall vs na e, Forall P vs -> P (Clos_v vs na e)) ->
+  (forall vs fnl n, Forall P vs -> P (ClosFix_v vs fnl n)) ->
   (forall v,  P v).
 Proof.
   intros H1 H2 H3 H4.
@@ -24,8 +24,12 @@ Proof.
     constructor.
     constructor. eapply IHv. eassumption.
   - eauto.
-  - eauto. 
-  - eauto.  
+  - eapply H3. induction l.
+    constructor.
+    constructor. eapply IHv. eassumption. 
+  - eapply H4. induction l.
+    constructor.
+    constructor. eapply IHv. eassumption. 
 Qed.
                              
 (* Definition of env *)
@@ -58,6 +62,87 @@ Fixpoint list_to_exps l : expression.exps :=
     (econs e exps')
   end.
 
+(* mostly using efnlst_as_list instead *)
+Fixpoint efnlst_to_list (fnlst: efnlst) :=
+  match fnlst with
+  | eflnil => nil
+  | eflcons na e fnlst' =>
+    let l := efnlst_to_list fnlst' in
+    (e::l)
+  end.
+
+(* TODOO move to expression *)
+Fixpoint parallel_sbst (e : exp) (depth : N) (esubst : list exp) :=
+  match e with
+  | Var_e i =>
+    if i <? depth then Var_e i
+    else
+      nth (N.to_nat (i - depth)) esubst (Var_e (i - (list.NLength esubst)))
+  | Lam_e na e1 =>
+    Lam_e na (parallel_sbst e1 (depth + 1) esubst)
+  | App_e e1 e2 =>
+    App_e (parallel_sbst e1 depth esubst) (parallel_sbst e2 depth esubst)
+  | Let_e na e1 e2 =>
+    Let_e na (parallel_sbst e1 depth esubst) (parallel_sbst e2 (depth + 1) esubst)
+  | Con_e d es => Con_e d (parallel_sbsts es depth esubst)
+  | Fix_e efns i =>
+    let l := efnlst_length efns in
+    Fix_e (parallel_sbst_efnlst efns (depth + l) esubst) i
+  | Match_e e1 n bs =>
+    Match_e (parallel_sbst e1 depth esubst) n (parallel_sbst_branches bs depth esubst)
+  | Prf_e => Prf_e
+  end
+with parallel_sbsts (es : exps) (depth : N) (esubst : list exp) :=
+       match es with
+       | enil => enil
+       | econs e es' =>
+         econs (parallel_sbst e depth esubst) (parallel_sbsts es' depth esubst)
+       end
+with parallel_sbst_efnlst (efns : efnlst) (depth : N) (esubst : list exp) :=
+       match efns with
+       | eflnil => eflnil
+       | eflcons na f efns' =>
+         let f' := (parallel_sbst f depth esubst) in
+         eflcons na f' (parallel_sbst_efnlst efns' depth esubst)
+       end
+with parallel_sbst_branches (bs : branches_e) (depth : N) (esubst : list exp) :=
+       match bs with
+       | brnil_e => brnil_e
+       | brcons_e d (n, l) e bs' =>
+         let e' := parallel_sbst e (depth + n) esubst in
+         brcons_e d (n, l) e' (parallel_sbst_branches bs' depth esubst)
+       end.
+
+Fixpoint sbst_list_n (e : exp) (vs : exps) (n : N) : exp :=
+  match vs with
+  | enil => e
+  | econs v vs' => (sbst_list_n e vs' n) {n ::= v}
+  end.
+
+Fixpoint val_to_exp (v : value) : expression.exp :=
+  match v with
+  | Con_v d vs => Con_e d (list_to_exps (List.map val_to_exp vs))
+  | Prf_v => Prf_e
+  | Clos_v rho na e =>
+    let es := List.map val_to_exp rho in 
+    Lam_e na (parallel_sbst e (Npos 1%positive) es)
+  | ClosFix_v rho fnlst n =>
+    let len := efnlst_length fnlst in
+    let fix aux_efnlst fnlst len : efnlst :=
+        match fnlst with
+        | eflnil => eflnil
+        | eflcons n e fnlst' =>
+          let es := List.map val_to_exp rho in
+          eflcons n (parallel_sbst e len es) (aux_efnlst fnlst' len)
+        end in
+    Fix_e (aux_efnlst fnlst len) n
+  end.
+
+Definition sbst_env (e: expression.exp) (rho: env) (n : N) : expression.exp :=
+  let es := List.map val_to_exp rho in
+  parallel_sbst e n es.
+
+
 (** * Environment-based semantics for L4 *)
                                       
 Inductive eval_env: env -> exp -> value -> Prop :=
@@ -87,21 +172,22 @@ Inductive eval_env: env -> exp -> value -> Prop :=
     forall (n: N) (rho: env) (fnlst: efnlst),
       eval_env rho (Fix_e fnlst n) (ClosFix_v rho fnlst n)
 | eval_FixApp:
-    forall (e1 e2 e' e'': expression.exp) (rho rho' rho'' rho_f: env) (n: N)
-    (fnlst: efnlst) (v2 v : value) (na : name),
+    forall (e1 e2 e': expression.exp) (rho rho' rho'': env) (n: N)
+    (fnlst: efnlst) (v v2 : value),
       eval_env rho e1 (ClosFix_v rho' fnlst n) ->
       enthopt (N.to_nat n) fnlst = Some e' ->
       make_rec_env fnlst rho' = rho'' ->  
-      eval_env rho'' e' (Clos_v rho_f na e'') ->
-      eval_env rho e2 v2 -> 
-      eval_env (v2::rho_f) e'' v ->
+      (* eval_env rho'' e' (Clos_v rho_f na e'') -> *)
+      eval_env rho e2 v2 ->  
+      (* eval_env (v2::rho_f) e'' v -> *)
+      eval_env rho'' (App_e e' (val_to_exp v2)) v ->
       eval_env rho (App_e e1 e2) v
 | eval_Match:
     forall (e1 e': expression.exp) (rho: env) (dc: dcon) (vs: list value)
     (n: N) (brnchs: branches_e) (v: value),
       eval_env rho e1 (Con_v dc vs) ->
       find_branch dc (N.of_nat (List.length vs)) brnchs = Some e' ->
-      (*?*) eval_env ((List.rev vs) ++ rho) e' v ->
+      eval_env ((List.rev vs) ++ rho) e' v ->
       eval_env rho (Match_e e1 n brnchs) v
 | eval_Prf: forall rho, eval_env rho Prf_e Prf_v
 | eval_ProofApp:
@@ -135,24 +221,27 @@ Lemma eval_env_ind_strong :
     (forall (e1 e2 : exp) (v1 v2 : value) (rho : env) (na : name),
         eval_env rho e1 v1 ->
         P rho e1 v1 ->
-        eval_env (v1 :: rho) e2 v2 -> P (v1 :: rho) e2 v2 -> P rho (Let_e na e1 e2) v2) ->
+        eval_env (v1 :: rho) e2 v2 -> P (v1 :: rho) e2 v2 ->
+        P rho (Let_e na e1 e2) v2) ->
     (forall (es : exps) (vs : list value) (rho : env) (dc : dcon),
         Forall2 (fun (e : exp) (v : value) => eval_env rho e v) (exps_to_list es) vs ->
-        Forall2 (fun (e : exp) (v : value) => P rho e v) (exps_to_list es) vs ->        
+        Forall2 (fun (e : exp) (v : value) => P rho e v) (exps_to_list es) vs ->      
         P rho (Con_e dc es) (Con_v dc vs)) ->
     (forall (n : N) (rho : env) (fnlst : efnlst),
         P rho (Fix_e fnlst n) (ClosFix_v rho fnlst n)) ->
-    (forall (e1 e2 e' e'' : exp) (rho rho' rho'' rho_f : env) 
-            (n : N) (fnlst : efnlst) (v2 v : value) (na : name),
+    (forall (e1 e2 e': exp) (rho rho' rho'' : env) 
+            (n : N) (fnlst : efnlst) (v v2 : value),
         eval_env rho e1 (ClosFix_v rho' fnlst n) ->
         P rho e1 (ClosFix_v rho' fnlst n) ->
         enthopt (N.to_nat n) fnlst = Some e' ->
         make_rec_env fnlst rho' = rho'' ->
-        eval_env rho'' e' (Clos_v rho_f na e'') ->
-        P rho'' e' (Clos_v rho_f na e'') ->
-        eval_env rho e2 v2 ->
-        P rho e2 v2 ->
-        eval_env (v2 :: rho_f) e'' v -> P (v2 :: rho_f) e'' v -> P rho (e1 $ e2) v) ->
+        (* eval_env rho'' e' (Clos_v rho_f na e'') -> *)
+        (* P rho'' e' (Clos_v rho_f na e'') -> *)
+        (* eval_env rho e2 v2 -> *)
+        P rho e2 v2 -> 
+        (* eval_env (v2 :: rho_f) e'' v -> P (v2 :: rho_f) e'' v -> *)
+        P rho'' (e' $ (val_to_exp v2)) v ->
+        P rho (e1 $ e2) v) ->
     (forall (e1 e' : exp) (rho : env) (dc : dcon) (vs : list value) 
             (n : N) (brnchs : branches_e) (v : value),
         eval_env rho e1 (Con_v dc vs) ->
@@ -167,8 +256,7 @@ Lemma eval_env_ind_strong :
     forall (rho : env) (e : exp) (v : value), eval_env rho e v -> P rho e v.
 Proof.
   intros P H1 H2 H3 H4 H5 H6 H7 H8 H9 H10. fix IH 4.
-  intros rho e v Heval; inv Heval;
-    try (now clear IH; eauto).
+  intros rho e v Heval; inv Heval; try (now clear IH; eauto).
   - eapply H3.
     eassumption. eapply IH. eassumption.
     eassumption. eapply IH. eassumption.
@@ -186,9 +274,9 @@ Proof.
       * eapply IHForall2.
   - eapply H7.
     eassumption. eapply IH. eassumption.
-    eassumption. reflexivity. eassumption. eapply IH. eassumption.
-    eassumption. eapply IH. eassumption.
-    eassumption. eapply IH. eassumption.
+    eassumption. reflexivity.
+    eapply IH. eassumption.
+    eapply IH. eassumption.
   - eapply H8.
     eassumption. eapply IH. eassumption.
     eassumption. eassumption. 
@@ -196,10 +284,9 @@ Proof.
   - eapply H10. 
     eassumption. eapply IH. eassumption.
     eassumption. eapply IH. eassumption.
-Qed.
-        
+Qed.        
     
-(* write custom induction hypothesis? *)
+(* not required for now *)
 Lemma eval_env_single_valued:
   (forall e rho d, eval_env rho e d -> forall f, eval_env rho e f -> d = f).
 Proof.
@@ -217,14 +304,6 @@ Proof.
         inv H3. inv H4. rewrite <- H in H1. now inv H1.
         inv H3. inv H4. 
 Admitted. 
-
-Fixpoint efnlst_to_list (fnlst: efnlst) :=
-  match fnlst with
-  | eflnil => nil
-  | eflcons na e fnlst' =>
-    let l := efnlst_to_list fnlst' in
-    (e::l)
-  end.
 
 Definition well_formed_in_env (e : exp) (rho : list value) :=
   exp_wf (list.NLength rho) e.
@@ -394,6 +473,19 @@ Proof.
       eassumption.
 Qed.
 
+Lemma make_rec_env_wf:
+  forall rho fnlst n,
+    well_formed_val (ClosFix_v rho fnlst n) ->
+    well_formed_env (make_rec_env fnlst rho).
+Proof.
+  intros rho fnlst n Hwf.
+  inv Hwf. induction fnlst.
+  - simpl in *. unfold make_rec_env. eapply H1.
+  - simpl in *. unfold well_formed_env.
+    unfold make_rec_env. constructor.
+    + constructor. eassumption.
+Admitted.    
+
 Lemma enthopt_inlist_Forall (P : exp -> Prop) :
   forall efnl n e,
     Forall (fun (p : name * exp) => let (_, e) := p in P e) (efnlst_as_list efnl) ->
@@ -454,7 +546,257 @@ Proof.
     rewrite N.add_1_r.
     rewrite <- Nnat.Nat2N.inj_succ.
     reflexivity. intros Hfalse. now inv Hfalse.
-Qed. 
+Qed.
+
+Lemma N2Nat_inj_lt :
+   forall n1 n2,
+     n1 < n2 <-> lt (N.to_nat n1) (N.to_nat n2).
+Proof.
+  intros n1 n2. split.
+  - intros H. destruct n1; destruct n2.
+    + inv H.
+    + simpl. zify. omega.
+    + inv H.
+    + zify. omega.
+  - intros H. destruct n1; destruct n2.
+    + omega.
+    + zify. omega.
+    + inv H.
+    + zify. omega. 
+Qed.
+
+Lemma parallel_sbst_inv_efnlst_length :
+  forall efns esubst depth,
+    efnlst_length (parallel_sbst_efnlst efns depth esubst) =
+    efnlst_length efns.
+Proof.
+  intros efns esubst.
+  induction efns; intros depth. 
+  - simpl. reflexivity.
+  - simpl. rewrite (IHefns depth). reflexivity.
+Qed.
+
+Lemma f_efnlst_length':
+      forall l fnl rho, efnlst_length
+                      ((fix aux_efnlst (fnlst : efnlst) (len : N) {struct fnlst} :
+                         efnlst :=
+                         match fnlst with
+                         | eflnil => eflnil
+                         | eflcons n e fnlst' =>
+                           eflcons n (parallel_sbst e len (map val_to_exp rho))
+                                   (aux_efnlst fnlst' len)
+                         end) fnl l) = efnlst_length fnl.
+Proof.
+  induction fnl; intros.
+  - reflexivity.
+  - simpl. rewrite (IHfnl rho). reflexivity.
+Qed.
+
+Lemma f_efnlst_length_inv:
+  forall rho fnl,
+  efnlst_length ((fix aux_efnlst (fnlst : efnlst) (len : N) {struct fnlst} :
+                         efnlst :=
+                         match fnlst with
+                         | eflnil => eflnil
+                         | eflcons n e fnlst' =>
+                           eflcons n (parallel_sbst e len (map val_to_exp rho))
+                                   (aux_efnlst fnlst' len)
+                         end) fnl (efnlst_length fnl)) =
+                      efnlst_length fnl.
+Proof.
+  intros. eapply (f_efnlst_length' (efnlst_length fnl) fnl rho).
+Qed.
+
+Definition parallel_sbst_makes_wf_exp e :=
+  forall n rho,
+    exp_wf (n + list.NLength rho) e ->
+    Forall (exp_wf 0) rho ->
+    exp_wf n (parallel_sbst e n rho).
+
+Definition parallel_sbst_makes_wf_exps es :=
+  forall n rho,
+    exps_wf (n + list.NLength rho) es ->
+    Forall (exp_wf 0) rho ->
+    exps_wf n (parallel_sbsts es n rho).
+
+Definition parallel_sbst_makes_wf_efnlst efns :=
+  forall n rho,
+    efnlst_wf (n + list.NLength rho) efns ->
+    Forall (exp_wf 0) rho ->
+    efnlst_wf n (parallel_sbst_efnlst efns n rho).
+
+Definition parallel_sbst_makes_wf_branches bs :=
+  forall n rho,
+    branches_wf (n + list.NLength rho) bs ->
+    Forall (exp_wf 0) rho ->
+    branches_wf n (parallel_sbst_branches bs n rho). 
+
+Lemma parallel_sbst_makes_wf:
+  (forall e, parallel_sbst_makes_wf_exp e) /\
+  (forall es, parallel_sbst_makes_wf_exps es) /\
+  (forall efns, parallel_sbst_makes_wf_efnlst efns) /\
+  (forall bs, parallel_sbst_makes_wf_branches bs).
+Proof.
+  apply my_exp_ind; unfold parallel_sbst_makes_wf_exp.
+  - intros n i rho Hwf Hrho.
+    simpl. inv Hwf.
+    destruct (lt_dec n i).
+    + eapply OrdersEx.N_as_OT.ltb_lt in l. rewrite l.
+      constructor.
+      eapply OrdersEx.N_as_OT.ltb_lt in l. eassumption.
+    + eapply OrdersEx.N_as_OT.ge_le in g.
+      eapply N.ltb_ge in g. rewrite g.
+      eapply nth_inlist_Forall.
+      eapply N.ltb_ge in g. 
+      assert (Hltlen: (n - i) < list.NLength rho).
+      { zify. omega. }
+      unfold list.NLength in Hltlen.
+      eapply N2Nat_inj_lt in Hltlen.
+      rewrite Nnat.Nat2N.id in Hltlen. eassumption.
+      eapply Forall_impl with (P := exp_wf 0).
+      intros a. eapply weaken_closed. eassumption. 
+  - intros na e IHe n rho Hwf Hrho.
+    simpl. inv Hwf. constructor.
+    rewrite N.add_comm. eapply IHe.
+    rewrite N.add_assoc in H1. rewrite (N.add_comm n 1). eassumption.
+    eassumption.
+  - intros e1 IHe1 e2 IHe2 n rho Hwf Hrho.
+    simpl. inv Hwf. constructor. 
+    apply IHe1; try eassumption.
+    apply IHe2; try eassumption.
+  - intros dc es IHes n rho Hwf Hrho.
+    simpl. unfold parallel_sbst_makes_wf_exps in IHes.
+    inv Hwf. constructor.
+    eapply IHes; eassumption.
+  - intros e IHe pars bs IHbs n rho Hwf Hrho.
+    unfold parallel_sbst_makes_wf_branches in IHbs. inv Hwf.
+    simpl. constructor.
+    apply IHe; eassumption.
+    apply IHbs; eassumption.
+  - intros na e1 IHe1 e2 IHe2 n rho Hwf Hrho.
+    simpl. inv Hwf. constructor.
+    apply IHe1; eassumption.
+    rewrite N.add_comm. eapply IHe2. 
+    rewrite N.add_assoc in H4. rewrite (N.add_comm n 1).
+    eassumption. eassumption.
+  - intros efns IHefns n i rho Hwf Hrho.
+    unfold parallel_sbst_makes_wf_efnlst in IHefns.
+    simpl. inv Hwf. constructor.
+    assert (Hleneq: efnlst_length
+                      (parallel_sbst_efnlst efns (i + efnlst_length efns) rho) =
+                    efnlst_length efns).
+    { eapply parallel_sbst_inv_efnlst_length. }
+    rewrite Hleneq. rewrite N.add_comm.
+    eapply IHefns. rewrite N.add_assoc in H1.
+    rewrite (N.add_comm i (efnlst_length efns)). eassumption.
+    eassumption.
+  - intros n rho Hwf Hrho. simpl. constructor.
+  - unfold parallel_sbst_makes_wf_exps. simpl. constructor.
+  - unfold parallel_sbst_makes_wf_exps.
+    intros e IHe es IHes n rho Hwf Hrho.
+    simpl. inv Hwf. constructor.
+    apply IHe; eassumption.
+    apply IHes; eassumption.
+  - unfold parallel_sbst_makes_wf_efnlst. simpl. constructor.
+  - unfold parallel_sbst_makes_wf_efnlst.
+    intros na e IHe efns IHefns n rho Hwf Hrho.
+    simpl. inv Hwf. constructor.
+    apply IHe; eassumption.
+    destruct e; inv H4. simpl. reflexivity.
+    apply IHefns; eassumption.
+  - unfold parallel_sbst_makes_wf_branches. simpl. constructor.
+  - unfold parallel_sbst_makes_wf_branches.
+    intros d p e IHe bs IHbs n rho Hwf Hrho.
+    simpl. inv Hwf. destruct p. constructor.
+    simpl. rewrite N.add_comm. simpl in H2. apply IHe. 
+    rewrite N.add_assoc in H2. rewrite (N.add_comm n n0). eassumption.
+    eassumption.
+    apply IHbs; eassumption.
+Qed.
+
+Lemma val_to_exp_is_wf :
+  forall v, 
+    well_formed_val v -> exp_wf 0 (val_to_exp v).  
+Proof.
+  intros v. 
+  apply value_ind' with (P := fun v => well_formed_val v -> exp_wf 0 (val_to_exp v)).
+  - intros dc vs Hvs Hwf.
+    induction vs.
+    + simpl in *.
+      constructor. constructor. 
+    + simpl in *.
+      constructor.
+      assert (Hwf' : well_formed_val (Con_v dc vs)).
+      { constructor. inv Hwf. inv H0. eassumption. }
+      inversion Hwf. inv Hvs. inv H0.
+      constructor. apply H4. eassumption.
+      specialize (IHvs H5 Hwf'). inv IHvs. eassumption.
+  - constructor.
+  - intros vs na e Hvs Hwf.
+    simpl. constructor. inv Hwf.
+    edestruct parallel_sbst_makes_wf as [Hsbst _].
+    unfold parallel_sbst_makes_wf_exp in Hsbst.
+    rewrite N.add_0_r. eapply Hsbst.
+    unfold well_formed_in_env in H3.
+    unfold list.NLength in *. simpl in H3.
+    rewrite map_length.
+    rewrite Pos.of_nat_succ in H3.
+    rewrite <- positive_nat_N in H3.
+    rewrite Nat2Pos.id in H3.
+    rewrite Nnat.Nat2N.inj_succ in H3.
+    rewrite N.add_1_l. eapply H3. eassumption.
+    intros Hfalse; discriminate.
+    clear H3. induction vs.
+    + simpl. constructor.
+    + simpl. inv H1. inv Hvs.
+      constructor. apply H1. eassumption.
+      apply IHvs; try eassumption.
+  - intros vs efns n Hvs Hwf. 
+    inv Hwf.
+    simpl. constructor.    
+    rewrite N.add_0_r. rewrite f_efnlst_length_inv.  
+    set (f := (fix aux_efnlst (fnlst : efnlst) (len : N) {struct fnlst} : efnlst :=
+           match fnlst with
+           | eflnil => eflnil
+           | eflcons n0 e fnlst' =>
+               eflcons n0 (parallel_sbst e len (map val_to_exp vs))
+                 (aux_efnlst fnlst' len)
+           end)). 
+    assert (Ha : list.NLength (make_rec_env efns nil) = efnlst_length efns) by admit.
+    specialize (H3 (make_rec_env efns nil) Ha).
+    generalize dependent (efnlst_length efns).
+    induction efns; intros n1 Heq.
+    + constructor. 
+    + unfold f. fold f. constructor.
+      * edestruct parallel_sbst_makes_wf as [Hsbst _].
+        unfold parallel_sbst_makes_wf_exp in Hsbst.
+        eapply Hsbst.
+        -- inv H3. unfold well_formed_in_env in H2.
+           rewrite app_length_N in H2. 
+           unfold list.NLength in *.
+           rewrite map_length. eassumption. 
+        -- clear IHefns H3. induction vs.
+           ++ simpl. constructor.
+           ++ simpl. inv Hvs. inv H1. constructor.
+              eapply H2. eassumption.
+              eapply IHvs; eassumption.
+      * inv H3. unfold well_formed_in_env in H2.
+        admit.
+      * eapply IHefns. admit.
+Admitted.
+
+Lemma val_to_exp_rho :
+  forall rho,
+    well_formed_env rho ->
+    Forall (exp_wf 0) (map val_to_exp rho).
+Proof.
+  intros rho Hwf.
+  induction rho.
+  - simpl. constructor.
+  - simpl. inv Hwf. constructor.
+    apply val_to_exp_is_wf. eassumption.
+    apply IHrho. eapply H2.
+Qed.
 
 Lemma eval_env_preserves_well_formed:
   forall rho e v,
@@ -533,21 +875,27 @@ Proof.
          eapply H6. reflexivity.
   - (* FixApp *)
     subst.
-    eapply well_formed_in_env_App in H9.
-    destruct H9 as [He1 He2].
-    specialize (H0 He1 H10). inv H0.
+    eapply well_formed_in_env_App in H5.
+    destruct H5 as [He1 He2].
+    specialize (H0 He1 H6). inv H0.
     edestruct (make_rec_env_exists fnlst rho' 0) as (rhof & Heqf & Hlenf & Hwff).
     assert (Ha1 : well_formed_in_env e' (make_rec_env fnlst rho')).
     { rewrite Heqf.
-      specialize (H13 rhof Hlenf).  
-      eapply enthopt_inlist_Forall in H13; eauto. }
+      specialize (H9 rhof Hlenf).  
+      eapply enthopt_inlist_Forall in H9; eauto. }
     assert (Ha2 : well_formed_env (make_rec_env fnlst rho')).
     { rewrite Heqf. eapply Hwff. constructor. eassumption.
       eassumption. eassumption. }
-    specialize (H4 Ha1 Ha2). inv H4.
-    eapply H8.
-    + eapply H14.
-    + constructor. eapply H6; eauto. eassumption.
+    assert (Happ :
+              well_formed_in_env (e' $ (val_to_exp v2)) (make_rec_env fnlst rho')).
+    { constructor. eassumption.
+      eapply weaken_closed. eapply val_to_exp_is_wf.
+      eapply H3; eassumption. } 
+    specialize (H4 Happ Ha2). inv H4.
+    + constructor. eassumption.
+    + constructor.
+    + constructor; eassumption. 
+    + constructor. eassumption. eassumption. 
   - (* Match *)
     eapply H3.
     + unfold well_formed_in_env. inv H4.
@@ -567,90 +915,6 @@ Proof.
     destruct H3 as [Hf8 He].
     eapply H0; eassumption.
 Qed.
-
-Lemma make_rec_env_wf:
-  forall rho fnlst n, 
-    well_formed_val (ClosFix_v rho fnlst n) ->
-    well_formed_env (make_rec_env fnlst rho).
-Proof.
-  intros rho fnlst n Hwf.
-  inv Hwf. induction fnlst.
-  - simpl in *. unfold make_rec_env. eapply H1.
-  - simpl in *. unfold well_formed_env.
-    unfold make_rec_env. 
-Admitted. 
-   
-      
-(* TODOO move to expression *)
-Fixpoint parallel_sbst (e : exp) (depth : N) (esubst : list exp) :=
-  match e with
-  | Var_e i =>
-    if i <? depth then Var_e i
-    else
-      nth (N.to_nat (i - depth)) esubst (Var_e (i - (list.NLength esubst)))
-  | Lam_e na e1 =>
-    Lam_e na (parallel_sbst e1 (depth + 1) esubst)
-  | App_e e1 e2 =>
-    App_e (parallel_sbst e1 depth esubst) (parallel_sbst e2 depth esubst)
-  | Let_e na e1 e2 =>
-    Let_e na (parallel_sbst e1 depth esubst) (parallel_sbst e2 (depth + 1) esubst)
-  | Con_e d es => Con_e d (parallel_sbsts es depth esubst)
-  | Fix_e efns i =>
-    let l := efnlst_length efns in
-    Fix_e (parallel_sbst_efnlst efns (depth + l) esubst) i
-  | Match_e e1 n bs =>
-    Match_e (parallel_sbst e1 depth esubst) n (parallel_sbst_branches bs depth esubst)
-  | Prf_e => Prf_e
-  end
-with parallel_sbsts (es : exps) (depth : N) (esubst : list exp) :=
-       match es with
-       | enil => enil
-       | econs e es' =>
-         econs (parallel_sbst e depth esubst) (parallel_sbsts es' depth esubst)
-       end
-with parallel_sbst_efnlst (efns : efnlst) (depth : N) (esubst : list exp) :=
-       match efns with
-       | eflnil => eflnil
-       | eflcons na f efns' =>
-         let f' := (parallel_sbst f depth esubst) in
-         eflcons na f' (parallel_sbst_efnlst efns' depth esubst)
-       end
-with parallel_sbst_branches (bs : branches_e) (depth : N) (esubst : list exp) :=
-       match bs with
-       | brnil_e => brnil_e
-       | brcons_e d (n, l) e bs' =>
-         let e' := parallel_sbst e (depth + n) esubst in
-         brcons_e d (n, l) e' (parallel_sbst_branches bs' depth esubst)
-       end.
-
-Fixpoint sbst_list_n (e : exp) (vs : exps) (n : N) : exp :=
-  match vs with
-  | enil => e
-  | econs v vs' => (sbst_list_n e vs' n) {n ::= v}
-  end.
-
-Fixpoint val_to_exp (v : value) : expression.exp :=
-  match v with
-  | Con_v d vs => Con_e d (list_to_exps (List.map val_to_exp vs))
-  | Prf_v => Prf_e
-  | Clos_v rho na e =>
-    let es := List.map val_to_exp rho in 
-    Lam_e na (parallel_sbst e (Npos 1%positive) es)
-  | ClosFix_v rho fnlst n =>
-    let len := efnlst_length fnlst in
-    let fix aux_efnlst fnlst len : efnlst :=
-        match fnlst with
-        | eflnil => eflnil
-        | eflcons n e fnlst' =>
-          let es := List.map val_to_exp rho in
-          eflcons n (parallel_sbst e len es) (aux_efnlst fnlst' len)
-        end in
-    Fix_e (aux_efnlst fnlst len) n
-  end.
-
-Definition sbst_env (e: expression.exp) (rho: env) (n : N) : expression.exp :=
-  let es := List.map val_to_exp rho in
-  parallel_sbst e n es.
 
 (* the exps in this inductive relation should satisfy is_valueb *)
 Inductive rel_value: expression.exp -> value -> Prop :=
@@ -857,37 +1121,6 @@ Proof.
     eapply len_cons_lt in Hn. eassumption.
 Qed. 
 
-Lemma f_efnlst_length':
-      forall l fnl rho, efnlst_length
-                      ((fix aux_efnlst (fnlst : efnlst) (len : N) {struct fnlst} :
-                         efnlst :=
-                         match fnlst with
-                         | eflnil => eflnil
-                         | eflcons n e fnlst' =>
-                           eflcons n (parallel_sbst e len (map val_to_exp rho))
-                                   (aux_efnlst fnlst' len)
-                         end) fnl l) = efnlst_length fnl.
-Proof.
-  induction fnl; intros.
-  - reflexivity.
-  - simpl. rewrite (IHfnl rho). reflexivity.
-Qed.
-
-Lemma f_efnlst_length_inv:
-  forall rho fnl,
-  efnlst_length ((fix aux_efnlst (fnlst : efnlst) (len : N) {struct fnlst} :
-                         efnlst :=
-                         match fnlst with
-                         | eflnil => eflnil
-                         | eflcons n e fnlst' =>
-                           eflcons n (parallel_sbst e len (map val_to_exp rho))
-                                   (aux_efnlst fnlst' len)
-                         end) fnl (efnlst_length fnl)) =
-                      efnlst_length fnl.
-Proof.
-  intros. eapply (f_efnlst_length' (efnlst_length fnl) fnl rho).
-Qed.
-
 Opaque N.add.
 
 Lemma efnlst_length_commut flst :
@@ -1081,23 +1314,6 @@ Proof.
     specialize IHl with (N.of_nat n0).
     rewrite (Nnat.Nat2N.id n0) in IHl.
     eapply IHl. eassumption.
-Qed.
-
-Lemma N2Nat_inj_lt :
-   forall n1 n2,
-     n1 < n2 <-> lt (N.to_nat n1) (N.to_nat n2).
-Proof.
-  intros n1 n2. split.
-  - intros H. destruct n1; destruct n2.
-    + inv H.
-    + simpl. zify. omega.
-    + inv H.
-    + zify. omega.
-  - intros H. destruct n1; destruct n2.
-    + omega.
-    + zify. omega.
-    + inv H.
-    + zify. omega. 
 Qed.
 
 Lemma nlt_len_then_not_default:
@@ -1367,17 +1583,6 @@ Proof.
     rewrite IHes. eassumption. reflexivity.
 Qed.
 
-Lemma parallel_sbst_inv_efnlst_length :
-  forall efns esubst depth,
-    efnlst_length (parallel_sbst_efnlst efns depth esubst) =
-    efnlst_length efns.
-Proof.
-  intros efns esubst.
-  induction efns; intros depth. 
-  - simpl. reflexivity.
-  - simpl. rewrite (IHefns depth). reflexivity.
-Qed.
-
 Lemma nth_cons {A : Type} n (x : A) l :
   (n > 0)%nat ->
   nth n (x :: l) = nth (n - 1)%nat l.
@@ -1473,105 +1678,6 @@ Proof.
     rewrite IHe; try eassumption.
     rewrite IHbs; try eassumption. reflexivity.
 Qed.
-
-
-Definition val_to_exp_is_wf_exp e :=
-  forall v, well_formed_val v -> val_to_exp v = e -> exp_wf 0 e.
-
-Definition val_to_exp_is_wf_exps es :=
-  forall vs, Forall well_formed_val vs ->
-             map val_to_exp vs = (exps_to_list es) -> exps_wf 0 es.
-
-Definition val_to_exp_is_wf_efnlst efns :=
-  forall vs n efnlst, well_formed_val (ClosFix_v vs efns n) ->
-               val_to_exp (ClosFix_v vs efns n) = Fix_e efnlst n ->
-               efnlst_wf 0 efnlst.
-
-(* val_to_exp never applies to branches *)
-Definition val_to_exp_is_wf_branches bs :=
-  branches_wf 0 bs.
-
-Lemma val_to_exp_is_wf' :
-  forall v, 
-    (* well_formed_val v -> exp_wf 0 (val_to_exp v).  *)
-    exp_wf 0 (val_to_exp v). 
-Proof.
-  apply value_ind'.
-  - intros dc vs Hvs.
-    induction vs.
-    + simpl in *.
-      constructor. constructor. 
-    + simpl in *.
-      constructor. constructor.
-      inv Hvs. eassumption.
-      inv Hvs. eapply IHvs in H2.
-      inv H2. eassumption.
-  - constructor.
-  - intros vs na e.     
-    
-Abort. 
-
-Lemma val_to_exp_is_wf :
-  (forall e, val_to_exp_is_wf_exp e) /\
-  (forall es, val_to_exp_is_wf_exps es) /\
-  (forall efns, val_to_exp_is_wf_efnlst efns) /\
-  (forall bs, val_to_exp_is_wf_branches bs).
-Proof.
-  apply my_exp_ind; unfold val_to_exp_is_wf_exp.
-  - intros n v Hwf H. destruct v; inv H.
-  - intros na e IH v Hwf H.
-    destruct v; try inversion H; subst. inv Hwf.
-    subst. constructor. clear H.
-    (* ZOE: For this you need [parallel_sbst_makes_wf_exp]. The goal is exactly what the lemma states *)
-    (* need to do induction on value cases *) 
-    (* specialize (IH (Clos_v l na e0) Hwf H). *)
-Abort.
-
-Definition parallel_sbst_makes_wf_exp e :=
-  forall n rho,
-    well_formed_in_env e rho ->
-    exp_wf n (parallel_sbst e n (map val_to_exp rho)).
-
-Definition parallel_sbst_makes_wf_exps es :=
-  forall n rho,
-    Forall (fun e => well_formed_in_env e rho) (exps_to_list es) ->
-    exps_wf n (parallel_sbsts es n (map val_to_exp rho)).
-
-Definition parallel_sbst_makes_wf_efnlst efns :=
-  forall n rho,
-    Forall (fun (p: name * exp) => let (_, e) := p in well_formed_in_env e rho)
-           (efnlst_as_list efns) ->
-    efnlst_wf n (*??*) (parallel_sbst_efnlst efns n (map val_to_exp rho)).
-
-Definition parallel_sbst_makes_wf_branches bs :=
-  forall n rho,
-    Forall (fun (b: dcon * (N * list name) * exp) => let '(_, _, e) := b in
-                                                     well_formed_in_env e rho)
-           (branches_as_list bs) ->
-    branches_wf n (parallel_sbst_branches bs n (map val_to_exp rho)). 
-
-Lemma parallel_sbst_makes_wf:
-  (forall e, parallel_sbst_makes_wf_exp e) /\
-  (forall es, parallel_sbst_makes_wf_exps es) /\
-  (forall efns, parallel_sbst_makes_wf_efnlst efns) /\
-  (forall bs, parallel_sbst_makes_wf_branches bs).
-Proof.
-  apply my_exp_ind; unfold parallel_sbst_makes_wf_exp.
-  - intros n i rho Hwf.
-    simpl. inv Hwf.
-    destruct (lt_dec n i).
-    + eapply OrdersEx.N_as_OT.ltb_lt in l. rewrite l.
-      constructor.
-      eapply OrdersEx.N_as_OT.ltb_lt in l. eassumption. 
-    + eapply OrdersEx.N_as_OT.ge_le in g.
-      eapply N.ltb_ge in g. rewrite g.
-      (* val_to_exp_is_wf -> Forall (exp_wf 0) rho -> nth is wf *)
-      admit.
-  - intros na e IHe n rho Hwf.
-    simpl. inv Hwf. constructor.
-    rewrite N.add_comm. eapply IHe.
-    unfold well_formed_in_env. 
-Abort. 
 
 Definition parallel_sbst_with_sbst_exp e :=
   forall rho x n,
@@ -1738,16 +1844,58 @@ Proof.
   eapply eval_single_valued; eauto.
 Qed.
 
+Lemma efnlst_wf_isLambda :
+            forall n es e,
+              efnlst_wf n es /\ In e (efnlst_to_list es) ->
+              isLambda e /\ exp_wf n e.
+Proof.
+  intros n es e H.
+  destruct H.
+  induction es.
+  - inv H0.
+  - inv H. inv H0.
+    split; eassumption.
+    eapply IHes; eassumption.
+Qed. 
+
 Lemma find_branch_parallel_sbst:
   forall l dc b es e,
     find_branch dc l (parallel_sbst_branches b 0 es) = Some e -> 
-    exists n e', e = parallel_sbst e' n es. 
+    exists e', find_branch dc l b = Some e' /\ e = parallel_sbst e' l es. 
 Proof.
   intros l dc b es e H.
   induction b.
   - inv H.
   - simpl in H. destruct p eqn: Hp.
-Abort.
+    rewrite N.add_0_l in H. 
+    destruct (eq_dec dc d).
+    + assert (Heq: nargs p = n). { subst. reflexivity. }
+      destruct (eq_dec (nargs p) l).
+      * assert (Heq' : n = l). { rewrite <- Heq. rewrite <- e2. reflexivity. } 
+        exists e0. 
+        simpl. rewrite e1. inv H.
+        destruct d eqn: Hd.
+        destruct (inductive_dec i i).
+        destruct (N.eq_dec n0 n0). symmetry in Heq'. 
+        rewrite Heq'. rewrite Heq' in H1. 
+        destruct (N.eq_dec n n).
+        split. 
+        reflexivity.
+        inv H1. reflexivity.
+        discriminate. congruence. congruence.
+      * inv H. destruct d eqn: Hd.
+        destruct (inductive_dec i i).
+        destruct (N.eq_dec n1 n1).
+        destruct (N.eq_dec n l).
+        unfold not in n0. simpl in n0. apply n0 in e3. destruct e3.
+        discriminate. congruence. congruence.
+    + simpl. inv H. destruct dc eqn: Hdc.
+      destruct d eqn: Hd. destruct (inductive_dec i i0).
+      destruct (N.eq_dec n1 n2).
+      congruence.
+      apply IHb in H1. eassumption.
+      apply IHb in H1. eassumption. 
+Qed. 
   
 Lemma equiv_semantics_fwd_version2 :
   (forall e e' P, equiv_semantics_stmt_exp' e e' P) /\
@@ -1756,6 +1904,7 @@ Proof.
   eapply my_eval_ind with (P := equiv_semantics_stmt_exp');
     unfold equiv_semantics_stmt_exp', equiv_semantics_stmt_exps';
     intros; subst.
+  
   - (* Lam_e *)
     symmetry in H1.
     destruct e2; try inv H1.
@@ -1771,7 +1920,8 @@ Proof.
       reflexivity. 
     + eexists. split.
       constructor.
-      constructor. reflexivity. 
+      constructor. reflexivity.
+      
   - (* App_e (of Lam_e) *)
     simpl in *.
     symmetry in H4.
@@ -1808,12 +1958,16 @@ Proof.
         rewrite Nnat.Nat2N.inj_succ in H8. rewrite <- N.add_1_l in H8.
         rewrite map_length. eapply H8. eassumption.
         intros Hfalse; inv Hfalse.        
-        admit.
+        constructor.
+        eapply val_to_exp_is_wf. eapply eval_env_preserves_well_formed.
+        eapply He2. eassumption. eassumption.
+        apply val_to_exp_rho. inv HClos_wf. eassumption. 
       * eexists. split.       
         ++ econstructor. eassumption. eassumption.
            eassumption.
         ++ eassumption.
-    + eapply sbst_all_values. reflexivity. 
+    + eapply sbst_all_values. reflexivity.
+      
   - (* Con_e *)
     destruct e2; try inv H2.
     + destruct (n <? 0).
@@ -1844,6 +1998,7 @@ Proof.
       exists (Con_v d0 vs2). split.
       * constructor. eapply Hall1.
       * constructor. reflexivity. eapply Hall2.
+        
   - (* Let_e *)
     simpl in *.
     symmetry in H3.
@@ -1879,11 +2034,15 @@ Proof.
         rewrite Nnat.Nat2N.inj_succ in Hwf2. rewrite <- N.add_1_l in Hwf2.
         rewrite map_length. eapply Hwf2. 
         intros Hfalse; inv Hfalse.
-        constructor. admit. admit.
+        constructor.
+        eapply val_to_exp_is_wf. eapply eval_env_preserves_well_formed.
+        eapply He1. eapply Hwf1. eassumption. 
+        apply val_to_exp_rho. eassumption. 
       * eexists. split.
         ++ econstructor. eapply He1. eapply He2.
         ++ eassumption.
-    + eapply sbst_all_values. reflexivity. 
+    + eapply sbst_all_values. reflexivity.
+      
   - (* Match_e *)
     destruct e3; try inv H3.
     + destruct (n <? 0).
@@ -1903,13 +2062,20 @@ Proof.
     + inv H1. specialize (H rho e3 H6 H2 ltac:(reflexivity)).
       edestruct H as [v3 He3].
       destruct He3. inv H3.
+      apply find_branch_parallel_sbst in e1.
+      destruct e1. destruct H3.
+      specialize (H0 (rev vs_t ++ rho) x).
+      destruct H0. 
+      admit. admit. admit.
+      destruct H0. 
       eexists. split.
       * econstructor. eapply H1.
         assert (Hlen: exps_length vs = N.of_nat (Datatypes.length vs_t)). 
         { eapply Forall2_length in H10. rewrite <- H10. 
           eapply exps_length_is_Datatypes_length. }
-        rewrite <- Hlen. admit. admit.
-      * admit. 
+        rewrite <- Hlen. eassumption. eassumption. 
+      * eassumption.
+        
   - (* Fix_e *)
     destruct e2; try inv H1.
     + destruct (n <? 0).
@@ -1941,99 +2107,54 @@ Proof.
          split; reflexivity. 
          fold efnlst_as_list. fold parallel_sbst_efnlst.
          eapply IHe. inv H3. eassumption.
+         
   - (* Fix_app *)
     symmetry in H4. 
     eapply parallel_sbst_inv_App_e' in H4.
-    + { destruct H4 as [e1'' [e2'' [Heqapp [Hs1 Hs2]]]]. subst.
+    + destruct H4 as [e1'' [e2'' [Heqapp [Hs1 Hs2]]]]. subst.
 
-        assert (Hwf1 : well_formed_in_env e1'' rho).
-        { eapply well_formed_in_env_App in H2.
-          destruct H2 as [He1'' He2'']. eassumption. }
-        assert (Hwf2 : well_formed_in_env e2'' rho).
-        { eapply well_formed_in_env_App in H2.
-          destruct H2 as [He1'' He2'']. eassumption. }
-        
-        assert (Hwf : exp_wf 0 (parallel_sbst e1'' 0 (map val_to_exp rho))).
-        { (* (parallel_sbst e1'' 0 (map val_to_exp rho)) is WF because
-           * e1'' is WF in rho and rho is WF (TODO lemma)
-           *) admit.
-        }
+      assert (Hwf1 : well_formed_in_env e1'' rho).
+      { eapply well_formed_in_env_App in H2.
+        destruct H2 as [He1'' He2'']. eassumption. }
+      assert (Hwf2 : well_formed_in_env e2'' rho).
+      { eapply well_formed_in_env_App in H2.
+        destruct H2 as [He1'' He2'']. eassumption. }
 
-        (* because eval preserves wf we can derive: *)
-        assert (Hwf' : exp_wf 0 (Fix_e es n)).
-        { (* hint: use eval_preserves_wf *) admit. }
-               
-        assert (Hlam : isLambda e').
-        { inv Hwf'.
-          (* lemma about efnlst_wf :
-             if efnlst_wf i es and e \in es -> isLambda e /\ exp_ef i e 
-           *)
-          admit.                          
-        }      
-        destruct e'; inv Hlam. simpl in e4.        
-        inv e4.
-        - assert (Heq : sbst_fix es (Lam_e n0 e') = Lam_e na e1').
-          { (* because sbst_fix es (Lam_e n0 e') is value *)
-            admit. }
+      destruct (H rho _ Hwf1 H3 (eq_refl _)) as [v1 [He1 Hr1]].
+      destruct (H0 rho _ Hwf2 H3 (eq_refl _)) as [v2' [He2 Hr2]].
+      inv Hr1.
+      
+      assert (HClosFix_wf: well_formed_val (ClosFix_v rho0 fnlst_t k2)).
+      { eapply eval_env_preserves_well_formed.
+        eapply He1. eassumption. eassumption. }
 
-          assert (Heqv0 : is_value v0). { admit. }
-          assert (Heqv2 : is_value v2). { admit. }                                        
-          assert (Hveq : v2 = v0). 
-          { (* because v2 is a value *) admit. } subst. clear H7.
-
-          (* first IH *)
-          destruct (H rho _ Hwf1 H3 (eq_refl _)) as [v1 [He1 Hr1]].
-          inv Hr1.
-
-          (* second IH *)                    
-          destruct (H0 rho _ Hwf2 H3 (eq_refl _)) as [v2 [He2 Hr2]].
-
-          (* third IH *) 
-          specialize (H1 (make_rec_env fnlst_t rho0) (Lam_e n0 e' $ v0)).
-
-          assert (HClosFix_wf: well_formed_val (ClosFix_v rho0 fnlst_t k2)).
-          { eapply eval_env_preserves_well_formed.
-            eapply He1. eassumption. eassumption. }
-          
-          edestruct H1 as [vf [Heval Hrel]]. 
-          ** constructor.
-             +++ (* well_formed_in env -> parallel_sbst 0 rho -> exp_wf 0 *)
-               admit.
-             +++ (* use val_to_exp is wf- we have that rel_value v2 v2' *)
-               admit.
-          ** eapply make_rec_env_wf (*admitted*). now eapply HClosFix_wf.
-          ** (* because of H10, sbst_fix es is the same as parallel_subst *)
-             (* TODO write lemma *)
-             (* also note that (sbst_fix es (Lam_e n0 e') $ v0) is exp_wf 0 *)
-              admit.
-          ** inv Heval.
-             +++ eexists. split. 
-                 { eapply eval_FixApp.
-                   - eassumption.
-                   - admit.
-                   (* lemma : if enthop k fnl = Some e ->
-                      Forall2 P (as_list fnl) (as_list fnl') -> exists e, enthopt k fnl' = Some e' *)
-                   - reflexivity.
-                   - eassumption.
-                   - eassumption.
-                   - (* This is the trickiest part because H13 and H11.
-                        Think about this case and how it might be workable and lets discuss it the next time
-                        we meet. Hint: you might need to come up with a notion of value relatedness for values
-                        of the environment based semantics.
-                      *)
-                     admit. }
-                 admit.
-             +++ inv H7. (* contradiction because Lam expected *)
-             +++ inv H8. (* contradiction because Lam expected *)
-        - (* Zoe: Contradiction because of H6.
-             Should be IsLambda (sbst_fix es (Lam_e n0 e'))
-           *)
-          admit.
-        - (* Zoe: Contradiction because of H6.
-             Should be IsLambda (sbst_fix es (Lam_e n0 e'))
-           *)
-          admit. }
-    + admit. (* Zoe: easy corollary of is_value_env_val_to_exp *)
+      assert (Hwf' : exp_wf 0 (Fix_e es k2)).
+      { eapply eval_preserves_wf. eapply e0.
+        eapply parallel_sbst_makes_wf.
+        rewrite N.add_0_l.
+        unfold well_formed_in_env in Hwf1.
+        unfold list.NLength in *. rewrite map_length.
+        eassumption.
+        apply val_to_exp_rho. eassumption. 
+      }
+      
+      edestruct (make_rec_env_exists fnlst_t rho0 k2) as (rhof & Heqf & Hlenf & Hwff).
+      edestruct (H1 (make_rec_env fnlst_t rho0) (e' $ (val_to_exp v2'))).
+      -- econstructor. inv Hwf'. 
+         eapply nthopt_preserves_wf.
+         (* we have H6 *) admit.
+         eassumption.
+         eapply weaken_closed. eapply val_to_exp_is_wf.
+         eapply eval_env_preserves_well_formed.
+         eassumption. eassumption. eassumption.
+      -- rewrite <- Heqf in Hwff. eapply Hwff.
+         eassumption. inv HClosFix_wf. eassumption.
+      -- (* lemma required *) admit.
+      -- destruct H4. eexists. split.
+         eapply eval_FixApp.
+         eassumption. admit. reflexivity.
+         eassumption. eassumption. eassumption.
+    + eapply sbst_all_values. reflexivity. 
 
   - (* Prf_app *)
     symmetry in H3. 
@@ -2049,7 +2170,8 @@ Proof.
       eexists. split.
       * eapply eval_ProofApp. eassumption. eapply He2.
       * constructor.
-    + eapply sbst_all_values. reflexivity. 
+    + eapply sbst_all_values. reflexivity.
+      
   - (* Prf *)
     destruct e2; try inv H1.
     + destruct (n <? 0).
@@ -2063,11 +2185,13 @@ Proof.
       symmetry in H3. eapply H3.
       unfold not. intros Hfalse. inv Hfalse.
       reflexivity.
-    + repeat eexists; try econstructor. 
+    + repeat eexists; try econstructor.
+      
   - (* exps nil *)
     simpl. destruct es2.
     + simpl. econstructor.
-    + inv H1. 
+    + inv H1.
+      
   - (* exps cons *)
     simpl. destruct es2.
     + inv H3.

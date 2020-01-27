@@ -982,13 +982,13 @@ Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Cl
   | (fIdent, Gfun (Internal f)) =>
     (match M.get fIdent nenv with
      | Some (nNamed f_string) =>
-       if gv then
-         Some (fIdent, Gfun (External (EF_external f_string (signature_of_type (type_of_params (fn_params f)) (fn_return f) (fn_callconv f))) (type_of_params (fn_params f)) (fn_return f) (fn_callconv f)))
-       else None
+       Some (fIdent, Gfun (External (EF_external f_string (signature_of_type (type_of_params (fn_params f)) (fn_return f) (fn_callconv f))) (type_of_params (fn_params f)) (fn_return f) (fn_callconv f)))
      | _ => None
      end)
   | (vIdent, Gvar (mkglobvar v_info v_init v_r v_v)) =>
-    Some (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
+    if gv then 
+      Some (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
+    else None
   | _ => None
   end.
 
@@ -1701,27 +1701,28 @@ Section Check.
 End Check.
 
 
-Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv : name_env) :
+Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_env) :
   error (M.t BasicAst.name * Clight.program * Clight.program) * string :=
   let e := wrap_in_fun e in
-  let (fenv, log) := compute_fun_env nenv e in
+  let (fenv, log) := compute_fun_env nenv0 e in
   let ienv := compute_ind_env cenv in
   (* debug *)
-  let dbg := (cps_show.show_exp nenv cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv e in
+  let dbg := (cps_show.show_exp nenv0 cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv0 e in
   (* end debug *)
-  let p'' := make_defs args_opt e fenv cenv ienv nenv in
+  let p'' := make_defs args_opt e fenv cenv ienv nenv0 in
   (* state *)
   let n := ((max_var e 100) + 1)%positive in
-  let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv [] in (* XXX dummy *)
+  let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv0 [] in (* XXX dummy *)
   (* run compM *)
   let err : error (M.t BasicAst.name * Clight.program * Clight.program) :=
       let '(res, (p, m)) := run_compM p'' comp_d n in
-      '(nenv, defs) <- res ;;
-       let nenv := (add_inf_vars (ensure_unique nenv)) in
+      '(nenv1, defs) <- res ;;
+       let nenv := (add_inf_vars (ensure_unique nenv1)) in
        let forward_defs := make_extern_decls nenv defs false in
        let header_pre := make_empty_header cenv ienv e nenv in
        (* let header_p := (header_pre.(runState) m%positive) in *)
-       let header_p := run_compM p'' comp_d 1000000%positive in (* should be m, but m causes collision in nenv for some reason *)
+       let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv [] in (* XXX dummy *)
+       let header_p := run_compM header_pre comp_d 1000000%positive in (* should be m, but m causes collision in nenv for some reason *)
        '(nenv, hdefs) <- fst header_p ;;
         let decls := make_extern_decls nenv hdefs true in
        body <- mk_prog_opt (body_external_decl :: decls) mainIdent false;;

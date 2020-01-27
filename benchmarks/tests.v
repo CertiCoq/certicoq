@@ -11,28 +11,10 @@ Open Scope string.
 Import ListNotations.
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
-
-(* CertiCoq Compile "time" demo1. *)
-(* With dead_param_elim:
- L6_to_Clight: Failure in make_defs:translate_funs *)
-CertiCoq Compile "anf" demo1.
-
-
-Def: Function Coq.Lists.List.repeat has arity 2 2
-Def: Function repeat has arity 2 2
-Def: Function  y has arity 2 2
-Def: Function repeat_uncurried has arity 2 2
-Def: Function app_uncurried has arity 2 2
-LetApp: Function Coq.Lists.List.repeat has arity 2 2
-LetApp: Function y_code has arity 2 2
-LetApp: Function y_code has arity 2 2
-LetApp: Function Coq.Lists.List.repeat has arity 2 2
-LetApp: Function y_code has arity 2 2
-LetApp: Function y_code has arity 2 2
-LetApp: Function app_uncurried has arity 2 2
-
-
 Definition demo2 := List.map negb [true; false; true].
+
+CertiCoq Compile demo1.
+CertiCoq Compile "anf" demo1.
 
 CertiCoq Compile demo2.
 CertiCoq Compile "anf" demo2.
@@ -40,8 +22,9 @@ CertiCoq Compile "anf" demo2.
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
 CertiCoq Compile list_sum.
-CertiCoq Compile "anf" list_sum.
+CertiCoq Compile "anf" "debug" list_sum.
 
+(* 
 Import VeriStar.
 
 Definition vs_easy :=
@@ -91,5 +74,4 @@ CertiCoq Compile "anf" Binom.main.  (* returns nat *)
 
 CertiCoq Compile Color.main.
 CertiCoq Compile "anf" Color.main.
-
-
+*)
